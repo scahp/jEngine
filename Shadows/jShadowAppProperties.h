@@ -1,0 +1,43 @@
+﻿#pragma once
+#include "jAppSettings.h"
+
+//////////////////////////////////////////////////////////////////////////
+class jShadowAppSettingProperties : public jAppSettingProperties
+{
+public:
+	static jShadowAppSettingProperties& GetInstance()
+	{
+		if (!_instance)
+			_instance = new jShadowAppSettingProperties();
+		return *_instance;
+	}
+
+	EShadowType ShadowType = EShadowType::ShadowVolume;
+	bool ShowSilhouette_DirectionalLight = false;
+	bool ShowSilhouette_PointLight = false;
+	bool ShowSilhouette_SpotLight = false;
+	EShadowMapType ShadowMapType = EShadowMapType::SSM;
+	bool UsePoissonSample = true;
+	bool ShowDirectionalLightMap = false;
+	bool ShowDirectionalLightInfo = false;
+	bool ShowPointLightInfo = false;
+	bool ShowSpotLightInfo = false;
+	bool ShowBoundBox = false;
+	bool ShowBoundSphere = false;
+	Vector DirecionalLightDirection = Vector(-1.0f).GetNormalize();
+	Vector PointLightPosition = Vector(10.0f, 100.0f, 10.0f);
+	Vector SpotLightPosition = Vector(0.0f, 60.0f, 5.0f);
+	Vector SpotLightDirection = Vector(-1.0f, -1.0f, -0.4f).GetNormalize();
+
+	virtual void Setup(jAppSettingBase* appSetting) override;
+	virtual void Teardown(jAppSettingBase* appSetting) override;
+
+	void SwitchShadowType(jAppSettingBase* appSetting);
+	void SwitchShadowMapType(jAppSettingBase* appSetting);
+
+private:
+	jShadowAppSettingProperties() {}
+
+	static jShadowAppSettingProperties* _instance;
+};
+

@@ -1,0 +1,281 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>15.0</VCProjectVersion>
+    <ProjectGuid>{35A5F1CE-9058-4D97-A4D2-E66DCB2BAE54}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>ConsoleApplication1</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
+    <ProjectName>Shadows</ProjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>./</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;_ITERATOR_DEBUG_LEVEL=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>./;./glad/include;./External/AntTweakBar/include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>./;;./External/AntTweakBar/lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>opengl32.lib;glfw3.lib;AntTweakBar64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>./</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>./;./glad/include;./External/AntTweakBar/include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>opengl32.lib;glfw3.lib;AntTweakBar64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>./;;./External/AntTweakBar/lib</AdditionalLibraryDirectories>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="jAppSettings.h" />
+    <ClInclude Include="jCamera.h" />
+    <ClInclude Include="jCollision.h" />
+    <ClInclude Include="jEngine.h" />
+    <ClInclude Include="jFile.h" />
+    <ClInclude Include="jGame.h" />
+    <ClInclude Include="jImageFileLoader.h" />
+    <ClInclude Include="jInputEvent.h" />
+    <ClInclude Include="jLight.h" />
+    <ClInclude Include="jObject.h" />
+    <ClInclude Include="jPrimitiveUtil.h" />
+    <ClInclude Include="jRenderer.h" />
+    <ClInclude Include="jRenderObject.h" />
+    <ClInclude Include="jRenderTargetPool.h" />
+    <ClInclude Include="jRHI.h" />
+    <ClInclude Include="jRHIType.h" />
+    <ClInclude Include="jRHI_DirectX11.h" />
+    <ClInclude Include="jRHI_OpenGL.h" />
+    <ClInclude Include="jRHI_Vulkan.h" />
+    <ClInclude Include="jShadowAppProperties.h" />
+    <ClInclude Include="jShadowMapRenderer.h" />
+    <ClInclude Include="jShadowTypes.h" />
+    <ClInclude Include="jShadowVolume.h" />
+    <ClInclude Include="jShadowVolumeRenderer.h" />
+    <ClInclude Include="jShadowVolumeTypes.h" />
+    <ClInclude Include="jUtil.h" />
+    <ClInclude Include="jVertexAdjacency.h" />
+    <ClInclude Include="Math\MathUtility.h" />
+    <ClInclude Include="Math\Matrix.h" />
+    <ClInclude Include="Math\Plane.h" />
+    <ClInclude Include="Math\Vector.h" />
+    <ClInclude Include="pch.h" />
+    <ClInclude Include="lodepng.h" />
+    <ClInclude Include="TGALoader.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="glad.c">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="jAppSettings.cpp" />
+    <ClCompile Include="jCamera.cpp" />
+    <ClCompile Include="jCollision.cpp" />
+    <ClCompile Include="jEngine.cpp" />
+    <ClCompile Include="jFile.cpp" />
+    <ClCompile Include="jGame.cpp" />
+    <ClCompile Include="jImageFileLoader.cpp" />
+    <ClCompile Include="jInputEvent.cpp" />
+    <ClCompile Include="jLight.cpp" />
+    <ClCompile Include="jObject.cpp" />
+    <ClCompile Include="jPrimitiveUtil.cpp" />
+    <ClCompile Include="jRenderer.cpp" />
+    <ClCompile Include="jRenderObject.cpp" />
+    <ClCompile Include="jRenderTargetPool.cpp" />
+    <ClCompile Include="jRHI.cpp" />
+    <ClCompile Include="jRHI_DirectX11.cpp" />
+    <ClCompile Include="jRHI_OpenGL.cpp" />
+    <ClCompile Include="jRHI_Vulkan.cpp" />
+    <ClCompile Include="jShadowAppProperties.cpp" />
+    <ClCompile Include="jShadowMapRenderer.cpp" />
+    <ClCompile Include="jShadowVolume.cpp" />
+    <ClCompile Include="jShadowVolumeRenderer.cpp" />
+    <ClCompile Include="jUtil.cpp" />
+    <ClCompile Include="jVertexAdjacency.cpp" />
+    <ClCompile Include="Main.cpp" />
+    <ClCompile Include="Math\Matrix.cpp" />
+    <ClCompile Include="Math\Plane.cpp" />
+    <ClCompile Include="Math\Vector.cpp" />
+    <ClCompile Include="pch.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="loadpng.cpp" />
+    <ClCompile Include="TGALoader.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Shaders\color_only_fs.glsl" />
+    <None Include="Shaders\color_only_vs.glsl" />
+    <None Include="Shaders\common.glsl" />
+    <None Include="Shaders\fs_boundvolume.glsl" />
+    <None Include="Shaders\fs_shadowMap.glsl" />
+    <None Include="Shaders\fullscreen\fs_blur.glsl" />
+    <None Include="Shaders\fullscreen\fs_omnidirectional_blur.glsl" />
+    <None Include="Shaders\fullscreen\vs_blur.glsl" />
+    <None Include="Shaders\fullscreen\vs_omnidirectional_blur.glsl" />
+    <None Include="Shaders\shadow.glsl" />
+    <None Include="Shaders\shadowmap\fs.glsl" />
+    <None Include="Shaders\shadowmap\fs_EVSM.glsl" />
+    <None Include="Shaders\shadowmap\fs_exponentialShadowMap.glsl" />
+    <None Include="Shaders\shadowmap\fs_omniDirectionalEVSM.glsl" />
+    <None Include="Shaders\shadowmap\fs_omniDirectionalExponentialShadowMap.glsl" />
+    <None Include="Shaders\shadowmap\fs_omniDirectionalShadowMap.glsl" />
+    <None Include="Shaders\shadowmap\fs_shadowMap.glsl" />
+    <None Include="Shaders\shadowmap\fs_varianceShadowMap.glsl" />
+    <None Include="Shaders\shadowmap\vs.glsl" />
+    <None Include="Shaders\shadowmap\vs_EVSM.glsl" />
+    <None Include="Shaders\shadowmap\vs_omniDirectionalShadowMap.glsl" />
+    <None Include="Shaders\shadowmap\vs_shadowMap.glsl" />
+    <None Include="Shaders\shadowmap\vs_varianceShadowMap.glsl" />
+    <None Include="Shaders\shadowvolume\fs.glsl" />
+    <None Include="Shaders\shadowvolume\fs_ambientonly.glsl" />
+    <None Include="Shaders\shadowvolume\fs_infinityFar.glsl" />
+    <None Include="Shaders\shadowvolume\vs.glsl" />
+    <None Include="Shaders\shadowvolume\vs_infinityFar.glsl" />
+    <None Include="Shaders\tex_fs.glsl" />
+    <None Include="Shaders\tex_ui_fs.glsl" />
+    <None Include="Shaders\tex_ui_vs.glsl" />
+    <None Include="Shaders\tex_vs.glsl" />
+    <None Include="Shaders\vs_boundvolume.glsl" />
+    <None Include="Shaders\vs_shadowMap.glsl" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
