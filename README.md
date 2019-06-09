@@ -1,2 +1,2 @@
 # Shadows
-Shadows implementation
+Implementation of Shadows
