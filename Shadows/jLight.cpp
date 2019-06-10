@@ -55,7 +55,7 @@ jLight* jLight::CreateAmbientLight(const Vector& color, const Vector& intensity)
 }
 
 //////////////////////////////////////////////////////////////////////////
-jDirectionalLight* jLight::CreateDirectionalLight(const Vector& direction, const Vector4& color, const Vector& diffuseIntensity, const Vector& specularIntensity, float specularPower)
+jDirectionalLight* jLight::CreateDirectionalLight(const Vector& direction, const Vector& color, const Vector& diffuseIntensity, const Vector& specularIntensity, float specularPower)
 {
 	auto directionalLight = new jDirectionalLight();
 	JASSERT(directionalLight);
@@ -70,7 +70,7 @@ jDirectionalLight* jLight::CreateDirectionalLight(const Vector& direction, const
 	return directionalLight;
 }
 
-jPointLight* jLight::CreatePointLight(const Vector& pos, const Vector4& color, float maxDistance, const Vector& diffuseIntensity, const Vector& specularIntensity, float specularPower)
+jPointLight* jLight::CreatePointLight(const Vector& pos, const Vector& color, float maxDistance, const Vector& diffuseIntensity, const Vector& specularIntensity, float specularPower)
 {
 	auto pointLight = new jPointLight();
 	pointLight->Data.Position = pos;
@@ -84,7 +84,7 @@ jPointLight* jLight::CreatePointLight(const Vector& pos, const Vector4& color, f
 	return pointLight;
 }
 
-jSpotLight* jLight::CreateSpotLight(const Vector& pos, const Vector& direction, const Vector4& color, float maxDistance
+jSpotLight* jLight::CreateSpotLight(const Vector& pos, const Vector& direction, const Vector& color, float maxDistance
 	, float penumbraRadian, float umbraRadian, const Vector& diffuseIntensity, const Vector& specularIntensity, float specularPower)
 {
 	auto spotLight = new jSpotLight();
@@ -110,15 +110,9 @@ void jDirectionalLight::BindLight(jShader* shader, jMaterialData* materialData, 
 	JASSERT(shader);
 	JASSERT(materialData);
 
-	char szTemp[128] = {0,};
-	sprintf_s(szTemp, sizeof(szTemp), "DirectionalLight[%d].", index);
-	const std::string structName = szTemp;
-
-	g_rhi->SetUniformbuffer(&jUniformBuffer<Vector>(structName + "LightDirection", Data.Direction), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<Vector>(structName + "Color", Data.Color), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<Vector>(structName + "DiffuseLightIntensity", Data.DiffuseIntensity), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<Vector>(structName + "SpecularLightIntensity", Data.SpecularIntensity), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<float>(structName + "SpecularPow", Data.SpecularPow), shader);
+	if (!LightDataUniformBlock->Data || *static_cast<LightData*>(LightDataUniformBlock->Data) != Data)
+		LightDataUniformBlock->UpdateBufferData(&Data, sizeof(Data));
+	LightDataUniformBlock->Bind(shader);
 
 	if (ShadowMapData && ShadowMapData->IsValid())
 	{
@@ -147,16 +141,9 @@ jTexture* jDirectionalLight::GetShadowMap() const
 
 void jPointLight::BindLight(jShader* shader, jMaterialData* materialData, int32 index)
 {
-	char szTemp[128] = { 0, };
-	sprintf_s(szTemp, sizeof(szTemp), "PointLight[%d].", index);
-	const std::string structName = szTemp;
-
-	g_rhi->SetUniformbuffer(&jUniformBuffer<Vector>(structName + "LightPos", Data.Position), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<Vector>(structName + "Color", Data.Color), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<Vector>(structName + "DiffuseLightIntensity", Data.DiffuseIntensity), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<Vector>(structName + "SpecularLightIntensity", Data.SpecularIntensity), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<float>(structName + "SpecularPow", Data.SpecularPow), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<float>(structName + "MaxDistance", Data.MaxDistance), shader);
+	if (!LightDataUniformBlock->Data || *static_cast<LightData*>(LightDataUniformBlock->Data) != Data)
+		LightDataUniformBlock->UpdateBufferData(&Data, sizeof(Data));
+	LightDataUniformBlock->Bind(shader);
 
 	if (ShadowMapData && ShadowMapData->IsValid())
 	{
@@ -178,19 +165,9 @@ void jPointLight::BindLight(jShader* shader, jMaterialData* materialData, int32 
 
 void jSpotLight::BindLight(jShader* shader, jMaterialData* materialData, int32 index)
 {
-	char szTemp[128] = { 0, };
-	sprintf_s(szTemp, sizeof(szTemp), "SpotLight[%d].", index);
-	const std::string structName = szTemp;
-
-	g_rhi->SetUniformbuffer(&jUniformBuffer<Vector>(structName + "LightPos", Data.Position), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<Vector>(structName + "Direction", Data.Direction), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<Vector>(structName + "Color", Data.Color), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<Vector>(structName + "DiffuseLightIntensity", Data.DiffuseIntensity), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<Vector>(structName + "SpecularLightIntensity", Data.SpecularIntensity), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<float>(structName + "SpecularPow", Data.SpecularPow), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<float>(structName + "MaxDistance", Data.MaxDistance), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<float>(structName + "PenumbraRadian", Data.PenumbraRadian), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<float>(structName + "UmbraRadian", Data.UmbraRadian), shader);
+	if (!LightDataUniformBlock->Data || *static_cast<LightData*>(LightDataUniformBlock->Data) != Data)
+		LightDataUniformBlock->UpdateBufferData(&Data, sizeof(Data));
+	LightDataUniformBlock->Bind(shader);
 
 	if (ShadowMapData && ShadowMapData->IsValid())
 	{

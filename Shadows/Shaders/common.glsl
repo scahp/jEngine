@@ -9,33 +9,33 @@ struct jAmbientLight
 struct jDirectionalLight
 {
     vec3 LightDirection;
+    float SpecularPow;
     vec3 Color;
     vec3 DiffuseLightIntensity;
     vec3 SpecularLightIntensity;
-    float SpecularPow;
 };
 
 struct jPointLight
 {
     vec3 LightPos;
+    float SpecularPow;
     vec3 Color;
+    float MaxDistance;
     vec3 DiffuseLightIntensity;
     vec3 SpecularLightIntensity;
-    float SpecularPow;
-    float MaxDistance;
 };
 
 struct jSpotLight
 {
     vec3 LightPos;
-    vec3 Direction;
-    vec3 Color;
-    vec3 DiffuseLightIntensity;
-    vec3 SpecularLightIntensity;
-    float SpecularPow;
     float MaxDistance;
+    vec3 Direction;
     float PenumbraRadian;
+    vec3 Color;
     float UmbraRadian;
+    vec3 DiffuseLightIntensity;
+    float SpecularPow;
+    vec3 SpecularLightIntensity;
 };
 
 struct jMaterial

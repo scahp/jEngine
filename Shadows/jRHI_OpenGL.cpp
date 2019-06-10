@@ -1147,6 +1147,13 @@ void jRHI_OpenGL::SetColorMask(bool r, bool g, bool b, bool a)
 	glColorMask(r, g, b, a);
 }
 
+IUniformBufferBlock* jRHI_OpenGL::CreateUniformBufferBlock(const char* blockname) const
+{
+	auto uniformBufferBlock = new jUniformBufferBlock_OpenGL(blockname);
+	uniformBufferBlock->Init();
+	return uniformBufferBlock;
+}
+
 //////////////////////////////////////////////////////////////////////////
 void jVertexBuffer_OpenGL::Bind(jShader* shader)
 {
@@ -1178,3 +1185,38 @@ void jRenderTarget_OpenGL::End()
 	glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
 }
 
+//////////////////////////////////////////////////////////////////////////
+void jUniformBufferBlock_OpenGL::UpdateBufferData(void* newData, int32 size)
+{
+	if (Data)
+		delete[] Data;
+	Data = new char[size];
+	memcpy(Data, newData, size);
+	Size = size;
+	UpdateBufferData();
+}
+
+void jUniformBufferBlock_OpenGL::UpdateBufferData()
+{
+	glBindBuffer(GL_UNIFORM_BUFFER, UBO);
+	glBufferData(GL_UNIFORM_BUFFER, Size, Data, GL_DYNAMIC_DRAW);
+}
+
+void jUniformBufferBlock_OpenGL::Init()
+{
+	BindingPoint = IUniformBufferBlock::GetBindPoint();
+	glGenBuffers(1, &UBO);
+	UpdateBufferData();
+	glBindBufferBase(GL_UNIFORM_BUFFER, BindingPoint, UBO);
+}
+
+void jUniformBufferBlock_OpenGL::Bind(jShader* shader) const
+{
+	if (-1 == BindingPoint)
+		return;
+
+	auto shader_gl = static_cast<jShader_OpenGL*>(shader);
+	uint32 index = glGetUniformBlockIndex(shader_gl->program, Name.c_str());
+	if (-1 != index)
+		glUniformBlockBinding(shader_gl->program, index, BindingPoint);
+}

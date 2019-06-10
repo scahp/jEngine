@@ -62,6 +62,21 @@ struct jRenderTarget_OpenGL : public jRenderTarget
 	virtual void End() override;
 };
 
+struct jUniformBufferBlock_OpenGL : public IUniformBufferBlock
+{
+	using IUniformBufferBlock::IUniformBufferBlock;
+	virtual ~jUniformBufferBlock_OpenGL()
+	{
+		glDeleteBuffers(1, &UBO);
+	}
+
+	uint32 BindingPoint = -1;
+	uint32 UBO = -1;
+	virtual void Init() override;
+	virtual void UpdateBufferData() override;
+	virtual void Bind(jShader* shader) const override;
+	virtual void UpdateBufferData(void* newData, int32 size) override;
+};
 
 class jRHI_OpenGL : public jRHI
 {
@@ -166,5 +181,7 @@ public:
 	virtual void SetDepthFunc(EDepthStencilFunc func) override;
 	virtual void SetDepthMask(bool enable) override;
 	virtual void SetColorMask(bool r, bool g, bool b, bool a) override;
+
+	virtual IUniformBufferBlock* CreateUniformBufferBlock(const char* blockname) const override;
 };
 

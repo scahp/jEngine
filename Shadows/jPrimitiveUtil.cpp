@@ -1574,11 +1574,12 @@ jDirectionalLightPrimitive* CreateDirectionalLightDebug(const Vector& pos, const
 	object->ArrowSegementObject = jPrimitiveUtil::CreateArrowSegment(Vector::ZeroVector, light->Data.Direction * length, 1.0f, scale.x, scale.x / 2, Vector4(0.8f, 0.2f, 0.3f, 1.0f));
 	object->Pos = pos;
 	object->Light = light;
-	object->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
+	object->PostUpdateFunc = [length](jObject* thisObject, float deltaTime)
 	{
 		auto thisDirectionalLightObject = static_cast<jDirectionalLightPrimitive*>(thisObject);
 		thisDirectionalLightObject->BillboardObject->RenderObject->Pos =  thisDirectionalLightObject->Pos;
 		thisDirectionalLightObject->ArrowSegementObject->SetPos(thisDirectionalLightObject->Pos);
+		thisDirectionalLightObject->ArrowSegementObject->SetEnd(thisDirectionalLightObject->Light->Data.Direction * length);
 	};
 	object->SkipShadowMapGen = true;
 	object->SkipUpdateShadowVolume = true;
@@ -1595,7 +1596,7 @@ jPointLightPrimitive* CreatePointLightDebug(const Vector& scale, jCamera* target
 	object->BillboardObject = jPrimitiveUtil::CreateBillobardQuad(light->Data.Position, Vector::OneVector, scale, Vector4(1.0f), targetCamera);
 	if (data.ImageData.size() > 0)
 		object->BillboardObject->RenderObject->tex_object2 = g_rhi->CreateTextureFromData(&data.ImageData[0], data.Width, data.Height);
-	object->SphereObject = CreateSphere(light->Data.Position, light->Data.MaxDistance, 20, Vector::OneVector, light->Data.Color, true, false, false);
+	object->SphereObject = CreateSphere(light->Data.Position, light->Data.MaxDistance, 20, Vector::OneVector, Vector4(light->Data.Color, 1.0f), true, false, false);
 	object->Light = light;
 	object->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
 	{

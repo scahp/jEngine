@@ -156,7 +156,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>opengl32.lib;glfw3.lib;AntTweakBar64.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>./;;./External/AntTweakBar/lib</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>./;./External/AntTweakBar/lib</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -166,9 +166,11 @@
     <ClInclude Include="jEngine.h" />
     <ClInclude Include="jFile.h" />
     <ClInclude Include="jGame.h" />
+    <ClInclude Include="jHairModelLoader.h" />
     <ClInclude Include="jImageFileLoader.h" />
     <ClInclude Include="jInputEvent.h" />
     <ClInclude Include="jLight.h" />
+    <ClInclude Include="jMeshObject.h" />
     <ClInclude Include="jObject.h" />
     <ClInclude Include="jPrimitiveUtil.h" />
     <ClInclude Include="jRenderer.h" />
@@ -208,9 +210,11 @@
     <ClCompile Include="jEngine.cpp" />
     <ClCompile Include="jFile.cpp" />
     <ClCompile Include="jGame.cpp" />
+    <ClCompile Include="jHairModelLoader.cpp" />
     <ClCompile Include="jImageFileLoader.cpp" />
     <ClCompile Include="jInputEvent.cpp" />
     <ClCompile Include="jLight.cpp" />
+    <ClCompile Include="jMeshObject.cpp" />
     <ClCompile Include="jObject.cpp" />
     <ClCompile Include="jPrimitiveUtil.cpp" />
     <ClCompile Include="jRenderer.cpp" />

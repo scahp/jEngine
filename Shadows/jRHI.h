@@ -114,6 +114,31 @@ DECLARE_UNIFORMBUFFER(EUniformType::VECTOR4, Vector4);
 //	Matrix Data;
 //};
 
+struct IUniformBufferBlock
+{
+	IUniformBufferBlock() = default;
+	IUniformBufferBlock(const std::string& name)
+		: Name(name)
+	{}
+	virtual ~IUniformBufferBlock() {}
+
+	static int32 GetBindPoint()
+	{
+		static int32 s_index = 0;
+		return s_index++;
+	}
+
+	std::string Name;
+	void* Data = nullptr;
+	int32 Size = 0;
+
+	virtual void Init() = 0;
+	virtual void UpdateBufferData() = 0;
+	virtual void Bind(jShader* shader) const = 0;
+	virtual void UpdateBufferData(void* newData, int32 size) = 0;
+};
+
+
 struct IMaterialParam
 {
 	virtual ~IMaterialParam() {}
@@ -235,5 +260,7 @@ public:
 	virtual void SetDepthFunc(EDepthStencilFunc func) {}
 	virtual void SetDepthMask(bool enable) {}
 	virtual void SetColorMask(bool r, bool g, bool b, bool a) {}
+
+	virtual IUniformBufferBlock* CreateUniformBufferBlock(const char* blockname) const { return nullptr; }
 };
 
