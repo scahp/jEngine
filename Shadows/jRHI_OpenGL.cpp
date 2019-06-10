@@ -1188,9 +1188,12 @@ void jRenderTarget_OpenGL::End()
 //////////////////////////////////////////////////////////////////////////
 void jUniformBufferBlock_OpenGL::UpdateBufferData(void* newData, int32 size)
 {
-	if (Data)
-		delete[] Data;
-	Data = new char[size];
+	if (size != Size)
+	{
+		if (Data)
+			delete[] Data;
+		Data = new char[size];
+	}
 	memcpy(Data, newData, size);
 	Size = size;
 	UpdateBufferData();

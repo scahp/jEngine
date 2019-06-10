@@ -4,14 +4,21 @@
 
 precision mediump float;
 
-#define MAX_NUM_OF_POINT_LIGHT 3
-#define MAX_NUM_OF_SPOT_LIGHT 3
+#define MAX_NUM_OF_POINT_LIGHT 1
+#define MAX_NUM_OF_SPOT_LIGHT 1
 
 uniform int NumOfPointLight;
 uniform int NumOfSpotLight;
 
-uniform jPointLight PointLight[MAX_NUM_OF_POINT_LIGHT];
-uniform jSpotLight SpotLight[MAX_NUM_OF_SPOT_LIGHT];
+layout (std140) uniform PointLightBlock
+{
+	jPointLight PointLight[MAX_NUM_OF_POINT_LIGHT];
+};
+
+layout (std140) uniform SpotLightBlock
+{
+	jSpotLight SpotLight[MAX_NUM_OF_SPOT_LIGHT];
+};
 
 uniform float PointLightZNear;
 uniform float PointLightZFar;
