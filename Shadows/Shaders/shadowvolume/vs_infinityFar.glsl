@@ -19,9 +19,20 @@ uniform int NumOfDirectionalLight;
 uniform int NumOfPointLight;
 uniform int NumOfSpotLight;
 
-uniform jDirectionalLight DirectionalLight[MAX_NUM_OF_DIRECTIONAL_LIGHT];
-uniform jPointLight PointLight[MAX_NUM_OF_POINT_LIGHT];
-uniform jSpotLight SpotLight[MAX_NUM_OF_SPOT_LIGHT];
+layout (std140) uniform DirectionalLightBlock
+{
+	jDirectionalLight DirectionalLight[MAX_NUM_OF_DIRECTIONAL_LIGHT];
+};
+
+layout (std140) uniform PointLightBlock
+{
+	jPointLight PointLight[MAX_NUM_OF_POINT_LIGHT];
+};
+
+layout (std140) uniform SpotLightBlock
+{
+	jSpotLight SpotLight[MAX_NUM_OF_SPOT_LIGHT];
+};
 
 out vec4 Color_;
 
