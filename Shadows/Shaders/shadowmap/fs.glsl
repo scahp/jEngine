@@ -1,4 +1,4 @@
-#version 330 core
+﻿#version 330 core
 
 #preprocessor
 
@@ -32,6 +32,26 @@ layout (std140) uniform SpotLightBlock
 	jSpotLight SpotLight[MAX_NUM_OF_SPOT_LIGHT];
 };
 
+layout (std140) uniform DirectionalLightShadowMapBlock
+{
+	mat4 ShadowVP;
+	mat4 ShadowV;
+	vec3 LightPos;      // Directional Light Pos 임시
+	float LightZNear;
+	float LightZFar;
+};
+
+layout (std140) uniform PointLightShadowMapBlock
+{
+	float PointLightZNear;
+	float PointLightZFar;
+};
+
+layout (std140) uniform SpotLightShadowMapBlock
+{
+	float SpotLightZNear;
+	float SpotLightZFar;
+};
 
 #if defined(USE_MATERIAL)
 uniform jMaterial Material;
@@ -50,19 +70,12 @@ uniform sampler2D shadow_object;
 uniform vec2 ShadowMapSize;
 uniform float PCF_Size_Directional;
 uniform float PCF_Size_OmniDirectional;
-uniform float LightZNear;
-uniform float LightZFar;
-uniform float PointLightZNear;
-uniform float PointLightZFar;
-uniform float SpotLightZNear;
-uniform float SpotLightZFar;
-uniform mat4 ShadowVP;
-uniform mat4 ShadowV;
-uniform vec3 LightPos;      // Directional Light Pos 임시
 uniform float ESM_C;
 uniform float PointLightESM_C;
 uniform float SpotLightESM_C;
 uniform int UseTexture;
+
+
 
 // in vec3 ShadowPos_;
 // in vec3 ShadowCameraPos_;

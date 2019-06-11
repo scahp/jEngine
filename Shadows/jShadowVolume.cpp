@@ -113,7 +113,7 @@ void jShadowVolume::Update(const Vector* lightDirection, const Vector* lightPos,
 	}
 	/////////////////////////////////////////
 
-	int32 startIndex = QuadVertices.size();
+	const int32 startIndex = static_cast<int32>(QuadVertices.size());
 	index = 0;
 	QuadVertices.resize(QuadVertices.size() + Edges.size() * 24);
 	// Creation of quad from Edges that was created by previous step

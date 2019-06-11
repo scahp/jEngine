@@ -1,4 +1,4 @@
-precision mediump float;
+﻿precision mediump float;
 
 struct jAmbientLight
 {
@@ -44,6 +44,15 @@ struct jMaterial
     vec3 Emissive;
     vec3 Specular;
     float Shininess;
+};
+
+struct jShadowData
+{
+	mat4 ShadowVP;
+	mat4 ShadowV;
+	vec3 LightPos;
+	float Near;
+	float Far;
 };
 
 vec3 TransformPos(mat4 m, vec3 v)

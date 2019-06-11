@@ -1,4 +1,4 @@
-#version 330 core
+﻿#version 330 core
 
 #include "common.glsl"
 
@@ -20,10 +20,17 @@ layout (std140) uniform SpotLightBlock
 	jSpotLight SpotLight[MAX_NUM_OF_SPOT_LIGHT];
 };
 
-uniform float PointLightZNear;
-uniform float PointLightZFar;
-uniform float SpotLightZNear;
-uniform float SpotLightZFar;
+layout (std140) uniform PointLightShadowMapBlock
+{
+	float PointLightZNear;
+	float PointLightZFar;
+};
+
+layout (std140) uniform SpotLightShadowMapBlock
+{
+	float SpotLightZNear;
+	float SpotLightZFar;
+};
 
 uniform float PointLightESM_C;
 uniform float SpotLightESM_C;

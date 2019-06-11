@@ -68,10 +68,10 @@ void jShadowMapRenderer::ShadowPrePass(jCamera* camera)
 			case EShadowMapType::VSM:
 			case EShadowMapType::ESM:
 			case EShadowMapType::EVSM:
-				maxDist = directionalLight->ShadowMapData->ShadowMapCamera->Far * 2.0f;
-				maxDistSquare = maxDist * maxDist;
-				maxDist = expf(maxDist);
-				maxDistSquare = expf(maxDistSquare);
+				maxDist = FLT_MAX;
+				maxDistSquare = FLT_MAX;
+				//maxDist = expf(maxDist);
+				//maxDistSquare = expf(maxDistSquare);
 				break;
 			default:
 				break;
@@ -147,7 +147,7 @@ void jShadowMapRenderer::ShadowPrePass(jCamera* camera)
 		case EShadowMapType::ESM:
 		case EShadowMapType::EVSM:
 		{
-			auto vsmBlurRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RG32F, EFormat::RG, EFormatType::FLOAT, 1024, 1024 });
+			auto vsmBlurRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RG32F, EFormat::RG, EFormatType::FLOAT, SM_WIDTH, SM_HEIGHT });
 
 			////////////////////
 			// Directional Shadow
@@ -179,7 +179,7 @@ void jShadowMapRenderer::ShadowPrePass(jCamera* camera)
 
 			jRenderTargetPool::ReturnRenderTarget(vsmBlurRenderTarget);
 
-			auto vsmTexArrayBlurRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW, EFormat::RG32F, EFormat::RG, EFormatType::FLOAT, 1024, 1024 });
+			auto vsmTexArrayBlurRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW, EFormat::RG32F, EFormat::RG, EFormatType::FLOAT, SM_WIDTH, SM_HEIGHT });
 			const std::initializer_list<EDrawBufferType> drawBufferArray = { EDrawBufferType::COLOR_ATTACHMENT0, EDrawBufferType::COLOR_ATTACHMENT1, EDrawBufferType::COLOR_ATTACHMENT2
 				, EDrawBufferType::COLOR_ATTACHMENT3, EDrawBufferType::COLOR_ATTACHMENT4, EDrawBufferType::COLOR_ATTACHMENT5 };
 

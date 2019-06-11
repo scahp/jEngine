@@ -1,14 +1,20 @@
-#version 330 core
+﻿#version 330 core
 
 #include "common.glsl"
 
 precision mediump float;
 
 varying vec3 Pos_;
-uniform vec3 LightPos;
-uniform float LightZNear;
-uniform float LightZFar;
 uniform float ESM_C;
+
+layout (std140) uniform DirectionalLightShadowMapBlock
+{
+	mat4 ShadowVP;
+	mat4 ShadowV;
+	vec3 LightPos;      // Directional Light Pos 임시
+	float LightZNear;
+	float LightZFar;
+};
 
 void main()
 {

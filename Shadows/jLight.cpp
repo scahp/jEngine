@@ -15,28 +15,27 @@ namespace jLightUtil
 		const auto up = tempPos + Vector(0.0f, 1.0f, 0.0f);
 
 		// todo remove constant variable
-		auto shadowMapData = new jShadowMapData();
+		auto shadowMapData = new jShadowMapData("DirectionalLight");
 		shadowMapData->ShadowMapCamera = jCamera::CreateCamera(tempPos, target, up, DegreeToRadian(45.0f), 10.0f, 900.0f, 200.0f, 200.0f, false);
-		shadowMapData->ShadowMapRenderTarget 
-= jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RG32F, EFormat::RG, EFormatType::FLOAT, 1024, 1024 });
+		shadowMapData->ShadowMapRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RG32F, EFormat::RG, EFormatType::FLOAT, SM_WIDTH, SM_HEIGHT });
 
 		return shadowMapData;
 	}
 
-	jShadowMapArrayData* CreateShadowMapArray(const Vector& pos)
+	jShadowMapArrayData* CreateShadowMapArray(const Vector& pos, const char* prefix = nullptr)
 	{
 		// todo remove constant variable
-		auto shadowMapData = new jShadowMapArrayData();
+		auto shadowMapData = new jShadowMapArrayData(prefix);
 
 		const float nearDist = 10.0f;
 		const float farDist = 500.0f;
-		shadowMapData->ShadowMapCamera[0] = jCamera::CreateCamera(pos, pos + Vector(1.0f, 0.0f, 0.0f), pos + Vector(0.0f, 1.0f, 0.0f), DegreeToRadian(45.0f), nearDist, farDist, 1024, 1024, true);
-		shadowMapData->ShadowMapCamera[1] = jCamera::CreateCamera(pos, pos + Vector(-1.0f, 0.0f, 0.0f), pos + Vector(0.0f, 1.0f, 0.0f), DegreeToRadian(45.0f), nearDist, farDist, 1024, 1024, true);
-		shadowMapData->ShadowMapCamera[2] = jCamera::CreateCamera(pos, pos + Vector(0.0f, 1.0f, 0.0f), pos + Vector(0.0f, 0.0f, -1.0f), DegreeToRadian(45.0f), nearDist, farDist, 1024, 1024, true);
-		shadowMapData->ShadowMapCamera[3] = jCamera::CreateCamera(pos, pos + Vector(0.0f, -1.0f, 0.0f), pos + Vector(0.0f, 0.0f, 1.0f), DegreeToRadian(45.0f), nearDist, farDist, 1024, 1024, true);
-		shadowMapData->ShadowMapCamera[4] = jCamera::CreateCamera(pos, pos + Vector(0.0f, 0.0f, 1.0f), pos + Vector(0.0f, 1.0f, 0.0f), DegreeToRadian(45.0f), nearDist, farDist, 1024, 1024, true);
-		shadowMapData->ShadowMapCamera[5] = jCamera::CreateCamera(pos, pos + Vector(0.0f, 0.0f, -1.0f), pos + Vector(0.0f, 1.0f, 0.0f), DegreeToRadian(45.0f), nearDist, farDist, 1024, 1024, true);
-		shadowMapData->ShadowMapRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW, EFormat::RG32F, EFormat::RG, EFormatType::FLOAT, 1024, 1024 });
+		shadowMapData->ShadowMapCamera[0] = jCamera::CreateCamera(pos, pos + Vector(1.0f, 0.0f, 0.0f), pos + Vector(0.0f, 1.0f, 0.0f), DegreeToRadian(45.0f), nearDist, farDist, SM_WIDTH, SM_HEIGHT, true);
+		shadowMapData->ShadowMapCamera[1] = jCamera::CreateCamera(pos, pos + Vector(-1.0f, 0.0f, 0.0f), pos + Vector(0.0f, 1.0f, 0.0f), DegreeToRadian(45.0f), nearDist, farDist, SM_WIDTH, SM_HEIGHT, true);
+		shadowMapData->ShadowMapCamera[2] = jCamera::CreateCamera(pos, pos + Vector(0.0f, 1.0f, 0.0f), pos + Vector(0.0f, 0.0f, -1.0f), DegreeToRadian(45.0f), nearDist, farDist, SM_WIDTH, SM_HEIGHT, true);
+		shadowMapData->ShadowMapCamera[3] = jCamera::CreateCamera(pos, pos + Vector(0.0f, -1.0f, 0.0f), pos + Vector(0.0f, 0.0f, 1.0f), DegreeToRadian(45.0f), nearDist, farDist, SM_WIDTH, SM_HEIGHT, true);
+		shadowMapData->ShadowMapCamera[4] = jCamera::CreateCamera(pos, pos + Vector(0.0f, 0.0f, 1.0f), pos + Vector(0.0f, 1.0f, 0.0f), DegreeToRadian(45.0f), nearDist, farDist, SM_WIDTH, SM_HEIGHT, true);
+		shadowMapData->ShadowMapCamera[5] = jCamera::CreateCamera(pos, pos + Vector(0.0f, 0.0f, -1.0f), pos + Vector(0.0f, 1.0f, 0.0f), DegreeToRadian(45.0f), nearDist, farDist, SM_WIDTH, SM_HEIGHT, true);
+		shadowMapData->ShadowMapRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW, EFormat::RG32F, EFormat::RG, EFormatType::FLOAT, SM_WIDTH, SM_HEIGHT });
 
 		return shadowMapData;
 	}
@@ -79,7 +78,7 @@ jPointLight* jLight::CreatePointLight(const Vector& pos, const Vector& color, fl
 	pointLight->Data.SpecularIntensity = specularIntensity;
 	pointLight->Data.SpecularPow = specularPower;
 	pointLight->Data.MaxDistance = maxDistance;
-	pointLight->ShadowMapData = jLightUtil::CreateShadowMapArray(pos);
+	pointLight->ShadowMapData = jLightUtil::CreateShadowMapArray(pos, "PointLight");
 
 	return pointLight;
 }
@@ -98,7 +97,7 @@ jSpotLight* jLight::CreateSpotLight(const Vector& pos, const Vector& direction, 
 	spotLight->Data.MaxDistance = maxDistance;
 	spotLight->Data.PenumbraRadian = penumbraRadian;
 	spotLight->Data.UmbraRadian = umbraRadian;
-	spotLight->ShadowMapData = jLightUtil::CreateShadowMapArray(pos);
+	spotLight->ShadowMapData = jLightUtil::CreateShadowMapArray(pos, "SpotLight");
 
 	return spotLight;
 }
@@ -116,11 +115,45 @@ void jDirectionalLight::BindLight(jShader* shader, jMaterialData* materialData, 
 
 	if (ShadowMapData && ShadowMapData->IsValid())
 	{
-		g_rhi->SetUniformbuffer(&jUniformBuffer<float>("LightZNear", ShadowMapData->ShadowMapCamera->Near), shader);
-		g_rhi->SetUniformbuffer(&jUniformBuffer<float>("LightZFar", ShadowMapData->ShadowMapCamera->Far), shader);
-		g_rhi->SetUniformbuffer(&jUniformBuffer<Matrix>("ShadowVP", ShadowMapData->ShadowMapCamera->Projection * ShadowMapData->ShadowMapCamera->View), shader);
-		g_rhi->SetUniformbuffer(&jUniformBuffer<Matrix>("ShadowV", ShadowMapData->ShadowMapCamera->View), shader);
-		g_rhi->SetUniformbuffer(&jUniformBuffer<Vector>("LightPos", ShadowMapData->ShadowMapCamera->Pos), shader);
+		struct ShadowData
+		{
+			Matrix ShadowVP_Transposed;
+			Matrix ShadowV_Transposed;
+			Vector LightPos;
+			float Near;
+			float Far;
+			Vector padding0;
+
+			bool operator == (const ShadowData& rhs) const
+			{
+				return (ShadowVP_Transposed == rhs.ShadowVP_Transposed) && (ShadowV_Transposed == rhs.ShadowV_Transposed) 
+					&& (LightPos == rhs.LightPos) && (Near == rhs.Near) && (Far == rhs.Far);
+			}
+
+			bool operator != (const ShadowData& rhs) const
+			{
+				return !(*this == rhs);
+			}
+
+			void SetData(jCamera* camera)
+			{
+				JASSERT(camera);
+
+				ShadowVP_Transposed = (camera->Projection * camera->View).GetTranspose();
+				ShadowV_Transposed = (camera->View).GetTranspose();
+				LightPos = camera->Pos;
+				Near = camera->Near;
+				Far = camera->Far;
+			}
+		};
+
+		ShadowData shadowData;
+		shadowData.SetData(ShadowMapData->ShadowMapCamera);
+
+		IUniformBufferBlock* shadowDataUniformBlock = ShadowMapData->UniformBlock;
+		if (!shadowDataUniformBlock->Data || *static_cast<ShadowData*>(shadowDataUniformBlock->Data) != shadowData)
+			shadowDataUniformBlock->UpdateBufferData(&shadowData, sizeof(shadowData));
+		shadowDataUniformBlock->Bind(shader);
 
 		if (materialData)
 		{
@@ -147,9 +180,39 @@ void jPointLight::BindLight(jShader* shader, jMaterialData* materialData, int32 
 
 	if (ShadowMapData && ShadowMapData->IsValid())
 	{
-		// Both near and far are all same within camera array.
-		g_rhi->SetUniformbuffer(&jUniformBuffer<float>("PointLightZNear", ShadowMapData->ShadowMapCamera[0]->Near), shader);
-		g_rhi->SetUniformbuffer(&jUniformBuffer<float>("PointLightZFar", ShadowMapData->ShadowMapCamera[0]->Far), shader);
+		// Both near and far are all the same within camera array.
+		struct ShadowData
+		{
+			float Near;
+			float Far;
+			Vector2 padding0;
+
+			bool operator == (const ShadowData& rhs) const
+			{
+				return (Near == rhs.Near) && (Far == rhs.Far);
+			}
+
+			bool operator != (const ShadowData& rhs) const
+			{
+				return !(*this == rhs);
+			}
+
+			void SetData(jCamera* camera)
+			{
+				JASSERT(camera);
+
+				Near = camera->Near;
+				Far = camera->Far;
+			}
+		};
+
+		ShadowData shadowData;
+		shadowData.SetData(ShadowMapData->ShadowMapCamera[0]);
+
+		IUniformBufferBlock* shadowDataUniformBlock = ShadowMapData->UniformBlock;
+		if (!shadowDataUniformBlock->Data || *static_cast<ShadowData*>(shadowDataUniformBlock->Data) != shadowData)
+			shadowDataUniformBlock->UpdateBufferData(&shadowData, sizeof(shadowData));
+		shadowDataUniformBlock->Bind(shader);
 
 		if (materialData)
 		{
@@ -171,9 +234,39 @@ void jSpotLight::BindLight(jShader* shader, jMaterialData* materialData, int32 i
 
 	if (ShadowMapData && ShadowMapData->IsValid())
 	{
-		// Both near and far are all same within camera array.
-		g_rhi->SetUniformbuffer(&jUniformBuffer<float>("SpotLightZNear", ShadowMapData->ShadowMapCamera[0]->Near), shader);
-		g_rhi->SetUniformbuffer(&jUniformBuffer<float>("SpotLightZFar", ShadowMapData->ShadowMapCamera[0]->Far), shader);
+		// Both near and far are all the same within camera array.
+		struct ShadowData
+		{
+			float Near;
+			float Far;
+			Vector2 padding0;
+
+			bool operator == (const ShadowData& rhs) const
+			{
+				return (Near == rhs.Near) && (Far == rhs.Far);
+			}
+
+			bool operator != (const ShadowData& rhs) const
+			{
+				return !(*this == rhs);
+			}
+
+			void SetData(jCamera* camera)
+			{
+				JASSERT(camera);
+
+				Near = camera->Near;
+				Far = camera->Far;
+			}
+		};
+
+		ShadowData shadowData;
+		shadowData.SetData(ShadowMapData->ShadowMapCamera[0]);
+
+		IUniformBufferBlock* shadowDataUniformBlock = ShadowMapData->UniformBlock;
+		if (!shadowDataUniformBlock->Data || *static_cast<ShadowData*>(shadowDataUniformBlock->Data) != shadowData)
+			shadowDataUniformBlock->UpdateBufferData(&shadowData, sizeof(shadowData));
+		shadowDataUniformBlock->Bind(shader);
 
 		if (materialData)
 		{

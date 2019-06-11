@@ -46,6 +46,9 @@ using tchar = wchar_t;
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 
+const unsigned int SM_WIDTH = 512;
+const unsigned int SM_HEIGHT = 512;
+
 enum class EMouseButtonType
 {
 	LEFT = 0,

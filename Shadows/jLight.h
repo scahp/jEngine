@@ -27,21 +27,59 @@ namespace jLightUtil
 	//////////////////////////////////////////////////////////////////////////
 	struct jShadowMapArrayData
 	{
+		jShadowMapArrayData()
+		{
+			UniformBlock = g_rhi->CreateUniformBufferBlock("ShadowMapBlock");
+		}
+
+		jShadowMapArrayData(const char* prefix)
+		{
+			if (prefix)
+				UniformBlock = g_rhi->CreateUniformBufferBlock((std::string(prefix) + "ShadowMapBlock").c_str());
+			else
+				UniformBlock = g_rhi->CreateUniformBufferBlock("ShadowMapBlock");
+		}
+
+		~jShadowMapArrayData()
+		{
+			delete UniformBlock;
+		}
+
 		FORCEINLINE bool IsValid() const { return (ShadowMapRenderTarget && ShadowMapCamera[0] && ShadowMapCamera[1] && ShadowMapCamera[2] && ShadowMapCamera[3] && ShadowMapCamera[4] && ShadowMapCamera[5]); }
 
 		jRenderTarget* ShadowMapRenderTarget = nullptr;
 		jCamera* ShadowMapCamera[6] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
+		IUniformBufferBlock* UniformBlock = nullptr;
 	};
 
-	jShadowMapArrayData* CreateShadowMapArray(const Vector& pos);
+	static jShadowMapArrayData* CreateShadowMapArray(const Vector& pos);
 
 	//////////////////////////////////////////////////////////////////////////
 	struct jShadowMapData
 	{
+		jShadowMapData()
+		{
+			UniformBlock = g_rhi->CreateUniformBufferBlock("ShadowMapBlock");
+		}
+
+		jShadowMapData(const char* prefix)
+		{
+			if (prefix)
+				UniformBlock = g_rhi->CreateUniformBufferBlock((std::string(prefix) + "ShadowMapBlock").c_str());
+			else
+				UniformBlock = g_rhi->CreateUniformBufferBlock("ShadowMapBlock");
+		}
+
+		~jShadowMapData()
+		{
+			delete UniformBlock;
+		}
+
 		FORCEINLINE bool IsValid() const { return (ShadowMapCamera && ShadowMapRenderTarget); }
 
 		jRenderTarget* ShadowMapRenderTarget = nullptr;
 		jCamera* ShadowMapCamera = nullptr;
+		IUniformBufferBlock* UniformBlock = nullptr;
 	};
 
 	static jShadowMapData* CreateShadowMap(const Vector& direction, const Vector& pos);
