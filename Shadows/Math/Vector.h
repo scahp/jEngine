@@ -223,6 +223,7 @@ struct Vector
 
 struct Vector4
 {
+	static const Vector4 OneVector;
 	static const Vector4 ZeroVector;
 	static const Vector4 FowardVector;
 	static const Vector4 RightVector;

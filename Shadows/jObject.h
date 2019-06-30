@@ -34,7 +34,7 @@ public:
 	bool SkipShadowMapGen = false;
 	bool SkipUpdateShadowVolume = false;
 	bool Visible = true;
-
+	
 	std::function<void(jObject*, float)> PostUpdateFunc;
 
 	// todo 현재는 보유만 하고있음.
@@ -42,6 +42,7 @@ public:
 };
 
 extern std::list<jObject*> g_StaticObjectArray;
+extern std::list<jObject*> g_HairObjectArray;
 extern std::list<jObject*> g_DebugObjectArray;
 extern std::list<jObject*> g_BoundBoxObjectArray;
 extern std::list<jObject*> g_BoundSphereObjectArray;

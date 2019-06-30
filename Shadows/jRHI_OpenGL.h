@@ -38,7 +38,7 @@ struct jShader_OpenGL : public jShader
 struct jTexture_OpenGL : public jTexture
 {
 	ETextureType TextureType;
-	unsigned int textureID = 0;
+	uint32 TextureID = 0;
 };
 
 struct jMaterialParam_OpenGL : public IMaterialParam
@@ -51,12 +51,13 @@ struct jMaterialParam_OpenGL : public IMaterialParam
 
 struct jRenderTarget_OpenGL : public jRenderTarget
 {
-	uint32 fbo[6] = {0, 0, 0, 0, 0, 0};
-	uint32 tbo[6] = {0, 0, 0, 0, 0, 0};
-	uint32 rbo[6] = {0, 0, 0, 0, 0, 0};
+	std::vector<uint32> fbos;
+	std::vector<uint32> rbos;
+	std::vector<uint32> drawBuffers;
 
 	uint32 mrt_fbo = 0;
 	uint32 mrt_rbo = 0;
+	std::vector<uint32> mrt_drawBuffers;
 
 	virtual bool Begin(int index = 0, bool mrt = false) override;
 	virtual void End() override;
@@ -65,6 +66,7 @@ struct jRenderTarget_OpenGL : public jRenderTarget
 struct jUniformBufferBlock_OpenGL : public IUniformBufferBlock
 {
 	using IUniformBufferBlock::IUniformBufferBlock;
+	using IUniformBufferBlock::UpdateBufferData;
 	virtual ~jUniformBufferBlock_OpenGL()
 	{
 		glDeleteBuffers(1, &UBO);
@@ -73,9 +75,46 @@ struct jUniformBufferBlock_OpenGL : public IUniformBufferBlock
 	uint32 BindingPoint = -1;
 	uint32 UBO = -1;
 	virtual void Init() override;
-	virtual void UpdateBufferData() override;
 	virtual void Bind(jShader* shader) const override;
 	virtual void UpdateBufferData(void* newData, int32 size) override;
+	virtual void ClearBuffer(int32 clearValue) override;
+};
+
+struct jShaderStorageBufferObject_OpenGL : public IShaderStorageBufferObject
+{
+	using IShaderStorageBufferObject::IShaderStorageBufferObject;
+	using IShaderStorageBufferObject::GetBufferData;
+	using IShaderStorageBufferObject::UpdateBufferData;
+
+	virtual ~jShaderStorageBufferObject_OpenGL()
+	{
+		glDeleteBuffers(1, &SSBO);
+	}
+
+	uint32 BindingPoint = -1;
+	uint32 SSBO = -1;
+	virtual void Init() override;
+	virtual void Bind(jShader* shader) const override;
+	virtual void UpdateBufferData(void* newData, int32 size) override;
+	virtual void ClearBuffer(int32 clearValue) override;
+	virtual void GetBufferData(void* newData, int32 size) override;
+};
+
+struct jAtomicCounterBuffer_OpenGL : public IAtomicCounterBuffer
+{
+	using IAtomicCounterBuffer::IAtomicCounterBuffer;
+	virtual ~jAtomicCounterBuffer_OpenGL()
+	{
+		glDeleteBuffers(1, &ACBO);
+	}
+
+	uint32 ACBO = -1;
+	virtual void Init() override;
+	virtual void Bind(jShader* shader) const override;
+	virtual void UpdateBufferData(void* newData, int32 size) override;
+	using IAtomicCounterBuffer::GetBufferData;
+	virtual void GetBufferData(void* newData, int32 size) override;
+	virtual void ClearBuffer(int32 clearValue) override;
 };
 
 class jRHI_OpenGL : public jRHI
@@ -102,7 +141,7 @@ public:
 	virtual void DrawArray(EPrimitiveType type, int vertStartIndex, int vertCount) override;
 
 
-	virtual void DrawElement(EPrimitiveType type, int elementCount, int elementSize) override;
+	virtual void DrawElement(EPrimitiveType type, int elementSize, int32 startIndex = -1, int32 count = -1) override;
 
 	unsigned int GetPrimitiveType(EPrimitiveType type)
 	{
@@ -183,5 +222,15 @@ public:
 	virtual void SetColorMask(bool r, bool g, bool b, bool a) override;
 
 	virtual IUniformBufferBlock* CreateUniformBufferBlock(const char* blockname) const override;
+
+	virtual void DrawElementBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex) override;
+
+
+	virtual void EnableSRGB(bool enable) override;
+
+
+	virtual IShaderStorageBufferObject* CreateShaderStorageBufferObject(const char* blockname) const override;
+	virtual IAtomicCounterBuffer* CreateAtomicCounterBuffer(const char* name, int32 bindingPoint) const override;
+
 };
 

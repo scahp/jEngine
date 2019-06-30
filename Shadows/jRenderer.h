@@ -24,5 +24,7 @@ public:
 
 	virtual void Render(jCamera* camera);
 	virtual void UpdateSettings() {}
+
+	jRenderTarget* GBuffer = nullptr;
 };
 

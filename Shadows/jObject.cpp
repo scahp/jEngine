@@ -4,6 +4,7 @@
 #include "jVertexAdjacency.h"
 
 std::list<jObject*> g_StaticObjectArray;
+std::list<jObject*> g_HairObjectArray;
 std::list<jObject*> g_DebugObjectArray;
 std::list<jObject*> g_BoundBoxObjectArray;
 std::list<jObject*> g_BoundSphereObjectArray;

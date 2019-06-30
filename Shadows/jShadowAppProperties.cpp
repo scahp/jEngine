@@ -5,7 +5,7 @@ jShadowAppSettingProperties* jShadowAppSettingProperties::_instance = nullptr;
 
 void jShadowAppSettingProperties::Setup(jAppSettingBase* appSetting)
 {
-	sizeof(ShowSilhouette_DirectionalLight);
+	appSetting->AddVariable("ShadowOn", ShadowOn);
 
 	appSetting->AddEnumVariable("ShadowType", ShadowType, "EShadowType", EShadowTypeString);
 	appSetting->AddEnumVariable("ShadowMapType", ShadowMapType, "EShadowMapType", EShadowMapTypeString);
@@ -76,6 +76,16 @@ void jShadowAppSettingProperties::Setup(jAppSettingBase* appSetting)
 	appSetting->SetGroup("Box", "Bound");
 	appSetting->AddVariable("Sphere", ShowBoundSphere);
 	appSetting->SetGroup("Sphere", "Bound");
+
+	//////////////////////////////////////////////////////////////////////////
+	// Deep Shadow Option
+	appSetting->AddVariable("DeepShadowAlpha", DeepShadowAlpha);
+	appSetting->SetGroup("DeepShadowAlpha", "DeepShadow");
+	appSetting->SetStep("DeepShadowAlpha", 0.01f);
+	appSetting->SetMinMax("DeepShadowAlpha", 0.05f, 1.0f);
+	
+	appSetting->AddVariable("ExponentDeepShadowOn", ExponentDeepShadowOn);
+	appSetting->SetGroup("ExponentDeepShadowOn", "DeepShadow");
 }
 
 void jShadowAppSettingProperties::Teardown(jAppSettingBase* appSetting)
@@ -100,6 +110,8 @@ void jShadowAppSettingProperties::Teardown(jAppSettingBase* appSetting)
 	appSetting->RemoveVariable("SpotLight_Direction");
 	appSetting->RemoveVariable("Box");
 	appSetting->RemoveVariable("Sphere");
+	appSetting->RemoveVariable("DeepShadowAlpha");
+	appSetting->RemoveVariable("ExponentDeepShadowOn");
 }
 
 void jShadowAppSettingProperties::SwitchShadowType(jAppSettingBase* appSetting)

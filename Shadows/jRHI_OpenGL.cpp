@@ -128,10 +128,38 @@ void jRHI_OpenGL::DrawArray(EPrimitiveType type, int vertStartIndex, int vertCou
 	glDrawArrays(GetPrimitiveType(type), vertStartIndex, vertCount);
 }
 
-void jRHI_OpenGL::DrawElement(EPrimitiveType type, int elementCount, int elementSize)
+void jRHI_OpenGL::DrawElement(EPrimitiveType type, int elementSize, int32 startIndex /*= -1*/, int32 count /*= -1*/)
 {
-	const auto elementType = (elementSize == 4) ? GL_UNSIGNED_INT : GL_UNSIGNED_BYTE;
-	glDrawElements(GetPrimitiveType(type), elementCount, elementType, nullptr);
+	const auto elementType = (elementSize == 4) ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
+	glDrawElements(GetPrimitiveType(type), count, elementType, (void*)(startIndex * elementSize));
+}
+
+void jRHI_OpenGL::DrawElementBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex)
+{
+	const auto elementType = (elementSize == 4) ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
+	glDrawElementsBaseVertex(GetPrimitiveType(type), count, elementType, (void*)(startIndex * elementSize), baseVertexIndex);
+}
+
+void jRHI_OpenGL::EnableSRGB(bool enable)
+{
+	if (enable)
+		glEnable(GL_FRAMEBUFFER_SRGB);
+	else
+		glDisable(GL_FRAMEBUFFER_SRGB);
+}
+
+IShaderStorageBufferObject* jRHI_OpenGL::CreateShaderStorageBufferObject(const char* blockname) const
+{
+	auto ssbo = new jShaderStorageBufferObject_OpenGL(blockname);
+	ssbo->Init();
+	return ssbo;
+}
+
+IAtomicCounterBuffer* jRHI_OpenGL::CreateAtomicCounterBuffer(const char* name, int32 bindingPoint) const
+{
+	auto acbo = new jAtomicCounterBuffer_OpenGL(name, bindingPoint);
+	acbo->Init();
+	return acbo;
 }
 
 void jRHI_OpenGL::SetClear(ERenderBufferType typeBit)
@@ -190,109 +218,167 @@ jShader* jRHI_OpenGL::CreateShader(const jShaderInfo& shaderInfo)
 		shadowShader = shadowFile.GetBuffer();
 	}
 
-	jFile vsFile;
-	vsFile.OpenFile(shaderInfo.vs.c_str(), FileType::TEXT, ReadWriteType::READ);
-	vsFile.ReadFileToBuffer(false);
-	std::string vsText(vsFile.GetBuffer());
-	vsText = ReplaceString(vsText, "#include \"shadow.glsl\"", shadowShader);
-	vsText = ReplaceString(vsText, "#include \"common.glsl\"", commonShader);
-	vsText = ReplaceString(vsText, "#preprocessor", shaderInfo.vsPreProcessor);
-
-	jFile fsFile;
-	fsFile.OpenFile(shaderInfo.fs.c_str(), FileType::TEXT, ReadWriteType::READ);
-	fsFile.ReadFileToBuffer(false);
-	std::string fsText(fsFile.GetBuffer());
-	fsText = ReplaceString(fsText, "#include \"shadow.glsl\"", shadowShader);
-	fsText = ReplaceString(fsText, "#include \"common.glsl\"", commonShader);
-	fsText = ReplaceString(fsText, "#preprocessor", shaderInfo.fsPreProcessor);
-
-	auto vs = glCreateShader(GL_VERTEX_SHADER);
-	const char* vsPtr = vsText.c_str();
-	glShaderSource(vs, 1, &vsPtr, nullptr);
-	glCompileShader(vs);
-
-	int isValid = 0;
-	glGetShaderiv(vs, GL_COMPILE_STATUS, &isValid);
-	if (!isValid)
+	uint32 program = 0;
+	if (shaderInfo.cs.length())
 	{
-		int maxLength = 0;
-		glGetShaderiv(vs, GL_INFO_LOG_LENGTH, &maxLength);
+		jFile csFile;
+		csFile.OpenFile(shaderInfo.cs.c_str(), FileType::TEXT, ReadWriteType::READ);
+		csFile.ReadFileToBuffer(false);
+		std::string csText(csFile.GetBuffer());
 
-		if (maxLength > 0)
+		auto compute_shader = glCreateShader(GL_COMPUTE_SHADER);
+		const char* vsPtr = csText.c_str();
+		glShaderSource(compute_shader, 1, &vsPtr, nullptr);
+		glCompileShader(compute_shader);
+		int isValid = 0;
+		glGetShaderiv(compute_shader, GL_COMPILE_STATUS, &isValid);
+		if (!isValid)
 		{
-			std::vector<char> errorLog(maxLength + 1, 0);
-			glGetShaderInfoLog(vs, maxLength, &maxLength, &errorLog[0]);
-			JMESSAGE(&errorLog[0]);
+			int maxLength = 0;
+			glGetShaderiv(compute_shader, GL_INFO_LOG_LENGTH, &maxLength);
+
+			if (maxLength > 0)
+			{
+				std::vector<char> errorLog(maxLength + 1, 0);
+				glGetShaderInfoLog(compute_shader, maxLength, &maxLength, &errorLog[0]);
+				JMESSAGE(&errorLog[0]);
+				glDeleteShader(compute_shader);
+			}
+			return nullptr;
 		}
-		glDeleteShader(vs);
-		return nullptr;
-	}
 
-	auto fs = glCreateShader(GL_FRAGMENT_SHADER);
-	const char* fsPtr = fsText.c_str();
-	glShaderSource(fs, 1, &fsPtr, nullptr);
-	glCompileShader(fs);
-
-	isValid = 0;
-	glGetShaderiv(fs, GL_COMPILE_STATUS, &isValid);
-	if (!isValid)
-	{
-		int maxLength = 0;
-		glGetShaderiv(fs, GL_INFO_LOG_LENGTH, &maxLength);
-
-		if (maxLength > 0)
+		program = glCreateProgram();
+		glAttachShader(program, compute_shader);
+		glLinkProgram(program);
+		isValid = 0;
+		glGetProgramiv(program, GL_LINK_STATUS, &isValid);
+		if (!isValid)
 		{
-			std::vector<char> errorLog(maxLength + 1, 0);
-			glGetShaderInfoLog(vs, maxLength, &maxLength, &errorLog[0]);
-			JMESSAGE(&errorLog[0]);
+			int maxLength = 0;
+			glGetProgramiv(program, GL_INFO_LOG_LENGTH, &maxLength);
+
+			if (maxLength > 0)
+			{
+				std::vector<char> errorLog(maxLength + 1, 0);
+				glGetProgramInfoLog(program, maxLength, &maxLength, &errorLog[0]);
+				JMESSAGE(&errorLog[0]);
+				glDeleteShader(compute_shader);
+				glDeleteProgram(program);
+			}
+			return nullptr;
+		}
+
+		glDeleteShader(compute_shader);
+	}
+	else
+	{
+		jFile vsFile;
+		vsFile.OpenFile(shaderInfo.vs.c_str(), FileType::TEXT, ReadWriteType::READ);
+		vsFile.ReadFileToBuffer(false);
+		std::string vsText(vsFile.GetBuffer());
+		vsText = ReplaceString(vsText, "#include \"shadow.glsl\"", shadowShader);
+		vsText = ReplaceString(vsText, "#include \"common.glsl\"", commonShader);
+		vsText = ReplaceString(vsText, "#preprocessor", shaderInfo.vsPreProcessor);
+
+		jFile fsFile;
+		fsFile.OpenFile(shaderInfo.fs.c_str(), FileType::TEXT, ReadWriteType::READ);
+		fsFile.ReadFileToBuffer(false);
+		std::string fsText(fsFile.GetBuffer());
+		fsText = ReplaceString(fsText, "#include \"shadow.glsl\"", shadowShader);
+		fsText = ReplaceString(fsText, "#include \"common.glsl\"", commonShader);
+		fsText = ReplaceString(fsText, "#preprocessor", shaderInfo.fsPreProcessor);
+
+		auto vs = glCreateShader(GL_VERTEX_SHADER);
+		const char* vsPtr = vsText.c_str();
+		glShaderSource(vs, 1, &vsPtr, nullptr);
+		glCompileShader(vs);
+
+		int isValid = 0;
+		glGetShaderiv(vs, GL_COMPILE_STATUS, &isValid);
+		if (!isValid)
+		{
+			int maxLength = 0;
+			glGetShaderiv(vs, GL_INFO_LOG_LENGTH, &maxLength);
+
+			if (maxLength > 0)
+			{
+				std::vector<char> errorLog(maxLength + 1, 0);
+				glGetShaderInfoLog(vs, maxLength, &maxLength, &errorLog[0]);
+				JMESSAGE(&errorLog[0]);
+			}
+			glDeleteShader(vs);
+			return nullptr;
+		}
+
+		auto fs = glCreateShader(GL_FRAGMENT_SHADER);
+		const char* fsPtr = fsText.c_str();
+		int fragment_shader_string_length = fsText.length();
+		glShaderSource(fs, 1, &fsPtr, &fragment_shader_string_length);
+		glCompileShader(fs);
+
+		isValid = 0;
+		glGetShaderiv(fs, GL_COMPILE_STATUS, &isValid);
+		if (!isValid)
+		{
+			int maxLength = 0;
+			glGetShaderiv(fs, GL_INFO_LOG_LENGTH, &maxLength);
+
+			if (maxLength > 0)
+			{
+				std::vector<char> errorLog(maxLength + 1, 0);
+				glGetShaderInfoLog(fs, maxLength, &maxLength, &errorLog[0]);
+				JMESSAGE(&errorLog[0]);
+			}
+			glDeleteShader(vs);
+			glDeleteShader(fs);
+			return nullptr;
+		}
+
+		program = glCreateProgram();
+		glAttachShader(program, vs);
+		glAttachShader(program, fs);
+		glLinkProgram(program);
+
+		isValid = 0;
+		glGetProgramiv(program, GL_LINK_STATUS, &isValid);
+		if (!isValid)
+		{
+			int maxLength = 0;
+			glGetProgramiv(program, GL_INFO_LOG_LENGTH, &maxLength);
+
+			if (maxLength > 0)
+			{
+				std::vector<char> errorLog(maxLength + 1, 0);
+				glGetProgramInfoLog(program, maxLength, &maxLength, &errorLog[0]);
+				JMESSAGE(&errorLog[0]);
+			}
+			glDeleteShader(vs);
+			glDeleteShader(fs);
+			glDeleteShader(program);
+			return nullptr;
+		}
+
+		glValidateProgram(program);
+		isValid = 0;
+		glGetProgramiv(program, GL_VALIDATE_STATUS, &isValid);
+		if (!isValid)
+		{
+			int maxLength = 0;
+			glGetProgramiv(program, GL_INFO_LOG_LENGTH, &maxLength);
+
+			if (maxLength > 0)
+			{
+				std::vector<char> errorLog(maxLength + 1, 0);
+				glGetProgramInfoLog(program, maxLength, &maxLength, &errorLog[0]);
+				JMESSAGE(&errorLog[0]);
+			}
+			glDeleteShader(vs);
+			glDeleteShader(fs);
+			glDeleteShader(program);
+			return nullptr;
 		}
 		glDeleteShader(vs);
 		glDeleteShader(fs);
-		return nullptr;
-	}
-
-	auto program = glCreateProgram();
-	glAttachShader(program, vs);
-	glAttachShader(program, fs);
-	glLinkProgram(program);
-	
-	isValid = 0;
-	glGetProgramiv(program, GL_LINK_STATUS, &isValid);
-	if (!isValid)
-	{
-		int maxLength = 0;
-		glGetProgramiv(program, GL_INFO_LOG_LENGTH, &maxLength);
-
-		if (maxLength > 0)
-		{
-			std::vector<char> errorLog(maxLength + 1, 0);
-			glGetProgramInfoLog(program, maxLength, &maxLength, &errorLog[0]);
-			JMESSAGE(&errorLog[0]);
-		}
-		glDeleteShader(vs);
-		glDeleteShader(fs);
-		glDeleteShader(program);
-		return nullptr;
-	}
-
-	glValidateProgram(program);
-	isValid = 0;
-	glGetProgramiv(program, GL_VALIDATE_STATUS, &isValid);
-	if (!isValid)
-	{
-		int maxLength = 0;
-		glGetProgramiv(program, GL_INFO_LOG_LENGTH, &maxLength);
-
-		if (maxLength > 0)
-		{
-			std::vector<char> errorLog(maxLength + 1, 0);
-			glGetProgramInfoLog(program, maxLength, &maxLength, &errorLog[0]);
-			JMESSAGE(&errorLog[0]);
-		}
-		glDeleteShader(vs);
-		glDeleteShader(fs);
-		glDeleteShader(program);
-		return nullptr;
 	}
 
 	auto shader = new jShader_OpenGL();
@@ -303,8 +389,8 @@ jShader* jRHI_OpenGL::CreateShader(const jShaderInfo& shaderInfo)
 jTexture* jRHI_OpenGL::CreateNullTexture() const
 {
 	auto texure = new jTexture_OpenGL();
-	glGenTextures(1, &texure->textureID);
-	glBindTexture(GL_TEXTURE_2D, texure->textureID);
+	glGenTextures(1, &texure->TextureID);
+	glBindTexture(GL_TEXTURE_2D, texure->TextureID);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 2, 2, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -314,8 +400,8 @@ jTexture* jRHI_OpenGL::CreateNullTexture() const
 jTexture* jRHI_OpenGL::CreateTextureFromData(unsigned char* data, int32 width, int32 height)
 {
 	auto texure = new jTexture_OpenGL();
-	glGenTextures(1, &texure->textureID);
-	glBindTexture(GL_TEXTURE_2D, texure->textureID);
+	glGenTextures(1, &texure->TextureID);
+	glBindTexture(GL_TEXTURE_2D, texure->TextureID);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -454,7 +540,7 @@ void jRHI_OpenGL::SetTexture(int32 index, jTexture* texture)
 		break;
 	}
 	
-	glBindTexture(textureType, texture_gl->textureID);
+	glBindTexture(textureType, texture_gl->TextureID);
 }
 
 void jRHI_OpenGL::SetTextureFilter(ETextureType type, ETextureFilterTarget target, ETextureFilter filter)
@@ -529,6 +615,9 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info)
 	case EFormat::RG32F:
 		internalFormat = GL_RG32F;
 		break;
+	case EFormat::RGBA32F:
+		internalFormat = GL_RGBA32F;
+		break;
 	default:
 		break;
 	}
@@ -547,6 +636,9 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info)
 		break;
 	case EFormat::RG32F:
 		format = GL_RG32F;
+		break;
+	case EFormat::RGBA32F:
+		format = GL_RGBA32F;
 		break;
 	default:
 		break;
@@ -570,22 +662,33 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info)
 
 	auto rt_gl = new jRenderTarget_OpenGL();
 	rt_gl->Info = info;
-
+	
+	JASSERT(info.TextureCount > 0);
 	if (info.TextureType == ETextureType::TEXTURE_2D)
 	{
 		uint32 fbo = 0;
 		glGenFramebuffers(1, &fbo);
 		glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 
-		uint32 tbo = 0;
-		glGenTextures(1, &tbo);
-		glBindTexture(GL_TEXTURE_2D, tbo);
-		glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, info.Width, info.Height, 0, format, formatType, nullptr);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tbo, 0);
+		rt_gl->Textures.resize(info.TextureCount);
+		for (int i = 0; i < info.TextureCount; ++i)
+		{
+			uint32 tbo = 0;
+			glGenTextures(1, &tbo);
+			glBindTexture(GL_TEXTURE_2D, tbo);
+			glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, info.Width, info.Height, 0, format, formatType, nullptr);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, tbo, 0);
+			rt_gl->drawBuffers.push_back(GL_COLOR_ATTACHMENT0 + i);
+
+			auto tex_gl = new jTexture_OpenGL();
+			tex_gl->TextureType = info.TextureType;
+			tex_gl->TextureID = tbo;
+			rt_gl->Textures[i] = tex_gl;
+		}
 
 		uint32 rbo = 0;
 		glGenRenderbuffers(1, &rbo);
@@ -602,29 +705,29 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info)
 			return nullptr;
 		}
 
-		auto tex_gl = new jTexture_OpenGL();
-		tex_gl->TextureType = info.TextureType;
-		tex_gl->textureID = tbo;
-		rt_gl->Texture[0] = tex_gl;
-		
-		rt_gl->fbo[0] = fbo;
-		rt_gl->tbo[0] = tbo;
-		rt_gl->rbo[0] = rbo;
+	
+		rt_gl->fbos.push_back(fbo);
+		rt_gl->rbos.push_back(rbo);
 	}
 	else if (info.TextureType == ETextureType::TEXTURE_2D_ARRAY)
 	{
+		auto tex_gl = new jTexture_OpenGL();
+
 		uint32 tbo = 0;
 		glGenTextures(1, &tbo);
 		glBindTexture(GL_TEXTURE_2D_ARRAY, tbo);
 		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, internalFormat, info.Width, info.Height, 6, 0, format, formatType, nullptr);
+		glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, internalFormat, info.Width, info.Height, info.TextureCount, 0, format, formatType, nullptr);
 
 		uint32 fbo = 0;
 		glGenFramebuffers(1, &fbo);
 		glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-		for (int32 i = 0; i < 6; ++i)
+		for (int32 i = 0; i < info.TextureCount; ++i)
+		{
 			glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, tbo, 0, i);
+			rt_gl->drawBuffers.push_back(GL_COLOR_ATTACHMENT0 + i);
+		}
 
 		uint32 rbo = 0;
 		glGenRenderbuffers(1, &rbo);
@@ -641,17 +744,17 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info)
 			return nullptr;
 		}
 
-		auto tex_gl = new jTexture_OpenGL();
 		tex_gl->TextureType = info.TextureType;
-		tex_gl->textureID = tbo;
-		rt_gl->Texture[0] = tex_gl;
+		tex_gl->TextureID = tbo;
+		rt_gl->Textures.push_back(tex_gl);
 
-		rt_gl->fbo[0] = fbo;
-		rt_gl->tbo[0] = tbo;
-		rt_gl->rbo[0] = rbo;
+		rt_gl->fbos.push_back(fbo);
+		rt_gl->rbos.push_back(rbo);
 	}
 	else if (info.TextureType == ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW)
 	{
+		auto tex_gl = new jTexture_OpenGL();
+
 		uint32 texture2DArray = 0;
 		glGenTextures(1, &texture2DArray);
 		glBindTexture(GL_TEXTURE_2D_ARRAY, texture2DArray);
@@ -662,19 +765,19 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info)
 		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 		glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, internalFormat, info.Width, info.Height, 6, 0, format, formatType, nullptr);
 
-		uint32 framebuffers[] = {0, 0, 0, 0, 0, 0};
-		uint32 renderbuffers[] = { 0, 0, 0, 0, 0, 0 };
-
-		for (int32 i = 0; i < 6; ++i)
+		for (int32 i = 0; i < info.TextureCount; ++i)
 		{
-			glGenFramebuffers(1, &framebuffers[i]);
-			glBindFramebuffer(GL_FRAMEBUFFER, framebuffers[i]);
+			uint32 fbo = 0;
+			uint32 rbo = 0;
+
+			glGenFramebuffers(1, &fbo);
+			glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 			glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, texture2DArray, 0, i);
 
-			glGenRenderbuffers(1, &renderbuffers[i]);
-			glBindRenderbuffer(GL_RENDERBUFFER, renderbuffers[i]);
+			glGenRenderbuffers(1, &rbo);
+			glBindRenderbuffer(GL_RENDERBUFFER, rbo);
 			glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, info.Width, info.Height);
-			glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, renderbuffers[i]);
+			glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo);
 
 			if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 			{
@@ -684,14 +787,21 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info)
 				JMESSAGE(szTemp);
 				return nullptr;
 			}
+
+			rt_gl->fbos.push_back(fbo);
+			rt_gl->rbos.push_back(rbo);
 		}
+		rt_gl->drawBuffers.push_back(GL_COLOR_ATTACHMENT0);
 
 		//////////////////////////////////////////
 		uint32 mrt_fbo = 0;
 		glGenFramebuffers(1, &mrt_fbo);
 		glBindFramebuffer(GL_FRAMEBUFFER, mrt_fbo);
-		for (int32 i = 0; i < 6; ++i)
+		for (int32 i = 0; i < info.TextureCount; ++i)
+		{
 			glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, texture2DArray, 0, i);
+			rt_gl->mrt_drawBuffers.push_back(GL_COLOR_ATTACHMENT0 + i);
+		}
 
 		uint32 mrt_rbo = 0;
 		glGenRenderbuffers(1, &mrt_rbo);
@@ -709,17 +819,10 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info)
 		}
 		//////////////////////////////////////////
 
-		auto tex_gl = new jTexture_OpenGL();
 		tex_gl->TextureType = info.TextureType;
-		tex_gl->textureID = texture2DArray;
-		rt_gl->Texture[0] = tex_gl;
+		tex_gl->TextureID = texture2DArray;
+		rt_gl->Textures.push_back(tex_gl);
 
-		rt_gl->tbo[0] = texture2DArray;
-		for (int32 i = 0; i < 6; ++i)
-		{
-			rt_gl->fbo[i] = framebuffers[i];
-			rt_gl->rbo[i] = renderbuffers[i];
-		}
 		rt_gl->mrt_fbo = mrt_fbo;
 		rt_gl->mrt_rbo = mrt_rbo;
 	}
@@ -732,7 +835,6 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info)
 		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		rt_gl->tbo[0] = tbo;
 
 
 		for (int i = 0; i < 6; ++i)
@@ -740,8 +842,8 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info)
 
 		auto tex_gl = new jTexture_OpenGL();
 		tex_gl->TextureType = info.TextureType;
-		tex_gl->textureID = tbo;
-		rt_gl->Texture[0] = tex_gl;
+		tex_gl->TextureID = tbo;
+		rt_gl->Textures.push_back(tex_gl);
 
 		for (int i = 0; i < 6; ++i)
 		{
@@ -765,9 +867,11 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info)
 				return nullptr;
 			}
 
-			rt_gl->fbo[0] = fbo;
-			rt_gl->rbo[0] = rbo;
+			rt_gl->fbos.push_back(fbo);
+			rt_gl->rbos.push_back(rbo);
 		}
+
+		rt_gl->drawBuffers.push_back(GL_COLOR_ATTACHMENT0);
 	}
 	else
 	{
@@ -1170,7 +1274,10 @@ bool jRenderTarget_OpenGL::Begin(int index, bool mrt)
 	if (mrt && mrt_fbo)
 		glBindFramebuffer(GL_FRAMEBUFFER, mrt_fbo);
 	else
-		glBindFramebuffer(GL_FRAMEBUFFER, fbo[index]);
+		glBindFramebuffer(GL_FRAMEBUFFER, fbos[index]);
+
+	JASSERT(drawBuffers.size() > 0);
+	glDrawBuffers(drawBuffers.size(), &drawBuffers[0]);
 
 	glViewport(0, 0, Info.Width, Info.Height);
 	//glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -1188,28 +1295,21 @@ void jRenderTarget_OpenGL::End()
 //////////////////////////////////////////////////////////////////////////
 void jUniformBufferBlock_OpenGL::UpdateBufferData(void* newData, int32 size)
 {
-	if (size != Size)
-	{
-		if (Data)
-			delete[] Data;
-		Data = new char[size];
-	}
-	memcpy(Data, newData, size);
 	Size = size;
-	UpdateBufferData();
+	glBindBuffer(GL_UNIFORM_BUFFER, UBO);
+	glBufferData(GL_UNIFORM_BUFFER, size, newData, GL_DYNAMIC_DRAW);
 }
 
-void jUniformBufferBlock_OpenGL::UpdateBufferData()
+void jUniformBufferBlock_OpenGL::ClearBuffer(int32 clearValue)
 {
 	glBindBuffer(GL_UNIFORM_BUFFER, UBO);
-	glBufferData(GL_UNIFORM_BUFFER, Size, Data, GL_DYNAMIC_DRAW);
+	glClearBufferData(GL_UNIFORM_BUFFER, GL_R32I, GL_RED_INTEGER, GL_INT, &clearValue);
 }
 
 void jUniformBufferBlock_OpenGL::Init()
 {
-	BindingPoint = IUniformBufferBlock::GetBindPoint();
+	BindingPoint = GetBindPoint();
 	glGenBuffers(1, &UBO);
-	UpdateBufferData();
 	glBindBufferBase(GL_UNIFORM_BUFFER, BindingPoint, UBO);
 }
 
@@ -1222,4 +1322,90 @@ void jUniformBufferBlock_OpenGL::Bind(jShader* shader) const
 	uint32 index = glGetUniformBlockIndex(shader_gl->program, Name.c_str());
 	if (-1 != index)
 		glUniformBlockBinding(shader_gl->program, index, BindingPoint);
+}
+
+void jShaderStorageBufferObject_OpenGL::Init()
+{
+	BindingPoint = GetBindPoint();
+	glGenBuffers(1, &SSBO);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, BindingPoint, SSBO);
+}
+
+void jShaderStorageBufferObject_OpenGL::UpdateBufferData(void* newData, int32 size)
+{
+	Size = size;
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, SSBO);
+	glBufferData(GL_SHADER_STORAGE_BUFFER, size, newData, GL_DYNAMIC_COPY);
+}
+
+void jShaderStorageBufferObject_OpenGL::ClearBuffer(int32 clearValue)
+{
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, SSBO);
+	glClearBufferData(GL_SHADER_STORAGE_BUFFER, GL_R32I, GL_RED_INTEGER, GL_INT, &clearValue);
+}
+
+void jShaderStorageBufferObject_OpenGL::GetBufferData(void* newData, int32 size)
+{
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, SSBO);
+	void* p = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+	if (p)
+		memcpy(newData, p, size);
+	glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+}
+
+void jShaderStorageBufferObject_OpenGL::Bind(jShader* shader) const
+{
+	if (-1 == BindingPoint)
+		return;
+
+	auto shader_gl = static_cast<jShader_OpenGL*>(shader);
+	uint32 index = glGetProgramResourceIndex(shader_gl->program, GL_SHADER_STORAGE_BLOCK, Name.c_str());
+	if (-1 != index)
+		glShaderStorageBlockBinding(shader_gl->program, index, BindingPoint);
+}
+
+void jAtomicCounterBuffer_OpenGL::Init()
+{
+	glGenBuffers(1, &ACBO);
+	glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER, BindingPoint, ACBO);
+}
+
+void jAtomicCounterBuffer_OpenGL::UpdateBufferData(void* newData, int32 size)
+{
+	Size = size;
+	glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, ACBO);
+	glBufferData(GL_ATOMIC_COUNTER_BUFFER, size, newData, GL_DYNAMIC_COPY);
+}
+
+void jAtomicCounterBuffer_OpenGL::GetBufferData(void* newData, int32 size)
+{
+	glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, ACBO);
+	void* p = glMapBuffer(GL_ATOMIC_COUNTER_BUFFER, GL_READ_ONLY);
+	if (p)
+		memcpy(newData, p, size);
+	glUnmapBuffer(GL_ATOMIC_COUNTER_BUFFER);
+}
+
+void jAtomicCounterBuffer_OpenGL::ClearBuffer(int32 clearValue)
+{
+	glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, ACBO);
+	glClearBufferData(GL_ATOMIC_COUNTER_BUFFER, GL_R32I, GL_RED_INTEGER, GL_INT, &clearValue);
+}
+
+void jAtomicCounterBuffer_OpenGL::Bind(jShader* shader) const
+{
+	if (-1 == BindingPoint)
+		return;
+
+	//glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, ACBO);
+	//void* p = glMapBuffer(GL_ATOMIC_COUNTER_BUFFER, GL_WRITE_ONLY);
+	//if (Data)
+	//	memcpy(p, Data, Size);
+	//glUnmapBuffer(GL_ATOMIC_COUNTER_BUFFER);
+
+	//auto shader_gl = static_cast<jShader_OpenGL*>(shader);
+	//uint32 index = glGetUniformLocation(shader_gl->program, Name.c_str());
+	//uint32 index = glGetProgramResourceIndex(shader_gl->program, GL_ATOMIC_COUNTER_BUFFER, Name.c_str());
+	//if (-1 != index)
+	//	glShaderStorageBlockBinding(shader_gl->program, index, BindingPoint);
 }

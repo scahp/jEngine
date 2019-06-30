@@ -48,12 +48,14 @@ public:
 	Vector2 Size;
 
 	virtual void Draw(jCamera* camera, jShader* shader, jLight* light) override;
+
+	void SetUniformParams(jShader* shader);
+
 };
 
 class jFullscreenQuadPrimitive : public jObject
 {
 public:
-	jTexture* Texture = nullptr;
 	bool IsVertical = true;
 	float MaxDist = 0.0f;
 

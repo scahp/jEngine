@@ -93,6 +93,7 @@ enum class EFormat
 	RGBA = 1,
 	RG,
 	RG32F,
+	RGBA32F,
 };
 
 enum class EFormatType

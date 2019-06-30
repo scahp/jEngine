@@ -11,6 +11,12 @@ struct jShader;
 struct jMaterialData;
 struct jTexture;
 
+enum class EShadingModel : int32
+{
+	BASE = 0,
+	HAIR,
+};
+
 class jRenderObject
 {
 public:
@@ -19,8 +25,12 @@ public:
 
 	void CreateRenderObject(const std::shared_ptr<jVertexStreamData>& vertexStream, const std::shared_ptr<jIndexStreamData>& indexStream);
 
-	void Draw(jCamera* camera, jShader* shader);
-	void Draw(jCamera* camera, jShader* shader, jLight* light);
+	void Draw(jCamera* camera, jShader* shader, int32 startIndex = -1, int32 count = -1);
+	void Draw(jCamera* camera, jShader* shader, jLight* light, int32 startIndex = -1, int32 count = -1);
+
+	// todo 함수를 줄일까? 아니면 이렇게 쓸까? 고민
+	void Draw(jCamera* camera, jShader* shader, int32 startIndex, int32 count, int32 baseVertexIndex);
+	void Draw(jCamera* camera, jShader* shader, jLight* light, int32 startIndex, int32 count, int32 baseVertexIndex);
 	
 	void SetRenderProperty(jShader* shader);
 	void SetCameraProperty(jShader* shader, jCamera* camera);
@@ -42,6 +52,13 @@ public:
 	Vector Pos = Vector::ZeroVector;
 	Vector Rot = Vector::ZeroVector;
 	Vector Scale = Vector::OneVector;
+
+
+	// todo 정리 필요.
+	int UseUniformColor = 0;
+	Vector4 Color = Vector4::OneVector;
+	int UseMaterial = 0;
+	EShadingModel ShadingModel = EShadingModel::BASE;
 
 	Matrix World;
 

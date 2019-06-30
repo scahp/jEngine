@@ -11,6 +11,7 @@ struct jShader;
 class jPointLight;
 class jSpotLight;
 class jRenderer;
+struct jRenderTarget;
 
 class jGame
 {
@@ -36,6 +37,15 @@ public:
 	jShader* BaseShader = nullptr;
 	jShader* ShadowVolumeBaseShader = nullptr;
 	jShader* ShadowVolumeInfinityFarShader = nullptr;
+	
+	jShader* ExpDeepShadowMapGenShader = nullptr;
+	jShader* DeepShadowMapGenShader = nullptr;
+	jShader* Hair_Shader = nullptr;
+	jShader* ExpDeepShadowFull_Shader = nullptr;
+	jShader* DeepShadowFull_Shader = nullptr;
+	jShader* DeepShadowAA_Shader = nullptr;
+	jShader* Deferred_Shader = nullptr;
+	jShader* ExpDeferred_Shader = nullptr;
 
 	class jObject* Sphere = nullptr;
 

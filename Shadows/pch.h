@@ -9,6 +9,8 @@
 #ifndef PCH_H
 #define PCH_H
 
+#include <windows.h>
+
 // TODO: add headers that you want to pre-compile here
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -26,6 +28,7 @@
 #include <functional>
 #include <sstream>
 #include <set>
+#include <algorithm>
 
 
 #define JASSERT(x) assert(x)
@@ -43,11 +46,13 @@ using uint64 = unsigned __int64;
 using tchar = wchar_t;
 
 // settings
-const unsigned int SCR_WIDTH = 800;
-const unsigned int SCR_HEIGHT = 600;
+const unsigned int SCR_WIDTH = 1280;
+const unsigned int SCR_HEIGHT = 720;
 
 const unsigned int SM_WIDTH = 512;
 const unsigned int SM_HEIGHT = 512;
+
+#define FORCEINLINE __forceinline
 
 enum class EMouseButtonType
 {
@@ -72,5 +77,8 @@ inline void hash_combine(std::size_t& seed, const T& v)
 #include "jRHIType.h"
 
 ERenderBufferType MakeRenderBufferTypeList(const std::initializer_list<ERenderBufferType>& list);
+
+extern struct jRenderTarget* GBuffer;
+
 
 #endif //PCH_H

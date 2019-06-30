@@ -28,6 +28,9 @@
     <Filter Include="Shaders\fullscreen">
       <UniqueIdentifier>{a4e5db5f-666f-49b8-88c9-a503fa4162dc}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders\compute">
+      <UniqueIdentifier>{3d6c23d8-7b15-4ec7-85cb-fe2c92541182}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h">
@@ -138,6 +141,9 @@
     <ClInclude Include="jMeshObject.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="jModelLoader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -240,6 +246,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="jMeshObject.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="jModelLoader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -345,6 +354,51 @@
     </None>
     <None Include="Shaders\tex_vs.glsl">
       <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\shadowmap\fs_hair.glsl">
+      <Filter>Shaders\shadowmap</Filter>
+    </None>
+    <None Include="Shaders\shadowmap\vs_hair.glsl">
+      <Filter>Shaders\shadowmap</Filter>
+    </None>
+    <None Include="Shaders\compute\compute_example.glsl">
+      <Filter>Shaders\compute</Filter>
+    </None>
+    <None Include="Shaders\shadowmap\fs_deepShadowMap.glsl">
+      <Filter>Shaders\shadowmap</Filter>
+    </None>
+    <None Include="Shaders\compute\compute_sort_linkedlist.glsl">
+      <Filter>Shaders\compute</Filter>
+    </None>
+    <None Include="Shaders\shadowmap\fs_deferred.glsl">
+      <Filter>Shaders\shadowmap</Filter>
+    </None>
+    <None Include="Shaders\shadowmap\vs_deferred.glsl">
+      <Filter>Shaders\shadowmap</Filter>
+    </None>
+    <None Include="Shaders\fullscreen\fs_deepshadow.glsl">
+      <Filter>Shaders\fullscreen</Filter>
+    </None>
+    <None Include="Shaders\fullscreen\vs_deepshadow.glsl">
+      <Filter>Shaders\fullscreen</Filter>
+    </None>
+    <None Include="Shaders\compute\compute_link_linkedlist.glsl">
+      <Filter>Shaders\compute</Filter>
+    </None>
+    <None Include="Shaders\fullscreen\fs_expdeepshadow.glsl">
+      <Filter>Shaders\fullscreen</Filter>
+    </None>
+    <None Include="Shaders\fullscreen\vs_expdeepshadow.glsl">
+      <Filter>Shaders\fullscreen</Filter>
+    </None>
+    <None Include="Shaders\shadowmap\fs_expDeepShadowMap.glsl">
+      <Filter>Shaders\shadowmap</Filter>
+    </None>
+    <None Include="Shaders\shadowmap\fs_expDeferred.glsl">
+      <Filter>Shaders\shadowmap</Filter>
+    </None>
+    <None Include="Shaders\fullscreen\fs_deepshadow_aa.glsl">
+      <Filter>Shaders\fullscreen</Filter>
     </None>
   </ItemGroup>
 </Project>

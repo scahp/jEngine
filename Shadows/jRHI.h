@@ -36,12 +36,14 @@ struct jShaderInfo
 {
 	size_t CreateShaderHash() const
 	{
-		return std::hash<std::string>{}(vs+vsPreProcessor+fs+fsPreProcessor);
+		return std::hash<std::string>{}(vs+vsPreProcessor+fs+fsPreProcessor+cs+csPreProcessor);
 	}
 	std::string vs;
 	std::string fs;
+	std::string cs;
 	std::string vsPreProcessor;
 	std::string fsPreProcessor;
+	std::string csPreProcessor;
 };
 
 struct jShader
@@ -114,6 +116,12 @@ DECLARE_UNIFORMBUFFER(EUniformType::VECTOR4, Vector4);
 //	Matrix Data;
 //};
 
+static int32 GetBindPoint()
+{
+	static int32 s_index = 0;
+	return s_index++;
+}
+
 struct IUniformBufferBlock
 {
 	IUniformBufferBlock() = default;
@@ -122,22 +130,63 @@ struct IUniformBufferBlock
 	{}
 	virtual ~IUniformBufferBlock() {}
 
-	static int32 GetBindPoint()
-	{
-		static int32 s_index = 0;
-		return s_index++;
-	}
-
 	std::string Name;
-	void* Data = nullptr;
 	int32 Size = 0;
 
 	virtual void Init() = 0;
-	virtual void UpdateBufferData() = 0;
 	virtual void Bind(jShader* shader) const = 0;
 	virtual void UpdateBufferData(void* newData, int32 size) = 0;
+	virtual void ClearBuffer(int32 clearValue = 0) = 0;
 };
 
+struct IShaderStorageBufferObject
+{
+	IShaderStorageBufferObject() = default;
+	IShaderStorageBufferObject(const std::string& name)
+		: Name(name)
+	{}
+	virtual ~IShaderStorageBufferObject() {}
+
+	std::string Name;
+	int32 Size = 0;
+
+	virtual void Init() = 0;
+	virtual void Bind(jShader* shader) const = 0;
+	virtual void UpdateBufferData(void* newData, int32 size) = 0;
+	virtual void GetBufferData(void* newData, int32 size) = 0;
+	virtual void ClearBuffer(int32 clearValue) = 0;
+
+	template <typename T>
+	void GetBufferData(typename std::remove_reference<T>::type& out)
+	{
+		GetBufferData(&out, sizeof(T));
+	}
+};
+
+struct IAtomicCounterBuffer
+{
+	IAtomicCounterBuffer() = default;
+	IAtomicCounterBuffer(const std::string& name, uint32 bindingPoint)
+		: Name(name), BindingPoint(bindingPoint)
+	{}
+	virtual ~IAtomicCounterBuffer() {}
+
+	std::string Name;
+	int32 Size = 0;
+	uint32 BindingPoint = -1;
+
+	virtual void Init() = 0;
+	virtual void Bind(jShader* shader) const = 0;
+	virtual void UpdateBufferData(void* newData, int32 size) = 0;
+	virtual void GetBufferData(void* newData, int32 size) = 0;
+	virtual void ClearBuffer(int32 clearValue) = 0;
+
+	template <typename T>
+	void GetBufferData(typename std::remove_reference<T>::type& out)
+	{
+		GetBufferData(&out, sizeof(T));
+	}
+};
 
 struct IMaterialParam
 {
@@ -169,6 +218,8 @@ struct jRenderTargetInfo
 		hash_combine(result, FormatType);
 		hash_combine(result, Width);
 		hash_combine(result, Height);
+		hash_combine(result, Height);
+		hash_combine(result, TextureCount);
 		return result;
 	}
 
@@ -178,20 +229,21 @@ struct jRenderTargetInfo
 	EFormatType FormatType = EFormatType::BYTE;
 	int32 Width = 0;
 	int32 Height = 0;
+	int32 TextureCount = 1;
 };
 
 struct jRenderTarget
 {
 	virtual ~jRenderTarget() {}
 
-	virtual jTexture* GetTexture(int32 index = 0) const { return Texture[0]; }
+	virtual jTexture* GetTexture(int32 index = 0) const { return Textures[index]; }
 	virtual ETextureType GetTextureType() const { return Info.TextureType; }
 
 	virtual bool Begin(int index = 0, bool mrt = false) { return true; };
 	virtual void End() {}
 
 	jRenderTargetInfo Info;
-	jTexture* Texture[6] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
+	std::vector<jTexture*> Textures;
 };
 
 struct jPipeline
@@ -227,9 +279,10 @@ public:
 
 	virtual void SetTexture(int32 index, jTexture* texture) {}
 	
-	virtual void DrawArray(EPrimitiveType type, int vertStartIndex, int vertCount);
-	virtual void DrawElement(EPrimitiveType type, int elementCount, int elementSize);
-
+	virtual void DrawArray(EPrimitiveType type, int vertStartIndex, int vertCount) {}
+	virtual void DrawElement(EPrimitiveType type, int elementSize, int32 startIndex = -1, int32 count = -1) {}
+	virtual void DrawElementBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex) {}
+	
 	virtual void SetShader(jShader* shader) {}
 	virtual jShader* CreateShader(const jShaderInfo& shaderInfo) { return nullptr; }
 
@@ -262,5 +315,9 @@ public:
 	virtual void SetColorMask(bool r, bool g, bool b, bool a) {}
 
 	virtual IUniformBufferBlock* CreateUniformBufferBlock(const char* blockname) const { return nullptr; }
+	virtual IShaderStorageBufferObject* CreateShaderStorageBufferObject(const char* blockname) const { return nullptr; }
+	virtual IAtomicCounterBuffer* CreateAtomicCounterBuffer(const char* name, int32 bindingPoint) const { return nullptr; }
+
+	virtual void EnableSRGB(bool enable) {  }
 };
 

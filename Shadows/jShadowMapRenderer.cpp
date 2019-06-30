@@ -147,7 +147,7 @@ void jShadowMapRenderer::ShadowPrePass(jCamera* camera)
 		case EShadowMapType::ESM:
 		case EShadowMapType::EVSM:
 		{
-			auto vsmBlurRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RG32F, EFormat::RG, EFormatType::FLOAT, SM_WIDTH, SM_HEIGHT });
+			auto vsmBlurRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RG32F, EFormat::RG, EFormatType::FLOAT, SM_WIDTH, SM_HEIGHT, 1 });
 
 			////////////////////
 			// Directional Shadow
@@ -179,7 +179,7 @@ void jShadowMapRenderer::ShadowPrePass(jCamera* camera)
 
 			jRenderTargetPool::ReturnRenderTarget(vsmBlurRenderTarget);
 
-			auto vsmTexArrayBlurRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW, EFormat::RG32F, EFormat::RG, EFormatType::FLOAT, SM_WIDTH, SM_HEIGHT });
+			auto vsmTexArrayBlurRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW, EFormat::RG32F, EFormat::RG, EFormatType::FLOAT, SM_WIDTH, SM_HEIGHT, 6 });
 			const std::initializer_list<EDrawBufferType> drawBufferArray = { EDrawBufferType::COLOR_ATTACHMENT0, EDrawBufferType::COLOR_ATTACHMENT1, EDrawBufferType::COLOR_ATTACHMENT2
 				, EDrawBufferType::COLOR_ATTACHMENT3, EDrawBufferType::COLOR_ATTACHMENT4, EDrawBufferType::COLOR_ATTACHMENT5 };
 
@@ -338,6 +338,11 @@ void jShadowMapRenderer::RenderPass(jCamera* camera)
 		}
 	}
 
+	for (auto& iter : g_HairObjectArray)
+	{
+		iter->Draw(camera, Hair_Shader);
+	}
+
 //	// 3. Transparent object render
 //	gl.enable(gl.BLEND);
 //	gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -425,8 +430,13 @@ void jShadowMapRenderer::Setup()
 
 	SSM.vs = "shaders/shadowmap/vs.glsl";
 	SSM.fs = "shaders/shadowmap/fs.glsl";
-	SSM.fsPreProcessor = "#define USE_TEXTURE";
+	SSM.vsPreProcessor = "#define USE_TEXTURE 1\r\n#define USE_MATERIAL 1";
+	SSM.fsPreProcessor = "#define USE_TEXTURE 1\r\n#define USE_MATERIAL 1";
 	SSM_Shader = jShader::CreateShader(SSM);
+
+	Hair.vs = "shaders/shadowmap/vs_hair.glsl";
+	Hair.fs = "shaders/shadowmap/fs_hair.glsl";
+	Hair_Shader = jShader::CreateShader(Hair);
 
 	// Shadow Gen
 	ShadowGen_VSM.vs = "shaders/shadowmap/vs_varianceShadowMap.glsl";

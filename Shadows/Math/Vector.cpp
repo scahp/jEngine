@@ -30,6 +30,7 @@ void Vector::operator=(struct Vector4 const& vector)
 //////////////////////////////////////////////////////////////////////////
 
 // Vector4
+const Vector4 Vector4::OneVector = Vector4(1.0f);
 const Vector4 Vector4::ZeroVector = Vector4(ZeroType);
 const Vector4 Vector4::FowardVector = Vector4(0.0f, 0.0f, 1.0f, 0.0f);
 const Vector4 Vector4::RightVector = Vector4(1.0f, 0.0f, 0.0f, 0.0f);

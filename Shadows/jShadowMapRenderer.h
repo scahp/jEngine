@@ -30,6 +30,7 @@ public:
 	jShader* ESM_Shader = nullptr;
 	jShader* EVSM_Shader = nullptr;
 	jShader* SSM_Shader = nullptr;
+	jShader* Hair_Shader = nullptr;
 
 	jShaderInfo Blur;
 	jShaderInfo BlurOmni;
@@ -42,6 +43,7 @@ public:
 	jShaderInfo ESM;
 	jShaderInfo EVSM;
 	jShaderInfo SSM;
+	jShaderInfo Hair;
 
 	//////////////////////////////////////////////////////////////////////////
 	// Shadow Gen

@@ -1,4 +1,5 @@
-﻿precision mediump float;
+
+precision mediump float;
 
 struct jAmbientLight
 {
@@ -40,7 +41,7 @@ struct jSpotLight
 
 struct jMaterial
 {
-    vec3 Diffuse;
+    vec4 Diffuse;
     vec3 Emissive;
     vec3 Specular;
     float Shininess;

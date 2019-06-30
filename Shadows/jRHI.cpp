@@ -17,16 +17,6 @@ void jRHI::MapBufferdata(jBuffer* buffer)
 
 }
 
-void jRHI::DrawArray(EPrimitiveType type, int vertStartIndex, int vertCount)
-{
-
-}
-
-void jRHI::DrawElement(EPrimitiveType type, int elementCount, int elementSize)
-{
-
-}
-
 jShader* jShader::GetShader(size_t hashCode)
 {
 	auto it_find = ShaderMap.find(hashCode);

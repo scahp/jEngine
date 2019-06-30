@@ -84,13 +84,13 @@ jHairObject* jHairModelLoader::CreateHairObject(const char* filename)
 				vertexData[point * 2 + 0].z = points[point * 3 + 1];
 				vertexData[point * 2 + 0].y = points[point * 3 + 2];
 
-				normalData[point * 2 + 1].x = dirs[point * 3 + 0];
-				normalData[point * 2 + 1].z = dirs[point * 3 + 1];
-				normalData[point * 2 + 1].y = dirs[point * 3 + 2];
+				normalData[point * 2 + 0].x = dirs[point * 3 + 0];
+				normalData[point * 2 + 0].z = dirs[point * 3 + 1];
+				normalData[point * 2 + 0].y = dirs[point * 3 + 2];
 
-				vertexData[point * 2 + 0].x = points[(point + 1) * 3 + 0];
-				vertexData[point * 2 + 0].z = points[(point + 1) * 3 + 1];
-				vertexData[point * 2 + 0].y = points[(point + 1) * 3 + 2];
+				vertexData[point * 2 + 1].x = points[(point + 1) * 3 + 0];
+				vertexData[point * 2 + 1].z = points[(point + 1) * 3 + 1];
+				vertexData[point * 2 + 1].y = points[(point + 1) * 3 + 2];
 
 				normalData[point * 2 + 1].x = dirs[(point + 1) * 3 + 0];
 				normalData[point * 2 + 1].z = dirs[(point + 1) * 3 + 1];
@@ -111,13 +111,13 @@ jHairObject* jHairModelLoader::CreateHairObject(const char* filename)
 				vertexData[point * 2 + 0].z = points[point * 3 + 1];
 				vertexData[point * 2 + 0].y = points[point * 3 + 2];
 
-				normalData[point * 2 + 1].x = dirs[point * 3 + 0];
-				normalData[point * 2 + 1].z = dirs[point * 3 + 1];
-				normalData[point * 2 + 1].y = dirs[point * 3 + 2];
+				normalData[point * 2 + 0].x = dirs[point * 3 + 0];
+				normalData[point * 2 + 0].z = dirs[point * 3 + 1];
+				normalData[point * 2 + 0].y = dirs[point * 3 + 2];
 
-				vertexData[point * 2 + 0].x = points[(point + 1) * 3 + 0];
-				vertexData[point * 2 + 0].z = points[(point + 1) * 3 + 1];
-				vertexData[point * 2 + 0].y = points[(point + 1) * 3 + 2];
+				vertexData[point * 2 + 1].x = points[(point + 1) * 3 + 0];
+				vertexData[point * 2 + 1].z = points[(point + 1) * 3 + 1];
+				vertexData[point * 2 + 1].y = points[(point + 1) * 3 + 2];
 
 				normalData[point * 2 + 1].x = dirs[(point + 1) * 3 + 0];
 				normalData[point * 2 + 1].z = dirs[(point + 1) * 3 + 1];
@@ -133,7 +133,7 @@ jHairObject* jHairModelLoader::CreateHairObject(const char* filename)
 
 	{
 		auto streamParam = new jStreamParam<float>();
-		streamParam->BufferType = EBufferType::DYNAMIC;
+		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->Stride = sizeof(float) * 3;
@@ -161,8 +161,12 @@ jHairObject* jHairModelLoader::CreateHairObject(const char* filename)
 	auto object = new jHairObject();
 	object->RenderObject = new jRenderObject();
 	object->RenderObject->CreateRenderObject(vertexStreamData, nullptr);
+	object->RenderObject->Color = hairColor;
+	object->RenderObject->UseUniformColor = 1;
+	object->RenderObject->ShadingModel = EShadingModel::HAIR;
 
 	delete vertexData;
+	delete normalData;
 	delete dirs;
 
 	return object;

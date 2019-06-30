@@ -70,6 +70,24 @@ public:
 		TwRemoveVar(Bar, variableName);
 	}
 
+	void SetStep(const char* variableName, float step)
+	{
+		TwSetParam(Bar, variableName, "step", TW_PARAM_FLOAT, 1, &step);
+	}
+
+	void SetMinMax(const char* variableName, float min, float max)
+	{
+		TwSetParam(Bar, variableName, "min", TW_PARAM_FLOAT, 1, &min);
+		TwSetParam(Bar, variableName, "max", TW_PARAM_FLOAT, 1, &max);
+	}
+
+	void SetMinMax(const char* variableName, int32 min, int32 max)
+	{
+		TwSetParam(Bar, variableName, "min", TW_PARAM_INT32, 1, &min);
+		TwSetParam(Bar, variableName, "max", TW_PARAM_INT32, 1, &max);
+	}
+
+
 
 private:
 	TwBar* Bar = nullptr;

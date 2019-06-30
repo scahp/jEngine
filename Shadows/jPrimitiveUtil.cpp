@@ -35,6 +35,12 @@ void jBillboardQuadPrimitive::Update(float deltaTime)
 
 void jUIQuadPrimitive::Draw(jCamera* camera, jShader* shader, jLight* light)
 {
+	SetUniformParams(shader);
+	__super::Draw(camera, shader, light);
+}
+
+void jUIQuadPrimitive::SetUniformParams(jShader* shader)
+{
 	auto temp1 = jUniformBuffer<Vector2>("PixelSize", Vector2(1.0f / SCR_WIDTH, 1.0f / SCR_HEIGHT));
 	auto temp2 = jUniformBuffer<Vector2>("Pos", Pos);
 	auto temp3 = jUniformBuffer<Vector2>("Size", Size);
@@ -43,8 +49,6 @@ void jUIQuadPrimitive::Draw(jCamera* camera, jShader* shader, jLight* light)
 	g_rhi->SetUniformbuffer(&temp1, shader);
 	g_rhi->SetUniformbuffer(&temp2, shader);
 	g_rhi->SetUniformbuffer(&temp3, shader);
-
-	__super::Draw(camera, shader, light);
 }
 
 void jFullscreenQuadPrimitive::Draw(jCamera* camera, jShader* shader)

@@ -25,7 +25,7 @@ int main()
 	// glfw: initialize and configure
 	// ------------------------------
 	glfwInit();
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	//glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, true);
@@ -50,6 +50,12 @@ int main()
 	glfwSetCursorPosCallback(window, cursor_position_callback);
 	glfwSetMouseButtonCallback(window, mouse_button_callback);
 	glfwSetScrollCallback(window, scroll_callback);
+	
+	//int major, minor, rev;
+	//glfwGetVersion(&major, &minor, &rev);
+	//auto versionCheck = glfwGetVersionString();
+
+	glfwSwapInterval(0);		// 0 is no limit fps
 
 	// glad: load all OpenGL function pointers
 	// ---------------------------------------
@@ -78,6 +84,7 @@ int main()
 		g_Engine.Update(0.0f);
 
 		TwDraw();
+		glFlush();
 
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
 		// -------------------------------------------------------------------------------

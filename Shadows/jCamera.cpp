@@ -51,8 +51,8 @@ void jCamera::UpdateCamera()
 
 	if (IsPerspectiveProjection)
 	{
-		// Projection = jCameraUtil::CreatePerspectiveMatrix(Width, Height, FOV, Far, Near);
-		Projection = jCameraUtil::CreatePerspectiveMatrixFarAtInfinity(Width, Height, FOV, Near);
+		 Projection = jCameraUtil::CreatePerspectiveMatrix(Width, Height, FOV, Far, Near);
+		//Projection = jCameraUtil::CreatePerspectiveMatrixFarAtInfinity(Width, Height, FOV, Near);
 	}
 	else
 	{
@@ -121,7 +121,7 @@ Matrix jCameraUtil::CreateViewMatrix(const Vector& pos, const Vector& target, co
 
 Matrix jCameraUtil::CreatePerspectiveMatrix(float width, float height, float fov, float farDist, float nearDist)
 {
-	const float F = 1.0f / tanf(fov);
+	const float F = 1.0f / tanf(fov / 2.0f);
 	const float farSubNear = (farDist - nearDist);
 
 	Matrix projMat;
@@ -134,7 +134,7 @@ Matrix jCameraUtil::CreatePerspectiveMatrix(float width, float height, float fov
 
 Matrix jCameraUtil::CreatePerspectiveMatrixFarAtInfinity(float width, float height, float fov, float nearDist)
 {
-	const float F = 1.0f / tanf(fov);
+	const float F = 1.0f / tanf(fov / 2.0f);
 
 	Matrix projMat;
 	projMat.m[0][0] = F * (height / width); projMat.m[0][1] = 0.0f;      projMat.m[0][2] = 0.0f;                      projMat.m[0][3] = 0.0f;

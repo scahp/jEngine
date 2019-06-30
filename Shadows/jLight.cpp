@@ -10,14 +10,14 @@ namespace jLightUtil
 {
 	jShadowMapData* CreateShadowMap(const Vector& direction, const Vector& pos)
 	{
-		auto tempPos = Vector(100.0f);
-		const auto target = tempPos + direction;
+		auto tempPos = Vector(100.0f) * direction;
+		const auto target = Vector::ZeroVector;
 		const auto up = tempPos + Vector(0.0f, 1.0f, 0.0f);
 
 		// todo remove constant variable
 		auto shadowMapData = new jShadowMapData("DirectionalLight");
-		shadowMapData->ShadowMapCamera = jCamera::CreateCamera(tempPos, target, up, DegreeToRadian(45.0f), 10.0f, 900.0f, 200.0f, 200.0f, false);
-		shadowMapData->ShadowMapRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RG32F, EFormat::RG, EFormatType::FLOAT, SM_WIDTH, SM_HEIGHT });
+		shadowMapData->ShadowMapCamera = jCamera::CreateCamera(tempPos, target, up, DegreeToRadian(90.0f), 1.0f, 900.0f, 100.0f, 100.0f, false);
+		shadowMapData->ShadowMapRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RG32F, EFormat::RG, EFormatType::FLOAT, SM_WIDTH, SM_HEIGHT, 1 });
 
 		return shadowMapData;
 	}
@@ -29,13 +29,13 @@ namespace jLightUtil
 
 		const float nearDist = 10.0f;
 		const float farDist = 500.0f;
-		shadowMapData->ShadowMapCamera[0] = jCamera::CreateCamera(pos, pos + Vector(1.0f, 0.0f, 0.0f), pos + Vector(0.0f, 1.0f, 0.0f), DegreeToRadian(45.0f), nearDist, farDist, SM_WIDTH, SM_HEIGHT, true);
-		shadowMapData->ShadowMapCamera[1] = jCamera::CreateCamera(pos, pos + Vector(-1.0f, 0.0f, 0.0f), pos + Vector(0.0f, 1.0f, 0.0f), DegreeToRadian(45.0f), nearDist, farDist, SM_WIDTH, SM_HEIGHT, true);
-		shadowMapData->ShadowMapCamera[2] = jCamera::CreateCamera(pos, pos + Vector(0.0f, 1.0f, 0.0f), pos + Vector(0.0f, 0.0f, -1.0f), DegreeToRadian(45.0f), nearDist, farDist, SM_WIDTH, SM_HEIGHT, true);
-		shadowMapData->ShadowMapCamera[3] = jCamera::CreateCamera(pos, pos + Vector(0.0f, -1.0f, 0.0f), pos + Vector(0.0f, 0.0f, 1.0f), DegreeToRadian(45.0f), nearDist, farDist, SM_WIDTH, SM_HEIGHT, true);
-		shadowMapData->ShadowMapCamera[4] = jCamera::CreateCamera(pos, pos + Vector(0.0f, 0.0f, 1.0f), pos + Vector(0.0f, 1.0f, 0.0f), DegreeToRadian(45.0f), nearDist, farDist, SM_WIDTH, SM_HEIGHT, true);
-		shadowMapData->ShadowMapCamera[5] = jCamera::CreateCamera(pos, pos + Vector(0.0f, 0.0f, -1.0f), pos + Vector(0.0f, 1.0f, 0.0f), DegreeToRadian(45.0f), nearDist, farDist, SM_WIDTH, SM_HEIGHT, true);
-		shadowMapData->ShadowMapRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW, EFormat::RG32F, EFormat::RG, EFormatType::FLOAT, SM_WIDTH, SM_HEIGHT });
+		shadowMapData->ShadowMapCamera[0] = jCamera::CreateCamera(pos, pos + Vector(1.0f, 0.0f, 0.0f), pos + Vector(0.0f, 1.0f, 0.0f), DegreeToRadian(90.0f), nearDist, farDist, SM_WIDTH, SM_HEIGHT, true);
+		shadowMapData->ShadowMapCamera[1] = jCamera::CreateCamera(pos, pos + Vector(-1.0f, 0.0f, 0.0f), pos + Vector(0.0f, 1.0f, 0.0f), DegreeToRadian(90.0f), nearDist, farDist, SM_WIDTH, SM_HEIGHT, true);
+		shadowMapData->ShadowMapCamera[2] = jCamera::CreateCamera(pos, pos + Vector(0.0f, 1.0f, 0.0f), pos + Vector(0.0f, 0.0f, -1.0f), DegreeToRadian(90.0f), nearDist, farDist, SM_WIDTH, SM_HEIGHT, true);
+		shadowMapData->ShadowMapCamera[3] = jCamera::CreateCamera(pos, pos + Vector(0.0f, -1.0f, 0.0f), pos + Vector(0.0f, 0.0f, 1.0f), DegreeToRadian(90.0f), nearDist, farDist, SM_WIDTH, SM_HEIGHT, true);
+		shadowMapData->ShadowMapCamera[4] = jCamera::CreateCamera(pos, pos + Vector(0.0f, 0.0f, 1.0f), pos + Vector(0.0f, 1.0f, 0.0f), DegreeToRadian(90.0f), nearDist, farDist, SM_WIDTH, SM_HEIGHT, true);
+		shadowMapData->ShadowMapCamera[5] = jCamera::CreateCamera(pos, pos + Vector(0.0f, 0.0f, -1.0f), pos + Vector(0.0f, 1.0f, 0.0f), DegreeToRadian(90.0f), nearDist, farDist, SM_WIDTH, SM_HEIGHT, true);
+		shadowMapData->ShadowMapRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW, EFormat::RG32F, EFormat::RG, EFormatType::FLOAT, SM_WIDTH, SM_HEIGHT, 6 });
 
 		return shadowMapData;
 	}
@@ -109,7 +109,7 @@ void jDirectionalLight::BindLight(jShader* shader, jMaterialData* materialData, 
 	JASSERT(shader);
 	JASSERT(materialData);
 
-	if (!LightDataUniformBlock->Data || *static_cast<LightData*>(LightDataUniformBlock->Data) != Data)
+	//if (!LightDataUniformBlock->Data || *static_cast<LightData*>(LightDataUniformBlock->Data) != Data)
 		LightDataUniformBlock->UpdateBufferData(&Data, sizeof(Data));
 	LightDataUniformBlock->Bind(shader);
 
@@ -151,7 +151,7 @@ void jDirectionalLight::BindLight(jShader* shader, jMaterialData* materialData, 
 		shadowData.SetData(ShadowMapData->ShadowMapCamera);
 
 		IUniformBufferBlock* shadowDataUniformBlock = ShadowMapData->UniformBlock;
-		if (!shadowDataUniformBlock->Data || *static_cast<ShadowData*>(shadowDataUniformBlock->Data) != shadowData)
+		//if (!shadowDataUniformBlock->Data || *static_cast<ShadowData*>(shadowDataUniformBlock->Data) != shadowData)
 			shadowDataUniformBlock->UpdateBufferData(&shadowData, sizeof(shadowData));
 		shadowDataUniformBlock->Bind(shader);
 
@@ -174,7 +174,7 @@ jTexture* jDirectionalLight::GetShadowMap() const
 
 void jPointLight::BindLight(jShader* shader, jMaterialData* materialData, int32 index)
 {
-	if (!LightDataUniformBlock->Data || *static_cast<LightData*>(LightDataUniformBlock->Data) != Data)
+	//if (!LightDataUniformBlock->Data || *static_cast<LightData*>(LightDataUniformBlock->Data) != Data)
 		LightDataUniformBlock->UpdateBufferData(&Data, sizeof(Data));
 	LightDataUniformBlock->Bind(shader);
 
@@ -210,7 +210,7 @@ void jPointLight::BindLight(jShader* shader, jMaterialData* materialData, int32 
 		shadowData.SetData(ShadowMapData->ShadowMapCamera[0]);
 
 		IUniformBufferBlock* shadowDataUniformBlock = ShadowMapData->UniformBlock;
-		if (!shadowDataUniformBlock->Data || *static_cast<ShadowData*>(shadowDataUniformBlock->Data) != shadowData)
+		//if (!shadowDataUniformBlock->Data || *static_cast<ShadowData*>(shadowDataUniformBlock->Data) != shadowData)
 			shadowDataUniformBlock->UpdateBufferData(&shadowData, sizeof(shadowData));
 		shadowDataUniformBlock->Bind(shader);
 
@@ -228,7 +228,7 @@ void jPointLight::BindLight(jShader* shader, jMaterialData* materialData, int32 
 
 void jSpotLight::BindLight(jShader* shader, jMaterialData* materialData, int32 index)
 {
-	if (!LightDataUniformBlock->Data || *static_cast<LightData*>(LightDataUniformBlock->Data) != Data)
+	//if (!LightDataUniformBlock->Data || *static_cast<LightData*>(LightDataUniformBlock->Data) != Data)
 		LightDataUniformBlock->UpdateBufferData(&Data, sizeof(Data));
 	LightDataUniformBlock->Bind(shader);
 
@@ -264,7 +264,7 @@ void jSpotLight::BindLight(jShader* shader, jMaterialData* materialData, int32 i
 		shadowData.SetData(ShadowMapData->ShadowMapCamera[0]);
 
 		IUniformBufferBlock* shadowDataUniformBlock = ShadowMapData->UniformBlock;
-		if (!shadowDataUniformBlock->Data || *static_cast<ShadowData*>(shadowDataUniformBlock->Data) != shadowData)
+		//if (!shadowDataUniformBlock->Data || *static_cast<ShadowData*>(shadowDataUniformBlock->Data) != shadowData)
 			shadowDataUniformBlock->UpdateBufferData(&shadowData, sizeof(shadowData));
 		shadowDataUniformBlock->Bind(shader);
 
