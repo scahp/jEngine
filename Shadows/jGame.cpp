@@ -110,7 +110,7 @@ void jGame::Setup()
 	ShadowVolumeInfinityFarShader = jShader::CreateShader(info);
 
 	jShaderInfo deepShadowMapInfo;
-	deepShadowMapInfo.vs = "Shaders/shadowmap/vs_omniDirectionalShadowMap.glsl";
+	deepShadowMapInfo.vs = "Shaders/shadowmap/vs_expDeepShadowMap.glsl";
 	deepShadowMapInfo.fs = "Shaders/shadowmap/fs_expDeepShadowMap.glsl";
 	ExpDeepShadowMapGenShader = g_rhi->CreateShader(deepShadowMapInfo);
 
@@ -340,7 +340,7 @@ void jGame::Update(float deltaTime)
 			iter->Draw(MainCamera, Current_Deferred_Shader, nullptr);
 
 		for (auto& iter : g_HairObjectArray)
-			iter->Draw(MainCamera, Current_Deferred_Shader);
+			iter->Draw(MainCamera, Current_Deferred_Shader);		
 		GBuffer->End();
 	}
 
@@ -371,6 +371,9 @@ void jGame::Update(float deltaTime)
 		startElementBuf->Bind(deepShadowMapGenShader);
 		linkedListEntryDepthAlphaNext->Bind(deepShadowMapGenShader);
 
+		glEnable(GL_POLYGON_OFFSET_FILL);
+		glPolygonOffset(1.0f, 1.0f);
+
 		for (auto& iter : g_StaticObjectArray)
 		{
 			if (!iter->SkipShadowMapGen)
@@ -379,6 +382,7 @@ void jGame::Update(float deltaTime)
 
 		for (auto& iter : g_HairObjectArray)
 			iter->Draw(DirectionalLight->ShadowMapData->ShadowMapCamera, deepShadowMapGenShader);
+		glDisable(GL_POLYGON_OFFSET_FILL);
 	}
 	//////////////////////////////////////////////////////////////////////////
 
@@ -459,6 +463,12 @@ void jGame::Update(float deltaTime)
 
 	fsQuad->RenderObject->tex_object = rednerTargetAA->GetTexture();
 	fsQuad->Draw(MainCamera, DeepShadowAA_Shader, nullptr);
+
+	for (auto& iter : g_DebugObjectArray)
+	{
+		iter->Update(deltaTime);
+		iter->Draw(MainCamera, BaseShader, nullptr);
+	}
 
 	return;
 

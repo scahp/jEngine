@@ -56,7 +56,7 @@ float KajiyaKayShadingModelTest(vec3 tangent, vec3 toLight, vec3 toView)
 	float diffuse = clamp(sinTL, 0.0, 1.0);
 	float specular = clamp(pow(dotTL*dotTV + sinTL*sinTV, 6.0), 0.0, 1.0);
 	//return (diffuse + specular);
-	return (diffuse * 0.7f + specular * 0.8f) * 0.9f + 0.09f;
+	return (clamp(diffuse, 0.0, 1.0) * 0.7f + clamp(specular, 0.0, 1.0) * 0.8f) * 0.9f + 0.09f;
 }
 
 vec3 KajiyaKayShadingModel(vec3 tangent, vec3 toLight, vec3 toView, vec3 diffuseColor, vec3 specularColor, float specularPow)
@@ -116,10 +116,9 @@ layout (std430) buffer LinkedListEntryNeighbors
 void depthSearch(inout NodeData entry, inout NeighborData entryNeighbors, float z, out float outShading, out float outDepth)
 {
 	int newNum = -1;
-	float biasedZ = z + 0.001;
 
 	NodeData temp;
-	if (biasedZ < entry.depth)
+	if (z > entry.depth)
 	{
 		for(int k=0;k<DS_LINKED_LIST_DEPTH;++k)
 		{
@@ -131,7 +130,7 @@ void depthSearch(inout NodeData entry, inout NeighborData entryNeighbors, float 
 			}
 
 			temp = LinkedListData[entry.next];
-			if (biasedZ > temp.depth)
+			if (z < temp.depth)
 			{
 				outDepth = entry.depth;
 				outShading = entry.alpha;
@@ -155,7 +154,7 @@ void depthSearch(inout NodeData entry, inout NeighborData entryNeighbors, float 
 			newNum = entry.prev;
 			entry = LinkedListData[entry.prev];
 
-			if (biasedZ <= entry.depth)
+			if (z >= entry.depth)
 			{
 				outDepth = entry.depth;
 				outShading = entry.alpha;
@@ -170,12 +169,16 @@ void depthSearch(inout NodeData entry, inout NeighborData entryNeighbors, float 
 
 void main()
 {
-	vec4 Color = texture(ColorSampler, TexCoord_);
 	vec4 Normal = texture(NormalSampler, TexCoord_);
+	if (Normal.x == 0.0 && Normal.y == 0.0 && Normal.z == 0.0)
+		return;
+
+	vec4 Color = texture(ColorSampler, TexCoord_);
 	vec3 Pos = texture(PosInWorldSampler, TexCoord_).xyz;
 	vec3 ShadowPos = texture(PosInLightSampler, TexCoord_).xyz;
 
-	vec3 viewDir = normalize(Eye - Pos);
+	vec3 toLight = normalize(LightPos - Pos);
+	vec3 toEye = normalize(Eye - Pos);
 
 	vec3 finalColor = vec3(0.0, 0.0, 0.0);
 
@@ -194,9 +197,10 @@ void main()
 #endif // USE_MATERIAL
 
 		if (Normal.w == 0.0)
-			finalColor += GetDirectionalLight(light, Normal.xyz, viewDir);
+			finalColor += GetDirectionalLight(light, Normal.xyz, toEye);
 		else
-			finalColor += KajiyaKayShadingModelTest(Normal.xyz, normalize(-light.LightDirection), viewDir);
+			finalColor += KajiyaKayShadingModelTest(Normal.xyz, -light.LightDirection, toEye);
+			//finalColor += KajiyaKayShadingModelTest(Normal.xyz, toLight, toEye);
     }
 
 	ivec2 uv = ivec2(ShadowPos.x * ShadowMapWidth, ShadowPos.y * ShadowMapHeight);
@@ -387,7 +391,7 @@ void main()
 
 	float depth = bilinearInterpolation(dx, dy, depthSamples[FILTER_SIZE][FILTER_SIZE], depthSamples[FILTER_SIZE + 1][FILTER_SIZE], depthSamples[FILTER_SIZE][FILTER_SIZE + 1], depthSamples[FILTER_SIZE + 1][FILTER_SIZE + 1]);
 	float shading = bilinearInterpolation(dx, dy, shadingSamples[FILTER_SIZE][FILTER_SIZE], shadingSamples[FILTER_SIZE + 1][FILTER_SIZE], shadingSamples[FILTER_SIZE][FILTER_SIZE + 1], shadingSamples[FILTER_SIZE + 1][FILTER_SIZE + 1]);
-	shading = clamp(shading * exp(10.0f * (depth - ShadowPos.z)), 0.1f, 1.0f);
+	shading = clamp(shading * exp(20.0f * (depth - (ShadowPos.z))), 0.1f, 1.0f);
 
 	color = vec4(Color.xyz * finalColor * shading, Color.w);
 }

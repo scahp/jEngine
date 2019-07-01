@@ -282,6 +282,7 @@
     <None Include="Shaders\shadowmap\vs.glsl" />
     <None Include="Shaders\shadowmap\vs_deferred.glsl" />
     <None Include="Shaders\shadowmap\vs_EVSM.glsl" />
+    <None Include="Shaders\shadowmap\vs_expDeepShadowMap.glsl" />
     <None Include="Shaders\shadowmap\vs_hair.glsl" />
     <None Include="Shaders\shadowmap\vs_omniDirectionalShadowMap.glsl" />
     <None Include="Shaders\shadowmap\vs_shadowMap.glsl" />

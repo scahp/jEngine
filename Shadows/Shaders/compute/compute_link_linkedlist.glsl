@@ -40,6 +40,7 @@ struct LocalListEntry
 };
 
 uniform int ShadowMapWidth;
+uniform int ShadowMapHeight;
 
 void main(void)
 {
@@ -57,8 +58,8 @@ void main(void)
 	else
 		rightStartIndex = -1;
 
-	if (uv.y != 0)
-		topStartIndex = int(start[(uv.y - 1) * ShadowMapWidth + uv.x]);
+	if (uv.y != ShadowMapHeight - 1)
+		topStartIndex = int(start[(uv.y + 1) * ShadowMapWidth + uv.x]);
 	else
 		topStartIndex = -1;
 
@@ -103,48 +104,4 @@ void main(void)
 		if(centerStartIndex == -1)
 			break;
 	}
-
-//	LocalListEntry tempList[DS_LINKED_LIST_DEPTH];
-//	int curIndex = startIndex;
-//	int numOfList = 0;
-//	for(int i=0;i<DS_LINKED_LIST_DEPTH;++i)
-//	{
-//		tempList[i].depth = LinkedListData[curIndex].depth;
-//		tempList[i].alpha = LinkedListData[curIndex].alpha;
-//		++numOfList;
-//		curIndex = LinkedListData[curIndex].next;
-//		if (-1 == curIndex)
-//			break;
-//	}
-//
-//	int j = 0;
-//	LocalListEntry temp;
-//	for(int i=1;i<numOfList;++i)
-//	{
-//		temp = tempList[i];
-//		for(j=i-1;(j >= 0) && (temp.depth > tempList[j].depth);--j)
-//			tempList[j + 1] = tempList[j];
-//		tempList[j + 1] = temp;
-//	}
-//
-//	float shadingBefore = 1.0;
-//	int prevIndex = startIndex;
-//	curIndex = startIndex;
-//	for(int i=0;i<numOfList;++i)
-//	{
-//		float shadingCurrent = shadingBefore * (1.0 - tempList[i].alpha);
-//		LinkedListData[curIndex].depth = tempList[i].depth;
-//		LinkedListData[curIndex].alpha = shadingCurrent;
-//		if (shadingBefore - shadingCurrent <= 0.001)
-//		{
-//			LinkedListData[prevIndex].next = -1;
-//			break;
-//		}
-//		shadingBefore = shadingCurrent;
-//
-//		prevIndex = curIndex;
-//		curIndex = LinkedListData[curIndex].next;
-//	}
-//	if (curIndex != -1)
-//		LinkedListData[curIndex].next = -1;
 }

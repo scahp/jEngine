@@ -56,7 +56,7 @@ void main(void)
 	for(int i=1;i<numOfList;++i)
 	{
 		temp = tempList[i];
-		for(j=i-1;(j >= 0) && (temp.depth > tempList[j].depth);--j)
+		for(j=i-1;(j >= 0) && (temp.depth < tempList[j].depth);--j)
 			tempList[j + 1] = tempList[j];
 		tempList[j + 1] = temp;
 	}
@@ -67,17 +67,17 @@ void main(void)
 	for(int i=0;i<numOfList;++i)
 	{
 		float shadingCurrent = shadingBefore * (1.0 - tempList[i].alpha);
-		LinkedListData[curIndex].depth = tempList[i].depth;
-		LinkedListData[curIndex].alpha = shadingCurrent;
-		LinkedListData[curIndex].prev = prevIndex;
 		if (shadingBefore - shadingCurrent <= 0.001)
 		{
 			if (prevIndex == -1)
-				LinkedListData[curIndex].next = -1;
-			else
 				LinkedListData[prevIndex].next = -1;
+			else
+				LinkedListData[curIndex].next = -1;
 			break;
 		}
+		LinkedListData[curIndex].depth = tempList[i].depth;
+		LinkedListData[curIndex].alpha = shadingCurrent;
+		LinkedListData[curIndex].prev = prevIndex;
 		shadingBefore = shadingCurrent;
 
 		prevIndex = curIndex;

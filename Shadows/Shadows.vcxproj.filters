@@ -400,5 +400,8 @@
     <None Include="Shaders\fullscreen\fs_deepshadow_aa.glsl">
       <Filter>Shaders\fullscreen</Filter>
     </None>
+    <None Include="Shaders\shadowmap\vs_expDeepShadowMap.glsl">
+      <Filter>Shaders\shadowmap</Filter>
+    </None>
   </ItemGroup>
 </Project>

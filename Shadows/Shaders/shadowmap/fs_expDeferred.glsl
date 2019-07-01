@@ -68,12 +68,17 @@ void main()
     vec3 viewDir = normalize(Eye - Pos_);
 
     vec4 tempShadowPos = (ShadowVP * vec4(Pos_, 1.0));
-    tempShadowPos /= tempShadowPos.w;
+
+	float distFromLight = tempShadowPos.z / LightZFar;
+	if (ShadingModel == 0)
+		distFromLight -= 0.05;		// todo move another place.
+
+    tempShadowPos.xyz /= tempShadowPos.w;
     vec3 ShadowPos = tempShadowPos.xyz * 0.5 + 0.5;        // Transform NDC space coordinate from [-1.0 ~ 1.0] into [0.0 ~ 1.0].
 
 	vec3 lightDir = Pos_ - LightPos;
     float distSquared = dot(lightDir.xyz, lightDir.xyz);
-    float distFromLight = (sqrt(distSquared) - LightZNear) / (LightZFar - LightZNear);
+    //float distFromLight = clamp((sqrt(distSquared) - LightZNear) / (LightZFar - LightZNear), 0.0, 1.0);
 
 	vec4 diffuse = vec4(1.0);
 

@@ -43,7 +43,10 @@ void main()
 {
 	vec3 lightDir = Pos_ - LightPos;
     float distSquared = dot(lightDir.xyz, lightDir.xyz);
-    float distFromLight = (sqrt(distSquared) - LightZNear) / (LightZFar - LightZNear);
+    //float distFromLight = clamp((sqrt(distSquared) - LightZNear) / (LightZFar - LightZNear), 0.0, 1.0);
+	vec4 tempShadowPos = (ShadowVP * vec4(Pos_, 1.0));
+
+	float distFromLight = (tempShadowPos.z) / LightZFar + 0.00002;
 
 	uint counter = atomicCounterIncrement(LinkedListCounter);
 	LinkedListData[counter].depth = distFromLight;

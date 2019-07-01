@@ -10,13 +10,15 @@ namespace jLightUtil
 {
 	jShadowMapData* CreateShadowMap(const Vector& direction, const Vector& pos)
 	{
-		auto tempPos = Vector(100.0f) * direction;
+		//auto tempPos = Vector(100.0f) * direction;
+		auto tempPos = Vector(250.0f, 260.0f, 0.0f);
 		const auto target = Vector::ZeroVector;
 		const auto up = tempPos + Vector(0.0f, 1.0f, 0.0f);
 
 		// todo remove constant variable
 		auto shadowMapData = new jShadowMapData("DirectionalLight");
-		shadowMapData->ShadowMapCamera = jCamera::CreateCamera(tempPos, target, up, DegreeToRadian(90.0f), 1.0f, 900.0f, 100.0f, 100.0f, false);
+		shadowMapData->ShadowMapCamera = jCamera::CreateCamera(tempPos, target, up, 3.14 / 4.0f, 1.0f, 900.0f, SM_WIDTH, SM_HEIGHT, true);		// todo for deep shadow map. it should be replaced
+		// shadowMapData->ShadowMapCamera = jCamera::CreateCamera(tempPos, target, up, DegreeToRadian(90.0f), 1.0f, 900.0f, 100.0f, 100.0f, false);
 		shadowMapData->ShadowMapRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RG32F, EFormat::RG, EFormatType::FLOAT, SM_WIDTH, SM_HEIGHT, 1 });
 
 		return shadowMapData;

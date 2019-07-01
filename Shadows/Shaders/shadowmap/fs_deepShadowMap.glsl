@@ -31,7 +31,7 @@ out vec4 color;
 void main()
 {
 	uint counter = atomicCounterIncrement(LinkedListCounter);
-	LinkedListData[counter].depth = gl_FragCoord.z;
+	LinkedListData[counter].depth = gl_FragCoord.z + 0.00002;
 	LinkedListData[counter].alpha = DeepShadowAlpha;
 	
 	vec2 uv = gl_FragCoord.xy;
