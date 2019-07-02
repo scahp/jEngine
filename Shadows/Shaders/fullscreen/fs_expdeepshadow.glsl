@@ -176,7 +176,6 @@ void main()
 	vec4 Color = texture(ColorSampler, TexCoord_);
 	vec3 Pos = texture(PosInWorldSampler, TexCoord_).xyz;
 	vec3 ShadowPos = texture(PosInLightSampler, TexCoord_).xyz;
-
 	vec3 toLight = normalize(LightPos - Pos);
 	vec3 toEye = normalize(Eye - Pos);
 
@@ -299,38 +298,9 @@ void main()
 	float depthSamples2[2][FILTER_SIZE * 2 + 2];
 	float shadingSamples2[2][FILTER_SIZE * 2 + 2];
 
-	float oneOver = 1.0 / (FILTER_SIZE * 2 + 1);
-
-	for(int y = 0;y < FILTER_SIZE * 2 + 2;++y)
-	{
-		for(int x = 0;x < FILTER_SIZE * 2 + 2;++x)
-		{
-			int x2 = x - FILTER_SIZE;
-			float filteredShading = 0;
-
-			float sample0 = depthSamples[x2][y];
-			filteredShading = shadingSamples[x2][y];
-			++x2;
-
-			float sample1 = depthSamples[x2][y];
-			filteredShading += shadingSamples[x2][y];
-			++x2;
-
-			float filteredDepth = logConv(oneOver, sample0, oneOver, sample1);
-
-			for(; x2 <= x + FILTER_SIZE; x2++)
-			{
-				filteredDepth = logConv(1.0f, filteredDepth, oneOver, depthSamples[x2][y]);
-				filteredShading += shadingSamples[x2][y];
-			}
-
-			depthSamples2[x - FILTER_SIZE][y] = filteredDepth;
-			shadingSamples2[x - FILTER_SIZE][y] = filteredShading * oneOver;
-		}
-	}
-
+	float oneOver = 1.0f / (FILTER_SIZE * 2 + 1);
+	
 	for(int y = 0; y < FILTER_SIZE * 2 + 2; y++)
-	{
 		for(int x = FILTER_SIZE; x < FILTER_SIZE + 2; x++)
 		{
 			int x2 = x - FILTER_SIZE;
@@ -355,10 +325,8 @@ void main()
 			depthSamples2[x - FILTER_SIZE][y] = filteredDepth;
 			shadingSamples2[x - FILTER_SIZE][y] = filteredShading * oneOver;
 		}
-	}
-	
+
 	for(int x = FILTER_SIZE; x < FILTER_SIZE + 2; x++)
-	{
 		for(int y = FILTER_SIZE; y < FILTER_SIZE + 2; y++)
 		{
 			int y2 = y - FILTER_SIZE;
@@ -383,7 +351,6 @@ void main()
 			depthSamples[x][y] = filteredDepth;
 			shadingSamples[x][y] = filteredShading * oneOver;
 		}
-	}
 #endif
 
 	float dx = fract(ShadowPos.x * ShadowMapWidth);

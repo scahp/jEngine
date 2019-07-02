@@ -46,6 +46,9 @@ void main(void)
 {
 	ivec2 uv = ivec2(gl_GlobalInvocationID.xy);
 
+	if(uv.y > (ShadowMapHeight - 1) || uv.x > (ShadowMapWidth - 1))
+		return;
+
 	int centerStartIndex = int(start[uv.y * ShadowMapWidth + uv.x]);
 	if (-1 == centerStartIndex)
 		return;

@@ -392,6 +392,7 @@ void jGame::Update(float deltaTime)
 	startElementBuf->Bind(cs_sortShader);
 	linkedListEntryDepthAlphaNext->Bind(cs_sortShader);
 	g_rhi->SetUniformbuffer(&jUniformBuffer<int>("ShadowMapWidth", SM_WIDTH), cs_sortShader);
+	g_rhi->SetUniformbuffer(&jUniformBuffer<int>("ShadowMapHeight", SM_HEIGHT), cs_sortShader);
 	glDispatchCompute(SM_WIDTH / 16, SM_HEIGHT / 8, 1);
 
 	glUseProgram(cs_linkShader->program);
@@ -400,6 +401,7 @@ void jGame::Update(float deltaTime)
 	linkedListEntryDepthAlphaNext->Bind(cs_linkShader);
 	linkedListEntryNeighbors->Bind(cs_linkShader);
 	g_rhi->SetUniformbuffer(&jUniformBuffer<int>("ShadowMapWidth", SM_WIDTH), cs_linkShader);
+	g_rhi->SetUniformbuffer(&jUniformBuffer<int>("ShadowMapHeight", SM_HEIGHT), cs_linkShader);
 	glDispatchCompute(SM_WIDTH / 16, SM_HEIGHT / 8, 1);
 
 	//g_rhi->SetRenderTarget(nullptr);
