@@ -38,6 +38,7 @@ struct jShaderInfo
 	{
 		return std::hash<std::string>{}(vs+vsPreProcessor+fs+fsPreProcessor+cs+csPreProcessor);
 	}
+	std::string name;
 	std::string vs;
 	std::string fs;
 	std::string cs;
@@ -48,10 +49,38 @@ struct jShaderInfo
 
 struct jShader
 {
-	static std::map<size_t, jShader*> ShaderMap;
+	static std::unordered_map<size_t, jShader*> ShaderMap;
+	static std::unordered_map<std::string, jShader*> ShaderNameMap;
 	static jShader* GetShader(size_t hashCode);
+	static jShader* GetShader(const std::string& name);
 	static jShader* CreateShader(const jShaderInfo& shaderInfo);
 };
+
+#define CREATE_SHADER_VS_FS_WITH_OPTION(Name, VS, FS, IsUseTexture, IsUseMaterial) \
+{ \
+jShaderInfo info; \
+info.name = Name; \
+info.vs = VS; \
+info.fs = FS; \
+info.vsPreProcessor += IsUseTexture ? "#define USE_TEXTURE 1" : "";\
+info.vsPreProcessor += IsUseMaterial ? "\r\n#define USE_MATERIAL 1" : "";\
+info.fsPreProcessor += IsUseTexture ? "#define USE_TEXTURE 1" : "";\
+info.fsPreProcessor += IsUseMaterial ? "\r\n#define USE_MATERIAL 1" : "";\
+jShader::CreateShader(info); \
+}
+
+#define CREATE_SHADER_VS_FS(Name, VS, FS) CREATE_SHADER_VS_FS_WITH_OPTION(Name, VS, FS, false, false)
+
+#define CREATE_SHADER_CS_WITH_OPTION(Name, CS, IsUseTexture, IsUseMaterial) \
+{ \
+jShaderInfo info; \
+info.name = Name; \
+info.cs = CS; \
+info.csPreProcessor += IsUseTexture ? "#define USE_TEXTURE 1" : "";\
+info.csPreProcessor += IsUseMaterial ? "\r\n#define USE_MATERIAL 1" : "";\
+jShader::CreateShader(info); \
+}
+#define CREATE_SHADER_CS(Name, CS) CREATE_SHADER_CS_WITH_OPTION(Name, CS, false, false);
 
 enum class EUniformType
 {
@@ -282,6 +311,11 @@ public:
 	virtual void DrawArray(EPrimitiveType type, int vertStartIndex, int vertCount) {}
 	virtual void DrawElement(EPrimitiveType type, int elementSize, int32 startIndex = -1, int32 count = -1) {}
 	virtual void DrawElementBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex) {}
+
+	virtual void DispatchCompute(uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ) {}
+
+	virtual void EnableDepthBias(bool enable) {}
+	virtual void SetDepthBias(float constant, float slope) {}
 	
 	virtual void SetShader(jShader* shader) {}
 	virtual jShader* CreateShader(const jShaderInfo& shaderInfo) { return nullptr; }

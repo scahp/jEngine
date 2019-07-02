@@ -1,7 +1,8 @@
 ﻿#include "pch.h"
 #include "jRHI.h"
 
-std::map<size_t, jShader*> jShader::ShaderMap;
+std::unordered_map<size_t, jShader*> jShader::ShaderMap;
+std::unordered_map < std::string , jShader* > jShader::ShaderNameMap;
 
 jRHI::jRHI()
 {
@@ -25,6 +26,14 @@ jShader* jShader::GetShader(size_t hashCode)
 	return nullptr;
 }
 
+jShader* jShader::GetShader(const std::string& name)
+{
+	auto it_find = ShaderNameMap.find(name);
+	if (it_find != ShaderNameMap.end())
+		return it_find->second;
+	return nullptr;
+}
+
 jShader* jShader::CreateShader(const jShaderInfo& shaderInfo)
 {
 	auto hash = shaderInfo.CreateShaderHash();
@@ -38,5 +47,10 @@ jShader* jShader::CreateShader(const jShaderInfo& shaderInfo)
 		return nullptr;
 
 	ShaderMap[hash] = shader;
+	if (!shaderInfo.name.empty())
+	{
+		JASSERT(ShaderNameMap.end() == ShaderNameMap.find(shaderInfo.name));
+		ShaderNameMap[shaderInfo.name] = shader;
+	}
 	return shader;
 }

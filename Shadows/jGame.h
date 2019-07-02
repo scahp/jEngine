@@ -12,6 +12,11 @@ class jPointLight;
 class jSpotLight;
 class jRenderer;
 struct jRenderTarget;
+struct IShaderStorageBufferObject;
+struct IAtomicCounterBuffer;
+struct jTexture;
+struct jRenderTarget;
+class jObject;
 
 class jGame
 {
@@ -31,23 +36,25 @@ public:
 	jSpotLight* SpotLight = nullptr;
 	jLight* AmbientLight = nullptr;
 	jCamera* MainCamera = nullptr;
-	jShader* SimpleShader = nullptr;
-	jShader* ShadowMapShader = nullptr;
-	jShader* ShadowMapOmniShader = nullptr;
-	jShader* BaseShader = nullptr;
-	jShader* ShadowVolumeBaseShader = nullptr;
-	jShader* ShadowVolumeInfinityFarShader = nullptr;
-	
-	jShader* ExpDeepShadowMapGenShader = nullptr;
-	jShader* DeepShadowMapGenShader = nullptr;
-	jShader* Hair_Shader = nullptr;
-	jShader* ExpDeepShadowFull_Shader = nullptr;
-	jShader* DeepShadowFull_Shader = nullptr;
-	jShader* DeepShadowAA_Shader = nullptr;
-	jShader* Deferred_Shader = nullptr;
-	jShader* ExpDeferred_Shader = nullptr;
 
-	class jObject* Sphere = nullptr;
+	IShaderStorageBufferObject* ssbo = nullptr;
+	IShaderStorageBufferObject* startElementBuf = nullptr;
+	IShaderStorageBufferObject* linkedListEntryDepthAlphaNext = nullptr;
+	IShaderStorageBufferObject* linkedListEntryNeighbors = nullptr;
+	IAtomicCounterBuffer* atomicBuffer = nullptr;
+
+	struct shader_data_t
+	{
+		float camera_position[4] = { 1, 2, 3, 4 };
+		float light_position[4] = { 5, 6, 7, 8 };
+		float light_diffuse[4] = { 9, 10, 11, 12 };
+	} shader_data;
+
+	static constexpr int32 linkedlistDepth = 50;
+	static constexpr auto linkedListDepthSize = SM_WIDTH * SM_HEIGHT * linkedlistDepth;
+
+	jObject* FullscreenQuad = nullptr;
+	jObject* Sphere = nullptr;
 
 	jRenderer* Renderer = nullptr;
 

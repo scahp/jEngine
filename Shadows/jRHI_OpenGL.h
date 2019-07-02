@@ -143,6 +143,11 @@ public:
 
 	virtual void DrawElement(EPrimitiveType type, int elementSize, int32 startIndex = -1, int32 count = -1) override;
 
+	virtual void DispatchCompute(uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ) override;
+
+	virtual void EnableDepthBias(bool enable) override;
+	virtual void SetDepthBias(float constant, float slope) override;
+
 	unsigned int GetPrimitiveType(EPrimitiveType type)
 	{
 		unsigned int primitiveType = 0;

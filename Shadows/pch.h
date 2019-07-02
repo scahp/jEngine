@@ -29,6 +29,7 @@
 #include <sstream>
 #include <set>
 #include <algorithm>
+#include <unordered_map>
 
 
 #define JASSERT(x) assert(x)

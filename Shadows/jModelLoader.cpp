@@ -50,9 +50,9 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename)
 
 		jSubMesh subMesh;
 
-		subMesh.StartVertex = meshData->Vertices.size();
+		subMesh.StartVertex = static_cast<int32>(meshData->Vertices.size());
 		meshData->Vertices.resize(meshData->Vertices.size() + assimpMesh->mNumVertices);
-		subMesh.EndVertex = meshData->Vertices.size();
+		subMesh.EndVertex = static_cast<int32>(meshData->Vertices.size());
 
 		memcpy(&meshData->Vertices[subMesh.StartVertex], &assimpMesh->mVertices[0], assimpMesh->mNumVertices * sizeof(Vector));
 
@@ -74,9 +74,9 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename)
 			}
 		}
 
-		subMesh.StartFace = meshData->Faces.size();
+		subMesh.StartFace = static_cast<int32>(meshData->Faces.size());
 		meshData->Faces.resize(meshData->Faces.size() + assimpMesh->mNumFaces * 3);
-		subMesh.EndFace = meshData->Faces.size();
+		subMesh.EndFace = static_cast<int32>(meshData->Faces.size());
 		for (unsigned int k = 0; k < assimpMesh->mNumFaces; ++k)
 		{
 			aiFace& face = assimpMesh->mFaces[k];
@@ -136,7 +136,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename)
 
 		std::function<void(jMeshNode*, aiNode*)> fillupChildNode = [&](jMeshNode* node, aiNode* assimpNode)
 		{
-			for (int i = 0; i < assimpNode->mNumChildren; ++i)
+			for (uint32 i = 0; i < assimpNode->mNumChildren; ++i)
 			{
 				auto newNode = new jMeshNode();
 				fillUpMeshNode(newNode, assimpNode->mChildren[i]);
@@ -151,7 +151,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename)
 		object->RootNode = rootNode;
 	}
 
-	const int32 elementCount = meshData->Vertices.size();
+	const int32 elementCount = static_cast<int32>(meshData->Vertices.size());
 
 	// attribute 추가
 	auto vertexStreamData = std::shared_ptr<jVertexStreamData>(new jVertexStreamData());

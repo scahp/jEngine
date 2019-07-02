@@ -131,13 +131,31 @@ void jRHI_OpenGL::DrawArray(EPrimitiveType type, int vertStartIndex, int vertCou
 void jRHI_OpenGL::DrawElement(EPrimitiveType type, int elementSize, int32 startIndex /*= -1*/, int32 count /*= -1*/)
 {
 	const auto elementType = (elementSize == 4) ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
-	glDrawElements(GetPrimitiveType(type), count, elementType, (void*)(startIndex * elementSize));
+	glDrawElements(GetPrimitiveType(type), count, elementType, reinterpret_cast<void*>(startIndex * elementSize));
+}
+
+void jRHI_OpenGL::DispatchCompute(uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ)
+{
+	glDispatchCompute(numGroupsX, numGroupsY, numGroupsZ);
+}
+
+void jRHI_OpenGL::EnableDepthBias(bool enable)
+{
+	if (enable)
+		glEnable(GL_POLYGON_OFFSET_FILL);
+	else
+		glDisable(GL_POLYGON_OFFSET_FILL);
+}
+
+void jRHI_OpenGL::SetDepthBias(float constant, float slope)
+{
+	glPolygonOffset(1.0f, 1.0f);
 }
 
 void jRHI_OpenGL::DrawElementBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex)
 {
 	const auto elementType = (elementSize == 4) ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
-	glDrawElementsBaseVertex(GetPrimitiveType(type), count, elementType, (void*)(startIndex * elementSize), baseVertexIndex);
+	glDrawElementsBaseVertex(GetPrimitiveType(type), count, elementType, reinterpret_cast<void*>(startIndex * elementSize), baseVertexIndex);
 }
 
 void jRHI_OpenGL::EnableSRGB(bool enable)
@@ -312,7 +330,7 @@ jShader* jRHI_OpenGL::CreateShader(const jShaderInfo& shaderInfo)
 
 		auto fs = glCreateShader(GL_FRAGMENT_SHADER);
 		const char* fsPtr = fsText.c_str();
-		int fragment_shader_string_length = fsText.length();
+		int32 fragment_shader_string_length = static_cast<int32>(fsText.length());
 		glShaderSource(fs, 1, &fsPtr, &fragment_shader_string_length);
 		glCompileShader(fs);
 
@@ -1277,7 +1295,7 @@ bool jRenderTarget_OpenGL::Begin(int index, bool mrt)
 		glBindFramebuffer(GL_FRAMEBUFFER, fbos[index]);
 
 	JASSERT(drawBuffers.size() > 0);
-	glDrawBuffers(drawBuffers.size(), &drawBuffers[0]);
+	glDrawBuffers(static_cast<int32>(drawBuffers.size()), &drawBuffers[0]);
 
 	glViewport(0, 0, Info.Width, Info.Height);
 	//glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
