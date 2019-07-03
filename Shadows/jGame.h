@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include "jShadowTypes.h"
+#include "jPostProcess.h"
 
 class jRHI;
 extern jRHI* g_rhi;
@@ -53,12 +54,13 @@ public:
 	static constexpr int32 linkedlistDepth = 50;
 	static constexpr auto linkedListDepthSize = SM_WIDTH * SM_HEIGHT * linkedlistDepth;
 
-	jObject* FullscreenQuad = nullptr;
 	jObject* Sphere = nullptr;
 
 	jRenderer* Renderer = nullptr;
 
 	std::map<EShadowType, jRenderer*> ShadowRendererMap;
 	EShadowType ShadowType = EShadowType::MAX;
+
+	jPostprocessChain PostProcessChain;
 };
 

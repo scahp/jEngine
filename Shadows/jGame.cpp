@@ -231,7 +231,18 @@ void jGame::Setup()
 	uint32 zero = 0;
 	atomicBuffer->UpdateBufferData(&zero, sizeof(zero));
 
-	FullscreenQuad = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
+	//////////////////////////////////////////////////////////////////////////
+	// Setup a postprocess chain
+	static auto rednerTargetAA = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RGBA, EFormat::RGBA, EFormatType::FLOAT, SCR_WIDTH, SCR_HEIGHT, 1 });
+	{
+		auto postprocess = new jPostProcess_DeepShadowMap("DeepShadow", rednerTargetAA, { startElementBuf, linkedListEntryDepthAlphaNext, linkedListEntryNeighbors }, DirectionalLight);
+		PostProcessChain.AddNewPostprocess(postprocess);
+	}
+
+	{
+		auto postprocess = new jPostProcess_AA_DeepShadowAddition("AA_DeepShadowAddition", nullptr, jShader::GetShader("DeepShadowAA"));
+		PostProcessChain.AddNewPostprocess(postprocess);
+	}
 }
 
 void jGame::Update(float deltaTime)
@@ -239,33 +250,35 @@ void jGame::Update(float deltaTime)
 	atomicBuffer->ClearBuffer(0);
 	startElementBuf->ClearBuffer(-1);
 
-	bool expDeepShadowMap = jShadowAppSettingProperties::GetInstance().ExponentDeepShadowOn;
-	if (GBuffer->Begin())
+	// todo debug test, should remove this
+	if (DirectionalLight)
+		DirectionalLight->Data.Direction = jShadowAppSettingProperties::GetInstance().DirecionalLightDirection;
+	if (PointLight)
+		PointLight->Data.Position = jShadowAppSettingProperties::GetInstance().PointLightPosition;
+	if (SpotLight)
 	{
-		g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-		g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
-
-		if (auto Current_Deferred_Shader = expDeepShadowMap ? jShader::GetShader("ExpDeferred") : jShader::GetShader("Deferred"))
-		{
-			for (auto& iter : g_StaticObjectArray)
-				iter->Draw(MainCamera, Current_Deferred_Shader, nullptr);
-
-			for (auto& iter : g_HairObjectArray)
-				iter->Draw(MainCamera, Current_Deferred_Shader);
-		}
-
-		GBuffer->End();
+		SpotLight->Data.Direction = jShadowAppSettingProperties::GetInstance().SpotLightDirection;
+		SpotLight->Data.Position = jShadowAppSettingProperties::GetInstance().SpotLightPosition;
 	}
 
-	//////////////////////////////////////////////////////////////////////////
-
+	MainCamera->UpdateCamera();
+	if (DirectionalLight)
+		DirectionalLight->ShadowMapData->ShadowMapCamera->UpdateCamera();
+	if (PointLight)
 	{
-		//////////////////////////////////////////////////////////////////////////
-		MainCamera->UpdateCamera();
-		if (DirectionalLight)
-			DirectionalLight->ShadowMapData->ShadowMapCamera->UpdateCamera();
-		//////////////////////////////////////////////////////////////////////////
+		for (auto& iter : PointLight->ShadowMapData->ShadowMapCamera)
+			iter->UpdateCamera();
+	}
+	if (SpotLight)
+	{
+		for (auto& iter : SpotLight->ShadowMapData->ShadowMapCamera)
+			iter->UpdateCamera();
+	}
 
+	const bool expDeepShadowMap = jShadowAppSettingProperties::GetInstance().ExponentDeepShadowOn;
+
+	// Shadow Map Gen Path
+	{
 		// 1.1 Directional Light ShadowMap Generation
 		g_rhi->SetRenderTarget(DirectionalLight->ShadowMapData->ShadowMapRenderTarget);
 		g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -293,12 +306,33 @@ void jGame::Update(float deltaTime)
 
 			for (auto& iter : g_HairObjectArray)
 				iter->Draw(DirectionalLight->ShadowMapData->ShadowMapCamera, deepShadowMapGenShader);
-			
+
 			g_rhi->EnableDepthBias(false);
 		}
 	}
+	
+	
 	//////////////////////////////////////////////////////////////////////////
+	// Pass
+	if (GBuffer->Begin())
+	{
+		g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+		g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
 
+		if (auto Current_Deferred_Shader = expDeepShadowMap ? jShader::GetShader("ExpDeferred") : jShader::GetShader("Deferred"))
+		{
+			for (auto& iter : g_StaticObjectArray)
+				iter->Draw(MainCamera, Current_Deferred_Shader, nullptr);
+
+			for (auto& iter : g_HairObjectArray)
+				iter->Draw(MainCamera, Current_Deferred_Shader);
+		}
+
+		GBuffer->End();
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// Compute Pass
 	if (auto shader = jShader::GetShader("cs_sort"))
 	{
 		g_rhi->SetShader(shader);
@@ -323,68 +357,7 @@ void jGame::Update(float deltaTime)
 		g_rhi->DispatchCompute(SM_WIDTH / 16, SM_HEIGHT / 8, 1);
 	}
 
-	// todo debug test, should remove this
-	if (DirectionalLight)
-		DirectionalLight->Data.Direction = jShadowAppSettingProperties::GetInstance().DirecionalLightDirection;
-	if (PointLight)
-		PointLight->Data.Position = jShadowAppSettingProperties::GetInstance().PointLightPosition;
-	if (SpotLight)
-	{
-		SpotLight->Data.Direction = jShadowAppSettingProperties::GetInstance().SpotLightDirection;
-		SpotLight->Data.Position = jShadowAppSettingProperties::GetInstance().SpotLightPosition;
-	}
-
-	MainCamera->UpdateCamera();
-	if (DirectionalLight)
-		DirectionalLight->ShadowMapData->ShadowMapCamera->UpdateCamera();
-	if (PointLight)
-	{
-		for (auto& iter : PointLight->ShadowMapData->ShadowMapCamera)
-			iter->UpdateCamera();
-	}
-	if (SpotLight)
-	{
-		for (auto& iter : SpotLight->ShadowMapData->ShadowMapCamera)
-			iter->UpdateCamera();
-	}
-	
-	static auto rednerTargetAA = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RGBA, EFormat::RGBA, EFormatType::FLOAT, SCR_WIDTH, SCR_HEIGHT, 1 });
-	if (rednerTargetAA)
-	{
-		if (rednerTargetAA->Begin())
-		{
-			g_rhi->SetClearColor(0.025f, 0.025f, 0.025f, 1.0f);
-			g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
-
-			if (auto deepShadowFull_Shader = expDeepShadowMap ? jShader::GetShader("ExpDeepShadowFull") : jShader::GetShader("DeepShadowFull"))
-			{
-				g_rhi->SetShader(deepShadowFull_Shader);
-				startElementBuf->Bind(deepShadowFull_Shader);
-				linkedListEntryDepthAlphaNext->Bind(deepShadowFull_Shader);
-				linkedListEntryNeighbors->Bind(deepShadowFull_Shader);
-				FullscreenQuad->Draw(MainCamera, deepShadowFull_Shader, DirectionalLight);
-			}
-	
-			rednerTargetAA->End();
-		}
-	}
-
-	g_rhi->SetRenderTarget(nullptr);
-	g_rhi->SetClearColor(0.025f, 0.025f, 0.025f, 1.0f);
-	g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
-
-	FullscreenQuad->RenderObject->tex_object = rednerTargetAA->GetTexture();
-	if (auto shader = jShader::GetShader("DeepShadowAA"))
-		FullscreenQuad->Draw(MainCamera, shader, nullptr);
-
-	if (auto shader = jShader::GetShader("Base"))
-	{
-		for (auto& iter : g_DebugObjectArray)
-		{
-			iter->Update(deltaTime);
-			iter->Draw(MainCamera, shader, nullptr);
-		}
-	}
+	PostProcessChain.Process(MainCamera);
 
 	return;
 

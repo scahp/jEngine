@@ -33,13 +33,13 @@ void jBillboardQuadPrimitive::Update(float deltaTime)
 	}
 }
 
-void jUIQuadPrimitive::Draw(jCamera* camera, jShader* shader, jLight* light)
+void jUIQuadPrimitive::Draw(const jCamera* camera, const jShader* shader, const jLight* light)
 {
 	SetUniformParams(shader);
 	__super::Draw(camera, shader, light);
 }
 
-void jUIQuadPrimitive::SetUniformParams(jShader* shader)
+void jUIQuadPrimitive::SetUniformParams(const jShader* shader)
 {
 	auto temp1 = jUniformBuffer<Vector2>("PixelSize", Vector2(1.0f / SCR_WIDTH, 1.0f / SCR_HEIGHT));
 	auto temp2 = jUniformBuffer<Vector2>("Pos", Pos);
@@ -51,19 +51,19 @@ void jUIQuadPrimitive::SetUniformParams(jShader* shader)
 	g_rhi->SetUniformbuffer(&temp3, shader);
 }
 
-void jFullscreenQuadPrimitive::Draw(jCamera* camera, jShader* shader)
+void jFullscreenQuadPrimitive::Draw(const jCamera* camera, const jShader* shader)
 {
 	SetUniformBuffer(shader);
 	__super::Draw(camera, shader);
 }
 
-void jFullscreenQuadPrimitive::Draw(jCamera* camera, jShader* shader, jLight* light)
+void jFullscreenQuadPrimitive::Draw(const jCamera* camera, const jShader* shader, const jLight* light)
 {
 	SetUniformBuffer(shader);
 	__super::Draw(camera, shader, light);
 }
 
-void jFullscreenQuadPrimitive::SetUniformBuffer(jShader* shader)
+void jFullscreenQuadPrimitive::SetUniformBuffer(const jShader* shader)
 {
 	auto temp1 = jUniformBuffer<Vector2>("PixelSize", Vector2(1.0f / SCR_WIDTH, 1.0f / SCR_HEIGHT));
 	auto temp2 = jUniformBuffer<float>("IsVertical", IsVertical);
@@ -75,17 +75,22 @@ void jFullscreenQuadPrimitive::SetUniformBuffer(jShader* shader)
 	g_rhi->SetUniformbuffer(&temp3, shader);
 }
 
-void jBoundBoxObject::Draw(jCamera* camera, jShader* shader)
+void jFullscreenQuadPrimitive::SetTexture(const jTexture* texture)
+{
+	RenderObject->tex_object = texture;
+}
+
+void jBoundBoxObject::Draw(const jCamera* camera, const jShader* shader)
 {
 	__super::Draw(camera, shader);
 }
 
-void jBoundBoxObject::Draw(jCamera* camera, jShader* shader, jLight* light)
+void jBoundBoxObject::Draw(const jCamera* camera, const jShader* shader, const jLight* light)
 {
 	__super::Draw(camera, shader, light);
 }
 
-void jBoundBoxObject::SetUniformBuffer(jShader* shader)
+void jBoundBoxObject::SetUniformBuffer(const jShader* shader)
 {
 	auto colorData = jUniformBuffer<Vector4>("Color", Color);
 
@@ -93,17 +98,17 @@ void jBoundBoxObject::SetUniformBuffer(jShader* shader)
 	g_rhi->SetUniformbuffer(&colorData, shader);
 }
 
-void jBoundSphereObject::Draw(jCamera* camera, jShader* shader)
+void jBoundSphereObject::Draw(const jCamera* camera, const jShader* shader)
 {
 	__super::Draw(camera, shader);
 }
 
-void jBoundSphereObject::Draw(jCamera* camera, jShader* shader, jLight* light)
+void jBoundSphereObject::Draw(const jCamera* camera, const jShader* shader, const jLight* light)
 {
 	__super::Draw(camera, shader, light);
 }
 
-void jBoundSphereObject::SetUniformBuffer(jShader* shader)
+void jBoundSphereObject::SetUniformBuffer(const jShader* shader)
 {
 	auto colorData = jUniformBuffer<Vector4>("Color", Color);
 
@@ -121,7 +126,7 @@ void jArrowSegmentPrimitive::Update(float deltaTime)
 		ConeObject->Update(deltaTime);
 }
 
-void jArrowSegmentPrimitive::Draw(jCamera* camera, jShader* shader)
+void jArrowSegmentPrimitive::Draw(const jCamera* camera, const jShader* shader)
 {
 	__super::Draw(camera, shader);
 
@@ -131,7 +136,7 @@ void jArrowSegmentPrimitive::Draw(jCamera* camera, jShader* shader)
 		ConeObject->Draw(camera, shader);
 }
 
-void jArrowSegmentPrimitive::Draw(jCamera* camera, jShader* shader, jLight* light)
+void jArrowSegmentPrimitive::Draw(const jCamera* camera, const jShader* shader, const jLight* light)
 {
 	__super::Draw(camera, shader, light);
 
@@ -1665,7 +1670,7 @@ void jDirectionalLightPrimitive::Update(float deltaTime)
 		ArrowSegementObject->Update(deltaTime);
 }
 
-void jDirectionalLightPrimitive::Draw(jCamera* camera, jShader* shader)
+void jDirectionalLightPrimitive::Draw(const jCamera* camera, const jShader* shader)
 {
 	__super::Draw(camera, shader);
 
@@ -1675,7 +1680,7 @@ void jDirectionalLightPrimitive::Draw(jCamera* camera, jShader* shader)
 		ArrowSegementObject->Draw(camera, shader);
 }
 
-void jDirectionalLightPrimitive::Draw(jCamera* camera, jShader* shader, jLight* light)
+void jDirectionalLightPrimitive::Draw(const jCamera* camera, const jShader* shader, const jLight* light)
 {
 	__super::Draw(camera, shader, light);
 
@@ -1729,14 +1734,14 @@ void jPointLightPrimitive::Update(float deltaTime)
 	SphereObject->Update(deltaTime);
 }
 
-void jPointLightPrimitive::Draw(jCamera* camera, jShader* shader)
+void jPointLightPrimitive::Draw(const jCamera* camera, const jShader* shader)
 {
 	__super::Draw(camera, shader);
 	BillboardObject->Draw(camera, shader);
 	SphereObject->Draw(camera, shader);
 }
 
-void jPointLightPrimitive::Draw(jCamera* camera, jShader* shader, jLight* light)
+void jPointLightPrimitive::Draw(const jCamera* camera, const jShader* shader, const jLight* light)
 {
 	__super::Draw(camera, shader, light);
 	BillboardObject->Draw(camera, shader, light);
@@ -1751,7 +1756,7 @@ void jSpotLightPrimitive::Update(float deltaTime)
 	PenumbraConeObject->Update(deltaTime);
 }
 
-void jSpotLightPrimitive::Draw(jCamera* camera, jShader* shader)
+void jSpotLightPrimitive::Draw(const jCamera* camera, const jShader* shader)
 {
 	__super::Draw(camera, shader);
 	BillboardObject->Draw(camera, shader);
@@ -1759,7 +1764,7 @@ void jSpotLightPrimitive::Draw(jCamera* camera, jShader* shader)
 	PenumbraConeObject->Draw(camera, shader);
 }
 
-void jSpotLightPrimitive::Draw(jCamera* camera, jShader* shader, jLight* light)
+void jSpotLightPrimitive::Draw(const jCamera* camera, const jShader* shader, const jLight* light)
 {
 	__super::Draw(camera, shader, light);
 	BillboardObject->Draw(camera, shader, light);

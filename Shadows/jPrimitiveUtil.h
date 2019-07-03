@@ -47,9 +47,9 @@ public:
 	Vector2 Pos;
 	Vector2 Size;
 
-	virtual void Draw(jCamera* camera, jShader* shader, jLight* light) override;
+	virtual void Draw(const jCamera* camera, const jShader* shader, const jLight* light) override;
 
-	void SetUniformParams(jShader* shader);
+	void SetUniformParams(const jShader* shader);
 
 };
 
@@ -59,9 +59,10 @@ public:
 	bool IsVertical = true;
 	float MaxDist = 0.0f;
 
-	virtual void Draw(jCamera* camera, jShader* shader) override;
-	virtual void Draw(jCamera* camera, jShader* shader, jLight* light) override;
-	void SetUniformBuffer(jShader* shader);
+	virtual void Draw(const jCamera* camera, const jShader* shader) override;
+	virtual void Draw(const jCamera* camera, const jShader* shader, const jLight* light) override;
+	void SetUniformBuffer(const jShader* shader);
+	void SetTexture(const jTexture* texture);
 };
 
 struct jBoundBox
@@ -78,9 +79,9 @@ struct jBoundSphere
 class jBoundBoxObject : public jObject
 {
 public:
-	virtual void Draw(jCamera* camera, jShader* shader) override;
-	virtual void Draw(jCamera* camera, jShader* shader, jLight* light) override;
-	void SetUniformBuffer(jShader* shader);
+	virtual void Draw(const jCamera* camera, const jShader* shader) override;
+	virtual void Draw(const jCamera* camera, const jShader* shader, const jLight* light) override;
+	void SetUniformBuffer(const jShader* shader);
 
 	Vector4 Color = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
 	jBoundBox BoundBox;
@@ -90,9 +91,9 @@ public:
 class jBoundSphereObject : public jObject
 {
 public:
-	virtual void Draw(jCamera* camera, jShader* shader) override;
-	virtual void Draw(jCamera* camera, jShader* shader, jLight* light) override;
-	void SetUniformBuffer(jShader* shader);
+	virtual void Draw(const jCamera* camera, const jShader* shader) override;
+	virtual void Draw(const jCamera* camera, const jShader* shader, const jLight* light) override;
+	void SetUniformBuffer(const jShader* shader);
 
 	Vector4 Color = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
 	jBoundSphere BoundSphere;
@@ -129,8 +130,8 @@ class jArrowSegmentPrimitive : public jObject
 {
 public:
 	virtual void Update(float deltaTime) override;
-	virtual void Draw(jCamera* camera, jShader* shader) override;
-	virtual void Draw(jCamera* camera, jShader* shader, jLight* light) override;
+	virtual void Draw(const jCamera* camera, const jShader* shader) override;
+	virtual void Draw(const jCamera* camera, const jShader* shader, const jLight* light) override;
 
 	void SetPos(const Vector& pos);
 	void SetStart(const Vector& start);
@@ -145,8 +146,8 @@ class jDirectionalLightPrimitive : public jObject
 {
 public:
 	virtual void Update(float deltaTime) override;
-	virtual void Draw(jCamera* camera, jShader* shader) override;
-	virtual void Draw(jCamera* camera, jShader* shader, jLight* light) override;
+	virtual void Draw(const jCamera* camera, const jShader* shader) override;
+	virtual void Draw(const jCamera* camera, const jShader* shader, const jLight* light) override;
 
 	jBillboardQuadPrimitive* BillboardObject = nullptr;
 	jArrowSegmentPrimitive* ArrowSegementObject = nullptr;
@@ -158,8 +159,8 @@ class jPointLightPrimitive : public jObject
 {
 public:
 	virtual void Update(float deltaTime) override;
-	virtual void Draw(jCamera* camera, jShader* shader) override;
-	virtual void Draw(jCamera* camera, jShader* shader, jLight* light) override;
+	virtual void Draw(const jCamera* camera, const jShader* shader) override;
+	virtual void Draw(const jCamera* camera, const jShader* shader, const jLight* light) override;
 
 	jBillboardQuadPrimitive* BillboardObject = nullptr;
 	jObject* SphereObject = nullptr;
@@ -170,8 +171,8 @@ class jSpotLightPrimitive : public jObject
 {
 public:
 	virtual void Update(float deltaTime) override;
-	virtual void Draw(jCamera* camera, jShader* shader) override;
-	virtual void Draw(jCamera* camera, jShader* shader, jLight* light) override;
+	virtual void Draw(const jCamera* camera, const jShader* shader) override;
+	virtual void Draw(const jCamera* camera, const jShader* shader, const jLight* light) override;
 
 	jBillboardQuadPrimitive* BillboardObject = nullptr;
 	jConePrimitive* UmbraConeObject = nullptr;

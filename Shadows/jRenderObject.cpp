@@ -26,7 +26,7 @@ void jRenderObject::CreateRenderObject(const std::shared_ptr<jVertexStreamData>&
 	IndexBuffer = g_rhi->CreateIndexBuffer(IndexStream);
 }
 
-void jRenderObject::Draw(jCamera* camera, jShader* shader, int32 startIndex, int32 count)
+void jRenderObject::Draw(const jCamera* camera, const jShader* shader, int32 startIndex, int32 count)
 {
 	if (VertexBuffer->VertexStreamData.expired())
 		return;
@@ -63,7 +63,7 @@ void jRenderObject::Draw(jCamera* camera, jShader* shader, int32 startIndex, int
 	materialData.Params.clear();
 }
 
-void jRenderObject::Draw(jCamera* camera, jShader* shader, jLight* light, int32 startIndex, int32 count)
+void jRenderObject::Draw(const jCamera* camera, const jShader* shader, const jLight* light, int32 startIndex, int32 count)
 {
 	if (VertexBuffer->VertexStreamData.expired())
 		return;
@@ -100,7 +100,7 @@ void jRenderObject::Draw(jCamera* camera, jShader* shader, jLight* light, int32 
 	materialData.Params.clear();
 }
 
-void jRenderObject::Draw(jCamera* camera, jShader* shader, jLight* light, int32 startIndex, int32 count, int32 baseVertexIndex)
+void jRenderObject::Draw(const jCamera* camera, const jShader* shader, const jLight* light, int32 startIndex, int32 count, int32 baseVertexIndex)
 {
 	if (VertexBuffer->VertexStreamData.expired())
 		return;
@@ -133,7 +133,7 @@ void jRenderObject::Draw(jCamera* camera, jShader* shader, jLight* light, int32 
 	materialData.Params.clear();
 }
 
-void jRenderObject::Draw(jCamera* camera, jShader* shader, int32 startIndex, int32 count, int32 baseVertexIndex)
+void jRenderObject::Draw(const jCamera* camera, const jShader* shader, int32 startIndex, int32 count, int32 baseVertexIndex)
 {
 	if (VertexBuffer->VertexStreamData.expired())
 		return;
@@ -170,7 +170,7 @@ void jRenderObject::Draw(jCamera* camera, jShader* shader, int32 startIndex, int
 	materialData.Params.clear();
 }
 
-void jRenderObject::SetRenderProperty(jShader* shader)
+void jRenderObject::SetRenderProperty(const jShader* shader)
 {
 	if (VertexBuffer)
 		VertexBuffer->Bind(shader);
@@ -178,7 +178,7 @@ void jRenderObject::SetRenderProperty(jShader* shader)
 		IndexBuffer->Bind(shader);
 }
 
-void jRenderObject::SetCameraProperty(jShader* shader, jCamera* camera)
+void jRenderObject::SetCameraProperty(const jShader* shader, const jCamera* camera)
 {
 	auto posMatrix = Matrix::MakeTranslate(Pos);
 	auto rotMatrix = Matrix::MakeRotate(Rot);
@@ -214,7 +214,7 @@ void jRenderObject::SetCameraProperty(jShader* shader, jCamera* camera)
 	g_rhi->SetUniformbuffer(&jUniformBuffer<int>("ShadingModel", static_cast<int>(ShadingModel)), shader);
 }
 
-void jRenderObject::SetLightProperty(jShader* shader, jCamera* camera, jMaterialData* materialData)
+void jRenderObject::SetLightProperty(const jShader* shader, const jCamera* camera, jMaterialData* materialData)
 {
 	int ambient = 0;
 	int directional = 0;
@@ -280,7 +280,7 @@ void jRenderObject::SetLightProperty(jShader* shader, jCamera* camera, jMaterial
 	}
 }
 
-void jRenderObject::SetLightProperty(jShader* shader, jLight* light, jMaterialData* materialData)
+void jRenderObject::SetLightProperty(const jShader* shader, const jLight* light, jMaterialData* materialData)
 {
 	int ambient = 0;
 	int directional = 0;
@@ -317,7 +317,7 @@ void jRenderObject::SetLightProperty(jShader* shader, jLight* light, jMaterialDa
 	g_rhi->SetUniformbuffer(&jUniformBuffer<int>("NumOfSpotLight", spot), shader);
 }
 
-void jRenderObject::SetTextureProperty(jShader* shader, jMaterialData* materialData)
+void jRenderObject::SetTextureProperty(const jShader* shader, jMaterialData* materialData)
 {
 	if (materialData)
 	{
@@ -386,7 +386,7 @@ void jRenderObject::SetTextureProperty(jShader* shader, jMaterialData* materialD
 	}
 }
 
-void jRenderObject::SetMaterialProperty(jShader* shader, jMaterialData* materialData)
+void jRenderObject::SetMaterialProperty(const jShader* shader, jMaterialData* materialData)
 {
 	g_rhi->SetMatetrial(materialData, shader);
 }

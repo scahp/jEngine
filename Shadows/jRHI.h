@@ -17,14 +17,14 @@ struct jVertexBuffer : public jBuffer
 {
 	std::weak_ptr<jVertexStreamData> VertexStreamData;
 
-	virtual void Bind(jShader* shader) {}
+	virtual void Bind(const jShader* shader) {}
 };
 
 struct jIndexBuffer : public jBuffer
 {
 	std::weak_ptr<jIndexStreamData> IndexStreamData;
 
-	virtual void Bind(jShader* shader) {}
+	virtual void Bind(const jShader* shader) {}
 };
 
 struct jTexture
@@ -163,8 +163,8 @@ struct IUniformBufferBlock
 	int32 Size = 0;
 
 	virtual void Init() = 0;
-	virtual void Bind(jShader* shader) const = 0;
-	virtual void UpdateBufferData(void* newData, int32 size) = 0;
+	virtual void Bind(const jShader* shader) const = 0;
+	virtual void UpdateBufferData(const void* newData, int32 size) = 0;
 	virtual void ClearBuffer(int32 clearValue = 0) = 0;
 };
 
@@ -180,7 +180,7 @@ struct IShaderStorageBufferObject
 	int32 Size = 0;
 
 	virtual void Init() = 0;
-	virtual void Bind(jShader* shader) const = 0;
+	virtual void Bind(const jShader* shader) const = 0;
 	virtual void UpdateBufferData(void* newData, int32 size) = 0;
 	virtual void GetBufferData(void* newData, int32 size) = 0;
 	virtual void ClearBuffer(int32 clearValue) = 0;
@@ -205,7 +205,7 @@ struct IAtomicCounterBuffer
 	uint32 BindingPoint = -1;
 
 	virtual void Init() = 0;
-	virtual void Bind(jShader* shader) const = 0;
+	virtual void Bind(const jShader* shader) const = 0;
 	virtual void UpdateBufferData(void* newData, int32 size) = 0;
 	virtual void GetBufferData(void* newData, int32 size) = 0;
 	virtual void ClearBuffer(int32 clearValue) = 0;
@@ -298,15 +298,15 @@ public:
 	virtual void UpdateVertexBuffer(jVertexBuffer* vb, const std::shared_ptr<jVertexStreamData>& streamData) {}
 	virtual void UpdateVertexBuffer(jVertexBuffer* vb, IStreamParam* streamParam, int32 streamParamIndex) {}
 
-	virtual void BindVertexBuffer(jVertexBuffer* vb, jShader* shader) {}
-	virtual void BindIndexBuffer(jIndexBuffer* ib, jShader* shader) {}
+	virtual void BindVertexBuffer(const jVertexBuffer* vb, const jShader* shader) {}
+	virtual void BindIndexBuffer(const jIndexBuffer* ib, const jShader* shader) {}
 
 	virtual void MapBufferdata(jBuffer* buffer);
 
 	virtual void SetTextureFilter(ETextureType type, ETextureFilterTarget target, ETextureFilter filter) {}
 	virtual void SetTextureWrap(int flag) {}
 
-	virtual void SetTexture(int32 index, jTexture* texture) {}
+	virtual void SetTexture(int32 index, const jTexture* texture) {}
 	
 	virtual void DrawArray(EPrimitiveType type, int vertStartIndex, int vertCount) {}
 	virtual void DrawElement(EPrimitiveType type, int elementSize, int32 startIndex = -1, int32 count = -1) {}
@@ -317,16 +317,16 @@ public:
 	virtual void EnableDepthBias(bool enable) {}
 	virtual void SetDepthBias(float constant, float slope) {}
 	
-	virtual void SetShader(jShader* shader) {}
+	virtual void SetShader(const jShader* shader) {}
 	virtual jShader* CreateShader(const jShaderInfo& shaderInfo) { return nullptr; }
 
-	virtual bool SetUniformbuffer(IUniformBuffer* buffer, jShader* shader) { return false; }
+	virtual bool SetUniformbuffer(IUniformBuffer* buffer, const jShader* shader) { return false; }
 
 	virtual jTexture* CreateNullTexture() const { return nullptr; }
 
 	virtual jTexture* CreateTextureFromData(unsigned char* data, int32 width, int32 height) { return nullptr; }
 
-	virtual void SetMatetrial(jMaterialData* materialData, jShader* shader) {}
+	virtual void SetMatetrial(jMaterialData* materialData, const jShader* shader) {}
 
 	virtual void EnableCullFace(bool enable) {}
 

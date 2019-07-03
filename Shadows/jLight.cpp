@@ -106,7 +106,7 @@ jSpotLight* jLight::CreateSpotLight(const Vector& pos, const Vector& direction, 
 
 //////////////////////////////////////////////////////////////////////////
 
-void jDirectionalLight::BindLight(jShader* shader, jMaterialData* materialData, int32 index)
+void jDirectionalLight::BindLight(const jShader* shader, jMaterialData* materialData, int32 index /*= 0*/) const
 {
 	JASSERT(shader);
 	JASSERT(materialData);
@@ -174,7 +174,7 @@ jTexture* jDirectionalLight::GetShadowMap() const
 	return (ShadowMapData && ShadowMapData->ShadowMapRenderTarget) ? ShadowMapData->ShadowMapRenderTarget->GetTexture() : nullptr;
 }
 
-void jPointLight::BindLight(jShader* shader, jMaterialData* materialData, int32 index)
+void jPointLight::BindLight(const jShader* shader, jMaterialData* materialData, int32 index /*= 0*/) const
 {
 	//if (!LightDataUniformBlock->Data || *static_cast<LightData*>(LightDataUniformBlock->Data) != Data)
 		LightDataUniformBlock->UpdateBufferData(&Data, sizeof(Data));
@@ -228,7 +228,7 @@ void jPointLight::BindLight(jShader* shader, jMaterialData* materialData, int32 
 	}
 }
 
-void jSpotLight::BindLight(jShader* shader, jMaterialData* materialData, int32 index)
+void jSpotLight::BindLight(const jShader* shader, jMaterialData* materialData, int32 index /*= 0*/) const
 {
 	//if (!LightDataUniformBlock->Data || *static_cast<LightData*>(LightDataUniformBlock->Data) != Data)
 		LightDataUniformBlock->UpdateBufferData(&Data, sizeof(Data));
@@ -283,7 +283,7 @@ void jSpotLight::BindLight(jShader* shader, jMaterialData* materialData, int32 i
 }
 
 //////////////////////////////////////////////////////////////////////////
-void jAmbientLight::BindLight(jShader* shader, jMaterialData* materialData, int32 index)
+void jAmbientLight::BindLight(const jShader* shader, jMaterialData* materialData, int32 index /*= 0*/) const
 {
 	const std::string structName = "AmbientLight";
 

@@ -9,19 +9,19 @@ jMeshObject::jMeshObject()
 {	
 }
 
-void jMeshObject::Draw(jCamera* camera, jShader* shader)
+void jMeshObject::Draw(const jCamera* camera, const jShader* shader)
 {
 	if (Visible && RenderObject)
 		DrawNode(RootNode, camera, shader, nullptr);
 }
 
-void jMeshObject::Draw(jCamera* camera, jShader* shader, jLight* light)
+void jMeshObject::Draw(const jCamera* camera, const jShader* shader, const jLight* light)
 {
 	if (Visible && RenderObject)
 		DrawNode(RootNode, camera, shader, light);
 }
 
-void jMeshObject::SetMaterialUniform(jShader* shader, jMeshMaterial* material)
+void jMeshObject::SetMaterialUniform(const jShader* shader, const jMeshMaterial* material)
 {
 	g_rhi->SetShader(shader);
 	g_rhi->SetUniformbuffer(&jUniformBuffer<Vector4>("Material.Diffuse", material->Data.Diffuse), shader);
@@ -34,7 +34,7 @@ void jMeshObject::SetMaterialUniform(jShader* shader, jMeshMaterial* material)
 	g_rhi->SetUniformbuffer(&jUniformBuffer<float>("Material.Shininess", material->Data.SpecularPow), shader);
 }
 
-void jMeshObject::DrawNode(jMeshNode* node, jCamera* camera, jShader* shader, jLight* light)
+void jMeshObject::DrawNode(const jMeshNode* node, const jCamera* camera, const jShader* shader, const jLight* light)
 {
 	for (auto& iter : node->MeshIndex)
 		DrawSubMesh(iter, camera, shader, light);
@@ -43,7 +43,7 @@ void jMeshObject::DrawNode(jMeshNode* node, jCamera* camera, jShader* shader, jL
 		DrawNode(iter, camera, shader, light);
 }
 
-void jMeshObject::DrawSubMesh(int32 meshIndex, jCamera* camera, jShader* shader, jLight* light)
+void jMeshObject::DrawSubMesh(int32 meshIndex, const jCamera* camera, const jShader* shader, const jLight* light)
 {
 	auto& subMesh = SubMeshes[meshIndex];
 	auto it_find = MeshData->Materials.find(subMesh.MaterialIndex);

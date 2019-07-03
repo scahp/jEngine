@@ -20,14 +20,14 @@ struct jVertexBuffer_OpenGL : public jVertexBuffer
 	uint32 VAO = 0;
 	std::vector<jVertexStream_OpenGL> Streams;
 
-	virtual void Bind(jShader* shader) override;
+	virtual void Bind(const jShader* shader) override;
 };
 
 struct jIndexBuffer_OpenGL : public jIndexBuffer
 {
 	unsigned int BufferID = 0;
 
-	virtual void Bind(jShader* shader) override;
+	virtual void Bind(const jShader* shader) override;
 };
 
 struct jShader_OpenGL : public jShader
@@ -44,7 +44,7 @@ struct jTexture_OpenGL : public jTexture
 struct jMaterialParam_OpenGL : public IMaterialParam
 {
 	std::string Name;
-	jTexture* Texture;
+	const jTexture* Texture = nullptr;
 	ETextureFilter Minification = ETextureFilter::NEAREST;
 	ETextureFilter Magnification = ETextureFilter::NEAREST;
 };
@@ -75,8 +75,8 @@ struct jUniformBufferBlock_OpenGL : public IUniformBufferBlock
 	uint32 BindingPoint = -1;
 	uint32 UBO = -1;
 	virtual void Init() override;
-	virtual void Bind(jShader* shader) const override;
-	virtual void UpdateBufferData(void* newData, int32 size) override;
+	virtual void Bind(const jShader* shader) const override;
+	virtual void UpdateBufferData(const void* newData, int32 size) override;
 	virtual void ClearBuffer(int32 clearValue) override;
 };
 
@@ -94,7 +94,7 @@ struct jShaderStorageBufferObject_OpenGL : public IShaderStorageBufferObject
 	uint32 BindingPoint = -1;
 	uint32 SSBO = -1;
 	virtual void Init() override;
-	virtual void Bind(jShader* shader) const override;
+	virtual void Bind(const jShader* shader) const override;
 	virtual void UpdateBufferData(void* newData, int32 size) override;
 	virtual void ClearBuffer(int32 clearValue) override;
 	virtual void GetBufferData(void* newData, int32 size) override;
@@ -110,7 +110,7 @@ struct jAtomicCounterBuffer_OpenGL : public IAtomicCounterBuffer
 
 	uint32 ACBO = -1;
 	virtual void Init() override;
-	virtual void Bind(jShader* shader) const override;
+	virtual void Bind(const jShader* shader) const override;
 	virtual void UpdateBufferData(void* newData, int32 size) override;
 	using IAtomicCounterBuffer::GetBufferData;
 	virtual void GetBufferData(void* newData, int32 size) override;
@@ -129,10 +129,10 @@ public:
 	virtual jIndexBuffer* CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) override;
 
 
-	virtual void BindVertexBuffer(jVertexBuffer* vb, jShader* shader) override;
+	virtual void BindVertexBuffer(const jVertexBuffer* vb, const jShader* shader) override;
 
 
-	virtual void BindIndexBuffer(jIndexBuffer* ib, jShader* shader) override;
+	virtual void BindIndexBuffer(const jIndexBuffer* ib, const jShader* shader) override;
 
 
 	virtual void MapBufferdata(jBuffer* buffer) override;
@@ -173,7 +173,7 @@ public:
 	virtual void SetClearColor(float r, float g, float b, float a) override;
 
 
-	virtual void SetShader(jShader* shader) override;
+	virtual void SetShader(const jShader* shader) override;
 
 
 	virtual jShader* CreateShader(const jShaderInfo& shaderInfo) override;
@@ -183,13 +183,13 @@ public:
 	virtual jTexture* CreateTextureFromData(unsigned char* data, int32 width, int32 height) override;
 
 
-	virtual bool SetUniformbuffer(IUniformBuffer* buffer, jShader* shader) override;
+	virtual bool SetUniformbuffer(IUniformBuffer* buffer, const jShader* shader) override;
 
 
-	virtual void SetMatetrial(jMaterialData* materialData, jShader* shader) override;
+	virtual void SetMatetrial(jMaterialData* materialData, const jShader* shader) override;
 
 
-	virtual void SetTexture(int32 index, jTexture* texture) override;
+	virtual void SetTexture(int32 index, const jTexture* texture) override;
 
 
 	virtual void SetTextureFilter(ETextureType type, ETextureFilterTarget target, ETextureFilter filter) override;

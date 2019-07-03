@@ -81,11 +81,11 @@ jIndexBuffer* jRHI_OpenGL::CreateIndexBuffer(const std::shared_ptr<jIndexStreamD
 	return indexBuffer;
 }
 
-void jRHI_OpenGL::BindVertexBuffer(jVertexBuffer* vb, jShader* shader)
+void jRHI_OpenGL::BindVertexBuffer(const jVertexBuffer* vb, const jShader* shader)
 {
-	auto vb_gl = static_cast<jVertexBuffer_OpenGL*>(vb);
+	auto vb_gl = static_cast<const jVertexBuffer_OpenGL*>(vb);
 	glBindVertexArray(vb_gl->VAO);
-	auto shader_gl = static_cast<jShader_OpenGL*>(shader);
+	auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
 	for (const auto& iter : vb_gl->Streams)
 	{
 		auto loc = glGetAttribLocation(shader_gl->program, iter.Name.c_str());
@@ -112,9 +112,9 @@ void jRHI_OpenGL::BindVertexBuffer(jVertexBuffer* vb, jShader* shader)
 	}
 }
 
-void jRHI_OpenGL::BindIndexBuffer(jIndexBuffer* ib, jShader* shader)
+void jRHI_OpenGL::BindIndexBuffer(const jIndexBuffer* ib, const jShader* shader)
 {
-	auto ib_gl = static_cast<jIndexBuffer_OpenGL*>(ib);
+	auto ib_gl = static_cast<const jIndexBuffer_OpenGL*>(ib);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib_gl->BufferID);
 }
 
@@ -199,10 +199,10 @@ void jRHI_OpenGL::SetClearColor(float r, float g, float b, float a)
 	glClearColor(r, g, b, a);
 }
 
-void jRHI_OpenGL::SetShader(jShader* shader)
+void jRHI_OpenGL::SetShader(const jShader* shader)
 {
 	JASSERT(shader);
-	auto shader_gl = static_cast<jShader_OpenGL*>(shader);
+	auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
 	glUseProgram(shader_gl->program);
 }
 
@@ -426,13 +426,13 @@ jTexture* jRHI_OpenGL::CreateTextureFromData(unsigned char* data, int32 width, i
 	return texure;
 }
 
-bool jRHI_OpenGL::SetUniformbuffer(IUniformBuffer* buffer, jShader* shader)
+bool jRHI_OpenGL::SetUniformbuffer(IUniformBuffer* buffer, const jShader* shader)
 {
 	switch (buffer->GetType())
 	{
 	case EUniformType::MATRIX:
 	{
-		auto shader_gl = static_cast<jShader_OpenGL*>(shader);
+		auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
 
 		auto uniformMatrix = static_cast<jUniformBuffer<Matrix>*>(buffer);
 		auto loc = glGetUniformLocation(shader_gl->program, uniformMatrix->Name.c_str());
@@ -443,7 +443,7 @@ bool jRHI_OpenGL::SetUniformbuffer(IUniformBuffer* buffer, jShader* shader)
 	}
 	case EUniformType::BOOL:
 	{
-		auto shader_gl = static_cast<jShader_OpenGL*>(shader);
+		auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
 
 		auto uniformVector = static_cast<jUniformBuffer<bool>*>(buffer);
 		auto loc = glGetUniformLocation(shader_gl->program, uniformVector->Name.c_str());
@@ -453,7 +453,7 @@ bool jRHI_OpenGL::SetUniformbuffer(IUniformBuffer* buffer, jShader* shader)
 	}
 	case EUniformType::INT:
 	{
-		auto shader_gl = static_cast<jShader_OpenGL*>(shader);
+		auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
 
 		auto uniformVector = static_cast<jUniformBuffer<int>*>(buffer);
 		auto loc = glGetUniformLocation(shader_gl->program, uniformVector->Name.c_str());
@@ -464,7 +464,7 @@ bool jRHI_OpenGL::SetUniformbuffer(IUniformBuffer* buffer, jShader* shader)
 	}
 	case EUniformType::FLOAT:
 	{
-		auto shader_gl = static_cast<jShader_OpenGL*>(shader);
+		auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
 
 		auto uniformVector = static_cast<jUniformBuffer<float>*>(buffer);
 		auto loc = glGetUniformLocation(shader_gl->program, uniformVector->Name.c_str());
@@ -475,7 +475,7 @@ bool jRHI_OpenGL::SetUniformbuffer(IUniformBuffer* buffer, jShader* shader)
 	}
 	case EUniformType::VECTOR2:
 	{
-		auto shader_gl = static_cast<jShader_OpenGL*>(shader);
+		auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
 
 		auto uniformVector = static_cast<jUniformBuffer<Vector2>*>(buffer);
 		auto loc = glGetUniformLocation(shader_gl->program, uniformVector->Name.c_str());
@@ -486,7 +486,7 @@ bool jRHI_OpenGL::SetUniformbuffer(IUniformBuffer* buffer, jShader* shader)
 	}
 	case EUniformType::VECTOR3:
 	{
-		auto shader_gl = static_cast<jShader_OpenGL*>(shader);
+		auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
 
 		auto uniformVector = static_cast<jUniformBuffer<Vector>*>(buffer);
 		auto loc = glGetUniformLocation(shader_gl->program, uniformVector->Name.c_str());
@@ -497,7 +497,7 @@ bool jRHI_OpenGL::SetUniformbuffer(IUniformBuffer* buffer, jShader* shader)
 	}
 	case EUniformType::VECTOR4:
 	{
-		auto shader_gl = static_cast<jShader_OpenGL*>(shader);
+		auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
 
 		auto uniformVector = static_cast<jUniformBuffer<Vector4>*>(buffer);
 		auto loc = glGetUniformLocation(shader_gl->program, uniformVector->Name.c_str());
@@ -514,14 +514,14 @@ bool jRHI_OpenGL::SetUniformbuffer(IUniformBuffer* buffer, jShader* shader)
 	return true;
 }
 
-void jRHI_OpenGL::SetMatetrial(jMaterialData* materialData, jShader* shader)
+void jRHI_OpenGL::SetMatetrial(jMaterialData* materialData, const jShader* shader)
 {
 	int index = 0;
 	for (int32 i = 0; i < materialData->Params.size(); ++i)
 	{
 		auto matParam = materialData->Params[i];
 		auto matParam_gl = static_cast<jMaterialParam_OpenGL*>(matParam);
-		auto tex_gl = static_cast<jTexture_OpenGL*>(matParam_gl->Texture);
+		auto tex_gl = static_cast<const jTexture_OpenGL*>(matParam_gl->Texture);
 		if (!tex_gl)
 			continue;
 
@@ -535,11 +535,11 @@ void jRHI_OpenGL::SetMatetrial(jMaterialData* materialData, jShader* shader)
 	}
 }
 
-void jRHI_OpenGL::SetTexture(int32 index, jTexture* texture)
+void jRHI_OpenGL::SetTexture(int32 index, const jTexture* texture)
 {
 	glActiveTexture(GL_TEXTURE0 + index);
 	
-	auto texture_gl = static_cast<jTexture_OpenGL*>(texture);
+	auto texture_gl = static_cast<const jTexture_OpenGL*>(texture);
 
 	uint32 textureType = 0;
 	switch (texture_gl->TextureType)
@@ -1277,12 +1277,12 @@ IUniformBufferBlock* jRHI_OpenGL::CreateUniformBufferBlock(const char* blockname
 }
 
 //////////////////////////////////////////////////////////////////////////
-void jVertexBuffer_OpenGL::Bind(jShader* shader)
+void jVertexBuffer_OpenGL::Bind(const jShader* shader)
 {
 	g_rhi->BindVertexBuffer(this, shader);
 }
 
-void jIndexBuffer_OpenGL::Bind(jShader* shader)
+void jIndexBuffer_OpenGL::Bind(const jShader* shader)
 {
 	g_rhi->BindIndexBuffer(this, shader);
 }
@@ -1311,7 +1311,7 @@ void jRenderTarget_OpenGL::End()
 }
 
 //////////////////////////////////////////////////////////////////////////
-void jUniformBufferBlock_OpenGL::UpdateBufferData(void* newData, int32 size)
+void jUniformBufferBlock_OpenGL::UpdateBufferData(const void* newData, int32 size)
 {
 	Size = size;
 	glBindBuffer(GL_UNIFORM_BUFFER, UBO);
@@ -1331,12 +1331,12 @@ void jUniformBufferBlock_OpenGL::Init()
 	glBindBufferBase(GL_UNIFORM_BUFFER, BindingPoint, UBO);
 }
 
-void jUniformBufferBlock_OpenGL::Bind(jShader* shader) const
+void jUniformBufferBlock_OpenGL::Bind(const jShader* shader) const
 {
 	if (-1 == BindingPoint)
 		return;
 
-	auto shader_gl = static_cast<jShader_OpenGL*>(shader);
+	auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
 	uint32 index = glGetUniformBlockIndex(shader_gl->program, Name.c_str());
 	if (-1 != index)
 		glUniformBlockBinding(shader_gl->program, index, BindingPoint);
@@ -1371,12 +1371,12 @@ void jShaderStorageBufferObject_OpenGL::GetBufferData(void* newData, int32 size)
 	glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
 }
 
-void jShaderStorageBufferObject_OpenGL::Bind(jShader* shader) const
+void jShaderStorageBufferObject_OpenGL::Bind(const jShader* shader) const
 {
 	if (-1 == BindingPoint)
 		return;
 
-	auto shader_gl = static_cast<jShader_OpenGL*>(shader);
+	auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
 	uint32 index = glGetProgramResourceIndex(shader_gl->program, GL_SHADER_STORAGE_BLOCK, Name.c_str());
 	if (-1 != index)
 		glShaderStorageBlockBinding(shader_gl->program, index, BindingPoint);
@@ -1410,7 +1410,7 @@ void jAtomicCounterBuffer_OpenGL::ClearBuffer(int32 clearValue)
 	glClearBufferData(GL_ATOMIC_COUNTER_BUFFER, GL_R32I, GL_RED_INTEGER, GL_INT, &clearValue);
 }
 
-void jAtomicCounterBuffer_OpenGL::Bind(jShader* shader) const
+void jAtomicCounterBuffer_OpenGL::Bind(const jShader* shader) const
 {
 	if (-1 == BindingPoint)
 		return;
@@ -1421,7 +1421,7 @@ void jAtomicCounterBuffer_OpenGL::Bind(jShader* shader) const
 	//	memcpy(p, Data, Size);
 	//glUnmapBuffer(GL_ATOMIC_COUNTER_BUFFER);
 
-	//auto shader_gl = static_cast<jShader_OpenGL*>(shader);
+	//auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
 	//uint32 index = glGetUniformLocation(shader_gl->program, Name.c_str());
 	//uint32 index = glGetProgramResourceIndex(shader_gl->program, GL_ATOMIC_COUNTER_BUFFER, Name.c_str());
 	//if (-1 != index)

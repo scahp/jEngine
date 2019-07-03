@@ -175,6 +175,7 @@
     <ClInclude Include="jMeshObject.h" />
     <ClInclude Include="jModelLoader.h" />
     <ClInclude Include="jObject.h" />
+    <ClInclude Include="jPostProcess.h" />
     <ClInclude Include="jPrimitiveUtil.h" />
     <ClInclude Include="jRenderer.h" />
     <ClInclude Include="jRenderObject.h" />
@@ -220,6 +221,7 @@
     <ClCompile Include="jMeshObject.cpp" />
     <ClCompile Include="jModelLoader.cpp" />
     <ClCompile Include="jObject.cpp" />
+    <ClCompile Include="jPostProcess.cpp" />
     <ClCompile Include="jPrimitiveUtil.cpp" />
     <ClCompile Include="jRenderer.cpp" />
     <ClCompile Include="jRenderObject.cpp" />

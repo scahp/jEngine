@@ -80,13 +80,13 @@ void jObject::Update(float deltaTime)
 		PostUpdateFunc(this, deltaTime);
 }
 
-void jObject::Draw(jCamera* camera, jShader* shader, jLight* light)
+void jObject::Draw(const jCamera* camera, const jShader* shader, const jLight* light)
 {
 	if (Visible && RenderObject)
 		RenderObject->Draw(camera, shader, light);
 }
 
-void jObject::Draw(jCamera* camera, jShader* shader)
+void jObject::Draw(const jCamera* camera, const jShader* shader)
 {
 	if (Visible && RenderObject)
 		RenderObject->Draw(camera, shader);

@@ -101,7 +101,7 @@ public:
 	jLight(ELightType type) :Type(type) {}
 	virtual ~jLight() {}
 
-	virtual void BindLight(jShader* shader, jMaterialData* materialData, int32 index = 0) {}
+	virtual void BindLight(const jShader* shader, jMaterialData* materialData, int32 index = 0) const {}
 
 	const ELightType Type = ELightType::MAX;
 	jObject* LightDebugObject = nullptr;
@@ -120,7 +120,7 @@ public:
 	
 	LightData Data;
 	
-	virtual void BindLight(jShader* shader, jMaterialData* materialData, int32 index = 0) override;
+	virtual void BindLight(const jShader* shader, jMaterialData* materialData, int32 index = 0) const override;
 };
 
 class jDirectionalLight : public jLight
@@ -165,7 +165,7 @@ public:
 	LightData Data;
 	IUniformBufferBlock* LightDataUniformBlock = nullptr;
 
-	virtual void BindLight(jShader* shader, jMaterialData* materialData, int32 index = 0) override;
+	virtual void BindLight(const jShader* shader, jMaterialData* materialData, int32 index = 0) const override;
 
 	jLightUtil::jShadowMapData* ShadowMapData = nullptr;
 	jTexture* GetShadowMap() const;
@@ -214,7 +214,7 @@ public:
 	LightData Data;
 	IUniformBufferBlock* LightDataUniformBlock = nullptr;
 
-	virtual void BindLight(jShader* shader, jMaterialData* materialData, int32 index = 0) override;
+	virtual void BindLight(const jShader* shader, jMaterialData* materialData, int32 index = 0) const override;
 
 	jLightUtil::jShadowMapArrayData* ShadowMapData = nullptr;
 };
@@ -266,7 +266,7 @@ public:
 	LightData Data;
 	IUniformBufferBlock* LightDataUniformBlock = nullptr;
 
-	virtual void BindLight(jShader* shader, jMaterialData* materialData, int32 index = 0) override;
+	virtual void BindLight(const jShader* shader, jMaterialData* materialData, int32 index = 0) const override;
 
 	jLightUtil::jShadowMapArrayData* ShadowMapData = nullptr;
 

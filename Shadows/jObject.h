@@ -28,8 +28,8 @@ public:
 	static void RemoveDebugObject(jObject* object);
 
 	virtual void Update(float deltaTime);
-	virtual void Draw(jCamera* camera, jShader* shader);
-	virtual void Draw(jCamera* camera, jShader* shader, jLight* light);
+	virtual void Draw(const jCamera* camera, const jShader* shader);
+	virtual void Draw(const jCamera* camera, const jShader* shader, const jLight* light);
 
 	bool SkipShadowMapGen = false;
 	bool SkipUpdateShadowVolume = false;
