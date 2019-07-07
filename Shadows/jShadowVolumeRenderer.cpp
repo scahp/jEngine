@@ -19,7 +19,7 @@ jShadowVolumeRenderer::~jShadowVolumeRenderer()
 {
 }
 
-bool jShadowVolumeRenderer::CanSkipShadowObject(jCamera* camera, jObject* object, Vector* lightPos, Vector* lightDir, jLight* light) const
+bool jShadowVolumeRenderer::CanSkipShadowObject(const jCamera* camera, const jObject* object, const Vector* lightPos, const Vector* lightDir, const jLight* light) const
 {
 	if (!object->ShadowVolume || object->SkipUpdateShadowVolume)
 		return true;
@@ -41,9 +41,9 @@ bool jShadowVolumeRenderer::CanSkipShadowObject(jCamera* camera, jObject* object
 	{
 		float maxDistance = 0.0f;
 		if (light->Type == ELightType::POINT)
-			maxDistance = static_cast<jPointLight*>(light)->Data.MaxDistance;
+			maxDistance = static_cast<const jPointLight*>(light)->Data.MaxDistance;
 		else if (light->Type == ELightType::SPOT)
-			maxDistance = static_cast<jSpotLight*>(light)->Data.MaxDistance;
+			maxDistance = static_cast<const jSpotLight*>(light)->Data.MaxDistance;
 
 		// 1. check out of light radius with obj
 		const auto isCasterOutOfLightRadius = ((*lightPos - object->RenderObject->Pos).Length() > maxDistance);
@@ -60,7 +60,7 @@ bool jShadowVolumeRenderer::CanSkipShadowObject(jCamera* camera, jObject* object
 			const auto lightToObjVector = object->RenderObject->Pos - *lightPos;
 			const auto radianOfRadiusOffset = atanf(radius / lightToObjVector.Length());
 
-			auto spotLight = static_cast<jSpotLight*>(light);
+			auto spotLight = static_cast<const jSpotLight*>(light);
 			const auto radian = lightToObjVector.GetNormalize().DotProduct(spotLight->Data.Direction);
 			const auto limitRadian = cosf(Max(spotLight->Data.UmbraRadian, spotLight->Data.PenumbraRadian)) - radianOfRadiusOffset;
 			if (limitRadian > radian)
@@ -70,7 +70,7 @@ bool jShadowVolumeRenderer::CanSkipShadowObject(jCamera* camera, jObject* object
 	return false;
 }
 
-void jShadowVolumeRenderer::RenderPass(jCamera* camera)
+void jShadowVolumeRenderer::RenderPass(const jCamera* camera)
 {
 	//const ambientPipeLineHashCode = LoadPipeline(CreateBaseShadowVolumeAmbientOnlyShaderFile()).hashCode;
 	//const defaultPipeLineHashCode = LoadPipeline(CreateBaseShadowVolumeShaderFile()).hashCode;
@@ -99,7 +99,7 @@ void jShadowVolumeRenderer::RenderPass(jCamera* camera)
 
 	g_rhi->EnableDepthTest(true);
 
-	camera->IsEnableCullMode = true;
+	const_cast<jCamera*>(camera)->IsEnableCullMode = true;		// todo remove
 	g_rhi->SetClearColor(0.5f, 0.5f, 0.5f, 1.0f);
 	g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH, ERenderBufferType::STENCIL }));
 
@@ -109,14 +109,14 @@ void jShadowVolumeRenderer::RenderPass(jCamera* camera)
 	g_rhi->SetDepthMask(true);
 	g_rhi->SetColorMask(true, true, true, true);
 
-	camera->UseAmbient = true;
+	const_cast<jCamera*>(camera)->UseAmbient = true;			// todo remove
 	for (auto& iter : g_StaticObjectArray)
 		iter->Draw(camera, ambientShader, camera->Ambient);
 
 	//////////////////////////////////////////////////////////////////
 	// 2. Stencil volume update & rendering (z-fail)
 	const auto numOfLights = camera->LightList.size();
-	camera->UseAmbient = false;
+	const_cast<jCamera*>(camera)->UseAmbient = false;			// todo remove
 	g_rhi->EnableStencil(true);
 	for (auto i = 0; i < numOfLights; ++i)
 	{
@@ -164,7 +164,7 @@ void jShadowVolumeRenderer::RenderPass(jCamera* camera)
 		g_rhi->SetDepthMask(false);
 		g_rhi->SetColorMask(false, false, false, false);
 
-		camera->IsEnableCullMode = false;
+		const_cast<jCamera*>(camera)->IsEnableCullMode = false;			// todo remove
 
 		{
 			// todo
@@ -193,7 +193,7 @@ void jShadowVolumeRenderer::RenderPass(jCamera* camera)
 
 		g_rhi->SetDepthMask(false);
 		g_rhi->SetColorMask(true, true, true, true);
-		camera->IsEnableCullMode = true;
+		const_cast<jCamera*>(camera)->IsEnableCullMode = true;			// todo remove
 
 		g_rhi->SetDepthFunc(EDepthStencilFunc::EQUAL);
 		g_rhi->SetBlendFunc(EBlendSrc::ONE, EBlendDest::ONE);
@@ -201,7 +201,7 @@ void jShadowVolumeRenderer::RenderPass(jCamera* camera)
 		for (auto& iter : g_StaticObjectArray)
 			iter->Draw(camera, shadowVolumeBaseShader, light);
 	}
-	camera->UseAmbient = true;
+	const_cast<jCamera*>(camera)->UseAmbient = true;			// todo remove
 
 	g_rhi->EnableBlend(true);
 	g_rhi->SetBlendFunc(EBlendSrc::SRC_ALPHA, EBlendDest::ONE_MINUS_SRC_ALPHA);
@@ -211,9 +211,9 @@ void jShadowVolumeRenderer::RenderPass(jCamera* camera)
 	g_rhi->EnableStencil(false);
 }
 
-void jShadowVolumeRenderer::DebugRenderPass(jCamera* camera)
+void jShadowVolumeRenderer::DebugRenderPass(const jCamera* camera)
 {
-	camera->IsEnableCullMode = false;
+	const_cast<jCamera*>(camera)->IsEnableCullMode = false;		// todo remove
 	g_rhi->EnableBlend(true);
 	g_rhi->SetBlendFunc(EBlendSrc::SRC_ALPHA, EBlendDest::ONE_MINUS_SRC_ALPHA);
 
@@ -294,7 +294,7 @@ void jShadowVolumeRenderer::DebugRenderPass(jCamera* camera)
 	}
 
 	g_rhi->EnableBlend(false);
-	camera->IsEnableCullMode = false;
+	const_cast<jCamera*>(camera)->IsEnableCullMode = false;			// todo remove
 
 	__super::DebugRenderPass(camera);
 }

@@ -159,7 +159,7 @@ void jDirectionalLight::BindLight(const jShader* shader, jMaterialData* material
 
 		if (materialData)
 		{
-			auto materialParam = new jMaterialParam_OpenGL();
+			auto materialParam = new jMaterialParam();
 			materialParam->Name = "shadow_object";
 			materialParam->Texture = static_cast<jTexture_OpenGL*>(ShadowMapData->ShadowMapRenderTarget->GetTexture());
 			materialParam->Minification = ETextureFilter::LINEAR;
@@ -167,6 +167,16 @@ void jDirectionalLight::BindLight(const jShader* shader, jMaterialData* material
 			materialData->Params.push_back(materialParam);
 		}
 	}
+}
+
+jRenderTarget* jDirectionalLight::GetShadowMapRenderTarget() const
+{
+	return (ShadowMapData ? ShadowMapData->ShadowMapRenderTarget : nullptr);
+}
+
+jCamera* jDirectionalLight::GetLightCamra(int index /*= 0*/) const
+{
+	return (ShadowMapData ? ShadowMapData->ShadowMapCamera : nullptr);
 }
 
 jTexture* jDirectionalLight::GetShadowMap() const
@@ -218,7 +228,7 @@ void jPointLight::BindLight(const jShader* shader, jMaterialData* materialData, 
 
 		if (materialData)
 		{
-			auto materialParam = new jMaterialParam_OpenGL();
+			auto materialParam = new jMaterialParam();
 			materialParam->Name = "shadow_object_point_array";
 			materialParam->Texture = static_cast<jTexture_OpenGL*>(ShadowMapData->ShadowMapRenderTarget->GetTexture());
 			materialParam->Minification = ETextureFilter::LINEAR;
@@ -226,6 +236,17 @@ void jPointLight::BindLight(const jShader* shader, jMaterialData* materialData, 
 			materialData->Params.push_back(materialParam);
 		}
 	}
+}
+
+jRenderTarget* jPointLight::GetShadowMapRenderTarget() const
+{
+	return (ShadowMapData ? ShadowMapData->ShadowMapRenderTarget : nullptr);
+}
+
+jCamera* jPointLight::GetLightCamra(int index /*= 0*/) const
+{
+	JASSERT(ShadowMapData && _countof(ShadowMapData->ShadowMapCamera) <= index);
+	return (ShadowMapData ? ShadowMapData->ShadowMapCamera[index] : nullptr);
 }
 
 void jSpotLight::BindLight(const jShader* shader, jMaterialData* materialData, int32 index /*= 0*/) const
@@ -272,7 +293,7 @@ void jSpotLight::BindLight(const jShader* shader, jMaterialData* materialData, i
 
 		if (materialData)
 		{
-			auto materialParam = new jMaterialParam_OpenGL();
+			auto materialParam = new jMaterialParam();
 			materialParam->Name = "shadow_object_spot_array";
 			materialParam->Texture = static_cast<jTexture_OpenGL*>(ShadowMapData->ShadowMapRenderTarget->GetTexture());
 			materialParam->Minification = ETextureFilter::LINEAR;
@@ -280,6 +301,17 @@ void jSpotLight::BindLight(const jShader* shader, jMaterialData* materialData, i
 			materialData->Params.push_back(materialParam);
 		}
 	}
+}
+
+jRenderTarget* jSpotLight::GetShadowMapRenderTarget() const
+{
+	return (ShadowMapData ? ShadowMapData->ShadowMapRenderTarget : nullptr);
+}
+
+jCamera* jSpotLight::GetLightCamra(int index /*= 0*/) const
+{
+	JASSERT(ShadowMapData && _countof(ShadowMapData->ShadowMapCamera) <= index);
+	return (ShadowMapData ? ShadowMapData->ShadowMapCamera[index] : nullptr);
 }
 
 //////////////////////////////////////////////////////////////////////////

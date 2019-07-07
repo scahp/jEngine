@@ -4,16 +4,19 @@
 std::unordered_map<size_t, jShader*> jShader::ShaderMap;
 std::unordered_map < std::string , jShader* > jShader::ShaderNameMap;
 
+//////////////////////////////////////////////////////////////////////////
+void IUniformBuffer::Bind(const jShader* shader) const
+{
+	g_rhi->SetUniformbuffer(this, shader);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 jRHI::jRHI()
 {
 }
 
-void jRHI::SetClearColor(float r, float g, float b, float a)
-{
-
-}
-
-void jRHI::MapBufferdata(jBuffer* buffer)
+void jRHI::MapBufferdata(IBuffer* buffer)
 {
 
 }

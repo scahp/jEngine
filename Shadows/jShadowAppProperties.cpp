@@ -84,8 +84,8 @@ void jShadowAppSettingProperties::Setup(jAppSettingBase* appSetting)
 	appSetting->SetStep("DeepShadowAlpha", 0.01f);
 	appSetting->SetMinMax("DeepShadowAlpha", 0.05f, 1.0f);
 	
-	appSetting->AddVariable("ExponentDeepShadowOn", ExponentDeepShadowOn);
-	appSetting->SetGroup("ExponentDeepShadowOn", "DeepShadow");
+	//appSetting->AddVariable("ExponentDeepShadowOn", ExponentDeepShadowOn);
+	//appSetting->SetGroup("ExponentDeepShadowOn", "DeepShadow");
 }
 
 void jShadowAppSettingProperties::Teardown(jAppSettingBase* appSetting)
@@ -111,7 +111,7 @@ void jShadowAppSettingProperties::Teardown(jAppSettingBase* appSetting)
 	//appSetting->RemoveVariable("Box");
 	//appSetting->RemoveVariable("Sphere");
 	appSetting->RemoveVariable("DeepShadowAlpha");
-	appSetting->RemoveVariable("ExponentDeepShadowOn");
+	//appSetting->RemoveVariable("ExponentDeepShadowOn");
 }
 
 void jShadowAppSettingProperties::SwitchShadowType(jAppSettingBase* appSetting)

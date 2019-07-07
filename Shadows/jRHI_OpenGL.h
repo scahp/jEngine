@@ -20,14 +20,14 @@ struct jVertexBuffer_OpenGL : public jVertexBuffer
 	uint32 VAO = 0;
 	std::vector<jVertexStream_OpenGL> Streams;
 
-	virtual void Bind(const jShader* shader) override;
+	virtual void Bind(const jShader* shader) const override;
 };
 
 struct jIndexBuffer_OpenGL : public jIndexBuffer
 {
 	unsigned int BufferID = 0;
 
-	virtual void Bind(const jShader* shader) override;
+	virtual void Bind(const jShader* shader) const override;
 };
 
 struct jShader_OpenGL : public jShader
@@ -39,14 +39,6 @@ struct jTexture_OpenGL : public jTexture
 {
 	ETextureType TextureType;
 	uint32 TextureID = 0;
-};
-
-struct jMaterialParam_OpenGL : public IMaterialParam
-{
-	std::string Name;
-	const jTexture* Texture = nullptr;
-	ETextureFilter Minification = ETextureFilter::NEAREST;
-	ETextureFilter Magnification = ETextureFilter::NEAREST;
 };
 
 struct jRenderTarget_OpenGL : public jRenderTarget
@@ -135,7 +127,7 @@ public:
 	virtual void BindIndexBuffer(const jIndexBuffer* ib, const jShader* shader) override;
 
 
-	virtual void MapBufferdata(jBuffer* buffer) override;
+	virtual void MapBufferdata(IBuffer* buffer) override;
 
 
 	virtual void DrawArray(EPrimitiveType type, int vertStartIndex, int vertCount) override;
@@ -171,7 +163,7 @@ public:
 
 
 	virtual void SetClearColor(float r, float g, float b, float a) override;
-
+	virtual void SetClearColor(Vector4 rgba) override;
 
 	virtual void SetShader(const jShader* shader) override;
 
@@ -183,10 +175,10 @@ public:
 	virtual jTexture* CreateTextureFromData(unsigned char* data, int32 width, int32 height) override;
 
 
-	virtual bool SetUniformbuffer(IUniformBuffer* buffer, const jShader* shader) override;
+	virtual bool SetUniformbuffer(const IUniformBuffer* buffer, const jShader* shader) override;
 
 
-	virtual void SetMatetrial(jMaterialData* materialData, const jShader* shader) override;
+	virtual void SetMatetrial(jMaterialData* materialData, const jShader* shader, int32 baseBindingIndex = 0) override;
 
 
 	virtual void SetTexture(int32 index, const jTexture* texture) override;

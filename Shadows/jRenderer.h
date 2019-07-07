@@ -1,12 +1,17 @@
 ﻿#pragma once
 #include "jRHI.h"
+#include "jPostProcess.h"
 
 class jCamera;
+class jPipelineSet;
 
 class jRenderer
 {
 public:
 	jRenderer();
+	jRenderer(jPipelineSet* pipelineSet)
+		: PipelineSet(pipelineSet)
+	{}
 	virtual ~jRenderer();
 
 	typedef void (*RenderPassFunc)(jCamera*);
@@ -15,16 +20,23 @@ public:
 	virtual void Teardown();
 	virtual void Reset();
 
-	virtual void ShadowPrePass(jCamera* camera);
-	virtual void DebugShadowPrePass(jCamera* camera);
-	virtual void RenderPass(jCamera* camera);
-	virtual void DebugRenderPass(jCamera* camera);
-	virtual void UIPass(jCamera* camera);
-	virtual void DebugUIPass(jCamera* camera);
+	virtual void ShadowPrePass(const jCamera* camera);
+	virtual void DebugShadowPrePass(const jCamera* camera);
 
-	virtual void Render(jCamera* camera);
+	virtual void RenderPass(const jCamera* camera);
+	virtual void PostRenderPass(const jCamera* camera);
+	virtual void DebugRenderPass(const jCamera* camera);
+	
+	virtual void PostProcessPass(const jCamera* camera);
+	virtual void DebugPostProcessPass(const jCamera* camera);
+	
+	virtual void UIPass(const jCamera* camera);
+	virtual void DebugUIPass(const jCamera* camera);
+
+	virtual void Render(const jCamera* camera);
 	virtual void UpdateSettings() {}
 
-	jRenderTarget* GBuffer = nullptr;
+	jPipelineSet* PipelineSet = nullptr;
+	jPostprocessChain PostProcessChain;
 };
 

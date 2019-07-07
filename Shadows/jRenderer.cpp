@@ -26,19 +26,24 @@ void jRenderer::Reset()
 
 }
 
-void jRenderer::ShadowPrePass(jCamera* camera)
+void jRenderer::ShadowPrePass(const jCamera* camera)
 {
 }
 
-void jRenderer::DebugShadowPrePass(jCamera* camera)
+void jRenderer::DebugShadowPrePass(const jCamera* camera)
 {
 }
 
-void jRenderer::RenderPass(jCamera* camera)
+void jRenderer::RenderPass(const jCamera* camera)
 {
 }
 
-void jRenderer::DebugRenderPass(jCamera* camera)
+void jRenderer::PostRenderPass(const jCamera* camera)
+{
+
+}
+
+void jRenderer::DebugRenderPass(const jCamera* camera)
 {
 	jShaderInfo BoundVolumeShaderInfo;
 	jShader* BoundVolumeShader = nullptr;
@@ -60,22 +65,34 @@ void jRenderer::DebugRenderPass(jCamera* camera)
 	}
 }
 
-void jRenderer::UIPass(jCamera* camera)
+void jRenderer::PostProcessPass(const jCamera* camera)
+{
+
+}
+
+void jRenderer::DebugPostProcessPass(const jCamera* camera)
+{
+
+}
+
+void jRenderer::UIPass(const jCamera* camera)
 {
 }
 
-void jRenderer::DebugUIPass(jCamera* camera)
+void jRenderer::DebugUIPass(const jCamera* camera)
 {
 }
 
-
-void jRenderer::Render(jCamera* camera)
+void jRenderer::Render(const jCamera* camera)
 {
 	ShadowPrePass(camera);
 	DebugShadowPrePass(camera);
 
 	RenderPass(camera);
+	PostRenderPass(camera);
 	DebugRenderPass(camera);
+
+	PostProcessPass(camera);
 
 	UIPass(camera);
 	DebugUIPass(camera);

@@ -5,13 +5,14 @@
 #include "jLight.h"
 #include "jPrimitiveUtil.h"
 #include "jShadowAppProperties.h"
+#include "jGBuffer.h"
 
 //////////////////////////////////////////////////////////////////////////
 // IPostprocess
-void IPostprocess::SetUp()
+void IPostprocess::Setup()
 {
 	PostProcessOutput = std::shared_ptr<jPostProcessInOutput>(new jPostProcessInOutput());
-	PostProcessOutput->RenderTaret = RenderTarget;
+	PostProcessOutput->RenderTaret = RenderTarget.get();
 }
 
 bool IPostprocess::Process(const jCamera* camera) const
@@ -60,7 +61,7 @@ jPostprocessChain::~jPostprocessChain()
 void jPostprocessChain::AddNewPostprocess(IPostprocess* postprocess)
 {
 	JASSERT(postprocess);
-	postprocess->SetUp();
+	postprocess->Setup();
 
 	if (!PostProcesses.empty())
 	{
@@ -105,11 +106,16 @@ bool jPostProcess_DeepShadowMap::Do(const jCamera* camera) const
 	g_rhi->SetClearColor(0.025f, 0.025f, 0.025f, 1.0f);
 	g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
 
-	if (auto deepShadowFull_Shader = jShadowAppSettingProperties::GetInstance().ExponentDeepShadowOn ? jShader::GetShader("ExpDeepShadowFull") : jShader::GetShader("DeepShadowFull"))
+	//if (auto deepShadowFull_Shader = jShadowAppSettingProperties::GetInstance().ExponentDeepShadowOn ? jShader::GetShader("ExpDeepShadowFull") : jShader::GetShader("DeepShadowFull")) // todo PipelineSet 관련 기능 완료후 스위치 가능케 할예정
+	if (auto deepShadowFull_Shader = jShader::GetShader("DeepShadowFull"))
 	{
 		g_rhi->SetShader(deepShadowFull_Shader);
 		SSBOs.Bind(deepShadowFull_Shader);
-		Draw(camera, deepShadowFull_Shader, DirectionalLight);
+
+		JASSERT(GBuffer);
+		GBuffer->BindGeometryBuffer(deepShadowFull_Shader);
+
+		Draw(camera, deepShadowFull_Shader, camera->GetLight(ELightType::DIRECTIONAL));
 	}
 
 	return true;

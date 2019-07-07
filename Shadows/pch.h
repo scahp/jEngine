@@ -79,7 +79,5 @@ inline void hash_combine(std::size_t& seed, const T& v)
 
 ERenderBufferType MakeRenderBufferTypeList(const std::initializer_list<ERenderBufferType>& list);
 
-extern struct jRenderTarget* GBuffer;
-
 
 #endif //PCH_H

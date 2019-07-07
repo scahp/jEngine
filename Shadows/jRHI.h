@@ -6,25 +6,27 @@ extern class jRHI* g_rhi;
 
 struct jShader;
 
-struct jBuffer
+
+struct IBuffer
 {
-	virtual ~jBuffer() {}
+	virtual ~IBuffer() {}
 
 	virtual const char* GetName() const { return ""; }
+	virtual void Bind(const jShader* shader) const = 0;
 };
 
-struct jVertexBuffer : public jBuffer
+struct jVertexBuffer : public IBuffer
 {
 	std::weak_ptr<jVertexStreamData> VertexStreamData;
 
-	virtual void Bind(const jShader* shader) {}
+	virtual void Bind(const jShader* shader) const {}
 };
 
-struct jIndexBuffer : public jBuffer
+struct jIndexBuffer : public IBuffer
 {
 	std::weak_ptr<jIndexStreamData> IndexStreamData;
 
-	virtual void Bind(const jShader* shader) {}
+	virtual void Bind(const jShader* shader) const {}
 };
 
 struct jTexture
@@ -95,7 +97,7 @@ enum class EUniformType
 	MAX,
 };
 
-struct IUniformBuffer
+struct IUniformBuffer : public IBuffer
 {
 	IUniformBuffer() = default;
 	IUniformBuffer(const std::string& name)
@@ -104,6 +106,8 @@ struct IUniformBuffer
 	virtual ~IUniformBuffer() {}
 	std::string Name;
 	virtual EUniformType GetType() const { return EUniformType::NONE; }
+
+	virtual void Bind(const jShader* shader) const override;
 };
 
 template <typename T>
@@ -151,7 +155,7 @@ static int32 GetBindPoint()
 	return s_index++;
 }
 
-struct IUniformBufferBlock
+struct IUniformBufferBlock : public IBuffer
 {
 	IUniformBufferBlock() = default;
 	IUniformBufferBlock(const std::string& name)
@@ -163,12 +167,12 @@ struct IUniformBufferBlock
 	int32 Size = 0;
 
 	virtual void Init() = 0;
-	virtual void Bind(const jShader* shader) const = 0;
+	virtual void Bind(const jShader* shader) const override { }
 	virtual void UpdateBufferData(const void* newData, int32 size) = 0;
 	virtual void ClearBuffer(int32 clearValue = 0) = 0;
 };
 
-struct IShaderStorageBufferObject
+struct IShaderStorageBufferObject : public IBuffer
 {
 	IShaderStorageBufferObject() = default;
 	IShaderStorageBufferObject(const std::string& name)
@@ -180,7 +184,7 @@ struct IShaderStorageBufferObject
 	int32 Size = 0;
 
 	virtual void Init() = 0;
-	virtual void Bind(const jShader* shader) const = 0;
+	virtual void Bind(const jShader* shader) const override {}
 	virtual void UpdateBufferData(void* newData, int32 size) = 0;
 	virtual void GetBufferData(void* newData, int32 size) = 0;
 	virtual void ClearBuffer(int32 clearValue) = 0;
@@ -192,7 +196,7 @@ struct IShaderStorageBufferObject
 	}
 };
 
-struct IAtomicCounterBuffer
+struct IAtomicCounterBuffer : public IBuffer
 {
 	IAtomicCounterBuffer() = default;
 	IAtomicCounterBuffer(const std::string& name, uint32 bindingPoint)
@@ -205,7 +209,7 @@ struct IAtomicCounterBuffer
 	uint32 BindingPoint = -1;
 
 	virtual void Init() = 0;
-	virtual void Bind(const jShader* shader) const = 0;
+	virtual void Bind(const jShader* shader) const override {}
 	virtual void UpdateBufferData(void* newData, int32 size) = 0;
 	virtual void GetBufferData(void* newData, int32 size) = 0;
 	virtual void ClearBuffer(int32 clearValue) = 0;
@@ -217,14 +221,25 @@ struct IAtomicCounterBuffer
 	}
 };
 
-struct IMaterialParam
+struct jMaterialParam
 {
-	virtual ~IMaterialParam() {}
+	virtual ~jMaterialParam() {}
+
+	std::string Name;
+	const jTexture* Texture = nullptr;
+	ETextureFilter Minification = ETextureFilter::NEAREST;
+	ETextureFilter Magnification = ETextureFilter::NEAREST;
 };
 
 struct jMaterialData
 {
-	std::vector<IMaterialParam*> Params;
+	~jMaterialData()
+	{
+		for (auto& iter : Params)
+			delete iter;
+		Params.clear();
+	}
+	std::vector<jMaterialParam*> Params;
 };
 
 class jMaterial
@@ -275,10 +290,6 @@ struct jRenderTarget
 	std::vector<jTexture*> Textures;
 };
 
-struct jPipeline
-{
-};
-
 
 class jRHI
 {
@@ -287,7 +298,8 @@ public:
 	virtual ~jRHI() {}
 
 	virtual void SetClear(ERenderBufferType typeBit) {}
-	virtual void SetClearColor(float r, float g, float b, float a);
+	virtual void SetClearColor(float r, float g, float b, float a) {}
+	virtual void SetClearColor(Vector4 rgba) {}
 
 	virtual void SetRenderTarget(jRenderTarget* rt, int32 index = 0, bool mrt = false) {}
 	virtual void SetDrawBuffers(const std::initializer_list<EDrawBufferType>& list) {}
@@ -301,7 +313,7 @@ public:
 	virtual void BindVertexBuffer(const jVertexBuffer* vb, const jShader* shader) {}
 	virtual void BindIndexBuffer(const jIndexBuffer* ib, const jShader* shader) {}
 
-	virtual void MapBufferdata(jBuffer* buffer);
+	virtual void MapBufferdata(IBuffer* buffer);
 
 	virtual void SetTextureFilter(ETextureType type, ETextureFilterTarget target, ETextureFilter filter) {}
 	virtual void SetTextureWrap(int flag) {}
@@ -320,13 +332,13 @@ public:
 	virtual void SetShader(const jShader* shader) {}
 	virtual jShader* CreateShader(const jShaderInfo& shaderInfo) { return nullptr; }
 
-	virtual bool SetUniformbuffer(IUniformBuffer* buffer, const jShader* shader) { return false; }
+	virtual bool SetUniformbuffer(const IUniformBuffer* buffer, const jShader* shader) { return false; }
 
 	virtual jTexture* CreateNullTexture() const { return nullptr; }
 
 	virtual jTexture* CreateTextureFromData(unsigned char* data, int32 width, int32 height) { return nullptr; }
 
-	virtual void SetMatetrial(jMaterialData* materialData, const jShader* shader) {}
+	virtual void SetMatetrial(jMaterialData* materialData, const jShader* shader, int32 baseBindingIndex = 0) {}
 
 	virtual void EnableCullFace(bool enable) {}
 

@@ -7,7 +7,6 @@
 
 std::map<int, bool> g_KeyState;
 std::map<EMouseButtonType, bool> g_MouseState;
-jRenderTarget* GBuffer = nullptr;
 
 ERenderBufferType MakeRenderBufferTypeList(const std::initializer_list<ERenderBufferType>& list)
 {

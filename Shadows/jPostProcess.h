@@ -7,6 +7,7 @@ class jObject;
 class jLight;
 struct IShaderStorageBufferObject;
 class jFullscreenQuadPrimitive;
+class jGBuffer;
 
 struct jPostProcessInOutput
 {
@@ -18,17 +19,17 @@ class IPostprocess
 {
 public:
 	IPostprocess() = default;
-	IPostprocess(const std::string& name, jRenderTarget* renderTarget, const jShader* shader)
+	IPostprocess(const std::string& name, std::shared_ptr<jRenderTarget> renderTarget, const jShader* shader)
 		: Name(name), RenderTarget(renderTarget), Shader(shader)
 	{ }
 	virtual ~IPostprocess() {}
 	std::string Name;
-	jRenderTarget* RenderTarget = nullptr;
+	std::shared_ptr<jRenderTarget> RenderTarget;
 	const jShader* Shader = nullptr;
 	std::weak_ptr<jPostProcessInOutput> PostProcessInput;
 	std::shared_ptr<jPostProcessInOutput> PostProcessOutput;
 
-	virtual void SetUp();
+	virtual void Setup();
 	virtual void TearDown() { }
 
 	virtual bool Process(const jCamera* camera) const;
@@ -74,15 +75,15 @@ public:
 	};
 
 	jPostProcess_DeepShadowMap() = default;
-	jPostProcess_DeepShadowMap(const std::string& name, jRenderTarget* renderTarget, const jSSBO_DeepShadowMap& ssbos, const jLight* directionalLight)
-		: IPostprocess(name, renderTarget, nullptr), SSBOs(ssbos), DirectionalLight(directionalLight)
+	jPostProcess_DeepShadowMap(const std::string& name, std::shared_ptr<jRenderTarget> renderTarget, const jSSBO_DeepShadowMap& ssbos, const jGBuffer* gBuffer)
+		: IPostprocess(name, renderTarget, nullptr), SSBOs(ssbos), GBuffer(gBuffer)
 	{ }
 
 	virtual bool Do(const jCamera* camera) const override;
 
 private:
 	jSSBO_DeepShadowMap SSBOs;
-	const jLight* DirectionalLight = nullptr;
+	const jGBuffer* GBuffer = nullptr;
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -92,7 +93,7 @@ class jPostProcess_AA_DeepShadowAddition : public IPostprocess
 public:
 	using IPostprocess::IPostprocess;
 
-	virtual void SetUp() {}
+	virtual void Setup() {}
 	virtual void TearDown() {}
 
 	virtual bool Do(const jCamera* camera) const override;

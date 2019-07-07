@@ -57,10 +57,6 @@ void jRenderObject::Draw(const jCamera* camera, const jShader* shader, int32 sta
 		count = count != -1 ? count : vertexStreamData->ElementCount;
 		g_rhi->DrawArray(primitiveType, 0, count);
 	}
-
-	for (auto& iter : materialData.Params)
-		delete iter;
-	materialData.Params.clear();
 }
 
 void jRenderObject::Draw(const jCamera* camera, const jShader* shader, const jLight* light, int32 startIndex, int32 count)
@@ -94,10 +90,6 @@ void jRenderObject::Draw(const jCamera* camera, const jShader* shader, const jLi
 		count = count != -1 ? count : vertexStreamData->ElementCount;
 		g_rhi->DrawArray(primitiveType, 0, count);
 	}
-
-	for (auto& iter : materialData.Params)
-		delete iter;
-	materialData.Params.clear();
 }
 
 void jRenderObject::Draw(const jCamera* camera, const jShader* shader, const jLight* light, int32 startIndex, int32 count, int32 baseVertexIndex)
@@ -127,10 +119,6 @@ void jRenderObject::Draw(const jCamera* camera, const jShader* shader, const jLi
 	{
 		g_rhi->DrawArray(primitiveType, baseVertexIndex, count);
 	}
-
-	for (auto& iter : materialData.Params)
-		delete iter;
-	materialData.Params.clear();
 }
 
 void jRenderObject::Draw(const jCamera* camera, const jShader* shader, int32 startIndex, int32 count, int32 baseVertexIndex)
@@ -164,10 +152,6 @@ void jRenderObject::Draw(const jCamera* camera, const jShader* shader, int32 sta
 		count = count != -1 ? count : vertexStreamData->ElementCount;
 		g_rhi->DrawArray(primitiveType, baseVertexIndex, count);
 	}
-
-	for (auto& iter : materialData.Params)
-		delete iter;
-	materialData.Params.clear();
 }
 
 void jRenderObject::SetRenderProperty(const jShader* shader)
@@ -253,7 +237,7 @@ void jRenderObject::SetLightProperty(const jShader* shader, const jCamera* camer
 
 	if (!directional)
 	{
-		auto materialParam = new jMaterialParam_OpenGL();
+		auto materialParam = new jMaterialParam();
 		materialParam->Name = "shadow_object";
 		materialParam->Texture = jRenderTargetPool::GetNullTexture(ETextureType::TEXTURE_2D);
 		materialParam->Minification = ETextureFilter::LINEAR;
@@ -262,7 +246,7 @@ void jRenderObject::SetLightProperty(const jShader* shader, const jCamera* camer
 	}
 	if (!point)
 	{
-		auto materialParam = new jMaterialParam_OpenGL();
+		auto materialParam = new jMaterialParam();
 		materialParam->Name = "shadow_object_point_array";
 		materialParam->Texture = jRenderTargetPool::GetNullTexture(ETextureType::TEXTURE_2D_ARRAY);
 		materialParam->Minification = ETextureFilter::LINEAR;
@@ -271,7 +255,7 @@ void jRenderObject::SetLightProperty(const jShader* shader, const jCamera* camer
 	}
 	if (!spot)
 	{
-		auto materialParam = new jMaterialParam_OpenGL();
+		auto materialParam = new jMaterialParam();
 		materialParam->Name = "shadow_object_spot_array";
 		materialParam->Texture = jRenderTargetPool::GetNullTexture(ETextureType::TEXTURE_2D_ARRAY);
 		materialParam->Minification = ETextureFilter::LINEAR;
@@ -323,7 +307,7 @@ void jRenderObject::SetTextureProperty(const jShader* shader, jMaterialData* mat
 	{
 		if (tex_object)
 		{
-			auto tex_object_param = new jMaterialParam_OpenGL();
+			auto tex_object_param = new jMaterialParam();
 			tex_object_param->Name = "tex_object";
 			tex_object_param->Texture = tex_object;
 			materialData->Params.push_back(tex_object_param);
@@ -332,7 +316,7 @@ void jRenderObject::SetTextureProperty(const jShader* shader, jMaterialData* mat
 		bool useTexture = false;
 		if (tex_object2)
 		{
-			auto tex_object2_param = new jMaterialParam_OpenGL();
+			auto tex_object2_param = new jMaterialParam();
 			tex_object2_param->Name = "tex_object2";
 			tex_object2_param->Texture = tex_object2;
 			materialData->Params.push_back(tex_object2_param);
@@ -342,46 +326,10 @@ void jRenderObject::SetTextureProperty(const jShader* shader, jMaterialData* mat
 
 		if (tex_object_array)
 		{
-			auto tex_objectArray_param = new jMaterialParam_OpenGL();
+			auto tex_objectArray_param = new jMaterialParam();
 			tex_objectArray_param->Name = "tex_object_array";
 			tex_objectArray_param->Texture = tex_object_array;
 			materialData->Params.push_back(tex_objectArray_param);
-		}
-
-		// todo 어디로 옮겨야함.
-		if (GBuffer)
-		{
-			{
-				auto tex_gl = static_cast<jTexture_OpenGL*>(GBuffer->Textures[0]);
-				auto param = new jMaterialParam_OpenGL();
-				param->Name = "ColorSampler";
-				param->Texture = tex_gl;
-				materialData->Params.push_back(param);
-			}
-
-			{
-				auto tex_gl = static_cast<jTexture_OpenGL*>(GBuffer->Textures[1]);
-				auto param = new jMaterialParam_OpenGL();
-				param->Name = "NormalSampler";
-				param->Texture = tex_gl;
-				materialData->Params.push_back(param);
-			}
-
-			{
-				auto tex_gl = static_cast<jTexture_OpenGL*>(GBuffer->Textures[2]);
-				auto param = new jMaterialParam_OpenGL();
-				param->Name = "PosInWorldSampler";
-				param->Texture = tex_gl;
-				materialData->Params.push_back(param);
-			}
-
-			{
-				auto tex_gl = static_cast<jTexture_OpenGL*>(GBuffer->Textures[3]);
-				auto param = new jMaterialParam_OpenGL();
-				param->Name = "PosInLightSampler";
-				param->Texture = tex_gl;
-				materialData->Params.push_back(param);
-			}
 		}
 	}
 }

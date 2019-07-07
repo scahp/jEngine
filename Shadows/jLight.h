@@ -102,6 +102,8 @@ public:
 	virtual ~jLight() {}
 
 	virtual void BindLight(const jShader* shader, jMaterialData* materialData, int32 index = 0) const {}
+	virtual jRenderTarget* GetShadowMapRenderTarget() const { return nullptr; }
+	virtual jCamera* GetLightCamra(int index = 0) const { return nullptr; }
 
 	const ELightType Type = ELightType::MAX;
 	jObject* LightDebugObject = nullptr;
@@ -166,6 +168,8 @@ public:
 	IUniformBufferBlock* LightDataUniformBlock = nullptr;
 
 	virtual void BindLight(const jShader* shader, jMaterialData* materialData, int32 index = 0) const override;
+	virtual jRenderTarget* GetShadowMapRenderTarget() const override;
+	virtual jCamera* GetLightCamra(int index = 0) const;
 
 	jLightUtil::jShadowMapData* ShadowMapData = nullptr;
 	jTexture* GetShadowMap() const;
@@ -215,6 +219,8 @@ public:
 	IUniformBufferBlock* LightDataUniformBlock = nullptr;
 
 	virtual void BindLight(const jShader* shader, jMaterialData* materialData, int32 index = 0) const override;
+	virtual jRenderTarget* GetShadowMapRenderTarget() const override;
+	virtual jCamera* GetLightCamra(int index = 0) const;
 
 	jLightUtil::jShadowMapArrayData* ShadowMapData = nullptr;
 };
@@ -267,6 +273,8 @@ public:
 	IUniformBufferBlock* LightDataUniformBlock = nullptr;
 
 	virtual void BindLight(const jShader* shader, jMaterialData* materialData, int32 index = 0) const override;
+	virtual jRenderTarget* GetShadowMapRenderTarget() const override;
+	virtual jCamera* GetLightCamra(int index = 0) const;
 
 	jLightUtil::jShadowMapArrayData* ShadowMapData = nullptr;
 

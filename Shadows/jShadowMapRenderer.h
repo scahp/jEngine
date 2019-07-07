@@ -13,9 +13,9 @@ public:
 	jShadowMapRenderer() {}
 	virtual ~jShadowMapRenderer() {}
 
-	virtual void ShadowPrePass(jCamera* camera) override;
-	virtual void RenderPass(jCamera* camera) override;
-	virtual void UIPass(jCamera* camera) override;
+	virtual void ShadowPrePass(const jCamera* camera) override;
+	virtual void RenderPass(const jCamera* camera) override;
+	virtual void UIPass(const jCamera* camera) override;
 
 	jFullscreenQuadPrimitive* FullscreenQuadPrimitive = nullptr;
 	
@@ -79,7 +79,7 @@ public:
 	EShadowMapType ShadowMapType = EShadowMapType::MAX;
 	bool UsePoissonSample = false;
 
-	virtual void DebugRenderPass(jCamera* camera) override;
+	virtual void DebugRenderPass(const jCamera* camera) override;
 
 };
 

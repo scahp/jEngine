@@ -173,7 +173,7 @@ public:
 		return true;
 	}
 
-	bool IsInFrustumWithDirection(const Vector& pos, const Vector& dir, float radius)
+	bool IsInFrustumWithDirection(const Vector& pos, const Vector& dir, float radius) const
 	{
 		for (auto& iter : Frustum.Planes)
 		{

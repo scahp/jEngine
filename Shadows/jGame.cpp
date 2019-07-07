@@ -19,6 +19,7 @@
 #include "jFile.h"
 #include "jRenderTargetPool.h"
 #include "glad\glad.h"
+#include "jDeferredRenderer.h"
 
 jRHI* g_rhi = nullptr;
 
@@ -203,53 +204,22 @@ void jGame::Setup()
 	//quad3->RenderObject->Rot = jShadowAppSettingProperties::GetInstance().DirecionalLightDirection.GetEulerAngleFrom();
 	//g_HairObjectArray.push_back(quad3);
 
-	//////////////////////////////////////////////////////////////////////////
-	auto shadowVolumeRenderer = new jShadowVolumeRenderer();
-	shadowVolumeRenderer->Setup();
-	ShadowRendererMap[EShadowType::ShadowVolume] = shadowVolumeRenderer;
+	////////////////////////////////////////////////////////////////////////////
+	//auto shadowVolumeRenderer = new jShadowVolumeRenderer();
+	//shadowVolumeRenderer->Setup();
+	//ShadowRendererMap[EShadowType::ShadowVolume] = shadowVolumeRenderer;
 
-	auto shadowMapRenderer = new jShadowMapRenderer();
-	shadowMapRenderer->Setup();
-	ShadowRendererMap[EShadowType::ShadowMap] = shadowMapRenderer;
+	//auto shadowMapRenderer = new jShadowMapRenderer();
+	//shadowMapRenderer->Setup();
+	//ShadowRendererMap[EShadowType::ShadowMap] = shadowMapRenderer;
 
-	GBuffer = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RGBA32F, EFormat::RGBA, EFormatType::FLOAT, SCR_WIDTH, SCR_HEIGHT, 4 });
-
-	ssbo = static_cast<jShaderStorageBufferObject_OpenGL*>(g_rhi->CreateShaderStorageBufferObject("shader_data"));
-	ssbo->UpdateBufferData(&shader_data, sizeof(shader_data));
-
-	linkedListEntryDepthAlphaNext = static_cast<jShaderStorageBufferObject_OpenGL*>(g_rhi->CreateShaderStorageBufferObject("LinkedListEntryDepthAlphaNext"));
-	linkedListEntryDepthAlphaNext->UpdateBufferData(nullptr, linkedListDepthSize* (sizeof(float) * 2 + sizeof(uint32) * 2));
-
-	startElementBuf = static_cast<jShaderStorageBufferObject_OpenGL*>(g_rhi->CreateShaderStorageBufferObject("StartElementBufEntry"));
-	startElementBuf->UpdateBufferData(nullptr, (linkedListDepthSize) * sizeof(int32));
-
-	linkedListEntryNeighbors = static_cast<jShaderStorageBufferObject_OpenGL*>(g_rhi->CreateShaderStorageBufferObject("LinkedListEntryNeighbors"));
-	linkedListEntryNeighbors->UpdateBufferData(nullptr, linkedListDepthSize * sizeof(int32) * 2);
-
-	atomicBuffer = static_cast<jAtomicCounterBuffer_OpenGL*>(g_rhi->CreateAtomicCounterBuffer("LinkedListCounter", 3));
-
-	uint32 zero = 0;
-	atomicBuffer->UpdateBufferData(&zero, sizeof(zero));
-
-	//////////////////////////////////////////////////////////////////////////
-	// Setup a postprocess chain
-	static auto rednerTargetAA = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RGBA, EFormat::RGBA, EFormatType::FLOAT, SCR_WIDTH, SCR_HEIGHT, 1 });
-	{
-		auto postprocess = new jPostProcess_DeepShadowMap("DeepShadow", rednerTargetAA, { startElementBuf, linkedListEntryDepthAlphaNext, linkedListEntryNeighbors }, DirectionalLight);
-		PostProcessChain.AddNewPostprocess(postprocess);
-	}
-
-	{
-		auto postprocess = new jPostProcess_AA_DeepShadowAddition("AA_DeepShadowAddition", nullptr, jShader::GetShader("DeepShadowAA"));
-		PostProcessChain.AddNewPostprocess(postprocess);
-	}
+	//GBuffer = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RGBA32F, EFormat::RGBA, EFormatType::FLOAT, SCR_WIDTH, SCR_HEIGHT, 4 });
+	DeferredRenderer = new jDeferredRenderer({ ETextureType::TEXTURE_2D, EFormat::RGBA32F, EFormat::RGBA, EFormatType::FLOAT, SCR_WIDTH, SCR_HEIGHT, 4 });
+	DeferredRenderer->Setup();
 }
 
 void jGame::Update(float deltaTime)
 {
-	atomicBuffer->ClearBuffer(0);
-	startElementBuf->ClearBuffer(-1);
-
 	// todo debug test, should remove this
 	if (DirectionalLight)
 		DirectionalLight->Data.Direction = jShadowAppSettingProperties::GetInstance().DirecionalLightDirection;
@@ -275,89 +245,9 @@ void jGame::Update(float deltaTime)
 			iter->UpdateCamera();
 	}
 
-	const bool expDeepShadowMap = jShadowAppSettingProperties::GetInstance().ExponentDeepShadowOn;
+	//const bool expDeepShadowMap = jShadowAppSettingProperties::GetInstance().ExponentDeepShadowOn;
 
-	// Shadow Map Gen Path
-	{
-		// 1.1 Directional Light ShadowMap Generation
-		g_rhi->SetRenderTarget(DirectionalLight->ShadowMapData->ShadowMapRenderTarget);
-		g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-		g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
-
-		g_rhi->EnableDepthTest(true);
-		g_rhi->SetDepthFunc(EDepthStencilFunc::LEQUAL);
-
-		if (auto deepShadowMapGenShader = expDeepShadowMap ? jShader::GetShader("ExpDeepShadowMapGen") : jShader::GetShader("DeepShadowMapGen"))
-		{
-			g_rhi->SetShader(deepShadowMapGenShader);
-			ssbo->Bind(deepShadowMapGenShader);
-			atomicBuffer->Bind(deepShadowMapGenShader);
-			startElementBuf->Bind(deepShadowMapGenShader);
-			linkedListEntryDepthAlphaNext->Bind(deepShadowMapGenShader);
-
-			g_rhi->EnableDepthBias(true);
-			g_rhi->SetDepthBias(1.0f, 1.0f);
-
-			for (auto& iter : g_StaticObjectArray)
-			{
-				if (!iter->SkipShadowMapGen)
-					iter->Draw(DirectionalLight->ShadowMapData->ShadowMapCamera, deepShadowMapGenShader, DirectionalLight);
-			}
-
-			for (auto& iter : g_HairObjectArray)
-				iter->Draw(DirectionalLight->ShadowMapData->ShadowMapCamera, deepShadowMapGenShader);
-
-			g_rhi->EnableDepthBias(false);
-		}
-	}
-	
-	
-	//////////////////////////////////////////////////////////////////////////
-	// Pass
-	if (GBuffer->Begin())
-	{
-		g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-		g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
-
-		if (auto Current_Deferred_Shader = expDeepShadowMap ? jShader::GetShader("ExpDeferred") : jShader::GetShader("Deferred"))
-		{
-			for (auto& iter : g_StaticObjectArray)
-				iter->Draw(MainCamera, Current_Deferred_Shader, nullptr);
-
-			for (auto& iter : g_HairObjectArray)
-				iter->Draw(MainCamera, Current_Deferred_Shader);
-		}
-
-		GBuffer->End();
-	}
-
-	//////////////////////////////////////////////////////////////////////////
-	// Compute Pass
-	if (auto shader = jShader::GetShader("cs_sort"))
-	{
-		g_rhi->SetShader(shader);
-		ssbo->Bind(shader);
-		atomicBuffer->Bind(shader);
-		startElementBuf->Bind(shader);
-		linkedListEntryDepthAlphaNext->Bind(shader);
-		g_rhi->SetUniformbuffer(&jUniformBuffer<int>("ShadowMapWidth", SM_WIDTH), shader);
-		g_rhi->SetUniformbuffer(&jUniformBuffer<int>("ShadowMapHeight", SM_HEIGHT), shader);
-		g_rhi->DispatchCompute(SM_WIDTH / 16, SM_HEIGHT / 8, 1);
-	}
-
-	if (auto shader = jShader::GetShader("cs_link"))
-	{
-		g_rhi->SetShader(shader);
-		ssbo->Bind(shader);
-		startElementBuf->Bind(shader);
-		linkedListEntryDepthAlphaNext->Bind(shader);
-		linkedListEntryNeighbors->Bind(shader);
-		g_rhi->SetUniformbuffer(&jUniformBuffer<int>("ShadowMapWidth", SM_WIDTH), shader);
-		g_rhi->SetUniformbuffer(&jUniformBuffer<int>("ShadowMapHeight", SM_HEIGHT), shader);
-		g_rhi->DispatchCompute(SM_WIDTH / 16, SM_HEIGHT / 8, 1);
-	}
-
-	PostProcessChain.Process(MainCamera);
+	Renderer->Render(MainCamera);
 
 	return;
 
@@ -388,22 +278,24 @@ void jGame::Teardown()
 
 void jGame::UpdateSettings()
 {
-	if (ShadowType != jShadowAppSettingProperties::GetInstance().ShadowType)
-	{
-		ShadowType = jShadowAppSettingProperties::GetInstance().ShadowType;
+	//if (ShadowType != jShadowAppSettingProperties::GetInstance().ShadowType)
+	//{
+	//	ShadowType = jShadowAppSettingProperties::GetInstance().ShadowType;
 
-		switch (jShadowAppSettingProperties::GetInstance().ShadowType)
-		{
-		case EShadowType::ShadowVolume:
-			Renderer = ShadowRendererMap[EShadowType::ShadowVolume];
-			break;
-		case EShadowType::ShadowMap:
-			Renderer = ShadowRendererMap[EShadowType::ShadowMap];
-			break;
-		}
+	//	switch (jShadowAppSettingProperties::GetInstance().ShadowType)
+	//	{
+	//	case EShadowType::ShadowVolume:
+	//		Renderer = ShadowRendererMap[EShadowType::ShadowVolume];
+	//		break;
+	//	case EShadowType::ShadowMap:
+	//		Renderer = ShadowRendererMap[EShadowType::ShadowMap];
+	//		break;
+	//	}
 
-		jShadowAppSettingProperties::GetInstance().SwitchShadowType(jAppSettings::GetInstance().Get("MainPannel"));
-	}
+	//	jShadowAppSettingProperties::GetInstance().SwitchShadowType(jAppSettings::GetInstance().Get("MainPannel"));
+	//}
 
-	Renderer->UpdateSettings();
+	//Renderer->UpdateSettings();
+
+	Renderer = DeferredRenderer;
 }

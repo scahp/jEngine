@@ -177,6 +177,7 @@ enum class EDepthStencilFunc
 
 enum class ERenderBufferType : uint32
 {
+	NONE = 0,
 	COLOR = 0x00000001,
 	DEPTH = 0x00000002,
 	STENCIL = 0x00000004,

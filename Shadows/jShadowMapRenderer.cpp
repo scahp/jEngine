@@ -11,7 +11,7 @@
 #include "jShadowAppProperties.h"
 #include "jAppSettings.h"
 
-void jShadowMapRenderer::ShadowPrePass(jCamera* camera)
+void jShadowMapRenderer::ShadowPrePass(const jCamera* camera)
 {
 	jShader* ShadowGenShader = nullptr;
 	switch (ShadowMapType)
@@ -249,7 +249,7 @@ void jShadowMapRenderer::ShadowPrePass(jCamera* camera)
 	g_rhi->SetRenderTarget(nullptr);
 }
 
-void jShadowMapRenderer::RenderPass(jCamera* camera)
+void jShadowMapRenderer::RenderPass(const jCamera* camera)
 {
 	jShader* baseShader = nullptr;
 	switch (ShadowMapType)
@@ -362,7 +362,7 @@ void jShadowMapRenderer::RenderPass(jCamera* camera)
 //	gl.disable(gl.BLEND);
 }
 
-void jShadowMapRenderer::UIPass(jCamera* camera)
+void jShadowMapRenderer::UIPass(const jCamera* camera)
 {
 	g_rhi->EnableDepthTest(false);
 
@@ -482,7 +482,7 @@ void jShadowMapRenderer::UpdateSettings()
 	UsePoissonSample = jShadowAppSettingProperties::GetInstance().UsePoissonSample;
 }
 
-void jShadowMapRenderer::DebugRenderPass(jCamera* camera)
+void jShadowMapRenderer::DebugRenderPass(const jCamera* camera)
 {
 	static jShader* texShader = nullptr;
 	if (!texShader)
