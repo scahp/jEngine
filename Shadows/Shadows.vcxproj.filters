@@ -156,6 +156,9 @@
     <ClInclude Include="jPipeline.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="jForwardRenderer.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -273,6 +276,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="jPipeline.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="jForwardRenderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -425,6 +431,9 @@
       <Filter>Shaders\fullscreen</Filter>
     </None>
     <None Include="Shaders\shadowmap\vs_expDeepShadowMap.glsl">
+      <Filter>Shaders\shadowmap</Filter>
+    </None>
+    <None Include="Shaders\shadowmap\gs_omniDirectionalShadowMap.glsl">
       <Filter>Shaders\shadowmap</Filter>
     </None>
   </ItemGroup>

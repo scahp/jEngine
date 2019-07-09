@@ -44,24 +44,6 @@ void jDeferredRenderer::Setup()
 		auto postprocess = new jPostProcess_AA_DeepShadowAddition("AA_DeepShadowAddition", nullptr, jShader::GetShader("DeepShadowAA"));
 		PostProcessChain.AddNewPostprocess(postprocess);
 	}
-
-	//////////////////////////////////////////////////////////////////////////
-	// Render Object Update
-	
-	// todo 실시간 업데이트 관련 코드 추가 해야 함. 오브젝트 관리해줄 객체가 필요함.
-	for (auto& iter : g_StaticObjectArray)
-	{
-		if (!iter->SkipShadowMapGen)
-			ShadowPassObjects.push_back(iter);
-		RenderPassObjects.push_back(iter);
-	}
-
-	for (auto& iter : g_HairObjectArray)
-	{
-		if (!iter->SkipShadowMapGen)
-			ShadowPassObjects.push_back(iter);
-		RenderPassObjects.push_back(iter);
-	}
 }
 
 void jDeferredRenderer::Teardown()
@@ -71,7 +53,7 @@ void jDeferredRenderer::Teardown()
 
 void jDeferredRenderer::ShadowPrePass(const jCamera* camera)
 {
-	const jPipelineData data(ShadowPassObjects, camera, camera->GetLight(ELightType::DIRECTIONAL));
+	const jPipelineData data(jObject::GetShadowCasterObject(), camera, { camera->GetLight(ELightType::DIRECTIONAL) });
 
 	for (auto& iter : PipelineSet->ShadowPrePass)
 		iter->Do(data);
@@ -80,7 +62,7 @@ void jDeferredRenderer::ShadowPrePass(const jCamera* camera)
 void jDeferredRenderer::RenderPass(const jCamera* camera)
 {
 	// Geometry Pass
-	const jPipelineData data(RenderPassObjects, camera, nullptr);
+	const jPipelineData data(jObject::GetStaticObject(), camera, {});
 
 	for (auto& iter : PipelineSet->RenderPass)
 		iter->Do(data);

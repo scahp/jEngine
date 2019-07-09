@@ -41,7 +41,7 @@ protected:
 	virtual bool Do(const jCamera* camera) const = 0;
 
 	jFullscreenQuadPrimitive* GetFullscreenQuad() const;
-	virtual void Draw(const jCamera* camera, const jShader* shader, const jLight* directionalLight) const;
+	virtual void Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights) const;
 };
 
 //////////////////////////////////////////////////////////////////////////

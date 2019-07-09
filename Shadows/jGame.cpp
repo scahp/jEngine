@@ -20,6 +20,7 @@
 #include "jRenderTargetPool.h"
 #include "glad\glad.h"
 #include "jDeferredRenderer.h"
+#include "jForwardRenderer.h"
 
 jRHI* g_rhi = nullptr;
 
@@ -56,19 +57,18 @@ void jGame::Setup()
 	//const Vector mainCameraTarget(171.96f, 166.02f, -180.05f);
 	const Vector mainCameraPos(165.0f, 125.0f, -136.0f);
 	const Vector mainCameraTarget(0.0f, 0.0f, 0.0f);
-	MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 1.0f, 1000.0f, SCR_WIDTH, SCR_HEIGHT, true);
+	MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 10.0f, 1000.0f, SCR_WIDTH, SCR_HEIGHT, true);
 	jCamera::AddCamera(0, MainCamera);
 
 	// Light creation step
 	DirectionalLight = jLight::CreateDirectionalLight(jShadowAppSettingProperties::GetInstance().DirecionalLightDirection
-		//, Vector4(0.5f, 0.5f, 0.5f, 1.0f)
-		, Vector4(1.0f)
+		, Vector4(0.5f, 0.5f, 0.5f, 1.0f)
 		, Vector(1.0f), Vector(1.0f), 64);
 	//AmbientLight = jLight::CreateAmbientLight(Vector(0.7f, 0.8f, 0.8f), Vector(0.1f));
 	AmbientLight = jLight::CreateAmbientLight(Vector(1.0f), Vector(0.1f));
 
-	//PointLight = jLight::CreatePointLight(jShadowAppSettingProperties::GetInstance().PointLightPosition, Vector4(2.0f, 0.7f, 0.7f, 1.0f), 500.0f, Vector(1.0f, 1.0f, 1.0f), Vector(0.4f, 0.4f, 0.4f), 64.0f);
-	//SpotLight = jLight::CreateSpotLight(jShadowAppSettingProperties::GetInstance().SpotLightPosition, jShadowAppSettingProperties::GetInstance().SpotLightDirection, Vector4(0.0f, 1.0f, 0.0f, 1.0f), 500.0f, 0.7f, 1.0f, Vector(1.0f, 1.0f, 1.0f), Vector(0.4f, 0.4f, 0.4f), 64.0f);
+	PointLight = jLight::CreatePointLight(jShadowAppSettingProperties::GetInstance().PointLightPosition, Vector4(2.0f, 0.7f, 0.7f, 1.0f), 500.0f, Vector(1.0f, 1.0f, 1.0f), Vector(0.4f, 0.4f, 0.4f), 64.0f);
+	SpotLight = jLight::CreateSpotLight(jShadowAppSettingProperties::GetInstance().SpotLightPosition, jShadowAppSettingProperties::GetInstance().SpotLightDirection, Vector4(0.0f, 1.0f, 0.0f, 1.0f), 500.0f, 0.7f, 1.0f, Vector(1.0f, 1.0f, 1.0f), Vector(0.4f, 0.4f, 0.4f), 64.0f);
 
 	auto directionalLightDebug = jPrimitiveUtil::CreateDirectionalLightDebug(Vector(250, 260, 0)*0.5f, Vector::OneVector * 10.0f, 10.0f, MainCamera, DirectionalLight, "Image/sun.png");
 	g_DebugObjectArray.push_back(directionalLightDebug);
@@ -80,8 +80,8 @@ void jGame::Setup()
 	//g_DebugObjectArray.push_back(spotLightDebug);
 
 	MainCamera->AddLight(DirectionalLight);
-	//MainCamera->AddLight(PointLight);
-	//MainCamera->AddLight(SpotLight);
+	MainCamera->AddLight(PointLight);
+	MainCamera->AddLight(SpotLight);
 	MainCamera->AddLight(AmbientLight);
 
 	// Shader creation step
@@ -103,106 +103,93 @@ void jGame::Setup()
 	CREATE_SHADER_CS("cs_sort", "Shaders/compute/compute_sort_linkedlist.glsl");
 	CREATE_SHADER_CS("cs_link", "Shaders/compute/compute_link_linkedlist.glsl");
 
-	//auto quad = jPrimitiveUtil::CreateQuad(Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), Vector(1000.0f, 1000.0f, 1000.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
-	//quad->SetPlane(jPlane(Vector(0.0, 1.0, 0.0), -0.1f));
-	////quad->SkipShadowMapGen = true;
-	//quad->SkipUpdateShadowVolume = true;
-	//g_StaticObjectArray.push_back(quad);
+	CREATE_SHADER_VS_FS("ShadowGen_SSM", "shaders/shadowmap/vs_shadowMap.glsl", "shaders/shadowmap/fs_shadowMap.glsl");
+	CREATE_SHADER_VS_GS_FS("ShadowGen_Omni_SSM", "shaders/shadowmap/vs_omniDirectionalShadowMap.glsl", "shaders/shadowmap/gs_omniDirectionalShadowMap.glsl", "shaders/shadowmap/fs_omniDirectionalShadowMap.glsl");
+	//CREATE_SHADER_VS_FS_WITH_OPTION("SSM", "shaders/shadowmap/vs.glsl", "shaders/shadowmap/fs.glsl", true, true);
+	CREATE_SHADER_VS_FS("SSM", "shaders/shadowmap/vs.glsl", "shaders/shadowmap/fs.glsl");
 
-	//auto gizmo = jPrimitiveUtil::CreateGizmo(Vector::ZeroVector, Vector::ZeroVector, Vector::OneVector);
-	//g_StaticObjectArray.push_back(gizmo);
+	auto quad = jPrimitiveUtil::CreateQuad(Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), Vector(1000.0f, 1000.0f, 1000.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+	quad->SetPlane(jPlane(Vector(0.0, 1.0, 0.0), -0.1f));
+	//quad->SkipShadowMapGen = true;
+	quad->SkipUpdateShadowVolume = true;
+	jObject::AddObject(quad);
 
-	//auto triangle = jPrimitiveUtil::CreateTriangle(Vector(60.0, 100.0, 20.0), Vector::OneVector, Vector(40.0, 40.0, 40.0), Vector4(0.5f, 0.1f, 1.0f, 1.0f));
-	//triangle->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
-	//{
-	//	thisObject->RenderObject->Rot.x += 0.05f;
-	//};
-	//g_StaticObjectArray.push_back(triangle);
+	auto gizmo = jPrimitiveUtil::CreateGizmo(Vector::ZeroVector, Vector::ZeroVector, Vector::OneVector);
+	jObject::AddObject(gizmo);
 
-	//auto cube = jPrimitiveUtil::CreateCube(Vector(-60.0f, 55.0f, -20.0f), Vector::OneVector, Vector(50.0f, 50.0f, 50.0f), Vector4(0.7f, 0.7f, 0.7f, 1.0f));
-	//cube->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
-	//{
-	//	thisObject->RenderObject->Rot.z += 0.005f;
-	//};
-	//g_StaticObjectArray.push_back(cube);
-	//
-	//auto cube2 = jPrimitiveUtil::CreateCube(Vector(-65.0f, 35.0f, 10.0f), Vector::OneVector, Vector(50.0f, 50.0f, 50.0f), Vector4(0.7f, 0.7f, 0.7f, 1.0f));
-	//g_StaticObjectArray.push_back(cube2);
+	auto triangle = jPrimitiveUtil::CreateTriangle(Vector(60.0, 100.0, 20.0), Vector::OneVector, Vector(40.0, 40.0, 40.0), Vector4(0.5f, 0.1f, 1.0f, 1.0f));
+	triangle->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
+	{
+		thisObject->RenderObject->Rot.x += 0.05f;
+	};
+	jObject::AddObject(triangle);
 
-	//auto capsule = jPrimitiveUtil::CreateCapsule(Vector(30.0f, 30.0f, -80.0f), 40.0f, 10.0f, 20, Vector(1.0f), Vector4(1.0f, 1.0f, 0.0f, 1.0f));
-	//capsule->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
-	//{
-	//	thisObject->RenderObject->Rot.x -= 0.01f;
-	//};
-	//g_StaticObjectArray.push_back(capsule);
+	auto cube = jPrimitiveUtil::CreateCube(Vector(-60.0f, 55.0f, -20.0f), Vector::OneVector, Vector(50.0f, 50.0f, 50.0f), Vector4(0.7f, 0.7f, 0.7f, 1.0f));
+	cube->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
+	{
+		thisObject->RenderObject->Rot.z += 0.005f;
+	};
+	jObject::AddObject(cube);
+	
+	auto cube2 = jPrimitiveUtil::CreateCube(Vector(-65.0f, 35.0f, 10.0f), Vector::OneVector, Vector(50.0f, 50.0f, 50.0f), Vector4(0.7f, 0.7f, 0.7f, 1.0f));
+	jObject::AddObject(cube2);
 
-	//auto cone = jPrimitiveUtil::CreateCone(Vector(0.0f, 50.0f, 60.0f), 40.0f, 20.0f, 15, Vector::OneVector, Vector4(1.0f, 1.0f, 0.0f, 1.0f));
-	//cone->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
-	//{
-	//	thisObject->RenderObject->Rot.y += 0.03f;
-	//};
-	//g_StaticObjectArray.push_back(cone);
+	auto capsule = jPrimitiveUtil::CreateCapsule(Vector(30.0f, 30.0f, -80.0f), 40.0f, 10.0f, 20, Vector(1.0f), Vector4(1.0f, 1.0f, 0.0f, 1.0f));
+	capsule->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
+	{
+		thisObject->RenderObject->Rot.x -= 0.01f;
+	};
+	jObject::AddObject(capsule);
 
-	//auto cylinder = jPrimitiveUtil::CreateCylinder(Vector(-30.0f, 60.0f, -60.0f), 20.0f, 10.0f, 20, Vector::OneVector, Vector4(0.0f, 0.0f, 1.0f, 1.0f));
-	//cylinder->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
-	//{
-	//	thisObject->RenderObject->Rot.x += 0.05f;
-	//};
-	//g_StaticObjectArray.push_back(cylinder);
+	auto cone = jPrimitiveUtil::CreateCone(Vector(0.0f, 50.0f, 60.0f), 40.0f, 20.0f, 15, Vector::OneVector, Vector4(1.0f, 1.0f, 0.0f, 1.0f));
+	cone->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
+	{
+		thisObject->RenderObject->Rot.y += 0.03f;
+	};
+	jObject::AddObject(cone);
 
-	//auto quad2 = jPrimitiveUtil::CreateQuad(Vector(-20.0f, 80.0f, 40.0f), Vector::OneVector, Vector(20.0f, 20.0f, 20.0f), Vector4(0.0f, 0.0f, 1.0f, 1.0f));
-	//quad2->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
-	//{
-	//	thisObject->RenderObject->Rot.z += 0.08f;
-	//};
-	//g_StaticObjectArray.push_back(quad2);
+	auto cylinder = jPrimitiveUtil::CreateCylinder(Vector(-30.0f, 60.0f, -60.0f), 20.0f, 10.0f, 20, Vector::OneVector, Vector4(0.0f, 0.0f, 1.0f, 1.0f));
+	cylinder->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
+	{
+		thisObject->RenderObject->Rot.x += 0.05f;
+	};
+	jObject::AddObject(cylinder);
 
-	//auto sphere = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f), 1.0, 16, Vector(30.0f), Vector4(0.8f, 0.0f, 0.0f, 1.0f));
-	//sphere->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
-	//{
-	//	//thisObject->RenderObject->Rot.z += 0.01f;
-	//	thisObject->RenderObject->Rot.z = DegreeToRadian(180.0f);
-	//};
-	//Sphere = sphere;
-	//g_StaticObjectArray.push_back(sphere);
+	auto quad2 = jPrimitiveUtil::CreateQuad(Vector(-20.0f, 80.0f, 40.0f), Vector::OneVector, Vector(20.0f, 20.0f, 20.0f), Vector4(0.0f, 0.0f, 1.0f, 1.0f));
+	quad2->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
+	{
+		thisObject->RenderObject->Rot.z += 0.08f;
+	};
+	jObject::AddObject(quad2);
 
-	//auto sphere2 = jPrimitiveUtil::CreateSphere(Vector(150.0f, 5.0f, 0.0f), 1.0, 16, Vector(10.0f), Vector4(0.8f, 0.4f, 0.6f, 1.0f));
-	//sphere2->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
-	//{
-	//	const float startY = 5.0f;
-	//	const float endY = 100;
-	//	const float speed = 1.5f;
-	//	static bool dir = true;
-	//	thisObject->RenderObject->Pos.y += dir ? speed : -speed;
-	//	if (thisObject->RenderObject->Pos.y < startY || thisObject->RenderObject->Pos.y > endY)
-	//	{
-	//		dir = !dir;
-	//		thisObject->RenderObject->Pos.y += dir ? speed : -speed;
-	//	}
-	//};
-	//Sphere = sphere2;
-	//g_StaticObjectArray.push_back(sphere2);
+	auto sphere = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f), 1.0, 16, Vector(30.0f), Vector4(0.8f, 0.0f, 0.0f, 1.0f));
+	sphere->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
+	{
+		//thisObject->RenderObject->Rot.z += 0.01f;
+		thisObject->RenderObject->Rot.z = DegreeToRadian(180.0f);
+	};
+	Sphere = sphere;
+	jObject::AddObject(sphere);
 
-	//auto billboard = jPrimitiveUtil::CreateBillobardQuad(Vector(0.0f, 60.0f, 80.0f), Vector::OneVector, Vector(20.0f, 20.0f, 20.0f), Vector4(1.0f, 0.0f, 1.0f, 1.0f), MainCamera);
-	//g_StaticObjectArray.push_back(billboard);
+	auto sphere2 = jPrimitiveUtil::CreateSphere(Vector(150.0f, 5.0f, 0.0f), 1.0, 16, Vector(10.0f), Vector4(0.8f, 0.4f, 0.6f, 1.0f));
+	sphere2->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
+	{
+		const float startY = 5.0f;
+		const float endY = 100;
+		const float speed = 1.5f;
+		static bool dir = true;
+		thisObject->RenderObject->Pos.y += dir ? speed : -speed;
+		if (thisObject->RenderObject->Pos.y < startY || thisObject->RenderObject->Pos.y > endY)
+		{
+			dir = !dir;
+			thisObject->RenderObject->Pos.y += dir ? speed : -speed;
+		}
+	};
+	Sphere = sphere2;
+	jObject::AddObject(sphere2);
 
-	auto hairObject = jHairModelLoader::GetInstance().CreateHairObject("Model/straight.hair");
-	g_HairObjectArray.push_back(hairObject);
-
-	auto headModel = jModelLoader::GetInstance().LoadFromFile("Model/woman.x");
-	g_StaticObjectArray.push_back(headModel);
-
-	//auto quad1 = jPrimitiveUtil::CreateQuad(Vector(0.0f), Vector::OneVector, Vector(20.0f, 20.0f, 20.0f), Vector4(0.0f, 0.0f, 1.0f, 1.0f));
-	//quad1->RenderObject->Rot = jShadowAppSettingProperties::GetInstance().DirecionalLightDirection.GetEulerAngleFrom();
-	//g_HairObjectArray.push_back(quad1);
-
-	//auto quad2 = jPrimitiveUtil::CreateQuad(Vector(1.0f), Vector::OneVector, Vector(20.0f, 20.0f, 20.0f), Vector4(0.0f, 0.0f, 1.0f, 1.0f));
-	//quad2->RenderObject->Rot = jShadowAppSettingProperties::GetInstance().DirecionalLightDirection.GetEulerAngleFrom();
-	//g_HairObjectArray.push_back(quad2);
-
-	//auto quad3 = jPrimitiveUtil::CreateQuad(Vector(2.0f), Vector::OneVector, Vector(20.0f, 20.0f, 20.0f), Vector4(0.0f, 0.0f, 1.0f, 1.0f));
-	//quad3->RenderObject->Rot = jShadowAppSettingProperties::GetInstance().DirecionalLightDirection.GetEulerAngleFrom();
-	//g_HairObjectArray.push_back(quad3);
+	auto billboard = jPrimitiveUtil::CreateBillobardQuad(Vector(0.0f, 60.0f, 80.0f), Vector::OneVector, Vector(20.0f, 20.0f, 20.0f), Vector4(1.0f, 0.0f, 1.0f, 1.0f), MainCamera);
+	jObject::AddObject(billboard);
 
 	////////////////////////////////////////////////////////////////////////////
 	//auto shadowVolumeRenderer = new jShadowVolumeRenderer();
@@ -216,6 +203,17 @@ void jGame::Setup()
 	//GBuffer = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RGBA32F, EFormat::RGBA, EFormatType::FLOAT, SCR_WIDTH, SCR_HEIGHT, 4 });
 	DeferredRenderer = new jDeferredRenderer({ ETextureType::TEXTURE_2D, EFormat::RGBA32F, EFormat::RGBA, EFormatType::FLOAT, SCR_WIDTH, SCR_HEIGHT, 4 });
 	DeferredRenderer->Setup();
+
+	//auto hairObject = jHairModelLoader::GetInstance().CreateHairObject("Model/straight.hair");
+	////g_HairObjectArray.push_back(hairObject);
+	//jObject::AddObject(hairObject);
+
+	//auto headModel = jModelLoader::GetInstance().LoadFromFile("Model/woman.x");
+	////g_StaticObjectArray.push_back(headModel);
+	//jObject::AddObject(headModel);
+
+	ForwardRenderer = new jForwardRenderer();
+	ForwardRenderer->Setup();
 }
 
 void jGame::Update(float deltaTime)
@@ -244,6 +242,11 @@ void jGame::Update(float deltaTime)
 		for (auto& iter : SpotLight->ShadowMapData->ShadowMapCamera)
 			iter->UpdateCamera();
 	}
+
+	for (auto iter : jObject::GetStaticObject())
+		iter->Update(deltaTime);
+
+	jObject::FlushDirtyState();
 
 	//const bool expDeepShadowMap = jShadowAppSettingProperties::GetInstance().ExponentDeepShadowOn;
 
@@ -297,5 +300,6 @@ void jGame::UpdateSettings()
 
 	//Renderer->UpdateSettings();
 
-	Renderer = DeferredRenderer;
+	//Renderer = DeferredRenderer;
+	Renderer = ForwardRenderer;
 }

@@ -51,8 +51,8 @@ struct jRenderTarget_OpenGL : public jRenderTarget
 	uint32 mrt_rbo = 0;
 	std::vector<uint32> mrt_drawBuffers;
 
-	virtual bool Begin(int index = 0, bool mrt = false) override;
-	virtual void End() override;
+	virtual bool Begin(int index = 0, bool mrt = false) const override;
+	virtual void End() const override;
 };
 
 struct jUniformBufferBlock_OpenGL : public IUniformBufferBlock
@@ -196,7 +196,7 @@ public:
 	virtual void EnableDepthTest(bool enable) override;
 
 
-	virtual void SetRenderTarget(jRenderTarget* rt, int32 index = 0, bool mrt = false) override;
+	virtual void SetRenderTarget(const jRenderTarget* rt, int32 index = 0, bool mrt = false) override;
 	virtual void SetDrawBuffers(const std::initializer_list<EDrawBufferType>& list) override;
 
 
@@ -229,5 +229,10 @@ public:
 	virtual IShaderStorageBufferObject* CreateShaderStorageBufferObject(const char* blockname) const override;
 	virtual IAtomicCounterBuffer* CreateAtomicCounterBuffer(const char* name, int32 bindingPoint) const override;
 
+	virtual void SetViewport(int32 x, int32 y, int32 width, int32 height) const override;
+	virtual void SetViewport(const jViewport& viewport) const override;
+	virtual void SetViewportIndexed(int32 index, float x, float y, float width, float height) const override;
+	virtual void SetViewportIndexed(int32 index, const jViewport& viewport) const override;
+	virtual void SetViewportIndexedArray(int32 startIndex, int32 count, const jViewport* viewports) const override;
 };
 

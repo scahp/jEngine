@@ -12,7 +12,7 @@ public:
 		return *_instance;
 	}
 
-	bool ShadowOn = false;
+	bool ShadowOn = true;
 	EShadowType ShadowType = EShadowType::ShadowMap;
 	bool ShowSilhouette_DirectionalLight = false;
 	bool ShowSilhouette_PointLight = false;

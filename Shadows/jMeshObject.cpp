@@ -9,16 +9,10 @@ jMeshObject::jMeshObject()
 {	
 }
 
-void jMeshObject::Draw(const jCamera* camera, const jShader* shader)
+void jMeshObject::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights)
 {
 	if (Visible && RenderObject)
-		DrawNode(RootNode, camera, shader, nullptr);
-}
-
-void jMeshObject::Draw(const jCamera* camera, const jShader* shader, const jLight* light)
-{
-	if (Visible && RenderObject)
-		DrawNode(RootNode, camera, shader, light);
+		DrawNode(RootNode, camera, shader, lights);
 }
 
 void jMeshObject::SetMaterialUniform(const jShader* shader, const jMeshMaterial* material)
@@ -34,16 +28,16 @@ void jMeshObject::SetMaterialUniform(const jShader* shader, const jMeshMaterial*
 	g_rhi->SetUniformbuffer(&jUniformBuffer<float>("Material.Shininess", material->Data.SpecularPow), shader);
 }
 
-void jMeshObject::DrawNode(const jMeshNode* node, const jCamera* camera, const jShader* shader, const jLight* light)
+void jMeshObject::DrawNode(const jMeshNode* node, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights)
 {
 	for (auto& iter : node->MeshIndex)
-		DrawSubMesh(iter, camera, shader, light);
+		DrawSubMesh(iter, camera, shader, lights);
 
 	for (auto& iter : node->childNode)
-		DrawNode(iter, camera, shader, light);
+		DrawNode(iter, camera, shader, lights);
 }
 
-void jMeshObject::DrawSubMesh(int32 meshIndex, const jCamera* camera, const jShader* shader, const jLight* light)
+void jMeshObject::DrawSubMesh(int32 meshIndex, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights)
 {
 	auto& subMesh = SubMeshes[meshIndex];
 	auto it_find = MeshData->Materials.find(subMesh.MaterialIndex);
@@ -58,19 +52,9 @@ void jMeshObject::DrawSubMesh(int32 meshIndex, const jCamera* camera, const jSha
 		SetMaterialUniform(shader, &NullMeshMateral);
 	}
 
-	if (light)
-	{
-		if (subMesh.EndFace > 0)
-			RenderObject->Draw(camera, shader, light, subMesh.StartFace, subMesh.EndFace - subMesh.StartFace, subMesh.StartVertex);
-		else
-			RenderObject->Draw(camera, shader, light, subMesh.StartVertex, subMesh.EndVertex - subMesh.StartVertex, subMesh.StartVertex);
-	}
+	if (subMesh.EndFace > 0)
+		RenderObject->Draw(camera, shader, lights, subMesh.StartFace, subMesh.EndFace - subMesh.StartFace, subMesh.StartVertex);
 	else
-	{
-		if (subMesh.EndFace > 0)
-			RenderObject->Draw(camera, shader, subMesh.StartFace, subMesh.EndFace - subMesh.StartFace, subMesh.StartVertex);
-		else
-			RenderObject->Draw(camera, shader, subMesh.StartVertex, subMesh.EndVertex - subMesh.StartVertex, subMesh.StartVertex);
-	}
+		RenderObject->Draw(camera, shader, lights, subMesh.StartVertex, subMesh.EndVertex - subMesh.StartVertex, subMesh.StartVertex);
 }
 

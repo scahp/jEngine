@@ -55,13 +55,13 @@ void jRenderer::DebugRenderPass(const jCamera* camera)
 	if (jShadowAppSettingProperties::GetInstance().ShowBoundBox)
 	{
 		for (auto& iter : g_BoundBoxObjectArray)
-			iter->Draw(camera, BoundVolumeShader, nullptr);
+			iter->Draw(camera, BoundVolumeShader, {});
 	}
 
 	if (jShadowAppSettingProperties::GetInstance().ShowBoundSphere)
 	{
 		for (auto& iter : g_BoundSphereObjectArray)
-			iter->Draw(camera, BoundVolumeShader, nullptr);
+			iter->Draw(camera, BoundVolumeShader, {});
 	}
 }
 

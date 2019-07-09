@@ -10,14 +10,10 @@ struct jTexture* jRenderTargetPool::GetNullTexture(ETextureType type)
 	switch (type)
 	{
 	case ETextureType::TEXTURE_2D:
-	{
-		static auto temp = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RGBA, EFormat::RGBA, EFormatType::BYTE, 2, 2, 1 });
-		return temp->GetTexture();
-	}
 	case ETextureType::TEXTURE_2D_ARRAY:
 	case ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW:
 	{
-		static auto temp = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D_ARRAY, EFormat::RGBA, EFormat::RGBA, EFormatType::BYTE, 2, 2, 1 });
+		static auto temp = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RGBA, EFormat::RGBA, EFormatType::BYTE, 2, 2, 1 });
 		return temp->GetTexture();
 	}
 	case ETextureType::TEXTURE_CUBE:

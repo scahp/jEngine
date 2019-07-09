@@ -34,17 +34,27 @@ struct jTexture
 
 };
 
+struct jViewport
+{
+	float x = 0.0f;
+	float y = 0.0f;
+	float width = 0.0f;
+	float height = 0.0f;
+};
+
 struct jShaderInfo
 {
 	size_t CreateShaderHash() const
 	{
-		return std::hash<std::string>{}(vs+vsPreProcessor+fs+fsPreProcessor+cs+csPreProcessor);
+		return std::hash<std::string>{}(vs+vsPreProcessor+gs+gsPreProcessor+fs+fsPreProcessor+cs+csPreProcessor);
 	}
 	std::string name;
 	std::string vs;
+	std::string gs;
 	std::string fs;
 	std::string cs;
 	std::string vsPreProcessor;
+	std::string gsPreProcessor;
 	std::string fsPreProcessor;
 	std::string csPreProcessor;
 };
@@ -72,6 +82,24 @@ jShader::CreateShader(info); \
 }
 
 #define CREATE_SHADER_VS_FS(Name, VS, FS) CREATE_SHADER_VS_FS_WITH_OPTION(Name, VS, FS, false, false)
+
+#define CREATE_SHADER_VS_GS_FS_WITH_OPTION(Name, VS, GS, FS, IsUseTexture, IsUseMaterial) \
+{ \
+jShaderInfo info; \
+info.name = Name; \
+info.vs = VS; \
+info.gs = GS; \
+info.fs = FS; \
+info.vsPreProcessor += IsUseTexture ? "#define USE_TEXTURE 1" : "";\
+info.vsPreProcessor += IsUseMaterial ? "\r\n#define USE_MATERIAL 1" : "";\
+info.gsPreProcessor += IsUseTexture ? "#define USE_TEXTURE 1" : ""; \
+info.gsPreProcessor += IsUseMaterial ? "\r\n#define USE_MATERIAL 1" : ""; \
+info.fsPreProcessor += IsUseTexture ? "#define USE_TEXTURE 1" : "";\
+info.fsPreProcessor += IsUseMaterial ? "\r\n#define USE_MATERIAL 1" : "";\
+jShader::CreateShader(info); \
+}
+
+#define CREATE_SHADER_VS_GS_FS(Name, VS, GS, FS) CREATE_SHADER_VS_GS_FS_WITH_OPTION(Name, VS, GS, FS, false, false)
 
 #define CREATE_SHADER_CS_WITH_OPTION(Name, CS, IsUseTexture, IsUseMaterial) \
 { \
@@ -283,8 +311,8 @@ struct jRenderTarget
 	virtual jTexture* GetTexture(int32 index = 0) const { return Textures[index]; }
 	virtual ETextureType GetTextureType() const { return Info.TextureType; }
 
-	virtual bool Begin(int index = 0, bool mrt = false) { return true; };
-	virtual void End() {}
+	virtual bool Begin(int index = 0, bool mrt = false) const { return true; };
+	virtual void End() const {}
 
 	jRenderTargetInfo Info;
 	std::vector<jTexture*> Textures;
@@ -301,7 +329,7 @@ public:
 	virtual void SetClearColor(float r, float g, float b, float a) {}
 	virtual void SetClearColor(Vector4 rgba) {}
 
-	virtual void SetRenderTarget(jRenderTarget* rt, int32 index = 0, bool mrt = false) {}
+	virtual void SetRenderTarget(const jRenderTarget* rt, int32 index = 0, bool mrt = false) {}
 	virtual void SetDrawBuffers(const std::initializer_list<EDrawBufferType>& list) {}
 	
 	virtual jVertexBuffer* CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) { return nullptr; }
@@ -331,6 +359,12 @@ public:
 	
 	virtual void SetShader(const jShader* shader) {}
 	virtual jShader* CreateShader(const jShaderInfo& shaderInfo) { return nullptr; }
+
+	virtual void SetViewport(int32 x, int32 y, int32 width, int32 height) const {}
+	virtual void SetViewport(const jViewport& viewport) const {}
+	virtual void SetViewportIndexed(int32 index, float x, float y, float width, float height) const {}
+	virtual void SetViewportIndexed(int32 index, const jViewport& viewport) const {}
+	virtual void SetViewportIndexedArray(int32 startIndex, int32 count, const jViewport* viewports) const {}
 
 	virtual bool SetUniformbuffer(const IUniformBuffer* buffer, const jShader* shader) { return false; }
 

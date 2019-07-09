@@ -26,7 +26,40 @@ void jRenderObject::CreateRenderObject(const std::shared_ptr<jVertexStreamData>&
 	IndexBuffer = g_rhi->CreateIndexBuffer(IndexStream);
 }
 
-void jRenderObject::Draw(const jCamera* camera, const jShader* shader, int32 startIndex, int32 count)
+//void jRenderObject::Draw(const jCamera* camera, const jShader* shader, int32 startIndex, int32 count)
+//{
+//	if (VertexBuffer->VertexStreamData.expired())
+//		return;
+//
+//	g_rhi->SetShader(shader);
+//	g_rhi->EnableCullFace(camera->IsEnableCullMode && !IsTwoSided);
+//
+//	jMaterialData materialData;
+//
+//	SetRenderProperty(shader);
+//	SetCameraProperty(shader, camera);
+//	SetLightProperty(shader, camera, &materialData);
+//	SetTextureProperty(shader, &materialData);
+//	SetMaterialProperty(shader, &materialData);
+//
+//	startIndex = startIndex != -1 ? startIndex : 0;
+//
+//	auto vertexStreamData = VertexBuffer->VertexStreamData.lock();
+//	auto primitiveType = vertexStreamData->PrimitiveType;
+//	if (IndexBuffer)
+//	{
+//		auto indexStreamData = IndexBuffer->IndexStreamData.lock();		
+//		count = count != -1 ? count : indexStreamData->ElementCount;
+//		g_rhi->DrawElement(primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count);
+//	}
+//	else
+//	{
+//		count = count != -1 ? count : vertexStreamData->ElementCount;
+//		g_rhi->DrawArray(primitiveType, 0, count);
+//	}
+//}
+
+void jRenderObject::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 startIndex, int32 count)
 {
 	if (VertexBuffer->VertexStreamData.expired())
 		return;
@@ -38,40 +71,7 @@ void jRenderObject::Draw(const jCamera* camera, const jShader* shader, int32 sta
 
 	SetRenderProperty(shader);
 	SetCameraProperty(shader, camera);
-	SetLightProperty(shader, camera, &materialData);
-	SetTextureProperty(shader, &materialData);
-	SetMaterialProperty(shader, &materialData);
-
-	startIndex = startIndex != -1 ? startIndex : 0;
-
-	auto vertexStreamData = VertexBuffer->VertexStreamData.lock();
-	auto primitiveType = vertexStreamData->PrimitiveType;
-	if (IndexBuffer)
-	{
-		auto indexStreamData = IndexBuffer->IndexStreamData.lock();		
-		count = count != -1 ? count : indexStreamData->ElementCount;
-		g_rhi->DrawElement(primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count);
-	}
-	else
-	{
-		count = count != -1 ? count : vertexStreamData->ElementCount;
-		g_rhi->DrawArray(primitiveType, 0, count);
-	}
-}
-
-void jRenderObject::Draw(const jCamera* camera, const jShader* shader, const jLight* light, int32 startIndex, int32 count)
-{
-	if (VertexBuffer->VertexStreamData.expired())
-		return;
-
-	g_rhi->SetShader(shader);
-	g_rhi->EnableCullFace(camera->IsEnableCullMode && !IsTwoSided);
-
-	jMaterialData materialData;
-
-	SetRenderProperty(shader);
-	SetCameraProperty(shader, camera);
-	SetLightProperty(shader, light, &materialData);
+	SetLightProperty(shader, camera, lights, &materialData);
 	SetTextureProperty(shader, &materialData);
 	SetMaterialProperty(shader, &materialData);
 	
@@ -92,7 +92,7 @@ void jRenderObject::Draw(const jCamera* camera, const jShader* shader, const jLi
 	}
 }
 
-void jRenderObject::Draw(const jCamera* camera, const jShader* shader, const jLight* light, int32 startIndex, int32 count, int32 baseVertexIndex)
+void jRenderObject::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 startIndex, int32 count, int32 baseVertexIndex)
 {
 	if (VertexBuffer->VertexStreamData.expired())
 		return;
@@ -104,7 +104,7 @@ void jRenderObject::Draw(const jCamera* camera, const jShader* shader, const jLi
 
 	SetRenderProperty(shader);
 	SetCameraProperty(shader, camera);
-	SetLightProperty(shader, light, &materialData);
+	SetLightProperty(shader, camera, lights, &materialData);
 	SetTextureProperty(shader, &materialData);
 	SetMaterialProperty(shader, &materialData);
 
@@ -121,38 +121,38 @@ void jRenderObject::Draw(const jCamera* camera, const jShader* shader, const jLi
 	}
 }
 
-void jRenderObject::Draw(const jCamera* camera, const jShader* shader, int32 startIndex, int32 count, int32 baseVertexIndex)
-{
-	if (VertexBuffer->VertexStreamData.expired())
-		return;
-
-	g_rhi->SetShader(shader);
-	g_rhi->EnableCullFace(camera->IsEnableCullMode && !IsTwoSided);
-
-	jMaterialData materialData;
-
-	SetRenderProperty(shader);
-	SetCameraProperty(shader, camera);
-	SetLightProperty(shader, camera, &materialData);
-	SetTextureProperty(shader, &materialData);
-	SetMaterialProperty(shader, &materialData);
-
-	startIndex = startIndex != -1 ? startIndex : 0;
-
-	auto vertexStreamData = VertexBuffer->VertexStreamData.lock();
-	auto primitiveType = vertexStreamData->PrimitiveType;
-	if (IndexBuffer)
-	{
-		auto indexStreamData = IndexBuffer->IndexStreamData.lock();
-		count = count != -1 ? count : indexStreamData->ElementCount;
-		g_rhi->DrawElementBaseVertex(primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count, baseVertexIndex);
-	}
-	else
-	{
-		count = count != -1 ? count : vertexStreamData->ElementCount;
-		g_rhi->DrawArray(primitiveType, baseVertexIndex, count);
-	}
-}
+//void jRenderObject::Draw(const jCamera* camera, const jShader* shader, int32 startIndex, int32 count, int32 baseVertexIndex)
+//{
+//	if (VertexBuffer->VertexStreamData.expired())
+//		return;
+//
+//	g_rhi->SetShader(shader);
+//	g_rhi->EnableCullFace(camera->IsEnableCullMode && !IsTwoSided);
+//
+//	jMaterialData materialData;
+//
+//	SetRenderProperty(shader);
+//	SetCameraProperty(shader, camera);
+//	SetLightProperty(shader, camera, &materialData);
+//	SetTextureProperty(shader, &materialData);
+//	SetMaterialProperty(shader, &materialData);
+//
+//	startIndex = startIndex != -1 ? startIndex : 0;
+//
+//	auto vertexStreamData = VertexBuffer->VertexStreamData.lock();
+//	auto primitiveType = vertexStreamData->PrimitiveType;
+//	if (IndexBuffer)
+//	{
+//		auto indexStreamData = IndexBuffer->IndexStreamData.lock();
+//		count = count != -1 ? count : indexStreamData->ElementCount;
+//		g_rhi->DrawElementBaseVertex(primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count, baseVertexIndex);
+//	}
+//	else
+//	{
+//		count = count != -1 ? count : vertexStreamData->ElementCount;
+//		g_rhi->DrawArray(primitiveType, baseVertexIndex, count);
+//	}
+//}
 
 void jRenderObject::SetRenderProperty(const jShader* shader)
 {
@@ -198,15 +198,14 @@ void jRenderObject::SetCameraProperty(const jShader* shader, const jCamera* came
 	g_rhi->SetUniformbuffer(&jUniformBuffer<int>("ShadingModel", static_cast<int>(ShadingModel)), shader);
 }
 
-void jRenderObject::SetLightProperty(const jShader* shader, const jCamera* camera, jMaterialData* materialData)
+void jRenderObject::SetLightProperty(const jShader* shader, const jCamera* camera, const std::list<const jLight*>& lights, jMaterialData* materialData)
 {
 	int ambient = 0;
 	int directional = 0;
 	int point = 0;
 	int spot = 0;
-	for (int i = 0; i < camera->LightList.size(); ++i)
+	for(auto light : lights)
 	{
-		auto light = camera->LightList[i];
 		switch (light->Type)
 		{
 		case ELightType::AMBIENT:
@@ -247,7 +246,7 @@ void jRenderObject::SetLightProperty(const jShader* shader, const jCamera* camer
 	if (!point)
 	{
 		auto materialParam = new jMaterialParam();
-		materialParam->Name = "shadow_object_point_array";
+		materialParam->Name = "shadow_object_point";
 		materialParam->Texture = jRenderTargetPool::GetNullTexture(ETextureType::TEXTURE_2D_ARRAY);
 		materialParam->Minification = ETextureFilter::LINEAR;
 		materialParam->Magnification = ETextureFilter::LINEAR;
@@ -256,7 +255,7 @@ void jRenderObject::SetLightProperty(const jShader* shader, const jCamera* camer
 	if (!spot)
 	{
 		auto materialParam = new jMaterialParam();
-		materialParam->Name = "shadow_object_spot_array";
+		materialParam->Name = "shadow_object_spot";
 		materialParam->Texture = jRenderTargetPool::GetNullTexture(ETextureType::TEXTURE_2D_ARRAY);
 		materialParam->Minification = ETextureFilter::LINEAR;
 		materialParam->Magnification = ETextureFilter::LINEAR;
@@ -264,42 +263,42 @@ void jRenderObject::SetLightProperty(const jShader* shader, const jCamera* camer
 	}
 }
 
-void jRenderObject::SetLightProperty(const jShader* shader, const jLight* light, jMaterialData* materialData)
-{
-	int ambient = 0;
-	int directional = 0;
-	int point = 0;
-	int spot = 0;
-	if (light)
-	{
-		switch (light->Type)
-		{
-		case ELightType::AMBIENT:
-			light->BindLight(shader, materialData);
-			ambient = 1;
-			break;
-		case ELightType::DIRECTIONAL:
-			light->BindLight(shader, materialData, directional);
-			++directional;
-			break;
-		case ELightType::POINT:
-			light->BindLight(shader, materialData, point);
-			++point;
-			break;
-		case ELightType::SPOT:
-			light->BindLight(shader, materialData, spot);
-			++spot;
-			break;
-		default:
-			break;
-		}
-	}
-
-	g_rhi->SetUniformbuffer(&jUniformBuffer<int>("UseAmbientLight", ambient), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<int>("NumOfDirectionalLight", directional), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<int>("NumOfPointLight", point), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<int>("NumOfSpotLight", spot), shader);
-}
+//void jRenderObject::SetLightProperty(const jShader* shader, const jLight* light, jMaterialData* materialData)
+//{
+//	int ambient = 0;
+//	int directional = 0;
+//	int point = 0;
+//	int spot = 0;
+//	if (light)
+//	{
+//		switch (light->Type)
+//		{
+//		case ELightType::AMBIENT:
+//			light->BindLight(shader, materialData);
+//			ambient = 1;
+//			break;
+//		case ELightType::DIRECTIONAL:
+//			light->BindLight(shader, materialData, directional);
+//			++directional;
+//			break;
+//		case ELightType::POINT:
+//			light->BindLight(shader, materialData, point);
+//			++point;
+//			break;
+//		case ELightType::SPOT:
+//			light->BindLight(shader, materialData, spot);
+//			++spot;
+//			break;
+//		default:
+//			break;
+//		}
+//	}
+//
+//	g_rhi->SetUniformbuffer(&jUniformBuffer<int>("UseAmbientLight", ambient), shader);
+//	g_rhi->SetUniformbuffer(&jUniformBuffer<int>("NumOfDirectionalLight", directional), shader);
+//	g_rhi->SetUniformbuffer(&jUniformBuffer<int>("NumOfPointLight", point), shader);
+//	g_rhi->SetUniformbuffer(&jUniformBuffer<int>("NumOfSpotLight", spot), shader);
+//}
 
 void jRenderObject::SetTextureProperty(const jShader* shader, jMaterialData* materialData)
 {

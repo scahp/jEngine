@@ -39,8 +39,8 @@ uniform int Collided;
 uniform sampler2D tex_object2;
 #endif // USE_TEXTURE
 
-uniform sampler2DArray shadow_object_point_array;
-uniform sampler2DArray shadow_object_spot_array;
+uniform sampler2D shadow_object_point;
+uniform sampler2D shadow_object_spot;
 uniform sampler2D shadow_object;
 uniform vec2 ShadowMapSize;
 uniform int UseTexture;

@@ -41,17 +41,18 @@ struct jDeepShadowMapBuffers
 // jPipelineData
 struct jPipelineData
 {
-	static const std::list<jObject*> emptyList;
+	static const std::list<jObject*> emptyObjectList;
+	//static const std::list<const jLight*> emptyLightList;
 	jPipelineData()
-		: Objects(emptyList)
+		: Objects(emptyObjectList)// , Lights(emptyLightList)
 	{ }
-	jPipelineData(const std::list<jObject*>& objects, const jCamera* camera, const jLight* light)
-		: Objects(objects), Camera(camera), Light(light)
+	jPipelineData(const std::list<jObject*>& objects, const jCamera* camera, const std::list<const jLight*>& lights)
+		: Objects(objects), Camera(camera), Lights(lights)
 	{ }
 
 	const std::list<jObject*>& Objects;
 	const jCamera* Camera = nullptr;
-	const jLight* Light = nullptr;
+	const std::list<const jLight*> Lights;
 };
 
 class IPipeline
@@ -69,6 +70,14 @@ protected:
 	jShader* Shader = nullptr;
 	Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
 	ERenderBufferType ClearType = ERenderBufferType::NONE;
+	bool EnableDepthTest = true;
+	EDepthStencilFunc DepthStencilFunc = EDepthStencilFunc::LEQUAL;
+	bool EnableBlend = false;
+	EBlendSrc BlendSrc = EBlendSrc::ONE;
+	EBlendDest BlendDest = EBlendDest::ONE_MINUS_SRC_ALPHA;
+	bool EnableDepthBias = true;
+	float DepthSlopeBias = 1.0f;
+	float DepthConstantBias = 1.0f;
 	std::vector<IBuffer*> Buffers;
 };
 
@@ -78,7 +87,7 @@ class jRenderPipeline : public IPipeline
 {
 public:
 	virtual void Do(const jPipelineData& pipelineData) override;
-	virtual void Draw(const std::list<jObject*>& objects, const jCamera* camera, const jLight* light) const;
+	virtual void Draw(const std::list<jObject*>& objects, const jShader* shader, const jCamera* camera, const std::list<const jLight*>& lights) const;
 };
 
 
@@ -93,7 +102,7 @@ public:
 	virtual void Setup() override;
 	virtual void Teardown() override {}
 
-	virtual void Draw(const std::list<jObject*>& objects, const jCamera* camera, const jLight* light) const override;
+	virtual void Draw(const std::list<jObject*>& objects, const jShader* shader, const jCamera* camera, const std::list<const jLight*>& lights) const override;
 
 private:
 	const jGBuffer* GBuffer = nullptr;
@@ -108,13 +117,35 @@ public:
 	{ }
 
 	virtual void Setup() override;
-	virtual void  Teardown() override {}
-	virtual void Draw(const std::list<jObject*>& objects, const jCamera* camera, const jLight* light) const override;
+	virtual void Teardown() override {}
+	virtual void Draw(const std::list<jObject*>& objects, const jShader* shader, const jCamera* camera, const std::list<const jLight*>& lights) const override;
 
 private:
 	jDeepShadowMapBuffers DeepShadowMapBuffers;
 };
 
+class jForwardShadowMap_SSM_Pipeline : public jRenderPipeline
+{
+public:
+	jForwardShadowMap_SSM_Pipeline() = default;
+
+	virtual void Setup() override;
+	virtual void Teardown() override;
+	virtual void Draw(const std::list<jObject*>& objects, const jShader* shader, const jCamera* camera, const std::list<const jLight*>& lights) const override;
+
+	jShader* ShadowGenShader = nullptr;
+	jShader* OmniShadowGenShader = nullptr;
+};
+
+class jForward_SSM_Pipeline : public jRenderPipeline
+{
+public:
+	jForward_SSM_Pipeline() = default;
+
+	virtual void Setup() override;
+	virtual void Teardown() override;
+	virtual void Draw(const std::list<jObject*>& objects, const jShader* shader, const jCamera* camera, const std::list<const jLight*>& lights) const override;
+};
 
 //////////////////////////////////////////////////////////////////////////
 // jComputePipeline
@@ -172,6 +203,7 @@ enum class EPipelineSetType
 {
 	None = 0,
 	DeepShadowMap,
+	Forward,
 	Max,
 };
 
@@ -182,13 +214,15 @@ public:
 	std::list<IPipeline*> ShadowPrePass;
 	std::list<IPipeline*> RenderPass;
 	std::list<IPipeline*> PostRenderPass;
-	std::list<IPipeline*> UiPass;
+	std::list<IPipeline*> UIPass;
 
 	virtual EPipelineSetType GetType() const { return EPipelineSetType::None; }
 	virtual void Setup() {}
 	virtual void Teardown() {}
 };
 
+//////////////////////////////////////////////////////////////////////////
+// jDeferredDeepShadowMapPipelineSet
 class jDeferredDeepShadowMapPipelineSet : public jPipelineSet
 {
 public:
@@ -202,4 +236,17 @@ public:
 
 	const jGBuffer* GBuffer = nullptr;
 	jDeepShadowMapBuffers DeepShadowMapBuffers;
+};
+
+//////////////////////////////////////////////////////////////////////////
+// jForwardPipelineSet
+class jForwardPipelineSet : public jPipelineSet
+{
+public:
+	jForwardPipelineSet() = default;
+
+	virtual EPipelineSetType GetType() const override { return EPipelineSetType::Forward; }
+
+	virtual void Setup() override;
+	virtual void Teardown() override;
 };

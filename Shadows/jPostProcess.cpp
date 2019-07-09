@@ -46,9 +46,9 @@ jFullscreenQuadPrimitive* IPostprocess::GetFullscreenQuad() const
 	return s_fullscreenQuad;
 }
 
-void IPostprocess::Draw(const jCamera* camera, const jShader* shader, const jLight* directionalLight) const
+void IPostprocess::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights) const
 {
-	GetFullscreenQuad()->Draw(camera, shader, directionalLight);
+	GetFullscreenQuad()->Draw(camera, shader, lights);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -115,7 +115,7 @@ bool jPostProcess_DeepShadowMap::Do(const jCamera* camera) const
 		JASSERT(GBuffer);
 		GBuffer->BindGeometryBuffer(deepShadowFull_Shader);
 
-		Draw(camera, deepShadowFull_Shader, camera->GetLight(ELightType::DIRECTIONAL));
+		Draw(camera, deepShadowFull_Shader, { camera->GetLight(ELightType::DIRECTIONAL) });
 	}
 
 	return true;
@@ -131,7 +131,7 @@ bool jPostProcess_AA_DeepShadowAddition::Do(const jCamera* camera) const
 	auto fullscreenQuad = GetFullscreenQuad();
 	if (!PostProcessInput.expired())
 		fullscreenQuad->SetTexture(PostProcessInput.lock()->RenderTaret->GetTexture());
-	fullscreenQuad->Draw(camera, Shader, nullptr);
+	fullscreenQuad->Draw(camera, Shader, {});
 	fullscreenQuad->SetTexture(nullptr);
 
 	return true;

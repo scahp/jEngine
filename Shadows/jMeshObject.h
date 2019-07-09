@@ -57,13 +57,12 @@ public:
 	std::vector<jSubMesh> SubMeshes;
 	jMeshNode* RootNode = nullptr;
 
-	virtual void Draw(const jCamera* camera, const jShader* shader) override;
-	virtual void Draw(const jCamera* camera, const jShader* shader, const jLight* light) override;
+	virtual void Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights) override;
 
 	void SetMaterialUniform(const jShader* shader, const jMeshMaterial* material);
 
-	void DrawNode(const jMeshNode* node, const jCamera* camera, const jShader* shader, const jLight* light);
-	void DrawSubMesh(int32 meshIndex, const jCamera* camera, const jShader* shader, const jLight* light);
+	void DrawNode(const jMeshNode* node, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights);
+	void DrawSubMesh(int32 meshIndex, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights);
 };
 
 class jHairObject : public jObject

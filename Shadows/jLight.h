@@ -21,6 +21,7 @@ class jDirectionalLight;
 class jPointLight;
 class jSpotLight;
 class jObject;
+class jLight;
 
 namespace jLightUtil
 {
@@ -85,6 +86,8 @@ namespace jLightUtil
 	static jShadowMapData* CreateShadowMap(const Vector& direction, const Vector& pos);
 }
 
+typedef std::function<void(const jRenderTarget*, int32, const jCamera*, const std::vector<jViewport>& viewports)> RenderToShadowMapFunc;
+
 class jLight
 {
 public:
@@ -104,6 +107,8 @@ public:
 	virtual void BindLight(const jShader* shader, jMaterialData* materialData, int32 index = 0) const {}
 	virtual jRenderTarget* GetShadowMapRenderTarget() const { return nullptr; }
 	virtual jCamera* GetLightCamra(int index = 0) const { return nullptr; }
+	virtual void RenderToShadowMap(const RenderToShadowMapFunc& func, const jShader* shader) const {}
+	virtual void Update(float deltaTime) { }
 
 	const ELightType Type = ELightType::MAX;
 	jObject* LightDebugObject = nullptr;
@@ -123,6 +128,7 @@ public:
 	LightData Data;
 	
 	virtual void BindLight(const jShader* shader, jMaterialData* materialData, int32 index = 0) const override;
+
 };
 
 class jDirectionalLight : public jLight
@@ -173,6 +179,10 @@ public:
 
 	jLightUtil::jShadowMapData* ShadowMapData = nullptr;
 	jTexture* GetShadowMap() const;
+
+	virtual void RenderToShadowMap(const RenderToShadowMapFunc& func, const jShader* shader) const override;
+	virtual void Update(float deltaTime) override;
+
 };
 
 class jPointLight : public jLight
@@ -223,6 +233,10 @@ public:
 	virtual jCamera* GetLightCamra(int index = 0) const;
 
 	jLightUtil::jShadowMapArrayData* ShadowMapData = nullptr;
+
+	virtual void RenderToShadowMap(const RenderToShadowMapFunc& func, const jShader* shader) const override;
+	virtual void Update(float deltaTime) override;
+
 };
 
 class jSpotLight : public jLight
@@ -277,5 +291,9 @@ public:
 	virtual jCamera* GetLightCamra(int index = 0) const;
 
 	jLightUtil::jShadowMapArrayData* ShadowMapData = nullptr;
+
+
+	virtual void RenderToShadowMap(const RenderToShadowMapFunc& func, const jShader* shader) const override;
+	virtual void Update(float deltaTime) override;
 
 };

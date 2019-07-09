@@ -5,19 +5,20 @@
 #include "jRenderTargetPool.h"
 #include "jCamera.h"
 #include "jRHI_OpenGL.h"
+#include "jObject.h"
 
 namespace jLightUtil
 {
 	jShadowMapData* CreateShadowMap(const Vector& direction, const Vector& pos)
 	{
 		//auto tempPos = Vector(100.0f) * direction;
-		auto tempPos = Vector(250.0f, 260.0f, 0.0f);
+		auto tempPos = Vector(350.0f, 360.0f, 100.0f);
 		const auto target = Vector::ZeroVector;
 		const auto up = tempPos + Vector(0.0f, 1.0f, 0.0f);
 
 		// todo remove constant variable
 		auto shadowMapData = new jShadowMapData("DirectionalLight");
-		shadowMapData->ShadowMapCamera = jCamera::CreateCamera(tempPos, target, up, 3.14f / 4.0f, 1.0f, 900.0f, SM_WIDTH, SM_HEIGHT, true);		// todo for deep shadow map. it should be replaced
+		shadowMapData->ShadowMapCamera = jCamera::CreateCamera(tempPos, target, up, 3.14f / 4.0f, 50.0f, 900.0f, SM_WIDTH, SM_HEIGHT, true);		// todo for deep shadow map. it should be replaced
 		// shadowMapData->ShadowMapCamera = jCamera::CreateCamera(tempPos, target, up, DegreeToRadian(90.0f), 1.0f, 900.0f, 100.0f, 100.0f, false);
 		shadowMapData->ShadowMapRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RG32F, EFormat::RG, EFormatType::FLOAT, SM_WIDTH, SM_HEIGHT, 1 });
 
@@ -37,7 +38,7 @@ namespace jLightUtil
 		shadowMapData->ShadowMapCamera[3] = jCamera::CreateCamera(pos, pos + Vector(0.0f, -1.0f, 0.0f), pos + Vector(0.0f, 0.0f, 1.0f), DegreeToRadian(90.0f), nearDist, farDist, SM_WIDTH, SM_HEIGHT, true);
 		shadowMapData->ShadowMapCamera[4] = jCamera::CreateCamera(pos, pos + Vector(0.0f, 0.0f, 1.0f), pos + Vector(0.0f, 1.0f, 0.0f), DegreeToRadian(90.0f), nearDist, farDist, SM_WIDTH, SM_HEIGHT, true);
 		shadowMapData->ShadowMapCamera[5] = jCamera::CreateCamera(pos, pos + Vector(0.0f, 0.0f, -1.0f), pos + Vector(0.0f, 1.0f, 0.0f), DegreeToRadian(90.0f), nearDist, farDist, SM_WIDTH, SM_HEIGHT, true);
-		shadowMapData->ShadowMapRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW, EFormat::RG32F, EFormat::RG, EFormatType::FLOAT, SM_WIDTH, SM_HEIGHT, 6 });
+		shadowMapData->ShadowMapRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW, EFormat::RG32F, EFormat::RG, EFormatType::FLOAT, SM_WIDTH, SM_HEIGHT * 6, 1 });
 
 		return shadowMapData;
 	}
@@ -184,6 +185,22 @@ jTexture* jDirectionalLight::GetShadowMap() const
 	return (ShadowMapData && ShadowMapData->ShadowMapRenderTarget) ? ShadowMapData->ShadowMapRenderTarget->GetTexture() : nullptr;
 }
 
+void jDirectionalLight::RenderToShadowMap(const RenderToShadowMapFunc& func, const jShader* shader) const
+{
+	JASSERT(ShadowMapData);
+	JASSERT(ShadowMapData->ShadowMapRenderTarget);
+	g_rhi->SetShader(shader);
+	const auto& renderTargetInfo = ShadowMapData->ShadowMapRenderTarget->Info;
+	std::vector<jViewport> viewports{ jViewport{0.0f, 0.0f, static_cast<float>(renderTargetInfo.Width), static_cast<float>(renderTargetInfo.Height)} };
+	func(ShadowMapData->ShadowMapRenderTarget, 0, ShadowMapData->ShadowMapCamera, viewports);
+}
+
+void jDirectionalLight::Update(float deltaTime)
+{
+	if (ShadowMapData && ShadowMapData->ShadowMapCamera)
+		ShadowMapData->ShadowMapCamera->UpdateCamera();
+}
+
 void jPointLight::BindLight(const jShader* shader, jMaterialData* materialData, int32 index /*= 0*/) const
 {
 	//if (!LightDataUniformBlock->Data || *static_cast<LightData*>(LightDataUniformBlock->Data) != Data)
@@ -229,7 +246,7 @@ void jPointLight::BindLight(const jShader* shader, jMaterialData* materialData, 
 		if (materialData)
 		{
 			auto materialParam = new jMaterialParam();
-			materialParam->Name = "shadow_object_point_array";
+			materialParam->Name = "shadow_object_point";
 			materialParam->Texture = static_cast<jTexture_OpenGL*>(ShadowMapData->ShadowMapRenderTarget->GetTexture());
 			materialParam->Minification = ETextureFilter::LINEAR;
 			materialParam->Magnification = ETextureFilter::LINEAR;
@@ -247,6 +264,37 @@ jCamera* jPointLight::GetLightCamra(int index /*= 0*/) const
 {
 	JASSERT(ShadowMapData && _countof(ShadowMapData->ShadowMapCamera) <= index);
 	return (ShadowMapData ? ShadowMapData->ShadowMapCamera[index] : nullptr);
+}
+
+void jPointLight::RenderToShadowMap(const RenderToShadowMapFunc& func, const jShader* shader) const
+{
+	JASSERT(ShadowMapData);
+	JASSERT(ShadowMapData->ShadowMapRenderTarget);
+	if (ShadowMapData)
+	{	
+		g_rhi->SetShader(shader);
+		char szTemp[128] = { 0, };
+		std::vector<jViewport> viewports;
+		viewports.reserve(6);
+		for (int i = 0; i < 6; ++i)
+		{
+			auto camera = ShadowMapData->ShadowMapCamera[i];
+			const auto vp = (camera->Projection * camera->View);
+			sprintf_s(szTemp, sizeof(szTemp), "OmniShadowMapVP[%d]", i);
+			g_rhi->SetUniformbuffer(&jUniformBuffer<Matrix>(szTemp, vp), shader);
+			viewports.push_back({ 0.0f, static_cast<float>(SM_HEIGHT * i), static_cast<float>(SM_WIDTH), static_cast<float>(SM_HEIGHT) });
+		}
+		func(ShadowMapData->ShadowMapRenderTarget, 0, ShadowMapData->ShadowMapCamera[0], viewports);
+	}
+}
+
+void jPointLight::Update(float deltaTime)
+{
+	if (ShadowMapData)
+	{
+		for (int32 i = 0; i < 6; ++i)
+			ShadowMapData->ShadowMapCamera[i]->UpdateCamera();
+	}
 }
 
 void jSpotLight::BindLight(const jShader* shader, jMaterialData* materialData, int32 index /*= 0*/) const
@@ -294,7 +342,7 @@ void jSpotLight::BindLight(const jShader* shader, jMaterialData* materialData, i
 		if (materialData)
 		{
 			auto materialParam = new jMaterialParam();
-			materialParam->Name = "shadow_object_spot_array";
+			materialParam->Name = "shadow_object_spot";
 			materialParam->Texture = static_cast<jTexture_OpenGL*>(ShadowMapData->ShadowMapRenderTarget->GetTexture());
 			materialParam->Minification = ETextureFilter::LINEAR;
 			materialParam->Magnification = ETextureFilter::LINEAR;
@@ -312,6 +360,37 @@ jCamera* jSpotLight::GetLightCamra(int index /*= 0*/) const
 {
 	JASSERT(ShadowMapData && _countof(ShadowMapData->ShadowMapCamera) <= index);
 	return (ShadowMapData ? ShadowMapData->ShadowMapCamera[index] : nullptr);
+}
+
+void jSpotLight::RenderToShadowMap(const RenderToShadowMapFunc& func, const jShader* shader) const
+{
+	JASSERT(ShadowMapData);
+	JASSERT(ShadowMapData->ShadowMapRenderTarget);
+	if (ShadowMapData)
+	{
+		g_rhi->SetShader(shader);
+		char szTemp[128] = { 0, };
+		std::vector<jViewport> viewports;
+		viewports.reserve(6);
+		for (int i = 0; i < 6; ++i)
+		{
+			auto camera = ShadowMapData->ShadowMapCamera[i];
+			const auto vp = (camera->Projection * camera->View);
+			sprintf_s(szTemp, sizeof(szTemp), "OmniShadowMapVP[%d]", i);
+			g_rhi->SetUniformbuffer(&jUniformBuffer<Matrix>(szTemp, vp), shader);
+			viewports.push_back({ 0.0f, static_cast<float>(SM_HEIGHT * i), static_cast<float>(SM_WIDTH), static_cast<float>(SM_HEIGHT) });
+		}
+		func(ShadowMapData->ShadowMapRenderTarget, 0, ShadowMapData->ShadowMapCamera[0], viewports);
+	}
+}
+
+void jSpotLight::Update(float deltaTime)
+{
+	if (ShadowMapData)
+	{
+		for (int32 i = 0; i < 6; ++i)
+			ShadowMapData->ShadowMapCamera[i]->UpdateCamera();
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////

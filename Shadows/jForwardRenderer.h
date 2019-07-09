@@ -6,11 +6,11 @@
 
 class jCamera;
 
-class jDeferredRenderer : public jRenderer
+class jForwardRenderer : public jRenderer
 {
 public:
-	jDeferredRenderer(const jRenderTargetInfo& geometryBufferInfo);
-	virtual ~jDeferredRenderer();
+	jForwardRenderer() = default;
+	virtual ~jForwardRenderer();
 
 	typedef void (*RenderPassFunc)(jCamera*);
 
@@ -23,10 +23,5 @@ public:
 	virtual void PostRenderPass(const jCamera* camera) override;
 
 	virtual void UpdateSettings() {}
-
-private:
-	jGBuffer GBuffer;
-	jRenderTargetInfo GeometryBufferInfo;
-
 };
 

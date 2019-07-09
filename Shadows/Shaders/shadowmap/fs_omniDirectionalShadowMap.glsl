@@ -1,4 +1,4 @@
-#version 330 core
+#version 430 core
 
 #include "common.glsl"
 
@@ -20,26 +20,27 @@ layout (std140) uniform SpotLightBlock
 	jSpotLight SpotLight[MAX_NUM_OF_SPOT_LIGHT];
 };
 
-in vec3 Pos_;
+in vec4 fragPos_;
+out vec4 color;
 
 void main()
 {
     if (NumOfPointLight > 0)
     {
-        vec3 lightDir = Pos_ - PointLight[0].LightPos;
+        vec3 lightDir = fragPos_.xyz - PointLight[0].LightPos;
 
         float dist = dot(lightDir.xyz, lightDir.xyz);
-        gl_FragData[0].x = dist;
-        gl_FragData[0].y = sqrt(dist);
-        gl_FragData[0].w = 1.0;
+		color.x = dist;
+		color.y = sqrt(dist);
+		color.w = 1.0;
     }
     else if (NumOfSpotLight > 0)
     {
-        vec3 lightDir = Pos_ - SpotLight[0].LightPos;
+        vec3 lightDir = fragPos_.xyz - SpotLight[0].LightPos;
 
         float dist = dot(lightDir.xyz, lightDir.xyz);
-        gl_FragData[0].x = dist;
-        gl_FragData[0].y = sqrt(dist);
-        gl_FragData[0].w = 1.0;
+        color.x = dist;
+        color.y = sqrt(dist);
+        color.w = 1.0;
     }
 }

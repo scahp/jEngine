@@ -37,6 +37,7 @@ public:
 	void CloseFile();
 	const char* GetBuffer(unsigned int index = 0, unsigned int count = 0) const;
 	bool GetBuffer(FILE_BUFFER& outBuffer, const char* startToken, const char* endToken);
+	bool IsBufferEmpty() const { return m_buffer.empty(); }
 
 private:
 	FILE* m_fp;

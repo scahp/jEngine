@@ -110,8 +110,9 @@ void jShadowVolumeRenderer::RenderPass(const jCamera* camera)
 	g_rhi->SetColorMask(true, true, true, true);
 
 	const_cast<jCamera*>(camera)->UseAmbient = true;			// todo remove
-	for (auto& iter : g_StaticObjectArray)
-		iter->Draw(camera, ambientShader, camera->Ambient);
+	const auto& staticObjects = jObject::GetStaticObject();
+	for (auto& iter : staticObjects)
+		iter->Draw(camera, ambientShader, { camera->Ambient });
 
 	//////////////////////////////////////////////////////////////////
 	// 2. Stencil volume update & rendering (z-fail)
@@ -171,13 +172,14 @@ void jShadowVolumeRenderer::RenderPass(const jCamera* camera)
 			glEnable(GL_POLYGON_OFFSET_FILL);
 			glPolygonOffset(0.0f, 100.0f);
 
-			for (auto& iter : g_StaticObjectArray)
+			const auto& staticObjects = jObject::GetStaticObject();
+			for (auto& iter : staticObjects)
 			{
 				if (CanSkipShadowObject(camera, iter, lightPos, lightDirection, light))
 					continue;
 				
 				iter->ShadowVolume->Update(lightDirection, lightPos, iter);
-				iter->ShadowVolume->QuadObject->Draw(camera, ShadowVolumeInfinityFarShader, light);
+				iter->ShadowVolume->QuadObject->Draw(camera, ShadowVolumeInfinityFarShader, { light });
 			}
 
 			// todo
@@ -198,8 +200,9 @@ void jShadowVolumeRenderer::RenderPass(const jCamera* camera)
 		g_rhi->SetDepthFunc(EDepthStencilFunc::EQUAL);
 		g_rhi->SetBlendFunc(EBlendSrc::ONE, EBlendDest::ONE);
 
-		for (auto& iter : g_StaticObjectArray)
-			iter->Draw(camera, shadowVolumeBaseShader, light);
+		const auto& staticObjects = jObject::GetStaticObject();
+		for (auto& iter : staticObjects)
+			iter->Draw(camera, shadowVolumeBaseShader, {light});
 	}
 	const_cast<jCamera*>(camera)->UseAmbient = true;			// todo remove
 
@@ -250,7 +253,8 @@ void jShadowVolumeRenderer::DebugRenderPass(const jCamera* camera)
 		if (skip)
 			continue;
 
-		for (auto& iter : g_StaticObjectArray)
+		const auto& staticObjects = jObject::GetStaticObject();
+		for (auto& iter : staticObjects)
 		{
 			if (CanSkipShadowObject(camera, iter, lightPos, lightDirection, light))
 				continue;
@@ -259,9 +263,9 @@ void jShadowVolumeRenderer::DebugRenderPass(const jCamera* camera)
 
 			iter->ShadowVolume->Update(lightDirection, lightPos, iter);
 			if (iter->ShadowVolume->EdgeObject)
-				iter->ShadowVolume->EdgeObject->Draw(camera, ShadowVolumeInfinityFarShader, light);
+				iter->ShadowVolume->EdgeObject->Draw(camera, ShadowVolumeInfinityFarShader, {light});
 			if (iter->ShadowVolume->QuadObject)
-				iter->ShadowVolume->QuadObject->Draw(camera, ShadowVolumeInfinityFarShader, light);
+				iter->ShadowVolume->QuadObject->Draw(camera, ShadowVolumeInfinityFarShader, {light});
 		}
 	}
 
@@ -289,7 +293,7 @@ void jShadowVolumeRenderer::DebugRenderPass(const jCamera* camera)
 			if (iter->Type == ELightType::SPOT && !ShowSpotLightInfo)
 				continue;
 
-			iter->LightDebugObject->Draw(camera, texShader, nullptr);
+			iter->LightDebugObject->Draw(camera, texShader, {});
 		}
 	}
 

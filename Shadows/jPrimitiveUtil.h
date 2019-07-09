@@ -47,7 +47,7 @@ public:
 	Vector2 Pos;
 	Vector2 Size;
 
-	virtual void Draw(const jCamera* camera, const jShader* shader, const jLight* light) override;
+	virtual void Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights) override;
 
 	void SetUniformParams(const jShader* shader);
 
@@ -59,8 +59,7 @@ public:
 	bool IsVertical = true;
 	float MaxDist = 0.0f;
 
-	virtual void Draw(const jCamera* camera, const jShader* shader) override;
-	virtual void Draw(const jCamera* camera, const jShader* shader, const jLight* light) override;
+	virtual void Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights) override;
 	void SetUniformBuffer(const jShader* shader);
 	void SetTexture(const jTexture* texture);
 };
@@ -79,8 +78,7 @@ struct jBoundSphere
 class jBoundBoxObject : public jObject
 {
 public:
-	virtual void Draw(const jCamera* camera, const jShader* shader) override;
-	virtual void Draw(const jCamera* camera, const jShader* shader, const jLight* light) override;
+	virtual void Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights) override;
 	void SetUniformBuffer(const jShader* shader);
 
 	Vector4 Color = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
@@ -91,8 +89,7 @@ public:
 class jBoundSphereObject : public jObject
 {
 public:
-	virtual void Draw(const jCamera* camera, const jShader* shader) override;
-	virtual void Draw(const jCamera* camera, const jShader* shader, const jLight* light) override;
+	virtual void Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights) override;
 	void SetUniformBuffer(const jShader* shader);
 
 	Vector4 Color = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
@@ -130,8 +127,7 @@ class jArrowSegmentPrimitive : public jObject
 {
 public:
 	virtual void Update(float deltaTime) override;
-	virtual void Draw(const jCamera* camera, const jShader* shader) override;
-	virtual void Draw(const jCamera* camera, const jShader* shader, const jLight* light) override;
+	virtual void Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights) override;
 
 	void SetPos(const Vector& pos);
 	void SetStart(const Vector& start);
@@ -146,8 +142,7 @@ class jDirectionalLightPrimitive : public jObject
 {
 public:
 	virtual void Update(float deltaTime) override;
-	virtual void Draw(const jCamera* camera, const jShader* shader) override;
-	virtual void Draw(const jCamera* camera, const jShader* shader, const jLight* light) override;
+	virtual void Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights) override;
 
 	jBillboardQuadPrimitive* BillboardObject = nullptr;
 	jArrowSegmentPrimitive* ArrowSegementObject = nullptr;
@@ -159,8 +154,7 @@ class jPointLightPrimitive : public jObject
 {
 public:
 	virtual void Update(float deltaTime) override;
-	virtual void Draw(const jCamera* camera, const jShader* shader) override;
-	virtual void Draw(const jCamera* camera, const jShader* shader, const jLight* light) override;
+	virtual void Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights) override;
 
 	jBillboardQuadPrimitive* BillboardObject = nullptr;
 	jObject* SphereObject = nullptr;
@@ -171,8 +165,7 @@ class jSpotLightPrimitive : public jObject
 {
 public:
 	virtual void Update(float deltaTime) override;
-	virtual void Draw(const jCamera* camera, const jShader* shader) override;
-	virtual void Draw(const jCamera* camera, const jShader* shader, const jLight* light) override;
+	virtual void Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights) override;
 
 	jBillboardQuadPrimitive* BillboardObject = nullptr;
 	jConePrimitive* UmbraConeObject = nullptr;

@@ -33,10 +33,10 @@ void jBillboardQuadPrimitive::Update(float deltaTime)
 	}
 }
 
-void jUIQuadPrimitive::Draw(const jCamera* camera, const jShader* shader, const jLight* light)
+void jUIQuadPrimitive::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights)
 {
 	SetUniformParams(shader);
-	__super::Draw(camera, shader, light);
+	__super::Draw(camera, shader, lights);
 }
 
 void jUIQuadPrimitive::SetUniformParams(const jShader* shader)
@@ -51,16 +51,10 @@ void jUIQuadPrimitive::SetUniformParams(const jShader* shader)
 	g_rhi->SetUniformbuffer(&temp3, shader);
 }
 
-void jFullscreenQuadPrimitive::Draw(const jCamera* camera, const jShader* shader)
+void jFullscreenQuadPrimitive::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights)
 {
 	SetUniformBuffer(shader);
-	__super::Draw(camera, shader);
-}
-
-void jFullscreenQuadPrimitive::Draw(const jCamera* camera, const jShader* shader, const jLight* light)
-{
-	SetUniformBuffer(shader);
-	__super::Draw(camera, shader, light);
+	__super::Draw(camera, shader, lights);
 }
 
 void jFullscreenQuadPrimitive::SetUniformBuffer(const jShader* shader)
@@ -80,14 +74,9 @@ void jFullscreenQuadPrimitive::SetTexture(const jTexture* texture)
 	RenderObject->tex_object = texture;
 }
 
-void jBoundBoxObject::Draw(const jCamera* camera, const jShader* shader)
+void jBoundBoxObject::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights)
 {
-	__super::Draw(camera, shader);
-}
-
-void jBoundBoxObject::Draw(const jCamera* camera, const jShader* shader, const jLight* light)
-{
-	__super::Draw(camera, shader, light);
+	__super::Draw(camera, shader, lights);
 }
 
 void jBoundBoxObject::SetUniformBuffer(const jShader* shader)
@@ -98,14 +87,9 @@ void jBoundBoxObject::SetUniformBuffer(const jShader* shader)
 	g_rhi->SetUniformbuffer(&colorData, shader);
 }
 
-void jBoundSphereObject::Draw(const jCamera* camera, const jShader* shader)
+void jBoundSphereObject::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights)
 {
-	__super::Draw(camera, shader);
-}
-
-void jBoundSphereObject::Draw(const jCamera* camera, const jShader* shader, const jLight* light)
-{
-	__super::Draw(camera, shader, light);
+	__super::Draw(camera, shader, lights);
 }
 
 void jBoundSphereObject::SetUniformBuffer(const jShader* shader)
@@ -126,24 +110,14 @@ void jArrowSegmentPrimitive::Update(float deltaTime)
 		ConeObject->Update(deltaTime);
 }
 
-void jArrowSegmentPrimitive::Draw(const jCamera* camera, const jShader* shader)
+void jArrowSegmentPrimitive::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights)
 {
-	__super::Draw(camera, shader);
+	__super::Draw(camera, shader, lights);
 
 	if (SegmentObject)
-		SegmentObject->Draw(camera, shader);
+		SegmentObject->Draw(camera, shader, lights);
 	if (ConeObject)
-		ConeObject->Draw(camera, shader);
-}
-
-void jArrowSegmentPrimitive::Draw(const jCamera* camera, const jShader* shader, const jLight* light)
-{
-	__super::Draw(camera, shader, light);
-
-	if (SegmentObject)
-		SegmentObject->Draw(camera, shader, light);
-	if (ConeObject)
-		ConeObject->Draw(camera, shader, light);
+		ConeObject->Draw(camera, shader, lights);
 }
 
 
@@ -1670,24 +1644,15 @@ void jDirectionalLightPrimitive::Update(float deltaTime)
 		ArrowSegementObject->Update(deltaTime);
 }
 
-void jDirectionalLightPrimitive::Draw(const jCamera* camera, const jShader* shader)
+
+void jDirectionalLightPrimitive::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights)
 {
-	__super::Draw(camera, shader);
+	__super::Draw(camera, shader, lights);
 
 	if (BillboardObject)
-		BillboardObject->Draw(camera, shader);
+		BillboardObject->Draw(camera, shader, lights);
 	if (ArrowSegementObject)
-		ArrowSegementObject->Draw(camera, shader);
-}
-
-void jDirectionalLightPrimitive::Draw(const jCamera* camera, const jShader* shader, const jLight* light)
-{
-	__super::Draw(camera, shader, light);
-
-	if (BillboardObject)
-		BillboardObject->Draw(camera, shader, light);
-	if (ArrowSegementObject)
-		ArrowSegementObject->Draw(camera, shader, light);
+		ArrowSegementObject->Draw(camera, shader, lights);
 }
 
 void jSegmentPrimitive::UpdateSegment()
@@ -1734,18 +1699,11 @@ void jPointLightPrimitive::Update(float deltaTime)
 	SphereObject->Update(deltaTime);
 }
 
-void jPointLightPrimitive::Draw(const jCamera* camera, const jShader* shader)
+void jPointLightPrimitive::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights)
 {
-	__super::Draw(camera, shader);
-	BillboardObject->Draw(camera, shader);
-	SphereObject->Draw(camera, shader);
-}
-
-void jPointLightPrimitive::Draw(const jCamera* camera, const jShader* shader, const jLight* light)
-{
-	__super::Draw(camera, shader, light);
-	BillboardObject->Draw(camera, shader, light);
-	SphereObject->Draw(camera, shader, light);
+	__super::Draw(camera, shader, lights);
+	BillboardObject->Draw(camera, shader, lights);
+	SphereObject->Draw(camera, shader, lights);
 }
 
 void jSpotLightPrimitive::Update(float deltaTime)
@@ -1756,18 +1714,10 @@ void jSpotLightPrimitive::Update(float deltaTime)
 	PenumbraConeObject->Update(deltaTime);
 }
 
-void jSpotLightPrimitive::Draw(const jCamera* camera, const jShader* shader)
+void jSpotLightPrimitive::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights)
 {
-	__super::Draw(camera, shader);
-	BillboardObject->Draw(camera, shader);
-	UmbraConeObject->Draw(camera, shader);
-	PenumbraConeObject->Draw(camera, shader);
-}
-
-void jSpotLightPrimitive::Draw(const jCamera* camera, const jShader* shader, const jLight* light)
-{
-	__super::Draw(camera, shader, light);
-	BillboardObject->Draw(camera, shader, light);
-	UmbraConeObject->Draw(camera, shader, light);
-	PenumbraConeObject->Draw(camera, shader, light);
+	__super::Draw(camera, shader, lights);
+	BillboardObject->Draw(camera, shader, lights);
+	UmbraConeObject->Draw(camera, shader, lights);
+	PenumbraConeObject->Draw(camera, shader, lights);
 }

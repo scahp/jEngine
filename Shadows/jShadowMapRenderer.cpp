@@ -80,11 +80,9 @@ void jShadowMapRenderer::ShadowPrePass(const jCamera* camera)
 			g_rhi->SetClearColor(maxDist, maxDistSquare, 0.0f, 1.0f);
 			g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
 
-			for (auto& iter : g_StaticObjectArray)
-			{
-				if (!iter->SkipShadowMapGen)
-					iter->Draw(directionalLight->ShadowMapData->ShadowMapCamera, ShadowGenShader, light);
-			}
+			const auto& shadowCasterObjects = jObject::GetShadowCasterObject();
+			for (auto& iter : shadowCasterObjects)
+				iter->Draw(directionalLight->ShadowMapData->ShadowMapCamera, ShadowGenShader, { light });
 			break;
 		}
 		case ELightType::POINT:
@@ -103,11 +101,9 @@ void jShadowMapRenderer::ShadowPrePass(const jCamera* camera)
 				g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 				g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
 
-				for (auto& iter : g_StaticObjectArray)
-				{
-					if (!iter->SkipShadowMapGen)
-						iter->Draw(pointLight->ShadowMapData->ShadowMapCamera[i], ShadowGenOmniShader, light);
-				}
+				const auto& shadowCasterObjects = jObject::GetShadowCasterObject();
+				for (auto& iter : shadowCasterObjects)
+					iter->Draw(pointLight->ShadowMapData->ShadowMapCamera[i], ShadowGenOmniShader, { light });
 			}
 			break;
 		}
@@ -127,11 +123,9 @@ void jShadowMapRenderer::ShadowPrePass(const jCamera* camera)
 				g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 				g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
 				
-				for (auto& iter : g_StaticObjectArray)
-				{
-					if (!iter->SkipShadowMapGen)
-						iter->Draw(spotLight->ShadowMapData->ShadowMapCamera[i], ShadowGenOmniShader, light);
-				}
+				const auto& shadowCasterObjects = jObject::GetShadowCasterObject();
+				for (auto& iter : shadowCasterObjects)
+					iter->Draw(spotLight->ShadowMapData->ShadowMapCamera[i], ShadowGenOmniShader, { light });
 			}
 			break;
 		}
@@ -163,7 +157,7 @@ void jShadowMapRenderer::ShadowPrePass(const jCamera* camera)
 				g_rhi->SetClear(MakeRenderBufferTypeList({ERenderBufferType::COLOR, ERenderBufferType::DEPTH}));
 				FullscreenQuadPrimitive->IsVertical = true;
 				FullscreenQuadPrimitive->RenderObject->tex_object = direcitonalLight->ShadowMapData->ShadowMapRenderTarget->GetTexture();
-				FullscreenQuadPrimitive->Draw(camera, BlurShader, light);
+				FullscreenQuadPrimitive->Draw(camera, BlurShader, { light });
 				// 원본 텍스쳐 -> 임시 텍스쳐
 
 				// horizontal
@@ -172,7 +166,7 @@ void jShadowMapRenderer::ShadowPrePass(const jCamera* camera)
 				g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
 				FullscreenQuadPrimitive->IsVertical = false;
 				FullscreenQuadPrimitive->RenderObject->tex_object = vsmBlurRenderTarget->GetTexture();
-				FullscreenQuadPrimitive->Draw(camera, BlurShader, light);
+				FullscreenQuadPrimitive->Draw(camera, BlurShader, { light });
 				// 임시 텍스쳐 -> 원본 텍스쳐
 			}
 			//////////////////////
@@ -197,7 +191,7 @@ void jShadowMapRenderer::ShadowPrePass(const jCamera* camera)
 				g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
 				FullscreenQuadPrimitive->IsVertical = true;
 				FullscreenQuadPrimitive->RenderObject->tex_object_array = pointLight->ShadowMapData->ShadowMapRenderTarget->GetTexture();
-				FullscreenQuadPrimitive->Draw(camera, BlurOmniShader, nullptr);
+				FullscreenQuadPrimitive->Draw(camera, BlurOmniShader, {});
 
 				// horizontal
 				g_rhi->SetRenderTarget(pointLight->ShadowMapData->ShadowMapRenderTarget, 0, true);
@@ -206,7 +200,7 @@ void jShadowMapRenderer::ShadowPrePass(const jCamera* camera)
 				g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
 				FullscreenQuadPrimitive->IsVertical = false;
 				FullscreenQuadPrimitive->RenderObject->tex_object_array = vsmTexArrayBlurRenderTarget->GetTexture();
-				FullscreenQuadPrimitive->Draw(camera, BlurOmniShader, nullptr);
+				FullscreenQuadPrimitive->Draw(camera, BlurOmniShader, {});
 			}
 			////////////////////
 
@@ -224,7 +218,7 @@ void jShadowMapRenderer::ShadowPrePass(const jCamera* camera)
 				g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
 				FullscreenQuadPrimitive->IsVertical = true;
 				FullscreenQuadPrimitive->RenderObject->tex_object_array = spotLight->ShadowMapData->ShadowMapRenderTarget->GetTexture();
-				FullscreenQuadPrimitive->Draw(camera, BlurOmniShader, nullptr);
+				FullscreenQuadPrimitive->Draw(camera, BlurOmniShader, {});
 
 				// horizontal
 				g_rhi->SetRenderTarget(spotLight->ShadowMapData->ShadowMapRenderTarget, 0, true);
@@ -233,7 +227,7 @@ void jShadowMapRenderer::ShadowPrePass(const jCamera* camera)
 				g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
 				FullscreenQuadPrimitive->IsVertical = false;
 				FullscreenQuadPrimitive->RenderObject->tex_object_array = vsmTexArrayBlurRenderTarget->GetTexture();
-				FullscreenQuadPrimitive->Draw(camera, BlurOmniShader, nullptr);
+				FullscreenQuadPrimitive->Draw(camera, BlurOmniShader, {});
 			}
 			////////////////////
 
@@ -291,7 +285,10 @@ void jShadowMapRenderer::RenderPass(const jCamera* camera)
 
 	// 2. Light pass
 	g_rhi->SetBlendFunc(EBlendSrc::ONE, EBlendDest::ZERO);
-	for (auto& iter : g_StaticObjectArray)
+	std::list<const jLight*> lights;
+	lights.insert(lights.end(), camera->LightList.begin(), camera->LightList.end());
+	const auto& staticObjects = jObject::GetStaticObject();
+	for (auto& iter : staticObjects)
 	{
 		//if (iter->RenderObject->tex_object2/* || obj.material*/)
 		//{
@@ -334,13 +331,13 @@ void jShadowMapRenderer::RenderPass(const jCamera* camera)
 		//}
 		//else
 		{
-			iter->Draw(camera, baseShader);
+			iter->Draw(camera, baseShader, lights);
 		}
 	}
 
 	for (auto& iter : g_HairObjectArray)
 	{
-		iter->Draw(camera, Hair_Shader);
+		iter->Draw(camera, Hair_Shader, lights);
 	}
 
 //	// 3. Transparent object render
@@ -373,7 +370,7 @@ void jShadowMapRenderer::UIPass(const jCamera* camera)
 		{
 			if (!ShadowMapDebugQuad)
 				ShadowMapDebugQuad = jPrimitiveUtil::CreateUIQuad(Vector2(10.0f, 10.0f), Vector2(120.0f, 120.0f), directionalLight->ShadowMapData->ShadowMapRenderTarget->GetTexture());
-			ShadowMapDebugQuad->Draw(camera, UIShader, directionalLight);
+			ShadowMapDebugQuad->Draw(camera, UIShader, { directionalLight });
 		}
 	}
 }
@@ -384,89 +381,108 @@ void jShadowMapRenderer::Setup()
 	FullscreenQuadPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
 
 	// Blur
+	Blur.name = "Blur";
 	Blur.vs = "shaders/fullscreen/vs_blur.glsl";
 	Blur.fs = "shaders/fullscreen/fs_blur.glsl";
 	BlurShader = jShader::CreateShader(Blur);
 
+	BlurOmni.name = "BlurOmni";
 	BlurOmni.vs = "shaders/fullscreen/vs_omnidirectional_blur.glsl";
 	BlurOmni.fs = "shaders/fullscreen/fs_omnidirectional_blur.glsl";
 	BlurOmniShader = jShader::CreateShader(BlurOmni);
 
 	// Shadow
+	PCF_Poisson.name = "PCF_Poisson";
 	PCF_Poisson.vs = "shaders/shadowmap/vs.glsl";
 	PCF_Poisson.fs = "shaders/shadowmap/fs.glsl";
 	PCF_Poisson.fsPreProcessor = "#define USE_PCF 1\r\n#define USE_POISSON_SAMPLE 1";
 	PCF_Poisson_Shader = jShader::CreateShader(PCF_Poisson);
 
+	PCF.name = "PCF";
 	PCF.vs = "shaders/shadowmap/vs.glsl";
 	PCF.fs = "shaders/shadowmap/fs.glsl";
 	PCF.fsPreProcessor = "#define USE_PCF 1\r\n#define USE_TEXTURE";
 	PCF_Shader = jShader::CreateShader(PCF);
 
+	PCSS_Poisson.name = "PCSS_Poisson";
 	PCSS_Poisson.vs = "shaders/shadowmap/vs.glsl";
 	PCSS_Poisson.fs = "shaders/shadowmap/fs.glsl";
 	PCSS_Poisson.fsPreProcessor = "#define USE_PCSS 1\r\n#define USE_POISSON_SAMPLE 1\r\n#define USE_TEXTURE";
 	PCSS_Poisson_Shader = jShader::CreateShader(PCSS_Poisson);
 
+	PCSS.name = "PCSS";
 	PCSS.vs = "shaders/shadowmap/vs.glsl";
 	PCSS.fs = "shaders/shadowmap/fs.glsl";
 	PCSS.fsPreProcessor = "#define USE_PCSS 1\r\n#define USE_TEXTURE";
 	PCSS_Shader = jShader::CreateShader(PCSS);
 
+	VSM.name = "VSM";
 	VSM.vs = "shaders/shadowmap/vs.glsl";
 	VSM.fs = "shaders/shadowmap/fs.glsl";
 	VSM.fsPreProcessor = "#define USE_VSM 1\r\n#define USE_TEXTURE";
 	VSM_Shader = jShader::CreateShader(VSM);
 
+	ESM.name = "ESM";
 	ESM.vs = "shaders/shadowmap/vs.glsl";
 	ESM.fs = "shaders/shadowmap/fs.glsl";
 	ESM.fsPreProcessor = "#define USE_ESM 1\r\n#define USE_TEXTURE";
 	ESM_Shader = jShader::CreateShader(ESM);
 
+	EVSM.name = "EVSM";
 	EVSM.vs = "shaders/shadowmap/vs.glsl";
 	EVSM.fs = "shaders/shadowmap/fs.glsl";
 	EVSM.fsPreProcessor = "#define USE_EVSM 1\r\n#define USE_TEXTURE";
 	EVSM_Shader = jShader::CreateShader(EVSM);
 
+	SSM.name = "SSM";
 	SSM.vs = "shaders/shadowmap/vs.glsl";
 	SSM.fs = "shaders/shadowmap/fs.glsl";
 	SSM.vsPreProcessor = "#define USE_TEXTURE 1\r\n#define USE_MATERIAL 1";
 	SSM.fsPreProcessor = "#define USE_TEXTURE 1\r\n#define USE_MATERIAL 1";
 	SSM_Shader = jShader::CreateShader(SSM);
 
+	Hair.name = "Hair";
 	Hair.vs = "shaders/shadowmap/vs_hair.glsl";
 	Hair.fs = "shaders/shadowmap/fs_hair.glsl";
 	Hair_Shader = jShader::CreateShader(Hair);
 
 	// Shadow Gen
+	ShadowGen_VSM.name = "ShadowGen_VSM";
 	ShadowGen_VSM.vs = "shaders/shadowmap/vs_varianceShadowMap.glsl";
 	ShadowGen_VSM.fs = "shaders/shadowmap/fs_varianceShadowMap.glsl";
 	ShadowGen_VSM_Shader = jShader::CreateShader(ShadowGen_VSM);
 
+	ShadowGen_ESM.name = "ShadowGen_ESM";
 	ShadowGen_ESM.vs = "shaders/shadowmap/vs_omniDirectionalShadowMap.glsl";
 	ShadowGen_ESM.fs = "shaders/shadowmap/fs_exponentialShadowMap.glsl";
 	ShadowGen_ESM_Shader = jShader::CreateShader(ShadowGen_ESM);
 
+	ShadowGen_EVSM.name = "ShadowGen_EVSM";
 	ShadowGen_EVSM.vs = "shaders/shadowmap/vs_EVSM.glsl";
 	ShadowGen_EVSM.fs = "shaders/shadowmap/fs_EVSM.glsl";
 	ShadowGen_EVSM_Shader = jShader::CreateShader(ShadowGen_EVSM);
 
+	ShadowGen_SSM.name = "ShadowGen_SSM";
 	ShadowGen_SSM.vs = "shaders/shadowmap/vs_shadowMap.glsl";
 	ShadowGen_SSM.fs = "shaders/shadowmap/fs_shadowMap.glsl";
 	ShadowGen_SSM_Shader = jShader::CreateShader(ShadowGen_SSM);
 
+	ShadowGen_Omni_ESM.name = "ShadowGen_Omni_ESM";
 	ShadowGen_Omni_ESM.vs = "shaders/shadowmap/vs_omniDirectionalShadowMap.glsl";
 	ShadowGen_Omni_ESM.fs = "shaders/shadowmap/fs_omniDirectionalExponentialShadowMap.glsl";
 	ShadowGen_Omni_ESM_Shader = jShader::CreateShader(ShadowGen_Omni_ESM);
 
+	ShadowGen_Omni_EVSM.name = "ShadowGen_Omni_EVSM";
 	ShadowGen_Omni_EVSM.vs = "shaders/shadowmap/vs_omniDirectionalShadowMap.glsl";
 	ShadowGen_Omni_EVSM.fs = "shaders/shadowmap/fs_omniDirectionalEVSM.glsl";
 	ShadowGen_Omni_EVSM_Shader = jShader::CreateShader(ShadowGen_Omni_EVSM);
 
+	ShadowGen_Omni_SSM.name = "ShadowGen_Omni_SSM";
 	ShadowGen_Omni_SSM.vs = "shaders/shadowmap/vs_omniDirectionalShadowMap.glsl";
 	ShadowGen_Omni_SSM.fs = "shaders/shadowmap/fs_omniDirectionalShadowMap.glsl";
 	ShadowGen_Omni_SSM_Shader = jShader::CreateShader(ShadowGen_Omni_SSM);
 
+	UIShadowInfo.name = "UI";
 	UIShadowInfo.vs = "Shaders/tex_ui_vs.glsl";
 	UIShadowInfo.fs = "Shaders/tex_ui_fs.glsl";
 	UIShader = jShader::CreateShader(UIShadowInfo);
@@ -511,7 +527,7 @@ void jShadowMapRenderer::DebugRenderPass(const jCamera* camera)
 			if (iter->Type == ELightType::SPOT && !ShowSpotLightInfo)
 				continue;
 
-			iter->LightDebugObject->Draw(camera, texShader, nullptr);
+			iter->LightDebugObject->Draw(camera, texShader, {});
 		}
 	}
 	g_rhi->EnableBlend(false);
