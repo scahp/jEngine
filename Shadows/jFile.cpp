@@ -77,7 +77,8 @@ size_t jFile::ReadFileToBuffer(bool appendToEndofBuffer/* = true*/, unsigned int
 		fseek(m_fp, index, SEEK_SET);
 
 		readSize += fread(&m_buffer[writeStartIndex], sizeof(ELEMENT_TYPE), count, m_fp);
-		m_buffer[count] = 0;
+		m_buffer.resize(readSize + 1);
+		m_buffer[readSize] = 0;
 	}
 
 	return readSize;

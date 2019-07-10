@@ -68,6 +68,21 @@ struct jShader
 	static jShader* CreateShader(const jShaderInfo& shaderInfo);
 };
 
+#define CREATE_SHADER_VS_FS_WITH_OPTION_MORE(Name, VS, FS, IsUseTexture, IsUseMaterial, MoreOption) \
+{ \
+jShaderInfo info; \
+info.name = Name; \
+info.vs = VS; \
+info.fs = FS; \
+info.vsPreProcessor += IsUseTexture ? "#define USE_TEXTURE 1" : "";\
+info.vsPreProcessor += IsUseMaterial ? "\r\n#define USE_MATERIAL 1" : "";\
+info.vsPreProcessor += "\r\n"MoreOption;\
+info.fsPreProcessor += IsUseTexture ? "#define USE_TEXTURE 1" : "";\
+info.fsPreProcessor += IsUseMaterial ? "\r\n#define USE_MATERIAL 1" : "";\
+info.fsPreProcessor += "\r\n"MoreOption;\
+jShader::CreateShader(info); \
+}
+
 #define CREATE_SHADER_VS_FS_WITH_OPTION(Name, VS, FS, IsUseTexture, IsUseMaterial) \
 { \
 jShaderInfo info; \
@@ -80,6 +95,7 @@ info.fsPreProcessor += IsUseTexture ? "#define USE_TEXTURE 1" : "";\
 info.fsPreProcessor += IsUseMaterial ? "\r\n#define USE_MATERIAL 1" : "";\
 jShader::CreateShader(info); \
 }
+
 
 #define CREATE_SHADER_VS_FS(Name, VS, FS) CREATE_SHADER_VS_FS_WITH_OPTION(Name, VS, FS, false, false)
 

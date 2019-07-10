@@ -107,6 +107,11 @@ void jGame::Setup()
 	CREATE_SHADER_VS_GS_FS("ShadowGen_Omni_SSM", "shaders/shadowmap/vs_omniDirectionalShadowMap.glsl", "shaders/shadowmap/gs_omniDirectionalShadowMap.glsl", "shaders/shadowmap/fs_omniDirectionalShadowMap.glsl");
 	//CREATE_SHADER_VS_FS_WITH_OPTION("SSM", "shaders/shadowmap/vs.glsl", "shaders/shadowmap/fs.glsl", true, true);
 	CREATE_SHADER_VS_FS("SSM", "shaders/shadowmap/vs.glsl", "shaders/shadowmap/fs.glsl");
+	CREATE_SHADER_VS_FS_WITH_OPTION_MORE("PCF", "shaders/shadowmap/vs.glsl", "shaders/shadowmap/fs.glsl", false, false, "\r\n#define USE_PCF 1");
+	CREATE_SHADER_VS_FS_WITH_OPTION_MORE("PCF_Poisson", "shaders/shadowmap/vs.glsl", "shaders/shadowmap/fs.glsl", false, false, "\r\n#define USE_PCF 1\r\n#define USE_POISSON_SAMPLE 1");	
+
+	CREATE_SHADER_VS_FS_WITH_OPTION_MORE("PCSS", "shaders/shadowmap/vs.glsl", "shaders/shadowmap/fs.glsl", false, false, "\r\n#define USE_PCSS 1");
+	CREATE_SHADER_VS_FS_WITH_OPTION_MORE("PCSS_Poisson", "shaders/shadowmap/vs.glsl", "shaders/shadowmap/fs.glsl", false, false, "\r\n#define USE_PCSS 1\r\n#define USE_POISSON_SAMPLE 1");
 
 	auto quad = jPrimitiveUtil::CreateQuad(Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), Vector(1000.0f, 1000.0f, 1000.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
 	quad->SetPlane(jPlane(Vector(0.0, 1.0, 0.0), -0.1f));

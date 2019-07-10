@@ -268,6 +268,13 @@ TexArrayUV convert_xyz_to_texarray_uv(vec3 direction)
     return result;
 }
 
+vec2 convert_xyz_to_tex2d_uv(vec3 direction)		// TEXTURE SIZE => (N) x (N * 6) 
+{
+	TexArrayUV result = convert_xyz_to_texarray_uv(direction);
+	result.v = result.v / 6.0 + float(result.index) * 1.0 / 6.0;
+	return vec2(result.u, result.v);
+}
+
 TexArrayUV MakeTexArrayUV(TexArrayUV uv)
 {
     //for(int i=0;i<2;++i)        // to cover uv is out of range simultaneously. loop over 2 times.

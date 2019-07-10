@@ -187,7 +187,7 @@ void jRHI_OpenGL::SetViewport(int32 x, int32 y, int32 width, int32 height) const
 
 void jRHI_OpenGL::SetViewport(const jViewport& viewport) const
 {
-	glViewport(viewport.x, viewport.y, viewport.width, viewport.height);
+	glViewport(static_cast<int32>(viewport.x), static_cast<int32>(viewport.y), static_cast<int32>(viewport.width), static_cast<int32>(viewport.height));
 }
 
 void jRHI_OpenGL::SetViewportIndexed(int32 index, float x, float y, float width, float height) const
