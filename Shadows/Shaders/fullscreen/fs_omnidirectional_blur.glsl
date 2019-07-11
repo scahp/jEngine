@@ -5,7 +5,7 @@
 precision mediump float;
 precision mediump sampler2DArray;
 
-uniform sampler2DArray tex_object_array;
+uniform sampler2D tex_object;
 uniform vec2 PixelSize;
 uniform float IsVertical;
 uniform float MaxDist;
@@ -16,12 +16,7 @@ uniform float MaxDist;
 
 in vec2 TexCoord_;
 
-layout(location = 0) out vec4 color0;
-layout(location = 1) out vec4 color1;
-layout(location = 2) out vec4 color2;
-layout(location = 3) out vec4 color3;
-layout(location = 4) out vec4 color4;
-layout(location = 5) out vec4 color5;
+out vec4 color;
 
 void main()
 {
@@ -36,33 +31,41 @@ void main()
         radiusUV = vec2(radiusUV.x, 0.0);
     }
 
-    for(int k=0;k<6;++k)
-    {
-        vec4 color = vec4(0);
-        for (float x = -FILTER_STEP_COUNT; x <= FILTER_STEP_COUNT; ++x)
+	float inv6 = 1.0 / 6.0;
+
+    vec4 colorTemp = vec4(0);
+    for (float x = -FILTER_STEP_COUNT; x <= FILTER_STEP_COUNT; ++x)
+	{
+        vec2 offset = vec2(x, x / 6.0) * radiusUV;
+        vec2 tex = TexCoord_ + offset;
+
+		//colorTemp = vec4(0.0, 0.0, 0.0, COUNT);
+
+		int index = int(tex.y / inv6);
+
+		TexArrayUV uv;
+		uv.u = tex.x;
+		uv.v = (tex.y - (inv6 * index)) * 6.0;
+		uv.index = index;
+		tex = Convert_TexArrayUV_To_Tex2dUV(uv);
+
+		index = int(tex.y / inv6);
+		uv.u = tex.x;
+		uv.v = (tex.y - (inv6 * index)) * 6.0;
+		uv.index = index;
+		tex = Convert_TexArrayUV_To_Tex2dUV(uv);
+
+        if (tex.x < 0.0 || tex.x > 1.0 || tex.y < 0.0 || tex.y > 1.0)
         {
-            vec2 offset = vec2(x, x) * radiusUV;
-            TexArrayUV temp;
-            temp.u = TexCoord_.x + offset.x;
-            temp.v = TexCoord_.y + offset.y;
-            temp.index = k;
-            //temp = MakeTexArrayUV(temp);		// remove this to improve performance
-            color += texture(tex_object_array, vec3(temp.u, temp.v, temp.index));
+            colorTemp.x += exp(MaxDist);
+            colorTemp.y += exp(MaxDist * MaxDist);
+            colorTemp.w += 1.0;
         }
-
-        color /= COUNT;
-
-        if (k == 0)
-            color0 = color;
-        else if (k == 1)
-            color1 = color;
-        else if (k == 2)
-            color2 = color;
-        else if (k == 3)
-            color3 = color;
-        else if (k == 4)
-            color4 = color;
-        else if (k == 5)
-            color5 = color;
+        else
+        {
+            colorTemp += texture(tex_object, tex);
+        }
     }
+
+    color = colorTemp / COUNT;
 }

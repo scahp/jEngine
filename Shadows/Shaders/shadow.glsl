@@ -67,7 +67,7 @@ void InitPoissonSamples( const in vec2 randomSeed ) {
 
 //////////////////////////////////////////////////////////////////////
 // Dirctional Light Shadow
-#define SHADOW_BIAS_DIRECTIONAL 0.001
+#define SHADOW_BIAS_DIRECTIONAL 0.01
 #define SEARCH_RADIUS_DIRECTIONAL 20.0
 bool IsInShadowMapSpace(vec2 clipPos)
 {
@@ -79,6 +79,7 @@ bool IsInShadowMapSpace(vec3 clipPos)
     return (clipPos.x >= 0.0 && clipPos.x <= 1.0 && clipPos.y >= 0.0 && clipPos.y <= 1.0 && clipPos.z >= 0.0 && clipPos.z <= 1.0);
 }
 
+// SSM + Directional
 bool IsShadowing(vec3 lightClipPos, sampler2D shadow_object)
 {
     if (IsInShadowMapSpace(lightClipPos))
@@ -100,6 +101,7 @@ vec2 PenumbraRadiusUV(float zReceiver, float zBlocker, vec2 texelSize)
 #if defined(USE_POISSON_SAMPLE)
 
 #if defined(USE_PCF) || defined(USE_PCSS)
+// SSM + PCF + Directional + Poisson
 float PCF_PoissonSample(vec3 lightClipPos, vec2 radiusUV, sampler2D shadow_object)
 {
     float sum = 0.0;
@@ -107,12 +109,16 @@ float PCF_PoissonSample(vec3 lightClipPos, vec2 radiusUV, sampler2D shadow_objec
     {
         vec2 offset = poissonDisk[ i ] * radiusUV;
         vec3 depthPos = lightClipPos + vec3(offset, 0.0);
+        // if (!IsShadowing(depthPos, shadow_object))
+        //     ++sum;
         sum += float(!IsShadowing(depthPos, shadow_object));
     }
     for(int i = 0; i < PCF_NUM_SAMPLES;++i) 
     {
         vec2 offset = -poissonDisk[ i ].yx * radiusUV;
         vec3 depthPos = lightClipPos + vec3(offset, 0.0);
+        // if (!IsShadowing(depthPos, shadow_object))
+        //     ++sum;
         sum += float(!IsShadowing(depthPos, shadow_object));
     }
     return sum / ( 2.0 * float( PCF_NUM_SAMPLES ) );
@@ -120,6 +126,7 @@ float PCF_PoissonSample(vec3 lightClipPos, vec2 radiusUV, sampler2D shadow_objec
 #endif  // USE_PCF || USE_PCSS
 
 #if defined(USE_PCSS)
+// SSM + PCSS Blocker + Directional + Poisson
 void FindBlocker_PoissonSample(out float accumBlockerDepth, out float numBlockers, vec3 lightClipPos, vec2 searchRegionRadiusUV, sampler2D shadow_object)
 {
     for(int i = 0; i < BLOCKER_SEARCH_NUM_SAMPLES; ++i) 
@@ -138,6 +145,7 @@ void FindBlocker_PoissonSample(out float accumBlockerDepth, out float numBlocker
     }
 }
 
+// SSM + PCSS + Directional + Poisson
 float PCSS_PoissonSample(vec3 lightClipPos, float shadowCameraDepth, sampler2D shadow_object, float zLightNear, vec2 texelSize)
 {
     if (!IsInShadowMapSpace(lightClipPos))
@@ -169,6 +177,7 @@ float PCSS_PoissonSample(vec3 lightClipPos, float shadowCameraDepth, sampler2D s
 #else   // USE_POISSON_SAMPLE
 
 #if defined(USE_PCF) || defined(USE_PCSS)
+// SSM + PCF + Directional
 float PCF(vec3 lightClipPos, vec2 radiusUV, sampler2D shadow_object)
 {
     float sum = 0.0;
@@ -180,6 +189,8 @@ float PCF(vec3 lightClipPos, vec2 radiusUV, sampler2D shadow_object)
 		{
             vec2 offset = vec2(x, y) * stepUV;
             vec3 depthPos = lightClipPos + vec3(offset, 0.0);
+            // if (IsShadowing(depthPos, shadow_object))
+            //     ++pcf_count;
             pcf_count += float(IsShadowing(depthPos, shadow_object));
 
         }
@@ -190,6 +201,7 @@ float PCF(vec3 lightClipPos, vec2 radiusUV, sampler2D shadow_object)
 #endif  // USE_PCSS || USE_PCSS
 
 #if defined(USE_PCSS)
+// SSM + PCSS Blocker + Directional
 void FindBlocker(out float accumBlockerDepth, out float numBlockers, vec3 lightClipPos, vec2 searchRegionRadiusUV, sampler2D shadow_object)
 {
     vec2 stepUV = searchRegionRadiusUV / BLOCKER_SEARCH_STEP_COUNT;
@@ -212,6 +224,7 @@ void FindBlocker(out float accumBlockerDepth, out float numBlockers, vec3 lightC
     }
 }
 
+// SSM + PCSS + Directional
 float PCSS(vec3 lightClipPos, float shadowCameraDepth, sampler2D shadow_object, float zLightNear, vec2 texelSize)
 {
     if (!IsInShadowMapSpace(lightClipPos))
@@ -243,6 +256,7 @@ float PCSS(vec3 lightClipPos, float shadowCameraDepth, sampler2D shadow_object, 
 #endif  // USE_POISSON_SAMPLE
 
 #if defined(USE_VSM)
+// VSM + Directional
 float VSM(vec3 lightClipPos, vec3 lightPos, vec3 pos, sampler2D shadow_object)
 {
     float lit = 1.0;
@@ -267,6 +281,7 @@ float VSM(vec3 lightClipPos, vec3 lightPos, vec3 pos, sampler2D shadow_object)
 #endif // USE_VSM
 
 #if defined(USE_ESM)
+// ESM + Directional
 float ESM(vec3 lightClipPos, vec3 lightPos, vec3 pos, float near, float far, float ESM_C, sampler2D shadow_object)
 {
     float lit = 1.0;
@@ -282,6 +297,7 @@ float ESM(vec3 lightClipPos, vec3 lightPos, vec3 pos, float near, float far, flo
 #endif  // USE_ESM
 
 #if defined(USE_EVSM)
+// EVSM + Directional
 float EVSM(vec3 lightClipPos, vec3 lightPos, vec3 pos, float near, float far, float ESM_C, sampler2D shadow_object)
 {
     float lit = 1.0;
@@ -309,13 +325,14 @@ float EVSM(vec3 lightClipPos, vec3 lightPos, vec3 pos, float near, float far, fl
 // OmniDirectional Light Shadow
 #define SHADOW_BIAS_OMNIDIRECTIONAL 0.9
 #define SEARCH_RADIUS_OMNIDIRECTIONAL 0.05
-bool IsShadowing(vec3 pos, vec3 lightPos, sampler2D shadow_object_omni)
+// SSM + OmniDirectional
+bool IsShadowing(vec3 pos, vec3 lightPos, sampler2D shadow_object)
 {
     vec3 lightDir = pos - lightPos;
     float dist = dot(lightDir, lightDir) * SHADOW_BIAS_OMNIDIRECTIONAL;
 
-    vec2 result = convert_xyz_to_tex2d_uv(normalize(lightDir));
-    return (texture(shadow_object_omni, result).r <= dist);
+    TexArrayUV result = convert_xyz_to_texarray_uv(normalize(lightDir));
+    return (texture(shadow_object, Convert_TexArrayUV_To_Tex2dUV(result)).r <= dist);
 }
 
 vec2 SearchRegionRadius_OmniDirectional(float zEye, float zLightNear)         // Z Shadow Camera Space
@@ -331,43 +348,64 @@ vec2 PenumbraRadius_OmniDirectional(float zReceiver, float zBlocker)
 #if defined(USE_POISSON_SAMPLE)
 
 #if defined(USE_PCF) || defined(USE_PCSS)
-float PCF_OmniDirectional_PoissonSample(vec2 coordCenter, float distSqured, vec2 radiusUV, sampler2D shadow_object_omni)
+// SSM + PCF + OmiDirectional + Poisson
+float PCF_OmniDirectional_PoissonSample(TexArrayUV result, float distSqured, vec2 radiusUV, sampler2D shadow_object)
 {
     float sum = 0.0;
     for(int i = 0; i < PCF_NUM_SAMPLES;++i) 
     {
-	    vec2 coord = coordCenter + poissonDisk[i] * radiusUV;
-        sum += float(texture(shadow_object_omni, coord).r > distSqured);
+        vec2 offset = poissonDisk[ i ] * radiusUV;
+        TexArrayUV temp = result;
+        temp.u += offset.x;
+        temp.v += offset.y;
+        temp = MakeTexArrayUV(temp);
+
+        // if (texture(shadow_object, vec3(temp.u, temp.v, temp.index)).r > distSqured)
+        //     ++sum;
+        sum += float(texture(shadow_object, Convert_TexArrayUV_To_Tex2dUV(temp)).r > distSqured);
     }
     for(int i = 0; i < PCF_NUM_SAMPLES;++i) 
     {
-        vec2 coord = coordCenter - poissonDisk[i].yx * radiusUV;
-        sum += float(texture(shadow_object_omni, coord).r > distSqured);
+        vec2 offset = -poissonDisk[ i ].yx * radiusUV;
+        TexArrayUV temp = result;
+        temp.u += offset.x;
+        temp.v += offset.y;
+        temp = MakeTexArrayUV(temp);
+
+        // if (texture(shadow_object, vec3(temp.u, temp.v, temp.index)).r > distSqured)
+        //     ++sum;
+        sum += float(texture(shadow_object, Convert_TexArrayUV_To_Tex2dUV(temp)).r > distSqured);
     }
     return sum / ( 2.0 * float( PCF_NUM_SAMPLES ) );
 }
-float PCF_OmniDirectional_PoissonSample(vec3 pos, vec3 lightPos, vec2 radiusSquredUV, sampler2D shadow_object_omni)
+float PCF_OmniDirectional_PoissonSample(vec3 pos, vec3 lightPos, vec2 radiusSquredUV, sampler2D shadow_object)
 {
     vec3 lightDir = pos - lightPos;
     float dist = dot(lightDir, lightDir) * SHADOW_BIAS_OMNIDIRECTIONAL;
 
-    vec2 coord = convert_xyz_to_tex2d_uv(normalize(lightDir));
-    return PCF_OmniDirectional_PoissonSample(coord, dist, radiusSquredUV, shadow_object_omni);
+    TexArrayUV coord = convert_xyz_to_texarray_uv(normalize(lightDir));
+
+    return PCF_OmniDirectional_PoissonSample(coord, dist, radiusSquredUV, shadow_object);
 }
 #endif  // USE_PCF || USE_PCSS
 
 #if defined(USE_PCSS)
-void FindBlocker_OmniDirectional_PoissonSample(out float accumBlockerDepth, out float numBlockers, vec2 centerCoord, float dist, vec2 searchRegionRadius, sampler2D shadow_object_omni)
+// SSM + PCSS Blocker + OmniDirectional + Poisson
+void FindBlocker_OmniDirectional_PoissonSample(out float accumBlockerDepth, out float numBlockers, TexArrayUV pos, float dist, vec2 searchRegionRadius, sampler2D shadow_object)
 {
     float distSqure = dist * dist;
     for(int i = 0; i < BLOCKER_SEARCH_NUM_SAMPLES; ++i) 
     {
-        vec2 coord = centerCoord + poissonDisk[i] * searchRegionRadius;
+        vec2 offset = poissonDisk[ i ] * searchRegionRadius;
+        TexArrayUV temp = pos;
+        temp.u += offset.x;
+        temp.v += offset.y;
+        temp = MakeTexArrayUV(temp);
 
         // if (!IsInShadowMapSpace(vec2(temp.u, temp.v)))
         //     continue;
 
-        float shadowValue = texture(shadow_object_omni, coord).r;
+        float shadowValue = texture(shadow_object, Convert_TexArrayUV_To_Tex2dUV(temp)).r;
         if (shadowValue <= distSqure)
         {
             accumBlockerDepth += sqrt(shadowValue);
@@ -375,108 +413,21 @@ void FindBlocker_OmniDirectional_PoissonSample(out float accumBlockerDepth, out 
         }
     }
 }
-float PCSS_OmniDirectional_PoissonSample(vec3 pos, vec3 lightPos, float zLightNear, vec2 texelSize, sampler2D shadow_object_omni)
+// SSM + PCSS + OmniDirectional + Poisson
+float PCSS_OmniDirectional_PoissonSample(vec3 pos, vec3 lightPos, float zLightNear, vec2 texelSize, sampler2D shadow_object)
 {
     vec3 lightDir = pos - lightPos;
     float distSqured = dot(lightDir, lightDir);
     float dist = sqrt(distSqured);
     distSqured *= SHADOW_BIAS_OMNIDIRECTIONAL;
     dist *= SHADOW_BIAS_OMNIDIRECTIONAL;
-    vec2 coord = convert_xyz_to_tex2d_uv(normalize(lightDir));
+    TexArrayUV result = convert_xyz_to_texarray_uv(normalize(lightDir));
 
     // 1. Blocker Search
     float accumBlockerDepth = 0.0;
     float numBlockers = 0.0;
     vec2 searchRegionRadius = SearchRegionRadius_OmniDirectional(dist, zLightNear);
-    FindBlocker_OmniDirectional_PoissonSample(accumBlockerDepth, numBlockers, coord, dist, searchRegionRadius, shadow_object_omni);
-
-    if (numBlockers == 0.0)
-        return 1.0;
-    else if (numBlockers >= BLOCKER_SEARCH_COUNT)
-       return 0.0;
-
-    // 2. Penumbra size
-    float avgBlockerDepthWorld = accumBlockerDepth / numBlockers;
-    vec2 penumbraRadius = PenumbraRadius_OmniDirectional(dist, avgBlockerDepthWorld);
-    penumbraRadius = min(searchRegionRadius, penumbraRadius);     // to avoid artifacts of too much penumbra radius
-
-     // 3. Filtering
-    return PCF_OmniDirectional_PoissonSample(coord, distSqured, penumbraRadius, shadow_object_omni);
-}
-#endif // USE_PCSS
-
-#else   // USE_POISSON_SAMPLE
-
-#if defined(USE_PCF) || defined(USE_PCSS)
-float PCF_OmniDirectional(vec2 coordCenter, float distSqured, vec2 radiusUV, sampler2D shadow_object_omni)
-{
-    float sum = 0.0;
-    float pcf_count = 0.0;
-    
-	vec2 stepUV = radiusUV / PCF_FILTER_STEP_COUNT;
-	stepUV.y /= 6.0;
-
-    for (float x = -PCF_FILTER_STEP_COUNT; x <= PCF_FILTER_STEP_COUNT; ++x)
-	{
-		for (float y = -PCF_FILTER_STEP_COUNT; y <= PCF_FILTER_STEP_COUNT; ++y)
-		{
-            vec2 coord = coordCenter + vec2(x, y) * stepUV;
-            pcf_count += float(texture(shadow_object_omni, coord).r <= distSqured);
-        }
-    }
-
-    return 1.0 - (pcf_count / PCF_COUNT);
-}
-
-float PCF_OmniDirectional(vec3 pos, vec3 lightPos, vec2 radiusSquredUV, sampler2D shadow_object_omni)
-{
-    vec3 lightDir = pos - lightPos;
-    float dist = dot(lightDir, lightDir) * SHADOW_BIAS_OMNIDIRECTIONAL;
-
-    vec2 coord = convert_xyz_to_tex2d_uv(normalize(lightDir));
-    return PCF_OmniDirectional(coord, dist, radiusSquredUV, shadow_object_omni);
-}
-#endif  // USE_PCF || USE_PCSS
-
-#if defined(USE_PCSS)
-void FindBlocker_OmniDirectional(out float accumBlockerDepth, out float numBlockers, vec2 centerCoord, float dist, vec2 searchRegionRadius, sampler2D shadow_object_omni)
-{
-    vec2 stepUV = searchRegionRadius / BLOCKER_SEARCH_STEP_COUNT;
-	stepUV.y /= 6.0;
-
-    float distSqure = dist * dist;
-	for(float x = -BLOCKER_SEARCH_STEP_COUNT; x <= BLOCKER_SEARCH_STEP_COUNT; ++x)
-    {
-		for(float y = -BLOCKER_SEARCH_STEP_COUNT; y <= BLOCKER_SEARCH_STEP_COUNT; ++y)
-        {
-            vec2 coord = centerCoord + vec2(x, y) * stepUV;
-
-            // if (!IsInShadowMapSpace(vec2(temp.u, temp.v)))
-            //     continue;
-
-            float shadowValue = texture(shadow_object_omni, coord).r;
-            if (shadowValue <= distSqure)
-            {
-                accumBlockerDepth += sqrt(shadowValue);
-                ++numBlockers;
-            }
-        }
-    }
-}
-float PCSS_OmniDirectional(vec3 pos, vec3 lightPos, float zLightNear, vec2 texelSize, sampler2D shadow_object_omni)
-{
-    vec3 lightDir = pos - lightPos;
-    float distSqured = dot(lightDir, lightDir);
-    float dist = sqrt(distSqured);
-    distSqured *= SHADOW_BIAS_OMNIDIRECTIONAL;
-    dist *= SHADOW_BIAS_OMNIDIRECTIONAL;
-    vec2 coord = convert_xyz_to_tex2d_uv(normalize(lightDir));
-
-    // 1. Blocker Search
-    float accumBlockerDepth = 0.0;
-    float numBlockers = 0.0;
-    vec2 searchRegionRadius = SearchRegionRadius_OmniDirectional(dist, zLightNear);
-    FindBlocker_OmniDirectional(accumBlockerDepth, numBlockers, coord, dist, searchRegionRadius, shadow_object_omni);
+    FindBlocker_OmniDirectional_PoissonSample(accumBlockerDepth, numBlockers, result, dist, searchRegionRadius, shadow_object);
 
     if (numBlockers == 0.0)
         return 1.0;
@@ -489,20 +440,120 @@ float PCSS_OmniDirectional(vec3 pos, vec3 lightPos, float zLightNear, vec2 texel
     penumbraRadius = min(searchRegionRadius, penumbraRadius);     // to avoid artifacts of too much penumbra radius
 
     // // 3. Filtering
-    return PCF_OmniDirectional(coord, distSqured, penumbraRadius, shadow_object_omni);
+    return PCF_OmniDirectional_PoissonSample(result, distSqured, penumbraRadius, shadow_object);
+}
+#endif // USE_PCSS
+
+#else   // USE_POISSON_SAMPLE
+
+#if defined(USE_PCF) || defined(USE_PCSS)
+// SSM + PCF + OmiDirectional
+float PCF_OmniDirectional(TexArrayUV result, float distSqured, vec2 radiusUV, sampler2D shadow_object)
+{
+    float sum = 0.0;
+    float pcf_count = 0.0;
+    vec2 stepUV = radiusUV / PCF_FILTER_STEP_COUNT;
+    for (float x = -PCF_FILTER_STEP_COUNT; x <= PCF_FILTER_STEP_COUNT; ++x)
+	{
+		for (float y = -PCF_FILTER_STEP_COUNT; y <= PCF_FILTER_STEP_COUNT; ++y)
+		{
+            vec2 offset = vec2(x, y) * stepUV;
+
+            TexArrayUV temp = result;
+            temp.u += offset.x;
+            temp.v += offset.y;
+            temp = MakeTexArrayUV(temp);
+
+            // if (texture(shadow_object, vec3(temp.u, temp.v, temp.index)).r <= distSqured)
+            //     ++pcf_count;
+            pcf_count += float(texture(shadow_object, Convert_TexArrayUV_To_Tex2dUV(temp)).r <= distSqured);
+        }
+    }
+
+    return 1.0 - (pcf_count / PCF_COUNT);
+}
+
+float PCF_OmniDirectional(vec3 pos, vec3 lightPos, vec2 radiusSquredUV, sampler2D shadow_object)
+{
+    vec3 lightDir = pos - lightPos;
+    float dist = dot(lightDir, lightDir) * SHADOW_BIAS_OMNIDIRECTIONAL;
+
+    TexArrayUV coord = convert_xyz_to_texarray_uv(normalize(lightDir));
+
+    return PCF_OmniDirectional(coord, dist, radiusSquredUV, shadow_object);
+}
+#endif  // USE_PCF || USE_PCSS
+
+#if defined(USE_PCSS)
+// SSM + PCSS Blocker + OmniDirectional
+void FindBlocker_OmniDirectional(out float accumBlockerDepth, out float numBlockers, TexArrayUV pos, float dist, vec2 searchRegionRadius, sampler2D shadow_object)
+{
+    vec2 stepUV = searchRegionRadius / BLOCKER_SEARCH_STEP_COUNT;
+    float distSqure = dist * dist;
+	for(float x = -BLOCKER_SEARCH_STEP_COUNT; x <= BLOCKER_SEARCH_STEP_COUNT; ++x)
+    {
+		for(float y = -BLOCKER_SEARCH_STEP_COUNT; y <= BLOCKER_SEARCH_STEP_COUNT; ++y)
+        {
+            vec2 offset = vec2(x, y) * stepUV;
+            TexArrayUV temp = pos;
+            temp.u += offset.x;
+            temp.v += offset.y;
+            temp = MakeTexArrayUV(temp);
+
+            // if (!IsInShadowMapSpace(vec2(temp.u, temp.v)))
+            //     continue;
+
+            float shadowValue = texture(shadow_object, Convert_TexArrayUV_To_Tex2dUV(temp)).r;
+            if (shadowValue <= distSqure)
+            {
+                accumBlockerDepth += sqrt(shadowValue);
+                ++numBlockers;
+            }
+        }
+    }
+}
+// SSM + PCSS + OmniDirectional
+float PCSS_OmniDirectional(vec3 pos, vec3 lightPos, float zLightNear, vec2 texelSize, sampler2D shadow_object)
+{
+    vec3 lightDir = pos - lightPos;
+    float distSqured = dot(lightDir, lightDir);
+    float dist = sqrt(distSqured);
+    distSqured *= SHADOW_BIAS_OMNIDIRECTIONAL;
+    dist *= SHADOW_BIAS_OMNIDIRECTIONAL;
+    TexArrayUV result = convert_xyz_to_texarray_uv(normalize(lightDir));
+
+    // 1. Blocker Search
+    float accumBlockerDepth = 0.0;
+    float numBlockers = 0.0;
+    vec2 searchRegionRadius = SearchRegionRadius_OmniDirectional(dist, zLightNear);
+    FindBlocker_OmniDirectional(accumBlockerDepth, numBlockers, result, dist, searchRegionRadius, shadow_object);
+
+    if (numBlockers == 0.0)
+        return 1.0;
+    else if (numBlockers >= BLOCKER_SEARCH_COUNT)
+       return 0.0;
+
+    // 2. Penumbra size
+    float avgBlockerDepthWorld = accumBlockerDepth / numBlockers;
+    vec2 penumbraRadius = PenumbraRadius_OmniDirectional(dist, avgBlockerDepthWorld);
+    penumbraRadius = min(searchRegionRadius, penumbraRadius);     // to avoid artifacts of too much penumbra radius
+
+    // // 3. Filtering
+    return PCF_OmniDirectional(result, distSqured, penumbraRadius, shadow_object);
 }
 #endif
 
 #endif  // USE_POISSON_SAMPLE
 
 #if defined(USE_VSM)
+// VSM + OmniDirectional
 float VSM_OmniDirectional(vec3 lightPos, vec3 pos, sampler2D shadow_object, float biasDistance)
 {
     vec3 toLight = (lightPos - pos);
     float distFromLight = sqrt(dot(toLight, toLight));
     TexArrayUV result = convert_xyz_to_texarray_uv(normalize(-toLight));
 
-    vec2 moments = texture(shadow_object, vec3(result.u, result.v, result.index)).yx;   // OmniDirectional ShadowMap saves (dist * dist, dist, 0.0, 1.0)
+    vec2 moments = texture(shadow_object, Convert_TexArrayUV_To_Tex2dUV(result)).yx;   // OmniDirectional ShadowMap saves (dist * dist, dist, 0.0, 1.0)
     float E_x2 = moments.y;
     float Ex_2 = moments.x * moments.x;
     float variance = E_x2 - Ex_2;
@@ -522,17 +573,19 @@ float VSM_OmniDirectional(vec3 lightPos, vec3 pos, sampler2D shadow_object, floa
 #endif // USE_VSM
 
 #if defined(USE_ESM)
+// ESM + OmniDirectional
 float ESM_OmniDirectional(vec3 lightPos, vec3 pos, float near, float far, float ESM_C, sampler2D shadow_object)
 {
     vec3 toLight = (lightPos - pos);
     TexArrayUV result = convert_xyz_to_texarray_uv(normalize(-toLight));
-    float expCZ = texture(shadow_object, vec3(result.u, result.v, result.index)).r;
+    float expCZ = texture(shadow_object, Convert_TexArrayUV_To_Tex2dUV(result)).r;
     float distFromLight = (sqrt(dot(toLight, toLight)) - near) / (far - near);
     return clamp(exp(-distFromLight * ESM_C) * expCZ, 0.0, 1.0);
 }
 #endif  // USE_ESM
 
 #if defined(USE_EVSM)
+// EVSM + OmniDirectional
 float EVSM_OmniDirectional(vec3 lightPos, vec3 pos, float near, float far, float ESM_C, sampler2D shadow_object, float biasDistance)
 {
     vec3 toLight = (lightPos - pos);
@@ -540,7 +593,7 @@ float EVSM_OmniDirectional(vec3 lightPos, vec3 pos, float near, float far, float
     float ed = exp(distFromLight * ESM_C);
     TexArrayUV result = convert_xyz_to_texarray_uv(normalize(-toLight));
 
-    vec2 moments = texture(shadow_object, vec3(result.u, result.v, result.index)).yx;   // OmniDirectional ShadowMap saves (dist * dist, dist, 0.0, 1.0)
+    vec2 moments = texture(shadow_object, Convert_TexArrayUV_To_Tex2dUV(result)).yx;   // OmniDirectional ShadowMap saves (dist * dist, dist, 0.0, 1.0)
     float E_x2 = moments.y;
     float Ex_2 = moments.x * moments.x;
     float variance = E_x2 - Ex_2;

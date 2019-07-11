@@ -56,7 +56,7 @@ void jShadowMapRenderer::ShadowPrePass(const jCamera* camera)
 		{
 			// 1.1 Directional Light ShadowMap Generation
 			auto directionalLight = static_cast<jDirectionalLight*>(light);
-			g_rhi->SetRenderTarget(directionalLight->ShadowMapData->ShadowMapRenderTarget);
+			g_rhi->SetRenderTarget(directionalLight->ShadowMapData->ShadowMapRenderTarget.get());
 
 			g_rhi->EnableDepthTest(true);
 			g_rhi->SetDepthFunc(EDepthStencilFunc::LEQUAL);
@@ -93,7 +93,7 @@ void jShadowMapRenderer::ShadowPrePass(const jCamera* camera)
 			{
 				pointLight->ShadowMapData->ShadowMapCamera[i]->UpdateCamera();
 
-				g_rhi->SetRenderTarget(pointLight->ShadowMapData->ShadowMapRenderTarget, i);
+				g_rhi->SetRenderTarget(pointLight->ShadowMapData->ShadowMapRenderTarget.get(), i);
 
 				g_rhi->EnableDepthTest(true);
 				g_rhi->SetDepthFunc(EDepthStencilFunc::LEQUAL);
@@ -115,7 +115,7 @@ void jShadowMapRenderer::ShadowPrePass(const jCamera* camera)
 			{
 				spotLight->ShadowMapData->ShadowMapCamera[i]->UpdateCamera();
 
-				g_rhi->SetRenderTarget(spotLight->ShadowMapData->ShadowMapRenderTarget, i);
+				g_rhi->SetRenderTarget(spotLight->ShadowMapData->ShadowMapRenderTarget.get(), i);
 
 				g_rhi->EnableDepthTest(true);
 				g_rhi->SetDepthFunc(EDepthStencilFunc::LEQUAL);
@@ -152,7 +152,7 @@ void jShadowMapRenderer::ShadowPrePass(const jCamera* camera)
 				FullscreenQuadPrimitive->RenderObject->tex_object_array = nullptr;
 
 				// vertical
-				g_rhi->SetRenderTarget(vsmBlurRenderTarget);
+				g_rhi->SetRenderTarget(vsmBlurRenderTarget.get());
 				g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 				g_rhi->SetClear(MakeRenderBufferTypeList({ERenderBufferType::COLOR, ERenderBufferType::DEPTH}));
 				FullscreenQuadPrimitive->IsVertical = true;
@@ -161,7 +161,7 @@ void jShadowMapRenderer::ShadowPrePass(const jCamera* camera)
 				// 원본 텍스쳐 -> 임시 텍스쳐
 
 				// horizontal
-				g_rhi->SetRenderTarget(direcitonalLight->ShadowMapData->ShadowMapRenderTarget);
+				g_rhi->SetRenderTarget(direcitonalLight->ShadowMapData->ShadowMapRenderTarget.get());
 				g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 				g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
 				FullscreenQuadPrimitive->IsVertical = false;
@@ -171,7 +171,7 @@ void jShadowMapRenderer::ShadowPrePass(const jCamera* camera)
 			}
 			//////////////////////
 
-			jRenderTargetPool::ReturnRenderTarget(vsmBlurRenderTarget);
+			jRenderTargetPool::ReturnRenderTarget(vsmBlurRenderTarget.get());
 
 			auto vsmTexArrayBlurRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW, EFormat::RG32F, EFormat::RG, EFormatType::FLOAT, SM_WIDTH, SM_HEIGHT, 6 });
 			const std::initializer_list<EDrawBufferType> drawBufferArray = { EDrawBufferType::COLOR_ATTACHMENT0, EDrawBufferType::COLOR_ATTACHMENT1, EDrawBufferType::COLOR_ATTACHMENT2
@@ -185,7 +185,7 @@ void jShadowMapRenderer::ShadowPrePass(const jCamera* camera)
 				FullscreenQuadPrimitive->RenderObject->tex_object = nullptr;
 
 				// vertical
-				g_rhi->SetRenderTarget(vsmTexArrayBlurRenderTarget, 0, true);
+				g_rhi->SetRenderTarget(vsmTexArrayBlurRenderTarget.get(), 0, true);
 				g_rhi->SetDrawBuffers(drawBufferArray);
 				g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 				g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
@@ -194,7 +194,7 @@ void jShadowMapRenderer::ShadowPrePass(const jCamera* camera)
 				FullscreenQuadPrimitive->Draw(camera, BlurOmniShader, {});
 
 				// horizontal
-				g_rhi->SetRenderTarget(pointLight->ShadowMapData->ShadowMapRenderTarget, 0, true);
+				g_rhi->SetRenderTarget(pointLight->ShadowMapData->ShadowMapRenderTarget.get(), 0, true);
 				g_rhi->SetDrawBuffers(drawBufferArray);
 				g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 				g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
@@ -212,7 +212,7 @@ void jShadowMapRenderer::ShadowPrePass(const jCamera* camera)
 				FullscreenQuadPrimitive->RenderObject->tex_object = nullptr;
 
 				// vertical
-				g_rhi->SetRenderTarget(vsmTexArrayBlurRenderTarget, 0, true);
+				g_rhi->SetRenderTarget(vsmTexArrayBlurRenderTarget.get(), 0, true);
 				g_rhi->SetDrawBuffers(drawBufferArray);
 				g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 				g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
@@ -221,7 +221,7 @@ void jShadowMapRenderer::ShadowPrePass(const jCamera* camera)
 				FullscreenQuadPrimitive->Draw(camera, BlurOmniShader, {});
 
 				// horizontal
-				g_rhi->SetRenderTarget(spotLight->ShadowMapData->ShadowMapRenderTarget, 0, true);
+				g_rhi->SetRenderTarget(spotLight->ShadowMapData->ShadowMapRenderTarget.get(), 0, true);
 				g_rhi->SetDrawBuffers(drawBufferArray);
 				g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 				g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
@@ -231,7 +231,7 @@ void jShadowMapRenderer::ShadowPrePass(const jCamera* camera)
 			}
 			////////////////////
 
-			jRenderTargetPool::ReturnRenderTarget(vsmTexArrayBlurRenderTarget);
+			jRenderTargetPool::ReturnRenderTarget(vsmTexArrayBlurRenderTarget.get());
 
 			break;
 		}

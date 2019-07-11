@@ -38,7 +38,7 @@ jRenderTargetPool::~jRenderTargetPool()
 {
 }
 
-jRenderTarget* jRenderTargetPool::GetRenderTarget(const jRenderTargetInfo& info)
+std::shared_ptr<jRenderTarget> jRenderTargetPool::GetRenderTarget(const jRenderTargetInfo& info)
 {
 	auto hash = info.GetHash();
 
@@ -51,19 +51,19 @@ jRenderTarget* jRenderTargetPool::GetRenderTarget(const jRenderTargetInfo& info)
 			if (!iter.IsUsing)
 			{
 				iter.IsUsing = true;
-				return iter.RenderTarget;
+				return iter.RenderTargetPtr;
 			}
 		}
 	}
 
-	auto renderTarget = g_rhi->CreateRenderTarget(info);
-	if (renderTarget)
+	auto renderTargetPtr = std::shared_ptr<jRenderTarget>(g_rhi->CreateRenderTarget(info));
+	if (renderTargetPtr)
 	{
-		RenderTargetResourceMap[hash].push_back({ true, renderTarget });
-		RenderTargetHashVariableMap[renderTarget] = hash;
+		RenderTargetResourceMap[hash].push_back({ true, renderTargetPtr });
+		RenderTargetHashVariableMap[renderTargetPtr.get()] = hash;
 	}
 	
-	return renderTarget;
+	return renderTargetPtr;
 }
 
 void jRenderTargetPool::ReturnRenderTarget(jRenderTarget* renderTarget)
@@ -75,7 +75,7 @@ void jRenderTargetPool::ReturnRenderTarget(jRenderTarget* renderTarget)
 	const size_t hash = it_find->second;
 	for (auto& iter : RenderTargetResourceMap[hash])
 	{
-		if (renderTarget == iter.RenderTarget)
+		if (renderTarget == iter.RenderTargetPtr.get())
 		{
 			iter.IsUsing = false;
 			break;

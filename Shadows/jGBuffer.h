@@ -12,5 +12,5 @@ public:
 	void End() const;
 	void BindGeometryBuffer(const jShader* shader) const;
 
-	jRenderTarget* GeometryBuffer = nullptr;
+	std::shared_ptr<jRenderTarget> GeometryBuffer;
 };

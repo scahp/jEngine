@@ -58,13 +58,21 @@ struct jPipelineData
 class IPipeline
 {
 public:
+	static std::unordered_map<std::string, IPipeline*> s_pipelinesNameMap;
+	static std::unordered_set<IPipeline*> s_pipelinesNameSet;
+
+	static void AddPipeline(const std::string& name, IPipeline* newPipeline);
+	static IPipeline* GetPipeline(const std::string& name);
+	static void SetupPipelines();
+	static void TeardownPipelines();
+
 	IPipeline() = default;
 	virtual ~IPipeline() { }
 
 	virtual void Setup() {}
 	virtual void Teardown() {}
 
-	virtual void Do(const jPipelineData& pipelineData) = 0;
+	virtual void Do(const jPipelineData& pipelineData) const = 0;
 
 protected:
 	jShader* Shader = nullptr;
@@ -81,12 +89,26 @@ protected:
 	std::vector<IBuffer*> Buffers;
 };
 
+#define CREATE_PIPELINE_WITH_SETUP(PipelineClass, ...) \
+[this]()\
+{ \
+auto newPipeline = new PipelineClass(__VA_ARGS__); \
+newPipeline->Setup(); \
+return newPipeline; \
+}()
+
+#define ADD_PIPELINE_WITH_CREATE_AND_SETUP_AT_RENDERPASS(RenderPassCont, PipelineClass, ...) \
+RenderPassCont.push_back(CREATE_PIPELINE_WITH_SETUP(PipelineClass, __VA_ARGS__))
+
+#define ADD_PIPELINE_AT_RENDERPASS(RenderPassCont, PipelineName) \
+RenderPassCont.push_back(IPipeline::GetPipeline(PipelineName))
+
 //////////////////////////////////////////////////////////////////////////
 // jRenderPipeline
 class jRenderPipeline : public IPipeline
 {
 public:
-	virtual void Do(const jPipelineData& pipelineData) override;
+	virtual void Do(const jPipelineData& pipelineData) const override;
 	virtual void Draw(const std::list<jObject*>& objects, const jShader* shader, const jCamera* camera, const std::list<const jLight*>& lights) const;
 };
 
@@ -100,7 +122,6 @@ public:
 	{ }
 
 	virtual void Setup() override;
-	virtual void Teardown() override {}
 
 	virtual void Draw(const std::list<jObject*>& objects, const jShader* shader, const jCamera* camera, const std::list<const jLight*>& lights) const override;
 
@@ -117,34 +138,60 @@ public:
 	{ }
 
 	virtual void Setup() override;
-	virtual void Teardown() override {}
 	virtual void Draw(const std::list<jObject*>& objects, const jShader* shader, const jCamera* camera, const std::list<const jLight*>& lights) const override;
 
 private:
 	jDeepShadowMapBuffers DeepShadowMapBuffers;
 };
 
-class jForwardShadowMap_SSM_Pipeline : public jRenderPipeline
+//////////////////////////////////////////////////////////////////////////
+// jForward_ShadowMapGen_Pipeline
+class jForward_ShadowMapGen_Pipeline : public jRenderPipeline
 {
 public:
-	jForwardShadowMap_SSM_Pipeline() = default;
+	jForward_ShadowMapGen_Pipeline(const char* directionalLightShaderName, const char* omniDirectionalLightShaderName)
+		: DirectionalLightShaderName(directionalLightShaderName), OmniDirectionalLightShaderName(omniDirectionalLightShaderName)
+	{ }
 
 	virtual void Setup() override;
-	virtual void Teardown() override;
 	virtual void Draw(const std::list<jObject*>& objects, const jShader* shader, const jCamera* camera, const std::list<const jLight*>& lights) const override;
 
 	jShader* ShadowGenShader = nullptr;
 	jShader* OmniShadowGenShader = nullptr;
+
+	const char* DirectionalLightShaderName = nullptr;
+	const char* OmniDirectionalLightShaderName = nullptr;
 };
 
-class jForward_SSM_Pipeline : public jRenderPipeline
+#define ADD_FORWARD_SHADOWMAP_GEN_PIPELINE(Name, DirectionalLightShaderName, OmniDirectionalLightShaderName) \
+IPipeline::AddPipeline(Name, new jForward_ShadowMapGen_Pipeline(DirectionalLightShaderName, OmniDirectionalLightShaderName))
+
+//////////////////////////////////////////////////////////////////////////
+// jForward_Shadow_Pipeline
+class jForward_Shadow_Pipeline : public jRenderPipeline
 {
 public:
-	jForward_SSM_Pipeline() = default;
+	jForward_Shadow_Pipeline(const char* shaderName)
+		: ShaderName(shaderName)
+	{}
 
 	virtual void Setup() override;
-	virtual void Teardown() override;
+
+	const char* ShaderName = nullptr;
+};
+
+#define ADD_FORWARD_SHADOW_PIPELINE(Name, ShaderName) \
+IPipeline::AddPipeline(Name, new jForward_Shadow_Pipeline(ShaderName))
+
+class jForwardShadowMap_Blur_Pipeline : public jRenderPipeline
+{
+public:
+	jForwardShadowMap_Blur_Pipeline() = default;
+
+	virtual void Setup() override;
 	virtual void Draw(const std::list<jObject*>& objects, const jShader* shader, const jCamera* camera, const std::list<const jLight*>& lights) const override;
+
+	std::shared_ptr<struct jPostProcessInOutput> PostProcessInput;
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -155,7 +202,7 @@ public:
 	virtual void Setup() {}
 	virtual void Teardown() {}
 
-	virtual void Do(const jPipelineData& pipelineData) override;
+	virtual void Do(const jPipelineData& pipelineData) const override;
 	virtual void Dispatch() const;
 
 	uint32 NumGroupsX = 0;
@@ -211,10 +258,10 @@ class jPipelineSet
 {
 public:
 	virtual ~jPipelineSet() {}
-	std::list<IPipeline*> ShadowPrePass;
-	std::list<IPipeline*> RenderPass;
-	std::list<IPipeline*> PostRenderPass;
-	std::list<IPipeline*> UIPass;
+	std::list<const IPipeline*> ShadowPrePass;
+	std::list<const IPipeline*> RenderPass;
+	std::list<const IPipeline*> PostRenderPass;
+	std::list<const IPipeline*> UIPass;
 
 	virtual EPipelineSetType GetType() const { return EPipelineSetType::None; }
 	virtual void Setup() {}
@@ -248,5 +295,4 @@ public:
 	virtual EPipelineSetType GetType() const override { return EPipelineSetType::Forward; }
 
 	virtual void Setup() override;
-	virtual void Teardown() override;
 };

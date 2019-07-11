@@ -4,13 +4,65 @@
 #include "jLight.h"
 #include "jCamera.h"
 #include "jGBuffer.h"
+#include "jRenderTargetPool.h"
+#include "jPostProcess.h"
 
 const std::list<jObject*> jPipelineData::emptyObjectList;
 //const std::list<const jLight*> jPipelineData::emptyLightList;
 
+std::unordered_map<std::string, IPipeline*> IPipeline::s_pipelinesNameMap;
+std::unordered_set<IPipeline*> IPipeline::s_pipelinesNameSet;
+
+void IPipeline::AddPipeline(const std::string& name, IPipeline* newPipeline)
+{
+	s_pipelinesNameMap.insert(std::make_pair(name, newPipeline));
+	s_pipelinesNameSet.insert(newPipeline);
+}
+
+IPipeline* IPipeline::GetPipeline(const std::string& name)
+{
+	auto it_find = s_pipelinesNameMap.find(name);
+	return s_pipelinesNameMap.end() != it_find ? it_find->second : nullptr;
+}
+
+void IPipeline::SetupPipelines()
+{
+	for (auto it : s_pipelinesNameMap)
+	{
+		if (it.second)
+			it.second->Setup();
+	}
+}
+
+void IPipeline::TeardownPipelines()
+{
+	for (auto it : s_pipelinesNameMap)
+	{
+		if (it.second)
+			it.second->Teardown();
+	}
+}
+
+struct jShadowPipelinCreation
+{
+	jShadowPipelinCreation()
+	{
+		ADD_FORWARD_SHADOWMAP_GEN_PIPELINE("Forward_ShadowMapGen_SSM_Pipeline", "ShadowGen_SSM", "ShadowGen_Omni_SSM");
+		ADD_FORWARD_SHADOWMAP_GEN_PIPELINE("Forward_ShadowMapGen_VSM_Pipeline", "ShadowGen_VSM", "ShadowGen_Omni_SSM");
+		ADD_FORWARD_SHADOWMAP_GEN_PIPELINE("Forward_ShadowMapGen_ESM_Pipeline", "ShadowGen_ESM", "ShadowGen_Omni_ESM");
+		ADD_FORWARD_SHADOWMAP_GEN_PIPELINE("Forward_ShadowMapGen_EVSM_Pipeline", "ShadowGen_EVSM", "ShadowGen_Omni_EVSM");
+
+
+		ADD_FORWARD_SHADOW_PIPELINE("Forward_SSM_Pipeline", "SSM");
+		ADD_FORWARD_SHADOW_PIPELINE("Forward_VSM_Pipeline", "VSM");
+		ADD_FORWARD_SHADOW_PIPELINE("Forward_ESM_Pipeline", "ESM");
+		ADD_FORWARD_SHADOW_PIPELINE("Forward_EVSM_Pipeline", "EVSM");
+	}
+} s_shadowPipelinCreation;
+
 //////////////////////////////////////////////////////////////////////////
 // jRenderPipeline
-void jRenderPipeline::Do(const jPipelineData& pipelineData)
+void jRenderPipeline::Do(const jPipelineData& pipelineData) const
 {
 	Draw(pipelineData.Objects, Shader, pipelineData.Camera, pipelineData.Lights);
 }
@@ -99,23 +151,20 @@ void jDeepShadowMap_ShadowPass_Pipeline::Draw(const std::list<jObject*>& objects
 }
 
 //////////////////////////////////////////////////////////////////////////
-// jForwardShadowMap_SSM_Pipeline
-void jForwardShadowMap_SSM_Pipeline::Setup()
+// jForward_ShadowMapGen_Pipeline
+void jForward_ShadowMapGen_Pipeline::Setup()
 {
 	ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
 	ClearType = MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH });
 	EnableDepthTest = true;
 	DepthStencilFunc = EDepthStencilFunc::LEQUAL;
-	ShadowGenShader = jShader::GetShader("ShadowGen_SSM");
-	OmniShadowGenShader = jShader::GetShader("ShadowGen_Omni_SSM");
+	ShadowGenShader = jShader::GetShader(DirectionalLightShaderName);
+	JASSERT(ShadowGenShader);
+	OmniShadowGenShader = jShader::GetShader(OmniDirectionalLightShaderName);
+	JASSERT(OmniShadowGenShader);
 }
 
-void jForwardShadowMap_SSM_Pipeline::Teardown()
-{
-
-}
-
-void jForwardShadowMap_SSM_Pipeline::Draw(const std::list<jObject*>& objects, const jShader* shader, const jCamera* camera, const std::list<const jLight*>& lights) const
+void jForward_ShadowMapGen_Pipeline::Draw(const std::list<jObject*>& objects, const jShader* shader, const jCamera* camera, const std::list<const jLight*>& lights) const
 {
 	//light->Update(0); // todo remove
 
@@ -164,8 +213,73 @@ void jForwardShadowMap_SSM_Pipeline::Draw(const std::list<jObject*>& objects, co
 }
 
 //////////////////////////////////////////////////////////////////////////
-// jForward_SSM_Pipeline
-void jForward_SSM_Pipeline::Setup()
+// jForwardShadowMap_Blur_Pipeline
+void jForwardShadowMap_Blur_Pipeline::Setup()
+{
+	ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
+	ClearType = MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH });
+	EnableDepthTest = false;
+	DepthStencilFunc = EDepthStencilFunc::LEQUAL;
+
+	PostProcessInput = std::shared_ptr<jPostProcessInOutput>(new jPostProcessInOutput());
+}
+
+void jForwardShadowMap_Blur_Pipeline::Draw(const std::list<jObject *>& objects, const jShader* shader, const jCamera* camera, const std::list<const jLight *>& lights) const
+{
+	for (auto light : lights)
+	{
+		JASSERT(light);
+
+		bool skip = false;
+		bool isOmniDirectional = false;
+		const jShader* shader = nullptr;
+		switch (light->Type)
+		{
+		case ELightType::DIRECTIONAL:
+			isOmniDirectional = false;
+			break;
+		case ELightType::POINT:
+		case ELightType::SPOT:
+			isOmniDirectional = true;
+			break;
+		case ELightType::AMBIENT:
+			skip = true;
+			break;
+		default:
+			JASSERT(0);
+			return;
+		}
+
+		if (skip)
+			continue;
+
+		JASSERT(light->GetShadowMapRenderTarget());
+		auto tempRenderTargetPtr = jRenderTargetPool::GetRenderTarget(light->GetShadowMapRenderTarget()->Info);
+		
+		PostProcessInput->RenderTaret = light->GetShadowMapRenderTarget();
+		auto post1 = new jPostProcess_Blur("BlurVer", tempRenderTargetPtr, true);
+		post1->OmniDirectional = isOmniDirectional;
+		post1->SetPostProcessInput(PostProcessInput);
+		
+		post1->Process(camera);
+
+		auto post2 = new jPostProcess_Blur("BlurHor", light->GetShadowMapRenderTargetPtr(), false);
+		PostProcessInput->RenderTaret = tempRenderTargetPtr.get();
+		post2->SetPostProcessInput(PostProcessInput);
+		post2->OmniDirectional = isOmniDirectional;
+
+		post2->Process(camera);
+
+		delete post1;
+		delete post2;
+
+		jRenderTargetPool::ReturnRenderTarget(tempRenderTargetPtr.get());
+	}
+}
+
+//////////////////////////////////////////////////////////////////////////
+// jForward_Shadow_Pipeline
+void jForward_Shadow_Pipeline::Setup()
 {
 	ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
 	ClearType = MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH });
@@ -174,23 +288,12 @@ void jForward_SSM_Pipeline::Setup()
 	EnableBlend = true;
 	BlendSrc = EBlendSrc::ONE;
 	BlendDest = EBlendDest::ZERO;
-	Shader = jShader::GetShader("SSM");
+	Shader = jShader::GetShader(ShaderName);
 }
-
-void jForward_SSM_Pipeline::Teardown()
-{
-}
-
-void jForward_SSM_Pipeline::Draw(const std::list<jObject*>& objects, const jShader* shader, const jCamera* camera, const std::list<const jLight*>& lights) const
-{
-	g_rhi->SetRenderTarget(nullptr);
-	__super::Draw(objects, Shader, camera, lights);
-}
-
 
 //////////////////////////////////////////////////////////////////////////
 // jComputePipeline
-void jComputePipeline::Do(const jPipelineData& pipelineData)
+void jComputePipeline::Do(const jPipelineData& pipelineData) const
 {
 	Dispatch();
 }
@@ -257,18 +360,6 @@ void jDeepShadowMap_Link_ComputePipeline::Teardown()
 	delete ShadowMapHeightUniform;
 }
 
-static auto s_FuncSetup = [](std::list<IPipeline*>& pipelines)
-{
-	for (auto& pipeline : pipelines)
-		pipeline->Setup();
-};
-
-static auto s_FuncTeardown = [](std::list<IPipeline*>& pipelines)
-{
-	for (auto& pipeline : pipelines)
-		pipeline->Teardown();
-};
-
 //////////////////////////////////////////////////////////////////////////
 // jDeferredDeepShadowMapPipelineSet
 void jDeferredDeepShadowMapPipelineSet::Setup()
@@ -289,21 +380,14 @@ void jDeferredDeepShadowMapPipelineSet::Setup()
 	DeepShadowMapBuffers.AtomicBuffer->UpdateBufferData(&zero, sizeof(zero));
 
 	// Setup ShadowPrePass
-	ShadowPrePass.push_back(new jDeepShadowMap_ShadowPass_Pipeline(DeepShadowMapBuffers));
-	RenderPass.push_back(new jDeferredGeometryPipeline(GBuffer));
-	PostRenderPass.push_back(new jDeepShadowMap_Sort_ComputePipeline(DeepShadowMapBuffers));
-	PostRenderPass.push_back(new jDeepShadowMap_Link_ComputePipeline(DeepShadowMapBuffers));
-
-	s_FuncSetup(ShadowPrePass);
-	s_FuncSetup(RenderPass);
-	s_FuncSetup(PostRenderPass);
+	ADD_PIPELINE_WITH_CREATE_AND_SETUP_AT_RENDERPASS(ShadowPrePass, jDeepShadowMap_ShadowPass_Pipeline, DeepShadowMapBuffers);
+	ADD_PIPELINE_WITH_CREATE_AND_SETUP_AT_RENDERPASS(RenderPass, jDeferredGeometryPipeline, GBuffer);
+	ADD_PIPELINE_WITH_CREATE_AND_SETUP_AT_RENDERPASS(PostRenderPass, jDeepShadowMap_Sort_ComputePipeline, DeepShadowMapBuffers);
+	ADD_PIPELINE_WITH_CREATE_AND_SETUP_AT_RENDERPASS(PostRenderPass, jDeepShadowMap_Link_ComputePipeline, DeepShadowMapBuffers);
 }
 
 void jDeferredDeepShadowMapPipelineSet::Teardown()
 {
-	s_FuncTeardown(ShadowPrePass);
-	s_FuncTeardown(RenderPass);
-	s_FuncTeardown(PostRenderPass);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -311,15 +395,8 @@ void jDeferredDeepShadowMapPipelineSet::Teardown()
 void jForwardPipelineSet::Setup()
 {
 	// Setup ShadowPrePass
-	ShadowPrePass.push_back(new jForwardShadowMap_SSM_Pipeline());
-	RenderPass.push_back(new jForward_SSM_Pipeline());
-
-	s_FuncSetup(ShadowPrePass);
-	s_FuncSetup(RenderPass);
+	ADD_PIPELINE_AT_RENDERPASS(ShadowPrePass, "Forward_ShadowMapGen_SSM_Pipeline");
+	ADD_PIPELINE_WITH_CREATE_AND_SETUP_AT_RENDERPASS(ShadowPrePass, jForwardShadowMap_Blur_Pipeline);
+	ADD_PIPELINE_AT_RENDERPASS(RenderPass, "Forward_SSM_Pipeline");
 }
 
-void jForwardPipelineSet::Teardown()
-{
-	s_FuncTeardown(ShadowPrePass);
-	s_FuncTeardown(RenderPass);
-}

@@ -4,7 +4,7 @@
 
 jGBuffer::~jGBuffer()
 {
-	delete GeometryBuffer;
+	GeometryBuffer;
 }
 
 bool jGBuffer::Begin(int index /*= 0*/, bool mrt /*= false*/) const

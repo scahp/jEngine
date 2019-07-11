@@ -46,11 +46,14 @@ void jRenderer::PostRenderPass(const jCamera* camera)
 void jRenderer::DebugRenderPass(const jCamera* camera)
 {
 	jShaderInfo BoundVolumeShaderInfo;
-	jShader* BoundVolumeShader = nullptr;
-
-	BoundVolumeShaderInfo.vs = "Shaders/vs_boundvolume.glsl";
-	BoundVolumeShaderInfo.fs = "Shaders/fs_boundvolume.glsl";
-	BoundVolumeShader = jShader::CreateShader(BoundVolumeShaderInfo);
+	static jShader* BoundVolumeShader = nullptr;
+	if (!BoundVolumeShader)
+	{
+		BoundVolumeShaderInfo.name = "BoundVolumeShader";
+		BoundVolumeShaderInfo.vs = "Shaders/vs_boundvolume.glsl";
+		BoundVolumeShaderInfo.fs = "Shaders/fs_boundvolume.glsl";
+		BoundVolumeShader = jShader::CreateShader(BoundVolumeShaderInfo);
+	}
 
 	if (jShadowAppSettingProperties::GetInstance().ShowBoundBox)
 	{

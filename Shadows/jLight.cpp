@@ -163,14 +163,19 @@ void jDirectionalLight::BindLight(const jShader* shader, jMaterialData* material
 			auto materialParam = new jMaterialParam();
 			materialParam->Name = "shadow_object";
 			materialParam->Texture = static_cast<jTexture_OpenGL*>(ShadowMapData->ShadowMapRenderTarget->GetTexture());
-			materialParam->Minification = ETextureFilter::LINEAR;
-			materialParam->Magnification = ETextureFilter::LINEAR;
+			materialParam->Minification = ETextureFilter::NEAREST;
+			materialParam->Magnification = ETextureFilter::NEAREST;
 			materialData->Params.push_back(materialParam);
 		}
 	}
 }
 
 jRenderTarget* jDirectionalLight::GetShadowMapRenderTarget() const
+{
+	return (ShadowMapData ? ShadowMapData->ShadowMapRenderTarget.get() : nullptr);
+}
+
+std::shared_ptr<jRenderTarget> jDirectionalLight::GetShadowMapRenderTargetPtr() const
 {
 	return (ShadowMapData ? ShadowMapData->ShadowMapRenderTarget : nullptr);
 }
@@ -192,7 +197,7 @@ void jDirectionalLight::RenderToShadowMap(const RenderToShadowMapFunc& func, con
 	g_rhi->SetShader(shader);
 	const auto& renderTargetInfo = ShadowMapData->ShadowMapRenderTarget->Info;
 	std::vector<jViewport> viewports{ jViewport{0.0f, 0.0f, static_cast<float>(renderTargetInfo.Width), static_cast<float>(renderTargetInfo.Height)} };
-	func(ShadowMapData->ShadowMapRenderTarget, 0, ShadowMapData->ShadowMapCamera, viewports);
+	func(ShadowMapData->ShadowMapRenderTarget.get(), 0, ShadowMapData->ShadowMapCamera, viewports);
 }
 
 void jDirectionalLight::Update(float deltaTime)
@@ -248,14 +253,19 @@ void jPointLight::BindLight(const jShader* shader, jMaterialData* materialData, 
 			auto materialParam = new jMaterialParam();
 			materialParam->Name = "shadow_object_point";
 			materialParam->Texture = static_cast<jTexture_OpenGL*>(ShadowMapData->ShadowMapRenderTarget->GetTexture());
-			materialParam->Minification = ETextureFilter::LINEAR;
-			materialParam->Magnification = ETextureFilter::LINEAR;
+			materialParam->Minification = ETextureFilter::NEAREST;
+			materialParam->Magnification = ETextureFilter::NEAREST;
 			materialData->Params.push_back(materialParam);
 		}
 	}
 }
 
 jRenderTarget* jPointLight::GetShadowMapRenderTarget() const
+{
+	return (ShadowMapData ? ShadowMapData->ShadowMapRenderTarget.get() : nullptr);
+}
+
+std::shared_ptr<jRenderTarget> jPointLight::GetShadowMapRenderTargetPtr() const
 {
 	return (ShadowMapData ? ShadowMapData->ShadowMapRenderTarget : nullptr);
 }
@@ -284,7 +294,7 @@ void jPointLight::RenderToShadowMap(const RenderToShadowMapFunc& func, const jSh
 			g_rhi->SetUniformbuffer(&jUniformBuffer<Matrix>(szTemp, vp), shader);
 			viewports.push_back({ 0.0f, static_cast<float>(SM_HEIGHT * i), static_cast<float>(SM_WIDTH), static_cast<float>(SM_HEIGHT) });
 		}
-		func(ShadowMapData->ShadowMapRenderTarget, 0, ShadowMapData->ShadowMapCamera[0], viewports);
+		func(ShadowMapData->ShadowMapRenderTarget.get(), 0, ShadowMapData->ShadowMapCamera[0], viewports);
 	}
 }
 
@@ -344,14 +354,19 @@ void jSpotLight::BindLight(const jShader* shader, jMaterialData* materialData, i
 			auto materialParam = new jMaterialParam();
 			materialParam->Name = "shadow_object_spot";
 			materialParam->Texture = static_cast<jTexture_OpenGL*>(ShadowMapData->ShadowMapRenderTarget->GetTexture());
-			materialParam->Minification = ETextureFilter::LINEAR;
-			materialParam->Magnification = ETextureFilter::LINEAR;
+			materialParam->Minification = ETextureFilter::NEAREST;
+			materialParam->Magnification = ETextureFilter::NEAREST;
 			materialData->Params.push_back(materialParam);
 		}
 	}
 }
 
 jRenderTarget* jSpotLight::GetShadowMapRenderTarget() const
+{
+	return (ShadowMapData ? ShadowMapData->ShadowMapRenderTarget.get() : nullptr);
+}
+
+std::shared_ptr<jRenderTarget> jSpotLight::GetShadowMapRenderTargetPtr() const
 {
 	return (ShadowMapData ? ShadowMapData->ShadowMapRenderTarget : nullptr);
 }
@@ -380,7 +395,7 @@ void jSpotLight::RenderToShadowMap(const RenderToShadowMapFunc& func, const jSha
 			g_rhi->SetUniformbuffer(&jUniformBuffer<Matrix>(szTemp, vp), shader);
 			viewports.push_back({ 0.0f, static_cast<float>(SM_HEIGHT * i), static_cast<float>(SM_WIDTH), static_cast<float>(SM_HEIGHT) });
 		}
-		func(ShadowMapData->ShadowMapRenderTarget, 0, ShadowMapData->ShadowMapCamera[0], viewports);
+		func(ShadowMapData->ShadowMapRenderTarget.get(), 0, ShadowMapData->ShadowMapCamera[0], viewports);
 	}
 }
 

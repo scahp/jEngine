@@ -30,7 +30,7 @@
 #include <set>
 #include <algorithm>
 #include <unordered_map>
-
+#include <unordered_set>
 
 #define JASSERT(x) assert(x)
 #define JMESSAGE(x) MessageBoxA(0, x, "", MB_OK)

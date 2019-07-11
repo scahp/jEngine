@@ -6,6 +6,7 @@
 #include "jPrimitiveUtil.h"
 #include "jShadowAppProperties.h"
 #include "jGBuffer.h"
+#include "jRenderTargetPool.h"
 
 //////////////////////////////////////////////////////////////////////////
 // IPostprocess
@@ -35,9 +36,14 @@ std::weak_ptr<jPostProcessInOutput> IPostprocess::GetPostProcessOutput() const
 	return PostProcessOutput;
 }
 
-void IPostprocess::SetPostProcessInput(std::weak_ptr<jPostProcessInOutput> input)
+void IPostprocess::SetPostProcessInput(const std::weak_ptr<jPostProcessInOutput>& input)
 {
 	PostProcessInput = input;
+}
+
+void IPostprocess::SetPostProcessOutput(const std::shared_ptr<jPostProcessInOutput>& output)
+{
+	PostProcessOutput = output;
 }
 
 jFullscreenQuadPrimitive* IPostprocess::GetFullscreenQuad() const
@@ -53,11 +59,6 @@ void IPostprocess::Draw(const jCamera* camera, const jShader* shader, const std:
 
 //////////////////////////////////////////////////////////////////////////
 // jPostprocessChain
-jPostprocessChain::~jPostprocessChain()
-{
-
-}
-
 void jPostprocessChain::AddNewPostprocess(IPostprocess* postprocess)
 {
 	JASSERT(postprocess);
@@ -80,7 +81,7 @@ void jPostprocessChain::ReleaseAllPostprocesses()
 	PostProcesses.clear();
 }
 
-bool jPostprocessChain::Process(const jCamera* camera)
+bool jPostprocessChain::Process(const jCamera* camera) const
 {
 	for (auto iter : PostProcesses)
 		iter->Process(camera);
@@ -121,9 +122,15 @@ bool jPostProcess_DeepShadowMap::Do(const jCamera* camera) const
 	return true;
 }
 
+void jPostProcess_AA_DeepShadowAddition::Setup()
+{
+	Shader = jShader::GetShader("DeepShadowAA");
+}
+
 bool jPostProcess_AA_DeepShadowAddition::Do(const jCamera* camera) const
 {
 	JASSERT(Shader);
+	JASSERT(!PostProcessInput.expired());
 
 	g_rhi->SetClearColor(0.025f, 0.025f, 0.025f, 1.0f);
 	g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
@@ -136,3 +143,25 @@ bool jPostProcess_AA_DeepShadowAddition::Do(const jCamera* camera) const
 
 	return true;
 }
+
+//////////////////////////////////////////////////////////////////////////
+// jPostProcess_Blur
+bool jPostProcess_Blur::Do(const jCamera* camera) const
+{
+	JASSERT(!PostProcessInput.expired());
+
+	g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+	g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
+
+	auto shader = OmniDirectional ? jShader::GetShader("BlurOmni") : jShader::GetShader("Blur");
+
+	auto fullscreenQuad = GetFullscreenQuad();
+	if (!PostProcessInput.expired())
+		fullscreenQuad->SetTexture(PostProcessInput.lock()->RenderTaret->GetTexture());
+	fullscreenQuad->IsVertical = IsVertical;
+	fullscreenQuad->Draw(camera, shader, {});
+	fullscreenQuad->SetTexture(nullptr);
+
+	return true;
+}
+

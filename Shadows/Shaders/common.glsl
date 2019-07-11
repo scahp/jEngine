@@ -268,6 +268,12 @@ TexArrayUV convert_xyz_to_texarray_uv(vec3 direction)
     return result;
 }
 
+vec2 Convert_TexArrayUV_To_Tex2dUV(TexArrayUV uv)
+{
+	uv.v = uv.v / 6.0 + float(uv.index) * 1.0 / 6.0;
+	return vec2(uv.u, uv.v);
+}
+
 vec2 convert_xyz_to_tex2d_uv(vec3 direction)		// TEXTURE SIZE => (N) x (N * 6) 
 {
 	TexArrayUV result = convert_xyz_to_texarray_uv(direction);
@@ -438,5 +444,180 @@ TexArrayUV MakeTexArrayUV(TexArrayUV uv)
             }
         }
     }
+    return uv;
+}
+
+vec2 make_tex2d_uv(vec2 uv)
+{
+	float inv6 = 1.0 / 6.0;
+
+	int index = int(floor(uv.y / inv6));// + float(uv.index) * 1.0 / 6.0;
+	uv.y -= float(index) * inv6;
+	uv.y *= 6.0;
+
+    //for(int i=0;i<2;++i)        // to cover uv is out of range simultaneously. loop over 2 times.
+    {
+        if (index == 0)            // Positive X
+        {
+            if (uv.x > 1.0)
+            {
+                uv.x = 1.0 - uv.x;
+                index = 4;
+            }
+            else if (uv.x < 0.0)
+            {
+                uv.x = 1.0 + uv.x;
+                index = 5;
+            }            
+            else if (uv.y > 1.0)
+            {
+                float t = uv.x;
+                uv.x = uv.y - 1.0;
+                uv.y = 1.0 - t;
+                index = 2;
+            }
+            else if (uv.y < 0.0)
+            {
+                float t = uv.x;
+                uv.x = -uv.y;
+                uv.y = t;
+                index = 3;
+            }
+        }
+        else if (index == 1)       // Negative X
+        {
+            if (uv.x > 1.0)
+            {
+                uv.x = 1.0 - uv.x;
+                index = 5;
+            }
+            else if (uv.x < 0.0)
+            {
+                uv.x = 1.0 + uv.x;
+                index = 4;
+            }            
+            else if (uv.y > 1.0)
+            {
+                float t = uv.x;
+                uv.x = 2.0 - uv.y;
+                uv.y = t;
+                index = 2;
+            }
+            else if (uv.y < 0.0)
+            {
+                float t = uv.x;
+                uv.x = 1.0 + uv.y;
+                uv.y = 1.0 - t;
+                index = 3;
+            }
+        }
+        else if (index == 2)       // Positive Y
+        {
+            if (uv.x > 1.0)
+            {
+                float t = uv.x;
+                uv.x = uv.y;
+                uv.y = 2.0 - t;
+                index = 1;
+            }
+            else if (uv.x < 0.0)
+            {
+                float t = uv.x;
+                uv.x = 1.0 - uv.y;
+                uv.y = 1.0 + t;
+                index = 0;
+            }            
+            else if (uv.y > 1.0)
+            {
+                uv.x = 1.0 - uv.x;
+                uv.y = 2.0 - uv.y;
+                index = 5;
+            }
+            else if (uv.y < 0.0)
+            {
+                uv.y = 1.0 + uv.y;
+                index = 4;
+            }
+        }
+        else if (index == 3)       // Negative Y
+        {
+            if (uv.x > 1.0)
+            {
+                float t = uv.x;
+                uv.x = 1.0 - uv.y;
+                uv.y = 1.0 - t;
+                index = 1;
+            }
+            else if (uv.x < 0.0)
+            {
+                float t = uv.x;
+                uv.x = uv.y;
+                uv.y = -t;
+                index = 0;
+            }            
+            else if (uv.y > 1.0)
+            {
+                uv.y = 1.0 - uv.y;
+                index = 4;
+            }
+            else if (uv.y < 0.0)
+            {
+                uv.x = 1.0-uv.x;
+                uv.y = -uv.y;
+                index = 5;
+            }
+        }
+        else if (index == 4)       // Positive Z
+        {
+            if (uv.x > 1.0)
+            {
+                uv.x = 1.0 - uv.x;
+                index = 1;
+            }
+            else if (uv.x < 0.0)
+            {
+                uv.x = 1.0 + uv.x;
+                index = 0;
+            }            
+            else if (uv.y > 1.0)
+            {
+                uv.y = uv.y - 1.0;
+                index = 2;
+            }
+            else if (uv.y < 0.0)
+            {
+                uv.y = 1.0 + uv.y;
+                index = 3;
+            }
+        }
+        else if (index == 5)       // Negative Z
+        {
+            if (uv.x > 1.0)
+            {
+                uv.x = 1.0 - uv.x;
+                index = 0;
+            }
+            else if (uv.x < 0.0)
+            {
+                uv.x = 1.0 + uv.x;
+                index = 1;
+            }            
+            else if (uv.y > 1.0)
+            {
+                uv.x = 1.0 - uv.x;
+                uv.y = 2.0 - uv.y;
+                index = 2;
+            }
+            else if (uv.y < 0.0)
+            {
+                uv.x = 1.0 - uv.x;
+                uv.y = -uv.y;
+                index = 3;
+            }
+        }
+    }
+
+	uv.y = uv.y * inv6 + float(index) * inv6;
+
     return uv;
 }

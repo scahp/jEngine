@@ -48,7 +48,7 @@ namespace jLightUtil
 
 		FORCEINLINE bool IsValid() const { return (ShadowMapRenderTarget && ShadowMapCamera[0] && ShadowMapCamera[1] && ShadowMapCamera[2] && ShadowMapCamera[3] && ShadowMapCamera[4] && ShadowMapCamera[5]); }
 
-		jRenderTarget* ShadowMapRenderTarget = nullptr;
+		std::shared_ptr<jRenderTarget> ShadowMapRenderTarget;
 		jCamera* ShadowMapCamera[6] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
 		IUniformBufferBlock* UniformBlock = nullptr;
 	};
@@ -78,7 +78,7 @@ namespace jLightUtil
 
 		FORCEINLINE bool IsValid() const { return (ShadowMapCamera && ShadowMapRenderTarget); }
 
-		jRenderTarget* ShadowMapRenderTarget = nullptr;
+		std::shared_ptr<jRenderTarget> ShadowMapRenderTarget;
 		jCamera* ShadowMapCamera = nullptr;
 		IUniformBufferBlock* UniformBlock = nullptr;
 	};
@@ -106,6 +106,7 @@ public:
 
 	virtual void BindLight(const jShader* shader, jMaterialData* materialData, int32 index = 0) const {}
 	virtual jRenderTarget* GetShadowMapRenderTarget() const { return nullptr; }
+	virtual std::shared_ptr<jRenderTarget> GetShadowMapRenderTargetPtr() const { return nullptr; }
 	virtual jCamera* GetLightCamra(int index = 0) const { return nullptr; }
 	virtual void RenderToShadowMap(const RenderToShadowMapFunc& func, const jShader* shader) const {}
 	virtual void Update(float deltaTime) { }
@@ -175,6 +176,7 @@ public:
 
 	virtual void BindLight(const jShader* shader, jMaterialData* materialData, int32 index = 0) const override;
 	virtual jRenderTarget* GetShadowMapRenderTarget() const override;
+	virtual std::shared_ptr<jRenderTarget> GetShadowMapRenderTargetPtr() const override;
 	virtual jCamera* GetLightCamra(int index = 0) const;
 
 	jLightUtil::jShadowMapData* ShadowMapData = nullptr;
@@ -230,6 +232,7 @@ public:
 
 	virtual void BindLight(const jShader* shader, jMaterialData* materialData, int32 index = 0) const override;
 	virtual jRenderTarget* GetShadowMapRenderTarget() const override;
+	virtual std::shared_ptr<jRenderTarget> GetShadowMapRenderTargetPtr() const override;
 	virtual jCamera* GetLightCamra(int index = 0) const;
 
 	jLightUtil::jShadowMapArrayData* ShadowMapData = nullptr;
@@ -288,6 +291,7 @@ public:
 
 	virtual void BindLight(const jShader* shader, jMaterialData* materialData, int32 index = 0) const override;
 	virtual jRenderTarget* GetShadowMapRenderTarget() const override;
+	virtual std::shared_ptr<jRenderTarget> GetShadowMapRenderTargetPtr() const override;
 	virtual jCamera* GetLightCamra(int index = 0) const;
 
 	jLightUtil::jShadowMapArrayData* ShadowMapData = nullptr;

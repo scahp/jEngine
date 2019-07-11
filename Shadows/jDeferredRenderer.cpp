@@ -41,7 +41,7 @@ void jDeferredRenderer::Setup()
 	}
 
 	{
-		auto postprocess = new jPostProcess_AA_DeepShadowAddition("AA_DeepShadowAddition", nullptr, jShader::GetShader("DeepShadowAA"));
+		auto postprocess = new jPostProcess_AA_DeepShadowAddition("AA_DeepShadowAddition", nullptr);
 		PostProcessChain.AddNewPostprocess(postprocess);
 	}
 }

@@ -59,13 +59,16 @@ struct jShaderInfo
 	std::string csPreProcessor;
 };
 
-struct jShader
+struct jShader : public std::enable_shared_from_this<jShader>
 {
-	static std::unordered_map<size_t, jShader*> ShaderMap;
-	static std::unordered_map<std::string, jShader*> ShaderNameMap;
+	static std::unordered_map<size_t, std::shared_ptr<jShader> > ShaderMap;
+	static std::unordered_map<std::string, std::shared_ptr<jShader> > ShaderNameMap;
 	static jShader* GetShader(size_t hashCode);
 	static jShader* GetShader(const std::string& name);
 	static jShader* CreateShader(const jShaderInfo& shaderInfo);
+	static std::shared_ptr<jShader> GetShaderPtr(size_t hashCode);
+	static std::shared_ptr<jShader> GetShaderPtr(const std::string& name);
+	static std::shared_ptr<jShader> CreateShaderPtr(const jShaderInfo& shaderInfo);
 };
 
 #define CREATE_SHADER_VS_FS_WITH_OPTION_MORE(Name, VS, FS, IsUseTexture, IsUseMaterial, MoreOption) \
@@ -320,7 +323,7 @@ struct jRenderTargetInfo
 	int32 TextureCount = 1;
 };
 
-struct jRenderTarget
+struct jRenderTarget : public std::enable_shared_from_this<jRenderTarget>
 {
 	virtual ~jRenderTarget() {}
 

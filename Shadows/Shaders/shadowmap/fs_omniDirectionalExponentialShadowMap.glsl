@@ -35,13 +35,13 @@ layout (std140) uniform SpotLightShadowMapBlock
 uniform float PointLightESM_C;
 uniform float SpotLightESM_C;
 
-in vec3 Pos_;
+in vec4 fragPos_;
 
 void main()
 {
     if (NumOfPointLight > 0)
     {
-        vec3 lightDir = Pos_ - PointLight[0].LightPos;
+        vec3 lightDir = fragPos_.xyz - PointLight[0].LightPos;
         float distSquared = dot(lightDir.xyz, lightDir.xyz);
         float distFromLight = (sqrt(distSquared) - PointLightZNear) / (PointLightZFar - PointLightZNear);
         
@@ -50,7 +50,7 @@ void main()
     }
     else if (NumOfSpotLight > 0)
     {
-        vec3 lightDir = Pos_ - SpotLight[0].LightPos;
+        vec3 lightDir = fragPos_.xyz - SpotLight[0].LightPos;
         float distSquared = dot(lightDir.xyz, lightDir.xyz);
         float distFromLight = (sqrt(distSquared) - SpotLightZNear) / (SpotLightZFar - SpotLightZNear);
         
