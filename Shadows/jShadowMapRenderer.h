@@ -3,6 +3,7 @@
 #include "jRenderer.h"
 #include "jRHI.h"
 #include "jShadowTypes.h"
+#include "jShader.h"
 
 class jFullscreenQuadPrimitive;
 struct jShader;

@@ -53,6 +53,7 @@ void jDeferredRenderer::Teardown()
 
 void jDeferredRenderer::ShadowPrePass(const jCamera* camera)
 {
+	// todo Directional Light 만 쓸건가?
 	const jPipelineData data(jObject::GetShadowCasterObject(), camera, { camera->GetLight(ELightType::DIRECTIONAL) });
 
 	for (auto& iter : PipelineSet->ShadowPrePass)
@@ -62,7 +63,8 @@ void jDeferredRenderer::ShadowPrePass(const jCamera* camera)
 void jDeferredRenderer::RenderPass(const jCamera* camera)
 {
 	// Geometry Pass
-	const jPipelineData data(jObject::GetStaticObject(), camera, {});
+	// todo Directional Light 만 쓸건가?
+	const jPipelineData data(jObject::GetStaticObject(), camera, { camera->GetLight(ELightType::DIRECTIONAL) });
 
 	for (auto& iter : PipelineSet->RenderPass)
 		iter->Do(data);

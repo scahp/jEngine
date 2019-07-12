@@ -2,6 +2,7 @@
 #include "jRenderer.h"
 #include "jObject.h"
 #include "jShadowAppProperties.h"
+#include "jShader.h"
 
 jRenderer::jRenderer()
 {

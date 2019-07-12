@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include "jRenderer.h"
 #include "jRHI.h"
+#include "jShader.h"
 
 class jCamera;
 class jObject;

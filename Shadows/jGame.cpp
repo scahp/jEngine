@@ -84,155 +84,12 @@ void jGame::Setup()
 	MainCamera->AddLight(SpotLight);
 	MainCamera->AddLight(AmbientLight);
 
-	// Shader creation step
-	CREATE_SHADER_VS_FS("Simple", "Shaders/color_only_vs.glsl", "Shaders/color_only_fs.glsl");
-	CREATE_SHADER_VS_FS("ShadowMap", "Shaders/vs_shadowMap.glsl", "Shaders/fs_shadowMap.glsl");
-	CREATE_SHADER_VS_FS("Base", "Shaders/shadowmap/vs.glsl", "Shaders/shadowmap/fs.glsl");
-	CREATE_SHADER_VS_FS("ShadowMapOmni", "Shaders/shadowmap/vs_omniDirectionalShadowMap.glsl", "Shaders/shadowmap/fs_omniDirectionalShadowMap.glsl");
-	CREATE_SHADER_VS_FS("ShadowVolumeBase", "Shaders/shadowvolume/vs.glsl", "Shaders/shadowvolume/fs.glsl");
-	CREATE_SHADER_VS_FS("ShadowVolumeInfinityFar", "Shaders/shadowvolume/vs_infinityFar.glsl", "Shaders/shadowvolume/fs_infinityFar.glsl");
-	CREATE_SHADER_VS_FS("ExpDeepShadowMapGen", "Shaders/shadowmap/vs_expDeepShadowMap.glsl", "Shaders/shadowmap/fs_expDeepShadowMap.glsl");
-	CREATE_SHADER_VS_FS("DeepShadowMapGen", "Shaders/shadowmap/vs_shadowMap.glsl", "Shaders/shadowmap/fs_deepShadowMap.glsl");
-	CREATE_SHADER_VS_FS_WITH_OPTION("Hair", "shaders/shadowmap/vs_hair.glsl", "shaders/shadowmap/fs_hair.glsl", true, true);
-	CREATE_SHADER_VS_FS_WITH_OPTION("ExpDeepShadowFull", "shaders/fullscreen/vs_deepshadow.glsl", "shaders/fullscreen/fs_expdeepshadow.glsl", true, true);
-	CREATE_SHADER_VS_FS("DeepShadowFull", "shaders/fullscreen/vs_deepshadow.glsl", "shaders/fullscreen/fs_deepshadow.glsl");
-	CREATE_SHADER_VS_FS("DeepShadowAA", "shaders/fullscreen/vs_deepshadow.glsl", "shaders/fullscreen/fs_deepshadow_aa.glsl");
-	CREATE_SHADER_VS_FS_WITH_OPTION("ExpDeferred", "shaders/shadowmap/vs_deferred.glsl", "shaders/shadowmap/fs_expDeferred.glsl", true, true);
-	CREATE_SHADER_VS_FS_WITH_OPTION("Deferred", "shaders/shadowmap/vs_deferred.glsl", "shaders/shadowmap/fs_deferred.glsl", true, true);
-	CREATE_SHADER_CS("cs", "Shaders/compute/compute_example.glsl");
-	CREATE_SHADER_CS("cs_sort", "Shaders/compute/compute_sort_linkedlist.glsl");
-	CREATE_SHADER_CS("cs_link", "Shaders/compute/compute_link_linkedlist.glsl");
+	SpawnTestPrimitives();
+	//SpawnHairObjects();
 
-	CREATE_SHADER_VS_FS("ShadowGen_SSM", "shaders/shadowmap/vs_shadowMap.glsl", "shaders/shadowmap/fs_shadowMap.glsl");
-	CREATE_SHADER_VS_GS_FS("ShadowGen_Omni_SSM", "shaders/shadowmap/vs_omniDirectionalShadowMap.glsl", "shaders/shadowmap/gs_omniDirectionalShadowMap.glsl", "shaders/shadowmap/fs_omniDirectionalShadowMap.glsl");
-	CREATE_SHADER_VS_FS("SSM", "shaders/shadowmap/vs.glsl", "shaders/shadowmap/fs.glsl");
-	CREATE_SHADER_VS_FS_WITH_OPTION_MORE("PCF", "shaders/shadowmap/vs.glsl", "shaders/shadowmap/fs.glsl", false, false, "\r\n#define USE_PCF 1");
-	CREATE_SHADER_VS_FS_WITH_OPTION_MORE("PCF_Poisson", "shaders/shadowmap/vs.glsl", "shaders/shadowmap/fs.glsl", false, false, "\r\n#define USE_PCF 1\r\n#define USE_POISSON_SAMPLE 1");	
 
-	CREATE_SHADER_VS_FS_WITH_OPTION_MORE("PCSS", "shaders/shadowmap/vs.glsl", "shaders/shadowmap/fs.glsl", false, false, "\r\n#define USE_PCSS 1");
-	CREATE_SHADER_VS_FS_WITH_OPTION_MORE("PCSS_Poisson", "shaders/shadowmap/vs.glsl", "shaders/shadowmap/fs.glsl", false, false, "\r\n#define USE_PCSS 1\r\n#define USE_POISSON_SAMPLE 1");
-
-	CREATE_SHADER_VS_FS("ShadowGen_VSM", "shaders/shadowmap/vs_varianceShadowMap.glsl", "shaders/shadowmap/fs_varianceShadowMap.glsl");
-	CREATE_SHADER_VS_GS_FS("ShadowGen_Omni_VSM", "shaders/shadowmap/vs_omniDirectionalShadowMap.glsl", "shaders/shadowmap/gs_omniDirectionalShadowMap.glsl", "shaders/shadowmap/fs_omniDirectionalShadowMap.glsl");
-
-	CREATE_SHADER_VS_FS_WITH_OPTION_MORE("VSM", "shaders/shadowmap/vs.glsl", "shaders/shadowmap/fs.glsl", false, false, "\r\n#define USE_VSM 1");
-	CREATE_SHADER_VS_FS_WITH_OPTION_MORE("ESM", "shaders/shadowmap/vs.glsl", "shaders/shadowmap/fs.glsl", false, false, "\r\n#define USE_ESM 1");
-	CREATE_SHADER_VS_FS_WITH_OPTION_MORE("EVSM", "shaders/shadowmap/vs.glsl", "shaders/shadowmap/fs.glsl", false, false, "\r\n#define USE_EVSM 1");
-
-	CREATE_SHADER_VS_FS("Blur", "shaders/fullscreen/vs_blur.glsl", "shaders/fullscreen/fs_blur.glsl");
-	CREATE_SHADER_VS_FS("BlurOmni", "shaders/fullscreen/vs_omnidirectional_blur.glsl", "shaders/fullscreen/fs_omnidirectional_blur.glsl");
-
-	CREATE_SHADER_VS_FS("ShadowGen_ESM", "shaders/shadowmap/vs_varianceShadowMap.glsl", "shaders/shadowmap/fs_exponentialShadowMap.glsl");
-	CREATE_SHADER_VS_GS_FS("ShadowGen_Omni_ESM", "shaders/shadowmap/vs_omniDirectionalShadowMap.glsl", "shaders/shadowmap/gs_omniDirectionalShadowMap.glsl", "shaders/shadowmap/fs_omniDirectionalExponentialShadowMap.glsl");
-
-	CREATE_SHADER_VS_FS("ShadowGen_EVSM", "shaders/shadowmap/vs_EVSM.glsl", "shaders/shadowmap/fs_EVSM.glsl");
-	CREATE_SHADER_VS_GS_FS("ShadowGen_Omni_EVSM", "shaders/shadowmap/vs_omniDirectionalShadowMap.glsl", "shaders/shadowmap/gs_omniDirectionalShadowMap.glsl", "shaders/shadowmap/fs_omniDirectionalEVSM.glsl");
-
-	IPipeline::SetupPipelines();
-
-	auto quad = jPrimitiveUtil::CreateQuad(Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), Vector(1000.0f, 1000.0f, 1000.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
-	quad->SetPlane(jPlane(Vector(0.0, 1.0, 0.0), -0.1f));
-	//quad->SkipShadowMapGen = true;
-	quad->SkipUpdateShadowVolume = true;
-	jObject::AddObject(quad);
-
-	auto gizmo = jPrimitiveUtil::CreateGizmo(Vector::ZeroVector, Vector::ZeroVector, Vector::OneVector);
-	jObject::AddObject(gizmo);
-
-	auto triangle = jPrimitiveUtil::CreateTriangle(Vector(60.0, 100.0, 20.0), Vector::OneVector, Vector(40.0, 40.0, 40.0), Vector4(0.5f, 0.1f, 1.0f, 1.0f));
-	triangle->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
-	{
-		thisObject->RenderObject->Rot.x += 0.05f;
-	};
-	jObject::AddObject(triangle);
-
-	auto cube = jPrimitiveUtil::CreateCube(Vector(-60.0f, 55.0f, -20.0f), Vector::OneVector, Vector(50.0f, 50.0f, 50.0f), Vector4(0.7f, 0.7f, 0.7f, 1.0f));
-	cube->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
-	{
-		thisObject->RenderObject->Rot.z += 0.005f;
-	};
-	jObject::AddObject(cube);
-	
-	auto cube2 = jPrimitiveUtil::CreateCube(Vector(-65.0f, 35.0f, 10.0f), Vector::OneVector, Vector(50.0f, 50.0f, 50.0f), Vector4(0.7f, 0.7f, 0.7f, 1.0f));
-	jObject::AddObject(cube2);
-
-	auto capsule = jPrimitiveUtil::CreateCapsule(Vector(30.0f, 30.0f, -80.0f), 40.0f, 10.0f, 20, Vector(1.0f), Vector4(1.0f, 1.0f, 0.0f, 1.0f));
-	capsule->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
-	{
-		thisObject->RenderObject->Rot.x -= 0.01f;
-	};
-	jObject::AddObject(capsule);
-
-	auto cone = jPrimitiveUtil::CreateCone(Vector(0.0f, 50.0f, 60.0f), 40.0f, 20.0f, 15, Vector::OneVector, Vector4(1.0f, 1.0f, 0.0f, 1.0f));
-	cone->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
-	{
-		thisObject->RenderObject->Rot.y += 0.03f;
-	};
-	jObject::AddObject(cone);
-
-	auto cylinder = jPrimitiveUtil::CreateCylinder(Vector(-30.0f, 60.0f, -60.0f), 20.0f, 10.0f, 20, Vector::OneVector, Vector4(0.0f, 0.0f, 1.0f, 1.0f));
-	cylinder->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
-	{
-		thisObject->RenderObject->Rot.x += 0.05f;
-	};
-	jObject::AddObject(cylinder);
-
-	auto quad2 = jPrimitiveUtil::CreateQuad(Vector(-20.0f, 80.0f, 40.0f), Vector::OneVector, Vector(20.0f, 20.0f, 20.0f), Vector4(0.0f, 0.0f, 1.0f, 1.0f));
-	quad2->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
-	{
-		thisObject->RenderObject->Rot.z += 0.08f;
-	};
-	jObject::AddObject(quad2);
-
-	auto sphere = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f), 1.0, 16, Vector(30.0f), Vector4(0.8f, 0.0f, 0.0f, 1.0f));
-	sphere->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
-	{
-		//thisObject->RenderObject->Rot.z += 0.01f;
-		thisObject->RenderObject->Rot.z = DegreeToRadian(180.0f);
-	};
-	Sphere = sphere;
-	jObject::AddObject(sphere);
-
-	auto sphere2 = jPrimitiveUtil::CreateSphere(Vector(150.0f, 5.0f, 0.0f), 1.0, 16, Vector(10.0f), Vector4(0.8f, 0.4f, 0.6f, 1.0f));
-	sphere2->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
-	{
-		const float startY = 5.0f;
-		const float endY = 100;
-		const float speed = 1.5f;
-		static bool dir = true;
-		thisObject->RenderObject->Pos.y += dir ? speed : -speed;
-		if (thisObject->RenderObject->Pos.y < startY || thisObject->RenderObject->Pos.y > endY)
-		{
-			dir = !dir;
-			thisObject->RenderObject->Pos.y += dir ? speed : -speed;
-		}
-	};
-	Sphere = sphere2;
-	jObject::AddObject(sphere2);
-
-	auto billboard = jPrimitiveUtil::CreateBillobardQuad(Vector(0.0f, 60.0f, 80.0f), Vector::OneVector, Vector(20.0f, 20.0f, 20.0f), Vector4(1.0f, 0.0f, 1.0f, 1.0f), MainCamera);
-	jObject::AddObject(billboard);
-
-	////////////////////////////////////////////////////////////////////////////
-	//auto shadowVolumeRenderer = new jShadowVolumeRenderer();
-	//shadowVolumeRenderer->Setup();
-	//ShadowRendererMap[EShadowType::ShadowVolume] = shadowVolumeRenderer;
-
-	//auto shadowMapRenderer = new jShadowMapRenderer();
-	//shadowMapRenderer->Setup();
-	//ShadowRendererMap[EShadowType::ShadowMap] = shadowMapRenderer;
-
-	//GBuffer = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RGBA32F, EFormat::RGBA, EFormatType::FLOAT, SCR_WIDTH, SCR_HEIGHT, 4 });
 	DeferredRenderer = new jDeferredRenderer({ ETextureType::TEXTURE_2D, EFormat::RGBA32F, EFormat::RGBA, EFormatType::FLOAT, SCR_WIDTH, SCR_HEIGHT, 4 });
 	DeferredRenderer->Setup();
-
-	//auto hairObject = jHairModelLoader::GetInstance().CreateHairObject("Model/straight.hair");
-	////g_HairObjectArray.push_back(hairObject);
-	//jObject::AddObject(hairObject);
-
-	//auto headModel = jModelLoader::GetInstance().LoadFromFile("Model/woman.x");
-	////g_StaticObjectArray.push_back(headModel);
-	//jObject::AddObject(headModel);
 
 	ForwardRenderer = new jForwardRenderer();
 	ForwardRenderer->Setup();
@@ -324,4 +181,102 @@ void jGame::UpdateSettings()
 
 	//Renderer = DeferredRenderer;
 	Renderer = ForwardRenderer;
+}
+
+
+void jGame::SpawnHairObjects()
+{
+	auto hairObject = jHairModelLoader::GetInstance().CreateHairObject("Model/straight.hair");
+	//g_HairObjectArray.push_back(hairObject);
+	jObject::AddObject(hairObject);
+
+	auto headModel = jModelLoader::GetInstance().LoadFromFile("Model/woman.x");
+	//g_StaticObjectArray.push_back(headModel);
+	jObject::AddObject(headModel);
+}
+
+void jGame::SpawnTestPrimitives()
+{
+	auto quad = jPrimitiveUtil::CreateQuad(Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), Vector(1000.0f, 1000.0f, 1000.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+	quad->SetPlane(jPlane(Vector(0.0, 1.0, 0.0), -0.1f));
+	//quad->SkipShadowMapGen = true;
+	quad->SkipUpdateShadowVolume = true;
+	jObject::AddObject(quad);
+
+	auto gizmo = jPrimitiveUtil::CreateGizmo(Vector::ZeroVector, Vector::ZeroVector, Vector::OneVector);
+	jObject::AddObject(gizmo);
+
+	auto triangle = jPrimitiveUtil::CreateTriangle(Vector(60.0, 100.0, 20.0), Vector::OneVector, Vector(40.0, 40.0, 40.0), Vector4(0.5f, 0.1f, 1.0f, 1.0f));
+	triangle->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
+	{
+		thisObject->RenderObject->Rot.x += 0.05f;
+	};
+	jObject::AddObject(triangle);
+
+	auto cube = jPrimitiveUtil::CreateCube(Vector(-60.0f, 55.0f, -20.0f), Vector::OneVector, Vector(50.0f, 50.0f, 50.0f), Vector4(0.7f, 0.7f, 0.7f, 1.0f));
+	cube->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
+	{
+		thisObject->RenderObject->Rot.z += 0.005f;
+	};
+	jObject::AddObject(cube);
+
+	auto cube2 = jPrimitiveUtil::CreateCube(Vector(-65.0f, 35.0f, 10.0f), Vector::OneVector, Vector(50.0f, 50.0f, 50.0f), Vector4(0.7f, 0.7f, 0.7f, 1.0f));
+	jObject::AddObject(cube2);
+
+	auto capsule = jPrimitiveUtil::CreateCapsule(Vector(30.0f, 30.0f, -80.0f), 40.0f, 10.0f, 20, Vector(1.0f), Vector4(1.0f, 1.0f, 0.0f, 1.0f));
+	capsule->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
+	{
+		thisObject->RenderObject->Rot.x -= 0.01f;
+	};
+	jObject::AddObject(capsule);
+
+	auto cone = jPrimitiveUtil::CreateCone(Vector(0.0f, 50.0f, 60.0f), 40.0f, 20.0f, 15, Vector::OneVector, Vector4(1.0f, 1.0f, 0.0f, 1.0f));
+	cone->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
+	{
+		thisObject->RenderObject->Rot.y += 0.03f;
+	};
+	jObject::AddObject(cone);
+
+	auto cylinder = jPrimitiveUtil::CreateCylinder(Vector(-30.0f, 60.0f, -60.0f), 20.0f, 10.0f, 20, Vector::OneVector, Vector4(0.0f, 0.0f, 1.0f, 1.0f));
+	cylinder->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
+	{
+		thisObject->RenderObject->Rot.x += 0.05f;
+	};
+	jObject::AddObject(cylinder);
+
+	auto quad2 = jPrimitiveUtil::CreateQuad(Vector(-20.0f, 80.0f, 40.0f), Vector::OneVector, Vector(20.0f, 20.0f, 20.0f), Vector4(0.0f, 0.0f, 1.0f, 1.0f));
+	quad2->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
+	{
+		thisObject->RenderObject->Rot.z += 0.08f;
+	};
+	jObject::AddObject(quad2);
+
+	auto sphere = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f), 1.0, 16, Vector(30.0f), Vector4(0.8f, 0.0f, 0.0f, 1.0f));
+	sphere->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
+	{
+		//thisObject->RenderObject->Rot.z += 0.01f;
+		thisObject->RenderObject->Rot.z = DegreeToRadian(180.0f);
+	};
+	Sphere = sphere;
+	jObject::AddObject(sphere);
+
+	auto sphere2 = jPrimitiveUtil::CreateSphere(Vector(150.0f, 5.0f, 0.0f), 1.0, 16, Vector(10.0f), Vector4(0.8f, 0.4f, 0.6f, 1.0f));
+	sphere2->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
+	{
+		const float startY = 5.0f;
+		const float endY = 100;
+		const float speed = 1.5f;
+		static bool dir = true;
+		thisObject->RenderObject->Pos.y += dir ? speed : -speed;
+		if (thisObject->RenderObject->Pos.y < startY || thisObject->RenderObject->Pos.y > endY)
+		{
+			dir = !dir;
+			thisObject->RenderObject->Pos.y += dir ? speed : -speed;
+		}
+	};
+	Sphere = sphere2;
+	jObject::AddObject(sphere2);
+
+	auto billboard = jPrimitiveUtil::CreateBillobardQuad(Vector(0.0f, 60.0f, 80.0f), Vector::OneVector, Vector(20.0f, 20.0f, 20.0f), Vector4(1.0f, 0.0f, 1.0f, 1.0f), MainCamera);
+	jObject::AddObject(billboard);
 }

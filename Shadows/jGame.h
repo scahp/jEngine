@@ -27,6 +27,10 @@ public:
 
 	void ProcessInput();
 	void Setup();
+
+	void SpawnHairObjects();
+	void SpawnTestPrimitives();
+
 	void Update(float deltaTime);
 	void OnMouseMove(int32 xOffset, int32 yOffset);
 	void Teardown();

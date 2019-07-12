@@ -109,7 +109,7 @@ class jRenderPipeline : public IPipeline
 {
 public:
 	virtual void Do(const jPipelineData& pipelineData) const override;
-	virtual void Draw(const std::list<jObject*>& objects, const jShader* shader, const jCamera* camera, const std::list<const jLight*>& lights) const;
+	virtual void Draw(const jPipelineData& pipelineData, const jShader* shader) const;
 };
 
 
@@ -123,7 +123,7 @@ public:
 
 	virtual void Setup() override;
 
-	virtual void Draw(const std::list<jObject*>& objects, const jShader* shader, const jCamera* camera, const std::list<const jLight*>& lights) const override;
+	virtual void Draw(const jPipelineData& pipelineData, const jShader* shader) const override;
 
 private:
 	const jGBuffer* GBuffer = nullptr;
@@ -138,7 +138,7 @@ public:
 	{ }
 
 	virtual void Setup() override;
-	virtual void Draw(const std::list<jObject*>& objects, const jShader* shader, const jCamera* camera, const std::list<const jLight*>& lights) const override;
+	virtual void Draw(const jPipelineData& pipelineData, const jShader* shader) const override;
 
 private:
 	jDeepShadowMapBuffers DeepShadowMapBuffers;
@@ -154,7 +154,7 @@ public:
 	{ }
 
 	virtual void Setup() override;
-	virtual void Draw(const std::list<jObject*>& objects, const jShader* shader, const jCamera* camera, const std::list<const jLight*>& lights) const override;
+	virtual void Draw(const jPipelineData& pipelineData, const jShader* shader) const override;
 
 	jShader* ShadowGenShader = nullptr;
 	jShader* OmniShadowGenShader = nullptr;
@@ -189,7 +189,7 @@ public:
 	jForwardShadowMap_Blur_Pipeline() = default;
 
 	virtual void Setup() override;
-	virtual void Draw(const std::list<jObject*>& objects, const jShader* shader, const jCamera* camera, const std::list<const jLight*>& lights) const override;
+	virtual void Draw(const jPipelineData& pipelineData, const jShader* shader) const override;
 
 	std::shared_ptr<struct jPostProcessInOutput> PostProcessInput;
 };
@@ -279,20 +279,44 @@ public:
 
 	virtual EPipelineSetType GetType() const { return EPipelineSetType::DeepShadowMap; }
 	virtual void Setup() override;
-	virtual void Teardown() override;
 
 	const jGBuffer* GBuffer = nullptr;
 	jDeepShadowMapBuffers DeepShadowMapBuffers;
 };
 
+#define START_CREATE_PIPELINE_SET_INFO(Name, Prefix, PipelineSetType) \
+class j##Prefix##PipelineSet_##Name : public jPipelineSet \
+{ \
+public: \
+	virtual EPipelineSetType GetType() const override { return PipelineSetType; } \
+	virtual void Setup() override {
+
+#define END_CREATE_PIPELINE_SET_INFO() } };
+
 //////////////////////////////////////////////////////////////////////////
-// jForwardPipelineSet
-class jForwardPipelineSet : public jPipelineSet
-{
-public:
-	jForwardPipelineSet() = default;
+// jForwardPipelineSet_SSM
+START_CREATE_PIPELINE_SET_INFO(SSM, Forward, EPipelineSetType::Forward)
+	ADD_PIPELINE_AT_RENDERPASS(ShadowPrePass, "Forward_ShadowMapGen_SSM_Pipeline");
+	ADD_PIPELINE_AT_RENDERPASS(RenderPass, "Forward_SSM_Pipeline");
+END_CREATE_PIPELINE_SET_INFO()
 
-	virtual EPipelineSetType GetType() const override { return EPipelineSetType::Forward; }
+// jForwardPipelineSet_VSM
+START_CREATE_PIPELINE_SET_INFO(VSM, Forward, EPipelineSetType::Forward)
+	ADD_PIPELINE_AT_RENDERPASS(ShadowPrePass, "Forward_ShadowMapGen_VSM_Pipeline");
+	ADD_PIPELINE_WITH_CREATE_AND_SETUP_AT_RENDERPASS(ShadowPrePass, jForwardShadowMap_Blur_Pipeline);
+	ADD_PIPELINE_AT_RENDERPASS(RenderPass, "Forward_VSM_Pipeline");
+END_CREATE_PIPELINE_SET_INFO()
 
-	virtual void Setup() override;
-};
+// jForwardPipelineSet_VSM
+START_CREATE_PIPELINE_SET_INFO(ESM, Forward, EPipelineSetType::Forward)
+	ADD_PIPELINE_AT_RENDERPASS(ShadowPrePass, "Forward_ShadowMapGen_ESM_Pipeline");
+	ADD_PIPELINE_WITH_CREATE_AND_SETUP_AT_RENDERPASS(ShadowPrePass, jForwardShadowMap_Blur_Pipeline);
+	ADD_PIPELINE_AT_RENDERPASS(RenderPass, "Forward_ESM_Pipeline");
+END_CREATE_PIPELINE_SET_INFO()
+
+// jForwardPipelineSet_EVSM
+START_CREATE_PIPELINE_SET_INFO(EVSM, Forward, EPipelineSetType::Forward)
+	ADD_PIPELINE_AT_RENDERPASS(ShadowPrePass, "Forward_ShadowMapGen_EVSM_Pipeline");
+	ADD_PIPELINE_WITH_CREATE_AND_SETUP_AT_RENDERPASS(ShadowPrePass, jForwardShadowMap_Blur_Pipeline);
+	ADD_PIPELINE_AT_RENDERPASS(RenderPass, "Forward_EVSM_Pipeline");
+END_CREATE_PIPELINE_SET_INFO()

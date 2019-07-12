@@ -2,6 +2,7 @@
 
 #include "jRHI.h"
 #include "jRHIType.h"
+#include "jShader.h"
 
 struct jVertexStream_OpenGL
 {

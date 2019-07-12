@@ -1,5 +1,6 @@
 ﻿#include "pch.h"
 #include "jRHI.h"
+#include "jShader.h"
 
 std::unordered_map<size_t, std::shared_ptr<jShader> > jShader::ShaderMap;
 std::unordered_map < std::string , std::shared_ptr<jShader> > jShader::ShaderNameMap;

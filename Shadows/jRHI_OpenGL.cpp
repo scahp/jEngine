@@ -2,6 +2,7 @@
 #include "jRHI_OpenGL.h"
 #include "jFile.h"
 #include "jRHIType.h"
+#include "jShader.h"
 
 jRHI_OpenGL::jRHI_OpenGL()
 {

@@ -2,7 +2,8 @@
 #include "jEngine.h"
 #include "jAppSettings.h"
 #include "jShadowAppProperties.h"
-
+#include "jPipeline.h"
+#include "jShader.h"
 
 jEngine::jEngine()
 {
@@ -18,6 +19,9 @@ jEngine::~jEngine()
 
 void jEngine::Init()
 {
+	jShaderInfo::CreateShaders();
+	IPipeline::SetupPipelines();
+
 	Game.Setup();
 
 	jShadowAppSettingProperties::GetInstance().Setup(jAppSettings::GetInstance().Get("MainPannel"));

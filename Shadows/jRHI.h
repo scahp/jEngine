@@ -5,7 +5,7 @@
 extern class jRHI* g_rhi;
 
 struct jShader;
-
+struct jShaderInfo;
 
 struct IBuffer
 {
@@ -41,95 +41,6 @@ struct jViewport
 	float width = 0.0f;
 	float height = 0.0f;
 };
-
-struct jShaderInfo
-{
-	size_t CreateShaderHash() const
-	{
-		return std::hash<std::string>{}(vs+vsPreProcessor+gs+gsPreProcessor+fs+fsPreProcessor+cs+csPreProcessor);
-	}
-	std::string name;
-	std::string vs;
-	std::string gs;
-	std::string fs;
-	std::string cs;
-	std::string vsPreProcessor;
-	std::string gsPreProcessor;
-	std::string fsPreProcessor;
-	std::string csPreProcessor;
-};
-
-struct jShader : public std::enable_shared_from_this<jShader>
-{
-	static std::unordered_map<size_t, std::shared_ptr<jShader> > ShaderMap;
-	static std::unordered_map<std::string, std::shared_ptr<jShader> > ShaderNameMap;
-	static jShader* GetShader(size_t hashCode);
-	static jShader* GetShader(const std::string& name);
-	static jShader* CreateShader(const jShaderInfo& shaderInfo);
-	static std::shared_ptr<jShader> GetShaderPtr(size_t hashCode);
-	static std::shared_ptr<jShader> GetShaderPtr(const std::string& name);
-	static std::shared_ptr<jShader> CreateShaderPtr(const jShaderInfo& shaderInfo);
-};
-
-#define CREATE_SHADER_VS_FS_WITH_OPTION_MORE(Name, VS, FS, IsUseTexture, IsUseMaterial, MoreOption) \
-{ \
-jShaderInfo info; \
-info.name = Name; \
-info.vs = VS; \
-info.fs = FS; \
-info.vsPreProcessor += IsUseTexture ? "#define USE_TEXTURE 1" : "";\
-info.vsPreProcessor += IsUseMaterial ? "\r\n#define USE_MATERIAL 1" : "";\
-info.vsPreProcessor += "\r\n"MoreOption;\
-info.fsPreProcessor += IsUseTexture ? "#define USE_TEXTURE 1" : "";\
-info.fsPreProcessor += IsUseMaterial ? "\r\n#define USE_MATERIAL 1" : "";\
-info.fsPreProcessor += "\r\n"MoreOption;\
-jShader::CreateShader(info); \
-}
-
-#define CREATE_SHADER_VS_FS_WITH_OPTION(Name, VS, FS, IsUseTexture, IsUseMaterial) \
-{ \
-jShaderInfo info; \
-info.name = Name; \
-info.vs = VS; \
-info.fs = FS; \
-info.vsPreProcessor += IsUseTexture ? "#define USE_TEXTURE 1" : "";\
-info.vsPreProcessor += IsUseMaterial ? "\r\n#define USE_MATERIAL 1" : "";\
-info.fsPreProcessor += IsUseTexture ? "#define USE_TEXTURE 1" : "";\
-info.fsPreProcessor += IsUseMaterial ? "\r\n#define USE_MATERIAL 1" : "";\
-jShader::CreateShader(info); \
-}
-
-
-#define CREATE_SHADER_VS_FS(Name, VS, FS) CREATE_SHADER_VS_FS_WITH_OPTION(Name, VS, FS, false, false)
-
-#define CREATE_SHADER_VS_GS_FS_WITH_OPTION(Name, VS, GS, FS, IsUseTexture, IsUseMaterial) \
-{ \
-jShaderInfo info; \
-info.name = Name; \
-info.vs = VS; \
-info.gs = GS; \
-info.fs = FS; \
-info.vsPreProcessor += IsUseTexture ? "#define USE_TEXTURE 1" : "";\
-info.vsPreProcessor += IsUseMaterial ? "\r\n#define USE_MATERIAL 1" : "";\
-info.gsPreProcessor += IsUseTexture ? "#define USE_TEXTURE 1" : ""; \
-info.gsPreProcessor += IsUseMaterial ? "\r\n#define USE_MATERIAL 1" : ""; \
-info.fsPreProcessor += IsUseTexture ? "#define USE_TEXTURE 1" : "";\
-info.fsPreProcessor += IsUseMaterial ? "\r\n#define USE_MATERIAL 1" : "";\
-jShader::CreateShader(info); \
-}
-
-#define CREATE_SHADER_VS_GS_FS(Name, VS, GS, FS) CREATE_SHADER_VS_GS_FS_WITH_OPTION(Name, VS, GS, FS, false, false)
-
-#define CREATE_SHADER_CS_WITH_OPTION(Name, CS, IsUseTexture, IsUseMaterial) \
-{ \
-jShaderInfo info; \
-info.name = Name; \
-info.cs = CS; \
-info.csPreProcessor += IsUseTexture ? "#define USE_TEXTURE 1" : "";\
-info.csPreProcessor += IsUseMaterial ? "\r\n#define USE_MATERIAL 1" : "";\
-jShader::CreateShader(info); \
-}
-#define CREATE_SHADER_CS(Name, CS) CREATE_SHADER_CS_WITH_OPTION(Name, CS, false, false);
 
 enum class EUniformType
 {
