@@ -16,7 +16,7 @@ jForwardRenderer::~jForwardRenderer()
 
 void jForwardRenderer::Setup()
 {
-	PipelineSet = new jForwardPipelineSet_SSM();
+	PipelineSet = new jForwardPipelineSet_EVSM();
 	PipelineSet->Setup();
 }
 

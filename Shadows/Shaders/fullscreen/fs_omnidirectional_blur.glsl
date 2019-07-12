@@ -21,51 +21,28 @@ out vec4 color;
 void main()
 {
     vec2 radiusUV = (FILTER_SIZE * PixelSize) / FILTER_STEP_COUNT;
-
     if (IsVertical > 0.0)
-    {
         radiusUV = vec2(0.0, radiusUV.y);
-    }
     else
-    {
         radiusUV = vec2(radiusUV.x, 0.0);
-    }
 
-	float inv6 = 1.0 / 6.0;
-
+	const float inv6 = 1.0 / 6.0;
     vec4 colorTemp = vec4(0);
-    for (float x = -FILTER_STEP_COUNT; x <= FILTER_STEP_COUNT; ++x)
+	for (float x = -FILTER_STEP_COUNT; x <= FILTER_STEP_COUNT; ++x)
 	{
-        vec2 offset = vec2(x, x / 6.0) * radiusUV;
-        vec2 tex = TexCoord_ + offset;
-
-		//colorTemp = vec4(0.0, 0.0, 0.0, COUNT);
-
-		int index = int(tex.y / inv6);
+		int index = int(TexCoord_.y / inv6);
+		vec2 tex = TexCoord_ + vec2(x, x * inv6) * radiusUV;
 
 		TexArrayUV uv;
 		uv.u = tex.x;
 		uv.v = (tex.y - (inv6 * index)) * 6.0;
 		uv.index = index;
+		uv = MakeTexArrayUV(uv);
+		uv = MakeTexArrayUV(uv);
 		tex = Convert_TexArrayUV_To_Tex2dUV(uv);
+		colorTemp += texture(tex_object, tex);
+	}
+	color = colorTemp / COUNT;
 
-		index = int(tex.y / inv6);
-		uv.u = tex.x;
-		uv.v = (tex.y - (inv6 * index)) * 6.0;
-		uv.index = index;
-		tex = Convert_TexArrayUV_To_Tex2dUV(uv);
-
-        if (tex.x < 0.0 || tex.x > 1.0 || tex.y < 0.0 || tex.y > 1.0)
-        {
-            colorTemp.x += exp(MaxDist);
-            colorTemp.y += exp(MaxDist * MaxDist);
-            colorTemp.w += 1.0;
-        }
-        else
-        {
-            colorTemp += texture(tex_object, tex);
-        }
-    }
-
-    color = colorTemp / COUNT;
+	//color = texture(tex_object, TexCoord_);
 }
