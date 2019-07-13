@@ -112,6 +112,7 @@ public:
 
 	virtual bool Do(const jCamera* camera) const override;
 
+	float MaxDist = FLT_MAX;
 	bool IsVertical = false;
 	bool OmniDirectional = false;
 };

@@ -158,7 +158,11 @@ bool jPostProcess_Blur::Do(const jCamera* camera) const
 	auto fullscreenQuad = GetFullscreenQuad();
 	if (!PostProcessInput.expired())
 		fullscreenQuad->SetTexture(PostProcessInput.lock()->RenderTaret->GetTexture());
-	fullscreenQuad->IsVertical = IsVertical;
+
+	g_rhi->SetShader(shader);
+	g_rhi->SetUniformbuffer(&jUniformBuffer<float>("IsVertical", IsVertical), shader);
+	g_rhi->SetUniformbuffer(&jUniformBuffer<float>("MaxDist", MaxDist), shader);
+
 	fullscreenQuad->Draw(camera, shader, {});
 	fullscreenQuad->SetTexture(nullptr);
 

@@ -56,9 +56,6 @@ public:
 class jFullscreenQuadPrimitive : public jObject
 {
 public:
-	bool IsVertical = true;
-	float MaxDist = 0.0f;
-
 	virtual void Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights) override;
 	void SetUniformBuffer(const jShader* shader);
 	void SetTexture(const jTexture* texture);

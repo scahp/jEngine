@@ -60,13 +60,9 @@ void jFullscreenQuadPrimitive::Draw(const jCamera* camera, const jShader* shader
 void jFullscreenQuadPrimitive::SetUniformBuffer(const jShader* shader)
 {
 	auto temp1 = jUniformBuffer<Vector2>("PixelSize", Vector2(1.0f / SCR_WIDTH, 1.0f / SCR_HEIGHT));
-	auto temp2 = jUniformBuffer<float>("IsVertical", IsVertical);
-	auto temp3 = jUniformBuffer<float>("MaxDist", MaxDist);
 
 	g_rhi->SetShader(shader);
 	g_rhi->SetUniformbuffer(&temp1, shader);
-	g_rhi->SetUniformbuffer(&temp2, shader);
-	g_rhi->SetUniformbuffer(&temp3, shader);
 }
 
 void jFullscreenQuadPrimitive::SetTexture(const jTexture* texture)

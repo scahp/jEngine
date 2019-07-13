@@ -172,7 +172,6 @@ void jForward_ShadowMapGen_Pipeline::Draw(const jPipelineData& pipelineData, con
 	{
 		JASSERT(light);
 
-		bool useMRT = false;
 		bool skip = false;
 
 		jShader* currentShader = nullptr;
@@ -184,7 +183,6 @@ void jForward_ShadowMapGen_Pipeline::Draw(const jPipelineData& pipelineData, con
 		case ELightType::POINT:
 		case ELightType::SPOT:
 			currentShader = OmniShadowGenShader;
-			useMRT = true;
 			break;
 		case ELightType::AMBIENT:
 			skip = true;
