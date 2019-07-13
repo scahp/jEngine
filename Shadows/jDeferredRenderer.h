@@ -27,6 +27,6 @@ public:
 private:
 	jGBuffer GBuffer;
 	jRenderTargetInfo GeometryBufferInfo;
-
+	jPipelineSet* DeferredDeepShadowMapPipelineSet = nullptr;
 };
 

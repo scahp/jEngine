@@ -23,8 +23,10 @@ void jDeferredRenderer::Setup()
 {
 	GBuffer.GeometryBuffer = jRenderTargetPool::GetRenderTarget(GeometryBufferInfo);
 
-	PipelineSet = new jDeferredDeepShadowMapPipelineSet(&GBuffer);
-	PipelineSet->Setup();
+	DeferredDeepShadowMapPipelineSet = new jDeferredDeepShadowMapPipelineSet(&GBuffer);
+	DeferredDeepShadowMapPipelineSet->Setup();
+
+	SetChangePipelineSet(DeferredDeepShadowMapPipelineSet);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Setup a postprocess chain

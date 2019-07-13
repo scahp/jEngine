@@ -21,6 +21,7 @@
 #include "glad\glad.h"
 #include "jDeferredRenderer.h"
 #include "jForwardRenderer.h"
+#include "jPipeline.h"
 
 jRHI* g_rhi = nullptr;
 
@@ -91,12 +92,25 @@ void jGame::Setup()
 	DeferredRenderer = new jDeferredRenderer({ ETextureType::TEXTURE_2D, EFormat::RGBA32F, EFormat::RGBA, EFormatType::FLOAT, SCR_WIDTH, SCR_HEIGHT, 4 });
 	DeferredRenderer->Setup();
 
-	ForwardRenderer = new jForwardRenderer();
+	ShadowPipelineSetMap.insert(std::make_pair(EShadowMapType::SSM, CREATE_PIPELINE_SET_WITH_SETUP(jForwardPipelineSet_SSM)));
+	ShadowPipelineSetMap.insert(std::make_pair(EShadowMapType::VSM, CREATE_PIPELINE_SET_WITH_SETUP(jForwardPipelineSet_VSM)));
+	ShadowPipelineSetMap.insert(std::make_pair(EShadowMapType::ESM, CREATE_PIPELINE_SET_WITH_SETUP(jForwardPipelineSet_ESM)));
+	ShadowPipelineSetMap.insert(std::make_pair(EShadowMapType::EVSM, CREATE_PIPELINE_SET_WITH_SETUP(jForwardPipelineSet_EVSM)));
+
+	CurrentShadowMapType = jShadowAppSettingProperties::GetInstance().ShadowMapType;
+
+	ForwardRenderer = new jForwardRenderer(ShadowPipelineSetMap[CurrentShadowMapType]);
 	ForwardRenderer->Setup();
 }
 
 void jGame::Update(float deltaTime)
 {
+	if (CurrentShadowMapType != jShadowAppSettingProperties::GetInstance().ShadowMapType)
+	{
+		CurrentShadowMapType = jShadowAppSettingProperties::GetInstance().ShadowMapType;
+		Renderer->SetChangePipelineSet(ShadowPipelineSetMap[CurrentShadowMapType]);
+	}
+
 	// todo debug test, should remove this
 	if (DirectionalLight)
 		DirectionalLight->Data.Direction = jShadowAppSettingProperties::GetInstance().DirecionalLightDirection;

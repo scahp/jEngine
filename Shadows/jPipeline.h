@@ -320,3 +320,11 @@ START_CREATE_PIPELINE_SET_INFO(EVSM, Forward, EPipelineSetType::Forward)
 	ADD_PIPELINE_WITH_CREATE_AND_SETUP_AT_RENDERPASS(ShadowPrePass, jForwardShadowMap_Blur_Pipeline);
 	ADD_PIPELINE_AT_RENDERPASS(RenderPass, "Forward_EVSM_Pipeline");
 END_CREATE_PIPELINE_SET_INFO()
+
+#define CREATE_PIPELINE_SET_WITH_SETUP(PipelineSetClass, ...) \
+[this]()\
+{ \
+auto newPipeline = new PipelineSetClass(__VA_ARGS__); \
+newPipeline->Setup(); \
+return newPipeline; \
+}()

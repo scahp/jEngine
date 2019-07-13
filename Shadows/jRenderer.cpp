@@ -3,6 +3,7 @@
 #include "jObject.h"
 #include "jShadowAppProperties.h"
 #include "jShader.h"
+#include "jPipeline.h"
 
 jRenderer::jRenderer()
 {
@@ -100,4 +101,12 @@ void jRenderer::Render(const jCamera* camera)
 
 	UIPass(camera);
 	DebugUIPass(camera);
+}
+
+void jRenderer::SetChangePipelineSet(jPipelineSet* newPipelineSet)
+{
+	if (!newPipelineSet)
+		return;
+
+	PipelineSet = newPipelineSet;
 }

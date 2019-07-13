@@ -95,11 +95,11 @@ out vec4 color;
 void main()
 {
 #if defined(USE_VSM)
-    float vsmBiasForOmniDirectional = 0.5;
+    float vsmBiasForOmniDirectional = 0.1;
 #endif // defined(USE_VSM) || defined(USE_EVSM)
 
 #if defined(USE_EVSM)
-    float evsmBiasForOmniDirectional = 0.5;
+    float evsmBiasForOmniDirectional = 0.1;
 #endif // USE_EVSM
 
     vec3 normal = normalize(Normal_);
@@ -266,7 +266,7 @@ void main()
 			}
 #endif // USE_MATERIAL
 
-            finalColor += GetPointLight(light, normal, Pos_, viewDir) * lit;
+			finalColor += GetPointLight(light, normal, Pos_, viewDir) * lit;
         }
     }
     

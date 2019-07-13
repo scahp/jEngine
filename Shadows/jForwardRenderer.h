@@ -9,7 +9,7 @@ class jCamera;
 class jForwardRenderer : public jRenderer
 {
 public:
-	jForwardRenderer() = default;
+	using jRenderer::jRenderer;
 	virtual ~jForwardRenderer();
 
 	typedef void (*RenderPassFunc)(jCamera*);

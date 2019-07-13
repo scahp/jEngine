@@ -18,6 +18,7 @@ struct IAtomicCounterBuffer;
 struct jTexture;
 struct jRenderTarget;
 class jObject;
+class jPipelineSet;
 
 class jGame
 {
@@ -51,5 +52,9 @@ public:
 
 	jRenderer* DeferredRenderer = nullptr;
 	jRenderer* ForwardRenderer = nullptr;
+
+	std::map<EShadowMapType, jPipelineSet*> ShadowPipelineSetMap;
+
+	EShadowMapType CurrentShadowMapType = EShadowMapType::SSM;
 };
 

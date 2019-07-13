@@ -248,18 +248,18 @@ void jShadowMapRenderer::RenderPass(const jCamera* camera)
 	jShader* baseShader = nullptr;
 	switch (ShadowMapType)
 	{
-	case EShadowMapType::PCF:     // PCF
-		if (UsePoissonSample)
-			baseShader = PCF_Poisson_Shader;
-		else
-			baseShader = PCF_Shader;
-		break;
-	case EShadowMapType::PCSS:     // PCSS
-		if (UsePoissonSample)
-			baseShader = PCSS_Poisson_Shader;
-		else
-			baseShader = PCSS_Shader;
-		break;
+	//case EShadowMapType::PCF:     // PCF
+	//	if (UsePoissonSample)
+	//		baseShader = PCF_Poisson_Shader;
+	//	else
+	//		baseShader = PCF_Shader;
+	//	break;
+	//case EShadowMapType::PCSS:     // PCSS
+	//	if (UsePoissonSample)
+	//		baseShader = PCSS_Poisson_Shader;
+	//	else
+	//		baseShader = PCSS_Shader;
+	//	break;
 	case EShadowMapType::VSM:     // VSM
 		baseShader = VSM_Shader;;
 		break;

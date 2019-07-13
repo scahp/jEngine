@@ -36,6 +36,8 @@ public:
 	virtual void Render(const jCamera* camera);
 	virtual void UpdateSettings() {}
 
+	virtual void SetChangePipelineSet(jPipelineSet* newPipelineSet);
+
 	jPipelineSet* PipelineSet = nullptr;
 	jPostprocessChain PostProcessChain;
 };

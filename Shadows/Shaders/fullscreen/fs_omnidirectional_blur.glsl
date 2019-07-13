@@ -37,7 +37,6 @@ void main()
 		uv.v = (tex.y - (inv6 * index)) * 6.0;
 		uv.index = index;
 		uv = MakeTexArrayUV(uv);
-		uv = MakeTexArrayUV(uv);
 		tex = Convert_TexArrayUV_To_Tex2dUV(uv);
 		colorTemp += texture(tex_object, tex) * invCount;
 	}
