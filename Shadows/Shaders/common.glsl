@@ -385,7 +385,7 @@ TexArrayUV MakeTexArrayUV(TexArrayUV uv)
             }            
             else if (uv.v > 1.0)
             {
-                uv.v = 1.0 - uv.v;
+				uv.v = uv.v - 1.0;
                 uv.index = 4;
             }
             else if (uv.v < 0.0)

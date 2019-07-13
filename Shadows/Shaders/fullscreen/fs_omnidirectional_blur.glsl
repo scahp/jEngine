@@ -3,7 +3,6 @@
 #include "common.glsl"
 
 precision mediump float;
-precision mediump sampler2DArray;
 
 uniform sampler2D tex_object;
 uniform vec2 PixelSize;
@@ -26,13 +25,13 @@ void main()
     else
         radiusUV = vec2(radiusUV.x, 0.0);
 
+	const float invCount = 1.0 / COUNT;
 	const float inv6 = 1.0 / 6.0;
     vec4 colorTemp = vec4(0);
 	for (float x = -FILTER_STEP_COUNT; x <= FILTER_STEP_COUNT; ++x)
 	{
 		int index = int(TexCoord_.y / inv6);
 		vec2 tex = TexCoord_ + vec2(x, x * inv6) * radiusUV;
-
 		TexArrayUV uv;
 		uv.u = tex.x;
 		uv.v = (tex.y - (inv6 * index)) * 6.0;
@@ -40,9 +39,7 @@ void main()
 		uv = MakeTexArrayUV(uv);
 		uv = MakeTexArrayUV(uv);
 		tex = Convert_TexArrayUV_To_Tex2dUV(uv);
-		colorTemp += texture(tex_object, tex);
+		colorTemp += texture(tex_object, tex) * invCount;
 	}
-	color = colorTemp / COUNT;
-
-	//color = texture(tex_object, TexCoord_);
+	color = colorTemp;
 }
