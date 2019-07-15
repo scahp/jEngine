@@ -335,10 +335,10 @@ void jShadowMapRenderer::RenderPass(const jCamera* camera)
 		}
 	}
 
-	for (auto& iter : g_HairObjectArray)
-	{
-		iter->Draw(camera, Hair_Shader, lights);
-	}
+	//for (auto& iter : g_HairObjectArray)
+	//{
+	//	iter->Draw(camera, Hair_Shader, lights);
+	//}
 
 //	// 3. Transparent object render
 //	gl.enable(gl.BLEND);

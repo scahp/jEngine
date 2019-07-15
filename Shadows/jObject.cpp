@@ -5,13 +5,13 @@
 
 std::list<jObject*> jObject::s_ShadowCasterObject;
 std::list<jObject*> jObject::s_StaticObjects;
+std::list<jObject*> jObject::s_BoundBoxObjects;
+std::list<jObject*> jObject::s_BoundSphereObjects;
+std::list<jObject*> jObject::s_DebugObjects;
 std::set<jObject*> jObject::s_DirtyStateObjects;
 
 //std::list<jObject*> g_StaticObjectArray;
 std::list<jObject*> g_HairObjectArray;
-std::list<jObject*> g_DebugObjectArray;
-std::list<jObject*> g_BoundBoxObjectArray;
-std::list<jObject*> g_BoundSphereObjectArray;
 
 void jObject::AddObject(jObject* object)
 {
@@ -58,12 +58,12 @@ void jObject::FlushDirtyState()
 
 void jObject::AddBoundBoxObject(jObject* object)
 {
-	g_BoundBoxObjectArray.push_back(object);
+	s_BoundBoxObjects.push_back(object);
 }
 
 void jObject::RemoveBoundBoxObject(jObject* object)
 {
-	g_BoundBoxObjectArray.remove_if([&object](jObject* param)
+	s_BoundBoxObjects.remove_if([&object](jObject* param)
 	{
 		return (param == object);
 	});
@@ -71,12 +71,12 @@ void jObject::RemoveBoundBoxObject(jObject* object)
 
 void jObject::AddBoundSphereObject(jObject* object)
 {
-	g_BoundSphereObjectArray.push_back(object);
+	s_BoundSphereObjects.push_back(object);
 }
 
 void jObject::RemoveBoundSphereObject(jObject* object)
 {
-	g_BoundSphereObjectArray.remove_if([&object](jObject* param)
+	s_BoundSphereObjects.remove_if([&object](jObject* param)
 	{
 		return (param == object);
 	});
@@ -84,12 +84,12 @@ void jObject::RemoveBoundSphereObject(jObject* object)
 
 void jObject::AddDebugObject(jObject* object)
 {
-	g_DebugObjectArray.push_back(object);
+	s_DebugObjects.push_back(object);
 }
 
 void jObject::RemoveDebugObject(jObject* object)
 {
-	g_DebugObjectArray.remove_if([&object](jObject* param)
+	s_DebugObjects.remove_if([&object](jObject* param)
 		{
 			return (param == object);
 		});

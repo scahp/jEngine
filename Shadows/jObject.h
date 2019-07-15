@@ -13,23 +13,26 @@ public:
 	jObject();
 	~jObject();
 
-	jRenderObject* RenderObject = nullptr;
-	jVertexAdjacency* VertexAdjacency = nullptr;
-	jShadowVolume* ShadowVolume = nullptr;
-
+	//////////////////////////////////////////////////////////////////////////
 	static void AddObject(jObject* object);
 	static void RemoveObject(jObject* object);
 	static void FlushDirtyState();
 
 	static const std::list<jObject*>& GetShadowCasterObject() { return s_ShadowCasterObject; }
 	static const std::list<jObject*>& GetStaticObject() { return s_StaticObjects; }
+	static const std::list<jObject*>& GetBoundBoxObject() { return s_BoundBoxObjects; }
+	static const std::list<jObject*>& GetBoundSphereObject() { return s_BoundSphereObjects; }
+	static const std::list<jObject*>& GetDebugObject() { return s_DebugObjects; }
 
 	static void AddBoundBoxObject(jObject* object);
 	static void RemoveBoundBoxObject(jObject* object);
+	
 	static void AddBoundSphereObject(jObject* object);
 	static void RemoveBoundSphereObject(jObject* object);
+
 	static void AddDebugObject(jObject* object);
 	static void RemoveDebugObject(jObject* object);
+	//////////////////////////////////////////////////////////////////////////
 
 	virtual void Update(float deltaTime);
 	//virtual void Draw(const jCamera* camera, const jShader* shader);
@@ -40,6 +43,11 @@ public:
 	void SetSkipShadowMapGen(bool skipShadowMapGen) { SkipShadowMapGen = skipShadowMapGen; SetDirtyState(); }
 	void SetSkipUpdateShadowVolume(bool skipUpdateShadowVolume) { SkipUpdateShadowVolume = skipUpdateShadowVolume; SetDirtyState(); }
 	void SetVisible(bool visible) { Visible = visible; SetDirtyState(); }
+
+
+	jRenderObject* RenderObject = nullptr;
+	jVertexAdjacency* VertexAdjacency = nullptr;
+	jShadowVolume* ShadowVolume = nullptr;
 
 	bool SkipShadowMapGen = false;
 	bool SkipUpdateShadowVolume = false;
@@ -54,11 +62,9 @@ public:
 private:
 	static std::list<jObject*> s_ShadowCasterObject;
 	static std::list<jObject*> s_StaticObjects;
+	static std::list<jObject*> s_BoundBoxObjects;
+	static std::list<jObject*> s_BoundSphereObjects;
+	static std::list<jObject*> s_DebugObjects;
 	static std::set<jObject*> s_DirtyStateObjects;
 };
 
-//extern std::list<jObject*> g_StaticObjectArray;
-extern std::list<jObject*> g_HairObjectArray;
-extern std::list<jObject*> g_DebugObjectArray;
-extern std::list<jObject*> g_BoundBoxObjectArray;
-extern std::list<jObject*> g_BoundSphereObjectArray;

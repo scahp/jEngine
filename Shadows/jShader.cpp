@@ -41,11 +41,11 @@ struct jShaderInfoCreation
 		DECLARE_SHADER_VS_FS("ShadowGen_SSM", "shaders/shadowmap/vs_shadowMap.glsl", "shaders/shadowmap/fs_shadowMap.glsl");
 		DECLARE_SHADER_VS_GS_FS("ShadowGen_Omni_SSM", "shaders/shadowmap/vs_omniDirectionalShadowMap.glsl", "shaders/shadowmap/gs_omniDirectionalShadowMap.glsl", "shaders/shadowmap/fs_omniDirectionalShadowMap.glsl");
 		DECLARE_SHADER_VS_FS("SSM", "shaders/shadowmap/vs.glsl", "shaders/shadowmap/fs.glsl");
-		DECLARE_SHADER_VS_FS_WITH_OPTION_MORE("SSM_PCF", "shaders/shadowmap/vs.glsl", "shaders/shadowmap/fs.glsl", false, false, "\r\n#define USE_PCF 1");
-		DECLARE_SHADER_VS_FS_WITH_OPTION_MORE("SSM_PCF_Poisson", "shaders/shadowmap/vs.glsl", "shaders/shadowmap/fs.glsl", false, false, "\r\n#define USE_PCF 1\r\n#define USE_POISSON_SAMPLE 1");
+		DECLARE_SHADER_VS_FS_WITH_OPTION_MORE("PCF", "shaders/shadowmap/vs.glsl", "shaders/shadowmap/fs.glsl", false, false, "\r\n#define USE_PCF 1");
+		DECLARE_SHADER_VS_FS_WITH_OPTION_MORE("PCF_Poisson", "shaders/shadowmap/vs.glsl", "shaders/shadowmap/fs.glsl", false, false, "\r\n#define USE_PCF 1\r\n#define USE_POISSON_SAMPLE 1");
 
-		DECLARE_SHADER_VS_FS_WITH_OPTION_MORE("SSM_PCSS", "shaders/shadowmap/vs.glsl", "shaders/shadowmap/fs.glsl", false, false, "\r\n#define USE_PCSS 1");
-		DECLARE_SHADER_VS_FS_WITH_OPTION_MORE("SSM_PCSS_Poisson", "shaders/shadowmap/vs.glsl", "shaders/shadowmap/fs.glsl", false, false, "\r\n#define USE_PCSS 1\r\n#define USE_POISSON_SAMPLE 1");
+		DECLARE_SHADER_VS_FS_WITH_OPTION_MORE("PCSS", "shaders/shadowmap/vs.glsl", "shaders/shadowmap/fs.glsl", false, false, "\r\n#define USE_PCSS 1");
+		DECLARE_SHADER_VS_FS_WITH_OPTION_MORE("PCSS_Poisson", "shaders/shadowmap/vs.glsl", "shaders/shadowmap/fs.glsl", false, false, "\r\n#define USE_PCSS 1\r\n#define USE_POISSON_SAMPLE 1");
 
 		DECLARE_SHADER_VS_FS("ShadowGen_VSM", "shaders/shadowmap/vs_varianceShadowMap.glsl", "shaders/shadowmap/fs_varianceShadowMap.glsl");
 		DECLARE_SHADER_VS_GS_FS("ShadowGen_Omni_VSM", "shaders/shadowmap/vs_omniDirectionalShadowMap.glsl", "shaders/shadowmap/gs_omniDirectionalShadowMap.glsl", "shaders/shadowmap/fs_omniDirectionalShadowMap.glsl");

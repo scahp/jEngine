@@ -18,11 +18,11 @@ public:
 	bool ShowSilhouette_PointLight = false;
 	bool ShowSilhouette_SpotLight = false;
 	EShadowMapType ShadowMapType = EShadowMapType::SSM;
-	bool UsePoissonSample = false;
+	bool UsePoissonSample = true;
 	bool ShowDirectionalLightMap = false;
-	bool ShowDirectionalLightInfo = false;
-	bool ShowPointLightInfo = false;
-	bool ShowSpotLightInfo = false;
+	bool ShowDirectionalLightInfo = true;
+	bool ShowPointLightInfo = true;
+	bool ShowSpotLightInfo = true;
 	bool ShowBoundBox = false;
 	bool ShowBoundSphere = false;
 	Vector DirecionalLightDirection = Vector(-0.56f, -0.83f, 0.01f).GetNormalize();

@@ -9,17 +9,29 @@
 
 namespace jLightUtil
 {
+	void MakeDirectionalLightViewInfo(Vector& outPos, Vector& outTarget, Vector& outUp, const Vector& direction)
+	{
+		outPos = Vector(100.0f) * direction;
+		outTarget = Vector::ZeroVector;
+		outUp = outPos + Vector(0.0f, 1.0f, 0.0f);
+	}
+
+	void MakeDirectionalLightViewInfoWithPos(Vector& outTarget, Vector& outUp, const Vector& pos, const Vector& direction)
+	{
+		outTarget = pos + direction;
+		outUp = pos + Vector(0.0f, 1.0f, 0.0f);
+	}
+
 	jShadowMapData* CreateShadowMap(const Vector& direction, const Vector& pos)
 	{
-		//auto tempPos = Vector(100.0f) * direction;
 		auto tempPos = Vector(350.0f, 360.0f, 100.0f);
-		const auto target = Vector::ZeroVector;
-		const auto up = tempPos + Vector(0.0f, 1.0f, 0.0f);
+		Vector target, up;
+		MakeDirectionalLightViewInfoWithPos(target, up, tempPos, direction);
 
 		// todo remove constant variable
 		auto shadowMapData = new jShadowMapData("DirectionalLight");
-		shadowMapData->ShadowMapCamera = jCamera::CreateCamera(tempPos, target, up, 3.14f / 4.0f, 300.0f, 900.0f, SM_WIDTH, SM_HEIGHT, true);		// todo for deep shadow map. it should be replaced
-		// shadowMapData->ShadowMapCamera = jCamera::CreateCamera(tempPos, target, up, DegreeToRadian(90.0f), 1.0f, 900.0f, 100.0f, 100.0f, false);
+		//shadowMapData->ShadowMapCamera = jCamera::CreateCamera(tempPos, target, up, 3.14f / 4.0f, 300.0f, 900.0f, SM_WIDTH, SM_HEIGHT, true);		// todo for deep shadow map. it should be replaced
+		shadowMapData->ShadowMapCamera = jCamera::CreateCamera(tempPos, target, up, DegreeToRadian(90.0f), 1.0f, 900.0f, SM_WIDTH, SM_HEIGHT, false);
 		shadowMapData->ShadowMapRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RG32F, EFormat::RG, EFormatType::FLOAT, SM_WIDTH, SM_HEIGHT, 1 });
 
 		return shadowMapData;
@@ -30,7 +42,7 @@ namespace jLightUtil
 		// todo remove constant variable
 		auto shadowMapData = new jShadowMapArrayData(prefix);
 
-		const float nearDist = 1.0f;
+		const float nearDist = 10.0f;
 		const float farDist = 500.0f;
 		shadowMapData->ShadowMapCamera[0] = jCamera::CreateCamera(pos, pos + Vector(1.0f, 0.0f, 0.0f), pos + Vector(0.0f, 1.0f, 0.0f), DegreeToRadian(90.0f), nearDist, farDist, SM_WIDTH, SM_HEIGHT, true);
 		shadowMapData->ShadowMapCamera[1] = jCamera::CreateCamera(pos, pos + Vector(-1.0f, 0.0f, 0.0f), pos + Vector(0.0f, 1.0f, 0.0f), DegreeToRadian(90.0f), nearDist, farDist, SM_WIDTH, SM_HEIGHT, true);
@@ -203,7 +215,11 @@ void jDirectionalLight::RenderToShadowMap(const RenderToShadowMapFunc& func, con
 void jDirectionalLight::Update(float deltaTime)
 {
 	if (ShadowMapData && ShadowMapData->ShadowMapCamera)
-		ShadowMapData->ShadowMapCamera->UpdateCamera();
+	{
+		auto camera = ShadowMapData->ShadowMapCamera;
+		jLightUtil::MakeDirectionalLightViewInfoWithPos(camera->Target, camera->Up, camera->Pos, Data.Direction);
+		camera->UpdateCamera();
+	}
 }
 
 void jPointLight::BindLight(const jShader* shader, jMaterialData* materialData, int32 index /*= 0*/) const
@@ -302,8 +318,16 @@ void jPointLight::Update(float deltaTime)
 {
 	if (ShadowMapData)
 	{
+		auto camers = ShadowMapData->ShadowMapCamera;
 		for (int32 i = 0; i < 6; ++i)
-			ShadowMapData->ShadowMapCamera[i]->UpdateCamera();
+		{
+			auto currentCamera = camers[i];
+			const auto offset = Data.Position - currentCamera->Pos;
+			currentCamera->Pos = Data.Position;
+			currentCamera->Target += offset;
+			currentCamera->Up += offset;
+			currentCamera->UpdateCamera();
+		}
 	}
 }
 
@@ -401,10 +425,15 @@ void jSpotLight::RenderToShadowMap(const RenderToShadowMapFunc& func, const jSha
 
 void jSpotLight::Update(float deltaTime)
 {
-	if (ShadowMapData)
+	auto camers = ShadowMapData->ShadowMapCamera;
+	for (int32 i = 0; i < 6; ++i)
 	{
-		for (int32 i = 0; i < 6; ++i)
-			ShadowMapData->ShadowMapCamera[i]->UpdateCamera();
+		auto currentCamera = camers[i];
+		const auto offset = Data.Position - currentCamera->Pos;
+		currentCamera->Pos = Data.Position;
+		currentCamera->Target += offset;
+		currentCamera->Up += offset;
+		currentCamera->UpdateCamera();
 	}
 }
 

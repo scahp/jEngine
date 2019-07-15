@@ -86,6 +86,37 @@ jLight* jCamera::GetLight(ELightType type) const
 	return nullptr;
 }
 
+void jCamera::RemoveLight(int32 index)
+{
+	LightList.erase(LightList.begin() + index);
+}
+
+void jCamera::RemoveLight(ELightType type)
+{
+	for (auto it = LightList.begin(); it != LightList.end();)
+	{
+		if ((*it)->Type == type)
+		{
+			it = LightList.erase(it);
+			continue;
+		}
+		++it;
+	}
+}
+
+void jCamera::RemoveLight(jLight* light)
+{
+	for (auto it = LightList.begin(); it != LightList.end();)
+	{
+		if (*it == light)
+		{
+			it = LightList.erase(it);
+			continue;
+		}
+		++it;
+	}
+}
+
 int32 jCamera::GetNumOfLight() const
 {
 	return static_cast<int32>(LightList.size());

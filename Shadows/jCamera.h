@@ -190,6 +190,10 @@ public:
 	void AddLight(jLight* light);
 	jLight* GetLight(int32 index) const;
 	jLight* GetLight(ELightType type) const;
+	void RemoveLight(int32 index);
+	void RemoveLight(ELightType type);
+	void RemoveLight(jLight* light);
+
 	int32 GetNumOfLight() const;
 
 	Vector Pos;

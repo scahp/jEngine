@@ -72,7 +72,7 @@ void jGame::Setup()
 	SpotLight = jLight::CreateSpotLight(jShadowAppSettingProperties::GetInstance().SpotLightPosition, jShadowAppSettingProperties::GetInstance().SpotLightDirection, Vector4(0.0f, 1.0f, 0.0f, 1.0f), 500.0f, 0.7f, 1.0f, Vector(1.0f, 1.0f, 1.0f), Vector(0.4f, 0.4f, 0.4f), 64.0f);
 
 	auto directionalLightDebug = jPrimitiveUtil::CreateDirectionalLightDebug(Vector(250, 260, 0)*0.5f, Vector::OneVector * 10.0f, 10.0f, MainCamera, DirectionalLight, "Image/sun.png");
-	g_DebugObjectArray.push_back(directionalLightDebug);
+	jObject::AddDebugObject(directionalLightDebug);
 
 	//auto pointLightDebug = jPrimitiveUtil::CreatePointLightDebug(Vector(10.0f), MainCamera, PointLight, "Image/bulb.png");
 	//g_DebugObjectArray.push_back(pointLightDebug);
@@ -124,6 +124,38 @@ void jGame::Update(float deltaTime)
 		Renderer->SetChangePipelineSet(newPipelineSet);
 	}
 
+	static auto s_showDirectionalLightInfo = jShadowAppSettingProperties::GetInstance().ShowDirectionalLightInfo;
+	static auto s_showPointLightInfo = jShadowAppSettingProperties::GetInstance().ShowPointLightInfo;
+	static auto s_showSpotLightInfo = jShadowAppSettingProperties::GetInstance().ShowSpotLightInfo;
+
+	if (s_showDirectionalLightInfo != jShadowAppSettingProperties::GetInstance().ShowDirectionalLightInfo)
+	{
+		s_showDirectionalLightInfo = jShadowAppSettingProperties::GetInstance().ShowDirectionalLightInfo;
+
+		if (s_showDirectionalLightInfo)
+			MainCamera->AddLight(DirectionalLight);
+		else
+			MainCamera->RemoveLight(DirectionalLight);
+	}
+
+	if (s_showPointLightInfo != jShadowAppSettingProperties::GetInstance().ShowPointLightInfo)
+	{
+		s_showPointLightInfo = jShadowAppSettingProperties::GetInstance().ShowPointLightInfo;
+		if (s_showPointLightInfo)
+			MainCamera->AddLight(PointLight);
+		else
+			MainCamera->RemoveLight(PointLight);
+	}
+
+	if (s_showSpotLightInfo != jShadowAppSettingProperties::GetInstance().ShowSpotLightInfo)
+	{
+		s_showSpotLightInfo = jShadowAppSettingProperties::GetInstance().ShowSpotLightInfo;
+		if (s_showSpotLightInfo)
+			MainCamera->AddLight(SpotLight);
+		else
+			MainCamera->RemoveLight(SpotLight);
+	}
+
 	// todo debug test, should remove this
 	if (DirectionalLight)
 		DirectionalLight->Data.Direction = jShadowAppSettingProperties::GetInstance().DirecionalLightDirection;
@@ -136,17 +168,13 @@ void jGame::Update(float deltaTime)
 	}
 
 	MainCamera->UpdateCamera();
-	if (DirectionalLight)
-		DirectionalLight->ShadowMapData->ShadowMapCamera->UpdateCamera();
-	if (PointLight)
+
+	const int32 numOfLights = MainCamera->GetNumOfLight();
+	for (int32 i = 0; i < numOfLights; ++i)
 	{
-		for (auto& iter : PointLight->ShadowMapData->ShadowMapCamera)
-			iter->UpdateCamera();
-	}
-	if (SpotLight)
-	{
-		for (auto& iter : SpotLight->ShadowMapData->ShadowMapCamera)
-			iter->UpdateCamera();
+		auto light = MainCamera->GetLight(i);
+		JASSERT(light);
+		light->Update(deltaTime);
 	}
 
 	for (auto iter : jObject::GetStaticObject())
@@ -156,17 +184,15 @@ void jGame::Update(float deltaTime)
 
 	//const bool expDeepShadowMap = jShadowAppSettingProperties::GetInstance().ExponentDeepShadowOn;
 
-	Renderer->Render(MainCamera);
-
-	return;
-
-	for (auto& iter : g_BoundBoxObjectArray)
+	for (auto& iter : jObject::GetBoundBoxObject())
 		iter->Update(deltaTime);
 
-	for (auto& iter : g_BoundSphereObjectArray)
+	for (auto& iter : jObject::GetBoundSphereObject())
 		iter->Update(deltaTime);
 
 	Renderer->Render(MainCamera);
+
+	//Renderer->Render(MainCamera);
 }
 
 void jGame::OnMouseMove(int32 xOffset, int32 yOffset)
