@@ -107,8 +107,16 @@ bool jPostProcess_DeepShadowMap::Do(const jCamera* camera) const
 	g_rhi->SetClearColor(0.025f, 0.025f, 0.025f, 1.0f);
 	g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
 
-	//if (auto deepShadowFull_Shader = jShadowAppSettingProperties::GetInstance().ExponentDeepShadowOn ? jShader::GetShader("ExpDeepShadowFull") : jShader::GetShader("DeepShadowFull")) // todo PipelineSet 관련 기능 완료후 스위치 가능케 할예정
-	if (auto deepShadowFull_Shader = jShader::GetShader("DeepShadowFull"))
+	const auto ambientLight = camera->GetLight(ELightType::AMBIENT);
+	const auto directionalLight = camera->GetLight(ELightType::DIRECTIONAL);
+
+	std::list<const jLight*> lights;
+	if (ambientLight)
+		lights.push_back(ambientLight);
+	if (directionalLight)
+		lights.push_back(directionalLight);
+
+	if (auto deepShadowFull_Shader = jShadowAppSettingProperties::GetInstance().ExponentDeepShadowOn ? jShader::GetShader("ExpDeepShadowFull") : jShader::GetShader("DeepShadowFull"))
 	{
 		g_rhi->SetShader(deepShadowFull_Shader);
 		SSBOs.Bind(deepShadowFull_Shader);
@@ -116,7 +124,7 @@ bool jPostProcess_DeepShadowMap::Do(const jCamera* camera) const
 		JASSERT(GBuffer);
 		GBuffer->BindGeometryBuffer(deepShadowFull_Shader);
 
-		Draw(camera, deepShadowFull_Shader, { camera->GetLight(ELightType::DIRECTIONAL) });
+		Draw(camera, deepShadowFull_Shader, lights);
 	}
 
 	return true;

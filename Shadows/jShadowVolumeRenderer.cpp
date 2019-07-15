@@ -178,7 +178,7 @@ void jShadowVolumeRenderer::RenderPass(const jCamera* camera)
 				if (CanSkipShadowObject(camera, iter, lightPos, lightDirection, light))
 					continue;
 				
-				iter->ShadowVolume->Update(lightDirection, lightPos, iter);
+				//iter->ShadowVolume->Update(lightDirection, lightPos, iter);
 				iter->ShadowVolume->QuadObject->Draw(camera, ShadowVolumeInfinityFarShader, { light });
 			}
 
@@ -261,7 +261,7 @@ void jShadowVolumeRenderer::DebugRenderPass(const jCamera* camera)
 
 			//iter->ShadowVolume->Update(&DirectionalLight->Data.Direction, nullptr, iter);
 
-			iter->ShadowVolume->Update(lightDirection, lightPos, iter);
+			//iter->ShadowVolume->Update(lightDirection, lightPos, iter);
 			if (iter->ShadowVolume->EdgeObject)
 				iter->ShadowVolume->EdgeObject->Draw(camera, ShadowVolumeInfinityFarShader, {light});
 			if (iter->ShadowVolume->QuadObject)

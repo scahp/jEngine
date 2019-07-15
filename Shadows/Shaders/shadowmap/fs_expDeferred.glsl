@@ -85,6 +85,8 @@ void main()
 #if defined(USE_TEXTURE)
 	if (UseTexture > 0)
 		diffuse *= texture(tex_object2, TexCoord_);
+	else
+		diffuse = Color_;
 #else
 	diffuse = Color_;
 #endif // USE_TEXTURE

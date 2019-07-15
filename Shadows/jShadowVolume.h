@@ -11,7 +11,7 @@ public:
 	jShadowVolume() = default;
 	jShadowVolume(jVertexAdjacency* vertexAdjacency) : VertexAdjacency(vertexAdjacency) {}
 
-	void Update(const Vector* lightDirection, const Vector* lightPos, jObject* ownerObject);
+	void Update(const Vector& lightPosOrDirection, bool isOmniDirectional, jObject* ownerObject);
 
 	jObject* EdgeObject = nullptr;
 	jObject* QuadObject = nullptr;

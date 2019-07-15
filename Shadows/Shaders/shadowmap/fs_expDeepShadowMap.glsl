@@ -39,6 +39,8 @@ in vec3 Pos_;
 
 out vec4 color;
 
+#define DEEP_SHADOW_MAP_BIAS -0.03
+
 void main()
 {
 	vec3 lightDir = Pos_ - LightPos;
@@ -46,7 +48,7 @@ void main()
     //float distFromLight = clamp((sqrt(distSquared) - LightZNear) / (LightZFar - LightZNear), 0.0, 1.0);
 	vec4 tempShadowPos = (ShadowVP * vec4(Pos_, 1.0));
 
-	float distFromLight = (tempShadowPos.z) / LightZFar + 0.00002;
+	float distFromLight = (tempShadowPos.z) / LightZFar + DEEP_SHADOW_MAP_BIAS;
 
 	uint counter = atomicCounterIncrement(LinkedListCounter);
 	LinkedListData[counter].depth = distFromLight;

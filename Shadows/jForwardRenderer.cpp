@@ -15,8 +15,7 @@ jForwardRenderer::~jForwardRenderer()
 }
 
 void jForwardRenderer::Setup()
-{
-	CREATE_PIPELINE_SET_WITH_SETUP(jForwardPipelineSet_SSM);
+{	
 }
 
 void jForwardRenderer::Teardown()
@@ -42,6 +41,30 @@ void jForwardRenderer::RenderPass(const jCamera* camera)
 
 	for (auto& iter : PipelineSet->RenderPass)
 		iter->Do(data);
+}
+
+void jForwardRenderer::DebugRenderPass(const jCamera* camera)
+{
+	const jPipelineData data(jObject::GetDebugObject(), camera, {});
+	for (auto& iter : PipelineSet->DebugRenderPass)
+		iter->Do(data);
+}
+
+void jForwardRenderer::BoundVolumeRenderPass(const jCamera* camera)
+{
+	if (jShadowAppSettingProperties::GetInstance().ShowBoundBox)
+	{
+		const jPipelineData data(jObject::GetBoundBoxObject(), camera, {});
+		for (auto& iter : PipelineSet->BoundVolumeRenderPass)
+			iter->Do(data);
+	}
+
+	if (jShadowAppSettingProperties::GetInstance().ShowBoundSphere)
+	{
+		const jPipelineData data(jObject::GetBoundSphereObject(), camera, {});
+		for (auto& iter : PipelineSet->BoundVolumeRenderPass)
+			iter->Do(data);
+	}
 }
 
 void jForwardRenderer::PostProcessPass(const jCamera* camera)

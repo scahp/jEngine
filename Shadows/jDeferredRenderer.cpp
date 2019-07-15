@@ -55,8 +55,12 @@ void jDeferredRenderer::Teardown()
 
 void jDeferredRenderer::ShadowPrePass(const jCamera* camera)
 {
+	auto directionalLight = camera->GetLight(ELightType::DIRECTIONAL);
+	if (!directionalLight)
+		return;
+
 	// todo Directional Light 만 쓸건가?
-	const jPipelineData data(jObject::GetShadowCasterObject(), camera, { camera->GetLight(ELightType::DIRECTIONAL) });
+	const jPipelineData data(jObject::GetShadowCasterObject(), camera, { directionalLight });
 
 	for (auto& iter : PipelineSet->ShadowPrePass)
 		iter->Do(data);
@@ -66,10 +70,42 @@ void jDeferredRenderer::RenderPass(const jCamera* camera)
 {
 	// Geometry Pass
 	// todo Directional Light 만 쓸건가?
-	const jPipelineData data(jObject::GetStaticObject(), camera, { camera->GetLight(ELightType::DIRECTIONAL) });
+	const jPipelineData data(jObject::GetStaticObject(), camera, { });
 
 	for (auto& iter : PipelineSet->RenderPass)
 		iter->Do(data);
+}
+
+void jDeferredRenderer::DebugRenderPass(const jCamera* camera)
+{
+	if (GBuffer.Begin())
+	{
+		const jPipelineData data(jObject::GetDebugObject(), camera, {});
+		for (auto& iter : PipelineSet->DebugRenderPass)
+			iter->Do(data);
+		GBuffer.End();
+	}
+}
+
+void jDeferredRenderer::BoundVolumeRenderPass(const jCamera* camera)
+{
+	if (GBuffer.Begin())
+	{
+		if (jShadowAppSettingProperties::GetInstance().ShowBoundBox)
+		{
+			const jPipelineData data(jObject::GetBoundBoxObject(), camera, {});
+			for (auto& iter : PipelineSet->BoundVolumeRenderPass)
+				iter->Do(data);
+		}
+
+		if (jShadowAppSettingProperties::GetInstance().ShowBoundSphere)
+		{
+			const jPipelineData data(jObject::GetBoundSphereObject(), camera, {});
+			for (auto& iter : PipelineSet->BoundVolumeRenderPass)
+				iter->Do(data);
+		}
+		GBuffer.End();
+	}
 }
 
 void jDeferredRenderer::PostProcessPass(const jCamera* camera)

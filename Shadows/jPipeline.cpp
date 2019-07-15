@@ -6,6 +6,9 @@
 #include "jGBuffer.h"
 #include "jRenderTargetPool.h"
 #include "jPostProcess.h"
+#include "jRenderObject.h"
+#include "jShadowVolume.h"
+#include "jShadowAppProperties.h"
 
 const std::list<jObject*> jPipelineData::emptyObjectList;
 //const std::list<const jLight*> jPipelineData::emptyLightList;
@@ -61,6 +64,9 @@ struct jShadowPipelinCreation
 		ADD_FORWARD_SHADOW_PIPELINE(Forward_VSM_Pipeline, "VSM");
 		ADD_FORWARD_SHADOW_PIPELINE(Forward_ESM_Pipeline, "ESM");
 		ADD_FORWARD_SHADOW_PIPELINE(Forward_EVSM_Pipeline, "EVSM");
+
+		IPipeline::AddPipeline("Forward_BoundVolume_Pipeline", new jForward_DebugObject_Pipeline("BoundVolumeShader"));
+		IPipeline::AddPipeline("Forward_DebugObject_Pipeline", new jForward_DebugObject_Pipeline("DebugObjectShader"));
 	}
 } s_shadowPipelinCreation;
 
@@ -73,8 +79,11 @@ void jRenderPipeline::Do(const jPipelineData& pipelineData) const
 
 void jRenderPipeline::Draw(const jPipelineData& pipelineData, const jShader* shader) const
 {
-	g_rhi->SetClearColor(ClearColor);
-	g_rhi->SetClear(ClearType);
+	if (EnableClear)
+	{
+		g_rhi->SetClearColor(ClearColor);
+		g_rhi->SetClear(ClearType);
+	}
 
 	g_rhi->EnableDepthTest(EnableDepthTest);
 	g_rhi->SetDepthFunc(DepthStencilFunc);
@@ -100,7 +109,6 @@ void jDeferredGeometryPipeline::Setup()
 {
 	ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
 	ClearType = MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH });
-	Shader = jShader::GetShader("Deferred");			// jShader::GetShader("ExpDeferred");
 }
 
 void jDeferredGeometryPipeline::Draw(const jPipelineData& pipelineData, const jShader* shader) const
@@ -108,7 +116,10 @@ void jDeferredGeometryPipeline::Draw(const jPipelineData& pipelineData, const jS
 	JASSERT(GBuffer);
 	if (GBuffer->Begin())
 	{
-		__super::Draw(pipelineData, Shader);
+		if (auto currentShader = jShadowAppSettingProperties::GetInstance().ExponentDeepShadowOn ? jShader::GetShader("ExpDeferred") : jShader::GetShader("Deferred"))
+		{
+			__super::Draw(pipelineData, currentShader);
+		}
 		GBuffer->End();
 	}
 }
@@ -124,7 +135,6 @@ void jDeepShadowMap_ShadowPass_Pipeline::Setup()
 	EnableDepthBias = true;
 	DepthSlopeBias = 1.0f;
 	DepthConstantBias = 1.0f;
-	Shader = jShader::GetShader("DeepShadowMapGen");		// jShader::GetShader("ExpDeepShadowMapGen")
 
 	Buffers.push_back(DeepShadowMapBuffers.AtomicBuffer);
 	Buffers.push_back(DeepShadowMapBuffers.StartElementBuf);
@@ -146,9 +156,12 @@ void jDeepShadowMap_ShadowPass_Pipeline::Draw(const jPipelineData& pipelineData,
 
 		if (renderTarget->Begin())
 		{
-			g_rhi->SetShader(Shader);
+			if (auto currentShader = jShadowAppSettingProperties::GetInstance().ExponentDeepShadowOn ? jShader::GetShader("ExpDeepShadowMapGen") : jShader::GetShader("DeepShadowMapGen"))
+			{
+				g_rhi->SetShader(currentShader);
 
-			__super::Draw(jPipelineData(pipelineData.Objects, lightCamera, {}), Shader);
+				__super::Draw(jPipelineData(pipelineData.Objects, lightCamera, { light }), currentShader);
+			}
 			renderTarget->End();
 		}
 	}
@@ -286,7 +299,7 @@ void jForward_Shadow_Pipeline::Setup()
 {
 	ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
 	ClearType = MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH });
-	EnableBlend = true;
+	EnableDepthTest = true;
 	DepthStencilFunc = EDepthStencilFunc::LEQUAL;
 	EnableBlend = true;
 	BlendSrc = EBlendSrc::ONE;
@@ -387,5 +400,216 @@ void jDeferredDeepShadowMapPipelineSet::Setup()
 	ADD_PIPELINE_WITH_CREATE_AND_SETUP_AT_RENDERPASS(RenderPass, jDeferredGeometryPipeline, GBuffer);
 	ADD_PIPELINE_WITH_CREATE_AND_SETUP_AT_RENDERPASS(PostRenderPass, jDeepShadowMap_Sort_ComputePipeline, DeepShadowMapBuffers);
 	ADD_PIPELINE_WITH_CREATE_AND_SETUP_AT_RENDERPASS(PostRenderPass, jDeepShadowMap_Link_ComputePipeline, DeepShadowMapBuffers);
+
+	// Deferred 이지만 Debug 정보는 Forward로 렌더링 함.
+	ADD_PIPELINE_WITH_CREATE_AND_SETUP_AT_RENDERPASS(DebugRenderPass, jForward_DebugObject_Pipeline, "DebugObjectShader");
+	ADD_PIPELINE_WITH_CREATE_AND_SETUP_AT_RENDERPASS(BoundVolumeRenderPass, jForward_DebugObject_Pipeline, "BoundVolumeShader");
 }
 
+//////////////////////////////////////////////////////////////////////////
+// jForward_DebugObject_Pipeline
+void jForward_DebugObject_Pipeline::Setup()
+{
+	EnableClear = false;
+	EnableDepthTest = true;
+	DepthStencilFunc = EDepthStencilFunc::LEQUAL;
+	EnableBlend = true;
+	BlendSrc = EBlendSrc::SRC_ALPHA;
+	BlendDest = EBlendDest::ONE_MINUS_SRC_ALPHA;
+	Shader = jShader::GetShader(ShaderName);
+}
+
+void jForward_ShadowVolume_Pipeline::Setup()
+{
+	EnableClear = true;
+	EnableDepthTest = true;
+	DepthStencilFunc = EDepthStencilFunc::LEQUAL;
+	EnableBlend = true;
+	BlendSrc = EBlendSrc::ONE;
+	BlendDest = EBlendDest::ZERO;
+}
+
+//////////////////////////////////////////////////////////////////////////
+// jForward_ShadowVolume_Pipeline
+bool jForward_ShadowVolume_Pipeline::CanSkipShadowObject(const jCamera* camera, const jObject* object
+	, const Vector& lightPosOrDirection, bool isOmniDirectional, const jLight* light) const
+{
+	if (!object->ShadowVolume || object->SkipUpdateShadowVolume)
+		return true;
+
+	const float radius = object->RenderObject->Scale.x;
+	//var radius = 0.0;
+	//if (obj.hasOwnProperty('radius'))
+	//	radius = obj.radius;
+	//else
+	//	radius = obj.scale.x;
+
+	if (isOmniDirectional)  // Sphere or Spot Light
+	{
+		float maxDistance = 0.0f;
+		if (light->Type == ELightType::POINT)
+			maxDistance = static_cast<const jPointLight*>(light)->Data.MaxDistance;
+		else if (light->Type == ELightType::SPOT)
+			maxDistance = static_cast<const jSpotLight*>(light)->Data.MaxDistance;
+
+		// 1. check out of light radius with obj
+		const auto isCasterOutOfLightRadius = ((lightPosOrDirection - object->RenderObject->Pos).Length() > maxDistance);
+		if (isCasterOutOfLightRadius)
+			return true;
+
+		// 2. check direction against frustum
+		if (!camera->IsInFrustumWithDirection(object->RenderObject->Pos, object->RenderObject->Pos - lightPosOrDirection, radius))
+			return true;
+
+		// 3. check Spot light range with obj
+		if (light->Type == ELightType::SPOT)
+		{
+			const auto lightToObjVector = object->RenderObject->Pos - lightPosOrDirection;
+			const auto radianOfRadiusOffset = atanf(radius / lightToObjVector.Length());
+
+			auto spotLight = static_cast<const jSpotLight*>(light);
+			const auto radian = lightToObjVector.GetNormalize().DotProduct(spotLight->Data.Direction);
+			const auto limitRadian = cosf(Max(spotLight->Data.UmbraRadian, spotLight->Data.PenumbraRadian)) - radianOfRadiusOffset;
+			if (limitRadian > radian)
+				return true;
+		}
+	}
+	else       // Directional light
+	{
+		// 1. check direction against frustum
+		if (!camera->IsInFrustumWithDirection(object->RenderObject->Pos, lightPosOrDirection, radius))
+			return true;
+	}
+	return false;
+}
+
+
+void jForward_ShadowVolume_Pipeline::Do(const jPipelineData& pipelineData) const
+{
+	auto camera = pipelineData.Camera;
+
+	auto ambientShader = jShader::GetShader("AmbientOnly");
+	auto shadowVolumeBaseShader = jShader::GetShader("ShadowVolume");
+	auto ShadowVolumeInfinityFarShader = jShader::GetShader("ShadowVolume_InfinityFar_StencilShader");
+
+	//////////////////////////////////////////////////////////////////
+	// 1. Render objects to depth buffer and Ambient & Emissive to color buffer.
+	g_rhi->EnableBlend(true);
+	g_rhi->SetBlendFunc(EBlendSrc::ONE, EBlendDest::ZERO);
+
+	g_rhi->EnableDepthTest(true);
+
+	const_cast<jCamera*>(camera)->IsEnableCullMode = true;		// todo remove
+	g_rhi->SetClearColor(0.5f, 0.5f, 0.5f, 1.0f);
+	g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH, ERenderBufferType::STENCIL }));
+
+	g_rhi->SetDepthFunc(EDepthStencilFunc::LEQUAL);
+	g_rhi->EnableStencil(false);
+
+	g_rhi->SetDepthMask(true);
+	g_rhi->SetColorMask(true, true, true, true);
+
+	const_cast<jCamera*>(camera)->UseAmbient = true;			// todo remove
+	const auto& staticObjects = jObject::GetStaticObject();
+	for (auto& iter : staticObjects)
+		iter->Draw(camera, ambientShader, { camera->Ambient });
+
+	//////////////////////////////////////////////////////////////////
+	// 2. Stencil volume update & rendering (z-fail)
+	const_cast<jCamera*>(camera)->UseAmbient = false;			// todo remove
+	g_rhi->EnableStencil(true);
+	for(auto& light : pipelineData.Lights)
+	{
+		bool isOmniDirectional = false;
+		Vector lightPosOrDirection;
+
+		bool skip = false;
+		switch (light->Type)
+		{
+		case ELightType::DIRECTIONAL:
+		{
+			auto directionalLight = static_cast<const jDirectionalLight*>(light);
+			if (directionalLight)
+				lightPosOrDirection = directionalLight->Data.Direction;
+			break;
+		}
+		case ELightType::POINT:
+		{
+			auto pointLight = static_cast<const jPointLight*>(light);
+			if (pointLight)
+				lightPosOrDirection = pointLight->Data.Position;
+			isOmniDirectional = true;
+			break;
+		}
+		case ELightType::SPOT:
+		{
+			auto spotLight = static_cast<const jSpotLight*>(light);
+			if (spotLight)
+				lightPosOrDirection = spotLight->Data.Position;
+			isOmniDirectional = true;
+			break;
+		}
+		default:
+			skip = true;
+			break;
+		}
+		if (skip)
+			continue;
+
+		g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::STENCIL }));
+		g_rhi->SetStencilOpSeparate(EFace::FRONT, EStencilOp::KEEP, EStencilOp::DECR_WRAP, EStencilOp::KEEP);
+		g_rhi->SetStencilOpSeparate(EFace::BACK, EStencilOp::KEEP, EStencilOp::INCR_WRAP, EStencilOp::KEEP);
+
+		g_rhi->SetStencilFunc(EDepthStencilFunc::ALWAYS, 0, 0xff);
+		g_rhi->SetDepthFunc(EDepthStencilFunc::LEQUAL);
+		g_rhi->SetDepthMask(false);
+		g_rhi->SetColorMask(false, false, false, false);
+
+		const_cast<jCamera*>(camera)->IsEnableCullMode = false;			// todo remove
+
+		{
+			// todo
+			glEnable(GL_POLYGON_OFFSET_FILL);
+			glPolygonOffset(0.0f, 100.0f);
+
+			const auto& staticObjects = jObject::GetStaticObject();
+			for (auto& iter : staticObjects)
+			{
+				if (CanSkipShadowObject(camera, iter, lightPosOrDirection, isOmniDirectional, light))
+					continue;
+
+				iter->ShadowVolume->Update(lightPosOrDirection, isOmniDirectional, iter);
+				iter->ShadowVolume->QuadObject->Draw(camera, ShadowVolumeInfinityFarShader, { light });
+			}
+
+			// todo
+			// disable polygon offset fill
+			glDisable(GL_POLYGON_OFFSET_FILL);
+		}
+
+		//////////////////////////////////////////////////////////////////
+		// 3. Final light(Directional, Point, Spot) rendering.
+		g_rhi->SetStencilFunc(EDepthStencilFunc::EQUAL, 0, 0xff);
+		g_rhi->SetStencilOpSeparate(EFace::FRONT, EStencilOp::KEEP, EStencilOp::KEEP, EStencilOp::KEEP);
+		g_rhi->SetStencilOpSeparate(EFace::BACK, EStencilOp::KEEP, EStencilOp::KEEP, EStencilOp::KEEP);
+
+		g_rhi->SetDepthMask(false);
+		g_rhi->SetColorMask(true, true, true, true);
+		const_cast<jCamera*>(camera)->IsEnableCullMode = true;			// todo remove
+
+		g_rhi->SetDepthFunc(EDepthStencilFunc::EQUAL);
+		g_rhi->SetBlendFunc(EBlendSrc::ONE, EBlendDest::ONE);
+
+		const auto& staticObjects = jObject::GetStaticObject();
+		for (auto& iter : staticObjects)
+			iter->Draw(camera, shadowVolumeBaseShader, { light });
+	}
+	const_cast<jCamera*>(camera)->UseAmbient = true;			// todo remove
+
+	g_rhi->EnableBlend(true);
+	g_rhi->SetBlendFunc(EBlendSrc::SRC_ALPHA, EBlendDest::ONE_MINUS_SRC_ALPHA);
+	g_rhi->SetDepthFunc(EDepthStencilFunc::LEQUAL);
+	g_rhi->SetDepthMask(true);
+	g_rhi->SetColorMask(true, true, true, true);
+	g_rhi->EnableStencil(false);
+}

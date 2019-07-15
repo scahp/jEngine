@@ -35,6 +35,7 @@ enum class EShadowMapType
 	VSM,
 	ESM,
 	EVSM,
+	DeepShadowMap_DirectionalLight,
 	MAX
 };
 
@@ -45,4 +46,5 @@ static const char* EShadowMapTypeString[] = {
 	"VSM",
 	"ESM",
 	"EVSM",
+	"DeepShadowMap_DirectionalLight",
 };

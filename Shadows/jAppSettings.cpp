@@ -10,7 +10,9 @@ void jAppSettings::Init(int32 width, int32 height)
 	TwInit(TW_OPENGL_CORE, nullptr);
 	TwWindowSize(width, height);
 
-	jAppSettings::GetInstance().AddTwBar("MainPannel");		// Default Pannel
+	auto mainPannel = jAppSettings::GetInstance().AddTwBar("MainPannel");		// Default Pannel
+	mainPannel->SetSizeBar(250, 600);
+	mainPannel->SetValueSizeFit();
 }
 
 jAppSettingBase* jAppSettings::AddTwBar(const char* barName)
@@ -19,7 +21,7 @@ jAppSettingBase* jAppSettings::AddTwBar(const char* barName)
 	if (it_find != BarMap.end())
 		delete it_find->second;
 
-	auto appSettings = new jAppSettingBase(TwNewBar("TestNumberOneTeakBar!"));
+	auto appSettings = new jAppSettingBase(TwNewBar(barName));
 	BarMap[barName] = appSettings;
 	return appSettings;
 }
@@ -35,3 +37,24 @@ void jAppSettings::DeleteTwBar(const char* barName)
 }
 
 //////////////////////////////////////////////////////////////////////////
+
+void jAppSettingBase::SetSizeBar(int sizeX, int sizeY)
+{
+	char szTemp[256] = { 0, };
+	sprintf_s(szTemp, sizeof(szTemp) - 1, "%s size='%d %d'", TwGetBarName(Bar), sizeX, sizeY);
+	TwDefine(szTemp);
+}
+
+void jAppSettingBase::SetPositionBar(int ix, int iy)
+{
+	char szTemp[256] = { 0, };
+	sprintf_s(szTemp, sizeof(szTemp) - 1, "%s position='%d %d'", TwGetBarName(Bar), ix, iy);
+	TwDefine(szTemp);
+}
+
+void jAppSettingBase::SetValueSizeFit()
+{
+	char szTemp[256] = { 0, };
+	sprintf_s(szTemp, sizeof(szTemp) - 1, "%s valueswidth=fit", TwGetBarName(Bar));
+	TwDefine(szTemp);
+}

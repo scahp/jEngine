@@ -86,8 +86,9 @@ public:
 		TwSetParam(Bar, variableName, "min", TW_PARAM_INT32, 1, &min);
 		TwSetParam(Bar, variableName, "max", TW_PARAM_INT32, 1, &max);
 	}
-
-
+	void SetSizeBar(int sizeX, int sizeY);
+	void SetPositionBar(int ix, int iy);
+	void SetValueSizeFit();
 
 private:
 	TwBar* Bar = nullptr;

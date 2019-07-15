@@ -29,6 +29,9 @@ uniform int UseMaterial;
 uniform jMaterial Material;
 #endif // USE_MATERIAL
 
+uniform int UseAmbientLight;
+uniform jAmbientLight AmbientLight;
+
 uniform vec3 Eye;
 uniform int ShadowOn;
 uniform int ShadowMapWidth;
@@ -186,6 +189,9 @@ void main()
 			finalColor += KajiyaKayShadingModelTest(Normal.xyz, -light.LightDirection, toEye);
 			//finalColor += KajiyaKayShadingModelTest(Normal.xyz, toLight, toEye);
     }
+
+	if (UseAmbientLight != 0)
+		finalColor += GetAmbientLight(AmbientLight);
 
 	ivec2 uv = ivec2(ShadowPos.x * ShadowMapWidth, ShadowPos.y * ShadowMapHeight);
 

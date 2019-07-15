@@ -51,8 +51,8 @@ void jCamera::UpdateCamera()
 
 	if (IsPerspectiveProjection)
 	{
-		 Projection = jCameraUtil::CreatePerspectiveMatrix(Width, Height, FOV, Far, Near);
-		//Projection = jCameraUtil::CreatePerspectiveMatrixFarAtInfinity(Width, Height, FOV, Near);
+		//Projection = jCameraUtil::CreatePerspectiveMatrix(Width, Height, FOV, Far, Near);
+		Projection = jCameraUtil::CreatePerspectiveMatrixFarAtInfinity(Width, Height, FOV, Near);
 	}
 	else
 	{

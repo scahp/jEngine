@@ -33,6 +33,9 @@ public:
 	void SpawnTestPrimitives();
 
 	void Update(float deltaTime);
+
+	void UpdateAppSetting();
+
 	void OnMouseMove(int32 xOffset, int32 yOffset);
 	void Teardown();
 	void UpdateSettings();
@@ -53,10 +56,16 @@ public:
 	jRenderer* DeferredRenderer = nullptr;
 	jRenderer* ForwardRenderer = nullptr;
 
+	jPipelineSet* ShadowVolumePipelineSet = nullptr;
 	std::map<EShadowMapType, jPipelineSet*> ShadowPipelineSetMap;
 	std::map<EShadowMapType, jPipelineSet*> ShadowPoissonSamplePipelineSetMap;
 
 	EShadowMapType CurrentShadowMapType = EShadowMapType::SSM;
 	bool UsePoissonSample = false;
+	EShadowType CurrentShadowType = EShadowType::MAX;
+
+	jObject* DirectionalLightInfo = nullptr;
+	jObject* PointLightInfo = nullptr;
+	jObject* SpotLightInfo = nullptr;
 };
 

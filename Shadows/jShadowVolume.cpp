@@ -7,7 +7,7 @@
 #include "jRHI.h"
 #include "jPrimitiveUtil.h"
 
-void jShadowVolume::Update(const Vector* lightDirection, const Vector* lightPos, jObject* ownerObject)
+void jShadowVolume::Update(const Vector& lightPosOrDirection, bool isOmniDirectional, jObject* ownerObject)
 {
 	QuadVertices.clear();
 	EdgeVertices.clear();
@@ -15,19 +15,18 @@ void jShadowVolume::Update(const Vector* lightDirection, const Vector* lightPos,
 
 	const Matrix matWorldInv = ownerObject->RenderObject->World.GetInverse();
 	Vector lightDirWorldInv(Vector::ZeroVector);
-	if (lightDirection)
-		lightDirWorldInv = Matrix3(matWorldInv).Transform(*lightDirection);
 	Vector lightPosWorldInv(Vector::ZeroVector);
-	if (lightPos)
-		lightPosWorldInv = matWorldInv.Transform(*lightPos);
+	if (isOmniDirectional)
+		lightPosWorldInv = matWorldInv.Transform(lightPosOrDirection);
+	else
+		lightDirWorldInv = Matrix3(matWorldInv).Transform(lightPosOrDirection);
 
-	const auto getLightDirection = [&lightDirection, &lightDirWorldInv, &lightPos, &lightPosWorldInv](const Vector& pos)
+	const auto getLightDirection = [&lightDirWorldInv, &isOmniDirectional, &lightPosWorldInv](const Vector& pos)
 	{
-		if (lightDirection)
-			return lightDirWorldInv;
-
-		if (lightPos)
+		if (isOmniDirectional)
 			return pos - lightPosWorldInv;
+
+		return lightDirWorldInv;
 
 		JMESSAGE("lightDirection or lightPos should be not null");
 		return Vector::ZeroVector;

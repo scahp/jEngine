@@ -87,6 +87,7 @@ protected:
 	float DepthSlopeBias = 1.0f;
 	float DepthConstantBias = 1.0f;
 	std::vector<IBuffer*> Buffers;
+	bool EnableClear = true;
 };
 
 #define CREATE_PIPELINE_WITH_SETUP(PipelineClass, ...) \
@@ -262,6 +263,8 @@ public:
 	virtual ~jPipelineSet() {}
 	std::list<const IPipeline*> ShadowPrePass;
 	std::list<const IPipeline*> RenderPass;
+	std::list<const IPipeline*> DebugRenderPass;
+	std::list<const IPipeline*> BoundVolumeRenderPass;
 	std::list<const IPipeline*> PostRenderPass;
 	std::list<const IPipeline*> UIPass;
 
@@ -293,55 +296,60 @@ public: \
 	virtual EPipelineSetType GetType() const override { return PipelineSetType; } \
 	virtual void Setup() override {
 
+#define START_CREATE_PIPELINE_SET_INFO_WITH_DEBUG_RENDER(Name, Prefix, PipelineSetType) \
+START_CREATE_PIPELINE_SET_INFO(Name, Prefix, PipelineSetType) \
+	ADD_PIPELINE_AT_RENDERPASS(DebugRenderPass, "Forward_DebugObject_Pipeline");\
+	ADD_PIPELINE_AT_RENDERPASS(BoundVolumeRenderPass, "Forward_BoundVolume_Pipeline");
+
 #define END_CREATE_PIPELINE_SET_INFO() } };
 
 //////////////////////////////////////////////////////////////////////////
 // jForwardPipelineSet_SSM
-START_CREATE_PIPELINE_SET_INFO(SSM, Forward, EPipelineSetType::Forward)
+START_CREATE_PIPELINE_SET_INFO_WITH_DEBUG_RENDER(SSM, Forward, EPipelineSetType::Forward)
 	ADD_PIPELINE_AT_RENDERPASS(ShadowPrePass, "Forward_ShadowMapGen_SSM_Pipeline");
 	ADD_PIPELINE_AT_RENDERPASS(RenderPass, "Forward_SSM_Pipeline");
 END_CREATE_PIPELINE_SET_INFO()
 
 // jForwardPipelineSet_SSM_PCF
-START_CREATE_PIPELINE_SET_INFO(SSM_PCF, Forward, EPipelineSetType::Forward)
+START_CREATE_PIPELINE_SET_INFO_WITH_DEBUG_RENDER(SSM_PCF, Forward, EPipelineSetType::Forward)
 	ADD_PIPELINE_AT_RENDERPASS(ShadowPrePass, "Forward_ShadowMapGen_SSM_Pipeline");
 	ADD_PIPELINE_AT_RENDERPASS(RenderPass, "Forward_SSM_PCF_Pipeline");
 END_CREATE_PIPELINE_SET_INFO()
 
 // jForwardPipelineSet_SSM_PCSS
-START_CREATE_PIPELINE_SET_INFO(SSM_PCSS, Forward, EPipelineSetType::Forward)
+START_CREATE_PIPELINE_SET_INFO_WITH_DEBUG_RENDER(SSM_PCSS, Forward, EPipelineSetType::Forward)
 	ADD_PIPELINE_AT_RENDERPASS(ShadowPrePass, "Forward_ShadowMapGen_SSM_Pipeline");
 	ADD_PIPELINE_AT_RENDERPASS(RenderPass, "Forward_SSM_PCSS_Pipeline");
 END_CREATE_PIPELINE_SET_INFO()
 
 // jForwardPipelineSet_SSM_PCF_Poisson
-START_CREATE_PIPELINE_SET_INFO(SSM_PCF_Poisson, Forward, EPipelineSetType::Forward)
+START_CREATE_PIPELINE_SET_INFO_WITH_DEBUG_RENDER(SSM_PCF_Poisson, Forward, EPipelineSetType::Forward)
 	ADD_PIPELINE_AT_RENDERPASS(ShadowPrePass, "Forward_ShadowMapGen_SSM_Pipeline");
 	ADD_PIPELINE_AT_RENDERPASS(RenderPass, "Forward_SSM_PCF_Poisson_Pipeline");
 END_CREATE_PIPELINE_SET_INFO()
 
 // jForwardPipelineSet_SSM_PCSS_Poisson
-START_CREATE_PIPELINE_SET_INFO(SSM_PCSS_Poisson, Forward, EPipelineSetType::Forward)
+START_CREATE_PIPELINE_SET_INFO_WITH_DEBUG_RENDER(SSM_PCSS_Poisson, Forward, EPipelineSetType::Forward)
 	ADD_PIPELINE_AT_RENDERPASS(ShadowPrePass, "Forward_ShadowMapGen_SSM_Pipeline");
 	ADD_PIPELINE_AT_RENDERPASS(RenderPass, "Forward_SSM_PCSS_Poisson_Pipeline");
 END_CREATE_PIPELINE_SET_INFO()
 
 // jForwardPipelineSet_VSM
-START_CREATE_PIPELINE_SET_INFO(VSM, Forward, EPipelineSetType::Forward)
+START_CREATE_PIPELINE_SET_INFO_WITH_DEBUG_RENDER(VSM, Forward, EPipelineSetType::Forward)
 	ADD_PIPELINE_AT_RENDERPASS(ShadowPrePass, "Forward_ShadowMapGen_VSM_Pipeline");
 	ADD_PIPELINE_WITH_CREATE_AND_SETUP_AT_RENDERPASS(ShadowPrePass, jForwardShadowMap_Blur_Pipeline);
 	ADD_PIPELINE_AT_RENDERPASS(RenderPass, "Forward_VSM_Pipeline");
 END_CREATE_PIPELINE_SET_INFO()
 
 // jForwardPipelineSet_VSM
-START_CREATE_PIPELINE_SET_INFO(ESM, Forward, EPipelineSetType::Forward)
+START_CREATE_PIPELINE_SET_INFO_WITH_DEBUG_RENDER(ESM, Forward, EPipelineSetType::Forward)
 	ADD_PIPELINE_AT_RENDERPASS(ShadowPrePass, "Forward_ShadowMapGen_ESM_Pipeline");
 	ADD_PIPELINE_WITH_CREATE_AND_SETUP_AT_RENDERPASS(ShadowPrePass, jForwardShadowMap_Blur_Pipeline);
 	ADD_PIPELINE_AT_RENDERPASS(RenderPass, "Forward_ESM_Pipeline");
 END_CREATE_PIPELINE_SET_INFO()
 
 // jForwardPipelineSet_EVSM
-START_CREATE_PIPELINE_SET_INFO(EVSM, Forward, EPipelineSetType::Forward)
+START_CREATE_PIPELINE_SET_INFO_WITH_DEBUG_RENDER(EVSM, Forward, EPipelineSetType::Forward)
 	ADD_PIPELINE_AT_RENDERPASS(ShadowPrePass, "Forward_ShadowMapGen_EVSM_Pipeline");
 	ADD_PIPELINE_WITH_CREATE_AND_SETUP_AT_RENDERPASS(ShadowPrePass, jForwardShadowMap_Blur_Pipeline);
 	ADD_PIPELINE_AT_RENDERPASS(RenderPass, "Forward_EVSM_Pipeline");
@@ -354,3 +362,37 @@ auto newPipeline = new PipelineSetClass(__VA_ARGS__); \
 newPipeline->Setup(); \
 return newPipeline; \
 }()
+
+
+//////////////////////////////////////////////////////////////////////////
+// jForward_DebugObject_Pipeline
+class jForward_DebugObject_Pipeline : public jRenderPipeline
+{
+public:
+	jForward_DebugObject_Pipeline(const char* shaderName)
+		: ShaderName(shaderName)
+	{}
+
+	virtual void Setup() override;
+	const char* ShaderName = nullptr;
+};
+
+//////////////////////////////////////////////////////////////////////////
+// jForward_ShadowVolume_Pipeline
+class jForward_ShadowVolume_Pipeline : public jRenderPipeline
+{
+public:
+	using jRenderPipeline::jRenderPipeline;
+	
+	virtual void Setup() override;
+	bool CanSkipShadowObject(const jCamera* camera, const jObject* object
+		, const Vector& lightPosOrDirection, bool isOmniDirectional, const jLight* light) const;
+	virtual void Do(const jPipelineData& pipelineData) const override;
+};
+
+
+// jForwardPipelineSet_ShadowVolume
+START_CREATE_PIPELINE_SET_INFO_WITH_DEBUG_RENDER(ShadowVolume, Forward, EPipelineSetType::Forward)
+	ADD_PIPELINE_WITH_CREATE_AND_SETUP_AT_RENDERPASS(RenderPass, jForward_ShadowVolume_Pipeline);
+END_CREATE_PIPELINE_SET_INFO()
+
