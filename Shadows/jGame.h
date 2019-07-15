@@ -54,7 +54,9 @@ public:
 	jRenderer* ForwardRenderer = nullptr;
 
 	std::map<EShadowMapType, jPipelineSet*> ShadowPipelineSetMap;
+	std::map<EShadowMapType, jPipelineSet*> ShadowPoissonSamplePipelineSetMap;
 
 	EShadowMapType CurrentShadowMapType = EShadowMapType::SSM;
+	bool UsePoissonSample = false;
 };
 

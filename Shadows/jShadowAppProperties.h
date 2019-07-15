@@ -18,7 +18,7 @@ public:
 	bool ShowSilhouette_PointLight = false;
 	bool ShowSilhouette_SpotLight = false;
 	EShadowMapType ShadowMapType = EShadowMapType::SSM;
-	bool UsePoissonSample = true;
+	bool UsePoissonSample = false;
 	bool ShowDirectionalLightMap = false;
 	bool ShowDirectionalLightInfo = false;
 	bool ShowPointLightInfo = false;

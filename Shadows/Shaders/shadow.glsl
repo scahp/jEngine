@@ -109,16 +109,12 @@ float PCF_PoissonSample(vec3 lightClipPos, vec2 radiusUV, sampler2D shadow_objec
     {
         vec2 offset = poissonDisk[ i ] * radiusUV;
         vec3 depthPos = lightClipPos + vec3(offset, 0.0);
-        // if (!IsShadowing(depthPos, shadow_object))
-        //     ++sum;
         sum += float(!IsShadowing(depthPos, shadow_object));
     }
     for(int i = 0; i < PCF_NUM_SAMPLES;++i) 
     {
         vec2 offset = -poissonDisk[ i ].yx * radiusUV;
         vec3 depthPos = lightClipPos + vec3(offset, 0.0);
-        // if (!IsShadowing(depthPos, shadow_object))
-        //     ++sum;
         sum += float(!IsShadowing(depthPos, shadow_object));
     }
     return sum / ( 2.0 * float( PCF_NUM_SAMPLES ) );
@@ -189,8 +185,6 @@ float PCF(vec3 lightClipPos, vec2 radiusUV, sampler2D shadow_object)
 		{
             vec2 offset = vec2(x, y) * stepUV;
             vec3 depthPos = lightClipPos + vec3(offset, 0.0);
-            // if (IsShadowing(depthPos, shadow_object))
-            //     ++pcf_count;
             pcf_count += float(IsShadowing(depthPos, shadow_object));
 
         }
@@ -359,9 +353,6 @@ float PCF_OmniDirectional_PoissonSample(TexArrayUV result, float distSqured, vec
         temp.u += offset.x;
         temp.v += offset.y;
         temp = MakeTexArrayUV(temp);
-
-        // if (texture(shadow_object, vec3(temp.u, temp.v, temp.index)).r > distSqured)
-        //     ++sum;
         sum += float(texture(shadow_object, Convert_TexArrayUV_To_Tex2dUV(temp)).r > distSqured);
     }
     for(int i = 0; i < PCF_NUM_SAMPLES;++i) 
@@ -371,9 +362,6 @@ float PCF_OmniDirectional_PoissonSample(TexArrayUV result, float distSqured, vec
         temp.u += offset.x;
         temp.v += offset.y;
         temp = MakeTexArrayUV(temp);
-
-        // if (texture(shadow_object, vec3(temp.u, temp.v, temp.index)).r > distSqured)
-        //     ++sum;
         sum += float(texture(shadow_object, Convert_TexArrayUV_To_Tex2dUV(temp)).r > distSqured);
     }
     return sum / ( 2.0 * float( PCF_NUM_SAMPLES ) );
@@ -463,9 +451,6 @@ float PCF_OmniDirectional(TexArrayUV result, float distSqured, vec2 radiusUV, sa
             temp.u += offset.x;
             temp.v += offset.y;
             temp = MakeTexArrayUV(temp);
-
-            // if (texture(shadow_object, vec3(temp.u, temp.v, temp.index)).r <= distSqured)
-            //     ++pcf_count;
             pcf_count += float(texture(shadow_object, Convert_TexArrayUV_To_Tex2dUV(temp)).r <= distSqured);
         }
     }

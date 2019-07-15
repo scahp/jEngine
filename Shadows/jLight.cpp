@@ -30,7 +30,7 @@ namespace jLightUtil
 		// todo remove constant variable
 		auto shadowMapData = new jShadowMapArrayData(prefix);
 
-		const float nearDist = 10.0f;
+		const float nearDist = 1.0f;
 		const float farDist = 500.0f;
 		shadowMapData->ShadowMapCamera[0] = jCamera::CreateCamera(pos, pos + Vector(1.0f, 0.0f, 0.0f), pos + Vector(0.0f, 1.0f, 0.0f), DegreeToRadian(90.0f), nearDist, farDist, SM_WIDTH, SM_HEIGHT, true);
 		shadowMapData->ShadowMapCamera[1] = jCamera::CreateCamera(pos, pos + Vector(-1.0f, 0.0f, 0.0f), pos + Vector(0.0f, 1.0f, 0.0f), DegreeToRadian(90.0f), nearDist, farDist, SM_WIDTH, SM_HEIGHT, true);

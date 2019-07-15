@@ -14,24 +14,27 @@ uniform float MaxDist;
 #define COUNT (FILTER_STEP_COUNT * 2.0 + 1.0)
 
 in vec2 TexCoord_;
+in int gl_Layer;
 
 out vec4 color;
 
 void main()
 {
-    vec2 radiusUV = (FILTER_SIZE * PixelSize) / FILTER_STEP_COUNT;
-    if (IsVertical > 0.0)
+	const float invCount = 1.0 / COUNT;
+	const float inv6 = 1.0 / 6.0;
+	
+	vec2 radiusUV = (FILTER_SIZE * PixelSize) / FILTER_STEP_COUNT;
+	radiusUV.y *= inv6;
+	if (IsVertical > 0.0)
         radiusUV = vec2(0.0, radiusUV.y);
     else
         radiusUV = vec2(radiusUV.x, 0.0);
 
-	const float invCount = 1.0 / COUNT;
-	const float inv6 = 1.0 / 6.0;
     vec4 colorTemp = vec4(0);
 	for (float x = -FILTER_STEP_COUNT; x <= FILTER_STEP_COUNT; ++x)
 	{
 		int index = int(TexCoord_.y / inv6);
-		vec2 tex = TexCoord_ + vec2(x, x * inv6) * radiusUV;
+		vec2 tex = TexCoord_ + vec2(x, x) * radiusUV;
 		TexArrayUV uv;
 		uv.u = tex.x;
 		uv.v = (tex.y - (inv6 * index)) * 6.0;

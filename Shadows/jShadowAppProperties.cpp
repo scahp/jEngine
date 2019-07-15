@@ -9,7 +9,7 @@ void jShadowAppSettingProperties::Setup(jAppSettingBase* appSetting)
 
 	//appSetting->AddEnumVariable("ShadowType", ShadowType, "EShadowType", EShadowTypeString);
 	appSetting->AddEnumVariable("ShadowMapType", ShadowMapType, "EShadowMapType", EShadowMapTypeString);
-	//appSetting->AddVariable("UsePoissonSample", UsePoissonSample);
+	appSetting->AddVariable("UsePoissonSample", UsePoissonSample);
 	//appSetting->AddVariable("DirectionalLightMap", ShowDirectionalLightMap);
 
 	////////////////////////////////////////////////////////////////////////////
@@ -95,7 +95,7 @@ void jShadowAppSettingProperties::Teardown(jAppSettingBase* appSetting)
 	//appSetting->RemoveVariable("PointLightSilhouette");
 	//appSetting->RemoveVariable("SpotLightSilhouette");
 	appSetting->RemoveVariable("ShadowMapType");
-	//appSetting->RemoveVariable("UsePoissonSample");
+	appSetting->RemoveVariable("UsePoissonSample");
 	//appSetting->RemoveVariable("DirectionalLightMap");
 	//appSetting->RemoveVariable("DirectionalInfo");
 	//appSetting->RemoveVariable("PointInfo");

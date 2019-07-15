@@ -30,8 +30,8 @@ static const char* EShadowVolumeSilhouetteString[] = {
 enum class EShadowMapType
 {
 	SSM = 0,
-	//PCF,
-	//PCSS,
+	PCF,
+	PCSS,
 	VSM,
 	ESM,
 	EVSM,
@@ -40,8 +40,8 @@ enum class EShadowMapType
 
 static const char* EShadowMapTypeString[] = {
 	"SSM",
-	//"PCF",
-	//"PCSS",
+	"PCF",
+	"PCSS",
 	"VSM",
 	"ESM",
 	"EVSM",

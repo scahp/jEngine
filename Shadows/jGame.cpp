@@ -63,8 +63,8 @@ void jGame::Setup()
 
 	// Light creation step
 	DirectionalLight = jLight::CreateDirectionalLight(jShadowAppSettingProperties::GetInstance().DirecionalLightDirection
-		, Vector4(0.5f, 0.5f, 0.5f, 1.0f)
-		, Vector(1.0f), Vector(1.0f), 64);
+		, Vector4(1.0f)
+		, Vector(0.5f), Vector(1.0f), 64);
 	//AmbientLight = jLight::CreateAmbientLight(Vector(0.7f, 0.8f, 0.8f), Vector(0.1f));
 	AmbientLight = jLight::CreateAmbientLight(Vector(1.0f), Vector(0.1f));
 
@@ -93,9 +93,18 @@ void jGame::Setup()
 	DeferredRenderer->Setup();
 
 	ShadowPipelineSetMap.insert(std::make_pair(EShadowMapType::SSM, CREATE_PIPELINE_SET_WITH_SETUP(jForwardPipelineSet_SSM)));
+	ShadowPipelineSetMap.insert(std::make_pair(EShadowMapType::PCF, CREATE_PIPELINE_SET_WITH_SETUP(jForwardPipelineSet_SSM_PCF)));
+	ShadowPipelineSetMap.insert(std::make_pair(EShadowMapType::PCSS, CREATE_PIPELINE_SET_WITH_SETUP(jForwardPipelineSet_SSM_PCSS)));
 	ShadowPipelineSetMap.insert(std::make_pair(EShadowMapType::VSM, CREATE_PIPELINE_SET_WITH_SETUP(jForwardPipelineSet_VSM)));
 	ShadowPipelineSetMap.insert(std::make_pair(EShadowMapType::ESM, CREATE_PIPELINE_SET_WITH_SETUP(jForwardPipelineSet_ESM)));
 	ShadowPipelineSetMap.insert(std::make_pair(EShadowMapType::EVSM, CREATE_PIPELINE_SET_WITH_SETUP(jForwardPipelineSet_EVSM)));
+
+	ShadowPoissonSamplePipelineSetMap.insert(std::make_pair(EShadowMapType::SSM, CREATE_PIPELINE_SET_WITH_SETUP(jForwardPipelineSet_SSM)));
+	ShadowPoissonSamplePipelineSetMap.insert(std::make_pair(EShadowMapType::PCF, CREATE_PIPELINE_SET_WITH_SETUP(jForwardPipelineSet_SSM_PCF_Poisson)));
+	ShadowPoissonSamplePipelineSetMap.insert(std::make_pair(EShadowMapType::PCSS, CREATE_PIPELINE_SET_WITH_SETUP(jForwardPipelineSet_SSM_PCSS_Poisson)));
+	ShadowPoissonSamplePipelineSetMap.insert(std::make_pair(EShadowMapType::VSM, CREATE_PIPELINE_SET_WITH_SETUP(jForwardPipelineSet_VSM)));
+	ShadowPoissonSamplePipelineSetMap.insert(std::make_pair(EShadowMapType::ESM, CREATE_PIPELINE_SET_WITH_SETUP(jForwardPipelineSet_ESM)));
+	ShadowPoissonSamplePipelineSetMap.insert(std::make_pair(EShadowMapType::EVSM, CREATE_PIPELINE_SET_WITH_SETUP(jForwardPipelineSet_EVSM)));	
 
 	CurrentShadowMapType = jShadowAppSettingProperties::GetInstance().ShadowMapType;
 
@@ -105,10 +114,14 @@ void jGame::Setup()
 
 void jGame::Update(float deltaTime)
 {
-	if (CurrentShadowMapType != jShadowAppSettingProperties::GetInstance().ShadowMapType)
+	const bool isChangedPoisson = (UsePoissonSample != jShadowAppSettingProperties::GetInstance().UsePoissonSample);
+	const bool isChangedShadowMapType = (CurrentShadowMapType != jShadowAppSettingProperties::GetInstance().ShadowMapType);
+	if (isChangedPoisson || isChangedShadowMapType)
 	{
+		UsePoissonSample = jShadowAppSettingProperties::GetInstance().UsePoissonSample;
 		CurrentShadowMapType = jShadowAppSettingProperties::GetInstance().ShadowMapType;
-		Renderer->SetChangePipelineSet(ShadowPipelineSetMap[CurrentShadowMapType]);
+		auto newPipelineSet = UsePoissonSample ? ShadowPoissonSamplePipelineSetMap[CurrentShadowMapType] :ShadowPipelineSetMap[CurrentShadowMapType];
+		Renderer->SetChangePipelineSet(newPipelineSet);
 	}
 
 	// todo debug test, should remove this

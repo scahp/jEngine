@@ -47,16 +47,20 @@ struct jShadowPipelinCreation
 {
 	jShadowPipelinCreation()
 	{
-		ADD_FORWARD_SHADOWMAP_GEN_PIPELINE("Forward_ShadowMapGen_SSM_Pipeline", "ShadowGen_SSM", "ShadowGen_Omni_SSM");
-		ADD_FORWARD_SHADOWMAP_GEN_PIPELINE("Forward_ShadowMapGen_VSM_Pipeline", "ShadowGen_VSM", "ShadowGen_Omni_SSM");
-		ADD_FORWARD_SHADOWMAP_GEN_PIPELINE("Forward_ShadowMapGen_ESM_Pipeline", "ShadowGen_ESM", "ShadowGen_Omni_ESM");
-		ADD_FORWARD_SHADOWMAP_GEN_PIPELINE("Forward_ShadowMapGen_EVSM_Pipeline", "ShadowGen_EVSM", "ShadowGen_Omni_EVSM");
+		ADD_FORWARD_SHADOWMAP_GEN_PIPELINE(Forward_ShadowMapGen_SSM_Pipeline, "ShadowGen_SSM", "ShadowGen_Omni_SSM");
+		ADD_FORWARD_SHADOWMAP_GEN_PIPELINE(Forward_ShadowMapGen_VSM_Pipeline, "ShadowGen_VSM", "ShadowGen_Omni_SSM");
+		ADD_FORWARD_SHADOWMAP_GEN_PIPELINE(Forward_ShadowMapGen_ESM_Pipeline, "ShadowGen_ESM", "ShadowGen_Omni_ESM");
+		ADD_FORWARD_SHADOWMAP_GEN_PIPELINE(Forward_ShadowMapGen_EVSM_Pipeline, "ShadowGen_EVSM", "ShadowGen_Omni_EVSM");
 
 
-		ADD_FORWARD_SHADOW_PIPELINE("Forward_SSM_Pipeline", "SSM");
-		ADD_FORWARD_SHADOW_PIPELINE("Forward_VSM_Pipeline", "VSM");
-		ADD_FORWARD_SHADOW_PIPELINE("Forward_ESM_Pipeline", "ESM");
-		ADD_FORWARD_SHADOW_PIPELINE("Forward_EVSM_Pipeline", "EVSM");
+		ADD_FORWARD_SHADOW_PIPELINE(Forward_SSM_Pipeline, "SSM");
+		ADD_FORWARD_SHADOW_PIPELINE(Forward_SSM_PCF_Pipeline, "SSM_PCF");
+		ADD_FORWARD_SHADOW_PIPELINE(Forward_SSM_PCSS_Pipeline, "SSM_PCSS");
+		ADD_FORWARD_SHADOW_PIPELINE(Forward_SSM_PCF_Poisson_Pipeline, "SSM_PCF_Poisson");
+		ADD_FORWARD_SHADOW_PIPELINE(Forward_SSM_PCSS_Poisson_Pipeline, "SSM_PCSS_Poisson");
+		ADD_FORWARD_SHADOW_PIPELINE(Forward_VSM_Pipeline, "VSM");
+		ADD_FORWARD_SHADOW_PIPELINE(Forward_ESM_Pipeline, "ESM");
+		ADD_FORWARD_SHADOW_PIPELINE(Forward_EVSM_Pipeline, "EVSM");
 	}
 } s_shadowPipelinCreation;
 

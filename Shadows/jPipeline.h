@@ -101,7 +101,9 @@ return newPipeline; \
 RenderPassCont.push_back(CREATE_PIPELINE_WITH_SETUP(PipelineClass, __VA_ARGS__))
 
 #define ADD_PIPELINE_AT_RENDERPASS(RenderPassCont, PipelineName) \
-RenderPassCont.push_back(IPipeline::GetPipeline(PipelineName))
+{ auto pipeline = IPipeline::GetPipeline(PipelineName); \
+JASSERT(pipeline);\
+RenderPassCont.push_back(pipeline); }
 
 //////////////////////////////////////////////////////////////////////////
 // jRenderPipeline
@@ -164,7 +166,7 @@ public:
 };
 
 #define ADD_FORWARD_SHADOWMAP_GEN_PIPELINE(Name, DirectionalLightShaderName, OmniDirectionalLightShaderName) \
-IPipeline::AddPipeline(Name, new jForward_ShadowMapGen_Pipeline(DirectionalLightShaderName, OmniDirectionalLightShaderName))
+IPipeline::AddPipeline(#Name, new jForward_ShadowMapGen_Pipeline(DirectionalLightShaderName, OmniDirectionalLightShaderName))
 
 //////////////////////////////////////////////////////////////////////////
 // jForward_Shadow_Pipeline
@@ -181,7 +183,7 @@ public:
 };
 
 #define ADD_FORWARD_SHADOW_PIPELINE(Name, ShaderName) \
-IPipeline::AddPipeline(Name, new jForward_Shadow_Pipeline(ShaderName))
+IPipeline::AddPipeline(#Name, new jForward_Shadow_Pipeline(ShaderName))
 
 class jForwardShadowMap_Blur_Pipeline : public jRenderPipeline
 {
@@ -298,6 +300,30 @@ public: \
 START_CREATE_PIPELINE_SET_INFO(SSM, Forward, EPipelineSetType::Forward)
 	ADD_PIPELINE_AT_RENDERPASS(ShadowPrePass, "Forward_ShadowMapGen_SSM_Pipeline");
 	ADD_PIPELINE_AT_RENDERPASS(RenderPass, "Forward_SSM_Pipeline");
+END_CREATE_PIPELINE_SET_INFO()
+
+// jForwardPipelineSet_SSM_PCF
+START_CREATE_PIPELINE_SET_INFO(SSM_PCF, Forward, EPipelineSetType::Forward)
+	ADD_PIPELINE_AT_RENDERPASS(ShadowPrePass, "Forward_ShadowMapGen_SSM_Pipeline");
+	ADD_PIPELINE_AT_RENDERPASS(RenderPass, "Forward_SSM_PCF_Pipeline");
+END_CREATE_PIPELINE_SET_INFO()
+
+// jForwardPipelineSet_SSM_PCSS
+START_CREATE_PIPELINE_SET_INFO(SSM_PCSS, Forward, EPipelineSetType::Forward)
+	ADD_PIPELINE_AT_RENDERPASS(ShadowPrePass, "Forward_ShadowMapGen_SSM_Pipeline");
+	ADD_PIPELINE_AT_RENDERPASS(RenderPass, "Forward_SSM_PCSS_Pipeline");
+END_CREATE_PIPELINE_SET_INFO()
+
+// jForwardPipelineSet_SSM_PCF_Poisson
+START_CREATE_PIPELINE_SET_INFO(SSM_PCF_Poisson, Forward, EPipelineSetType::Forward)
+	ADD_PIPELINE_AT_RENDERPASS(ShadowPrePass, "Forward_ShadowMapGen_SSM_Pipeline");
+	ADD_PIPELINE_AT_RENDERPASS(RenderPass, "Forward_SSM_PCF_Poisson_Pipeline");
+END_CREATE_PIPELINE_SET_INFO()
+
+// jForwardPipelineSet_SSM_PCSS_Poisson
+START_CREATE_PIPELINE_SET_INFO(SSM_PCSS_Poisson, Forward, EPipelineSetType::Forward)
+	ADD_PIPELINE_AT_RENDERPASS(ShadowPrePass, "Forward_ShadowMapGen_SSM_Pipeline");
+	ADD_PIPELINE_AT_RENDERPASS(RenderPass, "Forward_SSM_PCSS_Poisson_Pipeline");
 END_CREATE_PIPELINE_SET_INFO()
 
 // jForwardPipelineSet_VSM
