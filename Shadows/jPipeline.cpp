@@ -143,6 +143,9 @@ void jDeepShadowMap_ShadowPass_Pipeline::Setup()
 
 void jDeepShadowMap_ShadowPass_Pipeline::Draw(const jPipelineData& pipelineData, const jShader* shader) const
 {
+	DeepShadowMapBuffers.AtomicBuffer->ClearBuffer(0);
+	DeepShadowMapBuffers.StartElementBuf->ClearBuffer(-1);
+
 	for (auto light : pipelineData.Lights)
 	{
 		JASSERT(light);
@@ -150,9 +153,6 @@ void jDeepShadowMap_ShadowPass_Pipeline::Draw(const jPipelineData& pipelineData,
 		JASSERT(light->GetLightCamra());
 		const auto renderTarget = light->GetShadowMapRenderTarget();
 		const auto lightCamera = light->GetLightCamra();
-
-		DeepShadowMapBuffers.AtomicBuffer->ClearBuffer(0);
-		DeepShadowMapBuffers.StartElementBuf->ClearBuffer(-1);
 
 		if (renderTarget->Begin())
 		{
