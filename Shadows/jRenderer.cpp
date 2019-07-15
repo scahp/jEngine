@@ -13,6 +13,7 @@ void jRenderer::Render(const jCamera* camera)
 	RenderPass(camera);
 	PostRenderPass(camera);
 	DebugRenderPass(camera);
+	BoundVolumeRenderPass(camera);
 
 	PostProcessPass(camera);
 
