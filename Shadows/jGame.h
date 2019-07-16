@@ -66,5 +66,6 @@ public:
 	jObject* DirectionalLightInfo = nullptr;
 	jObject* PointLightInfo = nullptr;
 	jObject* SpotLightInfo = nullptr;
+	jObject* DirectionalLightShadowMapUIDebug = nullptr;
 };
 

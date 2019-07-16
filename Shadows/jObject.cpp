@@ -9,6 +9,8 @@ std::list<jObject*> jObject::s_BoundBoxObjects;
 std::list<jObject*> jObject::s_BoundSphereObjects;
 std::list<jObject*> jObject::s_DebugObjects;
 std::set<jObject*> jObject::s_DirtyStateObjects;
+std::list<jObject*> jObject::s_UIObjects;
+std::list<jObject*> jObject::s_UIDebugObjects;
 
 //std::list<jObject*> g_StaticObjectArray;
 std::list<jObject*> g_HairObjectArray;
@@ -95,6 +97,31 @@ void jObject::RemoveDebugObject(jObject* object)
 		});
 }
 
+void jObject::AddUIObject(jObject* object)
+{
+	s_UIObjects.push_back(object);
+}
+
+void jObject::RemoveUIObject(jObject* object)
+{
+	s_UIObjects.remove_if([&object](jObject* param)
+		{
+			return (param == object);
+		});
+}
+
+void jObject::AddUIDebugObject(jObject* object)
+{
+	s_UIDebugObjects.push_back(object);
+}
+
+void jObject::RemoveUIDebugObject(jObject* object)
+{
+	s_UIDebugObjects.remove_if([&object](jObject* param)
+		{
+			return (param == object);
+		});
+}
 //////////////////////////////////////////////////////////////////////////
 jObject::jObject()
 {

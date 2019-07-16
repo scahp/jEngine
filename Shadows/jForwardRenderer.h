@@ -23,6 +23,7 @@ public:
 	virtual void BoundVolumeRenderPass(const jCamera* camera) override;
 	virtual void PostProcessPass(const jCamera* camera) override;
 	virtual void PostRenderPass(const jCamera* camera) override;
+	virtual void DebugUIPass(const jCamera* camera) override;
 
 	virtual void UpdateSettings() {}
 };

@@ -267,6 +267,7 @@ public:
 	std::list<const IPipeline*> BoundVolumeRenderPass;
 	std::list<const IPipeline*> PostRenderPass;
 	std::list<const IPipeline*> UIPass;
+	std::list<const IPipeline*> DebugUIPass;
 
 	virtual EPipelineSetType GetType() const { return EPipelineSetType::None; }
 	virtual void Setup() {}
@@ -299,7 +300,8 @@ public: \
 #define START_CREATE_PIPELINE_SET_INFO_WITH_DEBUG_RENDER(Name, Prefix, PipelineSetType) \
 START_CREATE_PIPELINE_SET_INFO(Name, Prefix, PipelineSetType) \
 	ADD_PIPELINE_AT_RENDERPASS(DebugRenderPass, "Forward_DebugObject_Pipeline");\
-	ADD_PIPELINE_AT_RENDERPASS(BoundVolumeRenderPass, "Forward_BoundVolume_Pipeline");
+	ADD_PIPELINE_AT_RENDERPASS(BoundVolumeRenderPass, "Forward_BoundVolume_Pipeline");\
+	ADD_PIPELINE_AT_RENDERPASS(DebugUIPass, "Forward_UI_Pipeline");
 
 #define END_CREATE_PIPELINE_SET_INFO() } };
 

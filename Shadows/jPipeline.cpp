@@ -67,6 +67,7 @@ struct jShadowPipelinCreation
 
 		IPipeline::AddPipeline("Forward_BoundVolume_Pipeline", new jForward_DebugObject_Pipeline("BoundVolumeShader"));
 		IPipeline::AddPipeline("Forward_DebugObject_Pipeline", new jForward_DebugObject_Pipeline("DebugObjectShader"));
+		IPipeline::AddPipeline("Forward_UI_Pipeline", new jForward_DebugObject_Pipeline("UIShader"));
 	}
 } s_shadowPipelinCreation;
 
@@ -419,6 +420,8 @@ void jForward_DebugObject_Pipeline::Setup()
 	Shader = jShader::GetShader(ShaderName);
 }
 
+//////////////////////////////////////////////////////////////////////////
+// jForward_ShadowVolume_Pipeline
 void jForward_ShadowVolume_Pipeline::Setup()
 {
 	EnableClear = true;

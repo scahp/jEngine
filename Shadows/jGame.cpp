@@ -72,6 +72,9 @@ void jGame::Setup()
 	DirectionalLightInfo = jPrimitiveUtil::CreateDirectionalLightDebug(Vector(250, 260, 0)*0.5f, Vector::OneVector * 10.0f, 10.0f, MainCamera, DirectionalLight, "Image/sun.png");
 	jObject::AddDebugObject(DirectionalLightInfo);
 
+	DirectionalLightShadowMapUIDebug = jPrimitiveUtil::CreateUIQuad({ 0.0f, 0.0f }, { 300, 300 }, DirectionalLight->GetShadowMap());
+	jObject::AddUIDebugObject(DirectionalLightShadowMapUIDebug);
+
 	PointLightInfo = jPrimitiveUtil::CreatePointLightDebug(Vector(10.0f), MainCamera, PointLight, "Image/bulb.png");
 	jObject::AddDebugObject(PointLightInfo);
 
@@ -154,16 +157,16 @@ void jGame::UpdateAppSetting()
 	{
 		if (jShadowAppSettingProperties::GetInstance().ShadowMapType == EShadowMapType::DeepShadowMap_DirectionalLight)
 		{
-			if (DirectionalLight && DirectionalLight->ShadowMapData && DirectionalLight->ShadowMapData->ShadowMapCamera)
-				DirectionalLight->ShadowMapData->ShadowMapCamera->IsPerspectiveProjection = true;
+			//if (DirectionalLight && DirectionalLight->ShadowMapData && DirectionalLight->ShadowMapData->ShadowMapCamera)
+			//	DirectionalLight->ShadowMapData->ShadowMapCamera->IsPerspectiveProjection = true;
 			Renderer = DeferredRenderer;
 			jShadowAppSettingProperties::GetInstance().ShowPointLightInfo = false;
 			jShadowAppSettingProperties::GetInstance().ShowSpotLightInfo = false;
 		}
 		else
 		{
-			if (DirectionalLight && DirectionalLight->ShadowMapData && DirectionalLight->ShadowMapData->ShadowMapCamera)
-				DirectionalLight->ShadowMapData->ShadowMapCamera->IsPerspectiveProjection = false;
+			//if (DirectionalLight && DirectionalLight->ShadowMapData && DirectionalLight->ShadowMapData->ShadowMapCamera)
+			//	DirectionalLight->ShadowMapData->ShadowMapCamera->IsPerspectiveProjection = false;
 			Renderer = ForwardRenderer;
 
 			const bool isChangedPoisson = (UsePoissonSample != jShadowAppSettingProperties::GetInstance().UsePoissonSample);
@@ -256,6 +259,9 @@ void jGame::UpdateAppSetting()
 		SpotLight->Data.Direction = jShadowAppSettingProperties::GetInstance().SpotLightDirection;
 		SpotLight->Data.Position = jShadowAppSettingProperties::GetInstance().SpotLightPosition;
 	}
+
+	if (DirectionalLightShadowMapUIDebug)
+		DirectionalLightShadowMapUIDebug->Visible = jShadowAppSettingProperties::GetInstance().ShowDirectionalLightMap;
 }
 
 void jGame::OnMouseMove(int32 xOffset, int32 yOffset)

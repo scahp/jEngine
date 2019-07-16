@@ -65,6 +65,7 @@ struct jShaderInfoCreation
 
 		DECLARE_SHADER_VS_FS("BoundVolumeShader", "Shaders/vs_boundvolume.glsl", "Shaders/fs_boundvolume.glsl");
 		DECLARE_SHADER_VS_FS("DebugObjectShader", "Shaders/tex_vs.glsl", "Shaders/tex_fs.glsl");
+		DECLARE_SHADER_VS_FS("UIShader", "Shaders/tex_ui_vs.glsl", "Shaders/tex_ui_fs.glsl");
 		
 		DECLARE_SHADER_VS_FS("AmbientOnly", "Shaders/shadowvolume/vs.glsl", "Shaders/shadowvolume/fs_ambientonly.glsl");
 		DECLARE_SHADER_VS_FS("ShadowVolume", "Shaders/shadowvolume/vs.glsl", "Shaders/shadowvolume/fs.glsl");

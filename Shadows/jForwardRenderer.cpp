@@ -77,3 +77,10 @@ void jForwardRenderer::PostRenderPass(const jCamera* camera)
 	for (auto& iter : PipelineSet->PostRenderPass)
 		iter->Do({});
 }
+
+void jForwardRenderer::DebugUIPass(const jCamera* camera)
+{
+	const jPipelineData data(jObject::GetUIDebugObject(), camera, {});
+	for (auto& iter : PipelineSet->DebugUIPass)
+		iter->Do(data);
+}
