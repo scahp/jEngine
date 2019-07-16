@@ -9,8 +9,6 @@
 #include "jRHI.h"
 #include "jRenderObject.h"
 #include "jShadowVolume.h"
-#include "jShadowVolumeRenderer.h"
-#include "jShadowMapRenderer.h"
 #include "jShadowAppProperties.h"
 #include "jImageFileLoader.h"
 #include "jHairModelLoader.h"
@@ -150,6 +148,8 @@ void jGame::Update(float deltaTime)
 
 void jGame::UpdateAppSetting()
 {
+	const bool isChangedShadowType = CurrentShadowType != jShadowAppSettingProperties::GetInstance().ShadowType;
+	const bool isChangedShadowMapType = (CurrentShadowMapType != jShadowAppSettingProperties::GetInstance().ShadowMapType);
 	if (jShadowAppSettingProperties::GetInstance().ShadowType == EShadowType::ShadowMap)
 	{
 		if (jShadowAppSettingProperties::GetInstance().ShadowMapType == EShadowMapType::DeepShadowMap_DirectionalLight)
@@ -166,9 +166,7 @@ void jGame::UpdateAppSetting()
 				DirectionalLight->ShadowMapData->ShadowMapCamera->IsPerspectiveProjection = false;
 			Renderer = ForwardRenderer;
 
-			const bool isChangedShadowType = CurrentShadowType != jShadowAppSettingProperties::GetInstance().ShadowType;
 			const bool isChangedPoisson = (UsePoissonSample != jShadowAppSettingProperties::GetInstance().UsePoissonSample);
-			const bool isChangedShadowMapType = (CurrentShadowMapType != jShadowAppSettingProperties::GetInstance().ShadowMapType);
 			if (isChangedShadowType || isChangedPoisson || isChangedShadowMapType)
 			{
 				CurrentShadowType = jShadowAppSettingProperties::GetInstance().ShadowType;
@@ -192,6 +190,11 @@ void jGame::UpdateAppSetting()
 			Renderer->SetChangePipelineSet(ShadowVolumePipelineSet);
 		}
 	}
+
+	if (isChangedShadowType)
+		jShadowAppSettingProperties::GetInstance().SwitchShadowType(jAppSettings::GetInstance().Get("MainPannel"));
+	if (isChangedShadowMapType)
+		jShadowAppSettingProperties::GetInstance().SwitchShadowMapType(jAppSettings::GetInstance().Get("MainPannel"));
 
 	static auto s_showDirectionalLightInfo = jShadowAppSettingProperties::GetInstance().ShowDirectionalLightInfo;
 	static auto s_showPointLightInfo = jShadowAppSettingProperties::GetInstance().ShowPointLightInfo;
@@ -270,32 +273,6 @@ void jGame::Teardown()
 {
 	Renderer->Teardown();
 }
-
-void jGame::UpdateSettings()
-{
-	//if (ShadowType != jShadowAppSettingProperties::GetInstance().ShadowType)
-	//{
-	//	ShadowType = jShadowAppSettingProperties::GetInstance().ShadowType;
-
-	//	switch (jShadowAppSettingProperties::GetInstance().ShadowType)
-	//	{
-	//	case EShadowType::ShadowVolume:
-	//		Renderer = ShadowRendererMap[EShadowType::ShadowVolume];
-	//		break;
-	//	case EShadowType::ShadowMap:
-	//		Renderer = ShadowRendererMap[EShadowType::ShadowMap];
-	//		break;
-	//	}
-
-	//	jShadowAppSettingProperties::GetInstance().SwitchShadowType(jAppSettings::GetInstance().Get("MainPannel"));
-	//}
-
-	//Renderer->UpdateSettings();
-
-	//Renderer = DeferredRenderer;
-	Renderer = ForwardRenderer;
-}
-
 
 void jGame::SpawnHairObjects()
 {

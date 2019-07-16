@@ -38,7 +38,6 @@ public:
 
 	void OnMouseMove(int32 xOffset, int32 yOffset);
 	void Teardown();
-	void UpdateSettings();
 
 	jDirectionalLight* DirectionalLight = nullptr;
 	jPointLight* PointLight = nullptr;

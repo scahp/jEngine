@@ -193,97 +193,104 @@ void main()
 	if (UseAmbientLight != 0)
 		finalColor += GetAmbientLight(AmbientLight);
 
-	ivec2 uv = ivec2(ShadowPos.x * ShadowMapWidth, ShadowPos.y * ShadowMapHeight);
-
-	NodeData currentXEntry;
-	NodeData currentYEntry;
-	NeighborData currentXEntryNeighbors;
-	NeighborData currentYEntryNeighbors;
-
-	bool noXLink = true;
-	int currentX = uv.x - FILTER_SIZE;
 	float shading = 0.0;
-	for(int x = 0;x < FILTER_SIZE * 2 + 1;++x)
+	if (ShadowOn > 0.0)
 	{
-		bool noYLink = true;
-		int currentY = uv.y - FILTER_SIZE;
+		ivec2 uv = ivec2(ShadowPos.x * ShadowMapWidth, ShadowPos.y * ShadowMapHeight);
 
-		if (noXLink && !(currentX < 0 || currentY < 0 || currentX >= ShadowMapWidth || currentY >= ShadowMapHeight))
-		{
-			int startIndex = start[currentY * ShadowMapWidth + currentX];
-			if (startIndex != -1)
-			{
-				currentXEntry = LinkedListData[startIndex];
-				currentXEntryNeighbors = NeighborListData[startIndex];
-				noXLink = false;
-			}
-		}
+		NodeData currentXEntry;
+		NodeData currentYEntry;
+		NeighborData currentXEntryNeighbors;
+		NeighborData currentYEntryNeighbors;
 
-		if (noXLink)
+		bool noXLink = true;
+		int currentX = uv.x - FILTER_SIZE;
+		for (int x = 0; x < FILTER_SIZE * 2 + 1; ++x)
 		{
-			noYLink = true;
-		}
-		else
-		{
-			currentYEntry = currentXEntry;
-			currentYEntryNeighbors = currentXEntryNeighbors;
-		}
+			bool noYLink = true;
+			int currentY = uv.y - FILTER_SIZE;
 
-		for(int y = 0;y < FILTER_SIZE * 2 + 1;++y)
-		{
-			if (currentX < 0 || currentY < 0 || currentX >= ShadowMapWidth || currentY >= ShadowMapHeight)
-			{
-				shading += 1.0;
-				++currentY;
-				continue;
-			}
-
-			if (noYLink)
+			if (noXLink && !(currentX < 0 || currentY < 0 || currentX >= ShadowMapWidth || currentY >= ShadowMapHeight))
 			{
 				int startIndex = start[currentY * ShadowMapWidth + currentX];
-				if (startIndex == -1)
+				if (startIndex != -1)
+				{
+					currentXEntry = LinkedListData[startIndex];
+					currentXEntryNeighbors = NeighborListData[startIndex];
+					noXLink = false;
+				}
+			}
+
+			if (noXLink)
+			{
+				noYLink = true;
+			}
+			else
+			{
+				currentYEntry = currentXEntry;
+				currentYEntryNeighbors = currentXEntryNeighbors;
+			}
+
+			for (int y = 0; y < FILTER_SIZE * 2 + 1; ++y)
+			{
+				if (currentX < 0 || currentY < 0 || currentX >= ShadowMapWidth || currentY >= ShadowMapHeight)
 				{
 					shading += 1.0;
 					++currentY;
 					continue;
 				}
 
-				noYLink = false;
-				currentYEntry = LinkedListData[startIndex];
-				currentYEntryNeighbors = NeighborListData[startIndex];
+				if (noYLink)
+				{
+					int startIndex = start[currentY * ShadowMapWidth + currentX];
+					if (startIndex == -1)
+					{
+						shading += 1.0;
+						++currentY;
+						continue;
+					}
+
+					noYLink = false;
+					currentYEntry = LinkedListData[startIndex];
+					currentYEntryNeighbors = NeighborListData[startIndex];
+				}
+
+				float localShading = 0.0f;
+				depthSearch(currentYEntry, currentYEntryNeighbors, ShadowPos.z, localShading);
+				shading += localShading;
+
+				++currentY;
+
+				if (currentYEntryNeighbors.top != -1 && !noYLink)
+				{
+					currentYEntry = LinkedListData[currentYEntryNeighbors.top];
+					currentYEntryNeighbors = NeighborListData[currentYEntryNeighbors.top];
+				}
+				else
+				{
+					noYLink = true;
+				}
 			}
 
-			float localShading = 0.0f;
-			depthSearch(currentYEntry, currentYEntryNeighbors, ShadowPos.z, localShading);
-			shading += localShading;
+			++currentX;
 
-			++currentY;
-
-			if (currentYEntryNeighbors.top != -1 && !noYLink)
+			if (currentXEntryNeighbors.right != -1 && !noXLink)
 			{
-				currentYEntry = LinkedListData[currentYEntryNeighbors.top];
-				currentYEntryNeighbors = NeighborListData[currentYEntryNeighbors.top];
+				currentXEntry = LinkedListData[currentXEntryNeighbors.right];
+				currentXEntryNeighbors = NeighborListData[currentXEntryNeighbors.right];
 			}
 			else
 			{
-				noYLink = true;
+				noXLink = true;
 			}
 		}
 
-		++currentX;
-
-		if (currentXEntryNeighbors.right != -1 && !noXLink)
-		{
-			currentXEntry = LinkedListData[currentXEntryNeighbors.right];
-			currentXEntryNeighbors = NeighborListData[currentXEntryNeighbors.right];
-		}
-		else
-		{
-			noXLink = true;
-		}
+		shading /= FILTER_AREA;
 	}
-
-	shading /= FILTER_AREA;
+	else
+	{
+		shading = 1.0;
+	}
 
 	color = vec4(Color.xyz * finalColor * clamp(shading, 0.1f, 1.0), Color.w);
 }

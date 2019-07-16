@@ -51,12 +51,6 @@
     <ClInclude Include="jRenderer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="jShadowVolumeRenderer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jShadowMapRenderer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="jObject.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -183,12 +177,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="jRenderer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="jShadowVolumeRenderer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="jShadowMapRenderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="jObject.cpp">

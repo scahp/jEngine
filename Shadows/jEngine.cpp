@@ -34,7 +34,6 @@ void jEngine::ProcessInput()
 
 void jEngine::Update(float deltaTime)
 {
-	Game.UpdateSettings();
 	Game.Update(deltaTime);
 }
 

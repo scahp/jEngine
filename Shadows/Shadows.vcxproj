@@ -191,10 +191,8 @@
     <ClInclude Include="jRHI_Vulkan.h" />
     <ClInclude Include="jShader.h" />
     <ClInclude Include="jShadowAppProperties.h" />
-    <ClInclude Include="jShadowMapRenderer.h" />
     <ClInclude Include="jShadowTypes.h" />
     <ClInclude Include="jShadowVolume.h" />
-    <ClInclude Include="jShadowVolumeRenderer.h" />
     <ClInclude Include="jShadowVolumeTypes.h" />
     <ClInclude Include="jUtil.h" />
     <ClInclude Include="jVertexAdjacency.h" />
@@ -241,9 +239,7 @@
     <ClCompile Include="jRHI_Vulkan.cpp" />
     <ClCompile Include="jShader.cpp" />
     <ClCompile Include="jShadowAppProperties.cpp" />
-    <ClCompile Include="jShadowMapRenderer.cpp" />
     <ClCompile Include="jShadowVolume.cpp" />
-    <ClCompile Include="jShadowVolumeRenderer.cpp" />
     <ClCompile Include="jUtil.cpp" />
     <ClCompile Include="jVertexAdjacency.cpp" />
     <ClCompile Include="Main.cpp" />

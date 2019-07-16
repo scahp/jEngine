@@ -5,26 +5,26 @@ jShadowAppSettingProperties* jShadowAppSettingProperties::_instance = nullptr;
 
 void jShadowAppSettingProperties::Setup(jAppSettingBase* appSetting)
 {
-	//appSetting->AddVariable("ShadowOn", ShadowOn);
+	appSetting->AddVariable("ShadowOn", ShadowOn);
 
 	appSetting->AddEnumVariable("ShadowType", ShadowType, "EShadowType", EShadowTypeString);
 	appSetting->AddEnumVariable("ShadowMapType", ShadowMapType, "EShadowMapType", EShadowMapTypeString);
 	appSetting->AddVariable("UsePoissonSample", UsePoissonSample);
 	appSetting->AddVariable("DirectionalLightMap", ShowDirectionalLightMap);
 
-	////////////////////////////////////////////////////////////////////////////
-	//// Silhouette Group
-	//appSetting->AddVariable("DirectionalLight_Silhouette", ShowSilhouette_DirectionalLight);
-	//appSetting->SetGroup("DirectionalLight_Silhouette", "Silhouette");
-	//appSetting->SetLabel("DirectionalLight_Silhouette", "DirectionalLight");
+	//////////////////////////////////////////////////////////////////////////
+	// Silhouette Group
+	appSetting->AddVariable("DirectionalLight_Silhouette", ShowSilhouette_DirectionalLight);
+	appSetting->SetGroup("DirectionalLight_Silhouette", "Silhouette");
+	appSetting->SetLabel("DirectionalLight_Silhouette", "DirectionalLight");
 
-	//appSetting->AddVariable("PointLight_Silhouette", ShowSilhouette_PointLight);
-	//appSetting->SetGroup("PointLight_Silhouette", "Silhouette");
-	//appSetting->SetLabel("PointLight_Silhouette", "PointLight");
+	appSetting->AddVariable("PointLight_Silhouette", ShowSilhouette_PointLight);
+	appSetting->SetGroup("PointLight_Silhouette", "Silhouette");
+	appSetting->SetLabel("PointLight_Silhouette", "PointLight");
 
-	//appSetting->AddVariable("SpotLight_Silhouette", ShowSilhouette_SpotLight);
-	//appSetting->SetGroup("SpotLight_Silhouette", "Silhouette");
-	//appSetting->SetLabel("SpotLight_Silhouette", "SpotLight");
+	appSetting->AddVariable("SpotLight_Silhouette", ShowSilhouette_SpotLight);
+	appSetting->SetGroup("SpotLight_Silhouette", "Silhouette");
+	appSetting->SetLabel("SpotLight_Silhouette", "SpotLight");
 
 	//////////////////////////////////////////////////////////////////////////
 	// LightInfo Group
@@ -90,10 +90,11 @@ void jShadowAppSettingProperties::Setup(jAppSettingBase* appSetting)
 
 void jShadowAppSettingProperties::Teardown(jAppSettingBase* appSetting)
 {
-	//appSetting->RemoveVariable("EShadowType");
-	//appSetting->RemoveVariable("DirectionalLightSilhouette");
-	//appSetting->RemoveVariable("PointLightSilhouette");
-	//appSetting->RemoveVariable("SpotLightSilhouette");
+	appSetting->RemoveVariable("ShadowOn");
+	appSetting->RemoveVariable("EShadowType");
+	appSetting->RemoveVariable("DirectionalLightSilhouette");
+	appSetting->RemoveVariable("PointLightSilhouette");
+	appSetting->RemoveVariable("SpotLightSilhouette");
 	appSetting->RemoveVariable("ShadowMapType");
 	appSetting->RemoveVariable("UsePoissonSample");
 	appSetting->RemoveVariable("DirectionalLightMap");
@@ -116,33 +117,33 @@ void jShadowAppSettingProperties::Teardown(jAppSettingBase* appSetting)
 
 void jShadowAppSettingProperties::SwitchShadowType(jAppSettingBase* appSetting)
 {
-	//switch (ShadowType)
-	//{
-	//case EShadowType::ShadowVolume:
-	//	appSetting->SetVisible("Silhouette", 1);
-	//	appSetting->SetVisible("UsePoissonSample", 0);
-	//	appSetting->SetVisible("DirectionalLightMap", 0);
-	//	appSetting->SetVisible("ShadowMapType", 0);
-	//	break;
-	//case EShadowType::ShadowMap:
-	//	appSetting->SetVisible("Silhouette", 0);
-	//	appSetting->SetVisible("UsePoissonSample", 1);
-	//	appSetting->SetVisible("DirectionalLightMap", 1);
-	//	appSetting->SetVisible("ShadowMapType", 1);
-	//	break;
-	//}
+	switch (ShadowType)
+	{
+	case EShadowType::ShadowVolume:
+		appSetting->SetVisible("Silhouette", 1);
+		appSetting->SetVisible("UsePoissonSample", 0);
+		appSetting->SetVisible("DirectionalLightMap", 0);
+		appSetting->SetVisible("ShadowMapType", 0);
+		break;
+	case EShadowType::ShadowMap:
+		appSetting->SetVisible("Silhouette", 0);
+		appSetting->SetVisible("UsePoissonSample", 1);
+		appSetting->SetVisible("DirectionalLightMap", 1);
+		appSetting->SetVisible("ShadowMapType", 1);
+		break;
+	}
 }
 
 void jShadowAppSettingProperties::SwitchShadowMapType(jAppSettingBase* appSetting)
 {
-	//switch (ShadowMapType)
-	//{
-	//case EShadowMapType::PCF:
-	//case EShadowMapType::PCSS:
-	//	appSetting->SetVisible("UsePoissonSample", 1);
-	//	break;
-	//default:
-	//	appSetting->SetVisible("UsePoissonSample", 0);
-	//	break;
-	//}
+	switch (ShadowMapType)
+	{
+	case EShadowMapType::PCF:
+	case EShadowMapType::PCSS:
+		appSetting->SetVisible("UsePoissonSample", 1);
+		break;
+	default:
+		appSetting->SetVisible("UsePoissonSample", 0);
+		break;
+	}
 }

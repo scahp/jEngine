@@ -494,13 +494,15 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineData& pipelineData) const
 
 	//////////////////////////////////////////////////////////////////
 	// 1. Render objects to depth buffer and Ambient & Emissive to color buffer.
+	g_rhi->EnableDepthBias(false);
+
 	g_rhi->EnableBlend(true);
 	g_rhi->SetBlendFunc(EBlendSrc::ONE, EBlendDest::ZERO);
 
 	g_rhi->EnableDepthTest(true);
 
 	const_cast<jCamera*>(camera)->IsEnableCullMode = true;		// todo remove
-	g_rhi->SetClearColor(0.5f, 0.5f, 0.5f, 1.0f);
+	g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH, ERenderBufferType::STENCIL }));
 
 	g_rhi->SetDepthFunc(EDepthStencilFunc::LEQUAL);
@@ -567,6 +569,7 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineData& pipelineData) const
 
 		const_cast<jCamera*>(camera)->IsEnableCullMode = false;			// todo remove
 
+		if (jShadowAppSettingProperties::GetInstance().ShadowOn)
 		{
 			// todo
 			glEnable(GL_POLYGON_OFFSET_FILL);
@@ -612,4 +615,64 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineData& pipelineData) const
 	g_rhi->SetDepthMask(true);
 	g_rhi->SetColorMask(true, true, true, true);
 	g_rhi->EnableStencil(false);
+
+	// Debug
+	{
+		g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::STENCIL }));
+		const_cast<jCamera*>(camera)->IsEnableCullMode = false;		// todo remove
+		g_rhi->EnableBlend(true);
+		g_rhi->SetBlendFunc(EBlendSrc::SRC_ALPHA, EBlendDest::ONE_MINUS_SRC_ALPHA);
+
+		for (auto& light : camera->LightList)
+		{
+			bool isOmniDirectional = false;
+			Vector lightPosOrDirection;
+
+			bool skip = false;
+			switch (light->Type)
+			{
+			case ELightType::DIRECTIONAL:
+				if (!jShadowAppSettingProperties::GetInstance().ShowSilhouette_DirectionalLight)
+					skip = true;
+
+				lightPosOrDirection = static_cast<jDirectionalLight*>(light)->Data.Direction;
+				break;
+			case ELightType::POINT:
+				if (!jShadowAppSettingProperties::GetInstance().ShowSilhouette_PointLight)
+					skip = true;
+
+				lightPosOrDirection = static_cast<jPointLight*>(light)->Data.Position;
+				isOmniDirectional = true;
+				break;
+			case ELightType::SPOT:
+				if (!jShadowAppSettingProperties::GetInstance().ShowSilhouette_SpotLight)
+					skip = true;
+
+				lightPosOrDirection = static_cast<jSpotLight*>(light)->Data.Position;
+				isOmniDirectional = true;
+				break;
+			default:
+				skip = true;
+				break;
+			}
+			if (skip)
+				continue;
+
+			const auto& staticObjects = jObject::GetStaticObject();
+			for (auto& iter : staticObjects)
+			{
+				if (CanSkipShadowObject(camera, iter, lightPosOrDirection, isOmniDirectional, light))
+					continue;
+
+				iter->ShadowVolume->Update(lightPosOrDirection, isOmniDirectional, iter);
+				if (iter->ShadowVolume->EdgeObject)
+					iter->ShadowVolume->EdgeObject->Draw(camera, ShadowVolumeInfinityFarShader, { light });
+				if (iter->ShadowVolume->QuadObject)
+					iter->ShadowVolume->QuadObject->Draw(camera, ShadowVolumeInfinityFarShader, { light });
+			}
+		}
+
+		g_rhi->EnableBlend(false);
+		const_cast<jCamera*>(camera)->IsEnableCullMode = false;			// todo remove
+	}
 }
