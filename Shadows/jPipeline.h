@@ -380,6 +380,19 @@ public:
 };
 
 //////////////////////////////////////////////////////////////////////////
+// jForward_UIObject_Pipeline
+class jForward_UIObject_Pipeline : public jRenderPipeline
+{
+public:
+	jForward_UIObject_Pipeline(const char* shaderName)
+		: ShaderName(shaderName)
+	{}
+
+	virtual void Setup() override;
+	const char* ShaderName = nullptr;
+};
+
+//////////////////////////////////////////////////////////////////////////
 // jForward_ShadowVolume_Pipeline
 class jForward_ShadowVolume_Pipeline : public jRenderPipeline
 {

@@ -21,8 +21,8 @@ public:
 	bool UsePoissonSample = true;
 	bool ShowDirectionalLightMap = false;
 	bool ShowDirectionalLightInfo = true;
-	bool ShowPointLightInfo = false;
-	bool ShowSpotLightInfo = false;
+	bool ShowPointLightInfo = true;
+	bool ShowSpotLightInfo = true;
 	bool ShowBoundBox = false;
 	bool ShowBoundSphere = false;
 	Vector DirecionalLightDirection = Vector(-0.56f, -0.83f, 0.01f).GetNormalize();

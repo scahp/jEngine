@@ -67,7 +67,7 @@ struct jShadowPipelinCreation
 
 		IPipeline::AddPipeline("Forward_BoundVolume_Pipeline", new jForward_DebugObject_Pipeline("BoundVolumeShader"));
 		IPipeline::AddPipeline("Forward_DebugObject_Pipeline", new jForward_DebugObject_Pipeline("DebugObjectShader"));
-		IPipeline::AddPipeline("Forward_UI_Pipeline", new jForward_DebugObject_Pipeline("UIShader"));
+		IPipeline::AddPipeline("Forward_UI_Pipeline", new jForward_UIObject_Pipeline("UIShader"));
 	}
 } s_shadowPipelinCreation;
 
@@ -678,4 +678,15 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineData& pipelineData) const
 		g_rhi->EnableBlend(false);
 		const_cast<jCamera*>(camera)->IsEnableCullMode = false;			// todo remove
 	}
+}
+
+//////////////////////////////////////////////////////////////////////////
+// jForward_UIObject_Pipeline
+void jForward_UIObject_Pipeline::Setup()
+{
+	EnableClear = false;
+	EnableDepthTest = false;
+	DepthStencilFunc = EDepthStencilFunc::LEQUAL;
+	EnableBlend = false;
+	Shader = jShader::GetShader(ShaderName);
 }
