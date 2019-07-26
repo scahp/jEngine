@@ -81,7 +81,7 @@ void jGame::Setup()
 	DirectionalLightInfo = jPrimitiveUtil::CreateDirectionalLightDebug(Vector(250, 260, 0)*0.5f, Vector::OneVector * 10.0f, 10.0f, MainCamera, DirectionalLight, "Image/sun.png");
 	jObject::AddDebugObject(DirectionalLightInfo);
 
-	DirectionalLightShadowMapUIDebug = jPrimitiveUtil::CreateUIQuad({ 0.0f, 0.0f }, { 300, 300 }, DirectionalLight->GetShadowMap());
+	DirectionalLightShadowMapUIDebug = jPrimitiveUtil::CreateUIQuad({ 0.0f, 0.0f }, { 150, 150 }, DirectionalLight->GetShadowMap());
 	jObject::AddUIDebugObject(DirectionalLightShadowMapUIDebug);
 
 	PointLightInfo = jPrimitiveUtil::CreatePointLightDebug(Vector(10.0f), MainCamera, PointLight, "Image/bulb.png");
@@ -132,11 +132,6 @@ void jGame::Setup()
 	DeferredRenderer = new jDeferredRenderer({ ETextureType::TEXTURE_2D, EFormat::RGBA32F, EFormat::RGBA, EFormatType::FLOAT, SCR_WIDTH, SCR_HEIGHT, 4 });
 	DeferredRenderer->Setup();
 
-	{
-		const auto shaderMapRenderTarget = DirectionalLight->ShadowMapData->ShadowMapRenderTarget;
-		const float aspect = shaderMapRenderTarget->Info.Height / shaderMapRenderTarget->Info.Width;
-		jObject::AddUIDebugObject(jPrimitiveUtil::CreateUIQuad({ 0.0f, 0.0f }, { 150.0f, 150.0f * aspect }, shaderMapRenderTarget->GetTexture()));
-	}
 	//for (int32 i = 0; i < NUM_CASCADES; ++i)
 	//{
 	//	jObject::AddUIDebugObject(jPrimitiveUtil::CreateUIQuad({ i * 150.0f, 0.0f }, { 150.0f, 150.0f }, DirectionalLight->ShadowMapData->CascadeShadowMapRenderTarget[i]->GetTexture()));
@@ -181,6 +176,7 @@ void jGame::Update(float deltaTime)
 
 void jGame::UpdateAppSetting()
 {
+	bool changedDirectionalLight = false;
 	if (jShadowAppSettingProperties::GetInstance().ShadowMapType == EShadowMapType::CSM_SSM)
 	{
 		if (DirectionalLight != CascadeDirectionalLight)
@@ -188,6 +184,7 @@ void jGame::UpdateAppSetting()
 			MainCamera->RemoveLight(DirectionalLight);
 			DirectionalLight = CascadeDirectionalLight;
 			MainCamera->AddLight(DirectionalLight);
+			changedDirectionalLight = true;
 		}
 	}
 	else
@@ -197,7 +194,16 @@ void jGame::UpdateAppSetting()
 			MainCamera->RemoveLight(DirectionalLight);
 			DirectionalLight = NormalDirectionalLight;
 			MainCamera->AddLight(DirectionalLight);
+			changedDirectionalLight = true;
 		}
+	}
+
+	if (changedDirectionalLight)
+	{
+		const auto shaderMapRenderTarget = DirectionalLight->ShadowMapData->ShadowMapRenderTarget;
+		const float aspect = shaderMapRenderTarget->Info.Height / shaderMapRenderTarget->Info.Width;
+		DirectionalLightShadowMapUIDebug->SetTexture(DirectionalLight->ShadowMapData->ShadowMapRenderTarget->GetTexture());
+		DirectionalLightShadowMapUIDebug->Size.y = DirectionalLightShadowMapUIDebug->Size.x * aspect;
 	}
 
 	const bool isChangedShadowType = CurrentShadowType != jShadowAppSettingProperties::GetInstance().ShadowType;

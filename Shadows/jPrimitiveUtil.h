@@ -48,7 +48,7 @@ public:
 	Vector2 Size;
 
 	virtual void Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights) override;
-
+	void SetTexture(const jTexture* texture);
 	void SetUniformParams(const jShader* shader);
 
 };

@@ -20,6 +20,7 @@ struct jRenderTarget;
 class jObject;
 class jPipelineSet;
 class jCascadeDirectionalLight;
+class jUIQuadPrimitive;
 
 class jGame
 {
@@ -70,6 +71,6 @@ public:
 	jObject* DirectionalLightInfo = nullptr;
 	jObject* PointLightInfo = nullptr;
 	jObject* SpotLightInfo = nullptr;
-	jObject* DirectionalLightShadowMapUIDebug = nullptr;
+	jUIQuadPrimitive* DirectionalLightShadowMapUIDebug = nullptr;
 };
 

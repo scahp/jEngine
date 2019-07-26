@@ -39,6 +39,11 @@ void jUIQuadPrimitive::Draw(const jCamera* camera, const jShader* shader, const 
 	__super::Draw(camera, shader, lights);
 }
 
+void jUIQuadPrimitive::SetTexture(const jTexture* texture)
+{
+	RenderObject->tex_object = texture;
+}
+
 void jUIQuadPrimitive::SetUniformParams(const jShader* shader)
 {
 	auto temp1 = jUniformBuffer<Vector2>("PixelSize", Vector2(1.0f / SCR_WIDTH, 1.0f / SCR_HEIGHT));
