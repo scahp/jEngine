@@ -17,7 +17,7 @@ public:
 	bool ShowSilhouette_DirectionalLight = false;
 	bool ShowSilhouette_PointLight = false;
 	bool ShowSilhouette_SpotLight = false;
-	EShadowMapType ShadowMapType = EShadowMapType::SSM;
+	EShadowMapType ShadowMapType = EShadowMapType::CSM_SSM;
 	bool UsePoissonSample = true;
 	bool ShowDirectionalLightMap = false;
 	bool ShowDirectionalLightInfo = true;
@@ -31,6 +31,7 @@ public:
 	Vector SpotLightDirection = Vector(-1.0f, -1.0f, -0.4f).GetNormalize();
 	float DeepShadowAlpha = 0.3f;
 	bool ExponentDeepShadowOn = false;
+	bool CSMDebugOn = false;
 
 	virtual void Setup(jAppSettingBase* appSetting) override;
 	virtual void Teardown(jAppSettingBase* appSetting) override;

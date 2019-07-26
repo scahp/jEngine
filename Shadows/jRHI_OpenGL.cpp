@@ -206,6 +206,15 @@ void jRHI_OpenGL::SetViewportIndexedArray(int32 startIndex, int32 count, const j
 	glViewportArrayv(startIndex, count, reinterpret_cast<const float*>(viewports));
 }
 
+void jRHI_OpenGL::EnableDepthClip(bool enable)
+{
+	// Enabling GL_DEPTH_CLAMP means that it disabling depth clip.
+	if (enable)
+		glDisable(GL_DEPTH_CLAMP);
+	else
+		glEnable(GL_DEPTH_CLAMP);
+}
+
 void jRHI_OpenGL::SetClear(ERenderBufferType typeBit)
 {
 	uint32 clearBufferBit = 0;

@@ -235,5 +235,8 @@ public:
 	virtual void SetViewportIndexed(int32 index, float x, float y, float width, float height) const override;
 	virtual void SetViewportIndexed(int32 index, const jViewport& viewport) const override;
 	virtual void SetViewportIndexedArray(int32 startIndex, int32 count, const jViewport* viewports) const override;
+
+	virtual void EnableDepthClip(bool enable) override;
+
 };
 

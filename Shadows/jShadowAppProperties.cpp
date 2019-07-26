@@ -86,6 +86,11 @@ void jShadowAppSettingProperties::Setup(jAppSettingBase* appSetting)
 	
 	appSetting->AddVariable("ExponentDeepShadowOn", ExponentDeepShadowOn);
 	appSetting->SetGroup("ExponentDeepShadowOn", "DeepShadow");
+
+	//////////////////////////////////////////////////////////////////////////
+	// Cascade Shadow Option
+	appSetting->AddVariable("CSMDebugOn", CSMDebugOn);
+	appSetting->SetGroup("CSMDebugOn", "CascadeShadow");
 }
 
 void jShadowAppSettingProperties::Teardown(jAppSettingBase* appSetting)
@@ -113,6 +118,7 @@ void jShadowAppSettingProperties::Teardown(jAppSettingBase* appSetting)
 	appSetting->RemoveVariable("Sphere");
 	appSetting->RemoveVariable("DeepShadowAlpha");
 	appSetting->RemoveVariable("ExponentDeepShadowOn");
+	appSetting->RemoveVariable("CSMDebugOn");
 }
 
 void jShadowAppSettingProperties::SwitchShadowType(jAppSettingBase* appSetting)
@@ -124,18 +130,22 @@ void jShadowAppSettingProperties::SwitchShadowType(jAppSettingBase* appSetting)
 		appSetting->SetVisible("UsePoissonSample", 0);
 		appSetting->SetVisible("DirectionalLightMap", 0);
 		appSetting->SetVisible("ShadowMapType", 0);
+		appSetting->SetVisible("CSMDebugOn", 0);
 		break;
 	case EShadowType::ShadowMap:
 		appSetting->SetVisible("Silhouette", 0);
 		appSetting->SetVisible("UsePoissonSample", 1);
 		appSetting->SetVisible("DirectionalLightMap", 1);
 		appSetting->SetVisible("ShadowMapType", 1);
+		appSetting->SetVisible("CSMDebugOn", (ShadowMapType == EShadowMapType::CSM_SSM));
 		break;
 	}
 }
 
 void jShadowAppSettingProperties::SwitchShadowMapType(jAppSettingBase* appSetting)
 {
+	appSetting->SetVisible("CSMDebugOn", (ShadowMapType == EShadowMapType::CSM_SSM));
+
 	switch (ShadowMapType)
 	{
 	case EShadowMapType::PCF:

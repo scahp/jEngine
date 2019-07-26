@@ -55,7 +55,6 @@ struct jShadowPipelinCreation
 		ADD_FORWARD_SHADOWMAP_GEN_PIPELINE(Forward_ShadowMapGen_ESM_Pipeline, "ShadowGen_ESM", "ShadowGen_Omni_ESM");
 		ADD_FORWARD_SHADOWMAP_GEN_PIPELINE(Forward_ShadowMapGen_EVSM_Pipeline, "ShadowGen_EVSM", "ShadowGen_Omni_EVSM");
 
-
 		ADD_FORWARD_SHADOW_PIPELINE(Forward_SSM_Pipeline, "SSM");
 		ADD_FORWARD_SHADOW_PIPELINE(Forward_SSM_PCF_Pipeline, "SSM_PCF");
 		ADD_FORWARD_SHADOW_PIPELINE(Forward_SSM_PCSS_Pipeline, "SSM_PCSS");
@@ -64,16 +63,24 @@ struct jShadowPipelinCreation
 		ADD_FORWARD_SHADOW_PIPELINE(Forward_VSM_Pipeline, "VSM");
 		ADD_FORWARD_SHADOW_PIPELINE(Forward_ESM_Pipeline, "ESM");
 		ADD_FORWARD_SHADOW_PIPELINE(Forward_EVSM_Pipeline, "EVSM");
+		ADD_FORWARD_SHADOW_PIPELINE(Forward_CSM_SSM_Pipeline, "CSM_SSM");
 
 		IPipeline::AddPipeline("Forward_BoundVolume_Pipeline", new jForward_DebugObject_Pipeline("BoundVolumeShader"));
 		IPipeline::AddPipeline("Forward_DebugObject_Pipeline", new jForward_DebugObject_Pipeline("DebugObjectShader"));
 		IPipeline::AddPipeline("Forward_UI_Pipeline", new jForward_UIObject_Pipeline("UIShader"));
+
+		IPipeline::AddPipeline("Forward_ShadowMapGen_CSM_SSM_Pipeline", new jForward_ShadowMapGen_CSM_SSM_Pipeline("CSM_SSM_TEX2D_ARRAY", "ShadowGen_Omni_SSM"));
 	}
 } s_shadowPipelinCreation;
 
 //////////////////////////////////////////////////////////////////////////
 // jRenderPipeline
 void jRenderPipeline::Do(const jPipelineData& pipelineData) const
+{
+	Draw(pipelineData, Shader);
+}
+
+void jRenderPipeline::Draw(const jPipelineData& pipelineData) const
 {
 	Draw(pipelineData, Shader);
 }
@@ -103,6 +110,7 @@ void jRenderPipeline::Draw(const jPipelineData& pipelineData, const jShader* sha
 	for (const auto& iter : pipelineData.Objects)
 		iter->Draw(pipelineData.Camera, shader, pipelineData.Lights);
 }
+
 
 //////////////////////////////////////////////////////////////////////////
 // jDeferredGeometryPipeline
@@ -182,7 +190,7 @@ void jForward_ShadowMapGen_Pipeline::Setup()
 	JASSERT(OmniShadowGenShader);
 }
 
-void jForward_ShadowMapGen_Pipeline::Draw(const jPipelineData& pipelineData, const jShader* shader) const
+void jForward_ShadowMapGen_Pipeline::Do(const jPipelineData& pipelineData) const
 {
 	//light->Update(0); // todo remove
 
@@ -215,17 +223,189 @@ void jForward_ShadowMapGen_Pipeline::Draw(const jPipelineData& pipelineData, con
 
 		light->RenderToShadowMap([&pipelineData, currentShader, light, this](const jRenderTarget* renderTarget
 			, int32 renderTargetIndex, const jCamera* camera, const std::vector<jViewport>& viewports)
+		{
+			g_rhi->SetRenderTarget(renderTarget, renderTargetIndex);
+			if (viewports.empty())
+				g_rhi->SetViewport({ 0, 0, SM_WIDTH, SM_HEIGHT });
+			else
+				g_rhi->SetViewportIndexedArray(0, static_cast<int32>(viewports.size()), &viewports[0]);
+			this->jRenderPipeline::Draw(jPipelineData(pipelineData.Objects, camera, { light }), currentShader);
+		}, currentShader);
+	}
+
+	g_rhi->SetRenderTarget(nullptr);
+}
+
+//////////////////////////////////////////////////////////////////////////
+// jForward_ShadowMapGen_CSM_SSM_Pipeline
+void jForward_ShadowMapGen_CSM_SSM_Pipeline::Setup()
+{
+	ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
+	ClearType = MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH });
+	EnableDepthTest = true;
+	DepthStencilFunc = EDepthStencilFunc::LEQUAL;
+	EnableBlend = true;
+	BlendSrc = EBlendSrc::ONE;
+	BlendDest = EBlendDest::ZERO;
+
+	ShadowGenShader = jShader::GetShader(DirectionalLightShaderName);
+	JASSERT(ShadowGenShader);
+	OmniShadowGenShader = jShader::GetShader(OmniDirectionalLightShaderName);
+	JASSERT(OmniShadowGenShader);
+}
+
+void jForward_ShadowMapGen_CSM_SSM_Pipeline::Do(const jPipelineData& pipelineData) const
+{
+	// todo 여러개의 DIrectional light인경우 고려 필요.
+	if (pipelineData.Lights.empty())
+		return;
+
+	const jDirectionalLight* directionalLight = [&pipelineData]() -> const jDirectionalLight*
+	{
+		for (auto& iter : pipelineData.Lights)
+		{
+			if (iter->Type == ELightType::DIRECTIONAL)
+				return static_cast<const jDirectionalLight*>(iter);
+		}
+		return nullptr;
+	}();
+
+	for (auto light : pipelineData.Lights)
+	{
+		bool skip = false;
+
+		jShader* currentShader = nullptr;
+		switch (light->Type)
+		{
+		case ELightType::DIRECTIONAL:
+			currentShader = ShadowGenShader;
+			break;
+		case ELightType::POINT:
+		case ELightType::SPOT:
+		{
+			currentShader = OmniShadowGenShader;
+
+			light->RenderToShadowMap([&pipelineData, currentShader, light, this](const jRenderTarget* renderTarget
+				, int32 renderTargetIndex, const jCamera* camera, const std::vector<jViewport>& viewports)
+				{
+					g_rhi->SetRenderTarget(renderTarget, renderTargetIndex);
+					if (viewports.empty())
+						g_rhi->SetViewport({ 0, 0, SM_WIDTH, SM_HEIGHT });
+					else
+						g_rhi->SetViewportIndexedArray(0, static_cast<int32>(viewports.size()), &viewports[0]);
+					this->jRenderPipeline::Draw(jPipelineData(pipelineData.Objects, camera, { light }), currentShader);
+				}, currentShader);
+			g_rhi->SetRenderTarget(nullptr);
+			skip = true;
+		}
+		break;
+		case ELightType::AMBIENT:
+			skip = true;
+			break;
+		default:
+			JASSERT(0);
+			return;
+		}
+
+		if (skip)
+			continue;
+
+		//////////////////////////////////////////////////////////////////////////
+		// CSM Diretional Light 그리는 곳
+		auto camera = pipelineData.Camera;
+		const auto shadowMapData = directionalLight->ShadowMapData;
+		const auto shadowCameraNear = shadowMapData->ShadowMapCamera->Near;
+		const auto shadowCameraFar = shadowMapData->ShadowMapCamera->Far;
+
+		float cascadeEnds[NUM_CASCADES + 1] = { 0.0f, 0.2f, 0.4f, 1.0f };
+		Matrix cascadeLightVP[NUM_CASCADES];
+
+		char szTemp[128] = { 0, };
+		for (int k = 0; k < NUM_CASCADES; ++k)
+		{
+			shadowMapData->CascadeEndsW[k] = shadowCameraNear + (shadowCameraFar - shadowCameraNear) * cascadeEnds[k + 1];
+
+			// Get the 8 points of the view frustum in world space
+			Vector frustumCornersWS[8] =
+			{
+				Vector(-1.0f,  1.0f, -1.0f),
+				Vector(1.0f,  1.0f, -1.0f),
+				Vector(1.0f, -1.0f, -1.0f),
+				Vector(-1.0f, -1.0f, -1.0f),
+				Vector(-1.0f,  1.0f, 1.0f),
+				Vector(1.0f,  1.0f, 1.0f),
+				Vector(1.0f, -1.0f, 1.0f),
+				Vector(-1.0f, -1.0f, 1.0f),
+			};
+
+			Matrix invViewProj = (camera->Projection * camera->View).GetInverse();
+			for (uint32 i = 0; i < 8; ++i)
+				frustumCornersWS[i] = invViewProj.Transform(frustumCornersWS[i]);
+
+			// Get the corners of the current cascade slice of the view frustum
+			for (uint32 i = 0; i < 4; ++i)
+			{
+				Vector cornerRay = frustumCornersWS[i + 4] - frustumCornersWS[i];
+				Vector nearCornerRay = cornerRay * cascadeEnds[k];
+				Vector farCornerRay = cornerRay * cascadeEnds[k + 1];
+				frustumCornersWS[i + 4] = frustumCornersWS[i] + farCornerRay;
+				frustumCornersWS[i] = frustumCornersWS[i] + nearCornerRay;
+			}
+
+			// Calculate the centroid of the view frustum slice
+			Vector frustumCenter(0.0f);
+			for (uint32 i = 0; i < 8; ++i)
+				frustumCenter = frustumCenter + frustumCornersWS[i];
+			frustumCenter = frustumCenter * (1.0f / 8.0f);
+
+
+			auto upDir = Vector::UpVector;
+
+			// Create a temporary view matrix for the light
+			Vector lightCameraPos = frustumCenter;
+			Vector lookAt = frustumCenter + directionalLight->Data.Direction;
+			Matrix lightView = jCameraUtil::CreateViewMatrix(lightCameraPos, lookAt, lightCameraPos + upDir);
+
+			// Calculate an AABB around the frustum corners
+			Vector mins(FLT_MAX);
+			Vector maxes(-FLT_MAX);
+			for (uint32 i = 0; i < 8; ++i)
+			{
+				Vector corner = lightView.Transform(frustumCornersWS[i]);
+				mins.x = std::min(mins.x, corner.x);
+				mins.y = std::min(mins.y, corner.y);
+				mins.z = std::min(mins.z, corner.z);
+				maxes.x = std::max(maxes.x, corner.x);
+				maxes.y = std::max(maxes.y, corner.y);
+				maxes.z = std::max(maxes.z, corner.z);
+			}
+
+			Vector cascadeExtents = maxes - mins;
+
+			// Get position of the shadow camera
+			Vector shadowCameraPos = frustumCenter + directionalLight->Data.Direction * mins.z;
+
+			auto shadowCamera = jOrthographicCamera::CreateCamera(shadowCameraPos, frustumCenter, shadowCameraPos + upDir, mins.x, mins.y, maxes.x, maxes.y, cascadeExtents.z, 0.0f);
+			shadowCamera->UpdateCamera();
+
+			shadowMapData->CascadeLightVP[k] = shadowCamera->Projection * shadowCamera->View;
+		}
+
+		g_rhi->EnableDepthClip(false);
+
+		directionalLight->RenderToShadowMap([&pipelineData, light, currentShader, this](const jRenderTarget* renderTarget
+			, int32 renderTargetIndex, const jCamera* camera, const std::vector<jViewport>& viewports)
 			{
 				g_rhi->SetRenderTarget(renderTarget, renderTargetIndex);
 				if (viewports.empty())
 					g_rhi->SetViewport({ 0, 0, SM_WIDTH, SM_HEIGHT });
 				else
 					g_rhi->SetViewportIndexedArray(0, static_cast<int32>(viewports.size()), &viewports[0]);
-				this->jRenderPipeline::Draw(jPipelineData(pipelineData.Objects, camera, {light}), currentShader);
+				this->Draw(jPipelineData(pipelineData.Objects, camera, { light }), currentShader);
 			}, currentShader);
+		g_rhi->EnableDepthClip(true);
+		g_rhi->SetRenderTarget(nullptr);
 	}
-
-	g_rhi->SetRenderTarget(nullptr);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -690,3 +870,4 @@ void jForward_UIObject_Pipeline::Setup()
 	EnableBlend = false;
 	Shader = jShader::GetShader(ShaderName);
 }
+

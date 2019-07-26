@@ -26,6 +26,12 @@ void jRenderObject::CreateRenderObject(const std::shared_ptr<jVertexStreamData>&
 	IndexBuffer = g_rhi->CreateIndexBuffer(IndexStream);
 }
 
+void jRenderObject::UpdateVertexStream(const std::shared_ptr<jVertexStreamData>& vertexStream)
+{
+	VertexStream = vertexStream;
+	g_rhi->UpdateVertexBuffer(VertexBuffer, VertexStream);
+}
+
 //void jRenderObject::Draw(const jCamera* camera, const jShader* shader, int32 startIndex, int32 count)
 //{
 //	if (VertexBuffer->VertexStreamData.expired())
@@ -172,11 +178,13 @@ void jRenderObject::SetCameraProperty(const jShader* shader, const jCamera* came
 	auto MV = camera->View * World;
 	auto MVP = camera->Projection * MV;
 	auto VP = camera->Projection * camera->View;
+	auto P = camera->Projection;
 	
 	g_rhi->SetUniformbuffer(&jUniformBuffer<Matrix>("MVP", MVP), shader);
 	g_rhi->SetUniformbuffer(&jUniformBuffer<Matrix>("MV", MV), shader);
 	g_rhi->SetUniformbuffer(&jUniformBuffer<Matrix>("VP", VP), shader);
 	g_rhi->SetUniformbuffer(&jUniformBuffer<Matrix>("M", World), shader);
+	g_rhi->SetUniformbuffer(&jUniformBuffer<Matrix>("P", P), shader);
 	
 	g_rhi->SetUniformbuffer(&jUniformBuffer<Vector>("Eye", camera->Pos), shader);
 	g_rhi->SetUniformbuffer(&jUniformBuffer<int>("Collided", Collided), shader);
@@ -196,6 +204,7 @@ void jRenderObject::SetCameraProperty(const jShader* shader, const jCamera* came
 	g_rhi->SetUniformbuffer(&jUniformBuffer<int>("ShadowMapWidth", SM_WIDTH), shader);
 	g_rhi->SetUniformbuffer(&jUniformBuffer<int>("ShadowMapHeight", SM_HEIGHT), shader);
 	g_rhi->SetUniformbuffer(&jUniformBuffer<int>("ShadingModel", static_cast<int>(ShadingModel)), shader);
+	g_rhi->SetUniformbuffer(&jUniformBuffer<int>("CSMDebugOn", static_cast<int>(jShadowAppSettingProperties::GetInstance().CSMDebugOn)), shader);
 }
 
 void jRenderObject::SetLightProperty(const jShader* shader, const jCamera* camera, const std::list<const jLight*>& lights, jMaterialData* materialData)
@@ -206,6 +215,9 @@ void jRenderObject::SetLightProperty(const jShader* shader, const jCamera* camer
 	int spot = 0;
 	for(auto light : lights)
 	{
+		if (!light)
+			continue;
+
 		switch (light->Type)
 		{
 		case ELightType::AMBIENT:

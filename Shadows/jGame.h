@@ -19,6 +19,7 @@ struct jTexture;
 struct jRenderTarget;
 class jObject;
 class jPipelineSet;
+class jCascadeDirectionalLight;
 
 class jGame
 {
@@ -31,6 +32,7 @@ public:
 
 	void SpawnHairObjects();
 	void SpawnTestPrimitives();
+	void SapwnCubePrimitives();
 
 	void Update(float deltaTime);
 
@@ -40,6 +42,8 @@ public:
 	void Teardown();
 
 	jDirectionalLight* DirectionalLight = nullptr;
+	jDirectionalLight* NormalDirectionalLight = nullptr;
+	jCascadeDirectionalLight* CascadeDirectionalLight = nullptr;
 	jPointLight* PointLight = nullptr;
 	jSpotLight* SpotLight = nullptr;
 	jLight* AmbientLight = nullptr;

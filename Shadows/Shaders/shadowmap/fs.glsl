@@ -78,7 +78,7 @@ uniform int UseUniformColor;
 uniform vec4 Color;
 uniform int UseMaterial;
 uniform int ShadowOn;
-
+uniform int CSMDebugOn;
 
 // in vec3 ShadowPos_;
 // in vec3 ShadowCameraPos_;
@@ -91,6 +91,52 @@ in vec2 TexCoord_;
 #endif // USE_TEXTURE
 
 out vec4 color;
+
+#if defined(USE_CSM)
+#define NUM_CASCADES 3
+in vec3 PosV_;
+in vec4 LightSpacePos[NUM_CASCADES];
+uniform float CascadeEndsW[NUM_CASCADES];
+
+int GetCascadeIndex(float viewSpaceZ)
+{
+	for (int i = 0; i < NUM_CASCADES; ++i)
+	{
+		if (-viewSpaceZ < CascadeEndsW[i])
+			return i;
+	}
+	return -1;
+}
+
+#define CSM_BIAS 0.001
+
+bool IsInRange01(vec3 pos)
+{
+	return (pos.x >= 0.0 && pos.x <= 1.0 && pos.y >= 0.0 && pos.y <= 1.0 && pos.z >= 0.0 && pos.z <= 1.0);
+}
+
+bool IsShadowingCSM(sampler2D csm_sampler, vec4 lightClipScapePos)
+{
+	if (IsInRange01(lightClipScapePos.xyz))
+	{
+		if (lightClipScapePos.z >= texture(csm_sampler, lightClipScapePos.xy).x + CSM_BIAS)
+			return true;
+	}
+
+	return false;
+}
+bool IsShadowingCSM(sampler2D csm_sampler, vec4 lightClipScapePos, int cascadeIndex)
+{
+	if (IsInRange01(lightClipScapePos.xyz))
+	{
+		vec2 coords = vec2(lightClipScapePos.x, (lightClipScapePos.y + float(cascadeIndex)) / float(NUM_CASCADES) );
+		if (lightClipScapePos.z >= texture(csm_sampler, coords).x + CSM_BIAS)
+			return true;
+	}
+
+	return false;
+}
+#endif // USE_CSM
 
 void main()
 {
@@ -183,7 +229,36 @@ void main()
 			}
 	#else
 			{
+#if defined(USE_CSM)
+				vec4 lightClipSpacePos[NUM_CASCADES];
+
+				int index = -1;
+				for (int i = index; i < NUM_CASCADES; ++i)
+				{
+					lightClipSpacePos[i] = (LightSpacePos[i] / LightSpacePos[i].w) * 0.5 + vec4(0.5);
+					if (IsInRange01(lightClipSpacePos[i].xyz) && (-PosV_.z <= CascadeEndsW[i])
+						)
+					{
+						index = i;
+						break;
+					}
+				}
+
+				if (CSMDebugOn > 0)
+				{
+					if (index == 0)
+						finalColor.x += 0.5f;
+					if (index == 1)
+						finalColor.y += 0.5f;
+					if (index == 2)
+						finalColor.z += 0.5f;
+				}
+
+				if (index != -1)
+					lit = float(!IsShadowingCSM(shadow_object, lightClipSpacePos[index], index));
+#else	// USE_CSM
 				lit = float(!IsShadowing(ShadowPos, shadow_object));
+#endif	// USE_CSM
 			}
 	#endif
 		}

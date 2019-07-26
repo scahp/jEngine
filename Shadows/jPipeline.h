@@ -112,6 +112,7 @@ class jRenderPipeline : public IPipeline
 {
 public:
 	virtual void Do(const jPipelineData& pipelineData) const override;
+	virtual void Draw(const jPipelineData& pipelineData) const;
 	virtual void Draw(const jPipelineData& pipelineData, const jShader* shader) const;
 };
 
@@ -157,7 +158,7 @@ public:
 	{ }
 
 	virtual void Setup() override;
-	virtual void Draw(const jPipelineData& pipelineData, const jShader* shader) const override;
+	virtual void Do(const jPipelineData& pipelineData) const override;
 
 	jShader* ShadowGenShader = nullptr;
 	jShader* OmniShadowGenShader = nullptr;
@@ -168,6 +169,25 @@ public:
 
 #define ADD_FORWARD_SHADOWMAP_GEN_PIPELINE(Name, DirectionalLightShaderName, OmniDirectionalLightShaderName) \
 IPipeline::AddPipeline(#Name, new jForward_ShadowMapGen_Pipeline(DirectionalLightShaderName, OmniDirectionalLightShaderName))
+
+//////////////////////////////////////////////////////////////////////////
+// jForward_ShadowMapGen_CSM_SSM_Pipeline
+class jForward_ShadowMapGen_CSM_SSM_Pipeline : public jRenderPipeline
+{
+public:
+	jForward_ShadowMapGen_CSM_SSM_Pipeline(const char* directionalLightShaderName, const char* omniDirectionalLightShaderName)
+		: DirectionalLightShaderName(directionalLightShaderName), OmniDirectionalLightShaderName(omniDirectionalLightShaderName)
+	{}
+
+	virtual void Setup() override;
+	virtual void Do(const jPipelineData& pipelineData) const override;
+
+	jShader* ShadowGenShader = nullptr;
+	jShader* OmniShadowGenShader = nullptr;
+
+	const char* DirectionalLightShaderName = nullptr;
+	const char* OmniDirectionalLightShaderName = nullptr;
+};
 
 //////////////////////////////////////////////////////////////////////////
 // jForward_Shadow_Pipeline
@@ -355,6 +375,12 @@ START_CREATE_PIPELINE_SET_INFO_WITH_DEBUG_RENDER(EVSM, Forward, EPipelineSetType
 	ADD_PIPELINE_AT_RENDERPASS(ShadowPrePass, "Forward_ShadowMapGen_EVSM_Pipeline");
 	ADD_PIPELINE_WITH_CREATE_AND_SETUP_AT_RENDERPASS(ShadowPrePass, jForwardShadowMap_Blur_Pipeline);
 	ADD_PIPELINE_AT_RENDERPASS(RenderPass, "Forward_EVSM_Pipeline");
+END_CREATE_PIPELINE_SET_INFO()
+
+// jForwardPipelineSet_CSM_SSM
+START_CREATE_PIPELINE_SET_INFO_WITH_DEBUG_RENDER(CSM_SSM, Forward, EPipelineSetType::Forward)
+	ADD_PIPELINE_AT_RENDERPASS(ShadowPrePass, "Forward_ShadowMapGen_CSM_SSM_Pipeline");
+	ADD_PIPELINE_AT_RENDERPASS(RenderPass, "Forward_CSM_SSM_Pipeline");
 END_CREATE_PIPELINE_SET_INFO()
 
 #define CREATE_PIPELINE_SET_WITH_SETUP(PipelineSetClass, ...) \

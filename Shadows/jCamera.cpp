@@ -4,13 +4,31 @@
 
 std::map<int32, jCamera*> jCamera::CameraMap;
 
+//////////////////////////////////////////////////////////////////////////
+// jCamera
 jCamera::jCamera()
 {
 }
 
-
 jCamera::~jCamera()
 {
+}
+
+Matrix jCamera::CreateView() const
+{
+	return jCameraUtil::CreateViewMatrix(Pos, Target, Up);
+}
+
+Matrix jCamera::CreateProjection() const
+{
+	if (IsPerspectiveProjection)
+	{
+		if (IsInfinityFar)
+			return jCameraUtil::CreatePerspectiveMatrixFarAtInfinity(Width, Height, FOV, Near);
+		return jCameraUtil::CreatePerspectiveMatrix(Width, Height, FOV, Far, Near);
+	}
+
+	return jCameraUtil::CreateOrthogonalMatrix(Width, Height, Far, Near);
 }
 
 void jCamera::UpdateCameraFrustum()
@@ -47,17 +65,8 @@ void jCamera::UpdateCameraFrustum()
 
 void jCamera::UpdateCamera()
 {
-	View = jCameraUtil::CreateViewMatrix(Pos, Target, Up);
-
-	if (IsPerspectiveProjection)
-	{
-		//Projection = jCameraUtil::CreatePerspectiveMatrix(Width, Height, FOV, Far, Near);
-		Projection = jCameraUtil::CreatePerspectiveMatrixFarAtInfinity(Width, Height, FOV, Near);
-	}
-	else
-	{
-		Projection = jCameraUtil::CreateOrthogonalMatrix(Width, Height, Far, Near);
-	}
+	View = CreateView();
+	Projection = CreateProjection();
 }
 
 void jCamera::AddLight(jLight* light)
@@ -122,6 +131,14 @@ int32 jCamera::GetNumOfLight() const
 	return static_cast<int32>(LightList.size());
 }
 
+//////////////////////////////////////////////////////////////////////////
+// jOrthographicCamera
+Matrix jOrthographicCamera::CreateProjection() const
+{
+	return jCameraUtil::CreateOrthogonalMatrix(MinX, MaxX, MaxY, MinY, Far, Near);
+}
+
+
 Matrix jCameraUtil::CreateViewMatrix(const Vector& pos, const Vector& target, const Vector& up)
 {
 	const auto zAxis = (target - pos).GetNormalize();
@@ -178,11 +195,27 @@ Matrix jCameraUtil::CreatePerspectiveMatrixFarAtInfinity(float width, float heig
 Matrix jCameraUtil::CreateOrthogonalMatrix(float width, float height, float farDist, float nearDist)
 {
 	const float farSubNear = (farDist - nearDist);
+	const float halfWidth = width * 0.5f;
+	const float halfHeight = height * 0.5f;
 
 	Matrix projMat;
-	projMat.m[0][0] = 1.0f / width;      projMat.m[0][1] = 0.0f;                  projMat.m[0][2] = 0.0f;                      projMat.m[0][3] = 0.0f;
-	projMat.m[1][0] = 0.0f;              projMat.m[1][1] = 1.0f / height;         projMat.m[1][2] = 0.0f;                      projMat.m[1][3] = 0.0f;
-	projMat.m[2][0] = 0.0f;              projMat.m[2][1] = 0.0f;                  projMat.m[2][2] = -2.0f / farSubNear;        projMat.m[2][3] = -(farDist + nearDist) / farSubNear;
-	projMat.m[3][0] = 0.0f;              projMat.m[3][1] = 0.0f;                  projMat.m[3][2] = 0.0f;                      projMat.m[3][3] = 1.0f;
+	projMat.m[0][0] = 1.0f / halfWidth;     projMat.m[0][1] = 0.0f;                  projMat.m[0][2] = 0.0f;                      projMat.m[0][3] = 0.0f;
+	projMat.m[1][0] = 0.0f;					projMat.m[1][1] = 1.0f / halfHeight;     projMat.m[1][2] = 0.0f;                      projMat.m[1][3] = 0.0f;
+	projMat.m[2][0] = 0.0f;					projMat.m[2][1] = 0.0f;                  projMat.m[2][2] = -2.0f / farSubNear;        projMat.m[2][3] = -(farDist + nearDist) / farSubNear;
+	projMat.m[3][0] = 0.0f;					projMat.m[3][1] = 0.0f;                  projMat.m[3][2] = 0.0f;                      projMat.m[3][3] = 1.0f;
+	return projMat;
+}
+
+Matrix jCameraUtil::CreateOrthogonalMatrix(float left, float right, float top, float bottom, float farDist, float nearDist)
+{
+	const float fsn = (farDist - nearDist);
+	const float rsl = (right - left);
+	const float tsb = (top - bottom);
+
+	Matrix projMat;
+	projMat.m[0][0] = 2.0f / rsl;		 projMat.m[0][1] = 0.0f;                  projMat.m[0][2] = 0.0f;                   projMat.m[0][3] = -(right + left) / rsl;
+	projMat.m[1][0] = 0.0f;              projMat.m[1][1] = 2.0f / tsb;		      projMat.m[1][2] = 0.0f;                   projMat.m[1][3] = -(top + bottom) / tsb;
+	projMat.m[2][0] = 0.0f;              projMat.m[2][1] = 0.0f;                  projMat.m[2][2] = -2.0f / fsn;			projMat.m[2][3] = -(farDist + nearDist) / fsn;
+	projMat.m[3][0] = 0.0f;              projMat.m[3][1] = 0.0f;                  projMat.m[3][2] = 0.0f;                   projMat.m[3][3] = 1.0f;
 	return projMat;
 }

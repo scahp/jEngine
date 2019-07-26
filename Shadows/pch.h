@@ -9,6 +9,8 @@
 #ifndef PCH_H
 #define PCH_H
 
+#define NOMINMAX
+
 #include <windows.h>
 
 // TODO: add headers that you want to pre-compile here
@@ -31,6 +33,7 @@
 #include <algorithm>
 #include <unordered_map>
 #include <unordered_set>
+#include <limits>
 
 #define JASSERT(x) assert(x)
 #define JMESSAGE(x) MessageBoxA(0, x, "", MB_OK)
@@ -52,6 +55,9 @@ const unsigned int SCR_HEIGHT = 720;
 
 const unsigned int SM_WIDTH = 512;
 const unsigned int SM_HEIGHT = 512;
+
+constexpr int NUM_CASCADES = 3;
+constexpr int NUM_FRUSTUM_CORNERS = 8;
 
 #define FORCEINLINE __forceinline
 

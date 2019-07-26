@@ -1628,6 +1628,18 @@ jSpotLightPrimitive* CreateSpotLightDebug(const Vector& scale, jCamera* targetCa
 	return object;
 }
 
+jFrustumPrimitive* CreateFrustumDebug(const jCamera* targetCamera)
+{
+	jFrustumPrimitive* frustumPrimitive = new jFrustumPrimitive(targetCamera);
+	for (int32 i = 0; i < 12; ++i)
+		frustumPrimitive->Segments[i] = CreateSegment(Vector::ZeroVector, Vector::ZeroVector, 1.0f, Vector4(1.0f));
+
+	for (int32 i = 0; i < 6; ++i)
+		frustumPrimitive->Plane[i] = CreateQuad(Vector::ZeroVector, Vector::OneVector, Vector::OneVector, Vector4(1.0f));
+
+	return frustumPrimitive;
+}
+
 }
 
 void jDirectionalLightPrimitive::Update(float deltaTime)
@@ -1681,6 +1693,15 @@ void jSegmentPrimitive::UpdateSegment()
 	}
 }
 
+void jSegmentPrimitive::UpdateSegment(const Vector& start, const Vector& end, const Vector4& color, float time)
+{
+	Start = start;
+	End = end;
+	Color = color;
+	Time = time;
+	UpdateSegment();
+}
+
 void jSegmentPrimitive::Update(float deltaTime)
 {
 	__super::Update(deltaTime);
@@ -1717,3 +1738,148 @@ void jSpotLightPrimitive::Draw(const jCamera* camera, const jShader* shader, con
 	UmbraConeObject->Draw(camera, shader, lights);
 	PenumbraConeObject->Draw(camera, shader, lights);
 }
+
+void jFrustumPrimitive::Update(float deltaTime)
+{
+	const auto& origin = TargetCamera->Pos;
+	const float fovRad = TargetCamera->FOV;
+	const float n = TargetCamera->Near;
+	const float f = TargetCamera->Far;
+
+	Vector targetVec = TargetCamera->GetForwardVector().GetNormalize();
+	float length = tanf(fovRad / 2.0f) * f;
+	Vector rightVec = TargetCamera->GetRightVector() * length;
+	Vector upVec = TargetCamera->GetUpVector() * length;
+
+	Vector rightUp = (targetVec * f + rightVec + upVec).GetNormalize();
+	Vector leftUp = (targetVec * f - rightVec + upVec).GetNormalize();
+	Vector rightDown = (targetVec * f + rightVec - upVec).GetNormalize();
+	Vector leftDown = (targetVec * f - rightVec - upVec).GetNormalize();
+
+	Vector far_lt = origin + leftUp * f;
+	Vector far_rt = origin + rightUp * f;
+	Vector far_lb = origin + leftDown * f;
+	Vector far_rb = origin + rightDown * f;
+
+	Vector near_lt = origin + leftUp * n;
+	Vector near_rt = origin + rightUp * n;
+	Vector near_lb = origin + leftDown * n;
+	Vector near_rb = origin + rightDown * n;
+
+	const Vector4 white(1.0f);
+	Segments[0]->UpdateSegment(origin, far_rt, white);
+	Segments[1]->UpdateSegment(origin, far_lt, white);
+	Segments[2]->UpdateSegment(origin, far_rb, white);
+	Segments[3]->UpdateSegment(origin, far_lb, white);
+
+	const Vector4 red(1.0f, 0.0f, 0.0f, 1.0f);
+	Segments[4]->UpdateSegment(near_lt, near_rt, red);
+	Segments[5]->UpdateSegment(near_lb, near_rb, red);
+	Segments[6]->UpdateSegment(near_lt, near_lb, red);
+	Segments[7]->UpdateSegment(near_rt, near_rb, red);
+
+	Segments[8]->UpdateSegment(far_lt, far_rt, red);
+	Segments[9]->UpdateSegment(far_lb, far_rb, red);
+	Segments[10]->UpdateSegment(far_lt, far_lb, red);
+	Segments[11]->UpdateSegment(far_rt, far_rb, red);
+
+	auto updateQuadFunc = [this](jQuadPrimitive* quad, const Vector& p1, const Vector& p2, const Vector& p3, const Vector& p4, const Vector4& color)
+	{
+		float vertices[] = {
+			p1.x, p1.y, p1.z,
+			p2.x, p2.y, p2.z,
+			p3.x, p3.y, p3.z,
+			p3.x, p3.y, p3.z,
+			p2.x, p2.y, p2.z,
+			p4.x, p4.y, p4.z,
+		};
+
+		float colors[] = {
+			color.x, color.y, color.z, color.w,
+			color.x, color.y, color.z, color.w,
+			color.x, color.y, color.z, color.w,
+			color.x, color.y, color.z, color.w,
+			color.x, color.y, color.z, color.w,
+			color.x, color.y, color.z, color.w,
+			color.x, color.y, color.z, color.w,
+		};
+
+		const int32 elementCount = static_cast<int32>(_countof(vertices) / 3);
+
+		// attribute 추가
+		auto vertexStreamData = std::shared_ptr<jVertexStreamData>(new jVertexStreamData());
+
+		{
+			auto streamParam = new jStreamParam<float>();
+			streamParam->BufferType = EBufferType::STATIC;
+			streamParam->ElementTypeSize = sizeof(float);
+			streamParam->ElementType = EBufferElementType::FLOAT;
+			streamParam->Stride = sizeof(float) * 3;
+			streamParam->Name = "Pos";
+			streamParam->Data.resize(elementCount * 3);
+			memcpy(&streamParam->Data[0], &vertices[0], sizeof(vertices));
+			vertexStreamData->Params.push_back(streamParam);
+		}
+
+		{
+			auto streamParam = new jStreamParam<float>();
+			streamParam->BufferType = EBufferType::STATIC;
+			streamParam->ElementType = EBufferElementType::FLOAT;
+			streamParam->ElementTypeSize = sizeof(float);
+			streamParam->Stride = sizeof(float) * 4;
+			streamParam->Name = "Color";
+			streamParam->Data = std::move(jPrimitiveUtil::GenerateColor(color, elementCount));
+			for (int i = 0; i < elementCount; ++i)
+				vertexStreamData->Params.push_back(streamParam);
+		}
+
+		std::vector<float> normals(elementCount * 3);
+		for (int32 i = 0; i < elementCount; ++i)
+		{
+			normals[i * 3] = 0.0f;
+			normals[i * 3 + 1] = 1.0f;
+			normals[i * 3 + 2] = 0.0f;
+		}
+
+		{
+			auto streamParam = new jStreamParam<float>();
+			streamParam->BufferType = EBufferType::STATIC;
+			streamParam->ElementTypeSize = sizeof(float);
+			streamParam->ElementType = EBufferElementType::FLOAT;
+			streamParam->Stride = sizeof(float) * 3;
+			streamParam->Name = "Normal";
+			streamParam->Data.resize(elementCount * 3);
+			memcpy(&streamParam->Data[0], &normals[0], normals.size() * sizeof(float));
+			vertexStreamData->Params.push_back(streamParam);
+		}
+
+		vertexStreamData->PrimitiveType = EPrimitiveType::TRIANGLES;
+		vertexStreamData->ElementCount = elementCount;
+
+		RenderObject->UpdateVertexStream(vertexStreamData);
+	};
+
+	updateQuadFunc(Plane[0], far_lt, near_lt, far_lb, near_lb, Vector4(0.0f, 1.0f, 0.0f, 0.3f));
+	updateQuadFunc(Plane[1], near_rt, far_rt, near_rb, far_rb, Vector4(0.0f, 0.0f, 1.0f, 0.3f));
+	updateQuadFunc(Plane[2], far_lt, far_rt, near_lt, near_rt, Vector4(1.0f, 1.0f, 0.0f, 0.3f));
+	updateQuadFunc(Plane[3], near_lb, near_rb, far_lb, far_rb, Vector4(1.0f, 0.0f, 0.0f, 0.3f));
+	updateQuadFunc(Plane[4], near_lt, near_rt, near_lb, near_rb, Vector4(1.0f, 1.0f, 1.0f, 0.3f));
+	updateQuadFunc(Plane[5], far_lt, far_rt, far_lb, far_rb, Vector4(1.0f, 1.0f, 1.0f, 0.3f));
+
+	for (int32 i = 0; i < 12; ++i)
+		Segments[i]->Update(deltaTime);
+
+	for (int32 i = 0; i < 6; ++i)
+		Plane[i]->Update(deltaTime);
+}
+
+void jFrustumPrimitive::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights)
+{
+	__super::Draw(camera, shader, lights);
+	for (int32 i = 0; i < 12; ++i)
+		Segments[i]->Draw(camera, shader, lights);
+
+	for (int32 i = 0; i < 6; ++i)
+		Plane[i]->Draw(camera, shader, lights);
+}
+

@@ -430,5 +430,20 @@
     <None Include="Shaders\shadowmap\gs_omniDirectionalShadowMap.glsl">
       <Filter>Shaders\shadowmap</Filter>
     </None>
+    <None Include="Shaders\fs_red.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\vs_red.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\fs_test.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\vs_test.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\shadowmap\gs_cascadeShadowMap.glsl">
+      <Filter>Shaders\shadowmap</Filter>
+    </None>
   </ItemGroup>
 </Project>

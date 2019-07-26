@@ -11,7 +11,7 @@ namespace jLightUtil
 {
 	void MakeDirectionalLightViewInfo(Vector& outPos, Vector& outTarget, Vector& outUp, const Vector& direction)
 	{
-		outPos = Vector(100.0f) * direction;
+		outPos = Vector(-200.0f) * direction;
 		outTarget = Vector::ZeroVector;
 		outUp = outPos + Vector(0.0f, 1.0f, 0.0f);
 	}
@@ -22,17 +22,48 @@ namespace jLightUtil
 		outUp = pos + Vector(0.0f, 1.0f, 0.0f);
 	}
 
-	jShadowMapData* CreateShadowMap(const Vector& direction, const Vector& pos)
+	jShadowMapData* CreateShadowMap(const Vector& direction, const Vector&)
 	{
-		auto tempPos = Vector(350.0f, 360.0f, 100.0f);
-		Vector target, up;
-		MakeDirectionalLightViewInfoWithPos(target, up, tempPos, direction);
+		Vector pos, target, up;
+		pos = Vector(350.0f, 360.0f, 100.0f);
+		//pos = Vector(500.0f, 500.0f, 500.0f);
+		//MakeDirectionalLightViewInfoWithPos(target, up, pos, direction);
+		MakeDirectionalLightViewInfo(pos, target, up, direction);
 
 		// todo remove constant variable
 		auto shadowMapData = new jShadowMapData("DirectionalLight");
 		//shadowMapData->ShadowMapCamera = jCamera::CreateCamera(tempPos, target, up, 3.14f / 4.0f, 300.0f, 900.0f, SM_WIDTH, SM_HEIGHT, true);		// todo for deep shadow map. it should be replaced
-		shadowMapData->ShadowMapCamera = jCamera::CreateCamera(tempPos, target, up, DegreeToRadian(90.0f), 1.0f, 900.0f, SM_WIDTH / 2.0f, SM_HEIGHT / 2.0f, false);
+		//shadowMapData->ShadowMapCamera = jCamera::CreateCamera(tempPos, target, up, DegreeToRadian(90.0f), 10.0f, 900.0f, SM_WIDTH, SM_HEIGHT, false);
+		float width = SM_WIDTH;
+		float height = SM_HEIGHT;
+		float nearDist = 10.0f;
+		float farDist = 500.0f;
+		shadowMapData->ShadowMapCamera = jOrthographicCamera::CreateCamera(pos, target, up, -width / 2.0f, -height / 2.0f, width / 2.0f, height / 2.0f, farDist, nearDist);
+		
 		shadowMapData->ShadowMapRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RG32F, EFormat::RG, EFormatType::FLOAT, SM_WIDTH, SM_HEIGHT, 1 });
+
+		return shadowMapData;
+	}
+
+	jShadowMapData* CreateCascadeShadowMap(const Vector& direction, const Vector&)
+	{
+		Vector pos, target, up;
+		pos = Vector(350.0f, 360.0f, 100.0f);
+		//pos = Vector(500.0f, 500.0f, 500.0f);
+		//MakeDirectionalLightViewInfoWithPos(target, up, pos, direction);
+		MakeDirectionalLightViewInfo(pos, target, up, direction);
+
+		// todo remove constant variable
+		auto shadowMapData = new jShadowMapData("DirectionalLight");
+		//shadowMapData->ShadowMapCamera = jCamera::CreateCamera(tempPos, target, up, 3.14f / 4.0f, 300.0f, 900.0f, SM_WIDTH, SM_HEIGHT, true);		// todo for deep shadow map. it should be replaced
+		//shadowMapData->ShadowMapCamera = jCamera::CreateCamera(tempPos, target, up, DegreeToRadian(90.0f), 10.0f, 900.0f, SM_WIDTH, SM_HEIGHT, false);
+		float width = SM_WIDTH;
+		float height = SM_HEIGHT;
+		float nearDist = 10.0f;
+		float farDist = 1000.0f;
+		shadowMapData->ShadowMapCamera = jOrthographicCamera::CreateCamera(pos, target, up, -width / 2.0f, -height / 2.0f, width / 2.0f, height / 2.0f, farDist, nearDist);
+
+		shadowMapData->ShadowMapRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RG32F, EFormat::RG, EFormatType::FLOAT, SM_WIDTH, SM_HEIGHT * NUM_CASCADES, 1 });
 
 		return shadowMapData;
 	}
@@ -80,6 +111,21 @@ jDirectionalLight* jLight::CreateDirectionalLight(const Vector& direction, const
 	directionalLight->Data.SpecularIntensity = specularIntensity;
 	directionalLight->Data.SpecularPow = specularPower;
 	directionalLight->ShadowMapData = jLightUtil::CreateShadowMap(direction, Vector::ZeroVector);
+
+	return directionalLight;
+}
+
+jCascadeDirectionalLight* jLight::CreateCascadeDirectionalLight(const Vector& direction, const Vector& color, const Vector& diffuseIntensity, const Vector& specularIntensity, float specularPower)
+{
+	auto directionalLight = new jCascadeDirectionalLight();
+	JASSERT(directionalLight);
+
+	directionalLight->Data.Direction = direction;
+	directionalLight->Data.Color = color;
+	directionalLight->Data.DiffuseIntensity = diffuseIntensity;
+	directionalLight->Data.SpecularIntensity = specularIntensity;
+	directionalLight->Data.SpecularPow = specularPower;
+	directionalLight->ShadowMapData = jLightUtil::CreateCascadeShadowMap(direction, Vector::ZeroVector);
 
 	return directionalLight;
 }
@@ -172,12 +218,25 @@ void jDirectionalLight::BindLight(const jShader* shader, jMaterialData* material
 
 		if (materialData)
 		{
-			auto materialParam = new jMaterialParam();
-			materialParam->Name = "shadow_object";
-			materialParam->Texture = static_cast<jTexture_OpenGL*>(ShadowMapData->ShadowMapRenderTarget->GetTexture());
-			materialParam->Minification = ETextureFilter::NEAREST;
-			materialParam->Magnification = ETextureFilter::NEAREST;
-			materialData->Params.push_back(materialParam);
+			{
+				auto materialParam = new jMaterialParam();
+				materialParam->Name = "shadow_object";
+				materialParam->Texture = static_cast<jTexture_OpenGL*>(ShadowMapData->ShadowMapRenderTarget->GetTexture());
+				materialParam->Minification = ETextureFilter::NEAREST;
+				materialParam->Magnification = ETextureFilter::NEAREST;
+				materialData->Params.push_back(materialParam);
+			}
+
+			// todo 정리 필요
+			char szTemp[128] = { 0 };
+			for (int32 i = 0; i < NUM_CASCADES; ++i)
+			{
+				sprintf_s(szTemp, sizeof(szTemp), "CascadeLightVP[%d]", i);
+				g_rhi->SetUniformbuffer(&jUniformBuffer<Matrix>(szTemp, ShadowMapData->CascadeLightVP[i]), shader);
+
+				sprintf_s(szTemp, sizeof(szTemp), "CascadeEndsW[%d]", i);
+				g_rhi->SetUniformbuffer(&jUniformBuffer<float>(szTemp, ShadowMapData->CascadeEndsW[i]), shader);
+			}
 		}
 	}
 }
@@ -221,6 +280,25 @@ void jDirectionalLight::Update(float deltaTime)
 		camera->UpdateCamera();
 	}
 }
+
+//////////////////////////////////////////////////////////////////////////
+// jCascadeDirectionalLight
+void jCascadeDirectionalLight::RenderToShadowMap(const RenderToShadowMapFunc& func, const jShader* shader) const
+{
+	g_rhi->SetShader(shader);
+	char szTemp[128] = { 0, };
+	std::vector<jViewport> viewports;
+	viewports.reserve(NUM_CASCADES);
+	for (int i = 0; i < NUM_CASCADES; ++i)
+	{
+		sprintf_s(szTemp, sizeof(szTemp), "CascadeLightVP[%d]", i);
+		g_rhi->SetUniformbuffer(&jUniformBuffer<Matrix>(szTemp, ShadowMapData->CascadeLightVP[i]), shader);
+
+		viewports.push_back({ 0.0f, static_cast<float>(SM_HEIGHT * i), static_cast<float>(SM_WIDTH), static_cast<float>(SM_HEIGHT) });
+	}
+	func(ShadowMapData->ShadowMapRenderTarget.get(), 0, ShadowMapData->ShadowMapCamera, viewports);
+}
+
 
 void jPointLight::BindLight(const jShader* shader, jMaterialData* materialData, int32 index /*= 0*/) const
 {

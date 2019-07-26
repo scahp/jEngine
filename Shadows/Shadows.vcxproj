@@ -263,7 +263,9 @@
     <None Include="Shaders\compute\compute_link_linkedlist.glsl" />
     <None Include="Shaders\compute\compute_sort_linkedlist.glsl" />
     <None Include="Shaders\fs_boundvolume.glsl" />
+    <None Include="Shaders\fs_red.glsl" />
     <None Include="Shaders\fs_shadowMap.glsl" />
+    <None Include="Shaders\fs_test.glsl" />
     <None Include="Shaders\fullscreen\fs_blur.glsl" />
     <None Include="Shaders\fullscreen\fs_deepshadow.glsl" />
     <None Include="Shaders\fullscreen\fs_deepshadow_aa.glsl" />
@@ -287,6 +289,7 @@
     <None Include="Shaders\shadowmap\fs_omniDirectionalShadowMap.glsl" />
     <None Include="Shaders\shadowmap\fs_shadowMap.glsl" />
     <None Include="Shaders\shadowmap\fs_varianceShadowMap.glsl" />
+    <None Include="Shaders\shadowmap\gs_cascadeShadowMap.glsl" />
     <None Include="Shaders\shadowmap\gs_omniDirectionalShadowMap.glsl" />
     <None Include="Shaders\shadowmap\vs.glsl" />
     <None Include="Shaders\shadowmap\vs_deferred.glsl" />
@@ -306,7 +309,9 @@
     <None Include="Shaders\tex_ui_vs.glsl" />
     <None Include="Shaders\tex_vs.glsl" />
     <None Include="Shaders\vs_boundvolume.glsl" />
+    <None Include="Shaders\vs_red.glsl" />
     <None Include="Shaders\vs_shadowMap.glsl" />
+    <None Include="Shaders\vs_test.glsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

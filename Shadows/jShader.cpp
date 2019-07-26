@@ -70,5 +70,12 @@ struct jShaderInfoCreation
 		DECLARE_SHADER_VS_FS("AmbientOnly", "Shaders/shadowvolume/vs.glsl", "Shaders/shadowvolume/fs_ambientonly.glsl");
 		DECLARE_SHADER_VS_FS("ShadowVolume", "Shaders/shadowvolume/vs.glsl", "Shaders/shadowvolume/fs.glsl");
 		DECLARE_SHADER_VS_FS("ShadowVolume_InfinityFar_StencilShader", "Shaders/shadowvolume/vs_infinityFar.glsl", "Shaders/shadowvolume/fs_infinityFar.glsl");
+
+		DECLARE_SHADER_VS_FS("RedShader", "Shaders/vs_red.glsl", "Shaders/fs_red.glsl");
+
+		//DECLARE_SHADER_VS_FS("CSM_SSM", "Shaders/vs_test.glsl", "Shaders/fs_test.glsl");
+		DECLARE_SHADER_VS_FS_WITH_OPTION_MORE("CSM_SSM", "shaders/shadowmap/vs.glsl", "shaders/shadowmap/fs.glsl", false, false, "\r\n#define USE_CSM 1");
+
+		DECLARE_SHADER_VS_GS_FS("CSM_SSM_TEX2D_ARRAY", "shaders/shadowmap/vs_omniDirectionalShadowMap.glsl", "shaders/shadowmap/gs_cascadeShadowMap.glsl", "shaders/shadowmap/fs_shadowMap.glsl");
 	}
 } s_shaderInfoCreation;

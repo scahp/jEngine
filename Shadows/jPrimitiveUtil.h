@@ -110,11 +110,12 @@ public:
 	}
 
 	void UpdateSegment();
+	void UpdateSegment(const Vector& start, const Vector& end, const Vector4& color, float time = 1.0f);
 
 	Vector Start;
 	Vector End;
-	float Time = 0.0f;
 	Vector4 Color = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
+	float Time = 0.0f;
 
 	virtual void Update(float deltaTime) override;
 
@@ -170,6 +171,22 @@ public:
 	jSpotLight* Light = nullptr;
 };
 
+class jFrustumPrimitive : public jObject
+{
+public:
+	jFrustumPrimitive() = default;
+	jFrustumPrimitive(const jCamera* targetCamera)
+		: TargetCamera(targetCamera)
+	{}
+
+	virtual void Update(float deltaTime) override;
+	virtual void Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights) override;
+
+	jSegmentPrimitive* Segments[12] = { };
+	jQuadPrimitive* Plane[6] = { };
+	const jCamera* TargetCamera = nullptr;
+};
+
 namespace jPrimitiveUtil
 {
 	std::vector<float> GenerateColor(const Vector4& color, int32 elementCount);
@@ -199,4 +216,7 @@ namespace jPrimitiveUtil
 	jDirectionalLightPrimitive* CreateDirectionalLightDebug(const Vector& pos, const Vector& scale, float length, jCamera* targetCamera, jDirectionalLight* light, const char* textureFilename);
 	jPointLightPrimitive* CreatePointLightDebug(const Vector& scale, jCamera* targetCamera, jPointLight* light, const char* textureFilename);
 	jSpotLightPrimitive* CreateSpotLightDebug(const Vector& scale, jCamera* targetCamera, jSpotLight* light, const char* textureFilename);
+
+	//////////////////////////////////////////////////////////////////////////
+	jFrustumPrimitive* CreateFrustumDebug(const jCamera* targetCamera);
 }

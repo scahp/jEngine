@@ -329,5 +329,7 @@ public:
 	virtual IAtomicCounterBuffer* CreateAtomicCounterBuffer(const char* name, int32 bindingPoint) const { return nullptr; }
 
 	virtual void EnableSRGB(bool enable) {  }
+
+	virtual void EnableDepthClip(bool enable) {  }
 };
 

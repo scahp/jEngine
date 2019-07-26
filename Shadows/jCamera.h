@@ -43,10 +43,10 @@ namespace jCameraUtil
 	Matrix CreateViewMatrix(const Vector& pos, const Vector& target, const Vector& up);
 
 	Matrix CreatePerspectiveMatrix(float width, float height, float fov, float farDist, float nearDist);
-
 	Matrix CreatePerspectiveMatrixFarAtInfinity(float width, float height, float fov, float nearDist);
 
 	Matrix CreateOrthogonalMatrix(float width, float height, float farDist, float nearDist);
+	Matrix CreateOrthogonalMatrix(float left, float right, float top, float bottom, float farDist, float nearDist);
 }
 
 class jCamera
@@ -68,7 +68,7 @@ public:
 		const auto toUp = (up - pos);
 		const auto toRight = toTarget.CrossProduct(toUp);
 		
-		jCamera* camera = new jCamera;
+		jCamera* camera = new jCamera();
 
 		camera->Pos = pos;
 		camera->Up = toRight.CrossProduct(toTarget).GetNormalize();
@@ -86,7 +86,10 @@ public:
 	}
 
 	jCamera();
-	~jCamera();
+	virtual ~jCamera();
+
+	virtual Matrix CreateView() const;
+	virtual Matrix CreateProjection() const;
 
 	void UpdateCameraFrustum();
 	void UpdateCamera();
@@ -203,6 +206,7 @@ public:
 	Matrix View;
 	Matrix Projection;
 	bool IsPerspectiveProjection = true;
+	bool IsInfinityFar = false;
 
 	// debug object
 
@@ -224,3 +228,50 @@ public:
 	float PCF_SIZE_OMNIDIRECTIONAL = 8.0f;
 };
 
+class jOrthographicCamera : public jCamera 
+{
+public:
+	static jOrthographicCamera* CreateCamera(const Vector& pos, const Vector& target, const Vector& up, float minX, float minY, float maxX, float maxY, float farDist, float nearDist)
+	{
+		const auto toTarget = (target - pos);
+		const auto toUp = (up - pos);
+		const auto toRight = toTarget.CrossProduct(toUp);
+
+		jOrthographicCamera* camera = new jOrthographicCamera();
+
+		camera->Pos = pos;
+		camera->Up = toRight.CrossProduct(toTarget).GetNormalize();
+		camera->Target = camera->Up.CrossProduct(toRight).GetNormalize();
+		camera->Up += camera->Pos;
+		camera->Target += camera->Pos;
+
+		camera->Near = nearDist;
+		camera->Far = farDist;
+		camera->IsPerspectiveProjection = false;
+		
+		camera->MinX = minX;
+		camera->MinY = minY;
+		camera->MaxX = maxX;
+		camera->MaxY = maxY;
+		return camera;
+	}
+
+	virtual Matrix CreateProjection() const;
+	
+	float GetMinX() const { return MinX; };
+	float GetMinY() const { return MinY; };
+	float GetMaxX() const { return MaxX; };
+	float GetMaxY() const { return MaxY; };
+
+	void SetMinX(float minX) { MinX = minX; }
+	void SetMinY(float minY) { MinY = minY; }
+	void SetMaxX(float maxX) { MaxX = maxX; }
+	void SetMaxY(float maxY) { MaxY = maxY; }
+
+private:
+	float MinX = 0.0f;
+	float MinY = 0.0f;
+
+	float MaxX = 0.0f;
+	float MaxY = 0.0f;
+};

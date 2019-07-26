@@ -226,7 +226,10 @@ struct Matrix
 	// Transform
 	FORCEINLINE Vector Transform(Vector const& vector) const
 	{
-		return Transform(Vector4(vector, 1.0f));
+		Vector4 result = Transform(Vector4(vector, 1.0f));
+		if (IsNearlyZero(result.w))
+			return result;
+		return result / result.w;
 	}
 
 	FORCEINLINE Vector4 Transform(Vector4 const& vector) const

@@ -34,35 +34,44 @@ jGame::~jGame()
 
 void jGame::ProcessInput()
 {
+	static float speed = 1.0f;
+
 	// Process Key Event
-	if (g_KeyState['a'] || g_KeyState['A']) MainCamera->MoveShift(-1.0f);
-	if (g_KeyState['d'] || g_KeyState['D']) MainCamera->MoveShift(1.0f);
+	if (g_KeyState['a'] || g_KeyState['A']) MainCamera->MoveShift(-speed);
+	if (g_KeyState['d'] || g_KeyState['D']) MainCamera->MoveShift(speed);
 	//if (g_KeyState['1']) MainCamera->RotateForwardAxis(-0.1f);
 	//if (g_KeyState['2']) MainCamera->RotateForwardAxis(0.1f);
 	//if (g_KeyState['3']) MainCamera->RotateUpAxis(-0.1f);
 	//if (g_KeyState['4']) MainCamera->RotateUpAxis(0.1f);
 	//if (g_KeyState['5']) MainCamera->RotateRightAxis(-0.1f);
 	//if (g_KeyState['6']) MainCamera->RotateRightAxis(0.1f);
-	if (g_KeyState['w'] || g_KeyState['W']) MainCamera->MoveForward(1.0f);
-	if (g_KeyState['s'] || g_KeyState['S']) MainCamera->MoveForward(-1.0f);
+	if (g_KeyState['w'] || g_KeyState['W']) MainCamera->MoveForward(speed);
+	if (g_KeyState['s'] || g_KeyState['S']) MainCamera->MoveForward(-speed);
+	if (g_KeyState['+']) speed = Max(speed + 0.1f, 0.0f);
+	if (g_KeyState['-']) speed = Max(speed - 0.1f, 0.0f);
 }
 
 void jGame::Setup()
 {
 	//////////////////////////////////////////////////////////////////////////
-	g_rhi->EnableSRGB(true);
-
-	//const Vector mainCameraPos(172.66f, 166.47f, -180.63f);
+	const Vector mainCameraPos(172.66f, 166.47f, -180.63f);
 	//const Vector mainCameraTarget(171.96f, 166.02f, -180.05f);
-	const Vector mainCameraPos(165.0f, 125.0f, -136.0f);
+	//const Vector mainCameraPos(165.0f, 125.0f, -136.0f);
+	//const Vector mainCameraPos(300.0f, 100.0f, 300.0f);
 	const Vector mainCameraTarget(0.0f, 0.0f, 0.0f);
 	MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 10.0f, 1000.0f, SCR_WIDTH, SCR_HEIGHT, true);
 	jCamera::AddCamera(0, MainCamera);
 
 	// Light creation step
-	DirectionalLight = jLight::CreateDirectionalLight(jShadowAppSettingProperties::GetInstance().DirecionalLightDirection
+	NormalDirectionalLight = jLight::CreateDirectionalLight(jShadowAppSettingProperties::GetInstance().DirecionalLightDirection
 		, Vector4(1.0f)
 		, Vector(0.5f), Vector(1.0f), 64);
+	CascadeDirectionalLight = jLight::CreateCascadeDirectionalLight(jShadowAppSettingProperties::GetInstance().DirecionalLightDirection
+		, Vector4(1.0f)
+		, Vector(0.5f), Vector(1.0f), 64);
+
+	DirectionalLight = NormalDirectionalLight;
+
 	//AmbientLight = jLight::CreateAmbientLight(Vector(0.7f, 0.8f, 0.8f), Vector(0.1f));
 	AmbientLight = jLight::CreateAmbientLight(Vector(1.0f), Vector(0.1f));
 
@@ -88,6 +97,10 @@ void jGame::Setup()
 
 	SpawnTestPrimitives();
 	//SpawnHairObjects();
+	//SapwnCubePrimitives();
+
+	auto gizmo = jPrimitiveUtil::CreateGizmo(Vector::ZeroVector, Vector::ZeroVector, Vector::OneVector);
+	jObject::AddObject(gizmo);
 
 	ShadowPipelineSetMap.insert(std::make_pair(EShadowMapType::SSM, CREATE_PIPELINE_SET_WITH_SETUP(jForwardPipelineSet_SSM)));
 	ShadowPipelineSetMap.insert(std::make_pair(EShadowMapType::PCF, CREATE_PIPELINE_SET_WITH_SETUP(jForwardPipelineSet_SSM_PCF)));
@@ -95,6 +108,7 @@ void jGame::Setup()
 	ShadowPipelineSetMap.insert(std::make_pair(EShadowMapType::VSM, CREATE_PIPELINE_SET_WITH_SETUP(jForwardPipelineSet_VSM)));
 	ShadowPipelineSetMap.insert(std::make_pair(EShadowMapType::ESM, CREATE_PIPELINE_SET_WITH_SETUP(jForwardPipelineSet_ESM)));
 	ShadowPipelineSetMap.insert(std::make_pair(EShadowMapType::EVSM, CREATE_PIPELINE_SET_WITH_SETUP(jForwardPipelineSet_EVSM)));
+	ShadowPipelineSetMap.insert(std::make_pair(EShadowMapType::CSM_SSM, CREATE_PIPELINE_SET_WITH_SETUP(jForwardPipelineSet_CSM_SSM)));
 
 	ShadowPoissonSamplePipelineSetMap.insert(std::make_pair(EShadowMapType::SSM, CREATE_PIPELINE_SET_WITH_SETUP(jForwardPipelineSet_SSM)));
 	ShadowPoissonSamplePipelineSetMap.insert(std::make_pair(EShadowMapType::PCF, CREATE_PIPELINE_SET_WITH_SETUP(jForwardPipelineSet_SSM_PCF_Poisson)));
@@ -102,20 +116,31 @@ void jGame::Setup()
 	ShadowPoissonSamplePipelineSetMap.insert(std::make_pair(EShadowMapType::VSM, CREATE_PIPELINE_SET_WITH_SETUP(jForwardPipelineSet_VSM)));
 	ShadowPoissonSamplePipelineSetMap.insert(std::make_pair(EShadowMapType::ESM, CREATE_PIPELINE_SET_WITH_SETUP(jForwardPipelineSet_ESM)));
 	ShadowPoissonSamplePipelineSetMap.insert(std::make_pair(EShadowMapType::EVSM, CREATE_PIPELINE_SET_WITH_SETUP(jForwardPipelineSet_EVSM)));	
+	ShadowPoissonSamplePipelineSetMap.insert(std::make_pair(EShadowMapType::CSM_SSM, CREATE_PIPELINE_SET_WITH_SETUP(jForwardPipelineSet_CSM_SSM)));
 
 	CurrentShadowMapType = jShadowAppSettingProperties::GetInstance().ShadowMapType;
 
 	//ForwardRenderer = new jForwardRenderer(ShadowPipelineSetMap[CurrentShadowMapType]);
 	ShadowVolumePipelineSet = CREATE_PIPELINE_SET_WITH_SETUP(jForwardPipelineSet_ShadowVolume);
 
+	// todo 정리 필요
 	const auto currentShadowPipelineSet = (jShadowAppSettingProperties::GetInstance().ShadowType == EShadowType::ShadowMap) 
 		? ShadowPipelineSetMap[CurrentShadowMapType]  : ShadowVolumePipelineSet;
-
 	ForwardRenderer = new jForwardRenderer(currentShadowPipelineSet);
 	ForwardRenderer->Setup();
 
 	DeferredRenderer = new jDeferredRenderer({ ETextureType::TEXTURE_2D, EFormat::RGBA32F, EFormat::RGBA, EFormatType::FLOAT, SCR_WIDTH, SCR_HEIGHT, 4 });
 	DeferredRenderer->Setup();
+
+	{
+		const auto shaderMapRenderTarget = DirectionalLight->ShadowMapData->ShadowMapRenderTarget;
+		const float aspect = shaderMapRenderTarget->Info.Height / shaderMapRenderTarget->Info.Width;
+		jObject::AddUIDebugObject(jPrimitiveUtil::CreateUIQuad({ 0.0f, 0.0f }, { 150.0f, 150.0f * aspect }, shaderMapRenderTarget->GetTexture()));
+	}
+	//for (int32 i = 0; i < NUM_CASCADES; ++i)
+	//{
+	//	jObject::AddUIDebugObject(jPrimitiveUtil::CreateUIQuad({ i * 150.0f, 0.0f }, { 150.0f, 150.0f }, DirectionalLight->ShadowMapData->CascadeShadowMapRenderTarget[i]->GetTexture()));
+	//}
 }
 
 void jGame::Update(float deltaTime)
@@ -123,6 +148,11 @@ void jGame::Update(float deltaTime)
 	UpdateAppSetting();
 
 	MainCamera->UpdateCamera();
+
+	//DirectionalLight->ShadowMapData->ShadowMapCamera->Pos = MainCamera->Pos - Vector(1000.0f, 500.0f, 1000.0f) * DirectionalLight->Data.Direction;
+	//jLightUtil::MakeDirectionalLightViewInfoWithPos(DirectionalLight->ShadowMapData->ShadowMapCamera->Target, DirectionalLight->ShadowMapData->ShadowMapCamera->Up
+	//	, DirectionalLight->ShadowMapData->ShadowMapCamera->Pos, DirectionalLight->Data.Direction);
+	//DirectionalLight->ShadowMapData->ShadowMapCamera->UpdateCamera();
 
 	const int32 numOfLights = MainCamera->GetNumOfLight();
 	for (int32 i = 0; i < numOfLights; ++i)
@@ -151,6 +181,25 @@ void jGame::Update(float deltaTime)
 
 void jGame::UpdateAppSetting()
 {
+	if (jShadowAppSettingProperties::GetInstance().ShadowMapType == EShadowMapType::CSM_SSM)
+	{
+		if (DirectionalLight != CascadeDirectionalLight)
+		{
+			MainCamera->RemoveLight(DirectionalLight);
+			DirectionalLight = CascadeDirectionalLight;
+			MainCamera->AddLight(DirectionalLight);
+		}
+	}
+	else
+	{
+		if (DirectionalLight != NormalDirectionalLight)
+		{
+			MainCamera->RemoveLight(DirectionalLight);
+			DirectionalLight = NormalDirectionalLight;
+			MainCamera->AddLight(DirectionalLight);
+		}
+	}
+
 	const bool isChangedShadowType = CurrentShadowType != jShadowAppSettingProperties::GetInstance().ShadowType;
 	const bool isChangedShadowMapType = (CurrentShadowMapType != jShadowAppSettingProperties::GetInstance().ShadowMapType);
 	if (jShadowAppSettingProperties::GetInstance().ShadowType == EShadowType::ShadowMap)
@@ -179,6 +228,7 @@ void jGame::UpdateAppSetting()
 				Renderer->SetChangePipelineSet(newPipelineSet);
 			}
 		}
+		MainCamera->IsInfinityFar = false;
 	}
 	else if (jShadowAppSettingProperties::GetInstance().ShadowType == EShadowType::ShadowVolume)
 	{
@@ -192,6 +242,7 @@ void jGame::UpdateAppSetting()
 			CurrentShadowType = jShadowAppSettingProperties::GetInstance().ShadowType;
 			Renderer->SetChangePipelineSet(ShadowVolumePipelineSet);
 		}
+		MainCamera->IsInfinityFar = true;
 	}
 
 	if (isChangedShadowType)
@@ -375,4 +426,22 @@ void jGame::SpawnTestPrimitives()
 
 	auto billboard = jPrimitiveUtil::CreateBillobardQuad(Vector(0.0f, 60.0f, 80.0f), Vector::OneVector, Vector(20.0f, 20.0f, 20.0f), Vector4(1.0f, 0.0f, 1.0f, 1.0f), MainCamera);
 	jObject::AddObject(billboard);
+}
+
+void jGame::SapwnCubePrimitives()
+{
+	for (int i = 0; i < 20; ++i)
+	{
+		float height = 5.0f * i;
+		auto cube = jPrimitiveUtil::CreateCube(Vector(-500.0f + i * 50.0f, height / 2.0f, 20.0f), Vector::OneVector, Vector(10.0f, height, 20.0f), Vector4(0.7f, 0.7f, 0.7f, 1.0f));
+		jObject::AddObject(cube);
+		cube = jPrimitiveUtil::CreateCube(Vector(-500.0f + i * 50.0f, height / 2.0f, 20.0f + i * 20.0f), Vector::OneVector, Vector(10.0f, height, 10.0f), Vector4(0.7f, 0.7f, 0.7f, 1.0f));
+		jObject::AddObject(cube);
+		cube = jPrimitiveUtil::CreateCube(Vector(-500.0f + i * 50.0f, height / 2.0f, 20.0f - i * 20.0f), Vector::OneVector, Vector(20.0f, height, 10.0f), Vector4(0.7f, 0.7f, 0.7f, 1.0f));
+		jObject::AddObject(cube);
+	}
+
+	auto quad = jPrimitiveUtil::CreateQuad(Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), Vector(1000.0f, 1000.0f, 1000.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+	quad->SetPlane(jPlane(Vector(0.0, 1.0, 0.0), -0.1f));
+	jObject::AddObject(quad);
 }

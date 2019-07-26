@@ -18,6 +18,7 @@ class jCamera;
 struct jRenderTarget;
 struct jMaterialData;
 class jDirectionalLight;
+class jCascadeDirectionalLight;
 class jPointLight;
 class jSpotLight;
 class jObject;
@@ -25,8 +26,8 @@ class jLight;
 
 namespace jLightUtil
 {
-	static void MakeDirectionalLightViewInfo(Vector& outPos, Vector& outTarget, Vector& outUp, const Vector& direction);
-	static void MakeDirectionalLightViewInfoWithPos(Vector& outTarget, Vector& outUp, const Vector& pos, const Vector& direction);
+	void MakeDirectionalLightViewInfo(Vector& outPos, Vector& outTarget, Vector& outUp, const Vector& direction);
+	void MakeDirectionalLightViewInfoWithPos(Vector& outTarget, Vector& outUp, const Vector& pos, const Vector& direction);
 
 	//////////////////////////////////////////////////////////////////////////
 	struct jShadowMapArrayData
@@ -84,9 +85,14 @@ namespace jLightUtil
 		std::shared_ptr<jRenderTarget> ShadowMapRenderTarget;
 		jCamera* ShadowMapCamera = nullptr;
 		IUniformBufferBlock* UniformBlock = nullptr;
+
+		// todo 정리 필요
+		Matrix CascadeLightVP[NUM_CASCADES];
+		float CascadeEndsW[NUM_CASCADES];
 	};
 
 	static jShadowMapData* CreateShadowMap(const Vector& direction, const Vector& pos);
+	static jShadowMapData* CreateCascadeShadowMap(const Vector& direction, const Vector& pos);
 }
 
 typedef std::function<void(const jRenderTarget*, int32, const jCamera*, const std::vector<jViewport>& viewports)> RenderToShadowMapFunc;
@@ -97,6 +103,8 @@ public:
 	// todo debug object
 	static jLight* CreateAmbientLight(const Vector& color, const Vector& intensity);
 	static jDirectionalLight* CreateDirectionalLight(const Vector& direction, const Vector& color, const Vector& diffuseIntensity
+		, const Vector& specularIntensity, float specularPower);
+	static jCascadeDirectionalLight* CreateCascadeDirectionalLight(const Vector& direction, const Vector& color, const Vector& diffuseIntensity
 		, const Vector& specularIntensity, float specularPower);
 	static jPointLight* CreatePointLight(const Vector& pos, const Vector& color, float maxDistance, const Vector& diffuseIntensity
 		, const Vector& specularIntensity, float specularPower);
@@ -188,6 +196,12 @@ public:
 	virtual void RenderToShadowMap(const RenderToShadowMapFunc& func, const jShader* shader) const override;
 	virtual void Update(float deltaTime) override;
 
+};
+
+class jCascadeDirectionalLight : public jDirectionalLight
+{
+public:
+	virtual void RenderToShadowMap(const RenderToShadowMapFunc& func, const jShader* shader) const override;
 };
 
 class jPointLight : public jLight
