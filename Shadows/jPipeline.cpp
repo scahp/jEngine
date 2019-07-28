@@ -293,7 +293,7 @@ void jForward_ShadowMapGen_CSM_SSM_Pipeline::Do(const jPipelineData& pipelineDat
 						g_rhi->SetViewport({ 0, 0, SM_WIDTH, SM_HEIGHT });
 					else
 						g_rhi->SetViewportIndexedArray(0, static_cast<int32>(viewports.size()), &viewports[0]);
-					this->jRenderPipeline::Draw(jPipelineData(pipelineData.Objects, camera, { light }), currentShader);
+					this->Draw(jPipelineData(pipelineData.Objects, camera, { light }), currentShader);
 				}, currentShader);
 			g_rhi->SetRenderTarget(nullptr);
 			skip = true;

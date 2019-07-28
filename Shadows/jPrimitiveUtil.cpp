@@ -470,8 +470,7 @@ jRenderObject* CreateQuad_Internal(const Vector& pos, const Vector& size, const 
 		streamParam->Stride = sizeof(float) * 4;
 		streamParam->Name = "Color";
 		streamParam->Data = std::move(GenerateColor(color, elementCount));
-		for (int i = 0; i < elementCount; ++i)
-			vertexStreamData->Params.push_back(streamParam);
+		vertexStreamData->Params.push_back(streamParam);
 	}
 
 	std::vector<float> normals(elementCount * 3);
@@ -1834,8 +1833,7 @@ void jFrustumPrimitive::Update(float deltaTime)
 			streamParam->Stride = sizeof(float) * 4;
 			streamParam->Name = "Color";
 			streamParam->Data = std::move(jPrimitiveUtil::GenerateColor(color, elementCount));
-			for (int i = 0; i < elementCount; ++i)
-				vertexStreamData->Params.push_back(streamParam);
+			vertexStreamData->Params.push_back(streamParam);
 		}
 
 		std::vector<float> normals(elementCount * 3);
