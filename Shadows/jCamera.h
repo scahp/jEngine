@@ -91,6 +91,8 @@ public:
 	virtual Matrix CreateView() const;
 	virtual Matrix CreateProjection() const;
 
+	virtual void BindCamera(const jShader* shader) const;
+
 	void UpdateCameraFrustum();
 	void UpdateCamera();
 

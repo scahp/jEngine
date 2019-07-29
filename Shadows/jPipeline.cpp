@@ -107,6 +107,9 @@ void jRenderPipeline::Draw(const jPipelineData& pipelineData, const jShader* sha
 	for (const auto& iter : Buffers)
 		iter->Bind(shader);
 
+	pipelineData.Camera->BindCamera(shader);
+	jLight::BindLights(pipelineData.Lights, shader);		
+
 	for (const auto& iter : pipelineData.Objects)
 		iter->Draw(pipelineData.Camera, shader, pipelineData.Lights);
 }
@@ -293,7 +296,7 @@ void jForward_ShadowMapGen_CSM_SSM_Pipeline::Do(const jPipelineData& pipelineDat
 						g_rhi->SetViewport({ 0, 0, SM_WIDTH, SM_HEIGHT });
 					else
 						g_rhi->SetViewportIndexedArray(0, static_cast<int32>(viewports.size()), &viewports[0]);
-					this->jRenderPipeline::Draw(jPipelineData(pipelineData.Objects, camera, { light }), currentShader);
+					this->Draw(jPipelineData(pipelineData.Objects, camera, { light }), currentShader);
 				}, currentShader);
 			g_rhi->SetRenderTarget(nullptr);
 			skip = true;
@@ -696,6 +699,9 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineData& pipelineData) const
 
 	const_cast<jCamera*>(camera)->UseAmbient = true;			// todo remove
 	const auto& staticObjects = jObject::GetStaticObject();
+	g_rhi->SetShader(ambientShader);
+	camera->BindCamera(ambientShader);
+	jLight::BindLights({ camera->Ambient }, ambientShader);
 	for (auto& iter : staticObjects)
 		iter->Draw(camera, ambientShader, { camera->Ambient });
 
@@ -703,6 +709,7 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineData& pipelineData) const
 	// 2. Stencil volume update & rendering (z-fail)
 	const_cast<jCamera*>(camera)->UseAmbient = false;			// todo remove
 	g_rhi->EnableStencil(true);
+
 	for(auto& light : pipelineData.Lights)
 	{
 		bool isOmniDirectional = false;
@@ -741,6 +748,10 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineData& pipelineData) const
 		if (skip)
 			continue;
 
+		g_rhi->SetShader(ShadowVolumeInfinityFarShader);
+		jLight::BindLights({ light }, ShadowVolumeInfinityFarShader);
+		camera->BindCamera(ShadowVolumeInfinityFarShader);
+
 		g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::STENCIL }));
 		g_rhi->SetStencilOpSeparate(EFace::FRONT, EStencilOp::KEEP, EStencilOp::DECR_WRAP, EStencilOp::KEEP);
 		g_rhi->SetStencilOpSeparate(EFace::BACK, EStencilOp::KEEP, EStencilOp::INCR_WRAP, EStencilOp::KEEP);
@@ -755,8 +766,8 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineData& pipelineData) const
 		if (jShadowAppSettingProperties::GetInstance().ShadowOn)
 		{
 			// todo
-			glEnable(GL_POLYGON_OFFSET_FILL);
-			glPolygonOffset(0.0f, 100.0f);
+			g_rhi->EnableDepthBias(true);
+			g_rhi->SetDepthBias(0.0f, 100.0f);
 
 			const auto& staticObjects = jObject::GetStaticObject();
 			for (auto& iter : staticObjects)
@@ -770,7 +781,7 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineData& pipelineData) const
 
 			// todo
 			// disable polygon offset fill
-			glDisable(GL_POLYGON_OFFSET_FILL);
+			g_rhi->EnableDepthBias(false);
 		}
 
 		//////////////////////////////////////////////////////////////////
@@ -786,6 +797,9 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineData& pipelineData) const
 		g_rhi->SetDepthFunc(EDepthStencilFunc::EQUAL);
 		g_rhi->SetBlendFunc(EBlendSrc::ONE, EBlendDest::ONE);
 
+		g_rhi->SetShader(shadowVolumeBaseShader);
+		jLight::BindLights({ light }, shadowVolumeBaseShader);
+		camera->BindCamera(shadowVolumeBaseShader);
 		const auto& staticObjects = jObject::GetStaticObject();
 		for (auto& iter : staticObjects)
 			iter->Draw(camera, shadowVolumeBaseShader, { light });
@@ -806,6 +820,7 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineData& pipelineData) const
 		g_rhi->EnableBlend(true);
 		g_rhi->SetBlendFunc(EBlendSrc::SRC_ALPHA, EBlendDest::ONE_MINUS_SRC_ALPHA);
 
+		camera->BindCamera(ShadowVolumeInfinityFarShader);
 		for (auto& light : camera->LightList)
 		{
 			bool isOmniDirectional = false;
@@ -840,6 +855,8 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineData& pipelineData) const
 			}
 			if (skip)
 				continue;
+
+			jLight::BindLights({ light }, ShadowVolumeInfinityFarShader);
 
 			const auto& staticObjects = jObject::GetStaticObject();
 			for (auto& iter : staticObjects)

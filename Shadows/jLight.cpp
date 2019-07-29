@@ -163,12 +163,51 @@ jSpotLight* jLight::CreateSpotLight(const Vector& pos, const Vector& direction, 
 	return spotLight;
 }
 
+void jLight::BindLights(const std::list<const jLight*>& lights, const jShader* shader)
+{
+	int ambient = 0;
+	int directional = 0;
+	int point = 0;
+	int spot = 0;
+	for (auto light : lights)
+	{
+		if (!light)
+			continue;
+
+		switch (light->Type)
+		{
+		case ELightType::AMBIENT:
+			light->BindLight(shader);
+			ambient = 1;
+			break;
+		case ELightType::DIRECTIONAL:
+			light->BindLight(shader);
+			++directional;
+			break;
+		case ELightType::POINT:
+			light->BindLight(shader);
+			++point;
+			break;
+		case ELightType::SPOT:
+			light->BindLight(shader);
+			++spot;
+			break;
+		default:
+			break;
+		}
+	}
+
+	SET_UNIFORM_BUFFER_STATIC(int, "UseAmbientLight", ambient, shader);
+	SET_UNIFORM_BUFFER_STATIC(int, "NumOfDirectionalLight", directional, shader);
+	SET_UNIFORM_BUFFER_STATIC(int, "NumOfPointLight", point, shader);
+	SET_UNIFORM_BUFFER_STATIC(int, "NumOfSpotLight", spot, shader);
+}
+
 //////////////////////////////////////////////////////////////////////////
 
-void jDirectionalLight::BindLight(const jShader* shader, jMaterialData* materialData, int32 index /*= 0*/) const
+void jDirectionalLight::BindLight(const jShader* shader) const
 {
 	JASSERT(shader);
-	JASSERT(materialData);
 
 	//if (!LightDataUniformBlock->Data || *static_cast<LightData*>(LightDataUniformBlock->Data) != Data)
 		LightDataUniformBlock->UpdateBufferData(&Data, sizeof(Data));
@@ -216,28 +255,30 @@ void jDirectionalLight::BindLight(const jShader* shader, jMaterialData* material
 			shadowDataUniformBlock->UpdateBufferData(&shadowData, sizeof(shadowData));
 		shadowDataUniformBlock->Bind(shader);
 
-		if (materialData)
+		char szTemp[128] = { 0 };
+		for (int32 i = 0; i < NUM_CASCADES; ++i)
 		{
-			{
-				auto materialParam = new jMaterialParam();
-				materialParam->Name = "shadow_object";
-				materialParam->Texture = static_cast<jTexture_OpenGL*>(ShadowMapData->ShadowMapRenderTarget->GetTexture());
-				materialParam->Minification = ETextureFilter::NEAREST;
-				materialParam->Magnification = ETextureFilter::NEAREST;
-				materialData->Params.push_back(materialParam);
-			}
+			sprintf_s(szTemp, sizeof(szTemp), "CascadeLightVP[%d]", i);
+			g_rhi->SetUniformbuffer(&jUniformBuffer<Matrix>(szTemp, ShadowMapData->CascadeLightVP[i]), shader);
 
-			// todo 정리 필요
-			char szTemp[128] = { 0 };
-			for (int32 i = 0; i < NUM_CASCADES; ++i)
-			{
-				sprintf_s(szTemp, sizeof(szTemp), "CascadeLightVP[%d]", i);
-				g_rhi->SetUniformbuffer(&jUniformBuffer<Matrix>(szTemp, ShadowMapData->CascadeLightVP[i]), shader);
-
-				sprintf_s(szTemp, sizeof(szTemp), "CascadeEndsW[%d]", i);
-				g_rhi->SetUniformbuffer(&jUniformBuffer<float>(szTemp, ShadowMapData->CascadeEndsW[i]), shader);
-			}
+			sprintf_s(szTemp, sizeof(szTemp), "CascadeEndsW[%d]", i);
+			g_rhi->SetUniformbuffer(&jUniformBuffer<float>(szTemp, ShadowMapData->CascadeEndsW[i]), shader);
 		}
+	}
+}
+
+void jDirectionalLight::GetMaterialData(jMaterialData* OutMaterialData) const
+{
+	JASSERT(OutMaterialData);
+
+	if (OutMaterialData)
+	{
+		auto materialParam = new jMaterialParam();
+		materialParam->Name = "shadow_object";
+		materialParam->Texture = static_cast<jTexture_OpenGL*>(ShadowMapData->ShadowMapRenderTarget->GetTexture());
+		materialParam->Minification = ETextureFilter::NEAREST;
+		materialParam->Magnification = ETextureFilter::NEAREST;
+		OutMaterialData->Params.push_back(materialParam);
 	}
 }
 
@@ -300,7 +341,7 @@ void jCascadeDirectionalLight::RenderToShadowMap(const RenderToShadowMapFunc& fu
 }
 
 
-void jPointLight::BindLight(const jShader* shader, jMaterialData* materialData, int32 index /*= 0*/) const
+void jPointLight::BindLight(const jShader* shader) const
 {
 	//if (!LightDataUniformBlock->Data || *static_cast<LightData*>(LightDataUniformBlock->Data) != Data)
 		LightDataUniformBlock->UpdateBufferData(&Data, sizeof(Data));
@@ -341,16 +382,21 @@ void jPointLight::BindLight(const jShader* shader, jMaterialData* materialData, 
 		//if (!shadowDataUniformBlock->Data || *static_cast<ShadowData*>(shadowDataUniformBlock->Data) != shadowData)
 			shadowDataUniformBlock->UpdateBufferData(&shadowData, sizeof(shadowData));
 		shadowDataUniformBlock->Bind(shader);
+	}
+}
 
-		if (materialData)
-		{
-			auto materialParam = new jMaterialParam();
-			materialParam->Name = "shadow_object_point";
-			materialParam->Texture = static_cast<jTexture_OpenGL*>(ShadowMapData->ShadowMapRenderTarget->GetTexture());
-			materialParam->Minification = ETextureFilter::NEAREST;
-			materialParam->Magnification = ETextureFilter::NEAREST;
-			materialData->Params.push_back(materialParam);
-		}
+void jPointLight::GetMaterialData(jMaterialData* OutMaterialData) const
+{
+	JASSERT(OutMaterialData);
+
+	if (OutMaterialData)
+	{
+		auto materialParam = new jMaterialParam();
+		materialParam->Name = "shadow_object_point";
+		materialParam->Texture = static_cast<jTexture_OpenGL*>(ShadowMapData->ShadowMapRenderTarget->GetTexture());
+		materialParam->Minification = ETextureFilter::NEAREST;
+		materialParam->Magnification = ETextureFilter::NEAREST;
+		OutMaterialData->Params.push_back(materialParam);
 	}
 }
 
@@ -409,7 +455,7 @@ void jPointLight::Update(float deltaTime)
 	}
 }
 
-void jSpotLight::BindLight(const jShader* shader, jMaterialData* materialData, int32 index /*= 0*/) const
+void jSpotLight::BindLight(const jShader* shader) const
 {
 	//if (!LightDataUniformBlock->Data || *static_cast<LightData*>(LightDataUniformBlock->Data) != Data)
 		LightDataUniformBlock->UpdateBufferData(&Data, sizeof(Data));
@@ -451,15 +497,22 @@ void jSpotLight::BindLight(const jShader* shader, jMaterialData* materialData, i
 			shadowDataUniformBlock->UpdateBufferData(&shadowData, sizeof(shadowData));
 		shadowDataUniformBlock->Bind(shader);
 
-		if (materialData)
-		{
-			auto materialParam = new jMaterialParam();
-			materialParam->Name = "shadow_object_spot";
-			materialParam->Texture = static_cast<jTexture_OpenGL*>(ShadowMapData->ShadowMapRenderTarget->GetTexture());
-			materialParam->Minification = ETextureFilter::NEAREST;
-			materialParam->Magnification = ETextureFilter::NEAREST;
-			materialData->Params.push_back(materialParam);
-		}
+
+	}
+}
+
+void jSpotLight::GetMaterialData(jMaterialData* OutMaterialData) const
+{
+	JASSERT(OutMaterialData);
+
+	if (OutMaterialData)
+	{
+		auto materialParam = new jMaterialParam();
+		materialParam->Name = "shadow_object_spot";
+		materialParam->Texture = static_cast<jTexture_OpenGL*>(ShadowMapData->ShadowMapRenderTarget->GetTexture());
+		materialParam->Minification = ETextureFilter::NEAREST;
+		materialParam->Magnification = ETextureFilter::NEAREST;
+		OutMaterialData->Params.push_back(materialParam);
 	}
 }
 
@@ -516,10 +569,10 @@ void jSpotLight::Update(float deltaTime)
 }
 
 //////////////////////////////////////////////////////////////////////////
-void jAmbientLight::BindLight(const jShader* shader, jMaterialData* materialData, int32 index /*= 0*/) const
+void jAmbientLight::BindLight(const jShader* shader) const
 {
-	const std::string structName = "AmbientLight";
+	//const std::string structName = "AmbientLight";
 
-	g_rhi->SetUniformbuffer(&jUniformBuffer<Vector>(structName + ".Color", Data.Color), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<Vector>(structName + ".Intensity", Data.Intensity), shader);
+	SET_UNIFORM_BUFFER_STATIC(Vector, "AmbientLight.Color", Data.Color, shader);
+	SET_UNIFORM_BUFFER_STATIC(Vector, "AmbientLight.Intensity", Data.Intensity, shader);
 }

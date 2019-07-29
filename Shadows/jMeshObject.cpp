@@ -18,14 +18,13 @@ void jMeshObject::Draw(const jCamera* camera, const jShader* shader, const std::
 void jMeshObject::SetMaterialUniform(const jShader* shader, const jMeshMaterial* material)
 {
 	g_rhi->SetShader(shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<Vector4>("Material.Diffuse", material->Data.Diffuse), shader);
+	SET_UNIFORM_BUFFER_STATIC(Vector4, "Material.Diffuse", material->Data.Diffuse, shader);
 
 	// todo vec4인데 일단 vec3으로 넘김.. 고민임.
-	g_rhi->SetUniformbuffer(&jUniformBuffer<Vector>("Material.Specular", material->Data.Specular), shader);
-
-
-	g_rhi->SetUniformbuffer(&jUniformBuffer<Vector>("Material.Emissive", material->Data.Emissive), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<float>("Material.Shininess", material->Data.SpecularPow), shader);
+	SET_UNIFORM_BUFFER_STATIC(Vector4, "Material.Specular", material->Data.Specular, shader);
+	
+	SET_UNIFORM_BUFFER_STATIC(Vector, "Material.Emissive", material->Data.Emissive, shader);
+	SET_UNIFORM_BUFFER_STATIC(float, "Material.Shininess", material->Data.SpecularPow, shader);
 }
 
 void jMeshObject::DrawNode(const jMeshNode* node, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights)

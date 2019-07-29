@@ -1,6 +1,7 @@
 ﻿#include "pch.h"
 #include "jCamera.h"
 #include "jLight.h"
+#include "jShadowAppProperties.h"
 
 std::map<int32, jCamera*> jCamera::CameraMap;
 
@@ -29,6 +30,26 @@ Matrix jCamera::CreateProjection() const
 	}
 
 	return jCameraUtil::CreateOrthogonalMatrix(Width, Height, Far, Near);
+}
+
+void jCamera::BindCamera(const jShader* shader) const
+{
+	auto VP = Projection * View;
+	auto P = Projection;
+	SET_UNIFORM_BUFFER_STATIC(Matrix, "P", P, shader);
+	SET_UNIFORM_BUFFER_STATIC(Matrix, "VP", VP, shader);
+	SET_UNIFORM_BUFFER_STATIC(Vector, "Eye", Pos, shader);
+	SET_UNIFORM_BUFFER_STATIC(Vector2, "ShadowMapSize", Vector2(ShadowMapTexelSize), shader);
+	SET_UNIFORM_BUFFER_STATIC(float, "PCF_Size_Directional", PCF_SIZE_DIRECTIONAL, shader);
+	SET_UNIFORM_BUFFER_STATIC(float, "PCF_Size_OmniDirectional", PCF_SIZE_OMNIDIRECTIONAL, shader);
+	SET_UNIFORM_BUFFER_STATIC(float, "ESM_C", 40.0f, shader);
+	SET_UNIFORM_BUFFER_STATIC(float, "PointLightESM_C", 40.0f, shader);
+	SET_UNIFORM_BUFFER_STATIC(float, "SpotLightESM_C", 40.0f, shader);
+	SET_UNIFORM_BUFFER_STATIC(int, "ShadowMapWidth", SM_WIDTH, shader);
+	SET_UNIFORM_BUFFER_STATIC(int, "ShadowMapHeight", SM_HEIGHT, shader);
+	SET_UNIFORM_BUFFER_STATIC(int, "CSMDebugOn", static_cast<int>(jShadowAppSettingProperties::GetInstance().CSMDebugOn), shader);
+	SET_UNIFORM_BUFFER_STATIC(int, "ShadowOn", jShadowAppSettingProperties::GetInstance().ShadowOn ? 1 : 0, shader);
+	SET_UNIFORM_BUFFER_STATIC(float, "DeepShadowAlpha", jShadowAppSettingProperties::GetInstance().DeepShadowAlpha, shader);
 }
 
 void jCamera::UpdateCameraFrustum()

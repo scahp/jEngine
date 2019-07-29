@@ -150,7 +150,7 @@ void jRHI_OpenGL::EnableDepthBias(bool enable)
 
 void jRHI_OpenGL::SetDepthBias(float constant, float slope)
 {
-	glPolygonOffset(1.0f, 1.0f);
+	glPolygonOffset(constant, slope);
 }
 
 void jRHI_OpenGL::DrawElementBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex)
@@ -359,7 +359,7 @@ jShader* jRHI_OpenGL::CreateShader(const jShaderInfo& shaderInfo)
 		glShaderSource(vs, 1, &vsPtr, nullptr);
 		glCompileShader(vs);
 
-		auto checkShaderValid = [](uint32 shaderId)
+		auto checkShaderValid = [](uint32 shaderId, const std::string& filename)
 		{
 			int isValid = 0;
 			glGetShaderiv(shaderId, GL_COMPILE_STATUS, &isValid);
@@ -370,16 +370,18 @@ jShader* jRHI_OpenGL::CreateShader(const jShaderInfo& shaderInfo)
 
 				if (maxLength > 0)
 				{
-					std::vector<char> errorLog(maxLength + 1, 0);
+					std::string errorLog(maxLength, 0);
 					glGetShaderInfoLog(shaderId, maxLength, &maxLength, &errorLog[0]);
-					JMESSAGE(&errorLog[0]);
+					if (maxLength > 0)
+						errorLog.resize(maxLength - 1);	// remove null character to concatenate
+					JMESSAGE(std::string(errorLog + "(" + filename + ")").c_str());
 				}
 				glDeleteShader(shaderId);
 				return false;
 			}
 			return true;
 		};
-		if (!checkShaderValid(vs))
+		if (!checkShaderValid(vs, shaderInfo.vs))
 			return nullptr;
 
 		uint32 gs = 0;
@@ -390,7 +392,7 @@ jShader* jRHI_OpenGL::CreateShader(const jShaderInfo& shaderInfo)
 			glShaderSource(gs, 1, &gsPtr, nullptr);
 			glCompileShader(gs);
 
-			if (!checkShaderValid(gs))
+			if (!checkShaderValid(gs, shaderInfo.gs))
 			{
 				glDeleteShader(vs);
 				return nullptr;
@@ -403,7 +405,7 @@ jShader* jRHI_OpenGL::CreateShader(const jShaderInfo& shaderInfo)
 		glShaderSource(fs, 1, &fsPtr, &fragment_shader_string_length);
 		glCompileShader(fs);
 
-		if (!checkShaderValid(fs))
+		if (!checkShaderValid(fs, shaderInfo.fs))
 		{
 			glDeleteShader(vs);
 			if (!gs)
@@ -486,7 +488,7 @@ jTexture* jRHI_OpenGL::CreateTextureFromData(unsigned char* data, int32 width, i
 	return texure;
 }
 
-bool jRHI_OpenGL::SetUniformbuffer(const IUniformBuffer* buffer, const jShader* shader)
+bool jRHI_OpenGL::SetUniformbuffer(const IUniformBuffer* buffer, const jShader* shader) const
 {
 	switch (buffer->GetType())
 	{

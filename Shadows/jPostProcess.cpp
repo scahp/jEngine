@@ -119,6 +119,10 @@ bool jPostProcess_DeepShadowMap::Do(const jCamera* camera) const
 	if (auto deepShadowFull_Shader = jShadowAppSettingProperties::GetInstance().ExponentDeepShadowOn ? jShader::GetShader("ExpDeepShadowFull") : jShader::GetShader("DeepShadowFull"))
 	{
 		g_rhi->SetShader(deepShadowFull_Shader);
+
+		camera->BindCamera(deepShadowFull_Shader);
+		jLight::BindLights(lights, deepShadowFull_Shader);
+
 		SSBOs.Bind(deepShadowFull_Shader);
 
 		JASSERT(GBuffer);
@@ -146,6 +150,7 @@ bool jPostProcess_AA_DeepShadowAddition::Do(const jCamera* camera) const
 	auto fullscreenQuad = GetFullscreenQuad();
 	if (!PostProcessInput.expired())
 		fullscreenQuad->SetTexture(PostProcessInput.lock()->RenderTaret->GetTexture());
+	camera->BindCamera(Shader);
 	fullscreenQuad->Draw(camera, Shader, {});
 	fullscreenQuad->SetTexture(nullptr);
 
@@ -168,8 +173,8 @@ bool jPostProcess_Blur::Do(const jCamera* camera) const
 		fullscreenQuad->SetTexture(PostProcessInput.lock()->RenderTaret->GetTexture());
 
 	g_rhi->SetShader(shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<float>("IsVertical", IsVertical), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<float>("MaxDist", MaxDist), shader);
+	SET_UNIFORM_BUFFER_STATIC(float, "IsVertical", IsVertical, shader);
+	SET_UNIFORM_BUFFER_STATIC(float, "MaxDist", MaxDist, shader);
 
 	fullscreenQuad->Draw(camera, shader, {});
 	fullscreenQuad->SetTexture(nullptr);

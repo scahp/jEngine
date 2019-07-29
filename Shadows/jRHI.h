@@ -296,7 +296,7 @@ public:
 	virtual void SetViewportIndexed(int32 index, const jViewport& viewport) const {}
 	virtual void SetViewportIndexedArray(int32 startIndex, int32 count, const jViewport* viewports) const {}
 
-	virtual bool SetUniformbuffer(const IUniformBuffer* buffer, const jShader* shader) { return false; }
+	virtual bool SetUniformbuffer(const IUniformBuffer* buffer, const jShader* shader) const { return false; }
 
 	virtual jTexture* CreateNullTexture() const { return nullptr; }
 
@@ -333,3 +333,10 @@ public:
 	virtual void EnableDepthClip(bool enable) {  }
 };
 
+// Not thred safe
+#define SET_UNIFORM_BUFFER_STATIC(Type, Name, CurrentData, Shader) \
+{\
+	static jUniformBuffer<Type> temp(Name, CurrentData);\
+	temp.Data = CurrentData;\
+	g_rhi->SetUniformbuffer(&temp, Shader);\
+}

@@ -201,7 +201,7 @@ void jGame::UpdateAppSetting()
 	if (changedDirectionalLight)
 	{
 		const auto shaderMapRenderTarget = DirectionalLight->ShadowMapData->ShadowMapRenderTarget;
-		const float aspect = shaderMapRenderTarget->Info.Height / shaderMapRenderTarget->Info.Width;
+		const float aspect = static_cast<float>(shaderMapRenderTarget->Info.Height) / shaderMapRenderTarget->Info.Width;
 		DirectionalLightShadowMapUIDebug->SetTexture(DirectionalLight->ShadowMapData->ShadowMapRenderTarget->GetTexture());
 		DirectionalLightShadowMapUIDebug->Size.y = DirectionalLightShadowMapUIDebug->Size.x * aspect;
 	}

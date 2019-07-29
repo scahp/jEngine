@@ -46,14 +46,10 @@ void jUIQuadPrimitive::SetTexture(const jTexture* texture)
 
 void jUIQuadPrimitive::SetUniformParams(const jShader* shader)
 {
-	auto temp1 = jUniformBuffer<Vector2>("PixelSize", Vector2(1.0f / SCR_WIDTH, 1.0f / SCR_HEIGHT));
-	auto temp2 = jUniformBuffer<Vector2>("Pos", Pos);
-	auto temp3 = jUniformBuffer<Vector2>("Size", Size);
-
 	g_rhi->SetShader(shader);
-	g_rhi->SetUniformbuffer(&temp1, shader);
-	g_rhi->SetUniformbuffer(&temp2, shader);
-	g_rhi->SetUniformbuffer(&temp3, shader);
+	SET_UNIFORM_BUFFER_STATIC(Vector2, "PixelSize", Vector2(1.0f / SCR_WIDTH, 1.0f / SCR_HEIGHT), shader);
+	SET_UNIFORM_BUFFER_STATIC(Vector2, "Pos", Pos, shader);
+	SET_UNIFORM_BUFFER_STATIC(Vector2, "Size", Size, shader);
 }
 
 void jFullscreenQuadPrimitive::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights)
@@ -64,10 +60,8 @@ void jFullscreenQuadPrimitive::Draw(const jCamera* camera, const jShader* shader
 
 void jFullscreenQuadPrimitive::SetUniformBuffer(const jShader* shader)
 {
-	auto temp1 = jUniformBuffer<Vector2>("PixelSize", Vector2(1.0f / SCR_WIDTH, 1.0f / SCR_HEIGHT));
-
 	g_rhi->SetShader(shader);
-	g_rhi->SetUniformbuffer(&temp1, shader);
+	SET_UNIFORM_BUFFER_STATIC(Vector2, "PixelSize", Vector2(1.0f / SCR_WIDTH, 1.0f / SCR_HEIGHT), shader);
 }
 
 void jFullscreenQuadPrimitive::SetTexture(const jTexture* texture)
@@ -82,10 +76,8 @@ void jBoundBoxObject::Draw(const jCamera* camera, const jShader* shader, const s
 
 void jBoundBoxObject::SetUniformBuffer(const jShader* shader)
 {
-	auto colorData = jUniformBuffer<Vector4>("Color", Color);
-
 	g_rhi->SetShader(shader);
-	g_rhi->SetUniformbuffer(&colorData, shader);
+	SET_UNIFORM_BUFFER_STATIC(Vector4, "Color", Color, shader);
 }
 
 void jBoundSphereObject::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights)
@@ -95,10 +87,8 @@ void jBoundSphereObject::Draw(const jCamera* camera, const jShader* shader, cons
 
 void jBoundSphereObject::SetUniformBuffer(const jShader* shader)
 {
-	auto colorData = jUniformBuffer<Vector4>("Color", Color);
-
 	g_rhi->SetShader(shader);
-	g_rhi->SetUniformbuffer(&colorData, shader);
+	SET_UNIFORM_BUFFER_STATIC(Vector4, "Color", Color, shader);
 }
 
 void jArrowSegmentPrimitive::Update(float deltaTime)
@@ -470,8 +460,7 @@ jRenderObject* CreateQuad_Internal(const Vector& pos, const Vector& size, const 
 		streamParam->Stride = sizeof(float) * 4;
 		streamParam->Name = "Color";
 		streamParam->Data = std::move(GenerateColor(color, elementCount));
-		for (int i = 0; i < elementCount; ++i)
-			vertexStreamData->Params.push_back(streamParam);
+		vertexStreamData->Params.push_back(streamParam);
 	}
 
 	std::vector<float> normals(elementCount * 3);
@@ -1834,8 +1823,7 @@ void jFrustumPrimitive::Update(float deltaTime)
 			streamParam->Stride = sizeof(float) * 4;
 			streamParam->Name = "Color";
 			streamParam->Data = std::move(jPrimitiveUtil::GenerateColor(color, elementCount));
-			for (int i = 0; i < elementCount; ++i)
-				vertexStreamData->Params.push_back(streamParam);
+			vertexStreamData->Params.push_back(streamParam);
 		}
 
 		std::vector<float> normals(elementCount * 3);

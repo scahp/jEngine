@@ -176,7 +176,7 @@ public:
 	virtual jTexture* CreateTextureFromData(unsigned char* data, int32 width, int32 height) override;
 
 
-	virtual bool SetUniformbuffer(const IUniformBuffer* buffer, const jShader* shader) override;
+	virtual bool SetUniformbuffer(const IUniformBuffer* buffer, const jShader* shader) const override;
 
 
 	virtual void SetMatetrial(jMaterialData* materialData, const jShader* shader, int32 baseBindingIndex = 0) override;

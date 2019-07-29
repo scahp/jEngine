@@ -177,102 +177,21 @@ void jRenderObject::SetCameraProperty(const jShader* shader, const jCamera* came
 	World = posMatrix * rotMatrix * scaleMatrix;
 	auto MV = camera->View * World;
 	auto MVP = camera->Projection * MV;
-	auto VP = camera->Projection * camera->View;
-	auto P = camera->Projection;
-	
-	g_rhi->SetUniformbuffer(&jUniformBuffer<Matrix>("MVP", MVP), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<Matrix>("MV", MV), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<Matrix>("VP", VP), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<Matrix>("M", World), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<Matrix>("P", P), shader);
-	
-	g_rhi->SetUniformbuffer(&jUniformBuffer<Vector>("Eye", camera->Pos), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<int>("Collided", Collided), shader);
 
-	// todo 어디로 옮겨야 함.
-	g_rhi->SetUniformbuffer(&jUniformBuffer<Vector2>("ShadowMapSize", Vector2(camera->ShadowMapTexelSize)), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<float>("PCF_Size_Directional", camera->PCF_SIZE_DIRECTIONAL), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<float>("PCF_Size_OmniDirectional", camera->PCF_SIZE_OMNIDIRECTIONAL), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<float>("ESM_C", 40.0f), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<float>("PointLightESM_C", 40.0f), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<float>("SpotLightESM_C", 40.0f), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<int>("UseUniformColor", UseUniformColor), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<Vector4>("Color", Color), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<int>("UseMaterial", UseMaterial), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<int>("ShadowOn", jShadowAppSettingProperties::GetInstance().ShadowOn ? 1 : 0), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<float>("DeepShadowAlpha", jShadowAppSettingProperties::GetInstance().DeepShadowAlpha), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<int>("ShadowMapWidth", SM_WIDTH), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<int>("ShadowMapHeight", SM_HEIGHT), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<int>("ShadingModel", static_cast<int>(ShadingModel)), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<int>("CSMDebugOn", static_cast<int>(jShadowAppSettingProperties::GetInstance().CSMDebugOn)), shader);
+	SET_UNIFORM_BUFFER_STATIC(Matrix, "MVP", MVP, shader);
+	SET_UNIFORM_BUFFER_STATIC(Matrix, "MV", MV, shader);
+	SET_UNIFORM_BUFFER_STATIC(Matrix, "M", World, shader);
+	SET_UNIFORM_BUFFER_STATIC(int, "Collided", Collided, shader);
+	SET_UNIFORM_BUFFER_STATIC(int, "UseUniformColor", UseUniformColor, shader);
+	SET_UNIFORM_BUFFER_STATIC(Vector4, "Color", Color, shader);
+	SET_UNIFORM_BUFFER_STATIC(int, "UseMaterial", UseMaterial, shader);
+	SET_UNIFORM_BUFFER_STATIC(int, "ShadingModel", static_cast<int>(ShadingModel), shader);
 }
 
 void jRenderObject::SetLightProperty(const jShader* shader, const jCamera* camera, const std::list<const jLight*>& lights, jMaterialData* materialData)
 {
-	int ambient = 0;
-	int directional = 0;
-	int point = 0;
-	int spot = 0;
-	for(auto light : lights)
-	{
-		if (!light)
-			continue;
-
-		switch (light->Type)
-		{
-		case ELightType::AMBIENT:
-			light->BindLight(shader, materialData);
-			ambient = 1;
-			break;
-		case ELightType::DIRECTIONAL:
-			light->BindLight(shader, materialData, directional);
-			++directional;
-			break;
-		case ELightType::POINT:
-			light->BindLight(shader, materialData, point);
-			++point;
-			break;
-		case ELightType::SPOT:
-			light->BindLight(shader, materialData, spot);
-			++spot;
-			break;
-		default:
-			break;
-		}
-	}
-
-	g_rhi->SetUniformbuffer(&jUniformBuffer<int>("UseAmbientLight", ambient), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<int>("NumOfDirectionalLight", directional), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<int>("NumOfPointLight", point), shader);
-	g_rhi->SetUniformbuffer(&jUniformBuffer<int>("NumOfSpotLight", spot), shader);
-
-	if (!directional)
-	{
-		auto materialParam = new jMaterialParam();
-		materialParam->Name = "shadow_object";
-		materialParam->Texture = jRenderTargetPool::GetNullTexture(ETextureType::TEXTURE_2D);
-		materialParam->Minification = ETextureFilter::LINEAR;
-		materialParam->Magnification = ETextureFilter::LINEAR;
-		materialData->Params.push_back(materialParam);
-	}
-	if (!point)
-	{
-		auto materialParam = new jMaterialParam();
-		materialParam->Name = "shadow_object_point";
-		materialParam->Texture = jRenderTargetPool::GetNullTexture(ETextureType::TEXTURE_2D_ARRAY);
-		materialParam->Minification = ETextureFilter::LINEAR;
-		materialParam->Magnification = ETextureFilter::LINEAR;
-		materialData->Params.push_back(materialParam);
-	}
-	if (!spot)
-	{
-		auto materialParam = new jMaterialParam();
-		materialParam->Name = "shadow_object_spot";
-		materialParam->Texture = jRenderTargetPool::GetNullTexture(ETextureType::TEXTURE_2D_ARRAY);
-		materialParam->Minification = ETextureFilter::LINEAR;
-		materialParam->Magnification = ETextureFilter::LINEAR;
-		materialData->Params.push_back(materialParam);
-	}
+	for (auto iter : lights)
+		iter->GetMaterialData(materialData);
 }
 
 //void jRenderObject::SetLightProperty(const jShader* shader, const jLight* light, jMaterialData* materialData)
@@ -333,7 +252,7 @@ void jRenderObject::SetTextureProperty(const jShader* shader, jMaterialData* mat
 			materialData->Params.push_back(tex_object2_param);
 			useTexture = true;
 		}
-		g_rhi->SetUniformbuffer(&jUniformBuffer<int>("UseTexture", useTexture), shader);
+		SET_UNIFORM_BUFFER_STATIC(int, "UseTexture", useTexture, shader);
 
 		if (tex_object_array)
 		{
