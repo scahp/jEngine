@@ -131,8 +131,14 @@ void jRHI_OpenGL::DrawArray(EPrimitiveType type, int vertStartIndex, int vertCou
 
 void jRHI_OpenGL::DrawElement(EPrimitiveType type, int elementSize, int32 startIndex /*= -1*/, int32 count /*= -1*/) const
 {
-	const auto elementType = (elementSize == 4) ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
-	glDrawElements(GetPrimitiveType(type), count, elementType, reinterpret_cast<void*>(startIndex * elementSize));
+	union jOffset
+	{
+		int64 offset;
+		void* offset_pointer;
+	} u_offset;
+	u_offset.offset = startIndex * elementSize;
+	const auto elementType = (elementSize == 4) ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;	
+	glDrawElements(GetPrimitiveType(type), count, elementType, u_offset.offset_pointer);
 }
 
 void jRHI_OpenGL::DispatchCompute(uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ) const
@@ -155,8 +161,14 @@ void jRHI_OpenGL::SetDepthBias(float constant, float slope) const
 
 void jRHI_OpenGL::DrawElementBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex) const
 {
+	union jOffset
+	{
+		int64 offset;
+		void* offset_pointer;
+	} u_offset;
+	u_offset.offset = startIndex * elementSize;
 	const auto elementType = (elementSize == 4) ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
-	glDrawElementsBaseVertex(GetPrimitiveType(type), count, elementType, reinterpret_cast<void*>(startIndex * elementSize), baseVertexIndex);
+	glDrawElementsBaseVertex(GetPrimitiveType(type), count, elementType, u_offset.offset_pointer, baseVertexIndex);
 }
 
 void jRHI_OpenGL::EnableSRGB(bool enable) const
@@ -217,7 +229,7 @@ void jRHI_OpenGL::EnableDepthClip(bool enable) const
 
 void jRHI_OpenGL::BeginDebugEvent(const char* name) const
 {
-	glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, strlen(name), name);
+	glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, static_cast<int32>(strlen(name)), name);
 }
 
 void jRHI_OpenGL::EndDebugEvent() const
