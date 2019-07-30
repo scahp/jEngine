@@ -116,32 +116,7 @@ public:
 	jRHI_OpenGL();
 	~jRHI_OpenGL();
 
-	virtual jVertexBuffer* CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) override;
-
-
-	virtual jIndexBuffer* CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) override;
-
-
-	virtual void BindVertexBuffer(const jVertexBuffer* vb, const jShader* shader) override;
-
-
-	virtual void BindIndexBuffer(const jIndexBuffer* ib, const jShader* shader) override;
-
-
-	virtual void MapBufferdata(IBuffer* buffer) override;
-
-
-	virtual void DrawArray(EPrimitiveType type, int vertStartIndex, int vertCount) override;
-
-
-	virtual void DrawElement(EPrimitiveType type, int elementSize, int32 startIndex = -1, int32 count = -1) override;
-
-	virtual void DispatchCompute(uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ) override;
-
-	virtual void EnableDepthBias(bool enable) override;
-	virtual void SetDepthBias(float constant, float slope) override;
-
-	unsigned int GetPrimitiveType(EPrimitiveType type)
+	unsigned int GetPrimitiveType(EPrimitiveType type) const
 	{
 		unsigned int primitiveType = 0;
 		switch (type)
@@ -159,84 +134,54 @@ public:
 		return primitiveType;
 	}
 
-
-	virtual void SetClear(ERenderBufferType typeBit) override;
-
-
-	virtual void SetClearColor(float r, float g, float b, float a) override;
-	virtual void SetClearColor(Vector4 rgba) override;
-
-	virtual void SetShader(const jShader* shader) override;
-
-
-	virtual jShader* CreateShader(const jShaderInfo& shaderInfo) override;
-
-
+	virtual jVertexBuffer* CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const override;
+	virtual jIndexBuffer* CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const override;
+	virtual void BindVertexBuffer(const jVertexBuffer* vb, const jShader* shader) const override;
+	virtual void BindIndexBuffer(const jIndexBuffer* ib, const jShader* shader) const override;
+	virtual void MapBufferdata(IBuffer* buffer) override;
+	virtual void DrawArray(EPrimitiveType type, int vertStartIndex, int vertCount) const override;
+	virtual void DrawElement(EPrimitiveType type, int elementSize, int32 startIndex = -1, int32 count = -1) const override;
+	virtual void DispatchCompute(uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ) const override;
+	virtual void EnableDepthBias(bool enable) const override;
+	virtual void SetDepthBias(float constant, float slope) const override;
+	virtual void SetClear(ERenderBufferType typeBit) const override;
+	virtual void SetClearColor(float r, float g, float b, float a) const override;
+	virtual void SetClearColor(Vector4 rgba) const override;
+	virtual void SetShader(const jShader* shader) const override;
+	virtual jShader* CreateShader(const jShaderInfo& shaderInfo) const override;
 	virtual jTexture* CreateNullTexture() const override;
-	virtual jTexture* CreateTextureFromData(unsigned char* data, int32 width, int32 height) override;
-
-
+	virtual jTexture* CreateTextureFromData(unsigned char* data, int32 width, int32 height) const override;
 	virtual bool SetUniformbuffer(const IUniformBuffer* buffer, const jShader* shader) const override;
-
-
-	virtual void SetMatetrial(jMaterialData* materialData, const jShader* shader, int32 baseBindingIndex = 0) override;
-
-
-	virtual void SetTexture(int32 index, const jTexture* texture) override;
-
-
-	virtual void SetTextureFilter(ETextureType type, ETextureFilterTarget target, ETextureFilter filter) override;
-
-
-	virtual void EnableCullFace(bool enable) override;
-
-
-	virtual jRenderTarget* CreateRenderTarget(const jRenderTargetInfo& info) override;
-
-
-	virtual void EnableDepthTest(bool enable) override;
-
-
-	virtual void SetRenderTarget(const jRenderTarget* rt, int32 index = 0, bool mrt = false) override;
-	virtual void SetDrawBuffers(const std::initializer_list<EDrawBufferType>& list) override;
-
-
-	virtual void UpdateVertexBuffer(jVertexBuffer* vb, const std::shared_ptr<jVertexStreamData>& streamData) override;
-	virtual void UpdateVertexBuffer(jVertexBuffer* vb, IStreamParam* streamParam, int32 streamParamIndex) override;
-
-
-	virtual void EnableBlend(bool enable) override;
-
-
-	virtual void SetBlendFunc(EBlendSrc src, EBlendDest dest) override;
-
-	virtual void EnableStencil(bool enable) override;
-
-	virtual void SetStencilOpSeparate(EFace face, EStencilOp sFail, EStencilOp dpFail, EStencilOp dpPass) override;
-
-	virtual void SetStencilFunc(EDepthStencilFunc func, int32 ref, uint32 mask) override;
-	virtual void SetDepthFunc(EDepthStencilFunc func) override;
-	virtual void SetDepthMask(bool enable) override;
-	virtual void SetColorMask(bool r, bool g, bool b, bool a) override;
-
+	virtual void SetMatetrial(jMaterialData* materialData, const jShader* shader, int32 baseBindingIndex = 0) const override;
+	virtual void SetTexture(int32 index, const jTexture* texture) const override;
+	virtual void SetTextureFilter(ETextureType type, ETextureFilterTarget target, ETextureFilter filter) const override;
+	virtual void EnableCullFace(bool enable) const override;
+	virtual jRenderTarget* CreateRenderTarget(const jRenderTargetInfo& info) const override;
+	virtual void EnableDepthTest(bool enable) const override;
+	virtual void SetRenderTarget(const jRenderTarget* rt, int32 index = 0, bool mrt = false) const override;
+	virtual void SetDrawBuffers(const std::initializer_list<EDrawBufferType>& list) const override;
+	virtual void UpdateVertexBuffer(jVertexBuffer* vb, const std::shared_ptr<jVertexStreamData>& streamData) const override;
+	virtual void UpdateVertexBuffer(jVertexBuffer* vb, IStreamParam* streamParam, int32 streamParamIndex) const override;
+	virtual void EnableBlend(bool enable) const override;
+	virtual void SetBlendFunc(EBlendSrc src, EBlendDest dest) const override;
+	virtual void EnableStencil(bool enable) const override;
+	virtual void SetStencilOpSeparate(EFace face, EStencilOp sFail, EStencilOp dpFail, EStencilOp dpPass) const override;
+	virtual void SetStencilFunc(EDepthStencilFunc func, int32 ref, uint32 mask) const override;
+	virtual void SetDepthFunc(EDepthStencilFunc func) const override;
+	virtual void SetDepthMask(bool enable) const override;
+	virtual void SetColorMask(bool r, bool g, bool b, bool a) const override;
 	virtual IUniformBufferBlock* CreateUniformBufferBlock(const char* blockname) const override;
-
-	virtual void DrawElementBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex) override;
-
-
-	virtual void EnableSRGB(bool enable) override;
-
-
+	virtual void DrawElementBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex) const override;
+	virtual void EnableSRGB(bool enable) const override;
 	virtual IShaderStorageBufferObject* CreateShaderStorageBufferObject(const char* blockname) const override;
 	virtual IAtomicCounterBuffer* CreateAtomicCounterBuffer(const char* name, int32 bindingPoint) const override;
-
 	virtual void SetViewport(int32 x, int32 y, int32 width, int32 height) const override;
 	virtual void SetViewport(const jViewport& viewport) const override;
 	virtual void SetViewportIndexed(int32 index, float x, float y, float width, float height) const override;
 	virtual void SetViewportIndexed(int32 index, const jViewport& viewport) const override;
 	virtual void SetViewportIndexedArray(int32 startIndex, int32 count, const jViewport* viewports) const override;
-
-	virtual void EnableDepthClip(bool enable) override;
-
+	virtual void EnableDepthClip(bool enable) const override;
+	virtual void BeginDebugEvent(const char* name) const override;
+	virtual void EndDebugEvent() const override;
 };
 

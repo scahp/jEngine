@@ -25,6 +25,8 @@ void jForwardRenderer::Teardown()
 
 void jForwardRenderer::ShadowPrePass(const jCamera* camera)
 {
+	SCOPE_DEBUG_EVENT(g_rhi, "ShadowPrePass");
+
 	std::list<const jLight*> lights;
 	lights.insert(lights.end(), camera->LightList.begin(), camera->LightList.end());
 	const jPipelineData data(jObject::GetShadowCasterObject(), camera, lights);
@@ -35,6 +37,8 @@ void jForwardRenderer::ShadowPrePass(const jCamera* camera)
 
 void jForwardRenderer::RenderPass(const jCamera* camera)
 {
+	SCOPE_DEBUG_EVENT(g_rhi, "RenderPass");
+
 	std::list<const jLight*> lights;
 	lights.insert(lights.end(), camera->LightList.begin(), camera->LightList.end());
 	const jPipelineData data(jObject::GetStaticObject(), camera, lights);
@@ -45,6 +49,8 @@ void jForwardRenderer::RenderPass(const jCamera* camera)
 
 void jForwardRenderer::DebugRenderPass(const jCamera* camera)
 {
+	SCOPE_DEBUG_EVENT(g_rhi, "DebugRenderPass");
+
 	const jPipelineData data(jObject::GetDebugObject(), camera, {});
 	for (auto& iter : PipelineSet->DebugRenderPass)
 		iter->Do(data);
@@ -52,6 +58,8 @@ void jForwardRenderer::DebugRenderPass(const jCamera* camera)
 
 void jForwardRenderer::BoundVolumeRenderPass(const jCamera* camera)
 {
+	SCOPE_DEBUG_EVENT(g_rhi, "BoundVolumeRenderPass");
+
 	if (jShadowAppSettingProperties::GetInstance().ShowBoundBox)
 	{
 		const jPipelineData data(jObject::GetBoundBoxObject(), camera, {});
@@ -69,17 +77,20 @@ void jForwardRenderer::BoundVolumeRenderPass(const jCamera* camera)
 
 void jForwardRenderer::PostProcessPass(const jCamera* camera)
 {
+	SCOPE_DEBUG_EVENT(g_rhi, "PostProcessPass");
 	PostProcessChain.Process(camera);
 }
 
 void jForwardRenderer::PostRenderPass(const jCamera* camera)
 {
+	SCOPE_DEBUG_EVENT(g_rhi, "PostRenderPass");
 	for (auto& iter : PipelineSet->PostRenderPass)
 		iter->Do({});
 }
 
 void jForwardRenderer::DebugUIPass(const jCamera* camera)
 {
+	SCOPE_DEBUG_EVENT(g_rhi, "DebugUIPass");
 	const jPipelineData data(jObject::GetUIDebugObject(), camera, {});
 	for (auto& iter : PipelineSet->DebugUIPass)
 		iter->Do(data);

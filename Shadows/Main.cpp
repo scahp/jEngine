@@ -83,7 +83,10 @@ int main()
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		g_Engine.Update(0.0f);
 
-		TwDraw();
+		{
+			SCOPE_DEBUG_EVENT(g_rhi, "TwDraw");
+			TwDraw();
+		}
 		glFlush();
 
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)

@@ -13,7 +13,7 @@ jRHI_OpenGL::~jRHI_OpenGL()
 {
 }
 
-jVertexBuffer* jRHI_OpenGL::CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData)
+jVertexBuffer* jRHI_OpenGL::CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const
 {
 	if (!streamData)
 		return nullptr;
@@ -56,7 +56,7 @@ jVertexBuffer* jRHI_OpenGL::CreateVertexBuffer(const std::shared_ptr<jVertexStre
 	return vertexBuffer;
 }
 
-jIndexBuffer* jRHI_OpenGL::CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData)
+jIndexBuffer* jRHI_OpenGL::CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const
 {
 	if (!streamData)
 		return nullptr;
@@ -82,7 +82,7 @@ jIndexBuffer* jRHI_OpenGL::CreateIndexBuffer(const std::shared_ptr<jIndexStreamD
 	return indexBuffer;
 }
 
-void jRHI_OpenGL::BindVertexBuffer(const jVertexBuffer* vb, const jShader* shader)
+void jRHI_OpenGL::BindVertexBuffer(const jVertexBuffer* vb, const jShader* shader) const
 {
 	auto vb_gl = static_cast<const jVertexBuffer_OpenGL*>(vb);
 	glBindVertexArray(vb_gl->VAO);
@@ -113,7 +113,7 @@ void jRHI_OpenGL::BindVertexBuffer(const jVertexBuffer* vb, const jShader* shade
 	}
 }
 
-void jRHI_OpenGL::BindIndexBuffer(const jIndexBuffer* ib, const jShader* shader)
+void jRHI_OpenGL::BindIndexBuffer(const jIndexBuffer* ib, const jShader* shader) const
 {
 	auto ib_gl = static_cast<const jIndexBuffer_OpenGL*>(ib);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib_gl->BufferID);
@@ -124,23 +124,23 @@ void jRHI_OpenGL::MapBufferdata(IBuffer* buffer)
 	throw std::logic_error("The method or operation is not implemented.");
 }
 
-void jRHI_OpenGL::DrawArray(EPrimitiveType type, int vertStartIndex, int vertCount)
+void jRHI_OpenGL::DrawArray(EPrimitiveType type, int vertStartIndex, int vertCount) const
 {
 	glDrawArrays(GetPrimitiveType(type), vertStartIndex, vertCount);
 }
 
-void jRHI_OpenGL::DrawElement(EPrimitiveType type, int elementSize, int32 startIndex /*= -1*/, int32 count /*= -1*/)
+void jRHI_OpenGL::DrawElement(EPrimitiveType type, int elementSize, int32 startIndex /*= -1*/, int32 count /*= -1*/) const
 {
 	const auto elementType = (elementSize == 4) ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
 	glDrawElements(GetPrimitiveType(type), count, elementType, reinterpret_cast<void*>(startIndex * elementSize));
 }
 
-void jRHI_OpenGL::DispatchCompute(uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ)
+void jRHI_OpenGL::DispatchCompute(uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ) const
 {
 	glDispatchCompute(numGroupsX, numGroupsY, numGroupsZ);
 }
 
-void jRHI_OpenGL::EnableDepthBias(bool enable)
+void jRHI_OpenGL::EnableDepthBias(bool enable) const
 {
 	if (enable)
 		glEnable(GL_POLYGON_OFFSET_FILL);
@@ -148,18 +148,18 @@ void jRHI_OpenGL::EnableDepthBias(bool enable)
 		glDisable(GL_POLYGON_OFFSET_FILL);
 }
 
-void jRHI_OpenGL::SetDepthBias(float constant, float slope)
+void jRHI_OpenGL::SetDepthBias(float constant, float slope) const
 {
 	glPolygonOffset(constant, slope);
 }
 
-void jRHI_OpenGL::DrawElementBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex)
+void jRHI_OpenGL::DrawElementBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex) const
 {
 	const auto elementType = (elementSize == 4) ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
 	glDrawElementsBaseVertex(GetPrimitiveType(type), count, elementType, reinterpret_cast<void*>(startIndex * elementSize), baseVertexIndex);
 }
 
-void jRHI_OpenGL::EnableSRGB(bool enable)
+void jRHI_OpenGL::EnableSRGB(bool enable) const
 {
 	if (enable)
 		glEnable(GL_FRAMEBUFFER_SRGB);
@@ -206,7 +206,7 @@ void jRHI_OpenGL::SetViewportIndexedArray(int32 startIndex, int32 count, const j
 	glViewportArrayv(startIndex, count, reinterpret_cast<const float*>(viewports));
 }
 
-void jRHI_OpenGL::EnableDepthClip(bool enable)
+void jRHI_OpenGL::EnableDepthClip(bool enable) const
 {
 	// Enabling GL_DEPTH_CLAMP means that it disabling depth clip.
 	if (enable)
@@ -215,7 +215,17 @@ void jRHI_OpenGL::EnableDepthClip(bool enable)
 		glEnable(GL_DEPTH_CLAMP);
 }
 
-void jRHI_OpenGL::SetClear(ERenderBufferType typeBit)
+void jRHI_OpenGL::BeginDebugEvent(const char* name) const
+{
+	glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, strlen(name), name);
+}
+
+void jRHI_OpenGL::EndDebugEvent() const
+{
+	glPopDebugGroup();
+}
+
+void jRHI_OpenGL::SetClear(ERenderBufferType typeBit) const
 {
 	uint32 clearBufferBit = 0;
 	uint32 bit = static_cast<uint32>(typeBit);
@@ -229,24 +239,24 @@ void jRHI_OpenGL::SetClear(ERenderBufferType typeBit)
 	glClear(clearBufferBit);
 }
 
-void jRHI_OpenGL::SetClearColor(float r, float g, float b, float a)
+void jRHI_OpenGL::SetClearColor(float r, float g, float b, float a) const
 {
 	glClearColor(r, g, b, a);
 }
 
-void jRHI_OpenGL::SetClearColor(Vector4 rgba)
+void jRHI_OpenGL::SetClearColor(Vector4 rgba) const
 {
 	glClearColor(rgba.x, rgba.y, rgba.z, rgba.w);
 }
 
-void jRHI_OpenGL::SetShader(const jShader* shader)
+void jRHI_OpenGL::SetShader(const jShader* shader) const
 {
 	JASSERT(shader);
 	auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
 	glUseProgram(shader_gl->program);
 }
 
-jShader* jRHI_OpenGL::CreateShader(const jShaderInfo& shaderInfo)
+jShader* jRHI_OpenGL::CreateShader(const jShaderInfo& shaderInfo) const
 {
 	// https://stackoverflow.com/questions/5878775/how-to-find-and-replace-string
 	auto ReplaceString = [](std::string subject, const std::string& search, const std::string& replace) {
@@ -477,7 +487,7 @@ jTexture* jRHI_OpenGL::CreateNullTexture() const
 	return texure;
 }
 
-jTexture* jRHI_OpenGL::CreateTextureFromData(unsigned char* data, int32 width, int32 height)
+jTexture* jRHI_OpenGL::CreateTextureFromData(unsigned char* data, int32 width, int32 height) const
 {
 	auto texure = new jTexture_OpenGL();
 	glGenTextures(1, &texure->TextureID);
@@ -576,7 +586,7 @@ bool jRHI_OpenGL::SetUniformbuffer(const IUniformBuffer* buffer, const jShader* 
 	return true;
 }
 
-void jRHI_OpenGL::SetMatetrial(jMaterialData* materialData, const jShader* shader, int32 baseBindingIndex)
+void jRHI_OpenGL::SetMatetrial(jMaterialData* materialData, const jShader* shader, int32 baseBindingIndex /*= 0*/) const
 {
 	int index = baseBindingIndex;
 	for (int32 i = 0; i < materialData->Params.size(); ++i)
@@ -596,7 +606,7 @@ void jRHI_OpenGL::SetMatetrial(jMaterialData* materialData, const jShader* shade
 	}
 }
 
-void jRHI_OpenGL::SetTexture(int32 index, const jTexture* texture)
+void jRHI_OpenGL::SetTexture(int32 index, const jTexture* texture) const
 {
 	glActiveTexture(GL_TEXTURE0 + index);
 	
@@ -622,7 +632,7 @@ void jRHI_OpenGL::SetTexture(int32 index, const jTexture* texture)
 	glBindTexture(textureType, texture_gl->TextureID);
 }
 
-void jRHI_OpenGL::SetTextureFilter(ETextureType type, ETextureFilterTarget target, ETextureFilter filter)
+void jRHI_OpenGL::SetTextureFilter(ETextureType type, ETextureFilterTarget target, ETextureFilter filter) const
 {
 	uint32 texFilter = 0;
 	switch (filter)
@@ -669,7 +679,7 @@ void jRHI_OpenGL::SetTextureFilter(ETextureType type, ETextureFilterTarget targe
 	glTexParameteri(textureType, texTarget, texFilter);
 }
 
-void jRHI_OpenGL::EnableCullFace(bool enable)
+void jRHI_OpenGL::EnableCullFace(bool enable) const
 {
 	if (enable)
 		glEnable(GL_CULL_FACE);
@@ -677,7 +687,7 @@ void jRHI_OpenGL::EnableCullFace(bool enable)
 		glDisable(GL_CULL_FACE);
 }
 
-jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info)
+jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) const
 {
 	uint32 internalFormat = 0;
 	switch (info.InternalFormat)
@@ -932,7 +942,7 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info)
 	return rt_gl;
 }
 
-void jRHI_OpenGL::EnableDepthTest(bool enable)
+void jRHI_OpenGL::EnableDepthTest(bool enable) const
 {
 	if (enable)
 		glEnable(GL_DEPTH_TEST);
@@ -940,7 +950,7 @@ void jRHI_OpenGL::EnableDepthTest(bool enable)
 		glDisable(GL_DEPTH_TEST);
 }
 
-void jRHI_OpenGL::SetRenderTarget(const jRenderTarget* rt, int32 index /*= 0*/, bool mrt /*= false*/)
+void jRHI_OpenGL::SetRenderTarget(const jRenderTarget* rt, int32 index /*= 0*/, bool mrt /*= false*/) const
 {
 	if (rt)
 	{
@@ -953,7 +963,7 @@ void jRHI_OpenGL::SetRenderTarget(const jRenderTarget* rt, int32 index /*= 0*/, 
 	}
 }
 
-void jRHI_OpenGL::SetDrawBuffers(const std::initializer_list<EDrawBufferType>& list)
+void jRHI_OpenGL::SetDrawBuffers(const std::initializer_list<EDrawBufferType>& list) const
 {
 	std::vector<uint32> buffers;
 	for(auto& iter : list)
@@ -991,7 +1001,7 @@ void jRHI_OpenGL::SetDrawBuffers(const std::initializer_list<EDrawBufferType>& l
 		glDrawBuffers(static_cast<int32>(buffers.size()), &buffers[0]);
 }
 
-void jRHI_OpenGL::UpdateVertexBuffer(jVertexBuffer* vb, const std::shared_ptr<jVertexStreamData>& streamData)
+void jRHI_OpenGL::UpdateVertexBuffer(jVertexBuffer* vb, const std::shared_ptr<jVertexStreamData>& streamData) const
 {
 	auto vb_gl = static_cast<jVertexBuffer_OpenGL*>(vb);
 
@@ -1033,7 +1043,7 @@ void jRHI_OpenGL::UpdateVertexBuffer(jVertexBuffer* vb, const std::shared_ptr<jV
 	}
 }
 
-void jRHI_OpenGL::UpdateVertexBuffer(jVertexBuffer* vb, IStreamParam* streamParam, int32 streamParamIndex)
+void jRHI_OpenGL::UpdateVertexBuffer(jVertexBuffer* vb, IStreamParam* streamParam, int32 streamParamIndex) const
 {
 	JASSERT(streamParam->Stride > 0);
 	if (streamParam->Stride <= 0)
@@ -1064,7 +1074,7 @@ void jRHI_OpenGL::UpdateVertexBuffer(jVertexBuffer* vb, IStreamParam* streamPara
 	stream.Offset = 0;
 }
 
-void jRHI_OpenGL::EnableBlend(bool enable)
+void jRHI_OpenGL::EnableBlend(bool enable) const
 {
 	if (enable)
 		glEnable(GL_BLEND);
@@ -1072,7 +1082,7 @@ void jRHI_OpenGL::EnableBlend(bool enable)
 		glDisable(GL_BLEND);
 }
 
-void jRHI_OpenGL::SetBlendFunc(EBlendSrc src, EBlendDest dest)
+void jRHI_OpenGL::SetBlendFunc(EBlendSrc src, EBlendDest dest) const
 {
 	unsigned int src_gl = 0;
 	switch (src)
@@ -1180,7 +1190,7 @@ void jRHI_OpenGL::SetBlendFunc(EBlendSrc src, EBlendDest dest)
 	glBlendFunc(src_gl, dest_gl);
 }
 
-void jRHI_OpenGL::EnableStencil(bool enable)
+void jRHI_OpenGL::EnableStencil(bool enable) const
 {
 	if (enable)
 		glEnable(GL_STENCIL_TEST);
@@ -1188,7 +1198,7 @@ void jRHI_OpenGL::EnableStencil(bool enable)
 		glDisable(GL_STENCIL_TEST);
 }
 
-void jRHI_OpenGL::SetStencilOpSeparate(EFace face, EStencilOp sFail, EStencilOp dpFail, EStencilOp dpPass)
+void jRHI_OpenGL::SetStencilOpSeparate(EFace face, EStencilOp sFail, EStencilOp dpFail, EStencilOp dpPass) const
 {
 	unsigned int face_gl = 0;
 	switch (face)
@@ -1223,7 +1233,7 @@ void jRHI_OpenGL::SetStencilOpSeparate(EFace face, EStencilOp sFail, EStencilOp 
 	glStencilOpSeparate(face_gl, func(sFail), func(dpFail), func(dpPass));
 }
 
-void jRHI_OpenGL::SetStencilFunc(EDepthStencilFunc func, int32 ref, uint32 mask)
+void jRHI_OpenGL::SetStencilFunc(EDepthStencilFunc func, int32 ref, uint32 mask) const
 {
 	unsigned int func_gl = 0;
 	switch(func)
@@ -1257,7 +1267,7 @@ void jRHI_OpenGL::SetStencilFunc(EDepthStencilFunc func, int32 ref, uint32 mask)
 	glStencilFunc(func_gl, ref, mask);
 }
 
-void jRHI_OpenGL::SetDepthFunc(EDepthStencilFunc func)
+void jRHI_OpenGL::SetDepthFunc(EDepthStencilFunc func) const
 {
 	unsigned int func_gl = 0;
 	switch (func)
@@ -1291,12 +1301,12 @@ void jRHI_OpenGL::SetDepthFunc(EDepthStencilFunc func)
 	glDepthFunc(func_gl);
 }
 
-void jRHI_OpenGL::SetDepthMask(bool enable)
+void jRHI_OpenGL::SetDepthMask(bool enable) const
 {
 	glDepthMask(enable);
 }
 
-void jRHI_OpenGL::SetColorMask(bool r, bool g, bool b, bool a)
+void jRHI_OpenGL::SetColorMask(bool r, bool g, bool b, bool a) const
 {
 	glColorMask(r, g, b, a);
 }

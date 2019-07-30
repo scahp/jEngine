@@ -140,6 +140,8 @@ void jGame::Setup()
 
 void jGame::Update(float deltaTime)
 {
+	SCOPE_DEBUG_EVENT(g_rhi, "Game::Update");
+
 	UpdateAppSetting();
 
 	MainCamera->UpdateCamera();

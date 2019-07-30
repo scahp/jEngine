@@ -248,89 +248,62 @@ struct jRenderTarget : public std::enable_shared_from_this<jRenderTarget>
 	std::vector<jTexture*> Textures;
 };
 
-
 class jRHI
 {
 public:
 	jRHI();
 	virtual ~jRHI() {}
 
-	virtual void SetClear(ERenderBufferType typeBit) {}
-	virtual void SetClearColor(float r, float g, float b, float a) {}
-	virtual void SetClearColor(Vector4 rgba) {}
-
-	virtual void SetRenderTarget(const jRenderTarget* rt, int32 index = 0, bool mrt = false) {}
-	virtual void SetDrawBuffers(const std::initializer_list<EDrawBufferType>& list) {}
-	
-	virtual jVertexBuffer* CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) { return nullptr; }
-	virtual jIndexBuffer* CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) { return nullptr; }
-
-	virtual void UpdateVertexBuffer(jVertexBuffer* vb, const std::shared_ptr<jVertexStreamData>& streamData) {}
-	virtual void UpdateVertexBuffer(jVertexBuffer* vb, IStreamParam* streamParam, int32 streamParamIndex) {}
-
-	virtual void BindVertexBuffer(const jVertexBuffer* vb, const jShader* shader) {}
-	virtual void BindIndexBuffer(const jIndexBuffer* ib, const jShader* shader) {}
-
+	virtual void SetClear(ERenderBufferType typeBit) const {}
+	virtual void SetClearColor(float r, float g, float b, float a) const {}
+	virtual void SetClearColor(Vector4 rgba) const {}
+	virtual void SetRenderTarget(const jRenderTarget* rt, int32 index = 0, bool mrt = false) const {}
+	virtual void SetDrawBuffers(const std::initializer_list<EDrawBufferType>& list) const {}
+	virtual jVertexBuffer* CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const { return nullptr; }
+	virtual jIndexBuffer* CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const { return nullptr; }
+	virtual void UpdateVertexBuffer(jVertexBuffer* vb, const std::shared_ptr<jVertexStreamData>& streamData) const {}
+	virtual void UpdateVertexBuffer(jVertexBuffer* vb, IStreamParam* streamParam, int32 streamParamIndex) const {}
+	virtual void BindVertexBuffer(const jVertexBuffer* vb, const jShader* shader) const {}
+	virtual void BindIndexBuffer(const jIndexBuffer* ib, const jShader* shader) const {}
 	virtual void MapBufferdata(IBuffer* buffer);
-
-	virtual void SetTextureFilter(ETextureType type, ETextureFilterTarget target, ETextureFilter filter) {}
-	virtual void SetTextureWrap(int flag) {}
-
-	virtual void SetTexture(int32 index, const jTexture* texture) {}
-	
-	virtual void DrawArray(EPrimitiveType type, int vertStartIndex, int vertCount) {}
-	virtual void DrawElement(EPrimitiveType type, int elementSize, int32 startIndex = -1, int32 count = -1) {}
-	virtual void DrawElementBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex) {}
-
-	virtual void DispatchCompute(uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ) {}
-
-	virtual void EnableDepthBias(bool enable) {}
-	virtual void SetDepthBias(float constant, float slope) {}
-	
-	virtual void SetShader(const jShader* shader) {}
-	virtual jShader* CreateShader(const jShaderInfo& shaderInfo) { return nullptr; }
-
+	virtual void SetTextureFilter(ETextureType type, ETextureFilterTarget target, ETextureFilter filter) const {}
+	virtual void SetTextureWrap(int flag) const {}
+	virtual void SetTexture(int32 index, const jTexture* texture) const {}
+	virtual void DrawArray(EPrimitiveType type, int vertStartIndex, int vertCount) const {}
+	virtual void DrawElement(EPrimitiveType type, int elementSize, int32 startIndex = -1, int32 count = -1) const {}
+	virtual void DrawElementBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex) const {}
+	virtual void DispatchCompute(uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ) const {}
+	virtual void EnableDepthBias(bool enable) const {}
+	virtual void SetDepthBias(float constant, float slope) const {}
+	virtual void SetShader(const jShader* shader) const {}
+	virtual jShader* CreateShader(const jShaderInfo& shaderInfo) const { return nullptr; }
 	virtual void SetViewport(int32 x, int32 y, int32 width, int32 height) const {}
 	virtual void SetViewport(const jViewport& viewport) const {}
 	virtual void SetViewportIndexed(int32 index, float x, float y, float width, float height) const {}
 	virtual void SetViewportIndexed(int32 index, const jViewport& viewport) const {}
 	virtual void SetViewportIndexedArray(int32 startIndex, int32 count, const jViewport* viewports) const {}
-
 	virtual bool SetUniformbuffer(const IUniformBuffer* buffer, const jShader* shader) const { return false; }
-
 	virtual jTexture* CreateNullTexture() const { return nullptr; }
-
-	virtual jTexture* CreateTextureFromData(unsigned char* data, int32 width, int32 height) { return nullptr; }
-
-	virtual void SetMatetrial(jMaterialData* materialData, const jShader* shader, int32 baseBindingIndex = 0) {}
-
-	virtual void EnableCullFace(bool enable) {}
-
-	virtual jRenderTarget* CreateRenderTarget(const jRenderTargetInfo& info) { return nullptr; }
-
-	virtual void EnableDepthTest(bool enable) {}
-	
-	virtual void EnableBlend(bool enable) {}
-
-	virtual void SetBlendFunc(EBlendSrc src, EBlendDest dest) {}
-
-	virtual void EnableStencil(bool enable) {}
-
-	virtual void SetStencilOpSeparate(EFace face, EStencilOp sFail, EStencilOp dpFail, EStencilOp dpPass) {}
-
-	virtual void SetStencilFunc(EDepthStencilFunc func, int32 ref, uint32 mask) {}
-
-	virtual void SetDepthFunc(EDepthStencilFunc func) {}
-	virtual void SetDepthMask(bool enable) {}
-	virtual void SetColorMask(bool r, bool g, bool b, bool a) {}
-
+	virtual jTexture* CreateTextureFromData(unsigned char* data, int32 width, int32 height) const { return nullptr; }
+	virtual void SetMatetrial(jMaterialData* materialData, const jShader* shader, int32 baseBindingIndex = 0) const {}
+	virtual void EnableCullFace(bool enable) const {}
+	virtual jRenderTarget* CreateRenderTarget(const jRenderTargetInfo& info) const { return nullptr; }
+	virtual void EnableDepthTest(bool enable) const {}
+	virtual void EnableBlend(bool enable) const {}
+	virtual void SetBlendFunc(EBlendSrc src, EBlendDest dest) const {}
+	virtual void EnableStencil(bool enable) const {}
+	virtual void SetStencilOpSeparate(EFace face, EStencilOp sFail, EStencilOp dpFail, EStencilOp dpPass) const {}
+	virtual void SetStencilFunc(EDepthStencilFunc func, int32 ref, uint32 mask) const {}
+	virtual void SetDepthFunc(EDepthStencilFunc func) const {}
+	virtual void SetDepthMask(bool enable) const {}
+	virtual void SetColorMask(bool r, bool g, bool b, bool a) const {}
 	virtual IUniformBufferBlock* CreateUniformBufferBlock(const char* blockname) const { return nullptr; }
 	virtual IShaderStorageBufferObject* CreateShaderStorageBufferObject(const char* blockname) const { return nullptr; }
 	virtual IAtomicCounterBuffer* CreateAtomicCounterBuffer(const char* name, int32 bindingPoint) const { return nullptr; }
-
-	virtual void EnableSRGB(bool enable) {  }
-
-	virtual void EnableDepthClip(bool enable) {  }
+	virtual void EnableSRGB(bool enable) const {  }
+	virtual void EnableDepthClip(bool enable) const {  }
+	virtual void BeginDebugEvent(const char* name) const {}
+	virtual void EndDebugEvent() const {}
 };
 
 // Not thred safe
@@ -340,3 +313,20 @@ public:
 	temp.Data = CurrentData;\
 	g_rhi->SetUniformbuffer(&temp, Shader);\
 }
+
+struct jScopeDebugEvent final
+{
+	jScopeDebugEvent(const jRHI* rhi, const char* name)
+		: RHI(rhi)
+	{
+		JASSERT(RHI);
+		RHI->BeginDebugEvent(name);
+	}
+	~jScopeDebugEvent()
+	{
+		RHI->EndDebugEvent();
+	}
+
+	const jRHI* RHI = nullptr;
+};
+#define SCOPE_DEBUG_EVENT(rhi, name) jScopeDebugEvent scope_debug_event(rhi, name);

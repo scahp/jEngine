@@ -55,6 +55,8 @@ void jDeferredRenderer::Teardown()
 
 void jDeferredRenderer::ShadowPrePass(const jCamera* camera)
 {
+	SCOPE_DEBUG_EVENT(g_rhi, "ShadowPrePass");
+
 	const auto directionalLight = camera->GetLight(ELightType::DIRECTIONAL);
 	std::list<const jLight*> lights;
 	if (directionalLight)
@@ -69,6 +71,8 @@ void jDeferredRenderer::ShadowPrePass(const jCamera* camera)
 
 void jDeferredRenderer::RenderPass(const jCamera* camera)
 {
+	SCOPE_DEBUG_EVENT(g_rhi, "RenderPass");
+
 	const auto directionalLight = camera->GetLight(ELightType::DIRECTIONAL);
 
 	std::list<const jLight*> lights;
@@ -85,6 +89,8 @@ void jDeferredRenderer::RenderPass(const jCamera* camera)
 
 void jDeferredRenderer::DebugRenderPass(const jCamera* camera)
 {
+	SCOPE_DEBUG_EVENT(g_rhi, "DebugRenderPass");
+
 	if (GBuffer.Begin())
 	{
 		const jPipelineData data(jObject::GetDebugObject(), camera, {});
@@ -96,6 +102,8 @@ void jDeferredRenderer::DebugRenderPass(const jCamera* camera)
 
 void jDeferredRenderer::BoundVolumeRenderPass(const jCamera* camera)
 {
+	SCOPE_DEBUG_EVENT(g_rhi, "BoundVolumeRenderPass");
+
 	if (GBuffer.Begin())
 	{
 		if (jShadowAppSettingProperties::GetInstance().ShowBoundBox)
@@ -117,11 +125,13 @@ void jDeferredRenderer::BoundVolumeRenderPass(const jCamera* camera)
 
 void jDeferredRenderer::PostProcessPass(const jCamera* camera)
 {
+	SCOPE_DEBUG_EVENT(g_rhi, "PostProcessPass");
 	PostProcessChain.Process(camera);
 }
 
 void jDeferredRenderer::PostRenderPass(const jCamera* camera)
 {
+	SCOPE_DEBUG_EVENT(g_rhi, "PostRenderPass");
 	for (auto& iter : PipelineSet->PostRenderPass)
 		iter->Do({});
 }
