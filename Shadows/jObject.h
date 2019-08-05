@@ -11,7 +11,7 @@ class jObject
 {
 public:
 	jObject();
-	~jObject();
+	virtual ~jObject();
 
 	//////////////////////////////////////////////////////////////////////////
 	static void AddObject(jObject* object);
@@ -65,7 +65,8 @@ public:
 	std::function<void(jObject*, float)> PostUpdateFunc;
 
 	// todo 현재는 보유만 하고있음.
-	std::vector<jObject*> BoundObjects;
+	std::vector<jObject*> BoundBoxObjects;
+	std::vector<jObject*> BoundSphereObjects;
 
 private:
 	static std::list<jObject*> s_ShadowCasterObject;

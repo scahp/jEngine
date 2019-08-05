@@ -208,8 +208,8 @@ void CreateBoundObjects(const std::vector<float>& vertices, jObject* ownerObject
 {
 	auto boundBoxObject = CreateBoundBox(GenerateBoundBox(vertices), ownerObject);
 	auto boundSphereObject = CreateBoundSphere(GenerateBoundSphere(vertices), ownerObject);
-	ownerObject->BoundObjects.emplace_back(boundBoxObject);
-	ownerObject->BoundObjects.emplace_back(boundSphereObject);
+	ownerObject->BoundBoxObjects.emplace_back(boundBoxObject);
+	ownerObject->BoundSphereObjects.emplace_back(boundSphereObject);
 	jObject::AddBoundBoxObject(boundBoxObject);
 	jObject::AddBoundSphereObject(boundSphereObject);
 }

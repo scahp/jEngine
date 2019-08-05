@@ -31,9 +31,22 @@ public:
 	void ProcessInput();
 	void Setup();
 
+	enum class ESpawnedType
+	{
+		None = 0,
+		Hair,
+		TestPrimitive,
+		CubePrimitive
+	};
+
+	void SpawnObjects(ESpawnedType spawnType);
+
+	void RemoveSpawnedObjects();
 	void SpawnHairObjects();
 	void SpawnTestPrimitives();
 	void SapwnCubePrimitives();
+
+	ESpawnedType SpawnedType = ESpawnedType::None;
 
 	void Update(float deltaTime);
 
@@ -72,5 +85,7 @@ public:
 	jObject* PointLightInfo = nullptr;
 	jObject* SpotLightInfo = nullptr;
 	jUIQuadPrimitive* DirectionalLightShadowMapUIDebug = nullptr;
+
+	std::vector<jObject*> SpawnedObjects;
 };
 

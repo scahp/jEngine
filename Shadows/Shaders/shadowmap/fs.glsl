@@ -161,7 +161,10 @@ void main()
 
 #if defined(USE_TEXTURE)
 	if (UseTexture > 0)
+	{
 		diffuse *= texture(tex_object2, TexCoord_);
+		//diffuse *= exp(texture(tex_object2, TexCoord_), 2.2);
+	}
 #else
 	diffuse = Color_;
 #endif // USE_TEXTURE
@@ -412,4 +415,11 @@ void main()
     }
 
     color = vec4(finalColor * diffuse.xyz, diffuse.w);
+
+#if defined(USE_TEXTURE)
+	if (UseTexture > 0)
+	{
+		//color.xyz = pow(color.xyz, 1.0/2.2);
+	}
+#endif
 }

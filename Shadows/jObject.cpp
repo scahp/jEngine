@@ -130,6 +130,19 @@ jObject::jObject()
 
 jObject::~jObject()
 {
+	for (auto iter : BoundSphereObjects)
+	{
+		jObject::RemoveBoundSphereObject(iter);
+		delete iter;
+	}
+	BoundSphereObjects.clear();
+
+	for (auto iter : BoundBoxObjects)
+	{
+		jObject::RemoveBoundBoxObject(iter);
+		delete iter;
+	}
+	BoundBoxObjects.clear();
 }
 
 void jObject::Update(float deltaTime)

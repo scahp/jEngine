@@ -39,7 +39,7 @@ in vec3 Pos_;
 
 out vec4 color;
 
-#define DEEP_SHADOW_MAP_BIAS -0.03
+#define DEEP_SHADOW_MAP_BIAS 0.0
 
 void main()
 {

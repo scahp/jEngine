@@ -176,13 +176,22 @@ void main()
 	if (Normal.x == 0.0 && Normal.y == 0.0 && Normal.z == 0.0)
 		return;
 
+	bool isDataFromTexture = (Normal.w == 0.0);
+
 	vec4 Color = texture(ColorSampler, TexCoord_);
+	if (isDataFromTexture)
+	{
+		Color.x = pow(Color.x, 2.2);
+		Color.y = pow(Color.y, 2.2);
+		Color.z = pow(Color.z, 2.2);
+	}
 	vec3 Pos = texture(PosInWorldSampler, TexCoord_).xyz;
 	vec3 ShadowPos = texture(PosInLightSampler, TexCoord_).xyz;
 	vec3 toLight = normalize(LightPos - Pos);
 	vec3 toEye = normalize(Eye - Pos);
 
 	vec3 finalColor = vec3(0.0, 0.0, 0.0);
+	vec3 ambientColor = vec3(0.0, 0.0, 0.0);
 
 	for(int i=0;i<MAX_NUM_OF_DIRECTIONAL_LIGHT;++i)
     {
@@ -198,7 +207,7 @@ void main()
 		}
 #endif // USE_MATERIAL
 
-		if (Normal.w == 0.0)
+		if (isDataFromTexture)
 			finalColor += GetDirectionalLight(light, Normal.xyz, toEye);
 		else
 			finalColor += KajiyaKayShadingModelTest(Normal.xyz, -light.LightDirection, toEye);
@@ -206,7 +215,7 @@ void main()
     }
 
 	if (UseAmbientLight != 0)
-		finalColor += GetAmbientLight(AmbientLight);
+		ambientColor += GetAmbientLight(AmbientLight);
 
 	ivec2 uv = ivec2(ShadowPos.x * ShadowMapWidth, ShadowPos.y * ShadowMapHeight);
 
@@ -366,5 +375,12 @@ void main()
 	float shading = bilinearInterpolation(dx, dy, shadingSamples[FILTER_SIZE][FILTER_SIZE], shadingSamples[FILTER_SIZE + 1][FILTER_SIZE], shadingSamples[FILTER_SIZE][FILTER_SIZE + 1], shadingSamples[FILTER_SIZE + 1][FILTER_SIZE + 1]);
 	shading = clamp(shading * exp(20.0f * (depth - (ShadowPos.z))), 0.1f, 1.0f);
 
-	color = vec4(Color.xyz * finalColor * shading, Color.w);
+	Color.xyz = finalColor * Color.xyz * clamp(shading, 0.1f, 1.0);
+	if (isDataFromTexture)
+	{
+		Color.x = pow(Color.x, 1.0/2.2);
+		Color.y = pow(Color.y, 1.0/2.2);
+		Color.z = pow(Color.z, 1.0/2.2);
+	}
+	color = vec4(ambientColor + Color.xyz, 1.0);
 }
