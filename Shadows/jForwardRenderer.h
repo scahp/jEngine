@@ -26,5 +26,8 @@ public:
 	virtual void DebugUIPass(const jCamera* camera) override;
 
 	virtual void UpdateSettings() {}
+
+	std::shared_ptr<jRenderTarget> RenderTarget;
+	std::shared_ptr<jPostProcessInOutput> PostProcessInput;
 };
 

@@ -20,6 +20,7 @@ public:
 	EShadowMapType ShadowMapType = EShadowMapType::CSM_SSM;
 	bool UsePoissonSample = true;
 	bool ShowDirectionalLightMap = false;
+	bool UseTonemap = false;
 	bool ShowDirectionalLightInfo = true;
 	bool ShowPointLightInfo = true;
 	bool ShowSpotLightInfo = true;

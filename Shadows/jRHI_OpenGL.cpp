@@ -761,6 +761,22 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 		break;
 	}
 
+	uint32 depthBufferFormat = GL_DEPTH_COMPONENT16;
+	uint32 depthBufferType = GL_DEPTH_ATTACHMENT;
+	switch (info.DepthBufferType)
+	{
+	case EDepthBufferType::DEPTH:
+		depthBufferFormat = GL_DEPTH_COMPONENT16;
+		depthBufferType = GL_DEPTH_ATTACHMENT;
+		break;
+	case EDepthBufferType::DEPTH_STENCIL:
+		depthBufferFormat = GL_DEPTH24_STENCIL8;
+		depthBufferType = GL_DEPTH_STENCIL_ATTACHMENT;
+		break;
+	default:
+		break;
+	}
+
 	auto rt_gl = new jRenderTarget_OpenGL();
 	rt_gl->Info = info;
 	
@@ -794,8 +810,8 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 		uint32 rbo = 0;
 		glGenRenderbuffers(1, &rbo);
 		glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, info.Width, info.Height);
-		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo);
+		glRenderbufferStorage(GL_RENDERBUFFER, depthBufferFormat, info.Width, info.Height);
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, depthBufferType, GL_RENDERBUFFER, rbo);
 
 		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 		{
@@ -833,8 +849,8 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 		uint32 rbo = 0;
 		glGenRenderbuffers(1, &rbo);
 		glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, info.Width, info.Height);
-		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo);
+		glRenderbufferStorage(GL_RENDERBUFFER, depthBufferFormat, info.Width, info.Height);
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, depthBufferType, GL_RENDERBUFFER, rbo);
 
 		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 		{
@@ -883,8 +899,8 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 		uint32 rbo = 0;
 		glGenRenderbuffers(1, &rbo);
 		glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, info.Width, info.Height);
-		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo);
+		glRenderbufferStorage(GL_RENDERBUFFER, depthBufferFormat, info.Width, info.Height);
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, depthBufferType, GL_RENDERBUFFER, rbo);
 
 		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 		{
@@ -927,8 +943,8 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 			uint32 rbo = 0;
 			glGenRenderbuffers(1, &rbo);
 			glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-			glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, info.Width, info.Height);
-			glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo);
+			glRenderbufferStorage(GL_RENDERBUFFER, depthBufferFormat, info.Width, info.Height);
+			glFramebufferRenderbuffer(GL_FRAMEBUFFER, depthBufferType, GL_RENDERBUFFER, rbo);
 
 			if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 			{

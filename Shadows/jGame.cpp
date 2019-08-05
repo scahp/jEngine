@@ -127,7 +127,7 @@ void jGame::Setup()
 	ForwardRenderer = new jForwardRenderer(currentShadowPipelineSet);
 	ForwardRenderer->Setup();
 
-	DeferredRenderer = new jDeferredRenderer({ ETextureType::TEXTURE_2D, EFormat::RGBA32F, EFormat::RGBA, EFormatType::FLOAT, SCR_WIDTH, SCR_HEIGHT, 4 });
+	DeferredRenderer = new jDeferredRenderer({ ETextureType::TEXTURE_2D, EFormat::RGBA32F, EFormat::RGBA, EFormatType::FLOAT, EDepthBufferType::DEPTH, SCR_WIDTH, SCR_HEIGHT, 4 });
 	DeferredRenderer->Setup();
 
 	//for (int32 i = 0; i < NUM_CASCADES; ++i)

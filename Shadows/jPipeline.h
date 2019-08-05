@@ -46,10 +46,11 @@ struct jPipelineData
 	jPipelineData()
 		: Objects(emptyObjectList)// , Lights(emptyLightList)
 	{ }
-	jPipelineData(const std::list<jObject*>& objects, const jCamera* camera, const std::list<const jLight*>& lights)
-		: Objects(objects), Camera(camera), Lights(lights)
+	jPipelineData(const jRenderTarget* defaultRenderTarget, const std::list<jObject*>& objects, const jCamera* camera, const std::list<const jLight*>& lights)
+		: DefaultRenderTarget(defaultRenderTarget), Objects(objects), Camera(camera), Lights(lights)
 	{ }
 
+	const jRenderTarget* DefaultRenderTarget = nullptr;
 	const std::list<jObject*>& Objects;
 	const jCamera* Camera = nullptr;
 	const std::list<const jLight*> Lights;
@@ -199,6 +200,7 @@ public:
 	{}
 
 	virtual void Setup() override;
+	virtual void Do(const jPipelineData& pipelineData) const override;
 
 	const char* ShaderName = nullptr;
 };

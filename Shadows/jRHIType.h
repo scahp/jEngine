@@ -195,3 +195,10 @@ enum class EDrawBufferType
 	COLOR_ATTACHMENT6,
 	MAX
 };
+
+enum class EDepthBufferType
+{
+	DEPTH = 0,
+	DEPTH_STENCIL,
+	MAX,
+};

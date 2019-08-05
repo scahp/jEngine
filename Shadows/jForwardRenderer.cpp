@@ -15,7 +15,19 @@ jForwardRenderer::~jForwardRenderer()
 }
 
 void jForwardRenderer::Setup()
-{	
+{
+	RenderTarget = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RGBA, EFormat::RGBA, EFormatType::FLOAT, EDepthBufferType::DEPTH_STENCIL, SCR_WIDTH, SCR_HEIGHT, 1 }));
+
+	PostProcessInput = std::shared_ptr<jPostProcessInOutput>(new jPostProcessInOutput());
+	PostProcessInput->RenderTaret = RenderTarget.get();
+
+	//////////////////////////////////////////////////////////////////////////
+	// Setup a postprocess chain
+	{
+		auto postprocess = new jPostProcess_Tonemap("Tonemap", nullptr);
+		postprocess->SetPostProcessInput(PostProcessInput);
+		PostProcessChain.AddNewPostprocess(postprocess);
+	}
 }
 
 void jForwardRenderer::Teardown()
@@ -29,7 +41,7 @@ void jForwardRenderer::ShadowPrePass(const jCamera* camera)
 
 	std::list<const jLight*> lights;
 	lights.insert(lights.end(), camera->LightList.begin(), camera->LightList.end());
-	const jPipelineData data(jObject::GetShadowCasterObject(), camera, lights);
+	const jPipelineData data(RenderTarget.get(), jObject::GetShadowCasterObject(), camera, lights);
 
 	for (auto& iter : PipelineSet->ShadowPrePass)
 		iter->Do(data);
@@ -41,7 +53,7 @@ void jForwardRenderer::RenderPass(const jCamera* camera)
 
 	std::list<const jLight*> lights;
 	lights.insert(lights.end(), camera->LightList.begin(), camera->LightList.end());
-	const jPipelineData data(jObject::GetStaticObject(), camera, lights);
+	const jPipelineData data(RenderTarget.get(), jObject::GetStaticObject(), camera, lights);
 
 	for (auto& iter : PipelineSet->RenderPass)
 		iter->Do(data);
@@ -51,7 +63,7 @@ void jForwardRenderer::DebugRenderPass(const jCamera* camera)
 {
 	SCOPE_DEBUG_EVENT(g_rhi, "DebugRenderPass");
 
-	const jPipelineData data(jObject::GetDebugObject(), camera, {});
+	const jPipelineData data(RenderTarget.get(), jObject::GetDebugObject(), camera, {});
 	for (auto& iter : PipelineSet->DebugRenderPass)
 		iter->Do(data);
 }
@@ -62,14 +74,14 @@ void jForwardRenderer::BoundVolumeRenderPass(const jCamera* camera)
 
 	if (jShadowAppSettingProperties::GetInstance().ShowBoundBox)
 	{
-		const jPipelineData data(jObject::GetBoundBoxObject(), camera, {});
+		const jPipelineData data(RenderTarget.get(), jObject::GetBoundBoxObject(), camera, {});
 		for (auto& iter : PipelineSet->BoundVolumeRenderPass)
 			iter->Do(data);
 	}
 
 	if (jShadowAppSettingProperties::GetInstance().ShowBoundSphere)
 	{
-		const jPipelineData data(jObject::GetBoundSphereObject(), camera, {});
+		const jPipelineData data(RenderTarget.get(), jObject::GetBoundSphereObject(), camera, {});
 		for (auto& iter : PipelineSet->BoundVolumeRenderPass)
 			iter->Do(data);
 	}
@@ -91,7 +103,7 @@ void jForwardRenderer::PostRenderPass(const jCamera* camera)
 void jForwardRenderer::DebugUIPass(const jCamera* camera)
 {
 	SCOPE_DEBUG_EVENT(g_rhi, "DebugUIPass");
-	const jPipelineData data(jObject::GetUIDebugObject(), camera, {});
+	const jPipelineData data(RenderTarget.get(), jObject::GetUIDebugObject(), camera, {});
 	for (auto& iter : PipelineSet->DebugUIPass)
 		iter->Do(data);
 }

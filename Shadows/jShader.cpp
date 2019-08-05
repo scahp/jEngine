@@ -56,6 +56,7 @@ struct jShaderInfoCreation
 
 		DECLARE_SHADER_VS_FS("Blur", "shaders/fullscreen/vs_blur.glsl", "shaders/fullscreen/fs_blur.glsl");
 		DECLARE_SHADER_VS_FS("BlurOmni", "shaders/fullscreen/vs_omnidirectional_blur.glsl", "shaders/fullscreen/fs_omnidirectional_blur.glsl");
+		DECLARE_SHADER_VS_FS("Tonemap", "shaders/fullscreen/vs_tonemap.glsl", "shaders/fullscreen/fs_tonemap.glsl");
 
 		DECLARE_SHADER_VS_FS("ShadowGen_ESM", "shaders/shadowmap/vs_varianceShadowMap.glsl", "shaders/shadowmap/fs_exponentialShadowMap.glsl");
 		DECLARE_SHADER_VS_GS_FS("ShadowGen_Omni_ESM", "shaders/shadowmap/vs_omniDirectionalShadowMap.glsl", "shaders/shadowmap/gs_omniDirectionalShadowMap.glsl", "shaders/shadowmap/fs_omniDirectionalExponentialShadowMap.glsl");

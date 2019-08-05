@@ -30,7 +30,7 @@ void jDeferredRenderer::Setup()
 
 	//////////////////////////////////////////////////////////////////////////
 	// Setup a postprocess chain
-	auto tempRenderTarget = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RGBA, EFormat::RGBA, EFormatType::FLOAT, SCR_WIDTH, SCR_HEIGHT, 1 }));
+	auto tempRenderTarget = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RGBA, EFormat::RGBA, EFormatType::FLOAT, EDepthBufferType::DEPTH, SCR_WIDTH, SCR_HEIGHT, 1 }));
 	{
 		// this postprocess have to have DeepShadowMap PipelineSet.
 		JASSERT(PipelineSet->GetType() == EPipelineSetType::DeepShadowMap);
@@ -43,7 +43,13 @@ void jDeferredRenderer::Setup()
 	}
 
 	{
-		auto postprocess = new jPostProcess_AA_DeepShadowAddition("AA_DeepShadowAddition", nullptr);
+		auto renderTarget = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RGBA, EFormat::RGBA, EFormatType::FLOAT, EDepthBufferType::DEPTH, SCR_WIDTH, SCR_HEIGHT, 1 }));
+		auto postprocess = new jPostProcess_AA_DeepShadowAddition("AA_DeepShadowAddition", renderTarget);
+		PostProcessChain.AddNewPostprocess(postprocess);
+	}
+
+	{
+		auto postprocess = new jPostProcess_Tonemap("Tonemap", nullptr);
 		PostProcessChain.AddNewPostprocess(postprocess);
 	}
 }
@@ -63,7 +69,7 @@ void jDeferredRenderer::ShadowPrePass(const jCamera* camera)
 		lights.push_back(directionalLight);
 
 	// todo Directional Light 만 쓸건가?
-	const jPipelineData data(jObject::GetShadowCasterObject(), camera, lights);
+	const jPipelineData data(nullptr, jObject::GetShadowCasterObject(), camera, lights);
 
 	for (auto& iter : PipelineSet->ShadowPrePass)
 		iter->Do(data);
@@ -81,7 +87,7 @@ void jDeferredRenderer::RenderPass(const jCamera* camera)
 
 	// Geometry Pass
 	// todo Directional Light 만 쓸건가?
-	const jPipelineData data(jObject::GetStaticObject(), camera, lights);
+	const jPipelineData data(nullptr, jObject::GetStaticObject(), camera, lights);
 
 	for (auto& iter : PipelineSet->RenderPass)
 		iter->Do(data);
@@ -93,7 +99,7 @@ void jDeferredRenderer::DebugRenderPass(const jCamera* camera)
 
 	if (GBuffer.Begin())
 	{
-		const jPipelineData data(jObject::GetDebugObject(), camera, {});
+		const jPipelineData data(nullptr, jObject::GetDebugObject(), camera, {});
 		for (auto& iter : PipelineSet->DebugRenderPass)
 			iter->Do(data);
 		GBuffer.End();
@@ -108,14 +114,14 @@ void jDeferredRenderer::BoundVolumeRenderPass(const jCamera* camera)
 	{
 		if (jShadowAppSettingProperties::GetInstance().ShowBoundBox)
 		{
-			const jPipelineData data(jObject::GetBoundBoxObject(), camera, {});
+			const jPipelineData data(nullptr, jObject::GetBoundBoxObject(), camera, {});
 			for (auto& iter : PipelineSet->BoundVolumeRenderPass)
 				iter->Do(data);
 		}
 
 		if (jShadowAppSettingProperties::GetInstance().ShowBoundSphere)
 		{
-			const jPipelineData data(jObject::GetBoundSphereObject(), camera, {});
+			const jPipelineData data(nullptr, jObject::GetBoundSphereObject(), camera, {});
 			for (auto& iter : PipelineSet->BoundVolumeRenderPass)
 				iter->Do(data);
 		}

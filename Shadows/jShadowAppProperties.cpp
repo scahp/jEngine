@@ -11,6 +11,7 @@ void jShadowAppSettingProperties::Setup(jAppSettingBase* appSetting)
 	appSetting->AddEnumVariable("ShadowMapType", ShadowMapType, "EShadowMapType", EShadowMapTypeString);
 	appSetting->AddVariable("UsePoissonSample", UsePoissonSample);
 	appSetting->AddVariable("DirectionalLightMap", ShowDirectionalLightMap);
+	appSetting->AddVariable("UseTonemap", UseTonemap);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Silhouette Group
@@ -103,6 +104,7 @@ void jShadowAppSettingProperties::Teardown(jAppSettingBase* appSetting)
 	appSetting->RemoveVariable("ShadowMapType");
 	appSetting->RemoveVariable("UsePoissonSample");
 	appSetting->RemoveVariable("DirectionalLightMap");
+	appSetting->RemoveVariable("UseTonemap");
 	appSetting->RemoveVariable("DirectionalLight_Info");
 	appSetting->RemoveVariable("PointLight_Info");
 	appSetting->RemoveVariable("SpotLight_Info");

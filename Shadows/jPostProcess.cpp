@@ -136,6 +136,7 @@ bool jPostProcess_DeepShadowMap::Do(const jCamera* camera) const
 
 void jPostProcess_AA_DeepShadowAddition::Setup()
 {
+	__super::Setup();
 	Shader = jShader::GetShader("DeepShadowAA");
 }
 
@@ -182,3 +183,32 @@ bool jPostProcess_Blur::Do(const jCamera* camera) const
 	return true;
 }
 
+//////////////////////////////////////////////////////////////////////////
+// jPostProcess_Tonemap
+void jPostProcess_Tonemap::Setup()
+{
+	__super::Setup();
+	Shader = jShader::GetShader("Tonemap");
+}
+
+bool jPostProcess_Tonemap::Do(const jCamera* camera) const
+{
+	JASSERT(Shader);
+	JASSERT(!PostProcessInput.expired());
+
+	g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+	g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
+
+	auto fullscreenQuad = GetFullscreenQuad();
+	if (!PostProcessInput.expired())
+		fullscreenQuad->SetTexture(PostProcessInput.lock()->RenderTaret->GetTexture());
+	camera->BindCamera(Shader);
+	
+	g_rhi->SetShader(Shader);
+	SET_UNIFORM_BUFFER_STATIC(int, "UseTonemap", jShadowAppSettingProperties::GetInstance().UseTonemap, Shader);
+
+	fullscreenQuad->Draw(camera, Shader, {});
+	fullscreenQuad->SetTexture(nullptr);
+
+	return true;
+}

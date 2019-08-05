@@ -229,6 +229,7 @@ struct jRenderTargetInfo
 	EFormat InternalFormat = EFormat::RGB;
 	EFormat Format = EFormat::RGB;
 	EFormatType FormatType = EFormatType::BYTE;
+	EDepthBufferType DepthBufferType = EDepthBufferType::DEPTH;
 	int32 Width = 0;
 	int32 Height = 0;
 	int32 TextureCount = 1;

@@ -271,10 +271,12 @@
     <None Include="Shaders\fullscreen\fs_deepshadow_aa.glsl" />
     <None Include="Shaders\fullscreen\fs_expdeepshadow.glsl" />
     <None Include="Shaders\fullscreen\fs_omnidirectional_blur.glsl" />
+    <None Include="Shaders\fullscreen\fs_tonemap.glsl" />
     <None Include="Shaders\fullscreen\vs_blur.glsl" />
     <None Include="Shaders\fullscreen\vs_deepshadow.glsl" />
     <None Include="Shaders\fullscreen\vs_expdeepshadow.glsl" />
     <None Include="Shaders\fullscreen\vs_omnidirectional_blur.glsl" />
+    <None Include="Shaders\fullscreen\vs_tonemap.glsl" />
     <None Include="Shaders\shadow.glsl" />
     <None Include="Shaders\shadowmap\fs.glsl" />
     <None Include="Shaders\shadowmap\fs_deepShadowMap.glsl" />

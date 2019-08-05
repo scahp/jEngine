@@ -445,5 +445,11 @@
     <None Include="Shaders\shadowmap\gs_cascadeShadowMap.glsl">
       <Filter>Shaders\shadowmap</Filter>
     </None>
+    <None Include="Shaders\fullscreen\fs_tonemap.glsl">
+      <Filter>Shaders\fullscreen</Filter>
+    </None>
+    <None Include="Shaders\fullscreen\vs_tonemap.glsl">
+      <Filter>Shaders\fullscreen</Filter>
+    </None>
   </ItemGroup>
 </Project>

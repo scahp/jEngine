@@ -93,7 +93,6 @@ public:
 	using IPostprocess::IPostprocess;
 
 	virtual void Setup() override;
-
 	virtual bool Do(const jCamera* camera) const override;
 
 private:
@@ -115,4 +114,18 @@ public:
 	float MaxDist = FLT_MAX;
 	bool IsVertical = false;
 	bool OmniDirectional = false;
+};
+
+//////////////////////////////////////////////////////////////////////////
+// Tonemap
+class jPostProcess_Tonemap : public IPostprocess
+{
+public:
+	using IPostprocess::IPostprocess;
+
+	virtual void Setup() override;
+	virtual bool Do(const jCamera* camera) const override;
+
+private:
+	const jShader* Shader = nullptr;
 };

@@ -172,7 +172,7 @@ void jDeepShadowMap_ShadowPass_Pipeline::Draw(const jPipelineData& pipelineData,
 			{
 				g_rhi->SetShader(currentShader);
 
-				__super::Draw(jPipelineData(pipelineData.Objects, lightCamera, { light }), currentShader);
+				__super::Draw(jPipelineData(pipelineData.DefaultRenderTarget, pipelineData.Objects, lightCamera, { light }), currentShader);
 			}
 			renderTarget->End();
 		}
@@ -196,6 +196,7 @@ void jForward_ShadowMapGen_Pipeline::Setup()
 void jForward_ShadowMapGen_Pipeline::Do(const jPipelineData& pipelineData) const
 {
 	//light->Update(0); // todo remove
+	g_rhi->SetRenderTarget(pipelineData.DefaultRenderTarget);
 
 	for (auto light : pipelineData.Lights)
 	{
@@ -232,11 +233,11 @@ void jForward_ShadowMapGen_Pipeline::Do(const jPipelineData& pipelineData) const
 				g_rhi->SetViewport({ 0, 0, SM_WIDTH, SM_HEIGHT });
 			else
 				g_rhi->SetViewportIndexedArray(0, static_cast<int32>(viewports.size()), &viewports[0]);
-			this->jRenderPipeline::Draw(jPipelineData(pipelineData.Objects, camera, { light }), currentShader);
+			this->jRenderPipeline::Draw(jPipelineData(pipelineData.DefaultRenderTarget, pipelineData.Objects, camera, { light }), currentShader);
 		}, currentShader);
 	}
 
-	g_rhi->SetRenderTarget(nullptr);
+	g_rhi->SetRenderTarget(pipelineData.DefaultRenderTarget);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -273,6 +274,8 @@ void jForward_ShadowMapGen_CSM_SSM_Pipeline::Do(const jPipelineData& pipelineDat
 		return nullptr;
 	}();
 
+	g_rhi->SetRenderTarget(pipelineData.DefaultRenderTarget);
+
 	for (auto light : pipelineData.Lights)
 	{
 		bool skip = false;
@@ -296,9 +299,9 @@ void jForward_ShadowMapGen_CSM_SSM_Pipeline::Do(const jPipelineData& pipelineDat
 						g_rhi->SetViewport({ 0, 0, SM_WIDTH, SM_HEIGHT });
 					else
 						g_rhi->SetViewportIndexedArray(0, static_cast<int32>(viewports.size()), &viewports[0]);
-					this->Draw(jPipelineData(pipelineData.Objects, camera, { light }), currentShader);
+					this->Draw(jPipelineData(pipelineData.DefaultRenderTarget, pipelineData.Objects, camera, { light }), currentShader);
 				}, currentShader);
-			g_rhi->SetRenderTarget(nullptr);
+			g_rhi->SetRenderTarget(pipelineData.DefaultRenderTarget);
 			skip = true;
 		}
 		break;
@@ -404,10 +407,10 @@ void jForward_ShadowMapGen_CSM_SSM_Pipeline::Do(const jPipelineData& pipelineDat
 					g_rhi->SetViewport({ 0, 0, SM_WIDTH, SM_HEIGHT });
 				else
 					g_rhi->SetViewportIndexedArray(0, static_cast<int32>(viewports.size()), &viewports[0]);
-				this->Draw(jPipelineData(pipelineData.Objects, camera, { light }), currentShader);
+				this->Draw(jPipelineData(pipelineData.DefaultRenderTarget, pipelineData.Objects, camera, { light }), currentShader);
 			}, currentShader);
 		g_rhi->EnableDepthClip(true);
-		g_rhi->SetRenderTarget(nullptr);
+		g_rhi->SetRenderTarget(pipelineData.DefaultRenderTarget);
 	}
 }
 
@@ -489,6 +492,12 @@ void jForward_Shadow_Pipeline::Setup()
 	BlendSrc = EBlendSrc::ONE;
 	BlendDest = EBlendDest::ZERO;
 	Shader = jShader::GetShader(ShaderName);
+}
+
+void jForward_Shadow_Pipeline::Do(const jPipelineData& pipelineData) const
+{
+	g_rhi->SetRenderTarget(pipelineData.DefaultRenderTarget);
+	__super::Do(pipelineData);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -672,6 +681,8 @@ bool jForward_ShadowVolume_Pipeline::CanSkipShadowObject(const jCamera* camera, 
 
 void jForward_ShadowVolume_Pipeline::Do(const jPipelineData& pipelineData) const
 {
+	g_rhi->SetRenderTarget(pipelineData.DefaultRenderTarget);
+
 	auto camera = pipelineData.Camera;
 
 	auto ambientShader = jShader::GetShader("AmbientOnly");
