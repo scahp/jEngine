@@ -119,7 +119,8 @@ void jRenderPipeline::Draw(const jPipelineData& pipelineData, const jShader* sha
 // jDeferredGeometryPipeline
 void jDeferredGeometryPipeline::Setup()
 {
-	ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
+	// ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
+	ClearColor = Vector4(135.0f / 255.0f, 206.0f / 255.0f, 250.0f / 255.0f, 1.0f);	// light sky blue
 	ClearType = MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH });
 }
 
@@ -484,7 +485,8 @@ void jForwardShadowMap_Blur_Pipeline::Draw(const jPipelineData& pipelineData, co
 // jForward_Shadow_Pipeline
 void jForward_Shadow_Pipeline::Setup()
 {
-	ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
+	//ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
+	ClearColor = Vector4(135.0f / 255.0f, 206.0f / 255.0f, 250.0f / 255.0f, 1.0f);	// light sky blue
 	ClearType = MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH });
 	EnableDepthTest = true;
 	DepthStencilFunc = EDepthStencilFunc::LEQUAL;
@@ -622,6 +624,7 @@ void jForward_ShadowVolume_Pipeline::Setup()
 	EnableBlend = true;
 	BlendSrc = EBlendSrc::ONE;
 	BlendDest = EBlendDest::ZERO;
+	ClearColor = Vector4(135.0f / 255.0f, 206.0f / 255.0f, 250.0f / 255.0f, 1.0f);	// light sky blue
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -699,7 +702,7 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineData& pipelineData) const
 	g_rhi->EnableDepthTest(true);
 
 	const_cast<jCamera*>(camera)->IsEnableCullMode = true;		// todo remove
-	g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+	g_rhi->SetClearColor(ClearColor);
 	g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH, ERenderBufferType::STENCIL }));
 
 	g_rhi->SetDepthFunc(EDepthStencilFunc::LEQUAL);

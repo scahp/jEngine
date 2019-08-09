@@ -7,6 +7,7 @@
 
 std::map<int, bool> g_KeyState;
 std::map<EMouseButtonType, bool> g_MouseState;
+float g_timeDeltaSecond = 0.0f;
 
 ERenderBufferType MakeRenderBufferTypeList(const std::initializer_list<ERenderBufferType>& list)
 {

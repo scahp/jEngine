@@ -451,5 +451,17 @@
     <None Include="Shaders\fullscreen\vs_tonemap.glsl">
       <Filter>Shaders\fullscreen</Filter>
     </None>
+    <None Include="Shaders\fullscreen\fs_luminanceMap.glsl">
+      <Filter>Shaders\fullscreen</Filter>
+    </None>
+    <None Include="Shaders\fullscreen\vs_luminanceMap.glsl">
+      <Filter>Shaders\fullscreen</Filter>
+    </None>
+    <None Include="Shaders\fullscreen\fs_adaptiveLuminance.glsl">
+      <Filter>Shaders\fullscreen</Filter>
+    </None>
+    <None Include="Shaders\fullscreen\vs_adaptiveLuminance.glsl">
+      <Filter>Shaders\fullscreen</Filter>
+    </None>
   </ItemGroup>
 </Project>

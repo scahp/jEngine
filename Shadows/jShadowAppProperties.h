@@ -20,7 +20,8 @@ public:
 	EShadowMapType ShadowMapType = EShadowMapType::CSM_SSM;
 	bool UsePoissonSample = true;
 	bool ShowDirectionalLightMap = false;
-	bool UseTonemap = false;
+	bool UseTonemap = true;
+	float AutoExposureKeyValue = 0.5f;
 	bool ShowDirectionalLightInfo = true;
 	bool ShowPointLightInfo = true;
 	bool ShowSpotLightInfo = true;
@@ -33,6 +34,7 @@ public:
 	float DeepShadowAlpha = 0.3f;
 	bool ExponentDeepShadowOn = false;
 	bool CSMDebugOn = false;
+	float AdaptationRate = 0.5f;
 
 	virtual void Setup(jAppSettingBase* appSetting) override;
 	virtual void Teardown(jAppSettingBase* appSetting) override;

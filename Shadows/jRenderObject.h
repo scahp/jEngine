@@ -47,7 +47,7 @@ public:
 	jIndexBuffer* IndexBuffer = nullptr;
 
 	const jTexture* tex_object = nullptr;
-	jTexture* tex_object2 = nullptr;
+	const jTexture* tex_object2 = nullptr;
 	jTexture* tex_object_array = nullptr;
 
 	Vector Pos = Vector::ZeroVector;

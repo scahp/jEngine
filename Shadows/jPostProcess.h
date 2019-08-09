@@ -9,9 +9,10 @@ struct IShaderStorageBufferObject;
 class jFullscreenQuadPrimitive;
 class jGBuffer;
 
-struct jPostProcessInOutput : public std::enable_shared_from_this< jPostProcessInOutput>
+struct jPostProcessInOutput : public std::enable_shared_from_this<jPostProcessInOutput>
 {
 	jRenderTarget* RenderTaret = nullptr;
+	jRenderTarget* LuminanceMapRT = nullptr;
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -51,6 +52,7 @@ public:
 	jPostprocessChain() = default;
 
 	void AddNewPostprocess(IPostprocess* postprocess);
+	void AddNewPostprocess(IPostprocess* postprocess, const std::weak_ptr<jPostProcessInOutput>& input);
 	void ReleaseAllPostprocesses();
 
 	bool Process(const jCamera* camera) const;
@@ -128,4 +130,47 @@ public:
 
 private:
 	const jShader* Shader = nullptr;
+};
+
+//////////////////////////////////////////////////////////////////////////
+// LuminanceMapGeneration
+class jPostProcess_LuminanceMapGeneration : public IPostprocess
+{
+public:
+	using IPostprocess::IPostprocess;
+
+	virtual bool Process(const jCamera* camera) const override;
+	virtual void Setup() override;
+	virtual bool Do(const jCamera* camera) const override;
+
+private:
+	const jShader* Shader = nullptr;
+};
+
+//////////////////////////////////////////////////////////////////////////
+// AdaptiveLuminance
+class jPostProcess_AdaptiveLuminance : public IPostprocess
+{
+public:
+	jPostProcess_AdaptiveLuminance()
+	{ }
+	jPostProcess_AdaptiveLuminance(const std::string& name, std::shared_ptr<jRenderTarget> renderTarget, std::weak_ptr<jRenderTarget> luminanceMap)
+		: IPostprocess(name, renderTarget), LuminanceMap(luminanceMap)
+	{ }
+
+	virtual bool Process(const jCamera* camera) const override;
+	virtual void Setup() override;
+	virtual bool Do(const jCamera* camera) const override;
+
+	static int32 s_index;
+	static int32 UpdateLuminanceIndex()
+	{		
+		s_index = static_cast<int32>(!s_index);
+		return s_index;			
+	}
+
+private:
+	const jShader* Shader = nullptr;
+	std::shared_ptr<jRenderTarget> LastLumianceRenderTarget[2];
+	std::weak_ptr<jRenderTarget> LuminanceMap;
 };

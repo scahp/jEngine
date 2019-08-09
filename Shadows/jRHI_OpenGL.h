@@ -38,6 +38,7 @@ struct jShader_OpenGL : public jShader
 
 struct jTexture_OpenGL : public jTexture
 {
+	bool sRGB = false;
 	ETextureType TextureType;
 	uint32 TextureID = 0;
 };
@@ -133,6 +134,7 @@ public:
 		}
 		return primitiveType;
 	}
+	uint32 GetOpenGLTextureType(ETextureType textureType) const;
 
 	virtual jVertexBuffer* CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const override;
 	virtual jIndexBuffer* CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const override;
@@ -150,7 +152,7 @@ public:
 	virtual void SetShader(const jShader* shader) const override;
 	virtual jShader* CreateShader(const jShaderInfo& shaderInfo) const override;
 	virtual jTexture* CreateNullTexture() const override;
-	virtual jTexture* CreateTextureFromData(unsigned char* data, int32 width, int32 height) const override;
+	virtual jTexture* CreateTextureFromData(unsigned char* data, int32 width, int32 height, bool sRGB) const override;
 	virtual bool SetUniformbuffer(const IUniformBuffer* buffer, const jShader* shader) const override;
 	virtual void SetMatetrial(jMaterialData* materialData, const jShader* shader, int32 baseBindingIndex = 0) const override;
 	virtual void SetTexture(int32 index, const jTexture* texture) const override;
@@ -183,5 +185,6 @@ public:
 	virtual void EnableDepthClip(bool enable) const override;
 	virtual void BeginDebugEvent(const char* name) const override;
 	virtual void EndDebugEvent() const override;
+	virtual void GenerateMips(const jTexture* texture) const override;
 };
 

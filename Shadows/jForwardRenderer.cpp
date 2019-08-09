@@ -23,9 +23,19 @@ void jForwardRenderer::Setup()
 
 	//////////////////////////////////////////////////////////////////////////
 	// Setup a postprocess chain
+	LuminanceRenderTarget = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RG32F, EFormat::RG, EFormatType::FLOAT, EDepthBufferType::DEPTH, SCR_WIDTH, SCR_HEIGHT, 1 }));
+	{
+		auto postprocess = new jPostProcess_LuminanceMapGeneration("LuminanceMapGeneration", LuminanceRenderTarget);
+		PostProcessChain.AddNewPostprocess(postprocess, PostProcessInput);
+	}
+
+	{
+		auto postprocess = new jPostProcess_AdaptiveLuminance("AdaptiveLuminance", RenderTarget, LuminanceRenderTarget);
+		PostProcessChain.AddNewPostprocess(postprocess);
+	}
+
 	{
 		auto postprocess = new jPostProcess_Tonemap("Tonemap", nullptr);
-		postprocess->SetPostProcessInput(PostProcessInput);
 		PostProcessChain.AddNewPostprocess(postprocess);
 	}
 }

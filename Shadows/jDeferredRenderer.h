@@ -30,5 +30,6 @@ private:
 	jGBuffer GBuffer;
 	jRenderTargetInfo GeometryBufferInfo;
 	jPipelineSet* DeferredDeepShadowMapPipelineSet = nullptr;
+	std::shared_ptr<jRenderTarget> LuminanceRenderTarget;
 };
 

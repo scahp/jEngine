@@ -97,7 +97,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename)
 			material->GetTexture(aiTextureType_DIFFUSE, 0, &str);
 			jImageData data;
 			jImageFileLoader::GetInstance().LoadTextureFromFile(data, std::string("Image/") + str.C_Str());
-			newMeshMaterial->Texture = g_rhi->CreateTextureFromData(&data.ImageData[0], data.Width, data.Height);
+			newMeshMaterial->Texture = g_rhi->CreateTextureFromData(&data.ImageData[0], data.Width, data.Height, data.srgb);
 			newMeshMaterial->TextureName = str.C_Str();
 		}
 

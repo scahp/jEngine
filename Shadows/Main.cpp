@@ -81,7 +81,13 @@ int main()
 		// render
 		// ------
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		g_Engine.Update(0.0f);
+
+		static int64 lastTick = GetTickCount64();
+		int64 currentTick = GetTickCount64();
+		g_timeDeltaSecond = (currentTick - lastTick) * 0.001f;
+		lastTick = currentTick;
+
+		g_Engine.Update(g_timeDeltaSecond);
 
 		{
 			SCOPE_DEBUG_EVENT(g_rhi, "TwDraw");

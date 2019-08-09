@@ -179,12 +179,6 @@ void main()
 	bool isDataFromTexture = (Normal.w == 0.0);
 
 	vec4 Color = texture(ColorSampler, TexCoord_);
-	if (isDataFromTexture)
-	{
-		Color.x = pow(Color.x, 2.2);
-		Color.y = pow(Color.y, 2.2);
-		Color.z = pow(Color.z, 2.2);
-	}
 	vec3 Pos = texture(PosInWorldSampler, TexCoord_).xyz;
 	vec3 ShadowPos = texture(PosInLightSampler, TexCoord_).xyz;
 	vec3 toLight = normalize(LightPos - Pos);
@@ -376,11 +370,5 @@ void main()
 	shading = clamp(shading * exp(20.0f * (depth - (ShadowPos.z))), 0.1f, 1.0f);
 
 	Color.xyz = finalColor * Color.xyz * clamp(shading, 0.1f, 1.0);
-	if (isDataFromTexture)
-	{
-		Color.x = pow(Color.x, 1.0/2.2);
-		Color.y = pow(Color.y, 1.0/2.2);
-		Color.z = pow(Color.z, 1.0/2.2);
-	}
 	color = vec4(ambientColor + Color.xyz, 1.0);
 }

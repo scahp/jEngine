@@ -12,6 +12,12 @@ void jShadowAppSettingProperties::Setup(jAppSettingBase* appSetting)
 	appSetting->AddVariable("UsePoissonSample", UsePoissonSample);
 	appSetting->AddVariable("DirectionalLightMap", ShowDirectionalLightMap);
 	appSetting->AddVariable("UseTonemap", UseTonemap);
+	appSetting->AddVariable("AdaptationRate", AdaptationRate);
+	appSetting->SetStep("AdaptationRate", 0.01f);
+	appSetting->SetMinMax("AdaptationRate", 0.0f, 1.0f);
+	appSetting->AddVariable("AutoExposureKeyValue", AutoExposureKeyValue);
+	appSetting->SetStep("AutoExposureKeyValue", 0.01f);
+	appSetting->SetMinMax("AutoExposureKeyValue", 0.0f, 1.0f);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Silhouette Group
@@ -121,6 +127,8 @@ void jShadowAppSettingProperties::Teardown(jAppSettingBase* appSetting)
 	appSetting->RemoveVariable("DeepShadowAlpha");
 	appSetting->RemoveVariable("ExponentDeepShadowOn");
 	appSetting->RemoveVariable("CSMDebugOn");
+	appSetting->RemoveVariable("AdaptationRate");
+	appSetting->RemoveVariable("AutoExposureKeyValue");
 }
 
 void jShadowAppSettingProperties::SwitchShadowType(jAppSettingBase* appSetting)

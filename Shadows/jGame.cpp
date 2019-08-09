@@ -286,6 +286,8 @@ void jGame::UpdateAppSetting()
 			CurrentShadowType = jShadowAppSettingProperties::GetInstance().ShadowType;
 			Renderer->SetChangePipelineSet(ShadowVolumePipelineSet);
 		}
+
+		SpawnObjects(ESpawnedType::TestPrimitive);
 		MainCamera->IsInfinityFar = true;
 	}
 

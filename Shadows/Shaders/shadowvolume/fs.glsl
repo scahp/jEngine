@@ -38,6 +38,7 @@ uniform jMaterial Material;
 
 #if defined(USE_TEXTURE)
 uniform sampler2D tex_object2;
+uniform int TextureSRGB[1];
 #endif // USE_TEXTURE
 
 in vec3 Pos_;
@@ -60,7 +61,17 @@ void main()
         diffuse = vec4(1.0, 1.0, 1.0, 1.0);
 
 #if defined(USE_TEXTURE)
-    diffuse *= texture(tex_object2, TexCoord_);
+	if (TextureSRGB[0] > 0)
+	{
+		// from sRGB to Linear color
+		vec4 tempColor = texture(tex_object2, TexCoord_);
+		diffuse.xyz *= pow(tempColor.xyz, vec3(2.2));
+		diffuse.w *= tempColor.w;
+	}
+	else
+	{
+		diffuse *= texture(tex_object2, TexCoord_);
+	}
 #endif // USE_TEXTURE
 
 #if defined(USE_MATERIAL)

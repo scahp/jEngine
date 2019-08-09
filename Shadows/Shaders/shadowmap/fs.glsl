@@ -62,6 +62,7 @@ uniform int Collided;
 
 #if defined(USE_TEXTURE)
 uniform sampler2D tex_object2;
+uniform int TextureSRGB[1];
 #endif // USE_TEXTURE
 
 uniform sampler2D shadow_object_point;
@@ -162,8 +163,17 @@ void main()
 #if defined(USE_TEXTURE)
 	if (UseTexture > 0)
 	{
-		diffuse *= texture(tex_object2, TexCoord_);
-		//diffuse *= exp(texture(tex_object2, TexCoord_), 2.2);
+		if (TextureSRGB[0] > 0)
+		{
+			// from sRGB to Linear color
+			vec4 tempColor = texture(tex_object2, TexCoord_);
+			diffuse.xyz *= pow(tempColor.xyz, vec3(2.2));
+			diffuse.w *= tempColor.w;
+		}
+		else
+		{
+			diffuse *= texture(tex_object2, TexCoord_);
+		}
 	}
 #else
 	diffuse = Color_;
@@ -415,11 +425,4 @@ void main()
     }
 
     color = vec4(finalColor * diffuse.xyz, diffuse.w);
-
-#if defined(USE_TEXTURE)
-	if (UseTexture > 0)
-	{
-		//color.xyz = pow(color.xyz, 1.0/2.2);
-	}
-#endif
 }

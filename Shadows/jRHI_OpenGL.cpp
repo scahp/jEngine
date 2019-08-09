@@ -13,6 +13,27 @@ jRHI_OpenGL::~jRHI_OpenGL()
 {
 }
 
+uint32 jRHI_OpenGL::GetOpenGLTextureType(ETextureType textureType) const
+{
+	uint32 result = 0;
+	switch (textureType)
+	{
+	case ETextureType::TEXTURE_2D:
+		result = GL_TEXTURE_2D;
+		break;
+	case ETextureType::TEXTURE_2D_ARRAY:
+	case ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW:
+		result = GL_TEXTURE_2D;
+		break;
+	case ETextureType::TEXTURE_CUBE:
+		result = GL_TEXTURE_CUBE_MAP;
+		break;
+	default:
+		break;
+	}
+	return result;
+}
+
 jVertexBuffer* jRHI_OpenGL::CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const
 {
 	if (!streamData)
@@ -235,6 +256,15 @@ void jRHI_OpenGL::BeginDebugEvent(const char* name) const
 void jRHI_OpenGL::EndDebugEvent() const
 {
 	glPopDebugGroup();
+}
+
+void jRHI_OpenGL::GenerateMips(const jTexture* texture) const
+{
+	const auto texture_gl = static_cast<const jTexture_OpenGL*>(texture);
+	glActiveTexture(GL_TEXTURE0);
+	const auto textureType = GetOpenGLTextureType(texture_gl->TextureType);
+	glBindTexture(textureType, texture_gl->TextureID);
+	glGenerateMipmap(textureType);
 }
 
 void jRHI_OpenGL::SetClear(ERenderBufferType typeBit) const
@@ -491,6 +521,7 @@ jShader* jRHI_OpenGL::CreateShader(const jShaderInfo& shaderInfo) const
 jTexture* jRHI_OpenGL::CreateNullTexture() const
 {
 	auto texure = new jTexture_OpenGL();
+	texure->sRGB = false;
 	glGenTextures(1, &texure->TextureID);
 	glBindTexture(GL_TEXTURE_2D, texure->TextureID);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 2, 2, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
@@ -499,9 +530,10 @@ jTexture* jRHI_OpenGL::CreateNullTexture() const
 	return texure;
 }
 
-jTexture* jRHI_OpenGL::CreateTextureFromData(unsigned char* data, int32 width, int32 height) const
+jTexture* jRHI_OpenGL::CreateTextureFromData(unsigned char* data, int32 width, int32 height, bool sRGB) const
 {
 	auto texure = new jTexture_OpenGL();
+	texure->sRGB = false;
 	glGenTextures(1, &texure->TextureID);
 	glBindTexture(GL_TEXTURE_2D, texure->TextureID);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
@@ -612,6 +644,13 @@ void jRHI_OpenGL::SetMatetrial(jMaterialData* materialData, const jShader* shade
 			continue;
 		SetTexture(index, matParam->Texture);
 
+		char szTemp[128] = { 0, };
+		jUniformBuffer<int> sRGB_UniformData;
+		sprintf_s(szTemp, sizeof(szTemp), "TextureSRGB[%d]", i);
+		sRGB_UniformData.Name = szTemp;
+		sRGB_UniformData.Data = i;
+		SetUniformbuffer(&sRGB_UniformData, shader);
+
 		SetTextureFilter(tex_gl->TextureType, ETextureFilterTarget::MAGNIFICATION, matParam->Magnification);
 		SetTextureFilter(tex_gl->TextureType, ETextureFilterTarget::MINIFICATION, matParam->Minification);
 		++index;
@@ -623,24 +662,7 @@ void jRHI_OpenGL::SetTexture(int32 index, const jTexture* texture) const
 	glActiveTexture(GL_TEXTURE0 + index);
 	
 	auto texture_gl = static_cast<const jTexture_OpenGL*>(texture);
-
-	uint32 textureType = 0;
-	switch (texture_gl->TextureType)
-	{
-	case ETextureType::TEXTURE_2D:
-		textureType = GL_TEXTURE_2D;
-		break;
-	case ETextureType::TEXTURE_2D_ARRAY:
-	case ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW:
-		textureType = GL_TEXTURE_2D;
-		break;
-	case ETextureType::TEXTURE_CUBE:
-		textureType = GL_TEXTURE_CUBE_MAP;
-		break;
-	default:
-		break;
-	}
-	
+	auto textureType = GetOpenGLTextureType(texture_gl->TextureType);
 	glBindTexture(textureType, texture_gl->TextureID);
 }
 

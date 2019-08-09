@@ -26,5 +26,6 @@ void jImageFileLoader::LoadTextureFromFile(jImageData& data, std::string const& 
 		LodePNG::decode(data.ImageData, w, h, filename.c_str());
 		data.Width = static_cast<int32>(w);
 		data.Height = static_cast<int32>(h);
+		data.srgb = false;		// LodePNG library is not support srgb
 	}
 }

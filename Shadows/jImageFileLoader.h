@@ -2,6 +2,7 @@
 
 struct jImageData
 {
+	bool srgb = false;
 	int32 Width = 0;
 	int32 Height = 0;
 	std::string Filename;

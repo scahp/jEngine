@@ -78,5 +78,8 @@ struct jShaderInfoCreation
 		DECLARE_SHADER_VS_FS_WITH_OPTION_MORE("CSM_SSM", "shaders/shadowmap/vs.glsl", "shaders/shadowmap/fs.glsl", false, false, "\r\n#define USE_CSM 1");
 
 		DECLARE_SHADER_VS_GS_FS("CSM_SSM_TEX2D_ARRAY", "shaders/shadowmap/vs_omniDirectionalShadowMap.glsl", "shaders/shadowmap/gs_cascadeShadowMap.glsl", "shaders/shadowmap/fs_shadowMap.glsl");
+
+		DECLARE_SHADER_VS_FS("LuminanceMapGeneration", "shaders/fullscreen/vs_luminanceMap.glsl", "shaders/fullscreen/fs_luminanceMap.glsl");
+		DECLARE_SHADER_VS_FS("AdaptiveLuminance", "shaders/fullscreen/vs_adaptiveLuminance.glsl", "shaders/fullscreen/fs_adaptiveLuminance.glsl");
 	}
 } s_shaderInfoCreation;

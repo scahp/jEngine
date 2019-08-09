@@ -285,7 +285,7 @@ public:
 	virtual void SetViewportIndexedArray(int32 startIndex, int32 count, const jViewport* viewports) const {}
 	virtual bool SetUniformbuffer(const IUniformBuffer* buffer, const jShader* shader) const { return false; }
 	virtual jTexture* CreateNullTexture() const { return nullptr; }
-	virtual jTexture* CreateTextureFromData(unsigned char* data, int32 width, int32 height) const { return nullptr; }
+	virtual jTexture* CreateTextureFromData(unsigned char* data, int32 width, int32 height, bool sRGB) const { return nullptr; }
 	virtual void SetMatetrial(jMaterialData* materialData, const jShader* shader, int32 baseBindingIndex = 0) const {}
 	virtual void EnableCullFace(bool enable) const {}
 	virtual jRenderTarget* CreateRenderTarget(const jRenderTargetInfo& info) const { return nullptr; }
@@ -305,6 +305,7 @@ public:
 	virtual void EnableDepthClip(bool enable) const {  }
 	virtual void BeginDebugEvent(const char* name) const {}
 	virtual void EndDebugEvent() const {}
+	virtual void GenerateMips(const jTexture* texture) const {}
 };
 
 // Not thred safe

@@ -42,9 +42,20 @@ void jDeferredRenderer::Setup()
 		PostProcessChain.AddNewPostprocess(postprocess);
 	}
 
+	auto RenderTarget = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RGBA, EFormat::RGBA, EFormatType::FLOAT, EDepthBufferType::DEPTH, SCR_WIDTH, SCR_HEIGHT, 1 }));
 	{
-		auto renderTarget = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RGBA, EFormat::RGBA, EFormatType::FLOAT, EDepthBufferType::DEPTH, SCR_WIDTH, SCR_HEIGHT, 1 }));
-		auto postprocess = new jPostProcess_AA_DeepShadowAddition("AA_DeepShadowAddition", renderTarget);
+		auto postprocess = new jPostProcess_AA_DeepShadowAddition("AA_DeepShadowAddition", RenderTarget);
+		PostProcessChain.AddNewPostprocess(postprocess);
+	}
+
+	LuminanceRenderTarget = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RG32F, EFormat::RG, EFormatType::FLOAT, EDepthBufferType::DEPTH, SCR_WIDTH, SCR_HEIGHT, 1 }));
+	{
+		auto postprocess = new jPostProcess_LuminanceMapGeneration("LuminanceMapGeneration", LuminanceRenderTarget);
+		PostProcessChain.AddNewPostprocess(postprocess);
+	}
+
+	{
+		auto postprocess = new jPostProcess_AdaptiveLuminance("AdaptiveLuminance", RenderTarget, LuminanceRenderTarget);
 		PostProcessChain.AddNewPostprocess(postprocess);
 	}
 
