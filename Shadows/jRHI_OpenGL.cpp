@@ -533,7 +533,7 @@ jTexture* jRHI_OpenGL::CreateNullTexture() const
 jTexture* jRHI_OpenGL::CreateTextureFromData(unsigned char* data, int32 width, int32 height, bool sRGB) const
 {
 	auto texure = new jTexture_OpenGL();
-	texure->sRGB = false;
+	texure->sRGB = sRGB;
 	glGenTextures(1, &texure->TextureID);
 	glBindTexture(GL_TEXTURE_2D, texure->TextureID);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
@@ -646,9 +646,9 @@ void jRHI_OpenGL::SetMatetrial(jMaterialData* materialData, const jShader* shade
 
 		char szTemp[128] = { 0, };
 		jUniformBuffer<int> sRGB_UniformData;
-		sprintf_s(szTemp, sizeof(szTemp), "TextureSRGB[%d]", i);
+		sprintf_s(szTemp, sizeof(szTemp), "TextureSRGB[%d]", index);
 		sRGB_UniformData.Name = szTemp;
-		sRGB_UniformData.Data = i;
+		sRGB_UniformData.Data = tex_gl->sRGB;
 		SetUniformbuffer(&sRGB_UniformData, shader);
 
 		SetTextureFilter(tex_gl->TextureType, ETextureFilterTarget::MAGNIFICATION, matParam->Magnification);
