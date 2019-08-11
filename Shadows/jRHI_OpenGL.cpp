@@ -735,11 +735,20 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 	case EFormat::RG:
 		internalFormat = GL_RG;
 		break;
+	case EFormat::R:
+		internalFormat = GL_RED;
+		break;
+	case EFormat::R32F:
+		internalFormat = GL_R32F;
+		break;
 	case EFormat::RG32F:
 		internalFormat = GL_RG32F;
 		break;
 	case EFormat::RGBA32F:
 		internalFormat = GL_RGBA32F;
+		break;
+	case EFormat::RGBA16F:
+		internalFormat = GL_RGBA16F;
 		break;
 	default:
 		break;
@@ -757,11 +766,20 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 	case EFormat::RG:
 		format = GL_RG;
 		break;
+	case EFormat::R:
+		format = GL_RED;
+		break;
+	case EFormat::R32F:
+		format = GL_R32F;
+		break;
 	case EFormat::RG32F:
 		format = GL_RG32F;
 		break;
 	case EFormat::RGBA32F:
 		format = GL_RGBA32F;
+		break;
+	case EFormat::RGBA16F:
+		format = GL_RGBA16F;
 		break;
 	default:
 		break;

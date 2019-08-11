@@ -56,6 +56,9 @@ const unsigned int SCR_HEIGHT = 720;
 const unsigned int SM_WIDTH = 512;
 const unsigned int SM_HEIGHT = 512;
 
+const unsigned int LUMINANCE_WIDTH = 1024;
+const unsigned int LUMINANCE_HEIGHT = 1024;
+
 constexpr int NUM_CASCADES = 3;
 constexpr int NUM_FRUSTUM_CORNERS = 8;
 

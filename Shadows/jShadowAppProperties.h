@@ -21,7 +21,7 @@ public:
 	bool UsePoissonSample = true;
 	bool ShowDirectionalLightMap = false;
 	bool UseTonemap = true;
-	float AutoExposureKeyValue = 0.5f;
+	float AutoExposureKeyValue = 0.7f;
 	bool ShowDirectionalLightInfo = true;
 	bool ShowPointLightInfo = true;
 	bool ShowSpotLightInfo = true;

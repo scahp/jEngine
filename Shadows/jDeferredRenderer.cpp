@@ -48,7 +48,7 @@ void jDeferredRenderer::Setup()
 		PostProcessChain.AddNewPostprocess(postprocess);
 	}
 
-	LuminanceRenderTarget = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RG32F, EFormat::RG, EFormatType::FLOAT, EDepthBufferType::DEPTH, SCR_WIDTH, SCR_HEIGHT, 1 }));
+	LuminanceRenderTarget = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::R32F, EFormat::R, EFormatType::FLOAT, EDepthBufferType::DEPTH, LUMINANCE_WIDTH, LUMINANCE_HEIGHT, 1 }));
 	{
 		auto postprocess = new jPostProcess_LuminanceMapGeneration("LuminanceMapGeneration", LuminanceRenderTarget);
 		PostProcessChain.AddNewPostprocess(postprocess);

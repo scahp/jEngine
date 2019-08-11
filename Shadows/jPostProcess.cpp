@@ -114,7 +114,7 @@ void jPostProcess_DeepShadowMap::jSSBO_DeepShadowMap::Bind(const jShader* shader
 
 bool jPostProcess_DeepShadowMap::Do(const jCamera* camera) const
 {
-	g_rhi->SetClearColor(0.025f, 0.025f, 0.025f, 1.0f);
+	g_rhi->SetClearColor(135.0f / 255.0f, 206.0f / 255.0f, 250.0f / 255.0f, 1.0f);	// light sky blue
 	g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
 
 	const auto ambientLight = camera->GetLight(ELightType::AMBIENT);
@@ -223,6 +223,7 @@ bool jPostProcess_Tonemap::Do(const jCamera* camera) const
 
 	fullscreenQuad->Draw(camera, Shader, {});
 	fullscreenQuad->SetTexture(nullptr);
+	fullscreenQuad->SetTexture2(nullptr);
 
 	return true;
 }
@@ -303,8 +304,8 @@ void jPostProcess_AdaptiveLuminance::Setup()
 {
 	__super::Setup();
 	Shader = jShader::GetShader("AdaptiveLuminance");
-	LastLumianceRenderTarget[0] = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RG32F, EFormat::RG, EFormatType::FLOAT, EDepthBufferType::DEPTH, 1, 1, 1 });
-	LastLumianceRenderTarget[1] = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RG32F, EFormat::RG, EFormatType::FLOAT, EDepthBufferType::DEPTH, 1, 1, 1 });
+	LastLumianceRenderTarget[0] = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::R32F, EFormat::R, EFormatType::FLOAT, EDepthBufferType::DEPTH, 1, 1, 1 });
+	LastLumianceRenderTarget[1] = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::R32F, EFormat::R, EFormatType::FLOAT, EDepthBufferType::DEPTH, 1, 1, 1 });
 }
 
 bool jPostProcess_AdaptiveLuminance::Do(const jCamera* camera) const

@@ -2,7 +2,7 @@
 
 struct jImageData
 {
-	bool srgb = false;
+	bool sRGB = false;
 	int32 Width = 0;
 	int32 Height = 0;
 	std::string Filename;
@@ -16,7 +16,7 @@ public:
 
 	static jImageFileLoader& GetInstance() { return *_instance; }
 
-	void LoadTextureFromFile(jImageData& data, std::string const& filename);
+	void LoadTextureFromFile(jImageData& data, std::string const& filename, bool sRGB = false);
 
 private:
 	jImageFileLoader();

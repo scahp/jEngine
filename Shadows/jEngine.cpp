@@ -22,6 +22,8 @@ void jEngine::Init()
 	jShaderInfo::CreateShaders();
 	IPipeline::SetupPipelines();
 
+	g_rhi->EnableSRGB(false);
+
 	Game.Setup();
 
 	jShadowAppSettingProperties::GetInstance().Setup(jAppSettings::GetInstance().Get("MainPannel"));

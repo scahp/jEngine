@@ -10,11 +10,38 @@ uniform float AutoExposureKeyValue;
 in vec2 TexCoord_;
 out vec4 FragColor;
 
-// Applies the filmic curve from John Hable's presentation
-float FilmicToneMapALU(float linearColor)
+// http://filmicworlds.com/blog/filmic-tonemapping-operators/
+vec3 Uncharted2Tonemap(vec3 x)
 {
-	float color = max(0.0, linearColor - 0.004);
-	color = (color * (6.2 * color + 0.5)) / (color * (6.2 * color + 1.7f) + 0.06f);
+	float A = 0.15;		// Shoulder Strength
+	float B = 0.50;		// Linear Strength
+	float C = 0.10;		// Linear Angle
+	float D = 0.20;		// Toe Strength
+	float E = 0.02;		// Toe Numerator
+	float F = 0.30;		// Toe Denominator
+	float W = 11.2;		// Linear White Point Value
+
+	return ((x * (A * x + C * B) + D * E) / (x * (A * x + B) + D * F)) - E / F;
+}
+
+// https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
+vec3 ACESFilmTonemap(vec3 x)
+{
+	float a = 2.51f;
+	float b = 0.03f;
+	float c = 2.43f;
+	float d = 0.59f;
+	float e = 0.14f;
+	return clamp((x * (a * x + b)) / (x * (c * x + d) + e), vec3(0.0), vec3(1.0));
+}
+
+// http://filmicworlds.com/blog/filmic-tonemapping-with-piecewise-power-curves/		// wait for implementation
+
+// Applies the filmic curve from John Hable's presentation
+vec3 FilmicToneMapALU(vec3 linearColor)
+{
+	vec3 color = max(vec3(0.0), linearColor - vec3(0.004));
+	color = (color * (6.2 * color + 0.5)) / (color * (6.2 * color + 1.7) + 0.06);
 	
 	// result has 1/2.2 baked in
 	// return pow(color, 2.2);
@@ -22,18 +49,10 @@ float FilmicToneMapALU(float linearColor)
 	return color;
 }
 
-vec3 FilmicToneMapALU(vec3 linearColor)
-{
-	linearColor.x = FilmicToneMapALU(linearColor.x);
-	linearColor.y = FilmicToneMapALU(linearColor.y);
-	linearColor.z = FilmicToneMapALU(linearColor.z);
-	return linearColor;
-}
-
 // Retrieves the log-average luminance from the texture
 float GetAvgLuminance(sampler2D lumTex)
 {
-    return textureLod(lumTex, vec2(0.0, 0.0), 0.0).x;
+    return texelFetch(lumTex, ivec2(0, 0), 0).x;
 }
 
 // Determines the color based on exposure settings
@@ -56,11 +75,23 @@ void main()
 		float avgLuminance = GetAvgLuminance(tex_object2);
 		float exposure = 0.0;
 		color.xyz = CalcExposedColor(color.xyz, avgLuminance, 0.0, exposure);
-		color.xyz = FilmicToneMapALU(color.xyz);
+
+		// Filmic Tonemap
+		//color.xyz = FilmicToneMapALU(color.xyz);
+
+		vec3 cur = Uncharted2Tonemap(color.xyz);
+		float W = 11.2;		// Linear White Point Value
+		vec3 whiteScale = 1.0 / Uncharted2Tonemap(vec3(W));
+		color.xyz = cur * whiteScale;
+		color.xyz = pow(color.xyz, vec3(1.0 / 2.2));		// from Linear color to sRGB
+		
+		// ACES Filmic Tonemap
+		//color.xyz = ACESFilmTonemap(color.xyz);
+		//color.xyz = pow(color.xyz, vec3(1.0 / 2.2));		// from Linear color to sRGB
 	}
 	else
 	{
 		color.xyz = pow(color.xyz, vec3(1.0 / 2.2));		// from Linear color to sRGB
 	}
-	FragColor = color;
+	FragColor = vec4(color.xyz, 1.0);
 }

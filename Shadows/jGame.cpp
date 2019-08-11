@@ -65,18 +65,18 @@ void jGame::Setup()
 	// Light creation step
 	NormalDirectionalLight = jLight::CreateDirectionalLight(jShadowAppSettingProperties::GetInstance().DirecionalLightDirection
 		, Vector4(1.0f)
-		, Vector(0.5f), Vector(1.0f), 64);
+		, Vector(1.0f), Vector(1.0f), 64);
 	CascadeDirectionalLight = jLight::CreateCascadeDirectionalLight(jShadowAppSettingProperties::GetInstance().DirecionalLightDirection
 		, Vector4(1.0f)
-		, Vector(0.5f), Vector(1.0f), 64);
+		, Vector(1.0f), Vector(1.0f), 64);
 
 	DirectionalLight = NormalDirectionalLight;
 
 	//AmbientLight = jLight::CreateAmbientLight(Vector(0.7f, 0.8f, 0.8f), Vector(0.1f));
 	AmbientLight = jLight::CreateAmbientLight(Vector(1.0f), Vector(0.1f));
 
-	PointLight = jLight::CreatePointLight(jShadowAppSettingProperties::GetInstance().PointLightPosition, Vector4(2.0f, 0.7f, 0.7f, 1.0f), 500.0f, Vector(1.0f, 1.0f, 1.0f), Vector(0.4f, 0.4f, 0.4f), 64.0f);
-	SpotLight = jLight::CreateSpotLight(jShadowAppSettingProperties::GetInstance().SpotLightPosition, jShadowAppSettingProperties::GetInstance().SpotLightDirection, Vector4(0.0f, 1.0f, 0.0f, 1.0f), 500.0f, 0.7f, 1.0f, Vector(1.0f, 1.0f, 1.0f), Vector(0.4f, 0.4f, 0.4f), 64.0f);
+	PointLight = jLight::CreatePointLight(jShadowAppSettingProperties::GetInstance().PointLightPosition, Vector4(2.0f, 0.7f, 0.7f, 1.0f), 500.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
+	SpotLight = jLight::CreateSpotLight(jShadowAppSettingProperties::GetInstance().SpotLightPosition, jShadowAppSettingProperties::GetInstance().SpotLightDirection, Vector4(0.0f, 1.0f, 0.0f, 1.0f), 500.0f, 0.7f, 1.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
 
 	DirectionalLightInfo = jPrimitiveUtil::CreateDirectionalLightDebug(Vector(250, 260, 0)*0.5f, Vector::OneVector * 10.0f, 10.0f, MainCamera, DirectionalLight, "Image/sun.png");
 	jObject::AddDebugObject(DirectionalLightInfo);
@@ -93,7 +93,7 @@ void jGame::Setup()
 	MainCamera->AddLight(DirectionalLight);
 	MainCamera->AddLight(PointLight);
 	MainCamera->AddLight(SpotLight);
-	MainCamera->AddLight(AmbientLight);
+	//MainCamera->AddLight(AmbientLight);
 
 	SpawnObjects(ESpawnedType::TestPrimitive);
 

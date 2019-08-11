@@ -92,7 +92,10 @@ enum class EFormat
 	RGB = 0,
 	RGBA = 1,
 	RG,
+	R,
+	R32F,
 	RG32F,
+	RGBA16F,
 	RGBA32F,
 };
 
