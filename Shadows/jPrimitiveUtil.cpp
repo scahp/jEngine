@@ -69,6 +69,22 @@ void jFullscreenQuadPrimitive::SetTexture(const jTexture* texture)
 	RenderObject->tex_object = texture;
 }
 
+void jFullscreenQuadPrimitive::SetTexture(int index, const jTexture* texture)
+{
+	switch (index)
+	{
+	case 0:
+		RenderObject->tex_object = texture;
+		break;
+	case 1:
+		RenderObject->tex_object2 = texture;
+		break;
+	default:
+		JASSERT(0);
+		break;
+	}
+}
+
 void jFullscreenQuadPrimitive::SetTexture2(const jTexture* texture)
 {
 	RenderObject->tex_object2 = texture;

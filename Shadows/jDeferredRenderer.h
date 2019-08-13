@@ -31,5 +31,10 @@ private:
 	jRenderTargetInfo GeometryBufferInfo;
 	jPipelineSet* DeferredDeepShadowMapPipelineSet = nullptr;
 	std::shared_ptr<jRenderTarget> LuminanceRenderTarget;
+	std::shared_ptr<jRenderTarget> OutRenderTarget;
+	std::shared_ptr<jRenderTarget> PostPrceoss_AA_DeepShadowAddition;
+	std::shared_ptr<jPostProcessInOutput> PostProcessOutput;
+	std::shared_ptr<jPostProcessInOutput> PostProcessOutput2;
+	std::shared_ptr<jPostProcessInOutput> PostProcessLuminanceOutput;	
 };
 

@@ -276,8 +276,6 @@ void jDirectionalLight::GetMaterialData(jMaterialData* OutMaterialData) const
 		auto materialParam = new jMaterialParam();
 		materialParam->Name = "shadow_object";
 		materialParam->Texture = static_cast<jTexture_OpenGL*>(ShadowMapData->ShadowMapRenderTarget->GetTexture());
-		materialParam->Minification = ETextureFilter::NEAREST;
-		materialParam->Magnification = ETextureFilter::NEAREST;
 		OutMaterialData->Params.push_back(materialParam);
 	}
 }
@@ -394,8 +392,6 @@ void jPointLight::GetMaterialData(jMaterialData* OutMaterialData) const
 		auto materialParam = new jMaterialParam();
 		materialParam->Name = "shadow_object_point";
 		materialParam->Texture = static_cast<jTexture_OpenGL*>(ShadowMapData->ShadowMapRenderTarget->GetTexture());
-		materialParam->Minification = ETextureFilter::NEAREST;
-		materialParam->Magnification = ETextureFilter::NEAREST;
 		OutMaterialData->Params.push_back(materialParam);
 	}
 }
@@ -510,8 +506,6 @@ void jSpotLight::GetMaterialData(jMaterialData* OutMaterialData) const
 		auto materialParam = new jMaterialParam();
 		materialParam->Name = "shadow_object_spot";
 		materialParam->Texture = static_cast<jTexture_OpenGL*>(ShadowMapData->ShadowMapRenderTarget->GetTexture());
-		materialParam->Minification = ETextureFilter::NEAREST;
-		materialParam->Magnification = ETextureFilter::NEAREST;
 		OutMaterialData->Params.push_back(materialParam);
 	}
 }

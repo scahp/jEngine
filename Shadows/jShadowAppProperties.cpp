@@ -14,7 +14,7 @@ void jShadowAppSettingProperties::Setup(jAppSettingBase* appSetting)
 	appSetting->AddVariable("UseTonemap", UseTonemap);
 	appSetting->AddVariable("AdaptationRate", AdaptationRate);
 	appSetting->SetStep("AdaptationRate", 0.01f);
-	appSetting->SetMinMax("AdaptationRate", 0.0f, 1.0f);
+	appSetting->SetMinMax("AdaptationRate", 0.0f, 4.0f);
 	appSetting->AddVariable("AutoExposureKeyValue", AutoExposureKeyValue);
 	appSetting->SetStep("AutoExposureKeyValue", 0.01f);
 	appSetting->SetMinMax("AutoExposureKeyValue", 0.0f, 1.0f);

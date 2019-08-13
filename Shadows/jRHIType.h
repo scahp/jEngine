@@ -75,7 +75,11 @@ enum class ETextureFilterTarget
 enum class ETextureFilter
 {
 	NEAREST = 0,
-	LINEAR
+	LINEAR,
+	NEAREST_MIPMAP_NEAREST,
+	LINEAR_MIPMAP_NEAREST,
+	NEAREST_MIPMAP_LINEAR,
+	LINEAR_MIPMAP_LINEAR,
 };
 
 enum class ETextureType

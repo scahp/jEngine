@@ -34,6 +34,35 @@ uint32 jRHI_OpenGL::GetOpenGLTextureType(ETextureType textureType) const
 	return result;
 }
 
+uint32 GetOpenGLTextureFilterType(ETextureFilter filter)
+{
+	uint32 texFilter = 0;
+	switch (filter)
+	{
+	case ETextureFilter::NEAREST:
+		texFilter = GL_NEAREST;
+		break;
+	case ETextureFilter::LINEAR:
+		texFilter = GL_LINEAR;
+		break;
+	case ETextureFilter::NEAREST_MIPMAP_NEAREST:
+		texFilter = GL_NEAREST_MIPMAP_NEAREST;
+		break;
+	case ETextureFilter::LINEAR_MIPMAP_NEAREST:
+		texFilter = GL_LINEAR_MIPMAP_NEAREST;
+		break;
+	case ETextureFilter::NEAREST_MIPMAP_LINEAR:
+		texFilter = GL_NEAREST_MIPMAP_LINEAR;
+		break;
+	case ETextureFilter::LINEAR_MIPMAP_LINEAR:
+		texFilter = GL_LINEAR_MIPMAP_LINEAR;
+		break;
+	default:
+		break;
+	}
+	return texFilter;
+}
+
 jVertexBuffer* jRHI_OpenGL::CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const
 {
 	if (!streamData)
@@ -265,6 +294,7 @@ void jRHI_OpenGL::GenerateMips(const jTexture* texture) const
 	const auto textureType = GetOpenGLTextureType(texture_gl->TextureType);
 	glBindTexture(textureType, texture_gl->TextureID);
 	glGenerateMipmap(textureType);
+	glBindTexture(textureType, 0);
 }
 
 void jRHI_OpenGL::SetClear(ERenderBufferType typeBit) const
@@ -651,8 +681,8 @@ void jRHI_OpenGL::SetMatetrial(jMaterialData* materialData, const jShader* shade
 		sRGB_UniformData.Data = tex_gl->sRGB;
 		SetUniformbuffer(&sRGB_UniformData, shader);
 
-		SetTextureFilter(tex_gl->TextureType, ETextureFilterTarget::MAGNIFICATION, matParam->Magnification);
-		SetTextureFilter(tex_gl->TextureType, ETextureFilterTarget::MINIFICATION, matParam->Minification);
+		SetTextureFilter(tex_gl->TextureType, ETextureFilterTarget::MAGNIFICATION, tex_gl->Magnification);
+		SetTextureFilter(tex_gl->TextureType, ETextureFilterTarget::MINIFICATION, tex_gl->Minification);
 		++index;
 	}
 }
@@ -668,18 +698,7 @@ void jRHI_OpenGL::SetTexture(int32 index, const jTexture* texture) const
 
 void jRHI_OpenGL::SetTextureFilter(ETextureType type, ETextureFilterTarget target, ETextureFilter filter) const
 {
-	uint32 texFilter = 0;
-	switch (filter)
-	{
-	case ETextureFilter::NEAREST:
-		texFilter = GL_NEAREST;
-		break;
-	case ETextureFilter::LINEAR:
-		texFilter = GL_LINEAR;
-		break;
-	default:
-		break;
-	}
+	const uint32 texFilter = GetOpenGLTextureFilterType(filter);
 
 	uint32 texTarget = 0;
 	switch (target)
@@ -817,6 +836,9 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 		break;
 	}
 
+	const uint32 magnification = GetOpenGLTextureFilterType(info.Magnification);
+	const uint32 minification = GetOpenGLTextureFilterType(info.Minification);
+
 	auto rt_gl = new jRenderTarget_OpenGL();
 	rt_gl->Info = info;
 	
@@ -834,8 +856,8 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 			glGenTextures(1, &tbo);
 			glBindTexture(GL_TEXTURE_2D, tbo);
 			glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, info.Width, info.Height, 0, format, formatType, nullptr);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minification);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magnification);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, tbo, 0);
@@ -843,6 +865,8 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 
 			auto tex_gl = new jTexture_OpenGL();
 			tex_gl->TextureType = info.TextureType;
+			tex_gl->Magnification = info.Magnification;
+			tex_gl->Minification = info.Minification;
 			tex_gl->TextureID = tbo;
 			rt_gl->Textures[i] = tex_gl;
 		}
@@ -869,12 +893,14 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 	else if (info.TextureType == ETextureType::TEXTURE_2D_ARRAY)
 	{
 		auto tex_gl = new jTexture_OpenGL();
+		tex_gl->Magnification = info.Magnification;
+		tex_gl->Minification = info.Minification;
 
 		uint32 tbo = 0;
 		glGenTextures(1, &tbo);
 		glBindTexture(GL_TEXTURE_2D_ARRAY, tbo);
-		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, minification);
+		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, magnification);
 		glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, internalFormat, info.Width, info.Height, info.TextureCount, 0, format, formatType, nullptr);
 
 		uint32 fbo = 0;
@@ -923,8 +949,8 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 			glGenTextures(1, &tbo);
 			glBindTexture(GL_TEXTURE_2D, tbo);
 			glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, info.Width, info.Height, 0, format, formatType, nullptr);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minification);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magnification);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, tbo, 0);
@@ -932,6 +958,8 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 
 			auto tex_gl = new jTexture_OpenGL();
 			tex_gl->TextureType = info.TextureType;
+			tex_gl->Magnification = info.Magnification;
+			tex_gl->Minification = info.Minification;
 			tex_gl->TextureID = tbo;
 			rt_gl->Textures[i] = tex_gl;
 		}
@@ -959,8 +987,8 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 		uint32 tbo = 0;
 		glGenTextures(1, &tbo);
 		glBindTexture(GL_TEXTURE_CUBE_MAP, tbo);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, minification);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, magnification);
 		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
@@ -971,6 +999,8 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 		auto tex_gl = new jTexture_OpenGL();
 		tex_gl->TextureType = info.TextureType;
 		tex_gl->TextureID = tbo;
+		tex_gl->Magnification = info.Magnification;
+		tex_gl->Minification = info.Minification;
 		rt_gl->Textures.push_back(tex_gl);
 
 		for (int i = 0; i < 6; ++i)

@@ -424,7 +424,9 @@ void jForwardShadowMap_Blur_Pipeline::Setup()
 	EnableDepthTest = false;
 	DepthStencilFunc = EDepthStencilFunc::LEQUAL;
 
+	PostProcessBlur = std::shared_ptr<jPostProcess_Blur>(new jPostProcess_Blur("Blur", true));
 	PostProcessInput = std::shared_ptr<jPostProcessInOutput>(new jPostProcessInOutput());
+	PostProcessOutput = std::shared_ptr<jPostProcessInOutput>(new jPostProcessInOutput());
 }
 
 void jForwardShadowMap_Blur_Pipeline::Draw(const jPipelineData& pipelineData, const jShader* shader) const
@@ -458,24 +460,30 @@ void jForwardShadowMap_Blur_Pipeline::Draw(const jPipelineData& pipelineData, co
 
 		JASSERT(light->GetShadowMapRenderTarget());
 		auto tempRenderTargetPtr = jRenderTargetPool::GetRenderTarget(light->GetShadowMapRenderTarget()->Info);
+
+		PostProcessBlur->OmniDirectional = isOmniDirectional;
+
+		PostProcessBlur->IsVertical = true;
+		PostProcessBlur->ClearInOutputs();
+
+		PostProcessInput->RenderTarget = light->GetShadowMapRenderTarget();
+		PostProcessBlur->AddInput(PostProcessInput);
+
+		PostProcessOutput->RenderTarget = tempRenderTargetPtr.get();
+		PostProcessBlur->SetOutput(PostProcessOutput);
+
+		PostProcessBlur->Process(pipelineData.Camera);
+
+		PostProcessBlur->IsVertical = false;
+		PostProcessBlur->ClearInOutputs();
+	
+		PostProcessInput->RenderTarget = tempRenderTargetPtr.get();
+		PostProcessBlur->AddInput(PostProcessInput);
 		
-		// todo postprocess should alloc once.
-		PostProcessInput->RenderTaret = light->GetShadowMapRenderTarget();
-		auto post1 = new jPostProcess_Blur("BlurVer", tempRenderTargetPtr, true);
-		post1->OmniDirectional = isOmniDirectional;
-		post1->SetPostProcessInput(PostProcessInput);
-		
-		post1->Process(pipelineData.Camera);
+		PostProcessOutput->RenderTarget = light->GetShadowMapRenderTargetPtr().get();
+		PostProcessBlur->SetOutput(PostProcessOutput);
 
-		auto post2 = new jPostProcess_Blur("BlurHor", light->GetShadowMapRenderTargetPtr(), false);
-		PostProcessInput->RenderTaret = tempRenderTargetPtr.get();
-		post2->SetPostProcessInput(PostProcessInput);
-		post2->OmniDirectional = isOmniDirectional;
-
-		post2->Process(pipelineData.Camera);
-
-		delete post1;
-		delete post2;
+		PostProcessBlur->Process(pipelineData.Camera);
 
 		jRenderTargetPool::ReturnRenderTarget(tempRenderTargetPtr.get());
 	}

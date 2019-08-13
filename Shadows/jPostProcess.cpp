@@ -12,23 +12,23 @@
 // IPostprocess
 void IPostprocess::Setup()
 {
-	PostProcessOutput = std::shared_ptr<jPostProcessInOutput>(new jPostProcessInOutput());
-	PostProcessOutput->RenderTaret = RenderTarget.get();
 }
 
 bool IPostprocess::Process(const jCamera* camera) const
 {
 	SCOPE_DEBUG_EVENT(g_rhi, Name.c_str());
 
-	if (RenderTarget)
-		RenderTarget->Begin();
+	auto pCurrentRenderTarget = (PostProcessOutput ? PostProcessOutput.get()->RenderTarget : nullptr);
+
+	if (pCurrentRenderTarget)
+		pCurrentRenderTarget->Begin();
 	else
 		g_rhi->SetRenderTarget(nullptr);
 
 	auto result = Do(camera);
 
-	if (RenderTarget)
-		RenderTarget->End();
+	if (pCurrentRenderTarget)
+		pCurrentRenderTarget->End();
 
 	return result;
 }
@@ -38,20 +38,54 @@ std::weak_ptr<jPostProcessInOutput> IPostprocess::GetPostProcessOutput() const
 	return PostProcessOutput;
 }
 
-void IPostprocess::SetPostProcessInput(const std::weak_ptr<jPostProcessInOutput>& input)
+void IPostprocess::AddInput(const std::weak_ptr<jPostProcessInOutput>& input)
 {
-	PostProcessInput = input;
+	PostProcessInputList.push_back(input);
 }
 
-void IPostprocess::SetPostProcessOutput(const std::shared_ptr<jPostProcessInOutput>& output)
+void IPostprocess::SetOutput(const std::shared_ptr<jPostProcessInOutput>& output)
 {
 	PostProcessOutput = output;
+}
+
+void IPostprocess::ClearInputs()
+{
+	PostProcessInputList.clear();
+}
+
+void IPostprocess::ClearOutputs()
+{
+	PostProcessOutput = nullptr;
+}
+
+void IPostprocess::ClearInOutputs()
+{
+	ClearInputs();
+	ClearOutputs();
 }
 
 jFullscreenQuadPrimitive* IPostprocess::GetFullscreenQuad() const
 {
 	static jFullscreenQuadPrimitive* s_fullscreenQuad = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
 	return s_fullscreenQuad;
+}
+
+void IPostprocess::BindInputs(jFullscreenQuadPrimitive* fsQuad) const
+{
+	int index = 0;
+	for (auto it = PostProcessInputList.begin(); PostProcessInputList.end() != it; ++it,++index)
+	{
+		const auto& input = (*it);
+		const auto texture = input.expired() ? nullptr : input.lock()->RenderTarget->GetTexture();
+		fsQuad->SetTexture(index, texture);
+	}
+}
+
+void IPostprocess::UnbindInputs(jFullscreenQuadPrimitive* fsQuad) const
+{
+	int index = 0;
+	for (auto it = PostProcessInputList.begin(); PostProcessInputList.end() != it; ++it, ++index)
+		fsQuad->SetTexture(index, nullptr);
 }
 
 void IPostprocess::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights) const
@@ -65,22 +99,6 @@ void jPostprocessChain::AddNewPostprocess(IPostprocess* postprocess)
 {
 	JASSERT(postprocess);
 	postprocess->Setup();
-
-	if (!PostProcesses.empty())
-	{
-		IPostprocess* lastPostProcess = *PostProcesses.rbegin();
-		JASSERT(lastPostProcess);
-
-		postprocess->SetPostProcessInput(lastPostProcess->GetPostProcessOutput());
-	}
-	PostProcesses.push_back(postprocess);
-}
-
-void jPostprocessChain::AddNewPostprocess(IPostprocess* postprocess, const std::weak_ptr<jPostProcessInOutput>& input)
-{
-	JASSERT(postprocess);
-	postprocess->Setup();
-	postprocess->SetPostProcessInput(input);
 	PostProcesses.push_back(postprocess);
 }
 
@@ -153,17 +171,16 @@ void jPostProcess_AA_DeepShadowAddition::Setup()
 bool jPostProcess_AA_DeepShadowAddition::Do(const jCamera* camera) const
 {
 	JASSERT(Shader);
-	JASSERT(!PostProcessInput.expired());
+	//JASSERT(!PostProcessInput.expired());
 
 	g_rhi->SetClearColor(0.025f, 0.025f, 0.025f, 1.0f);
 	g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
 
 	auto fullscreenQuad = GetFullscreenQuad();
-	if (!PostProcessInput.expired())
-		fullscreenQuad->SetTexture(PostProcessInput.lock()->RenderTaret->GetTexture());
+	BindInputs(fullscreenQuad);
 	camera->BindCamera(Shader);
 	fullscreenQuad->Draw(camera, Shader, {});
-	fullscreenQuad->SetTexture(nullptr);
+	UnbindInputs(fullscreenQuad);
 
 	return true;
 }
@@ -172,7 +189,7 @@ bool jPostProcess_AA_DeepShadowAddition::Do(const jCamera* camera) const
 // jPostProcess_Blur
 bool jPostProcess_Blur::Do(const jCamera* camera) const
 {
-	JASSERT(!PostProcessInput.expired());
+//	JASSERT(!PostProcessInput.expired());
 
 	g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
@@ -180,15 +197,16 @@ bool jPostProcess_Blur::Do(const jCamera* camera) const
 	auto shader = OmniDirectional ? jShader::GetShader("BlurOmni") : jShader::GetShader("Blur");
 
 	auto fullscreenQuad = GetFullscreenQuad();
-	if (!PostProcessInput.expired())
-		fullscreenQuad->SetTexture(PostProcessInput.lock()->RenderTaret->GetTexture());
+
+	BindInputs(fullscreenQuad);
 
 	g_rhi->SetShader(shader);
 	SET_UNIFORM_BUFFER_STATIC(float, "IsVertical", IsVertical, shader);
 	SET_UNIFORM_BUFFER_STATIC(float, "MaxDist", MaxDist, shader);
 
 	fullscreenQuad->Draw(camera, shader, {});
-	fullscreenQuad->SetTexture(nullptr);
+	
+	UnbindInputs(fullscreenQuad);
 
 	return true;
 }
@@ -204,17 +222,12 @@ void jPostProcess_Tonemap::Setup()
 bool jPostProcess_Tonemap::Do(const jCamera* camera) const
 {
 	JASSERT(Shader);
-	JASSERT(!PostProcessInput.expired());
 
 	g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
 
 	auto fullscreenQuad = GetFullscreenQuad();
-	if (!PostProcessInput.expired())
-	{
-		fullscreenQuad->SetTexture(PostProcessInput.lock()->RenderTaret->GetTexture());
-		fullscreenQuad->SetTexture2(PostProcessInput.lock()->LuminanceMapRT->GetTexture());
-	}
+	BindInputs(fullscreenQuad);
 	camera->BindCamera(Shader);
 	
 	g_rhi->SetShader(Shader);
@@ -222,8 +235,7 @@ bool jPostProcess_Tonemap::Do(const jCamera* camera) const
 	SET_UNIFORM_BUFFER_STATIC(float, "AutoExposureKeyValue", jShadowAppSettingProperties::GetInstance().AutoExposureKeyValue, Shader);
 
 	fullscreenQuad->Draw(camera, Shader, {});
-	fullscreenQuad->SetTexture(nullptr);
-	fullscreenQuad->SetTexture2(nullptr);
+	UnbindInputs(fullscreenQuad);
 
 	return true;
 }
@@ -240,18 +252,20 @@ bool jPostProcess_LuminanceMapGeneration::Process(const jCamera* camera) const
 {
 	SCOPE_DEBUG_EVENT(g_rhi, Name.c_str());
 
-	if (RenderTarget)
-		RenderTarget->Begin();
+	auto pCurrentRenderTarget = (PostProcessOutput ? PostProcessOutput.get()->RenderTarget : nullptr);
+
+	if (pCurrentRenderTarget)
+		pCurrentRenderTarget->Begin();
 	else
 		g_rhi->SetRenderTarget(nullptr);
 
 	auto result = Do(camera);
 
-	if (RenderTarget)
-		RenderTarget->End();
+	if (pCurrentRenderTarget)
+		pCurrentRenderTarget->End();
 
-	if (RenderTarget)
-		g_rhi->GenerateMips(RenderTarget->GetTexture());
+	if (pCurrentRenderTarget)
+		g_rhi->GenerateMips(pCurrentRenderTarget->GetTexture());
 
 	return result;
 }
@@ -259,18 +273,17 @@ bool jPostProcess_LuminanceMapGeneration::Process(const jCamera* camera) const
 bool jPostProcess_LuminanceMapGeneration::Do(const jCamera* camera) const
 {
 	JASSERT(Shader);
-	JASSERT(!PostProcessInput.expired());
+	//JASSERT(!PostProcessInput.expired());
 
 	g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
 
 	auto fullscreenQuad = GetFullscreenQuad();
-	if (!PostProcessInput.expired())
-		fullscreenQuad->SetTexture(PostProcessInput.lock()->RenderTaret->GetTexture());
+	
+	BindInputs(fullscreenQuad);
 	camera->BindCamera(Shader);
-
 	fullscreenQuad->Draw(camera, Shader, {});
-	fullscreenQuad->SetTexture(nullptr);
+	UnbindInputs(fullscreenQuad);
 
 	return true;
 }
@@ -278,60 +291,74 @@ bool jPostProcess_LuminanceMapGeneration::Do(const jCamera* camera) const
 //////////////////////////////////////////////////////////////////////////
 // jPostProcess_AdaptiveLuminance
 int32 jPostProcess_AdaptiveLuminance::s_index = 0;
-bool jPostProcess_AdaptiveLuminance::Process(const jCamera* camera) const
+
+void jPostProcess_AdaptiveLuminance::BindInputs(jFullscreenQuadPrimitive* fsQuad) const
 {
-	SCOPE_DEBUG_EVENT(g_rhi, Name.c_str());
-	UpdateLuminanceIndex();
+	int index = 0;
+	for (auto it = PostProcessInputList.begin(); PostProcessInputList.end() != it; ++it, ++index)
+	{
+		const auto& input = (*it);
+		const auto texture = input.expired() ? nullptr : input.lock()->RenderTarget->GetTexture();
+		fsQuad->SetTexture(index, texture);
+	}
+	auto pLastLuminanceRenderTarget = LastLumianceRenderTarget[!s_index].get()->GetTexture();
+	fsQuad->SetTexture(index++, pLastLuminanceRenderTarget);
+}
 
-	const auto pCurrentLuminanceRT = LastLumianceRenderTarget[s_index];
-
-	if (pCurrentLuminanceRT)
-		pCurrentLuminanceRT->Begin();
-	else
-		g_rhi->SetRenderTarget(nullptr);
-
-	auto result = Do(camera);
-
-	if (pCurrentLuminanceRT)
-		pCurrentLuminanceRT->End();
-
-	PostProcessOutput->LuminanceMapRT = (pCurrentLuminanceRT ? pCurrentLuminanceRT.get() : nullptr);
-
-	return result;
+void jPostProcess_AdaptiveLuminance::UnbindInputs(jFullscreenQuadPrimitive* fsQuad) const
+{
+	for(int index = 0; index < PostProcessInputList.size() + 1 ;++index)
+		fsQuad->SetTexture(index, nullptr);
 }
 
 void jPostProcess_AdaptiveLuminance::Setup()
 {
 	__super::Setup();
 	Shader = jShader::GetShader("AdaptiveLuminance");
-	LastLumianceRenderTarget[0] = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::R32F, EFormat::R, EFormatType::FLOAT, EDepthBufferType::DEPTH, 1, 1, 1 });
-	LastLumianceRenderTarget[1] = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::R32F, EFormat::R, EFormatType::FLOAT, EDepthBufferType::DEPTH, 1, 1, 1 });
+	LastLumianceRenderTarget[0] = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RGBA32F, EFormat::RGBA, EFormatType::FLOAT, EDepthBufferType::DEPTH, 1, 1, 1, ETextureFilter::LINEAR, ETextureFilter::LINEAR_MIPMAP_LINEAR });
+	LastLumianceRenderTarget[1] = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RGBA32F, EFormat::RGBA, EFormatType::FLOAT, EDepthBufferType::DEPTH, 1, 1, 1, ETextureFilter::LINEAR, ETextureFilter::LINEAR_MIPMAP_LINEAR });
 }
 
 bool jPostProcess_AdaptiveLuminance::Do(const jCamera* camera) const
 {
 	JASSERT(Shader);
-	JASSERT(!PostProcessInput.expired());
 
 	g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
 
 	auto fullscreenQuad = GetFullscreenQuad();
 
-	JASSERT(!LuminanceMap.expired());
-	fullscreenQuad->SetTexture(LuminanceMap.lock()->GetTexture());		// CurrentLuminance
-
-	if (!PostProcessInput.expired())
-		fullscreenQuad->SetTexture2(LastLumianceRenderTarget[!s_index]->GetTexture());		// LastLuminance
+	BindInputs(fullscreenQuad);
 	camera->BindCamera(Shader);
-
 	g_rhi->SetShader(Shader);
 	SET_UNIFORM_BUFFER_STATIC(float, "TimeDeltaSecond", g_timeDeltaSecond, Shader);
 	SET_UNIFORM_BUFFER_STATIC(float, "AdaptationRate", jShadowAppSettingProperties::GetInstance().AdaptationRate, Shader);
-
 	fullscreenQuad->Draw(camera, Shader, {});
-	fullscreenQuad->SetTexture(nullptr);
-	fullscreenQuad->SetTexture2(nullptr);
-
+	UnbindInputs(fullscreenQuad);
 	return true;
+}
+
+bool jPostProcess_AdaptiveLuminance::Process(const jCamera* camera) const
+{
+	SCOPE_DEBUG_EVENT(g_rhi, Name.c_str());
+	UpdateLuminanceIndex();
+
+	auto pCurrentRenderTarget = (LastLumianceRenderTarget[s_index] ? LastLumianceRenderTarget[s_index] : nullptr);
+
+	if (pCurrentRenderTarget)
+		pCurrentRenderTarget->Begin();
+	else
+		g_rhi->SetRenderTarget(nullptr);
+
+	auto result = Do(camera);
+
+	if (pCurrentRenderTarget)
+		pCurrentRenderTarget->End();
+
+	JASSERT(PostProcessOutput);
+	if (PostProcessOutput)
+		PostProcessOutput.get()->RenderTarget = pCurrentRenderTarget.get();
+
+	return result;
+
 }

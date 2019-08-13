@@ -73,7 +73,7 @@ void jGame::Setup()
 	DirectionalLight = NormalDirectionalLight;
 
 	//AmbientLight = jLight::CreateAmbientLight(Vector(0.7f, 0.8f, 0.8f), Vector(0.1f));
-	AmbientLight = jLight::CreateAmbientLight(Vector(1.0f), Vector(0.1f));
+	AmbientLight = jLight::CreateAmbientLight(Vector(0.2f, 0.5f, 1.0f), Vector(0.1f));
 
 	PointLight = jLight::CreatePointLight(jShadowAppSettingProperties::GetInstance().PointLightPosition, Vector4(2.0f, 0.7f, 0.7f, 1.0f), 500.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
 	SpotLight = jLight::CreateSpotLight(jShadowAppSettingProperties::GetInstance().SpotLightPosition, jShadowAppSettingProperties::GetInstance().SpotLightDirection, Vector4(0.0f, 1.0f, 0.0f, 1.0f), 500.0f, 0.7f, 1.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
@@ -93,7 +93,7 @@ void jGame::Setup()
 	MainCamera->AddLight(DirectionalLight);
 	MainCamera->AddLight(PointLight);
 	MainCamera->AddLight(SpotLight);
-	//MainCamera->AddLight(AmbientLight);
+	MainCamera->AddLight(AmbientLight);
 
 	SpawnObjects(ESpawnedType::TestPrimitive);
 

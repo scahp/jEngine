@@ -27,5 +27,5 @@ void main()
     vec3 finalColor = vec3(0.0, 0.0, 0.0);
     finalColor += GetAmbientLight(AmbientLight);
 
-    color = vec4(finalColor * diffuse, Color_.w);
+    color = vec4(finalColor, Color_.w);
 }

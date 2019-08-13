@@ -216,7 +216,9 @@ public:
 	virtual void Setup() override;
 	virtual void Draw(const jPipelineData& pipelineData, const jShader* shader) const override;
 
+	std::shared_ptr<class jPostProcess_Blur> PostProcessBlur;
 	std::shared_ptr<struct jPostProcessInOutput> PostProcessInput;
+	std::shared_ptr<struct jPostProcessInOutput> PostProcessOutput;
 };
 
 //////////////////////////////////////////////////////////////////////////

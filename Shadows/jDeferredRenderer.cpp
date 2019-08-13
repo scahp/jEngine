@@ -28,9 +28,11 @@ void jDeferredRenderer::Setup()
 
 	SetChangePipelineSet(DeferredDeepShadowMapPipelineSet);
 
-	//////////////////////////////////////////////////////////////////////////
-	// Setup a postprocess chain
-	auto tempRenderTarget = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RGBA, EFormat::RGBA, EFormatType::FLOAT, EDepthBufferType::DEPTH, SCR_WIDTH, SCR_HEIGHT, 1 }));
+	////////////////////////////////////////////////////////////////////////////
+	//// Setup a postprocess chain
+	OutRenderTarget = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RGBA, EFormat::RGBA, EFormatType::FLOAT, EDepthBufferType::DEPTH, SCR_WIDTH, SCR_HEIGHT, 1 }));
+	PostProcessOutput = std::shared_ptr<jPostProcessInOutput>(new jPostProcessInOutput());
+	PostProcessOutput->RenderTarget = OutRenderTarget.get();
 	{
 		// this postprocess have to have DeepShadowMap PipelineSet.
 		JASSERT(PipelineSet->GetType() == EPipelineSetType::DeepShadowMap);
@@ -38,29 +40,46 @@ void jDeferredRenderer::Setup()
 		auto& DeepShadowMapBuffers = deferredDeepShadowMapPipelineSet->DeepShadowMapBuffers;
 
 		// LightPass of DeepShadowMap
-		auto postprocess = new jPostProcess_DeepShadowMap("DeepShadow", tempRenderTarget, { DeepShadowMapBuffers.StartElementBuf, DeepShadowMapBuffers.LinkedListEntryDepthAlphaNext, DeepShadowMapBuffers.LinkedListEntryNeighbors }, &GBuffer);
-		PostProcessChain.AddNewPostprocess(postprocess);
-	}
-
-	auto RenderTarget = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RGBA, EFormat::RGBA, EFormatType::FLOAT, EDepthBufferType::DEPTH, SCR_WIDTH, SCR_HEIGHT, 1 }));
-	{
-		auto postprocess = new jPostProcess_AA_DeepShadowAddition("AA_DeepShadowAddition", RenderTarget);
-		PostProcessChain.AddNewPostprocess(postprocess);
-	}
-
-	LuminanceRenderTarget = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::R32F, EFormat::R, EFormatType::FLOAT, EDepthBufferType::DEPTH, LUMINANCE_WIDTH, LUMINANCE_HEIGHT, 1 }));
-	{
-		auto postprocess = new jPostProcess_LuminanceMapGeneration("LuminanceMapGeneration", LuminanceRenderTarget);
+		auto postprocess = new jPostProcess_DeepShadowMap("DeepShadow", { DeepShadowMapBuffers.StartElementBuf, DeepShadowMapBuffers.LinkedListEntryDepthAlphaNext, DeepShadowMapBuffers.LinkedListEntryNeighbors }, &GBuffer);
+		postprocess->SetOutput(PostProcessOutput);
 		PostProcessChain.AddNewPostprocess(postprocess);
 	}
 
 	{
-		auto postprocess = new jPostProcess_AdaptiveLuminance("AdaptiveLuminance", RenderTarget, LuminanceRenderTarget);
+		PostPrceoss_AA_DeepShadowAddition = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RGBA, EFormat::RGBA, EFormatType::FLOAT, EDepthBufferType::DEPTH, SCR_WIDTH, SCR_HEIGHT, 1 }));
+		PostProcessOutput2 = std::shared_ptr<jPostProcessInOutput>(new jPostProcessInOutput());
+		PostProcessOutput2->RenderTarget = PostPrceoss_AA_DeepShadowAddition.get();
+
+		auto postprocess = new jPostProcess_AA_DeepShadowAddition("AA_DeepShadowAddition");
+		postprocess->AddInput(PostProcessOutput);
+		postprocess->SetOutput(PostProcessOutput2);
 		PostProcessChain.AddNewPostprocess(postprocess);
 	}
 
 	{
-		auto postprocess = new jPostProcess_Tonemap("Tonemap", nullptr);
+		LuminanceRenderTarget = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::R32F, EFormat::R, EFormatType::FLOAT, EDepthBufferType::DEPTH, LUMINANCE_WIDTH, LUMINANCE_HEIGHT, 1 }));
+		PostProcessLuminanceOutput = std::shared_ptr<jPostProcessInOutput>(new jPostProcessInOutput());
+		PostProcessLuminanceOutput->RenderTarget = LuminanceRenderTarget.get();
+
+		auto postprocess = new jPostProcess_LuminanceMapGeneration("LuminanceMapGeneration");
+		postprocess->AddInput(PostProcessOutput2);
+		postprocess->SetOutput(PostProcessLuminanceOutput);
+		PostProcessChain.AddNewPostprocess(postprocess);
+	}
+
+	auto avgLuminancePostProcessOutput = std::shared_ptr<jPostProcessInOutput>(new jPostProcessInOutput());
+	{
+		auto postprocess = new jPostProcess_AdaptiveLuminance("AdaptiveLuminance");
+		postprocess->AddInput(PostProcessLuminanceOutput);
+		postprocess->SetOutput(avgLuminancePostProcessOutput);
+		PostProcessChain.AddNewPostprocess(postprocess);
+	}
+
+	{
+		auto postprocess = new jPostProcess_Tonemap("Tonemap");
+		postprocess->AddInput(PostProcessOutput2);
+		postprocess->AddInput(avgLuminancePostProcessOutput);
+		postprocess->SetOutput(nullptr);
 		PostProcessChain.AddNewPostprocess(postprocess);
 	}
 }

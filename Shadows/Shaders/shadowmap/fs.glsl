@@ -196,8 +196,9 @@ void main()
     bool shadow = false;
     vec3 finalColor = vec3(0.0, 0.0, 0.0);
 
+	vec3 ambientColor = vec3(0.0, 0.0, 0.0);
     if (UseAmbientLight != 0)
-        finalColor += GetAmbientLight(AmbientLight);
+        ambientColor = GetAmbientLight(AmbientLight);
 
 #if defined(USE_POISSON_SAMPLE)
         InitPoissonSamples(gl_FragCoord.xy);
@@ -424,5 +425,5 @@ void main()
         }
     }
 
-    color = vec4(finalColor * diffuse.xyz, diffuse.w);
+    color = vec4(ambientColor + finalColor * diffuse.xyz, diffuse.w);
 }

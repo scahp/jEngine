@@ -14,7 +14,7 @@ out vec4 FragColor;
 void main()
 {
 	float currentLuminance = exp(textureLod(tex_object, vec2(0.5, 0.5), 10.0).x);
-	float lastLuminance = texture(tex_object2, vec2(0.0, 0.0)).x;
+	float lastLuminance = texelFetch(tex_object2, ivec2(0, 0), 0).x;
 
 	// Adapt the luminance using Pattanaik's technique
 	float adaptedLuminance = lastLuminance + (currentLuminance - lastLuminance) * (1.0 - exp(-TimeDeltaSecond * AdaptationRate));

@@ -38,8 +38,6 @@ struct jShader_OpenGL : public jShader
 
 struct jTexture_OpenGL : public jTexture
 {
-	bool sRGB = false;
-	ETextureType TextureType;
 	uint32 TextureID = 0;
 };
 

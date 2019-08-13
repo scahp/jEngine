@@ -89,5 +89,4 @@ inline void hash_combine(std::size_t& seed, const T& v)
 
 ERenderBufferType MakeRenderBufferTypeList(const std::initializer_list<ERenderBufferType>& list);
 
-
 #endif //PCH_H

@@ -31,7 +31,11 @@ struct jIndexBuffer : public IBuffer
 
 struct jTexture
 {
+	bool sRGB = false;
+	ETextureType TextureType;
 
+	ETextureFilter Minification = ETextureFilter::NEAREST;
+	ETextureFilter Magnification = ETextureFilter::NEAREST;
 };
 
 struct jViewport
@@ -185,8 +189,6 @@ struct jMaterialParam
 
 	std::string Name;
 	const jTexture* Texture = nullptr;
-	ETextureFilter Minification = ETextureFilter::NEAREST;
-	ETextureFilter Magnification = ETextureFilter::NEAREST;
 };
 
 struct jMaterialData
@@ -233,6 +235,8 @@ struct jRenderTargetInfo
 	int32 Width = 0;
 	int32 Height = 0;
 	int32 TextureCount = 1;
+	ETextureFilter Magnification;
+	ETextureFilter Minification;
 };
 
 struct jRenderTarget : public std::enable_shared_from_this<jRenderTarget>

@@ -30,6 +30,7 @@ public:
 	std::shared_ptr<jRenderTarget> RenderTarget;
 	std::shared_ptr<jRenderTarget> RenderTarget2;
 	std::shared_ptr<jRenderTarget> LuminanceRenderTarget;
+	std::shared_ptr<jRenderTarget> AvgLuminanceRenderTarget;
 	std::shared_ptr<jPostProcessInOutput> PostProcessInput;
 };
 

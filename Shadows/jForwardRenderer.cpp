@@ -19,23 +19,33 @@ void jForwardRenderer::Setup()
 	RenderTarget = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RGBA16F, EFormat::RGBA, EFormatType::FLOAT, EDepthBufferType::DEPTH_STENCIL, SCR_WIDTH, SCR_HEIGHT, 1 }));
 
 	PostProcessInput = std::shared_ptr<jPostProcessInOutput>(new jPostProcessInOutput());
-	PostProcessInput->RenderTaret = RenderTarget.get();
+	PostProcessInput->RenderTarget = RenderTarget.get();
 
 	//////////////////////////////////////////////////////////////////////////
 	// Setup a postprocess chain
-	LuminanceRenderTarget = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::R32F, EFormat::R, EFormatType::FLOAT, EDepthBufferType::DEPTH, LUMINANCE_WIDTH, LUMINANCE_HEIGHT, 1 }));
+	LuminanceRenderTarget = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::R32F, EFormat::R, EFormatType::FLOAT, EDepthBufferType::DEPTH, LUMINANCE_WIDTH, LUMINANCE_HEIGHT, 1, ETextureFilter::LINEAR, ETextureFilter::LINEAR_MIPMAP_LINEAR }));
+	auto luminancePostProcessOutput = std::shared_ptr<jPostProcessInOutput>(new jPostProcessInOutput());
+	luminancePostProcessOutput->RenderTarget = LuminanceRenderTarget.get();
 	{
-		auto postprocess = new jPostProcess_LuminanceMapGeneration("LuminanceMapGeneration", LuminanceRenderTarget);
-		PostProcessChain.AddNewPostprocess(postprocess, PostProcessInput);
+		auto postprocess = new jPostProcess_LuminanceMapGeneration("LuminanceMapGeneration");
+		postprocess->AddInput(PostProcessInput);
+		postprocess->SetOutput(luminancePostProcessOutput);
+		PostProcessChain.AddNewPostprocess(postprocess);
 	}
 
+	auto avgLuminancePostProcessOutput = std::shared_ptr<jPostProcessInOutput>(new jPostProcessInOutput());
 	{
-		auto postprocess = new jPostProcess_AdaptiveLuminance("AdaptiveLuminance", RenderTarget, LuminanceRenderTarget);
+		auto postprocess = new jPostProcess_AdaptiveLuminance("AdaptiveLuminance");
+		postprocess->AddInput(luminancePostProcessOutput);
+		postprocess->SetOutput(avgLuminancePostProcessOutput);
 		PostProcessChain.AddNewPostprocess(postprocess);
 	}
 
 	{
-		auto postprocess = new jPostProcess_Tonemap("Tonemap", nullptr);
+		auto postprocess = new jPostProcess_Tonemap("Tonemap");
+		postprocess->AddInput(PostProcessInput);
+		postprocess->AddInput(avgLuminancePostProcessOutput);
+		postprocess->SetOutput(nullptr);
 		PostProcessChain.AddNewPostprocess(postprocess);
 	}
 }
