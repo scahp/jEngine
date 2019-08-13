@@ -1,6 +1,15 @@
 #include <pch.h>
 #include "jFile.h"
 
+uint64 jFile::GetFileTimeStamp(const char* filename)
+{
+	JASSERT(filename);
+
+	WIN32_FILE_ATTRIBUTE_DATA attributes;
+	GetFileAttributesExA(filename, GetFileExInfoStandard, &attributes);
+	return attributes.ftLastWriteTime.dwLowDateTime | static_cast<uint64>(attributes.ftLastWriteTime.dwHighDateTime) << 32;
+}
+
 jFile::~jFile()
 {
 	CloseFile();

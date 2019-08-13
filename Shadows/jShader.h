@@ -85,6 +85,7 @@ jShaderInfo::AddShaderInfo(info); \
 struct jShader : public std::enable_shared_from_this<jShader>
 {
 	static std::unordered_map<size_t, std::shared_ptr<jShader> > ShaderMap;
+	static std::vector<std::shared_ptr<jShader> > ShaderVector;
 	static std::unordered_map<std::string, std::shared_ptr<jShader> > ShaderNameMap;
 	static jShader* GetShader(size_t hashCode);
 	static jShader* GetShader(const std::string& name);
@@ -92,4 +93,10 @@ struct jShader : public std::enable_shared_from_this<jShader>
 	static std::shared_ptr<jShader> GetShaderPtr(size_t hashCode);
 	static std::shared_ptr<jShader> GetShaderPtr(const std::string& name);
 	static std::shared_ptr<jShader> CreateShaderPtr(const jShaderInfo& shaderInfo);
+	static void UpdateShaders();
+
+	uint64 TimeStamp = 0;
+	jShaderInfo ShaderInfo;
+
+	void UpdateShader();
 };

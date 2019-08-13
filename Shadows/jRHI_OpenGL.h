@@ -149,6 +149,8 @@ public:
 	virtual void SetClearColor(Vector4 rgba) const override;
 	virtual void SetShader(const jShader* shader) const override;
 	virtual jShader* CreateShader(const jShaderInfo& shaderInfo) const override;
+	virtual bool CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo) const override;
+	virtual void DeleteShader(jShader* shader) const override;
 	virtual jTexture* CreateNullTexture() const override;
 	virtual jTexture* CreateTextureFromData(unsigned char* data, int32 width, int32 height, bool sRGB) const override;
 	virtual bool SetUniformbuffer(const IUniformBuffer* buffer, const jShader* shader) const override;

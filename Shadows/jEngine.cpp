@@ -38,6 +38,8 @@ void jEngine::Update(float deltaTime)
 {
 	g_timeDeltaSecond = deltaTime;
 	Game.Update(deltaTime);
+
+	jShader::UpdateShaders();
 }
 
 void jEngine::Resize(int width, int height)

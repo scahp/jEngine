@@ -29,6 +29,8 @@ public:
 	typedef char ELEMENT_TYPE;
 	typedef std::vector<ELEMENT_TYPE> FILE_BUFFER;
 
+	static uint64 GetFileTimeStamp(const char* filename);
+
 	jFile() : m_fp(nullptr) {}
 	~jFile();
 

@@ -330,14 +330,23 @@ void jRHI_OpenGL::SetShader(const jShader* shader) const
 
 jShader* jRHI_OpenGL::CreateShader(const jShaderInfo& shaderInfo) const
 {
+	auto shader = new jShader_OpenGL();
+	CreateShader(shader, shaderInfo);
+	return shader;
+}
+
+bool jRHI_OpenGL::CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo) const
+{
+	JASSERT(OutShader);
+
 	// https://stackoverflow.com/questions/5878775/how-to-find-and-replace-string
 	auto ReplaceString = [](std::string subject, const std::string& search, const std::string& replace) {
-			size_t pos = 0;
-			while ((pos = subject.find(search, pos)) != std::string::npos) {
-				subject.replace(pos, search.length(), replace);
-				pos += replace.length();
-			}
-			return subject;
+		size_t pos = 0;
+		while ((pos = subject.find(search, pos)) != std::string::npos) {
+			subject.replace(pos, search.length(), replace);
+			pos += replace.length();
+		}
+		return subject;
 	};
 
 	static bool initializedCommonShader = false;
@@ -384,7 +393,7 @@ jShader* jRHI_OpenGL::CreateShader(const jShaderInfo& shaderInfo) const
 				JMESSAGE(&errorLog[0]);
 				glDeleteShader(compute_shader);
 			}
-			return nullptr;
+			return false;
 		}
 
 		program = glCreateProgram();
@@ -405,7 +414,7 @@ jShader* jRHI_OpenGL::CreateShader(const jShaderInfo& shaderInfo) const
 				glDeleteShader(compute_shader);
 				glDeleteProgram(program);
 			}
-			return nullptr;
+			return false;
 		}
 
 		glDeleteShader(compute_shader);
@@ -419,6 +428,7 @@ jShader* jRHI_OpenGL::CreateShader(const jShaderInfo& shaderInfo) const
 		vsText = ReplaceString(vsText, "#include \"shadow.glsl\"", shadowShader);
 		vsText = ReplaceString(vsText, "#include \"common.glsl\"", commonShader);
 		vsText = ReplaceString(vsText, "#preprocessor", shaderInfo.vsPreProcessor);
+		vsFile.CloseFile();
 
 		jFile gsFile;
 		gsFile.OpenFile(shaderInfo.gs.c_str(), FileType::TEXT, ReadWriteType::READ);
@@ -427,6 +437,7 @@ jShader* jRHI_OpenGL::CreateShader(const jShaderInfo& shaderInfo) const
 		gsText = ReplaceString(gsText, "#include \"shadow.glsl\"", shadowShader);
 		gsText = ReplaceString(gsText, "#include \"common.glsl\"", commonShader);
 		gsText = ReplaceString(gsText, "#preprocessor", shaderInfo.gsPreProcessor);
+		gsFile.CloseFile();
 
 		jFile fsFile;
 		fsFile.OpenFile(shaderInfo.fs.c_str(), FileType::TEXT, ReadWriteType::READ);
@@ -435,6 +446,7 @@ jShader* jRHI_OpenGL::CreateShader(const jShaderInfo& shaderInfo) const
 		fsText = ReplaceString(fsText, "#include \"shadow.glsl\"", shadowShader);
 		fsText = ReplaceString(fsText, "#include \"common.glsl\"", commonShader);
 		fsText = ReplaceString(fsText, "#preprocessor", shaderInfo.fsPreProcessor);
+		fsFile.CloseFile();
 
 		auto vs = glCreateShader(GL_VERTEX_SHADER);
 		const char* vsPtr = vsText.c_str();
@@ -464,7 +476,7 @@ jShader* jRHI_OpenGL::CreateShader(const jShaderInfo& shaderInfo) const
 			return true;
 		};
 		if (!checkShaderValid(vs, shaderInfo.vs))
-			return nullptr;
+			return false;
 
 		uint32 gs = 0;
 		if (!gsText.empty())
@@ -477,7 +489,7 @@ jShader* jRHI_OpenGL::CreateShader(const jShaderInfo& shaderInfo) const
 			if (!checkShaderValid(gs, shaderInfo.gs))
 			{
 				glDeleteShader(vs);
-				return nullptr;
+				return false;
 			}
 		}
 
@@ -490,14 +502,15 @@ jShader* jRHI_OpenGL::CreateShader(const jShaderInfo& shaderInfo) const
 		if (!checkShaderValid(fs, shaderInfo.fs))
 		{
 			glDeleteShader(vs);
-			if (!gs)
+			if (gs)
 				glDeleteShader(gs);
-			return nullptr;
+			return false;
 		}
 
 		program = glCreateProgram();
 		glAttachShader(program, vs);
-		glAttachShader(program, gs);
+		if (gs)
+			glAttachShader(program, gs);
 		glAttachShader(program, fs);
 		glLinkProgram(program);
 
@@ -516,8 +529,10 @@ jShader* jRHI_OpenGL::CreateShader(const jShaderInfo& shaderInfo) const
 			}
 			glDeleteShader(vs);
 			glDeleteShader(fs);
+			if (gs)
+				glDeleteShader(gs);
 			glDeleteShader(program);
-			return nullptr;
+			return false;
 		}
 
 		glValidateProgram(program);
@@ -536,16 +551,33 @@ jShader* jRHI_OpenGL::CreateShader(const jShaderInfo& shaderInfo) const
 			}
 			glDeleteShader(vs);
 			glDeleteShader(fs);
+			if (gs)
+				glDeleteShader(gs);
 			glDeleteShader(program);
-			return nullptr;
+			return false;
 		}
 		glDeleteShader(vs);
+		if (gs)
+			glDeleteShader(gs);
 		glDeleteShader(fs);
 	}
 
-	auto shader = new jShader_OpenGL();
-	shader->program = program;
-	return shader;
+	auto shader_gl = static_cast<jShader_OpenGL*>(OutShader);
+	if (shader_gl->program)
+		glDeleteProgram(shader_gl->program);
+	shader_gl->program = program;
+	shader_gl->ShaderInfo = shaderInfo;
+
+	return true;
+}
+
+void jRHI_OpenGL::DeleteShader(jShader* shader) const
+{
+	JASSERT(shader);
+	auto shader_gl = static_cast<jShader_OpenGL*>(shader);
+	if (shader_gl->program)
+		glDeleteProgram(shader_gl->program);
+	shader_gl->program = 0;
 }
 
 jTexture* jRHI_OpenGL::CreateNullTexture() const
