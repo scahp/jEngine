@@ -253,6 +253,13 @@ struct jRenderTarget : public std::enable_shared_from_this<jRenderTarget>
 	std::vector<jTexture*> Textures;
 };
 
+struct jQueryTime
+{
+	virtual ~jQueryTime() {}
+
+	uint64 TimeStamp = 0;
+};
+
 class jRHI
 {
 public:
@@ -283,7 +290,7 @@ public:
 	virtual void SetShader(const jShader* shader) const {}
 	virtual jShader* CreateShader(const jShaderInfo& shaderInfo) const { return nullptr; }
 	virtual bool CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo) const { return false;  }
-	virtual void DeleteShader(jShader* shader) const {}
+	virtual void ReleaseShader(jShader* shader) const {}
 	virtual void SetViewport(int32 x, int32 y, int32 width, int32 height) const {}
 	virtual void SetViewport(const jViewport& viewport) const {}
 	virtual void SetViewportIndexed(int32 index, float x, float y, float width, float height) const {}
@@ -312,6 +319,13 @@ public:
 	virtual void BeginDebugEvent(const char* name) const {}
 	virtual void EndDebugEvent() const {}
 	virtual void GenerateMips(const jTexture* texture) const {}
+	virtual jQueryTime* CreateQueryTime() const { return nullptr;  }
+	virtual void ReleaseQueryTime(jQueryTime* queryTime) const {}
+	virtual void QueryTimeStamp(const jQueryTime* queryTimeStamp) const {}
+	virtual bool IsQueryTimeStampResult(const jQueryTime* queryTimeStamp, bool isWaitUntilAvailable) const { return false; }
+	virtual void GetQueryTimeStampResult(jQueryTime* queryTimeStamp) const {}
+	virtual void BeginQueryTimeElapsed(const jQueryTime* queryTimeElpased) const {}
+	virtual void EndQueryTimeElapsed(const jQueryTime* queryTimeElpased) const {}
 };
 
 // Not thred safe

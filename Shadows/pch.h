@@ -89,4 +89,19 @@ inline void hash_combine(std::size_t& seed, const T& v)
 
 ERenderBufferType MakeRenderBufferTypeList(const std::initializer_list<ERenderBufferType>& list);
 
+#include "jPerformanceProfile.h"
+
+#define TRUE_PER_MS(WaitMS)\
+[waitMS = WaitMS]() -> bool\
+{\
+	static int64 lastTick = GetTickCount64();\
+	int64 currentTick = GetTickCount64();\
+	if (currentTick - lastTick >= waitMS)\
+	{\
+		lastTick = currentTick;\
+		return true;\
+	}\
+	return false;\
+}()
+
 #endif //PCH_H

@@ -297,6 +297,63 @@ void jRHI_OpenGL::GenerateMips(const jTexture* texture) const
 	glBindTexture(textureType, 0);
 }
 
+jQueryTime* jRHI_OpenGL::CreateQueryTime() const
+{
+	auto queryTime = new jQueryTime_OpenGL();
+	glGenQueries(1, &queryTime->QueryId);
+	return queryTime;
+}
+
+void jRHI_OpenGL::ReleaseQueryTime(jQueryTime* queryTime) const 
+{
+	auto queryTime_gl = static_cast<jQueryTime_OpenGL*>(queryTime);
+	glDeleteQueries(1, &queryTime_gl->QueryId);
+	queryTime_gl->QueryId = 0;
+}
+
+void jRHI_OpenGL::QueryTimeStamp(const jQueryTime* queryTimeStamp) const
+{
+	const auto queryTimeStamp_gl = static_cast<const jQueryTime_OpenGL*>(queryTimeStamp);
+	JASSERT(queryTimeStamp_gl->QueryId > 0);
+	glQueryCounter(queryTimeStamp_gl->QueryId, GL_TIMESTAMP);
+}
+
+bool jRHI_OpenGL::IsQueryTimeStampResult(const jQueryTime* queryTimeStamp, bool isWaitUntilAvailable) const
+{
+	auto queryTimeStamp_gl = static_cast<const jQueryTime_OpenGL*>(queryTimeStamp);
+	JASSERT(queryTimeStamp_gl->QueryId > 0);
+	uint32 available = 0;
+	if (isWaitUntilAvailable)
+	{
+		while (!available)
+			glGetQueryObjectuiv(queryTimeStamp_gl->QueryId, GL_QUERY_RESULT_AVAILABLE, &available);
+	}
+	else
+	{
+		glGetQueryObjectuiv(queryTimeStamp_gl->QueryId, GL_QUERY_RESULT_AVAILABLE, &available);
+	}
+	return !!available;
+}
+
+void jRHI_OpenGL::GetQueryTimeStampResult(jQueryTime* queryTimeStamp) const
+{
+	auto queryTimeStamp_gl = static_cast<jQueryTime_OpenGL*>(queryTimeStamp);
+	JASSERT(queryTimeStamp_gl->QueryId > 0);
+	glGetQueryObjectui64v(queryTimeStamp_gl->QueryId, GL_QUERY_RESULT, &queryTimeStamp_gl->TimeStamp);
+}
+
+void jRHI_OpenGL::BeginQueryTimeElapsed(const jQueryTime* queryTimeElpased) const
+{
+	const auto queryTimeElpased_gl = static_cast<const jQueryTime_OpenGL*>(queryTimeElpased);
+	JASSERT(queryTimeElpased_gl->QueryId > 0);
+	glBeginQuery(GL_TIME_ELAPSED, queryTimeElpased_gl->QueryId);
+}
+
+void jRHI_OpenGL::EndQueryTimeElapsed(const jQueryTime* queryTimeElpased) const 
+{
+	glEndQuery(GL_TIME_ELAPSED);
+}
+
 void jRHI_OpenGL::SetClear(ERenderBufferType typeBit) const
 {
 	uint32 clearBufferBit = 0;
@@ -571,7 +628,7 @@ bool jRHI_OpenGL::CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo
 	return true;
 }
 
-void jRHI_OpenGL::DeleteShader(jShader* shader) const
+void jRHI_OpenGL::ReleaseShader(jShader* shader) const
 {
 	JASSERT(shader);
 	auto shader_gl = static_cast<jShader_OpenGL*>(shader);

@@ -109,6 +109,13 @@ struct jAtomicCounterBuffer_OpenGL : public IAtomicCounterBuffer
 	virtual void ClearBuffer(int32 clearValue) override;
 };
 
+struct jQueryTime_OpenGL : public jQueryTime
+{
+	virtual ~jQueryTime_OpenGL() {}
+
+	uint32 QueryId = 0;
+};
+
 class jRHI_OpenGL : public jRHI
 {
 public:
@@ -150,7 +157,7 @@ public:
 	virtual void SetShader(const jShader* shader) const override;
 	virtual jShader* CreateShader(const jShaderInfo& shaderInfo) const override;
 	virtual bool CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo) const override;
-	virtual void DeleteShader(jShader* shader) const override;
+	virtual void ReleaseShader(jShader* shader) const override;
 	virtual jTexture* CreateNullTexture() const override;
 	virtual jTexture* CreateTextureFromData(unsigned char* data, int32 width, int32 height, bool sRGB) const override;
 	virtual bool SetUniformbuffer(const IUniformBuffer* buffer, const jShader* shader) const override;
@@ -186,5 +193,12 @@ public:
 	virtual void BeginDebugEvent(const char* name) const override;
 	virtual void EndDebugEvent() const override;
 	virtual void GenerateMips(const jTexture* texture) const override;
+	virtual jQueryTime* CreateQueryTime() const override;
+	virtual void ReleaseQueryTime(jQueryTime* queryTime) const override;
+	virtual void QueryTimeStamp(const jQueryTime* queryTimeStamp) const override;
+	virtual bool IsQueryTimeStampResult(const jQueryTime* queryTimeStamp, bool isWaitUntilAvailable) const override;
+	virtual void GetQueryTimeStampResult(jQueryTime* queryTimeStamp) const override;
+	virtual void BeginQueryTimeElapsed(const jQueryTime* queryTimeElpased) const override;
+	virtual void EndQueryTimeElapsed(const jQueryTime* queryTimeElpased) const override;
 };
 

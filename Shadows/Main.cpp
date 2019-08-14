@@ -88,6 +88,7 @@ int main()
 		lastTick = currentTick;
 
 		g_Engine.Update(g_timeDeltaSecond);
+		jPerformanceProfile::GetInstance().Update(g_timeDeltaSecond);
 
 		{
 			SCOPE_DEBUG_EVENT(g_rhi, "TwDraw");
