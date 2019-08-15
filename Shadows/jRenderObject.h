@@ -48,6 +48,7 @@ public:
 
 	const jTexture* tex_object = nullptr;
 	const jTexture* tex_object2 = nullptr;
+	const jTexture* tex_object3 = nullptr;
 	jTexture* tex_object_array = nullptr;
 
 	Vector Pos = Vector::ZeroVector;

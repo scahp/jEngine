@@ -178,3 +178,64 @@ private:
 	const jShader* Shader = nullptr;
 	std::shared_ptr<jRenderTarget> LastLumianceRenderTarget[2];
 };
+
+//////////////////////////////////////////////////////////////////////////
+// BloomThreshold
+class jPostProcess_BloomThreshold : public IPostprocess
+{
+public:
+	using IPostprocess::IPostprocess;
+
+	virtual void Setup() override;
+	virtual bool Do(const jCamera* camera) const override;
+
+private:
+	const jShader* Shader = nullptr;
+};
+
+//////////////////////////////////////////////////////////////////////////
+// Scale
+class jPostProcess_Scale : public IPostprocess
+{
+public:
+	using IPostprocess::IPostprocess;
+
+	virtual void Setup() override;
+	virtual bool Do(const jCamera* camera) const override;
+
+private:
+	const jShader* Shader = nullptr;
+};
+
+//////////////////////////////////////////////////////////////////////////
+// GaussianBlurH
+class jPostProcess_GaussianBlurH : public IPostprocess
+{
+public:
+	using IPostprocess::IPostprocess;
+
+	virtual void Setup() override;
+	virtual bool Do(const jCamera* camera) const override;
+	virtual void BindInputs(jFullscreenQuadPrimitive* fsQuad) const override;
+	virtual void UnbindInputs(jFullscreenQuadPrimitive* fsQuad) const override;
+
+private:
+	const jShader* Shader = nullptr;
+};
+
+//////////////////////////////////////////////////////////////////////////
+// GaussianBlurV
+class jPostProcess_GaussianBlurV : public IPostprocess
+{
+public:
+	using IPostprocess::IPostprocess;
+
+	virtual void Setup() override;
+	virtual bool Do(const jCamera* camera) const override;
+	virtual void BindInputs(jFullscreenQuadPrimitive* fsQuad) const override;
+	virtual void UnbindInputs(jFullscreenQuadPrimitive* fsQuad) const override;
+
+private:
+	const jShader* Shader = nullptr;
+};
+

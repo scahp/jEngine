@@ -61,6 +61,7 @@ public:
 	void SetTexture(int index, const jTexture* texture);
 	void SetTexture(const jTexture* texture);
 	void SetTexture2(const jTexture* texture);
+	void SetTexture3(const jTexture* texture);
 };
 
 struct jBoundBox

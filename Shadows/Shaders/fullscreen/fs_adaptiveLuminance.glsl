@@ -19,5 +19,5 @@ void main()
 	// Adapt the luminance using Pattanaik's technique
 	float adaptedLuminance = lastLuminance + (currentLuminance - lastLuminance) * (1.0 - exp(-TimeDeltaSecond * AdaptationRate));
 	
-	FragColor = vec4(adaptedLuminance, 1.0, 1.0, 1.0);
+	FragColor = vec4(adaptedLuminance, 0.0, 0.0, 1.0);
 }

@@ -17,5 +17,5 @@ void main()
 {
 	vec4 color = texture(tex_object, TexCoord_);
 	float luminance = log(max(GetLuminance(color.xyz), 0.00001f));
-	FragColor = vec4(luminance, 1.0, 1.0, 1.0);
+	FragColor = vec4(luminance, 0.0, 0.0, 1.0);
 }

@@ -91,7 +91,7 @@ enum class ETextureType
 	MAX,
 };
 
-enum class EFormat
+enum class ETextureFormat
 {
 	RGB = 0,
 	RGBA = 1,
@@ -101,6 +101,7 @@ enum class EFormat
 	RG32F,
 	RGBA16F,
 	RGBA32F,
+	R11G11B10F,
 };
 
 enum class EFormatType

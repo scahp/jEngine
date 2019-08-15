@@ -252,6 +252,14 @@ void jRenderObject::SetTextureProperty(const jShader* shader, jMaterialData* mat
 			materialData->Params.push_back(tex_object2_param);
 			useTexture = true;
 		}
+		if (tex_object3)
+		{
+			auto tex_object3_param = new jMaterialParam();
+			tex_object3_param->Name = "tex_object3";
+			tex_object3_param->Texture = tex_object3;
+			materialData->Params.push_back(tex_object3_param);
+			useTexture = true;
+		}
 		SET_UNIFORM_BUFFER_STATIC(int, "UseTexture", useTexture, shader);
 
 		if (tex_object_array)

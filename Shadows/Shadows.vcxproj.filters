@@ -337,13 +337,7 @@
     <None Include="Shaders\fullscreen\fs_blur.glsl">
       <Filter>Shaders\fullscreen</Filter>
     </None>
-    <None Include="Shaders\fullscreen\vs_blur.glsl">
-      <Filter>Shaders\fullscreen</Filter>
-    </None>
     <None Include="Shaders\fullscreen\fs_omnidirectional_blur.glsl">
-      <Filter>Shaders\fullscreen</Filter>
-    </None>
-    <None Include="Shaders\fullscreen\vs_omnidirectional_blur.glsl">
       <Filter>Shaders\fullscreen</Filter>
     </None>
     <None Include="Shaders\shadowmap\fs_EVSM.glsl">
@@ -409,16 +403,10 @@
     <None Include="Shaders\fullscreen\fs_deepshadow.glsl">
       <Filter>Shaders\fullscreen</Filter>
     </None>
-    <None Include="Shaders\fullscreen\vs_deepshadow.glsl">
-      <Filter>Shaders\fullscreen</Filter>
-    </None>
     <None Include="Shaders\compute\compute_link_linkedlist.glsl">
       <Filter>Shaders\compute</Filter>
     </None>
     <None Include="Shaders\fullscreen\fs_expdeepshadow.glsl">
-      <Filter>Shaders\fullscreen</Filter>
-    </None>
-    <None Include="Shaders\fullscreen\vs_expdeepshadow.glsl">
       <Filter>Shaders\fullscreen</Filter>
     </None>
     <None Include="Shaders\shadowmap\fs_expDeepShadowMap.glsl">
@@ -454,19 +442,25 @@
     <None Include="Shaders\fullscreen\fs_tonemap.glsl">
       <Filter>Shaders\fullscreen</Filter>
     </None>
-    <None Include="Shaders\fullscreen\vs_tonemap.glsl">
-      <Filter>Shaders\fullscreen</Filter>
-    </None>
     <None Include="Shaders\fullscreen\fs_luminanceMap.glsl">
-      <Filter>Shaders\fullscreen</Filter>
-    </None>
-    <None Include="Shaders\fullscreen\vs_luminanceMap.glsl">
       <Filter>Shaders\fullscreen</Filter>
     </None>
     <None Include="Shaders\fullscreen\fs_adaptiveLuminance.glsl">
       <Filter>Shaders\fullscreen</Filter>
     </None>
-    <None Include="Shaders\fullscreen\vs_adaptiveLuminance.glsl">
+    <None Include="Shaders\fullscreen\vs_fullscreen_common.glsl">
+      <Filter>Shaders\fullscreen</Filter>
+    </None>
+    <None Include="Shaders\fullscreen\fs_bloom_threshold.glsl">
+      <Filter>Shaders\fullscreen</Filter>
+    </None>
+    <None Include="Shaders\fullscreen\fs_scale.glsl">
+      <Filter>Shaders\fullscreen</Filter>
+    </None>
+    <None Include="Shaders\fullscreen\fs_blur_gaussian_horizontal.glsl">
+      <Filter>Shaders\fullscreen</Filter>
+    </None>
+    <None Include="Shaders\fullscreen\fs_blur_gaussian_vertical.glsl">
       <Filter>Shaders\fullscreen</Filter>
     </None>
   </ItemGroup>

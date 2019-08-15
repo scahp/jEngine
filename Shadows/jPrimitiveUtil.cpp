@@ -79,6 +79,9 @@ void jFullscreenQuadPrimitive::SetTexture(int index, const jTexture* texture)
 	case 1:
 		RenderObject->tex_object2 = texture;
 		break;
+	case 2:
+		RenderObject->tex_object3 = texture;
+		break;
 	default:
 		JASSERT(0);
 		break;
@@ -88,6 +91,11 @@ void jFullscreenQuadPrimitive::SetTexture(int index, const jTexture* texture)
 void jFullscreenQuadPrimitive::SetTexture2(const jTexture* texture)
 {
 	RenderObject->tex_object2 = texture;
+}
+
+void jFullscreenQuadPrimitive::SetTexture3(const jTexture* texture)
+{
+	RenderObject->tex_object3 = texture;
 }
 
 void jBoundBoxObject::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights)

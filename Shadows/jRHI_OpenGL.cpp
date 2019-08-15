@@ -13,7 +13,25 @@ jRHI_OpenGL::~jRHI_OpenGL()
 {
 }
 
-uint32 jRHI_OpenGL::GetOpenGLTextureType(ETextureType textureType) const
+unsigned int GetPrimitiveType(EPrimitiveType type)
+{
+	unsigned int primitiveType = 0;
+	switch (type)
+	{
+	case EPrimitiveType::LINES:
+		primitiveType = GL_LINES;
+		break;
+	case EPrimitiveType::TRIANGLES:
+		primitiveType = GL_TRIANGLES;
+		break;
+	case EPrimitiveType::TRIANGLE_STRIP:
+		primitiveType = GL_TRIANGLE_STRIP;
+		break;
+	}
+	return primitiveType;
+}
+
+uint32 GetOpenGLTextureType(ETextureType textureType)
 {
 	uint32 result = 0;
 	switch (textureType)
@@ -27,6 +45,44 @@ uint32 jRHI_OpenGL::GetOpenGLTextureType(ETextureType textureType) const
 		break;
 	case ETextureType::TEXTURE_CUBE:
 		result = GL_TEXTURE_CUBE_MAP;
+		break;
+	default:
+		break;
+	}
+	return result;
+}
+
+uint32 GetOpenGLTextureFormat(ETextureFormat format)
+{
+	uint32 result = 0;
+	switch (format)
+	{
+	case ETextureFormat::RGB:
+		result = GL_RGB;
+		break;
+	case ETextureFormat::RGBA:
+		result = GL_RGBA;
+		break;
+	case ETextureFormat::RG:
+		result = GL_RG;
+		break;
+	case ETextureFormat::R:
+		result = GL_RED;
+		break;
+	case ETextureFormat::R32F:
+		result = GL_R32F;
+		break;
+	case ETextureFormat::RG32F:
+		result = GL_RG32F;
+		break;
+	case ETextureFormat::RGBA32F:
+		result = GL_RGBA32F;
+		break;
+	case ETextureFormat::RGBA16F:
+		result = GL_RGBA16F;
+		break;
+	case ETextureFormat::R11G11B10F:
+		result = GL_R11F_G11F_B10F;
 		break;
 	default:
 		break;
@@ -831,67 +887,8 @@ void jRHI_OpenGL::EnableCullFace(bool enable) const
 
 jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) const
 {
-	uint32 internalFormat = 0;
-	switch (info.InternalFormat)
-	{
-	case EFormat::RGB:
-		internalFormat = GL_RGB;
-		break;
-	case EFormat::RGBA:
-		internalFormat = GL_RGBA;
-		break;
-	case EFormat::RG:
-		internalFormat = GL_RG;
-		break;
-	case EFormat::R:
-		internalFormat = GL_RED;
-		break;
-	case EFormat::R32F:
-		internalFormat = GL_R32F;
-		break;
-	case EFormat::RG32F:
-		internalFormat = GL_RG32F;
-		break;
-	case EFormat::RGBA32F:
-		internalFormat = GL_RGBA32F;
-		break;
-	case EFormat::RGBA16F:
-		internalFormat = GL_RGBA16F;
-		break;
-	default:
-		break;
-	}
-
-	uint32 format = 0;
-	switch (info.Format)
-	{
-	case EFormat::RGB:
-		format = GL_RGB;
-		break;
-	case EFormat::RGBA:
-		format = GL_RGBA;
-		break;
-	case EFormat::RG:
-		format = GL_RG;
-		break;
-	case EFormat::R:
-		format = GL_RED;
-		break;
-	case EFormat::R32F:
-		format = GL_R32F;
-		break;
-	case EFormat::RG32F:
-		format = GL_RG32F;
-		break;
-	case EFormat::RGBA32F:
-		format = GL_RGBA32F;
-		break;
-	case EFormat::RGBA16F:
-		format = GL_RGBA16F;
-		break;
-	default:
-		break;
-	}
+	const uint32 internalFormat = GetOpenGLTextureFormat(info.InternalFormat);
+	const uint32 format = GetOpenGLTextureFormat(info.Format);
 
 	uint32 formatType = 0;
 	switch (info.FormatType)

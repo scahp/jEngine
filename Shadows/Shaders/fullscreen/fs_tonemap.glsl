@@ -3,9 +3,11 @@ precision mediump float;
 
 uniform sampler2D tex_object;
 uniform sampler2D tex_object2;
+uniform sampler2D tex_object3;
 uniform vec2 PixelSize;
 uniform int UseTonemap;
 uniform float AutoExposureKeyValue;
+uniform float BloomMagnitude;
 
 in vec2 TexCoord_;
 out vec4 FragColor;
@@ -44,9 +46,7 @@ vec3 FilmicToneMapALU(vec3 linearColor)
 	color = (color * (6.2 * color + 0.5)) / (color * (6.2 * color + 1.7) + 0.06);
 	
 	// result has 1/2.2 baked in
-	// return pow(color, 2.2);
-
-	return color;
+	return pow(color, vec3(2.2));
 }
 
 // Retrieves the log-average luminance from the texture
@@ -79,19 +79,21 @@ void main()
 		// Filmic Tonemap
 		//color.xyz = FilmicToneMapALU(color.xyz);
 
+		// Uncharted2Tonemap
 		vec3 cur = Uncharted2Tonemap(color.xyz);
 		float W = 11.2;		// Linear White Point Value
 		vec3 whiteScale = 1.0 / Uncharted2Tonemap(vec3(W));
 		color.xyz = cur * whiteScale;
-		color.xyz = pow(color.xyz, vec3(1.0 / 2.2));		// from Linear color to sRGB
 		
 		// ACES Filmic Tonemap
 		//color.xyz = ACESFilmTonemap(color.xyz);
-		//color.xyz = pow(color.xyz, vec3(1.0 / 2.2));		// from Linear color to sRGB
 	}
-	else
-	{
-		color.xyz = pow(color.xyz, vec3(1.0 / 2.2));		// from Linear color to sRGB
-	}
+
+	vec3 bloom = texture(tex_object3, TexCoord_).xyz;
+	bloom *= BloomMagnitude;
+	color.xyz += bloom.xyz;
+
+	color.xyz = pow(color.xyz, vec3(1.0 / 2.2));		// from Linear color to sRGB
+
 	FragColor = vec4(color.xyz, 1.0);
 }

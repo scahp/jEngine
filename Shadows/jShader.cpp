@@ -31,9 +31,9 @@ struct jShaderInfoCreation
 		DECLARE_SHADER_VS_FS("ExpDeepShadowMapGen", "Shaders/shadowmap/vs_expDeepShadowMap.glsl", "Shaders/shadowmap/fs_expDeepShadowMap.glsl");
 		DECLARE_SHADER_VS_FS("DeepShadowMapGen", "Shaders/shadowmap/vs_shadowMap.glsl", "Shaders/shadowmap/fs_deepShadowMap.glsl");
 		DECLARE_SHADER_VS_FS_WITH_OPTION("Hair", "shaders/shadowmap/vs_hair.glsl", "shaders/shadowmap/fs_hair.glsl", true, true);
-		DECLARE_SHADER_VS_FS_WITH_OPTION("ExpDeepShadowFull", "shaders/fullscreen/vs_deepshadow.glsl", "shaders/fullscreen/fs_expdeepshadow.glsl", true, true);
-		DECLARE_SHADER_VS_FS("DeepShadowFull", "shaders/fullscreen/vs_deepshadow.glsl", "shaders/fullscreen/fs_deepshadow.glsl");
-		DECLARE_SHADER_VS_FS("DeepShadowAA", "shaders/fullscreen/vs_deepshadow.glsl", "shaders/fullscreen/fs_deepshadow_aa.glsl");
+		DECLARE_SHADER_VS_FS_WITH_OPTION("ExpDeepShadowFull", "shaders/fullscreen/vs_fullscreen_common.glsl", "shaders/fullscreen/fs_expdeepshadow.glsl", true, true);
+		DECLARE_SHADER_VS_FS("DeepShadowFull", "shaders/fullscreen/vs_fullscreen_common.glsl", "shaders/fullscreen/fs_deepshadow.glsl");
+		DECLARE_SHADER_VS_FS("DeepShadowAA", "shaders/fullscreen/vs_fullscreen_common.glsl", "shaders/fullscreen/fs_deepshadow_aa.glsl");
 		DECLARE_SHADER_VS_FS_WITH_OPTION("ExpDeferred", "shaders/shadowmap/vs_deferred.glsl", "shaders/shadowmap/fs_expDeferred.glsl", true, true);
 		DECLARE_SHADER_VS_FS_WITH_OPTION("Deferred", "shaders/shadowmap/vs_deferred.glsl", "shaders/shadowmap/fs_deferred.glsl", true, true);
 		DECLARE_SHADER_CS("cs", "Shaders/compute/compute_example.glsl");
@@ -56,9 +56,9 @@ struct jShaderInfoCreation
 		DECLARE_SHADER_VS_FS_WITH_OPTION_MORE("ESM", "shaders/shadowmap/vs.glsl", "shaders/shadowmap/fs.glsl", false, false, "\r\n#define USE_ESM 1");
 		DECLARE_SHADER_VS_FS_WITH_OPTION_MORE("EVSM", "shaders/shadowmap/vs.glsl", "shaders/shadowmap/fs.glsl", false, false, "\r\n#define USE_EVSM 1");
 
-		DECLARE_SHADER_VS_FS("Blur", "shaders/fullscreen/vs_blur.glsl", "shaders/fullscreen/fs_blur.glsl");
-		DECLARE_SHADER_VS_FS("BlurOmni", "shaders/fullscreen/vs_omnidirectional_blur.glsl", "shaders/fullscreen/fs_omnidirectional_blur.glsl");
-		DECLARE_SHADER_VS_FS("Tonemap", "shaders/fullscreen/vs_tonemap.glsl", "shaders/fullscreen/fs_tonemap.glsl");
+		DECLARE_SHADER_VS_FS("Blur", "shaders/fullscreen/vs_fullscreen_common.glsl", "shaders/fullscreen/fs_blur.glsl");
+		DECLARE_SHADER_VS_FS("BlurOmni", "shaders/fullscreen/vs_fullscreen_common.glsl", "shaders/fullscreen/fs_omnidirectional_blur.glsl");
+		DECLARE_SHADER_VS_FS("Tonemap", "shaders/fullscreen/vs_fullscreen_common.glsl", "shaders/fullscreen/fs_tonemap.glsl");
 
 		DECLARE_SHADER_VS_FS("ShadowGen_ESM", "shaders/shadowmap/vs_varianceShadowMap.glsl", "shaders/shadowmap/fs_exponentialShadowMap.glsl");
 		DECLARE_SHADER_VS_GS_FS("ShadowGen_Omni_ESM", "shaders/shadowmap/vs_omniDirectionalShadowMap.glsl", "shaders/shadowmap/gs_omniDirectionalShadowMap.glsl", "shaders/shadowmap/fs_omniDirectionalExponentialShadowMap.glsl");
@@ -81,8 +81,12 @@ struct jShaderInfoCreation
 
 		DECLARE_SHADER_VS_GS_FS("CSM_SSM_TEX2D_ARRAY", "shaders/shadowmap/vs_omniDirectionalShadowMap.glsl", "shaders/shadowmap/gs_cascadeShadowMap.glsl", "shaders/shadowmap/fs_shadowMap.glsl");
 
-		DECLARE_SHADER_VS_FS("LuminanceMapGeneration", "shaders/fullscreen/vs_luminanceMap.glsl", "shaders/fullscreen/fs_luminanceMap.glsl");
-		DECLARE_SHADER_VS_FS("AdaptiveLuminance", "shaders/fullscreen/vs_adaptiveLuminance.glsl", "shaders/fullscreen/fs_adaptiveLuminance.glsl");
+		DECLARE_SHADER_VS_FS("LuminanceMapGeneration", "shaders/fullscreen/vs_fullscreen_common.glsl", "shaders/fullscreen/fs_luminanceMap.glsl");
+		DECLARE_SHADER_VS_FS("AdaptiveLuminance", "shaders/fullscreen/vs_fullscreen_common.glsl", "shaders/fullscreen/fs_adaptiveLuminance.glsl");
+		DECLARE_SHADER_VS_FS("BloomThreshold", "shaders/fullscreen/vs_fullscreen_common.glsl", "shaders/fullscreen/fs_bloom_threshold.glsl");
+		DECLARE_SHADER_VS_FS("Scale", "shaders/fullscreen/vs_fullscreen_common.glsl", "shaders/fullscreen/fs_scale.glsl");
+		DECLARE_SHADER_VS_FS("GaussianBlurH", "shaders/fullscreen/vs_fullscreen_common.glsl", "shaders/fullscreen/fs_blur_gaussian_horizontal.glsl");
+		DECLARE_SHADER_VS_FS("GaussianBlurV", "shaders/fullscreen/vs_fullscreen_common.glsl", "shaders/fullscreen/fs_blur_gaussian_vertical.glsl");
 	}
 } s_shaderInfoCreation;
 

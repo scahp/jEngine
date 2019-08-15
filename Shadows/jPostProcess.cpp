@@ -233,6 +233,7 @@ bool jPostProcess_Tonemap::Do(const jCamera* camera) const
 	g_rhi->SetShader(Shader);
 	SET_UNIFORM_BUFFER_STATIC(int, "UseTonemap", jShadowAppSettingProperties::GetInstance().UseTonemap, Shader);
 	SET_UNIFORM_BUFFER_STATIC(float, "AutoExposureKeyValue", jShadowAppSettingProperties::GetInstance().AutoExposureKeyValue, Shader);
+	SET_UNIFORM_BUFFER_STATIC(float, "BloomMagnitude", jShadowAppSettingProperties::GetInstance().BloomMagnitude, Shader);
 
 	fullscreenQuad->Draw(camera, Shader, {});
 	UnbindInputs(fullscreenQuad);
@@ -315,8 +316,8 @@ void jPostProcess_AdaptiveLuminance::Setup()
 {
 	__super::Setup();
 	Shader = jShader::GetShader("AdaptiveLuminance");
-	LastLumianceRenderTarget[0] = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RGBA32F, EFormat::RGBA, EFormatType::FLOAT, EDepthBufferType::DEPTH, 1, 1, 1, ETextureFilter::LINEAR, ETextureFilter::LINEAR_MIPMAP_LINEAR });
-	LastLumianceRenderTarget[1] = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, EFormat::RGBA32F, EFormat::RGBA, EFormatType::FLOAT, EDepthBufferType::DEPTH, 1, 1, 1, ETextureFilter::LINEAR, ETextureFilter::LINEAR_MIPMAP_LINEAR });
+	LastLumianceRenderTarget[0] = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::R32F, ETextureFormat::R, EFormatType::FLOAT, EDepthBufferType::DEPTH, 1, 1, 1, ETextureFilter::LINEAR, ETextureFilter::LINEAR_MIPMAP_LINEAR });
+	LastLumianceRenderTarget[1] = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::R32F, ETextureFormat::R, EFormatType::FLOAT, EDepthBufferType::DEPTH, 1, 1, 1, ETextureFilter::LINEAR, ETextureFilter::LINEAR_MIPMAP_LINEAR });
 }
 
 bool jPostProcess_AdaptiveLuminance::Do(const jCamera* camera) const
@@ -361,4 +362,197 @@ bool jPostProcess_AdaptiveLuminance::Process(const jCamera* camera) const
 
 	return result;
 
+}
+
+//////////////////////////////////////////////////////////////////////////
+// jPostProcess_BloomThreshold
+void jPostProcess_BloomThreshold::Setup()
+{
+	__super::Setup();
+	Shader = jShader::GetShader("BloomThreshold");
+}
+
+bool jPostProcess_BloomThreshold::Do(const jCamera* camera) const
+{
+	JASSERT(Shader);
+
+	g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+	g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
+
+	auto fullscreenQuad = GetFullscreenQuad();
+	BindInputs(fullscreenQuad);
+	camera->BindCamera(Shader);
+
+	g_rhi->SetShader(Shader);
+	SET_UNIFORM_BUFFER_STATIC(float, "BloomThreshold", jShadowAppSettingProperties::GetInstance().BloomThreshold, Shader);
+	SET_UNIFORM_BUFFER_STATIC(float, "AutoExposureKeyValue", jShadowAppSettingProperties::GetInstance().AutoExposureKeyValue, Shader);
+
+	fullscreenQuad->Draw(camera, Shader, {});
+	UnbindInputs(fullscreenQuad);
+
+	return true;
+}
+
+//////////////////////////////////////////////////////////////////////////
+// jPostProcess_Scale
+void jPostProcess_Scale::Setup()
+{
+	__super::Setup();
+	Shader = jShader::GetShader("Scale");
+}
+
+bool jPostProcess_Scale::Do(const jCamera* camera) const
+{
+	JASSERT(Shader);
+
+	g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+	g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
+
+	auto fullscreenQuad = GetFullscreenQuad();
+	BindInputs(fullscreenQuad);
+	camera->BindCamera(Shader);
+
+	g_rhi->SetShader(Shader);
+
+	fullscreenQuad->Draw(camera, Shader, {});
+	UnbindInputs(fullscreenQuad);
+
+	return true;
+}
+
+//////////////////////////////////////////////////////////////////////////
+// jPostProcess_GaussianBlurH
+void jPostProcess_GaussianBlurH::Setup()
+{
+	__super::Setup();
+	Shader = jShader::GetShader("GaussianBlurH");
+}
+
+bool jPostProcess_GaussianBlurH::Do(const jCamera* camera) const
+{
+	JASSERT(Shader);
+
+	g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+	g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
+
+	auto fullscreenQuad = GetFullscreenQuad();
+	BindInputs(fullscreenQuad);
+	camera->BindCamera(Shader);
+
+	g_rhi->SetShader(Shader);
+	SET_UNIFORM_BUFFER_STATIC(float, "BloomBlurSigma", jShadowAppSettingProperties::GetInstance().BloomBlurSigma, Shader);
+	
+	Vector2 renderTargetSize;
+	auto pCurrentRenderTarget = (PostProcessOutput ? PostProcessOutput.get()->RenderTarget : nullptr);
+	if (pCurrentRenderTarget)
+		renderTargetSize = Vector2(static_cast<float>(pCurrentRenderTarget->Info.Width), static_cast<float>(pCurrentRenderTarget->Info.Height));
+	else
+		renderTargetSize = Vector2(SCR_WIDTH, SCR_HEIGHT);
+	SET_UNIFORM_BUFFER_STATIC(Vector2, "RenderTargetSize", renderTargetSize, Shader);
+
+	fullscreenQuad->Draw(camera, Shader, {});
+	UnbindInputs(fullscreenQuad);
+
+	return true;
+}
+
+void jPostProcess_GaussianBlurH::BindInputs(jFullscreenQuadPrimitive* fsQuad) const
+{
+	int index = 0;
+	for (auto it = PostProcessInputList.begin(); PostProcessInputList.end() != it; ++it, ++index)
+	{
+		const auto& input = (*it);
+		auto texture = input.expired() ? nullptr : input.lock()->RenderTarget->GetTexture();
+		if (texture)
+		{
+			texture->Magnification = ETextureFilter::NEAREST;
+			texture->Minification = ETextureFilter::NEAREST;
+		}
+		fsQuad->SetTexture(index, texture);
+	}
+}
+
+void jPostProcess_GaussianBlurH::UnbindInputs(jFullscreenQuadPrimitive* fsQuad) const
+{
+	int index = 0;
+	for (auto it = PostProcessInputList.begin(); PostProcessInputList.end() != it; ++it, ++index)
+	{
+		const auto& input = (*it);
+		if (!input.expired())
+		{
+			auto rt = input.lock()->RenderTarget;
+			auto texture = rt->GetTexture();
+			texture->Magnification = rt->Info.Magnification;
+			texture->Minification = rt->Info.Minification;
+		}
+		fsQuad->SetTexture(index, nullptr);
+	}
+}
+
+//////////////////////////////////////////////////////////////////////////
+// jPostProcess_GaussianBlurV
+void jPostProcess_GaussianBlurV::Setup()
+{
+	__super::Setup();
+	Shader = jShader::GetShader("GaussianBlurV");
+}
+
+bool jPostProcess_GaussianBlurV::Do(const jCamera* camera) const
+{
+	JASSERT(Shader);
+
+	g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+	g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
+
+	auto fullscreenQuad = GetFullscreenQuad();
+	BindInputs(fullscreenQuad);
+	camera->BindCamera(Shader);
+
+	g_rhi->SetShader(Shader);
+	SET_UNIFORM_BUFFER_STATIC(float, "BloomBlurSigma", jShadowAppSettingProperties::GetInstance().BloomBlurSigma, Shader);
+
+	Vector2 renderTargetSize;
+	auto pCurrentRenderTarget = (PostProcessOutput ? PostProcessOutput.get()->RenderTarget : nullptr);
+	if (pCurrentRenderTarget)
+		renderTargetSize = Vector2(static_cast<float>(pCurrentRenderTarget->Info.Width), static_cast<float>(pCurrentRenderTarget->Info.Height));
+	else
+		renderTargetSize = Vector2(SCR_WIDTH, SCR_HEIGHT);
+	SET_UNIFORM_BUFFER_STATIC(Vector2, "RenderTargetSize", renderTargetSize, Shader);
+	fullscreenQuad->Draw(camera, Shader, {});
+	UnbindInputs(fullscreenQuad);
+
+	return true;
+}
+
+void jPostProcess_GaussianBlurV::BindInputs(jFullscreenQuadPrimitive* fsQuad) const
+{
+	int index = 0;
+	for (auto it = PostProcessInputList.begin(); PostProcessInputList.end() != it; ++it, ++index)
+	{
+		const auto& input = (*it);
+		auto texture = input.expired() ? nullptr : input.lock()->RenderTarget->GetTexture();
+		if (texture)
+		{
+			texture->Magnification = ETextureFilter::NEAREST;
+			texture->Minification = ETextureFilter::NEAREST;
+		}
+		fsQuad->SetTexture(index, texture);
+	}
+}
+
+void jPostProcess_GaussianBlurV::UnbindInputs(jFullscreenQuadPrimitive* fsQuad) const
+{
+	int index = 0;
+	for (auto it = PostProcessInputList.begin(); PostProcessInputList.end() != it; ++it, ++index)
+	{
+		const auto& input = (*it);
+		if (!input.expired())
+		{
+			auto rt = input.lock()->RenderTarget;
+			auto texture = rt->GetTexture();
+			texture->Magnification = rt->Info.Magnification;
+			texture->Minification = rt->Info.Minification;
+		}
+		fsQuad->SetTexture(index, nullptr);
+	}
 }

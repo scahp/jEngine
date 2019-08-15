@@ -98,6 +98,21 @@ void jShadowAppSettingProperties::Setup(jAppSettingBase* appSetting)
 	// Cascade Shadow Option
 	appSetting->AddVariable("CSMDebugOn", CSMDebugOn);
 	appSetting->SetGroup("CSMDebugOn", "CascadeShadow");
+
+	//////////////////////////////////////////////////////////////////////////
+	// Bloom Option
+	appSetting->AddVariable("BloomThreshold", BloomThreshold);
+	appSetting->SetStep("BloomThreshold", 0.01f);
+	appSetting->SetMinMax("BloomThreshold", 0.0f, 20.0f);
+	appSetting->SetGroup("BloomThreshold", "Bloom");
+	appSetting->AddVariable("BloomBlurSigma", BloomBlurSigma);
+	appSetting->SetStep("BloomBlurSigma", 0.01f);
+	appSetting->SetMinMax("BloomBlurSigma", 0.5f, 1.5f);
+	appSetting->SetGroup("BloomBlurSigma", "Bloom");
+	appSetting->AddVariable("BloomMagnitude", BloomMagnitude);
+	appSetting->SetStep("BloomMagnitude", 0.01f);
+	appSetting->SetMinMax("BloomMagnitude", 0.0f, 2.0f);
+	appSetting->SetGroup("BloomMagnitude", "Bloom");	
 }
 
 void jShadowAppSettingProperties::Teardown(jAppSettingBase* appSetting)
@@ -129,6 +144,9 @@ void jShadowAppSettingProperties::Teardown(jAppSettingBase* appSetting)
 	appSetting->RemoveVariable("CSMDebugOn");
 	appSetting->RemoveVariable("AdaptationRate");
 	appSetting->RemoveVariable("AutoExposureKeyValue");
+	appSetting->RemoveVariable("BloomThreshold");
+	appSetting->RemoveVariable("BloomBlurSigma");
+	appSetting->RemoveVariable("BloomMagnitude");	
 }
 
 void jShadowAppSettingProperties::SwitchShadowType(jAppSettingBase* appSetting)

@@ -35,6 +35,9 @@ public:
 	bool ExponentDeepShadowOn = false;
 	bool CSMDebugOn = false;
 	float AdaptationRate = 1.0f;
+	float BloomThreshold = 3.0f;
+	float BloomBlurSigma = 0.8f;
+	float BloomMagnitude = 1.0f;
 
 	virtual void Setup(jAppSettingBase* appSetting) override;
 	virtual void Teardown(jAppSettingBase* appSetting) override;

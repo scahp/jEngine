@@ -122,25 +122,6 @@ public:
 	jRHI_OpenGL();
 	~jRHI_OpenGL();
 
-	unsigned int GetPrimitiveType(EPrimitiveType type) const
-	{
-		unsigned int primitiveType = 0;
-		switch (type)
-		{
-		case EPrimitiveType::LINES:
-			primitiveType = GL_LINES;
-			break;
-		case EPrimitiveType::TRIANGLES:
-			primitiveType = GL_TRIANGLES;
-			break;
-		case EPrimitiveType::TRIANGLE_STRIP:
-			primitiveType = GL_TRIANGLE_STRIP;
-			break;
-		}
-		return primitiveType;
-	}
-	uint32 GetOpenGLTextureType(ETextureType textureType) const;
-
 	virtual jVertexBuffer* CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const override;
 	virtual jIndexBuffer* CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const override;
 	virtual void BindVertexBuffer(const jVertexBuffer* vb, const jShader* shader) const override;
