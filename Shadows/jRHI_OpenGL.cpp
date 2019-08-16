@@ -906,19 +906,29 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 		break;
 	}
 
-	uint32 depthBufferFormat = GL_DEPTH_COMPONENT16;
-	uint32 depthBufferType = GL_DEPTH_ATTACHMENT;
+	bool hasDepthAttachment = true;
+	uint32 depthBufferFormat = 0;
+	uint32 depthBufferType = 0;
 	switch (info.DepthBufferType)
 	{
-	case EDepthBufferType::DEPTH:
+	case EDepthBufferType::DEPTH16:
 		depthBufferFormat = GL_DEPTH_COMPONENT16;
 		depthBufferType = GL_DEPTH_ATTACHMENT;
 		break;
-	case EDepthBufferType::DEPTH_STENCIL:
+	case EDepthBufferType::DEPTH24:
+		depthBufferFormat = GL_DEPTH_COMPONENT24;
+		depthBufferType = GL_DEPTH_ATTACHMENT;
+		break;
+	case EDepthBufferType::DEPTH32:
+		depthBufferFormat = GL_DEPTH_COMPONENT32;
+		depthBufferType = GL_DEPTH_ATTACHMENT;
+		break;
+	case EDepthBufferType::DEPTH24_STENCIL8:
 		depthBufferFormat = GL_DEPTH24_STENCIL8;
 		depthBufferType = GL_DEPTH_STENCIL_ATTACHMENT;
 		break;
 	default:
+		hasDepthAttachment = false;
 		break;
 	}
 
@@ -957,11 +967,15 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 			rt_gl->Textures[i] = tex_gl;
 		}
 
-		uint32 rbo = 0;
-		glGenRenderbuffers(1, &rbo);
-		glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-		glRenderbufferStorage(GL_RENDERBUFFER, depthBufferFormat, info.Width, info.Height);
-		glFramebufferRenderbuffer(GL_FRAMEBUFFER, depthBufferType, GL_RENDERBUFFER, rbo);
+		if (hasDepthAttachment)
+		{
+			uint32 rbo = 0;
+			glGenRenderbuffers(1, &rbo);
+			glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+			glRenderbufferStorage(GL_RENDERBUFFER, depthBufferFormat, info.Width, info.Height);
+			glFramebufferRenderbuffer(GL_FRAMEBUFFER, depthBufferType, GL_RENDERBUFFER, rbo);
+			rt_gl->rbos.push_back(rbo);
+		}
 
 		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 		{
@@ -974,7 +988,6 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 
 	
 		rt_gl->fbos.push_back(fbo);
-		rt_gl->rbos.push_back(rbo);
 	}
 	else if (info.TextureType == ETextureType::TEXTURE_2D_ARRAY)
 	{
@@ -998,11 +1011,15 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 			rt_gl->drawBuffers.push_back(GL_COLOR_ATTACHMENT0 + i);
 		}
 
-		uint32 rbo = 0;
-		glGenRenderbuffers(1, &rbo);
-		glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-		glRenderbufferStorage(GL_RENDERBUFFER, depthBufferFormat, info.Width, info.Height);
-		glFramebufferRenderbuffer(GL_FRAMEBUFFER, depthBufferType, GL_RENDERBUFFER, rbo);
+		if (hasDepthAttachment)
+		{
+			uint32 rbo = 0;
+			glGenRenderbuffers(1, &rbo);
+			glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+			glRenderbufferStorage(GL_RENDERBUFFER, depthBufferFormat, info.Width, info.Height);
+			glFramebufferRenderbuffer(GL_FRAMEBUFFER, depthBufferType, GL_RENDERBUFFER, rbo);
+			rt_gl->rbos.push_back(rbo);
+		}
 
 		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 		{
@@ -1018,7 +1035,6 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 		rt_gl->Textures.push_back(tex_gl);
 
 		rt_gl->fbos.push_back(fbo);
-		rt_gl->rbos.push_back(rbo);
 	}
 	else if (info.TextureType == ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW)
 	{
@@ -1050,11 +1066,15 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 			rt_gl->Textures[i] = tex_gl;
 		}
 
-		uint32 rbo = 0;
-		glGenRenderbuffers(1, &rbo);
-		glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-		glRenderbufferStorage(GL_RENDERBUFFER, depthBufferFormat, info.Width, info.Height);
-		glFramebufferRenderbuffer(GL_FRAMEBUFFER, depthBufferType, GL_RENDERBUFFER, rbo);
+		if (hasDepthAttachment)
+		{
+			uint32 rbo = 0;
+			glGenRenderbuffers(1, &rbo);
+			glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+			glRenderbufferStorage(GL_RENDERBUFFER, depthBufferFormat, info.Width, info.Height);
+			glFramebufferRenderbuffer(GL_FRAMEBUFFER, depthBufferType, GL_RENDERBUFFER, rbo);
+			rt_gl->rbos.push_back(rbo);
+		}
 
 		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 		{
@@ -1066,7 +1086,6 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 		}
 
 		rt_gl->fbos.push_back(fbo);
-		rt_gl->rbos.push_back(rbo);
 	}
 	else if (info.TextureType == ETextureType::TEXTURE_CUBE)
 	{
@@ -1096,11 +1115,15 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 			glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, tbo, 0);
 
-			uint32 rbo = 0;
-			glGenRenderbuffers(1, &rbo);
-			glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-			glRenderbufferStorage(GL_RENDERBUFFER, depthBufferFormat, info.Width, info.Height);
-			glFramebufferRenderbuffer(GL_FRAMEBUFFER, depthBufferType, GL_RENDERBUFFER, rbo);
+			if (hasDepthAttachment)
+			{
+				uint32 rbo = 0;
+				glGenRenderbuffers(1, &rbo);
+				glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+				glRenderbufferStorage(GL_RENDERBUFFER, depthBufferFormat, info.Width, info.Height);
+				glFramebufferRenderbuffer(GL_FRAMEBUFFER, depthBufferType, GL_RENDERBUFFER, rbo);
+				rt_gl->rbos.push_back(rbo);
+			}
 
 			if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 			{
@@ -1112,7 +1135,6 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 			}
 
 			rt_gl->fbos.push_back(fbo);
-			rt_gl->rbos.push_back(rbo);
 		}
 
 		rt_gl->drawBuffers.push_back(GL_COLOR_ATTACHMENT0);

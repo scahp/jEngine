@@ -206,7 +206,10 @@ enum class EDrawBufferType
 
 enum class EDepthBufferType
 {
-	DEPTH = 0,
-	DEPTH_STENCIL,
+	NONE = 0,
+	DEPTH16,
+	DEPTH24,
+	DEPTH32,
+	DEPTH24_STENCIL8,
 	MAX,
 };

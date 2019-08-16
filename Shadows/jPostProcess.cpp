@@ -316,8 +316,8 @@ void jPostProcess_AdaptiveLuminance::Setup()
 {
 	__super::Setup();
 	Shader = jShader::GetShader("AdaptiveLuminance");
-	LastLumianceRenderTarget[0] = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::R32F, ETextureFormat::R, EFormatType::FLOAT, EDepthBufferType::DEPTH, 1, 1, 1, ETextureFilter::LINEAR, ETextureFilter::LINEAR_MIPMAP_LINEAR });
-	LastLumianceRenderTarget[1] = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::R32F, ETextureFormat::R, EFormatType::FLOAT, EDepthBufferType::DEPTH, 1, 1, 1, ETextureFilter::LINEAR, ETextureFilter::LINEAR_MIPMAP_LINEAR });
+	LastLumianceRenderTarget[0] = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::R32F, ETextureFormat::R, EFormatType::FLOAT, EDepthBufferType::NONE, 1, 1, 1, ETextureFilter::LINEAR, ETextureFilter::LINEAR_MIPMAP_LINEAR });
+	LastLumianceRenderTarget[1] = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::R32F, ETextureFormat::R, EFormatType::FLOAT, EDepthBufferType::NONE, 1, 1, 1, ETextureFilter::LINEAR, ETextureFilter::LINEAR_MIPMAP_LINEAR });
 }
 
 bool jPostProcess_AdaptiveLuminance::Do(const jCamera* camera) const
