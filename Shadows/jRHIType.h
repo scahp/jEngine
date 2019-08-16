@@ -1,5 +1,24 @@
 ﻿#pragma once
 
+#include <type_traits>
+
+#define DECLARE_ENUM_BIT_OPERATORS(ENUM_TYPE)\
+FORCEINLINE ENUM_TYPE operator | (ENUM_TYPE lhs, ENUM_TYPE rhs)\
+{\
+	using T = std::underlying_type<ENUM_TYPE>::type;\
+	return static_cast<ENUM_TYPE>(static_cast<T>(lhs) | static_cast<T>(rhs));\
+}\
+FORCEINLINE ENUM_TYPE operator & (ENUM_TYPE lhs, ENUM_TYPE rhs)\
+{\
+	using T = std::underlying_type<ENUM_TYPE>::type;\
+	return static_cast<ENUM_TYPE>(static_cast<T>(lhs) & static_cast<T>(rhs));\
+}\
+FORCEINLINE decltype(auto) operator ! (ENUM_TYPE value)\
+{\
+	using T = std::underlying_type<ENUM_TYPE>::type;\
+	return !static_cast<T>(value);\
+}
+
 enum class EPrimitiveType
 {
 	LINES,
@@ -191,6 +210,8 @@ enum class ERenderBufferType : uint32
 	STENCIL = 0x00000004,
 	MAX = 0xffffffff
 };
+
+DECLARE_ENUM_BIT_OPERATORS(ERenderBufferType);
 
 enum class EDrawBufferType
 {

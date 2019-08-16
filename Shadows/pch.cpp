@@ -9,12 +9,3 @@ std::map<int, bool> g_KeyState;
 std::map<EMouseButtonType, bool> g_MouseState;
 float g_timeDeltaSecond = 0.0f;
 
-ERenderBufferType MakeRenderBufferTypeList(const std::initializer_list<ERenderBufferType>& list)
-{
-	uint32 result = 0;
-	for (auto it = std::begin(list); std::end(list) != it; ++it)
-	{
-		result |= static_cast<uint32>(*it);
-	}
-	return static_cast<ERenderBufferType>(result);
-}

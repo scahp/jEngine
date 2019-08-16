@@ -121,7 +121,7 @@ void jDeferredGeometryPipeline::Setup()
 {
 	// ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
 	ClearColor = Vector4(135.0f / 255.0f, 206.0f / 255.0f, 250.0f / 255.0f, 1.0f);	// light sky blue
-	ClearType = MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH });
+	ClearType = ERenderBufferType::COLOR | ERenderBufferType::DEPTH;
 }
 
 void jDeferredGeometryPipeline::Draw(const jPipelineData& pipelineData, const jShader* shader) const
@@ -142,7 +142,7 @@ void jDeferredGeometryPipeline::Draw(const jPipelineData& pipelineData, const jS
 void jDeepShadowMap_ShadowPass_Pipeline::Setup()
 {
 	ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
-	ClearType = MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH });
+	ClearType = ERenderBufferType::COLOR | ERenderBufferType::DEPTH;
 	EnableDepthTest = true;
 	DepthStencilFunc = EDepthStencilFunc::LEQUAL;
 	EnableDepthBias = true;
@@ -185,7 +185,7 @@ void jDeepShadowMap_ShadowPass_Pipeline::Draw(const jPipelineData& pipelineData,
 void jForward_ShadowMapGen_Pipeline::Setup()
 {
 	ClearColor = Vector4(FLT_MAX, FLT_MAX, FLT_MAX, 1.0f);
-	ClearType = MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH });
+	ClearType = ERenderBufferType::COLOR | ERenderBufferType::DEPTH;
 	EnableDepthTest = true;
 	DepthStencilFunc = EDepthStencilFunc::LEQUAL;
 	ShadowGenShader = jShader::GetShader(DirectionalLightShaderName);
@@ -246,7 +246,7 @@ void jForward_ShadowMapGen_Pipeline::Do(const jPipelineData& pipelineData) const
 void jForward_ShadowMapGen_CSM_SSM_Pipeline::Setup()
 {
 	ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
-	ClearType = MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH });
+	ClearType = ERenderBufferType::COLOR | ERenderBufferType::DEPTH;
 	EnableDepthTest = true;
 	DepthStencilFunc = EDepthStencilFunc::LEQUAL;
 	EnableBlend = true;
@@ -420,7 +420,7 @@ void jForward_ShadowMapGen_CSM_SSM_Pipeline::Do(const jPipelineData& pipelineDat
 void jForwardShadowMap_Blur_Pipeline::Setup()
 {
 	ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
-	ClearType = MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH });
+	ClearType = ERenderBufferType::COLOR | ERenderBufferType::DEPTH;
 	EnableDepthTest = false;
 	DepthStencilFunc = EDepthStencilFunc::LEQUAL;
 
@@ -495,7 +495,7 @@ void jForward_Shadow_Pipeline::Setup()
 {
 	//ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
 	ClearColor = Vector4(135.0f / 255.0f, 206.0f / 255.0f, 250.0f / 255.0f, 1.0f);	// light sky blue
-	ClearType = MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH });
+	ClearType = ERenderBufferType::COLOR | ERenderBufferType::DEPTH;
 	EnableDepthTest = true;
 	DepthStencilFunc = EDepthStencilFunc::LEQUAL;
 	EnableBlend = true;
@@ -711,7 +711,7 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineData& pipelineData) const
 
 	const_cast<jCamera*>(camera)->IsEnableCullMode = true;		// todo remove
 	g_rhi->SetClearColor(ClearColor);
-	g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH, ERenderBufferType::STENCIL }));
+	g_rhi->SetClear(ERenderBufferType::COLOR | ERenderBufferType::DEPTH | ERenderBufferType::STENCIL);
 
 	g_rhi->SetDepthFunc(EDepthStencilFunc::LEQUAL);
 	g_rhi->EnableStencil(false);
@@ -774,7 +774,7 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineData& pipelineData) const
 		jLight::BindLights({ light }, ShadowVolumeInfinityFarShader);
 		camera->BindCamera(ShadowVolumeInfinityFarShader);
 
-		g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::STENCIL }));
+		g_rhi->SetClear(ERenderBufferType::STENCIL);
 		g_rhi->SetStencilOpSeparate(EFace::FRONT, EStencilOp::KEEP, EStencilOp::DECR_WRAP, EStencilOp::KEEP);
 		g_rhi->SetStencilOpSeparate(EFace::BACK, EStencilOp::KEEP, EStencilOp::INCR_WRAP, EStencilOp::KEEP);
 
@@ -837,7 +837,7 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineData& pipelineData) const
 
 	// Debug
 	{
-		g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::STENCIL }));
+		g_rhi->SetClear(ERenderBufferType::STENCIL);
 		const_cast<jCamera*>(camera)->IsEnableCullMode = false;		// todo remove
 		g_rhi->EnableBlend(true);
 		g_rhi->SetBlendFunc(EBlendSrc::SRC_ALPHA, EBlendDest::ONE_MINUS_SRC_ALPHA);

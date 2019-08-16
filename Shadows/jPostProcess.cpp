@@ -133,7 +133,7 @@ void jPostProcess_DeepShadowMap::jSSBO_DeepShadowMap::Bind(const jShader* shader
 bool jPostProcess_DeepShadowMap::Do(const jCamera* camera) const
 {
 	g_rhi->SetClearColor(135.0f / 255.0f, 206.0f / 255.0f, 250.0f / 255.0f, 1.0f);	// light sky blue
-	g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
+	g_rhi->SetClear(ERenderBufferType::COLOR | ERenderBufferType::DEPTH);
 
 	const auto ambientLight = camera->GetLight(ELightType::AMBIENT);
 	const auto directionalLight = camera->GetLight(ELightType::DIRECTIONAL);
@@ -174,7 +174,7 @@ bool jPostProcess_AA_DeepShadowAddition::Do(const jCamera* camera) const
 	//JASSERT(!PostProcessInput.expired());
 
 	g_rhi->SetClearColor(0.025f, 0.025f, 0.025f, 1.0f);
-	g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
+	g_rhi->SetClear(ERenderBufferType::COLOR | ERenderBufferType::DEPTH);
 
 	auto fullscreenQuad = GetFullscreenQuad();
 	BindInputs(fullscreenQuad);
@@ -192,7 +192,7 @@ bool jPostProcess_Blur::Do(const jCamera* camera) const
 //	JASSERT(!PostProcessInput.expired());
 
 	g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-	g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
+	g_rhi->SetClear(ERenderBufferType::COLOR | ERenderBufferType::DEPTH);
 
 	auto shader = OmniDirectional ? jShader::GetShader("BlurOmni") : jShader::GetShader("Blur");
 
@@ -224,7 +224,7 @@ bool jPostProcess_Tonemap::Do(const jCamera* camera) const
 	JASSERT(Shader);
 
 	g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-	g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
+	g_rhi->SetClear(ERenderBufferType::COLOR | ERenderBufferType::DEPTH);
 
 	auto fullscreenQuad = GetFullscreenQuad();
 	BindInputs(fullscreenQuad);
@@ -277,7 +277,7 @@ bool jPostProcess_LuminanceMapGeneration::Do(const jCamera* camera) const
 	//JASSERT(!PostProcessInput.expired());
 
 	g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-	g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
+	g_rhi->SetClear(ERenderBufferType::COLOR | ERenderBufferType::DEPTH);
 
 	auto fullscreenQuad = GetFullscreenQuad();
 	
@@ -325,7 +325,7 @@ bool jPostProcess_AdaptiveLuminance::Do(const jCamera* camera) const
 	JASSERT(Shader);
 
 	g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-	g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
+	g_rhi->SetClear(ERenderBufferType::COLOR | ERenderBufferType::DEPTH);
 
 	auto fullscreenQuad = GetFullscreenQuad();
 
@@ -377,7 +377,7 @@ bool jPostProcess_BloomThreshold::Do(const jCamera* camera) const
 	JASSERT(Shader);
 
 	g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-	g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
+	g_rhi->SetClear(ERenderBufferType::COLOR | ERenderBufferType::DEPTH);
 
 	auto fullscreenQuad = GetFullscreenQuad();
 	BindInputs(fullscreenQuad);
@@ -406,7 +406,7 @@ bool jPostProcess_Scale::Do(const jCamera* camera) const
 	JASSERT(Shader);
 
 	g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-	g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
+	g_rhi->SetClear(ERenderBufferType::COLOR | ERenderBufferType::DEPTH);
 
 	auto fullscreenQuad = GetFullscreenQuad();
 	BindInputs(fullscreenQuad);
@@ -433,7 +433,7 @@ bool jPostProcess_GaussianBlurH::Do(const jCamera* camera) const
 	JASSERT(Shader);
 
 	g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-	g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
+	g_rhi->SetClear(ERenderBufferType::COLOR | ERenderBufferType::DEPTH);
 
 	auto fullscreenQuad = GetFullscreenQuad();
 	BindInputs(fullscreenQuad);
@@ -502,7 +502,7 @@ bool jPostProcess_GaussianBlurV::Do(const jCamera* camera) const
 	JASSERT(Shader);
 
 	g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-	g_rhi->SetClear(MakeRenderBufferTypeList({ ERenderBufferType::COLOR, ERenderBufferType::DEPTH }));
+	g_rhi->SetClear(ERenderBufferType::COLOR | ERenderBufferType::DEPTH);
 
 	auto fullscreenQuad = GetFullscreenQuad();
 	BindInputs(fullscreenQuad);

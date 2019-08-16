@@ -413,12 +413,11 @@ void jRHI_OpenGL::EndQueryTimeElapsed(const jQueryTime* queryTimeElpased) const
 void jRHI_OpenGL::SetClear(ERenderBufferType typeBit) const
 {
 	uint32 clearBufferBit = 0;
-	uint32 bit = static_cast<uint32>(typeBit);
-	if (static_cast<uint32>(ERenderBufferType::COLOR) & bit)
+	if (!!(ERenderBufferType::COLOR & typeBit))
 		clearBufferBit |= GL_COLOR_BUFFER_BIT;
-	if (static_cast<uint32>(ERenderBufferType::DEPTH) & bit)
+	if (!!(ERenderBufferType::DEPTH & typeBit))
 		clearBufferBit |= GL_DEPTH_BUFFER_BIT;
-	if (static_cast<uint32>(ERenderBufferType::STENCIL) & bit)
+	if (!!(ERenderBufferType::STENCIL & typeBit))
 		clearBufferBit |= GL_STENCIL_BUFFER_BIT;
 
 	glClear(clearBufferBit);

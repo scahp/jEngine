@@ -86,9 +86,6 @@ inline void hash_combine(std::size_t& seed, const T& v)
 }
 
 #include "jRHIType.h"
-
-ERenderBufferType MakeRenderBufferTypeList(const std::initializer_list<ERenderBufferType>& list);
-
 #include "jPerformanceProfile.h"
 
 #define TRUE_PER_MS(WaitMS)\
@@ -108,5 +105,6 @@ ERenderBufferType MakeRenderBufferTypeList(const std::initializer_list<ERenderBu
 #include "IMGUI/imgui.h"
 #include "IMGUI/imgui_impl_glfw.h"
 #include "IMGUI/imgui_impl_opengl3.h"
+
 
 #endif //PCH_H
