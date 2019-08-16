@@ -65,6 +65,23 @@ int main()
 		return -1;
 	}
 
+	// Decide GL+GLSL versions
+#if __APPLE__
+	// GL 3.2 + GLSL 150
+	const char* glsl_version = "#version 150";
+#else
+	// GL 3.0 + GLSL 130
+	const char* glsl_version = "#version 130";
+#endif
+
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGui_ImplGlfw_InitForOpenGL(window, true);
+	ImGui_ImplOpenGL3_Init(glsl_version);
+	ImGui::StyleColorsClassic();
+
+	ImGuiIO& io = ImGui::GetIO(); (void)io;
+
 	jAppSettings::GetInstance().Init(SCR_WIDTH, SCR_HEIGHT);
 
 	g_Engine.Init();
@@ -94,6 +111,65 @@ int main()
 			SCOPE_DEBUG_EVENT(g_rhi, "TwDraw");
 			TwDraw();
 		}
+
+		{
+			SCOPE_DEBUG_EVENT(g_rhi, "IMGUI");
+
+			ImGui_ImplOpenGL3_NewFrame();
+			ImGui_ImplGlfw_NewFrame();
+			ImGui::NewFrame();
+
+			//static bool show_demo_window = true;
+			//static bool show_another_window = false;
+			//ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
+			//// 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
+			//if (show_demo_window)
+			//	ImGui::ShowDemoWindow(&show_demo_window);
+
+			//// 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
+			//{
+			//	static float f = 0.0f;
+			//	static int counter = 0;
+
+			//	ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
+
+			//	ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
+			//	ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
+			//	ImGui::Checkbox("Another Window", &show_another_window);
+
+			//	ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
+			//	ImGui::ColorEdit3("clear color", (float*)& clear_color); // Edit 3 floats representing a color
+
+			//	if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
+			//		counter++;
+			//	ImGui::SameLine();
+			//	ImGui::Text("counter = %d", counter);
+
+			//	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+			//	ImGui::End();
+			//}
+
+			//// 3. Show another simple window.
+			//if (show_another_window)
+			//{
+			//	ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
+			//	ImGui::Text("Hello from another window!");
+			//	if (ImGui::Button("Close Me"))
+			//		show_another_window = false;
+			//	ImGui::End();
+			//}
+
+			ImGui::EndFrame();
+			ImGui::Render();
+			//int display_w, display_h;
+			//glfwGetFramebufferSize(window, &display_w, &display_h);
+			//glViewport(0, 0, display_w, display_h);
+			//glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+			//glClear(GL_COLOR_BUFFER_BIT);
+			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+		}
+
 		glFlush();
 
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
@@ -103,6 +179,10 @@ int main()
 
 		showFPS(window);
 	}
+
+	ImGui_ImplOpenGL3_Shutdown();
+	ImGui_ImplGlfw_Shutdown();
+	ImGui::DestroyContext();
 
 	// glfw: terminate, clearing all previously allocated GLFW resources.
 	// ------------------------------------------------------------------
@@ -137,9 +217,14 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 		return;
 
 	if (GLFW_PRESS == action)
-		g_KeyState[*key_name] = true;
+	{
+		if (!ImGui::IsAnyItemActive())
+			g_KeyState[*key_name] = true;
+	}
 	else if (GLFW_RELEASE == action)
+	{
 		g_KeyState[*key_name] = false;
+	}
 
 }
 
@@ -185,11 +270,18 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 
 	bool buttonDown = false;
 	if (GLFW_PRESS == action)
-		buttonDown = true;
+	{
+		if (!ImGui::IsAnyItemHovered() && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow))
+			buttonDown = true;
+	}
 	else if (GLFW_RELEASE == action)
+	{
 		buttonDown = false;
+	}
 	else
+	{
 		return;
+	}
 
 	g_MouseState[buttonType] = buttonDown;
 }

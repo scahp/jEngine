@@ -104,4 +104,9 @@ ERenderBufferType MakeRenderBufferTypeList(const std::initializer_list<ERenderBu
 	return false;\
 }()
 
+// imgui
+#include "IMGUI/imgui.h"
+#include "IMGUI/imgui_impl_glfw.h"
+#include "IMGUI/imgui_impl_opengl3.h"
+
 #endif //PCH_H
