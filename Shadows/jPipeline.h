@@ -74,6 +74,7 @@ public:
 	virtual void Teardown() {}
 
 	virtual void Do(const jPipelineData& pipelineData) const = 0;
+	FORCEINLINE void SetName(const std::string& name) { Name = name; }
 
 protected:
 	std::string Name;
@@ -96,6 +97,7 @@ protected:
 [this]()\
 { \
 auto newPipeline = new PipelineClass(__VA_ARGS__); \
+newPipeline->SetName(#PipelineClass); \
 newPipeline->Setup(); \
 return newPipeline; \
 }()
