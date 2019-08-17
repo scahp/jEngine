@@ -234,3 +234,25 @@ enum class EDepthBufferType
 	DEPTH24_STENCIL8,
 	MAX,
 };
+
+enum class ETextureAddressMode
+{
+	REPEAT = 0,
+	MIRRORED_REPEAT,
+	CLAMP_TO_EDGE,
+	CLAMP_TO_BORDER,
+	MAX,
+};
+
+enum class EDepthComparionFunc
+{
+	NEVER = 0,
+	LESS,
+	EQUAL,
+	LESS_EQUAL,
+	GREATER,
+	NOT_EQUAL,
+	GREATER_EQUAL,
+	ALWAYS,
+	MAX,
+};

@@ -9,6 +9,7 @@
 #include "jRenderObject.h"
 #include "jShadowVolume.h"
 #include "jShadowAppProperties.h"
+#include "jRHI.h"
 
 const std::list<jObject*> jPipelineData::emptyObjectList;
 //const std::list<const jLight*> jPipelineData::emptyLightList;
@@ -18,6 +19,7 @@ std::unordered_set<IPipeline*> IPipeline::s_pipelinesNameSet;
 
 void IPipeline::AddPipeline(const std::string& name, IPipeline* newPipeline)
 {
+	newPipeline->Name = name;
 	s_pipelinesNameMap.insert(std::make_pair(name, newPipeline));
 	s_pipelinesNameSet.insert(newPipeline);
 }
@@ -77,6 +79,8 @@ struct jShadowPipelinCreation
 // jRenderPipeline
 void jRenderPipeline::Do(const jPipelineData& pipelineData) const
 {
+	SCOPE_DEBUG_EVENT(g_rhi, Name.c_str());
+
 	Draw(pipelineData, Shader);
 }
 
@@ -196,6 +200,8 @@ void jForward_ShadowMapGen_Pipeline::Setup()
 
 void jForward_ShadowMapGen_Pipeline::Do(const jPipelineData& pipelineData) const
 {
+	SCOPE_DEBUG_EVENT(g_rhi, Name.c_str());
+
 	//light->Update(0); // todo remove
 	g_rhi->SetRenderTarget(pipelineData.DefaultRenderTarget);
 
@@ -261,6 +267,8 @@ void jForward_ShadowMapGen_CSM_SSM_Pipeline::Setup()
 
 void jForward_ShadowMapGen_CSM_SSM_Pipeline::Do(const jPipelineData& pipelineData) const
 {
+	SCOPE_DEBUG_EVENT(g_rhi, Name.c_str());
+
 	// todo 여러개의 DIrectional light인경우 고려 필요.
 	if (pipelineData.Lights.empty())
 		return;
@@ -514,6 +522,7 @@ void jForward_Shadow_Pipeline::Do(const jPipelineData& pipelineData) const
 // jComputePipeline
 void jComputePipeline::Do(const jPipelineData& pipelineData) const
 {
+	SCOPE_DEBUG_EVENT(g_rhi, Name.c_str());
 	Dispatch();
 }
 
@@ -692,6 +701,8 @@ bool jForward_ShadowVolume_Pipeline::CanSkipShadowObject(const jCamera* camera, 
 
 void jForward_ShadowVolume_Pipeline::Do(const jPipelineData& pipelineData) const
 {
+	SCOPE_DEBUG_EVENT(g_rhi, Name.c_str());
+
 	g_rhi->SetRenderTarget(pipelineData.DefaultRenderTarget);
 
 	auto camera = pipelineData.Camera;

@@ -76,6 +76,7 @@ public:
 	virtual void Do(const jPipelineData& pipelineData) const = 0;
 
 protected:
+	std::string Name;
 	jShader* Shader = nullptr;
 	Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
 	ERenderBufferType ClearType = ERenderBufferType::NONE;

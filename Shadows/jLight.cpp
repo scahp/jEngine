@@ -6,6 +6,7 @@
 #include "jCamera.h"
 #include "jRHI_OpenGL.h"
 #include "jObject.h"
+#include "jSamplerStatePool.h"
 
 namespace jLightUtil
 {
@@ -41,6 +42,7 @@ namespace jLightUtil
 		shadowMapData->ShadowMapCamera = jOrthographicCamera::CreateCamera(pos, target, up, -width / 2.0f, -height / 2.0f, width / 2.0f, height / 2.0f, farDist, nearDist);
 		
 		shadowMapData->ShadowMapRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::RG32F, ETextureFormat::RG, EFormatType::FLOAT, EDepthBufferType::DEPTH32, SM_WIDTH, SM_HEIGHT, 1 });
+		shadowMapData->ShadowMapSamplerState = jSamplerStatePool::GetSamplerState("Point");
 
 		return shadowMapData;
 	}
@@ -64,6 +66,7 @@ namespace jLightUtil
 		shadowMapData->ShadowMapCamera = jOrthographicCamera::CreateCamera(pos, target, up, -width / 2.0f, -height / 2.0f, width / 2.0f, height / 2.0f, farDist, nearDist);
 
 		shadowMapData->ShadowMapRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::RG32F, ETextureFormat::RG, EFormatType::FLOAT, EDepthBufferType::DEPTH32, SM_WIDTH, SM_HEIGHT * NUM_CASCADES, 1 });
+		shadowMapData->ShadowMapSamplerState = jSamplerStatePool::GetSamplerState("Point");
 
 		return shadowMapData;
 	}
@@ -82,6 +85,7 @@ namespace jLightUtil
 		shadowMapData->ShadowMapCamera[4] = jCamera::CreateCamera(pos, pos + Vector(0.0f, 0.0f, 1.0f), pos + Vector(0.0f, 1.0f, 0.0f), DegreeToRadian(90.0f), nearDist, farDist, SM_WIDTH, SM_HEIGHT, true);
 		shadowMapData->ShadowMapCamera[5] = jCamera::CreateCamera(pos, pos + Vector(0.0f, 0.0f, -1.0f), pos + Vector(0.0f, 1.0f, 0.0f), DegreeToRadian(90.0f), nearDist, farDist, SM_WIDTH, SM_HEIGHT, true);
 		shadowMapData->ShadowMapRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW, ETextureFormat::RG32F, ETextureFormat::RG, EFormatType::FLOAT, EDepthBufferType::DEPTH32, SM_WIDTH, SM_HEIGHT * 6, 1 });
+		shadowMapData->ShadowMapSamplerState = jSamplerStatePool::GetSamplerState("Point");
 
 		return shadowMapData;
 	}
@@ -275,7 +279,8 @@ void jDirectionalLight::GetMaterialData(jMaterialData* OutMaterialData) const
 	{
 		auto materialParam = new jMaterialParam();
 		materialParam->Name = "shadow_object";
-		materialParam->Texture = static_cast<jTexture_OpenGL*>(ShadowMapData->ShadowMapRenderTarget->GetTexture());
+		materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTexture();
+		materialParam->SamplerState = ShadowMapData->ShadowMapSamplerState.get();
 		OutMaterialData->Params.push_back(materialParam);
 	}
 }
@@ -391,7 +396,8 @@ void jPointLight::GetMaterialData(jMaterialData* OutMaterialData) const
 	{
 		auto materialParam = new jMaterialParam();
 		materialParam->Name = "shadow_object_point";
-		materialParam->Texture = static_cast<jTexture_OpenGL*>(ShadowMapData->ShadowMapRenderTarget->GetTexture());
+		materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTexture();
+		materialParam->SamplerState = ShadowMapData->ShadowMapSamplerState.get();
 		OutMaterialData->Params.push_back(materialParam);
 	}
 }
@@ -505,7 +511,8 @@ void jSpotLight::GetMaterialData(jMaterialData* OutMaterialData) const
 	{
 		auto materialParam = new jMaterialParam();
 		materialParam->Name = "shadow_object_spot";
-		materialParam->Texture = static_cast<jTexture_OpenGL*>(ShadowMapData->ShadowMapRenderTarget->GetTexture());
+		materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTexture();
+		materialParam->SamplerState = ShadowMapData->ShadowMapSamplerState.get();
 		OutMaterialData->Params.push_back(materialParam);
 	}
 }

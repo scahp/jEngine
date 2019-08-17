@@ -198,6 +198,7 @@
     <ClInclude Include="jRHI_DirectX11.h" />
     <ClInclude Include="jRHI_OpenGL.h" />
     <ClInclude Include="jRHI_Vulkan.h" />
+    <ClInclude Include="jSamplerStatePool.h" />
     <ClInclude Include="jShader.h" />
     <ClInclude Include="jShadowAppProperties.h" />
     <ClInclude Include="jShadowTypes.h" />
@@ -253,6 +254,7 @@
     <ClCompile Include="jRHI_DirectX11.cpp" />
     <ClCompile Include="jRHI_OpenGL.cpp" />
     <ClCompile Include="jRHI_Vulkan.cpp" />
+    <ClCompile Include="jSamplerStatePool.cpp" />
     <ClCompile Include="jShader.cpp" />
     <ClCompile Include="jShadowAppProperties.cpp" />
     <ClCompile Include="jShadowVolume.cpp" />

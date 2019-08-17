@@ -5,6 +5,7 @@
 #include "jPipeline.h"
 #include "jShader.h"
 #include "jPerformanceProfile.h"
+#include "jSamplerStatePool.h"
 
 jEngine::jEngine()
 {
@@ -20,6 +21,7 @@ jEngine::~jEngine()
 
 void jEngine::Init()
 {
+	jSamplerStatePool::CreateDefaultSamplerState();
 	jShaderInfo::CreateShaders();
 	IPipeline::SetupPipelines();
 

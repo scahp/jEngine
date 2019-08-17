@@ -15,7 +15,7 @@ jRHI::jRHI()
 {
 }
 
-void jRHI::MapBufferdata(IBuffer* buffer)
+void jRHI::MapBufferdata(IBuffer* buffer) const
 {
 
 }

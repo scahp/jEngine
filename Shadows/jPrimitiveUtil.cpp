@@ -64,23 +64,27 @@ void jFullscreenQuadPrimitive::SetUniformBuffer(const jShader* shader)
 	SET_UNIFORM_BUFFER_STATIC(Vector2, "PixelSize", Vector2(1.0f / SCR_WIDTH, 1.0f / SCR_HEIGHT), shader);
 }
 
-void jFullscreenQuadPrimitive::SetTexture(const jTexture* texture)
+void jFullscreenQuadPrimitive::SetTexture(const jTexture* texture, const jSamplerState* samplerState)
 {
 	RenderObject->tex_object = texture;
+	RenderObject->samplerState = samplerState;
 }
 
-void jFullscreenQuadPrimitive::SetTexture(int index, const jTexture* texture)
+void jFullscreenQuadPrimitive::SetTexture(int index, const jTexture* texture, const jSamplerState* samplerState)
 {
 	switch (index)
 	{
 	case 0:
 		RenderObject->tex_object = texture;
+		RenderObject->samplerState = samplerState;
 		break;
 	case 1:
 		RenderObject->tex_object2 = texture;
+		RenderObject->samplerState2 = samplerState;
 		break;
 	case 2:
 		RenderObject->tex_object3 = texture;
+		RenderObject->samplerState3 = samplerState;
 		break;
 	default:
 		JASSERT(0);
@@ -88,14 +92,16 @@ void jFullscreenQuadPrimitive::SetTexture(int index, const jTexture* texture)
 	}
 }
 
-void jFullscreenQuadPrimitive::SetTexture2(const jTexture* texture)
+void jFullscreenQuadPrimitive::SetTexture2(const jTexture* texture, const jSamplerState* samplerState)
 {
 	RenderObject->tex_object2 = texture;
+	RenderObject->samplerState2 = samplerState;
 }
 
-void jFullscreenQuadPrimitive::SetTexture3(const jTexture* texture)
+void jFullscreenQuadPrimitive::SetTexture3(const jTexture* texture, const jSamplerState* samplerState)
 {
 	RenderObject->tex_object3 = texture;
+	RenderObject->samplerState3 = samplerState;
 }
 
 void jBoundBoxObject::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights)

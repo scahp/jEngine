@@ -6,6 +6,7 @@ extern class jRHI* g_rhi;
 
 struct jShader;
 struct jShaderInfo;
+struct jSamplerState;
 
 struct IBuffer
 {
@@ -189,6 +190,7 @@ struct jMaterialParam
 
 	std::string Name;
 	const jTexture* Texture = nullptr;
+	const jSamplerState* SamplerState = nullptr;
 };
 
 struct jMaterialData
@@ -260,12 +262,57 @@ struct jQueryTime
 	uint64 TimeStamp = 0;
 };
 
+struct jSamplerStateInfo
+{
+	size_t GetHash() const
+	{
+		size_t result = 0;
+		hash_combine(result, Minification);
+		hash_combine(result, Magnification);
+		hash_combine(result, AddressU);
+		hash_combine(result, AddressV);
+		hash_combine(result, AddressW);
+		hash_combine(result, MipLODBias);
+		hash_combine(result, MaxAnisotropy);
+		hash_combine(result, BorderColor.x);
+		hash_combine(result, BorderColor.y);
+		hash_combine(result, BorderColor.z);
+		hash_combine(result, BorderColor.w);
+		hash_combine(result, MinLOD);
+		hash_combine(result, MaxLOD);
+		return result;
+	}
+
+	ETextureFilter Minification = ETextureFilter::NEAREST;
+	ETextureFilter Magnification = ETextureFilter::NEAREST;
+	ETextureAddressMode AddressU = ETextureAddressMode::CLAMP_TO_EDGE;
+	ETextureAddressMode AddressV = ETextureAddressMode::CLAMP_TO_EDGE;
+	ETextureAddressMode AddressW = ETextureAddressMode::CLAMP_TO_EDGE;
+	float MipLODBias = 0.0f;
+	float MaxAnisotropy = 1.0f;			// if you anisotropy filtering tuned on, set this variable greater than 1.
+	Vector4 BorderColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
+	float MinLOD = 0.0f;
+	float MaxLOD = FLT_MAX;
+};
+
+struct jSamplerState : public std::enable_shared_from_this<jSamplerState>
+{
+	jSamplerState(const jSamplerStateInfo& info)
+		: Info(info)
+	{ }
+	virtual ~jSamplerState() {}
+	const jSamplerStateInfo Info;
+};
+
 class jRHI
 {
 public:
 	jRHI();
 	virtual ~jRHI() {}
 
+	virtual jSamplerState* CreateSamplerState(const jSamplerStateInfo& info) const { return nullptr; }
+	virtual void ReleaseSamplerState(jSamplerState* samplerState) const {}
+	virtual void BindSamplerState(int32 index, const jSamplerState* samplerState) const {}
 	virtual void SetClear(ERenderBufferType typeBit) const {}
 	virtual void SetClearColor(float r, float g, float b, float a) const {}
 	virtual void SetClearColor(Vector4 rgba) const {}
@@ -277,7 +324,7 @@ public:
 	virtual void UpdateVertexBuffer(jVertexBuffer* vb, IStreamParam* streamParam, int32 streamParamIndex) const {}
 	virtual void BindVertexBuffer(const jVertexBuffer* vb, const jShader* shader) const {}
 	virtual void BindIndexBuffer(const jIndexBuffer* ib, const jShader* shader) const {}
-	virtual void MapBufferdata(IBuffer* buffer);
+	virtual void MapBufferdata(IBuffer* buffer) const;
 	virtual void SetTextureFilter(ETextureType type, ETextureFilterTarget target, ETextureFilter filter) const {}
 	virtual void SetTextureWrap(int flag) const {}
 	virtual void SetTexture(int32 index, const jTexture* texture) const {}

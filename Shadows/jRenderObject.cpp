@@ -240,6 +240,7 @@ void jRenderObject::SetTextureProperty(const jShader* shader, jMaterialData* mat
 			auto tex_object_param = new jMaterialParam();
 			tex_object_param->Name = "tex_object";
 			tex_object_param->Texture = tex_object;
+			tex_object_param->SamplerState = samplerState;
 			materialData->Params.push_back(tex_object_param);
 		}
 
@@ -249,6 +250,7 @@ void jRenderObject::SetTextureProperty(const jShader* shader, jMaterialData* mat
 			auto tex_object2_param = new jMaterialParam();
 			tex_object2_param->Name = "tex_object2";
 			tex_object2_param->Texture = tex_object2;
+			tex_object2_param->SamplerState = samplerState2;
 			materialData->Params.push_back(tex_object2_param);
 			useTexture = true;
 		}
@@ -257,6 +259,7 @@ void jRenderObject::SetTextureProperty(const jShader* shader, jMaterialData* mat
 			auto tex_object3_param = new jMaterialParam();
 			tex_object3_param->Name = "tex_object3";
 			tex_object3_param->Texture = tex_object3;
+			tex_object3_param->SamplerState = samplerState3;
 			materialData->Params.push_back(tex_object3_param);
 			useTexture = true;
 		}
@@ -267,6 +270,7 @@ void jRenderObject::SetTextureProperty(const jShader* shader, jMaterialData* mat
 			auto tex_objectArray_param = new jMaterialParam();
 			tex_objectArray_param->Name = "tex_object_array";
 			tex_objectArray_param->Texture = tex_object_array;
+			tex_objectArray_param->SamplerState = samplerStateTexArray;
 			materialData->Params.push_back(tex_objectArray_param);
 		}
 	}

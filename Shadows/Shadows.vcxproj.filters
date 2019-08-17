@@ -186,6 +186,9 @@
     <ClInclude Include="IMGUI\imgui_impl_opengl3.h">
       <Filter>IMGUI</Filter>
     </ClInclude>
+    <ClInclude Include="jSamplerStatePool.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -325,6 +328,9 @@
     </ClCompile>
     <ClCompile Include="IMGUI\imgui_impl_opengl3.cpp">
       <Filter>IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="jSamplerStatePool.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

@@ -10,6 +10,7 @@ struct jIndexBuffer;
 struct jShader;
 struct jMaterialData;
 struct jTexture;
+struct jSamplerState;
 
 enum class EShadingModel : int32
 {
@@ -49,7 +50,12 @@ public:
 	const jTexture* tex_object = nullptr;
 	const jTexture* tex_object2 = nullptr;
 	const jTexture* tex_object3 = nullptr;
+	const jSamplerState* samplerState = nullptr;
+	const jSamplerState* samplerState2 = nullptr;
+	const jSamplerState* samplerState3 = nullptr;
+
 	jTexture* tex_object_array = nullptr;
+	jSamplerState* samplerStateTexArray = nullptr;
 
 	Vector Pos = Vector::ZeroVector;
 	Vector Rot = Vector::ZeroVector;

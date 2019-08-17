@@ -4,15 +4,8 @@
 #include "jRHIType.h"
 #include "jShader.h"
 
-jRHI_OpenGL::jRHI_OpenGL()
-{
-}
-
-
-jRHI_OpenGL::~jRHI_OpenGL()
-{
-}
-
+//////////////////////////////////////////////////////////////////////////
+// OpenGL utility functions
 unsigned int GetPrimitiveType(EPrimitiveType type)
 {
 	unsigned int primitiveType = 0;
@@ -117,6 +110,77 @@ uint32 GetOpenGLTextureFilterType(ETextureFilter filter)
 		break;
 	}
 	return texFilter;
+}
+
+uint32 GetOpenGLTextureAddressMode(ETextureAddressMode textureAddressMode)
+{
+	uint32 result = 0;
+	switch (textureAddressMode)
+	{
+	case ETextureAddressMode::REPEAT:
+		result = GL_REPEAT;
+		break;
+	case ETextureAddressMode::MIRRORED_REPEAT:
+		result = GL_MIRRORED_REPEAT;
+		break;
+	case ETextureAddressMode::CLAMP_TO_EDGE:
+		result = GL_CLAMP_TO_EDGE;
+		break;
+	case ETextureAddressMode::CLAMP_TO_BORDER:
+		result = GL_CLAMP_TO_BORDER;
+		break;
+	default:
+		break;
+	}
+	return result;
+}
+
+//////////////////////////////////////////////////////////////////////////
+// jRHI_OpenGL
+jRHI_OpenGL::jRHI_OpenGL()
+{
+}
+
+
+jRHI_OpenGL::~jRHI_OpenGL()
+{
+}
+
+jSamplerState* jRHI_OpenGL::CreateSamplerState(const jSamplerStateInfo& info) const
+{
+	auto samplerState = new jSamplerState_OpenGL(info);
+	glGenSamplers(1, &samplerState->SamplerId);
+	glSamplerParameteri(samplerState->SamplerId, GL_TEXTURE_MIN_FILTER, GetOpenGLTextureFilterType(info.Minification));
+	glSamplerParameteri(samplerState->SamplerId, GL_TEXTURE_MAG_FILTER, GetOpenGLTextureFilterType(info.Magnification));
+	glSamplerParameteri(samplerState->SamplerId, GL_TEXTURE_WRAP_S, GetOpenGLTextureAddressMode(info.AddressU));
+	glSamplerParameteri(samplerState->SamplerId, GL_TEXTURE_WRAP_T, GetOpenGLTextureAddressMode(info.AddressV));
+	glSamplerParameteri(samplerState->SamplerId, GL_TEXTURE_WRAP_R, GetOpenGLTextureAddressMode(info.AddressW));
+	glSamplerParameterf(samplerState->SamplerId, GL_TEXTURE_LOD_BIAS, info.MipLODBias);
+	glSamplerParameterf(samplerState->SamplerId, GL_TEXTURE_MAX_ANISOTROPY, info.MaxAnisotropy);
+	glSamplerParameterfv(samplerState->SamplerId, GL_TEXTURE_BORDER_COLOR, info.BorderColor.v);
+	glSamplerParameterf(samplerState->SamplerId, GL_TEXTURE_MIN_LOD, info.MinLOD);
+	glSamplerParameterf(samplerState->SamplerId, GL_TEXTURE_MAX_LOD, info.MaxLOD);
+
+	return samplerState;
+}
+
+void jRHI_OpenGL::ReleaseSamplerState(jSamplerState* samplerState) const
+{
+	auto samplerState_gl = static_cast<jSamplerState_OpenGL*>(samplerState);
+	glDeleteSamplers(1, &samplerState_gl->SamplerId);
+}
+
+void jRHI_OpenGL::BindSamplerState(int32 index, const jSamplerState* samplerState) const
+{
+	if (samplerState)
+	{
+		auto samplerState_gl = static_cast<const jSamplerState_OpenGL*>(samplerState);
+		glBindSampler(index, samplerState_gl->SamplerId);
+	}
+	else
+	{
+		glBindSampler(index, 0);
+	}
 }
 
 jVertexBuffer* jRHI_OpenGL::CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const
@@ -225,7 +289,7 @@ void jRHI_OpenGL::BindIndexBuffer(const jIndexBuffer* ib, const jShader* shader)
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib_gl->BufferID);
 }
 
-void jRHI_OpenGL::MapBufferdata(IBuffer* buffer)
+void jRHI_OpenGL::MapBufferdata(IBuffer* buffer) const
 {
 	throw std::logic_error("The method or operation is not implemented.");
 }
@@ -818,6 +882,17 @@ void jRHI_OpenGL::SetMatetrial(jMaterialData* materialData, const jShader* shade
 			continue;
 		SetTexture(index, matParam->Texture);
 
+		if (matParam->SamplerState)
+		{
+			BindSamplerState(index, matParam->SamplerState);
+		}
+		else
+		{
+			BindSamplerState(index, nullptr);
+			SetTextureFilter(tex_gl->TextureType, ETextureFilterTarget::MAGNIFICATION, tex_gl->Magnification);
+			SetTextureFilter(tex_gl->TextureType, ETextureFilterTarget::MINIFICATION, tex_gl->Minification);
+		}
+
 		char szTemp[128] = { 0, };
 		jUniformBuffer<int> sRGB_UniformData;
 		sprintf_s(szTemp, sizeof(szTemp), "TextureSRGB[%d]", index);
@@ -825,8 +900,6 @@ void jRHI_OpenGL::SetMatetrial(jMaterialData* materialData, const jShader* shade
 		sRGB_UniformData.Data = tex_gl->sRGB;
 		SetUniformbuffer(&sRGB_UniformData, shader);
 
-		SetTextureFilter(tex_gl->TextureType, ETextureFilterTarget::MAGNIFICATION, tex_gl->Magnification);
-		SetTextureFilter(tex_gl->TextureType, ETextureFilterTarget::MINIFICATION, tex_gl->Minification);
 		++index;
 	}
 }

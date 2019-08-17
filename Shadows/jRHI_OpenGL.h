@@ -116,17 +116,27 @@ struct jQueryTime_OpenGL : public jQueryTime
 	uint32 QueryId = 0;
 };
 
+struct jSamplerState_OpenGL : public jSamplerState
+{
+	using jSamplerState::jSamplerState;
+	virtual ~jSamplerState_OpenGL() {}
+	uint32 SamplerId = 0;
+};
+
 class jRHI_OpenGL : public jRHI
 {
 public:
 	jRHI_OpenGL();
 	~jRHI_OpenGL();
 
+	virtual jSamplerState* CreateSamplerState(const jSamplerStateInfo& info) const override;
+	virtual void ReleaseSamplerState(jSamplerState* samplerState) const override;
+	virtual void BindSamplerState(int32 index, const jSamplerState* samplerState) const override;
 	virtual jVertexBuffer* CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const override;
 	virtual jIndexBuffer* CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const override;
 	virtual void BindVertexBuffer(const jVertexBuffer* vb, const jShader* shader) const override;
 	virtual void BindIndexBuffer(const jIndexBuffer* ib, const jShader* shader) const override;
-	virtual void MapBufferdata(IBuffer* buffer) override;
+	virtual void MapBufferdata(IBuffer* buffer) const override;
 	virtual void DrawArray(EPrimitiveType type, int vertStartIndex, int vertCount) const override;
 	virtual void DrawElement(EPrimitiveType type, int elementSize, int32 startIndex = -1, int32 count = -1) const override;
 	virtual void DispatchCompute(uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ) const override;

@@ -53,6 +53,7 @@ namespace jLightUtil
 		FORCEINLINE bool IsValid() const { return (ShadowMapRenderTarget && ShadowMapCamera[0] && ShadowMapCamera[1] && ShadowMapCamera[2] && ShadowMapCamera[3] && ShadowMapCamera[4] && ShadowMapCamera[5]); }
 
 		std::shared_ptr<jRenderTarget> ShadowMapRenderTarget;
+		std::shared_ptr<jSamplerState> ShadowMapSamplerState;
 		jCamera* ShadowMapCamera[6] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
 		IUniformBufferBlock* UniformBlock = nullptr;
 	};
@@ -83,6 +84,7 @@ namespace jLightUtil
 		FORCEINLINE bool IsValid() const { return (ShadowMapCamera && ShadowMapRenderTarget); }
 
 		std::shared_ptr<jRenderTarget> ShadowMapRenderTarget;
+		std::shared_ptr<jSamplerState> ShadowMapSamplerState;
 		jCamera* ShadowMapCamera = nullptr;
 		IUniformBufferBlock* UniformBlock = nullptr;
 

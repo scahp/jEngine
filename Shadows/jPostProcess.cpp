@@ -38,9 +38,9 @@ std::weak_ptr<jPostProcessInOutput> IPostprocess::GetPostProcessOutput() const
 	return PostProcessOutput;
 }
 
-void IPostprocess::AddInput(const std::weak_ptr<jPostProcessInOutput>& input)
+void IPostprocess::AddInput(const std::weak_ptr<jPostProcessInOutput>& input, const std::shared_ptr<jSamplerState>& samplerState)
 {
-	PostProcessInputList.push_back(input);
+	PostProcessInputList.push_back({ input, samplerState });
 }
 
 void IPostprocess::SetOutput(const std::shared_ptr<jPostProcessInOutput>& output)
@@ -75,17 +75,17 @@ void IPostprocess::BindInputs(jFullscreenQuadPrimitive* fsQuad) const
 	int index = 0;
 	for (auto it = PostProcessInputList.begin(); PostProcessInputList.end() != it; ++it,++index)
 	{
-		const auto& input = (*it);
+		const auto& input = it->Input;
 		const auto texture = input.expired() ? nullptr : input.lock()->RenderTarget->GetTexture();
-		fsQuad->SetTexture(index, texture);
+		fsQuad->SetTexture(index, texture, it->SamplerState.get());
 	}
 }
 
 void IPostprocess::UnbindInputs(jFullscreenQuadPrimitive* fsQuad) const
 {
-	int index = 0;
-	for (auto it = PostProcessInputList.begin(); PostProcessInputList.end() != it; ++it, ++index)
-		fsQuad->SetTexture(index, nullptr);
+	const int32 size = static_cast<int32>(PostProcessInputList.size());
+	for (int32 i = 0; i < size; ++i)
+		fsQuad->SetTexture(i, nullptr, nullptr);
 }
 
 void IPostprocess::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights) const
@@ -298,18 +298,19 @@ void jPostProcess_AdaptiveLuminance::BindInputs(jFullscreenQuadPrimitive* fsQuad
 	int index = 0;
 	for (auto it = PostProcessInputList.begin(); PostProcessInputList.end() != it; ++it, ++index)
 	{
-		const auto& input = (*it);
+		const auto& input = it->Input;
 		const auto texture = input.expired() ? nullptr : input.lock()->RenderTarget->GetTexture();
-		fsQuad->SetTexture(index, texture);
+		fsQuad->SetTexture(index, texture, it->SamplerState.get());
 	}
 	auto pLastLuminanceRenderTarget = LastLumianceRenderTarget[!s_index].get()->GetTexture();
-	fsQuad->SetTexture(index++, pLastLuminanceRenderTarget);
+	fsQuad->SetTexture(index++, pLastLuminanceRenderTarget, nullptr);
 }
 
 void jPostProcess_AdaptiveLuminance::UnbindInputs(jFullscreenQuadPrimitive* fsQuad) const
 {
-	for(int index = 0; index < PostProcessInputList.size() + 1 ;++index)
-		fsQuad->SetTexture(index, nullptr);
+	const int32 size = static_cast<int32>(PostProcessInputList.size() + 1);
+	for (int32 i = 0; i < size; ++i)
+		fsQuad->SetTexture(i, nullptr, nullptr);
 }
 
 void jPostProcess_AdaptiveLuminance::Setup()
@@ -461,14 +462,14 @@ void jPostProcess_GaussianBlurH::BindInputs(jFullscreenQuadPrimitive* fsQuad) co
 	int index = 0;
 	for (auto it = PostProcessInputList.begin(); PostProcessInputList.end() != it; ++it, ++index)
 	{
-		const auto& input = (*it);
+		const auto& input = it->Input;
 		auto texture = input.expired() ? nullptr : input.lock()->RenderTarget->GetTexture();
 		if (texture)
 		{
 			texture->Magnification = ETextureFilter::NEAREST;
 			texture->Minification = ETextureFilter::NEAREST;
 		}
-		fsQuad->SetTexture(index, texture);
+		fsQuad->SetTexture(index, texture, it->SamplerState.get());
 	}
 }
 
@@ -477,7 +478,7 @@ void jPostProcess_GaussianBlurH::UnbindInputs(jFullscreenQuadPrimitive* fsQuad) 
 	int index = 0;
 	for (auto it = PostProcessInputList.begin(); PostProcessInputList.end() != it; ++it, ++index)
 	{
-		const auto& input = (*it);
+		const auto& input = it->Input;
 		if (!input.expired())
 		{
 			auto rt = input.lock()->RenderTarget;
@@ -485,7 +486,7 @@ void jPostProcess_GaussianBlurH::UnbindInputs(jFullscreenQuadPrimitive* fsQuad) 
 			texture->Magnification = rt->Info.Magnification;
 			texture->Minification = rt->Info.Minification;
 		}
-		fsQuad->SetTexture(index, nullptr);
+		fsQuad->SetTexture(index, nullptr, nullptr);
 	}
 }
 
@@ -529,14 +530,14 @@ void jPostProcess_GaussianBlurV::BindInputs(jFullscreenQuadPrimitive* fsQuad) co
 	int index = 0;
 	for (auto it = PostProcessInputList.begin(); PostProcessInputList.end() != it; ++it, ++index)
 	{
-		const auto& input = (*it);
+		const auto& input = it->Input;
 		auto texture = input.expired() ? nullptr : input.lock()->RenderTarget->GetTexture();
 		if (texture)
 		{
 			texture->Magnification = ETextureFilter::NEAREST;
 			texture->Minification = ETextureFilter::NEAREST;
 		}
-		fsQuad->SetTexture(index, texture);
+		fsQuad->SetTexture(index, texture, it->SamplerState.get());
 	}
 }
 
@@ -545,7 +546,7 @@ void jPostProcess_GaussianBlurV::UnbindInputs(jFullscreenQuadPrimitive* fsQuad) 
 	int index = 0;
 	for (auto it = PostProcessInputList.begin(); PostProcessInputList.end() != it; ++it, ++index)
 	{
-		const auto& input = (*it);
+		const auto& input = it->Input;
 		if (!input.expired())
 		{
 			auto rt = input.lock()->RenderTarget;
@@ -553,6 +554,6 @@ void jPostProcess_GaussianBlurV::UnbindInputs(jFullscreenQuadPrimitive* fsQuad) 
 			texture->Magnification = rt->Info.Magnification;
 			texture->Minification = rt->Info.Minification;
 		}
-		fsQuad->SetTexture(index, nullptr);
+		fsQuad->SetTexture(index, nullptr, nullptr);
 	}
 }

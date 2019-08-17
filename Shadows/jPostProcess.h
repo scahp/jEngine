@@ -12,6 +12,7 @@ class jGBuffer;
 struct jPostProcessInOutput : public std::enable_shared_from_this<jPostProcessInOutput>
 {
 	jRenderTarget* RenderTarget = nullptr;
+
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -24,7 +25,14 @@ public:
 	{ }
 	virtual ~IPostprocess() {}
 	std::string Name;
-	std::list<std::weak_ptr<jPostProcessInOutput> > PostProcessInputList;
+
+	struct jInputData
+	{
+		std::weak_ptr<jPostProcessInOutput> Input;
+		std::shared_ptr<jSamplerState> SamplerState;
+	};
+
+	std::list<jInputData> PostProcessInputList;
 	std::shared_ptr<jPostProcessInOutput> PostProcessOutput;
 
 	virtual void Setup();
@@ -33,7 +41,7 @@ public:
 	virtual bool Process(const jCamera* camera) const;
 
 	virtual std::weak_ptr<jPostProcessInOutput> GetPostProcessOutput() const;
-	virtual void AddInput(const std::weak_ptr<jPostProcessInOutput>& input);
+	virtual void AddInput(const std::weak_ptr<jPostProcessInOutput>& input, const std::shared_ptr<jSamplerState>& samplerState = nullptr);
 	virtual void SetOutput(const std::shared_ptr<jPostProcessInOutput>& output);
 	virtual void ClearInputs();
 	virtual void ClearOutputs();
