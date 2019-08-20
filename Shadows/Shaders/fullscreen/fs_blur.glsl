@@ -6,7 +6,7 @@ uniform vec2 PixelSize;
 uniform float IsVertical;
 uniform float MaxDist;
 
-#define FILTER_STEP_COUNT 10.0
+#define FILTER_STEP_COUNT 5.0
 #define FilterSize vec2(FILTER_STEP_COUNT, FILTER_STEP_COUNT)
 #define COUNT (FILTER_STEP_COUNT * 2.0 + 1.0)
 
