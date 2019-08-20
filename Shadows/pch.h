@@ -109,4 +109,6 @@ inline void hash_combine(std::size_t& seed, const T& v)
 
 #include "jShadowAppProperties.h"
 
+#define DEBUG_OUTPUT_ON 0
+
 #endif //PCH_H

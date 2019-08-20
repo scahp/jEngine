@@ -992,6 +992,7 @@ void jRHI_OpenGL::SetTextureFilter(ETextureType type, ETextureFilterTarget targe
 		textureType = GL_TEXTURE_2D;
 		break;
 	case ETextureType::TEXTURE_2D_ARRAY:
+	case ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW:
 		textureType = GL_TEXTURE_2D_ARRAY;
 		break;
 	case ETextureType::TEXTURE_CUBE:

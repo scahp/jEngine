@@ -17,15 +17,25 @@ std::list<jObject*> g_HairObjectArray;
 
 void jObject::AddObject(jObject* object)
 {
+	if (!object)
+		return;
+
 	//g_StaticObjectArray.push_back(object);
 
 	if (!object->SkipShadowMapGen)
+	{
+		if (object->RenderObject && object->RenderObject->VertexStream)
+			JASSERT(object->RenderObject->VertexStream->PrimitiveType == EPrimitiveType::TRIANGLES);
+
 		s_ShadowCasterObject.push_back(object);
+	}
 	s_StaticObjects.push_back(object);
 }
 
 void jObject::RemoveObject(jObject* object)
 {
+	if (!object)
+		return;
 	s_ShadowCasterObject.remove_if([&object](jObject* param)
 	{
 		return (param == object);
@@ -60,11 +70,15 @@ void jObject::FlushDirtyState()
 
 void jObject::AddBoundBoxObject(jObject* object)
 {
+	if (!object)
+		return;
 	s_BoundBoxObjects.push_back(object);
 }
 
 void jObject::RemoveBoundBoxObject(jObject* object)
 {
+	if (!object)
+		return;
 	s_BoundBoxObjects.remove_if([&object](jObject* param)
 	{
 		return (param == object);
@@ -73,11 +87,15 @@ void jObject::RemoveBoundBoxObject(jObject* object)
 
 void jObject::AddBoundSphereObject(jObject* object)
 {
+	if (!object)
+		return;
 	s_BoundSphereObjects.push_back(object);
 }
 
 void jObject::RemoveBoundSphereObject(jObject* object)
 {
+	if (!object)
+		return;
 	s_BoundSphereObjects.remove_if([&object](jObject* param)
 	{
 		return (param == object);
@@ -86,11 +104,15 @@ void jObject::RemoveBoundSphereObject(jObject* object)
 
 void jObject::AddDebugObject(jObject* object)
 {
+	if (!object)
+		return;
 	s_DebugObjects.push_back(object);
 }
 
 void jObject::RemoveDebugObject(jObject* object)
 {
+	if (!object)
+		return;
 	s_DebugObjects.remove_if([&object](jObject* param)
 		{
 			return (param == object);
@@ -99,11 +121,15 @@ void jObject::RemoveDebugObject(jObject* object)
 
 void jObject::AddUIObject(jObject* object)
 {
+	if (!object)
+		return;
 	s_UIObjects.push_back(object);
 }
 
 void jObject::RemoveUIObject(jObject* object)
 {
+	if (!object)
+		return;
 	s_UIObjects.remove_if([&object](jObject* param)
 		{
 			return (param == object);
@@ -112,11 +138,15 @@ void jObject::RemoveUIObject(jObject* object)
 
 void jObject::AddUIDebugObject(jObject* object)
 {
+	if (!object)
+		return;
 	s_UIDebugObjects.push_back(object);
 }
 
 void jObject::RemoveUIDebugObject(jObject* object)
 {
+	if (!object)
+		return;
 	s_UIDebugObjects.remove_if([&object](jObject* param)
 		{
 			return (param == object);

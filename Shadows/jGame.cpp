@@ -97,9 +97,6 @@ void jGame::Setup()
 
 	SpawnObjects(ESpawnedType::TestPrimitive);
 
-	auto gizmo = jPrimitiveUtil::CreateGizmo(Vector::ZeroVector, Vector::ZeroVector, Vector::OneVector);
-	jObject::AddObject(gizmo);
-
 	ShadowPipelineSetMap.insert(std::make_pair(EShadowMapType::SSM, CREATE_PIPELINE_SET_WITH_SETUP(jForwardPipelineSet_SSM)));
 	ShadowPipelineSetMap.insert(std::make_pair(EShadowMapType::PCF, CREATE_PIPELINE_SET_WITH_SETUP(jForwardPipelineSet_SSM_PCF)));
 	ShadowPipelineSetMap.insert(std::make_pair(EShadowMapType::PCSS, CREATE_PIPELINE_SET_WITH_SETUP(jForwardPipelineSet_SSM_PCSS)));
@@ -404,6 +401,7 @@ void jGame::SpawnTestPrimitives()
 	SpawnedObjects.push_back(quad);
 
 	auto gizmo = jPrimitiveUtil::CreateGizmo(Vector::ZeroVector, Vector::ZeroVector, Vector::OneVector);
+	gizmo->SkipShadowMapGen = true;
 	jObject::AddObject(gizmo);
 	SpawnedObjects.push_back(gizmo);
 
