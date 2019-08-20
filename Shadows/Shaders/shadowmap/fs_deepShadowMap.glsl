@@ -23,7 +23,7 @@ layout (std430) buffer LinkedListEntryDepthAlphaNext
 uniform float DeepShadowAlpha;
 uniform int ShadowMapWidth;
 
-#define DEEP_SHADOW_MAP_BIAS 0.00002
+#define DEEP_SHADOW_MAP_BIAS 0.005
 
 layout (binding = 3, offset = 0) uniform atomic_uint LinkedListCounter;
 //layout (binding = 4, offset = 0) uniform atomic_uint LinkedListCounterTester;

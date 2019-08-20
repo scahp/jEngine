@@ -33,6 +33,7 @@ void main()
 		color.x = dist;
 		color.y = sqrt(dist);
 		color.w = 1.0;
+		gl_FragDepth = color.y / PointLight[0].MaxDistance;
     }
     else if (NumOfSpotLight > 0)
     {
@@ -42,5 +43,6 @@ void main()
         color.x = dist;
         color.y = sqrt(dist);
         color.w = 1.0;
+		gl_FragDepth = color.y / SpotLight[0].MaxDistance;
     }
 }

@@ -77,6 +77,9 @@ uint32 GetOpenGLTextureFormat(ETextureFormat format)
 	case ETextureFormat::R11G11B10F:
 		result = GL_R11F_G11F_B10F;
 		break;
+	case ETextureFormat::DEPTH:
+		result = GL_DEPTH_COMPONENT;
+		break;
 	default:
 		break;
 	}
@@ -135,6 +138,56 @@ uint32 GetOpenGLTextureAddressMode(ETextureAddressMode textureAddressMode)
 	return result;
 }
 
+uint32 GetOpenGLComparisonFunc(EComparisonFunc func)
+{
+	unsigned int result = 0;
+	switch (func)
+	{
+	case EComparisonFunc::NEVER:
+		result = GL_NEVER;
+		break;
+	case EComparisonFunc::LESS:
+		result = GL_LESS;
+		break;
+	case EComparisonFunc::EQUAL:
+		result = GL_EQUAL;
+		break;
+	case EComparisonFunc::LEQUAL:
+		result = GL_LEQUAL;
+		break;
+	case EComparisonFunc::GREATER:
+		result = GL_GREATER;
+		break;
+	case EComparisonFunc::NOTEQUAL:
+		result = GL_NOTEQUAL;
+		break;
+	case EComparisonFunc::GEQUAL:
+		result = GL_GEQUAL;
+		break;
+	case EComparisonFunc::ALWAYS:
+		result = GL_ALWAYS;
+		break;
+	}
+	return result;
+}
+
+uint32 GetOpenGLTextureComparisonMode(ETextureComparisonMode mode)
+{
+	uint32 result = 0;
+	switch (mode)
+	{
+	case ETextureComparisonMode::NONE:
+		result = GL_NONE;
+		break;
+	case ETextureComparisonMode::COMPARE_REF_TO_TEXTURE:		// to use PCF filtering by using samplerXXShadow series.
+		result = GL_COMPARE_REF_TO_TEXTURE;
+		break;
+	default:
+		break;
+	}
+	return result;
+}
+
 //////////////////////////////////////////////////////////////////////////
 // jRHI_OpenGL
 jRHI_OpenGL::jRHI_OpenGL()
@@ -160,6 +213,8 @@ jSamplerState* jRHI_OpenGL::CreateSamplerState(const jSamplerStateInfo& info) co
 	glSamplerParameterfv(samplerState->SamplerId, GL_TEXTURE_BORDER_COLOR, info.BorderColor.v);
 	glSamplerParameterf(samplerState->SamplerId, GL_TEXTURE_MIN_LOD, info.MinLOD);
 	glSamplerParameterf(samplerState->SamplerId, GL_TEXTURE_MAX_LOD, info.MaxLOD);
+	glSamplerParameteri(samplerState->SamplerId, GL_TEXTURE_COMPARE_MODE, GetOpenGLTextureComparisonMode(info.TextureComparisonMode));
+	glSamplerParameteri(samplerState->SamplerId, GL_TEXTURE_COMPARE_FUNC, GetOpenGLComparisonFunc(info.ComparisonFunc));
 
 	return samplerState;
 }
@@ -1041,12 +1096,16 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 
 		if (hasDepthAttachment)
 		{
-			uint32 rbo = 0;
-			glGenRenderbuffers(1, &rbo);
-			glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-			glRenderbufferStorage(GL_RENDERBUFFER, depthBufferFormat, info.Width, info.Height);
-			glFramebufferRenderbuffer(GL_FRAMEBUFFER, depthBufferType, GL_RENDERBUFFER, rbo);
-			rt_gl->rbos.push_back(rbo);
+			uint32 tbo = 0;
+			glGenTextures(1, &tbo);
+			glBindTexture(GL_TEXTURE_2D, tbo);
+			glTexStorage2D(GL_TEXTURE_2D, 1, depthBufferFormat, info.Width, info.Height);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, depthBufferType, GL_TEXTURE_2D, tbo, 0);
+
+			auto tex_gl = new jTexture_OpenGL();
+			tex_gl->TextureType = info.TextureType;
+			tex_gl->TextureID = tbo;
+			rt_gl->TextureDepth = tex_gl;
 		}
 
 		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
@@ -1057,7 +1116,6 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 			JMESSAGE(szTemp);
 			return nullptr;
 		}
-
 	
 		rt_gl->fbos.push_back(fbo);
 	}
@@ -1085,12 +1143,18 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 
 		if (hasDepthAttachment)
 		{
-			uint32 rbo = 0;
-			glGenRenderbuffers(1, &rbo);
-			glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-			glRenderbufferStorage(GL_RENDERBUFFER, depthBufferFormat, info.Width, info.Height);
-			glFramebufferRenderbuffer(GL_FRAMEBUFFER, depthBufferType, GL_RENDERBUFFER, rbo);
-			rt_gl->rbos.push_back(rbo);
+			uint32 tbo = 0;
+			glGenTextures(1, &tbo);
+			glBindTexture(GL_TEXTURE_2D, tbo);
+			glTexStorage2D(GL_TEXTURE_2D, 1, depthBufferFormat, info.Width, info.Height);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, depthBufferType, GL_TEXTURE_2D, tbo, 0);
+
+			auto tex_gl = new jTexture_OpenGL();
+			tex_gl->TextureType = info.TextureType;
+			tex_gl->Magnification = info.Magnification;
+			tex_gl->Minification = info.Minification;
+			tex_gl->TextureID = tbo;
+			rt_gl->TextureDepth = tex_gl;
 		}
 
 		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
@@ -1140,12 +1204,18 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 
 		if (hasDepthAttachment)
 		{
-			uint32 rbo = 0;
-			glGenRenderbuffers(1, &rbo);
-			glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-			glRenderbufferStorage(GL_RENDERBUFFER, depthBufferFormat, info.Width, info.Height);
-			glFramebufferRenderbuffer(GL_FRAMEBUFFER, depthBufferType, GL_RENDERBUFFER, rbo);
-			rt_gl->rbos.push_back(rbo);
+			uint32 tbo = 0;
+			glGenTextures(1, &tbo);
+			glBindTexture(GL_TEXTURE_2D, tbo);
+			glTexStorage2D(GL_TEXTURE_2D, 1, depthBufferFormat, info.Width, info.Height);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, depthBufferType, GL_TEXTURE_2D, tbo, 0);
+
+			auto tex_gl = new jTexture_OpenGL();
+			tex_gl->TextureType = info.TextureType;
+			tex_gl->Magnification = info.Magnification;
+			tex_gl->Minification = info.Minification;
+			tex_gl->TextureID = tbo;
+			rt_gl->TextureDepth = tex_gl;
 		}
 
 		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
@@ -1511,71 +1581,15 @@ void jRHI_OpenGL::SetStencilOpSeparate(EFace face, EStencilOp sFail, EStencilOp 
 	glStencilOpSeparate(face_gl, func(sFail), func(dpFail), func(dpPass));
 }
 
-void jRHI_OpenGL::SetStencilFunc(EDepthStencilFunc func, int32 ref, uint32 mask) const
+void jRHI_OpenGL::SetStencilFunc(EComparisonFunc func, int32 ref, uint32 mask) const
 {
-	unsigned int func_gl = 0;
-	switch(func)
-	{
-	case EDepthStencilFunc::NEVER:
-		func_gl = GL_NEVER;
-		break;
-	case EDepthStencilFunc::LESS:
-		func_gl = GL_LESS;
-		break;
-	case EDepthStencilFunc::EQUAL:
-		func_gl = GL_EQUAL;
-		break;
-	case EDepthStencilFunc::LEQUAL:
-		func_gl = GL_LEQUAL;
-		break;
-	case EDepthStencilFunc::GREATER:
-		func_gl = GL_GREATER;
-		break;
-	case EDepthStencilFunc::NOTEQUAL:
-		func_gl = GL_NOTEQUAL;
-		break;
-	case EDepthStencilFunc::GEQUAL:
-		func_gl = GL_GEQUAL;
-		break;
-	case EDepthStencilFunc::ALWAYS:
-		func_gl = GL_ALWAYS;
-		break;
-	}
-
+	uint32 func_gl = GetOpenGLComparisonFunc(func);
 	glStencilFunc(func_gl, ref, mask);
 }
 
-void jRHI_OpenGL::SetDepthFunc(EDepthStencilFunc func) const
+void jRHI_OpenGL::SetDepthFunc(EComparisonFunc func) const
 {
-	unsigned int func_gl = 0;
-	switch (func)
-	{
-	case EDepthStencilFunc::NEVER:
-		func_gl = GL_NEVER;
-		break;
-	case EDepthStencilFunc::LESS:
-		func_gl = GL_LESS;
-		break;
-	case EDepthStencilFunc::EQUAL:
-		func_gl = GL_EQUAL;
-		break;
-	case EDepthStencilFunc::LEQUAL:
-		func_gl = GL_LEQUAL;
-		break;
-	case EDepthStencilFunc::GREATER:
-		func_gl = GL_GREATER;
-		break;
-	case EDepthStencilFunc::NOTEQUAL:
-		func_gl = GL_NOTEQUAL;
-		break;
-	case EDepthStencilFunc::GEQUAL:
-		func_gl = GL_GEQUAL;
-		break;
-	case EDepthStencilFunc::ALWAYS:
-		func_gl = GL_ALWAYS;
-		break;
-	}
-
+	unsigned int func_gl = GetOpenGLComparisonFunc(func);
 	glDepthFunc(func_gl);
 }
 

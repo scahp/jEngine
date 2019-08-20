@@ -107,4 +107,6 @@ inline void hash_combine(std::size_t& seed, const T& v)
 #include "IMGUI/imgui_impl_opengl3.h"
 
 
+#include "jShadowAppProperties.h"
+
 #endif //PCH_H

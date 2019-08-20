@@ -148,7 +148,7 @@ void jDeepShadowMap_ShadowPass_Pipeline::Setup()
 	ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
 	ClearType = ERenderBufferType::COLOR | ERenderBufferType::DEPTH;
 	EnableDepthTest = true;
-	DepthStencilFunc = EDepthStencilFunc::LEQUAL;
+	DepthStencilFunc = EComparisonFunc::LESS;
 	EnableDepthBias = true;
 	DepthSlopeBias = 1.0f;
 	DepthConstantBias = 1.0f;
@@ -191,7 +191,7 @@ void jForward_ShadowMapGen_Pipeline::Setup()
 	ClearColor = Vector4(FLT_MAX, FLT_MAX, FLT_MAX, 1.0f);
 	ClearType = ERenderBufferType::COLOR | ERenderBufferType::DEPTH;
 	EnableDepthTest = true;
-	DepthStencilFunc = EDepthStencilFunc::LEQUAL;
+	DepthStencilFunc = EComparisonFunc::LESS;
 	ShadowGenShader = jShader::GetShader(DirectionalLightShaderName);
 	JASSERT(ShadowGenShader);
 	OmniShadowGenShader = jShader::GetShader(OmniDirectionalLightShaderName);
@@ -254,7 +254,7 @@ void jForward_ShadowMapGen_CSM_SSM_Pipeline::Setup()
 	ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
 	ClearType = ERenderBufferType::COLOR | ERenderBufferType::DEPTH;
 	EnableDepthTest = true;
-	DepthStencilFunc = EDepthStencilFunc::LEQUAL;
+	DepthStencilFunc = EComparisonFunc::LESS;
 	EnableBlend = true;
 	BlendSrc = EBlendSrc::ONE;
 	BlendDest = EBlendDest::ZERO;
@@ -430,7 +430,7 @@ void jForwardShadowMap_Blur_Pipeline::Setup()
 	ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
 	ClearType = ERenderBufferType::COLOR | ERenderBufferType::DEPTH;
 	EnableDepthTest = false;
-	DepthStencilFunc = EDepthStencilFunc::LEQUAL;
+	DepthStencilFunc = EComparisonFunc::LESS;
 
 	PostProcessBlur = std::shared_ptr<jPostProcess_Blur>(new jPostProcess_Blur("Blur", true));
 	PostProcessInput = std::shared_ptr<jPostProcessInOutput>(new jPostProcessInOutput());
@@ -505,7 +505,7 @@ void jForward_Shadow_Pipeline::Setup()
 	ClearColor = Vector4(135.0f / 255.0f, 206.0f / 255.0f, 250.0f / 255.0f, 1.0f);	// light sky blue
 	ClearType = ERenderBufferType::COLOR | ERenderBufferType::DEPTH;
 	EnableDepthTest = true;
-	DepthStencilFunc = EDepthStencilFunc::LEQUAL;
+	DepthStencilFunc = EComparisonFunc::LESS;
 	EnableBlend = true;
 	BlendSrc = EBlendSrc::ONE;
 	BlendDest = EBlendDest::ZERO;
@@ -624,7 +624,7 @@ void jForward_DebugObject_Pipeline::Setup()
 {
 	EnableClear = false;
 	EnableDepthTest = true;
-	DepthStencilFunc = EDepthStencilFunc::LEQUAL;
+	DepthStencilFunc = EComparisonFunc::LESS;
 	EnableBlend = true;
 	BlendSrc = EBlendSrc::SRC_ALPHA;
 	BlendDest = EBlendDest::ONE_MINUS_SRC_ALPHA;
@@ -637,7 +637,7 @@ void jForward_ShadowVolume_Pipeline::Setup()
 {
 	EnableClear = true;
 	EnableDepthTest = true;
-	DepthStencilFunc = EDepthStencilFunc::LEQUAL;
+	DepthStencilFunc = EComparisonFunc::LESS;
 	EnableBlend = true;
 	BlendSrc = EBlendSrc::ONE;
 	BlendDest = EBlendDest::ZERO;
@@ -724,7 +724,7 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineData& pipelineData) const
 	g_rhi->SetClearColor(ClearColor);
 	g_rhi->SetClear(ERenderBufferType::COLOR | ERenderBufferType::DEPTH | ERenderBufferType::STENCIL);
 
-	g_rhi->SetDepthFunc(EDepthStencilFunc::LEQUAL);
+	g_rhi->SetDepthFunc(EComparisonFunc::LESS);
 	g_rhi->EnableStencil(false);
 
 	g_rhi->SetDepthMask(true);
@@ -789,8 +789,8 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineData& pipelineData) const
 		g_rhi->SetStencilOpSeparate(EFace::FRONT, EStencilOp::KEEP, EStencilOp::DECR_WRAP, EStencilOp::KEEP);
 		g_rhi->SetStencilOpSeparate(EFace::BACK, EStencilOp::KEEP, EStencilOp::INCR_WRAP, EStencilOp::KEEP);
 
-		g_rhi->SetStencilFunc(EDepthStencilFunc::ALWAYS, 0, 0xff);
-		g_rhi->SetDepthFunc(EDepthStencilFunc::LEQUAL);
+		g_rhi->SetStencilFunc(EComparisonFunc::ALWAYS, 0, 0xff);
+		g_rhi->SetDepthFunc(EComparisonFunc::LESS);
 		g_rhi->SetDepthMask(false);
 		g_rhi->SetColorMask(false, false, false, false);
 
@@ -819,7 +819,7 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineData& pipelineData) const
 
 		//////////////////////////////////////////////////////////////////
 		// 3. Final light(Directional, Point, Spot) rendering.
-		g_rhi->SetStencilFunc(EDepthStencilFunc::EQUAL, 0, 0xff);
+		g_rhi->SetStencilFunc(EComparisonFunc::EQUAL, 0, 0xff);
 		g_rhi->SetStencilOpSeparate(EFace::FRONT, EStencilOp::KEEP, EStencilOp::KEEP, EStencilOp::KEEP);
 		g_rhi->SetStencilOpSeparate(EFace::BACK, EStencilOp::KEEP, EStencilOp::KEEP, EStencilOp::KEEP);
 
@@ -827,7 +827,7 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineData& pipelineData) const
 		g_rhi->SetColorMask(true, true, true, true);
 		const_cast<jCamera*>(camera)->IsEnableCullMode = true;			// todo remove
 
-		g_rhi->SetDepthFunc(EDepthStencilFunc::EQUAL);
+		g_rhi->SetDepthFunc(EComparisonFunc::EQUAL);
 		g_rhi->SetBlendFunc(EBlendSrc::ONE, EBlendDest::ONE);
 
 		g_rhi->SetShader(shadowVolumeBaseShader);
@@ -841,7 +841,7 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineData& pipelineData) const
 
 	g_rhi->EnableBlend(true);
 	g_rhi->SetBlendFunc(EBlendSrc::SRC_ALPHA, EBlendDest::ONE_MINUS_SRC_ALPHA);
-	g_rhi->SetDepthFunc(EDepthStencilFunc::LEQUAL);
+	g_rhi->SetDepthFunc(EComparisonFunc::LESS);
 	g_rhi->SetDepthMask(true);
 	g_rhi->SetColorMask(true, true, true, true);
 	g_rhi->EnableStencil(false);
@@ -916,7 +916,7 @@ void jForward_UIObject_Pipeline::Setup()
 {
 	EnableClear = false;
 	EnableDepthTest = false;
-	DepthStencilFunc = EDepthStencilFunc::LEQUAL;
+	DepthStencilFunc = EComparisonFunc::LESS;
 	EnableBlend = false;
 	Shader = jShader::GetShader(ShaderName);
 }

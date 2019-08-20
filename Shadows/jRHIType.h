@@ -121,6 +121,7 @@ enum class ETextureFormat
 	RGBA16F,
 	RGBA32F,
 	R11G11B10F,
+	DEPTH,
 };
 
 enum class EFormatType
@@ -190,7 +191,7 @@ enum class EStencilOp
 	MAX
 };
 
-enum class EDepthStencilFunc
+enum class EComparisonFunc
 {
 	NEVER = 0,
 	LESS,
@@ -254,5 +255,12 @@ enum class EDepthComparionFunc
 	NOT_EQUAL,
 	GREATER_EQUAL,
 	ALWAYS,
+	MAX,
+};
+
+enum class ETextureComparisonMode
+{
+	NONE = 0,
+	COMPARE_REF_TO_TEXTURE,
 	MAX,
 };

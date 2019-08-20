@@ -246,6 +246,7 @@ struct jRenderTarget : public std::enable_shared_from_this<jRenderTarget>
 	virtual ~jRenderTarget() {}
 
 	virtual jTexture* GetTexture(int32 index = 0) const { return Textures[index]; }
+	virtual jTexture* GetTextureDepth(int32 index = 0) const { return TextureDepth; }
 	virtual ETextureType GetTextureType() const { return Info.TextureType; }
 
 	virtual bool Begin(int index = 0, bool mrt = false) const { return true; };
@@ -253,6 +254,7 @@ struct jRenderTarget : public std::enable_shared_from_this<jRenderTarget>
 
 	jRenderTargetInfo Info;
 	std::vector<jTexture*> Textures;
+	jTexture* TextureDepth = nullptr;
 };
 
 struct jQueryTime
@@ -290,8 +292,10 @@ struct jSamplerStateInfo
 	ETextureAddressMode AddressW = ETextureAddressMode::CLAMP_TO_EDGE;
 	float MipLODBias = 0.0f;
 	float MaxAnisotropy = 1.0f;			// if you anisotropy filtering tuned on, set this variable greater than 1.
+	ETextureComparisonMode TextureComparisonMode = ETextureComparisonMode::NONE;
+	EComparisonFunc ComparisonFunc = EComparisonFunc::LESS;
 	Vector4 BorderColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
-	float MinLOD = 0.0f;
+	float MinLOD = -FLT_MAX;
 	float MaxLOD = FLT_MAX;
 };
 
@@ -354,8 +358,8 @@ public:
 	virtual void SetBlendFunc(EBlendSrc src, EBlendDest dest) const {}
 	virtual void EnableStencil(bool enable) const {}
 	virtual void SetStencilOpSeparate(EFace face, EStencilOp sFail, EStencilOp dpFail, EStencilOp dpPass) const {}
-	virtual void SetStencilFunc(EDepthStencilFunc func, int32 ref, uint32 mask) const {}
-	virtual void SetDepthFunc(EDepthStencilFunc func) const {}
+	virtual void SetStencilFunc(EComparisonFunc func, int32 ref, uint32 mask) const {}
+	virtual void SetDepthFunc(EComparisonFunc func) const {}
 	virtual void SetDepthMask(bool enable) const {}
 	virtual void SetColorMask(bool r, bool g, bool b, bool a) const {}
 	virtual IUniformBufferBlock* CreateUniformBufferBlock(const char* blockname) const { return nullptr; }

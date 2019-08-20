@@ -166,8 +166,8 @@ public:
 	virtual void SetBlendFunc(EBlendSrc src, EBlendDest dest) const override;
 	virtual void EnableStencil(bool enable) const override;
 	virtual void SetStencilOpSeparate(EFace face, EStencilOp sFail, EStencilOp dpFail, EStencilOp dpPass) const override;
-	virtual void SetStencilFunc(EDepthStencilFunc func, int32 ref, uint32 mask) const override;
-	virtual void SetDepthFunc(EDepthStencilFunc func) const override;
+	virtual void SetStencilFunc(EComparisonFunc func, int32 ref, uint32 mask) const override;
+	virtual void SetDepthFunc(EComparisonFunc func) const override;
 	virtual void SetDepthMask(bool enable) const override;
 	virtual void SetColorMask(bool r, bool g, bool b, bool a) const override;
 	virtual IUniformBufferBlock* CreateUniformBufferBlock(const char* blockname) const override;

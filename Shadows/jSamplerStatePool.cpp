@@ -32,11 +32,6 @@ void jSamplerStatePool::CreateDefaultSamplerState()
 		info.AddressU = ETextureAddressMode::REPEAT;
 		info.AddressV = ETextureAddressMode::REPEAT;
 		info.AddressW = ETextureAddressMode::REPEAT;
-		info.MipLODBias = 0.0f;
-		info.MaxAnisotropy = 1.0f;
-		info.BorderColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
-		info.MinLOD = 0.0f;
-		info.MaxLOD = FLT_MAX;
 		CreateSamplerState("LinearWrap", info);
 
 		info.Minification = ETextureFilter::LINEAR_MIPMAP_LINEAR;
@@ -49,11 +44,6 @@ void jSamplerStatePool::CreateDefaultSamplerState()
 		info.AddressU = ETextureAddressMode::CLAMP_TO_EDGE;
 		info.AddressV = ETextureAddressMode::CLAMP_TO_EDGE;
 		info.AddressW = ETextureAddressMode::CLAMP_TO_EDGE;
-		info.MipLODBias = 0.0f;
-		info.MaxAnisotropy = 1.0f;
-		info.BorderColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
-		info.MinLOD = 0.0f;
-		info.MaxLOD = FLT_MAX;
 		CreateSamplerState("LinearClamp", info);
 		
 		info.Minification = ETextureFilter::LINEAR_MIPMAP_LINEAR;
@@ -63,14 +53,20 @@ void jSamplerStatePool::CreateDefaultSamplerState()
 		jSamplerStateInfo info;
 		info.Minification = ETextureFilter::LINEAR;
 		info.Magnification = ETextureFilter::LINEAR;
+		info.AddressU = ETextureAddressMode::CLAMP_TO_EDGE;
+		info.AddressV = ETextureAddressMode::CLAMP_TO_EDGE;
+		info.AddressW = ETextureAddressMode::CLAMP_TO_EDGE;
+		info.TextureComparisonMode = ETextureComparisonMode::COMPARE_REF_TO_TEXTURE;
+		info.ComparisonFunc = EComparisonFunc::LESS;
+		CreateSamplerState("LinearClampShadow", info);
+	}
+	{
+		jSamplerStateInfo info;
+		info.Minification = ETextureFilter::LINEAR;
+		info.Magnification = ETextureFilter::LINEAR;
 		info.AddressU = ETextureAddressMode::CLAMP_TO_BORDER;
 		info.AddressV = ETextureAddressMode::CLAMP_TO_BORDER;
 		info.AddressW = ETextureAddressMode::CLAMP_TO_BORDER;
-		info.MipLODBias = 0.0f;
-		info.MaxAnisotropy = 1.0f;
-		info.BorderColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
-		info.MinLOD = 0.0f;
-		info.MaxLOD = FLT_MAX;
 		CreateSamplerState("LinearBorder", info);
 
 		info.Minification = ETextureFilter::LINEAR_MIPMAP_LINEAR;
@@ -83,11 +79,6 @@ void jSamplerStatePool::CreateDefaultSamplerState()
 		info.AddressU = ETextureAddressMode::CLAMP_TO_EDGE;
 		info.AddressV = ETextureAddressMode::CLAMP_TO_EDGE;
 		info.AddressW = ETextureAddressMode::CLAMP_TO_EDGE;
-		info.MipLODBias = 0.0f;
-		info.MaxAnisotropy = 1.0f;
-		info.BorderColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
-		info.MinLOD = 0.0f;
-		info.MaxLOD = FLT_MAX;
 		CreateSamplerState("Point", info);
 
 		info.Minification = ETextureFilter::NEAREST_MIPMAP_NEAREST;

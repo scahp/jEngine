@@ -100,7 +100,7 @@ void jForwardRenderer::Setup()
 			}
 
 			{
-				auto postprocess = new jPostProcess_GaussianBlurH("GaussianBlurV");
+				auto postprocess = new jPostProcess_GaussianBlurV("GaussianBlurV");
 				postprocess->AddInput(gaussianBlur_PostProcessOut, jSamplerStatePool::GetSamplerState("Point"));
 				postprocess->SetOutput(scale3_PostProcessOut);
 				PostProcessChain.AddNewPostprocess(postprocess);

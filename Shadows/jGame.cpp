@@ -64,10 +64,10 @@ void jGame::Setup()
 
 	// Light creation step
 	NormalDirectionalLight = jLight::CreateDirectionalLight(jShadowAppSettingProperties::GetInstance().DirecionalLightDirection
-		, Vector4(1.0f)
+		, Vector4(0.6f)
 		, Vector(1.0f), Vector(1.0f), 64);
 	CascadeDirectionalLight = jLight::CreateCascadeDirectionalLight(jShadowAppSettingProperties::GetInstance().DirecionalLightDirection
-		, Vector4(1.0f)
+		, Vector4(0.6f)
 		, Vector(1.0f), Vector(1.0f), 64);
 
 	DirectionalLight = NormalDirectionalLight;

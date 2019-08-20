@@ -226,7 +226,7 @@ public:
 	// todo 현재 렌더 스테이트를 저장하는 객체로 옮길 예정
 	bool IsEnableCullMode = false;
 	float ShadowMapTexelSize = 1.0f / SM_WIDTH;
-	float PCF_SIZE_DIRECTIONAL = 4.0f;
+	float PCF_SIZE_DIRECTIONAL = 2.0f;
 	float PCF_SIZE_OMNIDIRECTIONAL = 8.0f;
 };
 

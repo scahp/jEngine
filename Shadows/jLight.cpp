@@ -42,7 +42,7 @@ namespace jLightUtil
 		shadowMapData->ShadowMapCamera = jOrthographicCamera::CreateCamera(pos, target, up, -width / 2.0f, -height / 2.0f, width / 2.0f, height / 2.0f, farDist, nearDist);
 		
 		shadowMapData->ShadowMapRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::RG32F, ETextureFormat::RG, EFormatType::FLOAT, EDepthBufferType::DEPTH32, SM_WIDTH, SM_HEIGHT, 1 });
-		shadowMapData->ShadowMapSamplerState = jSamplerStatePool::GetSamplerState("Point");
+		shadowMapData->ShadowMapSamplerState = jSamplerStatePool::GetSamplerState("LinearClampShadow");
 
 		return shadowMapData;
 	}
@@ -66,7 +66,7 @@ namespace jLightUtil
 		shadowMapData->ShadowMapCamera = jOrthographicCamera::CreateCamera(pos, target, up, -width / 2.0f, -height / 2.0f, width / 2.0f, height / 2.0f, farDist, nearDist);
 
 		shadowMapData->ShadowMapRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::RG32F, ETextureFormat::RG, EFormatType::FLOAT, EDepthBufferType::DEPTH32, SM_WIDTH, SM_HEIGHT * NUM_CASCADES, 1 });
-		shadowMapData->ShadowMapSamplerState = jSamplerStatePool::GetSamplerState("Point");
+		shadowMapData->ShadowMapSamplerState = jSamplerStatePool::GetSamplerState("LinearClampShadow");
 
 		return shadowMapData;
 	}
@@ -85,7 +85,7 @@ namespace jLightUtil
 		shadowMapData->ShadowMapCamera[4] = jCamera::CreateCamera(pos, pos + Vector(0.0f, 0.0f, 1.0f), pos + Vector(0.0f, 1.0f, 0.0f), DegreeToRadian(90.0f), nearDist, farDist, SM_WIDTH, SM_HEIGHT, true);
 		shadowMapData->ShadowMapCamera[5] = jCamera::CreateCamera(pos, pos + Vector(0.0f, 0.0f, -1.0f), pos + Vector(0.0f, 1.0f, 0.0f), DegreeToRadian(90.0f), nearDist, farDist, SM_WIDTH, SM_HEIGHT, true);
 		shadowMapData->ShadowMapRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW, ETextureFormat::RG32F, ETextureFormat::RG, EFormatType::FLOAT, EDepthBufferType::DEPTH32, SM_WIDTH, SM_HEIGHT * 6, 1 });
-		shadowMapData->ShadowMapSamplerState = jSamplerStatePool::GetSamplerState("Point");
+		shadowMapData->ShadowMapSamplerState = jSamplerStatePool::GetSamplerState("LinearClampShadow");
 
 		return shadowMapData;
 	}
@@ -277,11 +277,30 @@ void jDirectionalLight::GetMaterialData(jMaterialData* OutMaterialData) const
 
 	if (OutMaterialData)
 	{
-		auto materialParam = new jMaterialParam();
-		materialParam->Name = "shadow_object";
-		materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTexture();
-		materialParam->SamplerState = ShadowMapData->ShadowMapSamplerState.get();
-		OutMaterialData->Params.push_back(materialParam);
+		{
+			auto materialParam = new jMaterialParam();
+			materialParam->Name = "shadow_object";
+			materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTextureDepth();
+			materialParam->SamplerState = ShadowMapData->ShadowMapSamplerState.get();
+			OutMaterialData->Params.push_back(materialParam);
+		}
+
+		{
+			auto materialParam = new jMaterialParam();
+			materialParam->Name = "shadow_object_test";
+
+			const auto type = jShadowAppSettingProperties::GetInstance().ShadowMapType;
+			if ((type == EShadowMapType::VSM) || (type == EShadowMapType::ESM) || (type == EShadowMapType::EVSM))
+			{
+				materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTexture();
+			}
+			else
+			{
+				materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTextureDepth();
+			}
+			materialParam->SamplerState = nullptr;
+			OutMaterialData->Params.push_back(materialParam);
+		}
 	}
 }
 
@@ -394,11 +413,29 @@ void jPointLight::GetMaterialData(jMaterialData* OutMaterialData) const
 
 	if (OutMaterialData)
 	{
-		auto materialParam = new jMaterialParam();
-		materialParam->Name = "shadow_object_point";
-		materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTexture();
-		materialParam->SamplerState = ShadowMapData->ShadowMapSamplerState.get();
-		OutMaterialData->Params.push_back(materialParam);
+		{
+			auto materialParam = new jMaterialParam();
+			materialParam->Name = "shadow_object_point";
+			materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTextureDepth();
+			materialParam->SamplerState = ShadowMapData->ShadowMapSamplerState.get();
+			OutMaterialData->Params.push_back(materialParam);
+		}
+		
+		{
+			auto materialParam = new jMaterialParam();
+			materialParam->Name = "shadow_object_point_test";
+			const auto type = jShadowAppSettingProperties::GetInstance().ShadowMapType;
+			if ((type == EShadowMapType::VSM) || (type == EShadowMapType::ESM) || (type == EShadowMapType::EVSM))
+			{
+				materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTexture();
+			}
+			else
+			{
+				materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTextureDepth();
+			}
+			materialParam->SamplerState = nullptr;
+			OutMaterialData->Params.push_back(materialParam);
+		}
 	}
 }
 
@@ -509,11 +546,29 @@ void jSpotLight::GetMaterialData(jMaterialData* OutMaterialData) const
 
 	if (OutMaterialData)
 	{
-		auto materialParam = new jMaterialParam();
-		materialParam->Name = "shadow_object_spot";
-		materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTexture();
-		materialParam->SamplerState = ShadowMapData->ShadowMapSamplerState.get();
-		OutMaterialData->Params.push_back(materialParam);
+		{
+			auto materialParam = new jMaterialParam();
+			materialParam->Name = "shadow_object_spot";
+			materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTextureDepth();
+			materialParam->SamplerState = ShadowMapData->ShadowMapSamplerState.get();
+			OutMaterialData->Params.push_back(materialParam);
+		}
+
+		{
+			auto materialParam = new jMaterialParam();
+			materialParam->Name = "shadow_object_spot_test";
+			const auto type = jShadowAppSettingProperties::GetInstance().ShadowMapType;
+			if ((type == EShadowMapType::VSM) || (type == EShadowMapType::ESM) || (type == EShadowMapType::EVSM))
+			{
+				materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTexture();
+			}
+			else
+			{
+				materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTextureDepth();
+			}
+			materialParam->SamplerState = nullptr;
+			OutMaterialData->Params.push_back(materialParam);
+		}
 	}
 }
 

@@ -165,6 +165,7 @@ std::shared_ptr<jShader> jShader::CreateShaderPtr(const jShaderInfo& shaderInfo)
 
 void jShader::UpdateShaders()
 {
+	return;
 	if (ShaderVector.empty())
 		return;
 

@@ -65,9 +65,13 @@ uniform sampler2D tex_object2;
 uniform int TextureSRGB[1];
 #endif // USE_TEXTURE
 
-uniform sampler2D shadow_object_point;
-uniform sampler2D shadow_object_spot;
-uniform sampler2D shadow_object;
+uniform sampler2DShadow shadow_object_point;
+uniform sampler2D shadow_object_point_test;
+uniform sampler2DShadow shadow_object_spot;
+uniform sampler2D shadow_object_spot_test;
+uniform sampler2DShadow shadow_object;
+uniform sampler2D shadow_object_test;
+//uniform sampler2D shadow_object;
 uniform vec2 ShadowMapSize;
 uniform float PCF_Size_Directional;
 uniform float PCF_Size_OmniDirectional;
@@ -116,26 +120,22 @@ bool IsInRange01(vec3 pos)
 	return (pos.x >= 0.0 && pos.x <= 1.0 && pos.y >= 0.0 && pos.y <= 1.0 && pos.z >= 0.0 && pos.z <= 1.0);
 }
 
-bool IsShadowingCSM(sampler2D csm_sampler, vec4 lightClipScapePos)
+float IsShadowingCSM(sampler2DShadow csm_sampler, vec4 lightClipScapePos)
 {
 	if (IsInRange01(lightClipScapePos.xyz))
-	{
-		if (lightClipScapePos.z >= texture(csm_sampler, lightClipScapePos.xy).x + CSM_BIAS)
-			return true;
-	}
+		return texture(csm_sampler, vec3(lightClipScapePos.xy, lightClipScapePos.z - CSM_BIAS));
 
-	return false;
+	return 0.0;
 }
-bool IsShadowingCSM(sampler2D csm_sampler, vec4 lightClipScapePos, int cascadeIndex)
+float IsShadowingCSM(sampler2DShadow csm_sampler, vec4 lightClipScapePos, int cascadeIndex)
 {
 	if (IsInRange01(lightClipScapePos.xyz))
 	{
 		vec2 coords = vec2(lightClipScapePos.x, (lightClipScapePos.y + float(cascadeIndex)) / float(NUM_CASCADES) );
-		if (lightClipScapePos.z >= texture(csm_sampler, coords).x + CSM_BIAS)
-			return true;
+		return texture(csm_sampler, vec3(coords.xy, lightClipScapePos.z - CSM_BIAS));
 	}
 
-	return false;
+	return 0.0;
 }
 #endif // USE_CSM
 
@@ -216,9 +216,9 @@ void main()
 	#if defined(USE_PCSS)
 			{
 	#if defined(USE_POISSON_SAMPLE)
-				lit = PCSS_PoissonSample(ShadowPos, -shadowCameraPos.z, shadow_object, LightZNear, ShadowMapSize);
+				lit = PCSS_PoissonSample(ShadowPos, -shadowCameraPos.z, shadow_object_test, shadow_object, LightZNear, ShadowMapSize);
 	#else // USE_POISSON_SAMPLE
-				lit = PCSS(ShadowPos, -shadowCameraPos.z, shadow_object, LightZNear, ShadowMapSize);
+				lit = PCSS(ShadowPos, -shadowCameraPos.z, shadow_object_test, shadow_object, LightZNear, ShadowMapSize);
 	#endif // USE_POISSON_SAMPLE
 			}
 	#elif defined(USE_PCF)
@@ -231,15 +231,15 @@ void main()
 			}
 	#elif defined(USE_VSM)
 			{
-				lit = VSM(ShadowPos, LightPos, Pos_, shadow_object);
+				lit = VSM(ShadowPos, LightPos, Pos_, shadow_object_test);
 			}
 	#elif defined(USE_ESM)
 			{
-				lit = ESM(ShadowPos, LightPos, Pos_, LightZNear, LightZFar, ESM_C, shadow_object);
+				lit = ESM(ShadowPos, LightPos, Pos_, LightZNear, LightZFar, ESM_C, shadow_object_test);
 			}
 	#elif defined(USE_EVSM)
 			{
-				lit = EVSM(ShadowPos, LightPos, Pos_, LightZNear, LightZFar, ESM_C, shadow_object);
+				lit = EVSM(ShadowPos, LightPos, Pos_, LightZNear, LightZFar, ESM_C, shadow_object_test);
 			}
 	#else
 			{
@@ -269,12 +269,12 @@ void main()
 				}
 
 				if (index != -1)
-					lit = float(!IsShadowingCSM(shadow_object, lightClipSpacePos[index], index));
+					lit = IsShadowingCSM(shadow_object, lightClipSpacePos[index], index);
 #else	// USE_CSM
-				lit = float(!IsShadowing(ShadowPos, shadow_object));
+				lit = IsShadowing(ShadowPos, shadow_object);
 #endif	// USE_CSM
 			}
-	#endif
+#endif	// USE_PCSS
 		}
 
         if (lit > 0.0)
@@ -311,35 +311,35 @@ void main()
 			{
 
 	#if defined(USE_POISSON_SAMPLE)
-				lit = PCSS_OmniDirectional_PoissonSample(Pos_, PointLight[i].LightPos, PointLightZNear, ShadowMapSize, shadow_object_point);
+				lit = PCSS_OmniDirectional_PoissonSample(Pos_, PointLight[i].LightPos, PointLightZNear, ShadowMapSize, PointLight[i].MaxDistance, shadow_object_point, shadow_object_point_test);
 	#else // USE_POISSON_SAMPLE
-				lit = PCSS_OmniDirectional(Pos_, PointLight[i].LightPos, PointLightZNear, ShadowMapSize, shadow_object_point);
+				lit = PCSS_OmniDirectional(Pos_, PointLight[i].LightPos, PointLightZNear, ShadowMapSize, PointLight[i].MaxDistance, shadow_object_point, shadow_object_point_test);
 	#endif // USE_POISSON_SAMPLE
 			}
 	#elif defined(USE_PCF)
 			{
 				vec2 radiusSquredUV = vec2(PCF_Size_OmniDirectional, PCF_Size_OmniDirectional) * ShadowMapSize;
 	#if defined(USE_POISSON_SAMPLE)
-				lit = PCF_OmniDirectional_PoissonSample(Pos_, PointLight[i].LightPos, radiusSquredUV, shadow_object_point);
+				lit = PCF_OmniDirectional_PoissonSample(Pos_, PointLight[i].LightPos, PointLight[i].MaxDistance, radiusSquredUV, shadow_object_point);
 	#else
-				lit = PCF_OmniDirectional(Pos_, PointLight[i].LightPos, radiusSquredUV, shadow_object_point);
+				lit = PCF_OmniDirectional(Pos_, PointLight[i].LightPos, PointLight[i].MaxDistance, radiusSquredUV, shadow_object_point);
 	#endif
 			}
 	#elif defined(USE_VSM)
 			{
-				lit = VSM_OmniDirectional(PointLight[i].LightPos, Pos_, shadow_object_point, vsmBiasForOmniDirectional);
+				lit = VSM_OmniDirectional(PointLight[i].LightPos, Pos_, shadow_object_point_test, vsmBiasForOmniDirectional);
 			}
 	#elif defined(USE_ESM)
 			{
-				lit = ESM_OmniDirectional(PointLight[i].LightPos, Pos_, PointLightZNear, PointLightZFar, PointLightESM_C, shadow_object_point);
+				lit = ESM_OmniDirectional(PointLight[i].LightPos, Pos_, PointLightZNear, PointLightZFar, PointLightESM_C, shadow_object_point_test);
 			}
 	#elif defined(USE_EVSM)
 			{
-				lit = EVSM_OmniDirectional(PointLight[i].LightPos, Pos_, PointLightZNear, PointLightZFar, PointLightESM_C, shadow_object_point, evsmBiasForOmniDirectional);
+				lit = EVSM_OmniDirectional(PointLight[i].LightPos, Pos_, PointLightZNear, PointLightZFar, PointLightESM_C, shadow_object_point_test, evsmBiasForOmniDirectional);
 			}
 	#else
 			{
-				lit = float(!IsShadowing(Pos_, PointLight[i].LightPos, shadow_object_point));
+				lit = IsShadowing(Pos_, PointLight[i].LightPos, PointLight[i].MaxDistance, shadow_object_point);
 			}
 	#endif
 		}
@@ -377,35 +377,35 @@ void main()
 	#if defined(USE_PCSS)
 			{
 	#if defined(USE_POISSON_SAMPLE)
-				lit = PCSS_OmniDirectional_PoissonSample(Pos_, SpotLight[i].LightPos, SpotLightZNear, ShadowMapSize, shadow_object_spot);
+				lit = PCSS_OmniDirectional_PoissonSample(Pos_, SpotLight[i].LightPos, SpotLightZNear, ShadowMapSize, SpotLight[i].MaxDistance, shadow_object_spot, shadow_object_spot_test);
 	#else // USE_POISSON_SAMPLE
-				lit = PCSS_OmniDirectional(Pos_, SpotLight[i].LightPos, SpotLightZNear, ShadowMapSize, shadow_object_spot);
+				lit = PCSS_OmniDirectional(Pos_, SpotLight[i].LightPos, SpotLightZNear, ShadowMapSize, SpotLight[i].MaxDistance, shadow_object_spot, shadow_object_spot_test);
 	#endif // USE_POISSON_SAMPLE
 			}
 	#elif defined(USE_PCF)
 			{
 				vec2 radiusSquredUV = vec2(PCF_Size_OmniDirectional, PCF_Size_OmniDirectional) * ShadowMapSize;
 	#if defined(USE_POISSON_SAMPLE)
-				lit = PCF_OmniDirectional_PoissonSample(Pos_, SpotLight[i].LightPos, radiusSquredUV, shadow_object_spot);
+				lit = PCF_OmniDirectional_PoissonSample(Pos_, SpotLight[i].LightPos, SpotLight[i].MaxDistance, radiusSquredUV, shadow_object_spot);
 	#else // USE_POISSON_SAMPLE
-				lit = PCF_OmniDirectional(Pos_, SpotLight[i].LightPos, radiusSquredUV, shadow_object_spot);
+				lit = PCF_OmniDirectional(Pos_, SpotLight[i].LightPos, SpotLight[i].MaxDistance, radiusSquredUV, shadow_object_spot);
 	#endif // USE_POISSON_SAMPLE
 			}
 	#elif defined(USE_VSM)
 			{
-				lit = VSM_OmniDirectional(SpotLight[i].LightPos, Pos_, shadow_object_spot, vsmBiasForOmniDirectional);
+				lit = VSM_OmniDirectional(SpotLight[i].LightPos, Pos_, shadow_object_spot_test, vsmBiasForOmniDirectional);
 			}
 	#elif defined(USE_ESM)
 			{
-				lit = ESM_OmniDirectional(SpotLight[i].LightPos, Pos_, SpotLightZNear, SpotLightZFar, SpotLightESM_C, shadow_object_spot);
+				lit = ESM_OmniDirectional(SpotLight[i].LightPos, Pos_, SpotLightZNear, SpotLightZFar, SpotLightESM_C, shadow_object_spot_test);
 			}
 	#elif defined(USE_EVSM)
 			{
-				lit = EVSM_OmniDirectional(SpotLight[i].LightPos, Pos_, SpotLightZNear, SpotLightZFar, SpotLightESM_C, shadow_object_spot, evsmBiasForOmniDirectional);
+				lit = EVSM_OmniDirectional(SpotLight[i].LightPos, Pos_, SpotLightZNear, SpotLightZFar, SpotLightESM_C, shadow_object_spot_test, evsmBiasForOmniDirectional);
 			}
 	#else
 			{
-				lit = float(!IsShadowing(Pos_, SpotLight[i].LightPos, shadow_object_spot));
+				lit = IsShadowing(Pos_, SpotLight[i].LightPos, SpotLight[i].MaxDistance, shadow_object_spot);
 			}
 	#endif
 		}
