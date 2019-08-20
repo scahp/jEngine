@@ -7,7 +7,7 @@ std::map<std::string, uint64> ScopedProfileCPUMap[MaxProfileFrame];
 std::map<std::string, uint64> ScopedProfileGPUMap[MaxProfileFrame];
 static int32 PerformanceFrame = 0;
 
-std::list<jQueryTime*> jQueryTimePool::s_running;
+std::set<jQueryTime*> jQueryTimePool::s_running;
 std::list<jQueryTime*> jQueryTimePool::s_resting;
 
 std::list<jProfile_GPU> jProfile_GPU::WatingResultList;

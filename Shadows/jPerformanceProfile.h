@@ -53,16 +53,16 @@ public:
 			queryTime = s_resting.back();
 			s_resting.pop_back();
 		}
-		s_running.push_back(queryTime);
+		s_running.insert(queryTime);
 		JASSERT(queryTime);
 		return queryTime;
 	}
 	static void ReturnQueryTime(jQueryTime* queryTime)
 	{
-		std::remove(s_running.begin(), s_running.end(), queryTime);
+		s_running.erase(queryTime);
 		s_resting.push_back(queryTime);
 	}
-	static void ReleaseAllQueryTime()
+	static void DeleteAllQueryTime()
 	{
 		JASSERT(s_running.empty());
 		for (auto& iter : s_resting)
@@ -74,7 +74,7 @@ public:
 	}
 
 private:
-	static std::list<jQueryTime*> s_running;
+	static std::set<jQueryTime*> s_running;
 	static std::list<jQueryTime*> s_resting;
 };
 
