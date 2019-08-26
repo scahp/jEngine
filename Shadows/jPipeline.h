@@ -86,7 +86,7 @@ protected:
 	bool EnableBlend = false;
 	EBlendSrc BlendSrc = EBlendSrc::ONE;
 	EBlendDest BlendDest = EBlendDest::ONE_MINUS_SRC_ALPHA;
-	bool EnableDepthBias = true;
+	bool EnableDepthBias = false;
 	float DepthSlopeBias = 1.0f;
 	float DepthConstantBias = 1.0f;
 	std::vector<IBuffer*> Buffers;

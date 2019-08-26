@@ -113,7 +113,7 @@ int GetCascadeIndex(float viewSpaceZ)
 	return -1;
 }
 
-#define CSM_BIAS 0.001
+#define CSM_BIAS 0.01
 
 bool IsInRange01(vec3 pos)
 {
