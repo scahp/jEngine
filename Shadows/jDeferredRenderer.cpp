@@ -34,7 +34,7 @@ void jDeferredRenderer::Setup()
 	
 	
 	// Render DeepShadow
-	OutRenderTarget = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::RGBA, ETextureFormat::RGBA, EFormatType::FLOAT, EDepthBufferType::NONE, SCR_WIDTH, SCR_HEIGHT, 1 }));
+	OutRenderTarget = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::RGBA32F, ETextureFormat::RGBA, EFormatType::FLOAT, EDepthBufferType::NONE, SCR_WIDTH, SCR_HEIGHT, 1 }));
 	PostProcessOutput = std::shared_ptr<jPostProcessInOutput>(new jPostProcessInOutput());
 	PostProcessOutput->RenderTarget = OutRenderTarget.get();
 	{
@@ -51,7 +51,7 @@ void jDeferredRenderer::Setup()
 
 	// Anti-Aliasing for DeepShadow
 	{
-		PostPrceoss_AA_DeepShadowAddition = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::RGBA, ETextureFormat::RGBA, EFormatType::FLOAT, EDepthBufferType::NONE, SCR_WIDTH, SCR_HEIGHT, 1 }));
+		PostPrceoss_AA_DeepShadowAddition = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::RGBA32F, ETextureFormat::RGBA, EFormatType::FLOAT, EDepthBufferType::NONE, SCR_WIDTH, SCR_HEIGHT, 1 }));
 		PostProcessOutput2 = std::shared_ptr<jPostProcessInOutput>(new jPostProcessInOutput());
 		PostProcessOutput2->RenderTarget = PostPrceoss_AA_DeepShadowAddition.get();
 

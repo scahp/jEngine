@@ -194,7 +194,7 @@ void main()
 #endif // USE_MATERIAL
 
     bool shadow = false;
-    vec3 finalColor = vec3(0.0, 0.0, 0.0);
+    vec3 directColor = vec3(0.0, 0.0, 0.0);
 
 	vec3 ambientColor = vec3(0.0, 0.0, 0.0);
     if (UseAmbientLight != 0)
@@ -261,11 +261,11 @@ void main()
 				if (CSMDebugOn > 0)
 				{
 					if (index == 0)
-						finalColor.x += 0.5f;
+						directColor.x += 0.5f;
 					if (index == 1)
-						finalColor.y += 0.5f;
+						directColor.y += 0.5f;
 					if (index == 2)
-						finalColor.z += 0.5f;
+						directColor.z += 0.5f;
 				}
 
 				if (index != -1)
@@ -288,7 +288,7 @@ void main()
 			}
 #endif // USE_MATERIAL
 
-            finalColor += GetDirectionalLight(light, normal, viewDir) * lit;
+			directColor += GetDirectionalLight(light, normal, viewDir) * lit;
         }
     }
 
@@ -355,7 +355,7 @@ void main()
 			}
 #endif // USE_MATERIAL
 
-			finalColor += GetPointLight(light, normal, Pos_, viewDir) * lit;
+			directColor += GetPointLight(light, normal, Pos_, viewDir) * lit;
         }
     }
     
@@ -421,9 +421,12 @@ void main()
 			}
 #endif // USE_MATERIAL
 
-            finalColor += GetSpotLight(light, normal, Pos_, viewDir) * lit;
+			directColor += GetSpotLight(light, normal, Pos_, viewDir) * lit;
         }
     }
 
-    color = vec4(ambientColor + finalColor * diffuse.xyz, diffuse.w);
+	ambientColor *= diffuse.xyz;
+	directColor *= 1.0 / 3.14 * diffuse.xyz;
+
+    color = vec4(ambientColor + directColor, diffuse.w);
 }

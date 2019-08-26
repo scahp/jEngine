@@ -178,13 +178,13 @@ void main()
 
 	bool isDataFromTexture = (Normal.w == 0.0);
 
-	vec4 Color = texture(ColorSampler, TexCoord_);
+	vec4 DiffuseColor = texture(ColorSampler, TexCoord_);
 	vec3 Pos = texture(PosInWorldSampler, TexCoord_).xyz;
 	vec3 ShadowPos = texture(PosInLightSampler, TexCoord_).xyz;
 	vec3 toLight = normalize(LightPos - Pos);
 	vec3 toEye = normalize(Eye - Pos);
 
-	vec3 finalColor = vec3(0.0, 0.0, 0.0);
+	vec3 directColor = vec3(0.0, 0.0, 0.0);
 	vec3 ambientColor = vec3(0.0, 0.0, 0.0);
 
 	for(int i=0;i<MAX_NUM_OF_DIRECTIONAL_LIGHT;++i)
@@ -202,10 +202,10 @@ void main()
 #endif // USE_MATERIAL
 
 		if (isDataFromTexture)
-			finalColor += GetDirectionalLight(light, Normal.xyz, toEye);
+			directColor += GetDirectionalLight(light, Normal.xyz, toEye);
 		else
-			finalColor += KajiyaKayShadingModelTest(Normal.xyz, -light.LightDirection, toEye);
-			//finalColor += KajiyaKayShadingModelTest(Normal.xyz, toLight, toEye);
+			directColor += KajiyaKayShadingModelTest(Normal.xyz, -light.LightDirection, toEye);
+			//directColor += KajiyaKayShadingModelTest(Normal.xyz, toLight, toEye);
     }
 
 	if (UseAmbientLight != 0)
@@ -369,6 +369,8 @@ void main()
 	float shading = bilinearInterpolation(dx, dy, shadingSamples[FILTER_SIZE][FILTER_SIZE], shadingSamples[FILTER_SIZE + 1][FILTER_SIZE], shadingSamples[FILTER_SIZE][FILTER_SIZE + 1], shadingSamples[FILTER_SIZE + 1][FILTER_SIZE + 1]);
 	shading = clamp(shading * exp(20.0f * (depth - (ShadowPos.z))), 0.1f, 1.0f);
 
-	Color.xyz = finalColor * Color.xyz * clamp(shading, 0.1f, 1.0);
-	color = vec4(ambientColor + Color.xyz, 1.0);
+	ambientColor *= DiffuseColor.xyz;
+	directColor *= (1.0 / 3.14) * DiffuseColor.xyz * clamp(shading, 0.1, 1.0);
+
+	color = vec4(ambientColor + directColor, 1.0);
 }

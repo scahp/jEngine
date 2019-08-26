@@ -79,7 +79,7 @@ void main()
     diffuse.xyz += Material.Emissive;
 #endif // USE_MATERIAL
 
-    vec3 finalColor = vec3(0.0, 0.0, 0.0);
+    vec3 directColor = vec3(0.0, 0.0, 0.0);
 
     for(int i=0;i<MAX_NUM_OF_DIRECTIONAL_LIGHT;++i)
     {
@@ -92,7 +92,7 @@ void main()
         light.SpecularPow = Material.Shininess;
 #endif // USE_MATERIAL
 
-        finalColor += GetDirectionalLight(light, normal, viewDir);
+        directColor += GetDirectionalLight(light, normal, viewDir);
     }
 
      for(int i=0;i<MAX_NUM_OF_POINT_LIGHT;++i)
@@ -106,7 +106,7 @@ void main()
          light.SpecularPow = Material.Shininess;
  #endif // USE_MATERIAL
         
-         finalColor += GetPointLight(light, normal, Pos_, viewDir);
+         directColor += GetPointLight(light, normal, Pos_, viewDir);
      }
     
      for(int i=0;i<MAX_NUM_OF_SPOT_LIGHT;++i)
@@ -120,8 +120,8 @@ void main()
          light.SpecularPow = Material.Shininess;
  #endif // USE_MATERIAL
 
-         finalColor += GetSpotLight(light, normal, Pos_, viewDir);
+         directColor += GetSpotLight(light, normal, Pos_, viewDir);
      }
 
-    color = vec4(finalColor * diffuse.xyz, diffuse.w);
+    color = vec4(directColor * (1.0 / 3.14) * diffuse.xyz, diffuse.w);
 }

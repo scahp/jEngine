@@ -24,8 +24,8 @@ void jObject::AddObject(jObject* object)
 
 	if (!object->SkipShadowMapGen)
 	{
-		if (object->RenderObject && object->RenderObject->VertexStream)
-			JASSERT(object->RenderObject->VertexStream->PrimitiveType == EPrimitiveType::TRIANGLES);
+		//if (object->RenderObject && object->RenderObject->VertexStream)
+		//	JASSERT(object->RenderObject->VertexStream->PrimitiveType == EPrimitiveType::TRIANGLES);
 
 		s_ShadowCasterObject.push_back(object);
 	}

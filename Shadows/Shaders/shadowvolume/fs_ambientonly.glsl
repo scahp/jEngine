@@ -12,6 +12,16 @@ uniform jAmbientLight AmbientLight;
 
 uniform int Collided;
 
+#if defined(USE_TEXTURE)
+uniform sampler2D tex_object2;
+uniform int TextureSRGB[1];
+#endif // USE_TEXTURE
+
+#if defined(USE_MATERIAL)
+uniform jMaterial Material;
+#endif // USE_MATERIAL
+
+
 in vec3 Pos_;
 in vec4 Color_;
 in vec3 Normal_;
@@ -20,12 +30,28 @@ out vec4 color;
 
 void main()
 {
-    vec3 diffuse = Color_.xyz;
-    if (Collided != 0)
-        diffuse = vec3(1.0, 1.0, 1.0);
+	vec4 diffuse = Color_;
+	if (Collided != 0)
+		diffuse = vec4(1.0, 1.0, 1.0, 1.0);
 
-    vec3 finalColor = vec3(0.0, 0.0, 0.0);
-    finalColor += GetAmbientLight(AmbientLight);
+#if defined(USE_TEXTURE)
+	if (TextureSRGB[0] > 0)
+	{
+		// from sRGB to Linear color
+		vec4 tempColor = texture(tex_object2, TexCoord_);
+		diffuse.xyz *= pow(tempColor.xyz, vec3(2.2));
+		diffuse.w *= tempColor.w;
+	}
+	else
+	{
+		diffuse *= texture(tex_object2, TexCoord_);
+	}
+#endif // USE_TEXTURE
 
-    color = vec4(finalColor, Color_.w);
+#if defined(USE_MATERIAL)
+	diffuse.xyz *= Material.Diffuse;
+	diffuse.xyz += Material.Emissive;
+#endif // USE_MATERIAL
+
+    color = vec4(GetAmbientLight(AmbientLight) * diffuse.xyz, diffuse.w);
 }
