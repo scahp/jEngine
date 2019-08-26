@@ -38,15 +38,15 @@ struct jDeepShadowMapBuffers
 //////////////////////////////////////////////////////////////////////////
 // class IPipeline
 
-// jPipelineData
-struct jPipelineData
+// jPipelineContext
+struct jPipelineContext
 {
 	static const std::list<jObject*> emptyObjectList;
 	//static const std::list<const jLight*> emptyLightList;
-	jPipelineData()
+	jPipelineContext()
 		: Objects(emptyObjectList)// , Lights(emptyLightList)
 	{ }
-	jPipelineData(const jRenderTarget* defaultRenderTarget, const std::list<jObject*>& objects, const jCamera* camera, const std::list<const jLight*>& lights)
+	jPipelineContext(const jRenderTarget* defaultRenderTarget, const std::list<jObject*>& objects, const jCamera* camera, const std::list<const jLight*>& lights)
 		: DefaultRenderTarget(defaultRenderTarget), Objects(objects), Camera(camera), Lights(lights)
 	{ }
 
@@ -73,7 +73,7 @@ public:
 	virtual void Setup() {}
 	virtual void Teardown() {}
 
-	virtual void Do(const jPipelineData& pipelineData) const = 0;
+	virtual void Do(const jPipelineContext& pipelineContext) const = 0;
 	FORCEINLINE void SetName(const std::string& name) { Name = name; }
 
 protected:
@@ -115,9 +115,9 @@ RenderPassCont.push_back(pipeline); }
 class jRenderPipeline : public IPipeline
 {
 public:
-	virtual void Do(const jPipelineData& pipelineData) const override;
-	virtual void Draw(const jPipelineData& pipelineData) const;
-	virtual void Draw(const jPipelineData& pipelineData, const jShader* shader) const;
+	virtual void Do(const jPipelineContext& pipelineContext) const override;
+	virtual void Draw(const jPipelineContext& pipelineContext) const;
+	virtual void Draw(const jPipelineContext& pipelineContext, const jShader* shader) const;
 };
 
 
@@ -131,7 +131,7 @@ public:
 
 	virtual void Setup() override;
 
-	virtual void Draw(const jPipelineData& pipelineData, const jShader* shader) const override;
+	virtual void Draw(const jPipelineContext& pipelineContext, const jShader* shader) const override;
 
 private:
 	const jGBuffer* GBuffer = nullptr;
@@ -146,7 +146,7 @@ public:
 	{ }
 
 	virtual void Setup() override;
-	virtual void Draw(const jPipelineData& pipelineData, const jShader* shader) const override;
+	virtual void Draw(const jPipelineContext& pipelineContext, const jShader* shader) const override;
 
 private:
 	jDeepShadowMapBuffers DeepShadowMapBuffers;
@@ -162,7 +162,7 @@ public:
 	{ }
 
 	virtual void Setup() override;
-	virtual void Do(const jPipelineData& pipelineData) const override;
+	virtual void Do(const jPipelineContext& pipelineContext) const override;
 
 	jShader* ShadowGenShader = nullptr;
 	jShader* OmniShadowGenShader = nullptr;
@@ -184,7 +184,7 @@ public:
 	{}
 
 	virtual void Setup() override;
-	virtual void Do(const jPipelineData& pipelineData) const override;
+	virtual void Do(const jPipelineContext& pipelineContext) const override;
 
 	jShader* ShadowGenShader = nullptr;
 	jShader* OmniShadowGenShader = nullptr;
@@ -203,7 +203,7 @@ public:
 	{}
 
 	virtual void Setup() override;
-	virtual void Do(const jPipelineData& pipelineData) const override;
+	virtual void Do(const jPipelineContext& pipelineContext) const override;
 
 	const char* ShaderName = nullptr;
 };
@@ -217,7 +217,7 @@ public:
 	jForwardShadowMap_Blur_Pipeline() = default;
 
 	virtual void Setup() override;
-	virtual void Draw(const jPipelineData& pipelineData, const jShader* shader) const override;
+	virtual void Draw(const jPipelineContext& pipelineContext, const jShader* shader) const override;
 
 	std::shared_ptr<class jPostProcess_Blur> PostProcessBlur;
 	std::shared_ptr<struct jPostProcessInOutput> PostProcessInput;
@@ -232,7 +232,7 @@ public:
 	virtual void Setup() {}
 	virtual void Teardown() {}
 
-	virtual void Do(const jPipelineData& pipelineData) const override;
+	virtual void Do(const jPipelineContext& pipelineContext) const override;
 	virtual void Dispatch() const;
 
 	uint32 NumGroupsX = 0;
@@ -435,7 +435,7 @@ public:
 	virtual void Setup() override;
 	bool CanSkipShadowObject(const jCamera* camera, const jObject* object
 		, const Vector& lightPosOrDirection, bool isOmniDirectional, const jLight* light) const;
-	virtual void Do(const jPipelineData& pipelineData) const override;
+	virtual void Do(const jPipelineContext& pipelineContext) const override;
 };
 
 

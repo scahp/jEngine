@@ -11,8 +11,8 @@
 #include "jShadowAppProperties.h"
 #include "jRHI.h"
 
-const std::list<jObject*> jPipelineData::emptyObjectList;
-//const std::list<const jLight*> jPipelineData::emptyLightList;
+const std::list<jObject*> jPipelineContext::emptyObjectList;
+//const std::list<const jLight*> jPipelineContext::emptyLightList;
 
 std::unordered_map<std::string, IPipeline*> IPipeline::s_pipelinesNameMap;
 std::unordered_set<IPipeline*> IPipeline::s_pipelinesNameSet;
@@ -77,19 +77,19 @@ struct jShadowPipelinCreation
 
 //////////////////////////////////////////////////////////////////////////
 // jRenderPipeline
-void jRenderPipeline::Do(const jPipelineData& pipelineData) const
+void jRenderPipeline::Do(const jPipelineContext& pipelineContext) const
 {
 	SCOPE_DEBUG_EVENT(g_rhi, Name.c_str());
 
-	Draw(pipelineData, Shader);
+	Draw(pipelineContext, Shader);
 }
 
-void jRenderPipeline::Draw(const jPipelineData& pipelineData) const
+void jRenderPipeline::Draw(const jPipelineContext& pipelineContext) const
 {
-	Draw(pipelineData, Shader);
+	Draw(pipelineContext, Shader);
 }
 
-void jRenderPipeline::Draw(const jPipelineData& pipelineData, const jShader* shader) const
+void jRenderPipeline::Draw(const jPipelineContext& pipelineContext, const jShader* shader) const
 {
 	if (EnableClear)
 	{
@@ -111,11 +111,11 @@ void jRenderPipeline::Draw(const jPipelineData& pipelineData, const jShader* sha
 	for (const auto& iter : Buffers)
 		iter->Bind(shader);
 
-	pipelineData.Camera->BindCamera(shader);
-	jLight::BindLights(pipelineData.Lights, shader);		
+	pipelineContext.Camera->BindCamera(shader);
+	jLight::BindLights(pipelineContext.Lights, shader);
 
-	for (const auto& iter : pipelineData.Objects)
-		iter->Draw(pipelineData.Camera, shader, pipelineData.Lights);
+	for (const auto& iter : pipelineContext.Objects)
+		iter->Draw(pipelineContext.Camera, shader, pipelineContext.Lights);
 }
 
 
@@ -128,14 +128,14 @@ void jDeferredGeometryPipeline::Setup()
 	ClearType = ERenderBufferType::COLOR | ERenderBufferType::DEPTH;
 }
 
-void jDeferredGeometryPipeline::Draw(const jPipelineData& pipelineData, const jShader* shader) const
+void jDeferredGeometryPipeline::Draw(const jPipelineContext& pipelineContext, const jShader* shader) const
 {
 	JASSERT(GBuffer);
 	if (GBuffer->Begin())
 	{
 		if (auto currentShader = jShadowAppSettingProperties::GetInstance().ExponentDeepShadowOn ? jShader::GetShader("ExpDeferred") : jShader::GetShader("Deferred"))
 		{
-			__super::Draw(pipelineData, currentShader);
+			__super::Draw(pipelineContext, currentShader);
 		}
 		GBuffer->End();
 	}
@@ -158,12 +158,12 @@ void jDeepShadowMap_ShadowPass_Pipeline::Setup()
 	Buffers.push_back(DeepShadowMapBuffers.LinkedListEntryDepthAlphaNext);
 }
 
-void jDeepShadowMap_ShadowPass_Pipeline::Draw(const jPipelineData& pipelineData, const jShader* shader) const
+void jDeepShadowMap_ShadowPass_Pipeline::Draw(const jPipelineContext& pipelineContext, const jShader* shader) const
 {
 	DeepShadowMapBuffers.AtomicBuffer->ClearBuffer(0);
 	DeepShadowMapBuffers.StartElementBuf->ClearBuffer(-1);
 
-	for (auto light : pipelineData.Lights)
+	for (auto light : pipelineContext.Lights)
 	{
 		JASSERT(light);
 		JASSERT(light->GetShadowMapRenderTarget());
@@ -177,7 +177,7 @@ void jDeepShadowMap_ShadowPass_Pipeline::Draw(const jPipelineData& pipelineData,
 			{
 				g_rhi->SetShader(currentShader);
 
-				__super::Draw(jPipelineData(pipelineData.DefaultRenderTarget, pipelineData.Objects, lightCamera, { light }), currentShader);
+				__super::Draw(jPipelineContext(pipelineContext.DefaultRenderTarget, pipelineContext.Objects, lightCamera, { light }), currentShader);
 			}
 			renderTarget->End();
 		}
@@ -198,14 +198,14 @@ void jForward_ShadowMapGen_Pipeline::Setup()
 	JASSERT(OmniShadowGenShader);
 }
 
-void jForward_ShadowMapGen_Pipeline::Do(const jPipelineData& pipelineData) const
+void jForward_ShadowMapGen_Pipeline::Do(const jPipelineContext& pipelineContext) const
 {
 	SCOPE_DEBUG_EVENT(g_rhi, Name.c_str());
 
 	//light->Update(0); // todo remove
-	g_rhi->SetRenderTarget(pipelineData.DefaultRenderTarget);
+	g_rhi->SetRenderTarget(pipelineContext.DefaultRenderTarget);
 
-	for (auto light : pipelineData.Lights)
+	for (auto light : pipelineContext.Lights)
 	{
 		JASSERT(light);
 
@@ -232,7 +232,7 @@ void jForward_ShadowMapGen_Pipeline::Do(const jPipelineData& pipelineData) const
 		if (skip)
 			continue;
 
-		light->RenderToShadowMap([&pipelineData, currentShader, light, this](const jRenderTarget* renderTarget
+		light->RenderToShadowMap([&pipelineContext, currentShader, light, this](const jRenderTarget* renderTarget
 			, int32 renderTargetIndex, const jCamera* camera, const std::vector<jViewport>& viewports)
 		{
 			g_rhi->SetRenderTarget(renderTarget, renderTargetIndex);
@@ -240,11 +240,11 @@ void jForward_ShadowMapGen_Pipeline::Do(const jPipelineData& pipelineData) const
 				g_rhi->SetViewport({ 0, 0, SM_WIDTH, SM_HEIGHT });
 			else
 				g_rhi->SetViewportIndexedArray(0, static_cast<int32>(viewports.size()), &viewports[0]);
-			this->jRenderPipeline::Draw(jPipelineData(pipelineData.DefaultRenderTarget, pipelineData.Objects, camera, { light }), currentShader);
+			this->jRenderPipeline::Draw(jPipelineContext(pipelineContext.DefaultRenderTarget, pipelineContext.Objects, camera, { light }), currentShader);
 		}, currentShader);
 	}
 
-	g_rhi->SetRenderTarget(pipelineData.DefaultRenderTarget);
+	g_rhi->SetRenderTarget(pipelineContext.DefaultRenderTarget);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -265,17 +265,17 @@ void jForward_ShadowMapGen_CSM_SSM_Pipeline::Setup()
 	JASSERT(OmniShadowGenShader);
 }
 
-void jForward_ShadowMapGen_CSM_SSM_Pipeline::Do(const jPipelineData& pipelineData) const
+void jForward_ShadowMapGen_CSM_SSM_Pipeline::Do(const jPipelineContext& pipelineContext) const
 {
 	SCOPE_DEBUG_EVENT(g_rhi, Name.c_str());
 
 	// todo 여러개의 DIrectional light인경우 고려 필요.
-	if (pipelineData.Lights.empty())
+	if (pipelineContext.Lights.empty())
 		return;
 
-	const jDirectionalLight* directionalLight = [&pipelineData]() -> const jDirectionalLight*
+	const jDirectionalLight* directionalLight = [&pipelineContext]() -> const jDirectionalLight*
 	{
-		for (auto& iter : pipelineData.Lights)
+		for (auto& iter : pipelineContext.Lights)
 		{
 			if (iter->Type == ELightType::DIRECTIONAL)
 				return static_cast<const jDirectionalLight*>(iter);
@@ -283,9 +283,9 @@ void jForward_ShadowMapGen_CSM_SSM_Pipeline::Do(const jPipelineData& pipelineDat
 		return nullptr;
 	}();
 
-	g_rhi->SetRenderTarget(pipelineData.DefaultRenderTarget);
+	g_rhi->SetRenderTarget(pipelineContext.DefaultRenderTarget);
 
-	for (auto light : pipelineData.Lights)
+	for (auto light : pipelineContext.Lights)
 	{
 		bool skip = false;
 
@@ -300,7 +300,7 @@ void jForward_ShadowMapGen_CSM_SSM_Pipeline::Do(const jPipelineData& pipelineDat
 		{
 			currentShader = OmniShadowGenShader;
 
-			light->RenderToShadowMap([&pipelineData, currentShader, light, this](const jRenderTarget* renderTarget
+			light->RenderToShadowMap([&pipelineContext, currentShader, light, this](const jRenderTarget* renderTarget
 				, int32 renderTargetIndex, const jCamera* camera, const std::vector<jViewport>& viewports)
 				{
 					g_rhi->SetRenderTarget(renderTarget, renderTargetIndex);
@@ -308,9 +308,9 @@ void jForward_ShadowMapGen_CSM_SSM_Pipeline::Do(const jPipelineData& pipelineDat
 						g_rhi->SetViewport({ 0, 0, SM_WIDTH, SM_HEIGHT });
 					else
 						g_rhi->SetViewportIndexedArray(0, static_cast<int32>(viewports.size()), &viewports[0]);
-					this->Draw(jPipelineData(pipelineData.DefaultRenderTarget, pipelineData.Objects, camera, { light }), currentShader);
+					this->Draw(jPipelineContext(pipelineContext.DefaultRenderTarget, pipelineContext.Objects, camera, { light }), currentShader);
 				}, currentShader);
-			g_rhi->SetRenderTarget(pipelineData.DefaultRenderTarget);
+			g_rhi->SetRenderTarget(pipelineContext.DefaultRenderTarget);
 			skip = true;
 		}
 		break;
@@ -327,7 +327,7 @@ void jForward_ShadowMapGen_CSM_SSM_Pipeline::Do(const jPipelineData& pipelineDat
 
 		//////////////////////////////////////////////////////////////////////////
 		// CSM Diretional Light 그리는 곳
-		auto camera = pipelineData.Camera;
+		auto camera = pipelineContext.Camera;
 		const auto shadowMapData = directionalLight->ShadowMapData;
 		const auto shadowCameraNear = shadowMapData->ShadowMapCamera->Near;
 		const auto shadowCameraFar = shadowMapData->ShadowMapCamera->Far;
@@ -408,7 +408,7 @@ void jForward_ShadowMapGen_CSM_SSM_Pipeline::Do(const jPipelineData& pipelineDat
 
 		g_rhi->EnableDepthClip(false);
 
-		directionalLight->RenderToShadowMap([&pipelineData, light, currentShader, this](const jRenderTarget* renderTarget
+		directionalLight->RenderToShadowMap([&pipelineContext, light, currentShader, this](const jRenderTarget* renderTarget
 			, int32 renderTargetIndex, const jCamera* camera, const std::vector<jViewport>& viewports)
 			{
 				g_rhi->SetRenderTarget(renderTarget, renderTargetIndex);
@@ -416,10 +416,10 @@ void jForward_ShadowMapGen_CSM_SSM_Pipeline::Do(const jPipelineData& pipelineDat
 					g_rhi->SetViewport({ 0, 0, SM_WIDTH, SM_HEIGHT });
 				else
 					g_rhi->SetViewportIndexedArray(0, static_cast<int32>(viewports.size()), &viewports[0]);
-				this->Draw(jPipelineData(pipelineData.DefaultRenderTarget, pipelineData.Objects, camera, { light }), currentShader);
+				this->Draw(jPipelineContext(pipelineContext.DefaultRenderTarget, pipelineContext.Objects, camera, { light }), currentShader);
 			}, currentShader);
 		g_rhi->EnableDepthClip(true);
-		g_rhi->SetRenderTarget(pipelineData.DefaultRenderTarget);
+		g_rhi->SetRenderTarget(pipelineContext.DefaultRenderTarget);
 	}
 }
 
@@ -437,9 +437,9 @@ void jForwardShadowMap_Blur_Pipeline::Setup()
 	PostProcessOutput = std::shared_ptr<jPostProcessInOutput>(new jPostProcessInOutput());
 }
 
-void jForwardShadowMap_Blur_Pipeline::Draw(const jPipelineData& pipelineData, const jShader* shader) const
+void jForwardShadowMap_Blur_Pipeline::Draw(const jPipelineContext& pipelineContext, const jShader* shader) const
 {
-	for (auto light : pipelineData.Lights)
+	for (auto light : pipelineContext.Lights)
 	{
 		JASSERT(light);
 
@@ -480,7 +480,7 @@ void jForwardShadowMap_Blur_Pipeline::Draw(const jPipelineData& pipelineData, co
 		PostProcessOutput->RenderTarget = tempRenderTargetPtr.get();
 		PostProcessBlur->SetOutput(PostProcessOutput);
 
-		PostProcessBlur->Process(pipelineData.Camera);
+		PostProcessBlur->Process(pipelineContext.Camera);
 
 		PostProcessBlur->IsVertical = false;
 		PostProcessBlur->ClearInOutputs();
@@ -491,7 +491,7 @@ void jForwardShadowMap_Blur_Pipeline::Draw(const jPipelineData& pipelineData, co
 		PostProcessOutput->RenderTarget = light->GetShadowMapRenderTargetPtr().get();
 		PostProcessBlur->SetOutput(PostProcessOutput);
 
-		PostProcessBlur->Process(pipelineData.Camera);
+		PostProcessBlur->Process(pipelineContext.Camera);
 
 		jRenderTargetPool::ReturnRenderTarget(tempRenderTargetPtr.get());
 	}
@@ -512,15 +512,15 @@ void jForward_Shadow_Pipeline::Setup()
 	Shader = jShader::GetShader(ShaderName);
 }
 
-void jForward_Shadow_Pipeline::Do(const jPipelineData& pipelineData) const
+void jForward_Shadow_Pipeline::Do(const jPipelineContext& pipelineContext) const
 {
-	g_rhi->SetRenderTarget(pipelineData.DefaultRenderTarget);
-	__super::Do(pipelineData);
+	g_rhi->SetRenderTarget(pipelineContext.DefaultRenderTarget);
+	__super::Do(pipelineContext);
 }
 
 //////////////////////////////////////////////////////////////////////////
 // jComputePipeline
-void jComputePipeline::Do(const jPipelineData& pipelineData) const
+void jComputePipeline::Do(const jPipelineContext& pipelineContext) const
 {
 	SCOPE_DEBUG_EVENT(g_rhi, Name.c_str());
 	Dispatch();
@@ -699,13 +699,13 @@ bool jForward_ShadowVolume_Pipeline::CanSkipShadowObject(const jCamera* camera, 
 }
 
 
-void jForward_ShadowVolume_Pipeline::Do(const jPipelineData& pipelineData) const
+void jForward_ShadowVolume_Pipeline::Do(const jPipelineContext& pipelineContext) const
 {
 	SCOPE_DEBUG_EVENT(g_rhi, Name.c_str());
 
-	g_rhi->SetRenderTarget(pipelineData.DefaultRenderTarget);
+	g_rhi->SetRenderTarget(pipelineContext.DefaultRenderTarget);
 
-	auto camera = pipelineData.Camera;
+	auto camera = pipelineContext.Camera;
 
 	auto ambientShader = jShader::GetShader("AmbientOnly");
 	auto shadowVolumeBaseShader = jShader::GetShader("ShadowVolume");
@@ -743,7 +743,7 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineData& pipelineData) const
 	const_cast<jCamera*>(camera)->UseAmbient = false;			// todo remove
 	g_rhi->EnableStencil(true);
 
-	for(auto& light : pipelineData.Lights)
+	for(auto& light : pipelineContext.Lights)
 	{
 		bool isOmniDirectional = false;
 		Vector lightPosOrDirection;

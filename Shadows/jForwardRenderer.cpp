@@ -144,7 +144,7 @@ void jForwardRenderer::ShadowPrePass(const jCamera* camera)
 
 	std::list<const jLight*> lights;
 	lights.insert(lights.end(), camera->LightList.begin(), camera->LightList.end());
-	const jPipelineData data(RenderTarget.get(), jObject::GetShadowCasterObject(), camera, lights);
+	const jPipelineContext data(RenderTarget.get(), jObject::GetShadowCasterObject(), camera, lights);
 
 	for (auto& iter : PipelineSet->ShadowPrePass)
 		iter->Do(data);
@@ -156,7 +156,7 @@ void jForwardRenderer::RenderPass(const jCamera* camera)
 
 	std::list<const jLight*> lights;
 	lights.insert(lights.end(), camera->LightList.begin(), camera->LightList.end());
-	const jPipelineData data(RenderTarget.get(), jObject::GetStaticObject(), camera, lights);
+	const jPipelineContext data(RenderTarget.get(), jObject::GetStaticObject(), camera, lights);
 
 	for (auto& iter : PipelineSet->RenderPass)
 		iter->Do(data);
@@ -166,7 +166,7 @@ void jForwardRenderer::DebugRenderPass(const jCamera* camera)
 {
 	SCOPE_DEBUG_EVENT(g_rhi, "DebugRenderPass");
 
-	const jPipelineData data(RenderTarget.get(), jObject::GetDebugObject(), camera, {});
+	const jPipelineContext data(RenderTarget.get(), jObject::GetDebugObject(), camera, {});
 	for (auto& iter : PipelineSet->DebugRenderPass)
 		iter->Do(data);
 }
@@ -177,14 +177,14 @@ void jForwardRenderer::BoundVolumeRenderPass(const jCamera* camera)
 
 	if (jShadowAppSettingProperties::GetInstance().ShowBoundBox)
 	{
-		const jPipelineData data(RenderTarget.get(), jObject::GetBoundBoxObject(), camera, {});
+		const jPipelineContext data(RenderTarget.get(), jObject::GetBoundBoxObject(), camera, {});
 		for (auto& iter : PipelineSet->BoundVolumeRenderPass)
 			iter->Do(data);
 	}
 
 	if (jShadowAppSettingProperties::GetInstance().ShowBoundSphere)
 	{
-		const jPipelineData data(RenderTarget.get(), jObject::GetBoundSphereObject(), camera, {});
+		const jPipelineContext data(RenderTarget.get(), jObject::GetBoundSphereObject(), camera, {});
 		for (auto& iter : PipelineSet->BoundVolumeRenderPass)
 			iter->Do(data);
 	}
@@ -206,7 +206,7 @@ void jForwardRenderer::PostRenderPass(const jCamera* camera)
 void jForwardRenderer::DebugUIPass(const jCamera* camera)
 {
 	SCOPE_DEBUG_EVENT(g_rhi, "DebugUIPass");
-	const jPipelineData data(RenderTarget.get(), jObject::GetUIDebugObject(), camera, {});
+	const jPipelineContext data(RenderTarget.get(), jObject::GetUIDebugObject(), camera, {});
 	for (auto& iter : PipelineSet->DebugUIPass)
 		iter->Do(data);
 }
