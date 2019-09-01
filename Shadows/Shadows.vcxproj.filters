@@ -514,5 +514,14 @@
     <None Include="Shaders\fullscreen\fs_blur_gaussian_vertical.glsl">
       <Filter>Shaders\fullscreen</Filter>
     </None>
+    <None Include="Shaders\shadowvolume\fs_infinityFar2.glsl">
+      <Filter>Shaders\shadowvolume</Filter>
+    </None>
+    <None Include="Shaders\shadowvolume\gs_infinityFar2.glsl">
+      <Filter>Shaders\shadowvolume</Filter>
+    </None>
+    <None Include="Shaders\shadowvolume\vs_infinityFar2.glsl">
+      <Filter>Shaders\shadowvolume</Filter>
+    </None>
   </ItemGroup>
 </Project>

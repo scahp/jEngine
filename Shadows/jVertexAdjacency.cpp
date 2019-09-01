@@ -48,6 +48,9 @@ jVertexAdjacency* jVertexAdjacency::GenerateVertexAdjacencyInfo(const std::vecto
 		vertexAdjacency->ResultVertices.push_back(v1.z);
 	}
 
+	vertexAdjacency->TriangleAdjacencyIndces.clear();
+	vertexAdjacency->CreateTriangleAdjacencyIndices(vertexAdjacency->TriangleAdjacencyIndces);
+
 	return vertexAdjacency;
 }
 
@@ -84,13 +87,15 @@ jEdge* jVertexAdjacency::AddEdge(int32 vertexIndex0, int32 vertexIndex1, int32 t
 	auto it_find = Edges.find(edgeKey);
 	if (Edges.end() == it_find)
 	{
-		auto it_ret = Edges.insert(std::make_pair(edgeKey, new jEdge({ vertexIndex0, vertexIndex1, triangleIndex, indexInTriangle })));
+		auto it_ret = Edges.insert(std::make_pair(edgeKey, new jEdge({ vertexIndex0, vertexIndex1, triangleIndex, -1, indexInTriangle })));
 		if (it_ret.second)
 			result = it_ret.first->second;
 	}
 	else
 	{
 		result = it_find->second;
+		JASSERT(result->TriangleIndex2 == -1);
+		result->TriangleIndex2 = triangleIndex;
 	}
 
 	return result;
@@ -191,4 +196,64 @@ void jVertexAdjacency::UpdatedTransformedAdjacencyInfo(const Matrix& world, bool
 void jVertexAdjacency::Update(jObject* ownerObject)
 {
 	UpdatedTransformedAdjacencyInfo(ownerObject->RenderObject->World);
+}
+
+void jVertexAdjacency::CreateTriangleAdjacencyIndices(std::vector<uint32>& OutResult) const
+{
+	const auto getVertexIndexOppositeToEdgeFunc = [this](size_t edgeKey, int32 currentTriangleIndex)
+	{
+		int32 oppositeTriangleIndex = -1;
+		auto it_find = Edges.find(edgeKey);
+		JASSERT(Edges.end() != it_find);
+		auto edge = it_find->second;
+		JASSERT(edge);
+
+		if (currentTriangleIndex == edge->TriangleIndex)
+			oppositeTriangleIndex = edge->TriangleIndex2;
+		else
+			oppositeTriangleIndex = edge->TriangleIndex;
+
+		auto it_triangle = Triangles.find(oppositeTriangleIndex);
+		//JASSERT(Triangles.end() != it_triangle);
+		int32 vertexIndexResult = -1;
+		if (Triangles.end() == it_triangle)
+		{
+			JASSERT(Triangles.size() > currentTriangleIndex);
+			auto currentTriangle = Triangles.find(currentTriangleIndex)->second;
+			if (!edge->ContainVertexIndex(currentTriangle->VertexIndex0))
+				vertexIndexResult = currentTriangle->VertexIndex0;
+			else if (!edge->ContainVertexIndex(currentTriangle->VertexIndex1))
+				vertexIndexResult = currentTriangle->VertexIndex1;
+			else if (!edge->ContainVertexIndex(currentTriangle->VertexIndex2))
+				vertexIndexResult = currentTriangle->VertexIndex2;
+		}
+		else
+		{
+			auto oppositeTriangle = it_triangle->second;
+			JASSERT(oppositeTriangle);
+
+			if (!edge->ContainVertexIndex(oppositeTriangle->VertexIndex0))
+				vertexIndexResult = oppositeTriangle->VertexIndex0;
+			else if (!edge->ContainVertexIndex(oppositeTriangle->VertexIndex1))
+				vertexIndexResult = oppositeTriangle->VertexIndex1;
+			else if (!edge->ContainVertexIndex(oppositeTriangle->VertexIndex2))
+				vertexIndexResult = oppositeTriangle->VertexIndex2;
+		}
+
+		JASSERT(vertexIndexResult != -1);
+
+		return vertexIndexResult;
+	};
+
+	for (auto& iter : Triangles)
+	{
+		const auto& triangle = iter.second;
+		JASSERT(triangle);
+		OutResult.push_back(triangle->VertexIndex0);
+		OutResult.push_back(getVertexIndexOppositeToEdgeFunc(triangle->EdgeKey0, triangle->TriangleIndex));
+		OutResult.push_back(triangle->VertexIndex1);
+		OutResult.push_back(getVertexIndexOppositeToEdgeFunc(triangle->EdgeKey1, triangle->TriangleIndex));
+		OutResult.push_back(triangle->VertexIndex2);
+		OutResult.push_back(getVertexIndexOppositeToEdgeFunc(triangle->EdgeKey2, triangle->TriangleIndex));
+	}
 }

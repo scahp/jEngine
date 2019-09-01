@@ -236,7 +236,9 @@ jBoundSphere GenerateBoundSphere(const std::vector<float>& vertices)
 void CreateShadowVolume(const std::vector<float>& vertices, const std::vector<uint32>& faces, jObject* ownerObject)
 {
 	ownerObject->VertexAdjacency = jVertexAdjacency::GenerateVertexAdjacencyInfo(vertices, faces);
-	ownerObject->ShadowVolume = new jShadowVolume(ownerObject->VertexAdjacency);
+	//ownerObject->ShadowVolume = new jShadowVolumeCPU(ownerObject->VertexAdjacency);
+	ownerObject->ShadowVolume = new jShadowVolumeGPU(ownerObject->VertexAdjacency);
+	ownerObject->ShadowVolume->CreateShadowVolumeObject();
 }
 
 void CreateBoundObjects(const std::vector<float>& vertices, jObject* ownerObject)
@@ -416,12 +418,12 @@ jBoundSphereObject* CreateBoundSphere(jBoundSphere boundSphere, jObject* ownerOb
 	{
 		auto streamParam = new jStreamParam<uint32>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->ElementType = EBufferElementType::FLOAT;
+		streamParam->ElementType = EBufferElementType::INT;
 		streamParam->ElementTypeSize = sizeof(uint32);
 		streamParam->Stride = sizeof(uint32) * 3;
 		streamParam->Name = "Index";
 		streamParam->Data.resize(faces.size());
-		memcpy(&streamParam->Data[0], &faces[0], faces.size() * sizeof(float));
+		memcpy(&streamParam->Data[0], &faces[0], faces.size() * sizeof(uint32));
 		indexStreamData->Param = streamParam;
 	}
 
@@ -986,12 +988,12 @@ jObject* CreateCapsule(const Vector& pos, float height, float radius, int32 slic
 	{
 		auto streamParam = new jStreamParam<uint32>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->ElementType = EBufferElementType::FLOAT;
+		streamParam->ElementType = EBufferElementType::INT;
 		streamParam->ElementTypeSize = sizeof(uint32);
 		streamParam->Stride = sizeof(uint32) * 3;
 		streamParam->Name = "Index";
 		streamParam->Data.resize(faces.size());
-		memcpy(&streamParam->Data[0], &faces[0], faces.size() * sizeof(float));
+		memcpy(&streamParam->Data[0], &faces[0], faces.size() * sizeof(uint32));
 		indexStreamData->Param = streamParam;
 	}
 
@@ -1383,12 +1385,12 @@ jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector
 	{
 		auto streamParam = new jStreamParam<uint32>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->ElementType = EBufferElementType::FLOAT;
+		streamParam->ElementType = EBufferElementType::INT;
 		streamParam->ElementTypeSize = sizeof(uint32);
 		streamParam->Stride = sizeof(uint32) * 3;
 		streamParam->Name = "Index";
 		streamParam->Data.resize(faces.size());
-		memcpy(&streamParam->Data[0], &faces[0], faces.size() * sizeof(float));
+		memcpy(&streamParam->Data[0], &faces[0], faces.size() * sizeof(uint32));
 		indexStreamData->Param = streamParam;
 	}
 

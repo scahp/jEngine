@@ -14,11 +14,23 @@ unsigned int GetPrimitiveType(EPrimitiveType type)
 	case EPrimitiveType::LINES:
 		primitiveType = GL_LINES;
 		break;
+	case EPrimitiveType::LINES_ADJACENCY:
+		primitiveType = GL_LINES_ADJACENCY;
+		break;
+	case EPrimitiveType::LINE_STRIP_ADJACENCY:
+		primitiveType = GL_LINE_STRIP_ADJACENCY;
+		break;
 	case EPrimitiveType::TRIANGLES:
 		primitiveType = GL_TRIANGLES;
 		break;
 	case EPrimitiveType::TRIANGLE_STRIP:
 		primitiveType = GL_TRIANGLE_STRIP;
+		break;
+	case EPrimitiveType::TRIANGLES_ADJACENCY:
+		primitiveType = GL_TRIANGLES_ADJACENCY;
+		break;
+	case EPrimitiveType::TRIANGLE_STRIP_ADJACENCY:
+		primitiveType = GL_TRIANGLE_STRIP_ADJACENCY;
 		break;
 	}
 	return primitiveType;

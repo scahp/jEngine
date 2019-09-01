@@ -5,7 +5,7 @@ class jCamera;
 struct jShader;
 class jLight;
 class jVertexAdjacency;
-class jShadowVolume;
+class IShadowVolume;
 
 class jObject
 {
@@ -55,7 +55,7 @@ public:
 
 	jRenderObject* RenderObject = nullptr;
 	jVertexAdjacency* VertexAdjacency = nullptr;
-	jShadowVolume* ShadowVolume = nullptr;
+	IShadowVolume* ShadowVolume = nullptr;
 
 	bool SkipShadowMapGen = false;
 	bool SkipUpdateShadowVolume = false;

@@ -22,8 +22,12 @@ FORCEINLINE decltype(auto) operator ! (ENUM_TYPE value)\
 enum class EPrimitiveType
 {
 	LINES,
+	LINES_ADJACENCY,
+	LINE_STRIP_ADJACENCY,
 	TRIANGLES,
 	TRIANGLE_STRIP,
+	TRIANGLES_ADJACENCY,
+	TRIANGLE_STRIP_ADJACENCY,
 	MAX
 };
 
@@ -82,7 +86,7 @@ struct jVertexStreamData : std::enable_shared_from_this<jVertexStreamData>
 struct jIndexStreamData : std::enable_shared_from_this<jIndexStreamData>
 {
 	IStreamParam* Param;
-	int ElementCount = 0;
+	int32 ElementCount = 0;
 };
 
 enum class ETextureFilterTarget

@@ -73,6 +73,7 @@ struct jShaderInfoCreation
 		DECLARE_SHADER_VS_FS("AmbientOnly", "Shaders/shadowvolume/vs.glsl", "Shaders/shadowvolume/fs_ambientonly.glsl");
 		DECLARE_SHADER_VS_FS("ShadowVolume", "Shaders/shadowvolume/vs.glsl", "Shaders/shadowvolume/fs.glsl");
 		DECLARE_SHADER_VS_FS("ShadowVolume_InfinityFar_StencilShader", "Shaders/shadowvolume/vs_infinityFar.glsl", "Shaders/shadowvolume/fs_infinityFar.glsl");
+		DECLARE_SHADER_VS_GS_FS("ShadowVolume_InfinityFar_StencilShader2", "Shaders/shadowvolume/vs_infinityFar2.glsl", "Shaders/shadowvolume/gs_infinityFar2.glsl", "Shaders/shadowvolume/fs_infinityFar2.glsl");
 
 		DECLARE_SHADER_VS_FS("RedShader", "Shaders/vs_red.glsl", "Shaders/fs_red.glsl");
 

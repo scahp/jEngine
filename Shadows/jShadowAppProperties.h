@@ -13,7 +13,7 @@ public:
 	}
 
 	bool ShadowOn = true;
-	EShadowType ShadowType = EShadowType::ShadowMap;
+	EShadowType ShadowType = EShadowType::ShadowVolume;
 	bool ShowSilhouette_DirectionalLight = false;
 	bool ShowSilhouette_PointLight = false;
 	bool ShowSilhouette_SpotLight = false;

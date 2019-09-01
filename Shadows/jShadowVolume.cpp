@@ -7,7 +7,9 @@
 #include "jRHI.h"
 #include "jPrimitiveUtil.h"
 
-void jShadowVolume::Update(const Vector& lightPosOrDirection, bool isOmniDirectional, jObject* ownerObject)
+//////////////////////////////////////////////////////////////////////////
+// jShadowVolumeCPU
+void jShadowVolumeCPU::Update(const Vector& lightPosOrDirection, bool isOmniDirectional, jObject* ownerObject)
 {
 	QuadVertices.clear();
 	EdgeVertices.clear();
@@ -167,16 +169,22 @@ void jShadowVolume::Update(const Vector& lightPosOrDirection, bool isOmniDirecti
 		IsInitialized = true;
 	}
 
-	EdgeObject->RenderObject->Pos = ownerObject->RenderObject->Pos;
-	EdgeObject->RenderObject->Rot = ownerObject->RenderObject->Rot;
-	EdgeObject->RenderObject->Scale = ownerObject->RenderObject->Scale;
+	if (EdgeObject)
+	{
+		EdgeObject->RenderObject->Pos = ownerObject->RenderObject->Pos;
+		EdgeObject->RenderObject->Rot = ownerObject->RenderObject->Rot;
+		EdgeObject->RenderObject->Scale = ownerObject->RenderObject->Scale;
+	}
 
-	QuadObject->RenderObject->Pos = ownerObject->RenderObject->Pos;
-	QuadObject->RenderObject->Rot = ownerObject->RenderObject->Rot;
-	QuadObject->RenderObject->Scale = ownerObject->RenderObject->Scale;
+	if (QuadObject)
+	{
+		QuadObject->RenderObject->Pos = ownerObject->RenderObject->Pos;
+		QuadObject->RenderObject->Rot = ownerObject->RenderObject->Rot;
+		QuadObject->RenderObject->Scale = ownerObject->RenderObject->Scale;
+	}
 }
 
-void jShadowVolume::UpdateEdge(size_t edgeKey)
+void jShadowVolumeCPU::UpdateEdge(size_t edgeKey)
 {
 	if (Edges.end() != Edges.find(edgeKey))
 		Edges.erase(edgeKey);
@@ -184,7 +192,7 @@ void jShadowVolume::UpdateEdge(size_t edgeKey)
 		Edges.insert(edgeKey);
 }
 
-void jShadowVolume::CreateShadowVolumeObject()
+void jShadowVolumeCPU::CreateShadowVolumeObject()
 {
 	if (CreateEdgeObject)
 	{
@@ -267,7 +275,7 @@ void jShadowVolume::CreateShadowVolumeObject()
 	}
 }
 
-void jShadowVolume::UpdateShadowVolumeObject()
+void jShadowVolumeCPU::UpdateShadowVolumeObject()
 {
 	if (CreateEdgeObject)
 	{
@@ -340,4 +348,81 @@ void jShadowVolume::UpdateShadowVolumeObject()
 
 		g_rhi->UpdateVertexBuffer(QuadObject->RenderObject->VertexBuffer, QuadVertexStreamData);
 	}
+}
+
+void jShadowVolumeCPU::Draw(const jPipelineContext& pipelineContext, const jShader* shader) const
+{
+	if (EdgeObject)
+		EdgeObject->Draw(pipelineContext.Camera, shader, pipelineContext.Lights);
+	if (QuadObject)
+		QuadObject->Draw(pipelineContext.Camera, shader, pipelineContext.Lights);
+}
+
+//////////////////////////////////////////////////////////////////////////
+// jShadowVolumeGPU
+void jShadowVolumeGPU::CreateShadowVolumeObject()
+{
+	// #todo release 처리 아직 확실하지 않음.
+	if (ShadowVolumeObject)
+	{
+		delete ShadowVolumeObject;
+		ShadowVolumeObject = nullptr;
+	}
+
+	const auto& vertices = VertexAdjacency->GetTriangleAdjacencyVertices();
+	const auto& indices = VertexAdjacency->GetTriangleAdjacencyIndices();
+
+	//////////////////////////////////////////////////////////////////////////
+	auto vertexStreamData = std::shared_ptr<jVertexStreamData>(new jVertexStreamData());
+	auto streamParam = new jStreamParam<float>();
+	streamParam->BufferType = EBufferType::STATIC;
+	streamParam->ElementTypeSize = sizeof(float);
+	streamParam->ElementType = EBufferElementType::FLOAT;
+	streamParam->Stride = sizeof(float) * 3;
+	streamParam->Name = "Pos";
+	streamParam->Data.resize(vertices.size() * 3);
+	memcpy(&streamParam->Data[0], &vertices[0], vertices.size() * sizeof(Vector));
+	vertexStreamData->Params.push_back(streamParam);
+
+	vertexStreamData->ElementCount = static_cast<int32>(vertices.size());
+	vertexStreamData->PrimitiveType = EPrimitiveType::TRIANGLES_ADJACENCY;
+
+	auto indexStreamData = std::shared_ptr<jIndexStreamData>(new jIndexStreamData());
+	indexStreamData->ElementCount = static_cast<int32>(indices.size());
+	{
+		auto streamParam = new jStreamParam<uint32>();
+		streamParam->BufferType = EBufferType::STATIC;
+		streamParam->ElementType = EBufferElementType::FLOAT;
+		streamParam->ElementTypeSize = sizeof(uint32);
+		streamParam->Stride = sizeof(uint32) * 6;
+		streamParam->Name = "Index";
+		streamParam->Data.resize(indices.size());
+		memcpy(&streamParam->Data[0], &indices[0], indices.size() * sizeof(uint32));
+		indexStreamData->Param = streamParam;
+	}
+
+	ShadowVolumeObject = new jObject();
+	ShadowVolumeObject->RenderObject = new jRenderObject();
+	ShadowVolumeObject->RenderObject->CreateRenderObject(vertexStreamData, indexStreamData);
+	//////////////////////////////////////////////////////////////////////////
+}
+
+void jShadowVolumeGPU::Update(const Vector& lightPosOrDirection, bool isOmniDirectional, jObject* ownerObject)
+{
+	JASSERT(ownerObject);
+	JASSERT(ownerObject->RenderObject);
+	JASSERT(ShadowVolumeObject);
+	JASSERT(ShadowVolumeObject->RenderObject);
+	ShadowVolumeObject->RenderObject->Pos = ownerObject->RenderObject->Pos;
+	ShadowVolumeObject->RenderObject->Rot = ownerObject->RenderObject->Rot;
+	ShadowVolumeObject->RenderObject->Scale = ownerObject->RenderObject->Scale;
+	ShadowVolumeObject->RenderObject->IsTwoSided = ownerObject->RenderObject->IsTwoSided;
+}
+
+void jShadowVolumeGPU::Draw(const jPipelineContext& pipelineContext, const jShader* shader) const
+{
+	if (!ShadowVolumeObject)
+		return;
+
+	ShadowVolumeObject->Draw(pipelineContext.Camera, shader, pipelineContext.Lights);
 }

@@ -20,6 +20,7 @@
 #include "jDeferredRenderer.h"
 #include "jForwardRenderer.h"
 #include "jPipeline.h"
+#include "jVertexAdjacency.h"
 
 jRHI* g_rhi = nullptr;
 
@@ -85,10 +86,10 @@ void jGame::Setup()
 	jObject::AddUIDebugObject(DirectionalLightShadowMapUIDebug);
 
 	PointLightInfo = jPrimitiveUtil::CreatePointLightDebug(Vector(10.0f), MainCamera, PointLight, "Image/bulb.png");
-	jObject::AddDebugObject(PointLightInfo);
+	//jObject::AddDebugObject(PointLightInfo);
 
 	SpotLightInfo = jPrimitiveUtil::CreateSpotLightDebug(Vector(10.0f), MainCamera, SpotLight, "Image/spot.png");
-	jObject::AddDebugObject(SpotLightInfo);
+	//jObject::AddDebugObject(SpotLightInfo);
 
 	MainCamera->AddLight(DirectionalLight);
 	MainCamera->AddLight(PointLight);
@@ -464,6 +465,7 @@ void jGame::SpawnTestPrimitives()
 		thisObject->RenderObject->Rot.z = DegreeToRadian(180.0f);
 	};
 	Sphere = sphere;
+
 	jObject::AddObject(sphere);
 	SpawnedObjects.push_back(sphere);
 
