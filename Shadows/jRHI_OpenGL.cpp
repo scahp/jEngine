@@ -1667,7 +1667,7 @@ void jRenderTarget_OpenGL::End() const
 }
 
 //////////////////////////////////////////////////////////////////////////
-void jUniformBufferBlock_OpenGL::UpdateBufferData(const void* newData, int32 size)
+void jUniformBufferBlock_OpenGL::UpdateBufferData(const void* newData, size_t size)
 {
 	Size = size;
 	glBindBuffer(GL_UNIFORM_BUFFER, UBO);
@@ -1705,7 +1705,7 @@ void jShaderStorageBufferObject_OpenGL::Init()
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, BindingPoint, SSBO);
 }
 
-void jShaderStorageBufferObject_OpenGL::UpdateBufferData(void* newData, int32 size)
+void jShaderStorageBufferObject_OpenGL::UpdateBufferData(void* newData, size_t size)
 {
 	Size = size;
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, SSBO);
@@ -1718,7 +1718,7 @@ void jShaderStorageBufferObject_OpenGL::ClearBuffer(int32 clearValue)
 	glClearBufferData(GL_SHADER_STORAGE_BUFFER, GL_R32I, GL_RED_INTEGER, GL_INT, &clearValue);
 }
 
-void jShaderStorageBufferObject_OpenGL::GetBufferData(void* newData, int32 size)
+void jShaderStorageBufferObject_OpenGL::GetBufferData(void* newData, size_t size)
 {
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, SSBO);
 	void* p = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
@@ -1744,14 +1744,14 @@ void jAtomicCounterBuffer_OpenGL::Init()
 	glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER, BindingPoint, ACBO);
 }
 
-void jAtomicCounterBuffer_OpenGL::UpdateBufferData(void* newData, int32 size)
+void jAtomicCounterBuffer_OpenGL::UpdateBufferData(void* newData, size_t size)
 {
 	Size = size;
 	glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, ACBO);
 	glBufferData(GL_ATOMIC_COUNTER_BUFFER, size, newData, GL_DYNAMIC_COPY);
 }
 
-void jAtomicCounterBuffer_OpenGL::GetBufferData(void* newData, int32 size)
+void jAtomicCounterBuffer_OpenGL::GetBufferData(void* newData, size_t size)
 {
 	glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, ACBO);
 	void* p = glMapBuffer(GL_ATOMIC_COUNTER_BUFFER, GL_READ_ONLY);

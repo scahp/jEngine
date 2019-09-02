@@ -68,7 +68,7 @@ struct jUniformBufferBlock_OpenGL : public IUniformBufferBlock
 	uint32 UBO = -1;
 	virtual void Init() override;
 	virtual void Bind(const jShader* shader) const override;
-	virtual void UpdateBufferData(const void* newData, int32 size) override;
+	virtual void UpdateBufferData(const void* newData, size_t size) override;
 	virtual void ClearBuffer(int32 clearValue) override;
 };
 
@@ -87,9 +87,9 @@ struct jShaderStorageBufferObject_OpenGL : public IShaderStorageBufferObject
 	uint32 SSBO = -1;
 	virtual void Init() override;
 	virtual void Bind(const jShader* shader) const override;
-	virtual void UpdateBufferData(void* newData, int32 size) override;
+	virtual void UpdateBufferData(void* newData, size_t size) override;
 	virtual void ClearBuffer(int32 clearValue) override;
-	virtual void GetBufferData(void* newData, int32 size) override;
+	virtual void GetBufferData(void* newData, size_t size) override;
 };
 
 struct jAtomicCounterBuffer_OpenGL : public IAtomicCounterBuffer
@@ -103,9 +103,9 @@ struct jAtomicCounterBuffer_OpenGL : public IAtomicCounterBuffer
 	uint32 ACBO = -1;
 	virtual void Init() override;
 	virtual void Bind(const jShader* shader) const override;
-	virtual void UpdateBufferData(void* newData, int32 size) override;
+	virtual void UpdateBufferData(void* newData, size_t size) override;
 	using IAtomicCounterBuffer::GetBufferData;
-	virtual void GetBufferData(void* newData, int32 size) override;
+	virtual void GetBufferData(void* newData, size_t size) override;
 	virtual void ClearBuffer(int32 clearValue) override;
 };
 

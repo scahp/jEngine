@@ -127,11 +127,11 @@ struct IUniformBufferBlock : public IBuffer
 	virtual ~IUniformBufferBlock() {}
 
 	std::string Name;
-	int32 Size = 0;
+	size_t Size = 0;
 
 	virtual void Init() = 0;
 	virtual void Bind(const jShader* shader) const override { }
-	virtual void UpdateBufferData(const void* newData, int32 size) = 0;
+	virtual void UpdateBufferData(const void* newData, size_t size) = 0;
 	virtual void ClearBuffer(int32 clearValue = 0) = 0;
 };
 
@@ -144,12 +144,12 @@ struct IShaderStorageBufferObject : public IBuffer
 	virtual ~IShaderStorageBufferObject() {}
 
 	std::string Name;
-	int32 Size = 0;
+	size_t Size = 0;
 
 	virtual void Init() = 0;
 	virtual void Bind(const jShader* shader) const override {}
-	virtual void UpdateBufferData(void* newData, int32 size) = 0;
-	virtual void GetBufferData(void* newData, int32 size) = 0;
+	virtual void UpdateBufferData(void* newData, size_t size) = 0;
+	virtual void GetBufferData(void* newData, size_t size) = 0;
 	virtual void ClearBuffer(int32 clearValue) = 0;
 
 	template <typename T>
@@ -168,13 +168,13 @@ struct IAtomicCounterBuffer : public IBuffer
 	virtual ~IAtomicCounterBuffer() {}
 
 	std::string Name;
-	int32 Size = 0;
+	size_t Size = 0;
 	uint32 BindingPoint = -1;
 
 	virtual void Init() = 0;
 	virtual void Bind(const jShader* shader) const override {}
-	virtual void UpdateBufferData(void* newData, int32 size) = 0;
-	virtual void GetBufferData(void* newData, int32 size) = 0;
+	virtual void UpdateBufferData(void* newData, size_t size) = 0;
+	virtual void GetBufferData(void* newData, size_t size) = 0;
 	virtual void ClearBuffer(int32 clearValue) = 0;
 
 	template <typename T>
