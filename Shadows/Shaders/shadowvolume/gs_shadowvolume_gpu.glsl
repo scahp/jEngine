@@ -14,6 +14,31 @@ uniform int IsTwoSided;
 
 in vec3 LightDirWS_[];
 
+void EmitTriangle(int v0Index, int v1Index, int v2Index)
+{
+	// Frontface
+	{
+		gl_Position = VP * gl_in[v0Index].gl_Position;
+		EmitVertex();
+		gl_Position = VP * gl_in[v1Index].gl_Position;
+		EmitVertex();
+		gl_Position = VP * gl_in[v2Index].gl_Position;
+		EmitVertex();
+		EndPrimitive();
+	}
+
+	// Backface
+	{
+		gl_Position = VP * vec4(LightDirWS_[v1Index], 0.0);
+		EmitVertex();
+		gl_Position = VP * vec4(LightDirWS_[v0Index], 0.0);
+		EmitVertex();
+		gl_Position = VP * vec4(LightDirWS_[v2Index], 0.0);
+		EmitVertex();
+		EndPrimitive();
+	}
+}
+
 void EmitEdgeSilhouette(bool isFrontFace, int v0Index, int v1Index, int adjcency_vertIndex)
 {
 	vec3 m0 = gl_in[v0Index].gl_Position.xyz;
@@ -80,54 +105,54 @@ void main()
 	vec4 v0;
 	vec4 v1;
 	vec4 v2;
-	if (isFrontFace)
+	if (IsTwoSided > 0)
 	{
-		v0 = VP * gl_in[0].gl_Position;
-		v1 = VP * gl_in[2].gl_Position;
-		v2 = VP * gl_in[4].gl_Position;
+		if (isFrontFace)
+			EmitTriangle(0, 2, 4);
+		else
+			EmitTriangle(2, 0, 4);
 
-		gl_Position = v0;
-		EmitVertex();
-		gl_Position = v1;
-		EmitVertex();
-		gl_Position = v2;
-		EmitVertex();
-		EndPrimitive();
-
-		if (IsTwoSided > 0)
+		// Two sided objects has just either face front or back face. so it should be draw no matter what faces does it.
+		EmitEdgeSilhouette(isFrontFace, 0, 2, 1);
+		EmitEdgeSilhouette(isFrontFace, 2, 4, 3);
+		EmitEdgeSilhouette(isFrontFace, 4, 0, 5);
+	}
+	else
+	{
+		if (isFrontFace)
 		{
-			v0 = VP * vec4(LightDirWS_[0], 0.0);
-			v1 = VP * vec4(LightDirWS_[2], 0.0);
-			v2 = VP * vec4(LightDirWS_[4], 0.0);
+			v0 = VP * gl_in[0].gl_Position;
+			v1 = VP * gl_in[2].gl_Position;
+			v2 = VP * gl_in[4].gl_Position;
 
-			gl_Position = v1;
-			EmitVertex();
 			gl_Position = v0;
+			EmitVertex();
+			gl_Position = v1;
 			EmitVertex();
 			gl_Position = v2;
 			EmitVertex();
 			EndPrimitive();
 		}
-	}
-	else
-	{
-		v0 = VP * vec4(LightDirWS_[0], 0.0);
-		v1 = VP * vec4(LightDirWS_[2], 0.0);
-		v2 = VP * vec4(LightDirWS_[4], 0.0);
+		else
+		{
+			v0 = VP * vec4(LightDirWS_[0], 0.0);
+			v1 = VP * vec4(LightDirWS_[2], 0.0);
+			v2 = VP * vec4(LightDirWS_[4], 0.0);
 
-		gl_Position = v0;
-		EmitVertex();
-		gl_Position = v1;
-		EmitVertex();
-		gl_Position = v2;
-		EmitVertex();
-		EndPrimitive();
-	}
+			gl_Position = v0;
+			EmitVertex();
+			gl_Position = v1;
+			EmitVertex();
+			gl_Position = v2;
+			EmitVertex();
+			EndPrimitive();
+		}
 
-	if (!isFrontFace || (IsTwoSided > 0))
-	{
-		EmitEdgeSilhouette(isFrontFace, 0, 2, 1);
-		EmitEdgeSilhouette(isFrontFace, 2, 4, 3);
-		EmitEdgeSilhouette(isFrontFace, 4, 0, 5);
+		if (isFrontFace)
+		{
+			EmitEdgeSilhouette(isFrontFace, 0, 2, 1);
+			EmitEdgeSilhouette(isFrontFace, 2, 4, 3);
+			EmitEdgeSilhouette(isFrontFace, 4, 0, 5);
+		}
 	}
 }
