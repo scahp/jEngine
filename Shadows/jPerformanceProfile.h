@@ -86,10 +86,13 @@ struct jProfile_GPU
 	jQueryTime* Start = nullptr;
 	jQueryTime* End = nullptr;
 
-	static std::list<jProfile_GPU> WatingResultList;
+	static int32 CurrentWatingResultListIndex;
+	static std::list<jProfile_GPU> WatingResultList[2];
 	static void ProcessWaitings()
 	{
-		for (auto rit = WatingResultList.rbegin(); WatingResultList.rend() != rit;++rit)
+		const auto prevIndex = !CurrentWatingResultListIndex;
+		auto& prevList = WatingResultList[prevIndex];
+		for (auto rit = prevList.rbegin(); prevList.rend() != rit;++rit)
 		{
 			const auto& iter = *rit;
 			g_rhi->IsQueryTimeStampResult(iter.End, true);
@@ -100,7 +103,8 @@ struct jProfile_GPU
 			jQueryTimePool::ReturnQueryTime(iter.Start);
 			jQueryTimePool::ReturnQueryTime(iter.End);
 		}
-		WatingResultList.clear();
+		prevList.clear();
+		CurrentWatingResultListIndex = prevIndex;
 	}
 };
 
@@ -122,7 +126,7 @@ public:
 		Profile.End = jQueryTimePool::GetQueryTime();
 		g_rhi->QueryTimeStamp(Profile.End);
 		
-		jProfile_GPU::WatingResultList.push_back(Profile);
+		jProfile_GPU::WatingResultList[jProfile_GPU::CurrentWatingResultListIndex].push_back(Profile);
 	}
 
 	jProfile_GPU Profile;

@@ -5,7 +5,7 @@
 precision mediump float;
 
 layout(triangles_adjacency) in;
-layout(triangle_strip, max_vertices = 21) out;
+layout(triangle_strip, max_vertices = 24) out;
 
 uniform mat4 VP;
 uniform mat4 MVP;
