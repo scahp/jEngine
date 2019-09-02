@@ -324,11 +324,11 @@
     <None Include="Shaders\shadowvolume\fs.glsl" />
     <None Include="Shaders\shadowvolume\fs_ambientonly.glsl" />
     <None Include="Shaders\shadowvolume\fs_infinityFar.glsl" />
-    <None Include="Shaders\shadowvolume\fs_infinityFar2.glsl" />
-    <None Include="Shaders\shadowvolume\gs_infinityFar2.glsl" />
+    <None Include="Shaders\shadowvolume\fs_shadowvolume_gpu.glsl" />
+    <None Include="Shaders\shadowvolume\gs_shadowvolume_gpu.glsl" />
     <None Include="Shaders\shadowvolume\vs.glsl" />
     <None Include="Shaders\shadowvolume\vs_infinityFar.glsl" />
-    <None Include="Shaders\shadowvolume\vs_infinityFar2.glsl" />
+    <None Include="Shaders\shadowvolume\vs_shadowvolume_gpu.glsl" />
     <None Include="Shaders\tex_fs.glsl" />
     <None Include="Shaders\tex_ui_fs.glsl" />
     <None Include="Shaders\tex_ui_vs.glsl" />

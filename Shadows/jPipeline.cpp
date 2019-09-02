@@ -711,7 +711,7 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineContext& pipelineContext)
 	auto ambientShader = jShader::GetShader("AmbientOnly");
 	auto shadowVolumeBaseShader = jShader::GetShader("ShadowVolume");
 	auto ShadowVolumeInfinityFarShader = jShader::GetShader("ShadowVolume_InfinityFar_StencilShader");
-	auto ShadowVolumeInfinityFarShader2 = jShader::GetShader("ShadowVolume_InfinityFar_StencilShader2");
+	auto ShadowVolumeGPU = jShader::GetShader("ShadowVolumeGPU");
 
 	//////////////////////////////////////////////////////////////////
 	// 1. Render objects to depth buffer and Ambient & Emissive to color buffer.
@@ -783,9 +783,9 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineContext& pipelineContext)
 		if (skip)
 			continue;
 
-		g_rhi->SetShader(ShadowVolumeInfinityFarShader2);
-		jLight::BindLights({ light }, ShadowVolumeInfinityFarShader2);
-		camera->BindCamera(ShadowVolumeInfinityFarShader2);
+		g_rhi->SetShader(ShadowVolumeGPU);
+		jLight::BindLights({ light }, ShadowVolumeGPU);
+		camera->BindCamera(ShadowVolumeGPU);
 
 		g_rhi->SetClear(ERenderBufferType::STENCIL);
 		g_rhi->SetStencilOpSeparate(EFace::FRONT, EStencilOp::KEEP, EStencilOp::DECR_WRAP, EStencilOp::KEEP);
@@ -814,7 +814,7 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineContext& pipelineContext)
 				//iter->ShadowVolume->QuadObject->Draw(camera, ShadowVolumeInfinityFarShader2, { light });
 				//iter->ShadowVolume->EdgeObject->Draw(camera, ShadowVolumeInfinityFarShader2, { light });
 				//iter->Draw(camera, ShadowVolumeInfinityFarShader2, { light });
-				iter->ShadowVolume->Draw(jPipelineContext(pipelineContext.DefaultRenderTarget, pipelineContext.Objects, pipelineContext.Camera, { light }), ShadowVolumeInfinityFarShader2);
+				iter->ShadowVolume->Draw(jPipelineContext(pipelineContext.DefaultRenderTarget, pipelineContext.Objects, pipelineContext.Camera, { light }), ShadowVolumeGPU);
 			}
 
 			// todo
@@ -903,7 +903,7 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineContext& pipelineContext)
 					continue;
 
 				iter->ShadowVolume->Update(lightPosOrDirection, isOmniDirectional, iter);
-				iter->ShadowVolume->Draw(jPipelineContext(pipelineContext.DefaultRenderTarget, pipelineContext.Objects, pipelineContext.Camera, { light }), ShadowVolumeInfinityFarShader2);
+				iter->ShadowVolume->Draw(jPipelineContext(pipelineContext.DefaultRenderTarget, pipelineContext.Objects, pipelineContext.Camera, { light }), ShadowVolumeGPU);
 			}
 		}
 
