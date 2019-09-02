@@ -236,9 +236,11 @@ jBoundSphere GenerateBoundSphere(const std::vector<float>& vertices)
 void CreateShadowVolume(const std::vector<float>& vertices, const std::vector<uint32>& faces, jObject* ownerObject)
 {
 	ownerObject->VertexAdjacency = jVertexAdjacency::GenerateVertexAdjacencyInfo(vertices, faces);
-	//ownerObject->ShadowVolume = new jShadowVolumeCPU(ownerObject->VertexAdjacency);
-	ownerObject->ShadowVolume = new jShadowVolumeGPU(ownerObject->VertexAdjacency);
-	ownerObject->ShadowVolume->CreateShadowVolumeObject();
+	ownerObject->ShadowVolumeGPU = new jShadowVolumeGPU(ownerObject->VertexAdjacency);
+	ownerObject->ShadowVolumeGPU->CreateShadowVolumeObject();
+
+	ownerObject->ShadowVolumeCPU = new jShadowVolumeCPU(ownerObject->VertexAdjacency);
+	ownerObject->ShadowVolumeCPU->CreateShadowVolumeObject();
 }
 
 void CreateBoundObjects(const std::vector<float>& vertices, jObject* ownerObject)

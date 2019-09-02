@@ -647,10 +647,10 @@ void jForward_ShadowVolume_Pipeline::Setup()
 
 //////////////////////////////////////////////////////////////////////////
 // jForward_ShadowVolume_Pipeline
-bool jForward_ShadowVolume_Pipeline::CanSkipShadowObject(const jCamera* camera, const jObject* object
+bool jForward_ShadowVolume_Pipeline::CanSkipShadowObject(const IShadowVolume* shadowVolume, const jCamera* camera, const jObject* object
 	, const Vector& lightPosOrDirection, bool isOmniDirectional, const jLight* light) const
 {
-	if (!object->ShadowVolume || object->SkipUpdateShadowVolume)
+	if (!shadowVolume || object->SkipUpdateShadowVolume)
 		return true;
 
 	const float radius = object->RenderObject->Scale.x;
@@ -708,10 +708,12 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineContext& pipelineContext)
 
 	auto camera = pipelineContext.Camera;
 
-	auto ambientShader = jShader::GetShader("AmbientOnly");
-	auto shadowVolumeBaseShader = jShader::GetShader("ShadowVolume");
-	auto ShadowVolumeInfinityFarShader = jShader::GetShader("ShadowVolume_InfinityFar_StencilShader");
-	auto ShadowVolumeGPU = jShader::GetShader("ShadowVolumeGPU");
+	const auto ambientShader = jShader::GetShader("AmbientOnly");
+	const auto shadowVolumeBaseShader = jShader::GetShader("ShadowVolume");
+	const auto ShadowVolumeCPU = jShader::GetShader("ShadowVolumeCPU");
+	const auto ShadowVolumeGPU = jShader::GetShader("ShadowVolumeGPU");
+	const auto isGPUShadowVolume = jShadowAppSettingProperties::GetInstance().IsGPUShadowVolume;
+	const auto shadowVolumeShader = (isGPUShadowVolume ? ShadowVolumeGPU : ShadowVolumeCPU);
 
 	//////////////////////////////////////////////////////////////////
 	// 1. Render objects to depth buffer and Ambient & Emissive to color buffer.
@@ -783,9 +785,9 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineContext& pipelineContext)
 		if (skip)
 			continue;
 
-		g_rhi->SetShader(ShadowVolumeGPU);
-		jLight::BindLights({ light }, ShadowVolumeGPU);
-		camera->BindCamera(ShadowVolumeGPU);
+		g_rhi->SetShader(shadowVolumeShader);
+		jLight::BindLights({ light }, shadowVolumeShader);
+		camera->BindCamera(shadowVolumeShader);
 
 		g_rhi->SetClear(ERenderBufferType::STENCIL);
 		g_rhi->SetStencilOpSeparate(EFace::FRONT, EStencilOp::KEEP, EStencilOp::DECR_WRAP, EStencilOp::KEEP);
@@ -807,14 +809,12 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineContext& pipelineContext)
 			const auto& staticObjects = jObject::GetStaticObject();
 			for (auto& iter : staticObjects)
 			{
-				if (CanSkipShadowObject(camera, iter, lightPosOrDirection, isOmniDirectional, light))
+				auto shadowVolume = isGPUShadowVolume ? iter->ShadowVolumeGPU : iter->ShadowVolumeCPU;
+				if (CanSkipShadowObject(shadowVolume, camera, iter, lightPosOrDirection, isOmniDirectional, light))
 					continue;
 
-				iter->ShadowVolume->Update(lightPosOrDirection, isOmniDirectional, iter);
-				//iter->ShadowVolume->QuadObject->Draw(camera, ShadowVolumeInfinityFarShader2, { light });
-				//iter->ShadowVolume->EdgeObject->Draw(camera, ShadowVolumeInfinityFarShader2, { light });
-				//iter->Draw(camera, ShadowVolumeInfinityFarShader2, { light });
-				iter->ShadowVolume->Draw(jPipelineContext(pipelineContext.DefaultRenderTarget, pipelineContext.Objects, pipelineContext.Camera, { light }), ShadowVolumeGPU);
+				shadowVolume->Update(lightPosOrDirection, isOmniDirectional, iter);
+				shadowVolume->Draw(jPipelineContext(pipelineContext.DefaultRenderTarget, pipelineContext.Objects, pipelineContext.Camera, { light }), shadowVolumeShader);
 			}
 
 			// todo
@@ -858,7 +858,7 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineContext& pipelineContext)
 		g_rhi->EnableBlend(true);
 		g_rhi->SetBlendFunc(EBlendSrc::SRC_ALPHA, EBlendDest::ONE_MINUS_SRC_ALPHA);
 
-		camera->BindCamera(ShadowVolumeInfinityFarShader);
+		camera->BindCamera(shadowVolumeShader);
 		for (auto& light : camera->LightList)
 		{
 			bool isOmniDirectional = false;
@@ -894,16 +894,17 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineContext& pipelineContext)
 			if (skip)
 				continue;
 
-			jLight::BindLights({ light }, ShadowVolumeInfinityFarShader);
+			jLight::BindLights({ light }, shadowVolumeShader);
 
 			const auto& staticObjects = jObject::GetStaticObject();
 			for (auto& iter : staticObjects)
 			{
-				if (CanSkipShadowObject(camera, iter, lightPosOrDirection, isOmniDirectional, light))
+				auto shadowVolume = isGPUShadowVolume ? iter->ShadowVolumeGPU : iter->ShadowVolumeCPU;
+				if (CanSkipShadowObject(shadowVolume, camera, iter, lightPosOrDirection, isOmniDirectional, light))
 					continue;
 
-				iter->ShadowVolume->Update(lightPosOrDirection, isOmniDirectional, iter);
-				iter->ShadowVolume->Draw(jPipelineContext(pipelineContext.DefaultRenderTarget, pipelineContext.Objects, pipelineContext.Camera, { light }), ShadowVolumeGPU);
+				shadowVolume->Update(lightPosOrDirection, isOmniDirectional, iter);
+				shadowVolume->Draw(jPipelineContext(pipelineContext.DefaultRenderTarget, pipelineContext.Objects, pipelineContext.Camera, { light }), shadowVolumeShader);
 			}
 		}
 

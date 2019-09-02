@@ -45,7 +45,7 @@ private:
 
 private:
 	bool IsInitialized = false;
-	bool CreateEdgeObject = true;
+	bool CreateEdgeObject = false;
 	bool CreateQuadObject = true;
 	std::set<size_t> Edges;
 	std::vector<float> EdgeVertices;

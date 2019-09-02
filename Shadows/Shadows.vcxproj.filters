@@ -376,12 +376,6 @@
     <None Include="Shaders\shadowvolume\vs.glsl">
       <Filter>Shaders\shadowvolume</Filter>
     </None>
-    <None Include="Shaders\shadowvolume\fs_infinityFar.glsl">
-      <Filter>Shaders\shadowvolume</Filter>
-    </None>
-    <None Include="Shaders\shadowvolume\vs_infinityFar.glsl">
-      <Filter>Shaders\shadowvolume</Filter>
-    </None>
     <None Include="Shaders\shadowvolume\fs_ambientonly.glsl">
       <Filter>Shaders\shadowvolume</Filter>
     </None>
@@ -521,6 +515,12 @@
       <Filter>Shaders\shadowvolume</Filter>
     </None>
     <None Include="Shaders\shadowvolume\vs_shadowvolume_gpu.glsl">
+      <Filter>Shaders\shadowvolume</Filter>
+    </None>
+    <None Include="Shaders\shadowvolume\fs_shadowvolume_cpu.glsl">
+      <Filter>Shaders\shadowvolume</Filter>
+    </None>
+    <None Include="Shaders\shadowvolume\vs_shadowvolume_cpu.glsl">
       <Filter>Shaders\shadowvolume</Filter>
     </None>
   </ItemGroup>

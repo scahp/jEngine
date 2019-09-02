@@ -55,7 +55,8 @@ public:
 
 	jRenderObject* RenderObject = nullptr;
 	jVertexAdjacency* VertexAdjacency = nullptr;
-	IShadowVolume* ShadowVolume = nullptr;
+	IShadowVolume* ShadowVolumeGPU = nullptr;
+	IShadowVolume* ShadowVolumeCPU = nullptr;
 
 	bool SkipShadowMapGen = false;
 	bool SkipUpdateShadowVolume = false;

@@ -17,6 +17,7 @@ public:
 	bool ShowSilhouette_DirectionalLight = false;
 	bool ShowSilhouette_PointLight = false;
 	bool ShowSilhouette_SpotLight = false;
+	bool IsGPUShadowVolume = true;
 	EShadowMapType ShadowMapType = EShadowMapType::PCSS;
 	bool UsePoissonSample = true;
 	bool ShowDirectionalLightMap = false;

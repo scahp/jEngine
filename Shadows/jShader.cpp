@@ -27,7 +27,6 @@ struct jShaderInfoCreation
 		DECLARE_SHADER_VS_FS("Base", "Shaders/shadowmap/vs.glsl", "Shaders/shadowmap/fs.glsl");
 		DECLARE_SHADER_VS_GS_FS("ShadowMapOmni", "Shaders/shadowmap/vs_omniDirectionalShadowMap.glsl", "shaders/shadowmap/gs_omniDirectionalShadowMap.glsl", "Shaders/shadowmap/fs_omniDirectionalShadowMap.glsl");
 		DECLARE_SHADER_VS_FS("ShadowVolumeBase", "Shaders/shadowvolume/vs.glsl", "Shaders/shadowvolume/fs.glsl");
-		DECLARE_SHADER_VS_FS("ShadowVolumeInfinityFar", "Shaders/shadowvolume/vs_infinityFar.glsl", "Shaders/shadowvolume/fs_infinityFar.glsl");
 		DECLARE_SHADER_VS_FS("ExpDeepShadowMapGen", "Shaders/shadowmap/vs_expDeepShadowMap.glsl", "Shaders/shadowmap/fs_expDeepShadowMap.glsl");
 		DECLARE_SHADER_VS_FS("DeepShadowMapGen", "Shaders/shadowmap/vs_shadowMap.glsl", "Shaders/shadowmap/fs_deepShadowMap.glsl");
 		DECLARE_SHADER_VS_FS_WITH_OPTION("Hair", "shaders/shadowmap/vs_hair.glsl", "shaders/shadowmap/fs_hair.glsl", true, true);
@@ -72,7 +71,7 @@ struct jShaderInfoCreation
 		
 		DECLARE_SHADER_VS_FS("AmbientOnly", "Shaders/shadowvolume/vs.glsl", "Shaders/shadowvolume/fs_ambientonly.glsl");
 		DECLARE_SHADER_VS_FS("ShadowVolume", "Shaders/shadowvolume/vs.glsl", "Shaders/shadowvolume/fs.glsl");
-		DECLARE_SHADER_VS_FS("ShadowVolume_InfinityFar_StencilShader", "Shaders/shadowvolume/vs_infinityFar.glsl", "Shaders/shadowvolume/fs_infinityFar.glsl");
+		DECLARE_SHADER_VS_FS("ShadowVolumeCPU", "Shaders/shadowvolume/vs_shadowvolume_cpu.glsl", "Shaders/shadowvolume/fs_shadowvolume_cpu.glsl");
 		DECLARE_SHADER_VS_GS_FS("ShadowVolumeGPU", "Shaders/shadowvolume/vs_shadowvolume_gpu.glsl", "Shaders/shadowvolume/gs_shadowvolume_gpu.glsl", "Shaders/shadowvolume/fs_shadowvolume_gpu.glsl");
 
 		DECLARE_SHADER_VS_FS("RedShader", "Shaders/vs_red.glsl", "Shaders/fs_red.glsl");

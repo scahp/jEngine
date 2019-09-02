@@ -5,6 +5,7 @@ class jObject;
 class jCamera;
 class jLight;
 class jGBuffer;
+class IShadowVolume;
 
 // 고민해볼 점
 // 하나의 픽셀을 그려내는 방식을 정의하는 것은 렌더링 파이프라인으로 인해 결정 된다.
@@ -433,7 +434,7 @@ public:
 	using jRenderPipeline::jRenderPipeline;
 	
 	virtual void Setup() override;
-	bool CanSkipShadowObject(const jCamera* camera, const jObject* object
+	bool CanSkipShadowObject(const IShadowVolume* shadowVolume, const jCamera* camera, const jObject* object
 		, const Vector& lightPosOrDirection, bool isOmniDirectional, const jLight* light) const;
 	virtual void Do(const jPipelineContext& pipelineContext) const override;
 };

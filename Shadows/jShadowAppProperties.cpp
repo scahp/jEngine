@@ -18,6 +18,7 @@ void jShadowAppSettingProperties::Setup(jAppSettingBase* appSetting)
 	appSetting->AddVariable("AutoExposureKeyValue", AutoExposureKeyValue);
 	appSetting->SetStep("AutoExposureKeyValue", 0.01f);
 	appSetting->SetMinMax("AutoExposureKeyValue", 0.0f, 1.0f);
+	appSetting->AddVariable("IsGPUShadowVolume", IsGPUShadowVolume);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Silhouette Group
@@ -122,6 +123,7 @@ void jShadowAppSettingProperties::Teardown(jAppSettingBase* appSetting)
 	appSetting->RemoveVariable("DirectionalLightSilhouette");
 	appSetting->RemoveVariable("PointLightSilhouette");
 	appSetting->RemoveVariable("SpotLightSilhouette");
+	appSetting->RemoveVariable("IsGPUShadowVolume");	
 	appSetting->RemoveVariable("ShadowMapType");
 	appSetting->RemoveVariable("UsePoissonSample");
 	appSetting->RemoveVariable("DirectionalLightMap");
@@ -155,6 +157,7 @@ void jShadowAppSettingProperties::SwitchShadowType(jAppSettingBase* appSetting)
 	{
 	case EShadowType::ShadowVolume:
 		appSetting->SetVisible("Silhouette", 1);
+		appSetting->SetVisible("IsGPUShadowVolume", 1);
 		appSetting->SetVisible("UsePoissonSample", 0);
 		appSetting->SetVisible("DirectionalLightMap", 0);
 		appSetting->SetVisible("ShadowMapType", 0);
@@ -162,6 +165,7 @@ void jShadowAppSettingProperties::SwitchShadowType(jAppSettingBase* appSetting)
 		break;
 	case EShadowType::ShadowMap:
 		appSetting->SetVisible("Silhouette", 0);
+		appSetting->SetVisible("IsGPUShadowVolume", 0);
 		appSetting->SetVisible("UsePoissonSample", 1);
 		appSetting->SetVisible("DirectionalLightMap", 1);
 		appSetting->SetVisible("ShadowMapType", 1);
