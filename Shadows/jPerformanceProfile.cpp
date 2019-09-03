@@ -106,7 +106,7 @@ void jPerformanceProfile::PrintOutputDebugString()
 		result += "-----CPU---PerformanceProfile----------\n";
 		for (auto& iter : AvgProfileMap)
 		{
-			sprintf_s(szTemp, sizeof(szTemp), "%s : %lf ms", iter.first.c_str(), iter.second.AvgElapsedMS);
+			sprintf_s(szTemp, sizeof(szTemp), "%s : \t\t\t\t%lf ms", iter.first.c_str(), iter.second.AvgElapsedMS);
 			result += szTemp;
 			result += "\n";
 		}
@@ -117,7 +117,7 @@ void jPerformanceProfile::PrintOutputDebugString()
 		result += "-----GPU---PerformanceProfile----------\n";
 		for (auto& iter : GPUAvgProfileMap)
 		{
-			sprintf_s(szTemp, sizeof(szTemp), "%s : %lf ms", iter.first.c_str(), iter.second.AvgElapsedMS);
+			sprintf_s(szTemp, sizeof(szTemp), "%s : \t\t\t\t%lf ms", iter.first.c_str(), iter.second.AvgElapsedMS);
 			result += szTemp;
 			result += "\n";
 		}

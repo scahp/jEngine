@@ -41,10 +41,17 @@ struct jTexture
 
 struct jViewport
 {
-	float x = 0.0f;
-	float y = 0.0f;
-	float width = 0.0f;
-	float height = 0.0f;
+	jViewport() = default;
+	jViewport(int32 x, int32 y, int32 width, int32 height)
+		: X(static_cast<float>(x)), Y(static_cast<float>(y))
+		, Width(static_cast<float>(width)), Height(static_cast<float>(height)) 
+	{}
+	jViewport(float x, float y, float width, float height) : X(x), Y(y), Width(width), Height(height) {}
+
+	float X = 0.0f;
+	float Y = 0.0f;
+	float Width = 0.0f;
+	float Height = 0.0f;
 };
 
 enum class EUniformType

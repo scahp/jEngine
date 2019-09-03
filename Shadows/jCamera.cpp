@@ -39,7 +39,6 @@ void jCamera::BindCamera(const jShader* shader) const
 	SET_UNIFORM_BUFFER_STATIC(Matrix, "P", P, shader);
 	SET_UNIFORM_BUFFER_STATIC(Matrix, "VP", VP, shader);
 	SET_UNIFORM_BUFFER_STATIC(Vector, "Eye", Pos, shader);
-	SET_UNIFORM_BUFFER_STATIC(Vector2, "ShadowMapSize", Vector2(ShadowMapTexelSize), shader);
 	SET_UNIFORM_BUFFER_STATIC(float, "PCF_Size_Directional", PCF_SIZE_DIRECTIONAL, shader);
 	SET_UNIFORM_BUFFER_STATIC(float, "PCF_Size_OmniDirectional", PCF_SIZE_OMNIDIRECTIONAL, shader);
 	SET_UNIFORM_BUFFER_STATIC(float, "ESM_C", 40.0f, shader);

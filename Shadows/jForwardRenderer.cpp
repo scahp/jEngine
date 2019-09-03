@@ -141,6 +141,8 @@ void jForwardRenderer::Teardown()
 void jForwardRenderer::ShadowPrePass(const jCamera* camera)
 {
 	SCOPE_DEBUG_EVENT(g_rhi, "ShadowPrePass");
+	SCOPE_PROFILE(ShadowPrePass);
+	SCOPE_GPU_PROFILE(ShadowPrePass);
 
 	std::list<const jLight*> lights;
 	lights.insert(lights.end(), camera->LightList.begin(), camera->LightList.end());
@@ -153,6 +155,8 @@ void jForwardRenderer::ShadowPrePass(const jCamera* camera)
 void jForwardRenderer::RenderPass(const jCamera* camera)
 {
 	SCOPE_DEBUG_EVENT(g_rhi, "RenderPass");
+	SCOPE_PROFILE(RenderPass);
+	SCOPE_GPU_PROFILE(RenderPass);
 
 	std::list<const jLight*> lights;
 	lights.insert(lights.end(), camera->LightList.begin(), camera->LightList.end());
@@ -165,6 +169,8 @@ void jForwardRenderer::RenderPass(const jCamera* camera)
 void jForwardRenderer::DebugRenderPass(const jCamera* camera)
 {
 	SCOPE_DEBUG_EVENT(g_rhi, "DebugRenderPass");
+	SCOPE_PROFILE(DebugRenderPass);
+	SCOPE_GPU_PROFILE(DebugRenderPass);
 
 	const jPipelineContext data(RenderTarget.get(), jObject::GetDebugObject(), camera, {});
 	for (auto& iter : PipelineSet->DebugRenderPass)
@@ -174,6 +180,8 @@ void jForwardRenderer::DebugRenderPass(const jCamera* camera)
 void jForwardRenderer::BoundVolumeRenderPass(const jCamera* camera)
 {
 	SCOPE_DEBUG_EVENT(g_rhi, "BoundVolumeRenderPass");
+	SCOPE_PROFILE(BoundVolumeRenderPass);
+	SCOPE_GPU_PROFILE(BoundVolumeRenderPass);
 
 	if (jShadowAppSettingProperties::GetInstance().ShowBoundBox)
 	{
@@ -193,12 +201,16 @@ void jForwardRenderer::BoundVolumeRenderPass(const jCamera* camera)
 void jForwardRenderer::PostProcessPass(const jCamera* camera)
 {
 	SCOPE_DEBUG_EVENT(g_rhi, "PostProcessPass");
+	SCOPE_PROFILE(PostProcessPass);
+	SCOPE_GPU_PROFILE(PostProcessPass);
 	PostProcessChain.Process(camera);
 }
 
 void jForwardRenderer::PostRenderPass(const jCamera* camera)
 {
 	SCOPE_DEBUG_EVENT(g_rhi, "PostRenderPass");
+	SCOPE_PROFILE(PostRenderPass);
+	SCOPE_GPU_PROFILE(PostRenderPass);
 	for (auto& iter : PipelineSet->PostRenderPass)
 		iter->Do({});
 }
@@ -206,6 +218,8 @@ void jForwardRenderer::PostRenderPass(const jCamera* camera)
 void jForwardRenderer::DebugUIPass(const jCamera* camera)
 {
 	SCOPE_DEBUG_EVENT(g_rhi, "DebugUIPass");
+	SCOPE_PROFILE(DebugUIPass);
+	SCOPE_GPU_PROFILE(DebugUIPass);
 	const jPipelineContext data(RenderTarget.get(), jObject::GetUIDebugObject(), camera, {});
 	for (auto& iter : PipelineSet->DebugUIPass)
 		iter->Do(data);

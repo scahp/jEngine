@@ -19,7 +19,7 @@ class IShadowVolume;
 struct jDeepShadowMapBuffers
 {
 	static constexpr size_t LinkedlistDepth = 50;
-	static constexpr size_t LinkedListDepthSize = SM_WIDTH * SM_HEIGHT * LinkedlistDepth;
+	static constexpr size_t LinkedListDepthSize = SM_LINKED_LIST_WIDTH * SM_LINKED_LIST_HEIGHT * LinkedlistDepth;
 
 	~jDeepShadowMapBuffers()
 	{

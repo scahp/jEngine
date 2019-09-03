@@ -238,7 +238,7 @@ void jForward_ShadowMapGen_Pipeline::Do(const jPipelineContext& pipelineContext)
 		{
 			g_rhi->SetRenderTarget(renderTarget, renderTargetIndex);
 			if (viewports.empty())
-				g_rhi->SetViewport({ 0, 0, SM_WIDTH, SM_HEIGHT });
+				g_rhi->SetViewport({ 0, 0, renderTarget->Info.Width, renderTarget->Info.Height });
 			else
 				g_rhi->SetViewportIndexedArray(0, static_cast<int32>(viewports.size()), &viewports[0]);
 			this->jRenderPipeline::Draw(jPipelineContext(pipelineContext.DefaultRenderTarget, pipelineContext.Objects, camera, { light }), currentShader);
@@ -306,7 +306,7 @@ void jForward_ShadowMapGen_CSM_SSM_Pipeline::Do(const jPipelineContext& pipeline
 				{
 					g_rhi->SetRenderTarget(renderTarget, renderTargetIndex);
 					if (viewports.empty())
-						g_rhi->SetViewport({ 0, 0, SM_WIDTH, SM_HEIGHT });
+						g_rhi->SetViewport({ 0, 0, renderTarget->Info.Width, renderTarget->Info.Height });
 					else
 						g_rhi->SetViewportIndexedArray(0, static_cast<int32>(viewports.size()), &viewports[0]);
 					this->Draw(jPipelineContext(pipelineContext.DefaultRenderTarget, pipelineContext.Objects, camera, { light }), currentShader);
@@ -414,7 +414,7 @@ void jForward_ShadowMapGen_CSM_SSM_Pipeline::Do(const jPipelineContext& pipeline
 			{
 				g_rhi->SetRenderTarget(renderTarget, renderTargetIndex);
 				if (viewports.empty())
-					g_rhi->SetViewport({ 0, 0, SM_WIDTH, SM_HEIGHT });
+					g_rhi->SetViewport({ 0, 0, renderTarget->Info.Width, renderTarget->Info.Height });
 				else
 					g_rhi->SetViewportIndexedArray(0, static_cast<int32>(viewports.size()), &viewports[0]);
 				this->Draw(jPipelineContext(pipelineContext.DefaultRenderTarget, pipelineContext.Objects, camera, { light }), currentShader);
@@ -542,8 +542,8 @@ void jComputePipeline::Dispatch() const
 void jDeepShadowMap_Sort_ComputePipeline::Setup()
 {
 	Shader = jShader::GetShader("cs_sort");
-	ShadowMapWidthUniform = new jUniformBuffer<int>("ShadowMapWidth", SM_WIDTH);
-	ShadowMapHeightUniform = new jUniformBuffer<int>("ShadowMapHeight", SM_HEIGHT);
+	ShadowMapWidthUniform = new jUniformBuffer<int>("ShadowMapWidth", SM_LINKED_LIST_WIDTH);
+	ShadowMapHeightUniform = new jUniformBuffer<int>("ShadowMapHeight", SM_LINKED_LIST_HEIGHT);
 
 	Buffers.push_back(ShadowMapWidthUniform);
 	Buffers.push_back(ShadowMapHeightUniform);
@@ -551,8 +551,8 @@ void jDeepShadowMap_Sort_ComputePipeline::Setup()
 	Buffers.push_back(DeepShadowMapBuffers.StartElementBuf);
 	Buffers.push_back(DeepShadowMapBuffers.LinkedListEntryDepthAlphaNext);
 
-	NumGroupsX = SM_WIDTH / 16;
-	NumGroupsY = SM_HEIGHT / 8;
+	NumGroupsX = SM_LINKED_LIST_WIDTH / 16;
+	NumGroupsY = SM_LINKED_LIST_HEIGHT / 8;
 	NumGroupsZ = 1;
 }
 
@@ -568,8 +568,8 @@ void jDeepShadowMap_Link_ComputePipeline::Setup()
 {
 	Shader = jShader::GetShader("cs_link");
 	
-	ShadowMapWidthUniform = new jUniformBuffer<int>("ShadowMapWidth", SM_WIDTH);
-	ShadowMapHeightUniform = new jUniformBuffer<int>("ShadowMapHeight", SM_HEIGHT);
+	ShadowMapWidthUniform = new jUniformBuffer<int>("ShadowMapWidth", SM_LINKED_LIST_WIDTH);
+	ShadowMapHeightUniform = new jUniformBuffer<int>("ShadowMapHeight", SM_LINKED_LIST_HEIGHT);
 
 	Buffers.push_back(ShadowMapWidthUniform);
 	Buffers.push_back(ShadowMapHeightUniform);
@@ -578,8 +578,8 @@ void jDeepShadowMap_Link_ComputePipeline::Setup()
 	Buffers.push_back(DeepShadowMapBuffers.LinkedListEntryDepthAlphaNext);
 	Buffers.push_back(DeepShadowMapBuffers.LinkedListEntryNeighbors);
 
-	NumGroupsX = SM_WIDTH / 16;
-	NumGroupsY = SM_HEIGHT / 8;
+	NumGroupsX = SM_LINKED_LIST_WIDTH / 16;
+	NumGroupsY = SM_LINKED_LIST_HEIGHT / 8;
 	NumGroupsZ = 1;
 }
 

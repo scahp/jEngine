@@ -43,7 +43,6 @@ uniform int TextureSRGB[1];
 uniform sampler2D shadow_object_point;
 uniform sampler2D shadow_object_spot;
 uniform sampler2D shadow_object;
-uniform vec2 ShadowMapSize;
 uniform int UseTexture;
 uniform int UseUniformColor;
 uniform vec4 Color;

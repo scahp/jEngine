@@ -340,6 +340,14 @@ void APIENTRY glDebugOutput(GLenum source, GLenum type, GLuint id, GLenum severi
 	// ignore non-significant error/warning codes
 	if (id == 131169 || id == 131185 || id == 131218 || id == 131204) return;
 
+#if DEBUG_OUTPUT_LEVEL == 2
+	if (severity != GL_DEBUG_SEVERITY_HIGH)
+		return;
+#elif DEBUG_OUTPUT_LEVEL == 1
+	if (severity != GL_DEBUG_SEVERITY_HIGH && severity != GL_DEBUG_SEVERITY_MEDIUM)
+		return;
+#endif
+
 	std::cout << "---------------" << std::endl;
 	std::cout << "Debug message (" << id << "): " << message << std::endl;
 

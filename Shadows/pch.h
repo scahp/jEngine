@@ -44,11 +44,17 @@ using tchar = wchar_t;
 const unsigned int SCR_WIDTH = 1280;
 const unsigned int SCR_HEIGHT = 720;
 
-const unsigned int SM_WIDTH = 512;
-const unsigned int SM_HEIGHT = 512;
+const unsigned int SM_WIDTH = 1024;
+const unsigned int SM_HEIGHT = 1024;
 
-const unsigned int LUMINANCE_WIDTH = 1024;
-const unsigned int LUMINANCE_HEIGHT = 1024;
+const unsigned int SM_ARRAY_WIDTH = 512;
+const unsigned int SM_ARRAY_HEIGHT = 512;
+
+const unsigned int SM_LINKED_LIST_WIDTH = 512;
+const unsigned int SM_LINKED_LIST_HEIGHT = 512;
+
+const unsigned int LUMINANCE_WIDTH = 512;
+const unsigned int LUMINANCE_HEIGHT = 512;
 
 constexpr int NUM_CASCADES = 3;
 constexpr int NUM_FRUSTUM_CORNERS = 8;
@@ -101,5 +107,8 @@ inline void hash_combine(std::size_t& seed, const T& v)
 #include "jShadowAppProperties.h"
 
 #define DEBUG_OUTPUT_ON 0
+//#define DEBUG_OUTPUT_LEVEL 0	// show all
+//#define DEBUG_OUTPUT_LEVEL 1	// show mid priority
+#define DEBUG_OUTPUT_LEVEL 2	// show high priority
 
 #endif //PCH_H
