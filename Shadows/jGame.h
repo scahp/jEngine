@@ -46,6 +46,8 @@ public:
 	void SpawnTestPrimitives();
 	void SapwnCubePrimitives();
 
+	void SpawnGraphTestFunc();	// Test
+
 	ESpawnedType SpawnedType = ESpawnedType::None;
 
 	void Update(float deltaTime);

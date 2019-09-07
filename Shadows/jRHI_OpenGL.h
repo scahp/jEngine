@@ -12,8 +12,9 @@ struct jVertexStream_OpenGL
 	EBufferType BufferType = EBufferType::STATIC;
 	EBufferElementType ElementType = EBufferElementType::BYTE;
 	bool Normalized = false;
-	int Stride = 0;
+	int32 Stride = 0;
 	size_t Offset = 0;
+	int32 InstanceDivisor = 0;
 };
 
 struct jVertexBuffer_OpenGL : public jVertexBuffer
@@ -137,8 +138,12 @@ public:
 	virtual void BindVertexBuffer(const jVertexBuffer* vb, const jShader* shader) const override;
 	virtual void BindIndexBuffer(const jIndexBuffer* ib, const jShader* shader) const override;
 	virtual void MapBufferdata(IBuffer* buffer) const override;
-	virtual void DrawArray(EPrimitiveType type, int vertStartIndex, int vertCount) const override;
-	virtual void DrawElement(EPrimitiveType type, int elementSize, int32 startIndex = -1, int32 count = -1) const override;
+	virtual void DrawArrays(EPrimitiveType type, int vertStartIndex, int vertCount) const override;
+	virtual void DrawArraysInstanced(EPrimitiveType type, int32 vertStartIndex, int32 vertCount, int32 instanceCount) const override;
+	virtual void DrawElements(EPrimitiveType type, int32 elementSize, int32 startIndex, int32 count) const override;
+	virtual void DrawElementsInstanced(EPrimitiveType type, int32 elementSize, int32 startIndex, int32 count, int32 instanceCount) const override;
+	virtual void DrawElementsBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex) const override;
+	virtual void DrawElementsInstancedBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex, int32 instanceCount) const override;
 	virtual void DispatchCompute(uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ) const override;
 	virtual void EnableDepthBias(bool enable) const override;
 	virtual void SetDepthBias(float constant, float slope) const override;
@@ -171,7 +176,6 @@ public:
 	virtual void SetDepthMask(bool enable) const override;
 	virtual void SetColorMask(bool r, bool g, bool b, bool a) const override;
 	virtual IUniformBufferBlock* CreateUniformBufferBlock(const char* blockname) const override;
-	virtual void DrawElementBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex) const override;
 	virtual void EnableSRGB(bool enable) const override;
 	virtual IShaderStorageBufferObject* CreateShaderStorageBufferObject(const char* blockname) const override;
 	virtual IAtomicCounterBuffer* CreateAtomicCounterBuffer(const char* name, int32 bindingPoint) const override;

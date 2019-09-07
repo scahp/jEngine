@@ -21,6 +21,7 @@ FORCEINLINE decltype(auto) operator ! (ENUM_TYPE value)\
 
 enum class EPrimitiveType
 {
+	POINTS,
 	LINES,
 	LINES_ADJACENCY,
 	LINE_STRIP_ADJACENCY,
@@ -48,16 +49,17 @@ enum class EBufferElementType
 struct IStreamParam
 {
 	IStreamParam() = default;
-	IStreamParam(const std::string& name, const EBufferType& bufferType, int stride, EBufferElementType elementType, int elementTypeSize)
-		: Name(name), BufferType(bufferType), Stride(stride), ElementType(elementType), ElementTypeSize(elementTypeSize)
+	IStreamParam(const std::string& name, const EBufferType& bufferType, int32 stride, EBufferElementType elementType, int32 elementTypeSize, int32 instanceDivisor = 0)
+		: Name(name), BufferType(bufferType), Stride(stride), ElementType(elementType), ElementTypeSize(elementTypeSize), InstanceDivisor(instanceDivisor)
 	{}
 	virtual ~IStreamParam() {}
 
-	EBufferType BufferType = EBufferType::STATIC;
-	int Stride = 0;
-	EBufferElementType ElementType = EBufferElementType::BYTE;
-	int ElementTypeSize = 0;
 	std::string Name;
+	EBufferType BufferType = EBufferType::STATIC;
+	int32 Stride = 0;
+	EBufferElementType ElementType = EBufferElementType::BYTE;
+	int32 ElementTypeSize = 0;
+	int32 InstanceDivisor = 0;
 
 	virtual const void* GetBufferData() const = 0;
 	virtual size_t GetBufferSize() const { return 0; }

@@ -62,7 +62,7 @@ public:
 		auto it_find = CameraMap.find(id);
 		return (CameraMap.end() != it_find) ? it_find->second : nullptr;
 	}
-	static jCamera* CreateCamera(const Vector& pos, const Vector& target, const Vector& up, float fov, float nearDist, float farDist, float width, float height, bool isPerspectiveProjection)
+	static jCamera* CreateCamera(const Vector& pos, const Vector& target, const Vector& up, float fovRad, float nearDist, float farDist, float width, float height, bool isPerspectiveProjection)
 	{
 		const auto toTarget = (target - pos);
 		const auto toUp = (up - pos);
@@ -76,7 +76,7 @@ public:
 		camera->Up += camera->Pos;
 		camera->Target += camera->Pos;
 		
-		camera->FOV = fov;
+		camera->FOVRad = fovRad;
 		camera->Near = nearDist;
 		camera->Far = farDist;
 		camera->Width = width;
@@ -212,7 +212,7 @@ public:
 
 	// debug object
 
-	float FOV = 0.0f;		// Radian
+	float FOVRad = 0.0f;		// Radian
 	float Near = 0.0f;
 	float Far = 0.0f;
 
@@ -232,7 +232,7 @@ public:
 class jOrthographicCamera : public jCamera 
 {
 public:
-	static jOrthographicCamera* CreateCamera(const Vector& pos, const Vector& target, const Vector& up, float minX, float minY, float maxX, float maxY, float farDist, float nearDist)
+	static jCamera* CreateCamera(const Vector& pos, const Vector& target, const Vector& up, float fovRad, float nearDist, float farDist, float width, float height, bool isPerspectiveProjection)
 	{
 		const auto toTarget = (target - pos);
 		const auto toUp = (up - pos);
@@ -246,14 +246,14 @@ public:
 		camera->Up += camera->Pos;
 		camera->Target += camera->Pos;
 
-		camera->Near = nearDist;
-		camera->Far = farDist;
+		camera->Near = isPerspectiveProjection;
+		camera->Far = height;
 		camera->IsPerspectiveProjection = false;
 		
-		camera->MinX = minX;
-		camera->MinY = minY;
-		camera->MaxX = maxX;
-		camera->MaxY = maxY;
+		camera->MinX = fovRad;
+		camera->MinY = isPerspectiveProjection;
+		camera->MaxX = height;
+		camera->MaxY = width;
 		return camera;
 	}
 

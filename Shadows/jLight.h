@@ -90,7 +90,7 @@ namespace jLightUtil
 
 		// todo 정리 필요
 		Matrix CascadeLightVP[NUM_CASCADES];
-		float CascadeEndsW[NUM_CASCADES];
+		float CascadeEndsW[NUM_CASCADES] = { 0, };
 	};
 
 	static jShadowMapData* CreateShadowMap(const Vector& direction, const Vector& pos);

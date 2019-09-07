@@ -32,6 +32,11 @@ void jRenderObject::UpdateVertexStream(const std::shared_ptr<jVertexStreamData>&
 	g_rhi->UpdateVertexBuffer(VertexBuffer, VertexStream);
 }
 
+void jRenderObject::UpdateVertexStream()
+{
+	g_rhi->UpdateVertexBuffer(VertexBuffer, VertexStream);
+}
+
 //void jRenderObject::Draw(const jCamera* camera, const jShader* shader, int32 startIndex, int32 count)
 //{
 //	if (VertexBuffer->VertexStreamData.expired())
@@ -65,7 +70,7 @@ void jRenderObject::UpdateVertexStream(const std::shared_ptr<jVertexStreamData>&
 //	}
 //}
 
-void jRenderObject::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 startIndex, int32 count)
+void jRenderObject::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 startIndex, int32 count, int32 instanceCount)
 {
 	if (VertexBuffer->VertexStreamData.expired())
 		return;
@@ -89,16 +94,22 @@ void jRenderObject::Draw(const jCamera* camera, const jShader* shader, const std
 	{
 		auto indexStreamData = IndexBuffer->IndexStreamData.lock();
 		count = count != -1 ? count : indexStreamData->ElementCount;
-		g_rhi->DrawElement(primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count);
+		if (instanceCount <= 0)
+			g_rhi->DrawElements(primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count);
+		else
+			g_rhi->DrawElementsInstanced(primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count, instanceCount);
 	}
 	else
 	{
 		count = count != -1 ? count : vertexStreamData->ElementCount;
-		g_rhi->DrawArray(primitiveType, 0, count);
+		if (instanceCount <= 0)
+			g_rhi->DrawArrays(primitiveType, 0, count);
+		else
+			g_rhi->DrawArraysInstanced(primitiveType, 0, count, instanceCount);
 	}
 }
 
-void jRenderObject::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 startIndex, int32 count, int32 baseVertexIndex)
+void jRenderObject::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 startIndex, int32 count, int32 baseVertexIndex, int32 instanceCount)
 {
 	if (VertexBuffer->VertexStreamData.expired())
 		return;
@@ -119,11 +130,17 @@ void jRenderObject::Draw(const jCamera* camera, const jShader* shader, const std
 	if (IndexBuffer)
 	{
 		auto indexStreamData = IndexBuffer->IndexStreamData.lock();
-		g_rhi->DrawElementBaseVertex(primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count, baseVertexIndex);
+		if (instanceCount <= 0)
+			g_rhi->DrawElementsBaseVertex(primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count, baseVertexIndex);
+		else
+			g_rhi->DrawElementsInstancedBaseVertex(primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count, baseVertexIndex, instanceCount);
 	}
 	else
 	{
-		g_rhi->DrawArray(primitiveType, baseVertexIndex, count);
+		if (instanceCount <= 0)
+			g_rhi->DrawArrays(primitiveType, baseVertexIndex, count);
+		else
+			g_rhi->DrawArraysInstanced(primitiveType, baseVertexIndex, count, instanceCount);
 	}
 }
 

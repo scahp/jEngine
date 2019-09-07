@@ -25,8 +25,8 @@ Matrix jCamera::CreateProjection() const
 	if (IsPerspectiveProjection)
 	{
 		if (IsInfinityFar)
-			return jCameraUtil::CreatePerspectiveMatrixFarAtInfinity(Width, Height, FOV, Near);
-		return jCameraUtil::CreatePerspectiveMatrix(Width, Height, FOV, Far, Near);
+			return jCameraUtil::CreatePerspectiveMatrixFarAtInfinity(Width, Height, FOVRad, Near);
+		return jCameraUtil::CreatePerspectiveMatrix(Width, Height, FOVRad, Far, Near);
 	}
 
 	return jCameraUtil::CreateOrthogonalMatrix(Width, Height, Far, Near);
@@ -54,7 +54,7 @@ void jCamera::BindCamera(const jShader* shader) const
 void jCamera::UpdateCameraFrustum()
 {
 	auto toTarget = (Target - Pos).GetNormalize();
-	const auto length = tanf(FOV) * Far;
+	const auto length = tanf(FOVRad) * Far;
 	auto toRight = GetRightVector() * length;
 	auto toUp = GetUpVector() * length;
 

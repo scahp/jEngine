@@ -523,5 +523,11 @@
     <None Include="Shaders\shadowvolume\vs_shadowvolume_cpu.glsl">
       <Filter>Shaders\shadowvolume</Filter>
     </None>
+    <None Include="Shaders\fs_graph.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\vs_graph.glsl">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

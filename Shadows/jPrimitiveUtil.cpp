@@ -33,10 +33,10 @@ void jBillboardQuadPrimitive::Update(float deltaTime)
 	}
 }
 
-void jUIQuadPrimitive::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights)
+void jUIQuadPrimitive::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 1 */)
 {
 	SetUniformParams(shader);
-	__super::Draw(camera, shader, lights);
+	__super::Draw(camera, shader, lights, instanceCount);
 }
 
 void jUIQuadPrimitive::SetTexture(const jTexture* texture)
@@ -52,10 +52,10 @@ void jUIQuadPrimitive::SetUniformParams(const jShader* shader)
 	SET_UNIFORM_BUFFER_STATIC(Vector2, "Size", Size, shader);
 }
 
-void jFullscreenQuadPrimitive::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights)
+void jFullscreenQuadPrimitive::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount)
 {
 	SetUniformBuffer(shader);
-	__super::Draw(camera, shader, lights);
+	__super::Draw(camera, shader, lights, instanceCount);
 }
 
 void jFullscreenQuadPrimitive::SetUniformBuffer(const jShader* shader)
@@ -104,7 +104,7 @@ void jFullscreenQuadPrimitive::SetTexture3(const jTexture* texture, const jSampl
 	RenderObject->samplerState3 = samplerState;
 }
 
-void jBoundBoxObject::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights)
+void jBoundBoxObject::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 1 */)
 {
 	__super::Draw(camera, shader, lights);
 }
@@ -115,7 +115,7 @@ void jBoundBoxObject::SetUniformBuffer(const jShader* shader)
 	SET_UNIFORM_BUFFER_STATIC(Vector4, "Color", Color, shader);
 }
 
-void jBoundSphereObject::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights)
+void jBoundSphereObject::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 1 */)
 {
 	__super::Draw(camera, shader, lights);
 }
@@ -136,7 +136,7 @@ void jArrowSegmentPrimitive::Update(float deltaTime)
 		ConeObject->Update(deltaTime);
 }
 
-void jArrowSegmentPrimitive::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights)
+void jArrowSegmentPrimitive::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 1 */)
 {
 	__super::Draw(camera, shader, lights);
 
@@ -1673,6 +1673,54 @@ jFrustumPrimitive* CreateFrustumDebug(const jCamera* targetCamera)
 	return frustumPrimitive;
 }
 
+jGraph2D* CreateGraph2D(const Vector2& pos, const Vector2& size, const std::vector<Vector2>& points)
+{
+	const Vector2 point[4] = { {0.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, 1.0f}, {1.0f, 1.0f} };
+
+	const int32 elementCount = 4;
+
+	// attribute 추가
+	auto vertexStreamData = std::shared_ptr<jVertexStreamData>(new jVertexStreamData());
+
+	{
+		auto streamParam = new jStreamParam<Vector2>();
+		streamParam->BufferType = EBufferType::STATIC;
+		streamParam->ElementTypeSize = sizeof(float);
+		streamParam->ElementType = EBufferElementType::FLOAT;
+		streamParam->Stride = sizeof(Vector2);
+		streamParam->Name = "Pos";
+		streamParam->Data.resize(_countof(point));
+		memcpy(&streamParam->Data[0], &point[0], sizeof(point));
+		vertexStreamData->Params.push_back(streamParam);
+	}
+
+	{
+		auto streamParam = new jStreamParam<Matrix>();
+		streamParam->BufferType = EBufferType::DYNAMIC;
+		streamParam->ElementType = EBufferElementType::FLOAT;
+		streamParam->ElementTypeSize = sizeof(float);
+		streamParam->Stride = sizeof(Matrix);
+		streamParam->Name = "Transform";
+		streamParam->Data.clear();
+		streamParam->InstanceDivisor = 1;
+		vertexStreamData->Params.push_back(streamParam);
+	}
+
+	vertexStreamData->PrimitiveType = EPrimitiveType::TRIANGLE_STRIP;
+	vertexStreamData->ElementCount = elementCount;
+
+	auto object = new jGraph2D();
+	auto renderObject = new jRenderObject();
+	renderObject->CreateRenderObject(vertexStreamData, nullptr);
+	object->RenderObject = renderObject;
+
+	object->SethPos(pos);
+	object->SetGuardLineSize(size);
+	object->SetPoints(points);
+
+	return object;
+}
+
 }
 
 void jDirectionalLightPrimitive::Update(float deltaTime)
@@ -1686,7 +1734,7 @@ void jDirectionalLightPrimitive::Update(float deltaTime)
 }
 
 
-void jDirectionalLightPrimitive::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights)
+void jDirectionalLightPrimitive::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 1 */)
 {
 	__super::Draw(camera, shader, lights);
 
@@ -1749,7 +1797,7 @@ void jPointLightPrimitive::Update(float deltaTime)
 	SphereObject->Update(deltaTime);
 }
 
-void jPointLightPrimitive::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights)
+void jPointLightPrimitive::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 1 */)
 {
 	__super::Draw(camera, shader, lights);
 	BillboardObject->Draw(camera, shader, lights);
@@ -1764,7 +1812,7 @@ void jSpotLightPrimitive::Update(float deltaTime)
 	PenumbraConeObject->Update(deltaTime);
 }
 
-void jSpotLightPrimitive::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights)
+void jSpotLightPrimitive::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 1 */)
 {
 	__super::Draw(camera, shader, lights);
 	BillboardObject->Draw(camera, shader, lights);
@@ -1775,7 +1823,7 @@ void jSpotLightPrimitive::Draw(const jCamera* camera, const jShader* shader, con
 void jFrustumPrimitive::Update(float deltaTime)
 {
 	const auto& origin = TargetCamera->Pos;
-	const float fovRad = TargetCamera->FOV;
+	const float fovRad = TargetCamera->FOVRad;
 	const float n = TargetCamera->Near;
 	const float f = TargetCamera->Far;
 
@@ -1905,7 +1953,7 @@ void jFrustumPrimitive::Update(float deltaTime)
 		Plane[i]->Update(deltaTime);
 }
 
-void jFrustumPrimitive::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights)
+void jFrustumPrimitive::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 1 */)
 {
 	__super::Draw(camera, shader, lights);
 	for (int32 i = 0; i < 12; ++i)
@@ -1915,3 +1963,108 @@ void jFrustumPrimitive::Draw(const jCamera* camera, const jShader* shader, const
 		Plane[i]->Draw(camera, shader, lights);
 }
 
+void jGraph2D::Update(float deltaTime)
+{
+	UpdateBuffer();
+}
+
+void jGraph2D::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/)
+{
+	UpdateBuffer();
+	SET_UNIFORM_BUFFER_STATIC(Vector2, "InvViewportSize", Vector2(1.0f / SCR_WIDTH, 1.0f / SCR_HEIGHT), shader);
+	SET_UNIFORM_BUFFER_STATIC(Vector4, "LineColor", Vector4::ColorRed, shader);
+	SET_UNIFORM_BUFFER_STATIC(Vector4, "GuardLineColor", Vector4::ColorWhite, shader);
+	__super::Draw(camera, shader, lights, ResultMatrices.size());
+}
+
+void jGraph2D::SethPos(const Vector2& pos)
+{
+	if (Pos != pos)
+	{
+		DirtyFlag = true;
+		Pos = pos;
+	}
+}
+
+void jGraph2D::SetPoints(const std::vector<Vector2>& points)
+{
+	Points = points;
+	DirtyFlag = true;
+}
+
+void jGraph2D::UpdateBuffer()
+{
+	if (DirtyFlag)
+	{
+		DirtyFlag = false;
+
+		ResultPoints.resize(Points.size());
+		for (int32 i = 0; i < ResultPoints.size(); ++i)
+			ResultPoints[i] = Vector2(Points[i].x, -Points[i].y) + Vector2(Pos.x, Pos.y);
+
+		if (ResultPoints.size() > 1)
+		{
+			ResultMatrices.resize(ResultPoints.size() - 1 + 2);
+
+			{
+				Matrix hor;
+				hor.SetIdentity();
+				hor.SetXBasis(Vector4::RightVector);
+				hor.SetYBasis(Vector4::UpVector);
+				hor.SetZBasis(Vector4::FowardVector);
+				hor.SetTranslate(Pos.x, Pos.y, 0.0f);
+				hor = (hor * Matrix::MakeScale(GuardLineSize.x, 1.0f, 1.0f)).GetTranspose();
+				ResultMatrices[0] = (hor);
+
+				Matrix ver;
+				ver.SetIdentity();
+				ver.SetXBasis(Vector4::RightVector);
+				ver.SetYBasis(Vector4::UpVector);
+				ver.SetZBasis(Vector4::FowardVector);
+				ver.SetTranslate(Pos.x, Pos.y, 0.0f);
+				ver = (ver * Matrix::MakeScale(1.0f, -GuardLineSize.y, 1.0f)).GetTranspose();
+				ResultMatrices[1] = (ver);
+			}
+
+			for (int i = 2; i < ResultMatrices.size(); ++i)
+			{
+				const auto& p2 = ResultPoints[i + 1];
+				const auto& p1 = ResultPoints[i];
+				auto right = Vector(p2 - p1, 0.0f);
+				const float lineLength = right.Length();
+				right.SetNormalize();
+				right.z = 0.0f;
+
+				auto up = right.CrossProduct(Vector::FowardVector);
+				up.SetNormalize();
+
+				Matrix& tr = ResultMatrices[i];
+				tr.SetIdentity();
+				tr.SetXBasis(Vector4(right, 0.0f));
+				tr.SetYBasis(Vector4(up, 0.0f));
+				tr.SetZBasis(Vector4::FowardVector);
+				tr.SetTranslate(p1.x, p1.y, 0.0f);
+				tr = (tr * Matrix::MakeScale(lineLength, 1.0f, 1.0f)).GetTranspose();
+			}
+
+			if (RenderObject && RenderObject->VertexStream)
+			{
+				for (auto& iter : RenderObject->VertexStream->Params)
+				{
+					if (iter->Name == "Transform")
+					{
+						auto matStreamParam = static_cast<jStreamParam<Matrix>*>(iter);
+						matStreamParam->Data.resize(ResultMatrices.size());
+						memcpy(&matStreamParam->Data[0], &ResultMatrices[0], ResultMatrices.size() * sizeof(Matrix));
+						break;
+					}
+				}
+				RenderObject->UpdateVertexStream();
+			}
+		}
+		else
+		{
+			ResultMatrices.empty();
+		}
+	}
+}

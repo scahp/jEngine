@@ -184,10 +184,10 @@ void jObject::Update(float deltaTime)
 		PostUpdateFunc(this, deltaTime);
 }
 
-void jObject::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights)
+void jObject::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/)
 {
 	if (Visible && RenderObject)
-		RenderObject->Draw(camera, shader, lights);
+		RenderObject->Draw(camera, shader, lights, 0, -1, instanceCount);
 }
 
 //void jObject::Draw(const jCamera* camera, const jShader* shader)

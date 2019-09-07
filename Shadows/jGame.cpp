@@ -492,6 +492,54 @@ void jGame::SpawnTestPrimitives()
 	SpawnedObjects.push_back(billboard);
 }
 
+void jGame::SpawnGraphTestFunc()
+{
+	Vector PerspectiveVector[90];
+	Vector OrthographicVector[90];
+	{
+		{
+			static jCamera* pCamera = jCamera::CreateCamera(Vector(0.0), Vector(0.0, 0.0, 1.0), Vector(0.0, 1.0, 0.0), DegreeToRadian(90), 10.0, 100.0, 100.0, 100.0, true);
+			pCamera->UpdateCamera();
+			int cnt = 0;
+			auto MV = pCamera->Projection * pCamera->View;
+			for (int i = 0; i < 90; ++i)
+			{
+				PerspectiveVector[cnt++] = MV.Transform(Vector({ 0.0f, 0.0f, 10.0f + static_cast<float>(i) }));
+			}
+
+			for (int i = 0; i < _countof(PerspectiveVector); ++i)
+				PerspectiveVector[i].z = (PerspectiveVector[i].z + 1.0) * 0.5;
+		}
+		{
+			static jCamera* pCamera = jCamera::CreateCamera(Vector(0.0), Vector(0.0, 0.0, 1.0), Vector(0.0, 1.0, 0.0), DegreeToRadian(90), 10.0, 100.0, 100.0, 100.0, false);
+			pCamera->UpdateCamera();
+			int cnt = 0;
+			auto MV = pCamera->Projection * pCamera->View;
+			for (int i = 0; i < 90; ++i)
+			{
+				OrthographicVector[cnt++] = MV.Transform(Vector({ 0.0f, 0.0f, 10.0f + static_cast<float>(i) }));
+			}
+
+			for (int i = 0; i < _countof(OrthographicVector); ++i)
+				OrthographicVector[i].z = (OrthographicVector[i].z + 1.0) * 0.5;
+		}
+	}
+	std::vector<Vector2> graph1;
+	std::vector<Vector2> graph2;
+
+	float scale = 100.0f;
+	for (int i = 0; i < _countof(PerspectiveVector); ++i)
+		graph1.push_back(Vector2(i*2, PerspectiveVector[i].z * scale));
+	for (int i = 0; i < _countof(OrthographicVector); ++i)
+		graph2.push_back(Vector2(i*2, OrthographicVector[i].z* scale));
+
+	auto graphObj1 = jPrimitiveUtil::CreateGraph2D({ 360, 350 }, {360, 300}, graph1);
+	jObject::AddUIDebugObject(graphObj1);
+
+	auto graphObj2 = jPrimitiveUtil::CreateGraph2D({ 360, 700 }, { 360, 300 }, graph2);
+	jObject::AddUIDebugObject(graphObj2);
+}
+
 void jGame::SapwnCubePrimitives()
 {
 	RemoveSpawnedObjects();

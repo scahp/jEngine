@@ -11,6 +11,9 @@ unsigned int GetPrimitiveType(EPrimitiveType type)
 	unsigned int primitiveType = 0;
 	switch (type)
 	{
+	case EPrimitiveType::POINTS:
+		primitiveType = GL_POINTS;
+		break;
 	case EPrimitiveType::LINES:
 		primitiveType = GL_LINES;
 		break;
@@ -286,6 +289,7 @@ jVertexBuffer* jRHI_OpenGL::CreateVertexBuffer(const std::shared_ptr<jVertexStre
 		stream.ElementType = iter->ElementType;
 		stream.Stride = iter->Stride;
 		stream.Offset = 0;
+		stream.InstanceDivisor = iter->InstanceDivisor;
 
 		vertexBuffer->Streams.emplace_back(stream);
 	}
@@ -344,8 +348,26 @@ void jRHI_OpenGL::BindVertexBuffer(const jVertexBuffer* vb, const jShader* shade
 			}
 
 			glBindBuffer(GL_ARRAY_BUFFER, iter.BufferID);
-			glVertexAttribPointer(loc, iter.Count, elementType, iter.Normalized, iter.Stride, reinterpret_cast<const void*>(iter.Offset));
-			glEnableVertexAttribArray(loc);
+
+			if (iter.Count <= 4)
+			{
+				glVertexAttribPointer(loc, iter.Count, elementType, iter.Normalized, iter.Stride, reinterpret_cast<const void*>(iter.Offset));
+				glEnableVertexAttribArray(loc);
+				glVertexAttribDivisor(loc, iter.InstanceDivisor);
+
+			}
+			else
+			{
+				const int cnt = iter.Count / 4;
+				int32 remainSize = iter.Count;
+				const int32 step = sizeof(float) * 4;
+				for (int32 i = 0; i < cnt; ++i, remainSize -= 4)
+				{
+					glVertexAttribPointer(loc + i, Min(4, remainSize), elementType, iter.Normalized, iter.Stride, reinterpret_cast<const void*>(iter.Offset + step * i));
+					glEnableVertexAttribArray(loc + i);
+					glVertexAttribDivisor(loc + i, iter.InstanceDivisor);
+				}
+			}
 		}
 	}
 }
@@ -361,12 +383,17 @@ void jRHI_OpenGL::MapBufferdata(IBuffer* buffer) const
 	throw std::logic_error("The method or operation is not implemented.");
 }
 
-void jRHI_OpenGL::DrawArray(EPrimitiveType type, int vertStartIndex, int vertCount) const
+void jRHI_OpenGL::DrawArrays(EPrimitiveType type, int vertStartIndex, int vertCount) const
 {
 	glDrawArrays(GetPrimitiveType(type), vertStartIndex, vertCount);
 }
 
-void jRHI_OpenGL::DrawElement(EPrimitiveType type, int elementSize, int32 startIndex /*= -1*/, int32 count /*= -1*/) const
+void jRHI_OpenGL::DrawArraysInstanced(EPrimitiveType type, int32 vertStartIndex, int32 vertCount, int32 instanceCount) const
+{
+	glDrawArraysInstanced(GetPrimitiveType(type), vertStartIndex, vertCount, instanceCount);
+}
+
+void jRHI_OpenGL::DrawElements(EPrimitiveType type, int32 elementSize, int32 startIndex, int32 count) const
 {
 	union jOffset
 	{
@@ -376,6 +403,42 @@ void jRHI_OpenGL::DrawElement(EPrimitiveType type, int elementSize, int32 startI
 	u_offset.offset = startIndex * elementSize;
 	const auto elementType = (elementSize == 4) ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;	
 	glDrawElements(GetPrimitiveType(type), count, elementType, u_offset.offset_pointer);
+}
+
+void jRHI_OpenGL::DrawElementsInstanced(EPrimitiveType type, int32 elementSize, int32 startIndex, int32 count, int32 instanceCount) const
+{
+	union jOffset
+	{
+		int64 offset;
+		void* offset_pointer;
+	} u_offset;
+	u_offset.offset = startIndex * elementSize;
+	const auto elementType = (elementSize == 4) ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
+	glDrawElementsInstanced(GetPrimitiveType(type), count, elementType, u_offset.offset_pointer, instanceCount);
+}
+
+void jRHI_OpenGL::DrawElementsBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex) const
+{
+	union jOffset
+	{
+		int64 offset;
+		void* offset_pointer;
+	} u_offset;
+	u_offset.offset = startIndex * elementSize;
+	const auto elementType = (elementSize == 4) ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
+	glDrawElementsBaseVertex(GetPrimitiveType(type), count, elementType, u_offset.offset_pointer, baseVertexIndex);
+}
+
+void jRHI_OpenGL::DrawElementsInstancedBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex, int32 instanceCount) const
+{
+	union jOffset
+	{
+		int64 offset;
+		void* offset_pointer;
+	} u_offset;
+	u_offset.offset = startIndex * elementSize;
+	const auto elementType = (elementSize == 4) ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
+	glDrawElementsInstancedBaseVertex(GetPrimitiveType(type), count, elementType, u_offset.offset_pointer, instanceCount, baseVertexIndex);
 }
 
 void jRHI_OpenGL::DispatchCompute(uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ) const
@@ -394,18 +457,6 @@ void jRHI_OpenGL::EnableDepthBias(bool enable) const
 void jRHI_OpenGL::SetDepthBias(float constant, float slope) const
 {
 	glPolygonOffset(constant, slope);
-}
-
-void jRHI_OpenGL::DrawElementBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex) const
-{
-	union jOffset
-	{
-		int64 offset;
-		void* offset_pointer;
-	} u_offset;
-	u_offset.offset = startIndex * elementSize;
-	const auto elementType = (elementSize == 4) ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
-	glDrawElementsBaseVertex(GetPrimitiveType(type), count, elementType, u_offset.offset_pointer, baseVertexIndex);
 }
 
 void jRHI_OpenGL::EnableSRGB(bool enable) const
@@ -1398,6 +1449,7 @@ void jRHI_OpenGL::UpdateVertexBuffer(jVertexBuffer* vb, const std::shared_ptr<jV
 		stream.BufferType = iter->BufferType;
 		stream.ElementType = iter->ElementType;
 		stream.Stride = iter->Stride;
+		stream.InstanceDivisor = iter->InstanceDivisor;
 		stream.Offset = 0;
 
 		vb_gl->Streams.emplace_back(stream);
