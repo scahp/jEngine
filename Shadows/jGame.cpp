@@ -186,6 +186,48 @@ void jGame::Update(float deltaTime)
 		light->Update(deltaTime);
 	}
 
+	//////////////////////////////////////////////////////////////////////////
+	// Get the 8 points of the view frustum in world space
+	{
+		Vector frustumCornersWS[8] =
+		{
+			Vector(-1.0f,  1.0f, -1.0f),
+			Vector(1.0f,  1.0f, -1.0f),
+			Vector(1.0f, -1.0f, -1.0f),
+			Vector(-1.0f, -1.0f, -1.0f),
+			Vector(-1.0f,  1.0f, 1.0f),
+			Vector(1.0f,  1.0f, 1.0f),
+			Vector(1.0f, -1.0f, 1.0f),
+			Vector(-1.0f, -1.0f, 1.0f),
+		};
+
+		Vector frustumCenter(0.0f);
+		Matrix invViewProj = (MainCamera->Projection * MainCamera->View).GetInverse();
+		for (uint32 i = 0; i < 8; ++i)
+		{
+			frustumCornersWS[i] = invViewProj.Transform(frustumCornersWS[i]);
+			frustumCenter = frustumCenter + frustumCornersWS[i];
+		}
+		frustumCenter = frustumCenter * (1.0f / 8.0f);
+
+		auto upDir = Vector::UpVector;
+
+		float width = SM_WIDTH;
+		float height = SM_HEIGHT;
+		float nearDist = 10.0f;
+		float farDist = 1000.0f;
+
+		// Get position of the shadow camera
+		Vector shadowCameraPos = frustumCenter + DirectionalLight->Data.Direction * -(farDist - nearDist) / 2.0f;
+	
+		auto shadowCamera = jOrthographicCamera::CreateCamera(shadowCameraPos, frustumCenter, shadowCameraPos + upDir
+			, -width / 2.0f, -height / 2.0f, width / 2.0f, height / 2.0f, farDist, nearDist);
+		shadowCamera->UpdateCamera();
+		DirectionalLight->GetLightCamra()->Projection = shadowCamera->Projection;
+		DirectionalLight->GetLightCamra()->View = shadowCamera->View;
+	}
+	//////////////////////////////////////////////////////////////////////////
+
 	for (auto iter : jObject::GetStaticObject())
 		iter->Update(deltaTime);
 

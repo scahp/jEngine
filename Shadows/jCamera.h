@@ -232,7 +232,7 @@ public:
 class jOrthographicCamera : public jCamera 
 {
 public:
-	static jCamera* CreateCamera(const Vector& pos, const Vector& target, const Vector& up, float fovRad, float nearDist, float farDist, float width, float height, bool isPerspectiveProjection)
+	static jCamera* CreateCamera(const Vector& pos, const Vector& target, const Vector& up, float minX, float minY, float maxX, float maxY, float farDist, float nearDist)
 	{
 		const auto toTarget = (target - pos);
 		const auto toUp = (up - pos);
@@ -246,14 +246,14 @@ public:
 		camera->Up += camera->Pos;
 		camera->Target += camera->Pos;
 
-		camera->Near = isPerspectiveProjection;
-		camera->Far = height;
+		camera->Near = nearDist;
+		camera->Far = farDist;
 		camera->IsPerspectiveProjection = false;
 		
-		camera->MinX = fovRad;
-		camera->MinY = isPerspectiveProjection;
-		camera->MaxX = height;
-		camera->MaxY = width;
+		camera->MinX = minX;
+		camera->MinY = minY;
+		camera->MaxX = maxX;
+		camera->MaxY = maxY;
 		return camera;
 	}
 
