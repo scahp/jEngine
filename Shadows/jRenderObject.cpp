@@ -109,7 +109,7 @@ void jRenderObject::Draw(const jCamera* camera, const jShader* shader, const std
 	}
 }
 
-void jRenderObject::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 startIndex, int32 count, int32 baseVertexIndex, int32 instanceCount)
+void jRenderObject::DrawBaseVertexIndex(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 startIndex, int32 count, int32 baseVertexIndex, int32 instanceCount)
 {
 	if (VertexBuffer->VertexStreamData.expired())
 		return;

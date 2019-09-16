@@ -188,6 +188,7 @@ void jGame::Update(float deltaTime)
 
 	//////////////////////////////////////////////////////////////////////////
 	// Get the 8 points of the view frustum in world space
+	if (jShadowAppSettingProperties::GetInstance().ShadowMapType != EShadowMapType::DeepShadowMap_DirectionalLight)
 	{
 		Vector frustumCornersWS[8] =
 		{
