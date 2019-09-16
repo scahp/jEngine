@@ -1,7 +1,7 @@
 # Shadows
 Implementation of Shadows
 
-A. ShadowVolume
+A. ShadowVolume(CPU and GPU) <br/>
 B. ShadowMap
   1. SSM
   2. PCF
