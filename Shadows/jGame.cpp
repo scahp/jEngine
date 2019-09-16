@@ -248,8 +248,12 @@ void jGame::Update(float deltaTime)
 
 void jGame::UpdateAppSetting()
 {
+	auto& appSetting =  jShadowAppSettingProperties::GetInstance();
+
+	appSetting.SpotLightDirection = Matrix::MakeRotateY(0.01).Transform(appSetting.SpotLightDirection);
+
 	bool changedDirectionalLight = false;
-	if (jShadowAppSettingProperties::GetInstance().ShadowMapType == EShadowMapType::CSM_SSM)
+	if (appSetting.ShadowMapType == EShadowMapType::CSM_SSM)
 	{
 		if (DirectionalLight != CascadeDirectionalLight)
 		{
@@ -278,17 +282,17 @@ void jGame::UpdateAppSetting()
 		DirectionalLightShadowMapUIDebug->Size.y = DirectionalLightShadowMapUIDebug->Size.x * aspect;
 	}
 
-	const bool isChangedShadowType = CurrentShadowType != jShadowAppSettingProperties::GetInstance().ShadowType;
-	const bool isChangedShadowMapType = (CurrentShadowMapType != jShadowAppSettingProperties::GetInstance().ShadowMapType);
-	if (jShadowAppSettingProperties::GetInstance().ShadowType == EShadowType::ShadowMap)
+	const bool isChangedShadowType = CurrentShadowType != appSetting.ShadowType;
+	const bool isChangedShadowMapType = (CurrentShadowMapType != appSetting.ShadowMapType);
+	if (appSetting.ShadowType == EShadowType::ShadowMap)
 	{
-		if (jShadowAppSettingProperties::GetInstance().ShadowMapType == EShadowMapType::DeepShadowMap_DirectionalLight)
+		if (appSetting.ShadowMapType == EShadowMapType::DeepShadowMap_DirectionalLight)
 		{
 			//if (DirectionalLight && DirectionalLight->ShadowMapData && DirectionalLight->ShadowMapData->ShadowMapCamera)
 			//	DirectionalLight->ShadowMapData->ShadowMapCamera->IsPerspectiveProjection = true;
 			Renderer = DeferredRenderer;
-			jShadowAppSettingProperties::GetInstance().ShowPointLightInfo = false;
-			jShadowAppSettingProperties::GetInstance().ShowSpotLightInfo = false;
+			appSetting.ShowPointLightInfo = false;
+			appSetting.ShowSpotLightInfo = false;
 
 			SpawnObjects(ESpawnedType::Hair);
 		}
@@ -298,33 +302,33 @@ void jGame::UpdateAppSetting()
 			//	DirectionalLight->ShadowMapData->ShadowMapCamera->IsPerspectiveProjection = false;
 			Renderer = ForwardRenderer;
 
-			const bool isChangedPoisson = (UsePoissonSample != jShadowAppSettingProperties::GetInstance().UsePoissonSample);
+			const bool isChangedPoisson = (UsePoissonSample != appSetting.UsePoissonSample);
 			if (isChangedShadowType || isChangedPoisson || isChangedShadowMapType)
 			{
-				CurrentShadowType = jShadowAppSettingProperties::GetInstance().ShadowType;
-				UsePoissonSample = jShadowAppSettingProperties::GetInstance().UsePoissonSample;
-				CurrentShadowMapType = jShadowAppSettingProperties::GetInstance().ShadowMapType;
+				CurrentShadowType = appSetting.ShadowType;
+				UsePoissonSample = appSetting.UsePoissonSample;
+				CurrentShadowMapType = appSetting.ShadowMapType;
 				auto newPipelineSet = UsePoissonSample ? ShadowPoissonSamplePipelineSetMap[CurrentShadowMapType] : ShadowPipelineSetMap[CurrentShadowMapType];
 				Renderer->SetChangePipelineSet(newPipelineSet);
 			}
 
-			if (jShadowAppSettingProperties::GetInstance().ShadowMapType == EShadowMapType::CSM_SSM)
+			if (appSetting.ShadowMapType == EShadowMapType::CSM_SSM)
 				SpawnObjects(ESpawnedType::CubePrimitive);
 			else
 				SpawnObjects(ESpawnedType::TestPrimitive);
 		}
 		MainCamera->IsInfinityFar = false;
 	}
-	else if (jShadowAppSettingProperties::GetInstance().ShadowType == EShadowType::ShadowVolume)
+	else if (appSetting.ShadowType == EShadowType::ShadowVolume)
 	{
 		Renderer = ForwardRenderer;
 		if (DirectionalLight && DirectionalLight->ShadowMapData && DirectionalLight->ShadowMapData->ShadowMapCamera)
 			DirectionalLight->ShadowMapData->ShadowMapCamera->IsPerspectiveProjection = false;
 
-		const bool isChangedShadowType = CurrentShadowType != jShadowAppSettingProperties::GetInstance().ShadowType;
+		const bool isChangedShadowType = CurrentShadowType != appSetting.ShadowType;
 		if (isChangedShadowType)
 		{
-			CurrentShadowType = jShadowAppSettingProperties::GetInstance().ShadowType;
+			CurrentShadowType = appSetting.ShadowType;
 			Renderer->SetChangePipelineSet(ShadowVolumePipelineSet);
 		}
 
@@ -333,73 +337,82 @@ void jGame::UpdateAppSetting()
 	}
 
 	if (isChangedShadowType)
-		jShadowAppSettingProperties::GetInstance().SwitchShadowType(jAppSettings::GetInstance().Get("MainPannel"));
+		appSetting.SwitchShadowType(jAppSettings::GetInstance().Get("MainPannel"));
 	if (isChangedShadowMapType)
-		jShadowAppSettingProperties::GetInstance().SwitchShadowMapType(jAppSettings::GetInstance().Get("MainPannel"));
+		appSetting.SwitchShadowMapType(jAppSettings::GetInstance().Get("MainPannel"));
 
-	static auto s_showDirectionalLightInfo = jShadowAppSettingProperties::GetInstance().ShowDirectionalLightInfo;
-	static auto s_showPointLightInfo = jShadowAppSettingProperties::GetInstance().ShowPointLightInfo;
-	static auto s_showSpotLightInfo = jShadowAppSettingProperties::GetInstance().ShowSpotLightInfo;
+	static auto s_showDirectionalLightInfo = appSetting.ShowDirectionalLightInfo;
+	static auto s_showPointLightInfo = appSetting.ShowPointLightInfo;
+	static auto s_showSpotLightInfo = appSetting.ShowSpotLightInfo;
 
-	if (s_showDirectionalLightInfo != jShadowAppSettingProperties::GetInstance().ShowDirectionalLightInfo)
+	static auto s_showDirectionalLightOn = appSetting.DirectionalLightOn;
+	static auto s_showPointLightOn = appSetting.PointLightOn;
+	static auto s_showSpotLightOn = appSetting.SpotLightOn;
+
+	const auto compareFunc = [](bool& LHS, const bool& RHS, auto func)
 	{
-		s_showDirectionalLightInfo = jShadowAppSettingProperties::GetInstance().ShowDirectionalLightInfo;
-
-		if (s_showDirectionalLightInfo)
+		if (LHS != RHS)
 		{
-			MainCamera->AddLight(DirectionalLight);
+			LHS = RHS;
+			func(LHS);
+		}
+	};
+
+	compareFunc(s_showDirectionalLightInfo, appSetting.ShowDirectionalLightInfo, [this](const auto& param) {
+		if (param)
 			jObject::AddDebugObject(DirectionalLightInfo);
-		}
 		else
-		{
-			MainCamera->RemoveLight(DirectionalLight);
 			jObject::RemoveDebugObject(DirectionalLightInfo);
-		}
-	}
+	});
 
-	if (s_showPointLightInfo != jShadowAppSettingProperties::GetInstance().ShowPointLightInfo)
-	{
-		s_showPointLightInfo = jShadowAppSettingProperties::GetInstance().ShowPointLightInfo;
-		if (s_showPointLightInfo)
-		{
-			MainCamera->AddLight(PointLight);
+	compareFunc(s_showDirectionalLightOn, appSetting.DirectionalLightOn, [this](const auto& param) {
+		if (param)
+			MainCamera->AddLight(DirectionalLight);
+		else
+			MainCamera->RemoveLight(DirectionalLight);
+	});
+
+	compareFunc(s_showPointLightInfo, appSetting.ShowPointLightInfo, [this](const auto& param) {
+		if (param)
 			jObject::AddDebugObject(PointLightInfo);
-		}
 		else
-		{
-			MainCamera->RemoveLight(PointLight);
 			jObject::RemoveDebugObject(PointLightInfo);
-		}
-	}
+	});
 
-	if (s_showSpotLightInfo != jShadowAppSettingProperties::GetInstance().ShowSpotLightInfo)
-	{
-		s_showSpotLightInfo = jShadowAppSettingProperties::GetInstance().ShowSpotLightInfo;
-		if (s_showSpotLightInfo)
-		{
-			MainCamera->AddLight(SpotLight);
-			jObject::AddDebugObject(SpotLightInfo);
-		}
+	compareFunc(s_showPointLightOn, appSetting.PointLightOn, [this](const auto& param) {
+		if (param)
+			MainCamera->AddLight(PointLight);
 		else
-		{
-			MainCamera->RemoveLight(SpotLight);
-			jObject::RemoveDebugObject(SpotLightInfo);
-		}
-	}
+			MainCamera->RemoveLight(PointLight);
+	});
 
+	compareFunc(s_showSpotLightInfo, appSetting.ShowSpotLightInfo, [this](const auto& param) {
+		if (param)
+			jObject::AddDebugObject(SpotLightInfo);
+		else
+			jObject::RemoveDebugObject(SpotLightInfo);
+	});
+
+	compareFunc(s_showSpotLightOn, appSetting.SpotLightOn, [this](const auto& param) {
+		if (param)
+			MainCamera->AddLight(SpotLight);
+		else
+			MainCamera->RemoveLight(SpotLight);
+	});
+	
 	// todo debug test, should remove this
 	if (DirectionalLight)
-		DirectionalLight->Data.Direction = jShadowAppSettingProperties::GetInstance().DirecionalLightDirection;
+		DirectionalLight->Data.Direction = appSetting.DirecionalLightDirection;
 	if (PointLight)
-		PointLight->Data.Position = jShadowAppSettingProperties::GetInstance().PointLightPosition;
+		PointLight->Data.Position = appSetting.PointLightPosition;
 	if (SpotLight)
 	{
-		SpotLight->Data.Direction = jShadowAppSettingProperties::GetInstance().SpotLightDirection;
-		SpotLight->Data.Position = jShadowAppSettingProperties::GetInstance().SpotLightPosition;
+		SpotLight->Data.Direction = appSetting.SpotLightDirection;
+		SpotLight->Data.Position = appSetting.SpotLightPosition;
 	}
 
 	if (DirectionalLightShadowMapUIDebug)
-		DirectionalLightShadowMapUIDebug->Visible = jShadowAppSettingProperties::GetInstance().ShowDirectionalLightMap;
+		DirectionalLightShadowMapUIDebug->Visible = appSetting.ShowDirectionalLightMap;
 }
 
 void jGame::OnMouseMove(int32 xOffset, int32 yOffset)

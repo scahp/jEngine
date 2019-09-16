@@ -23,9 +23,12 @@ public:
 	bool ShowDirectionalLightMap = false;
 	bool UseTonemap = true;
 	float AutoExposureKeyValue = 0.5f;
+	bool DirectionalLightOn = true;
+	bool PointLightOn = true;
+	bool SpotLightOn = true;
 	bool ShowDirectionalLightInfo = true;
-	bool ShowPointLightInfo = true;
-	bool ShowSpotLightInfo = true;
+	bool ShowPointLightInfo = false;
+	bool ShowSpotLightInfo = false;
 	bool ShowBoundBox = false;
 	bool ShowBoundSphere = false;
 	Vector DirecionalLightDirection = Vector(-0.56f, -0.83f, 0.01f).GetNormalize();

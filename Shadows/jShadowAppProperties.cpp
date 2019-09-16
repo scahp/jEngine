@@ -36,18 +36,29 @@ void jShadowAppSettingProperties::Setup(jAppSettingBase* appSetting)
 
 	//////////////////////////////////////////////////////////////////////////
 	// LightInfo Group
+	appSetting->AddVariable("DirectionalLightOn", DirectionalLightOn);
+	appSetting->SetGroup("DirectionalLightOn", "LightInfo");
+	appSetting->SetLabel("DirectionalLightOn", "DirectionalLightOn");
+
+	appSetting->AddVariable("PointLightOn", PointLightOn);
+	appSetting->SetGroup("PointLightOn", "LightInfo");
+	appSetting->SetLabel("PointLightOn", "PointLightOn");
+
+	appSetting->AddVariable("SpotLightOn", SpotLightOn);
+	appSetting->SetGroup("SpotLightOn", "LightInfo");
+	appSetting->SetLabel("SpotLightOn", "SpotLightOn");
+
 	appSetting->AddVariable("DirectionalLight_Info", ShowDirectionalLightInfo);
 	appSetting->SetGroup("DirectionalLight_Info", "LightInfo");
-	appSetting->SetLabel("DirectionalLight_Info", "DirectionalLight");
+	appSetting->SetLabel("DirectionalLight_Info", "DirectionalLightInfo");
 
 	appSetting->AddVariable("PointLight_Info", ShowPointLightInfo);
 	appSetting->SetGroup("PointLight_Info", "LightInfo");
-	appSetting->SetLabel("PointLight_Info", "PointLight");
+	appSetting->SetLabel("PointLight_Info", "PointLightInfo");
 
 	appSetting->AddVariable("SpotLight_Info", ShowSpotLightInfo);
 	appSetting->SetGroup("SpotLight_Info", "LightInfo");
-	appSetting->SetLabel("SpotLight_Info", "SpotLight");
-
+	appSetting->SetLabel("SpotLight_Info", "SpotLightInfo");
 	//////////////////////////////////////////////////////////////////////////
 	// Light Setting
 	appSetting->AddDirectionVariable("DirecionalLight_Direction", DirecionalLightDirection);
