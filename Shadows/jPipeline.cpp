@@ -858,7 +858,6 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineContext& pipelineContext)
 		g_rhi->EnableBlend(true);
 		g_rhi->SetBlendFunc(EBlendSrc::SRC_ALPHA, EBlendDest::ONE_MINUS_SRC_ALPHA);
 
-		camera->BindCamera(shadowVolumeShader);
 		for (auto& light : camera->LightList)
 		{
 			bool isOmniDirectional = false;
@@ -894,6 +893,8 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineContext& pipelineContext)
 			if (skip)
 				continue;
 
+			g_rhi->SetShader(shadowVolumeShader);
+			camera->BindCamera(shadowVolumeShader);
 			jLight::BindLights({ light }, shadowVolumeShader);
 
 			const auto& staticObjects = jObject::GetStaticObject();
