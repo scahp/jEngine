@@ -53,6 +53,12 @@ struct Vector
 		return *this;
 	}
 
+	FORCEINLINE Vector& operator*=(float fValue)
+	{
+		x *= fValue, y *= fValue, z *= fValue;
+		return *this;
+	}
+
 	FORCEINLINE Vector operator+(float fValue) const
 	{
 		return Vector(x + fValue, y + fValue, z + fValue);

@@ -115,7 +115,7 @@ int GetCascadeIndex(float viewSpaceZ)
 	return -1;
 }
 
-#define CSM_BIAS 0.01
+#define CSM_BIAS 0.003
 
 bool IsInRange01(vec3 pos)
 {
@@ -251,7 +251,7 @@ void main()
 				vec4 lightClipSpacePos[NUM_CASCADES];
 
 				int index = -1;
-				for (int i = index; i < NUM_CASCADES; ++i)
+				for (int i = 0; i < NUM_CASCADES; ++i)
 				{
 					lightClipSpacePos[i] = (LightSpacePos[i] / LightSpacePos[i].w) * 0.5 + vec4(0.5);
 					if (IsInRange01(lightClipSpacePos[i].xyz) && (-PosV_.z <= CascadeEndsW[i])

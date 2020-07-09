@@ -11,6 +11,7 @@
 #include "jShadowAppProperties.h"
 #include "jRHI.h"
 #include "jVertexAdjacency.h"
+#include "jPrimitiveUtil.h"
 
 const std::list<jObject*> jPipelineContext::emptyObjectList;
 //const std::list<const jLight*> jPipelineContext::emptyLightList;
@@ -345,13 +346,13 @@ void jForward_ShadowMapGen_CSM_SSM_Pipeline::Do(const jPipelineContext& pipeline
 			Vector frustumCornersWS[8] =
 			{
 				Vector(-1.0f,  1.0f, -1.0f),
-				Vector(1.0f,  1.0f, -1.0f),
-				Vector(1.0f, -1.0f, -1.0f),
+				Vector( 1.0f,  1.0f, -1.0f),
+				Vector( 1.0f, -1.0f, -1.0f),
 				Vector(-1.0f, -1.0f, -1.0f),
-				Vector(-1.0f,  1.0f, 1.0f),
-				Vector(1.0f,  1.0f, 1.0f),
-				Vector(1.0f, -1.0f, 1.0f),
-				Vector(-1.0f, -1.0f, 1.0f),
+				Vector(-1.0f,  1.0f,  1.0f),
+				Vector( 1.0f,  1.0f,  1.0f),
+				Vector( 1.0f, -1.0f,  1.0f),
+				Vector(-1.0f, -1.0f,  1.0f),
 			};
 
 			Matrix invViewProj = (camera->Projection * camera->View).GetInverse();
@@ -366,42 +367,54 @@ void jForward_ShadowMapGen_CSM_SSM_Pipeline::Do(const jPipelineContext& pipeline
 				Vector farCornerRay = cornerRay * cascadeEnds[k + 1];
 				frustumCornersWS[i + 4] = frustumCornersWS[i] + farCornerRay;
 				frustumCornersWS[i] = frustumCornersWS[i] + nearCornerRay;
-			}
+			}			
 
 			// Calculate the centroid of the view frustum slice
 			Vector frustumCenter(0.0f);
 			for (uint32 i = 0; i < 8; ++i)
-				frustumCenter = frustumCenter + frustumCornersWS[i];
-			frustumCenter = frustumCenter * (1.0f / 8.0f);
-
+				frustumCenter += frustumCornersWS[i];
+			frustumCenter *= (1.0f / 8.0f);
 
 			auto upDir = Vector::UpVector;
 
 			// Create a temporary view matrix for the light
 			Vector lightCameraPos = frustumCenter;
-			Vector lookAt = frustumCenter + directionalLight->Data.Direction;
+			Vector lookAt = lightCameraPos + directionalLight->Data.Direction.GetNormalize();
 			Matrix lightView = jCameraUtil::CreateViewMatrix(lightCameraPos, lookAt, lightCameraPos + upDir);
 
 			// Calculate an AABB around the frustum corners
 			Vector mins(FLT_MAX);
 			Vector maxes(-FLT_MAX);
+			//for (uint32 i = 0; i < 8; ++i)
+			//{
+			//	Vector corner = lightView.Transform(frustumCornersWS[i]);
+			//	mins.x = std::min(mins.x, corner.x);
+			//	mins.y = std::min(mins.y, corner.y);
+			//	mins.z = std::min(mins.z, corner.z);
+			//	maxes.x = std::max(maxes.x, corner.x);
+			//	maxes.y = std::max(maxes.y, corner.y);
+			//	maxes.z = std::max(maxes.z, corner.z);
+			//}
+
+			float sphereRadius = 0.0f;
 			for (uint32 i = 0; i < 8; ++i)
 			{
-				Vector corner = lightView.Transform(frustumCornersWS[i]);
-				mins.x = std::min(mins.x, corner.x);
-				mins.y = std::min(mins.y, corner.y);
-				mins.z = std::min(mins.z, corner.z);
-				maxes.x = std::max(maxes.x, corner.x);
-				maxes.y = std::max(maxes.y, corner.y);
-				maxes.z = std::max(maxes.z, corner.z);
+				float dist = (frustumCornersWS[i] - frustumCenter).Length();
+				sphereRadius = std::max(sphereRadius, dist);
 			}
+
+			sphereRadius = std::ceil(sphereRadius * 16.0f) / 16.0f;
+
+			maxes = Vector(sphereRadius, sphereRadius, sphereRadius);
+			mins = -maxes;
 
 			Vector cascadeExtents = maxes - mins;
 
 			// Get position of the shadow camera
-			Vector shadowCameraPos = frustumCenter + directionalLight->Data.Direction * mins.z;
+			Vector shadowCameraPos = frustumCenter + directionalLight->Data.Direction.GetNormalize() * mins.z;
 
-			auto shadowCamera = jOrthographicCamera::CreateCamera(shadowCameraPos, frustumCenter, shadowCameraPos + upDir, mins.x, mins.y, maxes.x, maxes.y, cascadeExtents.z, 0.0f);
+			auto shadowCamera = jOrthographicCamera::CreateCamera(shadowCameraPos, frustumCenter, shadowCameraPos + upDir
+				, mins.x, mins.y, maxes.x, maxes.y, cascadeExtents.z, 1.0f);
 			shadowCamera->UpdateCamera();
 
 			shadowMapData->CascadeLightVP[k] = shadowCamera->Projection * shadowCamera->View;
