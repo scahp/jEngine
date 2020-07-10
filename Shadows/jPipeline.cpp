@@ -385,16 +385,6 @@ void jForward_ShadowMapGen_CSM_SSM_Pipeline::Do(const jPipelineContext& pipeline
 			// Calculate an AABB around the frustum corners
 			Vector mins(FLT_MAX);
 			Vector maxes(-FLT_MAX);
-			//for (uint32 i = 0; i < 8; ++i)
-			//{
-			//	Vector corner = lightView.Transform(frustumCornersWS[i]);
-			//	mins.x = std::min(mins.x, corner.x);
-			//	mins.y = std::min(mins.y, corner.y);
-			//	mins.z = std::min(mins.z, corner.z);
-			//	maxes.x = std::max(maxes.x, corner.x);
-			//	maxes.y = std::max(maxes.y, corner.y);
-			//	maxes.z = std::max(maxes.z, corner.z);
-			//}
 
 			float sphereRadius = 0.0f;
 			for (uint32 i = 0; i < 8; ++i)
@@ -411,7 +401,7 @@ void jForward_ShadowMapGen_CSM_SSM_Pipeline::Do(const jPipelineContext& pipeline
 			Vector cascadeExtents = maxes - mins;
 
 			// Get position of the shadow camera
-			Vector shadowCameraPos = frustumCenter + directionalLight->Data.Direction.GetNormalize() * mins.z;
+			Vector shadowCameraPos = frustumCenter - directionalLight->Data.Direction.GetNormalize() * fabs(mins.z);
 
 			auto shadowCamera = jOrthographicCamera::CreateCamera(shadowCameraPos, frustumCenter, shadowCameraPos + upDir
 				, mins.x, mins.y, maxes.x, maxes.y, cascadeExtents.z, 1.0f);
