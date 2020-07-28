@@ -100,7 +100,7 @@ struct jIndexStreamData : public std::enable_shared_from_this<jIndexStreamData>
 		Param = nullptr;
 	}
 
-	IStreamParam* Param;
+	IStreamParam* Param = nullptr;
 	int32 ElementCount = 0;
 };
 
