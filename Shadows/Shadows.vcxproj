@@ -212,6 +212,7 @@
     <ClInclude Include="Math\Vector.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="lodepng.h" />
+    <ClInclude Include="stb_image.h" />
     <ClInclude Include="TGALoader.h" />
   </ItemGroup>
   <ItemGroup>

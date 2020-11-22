@@ -250,7 +250,7 @@ void jGame::UpdateAppSetting()
 {
 	auto& appSetting =  jShadowAppSettingProperties::GetInstance();
 
-	appSetting.SpotLightDirection = Matrix::MakeRotateY(0.01).Transform(appSetting.SpotLightDirection);
+	appSetting.SpotLightDirection = Matrix::MakeRotateY(0.01f).Transform(appSetting.SpotLightDirection);
 
 	bool changedDirectionalLight = false;
 	if (appSetting.ShadowMapType == EShadowMapType::CSM_SSM)
@@ -564,7 +564,7 @@ void jGame::SpawnGraphTestFunc()
 			}
 
 			for (int i = 0; i < _countof(PerspectiveVector); ++i)
-				PerspectiveVector[i].z = (PerspectiveVector[i].z + 1.0) * 0.5;
+				PerspectiveVector[i].z = (PerspectiveVector[i].z + 1.0f) * 0.5f;
 		}
 		{
 			static jCamera* pCamera = jCamera::CreateCamera(Vector(0.0), Vector(0.0, 0.0, 1.0), Vector(0.0, 1.0, 0.0), DegreeToRadian(90), 10.0, 100.0, 100.0, 100.0, false);
@@ -577,7 +577,7 @@ void jGame::SpawnGraphTestFunc()
 			}
 
 			for (int i = 0; i < _countof(OrthographicVector); ++i)
-				OrthographicVector[i].z = (OrthographicVector[i].z + 1.0) * 0.5;
+				OrthographicVector[i].z = (OrthographicVector[i].z + 1.0f) * 0.5f;
 		}
 	}
 	std::vector<Vector2> graph1;
@@ -585,9 +585,9 @@ void jGame::SpawnGraphTestFunc()
 
 	float scale = 100.0f;
 	for (int i = 0; i < _countof(PerspectiveVector); ++i)
-		graph1.push_back(Vector2(i*2, PerspectiveVector[i].z * scale));
+		graph1.push_back(Vector2(static_cast<float>(i*2), PerspectiveVector[i].z * scale));
 	for (int i = 0; i < _countof(OrthographicVector); ++i)
-		graph2.push_back(Vector2(i*2, OrthographicVector[i].z* scale));
+		graph2.push_back(Vector2(static_cast<float>(i*2), OrthographicVector[i].z* scale));
 
 	auto graphObj1 = jPrimitiveUtil::CreateGraph2D({ 360, 350 }, {360, 300}, graph1);
 	jObject::AddUIDebugObject(graphObj1);

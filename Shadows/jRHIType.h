@@ -140,12 +140,15 @@ enum class ETextureFormat
 	RGBA16F,
 	RGBA32F,
 	R11G11B10F,
+	RGB16F,
+	RGB32F,
 	DEPTH,
 };
 
 enum class EFormatType
 {
 	BYTE = 0,
+	UNSIGNED_BYTE,
 	INT,
 	FLOAT,
 };
