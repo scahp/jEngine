@@ -49,7 +49,7 @@ L. Signed Distance Field : branch link https://github.com/scahp/Shadows/tree/SDF
 <img src="https://user-images.githubusercontent.com/6734453/121388087-221c1b00-c986-11eb-867d-6aaefc3805e0.gif" width="90%"></img>
 
 M. Light Indexed Deferred Rendering : branch link https://github.com/scahp/Shadows/tree/LightIndexedDeferredRendering
-<img src="https://user-images.githubusercontent.com/6734453/121388410-6efff180-c986-11eb-8b7d-71a39896a8b3.gif" width="90%"></img>
+<img src="https://user-images.githubusercontent.com/6734453/121388410-6efff180-c986-11eb-8b7d-71a39896a8b3.gif" width="70%"></img>
 
 N. Hi-Z Occlusion culling : branch link https://github.com/scahp/Shadows/tree/HiZOcclusion
 <img src="https://user-images.githubusercontent.com/6734453/121389057-fb121900-c986-11eb-9fcb-0c713cbbf567.png" width="90%"></img>
