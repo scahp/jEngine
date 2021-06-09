@@ -14,7 +14,7 @@ B. ShadowMap : branch master
   9. Dual Parabolid : branch link https://github.com/scahp/Shadows/tree/DualParaboloidShadowMap (Blog https://scahp.tistory.com/7)
   10. PSM : branch link https://github.com/scahp/Shadows/tree/PSM (Blog https://scahp.tistory.com/44)
 <img src="https://user-images.githubusercontent.com/6734453/64974161-3f25d600-d8e7-11e9-8a87-fbb5655da514.png" width="90%"></img>
-<img src="https://user-images.githubusercontent.com/6734453/64978132-c8410b00-d8ef-11e9-81cd-ba1051e2bced.png" width="90%"></img>
+<img src="https://user-images.githubusercontent.com/6734453/121397610-74156e80-c98f-11eb-975d-03f8327c9c20.png" width="90%"></img>
 <img src="https://user-images.githubusercontent.com/6734453/121390069-fa2db700-c987-11eb-9d9e-5a1eb458406a.gif" width="70%"></img>
 
 C. SubsurfaceScattering (SSS Skin Rendering) : branch link https://github.com/scahp/Shadows/tree/Skin https://youtu.be/cWpoWrE-62A
