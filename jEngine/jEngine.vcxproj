@@ -211,6 +211,7 @@
     <ClInclude Include="Code\jRHI.h" />
     <ClInclude Include="Code\jRHIType.h" />
     <ClInclude Include="Code\jRHI_DirectX11.h" />
+    <ClInclude Include="Code\jRHI_DirectX12.h" />
     <ClInclude Include="Code\jRHI_OpenGL.h" />
     <ClInclude Include="Code\jRHI_Vulkan.h" />
     <ClInclude Include="Code\jSamplerStatePool.h" />
@@ -234,7 +235,6 @@
     <ClInclude Include="DeprecatedCode\jShadowVolume.h" />
     <ClInclude Include="DeprecatedCode\jShadowVolumeTypes.h" />
     <ClInclude Include="DeprecatedCode\jVertexAdjacency.h" />
-    <ClInclude Include="jRHI_DirectX12.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Code\External\glad.c">
@@ -273,6 +273,7 @@
     <ClCompile Include="Code\jRenderTargetPool.cpp" />
     <ClCompile Include="Code\jRHI.cpp" />
     <ClCompile Include="Code\jRHI_DirectX11.cpp" />
+    <ClCompile Include="Code\jRHI_DirectX12.cpp" />
     <ClCompile Include="Code\jRHI_OpenGL.cpp" />
     <ClCompile Include="Code\jRHI_Vulkan.cpp" />
     <ClCompile Include="Code\jSamplerStatePool.cpp" />
@@ -338,7 +339,6 @@
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">pch.h</PrecompiledHeaderFile>
     </ClCompile>
-    <ClCompile Include="jRHI_DirectX12.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Shaders\color_only_fs.glsl" />
@@ -367,6 +367,8 @@
     <None Include="Shaders\fullscreen\fs_scale.glsl" />
     <None Include="Shaders\fullscreen\fs_tonemap.glsl" />
     <None Include="Shaders\fullscreen\vs_fullscreen_common.glsl" />
+    <None Include="Shaders\HLSL\Color.ps" />
+    <None Include="Shaders\HLSL\Color.vs" />
     <None Include="Shaders\NewShaders\copy_fs.glsl" />
     <None Include="Shaders\NewShaders\copy_vs.glsl" />
     <None Include="Shaders\NewShaders\depthcopy_fs.glsl" />
@@ -437,6 +439,11 @@
     <None Include="Shaders\vs_red.glsl" />
     <None Include="Shaders\vs_shadowMap.glsl" />
     <None Include="Shaders\vs_test.glsl" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Shaders\HLSL\shaders.hlsl">
+      <FileType>Document</FileType>
+    </None>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

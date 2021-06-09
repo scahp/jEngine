@@ -47,158 +47,12 @@ struct MatrixBufferType
 
 bool InitializeBuffers(ID3D11Device* InDevice)
 {
-	int VertexCount = 3;
-	int IndexCount = 3;
-
-	VertexType* Vertices = new VertexType[VertexCount];
-	if (!Vertices)
-		return false;
-
-	unsigned long* Indices = new unsigned long[IndexCount];
-	if (!Indices)
-	{
-		delete []Vertices;
-		return false;
-	}
-
-	// 정점 배열에 데이터를 설정합니다.
-	Vertices[0].Position = XMFLOAT3(-1.0f, -1.0f, 0.0f);  // Bottom left.
-	Vertices[0].Color = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
-
-	Vertices[1].Position = XMFLOAT3(0.0f, 1.0f, 0.0f);  // Top middle.
-	Vertices[1].Color = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
-
-	Vertices[2].Position = XMFLOAT3(1.0f, -1.0f, 0.0f);  // Bottom right.
-	Vertices[2].Color = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
-
-	Indices[0] = 0;
-	Indices[1] = 1;
-	Indices[2] = 2;
-
-	D3D11_BUFFER_DESC VertexBufferDesc;
-	VertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-	VertexBufferDesc.ByteWidth = sizeof(VertexType) * VertexCount;
-	VertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-	VertexBufferDesc.CPUAccessFlags = 0;
-	VertexBufferDesc.MiscFlags = 0;
-	VertexBufferDesc.StructureByteStride = 0;
-
-	// Subresource 구조에 정점 데이터에 대한 포인터 제공
-	D3D11_SUBRESOURCE_DATA VertexData;
-	VertexData.pSysMem = Vertices;
-	VertexData.SysMemPitch = 0;
-	VertexData.SysMemSlicePitch = 0;
-
-	if (FAILED(InDevice->CreateBuffer(&VertexBufferDesc, &VertexData, &VertexBuffer)))
-	{
-		delete []Vertices;
-		delete []Indices;
-		return false;
-	}
-
-	D3D11_BUFFER_DESC IndexBufferDesc;
-	IndexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-	IndexBufferDesc.ByteWidth = sizeof(unsigned long) * IndexCount;
-	IndexBufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
-	IndexBufferDesc.CPUAccessFlags = 0;
-	IndexBufferDesc.MiscFlags = 0;
-	IndexBufferDesc.StructureByteStride = 0;
-
-	// Subresource 구조에 인덱스 데이터에 대한 포인터 제공
-	D3D11_SUBRESOURCE_DATA IndexData;
-	IndexData.pSysMem = Indices;
-	IndexData.SysMemPitch = 0;
-	IndexData.SysMemSlicePitch = 0;
-
-	if (FAILED(InDevice->CreateBuffer(&IndexBufferDesc, &IndexData, &IndexBuffer)))
-	{
-		delete []Vertices;
-		delete []Indices;
-		VertexBuffer->Release();
-		return false;
-	}
-
-	delete []Vertices;
-	delete []Indices;
-
 	return true;
 }
 
-bool InitializeShader(ID3D11Device* InDevice, HWND InHwnd, const WCHAR* InVSFilename, const WCHAR* InPSFilename)
+bool InitializeShader(ID3D11Device* InDevice, HWND hWnd, const WCHAR* InVSFilename, const WCHAR* InPSFilename)
 {
-	ID3D10Blob* ErrorMessage = nullptr;
-
-	// Compile VS
-	ID3D10Blob* VertexShaderBuffer = nullptr;
-	if (FAILED(D3DCompileFromFile(InVSFilename, nullptr, nullptr, "ColorVertexShader", "vs_5_0"
-		, D3D10_SHADER_ENABLE_STRICTNESS, 0, &VertexShaderBuffer, &ErrorMessage)))
-	{
-		if (ErrorMessage)
-			;// OutputShaderErrorMessage(ErrorMessage, InHwnd, InVSFilename);
-		else
-			MessageBox(InHwnd, InVSFilename, TEXT("Missing Shader File"), MB_OK);
-
-		return false;
-	}
-
-	ID3D10Blob* PixelShaderBuffer = nullptr;
-	if (FAILED(D3DCompileFromFile(InPSFilename, nullptr, nullptr, "ColorPixelShader", "ps_5_0"
-		, D3D10_SHADER_ENABLE_STRICTNESS, 0, &PixelShaderBuffer, &ErrorMessage)))
-	{
-		if (ErrorMessage)
-			;// OutputShaderErrorMessage(ErrorMessage, InHwnd, InVSFilename);
-		else
-			MessageBox(InHwnd, InVSFilename, TEXT("Missing Shader File"), MB_OK);
-
-		return false;
-	}
-
-	if (FAILED(InDevice->CreateVertexShader(VertexShaderBuffer->GetBufferPointer(), VertexShaderBuffer->GetBufferSize(), nullptr, &VertexShader)))
-		return false;
-
-	if (FAILED(InDevice->CreatePixelShader(PixelShaderBuffer->GetBufferPointer(), PixelShaderBuffer->GetBufferSize(), nullptr, &PixelShader)))
-		return false;
-
-	// 정점 입력 레이아웃 구조체 설정
-	// 이 설정은 ModelClass와 쉐이더의 VertexType 구조와 일치해야 합니다.
-	D3D11_INPUT_ELEMENT_DESC PolygonLayout[2];
-	PolygonLayout[0].SemanticName = "POSITION";
-	PolygonLayout[0].SemanticIndex = 0;
-	PolygonLayout[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;
-	PolygonLayout[0].InputSlot = 0;
-	PolygonLayout[0].AlignedByteOffset = 0;
-	PolygonLayout[0].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
-	PolygonLayout[0].InstanceDataStepRate = 0;
-
-	PolygonLayout[1].SemanticName = "COLOR";
-	PolygonLayout[1].SemanticIndex = 0;
-	PolygonLayout[1].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-	PolygonLayout[1].InputSlot = 0;
-	PolygonLayout[1].AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
-	PolygonLayout[1].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
-	PolygonLayout[1].InstanceDataStepRate = 0;
-
-	unsigned int NumElements = sizeof(PolygonLayout) / sizeof(PolygonLayout[0]);
-
-	// 정점 입력 레이아웃을 만듬
-	if (FAILED(InDevice->CreateInputLayout(PolygonLayout, NumElements, VertexShaderBuffer->GetBufferPointer(), VertexShaderBuffer->GetBufferSize(), &Layout)))
-		return false;
-
-	// 더이상 사용하지 않는 버퍼들 제거
-	VertexShaderBuffer->Release();
-	PixelShaderBuffer->Release();
-
-	// 정점 쉐이더에 있는 행렬 상수 버퍼의 구조체 작성
-	D3D11_BUFFER_DESC MatrixBufferDesc;
-	MatrixBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-	MatrixBufferDesc.ByteWidth = sizeof(MatrixBufferType);
-	MatrixBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-	MatrixBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-	MatrixBufferDesc.MiscFlags = 0;
-	MatrixBufferDesc.StructureByteStride = 0;
-
-	if (FAILED(InDevice->CreateBuffer(&MatrixBufferDesc, nullptr, &MatrixBuffer)))
-		return false;
+	
 
 	return true;
 }
@@ -288,9 +142,55 @@ LRESULT CALLBACK WindowProcDX11(HWND hWnd, UINT message, WPARAM wParam, LPARAM l
 	{
 		const float ClearColor[4] = { 0.5f, 0.5f, 0.5f, 1.0f };
 
+        float FieldOfView = 3.14f / 4.0f;
+        float ScreenAspect = (float)SCR_WIDTH / (float)SCR_HEIGHT;
+
+        ProjectionMatrix = XMMatrixPerspectiveFovLH(FieldOfView, ScreenAspect, 1.0f, 1000.0f);
+        WorldMatrix = XMMatrixIdentity();
+        OrthoMatrix = XMMatrixOrthographicLH((float)SCR_WIDTH, (float)SCR_HEIGHT, 1.0f, 1000.0f);
+
+        // 행렬을 Transpose 하여 쉐이더에서 사용할 수 있게 합니다.
+        WorldMatrix = XMMatrixTranspose(WorldMatrix);
+        auto ViewMatrix = XMMatrixTranspose(CreateViewMatrix());
+        ProjectionMatrix = XMMatrixTranspose(ProjectionMatrix);
+
+
+        D3D11_VIEWPORT Viewport;
+        Viewport.Width = (float)SCR_WIDTH;
+        Viewport.Height = (float)SCR_HEIGHT;
+        Viewport.MinDepth = 0.0f;
+        Viewport.MaxDepth = 1.0f;
+        Viewport.TopLeftX = 0.0f;
+        Viewport.TopLeftY = 0.0f;
+
+		// [1]. 커맨드 생성기 초기화
+
+		// [2]. PSO 바인딩
+        // Set DepthStencilState
+        DeviceContext->OMSetDepthStencilState(DepthStencilState, 1);
+        DeviceContext->RSSetState(RasterState);
+        DeviceContext->IASetInputLayout(Layout);
+        DeviceContext->VSSetShader(VertexShader, nullptr, 0);
+        DeviceContext->PSSetShader(PixelShader, nullptr, 0);
+
+		// [3]. 루트 시그니쳐 바인딩
+		// 
+
+		// [4]. 기타 상태 설정
+        DeviceContext->RSSetViewports(1, &Viewport);
+
+		// [5]. 렌더타겟 설정
+        // Set RenderTargetView and DepthStencilView
+        DeviceContext->OMSetRenderTargets(1, &RenderTargetView, DepthStencilView);
+
+		// [6]. 백버퍼 리소스 베리어 전환
+		// 
+
+		// [7]. 렌더타겟과 뎁스버퍼 클리어
 		DeviceContext->ClearRenderTargetView(RenderTargetView, ClearColor);
 		DeviceContext->ClearDepthStencilView(DepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
+		// [8]. 지오메트리 버퍼(버택스, 인덱스) 및 Primitive 타입 바인딩
 		unsigned int Stride = sizeof(VertexType);
 		unsigned int Offset = 0;
 
@@ -298,16 +198,28 @@ LRESULT CALLBACK WindowProcDX11(HWND hWnd, UINT message, WPARAM wParam, LPARAM l
 		DeviceContext->IASetIndexBuffer(IndexBuffer, DXGI_FORMAT_R32_UINT, 0);
 		DeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		SetShaderParameters(DeviceContext, WorldMatrix, CreateViewMatrix(), ProjectionMatrix);
+		// [8]. 상수버퍼 바인딩
+		// SetShaderParameters(DeviceContext, WorldMatrix, CreateViewMatrix(), ProjectionMatrix);
+        D3D11_MAPPED_SUBRESOURCE MappedResource;
+        if (SUCCEEDED(DeviceContext->Map(MatrixBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &MappedResource)))
+		{
+			MatrixBufferType* DataPtr = (MatrixBufferType*)MappedResource.pData;
+			DataPtr->World = WorldMatrix;
+			DataPtr->View = ViewMatrix;
+			DataPtr->Projection = ProjectionMatrix;
 
-		DeviceContext->IASetInputLayout(Layout);
+			DeviceContext->Unmap(MatrixBuffer, 0);
+		}
+        unsigned int BufferNumber = 0;
+        DeviceContext->VSSetConstantBuffers(BufferNumber, 1, &MatrixBuffer);	// 정점쉐이더에서의 상수 버퍼 위치 설정
 
-		DeviceContext->VSSetShader(VertexShader, nullptr, 0);
-		DeviceContext->PSSetShader(PixelShader, nullptr, 0);
-
+		// [10]. 렌더
 		int IndexCount = 3;
 		DeviceContext->DrawIndexed(IndexCount, 0, 0);
 
+		// [11]. 커맨드버퍼 실행
+
+		// [12]. Present
 		if (EnableVsync)
 			SwapChain->Present(1, 0);	// 화면 새로고침 비율을 고정
 		else
@@ -335,34 +247,7 @@ jRHI_DirectX11::~jRHI_DirectX11()
 
 void jRHI_DirectX11::Initialize()
 {
-	auto hInstance = GetModuleHandle(NULL);
-
-	// Initialize the window class.
-	WNDCLASSEX windowClass = { 0 };
-	windowClass.cbSize = sizeof(WNDCLASSEX);
-	windowClass.style = CS_HREDRAW | CS_VREDRAW;
-	windowClass.lpfnWndProc = WindowProcDX11;
-	windowClass.hInstance = hInstance;
-	windowClass.hCursor = LoadCursor(NULL, IDC_ARROW);
-	windowClass.lpszClassName = L"DXSampleClass";
-	RegisterClassEx(&windowClass);
-
-	RECT windowRect = { 0, 0, static_cast<LONG>(SCR_WIDTH), static_cast<LONG>(SCR_HEIGHT) };
-	AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
-
-	// Create the window and store a handle to it.
-	auto hWnd = CreateWindow(
-		windowClass.lpszClassName,
-		TEXT("DX11"),
-		WS_OVERLAPPEDWINDOW,
-		CW_USEDEFAULT,
-		CW_USEDEFAULT,
-		windowRect.right - windowRect.left,
-		windowRect.bottom - windowRect.top,
-		nullptr,        // We have no parent window.
-		nullptr,        // We aren't using menus.
-		hInstance,
-		nullptr);
+	HWND hWnd = CreateMainWindow();
 
 	//////////////////////////////////////////////////////////////////////////
 	IDXGIFactory* Factory = nullptr;
@@ -486,6 +371,11 @@ void jRHI_DirectX11::Initialize()
 		return;
 	}
 
+	// [여기서 부터 렌더링에 필요한 리소스 생성]
+	// 1. 렌더타겟 뷰를 생성할 디스크립터 힙을 생성함
+	// 
+
+	// 2. 백버퍼 포인터를 얻어와서 렌더타겟 뷰를 만듬
 	// 백버퍼 포인터를 얻어옵니다.
 	ID3D11Texture2D* Backbuffer = nullptr;
 	if (FAILED(SwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&Backbuffer)))
@@ -499,104 +389,241 @@ void jRHI_DirectX11::Initialize()
 	Backbuffer->Release();
 	Backbuffer = nullptr;
 
-	// 깊이버퍼 구조체를 초기화 합니다.
-	D3D11_TEXTURE2D_DESC DepthBufferDesc;
-	ZeroMemory(&DepthBufferDesc, sizeof(DepthBufferDesc));
+	// 3. 루트 시그니처를 생성함
+	// 4. PSO 생성
+	//		1). VertexShader, PixelShader 새성
+	//		2). DepthStencil 버퍼 초기화 및 생성
+	//		3). InputLayout 생성
+	//		4). RasterizerState 생성
+	
+    ID3D10Blob* ErrorMessage = nullptr;
 
-	DepthBufferDesc.Width = SCR_WIDTH;
-	DepthBufferDesc.Height = SCR_HEIGHT;
-	DepthBufferDesc.MipLevels = 1;
-	DepthBufferDesc.ArraySize = 1;
-	DepthBufferDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-	DepthBufferDesc.SampleDesc.Count = 1;
-	DepthBufferDesc.SampleDesc.Quality = 0;
-	DepthBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-	DepthBufferDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
-	DepthBufferDesc.CPUAccessFlags = 0;
-	DepthBufferDesc.MiscFlags = 0;
+    // Compile VS
+    ID3D10Blob* VertexShaderBuffer = nullptr;
+    if (FAILED(D3DCompileFromFile(TEXT("Shaders/HLSL/Color.vs"), nullptr, nullptr, "ColorVertexShader", "vs_5_0"
+        , D3D10_SHADER_ENABLE_STRICTNESS, 0, &VertexShaderBuffer, &ErrorMessage)))
+    {
+        if (ErrorMessage)
+            ;// OutputShaderErrorMessage(ErrorMessage, hWnd, TEXT("Shaders/HLSL/Color.vs"));
+        else
+            MessageBox(hWnd, TEXT("Shaders/HLSL/Color.vs"), TEXT("Missing Shader File"), MB_OK);
 
-	// 깊이버퍼 텍스쳐 생성
-	if (Device->CreateTexture2D(&DepthBufferDesc, nullptr, &DepthStencilBuffer))
-		return;
+        return;
+    }
 
-	// 스텐실상태 구조체를 초기화합니다.
-	D3D11_DEPTH_STENCIL_DESC DepthStencilDesc;
-	ZeroMemory(&DepthStencilDesc, sizeof(DepthStencilDesc));
+    ID3D10Blob* PixelShaderBuffer = nullptr;
+    if (FAILED(D3DCompileFromFile(TEXT("Shaders/HLSL/Color.ps"), nullptr, nullptr, "ColorPixelShader", "ps_5_0"
+        , D3D10_SHADER_ENABLE_STRICTNESS, 0, &PixelShaderBuffer, &ErrorMessage)))
+    {
+        if (ErrorMessage)
+            ;// OutputShaderErrorMessage(ErrorMessage, hWnd, TEXT("Shaders/HLSL/Color.vs"));
+        else
+            MessageBox(hWnd, TEXT("Shaders/HLSL/Color.ps"), TEXT("Missing Shader File"), MB_OK);
 
-	DepthStencilDesc.DepthEnable = true;
-	DepthStencilDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
-	DepthStencilDesc.DepthFunc = D3D11_COMPARISON_LESS;
+        return;
+    }
 
-	DepthStencilDesc.StencilEnable = true;
-	DepthStencilDesc.StencilReadMask = 0xFF;
-	DepthStencilDesc.StencilWriteMask = 0xFF;
+    if (FAILED(Device->CreateVertexShader(VertexShaderBuffer->GetBufferPointer(), VertexShaderBuffer->GetBufferSize(), nullptr, &VertexShader)))
+        return;
 
-	DepthStencilDesc.FrontFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
-	DepthStencilDesc.FrontFace.StencilDepthFailOp = D3D11_STENCIL_OP_INCR;
-	DepthStencilDesc.FrontFace.StencilPassOp = D3D11_STENCIL_OP_KEEP;
-	DepthStencilDesc.FrontFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
+    if (FAILED(Device->CreatePixelShader(PixelShaderBuffer->GetBufferPointer(), PixelShaderBuffer->GetBufferSize(), nullptr, &PixelShader)))
+        return;
 
-	DepthStencilDesc.BackFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
-	DepthStencilDesc.BackFace.StencilDepthFailOp = D3D11_STENCIL_OP_DECR;
-	DepthStencilDesc.BackFace.StencilPassOp = D3D11_STENCIL_OP_KEEP;
-	DepthStencilDesc.BackFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
+    // 깊이버퍼 구조체를 초기화 합니다.
+    D3D11_TEXTURE2D_DESC DepthBufferDesc;
+    ZeroMemory(&DepthBufferDesc, sizeof(DepthBufferDesc));
 
-	if (FAILED(Device->CreateDepthStencilState(&DepthStencilDesc, &DepthStencilState)))
-		return;
+    DepthBufferDesc.Width = SCR_WIDTH;
+    DepthBufferDesc.Height = SCR_HEIGHT;
+    DepthBufferDesc.MipLevels = 1;
+    DepthBufferDesc.ArraySize = 1;
+    DepthBufferDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+    DepthBufferDesc.SampleDesc.Count = 1;
+    DepthBufferDesc.SampleDesc.Quality = 0;
+    DepthBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+    DepthBufferDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+    DepthBufferDesc.CPUAccessFlags = 0;
+    DepthBufferDesc.MiscFlags = 0;
 
-	// Set DepthStencilState
-	DeviceContext->OMSetDepthStencilState(DepthStencilState, 1);
+    // 깊이버퍼 텍스쳐 생성
+    if (Device->CreateTexture2D(&DepthBufferDesc, nullptr, &DepthStencilBuffer))
+        return;
 
-	D3D11_DEPTH_STENCIL_VIEW_DESC DepthStencilViewDesc;
-	ZeroMemory(&DepthStencilViewDesc, sizeof(DepthStencilViewDesc));
-	DepthStencilViewDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-	DepthStencilViewDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
-	DepthStencilViewDesc.Texture2D.MipSlice = 0;
+    // DepthStencil State 생성
+    D3D11_DEPTH_STENCIL_DESC DepthStencilDesc;
+    ZeroMemory(&DepthStencilDesc, sizeof(DepthStencilDesc));
 
-	// 깊이 스텐실 뷰를 생성
-	if (FAILED(Device->CreateDepthStencilView(DepthStencilBuffer, &DepthStencilViewDesc, &DepthStencilView)))
-		return;
+    DepthStencilDesc.DepthEnable = true;
+    DepthStencilDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+    DepthStencilDesc.DepthFunc = D3D11_COMPARISON_LESS;
 
-	// Set RenderTargetView and DepthStencilView
-	DeviceContext->OMSetRenderTargets(1, &RenderTargetView, DepthStencilView);
+    DepthStencilDesc.StencilEnable = true;
+    DepthStencilDesc.StencilReadMask = 0xFF;
+    DepthStencilDesc.StencilWriteMask = 0xFF;
 
-	D3D11_RASTERIZER_DESC RasterDesc;
-	RasterDesc.AntialiasedLineEnable = false;
-	RasterDesc.CullMode = D3D11_CULL_BACK;
-	RasterDesc.DepthBias = 0;
-	RasterDesc.DepthBiasClamp = 0.0f;
-	RasterDesc.DepthClipEnable = true;
-	RasterDesc.FillMode = D3D11_FILL_SOLID;
-	RasterDesc.FrontCounterClockwise = false;
-	RasterDesc.MultisampleEnable = false;
-	RasterDesc.ScissorEnable = false;
-	RasterDesc.SlopeScaledDepthBias = 0.0f;
+    DepthStencilDesc.FrontFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
+    DepthStencilDesc.FrontFace.StencilDepthFailOp = D3D11_STENCIL_OP_INCR;
+    DepthStencilDesc.FrontFace.StencilPassOp = D3D11_STENCIL_OP_KEEP;
+    DepthStencilDesc.FrontFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
 
-	if (FAILED(Device->CreateRasterizerState(&RasterDesc, &RasterState)))
-		return;
+    DepthStencilDesc.BackFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
+    DepthStencilDesc.BackFace.StencilDepthFailOp = D3D11_STENCIL_OP_DECR;
+    DepthStencilDesc.BackFace.StencilPassOp = D3D11_STENCIL_OP_KEEP;
+    DepthStencilDesc.BackFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
 
-	// Set RasterizerState
-	DeviceContext->RSSetState(RasterState);
+    if (FAILED(Device->CreateDepthStencilState(&DepthStencilDesc, &DepthStencilState)))
+        return;
 
-	D3D11_VIEWPORT Viewport;
-	Viewport.Width = (float)SCR_WIDTH;
-	Viewport.Height = (float)SCR_HEIGHT;
-	Viewport.MinDepth = 0.0f;
-	Viewport.MaxDepth = 1.0f;
-	Viewport.TopLeftX = 0.0f;
-	Viewport.TopLeftY = 0.0f;
+	// DepthStencil 뷰 생성
+    D3D11_DEPTH_STENCIL_VIEW_DESC DepthStencilViewDesc;
+    ZeroMemory(&DepthStencilViewDesc, sizeof(DepthStencilViewDesc));
+    DepthStencilViewDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+    DepthStencilViewDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+    DepthStencilViewDesc.Texture2D.MipSlice = 0;
 
-	DeviceContext->RSSetViewports(1, &Viewport);
+    // 깊이 스텐실 뷰를 생성
+    if (FAILED(Device->CreateDepthStencilView(DepthStencilBuffer, &DepthStencilViewDesc, &DepthStencilView)))
+        return;
 
-	float FieldOfView = 3.14f / 4.0f;
-	float ScreenAspect = (float)SCR_WIDTH / (float)SCR_HEIGHT;
+    // 정점 입력 레이아웃 구조체 설정
+	// 이 설정은 ModelClass와 쉐이더의 VertexType 구조와 일치해야 합니다.
+    D3D11_INPUT_ELEMENT_DESC PolygonLayout[2];
+    PolygonLayout[0].SemanticName = "POSITION";
+    PolygonLayout[0].SemanticIndex = 0;
+    PolygonLayout[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;
+    PolygonLayout[0].InputSlot = 0;
+    PolygonLayout[0].AlignedByteOffset = 0;
+    PolygonLayout[0].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
+    PolygonLayout[0].InstanceDataStepRate = 0;
 
-	ProjectionMatrix = XMMatrixPerspectiveFovLH(FieldOfView, ScreenAspect, 1.0f, 1000.0f);
-	WorldMatrix = XMMatrixIdentity();
-	OrthoMatrix = XMMatrixOrthographicLH((float)SCR_WIDTH, (float)SCR_HEIGHT, 1.0f, 1000.0f);
+    PolygonLayout[1].SemanticName = "COLOR";
+    PolygonLayout[1].SemanticIndex = 0;
+    PolygonLayout[1].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+    PolygonLayout[1].InputSlot = 0;
+    PolygonLayout[1].AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
+    PolygonLayout[1].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
+    PolygonLayout[1].InstanceDataStepRate = 0;
 
-	InitializeBuffers(Device);
-	InitializeShader(Device, hWnd, TEXT("Shaders/HLSL/Color.vs"), TEXT("Shaders/HLSL/Color.ps"));
+    unsigned int NumElements = sizeof(PolygonLayout) / sizeof(PolygonLayout[0]);
+
+    // 정점 입력 레이아웃을 만듬
+    if (FAILED(Device->CreateInputLayout(PolygonLayout, NumElements, VertexShaderBuffer->GetBufferPointer(), VertexShaderBuffer->GetBufferSize(), &Layout)))
+        return;
+
+
+    // 더이상 사용하지 않는 버퍼들 제거
+    VertexShaderBuffer->Release();
+    PixelShaderBuffer->Release();
+
+    D3D11_RASTERIZER_DESC RasterDesc;
+    RasterDesc.AntialiasedLineEnable = false;
+    RasterDesc.CullMode = D3D11_CULL_BACK;
+    RasterDesc.DepthBias = 0;
+    RasterDesc.DepthBiasClamp = 0.0f;
+    RasterDesc.DepthClipEnable = true;
+    RasterDesc.FillMode = D3D11_FILL_SOLID;
+    RasterDesc.FrontCounterClockwise = false;
+    RasterDesc.MultisampleEnable = false;
+    RasterDesc.ScissorEnable = false;
+    RasterDesc.SlopeScaledDepthBias = 0.0f;
+
+    if (FAILED(Device->CreateRasterizerState(&RasterDesc, &RasterState)))
+        return;
+
+	// 5. 커맨드리스트 생성
+
+	// 6. 지오메트리 버퍼들 생성 (버택스, 인덱스)
+    // 버퍼 초기화 
+    int VertexCount = 3;
+    int IndexCount = 3;
+
+    VertexType* Vertices = new VertexType[VertexCount];
+    if (!Vertices)
+        return;
+
+    unsigned long* Indices = new unsigned long[IndexCount];
+    if (!Indices)
+    {
+        delete[]Vertices;
+        return;
+    }
+
+    // 정점 배열에 데이터를 설정합니다.
+    Vertices[0].Position = XMFLOAT3(-1.0f, -1.0f, 0.0f);  // Bottom left.
+    Vertices[0].Color = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
+
+    Vertices[1].Position = XMFLOAT3(0.0f, 1.0f, 0.0f);  // Top middle.
+    Vertices[1].Color = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
+
+    Vertices[2].Position = XMFLOAT3(1.0f, -1.0f, 0.0f);  // Bottom right.
+    Vertices[2].Color = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
+
+    Indices[0] = 0;
+    Indices[1] = 1;
+    Indices[2] = 2;
+
+    D3D11_BUFFER_DESC VertexBufferDesc;
+    VertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+    VertexBufferDesc.ByteWidth = sizeof(VertexType) * VertexCount;
+    VertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+    VertexBufferDesc.CPUAccessFlags = 0;
+    VertexBufferDesc.MiscFlags = 0;
+    VertexBufferDesc.StructureByteStride = 0;
+
+    // Subresource 구조에 정점 데이터에 대한 포인터 제공
+    D3D11_SUBRESOURCE_DATA VertexData;
+    VertexData.pSysMem = Vertices;
+    VertexData.SysMemPitch = 0;
+    VertexData.SysMemSlicePitch = 0;
+
+    if (FAILED(Device->CreateBuffer(&VertexBufferDesc, &VertexData, &VertexBuffer)))
+    {
+        delete[]Vertices;
+        delete[]Indices;
+        return;
+    }
+
+    D3D11_BUFFER_DESC IndexBufferDesc;
+    IndexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+    IndexBufferDesc.ByteWidth = sizeof(unsigned long) * IndexCount;
+    IndexBufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+    IndexBufferDesc.CPUAccessFlags = 0;
+    IndexBufferDesc.MiscFlags = 0;
+    IndexBufferDesc.StructureByteStride = 0;
+
+    // Subresource 구조에 인덱스 데이터에 대한 포인터 제공
+    D3D11_SUBRESOURCE_DATA IndexData;
+    IndexData.pSysMem = Indices;
+    IndexData.SysMemPitch = 0;
+    IndexData.SysMemSlicePitch = 0;
+
+    if (FAILED(Device->CreateBuffer(&IndexBufferDesc, &IndexData, &IndexBuffer)))
+    {
+        delete[]Vertices;
+        delete[]Indices;
+        VertexBuffer->Release();
+        return;
+    }
+
+    delete[]Vertices;
+    delete[]Indices;
+
+	// 7. 상수 버퍼 생성 및 데이터 채움
+    // 정점 쉐이더에 있는 행렬 상수 버퍼의 구조체 작성
+    D3D11_BUFFER_DESC MatrixBufferDesc;
+    MatrixBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+    MatrixBufferDesc.ByteWidth = sizeof(MatrixBufferType);
+    MatrixBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    MatrixBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    MatrixBufferDesc.MiscFlags = 0;
+    MatrixBufferDesc.StructureByteStride = 0;
+
+    if (FAILED(Device->CreateBuffer(&MatrixBufferDesc, nullptr, &MatrixBuffer)))
+        return;
+
+	// 8. 동기화 오브젝트 생성
+
+	// 9. 렌더링할 백버퍼 얻어옴
 
 	ShowWindow(hWnd, SW_SHOW);
 
@@ -611,4 +638,38 @@ void jRHI_DirectX11::Initialize()
 		}
 	}
 
+}
+
+HWND jRHI_DirectX11::CreateMainWindow() const
+{
+    auto hInstance = GetModuleHandle(NULL);
+
+    // Initialize the window class.
+    WNDCLASSEX windowClass = { 0 };
+    windowClass.cbSize = sizeof(WNDCLASSEX);
+    windowClass.style = CS_HREDRAW | CS_VREDRAW;
+    windowClass.lpfnWndProc = WindowProcDX11;
+    windowClass.hInstance = hInstance;
+    windowClass.hCursor = LoadCursor(NULL, IDC_ARROW);
+    windowClass.lpszClassName = L"DXSampleClass";
+    RegisterClassEx(&windowClass);
+
+    RECT windowRect = { 0, 0, static_cast<LONG>(SCR_WIDTH), static_cast<LONG>(SCR_HEIGHT) };
+    AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
+
+    // Create the window and store a handle to it.
+    auto hWnd = CreateWindow(
+        windowClass.lpszClassName,
+        TEXT("DX11"),
+        WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT,
+        CW_USEDEFAULT,
+        windowRect.right - windowRect.left,
+        windowRect.bottom - windowRect.top,
+        nullptr,        // We have no parent window.
+        nullptr,        // We aren't using menus.
+        hInstance,
+        nullptr);
+
+	return hWnd;
 }

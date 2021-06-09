@@ -28,11 +28,11 @@ jEngine g_Engine;
 
 int main()
 {
-	// jRHI_DirectX12 dx12;
-	// dx12.Initialize();
+	jRHI_DirectX12 dx12;
+	dx12.Initialize();
 
-	jRHI_DirectX11 dx11;
-	dx11.Initialize();
+	//jRHI_DirectX11 dx11;
+	//dx11.Initialize();
 
 	return 0;
 	// glfw: initialize and configure

@@ -45,6 +45,9 @@
     <Filter Include="Code\External\SOIL_STBI">
       <UniqueIdentifier>{d9c7b0ba-79bc-445d-a327-7559c6c051ac}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders\HLSL">
+      <UniqueIdentifier>{5e8a6067-12d0-489d-8f14-c20eec298fd8}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DeprecatedCode\jPipeline.h">
@@ -227,8 +230,8 @@
     <ClInclude Include="Code\External\SOIL_STBI\stbi_DDS_aug_c.h">
       <Filter>Code\External\SOIL_STBI</Filter>
     </ClInclude>
-    <ClInclude Include="jRHI_DirectX12.h">
-      <Filter>DeprecatedCode</Filter>
+    <ClInclude Include="Code\jRHI_DirectX12.h">
+      <Filter>Code</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -388,7 +391,7 @@
     <ClCompile Include="Code\Renderer\jRenderContext.cpp">
       <Filter>Code\Renderer</Filter>
     </ClCompile>
-    <ClCompile Include="jRHI_DirectX12.cpp">
+    <ClCompile Include="Code\jRHI_DirectX12.cpp">
       <Filter>Code</Filter>
     </ClCompile>
   </ItemGroup>
@@ -680,6 +683,15 @@
     </None>
     <None Include="Shaders\NewShaders\tonemap_vs.glsl">
       <Filter>Shaders\NewShaders</Filter>
+    </None>
+    <None Include="Shaders\HLSL\Color.ps">
+      <Filter>Shaders\HLSL</Filter>
+    </None>
+    <None Include="Shaders\HLSL\Color.vs">
+      <Filter>Shaders\HLSL</Filter>
+    </None>
+    <None Include="Shaders\HLSL\shaders.hlsl">
+      <Filter>Shaders\HLSL</Filter>
     </None>
   </ItemGroup>
 </Project>
