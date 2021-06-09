@@ -1,8 +1,8 @@
 # Shadows
 Implementation of Shadows
 
-A. ShadowVolume(CPU and GPU) <br/>
-B. ShadowMap
+A. ShadowVolume(CPU and GPU) : branch master <br/>
+B. ShadowMap : branch master
   1. SSM
   2. PCF
   3. PCSS
@@ -11,12 +11,48 @@ B. ShadowMap
   6. EVSM
   7. CSM (Directional Light Only)
   8. DeepShadowMap (Directional Light Only)
-
-C. SubsurfaceScattering (SSS Skin Rendering) at Skin Branch (https://youtu.be/cWpoWrE-62A)
-
-<img src="https://user-images.githubusercontent.com/6734453/83333392-2f1a1f00-a2db-11ea-8bfe-c30db6e4ae93.png" width="90%"></img>
+  9. Dual Parabolid : branch link https://github.com/scahp/Shadows/tree/DualParaboloidShadowMap
+  10. PSM : branch link https://github.com/scahp/Shadows/tree/PSM
 <img src="https://user-images.githubusercontent.com/6734453/64974161-3f25d600-d8e7-11e9-8a87-fbb5655da514.png" width="90%"></img>
 <img src="https://user-images.githubusercontent.com/6734453/64978132-c8410b00-d8ef-11e9-81cd-ba1051e2bced.png" width="90%"></img>
+
+C. SubsurfaceScattering (SSS Skin Rendering) : branch link https://youtu.be/cWpoWrE-62A
+
+<img src="https://user-images.githubusercontent.com/6734453/83333392-2f1a1f00-a2db-11ea-8bfe-c30db6e4ae93.png" width="90%"></img>
+
+D. Progressive Refinement Radiosity : branch link https://github.com/scahp/Shadows/tree/RadiosityCornellBox
+<img src="https://user-images.githubusercontent.com/6734453/121384475-432f3c80-c983-11eb-821a-46b16339c630.png" width="90%"></img>
+
+E. Diffuse IrradianceMap with Spherical Harmonics : branch link https://github.com/scahp/Shadows/tree/IrradianceMap
+<img src="https://user-images.githubusercontent.com/6734453/121385392-09126a80-c984-11eb-8144-067344411d6c.png" width="90%"></img>
+
+F. Atmospheric Shadowing : branch link https://github.com/scahp/Shadows/tree/sponza_atmosphericshadowing
+<img src="https://user-images.githubusercontent.com/6734453/121385788-627a9980-c984-11eb-99c8-3294c7e329ab.gif" width="90%"></img>
+
+G. Pixel projected Reflection : branch link https://github.com/scahp/Shadows/tree/sponza_atmosphericshadowing
+<img src="https://user-images.githubusercontent.com/6734453/121386330-dddc4b00-c984-11eb-9090-941b75b60a57.png" width="90%"></img>
+
+H. Effective Water Simulation from Physical Models : branch link https://github.com/scahp/Shadows/tree/WaveWithPhysicalModel
+<img src="https://user-images.githubusercontent.com/6734453/121386722-2a278b00-c985-11eb-990f-5e32e181c622.gif" width="90%"></img>
+
+I. Physically-Based Cosmetic Rendering : branch link https://github.com/scahp/Shadows/tree/Physically-based-cosmetic
+<img src="https://user-images.githubusercontent.com/6734453/121387071-5c38ed00-c985-11eb-88cb-2059ffa6a4e9.png" width="70%"></img>
+
+J. Accurate atmospheric scattering : branch link https://github.com/scahp/Shadows/tree/AccurateAtmosphericScattering
+<img src="https://user-images.githubusercontent.com/6734453/121387508-b043d180-c985-11eb-882d-84d9dc28e45d.png" width="90%"></img>
+
+K. ForwardPlus Rendering : branch link https://github.com/scahp/Shadows/tree/ForwardPlus
+<img src="https://user-images.githubusercontent.com/6734453/121387806-eda85f00-c985-11eb-8218-61b731bcf210.gif" width="90%"></img>
+
+L. Signed Distance Field : branch link https://github.com/scahp/Shadows/tree/SDF
+<img src="https://user-images.githubusercontent.com/6734453/121388087-221c1b00-c986-11eb-867d-6aaefc3805e0.gif" width="90%"></img>
+
+M. Light Indexed Deferred Rendering : branch link https://github.com/scahp/Shadows/tree/LightIndexedDeferredRendering
+<img src="https://user-images.githubusercontent.com/6734453/121388410-6efff180-c986-11eb-8b7d-71a39896a8b3.gif" width="90%"></img>
+
+N. Hi-Z Occlusion culling : branch link https://github.com/scahp/Shadows/tree/HiZOcclusion
+<img src="https://user-images.githubusercontent.com/6734453/121389057-fb121900-c986-11eb-9fcb-0c713cbbf567.png" width="90%"></img>
+
 
 References
 1. https://github.com/TheRealMJP/Shadows
@@ -35,3 +71,4 @@ References
 14. https://developer.download.nvidia.com/books/HTML/gpugems/gpugems_ch09.html
 15. http://ogldev.atspace.co.uk/www/tutorial40/tutorial40.html
 16. https://www.slideshare.net/Mark_Kilgard/realtime-shadowing-techniques-shadow-volumes
+17. https://foundationsofgameenginedev.com/
