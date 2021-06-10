@@ -693,5 +693,11 @@
     <None Include="Shaders\HLSL\shaders.hlsl">
       <Filter>Shaders\HLSL</Filter>
     </None>
+    <None Include="Shaders\HLSL\CubePixelShader.hlsl">
+      <Filter>Shaders\HLSL</Filter>
+    </None>
+    <None Include="Shaders\HLSL\CubeVertexShader.hlsl">
+      <Filter>Shaders\HLSL</Filter>
+    </None>
   </ItemGroup>
 </Project>
