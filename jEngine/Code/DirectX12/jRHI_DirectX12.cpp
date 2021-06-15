@@ -1,22 +1,11 @@
-
 #include "pch.h"
 #include "jRHI_DirectX12.h"
-
-#include <queue>
-
-#pragma comment(lib,"d3d12.lib")
-#pragma comment(lib,"dxgi.lib")
-#pragma comment(lib,"d3dcompiler.lib")
-#pragma comment(lib,"dxguid.lib")
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
 
 CD3DX12_VIEWPORT m_viewport(0.0f, 0.0f, static_cast<float>(SCR_WIDTH), static_cast<float>(SCR_HEIGHT));
 CD3DX12_RECT m_scissorRect(0, 0, static_cast<LONG>(SCR_WIDTH), static_cast<LONG>(SCR_HEIGHT));
-
-void WaitForPreviousFrame();
-
 
 // Vertex data for a colored cube.
 struct VertexPosColor
@@ -45,65 +34,6 @@ static WORD g_Indicies[36] =
 	1, 5, 6, 1, 6, 2,
 	4, 0, 3, 4, 3, 7
 };
-
-void jRHI_DirectX12::PopulateCommandList()
-{
-	// Command list allocators can only be reset when the associated 
-	// command lists have finished execution on the GPU; apps should use 
-	// fences to determine GPU execution progress.
-	m_commandAllocator->Reset();
-
-	// However, when ExecuteCommandList() is called on a particular command 
-	// list, that command list can then be reset at any time and must be before 
-	// re-recording.
-	m_commandList->Reset(m_commandAllocator.Get(), m_pipelineState.Get());
-
-	// Set necessary state.
-	m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
-	m_commandList->RSSetViewports(1, &m_viewport);
-	m_commandList->RSSetScissorRects(1, &m_scissorRect);
-
-	// Indicate that the back buffer will be used as a render target.
-	m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
-
-	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
-	m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
-
-	// Record commands.
-	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
-	m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-	m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
-	m_commandList->DrawInstanced(3, 1, 0, 0);
-
-	// Indicate that the back buffer will now be used to present.
-	m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
-
-	m_commandList->Close();
-}
-
-void jRHI_DirectX12::WaitForPreviousFrame()
-{
-	// WAITING FOR THE FRAME TO COMPLETE BEFORE CONTINUING IS NOT BEST PRACTICE.
-	// This is code implemented as such for simplicity. The D3D12HelloFrameBuffering
-	// sample illustrates how to use fences for efficient resource usage and to
-	// maximize GPU utilization.
-
-	// Signal and increment the fence value.
-	const UINT64 fence = m_fenceValue;
-	m_commandQueue->Signal(m_fence.Get(), fence);
-	m_fenceValue++;
-
-	// Wait until the previous frame is finished.
-	if (m_fence->GetCompletedValue() < fence)
-	{
-		m_fence->SetEventOnCompletion(fence, m_fenceEvent);
-		WaitForSingleObject(m_fenceEvent, INFINITE);
-	}
-
-	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
-}
-
 
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -252,20 +182,7 @@ void jRHI_DirectX12::Initialize()
 		);
 	}
 
-	//// Describe and create the command queue.
-	//D3D12_COMMAND_QUEUE_DESC queueDesc = {};
-	//queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-	//queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-
-	//m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue));
-
-	D3D12_COMMAND_QUEUE_DESC directQueueDesc = {};
-	directQueueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-	directQueueDesc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
-	directQueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-	directQueueDesc.NodeMask = 0;
-
-	m_device->CreateCommandQueue(&directQueueDesc, IID_PPV_ARGS(&directCommandQueue));
+	directCommandQueue.Initialize(m_device);
 
 	// Describe and create the swap chain.
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
@@ -279,7 +196,7 @@ void jRHI_DirectX12::Initialize()
 
 	ComPtr<IDXGISwapChain1> swapChain;
 	factory->CreateSwapChainForHwnd(
-		directCommandQueue.Get(),        // Swap chain needs the queue so that it can force a flush on it.
+		directCommandQueue.GetCommandQueue().Get(),        // Swap chain needs the queue so that it can force a flush on it.
 		hWnd,
 		&swapChainDesc,
 		nullptr,
@@ -321,7 +238,6 @@ void jRHI_DirectX12::Initialize()
 		}
 	}
 
-	//m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator));
 	//LoadAssets();
 
 //	// 3. 루트 시그니쳐를 생성함
@@ -524,13 +440,6 @@ void jRHI_DirectX12::Initialize()
 
 	LoadContent();
 
-	m_device->CreateFence(directFenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&directFence));
-	directFenceEvent = ::CreateEvent(NULL, FALSE, FALSE, NULL);
-
-	m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&directCommandAllocator));
-	m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, directCommandAllocator.Get(), nullptr, IID_PPV_ARGS(&directCommandList));
-	directCommandList->SetPrivateDataInterface(__uuidof(ID3D12CommandAllocator), directCommandAllocator.Get());
-
 	// WAITING FOR THE FRAME TO COMPLETE BEFORE CONTINUING IS NOT BEST PRACTICE.
 	// This is code implemented as such for simplicity. The D3D12HelloFrameBuffering
 	// sample illustrates how to use fences for efficient resource usage and to
@@ -554,65 +463,71 @@ void jRHI_DirectX12::Initialize()
 
 void jRHI_DirectX12::LoadContent()
 {
-	ComPtr<ID3D12CommandAllocator> commandAllocator;
-	ComPtr<ID3D12GraphicsCommandList2> commandList;
-	ComPtr<ID3D12Fence> fence;
-	uint64_t fenceValue = 0;
-	HANDLE fenceEvent;
-	{
-		D3D12_COMMAND_QUEUE_DESC copyqueueDesc = {};
-		copyqueueDesc.Type = D3D12_COMMAND_LIST_TYPE_COPY;
-		copyqueueDesc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
-		copyqueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-		copyqueueDesc.NodeMask = 0;
-		m_device->CreateCommandQueue(&copyqueueDesc, IID_PPV_ARGS(&m_copyCommandQueue));
-		m_device->CreateFence(fenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
-		fenceEvent = ::CreateEvent(NULL, FALSE, FALSE, NULL);
+	//ComPtr<ID3D12CommandAllocator> commandAllocator;
+	//ComPtr<ID3D12GraphicsCommandList2> commandList;
+	//ComPtr<ID3D12Fence> fence;
+	//uint64_t fenceValue = 0;
+	//HANDLE fenceEvent;
+	//{
+	//	D3D12_COMMAND_QUEUE_DESC copyqueueDesc = {};
+	//	copyqueueDesc.Type = D3D12_COMMAND_LIST_TYPE_COPY;
+	//	copyqueueDesc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
+	//	copyqueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+	//	copyqueueDesc.NodeMask = 0;
+	//	m_device->CreateCommandQueue(&copyqueueDesc, IID_PPV_ARGS(&m_copyCommandQueue));
+	//	m_device->CreateFence(fenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
+	//	fenceEvent = ::CreateEvent(NULL, FALSE, FALSE, NULL);
 
-		m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COPY, IID_PPV_ARGS(&commandAllocator));
-		m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_COPY, commandAllocator.Get(), nullptr, IID_PPV_ARGS(&commandList));
-	}
+	//	m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COPY, IID_PPV_ARGS(&commandAllocator));
+	//	m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_COPY, commandAllocator.Get(), nullptr, IID_PPV_ARGS(&commandList));
+	//}
+
+	copyCommandQueue.Initialize(m_device, D3D12_COMMAND_LIST_TYPE_COPY);
+	ComPtr<ID3D12GraphicsCommandList2> commandList = copyCommandQueue.GetAvailableCommandList();
 
 	// Upload vertex buffer data
 	ComPtr<ID3D12Resource> intermediateVertexBuffer;
+	UpdateBufferResource(m_device, commandList, m_vertexBuffer, intermediateVertexBuffer
+		, _countof(g_Vertices), sizeof(VertexPosColor), g_Vertices, D3D12_RESOURCE_FLAG_NONE);
+	//ComPtr<ID3D12Resource> intermediateVertexBuffer;
 
-	{
-		size_t numOfElements = _countof(g_Vertices);
-		size_t elementSize = sizeof(VertexPosColor);
-		const void* bufferData = g_Vertices;
-		D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE;
+	//{
+	//	size_t numOfElements = _countof(g_Vertices);
+	//	size_t elementSize = sizeof(VertexPosColor);
+	//	const void* bufferData = g_Vertices;
+	//	D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE;
 
-		size_t bufferSize = numOfElements * elementSize;
+	//	size_t bufferSize = numOfElements * elementSize;
 
-		ID3D12Resource** pDestinationResource = &m_vertexBuffer;
-		ID3D12Resource** pIntermediateResource = &intermediateVertexBuffer;
+	//	ID3D12Resource** pDestinationResource = &m_vertexBuffer;
+	//	ID3D12Resource** pIntermediateResource = &intermediateVertexBuffer;
 
-		m_device->CreateCommittedResource(
-			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-			D3D12_HEAP_FLAG_NONE,
-			&CD3DX12_RESOURCE_DESC::Buffer(bufferSize, flags),
-			D3D12_RESOURCE_STATE_COPY_DEST,
-			nullptr,
-			IID_PPV_ARGS(pDestinationResource));
+	//	m_device->CreateCommittedResource(
+	//		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+	//		D3D12_HEAP_FLAG_NONE,
+	//		&CD3DX12_RESOURCE_DESC::Buffer(bufferSize, flags),
+	//		D3D12_RESOURCE_STATE_COPY_DEST,
+	//		nullptr,
+	//		IID_PPV_ARGS(pDestinationResource));
 
-		if (bufferData)
-		{
-			m_device->CreateCommittedResource(
-				&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-				D3D12_HEAP_FLAG_NONE,
-				&CD3DX12_RESOURCE_DESC::Buffer(bufferSize, flags),
-				D3D12_RESOURCE_STATE_GENERIC_READ,
-				nullptr,
-				IID_PPV_ARGS(pIntermediateResource));
+	//	if (bufferData)
+	//	{
+	//		m_device->CreateCommittedResource(
+	//			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+	//			D3D12_HEAP_FLAG_NONE,
+	//			&CD3DX12_RESOURCE_DESC::Buffer(bufferSize, flags),
+	//			D3D12_RESOURCE_STATE_GENERIC_READ,
+	//			nullptr,
+	//			IID_PPV_ARGS(pIntermediateResource));
 
-			D3D12_SUBRESOURCE_DATA subresourceData = {};
-			subresourceData.pData = bufferData;
-			subresourceData.RowPitch = bufferSize;
-			subresourceData.SlicePitch = subresourceData.RowPitch;
+	//		D3D12_SUBRESOURCE_DATA subresourceData = {};
+	//		subresourceData.pData = bufferData;
+	//		subresourceData.RowPitch = bufferSize;
+	//		subresourceData.SlicePitch = subresourceData.RowPitch;
 
-			UpdateSubresources(commandList.Get(), *pDestinationResource, *pIntermediateResource, 0, 0, 1, &subresourceData);
-		}
-	}
+	//		UpdateSubresources(commandList.Get(), *pDestinationResource, *pIntermediateResource, 0, 0, 1, &subresourceData);
+	//	}
+	//}
 
 	// Create the vertex buffer view.
 	m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
@@ -621,43 +536,46 @@ void jRHI_DirectX12::LoadContent()
 
 	// Upload index buffer data.
 	ComPtr<ID3D12Resource> intermediateIndexBuffer;
-	{
-		size_t numOfElements = _countof(g_Indicies);
-		size_t elementSize = sizeof(DWORD);
-		const void* bufferData = g_Indicies;
-		D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE;
+	UpdateBufferResource(m_device, commandList, m_indexBuffer, intermediateIndexBuffer
+		, _countof(g_Indicies), sizeof(DWORD), g_Indicies, D3D12_RESOURCE_FLAG_NONE);
 
-		size_t bufferSize = numOfElements * elementSize;
+	//{
+	//	size_t numOfElements = _countof(g_Indicies);
+	//	size_t elementSize = sizeof(DWORD);
+	//	const void* bufferData = g_Indicies;
+	//	D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE;
 
-		ID3D12Resource** pDestinationResource = &m_indexBuffer;
-		ID3D12Resource** pIntermediateResource = &intermediateIndexBuffer;
+	//	size_t bufferSize = numOfElements * elementSize;
 
-		m_device->CreateCommittedResource(
-			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-			D3D12_HEAP_FLAG_NONE,
-			&CD3DX12_RESOURCE_DESC::Buffer(bufferSize, flags),
-			D3D12_RESOURCE_STATE_COPY_DEST,
-			nullptr,
-			IID_PPV_ARGS(pDestinationResource));
+	//	ID3D12Resource** pDestinationResource = &m_indexBuffer;
+	//	ID3D12Resource** pIntermediateResource = &intermediateIndexBuffer;
 
-		if (bufferData)
-		{
-			m_device->CreateCommittedResource(
-				&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-				D3D12_HEAP_FLAG_NONE,
-				&CD3DX12_RESOURCE_DESC::Buffer(bufferSize, flags),
-				D3D12_RESOURCE_STATE_GENERIC_READ,
-				nullptr,
-				IID_PPV_ARGS(pIntermediateResource));
+	//	m_device->CreateCommittedResource(
+	//		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+	//		D3D12_HEAP_FLAG_NONE,
+	//		&CD3DX12_RESOURCE_DESC::Buffer(bufferSize, flags),
+	//		D3D12_RESOURCE_STATE_COPY_DEST,
+	//		nullptr,
+	//		IID_PPV_ARGS(pDestinationResource));
 
-			D3D12_SUBRESOURCE_DATA subresourceData = {};
-			subresourceData.pData = bufferData;
-			subresourceData.RowPitch = bufferSize;
-			subresourceData.SlicePitch = subresourceData.RowPitch;
+	//	if (bufferData)
+	//	{
+	//		m_device->CreateCommittedResource(
+	//			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+	//			D3D12_HEAP_FLAG_NONE,
+	//			&CD3DX12_RESOURCE_DESC::Buffer(bufferSize, flags),
+	//			D3D12_RESOURCE_STATE_GENERIC_READ,
+	//			nullptr,
+	//			IID_PPV_ARGS(pIntermediateResource));
 
-			UpdateSubresources(commandList.Get(), *pDestinationResource, *pIntermediateResource, 0, 0, 1, &subresourceData);
-		}
-	}
+	//		D3D12_SUBRESOURCE_DATA subresourceData = {};
+	//		subresourceData.pData = bufferData;
+	//		subresourceData.RowPitch = bufferSize;
+	//		subresourceData.SlicePitch = subresourceData.RowPitch;
+
+	//		UpdateSubresources(commandList.Get(), *pDestinationResource, *pIntermediateResource, 0, 0, 1, &subresourceData);
+	//	}
+	//}
 
 	m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
 	m_indexBufferView.Format = DXGI_FORMAT_R16_UINT;
@@ -757,49 +675,8 @@ void jRHI_DirectX12::LoadContent()
 	};
 	m_device->CreatePipelineState(&pipelineStateStreamDesc, IID_PPV_ARGS(&m_pipelineState));
 
-	// fenceValue = m_copyCommandQueue->ExecuteCommandList(commandList);
-	uint64_t curFenceValue = 0;
-	{
-		//// Keep track of command allocators that are "in-flight"
-		//struct CommandAllocatorEntry
-		//{
-		//	uint64_t fenceValue;
-		//	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocator;
-		//};
-
-		//using CommandAllocatorQueue = std::queue<CommandAllocatorEntry>;
-		//using CommandListQueue = std::queue< Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList2> >;
-
-		//std::queue<CommandAllocatorEntry> commandAllocatorQueue;
-		//CommandListQueue commandListQueue;
-
-		commandList->Close();
-
-		//ID3D12CommandAllocator* commandAllocator;
-		//UINT dataSize = sizeof(commandAllocator);
-		//commandList->GetPrivateData(__uuidof(ID3D12CommandAllocator), &dataSize, &commandAllocator);
-
-		ID3D12CommandList* const ppCommandLists[] = { commandList.Get() };
-
-		m_copyCommandQueue->ExecuteCommandLists(1, ppCommandLists);
-		curFenceValue = ++fenceValue;
-		m_copyCommandQueue->Signal(fence.Get(), fenceValue);
-
-		//commandAllocatorQueue.emplace(CommandAllocatorEntry{ fenceValue, commandAllocator });
-		//commandListQueue.push(commandList);
-
-		//commandList->Release();
-		//commandAllocator->Release();
-	}
-	if (fence->GetCompletedValue() >= curFenceValue)		// IsFenceComplete
-	{
-		fence->SetEventOnCompletion(curFenceValue, fenceEvent);
-		::WaitForSingleObject(fenceEvent, DWORD_MAX);
-	}
-
-	// Flush any GPU commands that might be referencing the depth buffer
-	// m_copyCommandQueue->Flush();
-	// 위에있는 fence 기다리는것과 동일
+	uint64 executeFenceValue = copyCommandQueue.ExecuteCommandList(commandList);
+	copyCommandQueue.WaitForFenceValue(executeFenceValue);
 
 	// Resize/Create the depth buffer
 	D3D12_CLEAR_VALUE optimizedClearValue = {};
@@ -859,196 +736,160 @@ HWND jRHI_DirectX12::CreateMainWindow() const
 	return hWnd;
 }
 
-void jRHI_DirectX12::RenderTriangleTest()
-{
-	// Record all the commands we need to render the scene into the command list.
-//PopulateCommandList();
-	{
-		// [1]. 커맨드 생성기 초기화
-		// Command list allocators can only be reset when the associated 
-		// command lists have finished execution on the GPU; apps should use 
-		// fences to determine GPU execution progress.
-		m_commandAllocator->Reset();
-
-		// [2]. PSO 바인딩
-		// However, when ExecuteCommandList() is called on a particular command 
-		// list, that command list can then be reset at any time and must be before 
-		// re-recording.
-		m_commandList->Reset(m_commandAllocator.Get(), m_pipelineState.Get());
-
-		// [3]. 루트 시그니쳐 바인딩
-		m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
-
-		ID3D12DescriptorHeap* ppHeaps[] = { m_cbvHeap.Get() };
-		m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
-		m_commandList->SetGraphicsRootDescriptorTable(0, m_cbvHeap->GetGPUDescriptorHandleForHeapStart());
-
-		// [4]. 렌더타겟 설정
-		m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
-
-		CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
-		m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
-
-		// [5]. 기타 상태 설정
-		m_commandList->RSSetViewports(1, &m_viewport);
-		m_commandList->RSSetScissorRects(1, &m_scissorRect);
-
-		// [6]. 백버퍼 리소스 베리어 전환
-		// Indicate that the back buffer will be used as a render target.
-		m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
-
-		// [7]. 렌더타겟과 뎁스버퍼 클리어
-		// Record commands.
-		const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
-		m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-
-		// [8]. 지오메트리 버퍼(버택스, 인덱스) 및 Primitive 타입 바인딩
-		m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
-
-		// [9]. 상수버퍼 바인딩
-
-		// [10]. 렌더
-		m_commandList->DrawInstanced(3, 1, 0, 0);
-
-		// Indicate that the back buffer will now be used to present.
-		m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
-
-		m_commandList->Close();
-	}
-
-	// [11]. 커맨드버퍼 실행
-	// Execute the command list.
-	ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
-	m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
-
-	// [12]. Present
-	// Present the frame.
-	m_swapChain->Present(1, 0);
-
-	WaitForPreviousFrame();
-}
+//void jRHI_DirectX12::RenderTriangleTest()
+//{
+//	// Record all the commands we need to render the scene into the command list.
+////PopulateCommandList();
+//	{
+//		// [1]. 커맨드 생성기 초기화
+//		// Command list allocators can only be reset when the associated 
+//		// command lists have finished execution on the GPU; apps should use 
+//		// fences to determine GPU execution progress.
+//		m_commandAllocator->Reset();
+//
+//		// [2]. PSO 바인딩
+//		// However, when ExecuteCommandList() is called on a particular command 
+//		// list, that command list can then be reset at any time and must be before 
+//		// re-recording.
+//		m_commandList->Reset(m_commandAllocator.Get(), m_pipelineState.Get());
+//
+//		// [3]. 루트 시그니쳐 바인딩
+//		m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
+//
+//		ID3D12DescriptorHeap* ppHeaps[] = { m_cbvHeap.Get() };
+//		m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+//		m_commandList->SetGraphicsRootDescriptorTable(0, m_cbvHeap->GetGPUDescriptorHandleForHeapStart());
+//
+//		// [4]. 렌더타겟 설정
+//		m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+//
+//		CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
+//		m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+//
+//		// [5]. 기타 상태 설정
+//		m_commandList->RSSetViewports(1, &m_viewport);
+//		m_commandList->RSSetScissorRects(1, &m_scissorRect);
+//
+//		// [6]. 백버퍼 리소스 베리어 전환
+//		// Indicate that the back buffer will be used as a render target.
+//		m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+//
+//		// [7]. 렌더타겟과 뎁스버퍼 클리어
+//		// Record commands.
+//		const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
+//		m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+//
+//		// [8]. 지오메트리 버퍼(버택스, 인덱스) 및 Primitive 타입 바인딩
+//		m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+//		m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
+//
+//		// [9]. 상수버퍼 바인딩
+//
+//		// [10]. 렌더
+//		m_commandList->DrawInstanced(3, 1, 0, 0);
+//
+//		// Indicate that the back buffer will now be used to present.
+//		m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+//
+//		m_commandList->Close();
+//	}
+//
+//	// [11]. 커맨드버퍼 실행
+//	// Execute the command list.
+//	ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
+//	m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+//
+//	// [12]. Present
+//	// Present the frame.
+//	m_swapChain->Present(1, 0);
+//
+//	//WaitForPreviousFrame();
+//}
 
 void jRHI_DirectX12::RenderCubeTest()
 {
+	directCommandQueue.WaitForFenceValue();
+
+	ComPtr<ID3D12GraphicsCommandList2> commandList = directCommandQueue.GetAvailableCommandList();
+
+	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
+	ComPtr<ID3D12Resource> currentBackbuffer = m_renderTargets[m_frameIndex];
+	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
+
+	// Clear the render targets
 	{
-		static bool enable = 1;
+		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+			currentBackbuffer.Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		commandList->ResourceBarrier(1, &barrier);
 
-		// Signal and increment the fence value.
-		{
-			const UINT64 fence = directFenceValue;
-			directCommandQueue->Signal(directFence.Get(), fence);
-			directFenceValue++;
+		FLOAT clearColor[] = { 0.4f, 0.6f, 0.9f, 1.0f };
 
-			// Wait until the previous frame is finished.
-			if (directFence->GetCompletedValue() < fence)
-			{
-				directFence->SetEventOnCompletion(fence, directFenceEvent);
-				::WaitForSingleObject(directFenceEvent, INFINITE);
-			}
-		}
+		commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+		commandList->ClearDepthStencilView(m_dSVHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+	}
 
-		m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
-		ComPtr<ID3D12Resource> currentBackbuffer = m_renderTargets[m_frameIndex];
-		CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
+	{
+		commandList->SetPipelineState(m_pipelineState.Get());
+		commandList->SetGraphicsRootSignature(m_rootSignature.Get());
 
-		// Clear the render targets
-		if (enable)
-		{
-			CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-				currentBackbuffer.Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-			directCommandList->ResourceBarrier(1, &barrier);
+		commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
+		commandList->IASetIndexBuffer(&m_indexBufferView);
 
-			FLOAT clearColor[] = { 0.4f, 0.6f, 0.9f, 1.0f };
+		commandList->RSSetViewports(1, &m_viewport);
+		commandList->RSSetScissorRects(1, &m_scissorRect);
 
-			directCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-			directCommandList->ClearDepthStencilView(m_dSVHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-		}
+		commandList->OMSetRenderTargets(1, &rtvHandle, false, &m_dSVHeap->GetCPUDescriptorHandleForHeapStart());
+	}
 
-		if (enable)
-		{
-			directCommandList->SetPipelineState(m_pipelineState.Get());
-			directCommandList->SetGraphicsRootSignature(m_rootSignature.Get());
+	// Update the MVP matrix
+	{
+		XMMATRIX m_ModelMatrix;
+		XMMATRIX m_ViewMatrix;
+		XMMATRIX m_ProjectionMatrix;
 
-			directCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-			directCommandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
-			directCommandList->IASetIndexBuffer(&m_indexBufferView);
+		static float t = 0.0f;
+		t += 0.01f;
 
-			directCommandList->RSSetViewports(1, &m_viewport);
-			directCommandList->RSSetScissorRects(1, &m_scissorRect);
+		// Update the model matrix.
+		float angle = static_cast<float>(t * 90.0);
+		const XMVECTOR rotationAxis = XMVectorSet(0, 1, 1, 0);
+		m_ModelMatrix = XMMatrixRotationAxis(rotationAxis, XMConvertToRadians(angle));
 
-			directCommandList->OMSetRenderTargets(1, &rtvHandle, false, &m_dSVHeap->GetCPUDescriptorHandleForHeapStart());
-		}
+		// Update the view matrix.
+		const XMVECTOR eyePosition = XMVectorSet(0, 0, -10, 1);
+		const XMVECTOR focusPoint = XMVectorSet(0, 0, 0, 1);
+		const XMVECTOR upDirection = XMVectorSet(0, 1, 0, 0);
+		m_ViewMatrix = XMMatrixLookAtLH(eyePosition, focusPoint, upDirection);
 
-		// Update the MVP matrix
-		if (enable)
-		{
-			XMMATRIX m_ModelMatrix;
-			XMMATRIX m_ViewMatrix;
-			XMMATRIX m_ProjectionMatrix;
+		// Update the projection matrix.
+		float aspectRatio = SCR_WIDTH / static_cast<float>(SCR_HEIGHT);
+		m_ProjectionMatrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(45), aspectRatio, 0.1f, 100.0f);
 
-			static float t = 0.0f;
-			t += 0.01f;
+		XMMATRIX mvpMatrix = XMMatrixMultiply(m_ModelMatrix, m_ViewMatrix);
+		mvpMatrix = XMMatrixMultiply(mvpMatrix, m_ProjectionMatrix);
+		commandList->SetGraphicsRoot32BitConstants(0, sizeof(XMMATRIX) / 4, &mvpMatrix, 0);
 
-			// Update the model matrix.
-			float angle = static_cast<float>(t * 90.0);
-			const XMVECTOR rotationAxis = XMVectorSet(0, 1, 1, 0);
-			m_ModelMatrix = XMMatrixRotationAxis(rotationAxis, XMConvertToRadians(angle));
+		commandList->DrawIndexedInstanced(_countof(g_Indicies), 1, 0, 0, 0);
+	}
 
-			// Update the view matrix.
-			const XMVECTOR eyePosition = XMVectorSet(0, 0, -10, 1);
-			const XMVECTOR focusPoint = XMVectorSet(0, 0, 0, 1);
-			const XMVECTOR upDirection = XMVectorSet(0, 1, 0, 0);
-			m_ViewMatrix = XMMatrixLookAtLH(eyePosition, focusPoint, upDirection);
+	// Present
+	{
+		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+			currentBackbuffer.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+		commandList->ResourceBarrier(1, &barrier);
 
-			// Update the projection matrix.
-			float aspectRatio = SCR_WIDTH / static_cast<float>(SCR_HEIGHT);
-			m_ProjectionMatrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(45), aspectRatio, 0.1f, 100.0f);
-
-			XMMATRIX mvpMatrix = XMMatrixMultiply(m_ModelMatrix, m_ViewMatrix);
-			mvpMatrix = XMMatrixMultiply(mvpMatrix, m_ProjectionMatrix);
-			directCommandList->SetGraphicsRoot32BitConstants(0, sizeof(XMMATRIX) / 4, &mvpMatrix, 0);
-
-			directCommandList->DrawIndexedInstanced(_countof(g_Indicies), 1, 0, 0, 0);
-		}
+		uint64 executedFenceValue = directCommandQueue.ExecuteCommandList(commandList);
 
 		// Present
 		{
-			CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-				currentBackbuffer.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
-			directCommandList->ResourceBarrier(1, &barrier);
+			UINT syncInterval = 1;	// vsyn
+			UINT presentFlags = 0;
+			HRESULT r = m_swapChain->Present(syncInterval, presentFlags);
+			UINT currentBackbufferIndex = m_swapChain->GetCurrentBackBufferIndex();
 
-			auto r = directCommandList->Close();
 
-			ID3D12CommandAllocator* commandAllocator;
-			UINT dataSize = sizeof(commandAllocator);
-			directCommandList->GetPrivateData(__uuidof(ID3D12CommandAllocator), &dataSize, &commandAllocator);
-
-			ID3D12CommandList* const ppCommandLists[] = {
-				directCommandList.Get()
-			};
-
-			directCommandQueue->ExecuteCommandLists(1, ppCommandLists);
-			uint64_t fenceValue = ++directFenceValue;
-			auto r2 = directCommandQueue->Signal(directFence.Get(), fenceValue);
-			//directCommandAllocator->Release();
-
-			// Present
-			{
-				UINT syncInterval = 1;	// vsyn
-				UINT presentFlags = 0;
-				HRESULT r = m_swapChain->Present(syncInterval, presentFlags);
-				UINT currentBackbufferIndex = m_swapChain->GetCurrentBackBufferIndex();
-
-				if (directFence->GetCompletedValue() < fenceValue)
-				{
-					directFence->SetEventOnCompletion(directFenceValue, directFenceEvent);
-					::WaitForSingleObject(directFenceEvent, DWORD_MAX);
-				}
-			}
+			directCommandQueue.WaitForFenceValue(executedFenceValue);
 		}
-		directCommandAllocator->Reset();
-		directCommandList->Reset(directCommandAllocator.Get(), NULL);
-		directCommandList->SetPrivateDataInterface(__uuidof(ID3D12CommandAllocator), directCommandAllocator.Get());
 	}
 }

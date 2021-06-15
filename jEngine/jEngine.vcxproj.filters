@@ -48,6 +48,9 @@
     <Filter Include="Shaders\HLSL">
       <UniqueIdentifier>{5e8a6067-12d0-489d-8f14-c20eec298fd8}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Code\DirectX12">
+      <UniqueIdentifier>{c715a7c9-8017-486c-bceb-bc618ed6e7a9}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DeprecatedCode\jPipeline.h">
@@ -230,8 +233,11 @@
     <ClInclude Include="Code\External\SOIL_STBI\stbi_DDS_aug_c.h">
       <Filter>Code\External\SOIL_STBI</Filter>
     </ClInclude>
-    <ClInclude Include="Code\jRHI_DirectX12.h">
-      <Filter>Code</Filter>
+    <ClInclude Include="Code\DirectX12\jCommandQueue_DirectX12.h">
+      <Filter>Code\DirectX12</Filter>
+    </ClInclude>
+    <ClInclude Include="Code\DirectX12\jRHI_DirectX12.h">
+      <Filter>Code\DirectX12</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -391,8 +397,11 @@
     <ClCompile Include="Code\Renderer\jRenderContext.cpp">
       <Filter>Code\Renderer</Filter>
     </ClCompile>
-    <ClCompile Include="Code\jRHI_DirectX12.cpp">
-      <Filter>Code</Filter>
+    <ClCompile Include="Code\DirectX12\jCommandQueue_DirectX12.cpp">
+      <Filter>Code\DirectX12</Filter>
+    </ClCompile>
+    <ClCompile Include="Code\DirectX12\jRHI_DirectX12.cpp">
+      <Filter>Code\DirectX12</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

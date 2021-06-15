@@ -114,4 +114,17 @@ inline void hash_combine(std::size_t& seed, const T& v)
 
 #define USE_TW 1
 
+#include <Windows.h>
+#include <d3d12.h>
+#include <d3dx12.h>
+#include <wrl.h>
+#include <dxgi1_6.h>
+#include <d3dcompiler.h>
+#include <DirectXMath.h>
+
+#pragma comment(lib,"d3d12.lib")
+#pragma comment(lib,"dxgi.lib")
+#pragma comment(lib,"d3dcompiler.lib")
+#pragma comment(lib,"dxguid.lib")
+
 #endif //PCH_H

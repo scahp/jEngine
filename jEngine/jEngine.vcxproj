@@ -174,6 +174,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="Code\DirectX12\jCommandQueue_DirectX12.h" />
+    <ClInclude Include="Code\DirectX12\jRHI_DirectX12.h" />
     <ClInclude Include="Code\External\IMGUI\imconfig.h" />
     <ClInclude Include="Code\External\IMGUI\imgui.h" />
     <ClInclude Include="Code\External\IMGUI\imgui_impl_glfw.h" />
@@ -211,7 +213,6 @@
     <ClInclude Include="Code\jRHI.h" />
     <ClInclude Include="Code\jRHIType.h" />
     <ClInclude Include="Code\jRHI_DirectX11.h" />
-    <ClInclude Include="Code\jRHI_DirectX12.h" />
     <ClInclude Include="Code\jRHI_OpenGL.h" />
     <ClInclude Include="Code\jRHI_Vulkan.h" />
     <ClInclude Include="Code\jSamplerStatePool.h" />
@@ -237,6 +238,8 @@
     <ClInclude Include="DeprecatedCode\jVertexAdjacency.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Code\DirectX12\jCommandQueue_DirectX12.cpp" />
+    <ClCompile Include="Code\DirectX12\jRHI_DirectX12.cpp" />
     <ClCompile Include="Code\External\glad.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
@@ -273,7 +276,6 @@
     <ClCompile Include="Code\jRenderTargetPool.cpp" />
     <ClCompile Include="Code\jRHI.cpp" />
     <ClCompile Include="Code\jRHI_DirectX11.cpp" />
-    <ClCompile Include="Code\jRHI_DirectX12.cpp" />
     <ClCompile Include="Code\jRHI_OpenGL.cpp" />
     <ClCompile Include="Code\jRHI_Vulkan.cpp" />
     <ClCompile Include="Code\jSamplerStatePool.cpp" />

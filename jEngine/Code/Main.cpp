@@ -23,7 +23,7 @@ void APIENTRY glDebugOutput(GLenum source, GLenum type, GLuint id, GLenum severi
 
 jEngine g_Engine;
 
-#include "jRHI_DirectX12.h"
+#include "DirectX12/jRHI_DirectX12.h"
 #include "jRHI_DirectX11.h"
 
 int main()
@@ -31,8 +31,8 @@ int main()
 	jRHI_DirectX12 dx12;
 	dx12.Initialize();
 
-	//jRHI_DirectX11 dx11;
-	//dx11.Initialize();
+	// jRHI_DirectX11 dx11;
+	// dx11.Initialize();
 
 	return 0;
 	// glfw: initialize and configure
