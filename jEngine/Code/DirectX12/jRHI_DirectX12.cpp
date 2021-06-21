@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "jRHI_DirectX12.h"
+#include "jImageFileLoader.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -12,27 +13,67 @@ struct VertexPosColor
 {
 	XMFLOAT3 Position;
 	XMFLOAT3 Color;
+	XMFLOAT2 TexCoord;
 };
 
-static VertexPosColor g_Vertices[8] = {
-	{ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(0.0f, 0.0f, 0.0f) }, // 0
-	{ XMFLOAT3(-1.0f,  1.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) }, // 1
-	{ XMFLOAT3(1.0f,  1.0f, -1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f) }, // 2
-	{ XMFLOAT3(1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f) }, // 3
-	{ XMFLOAT3(-1.0f, -1.0f,  1.0f), XMFLOAT3(0.0f, 0.0f, 1.0f) }, // 4
-	{ XMFLOAT3(-1.0f,  1.0f,  1.0f), XMFLOAT3(0.0f, 1.0f, 1.0f) }, // 5
-	{ XMFLOAT3(1.0f,  1.0f,  1.0f), XMFLOAT3(1.0f, 1.0f, 1.0f) }, // 6
-	{ XMFLOAT3(1.0f, -1.0f,  1.0f), XMFLOAT3(1.0f, 0.0f, 1.0f) }  // 7
+static VertexPosColor g_Vertices[] = {
+	// Cube face 0
+	{ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f), XMFLOAT2(0.0f, 0.0f) },
+	{ XMFLOAT3(-1.0f,  1.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f), XMFLOAT2(0.0f, 1.0f) },
+	{ XMFLOAT3( 1.0f,  1.0f, -1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), XMFLOAT2(1.0f, 1.0f) },
+	{ XMFLOAT3( 1.0f,  1.0f, -1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), XMFLOAT2(1.0f, 1.0f) },
+	{ XMFLOAT3( 1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), XMFLOAT2(1.0f, 0.0f) },
+	{ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f), XMFLOAT2(0.0f, 0.0f) },
+
+	// Cube face 1
+	{ XMFLOAT3(-1.0f, -1.0f,  1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f), XMFLOAT2(0.0f, 0.0f) },
+	{ XMFLOAT3( 1.0f,  1.0f,  1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), XMFLOAT2(1.0f, 1.0f) },
+	{ XMFLOAT3(-1.0f,  1.0f,  1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f), XMFLOAT2(0.0f, 1.0f) },
+	{ XMFLOAT3( 1.0f,  1.0f,  1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), XMFLOAT2(1.0f, 1.0f) },
+	{ XMFLOAT3(-1.0f, -1.0f,  1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f), XMFLOAT2(0.0f, 0.0f) },
+	{ XMFLOAT3( 1.0f, -1.0f,  1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), XMFLOAT2(1.0f, 0.0f) },
+
+	// Cube face 2
+	{ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f), XMFLOAT2(0.0f, 0.0f) },
+	{ XMFLOAT3( 1.0f, -1.0f,  1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), XMFLOAT2(1.0f, 1.0f) },
+	{ XMFLOAT3(-1.0f, -1.0f,  1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f), XMFLOAT2(0.0f, 1.0f) },
+	{ XMFLOAT3( 1.0f, -1.0f,  1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), XMFLOAT2(1.0f, 1.0f) },
+	{ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f), XMFLOAT2(0.0f, 0.0f) },
+	{ XMFLOAT3( 1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), XMFLOAT2(1.0f, 0.0f) },
+
+	// Cube face 3
+	{ XMFLOAT3(-1.0f, 1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f), XMFLOAT2(0.0f, 0.0f) },
+	{ XMFLOAT3(-1.0f, 1.0f,  1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f), XMFLOAT2(0.0f, 1.0f) },
+	{ XMFLOAT3( 1.0f, 1.0f,  1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), XMFLOAT2(1.0f, 1.0f) },
+	{ XMFLOAT3( 1.0f, 1.0f,  1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), XMFLOAT2(1.0f, 1.0f) },
+	{ XMFLOAT3( 1.0f, 1.0f, -1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), XMFLOAT2(1.0f, 0.0f) },
+	{ XMFLOAT3(-1.0f, 1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f), XMFLOAT2(0.0f, 0.0f) },
+
+	// Cube face 4
+	{ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f), XMFLOAT2(0.0f, 0.0f) },
+	{ XMFLOAT3(-1.0f, -1.0f,  1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f), XMFLOAT2(0.0f, 1.0f) },
+	{ XMFLOAT3(-1.0f,  1.0f,  1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), XMFLOAT2(1.0f, 1.0f) },
+	{ XMFLOAT3(-1.0f,  1.0f,  1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), XMFLOAT2(1.0f, 1.0f) },
+	{ XMFLOAT3(-1.0f,  1.0f, -1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), XMFLOAT2(1.0f, 0.0f) },
+	{ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f), XMFLOAT2(0.0f, 0.0f) },
+
+	// Cube face 5
+	{ XMFLOAT3( 1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f), XMFLOAT2(0.0f, 0.0f) },
+	{ XMFLOAT3( 1.0f,  1.0f,  1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), XMFLOAT2(1.0f, 1.0f) },
+	{ XMFLOAT3( 1.0f, -1.0f,  1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f), XMFLOAT2(0.0f, 1.0f) },
+	{ XMFLOAT3( 1.0f,  1.0f,  1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), XMFLOAT2(1.0f, 1.0f) },
+	{ XMFLOAT3( 1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f), XMFLOAT2(0.0f, 0.0f) },
+	{ XMFLOAT3( 1.0f,  1.0f, -1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), XMFLOAT2(1.0f, 0.0f) },
 };
 
-static WORD g_Indicies[36] =
+static WORD g_Indicies[] =
 {
-	0, 1, 2, 0, 2, 3,
-	4, 6, 5, 4, 7, 6,
-	4, 5, 1, 4, 1, 0,
-	3, 2, 6, 3, 6, 7,
-	1, 5, 6, 1, 6, 2,
-	4, 0, 3, 4, 3, 7
+	0, 1, 2, 3, 4, 5,
+	6, 7, 8, 9, 10, 11,
+	12, 13, 14, 15, 16, 17,
+	18, 19, 20, 21, 22, 23,
+	24, 25, 26, 27, 28, 29,
+	30, 31, 32, 33, 34, 35
 };
 
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -222,6 +263,15 @@ void jRHI_DirectX12::Initialize()
 		m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap));
 
 		m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	}
+
+	{
+		// CreateTexutre
+		D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
+		srvHeapDesc.NumDescriptors = 1;
+		srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+		srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+		m_device->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_srvHeap));
 	}
 
 	// 2. 백버퍼 렌더타겟의 뷰를 만듬
@@ -489,45 +539,6 @@ void jRHI_DirectX12::LoadContent()
 	ComPtr<ID3D12Resource> intermediateVertexBuffer;
 	UpdateBufferResource(m_device, commandList, m_vertexBuffer, intermediateVertexBuffer
 		, _countof(g_Vertices), sizeof(VertexPosColor), g_Vertices, D3D12_RESOURCE_FLAG_NONE);
-	//ComPtr<ID3D12Resource> intermediateVertexBuffer;
-
-	//{
-	//	size_t numOfElements = _countof(g_Vertices);
-	//	size_t elementSize = sizeof(VertexPosColor);
-	//	const void* bufferData = g_Vertices;
-	//	D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE;
-
-	//	size_t bufferSize = numOfElements * elementSize;
-
-	//	ID3D12Resource** pDestinationResource = &m_vertexBuffer;
-	//	ID3D12Resource** pIntermediateResource = &intermediateVertexBuffer;
-
-	//	m_device->CreateCommittedResource(
-	//		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-	//		D3D12_HEAP_FLAG_NONE,
-	//		&CD3DX12_RESOURCE_DESC::Buffer(bufferSize, flags),
-	//		D3D12_RESOURCE_STATE_COPY_DEST,
-	//		nullptr,
-	//		IID_PPV_ARGS(pDestinationResource));
-
-	//	if (bufferData)
-	//	{
-	//		m_device->CreateCommittedResource(
-	//			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-	//			D3D12_HEAP_FLAG_NONE,
-	//			&CD3DX12_RESOURCE_DESC::Buffer(bufferSize, flags),
-	//			D3D12_RESOURCE_STATE_GENERIC_READ,
-	//			nullptr,
-	//			IID_PPV_ARGS(pIntermediateResource));
-
-	//		D3D12_SUBRESOURCE_DATA subresourceData = {};
-	//		subresourceData.pData = bufferData;
-	//		subresourceData.RowPitch = bufferSize;
-	//		subresourceData.SlicePitch = subresourceData.RowPitch;
-
-	//		UpdateSubresources(commandList.Get(), *pDestinationResource, *pIntermediateResource, 0, 0, 1, &subresourceData);
-	//	}
-	//}
 
 	// Create the vertex buffer view.
 	m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
@@ -539,43 +550,36 @@ void jRHI_DirectX12::LoadContent()
 	UpdateBufferResource(m_device, commandList, m_indexBuffer, intermediateIndexBuffer
 		, _countof(g_Indicies), sizeof(DWORD), g_Indicies, D3D12_RESOURCE_FLAG_NONE);
 
-	//{
-	//	size_t numOfElements = _countof(g_Indicies);
-	//	size_t elementSize = sizeof(DWORD);
-	//	const void* bufferData = g_Indicies;
-	//	D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE;
+	ComPtr<ID3D12Resource> intermediateTextureUploadBuffer;
+	{
+		std::weak_ptr<jImageData> ImageData = jImageFileLoader::GetInstance().LoadImageDataFromFile("Image/sun.png");
+		std::shared_ptr<jImageData> imageDataPtr = ImageData.lock();
 
-	//	size_t bufferSize = numOfElements * elementSize;
+		D3D12_RESOURCE_DESC textureDesc = {};
+		textureDesc.MipLevels = 1;
+		textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		textureDesc.Width = imageDataPtr->Width;
+		textureDesc.Height = imageDataPtr->Height;
+		textureDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+		textureDesc.DepthOrArraySize = 1;
+		textureDesc.SampleDesc.Count = 1;
+		textureDesc.SampleDesc.Quality = 0;
+		textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 
-	//	ID3D12Resource** pDestinationResource = &m_indexBuffer;
-	//	ID3D12Resource** pIntermediateResource = &intermediateIndexBuffer;
+		const size_t textureSize = imageDataPtr->Width * imageDataPtr->Height;
+		UpdateBufferResourceWithDesc(m_device, commandList, m_texture, intermediateTextureUploadBuffer
+			, textureSize, 4, textureDesc, &imageDataPtr->ImageData[0], D3D12_RESOURCE_FLAG_NONE);
 
-	//	m_device->CreateCommittedResource(
-	//		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-	//		D3D12_HEAP_FLAG_NONE,
-	//		&CD3DX12_RESOURCE_DESC::Buffer(bufferSize, flags),
-	//		D3D12_RESOURCE_STATE_COPY_DEST,
-	//		nullptr,
-	//		IID_PPV_ARGS(pDestinationResource));
+		commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_texture.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
 
-	//	if (bufferData)
-	//	{
-	//		m_device->CreateCommittedResource(
-	//			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-	//			D3D12_HEAP_FLAG_NONE,
-	//			&CD3DX12_RESOURCE_DESC::Buffer(bufferSize, flags),
-	//			D3D12_RESOURCE_STATE_GENERIC_READ,
-	//			nullptr,
-	//			IID_PPV_ARGS(pIntermediateResource));
-
-	//		D3D12_SUBRESOURCE_DATA subresourceData = {};
-	//		subresourceData.pData = bufferData;
-	//		subresourceData.RowPitch = bufferSize;
-	//		subresourceData.SlicePitch = subresourceData.RowPitch;
-
-	//		UpdateSubresources(commandList.Get(), *pDestinationResource, *pIntermediateResource, 0, 0, 1, &subresourceData);
-	//	}
-	//}
+		// Describe and create a SRV for the texture
+		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		srvDesc.Format = textureDesc.Format;
+		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		srvDesc.Texture2D.MipLevels = 1;
+		m_device->CreateShaderResourceView(m_texture.Get(), &srvDesc, m_srvHeap->GetCPUDescriptorHandleForHeapStart());
+	}
 
 	m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
 	m_indexBufferView.Format = DXGI_FORMAT_R16_UINT;
@@ -616,6 +620,7 @@ void jRHI_DirectX12::LoadContent()
 	D3D12_INPUT_ELEMENT_DESC inputLayout[] = {
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 		{ "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 	};
 
 	// Create a root signature
@@ -629,15 +634,36 @@ void jRHI_DirectX12::LoadContent()
 		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
 		D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
 		D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
-		D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
-		D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS;
+		D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;// |
+		//D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS;
 
 	// A single 32-bit constant root parameter that is used by the vertex shader
-	CD3DX12_ROOT_PARAMETER1 rootParameters[1];
+	CD3DX12_ROOT_PARAMETER1 rootParameters[2];
 	rootParameters[0].InitAsConstants(sizeof(XMMATRIX) / 4, 0, 0, D3D12_SHADER_VISIBILITY_VERTEX);
 
+	// Texture
+	CD3DX12_DESCRIPTOR_RANGE1 ranges[1];
+	ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+	rootParameters[1].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);		//	* rootParameters[1] 의 1을 SetGraphicsRootDescriptorTable에 Index로 넘겨야함. *
+
+	D3D12_STATIC_SAMPLER_DESC sampler = {};
+	sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+	sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+	sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+	sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+	sampler.MipLODBias = 0;
+	sampler.MaxAnisotropy = 0;
+	sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+	sampler.MinLOD = 0.0f;
+	sampler.MaxLOD = D3D12_FLOAT32_MAX;
+	sampler.ShaderRegister = 0;
+	sampler.RegisterSpace = 0;
+	sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	//////////////////////////////////////////////////////////////////////////
+
+
 	CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
-	rootSignatureDescription.Init_1_1(_countof(rootParameters), rootParameters, 0, nullptr, rootSignatureFlags);
+	rootSignatureDescription.Init_1_1(_countof(rootParameters), rootParameters, 1, &sampler, rootSignatureFlags);
 
 	// Serialize the root signature
 	ComPtr<ID3DBlob> rootSignatureBlob;
@@ -645,7 +671,8 @@ void jRHI_DirectX12::LoadContent()
 	D3DX12SerializeVersionedRootSignature(&rootSignatureDescription, featureData.HighestVersion, &rootSignatureBlob, &errorBlob);
 
 	// Create the root signature
-	m_device->CreateRootSignature(0, rootSignatureBlob->GetBufferPointer(), rootSignatureBlob->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature));
+	if (FAILED(m_device->CreateRootSignature(0, rootSignatureBlob->GetBufferPointer(), rootSignatureBlob->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature))))
+		return;
 
 	struct PipelineStateStream
 	{
@@ -673,7 +700,8 @@ void jRHI_DirectX12::LoadContent()
 	D3D12_PIPELINE_STATE_STREAM_DESC pipelineStateStreamDesc = {
 		sizeof(PipelineStateStream), &pipelineStateStream
 	};
-	m_device->CreatePipelineState(&pipelineStateStreamDesc, IID_PPV_ARGS(&m_pipelineState));
+	if (FAILED(m_device->CreatePipelineState(&pipelineStateStreamDesc, IID_PPV_ARGS(&m_pipelineState))))
+		return;
 
 	uint64 executeFenceValue = copyCommandQueue.ExecuteCommandList(commandList);
 	copyCommandQueue.WaitForFenceValue(executeFenceValue);
@@ -830,7 +858,12 @@ void jRHI_DirectX12::RenderCubeTest()
 
 	{
 		commandList->SetPipelineState(m_pipelineState.Get());
+
 		commandList->SetGraphicsRootSignature(m_rootSignature.Get());
+
+		ID3D12DescriptorHeap* ppHeaps[] = { m_srvHeap.Get() };
+		commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+		commandList->SetGraphicsRootDescriptorTable(1, m_srvHeap->GetGPUDescriptorHandleForHeapStart());	// rootParameters에서 SRV가 어떤 Index에 들어간지 RootParameterIndex를 설정해야 함
 
 		commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);

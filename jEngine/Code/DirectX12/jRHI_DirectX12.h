@@ -52,7 +52,8 @@ public:
 	ComPtr<ID3D12Resource> m_depthBuffer;
 	ComPtr<ID3D12Resource> m_indexBuffer;
 	ComPtr<ID3D12DescriptorHeap> m_dSVHeap;
-
+	ComPtr<ID3D12Resource> m_texture;
+	ComPtr<ID3D12DescriptorHeap> m_srvHeap;
 
 	// Synchronization objects.
 	UINT m_frameIndex;
@@ -101,6 +102,57 @@ public:
 			subresourceData.pData = InData;
 			subresourceData.RowPitch = bufferSize;
 			subresourceData.SlicePitch = subresourceData.RowPitch;
+
+			if (0 == UpdateSubresources(InCommandList.Get()
+				, InDestinationResource.Get(), InIntermediateResource.Get()
+				, 0, 0, 1, &subresourceData))
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	bool UpdateBufferResourceWithDesc(
+		ComPtr<ID3D12Device2> InDevice
+		, ComPtr<ID3D12GraphicsCommandList2> InCommandList
+		, ComPtr<ID3D12Resource>& InDestinationResource
+		, ComPtr<ID3D12Resource>& InIntermediateResource
+		, size_t InNumOfElement, size_t InElementSize
+		, const D3D12_RESOURCE_DESC& InDesc
+		, const void* InData, D3D12_RESOURCE_FLAGS InFlags = D3D12_RESOURCE_FLAG_NONE)
+	{
+		const size_t bufferSize = InNumOfElement * InElementSize;
+
+		if (FAILED(InDevice->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT)
+			, D3D12_HEAP_FLAG_NONE
+			, &InDesc
+			, D3D12_RESOURCE_STATE_COPY_DEST
+			, nullptr
+			, IID_PPV_ARGS(&InDestinationResource))))
+		{
+			return false;
+		}
+
+		if (InData)
+		{
+			if (FAILED(InDevice->CreateCommittedResource(
+				&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD)
+				, D3D12_HEAP_FLAG_NONE
+				, &CD3DX12_RESOURCE_DESC::Buffer(bufferSize)
+				, D3D12_RESOURCE_STATE_GENERIC_READ
+				, nullptr
+				, IID_PPV_ARGS(&InIntermediateResource))))
+			{
+				return false;
+			}
+
+			D3D12_SUBRESOURCE_DATA subresourceData = {};
+			subresourceData.pData = InData;
+			subresourceData.RowPitch = InDesc.Width * InElementSize;
+			subresourceData.SlicePitch = subresourceData.RowPitch * InDesc.Height;
 
 			if (0 == UpdateSubresources(InCommandList.Get()
 				, InDestinationResource.Get(), InIntermediateResource.Get()
