@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "jRHI.h"
 
 #include <windows.h>
@@ -62,6 +62,7 @@ public:
 	UINT64 m_fenceValue;
 
 	jCommandQueue_DirectX12 directCommandQueue;
+	jCommandQueue_DirectX12 bundleCommandQueue;
 	jCommandQueue_DirectX12 copyCommandQueue;
 
 	bool UpdateBufferResource(

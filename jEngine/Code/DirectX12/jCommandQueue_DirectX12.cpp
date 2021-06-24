@@ -1,4 +1,4 @@
-#include "pch.h"
+﻿#include "pch.h"
 #include "jCommandQueue_DirectX12.h"
 
 bool jCommandQueue_DirectX12::Initialize(ComPtr<ID3D12Device> InDevice, D3D12_COMMAND_LIST_TYPE InType)
@@ -6,14 +6,19 @@ bool jCommandQueue_DirectX12::Initialize(ComPtr<ID3D12Device> InDevice, D3D12_CO
 	JASSERT(InDevice);
 	Device = InDevice;
 
-	D3D12_COMMAND_QUEUE_DESC commandQueueDesc = {};
-	commandQueueDesc.Type = CommandListType;
-	commandQueueDesc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
-	commandQueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-	commandQueueDesc.NodeMask = 0;
+	CommandListType = InType;
 
-	if (FAILED(Device->CreateCommandQueue(&commandQueueDesc, IID_PPV_ARGS(&CommandQueue))))
-		return false;
+	if (CommandListType != D3D12_COMMAND_LIST_TYPE_BUNDLE)
+	{
+		D3D12_COMMAND_QUEUE_DESC commandQueueDesc = {};
+		commandQueueDesc.Type = CommandListType;
+		commandQueueDesc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
+		commandQueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+		commandQueueDesc.NodeMask = 0;
+
+		if (FAILED(Device->CreateCommandQueue(&commandQueueDesc, IID_PPV_ARGS(&CommandQueue))))
+			return false;
+	}
 
 	if (FAILED(Device->CreateFence(FenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&Fence))))
 		return false;
