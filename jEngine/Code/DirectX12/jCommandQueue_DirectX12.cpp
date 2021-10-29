@@ -32,7 +32,8 @@ bool jCommandQueue_DirectX12::Initialize(ComPtr<ID3D12Device> InDevice, D3D12_CO
 
 uint64 jCommandQueue_DirectX12::ExecuteCommandList(ComPtr<ID3D12GraphicsCommandList2> InCommandListPtr)
 {
-	InCommandListPtr->Close();
+	if (FAILED(InCommandListPtr->Close()))
+		return -1;
 
 	ID3D12CommandAllocator* commandAllocator = nullptr;
 	uint32 dataSize = sizeof(commandAllocator);

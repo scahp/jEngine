@@ -62,7 +62,7 @@ private:
 	{
 		ComPtr<ID3D12GraphicsCommandList2> commandList;
 		if (FAILED(Device->CreateCommandList(0, CommandListType, InAllocatorPtr.Get(), nullptr, IID_PPV_ARGS(&commandList))))
-			return false;
+			return nullptr;
 
 		return commandList;
 	}

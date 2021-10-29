@@ -269,7 +269,7 @@ void jRHI_DirectX12::Initialize()
 	{
 		// CreateTexutre
 		D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-		srvHeapDesc.NumDescriptors = 1;
+		srvHeapDesc.NumDescriptors = 1 + _countof(m_textureArray);
 		srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 		m_device->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_srvHeap));
@@ -332,25 +332,30 @@ void jRHI_DirectX12::LoadContent()
 	//	m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COPY, IID_PPV_ARGS(&commandAllocator));
 	//	m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_COPY, commandAllocator.Get(), nullptr, IID_PPV_ARGS(&commandList));
 	//}
+    ComPtr<ID3D12GraphicsCommandList2> directCommandList = directCommandQueue.GetAvailableCommandList();
 
 	copyCommandQueue.Initialize(m_device, D3D12_COMMAND_LIST_TYPE_COPY);
-	ComPtr<ID3D12GraphicsCommandList2> directCommandList = directCommandQueue.GetAvailableCommandList();
-	ComPtr<ID3D12GraphicsCommandList2> copyCommandList = copyCommandQueue.GetAvailableCommandList();
+	{
+		ComPtr<ID3D12GraphicsCommandList2> copyCommandList = copyCommandQueue.GetAvailableCommandList();
 
-	// Upload vertex buffer data
-	ComPtr<ID3D12Resource> intermediateVertexBuffer;
-	UpdateBufferResource(m_device, copyCommandList, m_vertexBuffer, intermediateVertexBuffer
-		, _countof(g_Vertices), sizeof(VertexPosColor), g_Vertices, D3D12_RESOURCE_FLAG_NONE);
+		// Upload vertex buffer data
+		ComPtr<ID3D12Resource> intermediateVertexBuffer;
+		UpdateBufferResource(m_device, copyCommandList, m_vertexBuffer, intermediateVertexBuffer
+			, _countof(g_Vertices), sizeof(VertexPosColor), g_Vertices, D3D12_RESOURCE_FLAG_NONE);
 
-	// Create the vertex buffer view.
-	m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
-	m_vertexBufferView.SizeInBytes = sizeof(g_Vertices);
-	m_vertexBufferView.StrideInBytes = sizeof(VertexPosColor);
+		// Create the vertex buffer view.
+		m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
+		m_vertexBufferView.SizeInBytes = sizeof(g_Vertices);
+		m_vertexBufferView.StrideInBytes = sizeof(VertexPosColor);
 
-	// Upload index buffer data.
-	ComPtr<ID3D12Resource> intermediateIndexBuffer;
-	UpdateBufferResource(m_device, copyCommandList, m_indexBuffer, intermediateIndexBuffer
-		, _countof(g_Indicies), sizeof(DWORD), g_Indicies, D3D12_RESOURCE_FLAG_NONE);
+		// Upload index buffer data.
+		ComPtr<ID3D12Resource> intermediateIndexBuffer;
+		UpdateBufferResource(m_device, copyCommandList, m_indexBuffer, intermediateIndexBuffer
+			, _countof(g_Indicies), sizeof(DWORD), g_Indicies, D3D12_RESOURCE_FLAG_NONE);
+
+        uint64 executeFenceValue = copyCommandQueue.ExecuteCommandList(copyCommandList);
+        copyCommandQueue.WaitForFenceValue(executeFenceValue);
+	}
 
 	// Texture
 	ComPtr<ID3D12Resource> intermediateTextureUploadBuffer;
@@ -368,15 +373,21 @@ void jRHI_DirectX12::LoadContent()
 	textureDesc.SampleDesc.Quality = 0;
 	textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 
-	const size_t textureSize = imageDataPtr->Width * imageDataPtr->Height;
-	UpdateBufferResourceWithDesc(m_device, copyCommandList, m_texture, intermediateTextureUploadBuffer
-		, textureSize, 4, textureDesc, &imageDataPtr->ImageData[0], D3D12_RESOURCE_FLAG_NONE);
+	{
+		ComPtr<ID3D12GraphicsCommandList2> copyCommandList = copyCommandQueue.GetAvailableCommandList();
 
-	directCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_texture.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+		const size_t textureSize = imageDataPtr->Width * imageDataPtr->Height;
+		UpdateBufferResourceWithDesc(m_device, copyCommandList, m_texture, intermediateTextureUploadBuffer
+			, textureSize, 4, textureDesc, &imageDataPtr->ImageData[0], D3D12_RESOURCE_FLAG_NONE);
 
-	uint64 executeFenceValue = copyCommandQueue.ExecuteCommandList(copyCommandList);
-	copyCommandQueue.WaitForFenceValue(executeFenceValue);
+		directCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_texture.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
 
+		uint64 executeFenceValue = copyCommandQueue.ExecuteCommandList(copyCommandList);
+		copyCommandQueue.WaitForFenceValue(executeFenceValue);
+    }
+
+    int32 m_cbvSrvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle(m_srvHeap->GetCPUDescriptorHandleForHeapStart(), 0, m_cbvSrvDescriptorSize);
 	{
 		// Describe and create a SRV for the texture
 		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -384,8 +395,50 @@ void jRHI_DirectX12::LoadContent()
 		srvDesc.Format = textureDesc.Format;
 		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 		srvDesc.Texture2D.MipLevels = 1;
-		m_device->CreateShaderResourceView(m_texture.Get(), &srvDesc, m_srvHeap->GetCPUDescriptorHandleForHeapStart());
+		m_device->CreateShaderResourceView(m_texture.Get(), &srvDesc, srvHandle);
+		srvHandle.Offset(m_cbvSrvDescriptorSize);
 	}
+	//////////////////////////////////////////////////////////////////////////\
+
+	// Texture Array
+	const char* ImagePathArray[] = 
+	{
+        "Image/bulb.png",
+        "Image/spot.png",
+		"Image/sun.png",
+	};
+	for (int32 i = 0; i < _countof(ImagePathArray); ++i)
+	{
+        std::weak_ptr<jImageData> ImageData = jImageFileLoader::GetInstance().LoadImageDataFromFile(ImagePathArray[i]);
+        std::shared_ptr<jImageData> imageDataPtr = ImageData.lock();
+
+        ComPtr<ID3D12GraphicsCommandList2> copyCommandList = copyCommandQueue.GetAvailableCommandList();
+        
+		const size_t textureSize = imageDataPtr->Width * imageDataPtr->Height;
+        UpdateBufferResourceWithDesc(m_device, copyCommandList, m_textureArray[i], intermediateTextureUploadBuffer
+            , textureSize, 4, textureDesc, &imageDataPtr->ImageData[0], D3D12_RESOURCE_FLAG_NONE);
+
+		directCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_textureArray[i].Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+
+        uint64 executeFenceValue = copyCommandQueue.ExecuteCommandList(copyCommandList);
+        copyCommandQueue.WaitForFenceValue(executeFenceValue);
+	}
+
+	{
+		for (int32 i = 0; i < _countof(m_textureArray); ++i)
+		{
+			// Create SRV for the ImageArray
+			D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+			srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			srvDesc.Format = textureDesc.Format;
+			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+			srvDesc.Texture2D.MipLevels = 1;
+			m_device->CreateShaderResourceView(m_textureArray[i].Get(), &srvDesc, srvHandle);
+
+			srvHandle.Offset(m_cbvSrvDescriptorSize);
+		}
+	}
+	//////////////////////////////////////////////////////////////////////////
 
 	m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
 	m_indexBufferView.Format = DXGI_FORMAT_R16_UINT;
@@ -396,7 +449,8 @@ void jRHI_DirectX12::LoadContent()
 	dsvHeapDesc.NumDescriptors = 1;
 	dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
 	dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-	m_device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_dSVHeap));
+	if (FAILED(m_device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_dSVHeap))))
+		return;
 
 	// Load the shaders
 #if defined(_DEBUG)
@@ -444,13 +498,17 @@ void jRHI_DirectX12::LoadContent()
 		//D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS;
 
 	// A single 32-bit constant root parameter that is used by the vertex shader
-	CD3DX12_ROOT_PARAMETER1 rootParameters[2];
+	CD3DX12_ROOT_PARAMETER1 rootParameters[3];
 	rootParameters[0].InitAsConstants(sizeof(XMMATRIX) / 4, 0, 0, D3D12_SHADER_VISIBILITY_VERTEX);
 
 	// Texture
-	CD3DX12_DESCRIPTOR_RANGE1 ranges[1];
+	CD3DX12_DESCRIPTOR_RANGE1 ranges[2];
 	ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+	//ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, _countof(m_textureArray), 1, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+	ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 3, 1, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+
 	rootParameters[1].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);		//	* rootParameters[1] 의 1을 SetGraphicsRootDescriptorTable에 Index로 넘겨야함. *
+	rootParameters[2].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_PIXEL);		//	* rootParameters[2] 의 2을 SetGraphicsRootDescriptorTable에 Index로 넘겨야함. *
 
 	D3D12_STATIC_SAMPLER_DESC sampler = {};
 	sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
@@ -474,7 +532,15 @@ void jRHI_DirectX12::LoadContent()
 	// Serialize the root signature
 	ComPtr<ID3DBlob> rootSignatureBlob;
 	ComPtr<ID3DBlob> errorBlob;
-	D3DX12SerializeVersionedRootSignature(&rootSignatureDescription, featureData.HighestVersion, &rootSignatureBlob, &errorBlob);
+	if (FAILED(D3DX12SerializeVersionedRootSignature(&rootSignatureDescription, featureData.HighestVersion, &rootSignatureBlob, &errorBlob)))
+	{
+		if (errorBlob)
+		{
+            OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+			errorBlob->Release();
+		}
+		return;
+	}
 
 	// Create the root signature
 	if (FAILED(m_device->CreateRootSignature(0, rootSignatureBlob->GetBufferPointer(), rootSignatureBlob->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature))))
@@ -605,7 +671,13 @@ void jRHI_DirectX12::RenderCubeTest()
 
 			ID3D12DescriptorHeap* ppHeaps[] = { m_srvHeap.Get() };
 			commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
-			commandList->SetGraphicsRootDescriptorTable(1, m_srvHeap->GetGPUDescriptorHandleForHeapStart());	// rootParameters에서 SRV가 어떤 Index에 들어간지 RootParameterIndex를 설정해야 함
+
+			int32 m_cbvSrvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+			CD3DX12_GPU_DESCRIPTOR_HANDLE cbvSrvHandle(m_srvHeap->GetGPUDescriptorHandleForHeapStart(), 0, m_cbvSrvDescriptorSize);
+
+			commandList->SetGraphicsRootDescriptorTable(1, cbvSrvHandle);	// rootParameters에서 SRV가 어떤 Index에 들어간지 RootParameterIndex를 설정해야 함
+			cbvSrvHandle.Offset(m_cbvSrvDescriptorSize);
+			commandList->SetGraphicsRootDescriptorTable(2, cbvSrvHandle);
 
 			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 			commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);

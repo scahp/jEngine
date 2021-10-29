@@ -53,6 +53,7 @@ public:
 	ComPtr<ID3D12Resource> m_indexBuffer;
 	ComPtr<ID3D12DescriptorHeap> m_dSVHeap;
 	ComPtr<ID3D12Resource> m_texture;
+	ComPtr<ID3D12Resource> m_textureArray[3];
 	ComPtr<ID3D12DescriptorHeap> m_srvHeap;
 
 	// Synchronization objects.
