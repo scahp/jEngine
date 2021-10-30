@@ -56,7 +56,7 @@ public:
 	ComPtr<ID3D12DescriptorHeap> m_srvHeap;
 
 	// Compute shader
-	struct SceneConstantBuffer
+	struct InstanceConstantBuffer
 	{
 		Vector4 Color = Vector4::ColorRed;
 		Vector4 padding[15]; // to be aligned 256 byte.
@@ -66,16 +66,24 @@ public:
 			Size = (sizeof(Color) + sizeof(padding))
 		};
 	};
+	struct MVPConstantBuffer
+	{
+		XMMATRIX MVP;
+		Vector4 padding[12];	// to be aligned 256 byte.
+	};
 	// Data structure to match the command signature used for ExecuteIndirect.
 	struct IndirectCommand
 	{
-		D3D12_GPU_VIRTUAL_ADDRESS cbv;
+		D3D12_GPU_VIRTUAL_ADDRESS cbvMVP;
+		D3D12_GPU_VIRTUAL_ADDRESS cbvInstanceBuffer;
 		D3D12_DRAW_INDEXED_ARGUMENTS drawArguments;
 	};
 	ComPtr<ID3D12RootSignature> m_computeRootSignature;
 	ComPtr<ID3D12PipelineState> m_computeState;
-	ComPtr<ID3D12Resource> m_constantBuffer;
-	std::vector<SceneConstantBuffer> m_constantBufferData;
+	ComPtr<ID3D12Resource> m_constantInstanceBuffer;
+	std::vector<InstanceConstantBuffer> m_constantInstanceBufferData;
+	ComPtr<ID3D12Resource> m_constantMVPBuffer;
+	std::vector<MVPConstantBuffer> m_constantMVPBufferData;
 	std::vector<IndirectCommand> commands;
 	ComPtr<ID3D12Resource> m_commandBuffer;
 	ComPtr<ID3D12Resource> m_processedCommandBuffers;

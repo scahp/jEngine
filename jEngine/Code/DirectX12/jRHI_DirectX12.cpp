@@ -97,8 +97,9 @@ struct ComputeRootConstant
 	float CommandCount;
 };
 
-const int32 CubeCount = 100;
-uint32 GraphicsShaderConstantBufferviewForIndirectCommand = 0;
+const int32 CubeCount = 49;
+uint32 GraphicsShaderCBVInstanceBufferForIndirectCommand = 0;
+uint32 GraphicsShaderCBVMVPForIndirectCommand = 0;
 
 
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -527,12 +528,16 @@ void jRHI_DirectX12::LoadContent()
 	// A single 32-bit constant root parameter that is used by the vertex shader
 	CD3DX12_ROOT_PARAMETER1 rootParameters[5];
 	int32 rootParameter = 0;
-	rootParameters[rootParameter++].InitAsConstants(sizeof(XMMATRIX) / 4, 0, 0, D3D12_SHADER_VISIBILITY_VERTEX);
-	rootParameters[rootParameter++].InitAsConstants(sizeof(MaterialConstants) / 4, 0, 0, D3D12_SHADER_VISIBILITY_PIXEL);
-	// rootParameters[2].InitAsConstants(SceneConstantBuffer::SizeWithoutPadding / 4, 1, 0, D3D12_SHADER_VISIBILITY_PIXEL);
 
-	GraphicsShaderConstantBufferviewForIndirectCommand = rootParameter++;
-	rootParameters[GraphicsShaderConstantBufferviewForIndirectCommand].InitAsConstantBufferView(1, 0, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC, D3D12_SHADER_VISIBILITY_PIXEL);
+	GraphicsShaderCBVMVPForIndirectCommand = rootParameter++;
+	rootParameters[GraphicsShaderCBVMVPForIndirectCommand].InitAsConstantBufferView(0, 0, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC, D3D12_SHADER_VISIBILITY_VERTEX);
+	//rootParameters[rootParameter++].InitAsConstants(sizeof(XMMATRIX) / 4, 0, 0, D3D12_SHADER_VISIBILITY_VERTEX);
+
+	rootParameters[rootParameter++].InitAsConstants(sizeof(MaterialConstants) / 4, 0, 0, D3D12_SHADER_VISIBILITY_PIXEL);
+
+	// rootParameters[2].InitAsConstants(InstanceConstantBuffer::SizeWithoutPadding / 4, 1, 0, D3D12_SHADER_VISIBILITY_PIXEL);
+	GraphicsShaderCBVInstanceBufferForIndirectCommand = rootParameter++;
+	rootParameters[GraphicsShaderCBVInstanceBufferForIndirectCommand].InitAsConstantBufferView(1, 0, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC, D3D12_SHADER_VISIBILITY_PIXEL);
 
 	// Texture
 	CD3DX12_DESCRIPTOR_RANGE1 ranges[2];
@@ -691,9 +696,11 @@ void jRHI_DirectX12::LoadContent()
 		if (FAILED(m_device->CreateComputePipelineState(&computePsoDesc, IID_PPV_ARGS(&m_computeState))))
 			return;
 
-		// Create the constant buffers
+		// Create the buffers
 		{
-			m_constantBufferData.resize(CubeCount);
+			//////////////////////////////////////////////////////////////////////////
+			// Create constant instance buffer
+			m_constantInstanceBufferData.resize(CubeCount);
 
 			// Initialize the constant buffers for each of the triangles.
 			const int32 Interval = (255 * 3) / CubeCount;
@@ -706,7 +713,7 @@ void jRHI_DirectX12::LoadContent()
 					ColorTemp.y += Interval;
 				else if (ColorTemp.z + Interval <= 255)
 					ColorTemp.z += Interval;
-				m_constantBufferData[i].Color = ColorTemp;
+				m_constantInstanceBufferData[i].Color = ColorTemp / 255.0f;
 			}
 
 			{
@@ -714,14 +721,14 @@ void jRHI_DirectX12::LoadContent()
 
 				// Upload constant buffer data
 				ComPtr<ID3D12Resource> intermediateConstantBuffer;
-				UpdateBufferResource(m_device, copyCommandList, m_constantBuffer, intermediateConstantBuffer
-					, m_constantBufferData.size(), sizeof(SceneConstantBuffer), m_constantBufferData.data(), D3D12_RESOURCE_FLAG_NONE);
+				UpdateBufferResource(m_device, copyCommandList, m_constantInstanceBuffer, intermediateConstantBuffer
+					, m_constantInstanceBufferData.size(), sizeof(InstanceConstantBuffer), m_constantInstanceBufferData.data(), D3D12_RESOURCE_FLAG_NONE);
 
 				uint64 executeFenceValue = copyCommandQueue.ExecuteCommandList(copyCommandList);
 				copyCommandQueue.WaitForFenceValue(executeFenceValue);
 			}
 
-			// Create shader resource views (SRV) of the constant buffers for the compute shader to read from.
+			// Create shader resource views (SRV) of the constant instance buffers for the compute shader to read from.
 			CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle(m_srvHeap->GetCPUDescriptorHandleForHeapStart(), HeapOffset::CBV, m_cbvSrvDescriptorSize);
 			{
 				D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -729,31 +736,95 @@ void jRHI_DirectX12::LoadContent()
 				srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
 				srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 				srvDesc.Buffer.NumElements = CubeCount;
-				srvDesc.Buffer.StructureByteStride = sizeof(SceneConstantBuffer);
+				srvDesc.Buffer.StructureByteStride = sizeof(InstanceConstantBuffer);
 				srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 				srvDesc.Buffer.FirstElement = 0;
 
-				m_device->CreateShaderResourceView(m_constantBuffer.Get(), &srvDesc, srvHandle);
+				m_device->CreateShaderResourceView(m_constantInstanceBuffer.Get(), &srvDesc, srvHandle);
 				srvHandle.Offset(m_cbvSrvDescriptorSize);
 			}
+			//////////////////////////////////////////////////////////////////////////
 
+			//////////////////////////////////////////////////////////////////////////
+			// Create constant MVP buffer
+			XMMATRIX VP;
+
+			// Update the view matrix.
+			const XMVECTOR eyePosition = XMVectorSet(0, 0, -10, 1);
+			const XMVECTOR focusPoint = XMVectorSet(0, 0, 0, 1);
+			const XMVECTOR upDirection = XMVectorSet(0, 1, 0, 0);
+			VP = XMMatrixLookAtLH(eyePosition, focusPoint, upDirection);
+
+			float aspectRatio = SCR_WIDTH / static_cast<float>(SCR_HEIGHT);
+			VP = XMMatrixMultiply(VP, XMMatrixPerspectiveFovLH(XMConvertToRadians(45), aspectRatio, 0.1f, 100.0f));
+
+			static float t = 0.0f;
+			m_constantMVPBufferData.resize(CubeCount);
+			const int32 MaxXorY = sqrt(CubeCount);
+			for (int32 i = 0; i < CubeCount; ++i)
+			{
+				t += 0.01f;
+				float angle = static_cast<float>(t * 90.0);
+				const XMVECTOR rotationAxis = XMVectorSet(0, 1, 1, 0);
+
+				float x = static_cast<float>(i % MaxXorY) - MaxXorY / 2;
+				float y = static_cast<float>(i / MaxXorY) - MaxXorY / 2;
+				XMMATRIX S = XMMatrixScaling(0.3f, 0.3f, 0.3f);
+				XMMATRIX R = XMMatrixRotationAxis(rotationAxis, XMConvertToRadians(angle));
+				XMMATRIX T = XMMatrixTranslation(x, y, 0.0f);
+				XMMATRIX ModelMatrix = XMMatrixMultiply(XMMatrixMultiply(S, R), T);
+				m_constantMVPBufferData[i].MVP = XMMatrixMultiply(ModelMatrix, VP);
+			}
+
+			{
+				ComPtr<ID3D12GraphicsCommandList2> copyCommandList = copyCommandQueue.GetAvailableCommandList();
+
+				// Upload constant buffer data
+				ComPtr<ID3D12Resource> intermeidateConstanceBuffer;
+				UpdateBufferResource(m_device, copyCommandList, m_constantMVPBuffer, intermeidateConstanceBuffer
+					, m_constantMVPBufferData.size(), sizeof(MVPConstantBuffer), m_constantMVPBufferData.data(), D3D12_RESOURCE_FLAG_NONE);
+
+				uint64 executeFenceValue = copyCommandQueue.ExecuteCommandList(copyCommandList);
+				copyCommandQueue.WaitForFenceValue(executeFenceValue);
+			}
+
+			// Create shader resource views (SRV) of the constant MVP buffers for the compute shader to read from.
+			{
+				D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+				srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+				srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+				srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+				srvDesc.Buffer.NumElements = CubeCount;
+				srvDesc.Buffer.StructureByteStride = sizeof(MVPConstantBuffer);
+				srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+				srvDesc.Buffer.FirstElement = 0;
+
+				m_device->CreateShaderResourceView(m_constantMVPBuffer.Get(), &srvDesc, srvHandle);
+				srvHandle.Offset(m_cbvSrvDescriptorSize);
+			}
+			//////////////////////////////////////////////////////////////////////////
+
+			//////////////////////////////////////////////////////////////////////////
 			// Create command buffer
 			commands.resize(CubeCount);
 			const int32 CommandSize = CubeCount * sizeof(IndirectCommand);
 
-			D3D12_GPU_VIRTUAL_ADDRESS gpuAddress = m_constantBuffer->GetGPUVirtualAddress();
+			D3D12_GPU_VIRTUAL_ADDRESS instanceBufferGpuAddress = m_constantInstanceBuffer->GetGPUVirtualAddress();
+			D3D12_GPU_VIRTUAL_ADDRESS MVPBufferGpuAddress = m_constantMVPBuffer->GetGPUVirtualAddress();
 			int32 commandIndex = 0;
 
 			for (int32 i = 0; i < CubeCount; ++i)
 			{
-				commands[commandIndex].cbv = gpuAddress;
+				commands[commandIndex].cbvInstanceBuffer = instanceBufferGpuAddress;
+				commands[commandIndex].cbvMVP = MVPBufferGpuAddress;
 				commands[commandIndex].drawArguments.IndexCountPerInstance = 36;
 				commands[commandIndex].drawArguments.InstanceCount = 1;
 				commands[commandIndex].drawArguments.StartIndexLocation = 0;
 				commands[commandIndex].drawArguments.StartInstanceLocation = 0;
 
 				++commandIndex;
-				gpuAddress += sizeof(SceneConstantBuffer);
+				instanceBufferGpuAddress += sizeof(InstanceConstantBuffer);
+				MVPBufferGpuAddress += sizeof(MVPConstantBuffer);
 			}
 
 			{
@@ -780,7 +851,9 @@ void jRHI_DirectX12::LoadContent()
 
 				m_device->CreateShaderResourceView(m_commandBuffer.Get(), &srvDesc, srvHandle);
 			}
+			//////////////////////////////////////////////////////////////////////////
 
+			//////////////////////////////////////////////////////////////////////////
 			// Create the unordered access views (UAVs) that store the results of the compute work
 			{
 				// We pack the UAV counter into the same buffer as the commands rather than create
@@ -816,15 +889,18 @@ void jRHI_DirectX12::LoadContent()
 					&uavDesc,
 					processedCommandsHandle);
 			}
+			//////////////////////////////////////////////////////////////////////////
 		}
 
 		// Create the command signature used for indirect drawing
 		{
 			// Each command consists of a CBV update and a DrawInstanced cell
-			D3D12_INDIRECT_ARGUMENT_DESC argDescs[2] = {};
+			D3D12_INDIRECT_ARGUMENT_DESC argDescs[3] = {};
 			argDescs[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_CONSTANT_BUFFER_VIEW;
-			argDescs[0].ConstantBufferView.RootParameterIndex = GraphicsShaderConstantBufferviewForIndirectCommand;		// Constant Buffer가 바인딩 될, 그래픽스 쉐이더에서 RootParameter의 인덱스 (b1)
-			argDescs[1].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW;
+			argDescs[0].ConstantBufferView.RootParameterIndex = GraphicsShaderCBVMVPForIndirectCommand;
+			argDescs[1].Type = D3D12_INDIRECT_ARGUMENT_TYPE_CONSTANT_BUFFER_VIEW;
+			argDescs[1].ConstantBufferView.RootParameterIndex = GraphicsShaderCBVInstanceBufferForIndirectCommand;
+			argDescs[2].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW;
 
 			D3D12_COMMAND_SIGNATURE_DESC commandSignatureDesc = {};
 			commandSignatureDesc.pArgumentDescs = argDescs;
@@ -930,31 +1006,31 @@ void jRHI_DirectX12::RenderCubeTest()
 
 		// Update the MVP matrix
 		{
-			XMMATRIX m_ModelMatrix;
-			XMMATRIX m_ViewMatrix;
-			XMMATRIX m_ProjectionMatrix;
+			//XMMATRIX m_ModelMatrix;
+			//XMMATRIX m_ViewMatrix;
+			//XMMATRIX m_ProjectionMatrix;
 
-			static float t = 0.0f;
-			t += 0.01f;
+			//static float t = 0.0f;
+			//t += 0.01f;
 
-			// Update the model matrix.
-			float angle = static_cast<float>(t * 90.0);
-			const XMVECTOR rotationAxis = XMVectorSet(0, 1, 1, 0);
-			m_ModelMatrix = XMMatrixRotationAxis(rotationAxis, XMConvertToRadians(angle));
+			//// Update the model matrix.
+			//float angle = static_cast<float>(t * 90.0);
+			//const XMVECTOR rotationAxis = XMVectorSet(0, 1, 1, 0);
+			//m_ModelMatrix = XMMatrixRotationAxis(rotationAxis, XMConvertToRadians(angle));
 
-			// Update the view matrix.
-			const XMVECTOR eyePosition = XMVectorSet(0, 0, -10, 1);
-			const XMVECTOR focusPoint = XMVectorSet(0, 0, 0, 1);
-			const XMVECTOR upDirection = XMVectorSet(0, 1, 0, 0);
-			m_ViewMatrix = XMMatrixLookAtLH(eyePosition, focusPoint, upDirection);
+			//// Update the view matrix.
+			//const XMVECTOR eyePosition = XMVectorSet(0, 0, -10, 1);
+			//const XMVECTOR focusPoint = XMVectorSet(0, 0, 0, 1);
+			//const XMVECTOR upDirection = XMVectorSet(0, 1, 0, 0);
+			//m_ViewMatrix = XMMatrixLookAtLH(eyePosition, focusPoint, upDirection);
 
-			// Update the projection matrix.
-			float aspectRatio = SCR_WIDTH / static_cast<float>(SCR_HEIGHT);
-			m_ProjectionMatrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(45), aspectRatio, 0.1f, 100.0f);
+			//// Update the projection matrix.
+			//float aspectRatio = SCR_WIDTH / static_cast<float>(SCR_HEIGHT);
+			//m_ProjectionMatrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(45), aspectRatio, 0.1f, 100.0f);
 
-			XMMATRIX mvpMatrix = XMMatrixMultiply(m_ModelMatrix, m_ViewMatrix);
-			mvpMatrix = XMMatrixMultiply(mvpMatrix, m_ProjectionMatrix);
-			commandList->SetGraphicsRoot32BitConstants(0, sizeof(XMMATRIX) / 4, &mvpMatrix, 0);
+			//XMMATRIX mvpMatrix = XMMatrixMultiply(m_ModelMatrix, m_ViewMatrix);
+			//mvpMatrix = XMMatrixMultiply(mvpMatrix, m_ProjectionMatrix);
+			//commandList->SetGraphicsRoot32BitConstants(0, sizeof(XMMATRIX) / 4, &mvpMatrix, 0);
 
 			static MaterialConstants materialConstants;
 
@@ -973,7 +1049,7 @@ void jRHI_DirectX12::RenderCubeTest()
 
 			// Draw all of the triangles.
 			uint32 CommandBufferOffset = 0;
-			commandList->ExecuteIndirect( m_commandSignature.Get(), CubeCount, m_commandBuffer.Get(), CommandBufferOffset, nullptr, 0);
+			commandList->ExecuteIndirect(m_commandSignature.Get(), CubeCount, m_commandBuffer.Get(), CommandBufferOffset, nullptr, 0);
 
 			if (ShouldRecordBundleCommandList)
 				commandList->Close();

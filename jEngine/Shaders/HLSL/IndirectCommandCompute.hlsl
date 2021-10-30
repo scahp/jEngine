@@ -1,10 +1,16 @@
 
 #define ThreadBlockSize 128
 
-struct SceneConstantBuffer
+struct InstanceConstantBuffer
 {
     float4 InstanceColor;
     float4 padding[15];         // to be aligned 256 byte.
+};
+
+struct MVPBuffer
+{
+    float4x4 MVP;
+    float4 padding[12];         // to be aligned 256 byte.
 };
 
 struct IndirectCommand
@@ -17,7 +23,8 @@ cbuffer RootConstants : register(b0)
     float commandCount; // The number of commands to be processed
 };
 
-StructuredBuffer<SceneConstantBuffer> cbv : register(t0);
+StructuredBuffer<InstanceConstantBuffer> InstanceCBV : register(t0);
+StructuredBuffer<MVPBuffer> MVPCBV : register(t0);
 StructuredBuffer<IndirectCommand> inputCommands : register(t1);
 AppendStructuredBuffer<IndirectCommand> outputCommands : register(u0);
 
