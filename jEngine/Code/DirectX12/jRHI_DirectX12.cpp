@@ -76,6 +76,11 @@ static WORD g_Indicies[] =
 	30, 31, 32, 33, 34, 35
 };
 
+struct MaterialConstants
+{
+	uint32 MaterialIndex = 0;
+};
+
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	switch (message)
@@ -469,7 +474,8 @@ void jRHI_DirectX12::LoadContent()
 		OutputDebugStringA(reinterpret_cast<const char*>(compilationMsgs->GetBufferPointer()));
 		compilationMsgs->Release();
 	}
-	D3DCompileFromFile(L"Shaders/HLSL/CubePixelShader.hlsl", nullptr, nullptr, "main", "ps_5_1", compileFlags, 0, &pixelShader, &compilationMsgs);
+	D3DCompileFromFile(L"Shaders/HLSL/CubePixelShader_DynamicIndexing.hlsl", nullptr, nullptr, "main", "ps_5_1"
+		, compileFlags | D3DCOMPILE_ENABLE_UNBOUNDED_DESCRIPTOR_TABLES, 0, &pixelShader, &compilationMsgs);
 	if (compilationMsgs)
 	{
 		OutputDebugStringA(reinterpret_cast<const char*>(compilationMsgs->GetBufferPointer()));
@@ -498,8 +504,9 @@ void jRHI_DirectX12::LoadContent()
 		//D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS;
 
 	// A single 32-bit constant root parameter that is used by the vertex shader
-	CD3DX12_ROOT_PARAMETER1 rootParameters[3];
+	CD3DX12_ROOT_PARAMETER1 rootParameters[4];
 	rootParameters[0].InitAsConstants(sizeof(XMMATRIX) / 4, 0, 0, D3D12_SHADER_VISIBILITY_VERTEX);
+	rootParameters[1].InitAsConstants(sizeof(MaterialConstants) / 4, 0, 0, D3D12_SHADER_VISIBILITY_PIXEL);
 
 	// Texture
 	CD3DX12_DESCRIPTOR_RANGE1 ranges[2];
@@ -507,8 +514,8 @@ void jRHI_DirectX12::LoadContent()
 	//ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, _countof(m_textureArray), 1, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 	ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 3, 1, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 
-	rootParameters[1].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);		//	* rootParameters[1] 의 1을 SetGraphicsRootDescriptorTable에 Index로 넘겨야함. *
-	rootParameters[2].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_PIXEL);		//	* rootParameters[2] 의 2을 SetGraphicsRootDescriptorTable에 Index로 넘겨야함. *
+	rootParameters[2].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);		//	* rootParameters[1] 의 1을 SetGraphicsRootDescriptorTable에 Index로 넘겨야함. *
+	rootParameters[3].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_PIXEL);		//	* rootParameters[2] 의 2을 SetGraphicsRootDescriptorTable에 Index로 넘겨야함. *
 
 	D3D12_STATIC_SAMPLER_DESC sampler = {};
 	sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
@@ -675,9 +682,9 @@ void jRHI_DirectX12::RenderCubeTest()
 			int32 m_cbvSrvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 			CD3DX12_GPU_DESCRIPTOR_HANDLE cbvSrvHandle(m_srvHeap->GetGPUDescriptorHandleForHeapStart(), 0, m_cbvSrvDescriptorSize);
 
-			commandList->SetGraphicsRootDescriptorTable(1, cbvSrvHandle);	// rootParameters에서 SRV가 어떤 Index에 들어간지 RootParameterIndex를 설정해야 함
+			commandList->SetGraphicsRootDescriptorTable(2, cbvSrvHandle);	// rootParameters에서 SRV가 어떤 Index에 들어간지 RootParameterIndex를 설정해야 함
 			cbvSrvHandle.Offset(m_cbvSrvDescriptorSize);
-			commandList->SetGraphicsRootDescriptorTable(2, cbvSrvHandle);
+			commandList->SetGraphicsRootDescriptorTable(3, cbvSrvHandle);
 
 			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 			commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
@@ -716,6 +723,21 @@ void jRHI_DirectX12::RenderCubeTest()
 			XMMATRIX mvpMatrix = XMMatrixMultiply(m_ModelMatrix, m_ViewMatrix);
 			mvpMatrix = XMMatrixMultiply(mvpMatrix, m_ProjectionMatrix);
 			commandList->SetGraphicsRoot32BitConstants(0, sizeof(XMMATRIX) / 4, &mvpMatrix, 0);
+
+			static MaterialConstants materialConstants;
+
+			static uint32 PrevTickCount = GetTickCount();
+			static uint32 AccumulatedTickCount = 0;
+			AccumulatedTickCount += GetTickCount() - PrevTickCount;
+			PrevTickCount = GetTickCount();
+
+			if (AccumulatedTickCount > 1000)
+			{
+				AccumulatedTickCount = 0;
+				materialConstants.MaterialIndex = (++materialConstants.MaterialIndex) % _countof(m_textureArray);
+			}
+
+			commandList->SetGraphicsRoot32BitConstants(1, sizeof(MaterialConstants) / 4, &materialConstants, 0);
 
 			commandList->DrawIndexedInstanced(_countof(g_Indicies), 1, 0, 0, 0);
 
