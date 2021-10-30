@@ -709,4 +709,9 @@
       <Filter>Shaders\HLSL</Filter>
     </None>
   </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="Shaders\HLSL\CubePixelShader_DynamicIndexing.hlsl">
+      <Filter>Shaders\HLSL</Filter>
+    </FxCompile>
+  </ItemGroup>
 </Project>
