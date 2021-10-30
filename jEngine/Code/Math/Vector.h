@@ -236,6 +236,7 @@ struct Vector4
 	static const Vector4 UpVector;
 	static const Vector4 ColorRed;
 	static const Vector4 ColorWhite;
+	static const Vector4 ColorBlack;
 
 	FORCEINLINE Vector4() { }
 	FORCEINLINE Vector4(zero_type /*ZeroType*/) { x = 0.0f; y = 0.0f; z = 0.0f; w = 0.0f; }

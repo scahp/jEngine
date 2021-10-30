@@ -37,6 +37,7 @@ const Vector4 Vector4::RightVector = Vector4(1.0f, 0.0f, 0.0f, 0.0f);
 const Vector4 Vector4::UpVector = Vector4(0.0f, 1.0f, 0.0f, 0.0f);
 const Vector4 Vector4::ColorRed = Vector4(1.0f, 0.0f, 0.0f, 1.0f);
 const Vector4 Vector4::ColorWhite = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+const Vector4 Vector4::ColorBlack = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
 
 void Vector4::operator=(struct Vector2 const& vector)
 {

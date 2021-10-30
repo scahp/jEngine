@@ -456,7 +456,20 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="Shaders\HLSL\CubePixelShader_DynamicIndexing.hlsl" />
+    <None Include="Shaders\HLSL\CubePixelShader_DynamicIndexing.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Shaders\HLSL\CubePixelShader_IndirectCommand.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Shaders\HLSL\IndirectCommandCompute.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Shaders\HLSL\CubeVertexShader_IndirectCommand.hlsl">
+      <FileType>Document</FileType>
+    </None>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -42,7 +42,6 @@ public:
 	ComPtr<ID3D12GraphicsCommandList> m_commandList;
 	ComPtr<ID3D12GraphicsCommandList> m_bundle;
 	UINT m_rtvDescriptorSize;
-	ComPtr<ID3D12Resource> m_constantBuffer;
 	ComPtr<ID3D12DescriptorHeap> m_cbvHeap;
 
 	// App resources.
@@ -56,6 +55,32 @@ public:
 	ComPtr<ID3D12Resource> m_textureArray[3];
 	ComPtr<ID3D12DescriptorHeap> m_srvHeap;
 
+	// Compute shader
+	struct SceneConstantBuffer
+	{
+		Vector4 Color = Vector4::ColorRed;
+		Vector4 padding[15]; // to be aligned 256 byte.
+		enum
+		{
+			SizeWithoutPadding = sizeof(Color),
+			Size = (sizeof(Color) + sizeof(padding))
+		};
+	};
+	// Data structure to match the command signature used for ExecuteIndirect.
+	struct IndirectCommand
+	{
+		D3D12_GPU_VIRTUAL_ADDRESS cbv;
+		D3D12_DRAW_INDEXED_ARGUMENTS drawArguments;
+	};
+	ComPtr<ID3D12RootSignature> m_computeRootSignature;
+	ComPtr<ID3D12PipelineState> m_computeState;
+	ComPtr<ID3D12Resource> m_constantBuffer;
+	std::vector<SceneConstantBuffer> m_constantBufferData;
+	std::vector<IndirectCommand> commands;
+	ComPtr<ID3D12Resource> m_commandBuffer;
+	ComPtr<ID3D12Resource> m_processedCommandBuffers;
+	ComPtr<ID3D12CommandSignature> m_commandSignature;
+
 	// Synchronization objects.
 	UINT m_frameIndex;
 	HANDLE m_fenceEvent;
@@ -65,6 +90,7 @@ public:
 	jCommandQueue_DirectX12 directCommandQueue;
 	jCommandQueue_DirectX12 bundleCommandQueue;
 	jCommandQueue_DirectX12 copyCommandQueue;
+	jCommandQueue_DirectX12 computeCommandQueue;
 
 	bool UpdateBufferResource(
 		ComPtr<ID3D12Device2> InDevice

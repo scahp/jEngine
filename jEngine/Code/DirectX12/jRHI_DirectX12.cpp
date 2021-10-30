@@ -81,6 +81,26 @@ struct MaterialConstants
 	uint32 MaterialIndex = 0;
 };
 
+enum HeapOffset
+{
+	CBV = 0,
+	UAV = 2,
+	TextureSRV = 3,
+	TextureSRV_Unbound = 4,
+	TextureSRV_Unbound_End = 6,
+	Num,
+};
+
+// Compute shader
+struct ComputeRootConstant
+{
+	float CommandCount;
+};
+
+const int32 CubeCount = 100;
+uint32 GraphicsShaderConstantBufferviewForIndirectCommand = 0;
+
+
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	switch (message)
@@ -230,6 +250,7 @@ void jRHI_DirectX12::Initialize()
 
 	directCommandQueue.Initialize(m_device);
 	bundleCommandQueue.Initialize(m_device, D3D12_COMMAND_LIST_TYPE_BUNDLE);
+	computeCommandQueue.Initialize(m_device, D3D12_COMMAND_LIST_TYPE_COMPUTE);
 
 	// Describe and create the swap chain.
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
@@ -272,9 +293,9 @@ void jRHI_DirectX12::Initialize()
 	}
 
 	{
-		// CreateTexutre
+		// Create Heap desc
 		D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-		srvHeapDesc.NumDescriptors = 1 + _countof(m_textureArray);
+		srvHeapDesc.NumDescriptors = HeapOffset::Num;
 		srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 		m_device->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_srvHeap));
@@ -392,7 +413,7 @@ void jRHI_DirectX12::LoadContent()
     }
 
     int32 m_cbvSrvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle(m_srvHeap->GetCPUDescriptorHandleForHeapStart(), 0, m_cbvSrvDescriptorSize);
+	CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle(m_srvHeap->GetCPUDescriptorHandleForHeapStart(), HeapOffset::TextureSRV, m_cbvSrvDescriptorSize);
 	{
 		// Describe and create a SRV for the texture
 		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -468,13 +489,13 @@ void jRHI_DirectX12::LoadContent()
 
 	ComPtr<ID3DBlob> vertexShader;
 	ComPtr<ID3DBlob> pixelShader;
-	D3DCompileFromFile(L"Shaders/HLSL/CubeVertexShader.hlsl", nullptr, nullptr, "main", "vs_5_1", compileFlags, 0, &vertexShader, &compilationMsgs);
+	D3DCompileFromFile(L"Shaders/HLSL/CubeVertexShader_IndirectCommand.hlsl", nullptr, nullptr, "main", "vs_5_1", compileFlags, 0, &vertexShader, &compilationMsgs);
 	if (compilationMsgs)
 	{
 		OutputDebugStringA(reinterpret_cast<const char*>(compilationMsgs->GetBufferPointer()));
 		compilationMsgs->Release();
 	}
-	D3DCompileFromFile(L"Shaders/HLSL/CubePixelShader_DynamicIndexing.hlsl", nullptr, nullptr, "main", "ps_5_1"
+	D3DCompileFromFile(L"Shaders/HLSL/CubePixelShader_IndirectCommand.hlsl", nullptr, nullptr, "main", "ps_5_1"
 		, compileFlags | D3DCOMPILE_ENABLE_UNBOUNDED_DESCRIPTOR_TABLES, 0, &pixelShader, &compilationMsgs);
 	if (compilationMsgs)
 	{
@@ -504,18 +525,23 @@ void jRHI_DirectX12::LoadContent()
 		//D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS;
 
 	// A single 32-bit constant root parameter that is used by the vertex shader
-	CD3DX12_ROOT_PARAMETER1 rootParameters[4];
-	rootParameters[0].InitAsConstants(sizeof(XMMATRIX) / 4, 0, 0, D3D12_SHADER_VISIBILITY_VERTEX);
-	rootParameters[1].InitAsConstants(sizeof(MaterialConstants) / 4, 0, 0, D3D12_SHADER_VISIBILITY_PIXEL);
+	CD3DX12_ROOT_PARAMETER1 rootParameters[5];
+	int32 rootParameter = 0;
+	rootParameters[rootParameter++].InitAsConstants(sizeof(XMMATRIX) / 4, 0, 0, D3D12_SHADER_VISIBILITY_VERTEX);
+	rootParameters[rootParameter++].InitAsConstants(sizeof(MaterialConstants) / 4, 0, 0, D3D12_SHADER_VISIBILITY_PIXEL);
+	// rootParameters[2].InitAsConstants(SceneConstantBuffer::SizeWithoutPadding / 4, 1, 0, D3D12_SHADER_VISIBILITY_PIXEL);
+
+	GraphicsShaderConstantBufferviewForIndirectCommand = rootParameter++;
+	rootParameters[GraphicsShaderConstantBufferviewForIndirectCommand].InitAsConstantBufferView(1, 0, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC, D3D12_SHADER_VISIBILITY_PIXEL);
 
 	// Texture
 	CD3DX12_DESCRIPTOR_RANGE1 ranges[2];
 	ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 	//ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, _countof(m_textureArray), 1, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
-	ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 3, 1, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+	ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);		// unbounded 라서 descriptor 수를 1개로 해도 됨.
 
-	rootParameters[2].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);		//	* rootParameters[1] 의 1을 SetGraphicsRootDescriptorTable에 Index로 넘겨야함. *
-	rootParameters[3].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_PIXEL);		//	* rootParameters[2] 의 2을 SetGraphicsRootDescriptorTable에 Index로 넘겨야함. *
+	rootParameters[rootParameter++].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);		//	* rootParameters[1] 의 1을 SetGraphicsRootDescriptorTable에 Index로 넘겨야함. *
+	rootParameters[rootParameter++].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_PIXEL);		//	* rootParameters[2] 의 2을 SetGraphicsRootDescriptorTable에 Index로 넘겨야함. *
 
 	D3D12_STATIC_SAMPLER_DESC sampler = {};
 	sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
@@ -604,6 +630,212 @@ void jRHI_DirectX12::LoadContent()
 	dsv.Flags = D3D12_DSV_FLAG_NONE;
 
 	m_device->CreateDepthStencilView(m_depthBuffer.Get(), &dsv, m_dSVHeap->GetCPUDescriptorHandleForHeapStart());
+
+	//////////////////////////////////////////////////////////////////////////
+	// Compute shader
+	{
+		D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
+
+		// This is the highest version the sample supports. If CheckFeatureSupport succeeds, the HighestVersion returned will not be greater than this.
+		featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
+		if (FAILED(m_device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
+			featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
+
+		// Create compute signature.
+		CD3DX12_DESCRIPTOR_RANGE1 ranges[2];
+		ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+		ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+
+		CD3DX12_ROOT_PARAMETER1 computeRootParameters[2];
+		computeRootParameters[0].InitAsDescriptorTable(2, ranges);
+		computeRootParameters[1].InitAsConstants(sizeof(ComputeRootConstant) / 4, 0);
+
+		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC computeRootSignatureDesc;
+		computeRootSignatureDesc.Init_1_1(_countof(computeRootParameters), computeRootParameters);
+
+		ComPtr<ID3DBlob> signature;
+		ComPtr<ID3DBlob> error;
+		if (FAILED(D3DX12SerializeVersionedRootSignature(&computeRootSignatureDesc, featureData.HighestVersion, &signature, &error)))
+		{
+			if (errorBlob)
+			{
+				OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+				errorBlob->Release();
+			}
+			return;
+		}
+
+		if (FAILED(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_computeRootSignature))))
+			return;
+
+#if defined(_DEBUG)
+		// Enable better shader debugging with the graphics debugging tools.
+		UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+#else
+		UINT compileFlags = 0;
+#endif
+		ID3DBlob* compilationMsgs = nullptr;
+		ComPtr<ID3DBlob> computeShader;
+		D3DCompileFromFile(L"Shaders/HLSL/IndirectCommandCompute.hlsl", nullptr, nullptr, "main", "cs_5_0", compileFlags, 0, &computeShader, &compilationMsgs);
+		if (compilationMsgs)
+		{
+			OutputDebugStringA(reinterpret_cast<const char*>(compilationMsgs->GetBufferPointer()));
+			compilationMsgs->Release();
+		}
+
+		// Describe and create the compute pipeline state object (PSO)
+		D3D12_COMPUTE_PIPELINE_STATE_DESC computePsoDesc = {};
+		computePsoDesc.pRootSignature = m_computeRootSignature.Get();
+		computePsoDesc.CS = CD3DX12_SHADER_BYTECODE(computeShader.Get());
+
+		if (FAILED(m_device->CreateComputePipelineState(&computePsoDesc, IID_PPV_ARGS(&m_computeState))))
+			return;
+
+		// Create the constant buffers
+		{
+			m_constantBufferData.resize(CubeCount);
+
+			// Initialize the constant buffers for each of the triangles.
+			const int32 Interval = (255 * 3) / CubeCount;
+			Vector4 ColorTemp = Vector4::ColorBlack;
+			for (int32 i = 0; i < CubeCount; ++i)
+			{
+				if (ColorTemp.x + Interval <= 255)
+					ColorTemp.x += Interval;
+				else if (ColorTemp.y + Interval <= 255)
+					ColorTemp.y += Interval;
+				else if (ColorTemp.z + Interval <= 255)
+					ColorTemp.z += Interval;
+				m_constantBufferData[i].Color = ColorTemp;
+			}
+
+			{
+				ComPtr<ID3D12GraphicsCommandList2> copyCommandList = copyCommandQueue.GetAvailableCommandList();
+
+				// Upload constant buffer data
+				ComPtr<ID3D12Resource> intermediateConstantBuffer;
+				UpdateBufferResource(m_device, copyCommandList, m_constantBuffer, intermediateConstantBuffer
+					, m_constantBufferData.size(), sizeof(SceneConstantBuffer), m_constantBufferData.data(), D3D12_RESOURCE_FLAG_NONE);
+
+				uint64 executeFenceValue = copyCommandQueue.ExecuteCommandList(copyCommandList);
+				copyCommandQueue.WaitForFenceValue(executeFenceValue);
+			}
+
+			// Create shader resource views (SRV) of the constant buffers for the compute shader to read from.
+			CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle(m_srvHeap->GetCPUDescriptorHandleForHeapStart(), HeapOffset::CBV, m_cbvSrvDescriptorSize);
+			{
+				D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+				srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+				srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+				srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+				srvDesc.Buffer.NumElements = CubeCount;
+				srvDesc.Buffer.StructureByteStride = sizeof(SceneConstantBuffer);
+				srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+				srvDesc.Buffer.FirstElement = 0;
+
+				m_device->CreateShaderResourceView(m_constantBuffer.Get(), &srvDesc, srvHandle);
+				srvHandle.Offset(m_cbvSrvDescriptorSize);
+			}
+
+			// Create command buffer
+			commands.resize(CubeCount);
+			const int32 CommandSize = CubeCount * sizeof(IndirectCommand);
+
+			D3D12_GPU_VIRTUAL_ADDRESS gpuAddress = m_constantBuffer->GetGPUVirtualAddress();
+			int32 commandIndex = 0;
+
+			for (int32 i = 0; i < CubeCount; ++i)
+			{
+				commands[commandIndex].cbv = gpuAddress;
+				commands[commandIndex].drawArguments.IndexCountPerInstance = 36;
+				commands[commandIndex].drawArguments.InstanceCount = 1;
+				commands[commandIndex].drawArguments.StartIndexLocation = 0;
+				commands[commandIndex].drawArguments.StartInstanceLocation = 0;
+
+				++commandIndex;
+				gpuAddress += sizeof(SceneConstantBuffer);
+			}
+
+			{
+				ComPtr<ID3D12GraphicsCommandList2> copyCommandList = copyCommandQueue.GetAvailableCommandList();
+
+				// Upload command buffer data
+				ComPtr<ID3D12Resource> intermediateCommandBuffer;
+				UpdateBufferResource(m_device, copyCommandList, m_commandBuffer, intermediateCommandBuffer
+					, commands.size(), sizeof(IndirectCommand), commands.data(), D3D12_RESOURCE_FLAG_NONE);
+
+				uint64 executeFenceValue = copyCommandQueue.ExecuteCommandList(copyCommandList);
+				copyCommandQueue.WaitForFenceValue(executeFenceValue);
+			}
+
+			{
+				// Create SRVs for the command buffers.
+				D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+				srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+				srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+				srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+				srvDesc.Buffer.NumElements = CubeCount;
+				srvDesc.Buffer.StructureByteStride = sizeof(IndirectCommand);
+				srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+
+				m_device->CreateShaderResourceView(m_commandBuffer.Get(), &srvDesc, srvHandle);
+			}
+
+			// Create the unordered access views (UAVs) that store the results of the compute work
+			{
+				// We pack the UAV counter into the same buffer as the commands rather than create
+				// a separate 64K resource/heap for it. The counter must be aligned on 4K boundaries,
+				// so we pad the command buffer (if necessary) such that the counter will be placed
+				// at a valid location in the buffer.
+				auto AlignForUavCounter = [](uint32 bufferSize)->uint32
+				{
+					const uint32 alignment = D3D12_UAV_COUNTER_PLACEMENT_ALIGNMENT;
+					return (bufferSize + (alignment - 1)) & ~(alignment - 1);
+				};
+
+				CD3DX12_CPU_DESCRIPTOR_HANDLE processedCommandsHandle(m_srvHeap->GetCPUDescriptorHandleForHeapStart(), HeapOffset::UAV, m_cbvSrvDescriptorSize);
+				const int32 CommandSizePerFrame = CubeCount * sizeof(IndirectCommand);
+				const int32 CommandBufferCounterOffset = AlignForUavCounter(CommandSizePerFrame);
+
+				D3D12_RESOURCE_DESC commandBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(CommandBufferCounterOffset + sizeof(uint32), D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+				m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT), D3D12_HEAP_FLAG_NONE
+					, &commandBufferDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&m_processedCommandBuffers));
+
+				D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+				uavDesc.Format = DXGI_FORMAT_UNKNOWN;
+				uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+				uavDesc.Buffer.FirstElement = 0;
+				uavDesc.Buffer.NumElements = CubeCount;
+				uavDesc.Buffer.StructureByteStride = sizeof(IndirectCommand);
+				uavDesc.Buffer.CounterOffsetInBytes = CommandBufferCounterOffset;
+				uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+
+				m_device->CreateUnorderedAccessView(
+					m_processedCommandBuffers.Get(),
+					m_processedCommandBuffers.Get(),
+					&uavDesc,
+					processedCommandsHandle);
+			}
+		}
+
+		// Create the command signature used for indirect drawing
+		{
+			// Each command consists of a CBV update and a DrawInstanced cell
+			D3D12_INDIRECT_ARGUMENT_DESC argDescs[2] = {};
+			argDescs[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_CONSTANT_BUFFER_VIEW;
+			argDescs[0].ConstantBufferView.RootParameterIndex = GraphicsShaderConstantBufferviewForIndirectCommand;		// Constant Buffer가 바인딩 될, 그래픽스 쉐이더에서 RootParameter의 인덱스 (b1)
+			argDescs[1].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW;
+
+			D3D12_COMMAND_SIGNATURE_DESC commandSignatureDesc = {};
+			commandSignatureDesc.pArgumentDescs = argDescs;
+			commandSignatureDesc.NumArgumentDescs = _countof(argDescs);
+			commandSignatureDesc.ByteStride = sizeof(IndirectCommand);
+
+			if (FAILED(m_device->CreateCommandSignature(&commandSignatureDesc, m_rootSignature.Get(), IID_PPV_ARGS(&m_commandSignature))))
+				return;
+		}
+	}
+	//////////////////////////////////////////////////////////////////////////
 }
 
 HWND jRHI_DirectX12::CreateMainWindow() const
@@ -680,11 +912,11 @@ void jRHI_DirectX12::RenderCubeTest()
 			commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
 			int32 m_cbvSrvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-			CD3DX12_GPU_DESCRIPTOR_HANDLE cbvSrvHandle(m_srvHeap->GetGPUDescriptorHandleForHeapStart(), 0, m_cbvSrvDescriptorSize);
+			CD3DX12_GPU_DESCRIPTOR_HANDLE cbvSrvHandle(m_srvHeap->GetGPUDescriptorHandleForHeapStart(), HeapOffset::TextureSRV, m_cbvSrvDescriptorSize);
 
-			commandList->SetGraphicsRootDescriptorTable(2, cbvSrvHandle);	// rootParameters에서 SRV가 어떤 Index에 들어간지 RootParameterIndex를 설정해야 함
+			commandList->SetGraphicsRootDescriptorTable(3, cbvSrvHandle);	// rootParameters에서 SRV가 어떤 Index에 들어간지 RootParameterIndex를 설정해야 함
 			cbvSrvHandle.Offset(m_cbvSrvDescriptorSize);
-			commandList->SetGraphicsRootDescriptorTable(3, cbvSrvHandle);
+			commandList->SetGraphicsRootDescriptorTable(4, cbvSrvHandle);
 
 			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 			commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
@@ -739,7 +971,9 @@ void jRHI_DirectX12::RenderCubeTest()
 
 			commandList->SetGraphicsRoot32BitConstants(1, sizeof(MaterialConstants) / 4, &materialConstants, 0);
 
-			commandList->DrawIndexedInstanced(_countof(g_Indicies), 1, 0, 0, 0);
+			// Draw all of the triangles.
+			uint32 CommandBufferOffset = 0;
+			commandList->ExecuteIndirect( m_commandSignature.Get(), CubeCount, m_commandBuffer.Get(), CommandBufferOffset, nullptr, 0);
 
 			if (ShouldRecordBundleCommandList)
 				commandList->Close();
