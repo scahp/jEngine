@@ -83,11 +83,12 @@ struct MaterialConstants
 
 enum HeapOffset
 {
-	CBV = 0,
-	UAV = 2,
-	TextureSRV = 3,
-	TextureSRV_Unbound = 4,
-	TextureSRV_Unbound_End = 6,
+	CBV_SRV = 0,
+	Command = 2,
+	UAV = 3,
+	TextureSRV = 4,
+	TextureSRV_Unbound = 5,
+	TextureSRV_Unbound_End = 7,
 	Num,
 };
 
@@ -101,6 +102,8 @@ const int32 CubeCount = 49;
 uint32 GraphicsShaderCBVInstanceBufferForIndirectCommand = 0;
 uint32 GraphicsShaderCBVMVPForIndirectCommand = 0;
 
+const uint32 ComputeShaderSrvUavRootParameterIndex = 0;
+const uint32 ComputeShaderRootConstantRootParameterIndex = 1;
 
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -529,15 +532,15 @@ void jRHI_DirectX12::LoadContent()
 	CD3DX12_ROOT_PARAMETER1 rootParameters[5];
 	int32 rootParameter = 0;
 
-	GraphicsShaderCBVMVPForIndirectCommand = rootParameter++;
-	rootParameters[GraphicsShaderCBVMVPForIndirectCommand].InitAsConstantBufferView(0, 0, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC, D3D12_SHADER_VISIBILITY_VERTEX);
+	GraphicsShaderCBVInstanceBufferForIndirectCommand = rootParameter++;
+	rootParameters[GraphicsShaderCBVInstanceBufferForIndirectCommand].InitAsConstantBufferView(0, 0, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC, D3D12_SHADER_VISIBILITY_VERTEX);
 	//rootParameters[rootParameter++].InitAsConstants(sizeof(XMMATRIX) / 4, 0, 0, D3D12_SHADER_VISIBILITY_VERTEX);
 
 	rootParameters[rootParameter++].InitAsConstants(sizeof(MaterialConstants) / 4, 0, 0, D3D12_SHADER_VISIBILITY_PIXEL);
 
 	// rootParameters[2].InitAsConstants(InstanceConstantBuffer::SizeWithoutPadding / 4, 1, 0, D3D12_SHADER_VISIBILITY_PIXEL);
-	GraphicsShaderCBVInstanceBufferForIndirectCommand = rootParameter++;
-	rootParameters[GraphicsShaderCBVInstanceBufferForIndirectCommand].InitAsConstantBufferView(1, 0, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC, D3D12_SHADER_VISIBILITY_PIXEL);
+	GraphicsShaderCBVMVPForIndirectCommand = rootParameter++;
+	rootParameters[GraphicsShaderCBVMVPForIndirectCommand].InitAsConstantBufferView(1, 0, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC, D3D12_SHADER_VISIBILITY_PIXEL);
 
 	// Texture
 	CD3DX12_DESCRIPTOR_RANGE1 ranges[2];
@@ -648,12 +651,12 @@ void jRHI_DirectX12::LoadContent()
 
 		// Create compute signature.
 		CD3DX12_DESCRIPTOR_RANGE1 ranges[2];
-		ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+		ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 3, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 		ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
 
 		CD3DX12_ROOT_PARAMETER1 computeRootParameters[2];
-		computeRootParameters[0].InitAsDescriptorTable(2, ranges);
-		computeRootParameters[1].InitAsConstants(sizeof(ComputeRootConstant) / 4, 0);
+		computeRootParameters[ComputeShaderSrvUavRootParameterIndex].InitAsDescriptorTable(2, ranges);
+		computeRootParameters[ComputeShaderRootConstantRootParameterIndex].InitAsConstants(sizeof(ComputeRootConstant) / 4, 0);
 
 		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC computeRootSignatureDesc;
 		computeRootSignatureDesc.Init_1_1(_countof(computeRootParameters), computeRootParameters);
@@ -729,7 +732,7 @@ void jRHI_DirectX12::LoadContent()
 			}
 
 			// Create shader resource views (SRV) of the constant instance buffers for the compute shader to read from.
-			CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle(m_srvHeap->GetCPUDescriptorHandleForHeapStart(), HeapOffset::CBV, m_cbvSrvDescriptorSize);
+			CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle(m_srvHeap->GetCPUDescriptorHandleForHeapStart(), HeapOffset::CBV_SRV, m_cbvSrvDescriptorSize);
 			{
 				D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 				srvDesc.Format = DXGI_FORMAT_UNKNOWN;
@@ -821,6 +824,7 @@ void jRHI_DirectX12::LoadContent()
 				commands[commandIndex].drawArguments.InstanceCount = 1;
 				commands[commandIndex].drawArguments.StartIndexLocation = 0;
 				commands[commandIndex].drawArguments.StartInstanceLocation = 0;
+				commands[commandIndex].drawArguments.BaseVertexLocation = 0;
 
 				++commandIndex;
 				instanceBufferGpuAddress += sizeof(InstanceConstantBuffer);
@@ -888,6 +892,26 @@ void jRHI_DirectX12::LoadContent()
 					m_processedCommandBuffers.Get(),
 					&uavDesc,
 					processedCommandsHandle);
+
+				// Allocate a buffer that can be used to reset the UAV counters and initialize it to 0.
+				if (FAILED(m_device->CreateCommittedResource(
+					&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+					D3D12_HEAP_FLAG_NONE,
+					&CD3DX12_RESOURCE_DESC::Buffer(sizeof(uint32)),
+					D3D12_RESOURCE_STATE_GENERIC_READ,
+					nullptr,
+					IID_PPV_ARGS(&m_processedCommandBufferCounterReset))))
+				{
+					return;
+				}
+
+				UINT8* pMappedCounterReset = nullptr;
+				CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
+				if (!FAILED(m_processedCommandBufferCounterReset->Map(0, &readRange, reinterpret_cast<void**>(&pMappedCounterReset))))
+				{
+					ZeroMemory(pMappedCounterReset, sizeof(uint32));
+					m_processedCommandBufferCounterReset->Unmap(0, nullptr);
+				}
 			}
 			//////////////////////////////////////////////////////////////////////////
 		}
@@ -897,10 +921,10 @@ void jRHI_DirectX12::LoadContent()
 			// Each command consists of a CBV update and a DrawInstanced cell
 			D3D12_INDIRECT_ARGUMENT_DESC argDescs[3] = {};
 			argDescs[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_CONSTANT_BUFFER_VIEW;
-			argDescs[0].ConstantBufferView.RootParameterIndex = GraphicsShaderCBVMVPForIndirectCommand;
+			argDescs[0].ConstantBufferView.RootParameterIndex = GraphicsShaderCBVInstanceBufferForIndirectCommand;
 			argDescs[1].Type = D3D12_INDIRECT_ARGUMENT_TYPE_CONSTANT_BUFFER_VIEW;
-			argDescs[1].ConstantBufferView.RootParameterIndex = GraphicsShaderCBVInstanceBufferForIndirectCommand;
-			argDescs[2].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW;
+			argDescs[1].ConstantBufferView.RootParameterIndex = GraphicsShaderCBVMVPForIndirectCommand;
+			argDescs[2].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
 
 			D3D12_COMMAND_SIGNATURE_DESC commandSignatureDesc = {};
 			commandSignatureDesc.pArgumentDescs = argDescs;
@@ -963,13 +987,76 @@ void jRHI_DirectX12::RenderCubeTest()
 	ComPtr<ID3D12Resource> currentBackbuffer = m_renderTargets[m_frameIndex];
 	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
 
+	// We pack the UAV counter into the same buffer as the commands rather than create
+	// a separate 64K resource/heap for it. The counter must be aligned on 4K boundaries,
+	// so we pad the command buffer (if necessary) such that the counter will be placed
+	// at a valid location in the buffer.
+	auto AlignForUavCounter = [](uint32 bufferSize) -> uint32
+	{
+		const uint32 alignment = D3D12_UAV_COUNTER_PLACEMENT_ALIGNMENT;
+		return (bufferSize + (alignment - 1)) & ~(alignment - 1);
+	};
+	const uint32 CommandBufferCounterOffset = AlignForUavCounter(CubeCount * sizeof(IndirectCommand));
+
+	// Record the compute commands that will cull cube and prevent them from being processed by vertex shader
+	{
+		ComPtr<ID3D12GraphicsCommandList2> computeCommandList = computeCommandQueue.GetAvailableCommandList();
+
+		const int32 m_cbvSrvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+		computeCommandList->SetPipelineState(m_computeState.Get());
+		computeCommandList->SetComputeRootSignature(m_computeRootSignature.Get());
+
+		ID3D12DescriptorHeap* ppHeaps[] = { m_srvHeap.Get() };
+		computeCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+
+		D3D12_GPU_DESCRIPTOR_HANDLE cbvSrvUavHandle = m_srvHeap->GetGPUDescriptorHandleForHeapStart();
+		computeCommandList->SetComputeRootDescriptorTable(ComputeShaderSrvUavRootParameterIndex
+			, CD3DX12_GPU_DESCRIPTOR_HANDLE(cbvSrvUavHandle, HeapOffset::CBV_SRV, m_cbvSrvDescriptorSize));
+
+		// Root constants for the compute shader.
+		struct RootConstants
+		{
+			float commandCount;
+		};
+
+		static RootConstants rootConstant{ std::min(100, CubeCount) };
+
+		computeCommandList->CopyBufferRegion(m_processedCommandBuffers.Get(), CommandBufferCounterOffset
+			, m_processedCommandBufferCounterReset.Get(), 0, sizeof(uint32));
+
+		computeCommandList->SetComputeRoot32BitConstants(ComputeShaderRootConstantRootParameterIndex
+			, sizeof(rootConstant) / 4, reinterpret_cast<void*>(&rootConstant), 0);
+
+		{
+			D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(m_processedCommandBuffers.Get()
+				, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+			computeCommandList->ResourceBarrier(1, &barrier);
+		}
+
+		static const uint32 ComputeThreadBlockSize = 128;
+		const uint32 NumGroupX = static_cast<uint32>(ceil(rootConstant.commandCount / float(ComputeThreadBlockSize)));
+		computeCommandList->Dispatch(NumGroupX, 1, 1);
+
+		{
+			D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(m_processedCommandBuffers.Get()
+				, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT);
+			computeCommandList->ResourceBarrier(1, &barrier);
+		}
+
+		auto fenceValue = computeCommandQueue.ExecuteCommandList(computeCommandList);
+		computeCommandQueue.WaitForFenceValue(fenceValue);
+	}
+
+	{
+		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+			currentBackbuffer.Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		direcCommandList->ResourceBarrier(1, &barrier);
+	}
+
 	// Clear the render targets
 	{
 		{
-			CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-				currentBackbuffer.Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-			direcCommandList->ResourceBarrier(1, &barrier);
-
 			FLOAT clearColor[] = { 0.4f, 0.6f, 0.9f, 1.0f };
 
 			direcCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
@@ -1006,32 +1093,6 @@ void jRHI_DirectX12::RenderCubeTest()
 
 		// Update the MVP matrix
 		{
-			//XMMATRIX m_ModelMatrix;
-			//XMMATRIX m_ViewMatrix;
-			//XMMATRIX m_ProjectionMatrix;
-
-			//static float t = 0.0f;
-			//t += 0.01f;
-
-			//// Update the model matrix.
-			//float angle = static_cast<float>(t * 90.0);
-			//const XMVECTOR rotationAxis = XMVectorSet(0, 1, 1, 0);
-			//m_ModelMatrix = XMMatrixRotationAxis(rotationAxis, XMConvertToRadians(angle));
-
-			//// Update the view matrix.
-			//const XMVECTOR eyePosition = XMVectorSet(0, 0, -10, 1);
-			//const XMVECTOR focusPoint = XMVectorSet(0, 0, 0, 1);
-			//const XMVECTOR upDirection = XMVectorSet(0, 1, 0, 0);
-			//m_ViewMatrix = XMMatrixLookAtLH(eyePosition, focusPoint, upDirection);
-
-			//// Update the projection matrix.
-			//float aspectRatio = SCR_WIDTH / static_cast<float>(SCR_HEIGHT);
-			//m_ProjectionMatrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(45), aspectRatio, 0.1f, 100.0f);
-
-			//XMMATRIX mvpMatrix = XMMatrixMultiply(m_ModelMatrix, m_ViewMatrix);
-			//mvpMatrix = XMMatrixMultiply(mvpMatrix, m_ProjectionMatrix);
-			//commandList->SetGraphicsRoot32BitConstants(0, sizeof(XMMATRIX) / 4, &mvpMatrix, 0);
-
 			static MaterialConstants materialConstants;
 
 			static uint32 PrevTickCount = GetTickCount();
@@ -1049,7 +1110,8 @@ void jRHI_DirectX12::RenderCubeTest()
 
 			// Draw all of the triangles.
 			uint32 CommandBufferOffset = 0;
-			commandList->ExecuteIndirect(m_commandSignature.Get(), CubeCount, m_commandBuffer.Get(), CommandBufferOffset, nullptr, 0);
+			commandList->ExecuteIndirect(m_commandSignature.Get(), CubeCount, m_processedCommandBuffers.Get()
+				, 0, m_processedCommandBuffers.Get(), CommandBufferOffset);
 
 			if (ShouldRecordBundleCommandList)
 				commandList->Close();
@@ -1061,23 +1123,29 @@ void jRHI_DirectX12::RenderCubeTest()
 		}
 	}
 
+	{
+		D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+			m_processedCommandBuffers.Get(), D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT, D3D12_RESOURCE_STATE_COPY_DEST);
+
+		commandList->ResourceBarrier(1, &barrier);
+	}
+
 	// Present
 	{
-		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-			currentBackbuffer.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
-		direcCommandList->ResourceBarrier(1, &barrier);
+		{
+			CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+				currentBackbuffer.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+			direcCommandList->ResourceBarrier(1, &barrier);
+		}
 
 		uint64 executedFenceValue = directCommandQueue.ExecuteCommandList(direcCommandList);
-
+		directCommandQueue.WaitForFenceValue(executedFenceValue);
 		// Present
 		{
 			UINT syncInterval = 1;	// vsyn
 			UINT presentFlags = 0;
 			HRESULT r = m_swapChain->Present(syncInterval, presentFlags);
 			UINT currentBackbufferIndex = m_swapChain->GetCurrentBackBufferIndex();
-
-
-			directCommandQueue.WaitForFenceValue(executedFenceValue);
 		}
 	}
 }

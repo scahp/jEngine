@@ -77,6 +77,14 @@ public:
 		D3D12_GPU_VIRTUAL_ADDRESS cbvMVP;
 		D3D12_GPU_VIRTUAL_ADDRESS cbvInstanceBuffer;
 		D3D12_DRAW_INDEXED_ARGUMENTS drawArguments;
+		float padding;									// align to multiple of 8
+		//float padding[55];	// to be aligned 256 byte.
+
+		//enum
+		//{
+		//	SizeWithoutPadding = sizeof(cbvMVP) + sizeof(cbvInstanceBuffer) + sizeof(drawArguments),
+		//	Size = (sizeof(cbvMVP) + sizeof(cbvInstanceBuffer) + sizeof(drawArguments) + sizeof(padding))
+		//};
 	};
 	ComPtr<ID3D12RootSignature> m_computeRootSignature;
 	ComPtr<ID3D12PipelineState> m_computeState;
@@ -87,6 +95,7 @@ public:
 	std::vector<IndirectCommand> commands;
 	ComPtr<ID3D12Resource> m_commandBuffer;
 	ComPtr<ID3D12Resource> m_processedCommandBuffers;
+	ComPtr<ID3D12Resource> m_processedCommandBufferCounterReset;
 	ComPtr<ID3D12CommandSignature> m_commandSignature;
 
 	// Synchronization objects.

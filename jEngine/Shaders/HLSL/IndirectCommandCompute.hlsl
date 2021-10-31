@@ -15,7 +15,17 @@ struct MVPBuffer
 
 struct IndirectCommand
 {
-    uint2 cbvAddress;
+    uint2 Instance_cbvAddress;
+    uint2 MVP_cbvAddress;
+    
+    uint IndexCountPerInstance;
+    uint InstanceCount;
+    uint StartIndexLocation;
+    int BaseVertexLocation;
+    uint StartInstanceLocation;
+    
+    float padding; // align to multiple of 8
+    //float4 padding[55]; // to be aligned 256 byte.
 };
 
 cbuffer RootConstants : register(b0)
@@ -24,15 +34,14 @@ cbuffer RootConstants : register(b0)
 };
 
 StructuredBuffer<InstanceConstantBuffer> InstanceCBV : register(t0);
-StructuredBuffer<MVPBuffer> MVPCBV : register(t0);
-StructuredBuffer<IndirectCommand> inputCommands : register(t1);
+StructuredBuffer<MVPBuffer> MVPCBV : register(t1);
+StructuredBuffer<IndirectCommand> inputCommands : register(t2);
 AppendStructuredBuffer<IndirectCommand> outputCommands : register(u0);
 
 [numthreads(ThreadBlockSize, 1, 1)]
 void main(uint3 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
 {
     uint index = (groupId.x * ThreadBlockSize) + groupIndex;
-
     if (index < commandCount)
     {
         outputCommands.Append(inputCommands[index]);
