@@ -94,7 +94,7 @@ public:
 	std::vector<MVPConstantBuffer> m_constantMVPBufferData;
 	std::vector<IndirectCommand> commands;
 	ComPtr<ID3D12Resource> m_commandBuffer;
-	ComPtr<ID3D12Resource> m_processedCommandBuffers;
+	ComPtr<ID3D12Resource> m_processedCommandBuffers[FrameCount];
 	ComPtr<ID3D12Resource> m_processedCommandBufferCounterReset;
 	ComPtr<ID3D12CommandSignature> m_commandSignature;
 

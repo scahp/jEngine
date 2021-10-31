@@ -299,7 +299,7 @@ void jRHI_DirectX12::Initialize()
 	{
 		// Create Heap desc
 		D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-		srvHeapDesc.NumDescriptors = HeapOffset::Num;
+		srvHeapDesc.NumDescriptors = HeapOffset::Num * FrameCount;
 		srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 		m_device->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_srvHeap));
@@ -417,7 +417,6 @@ void jRHI_DirectX12::LoadContent()
     }
 
     int32 m_cbvSrvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle(m_srvHeap->GetCPUDescriptorHandleForHeapStart(), HeapOffset::TextureSRV, m_cbvSrvDescriptorSize);
 	{
 		// Describe and create a SRV for the texture
 		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -425,8 +424,13 @@ void jRHI_DirectX12::LoadContent()
 		srvDesc.Format = textureDesc.Format;
 		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 		srvDesc.Texture2D.MipLevels = 1;
-		m_device->CreateShaderResourceView(m_texture.Get(), &srvDesc, srvHandle);
-		srvHandle.Offset(m_cbvSrvDescriptorSize);
+
+		for (uint32 frame = 0; frame < FrameCount; ++frame)
+		{
+			CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle(m_srvHeap->GetCPUDescriptorHandleForHeapStart(), HeapOffset::TextureSRV + frame * HeapOffset::Num, m_cbvSrvDescriptorSize);
+			m_device->CreateShaderResourceView(m_texture.Get(), &srvDesc, srvHandle);
+			//srvHandle.Offset(HeapOffset::Num, m_cbvSrvDescriptorSize);
+		}
 	}
 	//////////////////////////////////////////////////////////////////////////\
 
@@ -455,17 +459,22 @@ void jRHI_DirectX12::LoadContent()
 	}
 
 	{
-		for (int32 i = 0; i < _countof(m_textureArray); ++i)
+		for (uint32 frame = 0; frame < FrameCount; ++frame)
 		{
-			// Create SRV for the ImageArray
-			D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-			srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			srvDesc.Format = textureDesc.Format;
-			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-			srvDesc.Texture2D.MipLevels = 1;
-			m_device->CreateShaderResourceView(m_textureArray[i].Get(), &srvDesc, srvHandle);
+			CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle(m_srvHeap->GetCPUDescriptorHandleForHeapStart(), HeapOffset::TextureSRV_Unbound + frame * HeapOffset::Num, m_cbvSrvDescriptorSize);
+			for (int32 i = 0; i < _countof(m_textureArray); ++i)
+			{
+				// Create SRV for the ImageArray
+				D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+				srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+				srvDesc.Format = textureDesc.Format;
+				srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+				srvDesc.Texture2D.MipLevels = 1;
+				m_device->CreateShaderResourceView(m_textureArray[i].Get(), &srvDesc, srvHandle);
 
-			srvHandle.Offset(m_cbvSrvDescriptorSize);
+				srvHandle.Offset(m_cbvSrvDescriptorSize);
+			}
+			//srvHandle.Offset(HeapOffset::Num, m_cbvSrvDescriptorSize);
 		}
 	}
 	//////////////////////////////////////////////////////////////////////////
@@ -703,20 +712,23 @@ void jRHI_DirectX12::LoadContent()
 		{
 			//////////////////////////////////////////////////////////////////////////
 			// Create constant instance buffer
-			m_constantInstanceBufferData.resize(CubeCount);
+			m_constantInstanceBufferData.resize(CubeCount * FrameCount);
 
 			// Initialize the constant buffers for each of the triangles.
 			const int32 Interval = (255 * 3) / CubeCount;
-			Vector4 ColorTemp = Vector4::ColorBlack;
-			for (int32 i = 0; i < CubeCount; ++i)
+			for (int32 frame = 0; frame < FrameCount; ++frame)
 			{
-				if (ColorTemp.x + Interval <= 255)
-					ColorTemp.x += Interval;
-				else if (ColorTemp.y + Interval <= 255)
-					ColorTemp.y += Interval;
-				else if (ColorTemp.z + Interval <= 255)
-					ColorTemp.z += Interval;
-				m_constantInstanceBufferData[i].Color = ColorTemp / 255.0f;
+				Vector4 ColorTemp = Vector4::ColorBlack;
+				for (int32 i = 0; i < CubeCount; ++i)
+				{
+					if (ColorTemp.x + Interval <= 255)
+						ColorTemp.x += Interval;
+					else if (ColorTemp.y + Interval <= 255)
+						ColorTemp.y += Interval;
+					else if (ColorTemp.z + Interval <= 255)
+						ColorTemp.z += Interval;
+					m_constantInstanceBufferData[i + CubeCount * frame].Color = ColorTemp / 255.0f;
+				}
 			}
 
 			{
@@ -732,7 +744,6 @@ void jRHI_DirectX12::LoadContent()
 			}
 
 			// Create shader resource views (SRV) of the constant instance buffers for the compute shader to read from.
-			CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle(m_srvHeap->GetCPUDescriptorHandleForHeapStart(), HeapOffset::CBV_SRV, m_cbvSrvDescriptorSize);
 			{
 				D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 				srvDesc.Format = DXGI_FORMAT_UNKNOWN;
@@ -741,10 +752,14 @@ void jRHI_DirectX12::LoadContent()
 				srvDesc.Buffer.NumElements = CubeCount;
 				srvDesc.Buffer.StructureByteStride = sizeof(InstanceConstantBuffer);
 				srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-				srvDesc.Buffer.FirstElement = 0;
 
-				m_device->CreateShaderResourceView(m_constantInstanceBuffer.Get(), &srvDesc, srvHandle);
-				srvHandle.Offset(m_cbvSrvDescriptorSize);
+				CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle(m_srvHeap->GetCPUDescriptorHandleForHeapStart(), HeapOffset::CBV_SRV, m_cbvSrvDescriptorSize);
+				for (uint32 frame = 0; frame < FrameCount; ++frame)
+				{
+					srvDesc.Buffer.FirstElement = frame * CubeCount;
+					m_device->CreateShaderResourceView(m_constantInstanceBuffer.Get(), &srvDesc, srvHandle);
+					srvHandle.Offset(HeapOffset::Num, m_cbvSrvDescriptorSize);
+				}
 			}
 			//////////////////////////////////////////////////////////////////////////
 
@@ -753,30 +768,34 @@ void jRHI_DirectX12::LoadContent()
 			XMMATRIX VP;
 
 			// Update the view matrix.
-			const XMVECTOR eyePosition = XMVectorSet(0, 0, -10, 1);
-			const XMVECTOR focusPoint = XMVectorSet(0, 0, 0, 1);
-			const XMVECTOR upDirection = XMVectorSet(0, 1, 0, 0);
-			VP = XMMatrixLookAtLH(eyePosition, focusPoint, upDirection);
-
-			float aspectRatio = SCR_WIDTH / static_cast<float>(SCR_HEIGHT);
-			VP = XMMatrixMultiply(VP, XMMatrixPerspectiveFovLH(XMConvertToRadians(45), aspectRatio, 0.1f, 100.0f));
-
 			static float t = 0.0f;
-			m_constantMVPBufferData.resize(CubeCount);
+			m_constantMVPBufferData.resize(CubeCount * FrameCount);
 			const int32 MaxXorY = sqrt(CubeCount);
-			for (int32 i = 0; i < CubeCount; ++i)
+			for (int32 frame = 0; frame < FrameCount; ++frame)
 			{
-				t += 0.01f;
-				float angle = static_cast<float>(t * 90.0);
-				const XMVECTOR rotationAxis = XMVectorSet(0, 1, 1, 0);
+				const XMVECTOR eyePosition = XMVectorSet(0, 0, -10, 1);
+				const XMVECTOR focusPoint = XMVectorSet(0, 0, 0, 1);
+				const XMVECTOR upDirection = XMVectorSet(0, 1, 0, 0);
+				VP = XMMatrixLookAtLH(eyePosition, focusPoint, upDirection);
 
-				float x = static_cast<float>(i % MaxXorY) - MaxXorY / 2;
-				float y = static_cast<float>(i / MaxXorY) - MaxXorY / 2;
-				XMMATRIX S = XMMatrixScaling(0.3f, 0.3f, 0.3f);
-				XMMATRIX R = XMMatrixRotationAxis(rotationAxis, XMConvertToRadians(angle));
-				XMMATRIX T = XMMatrixTranslation(x, y, 0.0f);
-				XMMATRIX ModelMatrix = XMMatrixMultiply(XMMatrixMultiply(S, R), T);
-				m_constantMVPBufferData[i].MVP = XMMatrixMultiply(ModelMatrix, VP);
+				float aspectRatio = SCR_WIDTH / static_cast<float>(SCR_HEIGHT);
+				VP = XMMatrixMultiply(VP, XMMatrixPerspectiveFovLH(XMConvertToRadians(45), aspectRatio, 0.1f, 100.0f));
+				t = 0.0f;
+
+				for (int32 i = 0; i < CubeCount; ++i)
+				{
+					t += 0.01f;
+					float angle = static_cast<float>(t * 90.0);
+					const XMVECTOR rotationAxis = XMVectorSet(0, 1, 1, 0);
+
+					float x = static_cast<float>(i % MaxXorY) - MaxXorY / 2;
+					float y = static_cast<float>(i / MaxXorY) - MaxXorY / 2;
+					XMMATRIX S = XMMatrixScaling(0.3f, 0.3f, 0.3f);
+					XMMATRIX R = XMMatrixRotationAxis(rotationAxis, XMConvertToRadians(angle));
+					XMMATRIX T = XMMatrixTranslation(x, y, 0.0f);
+					XMMATRIX ModelMatrix = XMMatrixMultiply(XMMatrixMultiply(S, R), T);
+					m_constantMVPBufferData[i + CubeCount * frame].MVP = XMMatrixMultiply(ModelMatrix, VP);
+				}
 			}
 
 			{
@@ -800,37 +819,42 @@ void jRHI_DirectX12::LoadContent()
 				srvDesc.Buffer.NumElements = CubeCount;
 				srvDesc.Buffer.StructureByteStride = sizeof(MVPConstantBuffer);
 				srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-				srvDesc.Buffer.FirstElement = 0;
 
-				m_device->CreateShaderResourceView(m_constantMVPBuffer.Get(), &srvDesc, srvHandle);
-				srvHandle.Offset(m_cbvSrvDescriptorSize);
+				CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle(m_srvHeap->GetCPUDescriptorHandleForHeapStart(), HeapOffset::CBV_SRV + 1, m_cbvSrvDescriptorSize);
+				for (uint32 frame = 0; frame < FrameCount; ++frame)
+				{
+					srvDesc.Buffer.FirstElement = frame * CubeCount;
+					m_device->CreateShaderResourceView(m_constantMVPBuffer.Get(), &srvDesc, srvHandle);
+					srvHandle.Offset(HeapOffset::Num, m_cbvSrvDescriptorSize);
+				}
 			}
 			//////////////////////////////////////////////////////////////////////////
 
 			//////////////////////////////////////////////////////////////////////////
 			// Create command buffer
-			commands.resize(CubeCount);
-			const int32 CommandSize = CubeCount * sizeof(IndirectCommand);
+			commands.resize(CubeCount * FrameCount);
 
 			D3D12_GPU_VIRTUAL_ADDRESS instanceBufferGpuAddress = m_constantInstanceBuffer->GetGPUVirtualAddress();
 			D3D12_GPU_VIRTUAL_ADDRESS MVPBufferGpuAddress = m_constantMVPBuffer->GetGPUVirtualAddress();
 			int32 commandIndex = 0;
 
-			for (int32 i = 0; i < CubeCount; ++i)
+			for (int32 frame = 0; frame < FrameCount; ++frame)
 			{
-				commands[commandIndex].cbvInstanceBuffer = instanceBufferGpuAddress;
-				commands[commandIndex].cbvMVP = MVPBufferGpuAddress;
-				commands[commandIndex].drawArguments.IndexCountPerInstance = 36;
-				commands[commandIndex].drawArguments.InstanceCount = 1;
-				commands[commandIndex].drawArguments.StartIndexLocation = 0;
-				commands[commandIndex].drawArguments.StartInstanceLocation = 0;
-				commands[commandIndex].drawArguments.BaseVertexLocation = 0;
+				for (int32 i = 0; i < CubeCount; ++i)
+				{
+					commands[commandIndex].cbvInstanceBuffer = instanceBufferGpuAddress;
+					commands[commandIndex].cbvMVP = MVPBufferGpuAddress;
+					commands[commandIndex].drawArguments.IndexCountPerInstance = 36;
+					commands[commandIndex].drawArguments.InstanceCount = 1;
+					commands[commandIndex].drawArguments.StartIndexLocation = 0;
+					commands[commandIndex].drawArguments.StartInstanceLocation = 0;
+					commands[commandIndex].drawArguments.BaseVertexLocation = 0;
 
-				++commandIndex;
-				instanceBufferGpuAddress += sizeof(InstanceConstantBuffer);
-				MVPBufferGpuAddress += sizeof(MVPConstantBuffer);
+					++commandIndex;
+					instanceBufferGpuAddress += sizeof(InstanceConstantBuffer);
+					MVPBufferGpuAddress += sizeof(MVPConstantBuffer);
+				}
 			}
-
 			{
 				ComPtr<ID3D12GraphicsCommandList2> copyCommandList = copyCommandQueue.GetAvailableCommandList();
 
@@ -853,7 +877,13 @@ void jRHI_DirectX12::LoadContent()
 				srvDesc.Buffer.StructureByteStride = sizeof(IndirectCommand);
 				srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 
-				m_device->CreateShaderResourceView(m_commandBuffer.Get(), &srvDesc, srvHandle);
+				CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle(m_srvHeap->GetCPUDescriptorHandleForHeapStart(), HeapOffset::Command, m_cbvSrvDescriptorSize);
+				for (int32 frame = 0; frame < FrameCount; ++frame)
+				{
+					srvDesc.Buffer.FirstElement = frame * CubeCount;
+					m_device->CreateShaderResourceView(m_commandBuffer.Get(), &srvDesc, srvHandle);
+					srvHandle.Offset(HeapOffset::Num, m_cbvSrvDescriptorSize);
+				}
 			}
 			//////////////////////////////////////////////////////////////////////////
 
@@ -870,28 +900,34 @@ void jRHI_DirectX12::LoadContent()
 					return (bufferSize + (alignment - 1)) & ~(alignment - 1);
 				};
 
-				CD3DX12_CPU_DESCRIPTOR_HANDLE processedCommandsHandle(m_srvHeap->GetCPUDescriptorHandleForHeapStart(), HeapOffset::UAV, m_cbvSrvDescriptorSize);
 				const int32 CommandSizePerFrame = CubeCount * sizeof(IndirectCommand);
 				const int32 CommandBufferCounterOffset = AlignForUavCounter(CommandSizePerFrame);
 
 				D3D12_RESOURCE_DESC commandBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(CommandBufferCounterOffset + sizeof(uint32), D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-				m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT), D3D12_HEAP_FLAG_NONE
-					, &commandBufferDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&m_processedCommandBuffers));
 
-				D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
-				uavDesc.Format = DXGI_FORMAT_UNKNOWN;
-				uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-				uavDesc.Buffer.FirstElement = 0;
-				uavDesc.Buffer.NumElements = CubeCount;
-				uavDesc.Buffer.StructureByteStride = sizeof(IndirectCommand);
-				uavDesc.Buffer.CounterOffsetInBytes = CommandBufferCounterOffset;
-				uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+				CD3DX12_CPU_DESCRIPTOR_HANDLE processedCommandsHandle(m_srvHeap->GetCPUDescriptorHandleForHeapStart(), HeapOffset::UAV, m_cbvSrvDescriptorSize);
+				for (int32 frame = 0; frame < FrameCount; ++frame)
+				{
+					m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT), D3D12_HEAP_FLAG_NONE
+						, &commandBufferDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&m_processedCommandBuffers[frame]));
 
-				m_device->CreateUnorderedAccessView(
-					m_processedCommandBuffers.Get(),
-					m_processedCommandBuffers.Get(),
-					&uavDesc,
-					processedCommandsHandle);
+					D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+					uavDesc.Format = DXGI_FORMAT_UNKNOWN;
+					uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+					uavDesc.Buffer.FirstElement = 0;
+					uavDesc.Buffer.NumElements = CubeCount;
+					uavDesc.Buffer.StructureByteStride = sizeof(IndirectCommand);
+					uavDesc.Buffer.CounterOffsetInBytes = CommandBufferCounterOffset;
+					uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+
+					m_device->CreateUnorderedAccessView(
+						m_processedCommandBuffers[frame].Get(),
+						m_processedCommandBuffers[frame].Get(),
+						&uavDesc,
+						processedCommandsHandle);
+
+					processedCommandsHandle.Offset(HeapOffset::Num, m_cbvSrvDescriptorSize);
+				}
 
 				// Allocate a buffer that can be used to reset the UAV counters and initialize it to 0.
 				if (FAILED(m_device->CreateCommittedResource(
@@ -1010,9 +1046,8 @@ void jRHI_DirectX12::RenderCubeTest()
 		ID3D12DescriptorHeap* ppHeaps[] = { m_srvHeap.Get() };
 		computeCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
-		D3D12_GPU_DESCRIPTOR_HANDLE cbvSrvUavHandle = m_srvHeap->GetGPUDescriptorHandleForHeapStart();
 		computeCommandList->SetComputeRootDescriptorTable(ComputeShaderSrvUavRootParameterIndex
-			, CD3DX12_GPU_DESCRIPTOR_HANDLE(cbvSrvUavHandle, HeapOffset::CBV_SRV, m_cbvSrvDescriptorSize));
+			, CD3DX12_GPU_DESCRIPTOR_HANDLE(m_srvHeap->GetGPUDescriptorHandleForHeapStart(), HeapOffset::Num * m_frameIndex + HeapOffset::CBV_SRV, m_cbvSrvDescriptorSize));
 
 		// Root constants for the compute shader.
 		struct RootConstants
@@ -1022,14 +1057,14 @@ void jRHI_DirectX12::RenderCubeTest()
 
 		static RootConstants rootConstant{ std::min(100, CubeCount) };
 
-		computeCommandList->CopyBufferRegion(m_processedCommandBuffers.Get(), CommandBufferCounterOffset
+		computeCommandList->CopyBufferRegion(m_processedCommandBuffers[m_frameIndex].Get(), CommandBufferCounterOffset
 			, m_processedCommandBufferCounterReset.Get(), 0, sizeof(uint32));
 
 		computeCommandList->SetComputeRoot32BitConstants(ComputeShaderRootConstantRootParameterIndex
 			, sizeof(rootConstant) / 4, reinterpret_cast<void*>(&rootConstant), 0);
 
 		{
-			D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(m_processedCommandBuffers.Get()
+			D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(m_processedCommandBuffers[m_frameIndex].Get()
 				, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 			computeCommandList->ResourceBarrier(1, &barrier);
 		}
@@ -1039,7 +1074,7 @@ void jRHI_DirectX12::RenderCubeTest()
 		computeCommandList->Dispatch(NumGroupX, 1, 1);
 
 		{
-			D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(m_processedCommandBuffers.Get()
+			D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(m_processedCommandBuffers[m_frameIndex].Get()
 				, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT);
 			computeCommandList->ResourceBarrier(1, &barrier);
 		}
@@ -1075,7 +1110,7 @@ void jRHI_DirectX12::RenderCubeTest()
 			commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
 			int32 m_cbvSrvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-			CD3DX12_GPU_DESCRIPTOR_HANDLE cbvSrvHandle(m_srvHeap->GetGPUDescriptorHandleForHeapStart(), HeapOffset::TextureSRV, m_cbvSrvDescriptorSize);
+			CD3DX12_GPU_DESCRIPTOR_HANDLE cbvSrvHandle(m_srvHeap->GetGPUDescriptorHandleForHeapStart(), HeapOffset::Num * m_frameIndex + HeapOffset::TextureSRV, m_cbvSrvDescriptorSize);
 
 			commandList->SetGraphicsRootDescriptorTable(3, cbvSrvHandle);	// rootParameters에서 SRV가 어떤 Index에 들어간지 RootParameterIndex를 설정해야 함
 			cbvSrvHandle.Offset(m_cbvSrvDescriptorSize);
@@ -1110,8 +1145,9 @@ void jRHI_DirectX12::RenderCubeTest()
 
 			// Draw all of the triangles.
 			uint32 CommandBufferOffset = 0;
-			commandList->ExecuteIndirect(m_commandSignature.Get(), CubeCount, m_processedCommandBuffers.Get()
-				, 0, m_processedCommandBuffers.Get(), CommandBufferOffset);
+			const uint32 CommandSizePerFrame = CubeCount * sizeof(IndirectCommand);
+			commandList->ExecuteIndirect(m_commandSignature.Get(), CubeCount, m_processedCommandBuffers[m_frameIndex].Get()
+				, 0, m_processedCommandBuffers[m_frameIndex].Get(), CommandBufferOffset);
 
 			if (ShouldRecordBundleCommandList)
 				commandList->Close();
@@ -1125,7 +1161,7 @@ void jRHI_DirectX12::RenderCubeTest()
 
 	{
 		D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-			m_processedCommandBuffers.Get(), D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT, D3D12_RESOURCE_STATE_COPY_DEST);
+			m_processedCommandBuffers[m_frameIndex].Get(), D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT, D3D12_RESOURCE_STATE_COPY_DEST);
 
 		commandList->ResourceBarrier(1, &barrier);
 	}
