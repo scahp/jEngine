@@ -720,5 +720,8 @@
     <None Include="Shaders\HLSL\CubeVertexShader_IndirectCommand.hlsl">
       <Filter>Shaders\HLSL</Filter>
     </None>
+    <None Include="Shaders\HLSL\Prediction.hlsl">
+      <Filter>Shaders\HLSL</Filter>
+    </None>
   </ItemGroup>
 </Project>

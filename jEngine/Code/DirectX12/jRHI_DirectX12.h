@@ -16,11 +16,13 @@ using Microsoft::WRL::ComPtr;
 using namespace DirectX;
 
 static const UINT FrameCount = 2;
+static const uint32 cbvCountPerFrame = 3;
 
 class jRHI_DirectX12 : public jRHI
 {
 public:
 	void Initialize();
+	void Release();
 	void LoadContent();
 
 	HWND CreateMainWindow() const;
@@ -39,21 +41,31 @@ public:
 	ComPtr<ID3D12RootSignature> m_rootSignature;
 	ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
 	ComPtr<ID3D12PipelineState> m_pipelineState;
+	ComPtr<ID3D12PipelineState> m_queryState;
 	ComPtr<ID3D12GraphicsCommandList> m_commandList;
 	ComPtr<ID3D12GraphicsCommandList> m_bundle;
 	UINT m_rtvDescriptorSize;
 	ComPtr<ID3D12DescriptorHeap> m_cbvHeap;
+	ComPtr<ID3D12QueryHeap> m_queryHeap;
+	ComPtr<ID3D12Resource> m_queryResult;
+
+	int32 m_cbvSrvDescriptorSize = 0;
 
 	// App resources.
 	ComPtr<ID3D12Resource> m_vertexBuffer;
 	D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
 	D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
+	ComPtr<ID3D12Resource> m_vertexBuffer2;
+	D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView2;
 	ComPtr<ID3D12Resource> m_depthBuffer;
 	ComPtr<ID3D12Resource> m_indexBuffer;
-	ComPtr<ID3D12DescriptorHeap> m_dSVHeap;
+	ComPtr<ID3D12DescriptorHeap> m_dsvHeap;
 	ComPtr<ID3D12Resource> m_texture;
 	ComPtr<ID3D12Resource> m_textureArray[3];
 	ComPtr<ID3D12DescriptorHeap> m_srvHeap;
+
+    ComPtr<ID3D12CommandAllocator> m_commandAllocators[FrameCount];
+    ComPtr<ID3D12CommandQueue> m_commandQueue;
 
 	// Compute shader
 	struct InstanceConstantBuffer
@@ -98,16 +110,29 @@ public:
 	ComPtr<ID3D12Resource> m_processedCommandBufferCounterReset;
 	ComPtr<ID3D12CommandSignature> m_commandSignature;
 
+	struct SceneConstantBuffer
+	{
+		XMFLOAT4 offset;
+		XMMATRIX MVP;
+
+		// Constant buffers are 256-byte aligned. Add padding in the struct to allow multiple buffers
+		// to be array-indexed.
+		FLOAT padding[44];
+	};
+
+	UINT8* m_pCbvDataBegin = nullptr;
+	SceneConstantBuffer m_constantBufferData[cbvCountPerFrame];
+	ComPtr<ID3D12Resource> m_constantBuffer;
+
+
 	// Synchronization objects.
 	UINT m_frameIndex;
 	HANDLE m_fenceEvent;
 	ComPtr<ID3D12Fence> m_fence;
-	UINT64 m_fenceValue;
+	UINT64 m_fenceValue[FrameCount];
 
 	jCommandQueue_DirectX12 directCommandQueue;
-	jCommandQueue_DirectX12 bundleCommandQueue;
 	jCommandQueue_DirectX12 copyCommandQueue;
-	jCommandQueue_DirectX12 computeCommandQueue;
 
 	bool UpdateBufferResource(
 		ComPtr<ID3D12Device2> InDevice
