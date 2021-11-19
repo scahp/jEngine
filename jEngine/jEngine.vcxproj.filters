@@ -239,6 +239,9 @@
     <ClInclude Include="Code\DirectX12\jRHI_DirectX12.h">
       <Filter>Code\DirectX12</Filter>
     </ClInclude>
+    <ClInclude Include="Shaders\HLSL\RaytracingHlslCompat.h">
+      <Filter>Shaders\HLSL</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="DeprecatedCode\jPipeline.cpp">
@@ -720,5 +723,10 @@
     <None Include="Shaders\HLSL\CubeVertexShader_IndirectCommand.hlsl">
       <Filter>Shaders\HLSL</Filter>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="Shaders\HLSL\Raytracing.hlsl">
+      <Filter>Shaders\HLSL</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

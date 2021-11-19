@@ -92,7 +92,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>./Code;./DeprecatedCode;./Code/Math;./Code/External;./Code/Generic;./Code/External/IMGUI;./;./Code/External/DX12/include;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>./Code;./DeprecatedCode;./Code/Math;./Code/External;./Code/Generic;./Code/External/IMGUI;./;./Code/External/DX12/include;;$(IntDir)</AdditionalIncludeDirectories>
       <EnableParallelCodeGeneration>
       </EnableParallelCodeGeneration>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -111,7 +111,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;_ITERATOR_DEBUG_LEVEL=0;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>./Code;./DeprecatedCode;./Code/Math;./Code/External;./Code/Generic;./Code/External/IMGUI;./;./Code/External/DX12/include;./glad/include;./External/AntTweakBar/include;./External/assimp/include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>./Code;./DeprecatedCode;./Code/Math;./Code/External;./Code/Generic;./Code/External/IMGUI;./;./Code/External/DX12/include;./glad/include;./External/AntTweakBar/include;./External/assimp/include;$(IntDir)</AdditionalIncludeDirectories>
       <EnableParallelCodeGeneration>
       </EnableParallelCodeGeneration>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -136,7 +136,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>./Code;./DeprecatedCode;./Code/Math;./Code/External;./Code/Generic;./Code/External/IMGUI;./;./Code/External/DX12/include;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>./Code;./DeprecatedCode;./Code/Math;./Code/External;./Code/Generic;./Code/External/IMGUI;./;./Code/External/DX12/include;;$(IntDir)</AdditionalIncludeDirectories>
       <EnableParallelCodeGeneration>
       </EnableParallelCodeGeneration>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -159,7 +159,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>./Code;./DeprecatedCode;./Code/Math;./Code/External;./Code/Generic;./Code/External/IMGUI;./;./Code/External/DX12/include;./glad/include;./External/AntTweakBar/include;./External/assimp/include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>./Code;./DeprecatedCode;./Code/Math;./Code/External;./Code/Generic;./Code/External/IMGUI;./;./Code/External/DX12/include;./glad/include;./External/AntTweakBar/include;./External/assimp/include;$(IntDir)</AdditionalIncludeDirectories>
       <EnableParallelCodeGeneration>
       </EnableParallelCodeGeneration>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -236,6 +236,7 @@
     <ClInclude Include="DeprecatedCode\jShadowVolume.h" />
     <ClInclude Include="DeprecatedCode\jShadowVolumeTypes.h" />
     <ClInclude Include="DeprecatedCode\jVertexAdjacency.h" />
+    <ClInclude Include="Shaders\HLSL\RaytracingHlslCompat.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Code\DirectX12\jCommandQueue_DirectX12.cpp" />
@@ -470,6 +471,34 @@
     <None Include="Shaders\HLSL\CubeVertexShader_IndirectCommand.hlsl">
       <FileType>Document</FileType>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="Shaders\HLSL\Raytracing.hlsl">
+      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+      </EntryPointName>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Library</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">6.3</ShaderModel>
+      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+      </EntryPointName>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Library</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">6.3</ShaderModel>
+      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+      </EntryPointName>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Library</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">6.3</ShaderModel>
+      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      </EntryPointName>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Library</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">6.3</ShaderModel>
+      <VariableName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">g_p%(Filename)</VariableName>
+      <HeaderFileOutput Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(IntDir)CompiledShaders\%(Filename).hlsl.h</HeaderFileOutput>
+      <VariableName Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">g_p%(Filename)</VariableName>
+      <HeaderFileOutput Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(IntDir)CompiledShaders\%(Filename).hlsl.h</HeaderFileOutput>
+      <VariableName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">g_p%(Filename)</VariableName>
+      <HeaderFileOutput Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(IntDir)CompiledShaders\%(Filename).hlsl.h</HeaderFileOutput>
+      <VariableName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">g_p%(Filename)</VariableName>
+      <HeaderFileOutput Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(IntDir)CompiledShaders\%(Filename).hlsl.h</HeaderFileOutput>
+    </FxCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
