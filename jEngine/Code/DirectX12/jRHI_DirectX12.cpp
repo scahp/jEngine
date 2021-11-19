@@ -996,19 +996,60 @@ void jRHI_DirectX12::Initialize()
 
 void jRHI_DirectX12::Release()
 {
-	m_commandList.Reset();
-	for (int32 i = 0; i < _countof(m_commandAllocators); ++i)
+	if (m_commandQueue && m_fence && m_fenceEvent)
 	{
-		m_commandAllocators[i].Reset();
+		uint64 fenceValue = m_fenceValue[m_frameIndex];
+		if (SUCCEEDED(m_commandQueue->Signal(m_fence.Get(), fenceValue)))
+		{
+			if (SUCCEEDED(m_fence->SetEventOnCompletion(fenceValue, m_fenceEvent)))
+			{
+				WaitForSingleObjectEx(m_fenceEvent, INFINITE, false);
+
+				m_fenceValue[m_frameIndex]++;
+			}
+		}
 	}
-	m_fence.Reset();
-	m_commandQueue.Reset();
-	for (auto& rt : m_renderTargets)
+
+	// ReleaseWindowSizeDependentResources();
 	{
-		rt.Reset();
+		m_rayGenShaderTable.Reset();
+		m_missShaderTable.Reset();
+		m_hitGroupShaderTable.Reset();
+		m_raytracingOutput.Reset();
 	}
-	m_swapChain.Reset();
-	m_device.Reset();
+	// ReleaseDeviceDependentResources();
+	{
+		m_raytracingGlobalRootSignature.Reset();
+		m_raytracingLocalRootSignature.Reset();
+
+		m_dxrDevice.Reset();
+		m_dxrCommandList.Reset();
+		m_dxrStateObject.Reset();
+
+		m_cbvHeap.Reset();
+		m_descriptorsAllocated = 0;
+		m_raytracingOutputResourceUAVDescriptorHeapIndex = UINT_MAX;
+		m_indexBuffer.Reset();
+		m_vertexBuffer.Reset();
+
+		m_accelerationStructure.Reset();
+		m_bottomLevelAccelerationStructure.Reset();
+		m_topLevelAccelerationStructure.Reset();
+	}
+
+	//m_commandList.Reset();
+	//for (int32 i = 0; i < _countof(m_commandAllocators); ++i)
+	//{
+	//	m_commandAllocators[i].Reset();
+	//}
+	//m_fence.Reset();
+	//m_commandQueue.Reset();
+	//for (auto& rt : m_renderTargets)
+	//{
+	//	rt.Reset();
+	//}
+	//m_swapChain.Reset();
+	//m_device.Reset();
 }
 
 void jRHI_DirectX12::Prepare(D3D12_RESOURCE_STATES beforeState)
