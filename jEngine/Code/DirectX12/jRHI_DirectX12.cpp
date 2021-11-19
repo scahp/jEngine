@@ -3,6 +3,9 @@
 #include "jImageFileLoader.h"
 #include "CompiledShaders/Raytracing.hlsl.h"
 #include <limits>
+#include <vector>
+#include <string>
+#include <fstream>
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -153,6 +156,242 @@ public:
 	}
 };
 
+#include "dxcapi.h"
+class Dxc
+{
+public:
+	HMODULE m_dll = nullptr;
+	DxcCreateInstanceProc m_createFn = nullptr;
+	DxcCreateInstance2Proc m_createFn2 = nullptr;
+
+	HRESULT InitializeInternal(const wchar_t* InDllName, const char* InFnName)
+	{
+		if (m_dll)
+			return S_OK;
+
+		m_dll = LoadLibraryW(InDllName);
+
+		if (!m_dll)
+		{
+			return HRESULT_FROM_WIN32(GetLastError());
+		}
+
+		m_createFn = (DxcCreateInstanceProc)(GetProcAddress(m_dll, InFnName));
+
+		if (!m_createFn)
+		{
+			HRESULT hr = HRESULT_FROM_WIN32(GetLastError());
+			FreeLibrary(m_dll);
+			m_dll = nullptr;
+			return hr;
+		}
+
+		char fnName2[128];
+		size_t s = strlen(InFnName);
+		if (s < sizeof(fnName2) - 2)
+		{
+			memcpy(fnName2, InFnName, s);
+			fnName2[s] = '2';
+			fnName2[s + 1] = '\0';
+			m_createFn2 = (DxcCreateInstance2Proc)(GetProcAddress(m_dll, fnName2));
+		}
+
+		return S_OK;
+	}
+
+	Dxc() {}
+	Dxc(Dxc&& other)
+	{
+		m_dll = other.m_dll;
+		other.m_dll = nullptr;
+
+		m_createFn = other.m_createFn;
+		other.m_createFn = nullptr;
+
+		m_createFn2 = other.m_createFn2;
+		other.m_createFn2 = nullptr;
+	}
+
+	~Dxc()
+	{
+		CleanUp();
+	}
+
+	void CleanUp()
+	{
+		if (m_dll)
+		{
+			m_createFn = nullptr;
+			m_createFn2 = nullptr;
+			FreeLibrary(m_dll);
+			m_dll = nullptr;
+		}
+	}
+
+	HRESULT Initialize()
+	{
+		return InitializeInternal(TEXT("dxcompiler.dll"), "DxcCreateInstance");
+	}
+
+	HRESULT InitializeFordll(const wchar_t* InDll, const char* InEntryPoint)
+	{
+		return InitializeInternal(InDll, InEntryPoint);
+	}
+
+	template <typename TInterface>
+	HRESULT CreateInstance(REFCLSID clsid, TInterface** pResult)
+	{
+		return CreateInstance(clsid, __uuidof(TInterface), (IUnknown**)pResult);
+	}
+
+	HRESULT CreateInstance(REFCLSID clsid, REFIID riid, IUnknown** pResult)
+	{
+		if (!pResult)
+			return E_POINTER;
+
+		if (!m_dll)
+			return E_FAIL;
+
+		HRESULT hr = m_createFn(clsid, riid, (LPVOID*)pResult);
+		return hr;
+	}
+
+	template <typename TInterface>
+	HRESULT CreateInstance2(IMalloc* pMalloc, REFCLSID clsid, TInterface** pResult)
+	{
+		return CreateInstance2(pMalloc, clsid, __uuidof(TInterface), (IUnknown**)pResult);
+	}
+
+	HRESULT CreateInstance2(IMalloc* pMalloc, REFCLSID clsid, REFIID riid, IUnknown** pResult)
+	{
+		if (!pResult)
+			return E_POINTER;
+
+		if (!m_dll)
+			return E_FAIL;
+
+		if (!m_createFn2)
+			return E_FAIL;
+
+		HRESULT hr = m_createFn2(pMalloc, clsid, riid, (LPVOID*)pResult);
+		return hr;
+	}
+
+	bool HasCreateWithMalloc() const
+	{
+		return m_createFn2;
+	}
+
+	bool IsEnable() const
+	{
+		return m_dll;
+	}
+
+	HMODULE Detach()
+	{
+		HMODULE module = m_dll;
+		m_dll = nullptr;
+		return module;
+	}
+};
+
+struct DxilLibrary
+{
+	DxilLibrary(ComPtr<ID3DBlob> pBlob, const wchar_t* entryPoint[], uint32 entryPointCount)
+		: pShaderBlob(pBlob)
+	{
+		stateSubobject.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
+		stateSubobject.pDesc = &dxilLibDesc;
+
+		dxilLibDesc = {};
+		exportDesc.resize(entryPointCount);
+		exportName.resize(entryPointCount);
+		if (pBlob)
+		{
+			dxilLibDesc.DXILLibrary.pShaderBytecode = pBlob->GetBufferPointer();
+			dxilLibDesc.DXILLibrary.BytecodeLength = pBlob->GetBufferSize();
+			dxilLibDesc.NumExports = entryPointCount;
+			dxilLibDesc.pExports = exportDesc.data();
+
+			for (uint32 i = 0; i < entryPointCount; ++i)
+			{
+				exportName[i] = entryPoint[i];
+				exportDesc[i].Name = exportName[i].c_str();
+				exportDesc[i].Flags = D3D12_EXPORT_FLAG_NONE;
+				exportDesc[i].ExportToRename = nullptr;
+			}
+		}
+	}
+
+	DxilLibrary() : DxilLibrary(nullptr, nullptr, 0) {}
+
+	D3D12_DXIL_LIBRARY_DESC dxilLibDesc = {};
+	D3D12_STATE_SUBOBJECT stateSubobject = {};
+	ComPtr<ID3DBlob> pShaderBlob;
+	std::vector<D3D12_EXPORT_DESC> exportDesc;
+	std::vector<std::wstring> exportName;
+};
+
+Dxc gDXC;
+
+ComPtr<ID3DBlob> CompileLibrary(const wchar_t* InFilename, const wchar_t* InTargetString)
+{
+	if (FAILED(gDXC.Initialize()))
+		return nullptr;
+
+	ComPtr<IDxcCompiler> pCompiler;
+	ComPtr<IDxcLibrary> pLibrary;
+	if (FAILED(gDXC.CreateInstance(CLSID_DxcCompiler, pCompiler.GetAddressOf())))
+		return nullptr;
+	if (FAILED(gDXC.CreateInstance(CLSID_DxcLibrary, pLibrary.GetAddressOf())))
+		return nullptr;
+
+	std::ifstream shaderFile(InFilename);
+	if (!shaderFile.good())
+	{
+		return nullptr;
+	}
+	std::stringstream strStream;
+	strStream << shaderFile.rdbuf();
+	std::string shader = strStream.str();
+
+	// string 으로 부터 blob 생성
+	ComPtr<IDxcBlobEncoding> pTextBlob;
+	if (FAILED(pLibrary->CreateBlobWithEncodingFromPinned((LPBYTE)shader.c_str(), (uint32)shader.size(), 0, &pTextBlob)))
+		return nullptr;
+
+	// 컴파일
+	ComPtr<IDxcOperationResult> pResult;
+	if (FAILED(pCompiler->Compile(pTextBlob.Get(), InFilename, TEXT(""), InTargetString, nullptr, 0, nullptr, 0, nullptr, &pResult)))
+		return nullptr;
+
+	// 결과 확인
+	HRESULT resultCode;
+	if (FAILED((pResult->GetStatus(&resultCode))))
+		return nullptr;
+	if (FAILED(resultCode))
+	{
+		ComPtr<IDxcBlobEncoding> pError;
+		pResult->GetErrorBuffer(&pError);
+		OutputDebugStringA(reinterpret_cast<const char*>(pError->GetBufferPointer()));
+		return nullptr;
+	}
+
+	ComPtr<IDxcBlob> pBlob;
+	if (FAILED((pResult->GetResult(&pBlob))))
+		return nullptr;
+
+	ComPtr<ID3DBlob> result;
+	pBlob.As<ID3DBlob>(&result);
+	return result;
+}
+
+DxilLibrary CreateDxilLibrary()
+{
+	ComPtr<ID3DBlob> pDxilLib = CompileLibrary(TEXT("Shaders/HLSL/Raytracing.hlsl"), TEXT("lib_6_3"));
+	const wchar_t* entryPoints[] = { jRHI_DirectX12::c_raygenShaderName, jRHI_DirectX12::c_missShaderName, jRHI_DirectX12::c_closestHitShaderName };
+	return DxilLibrary(pDxilLib, entryPoints, _countof(entryPoints));
+}
 
 CD3DX12_VIEWPORT m_viewport(0.0f, 0.0f, static_cast<float>(SCR_WIDTH), static_cast<float>(SCR_HEIGHT));
 CD3DX12_RECT m_scissorRect(0, 0, static_cast<LONG>(SCR_WIDTH), static_cast<LONG>(SCR_HEIGHT));
@@ -628,6 +867,8 @@ void jRHI_DirectX12::Initialize()
 
 	//CreateRaytracingPipelineStateObject();
 	{
+#define USE_EXPORTED_SHADER 0
+#if USE_EXPORTED_SHADER
 		// 1 - DXIL Library
 		// 1 - Triangle hit group
 		// 1 - Shader config
@@ -681,6 +922,98 @@ void jRHI_DirectX12::Initialize()
 
 		if (FAILED(m_dxrDevice->CreateStateObject(raytracingPipeline, IID_PPV_ARGS(&m_dxrStateObject))))
 			return;
+#else
+	// 1 - DXIL Library
+	// 1 - Triangle hit group
+	// 1 - Shader config
+	// 2 - Local root signature and association
+	// 1 - Global root signature
+	// 1 - Pipeline config
+	std::array<D3D12_STATE_SUBOBJECT, 7> subobjects;
+	uint32 index = 0;
+
+	// DXIL 라이브러리 생성
+	DxilLibrary dxilLib = CreateDxilLibrary();
+	subobjects[index++] = dxilLib.stateSubobject;
+
+	// Triangle hit group
+	D3D12_HIT_GROUP_DESC desc = {};
+	{
+		desc.AnyHitShaderImport = nullptr;
+		desc.ClosestHitShaderImport = jRHI_DirectX12::c_closestHitShaderName;
+		desc.HitGroupExport = jRHI_DirectX12::c_hitGroupName;
+
+		D3D12_STATE_SUBOBJECT subObject;
+		subObject.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
+		subObject.pDesc = &desc;
+		subobjects[index++] = subObject;
+	}
+
+	// Shader config
+	D3D12_RAYTRACING_SHADER_CONFIG shaderConfig = {};
+	{
+		D3D12_STATE_SUBOBJECT subobject = {};
+
+		shaderConfig.MaxAttributeSizeInBytes = 2 * sizeof(float);	// float2 barycenterics
+		shaderConfig.MaxPayloadSizeInBytes = 4 * sizeof(float);		// float4 color
+
+		subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG;
+		subobject.pDesc = &shaderConfig;
+		subobjects[index++] = subobject;
+	}
+
+	D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION association = { };
+	{
+		// Local root signature and association
+		D3D12_STATE_SUBOBJECT subobject = {};
+
+		subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE;
+		subobject.pDesc = m_raytracingLocalRootSignature.GetAddressOf();
+
+		subobjects[index] = subobject;
+
+		D3D12_STATE_SUBOBJECT subobject2 = {};
+		association.NumExports = 1;
+		association.pExports = &jRHI_DirectX12::c_raygenShaderName;
+		association.pSubobjectToAssociate = &subobjects[index];
+
+		index++;
+
+		subobject2.Type = D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION;
+		subobject2.pDesc = &association;
+		subobjects[index++] = subobject2;
+	}
+
+	{
+		// Global root signature
+		D3D12_STATE_SUBOBJECT subobject;
+		subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE;
+		subobject.pDesc = m_raytracingGlobalRootSignature.GetAddressOf();
+		subobjects[index++] = subobject;
+	}
+
+	D3D12_RAYTRACING_PIPELINE_CONFIG config = {};
+	{
+		// Pipeline config
+		config.MaxTraceRecursionDepth = 1;
+
+		D3D12_STATE_SUBOBJECT subobject = {};
+		subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG;
+		subobject.pDesc = &config;
+
+		subobjects[index++] = subobject;
+	}
+
+	// Create the state
+	D3D12_STATE_OBJECT_DESC stateObjectDesc;
+	stateObjectDesc.NumSubobjects = index;
+	stateObjectDesc.pSubobjects = subobjects.data();
+	stateObjectDesc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
+
+	if (FAILED(m_dxrDevice->CreateStateObject(&stateObjectDesc, IID_PPV_ARGS(&m_dxrStateObject))))
+		return;
+
+#endif
 	}
 
 	//CreateDescriptorheap();
