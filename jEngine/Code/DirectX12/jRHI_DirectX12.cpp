@@ -992,8 +992,6 @@ void jRHI_DirectX12::Initialize()
 
 		Render();
 	}
-
-	Release();
 }
 
 void jRHI_DirectX12::Release()

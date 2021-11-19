@@ -30,6 +30,7 @@ int main()
 {
 	jRHI_DirectX12 dx12;
 	dx12.Initialize();
+	dx12.Release();
 
 	// jRHI_DirectX11 dx11;
 	// dx11.Initialize();
