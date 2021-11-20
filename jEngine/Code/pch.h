@@ -122,9 +122,26 @@ inline void hash_combine(std::size_t& seed, const T& v)
 #include <d3dcompiler.h>
 #include <DirectXMath.h>
 
+#include <fstream>
+
 #pragma comment(lib,"d3d12.lib")
 #pragma comment(lib,"dxgi.lib")
 #pragma comment(lib,"d3dcompiler.lib")
 #pragma comment(lib,"dxguid.lib")
+
+#ifndef _DEBUG
+#define _DEBUG 0
+#endif
+
+#if _DEBUG
+#define JOK(a) (SUCCEEDED(a) ? true : (assert(!(#a)), false))
+#define JFAIL(a) (!JOK(a))
+#define JASSERT(a) ((a) ? true : (assert(#a), false))
+#else
+#define JOK(a) (a)
+#define JFAIL(a) (a)
+#define JASSERT(a) (a)
+#endif
+
 
 #endif //PCH_H

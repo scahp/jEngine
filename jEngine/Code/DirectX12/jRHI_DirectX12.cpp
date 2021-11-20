@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include <fstream>
+#include "jShaderCompiler_DirectX12.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -15,491 +16,104 @@ const wchar_t* jRHI_DirectX12::c_raygenShaderName = L"MyRaygenShader";
 const wchar_t* jRHI_DirectX12::c_closestHitShaderName = L"MyClosestHitShader";
 const wchar_t* jRHI_DirectX12::c_missShaderName = L"MyMissShader";
 
-// Shader record = {{Shader ID}, {RootArguments}}
-class ShaderRecord
+bool BufferUtil::AllocateUploadBuffer(ID3D12Resource** OutResource, ID3D12Device* InDevice
+	, void* InData, uint64 InDataSize, const wchar_t* InResourceName)
 {
-public:
-	ShaderRecord(void* pShaderIdentifier, UINT shaderIdentifierSize) :
-		shaderIdentifier(pShaderIdentifier, shaderIdentifierSize)
+	auto uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(InDataSize);
+	if (JFAIL(InDevice->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE
+		, &bufferDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(OutResource))))
 	{
+		return false;
 	}
 
-	ShaderRecord(void* pShaderIdentifier, UINT shaderIdentifierSize, void* pLocalRootArguments, UINT localRootArgumentsSize) :
-		shaderIdentifier(pShaderIdentifier, shaderIdentifierSize),
-		localRootArguments(pLocalRootArguments, localRootArgumentsSize)
+	if (InResourceName)
+		(*OutResource)->SetName(InResourceName);
+	
+	if (InData && InDataSize > 0)
 	{
+		void* pMappedData = nullptr;
+		(*OutResource)->Map(0, nullptr, &pMappedData);
+		memcpy(pMappedData, InData, InDataSize);
+		(*OutResource)->Unmap(0, nullptr);
 	}
-
-	void CopyTo(void* dest) const
-	{
-		uint8_t* byteDest = static_cast<uint8_t*>(dest);
-		memcpy(byteDest, shaderIdentifier.ptr, shaderIdentifier.size);
-		if (localRootArguments.ptr)
-		{
-			memcpy(byteDest + shaderIdentifier.size, localRootArguments.ptr, localRootArguments.size);
-		}
-	}
-
-	struct PointerWithSize {
-		void* ptr;
-		UINT size;
-
-		PointerWithSize() : ptr(nullptr), size(0) {}
-		PointerWithSize(void* _ptr, UINT _size) : ptr(_ptr), size(_size) {};
-	};
-	PointerWithSize shaderIdentifier;
-	PointerWithSize localRootArguments;
-};
-
-class GpuUploadBuffer
-{
-public:
-	ComPtr<ID3D12Resource> GetResource() { return m_resource; }
-
-protected:
-	ComPtr<ID3D12Resource> m_resource;
-
-	GpuUploadBuffer() {}
-	~GpuUploadBuffer()
-	{
-		if (m_resource.Get())
-		{
-			m_resource->Unmap(0, nullptr);
-		}
-	}
-
-	void Allocate(ID3D12Device* device, UINT bufferSize, LPCWSTR resourceName = nullptr)
-	{
-		auto uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-
-		auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSize);
-		if (FAILED(device->CreateCommittedResource(
-			&uploadHeapProperties,
-			D3D12_HEAP_FLAG_NONE,
-			&bufferDesc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&m_resource))))
-		{
-			return;
-		}
-		m_resource->SetName(resourceName);
-	}
-
-	uint8_t* MapCpuWriteOnly()
-	{
-		uint8_t* mappedData;
-		// We don't unmap this until the app closes. Keeping buffer mapped for the lifetime of the resource is okay.
-		CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
-		if (FAILED((m_resource->Map(0, &readRange, reinterpret_cast<void**>(&mappedData)))))
-			return nullptr;
-		return mappedData;
-	}
-};
-
-inline UINT Align(UINT size, UINT alignment)
-{
-	return (size + (alignment - 1)) & ~(alignment - 1);
+	return true;
 }
 
-// Shader table = {{ ShaderRecord 1}, {ShaderRecord 2}, ...}
-class ShaderTable : public GpuUploadBuffer
+bool BufferUtil::AllocateUAVBuffer(ID3D12Resource** OutResource, ID3D12Device* InDevice
+	, uint64 InBufferSize, D3D12_RESOURCE_STATES InInitialResourceState
+	, const wchar_t* InResourceName)
 {
-	uint8_t* m_mappedShaderRecords;
-	UINT m_shaderRecordSize;
-
-	// Debug support
-	std::wstring m_name;
-	std::vector<ShaderRecord> m_shaderRecords;
-
-	ShaderTable() {}
-public:
-	ShaderTable(ID3D12Device* device, UINT numShaderRecords, UINT shaderRecordSize, LPCWSTR resourceName = nullptr)
-		: m_name(resourceName)
+	auto uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+	auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(InBufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+	if (JFAIL(InDevice->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE
+		, &bufferDesc, InInitialResourceState, nullptr, IID_PPV_ARGS(OutResource))))
 	{
-		m_shaderRecordSize = Align(shaderRecordSize, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
-		m_shaderRecords.reserve(numShaderRecords);
-		UINT bufferSize = numShaderRecords * m_shaderRecordSize;
-		Allocate(device, bufferSize, resourceName);
-		m_mappedShaderRecords = MapCpuWriteOnly();
+		return false;
 	}
 
-	void push_back(const ShaderRecord& shaderRecord)
-	{
-		if (FAILED(m_shaderRecords.size() < m_shaderRecords.capacity()))
-			return;
-		m_shaderRecords.push_back(shaderRecord);
-		shaderRecord.CopyTo(m_mappedShaderRecords);
-		m_mappedShaderRecords += m_shaderRecordSize;
-	}
+	if (InResourceName)
+		(*OutResource)->SetName(InResourceName);
 
-	UINT GetShaderRecordSize() { return m_shaderRecordSize; }
-
-	// Pretty-print the shader records.
-	void DebugPrint(std::unordered_map<void*, std::wstring> shaderIdToStringMap)
-	{
-		std::wstringstream wstr;
-		wstr << L"|--------------------------------------------------------------------\n";
-		wstr << L"|Shader table - " << m_name.c_str() << L": "
-			<< m_shaderRecordSize << L" | "
-			<< m_shaderRecords.size() * m_shaderRecordSize << L" bytes\n";
-
-		for (UINT i = 0; i < m_shaderRecords.size(); i++)
-		{
-			wstr << L"| [" << i << L"]: ";
-			wstr << shaderIdToStringMap[m_shaderRecords[i].shaderIdentifier.ptr] << L", ";
-			wstr << m_shaderRecords[i].shaderIdentifier.size << L" + " << m_shaderRecords[i].localRootArguments.size << L" bytes \n";
-		}
-		wstr << L"|--------------------------------------------------------------------\n";
-		wstr << L"\n";
-		OutputDebugStringW(wstr.str().c_str());
-	}
-};
-
-#include "dxcapi.h"
-class Dxc
-{
-public:
-	HMODULE m_dll = nullptr;
-	DxcCreateInstanceProc m_createFn = nullptr;
-	DxcCreateInstance2Proc m_createFn2 = nullptr;
-
-	HRESULT InitializeInternal(const wchar_t* InDllName, const char* InFnName)
-	{
-		if (m_dll)
-			return S_OK;
-
-		m_dll = LoadLibraryW(InDllName);
-
-		if (!m_dll)
-		{
-			return HRESULT_FROM_WIN32(GetLastError());
-		}
-
-		m_createFn = (DxcCreateInstanceProc)(GetProcAddress(m_dll, InFnName));
-
-		if (!m_createFn)
-		{
-			HRESULT hr = HRESULT_FROM_WIN32(GetLastError());
-			FreeLibrary(m_dll);
-			m_dll = nullptr;
-			return hr;
-		}
-
-		char fnName2[128];
-		size_t s = strlen(InFnName);
-		if (s < sizeof(fnName2) - 2)
-		{
-			memcpy(fnName2, InFnName, s);
-			fnName2[s] = '2';
-			fnName2[s + 1] = '\0';
-			m_createFn2 = (DxcCreateInstance2Proc)(GetProcAddress(m_dll, fnName2));
-		}
-
-		return S_OK;
-	}
-
-	Dxc() {}
-	Dxc(Dxc&& other)
-	{
-		m_dll = other.m_dll;
-		other.m_dll = nullptr;
-
-		m_createFn = other.m_createFn;
-		other.m_createFn = nullptr;
-
-		m_createFn2 = other.m_createFn2;
-		other.m_createFn2 = nullptr;
-	}
-
-	~Dxc()
-	{
-		CleanUp();
-	}
-
-	void CleanUp()
-	{
-		if (m_dll)
-		{
-			m_createFn = nullptr;
-			m_createFn2 = nullptr;
-			FreeLibrary(m_dll);
-			m_dll = nullptr;
-		}
-	}
-
-	HRESULT Initialize()
-	{
-		return InitializeInternal(TEXT("dxcompiler.dll"), "DxcCreateInstance");
-	}
-
-	HRESULT InitializeFordll(const wchar_t* InDll, const char* InEntryPoint)
-	{
-		return InitializeInternal(InDll, InEntryPoint);
-	}
-
-	template <typename TInterface>
-	HRESULT CreateInstance(REFCLSID clsid, TInterface** pResult)
-	{
-		return CreateInstance(clsid, __uuidof(TInterface), (IUnknown**)pResult);
-	}
-
-	HRESULT CreateInstance(REFCLSID clsid, REFIID riid, IUnknown** pResult)
-	{
-		if (!pResult)
-			return E_POINTER;
-
-		if (!m_dll)
-			return E_FAIL;
-
-		HRESULT hr = m_createFn(clsid, riid, (LPVOID*)pResult);
-		return hr;
-	}
-
-	template <typename TInterface>
-	HRESULT CreateInstance2(IMalloc* pMalloc, REFCLSID clsid, TInterface** pResult)
-	{
-		return CreateInstance2(pMalloc, clsid, __uuidof(TInterface), (IUnknown**)pResult);
-	}
-
-	HRESULT CreateInstance2(IMalloc* pMalloc, REFCLSID clsid, REFIID riid, IUnknown** pResult)
-	{
-		if (!pResult)
-			return E_POINTER;
-
-		if (!m_dll)
-			return E_FAIL;
-
-		if (!m_createFn2)
-			return E_FAIL;
-
-		HRESULT hr = m_createFn2(pMalloc, clsid, riid, (LPVOID*)pResult);
-		return hr;
-	}
-
-	bool HasCreateWithMalloc() const
-	{
-		return m_createFn2;
-	}
-
-	bool IsEnable() const
-	{
-		return m_dll;
-	}
-
-	HMODULE Detach()
-	{
-		HMODULE module = m_dll;
-		m_dll = nullptr;
-		return module;
-	}
-};
-
-struct DxilLibrary
-{
-	DxilLibrary(ComPtr<ID3DBlob> pBlob, const wchar_t* entryPoint[], uint32 entryPointCount)
-		: pShaderBlob(pBlob)
-	{
-		stateSubobject.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
-		stateSubobject.pDesc = &dxilLibDesc;
-
-		dxilLibDesc = {};
-		exportDesc.resize(entryPointCount);
-		exportName.resize(entryPointCount);
-		if (pBlob)
-		{
-			dxilLibDesc.DXILLibrary.pShaderBytecode = pBlob->GetBufferPointer();
-			dxilLibDesc.DXILLibrary.BytecodeLength = pBlob->GetBufferSize();
-			dxilLibDesc.NumExports = entryPointCount;
-			dxilLibDesc.pExports = exportDesc.data();
-
-			for (uint32 i = 0; i < entryPointCount; ++i)
-			{
-				exportName[i] = entryPoint[i];
-				exportDesc[i].Name = exportName[i].c_str();
-				exportDesc[i].Flags = D3D12_EXPORT_FLAG_NONE;
-				exportDesc[i].ExportToRename = nullptr;
-			}
-		}
-	}
-
-	DxilLibrary() : DxilLibrary(nullptr, nullptr, 0) {}
-
-	D3D12_DXIL_LIBRARY_DESC dxilLibDesc = {};
-	D3D12_STATE_SUBOBJECT stateSubobject = {};
-	ComPtr<ID3DBlob> pShaderBlob;
-	std::vector<D3D12_EXPORT_DESC> exportDesc;
-	std::vector<std::wstring> exportName;
-};
-
-Dxc gDXC;
-
-ComPtr<ID3DBlob> CompileLibrary(const wchar_t* InFilename, const wchar_t* InTargetString)
-{
-	if (FAILED(gDXC.Initialize()))
-		return nullptr;
-
-	ComPtr<IDxcCompiler> pCompiler;
-	ComPtr<IDxcLibrary> pLibrary;
-	if (FAILED(gDXC.CreateInstance(CLSID_DxcCompiler, pCompiler.GetAddressOf())))
-		return nullptr;
-	if (FAILED(gDXC.CreateInstance(CLSID_DxcLibrary, pLibrary.GetAddressOf())))
-		return nullptr;
-
-	std::ifstream shaderFile(InFilename);
-	if (!shaderFile.good())
-	{
-		return nullptr;
-	}
-	std::stringstream strStream;
-	strStream << shaderFile.rdbuf();
-	std::string shader = strStream.str();
-
-	// string 으로 부터 blob 생성
-	ComPtr<IDxcBlobEncoding> pTextBlob;
-	if (FAILED(pLibrary->CreateBlobWithEncodingFromPinned((LPBYTE)shader.c_str(), (uint32)shader.size(), 0, &pTextBlob)))
-		return nullptr;
-
-	// 컴파일
-	ComPtr<IDxcOperationResult> pResult;
-	if (FAILED(pCompiler->Compile(pTextBlob.Get(), InFilename, TEXT(""), InTargetString, nullptr, 0, nullptr, 0, nullptr, &pResult)))
-		return nullptr;
-
-	// 결과 확인
-	HRESULT resultCode;
-	if (FAILED((pResult->GetStatus(&resultCode))))
-		return nullptr;
-	if (FAILED(resultCode))
-	{
-		ComPtr<IDxcBlobEncoding> pError;
-		pResult->GetErrorBuffer(&pError);
-		OutputDebugStringA(reinterpret_cast<const char*>(pError->GetBufferPointer()));
-		return nullptr;
-	}
-
-	ComPtr<IDxcBlob> pBlob;
-	if (FAILED((pResult->GetResult(&pBlob))))
-		return nullptr;
-
-	ComPtr<ID3DBlob> result;
-	pBlob.As<ID3DBlob>(&result);
-	return result;
+	return true;
 }
 
-DxilLibrary CreateDxilLibrary()
+ShaderTable::ShaderTable(ID3D12Device* InDevice, uint32 InNumOfShaderRecords, uint32 InShaderRecordSize, const wchar_t* InResourceName /*= nullptr*/)
 {
-	ComPtr<ID3DBlob> pDxilLib = CompileLibrary(TEXT("Shaders/HLSL/Raytracing.hlsl"), TEXT("lib_6_3"));
-	const wchar_t* entryPoints[] = { jRHI_DirectX12::c_raygenShaderName, jRHI_DirectX12::c_missShaderName, jRHI_DirectX12::c_closestHitShaderName };
-	return DxilLibrary(pDxilLib, entryPoints, _countof(entryPoints));
+	m_shaderRecords.reserve(InNumOfShaderRecords);
+
+	m_shaderRecordSize = Align(InShaderRecordSize, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
+	const uint32 bufferSize = InNumOfShaderRecords & m_shaderRecordSize;
+	BufferUtil::AllocateUploadBuffer(&m_resource, InDevice, InResourceName);
+
+#if _DEBUG
+	m_name = InResourceName;
+#endif
+
+	CD3DX12_RANGE readRange(0, 0);
+	if (JFAIL(m_resource->Map(0, &readRange, reinterpret_cast<void**>(&m_mappedShaderRecords))))
+		return;
 }
 
-CD3DX12_VIEWPORT m_viewport(0.0f, 0.0f, static_cast<float>(SCR_WIDTH), static_cast<float>(SCR_HEIGHT));
-CD3DX12_RECT m_scissorRect(0, 0, static_cast<LONG>(SCR_WIDTH), static_cast<LONG>(SCR_HEIGHT));
-
-// Vertex data for a colored cube.
-struct VertexPosColor
+void ShaderTable::push_back(const ShaderRecord& InShaderRecord)
 {
-	XMFLOAT3 Position;
-	XMFLOAT3 Color;
-};
+	if (JASSERT(m_shaderRecords.size() < m_shaderRecords.capacity()))
+		return;
 
-static VertexPosColor g_Vertices[] = {
-	// Cube face 0
-	{ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f), },
-	{ XMFLOAT3(-1.0f,  1.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f), },
-	{ XMFLOAT3(1.0f,  1.0f, -1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), },
-	{ XMFLOAT3(1.0f,  1.0f, -1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), },
-	{ XMFLOAT3(1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), },
-	{ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f), },
+	m_shaderRecords.push_back(InShaderRecord);
 
-	// Cube face 1
-	{ XMFLOAT3(-1.0f, -1.0f,  1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f), },
-	{ XMFLOAT3(1.0f,  1.0f,  1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), },
-	{ XMFLOAT3(-1.0f,  1.0f,  1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f), },
-	{ XMFLOAT3(1.0f,  1.0f,  1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), },
-	{ XMFLOAT3(-1.0f, -1.0f,  1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f), },
-	{ XMFLOAT3(1.0f, -1.0f,  1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), },
+	memcpy(m_mappedShaderRecords, InShaderRecord.m_shaderIdentifier
+		, InShaderRecord.m_shaderIdentifierSize);
 
-	// Cube face 2
-	{ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f), },
-	{ XMFLOAT3(1.0f, -1.0f,  1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), },
-	{ XMFLOAT3(-1.0f, -1.0f,  1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f), },
-	{ XMFLOAT3(1.0f, -1.0f,  1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), },
-	{ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f), },
-	{ XMFLOAT3(1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), },
+	if (InShaderRecord.m_localRootArguments)
+	{
+		memcpy(m_mappedShaderRecords + InShaderRecord.m_shaderIdentifierSize
+			, InShaderRecord.m_localRootArguments, InShaderRecord.m_localRootArgumentsSize);
+	}
 
-	// Cube face 3
-	{ XMFLOAT3(-1.0f, 1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f), },
-	{ XMFLOAT3(-1.0f, 1.0f,  1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f), },
-	{ XMFLOAT3(1.0f, 1.0f,  1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), },
-	{ XMFLOAT3(1.0f, 1.0f,  1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), },
-	{ XMFLOAT3(1.0f, 1.0f, -1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), },
-	{ XMFLOAT3(-1.0f, 1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f), },
+	m_mappedShaderRecords += m_shaderRecordSize;
+}
 
-	// Cube face 4
-	{ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f), },
-	{ XMFLOAT3(-1.0f, -1.0f,  1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f), },
-	{ XMFLOAT3(-1.0f,  1.0f,  1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), },
-	{ XMFLOAT3(-1.0f,  1.0f,  1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), },
-	{ XMFLOAT3(-1.0f,  1.0f, -1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), },
-	{ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f), },
-
-	// Cube face 5
-	{ XMFLOAT3(1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f), },
-	{ XMFLOAT3(1.0f,  1.0f,  1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), },
-	{ XMFLOAT3(1.0f, -1.0f,  1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f), },
-	{ XMFLOAT3(1.0f,  1.0f,  1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), },
-	{ XMFLOAT3(1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f), },
-	{ XMFLOAT3(1.0f,  1.0f, -1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f), },
-};
-
-static WORD g_Indicies[] =
+void ShaderTable::DebugPrint(std::unordered_map<void*, std::wstring> shaderIdToStringMap)
 {
-	0, 1, 2, 3, 4, 5,
-	6, 7, 8, 9, 10, 11,
-	12, 13, 14, 15, 16, 17,
-	18, 19, 20, 21, 22, 23,
-	24, 25, 26, 27, 28, 29,
-	30, 31, 32, 33, 34, 35
-};
+#if _DEBUG
+	std::wstringstream wstr;
+	wstr << L"|--------------------------------------------------------------------\n";
+	wstr << L"|Shader table - " << m_name.c_str() << L": "
+		<< m_shaderRecordSize << L" | "
+		<< m_shaderRecords.size() * m_shaderRecordSize << L" bytes\n";
 
-static VertexPosColor g_Quad[] = {
-	{ XMFLOAT3(-1.0f, -1.0f, -7.f), XMFLOAT3(1.0f, 0.0f, 0.0f), },
-	{ XMFLOAT3(-1.0f,  1.0f, -7.), XMFLOAT3(0.0f, 1.0f, 0.0f), },
-	{ XMFLOAT3(1.0f,  1.0f, -7.), XMFLOAT3(1.0f, 1.0f, 0.0f), },
-	{ XMFLOAT3(1.0f,  1.0f, -7.), XMFLOAT3(1.0f, 1.0f, 0.0f), },
-	{ XMFLOAT3(1.0f, -1.0f, -7.), XMFLOAT3(1.0f, 1.0f, 0.0f), },
-	{ XMFLOAT3(-1.0f, -1.0f, -7.f), XMFLOAT3(1.0f, 0.0f, 0.0f), },
-};
-
-struct MaterialConstants
-{
-	uint32 MaterialIndex = 0;
-};
-
-enum HeapOffset
-{
-	CBV_SRV = 0,
-	Command = 2,
-	UAV = 3,
-	TextureSRV = 4,
-	TextureSRV_Unbound = 5,
-	TextureSRV_Unbound_End = 7,
-	Num,
-};
-
-// Compute shader
-struct ComputeRootConstant
-{
-	float CommandCount;
-};
-
-const int32 CubeCount = 49;
-uint32 GraphicsShaderCBVInstanceBufferForIndirectCommand = 0;
-uint32 GraphicsShaderCBVMVPForIndirectCommand = 0;
-
-const uint32 ComputeShaderSrvUavRootParameterIndex = 0;
-const uint32 ComputeShaderRootConstantRootParameterIndex = 1;
+	for (UINT i = 0; i < m_shaderRecords.size(); i++)
+	{
+		wstr << L"| [" << i << L"]: ";
+		wstr << shaderIdToStringMap[m_shaderRecords[i].m_shaderIdentifier] << L", ";
+		wstr << m_shaderRecords[i].m_shaderIdentifierSize << L" + " << m_shaderRecords[i].m_localRootArgumentsSize << L" bytes \n";
+	}
+	wstr << L"|--------------------------------------------------------------------\n";
+	wstr << L"\n";
+	OutputDebugStringW(wstr.str().c_str());
+#endif
+}
 
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -529,73 +143,6 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 
 	// Handle any messages the switch statement didn't.
 	return DefWindowProc(hWnd, message, wParam, lParam);
-}
-
-void GetHardwareAdapter(
-	IDXGIFactory1* pFactory,
-	IDXGIAdapter1** ppAdapter,
-	bool requestHighPerformanceAdapter = false)
-{
-	*ppAdapter = nullptr;
-
-	ComPtr<IDXGIAdapter1> adapter;
-
-	ComPtr<IDXGIFactory6> factory6;
-	if (SUCCEEDED(pFactory->QueryInterface(IID_PPV_ARGS(&factory6))))
-	{
-		for (
-			UINT adapterIndex = 0;
-			DXGI_ERROR_NOT_FOUND != factory6->EnumAdapterByGpuPreference(
-				adapterIndex,
-				requestHighPerformanceAdapter == true ? DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE : DXGI_GPU_PREFERENCE_UNSPECIFIED,
-				IID_PPV_ARGS(&adapter));
-			++adapterIndex)
-		{
-			if (!adapter)
-				continue;
-
-			DXGI_ADAPTER_DESC1 desc;
-			adapter->GetDesc1(&desc);
-
-			if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
-			{
-				// Don't select the Basic Render Driver adapter.
-				// If you want a software adapter, pass in "/warp" on the command line.
-				continue;
-			}
-
-			// Check to see whether the adapter supports Direct3D 12, but don't create the
-			// actual device yet.
-			if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, _uuidof(ID3D12Device), nullptr)))
-			{
-				break;
-			}
-		}
-	}
-	else
-	{
-		for (UINT adapterIndex = 0; DXGI_ERROR_NOT_FOUND != pFactory->EnumAdapters1(adapterIndex, &adapter); ++adapterIndex)
-		{
-			DXGI_ADAPTER_DESC1 desc;
-			adapter->GetDesc1(&desc);
-
-			if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
-			{
-				// Don't select the Basic Render Driver adapter.
-				// If you want a software adapter, pass in "/warp" on the command line.
-				continue;
-			}
-
-			// Check to see whether the adapter supports Direct3D 12, but don't create the
-			// actual device yet.
-			if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, _uuidof(ID3D12Device), nullptr)))
-			{
-				break;
-			}
-		}
-	}
-
-	*ppAdapter = adapter.Detach();
 }
 
 HWND jRHI_DirectX12::CreateMainWindow() const
@@ -632,66 +179,136 @@ HWND jRHI_DirectX12::CreateMainWindow() const
 	return hWnd;
 }
 
+void GetHardwareAdapter(IDXGIFactory1* InFactory, IDXGIAdapter1** InAdapter
+	, bool requestHighPerformanceAdapter = false)
+{
+	*InAdapter = nullptr;
+
+	ComPtr<IDXGIAdapter1> adapter;
+
+	ComPtr<IDXGIFactory6> factory6;
+	if (JOK(InFactory->QueryInterface(IID_PPV_ARGS(&factory6))))
+	{
+		const auto GpuPreference = requestHighPerformanceAdapter
+			? DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE : DXGI_GPU_PREFERENCE_UNSPECIFIED;
+		
+		uint32 adapterIndex = 0;
+		while (factory6->EnumAdapterByGpuPreference(adapterIndex, GpuPreference, IID_PPV_ARGS(&adapter)))
+		{
+			++adapterIndex;
+
+			if (!adapter)
+				continue;
+
+			DXGI_ADAPTER_DESC1 desc;
+			adapter->GetDesc1(&desc);
+
+			if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
+			{
+				// 기본 렌더 드라이버 어댑터는 선택하지 않음, 소프트웨어 렌더러를 원하면 warpAdapter를 사용
+				continue;
+			}
+
+			// 어댑터가 Direct3D 12를 지원하는지 체크하고 가능하면 device 를 생성한다.
+			if (JOK(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, _uuidof(ID3D12Device), nullptr)))
+				break;
+		}
+	}
+	else
+	{
+		uint32 adapterIndex = 0;
+		while (InFactory->EnumAdapters1(adapterIndex, &adapter))
+		{
+			++adapterIndex;
+
+			DXGI_ADAPTER_DESC1 desc;
+			adapter->GetDesc1(&desc);
+
+			if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
+			{
+				continue;
+			}
+
+			// 어댑터가 Direct3D 12를 지원하는지 체크하고 가능하면 device 를 생성한다.
+			if (JOK(SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, _uuidof(ID3D12Device), nullptr))))
+				break;
+		}
+	}
+
+	*InAdapter = adapter.Detach();
+}
+
+void jRHI_DirectX12::WaitForGPU()
+{
+	if (m_commandQueue && m_fence && m_fenceEvent)
+	{
+		uint64 fenceValue = m_fenceValue[m_frameIndex];
+		if (JFAIL(m_commandQueue->Signal(m_fence.Get(), fenceValue)))
+			return;
+
+		if (JFAIL(m_fence->SetEventOnCompletion(fenceValue, m_fenceEvent)))
+			return;
+
+		WaitForSingleObjectEx(m_fenceEvent, INFINITE, false);
+		++m_fenceValue[m_frameIndex];
+	}
+}
+
 void jRHI_DirectX12::Initialize()
 {
 	HWND hWnd = CreateMainWindow();
-
-	//////////////////////////////////////////////////////////////////////////
-	UINT dxgiFactoryFlags = 0;
+	
+	// 1. Device
+	uint32 dxgiFactoryFlags = 0;
 
 #if defined(_DEBUG)
-	// Enable the debug layer (requires the Graphics Tools "optional feature").
-	// NOTE: Enabling the debug layer after device creation will invalidate the active device.
+	// 디버그 레이어 켬 ("optional feature" 그래픽 툴을 요구함)
+	// 주의 : 디버그 레이어를 device 생성 후에 하면 활성화된 device를 무효화 됨.
 	{
 		ComPtr<ID3D12Debug> debugController;
-		if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
+		if (JOK(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
 		{
 			debugController->EnableDebugLayer();
 
-			// Enable additional debug layers.
+			// 디버그 레이어를 추가적으로 켬
 			dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
 		}
 	}
 #endif
 
 	ComPtr<IDXGIFactory4> factory;
-	CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory));
+	if (JFAIL(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory))))
+		return;
 
-	bool m_useWarpDevice = false;
-
-	if (m_useWarpDevice)
+	bool UseWarpDevice = false;		// Software rasterizer 사용 여부
+	if (UseWarpDevice)
 	{
 		ComPtr<IDXGIAdapter> warpAdapter;
-		factory->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter));
+		if (JFAIL(factory->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter))))
+			return;
 
-		D3D12CreateDevice(
-			warpAdapter.Get(),
-			D3D_FEATURE_LEVEL_11_0,
-			IID_PPV_ARGS(&m_device)
-		);
+		if (JFAIL((D3D12CreateDevice(warpAdapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_device)))))
+			return;
 	}
 	else
 	{
 		ComPtr<IDXGIAdapter1> hardwareAdapter;
 		GetHardwareAdapter(factory.Get(), &hardwareAdapter);
 
-		D3D12CreateDevice(
-			hardwareAdapter.Get(),
-			D3D_FEATURE_LEVEL_11_0,
-			IID_PPV_ARGS(&m_device)
-		);
+		if (JFAIL(D3D12CreateDevice(hardwareAdapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_device))))
+			return;
 	}
 
-	// CommandQueue를 명세하고 생성한다.
-	D3D12_COMMAND_QUEUE_DESC queueDesc = {};
+	// 2. Command
+	D3D12_COMMAND_QUEUE_DESC queueDesc{};
 	queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
 	queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 
-	if (FAILED(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue))))
+	if (JFAIL(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue))))
 		return;
 
-	// Describe and create the swap chain.
-	DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
+	// 3. Swapchain
+	DXGI_SWAP_CHAIN_DESC1 swapChainDesc{};
 	swapChainDesc.BufferCount = FrameCount;
 	swapChainDesc.Width = SCR_WIDTH;
 	swapChainDesc.Height = SCR_HEIGHT;
@@ -701,119 +318,88 @@ void jRHI_DirectX12::Initialize()
 	swapChainDesc.SampleDesc.Count = 1;
 
 	ComPtr<IDXGISwapChain1> swapChain;
-	factory->CreateSwapChainForHwnd(
-		m_commandQueue.Get(),        // Swap chain needs the queue so that it can force a flush on it.
-		hWnd,
-		&swapChainDesc,
-		nullptr,
-		nullptr,
-		&swapChain
-	);
+	if (JFAIL(factory->CreateSwapChainForHwnd(m_commandQueue.Get(), hWnd
+		, &swapChainDesc, nullptr, nullptr, &swapChain)))
+	{
+		return;
+	}
 
-	// This sample does not support fullscreen transitions.
+	// 풀스크린으로 전환하지 않을 것이므로 아래 처럼 설정
 	factory->MakeWindowAssociation(hWnd, DXGI_MWA_NO_ALT_ENTER);
 
 	swapChain.As(&m_swapChain);
 	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
-	// 힙 생성
-	{
-		D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
-		rtvHeapDesc.NumDescriptors = FrameCount;
-		rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-		rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-		if (FAILED(m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap))))
-			return;
-			
-		D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
-		dsvHeapDesc.NumDescriptors = 1;
-		dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-		dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-		if (FAILED(m_device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_dsvHeap))))
-			return;
-
-		D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc = {};
-		cbvHeapDesc.NumDescriptors = 1;		// 1 - raytracing output texture UAV
-		cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-		cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-		if (FAILED(m_device->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_cbvHeap))))
-			return;
-
-		//D3D12_QUERY_HEAP_DESC queryHeapDesc = {};
-		//queryHeapDesc.Count = 1;
-		//queryHeapDesc.Type = D3D12_QUERY_HEAP_TYPE_OCCLUSION;
-		//if (FAILED(m_device->CreateQueryHeap(&queryHeapDesc, IID_PPV_ARGS(&m_queryHeap))))
-		//	return;
-
-		m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-		m_cbvSrvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	}
-
-	// 프레임 리소스 생성
-	{
-		CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
-
-		// RTV와 커맨드 할당자 생성
-		for (uint32 i = 0; i < FrameCount; ++i)
-		{
-			if (FAILED(m_swapChain->GetBuffer(i, IID_PPV_ARGS(&m_renderTargets[i]))))
-				return;
-
-			m_device->CreateRenderTargetView(m_renderTargets[i].Get(), nullptr, rtvHandle);
-			rtvHandle.Offset(1, m_rtvDescriptorSize);
-
-			if (FAILED(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocators[i]))) )
-				return;
-		}
-	}
-
-	if (FAILED(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocators[0].Get(), nullptr, IID_PPV_ARGS(&m_commandList))))
+	// 4. Heap
+	D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc{};
+	rtvHeapDesc.NumDescriptors = FrameCount;
+	rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+	rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+	if (JFAIL(m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap))))
 		return;
+
+	D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc;
+	cbvHeapDesc.NumDescriptors = 1;			// 1 - ratracing output texture UAV
+	cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	if (JFAIL(m_device->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_cbvHeap))))
+		return;
+
+	m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	m_cbvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+	// 5. CommandAllocators, Commandlist, RTV for FrameCount
+	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
+
+	for (uint32 i = 0; i < FrameCount; ++i)
+	{
+		if (JFAIL(m_swapChain->GetBuffer(i, IID_PPV_ARGS(&m_renderTargets[i]))))
+			return;
+
+		m_device->CreateRenderTargetView(m_renderTargets[i].Get(), nullptr, rtvHandle);
+		rtvHandle.Offset(1, m_rtvDescriptorSize);
+
+		if (JFAIL(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator[i]))))
+			return;
+	}
+
+	if (JFAIL(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator[0].Get()
+		, nullptr, IID_PPV_ARGS(&m_commandList))))
+	{
+		return;
+	}
 	m_commandList->Close();
 
-	if (FAILED(m_device->CreateFence(m_fenceValue[m_frameIndex], D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence))))
+	// 6. Create sync object
+	if (JFAIL(m_device->CreateFence(m_fenceValue[m_frameIndex], D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence))))
 		return;
 
-	m_fenceValue[m_frameIndex]++;
+	++m_fenceValue[m_frameIndex];
 
-	// frame synchonization 에 사용할 event handle을 생성
 	m_fenceEvent = CreateEvent(nullptr, false, false, nullptr);
 	if (!m_fenceEvent)
 	{
-		if (FAILED(HRESULT_FROM_WIN32(GetLastError())))
+		if (JFAIL(HRESULT_FROM_WIN32(GetLastError())))
 			return;
 	}
 
-	if (m_commandQueue && m_fence && m_fenceEvent)
-	{
-		uint64 fenceValue = m_fenceValue[m_frameIndex];
-		if (FAILED(m_commandQueue->Signal(m_fence.Get(), fenceValue)))
-			return;
-		if (FAILED(m_fence->SetEventOnCompletion(fenceValue, m_fenceEvent)))
-			return;
-		WaitForSingleObjectEx(m_fenceEvent, INFINITE, false);
-		m_fenceValue[m_frameIndex]++;
-	}
+	WaitForGPU();
 
-	//////////////////////////////////////////////////////////////////////////
-	// 레이트레이싱 가능 여부 체크
-	D3D12_FEATURE_DATA_D3D12_OPTIONS5 featureSupportData = {};
-	if (FAILED(m_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &featureSupportData, sizeof(featureSupportData))))
+	// 7. Raytracing device and commandlist
+	D3D12_FEATURE_DATA_D3D12_OPTIONS5 featureSupportData{};
+	if (JFAIL(m_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &featureSupportData, sizeof(featureSupportData))))
 		return;
 
 	if (featureSupportData.RaytracingTier == D3D12_RAYTRACING_TIER_NOT_SUPPORTED)
 		return;
 
-	// CreateRaytracingInterfaces();
-	{
-		if (FAILED(m_device->QueryInterface(IID_PPV_ARGS(&m_dxrDevice))))
-			return;
+	if (JFAIL(m_device->QueryInterface(IID_PPV_ARGS(&m_dxrDevice))))
+		return;
 
-		if (FAILED(m_commandList->QueryInterface(IID_PPV_ARGS(&m_dxrCommandList))))
-			return;
-	}
+	if (JFAIL(m_commandList->QueryInterface(IID_PPV_ARGS(&m_dxrCommandList))))
+		return;
 
-	// CreateRootSignatures();
+	// 8. CreateRootSignature
 	{
 		CD3DX12_DESCRIPTOR_RANGE UAVDescriptor;
 		UAVDescriptor.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
@@ -821,496 +407,378 @@ void jRHI_DirectX12::Initialize()
 		rootParameters[GlobalRootSignatureParams::OutputViewSlot].InitAsDescriptorTable(1, &UAVDescriptor);
 		rootParameters[GlobalRootSignatureParams::AccelerationStructureSlot].InitAsShaderResourceView(0);
 
-		// Create Global Root Signature
+		CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc(_countof(rootParameters), rootParameters);
+		ComPtr<ID3DBlob> blob;
+		ComPtr<ID3DBlob> error;
+		if (JFAIL(D3D12SerializeRootSignature(&globalRootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &error)))
 		{
-			CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc(_countof(rootParameters), rootParameters);
-			ComPtr<ID3DBlob> blob;
-			ComPtr<ID3DBlob> error;
-			if (FAILED(D3D12SerializeRootSignature(&globalRootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &error)))
+			if (error)
 			{
-				if (error)
-				{
-					OutputDebugStringA(reinterpret_cast<const char*>(error->GetBufferPointer()));
-					error->Release();
-				}
-				return;
+				OutputDebugStringA(reinterpret_cast<const char*>(error->GetBufferPointer()));
+				error->Release();
 			}
-
-			if (FAILED(m_device->CreateRootSignature(1, blob->GetBufferPointer(), blob->GetBufferSize(), IID_PPV_ARGS(&m_raytracingGlobalRootSignature))))
-				return;
+			return;
 		}
 
-		// Create Local Root Signature
+		if (JFAIL(m_device->CreateRootSignature(1, blob->GetBufferPointer(), blob->GetBufferSize()
+			, IID_PPV_ARGS(&m_raytracingGlobalRootSignature))))
 		{
-#define SizeOfInUint32(obj) ((sizeof(obj) - 1) / sizeof(UINT32) + 1)
-
-			CD3DX12_ROOT_PARAMETER rootParameters[LocalRootSignatureParams::Count];
-			rootParameters[LocalRootSignatureParams::ViewportConstantSlot].InitAsConstants(SizeOfInUint32(m_rayGenCB), 0, 0);
-			CD3DX12_ROOT_SIGNATURE_DESC localRootSignatureDesc(_countof(rootParameters), rootParameters);
-			localRootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
-			ComPtr<ID3DBlob> blob;
-			ComPtr<ID3DBlob> error;
-			if (FAILED(D3D12SerializeRootSignature(&localRootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &error)))
-			{
-				if (error)
-				{
-					OutputDebugStringA(reinterpret_cast<const char*>(error->GetBufferPointer()));
-					error->Release();
-				}
-				return;
-			}
-
-			if (FAILED(m_device->CreateRootSignature(1, blob->GetBufferPointer(), blob->GetBufferSize(), IID_PPV_ARGS(&m_raytracingLocalRootSignature))))
-				return;
+			return;
 		}
 	}
 
-	//CreateRaytracingPipelineStateObject();
 	{
-#define USE_EXPORTED_SHADER 0
-#if USE_EXPORTED_SHADER
-		// 1 - DXIL Library
-		// 1 - Triangle hit group
-		// 1 - Shader config
-		// 2 - Local root signature and association
-		// 1 - Global root signature
-		// 1 - Pipeline config
-		CD3DX12_STATE_OBJECT_DESC raytracingPipeline{ D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE };
+#define SizeOfInUint32(obj) ((sizeof(obj) - 1) / sizeof(UINT32) + 1)
 
-		auto lib = raytracingPipeline.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
-		D3D12_SHADER_BYTECODE libdxil = CD3DX12_SHADER_BYTECODE((void*)g_pRaytracing, _countof(g_pRaytracing));
-		lib->SetDXILLibrary(&libdxil);
+		CD3DX12_ROOT_PARAMETER rootParameters[LocalRootSignatureParams::Count];
+		rootParameters[LocalRootSignatureParams::ViewportConstantSlot].InitAsConstants(SizeOfInUint32(m_rayGenCB), 0, 0);
 
+		CD3DX12_ROOT_SIGNATURE_DESC localRootSignatureDesc(_countof(rootParameters), rootParameters);
+		localRootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
+		ComPtr<ID3DBlob> blob;
+		ComPtr<ID3DBlob> error;
+		if (JFAIL(D3D12SerializeRootSignature(&localRootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &error)))
 		{
-			lib->DefineExport(c_raygenShaderName);
-			lib->DefineExport(c_closestHitShaderName);
-			lib->DefineExport(c_missShaderName);
-		}
-
-		// Triangle hit group
-		auto hitGroup = raytracingPipeline.CreateSubobject<CD3DX12_HIT_GROUP_SUBOBJECT>();
-		hitGroup->SetClosestHitShaderImport(c_closestHitShaderName);
-		hitGroup->SetHitGroupExport(c_hitGroupName);
-		hitGroup->SetHitGroupType(D3D12_HIT_GROUP_TYPE_TRIANGLES);
-		
-		// Shader config
-		auto shaderConfig = raytracingPipeline.CreateSubobject<CD3DX12_RAYTRACING_SHADER_CONFIG_SUBOBJECT>();
-		uint32 payloadSize = 4 * sizeof(float);		// float4 color
-		uint32 attributeSize = 2 * sizeof(float);	// float2 barycenterics
-		shaderConfig->Config(payloadSize, attributeSize);
-		
-		// Local root signature and shader association
-		// CreateLocalRootSignatureSubobjects();
-		{
-			auto localRootSignature = raytracingPipeline.CreateSubobject<CD3DX12_LOCAL_ROOT_SIGNATURE_SUBOBJECT>();
-			localRootSignature->SetRootSignature(m_raytracingLocalRootSignature.Get());
-
-			// Shader association
-			auto rootSignatureAssociation = raytracingPipeline.CreateSubobject<CD3DX12_SUBOBJECT_TO_EXPORTS_ASSOCIATION_SUBOBJECT>();
-			rootSignatureAssociation->SetSubobjectToAssociate(*localRootSignature);
-			rootSignatureAssociation->AddExport(c_raygenShaderName);
-		}
-
-		// Global root signature
-		auto globalRootSignature = raytracingPipeline.CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();
-		globalRootSignature->SetRootSignature(m_raytracingGlobalRootSignature.Get());
-
-		// Pipeline config
-		auto pipelineConfig = raytracingPipeline.CreateSubobject<CD3DX12_RAYTRACING_PIPELINE_CONFIG_SUBOBJECT>();
-		uint32 maxRecursionDepth = 1;
-		pipelineConfig->Config(maxRecursionDepth);
-
-		if (FAILED(m_dxrDevice->CreateStateObject(raytracingPipeline, IID_PPV_ARGS(&m_dxrStateObject))))
+			if (error)
+			{
+				OutputDebugStringA(reinterpret_cast<const char*>(error->GetBufferPointer()));
+				error->Release();
+			}
 			return;
-#else
+		}
+
+		if (JFAIL(m_device->CreateRootSignature(1, blob->GetBufferPointer(), blob->GetBufferSize()
+			, IID_PPV_ARGS(&m_raytracingLocalRootSignature))))
+		{
+			return;
+		}
+	}
+
+	// 9. DXR PipeplineStateObject
+	// ----------------------------------------------------
 	// 1 - DXIL Library
 	// 1 - Triangle hit group
 	// 1 - Shader config
 	// 2 - Local root signature and association
 	// 1 - Global root signature
 	// 1 - Pipeline config
+	// ----------------------------------------------------
 	std::array<D3D12_STATE_SUBOBJECT, 7> subobjects;
 	uint32 index = 0;
 
-	// DXIL 라이브러리 생성
-	DxilLibrary dxilLib = CreateDxilLibrary();
-	subobjects[index++] = dxilLib.stateSubobject;
-
-	// Triangle hit group
-	D3D12_HIT_GROUP_DESC desc = {};
+	// 1). DXIL 라이브러리 생성
+	D3D12_DXIL_LIBRARY_DESC dxilDesc{};
+	std::vector<D3D12_EXPORT_DESC> exportDesc;
+	std::vector<std::wstring> exportName;
 	{
-		desc.AnyHitShaderImport = nullptr;
-		desc.ClosestHitShaderImport = jRHI_DirectX12::c_closestHitShaderName;
-		desc.HitGroupExport = jRHI_DirectX12::c_hitGroupName;
+		D3D12_STATE_SUBOBJECT subobject{};
+		ComPtr<ID3DBlob> ShaderBlob = jShaderCompiler_DirectX12::Get().Compile(TEXT("Shaders/HLSL/Raytracing.hlsl"), TEXT("lib_6_3"));
+		if (ShaderBlob)
+		{
+			const wchar_t* entryPoint[] = { jRHI_DirectX12::c_raygenShaderName, jRHI_DirectX12::c_missShaderName, jRHI_DirectX12::c_closestHitShaderName };
+			subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
+			subobject.pDesc = &dxilDesc;
 
-		D3D12_STATE_SUBOBJECT subObject;
-		subObject.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
-		subObject.pDesc = &desc;
-		subobjects[index++] = subObject;
+			exportDesc.resize(_countof(entryPoint));
+			exportName.resize(_countof(entryPoint));
+			dxilDesc.DXILLibrary.pShaderBytecode = ShaderBlob->GetBufferPointer();
+			dxilDesc.DXILLibrary.BytecodeLength = ShaderBlob->GetBufferSize();
+			dxilDesc.NumExports = _countof(entryPoint);
+			dxilDesc.pExports = exportDesc.data();
+
+			for (uint32 i = 0; i < _countof(entryPoint); ++i)
+			{
+				exportName[i] = entryPoint[i];
+				exportDesc[i].Name = exportName[i].c_str();
+				exportDesc[i].Flags = D3D12_EXPORT_FLAG_NONE;
+				exportDesc[i].ExportToRename = nullptr;
+			}
+		}
+		subobjects[index++] = subobject;
 	}
 
-	// Shader config
-	D3D12_RAYTRACING_SHADER_CONFIG shaderConfig = {};
+	// 2). Triangle hit group
+	D3D12_HIT_GROUP_DESC hitgroupDesc{};
 	{
-		D3D12_STATE_SUBOBJECT subobject = {};
+		hitgroupDesc.AnyHitShaderImport = nullptr;
+		hitgroupDesc.ClosestHitShaderImport = jRHI_DirectX12::c_closestHitShaderName;
+		hitgroupDesc.HitGroupExport = jRHI_DirectX12::c_hitGroupName;
 
-		shaderConfig.MaxAttributeSizeInBytes = 2 * sizeof(float);	// float2 barycenterics
+		D3D12_STATE_SUBOBJECT subobject{};
+		subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
+		subobject.pDesc = &hitgroupDesc;
+		subobjects[index++] = subobject;
+	}
+
+	// 3). Shader Config
+	D3D12_RAYTRACING_SHADER_CONFIG shaderConfig;
+	{
+		shaderConfig.MaxAttributeSizeInBytes = 2 * sizeof(float);	// float2 barycentrics
 		shaderConfig.MaxPayloadSizeInBytes = 4 * sizeof(float);		// float4 color
 
+		D3D12_STATE_SUBOBJECT subobject{};
 		subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG;
 		subobject.pDesc = &shaderConfig;
 		subobjects[index++] = subobject;
 	}
 
-	D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION association = { };
+	// 4). Local root signature and association
+	D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION association{};
 	{
-		// Local root signature and association
-		D3D12_STATE_SUBOBJECT subobject = {};
+		D3D12_STATE_SUBOBJECT subobject{};
 
 		subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE;
 		subobject.pDesc = m_raytracingLocalRootSignature.GetAddressOf();
-
 		subobjects[index] = subobject;
 
-		D3D12_STATE_SUBOBJECT subobject2 = {};
 		association.NumExports = 1;
 		association.pExports = &jRHI_DirectX12::c_raygenShaderName;
-		association.pSubobjectToAssociate = &subobjects[index];
+		association.pSubobjectToAssociate = &subobjects[index++];
 
-		index++;
-
+		D3D12_STATE_SUBOBJECT subobject2{};
 		subobject2.Type = D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION;
 		subobject2.pDesc = &association;
 		subobjects[index++] = subobject2;
 	}
 
+	// 5). Global root signature
 	{
-		// Global root signature
-		D3D12_STATE_SUBOBJECT subobject;
+		D3D12_STATE_SUBOBJECT subobject{};
 		subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE;
 		subobject.pDesc = m_raytracingGlobalRootSignature.GetAddressOf();
 		subobjects[index++] = subobject;
 	}
 
-	D3D12_RAYTRACING_PIPELINE_CONFIG config = {};
+	// 6). Pipeline Config
+	D3D12_RAYTRACING_PIPELINE_CONFIG pipelineConfig;
 	{
-		// Pipeline config
-		config.MaxTraceRecursionDepth = 1;
+		pipelineConfig.MaxTraceRecursionDepth = 1;
 
-		D3D12_STATE_SUBOBJECT subobject = {};
+		D3D12_STATE_SUBOBJECT subobject{};
 		subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG;
-		subobject.pDesc = &config;
+		subobject.pDesc = &pipelineConfig;
 
 		subobjects[index++] = subobject;
 	}
 
-	// Create the state
+	// Create pipeline state
 	D3D12_STATE_OBJECT_DESC stateObjectDesc;
 	stateObjectDesc.NumSubobjects = index;
 	stateObjectDesc.pSubobjects = subobjects.data();
 	stateObjectDesc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
 
-	if (FAILED(m_dxrDevice->CreateStateObject(&stateObjectDesc, IID_PPV_ARGS(&m_dxrStateObject))))
+	if (JFAIL(m_dxrDevice->CreateStateObject(&stateObjectDesc, IID_PPV_ARGS(&m_dxrStateObject))))
 		return;
 
-#endif
-	}
-
-	//CreateDescriptorheap();
- 
-	auto AllocateUploadBuffer = [&](ID3D12Device* pDevice, void* pData, uint64 dataSize, ID3D12Resource** ppResource, const wchar_t* resourceName = nullptr)
+	//////////////////////////////////////////////////////////////////////////
+	// 10. Create vertex and index buffer
+	uint16 indices[] =
 	{
-		auto uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-		auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(dataSize);
-		if (FAILED(pDevice->CreateCommittedResource(
-			&uploadHeapProperties,
-			D3D12_HEAP_FLAG_NONE,
-			&bufferDesc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(ppResource))))
-		{
-			return;
-		}
-		if (resourceName)
-		{
-			(*ppResource)->SetName(resourceName);
-		}
-		void* pMappedData;
-		(*ppResource)->Map(0, nullptr, &pMappedData);
-		memcpy(pMappedData, pData, dataSize);
-		(*ppResource)->Unmap(0, nullptr);
+		0, 1, 2
 	};
 
-	//BuildGeometry();
+	float depthValue = 1.0f;
+	float offset = 0.7f;
+
+	struct Vertex { float v1, v2, v3; };
+	Vertex vertices[] =
 	{
-		uint16 indices[] =
-		{
-			0, 1, 2
-		};
+		0, -offset, depthValue,
+		-offset, offset, depthValue,
+		offset, offset, depthValue
+	};
+	BufferUtil::AllocateUploadBuffer(&m_vertexBuffer, m_device.Get(), vertices, sizeof(vertices));
+	BufferUtil::AllocateUploadBuffer(&m_indexBuffer, m_device.Get(), indices, sizeof(indices));
 
-		float depthValue = 1.0f;
-		float offset = 0.7f;
-
-		Vertex vertices[] =
-		{
-			0, -offset, depthValue,
-			-offset, offset, depthValue,
-			offset, offset, depthValue
-		};
-
-		AllocateUploadBuffer(m_device.Get(), vertices, sizeof(vertices), &m_vertexBuffer);
-		AllocateUploadBuffer(m_device.Get(), indices, sizeof(indices), &m_indexBuffer);
-	}
-
-	m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), nullptr);
-
-	//BuildAccelerationStructures();
-	{
-		D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc = {};
-		geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-		geometryDesc.Triangles.IndexBuffer = m_indexBuffer->GetGPUVirtualAddress();
-		geometryDesc.Triangles.IndexCount = static_cast<uint16>(m_indexBuffer->GetDesc().Width) / sizeof(uint16);
-		geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R16_UINT;
-		geometryDesc.Triangles.Transform3x4 = 0;
-		geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-		geometryDesc.Triangles.VertexCount = static_cast<uint16>(m_vertexBuffer->GetDesc().Width) / sizeof(Vertex);
-		geometryDesc.Triangles.VertexBuffer.StartAddress = m_vertexBuffer->GetGPUVirtualAddress();
-		geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(Vertex);
-
-		// Mark geometry as opaque
-		// Opaque로 지오메트를 등록하면, 히트 쉐이더에서 더이상 쉐이더를 만들지 않을 것이므로 최적화에 좋다.
-		geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
-
-		// Acceleration structure에 필요한 크기를 요청함
-		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
-		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS topLevelInputs = {};
-		topLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-		topLevelInputs.Flags = buildFlags;
-		topLevelInputs.NumDescs = 1;
-		topLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
-
-		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO topLevelPrebuildInfo = {};
-		m_dxrDevice->GetRaytracingAccelerationStructurePrebuildInfo(&topLevelInputs, &topLevelPrebuildInfo);
-		if (topLevelPrebuildInfo.ResultDataMaxSizeInBytes <= 0)
-			return;
-
-		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO bottomLevelPrebuildInfo = {};
-		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS bottomLevelInputs = topLevelInputs;
-		bottomLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
-		bottomLevelInputs.pGeometryDescs = &geometryDesc;
-		m_dxrDevice->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
-		if (bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes <= 0)
-			return;
-
-		auto AllocateUAVBuffer = [](ID3D12Device* pDevice, uint64 bufferSize, ID3D12Resource** ppResource
-			, D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_COMMON, const wchar_t* resourceName = nullptr)
-		{
-			auto uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-			auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-			if (FAILED(pDevice->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE
-				, &bufferDesc, initialResourceState, nullptr, IID_PPV_ARGS(ppResource))))
-			{
-				return;
-			}
-
-			if (resourceName)
-			{
-				(*ppResource)->SetName(resourceName);
-			}
-		};
-
-		ComPtr<ID3D12Resource> scratchResource;
-		AllocateUAVBuffer(m_device.Get(), std::max(topLevelPrebuildInfo.ScratchDataSizeInBytes, bottomLevelPrebuildInfo.ScratchDataSizeInBytes)
-			, &scratchResource, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, L"ScratchResource");
-
-		// Acceleration structure를 위한 리소스를 할당함
-		// Acceleration structure는 default heap에서 생성된 리소스에만 있을 수 있음. (또는 그에 상응하는 heap)
-		// Default heap은 CPU 읽기/쓰기 접근이 필요없기 때문에 괜찮음.
-		// Acceleration structure를 포함하는 리소스는 D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE 상태로 생성해야 함.
-		// 그리고 D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS 플래그를 가져야 함. ALLOW_UNORDERED_aCCESS는 두가지 간단한 정보를 요구함:
-		// - 시스템은 백그라운드에서 Acceleration structure 빌드를 구현할 때 이러한 유형의 액세스를 수행할 것입니다.
-		// - 앱의 관점에서, acceleration structure에 쓰기/읽기의 동기화는 UAV barriers를 통해서 얻어짐.
-		{
-			D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
-			AllocateUAVBuffer(m_device.Get(), bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, &m_bottomLevelAccelerationStructure, initialResourceState, L"BottomLevelAccelerationStructure");
-			AllocateUAVBuffer(m_device.Get(), topLevelPrebuildInfo.ResultDataMaxSizeInBytes, &m_topLevelAccelerationStructure, initialResourceState, L"TopLevelAccelerationStructure");
-		}
-
-		// Bottom-level acceleration structure 를 위한 instance Desc 생성
-		ComPtr<ID3D12Resource> instanceDescs;
-		D3D12_RAYTRACING_INSTANCE_DESC instanceDesc = {};
-		instanceDesc.Transform[0][0] = instanceDesc.Transform[1][1] = instanceDesc.Transform[2][2] = 1;
-		instanceDesc.InstanceMask = 1;
-		instanceDesc.AccelerationStructure = m_bottomLevelAccelerationStructure->GetGPUVirtualAddress();
-		AllocateUploadBuffer(m_device.Get(), &instanceDesc, sizeof(instanceDesc), &instanceDescs, L"InstanceDescs");
-
-		// Bottom Level Acceleration strcuture desc
-		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc = {};
-		{
-			bottomLevelBuildDesc.Inputs = bottomLevelInputs;
-			bottomLevelBuildDesc.ScratchAccelerationStructureData = scratchResource->GetGPUVirtualAddress();
-			bottomLevelBuildDesc.DestAccelerationStructureData = m_bottomLevelAccelerationStructure->GetGPUVirtualAddress();
-		}
-
-		// Top level acceleration structure desc
-		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC topLevelBuildDesc = {};
-		{
-			topLevelInputs.InstanceDescs = instanceDescs->GetGPUVirtualAddress();
-			topLevelBuildDesc.Inputs = topLevelInputs;
-			topLevelBuildDesc.DestAccelerationStructureData = m_topLevelAccelerationStructure->GetGPUVirtualAddress();
-			topLevelBuildDesc.ScratchAccelerationStructureData = scratchResource->GetGPUVirtualAddress();
-		}
-
-		auto BuildAccelerationStructure = [&](auto* raytracingCommandList)
-		{
-			raytracingCommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
-			m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(m_bottomLevelAccelerationStructure.Get()));
-			raytracingCommandList->BuildRaytracingAccelerationStructure(&topLevelBuildDesc, 0, nullptr);
-		};
-
-		// Acceleration structure 빌드
-		BuildAccelerationStructure(m_dxrCommandList.Get());
-
-		m_commandList->Close();
-		ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
-		m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
-
-		// Wait for GPU
-		{
-			if (FAILED(m_commandQueue->Signal(m_fence.Get(), m_fenceValue[m_frameIndex])))
-				return;
-
-			if (FAILED(m_fence->SetEventOnCompletion(m_fenceValue[m_frameIndex], m_fenceEvent)))
-				return;
-
-			WaitForSingleObjectEx(m_fenceEvent, INFINITE, false);
-
-			m_fenceValue[m_frameIndex]++;
-		}
-	}
-	
-	//BuildShaderTables();
-	{
-		void* rayGenShaderIdentifier;
-		void* missShaderIdentifier;
-		void* hitGroupShaderIdentifier;
-
-		auto GetShaderIdentifiers = [&](auto* stateObjectProperties)
-		{
-			rayGenShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_raygenShaderName);
-			missShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_missShaderName);
-			hitGroupShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_hitGroupName);
-		};
-
-		// Shader identifier 얻기
-		uint16 shaderIdentifierSize;
-		{
-			ComPtr<ID3D12StateObjectProperties> stateObjectProperties;
-			if (FAILED(m_dxrStateObject.As(&stateObjectProperties)))
-				return;
-			GetShaderIdentifiers(stateObjectProperties.Get());
-			shaderIdentifierSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
-		}
-
-		// Ray gen shader table
-		{
-			auto UpdateForSizeChange = [&]()
-			{
-				const float aspectRatio = static_cast<float>(SCR_WIDTH) / static_cast<float>(SCR_HEIGHT);
-
-				float border = 0.1f;
-				if (SCR_WIDTH <= SCR_HEIGHT)
-				{
-					m_rayGenCB.stencil =
-					{
-						-1 + border, -1 + border * aspectRatio,
-						1.0f - border, 1 - border * aspectRatio
-					};
-				}
-				else
-				{
-					m_rayGenCB.stencil =
-					{
-						-1 + border / aspectRatio, -1 + border,
-						 1 - border / aspectRatio, 1.0f - border
-					};
-
-				}
-			};
-			m_rayGenCB.viewport = { -1.0f, -1.0f, 1.0f, 1.0f };
-			UpdateForSizeChange();
-
-			struct RootArguments
-			{
-				RayGenConstantBuffer cb;
-			} rootArguments;
-			rootArguments.cb = m_rayGenCB;
-
-			uint16 numShaderRecords = 1;
-			uint16 shaderRecordSize = shaderIdentifierSize + sizeof(rootArguments);
-			ShaderTable rayGenShaderTable(m_device.Get(), numShaderRecords, shaderRecordSize, L"RayGenShaderTable");
-			rayGenShaderTable.push_back(ShaderRecord(rayGenShaderIdentifier, shaderIdentifierSize, &rootArguments, sizeof(rootArguments)));
-			m_rayGenShaderTable = rayGenShaderTable.GetResource();
-		}
-
-		// Miss shader table
-		{
-			uint16 numShaderRecords = 1;
-			uint16 shaderRecordSize = shaderIdentifierSize;
-			ShaderTable missShaderTable(m_device.Get(), numShaderRecords, shaderRecordSize, L"MissShaderTable");
-			missShaderTable.push_back(ShaderRecord(missShaderIdentifier, shaderIdentifierSize));
-			m_missShaderTable = missShaderTable.GetResource();
-		}
-
-		// Hit group shader table
-		{
-			uint16 numShaderRecords = 1;
-			uint16 shaderRecordSize = shaderIdentifierSize;
-			ShaderTable hitGroupShaderTable(m_device.Get(), numShaderRecords, shaderRecordSize, L"HitGroupShaderTable");
-			hitGroupShaderTable.push_back(ShaderRecord(hitGroupShaderIdentifier, shaderIdentifierSize));
-			m_hitGroupShaderTable = hitGroupShaderTable.GetResource();
-		}
-	}
-	
-	//CreateRaytracingOutputResource();
-	{
-		// 출력 리소스를 생성. 차원과 포맷은 swap-chain과 매치 되어야 함
-		auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, SCR_WIDTH, SCR_HEIGHT, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-
-		auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-		if (FAILED(m_device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS
-			, nullptr, IID_PPV_ARGS(&m_raytracingOutput))))
-		{
-			return;
-		}
-
-		auto AllocateDscriptor = [&](D3D12_CPU_DESCRIPTOR_HANDLE* cpuDescriptor, uint16 descriptorIndexToUse) -> uint16
-		{
-			auto descriptorHeapCpuBase = m_cbvHeap->GetCPUDescriptorHandleForHeapStart();
-			if (descriptorIndexToUse >= m_cbvHeap->GetDesc().NumDescriptors)
-			{
-				descriptorIndexToUse = m_descriptorsAllocated++;
-			}
-			*cpuDescriptor = CD3DX12_CPU_DESCRIPTOR_HANDLE(descriptorHeapCpuBase, descriptorIndexToUse, m_cbvSrvDescriptorSize);
-			return descriptorIndexToUse;
-		};
-
-		D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle;
-		m_raytracingOutputResourceUAVDescriptorHeapIndex = AllocateDscriptor(&uavDescriptorHandle, m_raytracingOutputResourceUAVDescriptorHeapIndex);
-		D3D12_UNORDERED_ACCESS_VIEW_DESC UAVDesc = {};
-		UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-		m_device->CreateUnorderedAccessView(m_raytracingOutput.Get(), nullptr, &UAVDesc, uavDescriptorHandle);
-		m_raytracingOutputResourceUAVGpuDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_cbvHeap->GetGPUDescriptorHandleForHeapStart()
-			, m_raytracingOutputResourceUAVDescriptorHeapIndex, m_cbvSrvDescriptorSize);
-	}
 	//////////////////////////////////////////////////////////////////////////
+	// 11. AccelerationStructures
+	D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc{};
+	geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
+	geometryDesc.Triangles.IndexBuffer = m_indexBuffer->GetGPUVirtualAddress();
+	geometryDesc.Triangles.IndexCount = static_cast<uint16>(m_indexBuffer->GetDesc().Width) / sizeof(uint16);
+	geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R16_UINT;
+	geometryDesc.Triangles.Transform3x4 = 0;
+	geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+	geometryDesc.Triangles.VertexCount = static_cast<uint32>(m_vertexBuffer->GetDesc().Width) / sizeof(Vertex);
+	geometryDesc.Triangles.VertexBuffer.StartAddress = m_vertexBuffer->GetGPUVirtualAddress();
+	geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(Vertex);
 
-	// WAITING FOR THE FRAME TO COMPLETE BEFORE CONTINUING IS NOT BEST PRACTICE.
-	// This is code implemented as such for simplicity. The D3D12HelloFrameBuffering
-	// sample illustrates how to use fences for efficient resource usage and to
-	// maximize GPU utilization.
+	// Opaque로 지오메트를 등록하면, 히트 쉐이더에서 더이상 쉐이더를 만들지 않을 것이므로 최적화에 좋다.
+	geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
 
+	// Acceleration structure 에 필요한 크기를 요청함
+	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS topLevelInputs{};
+	topLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+	topLevelInputs.Flags = buildFlags;
+	topLevelInputs.NumDescs = 1;
+	topLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
+
+	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO topLevelPrebuildInfo{};
+	m_dxrDevice->GetRaytracingAccelerationStructurePrebuildInfo(&topLevelInputs, &topLevelPrebuildInfo);
+	if (!JASSERT(topLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0))
+		return;
+
+	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO bottomLevelPrebuildInfo{};
+	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS bottomLevelInputs = topLevelInputs;
+	bottomLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
+	bottomLevelInputs.pGeometryDescs = &geometryDesc;
+	
+	m_dxrDevice->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
+	if (!JASSERT(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0))
+		return;
+
+	ComPtr<ID3D12Resource> scratchResource;
+	const uint64 scratchResourceBufferSize 
+		= std::max(topLevelPrebuildInfo.ScratchDataSizeInBytes, bottomLevelPrebuildInfo.ScratchDataSizeInBytes);
+	BufferUtil::AllocateUAVBuffer(&scratchResource, m_device.Get(), scratchResourceBufferSize
+		, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, L"ScratchResource");
+
+	// Acceleration structure를 위한 리소스를 할당함
+	// Acceleration structure는 default heap에서 생성된 리소스에만 있을 수 있음. (또는 그에 상응하는 heap)
+	// Default heap은 CPU 읽기/쓰기 접근이 필요없기 때문에 괜찮음.
+	// Acceleration structure를 포함하는 리소스는 D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE 상태로 생성해야 함.
+	// 그리고 D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS 플래그를 가져야 함. ALLOW_UNORDERED_ACCESS는 두가지 간단한 정보를 요구함:
+	// - 시스템은 백그라운드에서 Acceleration structure 빌드를 구현할 때 이러한 유형의 액세스를 수행할 것입니다.
+	// - 앱의 관점에서, acceleration structure에 쓰기/읽기의 동기화는 UAV barriers를 통해서 얻어짐.
+	D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
+	BufferUtil::AllocateUAVBuffer(&m_bottomLevelAccelerationStructure, m_device.Get()
+		, bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, initialResourceState, TEXT("BottomLevelAccelerationStructure"));
+	BufferUtil::AllocateUAVBuffer(&m_topLevelAccelerationStructure, m_device.Get()
+		, topLevelPrebuildInfo.ResultDataMaxSizeInBytes, initialResourceState, TEXT("TopLevelAccelerationStructure"));
+
+	// Bottom-level acceleration structure 를 위한 instance Desc 생성
+	ComPtr<ID3D12Resource> instanceDescs;
+	D3D12_RAYTRACING_INSTANCE_DESC instanceDesc{};
+	instanceDesc.Transform[0][0] = instanceDesc.Transform[1][1] = instanceDesc.Transform[2][2] = 1;
+	instanceDesc.InstanceMask = 1;
+	instanceDesc.AccelerationStructure = m_bottomLevelAccelerationStructure->GetGPUVirtualAddress();
+	BufferUtil::AllocateUploadBuffer(&instanceDescs, m_device.Get(), &instanceDesc, sizeof(instanceDesc), TEXT("InstanceDescs"));
+
+	// Bottom level acceleration structure desc
+	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc{};
+	bottomLevelBuildDesc.Inputs = bottomLevelInputs;
+	bottomLevelBuildDesc.ScratchAccelerationStructureData = scratchResource->GetGPUVirtualAddress();
+	bottomLevelBuildDesc.DestAccelerationStructureData = m_bottomLevelAccelerationStructure->GetGPUVirtualAddress();
+
+	// Top level acceleration structure desc
+	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC topLevelBuildDesc{};
+	topLevelInputs.InstanceDescs = instanceDescs->GetGPUVirtualAddress();
+	topLevelBuildDesc.Inputs = topLevelInputs;
+	topLevelBuildDesc.DestAccelerationStructureData = m_topLevelAccelerationStructure->GetGPUVirtualAddress();
+	topLevelBuildDesc.ScratchAccelerationStructureData = scratchResource->GetGPUVirtualAddress();
+
+	// Acceleration structure 빌드
+	if (JFAIL(m_commandList->Reset(m_commandAllocator[m_frameIndex].Get(), nullptr)))
+		return;
+
+	m_dxrCommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
+	m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(m_bottomLevelAccelerationStructure.Get()));
+	m_dxrCommandList->BuildRaytracingAccelerationStructure(&topLevelBuildDesc, 0, nullptr);
+
+	if (JFAIL(m_commandList->Close()))
+		return;
+	ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
+	m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+
+	WaitForGPU();
+
+	// 12. ShaderTable
+	const uint16 shaderIdentifierSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+	ComPtr<ID3D12StateObjectProperties> stateObjectProperties;
+	if (JFAIL(m_dxrStateObject.As(&stateObjectProperties)))
+		return;
+	
+	void* rayGenShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_raygenShaderName);
+	void* misssShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_missShaderName);
+	void* hitGroupShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_hitGroupName);
+
+	// Raygen shader table
+	{
+		m_rayGenCB.viewport = { -1.0f, -1.0f, 1.0f, 1.0f };
+		const float aspectRatio = static_cast<float>(SCR_WIDTH) / static_cast<float>(SCR_HEIGHT);
+		if (SCR_WIDTH <= SCR_HEIGHT)
+		{
+			const float border = 0.1f;
+			if (SCR_WIDTH <= SCR_HEIGHT)
+			{
+				m_rayGenCB.stencil =
+				{
+					-1.0f + border, -1.0f + border * aspectRatio,
+					1.0f - border, 1.0f - border * aspectRatio
+				};
+			}
+			else
+			{
+				m_rayGenCB.stencil =
+				{
+					-1.0f + border / aspectRatio, -1.0f + border,
+					1.0f - border / aspectRatio, 1.0f + border
+				};
+			}
+		}
+
+		struct RootArguments
+		{
+			RayGenConstantBuffer cb;
+		};
+		RootArguments rootArguments;
+		rootArguments.cb = m_rayGenCB;
+
+		const uint16 numShaderRecords = 1;
+		const uint16 shaderRecordSize = shaderIdentifierSize * sizeof(rootArguments);
+		ShaderTable rayGenShaderTable(m_device.Get(), numShaderRecords, shaderRecordSize, TEXT("RayGenShaderTable"));
+		rayGenShaderTable.push_back(ShaderRecord(rayGenShaderIdentifier, shaderIdentifierSize, &rootArguments, sizeof(rootArguments)));
+		m_rayGenShaderTable = rayGenShaderTable.GetResource();
+	}
+
+	// Miss shader table
+	{
+		const uint16 numShaderRecords = 1;
+		const uint16 shaderRecordSize = shaderIdentifierSize;
+		ShaderTable missShaderTable(m_device.Get(), numShaderRecords, shaderRecordSize, TEXT("MissShaderTable"));
+		missShaderTable.push_back(ShaderRecord(misssShaderIdentifier, shaderIdentifierSize));
+		m_missShaderTable = missShaderTable.GetResource();
+	}
+
+	// Hit group shader table
+	{
+		const uint16 numShaderRecords = 1;
+		const uint16 shaderRecordSize = shaderIdentifierSize;
+		ShaderTable hitGroupShaderTable(m_device.Get(), numShaderRecords, shaderRecordSize, TEXT("HitGroupShader"));
+		hitGroupShaderTable.push_back(ShaderRecord(hitGroupShaderIdentifier, shaderIdentifierSize));
+		m_hitGroupShaderTable = hitGroupShaderTable.GetResource();
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// 13. Raytracing Output Resouce
+
+	// 출력 리소스를 생성. 차원과 포맷은 swap-chain과 매치 되어야 함
+	auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(BackbufferFormat
+		, SCR_WIDTH, SCR_HEIGHT, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+	auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+	if (JFAIL(m_device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE
+		, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_raytracingOutput))))
+	{
+		return;
+	}
+
+	D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle;
+	auto descriptorHeapCpuBase = m_cbvHeap->GetCPUDescriptorHandleForHeapStart();
+	if (m_raytracingOutputResourceUAVDescriptorHeapIndex >= m_cbvHeap->GetDesc().NumDescriptors)
+	{
+		m_raytracingOutputResourceUAVDescriptorHeapIndex = m_descriptorsAllocated++;
+		uavDescriptorHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(descriptorHeapCpuBase
+			, m_raytracingOutputResourceUAVDescriptorHeapIndex, m_cbvDescriptorSize);
+	}
+
+	D3D12_UNORDERED_ACCESS_VIEW_DESC UAVDesc{};
+	UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+	m_device->CreateUnorderedAccessView(m_raytracingOutput.Get(), nullptr, &UAVDesc, uavDescriptorHandle);
+	m_raytracingOutputResourceUAVGpuDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_cbvHeap->GetGPUDescriptorHandleForHeapStart()
+		, m_raytracingOutputResourceUAVDescriptorHeapIndex, m_cbvDescriptorSize);
+
+	//////////////////////////////////////////////////////////////////////////
 	ShowWindow(hWnd, SW_SHOW);
 
 	MSG msg = {};
@@ -1329,112 +797,72 @@ void jRHI_DirectX12::Initialize()
 
 void jRHI_DirectX12::Release()
 {
-	if (m_commandQueue && m_fence && m_fenceEvent)
-	{
-		uint64 fenceValue = m_fenceValue[m_frameIndex];
-		if (SUCCEEDED(m_commandQueue->Signal(m_fence.Get(), fenceValue)))
-		{
-			if (SUCCEEDED(m_fence->SetEventOnCompletion(fenceValue, m_fenceEvent)))
-			{
-				WaitForSingleObjectEx(m_fenceEvent, INFINITE, false);
 
-				m_fenceValue[m_frameIndex]++;
-			}
-		}
-	}
-
-	// ReleaseWindowSizeDependentResources();
-	{
-		m_rayGenShaderTable.Reset();
-		m_missShaderTable.Reset();
-		m_hitGroupShaderTable.Reset();
-		m_raytracingOutput.Reset();
-	}
-	// ReleaseDeviceDependentResources();
-	{
-		m_raytracingGlobalRootSignature.Reset();
-		m_raytracingLocalRootSignature.Reset();
-
-		m_dxrDevice.Reset();
-		m_dxrCommandList.Reset();
-		m_dxrStateObject.Reset();
-
-		m_cbvHeap.Reset();
-		m_descriptorsAllocated = 0;
-		m_raytracingOutputResourceUAVDescriptorHeapIndex = UINT_MAX;
-		m_indexBuffer.Reset();
-		m_vertexBuffer.Reset();
-
-		m_accelerationStructure.Reset();
-		m_bottomLevelAccelerationStructure.Reset();
-		m_topLevelAccelerationStructure.Reset();
-	}
-
-	//m_commandList.Reset();
-	//for (int32 i = 0; i < _countof(m_commandAllocators); ++i)
-	//{
-	//	m_commandAllocators[i].Reset();
-	//}
-	//m_fence.Reset();
-	//m_commandQueue.Reset();
-	//for (auto& rt : m_renderTargets)
-	//{
-	//	rt.Reset();
-	//}
-	//m_swapChain.Reset();
-	//m_device.Reset();
 }
 
-void jRHI_DirectX12::Prepare(D3D12_RESOURCE_STATES beforeState)
+
+void jRHI_DirectX12::Render()
 {
-	if (FAILED(m_commandAllocators[m_frameIndex]->Reset()))
+	// Prepare
+	if (JFAIL(m_commandAllocator[m_frameIndex]->Reset()))
+		return;
+	if (JFAIL(m_commandList->Reset(m_commandAllocator[m_frameIndex].Get(), nullptr)))
 		return;
 
-	if (FAILED(m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), nullptr)))
-		return;
+	// DoRaytracing
+	m_commandList->SetComputeRootSignature(m_raytracingGlobalRootSignature.Get());
 
-	if (beforeState != D3D12_RESOURCE_STATE_RENDER_TARGET)
-	{
-		// RT에 렌더링 하기위해서 RT를 올바른 State로 변경해준다.
-		D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), beforeState, D3D12_RESOURCE_STATE_RENDER_TARGET);
-		m_commandList->ResourceBarrier(1, &barrier);
-	}
-}
+	D3D12_DISPATCH_RAYS_DESC dispatchDesc{};
+	m_commandList->SetDescriptorHeaps(1, m_cbvHeap.GetAddressOf());
+	m_commandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::OutputViewSlot
+		, m_raytracingOutputResourceUAVGpuDescriptor);
+	m_commandList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot
+		, m_topLevelAccelerationStructure->GetGPUVirtualAddress());
 
-void jRHI_DirectX12::CopyRaytracingOutputToBackbuffer()
-{
+	// 각 Shader table은 단 한개의 shader record를 가지기 때문에 stride가 그 사이즈와 동일함
+	dispatchDesc.HitGroupTable.StartAddress = m_hitGroupShaderTable->GetGPUVirtualAddress();
+	dispatchDesc.HitGroupTable.SizeInBytes = m_hitGroupShaderTable->GetDesc().Width;
+	dispatchDesc.HitGroupTable.StrideInBytes = dispatchDesc.HitGroupTable.SizeInBytes;
+
+	dispatchDesc.MissShaderTable.StartAddress = m_missShaderTable->GetGPUVirtualAddress();
+	dispatchDesc.MissShaderTable.SizeInBytes = m_missShaderTable->GetDesc().Width;
+	dispatchDesc.MissShaderTable.StrideInBytes = dispatchDesc.MissShaderTable.SizeInBytes;
+
+	dispatchDesc.RayGenerationShaderRecord.StartAddress = m_rayGenShaderTable->GetGPUVirtualAddress();
+	dispatchDesc.RayGenerationShaderRecord.SizeInBytes = m_rayGenShaderTable->GetDesc().Width;
+
+	dispatchDesc.Width = SCR_WIDTH;
+	dispatchDesc.Height = SCR_HEIGHT;
+	dispatchDesc.Depth = 1;
+
+	m_dxrCommandList->SetPipelineState1(m_dxrStateObject.Get());
+	m_dxrCommandList->DispatchRays(&dispatchDesc);
+
+	// CopyRaytracingOutputToBackbuffer
 	D3D12_RESOURCE_BARRIER preCopyBarriers[2];
-	preCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_DEST);
-	preCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_raytracingOutput.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+	preCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get()
+		, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_DEST);
+	preCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_raytracingOutput.Get()
+		, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
 	m_commandList->ResourceBarrier(_countof(preCopyBarriers), preCopyBarriers);
 
 	m_commandList->CopyResource(m_renderTargets[m_frameIndex].Get(), m_raytracingOutput.Get());
 
 	D3D12_RESOURCE_BARRIER postCopyBarriers[2];
-	postCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
-	postCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_raytracingOutput.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	postCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get()
+		, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
+	postCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_raytracingOutput.Get()
+		, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 	m_commandList->ResourceBarrier(_countof(postCopyBarriers), postCopyBarriers);
-}
 
-void jRHI_DirectX12::Present(D3D12_RESOURCE_STATES beforeState)
-{
-	if (beforeState != D3D12_RESOURCE_STATE_PRESENT)
-	{
-		// RT의 state를 present 가능한 상태로 전환
-		D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), beforeState, D3D12_RESOURCE_STATE_PRESENT);
-		m_commandList->ResourceBarrier(1, &barrier);
-	}
-
-	// ExecuteCommandList();
-	{
-		if (FAILED(m_commandList->Close()))
-			return;
-		ID3D12CommandList* commandLists[] = { m_commandList.Get() };
-		m_commandQueue->ExecuteCommandLists(_countof(commandLists), commandLists);
-	}
+	// Present
+	if (JFAIL(m_commandList->Close()))
+		return;
+	ID3D12CommandList* commandLists[] = { m_commandList.Get() };
+	m_commandQueue->ExecuteCommandLists(_countof(commandLists), commandLists);
 
 	static bool IsAllowTearing = false;
-	HRESULT hr;
+	HRESULT hr = S_OK;
 	if (IsAllowTearing)
 	{
 		hr = m_swapChain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
@@ -1448,71 +876,38 @@ void jRHI_DirectX12::Present(D3D12_RESOURCE_STATES beforeState)
 
 	if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
 	{
-		// HandleDeviceLost;
+		// 디바이스 로스트 처리
 	}
 	else
 	{
-		if (FAILED(hr))
+		if (JFAIL(hr))
 			return;
 
-		// MoveToNextFrame();
+		const uint64 currentFenceValue = m_fenceValue[m_frameIndex];
+		if (JFAIL(m_commandQueue->Signal(m_fence.Get(), currentFenceValue)))
+			return;
+
+		m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
+
+		if (m_fence->GetCompletedValue() < m_fenceValue[m_frameIndex])
 		{
-			const uint64 currentFenceVaule = m_fenceValue[m_frameIndex];
-			if (FAILED(m_commandQueue->Signal(m_fence.Get(), currentFenceVaule)))
+			if (JFAIL(m_fence->SetEventOnCompletion(m_fenceValue[m_frameIndex], m_fenceEvent)))
 				return;
-
-			m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
-
-			if (m_fence->GetCompletedValue() < m_fenceValue[m_frameIndex])
-			{
-				if (FAILED(m_fence->SetEventOnCompletion(m_fenceValue[m_frameIndex], m_fenceEvent)))
-					return;
-				WaitForSingleObjectEx(m_fenceEvent, INFINITE, false);
-			}
-
-			m_fenceValue[m_frameIndex] = currentFenceVaule + 1;
+			WaitForSingleObjectEx(m_fenceEvent, INFINITE, false);
 		}
+		m_fenceValue[m_frameIndex] = currentFenceValue + 1;
 	}
 }
 
-void jRHI_DirectX12::Render()
+
+void jRHI_DirectX12::OnDeviceLost()
 {
-	Prepare();
-	DoRaytracing();
-	CopyRaytracingOutputToBackbuffer();
-	Present(D3D12_RESOURCE_STATE_PRESENT);
+
 }
 
-void jRHI_DirectX12::DoRaytracing()
+void jRHI_DirectX12::OnDeviceRestored()
 {
-	auto DispatchRays = [&](auto* commandList, auto* stateObject, auto* dispatchDesc)
-	{
-		// 각 Shader table은 단 한개의 shader record를 가지기 때문에 stride가 그 사이즈와 동일함
-		dispatchDesc->HitGroupTable.StartAddress = m_hitGroupShaderTable->GetGPUVirtualAddress();
-		dispatchDesc->HitGroupTable.SizeInBytes = m_hitGroupShaderTable->GetDesc().Width;
-		dispatchDesc->HitGroupTable.StrideInBytes = dispatchDesc->HitGroupTable.SizeInBytes;
 
-		dispatchDesc->MissShaderTable.StartAddress = m_missShaderTable->GetGPUVirtualAddress();
-		dispatchDesc->MissShaderTable.SizeInBytes = m_missShaderTable->GetDesc().Width;
-		dispatchDesc->MissShaderTable.StrideInBytes = dispatchDesc->MissShaderTable.SizeInBytes;
-
-		dispatchDesc->RayGenerationShaderRecord.StartAddress = m_rayGenShaderTable->GetGPUVirtualAddress();
-		dispatchDesc->RayGenerationShaderRecord.SizeInBytes = m_rayGenShaderTable->GetDesc().Width;
-
-		dispatchDesc->Width = SCR_WIDTH;
-		dispatchDesc->Height = SCR_HEIGHT;
-		dispatchDesc->Depth = 1;
-
-		commandList->SetPipelineState1(stateObject);
-		commandList->DispatchRays(dispatchDesc);
-	};
-
-	m_commandList->SetComputeRootSignature(m_raytracingGlobalRootSignature.Get());
-
-	// Heap, acceleration structure 를 바인딩하고, ray를 dispatch 함
-	D3D12_DISPATCH_RAYS_DESC dispatchDesc = {};
-	m_commandList->SetDescriptorHeaps(1, m_cbvHeap.GetAddressOf());
-	m_commandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::OutputViewSlot, m_raytracingOutputResourceUAVGpuDescriptor);
-	m_commandList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot, m_topLevelAccelerationStructure->GetGPUVirtualAddress());
-	DispatchRays(m_dxrCommandList.Get(), m_dxrStateObject.Get(), &dispatchDesc);
 }
+
+

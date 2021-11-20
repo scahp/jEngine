@@ -17,166 +17,140 @@ using namespace DirectX;
 
 static const UINT FrameCount = 2;
 static const uint32 cbvCountPerFrame = 3;
+static constexpr DXGI_FORMAT BackbufferFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+
+struct GlobalRootSignatureParams {
+	enum Value {
+		OutputViewSlot = 0,
+		AccelerationStructureSlot,
+		Count
+	};
+};
+
+struct LocalRootSignatureParams {
+	enum Value {
+		ViewportConstantSlot = 0,
+		Count
+	};
+};
+
+struct BufferUtil
+{
+	static bool AllocateUploadBuffer(ID3D12Resource** OutResource, ID3D12Device* InDevice
+		, void* InData, uint64 InDataSize, const wchar_t* resourceName = nullptr);
+
+	static bool AllocateUploadBuffer(ID3D12Resource** OutResource, ID3D12Device* InDevice
+		, const wchar_t* resourceName = nullptr)
+	{
+		return AllocateUploadBuffer(OutResource, InDevice, nullptr, 0, resourceName);
+	}
+
+	static bool AllocateUAVBuffer(ID3D12Resource** OutResource, ID3D12Device* InDevice
+		, uint64 InBufferSize, D3D12_RESOURCE_STATES InInitialResourceState = D3D12_RESOURCE_STATE_COMMON
+		, const wchar_t* resourceName = nullptr);
+};
+
+inline UINT Align(UINT size, UINT alignment)
+{
+	return (size + (alignment - 1)) & ~(alignment - 1);
+}
+
+// Shader record = {{Shader ID}, {RootArguments}}
+struct ShaderRecord
+{
+	ShaderRecord(void* InShaderIdentifier, uint32 InShaderIdentifierSize)
+		: m_shaderIdentifier(InShaderIdentifier), m_shaderIdentifierSize(InShaderIdentifierSize)
+	{}
+
+	ShaderRecord(void* InShaderIdentifier, uint32 InShaderIdentifierSize
+		, void* InLocalRootArugments, uint32 InLocalRootArgumentsSize)
+		: m_shaderIdentifier(InShaderIdentifier), m_shaderIdentifierSize(InShaderIdentifierSize)
+		, m_localRootArguments(InLocalRootArugments), m_localRootArgumentsSize(InLocalRootArgumentsSize)
+	{}
+
+	void* m_shaderIdentifier = nullptr;
+	uint32 m_shaderIdentifierSize = 0;
+
+	void* m_localRootArguments = nullptr;
+	uint32 m_localRootArgumentsSize = 0;
+};
+
+// Shader table = {{ ShaderRecord 1}, {ShaderRecord 2}, ...}
+class ShaderTable
+{
+public:
+	ShaderTable() {}
+	ShaderTable(ID3D12Device* InDevice, uint32 InNumOfShaderRecords, uint32 InShaderRecordSize
+		, const wchar_t* InResourceName = nullptr);
+
+	ComPtr<ID3D12Resource> GetResource() { return m_resource; }
+
+	void push_back(const ShaderRecord& InShaderRecord);
+
+	// Pretty-print the shader records.
+	void DebugPrint(std::unordered_map<void*, std::wstring> shaderIdToStringMap);
+	
+private:
+	uint8* m_mappedShaderRecords = nullptr;
+	uint32 m_shaderRecordSize = 0;
+	std::vector<ShaderRecord> m_shaderRecords;
+	ComPtr<ID3D12Resource> m_resource;
+
+#if _DEBUG
+	std::wstring m_name;
+#endif
+};
 
 class jRHI_DirectX12 : public jRHI
 {
 public:
-	void Initialize();
-	void Release();
-
-	HWND CreateMainWindow() const;
-
-	// TriangleTest function
-	void RenderTriangleTest();
-	//////////////////////////////////////////////////////////////////////////
-
-	// CubeTest
-	void Render();
-
-	void DoRaytracing();
+	static const wchar_t* jRHI_DirectX12::c_hitGroupName;
+	static const wchar_t* jRHI_DirectX12::c_raygenShaderName;
+	static const wchar_t* jRHI_DirectX12::c_closestHitShaderName;
+	static const wchar_t* jRHI_DirectX12::c_missShaderName;
 
 	//////////////////////////////////////////////////////////////////////////
+	// 1. Device
+	ComPtr<ID3D12Device> m_device;
 
-	ComPtr<IDXGISwapChain3> m_swapChain;
-	ComPtr<ID3D12Device2> m_device;
-	ComPtr<ID3D12Resource> m_renderTargets[FrameCount];
-	ComPtr<ID3D12RootSignature> m_rootSignature;
-	ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
-	ComPtr<ID3D12PipelineState> m_pipelineState;
-	ComPtr<ID3D12PipelineState> m_queryState;
+	//////////////////////////////////////////////////////////////////////////
+	// 2. Command
+	ComPtr<ID3D12CommandQueue> m_commandQueue;
+	ComPtr<ID3D12CommandAllocator> m_commandAllocator[FrameCount];
 	ComPtr<ID3D12GraphicsCommandList> m_commandList;
-	ComPtr<ID3D12GraphicsCommandList> m_bundle;
-	UINT m_rtvDescriptorSize;
+
+	//////////////////////////////////////////////////////////////////////////
+	// 3. Swapchain
+	int32 m_frameIndex = 0;
+	ComPtr<IDXGISwapChain3> m_swapChain;
+
+	//////////////////////////////////////////////////////////////////////////
+	// 4. Heap
+	ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
 	ComPtr<ID3D12DescriptorHeap> m_cbvHeap;
-	ComPtr<ID3D12QueryHeap> m_queryHeap;
-	ComPtr<ID3D12Resource> m_queryResult;
+	uint32 m_rtvDescriptorSize = 0;
+	uint32 m_cbvDescriptorSize = 0;
 
-	int32 m_cbvSrvDescriptorSize = 0;
+	//////////////////////////////////////////////////////////////////////////
+	// 5. CommandAllocators, Commandlist, RTV for FrameCount
+	ComPtr<ID3D12Resource> m_renderTargets[FrameCount];
 
-	// App resources.
-	ComPtr<ID3D12Resource> m_vertexBuffer;
-	D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
-	D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
-	ComPtr<ID3D12Resource> m_vertexBuffer2;
-	D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView2;
-	ComPtr<ID3D12Resource> m_depthBuffer;
-	ComPtr<ID3D12Resource> m_indexBuffer;
-	ComPtr<ID3D12DescriptorHeap> m_dsvHeap;
-	ComPtr<ID3D12Resource> m_texture;
-	ComPtr<ID3D12Resource> m_textureArray[3];
-	ComPtr<ID3D12DescriptorHeap> m_srvHeap;
-
-    ComPtr<ID3D12CommandAllocator> m_commandAllocators[FrameCount];
-    ComPtr<ID3D12CommandQueue> m_commandQueue;
-
-	// Compute shader
-	struct InstanceConstantBuffer
-	{
-		Vector4 Color = Vector4::ColorRed;
-		Vector4 padding[15]; // to be aligned 256 byte.
-		enum
-		{
-			SizeWithoutPadding = sizeof(Color),
-			Size = (sizeof(Color) + sizeof(padding))
-		};
-	};
-	struct MVPConstantBuffer
-	{
-		XMMATRIX MVP;
-		Vector4 padding[12];	// to be aligned 256 byte.
-	};
-	// Data structure to match the command signature used for ExecuteIndirect.
-	struct IndirectCommand
-	{
-		D3D12_GPU_VIRTUAL_ADDRESS cbvMVP;
-		D3D12_GPU_VIRTUAL_ADDRESS cbvInstanceBuffer;
-		D3D12_DRAW_INDEXED_ARGUMENTS drawArguments;
-		float padding;									// align to multiple of 8
-		//float padding[55];	// to be aligned 256 byte.
-
-		//enum
-		//{
-		//	SizeWithoutPadding = sizeof(cbvMVP) + sizeof(cbvInstanceBuffer) + sizeof(drawArguments),
-		//	Size = (sizeof(cbvMVP) + sizeof(cbvInstanceBuffer) + sizeof(drawArguments) + sizeof(padding))
-		//};
-	};
-	ComPtr<ID3D12RootSignature> m_computeRootSignature;
-	ComPtr<ID3D12PipelineState> m_computeState;
-	ComPtr<ID3D12Resource> m_constantInstanceBuffer;
-	std::vector<InstanceConstantBuffer> m_constantInstanceBufferData;
-	ComPtr<ID3D12Resource> m_constantMVPBuffer;
-	std::vector<MVPConstantBuffer> m_constantMVPBufferData;
-	std::vector<IndirectCommand> commands;
-	ComPtr<ID3D12Resource> m_commandBuffer;
-	ComPtr<ID3D12Resource> m_processedCommandBuffers[FrameCount];
-	ComPtr<ID3D12Resource> m_processedCommandBufferCounterReset;
-	ComPtr<ID3D12CommandSignature> m_commandSignature;
-
-	struct SceneConstantBuffer
-	{
-		XMFLOAT4 offset;
-		XMMATRIX MVP;
-
-		// Constant buffers are 256-byte aligned. Add padding in the struct to allow multiple buffers
-		// to be array-indexed.
-		FLOAT padding[44];
-	};
-
-	UINT8* m_pCbvDataBegin = nullptr;
-	SceneConstantBuffer m_constantBufferData[cbvCountPerFrame];
-	ComPtr<ID3D12Resource> m_constantBuffer;
-
-
-	// Synchronization objects.
-	UINT m_frameIndex;
-	HANDLE m_fenceEvent;
+	//////////////////////////////////////////////////////////////////////////
+	// 6. Create sync object
+	HANDLE m_fenceEvent = nullptr;
+	uint64 m_fenceValue[FrameCount]{};
 	ComPtr<ID3D12Fence> m_fence;
-	UINT64 m_fenceValue[FrameCount];
+	void WaitForGPU();
 
-	jCommandQueue_DirectX12 directCommandQueue;
-	jCommandQueue_DirectX12 copyCommandQueue;
-
-	// DXR Objects
+	//////////////////////////////////////////////////////////////////////////
+	// 7. Raytracing device and commandlist
 	ComPtr<ID3D12Device5> m_dxrDevice;
 	ComPtr<ID3D12GraphicsCommandList4> m_dxrCommandList;
+
+	//////////////////////////////////////////////////////////////////////////
+	// 8. CreateRootSignature
 	ComPtr<ID3D12RootSignature> m_raytracingGlobalRootSignature;
 	ComPtr<ID3D12RootSignature> m_raytracingLocalRootSignature;
-
-	static const wchar_t* c_hitGroupName;
-	static const wchar_t* c_raygenShaderName;
-	static const wchar_t* c_closestHitShaderName;
-	static const wchar_t* c_missShaderName;
-	ComPtr<ID3D12Resource> m_missShaderTable;
-	ComPtr<ID3D12Resource> m_hitGroupShaderTable;
-	ComPtr<ID3D12Resource> m_rayGenShaderTable;
-	ComPtr<ID3D12StateObject> m_dxrStateObject;
-
-	ComPtr<ID3D12Resource> m_accelerationStructure;
-	ComPtr<ID3D12Resource> m_bottomLevelAccelerationStructure;
-	ComPtr<ID3D12Resource> m_topLevelAccelerationStructure;
-
-	ComPtr<ID3D12Resource> m_raytracingOutput;
-	D3D12_GPU_DESCRIPTOR_HANDLE m_raytracingOutputResourceUAVGpuDescriptor;
-	uint32 m_raytracingOutputResourceUAVDescriptorHeapIndex = UINT_MAX;
-
-	uint32 m_descriptorsAllocated = 0;
-
-	struct GlobalRootSignatureParams {
-		enum Value {
-			OutputViewSlot = 0,
-			AccelerationStructureSlot,
-			Count
-		};
-	};
-
-	struct LocalRootSignatureParams {
-		enum Value {
-			ViewportConstantSlot = 0,
-			Count
-		};
-	};
-
-	struct Vertex { float v1, v2, v3; };
 
 	struct Viewport
 	{
@@ -193,109 +167,43 @@ public:
 	};
 	RayGenConstantBuffer m_rayGenCB;
 
-	bool UpdateBufferResource(
-		ComPtr<ID3D12Device2> InDevice
-		, ComPtr<ID3D12GraphicsCommandList2> InCommandList
-		, ComPtr<ID3D12Resource>& InDestinationResource
-		, ComPtr<ID3D12Resource>& InIntermediateResource
-		, size_t InNumOfElement, size_t InElementSize
-		, const void* InData, D3D12_RESOURCE_FLAGS InFlags = D3D12_RESOURCE_FLAG_NONE)
-	{
-		const size_t bufferSize = InNumOfElement * InElementSize;
+	//////////////////////////////////////////////////////////////////////////
+	// 9. DXR PipeplineStateObject
+	ComPtr<ID3D12StateObject> m_dxrStateObject;
 
-		if (FAILED(InDevice->CreateCommittedResource(
-			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT)
-			, D3D12_HEAP_FLAG_NONE
-			, &CD3DX12_RESOURCE_DESC::Buffer(bufferSize, InFlags)
-			, D3D12_RESOURCE_STATE_COPY_DEST
-			, nullptr
-			, IID_PPV_ARGS(&InDestinationResource))))
-		{
-			return false;
-		}
+	//////////////////////////////////////////////////////////////////////////
+	// 10. Create vertex and index buffer
+	ComPtr<ID3D12Resource> m_vertexBuffer;
+	D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
+	ComPtr<ID3D12Resource> m_indexBuffer;
+	D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
 
-		if (InData)
-		{
-			if (FAILED(InDevice->CreateCommittedResource(
-				&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD)
-				, D3D12_HEAP_FLAG_NONE
-				, &CD3DX12_RESOURCE_DESC::Buffer(bufferSize)
-				, D3D12_RESOURCE_STATE_GENERIC_READ
-				, nullptr
-				, IID_PPV_ARGS(&InIntermediateResource))))
-			{
-				return false;
-			}
+	//////////////////////////////////////////////////////////////////////////
+	// 11. AccelerationStructures
+	ComPtr<ID3D12Resource> m_bottomLevelAccelerationStructure;
+	ComPtr<ID3D12Resource> m_topLevelAccelerationStructure;
 
-			D3D12_SUBRESOURCE_DATA subresourceData = {};
-			subresourceData.pData = InData;
-			subresourceData.RowPitch = bufferSize;
-			subresourceData.SlicePitch = subresourceData.RowPitch;
+	//////////////////////////////////////////////////////////////////////////
+	// 12. ShaderTable
+	ComPtr<ID3D12Resource> m_rayGenShaderTable;
+	ComPtr<ID3D12Resource> m_missShaderTable;
+	ComPtr<ID3D12Resource> m_hitGroupShaderTable;
 
-			if (0 == UpdateSubresources(InCommandList.Get()
-				, InDestinationResource.Get(), InIntermediateResource.Get()
-				, 0, 0, 1, &subresourceData))
-			{
-				return false;
-			}
-		}
+	//////////////////////////////////////////////////////////////////////////
+	// 13. Raytracing Output Resouce
+	ComPtr<ID3D12Resource> m_raytracingOutput;
+	D3D12_GPU_DESCRIPTOR_HANDLE m_raytracingOutputResourceUAVGpuDescriptor;
+	uint32 m_raytracingOutputResourceUAVDescriptorHeapIndex = UINT_MAX;
+	uint32 m_descriptorsAllocated = 0;
 
-		return true;
-	}
+	void Initialize();
+	void Release();
 
-	bool UpdateBufferResourceWithDesc(
-		ComPtr<ID3D12Device2> InDevice
-		, ComPtr<ID3D12GraphicsCommandList2> InCommandList
-		, ComPtr<ID3D12Resource>& InDestinationResource
-		, ComPtr<ID3D12Resource>& InIntermediateResource
-		, size_t InNumOfElement, size_t InElementSize
-		, const D3D12_RESOURCE_DESC& InDesc
-		, const void* InData, D3D12_RESOURCE_FLAGS InFlags = D3D12_RESOURCE_FLAG_NONE)
-	{
-		const size_t bufferSize = InNumOfElement * InElementSize;
+	HWND CreateMainWindow() const;
 
-		if (FAILED(InDevice->CreateCommittedResource(
-			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT)
-			, D3D12_HEAP_FLAG_NONE
-			, &InDesc
-			, D3D12_RESOURCE_STATE_COPY_DEST
-			, nullptr
-			, IID_PPV_ARGS(&InDestinationResource))))
-		{
-			return false;
-		}
+	void Render();
 
-		if (InData)
-		{
-			if (FAILED(InDevice->CreateCommittedResource(
-				&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD)
-				, D3D12_HEAP_FLAG_NONE
-				, &CD3DX12_RESOURCE_DESC::Buffer(bufferSize)
-				, D3D12_RESOURCE_STATE_GENERIC_READ
-				, nullptr
-				, IID_PPV_ARGS(&InIntermediateResource))))
-			{
-				return false;
-			}
-
-			D3D12_SUBRESOURCE_DATA subresourceData = {};
-			subresourceData.pData = InData;
-			subresourceData.RowPitch = InDesc.Width * InElementSize;
-			subresourceData.SlicePitch = subresourceData.RowPitch * InDesc.Height;
-
-			if (0 == UpdateSubresources(InCommandList.Get()
-				, InDestinationResource.Get(), InIntermediateResource.Get()
-				, 0, 0, 1, &subresourceData))
-			{
-				return false;
-			}
-		}
-
-		return true;
-	}
-private:
-	void Prepare(D3D12_RESOURCE_STATES beforeState = D3D12_RESOURCE_STATE_PRESENT);
-	void CopyRaytracingOutputToBackbuffer();
-	void Present(D3D12_RESOURCE_STATES beforeState = D3D12_RESOURCE_STATE_RENDER_TARGET);
+	void OnDeviceLost();
+	void OnDeviceRestored();
 };
 

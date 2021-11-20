@@ -176,6 +176,7 @@
   <ItemGroup>
     <ClInclude Include="Code\DirectX12\jCommandQueue_DirectX12.h" />
     <ClInclude Include="Code\DirectX12\jRHI_DirectX12.h" />
+    <ClInclude Include="Code\DirectX12\jShaderCompiler_DirectX12.h" />
     <ClInclude Include="Code\External\IMGUI\imconfig.h" />
     <ClInclude Include="Code\External\IMGUI\imgui.h" />
     <ClInclude Include="Code\External\IMGUI\imgui_impl_glfw.h" />
@@ -241,6 +242,7 @@
   <ItemGroup>
     <ClCompile Include="Code\DirectX12\jCommandQueue_DirectX12.cpp" />
     <ClCompile Include="Code\DirectX12\jRHI_DirectX12.cpp" />
+    <ClCompile Include="Code\DirectX12\jShaderCompiler_DirectX12.cpp" />
     <ClCompile Include="Code\External\glad.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
