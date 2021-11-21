@@ -63,8 +63,8 @@ ShaderTable::ShaderTable(ID3D12Device* InDevice, uint32 InNumOfShaderRecords, ui
 	m_shaderRecords.reserve(InNumOfShaderRecords);
 
 	m_shaderRecordSize = Align(InShaderRecordSize, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
-	const uint32 bufferSize = InNumOfShaderRecords & m_shaderRecordSize;
-	BufferUtil::AllocateUploadBuffer(&m_resource, InDevice, InResourceName);
+	const uint32 bufferSize = InNumOfShaderRecords * m_shaderRecordSize;
+	BufferUtil::AllocateUploadBuffer(&m_resource, InDevice, nullptr, bufferSize, InResourceName);
 
 #if _DEBUG
 	m_name = InResourceName;
@@ -77,7 +77,7 @@ ShaderTable::ShaderTable(ID3D12Device* InDevice, uint32 InNumOfShaderRecords, ui
 
 void ShaderTable::push_back(const ShaderRecord& InShaderRecord)
 {
-	if (JASSERT(m_shaderRecords.size() < m_shaderRecords.capacity()))
+	if (JASSERT(m_shaderRecords.size() >= m_shaderRecords.capacity()))
 		return;
 
 	m_shaderRecords.push_back(InShaderRecord);
@@ -338,7 +338,7 @@ void jRHI_DirectX12::Initialize()
 	if (JFAIL(m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap))))
 		return;
 
-	D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc;
+	D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc{};
 	cbvHeapDesc.NumDescriptors = 1;			// 1 - ratracing output texture UAV
 	cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
@@ -697,25 +697,22 @@ void jRHI_DirectX12::Initialize()
 	{
 		m_rayGenCB.viewport = { -1.0f, -1.0f, 1.0f, 1.0f };
 		const float aspectRatio = static_cast<float>(SCR_WIDTH) / static_cast<float>(SCR_HEIGHT);
+		const float border = 0.1f;
 		if (SCR_WIDTH <= SCR_HEIGHT)
 		{
-			const float border = 0.1f;
-			if (SCR_WIDTH <= SCR_HEIGHT)
+			m_rayGenCB.stencil =
 			{
-				m_rayGenCB.stencil =
-				{
-					-1.0f + border, -1.0f + border * aspectRatio,
-					1.0f - border, 1.0f - border * aspectRatio
-				};
-			}
-			else
+				-1.0f + border, -1.0f + border * aspectRatio,
+				1.0f - border, 1.0f - border * aspectRatio
+			};
+		}
+		else
+		{
+			m_rayGenCB.stencil =
 			{
-				m_rayGenCB.stencil =
-				{
-					-1.0f + border / aspectRatio, -1.0f + border,
-					1.0f - border / aspectRatio, 1.0f + border
-				};
-			}
+				-1.0f + border / aspectRatio, -1.0f + border,
+				1.0f - border / aspectRatio, 1.0f - border
+			};
 		}
 
 		struct RootArguments
@@ -808,6 +805,9 @@ void jRHI_DirectX12::Render()
 		return;
 	if (JFAIL(m_commandList->Reset(m_commandAllocator[m_frameIndex].Get(), nullptr)))
 		return;
+
+	m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
+		m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
 	// DoRaytracing
 	m_commandList->SetComputeRootSignature(m_raytracingGlobalRootSignature.Get());
