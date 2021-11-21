@@ -794,9 +794,77 @@ void jRHI_DirectX12::Initialize()
 
 void jRHI_DirectX12::Release()
 {
+	WaitForGPU();
+
+	//////////////////////////////////////////////////////////////////////////
+	// 13. Raytracing Output Resouce
+	m_raytracingOutput.Reset();
+
+	//////////////////////////////////////////////////////////////////////////
+	// 12. ShaderTable
+	m_rayGenShaderTable.Reset();
+	m_missShaderTable.Reset();
+	m_hitGroupShaderTable.Reset();
+
+	//////////////////////////////////////////////////////////////////////////
+	// 11. AccelerationStructures
+	m_bottomLevelAccelerationStructure.Reset();
+	m_topLevelAccelerationStructure.Reset();
+
+	//////////////////////////////////////////////////////////////////////////
+	// 10. Create vertex and index buffer
+	m_vertexBuffer.Reset();
+	m_indexBuffer.Reset();
+
+	//////////////////////////////////////////////////////////////////////////
+	// 9. DXR PipeplineStateObject
+	m_dxrStateObject.Reset();
+
+	//////////////////////////////////////////////////////////////////////////
+	// 8. CreateRootSignature
+	m_raytracingGlobalRootSignature.Reset();
+	m_raytracingLocalRootSignature.Reset();
+
+	//////////////////////////////////////////////////////////////////////////
+	// 7. Raytracing device and commandlist
+	m_dxrDevice.Reset();
+	m_dxrCommandList.Reset();
+
+	//////////////////////////////////////////////////////////////////////////
+	// 6. Create sync object
+	m_fence.Reset();
+	CloseHandle(m_fenceEvent);
+
+	//////////////////////////////////////////////////////////////////////////
+	// 5. CommandAllocators, Commandlist, RTV for FrameCount
+	for (uint32 i = 0; i < FrameCount; ++i)
+	{
+		m_renderTargets[i].Reset();
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// 4. Heap
+	m_rtvHeap.Reset();
+	m_cbvHeap.Reset();
+
+	//////////////////////////////////////////////////////////////////////////
+	// 3. Swapchain
+	m_swapChain.Reset();
+
+	//////////////////////////////////////////////////////////////////////////
+	// 2. Command
+	m_commandList.Reset();
+	for (uint32 i = 0; i < FrameCount; ++i)
+	{
+		m_commandAllocator[i].Reset();
+	}
+	m_commandQueue.Reset();
+
+	//////////////////////////////////////////////////////////////////////////
+	// 1. Device
+	m_device.Reset();
 
 }
-
 
 void jRHI_DirectX12::Render()
 {
@@ -902,12 +970,31 @@ void jRHI_DirectX12::Render()
 
 void jRHI_DirectX12::OnDeviceLost()
 {
+	m_rayGenShaderTable.Reset();
+	m_missShaderTable.Reset();
+	m_hitGroupShaderTable.Reset();
+	m_raytracingOutput.Reset();
 
+	m_raytracingGlobalRootSignature.Reset();
+	m_raytracingLocalRootSignature.Reset();
+
+	m_dxrDevice.Reset();
+	m_dxrCommandList.Reset();
+	m_dxrStateObject.Reset();
+
+	m_cbvHeap.Reset();
+	m_descriptorsAllocated = 0;
+	m_raytracingOutputResourceUAVDescriptorHeapIndex = UINT_MAX;
+	m_indexBuffer.Reset();
+	m_vertexBuffer.Reset();
+
+	m_bottomLevelAccelerationStructure.Reset();
+	m_topLevelAccelerationStructure.Reset();
 }
 
 void jRHI_DirectX12::OnDeviceRestored()
 {
-
+	// 7. Raytracing device and commandlist ~ 13. Raytracing Output Resouce
 }
 
 
