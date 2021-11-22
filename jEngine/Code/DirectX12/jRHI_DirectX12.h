@@ -23,13 +23,15 @@ struct GlobalRootSignatureParams {
 	enum Value {
 		OutputViewSlot = 0,
 		AccelerationStructureSlot,
+		SceneConstantSlot,
+		VertexBuffersSlot,
 		Count
 	};
 };
 
 struct LocalRootSignatureParams {
 	enum Value {
-		ViewportConstantSlot = 0,
+		CubeConstantSlot = 0,
 		Count
 	};
 };
@@ -48,6 +50,17 @@ struct BufferUtil
 	static bool AllocateUAVBuffer(ID3D12Resource** OutResource, ID3D12Device* InDevice
 		, uint64 InBufferSize, D3D12_RESOURCE_STATES InInitialResourceState = D3D12_RESOURCE_STATE_COMMON
 		, const wchar_t* resourceName = nullptr);
+
+	static uint32 AllocateDescriptor(ID3D12DescriptorHeap* InDescriptorHeap, uint32& InAllocatedDescriptor
+		, const uint32 InDesciptorSize, D3D12_CPU_DESCRIPTOR_HANDLE* InCputDescriptor, uint32 InDescriptorIndexToUse = UINT_MAX)
+	{
+		auto descriptorHeapCpuBase = InDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+		if (InDescriptorIndexToUse >= InDescriptorHeap->GetDesc().NumDescriptors)
+		{
+			InDescriptorIndexToUse = InAllocatedDescriptor++;
+		}
+		*InCputDescriptor = CD3DX12_CPU_DESCRIPTOR_HANDLE(descriptorHeapCpuBase, InDescriptorIndexToUse, InDesciptorSize);
+	}
 };
 
 inline UINT Align(UINT size, UINT alignment)
@@ -194,7 +207,7 @@ public:
 	ComPtr<ID3D12Resource> m_raytracingOutput;
 	D3D12_GPU_DESCRIPTOR_HANDLE m_raytracingOutputResourceUAVGpuDescriptor;
 	uint32 m_raytracingOutputResourceUAVDescriptorHeapIndex = UINT_MAX;
-	uint32 m_descriptorsAllocated = 0;
+	uint32 m_allocatedDescriptors = 0;
 
 	void Initialize();
 	void Release();
@@ -205,5 +218,51 @@ public:
 
 	void OnDeviceLost();
 	void OnDeviceRestored();
+
+	// Raytracing scene
+	struct Vertex
+	{
+		XMFLOAT3 position;
+		XMFLOAT3 normal;
+	};
+
+	struct SceneConstantBuffer
+	{
+		XMMATRIX projectionToWorld;
+		XMVECTOR cameraPosition;
+		XMVECTOR lightPosition;
+		XMVECTOR lightAmbientColor;
+		XMVECTOR lightDiffuseColor;
+	};
+
+	struct CubeConstantBuffer
+	{
+		XMFLOAT4 albedo;
+	};
+	SceneConstantBuffer m_sceneCB[FrameCount];
+	CubeConstantBuffer m_cubeCB;
+
+	XMVECTOR m_eye;
+	XMVECTOR m_at;
+	XMVECTOR m_up;
+	void UpdateCameraMatrices();
+	void InitializeScene();
+	void CreateConstantBuffer();
+
+	static_assert(sizeof(SceneConstantBuffer) < D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT, "Checking the size here");
+
+	union AlignedSceneConstantBuffer
+	{
+		SceneConstantBuffer constants;
+		uint8 alignedPadding[D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT];
+	};
+	AlignedSceneConstantBuffer* m_mappedConstantData;
+	ComPtr<ID3D12Resource> m_perFrameConstants;
+
+	D3D12_CPU_DESCRIPTOR_HANDLE m_indexBufferCpuDescriptor;
+	D3D12_GPU_DESCRIPTOR_HANDLE m_indexBufferGpuDescriptor;
+
+	D3D12_CPU_DESCRIPTOR_HANDLE m_vertexBufferCpuDescriptor;
+	D3D12_GPU_DESCRIPTOR_HANDLE m_vertexBufferGpuDescriptor;
 };
 
