@@ -1,12 +1,13 @@
 ﻿#include "pch.h"
 #include "jRHI_DirectX12.h"
 #include "jImageFileLoader.h"
-#include "CompiledShaders/Raytracing.hlsl.h"
+#include "RaytracingCube.hlsl.h"
 #include <limits>
 #include <vector>
 #include <string>
 #include <fstream>
 #include "jShaderCompiler_DirectX12.h"
+#include <iomanip>
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -15,6 +16,118 @@ const wchar_t* jRHI_DirectX12::c_hitGroupName = L"MyHitGroup";
 const wchar_t* jRHI_DirectX12::c_raygenShaderName = L"MyRaygenShader";
 const wchar_t* jRHI_DirectX12::c_closestHitShaderName = L"MyClosestHitShader";
 const wchar_t* jRHI_DirectX12::c_missShaderName = L"MyMissShader";
+
+// Pretty-print a state object tree.
+inline void PrintStateObjectDesc(const D3D12_STATE_OBJECT_DESC* desc)
+{
+	std::wstringstream wstr;
+	wstr << L"\n";
+	wstr << L"--------------------------------------------------------------------\n";
+	wstr << L"| D3D12 State Object 0x" << static_cast<const void*>(desc) << L": ";
+	if (desc->Type == D3D12_STATE_OBJECT_TYPE_COLLECTION) wstr << L"Collection\n";
+	if (desc->Type == D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE) wstr << L"Raytracing Pipeline\n";
+
+	auto ExportTree = [](UINT depth, UINT numExports, const D3D12_EXPORT_DESC* exports)
+	{
+		std::wostringstream woss;
+		for (UINT i = 0; i < numExports; i++)
+		{
+			woss << L"|";
+			if (depth > 0)
+			{
+				for (UINT j = 0; j < 2 * depth - 1; j++) woss << L" ";
+			}
+			woss << L" [" << i << L"]: ";
+			if (exports[i].ExportToRename) woss << exports[i].ExportToRename << L" --> ";
+			woss << exports[i].Name << L"\n";
+		}
+		return woss.str();
+	};
+
+	for (UINT i = 0; i < desc->NumSubobjects; i++)
+	{
+		wstr << L"| [" << i << L"]: ";
+		switch (desc->pSubobjects[i].Type)
+		{
+		case D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE:
+			wstr << L"Global Root Signature 0x" << desc->pSubobjects[i].pDesc << L"\n";
+			break;
+		case D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE:
+			wstr << L"Local Root Signature 0x" << desc->pSubobjects[i].pDesc << L"\n";
+			break;
+		case D3D12_STATE_SUBOBJECT_TYPE_NODE_MASK:
+			wstr << L"Node Mask: 0x" << std::hex << std::setfill(L'0') << std::setw(8) << *static_cast<const UINT*>(desc->pSubobjects[i].pDesc) << std::setw(0) << std::dec << L"\n";
+			break;
+		case D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY:
+		{
+			wstr << L"DXIL Library 0x";
+			auto lib = static_cast<const D3D12_DXIL_LIBRARY_DESC*>(desc->pSubobjects[i].pDesc);
+			wstr << lib->DXILLibrary.pShaderBytecode << L", " << lib->DXILLibrary.BytecodeLength << L" bytes\n";
+			wstr << ExportTree(1, lib->NumExports, lib->pExports);
+			break;
+		}
+		case D3D12_STATE_SUBOBJECT_TYPE_EXISTING_COLLECTION:
+		{
+			wstr << L"Existing Library 0x";
+			auto collection = static_cast<const D3D12_EXISTING_COLLECTION_DESC*>(desc->pSubobjects[i].pDesc);
+			wstr << collection->pExistingCollection << L"\n";
+			wstr << ExportTree(1, collection->NumExports, collection->pExports);
+			break;
+		}
+		case D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION:
+		{
+			wstr << L"Subobject to Exports Association (Subobject [";
+			auto association = static_cast<const D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION*>(desc->pSubobjects[i].pDesc);
+			UINT index = static_cast<UINT>(association->pSubobjectToAssociate - desc->pSubobjects);
+			wstr << index << L"])\n";
+			for (UINT j = 0; j < association->NumExports; j++)
+			{
+				wstr << L"|  [" << j << L"]: " << association->pExports[j] << L"\n";
+			}
+			break;
+		}
+		case D3D12_STATE_SUBOBJECT_TYPE_DXIL_SUBOBJECT_TO_EXPORTS_ASSOCIATION:
+		{
+			wstr << L"DXIL Subobjects to Exports Association (";
+			auto association = static_cast<const D3D12_DXIL_SUBOBJECT_TO_EXPORTS_ASSOCIATION*>(desc->pSubobjects[i].pDesc);
+			wstr << association->SubobjectToAssociate << L")\n";
+			for (UINT j = 0; j < association->NumExports; j++)
+			{
+				wstr << L"|  [" << j << L"]: " << association->pExports[j] << L"\n";
+			}
+			break;
+		}
+		case D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG:
+		{
+			wstr << L"Raytracing Shader Config\n";
+			auto config = static_cast<const D3D12_RAYTRACING_SHADER_CONFIG*>(desc->pSubobjects[i].pDesc);
+			wstr << L"|  [0]: Max Payload Size: " << config->MaxPayloadSizeInBytes << L" bytes\n";
+			wstr << L"|  [1]: Max Attribute Size: " << config->MaxAttributeSizeInBytes << L" bytes\n";
+			break;
+		}
+		case D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG:
+		{
+			wstr << L"Raytracing Pipeline Config\n";
+			auto config = static_cast<const D3D12_RAYTRACING_PIPELINE_CONFIG*>(desc->pSubobjects[i].pDesc);
+			wstr << L"|  [0]: Max Recursion Depth: " << config->MaxTraceRecursionDepth << L"\n";
+			break;
+		}
+		case D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP:
+		{
+			wstr << L"Hit Group (";
+			auto hitGroup = static_cast<const D3D12_HIT_GROUP_DESC*>(desc->pSubobjects[i].pDesc);
+			wstr << (hitGroup->HitGroupExport ? hitGroup->HitGroupExport : L"[none]") << L")\n";
+			wstr << L"|  [0]: Any Hit Import: " << (hitGroup->AnyHitShaderImport ? hitGroup->AnyHitShaderImport : L"[none]") << L"\n";
+			wstr << L"|  [1]: Closest Hit Import: " << (hitGroup->ClosestHitShaderImport ? hitGroup->ClosestHitShaderImport : L"[none]") << L"\n";
+			wstr << L"|  [2]: Intersection Import: " << (hitGroup->IntersectionShaderImport ? hitGroup->IntersectionShaderImport : L"[none]") << L"\n";
+			break;
+		}
+		}
+		wstr << L"|--------------------------------------------------------------------\n";
+	}
+	wstr << L"\n";
+	OutputDebugStringW(wstr.str().c_str());
+}
 
 bool BufferUtil::AllocateUploadBuffer(ID3D12Resource** OutResource, ID3D12Device* InDevice
 	, void* InData, uint64 InDataSize, const wchar_t* InResourceName)
@@ -330,6 +443,8 @@ void jRHI_DirectX12::Initialize()
 	swapChain.As(&m_swapChain);
 	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
+	InitializeScene();
+
 	// 4. Heap
 	D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc{};
 	rtvHeapDesc.NumDescriptors = FrameCount;
@@ -339,7 +454,9 @@ void jRHI_DirectX12::Initialize()
 		return;
 
 	D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc{};
-	cbvHeapDesc.NumDescriptors = 1;			// 1 - ratracing output texture UAV
+	// 2 - vertex and index buffer SRV
+	// 1 - ratracing output texture UAV
+	cbvHeapDesc.NumDescriptors = 3;
 	cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	if (JFAIL(m_device->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_cbvHeap))))
@@ -408,10 +525,10 @@ void jRHI_DirectX12::Initialize()
 		ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 1);		// 2 static index and vertex buffer
 
 		CD3DX12_ROOT_PARAMETER rootParameters[GlobalRootSignatureParams::Count];
+		rootParameters[GlobalRootSignatureParams::VertexBuffersSlot].InitAsDescriptorTable(1, &ranges[1]);
 		rootParameters[GlobalRootSignatureParams::OutputViewSlot].InitAsDescriptorTable(1, &ranges[0]);
 		rootParameters[GlobalRootSignatureParams::AccelerationStructureSlot].InitAsShaderResourceView(0);
 		rootParameters[GlobalRootSignatureParams::SceneConstantSlot].InitAsConstantBufferView(0);
-		rootParameters[GlobalRootSignatureParams::VertexBuffersSlot].InitAsDescriptorTable(1, &ranges[1]);
 
 		CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc(_countof(rootParameters), rootParameters);
 		ComPtr<ID3DBlob> blob;
@@ -469,113 +586,189 @@ void jRHI_DirectX12::Initialize()
 	// 1 - Global root signature
 	// 1 - Pipeline config
 	// ----------------------------------------------------
-	std::array<D3D12_STATE_SUBOBJECT, 7> subobjects;
-	uint32 index = 0;
+//	std::array<D3D12_STATE_SUBOBJECT, 7> subobjects;
+//	uint32 index = 0;
+//
+//	// 1). DXIL 라이브러리 생성
+//	D3D12_DXIL_LIBRARY_DESC dxilDesc{};
+//	std::vector<D3D12_EXPORT_DESC> exportDesc;
+//	ComPtr<ID3DBlob> ShaderBlob;
+//	std::vector<std::wstring> exportName;
+//	{
+//		D3D12_STATE_SUBOBJECT subobject{};
+//		ShaderBlob = jShaderCompiler_DirectX12::Get().Compile(TEXT("Shaders/HLSL/RaytracingCube.hlsl"), TEXT("lib_6_3"));
+//		if (ShaderBlob)
+//		{
+//			const wchar_t* entryPoint[] = { jRHI_DirectX12::c_raygenShaderName, jRHI_DirectX12::c_missShaderName, jRHI_DirectX12::c_closestHitShaderName };
+//			subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
+//			subobject.pDesc = &dxilDesc;
+//
+//			exportDesc.resize(_countof(entryPoint));
+//			exportName.resize(_countof(entryPoint));
+//			dxilDesc.DXILLibrary.pShaderBytecode = ShaderBlob->GetBufferPointer();
+//			dxilDesc.DXILLibrary.BytecodeLength = ShaderBlob->GetBufferSize();
+//			dxilDesc.NumExports = _countof(entryPoint);
+//			dxilDesc.pExports = exportDesc.data();
+//
+//			for (uint32 i = 0; i < _countof(entryPoint); ++i)
+//			{
+//				exportName[i] = entryPoint[i];
+//				exportDesc[i].Name = exportName[i].c_str();
+//				exportDesc[i].Flags = D3D12_EXPORT_FLAG_NONE;
+//				exportDesc[i].ExportToRename = nullptr;
+//			}
+//		}
+//		subobjects[index++] = subobject;
+//	}
+//
+//	// 2). Triangle hit group
+//	D3D12_HIT_GROUP_DESC hitgroupDesc{};
+//	{
+//		hitgroupDesc.AnyHitShaderImport = nullptr;
+//		hitgroupDesc.ClosestHitShaderImport = jRHI_DirectX12::c_closestHitShaderName;
+//		hitgroupDesc.HitGroupExport = jRHI_DirectX12::c_hitGroupName;
+//		hitgroupDesc.Type = D3D12_HIT_GROUP_TYPE_TRIANGLES;
+//
+//		D3D12_STATE_SUBOBJECT subobject{};
+//		subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
+//		subobject.pDesc = &hitgroupDesc;
+//		subobjects[index++] = subobject;
+//	}
+//
+//	// 3). Shader Config
+//	D3D12_RAYTRACING_SHADER_CONFIG shaderConfig;
+//	{
+//		shaderConfig.MaxAttributeSizeInBytes = 2 * sizeof(float);	// float2 barycentrics
+//		shaderConfig.MaxPayloadSizeInBytes = 4 * sizeof(float);		// float4 color
+//
+//		D3D12_STATE_SUBOBJECT subobject{};
+//		subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG;
+//		subobject.pDesc = &shaderConfig;
+//		subobjects[index++] = subobject;
+//	}
+//
+//	// 4). Local root signature and association
+//	D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION association{};
+//	{
+//		D3D12_STATE_SUBOBJECT subobject{};
+//
+//		subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE;
+//		subobject.pDesc = m_raytracingLocalRootSignature.GetAddressOf();
+//		subobjects[index] = subobject;
+//
+//		association.NumExports = 1;
+//		association.pExports = &jRHI_DirectX12::c_hitGroupName;
+//		association.pSubobjectToAssociate = &subobjects[index++];
+//
+//		D3D12_STATE_SUBOBJECT subobject2{};
+//		subobject2.Type = D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION;
+//		subobject2.pDesc = &association;
+//		subobjects[index++] = subobject2;
+//	}
+//
+//	// 5). Global root signature
+//	{
+//		D3D12_STATE_SUBOBJECT subobject{};
+//		subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE;
+//		subobject.pDesc = m_raytracingGlobalRootSignature.GetAddressOf();
+//		subobjects[index++] = subobject;
+//	}
+//
+//	// 6). Pipeline Config
+//	D3D12_RAYTRACING_PIPELINE_CONFIG pipelineConfig;
+//	{
+//		pipelineConfig.MaxTraceRecursionDepth = 1;
+//
+//		D3D12_STATE_SUBOBJECT subobject{};
+//		subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG;
+//		subobject.pDesc = &pipelineConfig;
+//
+//		subobjects[index++] = subobject;
+//	}
+//
+//	// Create pipeline state
+//	D3D12_STATE_OBJECT_DESC stateObjectDesc;
+//	stateObjectDesc.NumSubobjects = index;
+//	stateObjectDesc.pSubobjects = subobjects.data();
+//	stateObjectDesc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
+//
+//#if _DEBUG
+//	PrintStateObjectDesc(&stateObjectDesc);
+//#endif
+//
+//	if (JFAIL(m_dxrDevice->CreateStateObject(&stateObjectDesc, IID_PPV_ARGS(&m_dxrStateObject))))
+//		return;
 
-	// 1). DXIL 라이브러리 생성
-	D3D12_DXIL_LIBRARY_DESC dxilDesc{};
-	std::vector<D3D12_EXPORT_DESC> exportDesc;
-	std::vector<std::wstring> exportName;
+CD3DX12_STATE_OBJECT_DESC raytracingPipeline{ D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE };
+
+
+// DXIL library
+// This contains the shaders and their entrypoints for the state object.
+// Since shaders are not considered a subobject, they need to be passed in via DXIL library subobjects.
+auto lib = raytracingPipeline.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
+D3D12_SHADER_BYTECODE libdxil = CD3DX12_SHADER_BYTECODE((void*)g_pRaytracing, ARRAYSIZE(g_pRaytracing));
+lib->SetDXILLibrary(&libdxil);
+// Define which shader exports to surface from the library.
+// If no shader exports are defined for a DXIL library subobject, all shaders will be surfaced.
+// In this sample, this could be ommited for convenience since the sample uses all shaders in the library. 
+{
+	lib->DefineExport(c_raygenShaderName);
+	lib->DefineExport(c_closestHitShaderName);
+	lib->DefineExport(c_missShaderName);
+}
+
+// Triangle hit group
+// A hit group specifies closest hit, any hit and intersection shaders to be executed when a ray intersects the geometry's triangle/AABB.
+// In this sample, we only use triangle geometry with a closest hit shader, so others are not set.
+auto hitGroup = raytracingPipeline.CreateSubobject<CD3DX12_HIT_GROUP_SUBOBJECT>();
+hitGroup->SetClosestHitShaderImport(c_closestHitShaderName);
+hitGroup->SetHitGroupExport(c_hitGroupName);
+hitGroup->SetHitGroupType(D3D12_HIT_GROUP_TYPE_TRIANGLES);
+
+// Shader config
+// Defines the maximum sizes in bytes for the ray payload and attribute structure.
+auto shaderConfig = raytracingPipeline.CreateSubobject<CD3DX12_RAYTRACING_SHADER_CONFIG_SUBOBJECT>();
+UINT payloadSize = sizeof(XMFLOAT4);    // float4 pixelColor
+UINT attributeSize = sizeof(XMFLOAT2);  // float2 barycentrics
+shaderConfig->Config(payloadSize, attributeSize);
+
+// Local root signature and shader association
+// This is a root signature that enables a shader to have unique arguments that come from shader tables.
+auto CreateLocalRootSignatureSubobjects = [&](CD3DX12_STATE_OBJECT_DESC* raytracingPipeline)
+{
+	// Ray gen and miss shaders in this sample are not using a local root signature and thus one is not associated with them.
+
+	// Local root signature to be used in a hit group.
+	auto localRootSignature = raytracingPipeline->CreateSubobject<CD3DX12_LOCAL_ROOT_SIGNATURE_SUBOBJECT>();
+	localRootSignature->SetRootSignature(m_raytracingLocalRootSignature.Get());
+	// Define explicit shader association for the local root signature. 
 	{
-		D3D12_STATE_SUBOBJECT subobject{};
-		ComPtr<ID3DBlob> ShaderBlob = jShaderCompiler_DirectX12::Get().Compile(TEXT("Shaders/HLSL/Raytracing.hlsl"), TEXT("lib_6_3"));
-		if (ShaderBlob)
-		{
-			const wchar_t* entryPoint[] = { jRHI_DirectX12::c_raygenShaderName, jRHI_DirectX12::c_missShaderName, jRHI_DirectX12::c_closestHitShaderName };
-			subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
-			subobject.pDesc = &dxilDesc;
-
-			exportDesc.resize(_countof(entryPoint));
-			exportName.resize(_countof(entryPoint));
-			dxilDesc.DXILLibrary.pShaderBytecode = ShaderBlob->GetBufferPointer();
-			dxilDesc.DXILLibrary.BytecodeLength = ShaderBlob->GetBufferSize();
-			dxilDesc.NumExports = _countof(entryPoint);
-			dxilDesc.pExports = exportDesc.data();
-
-			for (uint32 i = 0; i < _countof(entryPoint); ++i)
-			{
-				exportName[i] = entryPoint[i];
-				exportDesc[i].Name = exportName[i].c_str();
-				exportDesc[i].Flags = D3D12_EXPORT_FLAG_NONE;
-				exportDesc[i].ExportToRename = nullptr;
-			}
-		}
-		subobjects[index++] = subobject;
+		auto rootSignatureAssociation = raytracingPipeline->CreateSubobject<CD3DX12_SUBOBJECT_TO_EXPORTS_ASSOCIATION_SUBOBJECT>();
+		rootSignatureAssociation->SetSubobjectToAssociate(*localRootSignature);
+		rootSignatureAssociation->AddExport(c_hitGroupName);
 	}
+};
+CreateLocalRootSignatureSubobjects(&raytracingPipeline);
 
-	// 2). Triangle hit group
-	D3D12_HIT_GROUP_DESC hitgroupDesc{};
-	{
-		hitgroupDesc.AnyHitShaderImport = nullptr;
-		hitgroupDesc.ClosestHitShaderImport = jRHI_DirectX12::c_closestHitShaderName;
-		hitgroupDesc.HitGroupExport = jRHI_DirectX12::c_hitGroupName;
-		hitgroupDesc.Type = D3D12_HIT_GROUP_TYPE_TRIANGLES;
+// Global root signature
+// This is a root signature that is shared across all raytracing shaders invoked during a DispatchRays() call.
+auto globalRootSignature = raytracingPipeline.CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();
+globalRootSignature->SetRootSignature(m_raytracingGlobalRootSignature.Get());
 
-		D3D12_STATE_SUBOBJECT subobject{};
-		subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
-		subobject.pDesc = &hitgroupDesc;
-		subobjects[index++] = subobject;
-	}
+// Pipeline config
+// Defines the maximum TraceRay() recursion depth.
+auto pipelineConfig = raytracingPipeline.CreateSubobject<CD3DX12_RAYTRACING_PIPELINE_CONFIG_SUBOBJECT>();
+// PERFOMANCE TIP: Set max recursion depth as low as needed 
+// as drivers may apply optimization strategies for low recursion depths.
+UINT maxRecursionDepth = 1; // ~ primary rays only. 
+pipelineConfig->Config(maxRecursionDepth);
 
-	// 3). Shader Config
-	D3D12_RAYTRACING_SHADER_CONFIG shaderConfig;
-	{
-		shaderConfig.MaxAttributeSizeInBytes = 2 * sizeof(float);	// float2 barycentrics
-		shaderConfig.MaxPayloadSizeInBytes = 4 * sizeof(float);		// float4 color
+#if _DEBUG
+PrintStateObjectDesc(raytracingPipeline);
+#endif
 
-		D3D12_STATE_SUBOBJECT subobject{};
-		subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG;
-		subobject.pDesc = &shaderConfig;
-		subobjects[index++] = subobject;
-	}
-
-	// 4). Local root signature and association
-	D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION association{};
-	{
-		D3D12_STATE_SUBOBJECT subobject{};
-
-		subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE;
-		subobject.pDesc = m_raytracingLocalRootSignature.GetAddressOf();
-		subobjects[index] = subobject;
-
-		association.NumExports = 1;
-		association.pExports = &jRHI_DirectX12::c_raygenShaderName;
-		association.pSubobjectToAssociate = &subobjects[index++];
-
-		D3D12_STATE_SUBOBJECT subobject2{};
-		subobject2.Type = D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION;
-		subobject2.pDesc = &association;
-		subobjects[index++] = subobject2;
-	}
-
-	// 5). Global root signature
-	{
-		D3D12_STATE_SUBOBJECT subobject{};
-		subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE;
-		subobject.pDesc = m_raytracingGlobalRootSignature.GetAddressOf();
-		subobjects[index++] = subobject;
-	}
-
-	// 6). Pipeline Config
-	D3D12_RAYTRACING_PIPELINE_CONFIG pipelineConfig;
-	{
-		pipelineConfig.MaxTraceRecursionDepth = 1;
-
-		D3D12_STATE_SUBOBJECT subobject{};
-		subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG;
-		subobject.pDesc = &pipelineConfig;
-
-		subobjects[index++] = subobject;
-	}
-
-	// Create pipeline state
-	D3D12_STATE_OBJECT_DESC stateObjectDesc;
-	stateObjectDesc.NumSubobjects = index;
-	stateObjectDesc.pSubobjects = subobjects.data();
-	stateObjectDesc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
-
-	if (JFAIL(m_dxrDevice->CreateStateObject(&stateObjectDesc, IID_PPV_ARGS(&m_dxrStateObject))))
-		return;
+// Create the state object.
+m_dxrDevice->CreateStateObject(raytracingPipeline, IID_PPV_ARGS(&m_dxrStateObject));
 
 	//////////////////////////////////////////////////////////////////////////
 	// 10. Create vertex and index buffer
@@ -649,7 +842,13 @@ void jRHI_DirectX12::Initialize()
 		srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
 		srvDesc.Buffer.StructureByteStride = 0;
 
-		uint32 descriptorIndex = BufferUtil::AllocateDescriptor(m_cbvHeap.Get(), m_allocatedDescriptors, m_cbvDescriptorSize, &m_indexBufferCpuDescriptor);
+		uint32 descriptorIndex = UINT_MAX;
+		if (descriptorIndex >= m_cbvHeap->GetDesc().NumDescriptors)
+		{
+			descriptorIndex = m_allocatedDescriptors++;
+		}
+		m_indexBufferCpuDescriptor = CD3DX12_CPU_DESCRIPTOR_HANDLE(m_cbvHeap->GetCPUDescriptorHandleForHeapStart(), descriptorIndex, m_cbvDescriptorSize);
+
 		m_device->CreateShaderResourceView(m_indexBuffer.Get(), &srvDesc, m_indexBufferCpuDescriptor);
 		m_indexBufferGpuDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_cbvHeap->GetGPUDescriptorHandleForHeapStart(), descriptorIndex, m_cbvDescriptorSize);
 	}
@@ -663,8 +862,14 @@ void jRHI_DirectX12::Initialize()
 		srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 		srvDesc.Buffer.StructureByteStride = sizeof(vertices[0]);
 
-		uint32 descriptorIndex = BufferUtil::AllocateDescriptor(m_cbvHeap.Get(), m_allocatedDescriptors, m_cbvDescriptorSize, &m_vertexBufferCpuDescriptor);
-		m_device->CreateShaderResourceView(m_indexBuffer.Get(), &srvDesc, m_vertexBufferCpuDescriptor);
+		uint32 descriptorIndex = UINT_MAX;
+		if (descriptorIndex >= m_cbvHeap->GetDesc().NumDescriptors)
+		{
+			descriptorIndex = m_allocatedDescriptors++;
+		}
+		m_vertexBufferCpuDescriptor = CD3DX12_CPU_DESCRIPTOR_HANDLE(m_cbvHeap->GetCPUDescriptorHandleForHeapStart(), descriptorIndex, m_cbvDescriptorSize);
+
+		m_device->CreateShaderResourceView(m_vertexBuffer.Get(), &srvDesc, m_vertexBufferCpuDescriptor);
 		m_vertexBufferGpuDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_cbvHeap->GetGPUDescriptorHandleForHeapStart(), descriptorIndex, m_cbvDescriptorSize);
 	}
 
@@ -673,7 +878,7 @@ void jRHI_DirectX12::Initialize()
 	D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc{};
 	geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
 	geometryDesc.Triangles.IndexBuffer = m_indexBuffer->GetGPUVirtualAddress();
-	geometryDesc.Triangles.IndexCount = static_cast<uint16>(m_indexBuffer->GetDesc().Width) / sizeof(uint16);
+	geometryDesc.Triangles.IndexCount = static_cast<uint32>(m_indexBuffer->GetDesc().Width) / sizeof(uint16);
 	geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R16_UINT;
 	geometryDesc.Triangles.Transform3x4 = 0;
 	geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
@@ -773,37 +978,10 @@ void jRHI_DirectX12::Initialize()
 
 	// Raygen shader table
 	{
-		m_rayGenCB.viewport = { -1.0f, -1.0f, 1.0f, 1.0f };
-		const float aspectRatio = static_cast<float>(SCR_WIDTH) / static_cast<float>(SCR_HEIGHT);
-		const float border = 0.1f;
-		if (SCR_WIDTH <= SCR_HEIGHT)
-		{
-			m_rayGenCB.stencil =
-			{
-				-1.0f + border, -1.0f + border * aspectRatio,
-				1.0f - border, 1.0f - border * aspectRatio
-			};
-		}
-		else
-		{
-			m_rayGenCB.stencil =
-			{
-				-1.0f + border / aspectRatio, -1.0f + border,
-				1.0f - border / aspectRatio, 1.0f - border
-			};
-		}
-
-		struct RootArguments
-		{
-			RayGenConstantBuffer cb;
-		};
-		RootArguments rootArguments;
-		rootArguments.cb = m_rayGenCB;
-
 		const uint16 numShaderRecords = 1;
-		const uint16 shaderRecordSize = shaderIdentifierSize * sizeof(rootArguments);
+		const uint16 shaderRecordSize = shaderIdentifierSize;
 		ShaderTable rayGenShaderTable(m_device.Get(), numShaderRecords, shaderRecordSize, TEXT("RayGenShaderTable"));
-		rayGenShaderTable.push_back(ShaderRecord(rayGenShaderIdentifier, shaderIdentifierSize, &rootArguments, sizeof(rootArguments)));
+		rayGenShaderTable.push_back(ShaderRecord(rayGenShaderIdentifier, shaderIdentifierSize));
 		m_rayGenShaderTable = rayGenShaderTable.GetResource();
 	}
 
@@ -818,10 +996,17 @@ void jRHI_DirectX12::Initialize()
 
 	// Hit group shader table
 	{
+		struct RootArguments
+		{
+			CubeConstantBuffer cb;
+		};
+		RootArguments rootArguments;
+		rootArguments.cb = m_cubeCB;
+
 		const uint16 numShaderRecords = 1;
-		const uint16 shaderRecordSize = shaderIdentifierSize;
-		ShaderTable hitGroupShaderTable(m_device.Get(), numShaderRecords, shaderRecordSize, TEXT("HitGroupShader"));
-		hitGroupShaderTable.push_back(ShaderRecord(hitGroupShaderIdentifier, shaderIdentifierSize));
+		const uint16 shaderRecordSize = shaderIdentifierSize + sizeof(rootArguments);
+		ShaderTable hitGroupShaderTable(m_device.Get(), numShaderRecords, shaderRecordSize, TEXT("HitGroupShaderTable"));
+		hitGroupShaderTable.push_back(ShaderRecord(hitGroupShaderIdentifier, shaderIdentifierSize, &rootArguments, sizeof(rootArguments)));
 		m_hitGroupShaderTable = hitGroupShaderTable.GetResource();
 	}
 
@@ -854,6 +1039,27 @@ void jRHI_DirectX12::Initialize()
 		, m_raytracingOutputResourceUAVDescriptorHeapIndex, m_cbvDescriptorSize);
 
 	//////////////////////////////////////////////////////////////////////////
+	// 14. CreateConstantBuffers
+	// 상수 버퍼 메모리를 만들고 CPU와 GPU 주소를 매핑함
+	const D3D12_HEAP_PROPERTIES uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+
+	// 프레임별 상수버퍼를 만든다, 매프레임 업데이트 되기 때문
+	size_t cbSize = FrameCount * sizeof(AlignedSceneConstantBuffer);
+	const D3D12_RESOURCE_DESC constantBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(cbSize);
+
+	if (JFAIL(m_device->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE
+		, &constantBufferDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_perFrameConstants))))
+	{
+		return;
+	}
+
+	// 상수 버퍼를 매핑하고 heap 포인터를 캐싱한다.
+	// 앱 종료시 까지 매핑을 해제하지 않음. 살아있는 동안 버퍼의 매핑을 유지해도 괜찮음.
+	CD3DX12_RANGE readRange(0, 0);		// CPU에서 읽지 않으려는 의도
+	if (JFAIL(m_perFrameConstants->Map(0, nullptr, reinterpret_cast<void**>(&m_mappedConstantData))))
+		return;
+
+	//////////////////////////////////////////////////////////////////////////
 	ShowWindow(hWnd, SW_SHOW);
 
 	MSG msg = {};
@@ -866,6 +1072,7 @@ void jRHI_DirectX12::Initialize()
 			DispatchMessage(&msg);
 		}
 
+		Update();
 		Render();
 	}
 }
@@ -1003,26 +1210,34 @@ void jRHI_DirectX12::InitializeScene()
 	}
 }
 
-void jRHI_DirectX12::CreateConstantBuffer()
+void jRHI_DirectX12::Update()
 {
-	// 상수 버퍼 메모리를 만들고 CPU와 GPU 주소를 매핑함
-	const D3D12_HEAP_PROPERTIES uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	int32 prevFrameIndex = m_frameIndex - 1;
+	if (prevFrameIndex < 0)
+		prevFrameIndex = FrameCount - 1;
 
-	// 프레임별 상수버퍼를 만든다, 매프레임 업데이트 되기 때문
-	size_t cbSize = FrameCount * sizeof(AlignedSceneConstantBuffer);
-	const D3D12_RESOURCE_DESC constantBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(cbSize);
+	static float elapsedTime = 0.0f;
+	elapsedTime = 0.01f;
 
-	if (JFAIL(m_device->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE
-		, &constantBufferDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_perFrameConstants))))
+	// Y 축 주변으로 카메라를 회전
 	{
-		return;
+		float secondsToRotateAround = 24.0f;
+		float angleToRotateBy = 360.0f * (elapsedTime / secondsToRotateAround);
+		XMMATRIX rotate = XMMatrixRotationY(XMConvertToRadians(angleToRotateBy));
+		m_eye = XMVector3Transform(m_eye, rotate);
+		m_up = XMVector3Transform(m_up, rotate);
+		m_at = XMVector3Transform(m_at, rotate);
+		UpdateCameraMatrices();
 	}
 
-	// 상수 버퍼를 매핑하고 heap 포인터를 캐싱한다.
-	// 앱 종료시 까지 매핑을 해제하지 않음. 살아있는 동안 버퍼의 매핑을 유지해도 괜찮음.
-	CD3DX12_RANGE readRange(0, 0);		// CPU에서 읽지 않으려는 의도
-	if (JFAIL(m_perFrameConstants->Map(0, nullptr, reinterpret_cast<void**>(&m_mappedConstantData))))
-		return;
+	// Y 축 주변으로 두번째 라이트를 회전
+	{
+		float secondsToRotateAround = 8.0f;
+		float angleToRotateBy = -360.0f * (elapsedTime / secondsToRotateAround);
+		XMMATRIX rotate = XMMatrixRotationY(XMConvertToRadians(angleToRotateBy));
+		const XMVECTOR& prevLightPosition = m_sceneCB[prevFrameIndex].lightPosition;
+		m_sceneCB[m_frameIndex].lightPosition = XMVector3Transform(prevLightPosition, rotate);
+	}
 }
 
 void jRHI_DirectX12::Render()
@@ -1039,8 +1254,13 @@ void jRHI_DirectX12::Render()
 	// DoRaytracing
 	m_commandList->SetComputeRootSignature(m_raytracingGlobalRootSignature.Get());
 
+	memcpy(&m_mappedConstantData[m_frameIndex].constants, &m_sceneCB[m_frameIndex], sizeof(m_sceneCB[m_frameIndex]));
+	auto cbGpuAddress = m_perFrameConstants->GetGPUVirtualAddress() + m_frameIndex * sizeof(m_mappedConstantData[0]);
+	m_commandList->SetComputeRootConstantBufferView(GlobalRootSignatureParams::SceneConstantSlot, cbGpuAddress);
+
 	D3D12_DISPATCH_RAYS_DESC dispatchDesc{};
 	m_commandList->SetDescriptorHeaps(1, m_cbvHeap.GetAddressOf());
+	m_commandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::VertexBuffersSlot, m_indexBufferGpuDescriptor);
 	m_commandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::OutputViewSlot
 		, m_raytracingOutputResourceUAVGpuDescriptor);
 	m_commandList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot

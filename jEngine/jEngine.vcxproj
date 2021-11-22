@@ -475,7 +475,7 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="Shaders\HLSL\Raytracing.hlsl">
+    <None Include="Shaders\HLSL\Raytracing.hlsl">
       <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
       </EntryPointName>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Library</ShaderType>
@@ -502,7 +502,11 @@
       <HeaderFileOutput Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(IntDir)CompiledShaders\%(Filename).hlsl.h</HeaderFileOutput>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
       </ExcludedFromBuild>
-    </FxCompile>
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Shaders\HLSL\RaytracingCube.hlsl">
+      <FileType>Document</FileType>
+    </None>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

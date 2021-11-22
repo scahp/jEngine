@@ -46,21 +46,10 @@ struct BufferUtil
 	{
 		return AllocateUploadBuffer(OutResource, InDevice, nullptr, 0, resourceName);
 	}
-
+	
 	static bool AllocateUAVBuffer(ID3D12Resource** OutResource, ID3D12Device* InDevice
-		, uint64 InBufferSize, D3D12_RESOURCE_STATES InInitialResourceState = D3D12_RESOURCE_STATE_COMMON
-		, const wchar_t* resourceName = nullptr);
-
-	static uint32 AllocateDescriptor(ID3D12DescriptorHeap* InDescriptorHeap, uint32& InAllocatedDescriptor
-		, const uint32 InDesciptorSize, D3D12_CPU_DESCRIPTOR_HANDLE* InCputDescriptor, uint32 InDescriptorIndexToUse = UINT_MAX)
-	{
-		auto descriptorHeapCpuBase = InDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-		if (InDescriptorIndexToUse >= InDescriptorHeap->GetDesc().NumDescriptors)
-		{
-			InDescriptorIndexToUse = InAllocatedDescriptor++;
-		}
-		*InCputDescriptor = CD3DX12_CPU_DESCRIPTOR_HANDLE(descriptorHeapCpuBase, InDescriptorIndexToUse, InDesciptorSize);
-	}
+		, uint64 InBufferSize, D3D12_RESOURCE_STATES InInitialResourceState
+		, const wchar_t* InResourceName = nullptr);
 };
 
 inline UINT Align(UINT size, UINT alignment)
@@ -165,21 +154,6 @@ public:
 	ComPtr<ID3D12RootSignature> m_raytracingGlobalRootSignature;
 	ComPtr<ID3D12RootSignature> m_raytracingLocalRootSignature;
 
-	struct Viewport
-	{
-		float left;
-		float top;
-		float right;
-		float bottom;
-	};
-
-	struct RayGenConstantBuffer
-	{
-		Viewport viewport;
-		Viewport stencil;
-	};
-	RayGenConstantBuffer m_rayGenCB;
-
 	//////////////////////////////////////////////////////////////////////////
 	// 9. DXR PipeplineStateObject
 	ComPtr<ID3D12StateObject> m_dxrStateObject;
@@ -214,6 +188,7 @@ public:
 
 	HWND CreateMainWindow() const;
 
+	void Update();
 	void Render();
 
 	void OnDeviceLost();

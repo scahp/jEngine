@@ -729,10 +729,11 @@
     <None Include="Shaders\HLSL\CubeVertexShader_IndirectCommand.hlsl">
       <Filter>Shaders\HLSL</Filter>
     </None>
-  </ItemGroup>
-  <ItemGroup>
-    <FxCompile Include="Shaders\HLSL\Raytracing.hlsl">
+    <None Include="Shaders\HLSL\RaytracingCube.hlsl">
       <Filter>Shaders\HLSL</Filter>
-    </FxCompile>
+    </None>
+    <None Include="Shaders\HLSL\Raytracing.hlsl">
+      <Filter>Shaders\HLSL</Filter>
+    </None>
   </ItemGroup>
 </Project>
