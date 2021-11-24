@@ -1,4 +1,4 @@
-//*********************************************************
+ï»¿//*********************************************************
 //
 // Copyright (c) Microsoft. All rights reserved.
 // This code is licensed under the MIT License (MIT).
@@ -41,16 +41,16 @@ StructuredBuffer<Vertex> Vertices : register(t2, space0);
 ConstantBuffer<SceneConstantBuffer> g_sceneCB : register(b0);
 ConstantBuffer<CubeConstantBuffer> g_cubeCB : register(b1);
 
-// 3°³ÀÇ 16ºñÆ® ÀÎµ¦½º¸¦ byte address buffer ·Î ºÎÅÍ °¡Á®¿È
+// 3ê°œì˜ 16ë¹„íŠ¸ ì¸ë±ìŠ¤ë¥¼ byte address buffer ë¡œ ë¶€í„° ê°€ì ¸ì˜´
 uint3 Load3x16BitIndices(uint offsetBytes)
 {
     uint3 indices;
 
-    // ByteAddressBuffer´Â 4 ¹ÙÀÌÆ® Á¤·ÄµÇ¾î¾ß¸¸ ÇÔ.
-    // 16 ºñÆ® 3°³ÀÇ indices¸¦ ÀĞ¾î¾ß ÇÏ±â ¶§¹®¿¡ {0, 1, 2}
-    // 4 ¹ÙÀÌÆ® Á¤·ÄµÈ °ÍÀº {0 1} {2 0} {1 2} {0 1} ...
-    // 2°³ÀÇ ÀÎµ¦½º¸¦ ¼¼°³¸¦ Ã³¸®ÇÏ±â À§ÇØ¼­ 8 ¹ÙÀÌÆ®¸¦ ÀĞÀ» °ÍÀÔ´Ï´Ù. (~ 4 ÀÎµ¦½º {a b | c d})
-    // Ã¹¹øÂ° ÀÎµ¦½ºÀÇ offsetbyte°¡ 4 ¹ÙÀÌÆ® °æ°è¿¡¼­ Á¤·ÄµÇ´ÂÁö ¿©ºÎ¸¦ ±â¹İÀ¸·Î ÇÔ.
+    // ByteAddressBufferëŠ” 4 ë°”ì´íŠ¸ ì •ë ¬ë˜ì–´ì•¼ë§Œ í•¨.
+    // 16 ë¹„íŠ¸ 3ê°œì˜ indicesë¥¼ ì½ì–´ì•¼ í•˜ê¸° ë•Œë¬¸ì— {0, 1, 2}
+    // 4 ë°”ì´íŠ¸ ì •ë ¬ëœ ê²ƒì€ {0 1} {2 0} {1 2} {0 1} ...
+    // 2ê°œì˜ ì¸ë±ìŠ¤ë¥¼ ì„¸ê°œë¥¼ ì²˜ë¦¬í•˜ê¸° ìœ„í•´ì„œ 8 ë°”ì´íŠ¸ë¥¼ ì½ì„ ê²ƒì…ë‹ˆë‹¤. (~ 4 ì¸ë±ìŠ¤ {a b | c d})
+    // ì²«ë²ˆì§¸ ì¸ë±ìŠ¤ì˜ offsetbyteê°€ 4 ë°”ì´íŠ¸ ê²½ê³„ì—ì„œ ì •ë ¬ë˜ëŠ”ì§€ ì—¬ë¶€ë¥¼ ê¸°ë°˜ìœ¼ë¡œ í•¨.
     // Aligned      : {0 1 | 2 -}
     // Not aligned  : {- 0 | 1 2}
     const uint dwordAlignedOffset = offsetBytes & ~3;
@@ -79,29 +79,30 @@ struct RayPayload
     float4 color;
 };
 
-// hit world position ¾ò±â
+// hit world position ì–»ê¸°
 float3 HitWorldPosition()
 {
     return WorldRayOrigin() + RayTCurrent() * WorldRayDirection();
 }
 
-// Ãæµ¹ÇÑ °÷ÀÇ barycentrics¸¦ »ç¿ëÇÏ¿© vertex attributes ·Î ºÎÅÍ º¸°£µÈ hit position¿¡¼­ attribute¸¦ ¾ò¾î¿È
+// ì¶©ëŒí•œ ê³³ì˜ barycentricsë¥¼ ì‚¬ìš©í•˜ì—¬ vertex attributes ë¡œ ë¶€í„° ë³´ê°„ëœ hit positionì—ì„œ attributeë¥¼ ì–»ì–´ì˜´
 float3 HitAttribute(float3 vertexAttribute[3], BuiltInTriangleIntersectionAttributes attr)
 {
-    return vertexAttribute[0] + attr.barycentrics.x * (vertexAttribute[1] - vertexAttribute[0]) +
+    return vertexAttribute[0] + 
+        attr.barycentrics.x * (vertexAttribute[1] - vertexAttribute[0]) +
         attr.barycentrics.y * (vertexAttribute[2] - vertexAttribute[0]);
 }
 
-// Ä«¸Ş¶ó ÇÈ¼¿¿¡ ´ëÇÑ ¿ùµå°ø°£¿¡¼­ÀÇ ¹İÁ÷¼±À» »ı¼ºÇÔ, Ä«¸Ş¶ó ÇÈ¼¿Àº dispatched 2d Grid·Î ºÎÅÍÀÇ ÀÎµ¦½º¿Í ÀÏÄ¡ÇÔ.
+// ì¹´ë©”ë¼ í”½ì…€ì— ëŒ€í•œ ì›”ë“œê³µê°„ì—ì„œì˜ ë°˜ì§ì„ ì„ ìƒì„±í•¨, ì¹´ë©”ë¼ í”½ì…€ì€ dispatched 2d Gridë¡œ ë¶€í„°ì˜ ì¸ë±ìŠ¤ì™€ ì¼ì¹˜í•¨.
 inline void GenerateCameraRay(uint2 index, out float3 origin, out float3 direction)
 {
-    float2 xy = index + 0.5f;   // ÇÈ¼¿ÀÇ Áß¾Ó
+    float2 xy = index + 0.5f;   // í”½ì…€ì˜ ì¤‘ì•™
     float2 screenPos = xy / DispatchRaysDimensions().xy * 2.0f - 1.0f;
 
-    // DirectX ½ºÅ¸ÀÏÀÇ ÁÂÇ¥°è¸¦ À§ÇØ Y¸¦ µÚÁıÀ½
+    // DirectX ìŠ¤íƒ€ì¼ì˜ ì¢Œí‘œê³„ë¥¼ ìœ„í•´ Yë¥¼ ë’¤ì§‘ìŒ
     screenPos.y = -screenPos.y;
 
-    // ÇÈ¼¿ ÁÂÇ¥¸¦ ¿ª Åõ¿µÇÏ¿© ¹İÁ÷¼±À» ¸¸µë
+    // í”½ì…€ ì¢Œí‘œë¥¼ ì—­ íˆ¬ì˜í•˜ì—¬ ë°˜ì§ì„ ì„ ë§Œë“¬
     float4 world = mul(float4(screenPos, 0, 1), g_sceneCB.projectionToWorld);
 
     world.xyz /= world.w;
@@ -114,7 +115,7 @@ float4 CalculationDiffuseLighting(float3 hitPosition, float3 normal)
 {
     float3 pixelToLight = normalize(g_sceneCB.lightPosition.xyz - hitPosition);
 
-    // Diffuse ±â¿©
+    // Diffuse ê¸°ì—¬
     float fNDotL = max(0.0f, dot(pixelToLight, normal));
     return g_cubeCB.albedo * g_sceneCB.lightDiffuseColor * fNDotL;
 }
@@ -125,22 +126,22 @@ void MyRaygenShader()
     float3 rayDir;
     float3 origin;
 
-    // ¹İÁ÷¼± »ı¼º
+    // ë°˜ì§ì„  ìƒì„±
     GenerateCameraRay(DispatchRaysIndex().xy, origin, rayDir);
 
-    // ¹İÁ÷¼± ÃßÀû
+    // ë°˜ì§ì„  ì¶”ì 
     RayDesc ray;
     ray.Origin = origin;
     ray.Direction = rayDir;
 
-    // TMinÀ» 0ÀÌ ¾Æ´Ñ ÀÛÀº °ªÀ¸·Î ¼³Á¤ÇÏ¿© ¾Ù¸®¾î½Ì ÀÌ½´¸¦ ÇÇÇÔ. - floating point ¿¡·¯
-    // TMinÀ» ÀÛÀº °©½Â·Î À¯ÁöÇØ¼­ Á¢ÃËÇÏ°í ÀÖ´Â ¿µ¿ª¿¡¼­ Áö¿À¸ŞÆ®¸® missingÀ» ¿¹¹æ
+    // TMinì„ 0ì´ ì•„ë‹Œ ì‘ì€ ê°’ìœ¼ë¡œ ì„¤ì •í•˜ì—¬ ì•¨ë¦¬ì–´ì‹± ì´ìŠˆë¥¼ í”¼í•¨. - floating point ì—ëŸ¬
+    // TMinì„ ì‘ì€ ê°‘ìŠ¹ë¡œ ìœ ì§€í•´ì„œ ì ‘ì´‰í•˜ê³  ìˆëŠ” ì˜ì—­ì—ì„œ ì§€ì˜¤ë©”íŠ¸ë¦¬ missingì„ ì˜ˆë°©
     ray.TMin = 0.001;
     ray.TMax = 10000.0;
     RayPayload payload = { float4(0, 0, 0, 0) };
     TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0, ray, payload);
 
-    // Ãâ·Â ÅØ½ºÃÄ¿¡ ¹İÁ÷¼± ÃßÀûµÈ »ö»óÀ» ±â·ÏÇÔ
+    // ì¶œë ¥ í…ìŠ¤ì³ì— ë°˜ì§ì„  ì¶”ì ëœ ìƒ‰ìƒì„ ê¸°ë¡í•¨
     RenderTarget[DispatchRaysIndex().xy] = payload.color;
 }
 
@@ -149,24 +150,24 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 {
     float3 hitPosition = HitWorldPosition();
 
-    // »ï°¢ÇüÀÇ Ã¹¹øÂ° 16 ºñÆ® ÀÎµ¦½º¸¦ ±â¹İ ÀÎµ¦½º·Î °¡Á®¿È
+    // ì‚¼ê°í˜•ì˜ ì²«ë²ˆì§¸ 16 ë¹„íŠ¸ ì¸ë±ìŠ¤ë¥¼ ê¸°ë°˜ ì¸ë±ìŠ¤ë¡œ ê°€ì ¸ì˜´
     uint indexSizeInBytes = 2;
     uint indicesPerTriangle = 3;
     uint triangleIndexStride = indicesPerTriangle * indexSizeInBytes;
     uint baseIndex = PrimitiveIndex() * triangleIndexStride;
 
-    // »ï°¢ÇüÀ» À§ÇÑ 3°³ÀÇ 16 ºñÆ® ÀÎµ¦½º¸¦ ·Îµå
+    // ì‚¼ê°í˜•ì„ ìœ„í•œ 3ê°œì˜ 16 ë¹„íŠ¸ ì¸ë±ìŠ¤ë¥¼ ë¡œë“œ
     const uint3 indices = Load3x16BitIndices(baseIndex);
 
-    // »ï°¢Çü ¹öÅÃ½ºÀÇ ¹öÅÃ½º ³ë¸ÖÀ» ¾òÀ½
+    // ì‚¼ê°í˜• ë²„íƒìŠ¤ì˜ ë²„íƒìŠ¤ ë…¸ë©€ì„ ì–»ìŒ
     float3 vertexNormals[3] = {
         Vertices[indices[0]].normal,
         Vertices[indices[1]].normal,
         Vertices[indices[2]].normal
     };
 
-    // »ï°¢ÇüÀÇ ³ë¸ÖÀ» °è»êÇÔ
-    // ÀÌ°ÍÀº Áßº¹ÀÌ¸ç, ¼³¸íÀ» À§ÇØ¼­ ¼öÇàÇÔ ¿Ö³ÄÇÏ¸é ¸ğµç ¹öÅÃ½º´ç ³ë¸ÖÀº µ¿ÀÏÇÏ°í ÀÌ »ùÇÃÀÇ »ï°¢ÇüÀÇ ³ë¸Ö°ú ÀÏÄ¡ÇÏ±â ¶§¹®
+    // ì‚¼ê°í˜•ì˜ ë…¸ë©€ì„ ê³„ì‚°í•¨
+    // ì´ê²ƒì€ ì¤‘ë³µì´ë©°, ì„¤ëª…ì„ ìœ„í•´ì„œ ìˆ˜í–‰í•¨ ì™œëƒí•˜ë©´ ëª¨ë“  ë²„íƒìŠ¤ë‹¹ ë…¸ë©€ì€ ë™ì¼í•˜ê³  ì´ ìƒ˜í”Œì˜ ì‚¼ê°í˜•ì˜ ë…¸ë©€ê³¼ ì¼ì¹˜í•˜ê¸° ë•Œë¬¸
     float3 triangleNormal = HitAttribute(vertexNormals, attr);
 
     float4 diffuseColor = CalculationDiffuseLighting(hitPosition, triangleNormal);

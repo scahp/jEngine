@@ -84,7 +84,7 @@ struct Matrix
 		float const K = m33 * m21 - m31 * m23;
 		float const L = m33 * m22 - m32 * m23;
 
-		// ��Ľ� ��귮 ����ȭ
+		// 행렬식 계산량 최적화
 		// Det calculate optimize
 		//float const det = m00 * (m11 * L - m12 * K + m13 * J) - m10 * (m01 * L - m02 * K + m03 * J)
 		//              + m20 * (m31 * F - m32 * E + m33 * D) - m30 * (m21 * F - m22 * E + m23 * D);
@@ -114,7 +114,7 @@ struct Matrix
 		float const K = m33 * m21 - m31 * m23;
 		float const L = m33 * m22 - m32 * m23;
 
-		// ��Ľ� ��귮 ����ȭ
+		// 행렬식 계산량 최적화
 		// Det calculate optimize
 		//float const det = m00 * (m11 * L - m12 * K + m13 * J) - m10 * (m01 * L - m02 * K + m03 * J)
 		//              + m20 * (m31 * F - m32 * E + m33 * D) - m30 * (m21 * F - m22 * E + m23 * D);
@@ -127,12 +127,12 @@ struct Matrix
 		float const det = A * L -B * K + C * J + G * F -H * E + I * D;
 		if (0.0f == det)
 		{
-			JASSERT("������� ���� �� �����ϴ�.");
+			JASSERT("역행렬을 구할 수 없습니다.");
 			return *this;
 		}
 
 		float const InverseDet = 1.0f / det;
-		// �������. (-1)^(i+j) * M[i][j] �� ����� ���� �� ��ġ ��Ų ���
+		// 수반행렬. (-1)^(i+j) * M[i][j] 로 행렬을 만든 후 전치 시킨 행렬
 		// Adjoint matrix. Make a matrix (-1)^(i+j) * M[i][j] and then transpose the matrix.
 		Matrix inverseMatrix;
 		inverseMatrix.m[0][0] = (m11 * L - m12 * K + m13 * J) * InverseDet;
@@ -661,12 +661,12 @@ struct Matrix3
 		float const det = m00 * F - m01 * E + m02 * D;
 		if (0.0f == det)
 		{
-			JASSERT("������� ���� �� �����ϴ�.");
+			JASSERT("역행렬을 구할 수 없습니다.");
 			return *this;
 		}
 
 		float const InverseDet = 1.0f / det;
-		// �������. (-1)^(i+j) * M[i][j] �� ����� ���� �� ��ġ ��Ų ���
+		// 수반행렬. (-1)^(i+j) * M[i][j] 로 행렬을 만든 후 전치 시킨 행렬
 		// Adjoint matrix. Make a matrix (-1)^(i+j) * M[i][j] and then transpose the matrix.
 		Matrix3 inverseMatrix;
 		inverseMatrix.m[0][0] = F * InverseDet;

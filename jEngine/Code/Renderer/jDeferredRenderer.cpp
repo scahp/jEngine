@@ -367,7 +367,7 @@ void jDeferredRenderer::PPR(jRenderContext* InContext) const
 		g_rhi->SetImageTexture(0, GBufferRTPtr->GetTexture(2), EImageTextureAccessType::READ_ONLY);
 		g_rhi->SetImageTexture(1, IntermediateBufferPtr->GetTexture(), EImageTextureAccessType::READ_WRITE);
 
-		g_rhi->DispatchCompute(ScreenSize.x, ScreenSize.y, 1);
+		g_rhi->DispatchCompute((uint32)ScreenSize.x, (uint32)ScreenSize.y, 1);
 	}
 
 	{
@@ -389,7 +389,7 @@ void jDeferredRenderer::PPR(jRenderContext* InContext) const
 
 		g_rhi->SetMatetrial(&PPRMaterialData, shader);
 
-		g_rhi->DispatchCompute(ScreenSize.x, ScreenSize.y, 1);
+		g_rhi->DispatchCompute((uint32)ScreenSize.x, (uint32)ScreenSize.y, 1);
 	}
 }
 
@@ -597,7 +597,7 @@ void jDeferredRenderer::Render(jRenderContext* InContext)
 		{
 			jShader* shader = jShader::GetShader("UIShader");
 			g_rhi->SetShader(shader);
-			DebugQuad->Size = Vector2(SCR_WIDTH / 1.5, SCR_HEIGHT / 1.5);
+			DebugQuad->Size = Vector2(SCR_WIDTH / 1.5f, SCR_HEIGHT / 1.5f);
 			DebugQuad->Pos = Vector2(SCR_WIDTH, SCR_HEIGHT) - DebugQuad->Size - Vector2(10.0f, 10.0f);
 			DebugQuad->Draw(InContext->Camera, shader, {});
 		}

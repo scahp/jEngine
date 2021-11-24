@@ -74,7 +74,7 @@ public:
 	}
 
 	HRESULT Initialize();
-	ComPtr<ID3DBlob> Compile(const wchar_t* InFilename, const wchar_t* InTargetString) const;
+	ComPtr<IDxcBlob> Compile(const wchar_t* InFilename, const wchar_t* InTargetString) const;
 
 public:
 	jShaderCompiler_DirectX12(jShaderCompiler_DirectX12 const&) = delete;

@@ -98,7 +98,7 @@ HRESULT jShaderCompiler_DirectX12::Initialize()
 	return m_dxc.Initialize();
 }
 
-ComPtr<ID3DBlob> jShaderCompiler_DirectX12::Compile(const wchar_t* InFilename, const wchar_t* InEntryPoint) const
+ComPtr<IDxcBlob> jShaderCompiler_DirectX12::Compile(const wchar_t* InFilename, const wchar_t* InTargetString) const
 {
 	if (!m_dxc.IsEnable())
 		return nullptr;
@@ -125,10 +125,22 @@ ComPtr<ID3DBlob> jShaderCompiler_DirectX12::Compile(const wchar_t* InFilename, c
 	if (JFAIL(Library->CreateBlobWithEncodingFromPinned((LPBYTE)shader.c_str(), (uint32)shader.size(), 0, &textBlob)))
 		return nullptr;
 
+	std::vector<const wchar_t*> options;
+	options.push_back(TEXT("-WX"));				// Treat warnings as errors.
+	options.push_back(TEXT("-Zpr"));			// Pack matrices in row-major order.
+
+#ifdef _DEBUG
+	options.push_back(TEXT("-Zi"));				// Debug info.
+	options.push_back(TEXT("-Qembed_debug"));	// Embed PDB in shader container
+	options.push_back(TEXT("-Od"));				// Disable optimization
+#else
+	options.push_back(TEXT("-O3"));				// Optimization Level 3 (Default)
+#endif
+
 	// Compile
 	ComPtr<IDxcOperationResult> result;
-	if (JFAIL(Compiler->Compile(textBlob.Get(), InFilename, TEXT(""), InEntryPoint
-		, nullptr, 0, nullptr, 0, nullptr, &result)))
+	if (JFAIL(Compiler->Compile(textBlob.Get(), InFilename, TEXT(""), InTargetString
+		, &options[0], (uint32)options.size(), nullptr, 0, nullptr, &result)))
 	{
 		return nullptr;
 	}
@@ -149,9 +161,5 @@ ComPtr<ID3DBlob> jShaderCompiler_DirectX12::Compile(const wchar_t* InFilename, c
 	if (JFAIL(result->GetResult(&Blob)))
 		return nullptr;
 
-	ComPtr<ID3DBlob> D3DBlob;
-	if (JFAIL(Blob.As<ID3DBlob>(&D3DBlob)))
-		return nullptr;
-
-	return D3DBlob;
+	return Blob;
 }

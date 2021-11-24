@@ -27,8 +27,21 @@
 #include <limits>
 #include <random>
 
-#define JASSERT(x) assert(x)
+#ifndef _DEBUG
+#define _DEBUG 0
+#endif
+
+#if _DEBUG
+#define JOK(a) (SUCCEEDED(a) ? true : (assert(!(#a)), false))
+#define JFAIL(a) (!JOK(a))
+#define JASSERT(a) ((a) ? true : (assert(#a), false))
 #define JMESSAGE(x) MessageBoxA(0, x, "", MB_OK)
+#else
+#define JOK(a) (a)
+#define JFAIL(a) (a)
+#define JASSERT(a) (a)
+#define JMESSAGE(a) (a)
+#endif
 
 using int8 = char;
 using uint8 = unsigned char;
@@ -123,25 +136,12 @@ inline void hash_combine(std::size_t& seed, const T& v)
 #include <DirectXMath.h>
 
 #include <fstream>
+#include <string>
+#include <vector>
 
 #pragma comment(lib,"d3d12.lib")
 #pragma comment(lib,"dxgi.lib")
 #pragma comment(lib,"d3dcompiler.lib")
 #pragma comment(lib,"dxguid.lib")
-
-#ifndef _DEBUG
-#define _DEBUG 0
-#endif
-
-#if _DEBUG
-#define JOK(a) (SUCCEEDED(a) ? true : (assert(!(#a)), false))
-#define JFAIL(a) (!JOK(a))
-#define JASSERT(a) ((a) ? true : (assert(#a), false))
-#else
-#define JOK(a) (a)
-#define JFAIL(a) (a)
-#define JASSERT(a) (a)
-#endif
-
 
 #endif //PCH_H
