@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jRHI_DirectX12.h"
 #include "jImageFileLoader.h"
 #include <limits>
@@ -823,7 +823,7 @@ void jRHI_DirectX12::Initialize()
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS topLevelInputs{};
 	topLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
 	topLevelInputs.Flags = buildFlags;
-	topLevelInputs.NumDescs = 1;
+	topLevelInputs.NumDescs = 2;
 	topLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
 
 	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO topLevelPrebuildInfo{};
@@ -835,6 +835,7 @@ void jRHI_DirectX12::Initialize()
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS bottomLevelInputs = topLevelInputs;
 	bottomLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
 	bottomLevelInputs.pGeometryDescs = &geometryDesc;
+    bottomLevelInputs.NumDescs = 1;
 	
 	m_dxrDevice->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
 	if (!JASSERT(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0))
@@ -861,10 +862,17 @@ void jRHI_DirectX12::Initialize()
 
 	// Bottom-level acceleration structure 를 위한 instance Desc 생성
 	ComPtr<ID3D12Resource> instanceDescs;
-	D3D12_RAYTRACING_INSTANCE_DESC instanceDesc{};
-	instanceDesc.Transform[0][0] = instanceDesc.Transform[1][1] = instanceDesc.Transform[2][2] = 1;
-	instanceDesc.InstanceMask = 1;
-	instanceDesc.AccelerationStructure = m_bottomLevelAccelerationStructure->GetGPUVirtualAddress();
+    D3D12_RAYTRACING_INSTANCE_DESC instanceDesc[2] = { {}, {} };
+    float XOffset = -2.0f;
+    for (int32 i = 0; i < _countof(instanceDesc); ++i)
+    {
+        instanceDesc[i].InstanceID = i;
+        instanceDesc[i].InstanceContributionToHitGroupIndex = 0;
+        instanceDesc[i].Transform[0][0] = instanceDesc[i].Transform[1][1] = instanceDesc[i].Transform[2][2] = 1;
+        instanceDesc[i].Transform[0][3] = XOffset + i * 4.0f;
+        instanceDesc[i].InstanceMask = 1;
+        instanceDesc[i].AccelerationStructure = m_bottomLevelAccelerationStructure->GetGPUVirtualAddress();
+    }    
 	BufferUtil::AllocateUploadBuffer(&instanceDescs, m_device.Get(), &instanceDesc, sizeof(instanceDesc), TEXT("InstanceDescs"));
 
 	// Bottom level acceleration structure desc
