@@ -1,4 +1,4 @@
-#include "pch.h"
+﻿#include "pch.h"
 #include "jRHI_DirectX12.h"
 #include "jImageFileLoader.h"
 #include <limits>
@@ -442,15 +442,58 @@ void jRHI_DirectX12::Initialize()
 	swapChain.As(&m_swapChain);
 	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
-	InitializeScene();
-
-	// 4. Heap
+ 	// 4. Heap
 	D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc{};
 	rtvHeapDesc.NumDescriptors = FrameCount;
 	rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 	rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	if (JFAIL(m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap))))
 		return;
+
+    //////////////////////////////////////////////////////////////////////////
+    // 5. Initialize Camera and lighting
+    {
+        auto frameIndex = m_swapChain->GetCurrentBackBufferIndex();
+
+        // Setup material
+        m_cubeCB.albedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+
+        // Setup camera
+        m_eye = { 0.0f, 2.0f, -5.0f, 1.0f };
+        m_at = { 0.0f, 0.0f, 0.0f, 1.0f };
+        XMVECTOR right = { 1.0f, 0.0f, 0.0f, 0.0f };
+
+        XMVECTOR direction = XMVector4Normalize(m_at - m_eye);
+        m_up = XMVector3Normalize(XMVector3Cross(direction, right));
+
+        // Rotate camera around Y axis
+        XMMATRIX rotate = XMMatrixRotationY(XMConvertToRadians(45.0f));
+        m_eye = XMVector3Transform(m_eye, rotate);
+        m_up = XMVector3Transform(m_up, rotate);
+
+        UpdateCameraMatrices();
+
+        // Setup lights
+        XMFLOAT4 lightPosition;
+        XMFLOAT4 lightAmbientColor;
+        XMFLOAT4 lightDiffuseColor;
+
+        lightPosition = XMFLOAT4(0.0f, 1.8f, -3.0f, 0.0f);
+        m_sceneCB[frameIndex].lightPosition = XMLoadFloat4(&lightPosition);
+
+        lightAmbientColor = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
+        m_sceneCB[frameIndex].lightAmbientColor = XMLoadFloat4(&lightAmbientColor);
+
+        lightDiffuseColor = XMFLOAT4(0.5f, 0.0f, 0.0f, 1.0f);
+        m_sceneCB[frameIndex].lightDiffuseColor = XMLoadFloat4(&lightDiffuseColor);
+
+        // 모든 프레임의 버퍼 인스턴스에 초기값을 설정해줌
+        for (auto& sceneCB : m_sceneCB)
+        {
+            sceneCB = m_sceneCB[frameIndex];
+        }
+    }
+
 
 	D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc{};
 	// 2 - vertex and index buffer SRV
@@ -464,7 +507,7 @@ void jRHI_DirectX12::Initialize()
 	m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	m_cbvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-	// 5. CommandAllocators, Commandlist, RTV for FrameCount
+	// 6. CommandAllocators, Commandlist, RTV for FrameCount
 	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
 
 	for (uint32 i = 0; i < FrameCount; ++i)
@@ -486,7 +529,7 @@ void jRHI_DirectX12::Initialize()
 	}
 	m_commandList->Close();
 
-	// 6. Create sync object
+	// 7. Create sync object
 	if (JFAIL(m_device->CreateFence(m_fenceValue[m_frameIndex], D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence))))
 		return;
 
@@ -501,7 +544,7 @@ void jRHI_DirectX12::Initialize()
 
 	WaitForGPU();
 
-	// 7. Raytracing device and commandlist
+	// 8. Raytracing device and commandlist
 	D3D12_FEATURE_DATA_D3D12_OPTIONS5 featureSupportData{};
 	if (JFAIL(m_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &featureSupportData, sizeof(featureSupportData))))
 		return;
@@ -515,7 +558,7 @@ void jRHI_DirectX12::Initialize()
 	if (JFAIL(m_commandList->QueryInterface(IID_PPV_ARGS(&m_dxrCommandList))))
 		return;
 
-	// 8. CreateRootSignatures
+	// 9. CreateRootSignatures
 	{
 		// global root signature는 DispatchRays 함수 호출로 만들어지는 레이트레이싱 쉐이더의 전체에 공유됨.
 
@@ -576,7 +619,7 @@ void jRHI_DirectX12::Initialize()
 		}
 	}
 
-	// 9. DXR PipeplineStateObject
+	// 10. DXR PipeplineStateObject
 	// ----------------------------------------------------
 	// 1 - DXIL Library
 	// 1 - Triangle hit group
@@ -700,7 +743,11 @@ void jRHI_DirectX12::Initialize()
 		return;
 
 	//////////////////////////////////////////////////////////////////////////
-	// 10. Create vertex and index buffer
+	// 11. Create vertex and index buffer
+
+    if (JFAIL(m_commandList->Reset(m_commandAllocator[m_frameIndex].Get(), nullptr)))
+        return;
+
 	uint16 indices[] =
 	{
 		3,1,0,
@@ -803,7 +850,7 @@ void jRHI_DirectX12::Initialize()
 	}
 
 	//////////////////////////////////////////////////////////////////////////
-	// 11. AccelerationStructures
+	// 12. AccelerationStructures
 	D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc{};
 	geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
 	geometryDesc.Triangles.IndexBuffer = m_indexBuffer->GetGPUVirtualAddress();
@@ -819,81 +866,157 @@ void jRHI_DirectX12::Initialize()
 	geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
 
 	// Acceleration structure 에 필요한 크기를 요청함
-	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
-	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS topLevelInputs{};
-	topLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-	topLevelInputs.Flags = buildFlags;
-	topLevelInputs.NumDescs = 2;
-	topLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
+    // 첫번째 지오메트리
+    D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO bottomLevelPrebuildInfo{};
+    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS bottomLevelInputs{};
+    {
+        D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+        bottomLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+        bottomLevelInputs.Flags = buildFlags;
+        bottomLevelInputs.pGeometryDescs = &geometryDesc;
+        bottomLevelInputs.NumDescs = 1;
+        bottomLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
 
-	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO topLevelPrebuildInfo{};
-	m_dxrDevice->GetRaytracingAccelerationStructurePrebuildInfo(&topLevelInputs, &topLevelPrebuildInfo);
-	if (!JASSERT(topLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0))
-		return;
 
-	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO bottomLevelPrebuildInfo{};
-	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS bottomLevelInputs = topLevelInputs;
-	bottomLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
-	bottomLevelInputs.pGeometryDescs = &geometryDesc;
-    bottomLevelInputs.NumDescs = 1;
-	
-	m_dxrDevice->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
-	if (!JASSERT(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0))
-		return;
+        m_dxrDevice->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
+        if (!JASSERT(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0))
+            return;
+    }
 
-	ComPtr<ID3D12Resource> scratchResource;
-	const uint64 scratchResourceBufferSize 
-		= std::max(topLevelPrebuildInfo.ScratchDataSizeInBytes, bottomLevelPrebuildInfo.ScratchDataSizeInBytes);
-	BufferUtil::AllocateUAVBuffer(&scratchResource, m_device.Get(), scratchResourceBufferSize
+    // Acceleration structure를 위한 리소스를 할당함
+    // Acceleration structure는 default heap에서 생성된 리소스에만 있을 수 있음. (또는 그에 상응하는 heap)
+    // Default heap은 CPU 읽기/쓰기 접근이 필요없기 때문에 괜찮음.
+    // Acceleration structure를 포함하는 리소스는 D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE 상태로 생성해야 함.
+    // 그리고 D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS 플래그를 가져야 함. ALLOW_UNORDERED_ACCESS는 두가지 간단한 정보를 요구함:
+    // - 시스템은 백그라운드에서 Acceleration structure 빌드를 구현할 때 이러한 유형의 액세스를 수행할 것입니다.
+    // - 앱의 관점에서, acceleration structure에 쓰기/읽기의 동기화는 UAV barriers를 통해서 얻어짐.
+    D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
+    BufferUtil::AllocateUAVBuffer(&m_bottomLevelAccelerationStructure, m_device.Get()
+        , bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, initialResourceState, TEXT("BottomLevelAccelerationStructure"));
+
+    // Bottom level acceleration structure desc
+    ComPtr<ID3D12Resource> scratchResource;
+    BufferUtil::AllocateUAVBuffer(&scratchResource, m_device.Get(), bottomLevelPrebuildInfo.ScratchDataSizeInBytes
+        , D3D12_RESOURCE_STATE_UNORDERED_ACCESS, L"ScratchResourceGeometry1");
+
+    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc{};
+    bottomLevelBuildDesc.Inputs = bottomLevelInputs;
+    bottomLevelBuildDesc.ScratchAccelerationStructureData = scratchResource->GetGPUVirtualAddress();
+    bottomLevelBuildDesc.DestAccelerationStructureData = m_bottomLevelAccelerationStructure->GetGPUVirtualAddress();
+
+    m_dxrCommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(m_bottomLevelAccelerationStructure.Get()));
+
+    //////////////////////////////////////////////////////////////////////////
+
+    // 두번째 지오메트리
+    Vertex secondVertices[] = {
+            XMFLOAT3(-100.0f, -1.0f, -100.0f),    XMFLOAT3(0.0f, -1.0f, 0.0f),
+            XMFLOAT3(100.0f, -1.0f, 100.f),    XMFLOAT3(0.0f, -1.0f, 0.0f),
+            XMFLOAT3(-100.0f, -1.0f, 100.0f),   XMFLOAT3(0.0f, -1.0f, 0.0f),
+
+            XMFLOAT3(-100.0f, -1.0f, -100.0f),    XMFLOAT3(0.0f, -1.0f, 0.0f),
+            XMFLOAT3(100.0f, -1.0f, -100.0f),    XMFLOAT3(0.0f, -1.0f, 0.0f),
+            XMFLOAT3(100.0f, -1.0f, 100.0f),   XMFLOAT3(0.0f, -1.0f, 0.0f),
+    };
+
+    BufferUtil::AllocateUploadBuffer(&m_vertexBufferSecondGeometry, m_device.Get(), secondVertices, sizeof(secondVertices));
+
+    D3D12_RAYTRACING_GEOMETRY_DESC secondGeometryDesc{};
+    secondGeometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
+    secondGeometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
+    secondGeometryDesc.Triangles.Transform3x4 = 0;
+    secondGeometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+    secondGeometryDesc.Triangles.VertexCount = static_cast<uint32>(m_vertexBufferSecondGeometry->GetDesc().Width) / sizeof(Vertex);
+    secondGeometryDesc.Triangles.VertexBuffer.StartAddress = m_vertexBufferSecondGeometry->GetGPUVirtualAddress();
+    secondGeometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(Vertex);
+
+
+    D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO bottomLevelPrebuildInfoSecondGeometry{};
+    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS bottomLevelInputsSecondGeometry{};
+    {
+        D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+        bottomLevelInputsSecondGeometry.Flags = buildFlags;
+        bottomLevelInputsSecondGeometry.pGeometryDescs = &secondGeometryDesc;
+        bottomLevelInputsSecondGeometry.NumDescs = 1;
+        bottomLevelInputsSecondGeometry.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
+
+        m_dxrDevice->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputsSecondGeometry, &bottomLevelPrebuildInfoSecondGeometry);
+        if (!JASSERT(bottomLevelPrebuildInfoSecondGeometry.ResultDataMaxSizeInBytes > 0))
+            return;
+    }
+
+    BufferUtil::AllocateUAVBuffer(&m_bottomLevelAccelerationStructureSecondGeometry, m_device.Get()
+        , bottomLevelPrebuildInfoSecondGeometry.ResultDataMaxSizeInBytes, initialResourceState, TEXT("BottomLevelAccelerationStructure"));
+
+    ComPtr<ID3D12Resource> scratchResourceSecondGeometry;
+    BufferUtil::AllocateUAVBuffer(&scratchResourceSecondGeometry, m_device.Get(), bottomLevelPrebuildInfoSecondGeometry.ScratchDataSizeInBytes
+        , D3D12_RESOURCE_STATE_UNORDERED_ACCESS, L"ScratchResourceGeometry2");
+
+    // Bottom level acceleration structure desc
+    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDescSecondGeometry{};
+    bottomLevelBuildDescSecondGeometry.Inputs = bottomLevelInputsSecondGeometry;
+    bottomLevelBuildDescSecondGeometry.ScratchAccelerationStructureData = scratchResourceSecondGeometry->GetGPUVirtualAddress();
+    bottomLevelBuildDescSecondGeometry.DestAccelerationStructureData = m_bottomLevelAccelerationStructureSecondGeometry->GetGPUVirtualAddress();
+
+    m_dxrCommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDescSecondGeometry, 0, nullptr);
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(m_bottomLevelAccelerationStructureSecondGeometry.Get()));
+
+    // TLAS
+    D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO topLevelPrebuildInfo{};
+    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS topLevelInputs{};
+    {
+        D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+        topLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+        topLevelInputs.Flags = buildFlags;
+        topLevelInputs.NumDescs = 3;
+        topLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
+
+        m_dxrDevice->GetRaytracingAccelerationStructurePrebuildInfo(&topLevelInputs, &topLevelPrebuildInfo);
+        if (!JASSERT(topLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0))
+            return;
+    }
+
+	ComPtr<ID3D12Resource> topLevelScratchResource;
+	BufferUtil::AllocateUAVBuffer(&topLevelScratchResource, m_device.Get(), topLevelPrebuildInfo.ScratchDataSizeInBytes
 		, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, L"ScratchResource");
 
-	// Acceleration structure를 위한 리소스를 할당함
-	// Acceleration structure는 default heap에서 생성된 리소스에만 있을 수 있음. (또는 그에 상응하는 heap)
-	// Default heap은 CPU 읽기/쓰기 접근이 필요없기 때문에 괜찮음.
-	// Acceleration structure를 포함하는 리소스는 D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE 상태로 생성해야 함.
-	// 그리고 D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS 플래그를 가져야 함. ALLOW_UNORDERED_ACCESS는 두가지 간단한 정보를 요구함:
-	// - 시스템은 백그라운드에서 Acceleration structure 빌드를 구현할 때 이러한 유형의 액세스를 수행할 것입니다.
-	// - 앱의 관점에서, acceleration structure에 쓰기/읽기의 동기화는 UAV barriers를 통해서 얻어짐.
-	D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
-	BufferUtil::AllocateUAVBuffer(&m_bottomLevelAccelerationStructure, m_device.Get()
-		, bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, initialResourceState, TEXT("BottomLevelAccelerationStructure"));
 	BufferUtil::AllocateUAVBuffer(&m_topLevelAccelerationStructure, m_device.Get()
 		, topLevelPrebuildInfo.ResultDataMaxSizeInBytes, initialResourceState, TEXT("TopLevelAccelerationStructure"));
 
 	// Bottom-level acceleration structure 를 위한 instance Desc 생성
 	ComPtr<ID3D12Resource> instanceDescs;
-    D3D12_RAYTRACING_INSTANCE_DESC instanceDesc[2] = { {}, {} };
-    float XOffset = -2.0f;
-    for (int32 i = 0; i < _countof(instanceDesc); ++i)
+    D3D12_RAYTRACING_INSTANCE_DESC instanceDesc[3] = { {}, {}, {} };
     {
+        float XOffset = -2.0f;
+        int32 i = 0;
+        for (i = 0; i < _countof(instanceDesc) - 1; ++i)
+        {
+            instanceDesc[i].InstanceID = i;
+            instanceDesc[i].InstanceContributionToHitGroupIndex = 0;
+            instanceDesc[i].Transform[0][0] = instanceDesc[i].Transform[1][1] = instanceDesc[i].Transform[2][2] = 1;
+            instanceDesc[i].Transform[0][3] = XOffset + i * 4.0f;
+            instanceDesc[i].InstanceMask = 1;
+            instanceDesc[i].AccelerationStructure = m_bottomLevelAccelerationStructure->GetGPUVirtualAddress();
+        }
+
         instanceDesc[i].InstanceID = i;
         instanceDesc[i].InstanceContributionToHitGroupIndex = 0;
-        instanceDesc[i].Transform[0][0] = instanceDesc[i].Transform[1][1] = instanceDesc[i].Transform[2][2] = 1;
-        instanceDesc[i].Transform[0][3] = XOffset + i * 4.0f;
+        memset(&instanceDesc[i].Transform, 0, sizeof(instanceDesc[i].Transform));
+        instanceDesc[i].Transform[0][0] = instanceDesc[i].Transform[1][1] = instanceDesc[i].Transform[2][2] = 1.0f;
         instanceDesc[i].InstanceMask = 1;
-        instanceDesc[i].AccelerationStructure = m_bottomLevelAccelerationStructure->GetGPUVirtualAddress();
-    }    
+        instanceDesc[i].AccelerationStructure = m_bottomLevelAccelerationStructureSecondGeometry->GetGPUVirtualAddress();
+        instanceDesc[i].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_CULL_DISABLE;
+    }
 	BufferUtil::AllocateUploadBuffer(&instanceDescs, m_device.Get(), &instanceDesc, sizeof(instanceDesc), TEXT("InstanceDescs"));
-
-	// Bottom level acceleration structure desc
-	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc{};
-	bottomLevelBuildDesc.Inputs = bottomLevelInputs;
-	bottomLevelBuildDesc.ScratchAccelerationStructureData = scratchResource->GetGPUVirtualAddress();
-	bottomLevelBuildDesc.DestAccelerationStructureData = m_bottomLevelAccelerationStructure->GetGPUVirtualAddress();
 
 	// Top level acceleration structure desc
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC topLevelBuildDesc{};
 	topLevelInputs.InstanceDescs = instanceDescs->GetGPUVirtualAddress();
 	topLevelBuildDesc.Inputs = topLevelInputs;
 	topLevelBuildDesc.DestAccelerationStructureData = m_topLevelAccelerationStructure->GetGPUVirtualAddress();
-	topLevelBuildDesc.ScratchAccelerationStructureData = scratchResource->GetGPUVirtualAddress();
+	topLevelBuildDesc.ScratchAccelerationStructureData = topLevelScratchResource->GetGPUVirtualAddress();
 
-	// Acceleration structure 빌드
-	if (JFAIL(m_commandList->Reset(m_commandAllocator[m_frameIndex].Get(), nullptr)))
-		return;
-
-	m_dxrCommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
-	m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(m_bottomLevelAccelerationStructure.Get()));
 	m_dxrCommandList->BuildRaytracingAccelerationStructure(&topLevelBuildDesc, 0, nullptr);
 
 	if (JFAIL(m_commandList->Close()))
@@ -903,7 +1026,7 @@ void jRHI_DirectX12::Initialize()
 
 	WaitForGPU();
 
-	// 12. ShaderTable
+	// 13. ShaderTable
 	const uint16 shaderIdentifierSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
 	ComPtr<ID3D12StateObjectProperties> stateObjectProperties;
 	if (JFAIL(m_dxrStateObject.As(&stateObjectProperties)))
@@ -948,7 +1071,7 @@ void jRHI_DirectX12::Initialize()
 	}
 
 	//////////////////////////////////////////////////////////////////////////
-	// 13. Raytracing Output Resouce
+	// 14. Raytracing Output Resouce
 
 	// 출력 리소스를 생성. 차원과 포맷은 swap-chain과 매치 되어야 함
 	auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(BackbufferFormat
@@ -976,7 +1099,7 @@ void jRHI_DirectX12::Initialize()
 		, m_raytracingOutputResourceUAVDescriptorHeapIndex, m_cbvDescriptorSize);
 
 	//////////////////////////////////////////////////////////////////////////
-	// 14. CreateConstantBuffers
+	// 15. CreateConstantBuffers
 	// 상수 버퍼 메모리를 만들고 CPU와 GPU 주소를 매핑함
 	const D3D12_HEAP_PROPERTIES uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 
@@ -1019,50 +1142,53 @@ void jRHI_DirectX12::Release()
 	WaitForGPU();
 
 	//////////////////////////////////////////////////////////////////////////
-	// 13. Raytracing Output Resouce
+	// 14. Raytracing Output Resouce
 	m_raytracingOutput.Reset();
 
 	//////////////////////////////////////////////////////////////////////////
-	// 12. ShaderTable
+	// 13. ShaderTable
 	m_rayGenShaderTable.Reset();
 	m_missShaderTable.Reset();
 	m_hitGroupShaderTable.Reset();
 
 	//////////////////////////////////////////////////////////////////////////
-	// 11. AccelerationStructures
+	// 12. AccelerationStructures
 	m_bottomLevelAccelerationStructure.Reset();
 	m_topLevelAccelerationStructure.Reset();
 
 	//////////////////////////////////////////////////////////////////////////
-	// 10. Create vertex and index buffer
+	// 11. Create vertex and index buffer
 	m_vertexBuffer.Reset();
 	m_indexBuffer.Reset();
 
 	//////////////////////////////////////////////////////////////////////////
-	// 9. DXR PipeplineStateObject
+	// 10. DXR PipeplineStateObject
 	m_dxrStateObject.Reset();
 
 	//////////////////////////////////////////////////////////////////////////
-	// 8. CreateRootSignature
+	// 9. CreateRootSignature
 	m_raytracingGlobalRootSignature.Reset();
 	m_raytracingLocalRootSignature.Reset();
 
 	//////////////////////////////////////////////////////////////////////////
-	// 7. Raytracing device and commandlist
+	// 8. Raytracing device and commandlist
 	m_dxrDevice.Reset();
 	m_dxrCommandList.Reset();
 
 	//////////////////////////////////////////////////////////////////////////
-	// 6. Create sync object
+	// 7. Create sync object
 	m_fence.Reset();
 	CloseHandle(m_fenceEvent);
 
 	//////////////////////////////////////////////////////////////////////////
-	// 5. CommandAllocators, Commandlist, RTV for FrameCount
+	// 6. CommandAllocators, Commandlist, RTV for FrameCount
 	for (uint32 i = 0; i < FrameCount; ++i)
 	{
 		m_renderTargets[i].Reset();
 	}
+
+    //////////////////////////////////////////////////////////////////////////
+    // 5. Initialize Camera and lighting
 
 	//////////////////////////////////////////////////////////////////////////
 	// 4. Heap
@@ -1102,49 +1228,6 @@ void jRHI_DirectX12::UpdateCameraMatrices()
 	const XMMATRIX viewProj = view * proj;
 
 	m_sceneCB[frameIndex].projectionToWorld = XMMatrixInverse(nullptr, viewProj);
-}
-
-void jRHI_DirectX12::InitializeScene()
-{
-	auto frameIndex = m_swapChain->GetCurrentBackBufferIndex();
-
-	// Setup material
-	m_cubeCB.albedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-
-	// Setup camera
-	m_eye = { 0.0f, 2.0f, -5.0f, 1.0f };
-	m_at = { 0.0f, 0.0f, 0.0f, 1.0f };
-	XMVECTOR right = { 1.0f, 0.0f, 0.0f, 0.0f };
-
-	XMVECTOR direction = XMVector4Normalize(m_at - m_eye);
-	m_up = XMVector3Normalize(XMVector3Cross(direction, right));
-
-	// Rotate camera around Y axis
-	XMMATRIX rotate = XMMatrixRotationY(XMConvertToRadians(45.0f));
-	m_eye = XMVector3Transform(m_eye, rotate);
-	m_up = XMVector3Transform(m_up, rotate);
-
-	UpdateCameraMatrices();
-
-	// Setup lights
-	XMFLOAT4 lightPosition;
-	XMFLOAT4 lightAmbientColor;
-	XMFLOAT4 lightDiffuseColor;
-
-	lightPosition = XMFLOAT4(0.0f, 1.8f, -3.0f, 0.0f);
-	m_sceneCB[frameIndex].lightPosition = XMLoadFloat4(&lightPosition);
-
-	lightAmbientColor = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
-	m_sceneCB[frameIndex].lightAmbientColor = XMLoadFloat4(&lightAmbientColor);
-
-	lightDiffuseColor = XMFLOAT4(0.5f, 0.0f, 0.0f, 1.0f);
-	m_sceneCB[frameIndex].lightDiffuseColor = XMLoadFloat4(&lightDiffuseColor);
-
-	// 모든 프레임의 버퍼 인스턴스에 초기값을 설정해줌
-	for (auto& sceneCB : m_sceneCB)
-	{
-		sceneCB = m_sceneCB[frameIndex];
-	}
 }
 
 void jRHI_DirectX12::Update()

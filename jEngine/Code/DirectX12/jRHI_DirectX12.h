@@ -133,51 +133,70 @@ public:
 	uint32 m_rtvDescriptorSize = 0;
 	uint32 m_cbvDescriptorSize = 0;
 
+    //////////////////////////////////////////////////////////////////////////
+    // 5. Initialize Camera and lighting
+    struct CubeConstantBuffer
+    {
+        XMFLOAT4 albedo;
+    };
+    struct SceneConstantBuffer
+    {
+        XMMATRIX projectionToWorld;
+        XMVECTOR cameraPosition;
+        XMVECTOR lightPosition;
+        XMVECTOR lightAmbientColor;
+        XMVECTOR lightDiffuseColor;
+    };
+    SceneConstantBuffer m_sceneCB[FrameCount];
+    CubeConstantBuffer m_cubeCB;
+
 	//////////////////////////////////////////////////////////////////////////
-	// 5. CommandAllocators, Commandlist, RTV for FrameCount
+	// 6. CommandAllocators, Commandlist, RTV for FrameCount
 	ComPtr<ID3D12Resource> m_renderTargets[FrameCount];
 
 	//////////////////////////////////////////////////////////////////////////
-	// 6. Create sync object
+	// 7. Create sync object
 	HANDLE m_fenceEvent = nullptr;
 	uint64 m_fenceValue[FrameCount]{};
 	ComPtr<ID3D12Fence> m_fence;
 	void WaitForGPU();
 
 	//////////////////////////////////////////////////////////////////////////
-	// 7. Raytracing device and commandlist
+	// 8. Raytracing device and commandlist
 	ComPtr<ID3D12Device5> m_dxrDevice;
 	ComPtr<ID3D12GraphicsCommandList4> m_dxrCommandList;
 
 	//////////////////////////////////////////////////////////////////////////
-	// 8. CreateRootSignature
+	// 9. CreateRootSignature
 	ComPtr<ID3D12RootSignature> m_raytracingGlobalRootSignature;
 	ComPtr<ID3D12RootSignature> m_raytracingLocalRootSignature;
 
 	//////////////////////////////////////////////////////////////////////////
-	// 9. DXR PipeplineStateObject
+	// 10. DXR PipeplineStateObject
 	ComPtr<ID3D12StateObject> m_dxrStateObject;
 
 	//////////////////////////////////////////////////////////////////////////
-	// 10. Create vertex and index buffer
+	// 11. Create vertex and index buffer
 	ComPtr<ID3D12Resource> m_vertexBuffer;
 	D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
 	ComPtr<ID3D12Resource> m_indexBuffer;
 	D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
+    ComPtr<ID3D12Resource> m_vertexBufferSecondGeometry;        // Second Geometry
 
 	//////////////////////////////////////////////////////////////////////////
-	// 11. AccelerationStructures
+	// 12. AccelerationStructures
 	ComPtr<ID3D12Resource> m_bottomLevelAccelerationStructure;
+    ComPtr<ID3D12Resource> m_bottomLevelAccelerationStructureSecondGeometry;
 	ComPtr<ID3D12Resource> m_topLevelAccelerationStructure;
 
 	//////////////////////////////////////////////////////////////////////////
-	// 12. ShaderTable
+	// 13. ShaderTable
 	ComPtr<ID3D12Resource> m_rayGenShaderTable;
 	ComPtr<ID3D12Resource> m_missShaderTable;
 	ComPtr<ID3D12Resource> m_hitGroupShaderTable;
 
 	//////////////////////////////////////////////////////////////////////////
-	// 13. Raytracing Output Resouce
+	// 14. Raytracing Output Resouce
 	ComPtr<ID3D12Resource> m_raytracingOutput;
 	D3D12_GPU_DESCRIPTOR_HANDLE m_raytracingOutputResourceUAVGpuDescriptor;
 	uint32 m_raytracingOutputResourceUAVDescriptorHeapIndex = UINT_MAX;
@@ -201,27 +220,10 @@ public:
 		XMFLOAT3 normal;
 	};
 
-	struct SceneConstantBuffer
-	{
-		XMMATRIX projectionToWorld;
-		XMVECTOR cameraPosition;
-		XMVECTOR lightPosition;
-		XMVECTOR lightAmbientColor;
-		XMVECTOR lightDiffuseColor;
-	};
-
-	struct CubeConstantBuffer
-	{
-		XMFLOAT4 albedo;
-	};
-	SceneConstantBuffer m_sceneCB[FrameCount];
-	CubeConstantBuffer m_cubeCB;
-
 	XMVECTOR m_eye;
 	XMVECTOR m_at;
 	XMVECTOR m_up;
 	void UpdateCameraMatrices();
-	void InitializeScene();
 	void CreateConstantBuffer();
 
 	static_assert(sizeof(SceneConstantBuffer) < D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT, "Checking the size here");
