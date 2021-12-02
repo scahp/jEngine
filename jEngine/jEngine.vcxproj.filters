@@ -737,5 +737,8 @@
     <FxCompile Include="Shaders\HLSL\RaytracingCube.hlsl">
       <Filter>Shaders\HLSL</Filter>
     </FxCompile>
+    <FxCompile Include="Shaders\HLSL\RaytracingCubeAndPlane.hlsl">
+      <Filter>Shaders\HLSL</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jRHI_DirectX12.h"
 #include "jImageFileLoader.h"
 #include <limits>
@@ -11,10 +11,12 @@
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
 
-const wchar_t* jRHI_DirectX12::c_hitGroupName = L"MyHitGroup";
 const wchar_t* jRHI_DirectX12::c_raygenShaderName = L"MyRaygenShader";
 const wchar_t* jRHI_DirectX12::c_closestHitShaderName = L"MyClosestHitShader";
 const wchar_t* jRHI_DirectX12::c_missShaderName = L"MyMissShader";
+const wchar_t* jRHI_DirectX12::c_triHitGroupName = L"TriHitGroup";
+const wchar_t* jRHI_DirectX12::c_planeHitGroupName = L"PlaneHitGroup";
+const wchar_t* jRHI_DirectX12::c_planeclosestHitShaderName = L"MyPlaneClosestHitShader";
 
 // Pretty-print a state object tree.
 inline void PrintStateObjectDesc(const D3D12_STATE_OBJECT_DESC* desc)
@@ -189,10 +191,12 @@ ShaderTable::ShaderTable(ID3D12Device* InDevice, uint32 InNumOfShaderRecords, ui
 
 void ShaderTable::push_back(const ShaderRecord& InShaderRecord)
 {
-	if (JASSERT(m_shaderRecords.size() >= m_shaderRecords.capacity()))
-		return;
+	//if (JASSERT(m_shaderRecords.size() >= m_shaderRecords.capacity()))
+	//	return;
 
 	m_shaderRecords.push_back(InShaderRecord);
+
+    uint32 incrementSize = InShaderRecord.m_shaderIdentifierSize;
 
 	memcpy(m_mappedShaderRecords, InShaderRecord.m_shaderIdentifier
 		, InShaderRecord.m_shaderIdentifierSize);
@@ -201,9 +205,10 @@ void ShaderTable::push_back(const ShaderRecord& InShaderRecord)
 	{
 		memcpy(m_mappedShaderRecords + InShaderRecord.m_shaderIdentifierSize
 			, InShaderRecord.m_localRootArguments, InShaderRecord.m_localRootArgumentsSize);
+        incrementSize += InShaderRecord.m_localRootArgumentsSize;
 	}
 
-	m_mappedShaderRecords += m_shaderRecordSize;
+	m_mappedShaderRecords += incrementSize;
 }
 
 void ShaderTable::DebugPrint(std::unordered_map<void*, std::wstring> shaderIdToStringMap)
@@ -595,10 +600,11 @@ void jRHI_DirectX12::Initialize()
 	{
 #define SizeOfInUint32(obj) ((sizeof(obj) - 1) / sizeof(UINT32) + 1)
 
-		CD3DX12_ROOT_PARAMETER rootParameters[LocalRootSignatureParams::Count];
-		rootParameters[LocalRootSignatureParams::CubeConstantSlot].InitAsConstants(SizeOfInUint32(m_cubeCB), 1);
+		//CD3DX12_ROOT_PARAMETER rootParameters[LocalRootSignatureParams::Count];
+		//rootParameters[LocalRootSignatureParams::CubeConstantSlot].InitAsConstants(SizeOfInUint32(m_cubeCB), 1);
 
-		CD3DX12_ROOT_SIGNATURE_DESC localRootSignatureDesc(_countof(rootParameters), rootParameters);
+		//CD3DX12_ROOT_SIGNATURE_DESC localRootSignatureDesc(_countof(rootParameters), rootParameters);
+        CD3DX12_ROOT_SIGNATURE_DESC localRootSignatureDesc{};
 		localRootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
 		ComPtr<ID3DBlob> blob;
 		ComPtr<ID3DBlob> error;
@@ -622,13 +628,13 @@ void jRHI_DirectX12::Initialize()
 	// 10. DXR PipeplineStateObject
 	// ----------------------------------------------------
 	// 1 - DXIL Library
-	// 1 - Triangle hit group
+	// 2 - Triangle and plane hit group
 	// 1 - Shader config
-	// 2 - Local root signature and association
+	// 4 - Local root signature and association
 	// 1 - Global root signature
 	// 1 - Pipeline config
 	// ----------------------------------------------------
-	std::array<D3D12_STATE_SUBOBJECT, 7> subobjects;
+	std::array<D3D12_STATE_SUBOBJECT, 10> subobjects;
 	uint32 index = 0;
 
 	// 1). DXIL 라이브러리 생성
@@ -638,10 +644,10 @@ void jRHI_DirectX12::Initialize()
 	std::vector<std::wstring> exportName;
 	{
 		D3D12_STATE_SUBOBJECT subobject{};
-		ShaderBlob = jShaderCompiler_DirectX12::Get().Compile(TEXT("Shaders/HLSL/RaytracingCube.hlsl"), TEXT("lib_6_3"));
+		ShaderBlob = jShaderCompiler_DirectX12::Get().Compile(TEXT("Shaders/HLSL/RaytracingCubeAndPlane.hlsl"), TEXT("lib_6_3"));
 		if (ShaderBlob)
 		{
-			const wchar_t* entryPoint[] = { jRHI_DirectX12::c_raygenShaderName, jRHI_DirectX12::c_closestHitShaderName, jRHI_DirectX12::c_missShaderName };
+			const wchar_t* entryPoint[] = { jRHI_DirectX12::c_raygenShaderName, jRHI_DirectX12::c_closestHitShaderName, jRHI_DirectX12::c_missShaderName, jRHI_DirectX12::c_planeclosestHitShaderName };
 			subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
 			subobject.pDesc = &dxilDesc;
 
@@ -664,12 +670,13 @@ void jRHI_DirectX12::Initialize()
 		subobjects[index++] = subobject;
 	}
 
-	// 2). Triangle hit group
+	// 2). Triangle and plane hit group
+    // Triangle hit group
 	D3D12_HIT_GROUP_DESC hitgroupDesc{};
 	{
 		hitgroupDesc.AnyHitShaderImport = nullptr;
 		hitgroupDesc.ClosestHitShaderImport = jRHI_DirectX12::c_closestHitShaderName;
-		hitgroupDesc.HitGroupExport = jRHI_DirectX12::c_hitGroupName;
+		hitgroupDesc.HitGroupExport = jRHI_DirectX12::c_triHitGroupName;
 		hitgroupDesc.Type = D3D12_HIT_GROUP_TYPE_TRIANGLES;
 
 		D3D12_STATE_SUBOBJECT subobject{};
@@ -677,6 +684,20 @@ void jRHI_DirectX12::Initialize()
 		subobject.pDesc = &hitgroupDesc;
 		subobjects[index++] = subobject;
 	}
+
+    // Plane hit group
+    D3D12_HIT_GROUP_DESC planeHitGroupDesc{};
+    {
+        planeHitGroupDesc.AnyHitShaderImport = nullptr;
+        planeHitGroupDesc.ClosestHitShaderImport = jRHI_DirectX12::c_planeclosestHitShaderName;
+        planeHitGroupDesc.HitGroupExport = jRHI_DirectX12::c_planeHitGroupName;
+        planeHitGroupDesc.Type = D3D12_HIT_GROUP_TYPE_TRIANGLES;
+
+        D3D12_STATE_SUBOBJECT subobject{};
+        subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
+        subobject.pDesc = &planeHitGroupDesc;
+        subobjects[index++] = subobject;
+    }
 
 	// 3). Shader Config
 	D3D12_RAYTRACING_SHADER_CONFIG shaderConfig;
@@ -691,7 +712,9 @@ void jRHI_DirectX12::Initialize()
 	}
 
 	// 4). Local root signature and association
-	D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION association{};
+
+    // triangle hit root signature and association
+    D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION association{};
 	{
 		D3D12_STATE_SUBOBJECT subobject{};
 
@@ -700,7 +723,7 @@ void jRHI_DirectX12::Initialize()
 		subobjects[index] = subobject;
 
 		association.NumExports = 1;
-		association.pExports = &jRHI_DirectX12::c_hitGroupName;
+		association.pExports = &jRHI_DirectX12::c_triHitGroupName;
 		association.pSubobjectToAssociate = &subobjects[index++];
 
 		D3D12_STATE_SUBOBJECT subobject2{};
@@ -708,6 +731,50 @@ void jRHI_DirectX12::Initialize()
 		subobject2.pDesc = &association;
 		subobjects[index++] = subobject2;
 	}
+
+    // empty root signature and associate it with the plane hit group and miss shader
+    D3D12_ROOT_SIGNATURE_DESC emptyDesc{};
+    emptyDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
+    
+    const WCHAR* emptyRootExport[] = { c_planeclosestHitShaderName, c_missShaderName };
+    D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION emptyAssociation{};
+    {
+#define SizeOfInUint32(obj) ((sizeof(obj) - 1) / sizeof(UINT32) + 1)
+
+        ComPtr<ID3DBlob> blob;
+        ComPtr<ID3DBlob> error;
+        if (JFAIL(D3D12SerializeRootSignature(&emptyDesc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &error)))
+        {
+            if (error)
+            {
+                OutputDebugStringA(reinterpret_cast<const char*>(error->GetBufferPointer()));
+                error->Release();
+            }
+            return;
+        }
+
+        if (JFAIL(m_device->CreateRootSignature(1, blob->GetBufferPointer(), blob->GetBufferSize()
+            , IID_PPV_ARGS(&m_raytracingEmptyLocalRootSignature))))
+        {
+            return;
+        }
+
+        D3D12_STATE_SUBOBJECT subobject;
+        subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE;
+        subobject.pDesc = m_raytracingEmptyLocalRootSignature.GetAddressOf();
+        subobjects[index] = subobject;
+
+        association.NumExports = _countof(emptyRootExport);
+        association.pExports = emptyRootExport;
+        association.pSubobjectToAssociate = &subobjects[index++];
+
+        D3D12_STATE_SUBOBJECT subobject2{};
+        subobject2.Type = D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION;
+        subobject2.pDesc = &association;
+        subobjects[index++] = subobject2;
+    }
+
+
 
 	// 5). Global root signature
 	{
@@ -1001,7 +1068,7 @@ void jRHI_DirectX12::Initialize()
         }
 
         instanceDesc[i].InstanceID = i;
-        instanceDesc[i].InstanceContributionToHitGroupIndex = 0;
+        instanceDesc[i].InstanceContributionToHitGroupIndex = 1;
         memset(&instanceDesc[i].Transform, 0, sizeof(instanceDesc[i].Transform));
         instanceDesc[i].Transform[0][0] = instanceDesc[i].Transform[1][1] = instanceDesc[i].Transform[2][2] = 1.0f;
         instanceDesc[i].InstanceMask = 1;
@@ -1034,7 +1101,8 @@ void jRHI_DirectX12::Initialize()
 	
 	void* rayGenShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_raygenShaderName);
 	void* misssShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_missShaderName);
-	void* hitGroupShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_hitGroupName);
+	void* triHitGroupShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_triHitGroupName);
+    void* planeHitGroupShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_planeHitGroupName);
 
 	// Raygen shader table
 	{
@@ -1054,19 +1122,22 @@ void jRHI_DirectX12::Initialize()
 		m_missShaderTable = missShaderTable.GetResource();
 	}
 
-	// Hit group shader table
+	// Triangle Hit group shader table
 	{
-		struct RootArguments
-		{
-			CubeConstantBuffer cb;
-		};
-		RootArguments rootArguments;
-		rootArguments.cb = m_cubeCB;
+		//struct RootArguments
+		//{
+		//	CubeConstantBuffer cb;
+		//};
+		//RootArguments rootArguments;
+		//rootArguments.cb = m_cubeCB;
 
-		const uint16 numShaderRecords = 1;
-		const uint16 shaderRecordSize = shaderIdentifierSize + sizeof(rootArguments);
+		const uint16 numShaderRecords = 2;
+		//const uint16 shaderRecordSize = shaderIdentifierSize + sizeof(rootArguments);
+        const uint16 shaderRecordSize = shaderIdentifierSize;
 		ShaderTable hitGroupShaderTable(m_device.Get(), numShaderRecords, shaderRecordSize, TEXT("HitGroupShaderTable"));
-		hitGroupShaderTable.push_back(ShaderRecord(hitGroupShaderIdentifier, shaderIdentifierSize, &rootArguments, sizeof(rootArguments)));
+		//hitGroupShaderTable.push_back(ShaderRecord(triHitGroupShaderIdentifier, shaderIdentifierSize, &rootArguments, sizeof(rootArguments)));
+        hitGroupShaderTable.push_back(ShaderRecord(triHitGroupShaderIdentifier, shaderIdentifierSize));
+        hitGroupShaderTable.push_back(ShaderRecord(planeHitGroupShaderIdentifier, shaderIdentifierSize));
 		m_hitGroupShaderTable = hitGroupShaderTable.GetResource();
 	}
 
@@ -1288,7 +1359,7 @@ void jRHI_DirectX12::Render()
 
 	// 각 Shader table은 단 한개의 shader record를 가지기 때문에 stride가 그 사이즈와 동일함
 	dispatchDesc.HitGroupTable.StartAddress = m_hitGroupShaderTable->GetGPUVirtualAddress();
-	dispatchDesc.HitGroupTable.SizeInBytes = m_hitGroupShaderTable->GetDesc().Width;
+	dispatchDesc.HitGroupTable.SizeInBytes = m_hitGroupShaderTable->GetDesc().Width / 2;
 	dispatchDesc.HitGroupTable.StrideInBytes = dispatchDesc.HitGroupTable.SizeInBytes;
 
 	dispatchDesc.MissShaderTable.StartAddress = m_missShaderTable->GetGPUVirtualAddress();

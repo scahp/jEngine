@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "jRHI.h"
 
 #include <windows.h>
@@ -106,10 +106,12 @@ private:
 class jRHI_DirectX12 : public jRHI
 {
 public:
-	static const wchar_t* jRHI_DirectX12::c_hitGroupName;
-	static const wchar_t* jRHI_DirectX12::c_raygenShaderName;
-	static const wchar_t* jRHI_DirectX12::c_closestHitShaderName;
-	static const wchar_t* jRHI_DirectX12::c_missShaderName;
+	static const wchar_t* c_raygenShaderName;
+	static const wchar_t* c_closestHitShaderName;
+	static const wchar_t* c_missShaderName;
+    static const wchar_t* c_triHitGroupName;
+    static const wchar_t* c_planeHitGroupName;
+    static const wchar_t* c_planeclosestHitShaderName;
 
 	//////////////////////////////////////////////////////////////////////////
 	// 1. Device
@@ -170,6 +172,7 @@ public:
 	// 9. CreateRootSignature
 	ComPtr<ID3D12RootSignature> m_raytracingGlobalRootSignature;
 	ComPtr<ID3D12RootSignature> m_raytracingLocalRootSignature;
+    ComPtr<ID3D12RootSignature> m_raytracingEmptyLocalRootSignature;
 
 	//////////////////////////////////////////////////////////////////////////
 	// 10. DXR PipeplineStateObject
