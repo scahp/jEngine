@@ -151,6 +151,7 @@ public:
     };
     SceneConstantBuffer m_sceneCB[FrameCount];
     CubeConstantBuffer m_cubeCB;
+    CubeConstantBuffer m_planeCB;
 
 	//////////////////////////////////////////////////////////////////////////
 	// 6. CommandAllocators, Commandlist, RTV for FrameCount

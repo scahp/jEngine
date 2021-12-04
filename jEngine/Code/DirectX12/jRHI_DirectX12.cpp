@@ -191,8 +191,8 @@ ShaderTable::ShaderTable(ID3D12Device* InDevice, uint32 InNumOfShaderRecords, ui
 
 void ShaderTable::push_back(const ShaderRecord& InShaderRecord)
 {
-	//if (JASSERT(m_shaderRecords.size() >= m_shaderRecords.capacity()))
-	//	return;
+    if (JASSERT(m_shaderRecords.size() >= m_shaderRecords.capacity()))
+        return;
 
 	m_shaderRecords.push_back(InShaderRecord);
 
@@ -208,7 +208,8 @@ void ShaderTable::push_back(const ShaderRecord& InShaderRecord)
         incrementSize += InShaderRecord.m_localRootArgumentsSize;
 	}
 
-	m_mappedShaderRecords += incrementSize;
+	//m_mappedShaderRecords += incrementSize;
+    m_mappedShaderRecords += m_shaderRecordSize;
 }
 
 void ShaderTable::DebugPrint(std::unordered_map<void*, std::wstring> shaderIdToStringMap)
@@ -462,6 +463,7 @@ void jRHI_DirectX12::Initialize()
 
         // Setup material
         m_cubeCB.albedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+        m_planeCB.albedo = XMFLOAT4(0.2f, 0.5f, 0.2f, 1.0f);
 
         // Setup camera
         m_eye = { 0.0f, 2.0f, -5.0f, 1.0f };
@@ -489,7 +491,7 @@ void jRHI_DirectX12::Initialize()
         lightAmbientColor = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
         m_sceneCB[frameIndex].lightAmbientColor = XMLoadFloat4(&lightAmbientColor);
 
-        lightDiffuseColor = XMFLOAT4(0.5f, 0.0f, 0.0f, 1.0f);
+        lightDiffuseColor = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
         m_sceneCB[frameIndex].lightDiffuseColor = XMLoadFloat4(&lightDiffuseColor);
 
         // 모든 프레임의 버퍼 인스턴스에 초기값을 설정해줌
@@ -600,11 +602,10 @@ void jRHI_DirectX12::Initialize()
 	{
 #define SizeOfInUint32(obj) ((sizeof(obj) - 1) / sizeof(UINT32) + 1)
 
-		//CD3DX12_ROOT_PARAMETER rootParameters[LocalRootSignatureParams::Count];
-		//rootParameters[LocalRootSignatureParams::CubeConstantSlot].InitAsConstants(SizeOfInUint32(m_cubeCB), 1);
+		CD3DX12_ROOT_PARAMETER rootParameters[LocalRootSignatureParams::Count];
+		rootParameters[LocalRootSignatureParams::CubeConstantSlot].InitAsConstants(SizeOfInUint32(m_cubeCB), 1);
 
-		//CD3DX12_ROOT_SIGNATURE_DESC localRootSignatureDesc(_countof(rootParameters), rootParameters);
-        CD3DX12_ROOT_SIGNATURE_DESC localRootSignatureDesc{};
+		CD3DX12_ROOT_SIGNATURE_DESC localRootSignatureDesc(_countof(rootParameters), rootParameters);
 		localRootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
 		ComPtr<ID3DBlob> blob;
 		ComPtr<ID3DBlob> error;
@@ -733,7 +734,11 @@ void jRHI_DirectX12::Initialize()
 	}
 
     // empty root signature and associate it with the plane hit group and miss shader
-    D3D12_ROOT_SIGNATURE_DESC emptyDesc{};
+    //D3D12_ROOT_SIGNATURE_DESC emptyDesc{};
+    CD3DX12_ROOT_PARAMETER rootParametersSecondGeometry[LocalRootSignatureParams::Count];
+    rootParametersSecondGeometry[LocalRootSignatureParams::CubeConstantSlot].InitAsConstants(SizeOfInUint32(m_cubeCB), 1);
+
+    CD3DX12_ROOT_SIGNATURE_DESC emptyDesc(_countof(rootParametersSecondGeometry), rootParametersSecondGeometry);
     emptyDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
     
     const WCHAR* emptyRootExport[] = { c_planeclosestHitShaderName, c_missShaderName };
@@ -978,13 +983,13 @@ void jRHI_DirectX12::Initialize()
 
     // 두번째 지오메트리
     Vertex secondVertices[] = {
-            XMFLOAT3(-100.0f, -1.0f, -100.0f),    XMFLOAT3(0.0f, -1.0f, 0.0f),
-            XMFLOAT3(100.0f, -1.0f, 100.f),    XMFLOAT3(0.0f, -1.0f, 0.0f),
-            XMFLOAT3(-100.0f, -1.0f, 100.0f),   XMFLOAT3(0.0f, -1.0f, 0.0f),
+            XMFLOAT3(-100.0f, -1.0f, -100.0f),    XMFLOAT3(0.0f, 1.0f, 0.0f),
+            XMFLOAT3(100.0f, -1.0f, 100.f),    XMFLOAT3(0.0f, 1.0f, 0.0f),
+            XMFLOAT3(-100.0f, -1.0f, 100.0f),   XMFLOAT3(0.0f, 1.0f, 0.0f),
 
-            XMFLOAT3(-100.0f, -1.0f, -100.0f),    XMFLOAT3(0.0f, -1.0f, 0.0f),
-            XMFLOAT3(100.0f, -1.0f, -100.0f),    XMFLOAT3(0.0f, -1.0f, 0.0f),
-            XMFLOAT3(100.0f, -1.0f, 100.0f),   XMFLOAT3(0.0f, -1.0f, 0.0f),
+            XMFLOAT3(-100.0f, -1.0f, -100.0f),    XMFLOAT3(0.0f, 1.0f, 0.0f),
+            XMFLOAT3(100.0f, -1.0f, -100.0f),    XMFLOAT3(0.0f, 1.0f, 0.0f),
+            XMFLOAT3(100.0f, -1.0f, 100.0f),   XMFLOAT3(0.0f, 1.0f, 0.0f),
     };
 
     BufferUtil::AllocateUploadBuffer(&m_vertexBufferSecondGeometry, m_device.Get(), secondVertices, sizeof(secondVertices));
@@ -1124,20 +1129,21 @@ void jRHI_DirectX12::Initialize()
 
 	// Triangle Hit group shader table
 	{
-		//struct RootArguments
-		//{
-		//	CubeConstantBuffer cb;
-		//};
-		//RootArguments rootArguments;
-		//rootArguments.cb = m_cubeCB;
+		struct RootArguments
+		{
+			CubeConstantBuffer cb;
+		};
+		RootArguments rootArguments;
+		rootArguments.cb = m_cubeCB;
 
 		const uint16 numShaderRecords = 2;
-		//const uint16 shaderRecordSize = shaderIdentifierSize + sizeof(rootArguments);
-        const uint16 shaderRecordSize = shaderIdentifierSize;
+		const uint16 shaderRecordSize = shaderIdentifierSize + sizeof(rootArguments);       // 큰 사이즈 기준으로 2개 만듬
 		ShaderTable hitGroupShaderTable(m_device.Get(), numShaderRecords, shaderRecordSize, TEXT("HitGroupShaderTable"));
-		//hitGroupShaderTable.push_back(ShaderRecord(triHitGroupShaderIdentifier, shaderIdentifierSize, &rootArguments, sizeof(rootArguments)));
-        hitGroupShaderTable.push_back(ShaderRecord(triHitGroupShaderIdentifier, shaderIdentifierSize));
-        hitGroupShaderTable.push_back(ShaderRecord(planeHitGroupShaderIdentifier, shaderIdentifierSize));
+		hitGroupShaderTable.push_back(ShaderRecord(triHitGroupShaderIdentifier, shaderIdentifierSize, &rootArguments, sizeof(rootArguments)));
+
+        RootArguments planeRootArguments;
+        planeRootArguments.cb = m_planeCB;
+        hitGroupShaderTable.push_back(ShaderRecord(planeHitGroupShaderIdentifier, shaderIdentifierSize, &planeRootArguments, sizeof(planeRootArguments)));
 		m_hitGroupShaderTable = hitGroupShaderTable.GetResource();
 	}
 
@@ -1359,8 +1365,8 @@ void jRHI_DirectX12::Render()
 
 	// 각 Shader table은 단 한개의 shader record를 가지기 때문에 stride가 그 사이즈와 동일함
 	dispatchDesc.HitGroupTable.StartAddress = m_hitGroupShaderTable->GetGPUVirtualAddress();
-	dispatchDesc.HitGroupTable.SizeInBytes = m_hitGroupShaderTable->GetDesc().Width / 2;
-	dispatchDesc.HitGroupTable.StrideInBytes = dispatchDesc.HitGroupTable.SizeInBytes;
+	dispatchDesc.HitGroupTable.SizeInBytes = m_hitGroupShaderTable->GetDesc().Width;
+	dispatchDesc.HitGroupTable.StrideInBytes = dispatchDesc.HitGroupTable.SizeInBytes / 2;  // 2개의 HitGroupTable이 등록되었으므로 개수 만큼 나눠줌
 
 	dispatchDesc.MissShaderTable.StartAddress = m_missShaderTable->GetGPUVirtualAddress();
 	dispatchDesc.MissShaderTable.SizeInBytes = m_missShaderTable->GetDesc().Width;

@@ -22,10 +22,10 @@ struct SceneConstantBuffer
     float4 lightDiffuseColor;
 };
 
-//struct CubeConstantBuffer
-//{
-//    float4 albedo;
-//};
+struct CubeConstantBuffer
+{
+    float4 albedo;
+};
 
 struct Vertex
 {
@@ -39,7 +39,7 @@ ByteAddressBuffer Indices : register(t1, space0);
 StructuredBuffer<Vertex> Vertices : register(t2, space0);
 
 ConstantBuffer<SceneConstantBuffer> g_sceneCB : register(b0);
-//ConstantBuffer<CubeConstantBuffer> g_cubeCB : register(b1);
+ConstantBuffer<CubeConstantBuffer> g_cubeCB : register(b1);
 
 // 3개의 16비트 인덱스를 byte address buffer 로 부터 가져옴
 uint3 Load3x16BitIndices(uint offsetBytes)
@@ -110,15 +110,15 @@ inline void GenerateCameraRay(uint2 index, out float3 origin, out float3 directi
     direction = normalize(world.xyz - origin);
 }
 
-//// Diffuse lighting calculation
-//float4 CalculationDiffuseLighting(float3 hitPosition, float3 normal)
-//{
-//    float3 pixelToLight = normalize(g_sceneCB.lightPosition.xyz - hitPosition);
-//
-//    // Diffuse 기여
-//    float fNDotL = max(0.0f, dot(pixelToLight, normal));
-//    return g_cubeCB.albedo * g_sceneCB.lightDiffuseColor * fNDotL;
-//}
+// Diffuse lighting calculation
+float4 CalculationDiffuseLighting(float3 hitPosition, float3 normal)
+{
+    float3 pixelToLight = normalize(g_sceneCB.lightPosition.xyz - hitPosition);
+
+    // Diffuse 기여
+    float fNDotL = max(0.0f, dot(pixelToLight, normal));
+    return g_cubeCB.albedo * g_sceneCB.lightDiffuseColor * fNDotL;
+}
 
 [shader("raygeneration")]
 void MyRaygenShader()
@@ -148,33 +148,33 @@ void MyRaygenShader()
 [shader("closesthit")]
 void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 {
-    //float3 hitPosition = HitWorldPosition();
+    float3 hitPosition = HitWorldPosition();
 
-    //// 삼각형의 첫번째 16 비트 인덱스를 기반 인덱스로 가져옴
-    //uint indexSizeInBytes = 2;
-    //uint indicesPerTriangle = 3;
-    //uint triangleIndexStride = indicesPerTriangle * indexSizeInBytes;
-    //uint baseIndex = PrimitiveIndex() * triangleIndexStride;
+    // 삼각형의 첫번째 16 비트 인덱스를 기반 인덱스로 가져옴
+    uint indexSizeInBytes = 2;
+    uint indicesPerTriangle = 3;
+    uint triangleIndexStride = indicesPerTriangle * indexSizeInBytes;
+    uint baseIndex = PrimitiveIndex() * triangleIndexStride;
 
-    //// 삼각형을 위한 3개의 16 비트 인덱스를 로드
-    //const uint3 indices = Load3x16BitIndices(baseIndex);
+    // 삼각형을 위한 3개의 16 비트 인덱스를 로드
+    const uint3 indices = Load3x16BitIndices(baseIndex);
 
-    //// 삼각형 버택스의 버택스 노멀을 얻음
-    //float3 vertexNormals[3] = {
-    //    Vertices[indices[0]].normal,
-    //    Vertices[indices[1]].normal,
-    //    Vertices[indices[2]].normal
-    //};
+    // 삼각형 버택스의 버택스 노멀을 얻음
+    float3 vertexNormals[3] =
+    {
+        Vertices[indices[0]].normal,
+        Vertices[indices[1]].normal,
+        Vertices[indices[2]].normal
+    };
 
-    //// 삼각형의 노멀을 계산함
-    //// 이것은 중복이며, 설명을 위해서 수행함 왜냐하면 모든 버택스당 노멀은 동일하고 이 샘플의 삼각형의 노멀과 일치하기 때문
-    //float3 triangleNormal = HitAttribute(vertexNormals, attr);
+    // 삼각형의 노멀을 계산함
+    // 이것은 중복이며, 설명을 위해서 수행함 왜냐하면 모든 버택스당 노멀은 동일하고 이 샘플의 삼각형의 노멀과 일치하기 때문
+    float3 triangleNormal = HitAttribute(vertexNormals, attr);
 
-    //float4 diffuseColor = CalculationDiffuseLighting(hitPosition, triangleNormal);
-    //float4 color = g_sceneCB.lightAmbientColor + diffuseColor;
+    float4 diffuseColor = CalculationDiffuseLighting(hitPosition, triangleNormal);
+    float4 color = g_sceneCB.lightAmbientColor + diffuseColor;
 
-    //payload.color = color;
-    payload.color = float4(0.5f, 0.0f, 0.0f, 1.0f);
+    payload.color = color;
 }
 
 [shader("miss")]
@@ -187,7 +187,33 @@ void MyMissShader(inout RayPayload payload)
 [shader("closesthit")]
 void MyPlaneClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 {
-    payload.color = float4(0.2f, 0.5f, 0.2f, 1.0f);
+    float3 hitPosition = HitWorldPosition();
+
+    // 삼각형의 첫번째 16 비트 인덱스를 기반 인덱스로 가져옴
+    uint indexSizeInBytes = 2;
+    uint indicesPerTriangle = 3;
+    uint triangleIndexStride = indicesPerTriangle * indexSizeInBytes;
+    uint baseIndex = PrimitiveIndex() * triangleIndexStride;
+
+    // 삼각형을 위한 3개의 16 비트 인덱스를 로드
+    const uint3 indices = Load3x16BitIndices(baseIndex);
+
+    // 삼각형 버택스의 버택스 노멀을 얻음
+    float3 vertexNormals[3] =
+    {
+        Vertices[indices[0]].normal,
+        Vertices[indices[1]].normal,
+        Vertices[indices[2]].normal
+    };
+
+    // 삼각형의 노멀을 계산함
+    // 이것은 중복이며, 설명을 위해서 수행함 왜냐하면 모든 버택스당 노멀은 동일하고 이 샘플의 삼각형의 노멀과 일치하기 때문
+    float3 triangleNormal = HitAttribute(vertexNormals, attr);
+
+    float4 diffuseColor = CalculationDiffuseLighting(hitPosition, triangleNormal);
+    float4 color = g_sceneCB.lightAmbientColor + diffuseColor;
+
+    payload.color = color;
 }
 
 #endif // RAYTRACING_HLSL
