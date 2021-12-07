@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jPrimitiveUtil.h"
 #include "Math/Vector.h"
 #include "jRenderObject.h"
@@ -1363,7 +1363,7 @@ jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector
 	int32 iCount = 0;
 	int32 toNextSlice = slice + 1;
 	int32 temp = 6;
-	for (int32 i = 0; i < (slice) / 2 - 2; ++i, iCount += 1)
+	for (int32 k = 0; k < (slice) / 2 - 2; ++k, iCount += 1)
 	{
 		for (int32 i = 0; i < slice; ++i, iCount += 1)
 		{

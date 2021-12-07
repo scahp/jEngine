@@ -37,6 +37,7 @@ RaytracingAccelerationStructure Scene : register(t0, space0);
 RWTexture2D<float4> RenderTarget : register(u0);
 ByteAddressBuffer Indices : register(t1, space0);
 StructuredBuffer<Vertex> Vertices : register(t2, space0);
+StructuredBuffer<Vertex> PlaneVertices : register(t3, space0);
 
 ConstantBuffer<SceneConstantBuffer> g_sceneCB : register(b0);
 ConstantBuffer<CubeConstantBuffer> g_cubeCB : register(b1);
@@ -175,6 +176,7 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
     float4 color = g_sceneCB.lightAmbientColor + diffuseColor;
 
     payload.color = color;
+    //payload.color = float4(triangleNormal, 1.0);
 }
 
 [shader("miss")]
@@ -189,31 +191,29 @@ void MyPlaneClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 {
     float3 hitPosition = HitWorldPosition();
 
-    // 삼각형의 첫번째 16 비트 인덱스를 기반 인덱스로 가져옴
-    uint indexSizeInBytes = 2;
-    uint indicesPerTriangle = 3;
-    uint triangleIndexStride = indicesPerTriangle * indexSizeInBytes;
-    uint baseIndex = PrimitiveIndex() * triangleIndexStride;
+    //// 삼각형의 노멀을 계산함
+    //// 이것은 중복이며, 설명을 위해서 수행함 왜냐하면 모든 버택스당 노멀은 동일하고 이 샘플의 삼각형의 노멀과 일치하기 때문
+    //float3 triangleNormal = HitAttribute(vertexNormals, attr);
 
-    // 삼각형을 위한 3개의 16 비트 인덱스를 로드
-    const uint3 indices = Load3x16BitIndices(baseIndex);
+    //float4 diffuseColor = CalculationDiffuseLighting(hitPosition, triangleNormal);
+    //float4 color = g_sceneCB.lightAmbientColor + diffuseColor;
 
-    // 삼각형 버택스의 버택스 노멀을 얻음
     float3 vertexNormals[3] =
     {
-        Vertices[indices[0]].normal,
-        Vertices[indices[1]].normal,
-        Vertices[indices[2]].normal
+        PlaneVertices[PrimitiveIndex() * 3 + 0].normal,
+        PlaneVertices[PrimitiveIndex() * 3 + 1].normal,
+        PlaneVertices[PrimitiveIndex() * 3 + 2].normal
     };
-
+    
     // 삼각형의 노멀을 계산함
     // 이것은 중복이며, 설명을 위해서 수행함 왜냐하면 모든 버택스당 노멀은 동일하고 이 샘플의 삼각형의 노멀과 일치하기 때문
     float3 triangleNormal = HitAttribute(vertexNormals, attr);
 
     float4 diffuseColor = CalculationDiffuseLighting(hitPosition, triangleNormal);
     float4 color = g_sceneCB.lightAmbientColor + diffuseColor;
-
+    
     payload.color = color;
+    //payload.color = float4(triangleNormal, 1.0f);
 }
 
 #endif // RAYTRACING_HLSL

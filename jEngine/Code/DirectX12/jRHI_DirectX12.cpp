@@ -466,7 +466,7 @@ void jRHI_DirectX12::Initialize()
         m_planeCB.albedo = XMFLOAT4(0.2f, 0.5f, 0.2f, 1.0f);
 
         // Setup camera
-        m_eye = { 0.0f, 2.0f, -5.0f, 1.0f };
+        m_eye = { 0.0f, 5.0f, -15.0f, 1.0f };
         m_at = { 0.0f, 0.0f, 0.0f, 1.0f };
         XMVECTOR right = { 1.0f, 0.0f, 0.0f, 0.0f };
 
@@ -491,7 +491,7 @@ void jRHI_DirectX12::Initialize()
         lightAmbientColor = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
         m_sceneCB[frameIndex].lightAmbientColor = XMLoadFloat4(&lightAmbientColor);
 
-        lightDiffuseColor = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
+        lightDiffuseColor = XMFLOAT4(0.5f, 0.3f, 0.3f, 1.0f);
         m_sceneCB[frameIndex].lightDiffuseColor = XMLoadFloat4(&lightDiffuseColor);
 
         // 모든 프레임의 버퍼 인스턴스에 초기값을 설정해줌
@@ -503,9 +503,10 @@ void jRHI_DirectX12::Initialize()
 
 
 	D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc{};
-	// 2 - vertex and index buffer SRV
+	// 2 - vertex and index buffer SRV for Cube
+    // 1 - vertex buffer SRV for Plane
 	// 1 - ratracing output texture UAV
-	cbvHeapDesc.NumDescriptors = 3;
+	cbvHeapDesc.NumDescriptors = 4;
 	cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	if (JFAIL(m_device->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_cbvHeap))))
@@ -569,12 +570,14 @@ void jRHI_DirectX12::Initialize()
 	{
 		// global root signature는 DispatchRays 함수 호출로 만들어지는 레이트레이싱 쉐이더의 전체에 공유됨.
 
-		CD3DX12_DESCRIPTOR_RANGE ranges[2];		// 가장 빈번히 사용되는 것을 앞에 둘 수록 최적화에 좋음
+		CD3DX12_DESCRIPTOR_RANGE ranges[3];		// 가장 빈번히 사용되는 것을 앞에 둘 수록 최적화에 좋음
 		ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);		// 1 output texture
-		ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 1);		// 2 static index and vertex buffer
+		ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 1);		// 2 static index and vertex buffer for cube
+        ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 3);		// 1 vertex buffer for plane
 
 		CD3DX12_ROOT_PARAMETER rootParameters[GlobalRootSignatureParams::Count];
 		rootParameters[GlobalRootSignatureParams::VertexBuffersSlot].InitAsDescriptorTable(1, &ranges[1]);
+        rootParameters[GlobalRootSignatureParams::PlaneVertexBufferSlot].InitAsDescriptorTable(1, &ranges[2]);
 		rootParameters[GlobalRootSignatureParams::OutputViewSlot].InitAsDescriptorTable(1, &ranges[0]);
 		rootParameters[GlobalRootSignatureParams::AccelerationStructureSlot].InitAsShaderResourceView(0);
 		rootParameters[GlobalRootSignatureParams::SceneConstantSlot].InitAsConstantBufferView(0);
@@ -820,63 +823,79 @@ void jRHI_DirectX12::Initialize()
     if (JFAIL(m_commandList->Reset(m_commandAllocator[m_frameIndex].Get(), nullptr)))
         return;
 
-	uint16 indices[] =
-	{
-		3,1,0,
-		2,1,3,
+    const int32 slice = 20;
+    const int32 verticesCount = ((slice + 1) * (slice / 2) + 2);
+    const int32 verticesElementCount = ((slice + 1) * (slice / 2) + 2) / 3;
 
-		6,4,5,
-		7,4,6,
+    uint16 indices[((slice) / 2 - 2) * slice * 6 + (slice * 2 * 3)];
 
-		11,9,8,
-		10,9,11,
+    int32 iCount = 0;
+    int32 toNextSlice = slice + 1;
+    int32 cntIndex = 0;
+    for (int32 k = 0; k < (slice) / 2 - 2; ++k, iCount += 1)
+    {
+        for (int32 i = 0; i < slice; ++i, iCount += 1)
+        {
+            indices[cntIndex++] = iCount; indices[cntIndex++] = (iCount + 1); indices[cntIndex++] = (iCount + toNextSlice);
+            indices[cntIndex++] = (iCount + toNextSlice); indices[cntIndex++] = (iCount + 1); indices[cntIndex++] = (iCount + toNextSlice + 1);
+        }
+    }
 
-		14,12,13,
-		15,12,14,
+    for (int32 i = 0; i < slice; ++i, iCount += 1)
+    {
+        indices[cntIndex++] = (iCount);
+        indices[cntIndex++] = (iCount + 1);
+        indices[cntIndex++] = (verticesCount - 1);
+    }
 
-		19,17,16,
-		18,17,19,
-
-		22,20,21,
-		23,20,22
-	};
+    iCount = 0;
+    for (int32 i = 0; i < slice; ++i, iCount += 1)
+    {
+        indices[cntIndex++] = (iCount);
+        indices[cntIndex++] = (verticesCount - 2);
+        indices[cntIndex++] = (iCount + 1);
+    }
 
 	// Vertex and normal
-	Vertex vertices[] =
-	{
-		{ XMFLOAT3(-1.0f, 1.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
-		{ XMFLOAT3(1.0f, 1.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
-		{ XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
-		{ XMFLOAT3(-1.0f, 1.0f, 1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
+    Vertex vertices[verticesCount];
 
-		{ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(0.0f, -1.0f, 0.0f) },
-		{ XMFLOAT3(1.0f, -1.0f, -1.0f), XMFLOAT3(0.0f, -1.0f, 0.0f) },
-		{ XMFLOAT3(1.0f, -1.0f, 1.0f), XMFLOAT3(0.0f, -1.0f, 0.0f) },
-		{ XMFLOAT3(-1.0f, -1.0f, 1.0f), XMFLOAT3(0.0f, -1.0f, 0.0f) },
 
-		{ XMFLOAT3(-1.0f, -1.0f, 1.0f), XMFLOAT3(-1.0f, 0.0f, 0.0f) },
-		{ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(-1.0f, 0.0f, 0.0f) },
-		{ XMFLOAT3(-1.0f, 1.0f, -1.0f), XMFLOAT3(-1.0f, 0.0f, 0.0f) },
-		{ XMFLOAT3(-1.0f, 1.0f, 1.0f), XMFLOAT3(-1.0f, 0.0f, 0.0f) },
+    const float stepRadian = DegreeToRadian(360.0f / slice);
+    const float radius = 1.5f;
+    Vector offset = {0.0f, 0.0f, 0.0f};
+    int32 cnt = 0;
+    for (int32 j = 0; j < slice / 2; ++j)
+    {
+        for (int32 i = 0; i <= slice; ++i, ++cnt)
+        {
+            const Vector temp(offset.x + cosf(stepRadian * i) * radius * sinf(stepRadian * (j + 1))
+                , offset.z + cosf(stepRadian * (j + 1)) * radius
+                , offset.y + sinf(stepRadian * i) * radius * sinf(stepRadian * (j + 1)));
+            vertices[cnt].position = XMFLOAT3(temp.x, temp.y, temp.z);
+            
+            const Vector normal = temp.GetNormalize();
+            vertices[cnt].normal = XMFLOAT3(normal.x, normal.y, normal.z);
+        }
+    }
 
-		{ XMFLOAT3(1.0f, -1.0f, 1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f) },
-		{ XMFLOAT3(1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f) },
-		{ XMFLOAT3(1.0f, 1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f) },
-		{ XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f) },
+    // top
+    {
+        vertices[cnt].position = XMFLOAT3(0.0f, radius, 0.0f);
+        Vector normal = Vector(0.0f, radius, 0.0f).GetNormalize();
+        vertices[cnt].normal = XMFLOAT3(normal.x, normal.y, normal.z);
+        ++cnt;
+    }
 
-		{ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(0.0f, 0.0f, -1.0f) },
-		{ XMFLOAT3(1.0f, -1.0f, -1.0f), XMFLOAT3(0.0f, 0.0f, -1.0f) },
-		{ XMFLOAT3(1.0f, 1.0f, -1.0f), XMFLOAT3(0.0f, 0.0f, -1.0f) },
-		{ XMFLOAT3(-1.0f, 1.0f, -1.0f), XMFLOAT3(0.0f, 0.0f, -1.0f) },
+    // down
+    {    
+        vertices[cnt].position = XMFLOAT3(0.0f, -radius, 0.0f);
+        Vector normal = Vector(0.0f, -radius, 0.0f).GetNormalize();
+        vertices[cnt].normal = XMFLOAT3(normal.x, normal.y, normal.z);
+        ++cnt;
+    }
 
-		{ XMFLOAT3(-1.0f, -1.0f, 1.0f), XMFLOAT3(0.0f, 0.0f, 1.0f) },
-		{ XMFLOAT3(1.0f, -1.0f, 1.0f), XMFLOAT3(0.0f, 0.0f, 1.0f) },
-		{ XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(0.0f, 0.0f, 1.0f) },
-		{ XMFLOAT3(-1.0f, 1.0f, 1.0f), XMFLOAT3(0.0f, 0.0f, 1.0f) },
-	};
-
-	BufferUtil::AllocateUploadBuffer(&m_vertexBuffer, m_device.Get(), vertices, sizeof(vertices));
-	BufferUtil::AllocateUploadBuffer(&m_indexBuffer, m_device.Get(), indices, sizeof(indices));
+	BufferUtil::AllocateUploadBuffer(&m_vertexBuffer, m_device.Get(), vertices, sizeof(vertices), TEXT("SphereVB"));
+	BufferUtil::AllocateUploadBuffer(&m_indexBuffer, m_device.Get(), indices, sizeof(indices), TEXT("SphereIB"));
 
 	// 버택스 버퍼와 인덱스 버퍼는 디스크립터 테이블로 쉐이더로 전달됨
 	// 디스크립터 힙에서 버택스 버퍼 디스크립터는 인덱스 버퍼 디스크립터에 바로다음에 있어야 함
@@ -992,7 +1011,28 @@ void jRHI_DirectX12::Initialize()
             XMFLOAT3(100.0f, -1.0f, 100.0f),   XMFLOAT3(0.0f, 1.0f, 0.0f),
     };
 
-    BufferUtil::AllocateUploadBuffer(&m_vertexBufferSecondGeometry, m_device.Get(), secondVertices, sizeof(secondVertices));
+    BufferUtil::AllocateUploadBuffer(&m_vertexBufferSecondGeometry, m_device.Get(), secondVertices, sizeof(secondVertices), TEXT("SecondGeometryVB"));
+
+    {
+        // VertexBuffer SRV
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.Buffer.NumElements = _countof(secondVertices);
+        srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+        srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+        srvDesc.Buffer.StructureByteStride = sizeof(secondVertices[0]);
+
+        uint32 descriptorIndex = UINT_MAX;
+        if (descriptorIndex >= m_cbvHeap->GetDesc().NumDescriptors)
+        {
+            descriptorIndex = m_allocatedDescriptors++;
+        }
+        m_vertexBufferCpuDescriptorSecondGeometry = CD3DX12_CPU_DESCRIPTOR_HANDLE(m_cbvHeap->GetCPUDescriptorHandleForHeapStart(), descriptorIndex, m_cbvDescriptorSize);
+
+        m_device->CreateShaderResourceView(m_vertexBufferSecondGeometry.Get(), &srvDesc, m_vertexBufferCpuDescriptorSecondGeometry);
+        m_vertexBufferGpuDescriptorSecondGeometry = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_cbvHeap->GetGPUDescriptorHandleForHeapStart(), descriptorIndex, m_cbvDescriptorSize);
+    }
 
     D3D12_RAYTRACING_GEOMETRY_DESC secondGeometryDesc{};
     secondGeometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
@@ -1060,14 +1100,16 @@ void jRHI_DirectX12::Initialize()
 	ComPtr<ID3D12Resource> instanceDescs;
     D3D12_RAYTRACING_INSTANCE_DESC instanceDesc[3] = { {}, {}, {} };
     {
-        float XOffset = -2.0f;
+        const float Step = 4.0f;
+        float XOffset = -Step;
         int32 i = 0;
         for (i = 0; i < _countof(instanceDesc) - 1; ++i)
         {
             instanceDesc[i].InstanceID = i;
             instanceDesc[i].InstanceContributionToHitGroupIndex = 0;
             instanceDesc[i].Transform[0][0] = instanceDesc[i].Transform[1][1] = instanceDesc[i].Transform[2][2] = 1;
-            instanceDesc[i].Transform[0][3] = XOffset + i * 4.0f;
+            instanceDesc[i].Transform[0][3] = XOffset + i * Step;
+            instanceDesc[i].Transform[1][3] = 1.0f;
             instanceDesc[i].InstanceMask = 1;
             instanceDesc[i].AccelerationStructure = m_bottomLevelAccelerationStructure->GetGPUVirtualAddress();
         }
@@ -1329,11 +1371,15 @@ void jRHI_DirectX12::Update()
 
 	// Y 축 주변으로 두번째 라이트를 회전
 	{
-		float secondsToRotateAround = 8.0f;
+        constexpr float secondsToRotateAround = 8.0f;
 		float angleToRotateBy = -360.0f * (elapsedTime / secondsToRotateAround);
-		XMMATRIX rotate = XMMatrixRotationY(XMConvertToRadians(angleToRotateBy));
-		const XMVECTOR& prevLightPosition = m_sceneCB[prevFrameIndex].lightPosition;
-		m_sceneCB[m_frameIndex].lightPosition = XMVector3Transform(prevLightPosition, rotate);
+
+        static float accAngle = 0.0f;
+        accAngle += angleToRotateBy;
+
+		XMMATRIX rotate = XMMatrixRotationY(XMConvertToRadians(accAngle));
+        constexpr XMVECTOR rotationRadius = { 0.0f, 0.0f, 8.0f };
+		m_sceneCB[m_frameIndex].lightPosition = XMVector3Transform(rotationRadius, rotate);
 	}
 }
 
@@ -1358,8 +1404,10 @@ void jRHI_DirectX12::Render()
 	D3D12_DISPATCH_RAYS_DESC dispatchDesc{};
 	m_commandList->SetDescriptorHeaps(1, m_cbvHeap.GetAddressOf());
 	m_commandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::VertexBuffersSlot, m_indexBufferGpuDescriptor);
-	m_commandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::OutputViewSlot
-		, m_raytracingOutputResourceUAVGpuDescriptor);
+    m_commandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::PlaneVertexBufferSlot
+        , m_vertexBufferGpuDescriptorSecondGeometry);
+    m_commandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::OutputViewSlot
+        , m_raytracingOutputResourceUAVGpuDescriptor);
 	m_commandList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot
 		, m_topLevelAccelerationStructure->GetGPUVirtualAddress());
 

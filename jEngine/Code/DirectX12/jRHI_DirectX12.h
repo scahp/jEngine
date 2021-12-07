@@ -25,6 +25,7 @@ struct GlobalRootSignatureParams {
 		AccelerationStructureSlot,
 		SceneConstantSlot,
 		VertexBuffersSlot,
+        PlaneVertexBufferSlot,
 		Count
 	};
 };
@@ -245,5 +246,8 @@ public:
 
 	D3D12_CPU_DESCRIPTOR_HANDLE m_vertexBufferCpuDescriptor;
 	D3D12_GPU_DESCRIPTOR_HANDLE m_vertexBufferGpuDescriptor;
+    
+    D3D12_CPU_DESCRIPTOR_HANDLE m_vertexBufferCpuDescriptorSecondGeometry;
+    D3D12_GPU_DESCRIPTOR_HANDLE m_vertexBufferGpuDescriptorSecondGeometry;
 };
 
