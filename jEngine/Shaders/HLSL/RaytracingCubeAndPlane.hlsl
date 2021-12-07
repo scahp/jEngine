@@ -12,6 +12,8 @@
 #ifndef RAYTRACING_HLSL
 #define RAYTRACING_HLSL
 
+#define MAX_RECURSION_DEPTH 10
+
 //#include "RaytracingHlslCompat.h"
 struct SceneConstantBuffer
 {
@@ -40,7 +42,7 @@ StructuredBuffer<Vertex> Vertices : register(t2, space0);
 StructuredBuffer<Vertex> PlaneVertices : register(t3, space0);
 
 ConstantBuffer<SceneConstantBuffer> g_sceneCB : register(b0);
-ConstantBuffer<CubeConstantBuffer> g_cubeCB : register(b1);
+ConstantBuffer<CubeConstantBuffer> g_localRootSigCB : register(b1);
 
 // 3개의 16비트 인덱스를 byte address buffer 로 부터 가져옴
 uint3 Load3x16BitIndices(uint offsetBytes)
@@ -78,6 +80,7 @@ typedef BuiltInTriangleIntersectionAttributes MyAttributes;
 struct RayPayload
 {
     float4 color;
+    uint currentRecursionDepth;
 };
 
 // hit world position 얻기
@@ -118,7 +121,7 @@ float4 CalculationDiffuseLighting(float3 hitPosition, float3 normal)
 
     // Diffuse 기여
     float fNDotL = max(0.0f, dot(pixelToLight, normal));
-    return g_cubeCB.albedo * g_sceneCB.lightDiffuseColor * fNDotL;
+    return g_localRootSigCB.albedo * g_sceneCB.lightDiffuseColor * fNDotL;
 }
 
 [shader("raygeneration")]
@@ -139,18 +142,33 @@ void MyRaygenShader()
     // TMin을 작은 갑승로 유지해서 접촉하고 있는 영역에서 지오메트리 missing을 예방
     ray.TMin = 0.001;
     ray.TMax = 10000.0;
-    RayPayload payload = { float4(0, 0, 0, 0) };
+    // RayPayload payload = { float4(0, 0, 0, 0) };
+    RayPayload payload = { float4(1.0f, 1.0f, 1.0f, 1.0f), 0 };
     TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0, ray, payload);
 
     // 출력 텍스쳐에 반직선 추적된 색상을 기록함
     RenderTarget[DispatchRaysIndex().xy] = payload.color;
 }
 
+float3 random_in_unit_sphere()
+{
+    float2 uv = DispatchRaysIndex().xy + float2(RayTCurrent(), RayTCurrent() * 2.0f);
+    float noiseX = (frac(sin(dot(uv, float2(12.9898, 78.233))) * 43758.5453));
+    float noiseY = (frac(sin(dot(uv, float2(12.9898, 78.233) * 2.0)) * 43758.5453));
+    float noiseZ = (frac(sin(dot(uv, float2(12.9898, 78.233) * 3.0)) * 43758.5453));
+    
+    float3 randomUniSphere = float3(noiseX, noiseY, noiseZ);
+    if (length(randomUniSphere) <= 1.0f)
+        return randomUniSphere;
+
+    return normalize(randomUniSphere);
+}
+
 [shader("closesthit")]
 void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 {
     float3 hitPosition = HitWorldPosition();
-
+        
     // 삼각형의 첫번째 16 비트 인덱스를 기반 인덱스로 가져옴
     uint indexSizeInBytes = 2;
     uint indicesPerTriangle = 3;
@@ -172,18 +190,41 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
     // 이것은 중복이며, 설명을 위해서 수행함 왜냐하면 모든 버택스당 노멀은 동일하고 이 샘플의 삼각형의 노멀과 일치하기 때문
     float3 triangleNormal = HitAttribute(vertexNormals, attr);
 
-    float4 diffuseColor = CalculationDiffuseLighting(hitPosition, triangleNormal);
-    float4 color = g_sceneCB.lightAmbientColor + diffuseColor;
+    ///
 
-    payload.color = color;
-    //payload.color = float4(triangleNormal, 1.0);
+    if (payload.currentRecursionDepth < MAX_RECURSION_DEPTH)
+    {
+        payload.color *= g_localRootSigCB.albedo;
+        payload.currentRecursionDepth++;
+
+        // 반직선 추적
+        RayDesc ray;
+        ray.Origin = hitPosition;
+        ray.Direction = triangleNormal + random_in_unit_sphere();
+
+        // TMin을 0이 아닌 작은 값으로 설정하여 앨리어싱 이슈를 피함. - floating point 에러
+        // TMin을 작은 갑승로 유지해서 접촉하고 있는 영역에서 지오메트리 missing을 예방
+        ray.TMin = 0.001;
+        ray.TMax = 10000.0;
+        TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0, ray, payload);
+    }
+    ///
+
+    //float4 diffuseColor = CalculationDiffuseLighting(hitPosition, triangleNormal);
+    //float4 color = g_sceneCB.lightAmbientColor + diffuseColor;
+
+    //payload.color = color;
+    ////payload.color = float4(triangleNormal, 1.0);
 }
 
 [shader("miss")]
 void MyMissShader(inout RayPayload payload)
 {
-    float4 background = float4(0.0f, 0.2f, 0.4f, 1.0f);
-    payload.color = background;
+    if (payload.currentRecursionDepth == 0)
+    {
+        float4 background = float4(0.0f, 0.2f, 0.4f, 1.0f);
+        payload.color = background;
+    }
 }
 
 [shader("closesthit")]
@@ -209,11 +250,28 @@ void MyPlaneClosestHitShader(inout RayPayload payload, in MyAttributes attr)
     // 이것은 중복이며, 설명을 위해서 수행함 왜냐하면 모든 버택스당 노멀은 동일하고 이 샘플의 삼각형의 노멀과 일치하기 때문
     float3 triangleNormal = HitAttribute(vertexNormals, attr);
 
-    float4 diffuseColor = CalculationDiffuseLighting(hitPosition, triangleNormal);
-    float4 color = g_sceneCB.lightAmbientColor + diffuseColor;
-    
-    payload.color = color;
-    //payload.color = float4(triangleNormal, 1.0f);
+    if (payload.currentRecursionDepth < MAX_RECURSION_DEPTH)
+    {
+        payload.color *= g_localRootSigCB.albedo;
+        payload.currentRecursionDepth++;
+
+        // 반직선 추적
+        RayDesc ray;
+        ray.Origin = hitPosition;
+        ray.Direction = triangleNormal + random_in_unit_sphere();
+
+        // TMin을 0이 아닌 작은 값으로 설정하여 앨리어싱 이슈를 피함. - floating point 에러
+        // TMin을 작은 갑승로 유지해서 접촉하고 있는 영역에서 지오메트리 missing을 예방
+        ray.TMin = 0.001;
+        ray.TMax = 10000.0;
+        TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0, ray, payload);
+    }
+
+    //float4 diffuseColor = CalculationDiffuseLighting(hitPosition, triangleNormal);
+    //float4 color = g_sceneCB.lightAmbientColor + diffuseColor;
+    //
+    //payload.color = color;
+    ////payload.color = float4(triangleNormal, 1.0f);
 }
 
 #endif // RAYTRACING_HLSL

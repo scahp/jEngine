@@ -462,7 +462,7 @@ void jRHI_DirectX12::Initialize()
         auto frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
         // Setup material
-        m_cubeCB.albedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+        m_cubeCB.albedo = XMFLOAT4(0.8f, 0.8f, 0.8f, 1.0f);
         m_planeCB.albedo = XMFLOAT4(0.2f, 0.5f, 0.2f, 1.0f);
 
         // Setup camera
@@ -707,7 +707,7 @@ void jRHI_DirectX12::Initialize()
 	D3D12_RAYTRACING_SHADER_CONFIG shaderConfig;
 	{
 		shaderConfig.MaxAttributeSizeInBytes = 2 * sizeof(float);	// float2 barycentrics
-		shaderConfig.MaxPayloadSizeInBytes = 4 * sizeof(float);		// float4 color
+		shaderConfig.MaxPayloadSizeInBytes = 4 * sizeof(float) + sizeof(int32);		// float4 color + float maxDepth
 
 		D3D12_STATE_SUBOBJECT subobject{};
 		subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG;
@@ -795,7 +795,8 @@ void jRHI_DirectX12::Initialize()
 	// 6). Pipeline Config
 	D3D12_RAYTRACING_PIPELINE_CONFIG pipelineConfig;
 	{
-		pipelineConfig.MaxTraceRecursionDepth = 1;
+		// pipelineConfig.MaxTraceRecursionDepth = D3D12_RAYTRACING_MAX_DECLARABLE_TRACE_RECURSION_DEPTH;
+        pipelineConfig.MaxTraceRecursionDepth = 11;
 
 		D3D12_STATE_SUBOBJECT subobject{};
 		subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG;
