@@ -192,7 +192,7 @@ public:
 	// 12. AccelerationStructures
 	ComPtr<ID3D12Resource> m_bottomLevelAccelerationStructure;
     ComPtr<ID3D12Resource> m_bottomLevelAccelerationStructureSecondGeometry;
-	ComPtr<ID3D12Resource> m_topLevelAccelerationStructure;
+	//ComPtr<ID3D12Resource> m_topLevelAccelerationStructure;
 
 	//////////////////////////////////////////////////////////////////////////
 	// 13. ShaderTable
@@ -249,5 +249,15 @@ public:
     
     D3D12_CPU_DESCRIPTOR_HANDLE m_vertexBufferCpuDescriptorSecondGeometry;
     D3D12_GPU_DESCRIPTOR_HANDLE m_vertexBufferGpuDescriptorSecondGeometry;
+
+    struct TopLevelAccelerationStructureBuffers
+    {
+        ComPtr<ID3D12Resource> Scratch;
+        ComPtr<ID3D12Resource> Result;
+        ComPtr<ID3D12Resource> InstanceDesc;    // Used only for top-level AS
+    };
+    TopLevelAccelerationStructureBuffers TLASBuffer;
+
+    bool BuildTopLevelAS(TopLevelAccelerationStructureBuffers& InBuffers, bool InIsUpdate, float InRotationY, Vector InTranslation);
 };
 

@@ -1075,64 +1075,65 @@ void jRHI_DirectX12::Initialize()
     m_dxrCommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDescSecondGeometry, 0, nullptr);
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(m_bottomLevelAccelerationStructureSecondGeometry.Get()));
 
-    // TLAS
-    D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO topLevelPrebuildInfo{};
-    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS topLevelInputs{};
-    {
-        D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
-        topLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-        topLevelInputs.Flags = buildFlags;
-        topLevelInputs.NumDescs = 3;
-        topLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
+    if (!JASSERT(BuildTopLevelAS(TLASBuffer, 0.0f, 0.0f, Vector::ZeroVector)))
+        return;
+ //   D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO topLevelPrebuildInfo{};
+ //   D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS topLevelInputs{};
+ //   {
+ //       D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+ //       topLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+ //       topLevelInputs.Flags = buildFlags;
+ //       topLevelInputs.NumDescs = 3;
+ //       topLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
 
-        m_dxrDevice->GetRaytracingAccelerationStructurePrebuildInfo(&topLevelInputs, &topLevelPrebuildInfo);
-        if (!JASSERT(topLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0))
-            return;
-    }
+ //       m_dxrDevice->GetRaytracingAccelerationStructurePrebuildInfo(&topLevelInputs, &topLevelPrebuildInfo);
+ //       if (!JASSERT(topLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0))
+ //           return;
+ //   }
 
-	ComPtr<ID3D12Resource> topLevelScratchResource;
-	BufferUtil::AllocateUAVBuffer(&topLevelScratchResource, m_device.Get(), topLevelPrebuildInfo.ScratchDataSizeInBytes
-		, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, L"ScratchResource");
+	//ComPtr<ID3D12Resource> topLevelScratchResource;
+	//BufferUtil::AllocateUAVBuffer(&topLevelScratchResource, m_device.Get(), topLevelPrebuildInfo.ScratchDataSizeInBytes
+	//	, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, L"ScratchResource");
 
-	BufferUtil::AllocateUAVBuffer(&m_topLevelAccelerationStructure, m_device.Get()
-		, topLevelPrebuildInfo.ResultDataMaxSizeInBytes, initialResourceState, TEXT("TopLevelAccelerationStructure"));
+	//BufferUtil::AllocateUAVBuffer(&m_topLevelAccelerationStructure, m_device.Get()
+	//	, topLevelPrebuildInfo.ResultDataMaxSizeInBytes, initialResourceState, TEXT("TopLevelAccelerationStructure"));
 
-	// Bottom-level acceleration structure 를 위한 instance Desc 생성
-	ComPtr<ID3D12Resource> instanceDescs;
-    D3D12_RAYTRACING_INSTANCE_DESC instanceDesc[3] = { {}, {}, {} };
-    {
-        const float Step = 4.0f;
-        float XOffset = -Step;
-        int32 i = 0;
-        for (i = 0; i < _countof(instanceDesc) - 1; ++i)
-        {
-            instanceDesc[i].InstanceID = i;
-            instanceDesc[i].InstanceContributionToHitGroupIndex = 0;
-            instanceDesc[i].Transform[0][0] = instanceDesc[i].Transform[1][1] = instanceDesc[i].Transform[2][2] = 1;
-            instanceDesc[i].Transform[0][3] = XOffset + i * Step;
-            instanceDesc[i].Transform[1][3] = 1.0f;
-            instanceDesc[i].InstanceMask = 1;
-            instanceDesc[i].AccelerationStructure = m_bottomLevelAccelerationStructure->GetGPUVirtualAddress();
-        }
+	//// Bottom-level acceleration structure 를 위한 instance Desc 생성
+	//ComPtr<ID3D12Resource> instanceDescs;
+ //   D3D12_RAYTRACING_INSTANCE_DESC instanceDesc[3] = { {}, {}, {} };
+ //   {
+ //       const float Step = 4.0f;
+ //       float XOffset = -Step;
+ //       int32 i = 0;
+ //       for (i = 0; i < _countof(instanceDesc) - 1; ++i)
+ //       {
+ //           instanceDesc[i].InstanceID = i;
+ //           instanceDesc[i].InstanceContributionToHitGroupIndex = 0;
+ //           instanceDesc[i].Transform[0][0] = instanceDesc[i].Transform[1][1] = instanceDesc[i].Transform[2][2] = 1;
+ //           instanceDesc[i].Transform[0][3] = XOffset + i * Step;
+ //           instanceDesc[i].Transform[1][3] = 1.0f;
+ //           instanceDesc[i].InstanceMask = 1;
+ //           instanceDesc[i].AccelerationStructure = m_bottomLevelAccelerationStructure->GetGPUVirtualAddress();
+ //       }
 
-        instanceDesc[i].InstanceID = i;
-        instanceDesc[i].InstanceContributionToHitGroupIndex = 1;
-        memset(&instanceDesc[i].Transform, 0, sizeof(instanceDesc[i].Transform));
-        instanceDesc[i].Transform[0][0] = instanceDesc[i].Transform[1][1] = instanceDesc[i].Transform[2][2] = 1.0f;
-        instanceDesc[i].InstanceMask = 1;
-        instanceDesc[i].AccelerationStructure = m_bottomLevelAccelerationStructureSecondGeometry->GetGPUVirtualAddress();
-        instanceDesc[i].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_CULL_DISABLE;
-    }
-	BufferUtil::AllocateUploadBuffer(&instanceDescs, m_device.Get(), &instanceDesc, sizeof(instanceDesc), TEXT("InstanceDescs"));
+ //       instanceDesc[i].InstanceID = i;
+ //       instanceDesc[i].InstanceContributionToHitGroupIndex = 1;
+ //       memset(&instanceDesc[i].Transform, 0, sizeof(instanceDesc[i].Transform));
+ //       instanceDesc[i].Transform[0][0] = instanceDesc[i].Transform[1][1] = instanceDesc[i].Transform[2][2] = 1.0f;
+ //       instanceDesc[i].InstanceMask = 1;
+ //       instanceDesc[i].AccelerationStructure = m_bottomLevelAccelerationStructureSecondGeometry->GetGPUVirtualAddress();
+ //       instanceDesc[i].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_CULL_DISABLE;
+ //   }
+	//BufferUtil::AllocateUploadBuffer(&instanceDescs, m_device.Get(), &instanceDesc, sizeof(instanceDesc), TEXT("InstanceDescs"));
 
-	// Top level acceleration structure desc
-	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC topLevelBuildDesc{};
-	topLevelInputs.InstanceDescs = instanceDescs->GetGPUVirtualAddress();
-	topLevelBuildDesc.Inputs = topLevelInputs;
-	topLevelBuildDesc.DestAccelerationStructureData = m_topLevelAccelerationStructure->GetGPUVirtualAddress();
-	topLevelBuildDesc.ScratchAccelerationStructureData = topLevelScratchResource->GetGPUVirtualAddress();
+	//// Top level acceleration structure desc
+	//D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC topLevelBuildDesc{};
+	//topLevelInputs.InstanceDescs = instanceDescs->GetGPUVirtualAddress();
+	//topLevelBuildDesc.Inputs = topLevelInputs;
+	//topLevelBuildDesc.DestAccelerationStructureData = m_topLevelAccelerationStructure->GetGPUVirtualAddress();
+	//topLevelBuildDesc.ScratchAccelerationStructureData = topLevelScratchResource->GetGPUVirtualAddress();
 
-	m_dxrCommandList->BuildRaytracingAccelerationStructure(&topLevelBuildDesc, 0, nullptr);
+	//m_dxrCommandList->BuildRaytracingAccelerationStructure(&topLevelBuildDesc, 0, nullptr);
 
 	if (JFAIL(m_commandList->Close()))
 		return;
@@ -1274,7 +1275,8 @@ void jRHI_DirectX12::Release()
 	//////////////////////////////////////////////////////////////////////////
 	// 12. AccelerationStructures
 	m_bottomLevelAccelerationStructure.Reset();
-	m_topLevelAccelerationStructure.Reset();
+	//m_topLevelAccelerationStructure.Reset();
+    TLASBuffer.Result.Reset();
 
 	//////////////////////////////////////////////////////////////////////////
 	// 11. Create vertex and index buffer
@@ -1350,23 +1352,114 @@ void jRHI_DirectX12::UpdateCameraMatrices()
 	m_sceneCB[frameIndex].projectionToWorld = XMMatrixInverse(nullptr, viewProj);
 }
 
+bool jRHI_DirectX12::BuildTopLevelAS(TopLevelAccelerationStructureBuffers& InBuffers, bool InIsUpdate, float InRotationY, Vector InTranslation)
+{
+    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
+    inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+    inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
+    inputs.NumDescs = 3;
+    inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
+
+    D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO info;
+    m_dxrDevice->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &info);
+    if (!JASSERT(info.ResultDataMaxSizeInBytes > 0))
+        return false;
+
+    if (InIsUpdate)
+    {
+        // Update 요청이 온다면 TLAS 는 이미 DispatchRay()의 호출에서 사용되고있다.
+        // 버퍼가 업데이트 되기 전에 UAV 베리어를 read 연산의 끝에 넣어줘야 한다.
+
+        D3D12_RESOURCE_BARRIER uavBarrier = {};
+        uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+        uavBarrier.UAV.pResource = InBuffers.Result.Get();
+        m_dxrCommandList->ResourceBarrier(1, &uavBarrier);
+    }
+    else
+    {
+        // Update 요청이 아니면, 버퍼를 새로 만들어야 함, 그렇지 않으면 그대로 refit(이미 존재하는 TLAS를 업데이트) 될 것임.
+        BufferUtil::AllocateUAVBuffer(&InBuffers.Scratch, m_device.Get(), info.ScratchDataSizeInBytes, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, TEXT("TLAS Scratch Buffer"));
+        BufferUtil::AllocateUAVBuffer(&InBuffers.Result, m_device.Get(), info.ResultDataMaxSizeInBytes, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, TEXT("TLAS Result Buffer"));
+        BufferUtil::AllocateUploadBuffer(&InBuffers.InstanceDesc, m_device.Get(), nullptr, sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * 3, TEXT("TLAS Instance Desc"));
+    }
+
+    D3D12_RAYTRACING_INSTANCE_DESC* instanceDescs = nullptr;
+    InBuffers.InstanceDesc->Map(0, nullptr, (void**)&instanceDescs);
+    ZeroMemory(instanceDescs, sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * 3);
+
+    const float Step = 4.0f;
+
+    XMMATRIX transformation[3];
+    XMMATRIX rotateMat = XMMatrixRotationY(XMConvertToRadians(InRotationY));
+    transformation[0] = XMMatrixTranspose(XMMatrixMultiply(rotateMat, XMMatrixTranslation(InTranslation.x - Step, InTranslation.y + 1.0f, InTranslation.z)));
+    transformation[1] = XMMatrixTranspose(XMMatrixMultiply(rotateMat, XMMatrixTranslation(InTranslation.x + Step, InTranslation.y + 1.0f, InTranslation.z)));
+    transformation[2] = XMMatrixTranspose(XMMatrixIdentity());
+
+    int32 i = 0;
+    for (i = 0; i < 3 - 1; ++i)
+    {
+        instanceDescs[i].InstanceID = i;
+        instanceDescs[i].InstanceContributionToHitGroupIndex = 0;
+        memcpy(instanceDescs[i].Transform, &transformation[i], sizeof(instanceDescs[i].Transform));
+        instanceDescs[i].InstanceMask = 1;
+        instanceDescs[i].AccelerationStructure = m_bottomLevelAccelerationStructure->GetGPUVirtualAddress();
+    }
+
+    instanceDescs[i].InstanceID = i;
+    instanceDescs[i].InstanceContributionToHitGroupIndex = 1;
+    memcpy(instanceDescs[i].Transform, &transformation[i], sizeof(instanceDescs[i].Transform));
+    instanceDescs[i].InstanceMask = 1;
+    instanceDescs[i].AccelerationStructure = m_bottomLevelAccelerationStructureSecondGeometry->GetGPUVirtualAddress();
+    instanceDescs[i].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_CULL_DISABLE;
+
+    InBuffers.InstanceDesc->Unmap(0, nullptr);
+
+    // TLAS 생성
+    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC asDesc = {};
+    asDesc.Inputs = inputs;
+    asDesc.Inputs.InstanceDescs = InBuffers.InstanceDesc->GetGPUVirtualAddress();
+    asDesc.DestAccelerationStructureData = InBuffers.Result->GetGPUVirtualAddress();
+    asDesc.ScratchAccelerationStructureData = InBuffers.Scratch->GetGPUVirtualAddress();
+
+    // 만약 업데이트 중이라면 source buffer에 업데이트 플래그를 설정해준다.
+    if (InIsUpdate)
+    {
+        asDesc.Inputs.Flags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
+        asDesc.SourceAccelerationStructureData = InBuffers.Result->GetGPUVirtualAddress();
+    }
+
+    m_dxrCommandList->BuildRaytracingAccelerationStructure(&asDesc, 0, nullptr);
+
+    // 레이트레이싱 연산에서 Acceleration structure를 사용하기 전에 UAV 베리어를 추가해야 함.
+    D3D12_RESOURCE_BARRIER uavBarrier = {};
+    uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+    uavBarrier.UAV.pResource = InBuffers.Result.Get();
+    m_dxrCommandList->ResourceBarrier(1, &uavBarrier);
+
+    return true;
+}
+
 void jRHI_DirectX12::Update()
 {
 	int32 prevFrameIndex = m_frameIndex - 1;
 	if (prevFrameIndex < 0)
 		prevFrameIndex = FrameCount - 1;
 
-	static float elapsedTime = 0.0f;
-	elapsedTime = 0.01f;
+    static bool enableCameraRotation = false;
 
-	// Y 축 주변으로 카메라를 회전
+    static float elapsedTime = 0.0f;
+    elapsedTime = 0.01f;
+    
+    // Y 축 주변으로 카메라를 회전
+    if (enableCameraRotation)
 	{
-		float secondsToRotateAround = 24.0f;
-		float angleToRotateBy = 360.0f * (elapsedTime / secondsToRotateAround);
-		XMMATRIX rotate = XMMatrixRotationY(XMConvertToRadians(angleToRotateBy));
-		m_eye = XMVector3Transform(m_eye, rotate);
-		m_up = XMVector3Transform(m_up, rotate);
-		m_at = XMVector3Transform(m_at, rotate);
+        float secondsToRotateAround = 24.0f;
+        float angleToRotateBy = 360.0f * (elapsedTime / secondsToRotateAround);
+
+        XMMATRIX rotate = XMMatrixRotationY(XMConvertToRadians(angleToRotateBy));
+        m_eye = XMVector3Transform(m_eye, rotate);
+        m_up = XMVector3Transform(m_up, rotate);
+        m_at = XMVector3Transform(m_at, rotate);
 		UpdateCameraMatrices();
 	}
 
@@ -1392,6 +1485,32 @@ void jRHI_DirectX12::Render()
 	if (JFAIL(m_commandList->Reset(m_commandAllocator[m_frameIndex].Get(), nullptr)))
 		return;
 
+    static float elapsedTime = 0.0f;
+    elapsedTime = 0.01f;
+
+    float secondsToRotateAround = 24.0f;
+    float angleToRotateBy = 360.0f * (elapsedTime / secondsToRotateAround);
+    static float accumulatedRotation = 0.0f;
+    accumulatedRotation += angleToRotateBy;
+
+    static float TranslationOffsetX = 0.0f;
+    static bool TranslateDirRight = 1;
+    if (TranslateDirRight)
+    {
+        if (TranslationOffsetX > 2.0f)
+            TranslateDirRight = false;
+        TranslationOffsetX += 0.01f;
+    }
+    else
+    {
+        if (TranslationOffsetX < -2.0f)
+            TranslateDirRight = true;
+        TranslationOffsetX -= 0.01f;
+    }
+
+    if (!JASSERT(BuildTopLevelAS(TLASBuffer, true, accumulatedRotation, { TranslationOffsetX, 0.0f, 0.0f })))
+        return;
+
 	m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
 		m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
@@ -1410,7 +1529,7 @@ void jRHI_DirectX12::Render()
     m_commandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::OutputViewSlot
         , m_raytracingOutputResourceUAVGpuDescriptor);
 	m_commandList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot
-		, m_topLevelAccelerationStructure->GetGPUVirtualAddress());
+		, TLASBuffer.Result->GetGPUVirtualAddress());
 
 	// 각 Shader table은 단 한개의 shader record를 가지기 때문에 stride가 그 사이즈와 동일함
 	dispatchDesc.HitGroupTable.StartAddress = m_hitGroupShaderTable->GetGPUVirtualAddress();
@@ -1514,7 +1633,8 @@ void jRHI_DirectX12::OnDeviceLost()
 	m_vertexBuffer.Reset();
 
 	m_bottomLevelAccelerationStructure.Reset();
-	m_topLevelAccelerationStructure.Reset();
+	// m_topLevelAccelerationStructure.Reset();
+    TLASBuffer.Result.Reset();
 }
 
 void jRHI_DirectX12::OnDeviceRestored()
