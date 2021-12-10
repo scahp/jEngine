@@ -194,8 +194,9 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 
     if (payload.currentRecursionDepth < MAX_RECURSION_DEPTH)
     {
-        payload.color *= g_localRootSigCB.albedo;
-        payload.currentRecursionDepth++;
+        RayPayload newPayload;
+        newPayload.color = payload.color * g_localRootSigCB.albedo;
+        newPayload.currentRecursionDepth = payload.currentRecursionDepth + 1;
 
         // 반직선 추적
         RayDesc ray;
@@ -206,7 +207,9 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
         // TMin을 작은 갑승로 유지해서 접촉하고 있는 영역에서 지오메트리 missing을 예방
         ray.TMin = 0.001;
         ray.TMax = 10000.0;
-        TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0, ray, payload);
+        TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0, ray, newPayload);
+
+        payload.color *= newPayload.color;
     }
     ///
 
@@ -252,8 +255,9 @@ void MyPlaneClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 
     if (payload.currentRecursionDepth < MAX_RECURSION_DEPTH)
     {
-        payload.color *= g_localRootSigCB.albedo;
-        payload.currentRecursionDepth++;
+        RayPayload newPayload;
+        newPayload.color = payload.color * g_localRootSigCB.albedo;
+        newPayload.currentRecursionDepth = payload.currentRecursionDepth + 1;
 
         // 반직선 추적
         RayDesc ray;
@@ -264,7 +268,9 @@ void MyPlaneClosestHitShader(inout RayPayload payload, in MyAttributes attr)
         // TMin을 작은 갑승로 유지해서 접촉하고 있는 영역에서 지오메트리 missing을 예방
         ray.TMin = 0.001;
         ray.TMax = 10000.0;
-        TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0, ray, payload);
+        TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0, ray, newPayload);
+
+        payload.color *= newPayload.color;
     }
 
     //float4 diffuseColor = CalculationDiffuseLighting(hitPosition, triangleNormal);
