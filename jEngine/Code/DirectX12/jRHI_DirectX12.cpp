@@ -238,6 +238,7 @@ jRHI_DirectX12* pRHIDirectX12 = nullptr;
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     static bool sSizeChanged = false;
+    static bool sIsDraging = false;
 	switch (message)
 	{
 	case WM_CREATE:
@@ -269,19 +270,28 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
             SetScreenHeight(height);
             SetIsSizeMinimize(isSizeMininized);
             sSizeChanged = true;
+
+            if (!sIsDraging)
+            {
+                sSizeChanged = false;
+                if (pRHIDirectX12)
+                    pRHIDirectX12->OnHandleResized(GetScreenWidth(), GetScreenHeight(), GetIsSizeMinimize());
+            }
         }
     }
     return 0;
-
+    case WM_ENTERSIZEMOVE:
+        sIsDraging = true;
+        break;
     case WM_EXITSIZEMOVE:
     {
-        if (sSizeChanged)
+        if (sSizeChanged && sIsDraging)
         {
             sSizeChanged = false;
-
             if (pRHIDirectX12)
                 pRHIDirectX12->OnHandleResized(GetScreenWidth(), GetScreenHeight(), GetIsSizeMinimize());
         }
+        sIsDraging = false;
     }
     return 0;
 
@@ -474,7 +484,7 @@ void jRHI_DirectX12::Initialize()
 	}
 
 	// 풀스크린으로 전환하지 않을 것이므로 아래 처럼 설정
-	factory->MakeWindowAssociation(hWnd, DXGI_MWA_NO_ALT_ENTER);
+	// factory->MakeWindowAssociation(hWnd, DXGI_MWA_NO_ALT_ENTER);
 
 	swapChain.As(&m_swapChain);
 	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
