@@ -233,8 +233,11 @@ void ShaderTable::DebugPrint(std::unordered_map<void*, std::wstring> shaderIdToS
 #endif
 }
 
+jRHI_DirectX12* pRHIDirectX12 = nullptr;
+
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+    static bool sSizeChanged = false;
 	switch (message)
 	{
 	case WM_CREATE:
@@ -250,6 +253,37 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 
 	case WM_KEYUP:
 		return 0;
+
+    case WM_SIZE:
+    {
+        RECT clientRect = {};
+        GetClientRect(hWnd, &clientRect);
+
+        uint32 width = clientRect.right - clientRect.left;
+        uint32 height = clientRect.bottom - clientRect.top;
+        const bool isSizeMininized = wParam == SIZE_MINIMIZED;
+
+        if (width != GetScreenWidth() || height != GetScreenHeight())
+        {
+            SetScreenWidth(width);
+            SetScreenHeight(height);
+            SetIsSizeMinimize(isSizeMininized);
+            sSizeChanged = true;
+        }
+    }
+    return 0;
+
+    case WM_EXITSIZEMOVE:
+    {
+        if (sSizeChanged)
+        {
+            sSizeChanged = false;
+
+            if (pRHIDirectX12)
+                pRHIDirectX12->OnHandleResized(GetScreenWidth(), GetScreenHeight(), GetIsSizeMinimize());
+        }
+    }
+    return 0;
 
 	case WM_DESTROY:
 		PostQuitMessage(0);
@@ -274,7 +308,7 @@ HWND jRHI_DirectX12::CreateMainWindow() const
 	windowClass.lpszClassName = L"DXSampleClass";
 	RegisterClassEx(&windowClass);
 
-	RECT windowRect = { 0, 0, static_cast<LONG>(SCR_WIDTH), static_cast<LONG>(SCR_HEIGHT) };
+	RECT windowRect = { 0, 0, static_cast<LONG>(GetScreenWidth()), static_cast<LONG>(GetScreenHeight()) };
 	AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
 
 	// Create the window and store a handle to it.
@@ -425,8 +459,8 @@ void jRHI_DirectX12::Initialize()
 	// 3. Swapchain
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc{};
 	swapChainDesc.BufferCount = FrameCount;
-	swapChainDesc.Width = SCR_WIDTH;
-	swapChainDesc.Height = SCR_HEIGHT;
+	swapChainDesc.Width = GetScreenWidth();
+	swapChainDesc.Height = GetScreenHeight();
 	swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
@@ -778,8 +812,6 @@ void jRHI_DirectX12::Initialize()
         subobject2.pDesc = &association;
         subobjects[index++] = subobject2;
     }
-
-
 
 	// 5). Global root signature
 	{
@@ -1193,7 +1225,7 @@ void jRHI_DirectX12::Initialize()
 
 	// 출력 리소스를 생성. 차원과 포맷은 swap-chain과 매치 되어야 함
 	auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(BackbufferFormat
-		, SCR_WIDTH, SCR_HEIGHT, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+		, GetScreenWidth(), GetScreenHeight(), 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 	auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 	if (JFAIL(m_device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE
 		, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_raytracingOutput))))
@@ -1239,6 +1271,8 @@ void jRHI_DirectX12::Initialize()
 
 	//////////////////////////////////////////////////////////////////////////
 	ShowWindow(hWnd, SW_SHOW);
+
+    pRHIDirectX12 = this;
 
 	MSG msg = {};
 	while (msg.message != WM_QUIT)
@@ -1341,7 +1375,7 @@ void jRHI_DirectX12::UpdateCameraMatrices()
 
 	m_sceneCB[frameIndex].cameraPosition = m_eye;
 
-	const float m_aspectRatio = static_cast<float>(SCR_WIDTH) / static_cast<float>(SCR_HEIGHT);
+	const float m_aspectRatio = GetScreenAspect();
 
 	const float fovAngleY = 45.0f;
 	const XMMATRIX view = XMMatrixLookAtLH(m_eye, m_at, m_up);
@@ -1462,7 +1496,7 @@ void jRHI_DirectX12::Update()
         m_eye = XMVector3Transform(m_eye, rotate);
         m_up = XMVector3Transform(m_up, rotate);
         m_at = XMVector3Transform(m_at, rotate);
-		UpdateCameraMatrices();
+        UpdateCameraMatrices();
 	}
 
 	// Y 축 주변으로 두번째 라이트를 회전
@@ -1545,8 +1579,8 @@ void jRHI_DirectX12::Render()
 	dispatchDesc.RayGenerationShaderRecord.StartAddress = m_rayGenShaderTable->GetGPUVirtualAddress();
 	dispatchDesc.RayGenerationShaderRecord.SizeInBytes = m_rayGenShaderTable->GetDesc().Width;
 
-	dispatchDesc.Width = SCR_WIDTH;
-	dispatchDesc.Height = SCR_HEIGHT;
+	dispatchDesc.Width = GetScreenWidth();
+	dispatchDesc.Height = GetScreenHeight();
 	dispatchDesc.Depth = 1;
 
 	m_dxrCommandList->SetPipelineState1(m_dxrStateObject.Get());
@@ -1591,6 +1625,13 @@ void jRHI_DirectX12::Render()
 	if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
 	{
 		// 디바이스 로스트 처리
+
+#ifdef _DEBUG
+        char buff[64] = {};
+        sprintf_s(buff, "Device Lost on ResizeBuffers: Reason code 0x%08X\n"
+            , (hr == DXGI_ERROR_DEVICE_REMOVED) ? m_device->GetDeviceRemovedReason() : hr);
+        OutputDebugStringA(buff);
+#endif
 	}
 	else
 	{
@@ -1644,4 +1685,158 @@ void jRHI_DirectX12::OnDeviceRestored()
 	// 7. Raytracing device and commandlist ~ 13. Raytracing Output Resouce
 }
 
+bool jRHI_DirectX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimized)
+{
+    JASSERT(InWidth > 0);
+    JASSERT(InHeight > 0);
+
+    {
+        char szTemp[126];
+        sprintf(szTemp, "Called OnHandleResized %d %d\n", InWidth, InHeight);
+        OutputDebugStringA(szTemp);
+    }
+
+    WaitForGPU();
+
+    for (int32 i = 0; i < FrameCount; ++i)
+    {
+        m_renderTargets[i].Reset();
+        m_fenceValue[i] = m_fenceValue[m_frameIndex];
+    }
+
+    BackbufferFormat;
+
+    if (JASSERT(m_swapChain))
+    {
+        HRESULT hr = m_swapChain->ResizeBuffers(FrameCount, InWidth, InHeight, BackbufferFormat, 0);
+
+        if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
+        {
+#ifdef _DEBUG
+            char buff[64] = {};
+            sprintf_s(buff, "Device Lost on ResizeBuffers: Reason code 0x%08X\n"
+                , (hr == DXGI_ERROR_DEVICE_REMOVED) ? m_device->GetDeviceRemovedReason() : hr);
+            OutputDebugStringA(buff);
+#endif
+            JASSERT(0);
+            return false;
+        }
+        else
+        {
+            JASSERT(0);
+        }
+    }
+
+    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
+
+    for (int32 i = 0; i < FrameCount; ++i)
+    {
+        if (JFAIL(m_swapChain->GetBuffer(i, IID_PPV_ARGS(&m_renderTargets[i]))))
+            return false;
+
+        m_device->CreateRenderTargetView(m_renderTargets[i].Get(), nullptr, rtvHandle);
+        rtvHandle.Offset(1, m_rtvDescriptorSize);
+
+        //////////////////////////////////////////////////////////////////////////
+        m_sceneCB[i].cameraPosition = m_eye;
+        const float m_aspectRatio = GetScreenAspect();
+
+        const float fovAngleY = 45.0f;
+        const XMMATRIX view = XMMatrixLookAtLH(m_eye, m_at, m_up);
+        const XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(fovAngleY), m_aspectRatio, 1.0f, 125.0f);
+        const XMMATRIX viewProj = view * proj;
+        m_sceneCB[i].projectionToWorld = XMMatrixInverse(nullptr, viewProj);
+    }
+
+    m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
+
+    //////////////////////////////////////////////////////////////////////////
+    // ReleaseWindowSizeDependentResource
+    m_rayGenShaderTable.Reset();
+    m_missShaderTable.Reset();
+    m_hitGroupShaderTable.Reset();
+    m_raytracingOutput.Reset();
+    
+    //////////////////////////////////////////////////////////////////////////
+    // CreateWindowSizeDependentResource
+    auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(BackbufferFormat
+        , InWidth, InHeight, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+    auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+    if (JFAIL(m_device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE
+        , &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_raytracingOutput))))
+    {
+        return false;
+    }
+
+    // 이미 만들어 둔 인덱스가 있어서 괜찮다.
+    //D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle;
+    //auto descriptorHeapCpuBase = m_cbvHeap->GetCPUDescriptorHandleForHeapStart();
+    //if (m_raytracingOutputResourceUAVDescriptorHeapIndex >= m_cbvHeap->GetDesc().NumDescriptors)
+    //{
+    //    m_raytracingOutputResourceUAVDescriptorHeapIndex = m_allocatedDescriptors++;
+    //    uavDescriptorHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(descriptorHeapCpuBase
+    //        , m_raytracingOutputResourceUAVDescriptorHeapIndex, m_cbvDescriptorSize);
+    //}
+
+    D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(
+        m_cbvHeap->GetCPUDescriptorHandleForHeapStart(), m_raytracingOutputResourceUAVDescriptorHeapIndex, m_cbvDescriptorSize);
+
+    D3D12_UNORDERED_ACCESS_VIEW_DESC UAVDesc{};
+    UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+    m_device->CreateUnorderedAccessView(m_raytracingOutput.Get(), nullptr, &UAVDesc, uavDescriptorHandle);
+    m_raytracingOutputResourceUAVGpuDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_cbvHeap->GetGPUDescriptorHandleForHeapStart()
+        , m_raytracingOutputResourceUAVDescriptorHeapIndex, m_cbvDescriptorSize);
+
+    //////////////////////////////////////////////////////////////////////////
+    // RecreateShaderTable
+    const uint16 shaderIdentifierSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+    ComPtr<ID3D12StateObjectProperties> stateObjectProperties;
+    if (JFAIL(m_dxrStateObject.As(&stateObjectProperties)))
+        return false;
+
+    void* rayGenShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_raygenShaderName);
+    void* misssShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_missShaderName);
+    void* triHitGroupShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_triHitGroupName);
+    void* planeHitGroupShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_planeHitGroupName);
+
+    // Raygen shader table
+    {
+        const uint16 numShaderRecords = 1;
+        const uint16 shaderRecordSize = shaderIdentifierSize;
+        ShaderTable rayGenShaderTable(m_device.Get(), numShaderRecords, shaderRecordSize, TEXT("RayGenShaderTable"));
+        rayGenShaderTable.push_back(ShaderRecord(rayGenShaderIdentifier, shaderIdentifierSize));
+        m_rayGenShaderTable = rayGenShaderTable.GetResource();
+    }
+
+    // Miss shader table
+    {
+        const uint16 numShaderRecords = 1;
+        const uint16 shaderRecordSize = shaderIdentifierSize;
+        ShaderTable missShaderTable(m_device.Get(), numShaderRecords, shaderRecordSize, TEXT("MissShaderTable"));
+        missShaderTable.push_back(ShaderRecord(misssShaderIdentifier, shaderIdentifierSize));
+        m_missShaderTable = missShaderTable.GetResource();
+    }
+
+    // Triangle Hit group shader table
+    {
+        struct RootArguments
+        {
+            CubeConstantBuffer cb;
+        };
+        RootArguments rootArguments;
+        rootArguments.cb = m_cubeCB;
+
+        const uint16 numShaderRecords = 2;
+        const uint16 shaderRecordSize = shaderIdentifierSize + sizeof(rootArguments);       // 큰 사이즈 기준으로 2개 만듬
+        ShaderTable hitGroupShaderTable(m_device.Get(), numShaderRecords, shaderRecordSize, TEXT("HitGroupShaderTable"));
+        hitGroupShaderTable.push_back(ShaderRecord(triHitGroupShaderIdentifier, shaderIdentifierSize, &rootArguments, sizeof(rootArguments)));
+
+        RootArguments planeRootArguments;
+        planeRootArguments.cb = m_planeCB;
+        hitGroupShaderTable.push_back(ShaderRecord(planeHitGroupShaderIdentifier, shaderIdentifierSize, &planeRootArguments, sizeof(planeRootArguments)));
+        m_hitGroupShaderTable = hitGroupShaderTable.GetResource();
+    }
+
+    return true;
+}
 

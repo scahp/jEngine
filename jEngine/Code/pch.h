@@ -73,6 +73,16 @@ const unsigned int LUMINANCE_HEIGHT = 512;
 constexpr int NUM_CASCADES = 3;
 constexpr int NUM_FRUSTUM_CORNERS = 8;
 
+uint32 GetScreenWidth();
+uint32 GetScreenHeight();
+bool GetIsSizeMinimize();
+
+void SetScreenWidth(uint32 InWidth);
+void SetScreenHeight(uint32 InHeight);
+void SetIsSizeMinimize(bool InIsSizeMinimize);
+
+float GetScreenAspect();
+
 #define FORCEINLINE __forceinline
 
 enum class EMouseButtonType

@@ -259,5 +259,7 @@ public:
     TopLevelAccelerationStructureBuffers TLASBuffer;
 
     bool BuildTopLevelAS(TopLevelAccelerationStructureBuffers& InBuffers, bool InIsUpdate, float InRotationY, Vector InTranslation);
+
+    bool OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimized);
 };
 
