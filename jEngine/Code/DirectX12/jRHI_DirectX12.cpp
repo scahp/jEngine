@@ -251,9 +251,6 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 	case WM_KEYUP:
 		return 0;
 
-	case WM_PAINT:
-		return 0;
-
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		return 0;
@@ -1075,7 +1072,7 @@ void jRHI_DirectX12::Initialize()
     m_dxrCommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDescSecondGeometry, 0, nullptr);
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(m_bottomLevelAccelerationStructureSecondGeometry.Get()));
 
-    if (!JASSERT(BuildTopLevelAS(TLASBuffer, 0.0f, 0.0f, Vector::ZeroVector)))
+    if (!JASSERT(BuildTopLevelAS(TLASBuffer, false, 0.0f, Vector::ZeroVector)))
         return;
  //   D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO topLevelPrebuildInfo{};
  //   D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS topLevelInputs{};
@@ -1252,9 +1249,11 @@ void jRHI_DirectX12::Initialize()
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 		}
-
-		Update();
-		Render();
+        else
+        {
+            Update();
+            Render();
+        }
 	}
 }
 
@@ -1384,7 +1383,10 @@ bool jRHI_DirectX12::BuildTopLevelAS(TopLevelAccelerationStructureBuffers& InBuf
     }
 
     D3D12_RAYTRACING_INSTANCE_DESC* instanceDescs = nullptr;
-    InBuffers.InstanceDesc->Map(0, nullptr, (void**)&instanceDescs);
+    auto hr = InBuffers.InstanceDesc->Map(0, nullptr, (void**)&instanceDescs);
+    if (JFAIL(hr))
+        return false;
+
     ZeroMemory(instanceDescs, sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * 3);
 
     const float Step = 4.0f;
