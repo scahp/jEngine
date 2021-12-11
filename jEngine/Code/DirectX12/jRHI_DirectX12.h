@@ -207,7 +207,10 @@ public:
 	uint32 m_raytracingOutputResourceUAVDescriptorHeapIndex = UINT_MAX;
 	uint32 m_allocatedDescriptors = 0;
 
-	void Initialize();
+    HWND m_hWnd = 0;
+
+	bool Initialize();
+    bool Run();
 	void Release();
 
 	HWND CreateMainWindow() const;
@@ -255,11 +258,20 @@ public:
         ComPtr<ID3D12Resource> Scratch;
         ComPtr<ID3D12Resource> Result;
         ComPtr<ID3D12Resource> InstanceDesc;    // Used only for top-level AS
+
+        void Reset()
+        {
+            Scratch.Reset();
+            Result.Reset();
+            InstanceDesc.Reset();
+        }
     };
     TopLevelAccelerationStructureBuffers TLASBuffer;
 
     bool BuildTopLevelAS(TopLevelAccelerationStructureBuffers& InBuffers, bool InIsUpdate, float InRotationY, Vector InTranslation);
 
     bool OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimized);
+    bool OnHandleDeviceLost();
+    bool OnHandleDeviceRestored();
 };
 

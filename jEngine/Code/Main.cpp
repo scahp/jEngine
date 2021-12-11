@@ -29,7 +29,9 @@ jEngine g_Engine;
 int main()
 {
 	jRHI_DirectX12 dx12;
+    dx12.m_hWnd = dx12.CreateMainWindow();
 	dx12.Initialize();
+    dx12.Run();
 	dx12.Release();
 
 	// jRHI_DirectX11 dx11;

@@ -413,10 +413,8 @@ void jRHI_DirectX12::WaitForGPU()
 	}
 }
 
-void jRHI_DirectX12::Initialize()
+bool jRHI_DirectX12::Initialize()
 {
-	HWND hWnd = CreateMainWindow();
-	
 	// 1. Device
 	uint32 dxgiFactoryFlags = 0;
 
@@ -437,17 +435,17 @@ void jRHI_DirectX12::Initialize()
 
 	ComPtr<IDXGIFactory4> factory;
 	if (JFAIL(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory))))
-		return;
+		return false;
 
 	bool UseWarpDevice = false;		// Software rasterizer 사용 여부
 	if (UseWarpDevice)
 	{
 		ComPtr<IDXGIAdapter> warpAdapter;
 		if (JFAIL(factory->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter))))
-			return;
+			return false;
 
 		if (JFAIL((D3D12CreateDevice(warpAdapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_device)))))
-			return;
+			return false;
 	}
 	else
 	{
@@ -455,7 +453,7 @@ void jRHI_DirectX12::Initialize()
 		GetHardwareAdapter(factory.Get(), &hardwareAdapter);
 
 		if (JFAIL(D3D12CreateDevice(hardwareAdapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_device))))
-			return;
+			return false;
 	}
 
 	// 2. Command
@@ -464,7 +462,7 @@ void jRHI_DirectX12::Initialize()
 	queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 
 	if (JFAIL(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue))))
-		return;
+		return false;
 
 	// 3. Swapchain
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc{};
@@ -477,10 +475,10 @@ void jRHI_DirectX12::Initialize()
 	swapChainDesc.SampleDesc.Count = 1;
 
 	ComPtr<IDXGISwapChain1> swapChain;
-	if (JFAIL(factory->CreateSwapChainForHwnd(m_commandQueue.Get(), hWnd
+	if (JFAIL(factory->CreateSwapChainForHwnd(m_commandQueue.Get(), m_hWnd
 		, &swapChainDesc, nullptr, nullptr, &swapChain)))
 	{
-		return;
+		return false;
 	}
 
 	// 풀스크린으로 전환하지 않을 것이므로 아래 처럼 설정
@@ -495,7 +493,7 @@ void jRHI_DirectX12::Initialize()
 	rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 	rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	if (JFAIL(m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap))))
-		return;
+		return false;
 
     //////////////////////////////////////////////////////////////////////////
     // 5. Initialize Camera and lighting
@@ -551,7 +549,7 @@ void jRHI_DirectX12::Initialize()
 	cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	if (JFAIL(m_device->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_cbvHeap))))
-		return;
+		return false;
 
 	m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	m_cbvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -562,25 +560,25 @@ void jRHI_DirectX12::Initialize()
 	for (uint32 i = 0; i < FrameCount; ++i)
 	{
 		if (JFAIL(m_swapChain->GetBuffer(i, IID_PPV_ARGS(&m_renderTargets[i]))))
-			return;
+			return false;
 
 		m_device->CreateRenderTargetView(m_renderTargets[i].Get(), nullptr, rtvHandle);
 		rtvHandle.Offset(1, m_rtvDescriptorSize);
 
 		if (JFAIL(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator[i]))))
-			return;
+			return false;
 	}
 
 	if (JFAIL(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator[0].Get()
 		, nullptr, IID_PPV_ARGS(&m_commandList))))
 	{
-		return;
+		return false;
 	}
 	m_commandList->Close();
 
 	// 7. Create sync object
 	if (JFAIL(m_device->CreateFence(m_fenceValue[m_frameIndex], D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence))))
-		return;
+		return false;
 
 	++m_fenceValue[m_frameIndex];
 
@@ -588,7 +586,7 @@ void jRHI_DirectX12::Initialize()
 	if (!m_fenceEvent)
 	{
 		if (JFAIL(HRESULT_FROM_WIN32(GetLastError())))
-			return;
+			return false;
 	}
 
 	WaitForGPU();
@@ -596,16 +594,16 @@ void jRHI_DirectX12::Initialize()
 	// 8. Raytracing device and commandlist
 	D3D12_FEATURE_DATA_D3D12_OPTIONS5 featureSupportData{};
 	if (JFAIL(m_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &featureSupportData, sizeof(featureSupportData))))
-		return;
+		return false;
 
 	if (featureSupportData.RaytracingTier == D3D12_RAYTRACING_TIER_NOT_SUPPORTED)
-		return;
+		return false;
 
 	if (JFAIL(m_device->QueryInterface(IID_PPV_ARGS(&m_dxrDevice))))
-		return;
+		return false;
 
 	if (JFAIL(m_commandList->QueryInterface(IID_PPV_ARGS(&m_dxrCommandList))))
-		return;
+		return false;
 
 	// 9. CreateRootSignatures
 	{
@@ -633,13 +631,13 @@ void jRHI_DirectX12::Initialize()
 				OutputDebugStringA(reinterpret_cast<const char*>(error->GetBufferPointer()));
 				error->Release();
 			}
-			return;
+			return false;
 		}
 
 		if (JFAIL(m_device->CreateRootSignature(1, blob->GetBufferPointer(), blob->GetBufferSize()
 			, IID_PPV_ARGS(&m_raytracingGlobalRootSignature))))
 		{
-			return;
+			return false;
 		}
 	}
 
@@ -660,13 +658,13 @@ void jRHI_DirectX12::Initialize()
 				OutputDebugStringA(reinterpret_cast<const char*>(error->GetBufferPointer()));
 				error->Release();
 			}
-			return;
+			return false;
 		}
 
 		if (JFAIL(m_device->CreateRootSignature(1, blob->GetBufferPointer(), blob->GetBufferSize()
 			, IID_PPV_ARGS(&m_raytracingLocalRootSignature))))
 		{
-			return;
+			return false;
 		}
 	}
 
@@ -799,13 +797,13 @@ void jRHI_DirectX12::Initialize()
                 OutputDebugStringA(reinterpret_cast<const char*>(error->GetBufferPointer()));
                 error->Release();
             }
-            return;
+            return false;
         }
 
         if (JFAIL(m_device->CreateRootSignature(1, blob->GetBufferPointer(), blob->GetBufferSize()
             , IID_PPV_ARGS(&m_raytracingEmptyLocalRootSignature))))
         {
-            return;
+            return false;
         }
 
         D3D12_STATE_SUBOBJECT subobject;
@@ -855,13 +853,13 @@ void jRHI_DirectX12::Initialize()
 #endif
 
 	if (JFAIL(m_dxrDevice->CreateStateObject(&stateObjectDesc, IID_PPV_ARGS(&m_dxrStateObject))))
-		return;
+		return false;
 
 	//////////////////////////////////////////////////////////////////////////
 	// 11. Create vertex and index buffer
 
     if (JFAIL(m_commandList->Reset(m_commandAllocator[m_frameIndex].Get(), nullptr)))
-        return;
+        return false;
 
     const int32 slice = 20;
     const int32 verticesCount = ((slice + 1) * (slice / 2) + 2);
@@ -1011,7 +1009,7 @@ void jRHI_DirectX12::Initialize()
 
         m_dxrDevice->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
         if (!JASSERT(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0))
-            return;
+            return false;
     }
 
     // Acceleration structure를 위한 리소스를 할당함
@@ -1095,7 +1093,7 @@ void jRHI_DirectX12::Initialize()
 
         m_dxrDevice->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputsSecondGeometry, &bottomLevelPrebuildInfoSecondGeometry);
         if (!JASSERT(bottomLevelPrebuildInfoSecondGeometry.ResultDataMaxSizeInBytes > 0))
-            return;
+            return false;
     }
 
     BufferUtil::AllocateUAVBuffer(&m_bottomLevelAccelerationStructureSecondGeometry, m_device.Get()
@@ -1115,67 +1113,10 @@ void jRHI_DirectX12::Initialize()
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(m_bottomLevelAccelerationStructureSecondGeometry.Get()));
 
     if (!JASSERT(BuildTopLevelAS(TLASBuffer, false, 0.0f, Vector::ZeroVector)))
-        return;
- //   D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO topLevelPrebuildInfo{};
- //   D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS topLevelInputs{};
- //   {
- //       D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
- //       topLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
- //       topLevelInputs.Flags = buildFlags;
- //       topLevelInputs.NumDescs = 3;
- //       topLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
-
- //       m_dxrDevice->GetRaytracingAccelerationStructurePrebuildInfo(&topLevelInputs, &topLevelPrebuildInfo);
- //       if (!JASSERT(topLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0))
- //           return;
- //   }
-
-	//ComPtr<ID3D12Resource> topLevelScratchResource;
-	//BufferUtil::AllocateUAVBuffer(&topLevelScratchResource, m_device.Get(), topLevelPrebuildInfo.ScratchDataSizeInBytes
-	//	, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, L"ScratchResource");
-
-	//BufferUtil::AllocateUAVBuffer(&m_topLevelAccelerationStructure, m_device.Get()
-	//	, topLevelPrebuildInfo.ResultDataMaxSizeInBytes, initialResourceState, TEXT("TopLevelAccelerationStructure"));
-
-	//// Bottom-level acceleration structure 를 위한 instance Desc 생성
-	//ComPtr<ID3D12Resource> instanceDescs;
- //   D3D12_RAYTRACING_INSTANCE_DESC instanceDesc[3] = { {}, {}, {} };
- //   {
- //       const float Step = 4.0f;
- //       float XOffset = -Step;
- //       int32 i = 0;
- //       for (i = 0; i < _countof(instanceDesc) - 1; ++i)
- //       {
- //           instanceDesc[i].InstanceID = i;
- //           instanceDesc[i].InstanceContributionToHitGroupIndex = 0;
- //           instanceDesc[i].Transform[0][0] = instanceDesc[i].Transform[1][1] = instanceDesc[i].Transform[2][2] = 1;
- //           instanceDesc[i].Transform[0][3] = XOffset + i * Step;
- //           instanceDesc[i].Transform[1][3] = 1.0f;
- //           instanceDesc[i].InstanceMask = 1;
- //           instanceDesc[i].AccelerationStructure = m_bottomLevelAccelerationStructure->GetGPUVirtualAddress();
- //       }
-
- //       instanceDesc[i].InstanceID = i;
- //       instanceDesc[i].InstanceContributionToHitGroupIndex = 1;
- //       memset(&instanceDesc[i].Transform, 0, sizeof(instanceDesc[i].Transform));
- //       instanceDesc[i].Transform[0][0] = instanceDesc[i].Transform[1][1] = instanceDesc[i].Transform[2][2] = 1.0f;
- //       instanceDesc[i].InstanceMask = 1;
- //       instanceDesc[i].AccelerationStructure = m_bottomLevelAccelerationStructureSecondGeometry->GetGPUVirtualAddress();
- //       instanceDesc[i].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_CULL_DISABLE;
- //   }
-	//BufferUtil::AllocateUploadBuffer(&instanceDescs, m_device.Get(), &instanceDesc, sizeof(instanceDesc), TEXT("InstanceDescs"));
-
-	//// Top level acceleration structure desc
-	//D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC topLevelBuildDesc{};
-	//topLevelInputs.InstanceDescs = instanceDescs->GetGPUVirtualAddress();
-	//topLevelBuildDesc.Inputs = topLevelInputs;
-	//topLevelBuildDesc.DestAccelerationStructureData = m_topLevelAccelerationStructure->GetGPUVirtualAddress();
-	//topLevelBuildDesc.ScratchAccelerationStructureData = topLevelScratchResource->GetGPUVirtualAddress();
-
-	//m_dxrCommandList->BuildRaytracingAccelerationStructure(&topLevelBuildDesc, 0, nullptr);
+        return false;
 
 	if (JFAIL(m_commandList->Close()))
-		return;
+		return false;
 	ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
 	m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
@@ -1185,7 +1126,7 @@ void jRHI_DirectX12::Initialize()
 	const uint16 shaderIdentifierSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
 	ComPtr<ID3D12StateObjectProperties> stateObjectProperties;
 	if (JFAIL(m_dxrStateObject.As(&stateObjectProperties)))
-		return;
+		return false;
 	
 	void* rayGenShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_raygenShaderName);
 	void* misssShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_missShaderName);
@@ -1240,7 +1181,7 @@ void jRHI_DirectX12::Initialize()
 	if (JFAIL(m_device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE
 		, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_raytracingOutput))))
 	{
-		return;
+		return false;
 	}
 
 	D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle;
@@ -1270,35 +1211,41 @@ void jRHI_DirectX12::Initialize()
 	if (JFAIL(m_device->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE
 		, &constantBufferDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_perFrameConstants))))
 	{
-		return;
+		return false;
 	}
 
 	// 상수 버퍼를 매핑하고 heap 포인터를 캐싱한다.
 	// 앱 종료시 까지 매핑을 해제하지 않음. 살아있는 동안 버퍼의 매핑을 유지해도 괜찮음.
 	CD3DX12_RANGE readRange(0, 0);		// CPU에서 읽지 않으려는 의도
 	if (JFAIL(m_perFrameConstants->Map(0, nullptr, reinterpret_cast<void**>(&m_mappedConstantData))))
-		return;
+		return false;
 
 	//////////////////////////////////////////////////////////////////////////
-	ShowWindow(hWnd, SW_SHOW);
-
+	ShowWindow(m_hWnd, SW_SHOW);
     pRHIDirectX12 = this;
 
-	MSG msg = {};
-	while (msg.message != WM_QUIT)
-	{
-		// Process any messages in the queue.
-		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
-		{
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
-		}
+    return true;
+}
+
+bool jRHI_DirectX12::Run()
+{
+    MSG msg = {};
+    while (msg.message != WM_QUIT)
+    {
+        // Process any messages in the queue.
+        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+        {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
         else
         {
             Update();
             Render();
         }
-	}
+    }
+
+    return true;
 }
 
 void jRHI_DirectX12::Release()
@@ -1642,6 +1589,9 @@ void jRHI_DirectX12::Render()
             , (hr == DXGI_ERROR_DEVICE_REMOVED) ? m_device->GetDeviceRemovedReason() : hr);
         OutputDebugStringA(buff);
 #endif
+
+        OnHandleDeviceLost();
+        OnHandleDeviceRestored();
 	}
 	else
 	{
@@ -1728,7 +1678,10 @@ bool jRHI_DirectX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsM
                 , (hr == DXGI_ERROR_DEVICE_REMOVED) ? m_device->GetDeviceRemovedReason() : hr);
             OutputDebugStringA(buff);
 #endif
-            JASSERT(0);
+            if (!OnHandleDeviceLost() || !OnHandleDeviceRestored())
+            {
+                JASSERT(0);
+            }
             return false;
         }
         else
@@ -1761,14 +1714,14 @@ bool jRHI_DirectX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsM
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
     //////////////////////////////////////////////////////////////////////////
-    // ReleaseWindowSizeDependentResource
+    // ReleaseWindowSizeDependentResources
     m_rayGenShaderTable.Reset();
     m_missShaderTable.Reset();
     m_hitGroupShaderTable.Reset();
     m_raytracingOutput.Reset();
     
     //////////////////////////////////////////////////////////////////////////
-    // CreateWindowSizeDependentResource
+    // CreateWindowSizeDependentResources
     auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(BackbufferFormat
         , InWidth, InHeight, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
     auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
@@ -1847,6 +1800,47 @@ bool jRHI_DirectX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsM
         m_hitGroupShaderTable = hitGroupShaderTable.GetResource();
     }
 
+    return true;
+}
+
+bool jRHI_DirectX12::OnHandleDeviceLost()
+{
+    //////////////////////////////////////////////////////////////////////////
+    // ReleaseWindowSizeDependentResources
+    m_raytracingOutput.Reset();
+
+    //////////////////////////////////////////////////////////////////////////
+    // ReleaseDeviceDependentResources
+    m_raytracingGlobalRootSignature.Reset();
+    m_raytracingLocalRootSignature.Reset();
+    m_raytracingEmptyLocalRootSignature.Reset();
+
+    m_dxrStateObject.Reset();
+    m_dxrCommandList.Reset();
+    m_dxrDevice.Reset();
+
+    m_allocatedDescriptors = 0;
+    m_raytracingOutputResourceUAVDescriptorHeapIndex = UINT_MAX;
+    m_cbvHeap.Reset();
+    m_indexBuffer.Reset();
+    m_vertexBuffer.Reset();
+    m_vertexBufferSecondGeometry.Reset();
+    m_perFrameConstants.Reset();
+    m_rayGenShaderTable.Reset();
+    m_missShaderTable.Reset();
+    m_hitGroupShaderTable.Reset();
+
+    m_bottomLevelAccelerationStructure.Reset();
+    m_bottomLevelAccelerationStructureSecondGeometry.Reset();
+
+    TLASBuffer.Reset();
+
+    return true;
+}
+
+bool jRHI_DirectX12::OnHandleDeviceRestored()
+{
+    Initialize();
     return true;
 }
 
