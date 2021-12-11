@@ -1,4 +1,4 @@
-#include "pch.h"
+﻿#include "pch.h"
 #include "jPrimitiveUtil.h"
 #include "Math/Vector.h"
 #include "jRenderObject.h"

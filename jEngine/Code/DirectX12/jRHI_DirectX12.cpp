@@ -1,4 +1,4 @@
-#include "pch.h"
+﻿#include "pch.h"
 #include "jRHI_DirectX12.h"
 #include "jImageFileLoader.h"
 #include <limits>
