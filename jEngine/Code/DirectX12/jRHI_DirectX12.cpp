@@ -18,6 +18,10 @@ const wchar_t* jRHI_DirectX12::c_triHitGroupName = L"TriHitGroup";
 const wchar_t* jRHI_DirectX12::c_planeHitGroupName = L"PlaneHitGroup";
 const wchar_t* jRHI_DirectX12::c_planeclosestHitShaderName = L"MyPlaneClosestHitShader";
 
+constexpr uint32 c_AllowTearing = 0x1;
+constexpr uint32 c_RequireTearingSupport = 0x2;
+constexpr uint32 g_MaxRecursionDepth = 10;
+
 inline float random_double() 
 {
     // Returns a random real in [0,1).
@@ -444,6 +448,28 @@ bool jRHI_DirectX12::Initialize()
 	if (JFAIL(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory))))
 		return false;
 
+    ComPtr<IDXGIFactory5> factory5;
+    HRESULT hr = factory.As(&factory5);
+    if (SUCCEEDED(hr))
+    {
+        BOOL allowTearing = false;
+        hr = factory5->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &allowTearing, sizeof(allowTearing));
+
+        if (FAILED(hr) || !allowTearing)
+        {
+            OutputDebugStringA("WARNING: Variable refresh rate displays are not supported.\n");
+            if (m_options & c_RequireTearingSupport)
+            {
+                JASSERT(!L"Error: Sample must be run on an OS with tearing support.\n");
+            }
+            m_options &= ~c_AllowTearing;
+        }
+        else
+        {
+            m_options |= c_AllowTearing;
+        }
+    }
+
 	bool UseWarpDevice = false;		// Software rasterizer 사용 여부
 	if (UseWarpDevice)
 	{
@@ -495,6 +521,7 @@ bool jRHI_DirectX12::Initialize()
 	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 	swapChainDesc.SampleDesc.Count = 1;
+    swapChainDesc.Flags = (m_options & c_AllowTearing) ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
 
 	ComPtr<IDXGISwapChain1> swapChain;
 	if (JFAIL(factory->CreateSwapChainForHwnd(m_commandQueue.Get(), m_hWnd
@@ -856,7 +883,7 @@ bool jRHI_DirectX12::Initialize()
 	D3D12_RAYTRACING_PIPELINE_CONFIG pipelineConfig;
 	{
 		// pipelineConfig.MaxTraceRecursionDepth = D3D12_RAYTRACING_MAX_DECLARABLE_TRACE_RECURSION_DEPTH;
-        pipelineConfig.MaxTraceRecursionDepth = 11;
+        pipelineConfig.MaxTraceRecursionDepth = g_MaxRecursionDepth;
 
 		D3D12_STATE_SUBOBJECT subobject{};
 		subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG;
@@ -1358,7 +1385,7 @@ void jRHI_DirectX12::UpdateCameraMatrices()
 	const XMMATRIX viewProj = view * proj;
 
 	m_sceneCB[frameIndex].projectionToWorld = XMMatrixInverse(nullptr, viewProj);
-    m_sceneCB[frameIndex].NumOfStartingRay = 100;        // 첫 Ray 생성시 100개를 쏴서 보간하도록 함. 노이즈를 줄여줌
+    m_sceneCB[frameIndex].NumOfStartingRay = 20;        // 첫 Ray 생성시 NumOfStartingRay 개를 쏴서 보간하도록 함. 노이즈를 줄여줌
 
 }
 
@@ -1402,11 +1429,10 @@ bool jRHI_DirectX12::BuildTopLevelAS(TopLevelAccelerationStructureBuffers& InBuf
 
     ZeroMemory(instanceDescs, sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * totalCount);
 
-    srand(123);
-
-    const float radius = 0.3f;
-
     int32 cnt = 0;
+
+    srand(123);
+    const float radius = 0.3f;
     for (int32 i = -w; i < w; ++i)
     {
         for (int32 j = -h; j < h; ++j, ++cnt)
@@ -1494,7 +1520,8 @@ void jRHI_DirectX12::CalculateFrameStats()
         frameCnt = 0;
         elapsedTime = totalTime;
 
-        float MRaysPerSecond = (GetScreenWidth() * GetScreenHeight() * fps * m_sceneCB[m_frameIndex].NumOfStartingRay) / static_cast<float>(1e6);
+        float raysPerPixels = m_sceneCB[m_frameIndex].NumOfStartingRay * g_MaxRecursionDepth;
+        float MRaysPerSecond = (GetScreenWidth() * GetScreenHeight() * fps * raysPerPixels) / static_cast<float>(1e6);
 
         std::wstringstream windowText;
 
@@ -1641,9 +1668,8 @@ void jRHI_DirectX12::Render()
 	ID3D12CommandList* commandLists[] = { m_commandList.Get() };
 	m_commandQueue->ExecuteCommandLists(_countof(commandLists), commandLists);
 
-	static bool IsAllowTearing = false;
 	HRESULT hr = S_OK;
-	if (IsAllowTearing)
+	if (m_options & c_AllowTearing)
 	{
 		hr = m_swapChain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
 	}
@@ -1743,7 +1769,8 @@ bool jRHI_DirectX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsM
 
     if (JASSERT(m_swapChain))
     {
-        HRESULT hr = m_swapChain->ResizeBuffers(FrameCount, InWidth, InHeight, BackbufferFormat, 0);
+        HRESULT hr = m_swapChain->ResizeBuffers(FrameCount, InWidth, InHeight, BackbufferFormat
+            , (m_options & c_AllowTearing) ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0);
 
         if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
         {
