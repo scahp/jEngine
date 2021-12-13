@@ -129,6 +129,55 @@ float4 CalculationDiffuseLighting(float3 hitPosition, float3 normal)
     return g_localRootSigCB.albedo * g_sceneCB.lightDiffuseColor * fNDotL;
 }
 
+float3 random_in_unit_sphere()
+{
+    float2 uv = DispatchRaysIndex().xy + float2(RayTCurrent(), RayTCurrent() * 2.0f);
+    float noiseX = (frac(sin(dot(uv, float2(12.9898, 78.233))) * 43758.5453));
+    float noiseY = (frac(sin(dot(uv, float2(12.9898, 78.233) * 2.0)) * 43758.5453));
+    float noiseZ = (frac(sin(dot(uv, float2(12.9898, 78.233) * 3.0)) * 43758.5453));
+
+    float3 randomUniSphere = float3(noiseX, noiseY, noiseZ) * 2.0f - 0.5f;
+    if (length(randomUniSphere) <= 1.0f)
+        return randomUniSphere;
+
+    return normalize(randomUniSphere);
+}
+
+float3 random_in_hemisphere(float3 normal)
+{
+    float3 in_unit_sphere = random_in_unit_sphere();
+    if (dot(in_unit_sphere, normal) > 0.0)  // 노멀 기준으로 같은 반구 방향인지?
+        return in_unit_sphere;
+
+    return -in_unit_sphere;
+}
+
+// 1. Default Reflection
+float3 MakeDefaultReflection(float3 normal)
+{
+    return normal + random_in_unit_sphere();
+}
+
+// 2. Lambertian reflection
+float3 MakeLambertianReflection(float3 normal)
+{
+    return random_in_hemisphere(normal);
+}
+
+// 3. Mirror Reflection
+float3 MakeMirrorReflection(float3 normal, float fuzzFactor = 0.0f)
+{
+    float3 worldNormal = normalize(mul((float3x3)ObjectToWorld3x4(), normal));
+    float3 reflectedDir = Reflect(normalize(WorldRayDirection()), worldNormal);
+
+    if (fuzzFactor > 0)
+    {
+        reflectedDir += random_in_unit_sphere() * fuzzFactor;
+    }
+
+    return reflectedDir;
+}
+
 [shader("raygeneration")]
 void MyRaygenShader()
 {
@@ -160,29 +209,6 @@ void MyRaygenShader()
 
     // 출력 텍스쳐에 반직선 추적된 색상을 기록함
     RenderTarget[DispatchRaysIndex().xy] = payload.color;
-}
-
-float3 random_in_unit_sphere()
-{
-    float2 uv = DispatchRaysIndex().xy + float2(RayTCurrent(), RayTCurrent() * 2.0f);
-    float noiseX = (frac(sin(dot(uv, float2(12.9898, 78.233))) * 43758.5453));
-    float noiseY = (frac(sin(dot(uv, float2(12.9898, 78.233) * 2.0)) * 43758.5453));
-    float noiseZ = (frac(sin(dot(uv, float2(12.9898, 78.233) * 3.0)) * 43758.5453));
-    
-    float3 randomUniSphere = float3(noiseX, noiseY, noiseZ) * 2.0f - 0.5f;
-    if (length(randomUniSphere) <= 1.0f)
-        return randomUniSphere;
-
-    return normalize(randomUniSphere);
-}
-
-float3 random_in_hemisphere(float3 normal)
-{
-    float3 in_unit_sphere = random_in_unit_sphere();
-    if (dot(in_unit_sphere, normal) > 0.0)  // 노멀 기준으로 같은 반구 방향인지?
-        return in_unit_sphere;
-
-    return -in_unit_sphere;
 }
 
 [shader("closesthit")]
@@ -233,22 +259,15 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
         //payload.color *= newPayload.color;
 
         RayPayload newPayload;
-        newPayload.color = payload.color * 0.5f;// g_localRootSigCB.albedo;
+        newPayload.color = payload.color * g_localRootSigCB.albedo;
         newPayload.currentRecursionDepth = payload.currentRecursionDepth + 1;
 
         // 반직선 추적
         RayDesc ray;
         ray.Origin = hitPosition;
-        //ray.Direction = triangleNormal + random_in_unit_sphere();
-        ray.Direction = random_in_hemisphere(triangleNormal);
-
-        //float3 worldNormal = normalize(mul((float3x3)ObjectToWorld3x4(), triangleNormal));
-        //float3 reflectedDir = Reflect(normalize(WorldRayDirection()), worldNormal);
-
-        //float fuzz = 0.2f;
-        //reflectedDir += random_in_unit_sphere() * fuzz;
-
-        //ray.Direction = reflectedDir;
+        //ray.Direction = MakeDefaultReflection(triangleNormal);        // 1. Default Reflection
+        //ray.Direction = MakeLambertianReflection(triangleNormal);     // 2. Lambertian reflection
+        ray.Direction = MakeMirrorReflection(triangleNormal, 0.0f);   // 3. Mirror Reflection
 
         // TMin을 0이 아닌 작은 값으로 설정하여 앨리어싱 이슈를 피함. - floating point 에러
         // TMin을 작은 갑승로 유지해서 접촉하고 있는 영역에서 지오메트리 missing을 예방
@@ -308,17 +327,15 @@ void MyPlaneClosestHitShader(inout RayPayload payload, in MyAttributes attr)
     if (payload.currentRecursionDepth < MAX_RECURSION_DEPTH)
     {
         RayPayload newPayload;
-        newPayload.color = payload.color * 0.5f;// g_localRootSigCB.albedo;
+        newPayload.color = payload.color * g_localRootSigCB.albedo;
         newPayload.currentRecursionDepth = payload.currentRecursionDepth + 1;
 
         // 반직선 추적
         RayDesc ray;
         ray.Origin = hitPosition;
-        //ray.Direction = triangleNormal + random_in_unit_sphere();
-        ray.Direction = random_in_hemisphere(triangleNormal);
-
-        //float3 worldNormal = normalize(mul((float3x3)ObjectToWorld3x4(), triangleNormal));
-        //float3 reflectedDir = Reflect(normalize(WorldRayDirection()), worldNormal);
+        //ray.Direction = MakeDefaultReflection(triangleNormal);            // 1. Default reflection
+        ray.Direction = MakeLambertianReflection(triangleNormal);           // 2. Lambertian reflection
+        //ray.Direction = MakeMirrorReflection(triangleNormal, 0.0f);       // 3. Mirror Reflection
 
         // TMin을 0이 아닌 작은 값으로 설정하여 앨리어싱 이슈를 피함. - floating point 에러
         // TMin을 작은 갑승로 유지해서 접촉하고 있는 영역에서 지오메트리 missing을 예방
