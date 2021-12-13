@@ -11,6 +11,7 @@ struct SceneConstantBuffer
     float4 lightPosition;
     float4 lightAmbientColor;
     float4 lightDiffuseColor;
+    uint NumOfStartingRay;
 };
 
 struct CubeConstantBuffer
@@ -208,7 +209,7 @@ void MyRaygenShader()
     GenerateCameraRay(DispatchRaysIndex().xy, origin, rayDir);
 
     float4 color = float4(0.0f, 0.0f, 0.0f, 0.0f);
-    int samples = 100;
+    int samples = g_sceneCB.NumOfStartingRay;
 
     // 반직선 추적
     for (int i = 0; i < samples; ++i)

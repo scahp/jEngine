@@ -149,6 +149,7 @@ public:
         XMVECTOR lightPosition;
         XMVECTOR lightAmbientColor;
         XMVECTOR lightDiffuseColor;
+        uint32 NumOfStartingRay;
     };
     SceneConstantBuffer m_sceneCB[FrameCount];
     CubeConstantBuffer m_cubeCB;
@@ -212,6 +213,10 @@ public:
 	bool Initialize();
     bool Run();
 	void Release();
+    
+    uint32 AdapterID = -1;
+    std::wstring AdapterName;
+    void CalculateFrameStats();
 
 	HWND CreateMainWindow() const;
 

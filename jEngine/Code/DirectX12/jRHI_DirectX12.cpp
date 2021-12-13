@@ -18,10 +18,10 @@ const wchar_t* jRHI_DirectX12::c_triHitGroupName = L"TriHitGroup";
 const wchar_t* jRHI_DirectX12::c_planeHitGroupName = L"PlaneHitGroup";
 const wchar_t* jRHI_DirectX12::c_planeclosestHitShaderName = L"MyPlaneClosestHitShader";
 
-inline double random_double() 
+inline float random_double() 
 {
     // Returns a random real in [0,1).
-    return rand() / (RAND_MAX + 1.0);
+    return rand() / (RAND_MAX + 1.0f);
 }
 
 // Pretty-print a state object tree.
@@ -300,7 +300,13 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         sIsDraging = false;
     }
     return 0;
-
+    case WM_PAINT:
+        if (pRHIDirectX12)
+        {
+            pRHIDirectX12->Update();
+            pRHIDirectX12->Render();
+        }
+    return 0;
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		return 0;
@@ -344,21 +350,20 @@ HWND jRHI_DirectX12::CreateMainWindow() const
 	return hWnd;
 }
 
-void GetHardwareAdapter(IDXGIFactory1* InFactory, IDXGIAdapter1** InAdapter
+int32 GetHardwareAdapter(IDXGIFactory1* InFactory, IDXGIAdapter1** InAdapter
 	, bool requestHighPerformanceAdapter = false)
 {
 	*InAdapter = nullptr;
 
+    uint32 adapterIndex = 0;
 	ComPtr<IDXGIAdapter1> adapter;
-
 	ComPtr<IDXGIFactory6> factory6;
 	if (JOK(InFactory->QueryInterface(IID_PPV_ARGS(&factory6))))
 	{
 		const auto GpuPreference = requestHighPerformanceAdapter
 			? DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE : DXGI_GPU_PREFERENCE_UNSPECIFIED;
 		
-		uint32 adapterIndex = 0;
-		while (factory6->EnumAdapterByGpuPreference(adapterIndex, GpuPreference, IID_PPV_ARGS(&adapter)))
+		while (S_OK != factory6->EnumAdapterByGpuPreference(adapterIndex, GpuPreference, IID_PPV_ARGS(&adapter)))
 		{
 			++adapterIndex;
 
@@ -374,15 +379,12 @@ void GetHardwareAdapter(IDXGIFactory1* InFactory, IDXGIAdapter1** InAdapter
 				continue;
 			}
 
-			// 어댑터가 Direct3D 12를 지원하는지 체크하고 가능하면 device 를 생성한다.
-			if (JOK(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, _uuidof(ID3D12Device), nullptr)))
-				break;
+            break;
 		}
 	}
 	else
 	{
-		uint32 adapterIndex = 0;
-		while (InFactory->EnumAdapters1(adapterIndex, &adapter))
+		while (S_OK != InFactory->EnumAdapters1(adapterIndex, &adapter))
 		{
 			++adapterIndex;
 
@@ -394,13 +396,12 @@ void GetHardwareAdapter(IDXGIFactory1* InFactory, IDXGIAdapter1** InAdapter
 				continue;
 			}
 
-			// 어댑터가 Direct3D 12를 지원하는지 체크하고 가능하면 device 를 생성한다.
-			if (JOK(SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, _uuidof(ID3D12Device), nullptr))))
-				break;
+            break;
 		}
 	}
 
 	*InAdapter = adapter.Detach();
+    return adapterIndex;
 }
 
 void jRHI_DirectX12::WaitForGPU()
@@ -456,10 +457,25 @@ bool jRHI_DirectX12::Initialize()
 	else
 	{
 		ComPtr<IDXGIAdapter1> hardwareAdapter;
-		GetHardwareAdapter(factory.Get(), &hardwareAdapter);
+		const int32 ResultAdapterID = GetHardwareAdapter(factory.Get(), &hardwareAdapter);
 
-		if (JFAIL(D3D12CreateDevice(hardwareAdapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_device))))
-			return false;
+        if (JFAIL(D3D12CreateDevice(hardwareAdapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_device))))
+        {
+            return false;
+        }
+        else
+        {
+            DXGI_ADAPTER_DESC desc;
+            hardwareAdapter->GetDesc(&desc);
+            AdapterID = ResultAdapterID;
+            AdapterName = desc.Description;
+
+#ifdef _DEBUG
+            wchar_t buff[256] = {};
+            swprintf_s(buff, L"Direct3D Adapter (%u): VID:%04X, PID:%04X - %ls\n", AdapterID, desc.VendorId, desc.DeviceId, desc.Description);
+            OutputDebugStringW(buff);
+#endif
+        }
 	}
 
 	// 2. Command
@@ -1245,11 +1261,6 @@ bool jRHI_DirectX12::Run()
             TranslateMessage(&msg);
             DispatchMessage(&msg);
         }
-        else
-        {
-            Update();
-            Render();
-        }
     }
 
     return true;
@@ -1347,6 +1358,8 @@ void jRHI_DirectX12::UpdateCameraMatrices()
 	const XMMATRIX viewProj = view * proj;
 
 	m_sceneCB[frameIndex].projectionToWorld = XMMatrixInverse(nullptr, viewProj);
+    m_sceneCB[frameIndex].NumOfStartingRay = 100;        // 첫 Ray 생성시 100개를 쏴서 보간하도록 함. 노이즈를 줄여줌
+
 }
 
 bool jRHI_DirectX12::BuildTopLevelAS(TopLevelAccelerationStructureBuffers& InBuffers, bool InIsUpdate, float InRotationY, Vector InTranslation)
@@ -1400,7 +1413,10 @@ bool jRHI_DirectX12::BuildTopLevelAS(TopLevelAccelerationStructureBuffers& InBuf
         {
             float r = radius;
             auto s = XMMatrixScaling(r, r, r);
-            auto t = XMMatrixTranslation((i * radius * 5.0f) + (radius * 4.0f * random_double()), -0.7, (j * radius * 5.0f) + (radius * 4.0f * random_double()));
+            auto t = XMMatrixTranslation(
+                (float)(i * radius * 5.0f) + (radius * 4.0f * random_double())
+                , -0.7f
+                , (float)(j * radius * 5.0f) + (radius * 4.0f * random_double()));
             auto m = XMMatrixTranspose(XMMatrixMultiply(s, t));
 
             instanceDescs[cnt].InstanceID = cnt;
@@ -1462,8 +1478,37 @@ bool jRHI_DirectX12::BuildTopLevelAS(TopLevelAccelerationStructureBuffers& InBuf
     return true;
 }
 
+void jRHI_DirectX12::CalculateFrameStats()
+{
+    static int frameCnt = 0;
+    static double elapsedTime = 0.0f;
+    double totalTime = GetTickCount() / 1000.0f;
+    frameCnt++;
+
+    // Compute averages over one second period.
+    if ((totalTime - elapsedTime) >= 1.0f)
+    {
+        float diff = static_cast<float>(totalTime - elapsedTime);
+        float fps = static_cast<float>(frameCnt) / diff; // Normalize to an exact second.
+
+        frameCnt = 0;
+        elapsedTime = totalTime;
+
+        float MRaysPerSecond = (GetScreenWidth() * GetScreenHeight() * fps * m_sceneCB[m_frameIndex].NumOfStartingRay) / static_cast<float>(1e6);
+
+        std::wstringstream windowText;
+
+        windowText << std::setprecision(2) << std::fixed
+            << L"    fps: " << fps << L"     ~Million Primary Rays/s: " << MRaysPerSecond
+            << L"    GPU[" << AdapterID << L"]: " << AdapterName;
+        SetWindowText(m_hWnd, windowText.str().c_str());
+    }
+}
+
 void jRHI_DirectX12::Update()
 {
+    CalculateFrameStats();
+
 	int32 prevFrameIndex = m_frameIndex - 1;
 	if (prevFrameIndex < 0)
 		prevFrameIndex = FrameCount - 1;
