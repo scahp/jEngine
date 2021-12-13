@@ -1384,8 +1384,8 @@ bool jRHI_DirectX12::BuildTopLevelAS(TopLevelAccelerationStructureBuffers& InBuf
 
     XMMATRIX transformation[3];
     XMMATRIX rotateMat = XMMatrixRotationY(XMConvertToRadians(InRotationY));
-    transformation[0] = XMMatrixTranspose(XMMatrixMultiply(rotateMat, XMMatrixTranslation(InTranslation.x - Step, InTranslation.y + 1.0f, InTranslation.z)));
-    transformation[1] = XMMatrixTranspose(XMMatrixMultiply(rotateMat, XMMatrixTranslation(InTranslation.x + Step, InTranslation.y + 1.0f, InTranslation.z)));
+    transformation[0] = XMMatrixTranspose(XMMatrixMultiply(rotateMat, XMMatrixTranslation(InTranslation.x - Step, InTranslation.y + 0.7f, InTranslation.z)));
+    transformation[1] = XMMatrixTranspose(XMMatrixMultiply(rotateMat, XMMatrixTranslation(InTranslation.x + Step, InTranslation.y + 0.7f, InTranslation.z)));
     transformation[2] = XMMatrixTranspose(XMMatrixIdentity());
 
     int32 i = 0;

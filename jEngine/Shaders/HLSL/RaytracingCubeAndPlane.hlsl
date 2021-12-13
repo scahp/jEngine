@@ -44,6 +44,11 @@ StructuredBuffer<Vertex> PlaneVertices : register(t3, space0);
 ConstantBuffer<SceneConstantBuffer> g_sceneCB : register(b0);
 ConstantBuffer<CubeConstantBuffer> g_localRootSigCB : register(b1);
 
+float3 Reflect(float3 v, float3 n)
+{
+    return v - 2 * dot(v, n) * n;
+}
+
 // 3개의 16비트 인덱스를 byte address buffer 로 부터 가져옴
 uint3 Load3x16BitIndices(uint offsetBytes)
 {
@@ -142,9 +147,16 @@ void MyRaygenShader()
     // TMin을 작은 갑승로 유지해서 접촉하고 있는 영역에서 지오메트리 missing을 예방
     ray.TMin = 0.001;
     ray.TMax = 10000.0;
+
     // RayPayload payload = { float4(0, 0, 0, 0) };
-    RayPayload payload = { float4(1.0f, 1.0f, 1.0f, 1.0f), 0 };
+    RayPayload payload = { float4(1.0f, 1.0f, 1.0f, 1.0f), 1 };
     TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0, ray, payload);
+
+    if (payload.currentRecursionDepth >= 1)
+    {
+        payload.color /= payload.currentRecursionDepth;
+    }
+    payload.color = float4(sqrt(payload.color.xyz), payload.color.w);
 
     // 출력 텍스쳐에 반직선 추적된 색상을 기록함
     RenderTarget[DispatchRaysIndex().xy] = payload.color;
@@ -157,11 +169,20 @@ float3 random_in_unit_sphere()
     float noiseY = (frac(sin(dot(uv, float2(12.9898, 78.233) * 2.0)) * 43758.5453));
     float noiseZ = (frac(sin(dot(uv, float2(12.9898, 78.233) * 3.0)) * 43758.5453));
     
-    float3 randomUniSphere = float3(noiseX, noiseY, noiseZ);
+    float3 randomUniSphere = float3(noiseX, noiseY, noiseZ) * 2.0f - 0.5f;
     if (length(randomUniSphere) <= 1.0f)
         return randomUniSphere;
 
     return normalize(randomUniSphere);
+}
+
+float3 random_in_hemisphere(float3 normal)
+{
+    float3 in_unit_sphere = random_in_unit_sphere();
+    if (dot(in_unit_sphere, normal) > 0.0)  // 노멀 기준으로 같은 반구 방향인지?
+        return in_unit_sphere;
+
+    return -in_unit_sphere;
 }
 
 [shader("closesthit")]
@@ -194,14 +215,40 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 
     if (payload.currentRecursionDepth < MAX_RECURSION_DEPTH)
     {
+        //RayPayload newPayload;
+        //newPayload.color = payload.color * g_localRootSigCB.albedo;
+        //newPayload.currentRecursionDepth = payload.currentRecursionDepth + 1;
+
+        //// 반직선 추적
+        //RayDesc ray;
+        //ray.Origin = hitPosition;
+        //ray.Direction = triangleNormal + random_in_unit_sphere();
+
+        //// TMin을 0이 아닌 작은 값으로 설정하여 앨리어싱 이슈를 피함. - floating point 에러
+        //// TMin을 작은 갑승로 유지해서 접촉하고 있는 영역에서 지오메트리 missing을 예방
+        //ray.TMin = 0.001;
+        //ray.TMax = 10000.0;
+        //TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0, ray, newPayload);
+
+        //payload.color *= newPayload.color;
+
         RayPayload newPayload;
-        newPayload.color = payload.color * g_localRootSigCB.albedo;
+        newPayload.color = payload.color * 0.5f;// g_localRootSigCB.albedo;
         newPayload.currentRecursionDepth = payload.currentRecursionDepth + 1;
 
         // 반직선 추적
         RayDesc ray;
         ray.Origin = hitPosition;
-        ray.Direction = triangleNormal + random_in_unit_sphere();
+        //ray.Direction = triangleNormal + random_in_unit_sphere();
+        ray.Direction = random_in_hemisphere(triangleNormal);
+
+        //float3 worldNormal = normalize(mul((float3x3)ObjectToWorld3x4(), triangleNormal));
+        //float3 reflectedDir = Reflect(normalize(WorldRayDirection()), worldNormal);
+
+        //float fuzz = 0.2f;
+        //reflectedDir += random_in_unit_sphere() * fuzz;
+
+        //ray.Direction = reflectedDir;
 
         // TMin을 0이 아닌 작은 값으로 설정하여 앨리어싱 이슈를 피함. - floating point 에러
         // TMin을 작은 갑승로 유지해서 접촉하고 있는 영역에서 지오메트리 missing을 예방
@@ -209,7 +256,7 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
         ray.TMax = 10000.0;
         TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0, ray, newPayload);
 
-        payload.color *= newPayload.color;
+        payload.color = newPayload.color;
     }
     ///
 
@@ -223,11 +270,16 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 [shader("miss")]
 void MyMissShader(inout RayPayload payload)
 {
-    if (payload.currentRecursionDepth == 0)
-    {
-        float4 background = float4(0.0f, 0.2f, 0.4f, 1.0f);
-        payload.color = background;
-    }
+    float3 rayDir;
+    float3 origin;
+
+    // 반직선 생성
+    GenerateCameraRay(DispatchRaysIndex().xy, origin, rayDir);
+
+    float t = (rayDir.y + 1.0f) * 0.5f;
+    float3 background = (1.0f - t) * float3(1.0f, 1.0f, 1.0f) + t * float3(0.5f, 0.7f, 1.0f);
+
+    payload.color *= float4(background, 1.0f);
 }
 
 [shader("closesthit")]
@@ -256,13 +308,17 @@ void MyPlaneClosestHitShader(inout RayPayload payload, in MyAttributes attr)
     if (payload.currentRecursionDepth < MAX_RECURSION_DEPTH)
     {
         RayPayload newPayload;
-        newPayload.color = payload.color * g_localRootSigCB.albedo;
+        newPayload.color = payload.color * 0.5f;// g_localRootSigCB.albedo;
         newPayload.currentRecursionDepth = payload.currentRecursionDepth + 1;
 
         // 반직선 추적
         RayDesc ray;
         ray.Origin = hitPosition;
-        ray.Direction = triangleNormal + random_in_unit_sphere();
+        //ray.Direction = triangleNormal + random_in_unit_sphere();
+        ray.Direction = random_in_hemisphere(triangleNormal);
+
+        //float3 worldNormal = normalize(mul((float3x3)ObjectToWorld3x4(), triangleNormal));
+        //float3 reflectedDir = Reflect(normalize(WorldRayDirection()), worldNormal);
 
         // TMin을 0이 아닌 작은 값으로 설정하여 앨리어싱 이슈를 피함. - floating point 에러
         // TMin을 작은 갑승로 유지해서 접촉하고 있는 영역에서 지오메트리 missing을 예방
@@ -270,7 +326,7 @@ void MyPlaneClosestHitShader(inout RayPayload payload, in MyAttributes attr)
         ray.TMax = 10000.0;
         TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0, ray, newPayload);
 
-        payload.color *= newPayload.color;
+        payload.color = newPayload.color;
     }
 
     //float4 diffuseColor = CalculationDiffuseLighting(hitPosition, triangleNormal);
