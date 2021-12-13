@@ -868,7 +868,7 @@ bool jRHI_DirectX12::Initialize()
     if (JFAIL(m_commandList->Reset(m_commandAllocator[m_frameIndex].Get(), nullptr)))
         return false;
 
-    const int32 slice = 20;
+    const int32 slice = 100;
     const int32 verticesCount = ((slice + 1) * (slice / 2) + 2);
     const int32 verticesElementCount = ((slice + 1) * (slice / 2) + 2) / 3;
 
@@ -1396,7 +1396,7 @@ bool jRHI_DirectX12::BuildTopLevelAS(TopLevelAccelerationStructureBuffers& InBuf
     int32 cnt = 0;
     for (int32 i = -w; i < w; ++i)
     {
-        for (int32 j = -h; j < h; ++j,++cnt)
+        for (int32 j = -h; j < h; ++j, ++cnt)
         {
             float r = radius;
             auto s = XMMatrixScaling(r, r, r);
@@ -1411,7 +1411,7 @@ bool jRHI_DirectX12::BuildTopLevelAS(TopLevelAccelerationStructureBuffers& InBuf
         }
     }
 
-    for(int32 i=0;i<3;++i)
+    for (int32 i = 0; i < 3; ++i)
     {
         auto s = XMMatrixScaling(1.0f, 1.0f, 1.0f);
         auto t = XMMatrixTranslation(0.0f + i * 2, 0.0f, 0.0f + i * 2);

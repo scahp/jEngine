@@ -1,15 +1,4 @@
-﻿//*********************************************************
-//
-// Copyright (c) Microsoft. All rights reserved.
-// This code is licensed under the MIT License (MIT).
-// THIS CODE IS PROVIDED *AS IS* WITHOUT WARRANTY OF
-// ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING ANY
-// IMPLIED WARRANTIES OF FITNESS FOR A PARTICULAR
-// PURPOSE, MERCHANTABILITY, OR NON-INFRINGEMENT.
-//
-//*********************************************************
-
-#ifndef RAYTRACING_HLSL
+﻿#ifndef RAYTRACING_HLSL
 #define RAYTRACING_HLSL
 
 #define MAX_RECURSION_DEPTH 10
@@ -275,27 +264,8 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
     // 이것은 중복이며, 설명을 위해서 수행함 왜냐하면 모든 버택스당 노멀은 동일하고 이 샘플의 삼각형의 노멀과 일치하기 때문
     float3 triangleNormal = HitAttribute(vertexNormals, attr);
 
-    ///
-
     if (payload.currentRecursionDepth < MAX_RECURSION_DEPTH)
     {
-        //RayPayload newPayload;
-        //newPayload.color = payload.color * g_localRootSigCB.albedo;
-        //newPayload.currentRecursionDepth = payload.currentRecursionDepth + 1;
-
-        //// 반직선 추적
-        //RayDesc ray;
-        //ray.Origin = hitPosition;
-        //ray.Direction = triangleNormal + random_in_unit_sphere();
-
-        //// TMin을 0이 아닌 작은 값으로 설정하여 앨리어싱 이슈를 피함. - floating point 에러
-        //// TMin을 작은 값으로 유지해서 접촉하고 있는 영역에서 지오메트리 missing을 예방
-        //ray.TMin = 0.001;
-        //ray.TMax = 10000.0;
-        //TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0, ray, newPayload);
-
-        //payload.color *= newPayload.color;
-
         RayPayload newPayload;        
         newPayload.currentRecursionDepth = payload.currentRecursionDepth + 1;
 
@@ -331,8 +301,8 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 
         // Mirror Reflection
         case 1:
-            newPayload.color = payload.color * g_localRootSigCB.albedo;
             ray.Direction = MakeMirrorReflection(triangleNormal, 0.0f);
+            newPayload.color = payload.color * g_localRootSigCB.albedo;
             break;
 
         // Lambertian Reflection            
@@ -359,25 +329,20 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 
         payload.color = newPayload.color;
     }
-    ///
-
-    //float4 diffuseColor = CalculationDiffuseLighting(hitPosition, triangleNormal);
-    //float4 color = g_sceneCB.lightAmbientColor + diffuseColor;
-
-    //payload.color = color;
-    ////payload.color = float4(triangleNormal, 1.0);
 }
 
 [shader("miss")]
 void MyMissShader(inout RayPayload payload)
 {
-    float3 rayDir;
-    float3 origin;
+     // Make a 't' value that is the factor scaled by using ray hit on background of Y axis.
+    float2 xy = HitWorldPosition().xy;
+    float2 screenPos = xy / DispatchRaysDimensions().xy * 2.0f - 1.0f;;
+    float4 world = mul(float4(screenPos, 0, 1), g_sceneCB.projectionToWorld);
+    world.xyz /= world.w;
+    float3 origin = g_sceneCB.cameraPosition.xyz;
+    float3 direction = normalize(world.xyz - origin);
 
-    // 반직선 생성
-    GenerateCameraRay(DispatchRaysIndex().xy, origin, rayDir);
-
-    float t = (rayDir.y + 1.0f) * 0.5f;
+    float t = (direction.y + 1.0f) * 0.5f;
     float3 background = (1.0f - t) * float3(1.0f, 1.0f, 1.0f) + t * float3(0.5f, 0.7f, 1.0f);
 
     payload.color *= float4(background, 1.0f);
@@ -387,13 +352,6 @@ void MyMissShader(inout RayPayload payload)
 void MyPlaneClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 {
     float3 hitPosition = HitWorldPosition();
-
-    //// 삼각형의 노멀을 계산함
-    //// 이것은 중복이며, 설명을 위해서 수행함 왜냐하면 모든 버택스당 노멀은 동일하고 이 샘플의 삼각형의 노멀과 일치하기 때문
-    //float3 triangleNormal = HitAttribute(vertexNormals, attr);
-
-    //float4 diffuseColor = CalculationDiffuseLighting(hitPosition, triangleNormal);
-    //float4 color = g_sceneCB.lightAmbientColor + diffuseColor;
 
     float3 vertexNormals[3] =
     {
@@ -427,12 +385,6 @@ void MyPlaneClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 
         payload.color = newPayload.color;
     }
-
-    //float4 diffuseColor = CalculationDiffuseLighting(hitPosition, triangleNormal);
-    //float4 color = g_sceneCB.lightAmbientColor + diffuseColor;
-    //
-    //payload.color = color;
-    ////payload.color = float4(triangleNormal, 1.0f);
 }
 
 #endif // RAYTRACING_HLSL
