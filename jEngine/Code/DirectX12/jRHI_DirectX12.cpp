@@ -18,6 +18,12 @@ const wchar_t* jRHI_DirectX12::c_triHitGroupName = L"TriHitGroup";
 const wchar_t* jRHI_DirectX12::c_planeHitGroupName = L"PlaneHitGroup";
 const wchar_t* jRHI_DirectX12::c_planeclosestHitShaderName = L"MyPlaneClosestHitShader";
 
+inline double random_double() 
+{
+    // Returns a random real in [0,1).
+    return rand() / (RAND_MAX + 1.0);
+}
+
 // Pretty-print a state object tree.
 inline void PrintStateObjectDesc(const D3D12_STATE_OBJECT_DESC* desc)
 {
@@ -502,21 +508,21 @@ bool jRHI_DirectX12::Initialize()
 
         // Setup material
         m_cubeCB.albedo = XMFLOAT4(0.8f, 0.8f, 0.8f, 1.0f);
-        // m_cubeCB.albedo = XMFLOAT4(0.8f, 0.4f, 0.3f, 1.0f);
-        m_planeCB.albedo = XMFLOAT4(0.8, 0.8, 0.0, 1.0f);
+        m_planeCB.albedo = XMFLOAT4(0.5, 0.5, 0.5, 1.0f);
 
         // Setup camera
-        m_eye = { 0.0f, 1.0f, -15.0f, 1.0f };
+        m_eye = { 13.0f, 1.0f, 3.0f, 1.0f };
         m_at = { 0.0f, 0.0f, 0.0f, 1.0f };
         XMVECTOR right = { 1.0f, 0.0f, 0.0f, 0.0f };
 
         XMVECTOR direction = XMVector4Normalize(m_at - m_eye);
-        m_up = XMVector3Normalize(XMVector3Cross(direction, right));
+        // m_up = XMVector3Normalize(XMVector3Cross(direction, right));
+        m_up = { 0.0f, 1.0f, 0.0f };
 
-        // Rotate camera around Y axis
-        XMMATRIX rotate = XMMatrixRotationY(XMConvertToRadians(0.0f));
-        m_eye = XMVector3Transform(m_eye, rotate);
-        m_up = XMVector3Transform(m_up, rotate);
+        //// Rotate camera around Y axis
+        //XMMATRIX rotate = XMMatrixRotationY(XMConvertToRadians(0.0f));
+        //m_eye = XMVector3Transform(m_eye, rotate);
+        //m_up = XMVector3Transform(m_up, rotate);
 
         UpdateCameraMatrices();
 
@@ -900,7 +906,7 @@ bool jRHI_DirectX12::Initialize()
 
 
     const float stepRadian = DegreeToRadian(360.0f / slice);
-    const float radius = 1.5f;
+    const float radius = 1.0f;
     Vector offset = {0.0f, 0.0f, 0.0f};
     int32 cnt = 0;
     for (int32 j = 0; j < slice / 2; ++j)
@@ -1345,10 +1351,12 @@ void jRHI_DirectX12::UpdateCameraMatrices()
 
 bool jRHI_DirectX12::BuildTopLevelAS(TopLevelAccelerationStructureBuffers& InBuffers, bool InIsUpdate, float InRotationY, Vector InTranslation)
 {
+    int32 w = 11, h = 11;
+    int32 totalCount = (w * 2 * h * 2) + 3 + 1;     // small balls, big balls, plane
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
     inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
     inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
-    inputs.NumDescs = 3;
+    inputs.NumDescs = totalCount;
     inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
 
     D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO info;
@@ -1371,7 +1379,7 @@ bool jRHI_DirectX12::BuildTopLevelAS(TopLevelAccelerationStructureBuffers& InBuf
         // Update 요청이 아니면, 버퍼를 새로 만들어야 함, 그렇지 않으면 그대로 refit(이미 존재하는 TLAS를 업데이트) 될 것임.
         BufferUtil::AllocateUAVBuffer(&InBuffers.Scratch, m_device.Get(), info.ScratchDataSizeInBytes, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, TEXT("TLAS Scratch Buffer"));
         BufferUtil::AllocateUAVBuffer(&InBuffers.Result, m_device.Get(), info.ResultDataMaxSizeInBytes, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, TEXT("TLAS Result Buffer"));
-        BufferUtil::AllocateUploadBuffer(&InBuffers.InstanceDesc, m_device.Get(), nullptr, sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * 3, TEXT("TLAS Instance Desc"));
+        BufferUtil::AllocateUploadBuffer(&InBuffers.InstanceDesc, m_device.Get(), nullptr, sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * totalCount, TEXT("TLAS Instance Desc"));
     }
 
     D3D12_RAYTRACING_INSTANCE_DESC* instanceDescs = nullptr;
@@ -1379,32 +1387,53 @@ bool jRHI_DirectX12::BuildTopLevelAS(TopLevelAccelerationStructureBuffers& InBuf
     if (JFAIL(hr))
         return false;
 
-    ZeroMemory(instanceDescs, sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * 3);
+    ZeroMemory(instanceDescs, sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * totalCount);
 
-    const float Step = 1.5f;
+    srand(123);
 
-    XMMATRIX transformation[3];
-    XMMATRIX rotateMat = XMMatrixRotationY(XMConvertToRadians(InRotationY));
-    transformation[0] = XMMatrixTranspose(XMMatrixMultiply(rotateMat, XMMatrixTranslation(InTranslation.x - Step, InTranslation.y + 0.4f, InTranslation.z)));
-    transformation[1] = XMMatrixTranspose(XMMatrixMultiply(rotateMat, XMMatrixTranslation(InTranslation.x + Step, InTranslation.y + 0.4f, InTranslation.z)));
-    transformation[2] = XMMatrixTranspose(XMMatrixIdentity());
+    const float radius = 0.3f;
 
-    int32 i = 0;
-    for (i = 0; i < 3 - 1; ++i)
+    int32 cnt = 0;
+    for (int32 i = -w; i < w; ++i)
     {
-        instanceDescs[i].InstanceID = i;
-        instanceDescs[i].InstanceContributionToHitGroupIndex = 0;
-        memcpy(instanceDescs[i].Transform, &transformation[i], sizeof(instanceDescs[i].Transform));
-        instanceDescs[i].InstanceMask = 1;
-        instanceDescs[i].AccelerationStructure = m_bottomLevelAccelerationStructure->GetGPUVirtualAddress();
+        for (int32 j = -h; j < h; ++j,++cnt)
+        {
+            float r = radius;
+            auto s = XMMatrixScaling(r, r, r);
+            auto t = XMMatrixTranslation((i * radius * 5.0f) + (radius * 4.0f * random_double()), -0.7, (j * radius * 5.0f) + (radius * 4.0f * random_double()));
+            auto m = XMMatrixTranspose(XMMatrixMultiply(s, t));
+
+            instanceDescs[cnt].InstanceID = cnt;
+            instanceDescs[cnt].InstanceContributionToHitGroupIndex = 0;
+            memcpy(instanceDescs[cnt].Transform, &m, sizeof(instanceDescs[cnt].Transform));
+            instanceDescs[cnt].InstanceMask = 1;
+            instanceDescs[cnt].AccelerationStructure = m_bottomLevelAccelerationStructure->GetGPUVirtualAddress();
+        }
     }
 
-    instanceDescs[i].InstanceID = i;
-    instanceDescs[i].InstanceContributionToHitGroupIndex = 1;
-    memcpy(instanceDescs[i].Transform, &transformation[i], sizeof(instanceDescs[i].Transform));
-    instanceDescs[i].InstanceMask = 1;
-    instanceDescs[i].AccelerationStructure = m_bottomLevelAccelerationStructureSecondGeometry->GetGPUVirtualAddress();
-    instanceDescs[i].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_CULL_DISABLE;
+    for(int32 i=0;i<3;++i)
+    {
+        auto s = XMMatrixScaling(1.0f, 1.0f, 1.0f);
+        auto t = XMMatrixTranslation(0.0f + i * 2, 0.0f, 0.0f + i * 2);
+        auto m = XMMatrixTranspose(XMMatrixMultiply(s, t));
+
+        instanceDescs[cnt].InstanceID = cnt;
+        instanceDescs[cnt].InstanceContributionToHitGroupIndex = 0;
+        memcpy(instanceDescs[cnt].Transform, &m, sizeof(instanceDescs[cnt].Transform));
+        instanceDescs[cnt].InstanceMask = 1;
+        instanceDescs[cnt].AccelerationStructure = m_bottomLevelAccelerationStructure->GetGPUVirtualAddress();
+
+        ++cnt;
+    }
+
+    auto mIdentity = XMMatrixTranspose(XMMatrixIdentity());
+
+    instanceDescs[cnt].InstanceID = cnt;
+    instanceDescs[cnt].InstanceContributionToHitGroupIndex = 1;
+    memcpy(instanceDescs[cnt].Transform, &mIdentity, sizeof(instanceDescs[cnt].Transform));
+    instanceDescs[cnt].InstanceMask = 1;
+    instanceDescs[cnt].AccelerationStructure = m_bottomLevelAccelerationStructureSecondGeometry->GetGPUVirtualAddress();
+    instanceDescs[cnt].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_CULL_DISABLE;
 
     InBuffers.InstanceDesc->Unmap(0, nullptr);
 
@@ -1439,7 +1468,7 @@ void jRHI_DirectX12::Update()
 	if (prevFrameIndex < 0)
 		prevFrameIndex = FrameCount - 1;
 
-    static bool enableCameraRotation = true;
+    static bool enableCameraRotation = false;
 
     static float elapsedTime = 0.0f;
     elapsedTime = 0.05f;

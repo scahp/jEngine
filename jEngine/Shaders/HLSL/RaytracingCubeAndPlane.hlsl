@@ -133,8 +133,8 @@ float3 random_in_unit_sphere()
 {
     float2 uv = DispatchRaysIndex().xy + float2(RayTCurrent(), RayTCurrent() * 2.0f);
     float noiseX = (frac(sin(dot(uv, float2(12.9898, 78.233))) * 43758.5453));
-    float noiseY = (frac(sin(dot(uv, float2(12.9898, 78.233) * 2.0)) * 43758.5453));
-    float noiseZ = (frac(sin(dot(uv, float2(12.9898, 78.233) * 3.0)) * 43758.5453));
+    float noiseY = (frac(sin(dot(uv, float2(12.9898, 78.233) * RayTCurrent() * 2.0f)) * 43758.5453));
+    float noiseZ = (frac(sin(dot(uv, float2(12.9898, 78.233) * RayTCurrent())) * 43758.5453));
 
     float3 randomUniSphere = float3(noiseX, noiseY, noiseZ) * 2.0f - 0.5f;
     if (length(randomUniSphere) <= 1.0f)
@@ -229,7 +229,7 @@ void MyRaygenShader()
         ray.Direction = rayDir + float3(random_in_unit_sphere2(i).xy / DispatchRaysDimensions().xy, 0.0f);
 
         // TMin을 0이 아닌 작은 값으로 설정하여 앨리어싱 이슈를 피함. - floating point 에러
-        // TMin을 작은 갑승로 유지해서 접촉하고 있는 영역에서 지오메트리 missing을 예방
+        // TMin을 작은 값으로 유지해서 접촉하고 있는 영역에서 지오메트리 missing을 예방
         ray.TMin = 0.001;
         ray.TMax = 10000.0;
 
@@ -289,36 +289,41 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
         //ray.Direction = triangleNormal + random_in_unit_sphere();
 
         //// TMin을 0이 아닌 작은 값으로 설정하여 앨리어싱 이슈를 피함. - floating point 에러
-        //// TMin을 작은 갑승로 유지해서 접촉하고 있는 영역에서 지오메트리 missing을 예방
+        //// TMin을 작은 값으로 유지해서 접촉하고 있는 영역에서 지오메트리 missing을 예방
         //ray.TMin = 0.001;
         //ray.TMax = 10000.0;
         //TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0, ray, newPayload);
 
         //payload.color *= newPayload.color;
 
-        RayPayload newPayload;
-        newPayload.color = payload.color * g_localRootSigCB.albedo;
+        RayPayload newPayload;        
         newPayload.currentRecursionDepth = payload.currentRecursionDepth + 1;
 
         // 반직선 추적
         RayDesc ray;
         ray.Origin = hitPosition;
         //ray.Direction = MakeDefaultReflection(triangleNormal);        // 1. Default Reflection
-        if (InstanceID() == 1)
+        uint selectedIndex = InstanceID() % 5;
+        switch (selectedIndex)
         {
-            ray.Direction = MakeLambertianReflection(triangleNormal);     // 2. Lambertian reflection
-        }
-        else
+        // Mirror Reflection
+        case 0:
+            newPayload.color = payload.color * g_localRootSigCB.albedo;
+            ray.Direction = MakeMirrorReflection(triangleNormal, 0.0f);
+            break;
+        
+        // Refraction
+        case 1:
         {
-            //ray.Direction = MakeMirrorReflection(triangleNormal, 0.0f);   // 3. Mirror Reflection
-            //ray.Direction = MakeRefract(WorldRayDirection(), triangleNormal, 1.0f/1.5f);      // 4.Refraction
+            // ray.Direction = MakeRefract(WorldRayDirection(), triangleNormal, 1.0f / 1.5f);      // 4.Refraction
 
+            newPayload.color = payload.color * g_localRootSigCB.albedo;
 
             // 5. Refraction corrected
             float cos_theta = min(dot(-WorldRayDirection(), triangleNormal), 1.0);
             float sin_theta = sqrt(1.0 - cos_theta * cos_theta);
 
-            float ir = 1.1f;
+            float ir = 1.5f;
             bool IsFrontFace = true;
             float refraction_ratio = IsFrontFace ? (1.0 / ir) : ir;
             bool cannot_refract = refraction_ratio * sin_theta > 1.0;
@@ -328,9 +333,25 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
             else
                 ray.Direction = MakeRefract(WorldRayDirection(), triangleNormal, refraction_ratio);
         }
+        break;
+
+        // Lambertian Reflection            
+        case 2:
+            newPayload.color = payload.color * float4(0.8f, 0.2f, 0.2f, 1.0f);
+            ray.Direction = MakeLambertianReflection(triangleNormal);
+            break;
+        case 3:
+            newPayload.color = payload.color * float4(0.2f, 0.8f, 0.2f, 1.0f);
+            ray.Direction = MakeLambertianReflection(triangleNormal);
+            break;
+        case 4:
+            newPayload.color = payload.color * float4(0.2f, 0.2f, 0.8f, 1.0f);
+            ray.Direction = MakeLambertianReflection(triangleNormal);
+            break;
+        }
 
         // TMin을 0이 아닌 작은 값으로 설정하여 앨리어싱 이슈를 피함. - floating point 에러
-        // TMin을 작은 갑승로 유지해서 접촉하고 있는 영역에서 지오메트리 missing을 예방
+        // TMin을 작은 값으로 유지해서 접촉하고 있는 영역에서 지오메트리 missing을 예방
         ray.TMin = 0.001;
         ray.TMax = 10000.0;
 
@@ -399,7 +420,7 @@ void MyPlaneClosestHitShader(inout RayPayload payload, in MyAttributes attr)
         //ray.Direction = MakeMirrorReflection(triangleNormal, 0.0f);       // 3. Mirror Reflection
 
         // TMin을 0이 아닌 작은 값으로 설정하여 앨리어싱 이슈를 피함. - floating point 에러
-        // TMin을 작은 갑승로 유지해서 접촉하고 있는 영역에서 지오메트리 missing을 예방
+        // TMin을 작은 값으로 유지해서 접촉하고 있는 영역에서 지오메트리 missing을 예방
         ray.TMin = 0.001;
         ray.TMax = 10000.0;
         TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0, ray, newPayload);
