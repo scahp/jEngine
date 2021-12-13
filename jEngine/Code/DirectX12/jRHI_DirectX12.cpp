@@ -501,11 +501,12 @@ bool jRHI_DirectX12::Initialize()
         auto frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
         // Setup material
+        // m_cubeCB.albedo = XMFLOAT4(0.8f, 0.8f, 0.8f, 1.0f);
         m_cubeCB.albedo = XMFLOAT4(0.8f, 0.4f, 0.3f, 1.0f);
-        m_planeCB.albedo = XMFLOAT4(0.4f, 0.6f, 0.1f, 1.0f);
+        m_planeCB.albedo = XMFLOAT4(0.8, 0.8, 0.0, 1.0f);
 
         // Setup camera
-        m_eye = { 0.0f, 5.0f, -15.0f, 1.0f };
+        m_eye = { 0.0f, 1.0f, -15.0f, 1.0f };
         m_at = { 0.0f, 0.0f, 0.0f, 1.0f };
         XMVECTOR right = { 1.0f, 0.0f, 0.0f, 0.0f };
 
@@ -1384,8 +1385,8 @@ bool jRHI_DirectX12::BuildTopLevelAS(TopLevelAccelerationStructureBuffers& InBuf
 
     XMMATRIX transformation[3];
     XMMATRIX rotateMat = XMMatrixRotationY(XMConvertToRadians(InRotationY));
-    transformation[0] = XMMatrixTranspose(XMMatrixMultiply(rotateMat, XMMatrixTranslation(InTranslation.x - Step, InTranslation.y + 0.7f, InTranslation.z)));
-    transformation[1] = XMMatrixTranspose(XMMatrixMultiply(rotateMat, XMMatrixTranslation(InTranslation.x + Step, InTranslation.y + 0.7f, InTranslation.z)));
+    transformation[0] = XMMatrixTranspose(XMMatrixMultiply(rotateMat, XMMatrixTranslation(InTranslation.x - Step, InTranslation.y + 0.4f, InTranslation.z)));
+    transformation[1] = XMMatrixTranspose(XMMatrixMultiply(rotateMat, XMMatrixTranslation(InTranslation.x + Step, InTranslation.y + 0.4f, InTranslation.z)));
     transformation[2] = XMMatrixTranspose(XMMatrixIdentity());
 
     int32 i = 0;
@@ -1501,8 +1502,8 @@ void jRHI_DirectX12::Render()
         TranslationOffsetX -= 0.01f;
     }
 
-    if (!JASSERT(BuildTopLevelAS(TLASBuffer, true, accumulatedRotation, { TranslationOffsetX, 0.0f, 0.0f })))
-        return;
+    //if (!JASSERT(BuildTopLevelAS(TLASBuffer, true, accumulatedRotation, { TranslationOffsetX, 0.0f, 0.0f })))
+    //    return;
 
 	m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
 		m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
