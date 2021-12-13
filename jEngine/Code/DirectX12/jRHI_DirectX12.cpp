@@ -501,8 +501,8 @@ bool jRHI_DirectX12::Initialize()
         auto frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
         // Setup material
-        // m_cubeCB.albedo = XMFLOAT4(0.8f, 0.8f, 0.8f, 1.0f);
-        m_cubeCB.albedo = XMFLOAT4(0.8f, 0.4f, 0.3f, 1.0f);
+        m_cubeCB.albedo = XMFLOAT4(0.8f, 0.8f, 0.8f, 1.0f);
+        // m_cubeCB.albedo = XMFLOAT4(0.8f, 0.4f, 0.3f, 1.0f);
         m_planeCB.albedo = XMFLOAT4(0.8, 0.8, 0.0, 1.0f);
 
         // Setup camera
