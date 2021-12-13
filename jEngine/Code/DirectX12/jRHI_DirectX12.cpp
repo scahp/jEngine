@@ -511,7 +511,7 @@ bool jRHI_DirectX12::Initialize()
         m_planeCB.albedo = XMFLOAT4(0.5, 0.5, 0.5, 1.0f);
 
         // Setup camera
-        m_eye = { 13.0f, 1.0f, 3.0f, 1.0f };
+        m_eye = { 9.0f, 1.0f, 5.0f, 1.0f };
         m_at = { 0.0f, 0.0f, 0.0f, 1.0f };
         XMVECTOR right = { 1.0f, 0.0f, 0.0f, 0.0f };
 

@@ -152,7 +152,7 @@ float3 random_in_hemisphere(float3 normal)
     return -in_unit_sphere;
 }
 
-float reflectance(float cosine, float ref_idx) 
+float Schlick(float cosine, float ref_idx)
 {
     // Use Schlick's approximation for reflectance.
     float r0 = (1 - ref_idx) / (1 + ref_idx);
@@ -306,14 +306,8 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
         uint selectedIndex = InstanceID() % 5;
         switch (selectedIndex)
         {
-        // Mirror Reflection
-        case 0:
-            newPayload.color = payload.color * g_localRootSigCB.albedo;
-            ray.Direction = MakeMirrorReflection(triangleNormal, 0.0f);
-            break;
-        
         // Refraction
-        case 1:
+        case 0:
         {
             // ray.Direction = MakeRefract(WorldRayDirection(), triangleNormal, 1.0f / 1.5f);      // 4.Refraction
 
@@ -328,12 +322,18 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
             float refraction_ratio = IsFrontFace ? (1.0 / ir) : ir;
             bool cannot_refract = refraction_ratio * sin_theta > 1.0;
 
-            if (cannot_refract || reflectance(cos_theta, refraction_ratio) > (random_in_unit_sphere().x * 0.5f + 1.0f))
+            if (cannot_refract || Schlick(cos_theta, refraction_ratio) > (random_in_unit_sphere().x * 0.5f + 1.0f))
                 ray.Direction = MakeMirrorReflection(triangleNormal);
             else
                 ray.Direction = MakeRefract(WorldRayDirection(), triangleNormal, refraction_ratio);
         }
         break;
+
+        // Mirror Reflection
+        case 1:
+            newPayload.color = payload.color * g_localRootSigCB.albedo;
+            ray.Direction = MakeMirrorReflection(triangleNormal, 0.0f);
+            break;
 
         // Lambertian Reflection            
         case 2:
