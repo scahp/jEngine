@@ -514,7 +514,7 @@ bool jRHI_DirectX12::Initialize()
         m_up = XMVector3Normalize(XMVector3Cross(direction, right));
 
         // Rotate camera around Y axis
-        XMMATRIX rotate = XMMatrixRotationY(XMConvertToRadians(45.0f));
+        XMMATRIX rotate = XMMatrixRotationY(XMConvertToRadians(0.0f));
         m_eye = XMVector3Transform(m_eye, rotate);
         m_up = XMVector3Transform(m_up, rotate);
 
@@ -1381,7 +1381,7 @@ bool jRHI_DirectX12::BuildTopLevelAS(TopLevelAccelerationStructureBuffers& InBuf
 
     ZeroMemory(instanceDescs, sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * 3);
 
-    const float Step = 4.0f;
+    const float Step = 1.5f;
 
     XMMATRIX transformation[3];
     XMMATRIX rotateMat = XMMatrixRotationY(XMConvertToRadians(InRotationY));
@@ -1439,16 +1439,16 @@ void jRHI_DirectX12::Update()
 	if (prevFrameIndex < 0)
 		prevFrameIndex = FrameCount - 1;
 
-    static bool enableCameraRotation = false;
+    static bool enableCameraRotation = true;
 
     static float elapsedTime = 0.0f;
-    elapsedTime = 0.01f;
+    elapsedTime = 0.05f;
     
     // Y 축 주변으로 카메라를 회전
     if (enableCameraRotation)
 	{
         float secondsToRotateAround = 24.0f;
-        float angleToRotateBy = 360.0f * (elapsedTime / secondsToRotateAround);
+        static float angleToRotateBy = 360.0f * (elapsedTime / secondsToRotateAround);
 
         XMMATRIX rotate = XMMatrixRotationY(XMConvertToRadians(angleToRotateBy));
         m_eye = XMVector3Transform(m_eye, rotate);

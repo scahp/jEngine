@@ -304,22 +304,30 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
         RayDesc ray;
         ray.Origin = hitPosition;
         //ray.Direction = MakeDefaultReflection(triangleNormal);        // 1. Default Reflection
-        //ray.Direction = MakeLambertianReflection(triangleNormal);     // 2. Lambertian reflection
-        ray.Direction = MakeMirrorReflection(triangleNormal, 0.0f);   // 3. Mirror Reflection
-        //ray.Direction = MakeRefract(WorldRayDirection(), triangleNormal, 1.0f/1.5f);
-
-        /*float cos_theta = min(dot(-WorldRayDirection(), triangleNormal), 1.0);
-        float sin_theta = sqrt(1.0 - cos_theta * cos_theta);
-
-        float ir = 1.5f;
-        bool IsFrontFace = true;
-        float refraction_ratio = IsFrontFace ? (1.0 / ir) : ir;
-        bool cannot_refract = refraction_ratio * sin_theta > 1.0;
-
-        if (cannot_refract || reflectance(cos_theta, refraction_ratio) > (random_in_unit_sphere().x * 0.5f + 1.0f))
-            ray.Direction = MakeMirrorReflection(triangleNormal);
+        if (InstanceID() == 1)
+        {
+            ray.Direction = MakeLambertianReflection(triangleNormal);     // 2. Lambertian reflection
+        }
         else
-            ray.Direction = MakeRefract(WorldRayDirection(), triangleNormal, refraction_ratio);*/
+        {
+            //ray.Direction = MakeMirrorReflection(triangleNormal, 0.0f);   // 3. Mirror Reflection
+            //ray.Direction = MakeRefract(WorldRayDirection(), triangleNormal, 1.0f/1.5f);      // 4.Refraction
+
+
+            // 5. Refraction corrected
+            float cos_theta = min(dot(-WorldRayDirection(), triangleNormal), 1.0);
+            float sin_theta = sqrt(1.0 - cos_theta * cos_theta);
+
+            float ir = 1.1f;
+            bool IsFrontFace = true;
+            float refraction_ratio = IsFrontFace ? (1.0 / ir) : ir;
+            bool cannot_refract = refraction_ratio * sin_theta > 1.0;
+
+            if (cannot_refract || reflectance(cos_theta, refraction_ratio) > (random_in_unit_sphere().x * 0.5f + 1.0f))
+                ray.Direction = MakeMirrorReflection(triangleNormal);
+            else
+                ray.Direction = MakeRefract(WorldRayDirection(), triangleNormal, refraction_ratio);
+        }
 
         // TMin을 0이 아닌 작은 값으로 설정하여 앨리어싱 이슈를 피함. - floating point 에러
         // TMin을 작은 갑승로 유지해서 접촉하고 있는 영역에서 지오메트리 missing을 예방
