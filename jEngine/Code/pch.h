@@ -123,10 +123,12 @@ inline void hash_combine(std::size_t& seed, const T& v)
 }()
 
 // imgui
-#include "IMGUI/imgui.h"
-#include "IMGUI/imgui_impl_glfw.h"
-#include "IMGUI/imgui_impl_opengl3.h"
+#include "imgui/imgui.h"
+#include "imgui/backends/imgui_impl_win32.h"
+#include "imgui/backends/imgui_impl_dx12.h"
 
+//#include "imgui/backends/imgui_impl_glfw.h"
+//#include "imgui/backends/imgui_impl_opengl3.h"
 
 #include "jShadowAppProperties.h"
 

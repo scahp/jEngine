@@ -583,6 +583,9 @@ bool jRHI_DirectX12::Initialize()
         lightDiffuseColor = XMFLOAT4(0.5f, 0.3f, 0.3f, 1.0f);
         m_sceneCB[frameIndex].lightDiffuseColor = XMLoadFloat4(&lightDiffuseColor);
 
+        m_sceneCB[frameIndex].focalDistance = 10.0f;
+        m_sceneCB[frameIndex].lensRadius = 0.2f;
+
         // 모든 프레임의 버퍼 인스턴스에 초기값을 설정해줌
         for (auto& sceneCB : m_sceneCB)
         {
@@ -595,7 +598,8 @@ bool jRHI_DirectX12::Initialize()
 	// 2 - vertex and index buffer SRV for Cube
     // 1 - vertex buffer SRV for Plane
 	// 1 - ratracing output texture UAV
-	cbvHeapDesc.NumDescriptors = 4;
+    // 1 - imgui
+	cbvHeapDesc.NumDescriptors = 5;
 	cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	if (JFAIL(m_device->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_cbvHeap))))
@@ -1386,7 +1390,6 @@ void jRHI_DirectX12::UpdateCameraMatrices()
 
 	m_sceneCB[frameIndex].projectionToWorld = XMMatrixInverse(nullptr, viewProj);
     m_sceneCB[frameIndex].NumOfStartingRay = 20;        // 첫 Ray 생성시 NumOfStartingRay 개를 쏴서 보간하도록 함. 노이즈를 줄여줌
-
 }
 
 bool jRHI_DirectX12::BuildTopLevelAS(TopLevelAccelerationStructureBuffers& InBuffers, bool InIsUpdate, float InRotationY, Vector InTranslation)
@@ -1570,6 +1573,16 @@ void jRHI_DirectX12::Update()
         constexpr XMVECTOR rotationRadius = { 0.0f, 0.0f, 8.0f };
 		m_sceneCB[m_frameIndex].lightPosition = XMVector3Transform(rotationRadius, rotate);
 	}
+
+    {
+        auto frameIndex = m_swapChain->GetCurrentBackBufferIndex();
+
+        static float focalDistance = 10.0f;
+        static float lensRadius = 0.2;
+
+        m_sceneCB[frameIndex].focalDistance = focalDistance;
+        m_sceneCB[frameIndex].lensRadius = lensRadius;
+    }
 }
 
 void jRHI_DirectX12::Render()

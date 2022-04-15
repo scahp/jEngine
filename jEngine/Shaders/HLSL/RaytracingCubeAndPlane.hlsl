@@ -12,6 +12,8 @@ struct SceneConstantBuffer
     float4 lightAmbientColor;
     float4 lightDiffuseColor;
     uint NumOfStartingRay;
+    float focalDistance;
+    float lensRadius;
 };
 
 struct CubeConstantBuffer
@@ -78,6 +80,44 @@ struct RayPayload
     uint currentRecursionDepth;
 };
 
+float3 random_in_unit_sphere2(int i)
+{
+    float2 uv = DispatchRaysIndex().xy + float2(i, i * 2.0f);
+    float noiseX = (frac(sin(dot(uv, float2(12.9898, 78.233))) * 43758.5453));
+    float noiseY = (frac(sin(dot(uv, float2(12.9898, 78.233) * 2.0)) * 43758.5453));
+    float noiseZ = (frac(sin(dot(uv, float2(12.9898, 78.233) * 3.0)) * 43758.5453));
+
+    float3 randomUniSphere = float3(noiseX, noiseY, noiseZ) * 2.0f - 0.5f;
+    if (length(randomUniSphere) <= 1.0f)
+        return randomUniSphere;
+
+    return normalize(randomUniSphere);
+}
+
+float3 random_in_unit_sphere()
+{
+    float2 uv = DispatchRaysIndex().xy + float2(RayTCurrent(), RayTCurrent() * 2.0f);
+    float noiseX = (frac(sin(dot(uv, float2(12.9898, 78.233))) * 43758.5453));
+    float noiseY = (frac(sin(dot(uv, float2(12.9898, 78.233) * RayTCurrent() * 2.0f)) * 43758.5453));
+    float noiseZ = (frac(sin(dot(uv, float2(12.9898, 78.233) * RayTCurrent())) * 43758.5453));
+
+    float3 randomUniSphere = float3(noiseX, noiseY, noiseZ) * 2.0f - 0.5f;
+    if (length(randomUniSphere) <= 1.0f)
+        return randomUniSphere;
+
+    return normalize(randomUniSphere);
+}
+
+float3 random_in_hemisphere(float3 normal)
+{
+    float3 in_unit_sphere = random_in_unit_sphere();
+    if (dot(in_unit_sphere, normal) > 0.0)  // 노멀 기준으로 같은 반구 방향인지?
+        return in_unit_sphere;
+
+    return -in_unit_sphere;
+}
+
+
 // hit world position 얻기
 float3 HitWorldPosition()
 {
@@ -90,6 +130,17 @@ float3 HitAttribute(float3 vertexAttribute[3], BuiltInTriangleIntersectionAttrib
     return vertexAttribute[0] +
         attr.barycentrics.x * (vertexAttribute[1] - vertexAttribute[0]) +
         attr.barycentrics.y * (vertexAttribute[2] - vertexAttribute[0]);
+}
+
+inline void ApplyDepthOfField(inout float3 origin, inout float3 direction, int randomIndex)
+{
+    float ft = g_sceneCB.focalDistance / abs(direction.z); // z 가 마이너스가 될 수 있으므로 절대값 사용.
+    float3 lensRandom = random_in_unit_sphere2(randomIndex) * g_sceneCB.lensRadius;
+    
+    float3 pFocus = origin + ft * direction;
+
+    origin.xyz += lensRandom.xyz; // 렌즈에서 랜덤으로 선택한 위치로 origin 설정
+    direction = normalize(pFocus - origin);
 }
 
 // 카메라 픽셀에 대한 월드공간에서의 반직선을 생성함, 카메라 픽셀은 dispatched 2d Grid로 부터의 인덱스와 일치함.
@@ -117,29 +168,6 @@ float4 CalculationDiffuseLighting(float3 hitPosition, float3 normal)
     // Diffuse 기여
     float fNDotL = max(0.0f, dot(pixelToLight, normal));
     return g_localRootSigCB.albedo * g_sceneCB.lightDiffuseColor * fNDotL;
-}
-
-float3 random_in_unit_sphere()
-{
-    float2 uv = DispatchRaysIndex().xy + float2(RayTCurrent(), RayTCurrent() * 2.0f);
-    float noiseX = (frac(sin(dot(uv, float2(12.9898, 78.233))) * 43758.5453));
-    float noiseY = (frac(sin(dot(uv, float2(12.9898, 78.233) * RayTCurrent() * 2.0f)) * 43758.5453));
-    float noiseZ = (frac(sin(dot(uv, float2(12.9898, 78.233) * RayTCurrent())) * 43758.5453));
-
-    float3 randomUniSphere = float3(noiseX, noiseY, noiseZ) * 2.0f - 0.5f;
-    if (length(randomUniSphere) <= 1.0f)
-        return randomUniSphere;
-
-    return normalize(randomUniSphere);
-}
-
-float3 random_in_hemisphere(float3 normal)
-{
-    float3 in_unit_sphere = random_in_unit_sphere();
-    if (dot(in_unit_sphere, normal) > 0.0)  // 노멀 기준으로 같은 반구 방향인지?
-        return in_unit_sphere;
-
-    return -in_unit_sphere;
 }
 
 float Schlick(float cosine, float ref_idx)
@@ -185,28 +213,11 @@ float3 MakeRefract(float3 uv, float3 normal, float etai_over_etat)
     return r_out_perp + r_out_parallel;
 }
 
-float3 random_in_unit_sphere2(int i)
-{
-    float2 uv = DispatchRaysIndex().xy + float2(i, i * 2.0f);
-    float noiseX = (frac(sin(dot(uv, float2(12.9898, 78.233))) * 43758.5453));
-    float noiseY = (frac(sin(dot(uv, float2(12.9898, 78.233) * 2.0)) * 43758.5453));
-    float noiseZ = (frac(sin(dot(uv, float2(12.9898, 78.233) * 3.0)) * 43758.5453));
-
-    float3 randomUniSphere = float3(noiseX, noiseY, noiseZ) * 2.0f - 0.5f;
-    if (length(randomUniSphere) <= 1.0f)
-        return randomUniSphere;
-
-    return normalize(randomUniSphere);
-}
-
 [shader("raygeneration")]
 void MyRaygenShader()
 {
     float3 rayDir;
     float3 origin;
-
-    // 반직선 생성
-    GenerateCameraRay(DispatchRaysIndex().xy, origin, rayDir);
 
     float4 color = float4(0.0f, 0.0f, 0.0f, 0.0f);
     int samples = g_sceneCB.NumOfStartingRay;
@@ -214,6 +225,10 @@ void MyRaygenShader()
     // 반직선 추적
     for (int i = 0; i < samples; ++i)
     {
+        // 반직선 생성
+        GenerateCameraRay(DispatchRaysIndex().xy, origin, rayDir);
+        ApplyDepthOfField(origin, rayDir, i * 2.0);
+
         RayDesc ray;
         ray.Origin = origin;
         ray.Direction = rayDir + float3(random_in_unit_sphere2(i).xy / DispatchRaysDimensions().xy, 0.0f);

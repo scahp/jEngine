@@ -137,6 +137,8 @@ public:
 	uint32 m_rtvDescriptorSize = 0;
 	uint32 m_cbvDescriptorSize = 0;
 
+    ComPtr<ID3D12DescriptorHeap> m_imguiSrvDescHeap;
+
     //////////////////////////////////////////////////////////////////////////
     // 5. Initialize Camera and lighting
     struct CubeConstantBuffer
@@ -151,6 +153,8 @@ public:
         XMVECTOR lightAmbientColor;
         XMVECTOR lightDiffuseColor;
         uint32 NumOfStartingRay;
+        float focalDistance;
+        float lensRadius;
     };
     SceneConstantBuffer m_sceneCB[FrameCount];
     CubeConstantBuffer m_cubeCB;
