@@ -153,6 +153,7 @@ ComPtr<IDxcBlob> jShaderCompiler_DirectX12::Compile(const wchar_t* InFilename, c
 	{
 		ComPtr<IDxcBlobEncoding> error;
 		result->GetErrorBuffer(&error);
+        auto tt = reinterpret_cast<const char*>(error->GetBufferPointer());
 		OutputDebugStringA(reinterpret_cast<const char*>(error->GetBufferPointer()));
         JFAIL(resultCode);
         return nullptr;

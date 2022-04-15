@@ -152,6 +152,7 @@ public:
         XMVECTOR lightPosition;
         XMVECTOR lightAmbientColor;
         XMVECTOR lightDiffuseColor;
+        XMVECTOR cameraDirection;
         uint32 NumOfStartingRay;
         float focalDistance;
         float lensRadius;

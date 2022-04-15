@@ -1388,6 +1388,7 @@ void jRHI_DirectX12::UpdateCameraMatrices()
 	const XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(fovAngleY), m_aspectRatio, 1.0f, 125.0f);
 	const XMMATRIX viewProj = view * proj;
 
+    m_sceneCB[frameIndex].cameraDirection = XMVector3Normalize(m_at - m_eye);
 	m_sceneCB[frameIndex].projectionToWorld = XMMatrixInverse(nullptr, viewProj);
     m_sceneCB[frameIndex].NumOfStartingRay = 20;        // 첫 Ray 생성시 NumOfStartingRay 개를 쏴서 보간하도록 함. 노이즈를 줄여줌
 }
@@ -1824,6 +1825,10 @@ bool jRHI_DirectX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsM
         const XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(fovAngleY), m_aspectRatio, 1.0f, 125.0f);
         const XMMATRIX viewProj = view * proj;
         m_sceneCB[i].projectionToWorld = XMMatrixInverse(nullptr, viewProj);
+        m_sceneCB[i].cameraDirection = XMVector3Normalize(m_at - m_eye);
+
+        m_sceneCB[i].focalDistance = 10.0f;
+        m_sceneCB[i].lensRadius = 0.2f;
     }
 
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();

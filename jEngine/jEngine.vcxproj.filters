@@ -51,6 +51,9 @@
     <Filter Include="Code\DirectX12">
       <UniqueIdentifier>{c715a7c9-8017-486c-bceb-bc618ed6e7a9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Code\External\IMGUI\backends">
+      <UniqueIdentifier>{12c40e2b-5c5b-4155-a9bd-7b02eee834a1}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DeprecatedCode\jPipeline.h">
@@ -179,30 +182,6 @@
     <ClInclude Include="Code\Math\Vector.h">
       <Filter>Code\Math</Filter>
     </ClInclude>
-    <ClInclude Include="Code\External\IMGUI\imconfig.h">
-      <Filter>Code\External\IMGUI</Filter>
-    </ClInclude>
-    <ClInclude Include="Code\External\IMGUI\imgui.h">
-      <Filter>Code\External\IMGUI</Filter>
-    </ClInclude>
-    <ClInclude Include="Code\External\IMGUI\imgui_impl_glfw.h">
-      <Filter>Code\External\IMGUI</Filter>
-    </ClInclude>
-    <ClInclude Include="Code\External\IMGUI\imgui_impl_opengl3.h">
-      <Filter>Code\External\IMGUI</Filter>
-    </ClInclude>
-    <ClInclude Include="Code\External\IMGUI\imgui_internal.h">
-      <Filter>Code\External\IMGUI</Filter>
-    </ClInclude>
-    <ClInclude Include="Code\External\IMGUI\imstb_rectpack.h">
-      <Filter>Code\External\IMGUI</Filter>
-    </ClInclude>
-    <ClInclude Include="Code\External\IMGUI\imstb_textedit.h">
-      <Filter>Code\External\IMGUI</Filter>
-    </ClInclude>
-    <ClInclude Include="Code\External\IMGUI\imstb_truetype.h">
-      <Filter>Code\External\IMGUI</Filter>
-    </ClInclude>
     <ClInclude Include="Code\External\lodepng.h">
       <Filter>Code\External</Filter>
     </ClInclude>
@@ -244,6 +223,30 @@
     </ClInclude>
     <ClInclude Include="Code\DirectX12\jShaderCompiler_DirectX12.h">
       <Filter>Code\DirectX12</Filter>
+    </ClInclude>
+    <ClInclude Include="Code\External\imgui\imconfig.h">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="Code\External\imgui\imgui.h">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="Code\External\imgui\imgui_internal.h">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="Code\External\imgui\imstb_rectpack.h">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="Code\External\imgui\imstb_textedit.h">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="Code\External\imgui\imstb_truetype.h">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="Code\External\imgui\backends\imgui_impl_dx12.h">
+      <Filter>Code\External\IMGUI\backends</Filter>
+    </ClInclude>
+    <ClInclude Include="Code\External\imgui\backends\imgui_impl_win32.h">
+      <Filter>Code\External\IMGUI\backends</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -361,24 +364,6 @@
     <ClCompile Include="Code\Math\Vector.cpp">
       <Filter>Code\Math</Filter>
     </ClCompile>
-    <ClCompile Include="Code\External\IMGUI\imgui.cpp">
-      <Filter>Code\External\IMGUI</Filter>
-    </ClCompile>
-    <ClCompile Include="Code\External\IMGUI\imgui_demo.cpp">
-      <Filter>Code\External\IMGUI</Filter>
-    </ClCompile>
-    <ClCompile Include="Code\External\IMGUI\imgui_draw.cpp">
-      <Filter>Code\External\IMGUI</Filter>
-    </ClCompile>
-    <ClCompile Include="Code\External\IMGUI\imgui_impl_glfw.cpp">
-      <Filter>Code\External\IMGUI</Filter>
-    </ClCompile>
-    <ClCompile Include="Code\External\IMGUI\imgui_impl_opengl3.cpp">
-      <Filter>Code\External\IMGUI</Filter>
-    </ClCompile>
-    <ClCompile Include="Code\External\IMGUI\imgui_widgets.cpp">
-      <Filter>Code\External\IMGUI</Filter>
-    </ClCompile>
     <ClCompile Include="Code\External\glad.c">
       <Filter>Code\External</Filter>
     </ClCompile>
@@ -411,6 +396,27 @@
     </ClCompile>
     <ClCompile Include="Code\DirectX12\jShaderCompiler_DirectX12.cpp">
       <Filter>Code\DirectX12</Filter>
+    </ClCompile>
+    <ClCompile Include="Code\External\imgui\imgui.cpp">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="Code\External\imgui\imgui_demo.cpp">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="Code\External\imgui\imgui_draw.cpp">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="Code\External\imgui\imgui_tables.cpp">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="Code\External\imgui\imgui_widgets.cpp">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="Code\External\imgui\backends\imgui_impl_dx12.cpp">
+      <Filter>Code\External\IMGUI\backends</Filter>
+    </ClCompile>
+    <ClCompile Include="Code\External\imgui\backends\imgui_impl_win32.cpp">
+      <Filter>Code\External\IMGUI\backends</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

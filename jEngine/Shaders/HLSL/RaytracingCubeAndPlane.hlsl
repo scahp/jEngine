@@ -11,6 +11,7 @@ struct SceneConstantBuffer
     float4 lightPosition;
     float4 lightAmbientColor;
     float4 lightDiffuseColor;
+    float4 cameraDirection;
     uint NumOfStartingRay;
     float focalDistance;
     float lensRadius;
@@ -135,11 +136,18 @@ float3 HitAttribute(float3 vertexAttribute[3], BuiltInTriangleIntersectionAttrib
 inline void ApplyDepthOfField(inout float3 origin, inout float3 direction, int randomIndex)
 {
     float ft = g_sceneCB.focalDistance / abs(direction.z); // z 가 마이너스가 될 수 있으므로 절대값 사용.
-    float3 lensRandom = random_in_unit_sphere2(randomIndex) * g_sceneCB.lensRadius;
+    
+    // 월드 공간 카메라 방향 축을 기준으로, uv 를 구함.
+    float3 u = normalize(cross(g_sceneCB.cameraDirection.xyz, float3(0, 1, 0)));
+    float3 v = normalize(cross(g_sceneCB.cameraDirection.xyz, u));
+    
+    // uv 방향으로 랜덤하게 이동(최대 lensRadius) 시킴.
+    float2 lensRandom = random_in_unit_sphere2(randomIndex).xy * g_sceneCB.lensRadius;
+    float3 offsetOnLens = lensRandom.x * u + lensRandom.y * v;
     
     float3 pFocus = origin + ft * direction;
 
-    origin.xyz += lensRandom.xyz; // 렌즈에서 랜덤으로 선택한 위치로 origin 설정
+    origin.xyz += offsetOnLens; // 렌즈에서 랜덤으로 선택한 위치로 origin 설정
     direction = normalize(pFocus - origin);
 }
 
