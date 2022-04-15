@@ -1,0 +1,3 @@
+[submodule "jEngine/Code/External/imgui"]
+	path = jEngine/Code/External/imgui
+	url = https://github.com/ocornut/imgui.git
