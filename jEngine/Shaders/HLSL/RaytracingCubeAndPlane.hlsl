@@ -135,7 +135,7 @@ float3 HitAttribute(float3 vertexAttribute[3], BuiltInTriangleIntersectionAttrib
 
 inline void ApplyDepthOfField(inout float3 origin, inout float3 direction, int randomIndex)
 {
-    float ft = g_sceneCB.focalDistance / abs(direction.z); // z 가 마이너스가 될 수 있으므로 절대값 사용.
+    float ft = g_sceneCB.focalDistance / length(direction);     // Focal Plane 과 교차하는 파라메터 ft 구함
     
     // 월드 공간 카메라 방향 축을 기준으로, uv 를 구함.
     float3 u = normalize(cross(g_sceneCB.cameraDirection.xyz, float3(0, 1, 0)));
@@ -144,6 +144,7 @@ inline void ApplyDepthOfField(inout float3 origin, inout float3 direction, int r
     // uv 방향으로 랜덤하게 이동(최대 lensRadius) 시킴.
     float2 lensRandom = random_in_unit_sphere2(randomIndex).xy * g_sceneCB.lensRadius;
     float3 offsetOnLens = lensRandom.x * u + lensRandom.y * v;
+    offsetOnLens = random_in_unit_sphere2(randomIndex).xyz * g_sceneCB.lensRadius;
     
     float3 pFocus = origin + ft * direction;
 

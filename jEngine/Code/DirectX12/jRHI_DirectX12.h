@@ -137,8 +137,6 @@ public:
 	uint32 m_rtvDescriptorSize = 0;
 	uint32 m_cbvDescriptorSize = 0;
 
-    ComPtr<ID3D12DescriptorHeap> m_imguiSrvDescHeap;
-
     //////////////////////////////////////////////////////////////////////////
     // 5. Initialize Camera and lighting
     struct CubeConstantBuffer
@@ -215,6 +213,19 @@ public:
 	uint32 m_allocatedDescriptors = 0;
 
     HWND m_hWnd = 0;
+
+    //////////////////////////////////////////////////////////////////////////
+    // ImGui
+    ComPtr<ID3D12DescriptorHeap> m_imgui_SrvDescHeap;
+
+    void InitializeImGui();
+    void ReleaseImGui();
+    void RenderUI(ID3D12GraphicsCommandList* pCommandList, ID3D12Resource* pRenderTarget, CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle
+        , ID3D12DescriptorHeap* pDescriptorHeap, D3D12_RESOURCE_STATES beforeResourceState, D3D12_RESOURCE_STATES afterResourceState);
+
+    float m_focalDistance = 10.0f;
+    float m_lensRadius = 0.2f;
+    //////////////////////////////////////////////////////////////////////////
 
 	bool Initialize();
     bool Run();

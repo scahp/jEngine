@@ -245,8 +245,13 @@ void ShaderTable::DebugPrint(std::unordered_map<void*, std::wstring> shaderIdToS
 
 jRHI_DirectX12* pRHIDirectX12 = nullptr;
 
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+    if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
+        return true;
+
     static bool sSizeChanged = false;
     static bool sIsDraging = false;
 	switch (message)
@@ -583,8 +588,8 @@ bool jRHI_DirectX12::Initialize()
         lightDiffuseColor = XMFLOAT4(0.5f, 0.3f, 0.3f, 1.0f);
         m_sceneCB[frameIndex].lightDiffuseColor = XMLoadFloat4(&lightDiffuseColor);
 
-        m_sceneCB[frameIndex].focalDistance = 10.0f;
-        m_sceneCB[frameIndex].lensRadius = 0.2f;
+        m_sceneCB[frameIndex].focalDistance = m_focalDistance;
+        m_sceneCB[frameIndex].lensRadius = m_lensRadius;
 
         // 모든 프레임의 버퍼 인스턴스에 초기값을 설정해줌
         for (auto& sceneCB : m_sceneCB)
@@ -1278,6 +1283,8 @@ bool jRHI_DirectX12::Initialize()
 	ShowWindow(m_hWnd, SW_SHOW);
     pRHIDirectX12 = this;
 
+    InitializeImGui();
+
     return true;
 }
 
@@ -1300,6 +1307,8 @@ bool jRHI_DirectX12::Run()
 void jRHI_DirectX12::Release()
 {
 	WaitForGPU();
+    
+    ReleaseImGui();
 
 	//////////////////////////////////////////////////////////////////////////
 	// 14. Raytracing Output Resouce
@@ -1578,11 +1587,8 @@ void jRHI_DirectX12::Update()
     {
         auto frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
-        static float focalDistance = 10.0f;
-        static float lensRadius = 0.2;
-
-        m_sceneCB[frameIndex].focalDistance = focalDistance;
-        m_sceneCB[frameIndex].lensRadius = lensRadius;
+        m_sceneCB[frameIndex].focalDistance = m_focalDistance;
+        m_sceneCB[frameIndex].lensRadius = m_lensRadius;
     }
 }
 
@@ -1669,12 +1675,12 @@ void jRHI_DirectX12::Render()
 
 	m_commandList->CopyResource(m_renderTargets[m_frameIndex].Get(), m_raytracingOutput.Get());
 
-	D3D12_RESOURCE_BARRIER postCopyBarriers[2];
-	postCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get()
-		, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
-	postCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_raytracingOutput.Get()
-		, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-	m_commandList->ResourceBarrier(_countof(postCopyBarriers), postCopyBarriers);
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_raytracingOutput.Get()
+        , D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+
+    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex* m_rtvDescriptorSize);
+    RenderUI(m_commandList.Get(), m_renderTargets[m_frameIndex].Get(), rtvHandle, m_imgui_SrvDescHeap.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
+    //////////////////////////////////////////////////////////////////////////
 
 	// Present
 	if (JFAIL(m_commandList->Close()))
@@ -1827,8 +1833,8 @@ bool jRHI_DirectX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsM
         m_sceneCB[i].projectionToWorld = XMMatrixInverse(nullptr, viewProj);
         m_sceneCB[i].cameraDirection = XMVector3Normalize(m_at - m_eye);
 
-        m_sceneCB[i].focalDistance = 10.0f;
-        m_sceneCB[i].lensRadius = 0.2f;
+        m_sceneCB[i].focalDistance = m_focalDistance;
+        m_sceneCB[i].lensRadius = m_lensRadius;
     }
 
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
@@ -1964,3 +1970,76 @@ bool jRHI_DirectX12::OnHandleDeviceRestored()
     return true;
 }
 
+void jRHI_DirectX12::InitializeImGui()
+{
+    D3D12_DESCRIPTOR_HEAP_DESC desc = {};
+    desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+    desc.NumDescriptors = 1;
+    desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+    if (JFAIL(m_device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_imgui_SrvDescHeap))))
+        return;
+
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+
+    // Setup Dear ImGui style
+    ImGui::StyleColorsDark();
+
+    // Setup Platform/Renderer backends
+    ImGui_ImplWin32_Init(m_hWnd);
+
+    ImGui_ImplDX12_Init(m_device.Get(), FrameCount,
+        DXGI_FORMAT_R8G8B8A8_UNORM, m_imgui_SrvDescHeap.Get(),
+        m_imgui_SrvDescHeap->GetCPUDescriptorHandleForHeapStart(),
+        m_imgui_SrvDescHeap->GetGPUDescriptorHandleForHeapStart());
+}
+
+void jRHI_DirectX12::ReleaseImGui()
+{
+    // Cleanup
+    ImGui_ImplDX12_Shutdown();
+    ImGui_ImplWin32_Shutdown();
+    ImGui::DestroyContext();
+
+    m_imgui_SrvDescHeap.Reset();
+}
+
+void jRHI_DirectX12::RenderUI(ID3D12GraphicsCommandList* pCommandList, ID3D12Resource* pRenderTarget, CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle
+    , ID3D12DescriptorHeap* pDescriptorHeap, D3D12_RESOURCE_STATES beforeResourceState, D3D12_RESOURCE_STATES afterResourceState)
+{
+    ImGui_ImplDX12_NewFrame();
+    ImGui_ImplWin32_NewFrame();
+    ImGui::NewFrame();
+
+    Vector4 clear_color(0.45f, 0.55f, 0.60f, 1.00f);
+
+    {
+        ImGui::Begin("Control Pannel");
+
+        ImGui::SliderFloat("Focal distance", &m_focalDistance, 3.0f, 40.0f);
+        ImGui::SliderFloat("Lens radius", &m_lensRadius, 0.0f, 0.2f);
+
+        ImGui::Text("Average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+
+        ImGui::SetWindowPos({10, 10}, ImGuiCond_Once);
+        ImGui::SetWindowSize({350, 100}, ImGuiCond_Once);
+
+        ImGui::End();
+    }
+
+    // Rendering UI
+    ImGui::Render();
+
+    pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
+        pRenderTarget, beforeResourceState, D3D12_RESOURCE_STATE_RENDER_TARGET));
+    const float clear_color_with_alpha[4] = { clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w };
+
+    //m_commandList->ClearRenderTargetView(rtvHandle, clear_color_with_alpha, 0, NULL);
+    pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, NULL);
+    pCommandList->SetDescriptorHeaps(1, &pDescriptorHeap);
+    ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), pCommandList);
+
+    pCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
+        pRenderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, afterResourceState));
+}
