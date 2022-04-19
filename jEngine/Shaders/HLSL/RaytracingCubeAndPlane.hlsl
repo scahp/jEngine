@@ -88,7 +88,7 @@ float3 random_in_unit_sphere2(int i)
     float noiseY = (frac(sin(dot(uv, float2(12.9898, 78.233) * 2.0)) * 43758.5453));
     float noiseZ = (frac(sin(dot(uv, float2(12.9898, 78.233) * 3.0)) * 43758.5453));
 
-    float3 randomUniSphere = float3(noiseX, noiseY, noiseZ) * 2.0f - 0.5f;
+    float3 randomUniSphere = float3(noiseX, noiseY, noiseZ) * 2.0f - 1.0f;
     if (length(randomUniSphere) <= 1.0f)
         return randomUniSphere;
 
@@ -102,7 +102,7 @@ float3 random_in_unit_sphere()
     float noiseY = (frac(sin(dot(uv, float2(12.9898, 78.233) * RayTCurrent() * 2.0f)) * 43758.5453));
     float noiseZ = (frac(sin(dot(uv, float2(12.9898, 78.233) * RayTCurrent())) * 43758.5453));
 
-    float3 randomUniSphere = float3(noiseX, noiseY, noiseZ) * 2.0f - 0.5f;
+    float3 randomUniSphere = float3(noiseX, noiseY, noiseZ) * 2.0f - 1.0f;
     if (length(randomUniSphere) <= 1.0f)
         return randomUniSphere;
 
@@ -137,14 +137,17 @@ inline void ApplyDepthOfField(inout float3 origin, inout float3 direction, int r
 {
     float ft = g_sceneCB.focalDistance / length(direction);     // Focal Plane 과 교차하는 파라메터 ft 구함
     
-    // 월드 공간 카메라 방향 축을 기준으로, uv 를 구함.
-    float3 u = normalize(cross(g_sceneCB.cameraDirection.xyz, float3(0, 1, 0)));
-    float3 v = normalize(cross(g_sceneCB.cameraDirection.xyz, u));
+    //// 카메라 렌즈위에 점을 정확히 구하는 방법 - 1
+    //// 월드 공간 카메라 방향 축을 기준으로, uv 를 구함.
+    //float3 u = normalize(cross(g_sceneCB.cameraDirection.xyz, float3(0, 1, 0)));
+    //float3 v = normalize(cross(g_sceneCB.cameraDirection.xyz, u));
     
-    // uv 방향으로 랜덤하게 이동(최대 lensRadius) 시킴.
-    float2 lensRandom = random_in_unit_sphere2(randomIndex).xy * g_sceneCB.lensRadius;
-    float3 offsetOnLens = lensRandom.x * u + lensRandom.y * v;
-    offsetOnLens = random_in_unit_sphere2(randomIndex).xyz * g_sceneCB.lensRadius;
+    //// uv 방향으로 랜덤하게 이동(최대 lensRadius) 시킴.
+    //float2 lensRandom = random_in_unit_sphere2(randomIndex).xy * g_sceneCB.lensRadius;
+    //float3 offsetOnLens = lensRandom.x * u + lensRandom.y * v;
+    
+    // 카메라 렌즈의 위에서 조금 떨어진 곳 까지 적당히 근사하는 방법 - 2
+    float3 offsetOnLens = random_in_unit_sphere2(randomIndex) * g_sceneCB.lensRadius;
     
     float3 pFocus = origin + ft * direction;
 
