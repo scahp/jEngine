@@ -1055,7 +1055,8 @@ void jRHI_OpenGL::SetMatetrial(jMaterialData* materialData, const jShader* shade
 		if (!tex_gl)
 			continue;
 
-		if (!SetUniformbuffer(&jUniformBuffer<int>(matParam->Name, index), shader))
+		jUniformBuffer<int> indexUB(matParam->Name, index);
+		if (!SetUniformbuffer(&indexUB, shader))
 			continue;
 		SetTexture(index, matParam->Texture);
 
