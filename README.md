@@ -64,6 +64,8 @@ P. Parallax Mapping : branch link https://github.com/scahp/Shadows/tree/Parallax
 Q. Horizon Mapping : branch link https://github.com/scahp/Shadows/tree/HorizonMapping
 <img src="https://user-images.githubusercontent.com/6734453/158390906-d57d3938-8aef-4183-8560-7a2e927a5a9f.png" width="90%"></img>
 
+R. Weighted Blended OIT : branch link https://github.com/scahp/Shadows/tree/WeightOIT
+<img src="https://user-images.githubusercontent.com/6734453/169827564-0f5af360-6755-4026-b562-75f293195122.png" width="90%"></img>
 
 References
 1. https://github.com/TheRealMJP/Shadows
