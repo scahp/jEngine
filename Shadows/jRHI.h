@@ -489,6 +489,7 @@ public:
 	virtual void GetQueryPrimitiveGeneratedResult(jQueryPrimitiveGenerated* query) const {}
 	virtual void EnableRasterizerDiscard(bool enable) const {}
 	virtual void SetTextureMipmapLevelLimit(ETextureType type, int32 baseLevel, int32 maxLevel) const {}
+	virtual void EnableMultisample(bool enable) const {}
 };
 
 // Not thred safe

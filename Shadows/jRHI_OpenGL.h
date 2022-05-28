@@ -250,6 +250,7 @@ public:
 	virtual void EndQueryPrimitiveGenerated() const override;
 	virtual void GetQueryPrimitiveGeneratedResult(jQueryPrimitiveGenerated* query) const override;
 	virtual void EnableRasterizerDiscard(bool enable) const override;
-	virtual void SetTextureMipmapLevelLimit(ETextureType type, int32 baseLevel, int32 maxLevel) const override;	
+	virtual void SetTextureMipmapLevelLimit(ETextureType type, int32 baseLevel, int32 maxLevel) const override;
+	virtual void EnableMultisample(bool enable) const override;
 };
 

@@ -880,6 +880,14 @@ void jRHI_OpenGL::SetTextureMipmapLevelLimit(ETextureType type, int32 baseLevel,
 	glTexParameteri(textureType, GL_TEXTURE_MAX_LEVEL, maxLevel);
 }
 
+void jRHI_OpenGL::EnableMultisample(bool enable) const
+{
+	if (enable)
+		glEnable(GL_MULTISAMPLE);
+	else
+		glDisable(GL_MULTISAMPLE);
+}
+
 void jRHI_OpenGL::EnableWireframe(bool enable) const
 {
 	if (enable)
@@ -2351,6 +2359,7 @@ void jRenderTarget_OpenGL::End() const
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
 }
+
 
 //////////////////////////////////////////////////////////////////////////
 void jUniformBufferBlock_OpenGL::UpdateBufferData(const void* newData, size_t size)
