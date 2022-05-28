@@ -114,6 +114,54 @@ void jBoundBoxObject::SetUniformBuffer(const jShader* shader)
 	g_rhi->SetShader(shader);
 	SET_UNIFORM_BUFFER_STATIC(Vector4, "Color", Color, shader);
 }
+void jBoundBoxObject::UpdateBoundBox(const jBoundBox& boundBox)
+{
+	BoundBox = boundBox;
+	UpdateBoundBox();
+}
+
+void jBoundBoxObject::UpdateBoundBox()
+{
+	float vertices[] = {
+		// 아래
+		BoundBox.Min.x, BoundBox.Min.y, BoundBox.Min.z,
+		BoundBox.Max.x, BoundBox.Min.y, BoundBox.Min.z,
+		BoundBox.Max.x, BoundBox.Min.y, BoundBox.Min.z,
+		BoundBox.Max.x, BoundBox.Min.y, BoundBox.Max.z,
+		BoundBox.Max.x, BoundBox.Min.y, BoundBox.Max.z,
+		BoundBox.Min.x, BoundBox.Min.y, BoundBox.Max.z,
+		BoundBox.Min.x, BoundBox.Min.y, BoundBox.Max.z,
+		BoundBox.Min.x, BoundBox.Min.y, BoundBox.Min.z,
+
+		// 위
+		BoundBox.Min.x, BoundBox.Max.y, BoundBox.Min.z,
+		BoundBox.Max.x, BoundBox.Max.y, BoundBox.Min.z,
+		BoundBox.Max.x, BoundBox.Max.y, BoundBox.Min.z,
+		BoundBox.Max.x, BoundBox.Max.y, BoundBox.Max.z,
+		BoundBox.Max.x, BoundBox.Max.y, BoundBox.Max.z,
+		BoundBox.Min.x, BoundBox.Max.y, BoundBox.Max.z,
+		BoundBox.Min.x, BoundBox.Max.y, BoundBox.Max.z,
+		BoundBox.Min.x, BoundBox.Max.y, BoundBox.Min.z,
+
+		// 옆
+		BoundBox.Min.x, BoundBox.Min.y, BoundBox.Min.z,
+		BoundBox.Min.x, BoundBox.Max.y, BoundBox.Min.z,
+		BoundBox.Max.x, BoundBox.Min.y, BoundBox.Min.z,
+		BoundBox.Max.x, BoundBox.Max.y, BoundBox.Min.z,
+		BoundBox.Max.x, BoundBox.Min.y, BoundBox.Max.z,
+		BoundBox.Max.x, BoundBox.Max.y, BoundBox.Max.z,
+		BoundBox.Min.x, BoundBox.Max.y, BoundBox.Max.z,
+		BoundBox.Min.x, BoundBox.Min.y, BoundBox.Max.z,
+	};
+
+	const int32 elementCount = static_cast<int32>(_countof(vertices) / 3);
+	JASSERT(RenderObject->VertexStream->ElementCount == elementCount);
+
+	jStreamParam<float>* PositionParam = static_cast<jStreamParam<float>*>(RenderObject->VertexStream->Params[0]);
+	memcpy(&PositionParam->Data[0], vertices, sizeof(vertices));
+
+	RenderObject->UpdateVertexStream();
+}
 
 void jBoundSphereObject::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 1 */)
 {
@@ -314,22 +362,26 @@ jBoundBoxObject* CreateBoundBox(jBoundBox boundBox, jObject* ownerObject, const 
 	object->SkipShadowMapGen = true;
 	object->SkipUpdateShadowVolume = true;
 	object->OwnerObject = ownerObject;
+	object->Color = color;
 
-	object->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
+	if (object->OwnerObject)
 	{
-		JASSERT(thisObject);
-		auto boundBoxObject = static_cast<jBoundBoxObject*>(thisObject);
-		if (!boundBoxObject)
-			return;
+		object->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
+		{
+			JASSERT(thisObject);
+			auto boundBoxObject = static_cast<jBoundBoxObject*>(thisObject);
+			if (!boundBoxObject)
+				return;
 
-		JASSERT(boundBoxObject->OwnerObject);
-		auto ownerObject = boundBoxObject->OwnerObject;
+			JASSERT(boundBoxObject->OwnerObject);
+			auto ownerObject = boundBoxObject->OwnerObject;
 
-		boundBoxObject->RenderObject->Pos = ownerObject->RenderObject->Pos;
-		boundBoxObject->RenderObject->Rot = ownerObject->RenderObject->Rot;
-		boundBoxObject->RenderObject->Scale = ownerObject->RenderObject->Scale;
-		boundBoxObject->Visible = ownerObject->Visible;
-	};
+			boundBoxObject->RenderObject->Pos = ownerObject->RenderObject->Pos;
+			boundBoxObject->RenderObject->Rot = ownerObject->RenderObject->Rot;
+			boundBoxObject->RenderObject->Scale = ownerObject->RenderObject->Scale;
+			boundBoxObject->Visible = ownerObject->Visible;
+		};
+	}
 
 	return object;
 }
@@ -1664,8 +1716,11 @@ jSpotLightPrimitive* CreateSpotLightDebug(const Vector& scale, jCamera* targetCa
 jFrustumPrimitive* CreateFrustumDebug(const jCamera* targetCamera)
 {
 	jFrustumPrimitive* frustumPrimitive = new jFrustumPrimitive(targetCamera);
-	for (int32 i = 0; i < 12; ++i)
+	for (int32 i = 0; i < 16; ++i)
+	{
 		frustumPrimitive->Segments[i] = CreateSegment(Vector::ZeroVector, Vector::ZeroVector, 1.0f, Vector4(1.0f));
+		frustumPrimitive->Segments[i]->IsPostUpdate = false;
+	}
 
 	for (int32 i = 0; i < 6; ++i)
 		frustumPrimitive->Plane[i] = CreateQuad(Vector::ZeroVector, Vector::OneVector, Vector::OneVector, Vector4(1.0f));
@@ -1746,15 +1801,16 @@ void jDirectionalLightPrimitive::Draw(const jCamera* camera, const jShader* shad
 
 void jSegmentPrimitive::UpdateSegment()
 {
-	if (RenderObject->VertexStream->Params.size() <= 0)
+	if (RenderObject->VertexStream->Params.size() < 2)
 	{
 		JASSERT(0);
 		return;
 	}
 
 	delete RenderObject->VertexStream->Params[0];
+	delete RenderObject->VertexStream->Params[1];
 	const auto currentEnd = GetCurrentEnd();
-	
+
 	const float vertices[] = {
 	Start.x, Start.y, Start.z,
 	currentEnd.x, currentEnd.y, currentEnd.z,
@@ -1770,8 +1826,19 @@ void jSegmentPrimitive::UpdateSegment()
 		streamParam->Data.resize(_countof(vertices));
 		memcpy(&streamParam->Data[0], &vertices[0], sizeof(vertices));
 		RenderObject->VertexStream->Params[0] = streamParam;
-		g_rhi->UpdateVertexBuffer(RenderObject->VertexBuffer, streamParam, 0);
 	}
+
+	{
+		auto streamParam = new jStreamParam<float>();
+		streamParam->BufferType = EBufferType::STATIC;
+		streamParam->ElementType = EBufferElementType::FLOAT;
+		streamParam->ElementTypeSize = sizeof(float);
+		streamParam->Stride = sizeof(float) * 4;
+		streamParam->Name = "Color";
+		streamParam->Data = std::move(jPrimitiveUtil::GenerateColor(Color, 2));
+		RenderObject->VertexStream->Params[1] = streamParam;
+	}
+	g_rhi->UpdateVertexBuffer(RenderObject->VertexBuffer, RenderObject->VertexStream);
 }
 
 void jSegmentPrimitive::UpdateSegment(const Vector& start, const Vector& end, const Vector4& color, float time)
@@ -1822,47 +1889,100 @@ void jSpotLightPrimitive::Draw(const jCamera* camera, const jShader* shader, con
 
 void jFrustumPrimitive::Update(float deltaTime)
 {
-	const auto& origin = TargetCamera->Pos;
-	const float fovRad = TargetCamera->FOVRad;
+	Vector far_lt;
+	Vector far_rt;
+	Vector far_lb;
+	Vector far_rb;
+
+	Vector near_lt;
+	Vector near_rt;
+	Vector near_lb;
+	Vector near_rb;
+
+	const auto origin = TargetCamera->Pos;
 	const float n = TargetCamera->Near;
 	const float f = TargetCamera->Far;
 
-	Vector targetVec = TargetCamera->GetForwardVector().GetNormalize();
-	float length = tanf(fovRad / 2.0f) * f;
-	Vector rightVec = TargetCamera->GetRightVector() * length;
-	Vector upVec = TargetCamera->GetUpVector() * length;
+	if (TargetCamera->IsPerspectiveProjection)
+	{
+		const float InvAspect = (TargetCamera->Width / TargetCamera->Height);
+		const float length = tanf(TargetCamera->FOVRad * 0.5f);
+		Vector targetVec = TargetCamera->GetForwardVector().GetNormalize();
+		Vector rightVec = TargetCamera->GetRightVector() * length * InvAspect;
+		Vector upVec = TargetCamera->GetUpVector() * length;
 
-	Vector rightUp = (targetVec * f + rightVec + upVec).GetNormalize();
-	Vector leftUp = (targetVec * f - rightVec + upVec).GetNormalize();
-	Vector rightDown = (targetVec * f + rightVec - upVec).GetNormalize();
-	Vector leftDown = (targetVec * f - rightVec - upVec).GetNormalize();
+		Vector rightUp = (targetVec + rightVec + upVec);
+		Vector leftUp = (targetVec - rightVec + upVec);
+		Vector rightDown = (targetVec + rightVec - upVec);
+		Vector leftDown = (targetVec - rightVec - upVec);
 
-	Vector far_lt = origin + leftUp * f;
-	Vector far_rt = origin + rightUp * f;
-	Vector far_lb = origin + leftDown * f;
-	Vector far_rb = origin + rightDown * f;
+		far_lt = origin + leftUp * f;
+		far_rt = origin + rightUp * f;
+		far_lb = origin + leftDown * f;
+		far_rb = origin + rightDown * f;
 
-	Vector near_lt = origin + leftUp * n;
-	Vector near_rt = origin + rightUp * n;
-	Vector near_lb = origin + leftDown * n;
-	Vector near_rb = origin + rightDown * n;
+		near_lt = origin + leftUp * n;
+		near_rt = origin + rightUp * n;
+		near_lb = origin + leftDown * n;
+		near_rb = origin + rightDown * n;
 
-	const Vector4 white(1.0f);
-	Segments[0]->UpdateSegment(origin, far_rt, white);
-	Segments[1]->UpdateSegment(origin, far_lt, white);
-	Segments[2]->UpdateSegment(origin, far_rb, white);
-	Segments[3]->UpdateSegment(origin, far_lb, white);
+		if (PostPerspective)
+		{
+			auto ProjView = TargetCamera->Projection * TargetCamera->View;
+
+			far_lt = ProjView.Transform(far_lt);
+			far_rt = ProjView.Transform(far_rt);
+			far_lb = ProjView.Transform(far_lb);
+			far_rb = ProjView.Transform(far_rb);
+
+			near_lt = ProjView.Transform(near_lt);
+			near_rt = ProjView.Transform(near_rt);
+			near_lb = ProjView.Transform(near_lb);
+			near_rb = ProjView.Transform(near_rb);
+		}
+	}
+	else
+	{
+		const float w = TargetCamera->Width;
+		const float h = TargetCamera->Height;
+
+		Vector targetVec = TargetCamera->GetForwardVector().GetNormalize();
+		Vector rightVec = TargetCamera->GetRightVector().GetNormalize();
+		Vector upVec = TargetCamera->GetUpVector().GetNormalize();
+
+		far_lt = origin + targetVec * f - rightVec * w * 0.5f + upVec * h * 0.5f;
+		far_rt = origin + targetVec * f + rightVec * w * 0.5f + upVec * h * 0.5f;
+		far_lb = origin + targetVec * f - rightVec * w * 0.5f - upVec * h * 0.5f;
+		far_rb = origin + targetVec * f + rightVec * w * 0.5f - upVec * h * 0.5f;
+
+		near_lt = origin + targetVec * n - rightVec * w * 0.5f + upVec * h * 0.5f;
+		near_rt = origin + targetVec * n + rightVec * w * 0.5f + upVec * h * 0.5f;
+		near_lb = origin + targetVec * n - rightVec * w * 0.5f - upVec * h * 0.5f;
+		near_rb = origin + targetVec * n + rightVec * w * 0.5f - upVec * h * 0.5f;
+	}
+
+	const Vector4 baseColor = (TargetCamera->IsPerspectiveProjection ? Vector4(1.0f) : Vector4(0.0f, 0.0f, 1.0f, 1.0f));
+	Segments[0]->UpdateSegment(near_rt, far_rt, baseColor);
+	Segments[1]->UpdateSegment(near_lt, far_lt, baseColor);
+	Segments[2]->UpdateSegment(near_rb, far_rb, baseColor);
+	Segments[3]->UpdateSegment(near_lb, far_lb, baseColor);
+
+	const Vector4 green(0.0f, 1.0f, 0.0f, 1.0f);
+	Segments[4]->UpdateSegment(near_lt, near_rt, green);
+	Segments[5]->UpdateSegment(near_lb, near_rb, green);
+	Segments[6]->UpdateSegment(near_lt, near_lb, Vector4(1.0f, 1.0f, 0.0f, 1.0f));
+	Segments[7]->UpdateSegment(near_rt, near_rb, green);
 
 	const Vector4 red(1.0f, 0.0f, 0.0f, 1.0f);
-	Segments[4]->UpdateSegment(near_lt, near_rt, red);
-	Segments[5]->UpdateSegment(near_lb, near_rb, red);
-	Segments[6]->UpdateSegment(near_lt, near_lb, red);
-	Segments[7]->UpdateSegment(near_rt, near_rb, red);
-
 	Segments[8]->UpdateSegment(far_lt, far_rt, red);
 	Segments[9]->UpdateSegment(far_lb, far_rb, red);
-	Segments[10]->UpdateSegment(far_lt, far_lb, red);
+	Segments[10]->UpdateSegment(far_lt, far_lb, Vector4(0.0f, 1.0f, 1.0f, 1.0f));
 	Segments[11]->UpdateSegment(far_rt, far_rb, red);
+
+	Segments[12]->UpdateSegment(far_rt, near_rt, baseColor);
+	Segments[13]->UpdateSegment(far_rb, near_rb, baseColor);
+	Segments[14]->UpdateSegment(far_lb, near_lb, baseColor);
+	Segments[15]->UpdateSegment(far_rb, near_rb, baseColor);
 
 	auto updateQuadFunc = [this](jQuadPrimitive* quad, const Vector& p1, const Vector& p2, const Vector& p3, const Vector& p4, const Vector4& color)
 	{
@@ -1936,7 +2056,7 @@ void jFrustumPrimitive::Update(float deltaTime)
 		vertexStreamData->PrimitiveType = EPrimitiveType::TRIANGLES;
 		vertexStreamData->ElementCount = elementCount;
 
-		RenderObject->UpdateVertexStream(vertexStreamData);
+		quad->RenderObject->UpdateVertexStream(vertexStreamData);
 	};
 
 	updateQuadFunc(Plane[0], far_lt, near_lt, far_lb, near_lb, Vector4(0.0f, 1.0f, 0.0f, 0.3f));
@@ -1946,21 +2066,32 @@ void jFrustumPrimitive::Update(float deltaTime)
 	updateQuadFunc(Plane[4], near_lt, near_rt, near_lb, near_rb, Vector4(1.0f, 1.0f, 1.0f, 0.3f));
 	updateQuadFunc(Plane[5], far_lt, far_rt, far_lb, far_rb, Vector4(1.0f, 1.0f, 1.0f, 0.3f));
 
-	for (int32 i = 0; i < 12; ++i)
+	for (int32 i = 0; i < 16; ++i)
+	{
+		Segments[i]->RenderObject->Pos = Offset;
+		Segments[i]->RenderObject->Scale = Scale;
 		Segments[i]->Update(deltaTime);
+	}
 
 	for (int32 i = 0; i < 6; ++i)
+	{
+		Plane[i]->RenderObject->Pos = Offset;
+		Plane[i]->RenderObject->Scale = Scale;
 		Plane[i]->Update(deltaTime);
+	}
 }
 
 void jFrustumPrimitive::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 1 */)
 {
 	__super::Draw(camera, shader, lights);
-	for (int32 i = 0; i < 12; ++i)
+	for (int32 i = 0; i < 16; ++i)
 		Segments[i]->Draw(camera, shader, lights);
 
-	for (int32 i = 0; i < 6; ++i)
-		Plane[i]->Draw(camera, shader, lights);
+	if (DrawPlane)
+	{
+		for (int32 i = 0; i < 6; ++i)
+			Plane[i]->Draw(camera, shader, lights);
+	}
 }
 
 void jGraph2D::Update(float deltaTime)

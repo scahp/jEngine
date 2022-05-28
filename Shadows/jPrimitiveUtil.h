@@ -81,6 +81,8 @@ class jBoundBoxObject : public jObject
 public:
 	virtual void Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount = 0) override;
 	void SetUniformBuffer(const jShader* shader);
+	void UpdateBoundBox(const jBoundBox& boundBox);
+	void UpdateBoundBox();
 
 	Vector4 Color = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
 	jBoundBox BoundBox;
@@ -186,9 +188,13 @@ public:
 	virtual void Update(float deltaTime) override;
 	virtual void Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount = 0) override;
 
-	jSegmentPrimitive* Segments[12] = { };
+	jSegmentPrimitive* Segments[16] = { };
 	jQuadPrimitive* Plane[6] = { };
 	const jCamera* TargetCamera = nullptr;
+	bool PostPerspective = false;
+	bool DrawPlane = false;
+	Vector Offset;
+	Vector Scale = Vector::OneVector;
 };
 
 class jGraph2D : public jObject
