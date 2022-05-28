@@ -2,6 +2,7 @@
 #include "jRHIType.h"
 #include "Math\Vector.h"
 #include "Math\Matrix.h"
+#include "jBoundPrimitiveType.h"
 
 class jCamera;
 class jLight;
@@ -32,6 +33,7 @@ public:
 
 	//void Draw(const jCamera* camera, const jShader* shader, int32 startIndex = -1, int32 count = -1);
 	void Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 startIndex, int32 count, int32 instanceCount = 1);
+	void DrawBoundBox(const jCamera* camera, const jShader* shader, const Vector& offset = Vector(ZeroType));
 
 	// todo 함수를 줄일까? 아니면 이렇게 쓸까? 고민
 	//void Draw(const jCamera* camera, const jShader* shader, int32 startIndex, int32 count, int32 baseVertexIndex);
@@ -43,6 +45,10 @@ public:
 	void SetLightProperty(const jShader* shader, const jCamera* camera, const std::list<const jLight*>& lights, jMaterialData* materialData);
 	//void SetLightProperty(const jShader* shader, const jLight* light, jMaterialData* materialData);
 	void SetTextureProperty(const jShader* shader, jMaterialData* materialData);
+
+	const std::vector<float>& GetVertices() const;
+
+	void CreateBoundBox();
 
 	std::shared_ptr<jVertexStreamData> VertexStream;
 	jVertexBuffer* VertexBuffer = nullptr;
@@ -71,5 +77,8 @@ public:
 
 	bool Collided = false;
 	bool IsTwoSided = false;
+
+	bool IsHiddenBoundBox = false;
+	jBoundBox BoundBox;
 };
 

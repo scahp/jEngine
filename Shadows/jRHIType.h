@@ -306,6 +306,13 @@ enum class ETextureComparisonMode
 	MAX,
 };
 
+enum class EPolygonMode
+{
+	POINT = 0,
+	LINE,
+	FILL
+};
+
 enum class EImageTextureAccessType
 {
 	NONE = 0,

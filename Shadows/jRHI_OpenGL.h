@@ -112,9 +112,43 @@ struct jAtomicCounterBuffer_OpenGL : public IAtomicCounterBuffer
 	virtual void ClearBuffer(int32 clearValue) override;
 };
 
+struct jTransformFeedbackBuffer_OpenGL : public ITransformFeedbackBuffer
+{
+	using ITransformFeedbackBuffer::ITransformFeedbackBuffer;
+	virtual ~jTransformFeedbackBuffer_OpenGL()
+	{
+		glDeleteBuffers(1, &TFBO);
+	}
+
+	uint32 TFBO = -1;
+	int32 DepthCheck = 0;
+	virtual void Init() override;
+	virtual void Bind(const jShader* shader) const override;
+	virtual void UpdateBufferData(void* newData, size_t size) override;
+	using ITransformFeedbackBuffer::GetBufferData;
+	virtual void GetBufferData(void* newData, size_t size) override;
+	virtual void ClearBuffer(int32 clearValue) override;
+	virtual void UpdateVaryingsToShader(const std::vector<std::string>& varyings, const jShader* shader) override;
+	virtual void ClearVaryingsToShader(const jShader* shader) override;
+	virtual void Begin(EPrimitiveType type) override;
+	virtual void End() override;
+	virtual void Pause() override;
+
+private:
+	void LinkProgram(const jShader* shader) const;
+};
+
+
 struct jQueryTime_OpenGL : public jQueryTime
 {
 	virtual ~jQueryTime_OpenGL() {}
+
+	uint32 QueryId = 0;
+};
+
+struct jQueryPrimitiveGenerated_OpenGL : public jQueryPrimitiveGenerated
+{
+	virtual ~jQueryPrimitiveGenerated_OpenGL() {}
 
 	uint32 QueryId = 0;
 };
@@ -190,6 +224,7 @@ public:
 	virtual void EnableSRGB(bool enable) const override;
 	virtual IShaderStorageBufferObject* CreateShaderStorageBufferObject(const char* blockname) const override;
 	virtual IAtomicCounterBuffer* CreateAtomicCounterBuffer(const char* name, int32 bindingPoint) const override;
+	virtual ITransformFeedbackBuffer* CreateTransformFeedbackBuffer(const char* name) const override;
 	virtual void SetViewport(int32 x, int32 y, int32 width, int32 height) const override;
 	virtual void SetViewport(const jViewport& viewport) const override;
 	virtual void SetViewportIndexed(int32 index, float x, float y, float width, float height) const override;
@@ -208,5 +243,13 @@ public:
 	virtual void EndQueryTimeElapsed(const jQueryTime* queryTimeElpased) const override;
 	virtual void EnableWireframe(bool enable) const override;
 	virtual void SetImageTexture(int32 index, const jTexture* texture, EImageTextureAccessType type) const override;
+	virtual void SetPolygonMode(EFace face, EPolygonMode mode) override;
+	virtual jQueryPrimitiveGenerated* CreateQueryPrimitiveGenerated() const override;
+	virtual void ReleaseQueryPrimitiveGenerated(jQueryPrimitiveGenerated* query) const override;
+	virtual void BeginQueryPrimitiveGenerated(const jQueryPrimitiveGenerated* query) const override;
+	virtual void EndQueryPrimitiveGenerated() const override;
+	virtual void GetQueryPrimitiveGeneratedResult(jQueryPrimitiveGenerated* query) const override;
+	virtual void EnableRasterizerDiscard(bool enable) const override;
+	virtual void SetTextureMipmapLevelLimit(ETextureType type, int32 baseLevel, int32 maxLevel) const override;	
 };
 

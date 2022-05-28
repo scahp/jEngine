@@ -67,6 +67,9 @@ enum class EUniformType
 	VECTOR2,
 	VECTOR3,
 	VECTOR4,
+	VECTOR2I,
+	VECTOR3I,
+	VECTOR4I, 
 	MAX,
 };
 
@@ -119,6 +122,9 @@ DECLARE_UNIFORMBUFFER(EUniformType::FLOAT, float);
 DECLARE_UNIFORMBUFFER(EUniformType::VECTOR2, Vector2);
 DECLARE_UNIFORMBUFFER(EUniformType::VECTOR3, Vector);
 DECLARE_UNIFORMBUFFER(EUniformType::VECTOR4, Vector4);
+DECLARE_UNIFORMBUFFER(EUniformType::VECTOR2I, Vector2i);
+DECLARE_UNIFORMBUFFER(EUniformType::VECTOR3I, Vector3i);
+DECLARE_UNIFORMBUFFER(EUniformType::VECTOR4I, Vector4i);
 
 //template <>
 //struct jUniformBuffer<Matrix> : public IUniformBuffer
@@ -197,6 +203,36 @@ struct IAtomicCounterBuffer : public IBuffer
 	virtual void UpdateBufferData(void* newData, size_t size) = 0;
 	virtual void GetBufferData(void* newData, size_t size) = 0;
 	virtual void ClearBuffer(int32 clearValue) = 0;
+
+	template <typename T>
+	void GetBufferData(typename std::remove_reference<T>::type& out)
+	{
+		GetBufferData(&out, sizeof(T));
+	}
+};
+
+struct ITransformFeedbackBuffer : public IBuffer
+{
+	ITransformFeedbackBuffer() = default;
+	ITransformFeedbackBuffer(const std::string& name)
+		: Name(name)
+	{}
+	virtual ~ITransformFeedbackBuffer() {}
+
+	std::string Name;
+	size_t Size = 0;
+	std::vector<std::string> Varyings;
+
+	virtual void Init() = 0;
+	virtual void Bind(const jShader* shader) const override {}
+	virtual void UpdateBufferData(void* newData, size_t size) = 0;
+	virtual void GetBufferData(void* newData, size_t size) = 0;
+	virtual void ClearBuffer(int32 clearValue) = 0;
+	virtual void UpdateVaryingsToShader(const std::vector<std::string>& varyings, const jShader* shader) = 0;
+	virtual void ClearVaryingsToShader(const jShader* shader) = 0;
+	virtual void Begin(EPrimitiveType type) = 0;
+	virtual void End() = 0;
+	virtual void Pause() = 0;
 
 	template <typename T>
 	void GetBufferData(typename std::remove_reference<T>::type& out)
@@ -288,9 +324,14 @@ struct jRenderTarget : public std::enable_shared_from_this<jRenderTarget>
 	virtual bool Begin(int index = 0, bool mrt = false) const { return true; };
 	virtual void End() const {}
 
+	FORCEINLINE bool IsBinding() const { return Binding; }
+
 	jRenderTargetInfo Info;
 	std::vector<jTexture*> Textures;
 	jTexture* TextureDepth = nullptr;
+
+private:
+	mutable bool Binding = false;
 };
 
 struct jQueryTime
@@ -298,6 +339,17 @@ struct jQueryTime
 	virtual ~jQueryTime() {}
 
 	uint64 TimeStamp = 0;
+};
+
+struct jQueryPrimitiveGenerated
+{
+	virtual ~jQueryPrimitiveGenerated() {}
+
+	uint64 NumOfGeneratedPrimitives = 0;
+
+	void Begin() const;
+	void End() const;
+	uint64 GetResult();
 };
 
 struct jSamplerStateInfo
@@ -414,6 +466,7 @@ public:
 	virtual IUniformBufferBlock* CreateUniformBufferBlock(const char* blockname) const { return nullptr; }
 	virtual IShaderStorageBufferObject* CreateShaderStorageBufferObject(const char* blockname) const { return nullptr; }
 	virtual IAtomicCounterBuffer* CreateAtomicCounterBuffer(const char* name, int32 bindingPoint) const { return nullptr; }
+	virtual ITransformFeedbackBuffer* CreateTransformFeedbackBuffer(const char* name) const { return nullptr; }
 	virtual void EnableSRGB(bool enable) const {  }
 	virtual void EnableDepthClip(bool enable) const {  }
 	virtual void BeginDebugEvent(const char* name) const {}
@@ -428,6 +481,14 @@ public:
 	virtual void EndQueryTimeElapsed(const jQueryTime* queryTimeElpased) const {}
 	virtual void EnableWireframe(bool enable) const {}
 	virtual void SetImageTexture(int32 index, const jTexture* texture, EImageTextureAccessType type) const {}
+	virtual void SetPolygonMode(EFace face, EPolygonMode mode) {}
+	virtual jQueryPrimitiveGenerated* CreateQueryPrimitiveGenerated() const { return nullptr; }
+	virtual void ReleaseQueryPrimitiveGenerated(jQueryPrimitiveGenerated* query) const {}
+	virtual void BeginQueryPrimitiveGenerated(const jQueryPrimitiveGenerated* query) const {}
+	virtual void EndQueryPrimitiveGenerated() const {}
+	virtual void GetQueryPrimitiveGeneratedResult(jQueryPrimitiveGenerated* query) const {}
+	virtual void EnableRasterizerDiscard(bool enable) const {}
+	virtual void SetTextureMipmapLevelLimit(ETextureType type, int32 baseLevel, int32 maxLevel) const {}
 };
 
 // Not thred safe

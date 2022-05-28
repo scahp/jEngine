@@ -71,6 +71,23 @@ uint32 GetOpenGLTextureType(ETextureType textureType)
 	return result;
 }
 
+uint32 GetOpenGLFilterTargetType(ETextureFilterTarget target)
+{
+	uint32 texTarget = 0;
+	switch (target)
+	{
+	case ETextureFilterTarget::MINIFICATION:
+		texTarget = GL_TEXTURE_MIN_FILTER;
+		break;
+	case ETextureFilterTarget::MAGNIFICATION:
+		texTarget = GL_TEXTURE_MAG_FILTER;
+		break;
+	default:
+		break;
+	}
+	return texTarget;
+}
+
 uint32 GetOpenGLTextureFormat(ETextureFormat format)
 {
 	uint32 result = 0;
@@ -305,7 +322,27 @@ uint32 GetOpenGLImageTextureAccessType(EImageTextureAccessType type)
 	return result;
 }
 
-uint32 GetFrontFaceType(EFrontFace type)
+uint32 GetOpenGLPolygonMode(EPolygonMode mode)
+{
+	uint32 result = 0;
+	switch (mode)
+	{
+	case EPolygonMode::POINT:
+		result = GL_POINT;
+		break;
+	case EPolygonMode::LINE:
+		result = GL_LINE;
+		break;
+	case EPolygonMode::FILL:
+		result = GL_FILL;
+		break;
+	default:
+		break;
+	}
+	return result;
+}
+
+uint32 GetOpenGLFrontFaceType(EFrontFace type)
 {
 	uint32 result = 0;
 	switch (type)
@@ -320,6 +357,24 @@ uint32 GetFrontFaceType(EFrontFace type)
 		break;
 	}
 	return result;
+}
+
+uint32 GetOpenGLFaceType(EFace type)
+{
+	uint32 face_gl = 0;
+	switch (type)
+	{
+	case EFace::BACK:
+		face_gl = GL_BACK;
+		break;
+	case EFace::FRONT:
+		face_gl = GL_FRONT;
+		break;
+	case EFace::FRONT_AND_BACK:
+		face_gl = GL_FRONT_AND_BACK;
+		break;
+	}
+	return face_gl;
 }
 
 uint32 GetOpenGLCullMode(ECullMode cullMode)
@@ -405,6 +460,7 @@ void jRHI_OpenGL::ReleaseSamplerState(jSamplerState* samplerState) const
 {
 	auto samplerState_gl = static_cast<jSamplerState_OpenGL*>(samplerState);
 	glDeleteSamplers(1, &samplerState_gl->SamplerId);
+	delete samplerState_gl;
 }
 
 void jRHI_OpenGL::BindSamplerState(int32 index, const jSamplerState* samplerState) const
@@ -648,6 +704,13 @@ IAtomicCounterBuffer* jRHI_OpenGL::CreateAtomicCounterBuffer(const char* name, i
 	return acbo;
 }
 
+ITransformFeedbackBuffer* jRHI_OpenGL::CreateTransformFeedbackBuffer(const char* name) const
+{
+	auto tfbo = new jTransformFeedbackBuffer_OpenGL(name);
+	tfbo->Init();
+	return tfbo;
+}
+
 void jRHI_OpenGL::SetViewport(int32 x, int32 y, int32 width, int32 height) const
 {
 	glViewport(x, y, width, height);
@@ -714,6 +777,7 @@ void jRHI_OpenGL::ReleaseQueryTime(jQueryTime* queryTime) const
 	auto queryTime_gl = static_cast<jQueryTime_OpenGL*>(queryTime);
 	glDeleteQueries(1, &queryTime_gl->QueryId);
 	queryTime_gl->QueryId = 0;
+	delete queryTime_gl;
 }
 
 void jRHI_OpenGL::QueryTimeStamp(const jQueryTime* queryTimeStamp) const
@@ -757,6 +821,63 @@ void jRHI_OpenGL::BeginQueryTimeElapsed(const jQueryTime* queryTimeElpased) cons
 void jRHI_OpenGL::EndQueryTimeElapsed(const jQueryTime* queryTimeElpased) const 
 {
 	glEndQuery(GL_TIME_ELAPSED);
+}
+
+void jRHI_OpenGL::SetPolygonMode(EFace face, EPolygonMode mode)
+{
+	glPolygonMode(GetOpenGLFaceType(face), GetOpenGLPolygonMode(mode));
+}
+
+jQueryPrimitiveGenerated* jRHI_OpenGL::CreateQueryPrimitiveGenerated() const
+{
+	auto query = new jQueryPrimitiveGenerated_OpenGL();
+	glGenQueries(1, &query->QueryId);
+	return query;
+}
+
+void jRHI_OpenGL::ReleaseQueryPrimitiveGenerated(jQueryPrimitiveGenerated* query) const
+{
+	auto query_gl = static_cast<jQueryPrimitiveGenerated_OpenGL*>(query);
+	glDeleteQueries(1, &query_gl->QueryId);
+	query_gl->QueryId = 0;
+	delete query_gl;
+}
+
+static int32 DepthCheck_BeginQueryPrimitiveGenerated = 0;
+
+void jRHI_OpenGL::BeginQueryPrimitiveGenerated(const jQueryPrimitiveGenerated* query) const
+{
+	check(1 == ++DepthCheck_BeginQueryPrimitiveGenerated);
+
+	auto query_gl = static_cast<const jQueryPrimitiveGenerated_OpenGL*>(query);
+	glBeginQuery(GL_PRIMITIVES_GENERATED, query_gl->QueryId);
+}
+
+void jRHI_OpenGL::EndQueryPrimitiveGenerated() const 
+{
+	check(0 == --DepthCheck_BeginQueryPrimitiveGenerated);
+	glEndQuery(GL_PRIMITIVES_GENERATED);
+}
+
+void jRHI_OpenGL::GetQueryPrimitiveGeneratedResult(jQueryPrimitiveGenerated* query) const
+{
+	auto query_gl = static_cast<jQueryPrimitiveGenerated_OpenGL*>(query);
+	glGetQueryObjectui64v(query_gl->QueryId, GL_QUERY_RESULT, &query_gl->NumOfGeneratedPrimitives);
+}
+
+void jRHI_OpenGL::EnableRasterizerDiscard(bool enable) const
+{
+	if (enable)
+		glEnable(GL_RASTERIZER_DISCARD);
+	else
+		glDisable(GL_RASTERIZER_DISCARD);
+}
+
+void jRHI_OpenGL::SetTextureMipmapLevelLimit(ETextureType type, int32 baseLevel, int32 maxLevel) const
+{
+	const uint32 textureType = GetOpenGLTextureType(type);
+	glTexParameteri(textureType, GL_TEXTURE_BASE_LEVEL, baseLevel);
+	glTexParameteri(textureType, GL_TEXTURE_MAX_LEVEL, maxLevel);
 }
 
 void jRHI_OpenGL::EnableWireframe(bool enable) const
@@ -1060,6 +1181,7 @@ void jRHI_OpenGL::ReleaseShader(jShader* shader) const
 	if (shader_gl->program)
 		glDeleteProgram(shader_gl->program);
 	shader_gl->program = 0;
+	delete shader_gl;
 }
 
 jTexture* jRHI_OpenGL::CreateNullTexture() const
@@ -1129,12 +1251,12 @@ jTexture* jRHI_OpenGL::CreateCubeTextureFromData(unsigned char** data, int32 wid
 
 bool jRHI_OpenGL::SetUniformbuffer(const IUniformBuffer* buffer, const jShader* shader) const
 {
+	auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
+
 	switch (buffer->GetType())
 	{
 	case EUniformType::MATRIX:
 	{
-		auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
-
 		auto uniformMatrix = static_cast<const jUniformBuffer<Matrix>*>(buffer);
 		auto loc = glGetUniformLocation(shader_gl->program, uniformMatrix->Name.c_str());
 		if (loc == -1)
@@ -1144,8 +1266,6 @@ bool jRHI_OpenGL::SetUniformbuffer(const IUniformBuffer* buffer, const jShader* 
 	}
 	case EUniformType::BOOL:
 	{
-		auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
-
 		auto uniformVector = static_cast<const jUniformBuffer<bool>*>(buffer);
 		auto loc = glGetUniformLocation(shader_gl->program, uniformVector->Name.c_str());
 		if (loc != -1)
@@ -1154,8 +1274,6 @@ bool jRHI_OpenGL::SetUniformbuffer(const IUniformBuffer* buffer, const jShader* 
 	}
 	case EUniformType::INT:
 	{
-		auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
-
 		auto uniformVector = static_cast<const jUniformBuffer<int>*>(buffer);
 		auto loc = glGetUniformLocation(shader_gl->program, uniformVector->Name.c_str());
 		if (loc == -1)
@@ -1165,8 +1283,6 @@ bool jRHI_OpenGL::SetUniformbuffer(const IUniformBuffer* buffer, const jShader* 
 	}
 	case EUniformType::FLOAT:
 	{
-		auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
-
 		auto uniformVector = static_cast<const jUniformBuffer<float>*>(buffer);
 		auto loc = glGetUniformLocation(shader_gl->program, uniformVector->Name.c_str());
 		if (loc == -1)
@@ -1176,8 +1292,6 @@ bool jRHI_OpenGL::SetUniformbuffer(const IUniformBuffer* buffer, const jShader* 
 	}
 	case EUniformType::VECTOR2:
 	{
-		auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
-
 		auto uniformVector = static_cast<const jUniformBuffer<Vector2>*>(buffer);
 		auto loc = glGetUniformLocation(shader_gl->program, uniformVector->Name.c_str());
 		if (loc == -1)
@@ -1187,8 +1301,6 @@ bool jRHI_OpenGL::SetUniformbuffer(const IUniformBuffer* buffer, const jShader* 
 	}
 	case EUniformType::VECTOR3:
 	{
-		auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
-
 		auto uniformVector = static_cast<const jUniformBuffer<Vector>*>(buffer);
 		auto loc = glGetUniformLocation(shader_gl->program, uniformVector->Name.c_str());
 		if (loc == -1)
@@ -1198,13 +1310,38 @@ bool jRHI_OpenGL::SetUniformbuffer(const IUniformBuffer* buffer, const jShader* 
 	}
 	case EUniformType::VECTOR4:
 	{
-		auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
-
 		auto uniformVector = static_cast<const jUniformBuffer<Vector4>*>(buffer);
 		auto loc = glGetUniformLocation(shader_gl->program, uniformVector->Name.c_str());
 		if (loc == -1)
 			return false;
 		glUniform4fv(loc, 1, &uniformVector->Data.v[0]);
+		break;
+	}
+	case EUniformType::VECTOR2I:
+	{
+		auto uniformVector = static_cast<const jUniformBuffer<Vector2i>*>(buffer);
+		auto loc = glGetUniformLocation(shader_gl->program, uniformVector->Name.c_str());
+		if (loc == -1)
+			return false;
+		glUniform2iv(loc, 1, &uniformVector->Data.v[0]);
+		break;
+	}
+	case EUniformType::VECTOR3I:
+	{
+		auto uniformVector = static_cast<const jUniformBuffer<Vector3i>*>(buffer);
+		auto loc = glGetUniformLocation(shader_gl->program, uniformVector->Name.c_str());
+		if (loc == -1)
+			return false;
+		glUniform3iv(loc, 1, &uniformVector->Data.v[0]);
+		break;
+	}
+	case EUniformType::VECTOR4I:
+	{
+		auto uniformVector = static_cast<const jUniformBuffer<Vector4i>*>(buffer);
+		auto loc = glGetUniformLocation(shader_gl->program, uniformVector->Name.c_str());
+		if (loc == -1)
+			return false;
+		glUniform4iv(loc, 1, &uniformVector->Data.v[0]);
 		break;
 	}
 	default:
@@ -1226,12 +1363,12 @@ bool jRHI_OpenGL::GetUniformbuffer(void* outResult, EUniformType type, const cha
 	JASSERT(name);
 	JASSERT(outResult);
 
+	auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
+
 	switch (type)
 	{
 	case EUniformType::MATRIX:
 	{
-		auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
-
 		auto loc = glGetUniformLocation(shader_gl->program, name);
 		if (loc == -1)
 			return false;
@@ -1240,8 +1377,6 @@ bool jRHI_OpenGL::GetUniformbuffer(void* outResult, EUniformType type, const cha
 	}
 	case EUniformType::BOOL:
 	{
-		auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
-
 		auto loc = glGetUniformLocation(shader_gl->program, name);
 		if (loc == -1)
 			return false;
@@ -1252,8 +1387,6 @@ bool jRHI_OpenGL::GetUniformbuffer(void* outResult, EUniformType type, const cha
 	}
 	case EUniformType::INT:
 	{
-		auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
-
 		auto loc = glGetUniformLocation(shader_gl->program, name);
 		if (loc == -1)
 			return false;
@@ -1262,8 +1395,6 @@ bool jRHI_OpenGL::GetUniformbuffer(void* outResult, EUniformType type, const cha
 	}
 	case EUniformType::FLOAT:
 	{
-		auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
-
 		auto loc = glGetUniformLocation(shader_gl->program, name);
 		if (loc == -1)
 			return false;
@@ -1272,8 +1403,6 @@ bool jRHI_OpenGL::GetUniformbuffer(void* outResult, EUniformType type, const cha
 	}
 	case EUniformType::VECTOR2:
 	{
-		auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
-
 		auto loc = glGetUniformLocation(shader_gl->program, name);
 		if (loc == -1)
 			return false;
@@ -1282,8 +1411,6 @@ bool jRHI_OpenGL::GetUniformbuffer(void* outResult, EUniformType type, const cha
 	}
 	case EUniformType::VECTOR3:
 	{
-		auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
-
 		auto loc = glGetUniformLocation(shader_gl->program, name);
 		if (loc == -1)
 			return false;
@@ -1292,12 +1419,34 @@ bool jRHI_OpenGL::GetUniformbuffer(void* outResult, EUniformType type, const cha
 	}
 	case EUniformType::VECTOR4:
 	{
-		auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
-
 		auto loc = glGetUniformLocation(shader_gl->program, name);
 		if (loc == -1)
 			return false;
 		glGetnUniformfv(shader_gl->program, loc, sizeof(Vector4), (float*)outResult);
+		break;
+	}
+	case EUniformType::VECTOR2I:
+	{
+		auto loc = glGetUniformLocation(shader_gl->program, name);
+		if (loc == -1)
+			return false;
+		glGetnUniformiv(shader_gl->program, loc, sizeof(Vector4i), (int*)outResult);
+		break;
+	}
+	case EUniformType::VECTOR3I:
+	{
+		auto loc = glGetUniformLocation(shader_gl->program, name);
+		if (loc == -1)
+			return false;
+		glGetnUniformiv(shader_gl->program, loc, sizeof(Vector2i), (int*)outResult);
+		break;
+	}
+	case EUniformType::VECTOR4I:
+	{
+		auto loc = glGetUniformLocation(shader_gl->program, name);
+		if (loc == -1)
+			return false;
+		glGetnUniformiv(shader_gl->program, loc, sizeof(Vector4i), (int*)outResult);
 		break;
 	}
 	default:
@@ -1401,7 +1550,7 @@ void jRHI_OpenGL::EnableCullFace(bool enable) const
 
 void jRHI_OpenGL::SetFrontFace(EFrontFace frontFace) const
 {
-	glFrontFace(GetFrontFaceType(frontFace));
+	glFrontFace(GetOpenGLFrontFaceType(frontFace));
 }
 
 void jRHI_OpenGL::EnableCullMode(ECullMode cullMode) const
@@ -2061,19 +2210,7 @@ void jRHI_OpenGL::EnableStencil(bool enable) const
 
 void jRHI_OpenGL::SetStencilOpSeparate(EFace face, EStencilOp sFail, EStencilOp dpFail, EStencilOp dpPass) const
 {
-	unsigned int face_gl = 0;
-	switch (face)
-	{
-	case EFace::BACK:
-		face_gl = GL_BACK;
-		break;
-	case EFace::FRONT:
-		face_gl = GL_FRONT;
-		break;
-	case EFace::FRONT_AND_BACK:
-		face_gl = GL_FRONT_AND_BACK;
-		break;
-	}
+	const uint32 face_gl = GetOpenGLFaceType(face);
 
 	auto func = [](EStencilOp op)
 	{
@@ -2202,11 +2339,15 @@ bool jRenderTarget_OpenGL::Begin(int index, bool mrt) const
 	//glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+	__super::Begin(index, mrt);
+
 	return true;
 }
 
 void jRenderTarget_OpenGL::End() const
 {
+	__super::End();
+
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
 }
@@ -2327,4 +2468,103 @@ void jAtomicCounterBuffer_OpenGL::Bind(const jShader* shader) const
 	//uint32 index = glGetProgramResourceIndex(shader_gl->program, GL_ATOMIC_COUNTER_BUFFER, Name.c_str());
 	//if (-1 != index)
 	//	glShaderStorageBlockBinding(shader_gl->program, index, BindingPoint);
+}
+
+void jTransformFeedbackBuffer_OpenGL::Init()
+{
+	glGenBuffers(1, &TFBO);
+	glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, TFBO);
+}
+
+void jTransformFeedbackBuffer_OpenGL::Bind(const jShader* shader) const
+{
+	glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, TFBO);
+}
+
+void jTransformFeedbackBuffer_OpenGL::UpdateBufferData(void* newData, size_t size)
+{
+	Size = size;
+	glBindBuffer(GL_TRANSFORM_FEEDBACK_BUFFER, TFBO);
+	glBufferData(GL_TRANSFORM_FEEDBACK_BUFFER, size, newData, GL_DYNAMIC_COPY);
+}
+
+void jTransformFeedbackBuffer_OpenGL::GetBufferData(void* newData, size_t size)
+{
+	glGetBufferSubData(GL_TRANSFORM_FEEDBACK_BUFFER, 0, size, newData);
+}
+
+void jTransformFeedbackBuffer_OpenGL::ClearBuffer(int32 clearValue)
+{
+	glBindBuffer(GL_TRANSFORM_FEEDBACK_BUFFER, TFBO);
+	glClearBufferData(GL_TRANSFORM_FEEDBACK_BUFFER, GL_R32I, GL_RED_INTEGER, GL_INT, &clearValue);
+}
+
+void jTransformFeedbackBuffer_OpenGL::UpdateVaryingsToShader(const std::vector<std::string>& varyings, const jShader* shader)
+{
+	auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
+	check(shader_gl);
+
+	Varyings = varyings;
+
+	std::vector<const char*> tempVaryings;
+	tempVaryings.reserve(Varyings.size());
+	for (const auto& varying : Varyings)
+		tempVaryings.push_back(varying.c_str());
+
+	glTransformFeedbackVaryings(shader_gl->program, static_cast<int32>(tempVaryings.size()), tempVaryings.data(), GL_INTERLEAVED_ATTRIBS);
+	LinkProgram(shader);
+}
+
+void jTransformFeedbackBuffer_OpenGL::LinkProgram(const jShader* shader) const
+{
+	auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
+	check(shader_gl);
+
+	const auto program = shader_gl->program;
+
+	glLinkProgram(program);
+	int32 isValid = 0;
+	glGetProgramiv(program, GL_LINK_STATUS, &isValid);
+	if (!isValid)
+	{
+		int maxLength = 0;
+		glGetProgramiv(program, GL_INFO_LOG_LENGTH, &maxLength);
+
+		if (maxLength > 0)
+		{
+			std::vector<char> errorLog(maxLength + 1, 0);
+			glGetProgramInfoLog(program, maxLength, &maxLength, &errorLog[0]);
+			JMESSAGE(&errorLog[0]);
+		}
+	}
+}
+
+void jTransformFeedbackBuffer_OpenGL::ClearVaryingsToShader(const jShader* shader)
+{
+	auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
+	check(shader_gl);
+
+	glTransformFeedbackVaryings(shader_gl->program, 0, nullptr, GL_INTERLEAVED_ATTRIBS);
+	LinkProgram(shader);
+}
+
+void jTransformFeedbackBuffer_OpenGL::Begin(EPrimitiveType type)
+{
+	++DepthCheck;
+	check(DepthCheck == 1);
+
+	glBeginTransformFeedback(GetPrimitiveType(type));
+}
+
+void jTransformFeedbackBuffer_OpenGL::End()
+{
+	--DepthCheck;
+	check(DepthCheck == 0);
+
+	glEndTransformFeedback();
+}
+
+void jTransformFeedbackBuffer_OpenGL::Pause()
+{
+	glPauseTransformFeedback();
 }

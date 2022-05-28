@@ -2,6 +2,7 @@
 #include "Math/Vector.h"
 #include "Math/Plane.h"
 #include "jObject.h"
+#include "jBoundPrimitiveType.h"
 
 class jCamera;
 class jDirectionalLight;
@@ -61,17 +62,6 @@ public:
 	void SetUniformBuffer(const jShader* shader);
 	void SetTexture(int index, const jTexture* texture, const jSamplerState* samplerState);
 	void SetTexture(const jTexture* texture, const jSamplerState* samplerState, int32 index = 0);
-};
-
-struct jBoundBox
-{
-	Vector Min;
-	Vector Max;
-};
-
-struct jBoundSphere
-{
-	float Radius = 0.0f;
 };
 
 class jBoundBoxObject : public jObject
@@ -223,7 +213,7 @@ namespace jPrimitiveUtil
 	jBoundSphere GenerateBoundSphere(const std::vector<float>& vertices);
 	void CreateShadowVolume(const std::vector<float>& vertices, const std::vector<uint32>& faces, jObject* ownerObject);
 	void CreateBoundObjects(const std::vector<float>& vertices, jObject* ownerObject);
-
+	void CreateBound(jObject* object);
 	jBoundBoxObject* CreateBoundBox(jBoundBox boundBox, jObject* ownerObject, const Vector4& color = Vector4(0.0f, 0.0f, 0.0f, 1.0f));
 	jBoundSphereObject* CreateBoundSphere(jBoundSphere boundSphere, jObject* ownerObject, const Vector4& color = Vector4(0.0f, 0.0f, 0.0f, 1.0f));
 
