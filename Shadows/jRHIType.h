@@ -136,8 +136,12 @@ enum class ETextureFormat
 {
 	RGB = 0,
 	RGBA = 1,
+	RGBA_INTEGER,
 	RG,
 	R,
+	RGBA8,
+	RGBA8I,
+	RGBA8UI,
 	R32F,
 	RG32F,
 	RGBA16F,
@@ -154,6 +158,7 @@ enum class EFormatType
 	BYTE = 0,
 	UNSIGNED_BYTE,
 	INT,
+	HALF,
 	FLOAT,
 };
 
@@ -193,6 +198,16 @@ enum class EBlendDest
 	ONE_MINUS_CONSTANT_COLOR,
 	CONSTANT_ALPHA,
 	ONE_MINUS_CONSTANT_ALPHA,
+	MAX
+};
+
+enum class EBlendMode
+{
+	FUNC_ADD = 0,
+	FUNC_SUBTRACT,
+	FUNC_REVERSE_SUBTRACT,
+	FUNC_MIN,
+	FUNC_MAX,
 	MAX
 };
 
@@ -305,4 +320,11 @@ enum class EFrontFace
 	CW = 0,
 	CCW = 1,
 	MAX,
+};
+
+enum class ECullMode
+{
+	BACK = 0,
+	FRONT,
+	FRONT_AND_BACK
 };
