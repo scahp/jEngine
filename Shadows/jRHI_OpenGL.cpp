@@ -888,6 +888,15 @@ void jRHI_OpenGL::EnableMultisample(bool enable) const
 		glDisable(GL_MULTISAMPLE);
 }
 
+void jRHI_OpenGL::SetCubeMapSeamless(bool enable) const
+{
+	if (enable)
+		glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+	else
+		glDisable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+}
+
+
 void jRHI_OpenGL::EnableWireframe(bool enable) const
 {
 	if (enable)
@@ -1230,8 +1239,8 @@ jTexture* jRHI_OpenGL::CreateTextureFromData(void* data, int32 width, int32 heig
 	return texture;
 }
 
-jTexture* jRHI_OpenGL::CreateCubeTextureFromData(unsigned char** data, int32 width, int32 height, bool sRGB
-	, EFormatType dataType /*= EFormatType::UNSIGNED_BYTE*/, ETextureFormat textureFormat /*= ETextureFormat::RGBA*/) const
+jTexture* jRHI_OpenGL::CreateCubeTextureFromData(std::vector<void*> faces, int32 width, int32 height, bool sRGB
+	, EFormatType dataType, ETextureFormat textureFormat) const
 {
 	const uint32 internalFormat = GetOpenGLTextureFormat(textureFormat);
 	const uint32 simpleFormat = GetOpenGLTextureFormatSimple(textureFormat);
@@ -1247,8 +1256,12 @@ jTexture* jRHI_OpenGL::CreateCubeTextureFromData(unsigned char** data, int32 wid
 	glGenTextures(1, &texture->TextureID);
 	glBindTexture(GL_TEXTURE_CUBE_MAP, texture->TextureID);
 
-	for (unsigned int i = 0; i < 6; i++)
-		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, internalFormat, width, height, 0, simpleFormat, formatType, data[i]);
+	for (uint32 i = 0; i < faces.size(); i++)
+	{
+		unsigned char* data = (unsigned char* )faces[i];
+		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
+			0, internalFormat, width, height, 0, simpleFormat, formatType, data);
+	}
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);

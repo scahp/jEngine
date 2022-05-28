@@ -193,7 +193,7 @@ public:
 	virtual jTexture* CreateNullTexture() const override;
 	virtual jTexture* CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
 		, EFormatType dataType = EFormatType::UNSIGNED_BYTE, ETextureFormat textureFormat = ETextureFormat::RGBA) const override;
-	virtual jTexture* CreateCubeTextureFromData(unsigned char** data, int32 width, int32 height, bool sRGB
+	virtual jTexture* CreateCubeTextureFromData(std::vector<void*> faces, int32 width, int32 height, bool sRGB
 		, EFormatType dataType = EFormatType::UNSIGNED_BYTE, ETextureFormat textureFormat = ETextureFormat::RGBA) const override;
 	virtual bool SetUniformbuffer(const IUniformBuffer* buffer, const jShader* shader) const override;
 	virtual bool GetUniformbuffer(void* outResult, const IUniformBuffer* buffer, const jShader* shader) const override;
@@ -252,5 +252,6 @@ public:
 	virtual void EnableRasterizerDiscard(bool enable) const override;
 	virtual void SetTextureMipmapLevelLimit(ETextureType type, int32 baseLevel, int32 maxLevel) const override;
 	virtual void EnableMultisample(bool enable) const override;
+	virtual void SetCubeMapSeamless(bool enable) const override;
 };
 

@@ -444,7 +444,7 @@ public:
 	virtual jTexture* CreateNullTexture() const { return nullptr; }
 	virtual jTexture* CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
 		, EFormatType dataType = EFormatType::UNSIGNED_BYTE, ETextureFormat textureFormat = ETextureFormat::RGBA) const { return nullptr; }
-	virtual jTexture* CreateCubeTextureFromData(unsigned char** data, int32 width, int32 height, bool sRGB
+	virtual jTexture* CreateCubeTextureFromData(std::vector<void*> faces, int32 width, int32 height, bool sRGB
 		, EFormatType dataType = EFormatType::UNSIGNED_BYTE, ETextureFormat textureFormat = ETextureFormat::RGBA) const { return nullptr; }
 	virtual void SetMatetrial(jMaterialData* materialData, const jShader* shader, int32 baseBindingIndex = 0) const {}
 	virtual void EnableCullFace(bool enable) const {}
@@ -490,6 +490,7 @@ public:
 	virtual void EnableRasterizerDiscard(bool enable) const {}
 	virtual void SetTextureMipmapLevelLimit(ETextureType type, int32 baseLevel, int32 maxLevel) const {}
 	virtual void EnableMultisample(bool enable) const {}
+	virtual void SetCubeMapSeamless(bool enable) const {}	
 };
 
 // Not thred safe
