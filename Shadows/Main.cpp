@@ -129,6 +129,7 @@ int main()
 			TwDraw();
 		}
 
+		if (0)
 		{
 			SCOPE_DEBUG_EVENT(g_rhi, "IMGUI");
 

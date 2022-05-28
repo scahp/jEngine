@@ -21,6 +21,8 @@
 #include "jForwardRenderer.h"
 #include "jPipeline.h"
 #include "jVertexAdjacency.h"
+#include <time.h>
+#include <stdlib.h>
 
 jRHI* g_rhi = nullptr;
 
@@ -54,6 +56,7 @@ void jGame::ProcessInput()
 
 void jGame::Setup()
 {
+	srand(static_cast<uint32>(time(NULL)));
 	//////////////////////////////////////////////////////////////////////////
 	const Vector mainCameraPos(172.66f, 160.0f, -180.63f);
 	//const Vector mainCameraTarget(171.96f, 166.02f, -180.05f);
