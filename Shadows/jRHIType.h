@@ -201,14 +201,14 @@ enum class EBlendDest
 	MAX
 };
 
-enum class EBlendMode
+enum class EBlendEquation
 {
-	FUNC_ADD = 0,
-	FUNC_SUBTRACT,
-	FUNC_REVERSE_SUBTRACT,
-	FUNC_MIN,
-	FUNC_MAX,
-	MAX
+	ADD = 0,
+	SUBTRACT,
+	REVERSE_SUBTRACT,
+	MIN_VALUE,
+	MAX_VALUE,
+	MAX,
 };
 
 enum class EFace

@@ -425,6 +425,158 @@ bool GetOpenGLDepthBufferType(uint32& depthBufferFormat_gl, uint32& depthBufferT
 	return true;
 }
 
+uint32 GetOpenGLBlendSrc(EBlendSrc src)
+{
+    uint32 src_gl = 0;
+    switch (src)
+    {
+    case EBlendSrc::ZERO:
+        src_gl = GL_ZERO;
+        break;
+    case EBlendSrc::ONE:
+        src_gl = GL_ONE;
+        break;
+    case EBlendSrc::SRC_COLOR:
+        src_gl = GL_SRC_COLOR;
+        break;
+    case EBlendSrc::ONE_MINUS_SRC_COLOR:
+        src_gl = GL_ONE_MINUS_SRC_COLOR;
+        break;
+    case EBlendSrc::DST_COLOR:
+        src_gl = GL_DST_COLOR;
+        break;
+    case EBlendSrc::ONE_MINUS_DST_COLOR:
+        src_gl = GL_ONE_MINUS_DST_COLOR;
+        break;
+    case EBlendSrc::SRC_ALPHA:
+        src_gl = GL_SRC_ALPHA;
+        break;
+    case EBlendSrc::ONE_MINUS_SRC_ALPHA:
+        src_gl = GL_ONE_MINUS_SRC_ALPHA;
+        break;
+    case EBlendSrc::DST_ALPHA:
+        src_gl = GL_DST_ALPHA;
+        break;
+    case EBlendSrc::ONE_MINUS_DST_ALPHA:
+        src_gl = GL_ONE_MINUS_DST_ALPHA;
+        break;
+    case EBlendSrc::CONSTANT_COLOR:
+        src_gl = GL_CONSTANT_COLOR;
+        break;
+    case EBlendSrc::ONE_MINUS_CONSTANT_COLOR:
+        src_gl = GL_ONE_MINUS_CONSTANT_COLOR;
+        break;
+    case EBlendSrc::CONSTANT_ALPHA:
+        src_gl = GL_CONSTANT_ALPHA;
+        break;
+    case EBlendSrc::ONE_MINUS_CONSTANT_ALPHA:
+        src_gl = GL_ONE_MINUS_CONSTANT_ALPHA;
+        break;
+    case EBlendSrc::SRC_ALPHA_SATURATE:
+        src_gl = GL_SRC_ALPHA_SATURATE;
+        break;
+    default:
+        JASSERT(0);
+        break;
+    }
+	return src_gl;
+}
+
+uint32 GetOpenGLBlendDest(EBlendDest dest)
+{
+    uint32 dest_gl = 0;
+    switch (dest)
+    {
+    case EBlendDest::ZERO:
+        dest_gl = GL_ZERO;
+        break;
+    case EBlendDest::ONE:
+        dest_gl = GL_ONE;
+        break;
+    case EBlendDest::SRC_COLOR:
+        dest_gl = GL_SRC_COLOR;
+        break;
+    case EBlendDest::ONE_MINUS_SRC_COLOR:
+        dest_gl = GL_ONE_MINUS_SRC_COLOR;
+        break;
+    case EBlendDest::DST_COLOR:
+        dest_gl = GL_DST_COLOR;
+        break;
+    case EBlendDest::ONE_MINUS_DST_COLOR:
+        dest_gl = GL_ONE_MINUS_DST_COLOR;
+        break;
+    case EBlendDest::SRC_ALPHA:
+        dest_gl = GL_SRC_ALPHA;
+        break;
+    case EBlendDest::ONE_MINUS_SRC_ALPHA:
+        dest_gl = GL_ONE_MINUS_SRC_ALPHA;
+        break;
+    case EBlendDest::DST_ALPHA:
+        dest_gl = GL_DST_ALPHA;
+        break;
+    case EBlendDest::ONE_MINUS_DST_ALPHA:
+        dest_gl = GL_ONE_MINUS_DST_ALPHA;
+        break;
+    case EBlendDest::CONSTANT_COLOR:
+        dest_gl = GL_CONSTANT_COLOR;
+        break;
+    case EBlendDest::ONE_MINUS_CONSTANT_COLOR:
+        dest_gl = GL_ONE_MINUS_CONSTANT_COLOR;
+        break;
+    case EBlendDest::CONSTANT_ALPHA:
+        dest_gl = GL_CONSTANT_ALPHA;
+        break;
+    case EBlendDest::ONE_MINUS_CONSTANT_ALPHA:
+        dest_gl = GL_ONE_MINUS_CONSTANT_ALPHA;
+        break;
+    default:
+        JASSERT(0);
+        break;
+    }
+	return dest_gl;
+}
+
+uint32 GetOpenGLClearBufferBit(ERenderBufferType typeBit)
+{
+	uint32 clearBufferBit = 0;
+	if (!!(ERenderBufferType::COLOR & typeBit))
+		clearBufferBit |= GL_COLOR;
+	else if (!!(ERenderBufferType::DEPTH & typeBit) && !!(ERenderBufferType::STENCIL & typeBit))
+		clearBufferBit |= GL_DEPTH_STENCIL;
+	else if (!!(ERenderBufferType::DEPTH & typeBit))
+		clearBufferBit |= GL_DEPTH;
+	else if (!!(ERenderBufferType::STENCIL & typeBit))
+		clearBufferBit |= GL_STENCIL;
+	return clearBufferBit;
+}
+
+uint32 GetOpenGLBlendEquation(EBlendEquation equation)
+{
+	uint32 equation_gl = 0;
+	switch(equation)
+	{
+	case EBlendEquation::ADD:
+		equation_gl = GL_FUNC_ADD;
+		break;
+	case EBlendEquation::SUBTRACT:
+		equation_gl = GL_FUNC_SUBTRACT;
+		break;
+	case EBlendEquation::REVERSE_SUBTRACT:
+		equation_gl = GL_FUNC_REVERSE_SUBTRACT;
+		break;
+	case EBlendEquation::MIN_VALUE:
+		equation_gl = GL_MIN;
+		break;
+	case EBlendEquation::MAX_VALUE:
+		equation_gl = GL_MAX;
+		break;
+	default:
+		JASSERT(0);
+		break;
+	}
+	return equation_gl;
+}
+
 //////////////////////////////////////////////////////////////////////////
 // jRHI_OpenGL
 jRHI_OpenGL::jRHI_OpenGL()
@@ -935,6 +1087,18 @@ void jRHI_OpenGL::SetClearColor(float r, float g, float b, float a) const
 void jRHI_OpenGL::SetClearColor(Vector4 rgba) const
 {
 	glClearColor(rgba.x, rgba.y, rgba.z, rgba.w);
+}
+
+void jRHI_OpenGL::SetClearBuffer(ERenderBufferType typeBit, const float* value, int32 bufferIndex) const
+{
+	const uint32 clearBufferBit = GetOpenGLClearBufferBit(typeBit);
+	glClearBufferfv(clearBufferBit, bufferIndex, value);
+}
+
+void jRHI_OpenGL::SetClearBuffer(ERenderBufferType typeBit, const int32* value, int32 bufferIndex) const
+{
+	const uint32 clearBufferBit = GetOpenGLClearBufferBit(typeBit);
+	glClearBufferiv(clearBufferBit, bufferIndex, value);
 }
 
 void jRHI_OpenGL::SetShader(const jShader* shader) const
@@ -2082,138 +2246,30 @@ void jRHI_OpenGL::EnableBlend(bool enable) const
 
 void jRHI_OpenGL::SetBlendFunc(EBlendSrc src, EBlendDest dest) const
 {
-	unsigned int src_gl = 0;
-	switch (src)
-	{
-	case EBlendSrc::ZERO:
-		src_gl = GL_ZERO;
-		break;
-	case EBlendSrc::ONE:
-		src_gl = GL_ONE;
-		break;
-	case EBlendSrc::SRC_COLOR:
-		src_gl = GL_SRC_COLOR;
-		break;
-	case EBlendSrc::ONE_MINUS_SRC_COLOR:
-		src_gl = GL_ONE_MINUS_SRC_COLOR;
-		break;
-	case EBlendSrc::DST_COLOR:
-		src_gl = GL_DST_COLOR;
-		break;
-	case EBlendSrc::ONE_MINUS_DST_COLOR:
-		src_gl = GL_ONE_MINUS_DST_COLOR;
-		break;
-	case EBlendSrc::SRC_ALPHA:
-		src_gl = GL_SRC_ALPHA;
-		break;
-	case EBlendSrc::ONE_MINUS_SRC_ALPHA:
-		src_gl = GL_ONE_MINUS_SRC_ALPHA;
-		break;
-	case EBlendSrc::DST_ALPHA:
-		src_gl = GL_DST_ALPHA;
-		break;
-	case EBlendSrc::ONE_MINUS_DST_ALPHA:
-		src_gl = GL_ONE_MINUS_DST_ALPHA;
-		break;
-	case EBlendSrc::CONSTANT_COLOR:
-		src_gl = GL_CONSTANT_COLOR;
-		break;
-	case EBlendSrc::ONE_MINUS_CONSTANT_COLOR:
-		src_gl = GL_ONE_MINUS_CONSTANT_COLOR;
-		break;
-	case EBlendSrc::CONSTANT_ALPHA:
-		src_gl = GL_CONSTANT_ALPHA;
-		break;
-	case EBlendSrc::ONE_MINUS_CONSTANT_ALPHA:
-		src_gl = GL_ONE_MINUS_CONSTANT_ALPHA;
-		break;
-	case EBlendSrc::SRC_ALPHA_SATURATE:
-		src_gl = GL_SRC_ALPHA_SATURATE;
-		break;
-	default:
-		JASSERT(0);
-		break;
-	}
-
-	unsigned int dest_gl = 0;
-	switch (dest)
-	{
-	case EBlendDest::ZERO:
-		dest_gl = GL_ZERO;
-		break;
-	case EBlendDest::ONE:
-		dest_gl = GL_ONE;
-		break;
-	case EBlendDest::SRC_COLOR:
-		dest_gl = GL_SRC_COLOR;
-		break;
-	case EBlendDest::ONE_MINUS_SRC_COLOR:
-		dest_gl = GL_ONE_MINUS_SRC_COLOR;
-		break;
-	case EBlendDest::DST_COLOR:
-		dest_gl = GL_DST_COLOR;
-		break;
-	case EBlendDest::ONE_MINUS_DST_COLOR:
-		dest_gl = GL_ONE_MINUS_DST_COLOR;
-		break;
-	case EBlendDest::SRC_ALPHA:
-		dest_gl = GL_SRC_ALPHA;
-		break;
-	case EBlendDest::ONE_MINUS_SRC_ALPHA:
-		dest_gl = GL_ONE_MINUS_SRC_ALPHA;
-		break;
-	case EBlendDest::DST_ALPHA:
-		dest_gl = GL_DST_ALPHA;
-		break;
-	case EBlendDest::ONE_MINUS_DST_ALPHA:
-		dest_gl = GL_ONE_MINUS_DST_ALPHA;
-		break;
-	case EBlendDest::CONSTANT_COLOR:
-		dest_gl = GL_CONSTANT_COLOR;
-		break;
-	case EBlendDest::ONE_MINUS_CONSTANT_COLOR:
-		dest_gl = GL_ONE_MINUS_CONSTANT_COLOR;
-		break;
-	case EBlendDest::CONSTANT_ALPHA:
-		dest_gl = GL_CONSTANT_ALPHA;
-		break;
-	case EBlendDest::ONE_MINUS_CONSTANT_ALPHA:
-		dest_gl = GL_ONE_MINUS_CONSTANT_ALPHA;
-		break;
-	default:
-		JASSERT(0);
-		break;
-	}
+	const uint32 src_gl = GetOpenGLBlendSrc(src);
+	const uint32 dest_gl = GetOpenGLBlendDest(dest);
 
 	glBlendFunc(src_gl, dest_gl);
 }
 
-void jRHI_OpenGL::SetBlendEquation(EBlendMode mode) const
+void jRHI_OpenGL::SetBlendFuncRT(EBlendSrc src, EBlendDest dest, int32 rtIndex /*= 0*/) const
 {
-	unsigned int mode_gl = 0;
-	switch (mode)
-	{
-	case EBlendMode::FUNC_ADD:
-		mode_gl = GL_FUNC_ADD;
-		break;
-	case EBlendMode::FUNC_SUBTRACT:
-		mode_gl = GL_FUNC_SUBTRACT;
-		break;
-	case EBlendMode::FUNC_REVERSE_SUBTRACT:
-		mode_gl = GL_FUNC_REVERSE_SUBTRACT;
-		break;
-	case EBlendMode::FUNC_MIN:
-		mode_gl = GL_MIN;
-		break;
-	case EBlendMode::FUNC_MAX:
-		mode_gl = GL_MAX;
-		break;
-	default:
-		JASSERT(0);
-		break;
-	}
+    const uint32 src_gl = GetOpenGLBlendSrc(src);
+    const uint32 dest_gl = GetOpenGLBlendDest(dest);
 
-	glBlendEquation(mode_gl);
+	glBlendFunci(rtIndex, src_gl, dest_gl);
+}
+
+void jRHI_OpenGL::SetBlendEquation(EBlendEquation func) const
+{
+	const uint32 equation = GetOpenGLBlendEquation(func);
+	glBlendEquation(equation);
+}
+
+void jRHI_OpenGL::SetBlendEquation(EBlendEquation func, int32 rtIndex) const
+{
+	const uint32 equation = GetOpenGLBlendEquation(func);
+	glBlendEquationi(equation, rtIndex);
 }
 
 void jRHI_OpenGL::SetBlendColor(float r, float g, float b, float a) const
