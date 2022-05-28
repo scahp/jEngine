@@ -225,6 +225,15 @@ public:
 
 struct jRenderTargetInfo
 {
+	jRenderTargetInfo() = default;
+	jRenderTargetInfo(ETextureType textureType, ETextureFormat internalFormat, ETextureFormat format, EFormatType formatType, EDepthBufferType depthBufferType
+		, int32 width, int32 height, int32 textureCount = 1, ETextureFilter magnification = ETextureFilter::LINEAR
+		, ETextureFilter minification = ETextureFilter::LINEAR, bool isGenerateMipmapDepth = false, int32 sampleCount = 1)
+		: TextureType(textureType), InternalFormat(internalFormat), Format(format), FormatType(formatType), DepthBufferType(depthBufferType)
+		, Width(width), Height(height), TextureCount(textureCount), Magnification(magnification), Minification(minification), IsGenerateMipmapDepth(isGenerateMipmapDepth)
+		, SampleCount(sampleCount)
+	{}
+
 	size_t GetHash() const
 	{
 		size_t result = 0;
@@ -236,6 +245,8 @@ struct jRenderTargetInfo
 		hash_combine(result, Height);
 		hash_combine(result, Height);
 		hash_combine(result, TextureCount);
+		hash_combine(result, IsGenerateMipmapDepth);
+		hash_combine(result, SampleCount);
 		return result;
 	}
 
@@ -247,8 +258,10 @@ struct jRenderTargetInfo
 	int32 Width = 0;
 	int32 Height = 0;
 	int32 TextureCount = 1;
-	ETextureFilter Magnification;
-	ETextureFilter Minification;
+	ETextureFilter Magnification = ETextureFilter::LINEAR;
+	ETextureFilter Minification = ETextureFilter::LINEAR;
+	bool IsGenerateMipmapDepth = false;
+	int32 SampleCount = 1;
 };
 
 struct jRenderTarget : public std::enable_shared_from_this<jRenderTarget>
@@ -368,6 +381,7 @@ public:
 		, EFormatType dataType = EFormatType::UNSIGNED_BYTE, ETextureFormat textureFormat = ETextureFormat::RGBA) const { return nullptr; }
 	virtual void SetMatetrial(jMaterialData* materialData, const jShader* shader, int32 baseBindingIndex = 0) const {}
 	virtual void EnableCullFace(bool enable) const {}
+	virtual void SetFrontFace(EFrontFace frontFace) const {}
 	virtual jRenderTarget* CreateRenderTarget(const jRenderTargetInfo& info) const { return nullptr; }
 	virtual void EnableDepthTest(bool enable) const {}
 	virtual void EnableBlend(bool enable) const {}
