@@ -52,6 +52,13 @@ namespace jCameraUtil
 class jCamera
 {
 public:
+	enum ECameraType
+	{
+		NORMAL = 0,
+		ORTHO,
+		MAX
+	};
+
 	static std::map<int32, jCamera*> CameraMap;
 	static void AddCamera(int32 id, jCamera* camera)
 	{
@@ -66,27 +73,32 @@ public:
 	{
 		return GetCamera(0);
 	}
-	static jCamera* CreateCamera(const Vector& pos, const Vector& target, const Vector& up, float fovRad, float nearDist, float farDist, float width, float height, bool isPerspectiveProjection)
+	static jCamera* CreateCamera(const Vector& pos, const Vector& target, const Vector& up
+		, float fovRad, float nearDist, float farDist, float width, float height, bool isPerspectiveProjection)
+	{
+		jCamera* camera = new jCamera();
+		SetCamera(camera, pos, target, up, fovRad, nearDist, farDist, width, height, isPerspectiveProjection);
+		return camera;
+	}
+	static void SetCamera(jCamera* OutCamera, const Vector& pos, const Vector& target, const Vector& up
+		, float fovRad, float nearDist, float farDist, float width, float height, bool isPerspectiveProjection)
 	{
 		const auto toTarget = (target - pos);
 		const auto toUp = (up - pos);
 		const auto toRight = toTarget.CrossProduct(toUp);
-		
-		jCamera* camera = new jCamera();
 
-		camera->Pos = pos;
-		camera->Up = toRight.CrossProduct(toTarget).GetNormalize();
-		camera->Target = camera->Up.CrossProduct(toRight).GetNormalize();
-		camera->Up += camera->Pos;
-		camera->Target += camera->Pos;
-		
-		camera->FOVRad = fovRad;
-		camera->Near = nearDist;
-		camera->Far = farDist;
-		camera->Width = static_cast<int32>(width);
-		camera->Height = static_cast<int32>(height);
-		camera->IsPerspectiveProjection = isPerspectiveProjection;
-		return camera;
+		OutCamera->Pos = pos;
+		OutCamera->Up = toRight.CrossProduct(toTarget).GetNormalize();
+		OutCamera->Target = OutCamera->Up.CrossProduct(toRight).GetNormalize();
+		OutCamera->Up += OutCamera->Pos;
+		OutCamera->Target += OutCamera->Pos;
+
+		OutCamera->FOVRad = fovRad;
+		OutCamera->Near = nearDist;
+		OutCamera->Far = farDist;
+		OutCamera->Width = static_cast<int32>(width);
+		OutCamera->Height = static_cast<int32>(height);
+		OutCamera->IsPerspectiveProjection = isPerspectiveProjection;
 	}
 
 	jCamera();
@@ -210,6 +222,8 @@ public:
 
 	int32 GetNumOfLight() const;
 
+	ECameraType Type;
+
 	Vector Pos;
 	Vector Target;
 	Vector Up;
@@ -241,29 +255,40 @@ public:
 class jOrthographicCamera : public jCamera 
 {
 public:
-	static jCamera* CreateCamera(const Vector& pos, const Vector& target, const Vector& up, float minX, float minY, float maxX, float maxY, float farDist, float nearDist)
+	static jOrthographicCamera* CreateCamera(const Vector& pos, const Vector& target, const Vector& up
+		, float minX, float minY, float maxX, float maxY, float farDist, float nearDist)
+	{
+		jOrthographicCamera* camera = new jOrthographicCamera();
+		SetCamera(camera, pos, target, up, minX, minY, maxX, maxY, farDist, nearDist);
+		return camera;
+	}
+
+	static void SetCamera(jOrthographicCamera* OutCamera, const Vector& pos, const Vector& target, const Vector& up
+		, float minX, float minY, float maxX, float maxY, float farDist, float nearDist)
 	{
 		const auto toTarget = (target - pos);
 		const auto toUp = (up - pos);
 		const auto toRight = toTarget.CrossProduct(toUp);
 
-		jOrthographicCamera* camera = new jOrthographicCamera();
+		OutCamera->Pos = pos;
+		OutCamera->Up = toRight.CrossProduct(toTarget).GetNormalize();
+		OutCamera->Target = OutCamera->Up.CrossProduct(toRight).GetNormalize();
+		OutCamera->Up += OutCamera->Pos;
+		OutCamera->Target += OutCamera->Pos;
 
-		camera->Pos = pos;
-		camera->Up = toRight.CrossProduct(toTarget).GetNormalize();
-		camera->Target = camera->Up.CrossProduct(toRight).GetNormalize();
-		camera->Up += camera->Pos;
-		camera->Target += camera->Pos;
+		OutCamera->Near = nearDist;
+		OutCamera->Far = farDist;
+		OutCamera->IsPerspectiveProjection = false;
 
-		camera->Near = nearDist;
-		camera->Far = farDist;
-		camera->IsPerspectiveProjection = false;
-		
-		camera->MinX = minX;
-		camera->MinY = minY;
-		camera->MaxX = maxX;
-		camera->MaxY = maxY;
-		return camera;
+		OutCamera->MinX = minX;
+		OutCamera->MinY = minY;
+		OutCamera->MaxX = maxX;
+		OutCamera->MaxY = maxY;
+	}
+
+	jOrthographicCamera()
+	{
+		Type = ECameraType::ORTHO;
 	}
 
 	virtual Matrix CreateProjection() const;

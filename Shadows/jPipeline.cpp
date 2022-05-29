@@ -403,7 +403,9 @@ void jForward_ShadowMapGen_CSM_SSM_Pipeline::Do(const jPipelineContext& pipeline
 			// Get position of the shadow camera
 			Vector shadowCameraPos = frustumCenter - directionalLight->Data.Direction.GetNormalize() * fabs(mins.z);
 
-			auto shadowCamera = jOrthographicCamera::CreateCamera(shadowCameraPos, frustumCenter, shadowCameraPos + upDir
+			static auto shadowCamera = jOrthographicCamera::CreateCamera(shadowCameraPos, frustumCenter, shadowCameraPos + upDir
+				, mins.x, mins.y, maxes.x, maxes.y, cascadeExtents.z, 1.0f);
+			jOrthographicCamera::SetCamera(shadowCamera, shadowCameraPos, frustumCenter, shadowCameraPos + upDir
 				, mins.x, mins.y, maxes.x, maxes.y, cascadeExtents.z, 1.0f);
 			shadowCamera->UpdateCamera();
 

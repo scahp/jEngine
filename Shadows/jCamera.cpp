@@ -8,6 +8,7 @@ std::map<int32, jCamera*> jCamera::CameraMap;
 //////////////////////////////////////////////////////////////////////////
 // jCamera
 jCamera::jCamera()
+ : Type(ECameraType::NORMAL)
 {
 }
 
