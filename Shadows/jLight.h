@@ -130,6 +130,7 @@ public:
 
 	const ELightType Type = ELightType::MAX;
 	jObject* LightDebugObject = nullptr;
+	std::vector<jViewport> Viewports;
 };
 
 class jAmbientLight : public jLight
@@ -156,15 +157,6 @@ public:
 		: jLight(ELightType::DIRECTIONAL)
 	{
 		LightDataUniformBlock = g_rhi->CreateUniformBufferBlock("DirectionalLightBlock");
-
-        char szTemp[128] = { 0 };
-        for (int32 i = 0; i < NUM_CASCADES; ++i)
-        {
-            sprintf_s(szTemp, sizeof(szTemp), "CascadeLightVP[%d]", i);
-            CascadeLightVP[i].Name = szTemp;
-            sprintf_s(szTemp, sizeof(szTemp), "CascadeEndsW[%d]", i);
-            CascadeEndsW[i].Name = szTemp;
-        }
 	}
 	virtual ~jDirectionalLight()
 	{
@@ -216,15 +208,27 @@ public:
 	jMaterialData MaterialData;
 	bool DirtyMaterialData = true;
 	void UpdateMaterialData();
-
-    jUniformBuffer<Matrix> CascadeLightVP[NUM_CASCADES];
-    jUniformBuffer<float> CascadeEndsW[NUM_CASCADES];
 };
 
 class jCascadeDirectionalLight : public jDirectionalLight
 {
 public:
+	jCascadeDirectionalLight()
+	{
+		char szTemp[128] = { 0 };
+		for (int32 i = 0; i < NUM_CASCADES; ++i)
+		{
+			sprintf_s(szTemp, sizeof(szTemp), "CascadeLightVP[%d]", i);
+			CascadeLightVP[i].Name = szTemp;
+			sprintf_s(szTemp, sizeof(szTemp), "CascadeEndsW[%d]", i);
+			CascadeEndsW[i].Name = szTemp;
+		}
+	}
 	virtual void RenderToShadowMap(const RenderToShadowMapFunc& func, const jShader* shader) const override;
+	virtual void Update(float deltaTime) override;
+
+	jUniformBuffer<Matrix> CascadeLightVP[NUM_CASCADES];
+	jUniformBuffer<float> CascadeEndsW[NUM_CASCADES];
 };
 
 class jPointLight : public jLight
@@ -234,6 +238,13 @@ public:
 		: jLight(ELightType::POINT) 
 	{
 		LightDataUniformBlock = g_rhi->CreateUniformBufferBlock("PointLightBlock");
+		
+		char szTemp[128] = { 0, };
+		for (int i = 0; i < 6; ++i)
+		{
+			sprintf_s(szTemp, sizeof(szTemp), "OmniShadowMapVP[%d]", i);
+			OmniShadowMapVP[i].Name = szTemp;
+		}
 	}
 
 	virtual ~jPointLight()
@@ -285,6 +296,8 @@ public:
 	jMaterialData MaterialData;
 	bool DirtyMaterialData = true;
 	void UpdateMaterialData();
+
+	jUniformBuffer<Matrix> OmniShadowMapVP[6];
 };
 
 class jSpotLight : public jLight
@@ -294,6 +307,13 @@ public:
 		: jLight(ELightType::SPOT)
 	{
 		LightDataUniformBlock = g_rhi->CreateUniformBufferBlock("SpotLightBlock");
+
+		char szTemp[128] = { 0, };
+		for (int i = 0; i < 6; ++i)
+		{
+			sprintf_s(szTemp, sizeof(szTemp), "OmniShadowMapVP[%d]", i);
+			OmniShadowMapVP[i].Name = szTemp;
+		}
 	}
 
 	virtual ~jSpotLight()
@@ -349,4 +369,6 @@ public:
 	jMaterialData MaterialData;
 	bool DirtyMaterialData = true;
 	void UpdateMaterialData();
+
+	jUniformBuffer<Matrix> OmniShadowMapVP[6];
 };
