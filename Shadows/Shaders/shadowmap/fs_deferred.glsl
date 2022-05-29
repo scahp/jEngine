@@ -36,7 +36,7 @@ uniform vec3 Eye;
 uniform int Collided;
 
 #if defined(USE_TEXTURE)
-uniform sampler2D tex_object2;
+uniform sampler2D DiffuseSampler;
 uniform int TextureSRGB[1];
 #endif // USE_TEXTURE
 
@@ -83,13 +83,13 @@ void main()
 		if (TextureSRGB[0] > 0)
 		{
 			// from sRGB to Linear color
-			vec4 tempColor = texture(tex_object2, TexCoord_);
+			vec4 tempColor = texture(DiffuseSampler, TexCoord_);
 			diffuse.xyz *= pow(tempColor.xyz, vec3(2.2));
 			diffuse.w *= tempColor.w;
 		}
 		else
 		{
-			diffuse *= texture(tex_object2, TexCoord_);
+			diffuse *= texture(DiffuseSampler, TexCoord_);
 		}
 	}
 	else

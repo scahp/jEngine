@@ -542,6 +542,7 @@ void jPointLight::UpdateMaterialData()
 		return;
 	DirtyMaterialData = false;
 
+	MaterialData.Params.clear();
 	{
 		auto materialParam = new jMaterialParam();
 		materialParam->Name = "shadow_object_point_shadow";
@@ -690,6 +691,7 @@ void jSpotLight::UpdateMaterialData()
 		return;
 	DirtyMaterialData = false;
 
+	MaterialData.Params.clear();
 	{
 		auto materialParam = new jMaterialParam();
 		materialParam->Name = "shadow_object_spot_shadow";

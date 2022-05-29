@@ -288,7 +288,6 @@ void jGame::UpdateAppSetting()
 			changedDirectionalLight = true;
 		}
 	}
-
 	((jDirectionalLightPrimitive*)(DirectionalLightInfo))->Light = DirectionalLight;
 
 	if (changedDirectionalLight)
@@ -298,6 +297,8 @@ void jGame::UpdateAppSetting()
 		DirectionalLightShadowMapUIDebug->SetTexture(DirectionalLight->ShadowMapData->ShadowMapRenderTarget->GetTexture());
 		DirectionalLightShadowMapUIDebug->Size.y = DirectionalLightShadowMapUIDebug->Size.x * aspect;
 	}
+
+	bool isChangedShadowMode = false;
 
 	const bool isChangedShadowType = CurrentShadowType != appSetting.ShadowType;
 	const bool isChangedShadowMapType = (CurrentShadowMapType != appSetting.ShadowMapType);
@@ -312,6 +313,7 @@ void jGame::UpdateAppSetting()
 			appSetting.ShowSpotLightInfo = false;
 
 			SpawnObjects(ESpawnedType::Hair);
+			isChangedShadowMode = true;
 		}
 		else
 		{
@@ -327,6 +329,7 @@ void jGame::UpdateAppSetting()
 				CurrentShadowMapType = appSetting.ShadowMapType;
 				auto newPipelineSet = UsePoissonSample ? ShadowPoissonSamplePipelineSetMap[CurrentShadowMapType] : ShadowPipelineSetMap[CurrentShadowMapType];
 				Renderer->SetChangePipelineSet(newPipelineSet);
+				isChangedShadowMode = true;
 			}
 
 			if (appSetting.ShadowMapType == EShadowMapType::CSM_SSM)
@@ -347,10 +350,23 @@ void jGame::UpdateAppSetting()
 		{
 			CurrentShadowType = appSetting.ShadowType;
 			Renderer->SetChangePipelineSet(ShadowVolumePipelineSet);
+			isChangedShadowMode = true;
 		}
 
 		SpawnObjects(ESpawnedType::TestPrimitive);
 		MainCamera->IsInfinityFar = true;
+	}
+
+	if (isChangedShadowMode)
+	{
+		for (int32 i = 0; i < MainCamera->GetNumOfLight(); ++i)
+		{
+			jLight* light = MainCamera->GetLight(i);
+			if (light)
+			{
+				light->DirtyMaterialData = true;
+			}
+		}
 	}
 
 	if (isChangedShadowType)

@@ -131,6 +131,7 @@ public:
 	const ELightType Type = ELightType::MAX;
 	jObject* LightDebugObject = nullptr;
 	std::vector<jViewport> Viewports;
+	bool DirtyMaterialData = true;
 };
 
 class jAmbientLight : public jLight
@@ -206,7 +207,6 @@ public:
 	virtual void Update(float deltaTime) override;
 
 	jMaterialData MaterialData;
-	bool DirtyMaterialData = true;
 	void UpdateMaterialData();
 };
 
@@ -295,7 +295,6 @@ public:
 	virtual void Update(float deltaTime) override;
 
 	jMaterialData MaterialData;
-	bool DirtyMaterialData = true;
 	void UpdateMaterialData();
 
 	jUniformBuffer<Matrix> OmniShadowMapVP[6];
@@ -368,7 +367,6 @@ public:
 	virtual void Update(float deltaTime) override;
 
 	jMaterialData MaterialData;
-	bool DirtyMaterialData = true;
 	void UpdateMaterialData();
 
 	jUniformBuffer<Matrix> OmniShadowMapVP[6];

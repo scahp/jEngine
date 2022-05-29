@@ -72,8 +72,15 @@ void jMeshObject::DrawSubMesh(int32 meshIndex, const jCamera* camera, const jSha
 	{
 		//SCOPE_PROFILE(jMeshObject_DrawSubMesh_SetMaterialUniform);
 
-		if (subMesh.MaterialData.Params.empty())
-			subMesh.MaterialData.Params.resize((int32)jMeshMaterial::EMaterialTextureType::Max);
+		//if (subMesh.MaterialData.Params.empty())
+		//	subMesh.MaterialData.Params.resize((int32)jMeshMaterial::EMaterialTextureType::Max);
+
+		bool UseOpacitySampler = false;
+		bool UseDisplacementSampler = false;
+		bool UseAmbientSampler = false;
+		bool UseNormalSampler = false;
+
+		subMesh.MaterialData.Params.clear();
 
 		auto it_find = MeshData->Materials.find(subMesh.MaterialIndex);
 		if (MeshData->Materials.end() != it_find)
@@ -89,10 +96,24 @@ void jMeshObject::DrawSubMesh(int32 meshIndex, const jCamera* camera, const jSha
 					continue;
 
 				jMaterialData& materialData = subMesh.MaterialData;
-				if (!materialData.Params[i])
+
+				const jSamplerState* pSamplerState = jSamplerStatePool::GetSamplerState("LinearWrapMipmap").get();
+				materialData.Params.push_back(jRenderObject::CreateMaterialParam(jMeshMaterial::MaterialTextureTypeString[i], pTexture, pSamplerState));
+
+				switch ((jMeshMaterial::EMaterialTextureType)i)
 				{
-					const jSamplerState* pSamplerState = jSamplerStatePool::GetSamplerState("LinearWrapMipmap").get();
-					materialData.Params[i] = jRenderObject::CreateMaterialParam(jMeshMaterial::MaterialTextureTypeString[i], pTexture, pSamplerState);
+				case jMeshMaterial::EMaterialTextureType::OpacitySampler:
+					UseOpacitySampler = true;
+					break;
+				case jMeshMaterial::EMaterialTextureType::DisplacementSampler:
+					UseDisplacementSampler = true;
+					break;
+				case jMeshMaterial::EMaterialTextureType::AmbientSampler:
+					UseAmbientSampler = true;
+					break;
+				case jMeshMaterial::EMaterialTextureType::NormalSampler:
+					UseNormalSampler = true;
+					break;
 				}
 			}
 			SetMaterialUniform(shader, it_find->second);
@@ -102,16 +123,9 @@ void jMeshObject::DrawSubMesh(int32 meshIndex, const jCamera* camera, const jSha
 			SetMaterialUniform(shader, &NullMeshMateral);
 		}
 
-		const bool UseOpacitySampler = (nullptr != subMesh.MaterialData.Params[(int32)jMeshMaterial::EMaterialTextureType::OpacitySampler]);
 		shader->SetUniformbuffer("UseOpacitySampler", UseOpacitySampler);
-
-		const bool UseDisplacementSampler = (nullptr != subMesh.MaterialData.Params[(int32)jMeshMaterial::EMaterialTextureType::DisplacementSampler]);
 		shader->SetUniformbuffer("UseDisplacementSampler", UseDisplacementSampler);
-
-		const bool UseAmbientSampler = (nullptr != subMesh.MaterialData.Params[(int32)jMeshMaterial::EMaterialTextureType::AmbientSampler]);
 		shader->SetUniformbuffer("UseAmbientSampler", UseAmbientSampler);
-
-		const bool UseNormalSampler = (nullptr != subMesh.MaterialData.Params[(int32)jMeshMaterial::EMaterialTextureType::NormalSampler]);
 		shader->SetUniformbuffer("UseNormalSampler", UseNormalSampler);
 	}
 
