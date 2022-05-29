@@ -63,6 +63,8 @@ public:
 		return NewParam;
 	}
 	jMaterialData MaterialData;
+    std::vector<const jMaterialData*> DynamicMaterialData;
+
 	jTexture* tex_object_array = nullptr;
 	jSamplerState* samplerStateTexArray = nullptr;
 

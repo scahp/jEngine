@@ -425,7 +425,6 @@ public:
 	virtual bool SetUniformbuffer(const char* name, const Vector2i& InData, const jShader* InShader) const { return false; }
 	virtual bool SetUniformbuffer(const char* name, const Vector3i& InData, const jShader* InShader) const { return false; }
 	virtual bool SetUniformbuffer(const char* name, const Vector4i& InData, const jShader* InShader) const { return false; }
-	virtual bool SetUniformbuffer(const IUniformBuffer* buffer, const jShader* shader) const { return false; }
 	virtual bool GetUniformbuffer(void* outResult, const IUniformBuffer* buffer, const jShader* shader) const { return false; }
 	virtual bool GetUniformbuffer(void* outResult, EUniformType type, const char* name, const jShader* shader) const { return false; }
 	virtual jTexture* CreateNullTexture() const { return nullptr; }
@@ -486,7 +485,7 @@ public:
 {\
 	static jUniformBuffer<Type> temp(Name, CurrentData);\
 	temp.Data = CurrentData;\
-	g_rhi->SetUniformbuffer(&temp, Shader);\
+	temp.SetUniformbuffer(Shader);\
 }
 
 // Not thread safe
@@ -523,8 +522,8 @@ template <> struct jUniformBuffer<DataType> : public IUniformBuffer\
 		: IUniformBuffer(name), Data(data)\
 	{}\
 	static constexpr EUniformType Type = EnumType;\
-	virtual EUniformType GetType() const { return Type; }\
-	virtual void SetUniformbuffer(const jShader* InShader) const { g_rhi->SetUniformbuffer(Name.c_str(), Data, InShader); }\
+	FORCEINLINE virtual EUniformType GetType() const { return Type; }\
+	FORCEINLINE virtual void SetUniformbuffer(const jShader* InShader) const { g_rhi->SetUniformbuffer(Name.c_str(), Data, InShader); }\
 	DataType Data;\
 };
 

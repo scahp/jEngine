@@ -82,7 +82,7 @@ void jRenderObject::Draw(const jCamera* camera, const jShader* shader, const std
 	else
 		g_rhi->EnableCullFace(!IsTwoSided);
 
-	std::vector<const jMaterialData*> DynamicMaterialData;
+	DynamicMaterialData.clear();
 
 	SetRenderProperty(shader);
 	SetCameraProperty(shader, camera);

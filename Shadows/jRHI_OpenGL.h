@@ -210,7 +210,6 @@ public:
 	virtual bool SetUniformbuffer(const char* name, const Vector2i& InData, const jShader* InShader) const override;
 	virtual bool SetUniformbuffer(const char* name, const Vector3i& InData, const jShader* InShader) const override;
 	virtual bool SetUniformbuffer(const char* name, const Vector4i& InData, const jShader* InShader) const override;
-	virtual bool SetUniformbuffer(const IUniformBuffer* buffer, const jShader* shader) const override;
 	virtual bool GetUniformbuffer(void* outResult, const IUniformBuffer* buffer, const jShader* shader) const override;
 	virtual bool GetUniformbuffer(void* outResult, EUniformType type, const char* name, const jShader* shader) const override;
 	virtual int32 SetMatetrial(const jMaterialData* materialData, const jShader* shader, int32 baseBindingIndex = 0) const override;

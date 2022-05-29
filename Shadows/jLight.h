@@ -156,6 +156,15 @@ public:
 		: jLight(ELightType::DIRECTIONAL)
 	{
 		LightDataUniformBlock = g_rhi->CreateUniformBufferBlock("DirectionalLightBlock");
+
+        char szTemp[128] = { 0 };
+        for (int32 i = 0; i < NUM_CASCADES; ++i)
+        {
+            sprintf_s(szTemp, sizeof(szTemp), "CascadeLightVP[%d]", i);
+            CascadeLightVP[i].Name = szTemp;
+            sprintf_s(szTemp, sizeof(szTemp), "CascadeEndsW[%d]", i);
+            CascadeEndsW[i].Name = szTemp;
+        }
 	}
 	virtual ~jDirectionalLight()
 	{
@@ -207,6 +216,9 @@ public:
 	jMaterialData MaterialData;
 	bool DirtyMaterialData = true;
 	void UpdateMaterialData();
+
+    jUniformBuffer<Matrix> CascadeLightVP[NUM_CASCADES];
+    jUniformBuffer<float> CascadeEndsW[NUM_CASCADES];
 };
 
 class jCascadeDirectionalLight : public jDirectionalLight

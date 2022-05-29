@@ -1565,12 +1565,6 @@ bool jRHI_OpenGL::SetUniformbuffer(const char* name, const Vector4i& InData, con
 	return true;
 }
 
-bool jRHI_OpenGL::SetUniformbuffer(const IUniformBuffer* buffer, const jShader* shader) const
-{
-	buffer->SetUniformbuffer(shader);
-	return true;
-}
-
 bool jRHI_OpenGL::GetUniformbuffer(void* outResult, const IUniformBuffer* buffer, const jShader* shader) const
 {
 	JASSERT(buffer);
