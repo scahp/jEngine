@@ -35,6 +35,9 @@ struct jIndexBuffer_OpenGL : public jIndexBuffer
 struct jShader_OpenGL : public jShader
 {
 	unsigned int program = 0;
+
+	int32 TryGetUniformLocation(const char* name) const;
+	mutable std::unordered_map<size_t, int32> UniformNameMap;		// <string hash, location>
 };
 
 struct jTexture_OpenGL : public jTexture
@@ -52,10 +55,10 @@ struct jRenderTarget_OpenGL : public jRenderTarget
 	uint32 mrt_rbo = 0;
 	std::vector<uint32> mrt_drawBuffers;
 
-	virtual void SetTextureDetph(jTexture* depthTexture, EDepthBufferType depthBufferType, int index = 0) override;
-
 	virtual bool Begin(int index = 0, bool mrt = false) const override;
 	virtual void End() const override;
+	virtual bool SetDepthAttachment(const std::shared_ptr<jTexture>& InDepth) override;
+	virtual void SetDepthMipLevel(int32 InLevel) override;
 };
 
 struct jUniformBufferBlock_OpenGL : public IUniformBufferBlock
@@ -194,13 +197,23 @@ public:
 	virtual void ReleaseShader(jShader* shader) const override;
 	virtual jTexture* CreateNullTexture() const override;
 	virtual jTexture* CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
-		, EFormatType dataType = EFormatType::UNSIGNED_BYTE, ETextureFormat textureFormat = ETextureFormat::RGBA) const override;
+		, EFormatType dataType = EFormatType::UNSIGNED_BYTE, ETextureFormat textureFormat = ETextureFormat::RGBA, bool createMipmap = false) const override;
 	virtual jTexture* CreateCubeTextureFromData(std::vector<void*> faces, int32 width, int32 height, bool sRGB
-		, EFormatType dataType = EFormatType::UNSIGNED_BYTE, ETextureFormat textureFormat = ETextureFormat::RGBA) const override;
+		, EFormatType dataType = EFormatType::UNSIGNED_BYTE, ETextureFormat textureFormat = ETextureFormat::RGBA, bool createMipmap = false) const override;
+	virtual bool SetUniformbuffer(const char* name, const Matrix& InData, const jShader* InShader) const override;
+	virtual bool SetUniformbuffer(const char* name, const int InData, const jShader* InShader) const override;
+	virtual bool SetUniformbuffer(const char* name, const uint32 InData, const jShader* InShader) const override;
+	virtual bool SetUniformbuffer(const char* name, const float InData, const jShader* InShader) const override;
+	virtual bool SetUniformbuffer(const char* name, const Vector2& InData, const jShader* InShader) const override;
+	virtual bool SetUniformbuffer(const char* name, const Vector& InData, const jShader* InShader) const override;
+	virtual bool SetUniformbuffer(const char* name, const Vector4& InData, const jShader* InShader) const override;
+	virtual bool SetUniformbuffer(const char* name, const Vector2i& InData, const jShader* InShader) const override;
+	virtual bool SetUniformbuffer(const char* name, const Vector3i& InData, const jShader* InShader) const override;
+	virtual bool SetUniformbuffer(const char* name, const Vector4i& InData, const jShader* InShader) const override;
 	virtual bool SetUniformbuffer(const IUniformBuffer* buffer, const jShader* shader) const override;
 	virtual bool GetUniformbuffer(void* outResult, const IUniformBuffer* buffer, const jShader* shader) const override;
 	virtual bool GetUniformbuffer(void* outResult, EUniformType type, const char* name, const jShader* shader) const override;
-	virtual void SetMatetrial(jMaterialData* materialData, const jShader* shader, int32 baseBindingIndex = 0) const override;
+	virtual int32 SetMatetrial(const jMaterialData* materialData, const jShader* shader, int32 baseBindingIndex = 0) const override;
 	virtual void SetTexture(int32 index, const jTexture* texture) const override;
 	virtual void SetTextureFilter(ETextureType type, ETextureFilterTarget target, ETextureFilter filter) const override;
 	virtual void EnableCullFace(bool enable) const override;
@@ -257,5 +270,8 @@ public:
 	virtual void SetTextureMipmapLevelLimit(ETextureType type, int32 baseLevel, int32 maxLevel) const override;
 	virtual void EnableMultisample(bool enable) const override;
 	virtual void SetCubeMapSeamless(bool enable) const override;
+	
+	//////////////////////////////////////////////////////////////////////////
+	uint32 GetUniformLocation(uint32 InProgram, const char* name) const;
 };
 

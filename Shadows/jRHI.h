@@ -32,9 +32,16 @@ struct jIndexBuffer : public IBuffer
 
 struct jTexture
 {
+	static int32 GetMipLevels(int32 InWidth, int32 InHeight)
+	{
+		return 1 + (int32)floorf(log2f(fmaxf((float)InWidth, (float)InHeight)));
+	}
 	bool sRGB = false;
 	ETextureType Type = ETextureType::MAX;
-	ETextureFormat Format = ETextureFormat::MAX;
+	ETextureFormat ColorBufferType = ETextureFormat::RGB;
+	EFormatType ColorPixelType = EFormatType::BYTE;
+	EDepthBufferType DepthBufferType = EDepthBufferType::NONE;
+
 	int32 Width = 0;
 	int32 Height = 0;
 
@@ -93,7 +100,7 @@ struct IUniformBuffer : public IBuffer
 
 	virtual const char* GetName() const { return Name.c_str(); }
 	virtual EUniformType GetType() const { return EUniformType::NONE; }
-
+	virtual void SetUniformbuffer(const jShader* /*InShader*/) const {}
 	virtual void Bind(const jShader* shader) const override;
 };
 
@@ -102,42 +109,6 @@ struct jUniformBuffer : public IUniformBuffer
 {
 	T Data;
 };
-
-#define DECLARE_UNIFORMBUFFER(EnumType, DataType) \
-template <> struct jUniformBuffer<DataType> : public IUniformBuffer\
-{\
-	jUniformBuffer() = default;\
-	jUniformBuffer(const std::string& name, const DataType& data)\
-		: IUniformBuffer(name), Data(data)\
-	{}\
-	static constexpr EUniformType Type = EnumType;\
-	virtual EUniformType GetType() const { return Type; }\
-	DataType Data;\
-};
-
-DECLARE_UNIFORMBUFFER(EUniformType::MATRIX, Matrix);
-DECLARE_UNIFORMBUFFER(EUniformType::BOOL, bool);
-DECLARE_UNIFORMBUFFER(EUniformType::INT, int);
-DECLARE_UNIFORMBUFFER(EUniformType::FLOAT, float);
-DECLARE_UNIFORMBUFFER(EUniformType::VECTOR2, Vector2);
-DECLARE_UNIFORMBUFFER(EUniformType::VECTOR3, Vector);
-DECLARE_UNIFORMBUFFER(EUniformType::VECTOR4, Vector4);
-DECLARE_UNIFORMBUFFER(EUniformType::VECTOR2I, Vector2i);
-DECLARE_UNIFORMBUFFER(EUniformType::VECTOR3I, Vector3i);
-DECLARE_UNIFORMBUFFER(EUniformType::VECTOR4I, Vector4i);
-
-//template <>
-//struct jUniformBuffer<Matrix> : public IUniformBuffer
-//{
-//	jUniformBuffer<Matrix>() = default;
-//	jUniformBuffer<Matrix>(const std::string& name, const Matrix& data)
-//		: IUniformBuffer(name), Data(data)
-//	{}
-//
-//	static constexpr EUniformType Type = EUniformType::MATRIX;
-//	virtual EUniformType GetType() const { return Type; }
-//	Matrix Data;
-//};
 
 static int32 GetBindPoint()
 {
@@ -258,6 +229,10 @@ struct jMaterialData
 			delete iter;
 		Params.clear();
 	}
+
+	static jMaterialParam* CreateMaterialParam(const char* name, jTexture* texture, jSamplerState* samplerstate = nullptr);
+	void AddMaterialParam(const char* name, jTexture* texture, jSamplerState* samplerstate = nullptr);
+
 	std::vector<jMaterialParam*> Params;
 };
 
@@ -275,10 +250,10 @@ struct jRenderTargetInfo
 	jRenderTargetInfo() = default;
 	jRenderTargetInfo(ETextureType textureType, ETextureFormat internalFormat, ETextureFormat format, EFormatType formatType, EDepthBufferType depthBufferType
 		, int32 width, int32 height, int32 textureCount = 1, ETextureFilter magnification = ETextureFilter::LINEAR
-		, ETextureFilter minification = ETextureFilter::LINEAR, bool isGenerateMipmapDepth = false, int32 sampleCount = 1)
+		, ETextureFilter minification = ETextureFilter::LINEAR, bool isGenerateMipmap = false, bool isGenerateMipmapDepth = false, int32 sampleCount = 1)
 		: TextureType(textureType), InternalFormat(internalFormat), Format(format), FormatType(formatType), DepthBufferType(depthBufferType)
-		, Width(width), Height(height), TextureCount(textureCount), Magnification(magnification), Minification(minification), IsGenerateMipmapDepth(isGenerateMipmapDepth)
-		, SampleCount(sampleCount)
+		, Width(width), Height(height), TextureCount(textureCount), Magnification(magnification), Minification(minification), IsGenerateMipmap(isGenerateMipmap)
+		, IsGenerateMipmapDepth(isGenerateMipmapDepth), SampleCount(sampleCount)
 	{}
 
 	size_t GetHash() const
@@ -288,10 +263,13 @@ struct jRenderTargetInfo
 		hash_combine(result, InternalFormat);
 		hash_combine(result, Format);
 		hash_combine(result, FormatType);
+		hash_combine(result, DepthBufferType);
 		hash_combine(result, Width);
 		hash_combine(result, Height);
-		hash_combine(result, Height);
 		hash_combine(result, TextureCount);
+		hash_combine(result, Magnification);
+		hash_combine(result, Minification);
+		hash_combine(result, IsGenerateMipmap);
 		hash_combine(result, IsGenerateMipmapDepth);
 		hash_combine(result, SampleCount);
 		return result;
@@ -307,6 +285,7 @@ struct jRenderTargetInfo
 	int32 TextureCount = 1;
 	ETextureFilter Magnification = ETextureFilter::LINEAR;
 	ETextureFilter Minification = ETextureFilter::LINEAR;
+	bool IsGenerateMipmap = false;
 	bool IsGenerateMipmapDepth = false;
 	int32 SampleCount = 1;
 };
@@ -315,23 +294,18 @@ struct jRenderTarget : public std::enable_shared_from_this<jRenderTarget>
 {
 	virtual ~jRenderTarget() {}
 
-	virtual jTexture* GetTexture(int32 index = 0) const { return Textures[index]; }
-	virtual jTexture* GetTextureDepth(int32 index = 0) const { return TextureDepth; }
+	virtual jTexture* GetTexture(int32 index = 0) const { return Textures[index].get(); }
+	virtual jTexture* GetTextureDepth(int32 index = 0) const { return TextureDepth.get(); }
 	virtual ETextureType GetTextureType() const { return Info.TextureType; }
-
-	virtual void SetTextureDetph(jTexture* depthTexture, EDepthBufferType depthBufferType, int index = 0) {}
+	virtual bool SetDepthAttachment(const std::shared_ptr<jTexture>& InDepth) { TextureDepth = InDepth; return true; }
+	virtual void SetDepthMipLevel(int32 InLevel) {}
 
 	virtual bool Begin(int index = 0, bool mrt = false) const { return true; };
 	virtual void End() const {}
 
-	FORCEINLINE bool IsBinding() const { return Binding; }
-
 	jRenderTargetInfo Info;
-	std::vector<jTexture*> Textures;
-	jTexture* TextureDepth = nullptr;
-
-private:
-	mutable bool Binding = false;
+	std::vector<std::shared_ptr<jTexture> > Textures;
+	std::shared_ptr<jTexture> TextureDepth;
 };
 
 struct jQueryTime
@@ -440,15 +414,26 @@ public:
 	virtual void SetViewportIndexed(int32 index, float x, float y, float width, float height) const {}
 	virtual void SetViewportIndexed(int32 index, const jViewport& viewport) const {}
 	virtual void SetViewportIndexedArray(int32 startIndex, int32 count, const jViewport* viewports) const {}
+	virtual bool SetUniformbuffer(const char* name, const Matrix& InData, const jShader* InShader) const { return false; }
+	virtual bool SetUniformbuffer(const char* name, const int InData, const jShader* InShader) const { return false; }
+	virtual bool SetUniformbuffer(const char* name, const uint32 InData, const jShader* InShader) const { return false; }
+	FORCEINLINE virtual bool SetUniformbuffer(const char* name, const bool InData, const jShader* InShader) const { return SetUniformbuffer(name, (int32)InData, InShader); }
+	virtual bool SetUniformbuffer(const char* name, const float InData, const jShader* InShader) const { return false; }
+	virtual bool SetUniformbuffer(const char* name, const Vector2& InData, const jShader* InShader) const { return false; }
+	virtual bool SetUniformbuffer(const char* name, const Vector& InData, const jShader* InShader) const { return false; }
+	virtual bool SetUniformbuffer(const char* name, const Vector4& InData, const jShader* InShader) const { return false; }
+	virtual bool SetUniformbuffer(const char* name, const Vector2i& InData, const jShader* InShader) const { return false; }
+	virtual bool SetUniformbuffer(const char* name, const Vector3i& InData, const jShader* InShader) const { return false; }
+	virtual bool SetUniformbuffer(const char* name, const Vector4i& InData, const jShader* InShader) const { return false; }
 	virtual bool SetUniformbuffer(const IUniformBuffer* buffer, const jShader* shader) const { return false; }
 	virtual bool GetUniformbuffer(void* outResult, const IUniformBuffer* buffer, const jShader* shader) const { return false; }
 	virtual bool GetUniformbuffer(void* outResult, EUniformType type, const char* name, const jShader* shader) const { return false; }
 	virtual jTexture* CreateNullTexture() const { return nullptr; }
 	virtual jTexture* CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
-		, EFormatType dataType = EFormatType::UNSIGNED_BYTE, ETextureFormat textureFormat = ETextureFormat::RGBA) const { return nullptr; }
+		, EFormatType dataType = EFormatType::UNSIGNED_BYTE, ETextureFormat textureFormat = ETextureFormat::RGBA, bool createMipmap = false) const { return nullptr; }
 	virtual jTexture* CreateCubeTextureFromData(std::vector<void*> faces, int32 width, int32 height, bool sRGB
-		, EFormatType dataType = EFormatType::UNSIGNED_BYTE, ETextureFormat textureFormat = ETextureFormat::RGBA) const { return nullptr; }
-	virtual void SetMatetrial(jMaterialData* materialData, const jShader* shader, int32 baseBindingIndex = 0) const {}
+		, EFormatType dataType = EFormatType::UNSIGNED_BYTE, ETextureFormat textureFormat = ETextureFormat::RGBA, bool createMipmap = false) const { return nullptr; }
+	virtual int32 SetMatetrial(const jMaterialData* materialData, const jShader* shader, int32 baseBindingIndex = 0) const { return baseBindingIndex; }
 	virtual void EnableCullFace(bool enable) const {}
 	virtual void SetFrontFace(EFrontFace frontFace) const {}
 	virtual void EnableCullMode(ECullMode cullMode) const {}
@@ -528,3 +513,28 @@ struct jScopeDebugEvent final
 	const jRHI* RHI = nullptr;
 };
 #define SCOPE_DEBUG_EVENT(rhi, name) jScopeDebugEvent scope_debug_event(rhi, name);
+
+//////////////////////////////////////////////////////////////////////////
+#define DECLARE_UNIFORMBUFFER(EnumType, DataType) \
+template <> struct jUniformBuffer<DataType> : public IUniformBuffer\
+{\
+	jUniformBuffer() = default;\
+	jUniformBuffer(const std::string& name, const DataType& data)\
+		: IUniformBuffer(name), Data(data)\
+	{}\
+	static constexpr EUniformType Type = EnumType;\
+	virtual EUniformType GetType() const { return Type; }\
+	virtual void SetUniformbuffer(const jShader* InShader) const { g_rhi->SetUniformbuffer(Name.c_str(), Data, InShader); }\
+	DataType Data;\
+};
+
+DECLARE_UNIFORMBUFFER(EUniformType::MATRIX, Matrix);
+DECLARE_UNIFORMBUFFER(EUniformType::BOOL, bool);
+DECLARE_UNIFORMBUFFER(EUniformType::INT, int);
+DECLARE_UNIFORMBUFFER(EUniformType::FLOAT, float);
+DECLARE_UNIFORMBUFFER(EUniformType::VECTOR2, Vector2);
+DECLARE_UNIFORMBUFFER(EUniformType::VECTOR3, Vector);
+DECLARE_UNIFORMBUFFER(EUniformType::VECTOR4, Vector4);
+DECLARE_UNIFORMBUFFER(EUniformType::VECTOR2I, Vector2i);
+DECLARE_UNIFORMBUFFER(EUniformType::VECTOR3I, Vector3i);
+DECLARE_UNIFORMBUFFER(EUniformType::VECTOR4I, Vector4i);

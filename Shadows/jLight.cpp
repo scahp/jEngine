@@ -285,30 +285,7 @@ void jDirectionalLight::GetMaterialData(jMaterialData* OutMaterialData) const
 
 	if (OutMaterialData)
 	{
-		{
-			auto materialParam = new jMaterialParam();
-			materialParam->Name = "shadow_object";
-			materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTextureDepth();
-			materialParam->SamplerState = ShadowMapData->ShadowMapSamplerState.get();
-			OutMaterialData->Params.push_back(materialParam);
-		}
-
-		{
-			auto materialParam = new jMaterialParam();
-			materialParam->Name = "shadow_object_test";
-
-			const auto type = jShadowAppSettingProperties::GetInstance().ShadowMapType;
-			if ((type == EShadowMapType::VSM) || (type == EShadowMapType::ESM) || (type == EShadowMapType::EVSM))
-			{
-				materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTexture();
-			}
-			else
-			{
-				materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTextureDepth();
-			}
-			materialParam->SamplerState = nullptr;
-			OutMaterialData->Params.push_back(materialParam);
-		}
+		OutMaterialData->Params.insert(OutMaterialData->Params.end(), MaterialData.Params.begin(), MaterialData.Params.end());
 	}
 }
 
@@ -347,8 +324,43 @@ void jDirectionalLight::Update(float deltaTime)
 	if (ShadowMapData && ShadowMapData->ShadowMapCamera)
 	{
 		auto camera = ShadowMapData->ShadowMapCamera;
-		jLightUtil::MakeDirectionalLightViewInfoWithPos(camera->Target, camera->Up, camera->Pos, Data.Direction);
+		jLightUtil::MakeDirectionalLightViewInfo(camera->Pos, camera->Target, camera->Up, Data.Direction);
 		camera->UpdateCamera();
+
+		UpdateMaterialData();
+	}
+}
+
+void jDirectionalLight::UpdateMaterialData()
+{
+	if (!DirtyMaterialData)
+		return;
+	DirtyMaterialData = false;
+
+	MaterialData.Params.clear();
+	{
+		auto materialParam = new jMaterialParam();
+		materialParam->Name = "shadow_object";
+		materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTextureDepth();
+		materialParam->SamplerState = ShadowMapData->ShadowMapSamplerState.get();
+		MaterialData.Params.push_back(materialParam);
+	}
+
+	{
+		auto materialParam = new jMaterialParam();
+		materialParam->Name = "shadow_object_test";
+
+		const auto type = jShadowAppSettingProperties::GetInstance().ShadowMapType;
+		if ((type == EShadowMapType::VSM) || (type == EShadowMapType::ESM) || (type == EShadowMapType::EVSM))
+		{
+			materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTexture();
+		}
+		else
+		{
+			materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTextureDepth();
+		}
+		materialParam->SamplerState = nullptr;
+		MaterialData.Params.push_back(materialParam);
 	}
 }
 
@@ -459,29 +471,7 @@ void jPointLight::GetMaterialData(jMaterialData* OutMaterialData) const
 
 	if (OutMaterialData)
 	{
-		{
-			auto materialParam = new jMaterialParam();
-			materialParam->Name = "shadow_object_point_shadow";
-			materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTextureDepth();
-			materialParam->SamplerState = ShadowMapData->ShadowMapSamplerState.get();
-			OutMaterialData->Params.push_back(materialParam);
-		}
-		
-		{
-			auto materialParam = new jMaterialParam();
-			materialParam->Name = "shadow_object_point";
-			const auto type = jShadowAppSettingProperties::GetInstance().ShadowMapType;
-			if ((type == EShadowMapType::VSM) || (type == EShadowMapType::ESM) || (type == EShadowMapType::EVSM))
-			{
-				materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTexture();
-			}
-			else
-			{
-				materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTextureDepth();
-			}
-			materialParam->SamplerState = nullptr;
-			OutMaterialData->Params.push_back(materialParam);
-		}
+		OutMaterialData->Params.insert(OutMaterialData->Params.end(), MaterialData.Params.begin(), MaterialData.Params.end());
 	}
 }
 
@@ -540,6 +530,38 @@ void jPointLight::Update(float deltaTime)
 			currentCamera->Up += offset;
 			currentCamera->UpdateCamera();
 		}
+		UpdateMaterialData();
+	}
+}
+
+void jPointLight::UpdateMaterialData()
+{
+	if (!DirtyMaterialData)
+		return;
+	DirtyMaterialData = false;
+
+	{
+		auto materialParam = new jMaterialParam();
+		materialParam->Name = "shadow_object_point_shadow";
+		materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTextureDepth();
+		materialParam->SamplerState = ShadowMapData->ShadowMapSamplerState.get();
+		MaterialData.Params.push_back(materialParam);
+	}
+
+	{
+		auto materialParam = new jMaterialParam();
+		materialParam->Name = "shadow_object_point";
+		const auto type = jShadowAppSettingProperties::GetInstance().ShadowMapType;
+		if ((type == EShadowMapType::VSM) || (type == EShadowMapType::ESM) || (type == EShadowMapType::EVSM))
+		{
+			materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTexture();
+		}
+		else
+		{
+			materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTextureDepth();
+		}
+		materialParam->SamplerState = nullptr;
+		MaterialData.Params.push_back(materialParam);
 	}
 }
 
@@ -601,29 +623,7 @@ void jSpotLight::GetMaterialData(jMaterialData* OutMaterialData) const
 
 	if (OutMaterialData)
 	{
-		{
-			auto materialParam = new jMaterialParam();
-			materialParam->Name = "shadow_object_spot_shadow";
-			materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTextureDepth();
-			materialParam->SamplerState = ShadowMapData->ShadowMapSamplerState.get();
-			OutMaterialData->Params.push_back(materialParam);
-		}
-
-		{
-			auto materialParam = new jMaterialParam();
-			materialParam->Name = "shadow_object_spot";
-			const auto type = jShadowAppSettingProperties::GetInstance().ShadowMapType;
-			if ((type == EShadowMapType::VSM) || (type == EShadowMapType::ESM) || (type == EShadowMapType::EVSM))
-			{
-				materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTexture();
-			}
-			else
-			{
-				materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTextureDepth();
-			}
-			materialParam->SamplerState = nullptr;
-			OutMaterialData->Params.push_back(materialParam);
-		}
+		OutMaterialData->Params.insert(OutMaterialData->Params.end(), MaterialData.Params.begin(), MaterialData.Params.end());
 	}
 }
 
@@ -680,8 +680,39 @@ void jSpotLight::Update(float deltaTime)
 		currentCamera->Up += offset;
 		currentCamera->UpdateCamera();
 	}
+	UpdateMaterialData();
 }
 
+void jSpotLight::UpdateMaterialData()
+{
+	if (!DirtyMaterialData)
+		return;
+	DirtyMaterialData = false;
+
+	{
+		auto materialParam = new jMaterialParam();
+		materialParam->Name = "shadow_object_spot_shadow";
+		materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTextureDepth();
+		materialParam->SamplerState = ShadowMapData->ShadowMapSamplerState.get();
+		MaterialData.Params.push_back(materialParam);
+	}
+
+	{
+		auto materialParam = new jMaterialParam();
+		materialParam->Name = "shadow_object_spot";
+		const auto type = jShadowAppSettingProperties::GetInstance().ShadowMapType;
+		if ((type == EShadowMapType::VSM) || (type == EShadowMapType::ESM) || (type == EShadowMapType::EVSM))
+		{
+			materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTexture();
+		}
+		else
+		{
+			materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTextureDepth();
+		}
+		materialParam->SamplerState = nullptr;
+		MaterialData.Params.push_back(materialParam);
+	}
+}
 //////////////////////////////////////////////////////////////////////////
 void jAmbientLight::BindLight(const jShader* shader) const
 {

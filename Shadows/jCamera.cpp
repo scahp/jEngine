@@ -25,11 +25,11 @@ Matrix jCamera::CreateProjection() const
 	if (IsPerspectiveProjection)
 	{
 		if (IsInfinityFar)
-			return jCameraUtil::CreatePerspectiveMatrixFarAtInfinity(Width, Height, FOVRad, Near);
-		return jCameraUtil::CreatePerspectiveMatrix(Width, Height, FOVRad, Far, Near);
+			return jCameraUtil::CreatePerspectiveMatrixFarAtInfinity((int32)Width, (int32)Height, FOVRad, Near);
+		return jCameraUtil::CreatePerspectiveMatrix((int32)Width, (int32)Height, FOVRad, Far, Near);
 	}
 
-	return jCameraUtil::CreateOrthogonalMatrix(Width, Height, Far, Near);
+	return jCameraUtil::CreateOrthogonalMatrix((int32)Width, (int32)Height, Far, Near);
 }
 
 void jCamera::BindCamera(const jShader* shader) const

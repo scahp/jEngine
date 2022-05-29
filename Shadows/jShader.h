@@ -49,6 +49,16 @@ info.fsPreProcessor += IsUseMaterial ? "\r\n#define USE_MATERIAL 1" : "";\
 jShaderInfo::AddShaderInfo(info); \
 }
 
+#define DECLARE_SHADER_VS_FS_WITH_DEFINE(Name, VS, FS, AdditionalDifine) \
+{ \
+jShaderInfo info; \
+info.name = Name; \
+info.vs = VS; \
+info.fs = FS; \
+info.vsPreProcessor += "\r\n"AdditionalDifine;\
+info.fsPreProcessor += "\r\n"AdditionalDifine;\
+jShaderInfo::AddShaderInfo(info); \
+}
 
 #define DECLARE_SHADER_VS_FS(Name, VS, FS) DECLARE_SHADER_VS_FS_WITH_OPTION(Name, VS, FS, false, false)
 
@@ -95,6 +105,13 @@ struct jShader : public std::enable_shared_from_this<jShader>
 	static std::shared_ptr<jShader> CreateShaderPtr(const jShaderInfo& shaderInfo);
 	static void UpdateShaders();
 
+	bool SetUniformbuffer(const char* name, const Matrix& InData) const;
+	bool SetUniformbuffer(const char* name, const bool InData) const;
+	bool SetUniformbuffer(const char* name, const float InData) const;
+	bool SetUniformbuffer(const char* name, const int32 InData) const;
+	bool SetUniformbuffer(const char* name, const Vector2& InData) const;
+	bool SetUniformbuffer(const char* name, const Vector& InData) const;
+	bool SetUniformbuffer(const char* name, const Vector4& InData) const;
 	uint64 TimeStamp = 0;
 	jShaderInfo ShaderInfo;
 

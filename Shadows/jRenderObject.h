@@ -19,8 +19,6 @@ enum class EShadingModel : int32
 	HAIR,
 };
 
-static constexpr int32 MAX_TEX = 20;
-
 class jRenderObject
 {
 public:
@@ -37,14 +35,14 @@ public:
 
 	// todo 함수를 줄일까? 아니면 이렇게 쓸까? 고민
 	//void Draw(const jCamera* camera, const jShader* shader, int32 startIndex, int32 count, int32 baseVertexIndex);
-	void DrawBaseVertexIndex(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 startIndex, int32 count, int32 baseVertexIndex, int32 instanceCount = 1);
+	void DrawBaseVertexIndex(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, const jMaterialData& materialData, int32 startIndex, int32 count, int32 baseVertexIndex, int32 instanceCount = 1);
 	
 	void SetRenderProperty(const jShader* shader);
 	void SetCameraProperty(const jShader* shader, const jCamera* camera);
-	void SetMaterialProperty(const jShader* shader, jMaterialData* materialData);
+	void SetMaterialProperty(const jShader* shader, const jMaterialData* materialData, const std::vector<const jMaterialData*>& dynamicMaterialData);
 	void SetLightProperty(const jShader* shader, const jCamera* camera, const std::list<const jLight*>& lights, jMaterialData* materialData);
 	//void SetLightProperty(const jShader* shader, const jLight* light, jMaterialData* materialData);
-	void SetTextureProperty(const jShader* shader, jMaterialData* materialData);
+	void SetTextureProperty(const jShader* shader, const jMaterialData* materialData);
 
 	const std::vector<float>& GetVertices() const;
 
@@ -55,17 +53,18 @@ public:
 
 	std::shared_ptr<jIndexStreamData> IndexStream;
 	jIndexBuffer* IndexBuffer = nullptr;
-
-	const jTexture* tex_object[MAX_TEX] = {};
-	const jSamplerState* samplerState[MAX_TEX] = {};
-
+	static jMaterialParam* CreateMaterialParam(const char* name, const jTexture* texture, const jSamplerState* sampler = nullptr)
+	{
+		JASSERT(name);
+		auto NewParam = new jMaterialParam();
+		NewParam->Name = name;
+		NewParam->Texture = texture;
+		NewParam->SamplerState = sampler;
+		return NewParam;
+	}
+	jMaterialData MaterialData;
 	jTexture* tex_object_array = nullptr;
 	jSamplerState* samplerStateTexArray = nullptr;
-
-	Vector Pos = Vector::ZeroVector;
-	Vector Rot = Vector::ZeroVector;
-	Vector Scale = Vector::OneVector;
-
 
 	// todo 정리 필요.
 	int UseUniformColor = 0;
@@ -80,5 +79,38 @@ public:
 
 	bool IsHiddenBoundBox = false;
 	jBoundBox BoundBox;
+	
+	FORCEINLINE void SetPos(const Vector& InPos) { Pos = InPos; SetDirtyFlags(EDirty::POS); }
+	FORCEINLINE void SetRot(const Vector& InRot) { Rot = InRot; SetDirtyFlags(EDirty::ROT); }
+	FORCEINLINE void SetScale(const Vector& InScale) { Scale = InScale; SetDirtyFlags(EDirty::SCALE); }
+	FORCEINLINE const Vector& GetPos() const { return Pos; }
+	FORCEINLINE const Vector& GetRot() const { return Rot; }
+	FORCEINLINE const Vector& GetScale() const { return Scale; }
+
+private:
+	enum EDirty : int8
+	{
+		NONE	= 0,
+		POS		= 1,
+		ROT		= 1 << 1,
+		SCALE	= 1 << 2,
+		POS_ROT_SCALE = POS | ROT | SCALE,
+	};
+	EDirty DirtyFlags = EDirty::POS_ROT_SCALE;
+	void SetDirtyFlags(EDirty InEnum)
+	{
+		using T = std::underlying_type<EDirty>::type;
+		DirtyFlags = static_cast<EDirty>(static_cast<T>(InEnum) | static_cast<T>(DirtyFlags));
+	}
+	void ClearDirtyFlags(EDirty InEnum)
+	{
+		using T = std::underlying_type<EDirty>::type;
+		DirtyFlags = static_cast<EDirty>(static_cast<T>(InEnum) & (!static_cast<T>(DirtyFlags)));
+	}
+	FORCEINLINE void ClearDirtyFlags() { DirtyFlags = EDirty::NONE; }
+
+	Vector Pos = Vector::ZeroVector;
+	Vector Rot = Vector::ZeroVector;
+	Vector Scale = Vector::OneVector;
 };
 

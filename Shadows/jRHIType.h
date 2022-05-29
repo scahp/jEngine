@@ -139,6 +139,8 @@ enum class ETextureFormat
 	RGBA_INTEGER,
 	RG,
 	R,
+	R_INTEGER,
+	R32UI,
 	RGBA8,
 	RGBA8I,
 	RGBA8UI,
@@ -158,6 +160,7 @@ enum class EFormatType
 	BYTE = 0,
 	UNSIGNED_BYTE,
 	INT,
+	UNSIGNED_INT,
 	HALF,
 	FLOAT,
 };

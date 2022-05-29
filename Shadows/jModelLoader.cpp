@@ -5,6 +5,7 @@
 #include "assimp\cimport.h"
 #include "assimp\postprocess.h"
 #include "assimp\scene.h"
+#include "assimp\Exporter.hpp"
 #include "jMeshObject.h"
 #include "Math\Vector.h"
 #include "jRenderObject.h"
@@ -12,9 +13,9 @@
 #include "jRHI.h"
 
 #if defined _DEBUG
-#pragma comment(lib, "assimp-vc141-mtd.lib")
+#pragma comment(lib, "assimp-vc142-mtd.lib")
 #else
-#pragma comment(lib, "assimp-vc141-mt.lib")
+#pragma comment(lib, "assimp-vc142-mt.lib")
 #endif
 
 jModelLoader* jModelLoader::_instance = nullptr;
@@ -28,10 +29,24 @@ jModelLoader::~jModelLoader()
 {
 }
 
-jMeshObject* jModelLoader::LoadFromFile(const char* filename)
+//bool jModelLoader::ConvertToFBX(const char* destFilename, const char* filename) const
+//{
+//	Assimp::Exporter exporter;
+//	//for (int32 i = 0; i < exporter.GetExportFormatCount(); ++i)
+//	//	const aiExportFormatDesc* format = exporter.GetExportFormatDescription(i);
+//
+//	Assimp::Importer importer;
+//	const aiScene* scene = importer.ReadFile(filename, 0);
+//	aiReturn Ret = exporter.Export(scene, "fbx", destFilename, 0, nullptr);
+//	//aiReleaseImport(scene);
+//
+//	return (Ret == aiReturn_SUCCESS);
+//}
+
+jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materialRootDir)
 {
 	Assimp::Importer importer;
-	const aiScene *scene = importer.ReadFile(filename, aiProcess_Triangulate | aiProcess_FlipUVs);
+	const aiScene *scene = importer.ReadFile(filename, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_CalcTangentSpace);
 
 	if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
 	{
@@ -49,12 +64,24 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename)
 		const aiMesh* assimpMesh = scene->mMeshes[i];
 
 		jSubMesh subMesh;
+		if (assimpMesh->mName.length > 0)
+			subMesh.Name = assimpMesh->mName.C_Str();
 
 		subMesh.StartVertex = static_cast<int32>(meshData->Vertices.size());
 		meshData->Vertices.resize(meshData->Vertices.size() + assimpMesh->mNumVertices);
 		subMesh.EndVertex = static_cast<int32>(meshData->Vertices.size());
 
 		memcpy(&meshData->Vertices[subMesh.StartVertex], &assimpMesh->mVertices[0], assimpMesh->mNumVertices * sizeof(Vector));
+
+		const bool HasTangentBitangent = assimpMesh->HasTangentsAndBitangents();
+		if (HasTangentBitangent)
+		{
+			meshData->Tangents.resize(meshData->Tangents.size() + assimpMesh->mNumVertices);
+			memcpy(&meshData->Tangents[subMesh.StartVertex], &assimpMesh->mTangents[0], assimpMesh->mNumVertices * sizeof(Vector));
+
+			meshData->Bitangents.resize(meshData->Bitangents.size() + assimpMesh->mNumVertices);
+			memcpy(&meshData->Bitangents[subMesh.StartVertex], &assimpMesh->mBitangents[0], assimpMesh->mNumVertices * sizeof(Vector));
+		}
 
 		if (assimpMesh->HasNormals())
 		{
@@ -74,48 +101,109 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename)
 			}
 		}
 
-		subMesh.StartFace = static_cast<int32>(meshData->Faces.size());
-		meshData->Faces.resize(meshData->Faces.size() + assimpMesh->mNumFaces * 3);
-		subMesh.EndFace = static_cast<int32>(meshData->Faces.size());
-		for (unsigned int k = 0; k < assimpMesh->mNumFaces; ++k)
+		if (assimpMesh->HasFaces())
 		{
-			aiFace& face = assimpMesh->mFaces[k];
-			memcpy(&meshData->Faces[subMesh.StartFace + k * 3], &face.mIndices[0], sizeof(uint32) * 3);
+			subMesh.StartFace = static_cast<int32>(meshData->Faces.size());
+			meshData->Faces.resize(meshData->Faces.size() + assimpMesh->mNumFaces * 3);
+			subMesh.EndFace = static_cast<int32>(meshData->Faces.size());
+			for (unsigned int k = 0; k < assimpMesh->mNumFaces; ++k)
+			{
+				aiFace& face = assimpMesh->mFaces[k];
+				memcpy(&meshData->Faces[subMesh.StartFace + k * 3], &face.mIndices[0], sizeof(uint32) * 3);
+			}
 		}
 		subMesh.MaterialIndex = assimpMesh->mMaterialIndex;
 		object->SubMeshes.emplace_back(subMesh);
-	}
+}
 
 	for (uint32 i = 0; i < scene->mNumMaterials; ++i)
 	{
 		aiMaterial* material = scene->mMaterials[i];
 
+		std::string name = material->GetName().C_Str();
+
 		auto newMeshMaterial = new jMeshMaterial();
-		if (material->GetTextureCount(aiTextureType_DIFFUSE))
+		for (uint32 k = aiTextureType_DIFFUSE; k <= aiTextureType_REFLECTION; ++k)
 		{
+			auto curTexType = static_cast<aiTextureType>(k);
+			if (0 >= material->GetTextureCount(curTexType))
+				continue;
+
+			jMeshMaterial::TextureData& curTexData = newMeshMaterial->TexData[k - 1];
+
 			aiString str;
-			material->GetTexture(aiTextureType_DIFFUSE, 0, &str);
-			jImageData data;
-			jImageFileLoader::GetInstance().LoadTextureFromFile(data, std::string("Image/") + str.C_Str(), true);
-			newMeshMaterial->Texture = g_rhi->CreateTextureFromData(&data.ImageData[0], data.Width, data.Height, data.sRGB);
-			newMeshMaterial->TextureName = str.C_Str();
+			aiTextureMapping mapping;
+			aiTextureMapMode mode[2];
+			aiTextureOp op;
+			material->GetTexture(curTexType, 0, &str, &mapping, nullptr, nullptr, &op, &mode[0]);
+
+			auto FuncTextureAddressMode = [](aiTextureMapMode InMode)
+			{
+				switch (InMode)
+				{
+				case aiTextureMapMode_Wrap:		return ETextureAddressMode::REPEAT;
+				case aiTextureMapMode_Clamp:	return ETextureAddressMode::CLAMP_TO_EDGE;
+				case aiTextureMapMode_Decal:	return ETextureAddressMode::CLAMP_TO_BORDER;
+				case aiTextureMapMode_Mirror:	return ETextureAddressMode::MIRRORED_REPEAT;
+				default:
+					break;
+				}
+				return ETextureAddressMode::REPEAT;
+			};
+			curTexData.TextureAddressModeU = FuncTextureAddressMode(mode[0]);
+			curTexData.TextureAddressModeV = FuncTextureAddressMode(mode[1]);
+
+			std::string FilePath;
+			if (materialRootDir)
+				FilePath = materialRootDir;
+
+			if (FilePath.length() > 0 && str.length > 0)
+			{
+				const char last = FilePath[FilePath.length() - 1];
+				const char first = str.data[0];
+				const bool lastHasNoSlash = (last != '/' && last != '\\');
+				const bool firstHasNoSlash = (first != '/' && first != '\\');
+				if (lastHasNoSlash && firstHasNoSlash)
+					FilePath += "\\";
+			}
+			FilePath += str.C_Str();
+
+			curTexData.TextureWeakPtr = jImageFileLoader::GetInstance().LoadTextureFromFile(FilePath, true);
+			curTexData.TextureName = str.C_Str();
 		}
 
-		aiColor3D emissive;
-		if (AI_SUCCESS == material->Get(AI_MATKEY_COLOR_EMISSIVE, emissive))
-			memcpy(&newMeshMaterial->Data.Emissive, &emissive, sizeof(emissive));
+		ai_real Opacity = 1.0f;
+		material->Get(AI_MATKEY_OPACITY, Opacity);
 
-		aiColor4D diffuse;
-		if (AI_SUCCESS == material->Get(AI_MATKEY_COLOR_DIFFUSE, diffuse))
-			memcpy(&newMeshMaterial->Data.Diffuse, &diffuse, sizeof(diffuse));
+		ai_real Reflectivity = 0.0f;
+		material->Get(AI_MATKEY_REFLECTIVITY, Reflectivity);
 
-		aiColor4D specular;
-		if (AI_SUCCESS == material->Get(AI_MATKEY_COLOR_SPECULAR, specular))
-			memcpy(&newMeshMaterial->Data.Specular, &specular, sizeof(specular));
+		ai_real IndexOfRefraction = 1.0f;		// 1.0 means lights will not refract
+		material->Get(AI_MATKEY_REFRACTI, IndexOfRefraction);
 
-		float specularPow;
-		if (AI_SUCCESS == material->Get(AI_MATKEY_SHININESS, specularPow))
-			newMeshMaterial->Data.SpecularPow = specularPow;
+		aiColor3D Ambient(1.0f);
+		material->Get(AI_MATKEY_COLOR_AMBIENT, Ambient);
+
+		aiColor3D Diffuse(1.0f);
+		material->Get(AI_MATKEY_COLOR_DIFFUSE, Diffuse);
+
+		aiColor3D Specular(1.0f);
+		material->Get(AI_MATKEY_COLOR_SPECULAR, Specular);
+
+		aiColor3D Emissive(1.0f);
+		material->Get(AI_MATKEY_COLOR_EMISSIVE, Emissive);
+
+		ai_real SpecularShiness = 0.0f;
+		material->Get(AI_MATKEY_SHININESS, SpecularShiness);
+
+		newMeshMaterial->Data.Ambient = Vector(Ambient.r, Ambient.g, Ambient.b);
+		newMeshMaterial->Data.Diffuse = Vector(Diffuse.r, Diffuse.g, Diffuse.b);
+		newMeshMaterial->Data.Specular = Vector(Specular.r, Specular.g, Specular.b);
+		newMeshMaterial->Data.Emissive = Vector(Emissive.r, Emissive.g, Emissive.b);
+		newMeshMaterial->Data.SpecularShiness = SpecularShiness;
+		newMeshMaterial->Data.Opacity = Opacity;
+		newMeshMaterial->Data.Reflectivity = Reflectivity;
+		newMeshMaterial->Data.IndexOfRefraction = IndexOfRefraction;
 		
 		meshData->Materials.emplace(std::make_pair(i, newMeshMaterial));
 	}
@@ -168,7 +256,10 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename)
 		vertexStreamData->Params.push_back(streamParam);
 	}
 
+	if (!meshData->Normals.empty())
 	{
+		JASSERT(meshData->Vertices.size() == meshData->Normals.size());
+
 		auto streamParam = new jStreamParam<float>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
@@ -177,6 +268,36 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename)
 		streamParam->Name = "Normal";
 		streamParam->Data.resize(elementCount * 3);
 		memcpy(&streamParam->Data[0], &meshData->Normals[0], meshData->Normals.size() * sizeof(Vector));
+		vertexStreamData->Params.push_back(streamParam);
+	}
+
+	if (!meshData->Tangents.empty())
+	{
+		JASSERT(meshData->Vertices.size() == meshData->Tangents.size());
+
+		auto streamParam = new jStreamParam<float>();
+		streamParam->BufferType = EBufferType::STATIC;
+		streamParam->ElementType = EBufferElementType::FLOAT;
+		streamParam->ElementTypeSize = sizeof(float);
+		streamParam->Stride = sizeof(float) * 3;
+		streamParam->Name = "Tangent";
+		streamParam->Data.resize(elementCount * 3);
+		memcpy(&streamParam->Data[0], &meshData->Tangents[0], meshData->Tangents.size() * sizeof(Vector));
+		vertexStreamData->Params.push_back(streamParam);
+	}
+
+	if (!meshData->Bitangents.empty())
+	{
+		JASSERT(meshData->Vertices.size() == meshData->Bitangents.size());
+
+		auto streamParam = new jStreamParam<float>();
+		streamParam->BufferType = EBufferType::STATIC;
+		streamParam->ElementType = EBufferElementType::FLOAT;
+		streamParam->ElementTypeSize = sizeof(float);
+		streamParam->Stride = sizeof(float) * 3;
+		streamParam->Name = "Bitangent";
+		streamParam->Data.resize(elementCount * 3);
+		memcpy(&streamParam->Data[0], &meshData->Bitangents[0], meshData->Bitangents.size() * sizeof(Vector));
 		vertexStreamData->Params.push_back(streamParam);
 	}
 
@@ -214,4 +335,9 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename)
 	renderObject->UseMaterial = 1;
 	object->RenderObject = renderObject;
 	return object;
+}
+
+jMeshObject* jModelLoader::LoadFromFile(const char* filename)
+{
+	return LoadFromFile(filename, "Image/");
 }

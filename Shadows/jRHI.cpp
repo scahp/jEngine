@@ -6,7 +6,7 @@
 //////////////////////////////////////////////////////////////////////////
 void IUniformBuffer::Bind(const jShader* shader) const
 {
-	g_rhi->SetUniformbuffer(this, shader);
+	SetUniformbuffer(shader);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -34,4 +34,19 @@ uint64 jQueryPrimitiveGenerated::GetResult()
 {
 	g_rhi->GetQueryPrimitiveGeneratedResult(this);
 	return NumOfGeneratedPrimitives;
+}
+
+
+jMaterialParam* jMaterialData::CreateMaterialParam(const char* name, jTexture* texture, jSamplerState* samplerstate)
+{
+	auto param = new jMaterialParam();
+	param->Name = name;
+	param->Texture = texture;
+	param->SamplerState = samplerstate;
+	return param;
+}
+
+void jMaterialData::AddMaterialParam(const char* name, jTexture* texture, jSamplerState* samplerstate)
+{
+	Params.push_back(CreateMaterialParam(name, texture, samplerstate));
 }
