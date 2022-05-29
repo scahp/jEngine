@@ -165,7 +165,7 @@ jObject::~jObject()
 	jObject::RemoveBoundBoxObject(BoundBoxObjects);
 	delete BoundBoxObjects;
 
-	jObject::RemoveBoundBoxObject(BoundSphereObjects);
+	jObject::RemoveBoundSphereObject(BoundSphereObjects);
 	delete BoundSphereObjects;
 
 	delete RenderObject;
@@ -212,11 +212,11 @@ void jObject::ShowBoundBox(bool isShow)
 	if (isShow)
 	{
 		jObject::AddBoundBoxObject(BoundBoxObjects);
-		jObject::AddBoundBoxObject(BoundSphereObjects);
+		jObject::AddBoundSphereObject(BoundSphereObjects);
 	}
 	else
 	{
 		jObject::RemoveBoundBoxObject(BoundBoxObjects);
-		jObject::RemoveBoundBoxObject(BoundSphereObjects);
+		jObject::RemoveBoundSphereObject(BoundSphereObjects);
 	}
 }
