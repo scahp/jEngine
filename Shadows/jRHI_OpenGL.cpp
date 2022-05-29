@@ -2063,7 +2063,7 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 	}
 	else if (info.TextureType == ETextureType::TEXTURE_CUBE)
 	{
-		JASSERT(!info.SampleCount > 1);
+		JASSERT(info.SampleCount > 1);
 
 		uint32 tbo = 0;
 		glGenTextures(1, &tbo);
@@ -2483,7 +2483,10 @@ void jUniformBufferBlock_OpenGL::Bind(const jShader* shader) const
 	auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
 	uint32 index = glGetUniformBlockIndex(shader_gl->program, Name.c_str());
 	if (-1 != index)
+	{
 		glUniformBlockBinding(shader_gl->program, index, BindingPoint);
+		glBindBuffer(GL_UNIFORM_BUFFER, UBO);
+	}
 }
 
 void jShaderStorageBufferObject_OpenGL::Init()

@@ -161,11 +161,7 @@ jObject::jObject()
 
 jObject::~jObject()
 {
-	jObject::RemoveBoundSphereObject(BoundSphereObjects);
-	delete BoundSphereObjects;
-
-	jObject::RemoveBoundBoxObject(BoundBoxObjects);
-	delete BoundBoxObjects;
+	jObject::RemoveBoundBoxObject(this);
 
 	delete RenderObject;
 	delete VertexAdjacency;

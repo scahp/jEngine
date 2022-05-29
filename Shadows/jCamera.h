@@ -62,6 +62,10 @@ public:
 		auto it_find = CameraMap.find(id);
 		return (CameraMap.end() != it_find) ? it_find->second : nullptr;
 	}
+	static jCamera* GetMainCamera()
+	{
+		return GetCamera(0);
+	}
 	static jCamera* CreateCamera(const Vector& pos, const Vector& target, const Vector& up, float fovRad, float nearDist, float farDist, float width, float height, bool isPerspectiveProjection)
 	{
 		const auto toTarget = (target - pos);

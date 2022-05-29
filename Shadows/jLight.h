@@ -226,6 +226,7 @@ public:
 	}
 	virtual void RenderToShadowMap(const RenderToShadowMapFunc& func, const jShader* shader) const override;
 	virtual void Update(float deltaTime) override;
+	virtual void BindLight(const jShader* shader) const override;
 
 	jUniformBuffer<Matrix> CascadeLightVP[NUM_CASCADES];
 	jUniformBuffer<float> CascadeEndsW[NUM_CASCADES];

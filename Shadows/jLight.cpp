@@ -246,49 +246,7 @@ void jDirectionalLight::BindLight(const jShader* shader) const
 
 	if (ShadowMapData && ShadowMapData->IsValid())
 	{
-		struct ShadowData
-		{
-			Matrix ShadowVP_Transposed;
-			Matrix ShadowV_Transposed;
-			Vector LightPos;
-			float Near;
-			float Far;
-			float padding0;
-			Vector2 ShadowMapSize;
-
-			bool operator == (const ShadowData& rhs) const
-			{
-				return (ShadowVP_Transposed == rhs.ShadowVP_Transposed) && (ShadowV_Transposed == rhs.ShadowV_Transposed)
-					&& (LightPos == rhs.LightPos) && (Near == rhs.Near) && (Far == rhs.Far) && (ShadowMapSize == rhs.ShadowMapSize);
-			}
-
-			bool operator != (const ShadowData& rhs) const
-			{
-				return !(*this == rhs);
-			}
-
-			void SetData(jLightUtil::jShadowMapData* shadowMapData)
-			{
-				auto camera = shadowMapData->ShadowMapCamera;
-				JASSERT(camera);
-
-				const auto& renderTargetInfo = shadowMapData->ShadowMapRenderTarget->Info;
-
-				ShadowVP_Transposed = (camera->Projection * camera->View).GetTranspose();
-				ShadowV_Transposed = (camera->View).GetTranspose();
-				LightPos = camera->Pos;
-				Near = camera->Near;
-				Far = camera->Far;
-				ShadowMapSize.x = static_cast<float>(renderTargetInfo.Width);
-				ShadowMapSize.y = static_cast<float>(renderTargetInfo.Height);
-			}
-		};
-
-		ShadowData shadowData;
-		shadowData.SetData(ShadowMapData);
-
 		IUniformBufferBlock* shadowDataUniformBlock = ShadowMapData->UniformBlock;
-		shadowDataUniformBlock->UpdateBufferData(&shadowData, sizeof(shadowData));
 		shadowDataUniformBlock->Bind(shader);
 	}
 }
@@ -328,7 +286,6 @@ void jDirectionalLight::RenderToShadowMap(const RenderToShadowMapFunc& func, con
 	JASSERT(ShadowMapData);
 	JASSERT(ShadowMapData->ShadowMapRenderTarget);
 	g_rhi->SetShader(shader);
-	const auto& renderTargetInfo = ShadowMapData->ShadowMapRenderTarget->Info;
 	func(ShadowMapData->ShadowMapRenderTarget.get(), 0, ShadowMapData->ShadowMapCamera, Viewports);
 }
 
@@ -343,6 +300,53 @@ void jDirectionalLight::Update(float deltaTime)
 		UpdateMaterialData();
 
         LightDataUniformBlock->UpdateBufferData(&Data, sizeof(Data));
+
+		if (ShadowMapData && ShadowMapData->IsValid())
+		{
+			struct ShadowData
+			{
+				Matrix ShadowVP_Transposed;
+				Matrix ShadowV_Transposed;
+				Vector LightPos;
+				float Near;
+				float Far;
+				float padding0;
+				Vector2 ShadowMapSize;
+
+				bool operator == (const ShadowData& rhs) const
+				{
+					return (ShadowVP_Transposed == rhs.ShadowVP_Transposed) && (ShadowV_Transposed == rhs.ShadowV_Transposed)
+						&& (LightPos == rhs.LightPos) && (Near == rhs.Near) && (Far == rhs.Far) && (ShadowMapSize == rhs.ShadowMapSize);
+				}
+
+				bool operator != (const ShadowData& rhs) const
+				{
+					return !(*this == rhs);
+				}
+
+				void SetData(jLightUtil::jShadowMapData* shadowMapData)
+				{
+					auto camera = shadowMapData->ShadowMapCamera;
+					JASSERT(camera);
+
+					const auto& renderTargetInfo = shadowMapData->ShadowMapRenderTarget->Info;
+
+					ShadowVP_Transposed = (camera->Projection * camera->View).GetTranspose();
+					ShadowV_Transposed = (camera->View).GetTranspose();
+					LightPos = camera->Pos;
+					Near = camera->Near;
+					Far = camera->Far;
+					ShadowMapSize.x = static_cast<float>(renderTargetInfo.Width);
+					ShadowMapSize.y = static_cast<float>(renderTargetInfo.Height);
+				}
+			};
+
+			ShadowData shadowData;
+			shadowData.SetData(ShadowMapData);
+
+			IUniformBufferBlock* shadowDataUniformBlock = ShadowMapData->UniformBlock;
+			shadowDataUniformBlock->UpdateBufferData(&shadowData, sizeof(shadowData));
+		}
 	}
 }
 
@@ -384,11 +388,6 @@ void jDirectionalLight::UpdateMaterialData()
 void jCascadeDirectionalLight::RenderToShadowMap(const RenderToShadowMapFunc& func, const jShader* shader) const
 {
 	g_rhi->SetShader(shader);
-
-	for (int i = 0; i < NUM_CASCADES; ++i)
-	{
-		CascadeLightVP[i].SetUniformbuffer(shader);
-	}
 	func(ShadowMapData->ShadowMapRenderTarget.get(), 0, ShadowMapData->ShadowMapCamera, Viewports);
 }
 
@@ -402,7 +401,19 @@ void jCascadeDirectionalLight::Update(float deltaTime)
 		for (int i = 0; i < NUM_CASCADES; ++i)
 		{
 			CascadeLightVP[i].Data = ShadowMapData->CascadeLightVP[i];
+			CascadeEndsW[i].Data = ShadowMapData->CascadeEndsW[i];
 		}
+	}
+}
+
+void jCascadeDirectionalLight::BindLight(const jShader* shader) const
+{
+	__super::BindLight(shader);
+
+	for (int32 i = 0; i < NUM_CASCADES; ++i)
+	{
+		CascadeEndsW[i].SetUniformbuffer(shader);
+		CascadeLightVP[i].SetUniformbuffer(shader);
 	}
 }
 
@@ -414,6 +425,11 @@ void jPointLight::BindLight(const jShader* shader) const
 	{
 		const IUniformBufferBlock* shadowDataUniformBlock = ShadowMapData->UniformBlock;
 		shadowDataUniformBlock->Bind(shader);
+	}
+
+	for (int i = 0; i < 6; ++i)
+	{
+		OmniShadowMapVP[i].SetUniformbuffer(shader);
 	}
 }
 
@@ -450,10 +466,6 @@ void jPointLight::RenderToShadowMap(const RenderToShadowMapFunc& func, const jSh
 	if (ShadowMapData)
 	{	
 		g_rhi->SetShader(shader);
-		for (int i = 0; i < 6; ++i)
-		{
-			OmniShadowMapVP[i].SetUniformbuffer(shader);
-		}
 		func(ShadowMapData->ShadowMapRenderTarget.get(), 0, ShadowMapData->ShadowMapCamera[0], Viewports);
 	}
 }
@@ -564,6 +576,11 @@ void jSpotLight::BindLight(const jShader* shader) const
 		const IUniformBufferBlock* shadowDataUniformBlock = ShadowMapData->UniformBlock;
 		shadowDataUniformBlock->Bind(shader);
 	}
+
+	for (int i = 0; i < 6; ++i)
+	{
+		OmniShadowMapVP[i].SetUniformbuffer(shader);
+	}
 }
 
 void jSpotLight::GetMaterialData(jMaterialData* OutMaterialData) const
@@ -599,10 +616,6 @@ void jSpotLight::RenderToShadowMap(const RenderToShadowMapFunc& func, const jSha
 	if (ShadowMapData)
 	{
 		g_rhi->SetShader(shader);
-		for (int i = 0; i < 6; ++i)
-		{
-			OmniShadowMapVP[i].SetUniformbuffer(shader);
-		}
 		func(ShadowMapData->ShadowMapRenderTarget.get(), 0, ShadowMapData->ShadowMapCamera[0], Viewports);
 	}
 }
