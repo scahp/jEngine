@@ -196,10 +196,10 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 		ai_real SpecularShiness = 0.0f;
 		material->Get(AI_MATKEY_SHININESS, SpecularShiness);
 
-		newMeshMaterial->Data.Ambient = Vector(Ambient.r, Ambient.g, Ambient.b);
-		newMeshMaterial->Data.Diffuse = Vector(Diffuse.r, Diffuse.g, Diffuse.b);
-		newMeshMaterial->Data.Specular = Vector(Specular.r, Specular.g, Specular.b);
-		newMeshMaterial->Data.Emissive = Vector(Emissive.r, Emissive.g, Emissive.b);
+		newMeshMaterial->Data.Ambient = Vector4(Ambient.r, Ambient.g, Ambient.b, 1.0f);
+		newMeshMaterial->Data.Diffuse = Vector4(Diffuse.r, Diffuse.g, Diffuse.b, 1.0f);
+		newMeshMaterial->Data.Specular = Vector4(Specular.r, Specular.g, Specular.b, 1.0f);
+		newMeshMaterial->Data.Emissive = Vector4(Emissive.r, Emissive.g, Emissive.b, 1.0f);
 		newMeshMaterial->Data.SpecularShiness = SpecularShiness;
 		newMeshMaterial->Data.Opacity = Opacity;
 		newMeshMaterial->Data.Reflectivity = Reflectivity;

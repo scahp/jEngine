@@ -26,10 +26,10 @@ struct jMeshMaterial
 
 	struct Material
 	{
-		Vector Ambient = Vector::OneVector;
-		Vector Diffuse = Vector::OneVector;
-		Vector Specular = Vector::OneVector;
-		Vector Emissive = Vector::OneVector;
+		Vector4 Ambient = Vector4::OneVector;
+		Vector4 Diffuse = Vector4::OneVector;
+		Vector4 Specular = Vector4::OneVector;
+		Vector4 Emissive = Vector4::OneVector;
 		float SpecularShiness = 0.0f;
 		float Opacity = 1.0f;
 		float Reflectivity = 0.0f;
