@@ -46,8 +46,6 @@ public:
 
 	const std::vector<float>& GetVertices() const;
 
-	void CreateBoundBox();
-
 	std::shared_ptr<jVertexStreamData> VertexStream;
 	jVertexBuffer* VertexBuffer = nullptr;
 
@@ -80,7 +78,6 @@ public:
 	bool IsTwoSided = false;
 
 	bool IsHiddenBoundBox = false;
-	jBoundBox BoundBox;
 	
 	FORCEINLINE void SetPos(const Vector& InPos) { Pos = InPos; SetDirtyFlags(EDirty::POS); }
 	FORCEINLINE void SetRot(const Vector& InRot) { Rot = InRot; SetDirtyFlags(EDirty::ROT); }

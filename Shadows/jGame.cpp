@@ -288,7 +288,8 @@ void jGame::UpdateAppSetting()
 			changedDirectionalLight = true;
 		}
 	}
-	((jDirectionalLightPrimitive*)(DirectionalLightInfo))->Light = DirectionalLight;
+	if (DirectionalLightInfo)
+		((jDirectionalLightPrimitive*)(DirectionalLightInfo))->Light = DirectionalLight;
 
 	if (changedDirectionalLight)
 	{

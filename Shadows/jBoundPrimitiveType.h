@@ -42,4 +42,24 @@ struct jBoundBox
 struct jBoundSphere
 {
 	float Radius = 0.0f;
+
+	static jBoundSphere GenerateBoundSphere(const std::vector<float>& vertices)
+	{
+		auto maxDist = FLT_MIN;
+		for (size_t i = 0; i < vertices.size() / 3; ++i)
+		{
+			auto curIndex = i * 3;
+			auto x = vertices[curIndex];
+			auto y = vertices[curIndex + 1];
+			auto z = vertices[curIndex + 2];
+
+			auto currentPos = Vector(x, y, z);
+			const auto dist = currentPos.Length();
+			if (maxDist < dist)
+				maxDist = dist;
+		}
+		return { maxDist };
+	}
+
+	FORCEINLINE void CreateBoundSphere(const std::vector<float>& vertices) { *this = jBoundSphere::GenerateBoundSphere(vertices); }
 };

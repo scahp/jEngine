@@ -3,6 +3,7 @@
 #include "jRenderObject.h"
 #include "jVertexAdjacency.h"
 #include "jShadowVolume.h"
+#include "jPrimitiveUtil.h"
 
 std::list<jObject*> jObject::s_ShadowCasterObject;
 std::list<jObject*> jObject::s_StaticObjects;
@@ -161,7 +162,11 @@ jObject::jObject()
 
 jObject::~jObject()
 {
-	jObject::RemoveBoundBoxObject(this);
+	jObject::RemoveBoundBoxObject(BoundBoxObjects);
+	delete BoundBoxObjects;
+
+	jObject::RemoveBoundBoxObject(BoundSphereObjects);
+	delete BoundSphereObjects;
 
 	delete RenderObject;
 	delete VertexAdjacency;
@@ -188,16 +193,30 @@ void jObject::CreateBoundBox(bool isShow)
 {
 	if (RenderObject)
 	{
-		RenderObject->CreateBoundBox();
+		BoundBox.CreateBoundBox(RenderObject->GetVertices());
+		BoundBoxObjects = jPrimitiveUtil::CreateBoundBox(BoundBox, this);
+		
+		BoundSphere.CreateBoundSphere(RenderObject->GetVertices());
+		BoundSphereObjects = jPrimitiveUtil::CreateBoundSphere(BoundSphere, this);
+
 		if (isShow)
-			jObject::AddBoundBoxObject(this);
+		{
+			jObject::AddBoundBoxObject(BoundBoxObjects);
+			jObject::AddBoundSphereObject(BoundSphereObjects);
+		}
 	}
 }
 
 void jObject::ShowBoundBox(bool isShow)
 {
 	if (isShow)
-		jObject::AddBoundBoxObject(this);
+	{
+		jObject::AddBoundBoxObject(BoundBoxObjects);
+		jObject::AddBoundBoxObject(BoundSphereObjects);
+	}
 	else
-		jObject::RemoveBoundBoxObject(this);
+	{
+		jObject::RemoveBoundBoxObject(BoundBoxObjects);
+		jObject::RemoveBoundBoxObject(BoundSphereObjects);
+	}
 }

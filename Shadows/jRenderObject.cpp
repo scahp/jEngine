@@ -268,8 +268,3 @@ const std::vector<float>& jRenderObject::GetVertices() const
 	static const std::vector<float> s_emtpy;
 	return s_emtpy;
 }
-
-void jRenderObject::CreateBoundBox()
-{
-	BoundBox.CreateBoundBox(GetVertices());
-}
