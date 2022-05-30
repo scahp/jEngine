@@ -36,16 +36,6 @@ uint64 jQueryPrimitiveGenerated::GetResult()
 	return NumOfGeneratedPrimitives;
 }
 
-
-//jMaterialParam* jMaterialData::CreateMaterialParam(jName name, jTexture* texture, jSamplerState* samplerstate)
-//{
-//	auto param = new jMaterialParam();
-//	param->Name = name;
-//	param->Texture = texture;
-//	param->SamplerState = samplerstate;
-//	return param;
-//}
-
 void jMaterialData::AddMaterialParam(jName name, const jTexture* texture, const jSamplerState* samplerState)
 {
 	Params.emplace_back(jMaterialParam(name, texture, samplerState));

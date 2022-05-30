@@ -18,6 +18,8 @@ public:
 	FORCEINLINE explicit jName(uint32 InNameHash)
 	{
 		NameHash = InNameHash;
+		NameString = nullptr;
+		NameStringLength = 0;
 	}
 
 	FORCEINLINE explicit jName(const char* pName)
@@ -49,6 +51,8 @@ public:
 		if (s_NameTable.end() != find_it)
 		{
 			NameHash = NewNameHash;
+            NameString = find_it->second->c_str();
+            NameStringLength = find_it->second->size();
 			return;
 		}
 
@@ -56,6 +60,8 @@ public:
 		if (it_ret.second)
 		{
 			NameHash = NewNameHash;
+			NameString = it_ret.first->second->c_str();
+			NameStringLength = it_ret.first->second->size();
 			return;
 		}
 
@@ -71,6 +77,8 @@ public:
 	FORCEINLINE jName& operator = (const jName& In)
 	{
 		NameHash = In.NameHash;
+        NameString = In.NameString;
+        NameStringLength = In.NameStringLength;
 		return *this;
 	}
 
@@ -85,9 +93,15 @@ public:
 		if (!IsValid())
 			return nullptr;
 
+		if (NameString)
+			return NameString;
+
 		const auto it_find = s_NameTable.find(NameHash);
 		if (it_find == s_NameTable.end())
 			return nullptr;
+
+        NameString = it_find->second->c_str();
+        NameStringLength = it_find->second->size();
 
 		return it_find->second->c_str();
 	}
@@ -102,6 +116,8 @@ private:
 	}
 
 	uint32 NameHash = -1;
+	mutable const char* NameString = nullptr;
+	mutable size_t NameStringLength = 0;
 };
 
 struct jNameHashFunc
