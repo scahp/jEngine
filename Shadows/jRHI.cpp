@@ -37,18 +37,52 @@ uint64 jQueryPrimitiveGenerated::GetResult()
 }
 
 
-jMaterialParam* jMaterialData::CreateMaterialParam(jName name, jTexture* texture, jSamplerState* samplerstate)
+//jMaterialParam* jMaterialData::CreateMaterialParam(jName name, jTexture* texture, jSamplerState* samplerstate)
+//{
+//	auto param = new jMaterialParam();
+//	param->Name = name;
+//	param->Texture = texture;
+//	param->SamplerState = samplerstate;
+//	return param;
+//}
+
+void jMaterialData::AddMaterialParam(jName name, const jTexture* texture, const jSamplerState* samplerState)
 {
-	auto param = new jMaterialParam();
-	param->Name = name;
-	param->Texture = texture;
-	param->SamplerState = samplerstate;
-	return param;
+	Params.emplace_back(jMaterialParam(name, texture, samplerState));
 }
 
-void jMaterialData::AddMaterialParam(jName name, jTexture* texture, jSamplerState* samplerstate)
+void jMaterialData::SetMaterialParam(int32 index, jName name, const jTexture* texture, const jSamplerState* samplerState /*= nullptr*/)
 {
-	Params.push_back(CreateMaterialParam(name, texture, samplerstate));
+	if (Params.size() <= index)
+		return;
+
+	Params[index].Name = name;
+    Params[index].Texture = texture;
+    Params[index].SamplerState = samplerState;
+}
+
+void jMaterialData::SetMaterialParam(int32 index, jName name)
+{
+    if (Params.size() <= index)
+        return;
+
+    Params[index].Name = name;
+}
+
+void jMaterialData::SetMaterialParam(int32 index, const jTexture* texture)
+{
+    if (Params.size() <= index)
+        return;
+
+    Params[index].Texture = texture;
+}
+
+void jMaterialData::SetMaterialParam(int32 index, const jSamplerState* samplerState)
+{
+    if (Params.size() <= index)
+        return;
+
+    Params[index].SamplerState = samplerState;
 }
 
 jName GetCommonTextureName(int32 index)

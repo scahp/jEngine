@@ -215,6 +215,10 @@ struct ITransformFeedbackBuffer : public IBuffer
 
 struct jMaterialParam
 {
+	jMaterialParam() = default;
+	jMaterialParam(jName name, const jTexture* texture, const jSamplerState* samplerstate)
+		: Name(name), Texture(texture), SamplerState(samplerstate)
+	{}
 	virtual ~jMaterialParam() {}
 
 	jName Name;
@@ -226,15 +230,16 @@ struct jMaterialData
 {
 	~jMaterialData()
 	{
-		for (auto& iter : Params)
-			delete iter;
 		Params.clear();
 	}
 
-	static jMaterialParam* CreateMaterialParam(jName name, jTexture* texture, jSamplerState* samplerstate = nullptr);
-	void AddMaterialParam(jName name, jTexture* texture, jSamplerState* samplerstate = nullptr);
+	void AddMaterialParam(jName name, const jTexture* texture, const jSamplerState* samplerState = nullptr);
+    void SetMaterialParam(int32 index, jName name, const jTexture* texture, const jSamplerState* samplerState = nullptr);
+	void SetMaterialParam(int32 index, jName name);
+	void SetMaterialParam(int32 index, const jTexture* texture);
+	void SetMaterialParam(int32 index, const jSamplerState* samplerState);
 
-	std::vector<jMaterialParam*> Params;
+	std::vector<jMaterialParam> Params;
 };
 
 class jMaterial

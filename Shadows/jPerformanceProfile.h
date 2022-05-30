@@ -4,22 +4,22 @@
 
 static constexpr int32 MaxProfileFrame = 10;
 
-extern std::map<std::string, uint64> ScopedProfileCPUMap[MaxProfileFrame];
-extern std::map<std::string, uint64> ScopedProfileGPUMap[MaxProfileFrame];
+extern std::unordered_map<jName, uint64, jNameHashFunc> ScopedProfileCPUMap[MaxProfileFrame];
+extern std::unordered_map<jName, uint64, jNameHashFunc> ScopedProfileGPUMap[MaxProfileFrame];
 struct jQueryTime;
 
 void ClearScopedProfileCPU();
-void AddScopedProfileCPU(const std::string& name, uint64 elapsedTick);
+void AddScopedProfileCPU(const jName& name, uint64 elapsedTick);
 
 void ClearScopedProfileGPU();
-void AddScopedProfileGPU(const std::string& name, uint64 elapsedTick);
+void AddScopedProfileGPU(const jName& name, uint64 elapsedTick);
 
 //////////////////////////////////////////////////////////////////////////
 // jScopedProfile_CPU
 class jScopedProfile_CPU
 {
 public:
-	jScopedProfile_CPU(const std::string& name)
+	jScopedProfile_CPU(const jName& name)
 		: Name(name)
 	{
 		StartTick = GetTickCount64();
@@ -30,11 +30,11 @@ public:
 		AddScopedProfileCPU(Name, GetTickCount64() - StartTick);
 	}
 
-	std::string Name;
+	jName Name;
 	uint64 StartTick = 0;
 };
 
-#define SCOPE_PROFILE(Name) jScopedProfile_CPU Name##ScopedProfileCPU(#Name);
+#define SCOPE_PROFILE(Name) static jName Name##ScopedProfileCPUName(#Name); jScopedProfile_CPU Name##ScopedProfileCPU(Name##ScopedProfileCPUName);
 
 //////////////////////////////////////////////////////////////////////////
 // jQueryTimePool
@@ -83,7 +83,7 @@ private:
 // jProfile_GPU
 struct jProfile_GPU
 {
-	std::string Name;
+	jName Name;
 	jQueryTime* Start = nullptr;
 	jQueryTime* End = nullptr;
 
@@ -114,7 +114,7 @@ struct jProfile_GPU
 class jScopedProfile_GPU
 {
 public:
-	jScopedProfile_GPU(const std::string& name)
+	jScopedProfile_GPU(const jName& name)
 	{
 		Profile.Name = name;
 		Profile.Start = jQueryTimePool::GetQueryTime();
@@ -133,7 +133,7 @@ public:
 	jProfile_GPU Profile;
 };
 
-#define SCOPE_GPU_PROFILE(Name) jScopedProfile_GPU Name##ScopedProfileGPU(#Name);
+#define SCOPE_GPU_PROFILE(Name) static jName Name##ScopedProfileGPUName(#Name); jScopedProfile_GPU Name##ScopedProfileGPU(Name##ScopedProfileGPUName);
 
 //////////////////////////////////////////////////////////////////////////
 // jPerformanceProfile
@@ -152,8 +152,8 @@ public:
 	void PrintOutputDebugString();
 
 private:
-	std::map<std::string, jAvgProfile> AvgProfileMap;			// ms
-	std::map<std::string, jAvgProfile> GPUAvgProfileMap;		// ns
+	std::map<jName, jAvgProfile> AvgProfileMap;			// ms
+	std::map<jName, jAvgProfile> GPUAvgProfileMap;		// ns
 
 public:
 	static jPerformanceProfile& GetInstance()

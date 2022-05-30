@@ -358,28 +358,26 @@ void jDirectionalLight::UpdateMaterialData()
 
 	MaterialData.Params.clear();
 	{
-		auto materialParam = new jMaterialParam();
-		materialParam->Name = jName("shadow_object");
-		materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTextureDepth();
-		materialParam->SamplerState = ShadowMapData->ShadowMapSamplerState.get();
-		MaterialData.Params.push_back(materialParam);
+		static auto name = jName("shadow_object");
+		MaterialData.AddMaterialParam(name, ShadowMapData->ShadowMapRenderTarget->GetTextureDepth()
+			, ShadowMapData->ShadowMapSamplerState.get());
 	}
 
 	{
-		auto materialParam = new jMaterialParam();
-		materialParam->Name = jName("shadow_object_test");
+        static auto name = jName("shadow_object_test");
+		jTexture* texture = nullptr;
 
 		const auto type = jShadowAppSettingProperties::GetInstance().ShadowMapType;
-		if ((type == EShadowMapType::VSM) || (type == EShadowMapType::ESM) || (type == EShadowMapType::EVSM))
-		{
-			materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTexture();
-		}
-		else
-		{
-			materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTextureDepth();
-		}
-		materialParam->SamplerState = nullptr;
-		MaterialData.Params.push_back(materialParam);
+        if ((type == EShadowMapType::VSM) || (type == EShadowMapType::ESM) || (type == EShadowMapType::EVSM))
+        {
+            texture = ShadowMapData->ShadowMapRenderTarget->GetTexture();
+        }
+        else
+        {
+            texture = ShadowMapData->ShadowMapRenderTarget->GetTextureDepth();
+        }
+
+        MaterialData.AddMaterialParam(name, texture);
 	}
 }
 
@@ -544,27 +542,26 @@ void jPointLight::UpdateMaterialData()
 
 	MaterialData.Params.clear();
 	{
-		auto materialParam = new jMaterialParam();
-		materialParam->Name = jName("shadow_object_point_shadow");
-		materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTextureDepth();
-		materialParam->SamplerState = ShadowMapData->ShadowMapSamplerState.get();
-		MaterialData.Params.push_back(materialParam);
+        static auto name = jName("shadow_object_point_shadow");
+		MaterialData.AddMaterialParam(name, ShadowMapData->ShadowMapRenderTarget->GetTextureDepth()
+			, ShadowMapData->ShadowMapSamplerState.get());
 	}
 
 	{
-		auto materialParam = new jMaterialParam();
-		materialParam->Name = jName("shadow_object_point");
-		const auto type = jShadowAppSettingProperties::GetInstance().ShadowMapType;
-		if ((type == EShadowMapType::VSM) || (type == EShadowMapType::ESM) || (type == EShadowMapType::EVSM))
-		{
-			materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTexture();
-		}
-		else
-		{
-			materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTextureDepth();
-		}
-		materialParam->SamplerState = nullptr;
-		MaterialData.Params.push_back(materialParam);
+        static auto name = jName("shadow_object_point");
+		jTexture* texture = nullptr;
+
+        const auto type = jShadowAppSettingProperties::GetInstance().ShadowMapType;
+        if ((type == EShadowMapType::VSM) || (type == EShadowMapType::ESM) || (type == EShadowMapType::EVSM))
+        {
+            texture = ShadowMapData->ShadowMapRenderTarget->GetTexture();
+        }
+        else
+        {
+            texture = ShadowMapData->ShadowMapRenderTarget->GetTextureDepth();
+        }
+
+		MaterialData.AddMaterialParam(name, texture);
 	}
 }
 
@@ -693,27 +690,25 @@ void jSpotLight::UpdateMaterialData()
 
 	MaterialData.Params.clear();
 	{
-		auto materialParam = new jMaterialParam();
-		materialParam->Name = jName("shadow_object_spot_shadow");
-		materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTextureDepth();
-		materialParam->SamplerState = ShadowMapData->ShadowMapSamplerState.get();
-		MaterialData.Params.push_back(materialParam);
+		static auto name = jName("shadow_object_spot_shadow");
+		MaterialData.AddMaterialParam(name, ShadowMapData->ShadowMapRenderTarget->GetTextureDepth()
+			, ShadowMapData->ShadowMapSamplerState.get());
 	}
 
 	{
-		auto materialParam = new jMaterialParam();
-		materialParam->Name = jName("shadow_object_spot");
+        static auto name = jName("shadow_object_spot");
+		jTexture* texture = nullptr;
+
 		const auto type = jShadowAppSettingProperties::GetInstance().ShadowMapType;
 		if ((type == EShadowMapType::VSM) || (type == EShadowMapType::ESM) || (type == EShadowMapType::EVSM))
 		{
-			materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTexture();
+			texture = ShadowMapData->ShadowMapRenderTarget->GetTexture();
 		}
 		else
 		{
-			materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTextureDepth();
+			texture = ShadowMapData->ShadowMapRenderTarget->GetTextureDepth();
 		}
-		materialParam->SamplerState = nullptr;
-		MaterialData.Params.push_back(materialParam);
+		MaterialData.AddMaterialParam(name, texture);
 	}
 }
 //////////////////////////////////////////////////////////////////////////

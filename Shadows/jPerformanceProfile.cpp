@@ -3,8 +3,8 @@
 
 jPerformanceProfile* jPerformanceProfile::_instance = nullptr;
 
-std::map<std::string, uint64> ScopedProfileCPUMap[MaxProfileFrame];
-std::map<std::string, uint64> ScopedProfileGPUMap[MaxProfileFrame];
+std::unordered_map<jName, uint64, jNameHashFunc> ScopedProfileCPUMap[MaxProfileFrame];
+std::unordered_map<jName, uint64, jNameHashFunc> ScopedProfileGPUMap[MaxProfileFrame];
 static int32 PerformanceFrame = 0;
 
 std::unordered_set<jQueryTime*> jQueryTimePool::s_running;
@@ -25,7 +25,7 @@ void ClearScopedProfileCPU()
 		ScopedProfileCPUMap[i].clear();
 }
 
-void AddScopedProfileCPU(const std::string& name, uint64 elapsedTick)
+void AddScopedProfileCPU(const jName& name, uint64 elapsedTick)
 {
 	ScopedProfileCPUMap[PerformanceFrame][name] = elapsedTick;
 }
@@ -36,7 +36,7 @@ void ClearScopedProfileGPU()
 		ScopedProfileGPUMap[i].clear();
 }
 
-void AddScopedProfileGPU(const std::string& name, uint64 elapsedTick)
+void AddScopedProfileGPU(const jName& name, uint64 elapsedTick)
 {
 	ScopedProfileGPUMap[PerformanceFrame][name] = elapsedTick;
 }
@@ -106,7 +106,7 @@ void jPerformanceProfile::PrintOutputDebugString()
 		result += "-----CPU---PerformanceProfile----------\n";
 		for (auto& iter : AvgProfileMap)
 		{
-			sprintf_s(szTemp, sizeof(szTemp), "%s : \t\t\t\t%lf ms", iter.first.c_str(), iter.second.AvgElapsedMS);
+			sprintf_s(szTemp, sizeof(szTemp), "%s : \t\t\t\t%lf ms", iter.first.ToStr(), iter.second.AvgElapsedMS);
 			result += szTemp;
 			result += "\n";
 		}
@@ -117,7 +117,7 @@ void jPerformanceProfile::PrintOutputDebugString()
 		result += "-----GPU---PerformanceProfile----------\n";
 		for (auto& iter : GPUAvgProfileMap)
 		{
-			sprintf_s(szTemp, sizeof(szTemp), "%s : \t\t\t\t%lf ms", iter.first.c_str(), iter.second.AvgElapsedMS);
+			sprintf_s(szTemp, sizeof(szTemp), "%s : \t\t\t\t%lf ms", iter.first.ToStr(), iter.second.AvgElapsedMS);
 			result += szTemp;
 			result += "\n";
 		}

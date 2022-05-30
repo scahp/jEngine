@@ -74,6 +74,11 @@ public:
 		return *this;
 	}
 
+	FORCEINLINE bool operator == (const jName& rhs) const
+	{
+		return GetNameHash() == rhs.GetNameHash();
+	}
+
 	FORCEINLINE bool IsValid() const { return NameHash != -1; }
 	FORCEINLINE const char* ToStr() const 
 	{ 
@@ -97,4 +102,12 @@ private:
 	}
 
 	uint32 NameHash = -1;
+};
+
+struct jNameHashFunc
+{
+    std::size_t operator()(const jName& name) const
+    {
+        return static_cast<size_t>(name.GetNameHash());
+    }
 };

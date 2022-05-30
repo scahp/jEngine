@@ -51,15 +51,6 @@ public:
 
 	std::shared_ptr<jIndexStreamData> IndexStream;
 	jIndexBuffer* IndexBuffer = nullptr;
-	static jMaterialParam* CreateMaterialParam(jName name, const jTexture* texture, const jSamplerState* sampler = nullptr)
-	{
-		JASSERT(name);
-		auto NewParam = new jMaterialParam();
-		NewParam->Name = name;
-		NewParam->Texture = texture;
-		NewParam->SamplerState = sampler;
-		return NewParam;
-	}
 	jMaterialData MaterialData;
     std::vector<const jMaterialData*> DynamicMaterialData;
 

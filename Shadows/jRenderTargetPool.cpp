@@ -24,13 +24,13 @@ struct jTexture* jRenderTargetPool::GetNullTexture(ETextureType type)
 	case ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW_MULTISAMPLE:
 	{
 		static auto temp = jRenderTargetPool::GetRenderTarget(jRenderTargetInfo(ETextureType::TEXTURE_2D_MULTISAMPLE, ETextureFormat::RGBA, ETextureFormat::RGBA
-			, EFormatType::BYTE, EDepthBufferType::NONE, 2, 2, 1, ETextureFilter::LINEAR, ETextureFilter::LINEAR, false, 4));
+			, EFormatType::BYTE, EDepthBufferType::NONE, 2, 2, 1, ETextureFilter::LINEAR, ETextureFilter::LINEAR, false, false, 4));
 		return temp->GetTexture();
 	}
 	case ETextureType::TEXTURE_2D_ARRAY_MULTISAMPLE:
 	{
 		static auto temp = jRenderTargetPool::GetRenderTarget(jRenderTargetInfo(ETextureType::TEXTURE_2D_ARRAY_MULTISAMPLE, ETextureFormat::RGBA, ETextureFormat::RGBA
-			, EFormatType::BYTE, EDepthBufferType::NONE, 2, 2, 1, ETextureFilter::LINEAR, ETextureFilter::LINEAR, false, 4));
+			, EFormatType::BYTE, EDepthBufferType::NONE, 2, 2, 1, ETextureFilter::LINEAR, ETextureFilter::LINEAR, false, false, 4));
 		return temp->GetTexture();
 	}
 	case ETextureType::TEXTURE_CUBE:

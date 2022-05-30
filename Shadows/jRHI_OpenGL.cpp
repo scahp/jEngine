@@ -1675,18 +1675,18 @@ int32 jRHI_OpenGL::SetMatetrial(const jMaterialData* materialData, const jShader
 	int index = baseBindingIndex;
 	for (int32 i = 0; i < materialData->Params.size(); ++i)
 	{
-		auto matParam = materialData->Params[i];
-		auto tex_gl = static_cast<const jTexture_OpenGL*>(matParam->Texture);
+		const auto& matParam = materialData->Params[i];
+		auto tex_gl = static_cast<const jTexture_OpenGL*>(matParam.Texture);
 		if (!tex_gl)
 			continue;
 
-		if (!SetUniformbuffer(matParam->Name, index, shader))
+		if (!SetUniformbuffer(matParam.Name, index, shader))
 			continue;
-		SetTexture(index, matParam->Texture);
+		SetTexture(index, matParam.Texture);
 
-		if (matParam->SamplerState)
+		if (matParam.SamplerState)
 		{
-			BindSamplerState(index, matParam->SamplerState);
+			BindSamplerState(index, matParam.SamplerState);
 		}
 		else
 		{
