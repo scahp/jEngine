@@ -37,19 +37,19 @@ void jCamera::BindCamera(const jShader* shader) const
 {
 	auto VP = Projection * View;
 	auto P = Projection;
-	SET_UNIFORM_BUFFER_STATIC(Matrix, "P", P, shader);
-	SET_UNIFORM_BUFFER_STATIC(Matrix, "VP", VP, shader);
-	SET_UNIFORM_BUFFER_STATIC(Vector, "Eye", Pos, shader);
-	SET_UNIFORM_BUFFER_STATIC(float, "PCF_Size_Directional", PCF_SIZE_DIRECTIONAL, shader);
-	SET_UNIFORM_BUFFER_STATIC(float, "PCF_Size_OmniDirectional", PCF_SIZE_OMNIDIRECTIONAL, shader);
-	SET_UNIFORM_BUFFER_STATIC(float, "ESM_C", 40.0f, shader);
-	SET_UNIFORM_BUFFER_STATIC(float, "PointLightESM_C", 40.0f, shader);
-	SET_UNIFORM_BUFFER_STATIC(float, "SpotLightESM_C", 40.0f, shader);
-	SET_UNIFORM_BUFFER_STATIC(int, "ShadowMapWidth", SM_WIDTH, shader);
-	SET_UNIFORM_BUFFER_STATIC(int, "ShadowMapHeight", SM_HEIGHT, shader);
-	SET_UNIFORM_BUFFER_STATIC(int, "CSMDebugOn", static_cast<int>(jShadowAppSettingProperties::GetInstance().CSMDebugOn), shader);
-	SET_UNIFORM_BUFFER_STATIC(int, "ShadowOn", jShadowAppSettingProperties::GetInstance().ShadowOn ? 1 : 0, shader);
-	SET_UNIFORM_BUFFER_STATIC(float, "DeepShadowAlpha", jShadowAppSettingProperties::GetInstance().DeepShadowAlpha, shader);
+	SET_UNIFORM_BUFFER_STATIC("P", P, shader);
+	SET_UNIFORM_BUFFER_STATIC("VP", VP, shader);
+	SET_UNIFORM_BUFFER_STATIC("Eye", Pos, shader);
+	SET_UNIFORM_BUFFER_STATIC("PCF_Size_Directional", PCF_SIZE_DIRECTIONAL, shader);
+	SET_UNIFORM_BUFFER_STATIC("PCF_Size_OmniDirectional", PCF_SIZE_OMNIDIRECTIONAL, shader);
+	SET_UNIFORM_BUFFER_STATIC("ESM_C", 40.0f, shader);
+	SET_UNIFORM_BUFFER_STATIC("PointLightESM_C", 40.0f, shader);
+	SET_UNIFORM_BUFFER_STATIC("SpotLightESM_C", 40.0f, shader);
+	SET_UNIFORM_BUFFER_STATIC("ShadowMapWidth", (int32)SM_WIDTH, shader);
+	SET_UNIFORM_BUFFER_STATIC("ShadowMapHeight", (int32)SM_HEIGHT, shader);
+	SET_UNIFORM_BUFFER_STATIC("CSMDebugOn", static_cast<int>(jShadowAppSettingProperties::GetInstance().CSMDebugOn), shader);
+	SET_UNIFORM_BUFFER_STATIC("ShadowOn", jShadowAppSettingProperties::GetInstance().ShadowOn ? 1 : 0, shader);
+	SET_UNIFORM_BUFFER_STATIC("DeepShadowAlpha", jShadowAppSettingProperties::GetInstance().DeepShadowAlpha, shader);
 }
 
 void jCamera::UpdateCameraFrustum()

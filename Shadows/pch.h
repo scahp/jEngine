@@ -25,6 +25,9 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <limits>
+#include <type_traits>
+
+#include "External/cityhash/city.h"
 
 #define JASSERT(x) assert(x)
 #define JMESSAGE(x) MessageBoxA(0, x, "", MB_OK)
@@ -113,5 +116,7 @@ inline void hash_combine(std::size_t& seed, const T& v)
 //#define DEBUG_OUTPUT_LEVEL 0	// show all
 //#define DEBUG_OUTPUT_LEVEL 1	// show mid priority
 #define DEBUG_OUTPUT_LEVEL 2	// show high priority
+
+#include "Core/jName.h"
 
 #endif //PCH_H

@@ -225,15 +225,15 @@ void jRenderObject::SetCameraProperty(const jShader* shader, const jCamera* came
 	auto MV = camera->View * World;
 	auto MVP = camera->Projection * MV;
 
-	g_rhi->SetUniformbuffer("MVP", MVP, shader);
-	g_rhi->SetUniformbuffer("MV", MV, shader);
-	g_rhi->SetUniformbuffer("M", World, shader);
-	g_rhi->SetUniformbuffer("Collided", Collided, shader);
-	g_rhi->SetUniformbuffer("UseUniformColor", UseUniformColor, shader);
-	g_rhi->SetUniformbuffer("Color", Color, shader);
-	g_rhi->SetUniformbuffer("UseMaterial", UseMaterial, shader);
-	g_rhi->SetUniformbuffer("ShadingModel", static_cast<int>(ShadingModel), shader);
-	g_rhi->SetUniformbuffer("IsTwoSided", IsTwoSided, shader);
+	SET_UNIFORM_BUFFER_STATIC("MVP", MVP, shader);
+	SET_UNIFORM_BUFFER_STATIC("MV", MV, shader);
+	SET_UNIFORM_BUFFER_STATIC("M", World, shader);
+	SET_UNIFORM_BUFFER_STATIC("Collided", Collided, shader);
+	SET_UNIFORM_BUFFER_STATIC("UseUniformColor", UseUniformColor, shader);
+	SET_UNIFORM_BUFFER_STATIC("Color", Color, shader);
+	SET_UNIFORM_BUFFER_STATIC("UseMaterial", UseMaterial, shader);
+	SET_UNIFORM_BUFFER_STATIC("ShadingModel", static_cast<int>(ShadingModel), shader);
+	SET_UNIFORM_BUFFER_STATIC("IsTwoSided", IsTwoSided, shader);
 }
 
 void jRenderObject::SetLightProperty(const jShader* shader, const jCamera* camera, const std::list<const jLight*>& lights, jMaterialData* materialData)
@@ -245,7 +245,7 @@ void jRenderObject::SetLightProperty(const jShader* shader, const jCamera* camer
 void jRenderObject::SetTextureProperty(const jShader* shader, const jMaterialData* materialData)
 {
 	const bool useTexture = (materialData->Params.size() > 0);
-	g_rhi->SetUniformbuffer("UseTexture", useTexture, shader);
+	SET_UNIFORM_BUFFER_STATIC("UseTexture", useTexture, shader);
 }
 
 void jRenderObject::SetMaterialProperty(const jShader* shader, const jMaterialData* materialData, const std::vector<const jMaterialData*>& dynamicMaterialData)

@@ -37,7 +37,7 @@ uint64 jQueryPrimitiveGenerated::GetResult()
 }
 
 
-jMaterialParam* jMaterialData::CreateMaterialParam(const char* name, jTexture* texture, jSamplerState* samplerstate)
+jMaterialParam* jMaterialData::CreateMaterialParam(jName name, jTexture* texture, jSamplerState* samplerstate)
 {
 	auto param = new jMaterialParam();
 	param->Name = name;
@@ -46,7 +46,48 @@ jMaterialParam* jMaterialData::CreateMaterialParam(const char* name, jTexture* t
 	return param;
 }
 
-void jMaterialData::AddMaterialParam(const char* name, jTexture* texture, jSamplerState* samplerstate)
+void jMaterialData::AddMaterialParam(jName name, jTexture* texture, jSamplerState* samplerstate)
 {
 	Params.push_back(CreateMaterialParam(name, texture, samplerstate));
+}
+
+jName GetCommonTextureName(int32 index)
+{
+	static std::vector<jName> s_tex_name;
+
+	if ((s_tex_name.size() > index) && s_tex_name[index].IsValid())
+	{
+		return s_tex_name[index];
+	}
+
+	if (s_tex_name.size() < (index + 1))
+		s_tex_name.resize(index + 1);
+
+	char szTemp[128] = { 0, };
+	if (index > 0)
+		sprintf_s(szTemp, sizeof(szTemp), "tex_object%d", index + 1);
+	else
+		sprintf_s(szTemp, sizeof(szTemp), "tex_object");
+
+	s_tex_name[index] = jName(szTemp);
+	return s_tex_name[index];
+}
+
+jName GetCommonTextureSRGBName(int32 index)
+{
+	static std::vector<jName> s_tex_srgb_name;
+
+	if ((s_tex_srgb_name.size() > index) && s_tex_srgb_name[index].IsValid())
+	{
+		return s_tex_srgb_name[index];
+	}
+
+	if (s_tex_srgb_name.size() < (index + 1))
+		s_tex_srgb_name.resize(index + 1);
+
+	char szTemp[128] = { 0, };
+	sprintf_s(szTemp, sizeof(szTemp), "TextureSRGB[%d]", index);
+
+	s_tex_srgb_name[index] = jName(szTemp);
+	return s_tex_srgb_name[index];
 }

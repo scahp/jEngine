@@ -34,6 +34,15 @@
     <Filter Include="IMGUI">
       <UniqueIdentifier>{3b4a88b3-46a4-4af9-a6f1-5ecfe188c022}</UniqueIdentifier>
     </Filter>
+    <Filter Include="External">
+      <UniqueIdentifier>{73008294-ac15-42a9-9361-9c43b423dcc1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="External\cityhash">
+      <UniqueIdentifier>{2c2f005e-cfe1-438f-999d-ee3169b02878}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core">
+      <UniqueIdentifier>{624b473a-1da7-4d3c-aab8-9738c80fead3}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h">
@@ -192,6 +201,15 @@
     <ClInclude Include="stb_image.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="External\cityhash\city.h">
+      <Filter>External\cityhash</Filter>
+    </ClInclude>
+    <ClInclude Include="External\cityhash\citycrc.h">
+      <Filter>External\cityhash</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\jName.h">
+      <Filter>Core</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -334,6 +352,12 @@
     </ClCompile>
     <ClCompile Include="jSamplerStatePool.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="External\cityhash\city.cc">
+      <Filter>External\cityhash</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\jName.cpp">
+      <Filter>Core</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

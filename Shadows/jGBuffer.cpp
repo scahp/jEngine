@@ -22,28 +22,28 @@ void jGBuffer::BindGeometryBuffer(const jShader* shader) const
 	jMaterialData materialData;
 	{
 		auto param = new jMaterialParam();
-		param->Name = "ColorSampler";
+		param->Name = jName("ColorSampler");
 		param->Texture = GeometryBuffer->Textures[0].get();
 		materialData.Params.push_back(param);
 	}
 
 	{
 		auto param = new jMaterialParam();
-		param->Name = "NormalSampler";
+		param->Name = jName("NormalSampler");
 		param->Texture = GeometryBuffer->Textures[1].get();
 		materialData.Params.push_back(param);
 	}
 
 	{
 		auto param = new jMaterialParam();
-		param->Name = "PosInWorldSampler";
+		param->Name = jName("PosInWorldSampler");
 		param->Texture = GeometryBuffer->Textures[2].get();
 		materialData.Params.push_back(param);
 	}
 
 	{
 		auto param = new jMaterialParam();
-		param->Name = "PosInLightSampler";
+		param->Name = jName("PosInLightSampler");
 		param->Texture = GeometryBuffer->Textures[3].get();
 		materialData.Params.push_back(param);
 	}

@@ -7,33 +7,33 @@
 
 jMeshMaterial jMeshObject::NullMeshMateral;
 
-const char* jMeshMaterial::MaterialTextureTypeString[(int32)jMeshMaterial::EMaterialTextureType::Max + 1] = {
-	"DiffuseSampler",
-	"SpecularSampler",
-	"AmbientSampler",
-	"EmissiveSampler",
-	"HeightSampler",
-	"NormalSampler",
-	"ShininessSampler",
-	"OpacitySampler",
-	"DisplacementSampler",
-	"LightmapSampler",
-	"ReflectionSampler",
-	"Max"
+jName jMeshMaterial::MaterialTextureTypeString[(int32)jMeshMaterial::EMaterialTextureType::Max + 1] = {
+	jName("DiffuseSampler"),
+	jName("SpecularSampler"),
+	jName("AmbientSampler"),
+	jName("EmissiveSampler"),
+	jName("HeightSampler"),
+	jName("NormalSampler"),
+	jName("ShininessSampler"),
+	jName("OpacitySampler"),
+	jName("DisplacementSampler"),
+	jName("LightmapSampler"),
+	jName("ReflectionSampler"),
+	jName("Max")
 };
 
 //////////////////////////////////////////////////////////////////////////
 // LightData
 void jMeshMaterial::Material::BindMaterialData(const jShader* shader) const
 {
-	shader->SetUniformbuffer("Material.Ambient", Ambient);
-	shader->SetUniformbuffer("Material.Diffuse", Diffuse);
-	shader->SetUniformbuffer("Material.Specular", Specular);
-	shader->SetUniformbuffer("Material.Emissive", Emissive);
-	shader->SetUniformbuffer("Material.SpecularShiness", SpecularShiness);
-	shader->SetUniformbuffer("Material.Opacity", Opacity);
-	shader->SetUniformbuffer("Material.Reflectivity", Reflectivity);
-	shader->SetUniformbuffer("Material.IndexOfRefraction", IndexOfRefraction);
+	SET_UNIFORM_BUFFER_STATIC("Material.Ambient", Ambient, shader);
+	SET_UNIFORM_BUFFER_STATIC("Material.Diffuse", Diffuse, shader);
+	SET_UNIFORM_BUFFER_STATIC("Material.Specular", Specular, shader);
+	SET_UNIFORM_BUFFER_STATIC("Material.Emissive", Emissive, shader);
+	SET_UNIFORM_BUFFER_STATIC("Material.SpecularShiness", SpecularShiness, shader);
+	SET_UNIFORM_BUFFER_STATIC("Material.Opacity", Opacity, shader);
+	SET_UNIFORM_BUFFER_STATIC("Material.Reflectivity", Reflectivity, shader);
+	SET_UNIFORM_BUFFER_STATIC("Material.IndexOfRefraction", IndexOfRefraction, shader);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -122,11 +122,11 @@ void jMeshObject::DrawSubMesh(int32 meshIndex, const jCamera* camera, const jSha
 		{
 			SetMaterialUniform(shader, &NullMeshMateral);
 		}
-
-		shader->SetUniformbuffer("UseOpacitySampler", UseOpacitySampler);
-		shader->SetUniformbuffer("UseDisplacementSampler", UseDisplacementSampler);
-		shader->SetUniformbuffer("UseAmbientSampler", UseAmbientSampler);
-		shader->SetUniformbuffer("UseNormalSampler", UseNormalSampler);
+				
+		SET_UNIFORM_BUFFER_STATIC("UseOpacitySampler", UseOpacitySampler, shader);
+		SET_UNIFORM_BUFFER_STATIC("UseDisplacementSampler", UseDisplacementSampler, shader);
+		SET_UNIFORM_BUFFER_STATIC("UseAmbientSampler", UseAmbientSampler, shader);
+		SET_UNIFORM_BUFFER_STATIC("UseNormalSampler", UseNormalSampler, shader);
 	}
 
 	if (subMesh.EndFace > 0)

@@ -219,9 +219,9 @@ public:
 		for (int32 i = 0; i < NUM_CASCADES; ++i)
 		{
 			sprintf_s(szTemp, sizeof(szTemp), "CascadeLightVP[%d]", i);
-			CascadeLightVP[i].Name = szTemp;
+			CascadeLightVP[i].Name = jName(szTemp);
 			sprintf_s(szTemp, sizeof(szTemp), "CascadeEndsW[%d]", i);
-			CascadeEndsW[i].Name = szTemp;
+			CascadeEndsW[i].Name = jName(szTemp);
 		}
 	}
 	virtual void RenderToShadowMap(const RenderToShadowMapFunc& func, const jShader* shader) const override;
@@ -244,7 +244,7 @@ public:
 		for (int i = 0; i < 6; ++i)
 		{
 			sprintf_s(szTemp, sizeof(szTemp), "OmniShadowMapVP[%d]", i);
-			OmniShadowMapVP[i].Name = szTemp;
+			OmniShadowMapVP[i].Name = jName(szTemp);
 		}
 	}
 
@@ -312,7 +312,7 @@ public:
 		for (int i = 0; i < 6; ++i)
 		{
 			sprintf_s(szTemp, sizeof(szTemp), "OmniShadowMapVP[%d]", i);
-			OmniShadowMapVP[i].Name = szTemp;
+			OmniShadowMapVP[i].Name = jName(szTemp);
 		}
 	}
 

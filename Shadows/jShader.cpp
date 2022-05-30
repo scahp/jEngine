@@ -182,41 +182,6 @@ void jShader::UpdateShaders()
 	currentShader->UpdateShader();
 }
 
-bool jShader::SetUniformbuffer(const char* name, const Matrix& InData) const
-{
-	return g_rhi->SetUniformbuffer(name, InData, this);
-}
-
-bool jShader::SetUniformbuffer(const char* name, const bool InData) const
-{
-	return g_rhi->SetUniformbuffer(name, InData, this);
-}
-
-bool jShader::SetUniformbuffer(const char* name, const float InData) const
-{
-	return g_rhi->SetUniformbuffer(name, InData, this);
-}
-
-bool jShader::SetUniformbuffer(const char* name, const int32 InData) const
-{
-	return g_rhi->SetUniformbuffer(name, InData, this);
-}
-
-bool jShader::SetUniformbuffer(const char* name, const Vector2& InData) const
-{
-	return g_rhi->SetUniformbuffer(name, InData, this);
-}
-
-bool jShader::SetUniformbuffer(const char* name, const Vector& InData) const
-{
-	return g_rhi->SetUniformbuffer(name, InData, this);
-}
-
-bool jShader::SetUniformbuffer(const char* name, const Vector4& InData) const
-{
-	return g_rhi->SetUniformbuffer(name, InData, this);
-}
-
 void jShader::UpdateShader()
 {
 	auto checkTimeStampFunc = [this](const std::string& filename) -> uint64

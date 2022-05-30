@@ -32,12 +32,24 @@ struct jIndexBuffer_OpenGL : public jIndexBuffer
 	virtual void Bind(const jShader* shader) const override;
 };
 
+#define USE_CACHED_UNIFORM_LOCATION_HASH 0
+#define USE_CACHED_UNIFORM_LOCATION_ARRAY 1		// The way using an array is fastest
 struct jShader_OpenGL : public jShader
 {
 	unsigned int program = 0;
 
-	int32 TryGetUniformLocation(const char* name) const;
-	mutable std::unordered_map<size_t, int32> UniformNameMap;		// <string hash, location>
+	FORCEINLINE int32 TryGetUniformLocation(jName name) const;
+
+#if USE_CACHED_UNIFORM_LOCATION_HASH
+	mutable std::unordered_map<uint32, int32> UniformNameMap;		// <jNameHash, location>
+#elif USE_CACHED_UNIFORM_LOCATION_ARRAY
+	struct jUniformLocationInfo
+	{
+		uint32 hash = -1;
+		int32 location = -1;
+	};
+	mutable std::vector<jUniformLocationInfo> uniforms;
+#endif
 };
 
 struct jTexture_OpenGL : public jTexture
@@ -200,18 +212,18 @@ public:
 		, EFormatType dataType = EFormatType::UNSIGNED_BYTE, ETextureFormat textureFormat = ETextureFormat::RGBA, bool createMipmap = false) const override;
 	virtual jTexture* CreateCubeTextureFromData(std::vector<void*> faces, int32 width, int32 height, bool sRGB
 		, EFormatType dataType = EFormatType::UNSIGNED_BYTE, ETextureFormat textureFormat = ETextureFormat::RGBA, bool createMipmap = false) const override;
-	virtual bool SetUniformbuffer(const char* name, const Matrix& InData, const jShader* InShader) const override;
-	virtual bool SetUniformbuffer(const char* name, const int InData, const jShader* InShader) const override;
-	virtual bool SetUniformbuffer(const char* name, const uint32 InData, const jShader* InShader) const override;
-	virtual bool SetUniformbuffer(const char* name, const float InData, const jShader* InShader) const override;
-	virtual bool SetUniformbuffer(const char* name, const Vector2& InData, const jShader* InShader) const override;
-	virtual bool SetUniformbuffer(const char* name, const Vector& InData, const jShader* InShader) const override;
-	virtual bool SetUniformbuffer(const char* name, const Vector4& InData, const jShader* InShader) const override;
-	virtual bool SetUniformbuffer(const char* name, const Vector2i& InData, const jShader* InShader) const override;
-	virtual bool SetUniformbuffer(const char* name, const Vector3i& InData, const jShader* InShader) const override;
-	virtual bool SetUniformbuffer(const char* name, const Vector4i& InData, const jShader* InShader) const override;
+	virtual bool SetUniformbuffer(jName name, const Matrix& InData, const jShader* InShader) const override;
+	virtual bool SetUniformbuffer(jName name, const int InData, const jShader* InShader) const override;
+	virtual bool SetUniformbuffer(jName name, const uint32 InData, const jShader* InShader) const override;
+	virtual bool SetUniformbuffer(jName name, const float InData, const jShader* InShader) const override;
+	virtual bool SetUniformbuffer(jName name, const Vector2& InData, const jShader* InShader) const override;
+	virtual bool SetUniformbuffer(jName name, const Vector& InData, const jShader* InShader) const override;
+	virtual bool SetUniformbuffer(jName name, const Vector4& InData, const jShader* InShader) const override;
+	virtual bool SetUniformbuffer(jName name, const Vector2i& InData, const jShader* InShader) const override;
+	virtual bool SetUniformbuffer(jName name, const Vector3i& InData, const jShader* InShader) const override;
+	virtual bool SetUniformbuffer(jName name, const Vector4i& InData, const jShader* InShader) const override;
 	virtual bool GetUniformbuffer(void* outResult, const IUniformBuffer* buffer, const jShader* shader) const override;
-	virtual bool GetUniformbuffer(void* outResult, EUniformType type, const char* name, const jShader* shader) const override;
+	virtual bool GetUniformbuffer(void* outResult, EUniformType type, jName name, const jShader* shader) const override;
 	virtual int32 SetMatetrial(const jMaterialData* materialData, const jShader* shader, int32 baseBindingIndex = 0) const override;
 	virtual void SetTexture(int32 index, const jTexture* texture) const override;
 	virtual void SetTextureFilter(ETextureType type, ETextureFilterTarget target, ETextureFilter filter) const override;
@@ -271,6 +283,6 @@ public:
 	virtual void SetCubeMapSeamless(bool enable) const override;
 	
 	//////////////////////////////////////////////////////////////////////////
-	uint32 GetUniformLocation(uint32 InProgram, const char* name) const;
+	int32 GetUniformLocation(uint32 InProgram, const char* name) const;
 };
 

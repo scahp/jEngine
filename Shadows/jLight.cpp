@@ -230,10 +230,10 @@ void jLight::BindLights(const std::list<const jLight*>& lights, const jShader* s
 		}
 	}
 
-	SET_UNIFORM_BUFFER_STATIC(int, "UseAmbientLight", ambient, shader);
-	SET_UNIFORM_BUFFER_STATIC(int, "NumOfDirectionalLight", directional, shader);
-	SET_UNIFORM_BUFFER_STATIC(int, "NumOfPointLight", point, shader);
-	SET_UNIFORM_BUFFER_STATIC(int, "NumOfSpotLight", spot, shader);
+	SET_UNIFORM_BUFFER_STATIC("UseAmbientLight", ambient, shader);
+	SET_UNIFORM_BUFFER_STATIC("NumOfDirectionalLight", directional, shader);
+	SET_UNIFORM_BUFFER_STATIC("NumOfPointLight", point, shader);
+	SET_UNIFORM_BUFFER_STATIC("NumOfSpotLight", spot, shader);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -359,7 +359,7 @@ void jDirectionalLight::UpdateMaterialData()
 	MaterialData.Params.clear();
 	{
 		auto materialParam = new jMaterialParam();
-		materialParam->Name = "shadow_object";
+		materialParam->Name = jName("shadow_object");
 		materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTextureDepth();
 		materialParam->SamplerState = ShadowMapData->ShadowMapSamplerState.get();
 		MaterialData.Params.push_back(materialParam);
@@ -367,7 +367,7 @@ void jDirectionalLight::UpdateMaterialData()
 
 	{
 		auto materialParam = new jMaterialParam();
-		materialParam->Name = "shadow_object_test";
+		materialParam->Name = jName("shadow_object_test");
 
 		const auto type = jShadowAppSettingProperties::GetInstance().ShadowMapType;
 		if ((type == EShadowMapType::VSM) || (type == EShadowMapType::ESM) || (type == EShadowMapType::EVSM))
@@ -545,7 +545,7 @@ void jPointLight::UpdateMaterialData()
 	MaterialData.Params.clear();
 	{
 		auto materialParam = new jMaterialParam();
-		materialParam->Name = "shadow_object_point_shadow";
+		materialParam->Name = jName("shadow_object_point_shadow");
 		materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTextureDepth();
 		materialParam->SamplerState = ShadowMapData->ShadowMapSamplerState.get();
 		MaterialData.Params.push_back(materialParam);
@@ -553,7 +553,7 @@ void jPointLight::UpdateMaterialData()
 
 	{
 		auto materialParam = new jMaterialParam();
-		materialParam->Name = "shadow_object_point";
+		materialParam->Name = jName("shadow_object_point");
 		const auto type = jShadowAppSettingProperties::GetInstance().ShadowMapType;
 		if ((type == EShadowMapType::VSM) || (type == EShadowMapType::ESM) || (type == EShadowMapType::EVSM))
 		{
@@ -694,7 +694,7 @@ void jSpotLight::UpdateMaterialData()
 	MaterialData.Params.clear();
 	{
 		auto materialParam = new jMaterialParam();
-		materialParam->Name = "shadow_object_spot_shadow";
+		materialParam->Name = jName("shadow_object_spot_shadow");
 		materialParam->Texture = ShadowMapData->ShadowMapRenderTarget->GetTextureDepth();
 		materialParam->SamplerState = ShadowMapData->ShadowMapSamplerState.get();
 		MaterialData.Params.push_back(materialParam);
@@ -702,7 +702,7 @@ void jSpotLight::UpdateMaterialData()
 
 	{
 		auto materialParam = new jMaterialParam();
-		materialParam->Name = "shadow_object_spot";
+		materialParam->Name = jName("shadow_object_spot");
 		const auto type = jShadowAppSettingProperties::GetInstance().ShadowMapType;
 		if ((type == EShadowMapType::VSM) || (type == EShadowMapType::ESM) || (type == EShadowMapType::EVSM))
 		{
@@ -721,6 +721,6 @@ void jAmbientLight::BindLight(const jShader* shader) const
 {
 	//const std::string structName = "AmbientLight";
 
-	SET_UNIFORM_BUFFER_STATIC(Vector, "AmbientLight.Color", Data.Color, shader);
-	SET_UNIFORM_BUFFER_STATIC(Vector, "AmbientLight.Intensity", Data.Intensity, shader);
+	SET_UNIFORM_BUFFER_STATIC("AmbientLight.Color", Data.Color, shader);
+	SET_UNIFORM_BUFFER_STATIC("AmbientLight.Intensity", Data.Intensity, shader);
 }

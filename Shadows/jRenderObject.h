@@ -51,7 +51,7 @@ public:
 
 	std::shared_ptr<jIndexStreamData> IndexStream;
 	jIndexBuffer* IndexBuffer = nullptr;
-	static jMaterialParam* CreateMaterialParam(const char* name, const jTexture* texture, const jSamplerState* sampler = nullptr)
+	static jMaterialParam* CreateMaterialParam(jName name, const jTexture* texture, const jSamplerState* sampler = nullptr)
 	{
 		JASSERT(name);
 		auto NewParam = new jMaterialParam();

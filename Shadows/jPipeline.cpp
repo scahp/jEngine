@@ -547,8 +547,8 @@ void jComputePipeline::Dispatch() const
 void jDeepShadowMap_Sort_ComputePipeline::Setup()
 {
 	Shader = jShader::GetShader("cs_sort");
-	ShadowMapWidthUniform = new jUniformBuffer<int>("ShadowMapWidth", SM_LINKED_LIST_WIDTH);
-	ShadowMapHeightUniform = new jUniformBuffer<int>("ShadowMapHeight", SM_LINKED_LIST_HEIGHT);
+	ShadowMapWidthUniform = new jUniformBuffer<int>(jName("ShadowMapWidth"), SM_LINKED_LIST_WIDTH);
+	ShadowMapHeightUniform = new jUniformBuffer<int>(jName("ShadowMapHeight"), SM_LINKED_LIST_HEIGHT);
 
 	Buffers.push_back(ShadowMapWidthUniform);
 	Buffers.push_back(ShadowMapHeightUniform);
@@ -573,8 +573,8 @@ void jDeepShadowMap_Link_ComputePipeline::Setup()
 {
 	Shader = jShader::GetShader("cs_link");
 	
-	ShadowMapWidthUniform = new jUniformBuffer<int>("ShadowMapWidth", SM_LINKED_LIST_WIDTH);
-	ShadowMapHeightUniform = new jUniformBuffer<int>("ShadowMapHeight", SM_LINKED_LIST_HEIGHT);
+	ShadowMapWidthUniform = new jUniformBuffer<int>(jName("ShadowMapWidth"), SM_LINKED_LIST_WIDTH);
+	ShadowMapHeightUniform = new jUniformBuffer<int>(jName("ShadowMapHeight"), SM_LINKED_LIST_HEIGHT);
 
 	Buffers.push_back(ShadowMapWidthUniform);
 	Buffers.push_back(ShadowMapHeightUniform);

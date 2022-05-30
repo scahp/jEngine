@@ -55,7 +55,7 @@ int main()
 	glfwSetCursorPosCallback(window, cursor_position_callback);
 	glfwSetMouseButtonCallback(window, mouse_button_callback);
 	glfwSetScrollCallback(window, scroll_callback);
-	
+
 	//int major, minor, rev;
 	//glfwGetVersion(&major, &minor, &rev);
 	//auto versionCheck = glfwGetVersionString();

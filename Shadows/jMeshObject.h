@@ -22,7 +22,7 @@ struct jMeshMaterial
 		Max
 	};
 
-	static const char* MaterialTextureTypeString[(int32)EMaterialTextureType::Max + 1];
+	static jName MaterialTextureTypeString[(int32)EMaterialTextureType::Max + 1];
 
 	struct Material
 	{

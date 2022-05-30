@@ -50,8 +50,9 @@ public:
 		}
 		else
 		{
-			queryTime = s_resting.back();
-			s_resting.pop_back();
+			auto iter = s_resting.begin();
+			queryTime = *iter;
+			s_resting.erase(iter);
 		}
 		s_running.insert(queryTime);
 		JASSERT(queryTime);
@@ -60,7 +61,7 @@ public:
 	static void ReturnQueryTime(jQueryTime* queryTime)
 	{
 		s_running.erase(queryTime);
-		s_resting.push_back(queryTime);
+		s_resting.insert(queryTime);
 	}
 	static void DeleteAllQueryTime()
 	{
@@ -74,8 +75,8 @@ public:
 	}
 
 private:
-	static std::set<jQueryTime*> s_running;
-	static std::list<jQueryTime*> s_resting;
+	static std::unordered_set<jQueryTime*> s_running;
+	static std::unordered_set<jQueryTime*> s_resting;
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -126,7 +127,7 @@ public:
 		Profile.End = jQueryTimePool::GetQueryTime();
 		g_rhi->QueryTimeStamp(Profile.End);
 		
-		jProfile_GPU::WatingResultList[jProfile_GPU::CurrentWatingResultListIndex].push_back(Profile);
+		jProfile_GPU::WatingResultList[jProfile_GPU::CurrentWatingResultListIndex].emplace_back(Profile);
 	}
 
 	jProfile_GPU Profile;

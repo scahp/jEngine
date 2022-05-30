@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include "jRHIType.h"
 #include "Math\Matrix.h"
+#include "Core\jName.h"
 
 extern class jRHI* g_rhi;
 
@@ -12,7 +13,7 @@ struct IBuffer
 {
 	virtual ~IBuffer() {}
 
-	virtual const char* GetName() const { return ""; }
+	virtual jName GetName() const { return jName::Invalid; }
 	virtual void Bind(const jShader* shader) const = 0;
 };
 
@@ -92,13 +93,13 @@ template <> struct ConvertUniformType<Vector4> { operator EUniformType () { retu
 struct IUniformBuffer : public IBuffer
 {
 	IUniformBuffer() = default;
-	IUniformBuffer(const std::string& name)
+	IUniformBuffer(const jName& name)
 		: Name(name)
 	{}
 	virtual ~IUniformBuffer() {}
-	std::string Name;
+	jName Name;
 
-	virtual const char* GetName() const { return Name.c_str(); }
+	virtual jName GetName() const { return Name; }
 	virtual EUniformType GetType() const { return EUniformType::NONE; }
 	virtual void SetUniformbuffer(const jShader* /*InShader*/) const {}
 	virtual void Bind(const jShader* shader) const override;
@@ -216,7 +217,7 @@ struct jMaterialParam
 {
 	virtual ~jMaterialParam() {}
 
-	std::string Name;
+	jName Name;
 	const jTexture* Texture = nullptr;
 	const jSamplerState* SamplerState = nullptr;
 };
@@ -230,8 +231,8 @@ struct jMaterialData
 		Params.clear();
 	}
 
-	static jMaterialParam* CreateMaterialParam(const char* name, jTexture* texture, jSamplerState* samplerstate = nullptr);
-	void AddMaterialParam(const char* name, jTexture* texture, jSamplerState* samplerstate = nullptr);
+	static jMaterialParam* CreateMaterialParam(jName name, jTexture* texture, jSamplerState* samplerstate = nullptr);
+	void AddMaterialParam(jName name, jTexture* texture, jSamplerState* samplerstate = nullptr);
 
 	std::vector<jMaterialParam*> Params;
 };
@@ -414,19 +415,19 @@ public:
 	virtual void SetViewportIndexed(int32 index, float x, float y, float width, float height) const {}
 	virtual void SetViewportIndexed(int32 index, const jViewport& viewport) const {}
 	virtual void SetViewportIndexedArray(int32 startIndex, int32 count, const jViewport* viewports) const {}
-	virtual bool SetUniformbuffer(const char* name, const Matrix& InData, const jShader* InShader) const { return false; }
-	virtual bool SetUniformbuffer(const char* name, const int InData, const jShader* InShader) const { return false; }
-	virtual bool SetUniformbuffer(const char* name, const uint32 InData, const jShader* InShader) const { return false; }
-	FORCEINLINE virtual bool SetUniformbuffer(const char* name, const bool InData, const jShader* InShader) const { return SetUniformbuffer(name, (int32)InData, InShader); }
-	virtual bool SetUniformbuffer(const char* name, const float InData, const jShader* InShader) const { return false; }
-	virtual bool SetUniformbuffer(const char* name, const Vector2& InData, const jShader* InShader) const { return false; }
-	virtual bool SetUniformbuffer(const char* name, const Vector& InData, const jShader* InShader) const { return false; }
-	virtual bool SetUniformbuffer(const char* name, const Vector4& InData, const jShader* InShader) const { return false; }
-	virtual bool SetUniformbuffer(const char* name, const Vector2i& InData, const jShader* InShader) const { return false; }
-	virtual bool SetUniformbuffer(const char* name, const Vector3i& InData, const jShader* InShader) const { return false; }
-	virtual bool SetUniformbuffer(const char* name, const Vector4i& InData, const jShader* InShader) const { return false; }
+	virtual bool SetUniformbuffer(jName name, const Matrix& InData, const jShader* InShader) const { return false; }
+	virtual bool SetUniformbuffer(jName name, const int InData, const jShader* InShader) const { return false; }
+	virtual bool SetUniformbuffer(jName name, const uint32 InData, const jShader* InShader) const { return false; }
+	FORCEINLINE virtual bool SetUniformbuffer(jName name, const bool InData, const jShader* InShader) const { return SetUniformbuffer(name, (int32)InData, InShader); }
+	virtual bool SetUniformbuffer(jName name, const float InData, const jShader* InShader) const { return false; }
+	virtual bool SetUniformbuffer(jName name, const Vector2& InData, const jShader* InShader) const { return false; }
+	virtual bool SetUniformbuffer(jName name, const Vector& InData, const jShader* InShader) const { return false; }
+	virtual bool SetUniformbuffer(jName name, const Vector4& InData, const jShader* InShader) const { return false; }
+	virtual bool SetUniformbuffer(jName name, const Vector2i& InData, const jShader* InShader) const { return false; }
+	virtual bool SetUniformbuffer(jName name, const Vector3i& InData, const jShader* InShader) const { return false; }
+	virtual bool SetUniformbuffer(jName name, const Vector4i& InData, const jShader* InShader) const { return false; }
 	virtual bool GetUniformbuffer(void* outResult, const IUniformBuffer* buffer, const jShader* shader) const { return false; }
-	virtual bool GetUniformbuffer(void* outResult, EUniformType type, const char* name, const jShader* shader) const { return false; }
+	virtual bool GetUniformbuffer(void* outResult, EUniformType type, jName name, const jShader* shader) const { return false; }
 	virtual jTexture* CreateNullTexture() const { return nullptr; }
 	virtual jTexture* CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
 		, EFormatType dataType = EFormatType::UNSIGNED_BYTE, ETextureFormat textureFormat = ETextureFormat::RGBA, bool createMipmap = false) const { return nullptr; }
@@ -481,17 +482,17 @@ public:
 };
 
 // Not thred safe
-#define SET_UNIFORM_BUFFER_STATIC(Type, Name, CurrentData, Shader) \
+#define SET_UNIFORM_BUFFER_STATIC(Name, CurrentData, Shader) \
 {\
-	static jUniformBuffer<Type> temp(Name, CurrentData);\
+	static jUniformBuffer<typename std::decay<decltype(CurrentData)>::type> temp(jName(Name), CurrentData);\
 	temp.Data = CurrentData;\
 	temp.SetUniformbuffer(Shader);\
 }
 
 // Not thread safe
-#define GET_UNIFORM_BUFFER_STATIC(ResultData, Type, Name, Shader) \
+#define GET_UNIFORM_BUFFER_STATIC(ResultData, Name, Shader) \
 {\
-	EUniformType UniformType = ConvertUniformType<Type>();\
+	EUniformType UniformType = ConvertUniformType<typename std::decay<decltype(CurrentData)>::type>();\
 	JASSERT(UniformType != EUniformType::NONE);\
 	g_rhi->GetUniformbuffer(ResultData, UniformType, Name, Shader);\
 }
@@ -518,12 +519,12 @@ struct jScopeDebugEvent final
 template <> struct jUniformBuffer<DataType> : public IUniformBuffer\
 {\
 	jUniformBuffer() = default;\
-	jUniformBuffer(const std::string& name, const DataType& data)\
+	jUniformBuffer(const jName& name, const DataType& data)\
 		: IUniformBuffer(name), Data(data)\
 	{}\
 	static constexpr EUniformType Type = EnumType;\
 	FORCEINLINE virtual EUniformType GetType() const { return Type; }\
-	FORCEINLINE virtual void SetUniformbuffer(const jShader* InShader) const { g_rhi->SetUniformbuffer(Name.c_str(), Data, InShader); }\
+	FORCEINLINE virtual void SetUniformbuffer(const jShader* InShader) const { g_rhi->SetUniformbuffer(Name, Data, InShader); }\
 	DataType Data;\
 };
 
@@ -537,3 +538,6 @@ DECLARE_UNIFORMBUFFER(EUniformType::VECTOR4, Vector4);
 DECLARE_UNIFORMBUFFER(EUniformType::VECTOR2I, Vector2i);
 DECLARE_UNIFORMBUFFER(EUniformType::VECTOR3I, Vector3i);
 DECLARE_UNIFORMBUFFER(EUniformType::VECTOR4I, Vector4i);
+
+jName GetCommonTextureName(int32 index);
+jName GetCommonTextureSRGBName(int32 index);
