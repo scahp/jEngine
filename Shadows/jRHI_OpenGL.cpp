@@ -7,549 +7,289 @@
 jRHI_OpenGL* g_rhi_gl = nullptr;
 
 //////////////////////////////////////////////////////////////////////////
+// Auto generate type conversion code
+template <typename T>
+using ConversionTypePair = std::pair<T, uint32>;
+
+template <typename... T1>
+constexpr auto GenerateConversionTypeArrayGL(T1... args)
+{
+	std::array<uint32, sizeof...(args)> newArray;
+	auto AddElementFunc = [&newArray](const auto& arg)
+	{
+		newArray[(int32)arg.first] = arg.second;
+	};
+
+	int dummy[] = { 0, (AddElementFunc(args), 0)... };
+	return newArray;
+}
+
+#define CONVERSION_TYPE_ELEMENT(x, y) ConversionTypePair<decltype(x)>(x, y)
+#define GENERATE_STATIC_CONVERSION_ARRAY(...) {static auto TypeArrayGL = GenerateConversionTypeArrayGL(__VA_ARGS__); return TypeArrayGL[(int32)type];}
+
+//////////////////////////////////////////////////////////////////////////
 // OpenGL utility functions
-unsigned int GetPrimitiveType(EPrimitiveType type)
+FORCEINLINE uint32 GetPrimitiveType(EPrimitiveType type)
 {
-	unsigned int primitiveType = 0;
-	switch (type)
-	{
-	case EPrimitiveType::POINTS:
-		primitiveType = GL_POINTS;
-		break;
-	case EPrimitiveType::LINES:
-		primitiveType = GL_LINES;
-		break;
-	case EPrimitiveType::LINES_ADJACENCY:
-		primitiveType = GL_LINES_ADJACENCY;
-		break;
-	case EPrimitiveType::LINE_STRIP_ADJACENCY:
-		primitiveType = GL_LINE_STRIP_ADJACENCY;
-		break;
-	case EPrimitiveType::TRIANGLES:
-		primitiveType = GL_TRIANGLES;
-		break;
-	case EPrimitiveType::TRIANGLE_STRIP:
-		primitiveType = GL_TRIANGLE_STRIP;
-		break;
-	case EPrimitiveType::TRIANGLES_ADJACENCY:
-		primitiveType = GL_TRIANGLES_ADJACENCY;
-		break;
-	case EPrimitiveType::TRIANGLE_STRIP_ADJACENCY:
-		primitiveType = GL_TRIANGLE_STRIP_ADJACENCY;
-		break;
-	}
-	return primitiveType;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(EPrimitiveType::POINTS, GL_POINTS),
+		CONVERSION_TYPE_ELEMENT(EPrimitiveType::LINES, GL_LINES),
+		CONVERSION_TYPE_ELEMENT(EPrimitiveType::LINES_ADJACENCY, GL_LINES_ADJACENCY),
+		CONVERSION_TYPE_ELEMENT(EPrimitiveType::LINE_STRIP_ADJACENCY, GL_LINE_STRIP_ADJACENCY),
+		CONVERSION_TYPE_ELEMENT(EPrimitiveType::TRIANGLES, GL_TRIANGLES),
+		CONVERSION_TYPE_ELEMENT(EPrimitiveType::TRIANGLE_STRIP, GL_TRIANGLE_STRIP),
+		CONVERSION_TYPE_ELEMENT(EPrimitiveType::TRIANGLES_ADJACENCY, GL_TRIANGLES_ADJACENCY),
+		CONVERSION_TYPE_ELEMENT(EPrimitiveType::TRIANGLE_STRIP_ADJACENCY, GL_TRIANGLE_STRIP_ADJACENCY)
+		);
 }
 
-uint32 GetOpenGLTextureType(ETextureType textureType)
+FORCEINLINE uint32 GetOpenGLTextureType(ETextureType type)
 {
-	uint32 result = 0;
-	switch (textureType)
-	{
-	case ETextureType::TEXTURE_2D:
-		result = GL_TEXTURE_2D;
-		break;
-	case ETextureType::TEXTURE_2D_ARRAY:
-		result = GL_TEXTURE_2D_ARRAY;
-		break;
-	case ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW:
-		result = GL_TEXTURE_2D;
-		break;
-	case ETextureType::TEXTURE_CUBE:
-		result = GL_TEXTURE_CUBE_MAP;
-		break;
-	case ETextureType::TEXTURE_2D_MULTISAMPLE:
-		result = GL_TEXTURE_2D_MULTISAMPLE;
-		break;
-	case ETextureType::TEXTURE_2D_ARRAY_MULTISAMPLE:
-		result = GL_TEXTURE_2D_MULTISAMPLE_ARRAY;
-		break;
-	case ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW_MULTISAMPLE:
-		result = GL_TEXTURE_2D_MULTISAMPLE;
-		break;
-	default:
-		break;
-	}
-	return result;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(ETextureType::TEXTURE_2D, GL_TEXTURE_2D),
+		CONVERSION_TYPE_ELEMENT(ETextureType::TEXTURE_2D_ARRAY, GL_TEXTURE_2D_ARRAY),
+		CONVERSION_TYPE_ELEMENT(ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW, GL_TEXTURE_2D),
+		CONVERSION_TYPE_ELEMENT(ETextureType::TEXTURE_CUBE, GL_TEXTURE_CUBE_MAP),
+		CONVERSION_TYPE_ELEMENT(ETextureType::TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_2D_MULTISAMPLE),
+		CONVERSION_TYPE_ELEMENT(ETextureType::TEXTURE_2D_ARRAY_MULTISAMPLE, GL_TEXTURE_2D_MULTISAMPLE_ARRAY),
+		CONVERSION_TYPE_ELEMENT(ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW_MULTISAMPLE, GL_TEXTURE_2D_MULTISAMPLE)
+	);
 }
 
-uint32 GetOpenGLFilterTargetType(ETextureFilterTarget target)
+FORCEINLINE uint32 GetOpenGLFilterTargetType(ETextureFilterTarget type)
 {
-	uint32 texTarget = 0;
-	switch (target)
-	{
-	case ETextureFilterTarget::MINIFICATION:
-		texTarget = GL_TEXTURE_MIN_FILTER;
-		break;
-	case ETextureFilterTarget::MAGNIFICATION:
-		texTarget = GL_TEXTURE_MAG_FILTER;
-		break;
-	default:
-		break;
-	}
-	return texTarget;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(ETextureFilterTarget::MINIFICATION, GL_TEXTURE_MIN_FILTER),
+		CONVERSION_TYPE_ELEMENT(ETextureFilterTarget::MAGNIFICATION, GL_TEXTURE_MAG_FILTER)
+	);
 }
 
-uint32 GetOpenGLTextureFormat(ETextureFormat format)
+FORCEINLINE uint32 GetOpenGLTextureInternalFormat(ETextureFormat type)
 {
-	uint32 result = 0;
-	switch (format)
-	{
-	case ETextureFormat::RGB:
-		result = GL_RGB;
-		break;
-	case ETextureFormat::RGBA:
-		result = GL_RGBA;
-		break;
-	case ETextureFormat::RGBA_INTEGER:
-		result = GL_RGBA_INTEGER;
-		break;
-	case ETextureFormat::RG:
-		result = GL_RG;
-		break;
-	case ETextureFormat::R:
-		result = GL_RED;
-		break;
-	case ETextureFormat::R_INTEGER:
-		result = GL_RED_INTEGER;
-		break;
-	case ETextureFormat::R32UI:
-		result = GL_R32UI;
-		break;
-	case ETextureFormat::RGBA8:
-		result = GL_RGBA8;
-		break;
-	case ETextureFormat::RGBA8I:
-		result = GL_RGBA8I;
-		break;
-	case ETextureFormat::RGBA8UI:
-		result = GL_RGBA8UI;
-		break;
-	case ETextureFormat::R32F:
-		result = GL_R32F;
-		break;
-	case ETextureFormat::RG32F:
-		result = GL_RG32F;
-		break;
-	case ETextureFormat::RGBA32F:
-		result = GL_RGBA32F;
-		break;
-	case ETextureFormat::RGBA16F:
-		result = GL_RGBA16F;
-		break;
-	case ETextureFormat::R11G11B10F:
-		result = GL_R11F_G11F_B10F;
-		break;
-	case ETextureFormat::RGB16F:
-		result = GL_RGB16F;
-		break;
-	case ETextureFormat::RGB32F:
-		result = GL_RGB32F;
-		break;
-	case ETextureFormat::DEPTH:
-		result = GL_DEPTH_COMPONENT;
-		break;
-	default:
-		break;
-	}
-	return result;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		// TextureFormat + InternalFormat
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB32F, GL_RGB32F),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB16F, GL_RGB16F),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R11G11B10F, GL_R11F_G11F_B10F),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB, GL_RGB),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA16F, GL_RGBA16F),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA32F, GL_RGBA32F),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA, GL_RGBA),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RG32F, GL_RG32F),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RG, GL_RG),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R, GL_RED),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R32F, GL_R32F),
+
+		// below is Internal Format only
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA_INTEGER, GL_RGBA_INTEGER),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R_INTEGER, GL_RED_INTEGER),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R32UI, GL_R32UI),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8, GL_RGBA8),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8I, GL_RGBA8I),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8UI, GL_RGBA8UI),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::DEPTH, GL_DEPTH_COMPONENT)
+	);
 }
 
-uint32 GetOpenGLTextureFormatSimple(ETextureFormat format)
+FORCEINLINE uint32 GetOpenGLTextureFormat(ETextureFormat type)
 {
-	uint32 result = 0;
-	switch (format)
-	{
-	case ETextureFormat::RGB32F:
-	case ETextureFormat::RGB16F:
-	case ETextureFormat::R11G11B10F:
-	case ETextureFormat::RGB:
-		result = GL_RGB;
-		break;
-	case ETextureFormat::RGBA16F:
-	case ETextureFormat::RGBA32F:
-	case ETextureFormat::RGBA:
-		result = GL_RGBA;
-		break;
-	case ETextureFormat::RG32F:
-	case ETextureFormat::RG:
-		result = GL_RG;
-		break;
-	case ETextureFormat::R:
-	case ETextureFormat::R32F:
-		result = GL_RED;
-		break;
-	default:
-		break;
-	}
-	return result;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		// TextureFormat + InternalFormat
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB32F, GL_RGB32F),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB16F, GL_RGB16F),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R11G11B10F, GL_R11F_G11F_B10F),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB, GL_RGB),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA16F, GL_RGBA16F),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA32F, GL_RGBA32F),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA, GL_RGBA),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RG32F, GL_RG32F),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RG, GL_RG),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R, GL_RED),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R32F, GL_R32F),
+
+		// below is Internal Format only
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA_INTEGER, GL_NONE),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R_INTEGER, GL_NONE),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R32UI, GL_NONE),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8, GL_NONE),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8I, GL_NONE),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8UI, GL_NONE),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::DEPTH, GL_NONE)
+	);
 }
 
-uint32 GetOpenGLPixelFormat(EFormatType format)
+FORCEINLINE uint32 GetOpenGLPixelFormat(EFormatType type)
 {
-	uint32 result = 0;
-	switch (format)
-	{
-	case EFormatType::BYTE:
-		result = GL_BYTE;
-		break;
-	case EFormatType::UNSIGNED_BYTE:
-		result = GL_UNSIGNED_BYTE;
-		break;
-	case EFormatType::INT:
-		result = GL_INT;
-		break;
-	case EFormatType::UNSIGNED_INT:
-		result = GL_UNSIGNED_INT;
-		break;
-	case EFormatType::HALF:
-		result = GL_HALF_FLOAT;
-		break;
-	case EFormatType::FLOAT:
-		result = GL_FLOAT;
-		break;
-	default:
-		break;
-	}
-
-	return result;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(EFormatType::BYTE, GL_BYTE),
+		CONVERSION_TYPE_ELEMENT(EFormatType::UNSIGNED_BYTE, GL_UNSIGNED_BYTE),
+		CONVERSION_TYPE_ELEMENT(EFormatType::INT, GL_INT),
+		CONVERSION_TYPE_ELEMENT(EFormatType::UNSIGNED_INT, GL_UNSIGNED_INT),
+		CONVERSION_TYPE_ELEMENT(EFormatType::HALF, GL_HALF_FLOAT),
+		CONVERSION_TYPE_ELEMENT(EFormatType::FLOAT, GL_FLOAT)
+	);
 }
 
-uint32 GetOpenGLTextureFilterType(ETextureFilter filter)
+FORCEINLINE uint32 GetOpenGLTextureFilterType(ETextureFilter type)
 {
-	uint32 texFilter = 0;
-	switch (filter)
-	{
-	case ETextureFilter::NEAREST:
-		texFilter = GL_NEAREST;
-		break;
-	case ETextureFilter::LINEAR:
-		texFilter = GL_LINEAR;
-		break;
-	case ETextureFilter::NEAREST_MIPMAP_NEAREST:
-		texFilter = GL_NEAREST_MIPMAP_NEAREST;
-		break;
-	case ETextureFilter::LINEAR_MIPMAP_NEAREST:
-		texFilter = GL_LINEAR_MIPMAP_NEAREST;
-		break;
-	case ETextureFilter::NEAREST_MIPMAP_LINEAR:
-		texFilter = GL_NEAREST_MIPMAP_LINEAR;
-		break;
-	case ETextureFilter::LINEAR_MIPMAP_LINEAR:
-		texFilter = GL_LINEAR_MIPMAP_LINEAR;
-		break;
-	default:
-		break;
-	}
-	return texFilter;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(ETextureFilter::NEAREST, GL_NEAREST),
+		CONVERSION_TYPE_ELEMENT(ETextureFilter::LINEAR, GL_LINEAR),
+		CONVERSION_TYPE_ELEMENT(ETextureFilter::NEAREST_MIPMAP_NEAREST, GL_NEAREST_MIPMAP_NEAREST),
+		CONVERSION_TYPE_ELEMENT(ETextureFilter::LINEAR_MIPMAP_NEAREST, GL_LINEAR_MIPMAP_NEAREST),
+		CONVERSION_TYPE_ELEMENT(ETextureFilter::NEAREST_MIPMAP_LINEAR, GL_NEAREST_MIPMAP_LINEAR),
+		CONVERSION_TYPE_ELEMENT(ETextureFilter::LINEAR_MIPMAP_LINEAR, GL_LINEAR_MIPMAP_LINEAR)
+	);
 }
 
-uint32 GetOpenGLTextureAddressMode(ETextureAddressMode textureAddressMode)
+FORCEINLINE uint32 GetOpenGLTextureAddressMode(ETextureAddressMode type)
 {
-	uint32 result = 0;
-	switch (textureAddressMode)
-	{
-	case ETextureAddressMode::REPEAT:
-		result = GL_REPEAT;
-		break;
-	case ETextureAddressMode::MIRRORED_REPEAT:
-		result = GL_MIRRORED_REPEAT;
-		break;
-	case ETextureAddressMode::CLAMP_TO_EDGE:
-		result = GL_CLAMP_TO_EDGE;
-		break;
-	case ETextureAddressMode::CLAMP_TO_BORDER:
-		result = GL_CLAMP_TO_BORDER;
-		break;
-	default:
-		break;
-	}
-	return result;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(ETextureAddressMode::REPEAT, GL_REPEAT),
+		CONVERSION_TYPE_ELEMENT(ETextureAddressMode::MIRRORED_REPEAT, GL_MIRRORED_REPEAT),
+		CONVERSION_TYPE_ELEMENT(ETextureAddressMode::CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE),
+		CONVERSION_TYPE_ELEMENT(ETextureAddressMode::CLAMP_TO_BORDER, GL_CLAMP_TO_BORDER)
+	);
 }
 
-uint32 GetOpenGLComparisonFunc(EComparisonFunc func)
+FORCEINLINE uint32 GetOpenGLComparisonFunc(EComparisonFunc type)
 {
-	unsigned int result = 0;
-	switch (func)
-	{
-	case EComparisonFunc::NEVER:
-		result = GL_NEVER;
-		break;
-	case EComparisonFunc::LESS:
-		result = GL_LESS;
-		break;
-	case EComparisonFunc::EQUAL:
-		result = GL_EQUAL;
-		break;
-	case EComparisonFunc::LEQUAL:
-		result = GL_LEQUAL;
-		break;
-	case EComparisonFunc::GREATER:
-		result = GL_GREATER;
-		break;
-	case EComparisonFunc::NOTEQUAL:
-		result = GL_NOTEQUAL;
-		break;
-	case EComparisonFunc::GEQUAL:
-		result = GL_GEQUAL;
-		break;
-	case EComparisonFunc::ALWAYS:
-		result = GL_ALWAYS;
-		break;
-	}
-	return result;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(EComparisonFunc::NEVER, GL_NEVER),
+		CONVERSION_TYPE_ELEMENT(EComparisonFunc::LESS, GL_LESS),
+		CONVERSION_TYPE_ELEMENT(EComparisonFunc::EQUAL, GL_EQUAL),
+		CONVERSION_TYPE_ELEMENT(EComparisonFunc::LEQUAL, GL_LEQUAL),
+		CONVERSION_TYPE_ELEMENT(EComparisonFunc::GREATER, GL_GREATER),
+		CONVERSION_TYPE_ELEMENT(EComparisonFunc::NOTEQUAL, GL_NOTEQUAL),
+		CONVERSION_TYPE_ELEMENT(EComparisonFunc::GEQUAL, GL_GEQUAL),
+		CONVERSION_TYPE_ELEMENT(EComparisonFunc::ALWAYS, GL_ALWAYS)
+	);
 }
 
-uint32 GetOpenGLTextureComparisonMode(ETextureComparisonMode mode)
+FORCEINLINE uint32 GetOpenGLTextureComparisonMode(ETextureComparisonMode type)
 {
-	uint32 result = 0;
-	switch (mode)
-	{
-	case ETextureComparisonMode::NONE:
-		result = GL_NONE;
-		break;
-	case ETextureComparisonMode::COMPARE_REF_TO_TEXTURE:		// to use PCF filtering by using samplerXXShadow series.
-		result = GL_COMPARE_REF_TO_TEXTURE;
-		break;
-	default:
-		break;
-	}
-	return result;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(ETextureComparisonMode::NONE, GL_NONE),
+		CONVERSION_TYPE_ELEMENT(ETextureComparisonMode::COMPARE_REF_TO_TEXTURE, GL_COMPARE_REF_TO_TEXTURE)
+	);
 }
 
-uint32 GetOpenGLImageTextureAccessType(EImageTextureAccessType type)
+FORCEINLINE uint32 GetOpenGLImageTextureAccessType(EImageTextureAccessType type)
 {
-	uint32 result = 0;
-	switch (type)
-	{
-	case EImageTextureAccessType::READ_ONLY:
-		result = GL_READ_ONLY;
-		break;
-	case EImageTextureAccessType::WRITE_ONLY:
-		result = GL_WRITE_ONLY;
-		break;
-	case EImageTextureAccessType::READ_WRITE:
-		result = GL_READ_WRITE;
-		break;
-	default:
-		break;
-	}
-	return result;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(EImageTextureAccessType::READ_ONLY, GL_READ_ONLY),
+		CONVERSION_TYPE_ELEMENT(EImageTextureAccessType::WRITE_ONLY, GL_WRITE_ONLY),
+		CONVERSION_TYPE_ELEMENT(EImageTextureAccessType::READ_WRITE, GL_READ_WRITE)
+	);
 }
 
-uint32 GetOpenGLPolygonMode(EPolygonMode mode)
+FORCEINLINE uint32 GetOpenGLPolygonMode(EPolygonMode type)
 {
-	uint32 result = 0;
-	switch (mode)
-	{
-	case EPolygonMode::POINT:
-		result = GL_POINT;
-		break;
-	case EPolygonMode::LINE:
-		result = GL_LINE;
-		break;
-	case EPolygonMode::FILL:
-		result = GL_FILL;
-		break;
-	default:
-		break;
-	}
-	return result;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(EPolygonMode::POINT, GL_POINT),
+		CONVERSION_TYPE_ELEMENT(EPolygonMode::LINE, GL_LINE),
+		CONVERSION_TYPE_ELEMENT(EPolygonMode::FILL, GL_FILL)
+	);
 }
 
-uint32 GetOpenGLFrontFaceType(EFrontFace type)
+FORCEINLINE uint32 GetOpenGLFrontFaceType(EFrontFace type)
 {
-	uint32 result = 0;
-	switch (type)
-	{
-	case EFrontFace::CW:
-		result = GL_CW;
-		break;
-	case EFrontFace::CCW:
-		result = GL_CCW;
-		break;
-	default:
-		break;
-	}
-	return result;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(EFrontFace::CW, GL_CW),
+		CONVERSION_TYPE_ELEMENT(EFrontFace::CCW, GL_CCW)
+	);
 }
 
-uint32 GetOpenGLFaceType(EFace type)
+FORCEINLINE uint32 GetOpenGLFaceType(EFace type)
 {
-	uint32 face_gl = 0;
-	switch (type)
-	{
-	case EFace::BACK:
-		face_gl = GL_BACK;
-		break;
-	case EFace::FRONT:
-		face_gl = GL_FRONT;
-		break;
-	case EFace::FRONT_AND_BACK:
-		face_gl = GL_FRONT_AND_BACK;
-		break;
-	}
-	return face_gl;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(EFace::BACK, GL_BACK),
+		CONVERSION_TYPE_ELEMENT(EFace::FRONT, GL_FRONT),
+		CONVERSION_TYPE_ELEMENT(EFace::FRONT_AND_BACK, GL_FRONT_AND_BACK)
+	);
 }
 
-uint32 GetOpenGLCullMode(ECullMode cullMode)
+FORCEINLINE uint32 GetOpenGLCullMode(ECullMode type)
 {
-	uint32 cullMode_gl = 0;
-	switch (cullMode)
-	{
-	case ECullMode::BACK:
-		cullMode_gl = GL_BACK;
-		break;
-	case ECullMode::FRONT:
-		cullMode_gl = GL_FRONT;
-		break;
-	case ECullMode::FRONT_AND_BACK:
-		cullMode_gl = GL_FRONT_AND_BACK;
-		break;
-	default:
-		break;
-	}
-	return cullMode_gl;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(ECullMode::BACK, GL_BACK),
+		CONVERSION_TYPE_ELEMENT(ECullMode::FRONT, GL_FRONT),
+		CONVERSION_TYPE_ELEMENT(ECullMode::FRONT_AND_BACK, GL_FRONT_AND_BACK)
+	);
 }
 
-bool GetDepthBufferFormatAndType(uint32& depthBufferFormat, uint32& depthBufferType, const EDepthBufferType& InType)
+FORCEINLINE uint32 GetOpenGLDepthBufferType(EDepthBufferType type)
 {
-	switch (InType)
-	{
-	case EDepthBufferType::DEPTH16:
-		depthBufferFormat = GL_DEPTH_COMPONENT16;
-		depthBufferType = GL_DEPTH_ATTACHMENT;
-		break;
-	case EDepthBufferType::DEPTH24:
-		depthBufferFormat = GL_DEPTH_COMPONENT24;
-		depthBufferType = GL_DEPTH_ATTACHMENT;
-		break;
-	case EDepthBufferType::DEPTH32:
-		depthBufferFormat = GL_DEPTH_COMPONENT32;
-		depthBufferType = GL_DEPTH_ATTACHMENT;
-		break;
-	case EDepthBufferType::DEPTH24_STENCIL8:
-		depthBufferFormat = GL_DEPTH24_STENCIL8;
-		depthBufferType = GL_DEPTH_STENCIL_ATTACHMENT;
-		break;
-	default:
-		depthBufferFormat = 0;
-		depthBufferType = 0;
-		return false;
-	}
-
-	return true;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(EDepthBufferType::NONE, 0),
+		CONVERSION_TYPE_ELEMENT(EDepthBufferType::DEPTH16, GL_DEPTH_ATTACHMENT),
+		CONVERSION_TYPE_ELEMENT(EDepthBufferType::DEPTH24, GL_DEPTH_ATTACHMENT),
+		CONVERSION_TYPE_ELEMENT(EDepthBufferType::DEPTH32, GL_DEPTH_ATTACHMENT),
+		CONVERSION_TYPE_ELEMENT(EDepthBufferType::DEPTH24_STENCIL8, GL_DEPTH_STENCIL_ATTACHMENT)
+	);
 }
 
-uint32 GetOpenGLBlendSrc(EBlendSrc src)
+FORCEINLINE uint32 GetOpenGLDepthBufferFormat(EDepthBufferType type)
 {
-    uint32 src_gl = 0;
-    switch (src)
-    {
-    case EBlendSrc::ZERO:
-        src_gl = GL_ZERO;
-        break;
-    case EBlendSrc::ONE:
-        src_gl = GL_ONE;
-        break;
-    case EBlendSrc::SRC_COLOR:
-        src_gl = GL_SRC_COLOR;
-        break;
-    case EBlendSrc::ONE_MINUS_SRC_COLOR:
-        src_gl = GL_ONE_MINUS_SRC_COLOR;
-        break;
-    case EBlendSrc::DST_COLOR:
-        src_gl = GL_DST_COLOR;
-        break;
-    case EBlendSrc::ONE_MINUS_DST_COLOR:
-        src_gl = GL_ONE_MINUS_DST_COLOR;
-        break;
-    case EBlendSrc::SRC_ALPHA:
-        src_gl = GL_SRC_ALPHA;
-        break;
-    case EBlendSrc::ONE_MINUS_SRC_ALPHA:
-        src_gl = GL_ONE_MINUS_SRC_ALPHA;
-        break;
-    case EBlendSrc::DST_ALPHA:
-        src_gl = GL_DST_ALPHA;
-        break;
-    case EBlendSrc::ONE_MINUS_DST_ALPHA:
-        src_gl = GL_ONE_MINUS_DST_ALPHA;
-        break;
-    case EBlendSrc::CONSTANT_COLOR:
-        src_gl = GL_CONSTANT_COLOR;
-        break;
-    case EBlendSrc::ONE_MINUS_CONSTANT_COLOR:
-        src_gl = GL_ONE_MINUS_CONSTANT_COLOR;
-        break;
-    case EBlendSrc::CONSTANT_ALPHA:
-        src_gl = GL_CONSTANT_ALPHA;
-        break;
-    case EBlendSrc::ONE_MINUS_CONSTANT_ALPHA:
-        src_gl = GL_ONE_MINUS_CONSTANT_ALPHA;
-        break;
-    case EBlendSrc::SRC_ALPHA_SATURATE:
-        src_gl = GL_SRC_ALPHA_SATURATE;
-        break;
-    default:
-        JASSERT(0);
-        break;
-    }
-	return src_gl;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(EDepthBufferType::NONE, 0),
+		CONVERSION_TYPE_ELEMENT(EDepthBufferType::DEPTH16, GL_DEPTH_COMPONENT16),
+		CONVERSION_TYPE_ELEMENT(EDepthBufferType::DEPTH24, GL_DEPTH_COMPONENT24),
+		CONVERSION_TYPE_ELEMENT(EDepthBufferType::DEPTH32, GL_DEPTH_COMPONENT32),
+		CONVERSION_TYPE_ELEMENT(EDepthBufferType::DEPTH24_STENCIL8, GL_DEPTH24_STENCIL8)
+	);
 }
 
-uint32 GetOpenGLBlendDest(EBlendDest dest)
+FORCEINLINE uint32 GetOpenGLBlendSrc(EBlendSrc type)
 {
-    uint32 dest_gl = 0;
-    switch (dest)
-    {
-    case EBlendDest::ZERO:
-        dest_gl = GL_ZERO;
-        break;
-    case EBlendDest::ONE:
-        dest_gl = GL_ONE;
-        break;
-    case EBlendDest::SRC_COLOR:
-        dest_gl = GL_SRC_COLOR;
-        break;
-    case EBlendDest::ONE_MINUS_SRC_COLOR:
-        dest_gl = GL_ONE_MINUS_SRC_COLOR;
-        break;
-    case EBlendDest::DST_COLOR:
-        dest_gl = GL_DST_COLOR;
-        break;
-    case EBlendDest::ONE_MINUS_DST_COLOR:
-        dest_gl = GL_ONE_MINUS_DST_COLOR;
-        break;
-    case EBlendDest::SRC_ALPHA:
-        dest_gl = GL_SRC_ALPHA;
-        break;
-    case EBlendDest::ONE_MINUS_SRC_ALPHA:
-        dest_gl = GL_ONE_MINUS_SRC_ALPHA;
-        break;
-    case EBlendDest::DST_ALPHA:
-        dest_gl = GL_DST_ALPHA;
-        break;
-    case EBlendDest::ONE_MINUS_DST_ALPHA:
-        dest_gl = GL_ONE_MINUS_DST_ALPHA;
-        break;
-    case EBlendDest::CONSTANT_COLOR:
-        dest_gl = GL_CONSTANT_COLOR;
-        break;
-    case EBlendDest::ONE_MINUS_CONSTANT_COLOR:
-        dest_gl = GL_ONE_MINUS_CONSTANT_COLOR;
-        break;
-    case EBlendDest::CONSTANT_ALPHA:
-        dest_gl = GL_CONSTANT_ALPHA;
-        break;
-    case EBlendDest::ONE_MINUS_CONSTANT_ALPHA:
-        dest_gl = GL_ONE_MINUS_CONSTANT_ALPHA;
-        break;
-    default:
-        JASSERT(0);
-        break;
-    }
-	return dest_gl;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(EBlendSrc::ZERO, GL_ZERO),
+		CONVERSION_TYPE_ELEMENT(EBlendSrc::ONE, GL_ONE),
+		CONVERSION_TYPE_ELEMENT(EBlendSrc::SRC_COLOR, GL_SRC_COLOR),
+		CONVERSION_TYPE_ELEMENT(EBlendSrc::ONE_MINUS_SRC_COLOR, GL_ONE_MINUS_SRC_COLOR),
+		CONVERSION_TYPE_ELEMENT(EBlendSrc::DST_COLOR, GL_DST_COLOR),
+		CONVERSION_TYPE_ELEMENT(EBlendSrc::ONE_MINUS_DST_COLOR, GL_ONE_MINUS_DST_COLOR),
+		CONVERSION_TYPE_ELEMENT(EBlendSrc::SRC_ALPHA, GL_SRC_ALPHA),
+		CONVERSION_TYPE_ELEMENT(EBlendSrc::ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA),
+		CONVERSION_TYPE_ELEMENT(EBlendSrc::DST_ALPHA, GL_DST_ALPHA),
+		CONVERSION_TYPE_ELEMENT(EBlendSrc::ONE_MINUS_DST_ALPHA, GL_ONE_MINUS_DST_ALPHA),
+		CONVERSION_TYPE_ELEMENT(EBlendSrc::CONSTANT_COLOR, GL_CONSTANT_COLOR),
+		CONVERSION_TYPE_ELEMENT(EBlendSrc::ONE_MINUS_CONSTANT_COLOR, GL_ONE_MINUS_CONSTANT_COLOR),
+		CONVERSION_TYPE_ELEMENT(EBlendSrc::CONSTANT_ALPHA, GL_CONSTANT_ALPHA),
+		CONVERSION_TYPE_ELEMENT(EBlendSrc::ONE_MINUS_CONSTANT_ALPHA, GL_ONE_MINUS_CONSTANT_ALPHA),
+		CONVERSION_TYPE_ELEMENT(EBlendSrc::SRC_ALPHA_SATURATE, GL_SRC_ALPHA_SATURATE)
+	);
+}
+
+FORCEINLINE uint32 GetOpenGLBlendDest(EBlendDest type)
+{
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(EBlendDest::ZERO, GL_ZERO),
+		CONVERSION_TYPE_ELEMENT(EBlendDest::ONE, GL_ONE),
+		CONVERSION_TYPE_ELEMENT(EBlendDest::SRC_COLOR, GL_SRC_COLOR),
+		CONVERSION_TYPE_ELEMENT(EBlendDest::ONE_MINUS_SRC_COLOR, GL_ONE_MINUS_SRC_COLOR),
+		CONVERSION_TYPE_ELEMENT(EBlendDest::DST_COLOR, GL_DST_COLOR),
+		CONVERSION_TYPE_ELEMENT(EBlendDest::ONE_MINUS_DST_COLOR, GL_ONE_MINUS_DST_COLOR),
+		CONVERSION_TYPE_ELEMENT(EBlendDest::SRC_ALPHA, GL_SRC_ALPHA),
+		CONVERSION_TYPE_ELEMENT(EBlendDest::ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA),
+		CONVERSION_TYPE_ELEMENT(EBlendDest::DST_ALPHA, GL_DST_ALPHA),
+		CONVERSION_TYPE_ELEMENT(EBlendDest::ONE_MINUS_DST_ALPHA, GL_ONE_MINUS_DST_ALPHA),
+		CONVERSION_TYPE_ELEMENT(EBlendDest::CONSTANT_COLOR, GL_CONSTANT_COLOR),
+		CONVERSION_TYPE_ELEMENT(EBlendDest::ONE_MINUS_CONSTANT_COLOR, GL_ONE_MINUS_CONSTANT_COLOR),
+		CONVERSION_TYPE_ELEMENT(EBlendDest::CONSTANT_ALPHA, GL_CONSTANT_ALPHA),
+		CONVERSION_TYPE_ELEMENT(EBlendDest::ONE_MINUS_CONSTANT_ALPHA, GL_ONE_MINUS_CONSTANT_ALPHA)
+	);
+}
+
+FORCEINLINE uint32 GetOpenGLBlendEquation(EBlendEquation type)
+{
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(EBlendEquation::ADD, GL_FUNC_ADD),
+		CONVERSION_TYPE_ELEMENT(EBlendEquation::SUBTRACT, GL_FUNC_SUBTRACT),
+		CONVERSION_TYPE_ELEMENT(EBlendEquation::REVERSE_SUBTRACT, GL_FUNC_REVERSE_SUBTRACT),
+		CONVERSION_TYPE_ELEMENT(EBlendEquation::MIN_VALUE, GL_MIN),
+		CONVERSION_TYPE_ELEMENT(EBlendEquation::MAX_VALUE, GL_MAX)
+	);
 }
 
 uint32 GetOpenGLClearBufferBit(ERenderBufferType typeBit)
@@ -564,33 +304,6 @@ uint32 GetOpenGLClearBufferBit(ERenderBufferType typeBit)
 	else if (!!(ERenderBufferType::STENCIL & typeBit))
 		clearBufferBit |= GL_STENCIL;
 	return clearBufferBit;
-}
-
-uint32 GetOpenGLBlendEquation(EBlendEquation equation)
-{
-	uint32 equation_gl = 0;
-	switch(equation)
-	{
-	case EBlendEquation::ADD:
-		equation_gl = GL_FUNC_ADD;
-		break;
-	case EBlendEquation::SUBTRACT:
-		equation_gl = GL_FUNC_SUBTRACT;
-		break;
-	case EBlendEquation::REVERSE_SUBTRACT:
-		equation_gl = GL_FUNC_REVERSE_SUBTRACT;
-		break;
-	case EBlendEquation::MIN_VALUE:
-		equation_gl = GL_MIN;
-		break;
-	case EBlendEquation::MAX_VALUE:
-		equation_gl = GL_MAX;
-		break;
-	default:
-		JASSERT(0);
-		break;
-	}
-	return equation_gl;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -659,7 +372,7 @@ jVertexBuffer* jRHI_OpenGL::CreateVertexBuffer(const std::shared_ptr<jVertexStre
 		if (iter->Stride <= 0)
 			continue;
 
-		unsigned int bufferType = GL_STATIC_DRAW;
+		uint32 bufferType = GL_STATIC_DRAW;
 		switch (iter->BufferType)
 		{
 		case EBufferType::STATIC:
@@ -693,7 +406,7 @@ jIndexBuffer* jRHI_OpenGL::CreateIndexBuffer(const std::shared_ptr<jIndexStreamD
 	if (!streamData)
 		return nullptr;
 
-	unsigned int bufferType = GL_STATIC_DRAW;
+	uint32 bufferType = GL_STATIC_DRAW;
 	switch (streamData->Param->BufferType)
 	{
 	case EBufferType::STATIC:
@@ -724,7 +437,7 @@ void jRHI_OpenGL::BindVertexBuffer(const jVertexBuffer* vb, const jShader* shade
 		auto loc = shader_gl->TryGetAttributeLocation(iter.Name);
 		if (loc != -1)
 		{
-			unsigned int elementType = 0;
+			uint32 elementType = 0;
 			switch (iter.ElementType)
 			{
 			case EBufferElementType::BYTE:
@@ -1076,7 +789,7 @@ void jRHI_OpenGL::EnableWireframe(bool enable) const
 void jRHI_OpenGL::SetImageTexture(int32 index, const jTexture* texture, EImageTextureAccessType type) const
 {
 	const auto texture_gl = static_cast<const jTexture_OpenGL*>(texture);
-	const auto textureType = GetOpenGLTextureFormat(texture_gl->ColorBufferType);
+	const auto textureType = GetOpenGLTextureInternalFormat(texture_gl->ColorBufferType);
 	const auto accesstype_gl = GetOpenGLImageTextureAccessType(type);
 	glBindImageTexture(index, texture_gl->TextureID, 0, GL_FALSE, 0, accesstype_gl, textureType);
 }
@@ -1411,8 +1124,8 @@ jTexture* jRHI_OpenGL::CreateNullTexture() const
 jTexture* jRHI_OpenGL::CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
 	, EFormatType dataType, ETextureFormat textureFormat, bool createMipmap) const
 {
-	const uint32 internalFormat = GetOpenGLTextureFormat(textureFormat);
-	const uint32 simpleFormat = GetOpenGLTextureFormatSimple(textureFormat);
+	const uint32 internalFormat = GetOpenGLTextureInternalFormat(textureFormat);
+	const uint32 simpleFormat = GetOpenGLTextureFormat(textureFormat);
 	const uint32 formatType = GetOpenGLPixelFormat(dataType);
 
 	auto texture = new jTexture_OpenGL();
@@ -1435,8 +1148,8 @@ jTexture* jRHI_OpenGL::CreateTextureFromData(void* data, int32 width, int32 heig
 jTexture* jRHI_OpenGL::CreateCubeTextureFromData(std::vector<void*> faces, int32 width, int32 height, bool sRGB
 	, EFormatType dataType, ETextureFormat textureFormat, bool createMipmap) const
 {
-	const uint32 internalFormat = GetOpenGLTextureFormat(textureFormat);
-	const uint32 simpleFormat = GetOpenGLTextureFormatSimple(textureFormat);
+	const uint32 internalFormat = GetOpenGLTextureInternalFormat(textureFormat);
+	const uint32 simpleFormat = GetOpenGLTextureFormat(textureFormat);
 	const uint32 formatType = GetOpenGLPixelFormat(dataType);
 
 	auto texture = new jTexture_OpenGL();
@@ -1772,13 +1485,13 @@ void jRHI_OpenGL::EnableCullMode(ECullMode cullMode) const
 
 jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) const
 {
-	const uint32 internalFormat = GetOpenGLTextureFormat(info.InternalFormat);
-	const uint32 format = GetOpenGLTextureFormat(info.Format);
+	const uint32 internalFormat = GetOpenGLTextureInternalFormat(info.InternalFormat);
+	const uint32 format = GetOpenGLTextureInternalFormat(info.Format);
 	const uint32 formatType = GetOpenGLPixelFormat(info.FormatType);
 
-	uint32 depthBufferFormat = 0;
-	uint32 depthBufferType = 0;
-	const bool hasDepthAttachment = GetDepthBufferFormatAndType(depthBufferFormat, depthBufferType, info.DepthBufferType);
+	const uint32 depthBufferFormat = GetOpenGLDepthBufferFormat(info.DepthBufferType);
+	const uint32 depthBufferType = GetOpenGLDepthBufferType(info.DepthBufferType);
+	const bool hasDepthAttachment = (info.DepthBufferType != EDepthBufferType::NONE);
 
 	const uint32 magnification = GetOpenGLTextureFilterType(info.Magnification);
 	const uint32 minification = GetOpenGLTextureFilterType(info.Minification);
@@ -2206,7 +1919,7 @@ void jRHI_OpenGL::UpdateVertexBuffer(jVertexBuffer* vb, const std::shared_ptr<jV
 		if (iter->Stride <= 0)
 			continue;
 
-		unsigned int bufferType = GL_STATIC_DRAW;
+		uint32 bufferType = GL_STATIC_DRAW;
 		switch (iter->BufferType)
 		{
 		case EBufferType::STATIC:
@@ -2243,7 +1956,7 @@ void jRHI_OpenGL::UpdateVertexBuffer(jVertexBuffer* vb, IStreamParam* streamPara
 	
 	auto stream = vb_gl->Streams[streamParamIndex];
 
-	unsigned int bufferType = GL_STATIC_DRAW;
+	uint32 bufferType = GL_STATIC_DRAW;
 	switch (streamParam->BufferType)
 	{
 	case EBufferType::STATIC:
@@ -2344,7 +2057,7 @@ void jRHI_OpenGL::SetStencilFunc(EComparisonFunc func, int32 ref, uint32 mask) c
 
 void jRHI_OpenGL::SetDepthFunc(EComparisonFunc func) const
 {
-	unsigned int func_gl = GetOpenGLComparisonFunc(func);
+	uint32 func_gl = GetOpenGLComparisonFunc(func);
 	glDepthFunc(func_gl);
 }
 
@@ -2419,9 +2132,9 @@ bool jRenderTarget_OpenGL::SetDepthAttachment(const std::shared_ptr<jTexture>& I
 
 	const jTexture_OpenGL* tex_gl = static_cast<jTexture_OpenGL*>(InDepth.get());
 
-	uint32 depthBufferFormat = 0;
-	uint32 depthBufferType = 0;
-	const bool hasDepthAttachment = GetDepthBufferFormatAndType(depthBufferFormat, depthBufferType, tex_gl->DepthBufferType);
+	const uint32 depthBufferFormat = GetOpenGLDepthBufferFormat(tex_gl->DepthBufferType);
+	const uint32 depthBufferType = GetOpenGLDepthBufferType(tex_gl->DepthBufferType);
+	const bool hasDepthAttachment = (tex_gl->DepthBufferType != EDepthBufferType::NONE);
 	JASSERT(hasDepthAttachment);
 	if (!hasDepthAttachment)
 		return false;
@@ -2447,9 +2160,9 @@ void jRenderTarget_OpenGL::SetDepthMipLevel(int32 InLevel)
 	const jTexture_OpenGL* tex_gl = static_cast<jTexture_OpenGL*>(TextureDepth.get());
 	JASSERT(tex_gl);
 
-	uint32 depthBufferFormat = 0;
-	uint32 depthBufferType = 0;
-	const bool hasDepthAttachment = GetDepthBufferFormatAndType(depthBufferFormat, depthBufferType, tex_gl->DepthBufferType);
+	const uint32 depthBufferFormat = GetOpenGLDepthBufferFormat(tex_gl->DepthBufferType);
+	const uint32 depthBufferType = GetOpenGLDepthBufferType(tex_gl->DepthBufferType);
+	const bool hasDepthAttachment = (tex_gl->DepthBufferType != EDepthBufferType::NONE);
 
 	glFramebufferTexture2D(GL_FRAMEBUFFER, depthBufferType, GetOpenGLTextureType(tex_gl->Type), tex_gl->TextureID, InLevel);
 }
@@ -2674,68 +2387,3 @@ void jTransformFeedbackBuffer_OpenGL::Pause()
 	glPauseTransformFeedback();
 }
 
-int32 jShader_OpenGL::TryGetUniformLocation(jName name) const
-{
-#if USE_CACHED_UNIFORM_LOCATION_HASH
-	const auto it_find = UniformNameMap.find(name.GetNameHash());
-	const bool found = (it_find != UniformNameMap.end());
-	if (found)
-	{
-		return it_find->second;
-	}
-
-	const int32 UniformLocation = g_rhi_gl->GetUniformLocation(program, name.ToStr());
-	UniformNameMap[name.GetNameHash()] = UniformLocation;
-
-	return UniformLocation;
-#elif USE_CACHED_UNIFORM_LOCATION_ARRAY
-	const auto hash = name.GetNameHash();
-	const size_t size = uniforms.size();
-	for (size_t i = 0; i < size; ++i)
-	{
-		if (uniforms[i].hash == hash)
-		{
-			return uniforms[i].location;
-		}
-	}
-
-	const int32 UniformLocation = g_rhi_gl->GetUniformLocation(program, name.ToStr());
-	uniforms.push_back({ hash , UniformLocation });
-	return UniformLocation;
-#else
-	return g_rhi_gl->GetUniformLocation(program, name);
-#endif
-}
-
-int32 jShader_OpenGL::TryGetAttributeLocation(jName name) const
-{
-#if USE_CACHED_ATTRIBUTE_LOCATION_HASH
-	const auto it_find = AttributeNameMap.find(name.GetNameHash());
-	const bool found = (it_find != AttributeNameMap.end());
-	if (found)
-	{
-		return it_find->second;
-	}
-
-	const int32 AttributeLocation = g_rhi_gl->GetAttributeLocation(program, name.ToStr());
-	AttributeNameMap[name.GetNameHash()] = AttributeLocation;
-
-	return AttributeLocation;
-#elif USE_CACHED_ATTRIBUTE_LOCATION_ARRAY
-	const auto hash = name.GetNameHash();
-	const size_t size = attributes.size();
-	for (size_t i = 0; i < size; ++i)
-	{
-		if (attributes[i].hash == hash)
-		{
-			return attributes[i].location;
-		}
-	}
-
-	const int32 AttributeLocation = g_rhi_gl->GetAttributeLocation(program, name.ToStr());
-	attributes.push_back({ hash , AttributeLocation });
-	return AttributeLocation;
-#else
-	return g_rhi_gl->GetAttributeLocation(program, name);
-#endif
-}

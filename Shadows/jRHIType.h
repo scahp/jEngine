@@ -109,6 +109,7 @@ enum class ETextureFilterTarget
 {
 	MINIFICATION = 0,
 	MAGNIFICATION,
+	MAX
 };
 
 enum class ETextureFilter
@@ -119,6 +120,7 @@ enum class ETextureFilter
 	LINEAR_MIPMAP_NEAREST,
 	NEAREST_MIPMAP_LINEAR,
 	LINEAR_MIPMAP_LINEAR,
+	MAX
 };
 
 enum class ETextureType
@@ -135,23 +137,26 @@ enum class ETextureType
 
 enum class ETextureFormat
 {
-	RGB = 0,
-	RGBA = 1,
-	RGBA_INTEGER,
+	// TextureFormat + InternalFormat
+	RGB32F = 0,
+	RGB16F,
+	R11G11B10F,
+	RGB,
+	RGBA16F,
+	RGBA32F,
+	RGBA,
+	RG32F,
 	RG,
 	R,
+	R32F,
+
+	// below is Internal Format only
+	RGBA_INTEGER,
 	R_INTEGER,
 	R32UI,
 	RGBA8,
 	RGBA8I,
 	RGBA8UI,
-	R32F,
-	RG32F,
-	RGBA16F,
-	RGBA32F,
-	R11G11B10F,
-	RGB16F,
-	RGB32F,
 	DEPTH,
 	MAX,
 };
@@ -164,6 +169,7 @@ enum class EFormatType
 	UNSIGNED_INT,
 	HALF,
 	FLOAT,
+	MAX
 };
 
 enum class EBlendSrc
@@ -245,7 +251,8 @@ enum class EComparisonFunc
 	GREATER,
 	NOTEQUAL,
 	GEQUAL,
-	ALWAYS
+	ALWAYS,
+	MAX
 };
 
 enum class ERenderBufferType : uint32
@@ -306,7 +313,7 @@ enum class EDepthComparionFunc
 enum class ETextureComparisonMode
 {
 	NONE = 0,
-	COMPARE_REF_TO_TEXTURE,
+	COMPARE_REF_TO_TEXTURE,					// to use PCF filtering by using samplerXXShadow series.
 	MAX,
 };
 
@@ -314,7 +321,8 @@ enum class EPolygonMode
 {
 	POINT = 0,
 	LINE,
-	FILL
+	FILL,
+	MAX
 };
 
 enum class EImageTextureAccessType

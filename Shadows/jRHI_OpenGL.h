@@ -32,43 +32,6 @@ struct jIndexBuffer_OpenGL : public jIndexBuffer
 	virtual void Bind(const jShader* shader) const override;
 };
 
-#define USE_CACHED_UNIFORM_LOCATION_HASH 0
-#define USE_CACHED_UNIFORM_LOCATION_ARRAY 1		// The way using an array is fastest
-
-#define USE_CACHED_ATTRIBUTE_LOCATION_HASH 0
-#define USE_CACHED_ATTRIBUTE_LOCATION_ARRAY 1		// The way using an array is fastest
-struct jShader_OpenGL : public jShader
-{
-	uint32 program = 0;
-
-	//////////////////////////////////////////////////////////////////////////
-	FORCEINLINE int32 TryGetUniformLocation(jName name) const;
-
-#if USE_CACHED_UNIFORM_LOCATION_HASH
-	mutable std::unordered_map<uint32, int32> UniformNameMap;		// <jNameHash, location>
-#elif USE_CACHED_UNIFORM_LOCATION_ARRAY
-	struct jUniformLocationInfo
-	{
-		uint32 hash = -1;
-		int32 location = -1;
-	};
-	mutable std::vector<jUniformLocationInfo> uniforms;
-#endif
-	//////////////////////////////////////////////////////////////////////////
-	FORCEINLINE int32 TryGetAttributeLocation(jName name) const;
-
-#if USE_CACHED_ATTRIBUTE_LOCATION_HASH
-	mutable std::unordered_map<uint32, int32> AttributeNameMap;		// <jNameHash, location>
-#elif USE_CACHED_ATTRIBUTE_LOCATION_ARRAY
-	struct jAttributeLocationInfo
-	{
-		uint32 hash = -1;
-		int32 location = -1;
-	};
-	mutable std::vector<jAttributeLocationInfo> attributes;
-#endif
-};
-
 struct jTexture_OpenGL : public jTexture
 {
 	uint32 TextureID = 0;
@@ -315,3 +278,95 @@ public:
 };
 
 extern jRHI_OpenGL* g_rhi_gl;
+
+//////////////////////////////////////////////////////////////////////////
+#define USE_CACHED_LOCATION_HASH 0
+#define USE_CACHED_LOCATION_ARRAY 1		// The way using an array is fastest
+
+// UniformBuffer location 을 얻어오는 functor, TTrayGetLocation의 template type으로 사용
+struct jUniformbufferLocationGetter
+{
+	FORCEINLINE static int32 GetLocation(uint32 program, jName name)
+	{
+		return g_rhi_gl->GetUniformLocation(program, name.ToStr());
+	}
+};
+
+// Attribute location 을 얻어오는 functor, TTrayGetLocation의 template type으로 사용
+struct jAttributeLocationGatter
+{
+	FORCEINLINE static int32 GetLocation(uint32 program, jName name)
+	{
+		return g_rhi_gl->GetAttributeLocation(program, name.ToStr());
+	}
+};
+
+// Shader 의 Location 정보를 얻어오고, 캐싱해줌.
+template <typename T>
+struct TTryGetLocation
+{
+#if USE_CACHED_LOCATION_HASH
+	mutable std::unordered_map<uint32, int32> NameLocationMap;		// <jNameHash, location>
+#elif USE_CACHED_LOCATION_ARRAY
+	struct jLocationInfo
+	{
+		uint32 hash = -1;
+		int32 location = -1;
+	};
+	mutable std::vector<jLocationInfo> locations;
+#endif
+
+	FORCEINLINE int32 TryGetLocation(uint32 program, jName name) const
+	{
+#if USE_CACHED_LOCATION_HASH
+		const auto it_find = NameLocationMap.find(name.GetNameHash());
+		const bool found = (it_find != NameLocationMap.end());
+		if (found)
+		{
+			return it_find->second;
+		}
+
+		const int32 Location = T::GetLocation(program, name);
+		NameLocationMap[name.GetNameHash()] = Location;
+
+		return Location;
+#elif USE_CACHED_LOCATION_ARRAY
+		const auto hash = name.GetNameHash();
+		const size_t size = locations.size();
+		for (size_t i = 0; i < size; ++i)
+		{
+			if (locations[i].hash == hash)
+			{
+				return locations[i].location;
+			}
+		}
+
+		const int32 Location = T::GetLocation(program, name);
+		locations.push_back({ hash , Location });
+		return Location;
+#else
+		return T::GetLocation(program, name);
+#endif
+	}
+};
+
+using jTryGetUniformLocation = TTryGetLocation<jUniformbufferLocationGetter>;
+using jTryGetAttributeLocation = TTryGetLocation<jAttributeLocationGatter>;
+
+struct jShader_OpenGL : public jShader
+{
+	uint32 program = 0;
+
+	// 이 Shader 와 연관된 Location 정보를 얻어오고, 캐싱해줌.
+	jTryGetUniformLocation UniformLocationGatter;
+	jTryGetAttributeLocation AttributeLocationGatter;
+
+	FORCEINLINE int32 TryGetUniformLocation(jName name) const
+	{
+		return UniformLocationGatter.TryGetLocation(program, name);
+	}
+	FORCEINLINE int32 TryGetAttributeLocation(jName name) const
+	{
+		return AttributeLocationGatter.TryGetLocation(program, name);
+	}
+};
