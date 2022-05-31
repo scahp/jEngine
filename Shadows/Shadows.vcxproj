@@ -98,6 +98,10 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <PostBuildEvent>
+      <Command>xcopy /s /y /d  "$(ProjectDir)External\AntTweakBar\lib\*.dll" "$(OutDir)"
+xcopy /s /y /d  "$(ProjectDir)External\assimp\lib\*.dll" "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -118,6 +122,10 @@
       <IgnoreSpecificDefaultLibraries>
       </IgnoreSpecificDefaultLibraries>
     </Link>
+    <PostBuildEvent>
+      <Command>xcopy /s /y /d  "$(ProjectDir)External\AntTweakBar\lib\*.dll" "$(OutDir)"
+xcopy /s /y /d  "$(ProjectDir)External\assimp\lib\*.dll" "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -138,6 +146,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <PostBuildEvent>
+      <Command>xcopy /s /y /d  "$(ProjectDir)External\AntTweakBar\lib\*.dll" "$(OutDir)"
+xcopy /s /y /d  "$(ProjectDir)External\assimp\lib\*.dll" "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -160,6 +172,10 @@
       <AdditionalDependencies>opengl32.lib;glfw3.lib;AntTweakBar64.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>./;;./External/AntTweakBar/lib;;./External/assimp/lib</AdditionalLibraryDirectories>
     </Link>
+    <PostBuildEvent>
+      <Command>xcopy /s /y /d  "$(ProjectDir)External\AntTweakBar\lib\*.dll" "$(OutDir)"
+xcopy /s /y /d  "$(ProjectDir)External\assimp\lib\*.dll" "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="Core\jName.h" />
