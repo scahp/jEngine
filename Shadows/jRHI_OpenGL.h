@@ -212,6 +212,7 @@ public:
 		, EFormatType dataType = EFormatType::UNSIGNED_BYTE, ETextureFormat textureFormat = ETextureFormat::RGBA, bool createMipmap = false) const override;
 	virtual jTexture* CreateCubeTextureFromData(std::vector<void*> faces, int32 width, int32 height, bool sRGB
 		, EFormatType dataType = EFormatType::UNSIGNED_BYTE, ETextureFormat textureFormat = ETextureFormat::RGBA, bool createMipmap = false) const override;
+
 	virtual bool SetUniformbuffer(jName name, const Matrix& InData, const jShader* InShader) const override;
 	virtual bool SetUniformbuffer(jName name, const int InData, const jShader* InShader) const override;
 	virtual bool SetUniformbuffer(jName name, const uint32 InData, const jShader* InShader) const override;
@@ -222,8 +223,17 @@ public:
 	virtual bool SetUniformbuffer(jName name, const Vector2i& InData, const jShader* InShader) const override;
 	virtual bool SetUniformbuffer(jName name, const Vector3i& InData, const jShader* InShader) const override;
 	virtual bool SetUniformbuffer(jName name, const Vector4i& InData, const jShader* InShader) const override;
-	virtual bool GetUniformbuffer(void* outResult, const IUniformBuffer* buffer, const jShader* shader) const override;
-	virtual bool GetUniformbuffer(void* outResult, EUniformType type, jName name, const jShader* shader) const override;
+	virtual bool GetUniformbuffer(Matrix& outResult, jName name, const jShader* shader) const override;
+	virtual bool GetUniformbuffer(int& outResult, jName name, const jShader* shader) const override;
+	virtual bool GetUniformbuffer(uint32& outResult, jName name, const jShader* shader) const override;
+	virtual bool GetUniformbuffer(float& outResult, jName name, const jShader* shader) const override;
+	virtual bool GetUniformbuffer(Vector2& outResult, jName name, const jShader* shader) const override;
+	virtual bool GetUniformbuffer(Vector& outResult, jName name, const jShader* shader) const override;
+	virtual bool GetUniformbuffer(Vector4& outResult, jName name, const jShader* shader) const override;
+	virtual bool GetUniformbuffer(Vector2i& outResult, jName name, const jShader* shader) const override;
+	virtual bool GetUniformbuffer(Vector3i& outResult, jName name, const jShader* shader) const override;
+	virtual bool GetUniformbuffer(Vector4i& outResult, jName name, const jShader* shader) const override;
+
 	virtual int32 SetMatetrial(const jMaterialData* materialData, const jShader* shader, int32 baseBindingIndex = 0) const override;
 	virtual void SetTexture(int32 index, const jTexture* texture) const override;
 	virtual void SetTextureFilter(ETextureType type, ETextureFilterTarget target, ETextureFilter filter) const override;

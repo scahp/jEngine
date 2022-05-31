@@ -431,8 +431,16 @@ public:
 	virtual bool SetUniformbuffer(jName name, const Vector2i& InData, const jShader* InShader) const { return false; }
 	virtual bool SetUniformbuffer(jName name, const Vector3i& InData, const jShader* InShader) const { return false; }
 	virtual bool SetUniformbuffer(jName name, const Vector4i& InData, const jShader* InShader) const { return false; }
-	virtual bool GetUniformbuffer(void* outResult, const IUniformBuffer* buffer, const jShader* shader) const { return false; }
-	virtual bool GetUniformbuffer(void* outResult, EUniformType type, jName name, const jShader* shader) const { return false; }
+	virtual bool GetUniformbuffer(Matrix& outResult, jName name, const jShader* shader) const { return false; }
+	virtual bool GetUniformbuffer(int& outResult, jName name, const jShader* shader) const { return false; }
+	virtual bool GetUniformbuffer(uint32& outResult, jName name, const jShader* shader) const { return false; }
+	virtual bool GetUniformbuffer(float& outResult, jName name, const jShader* shader) const { return false; }
+	virtual bool GetUniformbuffer(Vector2& outResult, jName name, const jShader* shader) const { return false; }
+	virtual bool GetUniformbuffer(Vector& outResult, jName name, const jShader* shader) const { return false; }
+	virtual bool GetUniformbuffer(Vector4& outResult, jName name, const jShader* shader) const { return false; }
+	virtual bool GetUniformbuffer(Vector2i& outResult, jName name, const jShader* shader) const { return false; }
+	virtual bool GetUniformbuffer(Vector3i& outResult, jName name, const jShader* shader) const { return false; }
+	virtual bool GetUniformbuffer(Vector4i& outResult, jName name, const jShader* shader) const { return false; }
 	virtual jTexture* CreateNullTexture() const { return nullptr; }
 	virtual jTexture* CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
 		, EFormatType dataType = EFormatType::UNSIGNED_BYTE, ETextureFormat textureFormat = ETextureFormat::RGBA, bool createMipmap = false) const { return nullptr; }
@@ -497,9 +505,10 @@ public:
 // Not thread safe
 #define GET_UNIFORM_BUFFER_STATIC(ResultData, Name, Shader) \
 {\
-	EUniformType UniformType = ConvertUniformType<typename std::decay<decltype(CurrentData)>::type>();\
+	static jName tempName(Name);\
+	EUniformType UniformType = ConvertUniformType<typename std::decay<decltype(ResultData)>::type>();\
 	JASSERT(UniformType != EUniformType::NONE);\
-	g_rhi->GetUniformbuffer(ResultData, UniformType, Name, Shader);\
+	g_rhi->GetUniformbuffer(ResultData, tempName, Shader);\
 }
 
 struct jScopeDebugEvent final

@@ -5,6 +5,8 @@
 
 struct Matrix3;
 
+#define MATRIX_ROW_MAJOR_ORDER 1;
+
 struct Matrix
 {
 	FORCEINLINE Matrix() {}
