@@ -30,6 +30,8 @@
 //#include "config.h"
 //#include <city.h>
 #include "city.h"
+#pragma warning( push )
+#pragma warning( disable : 4267 )
 
 #include <algorithm>
 #include <string.h>  // for memcpy and memset
@@ -645,3 +647,5 @@ uint128 CityHashCrc128(const char *s, size_t len) {
 }
 
 #endif
+
+#pragma warning( pop )
