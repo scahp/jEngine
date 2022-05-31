@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <type_traits>
+#include "Core/jName.h"
 
 #define DECLARE_ENUM_BIT_OPERATORS(ENUM_TYPE)\
 FORCEINLINE ENUM_TYPE operator | (ENUM_TYPE lhs, ENUM_TYPE rhs)\
@@ -49,12 +50,12 @@ enum class EBufferElementType
 struct IStreamParam
 {
 	IStreamParam() = default;
-	IStreamParam(const std::string& name, const EBufferType& bufferType, int32 stride, EBufferElementType elementType, int32 elementTypeSize, int32 instanceDivisor = 0)
+	IStreamParam(const jName& name, const EBufferType& bufferType, int32 stride, EBufferElementType elementType, int32 elementTypeSize, int32 instanceDivisor = 0)
 		: Name(name), BufferType(bufferType), Stride(stride), ElementType(elementType), ElementTypeSize(elementTypeSize), InstanceDivisor(instanceDivisor)
 	{}
 	virtual ~IStreamParam() {}
 
-	std::string Name;
+	jName Name;
 	EBufferType BufferType = EBufferType::STATIC;
 	int32 Stride = 0;
 	EBufferElementType ElementType = EBufferElementType::BYTE;

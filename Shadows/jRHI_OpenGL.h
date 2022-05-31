@@ -6,7 +6,7 @@
 
 struct jVertexStream_OpenGL
 {
-	std::string Name;
+	jName Name;
 	unsigned int BufferID = 0;
 	unsigned int Count;
 	EBufferType BufferType = EBufferType::STATIC;
@@ -34,10 +34,14 @@ struct jIndexBuffer_OpenGL : public jIndexBuffer
 
 #define USE_CACHED_UNIFORM_LOCATION_HASH 0
 #define USE_CACHED_UNIFORM_LOCATION_ARRAY 1		// The way using an array is fastest
+
+#define USE_CACHED_ATTRIBUTE_LOCATION_HASH 0
+#define USE_CACHED_ATTRIBUTE_LOCATION_ARRAY 1		// The way using an array is fastest
 struct jShader_OpenGL : public jShader
 {
-	unsigned int program = 0;
+	uint32 program = 0;
 
+	//////////////////////////////////////////////////////////////////////////
 	FORCEINLINE int32 TryGetUniformLocation(jName name) const;
 
 #if USE_CACHED_UNIFORM_LOCATION_HASH
@@ -49,6 +53,19 @@ struct jShader_OpenGL : public jShader
 		int32 location = -1;
 	};
 	mutable std::vector<jUniformLocationInfo> uniforms;
+#endif
+	//////////////////////////////////////////////////////////////////////////
+	FORCEINLINE int32 TryGetAttributeLocation(jName name) const;
+
+#if USE_CACHED_ATTRIBUTE_LOCATION_HASH
+	mutable std::unordered_map<uint32, int32> AttributeNameMap;		// <jNameHash, location>
+#elif USE_CACHED_ATTRIBUTE_LOCATION_ARRAY
+	struct jAttributeLocationInfo
+	{
+		uint32 hash = -1;
+		int32 location = -1;
+	};
+	mutable std::vector<jAttributeLocationInfo> attributes;
 #endif
 };
 
@@ -294,5 +311,7 @@ public:
 	
 	//////////////////////////////////////////////////////////////////////////
 	int32 GetUniformLocation(uint32 InProgram, const char* name) const;
+	int32 GetAttributeLocation(uint32 InProgram, const char* name) const;
 };
 
+extern jRHI_OpenGL* g_rhi_gl;

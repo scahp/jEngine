@@ -137,7 +137,7 @@ jHairObject* jHairModelLoader::CreateHairObject(const char* filename)
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = "Pos";
+		streamParam->Name = jName("Pos");
 		streamParam->Data.resize(numOfVertex * 3);
 		memcpy(&streamParam->Data[0], vertexData, numOfVertex * sizeof(Vector));
 		vertexStreamData->Params.push_back(streamParam);
@@ -149,7 +149,7 @@ jHairObject* jHairModelLoader::CreateHairObject(const char* filename)
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = "Normal";
+		streamParam->Name = jName("Normal");
 		streamParam->Data.resize(numOfVertex * 3);
 		memcpy(&streamParam->Data[0], normalData, numOfVertex * sizeof(Vector));
 		vertexStreamData->Params.push_back(streamParam);

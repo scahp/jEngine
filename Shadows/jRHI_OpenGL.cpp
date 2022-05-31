@@ -4,6 +4,8 @@
 #include "jRHIType.h"
 #include "jShader.h"
 
+jRHI_OpenGL* g_rhi_gl = nullptr;
+
 //////////////////////////////////////////////////////////////////////////
 // OpenGL utility functions
 unsigned int GetPrimitiveType(EPrimitiveType type)
@@ -595,8 +597,8 @@ uint32 GetOpenGLBlendEquation(EBlendEquation equation)
 // jRHI_OpenGL
 jRHI_OpenGL::jRHI_OpenGL()
 {
+	g_rhi_gl = this;
 }
-
 
 jRHI_OpenGL::~jRHI_OpenGL()
 {
@@ -719,7 +721,7 @@ void jRHI_OpenGL::BindVertexBuffer(const jVertexBuffer* vb, const jShader* shade
 	auto shader_gl = static_cast<const jShader_OpenGL*>(shader);
 	for (const auto& iter : vb_gl->Streams)
 	{
-		auto loc = glGetAttribLocation(shader_gl->program, iter.Name.c_str());
+		auto loc = shader_gl->TryGetAttributeLocation(iter.Name);
 		if (loc != -1)
 		{
 			unsigned int elementType = 0;
@@ -1082,6 +1084,11 @@ void jRHI_OpenGL::SetImageTexture(int32 index, const jTexture* texture, EImageTe
 int32 jRHI_OpenGL::GetUniformLocation(uint32 InProgram, const char* name) const
 {
 	return glGetUniformLocation(InProgram, name);
+}
+
+int32 jRHI_OpenGL::GetAttributeLocation(uint32 InProgram, const char* name) const
+{
+	return glGetAttribLocation(InProgram, name);
 }
 
 void jRHI_OpenGL::SetClear(ERenderBufferType typeBit) const
@@ -2677,8 +2684,7 @@ int32 jShader_OpenGL::TryGetUniformLocation(jName name) const
 		return it_find->second;
 	}
 
-	auto rhi_gl = static_cast<jRHI_OpenGL*>(g_rhi);
-	const int32 UniformLocation = rhi_gl->GetUniformLocation(program, name.ToStr());
+	const int32 UniformLocation = g_rhi_gl->GetUniformLocation(program, name.ToStr());
 	UniformNameMap[name.GetNameHash()] = UniformLocation;
 
 	return UniformLocation;
@@ -2693,12 +2699,43 @@ int32 jShader_OpenGL::TryGetUniformLocation(jName name) const
 		}
 	}
 
-	auto rhi_gl = static_cast<jRHI_OpenGL*>(g_rhi);
-	const int32 UniformLocation = rhi_gl->GetUniformLocation(program, name.ToStr());
+	const int32 UniformLocation = g_rhi_gl->GetUniformLocation(program, name.ToStr());
 	uniforms.push_back({ hash , UniformLocation });
 	return UniformLocation;
 #else
-	auto rhi_gl = static_cast<jRHI_OpenGL*>(g_rhi);
-	return rhi_gl->GetUniformLocation(program, name);
+	return g_rhi_gl->GetUniformLocation(program, name);
+#endif
+}
+
+int32 jShader_OpenGL::TryGetAttributeLocation(jName name) const
+{
+#if USE_CACHED_ATTRIBUTE_LOCATION_HASH
+	const auto it_find = AttributeNameMap.find(name.GetNameHash());
+	const bool found = (it_find != AttributeNameMap.end());
+	if (found)
+	{
+		return it_find->second;
+	}
+
+	const int32 AttributeLocation = g_rhi_gl->GetAttributeLocation(program, name.ToStr());
+	AttributeNameMap[name.GetNameHash()] = AttributeLocation;
+
+	return AttributeLocation;
+#elif USE_CACHED_ATTRIBUTE_LOCATION_ARRAY
+	const auto hash = name.GetNameHash();
+	const size_t size = attributes.size();
+	for (size_t i = 0; i < size; ++i)
+	{
+		if (attributes[i].hash == hash)
+		{
+			return attributes[i].location;
+		}
+	}
+
+	const int32 AttributeLocation = g_rhi_gl->GetAttributeLocation(program, name.ToStr());
+	attributes.push_back({ hash , AttributeLocation });
+	return AttributeLocation;
+#else
+	return g_rhi_gl->GetAttributeLocation(program, name);
 #endif
 }

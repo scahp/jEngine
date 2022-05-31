@@ -207,7 +207,7 @@ void jShadowVolumeCPU::CreateShadowVolumeObject()
 			streamParam->ElementTypeSize = sizeof(float);
 			streamParam->ElementType = EBufferElementType::FLOAT;
 			streamParam->Stride = sizeof(float) * 3;
-			streamParam->Name = "Pos";
+			streamParam->Name = jName("Pos");
 			streamParam->Data.resize(EdgeVertices.size());
 			memcpy(&streamParam->Data[0], &EdgeVertices[0], EdgeVertices.size() * sizeof(float));
 			EdgeVertexStreamData->Params.push_back(streamParam);
@@ -219,7 +219,7 @@ void jShadowVolumeCPU::CreateShadowVolumeObject()
 			streamParam->ElementType = EBufferElementType::FLOAT;
 			streamParam->ElementTypeSize = sizeof(float);
 			streamParam->Stride = sizeof(float) * 4;
-			streamParam->Name = "Color";
+			streamParam->Name = jName("Color");
 			streamParam->Data = std::move(jPrimitiveUtil::GenerateColor(Vector4(0.0f, 1.0f, 0.0f, 1.0f), elementCount));
 			EdgeVertexStreamData->Params.push_back(streamParam);
 		}
@@ -247,7 +247,7 @@ void jShadowVolumeCPU::CreateShadowVolumeObject()
 			streamParam->ElementTypeSize = sizeof(float);
 			streamParam->ElementType = EBufferElementType::FLOAT;
 			streamParam->Stride = sizeof(float) * 4;
-			streamParam->Name = "Pos";
+			streamParam->Name = jName("Pos");
 			streamParam->Data.resize(QuadVertices.size());
 			memcpy(&streamParam->Data[0], &QuadVertices[0], QuadVertices.size() * sizeof(float));
 			QuadVertexStreamData->Params.push_back(streamParam);
@@ -259,7 +259,7 @@ void jShadowVolumeCPU::CreateShadowVolumeObject()
 			streamParam->ElementType = EBufferElementType::FLOAT;
 			streamParam->ElementTypeSize = sizeof(float);
 			streamParam->Stride = sizeof(float) * 4;
-			streamParam->Name = "Color";
+			streamParam->Name = jName("Color");
 			streamParam->Data = std::move(jPrimitiveUtil::GenerateColor(Vector4(0.0f, 0.0f, 1.0f, 0.5f), elementCount));
 			QuadVertexStreamData->Params.push_back(streamParam);
 		}
@@ -290,7 +290,7 @@ void jShadowVolumeCPU::UpdateShadowVolumeObject()
 			streamParam->ElementTypeSize = sizeof(float);
 			streamParam->ElementType = EBufferElementType::FLOAT;
 			streamParam->Stride = sizeof(float) * 3;
-			streamParam->Name = "Pos";
+			streamParam->Name = jName("Pos");
 			streamParam->Data.resize(EdgeVertices.size());
 			memcpy(&streamParam->Data[0], &EdgeVertices[0], EdgeVertices.size() * sizeof(float));
 			EdgeVertexStreamData->Params.push_back(streamParam);
@@ -302,7 +302,7 @@ void jShadowVolumeCPU::UpdateShadowVolumeObject()
 			streamParam->ElementType = EBufferElementType::FLOAT;
 			streamParam->ElementTypeSize = sizeof(float);
 			streamParam->Stride = sizeof(float) * 4;
-			streamParam->Name = "Color";
+			streamParam->Name = jName("Color");
 			streamParam->Data = std::move(jPrimitiveUtil::GenerateColor(Vector4(0.0f, 1.0f, 0.0f, 1.0f), elementCount));
 			EdgeVertexStreamData->Params.push_back(streamParam);
 		}
@@ -326,7 +326,7 @@ void jShadowVolumeCPU::UpdateShadowVolumeObject()
 			streamParam->ElementTypeSize = sizeof(float);
 			streamParam->ElementType = EBufferElementType::FLOAT;
 			streamParam->Stride = sizeof(float) * 4;
-			streamParam->Name = "Pos";
+			streamParam->Name = jName("Pos");
 			streamParam->Data.resize(QuadVertices.size());
 			memcpy(&streamParam->Data[0], &QuadVertices[0], QuadVertices.size() * sizeof(float));
 			QuadVertexStreamData->Params.push_back(streamParam);
@@ -338,7 +338,7 @@ void jShadowVolumeCPU::UpdateShadowVolumeObject()
 			streamParam->ElementType = EBufferElementType::FLOAT;
 			streamParam->ElementTypeSize = sizeof(float);
 			streamParam->Stride = sizeof(float) * 4;
-			streamParam->Name = "Color";
+			streamParam->Name = jName("Color");
 			streamParam->Data = std::move(jPrimitiveUtil::GenerateColor(Vector4(0.0f, 0.0f, 1.0f, 0.5f), elementCount));
 			QuadVertexStreamData->Params.push_back(streamParam);
 		}
@@ -379,7 +379,7 @@ void jShadowVolumeGPU::CreateShadowVolumeObject()
 	streamParam->ElementTypeSize = sizeof(float);
 	streamParam->ElementType = EBufferElementType::FLOAT;
 	streamParam->Stride = sizeof(float) * 3;
-	streamParam->Name = "Pos";
+	streamParam->Name = jName("Pos");
 	streamParam->Data.resize(vertices.size() * 3);
 	memcpy(&streamParam->Data[0], &vertices[0], vertices.size() * sizeof(Vector));
 	vertexStreamData->Params.push_back(streamParam);
@@ -395,7 +395,7 @@ void jShadowVolumeGPU::CreateShadowVolumeObject()
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(uint32);
 		streamParam->Stride = sizeof(uint32) * 6;
-		streamParam->Name = "Index";
+		streamParam->Name = jName("Index");
 		streamParam->Data.resize(indices.size());
 		memcpy(&streamParam->Data[0], &indices[0], indices.size() * sizeof(uint32));
 		indexStreamData->Param = streamParam;

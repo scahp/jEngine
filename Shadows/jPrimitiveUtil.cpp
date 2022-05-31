@@ -324,7 +324,7 @@ jBoundBoxObject* CreateBoundBox(jBoundBox boundBox, jObject* ownerObject, const 
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = "Pos";
+		streamParam->Name = jName("Pos");
 		streamParam->Data.resize(elementCount * 3);
 		memcpy(&streamParam->Data[0], vertices, sizeof(vertices));
 		vertexStreamData->Params.push_back(streamParam);
@@ -407,7 +407,7 @@ jBoundSphereObject* CreateBoundSphere(jBoundSphere boundSphere, jObject* ownerOb
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = "Pos";
+		streamParam->Name = jName("Pos");
 		streamParam->Data.resize(vertices.size());
 		memcpy(&streamParam->Data[0], &vertices[0], vertices.size() * sizeof(float));
 		vertexStreamData->Params.push_back(streamParam);
@@ -453,7 +453,7 @@ jBoundSphereObject* CreateBoundSphere(jBoundSphere boundSphere, jObject* ownerOb
 		streamParam->ElementType = EBufferElementType::INT;
 		streamParam->ElementTypeSize = sizeof(uint32);
 		streamParam->Stride = sizeof(uint32) * 3;
-		streamParam->Name = "Index";
+		streamParam->Name = jName("Index");
 		streamParam->Data.resize(faces.size());
 		memcpy(&streamParam->Data[0], &faces[0], faces.size() * sizeof(uint32));
 		indexStreamData->Param = streamParam;
@@ -515,7 +515,7 @@ jRenderObject* CreateQuad_Internal(const Vector& pos, const Vector& size, const 
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = "Pos";
+		streamParam->Name = jName("Pos");
 		streamParam->Data.resize(elementCount * 3);
 		memcpy(&streamParam->Data[0], &vertices[0], sizeof(vertices));
 		vertexStreamData->Params.push_back(streamParam);
@@ -527,7 +527,7 @@ jRenderObject* CreateQuad_Internal(const Vector& pos, const Vector& size, const 
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->Stride = sizeof(float) * 4;
-		streamParam->Name = "Color";
+		streamParam->Name = jName("Color");
 		streamParam->Data = std::move(GenerateColor(color, elementCount));
 		vertexStreamData->Params.push_back(streamParam);
 	}
@@ -546,7 +546,7 @@ jRenderObject* CreateQuad_Internal(const Vector& pos, const Vector& size, const 
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = "Normal";
+		streamParam->Name = jName("Normal");
 		streamParam->Data.resize(elementCount * 3);
 		memcpy(&streamParam->Data[0], &normals[0], normals.size() * sizeof(float));
 		vertexStreamData->Params.push_back(streamParam);
@@ -632,7 +632,7 @@ jObject* CreateGizmo(const Vector& pos, const Vector& rot, const Vector& scale)
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = "Pos";
+		streamParam->Name = jName("Pos");
 		streamParam->Data.resize(elementCount * 3);
 		memcpy(&streamParam->Data[0], vertices, sizeof(vertices));
 		vertexStreamData->Params.push_back(streamParam);
@@ -644,7 +644,7 @@ jObject* CreateGizmo(const Vector& pos, const Vector& rot, const Vector& scale)
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->Stride = sizeof(float) * 4;
-		streamParam->Name = "Color";
+		streamParam->Name = jName("Color");
 		streamParam->Data.resize(elementCount * 4);
 		memcpy(&streamParam->Data[0], colors, sizeof(colors));
 		vertexStreamData->Params.push_back(streamParam);
@@ -656,7 +656,7 @@ jObject* CreateGizmo(const Vector& pos, const Vector& rot, const Vector& scale)
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = "Normal";
+		streamParam->Name = jName("Normal");
 		streamParam->Data.resize(elementCount * 3);
 		for (int32 i = 0; i < elementCount; ++i)
 		{
@@ -702,7 +702,7 @@ jObject* CreateTriangle(const Vector& pos, const Vector& size, const Vector& sca
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = "Pos";
+		streamParam->Name = jName("Pos");
 		streamParam->Data.resize(elementCount * 3);
 		memcpy(&streamParam->Data[0], vertices, sizeof(vertices));
 		vertexStreamData->Params.push_back(streamParam);
@@ -714,7 +714,7 @@ jObject* CreateTriangle(const Vector& pos, const Vector& size, const Vector& sca
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->Stride = sizeof(float) * 4;
-		streamParam->Name = "Color";
+		streamParam->Name = jName("Color");
 		streamParam->Data = std::move(GenerateColor(color, elementCount));
 		vertexStreamData->Params.push_back(streamParam);
 	}
@@ -725,7 +725,7 @@ jObject* CreateTriangle(const Vector& pos, const Vector& size, const Vector& sca
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = "Normal";
+		streamParam->Name = jName("Normal");
 		streamParam->Data.resize(elementCount * 3);
 		for (int32 i = 0; i < elementCount; ++i)
 		{
@@ -862,7 +862,7 @@ jObject* CreateCube(const Vector& pos, const Vector& size, const Vector& scale, 
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = "Pos";
+		streamParam->Name = jName("Pos");
 		streamParam->Data.resize(elementCount * 3);
 		memcpy(&streamParam->Data[0], vertices, sizeof(vertices));
 		vertexStreamData->Params.push_back(streamParam);
@@ -874,7 +874,7 @@ jObject* CreateCube(const Vector& pos, const Vector& size, const Vector& scale, 
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->Stride = sizeof(float) * 4;
-		streamParam->Name = "Color";
+		streamParam->Name = jName("Color");
 		streamParam->Data = std::move(GenerateColor(color, elementCount));
 		vertexStreamData->Params.push_back(streamParam);
 	}
@@ -885,7 +885,7 @@ jObject* CreateCube(const Vector& pos, const Vector& size, const Vector& scale, 
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = "Normal";
+		streamParam->Name = jName("Normal");
 		streamParam->Data.resize(elementCount * 3);
 		memcpy(&streamParam->Data[0], normals, sizeof(normals));
 		vertexStreamData->Params.push_back(streamParam);
@@ -968,7 +968,7 @@ jObject* CreateCapsule(const Vector& pos, float height, float radius, int32 slic
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = "Pos";
+		streamParam->Name = jName("Pos");
 		streamParam->Data.resize(vertices.size());
 		memcpy(&streamParam->Data[0], &vertices[0], vertices.size() * sizeof(float));
 		vertexStreamData->Params.push_back(streamParam);
@@ -980,7 +980,7 @@ jObject* CreateCapsule(const Vector& pos, float height, float radius, int32 slic
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->Stride = sizeof(float) * 4;
-		streamParam->Name = "Color";
+		streamParam->Name = jName("Color");
 		streamParam->Data = std::move(GenerateColor(color, elementCount));
 		vertexStreamData->Params.push_back(streamParam);
 	}
@@ -991,7 +991,7 @@ jObject* CreateCapsule(const Vector& pos, float height, float radius, int32 slic
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = "Normal";
+		streamParam->Name = jName("Normal");
 		streamParam->Data.resize(normals.size());
 		memcpy(&streamParam->Data[0], &normals[0], normals.size() * sizeof(float));
 		vertexStreamData->Params.push_back(streamParam);
@@ -1023,7 +1023,7 @@ jObject* CreateCapsule(const Vector& pos, float height, float radius, int32 slic
 		streamParam->ElementType = EBufferElementType::INT;
 		streamParam->ElementTypeSize = sizeof(uint32);
 		streamParam->Stride = sizeof(uint32) * 3;
-		streamParam->Name = "Index";
+		streamParam->Name = jName("Index");
 		streamParam->Data.resize(faces.size());
 		memcpy(&streamParam->Data[0], &faces[0], faces.size() * sizeof(uint32));
 		indexStreamData->Param = streamParam;
@@ -1110,7 +1110,7 @@ jConePrimitive* CreateCone(const Vector& pos, float height, float radius, int32 
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = "Pos";
+		streamParam->Name = jName("Pos");
 		streamParam->Data.resize(vertices.size());
 		memcpy(&streamParam->Data[0], &vertices[0], vertices.size() * sizeof(float));
 		vertexStreamData->Params.push_back(streamParam);
@@ -1122,7 +1122,7 @@ jConePrimitive* CreateCone(const Vector& pos, float height, float radius, int32 
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->Stride = sizeof(float) * 4;
-		streamParam->Name = "Color";
+		streamParam->Name = jName("Color");
 		streamParam->Data = std::move(GenerateColor(color, elementCount));
 		vertexStreamData->Params.push_back(streamParam);
 	}
@@ -1133,7 +1133,7 @@ jConePrimitive* CreateCone(const Vector& pos, float height, float radius, int32 
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = "Normal";
+		streamParam->Name = jName("Normal");
 		streamParam->Data.resize(normals.size());
 		memcpy(&streamParam->Data[0], &normals[0], normals.size() * sizeof(float));
 		vertexStreamData->Params.push_back(streamParam);
@@ -1249,7 +1249,7 @@ jObject* CreateCylinder(const Vector& pos, float height, float radius, int32 sli
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = "Pos";
+		streamParam->Name = jName("Pos");
 		streamParam->Data.resize(vertices.size());
 		memcpy(&streamParam->Data[0], &vertices[0], vertices.size() * sizeof(float));
 		vertexStreamData->Params.push_back(streamParam);
@@ -1261,7 +1261,7 @@ jObject* CreateCylinder(const Vector& pos, float height, float radius, int32 sli
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->Stride = sizeof(float) * 4;
-		streamParam->Name = "Color";
+		streamParam->Name = jName("Color");
 		streamParam->Data = std::move(GenerateColor(color, elementCount));
 		vertexStreamData->Params.push_back(streamParam);
 	}
@@ -1272,7 +1272,7 @@ jObject* CreateCylinder(const Vector& pos, float height, float radius, int32 sli
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = "Normal";
+		streamParam->Name = jName("Normal");
 		streamParam->Data.resize(normals.size());
 		memcpy(&streamParam->Data[0], &normals[0], normals.size() * sizeof(float));
 		vertexStreamData->Params.push_back(streamParam);
@@ -1343,7 +1343,7 @@ jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = "Pos";
+		streamParam->Name = jName("Pos");
 		streamParam->Data.resize(vertices.size());
 		memcpy(&streamParam->Data[0], &vertices[0], vertices.size() * sizeof(float));
 		vertexStreamData->Params.push_back(streamParam);
@@ -1355,7 +1355,7 @@ jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->Stride = sizeof(float) * 4;
-		streamParam->Name = "Color";
+		streamParam->Name = jName("Color");
 		streamParam->Data = std::move(GenerateColor(color, elementCount));
 		vertexStreamData->Params.push_back(streamParam);
 	}
@@ -1374,7 +1374,7 @@ jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = "Normal";
+		streamParam->Name = jName("Normal");
 		streamParam->Data.resize(normals.size());
 		memcpy(&streamParam->Data[0], &normals[0], normals.size() * sizeof(float));
 		vertexStreamData->Params.push_back(streamParam);
@@ -1420,7 +1420,7 @@ jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector
 		streamParam->ElementType = EBufferElementType::INT;
 		streamParam->ElementTypeSize = sizeof(uint32);
 		streamParam->Stride = sizeof(uint32) * 3;
-		streamParam->Name = "Index";
+		streamParam->Name = jName("Index");
 		streamParam->Data.resize(faces.size());
 		memcpy(&streamParam->Data[0], &faces[0], faces.size() * sizeof(uint32));
 		indexStreamData->Param = streamParam;
@@ -1469,7 +1469,7 @@ jUIQuadPrimitive* CreateUIQuad(const Vector2& pos, const Vector2& size, jTexture
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->Stride = sizeof(float) * 2;
-		streamParam->Name = "VertPos";
+		streamParam->Name = jName("VertPos");
 		streamParam->Data.resize(_countof(vertices));
 		memcpy(&streamParam->Data[0], &vertices[0], sizeof(vertices));
 		vertexStreamData->Params.push_back(streamParam);
@@ -1505,7 +1505,7 @@ jFullscreenQuadPrimitive* CreateFullscreenQuad(jTexture* texture)
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->Stride = sizeof(float);
-		streamParam->Name = "VertID";
+		streamParam->Name = jName("VertID");
 		streamParam->Data.resize(_countof(vertices));
 		memcpy(&streamParam->Data[0], &vertices[0], sizeof(vertices));
 		vertexStreamData->Params.push_back(streamParam);
@@ -1552,7 +1552,7 @@ jSegmentPrimitive* CreateSegment(const Vector& start, const Vector& end, float t
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = "Pos";
+		streamParam->Name = jName("Pos");
 		streamParam->Data.resize(_countof(vertices));
 		memcpy(&streamParam->Data[0], &vertices[0], sizeof(vertices));
 		vertexStreamData->Params.push_back(streamParam);
@@ -1564,7 +1564,7 @@ jSegmentPrimitive* CreateSegment(const Vector& start, const Vector& end, float t
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->Stride = sizeof(float) * 4;
-		streamParam->Name = "Color";
+		streamParam->Name = jName("Color");
 		streamParam->Data = std::move(GenerateColor(color, elementCount));
 		vertexStreamData->Params.push_back(streamParam);
 	}
@@ -1735,7 +1735,7 @@ jGraph2D* CreateGraph2D(const Vector2& pos, const Vector2& size, const std::vect
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->Stride = sizeof(Vector2);
-		streamParam->Name = "Pos";
+		streamParam->Name = jName("Pos");
 		streamParam->Data.resize(_countof(point));
 		memcpy(&streamParam->Data[0], &point[0], sizeof(point));
 		vertexStreamData->Params.push_back(streamParam);
@@ -1747,7 +1747,7 @@ jGraph2D* CreateGraph2D(const Vector2& pos, const Vector2& size, const std::vect
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->Stride = sizeof(Matrix);
-		streamParam->Name = "Transform";
+		streamParam->Name = jName("Transform");
 		streamParam->Data.clear();
 		streamParam->InstanceDivisor = 1;
 		vertexStreamData->Params.push_back(streamParam);
@@ -1814,7 +1814,7 @@ void jSegmentPrimitive::UpdateSegment()
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = "Pos";
+		streamParam->Name = jName("Pos");
 		streamParam->Data.resize(_countof(vertices));
 		memcpy(&streamParam->Data[0], &vertices[0], sizeof(vertices));
 		RenderObject->VertexStream->Params[0] = streamParam;
@@ -1826,7 +1826,7 @@ void jSegmentPrimitive::UpdateSegment()
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->Stride = sizeof(float) * 4;
-		streamParam->Name = "Color";
+		streamParam->Name = jName("Color");
 		streamParam->Data = std::move(jPrimitiveUtil::GenerateColor(Color, 2));
 		RenderObject->VertexStream->Params[1] = streamParam;
 	}
@@ -2008,7 +2008,7 @@ void jFrustumPrimitive::Update(float deltaTime)
 			streamParam->ElementTypeSize = sizeof(float);
 			streamParam->ElementType = EBufferElementType::FLOAT;
 			streamParam->Stride = sizeof(float) * 3;
-			streamParam->Name = "Pos";
+			streamParam->Name = jName("Pos");
 			streamParam->Data.resize(elementCount * 3);
 			memcpy(&streamParam->Data[0], &vertices[0], sizeof(vertices));
 			vertexStreamData->Params.push_back(streamParam);
@@ -2020,7 +2020,7 @@ void jFrustumPrimitive::Update(float deltaTime)
 			streamParam->ElementType = EBufferElementType::FLOAT;
 			streamParam->ElementTypeSize = sizeof(float);
 			streamParam->Stride = sizeof(float) * 4;
-			streamParam->Name = "Color";
+			streamParam->Name = jName("Color");
 			streamParam->Data = std::move(jPrimitiveUtil::GenerateColor(color, elementCount));
 			vertexStreamData->Params.push_back(streamParam);
 		}
@@ -2039,7 +2039,7 @@ void jFrustumPrimitive::Update(float deltaTime)
 			streamParam->ElementTypeSize = sizeof(float);
 			streamParam->ElementType = EBufferElementType::FLOAT;
 			streamParam->Stride = sizeof(float) * 3;
-			streamParam->Name = "Normal";
+			streamParam->Name = jName("Normal");
 			streamParam->Data.resize(elementCount * 3);
 			memcpy(&streamParam->Data[0], &normals[0], normals.size() * sizeof(float));
 			vertexStreamData->Params.push_back(streamParam);
@@ -2171,9 +2171,10 @@ void jGraph2D::UpdateBuffer()
 
 			if (RenderObject && RenderObject->VertexStream)
 			{
+				static jName TransformName("Transform");
 				for (auto& iter : RenderObject->VertexStream->Params)
 				{
-					if (iter->Name == "Transform")
+					if (iter->Name == TransformName)
 					{
 						auto matStreamParam = static_cast<jStreamParam<Matrix>*>(iter);
 						matStreamParam->Data.resize(ResultMatrices.size());

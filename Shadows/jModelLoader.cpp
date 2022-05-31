@@ -250,7 +250,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = "Pos";
+		streamParam->Name = jName("Pos");
 		streamParam->Data.resize(elementCount * 3);
 		memcpy(&streamParam->Data[0], &meshData->Vertices[0], meshData->Vertices.size() * sizeof(Vector));
 		vertexStreamData->Params.push_back(streamParam);
@@ -265,7 +265,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = "Normal";
+		streamParam->Name = jName("Normal");
 		streamParam->Data.resize(elementCount * 3);
 		memcpy(&streamParam->Data[0], &meshData->Normals[0], meshData->Normals.size() * sizeof(Vector));
 		vertexStreamData->Params.push_back(streamParam);
@@ -280,7 +280,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = "Tangent";
+		streamParam->Name = jName("Tangent");
 		streamParam->Data.resize(elementCount * 3);
 		memcpy(&streamParam->Data[0], &meshData->Tangents[0], meshData->Tangents.size() * sizeof(Vector));
 		vertexStreamData->Params.push_back(streamParam);
@@ -295,7 +295,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = "Bitangent";
+		streamParam->Name = jName("Bitangent");
 		streamParam->Data.resize(elementCount * 3);
 		memcpy(&streamParam->Data[0], &meshData->Bitangents[0], meshData->Bitangents.size() * sizeof(Vector));
 		vertexStreamData->Params.push_back(streamParam);
@@ -307,7 +307,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->Stride = sizeof(float) * 2;
-		streamParam->Name = "TexCoord";
+		streamParam->Name = jName("TexCoord");
 		streamParam->Data.resize(elementCount * 2);
 		memcpy(&streamParam->Data[0], &meshData->TexCoord[0], meshData->TexCoord.size() * sizeof(Vector2));
 		vertexStreamData->Params.push_back(streamParam);
@@ -324,7 +324,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(uint32);
 		streamParam->Stride = sizeof(uint32) * 3;
-		streamParam->Name = "Index";
+		streamParam->Name = jName("Index");
 		streamParam->Data.resize(meshData->Faces.size());
 		memcpy(&streamParam->Data[0], &meshData->Faces[0], meshData->Faces.size() * sizeof(uint32));
 		indexStreamData->Param = streamParam;
