@@ -42,7 +42,7 @@ enum class EBufferType
 enum class EBufferElementType
 {
 	BYTE,
-	INT,
+	UNSIGNED_INT,
 	FLOAT,
 	MAX,
 };
@@ -275,6 +275,7 @@ enum class EDrawBufferType
 	COLOR_ATTACHMENT4,
 	COLOR_ATTACHMENT5,
 	COLOR_ATTACHMENT6,
+	COLOR_ATTACHMENT7,
 	MAX
 };
 

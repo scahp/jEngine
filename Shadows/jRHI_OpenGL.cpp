@@ -292,6 +292,51 @@ FORCEINLINE uint32 GetOpenGLBlendEquation(EBlendEquation type)
 	);
 }
 
+FORCEINLINE uint32 GetOpenGLBufferType(EBufferType type)
+{
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(EBufferType::STATIC, GL_STATIC_DRAW),
+		CONVERSION_TYPE_ELEMENT(EBufferType::DYNAMIC, GL_DYNAMIC_DRAW)
+	);
+}
+
+FORCEINLINE uint32 GetOpenGLBufferElementType(EBufferElementType type)
+{
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(EBufferElementType::BYTE, GL_STATIC_DRAW),
+		CONVERSION_TYPE_ELEMENT(EBufferElementType::UNSIGNED_INT, GL_UNSIGNED_INT),
+		CONVERSION_TYPE_ELEMENT(EBufferElementType::FLOAT, GL_FLOAT)
+	);
+}
+
+FORCEINLINE uint32 GetOpenGLDrawBufferType(EDrawBufferType type)
+{
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(EDrawBufferType::COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT0),
+		CONVERSION_TYPE_ELEMENT(EDrawBufferType::COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT1),
+		CONVERSION_TYPE_ELEMENT(EDrawBufferType::COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT2),
+		CONVERSION_TYPE_ELEMENT(EDrawBufferType::COLOR_ATTACHMENT3, GL_COLOR_ATTACHMENT3),
+		CONVERSION_TYPE_ELEMENT(EDrawBufferType::COLOR_ATTACHMENT4, GL_COLOR_ATTACHMENT4),
+		CONVERSION_TYPE_ELEMENT(EDrawBufferType::COLOR_ATTACHMENT5, GL_COLOR_ATTACHMENT5),
+		CONVERSION_TYPE_ELEMENT(EDrawBufferType::COLOR_ATTACHMENT6, GL_COLOR_ATTACHMENT6),
+		CONVERSION_TYPE_ELEMENT(EDrawBufferType::COLOR_ATTACHMENT7, GL_COLOR_ATTACHMENT7)
+	);
+}
+
+FORCEINLINE uint32 GetStencilOp(EStencilOp type)
+{
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(EStencilOp::KEEP, GL_KEEP),
+		CONVERSION_TYPE_ELEMENT(EStencilOp::ZERO, GL_ZERO),
+		CONVERSION_TYPE_ELEMENT(EStencilOp::REPLACE, GL_REPLACE),
+		CONVERSION_TYPE_ELEMENT(EStencilOp::INCR, GL_INCR),
+		CONVERSION_TYPE_ELEMENT(EStencilOp::INCR_WRAP, GL_INCR_WRAP),
+		CONVERSION_TYPE_ELEMENT(EStencilOp::DECR, GL_DECR),
+		CONVERSION_TYPE_ELEMENT(EStencilOp::DECR_WRAP, GL_DECR_WRAP),
+		CONVERSION_TYPE_ELEMENT(EStencilOp::INVERT, GL_INVERT)
+	);
+}
+
 uint32 GetOpenGLClearBufferBit(ERenderBufferType typeBit)
 {
 	uint32 clearBufferBit = 0;
@@ -372,16 +417,7 @@ jVertexBuffer* jRHI_OpenGL::CreateVertexBuffer(const std::shared_ptr<jVertexStre
 		if (iter->Stride <= 0)
 			continue;
 
-		uint32 bufferType = GL_STATIC_DRAW;
-		switch (iter->BufferType)
-		{
-		case EBufferType::STATIC:
-			bufferType = GL_STATIC_DRAW;
-			break;
-		case EBufferType::DYNAMIC:
-			bufferType = GL_DYNAMIC_DRAW;
-			break;
-		}
+		const uint32 bufferType = GetOpenGLBufferType(iter->BufferType);
 
 		jVertexStream_OpenGL stream;
 		glGenBuffers(1, &stream.BufferID);
@@ -406,16 +442,7 @@ jIndexBuffer* jRHI_OpenGL::CreateIndexBuffer(const std::shared_ptr<jIndexStreamD
 	if (!streamData)
 		return nullptr;
 
-	uint32 bufferType = GL_STATIC_DRAW;
-	switch (streamData->Param->BufferType)
-	{
-	case EBufferType::STATIC:
-		bufferType = GL_STATIC_DRAW;
-		break;
-	case EBufferType::DYNAMIC:
-		bufferType = GL_DYNAMIC_DRAW;
-		break;
-	}
+	const uint32 bufferType = GetOpenGLBufferType(streamData->Param->BufferType);
 
 	jIndexBuffer_OpenGL* indexBuffer = new jIndexBuffer_OpenGL();
 	indexBuffer->IndexStreamData = streamData;
@@ -437,19 +464,7 @@ void jRHI_OpenGL::BindVertexBuffer(const jVertexBuffer* vb, const jShader* shade
 		auto loc = shader_gl->TryGetAttributeLocation(iter.Name);
 		if (loc != -1)
 		{
-			uint32 elementType = 0;
-			switch (iter.ElementType)
-			{
-			case EBufferElementType::BYTE:
-				elementType = GL_UNSIGNED_BYTE;
-				break;
-			case EBufferElementType::INT:
-				elementType = GL_UNSIGNED_INT;
-				break;
-			case EBufferElementType::FLOAT:
-				elementType = GL_FLOAT;
-				break;
-			}
+			const uint32 elementType = GetOpenGLBufferElementType(iter.ElementType);
 
 			glBindBuffer(GL_ARRAY_BUFFER, iter.BufferID);
 
@@ -1430,36 +1445,8 @@ void jRHI_OpenGL::SetTexture(int32 index, const jTexture* texture) const
 void jRHI_OpenGL::SetTextureFilter(ETextureType type, ETextureFilterTarget target, ETextureFilter filter) const
 {
 	const uint32 texFilter = GetOpenGLTextureFilterType(filter);
-
-	uint32 texTarget = 0;
-	switch (target)
-	{
-	case ETextureFilterTarget::MINIFICATION:
-		texTarget = GL_TEXTURE_MIN_FILTER;
-		break;
-	case ETextureFilterTarget::MAGNIFICATION:
-		texTarget = GL_TEXTURE_MAG_FILTER;
-		break;
-	default:
-		break;
-	}
-
-	uint32 textureType = 0;
-	switch (type)
-	{
-	case ETextureType::TEXTURE_2D:
-		textureType = GL_TEXTURE_2D;
-		break;
-	case ETextureType::TEXTURE_2D_ARRAY:
-	case ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW:
-		textureType = GL_TEXTURE_2D_ARRAY;
-		break;
-	case ETextureType::TEXTURE_CUBE:
-		textureType = GL_TEXTURE_CUBE_MAP;
-		break;
-	default:
-		break;
-	}
+	const uint32 texTarget = GetOpenGLFilterTargetType(target);
+	const uint32 textureType = GetOpenGLTextureType(type);
 
 	glTexParameteri(textureType, texTarget, texFilter);
 }
@@ -1868,36 +1855,9 @@ void jRHI_OpenGL::SetRenderTarget(const jRenderTarget* rt, int32 index /*= 0*/, 
 void jRHI_OpenGL::SetDrawBuffers(const std::initializer_list<EDrawBufferType>& list) const
 {
 	std::vector<uint32> buffers;
+	buffers.reserve(list.size());
 	for(auto& iter : list)
-	{
-		switch (iter)
-		{
-		case EDrawBufferType::COLOR_ATTACHMENT0:
-			buffers.push_back(GL_COLOR_ATTACHMENT0);
-			break;
-		case EDrawBufferType::COLOR_ATTACHMENT1:
-			buffers.push_back(GL_COLOR_ATTACHMENT1);
-			break;
-		case EDrawBufferType::COLOR_ATTACHMENT2:
-			buffers.push_back(GL_COLOR_ATTACHMENT2);
-			break;
-		case EDrawBufferType::COLOR_ATTACHMENT3:
-			buffers.push_back(GL_COLOR_ATTACHMENT3);
-			break;
-		case EDrawBufferType::COLOR_ATTACHMENT4:
-			buffers.push_back(GL_COLOR_ATTACHMENT4);
-			break;
-		case EDrawBufferType::COLOR_ATTACHMENT5:
-			buffers.push_back(GL_COLOR_ATTACHMENT5);
-			break;
-		case EDrawBufferType::COLOR_ATTACHMENT6:
-			buffers.push_back(GL_COLOR_ATTACHMENT6);
-			break;
-		default:
-			JASSERT(0);
-			break;
-		}
-	}
+		buffers.push_back(GetOpenGLDrawBufferType(iter));
 
 	if (!buffers.empty())
 		glDrawBuffers(static_cast<int32>(buffers.size()), &buffers[0]);
@@ -1919,16 +1879,7 @@ void jRHI_OpenGL::UpdateVertexBuffer(jVertexBuffer* vb, const std::shared_ptr<jV
 		if (iter->Stride <= 0)
 			continue;
 
-		uint32 bufferType = GL_STATIC_DRAW;
-		switch (iter->BufferType)
-		{
-		case EBufferType::STATIC:
-			bufferType = GL_STATIC_DRAW;
-			break;
-		case EBufferType::DYNAMIC:
-			bufferType = GL_DYNAMIC_DRAW;
-			break;
-		}
+		const uint32 bufferType = GetOpenGLBufferType(iter->BufferType);
 
 		jVertexStream_OpenGL stream;
 		glGenBuffers(1, &stream.BufferID);
@@ -1955,17 +1906,7 @@ void jRHI_OpenGL::UpdateVertexBuffer(jVertexBuffer* vb, IStreamParam* streamPara
 	auto vb_gl = static_cast<jVertexBuffer_OpenGL*>(vb);
 	
 	auto stream = vb_gl->Streams[streamParamIndex];
-
-	uint32 bufferType = GL_STATIC_DRAW;
-	switch (streamParam->BufferType)
-	{
-	case EBufferType::STATIC:
-		bufferType = GL_STATIC_DRAW;
-		break;
-	case EBufferType::DYNAMIC:
-		bufferType = GL_DYNAMIC_DRAW;
-		break;
-	}
+	const uint32 bufferType = GetOpenGLBufferType(streamParam->BufferType);
 
 	glBindVertexArray(vb_gl->VAO);
 	glBindBuffer(GL_ARRAY_BUFFER, stream.BufferID);
@@ -2029,24 +1970,7 @@ void jRHI_OpenGL::EnableStencil(bool enable) const
 void jRHI_OpenGL::SetStencilOpSeparate(EFace face, EStencilOp sFail, EStencilOp dpFail, EStencilOp dpPass) const
 {
 	const uint32 face_gl = GetOpenGLFaceType(face);
-
-	auto func = [](EStencilOp op)
-	{
-		switch (op)
-		{
-		case EStencilOp::KEEP:		return GL_KEEP;
-		case EStencilOp::ZERO:		return GL_ZERO;
-		case EStencilOp::REPLACE:	return GL_REPLACE;
-		case EStencilOp::INCR:		return GL_INCR;
-		case EStencilOp::INCR_WRAP:	return GL_INCR_WRAP;
-		case EStencilOp::DECR:		return GL_DECR;
-		case EStencilOp::DECR_WRAP:	return GL_DECR_WRAP;
-		case EStencilOp::INVERT:	return GL_INVERT;
-		default:					return GL_NONE;
-		}
-	};
-
-	glStencilOpSeparate(face_gl, func(sFail), func(dpFail), func(dpPass));
+	glStencilOpSeparate(face_gl, GetStencilOp(sFail), GetStencilOp(dpFail), GetStencilOp(dpPass));
 }
 
 void jRHI_OpenGL::SetStencilFunc(EComparisonFunc func, int32 ref, uint32 mask) const

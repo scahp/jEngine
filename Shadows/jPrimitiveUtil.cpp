@@ -450,7 +450,7 @@ jBoundSphereObject* CreateBoundSphere(jBoundSphere boundSphere, jObject* ownerOb
 	{
 		auto streamParam = new jStreamParam<uint32>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->ElementType = EBufferElementType::INT;
+		streamParam->ElementType = EBufferElementType::UNSIGNED_INT;
 		streamParam->ElementTypeSize = sizeof(uint32);
 		streamParam->Stride = sizeof(uint32) * 3;
 		streamParam->Name = jName("Index");
@@ -1020,7 +1020,7 @@ jObject* CreateCapsule(const Vector& pos, float height, float radius, int32 slic
 	{
 		auto streamParam = new jStreamParam<uint32>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->ElementType = EBufferElementType::INT;
+		streamParam->ElementType = EBufferElementType::UNSIGNED_INT;
 		streamParam->ElementTypeSize = sizeof(uint32);
 		streamParam->Stride = sizeof(uint32) * 3;
 		streamParam->Name = jName("Index");
@@ -1417,7 +1417,7 @@ jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector
 	{
 		auto streamParam = new jStreamParam<uint32>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->ElementType = EBufferElementType::INT;
+		streamParam->ElementType = EBufferElementType::UNSIGNED_INT;
 		streamParam->ElementTypeSize = sizeof(uint32);
 		streamParam->Stride = sizeof(uint32) * 3;
 		streamParam->Name = jName("Index");
