@@ -216,7 +216,7 @@ struct ITransformFeedbackBuffer : public IBuffer
 struct jMaterialParam
 {
 	jMaterialParam() = default;
-	jMaterialParam(jName name, const jTexture* texture, const jSamplerState* samplerstate)
+	jMaterialParam(const jName& name, const jTexture* texture, const jSamplerState* samplerstate)
 		: Name(name), Texture(texture), SamplerState(samplerstate)
 	{}
 	virtual ~jMaterialParam() {}
@@ -230,14 +230,15 @@ struct jMaterialData
 {
 	~jMaterialData()
 	{
-		Params.clear();
+		Clear();
 	}
 
-	void AddMaterialParam(jName name, const jTexture* texture, const jSamplerState* samplerState = nullptr);
-    void SetMaterialParam(int32 index, jName name, const jTexture* texture, const jSamplerState* samplerState = nullptr);
-	void SetMaterialParam(int32 index, jName name);
+	void AddMaterialParam(const jName& name, const jTexture* texture, const jSamplerState* samplerState = nullptr);
+    void SetMaterialParam(int32 index, const jName& name, const jTexture* texture, const jSamplerState* samplerState = nullptr);
+	void SetMaterialParam(int32 index, const jName& name);
 	void SetMaterialParam(int32 index, const jTexture* texture);
 	void SetMaterialParam(int32 index, const jSamplerState* samplerState);
+	void Clear() { Params.clear(); }
 
 	std::vector<jMaterialParam> Params;
 };
@@ -409,7 +410,7 @@ public:
 	virtual void DrawElementsBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex) const {}
 	virtual void DrawElementsInstancedBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex, int32 instanceCount) const {}
 	virtual void DispatchCompute(uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ) const {}
-	virtual void EnableDepthBias(bool enable) const {}
+	virtual void EnableDepthBias(bool enable, EPolygonMode polygonMode = EPolygonMode::FILL) const {}
 	virtual void SetDepthBias(float constant, float slope) const {}
 	virtual void SetShader(const jShader* shader) const {}
 	virtual jShader* CreateShader(const jShaderInfo& shaderInfo) const { return nullptr; }
@@ -420,27 +421,27 @@ public:
 	virtual void SetViewportIndexed(int32 index, float x, float y, float width, float height) const {}
 	virtual void SetViewportIndexed(int32 index, const jViewport& viewport) const {}
 	virtual void SetViewportIndexedArray(int32 startIndex, int32 count, const jViewport* viewports) const {}
-	virtual bool SetUniformbuffer(jName name, const Matrix& InData, const jShader* InShader) const { return false; }
-	virtual bool SetUniformbuffer(jName name, const int InData, const jShader* InShader) const { return false; }
-	virtual bool SetUniformbuffer(jName name, const uint32 InData, const jShader* InShader) const { return false; }
+	virtual bool SetUniformbuffer(const jName& name, const Matrix& InData, const jShader* InShader) const { return false; }
+	virtual bool SetUniformbuffer(const jName& name, const int InData, const jShader* InShader) const { return false; }
+	virtual bool SetUniformbuffer(const jName& name, const uint32 InData, const jShader* InShader) const { return false; }
 	FORCEINLINE virtual bool SetUniformbuffer(jName name, const bool InData, const jShader* InShader) const { return SetUniformbuffer(name, (int32)InData, InShader); }
-	virtual bool SetUniformbuffer(jName name, const float InData, const jShader* InShader) const { return false; }
-	virtual bool SetUniformbuffer(jName name, const Vector2& InData, const jShader* InShader) const { return false; }
-	virtual bool SetUniformbuffer(jName name, const Vector& InData, const jShader* InShader) const { return false; }
-	virtual bool SetUniformbuffer(jName name, const Vector4& InData, const jShader* InShader) const { return false; }
-	virtual bool SetUniformbuffer(jName name, const Vector2i& InData, const jShader* InShader) const { return false; }
-	virtual bool SetUniformbuffer(jName name, const Vector3i& InData, const jShader* InShader) const { return false; }
-	virtual bool SetUniformbuffer(jName name, const Vector4i& InData, const jShader* InShader) const { return false; }
-	virtual bool GetUniformbuffer(Matrix& outResult, jName name, const jShader* shader) const { return false; }
-	virtual bool GetUniformbuffer(int& outResult, jName name, const jShader* shader) const { return false; }
-	virtual bool GetUniformbuffer(uint32& outResult, jName name, const jShader* shader) const { return false; }
-	virtual bool GetUniformbuffer(float& outResult, jName name, const jShader* shader) const { return false; }
-	virtual bool GetUniformbuffer(Vector2& outResult, jName name, const jShader* shader) const { return false; }
-	virtual bool GetUniformbuffer(Vector& outResult, jName name, const jShader* shader) const { return false; }
-	virtual bool GetUniformbuffer(Vector4& outResult, jName name, const jShader* shader) const { return false; }
-	virtual bool GetUniformbuffer(Vector2i& outResult, jName name, const jShader* shader) const { return false; }
-	virtual bool GetUniformbuffer(Vector3i& outResult, jName name, const jShader* shader) const { return false; }
-	virtual bool GetUniformbuffer(Vector4i& outResult, jName name, const jShader* shader) const { return false; }
+	virtual bool SetUniformbuffer(const jName& name, const float InData, const jShader* InShader) const { return false; }
+	virtual bool SetUniformbuffer(const jName& name, const Vector2& InData, const jShader* InShader) const { return false; }
+	virtual bool SetUniformbuffer(const jName& name, const Vector& InData, const jShader* InShader) const { return false; }
+	virtual bool SetUniformbuffer(const jName& name, const Vector4& InData, const jShader* InShader) const { return false; }
+	virtual bool SetUniformbuffer(const jName& name, const Vector2i& InData, const jShader* InShader) const { return false; }
+	virtual bool SetUniformbuffer(const jName& name, const Vector3i& InData, const jShader* InShader) const { return false; }
+	virtual bool SetUniformbuffer(const jName& name, const Vector4i& InData, const jShader* InShader) const { return false; }
+	virtual bool GetUniformbuffer(Matrix& outResult, const jName& name, const jShader* shader) const { return false; }
+	virtual bool GetUniformbuffer(int& outResult, const jName& name, const jShader* shader) const { return false; }
+	virtual bool GetUniformbuffer(uint32& outResult, const jName& name, const jShader* shader) const { return false; }
+	virtual bool GetUniformbuffer(float& outResult, const jName& name, const jShader* shader) const { return false; }
+	virtual bool GetUniformbuffer(Vector2& outResult, const jName& name, const jShader* shader) const { return false; }
+	virtual bool GetUniformbuffer(Vector& outResult, const jName& name, const jShader* shader) const { return false; }
+	virtual bool GetUniformbuffer(Vector4& outResult, const jName& name, const jShader* shader) const { return false; }
+	virtual bool GetUniformbuffer(Vector2i& outResult, const jName& name, const jShader* shader) const { return false; }
+	virtual bool GetUniformbuffer(Vector3i& outResult, const jName& name, const jShader* shader) const { return false; }
+	virtual bool GetUniformbuffer(Vector4i& outResult, const jName& name, const jShader* shader) const { return false; }
 	virtual jTexture* CreateNullTexture() const { return nullptr; }
 	virtual jTexture* CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
 		, EFormatType dataType = EFormatType::UNSIGNED_BYTE, ETextureFormat textureFormat = ETextureFormat::RGBA, bool createMipmap = false) const { return nullptr; }
@@ -482,7 +483,7 @@ public:
 	virtual void EndQueryTimeElapsed(const jQueryTime* queryTimeElpased) const {}
 	virtual void EnableWireframe(bool enable) const {}
 	virtual void SetImageTexture(int32 index, const jTexture* texture, EImageTextureAccessType type) const {}
-	virtual void SetPolygonMode(EFace face, EPolygonMode mode) {}
+	virtual void SetPolygonMode(EFace face, EPolygonMode mode = EPolygonMode::FILL) {}
 	virtual jQueryPrimitiveGenerated* CreateQueryPrimitiveGenerated() const { return nullptr; }
 	virtual void ReleaseQueryPrimitiveGenerated(jQueryPrimitiveGenerated* query) const {}
 	virtual void BeginQueryPrimitiveGenerated(const jQueryPrimitiveGenerated* query) const {}
@@ -491,7 +492,8 @@ public:
 	virtual void EnableRasterizerDiscard(bool enable) const {}
 	virtual void SetTextureMipmapLevelLimit(ETextureType type, int32 baseLevel, int32 maxLevel) const {}
 	virtual void EnableMultisample(bool enable) const {}
-	virtual void SetCubeMapSeamless(bool enable) const {}	
+	virtual void SetCubeMapSeamless(bool enable) const {}
+	virtual void SetLineWidth(float width) const {}
 };
 
 // Not thred safe

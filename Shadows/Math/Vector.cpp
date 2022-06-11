@@ -1,5 +1,6 @@
 ﻿#include <pch.h>
 #include "Vector.h"
+#include "Matrix.h"
 
 const Vector Vector::OneVector = Vector(1.0f);
 const Vector Vector::ZeroVector = Vector(ZeroType);
@@ -9,7 +10,13 @@ const Vector Vector::UpVector = Vector(0.0f, 1.0f, 0.0f);
 
 Vector Vector::GetEulerAngleFrom() const
 {
+	// Vector::UpVector 이 기반 회전 벡터 방향으로 가정함.
 	return Vector(acosf(y), atan2f(x, z), 0.0f);
+}
+
+Vector Vector::GetDirectionFromEulerAngle() const
+{
+	return Matrix::MakeRotate(x, y, z).TransformDirection(Vector::UpVector);
 }
 
 // Vector

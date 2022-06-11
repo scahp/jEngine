@@ -36,22 +36,25 @@ uint64 jQueryPrimitiveGenerated::GetResult()
 	return NumOfGeneratedPrimitives;
 }
 
-void jMaterialData::AddMaterialParam(jName name, const jTexture* texture, const jSamplerState* samplerState)
+void jMaterialData::AddMaterialParam(const jName& name, const jTexture* texture, const jSamplerState* samplerState)
 {
 	Params.emplace_back(jMaterialParam(name, texture, samplerState));
 }
 
-void jMaterialData::SetMaterialParam(int32 index, jName name, const jTexture* texture, const jSamplerState* samplerState /*= nullptr*/)
+void jMaterialData::SetMaterialParam(int32 index, const jName& name, const jTexture* texture, const jSamplerState* samplerState /*= nullptr*/)
 {
 	if (Params.size() <= index)
-		return;
+	{
+		Params.resize(index + 1);
+		OutputDebugStringA("Resized Params in SetMaterialParam\n");
+	}
 
 	Params[index].Name = name;
     Params[index].Texture = texture;
     Params[index].SamplerState = samplerState;
 }
 
-void jMaterialData::SetMaterialParam(int32 index, jName name)
+void jMaterialData::SetMaterialParam(int32 index, const jName& name)
 {
     if (Params.size() <= index)
         return;

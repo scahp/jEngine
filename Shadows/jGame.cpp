@@ -222,7 +222,7 @@ void jGame::UpdateAppSetting()
 	auto& appSetting =  jShadowAppSettingProperties::GetInstance();
 
 	// Rotating spot light
-	appSetting.SpotLightDirection = Matrix::MakeRotateY(0.01f).Transform(appSetting.SpotLightDirection);
+	appSetting.SpotLightDirection = Matrix::MakeRotateY(0.01f).TransformDirection(appSetting.SpotLightDirection);
 
 	// Chaning normal or cascade shadow map depend on shadow type.
 	bool changedDirectionalLight = false;
@@ -416,14 +416,18 @@ void jGame::UpdateAppSetting()
 		DirectionalLightShadowMapUIDebug->Visible = appSetting.ShowDirectionalLightMap;
 }
 
+void jGame::OnMouseButton()
+{
+
+}
+
 void jGame::OnMouseMove(int32 xOffset, int32 yOffset)
 {
 	if (g_MouseState[EMouseButtonType::LEFT])
 	{
-		if (abs(xOffset))
-			MainCamera->RotateYAxis(xOffset * -0.005f);
-		if (abs(yOffset))
-			MainCamera->RotateRightAxis(yOffset * -0.005f);
+		constexpr float PitchScale = 0.0025f;
+		constexpr float YawScale = -0.0025f;
+		MainCamera->SetEulerAngle(MainCamera->GetEulerAngle() + Vector(yOffset * PitchScale, xOffset * YawScale, 0.0f));
 	}
 }
 
@@ -559,7 +563,7 @@ void jGame::SpawnGraphTestFunc()
 			auto MV = pCamera->Projection * pCamera->View;
 			for (int i = 0; i < 90; ++i)
 			{
-				PerspectiveVector[cnt++] = MV.Transform(Vector({ 0.0f, 0.0f, 10.0f + static_cast<float>(i) }));
+				PerspectiveVector[cnt++] = MV.TransformPoint(Vector({ 0.0f, 0.0f, 10.0f + static_cast<float>(i) }));
 			}
 
 			for (int i = 0; i < _countof(PerspectiveVector); ++i)
@@ -572,7 +576,7 @@ void jGame::SpawnGraphTestFunc()
 			auto MV = pCamera->Projection * pCamera->View;
 			for (int i = 0; i < 90; ++i)
 			{
-				OrthographicVector[cnt++] = MV.Transform(Vector({ 0.0f, 0.0f, 10.0f + static_cast<float>(i) }));
+				OrthographicVector[cnt++] = MV.TransformPoint(Vector({ 0.0f, 0.0f, 10.0f + static_cast<float>(i) }));
 			}
 
 			for (int i = 0; i < _countof(OrthographicVector); ++i)

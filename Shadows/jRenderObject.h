@@ -46,6 +46,9 @@ public:
 
 	const std::vector<float>& GetVertices() const;
 
+	void UpdateWorldMatrix();
+	Matrix GetWorld() const;
+
 	std::shared_ptr<jVertexStreamData> VertexStream;
 	jVertexBuffer* VertexBuffer = nullptr;
 
@@ -76,6 +79,10 @@ public:
 	FORCEINLINE const Vector& GetPos() const { return Pos; }
 	FORCEINLINE const Vector& GetRot() const { return Rot; }
 	FORCEINLINE const Vector& GetScale() const { return Scale; }
+
+	void SetTexture(int32 index, const jName& name, const jTexture* texture, const jSamplerState* samplerState = nullptr);
+	void SetTextureWithCommonName(int32 index, const jTexture* texture, const jSamplerState* samplerState = nullptr);
+	void ClearTexture();
 
 private:
 	enum EDirty : int8

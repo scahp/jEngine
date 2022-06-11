@@ -18,20 +18,37 @@ jImageFileLoader::~jImageFileLoader()
 {
 }
 
-std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(std::string const& filename, bool sRGB)
+std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& filename, bool sRGB)
 {
+	char Ext[128] = "";
+	_splitpath_s(filename.ToStr(), nullptr, 0, nullptr, 0, nullptr, 0, Ext, sizeof(Ext));
+	for (int32 i = 0; i < _countof(Ext); ++i)
+	{
+		if (Ext[i] == '\0')
+			break;
+		Ext[i] = std::tolower(Ext[i]);
+	}
+	if (strlen(Ext) <= 0)
+		return std::weak_ptr<jImageData>();
+
 	auto it_find = CachedImageDataMap.find(filename);
 	if (CachedImageDataMap.end() != it_find)
 		return it_find->second;
 
+	const jName ExtName(Ext);
+	static jName ExtDDS(".dds");
+	static jName ExtPNG(".png");
+	static jName ExtHDR(".hdr");
+
 	std::shared_ptr<jImageData> NewImageDataPatr(new jImageData());
+	bool IsHDR = false;
 
 	int32 width = 0;
 	int32 height = 0;
 	int32 NumOfComponent = -1;
-	if (std::string::npos != filename.find(".tga"))
+	if (ExtName == ExtDDS)
 	{
-		uint8* imageData = stbi_load(filename.c_str(), &width, &height, &NumOfComponent, 0);
+		uint8* imageData = stbi_dds_load(filename.ToStr(), &width, &height, &NumOfComponent, 0);
 
 		int32 NumOfBytes = width * height * sizeof(uint8) * NumOfComponent;
 		NewImageDataPatr->ImageData.resize(NumOfBytes);
@@ -41,23 +58,11 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(std::string co
 
 		stbi_image_free(imageData);
 	}
-	else if (std::string::npos != filename.find(".dds"))
-	{
-		uint8* imageData = stbi_dds_load(filename.c_str(), &width, &height, &NumOfComponent, 0);
-
-		int32 NumOfBytes = width * height * sizeof(uint8) * NumOfComponent;
-		NewImageDataPatr->ImageData.resize(NumOfBytes);
-		memcpy(&NewImageDataPatr->ImageData[0], imageData, NumOfBytes);
-		NewImageDataPatr->sRGB = sRGB;
-		NewImageDataPatr->FormatType = EFormatType::UNSIGNED_BYTE;
-
-		stbi_image_free(imageData);
-	}
-	else if (std::string::npos != filename.find(".png"))
+	else if (ExtName == ExtPNG)
 	{
 		NewImageDataPatr->Filename = filename;
 		unsigned w, h;
-		LodePNG::decode(NewImageDataPatr->ImageData, w, h, filename.c_str());
+		LodePNG::decode(NewImageDataPatr->ImageData, w, h, filename.ToStr());
 		NewImageDataPatr->sRGB = sRGB;
 		NewImageDataPatr->FormatType = EFormatType::UNSIGNED_BYTE;
 
@@ -65,16 +70,28 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(std::string co
 		height = static_cast<int32>(h);
 		NumOfComponent = 4;
 	}
-	else if (std::string::npos != filename.find(".hdr"))
+	else if (ExtName == ExtHDR)
 	{
-		int w, h, nrComponents;
-		float* imageData = stbi_loadf(filename.c_str(), &w, &h, &nrComponents, 0);
+		float* imageData = stbi_loadf(filename.ToStr(), &width, &height, &NumOfComponent, 0);
 
-		int32 NumOfBytes = w * h * sizeof(float) * nrComponents;
+		int32 NumOfBytes = width * height * sizeof(float) * NumOfComponent;
 		NewImageDataPatr->ImageData.resize(NumOfBytes);
 		memcpy(&NewImageDataPatr->ImageData[0], imageData, NumOfBytes);
 		NewImageDataPatr->sRGB = sRGB;
 		NewImageDataPatr->FormatType = EFormatType::FLOAT;
+
+		stbi_image_free(imageData);
+		IsHDR = true;
+	}
+	else
+	{
+		uint8* imageData = stbi_load(filename.ToStr(), &width, &height, &NumOfComponent, 0);
+
+		int32 NumOfBytes = width * height * sizeof(uint8) * NumOfComponent;
+		NewImageDataPatr->ImageData.resize(NumOfBytes);
+		memcpy(&NewImageDataPatr->ImageData[0], imageData, NumOfBytes);
+		NewImageDataPatr->sRGB = sRGB;
+		NewImageDataPatr->FormatType = EFormatType::UNSIGNED_BYTE;
 
 		stbi_image_free(imageData);
 	}
@@ -85,16 +102,19 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(std::string co
 	switch (NumOfComponent)
 	{
 	case 1:
-		NewImageDataPatr->Format = ETextureFormat::R;
+		NewImageDataPatr->Format = IsHDR ? ETextureFormat::R32F : ETextureFormat::R;
 		break;
 	case 2:
-		NewImageDataPatr->Format = ETextureFormat::RG;
+		NewImageDataPatr->Format = IsHDR ? ETextureFormat::RG32F : ETextureFormat::RG;
 		break;
 	case 3:
-		NewImageDataPatr->Format = ETextureFormat::RGB;
+		NewImageDataPatr->Format = IsHDR ? ETextureFormat::RGB32F : ETextureFormat::RGB;
 		break;
 	case 4:
-		NewImageDataPatr->Format = ETextureFormat::RGBA;
+		NewImageDataPatr->Format = IsHDR ? ETextureFormat::RGBA32F : ETextureFormat::RGBA;
+		break;
+	default:
+		check(0);
 		break;
 	}
 
@@ -102,7 +122,7 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(std::string co
 	return NewImageDataPatr;
 }
 
-std::weak_ptr<jTexture> jImageFileLoader::LoadTextureFromFile(std::string const& filename, bool sRGB /*= false*/)
+std::weak_ptr<jTexture> jImageFileLoader::LoadTextureFromFile(const jName& filename, bool sRGB /*= false*/)
 {
 	auto it_find = CachedTextureMap.find(filename);
 	if (CachedTextureMap.end() != it_find)

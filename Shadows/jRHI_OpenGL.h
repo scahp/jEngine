@@ -176,7 +176,7 @@ public:
 	virtual void DrawElementsBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex) const override;
 	virtual void DrawElementsInstancedBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex, int32 instanceCount) const override;
 	virtual void DispatchCompute(uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ) const override;
-	virtual void EnableDepthBias(bool enable) const override;
+	virtual void EnableDepthBias(bool enable, EPolygonMode polygonMode = EPolygonMode::FILL) const override;
 	virtual void SetDepthBias(float constant, float slope) const override;
 	virtual void SetClear(ERenderBufferType typeBit) const override;
 	virtual void SetClearColor(float r, float g, float b, float a) const override;
@@ -193,26 +193,26 @@ public:
 	virtual jTexture* CreateCubeTextureFromData(std::vector<void*> faces, int32 width, int32 height, bool sRGB
 		, EFormatType dataType = EFormatType::UNSIGNED_BYTE, ETextureFormat textureFormat = ETextureFormat::RGBA, bool createMipmap = false) const override;
 
-	virtual bool SetUniformbuffer(jName name, const Matrix& InData, const jShader* InShader) const override;
-	virtual bool SetUniformbuffer(jName name, const int InData, const jShader* InShader) const override;
-	virtual bool SetUniformbuffer(jName name, const uint32 InData, const jShader* InShader) const override;
-	virtual bool SetUniformbuffer(jName name, const float InData, const jShader* InShader) const override;
-	virtual bool SetUniformbuffer(jName name, const Vector2& InData, const jShader* InShader) const override;
-	virtual bool SetUniformbuffer(jName name, const Vector& InData, const jShader* InShader) const override;
-	virtual bool SetUniformbuffer(jName name, const Vector4& InData, const jShader* InShader) const override;
-	virtual bool SetUniformbuffer(jName name, const Vector2i& InData, const jShader* InShader) const override;
-	virtual bool SetUniformbuffer(jName name, const Vector3i& InData, const jShader* InShader) const override;
-	virtual bool SetUniformbuffer(jName name, const Vector4i& InData, const jShader* InShader) const override;
-	virtual bool GetUniformbuffer(Matrix& outResult, jName name, const jShader* shader) const override;
-	virtual bool GetUniformbuffer(int& outResult, jName name, const jShader* shader) const override;
-	virtual bool GetUniformbuffer(uint32& outResult, jName name, const jShader* shader) const override;
-	virtual bool GetUniformbuffer(float& outResult, jName name, const jShader* shader) const override;
-	virtual bool GetUniformbuffer(Vector2& outResult, jName name, const jShader* shader) const override;
-	virtual bool GetUniformbuffer(Vector& outResult, jName name, const jShader* shader) const override;
-	virtual bool GetUniformbuffer(Vector4& outResult, jName name, const jShader* shader) const override;
-	virtual bool GetUniformbuffer(Vector2i& outResult, jName name, const jShader* shader) const override;
-	virtual bool GetUniformbuffer(Vector3i& outResult, jName name, const jShader* shader) const override;
-	virtual bool GetUniformbuffer(Vector4i& outResult, jName name, const jShader* shader) const override;
+	virtual bool SetUniformbuffer(const jName& name, const Matrix& InData, const jShader* InShader) const override;
+	virtual bool SetUniformbuffer(const jName& name, const int InData, const jShader* InShader) const override;
+	virtual bool SetUniformbuffer(const jName& name, const uint32 InData, const jShader* InShader) const override;
+	virtual bool SetUniformbuffer(const jName& name, const float InData, const jShader* InShader) const override;
+	virtual bool SetUniformbuffer(const jName& name, const Vector2& InData, const jShader* InShader) const override;
+	virtual bool SetUniformbuffer(const jName& name, const Vector& InData, const jShader* InShader) const override;
+	virtual bool SetUniformbuffer(const jName& name, const Vector4& InData, const jShader* InShader) const override;
+	virtual bool SetUniformbuffer(const jName& name, const Vector2i& InData, const jShader* InShader) const override;
+	virtual bool SetUniformbuffer(const jName& name, const Vector3i& InData, const jShader* InShader) const override;
+	virtual bool SetUniformbuffer(const jName& name, const Vector4i& InData, const jShader* InShader) const override;
+	virtual bool GetUniformbuffer(Matrix& outResult, const jName& name, const jShader* shader) const override;
+	virtual bool GetUniformbuffer(int& outResult, const jName& name, const jShader* shader) const override;
+	virtual bool GetUniformbuffer(uint32& outResult, const jName& name, const jShader* shader) const override;
+	virtual bool GetUniformbuffer(float& outResult, const jName& name, const jShader* shader) const override;
+	virtual bool GetUniformbuffer(Vector2& outResult, const jName& name, const jShader* shader) const override;
+	virtual bool GetUniformbuffer(Vector& outResult, const jName& name, const jShader* shader) const override;
+	virtual bool GetUniformbuffer(Vector4& outResult, const jName& name, const jShader* shader) const override;
+	virtual bool GetUniformbuffer(Vector2i& outResult, const jName& name, const jShader* shader) const override;
+	virtual bool GetUniformbuffer(Vector3i& outResult, const jName& name, const jShader* shader) const override;
+	virtual bool GetUniformbuffer(Vector4i& outResult, const jName& name, const jShader* shader) const override;
 
 	virtual int32 SetMatetrial(const jMaterialData* materialData, const jShader* shader, int32 baseBindingIndex = 0) const override;
 	virtual void SetTexture(int32 index, const jTexture* texture) const override;
@@ -261,7 +261,7 @@ public:
 	virtual void EndQueryTimeElapsed(const jQueryTime* queryTimeElpased) const override;
 	virtual void EnableWireframe(bool enable) const override;
 	virtual void SetImageTexture(int32 index, const jTexture* texture, EImageTextureAccessType type) const override;
-	virtual void SetPolygonMode(EFace face, EPolygonMode mode) override;
+	virtual void SetPolygonMode(EFace face, EPolygonMode mode = EPolygonMode::FILL) override;
 	virtual jQueryPrimitiveGenerated* CreateQueryPrimitiveGenerated() const override;
 	virtual void ReleaseQueryPrimitiveGenerated(jQueryPrimitiveGenerated* query) const override;
 	virtual void BeginQueryPrimitiveGenerated(const jQueryPrimitiveGenerated* query) const override;
@@ -271,7 +271,8 @@ public:
 	virtual void SetTextureMipmapLevelLimit(ETextureType type, int32 baseLevel, int32 maxLevel) const override;
 	virtual void EnableMultisample(bool enable) const override;
 	virtual void SetCubeMapSeamless(bool enable) const override;
-	
+	virtual void SetLineWidth(float width) const override;
+
 	//////////////////////////////////////////////////////////////////////////
 	int32 GetUniformLocation(uint32 InProgram, const char* name) const;
 	int32 GetAttributeLocation(uint32 InProgram, const char* name) const;
@@ -286,7 +287,7 @@ extern jRHI_OpenGL* g_rhi_gl;
 // UniformBuffer location 을 얻어오는 functor, TTrayGetLocation의 template type으로 사용
 struct jUniformbufferLocationGetter
 {
-	FORCEINLINE static int32 GetLocation(uint32 program, jName name)
+	FORCEINLINE static int32 GetLocation(uint32 program, const jName& name)
 	{
 		return g_rhi_gl->GetUniformLocation(program, name.ToStr());
 	}
@@ -295,7 +296,7 @@ struct jUniformbufferLocationGetter
 // Attribute location 을 얻어오는 functor, TTrayGetLocation의 template type으로 사용
 struct jAttributeLocationGatter
 {
-	FORCEINLINE static int32 GetLocation(uint32 program, jName name)
+	FORCEINLINE static int32 GetLocation(uint32 program, const jName& name)
 	{
 		return g_rhi_gl->GetAttributeLocation(program, name.ToStr());
 	}
@@ -316,7 +317,7 @@ struct TTryGetLocation
 	mutable std::vector<jLocationInfo> locations;
 #endif
 
-	FORCEINLINE int32 TryGetLocation(uint32 program, jName name) const
+	FORCEINLINE int32 TryGetLocation(uint32 program, const jName& name) const
 	{
 #if USE_CACHED_LOCATION_HASH
 		const auto it_find = NameLocationMap.find(name.GetNameHash());
@@ -348,6 +349,16 @@ struct TTryGetLocation
 		return T::GetLocation(program, name);
 #endif
 	}
+
+	FORCEINLINE void ClearLocation()
+	{
+#if USE_CACHED_LOCATION_HASH
+		NameLocationMap.clear();
+#elif USE_CACHED_LOCATION_ARRAY
+		locations.clear();
+#else
+#endif
+	}
 };
 
 using jTryGetUniformLocation = TTryGetLocation<jUniformbufferLocationGetter>;
@@ -361,12 +372,17 @@ struct jShader_OpenGL : public jShader
 	jTryGetUniformLocation UniformLocationGatter;
 	jTryGetAttributeLocation AttributeLocationGatter;
 
-	FORCEINLINE int32 TryGetUniformLocation(jName name) const
+	FORCEINLINE int32 TryGetUniformLocation(const jName& name) const
 	{
 		return UniformLocationGatter.TryGetLocation(program, name);
 	}
-	FORCEINLINE int32 TryGetAttributeLocation(jName name) const
+	FORCEINLINE int32 TryGetAttributeLocation(const jName& name) const
 	{
 		return AttributeLocationGatter.TryGetLocation(program, name);
+	}
+	FORCEINLINE void ClearAllLocations()
+	{
+		UniformLocationGatter.ClearLocation();
+		AttributeLocationGatter.ClearLocation();
 	}
 };
