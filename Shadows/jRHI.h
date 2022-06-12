@@ -383,6 +383,7 @@ public:
 	jRHI();
 	virtual ~jRHI() {}
 
+	virtual bool InitRHI() { return false; }
 	virtual jSamplerState* CreateSamplerState(const jSamplerStateInfo& info) const { return nullptr; }
 	virtual void ReleaseSamplerState(jSamplerState* samplerState) const {}
 	virtual void BindSamplerState(int32 index, const jSamplerState* samplerState) const {}

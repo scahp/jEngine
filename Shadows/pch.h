@@ -8,6 +8,8 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
+#include <vulkan.h>
+
 #include <assert.h>
 
 #include <vector>
@@ -26,6 +28,9 @@
 #include <unordered_set>
 #include <limits>
 #include <type_traits>
+#include <iostream>
+#include <optional>
+#include <chrono>
 
 #include "External/cityhash/city.h"
 
