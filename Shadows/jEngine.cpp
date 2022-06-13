@@ -21,6 +21,7 @@ jEngine::~jEngine()
 
 void jEngine::Init()
 {
+#if USE_OPENGL
 	jSamplerStatePool::CreateDefaultSamplerState();
 	jShaderInfo::CreateShaders();
 	IPipeline::SetupPipelines();
@@ -30,6 +31,7 @@ void jEngine::Init()
 	Game.Setup();
 
 	jShadowAppSettingProperties::GetInstance().Setup(jAppSettings::GetInstance().Get("MainPannel"));
+#endif
 }
 
 void jEngine::ProcessInput()

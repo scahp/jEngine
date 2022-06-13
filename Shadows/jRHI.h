@@ -384,6 +384,7 @@ public:
 	virtual ~jRHI() {}
 
 	virtual bool InitRHI() { return false; }
+	virtual void* GetWindow() const { return nullptr; }
 	virtual jSamplerState* CreateSamplerState(const jSamplerStateInfo& info) const { return nullptr; }
 	virtual void ReleaseSamplerState(jSamplerState* samplerState) const {}
 	virtual void BindSamplerState(int32 index, const jSamplerState* samplerState) const {}
@@ -495,6 +496,8 @@ public:
 	virtual void EnableMultisample(bool enable) const {}
 	virtual void SetCubeMapSeamless(bool enable) const {}
 	virtual void SetLineWidth(float width) const {}
+	virtual void Flush() const {}
+	virtual void Finish() const {}
 };
 
 // Not thred safe

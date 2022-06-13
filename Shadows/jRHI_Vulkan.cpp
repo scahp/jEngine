@@ -1,43 +1,10 @@
 ﻿#include "pch.h"
+
+#if USE_VULKAN
 #include "jRHI_Vulkan.h"
 
+#define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"	// 이거 안쓸예정
-
-static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
-	VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-	VkDebugUtilsMessageTypeFlagsEXT messageType,
-	const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-	void* pUserData)
-{
-	// messageSeverity
-	// 1. VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT : 진단 메시지
-	// 2. VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT : 리소스 생성 정보
-	// 3. VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT : 에러일 필요 없는 정보지만 버그를 낼수 있는것
-	// 4. VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT : Invalid 되었거나 크래시 날수 있는 경우
-	if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
-	{
-	}
-
-	// messageType
-	// VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT : 사양이나 성능과 관련되지 않은 이벤트 발생
-	// VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT : 사양 위반이나 발생 가능한 실수가 발생
-	// VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT : 불칸을 잠재적으로 최적화 되게 사용하지 않은 경우
-
-	// pCallbackData 의 중요 데이터 3종
-	// pMessage : 디버그 메시지 문장열(null 로 끝남)
-	// pObjects : 이 메시지와 연관된 불칸 오브젝트 핸들 배열
-	// objectCount : 배열에 있는 오브젝트들의 개수
-
-	// pUserData
-	// callback 설정시에 전달한 포인터 데이터
-
-	std::cerr << "validation layer : " << pCallbackData->pMessage << std::endl;
-
-	// VK_TRUE 리턴시 VK_ERROR_VALIDATION_FAILED_EXT 와 validation layer message 가 중단된다.
-	// 이것은 보통 validation layer 를 위해 사용하므로, 사용자는 항상 VK_FALSE 사용.
-	return VK_FALSE;
-}
-
 
 jRHI_Vulkan::jRHI_Vulkan()
 {
@@ -50,11 +17,19 @@ jRHI_Vulkan::~jRHI_Vulkan()
 
 bool jRHI_Vulkan::InitRHI()
 {
+    glfwInit();
+
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+
+    window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Vulkan", nullptr, nullptr);
+    glfwSetWindowUserPointer(window, this);
+
 	VkApplicationInfo appInfo;
 	appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 	appInfo.pApplicationName = "Vulkan";
 	appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-	appInfo.pEngineName = "jEngine";
+	appInfo.pEngineName = "No Engine";
 	appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
 	appInfo.apiVersion = VK_API_VERSION_1_0;
 
@@ -95,19 +70,19 @@ bool jRHI_Vulkan::InitRHI()
 
 	// SetupDebugMessenger
 	{
-		if (!enableValidationLayers)
-			return;
+		if (enableValidationLayers)
+		{
+			VkDebugUtilsMessengerCreateInfoEXT createInfo = {};
+			PopulateDebutMessengerCreateInfo(createInfo);
+			createInfo.pUserData = nullptr;	// optional
 
-		VkDebugUtilsMessengerCreateInfoEXT createInfo = {};
-		PopulateDebutMessengerCreateInfo(createInfo);
-		createInfo.pUserData = nullptr;	// optional
-
-		VkResult result = CreateDebugUtilsMessengerEXT(instance, &createInfo, nullptr, &debugMessenger);
-		check(result == VK_SUCCESS);
+			VkResult result = CreateDebugUtilsMessengerEXT(instance, &createInfo, nullptr, &debugMessenger);
+			check(result == VK_SUCCESS);
+		}
 	}
 
 	{
-		check(VK_SUCCESS == glfwCreateWindowSurface(instance, window, nullptr, &surface));
+		ensure(VK_SUCCESS == glfwCreateWindowSurface(instance, window, nullptr, &surface));
 	}
 
 	// Physical device
@@ -260,6 +235,25 @@ bool jRHI_Vulkan::InitRHI()
 		for (size_t i = 0; i < swapChainImages.size(); ++i)
 			swapChainImageViews[i] = CreateImageView(swapChainImages[i], swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
 	}
+    ensure(CreateCommandPool());
+    ensure(CreateColorResources());
+    ensure(CreateDepthResources());
+    ensure(CreateDescriptorPool());
+    ensure(CreateSyncObjects());
+
+	// 동적인 부분들 패스에 따라 달라짐
+    ensure(CreateRenderPass());
+    ensure(CreateDescriptorSetLayout());
+    ensure(CreateGraphicsPipeline());
+    ensure(CreateFrameBuffers());
+    ensure(CreateTextureImage());
+    ensure(CreateTextureSampler());
+    ensure(LoadModel());
+    ensure(CreateVertexBuffer());
+    ensure(CreateIndexBuffer());
+    ensure(CreateUniformBuffers());
+    ensure(CreateDescriptorSets());
+    ensure(CreateCommandBuffers());
 
 	return true;
 }
@@ -741,6 +735,7 @@ bool jRHI_Vulkan::CreateFrameBuffers()
 	return true;
 }
 
+#include "stb_image.h"
 const std::string MODEL_PATH = "chalet.obj";
 const std::string TEXTURE_PATH = "chalet.jpg";
 uint32_t textureMipLevels;
@@ -850,7 +845,7 @@ bool jRHI_Vulkan::LoadModel()
 	vertices.clear();
 	vertices.clear();
 
-	std::unordered_map<jVertex, uint32_t> uniqueVertices = {};
+	std::unordered_map<jVertex, uint32_t, jVertexHashFunc> uniqueVertices = {};
 
 	for (const auto& shape : shapes)
 	{
@@ -1147,11 +1142,11 @@ bool jRHI_Vulkan::CreateSyncObjects()
 
 void jRHI_Vulkan::MainLoop()
 {
-	while (!glfwWindowShouldClose(window))
-	{
+	//while (!glfwWindowShouldClose(window))
+	//{
 		glfwPollEvents();
 		DrawFrame();
-	}
+	//}
 
 	// Logical device 가 작업을 모두 마칠때까지 기다렸다가 Destory를 진행할 수 있게 기다림.
 	vkDeviceWaitIdle(device);
@@ -1376,3 +1371,4 @@ void jRHI_Vulkan::UpdateUniformBuffer(uint32_t currentImage)
 	memcpy(data, &ubo, sizeof(ubo));
 	vkUnmapMemory(device, uniformBuffersMemory[currentImage]);
 }
+#endif // USE_VULKAN

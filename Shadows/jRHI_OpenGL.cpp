@@ -371,6 +371,45 @@ jRHI_OpenGL::~jRHI_OpenGL()
 {
 }
 
+bool jRHI_OpenGL::InitRHI()
+{
+    // glfw: initialize and configure
+// ------------------------------
+    glfwInit();
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+#if (DEBUG_OUTPUT_ON == 1)
+    glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, true);
+#endif // DEBUG_OUTPUT_ON
+
+#ifdef __APPLE__
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // uncomment this statement to fix compilation on OS X
+#endif
+
+    // glfw window creation
+    // --------------------
+	window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "OpenGL", NULL, NULL);
+    if (window == NULL)
+    {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return false;
+    }
+
+	glfwMakeContextCurrent(window);
+
+    // glad: load all OpenGL function pointers
+	// ---------------------------------------
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to initialize GLAD" << std::endl;
+        return false;
+    }
+
+	return true;
+}
+
 jSamplerState* jRHI_OpenGL::CreateSamplerState(const jSamplerStateInfo& info) const
 {
 	auto samplerState = new jSamplerState_OpenGL(info);
@@ -805,6 +844,16 @@ void jRHI_OpenGL::SetCubeMapSeamless(bool enable) const
 void jRHI_OpenGL::SetLineWidth(float width) const
 {
 	glLineWidth(width);
+}
+
+void jRHI_OpenGL::Flush() const
+{
+	glFlush();
+}
+
+void jRHI_OpenGL::Finish() const
+{
+	glFinish();
 }
 
 void jRHI_OpenGL::EnableWireframe(bool enable) const

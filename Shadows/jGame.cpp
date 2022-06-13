@@ -1,6 +1,5 @@
 ﻿#include "pch.h"
 #include "jGame.h"
-#include "jRHI_OpenGL.h"
 #include "Math\Vector.h"
 #include "jCamera.h"
 #include "jObject.h"
@@ -24,11 +23,21 @@
 #include <time.h>
 #include <stdlib.h>
 
+#if USE_OPENGL
+#include "jRHI_OpenGL.h"
+#elif USE_VULKAN
+#include "jRHI_Vulkan.h"
+#endif
+
 jRHI* g_rhi = nullptr;
 
 jGame::jGame()
 {
+#if USE_OPENGL
 	g_rhi = new jRHI_OpenGL();
+#elif USE_VULKAN
+	g_rhi = new jRHI_Vulkan();
+#endif
 }
 
 jGame::~jGame()
@@ -433,7 +442,8 @@ void jGame::OnMouseMove(int32 xOffset, int32 yOffset)
 
 void jGame::Teardown()
 {
-	Renderer->Teardown();
+	if (Renderer)
+		Renderer->Teardown();
 }
 
 void jGame::SpawnHairObjects()

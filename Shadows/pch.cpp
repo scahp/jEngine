@@ -4,3 +4,7 @@
 std::map<int, bool> g_KeyState;
 std::map<EMouseButtonType, bool> g_MouseState;
 float g_timeDeltaSecond = 0.0f;
+
+#if USE_VULKAN
+#pragma comment(lib, "vulkan-1.lib")
+#endif

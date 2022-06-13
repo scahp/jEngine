@@ -1,9 +1,15 @@
 ﻿#pragma once
 
+#if USE_VULKAN
+
 #include "jRHI.h"
 
 #define VALIDATION_LAYER_VERBOSE 0
 #define MULTIPLE_FRAME 1
+
+#if MULTIPLE_FRAME
+static constexpr int32_t MAX_FRAMES_IN_FLIGHT = 2;
+#endif // MULTIPLE_FRAME
 
 struct jSimpleVec2
 {
@@ -83,6 +89,23 @@ struct jVertex
 	}
 };
 
+struct jVertexHashFunc
+{
+    std::size_t operator()(const jVertex& v) const
+    {
+		size_t result = 0;
+		result = std::hash<float>{}(v.pos.x);
+		result ^= std::hash<float>{}(v.pos.y);
+		result ^= std::hash<float>{}(v.pos.z);
+        result ^= std::hash<float>{}(v.color.x);
+		result ^= std::hash<float>{}(v.color.y);
+		result ^= std::hash<float>{}(v.color.z);
+		result ^= std::hash<float>{}(v.texCoord.x);
+		result ^= std::hash<float>{}(v.texCoord.y);
+		return result;
+    }
+};
+
 // Alignment
 // 1. 스칼라 타입은 4 bytes align 필요.				Scalars have to be aligned by N(= 4 bytes given 32 bit floats).
 // 2. vec2 타입은 8 bytes align 필요.				A vec2 must be aligned by 2N(= 8 bytes)
@@ -125,6 +148,9 @@ class jRHI_Vulkan : public jRHI
 public:
 	jRHI_Vulkan();
 	~jRHI_Vulkan();
+
+	GLFWwindow* window = nullptr;
+	bool framebufferResized = false;
 
 	VkInstance instance;		// Instance는 Application과 Vulkan Library를 연결시켜줌, 드라이버에 어플리케이션 정보를 전달하기도 한다.
 
@@ -286,6 +312,42 @@ public:
 
 		return true;
 	}
+
+    static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+        VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+        VkDebugUtilsMessageTypeFlagsEXT messageType,
+        const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+        void* pUserData)
+    {
+        // messageSeverity
+        // 1. VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT : 진단 메시지
+        // 2. VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT : 리소스 생성 정보
+        // 3. VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT : 에러일 필요 없는 정보지만 버그를 낼수 있는것
+        // 4. VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT : Invalid 되었거나 크래시 날수 있는 경우
+        if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
+        {
+        }
+
+        // messageType
+        // VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT : 사양이나 성능과 관련되지 않은 이벤트 발생
+        // VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT : 사양 위반이나 발생 가능한 실수가 발생
+        // VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT : 불칸을 잠재적으로 최적화 되게 사용하지 않은 경우
+
+        // pCallbackData 의 중요 데이터 3종
+        // pMessage : 디버그 메시지 문장열(null 로 끝남)
+        // pObjects : 이 메시지와 연관된 불칸 오브젝트 핸들 배열
+        // objectCount : 배열에 있는 오브젝트들의 개수
+
+        // pUserData
+        // callback 설정시에 전달한 포인터 데이터
+
+        std::cerr << "validation layer : " << pCallbackData->pMessage << std::endl;
+
+        // VK_TRUE 리턴시 VK_ERROR_VALIDATION_FAILED_EXT 와 validation layer message 가 중단된다.
+        // 이것은 보통 validation layer 를 위해 사용하므로, 사용자는 항상 VK_FALSE 사용.
+        return VK_FALSE;
+    }
+
 
 	void PopulateDebutMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo)
 	{
@@ -557,8 +619,8 @@ public:
 		// 다행히 std::vector의 default allocator가 가 메모리 할당시 4 byte aligned 을 이미 하고있어서 그대로 씀.
 		createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
 
-		VkShaderModule shaderModule;
-		check(vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) == VK_SUCCESS);
+		VkShaderModule shaderModule = {};
+		ensure(vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) == VK_SUCCESS);
 
 		// compiling or linking 과정이 graphics pipeline 이 생성되기 전까지 처리되지 않는다.
 		// 그래픽스 파이프라인이 생성된 후 VkShaderModule은 즉시 소멸 가능.
@@ -927,6 +989,23 @@ public:
 
 		return true;
 	}
+    static std::vector<char> ReadFile(const std::string& filename)
+    {
+        // 1. std::ios::ate : 파일의 끝에서 부터 읽기 시작한다. (파일의 끝에서 부터 읽어서 파일의 크기를 얻어 올수 있음)
+        // 2. std::ios::binary : 바이너리 파일로서 파일을 읽음. (text transformations 을 피함)
+        std::ifstream file(filename, std::ios::ate | std::ios::binary);
+
+        if (!ensure(file.is_open()))
+            return std::vector<char>();
+
+        size_t fileSize = (size_t)file.tellg();
+        std::vector<char> buffer(fileSize);
+
+        file.seekg(0);		// 파일의 맨 첨으로 이동
+        file.read(buffer.data(), fileSize);
+        file.close();
+        return buffer;
+    }
 	//////////////////////////////////////////////////////////////////////////
 
 	virtual bool InitRHI() override;
@@ -954,5 +1033,8 @@ public:
 	void CleanupSwapChain();
 	void RecreateSwapChain();
 	void UpdateUniformBuffer(uint32_t currentImage);
+
+	virtual void* GetWindow() const override { return window; }
 };
 
+#endif // USE_VULKAN

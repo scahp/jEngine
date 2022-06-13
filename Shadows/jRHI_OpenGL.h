@@ -161,6 +161,10 @@ public:
 	jRHI_OpenGL();
 	~jRHI_OpenGL();
 
+	struct GLFWwindow* window = nullptr;
+	
+	virtual bool InitRHI() override;
+	virtual void* GetWindow() const { return window; }
 	virtual jSamplerState* CreateSamplerState(const jSamplerStateInfo& info) const override;
 	virtual void ReleaseSamplerState(jSamplerState* samplerState) const override;
 	virtual void BindSamplerState(int32 index, const jSamplerState* samplerState) const override;
@@ -272,6 +276,8 @@ public:
 	virtual void EnableMultisample(bool enable) const override;
 	virtual void SetCubeMapSeamless(bool enable) const override;
 	virtual void SetLineWidth(float width) const override;
+	virtual void Flush() const override;
+	virtual void Finish() const override;
 
 	//////////////////////////////////////////////////////////////////////////
 	int32 GetUniformLocation(uint32 InProgram, const char* name) const;

@@ -5,10 +5,11 @@
 
 #include <windows.h>
 
+#define GLFW_INCLUDE_VULKAN
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
-#include <vulkan.h>
+#include <vulkan/vulkan.h>
 
 #include <assert.h>
 
@@ -31,13 +32,14 @@
 #include <iostream>
 #include <optional>
 #include <chrono>
+#include <fstream>
 
 #include "External/cityhash/city.h"
 
 #define JASSERT(x) assert(x)
 #define JMESSAGE(x) MessageBoxA(0, x, "", MB_OK)
 
-#define ensure(x) (JASSERT(x), (x))
+#define ensure(x) (((x) || (JASSERT(0), 0)))
 #define check(x) JASSERT(x)
 
 using int8 = char;
@@ -123,5 +125,21 @@ inline void hash_combine(std::size_t& seed, const T& v)
 #define DEBUG_OUTPUT_LEVEL 2	// show high priority
 
 #include "Core/jName.h"
+
+#define API_TYPE 1
+
+#if (API_TYPE == 1)
+#define USE_VULKAN 1
+#elif (API_TYPE == 2)
+#define USE_OPENGL 1
+#endif
+
+#ifndef USE_VULKAN
+#define USE_VULKAN 0
+#endif
+
+#ifndef USE_OPENGL
+#define USE_OPENGL 0
+#endif
 
 #endif //PCH_H

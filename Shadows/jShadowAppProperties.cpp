@@ -5,6 +5,9 @@ jShadowAppSettingProperties* jShadowAppSettingProperties::_instance = nullptr;
 
 void jShadowAppSettingProperties::Setup(jAppSettingBase* appSetting)
 {
+	if (!appSetting)
+		return;
+
 	appSetting->AddVariable("ShadowOn", ShadowOn);
 
 	appSetting->AddEnumVariable("ShadowType", ShadowType, "EShadowType", EShadowTypeString);
@@ -129,6 +132,9 @@ void jShadowAppSettingProperties::Setup(jAppSettingBase* appSetting)
 
 void jShadowAppSettingProperties::Teardown(jAppSettingBase* appSetting)
 {
+	if (!appSetting)
+		return;
+
 	appSetting->RemoveVariable("ShadowOn");
 	appSetting->RemoveVariable("EShadowType");
 	appSetting->RemoveVariable("DirectionalLightSilhouette");
@@ -164,6 +170,9 @@ void jShadowAppSettingProperties::Teardown(jAppSettingBase* appSetting)
 
 void jShadowAppSettingProperties::SwitchShadowType(jAppSettingBase* appSetting)
 {
+	if (!appSetting)
+		return;
+
 	switch (ShadowType)
 	{
 	case EShadowType::ShadowVolume:
@@ -187,6 +196,9 @@ void jShadowAppSettingProperties::SwitchShadowType(jAppSettingBase* appSetting)
 
 void jShadowAppSettingProperties::SwitchShadowMapType(jAppSettingBase* appSetting)
 {
+	if (!appSetting)
+		return;
+
 	appSetting->SetVisible("CSMDebugOn", (ShadowMapType == EShadowMapType::CSM_SSM));
 
 	switch (ShadowMapType)

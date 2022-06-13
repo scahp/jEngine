@@ -8,6 +8,7 @@
 
 #include <AntTweakBar.h>
 #include "jAppSettings.h"
+#include "jRHI_Vulkan.h"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
@@ -25,32 +26,11 @@ jEngine g_Engine;
 
 int main()
 {
-	::ShowWindow(::GetConsoleWindow(), SW_HIDE);		// hide console window
+	//::ShowWindow(::GetConsoleWindow(), SW_HIDE);		// hide console window
 
-	// glfw: initialize and configure
-	// ------------------------------
-	glfwInit();
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
-	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-#if (DEBUG_OUTPUT_ON == 1)
-	glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, true);
-#endif // DEBUG_OUTPUT_ON
+	g_rhi->InitRHI();
 
-#ifdef __APPLE__
-	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // uncomment this statement to fix compilation on OS X
-#endif
-
-	// glfw window creation
-	// --------------------
-	GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "OpenGL", NULL, NULL);
-	if (window == NULL)
-	{
-		std::cout << "Failed to create GLFW window" << std::endl;
-		glfwTerminate();
-		return -1;
-	}
-	glfwMakeContextCurrent(window);
+	GLFWwindow* window = static_cast<GLFWwindow*>(g_rhi->GetWindow());
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 	glfwSetKeyCallback(window, key_callback);
 	glfwSetCharCallback(window, char_callback);
@@ -62,15 +42,7 @@ int main()
 	//glfwGetVersion(&major, &minor, &rev);
 	//auto versionCheck = glfwGetVersionString();
 
-	//glfwSwapInterval(0);		// 0 is no limit fps
-
-	// glad: load all OpenGL function pointers
-	// ---------------------------------------
-	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-	{
-		std::cout << "Failed to initialize GLAD" << std::endl;
-		return -1;
-	}
+	// glfwSwapInterval(0);		// 0 is no limit fps
 
 	// Decide GL+GLSL versions
 #if __APPLE__
@@ -81,6 +53,7 @@ int main()
 	const char* glsl_version = "#version 130";
 #endif
 
+#if USE_OPENGL
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -89,7 +62,9 @@ int main()
 
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
 
-	jAppSettings::GetInstance().Init(SCR_WIDTH, SCR_HEIGHT);
+    jAppSettings::GetInstance().Init(SCR_WIDTH, SCR_HEIGHT);
+#endif
+
 
 #if (DEBUG_OUTPUT_ON == 1)
 	GLint flags;
@@ -116,20 +91,23 @@ int main()
 
 		// render
 		// ------
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
 		static int64 lastTick = GetTickCount64();
 		int64 currentTick = GetTickCount64();
 		g_timeDeltaSecond = (currentTick - lastTick) * 0.001f;
 		lastTick = currentTick;
 
-		g_Engine.Update(g_timeDeltaSecond);
+#if USE_VULKAN
+		((jRHI_Vulkan*)g_rhi)->MainLoop();
+#elif USE_OPENGL
+        g_Engine.Update(g_timeDeltaSecond);
 		jPerformanceProfile::GetInstance().Update(g_timeDeltaSecond);
+#endif
 
-		{
-			SCOPE_DEBUG_EVENT(g_rhi, "TwDraw");
-			TwDraw();
-		}
+		#if USE_OPENGL
+        {
+            SCOPE_DEBUG_EVENT(g_rhi, "TwDraw");
+            TwDraw();
+        }
 
 		if (0)
 		{
@@ -189,20 +167,25 @@ int main()
 			//glClear(GL_COLOR_BUFFER_BIT);
 			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 		}
+		#endif
 
-		glFlush();
+#if USE_OPENGL
+		g_rhi->Flush();
 
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
 		// -------------------------------------------------------------------------------
 		glfwSwapBuffers(window);
+#endif
 		glfwPollEvents();
 
 		showFPS(window);
 	}
 
+	#if USE_OPENGL
 	ImGui_ImplOpenGL3_Shutdown();
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
+	#endif
 
 	// glfw: terminate, clearing all previously allocated GLFW resources.
 	// ------------------------------------------------------------------
@@ -291,8 +274,10 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 	bool buttonDown = false;
 	if (GLFW_PRESS == action)
 	{
+#if USE_OPENGL
 		if (!ImGui::IsAnyItemHovered() && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow))
 			buttonDown = true;
+#endif
 	}
 	else if (GLFW_RELEASE == action)
 	{
