@@ -18,7 +18,7 @@ jImageFileLoader::~jImageFileLoader()
 {
 }
 
-std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& filename, bool sRGB)
+std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& filename, bool sRGB, bool paddingRGBA)
 {
 	char Ext[128] = "";
 	_splitpath_s(filename.ToStr(), nullptr, 0, nullptr, 0, nullptr, 0, Ext, sizeof(Ext));
@@ -48,7 +48,9 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
 	int32 NumOfComponent = -1;
 	if (ExtName == ExtDDS)
 	{
-		uint8* imageData = stbi_dds_load(filename.ToStr(), &width, &height, &NumOfComponent, 0);
+		uint8* imageData = stbi_dds_load(filename.ToStr(), &width, &height, &NumOfComponent, paddingRGBA ? STBI_rgb_alpha : 0);
+        if (paddingRGBA)
+            NumOfComponent = 4;
 
 		int32 NumOfBytes = width * height * sizeof(uint8) * NumOfComponent;
 		NewImageDataPatr->ImageData.resize(NumOfBytes);
@@ -72,7 +74,9 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
 	}
 	else if (ExtName == ExtHDR)
 	{
-		float* imageData = stbi_loadf(filename.ToStr(), &width, &height, &NumOfComponent, 0);
+		float* imageData = stbi_loadf(filename.ToStr(), &width, &height, &NumOfComponent, paddingRGBA ? STBI_rgb_alpha : 0);
+        if (paddingRGBA)
+            NumOfComponent = 4;
 
 		int32 NumOfBytes = width * height * sizeof(float) * NumOfComponent;
 		NewImageDataPatr->ImageData.resize(NumOfBytes);
@@ -85,7 +89,9 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
 	}
 	else
 	{
-		uint8* imageData = stbi_load(filename.ToStr(), &width, &height, &NumOfComponent, 0);
+		uint8* imageData = stbi_load(filename.ToStr(), &width, &height, &NumOfComponent, paddingRGBA ? STBI_rgb_alpha : 0);
+        if (paddingRGBA)
+            NumOfComponent = 4;
 
 		int32 NumOfBytes = width * height * sizeof(uint8) * NumOfComponent;
 		NewImageDataPatr->ImageData.resize(NumOfBytes);
@@ -122,7 +128,7 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
 	return NewImageDataPatr;
 }
 
-std::weak_ptr<jTexture> jImageFileLoader::LoadTextureFromFile(const jName& filename, bool sRGB /*= false*/)
+std::weak_ptr<jTexture> jImageFileLoader::LoadTextureFromFile(const jName& filename, bool sRGB, bool paddingRGBA)
 {
 	auto it_find = CachedTextureMap.find(filename);
 	if (CachedTextureMap.end() != it_find)
@@ -130,7 +136,7 @@ std::weak_ptr<jTexture> jImageFileLoader::LoadTextureFromFile(const jName& filen
 
 	std::shared_ptr<jTexture> NewTexture;
 
-	std::weak_ptr<jImageData> imageDataWeakPtr = LoadImageDataFromFile(filename, sRGB);
+	std::weak_ptr<jImageData> imageDataWeakPtr = LoadImageDataFromFile(filename, sRGB, paddingRGBA);
 	jImageData* pImageData = imageDataWeakPtr.lock().get();
 	JASSERT(pImageData);
 	if (pImageData)

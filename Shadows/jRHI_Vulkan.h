@@ -142,12 +142,146 @@ struct jUniformBufferObject
 	Matrix Proj;
 };
 
+class jRenderPass_Vulkan : public jRenderPass
+{
+public:
+    
+	jRenderPass_Vulkan() = default;
+	jRenderPass_Vulkan(const jAttachment& colorAttachment, const jAttachment& depthAttachment, const jAttachment& colorResolveAttachment)
+    {
+        SetAttachemnt(colorAttachment, depthAttachment, ColorAttachmentResolve);
+    }
+
+    void SetAttachemnt(const jAttachment& colorAttachment, const jAttachment& depthAttachment, const jAttachment& colorResolveAttachment)
+    {
+        ColorAttachments.push_back(colorAttachment);
+        DepthAttachment = depthAttachment;
+        ColorAttachmentResolve = colorResolveAttachment;
+    }
+
+	void SetRenderArea(const Vector2i& offset, const Vector2i& extent)
+	{
+		RenderOffset = offset;
+		RenderExtent = extent;
+	}
+
+    bool CreateRenderPass();
+    void Release();
+
+	void* GetRenderPass() const { return RenderPass; }
+	FORCEINLINE const VkRenderPass& GetRenderPassRaw() const { return RenderPass; }
+
+	bool BeginRenderPass(const VkCommandBuffer& commandBuffer, const VkFramebuffer& framebuffer)
+	{
+		if (!ensure(!CommandBuffer))
+			return false;
+
+		CommandBuffer = commandBuffer;
+		RenderPassInfo.framebuffer = framebuffer;
+	
+        // 커맨드를 기록하는 명령어는 prefix로 모두 vkCmd 가 붙으며, 리턴값은 void 로 에러 핸들링은 따로 안함.
+        // VK_SUBPASS_CONTENTS_INLINE : 렌더 패스 명령이 Primary 커맨드 버퍼에 포함되며, Secondary 커맨드 버퍼는 실행되지 않는다.
+        // VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS : 렌더 패스 명령이 Secondary 커맨드 버퍼에서 실행된다.
+        vkCmdBeginRenderPass(commandBuffer, &RenderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+		return true;
+    }
+
+	void EndRenderPass()
+	{
+		ensure(CommandBuffer);
+
+        // Finishing up
+        vkCmdEndRenderPass(CommandBuffer);
+		CommandBuffer = nullptr;
+	}
+
+private:
+	VkCommandBuffer CommandBuffer = nullptr;
+
+	VkRenderPassBeginInfo RenderPassInfo;
+    VkRenderPass RenderPass;
+    std::vector<VkClearValue> ClearValues;
+};
+
+class jFrameBuffer_Vulkan : public jFrameBuffer
+{
+public:
+	jFrameBuffer_Vulkan() = default;
+	jFrameBuffer_Vulkan(const jRenderPass* renderPass)
+		: RenderPass(renderPass)
+    {}
+
+    void SetRenderPass(const jRenderPass* renderPass)
+    {
+		RenderPass = renderPass;
+    }
+
+	void* GetFrameBuffer() { return FrameBuffer; }
+
+	bool CreateFrameBuffer(int32 index);
+	void Release();
+
+private:
+	int32 Index = -1;
+    VkFramebuffer FrameBuffer;
+	const jRenderPass* RenderPass = nullptr;
+};
+
+template <typename T>
+struct TBindings
+{
+	TBindings() = default;
+	TBindings(int32 bindingPoint, EShaderAccessStageFlag accessStageFlags, const T& data)
+		: BindingPoint(bindingPoint), AccessStageFlags(accessStageFlags), Data(data)
+	{ }
+
+    int32 BindingPoint = 0;
+    EShaderAccessStageFlag AccessStageFlags = EShaderAccessStageFlag::ALL_GRAPHICS;
+	T Data;
+};
+
+struct IEmptyUniform
+{
+
+};
+
+template <typename T>
+struct EmptyUniform	: public IEmptyUniform // todo remove
+{
+	T Data;
+	VkBuffer Bufffer;
+};		
+
+struct jShadingBindingInstance
+{
+    VkDescriptorSet DescriptorSet = nullptr;
+};
+
+struct jShaderBindings
+{
+    std::vector<TBindings<IEmptyUniform*>> UniformBuffers;
+    std::vector<TBindings<jTexture*>> Textures;
+    VkDescriptorSetLayout DescriptorSetLayout = nullptr;
+
+    bool CreateDescriptorSetLayout();
+	
+	jShadingBindingInstance CreateShaderBindingInstance() const;
+	std::vector<jShadingBindingInstance> CreateShaderBindingInstance(int32 count) const;
+};
+
+struct jTexture_Vulkan : public jTexture
+{
+    VkImage Image;
+    VkImageView ImageView;
+    VkDeviceMemory ImageMemory;
+};
+
 // todo
 class jRHI_Vulkan : public jRHI
 {
 public:
 	jRHI_Vulkan();
-	~jRHI_Vulkan();
+	virtual ~jRHI_Vulkan();
 
 	GLFWwindow* window = nullptr;
 	bool framebufferResized = false;
@@ -195,8 +329,8 @@ public:
 	std::vector<VkImageView> swapChainImageViews;
 
 	// GraphicsPipieline
-	VkRenderPass renderPass;
-	VkDescriptorSetLayout descriptorSetLayout;
+	//VkRenderPass renderPass;
+	//VkDescriptorSetLayout descriptorSetLayout;
 	VkPipelineLayout pipelineLayout;
 	VkPipeline graphicsPipeline;
 
@@ -209,15 +343,15 @@ public:
 	VkImageView depthImageView;
 
 	// Framebuffers
-	std::vector<VkFramebuffer> swapChainFramebuffers;
+	//std::vector<VkFramebuffer> swapChainFramebuffers;
 
 	//////////////////////////////////////////////////////////////////////////
 	// 현재 씬을 렌더링하기 위한 자료 구조들 모음, 일반화 되어야 함.
 	// 그냥 일반적인 텍스쳐 로드 하는데 필요한 자료 구조임. 정리 예정
-	VkImage textureImage;
-	VkImageView textureImageView;
-	VkDeviceMemory textureImageMemory;
-	VkSampler textureSampler;
+	//VkImage textureImage = nullptr;
+	//VkImageView textureImageView = nullptr;
+	//VkDeviceMemory textureImageMemory = nullptr;
+	VkSampler textureSampler = nullptr;
 
 	// 그냥 일반적인 모델 로드에 필요한 자료 구조임. 정리 예정
 	std::vector<jVertex> vertices;
@@ -240,7 +374,7 @@ public:
 	// Descriptor set layout	: 파이프라인을 통해 접근할 리소스 타입을 명세함
 	// Descriptor set			: Descriptor 에 묶일 실제 버퍼나 이미지 리소스를 명세함.
 	VkDescriptorPool descriptorPool;
-	std::vector<VkDescriptorSet> descriptorSets;		// DescriptorPool 이 소멸될때 자동으로 소멸되므로 따로 소멸시킬 필요없음.
+	//std::vector<VkDescriptorSet> descriptorSets;		// DescriptorPool 이 소멸될때 자동으로 소멸되므로 따로 소멸시킬 필요없음.
 
 	// Command buffers
 	VkCommandPool commandPool;		// 커맨드 버퍼를 저장할 메모리 관리자로 커맨드 버퍼를 생성함.
@@ -553,7 +687,7 @@ public:
 		actualExtent.height = std::max<uint32_t>(capabilities.minImageExtent.height, std::min<uint32_t>(capabilities.maxImageExtent.height, actualExtent.height));
 		return actualExtent;
 	}
-	VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlagBits aspectMask, uint32_t mipLevels)
+	VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlagBits aspectMask, uint32_t mipLevels) const
 	{
 		VkImageViewCreateInfo viewInfo = {};
 
@@ -626,7 +760,7 @@ public:
 		// 그래픽스 파이프라인이 생성된 후 VkShaderModule은 즉시 소멸 가능.
 		return shaderModule;
 	}
-	uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
+	uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const
 	{
 		VkPhysicalDeviceMemoryProperties memProperties;
 		vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
@@ -641,7 +775,7 @@ public:
 		return 0;
 	}
 	bool CreateImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage
-		, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory)
+		, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory) const
 	{
 		VkImageCreateInfo imageInfo = {};
 		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -693,7 +827,7 @@ public:
 
 		return true;
 	}
-	VkCommandBuffer BeginSingleTimeCommands()
+	VkCommandBuffer BeginSingleTimeCommands() const
 	{
 		VkCommandBufferAllocateInfo allocInfo = {};
 		allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -712,7 +846,7 @@ public:
 		return commandBuffer;
 	}
 
-	void EndSingleTimeCommands(VkCommandBuffer commandBuffer)
+	void EndSingleTimeCommands(VkCommandBuffer commandBuffer) const
 	{
 		vkEndCommandBuffer(commandBuffer);
 
@@ -728,11 +862,11 @@ public:
 		// fence를 사용하는 방법이 여러개의 전송을 동시에 하고 마치는 것을 기다릴 수 있게 해주기 때문에 그것을 사용함.
 		vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
 	}
-	bool HasStencilComponent(VkFormat format)
+	bool HasStencilComponent(VkFormat format) const
 	{
 		return ((format == VK_FORMAT_D32_SFLOAT_S8_UINT) || (format == VK_FORMAT_D24_UNORM_S8_UINT));
 	}
-	bool TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels)
+	bool TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels) const
 	{
 		VkCommandBuffer commandBuffer = BeginSingleTimeCommands();
 
@@ -832,7 +966,7 @@ public:
 
 		return true;
 	}
-	bool CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory)
+	bool CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) const
 	{
 		VkBufferCreateInfo bufferInfo = {};
 		bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -865,7 +999,7 @@ public:
 
 		return true;
 	}
-	void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height)
+	void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) const
 	{
 		VkCommandBuffer commandBuffer = BeginSingleTimeCommands();
 
@@ -890,7 +1024,7 @@ public:
 
 		EndSingleTimeCommands(commandBuffer);
 	}
-	bool GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels)
+	bool GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels) const
 	{
 		VkFormatProperties formatProperties;
 		vkGetPhysicalDeviceFormatProperties(physicalDevice, imageFormat, &formatProperties);
@@ -1010,13 +1144,13 @@ public:
 
 	virtual bool InitRHI() override;
 	bool CreateRenderPass();
-	bool CreateDescriptorSetLayout();
+	//bool CreateDescriptorSetLayout();
 	bool CreateGraphicsPipeline();
 	bool CreateCommandPool();
 	bool CreateColorResources();
 	bool CreateDepthResources();
-	bool CreateFrameBuffers();
-	bool CreateTextureImage();
+	//bool CreateFrameBuffers();
+	//bool CreateTextureImage();
 	bool CreateTextureSampler();
 	bool LoadModel();
 	bool CreateVertexBuffer();
@@ -1035,6 +1169,17 @@ public:
 	void UpdateUniformBuffer(uint32_t currentImage);
 
 	virtual void* GetWindow() const override { return window; }
+	FORCEINLINE const VkDevice& GetDevice() const { return device; }
+
+	jRenderPass_Vulkan RenderPassTest;
+	std::vector<jFrameBuffer_Vulkan> FrameBufferTest;
+	jShaderBindings ShaderBindings;
+	std::vector<jShadingBindingInstance> ShaderBindingInstances;
+	//////////////////////////////////////////////////////////////////////////
+	virtual jTexture* CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
+		, EFormatType dataType = EFormatType::UNSIGNED_BYTE, ETextureFormat textureFormat = ETextureFormat::RGBA, bool createMipmap = false) const override;
 };
+
+extern jRHI_Vulkan* g_rhi_vk;
 
 #endif // USE_VULKAN

@@ -2,6 +2,7 @@
 
 #include <type_traits>
 #include "Core/jName.h"
+#include "Math/Vector.h"
 
 #define DECLARE_ENUM_BIT_OPERATORS(ENUM_TYPE)\
 FORCEINLINE ENUM_TYPE operator | (ENUM_TYPE lhs, ENUM_TYPE rhs)\
@@ -20,7 +21,7 @@ FORCEINLINE decltype(auto) operator ! (ENUM_TYPE value)\
 	return !static_cast<T>(value);\
 }
 
-enum class EPrimitiveType
+enum class EPrimitiveType : uint8
 {
 	POINTS,
 	LINES,
@@ -33,13 +34,13 @@ enum class EPrimitiveType
 	MAX
 };
 
-enum class EBufferType
+enum class EBufferType : uint8
 {
 	STATIC,
 	DYNAMIC
 };
 
-enum class EBufferElementType
+enum class EBufferElementType : uint8
 {
 	BYTE,
 	UNSIGNED_INT,
@@ -105,14 +106,14 @@ struct jIndexStreamData : public std::enable_shared_from_this<jIndexStreamData>
 	int32 ElementCount = 0;
 };
 
-enum class ETextureFilterTarget
+enum class ETextureFilterTarget : uint8
 {
 	MINIFICATION = 0,
 	MAGNIFICATION,
 	MAX
 };
 
-enum class ETextureFilter
+enum class ETextureFilter : uint8
 {
 	NEAREST = 0,
 	LINEAR,
@@ -123,7 +124,7 @@ enum class ETextureFilter
 	MAX
 };
 
-enum class ETextureType
+enum class ETextureType : uint8
 {
 	TEXTURE_2D = 0,
 	TEXTURE_2D_ARRAY,
@@ -149,19 +150,23 @@ enum class ETextureFormat
 	RG,
 	R,
 	R32F,
+	D24_S8,
+	D32,
+	D32_S8,
 
 	// below is Internal Format only
 	RGBA_INTEGER,
 	R_INTEGER,
 	R32UI,
 	RGBA8,
+	BGRA8,
 	RGBA8I,
 	RGBA8UI,
 	DEPTH,
 	MAX,
 };
 
-enum class EFormatType
+enum class EFormatType : uint8
 {
 	BYTE = 0,
 	UNSIGNED_BYTE,
@@ -172,7 +177,7 @@ enum class EFormatType
 	MAX
 };
 
-enum class EBlendSrc
+enum class EBlendSrc : uint8
 {
 	ZERO = 0,
 	ONE,
@@ -192,7 +197,7 @@ enum class EBlendSrc
 	MAX
 };
 
-enum class EBlendDest
+enum class EBlendDest : uint8
 {
 	ZERO = 0,
 	ONE,
@@ -211,7 +216,7 @@ enum class EBlendDest
 	MAX
 };
 
-enum class EBlendEquation
+enum class EBlendEquation : uint8
 {
 	ADD = 0,
 	SUBTRACT,
@@ -221,7 +226,7 @@ enum class EBlendEquation
 	MAX,
 };
 
-enum class EFace
+enum class EFace : uint8
 {
 	FRONT = 0,
 	BACK,
@@ -229,7 +234,7 @@ enum class EFace
 	MAX,
 };
 
-enum class EStencilOp
+enum class EStencilOp : uint8
 {
 	KEEP = 0,
 	ZERO,
@@ -242,7 +247,7 @@ enum class EStencilOp
 	MAX
 };
 
-enum class EComparisonFunc
+enum class EComparisonFunc : uint8
 {
 	NEVER = 0,
 	LESS,
@@ -266,7 +271,7 @@ enum class ERenderBufferType : uint32
 
 DECLARE_ENUM_BIT_OPERATORS(ERenderBufferType);
 
-enum class EDrawBufferType
+enum class EDrawBufferType : uint8
 {
 	COLOR_ATTACHMENT0 = 0,
 	COLOR_ATTACHMENT1,
@@ -279,7 +284,7 @@ enum class EDrawBufferType
 	MAX
 };
 
-enum class EDepthBufferType
+enum class EDepthBufferType : uint8
 {
 	NONE = 0,
 	DEPTH16,
@@ -289,7 +294,7 @@ enum class EDepthBufferType
 	MAX,
 };
 
-enum class ETextureAddressMode
+enum class ETextureAddressMode : uint8
 {
 	REPEAT = 0,
 	MIRRORED_REPEAT,
@@ -298,7 +303,7 @@ enum class ETextureAddressMode
 	MAX,
 };
 
-enum class EDepthComparionFunc
+enum class EDepthComparionFunc : uint8
 {
 	NEVER = 0,
 	LESS,
@@ -311,14 +316,14 @@ enum class EDepthComparionFunc
 	MAX,
 };
 
-enum class ETextureComparisonMode
+enum class ETextureComparisonMode : uint8
 {
 	NONE = 0,
 	COMPARE_REF_TO_TEXTURE,					// to use PCF filtering by using samplerXXShadow series.
 	MAX,
 };
 
-enum class EPolygonMode
+enum class EPolygonMode : uint8
 {
 	POINT = 0,
 	LINE,
@@ -326,7 +331,7 @@ enum class EPolygonMode
 	MAX
 };
 
-enum class EImageTextureAccessType
+enum class EImageTextureAccessType : uint8
 {
 	NONE = 0,
 	READ_ONLY,
@@ -335,16 +340,100 @@ enum class EImageTextureAccessType
 	MAX,
 };
 
-enum class EFrontFace
+enum class EFrontFace : uint8
 {
 	CW = 0,
 	CCW = 1,
 	MAX,
 };
 
-enum class ECullMode
+enum class ECullMode : uint8
 {
 	BACK = 0,
 	FRONT,
-	FRONT_AND_BACK
+	FRONT_AND_BACK,
+	MAX
+};
+
+enum class EMSAASamples : uint8
+{
+	COUNT_1 = 1,
+	COUNT_2 = 2,
+	COUNT_4 = 4,
+	COUNT_8 = 8,
+	COUNT_16 = 16,
+	COUNT_32 = 32,
+	COUNT_64 = 64
+};
+
+enum class EAttachmentLoadStoreOp : uint8
+{
+    LOAD_STORE = 0,
+	LOAD_DONTCARE,
+    CLEAR_STORE,
+	CLEAR_DONTCARE,
+    DONTCARE_STORE,
+	DONTCARE_DONTCARE,
+    MAX
+};
+
+enum class EShaderAccessStageFlag : uint32
+{
+    VERTEX = 0x00000001,
+    TESSELLATION_CONTROL = 0x00000002,
+    TESSELLATION_EVALUATION = 0x00000004,
+    GEOMETRY = 0x00000008,
+    FRAGMENT = 0x00000010,
+    COMPUTE = 0x00000020,
+    ALL_GRAPHICS = 0x0000001F,
+    ALL = 0x7FFFFFFF
+};
+
+struct jAttachment
+{
+    ETextureFormat Format = ETextureFormat::RGBA8;
+    EMSAASamples Samples = EMSAASamples::COUNT_1;
+
+	// 아래 2가지 옵션은 렌더링 전, 후에 attachment에 있는 데이터에 무엇을 할지 결정하는 부분.
+	// 1). loadOp
+	//		- VK_ATTACHMENT_LOAD_OP_LOAD : attachment에 있는 내용을 그대로 유지
+	//		- VK_ATTACHMENT_LOAD_OP_CLEAR : attachment에 있는 내용을 constant 모두 값으로 설정함.
+	//		- VK_ATTACHMENT_LOAD_OP_DONT_CARE : attachment에 있는 내용에 대해 어떠한 것도 하지 않음. 정의되지 않은 상태.
+	// 2). storeOp
+	//		- VK_ATTACHMENT_STORE_OP_STORE : 그려진 내용이 메모리에 저장되고 추후에 읽어질 수 있음.
+	//		- VK_ATTACHMENT_STORE_OP_DONT_CARE : 렌더링을 수행한 후에 framebuffer의 내용이 어떻게 될지 모름(정의되지 않음).
+	EAttachmentLoadStoreOp LoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE;
+	EAttachmentLoadStoreOp StencilLoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE;
+
+	//union
+	//{
+	//	Vector4 ClearColor;
+	//	Vector2 ClearDepth;
+	//};
+    Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
+    Vector2 ClearDepth = Vector2(1.0f, 0.0f);
+
+	void* ImageView = nullptr;
+};
+
+class jRenderPass
+{
+public:
+    virtual ~jRenderPass() {}
+
+	virtual void* GetRenderPass() const { return nullptr; }
+
+    std::vector<jAttachment> ColorAttachments;
+    jAttachment DepthAttachment;
+    jAttachment ColorAttachmentResolve;
+    Vector2i RenderOffset;
+    Vector2i RenderExtent;
+};
+
+class jFrameBuffer
+{
+public:
+    virtual ~jFrameBuffer() {}
+
+	void* GetFrameBuffer(int32 index) { return nullptr; }
 };

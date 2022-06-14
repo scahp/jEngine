@@ -23,8 +23,8 @@ public:
 		return *_instance; 
 	}
 
-	std::weak_ptr<jImageData> LoadImageDataFromFile(const jName& filename, bool sRGB = false);
-	std::weak_ptr<jTexture> LoadTextureFromFile(const jName& filename, bool sRGB = false);
+	std::weak_ptr<jImageData> LoadImageDataFromFile(const jName& filename, bool sRGB = false, bool paddingRGBA = false);
+	std::weak_ptr<jTexture> LoadTextureFromFile(const jName& filename, bool sRGB = false, bool paddingRGBA = false);
 
 private:
 	std::map<jName, std::shared_ptr<jImageData> > CachedImageDataMap;

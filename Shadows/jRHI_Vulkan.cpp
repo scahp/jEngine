@@ -5,9 +5,13 @@
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"	// 이거 안쓸예정
+#include "jImageFileLoader.h"
+
+jRHI_Vulkan* g_rhi_vk = nullptr;
 
 jRHI_Vulkan::jRHI_Vulkan()
 {
+	g_rhi_vk = this;
 }
 
 
@@ -101,6 +105,7 @@ bool jRHI_Vulkan::InitRHI()
 			{
 				physicalDevice = device;
 				msaaSamples = GetMaxUsableSampleCount();
+				//msaaSamples = (VkSampleCountFlagBits)1;
 				break;
 			}
 		}
@@ -243,10 +248,24 @@ bool jRHI_Vulkan::InitRHI()
 
 	// 동적인 부분들 패스에 따라 달라짐
     ensure(CreateRenderPass());
-    ensure(CreateDescriptorSetLayout());
-    ensure(CreateGraphicsPipeline());
-    ensure(CreateFrameBuffers());
-    ensure(CreateTextureImage());
+
+	FrameBufferTest.resize(swapChainImageViews.size());
+	for (int32 i = 0; i < FrameBufferTest.size(); ++i)
+	{
+		FrameBufferTest[i].SetRenderPass(&RenderPassTest);
+		ensure(FrameBufferTest[i].CreateFrameBuffer(i));
+	}
+
+	IEmptyUniform* UniformBuffer = new EmptyUniform<jUniformBufferObject>();
+	std::weak_ptr<jTexture> Texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName("chalet.jpg"), true, true);
+
+	ShaderBindings.UniformBuffers.push_back(TBindings<IEmptyUniform*>(0, EShaderAccessStageFlag::VERTEX, UniformBuffer));
+	ShaderBindings.Textures.push_back(TBindings<jTexture*>(1, EShaderAccessStageFlag::FRAGMENT, Texture.lock().get()));
+	ShaderBindings.CreateDescriptorSetLayout();
+	ShaderBindingInstances = ShaderBindings.CreateShaderBindingInstance((int32)swapChainImageViews.size());
+
+	ensure(CreateGraphicsPipeline());
+    //ensure(CreateTextureImage());
     ensure(CreateTextureSampler());
     ensure(LoadModel());
     ensure(CreateVertexBuffer());
@@ -258,164 +277,200 @@ bool jRHI_Vulkan::InitRHI()
 	return true;
 }
 
+//std::vector<jAttachment> ColorAttachments;
+//jAttachment DepthAttachment;
+//jAttachment ColorAttachmentResolve;
+
+//////////////////////////////////////////////////////////////////////////
+// Auto generate type conversion code
+template <typename T1, typename T2>
+using ConversionTypePair = std::pair<T1, T2>;
+
+template <typename T, typename... T1>
+constexpr auto GenerateConversionTypeArray(T1... args)
+{
+    std::array<T, sizeof...(args)> newArray;
+    auto AddElementFunc = [&newArray](const auto& arg)
+    {
+        newArray[(int32)arg.first] = arg.second;
+    };
+
+    int dummy[] = { 0, (AddElementFunc(args), 0)... };
+    return newArray;
+}
+
+#define CONVERSION_TYPE_ELEMENT(x, y) ConversionTypePair<decltype(x), decltype(y)>(x, y)
+#define GENERATE_STATIC_CONVERSION_ARRAY(...) {static auto _TypeArray_ = GenerateConversionTypeArray<T>(__VA_ARGS__); return (T)_TypeArray_[(int32)type];}
+
+FORCEINLINE auto GetVulkanTextureInternalFormat(ETextureFormat type)
+{
+	using T = VkFormat;
+    GENERATE_STATIC_CONVERSION_ARRAY(
+        // TextureFormat + InternalFormat
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB32F, VK_FORMAT_R32G32B32_SFLOAT),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB16F, VK_FORMAT_R16G16B16_SFLOAT),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::R11G11B10F, VK_FORMAT_B10G11R11_UFLOAT_PACK32),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB, VK_FORMAT_R8G8B8_UNORM),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA16F, VK_FORMAT_R16G16B16A16_SFLOAT),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA32F, VK_FORMAT_R32G32B32A32_SFLOAT),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA, VK_FORMAT_R8G8B8A8_UNORM),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RG32F, VK_FORMAT_R32G32_SFLOAT),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RG, VK_FORMAT_R8G8_UNORM),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::R, VK_FORMAT_R8_UNORM),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::R32F, VK_FORMAT_R32_SFLOAT),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::D24_S8, VK_FORMAT_D24_UNORM_S8_UINT),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::D32, VK_FORMAT_D32_SFLOAT),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::D32_S8, VK_FORMAT_D32_SFLOAT_S8_UINT),
+
+        // below is Internal Format only
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA_INTEGER, VK_FORMAT_R8G8B8_SINT),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::R_INTEGER, VK_FORMAT_R8_SINT),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::R32UI, VK_FORMAT_R8_UINT),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8, VK_FORMAT_R8G8B8A8_UNORM),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::BGRA8, VK_FORMAT_B8G8R8A8_UNORM),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8I, VK_FORMAT_R8G8B8A8_SINT),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8UI, VK_FORMAT_R8G8B8A8_UINT)
+        // CONVERSION_TYPE_ELEMENT(ETextureFormat::DEPTH, GL_DEPTH_COMPONENT)
+    );
+}
+
+FORCEINLINE void GetVulkanAttachmentLoadStoreOp(VkAttachmentLoadOp& OutLoadOp, VkAttachmentStoreOp& OutStoreOp, EAttachmentLoadStoreOp InType)
+{
+	switch(InType)
+	{
+	case EAttachmentLoadStoreOp::LOAD_STORE:
+		OutLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+		OutStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+		break;
+	case EAttachmentLoadStoreOp::LOAD_DONTCARE:
+        OutLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+        OutStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		break;
+	case EAttachmentLoadStoreOp::CLEAR_STORE:
+        OutLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        OutStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+		break;
+	case EAttachmentLoadStoreOp::CLEAR_DONTCARE:
+        OutLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        OutStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		break;
+	case EAttachmentLoadStoreOp::DONTCARE_STORE:
+        OutLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        OutStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+		break;
+	case EAttachmentLoadStoreOp::DONTCARE_DONTCARE:
+        OutLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        OutStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		break;
+	case EAttachmentLoadStoreOp::MAX:
+	default:
+		check(0);
+		break;
+	}
+}
+
 bool jRHI_Vulkan::CreateRenderPass()
 {
-	VkAttachmentDescription colorAttachment = {};
-	colorAttachment.format = swapChainImageFormat;
-	colorAttachment.samples = msaaSamples;
-
-	// 아래 2가지 옵션은 렌더링 전, 후에 attachment에 있는 데이터에 무엇을 할지 결정하는 부분.
-	// 1). loadOp
-	//		- VK_ATTACHMENT_LOAD_OP_LOAD : attachment에 있는 내용을 그대로 유지
-	//		- VK_ATTACHMENT_LOAD_OP_CLEAR : attachment에 있는 내용을 constant 모두 값으로 설정함.
-	//		- VK_ATTACHMENT_LOAD_OP_DONT_CARE : attachment에 있는 내용에 대해 어떠한 것도 하지 않음. 정의되지 않은 상태.
-	// 2). storeOp
-	//		- VK_ATTACHMENT_STORE_OP_STORE : 그려진 내용이 메모리에 저장되고 추후에 읽어질 수 있음.
-	//		- VK_ATTACHMENT_STORE_OP_DONT_CARE : 렌더링을 수행한 후에 framebuffer의 내용이 어떻게 될지 모름(정의되지 않음).
-	colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-
-	colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-
-	// Texture나 Framebuffer의 경우 VkImage 객체로 특정 픽셀 형식을 표현함.
-	// 그러나 메모리의 픽셀 레이아웃은 이미지로 수행하려는 작업에 따라서 변경될 수 있음.
-	// 그래서 여기서는 수행할 작업에 적절한 레이아웃으로 image를 전환시켜주는 작업을 함.
-	// 주로 사용하는 layout의 종류
-	// 1). VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : Color attachment의 이미지
-	// 2). VK_IMAGE_LAYOUT_PRESENT_SRC_KHR : Swapchain으로 제출된 이미지
-	// 3). VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL : Memory copy 연산의 Destination으로 사용된 이미지
-	colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;			// RenderPass가 시작되기 전에 어떤 Image 레이아웃을 가지고 있을지 여부를 지정
-																		// VK_IMAGE_LAYOUT_UNDEFINED 은 이전 이미지 레이아웃을 무시한다는 의미.
-																		// 주의할 점은 이미지의 내용이 보존되지 않습니다. 그러나 현재는 이미지를 Clear할 것이므로 보존할 필요가 없음.
-
-	//colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;		// RenderPass가 끝날때 자동으로 전환될 Image 레이아웃을 정의함
-	//																	// 우리는 렌더링 결과를 스왑체인에 제출할 것이기 때문에 VK_IMAGE_LAYOUT_PRESENT_SRC_KHR 사용
-
-	// MSAA 를 사용하게 되면, Swapchain에 제출전에 resolve 를 해야하므로, 아래와 같이 final layout 을 변경해줌.
-	// 그리고 reoslve를 위한 VkAttachmentDescription 을 추가함. depth buffer의 경우는 Swapchain에 제출하지 않기 때문에 이 과정이 필요없음.
-	colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-	VkAttachmentDescription colorAttachmentResolve = {};
-	colorAttachmentResolve.format = swapChainImageFormat;
-	colorAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT;
-	colorAttachmentResolve.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	colorAttachmentResolve.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-	colorAttachmentResolve.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	colorAttachmentResolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-	VkAttachmentReference colorAttachmentResolveRef = {};
-	colorAttachmentResolveRef.attachment = 2;
-	colorAttachmentResolveRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-	// Subpasses
-	// 하나의 렌더링패스에는 여러개의 서브렌더패스가 존재할 수 있다. 예를 들어서 포스트프로세스를 처리할때 여러 포스트프로세스를 
-	// 서브패스로 전달하여 하나의 렌더패스로 만들 수 있다. 이렇게 하면 불칸이 Operation과 메모리 대역폭을 아껴쓸 수도 있으므로 성능이 더 나아진다.
-	// 포스프 프로세스 처리들 사이에 (GPU <-> Main memory에 계속해서 Framebuffer 내용을 올렸다 내렸다 하지 않고 계속 GPU에 올려두고 처리할 수 있음)
-	// 현재는 1개의 서브패스만 사용함.
-	VkAttachmentReference colorAttachmentRef = {};
-	colorAttachmentRef.attachment = 0;											// VkAttachmentDescription 배열의 인덱스
-																				// fragment shader의 layout(location = 0) out vec4 outColor; 에 location=? 에 인덱스가 매칭됨.
-	colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;		// 서브패스에서 어떤 이미지 레이아웃을 사용할것인지를 명세함.
-																				// Vulkan에서 이 서브패스가 되면 자동으로 Image 레이아웃을 이것으로 변경함.
-																				// 우리는 VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL 으로 설정하므로써 color attachment로 사용
-
-	VkAttachmentDescription depthAttachment = {};
-	depthAttachment.format = FindDepthFormat();
-	depthAttachment.samples = msaaSamples;
-	depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;					// 현재는 렌더링을 할때 말고는 쓰는데가 없으므로 DontCare
-	depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-	VkAttachmentReference depthAttachmentRef = {};
-	depthAttachmentRef.attachment = 1;
-	depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-	VkSubpassDescription subpass = {};
-	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-	subpass.colorAttachmentCount = 1;
-	subpass.pColorAttachments = &colorAttachmentRef;
-	subpass.pDepthStencilAttachment = &depthAttachmentRef;
-	subpass.pResolveAttachments = &colorAttachmentResolveRef;
-
-	std::array<VkAttachmentDescription, 3> attachments = { colorAttachment, depthAttachment, colorAttachmentResolve };
-
-	VkRenderPassCreateInfo renderPassInfo = {};
-	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-	renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-	renderPassInfo.pAttachments = attachments.data();
-	renderPassInfo.subpassCount = 1;
-	renderPassInfo.pSubpasses = &subpass;
-
-	// 1. Subpasses 들의 이미지 레이아웃 전환은 자동적으로 일어나며, 이런 전환은 subpass dependencies 로 관리 됨.
-	// 현재 서브패스를 1개 쓰고 있지만 서브패스 앞, 뒤에 암묵적인 서브페이스가 있음.
-	// 2. 2개의 내장된 dependencies 가 렌더패스 시작과 끝에 있음.
-	//		- 렌더패스 시작에 있는 경우 정확한 타이밍에 발생하지 않음. 파이프라인 시작에서 전환이 발생한다고 가정되지만 우리가 아직 이미지를 얻지 못한 경우가 있을 수 있음.
-	//		 이 문제를 해결하기 위해서 2가지 방법이 있음.
-	//			1). imageAvailableSemaphore 의 waitStages를 VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT 로 변경하여, 이미지가 사용가능하기 전에 렌더패스가 시작되지 못하도록 함.
-	//			2). 렌더패스가 VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT 스테이지를 기다리게 함. (여기선 이거 씀)
-	VkSubpassDependency dependency = {};
-	// VK_SUBPASS_EXTERNAL : implicit subpass 인 before or after render pass 에서 발생하는 subpass
-	// 여기서 dstSubpass 는 0으로 해주는데 현재 1개의 subpass 만 만들어서 0번 index로 설정함.
-	// 디펜던시 그래프에서 사이클 발생을 예방하기 위해서 dstSubpass는 항상 srcSubpass 더 높아야한다. (VK_SUBPASS_EXTERNAL 은 예외)
-	dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-	dependency.dstSubpass = 0;
-
-	// 수행되길 기다려야하는 작업과 이런 작업이 수행되야할 스테이지를 명세하는 부분.
-	// 우리가 이미지에 접근하기 전에 스왑체인에서 읽기가 완료될때 까지 기다려야하는데, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT 에서 가능.
-	dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	dependency.srcAccessMask = 0;
-
-	// 기다려야하는 작업들은 Color Attachment 스테이지에 있고 Color Attachment를 읽고 쓰는 것과 관련되어 있음.
-	// 이 설정으로 실제 이미지가 필요할때 혹은 허용될때까지 전환이 발생하는것을 방지함.
-	dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-	renderPassInfo.dependencyCount = 1;
-	renderPassInfo.pDependencies = &dependency;
-
-	if (!ensure(vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass) == VK_SUCCESS))
-		return false;
-
-	return true;
+    jAttachment color = { .Format = ETextureFormat::BGRA8, .Samples = (EMSAASamples)msaaSamples,
+        .LoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE, .StencilLoadStoreOp = EAttachmentLoadStoreOp::DONTCARE_DONTCARE, .ImageView = colorImageView };
+    jAttachment depth = { .Format = ETextureFormat::D32, .Samples = (EMSAASamples)msaaSamples,
+        .LoadStoreOp = EAttachmentLoadStoreOp::CLEAR_DONTCARE, .StencilLoadStoreOp = EAttachmentLoadStoreOp::DONTCARE_DONTCARE, .ImageView = depthImageView };
+    jAttachment resolve = { .Format = ETextureFormat::BGRA8, .Samples = (EMSAASamples)msaaSamples,
+        .LoadStoreOp = EAttachmentLoadStoreOp::DONTCARE_STORE, .StencilLoadStoreOp = EAttachmentLoadStoreOp::DONTCARE_DONTCARE, .ImageView = swapChainImageViews[0] };
+    RenderPassTest.SetAttachemnt({ color }, depth, resolve);
+    RenderPassTest.SetRenderArea({ 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
+    return RenderPassTest.CreateRenderPass();
 }
 
-bool jRHI_Vulkan::CreateDescriptorSetLayout()
+FORCEINLINE auto GetVulkanShaderAccessFlags(EShaderAccessStageFlag type)
 {
-	VkDescriptorSetLayoutBinding uboLayoutBinding = {};
-	uboLayoutBinding.binding = 0;
-	uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	uboLayoutBinding.descriptorCount = 1;
-
-	// VkShaderStageFlagBits 에 값을 | 연산으로 조합가능
-	//  - VK_SHADER_STAGE_ALL_GRAPHICS 로 설정하면 모든곳에서 사용
-	uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-	uboLayoutBinding.pImmutableSamplers = nullptr;	// Optional (이미지 샘플링 시에서만 사용)
-
-	VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
-	samplerLayoutBinding.binding = 1;
-	samplerLayoutBinding.descriptorCount = 1;
-	samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	samplerLayoutBinding.pImmutableSamplers = nullptr;
-	samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;	// sampler 를 fragment shader에 붙임.
-
-	std::array<VkDescriptorSetLayoutBinding, 2> bindings = { uboLayoutBinding, samplerLayoutBinding };
-
-	VkDescriptorSetLayoutCreateInfo layoutInfo = {};
-	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-	layoutInfo.pBindings = bindings.data();
-
-	if (!ensure(vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout) == VK_SUCCESS))
-		return false;
-
-	return true;
+	switch(type)
+	{
+	case EShaderAccessStageFlag::VERTEX:
+		return VK_SHADER_STAGE_VERTEX_BIT;
+	case EShaderAccessStageFlag::TESSELLATION_CONTROL:
+		return VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
+	case EShaderAccessStageFlag::TESSELLATION_EVALUATION:
+		return VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
+	case EShaderAccessStageFlag::GEOMETRY:
+		return VK_SHADER_STAGE_GEOMETRY_BIT;
+	case EShaderAccessStageFlag::FRAGMENT:
+		return VK_SHADER_STAGE_FRAGMENT_BIT;
+	case EShaderAccessStageFlag::COMPUTE:
+		return VK_SHADER_STAGE_COMPUTE_BIT;
+	case EShaderAccessStageFlag::ALL_GRAPHICS:
+		return VK_SHADER_STAGE_ALL_GRAPHICS;
+	case EShaderAccessStageFlag::ALL:
+		return VK_SHADER_STAGE_ALL;
+	default:
+		check(0);
+		break;
+	}
+	return VK_SHADER_STAGE_ALL;
 }
+
+FORCEINLINE auto GetVulkanTextureComponentCount(ETextureFormat type)
+{
+    using T = int8;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		// TextureFormat + InternalFormat
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB32F, 3),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB16F, 3),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R11G11B10F, 3),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB, 3),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA16F, 4),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA32F, 4),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA, 4),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RG32F, 2),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RG, 2),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R, 1),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R32F, 1),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::D24_S8, 1),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::D32, 1),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::D32_S8, 1),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA_INTEGER, 4),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R_INTEGER, 1),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R32UI, 1),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8, 4),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::BGRA8, 4),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8I, 4),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8UI, 4),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::DEPTH, 1)
+	);
+}
+
+
+//bool jRHI_Vulkan::CreateDescriptorSetLayout()
+//{
+//	VkDescriptorSetLayoutBinding uboLayoutBinding = {};
+//	uboLayoutBinding.binding = 0;
+//	uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+//	uboLayoutBinding.descriptorCount = 1;
+//
+//	// VkShaderStageFlagBits 에 값을 | 연산으로 조합가능
+//	//  - VK_SHADER_STAGE_ALL_GRAPHICS 로 설정하면 모든곳에서 사용
+//	uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+//	uboLayoutBinding.pImmutableSamplers = nullptr;	// Optional (이미지 샘플링 시에서만 사용)
+//
+//	VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
+//	samplerLayoutBinding.binding = 1;
+//	samplerLayoutBinding.descriptorCount = 1;
+//	samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+//	samplerLayoutBinding.pImmutableSamplers = nullptr;
+//	samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;	// sampler 를 fragment shader에 붙임.
+//
+//	std::array<VkDescriptorSetLayoutBinding, 2> bindings = { uboLayoutBinding, samplerLayoutBinding };
+//
+//	VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+//	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+//	layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+//	layoutInfo.pBindings = bindings.data();
+//
+//	if (!ensure(vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout) == VK_SUCCESS))
+//		return false;
+//
+//	return true;
+//}
 
 bool jRHI_Vulkan::CreateGraphicsPipeline()
 {
@@ -603,7 +658,7 @@ bool jRHI_Vulkan::CreateGraphicsPipeline()
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
 	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipelineLayoutInfo.setLayoutCount = 1;
-	pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+	pipelineLayoutInfo.pSetLayouts = &ShaderBindings.DescriptorSetLayout;
 	pipelineLayoutInfo.pushConstantRangeCount = 0;		// Optional		// 쉐이더에 값을 constant 값을 전달 할 수 있음. 이후에 배움
 	pipelineLayoutInfo.pPushConstantRanges = nullptr;	// Optional
 	if (!ensure(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) == VK_SUCCESS))
@@ -630,7 +685,7 @@ bool jRHI_Vulkan::CreateGraphicsPipeline()
 	pipelineInfo.pColorBlendState = &colorBlending;
 	pipelineInfo.pDynamicState = nullptr;			// Optional
 	pipelineInfo.layout = pipelineLayout;
-	pipelineInfo.renderPass = renderPass;
+	pipelineInfo.renderPass = (VkRenderPass)RenderPassTest.GetRenderPass();
 	pipelineInfo.subpass = 0;		// index of subpass
 
 	// Pipeline을 상속받을 수 있는데, 아래와 같은 장점이 있다.
@@ -708,89 +763,93 @@ bool jRHI_Vulkan::CreateDepthResources()
 	return true;
 }
 
-bool jRHI_Vulkan::CreateFrameBuffers()
-{
-	swapChainFramebuffers.resize(swapChainImageViews.size());
-	for (size_t i = 0; i < swapChainImageViews.size(); ++i)
-	{
-		// DepthBuffer는 같은 것을 씀. 세마포어 때문에 한번에 1개의 subpass 만 실행되기 때문.
-		std::array<VkImageView, 3> attachments = { colorImageView, depthImageView, swapChainImageViews[i] };
-
-		VkFramebufferCreateInfo framebufferInfo = {};
-		framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-		framebufferInfo.renderPass = renderPass;
-
-		// RenderPass와 같은 수와 같은 타입의 attachment 를 사용
-		framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-		framebufferInfo.pAttachments = attachments.data();
-
-		framebufferInfo.width = swapChainExtent.width;
-		framebufferInfo.height = swapChainExtent.height;
-		framebufferInfo.layers = 1;			// 이미지 배열의 레이어수(3D framebuffer에 사용할 듯)
-
-		if (!ensure(vkCreateFramebuffer(device, &framebufferInfo, nullptr, &swapChainFramebuffers[i]) == VK_SUCCESS))
-			return false;
-	}
-
-	return true;
-}
+//bool jRHI_Vulkan::CreateFrameBuffers()
+//{
+//	swapChainFramebuffers.resize(swapChainImageViews.size());
+//	for (size_t i = 0; i < swapChainImageViews.size(); ++i)
+//	{
+//		// DepthBuffer는 같은 것을 씀. 세마포어 때문에 한번에 1개의 subpass 만 실행되기 때문.
+//		std::vector<VkImageView> attachments;
+//		if (msaaSamples > 1)
+//			attachments = { colorImageView, depthImageView, swapChainImageViews[i] };
+//		else
+//			attachments = { swapChainImageViews[i], depthImageView };
+//
+//		VkFramebufferCreateInfo framebufferInfo = {};
+//		framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+//		framebufferInfo.renderPass = RenderPassTest.GetRenderPass();
+//
+//		// RenderPass와 같은 수와 같은 타입의 attachment 를 사용
+//		framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+//		framebufferInfo.pAttachments = attachments.data();
+//
+//		framebufferInfo.width = swapChainExtent.width;
+//		framebufferInfo.height = swapChainExtent.height;
+//		framebufferInfo.layers = 1;			// 이미지 배열의 레이어수(3D framebuffer에 사용할 듯)
+//
+//		if (!ensure(vkCreateFramebuffer(device, &framebufferInfo, nullptr, &swapChainFramebuffers[i]) == VK_SUCCESS))
+//			return false;
+//	}
+//
+//	return true;
+//}
 
 #include "stb_image.h"
 const std::string MODEL_PATH = "chalet.obj";
 const std::string TEXTURE_PATH = "chalet.jpg";
 uint32_t textureMipLevels;
-bool jRHI_Vulkan::CreateTextureImage()
-{
-	int texWidth, texHeight, texChannels;
-	stbi_uc* pixels = stbi_load(TEXTURE_PATH.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
-
-	if (!ensure(pixels))
-		return false;
-
-	VkDeviceSize imageSize = texWidth * texHeight * 4;
-	textureMipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max<int>(texWidth, texHeight)))) + 1;
-
-	VkBuffer stagingBuffer;
-	VkDeviceMemory stagingBufferMemory;
-
-	CreateBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-		, stagingBuffer, stagingBufferMemory);
-
-	void* data;
-	vkMapMemory(device, stagingBufferMemory, 0, imageSize, 0, &data);
-	memcpy(data, pixels, static_cast<size_t>(imageSize));
-	vkUnmapMemory(device, stagingBufferMemory);
-
-	stbi_image_free(pixels);
-
-	if (!ensure(CreateImage(static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), textureMipLevels, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_UNORM
-		, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT
-		| VK_IMAGE_USAGE_SAMPLED_BIT	// image를 shader 에서 접근가능하게 하고 싶은 경우
-		, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureImageMemory)))
-	{
-		return false;
-	}
-
-	if (!TransitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, textureMipLevels))
-		return false;
-	CopyBufferToImage(stagingBuffer, textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
-
-	// 밉맵을 만드는 동안 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL 으로 전환됨.
-	//// 이제 쉐이더에 읽기가 가능하게 하기위해서 아래와 같이 적용.
-	//if (TransitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, textureMipLevels))
-	//	return false;
-
-	vkDestroyBuffer(device, stagingBuffer, nullptr);
-	vkFreeMemory(device, stagingBufferMemory, nullptr);
-
-	if (!ensure(GenerateMipmaps(textureImage, VK_FORMAT_R8G8B8A8_UNORM, texWidth, texHeight, textureMipLevels)))
-		return false;
-
-	// Create Texture image view
-	textureImageView = CreateImageView(textureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, textureMipLevels);
-
-	return true;
-}
+//bool jRHI_Vulkan::CreateTextureImage()
+//{
+//	int texWidth, texHeight, texChannels;
+//	stbi_uc* pixels = stbi_load(TEXTURE_PATH.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+//
+//	if (!ensure(pixels))
+//		return false;
+//
+//	VkDeviceSize imageSize = texWidth * texHeight * 4;
+//	textureMipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max<int>(texWidth, texHeight)))) + 1;
+//
+//	VkBuffer stagingBuffer;
+//	VkDeviceMemory stagingBufferMemory;
+//
+//	CreateBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+//		, stagingBuffer, stagingBufferMemory);
+//
+//	void* data;
+//	vkMapMemory(device, stagingBufferMemory, 0, imageSize, 0, &data);
+//	memcpy(data, pixels, static_cast<size_t>(imageSize));
+//	vkUnmapMemory(device, stagingBufferMemory);
+//
+//	stbi_image_free(pixels);
+//
+//	if (!ensure(CreateImage(static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), textureMipLevels, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_UNORM
+//		, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT
+//		| VK_IMAGE_USAGE_SAMPLED_BIT	// image를 shader 에서 접근가능하게 하고 싶은 경우
+//		, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureImageMemory)))
+//	{
+//		return false;
+//	}
+//
+//	if (!TransitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, textureMipLevels))
+//		return false;
+//	CopyBufferToImage(stagingBuffer, textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
+//
+//	// 밉맵을 만드는 동안 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL 으로 전환됨.
+//	//// 이제 쉐이더에 읽기가 가능하게 하기위해서 아래와 같이 적용.
+//	//if (TransitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, textureMipLevels))
+//	//	return false;
+//
+//	vkDestroyBuffer(device, stagingBuffer, nullptr);
+//	vkFreeMemory(device, stagingBufferMemory, nullptr);
+//
+//	if (!ensure(GenerateMipmaps(textureImage, VK_FORMAT_R8G8B8A8_UNORM, texWidth, texHeight, textureMipLevels)))
+//		return false;
+//
+//	// Create Texture image view
+//	textureImageView = CreateImageView(textureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, textureMipLevels);
+//
+//	return true;
+//}
 
 bool jRHI_Vulkan::CreateTextureSampler()
 {
@@ -979,16 +1038,16 @@ bool jRHI_Vulkan::CreateDescriptorPool()
 
 bool jRHI_Vulkan::CreateDescriptorSets()
 {
-	std::vector<VkDescriptorSetLayout> layouts(swapChainImages.size(), descriptorSetLayout);
-	VkDescriptorSetAllocateInfo allocInfo = {};
-	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	allocInfo.descriptorPool = descriptorPool;
-	allocInfo.descriptorSetCount = static_cast<uint32_t>(swapChainImages.size());
-	allocInfo.pSetLayouts = layouts.data();
+	//std::vector<VkDescriptorSetLayout> layouts(swapChainImages.size(), ShaderBindings.DescriptorSetLayout);
+	//VkDescriptorSetAllocateInfo allocInfo = {};
+	//allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	//allocInfo.descriptorPool = descriptorPool;
+	//allocInfo.descriptorSetCount = static_cast<uint32_t>(swapChainImages.size());
+	//allocInfo.pSetLayouts = layouts.data();
 
-	descriptorSets.resize(swapChainImages.size());
-	if (!ensure(vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) == VK_SUCCESS))
-		return false;
+	//descriptorSets.resize(swapChainImages.size());
+	//if (!ensure(vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) == VK_SUCCESS))
+	//	return false;
 
 	for (size_t i = 0; i < swapChainImages.size(); ++i)
 	{
@@ -999,12 +1058,12 @@ bool jRHI_Vulkan::CreateDescriptorSets()
 
 		VkDescriptorImageInfo imageInfo = {};
 		imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		imageInfo.imageView = textureImageView;
+		imageInfo.imageView = ((jTexture_Vulkan*)ShaderBindings.Textures[0].Data)->ImageView;
 		imageInfo.sampler = textureSampler;
 
 		std::array<VkWriteDescriptorSet, 2> descriptorWrites = {};
 		descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrites[0].dstSet = descriptorSets[i];
+		descriptorWrites[0].dstSet = ShaderBindingInstances[i].DescriptorSet;
 		descriptorWrites[0].dstBinding = 0;
 		descriptorWrites[0].dstArrayElement = 0;
 		descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -1014,7 +1073,7 @@ bool jRHI_Vulkan::CreateDescriptorSets()
 		descriptorWrites[0].pTexelBufferView = nullptr;		// Optional (Buffer View 기반에 사용)
 
 		descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrites[1].dstSet = descriptorSets[i];
+		descriptorWrites[1].dstSet = ShaderBindingInstances[i].DescriptorSet;
 		descriptorWrites[1].dstBinding = 1;
 		descriptorWrites[1].dstArrayElement = 0;
 		descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -1030,7 +1089,7 @@ bool jRHI_Vulkan::CreateDescriptorSets()
 
 bool jRHI_Vulkan::CreateCommandBuffers()
 {
-	commandBuffers.resize(swapChainFramebuffers.size());
+	commandBuffers.resize(swapChainImageViews.size());
 
 	VkCommandBufferAllocateInfo allocInfo = {};
 	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -1061,26 +1120,7 @@ bool jRHI_Vulkan::CreateCommandBuffers()
 		if (!ensure(vkBeginCommandBuffer(commandBuffers[i], &beginInfo) == VK_SUCCESS))
 			return false;
 
-		// Starting render pass
-		VkRenderPassBeginInfo renderPassInfo = {};
-		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		renderPassInfo.renderPass = renderPass;
-		renderPassInfo.framebuffer = swapChainFramebuffers[i];
-
-		// 렌더될 영역이며, 최상의 성능을 위해 attachment의 크기와 동일해야함.
-		renderPassInfo.renderArea.offset = { 0, 0 };
-		renderPassInfo.renderArea.extent = swapChainExtent;
-
-		std::array<VkClearValue, 2> clearValues = {};
-		clearValues[0].color = { 0.0f, 0.0f, 0.0f, 1.0f };		// CreateRenderPass 할때 사용한 VK_ATTACHMENT_LOAD_OP_CLEAR 를 위해 사용.
-		clearValues[1].depthStencil = { 1.0f, 0 };
-		renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-		renderPassInfo.pClearValues = clearValues.data();
-
-		// 커맨드를 기록하는 명령어는 prefix로 모두 vkCmd 가 붙으며, 리턴값은 void 로 에러 핸들링은 따로 안함.
-		// VK_SUBPASS_CONTENTS_INLINE : 렌더 패스 명령이 Primary 커맨드 버퍼에 포함되며, Secondary 커맨드 버퍼는 실행되지 않는다.
-		// VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS : 렌더 패스 명령이 Secondary 커맨드 버퍼에서 실행된다.
-		vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+		RenderPassTest.BeginRenderPass(commandBuffers[i], (VkFramebuffer)FrameBufferTest[i].GetFrameBuffer());
 
 		// Basic drawing commands
 		vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
@@ -1091,13 +1131,13 @@ bool jRHI_Vulkan::CreateCommandBuffers()
 
 		vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-		vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[i], 0, nullptr);
+		vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &ShaderBindingInstances[i].DescriptorSet, 0, nullptr);
 
 		//vkCmdDraw(commandBuffers[i], static_cast<uint32_t>(vertices.size()), 1, 0, 0);			// VertexBuffer 만 있는 경우 호출
 		vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 
 		// Finishing up
-		vkCmdEndRenderPass(commandBuffers[i]);
+		RenderPassTest.EndRenderPass();
 
 		if (!ensure(vkEndCommandBuffer(commandBuffers[i]) == VK_SUCCESS))
 			return false;
@@ -1293,8 +1333,9 @@ void jRHI_Vulkan::CleanupSwapChain()
 	vkFreeMemory(device, depthImageMemory, nullptr);
 
 	// ImageViews and RenderPass 가 소멸되기전에 호출되어야 함
-	for (auto framebuffer : swapChainFramebuffers)
-		vkDestroyFramebuffer(device, framebuffer, nullptr);
+	//for (auto framebuffer : swapChainFramebuffers)
+	//	vkDestroyFramebuffer(device, framebuffer, nullptr);
+	RenderPassTest.Release();
 
 	// Command buffer pool 을 다시 만들기 보다 있는 커맨드 버퍼 풀을 cleanup 하고 재사용 함.
 	vkFreeCommandBuffers(device, commandPool, static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
@@ -1371,4 +1412,361 @@ void jRHI_Vulkan::UpdateUniformBuffer(uint32_t currentImage)
 	memcpy(data, &ubo, sizeof(ubo));
 	vkUnmapMemory(device, uniformBuffersMemory[currentImage]);
 }
+
+
+jTexture* jRHI_Vulkan::CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
+	, EFormatType dataType, ETextureFormat textureFormat, bool createMipmap) const
+{
+    VkDeviceSize imageSize = width * height * GetVulkanTextureComponentCount(textureFormat);
+    textureMipLevels = static_cast<uint32>(std::floor(std::log2(std::max<int>(width, height)))) + 1;
+
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+
+    CreateBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+        , stagingBuffer, stagingBufferMemory);
+
+    void* dset = nullptr;
+    vkMapMemory(device, stagingBufferMemory, 0, imageSize, 0, &dset);
+    memcpy(dset, data, static_cast<size_t>(imageSize));
+    vkUnmapMemory(device, stagingBufferMemory);
+
+	VkFormat vkTextureFormat = GetVulkanTextureInternalFormat(textureFormat);
+
+	VkImage TextureImage;
+	VkDeviceMemory TextureImageMemory;
+    if (!ensure(CreateImage(static_cast<uint32>(width), static_cast<uint32>(height), textureMipLevels, VK_SAMPLE_COUNT_1_BIT, vkTextureFormat
+        , VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT
+        | VK_IMAGE_USAGE_SAMPLED_BIT	// image를 shader 에서 접근가능하게 하고 싶은 경우
+        , VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, TextureImage, TextureImageMemory)))
+    {
+        return nullptr;
+    }
+
+    if (!TransitionImageLayout(TextureImage, vkTextureFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, textureMipLevels))
+        return nullptr;
+    CopyBufferToImage(stagingBuffer, TextureImage, static_cast<uint32>(width), static_cast<uint32>(height));
+
+    // 밉맵을 만드는 동안 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL 으로 전환됨.
+    //// 이제 쉐이더에 읽기가 가능하게 하기위해서 아래와 같이 적용.
+    //if (TransitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, textureMipLevels))
+    //	return false;
+
+    vkDestroyBuffer(device, stagingBuffer, nullptr);
+    vkFreeMemory(device, stagingBufferMemory, nullptr);
+
+	if (createMipmap)
+	{
+		if (!ensure(GenerateMipmaps(TextureImage, vkTextureFormat, width, height, textureMipLevels)))
+			return nullptr;
+	}
+
+    // Create Texture image view
+    VkImageView textureImageView = CreateImageView(TextureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, textureMipLevels);
+
+    auto texture = new jTexture_Vulkan();
+    texture->sRGB = sRGB;
+    texture->ColorBufferType = textureFormat;
+    texture->ColorPixelType = dataType;
+    texture->Type = ETextureType::TEXTURE_2D;
+    texture->Width = width;
+    texture->Height = height;
+    
+	texture->Image = TextureImage;
+	texture->ImageView = textureImageView;
+	texture->ImageMemory = TextureImageMemory;
+
+	return texture;
+}
+
+void jRenderPass_Vulkan::Release()
+{
+    vkDestroyRenderPass(g_rhi_vk->device, RenderPass, nullptr);
+}
+
+bool jRenderPass_Vulkan::CreateRenderPass()
+{
+    int32 AttachmentIndex = 0;
+    std::vector<VkAttachmentDescription> AttachmentDescs;
+	AttachmentDescs.reserve(ColorAttachments.size() + 2);		// Colors, Depth, ColorResolve
+    AttachmentDescs.resize(ColorAttachments.size() + 1);
+
+	bool IsUseMSAA = false;
+
+    std::vector<VkAttachmentReference> colorAttachmentRefs;
+    colorAttachmentRefs.resize(ColorAttachments.size());
+    for (int32 i = 0; i < ColorAttachments.size(); ++i)
+    {
+        VkAttachmentDescription& colorDesc = AttachmentDescs[AttachmentIndex];
+        colorDesc.format = GetVulkanTextureInternalFormat(ColorAttachments[i].Format);
+        colorDesc.samples = (VkSampleCountFlagBits)ColorAttachments[i].Samples;
+        GetVulkanAttachmentLoadStoreOp(colorDesc.loadOp, colorDesc.storeOp, ColorAttachments[i].LoadStoreOp);
+        GetVulkanAttachmentLoadStoreOp(colorDesc.stencilLoadOp, colorDesc.stencilStoreOp, ColorAttachments[i].StencilLoadStoreOp);
+
+		if ((int32)ColorAttachments[i].Samples > 1)
+			IsUseMSAA = true;
+
+        // Texture나 Framebuffer의 경우 VkImage 객체로 특정 픽셀 형식을 표현함.
+        // 그러나 메모리의 픽셀 레이아웃은 이미지로 수행하려는 작업에 따라서 변경될 수 있음.
+        // 그래서 여기서는 수행할 작업에 적절한 레이아웃으로 image를 전환시켜주는 작업을 함.
+        // 주로 사용하는 layout의 종류
+        // 1). VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : Color attachment의 이미지
+        // 2). VK_IMAGE_LAYOUT_PRESENT_SRC_KHR : Swapchain으로 제출된 이미지
+        // 3). VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL : Memory copy 연산의 Destination으로 사용된 이미지
+        colorDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;			// RenderPass가 시작되기 전에 어떤 Image 레이아웃을 가지고 있을지 여부를 지정
+                                                                            // VK_IMAGE_LAYOUT_UNDEFINED 은 이전 이미지 레이아웃을 무시한다는 의미.
+                                                                            // 주의할 점은 이미지의 내용이 보존되지 않습니다. 그러나 현재는 이미지를 Clear할 것이므로 보존할 필요가 없음.
+
+        //colorDesc.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;	// RenderPass가 끝날때 자동으로 전환될 Image 레이아웃을 정의함
+        //																	// 우리는 렌더링 결과를 스왑체인에 제출할 것이기 때문에 VK_IMAGE_LAYOUT_PRESENT_SRC_KHR 사용
+
+        // MSAA 를 사용하게 되면, Swapchain에 제출전에 resolve 를 해야하므로, 아래와 같이 final layout 을 변경해줌.
+        // 그리고 reoslve를 위한 VkAttachmentDescription 을 추가함. depth buffer의 경우는 Swapchain에 제출하지 않기 때문에 이 과정이 필요없음.
+		if (IsUseMSAA)
+			colorDesc.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		else
+			colorDesc.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;			// MSAA 안하면 바로 Present 할 것이므로
+
+        //////////////////////////////////////////////////////////////////////////
+
+        // Subpasses
+        // 하나의 렌더링패스에는 여러개의 서브렌더패스가 존재할 수 있다. 예를 들어서 포스트프로세스를 처리할때 여러 포스트프로세스를 
+        // 서브패스로 전달하여 하나의 렌더패스로 만들 수 있다. 이렇게 하면 불칸이 Operation과 메모리 대역폭을 아껴쓸 수도 있으므로 성능이 더 나아진다.
+        // 포스프 프로세스 처리들 사이에 (GPU <-> Main memory에 계속해서 Framebuffer 내용을 올렸다 내렸다 하지 않고 계속 GPU에 올려두고 처리할 수 있음)
+        // 현재는 1개의 서브패스만 사용함.
+        VkAttachmentReference& colorAttachmentRef = colorAttachmentRefs[i];
+        colorAttachmentRef.attachment = AttachmentIndex++;							// VkAttachmentDescription 배열의 인덱스
+                                                                                    // fragment shader의 layout(location = 0) out vec4 outColor; 에 location=? 에 인덱스가 매칭됨.
+        colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;		// 서브패스에서 어떤 이미지 레이아웃을 사용할것인지를 명세함.
+                                                                                    // Vulkan에서 이 서브패스가 되면 자동으로 Image 레이아웃을 이것으로 변경함.
+                                                                                    // 우리는 VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL 으로 설정하므로써 color attachment로 사용
+    }
+
+    VkAttachmentDescription& depthAttachment = AttachmentDescs[AttachmentIndex];
+    depthAttachment.format = GetVulkanTextureInternalFormat(DepthAttachment.Format);
+    depthAttachment.samples = (VkSampleCountFlagBits)DepthAttachment.Samples;
+    GetVulkanAttachmentLoadStoreOp(depthAttachment.loadOp, depthAttachment.storeOp, DepthAttachment.LoadStoreOp);
+    GetVulkanAttachmentLoadStoreOp(depthAttachment.stencilLoadOp, depthAttachment.stencilStoreOp, DepthAttachment.StencilLoadStoreOp);
+    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentReference depthAttachmentRef = {};
+    depthAttachmentRef.attachment = AttachmentIndex++;
+    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentReference colorAttachmentResolveRef = {};
+	if (IsUseMSAA)
+	{
+		VkAttachmentDescription colorAttachmentResolve = {};
+		colorAttachmentResolve.format = GetVulkanTextureInternalFormat(ColorAttachmentResolve.Format);
+		colorAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT;
+		GetVulkanAttachmentLoadStoreOp(colorAttachmentResolve.loadOp, colorAttachmentResolve.storeOp, ColorAttachmentResolve.LoadStoreOp);
+		GetVulkanAttachmentLoadStoreOp(colorAttachmentResolve.stencilLoadOp, colorAttachmentResolve.stencilStoreOp, ColorAttachmentResolve.StencilLoadStoreOp);
+		colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		AttachmentDescs.emplace_back(colorAttachmentResolve);
+
+		colorAttachmentResolveRef.attachment = AttachmentIndex++;		// color attachments + depth attachment
+		colorAttachmentResolveRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	}
+
+    VkSubpassDescription subpass = {};
+    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount = (uint32)colorAttachmentRefs.size();
+    subpass.pColorAttachments = &colorAttachmentRefs[0];
+    subpass.pDepthStencilAttachment = &depthAttachmentRef;
+	if (IsUseMSAA)
+		subpass.pResolveAttachments = &colorAttachmentResolveRef;
+	else
+		subpass.pResolveAttachments = nullptr;
+
+    VkRenderPassCreateInfo renderPassInfo = {};
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    renderPassInfo.attachmentCount = static_cast<uint32_t>(AttachmentDescs.size());
+    renderPassInfo.pAttachments = AttachmentDescs.data();
+    renderPassInfo.subpassCount = 1;
+    renderPassInfo.pSubpasses = &subpass;
+
+    // 1. Subpasses 들의 이미지 레이아웃 전환은 자동적으로 일어나며, 이런 전환은 subpass dependencies 로 관리 됨.
+    // 현재 서브패스를 1개 쓰고 있지만 서브패스 앞, 뒤에 암묵적인 서브페이스가 있음.
+    // 2. 2개의 내장된 dependencies 가 렌더패스 시작과 끝에 있음.
+    //		- 렌더패스 시작에 있는 경우 정확한 타이밍에 발생하지 않음. 파이프라인 시작에서 전환이 발생한다고 가정되지만 우리가 아직 이미지를 얻지 못한 경우가 있을 수 있음.
+    //		 이 문제를 해결하기 위해서 2가지 방법이 있음.
+    //			1). imageAvailableSemaphore 의 waitStages를 VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT 로 변경하여, 이미지가 사용가능하기 전에 렌더패스가 시작되지 못하도록 함.
+    //			2). 렌더패스가 VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT 스테이지를 기다리게 함. (여기선 이거 씀)
+    VkSubpassDependency dependency = {};
+    // VK_SUBPASS_EXTERNAL : implicit subpass 인 before or after render pass 에서 발생하는 subpass
+    // 여기서 dstSubpass 는 0으로 해주는데 현재 1개의 subpass 만 만들어서 0번 index로 설정함.
+    // 디펜던시 그래프에서 사이클 발생을 예방하기 위해서 dstSubpass는 항상 srcSubpass 더 높아야한다. (VK_SUBPASS_EXTERNAL 은 예외)
+    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+    dependency.dstSubpass = 0;
+
+    // 수행되길 기다려야하는 작업과 이런 작업이 수행되야할 스테이지를 명세하는 부분.
+    // 우리가 이미지에 접근하기 전에 스왑체인에서 읽기가 완료될때 까지 기다려야하는데, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT 에서 가능.
+    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.srcAccessMask = 0;
+
+    // 기다려야하는 작업들은 Color Attachment 스테이지에 있고 Color Attachment를 읽고 쓰는 것과 관련되어 있음.
+    // 이 설정으로 실제 이미지가 필요할때 혹은 허용될때까지 전환이 발생하는것을 방지함.
+    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+    renderPassInfo.dependencyCount = 1;
+    renderPassInfo.pDependencies = &dependency;
+
+    if (!ensure(vkCreateRenderPass(g_rhi_vk->GetDevice(), &renderPassInfo, nullptr, &RenderPass) == VK_SUCCESS))
+        return false;
+
+	// Create RenderPassInfo
+	RenderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    RenderPassInfo.renderPass = RenderPass;
+
+    // 렌더될 영역이며, 최상의 성능을 위해 attachment의 크기와 동일해야함.
+	RenderPassInfo.renderArea.offset = { RenderOffset.x, RenderOffset.y };
+	RenderPassInfo.renderArea.extent = { (uint32)RenderExtent.x, (uint32)RenderExtent.y };
+
+	ClearValues.resize(ColorAttachments.size() + 1);
+	for (int32 i = 0; i < ColorAttachments.size(); ++i)
+	{
+		const auto& color = ColorAttachments[i].ClearColor;
+		ClearValues[i].color = { color.x, color.y, color.z, color.w };
+	}
+	ClearValues[ColorAttachments.size()].depthStencil = { DepthAttachment.ClearDepth.x, (uint32)DepthAttachment.ClearDepth.y };
+	RenderPassInfo.clearValueCount = static_cast<uint32_t>(ClearValues.size());
+	RenderPassInfo.pClearValues = ClearValues.data();
+
+    return true;
+}
+
+bool jFrameBuffer_Vulkan::CreateFrameBuffer(int32 index)
+{
+	check(RenderPass);
+	check(index >= 0 && index < g_rhi_vk->swapChainImageViews.size());
+	
+	Index = index;
+
+	VkImageView FinalImageView = g_rhi_vk->swapChainImageViews[Index];
+
+    // DepthBuffer는 같은 것을 씀. 세마포어 때문에 한번에 1개의 subpass 만 실행되기 때문.
+    std::vector<VkImageView> attachments;
+	attachments.reserve(3);
+	if (g_rhi_vk->msaaSamples > 1)
+	{
+		for(int32 k=0;k<RenderPass->ColorAttachments.size();++k)
+		{
+			attachments.push_back((VkImageView)RenderPass->ColorAttachments[k].ImageView);
+		}
+		attachments.push_back((VkImageView)RenderPass->DepthAttachment.ImageView);
+		attachments.push_back(FinalImageView);
+	}
+	else
+	{
+        attachments.push_back(FinalImageView);
+        attachments.push_back((VkImageView)RenderPass->DepthAttachment.ImageView);
+	}
+
+    VkFramebufferCreateInfo framebufferInfo = {};
+    framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+    framebufferInfo.renderPass = (VkRenderPass)RenderPass->GetRenderPass();
+
+    // RenderPass와 같은 수와 같은 타입의 attachment 를 사용
+    framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+    framebufferInfo.pAttachments = attachments.data();
+
+    framebufferInfo.width = RenderPass->RenderExtent.x;
+    framebufferInfo.height = RenderPass->RenderExtent.y;
+    framebufferInfo.layers = 1;			// 이미지 배열의 레이어수(3D framebuffer에 사용할 듯)
+
+    if (!ensure(vkCreateFramebuffer(g_rhi_vk->device, &framebufferInfo, nullptr, &FrameBuffer) == VK_SUCCESS))
+        return false;
+
+    return true;
+}
+
+void jFrameBuffer_Vulkan::Release()
+{
+    // ImageViews and RenderPass 가 소멸되기전에 호출되어야 함
+    vkDestroyFramebuffer(g_rhi_vk->device, FrameBuffer, nullptr);
+}
+
+bool jShaderBindings::CreateDescriptorSetLayout()
+{
+    std::vector<VkDescriptorSetLayoutBinding> bindings;
+
+    for (int32 i = 0; i < UniformBuffers.size(); ++i)
+    {
+        auto& UBBindings = UniformBuffers[i];
+
+        VkDescriptorSetLayoutBinding binding = {};
+        binding.binding = UBBindings.BindingPoint;
+        binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        binding.descriptorCount = 1;
+        binding.stageFlags = GetVulkanShaderAccessFlags(UBBindings.AccessStageFlags);
+        binding.pImmutableSamplers = nullptr;
+        bindings.push_back(binding);
+    }
+
+    for (int32 i = 0; i < Textures.size(); ++i)
+    {
+        auto& TexBindings = Textures[i];
+
+        VkDescriptorSetLayoutBinding binding = {};
+        binding.binding = TexBindings.BindingPoint;
+        binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        binding.descriptorCount = 1;
+        binding.stageFlags = GetVulkanShaderAccessFlags(TexBindings.AccessStageFlags);
+        binding.pImmutableSamplers = nullptr;
+        bindings.push_back(binding);
+    }
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+    layoutInfo.pBindings = bindings.data();
+
+    if (!ensure(vkCreateDescriptorSetLayout(g_rhi_vk->device, &layoutInfo, nullptr, &DescriptorSetLayout) == VK_SUCCESS))
+        return false;
+
+    return true;
+}
+
+jShadingBindingInstance jShaderBindings::CreateShaderBindingInstance() const
+{
+    VkDescriptorSetAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = g_rhi_vk->descriptorPool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = &DescriptorSetLayout;
+
+	jShadingBindingInstance Instance = {};
+    if (!ensure(vkAllocateDescriptorSets(g_rhi_vk->device, &allocInfo, &Instance.DescriptorSet) == VK_SUCCESS))
+        return Instance;
+
+	return Instance;
+}
+
+std::vector<jShadingBindingInstance> jShaderBindings::CreateShaderBindingInstance(int32 count) const
+{
+    std::vector<VkDescriptorSetLayout> descSetLayout(count, DescriptorSetLayout);
+    VkDescriptorSetAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = g_rhi_vk->descriptorPool;
+    allocInfo.descriptorSetCount = (uint32)descSetLayout.size();
+    allocInfo.pSetLayouts = descSetLayout.data();
+
+    std::vector<jShadingBindingInstance> Instances;
+
+	std::vector< VkDescriptorSet> DescriptorSets;
+	DescriptorSets.resize(descSetLayout.size());
+    if (!ensure(vkAllocateDescriptorSets(g_rhi_vk->device, &allocInfo, DescriptorSets.data()) == VK_SUCCESS))
+        return Instances;
+
+    Instances.resize(DescriptorSets.size());
+	for (int32 i = 0; i < DescriptorSets.size(); ++i)		// todo opt
+		Instances[i].DescriptorSet = DescriptorSets[i];
+
+    return Instances;
+}
+
+
 #endif // USE_VULKAN
