@@ -227,40 +227,40 @@ private:
 	const jRenderPass* RenderPass = nullptr;
 };
 
-template <typename T>
 struct TBindings
 {
 	TBindings() = default;
-	TBindings(int32 bindingPoint, EShaderAccessStageFlag accessStageFlags, const T& data)
-		: BindingPoint(bindingPoint), AccessStageFlags(accessStageFlags), Data(data)
+	TBindings(int32 bindingPoint, EShaderAccessStageFlag accessStageFlags)
+		: BindingPoint(bindingPoint), AccessStageFlags(accessStageFlags)
 	{ }
 
     int32 BindingPoint = 0;
     EShaderAccessStageFlag AccessStageFlags = EShaderAccessStageFlag::ALL_GRAPHICS;
-	T Data;
 };
 
 struct IEmptyUniform
 {
-
+	virtual int32 GetBufferSize() const { return 0; }
+	virtual void Create() {}
+	virtual void Destroy() {}
+	virtual void* GetBuffer() const { return nullptr; }
+	virtual void* GetBufferMemory() const { return nullptr; }
 };
-
-template <typename T>
-struct EmptyUniform	: public IEmptyUniform // todo remove
-{
-	T Data;
-	VkBuffer Bufffer;
-};		
 
 struct jShadingBindingInstance
 {
     VkDescriptorSet DescriptorSet = nullptr;
+	const struct jShaderBindings* ShaderBindings = nullptr;
+	std::vector<IEmptyUniform*> UniformBuffers;
+	std::vector<jTexture*> Textures;
+
+	void UpdateShaderBindings();
 };
 
 struct jShaderBindings
 {
-    std::vector<TBindings<IEmptyUniform*>> UniformBuffers;
-    std::vector<TBindings<jTexture*>> Textures;
+    std::vector<TBindings> UniformBuffers;
+    std::vector<TBindings> Textures;
     VkDescriptorSetLayout DescriptorSetLayout = nullptr;
 
     bool CreateDescriptorSetLayout();
@@ -274,6 +274,8 @@ struct jTexture_Vulkan : public jTexture
     VkImage Image;
     VkImageView ImageView;
     VkDeviceMemory ImageMemory;
+
+	static VkSampler CreateDefaultSamplerState();
 };
 
 // todo
@@ -351,7 +353,7 @@ public:
 	//VkImage textureImage = nullptr;
 	//VkImageView textureImageView = nullptr;
 	//VkDeviceMemory textureImageMemory = nullptr;
-	VkSampler textureSampler = nullptr;
+	//VkSampler textureSampler = nullptr;
 
 	// 그냥 일반적인 모델 로드에 필요한 자료 구조임. 정리 예정
 	std::vector<jVertex> vertices;
@@ -362,8 +364,8 @@ public:
 	VkDeviceMemory indexBufferMemory;
 
 	// 그냥 일반적인 
-	std::vector<VkBuffer> uniformBuffers;
-	std::vector<VkDeviceMemory> uniformBuffersMemory;
+	//std::vector<VkBuffer> uniformBuffers;
+	//std::vector<VkDeviceMemory> uniformBuffersMemory;
 	//////////////////////////////////////////////////////////////////////////
 
 	// Descriptor : 쉐이더가 버퍼나 이미지 같은 리소스에 자유롭게 접근하는 방법. 디스크립터의 사용방법은 아래 3가지로 구성됨.
@@ -1151,13 +1153,13 @@ public:
 	bool CreateDepthResources();
 	//bool CreateFrameBuffers();
 	//bool CreateTextureImage();
-	bool CreateTextureSampler();
+	//bool CreateTextureSampler();
 	bool LoadModel();
 	bool CreateVertexBuffer();
 	bool CreateIndexBuffer();
-	bool CreateUniformBuffers();
+	//bool CreateUniformBuffers();
 	bool CreateDescriptorPool();
-	bool CreateDescriptorSets();
+	//bool CreateDescriptorSets();
 	bool CreateCommandBuffers();
 	bool CreateSyncObjects();
 
@@ -1175,11 +1177,37 @@ public:
 	std::vector<jFrameBuffer_Vulkan> FrameBufferTest;
 	jShaderBindings ShaderBindings;
 	std::vector<jShadingBindingInstance> ShaderBindingInstances;
+	std::vector<IEmptyUniform*> UniformBuffers;
 	//////////////////////////////////////////////////////////////////////////
 	virtual jTexture* CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
 		, EFormatType dataType = EFormatType::UNSIGNED_BYTE, ETextureFormat textureFormat = ETextureFormat::RGBA, bool createMipmap = false) const override;
 };
 
 extern jRHI_Vulkan* g_rhi_vk;
+
+template <typename T>
+struct EmptyUniform : public IEmptyUniform // todo remove
+{
+	T Data;
+	VkBuffer Bufffer;
+	VkDeviceMemory BufferMemory;
+
+	virtual int32 GetBufferSize() const override { return sizeof(T); }
+	virtual void* GetBuffer() const override { return Bufffer; }
+	virtual void* GetBufferMemory() const override { return BufferMemory; }
+	virtual void Destroy()
+	{
+		vkDestroyBuffer(g_rhi_vk->device, Bufffer, nullptr);
+		vkFreeMemory(g_rhi_vk->device, BufferMemory, nullptr);
+	}
+
+	virtual void Create() override
+	{
+		VkDeviceSize bufferSize = sizeof(T);
+
+		g_rhi_vk->CreateBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+			| VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, Bufffer, BufferMemory);
+	}
+};
 
 #endif // USE_VULKAN

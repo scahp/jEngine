@@ -9,6 +9,55 @@
 
 jRHI_Vulkan* g_rhi_vk = nullptr;
 
+VkSampler jTexture_Vulkan::CreateDefaultSamplerState()
+{
+	static VkSampler sampler = nullptr;
+	if (sampler)
+	{
+		return sampler;
+	}
+
+	VkSamplerCreateInfo samplerInfo = {};
+	samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	samplerInfo.magFilter = VK_FILTER_LINEAR;
+	samplerInfo.minFilter = VK_FILTER_LINEAR;
+
+	// UV가 [0~1] 범위를 벗어는 경우 처리
+	// VK_SAMPLER_ADDRESS_MODE_REPEAT : 반복해서 출력, UV % 1
+	// VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT : 반복하지만 거울에 비치듯 반대로 출력
+	// VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE : 범위 밖은 가장자리의 색으로 모두 출력
+	// VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE : 범위 밖은 반대편 가장자리의 색으로 모두 출력
+	// VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER : 단색으로 설정함. (samplerInfo.borderColor)
+	samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+
+	samplerInfo.anisotropyEnable = VK_TRUE;
+	samplerInfo.maxAnisotropy = 16;
+
+	// 이게 true 이면 UV 좌표가 [0, texWidth], [0, texHeight] 가 됨. false 이면 [0, 1] 범위
+	samplerInfo.unnormalizedCoordinates = VK_FALSE;
+
+	// compareEnable이 ture 이면, 텍셀을 특정 값과 비교한 뒤 그 결과를 필터링 연산에 사용한다.
+	// Percentage-closer filtering(PCF) 에 주로 사용됨.
+	samplerInfo.compareEnable = VK_FALSE;
+	samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+
+	uint32 textureMipLevels = static_cast<uint32>(std::floor(std::log2(std::max<int>(SCR_WIDTH, SCR_HEIGHT)))) + 1;		// 이것도 수정 필요. SamplerState 는 텍스쳐에 바인딩 해야 할듯 
+
+	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	samplerInfo.mipLodBias = 0.0f;	// Optional
+	samplerInfo.minLod = 0.0f;		// Optional
+	samplerInfo.maxLod = static_cast<float>(textureMipLevels);
+
+	if (!ensure(vkCreateSampler(g_rhi_vk->device, &samplerInfo, nullptr, &sampler) == VK_SUCCESS))
+		return nullptr;
+
+	return sampler;
+}
+
+
 jRHI_Vulkan::jRHI_Vulkan()
 {
 	g_rhi_vk = this;
@@ -256,22 +305,33 @@ bool jRHI_Vulkan::InitRHI()
 		ensure(FrameBufferTest[i].CreateFrameBuffer(i));
 	}
 
-	IEmptyUniform* UniformBuffer = new EmptyUniform<jUniformBufferObject>();
+	for (int32 i = 0; i < swapChainImageViews.size(); ++i)
+	{
+		IEmptyUniform* UniformBuffer = new EmptyUniform<jUniformBufferObject>();
+		UniformBuffer->Create();
+		UniformBuffers.push_back(UniformBuffer);
+	}
 	std::weak_ptr<jTexture> Texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName("chalet.jpg"), true, true);
 
-	ShaderBindings.UniformBuffers.push_back(TBindings<IEmptyUniform*>(0, EShaderAccessStageFlag::VERTEX, UniformBuffer));
-	ShaderBindings.Textures.push_back(TBindings<jTexture*>(1, EShaderAccessStageFlag::FRAGMENT, Texture.lock().get()));
+	ShaderBindings.UniformBuffers.push_back(TBindings(0, EShaderAccessStageFlag::VERTEX));
+	ShaderBindings.Textures.push_back(TBindings(1, EShaderAccessStageFlag::FRAGMENT));
 	ShaderBindings.CreateDescriptorSetLayout();
 	ShaderBindingInstances = ShaderBindings.CreateShaderBindingInstance((int32)swapChainImageViews.size());
+	for (int32 i = 0; i < ShaderBindingInstances.size(); ++i)
+	{
+		ShaderBindingInstances[i].UniformBuffers.push_back(UniformBuffers[i]);
+		ShaderBindingInstances[i].Textures.push_back(Texture.lock().get());
+		ShaderBindingInstances[i].UpdateShaderBindings();
+	}
 
 	ensure(CreateGraphicsPipeline());
     //ensure(CreateTextureImage());
-    ensure(CreateTextureSampler());
+    //ensure(CreateTextureSampler());
     ensure(LoadModel());
     ensure(CreateVertexBuffer());
     ensure(CreateIndexBuffer());
-    ensure(CreateUniformBuffers());
-    ensure(CreateDescriptorSets());
+    //ensure(CreateUniformBuffers());
+    //ensure(CreateDescriptorSets());
     ensure(CreateCommandBuffers());
 
 	return true;
@@ -851,45 +911,45 @@ uint32_t textureMipLevels;
 //	return true;
 //}
 
-bool jRHI_Vulkan::CreateTextureSampler()
-{
-	VkSamplerCreateInfo samplerInfo = {};
-	samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-	samplerInfo.magFilter = VK_FILTER_LINEAR;
-	samplerInfo.minFilter = VK_FILTER_LINEAR;
-
-	// UV가 [0~1] 범위를 벗어는 경우 처리
-	// VK_SAMPLER_ADDRESS_MODE_REPEAT : 반복해서 출력, UV % 1
-	// VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT : 반복하지만 거울에 비치듯 반대로 출력
-	// VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE : 범위 밖은 가장자리의 색으로 모두 출력
-	// VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE : 범위 밖은 반대편 가장자리의 색으로 모두 출력
-	// VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER : 단색으로 설정함. (samplerInfo.borderColor)
-	samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-
-	samplerInfo.anisotropyEnable = VK_TRUE;
-	samplerInfo.maxAnisotropy = 16;
-
-	// 이게 true 이면 UV 좌표가 [0, texWidth], [0, texHeight] 가 됨. false 이면 [0, 1] 범위
-	samplerInfo.unnormalizedCoordinates = VK_FALSE;
-
-	// compareEnable이 ture 이면, 텍셀을 특정 값과 비교한 뒤 그 결과를 필터링 연산에 사용한다.
-	// Percentage-closer filtering(PCF) 에 주로 사용됨.
-	samplerInfo.compareEnable = VK_FALSE;
-	samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-
-	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-	samplerInfo.mipLodBias = 0.0f;	// Optional
-	samplerInfo.minLod = 0.0f;		// Optional
-	samplerInfo.maxLod = static_cast<float>(textureMipLevels);
-
-	if (!ensure(vkCreateSampler(device, &samplerInfo, nullptr, &textureSampler) == VK_SUCCESS))
-		return false;
-
-	return true;
-}
+//bool jRHI_Vulkan::CreateTextureSampler()
+//{
+//	VkSamplerCreateInfo samplerInfo = {};
+//	samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+//	samplerInfo.magFilter = VK_FILTER_LINEAR;
+//	samplerInfo.minFilter = VK_FILTER_LINEAR;
+//
+//	// UV가 [0~1] 범위를 벗어는 경우 처리
+//	// VK_SAMPLER_ADDRESS_MODE_REPEAT : 반복해서 출력, UV % 1
+//	// VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT : 반복하지만 거울에 비치듯 반대로 출력
+//	// VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE : 범위 밖은 가장자리의 색으로 모두 출력
+//	// VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE : 범위 밖은 반대편 가장자리의 색으로 모두 출력
+//	// VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER : 단색으로 설정함. (samplerInfo.borderColor)
+//	samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+//	samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+//	samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+//	samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+//
+//	samplerInfo.anisotropyEnable = VK_TRUE;
+//	samplerInfo.maxAnisotropy = 16;
+//
+//	// 이게 true 이면 UV 좌표가 [0, texWidth], [0, texHeight] 가 됨. false 이면 [0, 1] 범위
+//	samplerInfo.unnormalizedCoordinates = VK_FALSE;
+//
+//	// compareEnable이 ture 이면, 텍셀을 특정 값과 비교한 뒤 그 결과를 필터링 연산에 사용한다.
+//	// Percentage-closer filtering(PCF) 에 주로 사용됨.
+//	samplerInfo.compareEnable = VK_FALSE;
+//	samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+//
+//	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+//	samplerInfo.mipLodBias = 0.0f;	// Optional
+//	samplerInfo.minLod = 0.0f;		// Optional
+//	samplerInfo.maxLod = static_cast<float>(textureMipLevels);
+//
+//	if (!ensure(vkCreateSampler(device, &samplerInfo, nullptr, &textureSampler) == VK_SUCCESS))
+//		return false;
+//
+//	return true;
+//}
 
 bool jRHI_Vulkan::LoadModel()
 {
@@ -1000,20 +1060,20 @@ bool jRHI_Vulkan::CreateIndexBuffer()
 	return true;
 }
 
-bool jRHI_Vulkan::CreateUniformBuffers()
-{
-	VkDeviceSize bufferSize = sizeof(jUniformBufferObject);
-
-	uniformBuffers.resize(swapChainImages.size());
-	uniformBuffersMemory.resize(swapChainImages.size());
-
-	for (size_t i = 0; i < swapChainImages.size(); ++i)
-	{
-		CreateBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
-			| VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBuffersMemory[i]);
-	}
-	return true;
-}
+//bool jRHI_Vulkan::CreateUniformBuffers()
+//{
+//	VkDeviceSize bufferSize = sizeof(jUniformBufferObject);
+//
+//	uniformBuffers.resize(swapChainImages.size());
+//	uniformBuffersMemory.resize(swapChainImages.size());
+//
+//	for (size_t i = 0; i < swapChainImages.size(); ++i)
+//	{
+//		CreateBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+//			| VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBuffersMemory[i]);
+//	}
+//	return true;
+//}
 
 bool jRHI_Vulkan::CreateDescriptorPool()
 {
@@ -1036,56 +1096,56 @@ bool jRHI_Vulkan::CreateDescriptorPool()
 	return true;
 }
 
-bool jRHI_Vulkan::CreateDescriptorSets()
-{
-	//std::vector<VkDescriptorSetLayout> layouts(swapChainImages.size(), ShaderBindings.DescriptorSetLayout);
-	//VkDescriptorSetAllocateInfo allocInfo = {};
-	//allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	//allocInfo.descriptorPool = descriptorPool;
-	//allocInfo.descriptorSetCount = static_cast<uint32_t>(swapChainImages.size());
-	//allocInfo.pSetLayouts = layouts.data();
-
-	//descriptorSets.resize(swapChainImages.size());
-	//if (!ensure(vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) == VK_SUCCESS))
-	//	return false;
-
-	for (size_t i = 0; i < swapChainImages.size(); ++i)
-	{
-		VkDescriptorBufferInfo bufferInfo = {};
-		bufferInfo.buffer = uniformBuffers[i];
-		bufferInfo.offset = 0;
-		bufferInfo.range = sizeof(jUniformBufferObject);		// 전체 사이즈라면 VK_WHOLE_SIZE 이거 가능
-
-		VkDescriptorImageInfo imageInfo = {};
-		imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		imageInfo.imageView = ((jTexture_Vulkan*)ShaderBindings.Textures[0].Data)->ImageView;
-		imageInfo.sampler = textureSampler;
-
-		std::array<VkWriteDescriptorSet, 2> descriptorWrites = {};
-		descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrites[0].dstSet = ShaderBindingInstances[i].DescriptorSet;
-		descriptorWrites[0].dstBinding = 0;
-		descriptorWrites[0].dstArrayElement = 0;
-		descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		descriptorWrites[0].descriptorCount = 1;
-		descriptorWrites[0].pBufferInfo = &bufferInfo;		// 현재는 Buffer 기반 Desriptor 이므로 이것을 사용
-		descriptorWrites[0].pImageInfo = nullptr;			// Optional	(Image Data 기반에 사용)
-		descriptorWrites[0].pTexelBufferView = nullptr;		// Optional (Buffer View 기반에 사용)
-
-		descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrites[1].dstSet = ShaderBindingInstances[i].DescriptorSet;
-		descriptorWrites[1].dstBinding = 1;
-		descriptorWrites[1].dstArrayElement = 0;
-		descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		descriptorWrites[1].descriptorCount = 1;
-		descriptorWrites[1].pImageInfo = &imageInfo;
-
-		vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size())
-			, descriptorWrites.data(), 0, nullptr);
-	}
-
-	return true;
-}
+//bool jRHI_Vulkan::CreateDescriptorSets()
+//{
+//	std::vector<VkDescriptorSetLayout> layouts(swapChainImages.size(), ShaderBindings.DescriptorSetLayout);
+//	VkDescriptorSetAllocateInfo allocInfo = {};
+//	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+//	allocInfo.descriptorPool = descriptorPool;
+//	allocInfo.descriptorSetCount = static_cast<uint32_t>(swapChainImages.size());
+//	allocInfo.pSetLayouts = layouts.data();
+//
+//	descriptorSets.resize(swapChainImages.size());
+//	if (!ensure(vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) == VK_SUCCESS))
+//		return false;
+//
+//	for (size_t i = 0; i < swapChainImages.size(); ++i)
+//	{
+//		VkDescriptorBufferInfo bufferInfo = {};
+//		bufferInfo.buffer = uniformBuffers[i];
+//		bufferInfo.offset = 0;
+//		bufferInfo.range = sizeof(jUniformBufferObject);		// 전체 사이즈라면 VK_WHOLE_SIZE 이거 가능
+//
+//		VkDescriptorImageInfo imageInfo = {};
+//		imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+//		imageInfo.imageView = ((jTexture_Vulkan*)ShaderBindings.Textures[0].Data)->ImageView;
+//		imageInfo.sampler = textureSampler;
+//
+//		std::array<VkWriteDescriptorSet, 2> descriptorWrites = {};
+//		descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+//		descriptorWrites[0].dstSet = ShaderBindingInstances[i].DescriptorSet;
+//		descriptorWrites[0].dstBinding = 0;
+//		descriptorWrites[0].dstArrayElement = 0;
+//		descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+//		descriptorWrites[0].descriptorCount = 1;
+//		descriptorWrites[0].pBufferInfo = &bufferInfo;		// 현재는 Buffer 기반 Desriptor 이므로 이것을 사용
+//		descriptorWrites[0].pImageInfo = nullptr;			// Optional	(Image Data 기반에 사용)
+//		descriptorWrites[0].pTexelBufferView = nullptr;		// Optional (Buffer View 기반에 사용)
+//
+//		descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+//		descriptorWrites[1].dstSet = ShaderBindingInstances[i].DescriptorSet;
+//		descriptorWrites[1].dstBinding = 1;
+//		descriptorWrites[1].dstArrayElement = 0;
+//		descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+//		descriptorWrites[1].descriptorCount = 1;
+//		descriptorWrites[1].pImageInfo = &imageInfo;
+//
+//		vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size())
+//			, descriptorWrites.data(), 0, nullptr);
+//	}
+//
+//	return true;
+//}
 
 bool jRHI_Vulkan::CreateCommandBuffers()
 {
@@ -1345,11 +1405,11 @@ void jRHI_Vulkan::CleanupSwapChain()
 
 	vkDestroySwapchainKHR(device, swapChain, nullptr);
 
-	for (size_t i = 0; i < swapChainImages.size(); ++i)
-	{
-		vkDestroyBuffer(device, uniformBuffers[i], nullptr);
-		vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
-	}
+	//for (size_t i = 0; i < swapChainImages.size(); ++i)
+	//{
+	//	vkDestroyBuffer(device, uniformBuffers[i], nullptr);
+	//	vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
+	//}
 
 	vkDestroyDescriptorPool(device, descriptorPool, nullptr);
 }
@@ -1407,10 +1467,10 @@ void jRHI_Vulkan::UpdateUniformBuffer(uint32_t currentImage)
 	//ubo.Model.SetTranslate({ 0.2f, 0.2f,0.2f });
 	//ubo.Model = ubo.Model.MakeRotateZ(time * DegreeToRadian(90.0f));
 
-	void* data;
-	vkMapMemory(device, uniformBuffersMemory[currentImage], 0, sizeof(ubo), 0, &data);
+	void* data = nullptr;
+	vkMapMemory(device, (VkDeviceMemory)UniformBuffers[currentImage]->GetBufferMemory(), 0, sizeof(ubo), 0, &data);
 	memcpy(data, &ubo, sizeof(ubo));
-	vkUnmapMemory(device, uniformBuffersMemory[currentImage]);
+	vkUnmapMemory(device, (VkDeviceMemory)UniformBuffers[currentImage]->GetBufferMemory());
 }
 
 
@@ -1756,17 +1816,80 @@ std::vector<jShadingBindingInstance> jShaderBindings::CreateShaderBindingInstanc
 
     std::vector<jShadingBindingInstance> Instances;
 
-	std::vector< VkDescriptorSet> DescriptorSets;
+	std::vector<VkDescriptorSet> DescriptorSets;
 	DescriptorSets.resize(descSetLayout.size());
     if (!ensure(vkAllocateDescriptorSets(g_rhi_vk->device, &allocInfo, DescriptorSets.data()) == VK_SUCCESS))
         return Instances;
 
     Instances.resize(DescriptorSets.size());
 	for (int32 i = 0; i < DescriptorSets.size(); ++i)		// todo opt
+	{
 		Instances[i].DescriptorSet = DescriptorSets[i];
+		Instances[i].ShaderBindings = this;
+	}
 
     return Instances;
 }
 
+void jShadingBindingInstance::UpdateShaderBindings()
+{
+	check(ShaderBindings->UniformBuffers.size() == UniformBuffers.size());
+	check(ShaderBindings->Textures.size() == Textures.size());
+
+	std::vector<VkDescriptorBufferInfo> descriptorBuffers;
+	descriptorBuffers.resize(ShaderBindings->UniformBuffers.size());
+	int32 bufferOffset = 0;
+	for (int32 i = 0; i < ShaderBindings->UniformBuffers.size(); ++i)
+	{
+		descriptorBuffers[i].buffer = (VkBuffer)UniformBuffers[i]->GetBuffer();
+		descriptorBuffers[i].offset = bufferOffset;
+		descriptorBuffers[i].range = UniformBuffers[i]->GetBufferSize();		// 전체 사이즈라면 VK_WHOLE_SIZE 이거 가능
+
+		bufferOffset += UniformBuffers[i]->GetBufferSize();
+	}
+
+	std::vector<VkDescriptorImageInfo> descriptorImages;
+	descriptorImages.resize(ShaderBindings->Textures.size());
+	for (int32 i = 0; i < ShaderBindings->UniformBuffers.size(); ++i)
+	{
+		descriptorImages[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		descriptorImages[i].imageView = ((jTexture_Vulkan*)Textures[i])->ImageView;
+		descriptorImages[i].sampler = jTexture_Vulkan::CreateDefaultSamplerState();		// todo 수정 필요, 텍스쳐를 어떻게 바인드 해야할지 고민 필요
+	}
+
+	std::vector<VkWriteDescriptorSet> descriptorWrites;
+	descriptorWrites.resize(descriptorBuffers.size() + descriptorImages.size());
+
+	int32 writeDescIndex = 0;
+	if (descriptorBuffers.size() > 0)
+	{
+		descriptorWrites[writeDescIndex].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWrites[writeDescIndex].dstSet = DescriptorSet;
+		descriptorWrites[writeDescIndex].dstBinding = writeDescIndex;
+		descriptorWrites[writeDescIndex].dstArrayElement = 0;
+		descriptorWrites[writeDescIndex].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		descriptorWrites[writeDescIndex].descriptorCount = (uint32)descriptorBuffers.size();
+		descriptorWrites[writeDescIndex].pBufferInfo = &descriptorBuffers[0];		// 현재는 Buffer 기반 Desriptor 이므로 이것을 사용
+		descriptorWrites[writeDescIndex].pImageInfo = nullptr;						// Optional	(Image Data 기반에 사용)
+		descriptorWrites[writeDescIndex].pTexelBufferView = nullptr;				// Optional (Buffer View 기반에 사용)
+		++writeDescIndex;
+	}
+	if (descriptorImages.size() > 0)
+	{
+		descriptorWrites[writeDescIndex].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWrites[writeDescIndex].dstSet = DescriptorSet;
+		descriptorWrites[writeDescIndex].dstBinding = writeDescIndex;
+		descriptorWrites[writeDescIndex].dstArrayElement = 0;
+		descriptorWrites[writeDescIndex].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		descriptorWrites[writeDescIndex].descriptorCount = (uint32)descriptorImages.size();
+		descriptorWrites[writeDescIndex].pImageInfo = &descriptorImages[0];
+		++writeDescIndex;
+	}
+
+	vkUpdateDescriptorSets(g_rhi_vk->device, static_cast<uint32>(descriptorWrites.size())
+		, descriptorWrites.data(), 0, nullptr);
+}
+
 
 #endif // USE_VULKAN
+
