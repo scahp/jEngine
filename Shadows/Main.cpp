@@ -313,7 +313,12 @@ void showFPS(GLFWwindow* pWindow)
 		double fps = double(nbFrames) / delta;
 
 		std::stringstream ss;
-		ss << "OpenGL" << " " << 0.1 << " [" << fps << " FPS]";
+#if USE_VULKAN
+		ss << "Vulkan"
+#else USE_OPENGL
+		ss << "OpenGL" 
+#endif
+			<< " " << 0.1 << " [" << fps << " FPS]";
 
 		glfwSetWindowTitle(pWindow, ss.str().c_str());
 

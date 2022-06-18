@@ -212,8 +212,10 @@ bool jRHI_Vulkan::InitRHI()
 			return false;
 
 		// 현재는 Queue가 1개 뿐이므로 QueueIndex를 0
-		vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
-		vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
+		GraphicsQueue.QueueIndex = indices.graphicsFamily.value();
+		PresentQueue.QueueIndex = indices.presentFamily.value();
+		vkGetDeviceQueue(device, GraphicsQueue.QueueIndex, 0, &GraphicsQueue.Queue);
+		vkGetDeviceQueue(device, PresentQueue.QueueIndex, 0, &PresentQueue.Queue);
 	}
 
 	// Swapchain
@@ -289,10 +291,13 @@ bool jRHI_Vulkan::InitRHI()
 		for (size_t i = 0; i < swapChainImages.size(); ++i)
 			swapChainImageViews[i] = CreateImageView(swapChainImages[i], swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
 	}
-    ensure(CreateCommandPool());
+
+	CommandBufferManager.CratePool(GraphicsQueue.QueueIndex);
+
+    //ensure(CreateCommandPool());
     ensure(CreateColorResources());
     ensure(CreateDepthResources());
-    ensure(CreateDescriptorPool());
+    //ensure(CreateDescriptorPool());
     ensure(CreateSyncObjects());
 
 	// 동적인 부분들 패스에 따라 달라짐
@@ -316,6 +321,7 @@ bool jRHI_Vulkan::InitRHI()
 	ShaderBindings.UniformBuffers.push_back(TBindings(0, EShaderAccessStageFlag::VERTEX));
 	ShaderBindings.Textures.push_back(TBindings(1, EShaderAccessStageFlag::FRAGMENT));
 	ShaderBindings.CreateDescriptorSetLayout();
+	ShaderBindings.CreatePool();
 	ShaderBindingInstances = ShaderBindings.CreateShaderBindingInstance((int32)swapChainImageViews.size());
 	for (int32 i = 0; i < ShaderBindingInstances.size(); ++i)
 	{
@@ -324,12 +330,13 @@ bool jRHI_Vulkan::InitRHI()
 		ShaderBindingInstances[i].UpdateShaderBindings();
 	}
 
+	ensure(LoadModel());
+
 	ensure(CreateGraphicsPipeline());
     //ensure(CreateTextureImage());
     //ensure(CreateTextureSampler());
-    ensure(LoadModel());
-    ensure(CreateVertexBuffer());
-    ensure(CreateIndexBuffer());
+    //ensure(CreateVertexBuffer());
+    //ensure(CreateIndexBuffer());
     //ensure(CreateUniformBuffers());
     //ensure(CreateDescriptorSets());
     ensure(CreateCommandBuffers());
@@ -499,6 +506,21 @@ FORCEINLINE auto GetVulkanTextureComponentCount(ETextureFormat type)
 	);
 }
 
+FORCEINLINE VkPrimitiveTopology GetVulkanPrimitiveTopology(EPrimitiveType type)
+{
+	using T = VkPrimitiveTopology;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		// TextureFormat + InternalFormat
+		CONVERSION_TYPE_ELEMENT(EPrimitiveType::POINTS, VK_PRIMITIVE_TOPOLOGY_POINT_LIST),
+		CONVERSION_TYPE_ELEMENT(EPrimitiveType::LINES, VK_PRIMITIVE_TOPOLOGY_LINE_LIST),
+		CONVERSION_TYPE_ELEMENT(EPrimitiveType::LINES_ADJACENCY, VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY),
+		CONVERSION_TYPE_ELEMENT(EPrimitiveType::LINE_STRIP_ADJACENCY, VK_PRIMITIVE_TOPOLOGY_LINE_STRIP),
+		CONVERSION_TYPE_ELEMENT(EPrimitiveType::TRIANGLES, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST),
+		CONVERSION_TYPE_ELEMENT(EPrimitiveType::TRIANGLES_ADJACENCY, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY),
+		CONVERSION_TYPE_ELEMENT(EPrimitiveType::TRIANGLE_STRIP_ADJACENCY, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY),
+		CONVERSION_TYPE_ELEMENT(EPrimitiveType::TRIANGLE_STRIP, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP)
+	);
+}
 
 //bool jRHI_Vulkan::CreateDescriptorSetLayout()
 //{
@@ -562,23 +584,10 @@ bool jRHI_Vulkan::CreateGraphicsPipeline()
 	// 2. Vertex Input
 	// 1). Bindings : 데이터 사이의 간격과 버택스당 or 인스턴스당(인스턴싱 사용시) 데이터인지 여부
 	// 2). Attribute descriptions : 버택스 쉐이더 전달되는 attributes 의 타입. 그것을 로드할 바인딩과 오프셋
-	VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
-	vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-
-	auto bindingDescription = jVertex::GetBindingDescription();
-	auto attributeDescription = jVertex::GetAttributeDescriptions();
-
-	vertexInputInfo.vertexBindingDescriptionCount = 1;
-	vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
-	vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescription.size());
-	vertexInputInfo.pVertexAttributeDescriptions = attributeDescription.data();
+	VkPipelineVertexInputStateCreateInfo vertexInputInfo = ((jVertexBuffer_Vulkan*)VertexBuffer)->CreateVertexInputState();
 
 	// 3. Input Assembly
-	// primitiveRestartEnable 옵션이 VK_TRUE 이면, 인덱스버퍼의 특수한 index 0xFFFF or 0xFFFFFFFF 를 사용해서 line 과 triangle topology mode를 사용할 수 있다.
-	VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
-	inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-	inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-	inputAssembly.primitiveRestartEnable = VK_FALSE;
+	VkPipelineInputAssemblyStateCreateInfo inputAssembly = ((jVertexBuffer_Vulkan*)VertexBuffer)->CreateInputAssemblyState();
 
 	// 4. Viewports and scissors
 	// SwapChain의 이미지 사이즈가 이 클래스에 정의된 상수 WIDTH, HEIGHT와 다를 수 있다는 것을 기억 해야함.
@@ -772,26 +781,26 @@ bool jRHI_Vulkan::CreateGraphicsPipeline()
 	return true;
 }
 
-bool jRHI_Vulkan::CreateCommandPool()
-{
-	QueueFamilyIndices queueFamilyIndices = findQueueFamilies(physicalDevice);
-
-	VkCommandPoolCreateInfo poolInfo = {};
-	poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-	poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
-
-	// VK_COMMAND_POOL_CREATE_TRANSIENT_BIT : 커맨드 버퍼가 새로운 커맨드를 자주 다시 기록한다고 힌트를 줌.
-	//											(메모리 할당 동작을 변경할 것임)
-	// VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT : 커맨드 버퍼들이 개별적으로 다시 기록될 수 있다.
-	//													이 플래그가 없으면 모든 커맨드 버퍼들이 동시에 리셋되야 함.
-	// 우리는 프로그램 시작시에 커맨드버퍼를 한번 녹화하고 계속해서 반복사용 할 것이므로 flags를 설정하지 않음.
-	poolInfo.flags = 0;		// Optional
-
-	if (!ensure(vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool) == VK_SUCCESS))
-		return false;
-
-	return true;
-}
+//bool jRHI_Vulkan::CreateCommandPool()
+//{
+//	QueueFamilyIndices queueFamilyIndices = findQueueFamilies(physicalDevice);
+//
+//	VkCommandPoolCreateInfo poolInfo = {};
+//	poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+//	poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
+//
+//	// VK_COMMAND_POOL_CREATE_TRANSIENT_BIT : 커맨드 버퍼가 새로운 커맨드를 자주 다시 기록한다고 힌트를 줌.
+//	//											(메모리 할당 동작을 변경할 것임)
+//	// VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT : 커맨드 버퍼들이 개별적으로 다시 기록될 수 있다.
+//	//													이 플래그가 없으면 모든 커맨드 버퍼들이 동시에 리셋되야 함.
+//	// 우리는 프로그램 시작시에 커맨드버퍼를 한번 녹화하고 계속해서 반복사용 할 것이므로 flags를 설정하지 않음.
+//	poolInfo.flags = 0;		// Optional
+//
+//	if (!ensure(vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool) == VK_SUCCESS))
+//		return false;
+//
+//	return true;
+//}
 
 bool jRHI_Vulkan::CreateColorResources()
 {
@@ -961,103 +970,239 @@ bool jRHI_Vulkan::LoadModel()
 	if (!ensure(tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, MODEL_PATH.c_str())))
 		return false;
 
-	vertices.clear();
-	vertices.clear();
+	struct jVertexHashFunc
+	{
+		std::size_t operator()(const Vector& pos, const Vector2& texCoord, const Vector& color) const
+		{
+			size_t result = 0;
+			result = std::hash<float>{}(pos.x);
+			result ^= std::hash<float>{}(pos.y);
+			result ^= std::hash<float>{}(pos.z);
+			result ^= std::hash<float>{}(color.x);
+			result ^= std::hash<float>{}(color.y);
+			result ^= std::hash<float>{}(color.z);
+			result ^= std::hash<float>{}(texCoord.x);
+			result ^= std::hash<float>{}(texCoord.y);
+			return result;
+		}
+	};
 
-	std::unordered_map<jVertex, uint32_t, jVertexHashFunc> uniqueVertices = {};
+	std::unordered_map<size_t, uint32> uniqueVertices = {};
+
+	std::vector<float> vertices_temp;
+	std::vector<float> texCoords_temp;
+	std::vector<float> colors_temp;
+	std::vector<uint32> indices;
 
 	for (const auto& shape : shapes)
 	{
 		for (const auto& index : shape.mesh.indices)
 		{
-			jVertex vertex = { };
-
-			vertex.pos = {
+			Vector pos = {
 				attrib.vertices[3 * index.vertex_index + 0],
 				attrib.vertices[3 * index.vertex_index + 1],
 				attrib.vertices[3 * index.vertex_index + 2]
 			};
 
-			vertex.texCoord = {
+			Vector2 texCoord = {
 				attrib.texcoords[2 * index.texcoord_index + 0],
 				1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
 			};
 
-			vertex.color = { 1.0f, 1.0f, 1.0f };
+			Vector color = { 1.0f, 1.0f, 1.0f };
 
-			if (uniqueVertices.count(vertex) == 0)
+			const size_t hash = jVertexHashFunc()(pos, texCoord, color);
+			if (uniqueVertices.count(hash) == 0)
 			{
-				uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
-				vertices.push_back(vertex);
+				uniqueVertices[hash] = static_cast<uint32>(vertices_temp.size() / 3);
+
+				vertices_temp.push_back(pos.x);
+				vertices_temp.push_back(pos.y);
+				vertices_temp.push_back(pos.z);
+
+				texCoords_temp.push_back(texCoord.x);
+				texCoords_temp.push_back(texCoord.y);
+
+				colors_temp.push_back(color.x);
+				colors_temp.push_back(color.y);
+				colors_temp.push_back(color.z);
 			}
 
-			indices.push_back(uniqueVertices[vertex]);
+			indices.push_back(uniqueVertices[hash]);
 		}
 	}
 
+	auto vertexStreamData = std::shared_ptr<jVertexStreamData>(new jVertexStreamData());
+	vertexStreamData->PrimitiveType = EPrimitiveType::TRIANGLES;
+	vertexStreamData->ElementCount = (uint32)(vertices_temp.size() / 3);
+
+	{
+		auto streamParam = new jStreamParam<float>();
+		streamParam->BufferType = EBufferType::STATIC;
+		streamParam->ElementTypeSize = sizeof(float);
+		streamParam->ElementType = EBufferElementType::FLOAT;
+		streamParam->Stride = sizeof(float) * 3;
+		streamParam->Name = jName("Pos");
+		streamParam->Data = std::move(vertices_temp);
+		vertexStreamData->Params.push_back(streamParam);
+	}
+
+	{
+		auto streamParam = new jStreamParam<float>();
+		streamParam->BufferType = EBufferType::STATIC;
+		streamParam->ElementType = EBufferElementType::FLOAT;
+		streamParam->ElementTypeSize = sizeof(float);
+		streamParam->Stride = sizeof(float) * 3;
+		streamParam->Name = jName("Color");
+		streamParam->Data = std::move(colors_temp);
+		vertexStreamData->Params.push_back(streamParam);
+	}
+
+	{
+		auto streamParam = new jStreamParam<float>();
+		streamParam->BufferType = EBufferType::STATIC;
+		streamParam->ElementType = EBufferElementType::FLOAT;
+		streamParam->ElementTypeSize = sizeof(float);
+		streamParam->Stride = sizeof(float) * 2;
+		streamParam->Name = jName("TexCoord");
+		streamParam->Data = std::move(texCoords_temp);
+		vertexStreamData->Params.push_back(streamParam);
+	}
+	VertexBuffer = g_rhi_vk->CreateVertexBuffer(vertexStreamData);
+
+	auto indexStreamData = std::shared_ptr<jIndexStreamData>(new jIndexStreamData());
+	indexStreamData->ElementCount = static_cast<int32>(indices.size());
+	{
+		auto streamParam = new jStreamParam<uint32>();
+		streamParam->BufferType = EBufferType::STATIC;
+		streamParam->ElementType = EBufferElementType::UNSIGNED_INT;
+		streamParam->ElementTypeSize = sizeof(uint32);
+		streamParam->Stride = sizeof(uint32) * 3;
+		streamParam->Name = jName("Index");
+		streamParam->Data = std::move(indices);
+		indexStreamData->Param = streamParam;
+	}
+	IndexBuffer = g_rhi_vk->CreateIndexBuffer(indexStreamData);
+
 	return true;
 }
 
-bool jRHI_Vulkan::CreateVertexBuffer()
+//struct jVertexStreamData : public std::enable_shared_from_this<jVertexStreamData>
+//{
+//	~jVertexStreamData()
+//	{
+//		for (auto param : Params)
+//			delete param;
+//		Params.clear();
+//	}
+//
+//	std::vector<IStreamParam*> Params;
+//	EPrimitiveType PrimitiveType;
+//	int ElementCount = 0;
+//};
+//
+//struct jVertexBuffer : public IBuffer
+//{
+//	std::weak_ptr<jVertexStreamData> VertexStreamData;
+//
+//	virtual void Bind(const jShader* shader) const {}
+//};
+
+//struct jVertexBuffer_OpenGL : public jVertexBuffer
+//{
+//	uint32 VAO = 0;
+//	std::vector<jVertexStream_OpenGL> Streams;
+//
+//	virtual void Bind(const jShader* shader) const override;
+//};
+
+
+//bool jRHI_Vulkan::CreateVertexBuffer()
+//{
+//	VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+//	VkBuffer stagingBuffer;
+//	VkDeviceMemory stagingBufferMemory;
+//
+//	// VK_BUFFER_USAGE_TRANSFER_SRC_BIT : 이 버퍼가 메모리 전송 연산의 소스가 될 수 있음.
+//	CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT
+//		, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+//
+//	//// 마지막 파라메터 0은 메모리 영역의 offset 임.
+//	//// 이 값이 0이 아니면 memRequirements.alignment 로 나눠야 함. (align 되어있다는 의미)
+//	//vkBindBufferMemory(device, vertexBuffer, vertexBufferMemory, 0);
+//
+//	void* data;
+//	// size 항목에 VK_WHOLE_SIZE  를 넣어서 모든 메모리를 잡을 수도 있음.
+//	vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+//	memcpy(data, vertices.data(), (size_t)bufferSize);
+//	vkUnmapMemory(device, stagingBufferMemory);
+//
+//	// Map -> Unmap 했다가 메모리에 데이터가 즉시 반영되는게 아님
+//	// 바로 사용하려면 아래 2가지 방법이 있음.
+//	// 1. VK_MEMORY_PROPERTY_HOST_COHERENT_BIT 사용 (항상 반영, 약간 느릴 수도)
+//	// 2. 쓰기 이후 vkFlushMappedMemoryRanges 호출, 읽기 이후 vkInvalidateMappedMemoryRanges 호출
+//	// 위의 2가지 방법을 사용해도 이 데이터가 GPU에 바로 보인다고 보장할 수는 없지만 다음 vkQueueSubmit 호출 전에는 완료될 것을 보장함.
+//
+//	// VK_BUFFER_USAGE_TRANSFER_DST_BIT : 이 버퍼가 메모리 전송 연산의 목적지가 될 수 있음.
+//	// DEVICE LOCAL 메모리에 VertexBuffer를 만들었으므로 이제 vkMapMemory 같은 것은 할 수 없음.
+//	CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
+//		, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
+//
+//	CopyBuffer(stagingBuffer, vertexBuffer, bufferSize);
+//
+//	vkDestroyBuffer(device, stagingBuffer, nullptr);
+//	vkFreeMemory(device, stagingBufferMemory, nullptr);
+//
+//	return true;
+//}
+
+//bool jRHI_Vulkan::CreateIndexBuffer()
+//{
+//	VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+//
+//	VkBuffer stagingBuffer;
+//	VkDeviceMemory stagingBufferMemory;
+//	CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+//
+//	void* data;
+//	vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+//	memcpy(data, indices.data(), (size_t)bufferSize);
+//	vkUnmapMemory(device, stagingBufferMemory);
+//
+//	CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
+//
+//	CopyBuffer(stagingBuffer, indexBuffer, bufferSize);
+//
+//	vkDestroyBuffer(device, stagingBuffer, nullptr);
+//	vkFreeMemory(device, stagingBufferMemory, nullptr);
+//
+//	return true;
+//}
+
+jIndexBuffer* jRHI_Vulkan::CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const
 {
-	VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+	check(streamData);
+	check(streamData->Param);
+	jIndexBuffer_Vulkan* indexBuffer = new jIndexBuffer_Vulkan();
+	indexBuffer->IndexStreamData = streamData;
+
+	VkDeviceSize bufferSize = streamData->Param->GetBufferSize();
+
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingBufferMemory;
+	g_rhi_vk->CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
-	// VK_BUFFER_USAGE_TRANSFER_SRC_BIT : 이 버퍼가 메모리 전송 연산의 소스가 될 수 있음.
-	CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT
-		, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-
-	//// 마지막 파라메터 0은 메모리 영역의 offset 임.
-	//// 이 값이 0이 아니면 memRequirements.alignment 로 나눠야 함. (align 되어있다는 의미)
-	//vkBindBufferMemory(device, vertexBuffer, vertexBufferMemory, 0);
-
-	void* data;
-	// size 항목에 VK_WHOLE_SIZE  를 넣어서 모든 메모리를 잡을 수도 있음.
+	void* data = nullptr;
 	vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-	memcpy(data, vertices.data(), (size_t)bufferSize);
+	memcpy(data, streamData->Param->GetBufferData(), (size_t)bufferSize);
 	vkUnmapMemory(device, stagingBufferMemory);
 
-	// Map -> Unmap 했다가 메모리에 데이터가 즉시 반영되는게 아님
-	// 바로 사용하려면 아래 2가지 방법이 있음.
-	// 1. VK_MEMORY_PROPERTY_HOST_COHERENT_BIT 사용 (항상 반영, 약간 느릴 수도)
-	// 2. 쓰기 이후 vkFlushMappedMemoryRanges 호출, 읽기 이후 vkInvalidateMappedMemoryRanges 호출
-	// 위의 2가지 방법을 사용해도 이 데이터가 GPU에 바로 보인다고 보장할 수는 없지만 다음 vkQueueSubmit 호출 전에는 완료될 것을 보장함.
-
-	// VK_BUFFER_USAGE_TRANSFER_DST_BIT : 이 버퍼가 메모리 전송 연산의 목적지가 될 수 있음.
-	// DEVICE LOCAL 메모리에 VertexBuffer를 만들었으므로 이제 vkMapMemory 같은 것은 할 수 없음.
-	CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
-		, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
-
-	CopyBuffer(stagingBuffer, vertexBuffer, bufferSize);
+	g_rhi_vk->CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer->IndexBuffer, indexBuffer->IndexBufferMemory);
+	g_rhi_vk->CopyBuffer(stagingBuffer, indexBuffer->IndexBuffer, bufferSize);
 
 	vkDestroyBuffer(device, stagingBuffer, nullptr);
 	vkFreeMemory(device, stagingBufferMemory, nullptr);
-
-	return true;
-}
-
-bool jRHI_Vulkan::CreateIndexBuffer()
-{
-	VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
-
-	VkBuffer stagingBuffer;
-	VkDeviceMemory stagingBufferMemory;
-	CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-
-	void* data;
-	vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-	memcpy(data, indices.data(), (size_t)bufferSize);
-	vkUnmapMemory(device, stagingBufferMemory);
-
-	CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
-
-	CopyBuffer(stagingBuffer, indexBuffer, bufferSize);
-
-	vkDestroyBuffer(device, stagingBuffer, nullptr);
-	vkFreeMemory(device, stagingBufferMemory, nullptr);
-
-	return true;
+	return indexBuffer;
 }
 
 //bool jRHI_Vulkan::CreateUniformBuffers()
@@ -1075,26 +1220,26 @@ bool jRHI_Vulkan::CreateIndexBuffer()
 //	return true;
 //}
 
-bool jRHI_Vulkan::CreateDescriptorPool()
-{
-	std::array<VkDescriptorPoolSize, 2> poolSizes = {};
-	poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	poolSizes[0].descriptorCount = static_cast<uint32_t>(swapChainImages.size());
-	poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	poolSizes[1].descriptorCount = static_cast<uint32_t>(swapChainImages.size());
-
-	VkDescriptorPoolCreateInfo poolInfo = {};
-	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
-	poolInfo.pPoolSizes = poolSizes.data();
-	poolInfo.maxSets = static_cast<uint32_t>(swapChainImages.size());
-	poolInfo.flags = 0;		// Descriptor Set을 만들고나서 더 이상 손대지 않을거라 그냥 기본값 0으로 설정
-
-	if (!ensure(vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool) == VK_SUCCESS))
-		return false;
-
-	return true;
-}
+//bool jRHI_Vulkan::CreateDescriptorPool()
+//{
+//	std::array<VkDescriptorPoolSize, 2> poolSizes = {};
+//	poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+//	poolSizes[0].descriptorCount = static_cast<uint32_t>(swapChainImages.size());
+//	poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+//	poolSizes[1].descriptorCount = static_cast<uint32_t>(swapChainImages.size());
+//
+//	VkDescriptorPoolCreateInfo poolInfo = {};
+//	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+//	poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+//	poolInfo.pPoolSizes = poolSizes.data();
+//	poolInfo.maxSets = static_cast<uint32_t>(swapChainImages.size());
+//	poolInfo.flags = 0;		// Descriptor Set을 만들고나서 더 이상 손대지 않을거라 그냥 기본값 0으로 설정
+//
+//	if (!ensure(vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool) == VK_SUCCESS))
+//		return false;
+//
+//	return true;
+//}
 
 //bool jRHI_Vulkan::CreateDescriptorSets()
 //{
@@ -1149,57 +1294,45 @@ bool jRHI_Vulkan::CreateDescriptorPool()
 
 bool jRHI_Vulkan::CreateCommandBuffers()
 {
-	commandBuffers.resize(swapChainImageViews.size());
+	//commandBuffers.resize(swapChainImageViews.size());
 
-	VkCommandBufferAllocateInfo allocInfo = {};
-	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	allocInfo.commandPool = commandPool;
+	//VkCommandBufferAllocateInfo allocInfo = {};
+	//allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	//allocInfo.commandPool = CommandBufferManager.GetPool();
 
-	// VK_COMMAND_BUFFER_LEVEL_PRIMARY : 실행을 위해 Queue를 제출할 수 있으면 다른 커맨드버퍼로 부터 호출될 수 없다.
-	// VK_COMMAND_BUFFER_LEVEL_SECONDARY : 직접 제출할 수 없으며, Primary command buffer 로 부터 호출될 수 있다.
-	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	allocInfo.commandBufferCount = (uint32_t)commandBuffers.size();
+	//// VK_COMMAND_BUFFER_LEVEL_PRIMARY : 실행을 위해 Queue를 제출할 수 있으면 다른 커맨드버퍼로 부터 호출될 수 없다.
+	//// VK_COMMAND_BUFFER_LEVEL_SECONDARY : 직접 제출할 수 없으며, Primary command buffer 로 부터 호출될 수 있다.
+	//allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	//allocInfo.commandBufferCount = (uint32_t)commandBuffers.size();
 
-	if (!ensure(vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) == VK_SUCCESS))
-		return false;
+	//if (!ensure(vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) == VK_SUCCESS))
+	//	return false;
 
 	// Begin command buffers
-	for (size_t i = 0; i < commandBuffers.size(); ++i)
+	for (int32 i = 0; i < swapChainImageViews.size(); ++i)
 	{
-		VkCommandBufferBeginInfo beginInfo = {};
-		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		commandBuffers.push_back(CommandBufferManager.GetOrCreateCommandBuffer());
 
-		// VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT : 커맨드가 한번 실행된다음에 다시 기록됨
-		// VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT : Single Render Pass 범위에 있는 Secondary Command Buffer.
-		// VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT : 실행 대기중인 동안에 다시 서밋 될 수 있음.
-		beginInfo.flags = 0;					// Optional
-
-		// 이 플래그는 Secondary command buffer를 위해서만 사용하며, Primary command buffer 로 부터 상속받을 상태를 명시함.
-		beginInfo.pInheritanceInfo = nullptr;	// Optional
-
-		if (!ensure(vkBeginCommandBuffer(commandBuffers[i], &beginInfo) == VK_SUCCESS))
+		if (!ensure(commandBuffers[i].Begin()))
 			return false;
 
-		RenderPassTest.BeginRenderPass(commandBuffers[i], (VkFramebuffer)FrameBufferTest[i].GetFrameBuffer());
+		RenderPassTest.BeginRenderPass(commandBuffers[i].Get(), (VkFramebuffer)FrameBufferTest[i].GetFrameBuffer());
 
 		// Basic drawing commands
-		vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+		vkCmdBindPipeline(commandBuffers[i].Get(), VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
-		VkBuffer vertexBuffers[] = { vertexBuffer };
-		VkDeviceSize offsets[] = { 0 };
-		vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
+		vkCmdBindDescriptorSets(commandBuffers[i].Get(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &ShaderBindingInstances[i].DescriptorSet, 0, nullptr);
 
-		vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-
-		vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &ShaderBindingInstances[i].DescriptorSet, 0, nullptr);
+		((jVertexBuffer_Vulkan*)VertexBuffer)->Bind(commandBuffers[i]);
+		((jIndexBuffer_Vulkan*)IndexBuffer)->Bind(commandBuffers[i]);
 
 		//vkCmdDraw(commandBuffers[i], static_cast<uint32_t>(vertices.size()), 1, 0, 0);			// VertexBuffer 만 있는 경우 호출
-		vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+		vkCmdDrawIndexed(commandBuffers[i].Get(), ((jIndexBuffer_Vulkan*)IndexBuffer)->GetIndexCount(), 1, 0, 0, 0);
 
 		// Finishing up
 		RenderPassTest.EndRenderPass();
 
-		if (!ensure(vkEndCommandBuffer(commandBuffers[i]) == VK_SUCCESS))
+		if (!ensure(commandBuffers[i].End()))
 			return false;
 	}
 
@@ -1319,7 +1452,7 @@ bool jRHI_Vulkan::DrawFrame()
 	submitInfo.pWaitSemaphores = waitsemaphores;
 	submitInfo.pWaitDstStageMask = waitStages;
 	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &commandBuffers[imageIndex];
+	submitInfo.pCommandBuffers = &commandBuffers[imageIndex].GetRef();
 
 #if MULTIPLE_FRAME
 	VkSemaphore signalSemaphores[] = { renderFinishedSemaphores[currenFrame] };
@@ -1334,10 +1467,10 @@ bool jRHI_Vulkan::DrawFrame()
 	vkResetFences(device, 1, &inFlightFences[currenFrame]);		// 세마포어와는 다르게 수동으로 펜스를 unsignaled 상태로 재설정 해줘야 함
 
 	// 마지막에 Fences 파라메터는 커맨드 버퍼가 모두 실행되고나면 Signaled 될 Fences.
-	if (!ensure(vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currenFrame]) == VK_SUCCESS))
+	if (!ensure(vkQueueSubmit(GraphicsQueue.Queue, 1, &submitInfo, inFlightFences[currenFrame]) == VK_SUCCESS))
 		return false;
 #else
-	if (!ensure(vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) == VK_SUCCESS))
+	if (!ensure(vkQueueSubmit(GraphicsQueue.Queue, 1, &submitInfo, VK_NULL_HANDLE) == VK_SUCCESS))
 		return false;
 #endif // MULTIPLE_FRAME
 
@@ -1354,7 +1487,7 @@ bool jRHI_Vulkan::DrawFrame()
 	// 여러개의 스왑체인에 제출하는 경우만 모든 스왑체인으로 잘 제출 되었나 확인하는데 사용
 	// 1개인 경우 그냥 vkQueuePresentKHR 의 리턴값을 확인하면 됨.
 	presentInfo.pResults = nullptr;			// Optional
-	VkResult queuePresentResult = vkQueuePresentKHR(presentQueue, &presentInfo);
+	VkResult queuePresentResult = vkQueuePresentKHR(PresentQueue.Queue, &presentInfo);
 
 	// 세마포어의 일관된 상태를 보장하기 위해서(세마포어 로직을 변경하지 않으려 노력한듯 함) vkQueuePresentKHR 이후에 framebufferResized 를 체크하는 것이 중요함.
 	if ((queuePresentResult == VK_ERROR_OUT_OF_DATE_KHR) || (queuePresentResult == VK_SUBOPTIMAL_KHR) || framebufferResized)
@@ -1376,7 +1509,7 @@ bool jRHI_Vulkan::DrawFrame()
 #if MULTIPLE_FRAME
 	currenFrame = (currenFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 #else
-	vkQueueWaitIdle(presentQueue);
+	vkQueueWaitIdle(PresentQueue);
 #endif // MULTIPLE_FRAME
 
 	return true;
@@ -1397,9 +1530,6 @@ void jRHI_Vulkan::CleanupSwapChain()
 	//	vkDestroyFramebuffer(device, framebuffer, nullptr);
 	RenderPassTest.Release();
 
-	// Command buffer pool 을 다시 만들기 보다 있는 커맨드 버퍼 풀을 cleanup 하고 재사용 함.
-	vkFreeCommandBuffers(device, commandPool, static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
-
 	for (auto imageView : swapChainImageViews)
 		vkDestroyImageView(device, imageView, nullptr);
 
@@ -1411,7 +1541,7 @@ void jRHI_Vulkan::CleanupSwapChain()
 	//	vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
 	//}
 
-	vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+	//vkDestroyDescriptorPool(device, descriptorPool, nullptr);
 }
 
 void jRHI_Vulkan::RecreateSwapChain()
@@ -1473,6 +1603,180 @@ void jRHI_Vulkan::UpdateUniformBuffer(uint32_t currentImage)
 	vkUnmapMemory(device, (VkDeviceMemory)UniformBuffers[currentImage]->GetBufferMemory());
 }
 
+
+jVertexBuffer* jRHI_Vulkan::CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const
+{
+	if (!streamData)
+		return nullptr;
+
+	jVertexBuffer_Vulkan* vertexBuffer = new jVertexBuffer_Vulkan();
+	vertexBuffer->VertexStreamData = streamData;
+	vertexBuffer->BindInfos.Reset();
+
+	std::list<uint32> buffers;
+	int32 index = 0;
+	for (const auto& iter : streamData->Params)
+	{
+		if (iter->Stride <= 0)
+			continue;
+
+		jVertexStream_Vulkan stream;
+		stream.Name = iter->Name;
+		stream.Count = iter->Stride / iter->ElementTypeSize;
+		stream.BufferType = EBufferType::STATIC;
+		stream.ElementType = iter->ElementType;
+		stream.Stride = iter->Stride;
+		stream.Offset = 0;
+		stream.InstanceDivisor = iter->InstanceDivisor;
+
+		{
+			VkDeviceSize bufferSize = iter->GetBufferSize();
+			VkBuffer stagingBuffer;
+			VkDeviceMemory stagingBufferMemory;
+
+			// VK_BUFFER_USAGE_TRANSFER_SRC_BIT : 이 버퍼가 메모리 전송 연산의 소스가 될 수 있음.
+			g_rhi_vk->CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT
+				, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+			//// 마지막 파라메터 0은 메모리 영역의 offset 임.
+			//// 이 값이 0이 아니면 memRequirements.alignment 로 나눠야 함. (align 되어있다는 의미)
+			//vkBindBufferMemory(device, vertexBuffer, vertexBufferMemory, 0);
+
+			void* data = nullptr;
+			// size 항목에 VK_WHOLE_SIZE  를 넣어서 모든 메모리를 잡을 수도 있음.
+			vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+			memcpy(data, iter->GetBufferData(), (size_t)bufferSize);
+			vkUnmapMemory(device, stagingBufferMemory);
+
+			// Map -> Unmap 했다가 메모리에 데이터가 즉시 반영되는게 아님
+			// 바로 사용하려면 아래 2가지 방법이 있음.
+			// 1. VK_MEMORY_PROPERTY_HOST_COHERENT_BIT 사용 (항상 반영, 약간 느릴 수도)
+			// 2. 쓰기 이후 vkFlushMappedMemoryRanges 호출, 읽기 이후 vkInvalidateMappedMemoryRanges 호출
+			// 위의 2가지 방법을 사용해도 이 데이터가 GPU에 바로 보인다고 보장할 수는 없지만 다음 vkQueueSubmit 호출 전에는 완료될 것을 보장함.
+
+			// VK_BUFFER_USAGE_TRANSFER_DST_BIT : 이 버퍼가 메모리 전송 연산의 목적지가 될 수 있음.
+			// DEVICE LOCAL 메모리에 VertexBuffer를 만들었으므로 이제 vkMapMemory 같은 것은 할 수 없음.
+			g_rhi_vk->CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
+				, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, stream.VertexBuffer, stream.VertexBufferMemory);
+
+			g_rhi_vk->CopyBuffer(stagingBuffer, stream.VertexBuffer, bufferSize);
+
+			vkDestroyBuffer(device, stagingBuffer, nullptr);
+			vkFreeMemory(device, stagingBufferMemory, nullptr);
+		}
+		vertexBuffer->BindInfos.Buffers.push_back(stream.VertexBuffer);
+		vertexBuffer->BindInfos.Offsets.push_back(stream.Offset);
+
+		/////////////////////////////////////////////////////////////
+		VkVertexInputBindingDescription bindingDescription = {};
+		// 모든 데이터가 하나의 배열에 있어서 binding index는 0
+		bindingDescription.binding = index;
+		bindingDescription.stride = iter->Stride;
+
+		// VK_VERTEX_INPUT_RATE_VERTEX : 각각 버택스 마다 다음 데이터로 이동
+		// VK_VERTEX_INPUT_RATE_INSTANCE : 각각의 인스턴스 마다 다음 데이터로 이동
+		bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+		vertexBuffer->BindInfos.InputBindingDescriptions.push_back(bindingDescription);
+		/////////////////////////////////////////////////////////////
+		VkVertexInputAttributeDescription attributeDescription = {};
+		attributeDescription.binding = index;
+		attributeDescription.location = index;
+
+		VkFormat AttrFormat = VK_FORMAT_UNDEFINED;
+		switch (iter->ElementType)
+		{
+		case EBufferElementType::BYTE:
+		{
+			const int32 elementCount = iter->Stride / sizeof(char);
+			switch (elementCount)
+			{
+			case 1:
+				AttrFormat = VK_FORMAT_R8_SINT;
+				break;
+			case 2:
+				AttrFormat = VK_FORMAT_R8G8_SINT;
+				break;
+			case 3:
+				AttrFormat = VK_FORMAT_R8G8B8_SINT;
+				break;
+			case 4:
+				AttrFormat = VK_FORMAT_R8G8B8A8_SINT;
+				break;
+			default:
+				check(0);
+				break;
+			}
+			break;
+		}
+		case EBufferElementType::UNSIGNED_INT:
+		{
+			const int32 elementCount = iter->Stride / sizeof(uint32);
+			switch (elementCount)
+			{
+			case 1:
+				AttrFormat = VK_FORMAT_R32_SINT;
+				break;
+			case 2:
+				AttrFormat = VK_FORMAT_R32G32_SINT;
+				break;
+			case 3:
+				AttrFormat = VK_FORMAT_R32G32B32_SINT;
+				break;
+			case 4:
+				AttrFormat = VK_FORMAT_R32G32B32A32_SINT;
+				break;
+			default:
+				check(0);
+				break;
+			}
+			break;
+		}
+		case EBufferElementType::FLOAT:
+		{
+			const int32 elementCount = iter->Stride / sizeof(float);
+			switch(elementCount)
+			{
+			case 1:
+				AttrFormat = VK_FORMAT_R32_SFLOAT;
+				break;
+			case 2:
+				AttrFormat = VK_FORMAT_R32G32_SFLOAT;
+				break;
+			case 3:
+				AttrFormat = VK_FORMAT_R32G32B32_SFLOAT;
+				break;
+			case 4:
+				AttrFormat = VK_FORMAT_R32G32B32A32_SFLOAT;
+				break;
+			default:
+				check(0);
+				break;
+			}
+			break;
+		}
+		default:
+			check(0);
+			break;
+		}
+		check(AttrFormat != VK_FORMAT_UNDEFINED);
+		//float: VK_FORMAT_R32_SFLOAT
+		//vec2 : VK_FORMAT_R32G32_SFLOAT
+		//vec3 : VK_FORMAT_R32G32B32_SFLOAT
+		//vec4 : VK_FORMAT_R32G32B32A32_SFLOAT
+		//ivec2: VK_FORMAT_R32G32_SINT, a 2-component vector of 32-bit signed integers
+		//uvec4: VK_FORMAT_R32G32B32A32_UINT, a 4-component vector of 32-bit unsigned integers
+		//double: VK_FORMAT_R64_SFLOAT, a double-precision (64-bit) float
+		attributeDescription.format = AttrFormat;
+		attributeDescription.offset = 0;
+		vertexBuffer->BindInfos.AttributeDescriptions.push_back(attributeDescription);
+		/////////////////////////////////////////////////////////////
+		vertexBuffer->Streams.emplace_back(stream);
+
+		++index;
+	}
+
+	return vertexBuffer;
+}
 
 jTexture* jRHI_Vulkan::CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
 	, EFormatType dataType, ETextureFormat textureFormat, bool createMipmap) const
@@ -1794,7 +2098,7 @@ jShadingBindingInstance jShaderBindings::CreateShaderBindingInstance() const
 {
     VkDescriptorSetAllocateInfo allocInfo = {};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = g_rhi_vk->descriptorPool;
+    allocInfo.descriptorPool = DescriptorPool;
     allocInfo.descriptorSetCount = 1;
     allocInfo.pSetLayouts = &DescriptorSetLayout;
 
@@ -1810,7 +2114,7 @@ std::vector<jShadingBindingInstance> jShaderBindings::CreateShaderBindingInstanc
     std::vector<VkDescriptorSetLayout> descSetLayout(count, DescriptorSetLayout);
     VkDescriptorSetAllocateInfo allocInfo = {};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = g_rhi_vk->descriptorPool;
+    allocInfo.descriptorPool = DescriptorPool;
     allocInfo.descriptorSetCount = (uint32)descSetLayout.size();
     allocInfo.pSetLayouts = descSetLayout.data();
 
@@ -1829,6 +2133,11 @@ std::vector<jShadingBindingInstance> jShaderBindings::CreateShaderBindingInstanc
 	}
 
     return Instances;
+}
+
+void jShaderBindings::CreatePool()
+{
+	DescriptorPool = g_rhi_vk->ShaderBindingsManager.CreatePool(*this);
 }
 
 void jShadingBindingInstance::UpdateShaderBindings()
@@ -1890,6 +2199,96 @@ void jShadingBindingInstance::UpdateShaderBindings()
 		, descriptorWrites.data(), 0, nullptr);
 }
 
+bool jCommandBufferManager_Vulkan::CratePool(uint32 QueueIndex)
+{
+	VkCommandPoolCreateInfo poolInfo = {};
+	poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	poolInfo.queueFamilyIndex = QueueIndex;
+
+	// VK_COMMAND_POOL_CREATE_TRANSIENT_BIT : 커맨드 버퍼가 새로운 커맨드를 자주 다시 기록한다고 힌트를 줌.
+	//											(메모리 할당 동작을 변경할 것임)
+	// VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT : 커맨드 버퍼들이 개별적으로 다시 기록될 수 있다.
+	//													이 플래그가 없으면 모든 커맨드 버퍼들이 동시에 리셋되야 함.
+	// 우리는 프로그램 시작시에 커맨드버퍼를 한번 녹화하고 계속해서 반복사용 할 것이므로 flags를 설정하지 않음.
+	poolInfo.flags = 0;		// Optional
+
+	if (!ensure(vkCreateCommandPool(g_rhi_vk->device, &poolInfo, nullptr, &CommandPool) == VK_SUCCESS))
+		return false;
+
+	return true;
+}
+
+jCommandBuffer_Vulkan jCommandBufferManager_Vulkan::GetOrCreateCommandBuffer()
+{
+	if (PendingCommandBuffers.size() > 0)
+	{
+		auto iter_find = PendingCommandBuffers.begin();
+		jCommandBuffer_Vulkan commandBuffer = *iter_find;
+		PendingCommandBuffers.erase(iter_find);
+
+		UsingCommandBuffers.push_back(commandBuffer);
+		return commandBuffer;
+	}
+
+	VkCommandBufferAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	allocInfo.commandPool = GetPool();
+
+	// VK_COMMAND_BUFFER_LEVEL_PRIMARY : 실행을 위해 Queue를 제출할 수 있으면 다른 커맨드버퍼로 부터 호출될 수 없다.
+	// VK_COMMAND_BUFFER_LEVEL_SECONDARY : 직접 제출할 수 없으며, Primary command buffer 로 부터 호출될 수 있다.
+	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	allocInfo.commandBufferCount = 1;
+
+	jCommandBuffer_Vulkan commandBuffer;
+	if (!ensure(vkAllocateCommandBuffers(g_rhi_vk->device, &allocInfo, &commandBuffer.GetRef()) == VK_SUCCESS))
+		return commandBuffer;
+
+	UsingCommandBuffers.push_back(commandBuffer);
+
+	return commandBuffer;
+}
+
+void jCommandBufferManager_Vulkan::ReturnCommandBuffer(jCommandBuffer_Vulkan commandBuffer)
+{
+	for (int32 i = 0; i < UsingCommandBuffers.size(); ++i)
+	{
+		if (UsingCommandBuffers[i].Get() == commandBuffer.Get())
+		{
+			UsingCommandBuffers.erase(UsingCommandBuffers.begin() + i);
+			break;
+		}
+	}
+	PendingCommandBuffers.push_back(commandBuffer);
+}
+
+VkDescriptorPool jShaderBindingsManager_Vulkan::CreatePool(const jShaderBindings& bindings, uint32 maxAllocations) const
+{
+	auto DescriptorPoolSizes = bindings.GetDescriptorPoolSizeArray(maxAllocations);
+
+	VkDescriptorPoolCreateInfo poolInfo = {};
+	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	poolInfo.poolSizeCount = static_cast<uint32>(DescriptorPoolSizes.size());
+	poolInfo.pPoolSizes = DescriptorPoolSizes.data();
+	poolInfo.maxSets = maxAllocations;
+	poolInfo.flags = 0;		// Descriptor Set을 만들고나서 더 이상 손대지 않을거라 그냥 기본값 0으로 설정
+
+	VkDescriptorPool pool = nullptr;
+	if (!ensure(vkCreateDescriptorPool(g_rhi_vk->device, &poolInfo, nullptr, &pool) == VK_SUCCESS))
+		return nullptr;
+
+	return pool;
+}
+
+void jShaderBindingsManager_Vulkan::Release(VkDescriptorPool pool) const
+{
+	if (pool)
+		vkDestroyDescriptorPool(g_rhi_vk->device, pool, nullptr);
+}
+
+void jVertexBuffer_Vulkan::Bind(const jCommandBuffer_Vulkan& commandBuffer) const
+{
+	vkCmdBindVertexBuffers(commandBuffer.Get(), 0, (uint32)BindInfos.Buffers.size(), &BindInfos.Buffers[0], &BindInfos.Offsets[0]);
+}
 
 #endif // USE_VULKAN
 

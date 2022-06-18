@@ -103,7 +103,7 @@ struct jIndexStreamData : public std::enable_shared_from_this<jIndexStreamData>
 	}
 
 	IStreamParam* Param = nullptr;
-	int32 ElementCount = 0;
+	uint32 ElementCount = 0;
 };
 
 enum class ETextureFilterTarget : uint8

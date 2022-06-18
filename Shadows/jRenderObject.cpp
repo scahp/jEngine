@@ -73,7 +73,7 @@ void jRenderObject::UpdateVertexStream()
 
 void jRenderObject::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 startIndex, int32 count, int32 instanceCount)
 {
-	if (VertexBuffer->VertexStreamData.expired())
+	if (VertexBuffer->VertexStreamData)
 		return;
 
 	g_rhi->SetShader(shader);
@@ -97,11 +97,11 @@ void jRenderObject::Draw(const jCamera* camera, const jShader* shader, const std
 	
 	startIndex = startIndex != -1 ? startIndex : 0;
 
-	auto vertexStreamData = VertexBuffer->VertexStreamData.lock();
+	auto& vertexStreamData = VertexBuffer->VertexStreamData;
 	auto primitiveType = vertexStreamData->PrimitiveType;
 	if (IndexBuffer)
 	{
-		auto indexStreamData = IndexBuffer->IndexStreamData.lock();
+		auto& indexStreamData = IndexBuffer->IndexStreamData;
 		count = count != -1 ? count : indexStreamData->ElementCount;
 		if (instanceCount <= 0)
 			g_rhi->DrawElements(primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count);
@@ -120,7 +120,7 @@ void jRenderObject::Draw(const jCamera* camera, const jShader* shader, const std
 
 void jRenderObject::DrawBaseVertexIndex(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, const jMaterialData& materialData, int32 startIndex, int32 count, int32 baseVertexIndex, int32 instanceCount /*= 1*/)
 {
-	if (VertexBuffer->VertexStreamData.expired())
+	if (VertexBuffer->VertexStreamData)
 		return;
 
 	g_rhi->SetShader(shader);
@@ -146,11 +146,11 @@ void jRenderObject::DrawBaseVertexIndex(const jCamera* camera, const jShader* sh
 
 	{
 		//SCOPE_PROFILE(jRenderObject_DrawBaseVertexIndex);
-		auto vertexStreamData = VertexBuffer->VertexStreamData.lock();
+		auto& vertexStreamData = VertexBuffer->VertexStreamData;
 		auto primitiveType = vertexStreamData->PrimitiveType;
 		if (IndexBuffer)
 		{
-			auto indexStreamData = IndexBuffer->IndexStreamData.lock();
+			auto& indexStreamData = IndexBuffer->IndexStreamData;
 			if (instanceCount <= 0)
 				g_rhi->DrawElementsBaseVertex(primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count, baseVertexIndex);
 			else

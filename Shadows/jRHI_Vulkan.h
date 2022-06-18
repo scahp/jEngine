@@ -11,6 +11,8 @@
 static constexpr int32_t MAX_FRAMES_IN_FLIGHT = 2;
 #endif // MULTIPLE_FRAME
 
+FORCEINLINE VkPrimitiveTopology GetVulkanPrimitiveTopology(EPrimitiveType type);
+
 struct jSimpleVec2
 {
 	float x;
@@ -87,23 +89,6 @@ struct jVertex
 
 		return attributeDescriptions;
 	}
-};
-
-struct jVertexHashFunc
-{
-    std::size_t operator()(const jVertex& v) const
-    {
-		size_t result = 0;
-		result = std::hash<float>{}(v.pos.x);
-		result ^= std::hash<float>{}(v.pos.y);
-		result ^= std::hash<float>{}(v.pos.z);
-        result ^= std::hash<float>{}(v.color.x);
-		result ^= std::hash<float>{}(v.color.y);
-		result ^= std::hash<float>{}(v.color.z);
-		result ^= std::hash<float>{}(v.texCoord.x);
-		result ^= std::hash<float>{}(v.texCoord.y);
-		return result;
-    }
 };
 
 // Alignment
@@ -263,10 +248,44 @@ struct jShaderBindings
     std::vector<TBindings> Textures;
     VkDescriptorSetLayout DescriptorSetLayout = nullptr;
 
+	// Descriptor : 쉐이더가 버퍼나 이미지 같은 리소스에 자유롭게 접근하는 방법. 디스크립터의 사용방법은 아래 3가지로 구성됨.
+	//	1. Pipeline 생성 도중 Descriptor Set Layout 명세
+	//	2. Descriptor Pool로 Descriptor Set 생성
+	//	3. Descriptor Set을 렌더링 하는 동안 묶어 주기.
+	//
+	// Descriptor set layout	: 파이프라인을 통해 접근할 리소스 타입을 명세함
+	// Descriptor set			: Descriptor 에 묶일 실제 버퍼나 이미지 리소스를 명세함.
+	VkDescriptorPool DescriptorPool = nullptr;
+
     bool CreateDescriptorSetLayout();
 	
 	jShadingBindingInstance CreateShaderBindingInstance() const;
 	std::vector<jShadingBindingInstance> CreateShaderBindingInstance(int32 count) const;
+
+	std::vector<VkDescriptorPoolSize> GetDescriptorPoolSizeArray(uint32 maxAllocations) const
+	{
+		std::vector<VkDescriptorPoolSize> resultArray;
+
+		if (UniformBuffers.size() > 0)
+		{
+			VkDescriptorPoolSize poolSize;
+			poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			poolSize.descriptorCount = static_cast<uint32>(UniformBuffers.size()) * maxAllocations;
+			resultArray.push_back(poolSize);
+		}
+
+		if (Textures.size() > 0)
+		{
+			VkDescriptorPoolSize poolSize;
+			poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			poolSize.descriptorCount = static_cast<uint32>(Textures.size()) * maxAllocations;
+			resultArray.push_back(poolSize);
+		}
+
+		return std::move(resultArray);
+	}
+
+	void CreatePool();
 };
 
 struct jTexture_Vulkan : public jTexture
@@ -276,6 +295,183 @@ struct jTexture_Vulkan : public jTexture
     VkDeviceMemory ImageMemory;
 
 	static VkSampler CreateDefaultSamplerState();
+};
+
+class jCommandBuffer_Vulkan // base 없음
+{
+public:
+	FORCEINLINE VkCommandBuffer Get() const { return CommandBuffer; }
+	FORCEINLINE VkCommandBuffer& GetRef() { return CommandBuffer; }
+
+	bool Begin()
+	{
+		VkCommandBufferBeginInfo beginInfo = {};
+		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+		// VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT : 커맨드가 한번 실행된다음에 다시 기록됨
+		// VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT : Single Render Pass 범위에 있는 Secondary Command Buffer.
+		// VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT : 실행 대기중인 동안에 다시 서밋 될 수 있음.
+		beginInfo.flags = 0;					// Optional
+
+		// 이 플래그는 Secondary command buffer를 위해서만 사용하며, Primary command buffer 로 부터 상속받을 상태를 명시함.
+		beginInfo.pInheritanceInfo = nullptr;	// Optional
+
+		if (!ensure(vkBeginCommandBuffer(CommandBuffer, &beginInfo) == VK_SUCCESS))
+			return false;
+		
+		return true;
+	}
+	bool End()
+	{
+		if (!ensure(vkEndCommandBuffer(CommandBuffer) == VK_SUCCESS))
+			return false;
+
+		return true;
+	}
+
+private:
+	VkCommandBuffer CommandBuffer = nullptr;
+};
+
+class jCommandBufferManager_Vulkan // base 없음
+{
+public:
+	bool CratePool(uint32 QueueIndex);
+	void Release()
+	{
+		//// Command buffer pool 을 다시 만들기 보다 있는 커맨드 버퍼 풀을 cleanup 하고 재사용 함.
+		//vkFreeCommandBuffers(device, CommandBufferManager.GetPool(), static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
+	}
+
+	FORCEINLINE const VkCommandPool& GetPool() const { return CommandPool; };
+
+	jCommandBuffer_Vulkan GetOrCreateCommandBuffer();
+	void ReturnCommandBuffer(jCommandBuffer_Vulkan commandBuffer);
+
+private:
+	VkCommandPool CommandPool;		// 커맨드 버퍼를 저장할 메모리 관리자로 커맨드 버퍼를 생성함.
+	std::vector<jCommandBuffer_Vulkan> UsingCommandBuffers;
+	std::vector<jCommandBuffer_Vulkan> PendingCommandBuffers;
+};
+
+class jShaderBindingsManager_Vulkan // base 없음
+{
+public:
+	VkDescriptorPool CreatePool(const jShaderBindings& bindings, uint32 MaxAllocations = 32) const;
+	void Release(VkDescriptorPool pool) const;
+};
+
+struct jVertexStream_Vulkan
+{
+	jName Name;
+	uint32 Count;
+	EBufferType BufferType = EBufferType::STATIC;
+	EBufferElementType ElementType = EBufferElementType::BYTE;
+	bool Normalized = false;
+	int32 Stride = 0;
+	size_t Offset = 0;
+	int32 InstanceDivisor = 0;
+
+	VkBuffer VertexBuffer = nullptr;
+	VkDeviceMemory VertexBufferMemory = nullptr;
+};
+
+struct jVertexBuffer_Vulkan : public jVertexBuffer
+{
+	struct jBindInfo
+	{
+		void Reset() 
+		{
+			InputBindingDescriptions.clear();
+			AttributeDescriptions.clear();
+			Buffers.clear();
+			Offsets.clear();
+		}
+		std::vector<VkVertexInputBindingDescription> InputBindingDescriptions;
+		std::vector<VkVertexInputAttributeDescription> AttributeDescriptions;
+		std::vector<VkBuffer> Buffers;
+		std::vector<VkDeviceSize> Offsets;
+
+		VkPipelineVertexInputStateCreateInfo CreateVertexInputState() const
+		{
+			// Vertex Input
+			// 1). Bindings : 데이터 사이의 간격과 버택스당 or 인스턴스당(인스턴싱 사용시) 데이터인지 여부
+			// 2). Attribute descriptions : 버택스 쉐이더 전달되는 attributes 의 타입. 그것을 로드할 바인딩과 오프셋
+			VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
+			vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+
+			vertexInputInfo.vertexBindingDescriptionCount = (uint32)InputBindingDescriptions.size();
+			vertexInputInfo.pVertexBindingDescriptions = &InputBindingDescriptions[0];
+			vertexInputInfo.vertexAttributeDescriptionCount = (uint32)AttributeDescriptions.size();;
+			vertexInputInfo.pVertexAttributeDescriptions = &AttributeDescriptions[0];
+
+			return vertexInputInfo;
+		}
+	};
+
+	FORCEINLINE VkPipelineVertexInputStateCreateInfo CreateVertexInputState() const
+	{
+		return BindInfos.CreateVertexInputState();
+	}
+
+	FORCEINLINE VkPipelineInputAssemblyStateCreateInfo CreateInputAssemblyState() const
+	{
+		check(VertexStreamData);
+
+		VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
+		inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+		inputAssembly.topology = GetVulkanPrimitiveTopology(VertexStreamData->PrimitiveType);
+
+		// primitiveRestartEnable 옵션이 VK_TRUE 이면, 인덱스버퍼의 특수한 index 0xFFFF or 0xFFFFFFFF 를 사용해서 line 과 triangle topology mode를 사용할 수 있다.
+		inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+		return inputAssembly;
+	}
+
+	jBindInfo BindInfos;
+	std::vector<jVertexStream_Vulkan> Streams;
+
+	virtual void Bind(const jShader* shader) const override
+	{
+	}
+
+	void Bind(const jCommandBuffer_Vulkan& commandBuffer) const;
+
+};
+
+struct jIndexBuffer_Vulkan : public jIndexBuffer
+{
+	VkBuffer IndexBuffer = nullptr;
+	VkDeviceMemory IndexBufferMemory = nullptr;
+	
+	virtual void Bind(const jShader* shader) const override {}
+	void Bind(const jCommandBuffer_Vulkan& commandBuffer) const
+	{
+		VkIndexType IndexType = VK_INDEX_TYPE_UINT16;
+		switch (IndexStreamData->Param->ElementType)
+		{
+		case EBufferElementType::BYTE:
+			IndexType = VK_INDEX_TYPE_UINT8_EXT;
+			break;
+		//case EBufferElementType::UNSIGNED_SHORT:		// 지원여부 확인 필요
+		//	IndexType = VK_INDEX_TYPE_UINT16;
+		//	break;
+		case EBufferElementType::UNSIGNED_INT:
+			IndexType = VK_INDEX_TYPE_UINT32;
+			break;
+		case EBufferElementType::FLOAT:
+			check(0);
+			break;
+		default:
+			break;
+		}
+		vkCmdBindIndexBuffer(commandBuffer.Get(), IndexBuffer, 0, IndexType);
+	}
+
+	FORCEINLINE uint32 GetIndexCount() const
+	{
+		return IndexStreamData->ElementCount;
+	}
 };
 
 // todo
@@ -317,8 +513,13 @@ public:
 	// 여러종류의 Queue type이 있을 수 있다. (ex. Compute or memory transfer related commands 만 만듬)
 	// - 논리 디바이스(VkDevice) 생성시에 함께 생성시킴
 	// - 논리 디바이스가 소멸될때 함께 알아서 소멸됨, 그래서 Cleanup 해줄필요가 없음.
-	VkQueue graphicsQueue;
-	VkQueue presentQueue;
+	struct jQueue_Vulkan // base 없음
+	{
+		uint32 QueueIndex = 0;
+		VkQueue Queue = nullptr;
+	};
+	jQueue_Vulkan GraphicsQueue;
+	jQueue_Vulkan PresentQueue;
 
 	// 논리 디바이스 생성
 	VkDevice device;
@@ -356,12 +557,12 @@ public:
 	//VkSampler textureSampler = nullptr;
 
 	// 그냥 일반적인 모델 로드에 필요한 자료 구조임. 정리 예정
-	std::vector<jVertex> vertices;
-	std::vector<uint32_t> indices;
-	VkBuffer vertexBuffer;
-	VkDeviceMemory vertexBufferMemory;
-	VkBuffer indexBuffer;
-	VkDeviceMemory indexBufferMemory;
+	//std::vector<jVertex> vertices;
+	//std::vector<uint32_t> indices;
+	//VkBuffer vertexBuffer;
+	//VkDeviceMemory vertexBufferMemory;
+	//VkBuffer indexBuffer;
+	//VkDeviceMemory indexBufferMemory;
 
 	// 그냥 일반적인 
 	//std::vector<VkBuffer> uniformBuffers;
@@ -375,12 +576,12 @@ public:
 	//
 	// Descriptor set layout	: 파이프라인을 통해 접근할 리소스 타입을 명세함
 	// Descriptor set			: Descriptor 에 묶일 실제 버퍼나 이미지 리소스를 명세함.
-	VkDescriptorPool descriptorPool;
+	//VkDescriptorPool descriptorPool;
 	//std::vector<VkDescriptorSet> descriptorSets;		// DescriptorPool 이 소멸될때 자동으로 소멸되므로 따로 소멸시킬 필요없음.
 
 	// Command buffers
-	VkCommandPool commandPool;		// 커맨드 버퍼를 저장할 메모리 관리자로 커맨드 버퍼를 생성함.
-	std::vector<VkCommandBuffer> commandBuffers;
+	//VkCommandPool commandPool;		// 커맨드 버퍼를 저장할 메모리 관리자로 커맨드 버퍼를 생성함.
+	std::vector<jCommandBuffer_Vulkan> commandBuffers;
 
 	// Semaphores
 #if MULTIPLE_FRAME
@@ -834,7 +1035,7 @@ public:
 		VkCommandBufferAllocateInfo allocInfo = {};
 		allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 		allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		allocInfo.commandPool = commandPool;
+		allocInfo.commandPool = CommandBufferManager.GetPool();
 		allocInfo.commandBufferCount = 1;
 
 		VkCommandBuffer commandBuffer;
@@ -857,12 +1058,12 @@ public:
 		submitInfo.commandBufferCount = 1;
 		submitInfo.pCommandBuffers = &commandBuffer;
 
-		vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
-		vkQueueWaitIdle(graphicsQueue);
+		vkQueueSubmit(GraphicsQueue.Queue, 1, &submitInfo, VK_NULL_HANDLE);
+		vkQueueWaitIdle(GraphicsQueue.Queue);
 
 		// 명령 완료를 기다리기 위해서 2가지 방법이 있는데, Fence를 사용하는 방법(vkWaitForFences)과 Queue가 Idle이 될때(vkQueueWaitIdle)를 기다리는 방법이 있음.
 		// fence를 사용하는 방법이 여러개의 전송을 동시에 하고 마치는 것을 기다릴 수 있게 해주기 때문에 그것을 사용함.
-		vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
+		vkFreeCommandBuffers(device, CommandBufferManager.GetPool(), 1, &commandBuffer);
 	}
 	bool HasStencilComponent(VkFormat format) const
 	{
@@ -1148,17 +1349,17 @@ public:
 	bool CreateRenderPass();
 	//bool CreateDescriptorSetLayout();
 	bool CreateGraphicsPipeline();
-	bool CreateCommandPool();
+	//bool CreateCommandPool();
 	bool CreateColorResources();
 	bool CreateDepthResources();
 	//bool CreateFrameBuffers();
 	//bool CreateTextureImage();
 	//bool CreateTextureSampler();
 	bool LoadModel();
-	bool CreateVertexBuffer();
-	bool CreateIndexBuffer();
+	//bool CreateVertexBuffer();
+	//bool CreateIndexBuffer();
 	//bool CreateUniformBuffers();
-	bool CreateDescriptorPool();
+	//bool CreateDescriptorPool();
 	//bool CreateDescriptorSets();
 	bool CreateCommandBuffers();
 	bool CreateSyncObjects();
@@ -1178,7 +1379,17 @@ public:
 	jShaderBindings ShaderBindings;
 	std::vector<jShadingBindingInstance> ShaderBindingInstances;
 	std::vector<IEmptyUniform*> UniformBuffers;
+
+	jCommandBufferManager_Vulkan CommandBufferManager;
+
+	// jVertexBuffer_Vulkan VertexBuffer;
+	jVertexBuffer* VertexBuffer = nullptr;
+	jIndexBuffer* IndexBuffer = nullptr;
+
+	jShaderBindingsManager_Vulkan ShaderBindingsManager;
 	//////////////////////////////////////////////////////////////////////////
+	virtual jVertexBuffer* CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const override;
+	virtual jIndexBuffer* CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const override;
 	virtual jTexture* CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
 		, EFormatType dataType = EFormatType::UNSIGNED_BYTE, ETextureFormat textureFormat = ETextureFormat::RGBA, bool createMipmap = false) const override;
 };

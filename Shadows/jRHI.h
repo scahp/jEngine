@@ -19,14 +19,14 @@ struct IBuffer
 
 struct jVertexBuffer : public IBuffer
 {
-	std::weak_ptr<jVertexStreamData> VertexStreamData;
+	std::shared_ptr<jVertexStreamData> VertexStreamData;
 
 	virtual void Bind(const jShader* shader) const {}
 };
 
 struct jIndexBuffer : public IBuffer
 {
-	std::weak_ptr<jIndexStreamData> IndexStreamData;
+	std::shared_ptr<jIndexStreamData> IndexStreamData;
 
 	virtual void Bind(const jShader* shader) const {}
 };
