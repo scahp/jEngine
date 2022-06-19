@@ -371,7 +371,7 @@ struct jSamplerStateInfo
 	float MipLODBias = 0.0f;
 	float MaxAnisotropy = 1.0f;			// if you anisotropy filtering tuned on, set this variable greater than 1.
 	ETextureComparisonMode TextureComparisonMode = ETextureComparisonMode::NONE;
-	EComparisonOp ComparisonFunc = EComparisonOp::LESS;
+	ECompareOp ComparisonFunc = ECompareOp::LESS;
 	Vector4 BorderColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
 	float MinLOD = -FLT_MAX;
 	float MaxLOD = FLT_MAX;
@@ -385,6 +385,191 @@ struct jSamplerState : public std::enable_shared_from_this<jSamplerState>
 	virtual ~jSamplerState() {}
 	const jSamplerStateInfo Info;
 };
+
+struct jRasterizationStateInfo
+{
+	virtual ~jRasterizationStateInfo() {}
+	virtual void Initialize() {}
+
+	EPolygonMode PolygonMode = EPolygonMode::FILL;
+	ECullMode CullMode = ECullMode::BACK;
+	EFrontFace FrontFace = EFrontFace::CCW;
+	bool DepthBiasEnable = false;
+	float DepthBiasConstantFactor = 0.0f;
+	float DepthBiasClamp = 0.0f;
+	float DepthBiasSlopeFactor = 0.0f;
+	float LineWidth = 1.0f;
+	bool DepthClampEnable = false;
+	bool RasterizerDiscardEnable = false;
+};
+
+template <EPolygonMode TPolygonMode = EPolygonMode::FILL, ECullMode TCullMode = ECullMode::BACK, EFrontFace TFrontFace = EFrontFace::CCW,
+	bool TDepthBiasEnable = false, float TDepthBiasConstantFactor = 0.0f, float TDepthBiasClamp = 0.0f, float TDepthBiasSlopeFactor = 0.0f,
+	float TLineWidth = 1.0f, bool TDepthClampEnable = false, bool TRasterizerDiscardEnable = false>
+struct TRasterizationStateInfo
+{
+	FORCEINLINE static jRasterizationStateInfo Create()
+	{
+		jRasterizationStateInfo state;
+		state.PolygonMode = TPolygonMode;
+		state.CullMode = TCullMode;
+		state.FrontFace = TFrontFace;
+		state.DepthBiasEnable = TDepthBiasEnable;
+		state.DepthBiasConstantFactor = TDepthBiasConstantFactor;
+		state.DepthBiasClamp = TDepthBiasClamp;
+		state.DepthBiasSlopeFactor = TDepthBiasSlopeFactor;
+		state.LineWidth = TLineWidth;
+		state.DepthClampEnable = TDepthClampEnable;
+		state.RasterizerDiscardEnable = TRasterizerDiscardEnable;
+		state.Initialize();
+		return state;
+	}
+};
+
+struct jMultisampleStateInfo
+{
+	virtual ~jMultisampleStateInfo() {}
+	virtual void Initialize() {}
+
+	EMSAASamples SampleCount = EMSAASamples::COUNT_1;
+	bool SampleShadingEnable = true;		// Sample shading 켬	 (텍스쳐 내부에 있는 aliasing 도 완화 해줌)
+	float MinSampleShading = 0.2f;
+	bool AlphaToCoverageEnable = false;
+	bool AlphaToOneEnable = false;
+};
+
+template <EMSAASamples TSampleCount = EMSAASamples::COUNT_1, bool TSampleShadingEnable = true, float TMinSampleShading = 0.2f,
+	bool TAlphaToCoverageEnable = false, bool TAlphaToOneEnable = false>
+struct TMultisampleStateInfo
+{
+	FORCEINLINE static jMultisampleStateInfo Create()
+	{
+		jMultisampleStateInfo state;
+		state.SampleCount = TSampleCount;
+		state.SampleShadingEnable = TSampleShadingEnable;		// Sample shading 켬	 (텍스쳐 내부에 있는 aliasing 도 완화 해줌)
+		state.MinSampleShading = TMinSampleShading;
+		state.AlphaToCoverageEnable = TAlphaToCoverageEnable;
+		state.AlphaToOneEnable = TAlphaToOneEnable;
+		state.Initialize();
+		return state;
+	}
+};
+
+struct jStencilOpStateInfo
+{
+	virtual ~jStencilOpStateInfo() {}
+	virtual void Initialize() {}
+
+	EStencilOp FailOp = EStencilOp::KEEP;
+	EStencilOp PassOp = EStencilOp::KEEP;
+	EStencilOp DepthFailOp = EStencilOp::KEEP;
+	ECompareOp CompareOp = ECompareOp::NEVER;
+	uint32 CompareMask = 0;
+	uint32 WriteMask = 0;
+	uint32 Reference = 0;
+};
+
+template <EStencilOp TFailOp = EStencilOp::KEEP, EStencilOp TPassOp = EStencilOp::KEEP, EStencilOp TDepthFailOp = EStencilOp::KEEP,
+	ECompareOp TCompareOp = ECompareOp::NEVER, uint32 TCompareMask = 0, uint32 TWriteMask = 0, uint32 TReference = 0>
+struct TStencilOpStateInfo
+{
+	FORCEINLINE static jStencilOpStateInfo Create()
+	{
+		jStencilOpStateInfo state;
+		state.FailOp = TFailOp;
+		state.PassOp = TPassOp;
+		state.DepthFailOp = TDepthFailOp;
+		state.CompareOp = TCompareOp;
+		state.CompareMask = TCompareMask;
+		state.WriteMask = TWriteMask;
+		state.Reference = TReference;
+		state.Initialize();
+		return state;
+	}
+};
+
+struct jDepthStencilStateInfo
+{
+	virtual ~jDepthStencilStateInfo() {}
+	virtual void Initialize() {}
+
+	bool DepthTestEnable = false;
+	bool DepthWriteEnable = false;
+	ECompareOp DepthCompareOp = ECompareOp::LEQUAL;
+	bool DepthBoundsTestEnable = false;
+	bool StencilTestEnable = false;
+	jStencilOpStateInfo* Front = nullptr;
+	jStencilOpStateInfo* Back = nullptr;
+	float MinDepthBounds = 0.0f;
+	float MaxDepthBounds = 1.0f;
+
+	// VkPipelineDepthStencilStateCreateFlags    flags;
+};
+
+template <bool TDepthTestEnable = false, bool TDepthWriteEnable = false, ECompareOp TDepthCompareOp = ECompareOp::LEQUAL,
+	bool TDepthBoundsTestEnable = false, bool TStencilTestEnable = false,
+	jStencilOpStateInfo* TFront = nullptr, jStencilOpStateInfo* TBack = nullptr,
+	float TMinDepthBounds = 0.0f, float TMaxDepthBounds = 1.0f>
+struct TDepthStencilStateInfo
+{
+	FORCEINLINE static jDepthStencilStateInfo Create()
+	{
+		jDepthStencilStateInfo state;
+		state.DepthTestEnable = TDepthTestEnable;
+		state.DepthWriteEnable = TDepthWriteEnable;
+		state.DepthCompareOp = TDepthCompareOp;
+		state.DepthBoundsTestEnable = TDepthBoundsTestEnable;
+		state.StencilTestEnable = TStencilTestEnable;
+		state.Front = TFront;
+		state.Back = TBack;
+		state.MinDepthBounds = TMinDepthBounds;
+		state.MaxDepthBounds = TMaxDepthBounds;
+		return state;
+	}
+};
+
+struct jBlendingStateInfo
+{
+	virtual ~jBlendingStateInfo() {}
+	virtual void Initialize() {}
+
+	bool BlendEnable = false;
+	EBlendFactor Src = EBlendFactor::SRC_COLOR;
+	EBlendFactor Dest = EBlendFactor::ONE_MINUS_SRC_ALPHA;
+	EBlendOp BlendOp = EBlendOp::ADD;
+	EBlendFactor SrcAlpha = EBlendFactor::SRC_ALPHA;
+	EBlendFactor DestAlpha = EBlendFactor::ONE_MINUS_SRC_ALPHA;
+	EBlendOp AlphaBlendOp = EBlendOp::ADD;
+	EColorMask ColorWriteMask = EColorMask::NONE;
+
+	//VkPipelineColorBlendStateCreateFlags          flags;
+	//VkBool32                                      logicOpEnable;
+	//VkLogicOp                                     logicOp;
+	//uint32_t                                      attachmentCount;
+	//const VkPipelineColorBlendAttachmentState* pAttachments;
+	//float                                         blendConstants[4];
+};
+
+template <bool TBlendEnable = false, EBlendFactor TSrc = EBlendFactor::SRC_COLOR, EBlendFactor TDest = EBlendFactor::ONE_MINUS_SRC_ALPHA, EBlendOp TBlendOp = EBlendOp::ADD,
+	EBlendFactor TSrcAlpha = EBlendFactor::SRC_ALPHA, EBlendFactor TDestAlpha = EBlendFactor::ONE_MINUS_SRC_ALPHA, EBlendOp TAlphaBlendOp = EBlendOp::ADD,
+	EColorMask TColorWriteMask = EColorMask::NONE>
+struct TBlendingStateInfo
+{
+	FORCEINLINE static jBlendingStateInfo Create()
+	{
+		jBlendingStateInfo state;
+		state.BlendEnable = TBlendEnable;
+		state.Src = TSrc;
+		state.Dest = TDest;
+		state.BlendOp = TBlendOp;
+		state.SrcAlpha = TSrcAlpha;
+		state.DestAlpha = TDestAlpha;
+		state.AlphaBlendOp = TAlphaBlendOp;
+		state.ColorWriteMask = TColorWriteMask;
+		return state;
+	}
+};
+
 
 class jRHI
 {
@@ -465,15 +650,15 @@ public:
 	virtual jRenderTarget* CreateRenderTarget(const jRenderTargetInfo& info) const { return nullptr; }
 	virtual void EnableDepthTest(bool enable) const {}
 	virtual void EnableBlend(bool enable) const {}
-	virtual void SetBlendFunc(EBlendSrc src, EBlendDest dest) const {}
-	virtual void SetBlendFuncRT(EBlendSrc src, EBlendDest dest, int32 rtIndex = 0) const {}
+	virtual void SetBlendFunc(EBlendFactor src, EBlendFactor dest) const {}
+	virtual void SetBlendFuncRT(EBlendFactor src, EBlendFactor dest, int32 rtIndex = 0) const {}
 	virtual void SetBlendEquation(EBlendOp func) const {}
 	virtual void SetBlendEquation(EBlendOp func, int32 rtIndex) const {}
 	virtual void SetBlendColor(float r, float g, float b, float a) const {}
 	virtual void EnableStencil(bool enable) const {}
 	virtual void SetStencilOpSeparate(EFace face, EStencilOp sFail, EStencilOp dpFail, EStencilOp dpPass) const {}
-	virtual void SetStencilFunc(EComparisonOp func, int32 ref, uint32 mask) const {}
-	virtual void SetDepthFunc(EComparisonOp func) const {}
+	virtual void SetStencilFunc(ECompareOp func, int32 ref, uint32 mask) const {}
+	virtual void SetDepthFunc(ECompareOp func) const {}
 	virtual void SetDepthMask(bool enable) const {}
 	virtual void SetColorMask(bool r, bool g, bool b, bool a) const {}
 	virtual IUniformBufferBlock* CreateUniformBufferBlock(const char* blockname) const { return nullptr; }

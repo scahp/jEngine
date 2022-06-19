@@ -469,7 +469,6 @@ FORCEINLINE auto GetVulkanTextureComponentCount(ETextureFormat type)
 {
     using T = int8;
 	GENERATE_STATIC_CONVERSION_ARRAY(
-		// TextureFormat + InternalFormat
 		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB32F, 3),
 		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB16F, 3),
 		CONVERSION_TYPE_ELEMENT(ETextureFormat::R11G11B10F, 3),
@@ -499,7 +498,6 @@ FORCEINLINE VkPrimitiveTopology GetVulkanPrimitiveTopology(EPrimitiveType type)
 {
 	using T = VkPrimitiveTopology;
 	GENERATE_STATIC_CONVERSION_ARRAY(
-		// TextureFormat + InternalFormat
 		CONVERSION_TYPE_ELEMENT(EPrimitiveType::POINTS, VK_PRIMITIVE_TOPOLOGY_POINT_LIST),
 		CONVERSION_TYPE_ELEMENT(EPrimitiveType::LINES, VK_PRIMITIVE_TOPOLOGY_LINE_LIST),
 		CONVERSION_TYPE_ELEMENT(EPrimitiveType::LINES_ADJACENCY, VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY),
@@ -510,6 +508,202 @@ FORCEINLINE VkPrimitiveTopology GetVulkanPrimitiveTopology(EPrimitiveType type)
 		CONVERSION_TYPE_ELEMENT(EPrimitiveType::TRIANGLE_STRIP, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP)
 	);
 }
+
+FORCEINLINE VkPolygonMode GetVulkanPolygonMode(EPolygonMode type)
+{
+	using T = VkPolygonMode;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(EPolygonMode::POINT, VK_POLYGON_MODE_POINT),
+		CONVERSION_TYPE_ELEMENT(EPolygonMode::LINE, VK_POLYGON_MODE_LINE),
+		CONVERSION_TYPE_ELEMENT(EPolygonMode::FILL, VK_POLYGON_MODE_FILL)
+	);
+}
+
+FORCEINLINE VkCullModeFlagBits GetVulkanCullMode(ECullMode type)
+{
+	using T = VkCullModeFlagBits;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(ECullMode::BACK, VK_CULL_MODE_BACK_BIT),
+		CONVERSION_TYPE_ELEMENT(ECullMode::FRONT, VK_CULL_MODE_FRONT_BIT),
+		CONVERSION_TYPE_ELEMENT(ECullMode::FRONT_AND_BACK, VK_CULL_MODE_FRONT_AND_BACK)
+	);
+}
+
+FORCEINLINE VkFrontFace GetVulkanFrontFace(EFrontFace type)
+{
+	using T = VkFrontFace;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(EFrontFace::CW, VK_FRONT_FACE_CLOCKWISE),
+		CONVERSION_TYPE_ELEMENT(EFrontFace::CCW, VK_FRONT_FACE_COUNTER_CLOCKWISE)
+	);
+}
+
+void jRasterizationStateInfo_Vulkan::Initialize()
+{
+	RasterizationStateInfo = {};
+	RasterizationStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+	RasterizationStateInfo.depthClampEnable = DepthClampEnable;						// 이 값이 VK_TRUE 면 Near나 Far을 벗어나는 영역을 [0.0 ~ 1.0]으로 Clamp 시켜줌.(쉐도우맵에서 유용)
+	RasterizationStateInfo.rasterizerDiscardEnable = RasterizerDiscardEnable;		// 이 값이 VK_TRUE 면, 레스터라이저 스테이지를 통과할 수 없음. 즉 Framebuffer 로 결과가 넘어가지 않음.
+	RasterizationStateInfo.polygonMode = GetVulkanPolygonMode(PolygonMode);			// FILL, LINE, POINT 세가지가 있음
+	RasterizationStateInfo.lineWidth = LineWidth;
+	RasterizationStateInfo.cullMode = GetVulkanCullMode(CullMode);
+	RasterizationStateInfo.frontFace = GetVulkanFrontFace(FrontFace);
+	RasterizationStateInfo.depthBiasEnable = DepthBiasEnable;						// 쉐도우맵 용
+	RasterizationStateInfo.depthBiasConstantFactor = DepthBiasConstantFactor;		// Optional
+	RasterizationStateInfo.depthBiasClamp = DepthBiasClamp;							// Optional
+	RasterizationStateInfo.depthBiasSlopeFactor = DepthBiasSlopeFactor;				// Optional
+
+	// VkPipelineRasterizationStateCreateFlags flags;
+}
+
+void jMultisampleStateInfo_Vulkan::Initialize()
+{
+	MultisampleStateInfo = {};
+	MultisampleStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+	MultisampleStateInfo.rasterizationSamples = (VkSampleCountFlagBits)SampleCount;
+	MultisampleStateInfo.sampleShadingEnable = SampleShadingEnable;			// Sample shading 켬	 (텍스쳐 내부에 있는 aliasing 도 완화 해줌)
+	MultisampleStateInfo.minSampleShading = MinSampleShading;
+	MultisampleStateInfo.alphaToCoverageEnable = AlphaToCoverageEnable;		// Optional
+	MultisampleStateInfo.alphaToOneEnable = AlphaToOneEnable;				// Optional
+
+	// VkPipelineMultisampleStateCreateFlags flags;
+	// const VkSampleMask* pSampleMask;
+}
+
+FORCEINLINE VkStencilOp GetVulkanStencilOp(EStencilOp type)
+{
+	using T = VkStencilOp;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(EStencilOp::KEEP, VK_STENCIL_OP_KEEP),
+		CONVERSION_TYPE_ELEMENT(EStencilOp::ZERO, VK_STENCIL_OP_ZERO),
+		CONVERSION_TYPE_ELEMENT(EStencilOp::REPLACE, VK_STENCIL_OP_REPLACE),
+		CONVERSION_TYPE_ELEMENT(EStencilOp::INCR, VK_STENCIL_OP_INCREMENT_AND_CLAMP),
+		CONVERSION_TYPE_ELEMENT(EStencilOp::INCR_WRAP, VK_STENCIL_OP_INCREMENT_AND_WRAP),
+		CONVERSION_TYPE_ELEMENT(EStencilOp::DECR, VK_STENCIL_OP_DECREMENT_AND_CLAMP),
+		CONVERSION_TYPE_ELEMENT(EStencilOp::DECR_WRAP, VK_STENCIL_OP_DECREMENT_AND_WRAP),
+		CONVERSION_TYPE_ELEMENT(EStencilOp::INVERT, VK_STENCIL_OP_INVERT)
+	);
+}
+
+FORCEINLINE VkCompareOp GetVulkanCompareOp(ECompareOp type)
+{
+	using T = VkCompareOp;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(ECompareOp::NEVER, VK_COMPARE_OP_NEVER),
+		CONVERSION_TYPE_ELEMENT(ECompareOp::LESS, VK_COMPARE_OP_LESS),
+		CONVERSION_TYPE_ELEMENT(ECompareOp::EQUAL, VK_COMPARE_OP_EQUAL),
+		CONVERSION_TYPE_ELEMENT(ECompareOp::LEQUAL, VK_COMPARE_OP_LESS_OR_EQUAL),
+		CONVERSION_TYPE_ELEMENT(ECompareOp::GREATER, VK_COMPARE_OP_GREATER),
+		CONVERSION_TYPE_ELEMENT(ECompareOp::NOTEQUAL, VK_COMPARE_OP_NOT_EQUAL),
+		CONVERSION_TYPE_ELEMENT(ECompareOp::GEQUAL, VK_COMPARE_OP_GREATER_OR_EQUAL),
+		CONVERSION_TYPE_ELEMENT(ECompareOp::ALWAYS, VK_COMPARE_OP_ALWAYS)
+	);
+}
+
+void jStencilOpStateInfo_Vulkan::Initialize()
+{
+	StencilOpStateInfo = {};
+	StencilOpStateInfo.failOp = GetVulkanStencilOp(FailOp);
+	StencilOpStateInfo.passOp = GetVulkanStencilOp(PassOp);
+	StencilOpStateInfo.depthFailOp = GetVulkanStencilOp(DepthFailOp);
+	StencilOpStateInfo.compareOp = GetVulkanCompareOp(CompareOp);
+	StencilOpStateInfo.compareMask = CompareMask;
+	StencilOpStateInfo.writeMask = WriteMask;
+	StencilOpStateInfo.reference = Reference;
+}
+
+void jDepthStencilStateInfo_Vulkan::Initialize()
+{
+	DepthStencilStateInfo = {};
+	DepthStencilStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+	DepthStencilStateInfo.depthTestEnable = DepthTestEnable;
+	DepthStencilStateInfo.depthWriteEnable = DepthWriteEnable;
+	DepthStencilStateInfo.depthCompareOp = GetVulkanCompareOp(DepthCompareOp);
+	DepthStencilStateInfo.depthBoundsTestEnable = DepthBoundsTestEnable;
+	DepthStencilStateInfo.minDepthBounds = MinDepthBounds;		// Optional
+	DepthStencilStateInfo.maxDepthBounds = MaxDepthBounds;		// Optional
+	DepthStencilStateInfo.stencilTestEnable = StencilTestEnable;
+	if (Front)
+	{
+		DepthStencilStateInfo.front = ((jStencilOpStateInfo_Vulkan*)Front)->StencilOpStateInfo;
+	}
+	if (Back)
+	{
+		DepthStencilStateInfo.back = ((jStencilOpStateInfo_Vulkan*)Back)->StencilOpStateInfo;
+	}
+
+	// VkPipelineDepthStencilStateCreateFlags    flags;
+}
+
+FORCEINLINE VkBlendFactor GetVulkanBlendFactor(EBlendFactor type)
+{
+	using T = VkBlendFactor;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(EBlendFactor::ZERO, VK_BLEND_FACTOR_ZERO),
+		CONVERSION_TYPE_ELEMENT(EBlendFactor::ONE, VK_BLEND_FACTOR_ONE),
+		CONVERSION_TYPE_ELEMENT(EBlendFactor::SRC_COLOR, VK_BLEND_FACTOR_SRC_COLOR),
+		CONVERSION_TYPE_ELEMENT(EBlendFactor::ONE_MINUS_SRC_COLOR, VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR),
+		CONVERSION_TYPE_ELEMENT(EBlendFactor::DST_COLOR, VK_BLEND_FACTOR_DST_COLOR),
+		CONVERSION_TYPE_ELEMENT(EBlendFactor::ONE_MINUS_DST_COLOR, VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR),
+		CONVERSION_TYPE_ELEMENT(EBlendFactor::SRC_ALPHA, VK_BLEND_FACTOR_SRC_ALPHA),
+		CONVERSION_TYPE_ELEMENT(EBlendFactor::ONE_MINUS_SRC_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA),
+		CONVERSION_TYPE_ELEMENT(EBlendFactor::DST_ALPHA, VK_BLEND_FACTOR_DST_ALPHA),
+		CONVERSION_TYPE_ELEMENT(EBlendFactor::ONE_MINUS_DST_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA),
+		CONVERSION_TYPE_ELEMENT(EBlendFactor::CONSTANT_COLOR, VK_BLEND_FACTOR_CONSTANT_COLOR),
+		CONVERSION_TYPE_ELEMENT(EBlendFactor::ONE_MINUS_CONSTANT_COLOR, VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR),
+		CONVERSION_TYPE_ELEMENT(EBlendFactor::CONSTANT_ALPHA, VK_BLEND_FACTOR_CONSTANT_ALPHA),
+		CONVERSION_TYPE_ELEMENT(EBlendFactor::ONE_MINUS_CONSTANT_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA),
+		CONVERSION_TYPE_ELEMENT(EBlendFactor::SRC_ALPHA_SATURATE, VK_BLEND_FACTOR_SRC_ALPHA_SATURATE)
+	);
+}
+
+FORCEINLINE VkBlendOp GetVulkanBlendOp(EBlendOp type)
+{
+	using T = VkBlendOp;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(EBlendOp::ADD, VK_BLEND_OP_ADD),
+		CONVERSION_TYPE_ELEMENT(EBlendOp::SUBTRACT, VK_BLEND_OP_SUBTRACT),
+		CONVERSION_TYPE_ELEMENT(EBlendOp::REVERSE_SUBTRACT, VK_BLEND_OP_REVERSE_SUBTRACT),
+		CONVERSION_TYPE_ELEMENT(EBlendOp::MIN_VALUE, VK_BLEND_OP_MIN),
+		CONVERSION_TYPE_ELEMENT(EBlendOp::MAX_VALUE, VK_BLEND_OP_MAX)
+	);
+}
+
+FORCEINLINE VkColorComponentFlags GetVulkanBlendOp(EColorMask type)
+{
+	VkColorComponentFlags result = 0;
+
+	if (EColorMask::NONE == type)
+		return result;
+
+	if (EColorMask::ALL == type)
+	{
+		result = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
+			| VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+	}
+	else
+	{
+		if ((int32)EColorMask::R & (int32)type) result |= VK_COLOR_COMPONENT_R_BIT;
+		if ((int32)EColorMask::G & (int32)type) result |= VK_COLOR_COMPONENT_G_BIT;
+		if ((int32)EColorMask::B & (int32)type) result |= VK_COLOR_COMPONENT_B_BIT;
+		if ((int32)EColorMask::A & (int32)type) result |= VK_COLOR_COMPONENT_A_BIT;
+	}
+	return result;
+}
+
+void jBlendingStateInfo_Vulakn::Initialize()
+{
+	ColorBlendAttachmentInfo = {};
+	ColorBlendAttachmentInfo.blendEnable = BlendEnable;
+	ColorBlendAttachmentInfo.srcColorBlendFactor = GetVulkanBlendFactor(Src);
+	ColorBlendAttachmentInfo.dstColorBlendFactor = GetVulkanBlendFactor(Dest);
+	ColorBlendAttachmentInfo.colorBlendOp = GetVulkanBlendOp(BlendOp);
+	ColorBlendAttachmentInfo.srcAlphaBlendFactor = GetVulkanBlendFactor(SrcAlpha);
+	ColorBlendAttachmentInfo.dstAlphaBlendFactor = GetVulkanBlendFactor(DestAlpha);
+	ColorBlendAttachmentInfo.alphaBlendOp = GetVulkanBlendOp(AlphaBlendOp);
+	ColorBlendAttachmentInfo.colorWriteMask = GetVulkanBlendOp(ColorWriteMask);
+}
+
 
 //bool jRHI_Vulkan::CreateDescriptorSetLayout()
 //{
@@ -542,177 +736,6 @@ FORCEINLINE VkPrimitiveTopology GetVulkanPrimitiveTopology(EPrimitiveType type)
 //
 //	return true;
 //}
-
-struct jRasterizationStateInfo
-{
-	EPolygonMode PolygonMode = EPolygonMode::FILL;
-	ECullMode CullMode = ECullMode::BACK;
-	EFrontFace FrontFace = EFrontFace::CCW;
-	bool DepthBiasEnable = false;
-	float DepthBiasConstantFactor = 0.0f;
-	float DepthBiasClamp = 0.0f;
-	float DepthBiasSlopeFactor = 0.0f;
-	float LineWidth = 1.0f;
-	bool DepthClampEnable = false;
-	bool RasterizerDiscardEnable = false;
-
-	// VkPipelineRasterizationStateCreateFlags flags;
-};
-
-template <EPolygonMode TPolygonMode = EPolygonMode::FILL, ECullMode TCullMode = ECullMode::BACK, EFrontFace TFrontFace = EFrontFace::CCW,
-	bool TDepthBiasEnable = false, float TDepthBiasConstantFactor = 0.0f, float TDepthBiasClamp = 0.0f, float TDepthBiasSlopeFactor = 0.0f,
-	float TLineWidth = 1.0f, bool TDepthClampEnable = false, bool TRasterizerDiscardEnable = false>
-struct TRasterizationStateInfo
-{
-	FORCEINLINE static jRasterizationStateInfo Create()
-	{
-		jRasterizationStateInfo state;
-		state.PolygonMode = TPolygonMode;
-		state.CullMode = TCullMode;
-		state.FrontFace = TFrontFace;
-		state.DepthBiasEnable = TDepthBiasEnable;
-		state.DepthBiasConstantFactor = TDepthBiasConstantFactor;
-		state.DepthBiasClamp = TDepthBiasClamp;
-		state.DepthBiasSlopeFactor = TDepthBiasSlopeFactor;
-		state.LineWidth = TLineWidth;
-		state.DepthClampEnable = TDepthClampEnable;
-		state.RasterizerDiscardEnable = TRasterizerDiscardEnable;
-		return state;
-	}
-};
-
-class jMultisampleStateInfo
-{
-	EMSAASamples SampleCount = EMSAASamples::COUNT_1;
-	bool SampleShadingEnable = true;		// Sample shading 켬	 (텍스쳐 내부에 있는 aliasing 도 완화 해줌)
-	float MinSampleShading = 0.2f;
-	bool AlphaToCoverageEnable = false;
-	bool AlphaToOneEnable = false;
-
-	// VkPipelineMultisampleStateCreateFlags flags;
-	// const VkSampleMask* pSampleMask;
-};
-
-template <EMSAASamples TSampleCount = EMSAASamples::COUNT_1, bool TSampleShadingEnable = true, float TMinSampleShading = 0.2f,
-		  bool TAlphaToCoverageEnable = false, bool TAlphaToOneEnable = false>
-struct TMultisampleStateInfo
-{
-	FORCEINLINE static jMultisampleStateInfo Create()
-	{
-		jMultisampleStateInfo state;
-		state.SampleCount = TSampleCount;
-		state.SampleShadingEnable = TSampleShadingEnable;		// Sample shading 켬	 (텍스쳐 내부에 있는 aliasing 도 완화 해줌)
-		state.MinSampleShading = TMinSampleShading;
-		state.AlphaToCoverageEnable = TAlphaToCoverageEnable;
-		state.AlphaToOneEnable = TAlphaToOneEnable;
-		return state;
-	}
-};
-
-struct jStencilOpStateInfo
-{
-	EStencilOp FailOp = EStencilOp::KEEP;
-	EStencilOp PassOp = EStencilOp::KEEP;
-	EStencilOp DepthFailOp = EStencilOp::KEEP;
-	EComparisonOp CompareOp = EComparisonOp::NEVER;
-	uint32 CompareMask = 0;
-	uint32 WriteMask = 0;
-	uint32 Reference = 0;
-};
-
-template <EStencilOp TFailOp = EStencilOp::KEEP, EStencilOp TPassOp = EStencilOp::KEEP, EStencilOp TDepthFailOp = EStencilOp::KEEP,
-		  EComparisonOp TCompareOp = EComparisonOp::NEVER, uint32 TCompareMask = 0, uint32 TWriteMask = 0, uint32 TReference = 0>
-struct TStencilOpStateInfo
-{
-	FORCEINLINE static jStencilOpStateInfo Create()
-	{
-		jStencilOpStateInfo state;
-		state.FailOp = TFailOp;
-		state.PassOp = TPassOp;
-		state.DepthFailOp = TDepthFailOp;
-		state.CompareOp = TCompareOp;
-		state.CompareMask = TCompareMask;
-		state.WriteMask = TWriteMask;
-		state.Reference = TReference;
-		return state;
-	}
-};
-
-struct jDepthStencilStateInfo
-{
-	bool DepthTestEnable = false;
-	bool DepthWriteEnable = false;
-	EDepthComparionFunc DepthCompareOp = EDepthComparionFunc::LESS_EQUAL;
-	bool DepthBoundsTestEnable = false;
-	bool StencilTestEnable = false;
-	jStencilOpStateInfo Front;
-	jStencilOpStateInfo Back;
-	float MinDepthBounds = 0.0f;
-	float MaxDepthBounds = 1.0f;
-
-	// VkPipelineDepthStencilStateCreateFlags    flags;
-};
-
-template <bool TDepthTestEnable = false, bool TDepthWriteEnable = false, EDepthComparionFunc TDepthCompareOp = EDepthComparionFunc::LESS_EQUAL,
-		  bool TDepthBoundsTestEnable = false, bool TStencilTestEnable = false, 
-		  jStencilOpStateInfo TFront = jStencilOpStateInfo(), jStencilOpStateInfo TBack = jStencilOpStateInfo(),
-		  float TMinDepthBounds = 0.0f, float TMaxDepthBounds = 1.0f>
-struct TDepthStencilStateInfo
-{
-	FORCEINLINE static jDepthStencilStateInfo Create()
-	{
-		jDepthStencilStateInfo state;
-		state.DepthTestEnable = TDepthTestEnable;
-		state.DepthWriteEnable = TDepthWriteEnable;
-		state.DepthCompareOp = TDepthCompareOp;
-		state.DepthBoundsTestEnable = TDepthBoundsTestEnable;
-		state.StencilTestEnable = TStencilTestEnable;
-		state.Front = TFront;
-		state.Back = TBack;
-		state.MinDepthBounds = TMinDepthBounds;
-		state.MaxDepthBounds = TMaxDepthBounds;
-		return state;
-	}
-};
-
-struct jBlendingStateInfo
-{
-	bool BlendEnable = false;
-	EBlendSrc Src = EBlendSrc::SRC_COLOR;
-	EBlendDest Dest = EBlendDest::ONE_MINUS_SRC_ALPHA;
-	EBlendOp BlendOp = EBlendOp::ADD;
-	EBlendSrc SrcAlpha = EBlendSrc::SRC_ALPHA;
-	EBlendDest DestAlpha = EBlendDest::ONE_MINUS_SRC_ALPHA;
-	EBlendOp AlphaBlendOp = EBlendOp::ADD;
-	EColorMask ColorWriteMask = EColorMask::NONE;
-
-	//VkPipelineColorBlendStateCreateFlags          flags;
-	//VkBool32                                      logicOpEnable;
-	//VkLogicOp                                     logicOp;
-	//uint32_t                                      attachmentCount;
-	//const VkPipelineColorBlendAttachmentState* pAttachments;
-	//float                                         blendConstants[4];
-};
-
-template <bool TBlendEnable = false, EBlendSrc TSrc = EBlendSrc::SRC_COLOR, EBlendDest TDest = EBlendDest::ONE_MINUS_SRC_ALPHA, EBlendOp TBlendOp = EBlendOp::ADD,
-	EBlendSrc TSrcAlpha = EBlendSrc::SRC_ALPHA, EBlendDest TDestAlpha = EBlendDest::ONE_MINUS_SRC_ALPHA, EBlendOp TAlphaBlendOp = EBlendOp::ADD,
-	EColorMask TColorWriteMask = EColorMask::NONE>
-struct TBlendingStateInfo
-{
-	FORCEINLINE static jBlendingStateInfo Create()
-	{
-		jBlendingStateInfo state;
-		state.BlendEnable = TBlendEnable;
-		state.Src = TSrc;
-		state.Dest = TDest;
-		state.BlendOp = TBlendOp;
-		state.SrcAlpha = TSrcAlpha;
-		state.DestAlpha = TDestAlpha;
-		state.AlphaBlendOp = TAlphaBlendOp;
-		state.ColorWriteMask = TColorWriteMask;
-		return state;
-	}
-};
 
 bool jRHI_Vulkan::CreateGraphicsPipeline()
 {
@@ -965,29 +988,36 @@ bool jRHI_Vulkan::CreateGraphicsPipeline()
 		}
 	};
 
-	// 1. Create Shader
-	auto vertShaderCode = ReadFile("Shaders/vert.spv");
-	auto fragShaderCode = ReadFile("Shaders/frag.spv");
+	jShaderInfo shaderInfo;
+	shaderInfo.name = "default_test";
+	shaderInfo.vs = "Shaders/vert.spv";
+	shaderInfo.fs = "Shaders/frag.spv";
+	Shader = g_rhi->CreateShader(shaderInfo);
+	auto shader_vk = (jShader_Vulkan*)Shader;
 
-	VkShaderModule vertShaderModule = CreateShaderModule(vertShaderCode);
-	VkShaderModule fragShaderModule = CreateShaderModule(fragShaderCode);
+	//// 1. Create Shader
+	//auto vertShaderCode = ReadFile("Shaders/vert.spv");
+	//auto fragShaderCode = ReadFile("Shaders/frag.spv");
 
-	VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
-	vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-	vertShaderStageInfo.module = vertShaderModule;
-	vertShaderStageInfo.pName = "main";
+	//VkShaderModule vertShaderModule = CreateShaderModule(vertShaderCode);
+	//VkShaderModule fragShaderModule = CreateShaderModule(fragShaderCode);
 
-	// pSpecializationInfo 을 통해 쉐이더에서 사용하는 상수값을 설정해줄 수 있음. 이 상수 값에 따라 if 분기문에 없어지거나 하는 최적화가 일어날 수 있음.
-	//vertShaderStageInfo.pSpecializationInfo
+	//VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
+	//vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	//vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+	//vertShaderStageInfo.module = vertShaderModule;
+	//vertShaderStageInfo.pName = "main";
 
-	VkPipelineShaderStageCreateInfo fragShaderStageInfo = {};
-	fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-	fragShaderStageInfo.module = fragShaderModule;
-	fragShaderStageInfo.pName = "main";
+	//// pSpecializationInfo 을 통해 쉐이더에서 사용하는 상수값을 설정해줄 수 있음. 이 상수 값에 따라 if 분기문에 없어지거나 하는 최적화가 일어날 수 있음.
+	////vertShaderStageInfo.pSpecializationInfo
 
-	VkPipelineShaderStageCreateInfo shaderStage[] = { vertShaderStageInfo, fragShaderStageInfo };
+	//VkPipelineShaderStageCreateInfo fragShaderStageInfo = {};
+	//fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	//fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	//fragShaderStageInfo.module = fragShaderModule;
+	//fragShaderStageInfo.pName = "main";
+
+	//VkPipelineShaderStageCreateInfo shaderStage[] = { vertShaderStageInfo, fragShaderStageInfo };
 	// VkShaderModule 은 이 함수의 끝에서 Destroy 시킴
 
 	// 2. Vertex Input
@@ -1134,8 +1164,8 @@ bool jRHI_Vulkan::CreateGraphicsPipeline()
 	VkPipelineLayout pipelineLayout = ShaderBindings.CreatePipelineLayout();
 	if (!ensure(pipelineLayout))
 	{
-		vkDestroyShaderModule(device, fragShaderModule, nullptr);
-		vkDestroyShaderModule(device, vertShaderModule, nullptr);
+		//vkDestroyShaderModule(device, fragShaderModule, nullptr);
+		//vkDestroyShaderModule(device, vertShaderModule, nullptr);
 		return false;
 	}
 
@@ -1143,8 +1173,10 @@ bool jRHI_Vulkan::CreateGraphicsPipeline()
 	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 
 	// Shader stage
-	pipelineInfo.stageCount = 2;
-	pipelineInfo.pStages = shaderStage;
+	//pipelineInfo.stageCount = 2;
+	//pipelineInfo.pStages = shaderStage;
+	pipelineInfo.stageCount = (uint32)shader_vk->ShaderStages.size();
+	pipelineInfo.pStages = shader_vk->ShaderStages.data();
 
 	// Fixed-function stage
 	pipelineInfo.pVertexInputState = &vertexInputInfo;
@@ -1172,13 +1204,13 @@ bool jRHI_Vulkan::CreateGraphicsPipeline()
 	// 굉장히 빠르게 할수있다. (듣기로는 대략 1/10 의 속도로 생성해낼 수 있다고 함)
 	if (!ensure(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) == VK_SUCCESS))
 	{
-		vkDestroyShaderModule(device, fragShaderModule, nullptr);
-		vkDestroyShaderModule(device, vertShaderModule, nullptr);
+		//vkDestroyShaderModule(device, fragShaderModule, nullptr);
+		//vkDestroyShaderModule(device, vertShaderModule, nullptr);
 		return false;
 	}
 
-	vkDestroyShaderModule(device, fragShaderModule, nullptr);
-	vkDestroyShaderModule(device, vertShaderModule, nullptr);
+	//vkDestroyShaderModule(device, fragShaderModule, nullptr);
+	//vkDestroyShaderModule(device, vertShaderModule, nullptr);
 
 	return true;
 }
@@ -2231,6 +2263,95 @@ jTexture* jRHI_Vulkan::CreateTextureFromData(void* data, int32 width, int32 heig
 	return texture;
 }
 
+jShader* jRHI_Vulkan::CreateShader(const jShaderInfo& shaderInfo) const
+{
+	auto shader = new jShader_Vulkan();
+	CreateShader(shader, shaderInfo);
+	return shader;
+}
+
+bool jRHI_Vulkan::CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo) const
+{
+	auto CreateShaderModule = [](const std::vector<char>& code) -> VkShaderModule
+	{
+		VkShaderModuleCreateInfo createInfo = {};
+		createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+		createInfo.codeSize = code.size();
+
+		// pCode 가 uint32_t* 형이라서 4 byte aligned 된 메모리를 넘겨줘야 함.
+		// 다행히 std::vector의 default allocator가 가 메모리 할당시 4 byte aligned 을 이미 하고있어서 그대로 씀.
+		createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+
+		VkShaderModule shaderModule = {};
+		ensure(vkCreateShaderModule(g_rhi_vk->device, &createInfo, nullptr, &shaderModule) == VK_SUCCESS);
+
+		// compiling or linking 과정이 graphics pipeline 이 생성되기 전까지 처리되지 않는다.
+		// 그래픽스 파이프라인이 생성된 후 VkShaderModule은 즉시 소멸 가능.
+		return shaderModule;
+	};
+
+	jShader_Vulkan* shader_vk = (jShader_Vulkan*)OutShader;
+
+	if (shaderInfo.cs.length() > 0)
+	{
+		auto csShaderCode = ReadFile(shaderInfo.cs);
+		VkShaderModule computeShaderModule = CreateShaderModule(csShaderCode);
+
+		VkPipelineShaderStageCreateInfo computeShaderStageInfo = {};
+		computeShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		computeShaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+		computeShaderStageInfo.module = computeShaderModule;
+		computeShaderStageInfo.pName = "main";
+
+		shader_vk->ShaderStages.push_back(computeShaderStageInfo);
+	}
+	else
+	{
+		if (shaderInfo.vs.length() > 0)
+		{
+			auto vertShaderCode = ReadFile(shaderInfo.vs);
+			VkShaderModule vertShaderModule = CreateShaderModule(vertShaderCode);
+			VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
+			vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+			vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+			vertShaderStageInfo.module = vertShaderModule;
+			vertShaderStageInfo.pName = "main";
+			// pSpecializationInfo 을 통해 쉐이더에서 사용하는 상수값을 설정해줄 수 있음. 이 상수 값에 따라 if 분기문에 없어지거나 하는 최적화가 일어날 수 있음.
+			//vertShaderStageInfo.pSpecializationInfo
+
+			shader_vk->ShaderStages.push_back(vertShaderStageInfo);
+		}
+
+		if (shaderInfo.gs.length() > 0)
+		{
+			auto geoShaderCode = ReadFile(shaderInfo.gs);
+			VkShaderModule geoShaderModule = CreateShaderModule(geoShaderCode);
+			VkPipelineShaderStageCreateInfo geoShaderStageInfo = {};
+			geoShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+			geoShaderStageInfo.stage = VK_SHADER_STAGE_GEOMETRY_BIT;
+			geoShaderStageInfo.module = geoShaderModule;
+			geoShaderStageInfo.pName = "main";
+
+			shader_vk->ShaderStages.push_back(geoShaderStageInfo);
+		}
+
+		if (shaderInfo.fs.length() > 0)
+		{
+			auto fragShaderCode = ReadFile(shaderInfo.fs);
+			VkShaderModule fragShaderModule = CreateShaderModule(fragShaderCode);
+			VkPipelineShaderStageCreateInfo fragShaderStageInfo = {};
+			fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+			fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+			fragShaderStageInfo.module = fragShaderModule;
+			fragShaderStageInfo.pName = "main";
+
+			shader_vk->ShaderStages.push_back(fragShaderStageInfo);
+		}
+	}
+
+	return true;
+}
+
 void jRenderPass_Vulkan::Release()
 {
     vkDestroyRenderPass(g_rhi_vk->device, RenderPass, nullptr);
@@ -2704,4 +2825,3 @@ void jVertexBuffer_Vulkan::Bind(const jCommandBuffer_Vulkan& commandBuffer) cons
 }
 
 #endif // USE_VULKAN
-

@@ -3,6 +3,7 @@
 #if USE_VULKAN
 
 #include "jRHI.h"
+#include "jShader.h"
 
 #define VALIDATION_LAYER_VERBOSE 0
 #define MULTIPLE_FRAME 1
@@ -477,6 +478,46 @@ struct jIndexBuffer_Vulkan : public jIndexBuffer
 	{
 		return IndexStreamData->ElementCount;
 	}
+};
+
+struct jRasterizationStateInfo_Vulkan : public jRasterizationStateInfo
+{
+	virtual ~jRasterizationStateInfo_Vulkan() {}
+	virtual void Initialize() override;
+
+	VkPipelineRasterizationStateCreateInfo RasterizationStateInfo = {};
+};
+
+struct jMultisampleStateInfo_Vulkan : public jMultisampleStateInfo
+{
+	virtual ~jMultisampleStateInfo_Vulkan() {}
+	virtual void Initialize() override;
+
+	VkPipelineMultisampleStateCreateInfo MultisampleStateInfo = {};
+};
+
+struct jStencilOpStateInfo_Vulkan : public jStencilOpStateInfo
+{
+	virtual ~jStencilOpStateInfo_Vulkan() {}
+	virtual void Initialize() override;
+
+	VkStencilOpState StencilOpStateInfo = {};
+};
+
+struct jDepthStencilStateInfo_Vulkan : public jDepthStencilStateInfo
+{
+	virtual ~jDepthStencilStateInfo_Vulkan() {}
+	virtual void Initialize() override;
+
+	VkPipelineDepthStencilStateCreateInfo DepthStencilStateInfo = {};
+};
+
+struct jBlendingStateInfo_Vulakn : public jBlendingStateInfo
+{
+	virtual ~jBlendingStateInfo_Vulakn() {}
+	virtual void Initialize() override;
+
+	VkPipelineColorBlendAttachmentState ColorBlendAttachmentInfo = {};
 };
 
 // todo
@@ -1381,11 +1422,15 @@ public:
 	jIndexBuffer* IndexBuffer = nullptr;
 
 	jShaderBindingsManager_Vulkan ShaderBindingsManager;
+
+	jShader* Shader = nullptr;
 	//////////////////////////////////////////////////////////////////////////
 	virtual jVertexBuffer* CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const override;
 	virtual jIndexBuffer* CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const override;
 	virtual jTexture* CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
 		, EFormatType dataType = EFormatType::UNSIGNED_BYTE, ETextureFormat textureFormat = ETextureFormat::RGBA, bool createMipmap = false) const override;
+	virtual jShader* CreateShader(const jShaderInfo& shaderInfo) const;
+	virtual bool CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo) const;
 };
 
 extern jRHI_Vulkan* g_rhi_vk;
@@ -1414,5 +1459,19 @@ struct EmptyUniform : public IEmptyUniform // todo remove
 			| VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, Bufffer, BufferMemory);
 	}
 };
+
+struct jShader_Vulkan : public jShader
+{
+	virtual ~jShader_Vulkan()
+	{
+		for (auto& Stage : ShaderStages)
+		{
+			vkDestroyShaderModule(g_rhi_vk->device, Stage.module, nullptr);
+		}
+	}
+
+	std::vector<VkPipelineShaderStageCreateInfo> ShaderStages;
+};
+
 
 #endif // USE_VULKAN
