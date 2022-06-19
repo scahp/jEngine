@@ -83,7 +83,7 @@ protected:
 	Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
 	ERenderBufferType ClearType = ERenderBufferType::NONE;
 	bool EnableDepthTest = true;
-	EComparisonFunc DepthStencilFunc = EComparisonFunc::LESS;
+	EComparisonOp DepthStencilFunc = EComparisonOp::LESS;
 	bool EnableBlend = false;
 	EBlendSrc BlendSrc = EBlendSrc::ONE;
 	EBlendDest BlendDest = EBlendDest::ONE_MINUS_SRC_ALPHA;

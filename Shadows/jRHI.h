@@ -53,16 +53,25 @@ struct jTexture
 struct jViewport
 {
 	jViewport() = default;
-	jViewport(int32 x, int32 y, int32 width, int32 height)
+	jViewport(int32 x, int32 y, int32 width, int32 height, float minDepth = 0.0f, float maxDepth = 1.0f)
 		: X(static_cast<float>(x)), Y(static_cast<float>(y))
-		, Width(static_cast<float>(width)), Height(static_cast<float>(height)) 
+		, Width(static_cast<float>(width)), Height(static_cast<float>(height))
+		, MinDepth(minDepth), MaxDepth(maxDepth)
 	{}
-	jViewport(float x, float y, float width, float height) : X(x), Y(y), Width(width), Height(height) {}
+	jViewport(float x, float y, float width, float height, float minDepth = 0.0f, float maxDepth = 1.0f) : X(x), Y(y), Width(width), Height(height), MinDepth(minDepth), MaxDepth(maxDepth) {}
 
 	float X = 0.0f;
 	float Y = 0.0f;
 	float Width = 0.0f;
 	float Height = 0.0f;
+	float MinDepth = 0.0f;
+	float MaxDepth = 1.0f;
+};
+
+struct jScissor
+{
+	Vector2i Offset;
+	Vector2i Extent;
 };
 
 enum class EUniformType
@@ -362,7 +371,7 @@ struct jSamplerStateInfo
 	float MipLODBias = 0.0f;
 	float MaxAnisotropy = 1.0f;			// if you anisotropy filtering tuned on, set this variable greater than 1.
 	ETextureComparisonMode TextureComparisonMode = ETextureComparisonMode::NONE;
-	EComparisonFunc ComparisonFunc = EComparisonFunc::LESS;
+	EComparisonOp ComparisonFunc = EComparisonOp::LESS;
 	Vector4 BorderColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
 	float MinLOD = -FLT_MAX;
 	float MaxLOD = FLT_MAX;
@@ -458,13 +467,13 @@ public:
 	virtual void EnableBlend(bool enable) const {}
 	virtual void SetBlendFunc(EBlendSrc src, EBlendDest dest) const {}
 	virtual void SetBlendFuncRT(EBlendSrc src, EBlendDest dest, int32 rtIndex = 0) const {}
-	virtual void SetBlendEquation(EBlendEquation func) const {}
-	virtual void SetBlendEquation(EBlendEquation func, int32 rtIndex) const {}
+	virtual void SetBlendEquation(EBlendOp func) const {}
+	virtual void SetBlendEquation(EBlendOp func, int32 rtIndex) const {}
 	virtual void SetBlendColor(float r, float g, float b, float a) const {}
 	virtual void EnableStencil(bool enable) const {}
 	virtual void SetStencilOpSeparate(EFace face, EStencilOp sFail, EStencilOp dpFail, EStencilOp dpPass) const {}
-	virtual void SetStencilFunc(EComparisonFunc func, int32 ref, uint32 mask) const {}
-	virtual void SetDepthFunc(EComparisonFunc func) const {}
+	virtual void SetStencilFunc(EComparisonOp func, int32 ref, uint32 mask) const {}
+	virtual void SetDepthFunc(EComparisonOp func) const {}
 	virtual void SetDepthMask(bool enable) const {}
 	virtual void SetColorMask(bool r, bool g, bool b, bool a) const {}
 	virtual IUniformBufferBlock* CreateUniformBufferBlock(const char* blockname) const { return nullptr; }

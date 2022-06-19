@@ -201,7 +201,8 @@ public:
 		RenderPass = renderPass;
     }
 
-	void* GetFrameBuffer() { return FrameBuffer; }
+	void* GetFrameBuffer() const { return FrameBuffer; }
+	const jRenderPass* GetRenderPass() const { return RenderPass; }
 
 	bool CreateFrameBuffer(int32 index);
 	void Release();
@@ -240,6 +241,7 @@ struct jShadingBindingInstance
 	std::vector<jTexture*> Textures;
 
 	void UpdateShaderBindings();
+	void Bind(const class jCommandBuffer_Vulkan& commandBuffer) const;
 };
 
 struct jShaderBindings
@@ -247,6 +249,7 @@ struct jShaderBindings
     std::vector<TBindings> UniformBuffers;
     std::vector<TBindings> Textures;
     VkDescriptorSetLayout DescriptorSetLayout = nullptr;
+	VkPipelineLayout PipelineLayout = nullptr;
 
 	// Descriptor : 쉐이더가 버퍼나 이미지 같은 리소스에 자유롭게 접근하는 방법. 디스크립터의 사용방법은 아래 3가지로 구성됨.
 	//	1. Pipeline 생성 도중 Descriptor Set Layout 명세
@@ -286,6 +289,8 @@ struct jShaderBindings
 	}
 
 	void CreatePool();
+
+	VkPipelineLayout CreatePipelineLayout();
 };
 
 struct jTexture_Vulkan : public jTexture
@@ -534,7 +539,7 @@ public:
 	// GraphicsPipieline
 	//VkRenderPass renderPass;
 	//VkDescriptorSetLayout descriptorSetLayout;
-	VkPipelineLayout pipelineLayout;
+	//VkPipelineLayout pipelineLayout;
 	VkPipeline graphicsPipeline;
 
 	VkImage colorImage;
@@ -1346,22 +1351,11 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 
 	virtual bool InitRHI() override;
-	bool CreateRenderPass();
-	//bool CreateDescriptorSetLayout();
 	bool CreateGraphicsPipeline();
-	//bool CreateCommandPool();
 	bool CreateColorResources();
 	bool CreateDepthResources();
-	//bool CreateFrameBuffers();
-	//bool CreateTextureImage();
-	//bool CreateTextureSampler();
 	bool LoadModel();
-	//bool CreateVertexBuffer();
-	//bool CreateIndexBuffer();
-	//bool CreateUniformBuffers();
-	//bool CreateDescriptorPool();
-	//bool CreateDescriptorSets();
-	bool CreateCommandBuffers();
+	bool RecordCommandBuffers();
 	bool CreateSyncObjects();
 
 	// 여기 있을 것은 아님

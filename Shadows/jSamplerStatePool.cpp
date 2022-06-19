@@ -57,7 +57,7 @@ void jSamplerStatePool::CreateDefaultSamplerState()
 		info.AddressV = ETextureAddressMode::CLAMP_TO_EDGE;
 		info.AddressW = ETextureAddressMode::CLAMP_TO_EDGE;
 		info.TextureComparisonMode = ETextureComparisonMode::COMPARE_REF_TO_TEXTURE;
-		info.ComparisonFunc = EComparisonFunc::LESS;
+		info.ComparisonFunc = EComparisonOp::LESS;
 		CreateSamplerState(jName("LinearClampShadow"), info);
 	}
 	{

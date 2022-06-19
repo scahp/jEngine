@@ -152,17 +152,17 @@ FORCEINLINE uint32 GetOpenGLTextureAddressMode(ETextureAddressMode type)
 	);
 }
 
-FORCEINLINE uint32 GetOpenGLComparisonFunc(EComparisonFunc type)
+FORCEINLINE uint32 GetOpenGLComparisonFunc(EComparisonOp type)
 {
 	GENERATE_STATIC_CONVERSION_ARRAY(
-		CONVERSION_TYPE_ELEMENT(EComparisonFunc::NEVER, GL_NEVER),
-		CONVERSION_TYPE_ELEMENT(EComparisonFunc::LESS, GL_LESS),
-		CONVERSION_TYPE_ELEMENT(EComparisonFunc::EQUAL, GL_EQUAL),
-		CONVERSION_TYPE_ELEMENT(EComparisonFunc::LEQUAL, GL_LEQUAL),
-		CONVERSION_TYPE_ELEMENT(EComparisonFunc::GREATER, GL_GREATER),
-		CONVERSION_TYPE_ELEMENT(EComparisonFunc::NOTEQUAL, GL_NOTEQUAL),
-		CONVERSION_TYPE_ELEMENT(EComparisonFunc::GEQUAL, GL_GEQUAL),
-		CONVERSION_TYPE_ELEMENT(EComparisonFunc::ALWAYS, GL_ALWAYS)
+		CONVERSION_TYPE_ELEMENT(EComparisonOp::NEVER, GL_NEVER),
+		CONVERSION_TYPE_ELEMENT(EComparisonOp::LESS, GL_LESS),
+		CONVERSION_TYPE_ELEMENT(EComparisonOp::EQUAL, GL_EQUAL),
+		CONVERSION_TYPE_ELEMENT(EComparisonOp::LEQUAL, GL_LEQUAL),
+		CONVERSION_TYPE_ELEMENT(EComparisonOp::GREATER, GL_GREATER),
+		CONVERSION_TYPE_ELEMENT(EComparisonOp::NOTEQUAL, GL_NOTEQUAL),
+		CONVERSION_TYPE_ELEMENT(EComparisonOp::GEQUAL, GL_GEQUAL),
+		CONVERSION_TYPE_ELEMENT(EComparisonOp::ALWAYS, GL_ALWAYS)
 	);
 }
 
@@ -281,14 +281,14 @@ FORCEINLINE uint32 GetOpenGLBlendDest(EBlendDest type)
 	);
 }
 
-FORCEINLINE uint32 GetOpenGLBlendEquation(EBlendEquation type)
+FORCEINLINE uint32 GetOpenGLBlendEquation(EBlendOp type)
 {
 	GENERATE_STATIC_CONVERSION_ARRAY(
-		CONVERSION_TYPE_ELEMENT(EBlendEquation::ADD, GL_FUNC_ADD),
-		CONVERSION_TYPE_ELEMENT(EBlendEquation::SUBTRACT, GL_FUNC_SUBTRACT),
-		CONVERSION_TYPE_ELEMENT(EBlendEquation::REVERSE_SUBTRACT, GL_FUNC_REVERSE_SUBTRACT),
-		CONVERSION_TYPE_ELEMENT(EBlendEquation::MIN_VALUE, GL_MIN),
-		CONVERSION_TYPE_ELEMENT(EBlendEquation::MAX_VALUE, GL_MAX)
+		CONVERSION_TYPE_ELEMENT(EBlendOp::ADD, GL_FUNC_ADD),
+		CONVERSION_TYPE_ELEMENT(EBlendOp::SUBTRACT, GL_FUNC_SUBTRACT),
+		CONVERSION_TYPE_ELEMENT(EBlendOp::REVERSE_SUBTRACT, GL_FUNC_REVERSE_SUBTRACT),
+		CONVERSION_TYPE_ELEMENT(EBlendOp::MIN_VALUE, GL_MIN),
+		CONVERSION_TYPE_ELEMENT(EBlendOp::MAX_VALUE, GL_MAX)
 	);
 }
 
@@ -2006,13 +2006,13 @@ void jRHI_OpenGL::SetBlendFuncRT(EBlendSrc src, EBlendDest dest, int32 rtIndex /
 	glBlendFunci(rtIndex, src_gl, dest_gl);
 }
 
-void jRHI_OpenGL::SetBlendEquation(EBlendEquation func) const
+void jRHI_OpenGL::SetBlendEquation(EBlendOp func) const
 {
 	const uint32 equation = GetOpenGLBlendEquation(func);
 	glBlendEquation(equation);
 }
 
-void jRHI_OpenGL::SetBlendEquation(EBlendEquation func, int32 rtIndex) const
+void jRHI_OpenGL::SetBlendEquation(EBlendOp func, int32 rtIndex) const
 {
 	const uint32 equation = GetOpenGLBlendEquation(func);
 	glBlendEquationi(equation, rtIndex);
@@ -2037,13 +2037,13 @@ void jRHI_OpenGL::SetStencilOpSeparate(EFace face, EStencilOp sFail, EStencilOp 
 	glStencilOpSeparate(face_gl, GetStencilOp(sFail), GetStencilOp(dpFail), GetStencilOp(dpPass));
 }
 
-void jRHI_OpenGL::SetStencilFunc(EComparisonFunc func, int32 ref, uint32 mask) const
+void jRHI_OpenGL::SetStencilFunc(EComparisonOp func, int32 ref, uint32 mask) const
 {
 	uint32 func_gl = GetOpenGLComparisonFunc(func);
 	glStencilFunc(func_gl, ref, mask);
 }
 
-void jRHI_OpenGL::SetDepthFunc(EComparisonFunc func) const
+void jRHI_OpenGL::SetDepthFunc(EComparisonOp func) const
 {
 	uint32 func_gl = GetOpenGLComparisonFunc(func);
 	glDepthFunc(func_gl);

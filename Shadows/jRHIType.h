@@ -216,7 +216,7 @@ enum class EBlendDest : uint8
 	MAX
 };
 
-enum class EBlendEquation : uint8
+enum class EBlendOp : uint8
 {
 	ADD = 0,
 	SUBTRACT,
@@ -247,7 +247,7 @@ enum class EStencilOp : uint8
 	MAX
 };
 
-enum class EComparisonFunc : uint8
+enum class EComparisonOp : uint8
 {
 	NEVER = 0,
 	LESS,
@@ -389,10 +389,20 @@ enum class EShaderAccessStageFlag : uint32
     ALL = 0x7FFFFFFF
 };
 
+enum class EColorMask : uint8
+{
+	NONE = 0,
+	R = 0x01,
+	G = 0x02,
+	B = 0x04,
+	A = 0x08,
+	ALL = 0x0F
+};
+
 struct jAttachment
 {
     ETextureFormat Format = ETextureFormat::RGBA8;
-    EMSAASamples Samples = EMSAASamples::COUNT_1;
+    EMSAASamples SampleCount = EMSAASamples::COUNT_1;
 
 	// 아래 2가지 옵션은 렌더링 전, 후에 attachment에 있는 데이터에 무엇을 할지 결정하는 부분.
 	// 1). loadOp
