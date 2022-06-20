@@ -52,7 +52,7 @@ void jEngine::Update(float deltaTime)
 
 void jEngine::Resize(int width, int height)
 {
-	glViewport(0, 0, width, height);
+	g_rhi->SetViewport(0, 0, width, height);
 }
 
 void jEngine::OnMouseButton()
