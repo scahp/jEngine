@@ -332,6 +332,13 @@ else()
     add_definitions(-DENABLE_OPT=0)
 endif()
 
+option(STL_ITER_CONT_DEBUG_LEVEL0 "STL_ITER_CONT_DEBUG_LEVEL0" ON)
+if(STL_ITER_CONT_DEBUG_LEVEL0)
+	add_definitions(-D_ITERATOR_DEBUG_LEVEL=0) 
+	add_definitions(-D_CONTAINER_DEBUG_LEVEL=0) 
+endif()
+
+
 add_subdirectory(glslang)
 add_subdirectory(OGLCompilersDLL)
 if(ENABLE_GLSLANG_BINARIES)
@@ -367,3 +374,4 @@ if(ENABLE_CTEST AND BUILD_TESTING)
         COMMAND bash ${IGNORE_CR_FLAG} runtests ${RESULTS_PATH} ${VALIDATOR_PATH} ${REMAP_PATH}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/Test/)
 endif()
+
