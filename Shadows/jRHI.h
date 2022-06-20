@@ -503,6 +503,7 @@ public:
 	virtual ~jRHI() {}
 
 	virtual bool InitRHI() { return false; }
+	virtual void ReleaseRHI() {}
 	virtual void* GetWindow() const { return nullptr; }
 	virtual jSamplerState* CreateSamplerState(const jSamplerStateInfo& info) const { return nullptr; }
 	virtual void ReleaseSamplerState(jSamplerState* samplerState) const {}

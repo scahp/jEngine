@@ -6,6 +6,7 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"	// 이거 안쓸예정
 #include "jImageFileLoader.h"
+#include "jFile.h"
 
 jRHI_Vulkan* g_rhi_vk = nullptr;
 std::unordered_map<size_t, VkPipeline> jPipelineStateInfo::PipelineStatePool;
@@ -162,7 +163,11 @@ bool jRHI_Vulkan::InitRHI()
 
 		if (!ensure(physicalDevice != VK_NULL_HANDLE))
 			return false;
+
+		vkGetPhysicalDeviceProperties(physicalDevice, &DeviceProperties);
 	}
+
+	jSpirvHelper::Init(DeviceProperties);
 
 	// Logical device
 	{
@@ -340,11 +345,15 @@ bool jRHI_Vulkan::InitRHI()
 	}
 
 	ensure(LoadModel());
-
 	ensure(CreateGraphicsPipeline());
     ensure(RecordCommandBuffers());
 
 	return true;
+}
+
+void jRHI_Vulkan::ReleaseRHI()
+{
+	jSpirvHelper::Finalize();
 }
 
 //std::vector<jAttachment> ColorAttachments;
@@ -742,8 +751,8 @@ bool jRHI_Vulkan::CreateGraphicsPipeline()
 {
 	jShaderInfo shaderInfo;
 	shaderInfo.name = "default_test";
-	shaderInfo.vs = "Shaders/vert.spv";
-	shaderInfo.fs = "Shaders/frag.spv";
+	shaderInfo.vs = "Shaders/Vulkan/shader_vs.glsl";
+	shaderInfo.fs = "Shaders/Vulkan/shader_fs.glsl";
 	auto Shader = g_rhi->CreateShader(shaderInfo);
 
 	auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
@@ -777,7 +786,7 @@ bool jRHI_Vulkan::CreateGraphicsPipeline()
 	auto DepthStencilState = TDepthStencilStateInfo<true, true, ECompareOp::LESS, false, false, nullptr, nullptr, 0.0f, 1.0f>::Create();
 	auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
 	PipelineState = jPipelineStateInfo(Shader, VertexBuffer, &ShaderBindings, &RenderPassTest, RasterizationState, MultisampleState, DepthStencilState, BlendingState
-		, jViewport(0.0f, 0.0f, swapChainExtent.width, swapChainExtent.height), jScissor(0, 0, swapChainExtent.width, swapChainExtent.height));
+		, jViewport(0.0f, 0.0f, (float)swapChainExtent.width, (float)swapChainExtent.height), jScissor(0, 0, swapChainExtent.width, swapChainExtent.height));
 
 	graphicsPipeline = PipelineState.CreateGraphicsPipelineState();
 
@@ -1841,11 +1850,11 @@ jShader* jRHI_Vulkan::CreateShader(const jShaderInfo& shaderInfo) const
 
 bool jRHI_Vulkan::CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo) const
 {
-	auto CreateShaderModule = [](const std::vector<char>& code) -> VkShaderModule
+	auto CreateShaderModule = [](const std::vector<uint32>& code) -> VkShaderModule
 	{
 		VkShaderModuleCreateInfo createInfo = {};
 		createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-		createInfo.codeSize = code.size();
+		createInfo.codeSize = code.size() * sizeof(uint32);
 
 		// pCode 가 uint32_t* 형이라서 4 byte aligned 된 메모리를 넘겨줘야 함.
 		// 다행히 std::vector의 default allocator가 가 메모리 할당시 4 byte aligned 을 이미 하고있어서 그대로 씀.
@@ -1863,8 +1872,14 @@ bool jRHI_Vulkan::CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo
 
 	if (shaderInfo.cs.length() > 0)
 	{
-		auto csShaderCode = ReadFile(shaderInfo.cs);
-		VkShaderModule computeShaderModule = CreateShaderModule(csShaderCode);
+		jFile csFile;
+		csFile.OpenFile(shaderInfo.cs.c_str(), FileType::TEXT, ReadWriteType::READ);
+		csFile.ReadFileToBuffer(false);
+		std::string csText(csFile.GetBuffer());
+
+		std::vector<uint32> SpirvCode;
+		jSpirvHelper::GLSLtoSPV(SpirvCode, EShLanguage::EShLangCompute, csText.data());
+		VkShaderModule computeShaderModule = CreateShaderModule(SpirvCode);
 
 		VkPipelineShaderStageCreateInfo computeShaderStageInfo = {};
 		computeShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -1878,8 +1893,14 @@ bool jRHI_Vulkan::CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo
 	{
 		if (shaderInfo.vs.length() > 0)
 		{
-			auto vertShaderCode = ReadFile(shaderInfo.vs);
-			VkShaderModule vertShaderModule = CreateShaderModule(vertShaderCode);
+			jFile vsFile;
+			vsFile.OpenFile(shaderInfo.vs.c_str(), FileType::TEXT, ReadWriteType::READ);
+			vsFile.ReadFileToBuffer(false);
+			std::string vsText(vsFile.GetBuffer());
+
+			std::vector<uint32> SpirvCode;
+			jSpirvHelper::GLSLtoSPV(SpirvCode, EShLanguage::EShLangVertex, vsText.data());
+			VkShaderModule vertShaderModule = CreateShaderModule(SpirvCode);
 			VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
 			vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 			vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
@@ -1893,8 +1914,14 @@ bool jRHI_Vulkan::CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo
 
 		if (shaderInfo.gs.length() > 0)
 		{
-			auto geoShaderCode = ReadFile(shaderInfo.gs);
-			VkShaderModule geoShaderModule = CreateShaderModule(geoShaderCode);
+			jFile gsFile;
+			gsFile.OpenFile(shaderInfo.gs.c_str(), FileType::TEXT, ReadWriteType::READ);
+			gsFile.ReadFileToBuffer(false);
+			std::string gsText(gsFile.GetBuffer());
+
+			std::vector<uint32> SpirvCode;
+			jSpirvHelper::GLSLtoSPV(SpirvCode, EShLanguage::EShLangGeometry, gsText.data());
+			VkShaderModule geoShaderModule = CreateShaderModule(SpirvCode);
 			VkPipelineShaderStageCreateInfo geoShaderStageInfo = {};
 			geoShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 			geoShaderStageInfo.stage = VK_SHADER_STAGE_GEOMETRY_BIT;
@@ -1906,8 +1933,14 @@ bool jRHI_Vulkan::CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo
 
 		if (shaderInfo.fs.length() > 0)
 		{
-			auto fragShaderCode = ReadFile(shaderInfo.fs);
-			VkShaderModule fragShaderModule = CreateShaderModule(fragShaderCode);
+			jFile fsFile;
+			fsFile.OpenFile(shaderInfo.fs.c_str(), FileType::TEXT, ReadWriteType::READ);
+			fsFile.ReadFileToBuffer(false);
+			std::string fsText(fsFile.GetBuffer());
+
+			std::vector<uint32> SpirvCode;
+			jSpirvHelper::GLSLtoSPV(SpirvCode, EShLanguage::EShLangFragment, fsText.data());
+			VkShaderModule fragShaderModule = CreateShaderModule(SpirvCode);
 			VkPipelineShaderStageCreateInfo fragShaderStageInfo = {};
 			fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 			fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;

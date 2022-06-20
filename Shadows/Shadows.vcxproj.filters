@@ -43,6 +43,9 @@
     <Filter Include="Core">
       <UniqueIdentifier>{624b473a-1da7-4d3c-aab8-9738c80fead3}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders\Vulkan">
+      <UniqueIdentifier>{6027e24a-4ae3-4dbf-8db8-f58d427ed687}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h">
@@ -210,6 +213,9 @@
     <ClInclude Include="Core\jName.h">
       <Filter>Core</Filter>
     </ClInclude>
+    <ClInclude Include="jSpirvHelper.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -358,6 +364,9 @@
     </ClCompile>
     <ClCompile Include="Core\jName.cpp">
       <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="jSpirvHelper.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -555,6 +564,12 @@
     </None>
     <None Include="Shaders\vs_graph.glsl">
       <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\Vulkan\shader_fs.glsl">
+      <Filter>Shaders\Vulkan</Filter>
+    </None>
+    <None Include="Shaders\Vulkan\shader_vs.glsl">
+      <Filter>Shaders\Vulkan</Filter>
     </None>
   </ItemGroup>
 </Project>

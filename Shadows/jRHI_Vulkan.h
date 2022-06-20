@@ -1464,6 +1464,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 
 	virtual bool InitRHI() override;
+	virtual void ReleaseRHI() override;
 	bool CreateGraphicsPipeline();
 	bool CreateColorResources();
 	bool CreateDepthResources();
@@ -1496,6 +1497,8 @@ public:
 	jShaderBindingsManager_Vulkan ShaderBindingsManager;
 
 	jPipelineStateInfo PipelineState;
+
+	VkPhysicalDeviceProperties DeviceProperties;
 
 	//////////////////////////////////////////////////////////////////////////
 	virtual jVertexBuffer* CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const override;

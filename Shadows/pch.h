@@ -36,6 +36,8 @@
 
 #include "External/cityhash/city.h"
 
+#include "jSpirvHelper.h"
+
 #define JASSERT(x) assert(x)
 #define JMESSAGE(x) MessageBoxA(0, x, "", MB_OK)
 
