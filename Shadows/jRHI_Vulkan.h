@@ -482,6 +482,8 @@ struct jIndexBuffer_Vulkan : public jIndexBuffer
 
 struct jRasterizationStateInfo_Vulkan : public jRasterizationStateInfo
 {
+	jRasterizationStateInfo_Vulkan() = default;
+	jRasterizationStateInfo_Vulkan(const jRasterizationStateInfo& state) : jRasterizationStateInfo(state) {}
 	virtual ~jRasterizationStateInfo_Vulkan() {}
 	virtual void Initialize() override;
 
@@ -490,6 +492,8 @@ struct jRasterizationStateInfo_Vulkan : public jRasterizationStateInfo
 
 struct jMultisampleStateInfo_Vulkan : public jMultisampleStateInfo
 {
+	jMultisampleStateInfo_Vulkan() = default;
+	jMultisampleStateInfo_Vulkan(const jMultisampleStateInfo& state) : jMultisampleStateInfo(state) {}
 	virtual ~jMultisampleStateInfo_Vulkan() {}
 	virtual void Initialize() override;
 
@@ -498,6 +502,8 @@ struct jMultisampleStateInfo_Vulkan : public jMultisampleStateInfo
 
 struct jStencilOpStateInfo_Vulkan : public jStencilOpStateInfo
 {
+	jStencilOpStateInfo_Vulkan() = default;
+	jStencilOpStateInfo_Vulkan(const jStencilOpStateInfo& state) : jStencilOpStateInfo(state) {}
 	virtual ~jStencilOpStateInfo_Vulkan() {}
 	virtual void Initialize() override;
 
@@ -506,6 +512,8 @@ struct jStencilOpStateInfo_Vulkan : public jStencilOpStateInfo
 
 struct jDepthStencilStateInfo_Vulkan : public jDepthStencilStateInfo
 {
+	jDepthStencilStateInfo_Vulkan() = default;
+	jDepthStencilStateInfo_Vulkan(const jDepthStencilStateInfo& state) : jDepthStencilStateInfo(state) {}
 	virtual ~jDepthStencilStateInfo_Vulkan() {}
 	virtual void Initialize() override;
 
@@ -514,10 +522,74 @@ struct jDepthStencilStateInfo_Vulkan : public jDepthStencilStateInfo
 
 struct jBlendingStateInfo_Vulakn : public jBlendingStateInfo
 {
+	jBlendingStateInfo_Vulakn() = default;
+	jBlendingStateInfo_Vulakn(const jBlendingStateInfo& state) : jBlendingStateInfo(state) {}
 	virtual ~jBlendingStateInfo_Vulakn() {}
 	virtual void Initialize() override;
 
 	VkPipelineColorBlendAttachmentState ColorBlendAttachmentInfo = {};
+};
+
+struct jPipelineStateInfo
+{
+	jPipelineStateInfo() = default;
+	jPipelineStateInfo(jShader* shader, jVertexBuffer* vertexBuffer, jShaderBindings* shaderBindings, jRenderPass* renderPass
+		, jRasterizationStateInfo* rasterizationState, jMultisampleStateInfo* multisampleState, jDepthStencilStateInfo* depthStencilState
+		, jBlendingStateInfo* blendingState, const std::vector<jViewport>& viewports, const std::vector<jScissor>& scissors)
+		: Shader(shader), VertexBuffer(vertexBuffer), ShaderBindings(shaderBindings), RenderPass(renderPass), RasterizationState(rasterizationState)
+		, MultisampleState(multisampleState), DepthStencilState(depthStencilState), BlendingState(blendingState), Viewports(Viewports), Scissors(scissors)
+	{}
+	jPipelineStateInfo(jShader* shader, jVertexBuffer* vertexBuffer, jShaderBindings* shaderBindings, jRenderPass* renderPass
+		, jRasterizationStateInfo* rasterizationState, jMultisampleStateInfo* multisampleState, jDepthStencilStateInfo* depthStencilState
+		, jBlendingStateInfo* blendingState, const jViewport& viewport, const jScissor& scissor)
+		: Shader(shader), VertexBuffer(vertexBuffer), ShaderBindings(shaderBindings), RenderPass(renderPass), RasterizationState(rasterizationState)
+		, MultisampleState(multisampleState), DepthStencilState(depthStencilState), BlendingState(blendingState), Viewports({ viewport }), Scissors({ scissor })
+	{}
+
+	size_t Hash = 0;
+
+	size_t CreateHash()
+	{
+		size_t result = 0;
+		result = Shader->ShaderInfo.CreateShaderHash();
+
+		for (int32 i = 0; i < Viewports.size(); ++i)
+			result ^= Viewports[i].CreateHash();
+
+		for (int32 i = 0; i < Scissors.size(); ++i)
+			result ^= Scissors[i].CreateHash();
+
+		// 아래 내용들도 해시를 만들 수 있어야 함, todo
+		result ^= (size_t)VertexBuffer;
+		result ^= (size_t)ShaderBindings;
+		result ^= (size_t)RenderPass;
+		result ^= (size_t)RasterizationState;
+		result ^= (size_t)MultisampleState;
+		result ^= (size_t)DepthStencilState;
+		result ^= (size_t)BlendingState;
+
+		Hash = result;
+
+		return result;
+	}
+
+	jShader* Shader = nullptr;
+
+	jVertexBuffer* VertexBuffer = nullptr;
+	std::vector<jViewport> Viewports;
+	std::vector<jScissor> Scissors;
+
+	jShaderBindings* ShaderBindings = nullptr;
+	jRenderPass* RenderPass = nullptr;
+
+	jRasterizationStateInfo* RasterizationState = nullptr;
+	jMultisampleStateInfo* MultisampleState = nullptr;
+	jDepthStencilStateInfo* DepthStencilState = nullptr;
+	jBlendingStateInfo* BlendingState = nullptr;
+
+	VkPipeline CreateGraphicsPipelineState();
+
+	static std::unordered_map<size_t, VkPipeline> PipelineStatePool;
 };
 
 // todo
@@ -1423,7 +1495,8 @@ public:
 
 	jShaderBindingsManager_Vulkan ShaderBindingsManager;
 
-	jShader* Shader = nullptr;
+	jPipelineStateInfo PipelineState;
+
 	//////////////////////////////////////////////////////////////////////////
 	virtual jVertexBuffer* CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const override;
 	virtual jIndexBuffer* CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const override;
@@ -1431,6 +1504,12 @@ public:
 		, EFormatType dataType = EFormatType::UNSIGNED_BYTE, ETextureFormat textureFormat = ETextureFormat::RGBA, bool createMipmap = false) const override;
 	virtual jShader* CreateShader(const jShaderInfo& shaderInfo) const;
 	virtual bool CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo) const;
+
+	virtual jRasterizationStateInfo* CreateRasterizationState(const jRasterizationStateInfo& initializer) const override;
+	virtual jMultisampleStateInfo* CreateMultisampleState(const jMultisampleStateInfo& initializer) const override;
+	virtual jStencilOpStateInfo* CreateStencilOpStateInfo(const jStencilOpStateInfo& initializer) const override;
+	virtual jDepthStencilStateInfo* CreateDepthStencilState(const jDepthStencilStateInfo& initializer) const override;
+	virtual jBlendingStateInfo* CreateBlendingState(const jBlendingStateInfo& initializer) const override;
 };
 
 extern jRHI_Vulkan* g_rhi_vk;

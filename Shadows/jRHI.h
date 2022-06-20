@@ -66,12 +66,38 @@ struct jViewport
 	float Height = 0.0f;
 	float MinDepth = 0.0f;
 	float MaxDepth = 1.0f;
+
+	size_t CreateHash()
+	{
+		size_t result = 0;
+		result = std::hash<float>{}(X);
+		result = std::hash<float>{}(Y);
+		result = std::hash<float>{}(Width);
+		result = std::hash<float>{}(Height);
+		result = std::hash<float>{}(MinDepth);
+		result = std::hash<float>{}(MaxDepth);
+		return result;
+	}
 };
 
 struct jScissor
 {
+	jScissor() = default;
+	jScissor(int32 x, int32 y, int32 width, int32 height)
+		: Offset(x, y), Extent(width, height)
+	{}
 	Vector2i Offset;
 	Vector2i Extent;
+
+	size_t CreateHash()
+	{
+		size_t result = 0;
+		result = std::hash<int32>{}(Offset.x);
+		result = std::hash<int32>{}(Offset.y);
+		result = std::hash<int32>{}(Extent.x);
+		result = std::hash<int32>{}(Extent.y);
+		return result;
+	}
 };
 
 enum class EUniformType
@@ -403,29 +429,6 @@ struct jRasterizationStateInfo
 	bool RasterizerDiscardEnable = false;
 };
 
-template <EPolygonMode TPolygonMode = EPolygonMode::FILL, ECullMode TCullMode = ECullMode::BACK, EFrontFace TFrontFace = EFrontFace::CCW,
-	bool TDepthBiasEnable = false, float TDepthBiasConstantFactor = 0.0f, float TDepthBiasClamp = 0.0f, float TDepthBiasSlopeFactor = 0.0f,
-	float TLineWidth = 1.0f, bool TDepthClampEnable = false, bool TRasterizerDiscardEnable = false>
-struct TRasterizationStateInfo
-{
-	FORCEINLINE static jRasterizationStateInfo Create()
-	{
-		jRasterizationStateInfo state;
-		state.PolygonMode = TPolygonMode;
-		state.CullMode = TCullMode;
-		state.FrontFace = TFrontFace;
-		state.DepthBiasEnable = TDepthBiasEnable;
-		state.DepthBiasConstantFactor = TDepthBiasConstantFactor;
-		state.DepthBiasClamp = TDepthBiasClamp;
-		state.DepthBiasSlopeFactor = TDepthBiasSlopeFactor;
-		state.LineWidth = TLineWidth;
-		state.DepthClampEnable = TDepthClampEnable;
-		state.RasterizerDiscardEnable = TRasterizerDiscardEnable;
-		state.Initialize();
-		return state;
-	}
-};
-
 struct jMultisampleStateInfo
 {
 	virtual ~jMultisampleStateInfo() {}
@@ -436,23 +439,6 @@ struct jMultisampleStateInfo
 	float MinSampleShading = 0.2f;
 	bool AlphaToCoverageEnable = false;
 	bool AlphaToOneEnable = false;
-};
-
-template <EMSAASamples TSampleCount = EMSAASamples::COUNT_1, bool TSampleShadingEnable = true, float TMinSampleShading = 0.2f,
-	bool TAlphaToCoverageEnable = false, bool TAlphaToOneEnable = false>
-struct TMultisampleStateInfo
-{
-	FORCEINLINE static jMultisampleStateInfo Create()
-	{
-		jMultisampleStateInfo state;
-		state.SampleCount = TSampleCount;
-		state.SampleShadingEnable = TSampleShadingEnable;		// Sample shading 켬	 (텍스쳐 내부에 있는 aliasing 도 완화 해줌)
-		state.MinSampleShading = TMinSampleShading;
-		state.AlphaToCoverageEnable = TAlphaToCoverageEnable;
-		state.AlphaToOneEnable = TAlphaToOneEnable;
-		state.Initialize();
-		return state;
-	}
 };
 
 struct jStencilOpStateInfo
@@ -467,25 +453,6 @@ struct jStencilOpStateInfo
 	uint32 CompareMask = 0;
 	uint32 WriteMask = 0;
 	uint32 Reference = 0;
-};
-
-template <EStencilOp TFailOp = EStencilOp::KEEP, EStencilOp TPassOp = EStencilOp::KEEP, EStencilOp TDepthFailOp = EStencilOp::KEEP,
-	ECompareOp TCompareOp = ECompareOp::NEVER, uint32 TCompareMask = 0, uint32 TWriteMask = 0, uint32 TReference = 0>
-struct TStencilOpStateInfo
-{
-	FORCEINLINE static jStencilOpStateInfo Create()
-	{
-		jStencilOpStateInfo state;
-		state.FailOp = TFailOp;
-		state.PassOp = TPassOp;
-		state.DepthFailOp = TDepthFailOp;
-		state.CompareOp = TCompareOp;
-		state.CompareMask = TCompareMask;
-		state.WriteMask = TWriteMask;
-		state.Reference = TReference;
-		state.Initialize();
-		return state;
-	}
 };
 
 struct jDepthStencilStateInfo
@@ -504,28 +471,6 @@ struct jDepthStencilStateInfo
 	float MaxDepthBounds = 1.0f;
 
 	// VkPipelineDepthStencilStateCreateFlags    flags;
-};
-
-template <bool TDepthTestEnable = false, bool TDepthWriteEnable = false, ECompareOp TDepthCompareOp = ECompareOp::LEQUAL,
-	bool TDepthBoundsTestEnable = false, bool TStencilTestEnable = false,
-	jStencilOpStateInfo* TFront = nullptr, jStencilOpStateInfo* TBack = nullptr,
-	float TMinDepthBounds = 0.0f, float TMaxDepthBounds = 1.0f>
-struct TDepthStencilStateInfo
-{
-	FORCEINLINE static jDepthStencilStateInfo Create()
-	{
-		jDepthStencilStateInfo state;
-		state.DepthTestEnable = TDepthTestEnable;
-		state.DepthWriteEnable = TDepthWriteEnable;
-		state.DepthCompareOp = TDepthCompareOp;
-		state.DepthBoundsTestEnable = TDepthBoundsTestEnable;
-		state.StencilTestEnable = TStencilTestEnable;
-		state.Front = TFront;
-		state.Back = TBack;
-		state.MinDepthBounds = TMinDepthBounds;
-		state.MaxDepthBounds = TMaxDepthBounds;
-		return state;
-	}
 };
 
 struct jBlendingStateInfo
@@ -548,26 +493,6 @@ struct jBlendingStateInfo
 	//uint32_t                                      attachmentCount;
 	//const VkPipelineColorBlendAttachmentState* pAttachments;
 	//float                                         blendConstants[4];
-};
-
-template <bool TBlendEnable = false, EBlendFactor TSrc = EBlendFactor::SRC_COLOR, EBlendFactor TDest = EBlendFactor::ONE_MINUS_SRC_ALPHA, EBlendOp TBlendOp = EBlendOp::ADD,
-	EBlendFactor TSrcAlpha = EBlendFactor::SRC_ALPHA, EBlendFactor TDestAlpha = EBlendFactor::ONE_MINUS_SRC_ALPHA, EBlendOp TAlphaBlendOp = EBlendOp::ADD,
-	EColorMask TColorWriteMask = EColorMask::NONE>
-struct TBlendingStateInfo
-{
-	FORCEINLINE static jBlendingStateInfo Create()
-	{
-		jBlendingStateInfo state;
-		state.BlendEnable = TBlendEnable;
-		state.Src = TSrc;
-		state.Dest = TDest;
-		state.BlendOp = TBlendOp;
-		state.SrcAlpha = TSrcAlpha;
-		state.DestAlpha = TDestAlpha;
-		state.AlphaBlendOp = TAlphaBlendOp;
-		state.ColorWriteMask = TColorWriteMask;
-		return state;
-	}
 };
 
 
@@ -692,6 +617,12 @@ public:
 	virtual void SetLineWidth(float width) const {}
 	virtual void Flush() const {}
 	virtual void Finish() const {}
+
+	virtual jRasterizationStateInfo* CreateRasterizationState(const jRasterizationStateInfo& initializer) const { return nullptr; }
+	virtual jMultisampleStateInfo* CreateMultisampleState(const jMultisampleStateInfo& initializer) const { return nullptr; }
+	virtual jStencilOpStateInfo* CreateStencilOpStateInfo(const jStencilOpStateInfo& initializer) const { return nullptr; }
+	virtual jDepthStencilStateInfo* CreateDepthStencilState(const jDepthStencilStateInfo& initializer) const { return nullptr; }
+	virtual jBlendingStateInfo* CreateBlendingState(const jBlendingStateInfo& initializer) const { return nullptr; }
 };
 
 // Not thred safe
@@ -755,3 +686,102 @@ DECLARE_UNIFORMBUFFER(EUniformType::VECTOR4I, Vector4i);
 
 jName GetCommonTextureName(int32 index);
 jName GetCommonTextureSRGBName(int32 index);
+
+//////////////////////////////////////////////////////////////////////////
+template <EPolygonMode TPolygonMode = EPolygonMode::FILL, ECullMode TCullMode = ECullMode::BACK, EFrontFace TFrontFace = EFrontFace::CCW,
+	bool TDepthBiasEnable = false, float TDepthBiasConstantFactor = 0.0f, float TDepthBiasClamp = 0.0f, float TDepthBiasSlopeFactor = 0.0f,
+	float TLineWidth = 1.0f, bool TDepthClampEnable = false, bool TRasterizerDiscardEnable = false>
+struct TRasterizationStateInfo
+{
+	FORCEINLINE static jRasterizationStateInfo* Create()
+	{
+		jRasterizationStateInfo initializer;
+		initializer.PolygonMode = TPolygonMode;
+		initializer.CullMode = TCullMode;
+		initializer.FrontFace = TFrontFace;
+		initializer.DepthBiasEnable = TDepthBiasEnable;
+		initializer.DepthBiasConstantFactor = TDepthBiasConstantFactor;
+		initializer.DepthBiasClamp = TDepthBiasClamp;
+		initializer.DepthBiasSlopeFactor = TDepthBiasSlopeFactor;
+		initializer.LineWidth = TLineWidth;
+		initializer.DepthClampEnable = TDepthClampEnable;
+		initializer.RasterizerDiscardEnable = TRasterizerDiscardEnable;
+		return g_rhi->CreateRasterizationState(initializer);
+	}
+};
+
+template <EMSAASamples TSampleCount = EMSAASamples::COUNT_1, bool TSampleShadingEnable = true, float TMinSampleShading = 0.2f,
+	bool TAlphaToCoverageEnable = false, bool TAlphaToOneEnable = false>
+struct TMultisampleStateInfo
+{
+	FORCEINLINE static jMultisampleStateInfo* Create()
+	{
+		jMultisampleStateInfo initializer;
+		initializer.SampleCount = TSampleCount;
+		initializer.SampleShadingEnable = TSampleShadingEnable;		// Sample shading 켬	 (텍스쳐 내부에 있는 aliasing 도 완화 해줌)
+		initializer.MinSampleShading = TMinSampleShading;
+		initializer.AlphaToCoverageEnable = TAlphaToCoverageEnable;
+		initializer.AlphaToOneEnable = TAlphaToOneEnable;
+		return g_rhi->CreateMultisampleState(initializer);
+	}
+};
+
+template <EStencilOp TFailOp = EStencilOp::KEEP, EStencilOp TPassOp = EStencilOp::KEEP, EStencilOp TDepthFailOp = EStencilOp::KEEP,
+	ECompareOp TCompareOp = ECompareOp::NEVER, uint32 TCompareMask = 0, uint32 TWriteMask = 0, uint32 TReference = 0>
+struct TStencilOpStateInfo
+{
+	FORCEINLINE static jStencilOpStateInfo* Create()
+	{
+		jStencilOpStateInfo initializer;
+		initializer.FailOp = TFailOp;
+		initializer.PassOp = TPassOp;
+		initializer.DepthFailOp = TDepthFailOp;
+		initializer.CompareOp = TCompareOp;
+		initializer.CompareMask = TCompareMask;
+		initializer.WriteMask = TWriteMask;
+		initializer.Reference = TReference;
+		return g_rhi->CreateStencilOpStateInfo(initializer);
+	}
+};
+
+template <bool TDepthTestEnable = false, bool TDepthWriteEnable = false, ECompareOp TDepthCompareOp = ECompareOp::LEQUAL,
+	bool TDepthBoundsTestEnable = false, bool TStencilTestEnable = false,
+	jStencilOpStateInfo* TFront = nullptr, jStencilOpStateInfo* TBack = nullptr,
+	float TMinDepthBounds = 0.0f, float TMaxDepthBounds = 1.0f>
+struct TDepthStencilStateInfo
+{
+	FORCEINLINE static jDepthStencilStateInfo* Create()
+	{
+		jDepthStencilStateInfo initializer;
+		initializer.DepthTestEnable = TDepthTestEnable;
+		initializer.DepthWriteEnable = TDepthWriteEnable;
+		initializer.DepthCompareOp = TDepthCompareOp;
+		initializer.DepthBoundsTestEnable = TDepthBoundsTestEnable;
+		initializer.StencilTestEnable = TStencilTestEnable;
+		initializer.Front = TFront;
+		initializer.Back = TBack;
+		initializer.MinDepthBounds = TMinDepthBounds;
+		initializer.MaxDepthBounds = TMaxDepthBounds;
+		return g_rhi->CreateDepthStencilState(initializer);
+	}
+};
+
+template <bool TBlendEnable = false, EBlendFactor TSrc = EBlendFactor::SRC_COLOR, EBlendFactor TDest = EBlendFactor::ONE_MINUS_SRC_ALPHA, EBlendOp TBlendOp = EBlendOp::ADD,
+	EBlendFactor TSrcAlpha = EBlendFactor::SRC_ALPHA, EBlendFactor TDestAlpha = EBlendFactor::ONE_MINUS_SRC_ALPHA, EBlendOp TAlphaBlendOp = EBlendOp::ADD,
+	EColorMask TColorWriteMask = EColorMask::NONE>
+struct TBlendingStateInfo
+{
+	FORCEINLINE static jBlendingStateInfo* Create()
+	{
+		jBlendingStateInfo initializer;
+		initializer.BlendEnable = TBlendEnable;
+		initializer.Src = TSrc;
+		initializer.Dest = TDest;
+		initializer.BlendOp = TBlendOp;
+		initializer.SrcAlpha = TSrcAlpha;
+		initializer.DestAlpha = TDestAlpha;
+		initializer.AlphaBlendOp = TAlphaBlendOp;
+		initializer.ColorWriteMask = TColorWriteMask;
+		return g_rhi->CreateBlendingState(initializer);
+	}
+};

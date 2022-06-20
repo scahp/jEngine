@@ -8,6 +8,7 @@
 #include "jImageFileLoader.h"
 
 jRHI_Vulkan* g_rhi_vk = nullptr;
+std::unordered_map<size_t, VkPipeline> jPipelineStateInfo::PipelineStatePool;
 
 VkSampler jTexture_Vulkan::CreateDefaultSamplerState()
 {
@@ -739,480 +740,48 @@ void jBlendingStateInfo_Vulakn::Initialize()
 
 bool jRHI_Vulkan::CreateGraphicsPipeline()
 {
-	struct jPipelineStateInfo
-	{
-		jShader* VertexShader = nullptr;
-		jShader* GeometryShader = nullptr;
-		jShader* PixelShader = nullptr;
-		jShader* ComputeShader = nullptr;
-
-		jVertexBuffer* VertexBuffer = nullptr;
-		std::vector<jViewport> Viewports;
-		std::vector<jScissor> Scissors;
-
-		jFrameBuffer* FrameBuffer = nullptr;
-		jShaderBindings* ShaderBindings = nullptr;
-
-		jRasterizationStateInfo RasterizationState;
-		jMultisampleStateInfo MultisampleSate;
-		jStencilOpStateInfo StencilOpState;
-		jDepthStencilStateInfo DepthStencilState;
-		jBlendingStateInfo BlendingState;
-
-		VkPipeline CreateGraphicsPipelineState()
-		{
-			VkPipeline t;
-			return t;
-
-			//// 1. Create Shader
-			//auto vertShaderCode = ReadFile("Shaders/vert.spv");
-			//auto fragShaderCode = ReadFile("Shaders/frag.spv");
-
-			//VkShaderModule vertShaderModule = CreateShaderModule(vertShaderCode);
-			//VkShaderModule fragShaderModule = CreateShaderModule(fragShaderCode);
-
-			//VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
-			//vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-			//vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-			//vertShaderStageInfo.module = vertShaderModule;
-			//vertShaderStageInfo.pName = "main";
-
-			//// pSpecializationInfo 을 통해 쉐이더에서 사용하는 상수값을 설정해줄 수 있음. 이 상수 값에 따라 if 분기문에 없어지거나 하는 최적화가 일어날 수 있음.
-			////vertShaderStageInfo.pSpecializationInfo
-
-			//VkPipelineShaderStageCreateInfo fragShaderStageInfo = {};
-			//fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-			//fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-			//fragShaderStageInfo.module = fragShaderModule;
-			//fragShaderStageInfo.pName = "main";
-
-			//VkPipelineShaderStageCreateInfo shaderStage[] = { vertShaderStageInfo, fragShaderStageInfo };
-			//// VkShaderModule 은 이 함수의 끝에서 Destroy 시킴
-
-			////////////////////////////////////////////////////////////////////////////
-			//// 2. Vertex Input
-			//// 1). Bindings : 데이터 사이의 간격과 버택스당 or 인스턴스당(인스턴싱 사용시) 데이터인지 여부
-			//// 2). Attribute descriptions : 버택스 쉐이더 전달되는 attributes 의 타입. 그것을 로드할 바인딩과 오프셋
-			//VkPipelineVertexInputStateCreateInfo vertexInputInfo = ((jVertexBuffer_Vulkan*)VertexBuffer)->CreateVertexInputState();
-
-			//// 3. Input Assembly
-			//VkPipelineInputAssemblyStateCreateInfo inputAssembly = ((jVertexBuffer_Vulkan*)VertexBuffer)->CreateInputAssemblyState();
-
-			//// 4. Viewports and scissors
-			//// SwapChain의 이미지 사이즈가 이 클래스에 정의된 상수 WIDTH, HEIGHT와 다를 수 있다는 것을 기억 해야함.
-			//// 그리고 Viewports 사이즈는 SwapChain 크기 이하로 마추면 됨.
-			//// [minDepth ~ maxDepth] 는 [0.0 ~ 1.0] 이며 특별한 경우가 아니면 이 범위로 사용하면 된다.
-			//// Scissor Rect 영역을 설정해주면 영역내에 있는 Pixel만 레스터라이저를 통과할 수 있으며 나머지는 버려(Discard)진다.
-			//std::vector<VkViewport> viewports;
-			//viewports.resize(Viewports.size());
-			//for (int32 i = 0; i < Viewports.size(); ++i)
-			//{
-			//	viewports[i].x = Viewports[i].X;
-			//	viewports[i].y = Viewports[i].Y;
-			//	viewports[i].width = Viewports[i].Width;
-			//	viewports[i].height = Viewports[i].Height;
-			//	viewports[i].minDepth = Viewports[i].MinDepth;
-			//	viewports[i].maxDepth = Viewports[i].MaxDepth;
-			//}
-
-			//std::vector<VkRect2D> scissors;
-			//scissors.resize(Scissors.size());
-			//for (int32 i = 0; i < Scissors.size(); ++i)
-			//{
-			//	scissors[i].offset = { .x = Scissors[i].Offset.x, .y = Scissors[i].Offset.y };
-			//	scissors[i].extent = { .width = (uint32)Scissors[i].Extent.x, .height = (uint32)Scissors[i].Extent.y };
-			//}
-
-			//// Viewport와 Scissor 를 여러개 설정할 수 있는 멀티 뷰포트를 사용할 수 있기 때문임
-			//VkPipelineViewportStateCreateInfo viewportState = {};
-			//viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-			//viewportState.viewportCount = viewports.size();
-			//viewportState.pViewports = &viewports[0];
-			//viewportState.scissorCount = scissors.size();
-			//viewportState.pScissors = &scissors[0];
-
-			//// 5. Rasterizer
-			//VkPipelineRasterizationStateCreateInfo rasterizer = {};
-			//rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-			//rasterizer.depthClampEnable = RasterizationState.DepthBiasClamp;		// 이 값이 VK_TRUE 면 Near나 Far을 벗어나는 영역을 [0.0 ~ 1.0]으로 Clamp 시켜줌.(쉐도우맵에서 유용)
-			//rasterizer.rasterizerDiscardEnable = RasterizationState.RasterizerDiscardEnable;	// 이 값이 VK_TRUE 면, 레스터라이저 스테이지를 통과할 수 없음. 즉 Framebuffer 로 결과가 넘어가지 않음.
-			//rasterizer.polygonMode = RasterizationState.PolygonMode VK_POLYGON_MODE_FILL;	// FILL, LINE, POINT 세가지가 있음
-			//rasterizer.lineWidth = RasterizationState.LineWidth;
-			//rasterizer.cullMode = RasterizationState.CullMode VK_CULL_MODE_BACK_BIT;
-			//rasterizer.frontFace = RasterizationState.FrontFace VK_FRONT_FACE_COUNTER_CLOCKWISE;
-			//rasterizer.depthBiasEnable = RasterizationState.DepthBiasEnable;			// 쉐도우맵 용
-			//rasterizer.depthBiasConstantFactor = RasterizationState.DepthBiasConstantFactor;		// Optional
-			//rasterizer.depthBiasClamp = RasterizationState.DepthBiasClamp;				// Optional
-			//rasterizer.depthBiasSlopeFactor = RasterizationState.DepthBiasSlopeFactor;			// Optional
-
-			//// 6. Multisampling
-			//// 현재는 사용하지 않음
-			//VkPipelineMultisampleStateCreateInfo multisampling = {};
-			//multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-			//multisampling.rasterizationSamples = (VkSampleCountFlagBits)MultisampleSate.SampleCount;
-			//multisampling.sampleShadingEnable = MultisampleSate.SampleShadingEnable;		// Sample shading 켬	 (텍스쳐 내부에 있는 aliasing 도 완화 해줌)
-			//multisampling.minSampleShading = MultisampleSate.MinSampleShading;
-			//multisampling.alphaToCoverageEnable = MultisampleSate.AlphaToCoverageEnable;		// Optional
-			//multisampling.alphaToOneEnable = MultisampleSate.AlphaToOneEnable;			// Optional
-
-			//// 7. Depth and stencil testing
-			//VkPipelineDepthStencilStateCreateInfo depthStencil = {};
-			//depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-			//depthStencil.depthTestEnable = DepthStencilState.DepthTestEnable;
-			//depthStencil.depthWriteEnable = DepthStencilState.DepthWriteEnable;
-			//depthStencil.depthCompareOp = DepthStencilState.DepthCompareOp VK_COMPARE_OP_LESS;
-			//depthStencil.depthBoundsTestEnable = DepthStencilState.DepthBoundsTestEnable;
-			//depthStencil.minDepthBounds = DepthStencilState.MinDepthBounds;		// Optional
-			//depthStencil.maxDepthBounds = DepthStencilState.MaxDepthBounds;		// Optional
-			//depthStencil.stencilTestEnable = DepthStencilState.StencilTestEnable;
-			//depthStencil.front = DepthStencilState.Front;
-			//depthStencil.back = DepthStencilState.Back;
-
-			//// 8. Color blending
-			//// 2가지 방식의 blending 이 있음
-			//// 1). 기존과 새로운 값을 섞어서 최종색을 만들어낸다.
-			//// 2). 기존과 새로운 값을 비트 연산으로 결합한다.
-			///*
-			//	// Blend 가 켜져있으면 대략 이런식으로 동작함
-			//	if (blendEnable)
-			//	{
-			//		finalColor.rgb = (srcColorBlendFactor * newColor.rgb) <colorBlendOp> (dstColorBlendFactor * oldColor.rgb);
-			//		finalColor.a = (srcAlphaBlendFactor * newColor.a) <alphaBlendOp> (dstAlphaBlendFactor * oldColor.a);
-			//	} else
-			//	{
-			//		finalColor = newColor;
-			//	}
-
-			//	finalColor = finalColor & colorWriteMask;
-			//*/			
-
-			//// 아래 내용들은 Attachment 정의할 때 같이 해주는게 나을까?
-
-			//VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
-			//colorBlendAttachment.colorWriteMask = BlendingState.ColorWriteMask;
-			//colorBlendAttachment.blendEnable = BlendingState.BlendEnable;						// 현재 VK_FALSE라 새로운 값이 그대로 사용됨
-			//colorBlendAttachment.srcColorBlendFactor = BlendingState.Src;		// Optional
-			//colorBlendAttachment.dstColorBlendFactor = BlendingState.Dest;	// Optional
-			//colorBlendAttachment.colorBlendOp = BlendingState.BlendOp;				// Optional
-			//colorBlendAttachment.srcAlphaBlendFactor = BlendingState.SrcAlpha;		// Optional
-			//colorBlendAttachment.dstAlphaBlendFactor = BlendingState.DestAlpha;	// Optional
-			//colorBlendAttachment.alphaBlendOp = BlendingState.AlphaBlendOp;				// Optional
-
-			//// 일반적인 경우 블랜드는 아래와 같은 식을 사용한다.
-			///*
-			//	finalColor.rgb = newAlpha * newColor + (1 - newAlpha) * oldColor;
-			//	finalColor.a = newAlpha.a;
-			//*/
-			//// 이렇게 하려면 아래와 같이 설정해야 함.
-			////colorBlendAttachment.blendEnable = VK_TRUE;
-			////colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-			////colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-			////colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
-			////colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-			////colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-			////colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
-
-			//// 2가지 blending 방식을 모두 끌 수도있는데 그렇게 되면, 변경되지 않은 fragment color 값이 그대로 framebuffer에 쓰여짐.
-			//VkPipelineColorBlendStateCreateInfo colorBlending = {};
-			//colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-			//// 2). 기존과 새로운 값을 비트 연산으로 결합한다.
-			//colorBlending.logicOpEnable = VK_FALSE;			// 모든 framebuffer에 사용하는 blendEnable을 VK_FALSE로 했다면 자동으로 logicOpEnable은 꺼진다.
-			//colorBlending.logicOp = VK_LOGIC_OP_COPY;		// Optional
-
-			//// 1). 기존과 새로운 값을 섞어서 최종색을 만들어낸다.
-			//colorBlending.attachmentCount = 1;						// framebuffer 개수에 맞게 설정해준다.
-			//colorBlending.pAttachments = &colorBlendAttachment;
-
-			//colorBlending.blendConstants[0] = 0.0f;		// Optional
-			//colorBlending.blendConstants[1] = 0.0f;		// Optional
-			//colorBlending.blendConstants[2] = 0.0f;		// Optional
-			//colorBlending.blendConstants[3] = 0.0f;		// Optional
-
-			//// 9. Dynamic state
-			//// 이전에 정의한 state에서 제한된 범위 내에서 새로운 pipeline을 만들지 않고 state를 변경할 수 있음. (viewport size, line width, blend constants)
-			//// 이것을 하고싶으면 Dynamic state를 만들어야 함. 이경우 Pipeline에 설정된 값은 무시되고, 매 렌더링시에 새로 설정해줘야 함.
-			//VkDynamicState dynamicStates[] = {
-			//	VK_DYNAMIC_STATE_VIEWPORT,
-			//	VK_DYNAMIC_STATE_LINE_WIDTH
-			//};
-			//// 현재는 사용하지 않음.
-			////VkPipelineDynamicStateCreateInfo dynamicState = {};
-			////dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-			////dynamicState.dynamicStateCount = 2;
-			////dynamicState.pDynamicStates = dynamicStates;
-
-			//// 10. Pipeline layout
-			//VkPipelineLayout pipelineLayout = ShaderBindings.CreatePipelineLayout();
-			//if (!ensure(pipelineLayout))
-			//{
-			//	vkDestroyShaderModule(device, fragShaderModule, nullptr);
-			//	vkDestroyShaderModule(device, vertShaderModule, nullptr);
-			//	return false;
-			//}
-
-			//VkGraphicsPipelineCreateInfo pipelineInfo = {};
-			//pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-
-			//// Shader stage
-			//pipelineInfo.stageCount = 2;
-			//pipelineInfo.pStages = shaderStage;
-
-			//// Fixed-function stage
-			//pipelineInfo.pVertexInputState = &vertexInputInfo;
-			//pipelineInfo.pInputAssemblyState = &inputAssembly;
-			//pipelineInfo.pViewportState = &viewportState;
-			//pipelineInfo.pRasterizationState = &rasterizer;
-			//pipelineInfo.pMultisampleState = &multisampling;
-			//pipelineInfo.pDepthStencilState = &depthStencil;
-			//pipelineInfo.pColorBlendState = &colorBlending;
-			//pipelineInfo.pDynamicState = nullptr;			// Optional
-			//pipelineInfo.layout = pipelineLayout;
-			//pipelineInfo.renderPass = (VkRenderPass)RenderPassTest.GetRenderPass();
-			//pipelineInfo.subpass = 0;		// index of subpass
-
-			//// Pipeline을 상속받을 수 있는데, 아래와 같은 장점이 있다.
-			//// 1). 공통된 내용이 많으면 파이프라인 설정이 저렴하다.
-			//// 2). 공통된 부모를 가진 파이프라인 들끼리의 전환이 더 빠를 수 있다.
-			//// BasePipelineHandle 이나 BasePipelineIndex 가 로 Pipeline 내용을 상속받을 수 있다.
-			//// 이 기능을 사용하려면 VkGraphicsPipelineCreateInfo의 flags 에 VK_PIPELINE_CREATE_DERIVATIVE_BIT  가 설정되어있어야 함
-			//pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;		// Optional
-			//pipelineInfo.basePipelineIndex = -1;					// Optional
-
-			//// 여기서 두번째 파라메터 VkPipelineCache에 VK_NULL_HANDLE을 넘겼는데, VkPipelineCache는 VkPipeline을 저장하고 생성하는데 재사용할 수 있음.
-			//// 또한 파일로드 저장할 수 있어서 다른 프로그램에서 다시 사용할 수도있다. VkPipelineCache를 사용하면 VkPipeline을 생성하는 시간을 
-			//// 굉장히 빠르게 할수있다. (듣기로는 대략 1/10 의 속도로 생성해낼 수 있다고 함)
-			//if (!ensure(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) == VK_SUCCESS))
-			//	return false;
-
-			//return true;
-		}
-	};
-
 	jShaderInfo shaderInfo;
 	shaderInfo.name = "default_test";
 	shaderInfo.vs = "Shaders/vert.spv";
 	shaderInfo.fs = "Shaders/frag.spv";
-	Shader = g_rhi->CreateShader(shaderInfo);
-	auto shader_vk = (jShader_Vulkan*)Shader;
+	auto Shader = g_rhi->CreateShader(shaderInfo);
 
-	//// 1. Create Shader
-	//auto vertShaderCode = ReadFile("Shaders/vert.spv");
-	//auto fragShaderCode = ReadFile("Shaders/frag.spv");
-
-	//VkShaderModule vertShaderModule = CreateShaderModule(vertShaderCode);
-	//VkShaderModule fragShaderModule = CreateShaderModule(fragShaderCode);
-
-	//VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
-	//vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	//vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-	//vertShaderStageInfo.module = vertShaderModule;
-	//vertShaderStageInfo.pName = "main";
-
-	//// pSpecializationInfo 을 통해 쉐이더에서 사용하는 상수값을 설정해줄 수 있음. 이 상수 값에 따라 if 분기문에 없어지거나 하는 최적화가 일어날 수 있음.
-	////vertShaderStageInfo.pSpecializationInfo
-
-	//VkPipelineShaderStageCreateInfo fragShaderStageInfo = {};
-	//fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	//fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-	//fragShaderStageInfo.module = fragShaderModule;
-	//fragShaderStageInfo.pName = "main";
-
-	//VkPipelineShaderStageCreateInfo shaderStage[] = { vertShaderStageInfo, fragShaderStageInfo };
-	// VkShaderModule 은 이 함수의 끝에서 Destroy 시킴
-
-	// 2. Vertex Input
-	// 1). Bindings : 데이터 사이의 간격과 버택스당 or 인스턴스당(인스턴싱 사용시) 데이터인지 여부
-	// 2). Attribute descriptions : 버택스 쉐이더 전달되는 attributes 의 타입. 그것을 로드할 바인딩과 오프셋
-	VkPipelineVertexInputStateCreateInfo vertexInputInfo = ((jVertexBuffer_Vulkan*)VertexBuffer)->CreateVertexInputState();
-
-	// 3. Input Assembly
-	VkPipelineInputAssemblyStateCreateInfo inputAssembly = ((jVertexBuffer_Vulkan*)VertexBuffer)->CreateInputAssemblyState();
-
-	// 4. Viewports and scissors
-	// SwapChain의 이미지 사이즈가 이 클래스에 정의된 상수 WIDTH, HEIGHT와 다를 수 있다는 것을 기억 해야함.
-	// 그리고 Viewports 사이즈는 SwapChain 크기 이하로 마추면 됨.
-	// [minDepth ~ maxDepth] 는 [0.0 ~ 1.0] 이며 특별한 경우가 아니면 이 범위로 사용하면 된다.
-	// Scissor Rect 영역을 설정해주면 영역내에 있는 Pixel만 레스터라이저를 통과할 수 있으며 나머지는 버려(Discard)진다.
-	VkViewport viewport = {};
-	viewport.x = 0.0f;
-	viewport.y = 0.0f;
-	viewport.width = static_cast<float>(swapChainExtent.width);
-	viewport.height = static_cast<float>(swapChainExtent.height);
-	viewport.minDepth = 0.0f;
-	viewport.maxDepth = 1.0f;
-
-	VkRect2D scissor = {};
-	scissor.offset = { 0, 0 };
-	scissor.extent = swapChainExtent;
-
-	// Viewport와 Scissor 를 여러개 설정할 수 있는 멀티 뷰포트를 사용할 수 있기 때문임
-	VkPipelineViewportStateCreateInfo viewportState = {};
-	viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-	viewportState.viewportCount = 1;
-	viewportState.pViewports = &viewport;
-	viewportState.scissorCount = 1;
-	viewportState.pScissors = &scissor;
-
-	// 5. Rasterizer
-	VkPipelineRasterizationStateCreateInfo rasterizer = {};
-	rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-	rasterizer.depthClampEnable = VK_FALSE;		// 이 값이 VK_TRUE 면 Near나 Far을 벗어나는 영역을 [0.0 ~ 1.0]으로 Clamp 시켜줌.(쉐도우맵에서 유용)
-	rasterizer.rasterizerDiscardEnable = VK_FALSE;	// 이 값이 VK_TRUE 면, 레스터라이저 스테이지를 통과할 수 없음. 즉 Framebuffer 로 결과가 넘어가지 않음.
-	rasterizer.polygonMode = VK_POLYGON_MODE_FILL;	// FILL, LINE, POINT 세가지가 있음
-	rasterizer.lineWidth = 1.0f;
-	rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-	//rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
-	rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-	rasterizer.depthBiasEnable = VK_FALSE;			// 쉐도우맵 용
-	rasterizer.depthBiasConstantFactor = 0.0f;		// Optional
-	rasterizer.depthBiasClamp = 0.0f;				// Optional
-	rasterizer.depthBiasSlopeFactor = 0.0f;			// Optional
-
-	// 6. Multisampling
-	// 현재는 사용하지 않음
-	VkPipelineMultisampleStateCreateInfo multisampling = {};
-	multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-	multisampling.rasterizationSamples = msaaSamples;
-	multisampling.sampleShadingEnable = VK_TRUE;		// Sample shading 켬	 (텍스쳐 내부에 있는 aliasing 도 완화 해줌)
-	multisampling.minSampleShading = 0.2f;
-	multisampling.pSampleMask = nullptr;				// Optional
-	multisampling.alphaToCoverageEnable = VK_FALSE;		// Optional
-	multisampling.alphaToOneEnable = VK_FALSE;			// Optional
-
-	// 7. Depth and stencil testing
-	VkPipelineDepthStencilStateCreateInfo depthStencil = {};
-	depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-	depthStencil.depthTestEnable = VK_TRUE;
-	depthStencil.depthWriteEnable = VK_TRUE;
-	depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
-	depthStencil.depthBoundsTestEnable = VK_FALSE;
-	depthStencil.minDepthBounds = 0.0f;		// Optional
-	depthStencil.maxDepthBounds = 1.0f;		// Optional
-
-	// 8. Color blending
-	// 2가지 방식의 blending 이 있음
-	// 1). 기존과 새로운 값을 섞어서 최종색을 만들어낸다.
-	// 2). 기존과 새로운 값을 비트 연산으로 결합한다.
-	/*
-		// Blend 가 켜져있으면 대략 이런식으로 동작함
-		if (blendEnable)
-		{
-			finalColor.rgb = (srcColorBlendFactor * newColor.rgb) <colorBlendOp> (dstColorBlendFactor * oldColor.rgb);
-			finalColor.a = (srcAlphaBlendFactor * newColor.a) <alphaBlendOp> (dstAlphaBlendFactor * oldColor.a);
-		} else
-		{
-			finalColor = newColor;
-		}
-
-		finalColor = finalColor & colorWriteMask;
-	*/
-	VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
-	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-	colorBlendAttachment.blendEnable = VK_FALSE;						// 현재 VK_FALSE라 새로운 값이 그대로 사용됨
-	colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;		// Optional
-	colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;	// Optional
-	colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;				// Optional
-	colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;		// Optional
-	colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;	// Optional
-	colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;				// Optional
-
-	// 일반적인 경우 블랜드는 아래와 같은 식을 사용한다.
-	/*
-		finalColor.rgb = newAlpha * newColor + (1 - newAlpha) * oldColor;
-		finalColor.a = newAlpha.a;
-	*/
-	// 이렇게 하려면 아래와 같이 설정해야 함.
-	//colorBlendAttachment.blendEnable = VK_TRUE;
-	//colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-	//colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-	//colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
-	//colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-	//colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-	//colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
-
-	// 2가지 blending 방식을 모두 끌 수도있는데 그렇게 되면, 변경되지 않은 fragment color 값이 그대로 framebuffer에 쓰여짐.
-	VkPipelineColorBlendStateCreateInfo colorBlending = {};
-	colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-
-	// 2). 기존과 새로운 값을 비트 연산으로 결합한다.
-	colorBlending.logicOpEnable = VK_FALSE;			// 모든 framebuffer에 사용하는 blendEnable을 VK_FALSE로 했다면 자동으로 logicOpEnable은 꺼진다.
-	colorBlending.logicOp = VK_LOGIC_OP_COPY;		// Optional
-
-	// 1). 기존과 새로운 값을 섞어서 최종색을 만들어낸다.
-	colorBlending.attachmentCount = 1;						// framebuffer 개수에 맞게 설정해준다.
-	colorBlending.pAttachments = &colorBlendAttachment;
-
-	colorBlending.blendConstants[0] = 0.0f;		// Optional
-	colorBlending.blendConstants[1] = 0.0f;		// Optional
-	colorBlending.blendConstants[2] = 0.0f;		// Optional
-	colorBlending.blendConstants[3] = 0.0f;		// Optional
-
-	// 9. Dynamic state
-	// 이전에 정의한 state에서 제한된 범위 내에서 새로운 pipeline을 만들지 않고 state를 변경할 수 있음. (viewport size, line width, blend constants)
-	// 이것을 하고싶으면 Dynamic state를 만들어야 함. 이경우 Pipeline에 설정된 값은 무시되고, 매 렌더링시에 새로 설정해줘야 함.
-	VkDynamicState dynamicStates[] = {
-		VK_DYNAMIC_STATE_VIEWPORT,
-		VK_DYNAMIC_STATE_LINE_WIDTH
-	};
-	// 현재는 사용하지 않음.
-	//VkPipelineDynamicStateCreateInfo dynamicState = {};
-	//dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-	//dynamicState.dynamicStateCount = 2;
-	//dynamicState.pDynamicStates = dynamicStates;
-
-	// 10. Pipeline layout
-	VkPipelineLayout pipelineLayout = ShaderBindings.CreatePipelineLayout();
-	if (!ensure(pipelineLayout))
+	auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
+	jMultisampleStateInfo* MultisampleState = nullptr;
+	switch (msaaSamples)
 	{
-		//vkDestroyShaderModule(device, fragShaderModule, nullptr);
-		//vkDestroyShaderModule(device, vertShaderModule, nullptr);
-		return false;
+	case VK_SAMPLE_COUNT_1_BIT:
+		MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_1, true, 0.2f, false, false>::Create();
+		break;
+	case VK_SAMPLE_COUNT_2_BIT:
+		MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_2, true, 0.2f, false, false>::Create();
+		break;
+	case VK_SAMPLE_COUNT_4_BIT:
+		MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_4, true, 0.2f, false, false>::Create();
+		break;
+	case VK_SAMPLE_COUNT_8_BIT:
+		MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_8, true, 0.2f, false, false>::Create();
+		break;
+	case VK_SAMPLE_COUNT_16_BIT:
+		MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_16, true, 0.2f, false, false>::Create();
+		break;
+	case VK_SAMPLE_COUNT_32_BIT:
+		MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_32, true, 0.2f, false, false>::Create();
+		break;
+	case VK_SAMPLE_COUNT_64_BIT:
+		MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_64, true, 0.2f, false, false>::Create();
+		break;
+	default:
+		break;
 	}
+	auto DepthStencilState = TDepthStencilStateInfo<true, true, ECompareOp::LESS, false, false, nullptr, nullptr, 0.0f, 1.0f>::Create();
+	auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
+	PipelineState = jPipelineStateInfo(Shader, VertexBuffer, &ShaderBindings, &RenderPassTest, RasterizationState, MultisampleState, DepthStencilState, BlendingState
+		, jViewport(0.0f, 0.0f, swapChainExtent.width, swapChainExtent.height), jScissor(0, 0, swapChainExtent.width, swapChainExtent.height));
 
-	VkGraphicsPipelineCreateInfo pipelineInfo = {};
-	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	graphicsPipeline = PipelineState.CreateGraphicsPipelineState();
 
-	// Shader stage
-	//pipelineInfo.stageCount = 2;
-	//pipelineInfo.pStages = shaderStage;
-	pipelineInfo.stageCount = (uint32)shader_vk->ShaderStages.size();
-	pipelineInfo.pStages = shader_vk->ShaderStages.data();
-
-	// Fixed-function stage
-	pipelineInfo.pVertexInputState = &vertexInputInfo;
-	pipelineInfo.pInputAssemblyState = &inputAssembly;
-	pipelineInfo.pViewportState = &viewportState;
-	pipelineInfo.pRasterizationState = &rasterizer;
-	pipelineInfo.pMultisampleState = &multisampling;
-	pipelineInfo.pDepthStencilState = &depthStencil;
-	pipelineInfo.pColorBlendState = &colorBlending;
-	pipelineInfo.pDynamicState = nullptr;			// Optional
-	pipelineInfo.layout = pipelineLayout;
-	pipelineInfo.renderPass = (VkRenderPass)RenderPassTest.GetRenderPass();
-	pipelineInfo.subpass = 0;		// index of subpass
-
-	// Pipeline을 상속받을 수 있는데, 아래와 같은 장점이 있다.
-	// 1). 공통된 내용이 많으면 파이프라인 설정이 저렴하다.
-	// 2). 공통된 부모를 가진 파이프라인 들끼리의 전환이 더 빠를 수 있다.
-	// BasePipelineHandle 이나 BasePipelineIndex 가 로 Pipeline 내용을 상속받을 수 있다.
-	// 이 기능을 사용하려면 VkGraphicsPipelineCreateInfo의 flags 에 VK_PIPELINE_CREATE_DERIVATIVE_BIT  가 설정되어있어야 함
-	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;		// Optional
-	pipelineInfo.basePipelineIndex = -1;					// Optional
-
-	// 여기서 두번째 파라메터 VkPipelineCache에 VK_NULL_HANDLE을 넘겼는데, VkPipelineCache는 VkPipeline을 저장하고 생성하는데 재사용할 수 있음.
-	// 또한 파일로드 저장할 수 있어서 다른 프로그램에서 다시 사용할 수도있다. VkPipelineCache를 사용하면 VkPipeline을 생성하는 시간을 
-	// 굉장히 빠르게 할수있다. (듣기로는 대략 1/10 의 속도로 생성해낼 수 있다고 함)
-	if (!ensure(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) == VK_SUCCESS))
-	{
-		//vkDestroyShaderModule(device, fragShaderModule, nullptr);
-		//vkDestroyShaderModule(device, vertShaderModule, nullptr);
-		return false;
-	}
-
-	//vkDestroyShaderModule(device, fragShaderModule, nullptr);
-	//vkDestroyShaderModule(device, vertShaderModule, nullptr);
-
-	return true;
+	return graphicsPipeline;
 }
 
 //bool jRHI_Vulkan::CreateCommandPool()
@@ -2352,6 +1921,41 @@ bool jRHI_Vulkan::CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo
 	return true;
 }
 
+jRasterizationStateInfo* jRHI_Vulkan::CreateRasterizationState(const jRasterizationStateInfo& initializer) const
+{
+	auto* state = new jRasterizationStateInfo_Vulkan(initializer);
+	state->Initialize();
+	return state;
+}
+
+jMultisampleStateInfo* jRHI_Vulkan::CreateMultisampleState(const jMultisampleStateInfo& initializer) const
+{
+	auto* state = new jMultisampleStateInfo_Vulkan(initializer);
+	state->Initialize();
+	return state;
+}
+
+jStencilOpStateInfo* jRHI_Vulkan::CreateStencilOpStateInfo(const jStencilOpStateInfo& initializer) const
+{
+	auto* state = new jStencilOpStateInfo_Vulkan(initializer);
+	state->Initialize();
+	return state;
+}
+
+jDepthStencilStateInfo* jRHI_Vulkan::CreateDepthStencilState(const jDepthStencilStateInfo& initializer) const
+{
+	auto* state = new jDepthStencilStateInfo_Vulkan(initializer);
+	state->Initialize();
+	return state;
+}
+
+jBlendingStateInfo* jRHI_Vulkan::CreateBlendingState(const jBlendingStateInfo& initializer) const
+{
+	auto* state = new jBlendingStateInfo_Vulakn(initializer);
+	state->Initialize();
+	return state;
+}
+
 void jRenderPass_Vulkan::Release()
 {
     vkDestroyRenderPass(g_rhi_vk->device, RenderPass, nullptr);
@@ -2824,4 +2428,134 @@ void jVertexBuffer_Vulkan::Bind(const jCommandBuffer_Vulkan& commandBuffer) cons
 	vkCmdBindVertexBuffers(commandBuffer.Get(), 0, (uint32)BindInfos.Buffers.size(), &BindInfos.Buffers[0], &BindInfos.Offsets[0]);
 }
 
+VkPipeline jPipelineStateInfo::CreateGraphicsPipelineState()
+{
+	Hash = CreateHash();
+	check(Hash);
+	{
+		auto it_find = PipelineStatePool.find(Hash);
+		if (PipelineStatePool.end() != it_find)
+		{
+			return it_find->second;
+		}
+	}
+
+	VkPipelineVertexInputStateCreateInfo vertexInputInfo = ((jVertexBuffer_Vulkan*)VertexBuffer)->CreateVertexInputState();
+	VkPipelineInputAssemblyStateCreateInfo inputAssembly = ((jVertexBuffer_Vulkan*)VertexBuffer)->CreateInputAssemblyState();
+
+	// 4. Viewports and scissors
+	// SwapChain의 이미지 사이즈가 이 클래스에 정의된 상수 WIDTH, HEIGHT와 다를 수 있다는 것을 기억 해야함.
+	// 그리고 Viewports 사이즈는 SwapChain 크기 이하로 마추면 됨.
+	// [minDepth ~ maxDepth] 는 [0.0 ~ 1.0] 이며 특별한 경우가 아니면 이 범위로 사용하면 된다.
+	// Scissor Rect 영역을 설정해주면 영역내에 있는 Pixel만 레스터라이저를 통과할 수 있으며 나머지는 버려(Discard)진다.
+	check(Viewports.size());
+	std::vector<VkViewport> vkViewports;
+	vkViewports.resize(Viewports.size());
+	for (int32 i = 0; i < vkViewports.size(); ++i)
+	{
+		vkViewports[i].x = Viewports[i].X;
+		vkViewports[i].y = Viewports[i].Y;
+		vkViewports[i].width = Viewports[i].Width;
+		vkViewports[i].height = Viewports[i].Height;
+		vkViewports[i].minDepth = Viewports[i].MinDepth;
+		vkViewports[i].maxDepth = Viewports[i].MaxDepth;
+	}
+
+	check(Scissors.size());
+	std::vector<VkRect2D> vkScissor;
+	vkScissor.resize(Scissors.size());
+	for (int32 i = 0; i < vkScissor.size(); ++i)
+	{
+		vkScissor[i].offset.x = Scissors[i].Offset.x;
+		vkScissor[i].offset.y = Scissors[i].Offset.y;
+		vkScissor[i].extent.width = Scissors[i].Extent.x;
+		vkScissor[i].extent.height = Scissors[i].Extent.y;
+	}
+
+	// Viewport와 Scissor 를 여러개 설정할 수 있는 멀티 뷰포트를 사용할 수 있기 때문임
+	VkPipelineViewportStateCreateInfo viewportState = {};
+	viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+	viewportState.viewportCount = (uint32)vkViewports.size();
+	viewportState.pViewports = &vkViewports[0];
+	viewportState.scissorCount = (uint32)vkScissor.size();
+	viewportState.pScissors = &vkScissor[0];
+
+	// 2가지 blending 방식을 모두 끌 수도있는데 그렇게 되면, 변경되지 않은 fragment color 값이 그대로 framebuffer에 쓰여짐.
+	VkPipelineColorBlendStateCreateInfo colorBlending = {};
+	colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+
+	// 2). 기존과 새로운 값을 비트 연산으로 결합한다.
+	colorBlending.logicOpEnable = VK_FALSE;			// 모든 framebuffer에 사용하는 blendEnable을 VK_FALSE로 했다면 자동으로 logicOpEnable은 꺼진다.
+	colorBlending.logicOp = VK_LOGIC_OP_COPY;		// Optional
+
+	// 1). 기존과 새로운 값을 섞어서 최종색을 만들어낸다.
+	colorBlending.attachmentCount = 1;						// framebuffer 개수에 맞게 설정해준다.
+	colorBlending.pAttachments = &((jBlendingStateInfo_Vulakn*)BlendingState)->ColorBlendAttachmentInfo;
+
+	colorBlending.blendConstants[0] = 0.0f;		// Optional
+	colorBlending.blendConstants[1] = 0.0f;		// Optional
+	colorBlending.blendConstants[2] = 0.0f;		// Optional
+	colorBlending.blendConstants[3] = 0.0f;		// Optional
+
+	// 9. Dynamic state
+	// 이전에 정의한 state에서 제한된 범위 내에서 새로운 pipeline을 만들지 않고 state를 변경할 수 있음. (viewport size, line width, blend constants)
+	// 이것을 하고싶으면 Dynamic state를 만들어야 함. 이경우 Pipeline에 설정된 값은 무시되고, 매 렌더링시에 새로 설정해줘야 함.
+	VkDynamicState dynamicStates[] = {
+		VK_DYNAMIC_STATE_VIEWPORT,
+		VK_DYNAMIC_STATE_LINE_WIDTH
+	};
+	// 현재는 사용하지 않음.
+	//VkPipelineDynamicStateCreateInfo dynamicState = {};
+	//dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+	//dynamicState.dynamicStateCount = 2;
+	//dynamicState.pDynamicStates = dynamicStates;
+
+	// 10. Pipeline layout
+	VkPipelineLayout pipelineLayout = ShaderBindings->CreatePipelineLayout();
+	check(pipelineLayout);
+
+	VkGraphicsPipelineCreateInfo pipelineInfo = {};
+	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+
+	// Shader stage
+	//pipelineInfo.stageCount = 2;
+	//pipelineInfo.pStages = shaderStage;
+	pipelineInfo.stageCount = (uint32)((jShader_Vulkan*)Shader)->ShaderStages.size();
+	pipelineInfo.pStages = ((jShader_Vulkan*)Shader)->ShaderStages.data();
+
+	// Fixed-function stage
+	pipelineInfo.pVertexInputState = &vertexInputInfo;
+	pipelineInfo.pInputAssemblyState = &inputAssembly;
+	pipelineInfo.pViewportState = &viewportState;
+	pipelineInfo.pRasterizationState = &((jRasterizationStateInfo_Vulkan*)RasterizationState)->RasterizationStateInfo;
+	pipelineInfo.pMultisampleState = &((jMultisampleStateInfo_Vulkan*)MultisampleState)->MultisampleStateInfo;
+	pipelineInfo.pDepthStencilState = &((jDepthStencilStateInfo_Vulkan*)DepthStencilState)->DepthStencilStateInfo;
+	pipelineInfo.pColorBlendState = &colorBlending;
+	pipelineInfo.pDynamicState = nullptr;			// Optional
+	pipelineInfo.layout = pipelineLayout;
+	pipelineInfo.renderPass = (VkRenderPass)RenderPass->GetRenderPass();
+	pipelineInfo.subpass = 0;		// index of subpass
+
+	// Pipeline을 상속받을 수 있는데, 아래와 같은 장점이 있다.
+	// 1). 공통된 내용이 많으면 파이프라인 설정이 저렴하다.
+	// 2). 공통된 부모를 가진 파이프라인 들끼리의 전환이 더 빠를 수 있다.
+	// BasePipelineHandle 이나 BasePipelineIndex 가 로 Pipeline 내용을 상속받을 수 있다.
+	// 이 기능을 사용하려면 VkGraphicsPipelineCreateInfo의 flags 에 VK_PIPELINE_CREATE_DERIVATIVE_BIT  가 설정되어있어야 함
+	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;		// Optional
+	pipelineInfo.basePipelineIndex = -1;					// Optional
+
+	VkPipeline vkPipeline = nullptr;
+
+	// 여기서 두번째 파라메터 VkPipelineCache에 VK_NULL_HANDLE을 넘겼는데, VkPipelineCache는 VkPipeline을 저장하고 생성하는데 재사용할 수 있음.
+	// 또한 파일로드 저장할 수 있어서 다른 프로그램에서 다시 사용할 수도있다. VkPipelineCache를 사용하면 VkPipeline을 생성하는 시간을 
+	// 굉장히 빠르게 할수있다. (듣기로는 대략 1/10 의 속도로 생성해낼 수 있다고 함)
+	if (!ensure(vkCreateGraphicsPipelines(g_rhi_vk->device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &vkPipeline) == VK_SUCCESS))
+	{
+		return nullptr;
+	}
+
+	return vkPipeline;
+}
+
 #endif // USE_VULKAN
+
