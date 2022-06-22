@@ -7,9 +7,247 @@
 #include "tiny_obj_loader.h"	// 이거 안쓸예정
 #include "jImageFileLoader.h"
 #include "jFile.h"
+#include "jRenderTargetPool.h"
 
 jRHI_Vulkan* g_rhi_vk = nullptr;
 std::unordered_map<size_t, VkPipeline> jPipelineStateInfo::PipelineStatePool;
+
+//////////////////////////////////////////////////////////////////////////
+// Auto generate type conversion code
+template <typename T1, typename T2>
+using ConversionTypePair = std::pair<T1, T2>;
+
+template <typename T, typename... T1>
+constexpr auto GenerateConversionTypeArray(T1... args)
+{
+	std::array<T, sizeof...(args)> newArray;
+	auto AddElementFunc = [&newArray](const auto& arg)
+	{
+		newArray[(int32)arg.first] = arg.second;
+	};
+
+	int dummy[] = { 0, (AddElementFunc(args), 0)... };
+	return newArray;
+}
+
+
+#define CONVERSION_TYPE_ELEMENT(x, y) ConversionTypePair<decltype(x), decltype(y)>(x, y)
+#define GENERATE_STATIC_CONVERSION_ARRAY(...) {static auto _TypeArray_ = GenerateConversionTypeArray<T>(__VA_ARGS__); return (T)_TypeArray_[(int32)type];}
+
+FORCEINLINE VkFormat GetVulkanDepthBufferFormat(EDepthBufferType type)
+{
+	using T = VkFormat;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(EDepthBufferType::NONE, VK_FORMAT_UNDEFINED),
+		CONVERSION_TYPE_ELEMENT(EDepthBufferType::DEPTH16, VK_FORMAT_D16_UNORM),
+		CONVERSION_TYPE_ELEMENT(EDepthBufferType::DEPTH16_STENCIL8, VK_FORMAT_D16_UNORM_S8_UINT),
+		CONVERSION_TYPE_ELEMENT(EDepthBufferType::DEPTH24, VK_FORMAT_X8_D24_UNORM_PACK32),
+		CONVERSION_TYPE_ELEMENT(EDepthBufferType::DEPTH24_STENCIL8, VK_FORMAT_D24_UNORM_S8_UINT),
+		CONVERSION_TYPE_ELEMENT(EDepthBufferType::DEPTH32, VK_FORMAT_D32_SFLOAT),
+		CONVERSION_TYPE_ELEMENT(EDepthBufferType::DEPTH32_STENCIL8, VK_FORMAT_D32_SFLOAT_S8_UINT)
+	);
+}
+
+FORCEINLINE VkFilter GetVulkanTextureFilterType(ETextureFilter type)
+{
+	using T = VkFilter;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(ETextureFilter::NEAREST, VK_FILTER_NEAREST),
+		CONVERSION_TYPE_ELEMENT(ETextureFilter::LINEAR, VK_FILTER_LINEAR),
+		CONVERSION_TYPE_ELEMENT(ETextureFilter::NEAREST_MIPMAP_NEAREST, VK_FILTER_NEAREST),
+		CONVERSION_TYPE_ELEMENT(ETextureFilter::LINEAR_MIPMAP_NEAREST, VK_FILTER_LINEAR),
+		CONVERSION_TYPE_ELEMENT(ETextureFilter::NEAREST_MIPMAP_LINEAR, VK_FILTER_NEAREST),
+		CONVERSION_TYPE_ELEMENT(ETextureFilter::LINEAR_MIPMAP_LINEAR, VK_FILTER_LINEAR)
+	);
+}
+
+FORCEINLINE VkSamplerMipmapMode GetVulkanTextureMipmapMode(ETextureFilter type)
+{
+	using T = VkSamplerMipmapMode;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(ETextureFilter::NEAREST, VK_SAMPLER_MIPMAP_MODE_NEAREST),
+		CONVERSION_TYPE_ELEMENT(ETextureFilter::LINEAR, VK_SAMPLER_MIPMAP_MODE_NEAREST),
+		CONVERSION_TYPE_ELEMENT(ETextureFilter::NEAREST_MIPMAP_NEAREST, VK_SAMPLER_MIPMAP_MODE_NEAREST),
+		CONVERSION_TYPE_ELEMENT(ETextureFilter::LINEAR_MIPMAP_NEAREST, VK_SAMPLER_MIPMAP_MODE_NEAREST),
+		CONVERSION_TYPE_ELEMENT(ETextureFilter::NEAREST_MIPMAP_LINEAR, VK_SAMPLER_MIPMAP_MODE_LINEAR),
+		CONVERSION_TYPE_ELEMENT(ETextureFilter::LINEAR_MIPMAP_LINEAR, VK_SAMPLER_MIPMAP_MODE_LINEAR)
+	);
+}
+
+FORCEINLINE auto GetVulkanTextureInternalFormat(ETextureFormat type)
+{
+	using T = VkFormat;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		// TextureFormat + InternalFormat
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB32F, VK_FORMAT_R32G32B32_SFLOAT),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB16F, VK_FORMAT_R16G16B16_SFLOAT),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R11G11B10F, VK_FORMAT_B10G11R11_UFLOAT_PACK32),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB, VK_FORMAT_R8G8B8_UNORM),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA16F, VK_FORMAT_R16G16B16A16_SFLOAT),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA32F, VK_FORMAT_R32G32B32A32_SFLOAT),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA, VK_FORMAT_R8G8B8A8_UNORM),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RG32F, VK_FORMAT_R32G32_SFLOAT),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RG, VK_FORMAT_R8G8_UNORM),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R, VK_FORMAT_R8_UNORM),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R32F, VK_FORMAT_R32_SFLOAT),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::D24_S8, VK_FORMAT_D24_UNORM_S8_UINT),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::D32, VK_FORMAT_D32_SFLOAT),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::D32_S8, VK_FORMAT_D32_SFLOAT_S8_UINT),
+
+		// below is Internal Format only
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA_INTEGER, VK_FORMAT_R8G8B8_SINT),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R_INTEGER, VK_FORMAT_R8_SINT),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R32UI, VK_FORMAT_R8_UINT),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8, VK_FORMAT_R8G8B8A8_UNORM),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::BGRA8, VK_FORMAT_B8G8R8A8_UNORM),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8I, VK_FORMAT_R8G8B8A8_SINT),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8UI, VK_FORMAT_R8G8B8A8_UINT)
+		// CONVERSION_TYPE_ELEMENT(ETextureFormat::DEPTH, GL_DEPTH_COMPONENT)
+	);
+}
+
+FORCEINLINE void GetVulkanAttachmentLoadStoreOp(VkAttachmentLoadOp& OutLoadOp, VkAttachmentStoreOp& OutStoreOp, EAttachmentLoadStoreOp InType)
+{
+	switch (InType)
+	{
+	case EAttachmentLoadStoreOp::LOAD_STORE:
+		OutLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+		OutStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+		break;
+	case EAttachmentLoadStoreOp::LOAD_DONTCARE:
+		OutLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+		OutStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		break;
+	case EAttachmentLoadStoreOp::CLEAR_STORE:
+		OutLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		OutStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+		break;
+	case EAttachmentLoadStoreOp::CLEAR_DONTCARE:
+		OutLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		OutStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		break;
+	case EAttachmentLoadStoreOp::DONTCARE_STORE:
+		OutLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		OutStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+		break;
+	case EAttachmentLoadStoreOp::DONTCARE_DONTCARE:
+		OutLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		OutStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		break;
+	case EAttachmentLoadStoreOp::MAX:
+	default:
+		check(0);
+		break;
+	}
+}
+
+FORCEINLINE auto GetVulkanShaderAccessFlags(EShaderAccessStageFlag type)
+{
+	switch (type)
+	{
+	case EShaderAccessStageFlag::VERTEX:
+		return VK_SHADER_STAGE_VERTEX_BIT;
+	case EShaderAccessStageFlag::TESSELLATION_CONTROL:
+		return VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
+	case EShaderAccessStageFlag::TESSELLATION_EVALUATION:
+		return VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
+	case EShaderAccessStageFlag::GEOMETRY:
+		return VK_SHADER_STAGE_GEOMETRY_BIT;
+	case EShaderAccessStageFlag::FRAGMENT:
+		return VK_SHADER_STAGE_FRAGMENT_BIT;
+	case EShaderAccessStageFlag::COMPUTE:
+		return VK_SHADER_STAGE_COMPUTE_BIT;
+	case EShaderAccessStageFlag::ALL_GRAPHICS:
+		return VK_SHADER_STAGE_ALL_GRAPHICS;
+	case EShaderAccessStageFlag::ALL:
+		return VK_SHADER_STAGE_ALL;
+	default:
+		check(0);
+		break;
+	}
+	return VK_SHADER_STAGE_ALL;
+}
+
+FORCEINLINE auto GetVulkanTextureComponentCount(ETextureFormat type)
+{
+	using T = int8;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB32F, 3),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB16F, 3),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R11G11B10F, 3),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB, 3),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA16F, 4),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA32F, 4),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA, 4),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RG32F, 2),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RG, 2),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R, 1),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R32F, 1),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::D24_S8, 1),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::D32, 1),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::D32_S8, 1),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA_INTEGER, 4),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R_INTEGER, 1),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R32UI, 1),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8, 4),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::BGRA8, 4),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8I, 4),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8UI, 4),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::DEPTH, 1)
+	);
+}
+
+FORCEINLINE VkPrimitiveTopology GetVulkanPrimitiveTopology(EPrimitiveType type)
+{
+	using T = VkPrimitiveTopology;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(EPrimitiveType::POINTS, VK_PRIMITIVE_TOPOLOGY_POINT_LIST),
+		CONVERSION_TYPE_ELEMENT(EPrimitiveType::LINES, VK_PRIMITIVE_TOPOLOGY_LINE_LIST),
+		CONVERSION_TYPE_ELEMENT(EPrimitiveType::LINES_ADJACENCY, VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY),
+		CONVERSION_TYPE_ELEMENT(EPrimitiveType::LINE_STRIP_ADJACENCY, VK_PRIMITIVE_TOPOLOGY_LINE_STRIP),
+		CONVERSION_TYPE_ELEMENT(EPrimitiveType::TRIANGLES, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST),
+		CONVERSION_TYPE_ELEMENT(EPrimitiveType::TRIANGLES_ADJACENCY, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY),
+		CONVERSION_TYPE_ELEMENT(EPrimitiveType::TRIANGLE_STRIP_ADJACENCY, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY),
+		CONVERSION_TYPE_ELEMENT(EPrimitiveType::TRIANGLE_STRIP, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP)
+	);
+}
+
+FORCEINLINE VkPolygonMode GetVulkanPolygonMode(EPolygonMode type)
+{
+	using T = VkPolygonMode;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(EPolygonMode::POINT, VK_POLYGON_MODE_POINT),
+		CONVERSION_TYPE_ELEMENT(EPolygonMode::LINE, VK_POLYGON_MODE_LINE),
+		CONVERSION_TYPE_ELEMENT(EPolygonMode::FILL, VK_POLYGON_MODE_FILL)
+	);
+}
+
+FORCEINLINE VkCullModeFlagBits GetVulkanCullMode(ECullMode type)
+{
+	using T = VkCullModeFlagBits;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(ECullMode::BACK, VK_CULL_MODE_BACK_BIT),
+		CONVERSION_TYPE_ELEMENT(ECullMode::FRONT, VK_CULL_MODE_FRONT_BIT),
+		CONVERSION_TYPE_ELEMENT(ECullMode::FRONT_AND_BACK, VK_CULL_MODE_FRONT_AND_BACK)
+	);
+}
+
+FORCEINLINE VkFrontFace GetVulkanFrontFace(EFrontFace type)
+{
+	using T = VkFrontFace;
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(EFrontFace::CW, VK_FRONT_FACE_CLOCKWISE),
+		CONVERSION_TYPE_ELEMENT(EFrontFace::CCW, VK_FRONT_FACE_COUNTER_CLOCKWISE)
+	);
+}
+
+struct jRenderTarget_Vulkan : public jRenderTarget
+{
+	bool IsInitialized = false;
+	std::vector<std::shared_ptr<jTexture> > AllTextures;
+
+	virtual jTexture* GetTexture(int32 index = 0) const { return AllTextures[index].get(); }
+};
 
 VkSampler jTexture_Vulkan::CreateDefaultSamplerState()
 {
@@ -156,7 +394,7 @@ bool jRHI_Vulkan::InitRHI()
 			{
 				physicalDevice = device;
 				msaaSamples = GetMaxUsableSampleCount();
-				//msaaSamples = (VkSampleCountFlagBits)1;
+				// msaaSamples = (VkSampleCountFlagBits)1;
 				break;
 			}
 		}
@@ -305,24 +543,107 @@ bool jRHI_Vulkan::InitRHI()
     ensure(CreateSyncObjects());
 
 	// 동적인 부분들 패스에 따라 달라짐
+	static bool s_Initializes = false;
+	if (!s_Initializes)
 	{
-		jAttachment color = { .Format = ETextureFormat::BGRA8, .SampleCount = (EMSAASamples)msaaSamples,
-		.LoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE, .StencilLoadStoreOp = EAttachmentLoadStoreOp::DONTCARE_DONTCARE, .ImageView = colorImageView };
-		jAttachment depth = { .Format = ETextureFormat::D32, .SampleCount = (EMSAASamples)msaaSamples,
-			.LoadStoreOp = EAttachmentLoadStoreOp::CLEAR_DONTCARE, .StencilLoadStoreOp = EAttachmentLoadStoreOp::DONTCARE_DONTCARE, .ImageView = depthImageView };
-		jAttachment resolve = { .Format = ETextureFormat::BGRA8, .SampleCount = (EMSAASamples)msaaSamples,
-			.LoadStoreOp = EAttachmentLoadStoreOp::DONTCARE_STORE, .StencilLoadStoreOp = EAttachmentLoadStoreOp::DONTCARE_DONTCARE, .ImageView = swapChainImageViews[0] };
-		RenderPassTest.SetAttachemnt({ color }, depth, resolve);
-		RenderPassTest.SetRenderArea({ 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
-		RenderPassTest.CreateRenderPass();
+		s_Initializes = true;
+		//jRenderTargetInfo(ETextureType textureType, ETextureFormat internalFormat, ETextureFormat format, EFormatType formatType, EDepthBufferType depthBufferType
+		//	, int32 width, int32 height, int32 textureCount = 1, ETextureFilter magnification = ETextureFilter::LINEAR
+		//	, ETextureFilter minification = ETextureFilter::LINEAR, bool isGenerateMipmap = false, bool isGenerateMipmapDepth = false, int32 sampleCount = 1)
+
+		for (int32 i = 0; i < swapChainImageViews.size(); ++i)
+		{
+			std::shared_ptr<jRenderTarget> DepthPtr = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget(
+				{ ETextureType::TEXTURE_2D, ETextureFormat::D24_S8, ETextureFormat::R, EFormatType::UNSIGNED_BYTE, EDepthBufferType::DEPTH24_STENCIL8, SCR_WIDTH, SCR_HEIGHT, 1, ETextureFilter::LINEAR, ETextureFilter::LINEAR, false, false, msaaSamples }));
+
+			std::shared_ptr<jRenderTarget> ColorPtr;
+			std::shared_ptr<jRenderTarget> ResolveColorPtr;
+
+			if (msaaSamples > 1)
+			{
+				ColorPtr = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget(
+					{ ETextureType::TEXTURE_2D, ETextureFormat::RGBA8, ETextureFormat::RGBA, EFormatType::FLOAT, EDepthBufferType::NONE
+					, SCR_WIDTH, SCR_HEIGHT, 1, ETextureFilter::LINEAR, ETextureFilter::LINEAR, false, false, msaaSamples }));
+
+				{
+					jRenderTargetInfo info = { ETextureType::TEXTURE_2D, ETextureFormat::BGRA8, ETextureFormat::RGBA, EFormatType::FLOAT, EDepthBufferType::NONE
+						, SCR_WIDTH, SCR_HEIGHT, 1, ETextureFilter::LINEAR, ETextureFilter::LINEAR, false, false, 1 };
+
+					auto rt_vk = new jRenderTarget_Vulkan();
+					rt_vk->Info = info;
+
+					auto tex_vk = new jTexture_Vulkan();
+					tex_vk->Type = info.TextureType;
+					tex_vk->ColorBufferType = info.InternalFormat;
+					tex_vk->ColorPixelType = info.FormatType;
+					tex_vk->Width = swapChainExtent.width;
+					tex_vk->Height = swapChainExtent.height;
+					tex_vk->Magnification = ETextureFilter::LINEAR;
+					tex_vk->Minification = ETextureFilter::LINEAR;
+					tex_vk->Image = swapChainImages[i];
+					tex_vk->ImageView = swapChainImageViews[i];
+					tex_vk->ImageMemory = nullptr;
+					auto texturePtr = std::shared_ptr<jTexture>(tex_vk);
+
+					rt_vk->Textures.push_back(texturePtr);
+					rt_vk->AllTextures.push_back(texturePtr);
+					ResolveColorPtr = std::shared_ptr<jRenderTarget>(rt_vk);
+				}
+			}
+			else
+			{
+				jRenderTargetInfo info = { ETextureType::TEXTURE_2D, ETextureFormat::BGRA8, ETextureFormat::RGBA, EFormatType::FLOAT, EDepthBufferType::NONE
+					, SCR_WIDTH, SCR_HEIGHT, 1, ETextureFilter::LINEAR, ETextureFilter::LINEAR, false, false, 1 };
+
+				auto rt_vk = new jRenderTarget_Vulkan();
+				rt_vk->Info = info;
+
+				auto tex_vk = new jTexture_Vulkan();
+				tex_vk->Type = info.TextureType;
+				tex_vk->ColorBufferType = info.InternalFormat;
+				tex_vk->ColorPixelType = info.FormatType;
+				tex_vk->Width = swapChainExtent.width;
+				tex_vk->Height = swapChainExtent.height;
+				tex_vk->Magnification = ETextureFilter::LINEAR;
+				tex_vk->Minification = ETextureFilter::LINEAR;
+				tex_vk->Image = swapChainImages[i];
+				tex_vk->ImageView = swapChainImageViews[i];
+				tex_vk->ImageMemory = nullptr;
+				auto texturePtr = std::shared_ptr<jTexture>(tex_vk);
+
+				rt_vk->Textures.push_back(texturePtr);
+				rt_vk->AllTextures.push_back(texturePtr);
+				ColorPtr = std::shared_ptr<jRenderTarget>(rt_vk);
+			}
+
+			const Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
+			const Vector2 ClearDepth = Vector2(1.0f, 0.0f);
+
+			jAttachment* color = new jAttachment(ColorPtr, EAttachmentLoadStoreOp::CLEAR_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth);
+			jAttachment* depth = new jAttachment(DepthPtr, EAttachmentLoadStoreOp::CLEAR_DONTCARE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth);
+			jAttachment* resolve = nullptr;
+
+			if (msaaSamples > 1)
+			{
+				resolve = new jAttachment(ResolveColorPtr, EAttachmentLoadStoreOp::DONTCARE_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth);
+			}
+
+			auto textureDepth = (jTexture_Vulkan*)depth->RenderTargetPtr->GetTexture();
+			auto depthFormat = GetVulkanDepthBufferFormat(textureDepth->DepthBufferType);
+			TransitionImageLayout(textureDepth->Image, depthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 1);
+
+			jRenderPass_Vulkan* renderPass = new jRenderPass_Vulkan(color, depth, resolve, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
+			renderPass->CreateRenderPass();
+			RenderPasses.push_back(renderPass);
+		}
 	}
 
-	FrameBufferTest.resize(swapChainImageViews.size());
-	for (int32 i = 0; i < FrameBufferTest.size(); ++i)
-	{
-		FrameBufferTest[i].SetRenderPass(&RenderPassTest);
-		ensure(FrameBufferTest[i].CreateFrameBuffer(i));
-	}
+	//FrameBufferTest.resize(swapChainImageViews.size());
+	//for (int32 i = 0; i < FrameBufferTest.size(); ++i)
+	//{
+	//	FrameBufferTest[i].SetRenderPass(&RenderPassTest);
+	//	ensure(FrameBufferTest[i].CreateFrameBuffer(i));
+	//}
 
 	for (int32 i = 0; i < swapChainImageViews.size(); ++i)
 	{
@@ -345,7 +666,54 @@ bool jRHI_Vulkan::InitRHI()
 	}
 
 	ensure(LoadModel());
-	ensure(CreateGraphicsPipeline());
+
+	{
+		jShaderInfo shaderInfo;
+		shaderInfo.name = "default_test";
+		shaderInfo.vs = "Shaders/Vulkan/shader_vs.glsl";
+		shaderInfo.fs = "Shaders/Vulkan/shader_fs.glsl";
+		auto Shader = g_rhi->CreateShader(shaderInfo);
+
+		auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
+		jMultisampleStateInfo* MultisampleState = nullptr;
+		switch (msaaSamples)
+		{
+		case VK_SAMPLE_COUNT_1_BIT:
+			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_1, true, 0.2f, false, false>::Create();
+			break;
+		case VK_SAMPLE_COUNT_2_BIT:
+			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_2, true, 0.2f, false, false>::Create();
+			break;
+		case VK_SAMPLE_COUNT_4_BIT:
+			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_4, true, 0.2f, false, false>::Create();
+			break;
+		case VK_SAMPLE_COUNT_8_BIT:
+			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_8, true, 0.2f, false, false>::Create();
+			break;
+		case VK_SAMPLE_COUNT_16_BIT:
+			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_16, true, 0.2f, false, false>::Create();
+			break;
+		case VK_SAMPLE_COUNT_32_BIT:
+			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_32, true, 0.2f, false, false>::Create();
+			break;
+		case VK_SAMPLE_COUNT_64_BIT:
+			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_64, true, 0.2f, false, false>::Create();
+			break;
+		default:
+			break;
+		}
+		auto DepthStencilState = TDepthStencilStateInfo<true, true, ECompareOp::LESS, false, false, nullptr, nullptr, 0.0f, 1.0f>::Create();
+		auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
+
+		for (int32 i = 0; i < swapChainImageViews.size(); ++i)
+		{
+			PipelineState = jPipelineStateInfo(Shader, VertexBuffer, &ShaderBindings, RenderPasses[i], RasterizationState, MultisampleState, DepthStencilState, BlendingState
+				, jViewport(0.0f, 0.0f, (float)swapChainExtent.width, (float)swapChainExtent.height), jScissor(0, 0, swapChainExtent.width, swapChainExtent.height));
+
+			graphicsPipelines.push_back(PipelineState.CreateGraphicsPipelineState());
+		}
+	}
+
     ensure(RecordCommandBuffers());
 
 	return true;
@@ -359,194 +727,6 @@ void jRHI_Vulkan::ReleaseRHI()
 //std::vector<jAttachment> ColorAttachments;
 //jAttachment DepthAttachment;
 //jAttachment ColorAttachmentResolve;
-
-//////////////////////////////////////////////////////////////////////////
-// Auto generate type conversion code
-template <typename T1, typename T2>
-using ConversionTypePair = std::pair<T1, T2>;
-
-template <typename T, typename... T1>
-constexpr auto GenerateConversionTypeArray(T1... args)
-{
-    std::array<T, sizeof...(args)> newArray;
-    auto AddElementFunc = [&newArray](const auto& arg)
-    {
-        newArray[(int32)arg.first] = arg.second;
-    };
-
-    int dummy[] = { 0, (AddElementFunc(args), 0)... };
-    return newArray;
-}
-
-#define CONVERSION_TYPE_ELEMENT(x, y) ConversionTypePair<decltype(x), decltype(y)>(x, y)
-#define GENERATE_STATIC_CONVERSION_ARRAY(...) {static auto _TypeArray_ = GenerateConversionTypeArray<T>(__VA_ARGS__); return (T)_TypeArray_[(int32)type];}
-
-FORCEINLINE auto GetVulkanTextureInternalFormat(ETextureFormat type)
-{
-	using T = VkFormat;
-    GENERATE_STATIC_CONVERSION_ARRAY(
-        // TextureFormat + InternalFormat
-        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB32F, VK_FORMAT_R32G32B32_SFLOAT),
-        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB16F, VK_FORMAT_R16G16B16_SFLOAT),
-        CONVERSION_TYPE_ELEMENT(ETextureFormat::R11G11B10F, VK_FORMAT_B10G11R11_UFLOAT_PACK32),
-        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB, VK_FORMAT_R8G8B8_UNORM),
-        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA16F, VK_FORMAT_R16G16B16A16_SFLOAT),
-        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA32F, VK_FORMAT_R32G32B32A32_SFLOAT),
-        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA, VK_FORMAT_R8G8B8A8_UNORM),
-        CONVERSION_TYPE_ELEMENT(ETextureFormat::RG32F, VK_FORMAT_R32G32_SFLOAT),
-        CONVERSION_TYPE_ELEMENT(ETextureFormat::RG, VK_FORMAT_R8G8_UNORM),
-        CONVERSION_TYPE_ELEMENT(ETextureFormat::R, VK_FORMAT_R8_UNORM),
-        CONVERSION_TYPE_ELEMENT(ETextureFormat::R32F, VK_FORMAT_R32_SFLOAT),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::D24_S8, VK_FORMAT_D24_UNORM_S8_UINT),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::D32, VK_FORMAT_D32_SFLOAT),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::D32_S8, VK_FORMAT_D32_SFLOAT_S8_UINT),
-
-        // below is Internal Format only
-        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA_INTEGER, VK_FORMAT_R8G8B8_SINT),
-        CONVERSION_TYPE_ELEMENT(ETextureFormat::R_INTEGER, VK_FORMAT_R8_SINT),
-        CONVERSION_TYPE_ELEMENT(ETextureFormat::R32UI, VK_FORMAT_R8_UINT),
-        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8, VK_FORMAT_R8G8B8A8_UNORM),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::BGRA8, VK_FORMAT_B8G8R8A8_UNORM),
-        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8I, VK_FORMAT_R8G8B8A8_SINT),
-        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8UI, VK_FORMAT_R8G8B8A8_UINT)
-        // CONVERSION_TYPE_ELEMENT(ETextureFormat::DEPTH, GL_DEPTH_COMPONENT)
-    );
-}
-
-FORCEINLINE void GetVulkanAttachmentLoadStoreOp(VkAttachmentLoadOp& OutLoadOp, VkAttachmentStoreOp& OutStoreOp, EAttachmentLoadStoreOp InType)
-{
-	switch(InType)
-	{
-	case EAttachmentLoadStoreOp::LOAD_STORE:
-		OutLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-		OutStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-		break;
-	case EAttachmentLoadStoreOp::LOAD_DONTCARE:
-        OutLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-        OutStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		break;
-	case EAttachmentLoadStoreOp::CLEAR_STORE:
-        OutLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        OutStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-		break;
-	case EAttachmentLoadStoreOp::CLEAR_DONTCARE:
-        OutLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        OutStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		break;
-	case EAttachmentLoadStoreOp::DONTCARE_STORE:
-        OutLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        OutStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-		break;
-	case EAttachmentLoadStoreOp::DONTCARE_DONTCARE:
-        OutLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        OutStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		break;
-	case EAttachmentLoadStoreOp::MAX:
-	default:
-		check(0);
-		break;
-	}
-}
-
-FORCEINLINE auto GetVulkanShaderAccessFlags(EShaderAccessStageFlag type)
-{
-	switch(type)
-	{
-	case EShaderAccessStageFlag::VERTEX:
-		return VK_SHADER_STAGE_VERTEX_BIT;
-	case EShaderAccessStageFlag::TESSELLATION_CONTROL:
-		return VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
-	case EShaderAccessStageFlag::TESSELLATION_EVALUATION:
-		return VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
-	case EShaderAccessStageFlag::GEOMETRY:
-		return VK_SHADER_STAGE_GEOMETRY_BIT;
-	case EShaderAccessStageFlag::FRAGMENT:
-		return VK_SHADER_STAGE_FRAGMENT_BIT;
-	case EShaderAccessStageFlag::COMPUTE:
-		return VK_SHADER_STAGE_COMPUTE_BIT;
-	case EShaderAccessStageFlag::ALL_GRAPHICS:
-		return VK_SHADER_STAGE_ALL_GRAPHICS;
-	case EShaderAccessStageFlag::ALL:
-		return VK_SHADER_STAGE_ALL;
-	default:
-		check(0);
-		break;
-	}
-	return VK_SHADER_STAGE_ALL;
-}
-
-FORCEINLINE auto GetVulkanTextureComponentCount(ETextureFormat type)
-{
-    using T = int8;
-	GENERATE_STATIC_CONVERSION_ARRAY(
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB32F, 3),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB16F, 3),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::R11G11B10F, 3),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB, 3),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA16F, 4),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA32F, 4),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA, 4),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RG32F, 2),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RG, 2),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::R, 1),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::R32F, 1),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::D24_S8, 1),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::D32, 1),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::D32_S8, 1),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA_INTEGER, 4),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::R_INTEGER, 1),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::R32UI, 1),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8, 4),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::BGRA8, 4),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8I, 4),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8UI, 4),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::DEPTH, 1)
-	);
-}
-
-FORCEINLINE VkPrimitiveTopology GetVulkanPrimitiveTopology(EPrimitiveType type)
-{
-	using T = VkPrimitiveTopology;
-	GENERATE_STATIC_CONVERSION_ARRAY(
-		CONVERSION_TYPE_ELEMENT(EPrimitiveType::POINTS, VK_PRIMITIVE_TOPOLOGY_POINT_LIST),
-		CONVERSION_TYPE_ELEMENT(EPrimitiveType::LINES, VK_PRIMITIVE_TOPOLOGY_LINE_LIST),
-		CONVERSION_TYPE_ELEMENT(EPrimitiveType::LINES_ADJACENCY, VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY),
-		CONVERSION_TYPE_ELEMENT(EPrimitiveType::LINE_STRIP_ADJACENCY, VK_PRIMITIVE_TOPOLOGY_LINE_STRIP),
-		CONVERSION_TYPE_ELEMENT(EPrimitiveType::TRIANGLES, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST),
-		CONVERSION_TYPE_ELEMENT(EPrimitiveType::TRIANGLES_ADJACENCY, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY),
-		CONVERSION_TYPE_ELEMENT(EPrimitiveType::TRIANGLE_STRIP_ADJACENCY, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY),
-		CONVERSION_TYPE_ELEMENT(EPrimitiveType::TRIANGLE_STRIP, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP)
-	);
-}
-
-FORCEINLINE VkPolygonMode GetVulkanPolygonMode(EPolygonMode type)
-{
-	using T = VkPolygonMode;
-	GENERATE_STATIC_CONVERSION_ARRAY(
-		CONVERSION_TYPE_ELEMENT(EPolygonMode::POINT, VK_POLYGON_MODE_POINT),
-		CONVERSION_TYPE_ELEMENT(EPolygonMode::LINE, VK_POLYGON_MODE_LINE),
-		CONVERSION_TYPE_ELEMENT(EPolygonMode::FILL, VK_POLYGON_MODE_FILL)
-	);
-}
-
-FORCEINLINE VkCullModeFlagBits GetVulkanCullMode(ECullMode type)
-{
-	using T = VkCullModeFlagBits;
-	GENERATE_STATIC_CONVERSION_ARRAY(
-		CONVERSION_TYPE_ELEMENT(ECullMode::BACK, VK_CULL_MODE_BACK_BIT),
-		CONVERSION_TYPE_ELEMENT(ECullMode::FRONT, VK_CULL_MODE_FRONT_BIT),
-		CONVERSION_TYPE_ELEMENT(ECullMode::FRONT_AND_BACK, VK_CULL_MODE_FRONT_AND_BACK)
-	);
-}
-
-FORCEINLINE VkFrontFace GetVulkanFrontFace(EFrontFace type)
-{
-	using T = VkFrontFace;
-	GENERATE_STATIC_CONVERSION_ARRAY(
-		CONVERSION_TYPE_ELEMENT(EFrontFace::CW, VK_FRONT_FACE_CLOCKWISE),
-		CONVERSION_TYPE_ELEMENT(EFrontFace::CCW, VK_FRONT_FACE_COUNTER_CLOCKWISE)
-	);
-}
 
 void jRasterizationStateInfo_Vulkan::Initialize()
 {
@@ -746,52 +926,6 @@ void jBlendingStateInfo_Vulakn::Initialize()
 //
 //	return true;
 //}
-
-bool jRHI_Vulkan::CreateGraphicsPipeline()
-{
-	jShaderInfo shaderInfo;
-	shaderInfo.name = "default_test";
-	shaderInfo.vs = "Shaders/Vulkan/shader_vs.glsl";
-	shaderInfo.fs = "Shaders/Vulkan/shader_fs.glsl";
-	auto Shader = g_rhi->CreateShader(shaderInfo);
-
-	auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
-	jMultisampleStateInfo* MultisampleState = nullptr;
-	switch (msaaSamples)
-	{
-	case VK_SAMPLE_COUNT_1_BIT:
-		MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_1, true, 0.2f, false, false>::Create();
-		break;
-	case VK_SAMPLE_COUNT_2_BIT:
-		MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_2, true, 0.2f, false, false>::Create();
-		break;
-	case VK_SAMPLE_COUNT_4_BIT:
-		MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_4, true, 0.2f, false, false>::Create();
-		break;
-	case VK_SAMPLE_COUNT_8_BIT:
-		MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_8, true, 0.2f, false, false>::Create();
-		break;
-	case VK_SAMPLE_COUNT_16_BIT:
-		MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_16, true, 0.2f, false, false>::Create();
-		break;
-	case VK_SAMPLE_COUNT_32_BIT:
-		MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_32, true, 0.2f, false, false>::Create();
-		break;
-	case VK_SAMPLE_COUNT_64_BIT:
-		MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_64, true, 0.2f, false, false>::Create();
-		break;
-	default:
-		break;
-	}
-	auto DepthStencilState = TDepthStencilStateInfo<true, true, ECompareOp::LESS, false, false, nullptr, nullptr, 0.0f, 1.0f>::Create();
-	auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
-	PipelineState = jPipelineStateInfo(Shader, VertexBuffer, &ShaderBindings, &RenderPassTest, RasterizationState, MultisampleState, DepthStencilState, BlendingState
-		, jViewport(0.0f, 0.0f, (float)swapChainExtent.width, (float)swapChainExtent.height), jScissor(0, 0, swapChainExtent.width, swapChainExtent.height));
-
-	graphicsPipeline = PipelineState.CreateGraphicsPipelineState();
-
-	return graphicsPipeline;
-}
 
 //bool jRHI_Vulkan::CreateCommandPool()
 //{
@@ -1314,10 +1448,10 @@ bool jRHI_Vulkan::RecordCommandBuffers()
 		if (!ensure(commandBuffers[i].Begin()))
 			return false;
 
-		RenderPassTest.BeginRenderPass(commandBuffers[i].Get(), (VkFramebuffer)FrameBufferTest[i].GetFrameBuffer());
+		RenderPasses[i]->BeginRenderPass(commandBuffers[i].Get());
 
 		// Basic drawing commands
-		vkCmdBindPipeline(commandBuffers[i].Get(), VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+		vkCmdBindPipeline(commandBuffers[i].Get(), VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipelines[i]);
 
 		ShaderBindingInstances[i].Bind(commandBuffers[i]);
 
@@ -1328,7 +1462,7 @@ bool jRHI_Vulkan::RecordCommandBuffers()
 		vkCmdDrawIndexed(commandBuffers[i].Get(), ((jIndexBuffer_Vulkan*)IndexBuffer)->GetIndexCount(), 1, 0, 0, 0);
 
 		// Finishing up
-		RenderPassTest.EndRenderPass();
+		RenderPasses[i]->EndRenderPass();
 
 		if (!ensure(commandBuffers[i].End()))
 			return false;
@@ -1347,12 +1481,12 @@ bool jRHI_Vulkan::CreateSyncObjects()
 	fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 	fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-	imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-	renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-	inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+	imageAvailableSemaphores.resize(swapChainImageViews.size());
+	renderFinishedSemaphores.resize(swapChainImageViews.size());
+	inFlightFences.resize(swapChainImageViews.size());
 	imagesInFlight.resize(swapChainImages.size(), VK_NULL_HANDLE);
 
-	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
+	for (size_t i = 0; i < swapChainImageViews.size(); ++i)
 	{
 		if (!ensure(vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) == VK_SUCCESS)
 			|| !ensure(vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) == VK_SUCCESS)
@@ -1505,7 +1639,7 @@ bool jRHI_Vulkan::DrawFrame()
 	// 1). 한프레임을 마치고 큐가 빌때까지 기다리는 것으로 해결할 수 있음. 한번에 1개의 프레임만 완성 가능(최적의 해결방법은 아님)
 	// 2). 여러개의 프레임을 동시에 처리 할수있도록 확장. 동시에 진행될 수 있는 최대 프레임수를 지정해줌.
 #if MULTIPLE_FRAME
-	currenFrame = (currenFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+	currenFrame = (currenFrame + 1) % swapChainImageViews.size();
 #else
 	vkQueueWaitIdle(PresentQueue);
 #endif // MULTIPLE_FRAME
@@ -1526,7 +1660,12 @@ void jRHI_Vulkan::CleanupSwapChain()
 	// ImageViews and RenderPass 가 소멸되기전에 호출되어야 함
 	//for (auto framebuffer : swapChainFramebuffers)
 	//	vkDestroyFramebuffer(device, framebuffer, nullptr);
-	RenderPassTest.Release();
+	for (int32 i = 0; i < RenderPasses.size(); ++i)
+	{
+		RenderPasses[i]->Release();
+		delete RenderPasses[i];
+	}
+	RenderPasses.clear();
 
 	for (auto imageView : swapChainImageViews)
 		vkDestroyImageView(device, imageView, nullptr);
@@ -1954,6 +2093,340 @@ bool jRHI_Vulkan::CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo
 	return true;
 }
 
+jRenderTarget* jRHI_Vulkan::CreateRenderTarget(const jRenderTargetInfo& info) const
+{
+	const VkFormat textureFormat =  GetVulkanTextureInternalFormat(info.InternalFormat);
+
+	VkFormat depthBufferFormat = VK_FORMAT_UNDEFINED;
+	const bool hasDepthAttachment = (info.DepthBufferType != EDepthBufferType::NONE);
+
+	if (hasDepthAttachment)
+		depthBufferFormat = GetVulkanDepthBufferFormat(info.DepthBufferType);
+
+	const VkFilter magnification = GetVulkanTextureFilterType(info.Magnification);
+	const VkFilter minification = GetVulkanTextureFilterType(info.Minification);
+
+	const VkSamplerMipmapMode mipmapMode = GetVulkanTextureMipmapMode(info.Magnification);
+	check(mipmapMode == GetVulkanTextureMipmapMode(info.Minification));
+
+	//static bool IsMobile = false;
+	//const VkImageTiling TilingMode = IsMobile ? VkImageTiling::VK_IMAGE_TILING_OPTIMAL : VkImageTiling::VK_IMAGE_TILING_LINEAR;
+	const VkImageTiling TilingMode = VkImageTiling::VK_IMAGE_TILING_OPTIMAL;
+
+	const int32 mipLevels = (info.IsGenerateMipmapDepth ? jTexture::GetMipLevels(info.Width, info.Height) : 1);
+	const bool NeedResolveTexture = info.SampleCount > 1;
+
+	auto rt_vk = new jRenderTarget_Vulkan();
+	rt_vk->Info = info;
+
+	JASSERT(info.SampleCount >= 1);
+	if ((info.TextureType == ETextureType::TEXTURE_2D) || (info.TextureType == ETextureType::TEXTURE_2D_MULTISAMPLE))
+	{
+		if (!hasDepthAttachment)
+		{
+			for (int i = 0; i < info.TextureCount; ++i)
+			{
+				VkImage image = nullptr;
+				VkDeviceMemory imageMemory = nullptr;
+
+				CreateImage(info.Width, info.Height, mipLevels, (VkSampleCountFlagBits)info.SampleCount
+					, textureFormat, TilingMode, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, imageMemory);
+
+				VkImageView imageView = CreateImageView(image, textureFormat, VK_IMAGE_ASPECT_COLOR_BIT, mipLevels);
+
+				auto tex_vk = new jTexture_Vulkan();
+				tex_vk->Type = info.TextureType;
+				tex_vk->ColorBufferType = info.InternalFormat;
+				tex_vk->ColorPixelType = info.FormatType;
+				tex_vk->Width = info.Width;
+				tex_vk->Height = info.Height;
+				tex_vk->Magnification = info.Magnification;
+				tex_vk->Minification = info.Minification;
+				tex_vk->Image = image;
+				tex_vk->ImageView = imageView;
+				tex_vk->ImageMemory = imageMemory;
+				auto texturePtr = std::shared_ptr<jTexture>(tex_vk);
+				rt_vk->Textures.push_back(texturePtr);
+				rt_vk->AllTextures.push_back(texturePtr);
+			}
+		}
+
+		if (hasDepthAttachment)
+		{
+			VkImage image = nullptr;
+			VkDeviceMemory imageMemory = nullptr;
+			CreateImage(info.Width, info.Height, mipLevels, (VkSampleCountFlagBits)info.SampleCount
+				, depthBufferFormat, TilingMode, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, imageMemory);
+
+			VkImageView imageView = CreateImageView(image, depthBufferFormat, VK_IMAGE_ASPECT_DEPTH_BIT, mipLevels);
+
+			auto tex_vk = new jTexture_Vulkan();
+			tex_vk->Type = info.TextureType;
+			tex_vk->DepthBufferType = info.DepthBufferType;
+			tex_vk->Width = info.Width;
+			tex_vk->Height = info.Height;
+			tex_vk->Image = image;
+			tex_vk->ImageView = imageView;
+			tex_vk->ImageMemory = imageMemory;
+			auto texturePtr = std::shared_ptr<jTexture>(tex_vk);
+			rt_vk->TextureDepth = texturePtr;
+			rt_vk->AllTextures.push_back(texturePtr);
+		}
+
+		//// Resolve texture
+		//if (info.SampleCount > 1)
+		//{
+		//	VkImage image = nullptr;
+		//	VkDeviceMemory imageMemory = nullptr;
+
+		//	CreateImage(info.Width, info.Height, mipLevels, VK_SAMPLE_COUNT_1_BIT
+		//		, textureFormat, TilingMode, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, imageMemory);
+
+		//	VkImageView imageView = CreateImageView(image, textureFormat, VK_IMAGE_ASPECT_COLOR_BIT, mipLevels);
+
+		//	auto tex_vk = new jTexture_Vulkan();
+		//	tex_vk->Type = info.TextureType;
+		//	tex_vk->ColorBufferType = info.InternalFormat;
+		//	tex_vk->ColorPixelType = info.FormatType;
+		//	tex_vk->Width = info.Width;
+		//	tex_vk->Height = info.Height;
+		//	tex_vk->Magnification = info.Magnification;
+		//	tex_vk->Minification = info.Minification;
+		//	tex_vk->Image = image;
+		//	tex_vk->ImageView = imageView;
+		//	tex_vk->ImageMemory = imageMemory;
+		//	auto texturePtr = std::shared_ptr<jTexture>(tex_vk);
+		//	rt_vk->Textures[textureIndex++] = texturePtr;
+		//	rt_vk->AllTextures[allTextureIndex++] = texturePtr;
+		//}
+	}
+	else if ((info.TextureType == ETextureType::TEXTURE_2D_ARRAY) || (info.TextureType == ETextureType::TEXTURE_2D_ARRAY_MULTISAMPLE))
+	{
+		if (!hasDepthAttachment)
+		{
+			VkImage image = nullptr;
+			VkDeviceMemory imageMemory = nullptr;
+
+			CreateImage2DArray(info.Width, info.Height, info.TextureCount, mipLevels, (VkSampleCountFlagBits)info.SampleCount
+				, textureFormat, TilingMode, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, imageMemory);
+			VkImageView imageView = CreateImage2DArrayView(image, info.TextureCount, textureFormat, VK_IMAGE_ASPECT_COLOR_BIT, mipLevels);
+
+			auto tex_vk = new jTexture_Vulkan();
+			tex_vk->Magnification = info.Magnification;
+			tex_vk->Minification = info.Minification;
+			tex_vk->ColorBufferType = info.InternalFormat;
+			tex_vk->ColorPixelType = info.FormatType;
+			tex_vk->Type = info.TextureType;
+			tex_vk->ColorBufferType = info.InternalFormat;
+			tex_vk->Width = info.Width;
+			tex_vk->Height = info.Height;
+			tex_vk->Image = image;
+			tex_vk->ImageView = imageView;
+			tex_vk->ImageMemory = imageMemory;
+			auto texturePtr = std::shared_ptr<jTexture>(tex_vk);
+			rt_vk->Textures.push_back(texturePtr);
+			rt_vk->AllTextures.push_back(texturePtr);
+		}
+		
+		if (hasDepthAttachment)
+		{
+			VkImage image = nullptr;
+			VkDeviceMemory imageMemory = nullptr;
+			CreateImage2DArray(info.Width, info.Height, info.TextureCount, mipLevels, (VkSampleCountFlagBits)info.SampleCount
+				, depthBufferFormat, TilingMode, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, imageMemory);
+
+			VkImageView imageView = CreateImage2DArrayView(image, info.TextureCount, depthBufferFormat, VK_IMAGE_ASPECT_DEPTH_BIT, mipLevels);
+
+			auto tex_vk = new jTexture_Vulkan();
+			tex_vk->Type = info.TextureType;
+			tex_vk->Width = info.Width;
+			tex_vk->Height = info.Height;
+			tex_vk->Magnification = info.Magnification;
+			tex_vk->Minification = info.Minification;
+			tex_vk->Image = image;
+			tex_vk->ImageMemory = imageMemory;
+			tex_vk->ImageView = imageView;
+			tex_vk->DepthBufferType = info.DepthBufferType;
+			auto texturePtr = std::shared_ptr<jTexture>(tex_vk);
+			rt_vk->TextureDepth = texturePtr;
+			rt_vk->AllTextures.push_back(texturePtr);
+		}
+
+		//// Resolve texture
+		//if (info.SampleCount > 1)
+		//{
+		//	VkImage image = nullptr;
+		//	VkDeviceMemory imageMemory = nullptr;
+
+		//	CreateImage2DArray(info.Width, info.Height, info.TextureCount, mipLevels, VK_SAMPLE_COUNT_1_BIT
+		//		, textureFormat, TilingMode, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, imageMemory);
+		//	VkImageView imageView = CreateImage2DArrayView(image, info.TextureCount, textureFormat, VK_IMAGE_ASPECT_COLOR_BIT, mipLevels);
+
+		//	auto tex_vk = new jTexture_Vulkan();
+		//	tex_vk->Magnification = info.Magnification;
+		//	tex_vk->Minification = info.Minification;
+		//	tex_vk->ColorBufferType = info.InternalFormat;
+		//	tex_vk->ColorPixelType = info.FormatType;
+		//	tex_vk->Type = info.TextureType;
+		//	tex_vk->ColorBufferType = info.InternalFormat;
+		//	tex_vk->Width = info.Width;
+		//	tex_vk->Height = info.Height;
+		//	tex_vk->Image = image;
+		//	tex_vk->ImageView = imageView;
+		//	tex_vk->ImageMemory = imageMemory;
+		//	auto texturePtr = std::shared_ptr<jTexture>(tex_vk);
+		//	rt_vk->Textures[textureIndex++] = texturePtr;
+		//	rt_vk->AllTextures[allTextureIndex++] = texturePtr;
+		//}
+	}
+	else if ((info.TextureType == ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW) || (info.TextureType == ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW_MULTISAMPLE))
+	{
+		JASSERT(info.TextureCount == 1);
+		if (!hasDepthAttachment)
+		{
+			for (int i = 0; i < info.TextureCount; ++i)
+			{
+				VkImage image = nullptr;
+				VkDeviceMemory imageMemory = nullptr;
+
+				CreateImage2DArray(info.Width, info.Height, info.TextureCount, mipLevels, (VkSampleCountFlagBits)info.SampleCount
+					, textureFormat, TilingMode, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, imageMemory);
+				VkImageView imageView = CreateImageView(image, textureFormat, VK_IMAGE_ASPECT_COLOR_BIT, mipLevels);
+
+				auto tex_vk = new jTexture_Vulkan();
+				tex_vk->Type = info.TextureType;
+				tex_vk->ColorBufferType = info.InternalFormat;
+				tex_vk->Width = info.Width;
+				tex_vk->Height = info.Height;
+				tex_vk->Magnification = info.Magnification;
+				tex_vk->Minification = info.Minification;
+				tex_vk->Image = image;
+				tex_vk->ImageView = imageView;
+				tex_vk->ImageMemory = imageMemory;
+				tex_vk->ColorBufferType = info.InternalFormat;
+				tex_vk->ColorPixelType = info.FormatType;
+				auto texturePtr = std::shared_ptr<jTexture>(tex_vk);
+				rt_vk->Textures.push_back(texturePtr);
+				rt_vk->AllTextures.push_back(texturePtr);
+			}
+		}
+
+		if (hasDepthAttachment)
+		{
+			VkImage image = nullptr;
+			VkDeviceMemory imageMemory = nullptr;
+			CreateImage(info.Width, info.Height, mipLevels, (VkSampleCountFlagBits)info.SampleCount
+				, depthBufferFormat, TilingMode, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, imageMemory);
+
+			VkImageView imageView = CreateImageView(image, depthBufferFormat, VK_IMAGE_ASPECT_DEPTH_BIT, mipLevels);
+
+			auto tex_vk = new jTexture_Vulkan();
+			tex_vk->Type = info.TextureType;
+			tex_vk->ColorBufferType = ETextureFormat::DEPTH;
+			tex_vk->Width = info.Width;
+			tex_vk->Height = info.Height;
+			tex_vk->Magnification = info.Magnification;
+			tex_vk->Minification = info.Minification;
+			tex_vk->Image = image;
+			tex_vk->ImageView = imageView;
+			tex_vk->ImageMemory = imageMemory;
+			tex_vk->DepthBufferType = info.DepthBufferType;
+			auto texturePtr = std::shared_ptr<jTexture>(tex_vk);
+			rt_vk->TextureDepth = texturePtr;
+			rt_vk->AllTextures.push_back(texturePtr);
+		}
+
+		//// Resolve texture
+		//{
+		//	VkImage image = nullptr;
+		//	VkDeviceMemory imageMemory = nullptr;
+
+		//	CreateImage2DArray(info.Width, info.Height, info.TextureCount, mipLevels, VK_SAMPLE_COUNT_1_BIT
+		//		, textureFormat, TilingMode, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, imageMemory);
+		//	VkImageView imageView = CreateImageView(image, textureFormat, VK_IMAGE_ASPECT_COLOR_BIT, mipLevels);
+
+		//	auto tex_vk = new jTexture_Vulkan();
+		//	tex_vk->Type = info.TextureType;
+		//	tex_vk->ColorBufferType = info.InternalFormat;
+		//	tex_vk->Width = info.Width;
+		//	tex_vk->Height = info.Height;
+		//	tex_vk->Magnification = info.Magnification;
+		//	tex_vk->Minification = info.Minification;
+		//	tex_vk->Image = image;
+		//	tex_vk->ImageView = imageView;
+		//	tex_vk->ImageMemory = imageMemory;
+		//	tex_vk->ColorBufferType = info.InternalFormat;
+		//	tex_vk->ColorPixelType = info.FormatType;
+		//	auto texturePtr = std::shared_ptr<jTexture>(tex_vk);
+		//	rt_vk->Textures[textureIndex++] = texturePtr;
+		//	rt_vk->AllTextures[allTextureIndex++] = texturePtr;
+		//}
+	}
+	else if (info.TextureType == ETextureType::TEXTURE_CUBE)
+	{
+		JASSERT(info.SampleCount > 1);
+
+		if (!hasDepthAttachment)
+		{
+			VkImage image = nullptr;
+			VkDeviceMemory imageMemory = nullptr;
+			CreateImageCube(info.Width, info.Height, mipLevels, (VkSampleCountFlagBits)info.SampleCount
+				, textureFormat, TilingMode, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, imageMemory);
+
+			VkImageView imageView = CreateImageCubeView(image, textureFormat, VK_IMAGE_ASPECT_DEPTH_BIT, mipLevels);
+
+			auto tex_vk = new jTexture_Vulkan();
+			tex_vk->Type = info.TextureType;
+			tex_vk->ColorBufferType = info.InternalFormat;
+			tex_vk->Width = info.Width;
+			tex_vk->Height = info.Height;
+			tex_vk->Image = image;
+			tex_vk->ImageView = imageView;
+			tex_vk->ImageMemory = imageMemory;
+			tex_vk->Magnification = info.Magnification;
+			tex_vk->Minification = info.Minification;
+			tex_vk->ColorBufferType = info.InternalFormat;
+			tex_vk->ColorPixelType = info.FormatType;
+			auto texturePtr = std::shared_ptr<jTexture>(tex_vk);
+			rt_vk->Textures.push_back(texturePtr);
+			rt_vk->AllTextures.push_back(texturePtr);
+		}
+
+		//// Resolve texture
+		//{
+		//	VkImage image = nullptr;
+		//	VkDeviceMemory imageMemory = nullptr;
+		//	CreateImageCube(info.Width, info.Height, mipLevels, VK_SAMPLE_COUNT_1_BIT
+		//		, textureFormat, TilingMode, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, imageMemory);
+
+		//	VkImageView imageView = CreateImageCubeView(image, textureFormat, VK_IMAGE_ASPECT_DEPTH_BIT, mipLevels);
+
+		//	auto tex_vk = new jTexture_Vulkan();
+		//	tex_vk->Type = info.TextureType;
+		//	tex_vk->ColorBufferType = info.InternalFormat;
+		//	tex_vk->Width = info.Width;
+		//	tex_vk->Height = info.Height;
+		//	tex_vk->Image = image;
+		//	tex_vk->ImageView = imageView;
+		//	tex_vk->ImageMemory = imageMemory;
+		//	tex_vk->Magnification = info.Magnification;
+		//	tex_vk->Minification = info.Minification;
+		//	tex_vk->ColorBufferType = info.InternalFormat;
+		//	tex_vk->ColorPixelType = info.FormatType;
+		//	auto texturePtr = std::shared_ptr<jTexture>(tex_vk);
+		//	rt_vk->Textures[textureIndex++] = texturePtr;
+		//	rt_vk->AllTextures[allTextureIndex++] = texturePtr;
+		//}
+	}
+	else
+	{
+		JMESSAGE("Unsupported type texture in FramebufferPool");
+		return nullptr;
+	}
+
+	return rt_vk;
+}
+
 jRasterizationStateInfo* jRHI_Vulkan::CreateRasterizationState(const jRasterizationStateInfo& initializer) const
 {
 	auto* state = new jRasterizationStateInfo_Vulkan(initializer);
@@ -1998,23 +2471,44 @@ bool jRenderPass_Vulkan::CreateRenderPass()
 {
     int32 AttachmentIndex = 0;
     std::vector<VkAttachmentDescription> AttachmentDescs;
-	AttachmentDescs.reserve(ColorAttachments.size() + 2);		// Colors, Depth, ColorResolve
+
+	const size_t Attachments = ColorAttachments.size() + (DepthAttachment ? 1 : 0) + (ColorAttachmentResolve ? 1 : 0);
     AttachmentDescs.resize(ColorAttachments.size() + 1);
 
-	bool IsUseMSAA = false;
+	int32 SampleCount = 0;
+	int32 LayerCount = 0;
+
+	if (ColorAttachments.size() > 0)
+	{
+		const jAttachment* attachment = ColorAttachments[0];
+		check(attachment);
+		check(attachment->RenderTargetPtr.get());
+
+		const jRenderTargetInfo& RTInfo = attachment->RenderTargetPtr->Info;
+
+		SampleCount = RTInfo.SampleCount;
+		LayerCount = RTInfo.TextureCount;
+	}
 
     std::vector<VkAttachmentReference> colorAttachmentRefs;
     colorAttachmentRefs.resize(ColorAttachments.size());
     for (int32 i = 0; i < ColorAttachments.size(); ++i)
     {
-        VkAttachmentDescription& colorDesc = AttachmentDescs[AttachmentIndex];
-        colorDesc.format = GetVulkanTextureInternalFormat(ColorAttachments[i].Format);
-        colorDesc.samples = (VkSampleCountFlagBits)ColorAttachments[i].SampleCount;
-        GetVulkanAttachmentLoadStoreOp(colorDesc.loadOp, colorDesc.storeOp, ColorAttachments[i].LoadStoreOp);
-        GetVulkanAttachmentLoadStoreOp(colorDesc.stencilLoadOp, colorDesc.stencilStoreOp, ColorAttachments[i].StencilLoadStoreOp);
+		const jAttachment* attachment = ColorAttachments[i];
+		check(attachment);
+		check(attachment->RenderTargetPtr.get());
 
-		if ((int32)ColorAttachments[i].SampleCount > 1)
-			IsUseMSAA = true;
+		const jRenderTargetInfo& RTInfo = attachment->RenderTargetPtr->Info;
+
+        VkAttachmentDescription& colorDesc = AttachmentDescs[AttachmentIndex];
+		colorDesc.format = GetVulkanTextureInternalFormat(RTInfo.InternalFormat);
+        colorDesc.samples = (VkSampleCountFlagBits)RTInfo.SampleCount;
+        GetVulkanAttachmentLoadStoreOp(colorDesc.loadOp, colorDesc.storeOp, attachment->LoadStoreOp);
+        GetVulkanAttachmentLoadStoreOp(colorDesc.stencilLoadOp, colorDesc.stencilStoreOp, attachment->StencilLoadStoreOp);
+
+		check((ColorAttachmentResolve && ((int32)RTInfo.SampleCount > 1)) || (!ColorAttachmentResolve && (int32)RTInfo.SampleCount == 1));
+		check(SampleCount == RTInfo.SampleCount);
+		check(LayerCount == RTInfo.TextureCount);
 
         // Texture나 Framebuffer의 경우 VkImage 객체로 특정 픽셀 형식을 표현함.
         // 그러나 메모리의 픽셀 레이아웃은 이미지로 수행하려는 작업에 따라서 변경될 수 있음.
@@ -2032,7 +2526,7 @@ bool jRenderPass_Vulkan::CreateRenderPass()
 
         // MSAA 를 사용하게 되면, Swapchain에 제출전에 resolve 를 해야하므로, 아래와 같이 final layout 을 변경해줌.
         // 그리고 reoslve를 위한 VkAttachmentDescription 을 추가함. depth buffer의 경우는 Swapchain에 제출하지 않기 때문에 이 과정이 필요없음.
-		if (IsUseMSAA)
+		if (SampleCount > 1)
 			colorDesc.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		else
 			colorDesc.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;			// MSAA 안하면 바로 Present 할 것이므로
@@ -2050,31 +2544,57 @@ bool jRenderPass_Vulkan::CreateRenderPass()
         colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;		// 서브패스에서 어떤 이미지 레이아웃을 사용할것인지를 명세함.
                                                                                     // Vulkan에서 이 서브패스가 되면 자동으로 Image 레이아웃을 이것으로 변경함.
                                                                                     // 우리는 VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL 으로 설정하므로써 color attachment로 사용
+
+		const auto& color = attachment->ClearColor;
+		VkClearValue colorClear = {};
+		colorClear.color = { color.x, color.y, color.z, color.w };
+		ClearValues.push_back(colorClear);
     }
 
-    VkAttachmentDescription& depthAttachment = AttachmentDescs[AttachmentIndex];
-    depthAttachment.format = GetVulkanTextureInternalFormat(DepthAttachment.Format);
-    depthAttachment.samples = (VkSampleCountFlagBits)DepthAttachment.SampleCount;
-    GetVulkanAttachmentLoadStoreOp(depthAttachment.loadOp, depthAttachment.storeOp, DepthAttachment.LoadStoreOp);
-    GetVulkanAttachmentLoadStoreOp(depthAttachment.stencilLoadOp, depthAttachment.stencilStoreOp, DepthAttachment.StencilLoadStoreOp);
-    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	if (DepthAttachment)
+	{
+		check(DepthAttachment->RenderTargetPtr.get());
+		const jRenderTargetInfo& RTInfo = DepthAttachment->RenderTargetPtr->Info;
+
+		VkAttachmentDescription& depthAttachment = AttachmentDescs[AttachmentIndex];
+		depthAttachment.format = GetVulkanTextureInternalFormat(RTInfo.InternalFormat);
+		depthAttachment.samples = (VkSampleCountFlagBits)RTInfo.SampleCount;
+		GetVulkanAttachmentLoadStoreOp(depthAttachment.loadOp, depthAttachment.storeOp, DepthAttachment->LoadStoreOp);
+		GetVulkanAttachmentLoadStoreOp(depthAttachment.stencilLoadOp, depthAttachment.stencilStoreOp, DepthAttachment->StencilLoadStoreOp);
+		depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+		check((ColorAttachmentResolve && ((int32)RTInfo.SampleCount > 1)) || (!ColorAttachmentResolve && (int32)RTInfo.SampleCount == 1));
+		check(SampleCount == RTInfo.SampleCount);
+		check(LayerCount == RTInfo.TextureCount);
+
+		VkClearValue colorClear = {};
+		colorClear.depthStencil = { DepthAttachment->ClearDepth.x, (uint32)DepthAttachment->ClearDepth.y };
+		ClearValues.push_back(colorClear);
+	}
 
     VkAttachmentReference depthAttachmentRef = {};
     depthAttachmentRef.attachment = AttachmentIndex++;
     depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
     VkAttachmentReference colorAttachmentResolveRef = {};
-	if (IsUseMSAA)
+	if (SampleCount > 1)
 	{
+		check(ColorAttachmentResolve);
+		check(ColorAttachmentResolve->RenderTargetPtr.get());
+		const jRenderTargetInfo& RTInfo = ColorAttachmentResolve->RenderTargetPtr->Info;
+
 		VkAttachmentDescription colorAttachmentResolve = {};
-		colorAttachmentResolve.format = GetVulkanTextureInternalFormat(ColorAttachmentResolve.Format);
+		colorAttachmentResolve.format = GetVulkanTextureInternalFormat(RTInfo.InternalFormat);
 		colorAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT;
-		GetVulkanAttachmentLoadStoreOp(colorAttachmentResolve.loadOp, colorAttachmentResolve.storeOp, ColorAttachmentResolve.LoadStoreOp);
-		GetVulkanAttachmentLoadStoreOp(colorAttachmentResolve.stencilLoadOp, colorAttachmentResolve.stencilStoreOp, ColorAttachmentResolve.StencilLoadStoreOp);
+		GetVulkanAttachmentLoadStoreOp(colorAttachmentResolve.loadOp, colorAttachmentResolve.storeOp, ColorAttachmentResolve->LoadStoreOp);
+		GetVulkanAttachmentLoadStoreOp(colorAttachmentResolve.stencilLoadOp, colorAttachmentResolve.stencilStoreOp, ColorAttachmentResolve->StencilLoadStoreOp);
 		colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 		AttachmentDescs.emplace_back(colorAttachmentResolve);
+
+		check(RTInfo.SampleCount == 1);
+		check(LayerCount == RTInfo.TextureCount);
 
 		colorAttachmentResolveRef.attachment = AttachmentIndex++;		// color attachments + depth attachment
 		colorAttachmentResolveRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -2084,11 +2604,12 @@ bool jRenderPass_Vulkan::CreateRenderPass()
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass.colorAttachmentCount = (uint32)colorAttachmentRefs.size();
     subpass.pColorAttachments = &colorAttachmentRefs[0];
-    subpass.pDepthStencilAttachment = &depthAttachmentRef;
-	if (IsUseMSAA)
+	
+	if (DepthAttachment)
+		subpass.pDepthStencilAttachment = &depthAttachmentRef;
+
+	if (SampleCount > 1)
 		subpass.pResolveAttachments = &colorAttachmentResolveRef;
-	else
-		subpass.pResolveAttachments = nullptr;
 
     VkRenderPassCreateInfo renderPassInfo = {};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
@@ -2135,60 +2656,117 @@ bool jRenderPass_Vulkan::CreateRenderPass()
 	RenderPassInfo.renderArea.offset = { RenderOffset.x, RenderOffset.y };
 	RenderPassInfo.renderArea.extent = { (uint32)RenderExtent.x, (uint32)RenderExtent.y };
 
-	ClearValues.resize(ColorAttachments.size() + 1);
-	for (int32 i = 0; i < ColorAttachments.size(); ++i)
-	{
-		const auto& color = ColorAttachments[i].ClearColor;
-		ClearValues[i].color = { color.x, color.y, color.z, color.w };
-	}
-	ClearValues[ColorAttachments.size()].depthStencil = { DepthAttachment.ClearDepth.x, (uint32)DepthAttachment.ClearDepth.y };
 	RenderPassInfo.clearValueCount = static_cast<uint32_t>(ClearValues.size());
 	RenderPassInfo.pClearValues = ClearValues.data();
+
+	// Create framebuffer
+	{
+		int32 layerCount = 1;
+		ETextureType textureType = ETextureType::TEXTURE_2D;
+
+		std::vector<jRenderTarget*> ColorRT;
+		jRenderTarget* DepthRT = nullptr;
+		jRenderTarget* ResolveRT = nullptr;
+
+		std::vector<VkImageView> ImageViews;
+
+		for (int32 k = 0; k < ColorAttachments.size(); ++k)
+		{
+			check(ColorAttachments[k]);
+			
+			const jRenderTarget* RT = ColorAttachments[k]->RenderTargetPtr.get();
+			check(RT);
+
+			const jTexture* texture = RT->GetTexture();
+			check(texture);
+
+			ImageViews.push_back((VkImageView)texture->GetHandle());
+		}
+
+		if (DepthAttachment)
+		{
+			const jRenderTarget* RT = DepthAttachment->RenderTargetPtr.get();
+			check(RT);
+
+			const jTexture* texture = RT->GetTexture();
+			check(texture);
+
+			ImageViews.push_back((VkImageView)texture->GetHandle());
+		}
+
+		if (SampleCount > 1)
+		{
+			check(ColorAttachmentResolve);
+
+			const jRenderTarget* RT = ColorAttachmentResolve->RenderTargetPtr.get();
+			check(RT);
+
+			const jTexture* texture = RT->GetTexture();
+			check(texture);
+
+			ImageViews.push_back((VkImageView)texture->GetHandle());
+		}
+
+		VkFramebufferCreateInfo framebufferInfo = {};
+		framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+		framebufferInfo.renderPass = RenderPass;
+
+		// RenderPass와 같은 수와 같은 타입의 attachment 를 사용
+		framebufferInfo.attachmentCount = static_cast<uint32>(ImageViews.size());
+		framebufferInfo.pAttachments = ImageViews.data();
+
+		framebufferInfo.width = RenderExtent.x;
+		framebufferInfo.height = RenderExtent.y;
+		framebufferInfo.layers = layerCount;			// 이미지 배열의 레이어수(3D framebuffer에 사용할 듯)
+
+		if (!ensure(vkCreateFramebuffer(g_rhi_vk->device, &framebufferInfo, nullptr, &FrameBuffer) == VK_SUCCESS))
+			return false;
+	}
 
     return true;
 }
 
 bool jFrameBuffer_Vulkan::CreateFrameBuffer(int32 index)
 {
-	check(RenderPass);
-	check(index >= 0 && index < g_rhi_vk->swapChainImageViews.size());
-	
-	Index = index;
+	//check(RenderPass);
+	//check(index >= 0 && index < g_rhi_vk->swapChainImageViews.size());
+	//
+	//Index = index;
 
-	VkImageView FinalImageView = g_rhi_vk->swapChainImageViews[Index];
+	//VkImageView FinalImageView = g_rhi_vk->swapChainImageViews[Index];
 
-    // DepthBuffer는 같은 것을 씀. 세마포어 때문에 한번에 1개의 subpass 만 실행되기 때문.
-    std::vector<VkImageView> attachments;
-	attachments.reserve(3);
-	if (g_rhi_vk->msaaSamples > 1)
-	{
-		for(int32 k=0;k<RenderPass->ColorAttachments.size();++k)
-		{
-			attachments.push_back((VkImageView)RenderPass->ColorAttachments[k].ImageView);
-		}
-		attachments.push_back((VkImageView)RenderPass->DepthAttachment.ImageView);
-		attachments.push_back(FinalImageView);
-	}
-	else
-	{
-        attachments.push_back(FinalImageView);
-        attachments.push_back((VkImageView)RenderPass->DepthAttachment.ImageView);
-	}
+ //   // DepthBuffer는 같은 것을 씀. 세마포어 때문에 한번에 1개의 subpass 만 실행되기 때문.
+ //   std::vector<VkImageView> attachments;
+	//attachments.reserve(3);
+	//if (g_rhi_vk->msaaSamples > 1)
+	//{
+	//	for(int32 k=0;k<RenderPass->ColorAttachments.size();++k)
+	//	{
+	//		attachments.push_back((VkImageView)RenderPass->ColorAttachments[k].ImageView);
+	//	}
+	//	attachments.push_back((VkImageView)RenderPass->DepthAttachment.ImageView);
+	//	attachments.push_back(FinalImageView);
+	//}
+	//else
+	//{
+ //       attachments.push_back(FinalImageView);
+ //       attachments.push_back((VkImageView)RenderPass->DepthAttachment.ImageView);
+	//}
 
-    VkFramebufferCreateInfo framebufferInfo = {};
-    framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-    framebufferInfo.renderPass = (VkRenderPass)RenderPass->GetRenderPass();
+ //   VkFramebufferCreateInfo framebufferInfo = {};
+ //   framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+ //   framebufferInfo.renderPass = (VkRenderPass)RenderPass->GetRenderPass();
 
-    // RenderPass와 같은 수와 같은 타입의 attachment 를 사용
-    framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-    framebufferInfo.pAttachments = attachments.data();
+ //   // RenderPass와 같은 수와 같은 타입의 attachment 를 사용
+ //   framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+ //   framebufferInfo.pAttachments = attachments.data();
 
-    framebufferInfo.width = RenderPass->RenderExtent.x;
-    framebufferInfo.height = RenderPass->RenderExtent.y;
-    framebufferInfo.layers = 1;			// 이미지 배열의 레이어수(3D framebuffer에 사용할 듯)
+ //   framebufferInfo.width = RenderPass->RenderExtent.x;
+ //   framebufferInfo.height = RenderPass->RenderExtent.y;
+ //   framebufferInfo.layers = 1;			// 이미지 배열의 레이어수(3D framebuffer에 사용할 듯)
 
-    if (!ensure(vkCreateFramebuffer(g_rhi_vk->device, &framebufferInfo, nullptr, &FrameBuffer) == VK_SUCCESS))
-        return false;
+ //   if (!ensure(vkCreateFramebuffer(g_rhi_vk->device, &framebufferInfo, nullptr, &FrameBuffer) == VK_SUCCESS))
+ //       return false;
 
     return true;
 }

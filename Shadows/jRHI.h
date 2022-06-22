@@ -33,10 +33,14 @@ struct jIndexBuffer : public IBuffer
 
 struct jTexture
 {
+	virtual ~jTexture() {}
 	static int32 GetMipLevels(int32 InWidth, int32 InHeight)
 	{
 		return 1 + (int32)floorf(log2f(fmaxf((float)InWidth, (float)InHeight)));
 	}
+
+	virtual void* GetHandle() const { return nullptr; }
+
 	bool sRGB = false;
 	ETextureType Type = ETextureType::MAX;
 	ETextureFormat ColorBufferType = ETextureFormat::RGB;
@@ -495,6 +499,65 @@ struct jBlendingStateInfo
 	//float                                         blendConstants[4];
 };
 
+struct jAttachment
+{
+	jAttachment() = default;
+	jAttachment(std::shared_ptr<jRenderTarget> InRTPtr
+		, EAttachmentLoadStoreOp InLoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE
+		, EAttachmentLoadStoreOp InStencilLoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE
+		, Vector4 InClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f)
+		, Vector2 InClearDepth = Vector2(1.0f, 0.0f))
+		: RenderTargetPtr(InRTPtr), LoadStoreOp(InLoadStoreOp), StencilLoadStoreOp(InStencilLoadStoreOp), ClearColor(InClearColor), ClearDepth(InClearDepth)
+	{}
+
+	//ETextureFormat Format = ETextureFormat::RGBA8;
+	//EMSAASamples SampleCount = EMSAASamples::COUNT_1;
+
+	std::shared_ptr<jRenderTarget> RenderTargetPtr;
+
+	// 아래 2가지 옵션은 렌더링 전, 후에 attachment에 있는 데이터에 무엇을 할지 결정하는 부분.
+	// 1). loadOp
+	//		- VK_ATTACHMENT_LOAD_OP_LOAD : attachment에 있는 내용을 그대로 유지
+	//		- VK_ATTACHMENT_LOAD_OP_CLEAR : attachment에 있는 내용을 constant 모두 값으로 설정함.
+	//		- VK_ATTACHMENT_LOAD_OP_DONT_CARE : attachment에 있는 내용에 대해 어떠한 것도 하지 않음. 정의되지 않은 상태.
+	// 2). storeOp
+	//		- VK_ATTACHMENT_STORE_OP_STORE : 그려진 내용이 메모리에 저장되고 추후에 읽어질 수 있음.
+	//		- VK_ATTACHMENT_STORE_OP_DONT_CARE : 렌더링을 수행한 후에 framebuffer의 내용이 어떻게 될지 모름(정의되지 않음).
+	EAttachmentLoadStoreOp LoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE;
+	EAttachmentLoadStoreOp StencilLoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE;
+
+	//union
+	//{
+	//	Vector4 ClearColor;
+	//	Vector2 ClearDepth;
+	//};
+	Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
+	Vector2 ClearDepth = Vector2(1.0f, 0.0f);
+
+	//void* ImageView = nullptr;
+};
+
+class jRenderPass
+{
+public:
+	virtual ~jRenderPass() {}
+
+	virtual void* GetRenderPass() const { return nullptr; }
+
+	std::vector<const jAttachment*> ColorAttachments;
+	const jAttachment* DepthAttachment = nullptr;
+	const jAttachment* ColorAttachmentResolve = nullptr;
+	Vector2i RenderOffset;
+	Vector2i RenderExtent;
+};
+
+class jFrameBuffer
+{
+public:
+	virtual ~jFrameBuffer() {}
+
+	void* GetFrameBuffer(int32 index) { return nullptr; }
+};
 
 class jRHI
 {

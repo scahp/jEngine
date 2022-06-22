@@ -9,7 +9,7 @@
 #define MULTIPLE_FRAME 1
 
 #if MULTIPLE_FRAME
-static constexpr int32_t MAX_FRAMES_IN_FLIGHT = 2;
+//static constexpr int32_t MAX_FRAMES_IN_FLIGHT = 2;
 #endif // MULTIPLE_FRAME
 
 FORCEINLINE VkPrimitiveTopology GetVulkanPrimitiveTopology(EPrimitiveType type);
@@ -133,12 +133,13 @@ class jRenderPass_Vulkan : public jRenderPass
 public:
     
 	jRenderPass_Vulkan() = default;
-	jRenderPass_Vulkan(const jAttachment& colorAttachment, const jAttachment& depthAttachment, const jAttachment& colorResolveAttachment)
+	jRenderPass_Vulkan(const jAttachment* colorAttachment, const jAttachment* depthAttachment, const jAttachment* colorResolveAttachment, const Vector2i& offset, const Vector2i& extent)
     {
-        SetAttachemnt(colorAttachment, depthAttachment, ColorAttachmentResolve);
+        SetAttachemnt(colorAttachment, depthAttachment, colorResolveAttachment);
+		SetRenderArea(offset, extent);
     }
 
-    void SetAttachemnt(const jAttachment& colorAttachment, const jAttachment& depthAttachment, const jAttachment& colorResolveAttachment)
+    void SetAttachemnt(const jAttachment* colorAttachment, const jAttachment* depthAttachment, const jAttachment* colorResolveAttachment)
     {
         ColorAttachments.push_back(colorAttachment);
         DepthAttachment = depthAttachment;
@@ -157,13 +158,15 @@ public:
 	void* GetRenderPass() const { return RenderPass; }
 	FORCEINLINE const VkRenderPass& GetRenderPassRaw() const { return RenderPass; }
 
-	bool BeginRenderPass(const VkCommandBuffer& commandBuffer, const VkFramebuffer& framebuffer)
+	bool BeginRenderPass(const VkCommandBuffer& commandBuffer)
 	{
 		if (!ensure(!CommandBuffer))
 			return false;
 
 		CommandBuffer = commandBuffer;
-		RenderPassInfo.framebuffer = framebuffer;
+
+		check(FrameBuffer);
+		RenderPassInfo.framebuffer = FrameBuffer;
 	
         // 커맨드를 기록하는 명령어는 prefix로 모두 vkCmd 가 붙으며, 리턴값은 void 로 에러 핸들링은 따로 안함.
         // VK_SUBPASS_CONTENTS_INLINE : 렌더 패스 명령이 Primary 커맨드 버퍼에 포함되며, Secondary 커맨드 버퍼는 실행되지 않는다.
@@ -185,8 +188,9 @@ private:
 	VkCommandBuffer CommandBuffer = nullptr;
 
 	VkRenderPassBeginInfo RenderPassInfo;
-    VkRenderPass RenderPass;
-    std::vector<VkClearValue> ClearValues;
+	std::vector<VkClearValue> ClearValues;
+	VkRenderPass RenderPass = nullptr;
+	VkFramebuffer FrameBuffer = nullptr;
 };
 
 class jFrameBuffer_Vulkan : public jFrameBuffer
@@ -300,6 +304,7 @@ struct jTexture_Vulkan : public jTexture
     VkImageView ImageView;
     VkDeviceMemory ImageMemory;
 
+	virtual void* GetHandle() const { return ImageView; }
 	static VkSampler CreateDefaultSamplerState();
 };
 
@@ -346,7 +351,7 @@ public:
 	void Release()
 	{
 		//// Command buffer pool 을 다시 만들기 보다 있는 커맨드 버퍼 풀을 cleanup 하고 재사용 함.
-		//vkFreeCommandBuffers(device, CommandBufferManager.GetPool(), static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
+		//vkFreeCommandBuffers(device, CommandBufferManager.GetPool(), static_cast<uint32>(commandBuffers.size()), commandBuffers.data());
 	}
 
 	FORCEINLINE const VkCommandPool& GetPool() const { return CommandPool; };
@@ -653,7 +658,7 @@ public:
 	//VkRenderPass renderPass;
 	//VkDescriptorSetLayout descriptorSetLayout;
 	//VkPipelineLayout pipelineLayout;
-	VkPipeline graphicsPipeline;
+	std::vector<VkPipeline> graphicsPipelines;
 
 	VkImage colorImage;
 	VkDeviceMemory colorImageMemory;
@@ -676,7 +681,7 @@ public:
 
 	// 그냥 일반적인 모델 로드에 필요한 자료 구조임. 정리 예정
 	//std::vector<jVertex> vertices;
-	//std::vector<uint32_t> indices;
+	//std::vector<uint32> indices;
 	//VkBuffer vertexBuffer;
 	//VkDeviceMemory vertexBufferMemory;
 	//VkBuffer indexBuffer;
@@ -728,7 +733,7 @@ public:
 
 	std::vector<const char*> GetRequiredExtensions()
 	{
-		uint32_t glfwExtensionCount = 0;
+		uint32 glfwExtensionCount = 0;
 		const char** glfwExtensions = nullptr;
 		glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
@@ -742,7 +747,7 @@ public:
 
 	bool CheckValidationLayerSupport()
 	{
-		uint32_t layerCount;
+		uint32 layerCount;
 		vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
 
 		std::vector<VkLayerProperties> availableLayers(layerCount);
@@ -830,8 +835,8 @@ public:
 
 	struct QueueFamilyIndices
 	{
-		std::optional<uint32_t> graphicsFamily;
-		std::optional<uint32_t> presentFamily;
+		std::optional<uint32> graphicsFamily;
+		std::optional<uint32> presentFamily;
 
 		bool IsComplete()
 		{
@@ -843,7 +848,7 @@ public:
 	{
 		QueueFamilyIndices indices;
 
-		uint32_t queueFamilyCount = 0;
+		uint32 queueFamilyCount = 0;
 		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
 
 		std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
@@ -871,7 +876,7 @@ public:
 
 	bool CheckDeviceExtensionSupport(VkPhysicalDevice device)
 	{
-		uint32_t extensionCount;
+		uint32 extensionCount;
 		vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
 
 		std::vector<VkExtensionProperties> availableExtensions(extensionCount);
@@ -897,7 +902,7 @@ public:
 
 		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
 
-		uint32_t formatCount;
+		uint32 formatCount;
 		vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
 		if (formatCount != 0)
 		{
@@ -905,7 +910,7 @@ public:
 			vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, details.formats.data());
 		}
 
-		uint32_t presentModeCount;
+		uint32 presentModeCount;
 		vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
 		if (presentModeCount != 0)
 		{
@@ -1002,13 +1007,13 @@ public:
 
 		int width, height;
 		glfwGetFramebufferSize(window, &width, &height);
-		VkExtent2D actualExtent = { static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
+		VkExtent2D actualExtent = { static_cast<uint32>(width), static_cast<uint32>(height) };
 
-		actualExtent.width = std::max<uint32_t>(capabilities.minImageExtent.width, std::min<uint32_t>(capabilities.maxImageExtent.width, actualExtent.width));
-		actualExtent.height = std::max<uint32_t>(capabilities.minImageExtent.height, std::min<uint32_t>(capabilities.maxImageExtent.height, actualExtent.height));
+		actualExtent.width = std::max<uint32>(capabilities.minImageExtent.width, std::min<uint32>(capabilities.maxImageExtent.width, actualExtent.width));
+		actualExtent.height = std::max<uint32>(capabilities.minImageExtent.height, std::min<uint32>(capabilities.maxImageExtent.height, actualExtent.height));
 		return actualExtent;
 	}
-	VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlagBits aspectMask, uint32_t mipLevels) const
+	VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlagBits aspectMask, uint32 mipLevels) const
 	{
 		VkImageViewCreateInfo viewInfo = {};
 
@@ -1023,6 +1028,64 @@ public:
 		viewInfo.subresourceRange.levelCount = mipLevels;
 		viewInfo.subresourceRange.baseArrayLayer = 0;
 		viewInfo.subresourceRange.layerCount = 1;
+
+		// RGBA 컴포넌트들에게 컬러 채널을 매핑할 수 있다.
+		// 예를들어 VK_COMPONENT_SWIZZLE_R 을 모든 채널에 넣으면 R을 사용한 흑백 텍스쳐를 나타낼 수 있음.
+		// 현재는 기본인 VK_COMPONENT_SWIZZLE_IDENTITY 를 설정해준다.
+		viewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+		viewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+		viewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+		viewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+		VkImageView imageView;
+		ensure(vkCreateImageView(device, &viewInfo, nullptr, &imageView) == VK_SUCCESS);
+
+		return imageView;
+	}
+	VkImageView CreateImage2DArrayView(VkImage image, uint32 layerCount, VkFormat format, VkImageAspectFlagBits aspectMask, uint32 mipLevels) const
+	{
+		VkImageViewCreateInfo viewInfo = {};
+
+		viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		viewInfo.image = image;
+		viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+		viewInfo.format = format;
+
+		// SubresourceRange에 이미지의 목적과 이미지의 어떤 파트에 접근할 것인지를 명세한다.
+		viewInfo.subresourceRange.aspectMask = aspectMask;
+		viewInfo.subresourceRange.baseMipLevel = 0;
+		viewInfo.subresourceRange.levelCount = mipLevels;
+		viewInfo.subresourceRange.baseArrayLayer = 0;
+		viewInfo.subresourceRange.layerCount = layerCount;
+
+		// RGBA 컴포넌트들에게 컬러 채널을 매핑할 수 있다.
+		// 예를들어 VK_COMPONENT_SWIZZLE_R 을 모든 채널에 넣으면 R을 사용한 흑백 텍스쳐를 나타낼 수 있음.
+		// 현재는 기본인 VK_COMPONENT_SWIZZLE_IDENTITY 를 설정해준다.
+		viewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+		viewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+		viewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+		viewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+		VkImageView imageView;
+		ensure(vkCreateImageView(device, &viewInfo, nullptr, &imageView) == VK_SUCCESS);
+
+		return imageView;
+	}
+	VkImageView CreateImageCubeView(VkImage image, VkFormat format, VkImageAspectFlagBits aspectMask, uint32 mipLevels) const
+	{
+		VkImageViewCreateInfo viewInfo = {};
+
+		viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		viewInfo.image = image;
+		viewInfo.viewType = VK_IMAGE_VIEW_TYPE_CUBE_ARRAY;
+		viewInfo.format = format;
+
+		// SubresourceRange에 이미지의 목적과 이미지의 어떤 파트에 접근할 것인지를 명세한다.
+		viewInfo.subresourceRange.aspectMask = aspectMask;
+		viewInfo.subresourceRange.baseMipLevel = 0;
+		viewInfo.subresourceRange.levelCount = mipLevels;
+		viewInfo.subresourceRange.baseArrayLayer = 0;
+		viewInfo.subresourceRange.layerCount = 6;
 
 		// RGBA 컴포넌트들에게 컬러 채널을 매핑할 수 있다.
 		// 예를들어 VK_COMPONENT_SWIZZLE_R 을 모든 채널에 넣으면 R을 사용한 흑백 텍스쳐를 나타낼 수 있음.
@@ -1070,9 +1133,9 @@ public:
 		createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 		createInfo.codeSize = code.size();
 
-		// pCode 가 uint32_t* 형이라서 4 byte aligned 된 메모리를 넘겨줘야 함.
+		// pCode 가 uint32* 형이라서 4 byte aligned 된 메모리를 넘겨줘야 함.
 		// 다행히 std::vector의 default allocator가 가 메모리 할당시 4 byte aligned 을 이미 하고있어서 그대로 씀.
-		createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+		createInfo.pCode = reinterpret_cast<const uint32*>(code.data());
 
 		VkShaderModule shaderModule = {};
 		ensure(vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) == VK_SUCCESS);
@@ -1081,12 +1144,12 @@ public:
 		// 그래픽스 파이프라인이 생성된 후 VkShaderModule은 즉시 소멸 가능.
 		return shaderModule;
 	}
-	uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const
+	uint32 FindMemoryType(uint32 typeFilter, VkMemoryPropertyFlags properties) const
 	{
 		VkPhysicalDeviceMemoryProperties memProperties;
 		vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
 
-		for (uint32_t i = 0; i < memProperties.memoryTypeCount; ++i)
+		for (uint32 i = 0; i < memProperties.memoryTypeCount; ++i)
 		{
 			if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
 				return i;
@@ -1095,7 +1158,7 @@ public:
 		check(0);	// failed to find sutable memory type!
 		return 0;
 	}
-	bool CreateImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage
+	bool CreateImage(uint32 width, uint32 height, uint32 mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage
 		, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory) const
 	{
 		VkImageCreateInfo imageInfo = {};
@@ -1106,6 +1169,112 @@ public:
 		imageInfo.extent.depth = 1;
 		imageInfo.mipLevels = mipLevels;
 		imageInfo.arrayLayers = 1;
+		imageInfo.format = format;
+
+		// VK_IMAGE_TILING_LINEAR : 텍셀이 Row-major 순서로 저장. pixels array 처럼.
+		// VK_IMAGE_TILING_OPTIMAL : 텍셀이 최적의 접근을 위한 순서로 저장
+		// image의 memory 안에 있는 texel에 직접 접근해야한다면, VK_IMAGE_TILING_LINEAR 를 써야함.
+		// 그러나 지금 staging image가 아닌 staging buffer를 사용하기 때문에 VK_IMAGE_TILING_OPTIMAL 를 쓰면됨.
+		imageInfo.tiling = tiling;
+
+		// VK_IMAGE_LAYOUT_UNDEFINED : GPU에 의해 사용될 수 없으며, 첫번째 transition 에서 픽셀들을 버릴 것임.
+		// VK_IMAGE_LAYOUT_PREINITIALIZED : GPU에 의해 사용될 수 없으며, 첫번째 transition 에서 픽셀들이 보존 될것임.
+		// VK_IMAGE_LAYOUT_GENERAL : 성능은 좋지 않지만 image를 input / output 둘다 의 용도로 사용하는 경우 씀.
+		// 첫번째 전환에서 텍셀이 보존되어야 하는 경우는 거의 없음.
+		//	-> 이런 경우는 image를 staging image로 하고 VK_IMAGE_TILING_LINEAR를 쓴 경우이며, 이때는 Texel 데이터를
+		//		image에 업로드하고, image를 transfer source로 transition 하는 경우가 됨.
+		// 하지만 지금의 경우는 첫번째 transition에서 image는 transfer destination 이 된다. 그래서 기존 데이터를 유지
+		// 할 필요가 없다 그래서 VK_IMAGE_LAYOUT_UNDEFINED 로 설정한다.
+		imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		imageInfo.usage = usage;
+
+		imageInfo.samples = numSamples;
+		imageInfo.flags = 0;		// Optional
+									// Sparse image 에 대한 정보를 설정가능
+									// Sparse image는 특정 영역의 정보를 메모리에 담아두는 것임. 예를들어 3D image의 경우
+									// 복셀영역의 air 부분의 표현을 위해 많은 메모리를 할당하는것을 피하게 해줌.
+
+		if (!ensure(vkCreateImage(device, &imageInfo, nullptr, &image) == VK_SUCCESS))
+			return false;
+
+		VkMemoryRequirements memRequirements;
+		vkGetImageMemoryRequirements(device, image, &memRequirements);
+
+		VkMemoryAllocateInfo allocInfo = {};
+		allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		allocInfo.allocationSize = memRequirements.size;
+		allocInfo.memoryTypeIndex = FindMemoryType(memRequirements.memoryTypeBits, properties);
+		if (!ensure(vkAllocateMemory(device, &allocInfo, nullptr, &imageMemory) == VK_SUCCESS))
+			return false;
+
+		vkBindImageMemory(device, image, imageMemory, 0);
+
+		return true;
+	}
+	bool CreateImage2DArray(uint32 width, uint32 height, uint32 arrayLayers, uint32 mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage
+		, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory) const
+	{
+		VkImageCreateInfo imageInfo = {};
+		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		imageInfo.imageType = VK_IMAGE_TYPE_2D;
+		imageInfo.extent.width = width;
+		imageInfo.extent.height = height;
+		imageInfo.extent.depth = 1;
+		imageInfo.mipLevels = mipLevels;
+		imageInfo.arrayLayers = arrayLayers;
+		imageInfo.format = format;
+
+		// VK_IMAGE_TILING_LINEAR : 텍셀이 Row-major 순서로 저장. pixels array 처럼.
+		// VK_IMAGE_TILING_OPTIMAL : 텍셀이 최적의 접근을 위한 순서로 저장
+		// image의 memory 안에 있는 texel에 직접 접근해야한다면, VK_IMAGE_TILING_LINEAR 를 써야함.
+		// 그러나 지금 staging image가 아닌 staging buffer를 사용하기 때문에 VK_IMAGE_TILING_OPTIMAL 를 쓰면됨.
+		imageInfo.tiling = tiling;
+
+		// VK_IMAGE_LAYOUT_UNDEFINED : GPU에 의해 사용될 수 없으며, 첫번째 transition 에서 픽셀들을 버릴 것임.
+		// VK_IMAGE_LAYOUT_PREINITIALIZED : GPU에 의해 사용될 수 없으며, 첫번째 transition 에서 픽셀들이 보존 될것임.
+		// VK_IMAGE_LAYOUT_GENERAL : 성능은 좋지 않지만 image를 input / output 둘다 의 용도로 사용하는 경우 씀.
+		// 첫번째 전환에서 텍셀이 보존되어야 하는 경우는 거의 없음.
+		//	-> 이런 경우는 image를 staging image로 하고 VK_IMAGE_TILING_LINEAR를 쓴 경우이며, 이때는 Texel 데이터를
+		//		image에 업로드하고, image를 transfer source로 transition 하는 경우가 됨.
+		// 하지만 지금의 경우는 첫번째 transition에서 image는 transfer destination 이 된다. 그래서 기존 데이터를 유지
+		// 할 필요가 없다 그래서 VK_IMAGE_LAYOUT_UNDEFINED 로 설정한다.
+		imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		imageInfo.usage = usage;
+
+		imageInfo.samples = numSamples;
+		imageInfo.flags = 0;		// Optional
+									// Sparse image 에 대한 정보를 설정가능
+									// Sparse image는 특정 영역의 정보를 메모리에 담아두는 것임. 예를들어 3D image의 경우
+									// 복셀영역의 air 부분의 표현을 위해 많은 메모리를 할당하는것을 피하게 해줌.
+
+		if (!ensure(vkCreateImage(device, &imageInfo, nullptr, &image) == VK_SUCCESS))
+			return false;
+
+		VkMemoryRequirements memRequirements;
+		vkGetImageMemoryRequirements(device, image, &memRequirements);
+
+		VkMemoryAllocateInfo allocInfo = {};
+		allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		allocInfo.allocationSize = memRequirements.size;
+		allocInfo.memoryTypeIndex = FindMemoryType(memRequirements.memoryTypeBits, properties);
+		if (!ensure(vkAllocateMemory(device, &allocInfo, nullptr, &imageMemory) == VK_SUCCESS))
+			return false;
+
+		vkBindImageMemory(device, image, imageMemory, 0);
+
+		return true;
+	}
+	bool CreateImageCube(uint32 width, uint32 height, uint32 mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage
+		, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory) const
+	{
+		VkImageCreateInfo imageInfo = {};
+		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		imageInfo.imageType = VK_IMAGE_TYPE_2D;
+		imageInfo.extent.width = width;
+		imageInfo.extent.height = height;
+		imageInfo.extent.depth = 1;
+		imageInfo.mipLevels = mipLevels;
+		imageInfo.arrayLayers = 6;
 		imageInfo.format = format;
 
 		// VK_IMAGE_TILING_LINEAR : 텍셀이 Row-major 순서로 저장. pixels array 처럼.
@@ -1187,7 +1356,7 @@ public:
 	{
 		return ((format == VK_FORMAT_D32_SFLOAT_S8_UINT) || (format == VK_FORMAT_D24_UNORM_S8_UINT));
 	}
-	bool TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels) const
+	bool TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32 mipLevels) const
 	{
 		VkCommandBuffer commandBuffer = BeginSingleTimeCommands();
 
@@ -1320,7 +1489,7 @@ public:
 
 		return true;
 	}
-	void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) const
+	void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32 width, uint32 height) const
 	{
 		VkCommandBuffer commandBuffer = BeginSingleTimeCommands();
 
@@ -1345,7 +1514,7 @@ public:
 
 		EndSingleTimeCommands(commandBuffer);
 	}
-	bool GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels) const
+	bool GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32 mipLevels) const
 	{
 		VkFormatProperties formatProperties;
 		vkGetPhysicalDeviceFormatProperties(physicalDevice, imageFormat, &formatProperties);
@@ -1366,7 +1535,7 @@ public:
 
 		int32_t mipWidth = texWidth;
 		int32_t mipHeight = texHeight;
-		for (uint32_t i = 1; i < mipLevels; ++i)
+		for (uint32 i = 1; i < mipLevels; ++i)
 		{
 			barrier.subresourceRange.baseMipLevel = i - 1;
 			barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
@@ -1465,7 +1634,6 @@ public:
 
 	virtual bool InitRHI() override;
 	virtual void ReleaseRHI() override;
-	bool CreateGraphicsPipeline();
 	bool CreateColorResources();
 	bool CreateDepthResources();
 	bool LoadModel();
@@ -1477,13 +1645,13 @@ public:
 	bool DrawFrame();
 	void CleanupSwapChain();
 	void RecreateSwapChain();
-	void UpdateUniformBuffer(uint32_t currentImage);
+	void UpdateUniformBuffer(uint32 currentImage);
 
 	virtual void* GetWindow() const override { return window; }
 	FORCEINLINE const VkDevice& GetDevice() const { return device; }
 
-	jRenderPass_Vulkan RenderPassTest;
-	std::vector<jFrameBuffer_Vulkan> FrameBufferTest;
+	std::vector<jRenderPass_Vulkan*> RenderPasses;
+	//std::vector<jFrameBuffer_Vulkan> FrameBufferTest;
 	jShaderBindings ShaderBindings;
 	std::vector<jShadingBindingInstance> ShaderBindingInstances;
 	std::vector<IEmptyUniform*> UniformBuffers;
@@ -1507,6 +1675,7 @@ public:
 		, EFormatType dataType = EFormatType::UNSIGNED_BYTE, ETextureFormat textureFormat = ETextureFormat::RGBA, bool createMipmap = false) const override;
 	virtual jShader* CreateShader(const jShaderInfo& shaderInfo) const;
 	virtual bool CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo) const;
+	virtual jRenderTarget* CreateRenderTarget(const jRenderTargetInfo& info) const override;
 
 	virtual jRasterizationStateInfo* CreateRasterizationState(const jRasterizationStateInfo& initializer) const override;
 	virtual jMultisampleStateInfo* CreateMultisampleState(const jMultisampleStateInfo& initializer) const override;
