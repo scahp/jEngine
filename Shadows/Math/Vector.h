@@ -25,10 +25,10 @@ struct Vector
 	static const Vector RightVector;
 	static const Vector UpVector;
 
-	FORCEINLINE Vector() { }
-	FORCEINLINE Vector(zero_type /*ZeroType*/) { x = 0.0f; y = 0.0f; z = 0.0f; }
-	FORCEINLINE explicit Vector(float fValue) : x(fValue), y(fValue), z(fValue) { }
-	FORCEINLINE Vector(float fX, float fY, float fZ) : x(fX), y(fY), z(fZ) { }
+	FORCEINLINE constexpr Vector() { }
+	FORCEINLINE constexpr Vector(zero_type /*ZeroType*/) { x = 0.0f; y = 0.0f; z = 0.0f; }
+	FORCEINLINE constexpr explicit Vector(float fValue) : x(fValue), y(fValue), z(fValue) { }
+	FORCEINLINE constexpr Vector(float fX, float fY, float fZ) : x(fX), y(fY), z(fZ) { }
 	FORCEINLINE Vector(Vector4 const& vector);
 	FORCEINLINE Vector(Vector2 const& vector, float fZ);
 
@@ -243,11 +243,12 @@ struct Vector4
 	static const Vector4 UpVector;
 	static const Vector4 ColorRed;
 	static const Vector4 ColorWhite;
+	static const Vector4 ColorBlack;
 
-	FORCEINLINE Vector4() { }
-	FORCEINLINE Vector4(zero_type /*ZeroType*/) { x = 0.0f; y = 0.0f; z = 0.0f; w = 0.0f; }
-	FORCEINLINE explicit Vector4(float fValue) : x(fValue), y(fValue), z(fValue), w(fValue) { }
-	FORCEINLINE Vector4(float fX, float fY, float fZ, float fW) : x(fX), y(fY), z(fZ), w(fW) { }
+	FORCEINLINE constexpr Vector4() { }
+	FORCEINLINE constexpr Vector4(zero_type /*ZeroType*/) { x = 0.0f; y = 0.0f; z = 0.0f; w = 0.0f; }
+	FORCEINLINE constexpr explicit Vector4(float fValue) : x(fValue), y(fValue), z(fValue), w(fValue) { }
+	FORCEINLINE constexpr Vector4(float fX, float fY, float fZ, float fW) : x(fX), y(fY), z(fZ), w(fW) { }
 	FORCEINLINE Vector4(Vector vector, float fW) : x(vector.x), y(vector.y), z(vector.z), w(fW) { }
 
 	FORCEINLINE Vector4 operator*(float fValue) const
@@ -426,10 +427,10 @@ struct Vector4
 
 struct Vector2
 {
-	Vector2() { }
-	Vector2(zero_type /*ZeroType*/) { x = 0.0f; y = 0.0f; }
-	Vector2(float fValue) : x(fValue), y(fValue) { }
-	Vector2(float fX, float fY) : x(fX), y(fY) { }
+	constexpr Vector2() { }
+	constexpr Vector2(zero_type /*ZeroType*/) { x = 0.0f; y = 0.0f; }
+	constexpr Vector2(float fValue) : x(fValue), y(fValue) { }
+	constexpr Vector2(float fX, float fY) : x(fX), y(fY) { }
 
 	FORCEINLINE Vector2 operator*(float fValue) const
 	{
@@ -633,8 +634,8 @@ FORCEINLINE Vector operator+(T value, Vector const& vector)
 
 struct Vector2i
 {
-	Vector2i() = default;
-	Vector2i(int32 fX, int32 fY) : x(fX), y(fY) {}
+	constexpr Vector2i() = default;
+	constexpr Vector2i(int32 fX, int32 fY) : x(fX), y(fY) {}
 	union
 	{
 		struct { int32 x, y; };
@@ -644,8 +645,8 @@ struct Vector2i
 
 struct Vector3i
 {
-	Vector3i() = default;
-	Vector3i(int32 fX, int32 fY, int32 fZ) : x(fX), y(fY), z(fZ) {}
+	constexpr Vector3i() = default;
+	constexpr Vector3i(int32 fX, int32 fY, int32 fZ) : x(fX), y(fY), z(fZ) {}
 	union
 	{
 		struct { int32 x, y, z; };
@@ -655,8 +656,8 @@ struct Vector3i
 
 struct Vector4i
 {
-	Vector4i() = default;
-	Vector4i(int32 fX, int32 fY, int32 fZ, int32 fW) : x(fX), y(fY), z(fZ), w(fW) {}
+	constexpr Vector4i() = default;
+	constexpr Vector4i(int32 fX, int32 fY, int32 fZ, int32 fW) : x(fX), y(fY), z(fZ), w(fW) {}
 	union
 	{
 		struct { int32 x, y, z, w; };

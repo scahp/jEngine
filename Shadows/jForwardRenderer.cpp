@@ -17,7 +17,10 @@ jForwardRenderer::~jForwardRenderer()
 
 void jForwardRenderer::Setup()
 {
-	RenderTarget = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, ETextureFormat::RGBA, EFormatType::FLOAT, EDepthBufferType::DEPTH24_STENCIL8, SCR_WIDTH, SCR_HEIGHT, 1 }));
+	// FrameBuffer 생성 필요
+	// RenderTarget = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, EDepthBufferType::DEPTH24_STENCIL8, SCR_WIDTH, SCR_HEIGHT, 1 }));
+	RenderTarget = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, SCR_WIDTH, SCR_HEIGHT, 1 }));
+	auto RenderTarget_Depth = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::D24_S8, SCR_WIDTH, SCR_HEIGHT, 1 }));
 
 	PostProcessInput = std::shared_ptr<jPostProcessInOutput>(new jPostProcessInOutput());
 	PostProcessInput->RenderTarget = RenderTarget.get();
@@ -26,7 +29,7 @@ void jForwardRenderer::Setup()
 	// Setup a postprocess chain
 
 	// Luminance And Adaptive Luminance
-	LuminanceRenderTarget = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::R32F, ETextureFormat::R, EFormatType::FLOAT, EDepthBufferType::NONE, LUMINANCE_WIDTH, LUMINANCE_HEIGHT, 1, ETextureFilter::LINEAR, ETextureFilter::LINEAR_MIPMAP_LINEAR }));
+	LuminanceRenderTarget = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::R32F, LUMINANCE_WIDTH, LUMINANCE_HEIGHT, 1/*, ETextureFilter::LINEAR, ETextureFilter::LINEAR_MIPMAP_LINEAR*/ }));
 	auto luminancePostProcessOutput = std::shared_ptr<jPostProcessInOutput>(new jPostProcessInOutput());
 	luminancePostProcessOutput->RenderTarget = LuminanceRenderTarget.get();
 	{
@@ -45,7 +48,7 @@ void jForwardRenderer::Setup()
 	}
 
 	// Bloom
-	auto bloomThresdholdRT = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::R11G11B10F, ETextureFormat::RGB, EFormatType::FLOAT, EDepthBufferType::NONE, SCR_WIDTH, SCR_HEIGHT, 1, ETextureFilter::LINEAR, ETextureFilter::LINEAR }));
+	auto bloomThresdholdRT = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::R11G11B10F, SCR_WIDTH, SCR_HEIGHT, 1/*, ETextureFilter::LINEAR, ETextureFilter::LINEAR*/ }));
 	auto bloomThresholdPostProcessOut = std::shared_ptr<jPostProcessInOutput>(new jPostProcessInOutput());
 	bloomThresholdPostProcessOut->RenderTarget = bloomThresdholdRT.get();
 	{
@@ -56,7 +59,7 @@ void jForwardRenderer::Setup()
 		PostProcessChain.AddNewPostprocess(postprocess);
 	}
 
-	auto scale1_RT = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::R11G11B10F, ETextureFormat::RGB, EFormatType::FLOAT, EDepthBufferType::NONE, SCR_WIDTH / 2, SCR_HEIGHT / 2, 1, ETextureFilter::LINEAR, ETextureFilter::LINEAR }));
+	auto scale1_RT = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::R11G11B10F, SCR_WIDTH / 2, SCR_HEIGHT / 2, 1/*, ETextureFilter::LINEAR, ETextureFilter::LINEAR*/ }));
 	auto scale1_PostProcessOut = std::shared_ptr<jPostProcessInOutput>(new jPostProcessInOutput());
 	scale1_PostProcessOut->RenderTarget = scale1_RT.get();
 	{
@@ -66,7 +69,7 @@ void jForwardRenderer::Setup()
 		PostProcessChain.AddNewPostprocess(postprocess);
 	}
 
-	auto scale2_RT = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::R11G11B10F, ETextureFormat::RGB, EFormatType::FLOAT, EDepthBufferType::NONE, SCR_WIDTH / 4, SCR_HEIGHT / 4, 1, ETextureFilter::LINEAR, ETextureFilter::LINEAR }));
+	auto scale2_RT = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::R11G11B10F, SCR_WIDTH / 4, SCR_HEIGHT / 4, 1/*, ETextureFilter::LINEAR, ETextureFilter::LINEAR*/ }));
 	auto scale2_PostProcessOut = std::shared_ptr<jPostProcessInOutput>(new jPostProcessInOutput());
 	scale2_PostProcessOut->RenderTarget = scale2_RT.get();
 	{
@@ -76,7 +79,7 @@ void jForwardRenderer::Setup()
 		PostProcessChain.AddNewPostprocess(postprocess);
 	}
 
-	auto scale3_RT = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::R11G11B10F, ETextureFormat::RGB, EFormatType::FLOAT, EDepthBufferType::NONE, SCR_WIDTH / 8, SCR_HEIGHT / 8, 1, ETextureFilter::LINEAR, ETextureFilter::LINEAR }));
+	auto scale3_RT = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::R11G11B10F, SCR_WIDTH / 8, SCR_HEIGHT / 8, 1/*, ETextureFilter::LINEAR, ETextureFilter::LINEAR*/ }));
 	auto scale3_PostProcessOut = std::shared_ptr<jPostProcessInOutput>(new jPostProcessInOutput());
 	scale3_PostProcessOut->RenderTarget = scale3_RT.get();
 	{
@@ -86,7 +89,7 @@ void jForwardRenderer::Setup()
 		PostProcessChain.AddNewPostprocess(postprocess);
 	}
 
-	auto gaussianBlurRT = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::R11G11B10F, ETextureFormat::RGB, EFormatType::FLOAT, EDepthBufferType::NONE, SCR_WIDTH / 8, SCR_HEIGHT / 8, 1 }));
+	auto gaussianBlurRT = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::R11G11B10F, SCR_WIDTH / 8, SCR_HEIGHT / 8, 1 }));
 	auto gaussianBlur_PostProcessOut = std::shared_ptr<jPostProcessInOutput>(new jPostProcessInOutput());
 	gaussianBlur_PostProcessOut->RenderTarget = gaussianBlurRT.get();
 	{

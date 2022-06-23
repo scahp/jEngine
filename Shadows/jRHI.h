@@ -2,12 +2,13 @@
 #include "jRHIType.h"
 #include "Math\Matrix.h"
 #include "Core\jName.h"
+#include "Math\Vector.h"
 
 extern class jRHI* g_rhi;
 
 struct jShader;
 struct jShaderInfo;
-struct jSamplerState;
+struct jSamplerStateInfo;
 
 struct IBuffer
 {
@@ -40,18 +41,14 @@ struct jTexture
 	}
 
 	virtual void* GetHandle() const { return nullptr; }
+	virtual void* GetSamplerStateHandle() const { return nullptr; }
 
 	bool sRGB = false;
 	ETextureType Type = ETextureType::MAX;
-	ETextureFormat ColorBufferType = ETextureFormat::RGB;
-	EFormatType ColorPixelType = EFormatType::BYTE;
-	EDepthBufferType DepthBufferType = EDepthBufferType::NONE;
+	ETextureFormat Format = ETextureFormat::RGB8;
 
 	int32 Width = 0;
 	int32 Height = 0;
-
-	ETextureFilter Minification = ETextureFilter::NEAREST;
-	ETextureFilter Magnification = ETextureFilter::NEAREST;
 };
 
 struct jViewport
@@ -255,14 +252,14 @@ struct ITransformFeedbackBuffer : public IBuffer
 struct jMaterialParam
 {
 	jMaterialParam() = default;
-	jMaterialParam(const jName& name, const jTexture* texture, const jSamplerState* samplerstate)
+	jMaterialParam(const jName& name, const jTexture* texture, const jSamplerStateInfo* samplerstate)
 		: Name(name), Texture(texture), SamplerState(samplerstate)
 	{}
 	virtual ~jMaterialParam() {}
 
 	jName Name;
 	const jTexture* Texture = nullptr;
-	const jSamplerState* SamplerState = nullptr;
+	const jSamplerStateInfo* SamplerState = nullptr;
 };
 
 struct jMaterialData
@@ -272,11 +269,11 @@ struct jMaterialData
 		Clear();
 	}
 
-	void AddMaterialParam(const jName& name, const jTexture* texture, const jSamplerState* samplerState = nullptr);
-    void SetMaterialParam(int32 index, const jName& name, const jTexture* texture, const jSamplerState* samplerState = nullptr);
+	void AddMaterialParam(const jName& name, const jTexture* texture, const jSamplerStateInfo* samplerState = nullptr);
+    void SetMaterialParam(int32 index, const jName& name, const jTexture* texture, const jSamplerStateInfo* samplerState = nullptr);
 	void SetMaterialParam(int32 index, const jName& name);
 	void SetMaterialParam(int32 index, const jTexture* texture);
-	void SetMaterialParam(int32 index, const jSamplerState* samplerState);
+	void SetMaterialParam(int32 index, const jSamplerStateInfo* samplerState);
 	void Clear() { Params.clear(); }
 
 	std::vector<jMaterialParam> Params;
@@ -290,31 +287,23 @@ public:
 };
 
 //////////////////////////////////////////////////////////////////////////
-
 struct jRenderTargetInfo
 {
 	jRenderTargetInfo() = default;
-	jRenderTargetInfo(ETextureType textureType, ETextureFormat internalFormat, ETextureFormat format, EFormatType formatType, EDepthBufferType depthBufferType
-		, int32 width, int32 height, int32 textureCount = 1, ETextureFilter magnification = ETextureFilter::LINEAR
-		, ETextureFilter minification = ETextureFilter::LINEAR, bool isGenerateMipmap = false, bool isGenerateMipmapDepth = false, int32 sampleCount = 1)
-		: TextureType(textureType), InternalFormat(internalFormat), Format(format), FormatType(formatType), DepthBufferType(depthBufferType)
-		, Width(width), Height(height), TextureCount(textureCount), Magnification(magnification), Minification(minification), IsGenerateMipmap(isGenerateMipmap)
-		, IsGenerateMipmapDepth(isGenerateMipmapDepth), SampleCount(sampleCount)
+	jRenderTargetInfo(ETextureType textureType, ETextureFormat format, int32 width, int32 height, int32 layerCount = 1
+		, bool isGenerateMipmap = false, bool isGenerateMipmapDepth = false, int32 sampleCount = 1)
+		: TextureType(textureType), Format(format), Width(width), Height(height), LayerCount(layerCount)
+		, IsGenerateMipmap(isGenerateMipmap), IsGenerateMipmapDepth(isGenerateMipmapDepth), SampleCount(sampleCount)
 	{}
 
 	size_t GetHash() const
 	{
 		size_t result = 0;
 		hash_combine(result, TextureType);
-		hash_combine(result, InternalFormat);
 		hash_combine(result, Format);
-		hash_combine(result, FormatType);
-		hash_combine(result, DepthBufferType);
 		hash_combine(result, Width);
 		hash_combine(result, Height);
-		hash_combine(result, TextureCount);
-		hash_combine(result, Magnification);
-		hash_combine(result, Minification);
+		hash_combine(result, LayerCount);
 		hash_combine(result, IsGenerateMipmap);
 		hash_combine(result, IsGenerateMipmapDepth);
 		hash_combine(result, SampleCount);
@@ -322,15 +311,10 @@ struct jRenderTargetInfo
 	}
 
 	ETextureType TextureType = ETextureType::TEXTURE_2D;
-	ETextureFormat InternalFormat = ETextureFormat::RGB;
-	ETextureFormat Format = ETextureFormat::RGB;
-	EFormatType FormatType = EFormatType::BYTE;
-	EDepthBufferType DepthBufferType = EDepthBufferType::DEPTH16;
+	ETextureFormat Format = ETextureFormat::RGB8;
 	int32 Width = 0;
 	int32 Height = 0;
-	int32 TextureCount = 1;
-	ETextureFilter Magnification = ETextureFilter::LINEAR;
-	ETextureFilter Minification = ETextureFilter::LINEAR;
+	int32 LayerCount = 1;
 	bool IsGenerateMipmap = false;
 	bool IsGenerateMipmapDepth = false;
 	int32 SampleCount = 1;
@@ -370,50 +354,6 @@ struct jQueryPrimitiveGenerated
 	void Begin() const;
 	void End() const;
 	uint64 GetResult();
-};
-
-struct jSamplerStateInfo
-{
-	size_t GetHash() const
-	{
-		size_t result = 0;
-		hash_combine(result, Minification);
-		hash_combine(result, Magnification);
-		hash_combine(result, AddressU);
-		hash_combine(result, AddressV);
-		hash_combine(result, AddressW);
-		hash_combine(result, MipLODBias);
-		hash_combine(result, MaxAnisotropy);
-		hash_combine(result, BorderColor.x);
-		hash_combine(result, BorderColor.y);
-		hash_combine(result, BorderColor.z);
-		hash_combine(result, BorderColor.w);
-		hash_combine(result, MinLOD);
-		hash_combine(result, MaxLOD);
-		return result;
-	}
-
-	ETextureFilter Minification = ETextureFilter::NEAREST;
-	ETextureFilter Magnification = ETextureFilter::NEAREST;
-	ETextureAddressMode AddressU = ETextureAddressMode::CLAMP_TO_EDGE;
-	ETextureAddressMode AddressV = ETextureAddressMode::CLAMP_TO_EDGE;
-	ETextureAddressMode AddressW = ETextureAddressMode::CLAMP_TO_EDGE;
-	float MipLODBias = 0.0f;
-	float MaxAnisotropy = 1.0f;			// if you anisotropy filtering tuned on, set this variable greater than 1.
-	ETextureComparisonMode TextureComparisonMode = ETextureComparisonMode::NONE;
-	ECompareOp ComparisonFunc = ECompareOp::LESS;
-	Vector4 BorderColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
-	float MinLOD = -FLT_MAX;
-	float MaxLOD = FLT_MAX;
-};
-
-struct jSamplerState : public std::enable_shared_from_this<jSamplerState>
-{
-	jSamplerState(const jSamplerStateInfo& info)
-		: Info(info)
-	{ }
-	virtual ~jSamplerState() {}
-	const jSamplerStateInfo Info;
 };
 
 struct jRasterizationStateInfo
@@ -502,16 +442,13 @@ struct jBlendingStateInfo
 struct jAttachment
 {
 	jAttachment() = default;
-	jAttachment(std::shared_ptr<jRenderTarget> InRTPtr
+	jAttachment(const std::shared_ptr<jRenderTarget>& InRTPtr
 		, EAttachmentLoadStoreOp InLoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE
 		, EAttachmentLoadStoreOp InStencilLoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE
 		, Vector4 InClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f)
 		, Vector2 InClearDepth = Vector2(1.0f, 0.0f))
 		: RenderTargetPtr(InRTPtr), LoadStoreOp(InLoadStoreOp), StencilLoadStoreOp(InStencilLoadStoreOp), ClearColor(InClearColor), ClearDepth(InClearDepth)
 	{}
-
-	//ETextureFormat Format = ETextureFormat::RGBA8;
-	//EMSAASamples SampleCount = EMSAASamples::COUNT_1;
 
 	std::shared_ptr<jRenderTarget> RenderTargetPtr;
 
@@ -526,15 +463,8 @@ struct jAttachment
 	EAttachmentLoadStoreOp LoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE;
 	EAttachmentLoadStoreOp StencilLoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE;
 
-	//union
-	//{
-	//	Vector4 ClearColor;
-	//	Vector2 ClearDepth;
-	//};
 	Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
 	Vector2 ClearDepth = Vector2(1.0f, 0.0f);
-
-	//void* ImageView = nullptr;
 };
 
 class jRenderPass
@@ -551,13 +481,13 @@ public:
 	Vector2i RenderExtent;
 };
 
-class jFrameBuffer
-{
-public:
-	virtual ~jFrameBuffer() {}
-
-	void* GetFrameBuffer(int32 index) { return nullptr; }
-};
+//class jFrameBuffer
+//{
+//public:
+//	virtual ~jFrameBuffer() {}
+//
+//	void* GetFrameBuffer(int32 index) { return nullptr; }
+//};
 
 class jRHI
 {
@@ -568,9 +498,9 @@ public:
 	virtual bool InitRHI() { return false; }
 	virtual void ReleaseRHI() {}
 	virtual void* GetWindow() const { return nullptr; }
-	virtual jSamplerState* CreateSamplerState(const jSamplerStateInfo& info) const { return nullptr; }
-	virtual void ReleaseSamplerState(jSamplerState* samplerState) const {}
-	virtual void BindSamplerState(int32 index, const jSamplerState* samplerState) const {}
+	virtual jSamplerStateInfo* CreateSamplerState(const jSamplerStateInfo& info) const { return nullptr; }
+	virtual void ReleaseSamplerState(jSamplerStateInfo* samplerState) const {}
+	virtual void BindSamplerState(int32 index, const jSamplerStateInfo* samplerState) const {}
 	virtual void SetClear(ERenderBufferType typeBit) const {}
 	virtual void SetClearColor(float r, float g, float b, float a) const {}
 	virtual void SetClearColor(Vector4 rgba) const {}
@@ -629,9 +559,9 @@ public:
 	virtual bool GetUniformbuffer(Vector4i& outResult, const jName& name, const jShader* shader) const { return false; }
 	virtual jTexture* CreateNullTexture() const { return nullptr; }
 	virtual jTexture* CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
-		, EFormatType dataType = EFormatType::UNSIGNED_BYTE, ETextureFormat textureFormat = ETextureFormat::RGBA, bool createMipmap = false) const { return nullptr; }
+		, ETextureFormat textureFormat = ETextureFormat::RGBA8, bool createMipmap = false) const { return nullptr; }
 	virtual jTexture* CreateCubeTextureFromData(std::vector<void*> faces, int32 width, int32 height, bool sRGB
-		, EFormatType dataType = EFormatType::UNSIGNED_BYTE, ETextureFormat textureFormat = ETextureFormat::RGBA, bool createMipmap = false) const { return nullptr; }
+		, ETextureFormat textureFormat = ETextureFormat::RGBA8, bool createMipmap = false) const { return nullptr; }
 	virtual int32 SetMatetrial(const jMaterialData* materialData, const jShader* shader, int32 baseBindingIndex = 0) const { return baseBindingIndex; }
 	virtual void EnableCullFace(bool enable) const {}
 	virtual void SetFrontFace(EFrontFace frontFace) const {}
@@ -752,6 +682,71 @@ jName GetCommonTextureName(int32 index);
 jName GetCommonTextureSRGBName(int32 index);
 
 //////////////////////////////////////////////////////////////////////////
+struct jSamplerStateInfo
+{
+	virtual ~jSamplerStateInfo() {}
+	virtual void Initialize() {}
+
+	virtual void* GetHandle() const { return nullptr; }
+
+	size_t GetHash() const
+	{
+		size_t result = 0;
+		hash_combine(result, Minification);
+		hash_combine(result, Magnification);
+		hash_combine(result, AddressU);
+		hash_combine(result, AddressV);
+		hash_combine(result, AddressW);
+		hash_combine(result, MipLODBias);
+		hash_combine(result, MaxAnisotropy);
+		hash_combine(result, BorderColor.x);
+		hash_combine(result, BorderColor.y);
+		hash_combine(result, BorderColor.z);
+		hash_combine(result, BorderColor.w);
+		hash_combine(result, MinLOD);
+		hash_combine(result, MaxLOD);
+		return result;
+	}
+
+	ETextureFilter Minification = ETextureFilter::NEAREST;
+	ETextureFilter Magnification = ETextureFilter::NEAREST;
+	ETextureAddressMode AddressU = ETextureAddressMode::CLAMP_TO_EDGE;
+	ETextureAddressMode AddressV = ETextureAddressMode::CLAMP_TO_EDGE;
+	ETextureAddressMode AddressW = ETextureAddressMode::CLAMP_TO_EDGE;
+	float MipLODBias = 0.0f;
+	float MaxAnisotropy = 1.0f;			// if you anisotropy filtering tuned on, set this variable greater than 1.
+	ETextureComparisonMode TextureComparisonMode = ETextureComparisonMode::NONE;
+	ECompareOp ComparisonFunc = ECompareOp::LESS;
+	Vector4 BorderColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
+	float MinLOD = -FLT_MAX;
+	float MaxLOD = FLT_MAX;
+};
+
+template <ETextureFilter TMinification = ETextureFilter::NEAREST, ETextureFilter TMagnification = ETextureFilter::NEAREST, ETextureAddressMode TAddressU = ETextureAddressMode::CLAMP_TO_EDGE
+	, ETextureAddressMode TAddressV = ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode TAddressW = ETextureAddressMode::CLAMP_TO_EDGE, float TMipLODBias = 0.0f
+	, float TMaxAnisotropy = 1.0f, Vector4 TBorderColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f), float TMinLOD = -FLT_MAX, float TMaxLOD = FLT_MAX,
+	ECompareOp TComparisonFunc = ECompareOp::LESS, ETextureComparisonMode TTextureComparisonMode = ETextureComparisonMode::NONE>
+struct TSamplerStateInfo
+{
+	FORCEINLINE static jSamplerStateInfo* Create()
+	{
+		jSamplerStateInfo state;
+		state.Minification = TMinification;
+		state.Magnification = TMagnification;
+		state.AddressU = TAddressU;
+		state.AddressV = TAddressV;
+		state.AddressW = TAddressW;
+		state.MipLODBias = TMipLODBias;
+		state.MaxAnisotropy = TMaxAnisotropy;
+		state.TextureComparisonMode = TTextureComparisonMode;
+		state.ComparisonFunc = TComparisonFunc;
+		state.BorderColor = TBorderColor;
+		state.MinLOD = TMinLOD;
+		state.MaxLOD = TMaxLOD;
+		return g_rhi->CreateSamplerState(state);
+	}
+};
+
 template <EPolygonMode TPolygonMode = EPolygonMode::FILL, ECullMode TCullMode = ECullMode::BACK, EFrontFace TFrontFace = EFrontFace::CCW,
 	bool TDepthBiasEnable = false, float TDepthBiasConstantFactor = 0.0f, float TDepthBiasClamp = 0.0f, float TDepthBiasSlopeFactor = 0.0f,
 	float TLineWidth = 1.0f, bool TDepthClampEnable = false, bool TRasterizerDiscardEnable = false>

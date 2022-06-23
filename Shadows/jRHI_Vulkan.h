@@ -193,30 +193,30 @@ private:
 	VkFramebuffer FrameBuffer = nullptr;
 };
 
-class jFrameBuffer_Vulkan : public jFrameBuffer
-{
-public:
-	jFrameBuffer_Vulkan() = default;
-	jFrameBuffer_Vulkan(const jRenderPass* renderPass)
-		: RenderPass(renderPass)
-    {}
-
-    void SetRenderPass(const jRenderPass* renderPass)
-    {
-		RenderPass = renderPass;
-    }
-
-	void* GetFrameBuffer() const { return FrameBuffer; }
-	const jRenderPass* GetRenderPass() const { return RenderPass; }
-
-	bool CreateFrameBuffer(int32 index);
-	void Release();
-
-private:
-	int32 Index = -1;
-    VkFramebuffer FrameBuffer;
-	const jRenderPass* RenderPass = nullptr;
-};
+//class jFrameBuffer_Vulkan : public jFrameBuffer
+//{
+//public:
+//	jFrameBuffer_Vulkan() = default;
+//	jFrameBuffer_Vulkan(const jRenderPass* renderPass)
+//		: RenderPass(renderPass)
+//    {}
+//
+//    void SetRenderPass(const jRenderPass* renderPass)
+//    {
+//		RenderPass = renderPass;
+//    }
+//
+//	void* GetFrameBuffer() const { return FrameBuffer; }
+//	const jRenderPass* GetRenderPass() const { return RenderPass; }
+//
+//	bool CreateFrameBuffer(int32 index);
+//	void Release();
+//
+//private:
+//	int32 Index = -1;
+//    VkFramebuffer FrameBuffer;
+//	const jRenderPass* RenderPass = nullptr;
+//};
 
 struct TBindings
 {
@@ -238,12 +238,18 @@ struct IEmptyUniform
 	virtual void* GetBufferMemory() const { return nullptr; }
 };
 
+struct jTextureBindings
+{
+	std::shared_ptr<jTexture> texturePtr;
+	std::shared_ptr<jSamplerStateInfo> samplerStatePtr;
+};
+
 struct jShadingBindingInstance
 {
     VkDescriptorSet DescriptorSet = nullptr;
 	const struct jShaderBindings* ShaderBindings = nullptr;
 	std::vector<IEmptyUniform*> UniformBuffers;
-	std::vector<jTexture*> Textures;
+	std::vector<jTextureBindings> Textures;
 
 	void UpdateShaderBindings();
 	void Bind(const class jCommandBuffer_Vulkan& commandBuffer) const;
@@ -300,11 +306,14 @@ struct jShaderBindings
 
 struct jTexture_Vulkan : public jTexture
 {
-    VkImage Image;
-    VkImageView ImageView;
-    VkDeviceMemory ImageMemory;
+    VkImage Image = nullptr;
+    VkImageView ImageView = nullptr;
+    VkDeviceMemory ImageMemory = nullptr;
+	VkSampler SamplerState = nullptr;
 
-	virtual void* GetHandle() const { return ImageView; }
+	virtual void* GetHandle() const override { return ImageView; }
+	virtual void* GetSamplerStateHandle() const override { return ImageView; }
+
 	static VkSampler CreateDefaultSamplerState();
 };
 
@@ -483,6 +492,19 @@ struct jIndexBuffer_Vulkan : public jIndexBuffer
 	{
 		return IndexStreamData->ElementCount;
 	}
+};
+
+struct jSamplerStateInfo_Vulkan : public jSamplerStateInfo
+{
+	jSamplerStateInfo_Vulkan() = default;
+	jSamplerStateInfo_Vulkan(const jSamplerStateInfo& state) : jSamplerStateInfo(state) {}
+	virtual ~jSamplerStateInfo_Vulkan() {}
+	virtual void Initialize() override;
+
+	virtual void* GetHandle() const { return SamplerState; }
+
+	VkSamplerCreateInfo SamplerStateInfo = {};
+	VkSampler SamplerState = nullptr;
 };
 
 struct jRasterizationStateInfo_Vulkan : public jRasterizationStateInfo
@@ -1158,60 +1180,12 @@ public:
 		check(0);	// failed to find sutable memory type!
 		return 0;
 	}
-	bool CreateImage(uint32 width, uint32 height, uint32 mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage
+	FORCEINLINE bool CreateImage(uint32 width, uint32 height, uint32 mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage
 		, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory) const
 	{
-		VkImageCreateInfo imageInfo = {};
-		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-		imageInfo.imageType = VK_IMAGE_TYPE_2D;
-		imageInfo.extent.width = width;
-		imageInfo.extent.height = height;
-		imageInfo.extent.depth = 1;
-		imageInfo.mipLevels = mipLevels;
-		imageInfo.arrayLayers = 1;
-		imageInfo.format = format;
-
-		// VK_IMAGE_TILING_LINEAR : 텍셀이 Row-major 순서로 저장. pixels array 처럼.
-		// VK_IMAGE_TILING_OPTIMAL : 텍셀이 최적의 접근을 위한 순서로 저장
-		// image의 memory 안에 있는 texel에 직접 접근해야한다면, VK_IMAGE_TILING_LINEAR 를 써야함.
-		// 그러나 지금 staging image가 아닌 staging buffer를 사용하기 때문에 VK_IMAGE_TILING_OPTIMAL 를 쓰면됨.
-		imageInfo.tiling = tiling;
-
-		// VK_IMAGE_LAYOUT_UNDEFINED : GPU에 의해 사용될 수 없으며, 첫번째 transition 에서 픽셀들을 버릴 것임.
-		// VK_IMAGE_LAYOUT_PREINITIALIZED : GPU에 의해 사용될 수 없으며, 첫번째 transition 에서 픽셀들이 보존 될것임.
-		// VK_IMAGE_LAYOUT_GENERAL : 성능은 좋지 않지만 image를 input / output 둘다 의 용도로 사용하는 경우 씀.
-		// 첫번째 전환에서 텍셀이 보존되어야 하는 경우는 거의 없음.
-		//	-> 이런 경우는 image를 staging image로 하고 VK_IMAGE_TILING_LINEAR를 쓴 경우이며, 이때는 Texel 데이터를
-		//		image에 업로드하고, image를 transfer source로 transition 하는 경우가 됨.
-		// 하지만 지금의 경우는 첫번째 transition에서 image는 transfer destination 이 된다. 그래서 기존 데이터를 유지
-		// 할 필요가 없다 그래서 VK_IMAGE_LAYOUT_UNDEFINED 로 설정한다.
-		imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		imageInfo.usage = usage;
-
-		imageInfo.samples = numSamples;
-		imageInfo.flags = 0;		// Optional
-									// Sparse image 에 대한 정보를 설정가능
-									// Sparse image는 특정 영역의 정보를 메모리에 담아두는 것임. 예를들어 3D image의 경우
-									// 복셀영역의 air 부분의 표현을 위해 많은 메모리를 할당하는것을 피하게 해줌.
-
-		if (!ensure(vkCreateImage(device, &imageInfo, nullptr, &image) == VK_SUCCESS))
-			return false;
-
-		VkMemoryRequirements memRequirements;
-		vkGetImageMemoryRequirements(device, image, &memRequirements);
-
-		VkMemoryAllocateInfo allocInfo = {};
-		allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-		allocInfo.allocationSize = memRequirements.size;
-		allocInfo.memoryTypeIndex = FindMemoryType(memRequirements.memoryTypeBits, properties);
-		if (!ensure(vkAllocateMemory(device, &allocInfo, nullptr, &imageMemory) == VK_SUCCESS))
-			return false;
-
-		vkBindImageMemory(device, image, imageMemory, 0);
-
-		return true;
+		return CreateImage2DArray(width, height, 1, mipLevels, numSamples, format, tiling, usage, properties, image, imageMemory);
 	}
-	bool CreateImage2DArray(uint32 width, uint32 height, uint32 arrayLayers, uint32 mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage
+	FORCEINLINE bool CreateImage2DArray(uint32 width, uint32 height, uint32 arrayLayers, uint32 mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage
 		, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory) const
 	{
 		VkImageCreateInfo imageInfo = {};
@@ -1264,58 +1238,11 @@ public:
 
 		return true;
 	}
-	bool CreateImageCube(uint32 width, uint32 height, uint32 mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage
+	FORCEINLINE bool CreateImageCube(uint32 width, uint32 height, uint32 mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage
 		, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory) const
 	{
-		VkImageCreateInfo imageInfo = {};
-		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-		imageInfo.imageType = VK_IMAGE_TYPE_2D;
-		imageInfo.extent.width = width;
-		imageInfo.extent.height = height;
-		imageInfo.extent.depth = 1;
-		imageInfo.mipLevels = mipLevels;
-		imageInfo.arrayLayers = 6;
-		imageInfo.format = format;
+		return CreateImage2DArray(width, height, 6, mipLevels, numSamples, format, tiling, usage, properties, image, imageMemory);
 
-		// VK_IMAGE_TILING_LINEAR : 텍셀이 Row-major 순서로 저장. pixels array 처럼.
-		// VK_IMAGE_TILING_OPTIMAL : 텍셀이 최적의 접근을 위한 순서로 저장
-		// image의 memory 안에 있는 texel에 직접 접근해야한다면, VK_IMAGE_TILING_LINEAR 를 써야함.
-		// 그러나 지금 staging image가 아닌 staging buffer를 사용하기 때문에 VK_IMAGE_TILING_OPTIMAL 를 쓰면됨.
-		imageInfo.tiling = tiling;
-
-		// VK_IMAGE_LAYOUT_UNDEFINED : GPU에 의해 사용될 수 없으며, 첫번째 transition 에서 픽셀들을 버릴 것임.
-		// VK_IMAGE_LAYOUT_PREINITIALIZED : GPU에 의해 사용될 수 없으며, 첫번째 transition 에서 픽셀들이 보존 될것임.
-		// VK_IMAGE_LAYOUT_GENERAL : 성능은 좋지 않지만 image를 input / output 둘다 의 용도로 사용하는 경우 씀.
-		// 첫번째 전환에서 텍셀이 보존되어야 하는 경우는 거의 없음.
-		//	-> 이런 경우는 image를 staging image로 하고 VK_IMAGE_TILING_LINEAR를 쓴 경우이며, 이때는 Texel 데이터를
-		//		image에 업로드하고, image를 transfer source로 transition 하는 경우가 됨.
-		// 하지만 지금의 경우는 첫번째 transition에서 image는 transfer destination 이 된다. 그래서 기존 데이터를 유지
-		// 할 필요가 없다 그래서 VK_IMAGE_LAYOUT_UNDEFINED 로 설정한다.
-		imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		imageInfo.usage = usage;
-
-		imageInfo.samples = numSamples;
-		imageInfo.flags = 0;		// Optional
-									// Sparse image 에 대한 정보를 설정가능
-									// Sparse image는 특정 영역의 정보를 메모리에 담아두는 것임. 예를들어 3D image의 경우
-									// 복셀영역의 air 부분의 표현을 위해 많은 메모리를 할당하는것을 피하게 해줌.
-
-		if (!ensure(vkCreateImage(device, &imageInfo, nullptr, &image) == VK_SUCCESS))
-			return false;
-
-		VkMemoryRequirements memRequirements;
-		vkGetImageMemoryRequirements(device, image, &memRequirements);
-
-		VkMemoryAllocateInfo allocInfo = {};
-		allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-		allocInfo.allocationSize = memRequirements.size;
-		allocInfo.memoryTypeIndex = FindMemoryType(memRequirements.memoryTypeBits, properties);
-		if (!ensure(vkAllocateMemory(device, &allocInfo, nullptr, &imageMemory) == VK_SUCCESS))
-			return false;
-
-		vkBindImageMemory(device, image, imageMemory, 0);
-
-		return true;
 	}
 	VkCommandBuffer BeginSingleTimeCommands() const
 	{
@@ -1672,11 +1599,12 @@ public:
 	virtual jVertexBuffer* CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const override;
 	virtual jIndexBuffer* CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const override;
 	virtual jTexture* CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
-		, EFormatType dataType = EFormatType::UNSIGNED_BYTE, ETextureFormat textureFormat = ETextureFormat::RGBA, bool createMipmap = false) const override;
+		, ETextureFormat textureFormat = ETextureFormat::RGBA8, bool createMipmap = false) const override;
 	virtual jShader* CreateShader(const jShaderInfo& shaderInfo) const;
 	virtual bool CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo) const;
 	virtual jRenderTarget* CreateRenderTarget(const jRenderTargetInfo& info) const override;
 
+	virtual jSamplerStateInfo* CreateSamplerState(const jSamplerStateInfo& initializer) const override;
 	virtual jRasterizationStateInfo* CreateRasterizationState(const jRasterizationStateInfo& initializer) const override;
 	virtual jMultisampleStateInfo* CreateMultisampleState(const jMultisampleStateInfo& initializer) const override;
 	virtual jStencilOpStateInfo* CreateStencilOpStateInfo(const jStencilOpStateInfo& initializer) const override;

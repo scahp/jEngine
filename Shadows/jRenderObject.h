@@ -11,7 +11,7 @@ struct jIndexBuffer;
 struct jShader;
 struct jMaterialData;
 struct jTexture;
-struct jSamplerState;
+struct jSamplerStateInfo;
 
 enum class EShadingModel : int32
 {
@@ -58,7 +58,7 @@ public:
     std::vector<const jMaterialData*> DynamicMaterialData;
 
 	jTexture* tex_object_array = nullptr;
-	jSamplerState* samplerStateTexArray = nullptr;
+	jSamplerStateInfo* samplerStateTexArray = nullptr;
 
 	// todo 정리 필요.
 	int UseUniformColor = 0;
@@ -80,8 +80,8 @@ public:
 	FORCEINLINE const Vector& GetRot() const { return Rot; }
 	FORCEINLINE const Vector& GetScale() const { return Scale; }
 
-	void SetTexture(int32 index, const jName& name, const jTexture* texture, const jSamplerState* samplerState = nullptr);
-	void SetTextureWithCommonName(int32 index, const jTexture* texture, const jSamplerState* samplerState = nullptr);
+	void SetTexture(int32 index, const jName& name, const jTexture* texture, const jSamplerStateInfo* samplerState = nullptr);
+	void SetTextureWithCommonName(int32 index, const jTexture* texture, const jSamplerStateInfo* samplerState = nullptr);
 	void ClearTexture();
 
 private:

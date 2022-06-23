@@ -108,16 +108,16 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
 	switch (NumOfComponent)
 	{
 	case 1:
-		NewImageDataPatr->Format = IsHDR ? ETextureFormat::R32F : ETextureFormat::R;
+		NewImageDataPatr->Format = IsHDR ? ETextureFormat::R32F : ETextureFormat::R8;
 		break;
 	case 2:
-		NewImageDataPatr->Format = IsHDR ? ETextureFormat::RG32F : ETextureFormat::RG;
+		NewImageDataPatr->Format = IsHDR ? ETextureFormat::RG32F : ETextureFormat::RG8;
 		break;
 	case 3:
-		NewImageDataPatr->Format = IsHDR ? ETextureFormat::RGB32F : ETextureFormat::RGB;
+		NewImageDataPatr->Format = IsHDR ? ETextureFormat::RGB32F : ETextureFormat::RGB8;
 		break;
 	case 4:
-		NewImageDataPatr->Format = IsHDR ? ETextureFormat::RGBA32F : ETextureFormat::RGBA;
+		NewImageDataPatr->Format = IsHDR ? ETextureFormat::RGBA32F : ETextureFormat::RGBA8;
 		break;
 	default:
 		check(0);
@@ -142,7 +142,7 @@ std::weak_ptr<jTexture> jImageFileLoader::LoadTextureFromFile(const jName& filen
 	if (pImageData)
 	{
 		jTexture* pCreatedTexture = g_rhi->CreateTextureFromData(&pImageData->ImageData[0], pImageData->Width
-			, pImageData->Height, pImageData->sRGB, pImageData->FormatType, pImageData->Format, true);
+			, pImageData->Height, pImageData->sRGB, pImageData->Format, true);
 		NewTexture = std::shared_ptr<jTexture>(pCreatedTexture);
 	}
 

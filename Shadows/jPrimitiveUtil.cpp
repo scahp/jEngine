@@ -143,7 +143,7 @@ void jFullscreenQuadPrimitive::SetUniformBuffer(const jShader* shader) const
 	SET_UNIFORM_BUFFER_STATIC("PixelSize", Vector2(1.0f / SCR_WIDTH, 1.0f / SCR_HEIGHT), shader);
 }
 
-void jFullscreenQuadPrimitive::SetTexture(int index, const jTexture* texture, const jSamplerState* samplerState)
+void jFullscreenQuadPrimitive::SetTexture(int index, const jTexture* texture, const jSamplerStateInfo* samplerState)
 {
 	RenderObject->MaterialData.Params.resize(index + 1);
 	RenderObject->MaterialData.SetMaterialParam(index, GetCommonTextureName(index), texture, samplerState);

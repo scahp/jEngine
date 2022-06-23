@@ -1,23 +1,23 @@
 #include "pch.h"
 #include "jSamplerStatePool.h"
 
-std::map<jName, std::shared_ptr<jSamplerState> > jSamplerStatePool::SamplerStateMap;
-std::map<jSamplerState*, jName > jSamplerStatePool::SamplerStateNameVariableMap;
+std::map<jName, std::shared_ptr<jSamplerStateInfo> > jSamplerStatePool::SamplerStateMap;
+std::map<jSamplerStateInfo*, jName > jSamplerStatePool::SamplerStateNameVariableMap;
 
-std::shared_ptr<jSamplerState> jSamplerStatePool::CreateSamplerState(const jName& name, const jSamplerStateInfo& info)
+std::shared_ptr<jSamplerStateInfo> jSamplerStatePool::CreateSamplerState(const jName& name, const jSamplerStateInfo& info)
 {
 	auto it_find = SamplerStateMap.find(name);
 	if (SamplerStateMap.end() != it_find)
 		return it_find->second;
 
-	auto samplerState = std::shared_ptr<jSamplerState>(g_rhi->CreateSamplerState(info));
+	auto samplerState = std::shared_ptr<jSamplerStateInfo>(g_rhi->CreateSamplerState(info));
 	JASSERT(samplerState.get());
 	SamplerStateMap.insert(std::make_pair(name, samplerState));
 	SamplerStateNameVariableMap.insert(std::make_pair(samplerState.get(), name));
 	return samplerState;
 }
 
-std::shared_ptr<jSamplerState> jSamplerStatePool::GetSamplerState(const jName& name)
+std::shared_ptr<jSamplerStateInfo> jSamplerStatePool::GetSamplerState(const jName& name)
 {
 	auto it_find = SamplerStateMap.find(name);
 	return (SamplerStateMap.end() != it_find) ? it_find->second : nullptr;

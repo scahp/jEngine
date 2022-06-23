@@ -221,12 +221,12 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 
 	if (GLFW_PRESS == action)
 	{
-		if (!ImGui::IsAnyItemActive())
-			g_KeyState[*key_name] = true;
+		//if (!ImGui::IsAnyItemActive())
+		//	g_KeyState[*key_name] = true;
 	}
 	else if (GLFW_RELEASE == action)
 	{
-		g_KeyState[*key_name] = false;
+		//g_KeyState[*key_name] = false;
 	}
 
 }

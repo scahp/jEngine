@@ -10,32 +10,18 @@ struct jTexture* jRenderTargetPool::GetNullTexture(ETextureType type)
 	switch (type)
 	{
 	case ETextureType::TEXTURE_2D:
-	case ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW:
 	{
-		static auto temp = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::RGBA, ETextureFormat::RGBA, EFormatType::BYTE, EDepthBufferType::NONE, 2, 2, 1 });
+		static auto temp = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::RGBA8, 2, 2, 1 });
 		return temp->GetTexture();
 	}
 	case ETextureType::TEXTURE_2D_ARRAY:
 	{
-		static auto temp = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D_ARRAY, ETextureFormat::RGBA, ETextureFormat::RGBA, EFormatType::BYTE, EDepthBufferType::NONE, 2, 2, 1 });
-		return temp->GetTexture();
-	}
-	case ETextureType::TEXTURE_2D_MULTISAMPLE:
-	case ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW_MULTISAMPLE:
-	{
-		static auto temp = jRenderTargetPool::GetRenderTarget(jRenderTargetInfo(ETextureType::TEXTURE_2D_MULTISAMPLE, ETextureFormat::RGBA, ETextureFormat::RGBA
-			, EFormatType::BYTE, EDepthBufferType::NONE, 2, 2, 1, ETextureFilter::LINEAR, ETextureFilter::LINEAR, false, false, 4));
-		return temp->GetTexture();
-	}
-	case ETextureType::TEXTURE_2D_ARRAY_MULTISAMPLE:
-	{
-		static auto temp = jRenderTargetPool::GetRenderTarget(jRenderTargetInfo(ETextureType::TEXTURE_2D_ARRAY_MULTISAMPLE, ETextureFormat::RGBA, ETextureFormat::RGBA
-			, EFormatType::BYTE, EDepthBufferType::NONE, 2, 2, 1, ETextureFilter::LINEAR, ETextureFilter::LINEAR, false, false, 4));
+		static auto temp = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D_ARRAY, ETextureFormat::RGBA8, 2, 2, 1 });
 		return temp->GetTexture();
 	}
 	case ETextureType::TEXTURE_CUBE:
 	{
-		static auto temp = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_CUBE, ETextureFormat::RGBA, ETextureFormat::RGBA, EFormatType::BYTE, EDepthBufferType::NONE, 2, 2, 1 });
+		static auto temp = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_CUBE, ETextureFormat::RGBA8, 2, 2, 1 });
 		return temp->GetTexture();
 	}
 	default:

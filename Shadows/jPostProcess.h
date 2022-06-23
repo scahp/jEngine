@@ -29,7 +29,7 @@ public:
 	struct jInputData
 	{
 		std::weak_ptr<jPostProcessInOutput> Input;
-		std::shared_ptr<jSamplerState> SamplerState;
+		std::shared_ptr<jSamplerStateInfo> SamplerState;
 	};
 
 	std::list<jInputData> PostProcessInputList;
@@ -41,7 +41,7 @@ public:
 	virtual bool Process(const jCamera* camera) const;
 
 	virtual std::weak_ptr<jPostProcessInOutput> GetPostProcessOutput() const;
-	virtual void AddInput(const std::weak_ptr<jPostProcessInOutput>& input, const std::shared_ptr<jSamplerState>& samplerState = nullptr);
+	virtual void AddInput(const std::weak_ptr<jPostProcessInOutput>& input, const std::shared_ptr<jSamplerStateInfo>& samplerState = nullptr);
 	virtual void SetOutput(const std::shared_ptr<jPostProcessInOutput>& output);
 	virtual void ClearInputs();
 	virtual void ClearOutputs();

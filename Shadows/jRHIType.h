@@ -129,42 +129,60 @@ enum class ETextureType : uint8
 	TEXTURE_2D = 0,
 	TEXTURE_2D_ARRAY,
 	TEXTURE_CUBE,
-	TEXTURE_2D_ARRAY_OMNISHADOW,
-	TEXTURE_2D_MULTISAMPLE,
-	TEXTURE_2D_ARRAY_MULTISAMPLE,
-	TEXTURE_2D_ARRAY_OMNISHADOW_MULTISAMPLE,
 	MAX,
 };
 
 enum class ETextureFormat
 {
-	// TextureFormat + InternalFormat
-	RGB32F = 0,
+	// color
+	RGB8 = 0,
 	RGB16F,
+	RGB32F,
 	R11G11B10F,
-	RGB,
+
+	RGBA8,
 	RGBA16F,
 	RGBA32F,
-	RGBA,
-	RG32F,
-	RG,
-	R,
+	RGBA8I,
+	RGBA8UI,
+
+	BGRA8,
+
+	R8,
+	R16F,
 	R32F,
+	R32UI,
+
+	RG8,
+	RG16F,
+	RG32F,
+
+	// depth
+	D16,
+	D16_S8,
+	D24,
 	D24_S8,
 	D32,
 	D32_S8,
 
-	// below is Internal Format only
-	RGBA_INTEGER,
-	R_INTEGER,
-	R32UI,
-	RGBA8,
-	BGRA8,
-	RGBA8I,
-	RGBA8UI,
-	DEPTH,
 	MAX,
 };
+
+static bool IsDepthFormat(ETextureFormat format)
+{
+	switch (format)
+	{
+		case ETextureFormat::D16:
+		case ETextureFormat::D16_S8:
+		case ETextureFormat::D24:
+		case ETextureFormat::D24_S8:
+		case ETextureFormat::D32:
+		case ETextureFormat::D32_S8:
+			return true;
+	}
+
+	return false;
+}
 
 enum class EFormatType : uint8
 {
@@ -283,6 +301,7 @@ enum class ETextureAddressMode : uint8
 	MIRRORED_REPEAT,
 	CLAMP_TO_EDGE,
 	CLAMP_TO_BORDER,
+	MIRROR_CLAMP_TO_EDGE,
 	MAX,
 };
 

@@ -48,11 +48,7 @@ FORCEINLINE uint32 GetOpenGLTextureType(ETextureType type)
 	GENERATE_STATIC_CONVERSION_ARRAY(
 		CONVERSION_TYPE_ELEMENT(ETextureType::TEXTURE_2D, GL_TEXTURE_2D),
 		CONVERSION_TYPE_ELEMENT(ETextureType::TEXTURE_2D_ARRAY, GL_TEXTURE_2D_ARRAY),
-		CONVERSION_TYPE_ELEMENT(ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW, GL_TEXTURE_2D),
-		CONVERSION_TYPE_ELEMENT(ETextureType::TEXTURE_CUBE, GL_TEXTURE_CUBE_MAP),
-		CONVERSION_TYPE_ELEMENT(ETextureType::TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_2D_MULTISAMPLE),
-		CONVERSION_TYPE_ELEMENT(ETextureType::TEXTURE_2D_ARRAY_MULTISAMPLE, GL_TEXTURE_2D_MULTISAMPLE_ARRAY),
-		CONVERSION_TYPE_ELEMENT(ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW_MULTISAMPLE, GL_TEXTURE_2D_MULTISAMPLE)
+		CONVERSION_TYPE_ELEMENT(ETextureType::TEXTURE_CUBE, GL_TEXTURE_CUBE_MAP)
 	);
 }
 
@@ -64,69 +60,101 @@ FORCEINLINE uint32 GetOpenGLFilterTargetType(ETextureFilterTarget type)
 	);
 }
 
-FORCEINLINE uint32 GetOpenGLTextureInternalFormat(ETextureFormat type)
-{
-	GENERATE_STATIC_CONVERSION_ARRAY(
-		// TextureFormat + InternalFormat
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB32F, GL_RGB32F),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB16F, GL_RGB16F),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::R11G11B10F, GL_R11F_G11F_B10F),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB, GL_RGB),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA16F, GL_RGBA16F),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA32F, GL_RGBA32F),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA, GL_RGBA),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RG32F, GL_RG32F),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RG, GL_RG),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::R, GL_RED),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::R32F, GL_R32F),
-
-		// below is Internal Format only
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA_INTEGER, GL_RGBA_INTEGER),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::R_INTEGER, GL_RED_INTEGER),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::R32UI, GL_R32UI),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8, GL_RGBA8),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8I, GL_RGBA8I),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8UI, GL_RGBA8UI),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::DEPTH, GL_DEPTH_COMPONENT)
-	);
-}
-
 FORCEINLINE uint32 GetOpenGLTextureFormat(ETextureFormat type)
 {
 	GENERATE_STATIC_CONVERSION_ARRAY(
-		// TextureFormat + InternalFormat
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB32F, GL_RGB),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB16F, GL_RGB),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::R11G11B10F, GL_RGB),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB, GL_RGB),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA16F, GL_RGBA),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA32F, GL_RGBA),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA, GL_RGBA),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RG32F, GL_RG),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RG, GL_RG),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::R, GL_RED),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::R32F, GL_RED),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB8, GL_RGB8),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB16F, GL_RGB16F),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB32F, GL_RGB32F),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R11G11B10F, GL_R11F_G11F_B10F),
 
-		// below is Internal Format only
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA_INTEGER, GL_NONE),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::R_INTEGER, GL_NONE),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::R32UI, GL_NONE),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8, GL_NONE),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8I, GL_NONE),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8UI, GL_NONE),
-		CONVERSION_TYPE_ELEMENT(ETextureFormat::DEPTH, GL_NONE)
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8, GL_RGBA8),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA16F, GL_RGBA16F),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA32F, GL_RGBA32F),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8I, GL_RGBA8I),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8UI, GL_RGBA8UI),
+
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::BGRA8, GL_BGRA),
+
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R32F, GL_R32F),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R32UI, GL_R32UI),
+
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RG32F, GL_RG32F),
+
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::D16, GL_DEPTH_COMPONENT16),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::D16_S8, GL_DEPTH_COMPONENT16),		// OpenGL 지원 안함, Depth16 포맷으로 변경
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::D24, GL_DEPTH_COMPONENT24),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::D24_S8, GL_DEPTH24_STENCIL8),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::D32, GL_DEPTH_COMPONENT32F),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::D32_S8, GL_DEPTH32F_STENCIL8)
 	);
 }
 
-FORCEINLINE uint32 GetOpenGLPixelFormat(EFormatType type)
+FORCEINLINE uint32 GetOpenGLTextureInternalFormat(ETextureFormat type)
 {
 	GENERATE_STATIC_CONVERSION_ARRAY(
-		CONVERSION_TYPE_ELEMENT(EFormatType::BYTE, GL_BYTE),
-		CONVERSION_TYPE_ELEMENT(EFormatType::UNSIGNED_BYTE, GL_UNSIGNED_BYTE),
-		CONVERSION_TYPE_ELEMENT(EFormatType::INT, GL_INT),
-		CONVERSION_TYPE_ELEMENT(EFormatType::UNSIGNED_INT, GL_UNSIGNED_INT),
-		CONVERSION_TYPE_ELEMENT(EFormatType::HALF, GL_HALF_FLOAT),
-		CONVERSION_TYPE_ELEMENT(EFormatType::FLOAT, GL_FLOAT)
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB8, GL_RGB),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB16F, GL_RGB),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB32F, GL_RGB),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R11G11B10F, GL_RGB),
+
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8, GL_RGBA),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA16F, GL_RGBA),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA32F, GL_RGBA),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8I, GL_RGBA),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8UI, GL_RGBA),
+
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::BGRA8, GL_BGRA),
+
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R8, GL_RED),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R16F, GL_RED),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R32F, GL_RED),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R32UI, GL_RED),
+
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RG8, GL_RG),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RG16F, GL_RG),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RG32F, GL_RG),
+
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::D16, GL_DEPTH_COMPONENT),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::D16_S8, GL_DEPTH_COMPONENT),		// OpenGL 지원 안함, Depth16 포맷으로 변경
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::D24, GL_DEPTH_COMPONENT),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::D24_S8, GL_DEPTH_STENCIL),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::D32, GL_DEPTH_COMPONENT),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::D32_S8, GL_DEPTH_STENCIL)
+	);
+}
+
+FORCEINLINE uint32 GetOpenGLPixelFormat(ETextureFormat type)
+{
+	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB8, GL_UNSIGNED_BYTE),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB16F, GL_FLOAT),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB32F, GL_FLOAT),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R11G11B10F, GL_FLOAT),
+
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8, GL_UNSIGNED_BYTE),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA16F, GL_FLOAT),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA32F, GL_FLOAT),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8I, GL_INT),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8UI, GL_UNSIGNED_INT),
+
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::BGRA8, GL_UNSIGNED_BYTE),
+
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R8, GL_UNSIGNED_BYTE),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R16F, GL_FLOAT),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R32F, GL_FLOAT),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::R32UI, GL_UNSIGNED_INT),
+
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RG8, GL_UNSIGNED_BYTE),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RG16F, GL_FLOAT),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::RG32F, GL_FLOAT),
+
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::D16, GL_UNSIGNED_BYTE),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::D16_S8, GL_UNSIGNED_BYTE),		// OpenGL 지원 안함, Depth16 포맷으로 변경
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::D24, GL_UNSIGNED_BYTE),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::D24_S8, GL_UNSIGNED_BYTE),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::D32, GL_FLOAT),
+		CONVERSION_TYPE_ELEMENT(ETextureFormat::D32_S8, GL_FLOAT)
 	);
 }
 
@@ -410,9 +438,9 @@ bool jRHI_OpenGL::InitRHI()
 	return true;
 }
 
-jSamplerState* jRHI_OpenGL::CreateSamplerState(const jSamplerStateInfo& info) const
+jSamplerStateInfo* jRHI_OpenGL::CreateSamplerState(const jSamplerStateInfo& info) const
 {
-	auto samplerState = new jSamplerState_OpenGL(info);
+	auto samplerState = new jSamplerStateInfo_OpenGL(info);
 	glGenSamplers(1, &samplerState->SamplerId);
 	glSamplerParameteri(samplerState->SamplerId, GL_TEXTURE_MIN_FILTER, GetOpenGLTextureFilterType(info.Minification));
 	glSamplerParameteri(samplerState->SamplerId, GL_TEXTURE_MAG_FILTER, GetOpenGLTextureFilterType(info.Magnification));
@@ -430,18 +458,18 @@ jSamplerState* jRHI_OpenGL::CreateSamplerState(const jSamplerStateInfo& info) co
 	return samplerState;
 }
 
-void jRHI_OpenGL::ReleaseSamplerState(jSamplerState* samplerState) const
+void jRHI_OpenGL::ReleaseSamplerState(jSamplerStateInfo* samplerState) const
 {
-	auto samplerState_gl = static_cast<jSamplerState_OpenGL*>(samplerState);
+	auto samplerState_gl = static_cast<jSamplerStateInfo_OpenGL*>(samplerState);
 	glDeleteSamplers(1, &samplerState_gl->SamplerId);
 	delete samplerState_gl;
 }
 
-void jRHI_OpenGL::BindSamplerState(int32 index, const jSamplerState* samplerState) const
+void jRHI_OpenGL::BindSamplerState(int32 index, const jSamplerStateInfo* samplerState) const
 {
 	if (samplerState)
 	{
-		auto samplerState_gl = static_cast<const jSamplerState_OpenGL*>(samplerState);
+		auto samplerState_gl = static_cast<const jSamplerStateInfo_OpenGL*>(samplerState);
 		glBindSampler(index, samplerState_gl->SamplerId);
 	}
 	else
@@ -867,7 +895,7 @@ void jRHI_OpenGL::EnableWireframe(bool enable) const
 void jRHI_OpenGL::SetImageTexture(int32 index, const jTexture* texture, EImageTextureAccessType type) const
 {
 	const auto texture_gl = static_cast<const jTexture_OpenGL*>(texture);
-	const auto textureType = GetOpenGLTextureInternalFormat(texture_gl->ColorBufferType);
+	const auto textureType = GetOpenGLTextureInternalFormat(texture_gl->Format);
 	const auto accesstype_gl = GetOpenGLImageTextureAccessType(type);
 	glBindImageTexture(index, texture_gl->TextureID, 0, GL_FALSE, 0, accesstype_gl, textureType);
 }
@@ -1186,9 +1214,8 @@ jTexture* jRHI_OpenGL::CreateNullTexture() const
 {
 	auto texture = new jTexture_OpenGL();
 	texture->sRGB = false;
-	texture->ColorBufferType = ETextureFormat::RGB;
+	texture->Format = ETextureFormat::RGB8;
 	texture->Type = ETextureType::TEXTURE_CUBE;
-	texture->ColorPixelType = EFormatType::UNSIGNED_BYTE;
 	texture->Width = 2;
 	texture->Height = 2;
 
@@ -1201,16 +1228,15 @@ jTexture* jRHI_OpenGL::CreateNullTexture() const
 }
 
 jTexture* jRHI_OpenGL::CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
-	, EFormatType dataType, ETextureFormat textureFormat, bool createMipmap) const
+	, ETextureFormat textureFormat, bool createMipmap) const
 {
 	const uint32 internalFormat = GetOpenGLTextureInternalFormat(textureFormat);
 	const uint32 simpleFormat = GetOpenGLTextureFormat(textureFormat);
-	const uint32 formatType = GetOpenGLPixelFormat(dataType);
+	const uint32 formatType = GetOpenGLPixelFormat(textureFormat);
 
 	auto texture = new jTexture_OpenGL();
 	texture->sRGB = sRGB;
-	texture->ColorBufferType = textureFormat;
-	texture->ColorPixelType = dataType;
+	texture->Format = textureFormat;
 	texture->Type = ETextureType::TEXTURE_2D;
 	texture->Width = width;
 	texture->Height = height;
@@ -1225,15 +1251,15 @@ jTexture* jRHI_OpenGL::CreateTextureFromData(void* data, int32 width, int32 heig
 }
 
 jTexture* jRHI_OpenGL::CreateCubeTextureFromData(std::vector<void*> faces, int32 width, int32 height, bool sRGB
-	, EFormatType dataType, ETextureFormat textureFormat, bool createMipmap) const
+	, ETextureFormat textureFormat, bool createMipmap) const
 {
 	const uint32 internalFormat = GetOpenGLTextureInternalFormat(textureFormat);
 	const uint32 simpleFormat = GetOpenGLTextureFormat(textureFormat);
-	const uint32 formatType = GetOpenGLPixelFormat(dataType);
+	const uint32 formatType = GetOpenGLPixelFormat(textureFormat);
 
 	auto texture = new jTexture_OpenGL();
 	texture->sRGB = sRGB;
-	texture->ColorBufferType = textureFormat;
+	texture->Format = textureFormat;
 	texture->Type = ETextureType::TEXTURE_CUBE;
 	texture->Width = width;
 	texture->Height = height;
@@ -1486,8 +1512,8 @@ int32 jRHI_OpenGL::SetMatetrial(const jMaterialData* materialData, const jShader
 		else
 		{
 			BindSamplerState(index, nullptr);
-			SetTextureFilter(tex_gl->Type, ETextureFilterTarget::MAGNIFICATION, tex_gl->Magnification);
-			SetTextureFilter(tex_gl->Type, ETextureFilterTarget::MINIFICATION, tex_gl->Minification);
+			//SetTextureFilter(tex_gl->Type, ETextureFilterTarget::MAGNIFICATION, tex_gl->Magnification);
+			//SetTextureFilter(tex_gl->Type, ETextureFilterTarget::MINIFICATION, tex_gl->Minification);
 		}
 
 		g_rhi->SetUniformbuffer(GetCommonTextureSRGBName(index), tex_gl->sRGB, shader);
@@ -1536,31 +1562,29 @@ void jRHI_OpenGL::EnableCullMode(ECullMode cullMode) const
 
 jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) const
 {
-	const uint32 internalFormat = GetOpenGLTextureInternalFormat(info.InternalFormat);
+	const uint32 internalFormat = GetOpenGLTextureInternalFormat(info.Format);
 	const uint32 format = GetOpenGLTextureInternalFormat(info.Format);
-	const uint32 formatType = GetOpenGLPixelFormat(info.FormatType);
+	const uint32 formatType = GetOpenGLPixelFormat(info.Format);
 
-	const uint32 depthBufferFormat = GetOpenGLDepthBufferFormat(info.DepthBufferType);
-	const uint32 depthBufferType = GetOpenGLDepthBufferType(info.DepthBufferType);
-	const bool hasDepthAttachment = (info.DepthBufferType != EDepthBufferType::NONE);
+	const bool hasDepthAttachment = IsDepthFormat(info.Format);
 
-	const uint32 magnification = GetOpenGLTextureFilterType(info.Magnification);
-	const uint32 minification = GetOpenGLTextureFilterType(info.Minification);
+	//const uint32 magnification = GetOpenGLTextureFilterType(info.Magnification);
+	//const uint32 minification = GetOpenGLTextureFilterType(info.Minification);
 
 	auto rt_gl = new jRenderTarget_OpenGL();
 	rt_gl->Info = info;
 	
 	const int32 MipLevels = (info.IsGenerateMipmapDepth ? jTexture::GetMipLevels(info.Width, info.Height) : 1);
 	JASSERT(info.SampleCount >= 1);
-	JASSERT(info.TextureCount > 0);
-	if ((info.TextureType == ETextureType::TEXTURE_2D) || (info.TextureType == ETextureType::TEXTURE_2D_MULTISAMPLE))
+	JASSERT(info.LayerCount > 0);
+	if ((info.TextureType == ETextureType::TEXTURE_2D))
 	{
 		uint32 fbo = 0;
 		glGenFramebuffers(1, &fbo);
 		glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 
-		rt_gl->Textures.resize(info.TextureCount);
-		for (int i = 0; i < info.TextureCount; ++i)
+		rt_gl->Textures.resize(info.LayerCount);
+		for (int i = 0; i < info.LayerCount; ++i)
 		{
 			uint32 tbo = 0;
 			glGenTextures(1, &tbo);
@@ -1568,10 +1592,10 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 			{
 				glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, tbo);
 				glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, info.SampleCount, internalFormat, info.Width, info.Height, true);
-				glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_MIN_FILTER, minification);
-				glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_MAG_FILTER, magnification);
-				glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-				glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+				//glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_MIN_FILTER, minification);
+				//glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_MAG_FILTER, magnification);
+				//glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+				//glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 				glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D_MULTISAMPLE, tbo, 0);
 				if (info.IsGenerateMipmap)
 					glGenerateMipmap(GL_TEXTURE_2D_MULTISAMPLE);
@@ -1580,10 +1604,10 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 			{
 				glBindTexture(GL_TEXTURE_2D, tbo);
 				glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, info.Width, info.Height, 0, format, formatType, nullptr);
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minification);
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magnification);
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+				//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minification);
+				//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magnification);
+				//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+				//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 				if (info.IsGenerateMipmap)
 					glGenerateMipmap(GL_TEXTURE_2D);
 				glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, tbo, 0);
@@ -1592,12 +1616,11 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 
 			auto tex_gl = new jTexture_OpenGL();
 			tex_gl->Type = info.TextureType;
-			tex_gl->ColorBufferType = info.InternalFormat;
-			tex_gl->ColorPixelType = info.FormatType;
+			tex_gl->Format = info.Format;
 			tex_gl->Width = info.Width;
 			tex_gl->Height = info.Height;
-			tex_gl->Magnification = info.Magnification;
-			tex_gl->Minification = info.Minification;
+			//tex_gl->Magnification = info.Magnification;
+			//tex_gl->Minification = info.Minification;
 			tex_gl->TextureID = tbo;
 			rt_gl->Textures[i] = std::shared_ptr<jTexture>(tex_gl);
 		}
@@ -1610,22 +1633,22 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 			if (info.SampleCount > 1)
 			{
 				glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, tbo);
-				glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, info.SampleCount, depthBufferFormat, info.Width, info.Height, true);
+				glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, info.SampleCount, format, info.Width, info.Height, true);
 				if (info.IsGenerateMipmapDepth)
 					glGenerateMipmap(GL_TEXTURE_2D_MULTISAMPLE);
-				glFramebufferTexture2D(GL_FRAMEBUFFER, depthBufferType, GL_TEXTURE_2D_MULTISAMPLE, tbo, 0);
+				glFramebufferTexture2D(GL_FRAMEBUFFER, internalFormat, GL_TEXTURE_2D_MULTISAMPLE, tbo, 0);
 			}
 			else
 			{
 				glBindTexture(GL_TEXTURE_2D, tbo);
-				glTexStorage2D(GL_TEXTURE_2D, MipLevels, depthBufferFormat, info.Width, info.Height);
+				glTexStorage2D(GL_TEXTURE_2D, MipLevels, format, info.Width, info.Height);
 				if (info.IsGenerateMipmapDepth)
 					glGenerateMipmap(GL_TEXTURE_2D);
-				glFramebufferTexture2D(GL_FRAMEBUFFER, depthBufferType, GL_TEXTURE_2D, tbo, 0);
+				glFramebufferTexture2D(GL_FRAMEBUFFER, internalFormat, GL_TEXTURE_2D, tbo, 0);
 			}
 			auto tex_gl = new jTexture_OpenGL();
 			tex_gl->Type = info.TextureType;
-			tex_gl->DepthBufferType = info.DepthBufferType;
+			tex_gl->Format = info.Format;
 			tex_gl->Width = info.Width;
 			tex_gl->Height = info.Height;
 			tex_gl->TextureID = tbo;
@@ -1643,31 +1666,30 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 	
 		rt_gl->fbos.push_back(fbo);
 	}
-	else if ((info.TextureType == ETextureType::TEXTURE_2D_ARRAY) || (info.TextureType == ETextureType::TEXTURE_2D_ARRAY_MULTISAMPLE))
+	else if (info.TextureType == ETextureType::TEXTURE_2D_ARRAY)
 	{
 		auto tex_gl = new jTexture_OpenGL();
-		tex_gl->Magnification = info.Magnification;
-		tex_gl->Minification = info.Minification;
-		tex_gl->ColorBufferType = info.InternalFormat;
-		tex_gl->ColorPixelType = info.FormatType;
+		//tex_gl->Magnification = info.Magnification;
+		//tex_gl->Minification = info.Minification;
+		tex_gl->Format = info.Format;
 
 		uint32 tbo = 0;
 		glGenTextures(1, &tbo);
 		if (info.SampleCount > 1)
 		{
 			glBindTexture(GL_TEXTURE_2D_MULTISAMPLE_ARRAY, tbo);
-			glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE_ARRAY, GL_TEXTURE_MIN_FILTER, minification);
-			glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE_ARRAY, GL_TEXTURE_MAG_FILTER, magnification);
-			glTexImage3DMultisample(GL_TEXTURE_2D_MULTISAMPLE_ARRAY, 4, internalFormat, info.Width, info.Height, info.TextureCount, true);
+			//glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE_ARRAY, GL_TEXTURE_MIN_FILTER, minification);
+			//glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE_ARRAY, GL_TEXTURE_MAG_FILTER, magnification);
+			glTexImage3DMultisample(GL_TEXTURE_2D_MULTISAMPLE_ARRAY, 4, internalFormat, info.Width, info.Height, info.LayerCount, true);
 			if (info.IsGenerateMipmap)
 				glGenerateMipmap(GL_TEXTURE_2D_MULTISAMPLE_ARRAY);
 		}
 		else
 		{
 			glBindTexture(GL_TEXTURE_2D_ARRAY, tbo);
-			glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, minification);
-			glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, magnification);
-			glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, internalFormat, info.Width, info.Height, info.TextureCount, 0, format, formatType, nullptr);
+			//glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, minification);
+			//glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, magnification);
+			glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, internalFormat, info.Width, info.Height, info.LayerCount, 0, format, formatType, nullptr);
 			if (info.IsGenerateMipmap)
 				glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
 		}
@@ -1675,7 +1697,7 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 		uint32 fbo = 0;
 		glGenFramebuffers(1, &fbo);
 		glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-		for (int32 i = 0; i < info.TextureCount; ++i)
+		for (int32 i = 0; i < info.LayerCount; ++i)
 		{
 			glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, tbo, 0, i);
 			rt_gl->drawBuffers.push_back(GL_COLOR_ATTACHMENT0 + i);
@@ -1688,27 +1710,27 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 			if (info.SampleCount > 1)
 			{
 				glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, tbo);
-				glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, info.SampleCount, depthBufferFormat, info.Width, info.Height, true);
+				glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, info.SampleCount, format, info.Width, info.Height, true);
 				if (info.IsGenerateMipmapDepth)
 					glGenerateMipmap(GL_TEXTURE_2D_MULTISAMPLE);
-				glFramebufferTexture2D(GL_FRAMEBUFFER, depthBufferType, GL_TEXTURE_2D_MULTISAMPLE, tbo, 0);
+				glFramebufferTexture2D(GL_FRAMEBUFFER, internalFormat, GL_TEXTURE_2D_MULTISAMPLE, tbo, 0);
 			}
 			else
 			{
 				glBindTexture(GL_TEXTURE_2D, tbo);
-				glTexStorage2D(GL_TEXTURE_2D, MipLevels, depthBufferFormat, info.Width, info.Height);
+				glTexStorage2D(GL_TEXTURE_2D, MipLevels, format, info.Width, info.Height);
 				if (info.IsGenerateMipmapDepth)
 					glGenerateMipmap(GL_TEXTURE_2D);
-				glFramebufferTexture2D(GL_FRAMEBUFFER, depthBufferType, GL_TEXTURE_2D, tbo, 0);
+				glFramebufferTexture2D(GL_FRAMEBUFFER, internalFormat, GL_TEXTURE_2D, tbo, 0);
 			}
 			auto tex_gl = new jTexture_OpenGL();
 			tex_gl->Type = info.TextureType;
 			tex_gl->Width = info.Width;
 			tex_gl->Height = info.Height;
-			tex_gl->Magnification = info.Magnification;
-			tex_gl->Minification = info.Minification;
+			//tex_gl->Magnification = info.Magnification;
+			//tex_gl->Minification = info.Minification;
 			tex_gl->TextureID = tbo;
-			tex_gl->DepthBufferType = info.DepthBufferType;
+			tex_gl->Format = info.Format;
 			rt_gl->TextureDepth = std::shared_ptr<jTexture>(tex_gl);
 		}
 
@@ -1722,106 +1744,11 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 		}
 
 		tex_gl->Type = info.TextureType;
-		tex_gl->ColorBufferType = info.InternalFormat;
+		tex_gl->Format = info.Format;
 		tex_gl->Width = info.Width;
 		tex_gl->Height = info.Height;
 		tex_gl->TextureID = tbo;
 		rt_gl->Textures.push_back(std::shared_ptr<jTexture>(tex_gl));
-
-		rt_gl->fbos.push_back(fbo);
-	}
-	else if ((info.TextureType == ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW) || (info.TextureType == ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW_MULTISAMPLE))
-	{
-		uint32 fbo = 0;
-		glGenFramebuffers(1, &fbo);
-		glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-
-		rt_gl->Textures.resize(info.TextureCount);
-
-		JASSERT(info.TextureCount == 1);
-		for (int i = 0; i < info.TextureCount; ++i)
-		{
-			uint32 tbo = 0;
-			glGenTextures(1, &tbo);
-			if (info.SampleCount > 1)
-			{
-				glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, tbo);
-				glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, info.SampleCount, internalFormat, info.Width, info.Height, true);
-				glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_MIN_FILTER, minification);
-				glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_MAG_FILTER, magnification);
-				glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-				glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-				if (info.IsGenerateMipmap)
-					glGenerateMipmap(GL_TEXTURE_2D_MULTISAMPLE);
-				glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D_MULTISAMPLE, tbo, 0);
-			}
-			else
-			{
-				glBindTexture(GL_TEXTURE_2D, tbo);
-				glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, info.Width, info.Height, 0, format, formatType, nullptr);
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minification);
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magnification);
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-				if (info.IsGenerateMipmap)
-					glGenerateMipmap(GL_TEXTURE_2D);
-				glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, tbo, 0);
-			}
-			rt_gl->drawBuffers.push_back(GL_COLOR_ATTACHMENT0 + i);
-
-			auto tex_gl = new jTexture_OpenGL();
-			tex_gl->Type = info.TextureType;
-			tex_gl->ColorBufferType = info.InternalFormat;
-			tex_gl->Width = info.Width;
-			tex_gl->Height = info.Height;
-			tex_gl->Magnification = info.Magnification;
-			tex_gl->Minification = info.Minification;
-			tex_gl->TextureID = tbo;
-			tex_gl->ColorBufferType = info.InternalFormat;
-			tex_gl->ColorPixelType = info.FormatType;
-			rt_gl->Textures[i] = std::shared_ptr<jTexture>(tex_gl);
-		}
-
-		if (hasDepthAttachment)
-		{
-			uint32 tbo = 0;
-			glGenTextures(1, &tbo);
-			if (info.SampleCount > 1)
-			{
-				glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, tbo);
-				glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, info.SampleCount, depthBufferFormat, info.Width, info.Height, true);
-				if (info.IsGenerateMipmapDepth)
-					glGenerateMipmap(GL_TEXTURE_2D_MULTISAMPLE);
-				glFramebufferTexture2D(GL_FRAMEBUFFER, depthBufferType, GL_TEXTURE_2D_MULTISAMPLE, tbo, 0);
-			}
-			else
-			{
-				glBindTexture(GL_TEXTURE_2D, tbo);
-				glTexStorage2D(GL_TEXTURE_2D, MipLevels, depthBufferFormat, info.Width, info.Height);
-				if (info.IsGenerateMipmapDepth)
-					glGenerateMipmap(GL_TEXTURE_2D);
-				glFramebufferTexture2D(GL_FRAMEBUFFER, depthBufferType, GL_TEXTURE_2D, tbo, 0);
-			}
-			auto tex_gl = new jTexture_OpenGL();
-			tex_gl->Type = info.TextureType;
-			tex_gl->ColorBufferType = ETextureFormat::DEPTH;
-			tex_gl->Width = info.Width;
-			tex_gl->Height = info.Height;
-			tex_gl->Magnification = info.Magnification;
-			tex_gl->Minification = info.Minification;
-			tex_gl->TextureID = tbo;
-			tex_gl->DepthBufferType = info.DepthBufferType;
-			rt_gl->TextureDepth = std::shared_ptr<jTexture>(tex_gl);
-		}
-
-		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-		{
-			auto status_code = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-			char szTemp[256] = { 0, };
-			sprintf_s(szTemp, sizeof(szTemp), "Failed to create Texture2D framebuffer which is not complete : %d", status_code);
-			JMESSAGE(szTemp);
-			return nullptr;
-		}
 
 		rt_gl->fbos.push_back(fbo);
 	}
@@ -1832,10 +1759,10 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 		uint32 tbo = 0;
 		glGenTextures(1, &tbo);
 		glBindTexture(GL_TEXTURE_CUBE_MAP, tbo);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, minification);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, magnification);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		//glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, minification);
+		//glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, magnification);
+		//glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		//glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
 
 		for (int i = 0; i < 6; ++i)
@@ -1845,14 +1772,12 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 			glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
 		auto tex_gl = new jTexture_OpenGL();
 		tex_gl->Type = info.TextureType;
-		tex_gl->ColorBufferType = info.InternalFormat;
+		tex_gl->Format = info.Format;
 		tex_gl->Width = info.Width;
 		tex_gl->Height = info.Height;
 		tex_gl->TextureID = tbo;
-		tex_gl->Magnification = info.Magnification;
-		tex_gl->Minification = info.Minification;
-		tex_gl->ColorBufferType = info.InternalFormat;
-		tex_gl->ColorPixelType = info.FormatType;
+		//tex_gl->Magnification = info.Magnification;
+		//tex_gl->Minification = info.Minification;
 		rt_gl->Textures.push_back(std::shared_ptr<jTexture>(tex_gl));
 
 		for (int i = 0; i < 6; ++i)
@@ -1867,8 +1792,8 @@ jRenderTarget* jRHI_OpenGL::CreateRenderTarget(const jRenderTargetInfo& info) co
 				uint32 rbo = 0;
 				glGenRenderbuffers(1, &rbo);
 				glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-				glRenderbufferStorage(GL_RENDERBUFFER, depthBufferFormat, info.Width, info.Height);
-				glFramebufferRenderbuffer(GL_FRAMEBUFFER, depthBufferType, GL_RENDERBUFFER, rbo);
+				glRenderbufferStorage(GL_RENDERBUFFER, format, info.Width, info.Height);
+				glFramebufferRenderbuffer(GL_FRAMEBUFFER, internalFormat, GL_RENDERBUFFER, rbo);
 				rt_gl->rbos.push_back(rbo);
 			}
 
@@ -2120,16 +2045,16 @@ bool jRenderTarget_OpenGL::SetDepthAttachment(const std::shared_ptr<jTexture>& I
 
 	const jTexture_OpenGL* tex_gl = static_cast<jTexture_OpenGL*>(InDepth.get());
 
-	const uint32 depthBufferFormat = GetOpenGLDepthBufferFormat(tex_gl->DepthBufferType);
-	const uint32 depthBufferType = GetOpenGLDepthBufferType(tex_gl->DepthBufferType);
-	const bool hasDepthAttachment = (tex_gl->DepthBufferType != EDepthBufferType::NONE);
+	// const uint32 format = GetOpenGLTextureFormat(tex_gl->Format);
+	const uint32 internalFormat = GetOpenGLTextureInternalFormat(tex_gl->Format);
+	const bool hasDepthAttachment = IsDepthFormat(tex_gl->Format);
 	JASSERT(hasDepthAttachment);
 	if (!hasDepthAttachment)
 		return false;
 
 	JASSERT(fbos.size() == 1);
 	glBindFramebuffer(GL_FRAMEBUFFER, fbos[0]);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, depthBufferType, GetOpenGLTextureType(tex_gl->Type), tex_gl->TextureID, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, internalFormat, GetOpenGLTextureType(tex_gl->Type), tex_gl->TextureID, 0);
 
 	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 	{
@@ -2148,11 +2073,12 @@ void jRenderTarget_OpenGL::SetDepthMipLevel(int32 InLevel)
 	const jTexture_OpenGL* tex_gl = static_cast<jTexture_OpenGL*>(TextureDepth.get());
 	JASSERT(tex_gl);
 
-	const uint32 depthBufferFormat = GetOpenGLDepthBufferFormat(tex_gl->DepthBufferType);
-	const uint32 depthBufferType = GetOpenGLDepthBufferType(tex_gl->DepthBufferType);
-	const bool hasDepthAttachment = (tex_gl->DepthBufferType != EDepthBufferType::NONE);
+	// const uint32 format = GetOpenGLTextureFormat(tex_gl->Format);
+	const uint32 internalFormat = GetOpenGLTextureInternalFormat(tex_gl->Format);
+	const bool hasDepthAttachment = IsDepthFormat(tex_gl->Format);
+	check(hasDepthAttachment);
 
-	glFramebufferTexture2D(GL_FRAMEBUFFER, depthBufferType, GetOpenGLTextureType(tex_gl->Type), tex_gl->TextureID, InLevel);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, internalFormat, GetOpenGLTextureType(tex_gl->Type), tex_gl->TextureID, InLevel);
 }
 
 //////////////////////////////////////////////////////////////////////////

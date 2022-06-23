@@ -38,7 +38,7 @@ std::weak_ptr<jPostProcessInOutput> IPostprocess::GetPostProcessOutput() const
 	return PostProcessOutput;
 }
 
-void IPostprocess::AddInput(const std::weak_ptr<jPostProcessInOutput>& input, const std::shared_ptr<jSamplerState>& samplerState)
+void IPostprocess::AddInput(const std::weak_ptr<jPostProcessInOutput>& input, const std::shared_ptr<jSamplerStateInfo>& samplerState)
 {
 	PostProcessInputList.push_back({ input, samplerState });
 }
@@ -317,8 +317,8 @@ void jPostProcess_AdaptiveLuminance::Setup()
 {
 	__super::Setup();
 	Shader = jShader::GetShader("AdaptiveLuminance");
-	LastLumianceRenderTarget[0] = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::R32F, ETextureFormat::R, EFormatType::FLOAT, EDepthBufferType::NONE, 1, 1, 1, ETextureFilter::LINEAR, ETextureFilter::LINEAR_MIPMAP_LINEAR });
-	LastLumianceRenderTarget[1] = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::R32F, ETextureFormat::R, EFormatType::FLOAT, EDepthBufferType::NONE, 1, 1, 1, ETextureFilter::LINEAR, ETextureFilter::LINEAR_MIPMAP_LINEAR });
+	LastLumianceRenderTarget[0] = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::R32F, 1, 1, 1/*, ETextureFilter::LINEAR, ETextureFilter::LINEAR_MIPMAP_LINEAR*/ });
+	LastLumianceRenderTarget[1] = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::R32F, 1, 1, 1/*, ETextureFilter::LINEAR, ETextureFilter::LINEAR_MIPMAP_LINEAR*/ });
 }
 
 bool jPostProcess_AdaptiveLuminance::Do(const jCamera* camera) const
@@ -466,8 +466,8 @@ void jPostProcess_GaussianBlurH::BindInputs(jFullscreenQuadPrimitive* fsQuad) co
 		auto texture = input.expired() ? nullptr : input.lock()->RenderTarget->GetTexture();
 		if (texture)
 		{
-			texture->Magnification = ETextureFilter::NEAREST;
-			texture->Minification = ETextureFilter::NEAREST;
+			//texture->Magnification = ETextureFilter::NEAREST;
+			//texture->Minification = ETextureFilter::NEAREST;
 		}
 		fsQuad->SetTexture(index, texture, it->SamplerState.get());
 	}
@@ -483,8 +483,8 @@ void jPostProcess_GaussianBlurH::UnbindInputs(jFullscreenQuadPrimitive* fsQuad) 
 		{
 			auto rt = input.lock()->RenderTarget;
 			auto texture = rt->GetTexture();
-			texture->Magnification = rt->Info.Magnification;
-			texture->Minification = rt->Info.Minification;
+			//texture->Magnification = rt->Info.Magnification;
+			//texture->Minification = rt->Info.Minification;
 		}
 		fsQuad->SetTexture(index, nullptr, nullptr);
 	}
@@ -534,8 +534,8 @@ void jPostProcess_GaussianBlurV::BindInputs(jFullscreenQuadPrimitive* fsQuad) co
 		auto texture = input.expired() ? nullptr : input.lock()->RenderTarget->GetTexture();
 		if (texture)
 		{
-			texture->Magnification = ETextureFilter::NEAREST;
-			texture->Minification = ETextureFilter::NEAREST;
+			//texture->Magnification = ETextureFilter::NEAREST;
+			//texture->Minification = ETextureFilter::NEAREST;
 		}
 		fsQuad->SetTexture(index, texture, it->SamplerState.get());
 	}
@@ -551,8 +551,8 @@ void jPostProcess_GaussianBlurV::UnbindInputs(jFullscreenQuadPrimitive* fsQuad) 
 		{
 			auto rt = input.lock()->RenderTarget;
 			auto texture = rt->GetTexture();
-			texture->Magnification = rt->Info.Magnification;
-			texture->Minification = rt->Info.Minification;
+			//texture->Magnification = rt->Info.Magnification;
+			//texture->Minification = rt->Info.Minification;
 		}
 		fsQuad->SetTexture(index, nullptr, nullptr);
 	}

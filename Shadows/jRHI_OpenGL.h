@@ -148,10 +148,12 @@ struct jQueryPrimitiveGenerated_OpenGL : public jQueryPrimitiveGenerated
 	uint32 QueryId = 0;
 };
 
-struct jSamplerState_OpenGL : public jSamplerState
+struct jSamplerStateInfo_OpenGL : public jSamplerStateInfo
 {
-	using jSamplerState::jSamplerState;
-	virtual ~jSamplerState_OpenGL() {}
+	jSamplerStateInfo_OpenGL() = default;
+	jSamplerStateInfo_OpenGL(const jSamplerStateInfo& state) : jSamplerStateInfo(state) {}
+	virtual ~jSamplerStateInfo_OpenGL() {}
+
 	uint32 SamplerId = 0;
 };
 
@@ -165,9 +167,9 @@ public:
 	
 	virtual bool InitRHI() override;
 	virtual void* GetWindow() const { return window; }
-	virtual jSamplerState* CreateSamplerState(const jSamplerStateInfo& info) const override;
-	virtual void ReleaseSamplerState(jSamplerState* samplerState) const override;
-	virtual void BindSamplerState(int32 index, const jSamplerState* samplerState) const override;
+	virtual jSamplerStateInfo* CreateSamplerState(const jSamplerStateInfo& info) const override;
+	virtual void ReleaseSamplerState(jSamplerStateInfo* samplerState) const override;
+	virtual void BindSamplerState(int32 index, const jSamplerStateInfo* samplerState) const override;
 	virtual jVertexBuffer* CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const override;
 	virtual jIndexBuffer* CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const override;
 	virtual void BindVertexBuffer(const jVertexBuffer* vb, const jShader* shader) const override;
@@ -193,9 +195,9 @@ public:
 	virtual void ReleaseShader(jShader* shader) const override;
 	virtual jTexture* CreateNullTexture() const override;
 	virtual jTexture* CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
-		, EFormatType dataType = EFormatType::UNSIGNED_BYTE, ETextureFormat textureFormat = ETextureFormat::RGBA, bool createMipmap = false) const override;
+		, ETextureFormat textureFormat = ETextureFormat::RGBA8, bool createMipmap = false) const override;
 	virtual jTexture* CreateCubeTextureFromData(std::vector<void*> faces, int32 width, int32 height, bool sRGB
-		, EFormatType dataType = EFormatType::UNSIGNED_BYTE, ETextureFormat textureFormat = ETextureFormat::RGBA, bool createMipmap = false) const override;
+		, ETextureFormat textureFormat = ETextureFormat::RGBA8, bool createMipmap = false) const override;
 
 	virtual bool SetUniformbuffer(const jName& name, const Matrix& InData, const jShader* InShader) const override;
 	virtual bool SetUniformbuffer(const jName& name, const int InData, const jShader* InShader) const override;

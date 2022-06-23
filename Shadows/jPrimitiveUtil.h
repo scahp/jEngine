@@ -60,8 +60,8 @@ class jFullscreenQuadPrimitive : public jObject
 public:
 	virtual void Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount = 0) const override;
 	void SetUniformBuffer(const jShader* shader) const;
-	void SetTexture(int index, const jTexture* texture, const jSamplerState* samplerState);
-	void SetTexture(const jTexture* texture, const jSamplerState* samplerState, int32 index = 0);
+	void SetTexture(int index, const jTexture* texture, const jSamplerStateInfo* samplerState);
+	void SetTexture(const jTexture* texture, const jSamplerStateInfo* samplerState, int32 index = 0);
 };
 
 class jBoundBoxObject : public jObject

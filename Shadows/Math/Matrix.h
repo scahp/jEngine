@@ -9,10 +9,10 @@ struct Matrix3;
 
 struct Matrix
 {
-	FORCEINLINE Matrix() {}
+	FORCEINLINE constexpr Matrix() {}
 	FORCEINLINE Matrix(identity_type /*IdentityType*/) { SetIdentity(); }
 	FORCEINLINE Matrix(zero_type /*ZeroType*/) { SetZero(); }
-	FORCEINLINE Matrix(float fM00, float fM01, float fM02, float fM03
+	FORCEINLINE constexpr Matrix(float fM00, float fM01, float fM02, float fM03
 	     , float fM10, float fM11, float fM12, float fM13
 	     , float fM20, float fM21, float fM22, float fM23
 	     , float fM30, float fM31, float fM32, float fM33)
@@ -577,10 +577,10 @@ struct Matrix
 
 struct Matrix3
 {
-	FORCEINLINE Matrix3() {}
+	FORCEINLINE constexpr Matrix3() {}
 	FORCEINLINE Matrix3(identity_type /*IdentityType*/) { SetIdentity(); }
 	FORCEINLINE Matrix3(zero_type /*ZeroType*/) { SetZero(); }
-	FORCEINLINE Matrix3(float fM00, float fM01, float fM02
+	FORCEINLINE constexpr Matrix3(float fM00, float fM01, float fM02
 		, float fM10, float fM11, float fM12
 		, float fM20, float fM21, float fM22)
 		: m00(fM00), m01(fM01), m02(fM02)

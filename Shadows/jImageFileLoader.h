@@ -7,7 +7,7 @@ struct jImageData
 	int32 Height = 0;
 	jName Filename;
 	std::vector<unsigned char> ImageData;
-	ETextureFormat Format = ETextureFormat::RGBA;
+	ETextureFormat Format = ETextureFormat::RGBA8;
 	EFormatType FormatType = EFormatType::UNSIGNED_BYTE;
 };
 
