@@ -5,7 +5,7 @@
 #include "jCamera.h"
 #include "jLight.h"
 #include "jRHI_OpenGL.h"
-#include "jRenderTargetPool.h"
+#include "jFrameBufferPool.h"
 #include "jShadowAppProperties.h"
 #include "jObject.h"
 

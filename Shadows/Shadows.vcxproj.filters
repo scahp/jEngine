@@ -96,7 +96,7 @@
     <ClInclude Include="jRenderObject.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="jRenderTargetPool.h">
+    <ClInclude Include="jFrameBufferPool.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="jRHIType.h">
@@ -216,6 +216,9 @@
     <ClInclude Include="jSpirvHelper.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="jRenderTargetPool.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -269,7 +272,7 @@
     <ClCompile Include="jRenderObject.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="jRenderTargetPool.cpp">
+    <ClCompile Include="jFrameBufferPool.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Math\Matrix.cpp">
@@ -366,6 +369,9 @@
       <Filter>Core</Filter>
     </ClCompile>
     <ClCompile Include="jSpirvHelper.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="jRenderTargetPool.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

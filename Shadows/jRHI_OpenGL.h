@@ -37,7 +37,7 @@ struct jTexture_OpenGL : public jTexture
 	uint32 TextureID = 0;
 };
 
-struct jRenderTarget_OpenGL : public jRenderTarget
+struct jFrameBuffer_OpenGL : public jFrameBuffer
 {
 	std::vector<uint32> fbos;
 	std::vector<uint32> rbos;
@@ -226,9 +226,9 @@ public:
 	virtual void EnableCullFace(bool enable) const override;
 	virtual void SetFrontFace(EFrontFace frontFace) const override;
 	virtual void EnableCullMode(ECullMode cullMode) const override;
-	virtual jRenderTarget* CreateRenderTarget(const jRenderTargetInfo& info) const override;
+	virtual jFrameBuffer* CreateFrameBuffer(const jFrameBufferInfo& info) const override;
 	virtual void EnableDepthTest(bool enable) const override;
-	virtual void SetRenderTarget(const jRenderTarget* rt, int32 index = 0, bool mrt = false) const override;
+	virtual void SetFrameBuffer(const jFrameBuffer* rt, int32 index = 0, bool mrt = false) const override;
 	virtual void SetDrawBuffers(const std::initializer_list<EDrawBufferType>& list) const override;
 	virtual void UpdateVertexBuffer(jVertexBuffer* vb, const std::shared_ptr<jVertexStreamData>& streamData) const override;
 	virtual void UpdateVertexBuffer(jVertexBuffer* vb, IStreamParam* streamParam, int32 streamParamIndex) const override;

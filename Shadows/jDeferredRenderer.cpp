@@ -2,7 +2,7 @@
 #include "jDeferredRenderer.h"
 #include "jObject.h"
 #include "jShadowAppProperties.h"
-#include "jRenderTargetPool.h"
+#include "jFrameBufferPool.h"
 
 #include "jRHI_OpenGL.h"		// todo it should be removed.
 #include "jCamera.h"
@@ -11,7 +11,7 @@
 
 //////////////////////////////////////////////////////////////////////////
 // jDeferredRenderer
-jDeferredRenderer::jDeferredRenderer(const jRenderTargetInfo& geometryBufferInfo)
+jDeferredRenderer::jDeferredRenderer(const jFrameBufferInfo& geometryBufferInfo)
 {
 	GeometryBufferInfo = geometryBufferInfo;
 }
@@ -22,7 +22,7 @@ jDeferredRenderer::~jDeferredRenderer()
 
 void jDeferredRenderer::Setup()
 {
-	GBuffer.GeometryBuffer = jRenderTargetPool::GetRenderTarget(GeometryBufferInfo);
+	GBuffer.GeometryBuffer = jFrameBufferPool::GetFrameBuffer(GeometryBufferInfo);
 
 	DeferredDeepShadowMapPipelineSet = new jDeferredDeepShadowMapPipelineSet(&GBuffer);
 	DeferredDeepShadowMapPipelineSet->Setup();
@@ -34,9 +34,9 @@ void jDeferredRenderer::Setup()
 	
 	
 	// Render DeepShadow
-	OutRenderTarget = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::RGBA32F, SCR_WIDTH, SCR_HEIGHT, 1 }));
+	OutFrameBuffer = std::shared_ptr<jFrameBuffer>(jFrameBufferPool::GetFrameBuffer({ ETextureType::TEXTURE_2D, ETextureFormat::RGBA32F, SCR_WIDTH, SCR_HEIGHT, 1 }));
 	PostProcessOutput = std::shared_ptr<jPostProcessInOutput>(new jPostProcessInOutput());
-	PostProcessOutput->RenderTarget = OutRenderTarget.get();
+	PostProcessOutput->FrameBuffer = OutFrameBuffer.get();
 	{
 		// this postprocess have to have DeepShadowMap PipelineSet.
 		JASSERT(PipelineSet->GetType() == EPipelineSetType::DeepShadowMap);
@@ -51,9 +51,9 @@ void jDeferredRenderer::Setup()
 
 	// Anti-Aliasing for DeepShadow
 	{
-		PostPrceoss_AA_DeepShadowAddition = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::RGBA32F, SCR_WIDTH, SCR_HEIGHT, 1 }));
+		PostPrceoss_AA_DeepShadowAddition = std::shared_ptr<jFrameBuffer>(jFrameBufferPool::GetFrameBuffer({ ETextureType::TEXTURE_2D, ETextureFormat::RGBA32F, SCR_WIDTH, SCR_HEIGHT, 1 }));
 		PostProcessOutput2 = std::shared_ptr<jPostProcessInOutput>(new jPostProcessInOutput());
-		PostProcessOutput2->RenderTarget = PostPrceoss_AA_DeepShadowAddition.get();
+		PostProcessOutput2->FrameBuffer = PostPrceoss_AA_DeepShadowAddition.get();
 
 		auto postprocess = new jPostProcess_AA_DeepShadowAddition("AA_DeepShadowAddition");
 		postprocess->AddInput(PostProcessOutput);
@@ -63,9 +63,9 @@ void jDeferredRenderer::Setup()
 
 	// Luminance And Adaptive Luminance
 	{
-		LuminanceRenderTarget = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::R32F, LUMINANCE_WIDTH, LUMINANCE_HEIGHT, 1 }));
+		LuminanceFrameBuffer = std::shared_ptr<jFrameBuffer>(jFrameBufferPool::GetFrameBuffer({ ETextureType::TEXTURE_2D, ETextureFormat::R32F, LUMINANCE_WIDTH, LUMINANCE_HEIGHT, 1 }));
 		PostProcessLuminanceOutput = std::shared_ptr<jPostProcessInOutput>(new jPostProcessInOutput());
-		PostProcessLuminanceOutput->RenderTarget = LuminanceRenderTarget.get();
+		PostProcessLuminanceOutput->FrameBuffer = LuminanceFrameBuffer.get();
 
 		auto postprocess = new jPostProcess_LuminanceMapGeneration("LuminanceMapGeneration");
 		postprocess->AddInput(PostProcessOutput2, jSamplerStatePool::GetSamplerState(jName("LinearClamp")));
@@ -82,9 +82,9 @@ void jDeferredRenderer::Setup()
 	}
 
 	// Bloom
-	auto bloomThresdholdRT = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::R11G11B10F, SCR_WIDTH, SCR_HEIGHT, 1/*, ETextureFilter::LINEAR, ETextureFilter::LINEAR*/ }));
+	auto bloomThresdholdRT = std::shared_ptr<jFrameBuffer>(jFrameBufferPool::GetFrameBuffer({ ETextureType::TEXTURE_2D, ETextureFormat::R11G11B10F, SCR_WIDTH, SCR_HEIGHT, 1/*, ETextureFilter::LINEAR, ETextureFilter::LINEAR*/ }));
 	auto bloomThresholdPostProcessOut = std::shared_ptr<jPostProcessInOutput>(new jPostProcessInOutput());
-	bloomThresholdPostProcessOut->RenderTarget = bloomThresdholdRT.get();
+	bloomThresholdPostProcessOut->FrameBuffer = bloomThresdholdRT.get();
 	{
 		auto postprocess = new jPostProcess_BloomThreshold("BloomThreshold");
 		postprocess->AddInput(PostProcessOutput2, jSamplerStatePool::GetSamplerState(jName("LinearClamp")));
@@ -93,9 +93,9 @@ void jDeferredRenderer::Setup()
 		PostProcessChain.AddNewPostprocess(postprocess);
 	}
 
-	auto scale1_RT = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::R11G11B10F, SCR_WIDTH / 2, SCR_HEIGHT / 2, 1/*, ETextureFilter::LINEAR, ETextureFilter::LINEAR*/ }));
+	auto scale1_RT = std::shared_ptr<jFrameBuffer>(jFrameBufferPool::GetFrameBuffer({ ETextureType::TEXTURE_2D, ETextureFormat::R11G11B10F, SCR_WIDTH / 2, SCR_HEIGHT / 2, 1/*, ETextureFilter::LINEAR, ETextureFilter::LINEAR*/ }));
 	auto scale1_PostProcessOut = std::shared_ptr<jPostProcessInOutput>(new jPostProcessInOutput());
-	scale1_PostProcessOut->RenderTarget = scale1_RT.get();
+	scale1_PostProcessOut->FrameBuffer = scale1_RT.get();
 	{
 		auto postprocess = new jPostProcess_Scale("Bloom Downscale");
 		postprocess->AddInput(bloomThresholdPostProcessOut, jSamplerStatePool::GetSamplerState(jName("LinearClamp")));
@@ -103,9 +103,9 @@ void jDeferredRenderer::Setup()
 		PostProcessChain.AddNewPostprocess(postprocess);
 	}
 
-	auto scale2_RT = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::R11G11B10F, SCR_WIDTH / 4, SCR_HEIGHT / 4, 1/*, ETextureFilter::LINEAR, ETextureFilter::LINEAR*/ }));
+	auto scale2_RT = std::shared_ptr<jFrameBuffer>(jFrameBufferPool::GetFrameBuffer({ ETextureType::TEXTURE_2D, ETextureFormat::R11G11B10F, SCR_WIDTH / 4, SCR_HEIGHT / 4, 1/*, ETextureFilter::LINEAR, ETextureFilter::LINEAR*/ }));
 	auto scale2_PostProcessOut = std::shared_ptr<jPostProcessInOutput>(new jPostProcessInOutput());
-	scale2_PostProcessOut->RenderTarget = scale2_RT.get();
+	scale2_PostProcessOut->FrameBuffer = scale2_RT.get();
 	{
 		auto postprocess = new jPostProcess_Scale("Bloom Downscale");
 		postprocess->AddInput(scale1_PostProcessOut, jSamplerStatePool::GetSamplerState(jName("LinearClamp")));
@@ -113,9 +113,9 @@ void jDeferredRenderer::Setup()
 		PostProcessChain.AddNewPostprocess(postprocess);
 	}
 
-	auto scale3_RT = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::R11G11B10F, SCR_WIDTH / 8, SCR_HEIGHT / 8, 1/*, ETextureFilter::LINEAR, ETextureFilter::LINEAR*/ }));
+	auto scale3_RT = std::shared_ptr<jFrameBuffer>(jFrameBufferPool::GetFrameBuffer({ ETextureType::TEXTURE_2D, ETextureFormat::R11G11B10F, SCR_WIDTH / 8, SCR_HEIGHT / 8, 1/*, ETextureFilter::LINEAR, ETextureFilter::LINEAR*/ }));
 	auto scale3_PostProcessOut = std::shared_ptr<jPostProcessInOutput>(new jPostProcessInOutput());
-	scale3_PostProcessOut->RenderTarget = scale3_RT.get();
+	scale3_PostProcessOut->FrameBuffer = scale3_RT.get();
 	{
 		auto postprocess = new jPostProcess_Scale("Bloom Downscale");
 		postprocess->AddInput(scale2_PostProcessOut, jSamplerStatePool::GetSamplerState(jName("LinearClamp")));
@@ -123,9 +123,9 @@ void jDeferredRenderer::Setup()
 		PostProcessChain.AddNewPostprocess(postprocess);
 	}
 
-	auto gaussianBlurRT = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::R11G11B10F, SCR_WIDTH / 8, SCR_HEIGHT / 8, 1 }));
+	auto gaussianBlurRT = std::shared_ptr<jFrameBuffer>(jFrameBufferPool::GetFrameBuffer({ ETextureType::TEXTURE_2D, ETextureFormat::R11G11B10F, SCR_WIDTH / 8, SCR_HEIGHT / 8, 1 }));
 	auto gaussianBlur_PostProcessOut = std::shared_ptr<jPostProcessInOutput>(new jPostProcessInOutput());
-	gaussianBlur_PostProcessOut->RenderTarget = gaussianBlurRT.get();
+	gaussianBlur_PostProcessOut->FrameBuffer = gaussianBlurRT.get();
 	{
 		for (int i = 0; i < 4; ++i)
 		{

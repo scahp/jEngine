@@ -6,7 +6,7 @@
 #include "jPrimitiveUtil.h"
 #include "jShadowAppProperties.h"
 #include "jGBuffer.h"
-#include "jRenderTargetPool.h"
+#include "jFrameBufferPool.h"
 
 //////////////////////////////////////////////////////////////////////////
 // IPostprocess
@@ -18,12 +18,12 @@ bool IPostprocess::Process(const jCamera* camera) const
 {
 	SCOPE_DEBUG_EVENT(g_rhi, Name.c_str());
 
-	auto pCurrentRenderTarget = (PostProcessOutput ? PostProcessOutput.get()->RenderTarget : nullptr);
+	auto pCurrentRenderTarget = (PostProcessOutput ? PostProcessOutput.get()->FrameBuffer : nullptr);
 
 	if (pCurrentRenderTarget)
 		pCurrentRenderTarget->Begin();
 	else
-		g_rhi->SetRenderTarget(nullptr);
+		g_rhi->SetFrameBuffer(nullptr);
 
 	auto result = Do(camera);
 
@@ -76,7 +76,7 @@ void IPostprocess::BindInputs(jFullscreenQuadPrimitive* fsQuad) const
 	for (auto it = PostProcessInputList.begin(); PostProcessInputList.end() != it; ++it,++index)
 	{
 		const auto& input = it->Input;
-		const auto texture = input.expired() ? nullptr : input.lock()->RenderTarget->GetTexture();
+		const auto texture = input.expired() ? nullptr : input.lock()->FrameBuffer->GetTexture();
 		fsQuad->SetTexture(index, texture, it->SamplerState.get());
 	}
 }
@@ -253,12 +253,12 @@ bool jPostProcess_LuminanceMapGeneration::Process(const jCamera* camera) const
 {
 	SCOPE_DEBUG_EVENT(g_rhi, Name.c_str());
 
-	auto pCurrentRenderTarget = (PostProcessOutput ? PostProcessOutput.get()->RenderTarget : nullptr);
+	auto pCurrentRenderTarget = (PostProcessOutput ? PostProcessOutput.get()->FrameBuffer : nullptr);
 
 	if (pCurrentRenderTarget)
 		pCurrentRenderTarget->Begin();
 	else
-		g_rhi->SetRenderTarget(nullptr);
+		g_rhi->SetFrameBuffer(nullptr);
 
 	auto result = Do(camera);
 
@@ -299,10 +299,10 @@ void jPostProcess_AdaptiveLuminance::BindInputs(jFullscreenQuadPrimitive* fsQuad
 	for (auto it = PostProcessInputList.begin(); PostProcessInputList.end() != it; ++it, ++index)
 	{
 		const auto& input = it->Input;
-		const auto texture = input.expired() ? nullptr : input.lock()->RenderTarget->GetTexture();
+		const auto texture = input.expired() ? nullptr : input.lock()->FrameBuffer->GetTexture();
 		fsQuad->SetTexture(index, texture, it->SamplerState.get());
 	}
-	auto pLastLuminanceRenderTarget = LastLumianceRenderTarget[!s_index].get()->GetTexture();
+	auto pLastLuminanceRenderTarget = LastLumianceFrameBuffer[!s_index].get()->GetTexture();
 	fsQuad->SetTexture(index++, pLastLuminanceRenderTarget, nullptr);
 }
 
@@ -317,8 +317,8 @@ void jPostProcess_AdaptiveLuminance::Setup()
 {
 	__super::Setup();
 	Shader = jShader::GetShader("AdaptiveLuminance");
-	LastLumianceRenderTarget[0] = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::R32F, 1, 1, 1/*, ETextureFilter::LINEAR, ETextureFilter::LINEAR_MIPMAP_LINEAR*/ });
-	LastLumianceRenderTarget[1] = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::R32F, 1, 1, 1/*, ETextureFilter::LINEAR, ETextureFilter::LINEAR_MIPMAP_LINEAR*/ });
+	LastLumianceFrameBuffer[0] = jFrameBufferPool::GetFrameBuffer({ ETextureType::TEXTURE_2D, ETextureFormat::R32F, 1, 1, 1/*, ETextureFilter::LINEAR, ETextureFilter::LINEAR_MIPMAP_LINEAR*/ });
+	LastLumianceFrameBuffer[1] = jFrameBufferPool::GetFrameBuffer({ ETextureType::TEXTURE_2D, ETextureFormat::R32F, 1, 1, 1/*, ETextureFilter::LINEAR, ETextureFilter::LINEAR_MIPMAP_LINEAR*/ });
 }
 
 bool jPostProcess_AdaptiveLuminance::Do(const jCamera* camera) const
@@ -345,12 +345,12 @@ bool jPostProcess_AdaptiveLuminance::Process(const jCamera* camera) const
 	SCOPE_DEBUG_EVENT(g_rhi, Name.c_str());
 	UpdateLuminanceIndex();
 
-	auto pCurrentRenderTarget = (LastLumianceRenderTarget[s_index] ? LastLumianceRenderTarget[s_index] : nullptr);
+	auto pCurrentRenderTarget = (LastLumianceFrameBuffer[s_index] ? LastLumianceFrameBuffer[s_index] : nullptr);
 
 	if (pCurrentRenderTarget)
 		pCurrentRenderTarget->Begin();
 	else
-		g_rhi->SetRenderTarget(nullptr);
+		g_rhi->SetFrameBuffer(nullptr);
 
 	auto result = Do(camera);
 
@@ -359,7 +359,7 @@ bool jPostProcess_AdaptiveLuminance::Process(const jCamera* camera) const
 
 	JASSERT(PostProcessOutput);
 	if (PostProcessOutput)
-		PostProcessOutput.get()->RenderTarget = pCurrentRenderTarget.get();
+		PostProcessOutput.get()->FrameBuffer = pCurrentRenderTarget.get();
 
 	return result;
 
@@ -444,7 +444,7 @@ bool jPostProcess_GaussianBlurH::Do(const jCamera* camera) const
 	SET_UNIFORM_BUFFER_STATIC("BloomBlurSigma", jShadowAppSettingProperties::GetInstance().BloomBlurSigma, Shader);
 	
 	Vector2 renderTargetSize;
-	auto pCurrentRenderTarget = (PostProcessOutput ? PostProcessOutput.get()->RenderTarget : nullptr);
+	auto pCurrentRenderTarget = (PostProcessOutput ? PostProcessOutput.get()->FrameBuffer : nullptr);
 	if (pCurrentRenderTarget)
 		renderTargetSize = Vector2(static_cast<float>(pCurrentRenderTarget->Info.Width), static_cast<float>(pCurrentRenderTarget->Info.Height));
 	else
@@ -463,7 +463,7 @@ void jPostProcess_GaussianBlurH::BindInputs(jFullscreenQuadPrimitive* fsQuad) co
 	for (auto it = PostProcessInputList.begin(); PostProcessInputList.end() != it; ++it, ++index)
 	{
 		const auto& input = it->Input;
-		auto texture = input.expired() ? nullptr : input.lock()->RenderTarget->GetTexture();
+		auto texture = input.expired() ? nullptr : input.lock()->FrameBuffer->GetTexture();
 		if (texture)
 		{
 			//texture->Magnification = ETextureFilter::NEAREST;
@@ -481,7 +481,7 @@ void jPostProcess_GaussianBlurH::UnbindInputs(jFullscreenQuadPrimitive* fsQuad) 
 		const auto& input = it->Input;
 		if (!input.expired())
 		{
-			auto rt = input.lock()->RenderTarget;
+			auto rt = input.lock()->FrameBuffer;
 			auto texture = rt->GetTexture();
 			//texture->Magnification = rt->Info.Magnification;
 			//texture->Minification = rt->Info.Minification;
@@ -513,7 +513,7 @@ bool jPostProcess_GaussianBlurV::Do(const jCamera* camera) const
 	SET_UNIFORM_BUFFER_STATIC("BloomBlurSigma", jShadowAppSettingProperties::GetInstance().BloomBlurSigma, Shader);
 
 	Vector2 renderTargetSize;
-	auto pCurrentRenderTarget = (PostProcessOutput ? PostProcessOutput.get()->RenderTarget : nullptr);
+	auto pCurrentRenderTarget = (PostProcessOutput ? PostProcessOutput.get()->FrameBuffer : nullptr);
 	if (pCurrentRenderTarget)
 		renderTargetSize = Vector2(static_cast<float>(pCurrentRenderTarget->Info.Width), static_cast<float>(pCurrentRenderTarget->Info.Height));
 	else
@@ -531,7 +531,7 @@ void jPostProcess_GaussianBlurV::BindInputs(jFullscreenQuadPrimitive* fsQuad) co
 	for (auto it = PostProcessInputList.begin(); PostProcessInputList.end() != it; ++it, ++index)
 	{
 		const auto& input = it->Input;
-		auto texture = input.expired() ? nullptr : input.lock()->RenderTarget->GetTexture();
+		auto texture = input.expired() ? nullptr : input.lock()->FrameBuffer->GetTexture();
 		if (texture)
 		{
 			//texture->Magnification = ETextureFilter::NEAREST;
@@ -549,7 +549,7 @@ void jPostProcess_GaussianBlurV::UnbindInputs(jFullscreenQuadPrimitive* fsQuad) 
 		const auto& input = it->Input;
 		if (!input.expired())
 		{
-			auto rt = input.lock()->RenderTarget;
+			auto rt = input.lock()->FrameBuffer;
 			auto texture = rt->GetTexture();
 			//texture->Magnification = rt->Info.Magnification;
 			//texture->Minification = rt->Info.Minification;

@@ -193,31 +193,6 @@ private:
 	VkFramebuffer FrameBuffer = nullptr;
 };
 
-//class jFrameBuffer_Vulkan : public jFrameBuffer
-//{
-//public:
-//	jFrameBuffer_Vulkan() = default;
-//	jFrameBuffer_Vulkan(const jRenderPass* renderPass)
-//		: RenderPass(renderPass)
-//    {}
-//
-//    void SetRenderPass(const jRenderPass* renderPass)
-//    {
-//		RenderPass = renderPass;
-//    }
-//
-//	void* GetFrameBuffer() const { return FrameBuffer; }
-//	const jRenderPass* GetRenderPass() const { return RenderPass; }
-//
-//	bool CreateFrameBuffer(int32 index);
-//	void Release();
-//
-//private:
-//	int32 Index = -1;
-//    VkFramebuffer FrameBuffer;
-//	const jRenderPass* RenderPass = nullptr;
-//};
-
 struct TBindings
 {
 	TBindings() = default;
@@ -306,13 +281,19 @@ struct jShaderBindings
 
 struct jTexture_Vulkan : public jTexture
 {
+	jTexture_Vulkan() = default;
+	jTexture_Vulkan(ETextureType InType, ETextureFormat InFormat, int32 InWidth, int32 InHeight, bool InSRGB, int32 InLayerCount, int32 InSampleCount
+		, VkImage InImage, VkImageView InImageView, VkDeviceMemory InImageMemory = nullptr, VkSampler InSamplerState = nullptr)
+		: jTexture(InType, InFormat, InWidth, InHeight, InLayerCount, InSampleCount, InSRGB), Image(InImage)
+		, ImageView(InImageView), ImageMemory(InImageMemory), SamplerState(InSamplerState)
+	{}
     VkImage Image = nullptr;
     VkImageView ImageView = nullptr;
     VkDeviceMemory ImageMemory = nullptr;
 	VkSampler SamplerState = nullptr;
 
 	virtual void* GetHandle() const override { return ImageView; }
-	virtual void* GetSamplerStateHandle() const override { return ImageView; }
+	virtual void* GetSamplerStateHandle() const override { return SamplerState; }
 
 	static VkSampler CreateDefaultSamplerState();
 };
@@ -1578,7 +1559,6 @@ public:
 	FORCEINLINE const VkDevice& GetDevice() const { return device; }
 
 	std::vector<jRenderPass_Vulkan*> RenderPasses;
-	//std::vector<jFrameBuffer_Vulkan> FrameBufferTest;
 	jShaderBindings ShaderBindings;
 	std::vector<jShadingBindingInstance> ShaderBindingInstances;
 	std::vector<IEmptyUniform*> UniformBuffers;
@@ -1602,7 +1582,8 @@ public:
 		, ETextureFormat textureFormat = ETextureFormat::RGBA8, bool createMipmap = false) const override;
 	virtual jShader* CreateShader(const jShaderInfo& shaderInfo) const;
 	virtual bool CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo) const;
-	virtual jRenderTarget* CreateRenderTarget(const jRenderTargetInfo& info) const override;
+	virtual jFrameBuffer* CreateFrameBuffer(const jFrameBufferInfo& info) const override;
+	virtual std::shared_ptr<jRenderTarget> CreateRenderTarget(const jRenderTargetInfo& info) const override;
 
 	virtual jSamplerStateInfo* CreateSamplerState(const jSamplerStateInfo& initializer) const override;
 	virtual jRasterizationStateInfo* CreateRasterizationState(const jRasterizationStateInfo& initializer) const override;

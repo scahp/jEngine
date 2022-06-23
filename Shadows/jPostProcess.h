@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-struct jRenderTarget;
+struct jFrameBuffer;
 struct jShader;
 class jCamera;
 class jObject;
@@ -11,7 +11,7 @@ class jGBuffer;
 
 struct jPostProcessInOutput : public std::enable_shared_from_this<jPostProcessInOutput>
 {
-	jRenderTarget* RenderTarget = nullptr;
+	jFrameBuffer* FrameBuffer = nullptr;
 
 };
 
@@ -184,7 +184,7 @@ public:
 
 private:
 	const jShader* Shader = nullptr;
-	std::shared_ptr<jRenderTarget> LastLumianceRenderTarget[2];
+	std::shared_ptr<jFrameBuffer> LastLumianceFrameBuffer[2];
 };
 
 //////////////////////////////////////////////////////////////////////////

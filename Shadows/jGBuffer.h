@@ -1,6 +1,6 @@
 #pragma once
 
-struct jRenderTarget;
+struct jFrameBuffer;
 struct jShader;
 
 class jGBuffer
@@ -13,5 +13,5 @@ public:
 	void BindGeometryBuffer(const jShader* shader) const;
 	void BindGeometryBuffer(const jShader* shader, const jTexture* resolvedColor) const;
 
-	std::shared_ptr<jRenderTarget> GeometryBuffer;
+	std::shared_ptr<jFrameBuffer> GeometryBuffer;
 };

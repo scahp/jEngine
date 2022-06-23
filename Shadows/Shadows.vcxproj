@@ -217,6 +217,7 @@ xcopy /s /y /d  "$(ProjectDir)External\assimp\lib\*.dll" "$(OutDir)"</Command>
     <ClInclude Include="jPrimitiveUtil.h" />
     <ClInclude Include="jRenderer.h" />
     <ClInclude Include="jRenderObject.h" />
+    <ClInclude Include="jFrameBufferPool.h" />
     <ClInclude Include="jRenderTargetPool.h" />
     <ClInclude Include="jRHI.h" />
     <ClInclude Include="jRHIType.h" />
@@ -283,6 +284,7 @@ xcopy /s /y /d  "$(ProjectDir)External\assimp\lib\*.dll" "$(OutDir)"</Command>
     <ClCompile Include="jPrimitiveUtil.cpp" />
     <ClCompile Include="jRenderer.cpp" />
     <ClCompile Include="jRenderObject.cpp" />
+    <ClCompile Include="jFrameBufferPool.cpp" />
     <ClCompile Include="jRenderTargetPool.cpp" />
     <ClCompile Include="jRHI.cpp" />
     <ClCompile Include="jRHI_DirectX11.cpp" />

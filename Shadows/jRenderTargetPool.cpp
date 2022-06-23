@@ -7,29 +7,8 @@ std::map<jRenderTarget*, size_t> jRenderTargetPool::RenderTargetHashVariableMap;
 
 struct jTexture* jRenderTargetPool::GetNullTexture(ETextureType type)
 {
-	switch (type)
-	{
-	case ETextureType::TEXTURE_2D:
-	{
-		static auto temp = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::RGBA8, 2, 2, 1 });
-		return temp->GetTexture();
-	}
-	case ETextureType::TEXTURE_2D_ARRAY:
-	{
-		static auto temp = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D_ARRAY, ETextureFormat::RGBA8, 2, 2, 1 });
-		return temp->GetTexture();
-	}
-	case ETextureType::TEXTURE_CUBE:
-	{
-		static auto temp = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_CUBE, ETextureFormat::RGBA8, 2, 2, 1 });
-		return temp->GetTexture();
-	}
-	default:
-		JASSERT(0);
-		break;
-	}
-
-	return nullptr;
+	static std::shared_ptr<jRenderTarget> RTPtr = jRenderTargetPool::GetRenderTarget({ type, ETextureFormat::RGBA8, 2, 2, 1 });
+	return RTPtr->GetTexture();
 }
 
 jRenderTargetPool::jRenderTargetPool()
@@ -59,7 +38,7 @@ std::shared_ptr<jRenderTarget> jRenderTargetPool::GetRenderTarget(const jRenderT
 		}
 	}
 
-	auto renderTargetPtr = std::shared_ptr<jRenderTarget>(g_rhi->CreateRenderTarget(info));
+	auto renderTargetPtr = g_rhi->CreateRenderTarget(info);
 	if (renderTargetPtr)
 	{
 		RenderTargetResourceMap[hash].push_back({ true, renderTargetPtr });

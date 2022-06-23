@@ -9,7 +9,7 @@ class jCamera;
 class jDeferredRenderer : public jRenderer
 {
 public:
-	jDeferredRenderer(const jRenderTargetInfo& geometryBufferInfo);
+	jDeferredRenderer(const jFrameBufferInfo& geometryBufferInfo);
 	virtual ~jDeferredRenderer();
 
 	typedef void (*RenderPassFunc)(jCamera*);
@@ -28,11 +28,11 @@ public:
 
 private:
 	jGBuffer GBuffer;
-	jRenderTargetInfo GeometryBufferInfo;
+	jFrameBufferInfo GeometryBufferInfo;
 	jPipelineSet* DeferredDeepShadowMapPipelineSet = nullptr;
-	std::shared_ptr<jRenderTarget> LuminanceRenderTarget;
-	std::shared_ptr<jRenderTarget> OutRenderTarget;
-	std::shared_ptr<jRenderTarget> PostPrceoss_AA_DeepShadowAddition;
+	std::shared_ptr<jFrameBuffer> LuminanceFrameBuffer;
+	std::shared_ptr<jFrameBuffer> OutFrameBuffer;
+	std::shared_ptr<jFrameBuffer> PostPrceoss_AA_DeepShadowAddition;
 	std::shared_ptr<jPostProcessInOutput> PostProcessOutput;
 	std::shared_ptr<jPostProcessInOutput> PostProcessOutput2;
 	std::shared_ptr<jPostProcessInOutput> PostProcessLuminanceOutput;	

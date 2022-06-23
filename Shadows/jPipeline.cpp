@@ -4,7 +4,7 @@
 #include "jLight.h"
 #include "jCamera.h"
 #include "jGBuffer.h"
-#include "jRenderTargetPool.h"
+#include "jFrameBufferPool.h"
 #include "jPostProcess.h"
 #include "jRenderObject.h"
 #include "jShadowVolume.h"
@@ -168,9 +168,9 @@ void jDeepShadowMap_ShadowPass_Pipeline::Draw(const jPipelineContext& pipelineCo
 	for (auto light : pipelineContext.Lights)
 	{
 		JASSERT(light);
-		JASSERT(light->GetShadowMapRenderTarget());
+		JASSERT(light->GetShadowMapFrameBuffer());
 		JASSERT(light->GetLightCamra());
-		const auto renderTarget = light->GetShadowMapRenderTarget();
+		const auto renderTarget = light->GetShadowMapFrameBuffer();
 		const auto lightCamera = light->GetLightCamra();
 
 		if (renderTarget->Begin())
@@ -179,7 +179,7 @@ void jDeepShadowMap_ShadowPass_Pipeline::Draw(const jPipelineContext& pipelineCo
 			{
 				g_rhi->SetShader(currentShader);
 
-				__super::Draw(jPipelineContext(pipelineContext.DefaultRenderTarget, pipelineContext.Objects, lightCamera, { light }), currentShader);
+				__super::Draw(jPipelineContext(pipelineContext.DefaultFrameBuffer, pipelineContext.Objects, lightCamera, { light }), currentShader);
 			}
 			renderTarget->End();
 		}
@@ -205,7 +205,7 @@ void jForward_ShadowMapGen_Pipeline::Do(const jPipelineContext& pipelineContext)
 	SCOPE_DEBUG_EVENT(g_rhi, Name.c_str());
 
 	//light->Update(0); // todo remove
-	g_rhi->SetRenderTarget(pipelineContext.DefaultRenderTarget);
+	g_rhi->SetFrameBuffer(pipelineContext.DefaultFrameBuffer);
 
 	for (auto light : pipelineContext.Lights)
 	{
@@ -234,19 +234,19 @@ void jForward_ShadowMapGen_Pipeline::Do(const jPipelineContext& pipelineContext)
 		if (skip)
 			continue;
 
-		light->RenderToShadowMap([&pipelineContext, currentShader, light, this](const jRenderTarget* renderTarget
+		light->RenderToShadowMap([&pipelineContext, currentShader, light, this](const jFrameBuffer* renderTarget
 			, int32 renderTargetIndex, const jCamera* camera, const std::vector<jViewport>& viewports)
 		{
-			g_rhi->SetRenderTarget(renderTarget, renderTargetIndex);
+			g_rhi->SetFrameBuffer(renderTarget, renderTargetIndex);
 			if (viewports.empty())
 				g_rhi->SetViewport({ 0, 0, renderTarget->Info.Width, renderTarget->Info.Height });
 			else
 				g_rhi->SetViewportIndexedArray(0, static_cast<int32>(viewports.size()), &viewports[0]);
-			this->jRenderPipeline::Draw(jPipelineContext(pipelineContext.DefaultRenderTarget, pipelineContext.Objects, camera, { light }), currentShader);
+			this->jRenderPipeline::Draw(jPipelineContext(pipelineContext.DefaultFrameBuffer, pipelineContext.Objects, camera, { light }), currentShader);
 		}, currentShader);
 	}
 
-	g_rhi->SetRenderTarget(pipelineContext.DefaultRenderTarget);
+	g_rhi->SetFrameBuffer(pipelineContext.DefaultFrameBuffer);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -285,7 +285,7 @@ void jForward_ShadowMapGen_CSM_SSM_Pipeline::Do(const jPipelineContext& pipeline
 		return nullptr;
 	}();
 
-	g_rhi->SetRenderTarget(pipelineContext.DefaultRenderTarget);
+	g_rhi->SetFrameBuffer(pipelineContext.DefaultFrameBuffer);
 
 	for (auto light : pipelineContext.Lights)
 	{
@@ -302,17 +302,17 @@ void jForward_ShadowMapGen_CSM_SSM_Pipeline::Do(const jPipelineContext& pipeline
 		{
 			currentShader = OmniShadowGenShader;
 
-			light->RenderToShadowMap([&pipelineContext, currentShader, light, this](const jRenderTarget* renderTarget
+			light->RenderToShadowMap([&pipelineContext, currentShader, light, this](const jFrameBuffer* renderTarget
 				, int32 renderTargetIndex, const jCamera* camera, const std::vector<jViewport>& viewports)
 				{
-					g_rhi->SetRenderTarget(renderTarget, renderTargetIndex);
+					g_rhi->SetFrameBuffer(renderTarget, renderTargetIndex);
 					if (viewports.empty())
 						g_rhi->SetViewport({ 0, 0, renderTarget->Info.Width, renderTarget->Info.Height });
 					else
 						g_rhi->SetViewportIndexedArray(0, static_cast<int32>(viewports.size()), &viewports[0]);
-					this->Draw(jPipelineContext(pipelineContext.DefaultRenderTarget, pipelineContext.Objects, camera, { light }), currentShader);
+					this->Draw(jPipelineContext(pipelineContext.DefaultFrameBuffer, pipelineContext.Objects, camera, { light }), currentShader);
 				}, currentShader);
-			g_rhi->SetRenderTarget(pipelineContext.DefaultRenderTarget);
+			g_rhi->SetFrameBuffer(pipelineContext.DefaultFrameBuffer);
 			skip = true;
 		}
 		break;
@@ -414,18 +414,18 @@ void jForward_ShadowMapGen_CSM_SSM_Pipeline::Do(const jPipelineContext& pipeline
 
 		g_rhi->EnableDepthClip(false);
 
-		directionalLight->RenderToShadowMap([&pipelineContext, light, currentShader, this](const jRenderTarget* renderTarget
+		directionalLight->RenderToShadowMap([&pipelineContext, light, currentShader, this](const jFrameBuffer* renderTarget
 			, int32 renderTargetIndex, const jCamera* camera, const std::vector<jViewport>& viewports)
 			{
-				g_rhi->SetRenderTarget(renderTarget, renderTargetIndex);
+				g_rhi->SetFrameBuffer(renderTarget, renderTargetIndex);
 				if (viewports.empty())
 					g_rhi->SetViewport({ 0, 0, renderTarget->Info.Width, renderTarget->Info.Height });
 				else
 					g_rhi->SetViewportIndexedArray(0, static_cast<int32>(viewports.size()), &viewports[0]);
-				this->Draw(jPipelineContext(pipelineContext.DefaultRenderTarget, pipelineContext.Objects, camera, { light }), currentShader);
+				this->Draw(jPipelineContext(pipelineContext.DefaultFrameBuffer, pipelineContext.Objects, camera, { light }), currentShader);
 			}, currentShader);
 		g_rhi->EnableDepthClip(true);
-		g_rhi->SetRenderTarget(pipelineContext.DefaultRenderTarget);
+		g_rhi->SetFrameBuffer(pipelineContext.DefaultFrameBuffer);
 	}
 }
 
@@ -472,18 +472,18 @@ void jForwardShadowMap_Blur_Pipeline::Draw(const jPipelineContext& pipelineConte
 		if (skip)
 			continue;
 
-		JASSERT(light->GetShadowMapRenderTarget());
-		auto tempRenderTargetPtr = jRenderTargetPool::GetRenderTarget(light->GetShadowMapRenderTarget()->Info);
+		JASSERT(light->GetShadowMapFrameBuffer());
+		auto tempRenderTargetPtr = jFrameBufferPool::GetFrameBuffer(light->GetShadowMapFrameBuffer()->Info);
 
 		PostProcessBlur->OmniDirectional = isOmniDirectional;
 
 		PostProcessBlur->IsVertical = true;
 		PostProcessBlur->ClearInOutputs();
 
-		PostProcessInput->RenderTarget = light->GetShadowMapRenderTarget();
+		PostProcessInput->FrameBuffer = light->GetShadowMapFrameBuffer();
 		PostProcessBlur->AddInput(PostProcessInput);
 
-		PostProcessOutput->RenderTarget = tempRenderTargetPtr.get();
+		PostProcessOutput->FrameBuffer = tempRenderTargetPtr.get();
 		PostProcessBlur->SetOutput(PostProcessOutput);
 
 		PostProcessBlur->Process(pipelineContext.Camera);
@@ -491,15 +491,15 @@ void jForwardShadowMap_Blur_Pipeline::Draw(const jPipelineContext& pipelineConte
 		PostProcessBlur->IsVertical = false;
 		PostProcessBlur->ClearInOutputs();
 	
-		PostProcessInput->RenderTarget = tempRenderTargetPtr.get();
+		PostProcessInput->FrameBuffer = tempRenderTargetPtr.get();
 		PostProcessBlur->AddInput(PostProcessInput);
 		
-		PostProcessOutput->RenderTarget = light->GetShadowMapRenderTargetPtr().get();
+		PostProcessOutput->FrameBuffer = light->GetShadowMapFrameBufferPtr().get();
 		PostProcessBlur->SetOutput(PostProcessOutput);
 
 		PostProcessBlur->Process(pipelineContext.Camera);
 
-		jRenderTargetPool::ReturnRenderTarget(tempRenderTargetPtr.get());
+		jFrameBufferPool::ReturnFrameBuffer(tempRenderTargetPtr.get());
 	}
 }
 
@@ -520,7 +520,7 @@ void jForward_Shadow_Pipeline::Setup()
 
 void jForward_Shadow_Pipeline::Do(const jPipelineContext& pipelineContext) const
 {
-	g_rhi->SetRenderTarget(pipelineContext.DefaultRenderTarget);
+	g_rhi->SetFrameBuffer(pipelineContext.DefaultFrameBuffer);
 	__super::Do(pipelineContext);
 }
 
@@ -709,7 +709,7 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineContext& pipelineContext)
 {
 	SCOPE_DEBUG_EVENT(g_rhi, Name.c_str());
 
-	g_rhi->SetRenderTarget(pipelineContext.DefaultRenderTarget);
+	g_rhi->SetFrameBuffer(pipelineContext.DefaultFrameBuffer);
 
 	auto camera = pipelineContext.Camera;
 
@@ -819,7 +819,7 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineContext& pipelineContext)
 					continue;
 
 				shadowVolume->Update(lightPosOrDirection, isOmniDirectional, iter);
-				shadowVolume->Draw(jPipelineContext(pipelineContext.DefaultRenderTarget, pipelineContext.Objects, pipelineContext.Camera, { light }), shadowVolumeShader);
+				shadowVolume->Draw(jPipelineContext(pipelineContext.DefaultFrameBuffer, pipelineContext.Objects, pipelineContext.Camera, { light }), shadowVolumeShader);
 			}
 
 			// todo
@@ -910,7 +910,7 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineContext& pipelineContext)
 					continue;
 
 				shadowVolume->Update(lightPosOrDirection, isOmniDirectional, iter);
-				shadowVolume->Draw(jPipelineContext(pipelineContext.DefaultRenderTarget, pipelineContext.Objects, pipelineContext.Camera, { light }), shadowVolumeShader);
+				shadowVolume->Draw(jPipelineContext(pipelineContext.DefaultFrameBuffer, pipelineContext.Objects, pipelineContext.Camera, { light }), shadowVolumeShader);
 			}
 		}
 

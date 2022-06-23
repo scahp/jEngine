@@ -47,11 +47,11 @@ struct jPipelineContext
 	jPipelineContext()
 		: Objects(emptyObjectList)// , Lights(emptyLightList)
 	{ }
-	jPipelineContext(const jRenderTarget* defaultRenderTarget, const std::list<jObject*>& objects, const jCamera* camera, const std::list<const jLight*>& lights)
-		: DefaultRenderTarget(defaultRenderTarget), Objects(objects), Camera(camera), Lights(lights)
+	jPipelineContext(const jFrameBuffer* defaultRenderTarget, const std::list<jObject*>& objects, const jCamera* camera, const std::list<const jLight*>& lights)
+		: DefaultFrameBuffer(defaultRenderTarget), Objects(objects), Camera(camera), Lights(lights)
 	{ }
 
-	const jRenderTarget* DefaultRenderTarget = nullptr;
+	const jFrameBuffer* DefaultFrameBuffer = nullptr;
 	const std::list<jObject*>& Objects;
 	const jCamera* Camera = nullptr;
 	const std::list<const jLight*> Lights;

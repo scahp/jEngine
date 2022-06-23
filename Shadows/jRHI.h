@@ -34,6 +34,12 @@ struct jIndexBuffer : public IBuffer
 
 struct jTexture
 {
+	constexpr jTexture() = default;
+	constexpr jTexture(ETextureType InType, ETextureFormat InFormat, int32 InWidth, int32 InHeight
+		, int32 InLayerCount = 1, int32 InSampleCount = 1, bool InSRGB = false)
+		: Type(InType), Format(InFormat), Width(InWidth), Height(InHeight), LayerCount(InLayerCount)
+		, SampleCount(InSampleCount), sRGB(InSRGB)
+	{}
 	virtual ~jTexture() {}
 	static int32 GetMipLevels(int32 InWidth, int32 InHeight)
 	{
@@ -43,12 +49,15 @@ struct jTexture
 	virtual void* GetHandle() const { return nullptr; }
 	virtual void* GetSamplerStateHandle() const { return nullptr; }
 
-	bool sRGB = false;
 	ETextureType Type = ETextureType::MAX;
 	ETextureFormat Format = ETextureFormat::RGB8;
+	int32 LayerCount = 1;
+	int32 SampleCount = 1;
 
 	int32 Width = 0;
 	int32 Height = 0;
+
+	bool sRGB = false;
 };
 
 struct jViewport
@@ -287,13 +296,13 @@ public:
 };
 
 //////////////////////////////////////////////////////////////////////////
-struct jRenderTargetInfo
+struct jFrameBufferInfo
 {
-	jRenderTargetInfo() = default;
-	jRenderTargetInfo(ETextureType textureType, ETextureFormat format, int32 width, int32 height, int32 layerCount = 1
-		, bool isGenerateMipmap = false, bool isGenerateMipmapDepth = false, int32 sampleCount = 1)
+	jFrameBufferInfo() = default;
+	jFrameBufferInfo(ETextureType textureType, ETextureFormat format, int32 width, int32 height, int32 layerCount = 1
+		, bool isGenerateMipmap = false, int32 sampleCount = 1)
 		: TextureType(textureType), Format(format), Width(width), Height(height), LayerCount(layerCount)
-		, IsGenerateMipmap(isGenerateMipmap), IsGenerateMipmapDepth(isGenerateMipmapDepth), SampleCount(sampleCount)
+		, IsGenerateMipmap(isGenerateMipmap), SampleCount(sampleCount)
 	{}
 
 	size_t GetHash() const
@@ -305,7 +314,6 @@ struct jRenderTargetInfo
 		hash_combine(result, Height);
 		hash_combine(result, LayerCount);
 		hash_combine(result, IsGenerateMipmap);
-		hash_combine(result, IsGenerateMipmapDepth);
 		hash_combine(result, SampleCount);
 		return result;
 	}
@@ -316,13 +324,12 @@ struct jRenderTargetInfo
 	int32 Height = 0;
 	int32 LayerCount = 1;
 	bool IsGenerateMipmap = false;
-	bool IsGenerateMipmapDepth = false;
 	int32 SampleCount = 1;
 };
 
-struct jRenderTarget : public std::enable_shared_from_this<jRenderTarget>
+struct jFrameBuffer : public std::enable_shared_from_this<jFrameBuffer>
 {
-	virtual ~jRenderTarget() {}
+	virtual ~jFrameBuffer() {}
 
 	virtual jTexture* GetTexture(int32 index = 0) const { return Textures[index].get(); }
 	virtual jTexture* GetTextureDepth(int32 index = 0) const { return TextureDepth.get(); }
@@ -333,9 +340,66 @@ struct jRenderTarget : public std::enable_shared_from_this<jRenderTarget>
 	virtual bool Begin(int index = 0, bool mrt = false) const { return true; };
 	virtual void End() const {}
 
-	jRenderTargetInfo Info;
+	jFrameBufferInfo Info;
 	std::vector<std::shared_ptr<jTexture> > Textures;
 	std::shared_ptr<jTexture> TextureDepth;
+};
+
+struct jRenderTargetInfo
+{
+	constexpr jRenderTargetInfo() = default;
+	constexpr jRenderTargetInfo(ETextureType textureType, ETextureFormat format, int32 width, int32 height, int32 layerCount = 1
+		, bool isGenerateMipmap = false, int32 sampleCount = 1)
+		: Type(textureType), Format(format), Width(width), Height(height), LayerCount(layerCount)
+		, IsGenerateMipmap(isGenerateMipmap), SampleCount(sampleCount)
+	{}
+
+	size_t GetHash() const
+	{
+		size_t result = 0;
+		hash_combine(result, Type);
+		hash_combine(result, Format);
+		hash_combine(result, Width);
+		hash_combine(result, Height);
+		hash_combine(result, LayerCount);
+		hash_combine(result, IsGenerateMipmap);
+		hash_combine(result, SampleCount);
+		return result;
+	}
+
+	ETextureType Type = ETextureType::TEXTURE_2D;
+	ETextureFormat Format = ETextureFormat::RGB8;
+	int32 Width = 0;
+	int32 Height = 0;
+	int32 LayerCount = 1;
+	bool IsGenerateMipmap = false;
+	int32 SampleCount = 1;
+};
+
+struct jRenderTarget : public std::enable_shared_from_this<jRenderTarget>
+{
+	constexpr jRenderTarget() = default;
+	jRenderTarget(const std::shared_ptr<jTexture>& InTexturePtr)
+		: TexturePtr(InTexturePtr)
+	{
+		jTexture* texture = TexturePtr.get();
+		if (texture)
+		{
+			Info.Type = texture->Type;
+			Info.Format = texture->Format;
+			Info.Width = texture->Width;
+			Info.Height = texture->Height;
+			Info.LayerCount = texture->LayerCount;
+			Info.SampleCount = texture->SampleCount;
+		}
+	}
+	virtual ~jRenderTarget() {}
+
+	virtual jTexture* GetTexture() const { return TexturePtr.get(); }
+	virtual void* GetTexureHandle() const { return TexturePtr.get() ? TexturePtr->GetHandle() : nullptr; }
+
+	jRenderTargetInfo Info;
+	std::shared_ptr<jTexture> TexturePtr;
 };
 
 struct jQueryTime
@@ -481,14 +545,6 @@ public:
 	Vector2i RenderExtent;
 };
 
-//class jFrameBuffer
-//{
-//public:
-//	virtual ~jFrameBuffer() {}
-//
-//	void* GetFrameBuffer(int32 index) { return nullptr; }
-//};
-
 class jRHI
 {
 public:
@@ -506,7 +562,7 @@ public:
 	virtual void SetClearColor(Vector4 rgba) const {}
 	virtual void SetClearBuffer(ERenderBufferType typeBit, const float* value, int32 bufferIndex) const {}
 	virtual void SetClearBuffer(ERenderBufferType typeBit, const int32* value, int32 bufferIndex) const {}
-	virtual void SetRenderTarget(const jRenderTarget* rt, int32 index = 0, bool mrt = false) const {}
+	virtual void SetFrameBuffer(const jFrameBuffer* rt, int32 index = 0, bool mrt = false) const {}
 	virtual void SetDrawBuffers(const std::initializer_list<EDrawBufferType>& list) const {}
 	virtual jVertexBuffer* CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const { return nullptr; }
 	virtual jIndexBuffer* CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const { return nullptr; }
@@ -566,7 +622,8 @@ public:
 	virtual void EnableCullFace(bool enable) const {}
 	virtual void SetFrontFace(EFrontFace frontFace) const {}
 	virtual void EnableCullMode(ECullMode cullMode) const {}
-	virtual jRenderTarget* CreateRenderTarget(const jRenderTargetInfo& info) const { return nullptr; }
+	virtual jFrameBuffer* CreateFrameBuffer(const jFrameBufferInfo& info) const { return nullptr; }
+	virtual std::shared_ptr<jRenderTarget> CreateRenderTarget(const jRenderTargetInfo& info) const { return nullptr; }
 	virtual void EnableDepthTest(bool enable) const {}
 	virtual void EnableBlend(bool enable) const {}
 	virtual void SetBlendFunc(EBlendFactor src, EBlendFactor dest) const {}

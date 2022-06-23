@@ -14,7 +14,7 @@
 #include "jMeshObject.h"
 #include "jModelLoader.h"
 #include "jFile.h"
-#include "jRenderTargetPool.h"
+#include "jFrameBufferPool.h"
 #include "glad\glad.h"
 #include "jDeferredRenderer.h"
 #include "jForwardRenderer.h"
@@ -265,11 +265,11 @@ void jGame::UpdateAppSetting()
 			((jDirectionalLightPrimitive*)(DirectionalLightInfo))->Light = DirectionalLight;
 
 		// Update debugging shadow map of directional light
-		const auto shaderMapRenderTarget = DirectionalLight->ShadowMapData->ShadowMapRenderTarget;
+		const auto shaderMapRenderTarget = DirectionalLight->ShadowMapData->ShadowMapFrameBuffer;
 		const float aspect = static_cast<float>(shaderMapRenderTarget->Info.Height) / shaderMapRenderTarget->Info.Width;
 		if (DirectionalLightShadowMapUIDebug)
 		{
-			DirectionalLightShadowMapUIDebug->SetTexture(DirectionalLight->ShadowMapData->ShadowMapRenderTarget->GetTexture());
+			DirectionalLightShadowMapUIDebug->SetTexture(DirectionalLight->ShadowMapData->ShadowMapFrameBuffer->GetTexture());
 			DirectionalLightShadowMapUIDebug->Size.y = DirectionalLightShadowMapUIDebug->Size.x * aspect;
 		}
 	}

@@ -27,10 +27,10 @@ public:
 
 	virtual void UpdateSettings() {}
 
-	std::shared_ptr<jRenderTarget> RenderTarget;
-	std::shared_ptr<jRenderTarget> RenderTarget2;
-	std::shared_ptr<jRenderTarget> LuminanceRenderTarget;
-	std::shared_ptr<jRenderTarget> AvgLuminanceRenderTarget;
+	std::shared_ptr<jFrameBuffer> FrameBuffer;
+	std::shared_ptr<jFrameBuffer> FrameBuffer2;
+	std::shared_ptr<jFrameBuffer> LuminanceFrameBuffer;
+	std::shared_ptr<jFrameBuffer> AvgLuminanceFrameBuffer;
 	std::shared_ptr<jPostProcessInOutput> PostProcessInput;
 };
 
