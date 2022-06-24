@@ -118,3 +118,26 @@ jName GetCommonTextureSRGBName(int32 index)
 	s_tex_srgb_name[index] = jName(szTemp);
 	return s_tex_srgb_name[index];
 }
+
+size_t jRenderPass::GetHash() const
+{
+	size_t result = 0;
+	result = STATIC_NAME_CITY_HASH("ColorAttachments");
+	for (int32 i = 0; i < ColorAttachments.size(); ++i)
+	{
+		result ^= ColorAttachments[i]->GetHash();
+	}
+	result ^= STATIC_NAME_CITY_HASH("DepthAttachment");
+	if (DepthAttachment)
+	{
+		result ^= DepthAttachment->GetHash();
+	}
+	result ^= STATIC_NAME_CITY_HASH("ColorAttachmentResolve");
+	if (ColorAttachmentResolve)
+	{
+		result ^= ColorAttachmentResolve->GetHash();
+	}
+	result ^= CityHash64((const char*)&RenderOffset, sizeof(RenderOffset));
+	result ^= CityHash64((const char*)&RenderExtent, sizeof(RenderExtent));
+	return result;
+}

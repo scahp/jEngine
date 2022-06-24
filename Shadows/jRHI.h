@@ -22,6 +22,7 @@ struct jVertexBuffer : public IBuffer
 {
 	std::shared_ptr<jVertexStreamData> VertexStreamData;
 
+	virtual size_t GetHash() const { return 0; }
 	virtual void Bind(const jShader* shader) const {}
 };
 
@@ -376,8 +377,16 @@ struct jRenderTargetInfo
 	int32 SampleCount = 1;
 };
 
-struct jRenderTarget : public std::enable_shared_from_this<jRenderTarget>
+struct jRenderTarget final : public std::enable_shared_from_this<jRenderTarget>
 {
+	// Create render target from texture, It is useful to create render target from swapchain texture
+	template <typename T1, class... T2>
+	static std::shared_ptr<jRenderTarget> CreateFromTexture(const T2&... args)
+	{
+		const auto& T1Ptr = std::shared_ptr<T1>(new T1(args...));
+		return std::shared_ptr<jRenderTarget>(new jRenderTarget(T1Ptr));
+	}
+
 	constexpr jRenderTarget() = default;
 	jRenderTarget(const std::shared_ptr<jTexture>& InTexturePtr)
 		: TexturePtr(InTexturePtr)
@@ -393,13 +402,17 @@ struct jRenderTarget : public std::enable_shared_from_this<jRenderTarget>
 			Info.SampleCount = texture->SampleCount;
 		}
 	}
-	virtual ~jRenderTarget() {}
 
-	virtual jTexture* GetTexture() const { return TexturePtr.get(); }
-	virtual void* GetTexureHandle() const { return TexturePtr.get() ? TexturePtr->GetHandle() : nullptr; }
+	jTexture* GetTexture() const { return TexturePtr.get(); }
+	void* GetTexureHandle() const { return TexturePtr.get() ? TexturePtr->GetHandle() : nullptr; }
 
 	jRenderTargetInfo Info;
 	std::shared_ptr<jTexture> TexturePtr;
+};
+
+template <typename T1>
+struct TRenderTarget
+{
 };
 
 struct jQueryTime
@@ -424,6 +437,20 @@ struct jRasterizationStateInfo
 {
 	virtual ~jRasterizationStateInfo() {}
 	virtual void Initialize() {}
+	virtual size_t GetHash() const
+	{
+		size_t result = CityHash64((const char*)&PolygonMode, sizeof(PolygonMode));
+		result ^= CityHash64((const char*)&CullMode, sizeof(CullMode));
+		result ^= CityHash64((const char*)&FrontFace, sizeof(FrontFace));
+		result ^= CityHash64((const char*)&DepthBiasEnable, sizeof(DepthBiasEnable));
+		result ^= CityHash64((const char*)&DepthBiasConstantFactor, sizeof(DepthBiasConstantFactor));
+		result ^= CityHash64((const char*)&DepthBiasClamp, sizeof(DepthBiasClamp));
+		result ^= CityHash64((const char*)&DepthBiasSlopeFactor, sizeof(DepthBiasSlopeFactor));
+		result ^= CityHash64((const char*)&LineWidth, sizeof(LineWidth));
+		result ^= CityHash64((const char*)&DepthClampEnable, sizeof(DepthClampEnable));
+		result ^= CityHash64((const char*)&RasterizerDiscardEnable, sizeof(RasterizerDiscardEnable));
+		return result;
+	}
 
 	EPolygonMode PolygonMode = EPolygonMode::FILL;
 	ECullMode CullMode = ECullMode::BACK;
@@ -441,6 +468,15 @@ struct jMultisampleStateInfo
 {
 	virtual ~jMultisampleStateInfo() {}
 	virtual void Initialize() {}
+	virtual size_t GetHash() const
+	{
+		size_t result = CityHash64((const char*)&SampleCount, sizeof(SampleCount));
+		result ^= CityHash64((const char*)&SampleShadingEnable, sizeof(SampleShadingEnable));
+		result ^= CityHash64((const char*)&MinSampleShading, sizeof(MinSampleShading));
+		result ^= CityHash64((const char*)&AlphaToCoverageEnable, sizeof(AlphaToCoverageEnable));
+		result ^= CityHash64((const char*)&AlphaToOneEnable, sizeof(AlphaToOneEnable));
+		return result;
+	}
 
 	EMSAASamples SampleCount = EMSAASamples::COUNT_1;
 	bool SampleShadingEnable = true;		// Sample shading 켬	 (텍스쳐 내부에 있는 aliasing 도 완화 해줌)
@@ -453,6 +489,17 @@ struct jStencilOpStateInfo
 {
 	virtual ~jStencilOpStateInfo() {}
 	virtual void Initialize() {}
+	virtual size_t GetHash() const
+	{
+		size_t result = CityHash64((const char*)&FailOp, sizeof(FailOp));
+		result ^= CityHash64((const char*)&PassOp, sizeof(PassOp));
+		result ^= CityHash64((const char*)&DepthFailOp, sizeof(DepthFailOp));
+		result ^= CityHash64((const char*)&CompareOp, sizeof(CompareOp));
+		result ^= CityHash64((const char*)&CompareMask, sizeof(CompareMask));
+		result ^= CityHash64((const char*)&WriteMask, sizeof(WriteMask));
+		result ^= CityHash64((const char*)&Reference, sizeof(Reference));
+		return result;
+	}
 
 	EStencilOp FailOp = EStencilOp::KEEP;
 	EStencilOp PassOp = EStencilOp::KEEP;
@@ -467,6 +514,21 @@ struct jDepthStencilStateInfo
 {
 	virtual ~jDepthStencilStateInfo() {}
 	virtual void Initialize() {}
+	virtual size_t GetHash() const
+	{
+		size_t result = CityHash64((const char*)&DepthTestEnable, sizeof(DepthTestEnable));
+		result ^= CityHash64((const char*)&DepthWriteEnable, sizeof(DepthWriteEnable));
+		result ^= CityHash64((const char*)&DepthCompareOp, sizeof(DepthCompareOp));
+		result ^= CityHash64((const char*)&DepthBoundsTestEnable, sizeof(DepthBoundsTestEnable));
+		result ^= CityHash64((const char*)&StencilTestEnable, sizeof(StencilTestEnable));
+		if (Front)
+			result ^= Front->GetHash();
+		if (Back)
+			result ^= Back->GetHash();
+		result ^= CityHash64((const char*)&MinDepthBounds, sizeof(MinDepthBounds));
+		result ^= CityHash64((const char*)&MaxDepthBounds, sizeof(MaxDepthBounds));
+		return result;
+	}
 
 	bool DepthTestEnable = false;
 	bool DepthWriteEnable = false;
@@ -485,6 +547,18 @@ struct jBlendingStateInfo
 {
 	virtual ~jBlendingStateInfo() {}
 	virtual void Initialize() {}
+	virtual size_t GetHash() const
+	{
+		size_t result = CityHash64((const char*)&BlendEnable, sizeof(BlendEnable));
+		result ^= CityHash64((const char*)&Src, sizeof(Src));
+		result ^= CityHash64((const char*)&Dest, sizeof(Dest));
+		result ^= CityHash64((const char*)&BlendOp, sizeof(BlendOp));
+		result ^= CityHash64((const char*)&SrcAlpha, sizeof(SrcAlpha));
+		result ^= CityHash64((const char*)&DestAlpha, sizeof(DestAlpha));
+		result ^= CityHash64((const char*)&AlphaBlendOp, sizeof(AlphaBlendOp));
+		result ^= CityHash64((const char*)&ColorWriteMask, sizeof(ColorWriteMask));
+		return result;
+	}
 
 	bool BlendEnable = false;
 	EBlendFactor Src = EBlendFactor::SRC_COLOR;
@@ -529,12 +603,24 @@ struct jAttachment
 
 	Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
 	Vector2 ClearDepth = Vector2(1.0f, 0.0f);
+
+	size_t GetHash() const
+	{
+		size_t result = 0;
+		result ^= CityHash64((const char*)&LoadStoreOp, sizeof(LoadStoreOp));
+		result ^= CityHash64((const char*)&StencilLoadStoreOp, sizeof(StencilLoadStoreOp));
+		result ^= CityHash64((const char*)&ClearColor, sizeof(ClearColor));
+		result ^= CityHash64((const char*)&ClearDepth, sizeof(ClearDepth));
+		return result;
+	}
 };
 
 class jRenderPass
 {
 public:
 	virtual ~jRenderPass() {}
+
+	virtual size_t GetHash() const;
 
 	virtual void* GetRenderPass() const { return nullptr; }
 
@@ -743,10 +829,9 @@ struct jSamplerStateInfo
 {
 	virtual ~jSamplerStateInfo() {}
 	virtual void Initialize() {}
-
 	virtual void* GetHandle() const { return nullptr; }
 
-	size_t GetHash() const
+	virtual size_t GetHash() const
 	{
 		size_t result = 0;
 		hash_combine(result, Minification);

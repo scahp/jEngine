@@ -184,6 +184,14 @@ public:
 		CommandBuffer = nullptr;
 	}
 
+	virtual size_t GetHash() const override
+	{
+		size_t result = __super::GetHash();
+		result ^= STATIC_NAME_CITY_HASH("ClearValues");
+		result ^= CityHash64((const char*)ClearValues.data(), sizeof(VkClearValue) * ClearValues.size());
+		return result;
+	}
+
 private:
 	VkCommandBuffer CommandBuffer = nullptr;
 
@@ -232,7 +240,7 @@ struct jShadingBindingInstance
 
 struct jShaderBindings
 {
-    std::vector<TBindings> UniformBuffers;
+	std::vector<TBindings> UniformBuffers;
     std::vector<TBindings> Textures;
     VkDescriptorSetLayout DescriptorSetLayout = nullptr;
 	VkPipelineLayout PipelineLayout = nullptr;
@@ -247,7 +255,9 @@ struct jShaderBindings
 	VkDescriptorPool DescriptorPool = nullptr;
 
     bool CreateDescriptorSetLayout();
-	
+	void CreatePool();
+	VkPipelineLayout CreatePipelineLayout();
+
 	jShadingBindingInstance CreateShaderBindingInstance() const;
 	std::vector<jShadingBindingInstance> CreateShaderBindingInstance(int32 count) const;
 
@@ -274,9 +284,18 @@ struct jShaderBindings
 		return std::move(resultArray);
 	}
 
-	void CreatePool();
+	size_t GetHash() const
+	{
+		size_t result = 0;
 
-	VkPipelineLayout CreatePipelineLayout();
+		result ^= STATIC_NAME_CITY_HASH("UniformBuffer");
+		result ^= CityHash64((const char*)UniformBuffers.data(), sizeof(TBindings) * UniformBuffers.size());
+
+		result ^= STATIC_NAME_CITY_HASH("Texture");
+		result ^= CityHash64((const char*)Textures.data(), sizeof(TBindings) * Textures.size());
+
+		return result;
+	}
 };
 
 struct jTexture_Vulkan : public jTexture
@@ -408,7 +427,31 @@ struct jVertexBuffer_Vulkan : public jVertexBuffer
 
 			return vertexInputInfo;
 		}
+
+		FORCEINLINE size_t GetHash() const
+		{
+			size_t result = 0;
+			result = CityHash64((const char*)InputBindingDescriptions.data(), sizeof(VkVertexInputBindingDescription) * InputBindingDescriptions.size());
+			result ^= CityHash64((const char*)AttributeDescriptions.data(), sizeof(VkVertexInputAttributeDescription) * AttributeDescriptions.size());
+			return result;
+		}
 	};
+
+	virtual size_t GetHash() const override
+	{
+		return GetVertexInputStateHash() ^ GetInputAssemblyStateHash();
+	}
+
+	FORCEINLINE size_t GetVertexInputStateHash() const
+	{
+		return BindInfos.GetHash();
+	}
+
+	FORCEINLINE size_t GetInputAssemblyStateHash() const
+	{
+		VkPipelineInputAssemblyStateCreateInfo state = CreateInputAssemblyState();
+		return CityHash64((const char*)&state, sizeof(VkPipelineInputAssemblyStateCreateInfo));
+	}
 
 	FORCEINLINE VkPipelineVertexInputStateCreateInfo CreateVertexInputState() const
 	{
@@ -568,15 +611,13 @@ struct jPipelineStateInfo
 			result ^= Scissors[i].CreateHash();
 
 		// 아래 내용들도 해시를 만들 수 있어야 함, todo
-		result ^= (size_t)VertexBuffer;
-		result ^= (size_t)ShaderBindings;
-		result ^= (size_t)RenderPass;
-		result ^= (size_t)RasterizationState;
-		result ^= (size_t)MultisampleState;
-		result ^= (size_t)DepthStencilState;
-		result ^= (size_t)BlendingState;
-
-		Hash = result;
+		result ^= VertexBuffer->GetHash();
+		result ^= ShaderBindings->GetHash();
+		result ^= RenderPass->GetHash();
+		result ^= RasterizationState->GetHash();
+		result ^= MultisampleState->GetHash();
+		result ^= DepthStencilState->GetHash();
+		result ^= BlendingState->GetHash();
 
 		return result;
 	}
