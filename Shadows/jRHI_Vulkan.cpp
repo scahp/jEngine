@@ -563,7 +563,7 @@ bool jRHI_Vulkan::InitRHI()
 		for (int32 i = 0; i < swapChainImageViews.size(); ++i)
 		{
 			std::shared_ptr<jRenderTarget> DepthPtr = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget(
-				{ ETextureType::TEXTURE_2D, ETextureFormat::D24_S8, SCR_WIDTH, SCR_HEIGHT, 1, /*ETextureFilter::LINEAR, ETextureFilter::LINEAR, */false, 1 }));
+				{ ETextureType::TEXTURE_2D, ETextureFormat::D24_S8, SCR_WIDTH, SCR_HEIGHT, 1, /*ETextureFilter::LINEAR, ETextureFilter::LINEAR, */false, msaaSamples }));
 
 			std::shared_ptr<jRenderTarget> ColorPtr;
 			std::shared_ptr<jRenderTarget> ResolveColorPtr;
@@ -574,7 +574,7 @@ bool jRHI_Vulkan::InitRHI()
 			if (msaaSamples > 1)
 			{
 				ColorPtr = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget(
-					{ ETextureType::TEXTURE_2D, ETextureFormat::RGBA8, SCR_WIDTH, SCR_HEIGHT, 1, /*ETextureFilter::LINEAR, ETextureFilter::LINEAR, */false, msaaSamples }));
+					{ ETextureType::TEXTURE_2D, ETextureFormat::BGRA8, SCR_WIDTH, SCR_HEIGHT, 1, /*ETextureFilter::LINEAR, ETextureFilter::LINEAR, */false, msaaSamples }));
 
 				ResolveColorPtr = SwapChainRTPtr;
 			}
@@ -2170,9 +2170,8 @@ std::shared_ptr<jRenderTarget> jRHI_Vulkan::CreateRenderTarget(const jRenderTarg
 	//const VkImageTiling TilingMode = IsMobile ? VkImageTiling::VK_IMAGE_TILING_OPTIMAL : VkImageTiling::VK_IMAGE_TILING_LINEAR;
 	const VkImageTiling TilingMode = VkImageTiling::VK_IMAGE_TILING_OPTIMAL;
 
-	const int32 mipLevels = jTexture::GetMipLevels(info.Width, info.Height);
+	const int32 mipLevels = (info.SampleCount > VK_SAMPLE_COUNT_1_BIT) ? 1 : jTexture::GetMipLevels(info.Width, info.Height);		// MipLevel 은 SampleCount 1인 경우만 가능
 	JASSERT(info.SampleCount >= 1);
-	check(!hasDepthAttachment || (hasDepthAttachment && info.SampleCount == VkSampleCountFlagBits::VK_SAMPLE_COUNT_1_BIT));
 
 	VkImage image = nullptr;
 	VkImageView imageView = nullptr;
@@ -2323,7 +2322,7 @@ bool jRenderPass_Vulkan::CreateRenderPass()
 		AttachmentDescs.resize(ColorAttachments.size() + 1);
 
 		std::vector<VkAttachmentReference> colorAttachmentRefs;
-		colorAttachmentRefs.resize(ColorAttachments.size());&
+		colorAttachmentRefs.resize(ColorAttachments.size());
 		for (int32 i = 0; i < ColorAttachments.size(); ++i)
 		{
 			const jAttachment* attachment = ColorAttachments[i];
