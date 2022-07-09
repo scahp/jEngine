@@ -7,9 +7,9 @@ jGBuffer::~jGBuffer()
 	GeometryBuffer;
 }
 
-bool jGBuffer::Begin(int index /*= 0*/, bool mrt /*= false*/) const
+bool jGBuffer::GBufferBegin(int index /*= 0*/, bool mrt /*= false*/) const
 {
-	return GeometryBuffer && GeometryBuffer->Begin(index, mrt);
+	return GeometryBuffer && GeometryBuffer->FBOBegin(index, mrt);
 }
 
 void jGBuffer::End() const

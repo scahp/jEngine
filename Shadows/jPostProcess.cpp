@@ -21,7 +21,7 @@ bool IPostprocess::Process(const jCamera* camera) const
 	auto pCurrentRenderTarget = (PostProcessOutput ? PostProcessOutput.get()->FrameBuffer : nullptr);
 
 	if (pCurrentRenderTarget)
-		pCurrentRenderTarget->Begin();
+		pCurrentRenderTarget->FBOBegin();
 	else
 		g_rhi->SetFrameBuffer(nullptr);
 
@@ -256,7 +256,7 @@ bool jPostProcess_LuminanceMapGeneration::Process(const jCamera* camera) const
 	auto pCurrentRenderTarget = (PostProcessOutput ? PostProcessOutput.get()->FrameBuffer : nullptr);
 
 	if (pCurrentRenderTarget)
-		pCurrentRenderTarget->Begin();
+		pCurrentRenderTarget->FBOBegin();
 	else
 		g_rhi->SetFrameBuffer(nullptr);
 
@@ -348,7 +348,7 @@ bool jPostProcess_AdaptiveLuminance::Process(const jCamera* camera) const
 	auto pCurrentRenderTarget = (LastLumianceFrameBuffer[s_index] ? LastLumianceFrameBuffer[s_index] : nullptr);
 
 	if (pCurrentRenderTarget)
-		pCurrentRenderTarget->Begin();
+		pCurrentRenderTarget->FBOBegin();
 	else
 		g_rhi->SetFrameBuffer(nullptr);
 

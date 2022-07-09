@@ -133,7 +133,7 @@ void jDeferredGeometryPipeline::Setup()
 void jDeferredGeometryPipeline::Draw(const jPipelineContext& pipelineContext, const jShader* shader) const
 {
 	JASSERT(GBuffer);
-	if (GBuffer->Begin())
+	if (GBuffer->GBufferBegin())
 	{
 		if (auto currentShader = jShadowAppSettingProperties::GetInstance().ExponentDeepShadowOn ? jShader::GetShader("ExpDeferred") : jShader::GetShader("Deferred"))
 		{
@@ -173,7 +173,7 @@ void jDeepShadowMap_ShadowPass_Pipeline::Draw(const jPipelineContext& pipelineCo
 		const auto renderTarget = light->GetShadowMapFrameBuffer();
 		const auto lightCamera = light->GetLightCamra();
 
-		if (renderTarget->Begin())
+		if (renderTarget->FBOBegin())
 		{
 			if (auto currentShader = jShadowAppSettingProperties::GetInstance().ExponentDeepShadowOn ? jShader::GetShader("ExpDeepShadowMapGen") : jShader::GetShader("DeepShadowMapGen"))
 			{

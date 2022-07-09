@@ -47,8 +47,8 @@ struct jTexture
 		return 1 + (int32)floorf(log2f(fmaxf((float)InWidth, (float)InHeight)));
 	}
 
-	virtual void* GetHandle() const { return nullptr; }
-	virtual void* GetSamplerStateHandle() const { return nullptr; }
+	virtual const void* GetHandle() const { return nullptr; }
+	virtual const void* GetSamplerStateHandle() const { return nullptr; }
 
 	ETextureType Type = ETextureType::MAX;
 	ETextureFormat Format = ETextureFormat::RGB8;
@@ -338,12 +338,22 @@ struct jFrameBuffer : public std::enable_shared_from_this<jFrameBuffer>
 	virtual bool SetDepthAttachment(const std::shared_ptr<jTexture>& InDepth) { TextureDepth = InDepth; return true; }
 	virtual void SetDepthMipLevel(int32 InLevel) {}
 
-	virtual bool Begin(int index = 0, bool mrt = false) const { return true; };
+	virtual bool FBOBegin(int index = 0, bool mrt = false) const { return true; };
 	virtual void End() const {}
 
 	jFrameBufferInfo Info;
 	std::vector<std::shared_ptr<jTexture> > Textures;
 	std::shared_ptr<jTexture> TextureDepth;
+};
+
+class jCommandBuffer
+{
+public:
+	virtual ~jCommandBuffer() {}
+
+	virtual void* GetHandle() const { return nullptr; }
+	virtual bool Begin() const { return false; }
+	virtual bool End() const { return false; }
 };
 
 struct jRenderTargetInfo
@@ -404,7 +414,7 @@ struct jRenderTarget final : public std::enable_shared_from_this<jRenderTarget>
 	}
 
 	jTexture* GetTexture() const { return TexturePtr.get(); }
-	void* GetTexureHandle() const { return TexturePtr.get() ? TexturePtr->GetHandle() : nullptr; }
+	const void* GetTexureHandle() const { return TexturePtr.get() ? TexturePtr->GetHandle() : nullptr; }
 
 	jRenderTargetInfo Info;
 	std::shared_ptr<jTexture> TexturePtr;
@@ -620,6 +630,29 @@ class jRenderPass
 public:
 	virtual ~jRenderPass() {}
 
+	jRenderPass() = default;
+	jRenderPass(const jAttachment* colorAttachment, const jAttachment* depthAttachment, const jAttachment* colorResolveAttachment, const Vector2i& offset, const Vector2i& extent)
+	{
+		SetAttachemnt(colorAttachment, depthAttachment, colorResolveAttachment);
+		SetRenderArea(offset, extent);
+	}
+
+	void SetAttachemnt(const jAttachment* colorAttachment, const jAttachment* depthAttachment, const jAttachment* colorResolveAttachment)
+	{
+		ColorAttachments.push_back(colorAttachment);
+		DepthAttachment = depthAttachment;
+		ColorAttachmentResolve = colorResolveAttachment;
+	}
+
+	void SetRenderArea(const Vector2i& offset, const Vector2i& extent)
+	{
+		RenderOffset = offset;
+		RenderExtent = extent;
+	}
+
+	virtual bool BeginRenderPass(const jCommandBuffer* commandBuffer) { return false; }
+	virtual void EndRenderPass() {}
+
 	virtual size_t GetHash() const;
 
 	virtual void* GetRenderPass() const { return nullptr; }
@@ -657,7 +690,7 @@ public:
 	virtual void BindVertexBuffer(const jVertexBuffer* vb, const jShader* shader) const {}
 	virtual void BindIndexBuffer(const jIndexBuffer* ib, const jShader* shader) const {}
 	virtual void MapBufferdata(IBuffer* buffer) const;
-	virtual void SetTextureFilter(ETextureType type, ETextureFilterTarget target, ETextureFilter filter) const {}
+	virtual void SetTextureFilter(ETextureType type, int32 sampleCount, ETextureFilterTarget target, ETextureFilter filter) const {}
 	virtual void SetTextureWrap(int flag) const {}
 	virtual void SetTexture(int32 index, const jTexture* texture) const {}
 	virtual void DrawArrays(EPrimitiveType type, int32 vertStartIndex, int32 vertCount) const {}
@@ -748,7 +781,7 @@ public:
 	virtual void EndQueryPrimitiveGenerated() const {}
 	virtual void GetQueryPrimitiveGeneratedResult(jQueryPrimitiveGenerated* query) const {}
 	virtual void EnableRasterizerDiscard(bool enable) const {}
-	virtual void SetTextureMipmapLevelLimit(ETextureType type, int32 baseLevel, int32 maxLevel) const {}
+	virtual void SetTextureMipmapLevelLimit(ETextureType type, int32 sampleCount, int32 baseLevel, int32 maxLevel) const {}
 	virtual void EnableMultisample(bool enable) const {}
 	virtual void SetCubeMapSeamless(bool enable) const {}
 	virtual void SetLineWidth(float width) const {}

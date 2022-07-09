@@ -10,6 +10,15 @@
 #include "jFrameBufferPool.h"
 #include "jRenderTargetPool.h"
 
+#include "stb_image.h"
+#include "jPrimitiveUtil.h"
+#include "jRenderObject.h"
+#include "jCamera.h"
+
+const std::string MODEL_PATH = "chalet.obj";
+const std::string TEXTURE_PATH = "chalet.jpg";
+uint32_t textureMipLevels;
+
 jRHI_Vulkan* g_rhi_vk = nullptr;
 std::unordered_map<size_t, VkPipeline> jPipelineStateInfo::PipelineStatePool;
 
@@ -900,60 +909,6 @@ void jBlendingStateInfo_Vulakn::Initialize()
 	ColorBlendAttachmentInfo.colorWriteMask = GetVulkanBlendOp(ColorWriteMask);
 }
 
-
-//bool jRHI_Vulkan::CreateDescriptorSetLayout()
-//{
-//	VkDescriptorSetLayoutBinding uboLayoutBinding = {};
-//	uboLayoutBinding.binding = 0;
-//	uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-//	uboLayoutBinding.descriptorCount = 1;
-//
-//	// VkShaderStageFlagBits 에 값을 | 연산으로 조합가능
-//	//  - VK_SHADER_STAGE_ALL_GRAPHICS 로 설정하면 모든곳에서 사용
-//	uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-//	uboLayoutBinding.pImmutableSamplers = nullptr;	// Optional (이미지 샘플링 시에서만 사용)
-//
-//	VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
-//	samplerLayoutBinding.binding = 1;
-//	samplerLayoutBinding.descriptorCount = 1;
-//	samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-//	samplerLayoutBinding.pImmutableSamplers = nullptr;
-//	samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;	// sampler 를 fragment shader에 붙임.
-//
-//	std::array<VkDescriptorSetLayoutBinding, 2> bindings = { uboLayoutBinding, samplerLayoutBinding };
-//
-//	VkDescriptorSetLayoutCreateInfo layoutInfo = {};
-//	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-//	layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-//	layoutInfo.pBindings = bindings.data();
-//
-//	if (!ensure(vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout) == VK_SUCCESS))
-//		return false;
-//
-//	return true;
-//}
-
-//bool jRHI_Vulkan::CreateCommandPool()
-//{
-//	QueueFamilyIndices queueFamilyIndices = findQueueFamilies(physicalDevice);
-//
-//	VkCommandPoolCreateInfo poolInfo = {};
-//	poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-//	poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
-//
-//	// VK_COMMAND_POOL_CREATE_TRANSIENT_BIT : 커맨드 버퍼가 새로운 커맨드를 자주 다시 기록한다고 힌트를 줌.
-//	//											(메모리 할당 동작을 변경할 것임)
-//	// VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT : 커맨드 버퍼들이 개별적으로 다시 기록될 수 있다.
-//	//													이 플래그가 없으면 모든 커맨드 버퍼들이 동시에 리셋되야 함.
-//	// 우리는 프로그램 시작시에 커맨드버퍼를 한번 녹화하고 계속해서 반복사용 할 것이므로 flags를 설정하지 않음.
-//	poolInfo.flags = 0;		// Optional
-//
-//	if (!ensure(vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool) == VK_SUCCESS))
-//		return false;
-//
-//	return true;
-//}
-
 bool jRHI_Vulkan::CreateColorResources()
 {
 	VkFormat colorFormat = swapChainImageFormat;
@@ -983,134 +938,6 @@ bool jRHI_Vulkan::CreateDepthResources()
 
 	return true;
 }
-
-//bool jRHI_Vulkan::CreateFrameBuffers()
-//{
-//	swapChainFramebuffers.resize(swapChainImageViews.size());
-//	for (size_t i = 0; i < swapChainImageViews.size(); ++i)
-//	{
-//		// DepthBuffer는 같은 것을 씀. 세마포어 때문에 한번에 1개의 subpass 만 실행되기 때문.
-//		std::vector<VkImageView> attachments;
-//		if (msaaSamples > 1)
-//			attachments = { colorImageView, depthImageView, swapChainImageViews[i] };
-//		else
-//			attachments = { swapChainImageViews[i], depthImageView };
-//
-//		VkFramebufferCreateInfo framebufferInfo = {};
-//		framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-//		framebufferInfo.renderPass = RenderPassTest.GetRenderPass();
-//
-//		// RenderPass와 같은 수와 같은 타입의 attachment 를 사용
-//		framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-//		framebufferInfo.pAttachments = attachments.data();
-//
-//		framebufferInfo.width = swapChainExtent.width;
-//		framebufferInfo.height = swapChainExtent.height;
-//		framebufferInfo.layers = 1;			// 이미지 배열의 레이어수(3D framebuffer에 사용할 듯)
-//
-//		if (!ensure(vkCreateFramebuffer(device, &framebufferInfo, nullptr, &swapChainFramebuffers[i]) == VK_SUCCESS))
-//			return false;
-//	}
-//
-//	return true;
-//}
-
-#include "stb_image.h"
-const std::string MODEL_PATH = "chalet.obj";
-const std::string TEXTURE_PATH = "chalet.jpg";
-uint32_t textureMipLevels;
-//bool jRHI_Vulkan::CreateTextureImage()
-//{
-//	int texWidth, texHeight, texChannels;
-//	stbi_uc* pixels = stbi_load(TEXTURE_PATH.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
-//
-//	if (!ensure(pixels))
-//		return false;
-//
-//	VkDeviceSize imageSize = texWidth * texHeight * 4;
-//	textureMipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max<int>(texWidth, texHeight)))) + 1;
-//
-//	VkBuffer stagingBuffer;
-//	VkDeviceMemory stagingBufferMemory;
-//
-//	CreateBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-//		, stagingBuffer, stagingBufferMemory);
-//
-//	void* data;
-//	vkMapMemory(device, stagingBufferMemory, 0, imageSize, 0, &data);
-//	memcpy(data, pixels, static_cast<size_t>(imageSize));
-//	vkUnmapMemory(device, stagingBufferMemory);
-//
-//	stbi_image_free(pixels);
-//
-//	if (!ensure(CreateImage(static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), textureMipLevels, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_UNORM
-//		, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT
-//		| VK_IMAGE_USAGE_SAMPLED_BIT	// image를 shader 에서 접근가능하게 하고 싶은 경우
-//		, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureImageMemory)))
-//	{
-//		return false;
-//	}
-//
-//	if (!TransitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, textureMipLevels))
-//		return false;
-//	CopyBufferToImage(stagingBuffer, textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
-//
-//	// 밉맵을 만드는 동안 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL 으로 전환됨.
-//	//// 이제 쉐이더에 읽기가 가능하게 하기위해서 아래와 같이 적용.
-//	//if (TransitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, textureMipLevels))
-//	//	return false;
-//
-//	vkDestroyBuffer(device, stagingBuffer, nullptr);
-//	vkFreeMemory(device, stagingBufferMemory, nullptr);
-//
-//	if (!ensure(GenerateMipmaps(textureImage, VK_FORMAT_R8G8B8A8_UNORM, texWidth, texHeight, textureMipLevels)))
-//		return false;
-//
-//	// Create Texture image view
-//	textureImageView = CreateImageView(textureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, textureMipLevels);
-//
-//	return true;
-//}
-
-//bool jRHI_Vulkan::CreateTextureSampler()
-//{
-//	VkSamplerCreateInfo samplerInfo = {};
-//	samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-//	samplerInfo.magFilter = VK_FILTER_LINEAR;
-//	samplerInfo.minFilter = VK_FILTER_LINEAR;
-//
-//	// UV가 [0~1] 범위를 벗어는 경우 처리
-//	// VK_SAMPLER_ADDRESS_MODE_REPEAT : 반복해서 출력, UV % 1
-//	// VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT : 반복하지만 거울에 비치듯 반대로 출력
-//	// VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE : 범위 밖은 가장자리의 색으로 모두 출력
-//	// VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE : 범위 밖은 반대편 가장자리의 색으로 모두 출력
-//	// VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER : 단색으로 설정함. (samplerInfo.borderColor)
-//	samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-//	samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-//	samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-//	samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-//
-//	samplerInfo.anisotropyEnable = VK_TRUE;
-//	samplerInfo.maxAnisotropy = 16;
-//
-//	// 이게 true 이면 UV 좌표가 [0, texWidth], [0, texHeight] 가 됨. false 이면 [0, 1] 범위
-//	samplerInfo.unnormalizedCoordinates = VK_FALSE;
-//
-//	// compareEnable이 ture 이면, 텍셀을 특정 값과 비교한 뒤 그 결과를 필터링 연산에 사용한다.
-//	// Percentage-closer filtering(PCF) 에 주로 사용됨.
-//	samplerInfo.compareEnable = VK_FALSE;
-//	samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-//
-//	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-//	samplerInfo.mipLodBias = 0.0f;	// Optional
-//	samplerInfo.minLod = 0.0f;		// Optional
-//	samplerInfo.maxLod = static_cast<float>(textureMipLevels);
-//
-//	if (!ensure(vkCreateSampler(device, &samplerInfo, nullptr, &textureSampler) == VK_SUCCESS))
-//		return false;
-//
-//	return true;
-//}
 
 bool jRHI_Vulkan::LoadModel()
 {
@@ -1227,7 +1054,7 @@ bool jRHI_Vulkan::LoadModel()
 	{
 		auto streamParam = new jStreamParam<uint32>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->ElementType = EBufferElementType::UNSIGNED_INT;
+		streamParam->ElementType = EBufferElementType::UINT32;
 		streamParam->ElementTypeSize = sizeof(uint32);
 		streamParam->Stride = sizeof(uint32) * 3;
 		streamParam->Name = jName("Index");
@@ -1239,100 +1066,11 @@ bool jRHI_Vulkan::LoadModel()
 	return true;
 }
 
-//struct jVertexStreamData : public std::enable_shared_from_this<jVertexStreamData>
-//{
-//	~jVertexStreamData()
-//	{
-//		for (auto param : Params)
-//			delete param;
-//		Params.clear();
-//	}
-//
-//	std::vector<IStreamParam*> Params;
-//	EPrimitiveType PrimitiveType;
-//	int ElementCount = 0;
-//};
-//
-//struct jVertexBuffer : public IBuffer
-//{
-//	std::weak_ptr<jVertexStreamData> VertexStreamData;
-//
-//	virtual void Bind(const jShader* shader) const {}
-//};
-
-//struct jVertexBuffer_OpenGL : public jVertexBuffer
-//{
-//	uint32 VAO = 0;
-//	std::vector<jVertexStream_OpenGL> Streams;
-//
-//	virtual void Bind(const jShader* shader) const override;
-//};
-
-
-//bool jRHI_Vulkan::CreateVertexBuffer()
-//{
-//	VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
-//	VkBuffer stagingBuffer;
-//	VkDeviceMemory stagingBufferMemory;
-//
-//	// VK_BUFFER_USAGE_TRANSFER_SRC_BIT : 이 버퍼가 메모리 전송 연산의 소스가 될 수 있음.
-//	CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT
-//		, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-//
-//	//// 마지막 파라메터 0은 메모리 영역의 offset 임.
-//	//// 이 값이 0이 아니면 memRequirements.alignment 로 나눠야 함. (align 되어있다는 의미)
-//	//vkBindBufferMemory(device, vertexBuffer, vertexBufferMemory, 0);
-//
-//	void* data;
-//	// size 항목에 VK_WHOLE_SIZE  를 넣어서 모든 메모리를 잡을 수도 있음.
-//	vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-//	memcpy(data, vertices.data(), (size_t)bufferSize);
-//	vkUnmapMemory(device, stagingBufferMemory);
-//
-//	// Map -> Unmap 했다가 메모리에 데이터가 즉시 반영되는게 아님
-//	// 바로 사용하려면 아래 2가지 방법이 있음.
-//	// 1. VK_MEMORY_PROPERTY_HOST_COHERENT_BIT 사용 (항상 반영, 약간 느릴 수도)
-//	// 2. 쓰기 이후 vkFlushMappedMemoryRanges 호출, 읽기 이후 vkInvalidateMappedMemoryRanges 호출
-//	// 위의 2가지 방법을 사용해도 이 데이터가 GPU에 바로 보인다고 보장할 수는 없지만 다음 vkQueueSubmit 호출 전에는 완료될 것을 보장함.
-//
-//	// VK_BUFFER_USAGE_TRANSFER_DST_BIT : 이 버퍼가 메모리 전송 연산의 목적지가 될 수 있음.
-//	// DEVICE LOCAL 메모리에 VertexBuffer를 만들었으므로 이제 vkMapMemory 같은 것은 할 수 없음.
-//	CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
-//		, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
-//
-//	CopyBuffer(stagingBuffer, vertexBuffer, bufferSize);
-//
-//	vkDestroyBuffer(device, stagingBuffer, nullptr);
-//	vkFreeMemory(device, stagingBufferMemory, nullptr);
-//
-//	return true;
-//}
-
-//bool jRHI_Vulkan::CreateIndexBuffer()
-//{
-//	VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
-//
-//	VkBuffer stagingBuffer;
-//	VkDeviceMemory stagingBufferMemory;
-//	CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-//
-//	void* data;
-//	vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-//	memcpy(data, indices.data(), (size_t)bufferSize);
-//	vkUnmapMemory(device, stagingBufferMemory);
-//
-//	CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
-//
-//	CopyBuffer(stagingBuffer, indexBuffer, bufferSize);
-//
-//	vkDestroyBuffer(device, stagingBuffer, nullptr);
-//	vkFreeMemory(device, stagingBufferMemory, nullptr);
-//
-//	return true;
-//}
-
 jIndexBuffer* jRHI_Vulkan::CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const
 {
+	if (!streamData)
+		return nullptr;
+
 	check(streamData);
 	check(streamData->Param);
 	jIndexBuffer_Vulkan* indexBuffer = new jIndexBuffer_Vulkan();
@@ -1357,93 +1095,6 @@ jIndexBuffer* jRHI_Vulkan::CreateIndexBuffer(const std::shared_ptr<jIndexStreamD
 	return indexBuffer;
 }
 
-//bool jRHI_Vulkan::CreateUniformBuffers()
-//{
-//	VkDeviceSize bufferSize = sizeof(jUniformBufferObject);
-//
-//	uniformBuffers.resize(swapChainImages.size());
-//	uniformBuffersMemory.resize(swapChainImages.size());
-//
-//	for (size_t i = 0; i < swapChainImages.size(); ++i)
-//	{
-//		CreateBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
-//			| VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBuffersMemory[i]);
-//	}
-//	return true;
-//}
-
-//bool jRHI_Vulkan::CreateDescriptorPool()
-//{
-//	std::array<VkDescriptorPoolSize, 2> poolSizes = {};
-//	poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-//	poolSizes[0].descriptorCount = static_cast<uint32_t>(swapChainImages.size());
-//	poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-//	poolSizes[1].descriptorCount = static_cast<uint32_t>(swapChainImages.size());
-//
-//	VkDescriptorPoolCreateInfo poolInfo = {};
-//	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-//	poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
-//	poolInfo.pPoolSizes = poolSizes.data();
-//	poolInfo.maxSets = static_cast<uint32_t>(swapChainImages.size());
-//	poolInfo.flags = 0;		// Descriptor Set을 만들고나서 더 이상 손대지 않을거라 그냥 기본값 0으로 설정
-//
-//	if (!ensure(vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool) == VK_SUCCESS))
-//		return false;
-//
-//	return true;
-//}
-
-//bool jRHI_Vulkan::CreateDescriptorSets()
-//{
-//	std::vector<VkDescriptorSetLayout> layouts(swapChainImages.size(), ShaderBindings.DescriptorSetLayout);
-//	VkDescriptorSetAllocateInfo allocInfo = {};
-//	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-//	allocInfo.descriptorPool = descriptorPool;
-//	allocInfo.descriptorSetCount = static_cast<uint32_t>(swapChainImages.size());
-//	allocInfo.pSetLayouts = layouts.data();
-//
-//	descriptorSets.resize(swapChainImages.size());
-//	if (!ensure(vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) == VK_SUCCESS))
-//		return false;
-//
-//	for (size_t i = 0; i < swapChainImages.size(); ++i)
-//	{
-//		VkDescriptorBufferInfo bufferInfo = {};
-//		bufferInfo.buffer = uniformBuffers[i];
-//		bufferInfo.offset = 0;
-//		bufferInfo.range = sizeof(jUniformBufferObject);		// 전체 사이즈라면 VK_WHOLE_SIZE 이거 가능
-//
-//		VkDescriptorImageInfo imageInfo = {};
-//		imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-//		imageInfo.imageView = ((jTexture_Vulkan*)ShaderBindings.Textures[0].Data)->ImageView;
-//		imageInfo.sampler = textureSampler;
-//
-//		std::array<VkWriteDescriptorSet, 2> descriptorWrites = {};
-//		descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-//		descriptorWrites[0].dstSet = ShaderBindingInstances[i].DescriptorSet;
-//		descriptorWrites[0].dstBinding = 0;
-//		descriptorWrites[0].dstArrayElement = 0;
-//		descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-//		descriptorWrites[0].descriptorCount = 1;
-//		descriptorWrites[0].pBufferInfo = &bufferInfo;		// 현재는 Buffer 기반 Desriptor 이므로 이것을 사용
-//		descriptorWrites[0].pImageInfo = nullptr;			// Optional	(Image Data 기반에 사용)
-//		descriptorWrites[0].pTexelBufferView = nullptr;		// Optional (Buffer View 기반에 사용)
-//
-//		descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-//		descriptorWrites[1].dstSet = ShaderBindingInstances[i].DescriptorSet;
-//		descriptorWrites[1].dstBinding = 1;
-//		descriptorWrites[1].dstArrayElement = 0;
-//		descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-//		descriptorWrites[1].descriptorCount = 1;
-//		descriptorWrites[1].pImageInfo = &imageInfo;
-//
-//		vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size())
-//			, descriptorWrites.data(), 0, nullptr);
-//	}
-//
-//	return true;
-//}
-
 bool jRHI_Vulkan::RecordCommandBuffers()
 {
 	// Begin command buffers
@@ -1454,18 +1105,25 @@ bool jRHI_Vulkan::RecordCommandBuffers()
 		if (!ensure(commandBuffers[i].Begin()))
 			return false;
 
-		RenderPasses[i]->BeginRenderPass(commandBuffers[i].Get());
+		RenderPasses[i]->BeginRenderPass(&commandBuffers[i]);
 
 		// Basic drawing commands
-		vkCmdBindPipeline(commandBuffers[i].Get(), VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipelines[i]);
+		vkCmdBindPipeline((VkCommandBuffer)commandBuffers[i].GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipelines[i]);
 
 		ShaderBindingInstances[i].Bind(commandBuffers[i]);
 
 		((jVertexBuffer_Vulkan*)VertexBuffer)->Bind(commandBuffers[i]);
-		((jIndexBuffer_Vulkan*)IndexBuffer)->Bind(commandBuffers[i]);
+		if (IndexBuffer)
+			((jIndexBuffer_Vulkan*)IndexBuffer)->Bind(commandBuffers[i]);
 
-		//vkCmdDraw(commandBuffers[i], static_cast<uint32_t>(vertices.size()), 1, 0, 0);			// VertexBuffer 만 있는 경우 호출
-		vkCmdDrawIndexed(commandBuffers[i].Get(), ((jIndexBuffer_Vulkan*)IndexBuffer)->GetIndexCount(), 1, 0, 0, 0);
+		if (IndexBuffer)
+		{
+			vkCmdDrawIndexed((VkCommandBuffer)commandBuffers[i].GetHandle(), ((jIndexBuffer_Vulkan*)IndexBuffer)->GetIndexCount(), 1, 0, 0, 0);
+		}
+		else
+		{
+			vkCmdDraw((VkCommandBuffer)commandBuffers[i].GetHandle(), VertexBuffer->VertexStreamData->ElementCount, 1, 0, 0);
+		}
 
 		// Finishing up
 		RenderPasses[i]->EndRenderPass();
@@ -1718,7 +1376,6 @@ void jRHI_Vulkan::RecreateSwapChain()
 	//CreateCommandBuffers();		// Swapchain images 과 연관 있어서 다시 만듬
 }
 
-#include "jCamera.h"
 void jRHI_Vulkan::UpdateUniformBuffer(uint32_t currentImage)
 {
 	static auto startTime = std::chrono::high_resolution_clock::now();
@@ -1851,7 +1508,7 @@ jVertexBuffer* jRHI_Vulkan::CreateVertexBuffer(const std::shared_ptr<jVertexStre
 			}
 			break;
 		}
-		case EBufferElementType::UNSIGNED_INT:
+		case EBufferElementType::UINT32:
 		{
 			const int32 elementCount = iter->Stride / sizeof(uint32);
 			switch (elementCount)
@@ -2501,12 +2158,6 @@ bool jRenderPass_Vulkan::CreateRenderPass()
 
 	// Create framebuffer
 	{
-		ETextureType textureType = ETextureType::TEXTURE_2D;
-
-		std::vector<jFrameBuffer*> ColorRT;
-		jFrameBuffer* DepthRT = nullptr;
-		jFrameBuffer* ResolveRT = nullptr;
-
 		std::vector<VkImageView> ImageViews;
 
 		for (int32 k = 0; k < ColorAttachments.size(); ++k)
@@ -2735,7 +2386,7 @@ void jShadingBindingInstance::Bind(const jCommandBuffer_Vulkan& commandBuffer) c
 {
 	check(ShaderBindings);
 	check(ShaderBindings->PipelineLayout);
-	vkCmdBindDescriptorSets(commandBuffer.Get(), VK_PIPELINE_BIND_POINT_GRAPHICS, ShaderBindings->PipelineLayout, 0, 1, &DescriptorSet, 0, nullptr);
+	vkCmdBindDescriptorSets((VkCommandBuffer)commandBuffer.GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, ShaderBindings->PipelineLayout, 0, 1, &DescriptorSet, 0, nullptr);
 }
 
 bool jCommandBufferManager_Vulkan::CratePool(uint32 QueueIndex)
@@ -2791,7 +2442,7 @@ void jCommandBufferManager_Vulkan::ReturnCommandBuffer(jCommandBuffer_Vulkan com
 {
 	for (int32 i = 0; i < UsingCommandBuffers.size(); ++i)
 	{
-		if (UsingCommandBuffers[i].Get() == commandBuffer.Get())
+		if (UsingCommandBuffers[i].GetHandle() == commandBuffer.GetHandle())
 		{
 			UsingCommandBuffers.erase(UsingCommandBuffers.begin() + i);
 			break;
@@ -2826,7 +2477,7 @@ void jShaderBindingsManager_Vulkan::Release(VkDescriptorPool pool) const
 
 void jVertexBuffer_Vulkan::Bind(const jCommandBuffer_Vulkan& commandBuffer) const
 {
-	vkCmdBindVertexBuffers(commandBuffer.Get(), 0, (uint32)BindInfos.Buffers.size(), &BindInfos.Buffers[0], &BindInfos.Offsets[0]);
+	vkCmdBindVertexBuffers((VkCommandBuffer)commandBuffer.GetHandle(), 0, (uint32)BindInfos.Buffers.size(), &BindInfos.Buffers[0], &BindInfos.Offsets[0]);
 }
 
 VkPipeline jPipelineStateInfo::CreateGraphicsPipelineState()

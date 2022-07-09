@@ -330,10 +330,10 @@ void CreateShadowVolume(const std::vector<float>& vertices, const std::vector<ui
 {
 	ownerObject->VertexAdjacency = jVertexAdjacency::GenerateVertexAdjacencyInfo(vertices, faces);
 	ownerObject->ShadowVolumeGPU = new jShadowVolumeGPU(ownerObject->VertexAdjacency);
-	ownerObject->ShadowVolumeGPU->CreateShadowVolumeObject();
+	//ownerObject->ShadowVolumeGPU->CreateShadowVolumeObject();
 
 	ownerObject->ShadowVolumeCPU = new jShadowVolumeCPU(ownerObject->VertexAdjacency);
-	ownerObject->ShadowVolumeCPU->CreateShadowVolumeObject();
+	//ownerObject->ShadowVolumeCPU->CreateShadowVolumeObject();
 }
 
 void CreateBoundObjects(const std::vector<float>& vertices, jObject* ownerObject)
@@ -518,7 +518,7 @@ jBoundSphereObject* CreateBoundSphere(jBoundSphere boundSphere, jObject* ownerOb
 	{
 		auto streamParam = new jStreamParam<uint32>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->ElementType = EBufferElementType::UNSIGNED_INT;
+		streamParam->ElementType = EBufferElementType::UINT32;
 		streamParam->ElementTypeSize = sizeof(uint32);
 		streamParam->Stride = sizeof(uint32) * 3;
 		streamParam->Name = jName("Index");
@@ -1222,7 +1222,7 @@ jObject* CreateCapsule(const Vector& pos, float height, float radius, int32 slic
 	{
 		auto streamParam = new jStreamParam<uint32>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->ElementType = EBufferElementType::UNSIGNED_INT;
+		streamParam->ElementType = EBufferElementType::UINT32;
 		streamParam->ElementTypeSize = sizeof(uint32);
 		streamParam->Stride = sizeof(uint32) * 3;
 		streamParam->Name = jName("Index");
@@ -1619,7 +1619,7 @@ jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector
 	{
 		auto streamParam = new jStreamParam<uint32>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->ElementType = EBufferElementType::UNSIGNED_INT;
+		streamParam->ElementType = EBufferElementType::UINT32;
 		streamParam->ElementTypeSize = sizeof(uint32);
 		streamParam->Stride = sizeof(uint32) * 3;
 		streamParam->Name = jName("Index");

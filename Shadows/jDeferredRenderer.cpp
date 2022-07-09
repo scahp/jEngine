@@ -213,7 +213,7 @@ void jDeferredRenderer::DebugRenderPass(const jCamera* camera)
 {
 	SCOPE_DEBUG_EVENT(g_rhi, "DebugRenderPass");
 
-	if (GBuffer.Begin())
+	if (GBuffer.GBufferBegin())
 	{
 		const jPipelineContext data(nullptr, jObject::GetDebugObject(), camera, {});
 		for (auto& iter : PipelineSet->DebugRenderPass)
@@ -226,7 +226,7 @@ void jDeferredRenderer::BoundVolumeRenderPass(const jCamera* camera)
 {
 	SCOPE_DEBUG_EVENT(g_rhi, "BoundVolumeRenderPass");
 
-	if (GBuffer.Begin())
+	if (GBuffer.GBufferBegin())
 	{
 		if (jShadowAppSettingProperties::GetInstance().ShowBoundBox)
 		{

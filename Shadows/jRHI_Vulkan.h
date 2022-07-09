@@ -131,26 +131,7 @@ struct jUniformBufferObject
 class jRenderPass_Vulkan : public jRenderPass
 {
 public:
-    
-	jRenderPass_Vulkan() = default;
-	jRenderPass_Vulkan(const jAttachment* colorAttachment, const jAttachment* depthAttachment, const jAttachment* colorResolveAttachment, const Vector2i& offset, const Vector2i& extent)
-    {
-        SetAttachemnt(colorAttachment, depthAttachment, colorResolveAttachment);
-		SetRenderArea(offset, extent);
-    }
-
-    void SetAttachemnt(const jAttachment* colorAttachment, const jAttachment* depthAttachment, const jAttachment* colorResolveAttachment)
-    {
-        ColorAttachments.push_back(colorAttachment);
-        DepthAttachment = depthAttachment;
-        ColorAttachmentResolve = colorResolveAttachment;
-    }
-
-	void SetRenderArea(const Vector2i& offset, const Vector2i& extent)
-	{
-		RenderOffset = offset;
-		RenderExtent = extent;
-	}
+	using jRenderPass::jRenderPass;
 
     bool CreateRenderPass();
     void Release();
@@ -158,9 +139,9 @@ public:
 	void* GetRenderPass() const { return RenderPass; }
 	FORCEINLINE const VkRenderPass& GetRenderPassRaw() const { return RenderPass; }
 
-	bool BeginRenderPass(const VkCommandBuffer& commandBuffer)
+	virtual bool BeginRenderPass(const jCommandBuffer* commandBuffer) override
 	{
-		if (!ensure(!CommandBuffer))
+		if (!ensure(commandBuffer))
 			return false;
 
 		CommandBuffer = commandBuffer;
@@ -171,16 +152,16 @@ public:
         // 커맨드를 기록하는 명령어는 prefix로 모두 vkCmd 가 붙으며, 리턴값은 void 로 에러 핸들링은 따로 안함.
         // VK_SUBPASS_CONTENTS_INLINE : 렌더 패스 명령이 Primary 커맨드 버퍼에 포함되며, Secondary 커맨드 버퍼는 실행되지 않는다.
         // VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS : 렌더 패스 명령이 Secondary 커맨드 버퍼에서 실행된다.
-        vkCmdBeginRenderPass(commandBuffer, &RenderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+        vkCmdBeginRenderPass((VkCommandBuffer)commandBuffer->GetHandle(), &RenderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 		return true;
     }
 
-	void EndRenderPass()
+	virtual void EndRenderPass() override
 	{
 		ensure(CommandBuffer);
 
         // Finishing up
-        vkCmdEndRenderPass(CommandBuffer);
+        vkCmdEndRenderPass((VkCommandBuffer)CommandBuffer->GetHandle());
 		CommandBuffer = nullptr;
 	}
 
@@ -193,7 +174,7 @@ public:
 	}
 
 private:
-	VkCommandBuffer CommandBuffer = nullptr;
+	const jCommandBuffer* CommandBuffer = nullptr;
 
 	VkRenderPassBeginInfo RenderPassInfo;
 	std::vector<VkClearValue> ClearValues;
@@ -311,19 +292,19 @@ struct jTexture_Vulkan : public jTexture
     VkDeviceMemory ImageMemory = nullptr;
 	VkSampler SamplerState = nullptr;
 
-	virtual void* GetHandle() const override { return ImageView; }
-	virtual void* GetSamplerStateHandle() const override { return SamplerState; }
+	virtual const void* GetHandle() const override { return ImageView; }
+	virtual const void* GetSamplerStateHandle() const override { return SamplerState; }
 
 	static VkSampler CreateDefaultSamplerState();
 };
 
-class jCommandBuffer_Vulkan // base 없음
+class jCommandBuffer_Vulkan : public jCommandBuffer
 {
 public:
-	FORCEINLINE VkCommandBuffer Get() const { return CommandBuffer; }
+	virtual void* GetHandle() const override { return CommandBuffer; }
 	FORCEINLINE VkCommandBuffer& GetRef() { return CommandBuffer; }
 
-	bool Begin()
+	virtual bool Begin() const override
 	{
 		VkCommandBufferBeginInfo beginInfo = {};
 		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -341,7 +322,7 @@ public:
 		
 		return true;
 	}
-	bool End()
+	virtual bool End() const override
 	{
 		if (!ensure(vkEndCommandBuffer(CommandBuffer) == VK_SUCCESS))
 			return false;
@@ -497,10 +478,10 @@ struct jIndexBuffer_Vulkan : public jIndexBuffer
 		case EBufferElementType::BYTE:
 			IndexType = VK_INDEX_TYPE_UINT8_EXT;
 			break;
-		//case EBufferElementType::UNSIGNED_SHORT:		// 지원여부 확인 필요
-		//	IndexType = VK_INDEX_TYPE_UINT16;
-		//	break;
-		case EBufferElementType::UNSIGNED_INT:
+		case EBufferElementType::UINT16:
+			IndexType = VK_INDEX_TYPE_UINT16;
+			break;
+		case EBufferElementType::UINT32:
 			IndexType = VK_INDEX_TYPE_UINT32;
 			break;
 		case EBufferElementType::FLOAT:
@@ -509,7 +490,7 @@ struct jIndexBuffer_Vulkan : public jIndexBuffer
 		default:
 			break;
 		}
-		vkCmdBindIndexBuffer(commandBuffer.Get(), IndexBuffer, 0, IndexType);
+		vkCmdBindIndexBuffer((VkCommandBuffer)commandBuffer.GetHandle(), IndexBuffer, 0, IndexType);
 	}
 
 	FORCEINLINE uint32 GetIndexCount() const
@@ -1407,6 +1388,7 @@ public:
 	}
 	bool CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) const
 	{
+		check(size);
 		VkBufferCreateInfo bufferInfo = {};
 		bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 		bufferInfo.size = size;

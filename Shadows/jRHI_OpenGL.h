@@ -35,6 +35,7 @@ struct jIndexBuffer_OpenGL : public jIndexBuffer
 struct jTexture_OpenGL : public jTexture
 {
 	uint32 TextureID = 0;
+	virtual const void* GetHandle() const override { return &TextureID; }
 };
 
 struct jFrameBuffer_OpenGL : public jFrameBuffer
@@ -47,10 +48,46 @@ struct jFrameBuffer_OpenGL : public jFrameBuffer
 	uint32 mrt_rbo = 0;
 	std::vector<uint32> mrt_drawBuffers;
 
-	virtual bool Begin(int index = 0, bool mrt = false) const override;
+	virtual bool FBOBegin(int index = 0, bool mrt = false) const override;
 	virtual void End() const override;
 	virtual bool SetDepthAttachment(const std::shared_ptr<jTexture>& InDepth) override;
 	virtual void SetDepthMipLevel(int32 InLevel) override;
+};
+
+
+class jRenderPass_OpenGL : public jRenderPass
+{
+public:
+	using jRenderPass::jRenderPass;
+
+	virtual ~jRenderPass_OpenGL() {}
+
+	bool CreateRenderPass();
+	void Release();
+
+	virtual bool BeginRenderPass(const jCommandBuffer* commandBuffer) override
+	{
+		glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+		if (drawBuffers.empty())
+			glDrawBuffer(GL_NONE);
+		else
+			glDrawBuffers(static_cast<int32>(drawBuffers.size()), &drawBuffers[0]);
+
+		//glViewport(0, 0, Info.Width, Info.Height);
+		////glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+		////glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		return true;
+	}
+	virtual void EndRenderPass() override
+	{
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		//glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+	}
+
+	uint32 fbo = 0;
+	std::vector<uint32> drawBuffers;
+	//std::vector<uint32> rbos;
 };
 
 struct jUniformBufferBlock_OpenGL : public IUniformBufferBlock
@@ -222,7 +259,7 @@ public:
 
 	virtual int32 SetMatetrial(const jMaterialData* materialData, const jShader* shader, int32 baseBindingIndex = 0) const override;
 	virtual void SetTexture(int32 index, const jTexture* texture) const override;
-	virtual void SetTextureFilter(ETextureType type, ETextureFilterTarget target, ETextureFilter filter) const override;
+	virtual void SetTextureFilter(ETextureType type, int32 sampleCount, ETextureFilterTarget target, ETextureFilter filter) const override;
 	virtual void EnableCullFace(bool enable) const override;
 	virtual void SetFrontFace(EFrontFace frontFace) const override;
 	virtual void EnableCullMode(ECullMode cullMode) const override;
@@ -274,12 +311,13 @@ public:
 	virtual void EndQueryPrimitiveGenerated() const override;
 	virtual void GetQueryPrimitiveGeneratedResult(jQueryPrimitiveGenerated* query) const override;
 	virtual void EnableRasterizerDiscard(bool enable) const override;
-	virtual void SetTextureMipmapLevelLimit(ETextureType type, int32 baseLevel, int32 maxLevel) const override;
+	virtual void SetTextureMipmapLevelLimit(ETextureType type, int32 sampleCount, int32 baseLevel, int32 maxLevel) const override;
 	virtual void EnableMultisample(bool enable) const override;
 	virtual void SetCubeMapSeamless(bool enable) const override;
 	virtual void SetLineWidth(float width) const override;
 	virtual void Flush() const override;
 	virtual void Finish() const override;
+	virtual std::shared_ptr<jRenderTarget> CreateRenderTarget(const jRenderTargetInfo& info) const override;
 
 	//////////////////////////////////////////////////////////////////////////
 	int32 GetUniformLocation(uint32 InProgram, const char* name) const;

@@ -28,6 +28,7 @@
 #elif USE_VULKAN
 #include "jRHI_Vulkan.h"
 #endif
+#include "jRenderTargetPool.h"
 
 jRHI* g_rhi = nullptr;
 

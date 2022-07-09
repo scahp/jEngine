@@ -43,7 +43,8 @@ enum class EBufferType : uint8
 enum class EBufferElementType : uint8
 {
 	BYTE,
-	UNSIGNED_INT,
+	UINT16,
+	UINT32,
 	FLOAT,
 	MAX,
 };
