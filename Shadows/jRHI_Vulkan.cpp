@@ -633,6 +633,7 @@ bool jRHI_Vulkan::InitRHI()
 	ShaderBindings.UniformBuffers.push_back(TBindings(0, EShaderAccessStageFlag::VERTEX));
 	ShaderBindings.Textures.push_back(TBindings(1, EShaderAccessStageFlag::FRAGMENT));
 	ShaderBindings.CreateDescriptorSetLayout();
+	ShaderBindings.CreatePipelineLayout();
 	ShaderBindings.CreatePool();
 	ShaderBindingInstances = ShaderBindings.CreateShaderBindingInstance((int32)swapChainImageViews.size());
 	for (int32 i = 0; i < ShaderBindingInstances.size(); ++i)
@@ -643,53 +644,6 @@ bool jRHI_Vulkan::InitRHI()
 	}
 
 	ensure(LoadModel());
-
-	{
-		jShaderInfo shaderInfo;
-		shaderInfo.name = "default_test";
-		shaderInfo.vs = "Shaders/Vulkan/shader_vs.glsl";
-		shaderInfo.fs = "Shaders/Vulkan/shader_fs.glsl";
-		auto Shader = g_rhi->CreateShader(shaderInfo);
-
-		auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
-		jMultisampleStateInfo* MultisampleState = nullptr;
-		switch (msaaSamples)
-		{
-		case VK_SAMPLE_COUNT_1_BIT:
-			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_1, true, 0.2f, false, false>::Create();
-			break;
-		case VK_SAMPLE_COUNT_2_BIT:
-			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_2, true, 0.2f, false, false>::Create();
-			break;
-		case VK_SAMPLE_COUNT_4_BIT:
-			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_4, true, 0.2f, false, false>::Create();
-			break;
-		case VK_SAMPLE_COUNT_8_BIT:
-			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_8, true, 0.2f, false, false>::Create();
-			break;
-		case VK_SAMPLE_COUNT_16_BIT:
-			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_16, true, 0.2f, false, false>::Create();
-			break;
-		case VK_SAMPLE_COUNT_32_BIT:
-			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_32, true, 0.2f, false, false>::Create();
-			break;
-		case VK_SAMPLE_COUNT_64_BIT:
-			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_64, true, 0.2f, false, false>::Create();
-			break;
-		default:
-			break;
-		}
-		auto DepthStencilState = TDepthStencilStateInfo<true, true, ECompareOp::LESS, false, false, nullptr, nullptr, 0.0f, 1.0f>::Create();
-		auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
-
-		for (int32 i = 0; i < swapChainImageViews.size(); ++i)
-		{
-			PipelineState = jPipelineStateInfo(Shader, VertexBuffer, &ShaderBindings, RenderPasses[i], RasterizationState, MultisampleState, DepthStencilState, BlendingState
-				, jViewport(0.0f, 0.0f, (float)swapChainExtent.width, (float)swapChainExtent.height), jScissor(0, 0, swapChainExtent.width, swapChainExtent.height));
-
-			graphicsPipelines.push_back(PipelineState.CreateGraphicsPipelineState());
-		}
-	}
 
     ensure(RecordCommandBuffers());
 
@@ -941,127 +895,132 @@ bool jRHI_Vulkan::CreateDepthResources()
 
 bool jRHI_Vulkan::LoadModel()
 {
-	tinyobj::attrib_t attrib;
-	std::vector<tinyobj::shape_t> shapes;
-	std::vector<tinyobj::material_t> materials;
-	std::string warn, err;
+	TestCube = jPrimitiveUtil::CreateCube(Vector::ZeroVector, Vector::OneVector, Vector::OneVector, Vector4::ColorRed);
+	VertexBuffer = TestCube->RenderObject->VertexBuffer;
+	IndexBuffer = TestCube->RenderObject->IndexBuffer;
+	return true;
 
-	if (!ensure(tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, MODEL_PATH.c_str())))
-		return false;
+	//tinyobj::attrib_t attrib;
+	//std::vector<tinyobj::shape_t> shapes;
+	//std::vector<tinyobj::material_t> materials;
+	//std::string warn, err;
 
-	struct jVertexHashFunc
-	{
-		std::size_t operator()(const Vector& pos, const Vector2& texCoord, const Vector& color) const
-		{
-			size_t result = 0;
-			result = std::hash<float>{}(pos.x);
-			result ^= std::hash<float>{}(pos.y);
-			result ^= std::hash<float>{}(pos.z);
-			result ^= std::hash<float>{}(color.x);
-			result ^= std::hash<float>{}(color.y);
-			result ^= std::hash<float>{}(color.z);
-			result ^= std::hash<float>{}(texCoord.x);
-			result ^= std::hash<float>{}(texCoord.y);
-			return result;
-		}
-	};
+	//if (!ensure(tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, MODEL_PATH.c_str())))
+	//	return false;
 
-	std::unordered_map<size_t, uint32> uniqueVertices = {};
+	//struct jVertexHashFunc
+	//{
+	//	std::size_t operator()(const Vector& pos, const Vector2& texCoord, const Vector& color) const
+	//	{
+	//		size_t result = 0;
+	//		result = std::hash<float>{}(pos.x);
+	//		result ^= std::hash<float>{}(pos.y);
+	//		result ^= std::hash<float>{}(pos.z);
+	//		result ^= std::hash<float>{}(color.x);
+	//		result ^= std::hash<float>{}(color.y);
+	//		result ^= std::hash<float>{}(color.z);
+	//		result ^= std::hash<float>{}(texCoord.x);
+	//		result ^= std::hash<float>{}(texCoord.y);
+	//		return result;
+	//	}
+	//};
 
-	std::vector<float> vertices_temp;
-	std::vector<float> texCoords_temp;
-	std::vector<float> colors_temp;
-	std::vector<uint32> indices;
+	//std::unordered_map<size_t, uint32> uniqueVertices = {};
 
-	for (const auto& shape : shapes)
-	{
-		for (const auto& index : shape.mesh.indices)
-		{
-			Vector pos = {
-				attrib.vertices[3 * index.vertex_index + 0],
-				attrib.vertices[3 * index.vertex_index + 1],
-				attrib.vertices[3 * index.vertex_index + 2]
-			};
+	//std::vector<float> vertices_temp;
+	//std::vector<float> texCoords_temp;
+	//std::vector<float> colors_temp;
+	//std::vector<uint32> indices;
 
-			Vector2 texCoord = {
-				attrib.texcoords[2 * index.texcoord_index + 0],
-				1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
-			};
+	//for (const auto& shape : shapes)
+	//{
+	//	for (const auto& index : shape.mesh.indices)
+	//	{
+	//		Vector pos = {
+	//			attrib.vertices[3 * index.vertex_index + 0],
+	//			attrib.vertices[3 * index.vertex_index + 1],
+	//			attrib.vertices[3 * index.vertex_index + 2]
+	//		};
 
-			Vector color = { 1.0f, 1.0f, 1.0f };
+	//		Vector2 texCoord = {
+	//			attrib.texcoords[2 * index.texcoord_index + 0],
+	//			1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
+	//		};
 
-			const size_t hash = jVertexHashFunc()(pos, texCoord, color);
-			if (uniqueVertices.count(hash) == 0)
-			{
-				uniqueVertices[hash] = static_cast<uint32>(vertices_temp.size() / 3);
+	//		Vector color = { 1.0f, 1.0f, 1.0f };
 
-				vertices_temp.push_back(pos.x);
-				vertices_temp.push_back(pos.y);
-				vertices_temp.push_back(pos.z);
+	//		const size_t hash = jVertexHashFunc()(pos, texCoord, color);
+	//		if (uniqueVertices.count(hash) == 0)
+	//		{
+	//			uniqueVertices[hash] = static_cast<uint32>(vertices_temp.size() / 3);
 
-				texCoords_temp.push_back(texCoord.x);
-				texCoords_temp.push_back(texCoord.y);
+	//			vertices_temp.push_back(pos.x);
+	//			vertices_temp.push_back(pos.y);
+	//			vertices_temp.push_back(pos.z);
 
-				colors_temp.push_back(color.x);
-				colors_temp.push_back(color.y);
-				colors_temp.push_back(color.z);
-			}
+	//			texCoords_temp.push_back(texCoord.x);
+	//			texCoords_temp.push_back(texCoord.y);
 
-			indices.push_back(uniqueVertices[hash]);
-		}
-	}
+	//			colors_temp.push_back(color.x);
+	//			colors_temp.push_back(color.y);
+	//			colors_temp.push_back(color.z);
+	//		}
 
-	auto vertexStreamData = std::shared_ptr<jVertexStreamData>(new jVertexStreamData());
-	vertexStreamData->PrimitiveType = EPrimitiveType::TRIANGLES;
-	vertexStreamData->ElementCount = (uint32)(vertices_temp.size() / 3);
+	//		indices.push_back(uniqueVertices[hash]);
+	//	}
+	//}
 
-	{
-		auto streamParam = new jStreamParam<float>();
-		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->ElementTypeSize = sizeof(float);
-		streamParam->ElementType = EBufferElementType::FLOAT;
-		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = jName("Pos");
-		streamParam->Data = std::move(vertices_temp);
-		vertexStreamData->Params.push_back(streamParam);
-	}
+	//auto vertexStreamData = std::shared_ptr<jVertexStreamData>(new jVertexStreamData());
+	//vertexStreamData->PrimitiveType = EPrimitiveType::TRIANGLES;
+	//vertexStreamData->ElementCount = (uint32)(vertices_temp.size() / 3);
 
-	{
-		auto streamParam = new jStreamParam<float>();
-		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->ElementType = EBufferElementType::FLOAT;
-		streamParam->ElementTypeSize = sizeof(float);
-		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = jName("Color");
-		streamParam->Data = std::move(colors_temp);
-		vertexStreamData->Params.push_back(streamParam);
-	}
+	//{
+	//	auto streamParam = new jStreamParam<float>();
+	//	streamParam->BufferType = EBufferType::STATIC;
+	//	streamParam->ElementTypeSize = sizeof(float);
+	//	streamParam->ElementType = EBufferElementType::FLOAT;
+	//	streamParam->Stride = sizeof(float) * 3;
+	//	streamParam->Name = jName("Pos");
+	//	streamParam->Data = std::move(vertices_temp);
+	//	vertexStreamData->Params.push_back(streamParam);
+	//}
 
-	{
-		auto streamParam = new jStreamParam<float>();
-		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->ElementType = EBufferElementType::FLOAT;
-		streamParam->ElementTypeSize = sizeof(float);
-		streamParam->Stride = sizeof(float) * 2;
-		streamParam->Name = jName("TexCoord");
-		streamParam->Data = std::move(texCoords_temp);
-		vertexStreamData->Params.push_back(streamParam);
-	}
-	VertexBuffer = g_rhi_vk->CreateVertexBuffer(vertexStreamData);
+	//{
+	//	auto streamParam = new jStreamParam<float>();
+	//	streamParam->BufferType = EBufferType::STATIC;
+	//	streamParam->ElementType = EBufferElementType::FLOAT;
+	//	streamParam->ElementTypeSize = sizeof(float);
+	//	streamParam->Stride = sizeof(float) * 3;
+	//	streamParam->Name = jName("Color");
+	//	streamParam->Data = std::move(colors_temp);
+	//	vertexStreamData->Params.push_back(streamParam);
+	//}
 
-	auto indexStreamData = std::shared_ptr<jIndexStreamData>(new jIndexStreamData());
-	indexStreamData->ElementCount = static_cast<int32>(indices.size());
-	{
-		auto streamParam = new jStreamParam<uint32>();
-		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->ElementType = EBufferElementType::UINT32;
-		streamParam->ElementTypeSize = sizeof(uint32);
-		streamParam->Stride = sizeof(uint32) * 3;
-		streamParam->Name = jName("Index");
-		streamParam->Data = std::move(indices);
-		indexStreamData->Param = streamParam;
-	}
-	IndexBuffer = g_rhi_vk->CreateIndexBuffer(indexStreamData);
+	//{
+	//	auto streamParam = new jStreamParam<float>();
+	//	streamParam->BufferType = EBufferType::STATIC;
+	//	streamParam->ElementType = EBufferElementType::FLOAT;
+	//	streamParam->ElementTypeSize = sizeof(float);
+	//	streamParam->Stride = sizeof(float) * 2;
+	//	streamParam->Name = jName("TexCoord");
+	//	streamParam->Data = std::move(texCoords_temp);
+	//	vertexStreamData->Params.push_back(streamParam);
+	//}
+	//VertexBuffer = g_rhi_vk->CreateVertexBuffer(vertexStreamData);
+
+	//auto indexStreamData = std::shared_ptr<jIndexStreamData>(new jIndexStreamData());
+	//indexStreamData->ElementCount = static_cast<int32>(indices.size());
+	//{
+	//	auto streamParam = new jStreamParam<uint32>();
+	//	streamParam->BufferType = EBufferType::STATIC;
+	//	streamParam->ElementType = EBufferElementType::UINT32;
+	//	streamParam->ElementTypeSize = sizeof(uint32);
+	//	streamParam->Stride = sizeof(uint32) * 3;
+	//	streamParam->Name = jName("Index");
+	//	streamParam->Data = std::move(indices);
+	//	indexStreamData->Param = streamParam;
+	//}
+	//IndexBuffer = g_rhi_vk->CreateIndexBuffer(indexStreamData);
 
 	return true;
 }
@@ -1097,6 +1056,54 @@ jIndexBuffer* jRHI_Vulkan::CreateIndexBuffer(const std::shared_ptr<jIndexStreamD
 
 bool jRHI_Vulkan::RecordCommandBuffers()
 {
+	VkPipeline pipeline = nullptr;
+	{
+		jShaderInfo shaderInfo;
+		shaderInfo.name = "default_test";
+		shaderInfo.vs = "Shaders/Vulkan/shader_vs.glsl";
+		shaderInfo.fs = "Shaders/Vulkan/shader_fs.glsl";
+		auto Shader = g_rhi->CreateShader(shaderInfo);
+
+		auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
+		jMultisampleStateInfo* MultisampleState = nullptr;
+		switch (msaaSamples)
+		{
+		case VK_SAMPLE_COUNT_1_BIT:
+			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_1, true, 0.2f, false, false>::Create();
+			break;
+		case VK_SAMPLE_COUNT_2_BIT:
+			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_2, true, 0.2f, false, false>::Create();
+			break;
+		case VK_SAMPLE_COUNT_4_BIT:
+			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_4, true, 0.2f, false, false>::Create();
+			break;
+		case VK_SAMPLE_COUNT_8_BIT:
+			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_8, true, 0.2f, false, false>::Create();
+			break;
+		case VK_SAMPLE_COUNT_16_BIT:
+			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_16, true, 0.2f, false, false>::Create();
+			break;
+		case VK_SAMPLE_COUNT_32_BIT:
+			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_32, true, 0.2f, false, false>::Create();
+			break;
+		case VK_SAMPLE_COUNT_64_BIT:
+			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_64, true, 0.2f, false, false>::Create();
+			break;
+		default:
+			break;
+		}
+		auto DepthStencilState = TDepthStencilStateInfo<true, true, ECompareOp::LESS, false, false, nullptr, nullptr, 0.0f, 1.0f>::Create();
+		auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
+
+		CurrentPipelineStateFixed = new jPipelineStateFixedInfo(Shader, RasterizationState, MultisampleState, DepthStencilState, BlendingState
+			, jViewport(0.0f, 0.0f, (float)swapChainExtent.width, (float)swapChainExtent.height), jScissor(0, 0, swapChainExtent.width, swapChainExtent.height));
+
+		//CurrentPipelineState = new jPipelineStateInfo(Shader, TestCube->RenderObject->VertexBuffer, &ShaderBindings, RenderPasses[i], RasterizationState, MultisampleState, DepthStencilState, BlendingState
+		//	, jViewport(0.0f, 0.0f, (float)swapChainExtent.width, (float)swapChainExtent.height), jScissor(0, 0, swapChainExtent.width, swapChainExtent.height));
+
+		//CurrentPipelineState->CreateGraphicsPipelineState();
+	}
+
 	// Begin command buffers
 	for (int32 i = 0; i < swapChainImageViews.size(); ++i)
 	{
@@ -1105,25 +1112,19 @@ bool jRHI_Vulkan::RecordCommandBuffers()
 		if (!ensure(commandBuffers[i].Begin()))
 			return false;
 
-		RenderPasses[i]->BeginRenderPass(&commandBuffers[i]);
+		CurrentCommandBuffer = &commandBuffers[i];
 
-		// Basic drawing commands
-		vkCmdBindPipeline((VkCommandBuffer)commandBuffers[i].GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipelines[i]);
+		RenderPasses[i]->BeginRenderPass(&commandBuffers[i]);
 
 		ShaderBindingInstances[i].Bind(commandBuffers[i]);
 
-		((jVertexBuffer_Vulkan*)VertexBuffer)->Bind(commandBuffers[i]);
-		if (IndexBuffer)
-			((jIndexBuffer_Vulkan*)IndexBuffer)->Bind(commandBuffers[i]);
+		CurrentPipelineStateInfo = new jPipelineStateInfo(CurrentPipelineStateFixed, VertexBuffer, &ShaderBindings, RenderPasses[i]);
+		auto pipeline = CurrentPipelineStateInfo->CreateGraphicsPipelineState();
 
-		if (IndexBuffer)
-		{
-			vkCmdDrawIndexed((VkCommandBuffer)commandBuffers[i].GetHandle(), ((jIndexBuffer_Vulkan*)IndexBuffer)->GetIndexCount(), 1, 0, 0, 0);
-		}
-		else
-		{
-			vkCmdDraw((VkCommandBuffer)commandBuffers[i].GetHandle(), VertexBuffer->VertexStreamData->ElementCount, 1, 0, 0);
-		}
+		// Basic drawing commands
+		vkCmdBindPipeline((VkCommandBuffer)commandBuffers[i].GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+
+		TestCube->Draw(MainCamera, shader, {}, 1);
 
 		// Finishing up
 		RenderPasses[i]->EndRenderPass();
@@ -1916,6 +1917,42 @@ jBlendingStateInfo* jRHI_Vulkan::CreateBlendingState(const jBlendingStateInfo& i
 	return state;
 }
 
+void jRHI_Vulkan::DrawArrays(EPrimitiveType type, int32 vertStartIndex, int32 vertCount) const
+{
+	check(CurrentCommandBuffer);
+	vkCmdDraw((VkCommandBuffer)CurrentCommandBuffer->GetHandle(), vertCount, 1, vertStartIndex, 0);
+}
+
+void jRHI_Vulkan::DrawArraysInstanced(EPrimitiveType type, int32 vertStartIndex, int32 vertCount, int32 instanceCount) const
+{
+	check(CurrentCommandBuffer);
+	vkCmdDraw((VkCommandBuffer)CurrentCommandBuffer->GetHandle(), vertCount, instanceCount, vertStartIndex, 0);
+}
+
+void jRHI_Vulkan::DrawElements(EPrimitiveType type, int32 elementSize, int32 startIndex, int32 count) const
+{
+	check(CurrentCommandBuffer);
+	vkCmdDrawIndexed((VkCommandBuffer)CurrentCommandBuffer->GetHandle(), elementSize, 1, startIndex, 0, 0);
+}
+
+void jRHI_Vulkan::DrawElementsInstanced(EPrimitiveType type, int32 elementSize, int32 startIndex, int32 count, int32 instanceCount) const
+{
+	check(CurrentCommandBuffer);
+	vkCmdDrawIndexed((VkCommandBuffer)CurrentCommandBuffer->GetHandle(), elementSize, instanceCount, startIndex, 0, 0);
+}
+
+void jRHI_Vulkan::DrawElementsBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex) const
+{
+	check(CurrentCommandBuffer);
+	vkCmdDrawIndexed((VkCommandBuffer)CurrentCommandBuffer->GetHandle(), elementSize, 1, startIndex, baseVertexIndex, 0);
+}
+
+void jRHI_Vulkan::DrawElementsInstancedBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex, int32 instanceCount) const
+{
+	check(CurrentCommandBuffer);
+	vkCmdDrawIndexed((VkCommandBuffer)CurrentCommandBuffer->GetHandle(), elementSize, instanceCount, startIndex, baseVertexIndex, 0);
+}
+
 void jRenderPass_Vulkan::Release()
 {
     vkDestroyRenderPass(g_rhi_vk->device, RenderPass, nullptr);
@@ -2475,13 +2512,40 @@ void jShaderBindingsManager_Vulkan::Release(VkDescriptorPool pool) const
 		vkDestroyDescriptorPool(g_rhi_vk->device, pool, nullptr);
 }
 
-void jVertexBuffer_Vulkan::Bind(const jCommandBuffer_Vulkan& commandBuffer) const
+void jVertexBuffer_Vulkan::Bind() const
 {
-	vkCmdBindVertexBuffers((VkCommandBuffer)commandBuffer.GetHandle(), 0, (uint32)BindInfos.Buffers.size(), &BindInfos.Buffers[0], &BindInfos.Offsets[0]);
+	check(g_rhi_vk->CurrentCommandBuffer);
+	vkCmdBindVertexBuffers((VkCommandBuffer)g_rhi_vk->CurrentCommandBuffer->GetHandle(), 0, (uint32)BindInfos.Buffers.size(), &BindInfos.Buffers[0], &BindInfos.Offsets[0]);
+}
+
+void jIndexBuffer_Vulkan::Bind() const
+{
+	VkIndexType IndexType = VK_INDEX_TYPE_UINT16;
+	switch (IndexStreamData->Param->ElementType)
+	{
+	case EBufferElementType::BYTE:
+		IndexType = VK_INDEX_TYPE_UINT8_EXT;
+		break;
+	case EBufferElementType::UINT16:
+		IndexType = VK_INDEX_TYPE_UINT16;
+		break;
+	case EBufferElementType::UINT32:
+		IndexType = VK_INDEX_TYPE_UINT32;
+		break;
+	case EBufferElementType::FLOAT:
+		check(0);
+		break;
+	default:
+		break;
+	}
+	check(g_rhi_vk->CurrentCommandBuffer);
+	vkCmdBindIndexBuffer((VkCommandBuffer)g_rhi_vk->CurrentCommandBuffer->GetHandle(), IndexBuffer, 0, IndexType);
 }
 
 VkPipeline jPipelineStateInfo::CreateGraphicsPipelineState()
 {
+	check(PipelineStateFixed);
+
 	Hash = CreateHash();
 	check(Hash);
 	{
@@ -2500,6 +2564,7 @@ VkPipeline jPipelineStateInfo::CreateGraphicsPipelineState()
 	// 그리고 Viewports 사이즈는 SwapChain 크기 이하로 마추면 됨.
 	// [minDepth ~ maxDepth] 는 [0.0 ~ 1.0] 이며 특별한 경우가 아니면 이 범위로 사용하면 된다.
 	// Scissor Rect 영역을 설정해주면 영역내에 있는 Pixel만 레스터라이저를 통과할 수 있으며 나머지는 버려(Discard)진다.
+	const auto& Viewports = PipelineStateFixed->Viewports;
 	check(Viewports.size());
 	std::vector<VkViewport> vkViewports;
 	vkViewports.resize(Viewports.size());
@@ -2513,6 +2578,7 @@ VkPipeline jPipelineStateInfo::CreateGraphicsPipelineState()
 		vkViewports[i].maxDepth = Viewports[i].MaxDepth;
 	}
 
+	const auto& Scissors = PipelineStateFixed->Scissors;
 	check(Scissors.size());
 	std::vector<VkRect2D> vkScissor;
 	vkScissor.resize(Scissors.size());
@@ -2542,7 +2608,7 @@ VkPipeline jPipelineStateInfo::CreateGraphicsPipelineState()
 
 	// 1). 기존과 새로운 값을 섞어서 최종색을 만들어낸다.
 	colorBlending.attachmentCount = 1;						// framebuffer 개수에 맞게 설정해준다.
-	colorBlending.pAttachments = &((jBlendingStateInfo_Vulakn*)BlendingState)->ColorBlendAttachmentInfo;
+	colorBlending.pAttachments = &((jBlendingStateInfo_Vulakn*)PipelineStateFixed->BlendingState)->ColorBlendAttachmentInfo;
 
 	colorBlending.blendConstants[0] = 0.0f;		// Optional
 	colorBlending.blendConstants[1] = 0.0f;		// Optional
@@ -2563,7 +2629,7 @@ VkPipeline jPipelineStateInfo::CreateGraphicsPipelineState()
 	//dynamicState.pDynamicStates = dynamicStates;
 
 	// 10. Pipeline layout
-	VkPipelineLayout pipelineLayout = ShaderBindings->CreatePipelineLayout();
+	VkPipelineLayout pipelineLayout = ShaderBindings->PipelineLayout;
 	check(pipelineLayout);
 
 	VkGraphicsPipelineCreateInfo pipelineInfo = {};
@@ -2572,16 +2638,16 @@ VkPipeline jPipelineStateInfo::CreateGraphicsPipelineState()
 	// Shader stage
 	//pipelineInfo.stageCount = 2;
 	//pipelineInfo.pStages = shaderStage;
-	pipelineInfo.stageCount = (uint32)((jShader_Vulkan*)Shader)->ShaderStages.size();
-	pipelineInfo.pStages = ((jShader_Vulkan*)Shader)->ShaderStages.data();
+	pipelineInfo.stageCount = (uint32)((jShader_Vulkan*)PipelineStateFixed->Shader)->ShaderStages.size();
+	pipelineInfo.pStages = ((jShader_Vulkan*)PipelineStateFixed->Shader)->ShaderStages.data();
 
 	// Fixed-function stage
 	pipelineInfo.pVertexInputState = &vertexInputInfo;
 	pipelineInfo.pInputAssemblyState = &inputAssembly;
 	pipelineInfo.pViewportState = &viewportState;
-	pipelineInfo.pRasterizationState = &((jRasterizationStateInfo_Vulkan*)RasterizationState)->RasterizationStateInfo;
-	pipelineInfo.pMultisampleState = &((jMultisampleStateInfo_Vulkan*)MultisampleState)->MultisampleStateInfo;
-	pipelineInfo.pDepthStencilState = &((jDepthStencilStateInfo_Vulkan*)DepthStencilState)->DepthStencilStateInfo;
+	pipelineInfo.pRasterizationState = &((jRasterizationStateInfo_Vulkan*)PipelineStateFixed->RasterizationState)->RasterizationStateInfo;
+	pipelineInfo.pMultisampleState = &((jMultisampleStateInfo_Vulkan*)PipelineStateFixed->MultisampleState)->MultisampleStateInfo;
+	pipelineInfo.pDepthStencilState = &((jDepthStencilStateInfo_Vulkan*)PipelineStateFixed->DepthStencilState)->DepthStencilStateInfo;
 	pipelineInfo.pColorBlendState = &colorBlending;
 	pipelineInfo.pDynamicState = nullptr;			// Optional
 	pipelineInfo.layout = pipelineLayout;
@@ -2606,8 +2672,9 @@ VkPipeline jPipelineStateInfo::CreateGraphicsPipelineState()
 		return nullptr;
 	}
 
+	PipelineStatePool.insert(std::make_pair(Hash, vkPipeline));
+
 	return vkPipeline;
 }
 
 #endif // USE_VULKAN
-

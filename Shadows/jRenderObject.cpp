@@ -73,7 +73,7 @@ void jRenderObject::UpdateVertexStream()
 
 void jRenderObject::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 startIndex, int32 count, int32 instanceCount)
 {
-	if (VertexBuffer->VertexStreamData)
+	if (!VertexBuffer->VertexStreamData)
 		return;
 
 	g_rhi->SetShader(shader);
@@ -201,10 +201,17 @@ void jRenderObject::DrawBaseVertexIndex(const jCamera* camera, const jShader* sh
 
 void jRenderObject::SetRenderProperty(const jShader* shader)
 {
+#if USE_OPENGL
 	if (VertexBuffer)
 		VertexBuffer->Bind(shader);
 	if (IndexBuffer)
 		IndexBuffer->Bind(shader);
+#elif USE_VULKAN
+	if (VertexBuffer)
+		VertexBuffer->Bind();
+	if (IndexBuffer)
+		IndexBuffer->Bind();
+#endif
 }
 
 void jRenderObject::UpdateWorldMatrix()
