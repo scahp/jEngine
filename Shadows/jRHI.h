@@ -713,6 +713,8 @@ struct jShaderBindings
 	std::vector<TBindings> UniformBuffers;
 	std::vector<TBindings> Textures;
 
+	FORCEINLINE int32 GetNextBindingIndex() const { return (int32)(UniformBuffers.size() + Textures.size()); };
+
 	virtual jShaderBindingInstance* CreateShaderBindingInstance() const { return nullptr; }
 	virtual std::vector<jShaderBindingInstance*> CreateShaderBindingInstance(int32 count) const { return {}; }
 

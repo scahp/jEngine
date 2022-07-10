@@ -1099,60 +1099,58 @@ bool jRHI_Vulkan::RecordCommandBuffers()
 	shaderInfo.fs = "Shaders/Vulkan/shader_fs.glsl";
 	auto Shader = g_rhi->CreateShader(shaderInfo);
 
-	class jView
-	{
-	public:
-		jView() = default;
-		jView(jCamera* camera, jLight* directionalLight, jLight* pointLight, jLight* spotLight)
-			: Camera(camera), DirectionalLight(directionalLight), PointLight(pointLight), SpotLight(spotLight)
-		{}
+	//class jView
+	//{
+	//public:
+	//	jView() = default;
+	//	jView(jCamera* camera, jLight* directionalLight, jLight* pointLight, jLight* spotLight)
+	//		: Camera(camera), DirectionalLight(directionalLight), PointLight(pointLight), SpotLight(spotLight)
+	//	{}
 
-		jShaderBindings* ShaderBindings = nullptr;
-		jShaderBindingInstance* ShaderBindingInstances = nullptr;
+	//	jShaderBindings* ShaderBindings = nullptr;
+	//	jShaderBindingInstance* ShaderBindingInstances = nullptr;
 
-		void CreateShaderBindings()
-		{
-			ShaderBindings = g_rhi->CreateShaderBindings();
-			int32 Index = 0;
-			if (Camera)
-				ShaderBindings->UniformBuffers.push_back(TBindings(0, EShaderAccessStageFlag::VERTEX));
-			++Index;
-			if (DirectionalLight)
-				ShaderBindings->UniformBuffers.push_back(TBindings(1, EShaderAccessStageFlag::VERTEX));
-			++Index;
-			if (PointLight)
-				ShaderBindings->UniformBuffers.push_back(TBindings(2, EShaderAccessStageFlag::VERTEX));
-			++Index;
-			if (SpotLight)
-				ShaderBindings->UniformBuffers.push_back(TBindings(3, EShaderAccessStageFlag::VERTEX));
-			++Index;
-			ShaderBindings->CreateDescriptorSetLayout();
-			ShaderBindings->CreatePool();
+	//	void CreateShaderBindings()
+	//	{
+	//		ShaderBindings = g_rhi->CreateShaderBindings();
+	//		int32 Index = 0;
+	//		if (Camera)
+	//			ShaderBindings->UniformBuffers.push_back(TBindings(0, EShaderAccessStageFlag::VERTEX));
+	//		++Index;
+	//		if (DirectionalLight)
+	//			ShaderBindings->UniformBuffers.push_back(TBindings(1, EShaderAccessStageFlag::VERTEX));
+	//		++Index;
+	//		if (PointLight)
+	//			ShaderBindings->UniformBuffers.push_back(TBindings(2, EShaderAccessStageFlag::VERTEX));
+	//		++Index;
+	//		if (SpotLight)
+	//			ShaderBindings->UniformBuffers.push_back(TBindings(3, EShaderAccessStageFlag::VERTEX));
+	//		++Index;
+	//		ShaderBindings->CreateDescriptorSetLayout();
+	//		ShaderBindings->CreatePool();
 
-			ShaderBindingInstances = ShaderBindings->CreateShaderBindingInstance();
-			if (Camera)
-				ShaderBindingInstances->UniformBuffers.push_back(Camera->UniformBufferBlock);
-			if (DirectionalLight)
-				ShaderBindingInstances->UniformBuffers.push_back(DirectionalLight->GetUniformBufferBlock());
-			if (PointLight)
-				ShaderBindingInstances->UniformBuffers.push_back(PointLight->GetUniformBufferBlock());
-			if (SpotLight)
-				ShaderBindingInstances->UniformBuffers.push_back(SpotLight->GetUniformBufferBlock());
-			ShaderBindingInstances->UpdateShaderBindings();
-		}
+	//		ShaderBindingInstances = ShaderBindings->CreateShaderBindingInstance();
+	//		if (Camera)
+	//			ShaderBindingInstances->UniformBuffers.push_back(Camera->UniformBufferBlock);
+	//		if (DirectionalLight)
+	//			ShaderBindingInstances->UniformBuffers.push_back(DirectionalLight->GetUniformBufferBlock());
+	//		if (PointLight)
+	//			ShaderBindingInstances->UniformBuffers.push_back(PointLight->GetUniformBufferBlock());
+	//		if (SpotLight)
+	//			ShaderBindingInstances->UniformBuffers.push_back(SpotLight->GetUniformBufferBlock());
+	//		ShaderBindingInstances->UpdateShaderBindings();
+	//	}
 
-		void Update()
-		{
-		}
+	//	jCamera* Camera = nullptr;
+	//	jLight* DirectionalLight = nullptr;
+	//	jLight* PointLight = nullptr;
+	//	jLight* SpotLight = nullptr;
+	//};
+	TestCube->RenderObject->UpdateWorldMatrix();
 
-		jCamera* Camera = nullptr;
-		jLight* DirectionalLight = nullptr;
-		jLight* PointLight = nullptr;
-		jLight* SpotLight = nullptr;
-	};
-
-	jView ViewDependentData;
-	ViewDependentData.Update();
+	const Vector mainCameraPos(172.66f, 160.0f, -180.63f);
+	const Vector mainCameraTarget(0.0f, 0.0f, 0.0f);
+	static auto MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 10.0f, 1000.0f, SCR_WIDTH, SCR_HEIGHT, true);
 
 	class jDrawCommand
 	{
@@ -1163,6 +1161,54 @@ bool jRHI_Vulkan::RecordCommandBuffers()
 
 		void PrepareToDraw()
 		{
+			{
+				static bool IsInitialized = false;
+				static auto RenderObjectParameterShaderBindings = g_rhi->CreateShaderBindings();
+				if (!IsInitialized)
+				{
+					RenderObjectParameterShaderBindings->UniformBuffers.push_back(TBindings(RenderObjectParameterShaderBindings->GetNextBindingIndex(), EShaderAccessStageFlag::VERTEX));
+					RenderObjectParameterShaderBindings->Textures.push_back(TBindings(RenderObjectParameterShaderBindings->GetNextBindingIndex(), EShaderAccessStageFlag::FRAGMENT));
+					RenderObjectParameterShaderBindings->CreateDescriptorSetLayout();
+					RenderObjectParameterShaderBindings->CreatePool();
+				}
+
+				struct jRenderObjectUniformParameters
+				{
+					Matrix M;
+					Matrix MV;
+					Matrix MVP;
+					Matrix InvM;
+				};
+
+				jRenderObjectUniformParameters Params;
+
+				Params.M = RenderObject->World;
+				const Matrix& View = MainCamera->View;
+				const Matrix& Projection = MainCamera->Projection;
+
+				Params.MV = View * Params.M;
+				Params.MVP = Projection * Params.MV;
+				Params.InvM = Params.M.GetInverse();
+
+				static IUniformBufferBlock* RenderObjectUniformParameters = g_rhi->CreateUniformBufferBlock("RenderObjectUniformParameters", sizeof(jRenderObjectUniformParameters));
+				RenderObjectUniformParameters->UpdateBufferData(&Params, sizeof(Params));
+
+				static jShaderBindingInstance* RenderObjectParameterShaderBindingInstance = RenderObjectParameterShaderBindings->CreateShaderBindingInstance();
+				if (!IsInitialized)
+				{
+					RenderObjectParameterShaderBindingInstance->UniformBuffers.push_back(RenderObjectUniformParameters);
+
+					jTextureBindings TextureBindings;
+					TextureBindings.texturePtr = jImageFileLoader::GetInstance().LoadTextureFromFile(jName("Image/sun.png"), true, true).lock();
+					TextureBindings.samplerStatePtr = std::shared_ptr<jSamplerStateInfo>(TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR>::Create());
+					RenderObjectParameterShaderBindingInstance->Textures.push_back(TextureBindings);
+				}
+				ShaderBindingInstances.push_back(RenderObjectParameterShaderBindingInstance);
+
+				RenderObjectParameterShaderBindingInstance->UpdateShaderBindings();
+				IsInitialized = true;
+			}
+
 			void* pipelineLayout = g_rhi->CreatePipelineLayout(ShaderBindingInstances);
 			std::vector<const jShaderBindings*> shaderBindings;
 			for (int32 i = 0; i < ShaderBindingInstances.size(); ++i)
@@ -1210,9 +1256,6 @@ bool jRHI_Vulkan::RecordCommandBuffers()
 		jDrawCommand command(TestCube->RenderObject, RenderPasses[i], Shader, CurrentPipelineStateFixed, { ShaderBindingInstances[i] });
 		command.PrepareToDraw();
 		command.Draw();
-		//ShaderBindingInstances[i].Bind();
-
-		//TestCube->Draw(MainCamera, shader, {}, 1);
 
 		// Finishing up
 		RenderPasses[i]->EndRenderPass();
@@ -2458,6 +2501,7 @@ jShaderBindingInstance* jShaderBindings_Vulkan::CreateShaderBindingInstance() co
     allocInfo.pSetLayouts = &DescriptorSetLayout;
 
 	jShaderBindingInstance_Vulkan* Instance = new jShaderBindingInstance_Vulkan();
+	Instance->ShaderBindings = this;
 	if (!ensure(vkAllocateDescriptorSets(g_rhi_vk->device, &allocInfo, &Instance->DescriptorSet) == VK_SUCCESS))
 	{
 		delete Instance;
@@ -2522,7 +2566,7 @@ void jShaderBindingInstance_Vulkan::UpdateShaderBindings()
 
 	std::vector<VkDescriptorImageInfo> descriptorImages;
 	descriptorImages.resize(ShaderBindings->Textures.size());
-	for (int32 i = 0; i < ShaderBindings->UniformBuffers.size(); ++i)
+	for (int32 i = 0; i < ShaderBindings->Textures.size(); ++i)
 	{
 		descriptorImages[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		descriptorImages[i].imageView = (VkImageView)Textures[i].texturePtr->GetHandle();
