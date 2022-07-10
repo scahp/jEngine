@@ -281,7 +281,7 @@ public:
 	virtual void SetDepthFunc(ECompareOp func) const override;
 	virtual void SetDepthMask(bool enable) const override;
 	virtual void SetColorMask(bool r, bool g, bool b, bool a) const override;
-	virtual IUniformBufferBlock* CreateUniformBufferBlock(const char* blockname) const override;
+	virtual IUniformBufferBlock* CreateUniformBufferBlock(const char* blockname, size_t size = 0) const override;
 	virtual void EnableSRGB(bool enable) const override;
 	virtual IShaderStorageBufferObject* CreateShaderStorageBufferObject(const char* blockname) const override;
 	virtual IAtomicCounterBuffer* CreateAtomicCounterBuffer(const char* name, int32 bindingPoint) const override;

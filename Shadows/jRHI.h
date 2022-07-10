@@ -82,15 +82,15 @@ struct jViewport
 	float MinDepth = 0.0f;
 	float MaxDepth = 1.0f;
 
-	size_t CreateHash()
+	size_t CreateHash() const
 	{
 		size_t result = 0;
 		result = std::hash<float>{}(X);
-		result = std::hash<float>{}(Y);
-		result = std::hash<float>{}(Width);
-		result = std::hash<float>{}(Height);
-		result = std::hash<float>{}(MinDepth);
-		result = std::hash<float>{}(MaxDepth);
+		result ^= std::hash<float>{}(Y);
+		result ^= std::hash<float>{}(Width);
+		result ^= std::hash<float>{}(Height);
+		result ^= std::hash<float>{}(MinDepth);
+		result ^= std::hash<float>{}(MaxDepth);
 		return result;
 	}
 };
@@ -104,13 +104,13 @@ struct jScissor
 	Vector2i Offset;
 	Vector2i Extent;
 
-	size_t CreateHash()
+	size_t CreateHash() const
 	{
 		size_t result = 0;
 		result = std::hash<int32>{}(Offset.x);
-		result = std::hash<int32>{}(Offset.y);
-		result = std::hash<int32>{}(Extent.x);
-		result = std::hash<int32>{}(Extent.y);
+		result ^= std::hash<int32>{}(Offset.y);
+		result ^= std::hash<int32>{}(Extent.x);
+		result ^= std::hash<int32>{}(Extent.y);
 		return result;
 	}
 };
@@ -170,18 +170,23 @@ static int32 GetBindPoint()
 struct IUniformBufferBlock : public IBuffer
 {
 	IUniformBufferBlock() = default;
-	IUniformBufferBlock(const std::string& name)
-		: Name(name)
+	IUniformBufferBlock(const std::string& name, size_t size = 0)
+		: Name(name), Size(size)
 	{}
 	virtual ~IUniformBufferBlock() {}
 
 	std::string Name;
 	size_t Size = 0;
 
+	FORCEINLINE size_t GetBufferSize() const { return Size; }
+
 	virtual void Init() = 0;
 	virtual void Bind(const jShader* shader) const override { }
 	virtual void UpdateBufferData(const void* newData, size_t size) = 0;
 	virtual void ClearBuffer(int32 clearValue = 0) = 0;
+	
+	virtual void* GetBuffer() const { return nullptr; }
+	virtual void* GetBufferMemory() const { return nullptr; }
 };
 
 struct IShaderStorageBufferObject : public IBuffer
@@ -668,6 +673,62 @@ public:
 	Vector2i RenderExtent;
 };
 
+
+struct TBindings
+{
+	TBindings() = default;
+	TBindings(int32 bindingPoint, EShaderAccessStageFlag accessStageFlags)
+		: BindingPoint(bindingPoint), AccessStageFlags(accessStageFlags)
+	{ }
+
+	int32 BindingPoint = 0;
+	EShaderAccessStageFlag AccessStageFlags = EShaderAccessStageFlag::ALL_GRAPHICS;
+};
+
+struct jTextureBindings
+{
+	std::shared_ptr<jTexture> texturePtr;
+	std::shared_ptr<jSamplerStateInfo> samplerStatePtr;
+};
+
+struct jShaderBindingInstance
+{
+	virtual ~jShaderBindingInstance() {}
+
+	const struct jShaderBindings* ShaderBindings = nullptr;
+	std::vector<IUniformBufferBlock*> UniformBuffers;
+	std::vector<jTextureBindings> Textures;
+
+	virtual void UpdateShaderBindings() {}
+	virtual void Bind(void* pipelineLayout, int32 InSlot = 0) const {}
+};
+
+struct jShaderBindings
+{
+	virtual ~jShaderBindings() {}
+
+	virtual bool CreateDescriptorSetLayout() { return false; }
+	virtual void CreatePool() {}
+
+	std::vector<TBindings> UniformBuffers;
+	std::vector<TBindings> Textures;
+
+	virtual jShaderBindingInstance* CreateShaderBindingInstance() const { return nullptr; }
+	virtual std::vector<jShaderBindingInstance*> CreateShaderBindingInstance(int32 count) const { return {}; }
+
+	virtual size_t GetHash() const;
+
+	FORCEINLINE static size_t CreateShaderBindingsHash(const std::vector<const jShaderBindings*>& shaderBindings)
+	{
+		size_t result = 0;
+		for (int32 i = 0; i < shaderBindings.size(); ++i)
+		{
+			result ^= shaderBindings[i]->GetHash();
+		}
+		return result;
+	}
+};
+
 class jRHI
 {
 public:
@@ -760,7 +821,7 @@ public:
 	virtual void SetDepthFunc(ECompareOp func) const {}
 	virtual void SetDepthMask(bool enable) const {}
 	virtual void SetColorMask(bool r, bool g, bool b, bool a) const {}
-	virtual IUniformBufferBlock* CreateUniformBufferBlock(const char* blockname) const { return nullptr; }
+	virtual IUniformBufferBlock* CreateUniformBufferBlock(const char* blockname, size_t size = 0) const { return nullptr; }
 	virtual IShaderStorageBufferObject* CreateShaderStorageBufferObject(const char* blockname) const { return nullptr; }
 	virtual IAtomicCounterBuffer* CreateAtomicCounterBuffer(const char* name, int32 bindingPoint) const { return nullptr; }
 	virtual ITransformFeedbackBuffer* CreateTransformFeedbackBuffer(const char* name) const { return nullptr; }
@@ -797,6 +858,23 @@ public:
 	virtual jStencilOpStateInfo* CreateStencilOpStateInfo(const jStencilOpStateInfo& initializer) const { return nullptr; }
 	virtual jDepthStencilStateInfo* CreateDepthStencilState(const jDepthStencilStateInfo& initializer) const { return nullptr; }
 	virtual jBlendingStateInfo* CreateBlendingState(const jBlendingStateInfo& initializer) const { return nullptr; }
+
+	virtual jShaderBindings* CreateShaderBindings() const { check(0); return nullptr; }
+
+	virtual void* CreatePipelineLayout(const std::vector<const jShaderBindings*>& shaderBindings) const { return nullptr; }
+	virtual void* CreatePipelineLayout(const std::vector<const jShaderBindingInstance*>& shaderBindingInstances) const { return nullptr; }
+
+	template <typename T>
+	FORCEINLINE T* CreatePipelineLayout(const std::vector<const jShaderBindings*>& shaderBindings)
+	{
+		return (T*)CreatePipelineLayout(shaderBindings);
+	}
+
+	template <typename T>
+	FORCEINLINE T* CreatePipelineLayout(const std::vector<const jShaderBindingInstance*>& shaderBindingInstances)
+	{
+		return (T*)CreatePipelineLayout(shaderBindingInstances);
+	}
 };
 
 // Not thred safe
@@ -1023,3 +1101,4 @@ struct TBlendingStateInfo
 		return g_rhi->CreateBlendingState(initializer);
 	}
 };
+

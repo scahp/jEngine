@@ -127,6 +127,7 @@ public:
 	virtual jCamera* GetLightCamra(int index = 0) const { return nullptr; }
 	virtual void RenderToShadowMap(const RenderToShadowMapFunc& func, const jShader* shader) const {}
 	virtual void Update(float deltaTime) { }
+	virtual IUniformBufferBlock* GetUniformBufferBlock() const { return nullptr; }
 
 	const ELightType Type = ELightType::MAX;
 	jObject* LightDebugObject = nullptr;
@@ -205,6 +206,7 @@ public:
 
 	virtual void RenderToShadowMap(const RenderToShadowMapFunc& func, const jShader* shader) const override;
 	virtual void Update(float deltaTime) override;
+	virtual IUniformBufferBlock* GetUniformBufferBlock() const override { return LightDataUniformBlock; }
 
 	jMaterialData MaterialData;
 	void UpdateMaterialData();
@@ -293,6 +295,7 @@ public:
 
 	virtual void RenderToShadowMap(const RenderToShadowMapFunc& func, const jShader* shader) const override;
 	virtual void Update(float deltaTime) override;
+	virtual IUniformBufferBlock* GetUniformBufferBlock() const override { return LightDataUniformBlock; }
 
 	jMaterialData MaterialData;
 	void UpdateMaterialData();
@@ -365,6 +368,7 @@ public:
 
 	virtual void RenderToShadowMap(const RenderToShadowMapFunc& func, const jShader* shader) const override;
 	virtual void Update(float deltaTime) override;
+	virtual IUniformBufferBlock* GetUniformBufferBlock() const override { return LightDataUniformBlock; }
 
 	jMaterialData MaterialData;
 	void UpdateMaterialData();

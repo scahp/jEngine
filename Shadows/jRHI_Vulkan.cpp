@@ -21,6 +21,7 @@ uint32_t textureMipLevels;
 
 jRHI_Vulkan* g_rhi_vk = nullptr;
 std::unordered_map<size_t, VkPipeline> jPipelineStateInfo::PipelineStatePool;
+std::unordered_map<size_t, VkPipelineLayout> jRHI_Vulkan::PipelineLayoutPool;
 
 //////////////////////////////////////////////////////////////////////////
 // Auto generate type conversion code
@@ -623,8 +624,8 @@ bool jRHI_Vulkan::InitRHI()
 
 	for (int32 i = 0; i < swapChainImageViews.size(); ++i)
 	{
-		IEmptyUniform* UniformBuffer = new EmptyUniform<jUniformBufferObject>();
-		UniformBuffer->Create();
+		IUniformBufferBlock* UniformBuffer = g_rhi->CreateUniformBufferBlock("jUniformBufferObject", sizeof(jUniformBufferObject));
+		UniformBuffer->UpdateBufferData(nullptr, sizeof(jUniformBufferObject));
 		UniformBuffers.push_back(UniformBuffer);
 	}
 	std::weak_ptr<jTexture> Texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName("chalet.jpg"), true, true);
@@ -633,14 +634,13 @@ bool jRHI_Vulkan::InitRHI()
 	ShaderBindings.UniformBuffers.push_back(TBindings(0, EShaderAccessStageFlag::VERTEX));
 	ShaderBindings.Textures.push_back(TBindings(1, EShaderAccessStageFlag::FRAGMENT));
 	ShaderBindings.CreateDescriptorSetLayout();
-	ShaderBindings.CreatePipelineLayout();
 	ShaderBindings.CreatePool();
 	ShaderBindingInstances = ShaderBindings.CreateShaderBindingInstance((int32)swapChainImageViews.size());
 	for (int32 i = 0; i < ShaderBindingInstances.size(); ++i)
 	{
-		ShaderBindingInstances[i].UniformBuffers.push_back(UniformBuffers[i]);
-		ShaderBindingInstances[i].Textures.push_back({ Texture.lock(), SamplerStatePtr });
-		ShaderBindingInstances[i].UpdateShaderBindings();
+		ShaderBindingInstances[i]->UniformBuffers.push_back(UniformBuffers[i]);
+		ShaderBindingInstances[i]->Textures.push_back({ .texturePtr=Texture.lock(), .samplerStatePtr=SamplerStatePtr });
+		ShaderBindingInstances[i]->UpdateShaderBindings();
 	}
 
 	ensure(LoadModel());
@@ -1058,12 +1058,6 @@ bool jRHI_Vulkan::RecordCommandBuffers()
 {
 	VkPipeline pipeline = nullptr;
 	{
-		jShaderInfo shaderInfo;
-		shaderInfo.name = "default_test";
-		shaderInfo.vs = "Shaders/Vulkan/shader_vs.glsl";
-		shaderInfo.fs = "Shaders/Vulkan/shader_fs.glsl";
-		auto Shader = g_rhi->CreateShader(shaderInfo);
-
 		auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
 		jMultisampleStateInfo* MultisampleState = nullptr;
 		switch (msaaSamples)
@@ -1095,14 +1089,111 @@ bool jRHI_Vulkan::RecordCommandBuffers()
 		auto DepthStencilState = TDepthStencilStateInfo<true, true, ECompareOp::LESS, false, false, nullptr, nullptr, 0.0f, 1.0f>::Create();
 		auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
 
-		CurrentPipelineStateFixed = new jPipelineStateFixedInfo(Shader, RasterizationState, MultisampleState, DepthStencilState, BlendingState
+		CurrentPipelineStateFixed = new jPipelineStateFixedInfo(RasterizationState, MultisampleState, DepthStencilState, BlendingState
 			, jViewport(0.0f, 0.0f, (float)swapChainExtent.width, (float)swapChainExtent.height), jScissor(0, 0, swapChainExtent.width, swapChainExtent.height));
-
-		//CurrentPipelineState = new jPipelineStateInfo(Shader, TestCube->RenderObject->VertexBuffer, &ShaderBindings, RenderPasses[i], RasterizationState, MultisampleState, DepthStencilState, BlendingState
-		//	, jViewport(0.0f, 0.0f, (float)swapChainExtent.width, (float)swapChainExtent.height), jScissor(0, 0, swapChainExtent.width, swapChainExtent.height));
-
-		//CurrentPipelineState->CreateGraphicsPipelineState();
 	}
+
+	jShaderInfo shaderInfo;
+	shaderInfo.name = "default_test";
+	shaderInfo.vs = "Shaders/Vulkan/shader_vs.glsl";
+	shaderInfo.fs = "Shaders/Vulkan/shader_fs.glsl";
+	auto Shader = g_rhi->CreateShader(shaderInfo);
+
+	class jView
+	{
+	public:
+		jView() = default;
+		jView(jCamera* camera, jLight* directionalLight, jLight* pointLight, jLight* spotLight)
+			: Camera(camera), DirectionalLight(directionalLight), PointLight(pointLight), SpotLight(spotLight)
+		{}
+
+		jShaderBindings* ShaderBindings = nullptr;
+		jShaderBindingInstance* ShaderBindingInstances = nullptr;
+
+		void CreateShaderBindings()
+		{
+			ShaderBindings = g_rhi->CreateShaderBindings();
+			int32 Index = 0;
+			if (Camera)
+				ShaderBindings->UniformBuffers.push_back(TBindings(0, EShaderAccessStageFlag::VERTEX));
+			++Index;
+			if (DirectionalLight)
+				ShaderBindings->UniformBuffers.push_back(TBindings(1, EShaderAccessStageFlag::VERTEX));
+			++Index;
+			if (PointLight)
+				ShaderBindings->UniformBuffers.push_back(TBindings(2, EShaderAccessStageFlag::VERTEX));
+			++Index;
+			if (SpotLight)
+				ShaderBindings->UniformBuffers.push_back(TBindings(3, EShaderAccessStageFlag::VERTEX));
+			++Index;
+			ShaderBindings->CreateDescriptorSetLayout();
+			ShaderBindings->CreatePool();
+
+			ShaderBindingInstances = ShaderBindings->CreateShaderBindingInstance();
+			if (Camera)
+				ShaderBindingInstances->UniformBuffers.push_back(Camera->UniformBufferBlock);
+			if (DirectionalLight)
+				ShaderBindingInstances->UniformBuffers.push_back(DirectionalLight->GetUniformBufferBlock());
+			if (PointLight)
+				ShaderBindingInstances->UniformBuffers.push_back(PointLight->GetUniformBufferBlock());
+			if (SpotLight)
+				ShaderBindingInstances->UniformBuffers.push_back(SpotLight->GetUniformBufferBlock());
+			ShaderBindingInstances->UpdateShaderBindings();
+		}
+
+		void Update()
+		{
+		}
+
+		jCamera* Camera = nullptr;
+		jLight* DirectionalLight = nullptr;
+		jLight* PointLight = nullptr;
+		jLight* SpotLight = nullptr;
+	};
+
+	jView ViewDependentData;
+	ViewDependentData.Update();
+
+	class jDrawCommand
+	{
+	public:
+		jDrawCommand(jRenderObject* renderObject, jRenderPass* renderPass, jShader* shader, jPipelineStateFixedInfo* pipelineStateFixed, std::vector<const jShaderBindingInstance*> shaderBindingInstances)
+			: RenderObject(renderObject), RenderPass(renderPass), Shader(shader), PipelineStateFixed(pipelineStateFixed), ShaderBindingInstances(shaderBindingInstances)
+		{}
+
+		void PrepareToDraw()
+		{
+			void* pipelineLayout = g_rhi->CreatePipelineLayout(ShaderBindingInstances);
+			std::vector<const jShaderBindings*> shaderBindings;
+			for (int32 i = 0; i < ShaderBindingInstances.size(); ++i)
+			{
+				ShaderBindingInstances[i]->Bind(pipelineLayout, i);
+				shaderBindings.push_back(ShaderBindingInstances[i]->ShaderBindings);
+			}
+
+			CurrentPipelineStateInfo = jPipelineStateInfo(PipelineStateFixed, Shader, RenderObject->VertexBuffer, RenderPass, shaderBindings);
+			auto vkPipeline = CurrentPipelineStateInfo.CreateGraphicsPipelineState();
+
+			// Basic drawing commands
+			check(g_rhi_vk->CurrentCommandBuffer);
+			vkCmdBindPipeline((VkCommandBuffer)g_rhi_vk->CurrentCommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipeline);
+		}
+		void Draw()
+		{
+			jCamera* camera = nullptr;
+			const std::list<const jLight*> lights = {};
+			RenderObject->Draw(camera, Shader, lights);
+		}
+
+		std::vector<const jShaderBindingInstance*> ShaderBindingInstances;
+		
+		jRenderPass* RenderPass = nullptr;
+		jShader* Shader = nullptr;
+		jRenderObject* RenderObject = nullptr;
+		jPipelineStateFixedInfo* PipelineStateFixed = nullptr;
+
+		jPipelineStateInfo CurrentPipelineStateInfo;
+	};
 
 	// Begin command buffers
 	for (int32 i = 0; i < swapChainImageViews.size(); ++i)
@@ -1116,15 +1207,12 @@ bool jRHI_Vulkan::RecordCommandBuffers()
 
 		RenderPasses[i]->BeginRenderPass(&commandBuffers[i]);
 
-		ShaderBindingInstances[i].Bind(commandBuffers[i]);
+		jDrawCommand command(TestCube->RenderObject, RenderPasses[i], Shader, CurrentPipelineStateFixed, { ShaderBindingInstances[i] });
+		command.PrepareToDraw();
+		command.Draw();
+		//ShaderBindingInstances[i].Bind();
 
-		CurrentPipelineStateInfo = new jPipelineStateInfo(CurrentPipelineStateFixed, VertexBuffer, &ShaderBindings, RenderPasses[i]);
-		auto pipeline = CurrentPipelineStateInfo->CreateGraphicsPipelineState();
-
-		// Basic drawing commands
-		vkCmdBindPipeline((VkCommandBuffer)commandBuffers[i].GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-
-		TestCube->Draw(MainCamera, shader, {}, 1);
+		//TestCube->Draw(MainCamera, shader, {}, 1);
 
 		// Finishing up
 		RenderPasses[i]->EndRenderPass();
@@ -1953,6 +2041,73 @@ void jRHI_Vulkan::DrawElementsInstancedBaseVertex(EPrimitiveType type, int eleme
 	vkCmdDrawIndexed((VkCommandBuffer)CurrentCommandBuffer->GetHandle(), elementSize, instanceCount, startIndex, baseVertexIndex, 0);
 }
 
+jShaderBindings* jRHI_Vulkan::CreateShaderBindings() const
+{
+	return new jShaderBindings_Vulkan();
+}
+
+void* jRHI_Vulkan::CreatePipelineLayout(const std::vector<const jShaderBindings*>& shaderBindings) const
+{
+	if (shaderBindings.size() <= 0)
+		return 0;
+
+	VkPipelineLayout vkPipelineLayout = nullptr;
+
+	const size_t hash = jShaderBindings::CreateShaderBindingsHash(shaderBindings);
+
+	auto it_find = PipelineLayoutPool.find(hash);
+	if (PipelineLayoutPool.end() != it_find)
+	{
+		vkPipelineLayout = it_find->second;
+	}
+	else
+	{
+		std::vector<VkDescriptorSetLayout> DescriptorSetLayouts;
+		DescriptorSetLayouts.reserve(shaderBindings.size());
+		for (const jShaderBindings* binding : shaderBindings)
+		{
+			const jShaderBindings_Vulkan* binding_vulkan = (const jShaderBindings_Vulkan*)binding;
+			DescriptorSetLayouts.push_back(binding_vulkan->DescriptorSetLayout);
+		}
+
+		// 쉐이더에 전달된 Uniform 들을 명세하기 위한 오브젝트
+		// 이 오브젝트는 프로그램 실행동안 계속해서 참조되므로 cleanup 에서 제거해줌
+		VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
+		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		pipelineLayoutInfo.setLayoutCount = (uint32)DescriptorSetLayouts.size();
+		pipelineLayoutInfo.pSetLayouts = &DescriptorSetLayouts[0];
+		pipelineLayoutInfo.pushConstantRangeCount = 0;		// Optional		// 쉐이더에 값을 constant 값을 전달 할 수 있음. 이후에 배움
+		pipelineLayoutInfo.pPushConstantRanges = nullptr;	// Optional
+		if (!ensure(vkCreatePipelineLayout(g_rhi_vk->device, &pipelineLayoutInfo, nullptr, &vkPipelineLayout) == VK_SUCCESS))
+			return nullptr;
+
+		PipelineLayoutPool.insert(std::make_pair(hash, vkPipelineLayout));
+	}
+
+	return vkPipelineLayout;
+}
+
+void* jRHI_Vulkan::CreatePipelineLayout(const std::vector<const jShaderBindingInstance*>& shaderBindingInstances) const
+{
+	if (shaderBindingInstances.size() <= 0)
+		return 0;
+
+	std::vector<const jShaderBindings*> bindings;
+	bindings.resize(shaderBindingInstances.size());
+	for (int32 i = 0; i < shaderBindingInstances.size(); ++i)
+	{
+		bindings[i] = shaderBindingInstances[i]->ShaderBindings;
+	}
+	return CreatePipelineLayout(bindings);
+}
+
+IUniformBufferBlock* jRHI_Vulkan::CreateUniformBufferBlock(const char* blockname, size_t size /*= 0*/) const
+{
+	auto uniformBufferBlock = new jUniformBufferBlock_Vulkan(blockname, size);
+	uniformBufferBlock->Init();
+	return uniformBufferBlock;
+}
+
 void jRenderPass_Vulkan::Release()
 {
     vkDestroyRenderPass(g_rhi_vk->device, RenderPass, nullptr);
@@ -2253,7 +2408,7 @@ bool jRenderPass_Vulkan::CreateRenderPass()
     return true;
 }
 
-bool jShaderBindings::CreateDescriptorSetLayout()
+bool jShaderBindings_Vulkan::CreateDescriptorSetLayout()
 {
     std::vector<VkDescriptorSetLayoutBinding> bindings;
 
@@ -2294,7 +2449,7 @@ bool jShaderBindings::CreateDescriptorSetLayout()
     return true;
 }
 
-jShadingBindingInstance jShaderBindings::CreateShaderBindingInstance() const
+jShaderBindingInstance* jShaderBindings_Vulkan::CreateShaderBindingInstance() const
 {
     VkDescriptorSetAllocateInfo allocInfo = {};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -2302,14 +2457,18 @@ jShadingBindingInstance jShaderBindings::CreateShaderBindingInstance() const
     allocInfo.descriptorSetCount = 1;
     allocInfo.pSetLayouts = &DescriptorSetLayout;
 
-	jShadingBindingInstance Instance = {};
-    if (!ensure(vkAllocateDescriptorSets(g_rhi_vk->device, &allocInfo, &Instance.DescriptorSet) == VK_SUCCESS))
-        return Instance;
+	jShaderBindingInstance_Vulkan* Instance = new jShaderBindingInstance_Vulkan();
+	if (!ensure(vkAllocateDescriptorSets(g_rhi_vk->device, &allocInfo, &Instance->DescriptorSet) == VK_SUCCESS))
+	{
+		delete Instance;
+		return nullptr;
+	}
+	CreatedBindingInstances.push_back(Instance);
 
 	return Instance;
 }
 
-std::vector<jShadingBindingInstance> jShaderBindings::CreateShaderBindingInstance(int32 count) const
+std::vector<jShaderBindingInstance*> jShaderBindings_Vulkan::CreateShaderBindingInstance(int32 count) const
 {
     std::vector<VkDescriptorSetLayout> descSetLayout(count, DescriptorSetLayout);
     VkDescriptorSetAllocateInfo allocInfo = {};
@@ -2318,7 +2477,7 @@ std::vector<jShadingBindingInstance> jShaderBindings::CreateShaderBindingInstanc
     allocInfo.descriptorSetCount = (uint32)descSetLayout.size();
     allocInfo.pSetLayouts = descSetLayout.data();
 
-    std::vector<jShadingBindingInstance> Instances;
+    std::vector<jShaderBindingInstance*> Instances;
 
 	std::vector<VkDescriptorSet> DescriptorSets;
 	DescriptorSets.resize(descSetLayout.size());
@@ -2328,37 +2487,23 @@ std::vector<jShadingBindingInstance> jShaderBindings::CreateShaderBindingInstanc
     Instances.resize(DescriptorSets.size());
 	for (int32 i = 0; i < DescriptorSets.size(); ++i)		// todo opt
 	{
-		Instances[i].DescriptorSet = DescriptorSets[i];
-		Instances[i].ShaderBindings = this;
+		auto NewBindingInstance = new jShaderBindingInstance_Vulkan();
+		CreatedBindingInstances.push_back(NewBindingInstance);
+		NewBindingInstance->DescriptorSet = DescriptorSets[i];
+		NewBindingInstance->ShaderBindings = this;
+
+		Instances[i] = NewBindingInstance;
 	}
 
     return Instances;
 }
 
-void jShaderBindings::CreatePool()
+void jShaderBindings_Vulkan::CreatePool()
 {
 	DescriptorPool = g_rhi_vk->ShaderBindingsManager.CreatePool(*this);
 }
 
-VkPipelineLayout jShaderBindings::CreatePipelineLayout()
-{
-	check(DescriptorSetLayout);
-
-	// 쉐이더에 전달된 Uniform 들을 명세하기 위한 오브젝트
-	// 이 오브젝트는 프로그램 실행동안 계속해서 참조되므로 cleanup 에서 제거해줌
-	VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
-	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	pipelineLayoutInfo.setLayoutCount = 1;
-	pipelineLayoutInfo.pSetLayouts = &DescriptorSetLayout;
-	pipelineLayoutInfo.pushConstantRangeCount = 0;		// Optional		// 쉐이더에 값을 constant 값을 전달 할 수 있음. 이후에 배움
-	pipelineLayoutInfo.pPushConstantRanges = nullptr;	// Optional
-	if (!ensure(vkCreatePipelineLayout(g_rhi_vk->device, &pipelineLayoutInfo, nullptr, &PipelineLayout) == VK_SUCCESS))
-		return nullptr;
-
-	return PipelineLayout;
-}
-
-void jShadingBindingInstance::UpdateShaderBindings()
+void jShaderBindingInstance_Vulkan::UpdateShaderBindings()
 {
 	check(ShaderBindings->UniformBuffers.size() == UniformBuffers.size());
 	check(ShaderBindings->Textures.size() == Textures.size());
@@ -2419,11 +2564,11 @@ void jShadingBindingInstance::UpdateShaderBindings()
 		, descriptorWrites.data(), 0, nullptr);
 }
 
-void jShadingBindingInstance::Bind(const jCommandBuffer_Vulkan& commandBuffer) const
+void jShaderBindingInstance_Vulkan::Bind(void* pipelineLayout, int32 InSlot) const
 {
-	check(ShaderBindings);
-	check(ShaderBindings->PipelineLayout);
-	vkCmdBindDescriptorSets((VkCommandBuffer)commandBuffer.GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, ShaderBindings->PipelineLayout, 0, 1, &DescriptorSet, 0, nullptr);
+	check(g_rhi_vk->CurrentCommandBuffer);
+	check(pipelineLayout);
+	vkCmdBindDescriptorSets((VkCommandBuffer)g_rhi_vk->CurrentCommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, (VkPipelineLayout)(pipelineLayout), InSlot, 1, &DescriptorSet, 0, nullptr);
 }
 
 bool jCommandBufferManager_Vulkan::CratePool(uint32 QueueIndex)
@@ -2488,7 +2633,7 @@ void jCommandBufferManager_Vulkan::ReturnCommandBuffer(jCommandBuffer_Vulkan com
 	PendingCommandBuffers.push_back(commandBuffer);
 }
 
-VkDescriptorPool jShaderBindingsManager_Vulkan::CreatePool(const jShaderBindings& bindings, uint32 maxAllocations) const
+VkDescriptorPool jShaderBindingsManager_Vulkan::CreatePool(const jShaderBindings_Vulkan& bindings, uint32 maxAllocations) const
 {
 	auto DescriptorPoolSizes = bindings.GetDescriptorPoolSizeArray(maxAllocations);
 
@@ -2544,6 +2689,10 @@ void jIndexBuffer_Vulkan::Bind() const
 
 VkPipeline jPipelineStateInfo::CreateGraphicsPipelineState()
 {
+	// 미리 만들어 둔게 있으면 사용
+	if (vkPipieline)
+		return vkPipieline;
+
 	check(PipelineStateFixed);
 
 	Hash = CreateHash();
@@ -2629,17 +2778,17 @@ VkPipeline jPipelineStateInfo::CreateGraphicsPipelineState()
 	//dynamicState.pDynamicStates = dynamicStates;
 
 	// 10. Pipeline layout
-	VkPipelineLayout pipelineLayout = ShaderBindings->PipelineLayout;
-	check(pipelineLayout);
+	VkPipelineLayout vkPipelineLayout = (VkPipelineLayout)g_rhi->CreatePipelineLayout(ShaderBindings);
 
 	VkGraphicsPipelineCreateInfo pipelineInfo = {};
 	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 
 	// Shader stage
+	check(Shader);
 	//pipelineInfo.stageCount = 2;
 	//pipelineInfo.pStages = shaderStage;
-	pipelineInfo.stageCount = (uint32)((jShader_Vulkan*)PipelineStateFixed->Shader)->ShaderStages.size();
-	pipelineInfo.pStages = ((jShader_Vulkan*)PipelineStateFixed->Shader)->ShaderStages.data();
+	pipelineInfo.stageCount = (uint32)((jShader_Vulkan*)Shader)->ShaderStages.size();
+	pipelineInfo.pStages = ((jShader_Vulkan*)Shader)->ShaderStages.data();
 
 	// Fixed-function stage
 	pipelineInfo.pVertexInputState = &vertexInputInfo;
@@ -2650,7 +2799,7 @@ VkPipeline jPipelineStateInfo::CreateGraphicsPipelineState()
 	pipelineInfo.pDepthStencilState = &((jDepthStencilStateInfo_Vulkan*)PipelineStateFixed->DepthStencilState)->DepthStencilStateInfo;
 	pipelineInfo.pColorBlendState = &colorBlending;
 	pipelineInfo.pDynamicState = nullptr;			// Optional
-	pipelineInfo.layout = pipelineLayout;
+	pipelineInfo.layout = vkPipelineLayout;
 	pipelineInfo.renderPass = (VkRenderPass)RenderPass->GetRenderPass();
 	pipelineInfo.subpass = 0;		// index of subpass
 
@@ -2662,19 +2811,64 @@ VkPipeline jPipelineStateInfo::CreateGraphicsPipelineState()
 	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;		// Optional
 	pipelineInfo.basePipelineIndex = -1;					// Optional
 
-	VkPipeline vkPipeline = nullptr;
-
 	// 여기서 두번째 파라메터 VkPipelineCache에 VK_NULL_HANDLE을 넘겼는데, VkPipelineCache는 VkPipeline을 저장하고 생성하는데 재사용할 수 있음.
 	// 또한 파일로드 저장할 수 있어서 다른 프로그램에서 다시 사용할 수도있다. VkPipelineCache를 사용하면 VkPipeline을 생성하는 시간을 
 	// 굉장히 빠르게 할수있다. (듣기로는 대략 1/10 의 속도로 생성해낼 수 있다고 함)
-	if (!ensure(vkCreateGraphicsPipelines(g_rhi_vk->device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &vkPipeline) == VK_SUCCESS))
+	if (!ensure(vkCreateGraphicsPipelines(g_rhi_vk->device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &vkPipieline) == VK_SUCCESS))
 	{
 		return nullptr;
 	}
 
-	PipelineStatePool.insert(std::make_pair(Hash, vkPipeline));
+	PipelineStatePool.insert(std::make_pair(Hash, vkPipieline));
 
-	return vkPipeline;
+	return vkPipieline;
 }
+
+
+void jUniformBufferBlock_Vulkan::Destroy()
+{
+	vkDestroyBuffer(g_rhi_vk->device, Bufffer, nullptr);
+	vkFreeMemory(g_rhi_vk->device, BufferMemory, nullptr);
+}
+
+void jUniformBufferBlock_Vulkan::Init()
+{
+	check(Size);
+	VkDeviceSize bufferSize = Size;
+
+	g_rhi_vk->CreateBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+		| VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, Bufffer, BufferMemory);
+}
+
+void jUniformBufferBlock_Vulkan::UpdateBufferData(const void* InData, size_t InSize)
+{
+	check(Size == InSize);
+	// 다르면 여기서 추가 작업을 해야 함.
+
+	Size = InSize;
+
+	if (Bufffer && BufferMemory)
+	{
+		void* data = nullptr;
+		vkMapMemory(g_rhi_vk->device, BufferMemory, 0, Size, 0, &data);
+		if (InData)
+			memcpy(data, InData, InSize);
+		else
+			memset(data, 0, InSize);
+		vkUnmapMemory(g_rhi_vk->device, BufferMemory);
+	}
+}
+
+void jUniformBufferBlock_Vulkan::ClearBuffer(int32 clearValue)
+{
+	if (Bufffer && BufferMemory)
+	{
+		void* data = nullptr;
+		vkMapMemory(g_rhi_vk->device, BufferMemory, 0, Size, 0, &data);
+		memset(data, clearValue, Size);
+		vkUnmapMemory(g_rhi_vk->device, BufferMemory);
+	}
+}
+
 
 #endif // USE_VULKAN

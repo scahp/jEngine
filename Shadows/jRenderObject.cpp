@@ -85,7 +85,7 @@ void jRenderObject::Draw(const jCamera* camera, const jShader* shader, const std
 	DynamicMaterialData.clear();
 
 	SetRenderProperty(shader);
-	SetCameraProperty(shader, camera);
+	//SetCameraProperty(shader, camera);
 	for (auto iter : lights)
 	{
 		auto matData = iter->GetMaterialData();

@@ -88,6 +88,8 @@ void jCamera::UpdateCamera()
 {
 	View = CreateView();
 	Projection = CreateProjection();
+
+	UpdateUniformBuffer();
 }
 
 void jCamera::AddLight(jLight* light)

@@ -182,47 +182,16 @@ private:
 	VkFramebuffer FrameBuffer = nullptr;
 };
 
-struct TBindings
+struct jShaderBindingInstance_Vulkan : public jShaderBindingInstance
 {
-	TBindings() = default;
-	TBindings(int32 bindingPoint, EShaderAccessStageFlag accessStageFlags)
-		: BindingPoint(bindingPoint), AccessStageFlags(accessStageFlags)
-	{ }
+	VkDescriptorSet DescriptorSet = nullptr;
 
-    int32 BindingPoint = 0;
-    EShaderAccessStageFlag AccessStageFlags = EShaderAccessStageFlag::ALL_GRAPHICS;
+	virtual void UpdateShaderBindings() override;
+	virtual void Bind(void* pipelineLayout, int32 InSlot = 0) const override;
 };
 
-struct IEmptyUniform
+struct jShaderBindings_Vulkan : public jShaderBindings
 {
-	virtual int32 GetBufferSize() const { return 0; }
-	virtual void Create() {}
-	virtual void Destroy() {}
-	virtual void* GetBuffer() const { return nullptr; }
-	virtual void* GetBufferMemory() const { return nullptr; }
-};
-
-struct jTextureBindings
-{
-	std::shared_ptr<jTexture> texturePtr;
-	std::shared_ptr<jSamplerStateInfo> samplerStatePtr;
-};
-
-struct jShadingBindingInstance
-{
-    VkDescriptorSet DescriptorSet = nullptr;
-	const struct jShaderBindings* ShaderBindings = nullptr;
-	std::vector<IEmptyUniform*> UniformBuffers;
-	std::vector<jTextureBindings> Textures;
-
-	void UpdateShaderBindings();
-	void Bind(const class jCommandBuffer_Vulkan& commandBuffer) const;
-};
-
-struct jShaderBindings
-{
-	std::vector<TBindings> UniformBuffers;
-    std::vector<TBindings> Textures;
     VkDescriptorSetLayout DescriptorSetLayout = nullptr;
 	VkPipelineLayout PipelineLayout = nullptr;
 
@@ -235,12 +204,26 @@ struct jShaderBindings
 	// Descriptor set			: Descriptor 에 묶일 실제 버퍼나 이미지 리소스를 명세함.
 	VkDescriptorPool DescriptorPool = nullptr;
 
-    bool CreateDescriptorSetLayout();
-	void CreatePool();
-	VkPipelineLayout CreatePipelineLayout();
+	mutable std::vector<jShaderBindingInstance_Vulkan*> CreatedBindingInstances;
 
-	jShadingBindingInstance CreateShaderBindingInstance() const;
-	std::vector<jShadingBindingInstance> CreateShaderBindingInstance(int32 count) const;
+    virtual bool CreateDescriptorSetLayout() override;
+	virtual void CreatePool() override;
+
+	virtual jShaderBindingInstance* CreateShaderBindingInstance() const override;
+	virtual std::vector<jShaderBindingInstance*> CreateShaderBindingInstance(int32 count) const override;
+
+	virtual size_t GetHash() const override
+	{
+		size_t result = 0;
+
+		result ^= STATIC_NAME_CITY_HASH("UniformBuffer");
+		result ^= CityHash64((const char*)UniformBuffers.data(), sizeof(TBindings) * UniformBuffers.size());
+
+		result ^= STATIC_NAME_CITY_HASH("Texture");
+		result ^= CityHash64((const char*)Textures.data(), sizeof(TBindings) * Textures.size());
+
+		return result;
+	}
 
 	std::vector<VkDescriptorPoolSize> GetDescriptorPoolSizeArray(uint32 maxAllocations) const
 	{
@@ -263,19 +246,6 @@ struct jShaderBindings
 		}
 
 		return std::move(resultArray);
-	}
-
-	size_t GetHash() const
-	{
-		size_t result = 0;
-
-		result ^= STATIC_NAME_CITY_HASH("UniformBuffer");
-		result ^= CityHash64((const char*)UniformBuffers.data(), sizeof(TBindings) * UniformBuffers.size());
-
-		result ^= STATIC_NAME_CITY_HASH("Texture");
-		result ^= CityHash64((const char*)Textures.data(), sizeof(TBindings) * Textures.size());
-
-		return result;
 	}
 };
 
@@ -358,7 +328,7 @@ private:
 class jShaderBindingsManager_Vulkan // base 없음
 {
 public:
-	VkDescriptorPool CreatePool(const jShaderBindings& bindings, uint32 MaxAllocations = 32) const;
+	VkDescriptorPool CreatePool(const jShaderBindings_Vulkan& bindings, uint32 MaxAllocations = 32) const;
 	void Release(VkDescriptorPool pool) const;
 };
 
@@ -544,23 +514,20 @@ struct jBlendingStateInfo_Vulakn : public jBlendingStateInfo
 struct jPipelineStateFixedInfo
 {
 	jPipelineStateFixedInfo() = default;
-	jPipelineStateFixedInfo(jShader* shader, jRasterizationStateInfo* rasterizationState, jMultisampleStateInfo* multisampleState, jDepthStencilStateInfo* depthStencilState
+	jPipelineStateFixedInfo(jRasterizationStateInfo* rasterizationState, jMultisampleStateInfo* multisampleState, jDepthStencilStateInfo* depthStencilState
 		, jBlendingStateInfo* blendingState, const std::vector<jViewport>& viewports, const std::vector<jScissor>& scissors)
-		: Shader(shader), RasterizationState(rasterizationState), MultisampleState(multisampleState), DepthStencilState(depthStencilState)
+		: RasterizationState(rasterizationState), MultisampleState(multisampleState), DepthStencilState(depthStencilState)
 		, BlendingState(blendingState), Viewports(Viewports), Scissors(scissors)
 	{}
-	jPipelineStateFixedInfo(jShader* shader, jRasterizationStateInfo* rasterizationState, jMultisampleStateInfo* multisampleState, jDepthStencilStateInfo* depthStencilState
+	jPipelineStateFixedInfo(jRasterizationStateInfo* rasterizationState, jMultisampleStateInfo* multisampleState, jDepthStencilStateInfo* depthStencilState
 		, jBlendingStateInfo* blendingState, const jViewport& viewport, const jScissor& scissor)
-		: Shader(shader), RasterizationState(rasterizationState), MultisampleState(multisampleState), DepthStencilState(depthStencilState)
+		: RasterizationState(rasterizationState), MultisampleState(multisampleState), DepthStencilState(depthStencilState)
 		, BlendingState(blendingState), Viewports({ viewport }), Scissors({ scissor })
 	{}
 
-	size_t Hash = 0;
-
-	size_t CreateHash()
+	size_t CreateHash() const
 	{
 		size_t result = 0;
-		result = Shader->ShaderInfo.CreateShaderHash();
 
 		for (int32 i = 0; i < Viewports.size(); ++i)
 			result ^= Viewports[i].CreateHash();
@@ -577,8 +544,6 @@ struct jPipelineStateFixedInfo
 		return result;
 	}
 
-	jShader* Shader = nullptr;
-
 	std::vector<jViewport> Viewports;
 	std::vector<jScissor> Scissors;
 
@@ -591,34 +556,63 @@ struct jPipelineStateFixedInfo
 struct jPipelineStateInfo
 {
 	jPipelineStateInfo() = default;
-	jPipelineStateInfo(jPipelineStateFixedInfo* pipelineStateFixed, jVertexBuffer* vertexBuffer, jShaderBindings* shaderBindings, jRenderPass* renderPass)
-		: PipelineStateFixed(pipelineStateFixed), VertexBuffer(vertexBuffer), ShaderBindings(shaderBindings), RenderPass(renderPass)
+	jPipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader, const jVertexBuffer* vertexBuffer, const jRenderPass* renderPass, const std::vector<const jShaderBindings*> shaderBindings)
+		: PipelineStateFixed(pipelineStateFixed), Shader(shader), VertexBuffer(vertexBuffer), RenderPass(renderPass), ShaderBindings(shaderBindings)
 	{}
 
-	size_t Hash = 0;
-
-	size_t CreateHash()
+	FORCEINLINE size_t CreateHash() const
 	{
 		size_t result = 0;
 		check(PipelineStateFixed);
 		result = PipelineStateFixed->CreateHash();
 
+		result ^= Shader->ShaderInfo.CreateShaderHash();
+
 		// 아래 내용들도 해시를 만들 수 있어야 함, todo
 		result ^= VertexBuffer->GetHash();
-		result ^= ShaderBindings->GetHash();
+		result ^= jShaderBindings::CreateShaderBindingsHash(ShaderBindings);
 		result ^= RenderPass->GetHash();
 
 		return result;
 	}
 
-	jVertexBuffer* VertexBuffer = nullptr;
-	jShaderBindings* ShaderBindings = nullptr;
-	jRenderPass* RenderPass = nullptr;
-	jPipelineStateFixedInfo* PipelineStateFixed = nullptr;
+	size_t Hash = 0;
+
+	const jShader* Shader = nullptr;
+	const jVertexBuffer* VertexBuffer = nullptr;
+	const jRenderPass* RenderPass = nullptr;
+	std::vector<const jShaderBindings*> ShaderBindings;
+	const jPipelineStateFixedInfo* PipelineStateFixed = nullptr;
+
+	VkPipelineLayout vkPipelineLayout = nullptr;
+	VkPipeline vkPipieline = nullptr;
 
 	VkPipeline CreateGraphicsPipelineState();
 
 	static std::unordered_map<size_t, VkPipeline> PipelineStatePool;
+};
+
+struct jUniformBufferBlock_Vulkan : public IUniformBufferBlock
+{
+	using IUniformBufferBlock::IUniformBufferBlock;
+	using IUniformBufferBlock::UpdateBufferData;
+	virtual ~jUniformBufferBlock_Vulkan()
+	{
+		Destroy();
+	}
+
+	void Destroy();
+
+	virtual void Init() override;
+	virtual void UpdateBufferData(const void* InData, size_t InSize) override;
+
+	virtual void ClearBuffer(int32 clearValue) override;
+
+	virtual void* GetBuffer() const override { return Bufffer; }
+	virtual void* GetBufferMemory() const override { return BufferMemory; }
+
+	VkBuffer Bufffer = nullptr;
+	VkDeviceMemory BufferMemory = nullptr;
 };
 
 // todo
@@ -1581,9 +1575,9 @@ public:
 	FORCEINLINE const VkDevice& GetDevice() const { return device; }
 
 	std::vector<jRenderPass_Vulkan*> RenderPasses;
-	jShaderBindings ShaderBindings;
-	std::vector<jShadingBindingInstance> ShaderBindingInstances;
-	std::vector<IEmptyUniform*> UniformBuffers;
+	jShaderBindings_Vulkan ShaderBindings;
+	std::vector<jShaderBindingInstance*> ShaderBindingInstances;
+	std::vector<IUniformBufferBlock*> UniformBuffers;
 
 	jCommandBufferManager_Vulkan CommandBufferManager;
 
@@ -1619,41 +1613,23 @@ public:
 	virtual void DrawElementsBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex) const override;
 	virtual void DrawElementsInstancedBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex, int32 instanceCount) const override;
 
+	virtual jShaderBindings* CreateShaderBindings() const override;	
+	virtual void* CreatePipelineLayout(const std::vector<const jShaderBindings*>& shaderBindings) const override;
+	virtual void* CreatePipelineLayout(const std::vector<const jShaderBindingInstance*>& shaderBindingInstances) const override;
+
+	virtual IUniformBufferBlock* CreateUniformBufferBlock(const char* blockname, size_t size = 0) const override;
+
+	static std::unordered_map<size_t, VkPipelineLayout> PipelineLayoutPool;
+
 	class jObject* TestCube = nullptr;
 	class jCamera* MainCamera = nullptr;
 	struct jShader* shader = nullptr;
 
 	jCommandBuffer_Vulkan* CurrentCommandBuffer = nullptr;
 	jPipelineStateFixedInfo* CurrentPipelineStateFixed = nullptr;
-	jPipelineStateInfo* CurrentPipelineStateInfo = nullptr;
 };
 
 extern jRHI_Vulkan* g_rhi_vk;
-
-template <typename T>
-struct EmptyUniform : public IEmptyUniform // todo remove
-{
-	T Data;
-	VkBuffer Bufffer;
-	VkDeviceMemory BufferMemory;
-
-	virtual int32 GetBufferSize() const override { return sizeof(T); }
-	virtual void* GetBuffer() const override { return Bufffer; }
-	virtual void* GetBufferMemory() const override { return BufferMemory; }
-	virtual void Destroy()
-	{
-		vkDestroyBuffer(g_rhi_vk->device, Bufffer, nullptr);
-		vkFreeMemory(g_rhi_vk->device, BufferMemory, nullptr);
-	}
-
-	virtual void Create() override
-	{
-		VkDeviceSize bufferSize = sizeof(T);
-
-		g_rhi_vk->CreateBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
-			| VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, Bufffer, BufferMemory);
-	}
-};
 
 struct jShader_Vulkan : public jShader
 {

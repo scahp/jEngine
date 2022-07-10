@@ -2071,7 +2071,7 @@ void jRHI_OpenGL::SetColorMask(bool r, bool g, bool b, bool a) const
 	glColorMask(r, g, b, a);
 }
 
-IUniformBufferBlock* jRHI_OpenGL::CreateUniformBufferBlock(const char* blockname) const
+IUniformBufferBlock* jRHI_OpenGL::CreateUniformBufferBlock(const char* blockname, size_t size /*= 0*/) const
 {
 	auto uniformBufferBlock = new jUniformBufferBlock_OpenGL(blockname);
 	uniformBufferBlock->Init();

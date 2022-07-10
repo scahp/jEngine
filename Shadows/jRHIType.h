@@ -379,6 +379,11 @@ enum class EShaderAccessStageFlag : uint32
     ALL = 0x7FFFFFFF
 };
 
+FORCEINLINE EShaderAccessStageFlag operator|(const EShaderAccessStageFlag a, const EShaderAccessStageFlag b)
+{
+	return static_cast<EShaderAccessStageFlag>(static_cast<int32>(a) | static_cast<int32>(b));
+}
+
 enum class EColorMask : uint8
 {
 	NONE = 0,

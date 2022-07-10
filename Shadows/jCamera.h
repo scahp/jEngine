@@ -248,6 +248,37 @@ public:
 
 	int32 GetNumOfLight() const;
 
+	// Camera Uniform buffer
+	struct jUniformBufferCamera
+	{
+		Matrix VP;
+		Matrix V;
+		float Near;
+		float Far;
+	};
+	jUniformBufferCamera Data;
+	IUniformBufferBlock* UniformBufferBlock = nullptr;
+
+	void UpdateUniformBuffer()
+	{
+		if (!UniformBufferBlock)
+		{
+			UniformBufferBlock = g_rhi->CreateUniformBufferBlock("Camera", sizeof(jUniformBufferCamera));
+		}
+
+		const auto& V = View;
+		const auto& VP = Projection * View;
+
+		jUniformBufferCamera ubo = {};
+		ubo.V = V.GetTranspose();
+		ubo.VP = VP.GetTranspose();
+		ubo.Far = Far;
+		ubo.Near = Near;
+
+		UniformBufferBlock->UpdateBufferData(&ubo, sizeof(ubo));
+	}
+	//////////////////////////////////////////////////////////////////////////
+
 	ECameraType Type;
 
 	Vector Pos;

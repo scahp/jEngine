@@ -141,3 +141,16 @@ size_t jRenderPass::GetHash() const
 	result ^= CityHash64((const char*)&RenderExtent, sizeof(RenderExtent));
 	return result;
 }
+
+size_t jShaderBindings::GetHash() const
+{
+	size_t result = 0;
+
+	result ^= STATIC_NAME_CITY_HASH("UniformBuffer");
+	result ^= CityHash64((const char*)UniformBuffers.data(), sizeof(TBindings) * UniformBuffers.size());
+
+	result ^= STATIC_NAME_CITY_HASH("Texture");
+	result ^= CityHash64((const char*)Textures.data(), sizeof(TBindings) * Textures.size());
+
+	return result;
+}
