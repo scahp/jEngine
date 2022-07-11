@@ -309,3 +309,21 @@ void jRenderObject::ClearTexture()
 {
 	MaterialData.Clear();
 }
+
+void jRenderObject::UpdateRenderObjectUniformBuffer(const jView* view)
+{
+	check(view);
+	check(view->Camera);
+
+	jRenderObjectUniformBuffer ubo;
+	ubo.M = World;
+	ubo.V = view->Camera->View;
+	ubo.P = view->Camera->Projection;
+	ubo.MV = ubo.V * ubo.M;
+	ubo.MVP = ubo.P * ubo.MV;
+	ubo.InvM = ubo.M.GetInverse();
+
+	if (!RenderObjectUniformBuffer)
+		RenderObjectUniformBuffer = CreateRenderObjectUniformBuffer();
+	RenderObjectUniformBuffer->UpdateBufferData(&ubo, sizeof(ubo));
+}

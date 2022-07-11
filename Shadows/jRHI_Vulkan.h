@@ -584,10 +584,10 @@ struct jPipelineStateInfo
 	std::vector<const jShaderBindings*> ShaderBindings;
 	const jPipelineStateFixedInfo* PipelineStateFixed = nullptr;
 
-	VkPipelineLayout vkPipelineLayout = nullptr;
-	VkPipeline vkPipieline = nullptr;
+	VkPipeline vkPipeline = nullptr;
 
 	VkPipeline CreateGraphicsPipelineState();
+	void Bind();
 
 	static std::unordered_map<size_t, VkPipeline> PipelineStatePool;
 };

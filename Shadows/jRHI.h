@@ -704,8 +704,8 @@ struct TShaderBinding : public jShaderBinding
 
 struct jTextureBindings
 {
-	std::shared_ptr<jTexture> texturePtr;
-	std::shared_ptr<jSamplerStateInfo> samplerStatePtr;
+	const jTexture* Texture = nullptr;
+	const jSamplerStateInfo* SamplerState = nullptr;
 };
 
 struct jShaderBindingInstance
@@ -748,6 +748,22 @@ struct jShaderBindings
 		}
 		return result;
 	}
+};
+
+class jCamera;
+class jLight;
+class jView
+{
+public:
+	jView() = default;
+	jView(const jCamera* camera, const jLight* directionalLight, const jLight* pointLight, const jLight* spotLight)
+		: Camera(camera), DirectionalLight(directionalLight), PointLight(pointLight), SpotLight(spotLight)
+	{}
+
+	const jCamera* Camera = nullptr;
+	const jLight* DirectionalLight = nullptr;
+	const jLight* PointLight = nullptr;
+	const jLight* SpotLight = nullptr;
 };
 
 class jRHI

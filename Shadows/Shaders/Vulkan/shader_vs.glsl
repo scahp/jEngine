@@ -11,6 +11,8 @@ layout(set = 0,binding = 0) uniform UniformBufferObject
 layout(set = 1, binding = 0) uniform RenderObjectParam
 {
 	mat4 M;
+    mat4 V;
+	mat4 P;
 	mat4 MV;
 	mat4 MVP;
 	mat4 InvM;
