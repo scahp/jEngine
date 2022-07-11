@@ -674,15 +674,32 @@ public:
 };
 
 
-struct TBindings
+struct jShaderBinding
 {
-	TBindings() = default;
-	TBindings(int32 bindingPoint, EShaderAccessStageFlag accessStageFlags)
+	jShaderBinding() = default;
+	jShaderBinding(const int32 bindingPoint, const EShaderAccessStageFlag accessStageFlags)
 		: BindingPoint(bindingPoint), AccessStageFlags(accessStageFlags)
 	{ }
 
+	FORCEINLINE size_t GetHash() const
+	{
+		size_t result = 0;
+		result ^= CityHash64((const char*)&BindingPoint, sizeof(BindingPoint));
+		result ^= CityHash64((const char*)&AccessStageFlags, sizeof(AccessStageFlags));
+		return result;
+	}
+
 	int32 BindingPoint = 0;
 	EShaderAccessStageFlag AccessStageFlags = EShaderAccessStageFlag::ALL_GRAPHICS;
+};
+
+template <typename T>
+struct TShaderBinding : public jShaderBinding
+{
+	TShaderBinding(const int32 bindingPoint, const EShaderAccessStageFlag accessStageFlags, const T& InData)
+		: jShaderBinding(bindingPoint, accessStageFlags), Data(InData)
+	{ }
+	T Data = T();
 };
 
 struct jTextureBindings
@@ -705,13 +722,15 @@ struct jShaderBindingInstance
 
 struct jShaderBindings
 {
+	static size_t GenerateHash(const std::vector<jShaderBinding>& InUniformBuffers, const std::vector<jShaderBinding>& InTextures);
+
 	virtual ~jShaderBindings() {}
 
 	virtual bool CreateDescriptorSetLayout() { return false; }
 	virtual void CreatePool() {}
 
-	std::vector<TBindings> UniformBuffers;
-	std::vector<TBindings> Textures;
+	std::vector<jShaderBinding> UniformBuffers;
+	std::vector<jShaderBinding> Textures;
 
 	FORCEINLINE int32 GetNextBindingIndex() const { return (int32)(UniformBuffers.size() + Textures.size()); };
 
@@ -861,7 +880,8 @@ public:
 	virtual jDepthStencilStateInfo* CreateDepthStencilState(const jDepthStencilStateInfo& initializer) const { return nullptr; }
 	virtual jBlendingStateInfo* CreateBlendingState(const jBlendingStateInfo& initializer) const { return nullptr; }
 
-	virtual jShaderBindings* CreateShaderBindings() const { check(0); return nullptr; }
+	virtual jShaderBindings* CreateShaderBindings(const std::vector<jShaderBinding>& InUniformBindings, const std::vector<jShaderBinding>& InTextureBindings) const { check(0); return nullptr; }
+	virtual jShaderBindingInstance* CreateShaderBindingInstance(const std::vector<TShaderBinding<IUniformBufferBlock*>>& InUniformBuffers, const std::vector<TShaderBinding<jTextureBindings>>& InTextures) const { check(0); return nullptr; }
 
 	virtual void* CreatePipelineLayout(const std::vector<const jShaderBindings*>& shaderBindings) const { return nullptr; }
 	virtual void* CreatePipelineLayout(const std::vector<const jShaderBindingInstance*>& shaderBindingInstances) const { return nullptr; }

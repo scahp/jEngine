@@ -217,10 +217,10 @@ struct jShaderBindings_Vulkan : public jShaderBindings
 		size_t result = 0;
 
 		result ^= STATIC_NAME_CITY_HASH("UniformBuffer");
-		result ^= CityHash64((const char*)UniformBuffers.data(), sizeof(TBindings) * UniformBuffers.size());
+		result ^= CityHash64((const char*)UniformBuffers.data(), sizeof(jShaderBinding) * UniformBuffers.size());
 
 		result ^= STATIC_NAME_CITY_HASH("Texture");
-		result ^= CityHash64((const char*)Textures.data(), sizeof(TBindings) * Textures.size());
+		result ^= CityHash64((const char*)Textures.data(), sizeof(jShaderBinding) * Textures.size());
 
 		return result;
 	}
@@ -1613,13 +1613,15 @@ public:
 	virtual void DrawElementsBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex) const override;
 	virtual void DrawElementsInstancedBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex, int32 instanceCount) const override;
 
-	virtual jShaderBindings* CreateShaderBindings() const override;	
+	virtual jShaderBindings* CreateShaderBindings(const std::vector<jShaderBinding>& InUniformBindings, const std::vector<jShaderBinding>& InTextureBindings) const override;
+	virtual jShaderBindingInstance* CreateShaderBindingInstance(const std::vector<TShaderBinding<IUniformBufferBlock*>>& InUniformBuffers, const std::vector<TShaderBinding<jTextureBindings>>& InTextures) const override;
 	virtual void* CreatePipelineLayout(const std::vector<const jShaderBindings*>& shaderBindings) const override;
 	virtual void* CreatePipelineLayout(const std::vector<const jShaderBindingInstance*>& shaderBindingInstances) const override;
 
 	virtual IUniformBufferBlock* CreateUniformBufferBlock(const char* blockname, size_t size = 0) const override;
 
 	static std::unordered_map<size_t, VkPipelineLayout> PipelineLayoutPool;
+	static std::unordered_map<size_t, jShaderBindings*> ShaderBindingPool;
 
 	class jObject* TestCube = nullptr;
 	class jCamera* MainCamera = nullptr;

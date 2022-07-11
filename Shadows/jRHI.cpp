@@ -142,15 +142,20 @@ size_t jRenderPass::GetHash() const
 	return result;
 }
 
-size_t jShaderBindings::GetHash() const
+size_t jShaderBindings::GenerateHash(const std::vector<jShaderBinding>& InUniformBuffers, const std::vector<jShaderBinding>& InTextures)
 {
 	size_t result = 0;
 
 	result ^= STATIC_NAME_CITY_HASH("UniformBuffer");
-	result ^= CityHash64((const char*)UniformBuffers.data(), sizeof(TBindings) * UniformBuffers.size());
+	result ^= CityHash64((const char*)InUniformBuffers.data(), sizeof(jShaderBinding) * InUniformBuffers.size());
 
 	result ^= STATIC_NAME_CITY_HASH("Texture");
-	result ^= CityHash64((const char*)Textures.data(), sizeof(TBindings) * Textures.size());
+	result ^= CityHash64((const char*)InTextures.data(), sizeof(jShaderBinding) * InTextures.size());
 
 	return result;
+}
+
+size_t jShaderBindings::GetHash() const
+{
+	return GenerateHash(UniformBuffers, Textures);
 }

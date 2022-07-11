@@ -22,6 +22,7 @@ uint32_t textureMipLevels;
 jRHI_Vulkan* g_rhi_vk = nullptr;
 std::unordered_map<size_t, VkPipeline> jPipelineStateInfo::PipelineStatePool;
 std::unordered_map<size_t, VkPipelineLayout> jRHI_Vulkan::PipelineLayoutPool;
+std::unordered_map<size_t, jShaderBindings*> jRHI_Vulkan::ShaderBindingPool;
 
 //////////////////////////////////////////////////////////////////////////
 // Auto generate type conversion code
@@ -631,8 +632,8 @@ bool jRHI_Vulkan::InitRHI()
 	std::weak_ptr<jTexture> Texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName("chalet.jpg"), true, true);
 	std::shared_ptr<jSamplerStateInfo> SamplerStatePtr = std::shared_ptr<jSamplerStateInfo>(TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR>::Create());
 
-	ShaderBindings.UniformBuffers.push_back(TBindings(0, EShaderAccessStageFlag::VERTEX));
-	ShaderBindings.Textures.push_back(TBindings(1, EShaderAccessStageFlag::FRAGMENT));
+	ShaderBindings.UniformBuffers.push_back(jShaderBinding(0, EShaderAccessStageFlag::VERTEX));
+	ShaderBindings.Textures.push_back(jShaderBinding(1, EShaderAccessStageFlag::FRAGMENT));
 	ShaderBindings.CreateDescriptorSetLayout();
 	ShaderBindings.CreatePool();
 	ShaderBindingInstances = ShaderBindings.CreateShaderBindingInstance((int32)swapChainImageViews.size());
@@ -1162,17 +1163,7 @@ bool jRHI_Vulkan::RecordCommandBuffers()
 		void PrepareToDraw()
 		{
 			{
-				static bool IsInitialized = false;
-				static auto RenderObjectParameterShaderBindings = g_rhi->CreateShaderBindings();
-				if (!IsInitialized)
-				{
-					RenderObjectParameterShaderBindings->UniformBuffers.push_back(TBindings(RenderObjectParameterShaderBindings->GetNextBindingIndex(), EShaderAccessStageFlag::VERTEX));
-					RenderObjectParameterShaderBindings->Textures.push_back(TBindings(RenderObjectParameterShaderBindings->GetNextBindingIndex(), EShaderAccessStageFlag::FRAGMENT));
-					RenderObjectParameterShaderBindings->CreateDescriptorSetLayout();
-					RenderObjectParameterShaderBindings->CreatePool();
-				}
-
-				struct jRenderObjectUniformParameters
+				struct jRenderObjectUniformBuffer
 				{
 					Matrix M;
 					Matrix MV;
@@ -1180,33 +1171,33 @@ bool jRHI_Vulkan::RecordCommandBuffers()
 					Matrix InvM;
 				};
 
-				jRenderObjectUniformParameters Params;
-
-				Params.M = RenderObject->World;
-				const Matrix& View = MainCamera->View;
-				const Matrix& Projection = MainCamera->Projection;
-
-				Params.MV = View * Params.M;
-				Params.MVP = Projection * Params.MV;
-				Params.InvM = Params.M.GetInverse();
-
-				static IUniformBufferBlock* RenderObjectUniformParameters = g_rhi->CreateUniformBufferBlock("RenderObjectUniformParameters", sizeof(jRenderObjectUniformParameters));
-				RenderObjectUniformParameters->UpdateBufferData(&Params, sizeof(Params));
-
-				static jShaderBindingInstance* RenderObjectParameterShaderBindingInstance = RenderObjectParameterShaderBindings->CreateShaderBindingInstance();
-				if (!IsInitialized)
+				static IUniformBufferBlock* RenderObjectUniformParameters = g_rhi->CreateUniformBufferBlock("RenderObjectUniformParameters", sizeof(jRenderObjectUniformBuffer));
 				{
-					RenderObjectParameterShaderBindingInstance->UniformBuffers.push_back(RenderObjectUniformParameters);
+					jRenderObjectUniformBuffer UniforBuffer;
 
-					jTextureBindings TextureBindings;
+					UniforBuffer.M = RenderObject->World;
+					const Matrix& View = MainCamera->View;
+					const Matrix& Projection = MainCamera->Projection;
+
+					UniforBuffer.MV = View * UniforBuffer.M;
+					UniforBuffer.MVP = Projection * UniforBuffer.MV;
+					UniforBuffer.InvM = UniforBuffer.M.GetInverse();
+
+					RenderObjectUniformParameters->UpdateBufferData(&UniforBuffer, sizeof(UniforBuffer));
+				}
+
+				jTextureBindings TextureBindings;
+				{
 					TextureBindings.texturePtr = jImageFileLoader::GetInstance().LoadTextureFromFile(jName("Image/sun.png"), true, true).lock();
 					TextureBindings.samplerStatePtr = std::shared_ptr<jSamplerStateInfo>(TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR>::Create());
-					RenderObjectParameterShaderBindingInstance->Textures.push_back(TextureBindings);
 				}
-				ShaderBindingInstances.push_back(RenderObjectParameterShaderBindingInstance);
 
+				auto RenderObjectParameterShaderBindingInstance = g_rhi->CreateShaderBindingInstance(
+					{ TShaderBinding(0, EShaderAccessStageFlag::VERTEX, RenderObjectUniformParameters) }
+					, { TShaderBinding(1, EShaderAccessStageFlag::FRAGMENT, TextureBindings) });
 				RenderObjectParameterShaderBindingInstance->UpdateShaderBindings();
-				IsInitialized = true;
+
+				ShaderBindingInstances.push_back(RenderObjectParameterShaderBindingInstance);
 			}
 
 			void* pipelineLayout = g_rhi->CreatePipelineLayout(ShaderBindingInstances);
@@ -1339,6 +1330,8 @@ bool jRHI_Vulkan::DrawFrame()
 	// timeout 은 nanoseconds. UINT64_MAX 는 타임아웃 없음
 #if MULTIPLE_FRAME
 	VkResult acquireNextImageResult = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphores[currenFrame], VK_NULL_HANDLE, &imageIndex);
+	if (acquireNextImageResult != VK_SUCCESS)
+		return false;
 
 	// 이전 프레임에서 현재 사용하려는 이미지를 사용중에 있나? (그렇다면 펜스를 기다려라)
 	if (imagesInFlight[imageIndex] != VK_NULL_HANDLE)
@@ -2084,9 +2077,41 @@ void jRHI_Vulkan::DrawElementsInstancedBaseVertex(EPrimitiveType type, int eleme
 	vkCmdDrawIndexed((VkCommandBuffer)CurrentCommandBuffer->GetHandle(), elementSize, instanceCount, startIndex, baseVertexIndex, 0);
 }
 
-jShaderBindings* jRHI_Vulkan::CreateShaderBindings() const
+jShaderBindings* jRHI_Vulkan::CreateShaderBindings(const std::vector<jShaderBinding>& InUniformBindings, const std::vector<jShaderBinding>& InTextureBindings) const
 {
-	return new jShaderBindings_Vulkan();
+	const auto hash = jShaderBindings::GenerateHash(InUniformBindings, InTextureBindings);
+
+	auto it_find = ShaderBindingPool.find(hash);
+	if (ShaderBindingPool.end() != it_find)
+		return it_find->second;
+
+	auto NewShaderBinding = new jShaderBindings_Vulkan();
+
+	NewShaderBinding->UniformBuffers = InUniformBindings;
+	NewShaderBinding->Textures = InTextureBindings;
+	NewShaderBinding->CreateDescriptorSetLayout();
+	NewShaderBinding->CreatePool();
+
+	ShaderBindingPool.insert(std::make_pair(hash, NewShaderBinding));
+
+	return NewShaderBinding;
+}
+
+jShaderBindingInstance* jRHI_Vulkan::CreateShaderBindingInstance(const std::vector<TShaderBinding<IUniformBufferBlock*>>& InUniformBuffers, const std::vector<TShaderBinding<jTextureBindings>>& InTextures) const
+{
+	const std::vector<jShaderBinding> UniformBindings(InUniformBuffers.begin(), InUniformBuffers.end());
+	const std::vector<jShaderBinding> TextureBindings(InTextures.begin(), InTextures.end());
+
+	auto shaderBindings = CreateShaderBindings(UniformBindings, TextureBindings);
+	check(shaderBindings);
+
+	auto shaderBindingInstance = shaderBindings->CreateShaderBindingInstance();
+	for (int32 i = 0; i < (int32)InUniformBuffers.size(); ++i)
+		shaderBindingInstance->UniformBuffers.push_back(InUniformBuffers[i].Data);
+	
+	for (int32 i = 0; i < (int32)InTextures.size(); ++i)
+		shaderBindingInstance->Textures.push_back(InTextures[i].Data);
+	return shaderBindingInstance;
 }
 
 void* jRHI_Vulkan::CreatePipelineLayout(const std::vector<const jShaderBindings*>& shaderBindings) const
@@ -2561,7 +2586,7 @@ void jShaderBindingInstance_Vulkan::UpdateShaderBindings()
 		descriptorBuffers[i].offset = bufferOffset;
 		descriptorBuffers[i].range = UniformBuffers[i]->GetBufferSize();		// 전체 사이즈라면 VK_WHOLE_SIZE 이거 가능
 
-		bufferOffset += UniformBuffers[i]->GetBufferSize();
+		bufferOffset += (int32)UniformBuffers[i]->GetBufferSize();
 	}
 
 	std::vector<VkDescriptorImageInfo> descriptorImages;
