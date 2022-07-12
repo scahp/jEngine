@@ -2,6 +2,10 @@
 #include <sysinfoapi.h>
 #include "jRHI.h"
 
+#define ENABLE_PROFILE 0
+#define ENABLE_PROFILE_CPU ENABLE_PROFILE
+#define ENABLE_PROFILE_GPU ENABLE_PROFILE
+
 static constexpr int32 MaxProfileFrame = 10;
 
 extern std::unordered_map<jName, uint64, jNameHashFunc> ScopedProfileCPUMap[MaxProfileFrame];
@@ -34,7 +38,11 @@ public:
 	uint64 StartTick = 0;
 };
 
+#if ENABLE_PROFILE_CPU
 #define SCOPE_PROFILE(Name) static jName Name##ScopedProfileCPUName(#Name); jScopedProfile_CPU Name##ScopedProfileCPU(Name##ScopedProfileCPUName);
+#else
+#define SCOPE_PROFILE(Name)
+#endif
 
 //////////////////////////////////////////////////////////////////////////
 // jQueryTimePool
@@ -133,7 +141,11 @@ public:
 	jProfile_GPU Profile;
 };
 
+#if ENABLE_PROFILE_GPU
 #define SCOPE_GPU_PROFILE(Name) static jName Name##ScopedProfileGPUName(#Name); jScopedProfile_GPU Name##ScopedProfileGPU(Name##ScopedProfileGPUName);
+#else
+#define SCOPE_GPU_PROFILE(Name)
+#endif
 
 //////////////////////////////////////////////////////////////////////////
 // jPerformanceProfile

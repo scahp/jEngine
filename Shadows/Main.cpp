@@ -97,7 +97,8 @@ int main()
 		lastTick = currentTick;
 
 #if USE_VULKAN
-		((jRHI_Vulkan*)g_rhi)->MainLoop();
+		// ((jRHI_Vulkan*)g_rhi)->MainLoop();
+		g_Engine.Update(g_timeDeltaSecond);
 #elif USE_OPENGL
         g_Engine.Update(g_timeDeltaSecond);
 		jPerformanceProfile::GetInstance().Update(g_timeDeltaSecond);
@@ -222,13 +223,12 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	if (GLFW_PRESS == action)
 	{
 		//if (!ImGui::IsAnyItemActive())
-		//	g_KeyState[*key_name] = true;
+		g_KeyState[*key_name] = true;
 	}
 	else if (GLFW_RELEASE == action)
 	{
-		//g_KeyState[*key_name] = false;
+		g_KeyState[*key_name] = false;
 	}
-
 }
 
 void char_callback(GLFWwindow* window, uint32 codepoint)
@@ -277,6 +277,8 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 #if USE_OPENGL
 		if (!ImGui::IsAnyItemHovered() && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow))
 			buttonDown = true;
+#else
+		buttonDown = true;
 #endif
 	}
 	else if (GLFW_RELEASE == action)

@@ -316,9 +316,9 @@ void jRenderObject::UpdateRenderObjectUniformBuffer(const jView* view)
 	check(view->Camera);
 
 	jRenderObjectUniformBuffer ubo;
-	ubo.M = World;
-	ubo.V = view->Camera->View;
-	ubo.P = view->Camera->Projection;
+	ubo.M = World.GetTranspose();
+	ubo.V = view->Camera->View.GetTranspose();
+	ubo.P = view->Camera->Projection.GetTranspose();
 	ubo.MV = ubo.V * ubo.M;
 	ubo.MVP = ubo.P * ubo.MV;
 	ubo.InvM = ubo.M.GetInverse();

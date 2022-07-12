@@ -363,6 +363,7 @@ public:
 	virtual void* GetHandle() const { return nullptr; }
 	virtual bool Begin() const { return false; }
 	virtual bool End() const { return false; }
+	virtual void Reset() const {}
 };
 
 struct jRenderTargetInfo

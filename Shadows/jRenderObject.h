@@ -150,7 +150,8 @@ public:
 		else
 		{
 			ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(UniformBinding, TextureBinding);
-		}
+			ShaderBindingInstance->UpdateShaderBindings();
+		}		
 	}
 	void GetShaderBindingInstance(std::vector<const jShaderBindingInstance*>& OutShaderBindingInstance)
 	{

@@ -14,6 +14,30 @@
 
 FORCEINLINE VkPrimitiveTopology GetVulkanPrimitiveTopology(EPrimitiveType type);
 
+template <typename T>
+class TResourcePool
+{
+public:
+	template <typename TInitializer>
+	T* GetOrCreate(const TInitializer& initializer)
+	{
+		const size_t hash = initializer.GetHash();
+		auto it_find = Pool.find(hash);
+		if (Pool.end() != it_find)
+		{
+			return it_find->second;
+		}
+
+		auto* newResource = new T(initializer);
+		newResource->Initialize();
+
+		Pool.insert(std::make_pair(hash, newResource));
+		return newResource;
+	}
+
+	std::unordered_map<size_t, T*> Pool;
+};
+
 struct jSimpleVec2
 {
 	float x;
@@ -300,6 +324,13 @@ public:
 		return true;
 	}
 
+	virtual void Reset() const override
+	{
+		vkResetCommandBuffer(CommandBuffer, 0);
+	}
+
+	VkFence Fence = nullptr;
+
 private:
 	VkCommandBuffer CommandBuffer = nullptr;
 };
@@ -307,7 +338,7 @@ private:
 class jCommandBufferManager_Vulkan // base 없음
 {
 public:
-	bool CratePool(uint32 QueueIndex);
+	bool CreatePool(uint32 QueueIndex);
 	void Release()
 	{
 		//// Command buffer pool 을 다시 만들기 보다 있는 커맨드 버퍼 풀을 cleanup 하고 재사용 함.
@@ -345,6 +376,20 @@ struct jVertexStream_Vulkan
 
 	VkBuffer VertexBuffer = nullptr;
 	VkDeviceMemory VertexBufferMemory = nullptr;
+};
+
+class jFenceManager_Vulkan	// base 없음
+{
+public:
+	VkFence GetOrCreateFence();
+	void ReturnFence(VkFence fence)
+	{
+		UsingFences.erase(fence);
+		PendingFences.insert(fence);
+	}
+
+	std::unordered_set<VkFence> UsingFences;
+	std::unordered_set<VkFence> PendingFences;
 };
 
 struct jVertexBuffer_Vulkan : public jVertexBuffer
@@ -722,7 +767,8 @@ public:
 
 	// Command buffers
 	//VkCommandPool commandPool;		// 커맨드 버퍼를 저장할 메모리 관리자로 커맨드 버퍼를 생성함.
-	std::vector<jCommandBuffer_Vulkan> commandBuffers;
+	// std::vector<jCommandBuffer_Vulkan> commandBuffers;
+	jCommandBufferManager_Vulkan CommandBuffersManager;
 
 	// Semaphores
 #if MULTIPLE_FRAME
@@ -1561,7 +1607,7 @@ public:
 	bool CreateColorResources();
 	bool CreateDepthResources();
 	bool LoadModel();
-	bool RecordCommandBuffers();
+	//bool RecordCommandBuffers();
 	bool CreateSyncObjects();
 
 	// 여기 있을 것은 아님
@@ -1586,6 +1632,7 @@ public:
 	jIndexBuffer* IndexBuffer = nullptr;
 
 	jShaderBindingsManager_Vulkan ShaderBindingsManager;
+	jFenceManager_Vulkan FenceManager;
 
 	VkPhysicalDeviceProperties DeviceProperties;
 
@@ -1594,8 +1641,8 @@ public:
 	virtual jIndexBuffer* CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const override;
 	virtual jTexture* CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
 		, ETextureFormat textureFormat = ETextureFormat::RGBA8, bool createMipmap = false) const override;
-	virtual jShader* CreateShader(const jShaderInfo& shaderInfo) const;
-	virtual bool CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo) const;
+	virtual jShader* CreateShader(const jShaderInfo& shaderInfo) const override;
+	virtual bool CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo) const override;
 	virtual jFrameBuffer* CreateFrameBuffer(const jFrameBufferInfo& info) const override;
 	virtual std::shared_ptr<jRenderTarget> CreateRenderTarget(const jRenderTargetInfo& info) const override;
 
@@ -1622,13 +1669,19 @@ public:
 
 	static std::unordered_map<size_t, VkPipelineLayout> PipelineLayoutPool;
 	static std::unordered_map<size_t, jShaderBindings*> ShaderBindingPool;
+	static TResourcePool<jSamplerStateInfo_Vulkan> SamplerStatePool;
+	static TResourcePool<jRasterizationStateInfo_Vulkan> RasterizationStatePool;
+	static TResourcePool<jMultisampleStateInfo_Vulkan> MultisampleStatePool;
+	static TResourcePool<jStencilOpStateInfo_Vulkan> StencilOpStatePool;
+	static TResourcePool<jDepthStencilStateInfo_Vulkan> DepthStencilStatePool;
+	static TResourcePool<jBlendingStateInfo_Vulakn> BlendingStatePool;
 
 	class jObject* TestCube = nullptr;
 	class jCamera* MainCamera = nullptr;
 	struct jShader* shader = nullptr;
 
 	jCommandBuffer_Vulkan* CurrentCommandBuffer = nullptr;
-	jPipelineStateFixedInfo* CurrentPipelineStateFixed = nullptr;
+	jPipelineStateFixedInfo CurrentPipelineStateFixed;
 };
 
 extern jRHI_Vulkan* g_rhi_vk;

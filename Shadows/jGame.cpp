@@ -76,53 +76,53 @@ void jGame::Setup()
 	MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 10.0f, 1000.0f, SCR_WIDTH, SCR_HEIGHT, true);
 	jCamera::AddCamera(0, MainCamera);
 
-	// Create lights
-	NormalDirectionalLight = jLight::CreateDirectionalLight(AppSettings.DirecionalLightDirection
-		, Vector4(0.6f), Vector(1.0f), Vector(1.0f), 64);
-	CascadeDirectionalLight = jLight::CreateCascadeDirectionalLight(AppSettings.DirecionalLightDirection
-		, Vector4(0.6f), Vector(1.0f), Vector(1.0f), 64);
-	AmbientLight = jLight::CreateAmbientLight(Vector(0.2f, 0.5f, 1.0f), Vector(0.05f));		// sky light color
-	PointLight = jLight::CreatePointLight(jShadowAppSettingProperties::GetInstance().PointLightPosition, Vector4(2.0f, 0.7f, 0.7f, 1.0f), 500.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
-	SpotLight = jLight::CreateSpotLight(jShadowAppSettingProperties::GetInstance().SpotLightPosition, jShadowAppSettingProperties::GetInstance().SpotLightDirection, Vector4(0.0f, 1.0f, 0.0f, 1.0f), 500.0f, 0.7f, 1.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
+	//// Create lights
+	//NormalDirectionalLight = jLight::CreateDirectionalLight(AppSettings.DirecionalLightDirection
+	//	, Vector4(0.6f), Vector(1.0f), Vector(1.0f), 64);
+	//CascadeDirectionalLight = jLight::CreateCascadeDirectionalLight(AppSettings.DirecionalLightDirection
+	//	, Vector4(0.6f), Vector(1.0f), Vector(1.0f), 64);
+	//AmbientLight = jLight::CreateAmbientLight(Vector(0.2f, 0.5f, 1.0f), Vector(0.05f));		// sky light color
+	//PointLight = jLight::CreatePointLight(jShadowAppSettingProperties::GetInstance().PointLightPosition, Vector4(2.0f, 0.7f, 0.7f, 1.0f), 500.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
+	//SpotLight = jLight::CreateSpotLight(jShadowAppSettingProperties::GetInstance().SpotLightPosition, jShadowAppSettingProperties::GetInstance().SpotLightDirection, Vector4(0.0f, 1.0f, 0.0f, 1.0f), 500.0f, 0.7f, 1.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
 
-	// Select one of directional light
-	DirectionalLight = NormalDirectionalLight;
+	//// Select one of directional light
+	//DirectionalLight = NormalDirectionalLight;
 
-	// Create light info for debugging light infomation
-	if (DirectionalLight)
-	{
-		DirectionalLightInfo = jPrimitiveUtil::CreateDirectionalLightDebug(Vector(250, 260, 0) * 0.5f, Vector::OneVector * 10.0f, 10.0f, MainCamera, DirectionalLight, "Image/sun.png");
-		if (AppSettings.ShowDirectionalLightInfo)
-			jObject::AddDebugObject(DirectionalLightInfo);
-	}
+	//// Create light info for debugging light infomation
+	//if (DirectionalLight)
+	//{
+	//	DirectionalLightInfo = jPrimitiveUtil::CreateDirectionalLightDebug(Vector(250, 260, 0) * 0.5f, Vector::OneVector * 10.0f, 10.0f, MainCamera, DirectionalLight, "Image/sun.png");
+	//	if (AppSettings.ShowDirectionalLightInfo)
+	//		jObject::AddDebugObject(DirectionalLightInfo);
+	//}
 
-	if (PointLight)
-	{
-		PointLightInfo = jPrimitiveUtil::CreatePointLightDebug(Vector(10.0f), MainCamera, PointLight, "Image/bulb.png");
-		if (AppSettings.ShowPointLightInfo)
-			jObject::AddDebugObject(PointLightInfo);
-	}
+	//if (PointLight)
+	//{
+	//	PointLightInfo = jPrimitiveUtil::CreatePointLightDebug(Vector(10.0f), MainCamera, PointLight, "Image/bulb.png");
+	//	if (AppSettings.ShowPointLightInfo)
+	//		jObject::AddDebugObject(PointLightInfo);
+	//}
 
-	if (SpotLight)
-	{
-		SpotLightInfo = jPrimitiveUtil::CreateSpotLightDebug(Vector(10.0f), MainCamera, SpotLight, "Image/spot.png");
-		if (AppSettings.ShowSpotLightInfo)
-			jObject::AddDebugObject(SpotLightInfo);
-	}
+	//if (SpotLight)
+	//{
+	//	SpotLightInfo = jPrimitiveUtil::CreateSpotLightDebug(Vector(10.0f), MainCamera, SpotLight, "Image/spot.png");
+	//	if (AppSettings.ShowSpotLightInfo)
+	//		jObject::AddDebugObject(SpotLightInfo);
+	//}
 
-	// Main camera is linked with lights which will be used.
-	if (DirectionalLight)
-		MainCamera->AddLight(DirectionalLight);
-	if (PointLight)
-		MainCamera->AddLight(PointLight);
-	if (SpotLight)
-		MainCamera->AddLight(SpotLight);
-	MainCamera->AddLight(AmbientLight);
+	//// Main camera is linked with lights which will be used.
+	//if (DirectionalLight)
+	//	MainCamera->AddLight(DirectionalLight);
+	//if (PointLight)
+	//	MainCamera->AddLight(PointLight);
+	//if (SpotLight)
+	//	MainCamera->AddLight(SpotLight);
+	//MainCamera->AddLight(AmbientLight);
 
-	// Create UI primitive to visualize shadowmap for debugging
-	DirectionalLightShadowMapUIDebug = jPrimitiveUtil::CreateUIQuad({ 0.0f, 0.0f }, { 150, 150 }, DirectionalLight->GetShadowMap());
-	if (DirectionalLightShadowMapUIDebug)
-		jObject::AddUIDebugObject(DirectionalLightShadowMapUIDebug);
+	//// Create UI primitive to visualize shadowmap for debugging
+	//DirectionalLightShadowMapUIDebug = jPrimitiveUtil::CreateUIQuad({ 0.0f, 0.0f }, { 150, 150 }, DirectionalLight->GetShadowMap());
+	//if (DirectionalLightShadowMapUIDebug)
+	//	jObject::AddUIDebugObject(DirectionalLightShadowMapUIDebug);
 
 	// Select spawning object type
 	SpawnObjects(ESpawnedType::TestPrimitive);
@@ -148,16 +148,16 @@ void jGame::Setup()
 
 	CurrentShadowMapType = jShadowAppSettingProperties::GetInstance().ShadowMapType;
 
-	// Prepare renderer which are both forward and deferred. It can be switched depend on shadow type
-	const auto currentShadowPipelineSet = (jShadowAppSettingProperties::GetInstance().ShadowType == EShadowType::ShadowMap) 
-		? ShadowPipelineSetMap[CurrentShadowMapType]  : ShadowVolumePipelineSet;
-	ForwardRenderer = new jForwardRenderer(currentShadowPipelineSet);
-	ForwardRenderer->Setup();
+	//// Prepare renderer which are both forward and deferred. It can be switched depend on shadow type
+	//const auto currentShadowPipelineSet = (jShadowAppSettingProperties::GetInstance().ShadowType == EShadowType::ShadowMap) 
+	//	? ShadowPipelineSetMap[CurrentShadowMapType]  : ShadowVolumePipelineSet;
+	//ForwardRenderer = new jForwardRenderer(currentShadowPipelineSet);
+	//ForwardRenderer->Setup();
 
-	// FrameBuffer 생성 필요
-	// DeferredRenderer = new jDeferredRenderer({ ETextureType::TEXTURE_2D, ETextureFormat::RGBA32F, EDepthBufferType::DEPTH16, SCR_WIDTH, SCR_HEIGHT, 4 });
-	DeferredRenderer = new jDeferredRenderer({ ETextureType::TEXTURE_2D, ETextureFormat::RGBA32F, SCR_WIDTH, SCR_HEIGHT, 4 });
-	DeferredRenderer->Setup();
+	//// FrameBuffer 생성 필요
+	//// DeferredRenderer = new jDeferredRenderer({ ETextureType::TEXTURE_2D, ETextureFormat::RGBA32F, EDepthBufferType::DEPTH16, SCR_WIDTH, SCR_HEIGHT, 4 });
+	//DeferredRenderer = new jDeferredRenderer({ ETextureType::TEXTURE_2D, ETextureFormat::RGBA32F, SCR_WIDTH, SCR_HEIGHT, 4 });
+	//DeferredRenderer->Setup();
 }
 
 void jGame::SpawnObjects(ESpawnedType spawnType)
@@ -196,37 +196,305 @@ void jGame::Update(float deltaTime)
 	SCOPE_DEBUG_EVENT(g_rhi, "Game::Update");
 
 	// Update application property by using UI Pannel.
-	UpdateAppSetting();
+	// UpdateAppSetting();
 
 	// Update main camera
 	MainCamera->UpdateCamera();
 
-	// Update lights
-	const int32 numOfLights = MainCamera->GetNumOfLight();
-	for (int32 i = 0; i < numOfLights; ++i)
-	{
-		auto light = MainCamera->GetLight(i);
-		JASSERT(light);
-		light->Update(deltaTime);
-	}
+	//// Update lights
+	//const int32 numOfLights = MainCamera->GetNumOfLight();
+	//for (int32 i = 0; i < numOfLights; ++i)
+	//{
+	//	auto light = MainCamera->GetLight(i);
+	//	JASSERT(light);
+	//	light->Update(deltaTime);
+	//}
 
-	for (auto iter : jObject::GetStaticObject())
-		iter->Update(deltaTime);
+	//for (auto iter : jObject::GetStaticObject())
+	//	iter->Update(deltaTime);
 
-	for (auto& iter : jObject::GetBoundBoxObject())
-		iter->Update(deltaTime);
+	//for (auto& iter : jObject::GetBoundBoxObject())
+	//	iter->Update(deltaTime);
 
-	for (auto& iter : jObject::GetBoundSphereObject())
-		iter->Update(deltaTime);
+	//for (auto& iter : jObject::GetBoundSphereObject())
+	//	iter->Update(deltaTime);
 
-	for (auto& iter : jObject::GetDebugObject())
-		iter->Update(deltaTime);
+	//for (auto& iter : jObject::GetDebugObject())
+	//	iter->Update(deltaTime);
 
 	// Update object which have dirty flag
 	jObject::FlushDirtyState();
 
-	// Render all objects by using selected renderer
-	Renderer->Render(MainCamera);
+	//// Render all objects by using selected renderer
+	//Renderer->Render(MainCamera);
+
+	uint32_t imageIndex = 0;
+	jCommandBuffer_Vulkan commandBuffer = g_rhi_vk->CommandBufferManager.GetOrCreateCommandBuffer();
+	{
+// 이 함수는 아래 3가지 기능을 수행함
+// 1. 스왑체인에서 이미지를 얻음
+// 2. Framebuffer 에서 Attachment로써 얻어온 이미지를 가지고 커맨드 버퍼를 실행
+// 3. 스왑체인 제출을 위해 이미지를 반환
+
+// 스왑체인을 동기화는 2가지 방법
+// 1. Fences		: vkWaitForFences 를 사용하여 프로그램에서 fences의 상태에 접근 할 수 있음.
+//						Fences는 어플리케이션과 렌더링 명령의 동기화를 위해 설계됨
+// 2. Semaphores	: 세마포어는 안됨.
+//						Semaphores 는 커맨드 Queue 내부 혹은 Queue 들 사이에 명령어 동기화를 위해서 설계됨
+
+// 현재는 Draw 와 presentation 커맨드를 동기화 하는 곳에 사용할 것이므로 세마포어가 적합.
+// 2개의 세마포어를 만들 예정
+// 1. 이미지를 획득해서 렌더링 준비가 완료된 경우 Signal(Lock 이 풀리는) 되는 것 (imageAvailableSemaphore)
+// 2. 렌더링을 마쳐서 Presentation 가능한 상태에서 Signal 되는 것 (renderFinishedSemaphore)
+
+#if MULTIPLE_FRAME
+		vkWaitForFences(g_rhi_vk->device, 1, &commandBuffer.Fence, VK_TRUE, UINT64_MAX);
+#endif // MULTIPLE_FRAME
+
+		// timeout 은 nanoseconds. UINT64_MAX 는 타임아웃 없음
+#if MULTIPLE_FRAME
+		VkResult acquireNextImageResult = vkAcquireNextImageKHR(g_rhi_vk->device, g_rhi_vk->swapChain, UINT64_MAX, g_rhi_vk->imageAvailableSemaphores[g_rhi_vk->currenFrame], VK_NULL_HANDLE, &imageIndex);
+		if (acquireNextImageResult != VK_SUCCESS)
+			return;
+
+		// 이전 프레임에서 현재 사용하려는 이미지를 사용중에 있나? (그렇다면 펜스를 기다려라)
+		if (commandBuffer.Fence != VK_NULL_HANDLE)
+			vkWaitForFences(g_rhi_vk->device, 1, &commandBuffer.Fence, VK_TRUE, UINT64_MAX);
+
+		// 이 프레임에서 펜스를 사용한다고 마크 해둠
+		commandBuffer.Fence = commandBuffer.Fence;
+#else
+		VkResult acquireNextImageResult = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+#endif // MULTIPLE_FRAME
+
+		// 여기서는 VK_SUCCESS or VK_SUBOPTIMAL_KHR 은 성공했다고 보고 계속함.
+		// VK_ERROR_OUT_OF_DATE_KHR : 스왑체인이 더이상 서피스와 렌더링하는데 호환되지 않는 경우. (보통 윈도우 리사이즈 이후)
+		// VK_SUBOPTIMAL_KHR : 스왑체인이 여전히 서피스에 제출 가능하지만, 서피스의 속성이 더이상 정확하게 맞지 않음.
+		if (acquireNextImageResult == VK_ERROR_OUT_OF_DATE_KHR)
+		{
+			g_rhi_vk->RecreateSwapChain();		// 이 경우 렌더링이 더이상 불가능하므로 즉시 스왑체인을 새로 만듬.
+			return;
+		}
+		else if (acquireNextImageResult != VK_SUCCESS && acquireNextImageResult != VK_SUBOPTIMAL_KHR)
+		{
+			check(0);
+			return;
+		}
+	}
+	{
+		{
+			auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
+			jMultisampleStateInfo* MultisampleState = nullptr;
+			switch (g_rhi_vk->msaaSamples)
+			{
+			case VK_SAMPLE_COUNT_1_BIT:
+				MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_1, true, 0.2f, false, false>::Create();
+				break;
+			case VK_SAMPLE_COUNT_2_BIT:
+				MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_2, true, 0.2f, false, false>::Create();
+				break;
+			case VK_SAMPLE_COUNT_4_BIT:
+				MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_4, true, 0.2f, false, false>::Create();
+				break;
+			case VK_SAMPLE_COUNT_8_BIT:
+				MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_8, true, 0.2f, false, false>::Create();
+				break;
+			case VK_SAMPLE_COUNT_16_BIT:
+				MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_16, true, 0.2f, false, false>::Create();
+				break;
+			case VK_SAMPLE_COUNT_32_BIT:
+				MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_32, true, 0.2f, false, false>::Create();
+				break;
+			case VK_SAMPLE_COUNT_64_BIT:
+				MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_64, true, 0.2f, false, false>::Create();
+				break;
+			default:
+				break;
+			}
+			auto DepthStencilState = TDepthStencilStateInfo<true, true, ECompareOp::LESS, false, false, nullptr, nullptr, 0.0f, 1.0f>::Create();
+			auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
+
+			g_rhi_vk->CurrentPipelineStateFixed = jPipelineStateFixedInfo(RasterizationState, MultisampleState, DepthStencilState, BlendingState
+				, jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT));
+		}
+
+		jShaderInfo shaderInfo;
+		shaderInfo.name = "default_test";
+		shaderInfo.vs = "Shaders/Vulkan/shader_vs.glsl";
+		shaderInfo.fs = "Shaders/Vulkan/shader_fs.glsl";
+		static jShader* Shader = g_rhi->CreateShader(shaderInfo);
+
+		//const Vector mainCameraPos = Vector(2.0f, 2.0f, 2.0f);
+		//const Vector mainCameraTarget(0.0f, 0.0f, 0.0f);
+		//static auto MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 0.1f, 10.0f, SCR_WIDTH, SCR_HEIGHT, true);
+		//MainCamera->UpdateCamera();
+
+		jView View;
+		View.Camera = MainCamera;
+
+		for (auto iter : jObject::GetStaticObject())
+		{
+			iter->Update(deltaTime);
+
+			iter->RenderObject->UpdateWorldMatrix();
+			iter->RenderObject->UpdateRenderObjectUniformBuffer(&View);
+			iter->RenderObject->PrepareShaderBindingInstance();
+		}
+
+		//g_rhi_vk->TestCube->RenderObject->UpdateWorldMatrix();
+		//g_rhi_vk->TestCube->RenderObject->UpdateRenderObjectUniformBuffer(&View);
+		//g_rhi_vk->TestCube->RenderObject->PrepareShaderBindingInstance();
+
+		class jDrawCommand
+		{
+		public:
+			jDrawCommand(jView* view, jRenderObject* renderObject, jRenderPass* renderPass, jShader* shader, jPipelineStateFixedInfo* pipelineStateFixed, std::vector<const jShaderBindingInstance*> shaderBindingInstances)
+				: View(view), RenderObject(renderObject), RenderPass(renderPass), Shader(shader), PipelineStateFixed(pipelineStateFixed), ShaderBindingInstances(shaderBindingInstances)
+			{}
+
+			void PrepareToDraw()
+			{
+				// GetShaderBindings
+				RenderObject->GetShaderBindingInstance(ShaderBindingInstances);
+
+				// Bind ShaderBindings
+				void* pipelineLayout = g_rhi->CreatePipelineLayout(ShaderBindingInstances);
+				std::vector<const jShaderBindings*> shaderBindings;
+				for (int32 i = 0; i < ShaderBindingInstances.size(); ++i)
+				{
+					ShaderBindingInstances[i]->Bind(pipelineLayout, i);
+					shaderBindings.push_back(ShaderBindingInstances[i]->ShaderBindings);
+				}
+
+				// Create Pipeline
+				CurrentPipelineStateInfo = jPipelineStateInfo(PipelineStateFixed, Shader, RenderObject->VertexBuffer, RenderPass, shaderBindings);
+				CurrentPipelineStateInfo.CreateGraphicsPipelineState();
+
+				// Bind Pipeline
+				CurrentPipelineStateInfo.Bind();
+			}
+			void Draw()
+			{
+				// Draw
+				RenderObject->Draw(nullptr, Shader, {});
+			}
+
+			std::vector<const jShaderBindingInstance*> ShaderBindingInstances;
+
+			jView* View = nullptr;
+			jRenderPass* RenderPass = nullptr;
+			jShader* Shader = nullptr;
+			jRenderObject* RenderObject = nullptr;
+			jPipelineStateFixedInfo* PipelineStateFixed = nullptr;
+			jPipelineStateInfo CurrentPipelineStateInfo;
+		};
+		//////////////////////////////////////////////////////////////////////////
+		// 여기서 부터 렌더 로직 시작
+
+		//UpdateUniformBuffer(imageIndex);
+
+		if (ensure(commandBuffer.Begin()))
+		{
+			g_rhi_vk->CurrentCommandBuffer = &commandBuffer;
+
+			g_rhi_vk->RenderPasses[imageIndex]->BeginRenderPass(&commandBuffer);
+
+			for (auto iter : jObject::GetStaticObject())
+			{
+				jDrawCommand command(&View, iter->RenderObject, g_rhi_vk->RenderPasses[imageIndex], Shader, &g_rhi_vk->CurrentPipelineStateFixed, { });
+				command.PrepareToDraw();
+				command.Draw();
+			}
+			//jDrawCommand command(&View, g_rhi_vk->TestCube->RenderObject, g_rhi_vk->RenderPasses[imageIndex], Shader, &g_rhi_vk->CurrentPipelineStateFixed, { });
+			//command.PrepareToDraw();
+			//command.Draw();
+
+			// Finishing up
+			g_rhi_vk->RenderPasses[imageIndex]->EndRenderPass();
+
+			ensure(commandBuffer.End());
+		}
+
+		// 여기 까지 렌더 로직 끝
+		//////////////////////////////////////////////////////////////////////////
+	}
+	{
+		// Submitting the command buffer
+		VkSubmitInfo submitInfo = {};
+		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+#if MULTIPLE_FRAME
+		VkSemaphore waitsemaphores[] = { g_rhi_vk->imageAvailableSemaphores[g_rhi_vk->currenFrame] };
+#else
+		VkSemaphore waitsemaphores[] = { imageAvailableSemaphore };
+#endif // MULTIPLE_FRAME
+		VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+		submitInfo.waitSemaphoreCount = 1;
+		submitInfo.pWaitSemaphores = waitsemaphores;
+		submitInfo.pWaitDstStageMask = waitStages;
+		submitInfo.commandBufferCount = 1;
+		submitInfo.pCommandBuffers = &commandBuffer.GetRef();
+
+#if MULTIPLE_FRAME
+		VkSemaphore signalSemaphores[] = { g_rhi_vk->renderFinishedSemaphores[g_rhi_vk->currenFrame] };
+#else
+		VkSemaphore signalSemaphores[] = { renderFinishedSemaphore };
+#endif // MULTIPLE_FRAME
+		submitInfo.signalSemaphoreCount = 1;
+		submitInfo.pSignalSemaphores = signalSemaphores;
+
+		// SubmitInfo를 동시에 할수도 있음.
+#if MULTIPLE_FRAME
+		vkResetFences(g_rhi_vk->device, 1, &commandBuffer.Fence);		// 세마포어와는 다르게 수동으로 펜스를 unsignaled 상태로 재설정 해줘야 함
+
+		// 마지막에 Fences 파라메터는 커맨드 버퍼가 모두 실행되고나면 Signaled 될 Fences.
+		if (!ensure(vkQueueSubmit(g_rhi_vk->GraphicsQueue.Queue, 1, &submitInfo, commandBuffer.Fence) == VK_SUCCESS))
+			return;
+#else
+		if (!ensure(vkQueueSubmit(g_rhi_vk->GraphicsQueue.Queue, 1, &submitInfo, VK_NULL_HANDLE) == VK_SUCCESS))
+			return;
+#endif // MULTIPLE_FRAME
+
+		VkPresentInfoKHR presentInfo = {};
+		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+		presentInfo.waitSemaphoreCount = 1;
+		presentInfo.pWaitSemaphores = signalSemaphores;
+
+		VkSwapchainKHR swapChains[] = { g_rhi_vk->swapChain };
+		presentInfo.swapchainCount = 1;
+		presentInfo.pSwapchains = swapChains;
+		presentInfo.pImageIndices = &imageIndex;
+
+		// 여러개의 스왑체인에 제출하는 경우만 모든 스왑체인으로 잘 제출 되었나 확인하는데 사용
+		// 1개인 경우 그냥 vkQueuePresentKHR 의 리턴값을 확인하면 됨.
+		presentInfo.pResults = nullptr;			// Optional
+		VkResult queuePresentResult = vkQueuePresentKHR(g_rhi_vk->PresentQueue.Queue, &presentInfo);
+
+		// 세마포어의 일관된 상태를 보장하기 위해서(세마포어 로직을 변경하지 않으려 노력한듯 함) vkQueuePresentKHR 이후에 framebufferResized 를 체크하는 것이 중요함.
+		if ((queuePresentResult == VK_ERROR_OUT_OF_DATE_KHR) || (queuePresentResult == VK_SUBOPTIMAL_KHR) || g_rhi_vk->framebufferResized)
+		{
+			g_rhi_vk->RecreateSwapChain();
+			g_rhi_vk->framebufferResized = false;
+		}
+		else if (queuePresentResult != VK_SUCCESS)
+		{
+			check(0);
+			return;
+		}
+
+
+		// CPU 가 큐에 작업을 제출하는 속도가 GPU 에서 소모하는 속도보다 빠른 경우 큐에 작업이 계속 쌓이거나 
+		// 여러 프레임에 걸쳐 동시에 imageAvailableSemaphore 와 renderFinishedSemaphore를 재사용하게 되는 문제가 있음.
+		// 1). 한프레임을 마치고 큐가 빌때까지 기다리는 것으로 해결할 수 있음. 한번에 1개의 프레임만 완성 가능(최적의 해결방법은 아님)
+		// 2). 여러개의 프레임을 동시에 처리 할수있도록 확장. 동시에 진행될 수 있는 최대 프레임수를 지정해줌.
+#if MULTIPLE_FRAME
+		g_rhi_vk->currenFrame = (g_rhi_vk->currenFrame + 1) % g_rhi_vk->swapChainImageViews.size();
+#else
+		vkQueueWaitIdle(PresentQueue);
+#endif // MULTIPLE_FRAME
+
+		g_rhi_vk->CommandBufferManager.ReturnCommandBuffer(commandBuffer);
+	}
 }
 
 void jGame::UpdateAppSetting()
@@ -535,7 +803,6 @@ void jGame::SpawnTestPrimitives()
 		thisObject->RenderObject->SetRot(thisObject->RenderObject->GetRot() + Vector(0.0f, 0.0f, DegreeToRadian(180.0f)));
 	};
 	Sphere = sphere;
-
 	jObject::AddObject(sphere);
 	SpawnedObjects.push_back(sphere);
 

@@ -23,6 +23,12 @@ jRHI_Vulkan* g_rhi_vk = nullptr;
 std::unordered_map<size_t, VkPipeline> jPipelineStateInfo::PipelineStatePool;
 std::unordered_map<size_t, VkPipelineLayout> jRHI_Vulkan::PipelineLayoutPool;
 std::unordered_map<size_t, jShaderBindings*> jRHI_Vulkan::ShaderBindingPool;
+TResourcePool<jSamplerStateInfo_Vulkan> jRHI_Vulkan::SamplerStatePool;
+TResourcePool<jRasterizationStateInfo_Vulkan> jRHI_Vulkan::RasterizationStatePool;
+TResourcePool<jMultisampleStateInfo_Vulkan> jRHI_Vulkan::MultisampleStatePool;
+TResourcePool<jStencilOpStateInfo_Vulkan> jRHI_Vulkan::StencilOpStatePool;
+TResourcePool<jDepthStencilStateInfo_Vulkan> jRHI_Vulkan::DepthStencilStatePool;
+TResourcePool<jBlendingStateInfo_Vulakn> jRHI_Vulkan::BlendingStatePool;
 
 //////////////////////////////////////////////////////////////////////////
 // Auto generate type conversion code
@@ -556,7 +562,7 @@ bool jRHI_Vulkan::InitRHI()
 			swapChainImageViews[i] = CreateImageView(swapChainImages[i], swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
 	}
 
-	CommandBufferManager.CratePool(GraphicsQueue.QueueIndex);
+	CommandBufferManager.CreatePool(GraphicsQueue.QueueIndex);
 
     ensure(CreateColorResources());
     ensure(CreateDepthResources());
@@ -646,7 +652,7 @@ bool jRHI_Vulkan::InitRHI()
 
 	ensure(LoadModel());
 
-    ensure(RecordCommandBuffers());
+    // ensure(RecordCommandBuffers());
 
 	return true;
 }
@@ -1055,132 +1061,10 @@ jIndexBuffer* jRHI_Vulkan::CreateIndexBuffer(const std::shared_ptr<jIndexStreamD
 	return indexBuffer;
 }
 
-bool jRHI_Vulkan::RecordCommandBuffers()
-{
-	VkPipeline pipeline = nullptr;
-	{
-		auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
-		jMultisampleStateInfo* MultisampleState = nullptr;
-		switch (msaaSamples)
-		{
-		case VK_SAMPLE_COUNT_1_BIT:
-			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_1, true, 0.2f, false, false>::Create();
-			break;
-		case VK_SAMPLE_COUNT_2_BIT:
-			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_2, true, 0.2f, false, false>::Create();
-			break;
-		case VK_SAMPLE_COUNT_4_BIT:
-			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_4, true, 0.2f, false, false>::Create();
-			break;
-		case VK_SAMPLE_COUNT_8_BIT:
-			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_8, true, 0.2f, false, false>::Create();
-			break;
-		case VK_SAMPLE_COUNT_16_BIT:
-			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_16, true, 0.2f, false, false>::Create();
-			break;
-		case VK_SAMPLE_COUNT_32_BIT:
-			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_32, true, 0.2f, false, false>::Create();
-			break;
-		case VK_SAMPLE_COUNT_64_BIT:
-			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_64, true, 0.2f, false, false>::Create();
-			break;
-		default:
-			break;
-		}
-		auto DepthStencilState = TDepthStencilStateInfo<true, true, ECompareOp::LESS, false, false, nullptr, nullptr, 0.0f, 1.0f>::Create();
-		auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
-
-		CurrentPipelineStateFixed = new jPipelineStateFixedInfo(RasterizationState, MultisampleState, DepthStencilState, BlendingState
-			, jViewport(0.0f, 0.0f, (float)swapChainExtent.width, (float)swapChainExtent.height), jScissor(0, 0, swapChainExtent.width, swapChainExtent.height));
-	}
-
-	jShaderInfo shaderInfo;
-	shaderInfo.name = "default_test";
-	shaderInfo.vs = "Shaders/Vulkan/shader_vs.glsl";
-	shaderInfo.fs = "Shaders/Vulkan/shader_fs.glsl";
-	auto Shader = g_rhi->CreateShader(shaderInfo);
-
-	TestCube->RenderObject->UpdateWorldMatrix();
-
-	const Vector mainCameraPos(172.66f, 160.0f, -180.63f);
-	const Vector mainCameraTarget(0.0f, 0.0f, 0.0f);
-	static auto MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 10.0f, 1000.0f, SCR_WIDTH, SCR_HEIGHT, true);
-
-	jView View;
-	View.Camera = MainCamera;
-
-	TestCube->RenderObject->UpdateRenderObjectUniformBuffer(&View);
-	TestCube->RenderObject->PrepareShaderBindingInstance();
-
-	class jDrawCommand
-	{
-	public:
-		jDrawCommand(jView* view, jRenderObject* renderObject, jRenderPass* renderPass, jShader* shader, jPipelineStateFixedInfo* pipelineStateFixed, std::vector<const jShaderBindingInstance*> shaderBindingInstances)
-			: View(view), RenderObject(renderObject), RenderPass(renderPass), Shader(shader), PipelineStateFixed(pipelineStateFixed), ShaderBindingInstances(shaderBindingInstances)
-		{}
-
-		void PrepareToDraw()
-		{
-			// GetShaderBindings
-			RenderObject->GetShaderBindingInstance(ShaderBindingInstances);
-
-			// Bind ShaderBindings
-			void* pipelineLayout = g_rhi->CreatePipelineLayout(ShaderBindingInstances);
-			std::vector<const jShaderBindings*> shaderBindings;
-			for (int32 i = 0; i < ShaderBindingInstances.size(); ++i)
-			{
-				ShaderBindingInstances[i]->Bind(pipelineLayout, i);
-				shaderBindings.push_back(ShaderBindingInstances[i]->ShaderBindings);
-			}
-
-			// Create Pipeline
-			CurrentPipelineStateInfo = jPipelineStateInfo(PipelineStateFixed, Shader, RenderObject->VertexBuffer, RenderPass, shaderBindings);
-			CurrentPipelineStateInfo.CreateGraphicsPipelineState();
-
-			// Bind Pipeline
-			CurrentPipelineStateInfo.Bind();
-		}
-		void Draw()
-		{
-			// Draw
-			RenderObject->Draw(nullptr, Shader, {});
-		}
-
-		std::vector<const jShaderBindingInstance*> ShaderBindingInstances;
-		
-		jView* View = nullptr;
-		jRenderPass* RenderPass = nullptr;
-		jShader* Shader = nullptr;
-		jRenderObject* RenderObject = nullptr;
-		jPipelineStateFixedInfo* PipelineStateFixed = nullptr;
-		jPipelineStateInfo CurrentPipelineStateInfo;
-	};
-
-	// Begin command buffers
-	for (int32 i = 0; i < swapChainImageViews.size(); ++i)
-	{
-		commandBuffers.push_back(CommandBufferManager.GetOrCreateCommandBuffer());
-
-		if (!ensure(commandBuffers[i].Begin()))
-			return false;
-
-		CurrentCommandBuffer = &commandBuffers[i];
-
-		RenderPasses[i]->BeginRenderPass(&commandBuffers[i]);
-
-		jDrawCommand command(&View, TestCube->RenderObject, RenderPasses[i], Shader, CurrentPipelineStateFixed, { ShaderBindingInstances[i] });
-		command.PrepareToDraw();
-		command.Draw();
-
-		// Finishing up
-		RenderPasses[i]->EndRenderPass();
-
-		if (!ensure(commandBuffers[i].End()))
-			return false;
-	}
-
-	return true;
-}
+//bool jRHI_Vulkan::RecordCommandBuffers()
+//{
+//
+//}
 
 bool jRHI_Vulkan::CreateSyncObjects()
 {
@@ -1230,7 +1114,113 @@ void jRHI_Vulkan::MainLoop()
 
 bool jRHI_Vulkan::DrawFrame()
 {
-	// 이 함수는 아래 3가지 기능을 수행함
+	{
+		auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
+		jMultisampleStateInfo* MultisampleState = nullptr;
+		switch (msaaSamples)
+		{
+		case VK_SAMPLE_COUNT_1_BIT:
+			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_1, true, 0.2f, false, false>::Create();
+			break;
+		case VK_SAMPLE_COUNT_2_BIT:
+			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_2, true, 0.2f, false, false>::Create();
+			break;
+		case VK_SAMPLE_COUNT_4_BIT:
+			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_4, true, 0.2f, false, false>::Create();
+			break;
+		case VK_SAMPLE_COUNT_8_BIT:
+			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_8, true, 0.2f, false, false>::Create();
+			break;
+		case VK_SAMPLE_COUNT_16_BIT:
+			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_16, true, 0.2f, false, false>::Create();
+			break;
+		case VK_SAMPLE_COUNT_32_BIT:
+			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_32, true, 0.2f, false, false>::Create();
+			break;
+		case VK_SAMPLE_COUNT_64_BIT:
+			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_64, true, 0.2f, false, false>::Create();
+			break;
+		default:
+			break;
+		}
+		auto DepthStencilState = TDepthStencilStateInfo<true, true, ECompareOp::LESS, false, false, nullptr, nullptr, 0.0f, 1.0f>::Create();
+		auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
+
+		CurrentPipelineStateFixed = jPipelineStateFixedInfo(RasterizationState, MultisampleState, DepthStencilState, BlendingState
+			, jViewport(0.0f, 0.0f, (float)swapChainExtent.width, (float)swapChainExtent.height), jScissor(0, 0, swapChainExtent.width, swapChainExtent.height));
+	}
+
+	jShaderInfo shaderInfo;
+	shaderInfo.name = "default_test";
+	shaderInfo.vs = "Shaders/Vulkan/shader_vs.glsl";
+	shaderInfo.fs = "Shaders/Vulkan/shader_fs.glsl";
+	static auto Shader = g_rhi->CreateShader(shaderInfo);
+
+	TestCube->RenderObject->UpdateWorldMatrix();
+
+	//ubo.Model = Matrix::MakeRotate(Vector(0.0f, 0.0f, 1.0f), DegreeToRadian(245.0f)).GetTranspose();
+	//ubo.View = jCameraUtil::CreateViewMatrix(Vector(2.0f, 2.0f, 2.0f), Vector(0.0f, 0.0f, 0.0f), Vector(0.0f, 0.0f, 1.0f)).GetTranspose();
+	//ubo.Proj = jCameraUtil::CreatePerspectiveMatrix(static_cast<float>(swapChainExtent.width), static_cast<float>(swapChainExtent.height)
+	//	, DegreeToRadian(45.0f), 10.0f, 0.1f).GetTranspose();
+	//ubo.Proj.m[1][1] *= -1;
+
+	const Vector mainCameraPos = Vector(2.0f, 2.0f, 2.0f);
+	const Vector mainCameraTarget(0.0f, 0.0f, 0.0f);
+	static auto MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 0.1f, 10.0f, SCR_WIDTH, SCR_HEIGHT, true);
+	MainCamera->UpdateCamera();
+
+	jView View;
+	View.Camera = MainCamera;
+
+	TestCube->RenderObject->UpdateRenderObjectUniformBuffer(&View);
+	TestCube->RenderObject->PrepareShaderBindingInstance();
+
+	class jDrawCommand
+	{
+	public:
+		jDrawCommand(jView* view, jRenderObject* renderObject, jRenderPass* renderPass, jShader* shader, jPipelineStateFixedInfo* pipelineStateFixed, std::vector<const jShaderBindingInstance*> shaderBindingInstances)
+			: View(view), RenderObject(renderObject), RenderPass(renderPass), Shader(shader), PipelineStateFixed(pipelineStateFixed), ShaderBindingInstances(shaderBindingInstances)
+		{}
+
+		void PrepareToDraw()
+		{
+			// GetShaderBindings
+			RenderObject->GetShaderBindingInstance(ShaderBindingInstances);
+
+			// Bind ShaderBindings
+			void* pipelineLayout = g_rhi->CreatePipelineLayout(ShaderBindingInstances);
+			std::vector<const jShaderBindings*> shaderBindings;
+			for (int32 i = 0; i < ShaderBindingInstances.size(); ++i)
+			{
+				ShaderBindingInstances[i]->Bind(pipelineLayout, i);
+				shaderBindings.push_back(ShaderBindingInstances[i]->ShaderBindings);
+			}
+
+			// Create Pipeline
+			CurrentPipelineStateInfo = jPipelineStateInfo(PipelineStateFixed, Shader, RenderObject->VertexBuffer, RenderPass, shaderBindings);
+			CurrentPipelineStateInfo.CreateGraphicsPipelineState();
+
+			// Bind Pipeline
+			CurrentPipelineStateInfo.Bind();
+		}
+		void Draw()
+		{
+			// Draw
+			RenderObject->Draw(nullptr, Shader, {});
+		}
+
+		std::vector<const jShaderBindingInstance*> ShaderBindingInstances;
+
+		jView* View = nullptr;
+		jRenderPass* RenderPass = nullptr;
+		jShader* Shader = nullptr;
+		jRenderObject* RenderObject = nullptr;
+		jPipelineStateFixedInfo* PipelineStateFixed = nullptr;
+		jPipelineStateInfo CurrentPipelineStateInfo;
+	};
+
+
+// 이 함수는 아래 3가지 기능을 수행함
 // 1. 스왑체인에서 이미지를 얻음
 // 2. Framebuffer 에서 Attachment로써 얻어온 이미지를 가지고 커맨드 버퍼를 실행
 // 3. 스왑체인 제출을 위해 이미지를 반환
@@ -1281,7 +1271,30 @@ bool jRHI_Vulkan::DrawFrame()
 		return false;
 	}
 
-	UpdateUniformBuffer(imageIndex);
+	//////////////////////////////////////////////////////////////////////////
+	// 여기서 부터 렌더 로직 시작
+
+	//UpdateUniformBuffer(imageIndex);
+
+	auto commandBuffer = CommandBufferManager.GetOrCreateCommandBuffer();
+	if (ensure(commandBuffer.Begin()))
+	{
+		CurrentCommandBuffer = &commandBuffer;
+
+		RenderPasses[imageIndex]->BeginRenderPass(&commandBuffer);
+
+		jDrawCommand command(&View, TestCube->RenderObject, RenderPasses[imageIndex], Shader, &CurrentPipelineStateFixed, { });
+		command.PrepareToDraw();
+		command.Draw();
+
+		// Finishing up
+		RenderPasses[imageIndex]->EndRenderPass();
+
+		ensure(commandBuffer.End());
+	}
+
+	// 여기 까지 렌더 로직 끝
+	//////////////////////////////////////////////////////////////////////////
 
 	// Submitting the command buffer
 	VkSubmitInfo submitInfo = {};
@@ -1297,7 +1310,7 @@ bool jRHI_Vulkan::DrawFrame()
 	submitInfo.pWaitSemaphores = waitsemaphores;
 	submitInfo.pWaitDstStageMask = waitStages;
 	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &commandBuffers[imageIndex].GetRef();
+	submitInfo.pCommandBuffers = &commandBuffer.GetRef();
 
 #if MULTIPLE_FRAME
 	VkSemaphore signalSemaphores[] = { renderFinishedSemaphores[currenFrame] };
@@ -1356,6 +1369,8 @@ bool jRHI_Vulkan::DrawFrame()
 #else
 	vkQueueWaitIdle(PresentQueue);
 #endif // MULTIPLE_FRAME
+
+	CommandBufferManager.ReturnCommandBuffer(commandBuffer);
 
 	return true;
 }
@@ -1925,44 +1940,32 @@ std::shared_ptr<jRenderTarget> jRHI_Vulkan::CreateRenderTarget(const jRenderTarg
 
 jSamplerStateInfo* jRHI_Vulkan::CreateSamplerState(const jSamplerStateInfo& initializer) const
 {
-	auto* state = new jSamplerStateInfo_Vulkan(initializer);
-	state->Initialize();
-	return state;
+	return SamplerStatePool.GetOrCreate(initializer);
 }
 
 jRasterizationStateInfo* jRHI_Vulkan::CreateRasterizationState(const jRasterizationStateInfo& initializer) const
 {
-	auto* state = new jRasterizationStateInfo_Vulkan(initializer);
-	state->Initialize();
-	return state;
+	return RasterizationStatePool.GetOrCreate(initializer);
 }
 
 jMultisampleStateInfo* jRHI_Vulkan::CreateMultisampleState(const jMultisampleStateInfo& initializer) const
 {
-	auto* state = new jMultisampleStateInfo_Vulkan(initializer);
-	state->Initialize();
-	return state;
+	return MultisampleStatePool.GetOrCreate(initializer);
 }
 
 jStencilOpStateInfo* jRHI_Vulkan::CreateStencilOpStateInfo(const jStencilOpStateInfo& initializer) const
 {
-	auto* state = new jStencilOpStateInfo_Vulkan(initializer);
-	state->Initialize();
-	return state;
+	return StencilOpStatePool.GetOrCreate(initializer);
 }
 
 jDepthStencilStateInfo* jRHI_Vulkan::CreateDepthStencilState(const jDepthStencilStateInfo& initializer) const
 {
-	auto* state = new jDepthStencilStateInfo_Vulkan(initializer);
-	state->Initialize();
-	return state;
+	return DepthStencilStatePool.GetOrCreate(initializer);
 }
 
 jBlendingStateInfo* jRHI_Vulkan::CreateBlendingState(const jBlendingStateInfo& initializer) const
 {
-	auto* state = new jBlendingStateInfo_Vulakn(initializer);
-	state->Initialize();
-	return state;
+	return BlendingStatePool.GetOrCreate(initializer);
 }
 
 void jRHI_Vulkan::DrawArrays(EPrimitiveType type, int32 vertStartIndex, int32 vertCount) const
@@ -1980,25 +1983,25 @@ void jRHI_Vulkan::DrawArraysInstanced(EPrimitiveType type, int32 vertStartIndex,
 void jRHI_Vulkan::DrawElements(EPrimitiveType type, int32 elementSize, int32 startIndex, int32 count) const
 {
 	check(CurrentCommandBuffer);
-	vkCmdDrawIndexed((VkCommandBuffer)CurrentCommandBuffer->GetHandle(), elementSize, 1, startIndex, 0, 0);
+	vkCmdDrawIndexed((VkCommandBuffer)CurrentCommandBuffer->GetHandle(), count, 1, startIndex, 0, 0);
 }
 
 void jRHI_Vulkan::DrawElementsInstanced(EPrimitiveType type, int32 elementSize, int32 startIndex, int32 count, int32 instanceCount) const
 {
 	check(CurrentCommandBuffer);
-	vkCmdDrawIndexed((VkCommandBuffer)CurrentCommandBuffer->GetHandle(), elementSize, instanceCount, startIndex, 0, 0);
+	vkCmdDrawIndexed((VkCommandBuffer)CurrentCommandBuffer->GetHandle(), count, instanceCount, startIndex, 0, 0);
 }
 
 void jRHI_Vulkan::DrawElementsBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex) const
 {
 	check(CurrentCommandBuffer);
-	vkCmdDrawIndexed((VkCommandBuffer)CurrentCommandBuffer->GetHandle(), elementSize, 1, startIndex, baseVertexIndex, 0);
+	vkCmdDrawIndexed((VkCommandBuffer)CurrentCommandBuffer->GetHandle(), count, 1, startIndex, baseVertexIndex, 0);
 }
 
 void jRHI_Vulkan::DrawElementsInstancedBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex, int32 instanceCount) const
 {
 	check(CurrentCommandBuffer);
-	vkCmdDrawIndexed((VkCommandBuffer)CurrentCommandBuffer->GetHandle(), elementSize, instanceCount, startIndex, baseVertexIndex, 0);
+	vkCmdDrawIndexed((VkCommandBuffer)CurrentCommandBuffer->GetHandle(), count, instanceCount, startIndex, baseVertexIndex, 0);
 }
 
 jShaderBindings* jRHI_Vulkan::CreateShaderBindings(const std::vector<jShaderBinding>& InUniformBindings, const std::vector<jShaderBinding>& InTextureBindings) const
@@ -2564,7 +2567,7 @@ void jShaderBindingInstance_Vulkan::Bind(void* pipelineLayout, int32 InSlot) con
 	vkCmdBindDescriptorSets((VkCommandBuffer)g_rhi_vk->CurrentCommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, (VkPipelineLayout)(pipelineLayout), InSlot, 1, &DescriptorSet, 0, nullptr);
 }
 
-bool jCommandBufferManager_Vulkan::CratePool(uint32 QueueIndex)
+bool jCommandBufferManager_Vulkan::CreatePool(uint32 QueueIndex)
 {
 	VkCommandPoolCreateInfo poolInfo = {};
 	poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -2574,8 +2577,7 @@ bool jCommandBufferManager_Vulkan::CratePool(uint32 QueueIndex)
 	//											(메모리 할당 동작을 변경할 것임)
 	// VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT : 커맨드 버퍼들이 개별적으로 다시 기록될 수 있다.
 	//													이 플래그가 없으면 모든 커맨드 버퍼들이 동시에 리셋되야 함.
-	// 우리는 프로그램 시작시에 커맨드버퍼를 한번 녹화하고 계속해서 반복사용 할 것이므로 flags를 설정하지 않음.
-	poolInfo.flags = 0;		// Optional
+	poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;		// Optional
 
 	if (!ensure(vkCreateCommandPool(g_rhi_vk->device, &poolInfo, nullptr, &CommandPool) == VK_SUCCESS))
 		return false;
@@ -2587,12 +2589,20 @@ jCommandBuffer_Vulkan jCommandBufferManager_Vulkan::GetOrCreateCommandBuffer()
 {
 	if (PendingCommandBuffers.size() > 0)
 	{
-		auto iter_find = PendingCommandBuffers.begin();
-		jCommandBuffer_Vulkan commandBuffer = *iter_find;
-		PendingCommandBuffers.erase(iter_find);
+		for (int32 i = 0; i < (int32)PendingCommandBuffers.size(); ++i)
+		{
+			const VkResult Result = vkGetFenceStatus(g_rhi_vk->device, PendingCommandBuffers[i].Fence);
+			if (Result == VK_SUCCESS)		// VK_SUCCESS 면 Signaled
+			{
+				jCommandBuffer_Vulkan commandBuffer = PendingCommandBuffers[i];
+				PendingCommandBuffers.erase(PendingCommandBuffers.begin() + i);
 
-		UsingCommandBuffers.push_back(commandBuffer);
-		return commandBuffer;
+				UsingCommandBuffers.push_back(commandBuffer);
+				commandBuffer.Reset();
+
+				return commandBuffer;
+			}
+		}
 	}
 
 	VkCommandBufferAllocateInfo allocInfo = {};
@@ -2607,6 +2617,8 @@ jCommandBuffer_Vulkan jCommandBufferManager_Vulkan::GetOrCreateCommandBuffer()
 	jCommandBuffer_Vulkan commandBuffer;
 	if (!ensure(vkAllocateCommandBuffers(g_rhi_vk->device, &allocInfo, &commandBuffer.GetRef()) == VK_SUCCESS))
 		return commandBuffer;
+
+	commandBuffer.Fence = g_rhi_vk->FenceManager.GetOrCreateFence();
 
 	UsingCommandBuffers.push_back(commandBuffer);
 
@@ -2868,6 +2880,25 @@ void jUniformBufferBlock_Vulkan::ClearBuffer(int32 clearValue)
 		memset(data, clearValue, Size);
 		vkUnmapMemory(g_rhi_vk->device, BufferMemory);
 	}
+}
+
+VkFence jFenceManager_Vulkan::GetOrCreateFence()
+{
+	if (PendingFences.size() > 0)
+	{
+		VkFence fence = *PendingFences.begin();
+		PendingFences.erase(PendingFences.begin());
+		UsingFences.insert(fence);
+		return fence;
+	}
+	VkFenceCreateInfo fenceInfo = {};
+	fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+	VkFence newFence = nullptr;
+	if (ensure(vkCreateFence(g_rhi_vk->device, &fenceInfo, nullptr, &newFence) == VK_SUCCESS))
+		UsingFences.insert(newFence);
+
+	return newFence;
 }
 
 

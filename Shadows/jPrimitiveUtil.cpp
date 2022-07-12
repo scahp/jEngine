@@ -565,11 +565,11 @@ jRenderObject* CreateQuad_Internal(const Vector& pos, const Vector& size, const 
 
 	float vertices[] = {
 		offset.x + (-halfSize.x), 0.0f, offset.z + (-halfSize.z),
-		offset.x + (halfSize.x), 0.0f, offset.z + (halfSize.z),
 		offset.x + (halfSize.x), 0.0f, offset.z + (-halfSize.z),
 		offset.x + (halfSize.x), 0.0f, offset.z + (halfSize.z),
+		offset.x + (halfSize.x), 0.0f, offset.z + (halfSize.z),
+		offset.x + (-halfSize.x), 0.0f, offset.z + (halfSize.z),
 		offset.x + (-halfSize.x), 0.0f, offset.z + (-halfSize.z),
-		offset.x + (-halfSize.x), 0.0f, offset.z + (halfSize.z)
 	};
 
 	float normals[] = {
@@ -812,6 +812,12 @@ jObject* CreateTriangle(const Vector& pos, const Vector& size, const Vector& sca
 		offset.x + (halfSize.x), 0.0, offset.z + (halfSize.z),
 	};
 
+	Vector2 texcoords[] = {
+		Vector2(0.0f, 0.0f),
+		Vector2(1.0f, 0.0f),
+		Vector2(0.0f, 1.0f),
+	};
+
 	int32 elementCount = _countof(vertices) / 3;
 
 	// attribute 추가
@@ -854,6 +860,35 @@ jObject* CreateTriangle(const Vector& pos, const Vector& size, const Vector& sca
 			streamParam->Data[i * 3 + 1] = 1.0f;
 			streamParam->Data[i * 3 + 2] = 0.0f;
 		}
+		vertexStreamData->Params.push_back(streamParam);
+	}
+
+	{
+		auto streamParam = new jStreamParam<float>();
+		streamParam->BufferType = EBufferType::STATIC;
+		streamParam->ElementType = EBufferElementType::FLOAT;
+		streamParam->ElementTypeSize = sizeof(float);
+		streamParam->Stride = sizeof(float) * 3;
+		streamParam->Name = jName("Tangent");
+		streamParam->Data.resize(elementCount * 3);
+		for (int32 i = 0; i < elementCount; ++i)
+		{
+			streamParam->Data[i * 3 + 0] = 1.0f;
+			streamParam->Data[i * 3 + 1] = 0.0f;
+			streamParam->Data[i * 3 + 2] = 0.0f;
+		}
+		vertexStreamData->Params.push_back(streamParam);
+	}
+
+	{
+		auto streamParam = new jStreamParam<float>();
+		streamParam->BufferType = EBufferType::STATIC;
+		streamParam->ElementType = EBufferElementType::FLOAT;
+		streamParam->ElementTypeSize = sizeof(float);
+		streamParam->Stride = sizeof(float) * 2;
+		streamParam->Name = jName("TexCoord");
+		streamParam->Data.resize(elementCount * 2);
+		memcpy(&streamParam->Data[0], texcoords, sizeof(texcoords));
 		vertexStreamData->Params.push_back(streamParam);
 	}
 
