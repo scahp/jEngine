@@ -3,6 +3,7 @@
 #include "jShader.h"
 
 
+
 //////////////////////////////////////////////////////////////////////////
 void IUniformBuffer::Bind(const jShader* shader) const
 {
@@ -121,25 +122,27 @@ jName GetCommonTextureSRGBName(int32 index)
 
 size_t jRenderPass::GetHash() const
 {
-	size_t result = 0;
-	result = STATIC_NAME_CITY_HASH("ColorAttachments");
+	if (Hash)
+		return Hash;
+
+	Hash = STATIC_NAME_CITY_HASH("ColorAttachments");
 	for (int32 i = 0; i < ColorAttachments.size(); ++i)
 	{
-		result ^= ColorAttachments[i]->GetHash();
+		Hash ^= ColorAttachments[i]->GetHash();
 	}
-	result ^= STATIC_NAME_CITY_HASH("DepthAttachment");
+	Hash ^= STATIC_NAME_CITY_HASH("DepthAttachment");
 	if (DepthAttachment)
 	{
-		result ^= DepthAttachment->GetHash();
+		Hash ^= DepthAttachment->GetHash();
 	}
-	result ^= STATIC_NAME_CITY_HASH("ColorAttachmentResolve");
+	Hash ^= STATIC_NAME_CITY_HASH("ColorAttachmentResolve");
 	if (ColorAttachmentResolve)
 	{
-		result ^= ColorAttachmentResolve->GetHash();
+		Hash ^= ColorAttachmentResolve->GetHash();
 	}
-	result ^= CityHash64((const char*)&RenderOffset, sizeof(RenderOffset));
-	result ^= CityHash64((const char*)&RenderExtent, sizeof(RenderExtent));
-	return result;
+	Hash ^= CityHash64((const char*)&RenderOffset, sizeof(RenderOffset));
+	Hash ^= CityHash64((const char*)&RenderExtent, sizeof(RenderExtent));
+	return Hash;
 }
 
 size_t jShaderBindings::GenerateHash(const std::vector<jShaderBinding>& InUniformBuffers, const std::vector<jShaderBinding>& InTextures)
@@ -157,5 +160,18 @@ size_t jShaderBindings::GenerateHash(const std::vector<jShaderBinding>& InUnifor
 
 size_t jShaderBindings::GetHash() const
 {
-	return GenerateHash(UniformBuffers, Textures);
+	if (Hash)
+		return Hash;
+	
+	Hash = GenerateHash(UniformBuffers, Textures);
+	return Hash;
+}
+
+#include "jLight.h"
+void jView::GetShaderBindingInstance(std::vector<const jShaderBindingInstance*>& OutShaderBindingInstance)
+{
+	if (DirectionalLight)
+	{
+		OutShaderBindingInstance.push_back(DirectionalLight->ShaderBindingInstance);
+	}
 }

@@ -76,25 +76,25 @@ void jGame::Setup()
 	MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 10.0f, 1000.0f, SCR_WIDTH, SCR_HEIGHT, true);
 	jCamera::AddCamera(0, MainCamera);
 
-	//// Create lights
-	//NormalDirectionalLight = jLight::CreateDirectionalLight(AppSettings.DirecionalLightDirection
-	//	, Vector4(0.6f), Vector(1.0f), Vector(1.0f), 64);
+	// Create lights
+	NormalDirectionalLight = jLight::CreateDirectionalLight(AppSettings.DirecionalLightDirection
+		, Vector4(0.6f), Vector(1.0f), Vector(1.0f), 64);
 	//CascadeDirectionalLight = jLight::CreateCascadeDirectionalLight(AppSettings.DirecionalLightDirection
 	//	, Vector4(0.6f), Vector(1.0f), Vector(1.0f), 64);
 	//AmbientLight = jLight::CreateAmbientLight(Vector(0.2f, 0.5f, 1.0f), Vector(0.05f));		// sky light color
 	//PointLight = jLight::CreatePointLight(jShadowAppSettingProperties::GetInstance().PointLightPosition, Vector4(2.0f, 0.7f, 0.7f, 1.0f), 500.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
 	//SpotLight = jLight::CreateSpotLight(jShadowAppSettingProperties::GetInstance().SpotLightPosition, jShadowAppSettingProperties::GetInstance().SpotLightDirection, Vector4(0.0f, 1.0f, 0.0f, 1.0f), 500.0f, 0.7f, 1.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
 
-	//// Select one of directional light
-	//DirectionalLight = NormalDirectionalLight;
+	// Select one of directional light
+	DirectionalLight = NormalDirectionalLight;
 
-	//// Create light info for debugging light infomation
-	//if (DirectionalLight)
-	//{
-	//	DirectionalLightInfo = jPrimitiveUtil::CreateDirectionalLightDebug(Vector(250, 260, 0) * 0.5f, Vector::OneVector * 10.0f, 10.0f, MainCamera, DirectionalLight, "Image/sun.png");
-	//	if (AppSettings.ShowDirectionalLightInfo)
-	//		jObject::AddDebugObject(DirectionalLightInfo);
-	//}
+	// Create light info for debugging light infomation
+	if (DirectionalLight)
+	{
+		DirectionalLightInfo = jPrimitiveUtil::CreateDirectionalLightDebug(Vector(250, 260, 0) * 0.5f, Vector::OneVector * 10.0f, 10.0f, MainCamera, DirectionalLight, "Image/sun.png");
+		if (AppSettings.ShowDirectionalLightInfo)
+			jObject::AddDebugObject(DirectionalLightInfo);
+	}
 
 	//if (PointLight)
 	//{
@@ -191,6 +191,58 @@ void jGame::RemoveSpawnedObjects()
 	SpawnedObjects.clear();
 }
 
+// todo 위치 정해야 함
+template <bool bPointOnly>
+class jDrawCommand
+{
+public:
+	jDrawCommand(jView* view, jRenderObject* renderObject, jRenderPass* renderPass, jShader* shader, jPipelineStateFixedInfo* pipelineStateFixed, std::vector<const jShaderBindingInstance*> shaderBindingInstances)
+		: View(view), RenderObject(renderObject), RenderPass(renderPass), Shader(shader), PipelineStateFixed(pipelineStateFixed), ShaderBindingInstances(shaderBindingInstances)
+	{}
+
+	void PrepareToDraw()
+	{
+		RenderObject->UpdateRenderObjectUniformBuffer(View);
+		RenderObject->PrepareShaderBindingInstance();
+
+		// GetShaderBindings
+		View->GetShaderBindingInstance(ShaderBindingInstances);
+
+		// GetShaderBindings
+		RenderObject->GetShaderBindingInstance(ShaderBindingInstances);
+
+		// Bind ShaderBindings
+		void* pipelineLayout = g_rhi->CreatePipelineLayout(ShaderBindingInstances);
+		std::vector<const jShaderBindings*> shaderBindings;
+		for (int32 i = 0; i < ShaderBindingInstances.size(); ++i)
+		{
+			ShaderBindingInstances[i]->Bind(pipelineLayout, i);
+			shaderBindings.push_back(ShaderBindingInstances[i]->ShaderBindings);
+		}
+
+		// Create Pipeline
+		CurrentPipelineStateInfo = jPipelineStateInfo(PipelineStateFixed, Shader, bPointOnly ? RenderObject->VertexBuffer_PositionOnly : RenderObject->VertexBuffer, RenderPass, shaderBindings);
+		CurrentPipelineStateInfo.CreateGraphicsPipelineState();
+
+		// Bind Pipeline
+		CurrentPipelineStateInfo.Bind();
+	}
+	void Draw()
+	{
+		// Draw
+		RenderObject->Draw(nullptr, Shader, {});
+	}
+
+	std::vector<const jShaderBindingInstance*> ShaderBindingInstances;
+
+	jView* View = nullptr;
+	jRenderPass* RenderPass = nullptr;
+	jShader* Shader = nullptr;
+	jRenderObject* RenderObject = nullptr;
+	jPipelineStateFixedInfo* PipelineStateFixed = nullptr;
+	jPipelineStateInfo CurrentPipelineStateInfo;
+};
+
 void jGame::Update(float deltaTime)
 {
 	SCOPE_DEBUG_EVENT(g_rhi, "Game::Update");
@@ -247,9 +299,7 @@ void jGame::Update(float deltaTime)
 // 1. 이미지를 획득해서 렌더링 준비가 완료된 경우 Signal(Lock 이 풀리는) 되는 것 (imageAvailableSemaphore)
 // 2. 렌더링을 마쳐서 Presentation 가능한 상태에서 Signal 되는 것 (renderFinishedSemaphore)
 
-#if MULTIPLE_FRAME
-		vkWaitForFences(g_rhi_vk->device, 1, &commandBuffer.Fence, VK_TRUE, UINT64_MAX);
-#endif // MULTIPLE_FRAME
+		VkFence lastCommandBufferFence = g_rhi_vk->swapChainCommandBufferFences[g_rhi_vk->currenFrame];
 
 		// timeout 은 nanoseconds. UINT64_MAX 는 타임아웃 없음
 #if MULTIPLE_FRAME
@@ -258,11 +308,11 @@ void jGame::Update(float deltaTime)
 			return;
 
 		// 이전 프레임에서 현재 사용하려는 이미지를 사용중에 있나? (그렇다면 펜스를 기다려라)
-		if (commandBuffer.Fence != VK_NULL_HANDLE)
-			vkWaitForFences(g_rhi_vk->device, 1, &commandBuffer.Fence, VK_TRUE, UINT64_MAX);
+		if (lastCommandBufferFence != VK_NULL_HANDLE)
+			vkWaitForFences(g_rhi_vk->device, 1, &lastCommandBufferFence, VK_TRUE, UINT64_MAX);
 
 		// 이 프레임에서 펜스를 사용한다고 마크 해둠
-		commandBuffer.Fence = commandBuffer.Fence;
+		g_rhi_vk->swapChainCommandBufferFences[g_rhi_vk->currenFrame] = commandBuffer.Fence;
 #else
 		VkResult acquireNextImageResult = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
 #endif // MULTIPLE_FRAME
@@ -318,105 +368,131 @@ void jGame::Update(float deltaTime)
 				, jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT));
 		}
 
-		jShaderInfo shaderInfo;
-		shaderInfo.name = "default_test";
-		shaderInfo.vs = "Shaders/Vulkan/shader_vs.glsl";
-		shaderInfo.fs = "Shaders/Vulkan/shader_fs.glsl";
-		static jShader* Shader = g_rhi->CreateShader(shaderInfo);
+		{
+			auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
+			jMultisampleStateInfo* MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_1, true, 0.2f, false, false>::Create();
+			auto DepthStencilState = TDepthStencilStateInfo<true, true, ECompareOp::LESS, false, false, nullptr, nullptr, 0.0f, 1.0f>::Create();
+			auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::NONE>::Create();
 
-		//const Vector mainCameraPos = Vector(2.0f, 2.0f, 2.0f);
-		//const Vector mainCameraTarget(0.0f, 0.0f, 0.0f);
-		//static auto MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 0.1f, 10.0f, SCR_WIDTH, SCR_HEIGHT, true);
-		//MainCamera->UpdateCamera();
-
-		jView View;
-		View.Camera = MainCamera;
+			g_rhi_vk->CurrentPipelineStateFixed_Shadow = jPipelineStateFixedInfo(RasterizationState, MultisampleState, DepthStencilState, BlendingState
+				, jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT));			
+		}
 
 		for (auto iter : jObject::GetStaticObject())
 		{
 			iter->Update(deltaTime);
 
 			iter->RenderObject->UpdateWorldMatrix();
-			iter->RenderObject->UpdateRenderObjectUniformBuffer(&View);
-			iter->RenderObject->PrepareShaderBindingInstance();
 		}
 
-		//g_rhi_vk->TestCube->RenderObject->UpdateWorldMatrix();
-		//g_rhi_vk->TestCube->RenderObject->UpdateRenderObjectUniformBuffer(&View);
-		//g_rhi_vk->TestCube->RenderObject->PrepareShaderBindingInstance();
+		// 정리해야함
+		DirectionalLight->Update(deltaTime);
 
-		class jDrawCommand
+		static jRenderPass_Vulkan* renderPass = nullptr;
+		if (!renderPass)
 		{
-		public:
-			jDrawCommand(jView* view, jRenderObject* renderObject, jRenderPass* renderPass, jShader* shader, jPipelineStateFixedInfo* pipelineStateFixed, std::vector<const jShaderBindingInstance*> shaderBindingInstances)
-				: View(view), RenderObject(renderObject), RenderPass(renderPass), Shader(shader), PipelineStateFixed(pipelineStateFixed), ShaderBindingInstances(shaderBindingInstances)
-			{}
+			DirectionalLight->ShadowMapPtr = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget(
+				{ ETextureType::TEXTURE_2D, ETextureFormat::D24_S8, SCR_WIDTH, SCR_HEIGHT, 1, /*ETextureFilter::LINEAR, ETextureFilter::LINEAR, */false, 1 }));
 
-			void PrepareToDraw()
+			const Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
+			const Vector2 ClearDepth = Vector2(1.0f, 0.0f);
+
+			jAttachment* depth = new jAttachment(DirectionalLight->ShadowMapPtr, EAttachmentLoadStoreOp::CLEAR_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth, true);
+			jAttachment* resolve = nullptr;
+
+			auto textureDepth = (jTexture_Vulkan*)depth->RenderTargetPtr->GetTexture();
+			auto depthFormat = VK_FORMAT_D24_UNORM_S8_UINT;
+			g_rhi_vk->TransitionImageLayout(textureDepth->Image, depthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 1);
+
+			renderPass = new jRenderPass_Vulkan(nullptr, depth, resolve, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
+			renderPass->CreateRenderPass();
+			//RenderPasses.push_back(renderPass);
+		}
+
+		// Shadow
+		{
+			static jShader* Shader = nullptr;
+			if (!Shader)
 			{
-				// GetShaderBindings
-				RenderObject->GetShaderBindingInstance(ShaderBindingInstances);
+				jShaderInfo shaderInfo;
+				shaderInfo.name = jName("shadow_test");
+				shaderInfo.vs = jName("Shaders/Vulkan/shadow_vs.glsl");
+				shaderInfo.fs = jName("Shaders/Vulkan/shadow_fs.glsl");
+				Shader = g_rhi->CreateShader(shaderInfo);
+			}
 
-				// Bind ShaderBindings
-				void* pipelineLayout = g_rhi->CreatePipelineLayout(ShaderBindingInstances);
-				std::vector<const jShaderBindings*> shaderBindings;
-				for (int32 i = 0; i < ShaderBindingInstances.size(); ++i)
+			jView View;
+			View.Camera = DirectionalLight->GetLightCamra();
+
+			//////////////////////////////////////////////////////////////////////////
+			// 여기서 부터 렌더 로직 시작
+			if (ensure(commandBuffer.Begin()))
+			{
+				g_rhi_vk->CurrentCommandBuffer = &commandBuffer;
+
+				renderPass->BeginRenderPass(&commandBuffer);
+
+				for (auto iter : jObject::GetStaticObject())
 				{
-					ShaderBindingInstances[i]->Bind(pipelineLayout, i);
-					shaderBindings.push_back(ShaderBindingInstances[i]->ShaderBindings);
+					jDrawCommand<true> command(&View, iter->RenderObject, renderPass, Shader, &g_rhi_vk->CurrentPipelineStateFixed_Shadow, { });
+					command.PrepareToDraw();
+					command.Draw();
 				}
 
-				// Create Pipeline
-				CurrentPipelineStateInfo = jPipelineStateInfo(PipelineStateFixed, Shader, RenderObject->VertexBuffer, RenderPass, shaderBindings);
-				CurrentPipelineStateInfo.CreateGraphicsPipelineState();
+				// Finishing up
+				renderPass->EndRenderPass();
 
-				// Bind Pipeline
-				CurrentPipelineStateInfo.Bind();
-			}
-			void Draw()
-			{
-				// Draw
-				RenderObject->Draw(nullptr, Shader, {});
+				//ensure(commandBuffer.End());
 			}
 
-			std::vector<const jShaderBindingInstance*> ShaderBindingInstances;
-
-			jView* View = nullptr;
-			jRenderPass* RenderPass = nullptr;
-			jShader* Shader = nullptr;
-			jRenderObject* RenderObject = nullptr;
-			jPipelineStateFixedInfo* PipelineStateFixed = nullptr;
-			jPipelineStateInfo CurrentPipelineStateInfo;
-		};
-		//////////////////////////////////////////////////////////////////////////
-		// 여기서 부터 렌더 로직 시작
-
-		//UpdateUniformBuffer(imageIndex);
-
-		if (ensure(commandBuffer.Begin()))
-		{
-			g_rhi_vk->CurrentCommandBuffer = &commandBuffer;
-
-			g_rhi_vk->RenderPasses[imageIndex]->BeginRenderPass(&commandBuffer);
-
-			for (auto iter : jObject::GetStaticObject())
-			{
-				jDrawCommand command(&View, iter->RenderObject, g_rhi_vk->RenderPasses[imageIndex], Shader, &g_rhi_vk->CurrentPipelineStateFixed, { });
-				command.PrepareToDraw();
-				command.Draw();
-			}
-			//jDrawCommand command(&View, g_rhi_vk->TestCube->RenderObject, g_rhi_vk->RenderPasses[imageIndex], Shader, &g_rhi_vk->CurrentPipelineStateFixed, { });
-			//command.PrepareToDraw();
-			//command.Draw();
-
-			// Finishing up
-			g_rhi_vk->RenderPasses[imageIndex]->EndRenderPass();
-
-			ensure(commandBuffer.End());
+			// 여기 까지 렌더 로직 끝
+			//////////////////////////////////////////////////////////////////////////
 		}
 
-		// 여기 까지 렌더 로직 끝
-		//////////////////////////////////////////////////////////////////////////
+		// BasePass
+		if (1)
+		{
+			static jShader* Shader = nullptr;
+			if (!Shader)
+			{
+				jShaderInfo shaderInfo;
+				shaderInfo.name = jName("default_test");
+				shaderInfo.vs = jName("Shaders/Vulkan/shader_vs.glsl");
+				shaderInfo.fs = jName("Shaders/Vulkan/shader_fs.glsl");
+				Shader = g_rhi->CreateShader(shaderInfo);
+			}
+
+			jView View;
+			View.Camera = MainCamera;
+			View.DirectionalLight = DirectionalLight;
+
+			// 정리 해야 함
+			DirectionalLight->PrepareShaderBindingInstance();
+
+			//////////////////////////////////////////////////////////////////////////
+			// 여기서 부터 렌더 로직 시작
+			//if (ensure(commandBuffer.Begin()))
+			{
+				g_rhi_vk->CurrentCommandBuffer = &commandBuffer;
+
+				g_rhi_vk->RenderPasses[imageIndex]->BeginRenderPass(&commandBuffer);
+
+				for (auto iter : jObject::GetStaticObject())
+				{
+					jDrawCommand<false> command(&View, iter->RenderObject, g_rhi_vk->RenderPasses[imageIndex], Shader, &g_rhi_vk->CurrentPipelineStateFixed, { });
+					command.PrepareToDraw();
+					command.Draw();
+				}
+
+				// Finishing up
+				g_rhi_vk->RenderPasses[imageIndex]->EndRenderPass();
+
+				ensure(commandBuffer.End());
+			}
+
+			// 여기 까지 렌더 로직 끝
+			//////////////////////////////////////////////////////////////////////////
+		}
 	}
 	{
 		// Submitting the command buffer
@@ -481,7 +557,6 @@ void jGame::Update(float deltaTime)
 			check(0);
 			return;
 		}
-
 
 		// CPU 가 큐에 작업을 제출하는 속도가 GPU 에서 소모하는 속도보다 빠른 경우 큐에 작업이 계속 쌓이거나 
 		// 여러 프레임에 걸쳐 동시에 imageAvailableSemaphore 와 renderFinishedSemaphore를 재사용하게 되는 문제가 있음.

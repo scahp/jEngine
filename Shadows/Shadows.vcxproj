@@ -386,6 +386,8 @@ xcopy /s /y /d  "$(ProjectDir)External\assimp\lib\*.dll" "$(OutDir)"</Command>
     <None Include="Shaders\vs_test.glsl" />
     <None Include="Shaders\Vulkan\shader_fs.glsl" />
     <None Include="Shaders\Vulkan\shader_vs.glsl" />
+    <None Include="Shaders\Vulkan\shadow_fs.glsl" />
+    <None Include="Shaders\Vulkan\shadow_vs.glsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

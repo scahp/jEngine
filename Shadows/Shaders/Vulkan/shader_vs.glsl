@@ -8,11 +8,34 @@
 //    mat4 Proj;
 //} ubo;
 
-layout(set = 0, binding = 0) uniform RenderObjectUniformBuffer
+layout(set = 0, binding = 0) uniform DirectionalLightUniformBuffer
+{
+	vec3 Direction;
+	float SpecularPow;
+
+	vec3 Color;
+	float padding0;
+
+	vec3 DiffuseIntensity;
+	float padding1;
+
+	vec3 SpecularIntensity;
+	float padding2;
+
+	mat4 ShadowVP;
+	mat4 ShadowV;
+		
+	vec3 LightPos;
+	float padding3;
+
+	vec2 ShadowMapSize;
+	float Near;
+	float Far;
+} DirectionalLight;
+
+layout(set = 1, binding = 0) uniform RenderObjectUniformBuffer
 {
 	mat4 M;
-    mat4 V;
-	mat4 P;
 	mat4 MV;
 	mat4 MVP;
 	mat4 InvM;
@@ -32,10 +55,17 @@ layout(location = 2) in vec3 inColor;
 
 layout(location = 0) out vec4 fragColor;
 layout(location = 1) out vec2 fragTexCoord;
+layout(location = 2) out vec3 fragNormal;
 
 void main() 
 {
-    gl_Position = RenderObjectParam.P * RenderObjectParam.V * RenderObjectParam.M * vec4(inPosition, 1.0);
+    gl_Position = RenderObjectParam.MVP * vec4(inPosition, 1.0);
     fragColor = inColor;
     fragTexCoord = inTexCoord;
+
+	fragNormal = normalize(mat3(RenderObjectParam.M) * inNormal);
+	
+	// ¿Þ¼Õ ÁÂÇ¥°è·Î Color
+	gl_Position.y = 1.0 - gl_Position.y;
+	fragTexCoord.y = 1.0 - inTexCoord.y;
 }

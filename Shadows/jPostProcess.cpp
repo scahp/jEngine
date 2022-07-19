@@ -144,7 +144,7 @@ bool jPostProcess_DeepShadowMap::Do(const jCamera* camera) const
 	if (directionalLight)
 		lights.push_back(directionalLight);
 
-	if (auto deepShadowFull_Shader = jShadowAppSettingProperties::GetInstance().ExponentDeepShadowOn ? jShader::GetShader("ExpDeepShadowFull") : jShader::GetShader("DeepShadowFull"))
+	if (auto deepShadowFull_Shader = jShadowAppSettingProperties::GetInstance().ExponentDeepShadowOn ? jShader::GetShader(jName("ExpDeepShadowFull")) : jShader::GetShader(jName("DeepShadowFull")))
 	{
 		g_rhi->SetShader(deepShadowFull_Shader);
 
@@ -165,7 +165,7 @@ bool jPostProcess_DeepShadowMap::Do(const jCamera* camera) const
 void jPostProcess_AA_DeepShadowAddition::Setup()
 {
 	__super::Setup();
-	Shader = jShader::GetShader("DeepShadowAA");
+	Shader = jShader::GetShader(jName("DeepShadowAA"));
 }
 
 bool jPostProcess_AA_DeepShadowAddition::Do(const jCamera* camera) const
@@ -194,7 +194,7 @@ bool jPostProcess_Blur::Do(const jCamera* camera) const
 	g_rhi->SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	g_rhi->SetClear(ERenderBufferType::COLOR | ERenderBufferType::DEPTH);
 
-	auto shader = OmniDirectional ? jShader::GetShader("BlurOmni") : jShader::GetShader("Blur");
+	auto shader = OmniDirectional ? jShader::GetShader(jName("BlurOmni")) : jShader::GetShader(jName("Blur"));
 
 	auto fullscreenQuad = GetFullscreenQuad();
 
@@ -216,7 +216,7 @@ bool jPostProcess_Blur::Do(const jCamera* camera) const
 void jPostProcess_Tonemap::Setup()
 {
 	__super::Setup();
-	Shader = jShader::GetShader("Tonemap");
+	Shader = jShader::GetShader(jName("Tonemap"));
 }
 
 bool jPostProcess_Tonemap::Do(const jCamera* camera) const
@@ -246,7 +246,7 @@ bool jPostProcess_Tonemap::Do(const jCamera* camera) const
 void jPostProcess_LuminanceMapGeneration::Setup()
 {
 	__super::Setup();
-	Shader = jShader::GetShader("LuminanceMapGeneration");
+	Shader = jShader::GetShader(jName("LuminanceMapGeneration"));
 }
 
 bool jPostProcess_LuminanceMapGeneration::Process(const jCamera* camera) const
@@ -316,7 +316,7 @@ void jPostProcess_AdaptiveLuminance::UnbindInputs(jFullscreenQuadPrimitive* fsQu
 void jPostProcess_AdaptiveLuminance::Setup()
 {
 	__super::Setup();
-	Shader = jShader::GetShader("AdaptiveLuminance");
+	Shader = jShader::GetShader(jName("AdaptiveLuminance"));
 	LastLumianceFrameBuffer[0] = jFrameBufferPool::GetFrameBuffer({ ETextureType::TEXTURE_2D, ETextureFormat::R32F, 1, 1, 1/*, ETextureFilter::LINEAR, ETextureFilter::LINEAR_MIPMAP_LINEAR*/ });
 	LastLumianceFrameBuffer[1] = jFrameBufferPool::GetFrameBuffer({ ETextureType::TEXTURE_2D, ETextureFormat::R32F, 1, 1, 1/*, ETextureFilter::LINEAR, ETextureFilter::LINEAR_MIPMAP_LINEAR*/ });
 }
@@ -370,7 +370,7 @@ bool jPostProcess_AdaptiveLuminance::Process(const jCamera* camera) const
 void jPostProcess_BloomThreshold::Setup()
 {
 	__super::Setup();
-	Shader = jShader::GetShader("BloomThreshold");
+	Shader = jShader::GetShader(jName("BloomThreshold"));
 }
 
 bool jPostProcess_BloomThreshold::Do(const jCamera* camera) const
@@ -399,7 +399,7 @@ bool jPostProcess_BloomThreshold::Do(const jCamera* camera) const
 void jPostProcess_Scale::Setup()
 {
 	__super::Setup();
-	Shader = jShader::GetShader("Scale");
+	Shader = jShader::GetShader(jName("Scale"));
 }
 
 bool jPostProcess_Scale::Do(const jCamera* camera) const
@@ -426,7 +426,7 @@ bool jPostProcess_Scale::Do(const jCamera* camera) const
 void jPostProcess_GaussianBlurH::Setup()
 {
 	__super::Setup();
-	Shader = jShader::GetShader("GaussianBlurH");
+	Shader = jShader::GetShader(jName("GaussianBlurH"));
 }
 
 bool jPostProcess_GaussianBlurH::Do(const jCamera* camera) const
@@ -495,7 +495,7 @@ void jPostProcess_GaussianBlurH::UnbindInputs(jFullscreenQuadPrimitive* fsQuad) 
 void jPostProcess_GaussianBlurV::Setup()
 {
 	__super::Setup();
-	Shader = jShader::GetShader("GaussianBlurV");
+	Shader = jShader::GetShader(jName("GaussianBlurV"));
 }
 
 bool jPostProcess_GaussianBlurV::Do(const jCamera* camera) const

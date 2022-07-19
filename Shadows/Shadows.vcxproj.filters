@@ -577,5 +577,11 @@
     <None Include="Shaders\Vulkan\shader_vs.glsl">
       <Filter>Shaders\Vulkan</Filter>
     </None>
+    <None Include="Shaders\Vulkan\shadow_vs.glsl">
+      <Filter>Shaders\Vulkan</Filter>
+    </None>
+    <None Include="Shaders\Vulkan\shadow_fs.glsl">
+      <Filter>Shaders\Vulkan</Filter>
+    </None>
   </ItemGroup>
 </Project>

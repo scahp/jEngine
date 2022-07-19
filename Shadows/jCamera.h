@@ -42,11 +42,11 @@ namespace jCameraUtil
 {
 	Matrix CreateViewMatrix(const Vector& pos, const Vector& target, const Vector& up);
 
-	Matrix CreatePerspectiveMatrix(float width, float height, float fov, float farDist, float nearDist);
+	Matrix CreatePerspectiveMatrix(float width, float height, float fov, float nearDist, float farDist);
 	Matrix CreatePerspectiveMatrixFarAtInfinity(float width, float height, float fov, float nearDist);
 
-	Matrix CreateOrthogonalMatrix(float width, float height, float farDist, float nearDist);
-	Matrix CreateOrthogonalMatrix(float left, float right, float top, float bottom, float farDist, float nearDist);
+	Matrix CreateOrthogonalMatrix(float width, float height, float nearDist, float farDist);
+	Matrix CreateOrthogonalMatrix(float left, float right, float top, float bottom, float nearDist, float farDist);
 }
 
 class jCamera
@@ -316,15 +316,15 @@ class jOrthographicCamera : public jCamera
 {
 public:
 	FORCEINLINE static jOrthographicCamera* CreateCamera(const Vector& pos, const Vector& target, const Vector& up
-		, float minX, float minY, float maxX, float maxY, float farDist, float nearDist)
+		, float minX, float minY, float maxX, float maxY, float nearDist, float farDist)
 	{
 		jOrthographicCamera* camera = new jOrthographicCamera();
-		SetCamera(camera, pos, target, up, minX, minY, maxX, maxY, farDist, nearDist);
+		SetCamera(camera, pos, target, up, minX, minY, maxX, maxY, nearDist, farDist);
 		return camera;
 	}
 
 	FORCEINLINE static void SetCamera(jOrthographicCamera* OutCamera, const Vector& pos, const Vector& target, const Vector& up
-		, float minX, float minY, float maxX, float maxY, float farDist, float nearDist, float distance = 300.0f)
+		, float minX, float minY, float maxX, float maxY, float nearDist, float farDist, float distance = 300.0f)
 	{
 		const auto toTarget = (target - pos);
 		OutCamera->Pos = pos;

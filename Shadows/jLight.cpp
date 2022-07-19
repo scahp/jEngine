@@ -39,7 +39,7 @@ namespace jLightUtil
 		float height = SM_HEIGHT;
 		float nearDist = 10.0f;
 		float farDist = 1000.0f;
-		shadowMapData->ShadowMapCamera = jOrthographicCamera::CreateCamera(pos, target, up, -width / 2.0f, -height / 2.0f, width / 2.0f, height / 2.0f, farDist, nearDist);
+		shadowMapData->ShadowMapCamera = jOrthographicCamera::CreateCamera(pos, target, up, -width / 2.0f, -height / 2.0f, width / 2.0f, height / 2.0f, nearDist, farDist);
 		
 		// FrameBuffer 생성 필요
 		// shadowMapData->ShadowMapRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::RG32F, EDepthBufferType::DEPTH32, SM_WIDTH, SM_HEIGHT, 1, ETextureFilter::LINEAR, ETextureFilter::LINEAR });
@@ -65,7 +65,7 @@ namespace jLightUtil
 		float height = SM_HEIGHT;
 		float nearDist = 10.0f;
 		float farDist = 1000.0f;
-		shadowMapData->ShadowMapCamera = jOrthographicCamera::CreateCamera(pos, target, up, -width / 2.0f, -height / 2.0f, width / 2.0f, height / 2.0f, farDist, nearDist);
+		shadowMapData->ShadowMapCamera = jOrthographicCamera::CreateCamera(pos, target, up, -width / 2.0f, -height / 2.0f, width / 2.0f, height / 2.0f, nearDist, farDist);
 
 		// FrameBuffer 생성 필요
 		// shadowMapData->ShadowMapRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::RG32F, EDepthBufferType::DEPTH32, SM_WIDTH, SM_HEIGHT * NUM_CASCADES, 1, ETextureFilter::LINEAR, ETextureFilter::LINEAR });
@@ -351,7 +351,8 @@ void jDirectionalLight::Update(float deltaTime)
 			shadowData.SetData(ShadowMapData);
 
 			IUniformBufferBlock* shadowDataUniformBlock = ShadowMapData->UniformBlock;
-			shadowDataUniformBlock->UpdateBufferData(&shadowData, sizeof(shadowData));
+			if (shadowDataUniformBlock)
+				shadowDataUniformBlock->UpdateBufferData(&shadowData, sizeof(shadowData));
 		}
 	}
 }

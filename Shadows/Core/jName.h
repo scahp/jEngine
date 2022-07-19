@@ -105,6 +105,23 @@ public:
 
 		return it_find->second->c_str();
 	}
+	FORCEINLINE const size_t GetStringLength() const
+	{
+		if (!IsValid())
+			return 0;
+
+		if (!NameStringLength)
+			return NameStringLength;
+
+		const auto it_find = s_NameTable.find(NameHash);
+		if (it_find == s_NameTable.end())
+			return 0;
+
+		NameString = it_find->second->c_str();
+		NameStringLength = it_find->second->size();
+
+		return NameStringLength;
+	}
 	FORCEINLINE uint32 GetNameHash() const { return NameHash; }
 
 private:

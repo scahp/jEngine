@@ -2,6 +2,7 @@
 #include "Math\Vector.h"
 #include "jRHI.h"
 #include "jRHI_OpenGL.h"
+#include "jSamplerStatePool.h"
 
 enum class ELightType
 {
@@ -65,15 +66,15 @@ namespace jLightUtil
 	{
 		jShadowMapData()
 		{
-			UniformBlock = g_rhi->CreateUniformBufferBlock("ShadowMapBlock");
+			//UniformBlock = g_rhi->CreateUniformBufferBlock("ShadowMapBlock");
 		}
 
 		jShadowMapData(const char* prefix)
 		{
-			if (prefix)
-				UniformBlock = g_rhi->CreateUniformBufferBlock((std::string(prefix) + "ShadowMapBlock").c_str());
-			else
-				UniformBlock = g_rhi->CreateUniformBufferBlock("ShadowMapBlock");
+			//if (prefix)
+			//	UniformBlock = g_rhi->CreateUniformBufferBlock((std::string(prefix) + "ShadowMapBlock").c_str());
+			//else
+			//	UniformBlock = g_rhi->CreateUniformBufferBlock("ShadowMapBlock");
 		}
 
 		~jShadowMapData()
@@ -133,6 +134,14 @@ public:
 	jObject* LightDebugObject = nullptr;
 	std::vector<jViewport> Viewports;
 	bool DirtyMaterialData = true;
+
+	jShaderBindingInstance* ShaderBindingInstance = nullptr;
+	bool NeedUpdateRenderObjectUniformBuffer = false;
+	void GetShaderBindingInstance(std::vector<const jShaderBindingInstance*>& OutShaderBindingInstance)
+	{
+		OutShaderBindingInstance.push_back(ShaderBindingInstance);
+	}
+	virtual void PrepareShaderBindingInstance() {}
 };
 
 class jAmbientLight : public jLight
@@ -158,7 +167,7 @@ public:
 	jDirectionalLight()
 		: jLight(ELightType::DIRECTIONAL)
 	{
-		LightDataUniformBlock = g_rhi->CreateUniformBufferBlock("DirectionalLightBlock");
+		LightDataUniformBlock = g_rhi->CreateUniformBufferBlock("DirectionalLightBlock", sizeof(LightData));
 	}
 	virtual ~jDirectionalLight()
 	{
@@ -179,10 +188,22 @@ public:
 		Vector SpecularIntensity;
 		float padding2;
 
+		Matrix ShadowVP;
+		Matrix ShadowV;
+		
+		Vector LightPos;
+		float padding3;
+
+		Vector2 ShadowMapSize;
+		float Near;
+		float Far;
+
 		bool operator == (const LightData& rhs) const
 		{
 			return (Direction == rhs.Direction && Color == rhs.Color && DiffuseIntensity == rhs.DiffuseIntensity 
-				&& SpecularIntensity == rhs.SpecularIntensity && SpecularPow == rhs.SpecularPow);
+				&& SpecularIntensity == rhs.SpecularIntensity && SpecularPow == rhs.SpecularPow && ShadowVP == rhs.ShadowVP
+				&& ShadowV == rhs.ShadowV && LightPos == rhs.LightPos && ShadowMapSize == rhs.ShadowMapSize 
+				&& Near == rhs.Near && Far == rhs.Far);
 		}
 
 		bool operator != (const LightData& rhs) const
@@ -193,6 +214,7 @@ public:
 
 	LightData Data;
 	IUniformBufferBlock* LightDataUniformBlock = nullptr;
+	std::shared_ptr<jRenderTarget> ShadowMapPtr;
 
 	virtual void BindLight(const jShader* shader) const override;
 	virtual void GetMaterialData(jMaterialData* OutMaterialData) const override;
@@ -210,6 +232,57 @@ public:
 
 	jMaterialData MaterialData;
 	void UpdateMaterialData();
+
+	//////////////////////////////////////////////////////////////////////////	
+	virtual void PrepareShaderBindingInstance() override
+	{
+		int32 BindingPoint = 0;
+		std::vector<TShaderBinding<IUniformBufferBlock*>> UniformBinding;
+		UniformBinding.emplace_back(TShaderBinding(BindingPoint++, EShaderAccessStageFlag::ALL_GRAPHICS, LightDataUniformBlock));
+
+		//std::vector<TShaderBinding<jTextureBindings>> TextureBinding;
+		//for (int32 i = 0; i < (int32)MaterialData.Params.size(); ++i)
+		//{
+		//	if (!MaterialData.Params[i].Texture)
+		//		continue;
+
+		//	jTextureBindings bindings;
+		//	bindings.Texture = MaterialData.Params[i].Texture;
+		//	bindings.SamplerState = MaterialData.Params[i].SamplerState;
+		//	TextureBinding.push_back(TShaderBinding(BindingPoint++, EShaderAccessStageFlag::ALL_GRAPHICS, bindings));
+		//}
+
+		std::vector<TShaderBinding<jTextureBindings>> TextureBinding;
+		if (ShadowMapPtr)
+		{
+			jTextureBindings bindings;
+			bindings.Texture = ShadowMapPtr->GetTexture();
+			bindings.SamplerState = nullptr;
+			TextureBinding.emplace_back(TShaderBinding(BindingPoint++, EShaderAccessStageFlag::ALL_GRAPHICS, bindings));
+		}		
+
+		if (NeedUpdateRenderObjectUniformBuffer)
+		{
+			delete ShaderBindingInstance;
+			NeedUpdateRenderObjectUniformBuffer = false;
+		}
+
+		if (ShaderBindingInstance)
+		{
+			ShaderBindingInstance->UniformBuffers.clear();
+			ShaderBindingInstance->UniformBuffers.push_back(LightDataUniformBlock);
+
+			ShaderBindingInstance->Textures.resize(TextureBinding.size());
+			for (int32 i = 0; i < (int32)TextureBinding.size(); ++i)
+				ShaderBindingInstance->Textures[i] = TextureBinding[i].Data;
+		}
+		else
+		{
+			ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(UniformBinding, TextureBinding);
+			ShaderBindingInstance->UpdateShaderBindings();
+		}
+	}
+	//////////////////////////////////////////////////////////////////////////
 };
 
 class jCascadeDirectionalLight : public jDirectionalLight

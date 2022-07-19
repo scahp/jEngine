@@ -419,8 +419,8 @@ bool jRHI_Vulkan::InitRHI()
 			if (IsDeviceSuitable(device))
 			{
 				physicalDevice = device;
-				msaaSamples = GetMaxUsableSampleCount();
-				// msaaSamples = (VkSampleCountFlagBits)1;
+				// msaaSamples = GetMaxUsableSampleCount();
+				msaaSamples = (VkSampleCountFlagBits)1;
 				break;
 			}
 		}
@@ -561,6 +561,7 @@ bool jRHI_Vulkan::InitRHI()
 		for (size_t i = 0; i < swapChainImages.size(); ++i)
 			swapChainImageViews[i] = CreateImageView(swapChainImages[i], swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
 	}
+	swapChainCommandBufferFences.resize(swapChainImageViews.size(), 0);
 
 	CommandBufferManager.CreatePool(GraphicsQueue.QueueIndex);
 
@@ -1151,9 +1152,9 @@ bool jRHI_Vulkan::DrawFrame()
 	}
 
 	jShaderInfo shaderInfo;
-	shaderInfo.name = "default_test";
-	shaderInfo.vs = "Shaders/Vulkan/shader_vs.glsl";
-	shaderInfo.fs = "Shaders/Vulkan/shader_fs.glsl";
+	shaderInfo.name = jName("default_test");
+	shaderInfo.vs = jName("Shaders/Vulkan/shader_vs.glsl");
+	shaderInfo.fs = jName("Shaders/Vulkan/shader_fs.glsl");
 	static auto Shader = g_rhi->CreateShader(shaderInfo);
 
 	TestCube->RenderObject->UpdateWorldMatrix();
@@ -1161,7 +1162,7 @@ bool jRHI_Vulkan::DrawFrame()
 	//ubo.Model = Matrix::MakeRotate(Vector(0.0f, 0.0f, 1.0f), DegreeToRadian(245.0f)).GetTranspose();
 	//ubo.View = jCameraUtil::CreateViewMatrix(Vector(2.0f, 2.0f, 2.0f), Vector(0.0f, 0.0f, 0.0f), Vector(0.0f, 0.0f, 1.0f)).GetTranspose();
 	//ubo.Proj = jCameraUtil::CreatePerspectiveMatrix(static_cast<float>(swapChainExtent.width), static_cast<float>(swapChainExtent.height)
-	//	, DegreeToRadian(45.0f), 10.0f, 0.1f).GetTranspose();
+	//	, DegreeToRadian(45.0f), 0.1f, 10.0f).GetTranspose();
 	//ubo.Proj.m[1][1] *= -1;
 
 	const Vector mainCameraPos = Vector(2.0f, 2.0f, 2.0f);
@@ -1455,7 +1456,7 @@ void jRHI_Vulkan::UpdateUniformBuffer(uint32_t currentImage)
 	ubo.Model = Matrix::MakeRotate(Vector(0.0f, 0.0f, 1.0f), DegreeToRadian(245.0f)).GetTranspose();
 	ubo.View = jCameraUtil::CreateViewMatrix(Vector(2.0f, 2.0f, 2.0f), Vector(0.0f, 0.0f, 0.0f), Vector(0.0f, 0.0f, 1.0f)).GetTranspose();
 	ubo.Proj = jCameraUtil::CreatePerspectiveMatrix(static_cast<float>(swapChainExtent.width), static_cast<float>(swapChainExtent.height)
-		, DegreeToRadian(45.0f), 10.0f, 0.1f).GetTranspose();
+		, DegreeToRadian(45.0f), 0.1f, 10.0f).GetTranspose();
 	ubo.Proj.m[1][1] *= -1;
 
 	//ubo.Model.SetTranslate({ 0.2f, 0.2f,0.2f });
@@ -1698,6 +1699,7 @@ jTexture* jRHI_Vulkan::CreateTextureFromData(void* data, int32 width, int32 heig
     texture->Type = ETextureType::TEXTURE_2D;
     texture->Width = width;
     texture->Height = height;
+	texture->MipLevel = createMipmap ? jTexture::GetMipLevels(width, height) : 1;
     
 	texture->Image = TextureImage;
 	texture->ImageView = textureImageView;
@@ -1735,10 +1737,10 @@ bool jRHI_Vulkan::CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo
 
 	jShader_Vulkan* shader_vk = (jShader_Vulkan*)OutShader;
 
-	if (shaderInfo.cs.length() > 0)
+	if (shaderInfo.cs.GetStringLength() > 0)
 	{
 		jFile csFile;
-		csFile.OpenFile(shaderInfo.cs.c_str(), FileType::TEXT, ReadWriteType::READ);
+		csFile.OpenFile(shaderInfo.cs.ToStr(), FileType::TEXT, ReadWriteType::READ);
 		csFile.ReadFileToBuffer(false);
 		std::string csText(csFile.GetBuffer());
 
@@ -1756,10 +1758,10 @@ bool jRHI_Vulkan::CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo
 	}
 	else
 	{
-		if (shaderInfo.vs.length() > 0)
+		if (shaderInfo.vs.GetStringLength() > 0)
 		{
 			jFile vsFile;
-			vsFile.OpenFile(shaderInfo.vs.c_str(), FileType::TEXT, ReadWriteType::READ);
+			vsFile.OpenFile(shaderInfo.vs.ToStr(), FileType::TEXT, ReadWriteType::READ);
 			vsFile.ReadFileToBuffer(false);
 			std::string vsText(vsFile.GetBuffer());
 
@@ -1777,10 +1779,10 @@ bool jRHI_Vulkan::CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo
 			shader_vk->ShaderStages.push_back(vertShaderStageInfo);
 		}
 
-		if (shaderInfo.gs.length() > 0)
+		if (shaderInfo.gs.GetStringLength() > 0)
 		{
 			jFile gsFile;
-			gsFile.OpenFile(shaderInfo.gs.c_str(), FileType::TEXT, ReadWriteType::READ);
+			gsFile.OpenFile(shaderInfo.gs.ToStr(), FileType::TEXT, ReadWriteType::READ);
 			gsFile.ReadFileToBuffer(false);
 			std::string gsText(gsFile.GetBuffer());
 
@@ -1796,10 +1798,10 @@ bool jRHI_Vulkan::CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo
 			shader_vk->ShaderStages.push_back(geoShaderStageInfo);
 		}
 
-		if (shaderInfo.fs.length() > 0)
+		if (shaderInfo.fs.GetStringLength() > 0)
 		{
 			jFile fsFile;
-			fsFile.OpenFile(shaderInfo.fs.c_str(), FileType::TEXT, ReadWriteType::READ);
+			fsFile.OpenFile(shaderInfo.fs.ToStr(), FileType::TEXT, ReadWriteType::READ);
 			fsFile.ReadFileToBuffer(false);
 			std::string fsText(fsFile.GetBuffer());
 
@@ -1816,6 +1818,8 @@ bool jRHI_Vulkan::CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo
 		}
 	}
 
+	shader_vk->ShaderInfo = shaderInfo;
+
 	return true;
 }
 
@@ -1831,7 +1835,7 @@ jFrameBuffer* jRHI_Vulkan::CreateFrameBuffer(const jFrameBufferInfo& info) const
 	//const VkImageTiling TilingMode = IsMobile ? VkImageTiling::VK_IMAGE_TILING_OPTIMAL : VkImageTiling::VK_IMAGE_TILING_LINEAR;
 	const VkImageTiling TilingMode = VkImageTiling::VK_IMAGE_TILING_OPTIMAL;
 
-	const int32 mipLevels = jTexture::GetMipLevels(info.Width, info.Height);
+	const int32 mipLevels = info.IsGenerateMipmap ? jTexture::GetMipLevels(info.Width, info.Height) : 1;
 
 	JASSERT(info.SampleCount >= 1);
 
@@ -1869,6 +1873,7 @@ jFrameBuffer* jRHI_Vulkan::CreateFrameBuffer(const jFrameBufferInfo& info) const
 	tex_vk->Image = image;
 	tex_vk->ImageView = imageView;
 	tex_vk->ImageMemory = imageMemory;
+	tex_vk->MipLevel = mipLevels;
 	auto texturePtr = std::shared_ptr<jTexture>(tex_vk);
 
 	auto fb_vk = new jFrameBuffer_Vulkan();
@@ -1884,14 +1889,14 @@ std::shared_ptr<jRenderTarget> jRHI_Vulkan::CreateRenderTarget(const jRenderTarg
 	const VkFormat textureFormat = GetVulkanTextureFormat(info.Format);
 	const bool hasDepthAttachment = IsDepthFormat(info.Format);
 
-	const VkImageUsageFlagBits ImageUsageFlagBit = hasDepthAttachment ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-	const VkImageAspectFlagBits ImageAspectFlagBit = hasDepthAttachment ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+	const VkImageUsageFlags ImageUsageFlag = (hasDepthAttachment ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) | VK_IMAGE_USAGE_SAMPLED_BIT;
+	const VkImageAspectFlags ImageAspectFlag = hasDepthAttachment ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
 
 	// VK_IMAGE_TILING_LINEAR 설정시 크래시 나서 VK_IMAGE_TILING_OPTIMAL 로 함.
 	//const VkImageTiling TilingMode = IsMobile ? VkImageTiling::VK_IMAGE_TILING_OPTIMAL : VkImageTiling::VK_IMAGE_TILING_LINEAR;
 	const VkImageTiling TilingMode = VkImageTiling::VK_IMAGE_TILING_OPTIMAL;
 
-	const int32 mipLevels = (info.SampleCount > VK_SAMPLE_COUNT_1_BIT) ? 1 : jTexture::GetMipLevels(info.Width, info.Height);		// MipLevel 은 SampleCount 1인 경우만 가능
+	const int32 mipLevels = (info.SampleCount > VK_SAMPLE_COUNT_1_BIT || !info.IsGenerateMipmap) ? 1 : jTexture::GetMipLevels(info.Width, info.Height);		// MipLevel 은 SampleCount 1인 경우만 가능
 	JASSERT(info.SampleCount >= 1);
 
 	VkImage image = nullptr;
@@ -1902,18 +1907,18 @@ std::shared_ptr<jRenderTarget> jRHI_Vulkan::CreateRenderTarget(const jRenderTarg
 	{
 	case ETextureType::TEXTURE_2D:
 		CreateImage(info.Width, info.Height, mipLevels, (VkSampleCountFlagBits)info.SampleCount
-			, textureFormat, TilingMode, ImageUsageFlagBit, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, imageMemory);
-		imageView = CreateImageView(image, textureFormat, ImageAspectFlagBit, mipLevels);
+			, textureFormat, TilingMode, ImageUsageFlag, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, imageMemory);
+		imageView = CreateImageView(image, textureFormat, ImageAspectFlag, mipLevels);
 		break;
 	case ETextureType::TEXTURE_2D_ARRAY:
 		CreateImage2DArray(info.Width, info.Height, info.LayerCount, mipLevels, (VkSampleCountFlagBits)info.SampleCount
-			, textureFormat, TilingMode, ImageUsageFlagBit, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, imageMemory);
-		imageView = CreateImage2DArrayView(image, info.LayerCount, textureFormat, ImageAspectFlagBit, mipLevels);
+			, textureFormat, TilingMode, ImageUsageFlag, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, imageMemory);
+		imageView = CreateImage2DArrayView(image, info.LayerCount, textureFormat, ImageAspectFlag, mipLevels);
 		break;
 	case ETextureType::TEXTURE_CUBE:
 		CreateImageCube(info.Width, info.Height, mipLevels, (VkSampleCountFlagBits)info.SampleCount
-			, textureFormat, TilingMode, ImageUsageFlagBit, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, imageMemory);
-		imageView = CreateImageCubeView(image, textureFormat, ImageAspectFlagBit, mipLevels);
+			, textureFormat, TilingMode, ImageUsageFlag, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, imageMemory);
+		imageView = CreateImageCubeView(image, textureFormat, ImageAspectFlag, mipLevels);
 		break;
 	default:
 		JMESSAGE("Unsupported type texture in FramebufferPool");
@@ -1930,6 +1935,7 @@ std::shared_ptr<jRenderTarget> jRHI_Vulkan::CreateRenderTarget(const jRenderTarg
 	tex_vk->Image = image;
 	tex_vk->ImageView = imageView;
 	tex_vk->ImageMemory = imageMemory;
+	tex_vk->MipLevel = mipLevels;
 
 	auto rt_vk = new jRenderTarget();
 	rt_vk->Info = info;
@@ -2204,9 +2210,16 @@ bool jRenderPass_Vulkan::CreateRenderPass()
 			// MSAA 를 사용하게 되면, Swapchain에 제출전에 resolve 를 해야하므로, 아래와 같이 final layout 을 변경해줌.
 			// 그리고 reoslve를 위한 VkAttachmentDescription 을 추가함. depth buffer의 경우는 Swapchain에 제출하지 않기 때문에 이 과정이 필요없음.
 			if (SampleCount > 1)
-				colorDesc.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			{
+				if (DepthAttachment->TransitToShaderReadAtFinal)
+					colorDesc.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				else
+					colorDesc.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			}
 			else
+			{
 				colorDesc.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;			// MSAA 안하면 바로 Present 할 것이므로
+			}
 
 			//////////////////////////////////////////////////////////////////////////
 
@@ -2239,7 +2252,12 @@ bool jRenderPass_Vulkan::CreateRenderPass()
 			GetVulkanAttachmentLoadStoreOp(depthAttachment.loadOp, depthAttachment.storeOp, DepthAttachment->LoadStoreOp);
 			GetVulkanAttachmentLoadStoreOp(depthAttachment.stencilLoadOp, depthAttachment.stencilStoreOp, DepthAttachment->StencilLoadStoreOp);
 			depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-			depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+			// 최종 쉐이더 리로스 레이아웃 결정 - 쉐이더에서 읽는 리소스로 사용할 경우 처리
+			if (DepthAttachment->TransitToShaderReadAtFinal)
+				depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+			else
+				depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;			
 
 			//check((ColorAttachmentResolve && ((int32)RTInfo.SampleCount > 1)) || (!ColorAttachmentResolve && (int32)RTInfo.SampleCount == 1));
 			//check(SampleCount == 0 || SampleCount == RTInfo.SampleCount);
@@ -2283,8 +2301,11 @@ bool jRenderPass_Vulkan::CreateRenderPass()
 
 		VkSubpassDescription subpass = {};
 		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		subpass.colorAttachmentCount = (uint32)colorAttachmentRefs.size();
-		subpass.pColorAttachments = &colorAttachmentRefs[0];
+		if (colorAttachmentRefs.size() > 0)
+		{
+			subpass.colorAttachmentCount = (uint32)colorAttachmentRefs.size();
+			subpass.pColorAttachments = &colorAttachmentRefs[0];
+		}
 
 		if (DepthAttachment)
 			subpass.pDepthStencilAttachment = &depthAttachmentRef;
@@ -2299,8 +2320,9 @@ bool jRenderPass_Vulkan::CreateRenderPass()
 		renderPassInfo.subpassCount = 1;
 		renderPassInfo.pSubpasses = &subpass;
 
+		
 		// 1. Subpasses 들의 이미지 레이아웃 전환은 자동적으로 일어나며, 이런 전환은 subpass dependencies 로 관리 됨.
-		// 현재 서브패스를 1개 쓰고 있지만 서브패스 앞, 뒤에 암묵적인 서브페이스가 있음.
+		// 현재 서브패스를 1개 쓰고 있지만 서브패스 앞, 뒤에 암묵적인 서브페스가 있음.
 		// 2. 2개의 내장된 dependencies 가 렌더패스 시작과 끝에 있음.
 		//		- 렌더패스 시작에 있는 경우 정확한 타이밍에 발생하지 않음. 파이프라인 시작에서 전환이 발생한다고 가정되지만 우리가 아직 이미지를 얻지 못한 경우가 있을 수 있음.
 		//		 이 문제를 해결하기 위해서 2가지 방법이 있음.
@@ -2325,6 +2347,28 @@ bool jRenderPass_Vulkan::CreateRenderPass()
 
 		renderPassInfo.dependencyCount = 1;
 		renderPassInfo.pDependencies = &dependency;
+		
+
+		//std::array<VkSubpassDependency, 2> dependencies;
+
+		//dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+		//dependencies[0].dstSubpass = 0;
+		//dependencies[0].srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		//dependencies[0].dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+		//dependencies[0].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		//dependencies[0].dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		//dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+		//dependencies[1].srcSubpass = 0;
+		//dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+		//dependencies[1].srcStageMask = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+		//dependencies[1].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		//dependencies[1].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		//dependencies[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		//dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+		//renderPassInfo.dependencyCount = (int32)dependencies.size();
+		//renderPassInfo.pDependencies = dependencies.data();
 
 		if (!ensure(vkCreateRenderPass(g_rhi_vk->GetDevice(), &renderPassInfo, nullptr, &RenderPass) == VK_SUCCESS))
 			return false;
@@ -2520,9 +2564,11 @@ void jShaderBindingInstance_Vulkan::UpdateShaderBindings()
 	descriptorImages.resize(ShaderBindings->Textures.size());
 	for (int32 i = 0; i < ShaderBindings->Textures.size(); ++i)
 	{
-		descriptorImages[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		descriptorImages[i].imageLayout = Textures[i].Texture->IsDepthFormat() ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		descriptorImages[i].imageView = (VkImageView)Textures[i].Texture->GetHandle();
-		descriptorImages[i].sampler = (VkSampler)Textures[i].SamplerState->GetHandle();
+		if (Textures[i].SamplerState)
+			descriptorImages[i].sampler = (VkSampler)Textures[i].SamplerState->GetHandle();
+
 		if (!descriptorImages[i].sampler)
 			descriptorImages[i].sampler = jTexture_Vulkan::CreateDefaultSamplerState();		// todo 수정 필요, 텍스쳐를 어떻게 바인드 해야할지 고민 필요
 	}
@@ -2700,7 +2746,7 @@ VkPipeline jPipelineStateInfo::CreateGraphicsPipelineState()
 
 	check(PipelineStateFixed);
 
-	Hash = CreateHash();
+	Hash = GetHash();
 	check(Hash);
 	{
 		auto it_find = PipelineStatePool.find(Hash);

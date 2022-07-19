@@ -23,7 +23,17 @@ void jRenderObject::CreateRenderObject(const std::shared_ptr<jVertexStreamData>&
 {
 	VertexStream = vertexStream;
 	IndexStream = indexStream;
+
+	if (VertexStream && ensure(VertexStream->Params.size()))
+	{
+		VertexStream_PositionOnly = std::shared_ptr<jVertexStreamData>(new jVertexStreamData());
+		VertexStream_PositionOnly->Params.push_back(VertexStream->Params[0]);
+		VertexStream_PositionOnly->PrimitiveType = VertexStream->PrimitiveType;
+		VertexStream_PositionOnly->ElementCount = VertexStream->ElementCount;
+	}
+
 	VertexBuffer = g_rhi->CreateVertexBuffer(VertexStream);
+	VertexBuffer_PositionOnly = g_rhi->CreateVertexBuffer(VertexStream_PositionOnly);
 	IndexBuffer = g_rhi->CreateIndexBuffer(IndexStream);
 }
 
@@ -31,11 +41,20 @@ void jRenderObject::UpdateVertexStream(const std::shared_ptr<jVertexStreamData>&
 {
 	VertexStream = vertexStream;
 	g_rhi->UpdateVertexBuffer(VertexBuffer, VertexStream);
+
+	if (VertexStream && ensure(VertexStream->Params.size()))
+	{
+		VertexStream_PositionOnly = std::shared_ptr<jVertexStreamData>(new jVertexStreamData());
+		VertexStream_PositionOnly->Params.push_back(VertexStream->Params[0]);
+		VertexStream_PositionOnly->PrimitiveType = VertexStream->PrimitiveType;
+		VertexStream_PositionOnly->ElementCount = VertexStream->ElementCount;
+	}
 }
 
 void jRenderObject::UpdateVertexStream()
 {
 	g_rhi->UpdateVertexBuffer(VertexBuffer, VertexStream);
+	g_rhi->UpdateVertexBuffer(VertexBuffer_PositionOnly, VertexStream_PositionOnly);
 }
 
 //void jRenderObject::Draw(const jCamera* camera, const jShader* shader, int32 startIndex, int32 count)
@@ -71,7 +90,7 @@ void jRenderObject::UpdateVertexStream()
 //	}
 //}
 
-void jRenderObject::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 startIndex, int32 count, int32 instanceCount)
+void jRenderObject::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 startIndex, int32 count, int32 instanceCount, bool bPoisitionOnly)
 {
 	if (!VertexBuffer->VertexStreamData)
 		return;
@@ -199,16 +218,32 @@ void jRenderObject::DrawBaseVertexIndex(const jCamera* camera, const jShader* sh
 //	}
 //}
 
-void jRenderObject::SetRenderProperty(const jShader* shader)
+void jRenderObject::SetRenderProperty(const jShader* shader, bool bPositionOnly)
 {
 #if USE_OPENGL
-	if (VertexBuffer)
-		VertexBuffer->Bind(shader);
+	if (bPositionOnly)
+	{
+		if (VertexBuffer_PositionOnly)
+			VertexBuffer_PositionOnly->Bind(shader);
+	}
+	else
+	{
+		if (VertexBuffer)
+			VertexBuffer->Bind(shader);
+	}
 	if (IndexBuffer)
 		IndexBuffer->Bind(shader);
 #elif USE_VULKAN
-	if (VertexBuffer)
-		VertexBuffer->Bind();
+	if (bPositionOnly)
+	{
+		if (VertexBuffer_PositionOnly)
+			VertexBuffer_PositionOnly->Bind();
+	}
+	else
+	{
+		if (VertexBuffer)
+			VertexBuffer->Bind();
+	}
 	if (IndexBuffer)
 		IndexBuffer->Bind();
 #endif
@@ -317,10 +352,11 @@ void jRenderObject::UpdateRenderObjectUniformBuffer(const jView* view)
 
 	jRenderObjectUniformBuffer ubo;
 	ubo.M = World.GetTranspose();
-	ubo.V = view->Camera->View.GetTranspose();
-	ubo.P = view->Camera->Projection.GetTranspose();
-	ubo.MV = ubo.V * ubo.M;
-	ubo.MVP = ubo.P * ubo.MV;
+
+	ubo.MV = (view->Camera->View * World);
+	ubo.MVP = (view->Camera->Projection * ubo.MV).GetTranspose();
+	ubo.MV = ubo.MV.GetTranspose();
+
 	ubo.InvM = ubo.M.GetInverse();
 
 	if (!RenderObjectUniformBuffer)

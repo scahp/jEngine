@@ -565,11 +565,11 @@ jRenderObject* CreateQuad_Internal(const Vector& pos, const Vector& size, const 
 
 	float vertices[] = {
 		offset.x + (-halfSize.x), 0.0f, offset.z + (-halfSize.z),
+		offset.x + (halfSize.x), 0.0f, offset.z + (halfSize.z),
 		offset.x + (halfSize.x), 0.0f, offset.z + (-halfSize.z),
 		offset.x + (halfSize.x), 0.0f, offset.z + (halfSize.z),
-		offset.x + (halfSize.x), 0.0f, offset.z + (halfSize.z),
-		offset.x + (-halfSize.x), 0.0f, offset.z + (halfSize.z),
 		offset.x + (-halfSize.x), 0.0f, offset.z + (-halfSize.z),
+		offset.x + (-halfSize.x), 0.0f, offset.z + (halfSize.z),
 	};
 
 	float normals[] = {
@@ -742,7 +742,7 @@ jObject* CreateGizmo(const Vector& pos, const Vector& rot, const Vector& scale)
 		0.0f, 1.0f, 0.0f, 1.0f,
 	};
 
-	int32 elementCount = _countof(vertices) / 3;
+	const int32 elementCount = _countof(vertices) / 3;
 
 	// attribute 추가
 	auto vertexStreamData = std::shared_ptr<jVertexStreamData>(new jVertexStreamData());
@@ -785,6 +785,34 @@ jObject* CreateGizmo(const Vector& pos, const Vector& rot, const Vector& scale)
 			streamParam->Data[i * 3 + 1] = 1.0f;
 			streamParam->Data[i * 3 + 2] = 0.0f;
 		}
+		vertexStreamData->Params.push_back(streamParam);
+	}
+
+	{
+		auto streamParam = new jStreamParam<float>();
+		streamParam->BufferType = EBufferType::STATIC;
+		streamParam->ElementType = EBufferElementType::FLOAT;
+		streamParam->ElementTypeSize = sizeof(float);
+		streamParam->Stride = sizeof(float) * 3;
+		streamParam->Name = jName("Tangent");
+		streamParam->Data.resize(elementCount * 3);
+		for (int32 i = 0; i < elementCount; ++i)
+		{
+			streamParam->Data[i * 3 + 0] = 1.0f;
+			streamParam->Data[i * 3 + 1] = 0.0f;
+			streamParam->Data[i * 3 + 2] = 0.0f;
+		}
+		vertexStreamData->Params.push_back(streamParam);
+	}
+
+	{
+		auto streamParam = new jStreamParam<float>();
+		streamParam->BufferType = EBufferType::STATIC;
+		streamParam->ElementType = EBufferElementType::FLOAT;
+		streamParam->ElementTypeSize = sizeof(float);
+		streamParam->Stride = sizeof(float) * 2;
+		streamParam->Name = jName("TexCoord");
+		streamParam->Data.resize(elementCount * 2, 0.0f);
 		vertexStreamData->Params.push_back(streamParam);
 	}
 
@@ -1234,6 +1262,30 @@ jObject* CreateCapsule(const Vector& pos, float height, float radius, int32 slic
 		vertexStreamData->Params.push_back(streamParam);
 	}
 
+	// Dummy
+	{
+		auto streamParam = new jStreamParam<float>();
+		streamParam->BufferType = EBufferType::STATIC;
+		streamParam->ElementType = EBufferElementType::FLOAT;
+		streamParam->ElementTypeSize = sizeof(float);
+		streamParam->Stride = sizeof(float) * 3;
+		streamParam->Name = jName("Tangent");
+		streamParam->Data.resize(normals.size(), 0.0f);
+		vertexStreamData->Params.push_back(streamParam);
+	}
+
+	// Dummy
+	{
+		auto streamParam = new jStreamParam<float>();
+		streamParam->BufferType = EBufferType::STATIC;
+		streamParam->ElementType = EBufferElementType::FLOAT;
+		streamParam->ElementTypeSize = sizeof(float);
+		streamParam->Stride = sizeof(float) * 2;
+		streamParam->Name = jName("TexCoord");
+		streamParam->Data.resize(normals.size(), 0.0f);
+		vertexStreamData->Params.push_back(streamParam);
+	}
+
 	vertexStreamData->PrimitiveType = EPrimitiveType::TRIANGLES;
 	vertexStreamData->ElementCount = elementCount;
 
@@ -1376,6 +1428,30 @@ jConePrimitive* CreateCone(const Vector& pos, float height, float radius, int32 
 		vertexStreamData->Params.push_back(streamParam);
 	}
 
+	// Dummy
+	{
+		auto streamParam = new jStreamParam<float>();
+		streamParam->BufferType = EBufferType::STATIC;
+		streamParam->ElementType = EBufferElementType::FLOAT;
+		streamParam->ElementTypeSize = sizeof(float);
+		streamParam->Stride = sizeof(float) * 3;
+		streamParam->Name = jName("Tangent");
+		streamParam->Data.resize(normals.size(), 0.0f);
+		vertexStreamData->Params.push_back(streamParam);
+	}
+
+	// Dummy
+	{
+		auto streamParam = new jStreamParam<float>();
+		streamParam->BufferType = EBufferType::STATIC;
+		streamParam->ElementType = EBufferElementType::FLOAT;
+		streamParam->ElementTypeSize = sizeof(float);
+		streamParam->Stride = sizeof(float) * 2;
+		streamParam->Name = jName("TexCoord");
+		streamParam->Data.resize(normals.size(), 0.0f);
+		vertexStreamData->Params.push_back(streamParam);
+	}
+
 	vertexStreamData->PrimitiveType = isWireframe ? EPrimitiveType::LINES : EPrimitiveType::TRIANGLES;
 	vertexStreamData->ElementCount = elementCount;
 
@@ -1515,6 +1591,30 @@ jObject* CreateCylinder(const Vector& pos, float height, float radius, int32 sli
 		vertexStreamData->Params.push_back(streamParam);
 	}
 
+	// Dummy
+	{
+		auto streamParam = new jStreamParam<float>();
+		streamParam->BufferType = EBufferType::STATIC;
+		streamParam->ElementType = EBufferElementType::FLOAT;
+		streamParam->ElementTypeSize = sizeof(float);
+		streamParam->Stride = sizeof(float) * 3;
+		streamParam->Name = jName("Tangent");
+		streamParam->Data.resize(normals.size(), 0.0f);
+		vertexStreamData->Params.push_back(streamParam);
+	}
+
+	// Dummy
+	{
+		auto streamParam = new jStreamParam<float>();
+		streamParam->BufferType = EBufferType::STATIC;
+		streamParam->ElementType = EBufferElementType::FLOAT;
+		streamParam->ElementTypeSize = sizeof(float);
+		streamParam->Stride = sizeof(float) * 2;
+		streamParam->Name = jName("TexCoord");
+		streamParam->Data.resize(normals.size(), 0.0f);
+		vertexStreamData->Params.push_back(streamParam);
+	}
+
 	vertexStreamData->PrimitiveType = EPrimitiveType::TRIANGLES;
 	vertexStreamData->ElementCount = elementCount;
 
@@ -1614,6 +1714,30 @@ jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector
 		streamParam->Name = jName("Normal");
 		streamParam->Data.resize(normals.size());
 		memcpy(&streamParam->Data[0], &normals[0], normals.size() * sizeof(float));
+		vertexStreamData->Params.push_back(streamParam);
+	}
+
+	// Dummy
+	{
+		auto streamParam = new jStreamParam<float>();
+		streamParam->BufferType = EBufferType::STATIC;
+		streamParam->ElementType = EBufferElementType::FLOAT;
+		streamParam->ElementTypeSize = sizeof(float);
+		streamParam->Stride = sizeof(float) * 3;
+		streamParam->Name = jName("Tangent");
+		streamParam->Data.resize(normals.size(), 0.0f);
+		vertexStreamData->Params.push_back(streamParam);
+	}
+
+	// Dummy
+	{
+		auto streamParam = new jStreamParam<float>();
+		streamParam->BufferType = EBufferType::STATIC;
+		streamParam->ElementType = EBufferElementType::FLOAT;
+		streamParam->ElementTypeSize = sizeof(float);
+		streamParam->Stride = sizeof(float) * 2;
+		streamParam->Name = jName("TexCoord");
+		streamParam->Data.resize(normals.size(), 0.0f);
 		vertexStreamData->Params.push_back(streamParam);
 	}
 

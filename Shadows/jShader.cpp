@@ -5,7 +5,7 @@
 
 //////////////////////////////////////////////////////////////////////////
 // jShaderInfo
-std::map<std::string, jShaderInfo> jShaderInfo::s_ShaderInfoMap;
+std::unordered_map<jName, jShaderInfo, jNameHashFunc> jShaderInfo::s_ShaderInfoMap;
 void jShaderInfo::AddShaderInfo(const jShaderInfo& shaderInfo)
 {
 	s_ShaderInfoMap.insert(std::make_pair(shaderInfo.name, shaderInfo));
@@ -93,29 +93,29 @@ struct jShaderInfoCreation
 } s_shaderInfoCreation;
 
 //////////////////////////////////////////////////////////////////////////
-std::unordered_map<size_t, std::shared_ptr<jShader> > jShader::ShaderMap;
+//std::unordered_map<size_t, std::shared_ptr<jShader> > jShader::ShaderMap;
 std::vector<std::shared_ptr<jShader> > jShader::ShaderVector;
-std::unordered_map < std::string, std::shared_ptr<jShader> > jShader::ShaderNameMap;
+std::unordered_map<jName, std::shared_ptr<jShader>, jNameHashFunc> jShader::ShaderNameMap;
 
 
-jShader* jShader::GetShader(size_t hashCode)
-{
-	auto it_find = ShaderMap.find(hashCode);
-	if (it_find != ShaderMap.end())
-		return it_find->second.get();
-	return nullptr;
-}
+//jShader* jShader::GetShader(size_t hashCode)
+//{
+//	auto it_find = ShaderMap.find(hashCode);
+//	if (it_find != ShaderMap.end())
+//		return it_find->second.get();
+//	return nullptr;
+//}
 
-std::shared_ptr<jShader> jShader::GetShaderPtr(size_t hashCode)
-{
-	auto it_find = ShaderMap.find(hashCode);
-	if (it_find != ShaderMap.end())
-		return it_find->second;
-	return nullptr;
-}
+//std::shared_ptr<jShader> jShader::GetShaderPtr(size_t hashCode)
+//{
+//	auto it_find = ShaderMap.find(hashCode);
+//	if (it_find != ShaderMap.end())
+//		return it_find->second;
+//	return nullptr;
+//}
 
 
-jShader* jShader::GetShader(const std::string& name)
+jShader* jShader::GetShader(const jName& name)
 {
 	auto it_find = ShaderNameMap.find(name);
 	if (it_find != ShaderNameMap.end())
@@ -123,7 +123,7 @@ jShader* jShader::GetShader(const std::string& name)
 	return nullptr;
 }
 
-std::shared_ptr<jShader> jShader::GetShaderPtr(const std::string& name)
+std::shared_ptr<jShader> jShader::GetShaderPtr(const jName& name)
 {
 	auto it_find = ShaderNameMap.find(name);
 	if (it_find != ShaderNameMap.end())
@@ -139,8 +139,8 @@ jShader* jShader::CreateShader(const jShaderInfo& shaderInfo)
 
 std::shared_ptr<jShader> jShader::CreateShaderPtr(const jShaderInfo& shaderInfo)
 {
-	auto hash = shaderInfo.CreateShaderHash();
-	auto shaderPtr = GetShaderPtr(hash);
+	// auto hash = shaderInfo.CreateShaderHash();
+	auto shaderPtr = GetShaderPtr(shaderInfo.name);
 	if (shaderPtr)
 	{
 		if (ShaderNameMap.end() == ShaderNameMap.find(shaderInfo.name))
@@ -155,8 +155,8 @@ std::shared_ptr<jShader> jShader::CreateShaderPtr(const jShaderInfo& shaderInfo)
 	if (!shaderPtr)
 		return nullptr;
 
-	ShaderMap[hash] = shaderPtr;
-	if (!shaderInfo.name.empty())
+	// ShaderMap[hash] = shaderPtr;
+	if (shaderInfo.name.IsValid())
 	{
 		JASSERT(ShaderNameMap.end() == ShaderNameMap.find(shaderInfo.name));
 		ShaderNameMap[shaderInfo.name] = shaderPtr;
@@ -191,10 +191,10 @@ void jShader::UpdateShader()
 		return 0;
 	};
 
-	uint64 currentTimeStamp = checkTimeStampFunc(ShaderInfo.vs);
-	currentTimeStamp = Max(currentTimeStamp, checkTimeStampFunc(ShaderInfo.fs));
-	currentTimeStamp = Max(currentTimeStamp, checkTimeStampFunc(ShaderInfo.cs));
-	currentTimeStamp = Max(currentTimeStamp, checkTimeStampFunc(ShaderInfo.gs));
+	uint64 currentTimeStamp = checkTimeStampFunc(ShaderInfo.vs.ToStr());
+	currentTimeStamp = Max(currentTimeStamp, checkTimeStampFunc(ShaderInfo.fs.ToStr()));
+	currentTimeStamp = Max(currentTimeStamp, checkTimeStampFunc(ShaderInfo.cs.ToStr()));
+	currentTimeStamp = Max(currentTimeStamp, checkTimeStampFunc(ShaderInfo.gs.ToStr()));
 	
 	if (currentTimeStamp <= 0)
 		return;

@@ -191,10 +191,13 @@ public:
 
 	virtual size_t GetHash() const override
 	{
-		size_t result = __super::GetHash();
-		result ^= STATIC_NAME_CITY_HASH("ClearValues");
-		result ^= CityHash64((const char*)ClearValues.data(), sizeof(VkClearValue) * ClearValues.size());
-		return result;
+		if (Hash)
+			return Hash;
+
+		Hash = __super::GetHash();
+		Hash ^= STATIC_NAME_CITY_HASH("ClearValues");
+		Hash ^= CityHash64((const char*)ClearValues.data(), sizeof(VkClearValue) * ClearValues.size());
+		return Hash;
 	}
 
 private:
@@ -435,7 +438,11 @@ struct jVertexBuffer_Vulkan : public jVertexBuffer
 
 	virtual size_t GetHash() const override
 	{
-		return GetVertexInputStateHash() ^ GetInputAssemblyStateHash();
+		if (Hash)
+			return Hash;
+		
+		Hash = GetVertexInputStateHash() ^ GetInputAssemblyStateHash();
+		return Hash;
 	}
 
 	FORCEINLINE size_t GetVertexInputStateHash() const
@@ -470,6 +477,7 @@ struct jVertexBuffer_Vulkan : public jVertexBuffer
 
 	jBindInfo BindInfos;
 	std::vector<jVertexStream_Vulkan> Streams;
+	mutable size_t Hash = 0;
 
 	virtual void Bind(const jShader* shader) const override
 	{
@@ -572,21 +580,23 @@ struct jPipelineStateFixedInfo
 
 	size_t CreateHash() const
 	{
-		size_t result = 0;
+		if (Hash)
+			return Hash;
 
+		Hash = 0;
 		for (int32 i = 0; i < Viewports.size(); ++i)
-			result ^= Viewports[i].CreateHash();
+			Hash ^= Viewports[i].GetHash();
 
 		for (int32 i = 0; i < Scissors.size(); ++i)
-			result ^= Scissors[i].CreateHash();
+			Hash ^= Scissors[i].GetHash();
 
 		// 아래 내용들도 해시를 만들 수 있어야 함, todo
-		result ^= RasterizationState->GetHash();
-		result ^= MultisampleState->GetHash();
-		result ^= DepthStencilState->GetHash();
-		result ^= BlendingState->GetHash();
+		Hash ^= RasterizationState->GetHash();
+		Hash ^= MultisampleState->GetHash();
+		Hash ^= DepthStencilState->GetHash();
+		Hash ^= BlendingState->GetHash();
 
-		return result;
+		return Hash;
 	}
 
 	std::vector<jViewport> Viewports;
@@ -596,6 +606,8 @@ struct jPipelineStateFixedInfo
 	jMultisampleStateInfo* MultisampleState = nullptr;
 	jDepthStencilStateInfo* DepthStencilState = nullptr;
 	jBlendingStateInfo* BlendingState = nullptr;
+
+	mutable size_t Hash = 0;
 };
 
 struct jPipelineStateInfo
@@ -605,23 +617,23 @@ struct jPipelineStateInfo
 		: PipelineStateFixed(pipelineStateFixed), Shader(shader), VertexBuffer(vertexBuffer), RenderPass(renderPass), ShaderBindings(shaderBindings)
 	{}
 
-	FORCEINLINE size_t CreateHash() const
+	FORCEINLINE size_t GetHash() const
 	{
-		size_t result = 0;
+		if (Hash)
+			return Hash;
+
 		check(PipelineStateFixed);
-		result = PipelineStateFixed->CreateHash();
+		Hash = PipelineStateFixed->CreateHash();
 
-		result ^= Shader->ShaderInfo.CreateShaderHash();
+		Hash ^= Shader->ShaderInfo.CreateShaderHash();
+		Hash ^= VertexBuffer->GetHash();
+		Hash ^= jShaderBindings::CreateShaderBindingsHash(ShaderBindings);
+		Hash ^= RenderPass->GetHash();
 
-		// 아래 내용들도 해시를 만들 수 있어야 함, todo
-		result ^= VertexBuffer->GetHash();
-		result ^= jShaderBindings::CreateShaderBindingsHash(ShaderBindings);
-		result ^= RenderPass->GetHash();
-
-		return result;
+		return Hash;
 	}
 
-	size_t Hash = 0;
+	mutable size_t Hash = 0;
 
 	const jShader* Shader = nullptr;
 	const jVertexBuffer* VertexBuffer = nullptr;
@@ -716,6 +728,7 @@ public:
 	VkFormat swapChainImageFormat;
 	VkExtent2D swapChainExtent;
 	std::vector<VkImageView> swapChainImageViews;
+	std::vector<VkFence> swapChainCommandBufferFences;
 
 	// GraphicsPipieline
 	//VkRenderPass renderPass;
@@ -1077,7 +1090,7 @@ public:
 		actualExtent.height = std::max<uint32>(capabilities.minImageExtent.height, std::min<uint32>(capabilities.maxImageExtent.height, actualExtent.height));
 		return actualExtent;
 	}
-	VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlagBits aspectMask, uint32 mipLevels) const
+	VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectMask, uint32 mipLevels) const
 	{
 		VkImageViewCreateInfo viewInfo = {};
 
@@ -1106,7 +1119,7 @@ public:
 
 		return imageView;
 	}
-	VkImageView CreateImage2DArrayView(VkImage image, uint32 layerCount, VkFormat format, VkImageAspectFlagBits aspectMask, uint32 mipLevels) const
+	VkImageView CreateImage2DArrayView(VkImage image, uint32 layerCount, VkFormat format, VkImageAspectFlags aspectMask, uint32 mipLevels) const
 	{
 		VkImageViewCreateInfo viewInfo = {};
 
@@ -1135,7 +1148,7 @@ public:
 
 		return imageView;
 	}
-	VkImageView CreateImageCubeView(VkImage image, VkFormat format, VkImageAspectFlagBits aspectMask, uint32 mipLevels) const
+	VkImageView CreateImageCubeView(VkImage image, VkFormat format, VkImageAspectFlags aspectMask, uint32 mipLevels) const
 	{
 		VkImageViewCreateInfo viewInfo = {};
 
@@ -1681,6 +1694,7 @@ public:
 	struct jShader* shader = nullptr;
 
 	jCommandBuffer_Vulkan* CurrentCommandBuffer = nullptr;
+	jPipelineStateFixedInfo CurrentPipelineStateFixed_Shadow;
 	jPipelineStateFixedInfo CurrentPipelineStateFixed;
 };
 

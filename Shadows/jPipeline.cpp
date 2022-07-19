@@ -135,7 +135,7 @@ void jDeferredGeometryPipeline::Draw(const jPipelineContext& pipelineContext, co
 	JASSERT(GBuffer);
 	if (GBuffer->GBufferBegin())
 	{
-		if (auto currentShader = jShadowAppSettingProperties::GetInstance().ExponentDeepShadowOn ? jShader::GetShader("ExpDeferred") : jShader::GetShader("Deferred"))
+		if (auto currentShader = jShadowAppSettingProperties::GetInstance().ExponentDeepShadowOn ? jShader::GetShader(jName("ExpDeferred")) : jShader::GetShader(jName("Deferred")))
 		{
 			__super::Draw(pipelineContext, currentShader);
 		}
@@ -175,7 +175,7 @@ void jDeepShadowMap_ShadowPass_Pipeline::Draw(const jPipelineContext& pipelineCo
 
 		if (renderTarget->FBOBegin())
 		{
-			if (auto currentShader = jShadowAppSettingProperties::GetInstance().ExponentDeepShadowOn ? jShader::GetShader("ExpDeepShadowMapGen") : jShader::GetShader("DeepShadowMapGen"))
+			if (auto currentShader = jShadowAppSettingProperties::GetInstance().ExponentDeepShadowOn ? jShader::GetShader(jName("ExpDeepShadowMapGen")) : jShader::GetShader(jName("DeepShadowMapGen")))
 			{
 				g_rhi->SetShader(currentShader);
 
@@ -194,9 +194,9 @@ void jForward_ShadowMapGen_Pipeline::Setup()
 	ClearType = ERenderBufferType::COLOR | ERenderBufferType::DEPTH;
 	EnableDepthTest = true;
 	DepthStencilFunc = ECompareOp::LESS;
-	ShadowGenShader = jShader::GetShader(DirectionalLightShaderName);
+	ShadowGenShader = jShader::GetShader(jName(DirectionalLightShaderName));
 	JASSERT(ShadowGenShader);
-	OmniShadowGenShader = jShader::GetShader(OmniDirectionalLightShaderName);
+	OmniShadowGenShader = jShader::GetShader(jName(OmniDirectionalLightShaderName));
 	JASSERT(OmniShadowGenShader);
 }
 
@@ -261,9 +261,9 @@ void jForward_ShadowMapGen_CSM_SSM_Pipeline::Setup()
 	BlendSrc = EBlendFactor::ONE;
 	BlendDest = EBlendFactor::ZERO;
 
-	ShadowGenShader = jShader::GetShader(DirectionalLightShaderName);
+	ShadowGenShader = jShader::GetShader(jName(DirectionalLightShaderName));
 	JASSERT(ShadowGenShader);
-	OmniShadowGenShader = jShader::GetShader(OmniDirectionalLightShaderName);
+	OmniShadowGenShader = jShader::GetShader(jName(OmniDirectionalLightShaderName));
 	JASSERT(OmniShadowGenShader);
 }
 
@@ -404,9 +404,9 @@ void jForward_ShadowMapGen_CSM_SSM_Pipeline::Do(const jPipelineContext& pipeline
 			Vector shadowCameraPos = frustumCenter - directionalLight->Data.Direction.GetNormalize() * fabs(mins.z);
 
 			static auto shadowCamera = jOrthographicCamera::CreateCamera(shadowCameraPos, frustumCenter, shadowCameraPos + upDir
-				, mins.x, mins.y, maxes.x, maxes.y, cascadeExtents.z, 1.0f);
+				, mins.x, mins.y, maxes.x, maxes.y, 1.0f, cascadeExtents.z);
 			jOrthographicCamera::SetCamera(shadowCamera, shadowCameraPos, frustumCenter, shadowCameraPos + upDir
-				, mins.x, mins.y, maxes.x, maxes.y, cascadeExtents.z, 1.0f);
+				, mins.x, mins.y, maxes.x, maxes.y, 1.0f, cascadeExtents.z);
 			shadowCamera->UpdateCamera();
 
 			shadowMapData->CascadeLightVP[k] = shadowCamera->Projection * shadowCamera->View;
@@ -515,7 +515,7 @@ void jForward_Shadow_Pipeline::Setup()
 	EnableBlend = true;
 	BlendSrc = EBlendFactor::ONE;
 	BlendDest = EBlendFactor::ZERO;
-	Shader = jShader::GetShader(ShaderName);
+	Shader = jShader::GetShader(jName(ShaderName));
 }
 
 void jForward_Shadow_Pipeline::Do(const jPipelineContext& pipelineContext) const
@@ -546,7 +546,7 @@ void jComputePipeline::Dispatch() const
 // jDeepShadowMap_Sort_ComputePipeline
 void jDeepShadowMap_Sort_ComputePipeline::Setup()
 {
-	Shader = jShader::GetShader("cs_sort");
+	Shader = jShader::GetShader(jName("cs_sort"));
 	ShadowMapWidthUniform = new jUniformBuffer<int>(jName("ShadowMapWidth"), SM_LINKED_LIST_WIDTH);
 	ShadowMapHeightUniform = new jUniformBuffer<int>(jName("ShadowMapHeight"), SM_LINKED_LIST_HEIGHT);
 
@@ -571,7 +571,7 @@ void jDeepShadowMap_Sort_ComputePipeline::Teardown()
 // jDeepShadowMap_Sort_ComputePipeline
 void jDeepShadowMap_Link_ComputePipeline::Setup()
 {
-	Shader = jShader::GetShader("cs_link");
+	Shader = jShader::GetShader(jName("cs_link"));
 	
 	ShadowMapWidthUniform = new jUniformBuffer<int>(jName("ShadowMapWidth"), SM_LINKED_LIST_WIDTH);
 	ShadowMapHeightUniform = new jUniformBuffer<int>(jName("ShadowMapHeight"), SM_LINKED_LIST_HEIGHT);
@@ -634,7 +634,7 @@ void jForward_DebugObject_Pipeline::Setup()
 	EnableBlend = true;
 	BlendSrc = EBlendFactor::SRC_ALPHA;
 	BlendDest = EBlendFactor::ONE_MINUS_SRC_ALPHA;
-	Shader = jShader::GetShader(ShaderName);
+	Shader = jShader::GetShader(jName(ShaderName));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -713,10 +713,10 @@ void jForward_ShadowVolume_Pipeline::Do(const jPipelineContext& pipelineContext)
 
 	auto camera = pipelineContext.Camera;
 
-	const auto ambientShader = jShader::GetShader("AmbientOnly");
-	const auto shadowVolumeBaseShader = jShader::GetShader("ShadowVolume");
-	const auto ShadowVolumeCPU = jShader::GetShader("ShadowVolumeCPU");
-	const auto ShadowVolumeGPU = jShader::GetShader("ShadowVolumeGPU");
+	const auto ambientShader = jShader::GetShader(jName("AmbientOnly"));
+	const auto shadowVolumeBaseShader = jShader::GetShader(jName("ShadowVolume"));
+	const auto ShadowVolumeCPU = jShader::GetShader(jName("ShadowVolumeCPU"));
+	const auto ShadowVolumeGPU = jShader::GetShader(jName("ShadowVolumeGPU"));
 	const auto isGPUShadowVolume = jShadowAppSettingProperties::GetInstance().IsGPUShadowVolume;
 	const auto shadowVolumeShader = (isGPUShadowVolume ? ShadowVolumeGPU : ShadowVolumeCPU);
 
@@ -927,6 +927,6 @@ void jForward_UIObject_Pipeline::Setup()
 	EnableDepthTest = false;
 	DepthStencilFunc = ECompareOp::LESS;
 	EnableBlend = false;
-	Shader = jShader::GetShader(ShaderName);
+	Shader = jShader::GetShader(jName(ShaderName));
 }
 

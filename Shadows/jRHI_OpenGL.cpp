@@ -964,6 +964,7 @@ std::shared_ptr<jRenderTarget> jRHI_OpenGL::CreateRenderTarget(const jRenderTarg
 	tex_gl->LayerCount = info.LayerCount;
 	tex_gl->SampleCount = info.SampleCount;
 	tex_gl->TextureID = tbo;
+	tex_gl->MipLevel = info.IsGenerateMipmap ? jTexture::GetMipLevels(info.Width, info.Height) : 1;
 
 	auto rt = new jRenderTarget();
 	rt->Info = info;
@@ -1080,10 +1081,10 @@ bool jRHI_OpenGL::CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo
 	}
 
 	uint32 program = 0;
-	if (shaderInfo.cs.length())
+	if (shaderInfo.cs.GetStringLength())
 	{
 		jFile csFile;
-		csFile.OpenFile(shaderInfo.cs.c_str(), FileType::TEXT, ReadWriteType::READ);
+		csFile.OpenFile(shaderInfo.cs.ToStr(), FileType::TEXT, ReadWriteType::READ);
 		csFile.ReadFileToBuffer(false);
 		std::string csText(csFile.GetBuffer());
 
@@ -1134,30 +1135,30 @@ bool jRHI_OpenGL::CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo
 	else
 	{
 		jFile vsFile;
-		vsFile.OpenFile(shaderInfo.vs.c_str(), FileType::TEXT, ReadWriteType::READ);
+		vsFile.OpenFile(shaderInfo.vs.ToStr(), FileType::TEXT, ReadWriteType::READ);
 		vsFile.ReadFileToBuffer(false);
 		std::string vsText(vsFile.IsBufferEmpty() ? "" : vsFile.GetBuffer());
 		vsText = ReplaceString(vsText, "#include \"shadow.glsl\"", shadowShader);
 		vsText = ReplaceString(vsText, "#include \"common.glsl\"", commonShader);
-		vsText = ReplaceString(vsText, "#preprocessor", shaderInfo.vsPreProcessor);
+		vsText = ReplaceString(vsText, "#preprocessor", shaderInfo.vsPreProcessor.ToStr());
 		vsFile.CloseFile();
 
 		jFile gsFile;
-		gsFile.OpenFile(shaderInfo.gs.c_str(), FileType::TEXT, ReadWriteType::READ);
+		gsFile.OpenFile(shaderInfo.gs.ToStr(), FileType::TEXT, ReadWriteType::READ);
 		gsFile.ReadFileToBuffer(false);
 		std::string gsText(gsFile.IsBufferEmpty() ? "" : gsFile.GetBuffer());
 		gsText = ReplaceString(gsText, "#include \"shadow.glsl\"", shadowShader);
 		gsText = ReplaceString(gsText, "#include \"common.glsl\"", commonShader);
-		gsText = ReplaceString(gsText, "#preprocessor", shaderInfo.gsPreProcessor);
+		gsText = ReplaceString(gsText, "#preprocessor", shaderInfo.gsPreProcessor.ToStr());
 		gsFile.CloseFile();
 
 		jFile fsFile;
-		fsFile.OpenFile(shaderInfo.fs.c_str(), FileType::TEXT, ReadWriteType::READ);
+		fsFile.OpenFile(shaderInfo.fs.ToStr(), FileType::TEXT, ReadWriteType::READ);
 		fsFile.ReadFileToBuffer(false);
 		std::string fsText(fsFile.IsBufferEmpty() ? "" : fsFile.GetBuffer());
 		fsText = ReplaceString(fsText, "#include \"shadow.glsl\"", shadowShader);
 		fsText = ReplaceString(fsText, "#include \"common.glsl\"", commonShader);
-		fsText = ReplaceString(fsText, "#preprocessor", shaderInfo.fsPreProcessor);
+		fsText = ReplaceString(fsText, "#preprocessor", shaderInfo.fsPreProcessor.ToStr());
 		fsFile.CloseFile();
 
 		auto vs = glCreateShader(GL_VERTEX_SHADER);
@@ -1187,7 +1188,7 @@ bool jRHI_OpenGL::CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo
 			}
 			return true;
 		};
-		if (!checkShaderValid(vs, shaderInfo.vs))
+		if (!checkShaderValid(vs, shaderInfo.vs.ToStr()))
 			return false;
 
 		uint32 gs = 0;
@@ -1198,7 +1199,7 @@ bool jRHI_OpenGL::CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo
 			glShaderSource(gs, 1, &gsPtr, nullptr);
 			glCompileShader(gs);
 
-			if (!checkShaderValid(gs, shaderInfo.gs))
+			if (!checkShaderValid(gs, shaderInfo.gs.ToStr()))
 			{
 				glDeleteShader(vs);
 				return false;
@@ -1211,7 +1212,7 @@ bool jRHI_OpenGL::CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo
 		glShaderSource(fs, 1, &fsPtr, &fragment_shader_string_length);
 		glCompileShader(fs);
 
-		if (!checkShaderValid(fs, shaderInfo.fs))
+		if (!checkShaderValid(fs, shaderInfo.fs.ToStr()))
 		{
 			glDeleteShader(vs);
 			if (gs)
@@ -1239,7 +1240,7 @@ bool jRHI_OpenGL::CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo
 				glGetProgramInfoLog(program, maxLength, &maxLength, &errorLog[0]);
 				if (maxLength > 0)
 					errorLog.resize(maxLength - 1);	// remove null character to concatenate
-				JMESSAGE(std::string("Shader name : " + shaderInfo.name + "\n-----\n" + errorLog).c_str());
+				JMESSAGE(std::string("Shader name : " + std::string(shaderInfo.name.ToStr()) + "\n-----\n" + errorLog).c_str());
 			}
 			glDeleteShader(vs);
 			glDeleteShader(fs);
@@ -1263,7 +1264,7 @@ bool jRHI_OpenGL::CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo
 				glGetProgramInfoLog(program, maxLength, &maxLength, &errorLog[0]);
 				if (maxLength > 0)
 					errorLog.resize(maxLength - 1);	// remove null character to concatenate
-				JMESSAGE(std::string("Shader name : " + shaderInfo.name + "\n-----\n" + errorLog).c_str());
+				JMESSAGE(std::string("Shader name : " + std::string(shaderInfo.name.ToStr()) + "\n-----\n" + errorLog).c_str());
 			}
 			glDeleteShader(vs);
 			glDeleteShader(fs);
@@ -1328,6 +1329,7 @@ jTexture* jRHI_OpenGL::CreateTextureFromData(void* data, int32 width, int32 heig
 	texture->Type = ETextureType::TEXTURE_2D;
 	texture->Width = width;
 	texture->Height = height;
+	texture->MipLevel = createMipmap ? jTexture::GetMipLevels(width, height) : 1;
 	glGenTextures(1, &texture->TextureID);
 	glBindTexture(GL_TEXTURE_2D, texture->TextureID);
 	glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, simpleFormat, formatType, data);
@@ -1710,6 +1712,7 @@ jFrameBuffer* jRHI_OpenGL::CreateFrameBuffer(const jFrameBufferInfo& info) const
 			//tex_gl->Magnification = info.Magnification;
 			//tex_gl->Minification = info.Minification;
 			tex_gl->TextureID = tbo;
+			tex_gl->MipLevel = info.IsGenerateMipmap ? jTexture::GetMipLevels(info.Width, info.Height) : 1;
 			rt_gl->Textures[i] = std::shared_ptr<jTexture>(tex_gl);
 		}
 
@@ -1739,6 +1742,7 @@ jFrameBuffer* jRHI_OpenGL::CreateFrameBuffer(const jFrameBufferInfo& info) const
 			tex_gl->Width = info.Width;
 			tex_gl->Height = info.Height;
 			tex_gl->TextureID = tbo;
+			tex_gl->MipLevel = info.IsGenerateMipmap ? jTexture::GetMipLevels(info.Width, info.Height) : 1;
 			rt_gl->TextureDepth = std::shared_ptr<jTexture>(tex_gl);
 		}
 
@@ -1818,6 +1822,7 @@ jFrameBuffer* jRHI_OpenGL::CreateFrameBuffer(const jFrameBufferInfo& info) const
 			//tex_gl->Minification = info.Minification;
 			tex_gl->TextureID = tbo;
 			tex_gl->Format = info.Format;
+			tex_gl->MipLevel = info.IsGenerateMipmap ? jTexture::GetMipLevels(info.Width, info.Height) : 1;
 			rt_gl->TextureDepth = std::shared_ptr<jTexture>(tex_gl);
 		}
 
@@ -1863,6 +1868,7 @@ jFrameBuffer* jRHI_OpenGL::CreateFrameBuffer(const jFrameBufferInfo& info) const
 		tex_gl->Width = info.Width;
 		tex_gl->Height = info.Height;
 		tex_gl->TextureID = tbo;
+		tex_gl->MipLevel = info.IsGenerateMipmap ? jTexture::GetMipLevels(info.Width, info.Height) : 1;
 		//tex_gl->Magnification = info.Magnification;
 		//tex_gl->Minification = info.Minification;
 		rt_gl->Textures.push_back(std::shared_ptr<jTexture>(tex_gl));

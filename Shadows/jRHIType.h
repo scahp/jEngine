@@ -83,7 +83,7 @@ struct jStreamParam : public IStreamParam
 
 struct jVertexStreamData : public std::enable_shared_from_this<jVertexStreamData>
 {
-	~jVertexStreamData()
+	virtual ~jVertexStreamData()
 	{
 		for (auto param : Params)
 			delete param;
