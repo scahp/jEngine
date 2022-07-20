@@ -20,7 +20,7 @@ const std::string TEXTURE_PATH = "chalet.jpg";
 uint32_t textureMipLevels;
 
 jRHI_Vulkan* g_rhi_vk = nullptr;
-std::unordered_map<size_t, VkPipeline> jPipelineStateInfo::PipelineStatePool;
+std::unordered_map<size_t, jPipelineStateInfo> jPipelineStateInfo::PipelineStatePool;
 std::unordered_map<size_t, VkPipelineLayout> jRHI_Vulkan::PipelineLayoutPool;
 std::unordered_map<size_t, jShaderBindings*> jRHI_Vulkan::ShaderBindingPool;
 TResourcePool<jSamplerStateInfo_Vulkan> jRHI_Vulkan::SamplerStatePool;
@@ -2752,8 +2752,8 @@ VkPipeline jPipelineStateInfo::CreateGraphicsPipelineState()
 		auto it_find = PipelineStatePool.find(Hash);
 		if (PipelineStatePool.end() != it_find)
 		{
-			vkPipeline = it_find->second;
-			return it_find->second;
+			*this = it_find->second;
+			return vkPipeline;
 		}
 	}
 
@@ -2830,7 +2830,7 @@ VkPipeline jPipelineStateInfo::CreateGraphicsPipelineState()
 	//dynamicState.pDynamicStates = dynamicStates;
 
 	// 10. Pipeline layout
-	VkPipelineLayout vkPipelineLayout = (VkPipelineLayout)g_rhi->CreatePipelineLayout(ShaderBindings);
+	vkPipelineLayout = (VkPipelineLayout)g_rhi->CreatePipelineLayout(ShaderBindings);
 
 	VkGraphicsPipelineCreateInfo pipelineInfo = {};
 	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -2871,7 +2871,7 @@ VkPipeline jPipelineStateInfo::CreateGraphicsPipelineState()
 		return nullptr;
 	}
 
-	PipelineStatePool.insert(std::make_pair(Hash, vkPipeline));
+	PipelineStatePool.insert(std::make_pair(Hash, *this));
 
 	return vkPipeline;
 }

@@ -267,15 +267,14 @@ Matrix jCameraUtil::CreateOrthogonalMatrix(float left, float right, float top, f
 	const float rsl = (right - left);
 	const float tsb = (top - bottom);
 
-#define LEFT_HANDED USE_VULKAN
-
 	Matrix projMat;
 	projMat.m[0][0] = 2.0f / rsl;		 projMat.m[0][1] = 0.0f;                  projMat.m[0][2] = 0.0f;                   projMat.m[0][3] = -(right + left) / rsl;
+#if USE_OPENGL
 	projMat.m[1][0] = 0.0f;              projMat.m[1][1] = 2.0f / tsb;		      projMat.m[1][2] = 0.0f;                   projMat.m[1][3] = -(top + bottom) / tsb;
-#if LEFT_HANDED
-	projMat.m[2][0] = 0.0f;              projMat.m[2][1] = 0.0f;                  projMat.m[2][2] = 2.0f / fsn;			projMat.m[2][3] = (farDist + nearDist) / fsn;
-#else
 	projMat.m[2][0] = 0.0f;              projMat.m[2][1] = 0.0f;                  projMat.m[2][2] = -2.0f / fsn;			projMat.m[2][3] = -(farDist + nearDist) / fsn;
+#else
+	projMat.m[1][0] = 0.0f;              projMat.m[1][1] = 2.0f / tsb;		      projMat.m[1][2] = 0.0f;                   projMat.m[1][3] = -(bottom) / tsb;
+	projMat.m[2][0] = 0.0f;              projMat.m[2][1] = 0.0f;                  projMat.m[2][2] = -1.0f / fsn;			projMat.m[2][3] = -(nearDist) / fsn;
 #endif
 	projMat.m[3][0] = 0.0f;              projMat.m[3][1] = 0.0f;                  projMat.m[3][2] = 0.0f;                   projMat.m[3][3] = 1.0f;
 	return projMat;

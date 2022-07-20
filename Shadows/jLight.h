@@ -238,6 +238,7 @@ public:
 	{
 		int32 BindingPoint = 0;
 		std::vector<TShaderBinding<IUniformBufferBlock*>> UniformBinding;
+		UniformBinding.reserve(2);
 		UniformBinding.emplace_back(TShaderBinding(BindingPoint++, EShaderAccessStageFlag::ALL_GRAPHICS, LightDataUniformBlock));
 
 		//std::vector<TShaderBinding<jTextureBindings>> TextureBinding;

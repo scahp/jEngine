@@ -56,6 +56,7 @@ layout(location = 2) in vec3 inColor;
 layout(location = 0) out vec4 fragColor;
 layout(location = 1) out vec2 fragTexCoord;
 layout(location = 2) out vec3 fragNormal;
+layout(location = 3) out vec4 fragShadowPosition;
 
 void main() 
 {
@@ -65,6 +66,10 @@ void main()
 
 	fragNormal = normalize(mat3(RenderObjectParam.M) * inNormal);
 	
+	fragShadowPosition = DirectionalLight.ShadowVP * RenderObjectParam.M * vec4(inPosition, 1.0);
+	fragShadowPosition.y = 1.0 - fragShadowPosition.y;
+	fragShadowPosition /= fragShadowPosition.w;
+
 	// ¿Þ¼Õ ÁÂÇ¥°è·Î Color
 	gl_Position.y = 1.0 - gl_Position.y;
 	fragTexCoord.y = 1.0 - inTexCoord.y;

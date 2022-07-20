@@ -77,7 +77,7 @@ void jGame::Setup()
 	jCamera::AddCamera(0, MainCamera);
 
 	// Create lights
-	NormalDirectionalLight = jLight::CreateDirectionalLight(AppSettings.DirecionalLightDirection
+	NormalDirectionalLight = jLight::CreateDirectionalLight(Vector(-1.0f, -1.0f, -1.0f) // AppSettings.DirecionalLightDirection
 		, Vector4(0.6f), Vector(1.0f), Vector(1.0f), 64);
 	//CascadeDirectionalLight = jLight::CreateCascadeDirectionalLight(AppSettings.DirecionalLightDirection
 	//	, Vector4(0.6f), Vector(1.0f), Vector(1.0f), 64);
@@ -192,13 +192,16 @@ void jGame::RemoveSpawnedObjects()
 }
 
 // todo 위치 정해야 함
-template <bool bPointOnly>
+template <bool bPositionOnly>
 class jDrawCommand
 {
 public:
 	jDrawCommand(jView* view, jRenderObject* renderObject, jRenderPass* renderPass, jShader* shader, jPipelineStateFixedInfo* pipelineStateFixed, std::vector<const jShaderBindingInstance*> shaderBindingInstances)
-		: View(view), RenderObject(renderObject), RenderPass(renderPass), Shader(shader), PipelineStateFixed(pipelineStateFixed), ShaderBindingInstances(shaderBindingInstances)
-	{}
+		: View(view), RenderObject(renderObject), RenderPass(renderPass), Shader(shader), PipelineStateFixed(pipelineStateFixed)
+	{
+		ShaderBindingInstances.reserve(shaderBindingInstances.size() + 3);
+		ShaderBindingInstances.insert(ShaderBindingInstances.begin(), shaderBindingInstances.begin(), shaderBindingInstances.end());
+	}
 
 	void PrepareToDraw()
 	{
@@ -212,23 +215,25 @@ public:
 		RenderObject->GetShaderBindingInstance(ShaderBindingInstances);
 
 		// Bind ShaderBindings
-		void* pipelineLayout = g_rhi->CreatePipelineLayout(ShaderBindingInstances);
 		std::vector<const jShaderBindings*> shaderBindings;
+		shaderBindings.reserve(ShaderBindingInstances.size());
 		for (int32 i = 0; i < ShaderBindingInstances.size(); ++i)
-		{
-			ShaderBindingInstances[i]->Bind(pipelineLayout, i);
 			shaderBindings.push_back(ShaderBindingInstances[i]->ShaderBindings);
-		}
 
 		// Create Pipeline
-		CurrentPipelineStateInfo = jPipelineStateInfo(PipelineStateFixed, Shader, bPointOnly ? RenderObject->VertexBuffer_PositionOnly : RenderObject->VertexBuffer, RenderPass, shaderBindings);
+		CurrentPipelineStateInfo = jPipelineStateInfo(PipelineStateFixed, Shader, bPositionOnly ? RenderObject->VertexBuffer_PositionOnly : RenderObject->VertexBuffer, RenderPass, shaderBindings);
 		CurrentPipelineStateInfo.CreateGraphicsPipelineState();
-
-		// Bind Pipeline
-		CurrentPipelineStateInfo.Bind();
 	}
 	void Draw()
 	{
+		for (int32 i = 0; i < ShaderBindingInstances.size(); ++i)
+		{
+			ShaderBindingInstances[i]->Bind(CurrentPipelineStateInfo.vkPipelineLayout, i);
+		}
+
+		// Bind Pipeline
+		CurrentPipelineStateInfo.Bind();
+
 		// Draw
 		RenderObject->Draw(nullptr, Shader, {});
 	}
@@ -409,6 +414,11 @@ void jGame::Update(float deltaTime)
 			//RenderPasses.push_back(renderPass);
 		}
 
+		// 정리 해야 함
+		DirectionalLight->PrepareShaderBindingInstance();
+
+#define STATIC_COMMAND 0
+
 		// Shadow
 		{
 			static jShader* Shader = nullptr;
@@ -421,21 +431,35 @@ void jGame::Update(float deltaTime)
 				Shader = g_rhi->CreateShader(shaderInfo);
 			}
 
-			jView View;
+			static jView View;
 			View.Camera = DirectionalLight->GetLightCamra();
+			View.DirectionalLight = DirectionalLight;
+
+			g_rhi_vk->CurrentCommandBuffer = &commandBuffer;
+
+#if STATIC_COMMAND
+			static std::vector<jDrawCommand<true>> ShadowPasses;
+			if (ShadowPasses.size() <= 0)
+#else
+			std::vector<jDrawCommand<true>> ShadowPasses;
+#endif
+			{
+				for (auto iter : jObject::GetStaticObject())
+				{
+					auto newCommand = jDrawCommand<true>(&View, iter->RenderObject, renderPass, Shader, &g_rhi_vk->CurrentPipelineStateFixed_Shadow, { });
+					newCommand.PrepareToDraw();
+					ShadowPasses.push_back(newCommand);
+				}
+			}
 
 			//////////////////////////////////////////////////////////////////////////
 			// 여기서 부터 렌더 로직 시작
 			if (ensure(commandBuffer.Begin()))
 			{
-				g_rhi_vk->CurrentCommandBuffer = &commandBuffer;
-
 				renderPass->BeginRenderPass(&commandBuffer);
 
-				for (auto iter : jObject::GetStaticObject())
+				for (auto& command : ShadowPasses)
 				{
-					jDrawCommand<true> command(&View, iter->RenderObject, renderPass, Shader, &g_rhi_vk->CurrentPipelineStateFixed_Shadow, { });
-					command.PrepareToDraw();
 					command.Draw();
 				}
 
@@ -462,25 +486,35 @@ void jGame::Update(float deltaTime)
 				Shader = g_rhi->CreateShader(shaderInfo);
 			}
 
-			jView View;
+			static jView View;
 			View.Camera = MainCamera;
 			View.DirectionalLight = DirectionalLight;
 
-			// 정리 해야 함
-			DirectionalLight->PrepareShaderBindingInstance();
+			g_rhi_vk->CurrentCommandBuffer = &commandBuffer;
+
+#if STATIC_COMMAND
+			static std::vector<jDrawCommand<false>> BasePasses;
+			if (BasePasses.size() <= 0)
+#else
+			std::vector<jDrawCommand<false>> BasePasses;
+#endif
+			{
+				for (auto iter : jObject::GetStaticObject())
+				{
+					auto newCommand = jDrawCommand<false>(&View, iter->RenderObject, g_rhi_vk->RenderPasses[imageIndex], Shader, &g_rhi_vk->CurrentPipelineStateFixed, { });
+					newCommand.PrepareToDraw();
+					BasePasses.push_back(newCommand);
+				}
+			}
 
 			//////////////////////////////////////////////////////////////////////////
 			// 여기서 부터 렌더 로직 시작
 			//if (ensure(commandBuffer.Begin()))
 			{
-				g_rhi_vk->CurrentCommandBuffer = &commandBuffer;
-
 				g_rhi_vk->RenderPasses[imageIndex]->BeginRenderPass(&commandBuffer);
 
-				for (auto iter : jObject::GetStaticObject())
+				for (auto command : BasePasses)
 				{
-					jDrawCommand<false> command(&View, iter->RenderObject, g_rhi_vk->RenderPasses[imageIndex], Shader, &g_rhi_vk->CurrentPipelineStateFixed, { });
-					command.PrepareToDraw();
 					command.Draw();
 				}
 

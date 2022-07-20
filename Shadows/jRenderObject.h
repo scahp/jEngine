@@ -121,15 +121,17 @@ public:
 	{
 		int32 BindingPoint = 0;
 		std::vector<TShaderBinding<IUniformBufferBlock*>> UniformBinding;
-		UniformBinding.push_back(TShaderBinding(BindingPoint++, EShaderAccessStageFlag::ALL_GRAPHICS, RenderObjectUniformBuffer));
+		UniformBinding.reserve(1);
+		UniformBinding.emplace_back(TShaderBinding(BindingPoint++, EShaderAccessStageFlag::ALL_GRAPHICS, RenderObjectUniformBuffer));
 
 		std::vector<TShaderBinding<jTextureBindings>> TextureBinding;
+		TextureBinding.reserve(MaterialData.Params.size());
 		for (int32 i = 0; i < (int32)MaterialData.Params.size(); ++i)
 		{
 			jTextureBindings bindings;
 			bindings.Texture = MaterialData.Params[i].Texture;
 			bindings.SamplerState = MaterialData.Params[i].SamplerState;
-			TextureBinding.push_back(TShaderBinding(BindingPoint++, EShaderAccessStageFlag::ALL_GRAPHICS, bindings));
+			TextureBinding.emplace_back(TShaderBinding(BindingPoint++, EShaderAccessStageFlag::ALL_GRAPHICS, bindings));
 		}
 
 		if (NeedUpdateRenderObjectUniformBuffer)

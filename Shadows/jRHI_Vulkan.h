@@ -625,7 +625,7 @@ struct jPipelineStateInfo
 		check(PipelineStateFixed);
 		Hash = PipelineStateFixed->CreateHash();
 
-		Hash ^= Shader->ShaderInfo.CreateShaderHash();
+		Hash ^= Shader->ShaderInfo.GetHash();
 		Hash ^= VertexBuffer->GetHash();
 		Hash ^= jShaderBindings::CreateShaderBindingsHash(ShaderBindings);
 		Hash ^= RenderPass->GetHash();
@@ -642,11 +642,12 @@ struct jPipelineStateInfo
 	const jPipelineStateFixedInfo* PipelineStateFixed = nullptr;
 
 	VkPipeline vkPipeline = nullptr;
+	VkPipelineLayout vkPipelineLayout = nullptr;
 
 	VkPipeline CreateGraphicsPipelineState();
 	void Bind();
 
-	static std::unordered_map<size_t, VkPipeline> PipelineStatePool;
+	static std::unordered_map<size_t, jPipelineStateInfo> PipelineStatePool;
 };
 
 struct jUniformBufferBlock_Vulkan : public IUniformBufferBlock

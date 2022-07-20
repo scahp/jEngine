@@ -92,12 +92,12 @@ struct jViewport
 		if (Hash)
 			return Hash;
 
-		Hash = std::hash<float>{}(X);
-		Hash ^= std::hash<float>{}(Y);
-		Hash ^= std::hash<float>{}(Width);
-		Hash ^= std::hash<float>{}(Height);
-		Hash ^= std::hash<float>{}(MinDepth);
-		Hash ^= std::hash<float>{}(MaxDepth);
+		Hash = CityHash64((const char*)&X, sizeof(X));
+		Hash ^= CityHash64((const char*)&Y, sizeof(Y));
+		Hash ^= CityHash64((const char*)&Width, sizeof(Width));
+		Hash ^= CityHash64((const char*)&Height, sizeof(Height));
+		Hash ^= CityHash64((const char*)&MinDepth, sizeof(MinDepth));
+		Hash ^= CityHash64((const char*)&MaxDepth, sizeof(MaxDepth));
 		return Hash;
 	}
 };
@@ -118,10 +118,8 @@ struct jScissor
 		if (Hash)
 			return Hash;
 
-		Hash = std::hash<int32>{}(Offset.x);
-		Hash ^= std::hash<int32>{}(Offset.y);
-		Hash ^= std::hash<int32>{}(Extent.x);
-		Hash ^= std::hash<int32>{}(Extent.y);
+		Hash = CityHash64((const char*)&Offset, sizeof(Offset));
+		Hash ^= CityHash64((const char*)&Extent, sizeof(Extent));
 		return Hash;
 	}
 };
@@ -776,9 +774,9 @@ struct jShaderBindings
 	FORCEINLINE static size_t CreateShaderBindingsHash(const std::vector<const jShaderBindings*>& shaderBindings)
 	{
 		size_t result = 0;
-		for (int32 i = 0; i < shaderBindings.size(); ++i)
+		for(auto& bindings : shaderBindings)
 		{
-			result ^= shaderBindings[i]->GetHash();
+			result ^= bindings->GetHash();
 		}
 		return result;
 	}

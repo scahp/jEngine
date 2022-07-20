@@ -4,6 +4,7 @@
 layout(location = 0) in vec4 fragColor;
 layout(location = 1) in vec2 fragTexCoord;
 layout(location = 2) in vec3 fragNormal;
+layout(location = 3) in vec4 fragShadowPosition;
 
 //layout(set = 0, binding = 1) uniform sampler2D texSampler;
 
@@ -34,14 +35,28 @@ layout(set = 0, binding = 0) uniform DirectionalLightUniformBuffer
 	float Far;
 } DirectionalLight;
 
+layout(set = 1, binding = 0) uniform RenderObjectUniformBuffer
+{
+	mat4 M;
+	mat4 MV;
+	mat4 MVP;
+	mat4 InvM;
+} RenderObjectParam;
+
 layout(set = 0, binding = 1) uniform sampler2D DirectionalLightShadowMap;
 
-void main() 
+void main()
 {
-    vec4 shadow = vec4(texture(DirectionalLightShadowMap, fragTexCoord).rgb, 1.0);
+    float lit = 1.0;
+	if (-1.0 <= fragShadowPosition.z && fragShadowPosition.z <= 1.0)
+	{
+		float shadowMapDist = texture(DirectionalLightShadowMap, fragShadowPosition.xy * 0.5 + 0.5).r;
+		if (fragShadowPosition.z > shadowMapDist + 0.0001)
+		{
+			lit = 0.5;
+		}
+	}
 
-	float Intensity = dot(fragNormal, -DirectionalLight.Direction);
+	float Intensity = dot(fragNormal, -DirectionalLight.Direction) * lit;
 	outColor = vec4(fragColor.xyz * Intensity, 1.0);
-	outColor.z += shadow.x * 0.01;
-    //outColor = vec4(fragColor);
 }

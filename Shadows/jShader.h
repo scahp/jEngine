@@ -7,7 +7,7 @@ struct jShaderInfo
 	static void AddShaderInfo(const jShaderInfo& shaderInfo);
 	static void CreateShaders();
 
-	size_t CreateShaderHash() const
+	FORCEINLINE size_t GetHash() const
 	{
 		if (!Hash)
 		{
