@@ -86,7 +86,11 @@ public:
 
 		const bool IsInvert = (InEulerAngle.x < 0 || PI < InEulerAngle.x);
 		auto t = RadianToDegree(InEulerAngle.x);
+#if RIGHT_HANDED
 		OutRight = OutForward.CrossProduct(IsInvert ? Vector::UpVector : -Vector::UpVector).GetNormalize();
+#else
+		OutRight = (IsInvert ? Vector::UpVector : -Vector::UpVector).CrossProduct(OutForward).GetNormalize();
+#endif
 
 		OutUp = OutForward.CrossProduct(OutRight).GetNormalize();
 	}
@@ -150,7 +154,11 @@ public:
 	{
 		auto toForward = GetForwardVector();
 		auto toUp = GetUpVector();
+#if RIGHT_HANDED
 		return toForward.CrossProduct(toUp).GetNormalize();
+#else
+		return toUp.CrossProduct(toForward).GetNormalize();
+#endif
 	}
 
 	FORCEINLINE void MoveShift(float dist)

@@ -144,6 +144,9 @@ inline void hash_combine(std::size_t& seed, const T& v)
 #define USE_OPENGL 0
 #endif
 
+#define LEFT_HANDED !USE_OPENGL
+#define RIGHT_HANDED USE_OPENGL
+
 // string type city hash generator
 #define STATIC_NAME_CITY_HASH(str) []() -> size_t { \
 			static size_t StrLen = strlen(str); \

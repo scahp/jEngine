@@ -39,7 +39,4 @@ layout(location = 0) in vec3 inPosition;
 void main() 
 {
     gl_Position = DirectionalLight.ShadowVP * RenderObjectParam.M * vec4(inPosition, 1.0);
-	
-	// ¿Þ¼Õ ÁÂÇ¥°è·Î Color
-	gl_Position.y = 1.0 - gl_Position.y;
 }

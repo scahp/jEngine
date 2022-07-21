@@ -67,10 +67,5 @@ void main()
 	fragNormal = normalize(mat3(RenderObjectParam.M) * inNormal);
 	
 	fragShadowPosition = DirectionalLight.ShadowVP * RenderObjectParam.M * vec4(inPosition, 1.0);
-	fragShadowPosition.y = 1.0 - fragShadowPosition.y;
 	fragShadowPosition /= fragShadowPosition.w;
-
-	// ¿Þ¼Õ ÁÂÇ¥°è·Î Color
-	gl_Position.y = 1.0 - gl_Position.y;
-	fragTexCoord.y = 1.0 - inTexCoord.y;
 }
