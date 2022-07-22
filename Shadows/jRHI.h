@@ -712,6 +712,7 @@ public:
 	virtual size_t GetHash() const;
 
 	virtual void* GetRenderPass() const { return nullptr; }
+	virtual void* GetFrameBuffer() const { return nullptr; }
 
 	std::vector<const jAttachment*> ColorAttachments;
 	const jAttachment* DepthAttachment = nullptr;

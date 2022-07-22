@@ -5,13 +5,37 @@
 
 #include <windows.h>
 
+#define API_TYPE 1
+
+#if (API_TYPE == 1)
+#define USE_VULKAN 1
+#elif (API_TYPE == 2)
+#define USE_OPENGL 1
+#endif
+
+#ifndef USE_VULKAN
+#define USE_VULKAN 0
+#endif
+
+#ifndef USE_OPENGL
+#define USE_OPENGL 0
+#endif
+
+#define LEFT_HANDED !USE_OPENGL
+#define RIGHT_HANDED USE_OPENGL
+
+#if USE_VULKAN
+#include <vulkan/vulkan.h>
 #define GLFW_INCLUDE_VULKAN
+#endif
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
-
-#include <vulkan/vulkan.h>
-
 #include <assert.h>
+
+#if USE_VULKAN
+#include "imgui_impl_vulkan.h"
+#endif
 
 #include <vector>
 #include <list>
@@ -127,25 +151,6 @@ inline void hash_combine(std::size_t& seed, const T& v)
 #define DEBUG_OUTPUT_LEVEL 2	// show high priority
 
 #include "Core/jName.h"
-
-#define API_TYPE 1
-
-#if (API_TYPE == 1)
-#define USE_VULKAN 1
-#elif (API_TYPE == 2)
-#define USE_OPENGL 1
-#endif
-
-#ifndef USE_VULKAN
-#define USE_VULKAN 0
-#endif
-
-#ifndef USE_OPENGL
-#define USE_OPENGL 0
-#endif
-
-#define LEFT_HANDED !USE_OPENGL
-#define RIGHT_HANDED USE_OPENGL
 
 // string type city hash generator
 #define STATIC_NAME_CITY_HASH(str) []() -> size_t { \

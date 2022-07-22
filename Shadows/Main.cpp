@@ -17,12 +17,19 @@ void char_callback(GLFWwindow* window, uint32 codepoint);
 void cursor_position_callback(GLFWwindow* window, double xpos, double ypos);
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
+void window_focus_callback(GLFWwindow* window, int focused);
 void showFPS(GLFWwindow* pWindow);
 
+#if USE_OPENGL
 void APIENTRY glDebugOutput(GLenum source, GLenum type, GLuint id, GLenum severity,
 	GLsizei length, const GLchar* message, const void* userParam);
+#endif
 
 jEngine g_Engine;
+
+std::vector<jRenderPass*> ImGuiRenderPasses;
+std::vector<VkPipeline> Pipelines;
+ImGUI* g_imGui = nullptr;
 
 int main()
 {
@@ -37,6 +44,7 @@ int main()
 	glfwSetCursorPosCallback(window, cursor_position_callback);
 	glfwSetMouseButtonCallback(window, mouse_button_callback);
 	glfwSetScrollCallback(window, scroll_callback);
+	glfwSetWindowFocusCallback(window, window_focus_callback);
 
 	//int major, minor, rev;
 	//glfwGetVersion(&major, &minor, &rev);
@@ -54,18 +62,6 @@ int main()
 #endif
 
 #if USE_OPENGL
-	IMGUI_CHECKVERSION();
-	ImGui::CreateContext();
-	ImGui_ImplGlfw_InitForOpenGL(window, true);
-	ImGui_ImplOpenGL3_Init(glsl_version);
-	ImGui::StyleColorsClassic();
-
-	ImGuiIO& io = ImGui::GetIO(); (void)io;
-
-    jAppSettings::GetInstance().Init(SCR_WIDTH, SCR_HEIGHT);
-#endif
-
-
 #if (DEBUG_OUTPUT_ON == 1)
 	GLint flags;
 	glGetIntegerv(GL_CONTEXT_FLAGS, &flags);
@@ -77,8 +73,95 @@ int main()
 		glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr, GL_TRUE);
 	}
 #endif // DEBUG_OUTPUT_ON
+#endif
 
 	g_Engine.Init();
+
+#if USE_OPENGL
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init(glsl_version);
+    ImGui::StyleColorsClassic();
+
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+
+    jAppSettings::GetInstance().Init(SCR_WIDTH, SCR_HEIGHT);
+#elif USE_VULKAN
+	g_imGui = new ImGUI();
+    //{
+    //    std::array<VkAttachmentDescription, 2> attachments = {};
+    //    // Color attachment
+    //    attachments[0].format = g_rhi_vk->swapChainImageFormat;
+    //    attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
+    //    attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    //    attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    //    attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    //    attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    //    attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    //    attachments[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    //    // Depth attachment
+    //    attachments[1].format = g_rhi_vk->FindDepthFormat();
+    //    attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
+    //    attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    //    attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    //    attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    //    attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    //    attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    //    attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    //    VkAttachmentReference colorReference = {};
+    //    colorReference.attachment = 0;
+    //    colorReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    //    VkAttachmentReference depthReference = {};
+    //    depthReference.attachment = 1;
+    //    depthReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    //    VkSubpassDescription subpassDescription = {};
+    //    subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    //    subpassDescription.colorAttachmentCount = 1;
+    //    subpassDescription.pColorAttachments = &colorReference;
+    //    subpassDescription.pDepthStencilAttachment = &depthReference;
+    //    subpassDescription.inputAttachmentCount = 0;
+    //    subpassDescription.pInputAttachments = nullptr;
+    //    subpassDescription.preserveAttachmentCount = 0;
+    //    subpassDescription.pPreserveAttachments = nullptr;
+    //    subpassDescription.pResolveAttachments = nullptr;
+
+    //    // Subpass dependencies for layout transitions
+    //    std::array<VkSubpassDependency, 2> dependencies;
+
+    //    dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+    //    dependencies[0].dstSubpass = 0;
+    //    dependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    //    dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    //    dependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+    //    dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    //    dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+    //    dependencies[1].srcSubpass = 0;
+    //    dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+    //    dependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    //    dependencies[1].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    //    dependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    //    dependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+    //    dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+    //    VkRenderPassCreateInfo renderPassInfo = {};
+    //    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    //    renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+    //    renderPassInfo.pAttachments = attachments.data();
+    //    renderPassInfo.subpassCount = 1;
+    //    renderPassInfo.pSubpasses = &subpassDescription;
+    //    renderPassInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
+    //    renderPassInfo.pDependencies = dependencies.data();
+
+    //    check(VK_SUCCESS == vkCreateRenderPass(g_rhi_vk->device, &renderPassInfo, nullptr, &ImGuiRenderPasses));
+    //}
+
+    g_imGui->init((float)SCR_WIDTH, (float)SCR_HEIGHT);
+#endif
 
 	// render loop
 	// -----------
@@ -182,11 +265,13 @@ int main()
 		showFPS(window);
 	}
 
-	#if USE_OPENGL
+#if USE_OPENGL
 	ImGui_ImplOpenGL3_Shutdown();
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
-	#endif
+#elif USE_VULKAN
+	delete g_imGui;
+#endif
 
 	// glfw: terminate, clearing all previously allocated GLFW resources.
 	// ------------------------------------------------------------------
@@ -222,8 +307,8 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 
 	if (GLFW_PRESS == action)
 	{
-		//if (!ImGui::IsAnyItemActive())
-		g_KeyState[*key_name] = true;
+		if (!ImGui::IsAnyItemActive())
+			g_KeyState[*key_name] = true;
 	}
 	else if (GLFW_RELEASE == action)
 	{
@@ -274,12 +359,11 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 	bool buttonDown = false;
 	if (GLFW_PRESS == action)
 	{
-#if USE_OPENGL
-		if (!ImGui::IsAnyItemHovered() && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow))
+		const bool IsCapturedButtonInputOnUI = ImGui::IsAnyItemHovered() || ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow);
+		if (!IsCapturedButtonInputOnUI)
+		{
 			buttonDown = true;
-#else
-		buttonDown = true;
-#endif
+		}
 	}
 	else if (GLFW_RELEASE == action)
 	{
@@ -298,6 +382,22 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
 	if (TwEventMouseWheelGLFW(static_cast<int>(yoffset)))
 		return;
+
+    ImGuiIO& io = ImGui::GetIO();
+    io.MouseWheelH += (float)xoffset;
+    io.MouseWheel += (float)yoffset;
+}
+
+void window_focus_callback(GLFWwindow* window, int focused)
+{
+	if (focused)
+    {
+		// 윈도우가 Focus 를 얻는 경우 Mouse click callback 이 호출되는데, 
+		// 이때 아직 UI는 Mouse Hover 상태 정보를 모르기 때문에 여기서 갱신
+		ImGui_ImplGlfw_NewFrame();
+		ImGui::NewFrame();
+		ImGui::EndFrame();
+	}
 }
 
 // https://stackoverflow.com/questions/18412120/displaying-fps-in-glfw-window-title
@@ -329,7 +429,7 @@ void showFPS(GLFWwindow* pWindow)
 	}
 }
 
-
+#if USE_OPENGL
 void APIENTRY glDebugOutput(GLenum source, GLenum type, GLuint id, GLenum severity,
 	GLsizei length, const GLchar* message, const void* userParam)
 {
@@ -379,3 +479,4 @@ void APIENTRY glDebugOutput(GLenum source, GLenum type, GLuint id, GLenum severi
 	} std::cout << std::endl;
 	std::cout << std::endl;
 }
+#endif // USE_OPENGL

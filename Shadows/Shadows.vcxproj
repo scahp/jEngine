@@ -92,7 +92,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;_ITERATOR_DEBUG_LEVEL=0;_CONTAINER_DEBUG_LEVEL=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>./;./glad/include;./External/AntTweakBar/include;./External/assimp/include;./External;./External/vulkan/1.2.176.1/Include;./External/glslang;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>./;./glad/include;./External/AntTweakBar/include;./External/assimp/include;./External;./External/vulkan/1.2.176.1/Include;./External/glslang;./External/IMGUI</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <DisableSpecificWarnings>
       </DisableSpecificWarnings>
@@ -116,7 +116,7 @@ xcopy /s /y /d  "$(ProjectDir)External\assimp\lib\*.dll" "$(OutDir)"</Command>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;_ITERATOR_DEBUG_LEVEL=0;_CONTAINER_DEBUG_LEVEL=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>./;./glad/include;./External/AntTweakBar/include;./External/assimp/include;./External;./External/vulkan/1.2.176.1/Include;./External/glslang;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>./;./glad/include;./External/AntTweakBar/include;./External/assimp/include;./External;./External/vulkan/1.2.176.1/Include;./External/glslang;./External/IMGUI</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <DisableSpecificWarnings>
       </DisableSpecificWarnings>
@@ -145,7 +145,7 @@ xcopy /s /y /d  "$(ProjectDir)External\assimp\lib\*.dll" "$(OutDir)"</Command>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>./;./glad/include;./External/AntTweakBar/include;./External/assimp/include;./External;./External/vulkan/1.2.176.1/Include;./External/glslang;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>./;./glad/include;./External/AntTweakBar/include;./External/assimp/include;./External;./External/vulkan/1.2.176.1/Include;./External/glslang;./External/IMGUI</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <DisableSpecificWarnings>
       </DisableSpecificWarnings>
@@ -173,7 +173,7 @@ xcopy /s /y /d  "$(ProjectDir)External\assimp\lib\*.dll" "$(OutDir)"</Command>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;_ITERATOR_DEBUG_LEVEL=0;_CONTAINER_DEBUG_LEVEL=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>./;./glad/include;./External/AntTweakBar/include;./External/assimp/include;./External;./External/vulkan/1.2.176.1/Include;./External/glslang;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>./;./glad/include;./External/AntTweakBar/include;./External/assimp/include;./External;./External/vulkan/1.2.176.1/Include;./External/glslang;./External/IMGUI</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <DisableSpecificWarnings>
       </DisableSpecificWarnings>
@@ -195,14 +195,14 @@ xcopy /s /y /d  "$(ProjectDir)External\assimp\lib\*.dll" "$(OutDir)"</Command>
     <ClInclude Include="Core\jName.h" />
     <ClInclude Include="External\cityhash\city.h" />
     <ClInclude Include="External\cityhash\citycrc.h" />
-    <ClInclude Include="IMGUI\imconfig.h" />
-    <ClInclude Include="IMGUI\imgui.h" />
-    <ClInclude Include="IMGUI\imgui_impl_glfw.h" />
-    <ClInclude Include="IMGUI\imgui_impl_opengl3.h" />
-    <ClInclude Include="IMGUI\imgui_internal.h" />
-    <ClInclude Include="IMGUI\imstb_rectpack.h" />
-    <ClInclude Include="IMGUI\imstb_textedit.h" />
-    <ClInclude Include="IMGUI\imstb_truetype.h" />
+    <ClInclude Include="External\IMGUI\imgui.h" />
+    <ClInclude Include="External\IMGUI\imgui_impl_glfw.h" />
+    <ClInclude Include="External\IMGUI\imgui_impl_opengl3.h" />
+    <ClInclude Include="External\IMGUI\imgui_impl_vulkan.h" />
+    <ClInclude Include="External\IMGUI\imgui_internal.h" />
+    <ClInclude Include="External\IMGUI\imstb_rectpack.h" />
+    <ClInclude Include="External\IMGUI\imstb_textedit.h" />
+    <ClInclude Include="External\IMGUI\imstb_truetype.h" />
     <ClInclude Include="jAppSettings.h" />
     <ClInclude Include="jCamera.h" />
     <ClInclude Include="jCollision.h" />
@@ -258,18 +258,19 @@ xcopy /s /y /d  "$(ProjectDir)External\assimp\lib\*.dll" "$(OutDir)"</Command>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="External\IMGUI\imgui.cpp" />
+    <ClCompile Include="External\IMGUI\imgui_demo.cpp" />
+    <ClCompile Include="External\IMGUI\imgui_draw.cpp" />
+    <ClCompile Include="External\IMGUI\imgui_impl_glfw.cpp" />
+    <ClCompile Include="External\IMGUI\imgui_impl_opengl3.cpp" />
+    <ClCompile Include="External\IMGUI\imgui_impl_vulkan.cpp" />
+    <ClCompile Include="External\IMGUI\imgui_widgets.cpp" />
     <ClCompile Include="glad.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="IMGUI\imgui.cpp" />
-    <ClCompile Include="IMGUI\imgui_demo.cpp" />
-    <ClCompile Include="IMGUI\imgui_draw.cpp" />
-    <ClCompile Include="IMGUI\imgui_impl_glfw.cpp" />
-    <ClCompile Include="IMGUI\imgui_impl_opengl3.cpp" />
-    <ClCompile Include="IMGUI\imgui_widgets.cpp" />
     <ClCompile Include="jAppSettings.cpp" />
     <ClCompile Include="jCamera.cpp" />
     <ClCompile Include="jCollision.cpp" />

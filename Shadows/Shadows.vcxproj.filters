@@ -31,9 +31,6 @@
     <Filter Include="Shaders\compute">
       <UniqueIdentifier>{3d6c23d8-7b15-4ec7-85cb-fe2c92541182}</UniqueIdentifier>
     </Filter>
-    <Filter Include="IMGUI">
-      <UniqueIdentifier>{3b4a88b3-46a4-4af9-a6f1-5ecfe188c022}</UniqueIdentifier>
-    </Filter>
     <Filter Include="External">
       <UniqueIdentifier>{73008294-ac15-42a9-9361-9c43b423dcc1}</UniqueIdentifier>
     </Filter>
@@ -45,6 +42,9 @@
     </Filter>
     <Filter Include="Shaders\Vulkan">
       <UniqueIdentifier>{6027e24a-4ae3-4dbf-8db8-f58d427ed687}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="External\IMGUI">
+      <UniqueIdentifier>{cd851a30-9515-458d-bda7-72967629a5ff}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -174,30 +174,6 @@
     <ClInclude Include="jPerformanceProfile.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="IMGUI\imconfig.h">
-      <Filter>IMGUI</Filter>
-    </ClInclude>
-    <ClInclude Include="IMGUI\imgui.h">
-      <Filter>IMGUI</Filter>
-    </ClInclude>
-    <ClInclude Include="IMGUI\imgui_impl_glfw.h">
-      <Filter>IMGUI</Filter>
-    </ClInclude>
-    <ClInclude Include="IMGUI\imgui_internal.h">
-      <Filter>IMGUI</Filter>
-    </ClInclude>
-    <ClInclude Include="IMGUI\imstb_rectpack.h">
-      <Filter>IMGUI</Filter>
-    </ClInclude>
-    <ClInclude Include="IMGUI\imstb_textedit.h">
-      <Filter>IMGUI</Filter>
-    </ClInclude>
-    <ClInclude Include="IMGUI\imstb_truetype.h">
-      <Filter>IMGUI</Filter>
-    </ClInclude>
-    <ClInclude Include="IMGUI\imgui_impl_opengl3.h">
-      <Filter>IMGUI</Filter>
-    </ClInclude>
     <ClInclude Include="jSamplerStatePool.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -218,6 +194,30 @@
     </ClInclude>
     <ClInclude Include="jRenderTargetPool.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="External\IMGUI\imgui_impl_vulkan.h">
+      <Filter>External\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="External\IMGUI\imgui.h">
+      <Filter>External\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="External\IMGUI\imgui_impl_glfw.h">
+      <Filter>External\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="External\IMGUI\imgui_impl_opengl3.h">
+      <Filter>External\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="External\IMGUI\imstb_rectpack.h">
+      <Filter>External\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="External\IMGUI\imstb_textedit.h">
+      <Filter>External\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="External\IMGUI\imstb_truetype.h">
+      <Filter>External\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="External\IMGUI\imgui_internal.h">
+      <Filter>External\IMGUI</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -341,24 +341,6 @@
     <ClCompile Include="jPerformanceProfile.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="IMGUI\imgui.cpp">
-      <Filter>IMGUI</Filter>
-    </ClCompile>
-    <ClCompile Include="IMGUI\imgui_demo.cpp">
-      <Filter>IMGUI</Filter>
-    </ClCompile>
-    <ClCompile Include="IMGUI\imgui_draw.cpp">
-      <Filter>IMGUI</Filter>
-    </ClCompile>
-    <ClCompile Include="IMGUI\imgui_impl_glfw.cpp">
-      <Filter>IMGUI</Filter>
-    </ClCompile>
-    <ClCompile Include="IMGUI\imgui_widgets.cpp">
-      <Filter>IMGUI</Filter>
-    </ClCompile>
-    <ClCompile Include="IMGUI\imgui_impl_opengl3.cpp">
-      <Filter>IMGUI</Filter>
-    </ClCompile>
     <ClCompile Include="jSamplerStatePool.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -373,6 +355,27 @@
     </ClCompile>
     <ClCompile Include="jRenderTargetPool.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="External\IMGUI\imgui_impl_vulkan.cpp">
+      <Filter>External\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="External\IMGUI\imgui.cpp">
+      <Filter>External\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="External\IMGUI\imgui_impl_glfw.cpp">
+      <Filter>External\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="External\IMGUI\imgui_impl_opengl3.cpp">
+      <Filter>External\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="External\IMGUI\imgui_widgets.cpp">
+      <Filter>External\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="External\IMGUI\imgui_draw.cpp">
+      <Filter>External\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="External\IMGUI\imgui_demo.cpp">
+      <Filter>External\IMGUI</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

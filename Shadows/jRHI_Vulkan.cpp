@@ -1047,14 +1047,14 @@ jIndexBuffer* jRHI_Vulkan::CreateIndexBuffer(const std::shared_ptr<jIndexStreamD
 
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingBufferMemory;
-	g_rhi_vk->CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+	g_rhi_vk->CreateBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferSize, stagingBuffer, stagingBufferMemory);
 
 	void* data = nullptr;
 	vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
 	memcpy(data, streamData->Param->GetBufferData(), (size_t)bufferSize);
 	vkUnmapMemory(device, stagingBufferMemory);
 
-	g_rhi_vk->CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer->IndexBuffer, indexBuffer->IndexBufferMemory);
+	g_rhi_vk->CreateBuffer(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, bufferSize, indexBuffer->IndexBuffer, indexBuffer->IndexBufferMemory);
 	g_rhi_vk->CopyBuffer(stagingBuffer, indexBuffer->IndexBuffer, bufferSize);
 
 	vkDestroyBuffer(device, stagingBuffer, nullptr);
@@ -1500,8 +1500,8 @@ jVertexBuffer* jRHI_Vulkan::CreateVertexBuffer(const std::shared_ptr<jVertexStre
 			VkDeviceMemory stagingBufferMemory;
 
 			// VK_BUFFER_USAGE_TRANSFER_SRC_BIT : 이 버퍼가 메모리 전송 연산의 소스가 될 수 있음.
-			g_rhi_vk->CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT
-				, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+			g_rhi_vk->CreateBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT
+				, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferSize, stagingBuffer, stagingBufferMemory);
 
 			//// 마지막 파라메터 0은 메모리 영역의 offset 임.
 			//// 이 값이 0이 아니면 memRequirements.alignment 로 나눠야 함. (align 되어있다는 의미)
@@ -1521,8 +1521,8 @@ jVertexBuffer* jRHI_Vulkan::CreateVertexBuffer(const std::shared_ptr<jVertexStre
 
 			// VK_BUFFER_USAGE_TRANSFER_DST_BIT : 이 버퍼가 메모리 전송 연산의 목적지가 될 수 있음.
 			// DEVICE LOCAL 메모리에 VertexBuffer를 만들었으므로 이제 vkMapMemory 같은 것은 할 수 없음.
-			g_rhi_vk->CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
-				, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, stream.VertexBuffer, stream.VertexBufferMemory);
+			g_rhi_vk->CreateBuffer(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
+				, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, bufferSize, stream.VertexBuffer, stream.VertexBufferMemory);
 
 			g_rhi_vk->CopyBuffer(stagingBuffer, stream.VertexBuffer, bufferSize);
 
@@ -1652,8 +1652,8 @@ jTexture* jRHI_Vulkan::CreateTextureFromData(void* data, int32 width, int32 heig
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
 
-    CreateBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-        , stagingBuffer, stagingBufferMemory);
+    CreateBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+        , imageSize, stagingBuffer, stagingBufferMemory);
 
     void* dset = nullptr;
     vkMapMemory(device, stagingBufferMemory, 0, imageSize, 0, &dset);
@@ -2169,7 +2169,7 @@ bool jRenderPass_Vulkan::CreateRenderPass()
 		std::vector<VkAttachmentDescription> AttachmentDescs;
 
 		const size_t Attachments = ColorAttachments.size() + (DepthAttachment ? 1 : 0) + (ColorAttachmentResolve ? 1 : 0);
-		AttachmentDescs.resize(ColorAttachments.size() + 1);
+		AttachmentDescs.resize(Attachments);
 
 		std::vector<VkAttachmentReference> colorAttachmentRefs;
 		colorAttachmentRefs.resize(ColorAttachments.size());
@@ -2272,10 +2272,6 @@ bool jRenderPass_Vulkan::CreateRenderPass()
 			ClearValues.push_back(colorClear);
 		}
 
-		VkAttachmentReference depthAttachmentRef = {};
-		depthAttachmentRef.attachment = AttachmentIndex++;
-		depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
 		VkAttachmentReference colorAttachmentResolveRef = {};
 		if (SampleCount > 1)
 		{
@@ -2308,7 +2304,13 @@ bool jRenderPass_Vulkan::CreateRenderPass()
 		}
 
 		if (DepthAttachment)
+		{
+            VkAttachmentReference depthAttachmentRef = {};
+            depthAttachmentRef.attachment = AttachmentIndex++;
+            depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
 			subpass.pDepthStencilAttachment = &depthAttachmentRef;
+		}
 
 		if (SampleCount > 1)
 			subpass.pResolveAttachments = &colorAttachmentResolveRef;
@@ -2894,8 +2896,8 @@ void jUniformBufferBlock_Vulkan::Init()
 	check(Size);
 	VkDeviceSize bufferSize = Size;
 
-	g_rhi_vk->CreateBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
-		| VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, Bufffer, BufferMemory);
+	g_rhi_vk->CreateBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+		| VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferSize, Bufffer, BufferMemory);
 }
 
 void jUniformBufferBlock_Vulkan::UpdateBufferData(const void* InData, size_t InSize)

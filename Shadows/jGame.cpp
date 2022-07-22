@@ -336,6 +336,7 @@ void jGame::Update(float deltaTime)
 			return;
 		}
 	}
+
 	{
 		{
 			auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
@@ -473,6 +474,37 @@ void jGame::Update(float deltaTime)
 			//////////////////////////////////////////////////////////////////////////
 		}
 
+
+        extern std::vector<jRenderPass*> ImGuiRenderPasses;
+		extern std::vector<VkPipeline> Pipelines;
+        extern ImGUI* g_imGui;
+
+		static bool test = false;
+		if (!test)
+		{
+			test = true;
+
+			ImGuiRenderPasses.resize(g_rhi_vk->swapChainImageViews.size());
+			Pipelines.resize(g_rhi_vk->swapChainImageViews.size());
+
+			for (int32 i = 0; i < ImGuiRenderPasses.size(); ++i)
+			{
+				auto SwapChainRTPtr = jRenderTarget::CreateFromTexture<jTexture_Vulkan>(ETextureType::TEXTURE_2D, ETextureFormat::BGRA8
+					, g_rhi_vk->swapChainExtent.width, g_rhi_vk->swapChainExtent.height, false, 1, 1, g_rhi_vk->swapChainImages[i], g_rhi_vk->swapChainImageViews[i]);
+
+				jAttachment* color = new jAttachment(SwapChainRTPtr, EAttachmentLoadStoreOp::DONTCARE_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE);
+
+				auto newRenderPass = new jRenderPass_Vulkan(color, nullptr, nullptr, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
+				newRenderPass->CreateRenderPass();
+				ImGuiRenderPasses[i] = newRenderPass;
+				Pipelines[i] = g_imGui->CreatePipelineState((VkRenderPass)ImGuiRenderPasses[i]->GetRenderPass(), g_rhi_vk->GraphicsQueue.Queue);
+			}
+		}
+
+        g_imGui->newFrame((g_rhi_vk->currenFrame == 0));
+        g_imGui->updateBuffers();
+
+
 		// BasePass
 		if (1)
 		{
@@ -518,8 +550,37 @@ void jGame::Update(float deltaTime)
 					command.Draw();
 				}
 
-				// Finishing up
-				g_rhi_vk->RenderPasses[imageIndex]->EndRenderPass();
+                // Finishing up
+                g_rhi_vk->RenderPasses[imageIndex]->EndRenderPass();
+
+				{
+                    VkClearValue clearValues[2];
+                    clearValues[0].color = { { 0.2f, 0.2f, 0.2f, 1.0f} };
+                    clearValues[1].depthStencil = { 1.0f, 0 };
+
+                    VkRenderPassBeginInfo renderPassBeginInfo{};
+                    renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+                    renderPassBeginInfo.renderPass = (VkRenderPass)ImGuiRenderPasses[imageIndex]->GetRenderPass();
+                    renderPassBeginInfo.renderArea.offset.x = 0;
+                    renderPassBeginInfo.renderArea.offset.y = 0;
+                    renderPassBeginInfo.renderArea.extent.width = SCR_WIDTH;
+                    renderPassBeginInfo.renderArea.extent.height = SCR_HEIGHT;
+                    renderPassBeginInfo.clearValueCount = 2;
+                    renderPassBeginInfo.pClearValues = clearValues;
+					renderPassBeginInfo.framebuffer = (VkFramebuffer)ImGuiRenderPasses[imageIndex]->GetFrameBuffer();
+
+                    VkCommandBufferBeginInfo cmdBufferBeginInfo{};
+                    cmdBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+					vkCmdBeginRenderPass((VkCommandBuffer)commandBuffer.GetHandle(), &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+					// Render imGui
+					ImGui::EndFrame();
+                    g_imGui->drawFrame((VkCommandBuffer)commandBuffer.GetHandle(), Pipelines[imageIndex]);
+
+					vkCmdEndRenderPass((VkCommandBuffer)commandBuffer.GetHandle());
+				}
+
 
 				ensure(commandBuffer.End());
 			}
@@ -807,7 +868,7 @@ void jGame::UpdateAppSetting()
 
 void jGame::OnMouseButton()
 {
-
+	
 }
 
 void jGame::OnMouseMove(int32 xOffset, int32 yOffset)
