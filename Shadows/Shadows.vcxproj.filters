@@ -46,6 +46,9 @@
     <Filter Include="External\IMGUI">
       <UniqueIdentifier>{cd851a30-9515-458d-bda7-72967629a5ff}</UniqueIdentifier>
     </Filter>
+    <Filter Include="ImGui">
+      <UniqueIdentifier>{c08066e9-ebf0-484b-be22-007f35ad5e13}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h">
@@ -219,6 +222,9 @@
     <ClInclude Include="External\IMGUI\imgui_internal.h">
       <Filter>External\IMGUI</Filter>
     </ClInclude>
+    <ClInclude Include="ImGui\jImGui.h">
+      <Filter>ImGui</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -376,6 +382,9 @@
     </ClCompile>
     <ClCompile Include="External\IMGUI\imgui_demo.cpp">
       <Filter>External\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGui\jImGui.cpp">
+      <Filter>ImGui</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

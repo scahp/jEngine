@@ -1152,11 +1152,10 @@ struct TStencilOpStateInfo
 
 template <bool TDepthTestEnable = false, bool TDepthWriteEnable = false, ECompareOp TDepthCompareOp = ECompareOp::LEQUAL,
 	bool TDepthBoundsTestEnable = false, bool TStencilTestEnable = false,
-	jStencilOpStateInfo* TFront = nullptr, jStencilOpStateInfo* TBack = nullptr,
 	float TMinDepthBounds = 0.0f, float TMaxDepthBounds = 1.0f>
 struct TDepthStencilStateInfo
 {
-	FORCEINLINE static jDepthStencilStateInfo* Create()
+	FORCEINLINE static jDepthStencilStateInfo* Create(jStencilOpStateInfo* Front = nullptr, jStencilOpStateInfo* Back = nullptr)
 	{
 		jDepthStencilStateInfo initializer;
 		initializer.DepthTestEnable = TDepthTestEnable;
@@ -1164,17 +1163,17 @@ struct TDepthStencilStateInfo
 		initializer.DepthCompareOp = TDepthCompareOp;
 		initializer.DepthBoundsTestEnable = TDepthBoundsTestEnable;
 		initializer.StencilTestEnable = TStencilTestEnable;
-		initializer.Front = TFront;
-		initializer.Back = TBack;
+		initializer.Front = Front;
+		initializer.Back = Back;
 		initializer.MinDepthBounds = TMinDepthBounds;
 		initializer.MaxDepthBounds = TMaxDepthBounds;
 		return g_rhi->CreateDepthStencilState(initializer);
 	}
 };
 
-template <bool TBlendEnable = false, EBlendFactor TSrc = EBlendFactor::SRC_COLOR, EBlendFactor TDest = EBlendFactor::ONE_MINUS_SRC_ALPHA, EBlendOp TBlendOp = EBlendOp::ADD,
+template <bool TBlendEnable = false, EBlendFactor TSrc = EBlendFactor::SRC_ALPHA, EBlendFactor TDest = EBlendFactor::ONE_MINUS_SRC_ALPHA, EBlendOp TBlendOp = EBlendOp::ADD,
 	EBlendFactor TSrcAlpha = EBlendFactor::SRC_ALPHA, EBlendFactor TDestAlpha = EBlendFactor::ONE_MINUS_SRC_ALPHA, EBlendOp TAlphaBlendOp = EBlendOp::ADD,
-	EColorMask TColorWriteMask = EColorMask::NONE>
+	EColorMask TColorWriteMask = EColorMask::ALL>
 struct TBlendingStateInfo
 {
 	FORCEINLINE static jBlendingStateInfo* Create()

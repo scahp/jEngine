@@ -203,6 +203,7 @@ xcopy /s /y /d  "$(ProjectDir)External\assimp\lib\*.dll" "$(OutDir)"</Command>
     <ClInclude Include="External\IMGUI\imstb_rectpack.h" />
     <ClInclude Include="External\IMGUI\imstb_textedit.h" />
     <ClInclude Include="External\IMGUI\imstb_truetype.h" />
+    <ClInclude Include="ImGui\jImGui.h" />
     <ClInclude Include="jAppSettings.h" />
     <ClInclude Include="jCamera.h" />
     <ClInclude Include="jCollision.h" />
@@ -271,6 +272,7 @@ xcopy /s /y /d  "$(ProjectDir)External\assimp\lib\*.dll" "$(OutDir)"</Command>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="ImGui\jImGui.cpp" />
     <ClCompile Include="jAppSettings.cpp" />
     <ClCompile Include="jCamera.cpp" />
     <ClCompile Include="jCollision.cpp" />

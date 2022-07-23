@@ -339,7 +339,8 @@ enum class EFrontFace : uint8
 
 enum class ECullMode : uint8
 {
-	BACK = 0,
+	NONE = 0,
+	BACK,
 	FRONT,
 	FRONT_AND_BACK,
 	MAX

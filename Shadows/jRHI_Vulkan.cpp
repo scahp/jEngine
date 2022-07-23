@@ -252,6 +252,7 @@ FORCEINLINE VkCullModeFlagBits GetVulkanCullMode(ECullMode type)
 {
 	using T = VkCullModeFlagBits;
 	GENERATE_STATIC_CONVERSION_ARRAY(
+		CONVERSION_TYPE_ELEMENT(ECullMode::NONE, VK_CULL_MODE_NONE),
 		CONVERSION_TYPE_ELEMENT(ECullMode::BACK, VK_CULL_MODE_BACK_BIT),
 		CONVERSION_TYPE_ELEMENT(ECullMode::FRONT, VK_CULL_MODE_FRONT_BIT),
 		CONVERSION_TYPE_ELEMENT(ECullMode::FRONT_AND_BACK, VK_CULL_MODE_FRONT_AND_BACK)
@@ -569,6 +570,11 @@ bool jRHI_Vulkan::InitRHI()
     ensure(CreateDepthResources());
     ensure(CreateSyncObjects());
 
+    // Pipeline cache
+    VkPipelineCacheCreateInfo pipelineCacheCreateInfo = {};
+    pipelineCacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+    check(VK_SUCCESS == vkCreatePipelineCache(g_rhi_vk->device, &pipelineCacheCreateInfo, nullptr, &PipelineCache));
+
 	// 동적인 부분들 패스에 따라 달라짐
 	static bool s_Initializes = false;
 	if (!s_Initializes)
@@ -637,7 +643,7 @@ bool jRHI_Vulkan::InitRHI()
 		UniformBuffers.push_back(UniformBuffer);
 	}
 	std::weak_ptr<jTexture> Texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName("chalet.jpg"), true, true);
-	std::shared_ptr<jSamplerStateInfo> SamplerStatePtr = std::shared_ptr<jSamplerStateInfo>(TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR>::Create());
+	jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR>::Create();
 
 	ShaderBindings.UniformBuffers.push_back(jShaderBinding(0, EShaderAccessStageFlag::VERTEX));
 	ShaderBindings.Textures.push_back(jShaderBinding(1, EShaderAccessStageFlag::FRAGMENT));
@@ -647,7 +653,7 @@ bool jRHI_Vulkan::InitRHI()
 	for (int32 i = 0; i < ShaderBindingInstances.size(); ++i)
 	{
 		ShaderBindingInstances[i]->UniformBuffers.push_back(UniformBuffers[i]);
-		ShaderBindingInstances[i]->Textures.push_back({ .Texture=Texture.lock().get(), .SamplerState=SamplerStatePtr.get() });
+		ShaderBindingInstances[i]->Textures.push_back({ .Texture=Texture.lock().get(), .SamplerState=SamplerState });
 		ShaderBindingInstances[i]->UpdateShaderBindings();
 	}
 
@@ -1144,7 +1150,7 @@ bool jRHI_Vulkan::DrawFrame()
 		default:
 			break;
 		}
-		auto DepthStencilState = TDepthStencilStateInfo<true, true, ECompareOp::LESS, false, false, nullptr, nullptr, 0.0f, 1.0f>::Create();
+		auto DepthStencilState = TDepthStencilStateInfo<true, true, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
 		auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
 
 		CurrentPipelineStateFixed = jPipelineStateFixedInfo(RasterizationState, MultisampleState, DepthStencilState, BlendingState
@@ -2868,7 +2874,7 @@ VkPipeline jPipelineStateInfo::CreateGraphicsPipelineState()
 	// 여기서 두번째 파라메터 VkPipelineCache에 VK_NULL_HANDLE을 넘겼는데, VkPipelineCache는 VkPipeline을 저장하고 생성하는데 재사용할 수 있음.
 	// 또한 파일로드 저장할 수 있어서 다른 프로그램에서 다시 사용할 수도있다. VkPipelineCache를 사용하면 VkPipeline을 생성하는 시간을 
 	// 굉장히 빠르게 할수있다. (듣기로는 대략 1/10 의 속도로 생성해낼 수 있다고 함)
-	if (!ensure(vkCreateGraphicsPipelines(g_rhi_vk->device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &vkPipeline) == VK_SUCCESS))
+	if (!ensure(vkCreateGraphicsPipelines(g_rhi_vk->device, g_rhi_vk->PipelineCache, 1, &pipelineInfo, nullptr, &vkPipeline) == VK_SUCCESS))
 	{
 		return nullptr;
 	}
