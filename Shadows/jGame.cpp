@@ -458,15 +458,20 @@ void jGame::Update(float deltaTime)
 			// 여기서 부터 렌더 로직 시작
 			if (ensure(commandBuffer.Begin()))
 			{
-				renderPass->BeginRenderPass(&commandBuffer);
+				g_rhi_vk->QueryPool.ResetQueryPool(&commandBuffer);
 
-				for (auto& command : ShadowPasses)
 				{
-					command.Draw();
-				}
+					SCOPE_GPU_PROFILE(ShadowPass);
+					renderPass->BeginRenderPass(&commandBuffer);
 
-				// Finishing up
-				renderPass->EndRenderPass();
+					for (auto& command : ShadowPasses)
+					{
+						command.Draw();
+					}
+
+					// Finishing up
+					renderPass->EndRenderPass();
+				}
 
 				//ensure(commandBuffer.End());
 			}
@@ -513,20 +518,25 @@ void jGame::Update(float deltaTime)
 			// 여기서 부터 렌더 로직 시작
 			//if (ensure(commandBuffer.Begin()))
 			{
+				SCOPE_GPU_PROFILE(BasePass);
+
 				g_rhi_vk->RenderPasses[imageIndex]->BeginRenderPass(&commandBuffer);
+
+				//vkCmdWriteTimestamp((VkCommandBuffer)commandBuffer.GetHandle(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, g_rhi_vk->vkQueryPool, 0);
 
 				for (auto command : BasePasses)
 				{
 					command.Draw();
 				}
 
-                // Finishing up
-                g_rhi_vk->RenderPasses[imageIndex]->EndRenderPass();
+				// Finishing up
+				g_rhi_vk->RenderPasses[imageIndex]->EndRenderPass();
 
 				jImGUI_Vulkan::Get().Draw((VkCommandBuffer)commandBuffer.GetHandle(), imageIndex);
 
-				ensure(commandBuffer.End());
+				//vkCmdWriteTimestamp((VkCommandBuffer)commandBuffer.GetHandle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, g_rhi_vk->vkQueryPool, 1);
 			}
+			ensure(commandBuffer.End());
 
 			// 여기 까지 렌더 로직 끝
 			//////////////////////////////////////////////////////////////////////////

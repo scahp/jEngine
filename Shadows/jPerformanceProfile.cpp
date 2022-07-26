@@ -10,7 +10,7 @@ static int32 PerformanceFrame = 0;
 std::unordered_set<jQueryTime*> jQueryTimePool::s_running;
 std::unordered_set<jQueryTime*> jQueryTimePool::s_resting;
 
-std::list<jProfile_GPU> jProfile_GPU::WatingResultList[2];
+std::list<jProfile_GPU> jProfile_GPU::WatingResultList[jRHI::MaxWaitingQuerySet];
 int32 jProfile_GPU::CurrentWatingResultListIndex = 0;
 
 int32 NextFrame()
@@ -48,8 +48,8 @@ void jPerformanceProfile::Update(float deltaTime)
 	CalcAvg();
 	NextFrame();
 
-	if (TRUE_PER_MS(1000))
-		PrintOutputDebugString();
+    //if (TRUE_PER_MS(1000))
+    //    PrintOutputDebugString();
 }
 
 void jPerformanceProfile::CalcAvg()

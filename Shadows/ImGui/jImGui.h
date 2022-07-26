@@ -58,16 +58,20 @@ private:
 
 private:
     // Vulkan resources for rendering the UI
-    VkBuffer vertexBuffer = nullptr;
-    void* vertexBufferMapped = nullptr;
-    VkDeviceSize vertexBufferSize = 0;
-    VkDeviceMemory vertexBufferMemory = nullptr;
-    VkBuffer indexBuffer = nullptr;
-    void* indexBufferMapped = nullptr;
-    VkDeviceMemory indexBufferMemory = nullptr;
-    VkDeviceSize indexBufferSize = 0;
-    int32_t vertexCount = 0;
-    int32_t indexCount = 0;
+    struct jDynamicBufferData
+    {
+        VkBuffer vertexBuffer = nullptr;
+        void* vertexBufferMapped = nullptr;
+        VkDeviceSize vertexBufferSize = 0;
+        VkDeviceMemory vertexBufferMemory = nullptr;
+        VkBuffer indexBuffer = nullptr;
+        void* indexBufferMapped = nullptr;
+        VkDeviceMemory indexBufferMemory = nullptr;
+        VkDeviceSize indexBufferSize = 0;
+        int32_t vertexCount = 0;
+        int32_t indexCount = 0;
+    };
+    std::vector<jDynamicBufferData> DynamicBufferData;
     VkDeviceMemory fontMemory = nullptr;
     VkImage fontImage = nullptr;
     VkImageView fontView = nullptr;

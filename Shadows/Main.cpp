@@ -109,13 +109,8 @@ int main()
 
 		jImGUI_Vulkan::Get().Update(g_timeDeltaSecond);
 
-#if USE_VULKAN
-		// ((jRHI_Vulkan*)g_rhi)->MainLoop();
 		g_Engine.Update(g_timeDeltaSecond);
-#elif USE_OPENGL
-        g_Engine.Update(g_timeDeltaSecond);
 		jPerformanceProfile::GetInstance().Update(g_timeDeltaSecond);
-#endif
 
 		#if USE_OPENGL
         {

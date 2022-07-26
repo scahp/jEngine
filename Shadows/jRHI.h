@@ -444,11 +444,22 @@ struct TRenderTarget
 {
 };
 
+struct jQueryPool
+{
+	virtual ~jQueryPool() {}
+	virtual bool Create() { return false; }
+	virtual void ResetQueryPool(jCommandBuffer* pCommanBuffer = nullptr) {}
+};
+
 struct jQueryTime
 {
 	virtual ~jQueryTime() {}
+	virtual void Init() {}
 
 	uint64 TimeStamp = 0;
+
+	// 이걸로 교체 예정
+	uint64 TimeStampStartEnd[2] = { 0, 0 };
 };
 
 struct jQueryPrimitiveGenerated
@@ -824,6 +835,8 @@ public:
 	jRHI();
 	virtual ~jRHI() {}
 
+    static constexpr int32 MaxWaitingQuerySet = 3;
+
 	virtual bool InitRHI() { return false; }
 	virtual void ReleaseRHI() {}
 	virtual void* GetWindow() const { return nullptr; }
@@ -921,6 +934,8 @@ public:
 	virtual void GenerateMips(const jTexture* texture) const {}
 	virtual jQueryTime* CreateQueryTime() const { return nullptr;  }
 	virtual void ReleaseQueryTime(jQueryTime* queryTime) const {}
+	virtual void QueryTimeStampStart(const jQueryTime* queryTimeStamp) const {}
+	virtual void QueryTimeStampEnd(const jQueryTime* queryTimeStamp) const {}
 	virtual void QueryTimeStamp(const jQueryTime* queryTimeStamp) const {}
 	virtual bool IsQueryTimeStampResult(const jQueryTime* queryTimeStamp, bool isWaitUntilAvailable) const { return false; }
 	virtual void GetQueryTimeStampResult(jQueryTime* queryTimeStamp) const {}

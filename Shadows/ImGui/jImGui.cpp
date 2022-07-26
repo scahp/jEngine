@@ -15,10 +15,13 @@ jImGUI_Vulkan::~jImGUI_Vulkan()
 {
     ImGui::DestroyContext();
     // Release all Vulkan resources required for rendering imGui
-    vkDestroyBuffer(g_rhi_vk->device, vertexBuffer, nullptr);
-    vkFreeMemory(g_rhi_vk->device, vertexBufferMemory, nullptr);
-    vkDestroyBuffer(g_rhi_vk->device, indexBuffer, nullptr);
-    vkFreeMemory(g_rhi_vk->device, indexBufferMemory, nullptr);
+    for (int32 i = 0; i < DynamicBufferData.size(); ++i)
+    {
+        vkDestroyBuffer(g_rhi_vk->device, DynamicBufferData[i].vertexBuffer, nullptr);
+        vkFreeMemory(g_rhi_vk->device, DynamicBufferData[i].vertexBufferMemory, nullptr);
+        vkDestroyBuffer(g_rhi_vk->device, DynamicBufferData[i].indexBuffer, nullptr);
+        vkFreeMemory(g_rhi_vk->device, DynamicBufferData[i].indexBufferMemory, nullptr);
+    }
     vkDestroyImage(g_rhi_vk->device, fontImage, nullptr);
     vkDestroyImageView(g_rhi_vk->device, fontView, nullptr);
     vkFreeMemory(g_rhi_vk->device, fontMemory, nullptr);
@@ -303,8 +306,17 @@ void jImGUI_Vulkan::NewFrame(bool updateFrameGraph)
 
     ImVec4 clear_color = ImColor(114, 144, 154);
     static float f = 0.0f;
-    ImGui::TextUnformatted("TitleTest");
-    ImGui::TextUnformatted(g_rhi_vk->DeviceProperties.deviceName);
+    //ImGui::TextUnformatted("TitleTest");
+    //ImGui::TextUnformatted(g_rhi_vk->DeviceProperties.deviceName);
+
+    ImGui::SetNextWindowSize(ImVec2(200.0f, 200.0f), ImGuiCond_FirstUseEver);
+    ImGui::Begin("GPU Time Stamp");
+    const std::map<jName, jPerformanceProfile::jAvgProfile>& GPUAvgProfileMap = jPerformanceProfile::GetInstance().GetGPUAvgProfileMap();
+    for (auto& pair : GPUAvgProfileMap)
+    {
+        ImGui::Text("%s : %lf ms", pair.first.ToStr(), pair.second.AvgElapsedMS);
+    }
+    ImGui::End();
 
     //// Update frame time display
     //if (updateFrameGraph) {
@@ -335,7 +347,7 @@ void jImGUI_Vulkan::NewFrame(bool updateFrameGraph)
     //ImGui::End();
 
     //ImGui::SetNextWindowPos(ImVec2(650, 20), ImGuiSetCond_FirstUseEver);
-    ImGui::ShowDemoWindow();
+    //ImGui::ShowDemoWindow();
 
     // Render to generate draw buffers
     ImGui::Render();
@@ -344,48 +356,53 @@ void jImGUI_Vulkan::NewFrame(bool updateFrameGraph)
 void jImGUI_Vulkan::UpdateBuffers()
 {
     ImDrawData* imDrawData = ImGui::GetDrawData();
-
-    if ((imDrawData->TotalVtxCount == 0) || (imDrawData->TotalIdxCount == 0)) {
+    if ((imDrawData->TotalVtxCount == 0) || (imDrawData->TotalIdxCount == 0))
         return;
-    }
+
+    if (DynamicBufferData.size() <= g_rhi_vk->currenFrame)
+        DynamicBufferData.resize(g_rhi_vk->currenFrame + 1);
+
+    auto& DynamicBuffer = DynamicBufferData[g_rhi_vk->currenFrame];
 
     // Update buffers only if vertex or index count has been changed compared to current buffer size
 
     // Vertex buffer
-    if ((vertexBuffer == VK_NULL_HANDLE) || (vertexCount != imDrawData->TotalVtxCount))
+    if ((DynamicBuffer.vertexBuffer == VK_NULL_HANDLE) || (DynamicBuffer.vertexCount != imDrawData->TotalVtxCount))
     {
-        vertexBufferSize = imDrawData->TotalVtxCount * sizeof(ImDrawVert);
+        DynamicBuffer.vertexBufferSize = imDrawData->TotalVtxCount * sizeof(ImDrawVert);
 
-        if (vertexBufferMemory)
-            vkUnmapMemory(g_rhi_vk->device, vertexBufferMemory);
-        if (vertexBuffer)
-            vkDestroyBuffer(g_rhi_vk->device, vertexBuffer, nullptr);
-        if (vertexBufferMemory)
-            vkFreeMemory(g_rhi_vk->device, vertexBufferMemory, nullptr);
-        check(vertexBufferSize = g_rhi_vk->CreateBuffer(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, vertexBufferSize, vertexBuffer, vertexBufferMemory));
-        vertexCount = imDrawData->TotalVtxCount;
-        vkMapMemory(g_rhi_vk->device, vertexBufferMemory, 0, vertexBufferSize, 0, &vertexBufferMapped);
+        if (DynamicBuffer.vertexBufferMemory)
+            vkUnmapMemory(g_rhi_vk->device, DynamicBuffer.vertexBufferMemory);
+        if (DynamicBuffer.vertexBuffer)
+            vkDestroyBuffer(g_rhi_vk->device, DynamicBuffer.vertexBuffer, nullptr);
+        if (DynamicBuffer.vertexBufferMemory)
+            vkFreeMemory(g_rhi_vk->device, DynamicBuffer.vertexBufferMemory, nullptr);
+        check(DynamicBuffer.vertexBufferSize = g_rhi_vk->CreateBuffer(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+            , DynamicBuffer.vertexBufferSize, DynamicBuffer.vertexBuffer, DynamicBuffer.vertexBufferMemory));
+        DynamicBuffer.vertexCount = imDrawData->TotalVtxCount;
+        vkMapMemory(g_rhi_vk->device, DynamicBuffer.vertexBufferMemory, 0, DynamicBuffer.vertexBufferSize, 0, &DynamicBuffer.vertexBufferMapped);
     }
 
     // Index buffer
-    if ((indexBuffer == VK_NULL_HANDLE) || (indexCount < imDrawData->TotalIdxCount))
+    if ((DynamicBuffer.indexBuffer == VK_NULL_HANDLE) || (DynamicBuffer.indexCount < imDrawData->TotalIdxCount))
     {
-        indexBufferSize = imDrawData->TotalIdxCount * sizeof(ImDrawIdx);
+        DynamicBuffer.indexBufferSize = imDrawData->TotalIdxCount * sizeof(ImDrawIdx);
 
-        if (indexBufferMemory)
-            vkUnmapMemory(g_rhi_vk->device, indexBufferMemory);
-        if (indexBuffer)
-            vkDestroyBuffer(g_rhi_vk->device, indexBuffer, nullptr);
-        if (indexBufferMemory)
-            vkFreeMemory(g_rhi_vk->device, indexBufferMemory, nullptr);
-        check(indexBufferSize = g_rhi_vk->CreateBuffer(VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, indexBufferSize, indexBuffer, indexBufferMemory));
-        indexCount = imDrawData->TotalIdxCount;
-        vkMapMemory(g_rhi_vk->device, indexBufferMemory, 0, indexBufferSize, 0, &indexBufferMapped);
+        if (DynamicBuffer.indexBufferMemory)
+            vkUnmapMemory(g_rhi_vk->device, DynamicBuffer.indexBufferMemory);
+        if (DynamicBuffer.indexBuffer)
+            vkDestroyBuffer(g_rhi_vk->device, DynamicBuffer.indexBuffer, nullptr);
+        if (DynamicBuffer.indexBufferMemory)
+            vkFreeMemory(g_rhi_vk->device, DynamicBuffer.indexBufferMemory, nullptr);
+        check(DynamicBuffer.indexBufferSize = g_rhi_vk->CreateBuffer(VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+            , DynamicBuffer.indexBufferSize, DynamicBuffer.indexBuffer, DynamicBuffer.indexBufferMemory));
+        DynamicBuffer.indexCount = imDrawData->TotalIdxCount;
+        vkMapMemory(g_rhi_vk->device, DynamicBuffer.indexBufferMemory, 0, DynamicBuffer.indexBufferSize, 0, &DynamicBuffer.indexBufferMapped);
     }
 
     // Upload data
-    ImDrawVert* vtxDst = (ImDrawVert*)vertexBufferMapped;
-    ImDrawIdx* idxDst = (ImDrawIdx*)indexBufferMapped;
+    ImDrawVert* vtxDst = (ImDrawVert*)DynamicBuffer.vertexBufferMapped;
+    ImDrawIdx* idxDst = (ImDrawIdx*)DynamicBuffer.indexBufferMapped;
 
     for (int n = 0; n < imDrawData->CmdListsCount; n++) {
         const ImDrawList* cmd_list = imDrawData->CmdLists[n];
@@ -399,17 +416,17 @@ void jImGUI_Vulkan::UpdateBuffers()
     {
         VkMappedMemoryRange mappedRange = {};
         mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-        mappedRange.memory = vertexBufferMemory;
+        mappedRange.memory = DynamicBuffer.vertexBufferMemory;
         mappedRange.offset = 0;
-        mappedRange.size = vertexBufferSize;
+        mappedRange.size = DynamicBuffer.vertexBufferSize;
         check(VK_SUCCESS == vkFlushMappedMemoryRanges(g_rhi_vk->device, 1, &mappedRange));
     }
     {
         VkMappedMemoryRange mappedRange = {};
         mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-        mappedRange.memory = indexBufferMemory;
+        mappedRange.memory = DynamicBuffer.indexBufferMemory;
         mappedRange.offset = 0;
-        mappedRange.size = indexBufferSize;
+        mappedRange.size = DynamicBuffer.indexBufferSize;
         check(VK_SUCCESS == vkFlushMappedMemoryRanges(g_rhi_vk->device, 1, &mappedRange));
     }
 }
@@ -484,11 +501,13 @@ void jImGUI_Vulkan::Draw(VkCommandBuffer commandBuffer, int32 imageIndex)
     int32_t vertexOffset = 0;
     int32_t indexOffset = 0;
 
-    if (imDrawData->CmdListsCount > 0) {
+    if (imDrawData->CmdListsCount > 0 && DynamicBufferData.size() > imageIndex)
+    {
+        auto& DynamicBuffer = DynamicBufferData[imageIndex];
 
         VkDeviceSize offsets[1] = { 0 };
-        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer, offsets);
-        vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &DynamicBuffer.vertexBuffer, offsets);
+        vkCmdBindIndexBuffer(commandBuffer, DynamicBuffer.indexBuffer, 0, VK_INDEX_TYPE_UINT16);
 
         for (int32_t i = 0; i < imDrawData->CmdListsCount; i++)
         {

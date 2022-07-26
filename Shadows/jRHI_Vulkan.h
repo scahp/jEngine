@@ -190,16 +190,7 @@ public:
 		CommandBuffer = nullptr;
 	}
 
-	virtual size_t GetHash() const override
-	{
-		if (Hash)
-			return Hash;
-
-		Hash = __super::GetHash();
-		Hash ^= STATIC_NAME_CITY_HASH("ClearValues");
-		Hash ^= CityHash64((const char*)ClearValues.data(), sizeof(VkClearValue) * ClearValues.size());
-		return Hash;
-	}
+	virtual size_t GetHash() const override;
 
 private:
 	const jCommandBuffer* CommandBuffer = nullptr;
@@ -240,18 +231,7 @@ struct jShaderBindings_Vulkan : public jShaderBindings
 	virtual jShaderBindingInstance* CreateShaderBindingInstance() const override;
 	virtual std::vector<jShaderBindingInstance*> CreateShaderBindingInstance(int32 count) const override;
 
-	virtual size_t GetHash() const override
-	{
-		size_t result = 0;
-
-		result ^= STATIC_NAME_CITY_HASH("UniformBuffer");
-		result ^= CityHash64((const char*)UniformBuffers.data(), sizeof(jShaderBinding) * UniformBuffers.size());
-
-		result ^= STATIC_NAME_CITY_HASH("Texture");
-		result ^= CityHash64((const char*)Textures.data(), sizeof(jShaderBinding) * Textures.size());
-
-		return result;
-	}
+	virtual size_t GetHash() const override;
 
 	std::vector<VkDescriptorPoolSize> GetDescriptorPoolSizeArray(uint32 maxAllocations) const
 	{
@@ -672,6 +652,19 @@ struct jUniformBufferBlock_Vulkan : public IUniformBufferBlock
 
 	VkBuffer Bufffer = nullptr;
 	VkDeviceMemory BufferMemory = nullptr;
+};
+
+struct jQueryPool_Vulkan : public jQueryPool
+{
+    static constexpr int32 MaxQueryPool = 512;
+
+    virtual ~jQueryPool_Vulkan() {}
+
+	virtual bool Create() override;
+    virtual void ResetQueryPool(jCommandBuffer* pCommanBuffer = nullptr);
+
+    VkQueryPool vkQueryPool = nullptr;
+	int32 QueryIndex[jRHI::MaxWaitingQuerySet] = { 0, };
 };
 
 // todo
@@ -1683,6 +1676,16 @@ public:
 
 	virtual IUniformBufferBlock* CreateUniformBufferBlock(const char* blockname, size_t size = 0) const override;
 
+    virtual jQueryTime* CreateQueryTime() const override;
+    virtual void ReleaseQueryTime(jQueryTime* queryTime) const override;
+	virtual void QueryTimeStampStart(const jQueryTime* queryTimeStamp) const override;
+	virtual void QueryTimeStampEnd(const jQueryTime* queryTimeStamp) const override;
+    virtual void QueryTimeStamp(const jQueryTime* queryTimeStamp) const override;
+    virtual bool IsQueryTimeStampResult(const jQueryTime* queryTimeStamp, bool isWaitUntilAvailable) const override;
+    virtual void GetQueryTimeStampResult(jQueryTime* queryTimeStamp) const override;
+    virtual void BeginQueryTimeElapsed(const jQueryTime* queryTimeElpased) const override;
+    virtual void EndQueryTimeElapsed(const jQueryTime* queryTimeElpased) const override;
+
 	static std::unordered_map<size_t, VkPipelineLayout> PipelineLayoutPool;
 	static std::unordered_map<size_t, jShaderBindings*> ShaderBindingPool;
 	static TResourcePool<jSamplerStateInfo_Vulkan> SamplerStatePool;
@@ -1699,6 +1702,8 @@ public:
 	jCommandBuffer_Vulkan* CurrentCommandBuffer = nullptr;
 	jPipelineStateFixedInfo CurrentPipelineStateFixed_Shadow;
 	jPipelineStateFixedInfo CurrentPipelineStateFixed;
+
+	jQueryPool_Vulkan QueryPool;
 };
 
 extern jRHI_Vulkan* g_rhi_vk;
@@ -1714,6 +1719,14 @@ struct jShader_Vulkan : public jShader
 	}
 
 	std::vector<VkPipelineShaderStageCreateInfo> ShaderStages;
+};
+
+struct jQueryTime_Vulkan : public jQueryTime
+{
+	virtual ~jQueryTime_Vulkan() {}
+	virtual void Init() override;
+
+    uint32 QueryId = 0;
 };
 
 #endif // USE_VULKAN

@@ -1,10 +1,11 @@
 #pragma once
 #include <sysinfoapi.h>
 #include "jRHI.h"
+#include "jRHI_Vulkan.h"
 
-#define ENABLE_PROFILE 0
-#define ENABLE_PROFILE_CPU ENABLE_PROFILE
-#define ENABLE_PROFILE_GPU ENABLE_PROFILE
+#define ENABLE_PROFILE 1
+#define ENABLE_PROFILE_CPU (ENABLE_PROFILE && 0)
+#define ENABLE_PROFILE_GPU (ENABLE_PROFILE && 1)
 
 static constexpr int32 MaxProfileFrame = 10;
 
@@ -62,6 +63,7 @@ public:
 			queryTime = *iter;
 			s_resting.erase(iter);
 		}
+		queryTime->Init();
 		s_running.insert(queryTime);
 		JASSERT(queryTime);
 		return queryTime;
@@ -92,28 +94,31 @@ private:
 struct jProfile_GPU
 {
 	jName Name;
-	jQueryTime* Start = nullptr;
-	jQueryTime* End = nullptr;
+	jQueryTime* Query = nullptr;
+	//jQueryTime* Start = nullptr;
+	//jQueryTime* End = nullptr;
 
 	static int32 CurrentWatingResultListIndex;
-	static std::list<jProfile_GPU> WatingResultList[2];
+	static std::list<jProfile_GPU> WatingResultList[jRHI::MaxWaitingQuerySet];
 	static void ProcessWaitings()
 	{
-		const auto prevIndex = !CurrentWatingResultListIndex;
+		const auto prevIndex = CurrentWatingResultListIndex > 0 ? CurrentWatingResultListIndex - 1 : (jRHI::MaxWaitingQuerySet - 1);
 		auto& prevList = WatingResultList[prevIndex];
 		for (auto rit = prevList.rbegin(); prevList.rend() != rit;++rit)
 		{
 			const auto& iter = *rit;
-			g_rhi->IsQueryTimeStampResult(iter.End, true);
-			g_rhi->GetQueryTimeStampResult(iter.End);
-			g_rhi->IsQueryTimeStampResult(iter.Start, true);
-			g_rhi->GetQueryTimeStampResult(iter.Start);
-			AddScopedProfileGPU(iter.Name, iter.End->TimeStamp - iter.Start->TimeStamp);
-			jQueryTimePool::ReturnQueryTime(iter.Start);
-			jQueryTimePool::ReturnQueryTime(iter.End);
+			//g_rhi->IsQueryTimeStampResult(iter.End, true);
+			//g_rhi->GetQueryTimeStampResult(iter.End);
+			//g_rhi->IsQueryTimeStampResult(iter.Start, true);
+			//g_rhi->GetQueryTimeStampResult(iter.Start);
+			//AddScopedProfileGPU(iter.Name, iter.End->TimeStamp - iter.Start->TimeStamp);
+			//jQueryTimePool::ReturnQueryTime(iter.Start);
+			g_rhi->GetQueryTimeStampResult(iter.Query);
+			AddScopedProfileGPU(iter.Name, iter.Query->TimeStampStartEnd[1] - iter.Query->TimeStampStartEnd[0]);
+            jQueryTimePool::ReturnQueryTime(iter.Query);
 		}
 		prevList.clear();
-		CurrentWatingResultListIndex = prevIndex;
+		CurrentWatingResultListIndex = (++CurrentWatingResultListIndex) % jRHI::MaxWaitingQuerySet;
 	}
 };
 
@@ -125,16 +130,20 @@ public:
 	jScopedProfile_GPU(const jName& name)
 	{
 		Profile.Name = name;
-		Profile.Start = jQueryTimePool::GetQueryTime();
-		JASSERT(Profile.Start);
-		g_rhi->QueryTimeStamp(Profile.Start);
+		//Profile.Start = jQueryTimePool::GetQueryTime();
+		//JASSERT(Profile.Start);
+		//g_rhi->QueryTimeStamp(Profile.Start);
+
+        Profile.Query = jQueryTimePool::GetQueryTime();
+		g_rhi_vk->QueryTimeStampStart(Profile.Query);
 	}
 
 	~jScopedProfile_GPU()
 	{
-		Profile.End = jQueryTimePool::GetQueryTime();
-		g_rhi->QueryTimeStamp(Profile.End);
-		
+		//Profile.End = jQueryTimePool::GetQueryTime();
+		//g_rhi->QueryTimeStamp(Profile.End);
+
+        g_rhi_vk->QueryTimeStampEnd(Profile.Query);
 		jProfile_GPU::WatingResultList[jProfile_GPU::CurrentWatingResultListIndex].emplace_back(Profile);
 	}
 
@@ -163,9 +172,12 @@ public:
 	void CalcAvg();
 	void PrintOutputDebugString();
 
+	const std::map<jName, jAvgProfile>& GetAvgProfileMap() const { return AvgProfileMap; }
+	const std::map<jName, jAvgProfile>& GetGPUAvgProfileMap() const { return GPUAvgProfileMap; }
+
 private:
 	std::map<jName, jAvgProfile> AvgProfileMap;			// ms
-	std::map<jName, jAvgProfile> GPUAvgProfileMap;		// ns
+	std::map<jName, jAvgProfile> GPUAvgProfileMap;		// ms
 
 public:
 	static jPerformanceProfile& GetInstance()

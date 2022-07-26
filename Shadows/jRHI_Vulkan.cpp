@@ -661,6 +661,8 @@ bool jRHI_Vulkan::InitRHI()
 
     // ensure(RecordCommandBuffers());
 
+	QueryPool.Create();
+
 	return true;
 }
 
@@ -2115,9 +2117,89 @@ IUniformBufferBlock* jRHI_Vulkan::CreateUniformBufferBlock(const char* blockname
 	return uniformBufferBlock;
 }
 
+jQueryTime* jRHI_Vulkan::CreateQueryTime() const
+{
+	auto queryTime = new jQueryTime_Vulkan();
+	return queryTime;
+}
+
+void jRHI_Vulkan::ReleaseQueryTime(jQueryTime* queryTime) const
+{
+    auto queryTime_gl = static_cast<jQueryTime_OpenGL*>(queryTime);
+    // glDeleteQueries(1, &queryTime_gl->QueryId);
+    delete queryTime_gl;
+}
+
+void jRHI_Vulkan::QueryTimeStampStart(const jQueryTime* queryTimeStamp) const
+{
+	vkCmdWriteTimestamp((VkCommandBuffer)g_rhi_vk->CurrentCommandBuffer->GetHandle(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, g_rhi_vk->QueryPool.vkQueryPool, ((jQueryTime_Vulkan*)queryTimeStamp)->QueryId);
+}
+
+void jRHI_Vulkan::QueryTimeStampEnd(const jQueryTime* queryTimeStamp) const
+{
+	vkCmdWriteTimestamp((VkCommandBuffer)g_rhi_vk->CurrentCommandBuffer->GetHandle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, g_rhi_vk->QueryPool.vkQueryPool, ((jQueryTime_Vulkan*)queryTimeStamp)->QueryId + 1);
+}
+
+void jRHI_Vulkan::QueryTimeStamp(const jQueryTime* queryTimeStamp) const
+{
+	check(0);
+	//const auto queryTimeStamp_gl = static_cast<const jQueryTime_OpenGL*>(queryTimeStamp);
+    //JASSERT(queryTimeStamp_gl->QueryId > 0);
+    //glQueryCounter(queryTimeStamp_gl->QueryId, GL_TIMESTAMP);
+}
+
+bool jRHI_Vulkan::IsQueryTimeStampResult(const jQueryTime* queryTimeStamp, bool isWaitUntilAvailable) const
+{
+	auto queryTimeStamp_vk = static_cast<const jQueryTime_Vulkan*>(queryTimeStamp);
+
+	uint64 time[2] = { 0, 0 };
+    VkResult result = VK_RESULT_MAX_ENUM;
+	if (isWaitUntilAvailable)
+    {
+		while (result == VK_SUCCESS)
+		{
+			result = (vkGetQueryPoolResults(g_rhi_vk->device, g_rhi_vk->QueryPool.vkQueryPool, queryTimeStamp_vk->QueryId, 2, sizeof(uint64) * 2, time, sizeof(uint64_t), VK_QUERY_RESULT_WITH_AVAILABILITY_BIT));
+		}
+	}
+
+    result = (vkGetQueryPoolResults(g_rhi_vk->device, g_rhi_vk->QueryPool.vkQueryPool, queryTimeStamp_vk->QueryId, 2, sizeof(uint64) * 2, time, sizeof(uint64_t), VK_QUERY_RESULT_WITH_AVAILABILITY_BIT));
+    return (result == VK_SUCCESS);
+}
+
+void jRHI_Vulkan::GetQueryTimeStampResult(jQueryTime* queryTimeStamp) const
+{
+	auto queryTimeStamp_vk = static_cast<jQueryTime_Vulkan*>(queryTimeStamp);
+	vkGetQueryPoolResults(g_rhi_vk->device, g_rhi_vk->QueryPool.vkQueryPool, queryTimeStamp_vk->QueryId, 2, sizeof(uint64) * 2, queryTimeStamp_vk->TimeStampStartEnd, sizeof(uint64_t), VK_QUERY_RESULT_64_BIT);
+}
+
+void jRHI_Vulkan::BeginQueryTimeElapsed(const jQueryTime* queryTimeElpased) const
+{
+    //const auto queryTimeElpased_gl = static_cast<const jQueryTime_OpenGL*>(queryTimeElpased);
+    //JASSERT(queryTimeElpased_gl->QueryId > 0);
+    ////glBeginQuery(GL_TIME_ELAPSED, queryTimeElpased_gl->QueryId);
+	check(0);
+}
+
+void jRHI_Vulkan::EndQueryTimeElapsed(const jQueryTime* queryTimeElpased) const
+{
+   // glEndQuery(GL_TIME_ELAPSED);
+	check(0);
+}
+
 void jRenderPass_Vulkan::Release()
 {
     vkDestroyRenderPass(g_rhi_vk->device, RenderPass, nullptr);
+}
+
+size_t jRenderPass_Vulkan::GetHash() const
+{
+    if (Hash)
+        return Hash;
+
+    Hash = __super::GetHash();
+    Hash ^= STATIC_NAME_CITY_HASH("ClearValues");
+    Hash ^= CityHash64((const char*)ClearValues.data(), sizeof(VkClearValue) * ClearValues.size());
+    return Hash;
 }
 
 std::unordered_map<size_t, VkRenderPass> s_renderPassPool;
@@ -2546,6 +2628,19 @@ std::vector<jShaderBindingInstance*> jShaderBindings_Vulkan::CreateShaderBinding
     return Instances;
 }
 
+size_t jShaderBindings_Vulkan::GetHash() const
+{
+    size_t result = 0;
+
+    result ^= STATIC_NAME_CITY_HASH("UniformBuffer");
+    result ^= CityHash64((const char*)UniformBuffers.data(), sizeof(jShaderBinding) * UniformBuffers.size());
+
+    result ^= STATIC_NAME_CITY_HASH("Texture");
+    result ^= CityHash64((const char*)Textures.data(), sizeof(jShaderBinding) * Textures.size());
+
+    return result;
+}
+
 void jShaderBindings_Vulkan::CreatePool()
 {
 	DescriptorPool = g_rhi_vk->ShaderBindingsManager.CreatePool(*this);
@@ -2953,6 +3048,32 @@ VkFence jFenceManager_Vulkan::GetOrCreateFence()
 		UsingFences.insert(newFence);
 
 	return newFence;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void jQueryTime_Vulkan::Init()
+{
+	QueryId = g_rhi_vk->QueryPool.QueryIndex[jProfile_GPU::CurrentWatingResultListIndex];
+	g_rhi_vk->QueryPool.QueryIndex[jProfile_GPU::CurrentWatingResultListIndex] += 2;		// Need 2 Queries for Starting, Ending timestamp
+}
+
+bool jQueryPool_Vulkan::Create()
+{
+    VkQueryPoolCreateInfo querPoolCreateInfo = {};
+    querPoolCreateInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+    querPoolCreateInfo.pNext = nullptr;
+    querPoolCreateInfo.queryType = VK_QUERY_TYPE_TIMESTAMP;
+    querPoolCreateInfo.queryCount = 512 * jRHI::MaxWaitingQuerySet;
+
+    const VkResult res = vkCreateQueryPool(g_rhi_vk->device, &querPoolCreateInfo, nullptr, &vkQueryPool);
+    return (res == VK_SUCCESS);
+}
+
+void jQueryPool_Vulkan::ResetQueryPool(jCommandBuffer* pCommanBuffer /*= nullptr*/)
+{
+    vkCmdResetQueryPool((VkCommandBuffer)pCommanBuffer->GetHandle(), vkQueryPool, MaxQueryPool * jProfile_GPU::CurrentWatingResultListIndex, MaxQueryPool);
+	QueryIndex[jProfile_GPU::CurrentWatingResultListIndex] = MaxQueryPool * jProfile_GPU::CurrentWatingResultListIndex;
 }
 
 
