@@ -39,18 +39,28 @@
 
 #include <vector>
 #include <list>
-#include <memory>
-#include <string>
-#include <stdexcept>
-#include <stdlib.h>
 #include <map>
 #include <array>
-#include <functional>
-#include <sstream>
+#include <string>
 #include <set>
-#include <algorithm>
 #include <unordered_map>
 #include <unordered_set>
+
+#include <EASTL/vector.h>
+#include <EASTL/list.h>
+#include <EASTL/map.h>
+#include <EASTL/array.h>
+#include <EASTL/string.h>
+#include <EASTL/set.h>
+#include <EASTL/unordered_map.h>
+#include <EASTL/unordered_set.h>
+
+#include <memory>
+#include <stdexcept>
+#include <stdlib.h>
+#include <functional>
+#include <sstream>
+#include <algorithm>
 #include <limits>
 #include <type_traits>
 #include <iostream>

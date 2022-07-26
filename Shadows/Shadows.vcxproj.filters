@@ -49,6 +49,9 @@
     <Filter Include="ImGui">
       <UniqueIdentifier>{c08066e9-ebf0-484b-be22-007f35ad5e13}</UniqueIdentifier>
     </Filter>
+    <Filter Include="External\EASTL">
+      <UniqueIdentifier>{b4a2146e-541a-46df-8ee3-1ad8743a38e5}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h">
@@ -385,6 +388,36 @@
     </ClCompile>
     <ClCompile Include="ImGui\jImGui.cpp">
       <Filter>ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="External\EASTL\source\allocator_eastl.cpp">
+      <Filter>External\EASTL</Filter>
+    </ClCompile>
+    <ClCompile Include="External\EASTL\source\assert.cpp">
+      <Filter>External\EASTL</Filter>
+    </ClCompile>
+    <ClCompile Include="External\EASTL\source\atomic.cpp">
+      <Filter>External\EASTL</Filter>
+    </ClCompile>
+    <ClCompile Include="External\EASTL\source\fixed_pool.cpp">
+      <Filter>External\EASTL</Filter>
+    </ClCompile>
+    <ClCompile Include="External\EASTL\source\hashtable.cpp">
+      <Filter>External\EASTL</Filter>
+    </ClCompile>
+    <ClCompile Include="External\EASTL\source\intrusive_list.cpp">
+      <Filter>External\EASTL</Filter>
+    </ClCompile>
+    <ClCompile Include="External\EASTL\source\numeric_limits.cpp">
+      <Filter>External\EASTL</Filter>
+    </ClCompile>
+    <ClCompile Include="External\EASTL\source\red_black_tree.cpp">
+      <Filter>External\EASTL</Filter>
+    </ClCompile>
+    <ClCompile Include="External\EASTL\source\string.cpp">
+      <Filter>External\EASTL</Filter>
+    </ClCompile>
+    <ClCompile Include="External\EASTL\source\thread_support.cpp">
+      <Filter>External\EASTL</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
