@@ -10,7 +10,7 @@ static int32 PerformanceFrame = 0;
 std::unordered_set<jQueryTime*> jQueryTimePool::s_running;
 std::unordered_set<jQueryTime*> jQueryTimePool::s_resting;
 
-std::list<jProfile_GPU> jProfile_GPU::WatingResultList[jRHI::MaxWaitingQuerySet];
+std::vector<jProfile_GPU> jProfile_GPU::WatingResultList[jRHI::MaxWaitingQuerySet];
 int32 jProfile_GPU::CurrentWatingResultListIndex = 0;
 
 int32 NextFrame()

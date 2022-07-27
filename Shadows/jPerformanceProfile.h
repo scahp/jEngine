@@ -97,7 +97,7 @@ struct jProfile_GPU
 	jQueryTime* Query = nullptr;
 
 	static int32 CurrentWatingResultListIndex;
-	static std::list<jProfile_GPU> WatingResultList[jRHI::MaxWaitingQuerySet];
+	static std::vector<jProfile_GPU> WatingResultList[jRHI::MaxWaitingQuerySet];
 	static void ProcessWaitings()
 	{
 		int32 prevIndex = CurrentWatingResultListIndex;
