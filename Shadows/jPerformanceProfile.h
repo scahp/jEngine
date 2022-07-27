@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <sysinfoapi.h>
 #include "jRHI.h"
 #include "jRHI_Vulkan.h"
@@ -95,25 +95,40 @@ struct jProfile_GPU
 {
 	jName Name;
 	jQueryTime* Query = nullptr;
-	//jQueryTime* Start = nullptr;
-	//jQueryTime* End = nullptr;
 
 	static int32 CurrentWatingResultListIndex;
 	static std::list<jProfile_GPU> WatingResultList[jRHI::MaxWaitingQuerySet];
 	static void ProcessWaitings()
 	{
-		const auto prevIndex = CurrentWatingResultListIndex > 0 ? CurrentWatingResultListIndex - 1 : (jRHI::MaxWaitingQuerySet - 1);
+		int32 prevIndex = CurrentWatingResultListIndex;
+		if (jRHI::MaxWaitingQuerySet > 2)
+		{
+			prevIndex = (CurrentWatingResultListIndex + 2) % jRHI::MaxWaitingQuerySet;
+		}
+		else if (jRHI::MaxWaitingQuerySet > 1)
+		{
+			prevIndex = (int32)!CurrentWatingResultListIndex;
+		}
+
+		// Query 결과를 한번에 다 받아올 수 있는 API 는 그렇게 처리하고, 아니면 개별로 결과를 얻어오도록 함
+        std::vector<uint64> WholeQueryTimeStampArray;
+		if (g_rhi->CanWholeQueryTimeStampResult())
+		{
+			WholeQueryTimeStampArray = g_rhi->GetWholeQueryTimeStampResult(prevIndex);
+		}
+
 		auto& prevList = WatingResultList[prevIndex];
 		for (auto rit = prevList.rbegin(); prevList.rend() != rit;++rit)
 		{
 			const auto& iter = *rit;
-			//g_rhi->IsQueryTimeStampResult(iter.End, true);
-			//g_rhi->GetQueryTimeStampResult(iter.End);
-			//g_rhi->IsQueryTimeStampResult(iter.Start, true);
-			//g_rhi->GetQueryTimeStampResult(iter.Start);
-			//AddScopedProfileGPU(iter.Name, iter.End->TimeStamp - iter.Start->TimeStamp);
-			//jQueryTimePool::ReturnQueryTime(iter.Start);
-			g_rhi->GetQueryTimeStampResult(iter.Query);
+			if (g_rhi->CanWholeQueryTimeStampResult())
+			{
+				g_rhi->GetQueryTimeStampResultFromWholeStampArray(iter.Query, prevIndex, WholeQueryTimeStampArray);
+			}
+			else
+			{
+				g_rhi->GetQueryTimeStampResult(iter.Query);
+			}
 			AddScopedProfileGPU(iter.Name, iter.Query->TimeStampStartEnd[1] - iter.Query->TimeStampStartEnd[0]);
             jQueryTimePool::ReturnQueryTime(iter.Query);
 		}

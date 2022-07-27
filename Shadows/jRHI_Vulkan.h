@@ -656,8 +656,6 @@ struct jUniformBufferBlock_Vulkan : public IUniformBufferBlock
 
 struct jQueryPool_Vulkan : public jQueryPool
 {
-    static constexpr int32 MaxQueryPool = 512;
-
     virtual ~jQueryPool_Vulkan() {}
 
 	virtual bool Create() override;
@@ -1680,11 +1678,11 @@ public:
     virtual void ReleaseQueryTime(jQueryTime* queryTime) const override;
 	virtual void QueryTimeStampStart(const jQueryTime* queryTimeStamp) const override;
 	virtual void QueryTimeStampEnd(const jQueryTime* queryTimeStamp) const override;
-    virtual void QueryTimeStamp(const jQueryTime* queryTimeStamp) const override;
     virtual bool IsQueryTimeStampResult(const jQueryTime* queryTimeStamp, bool isWaitUntilAvailable) const override;
     virtual void GetQueryTimeStampResult(jQueryTime* queryTimeStamp) const override;
-    virtual void BeginQueryTimeElapsed(const jQueryTime* queryTimeElpased) const override;
-    virtual void EndQueryTimeElapsed(const jQueryTime* queryTimeElpased) const override;
+	virtual bool CanWholeQueryTimeStampResult() const override { return true; }
+	virtual std::vector<uint64> GetWholeQueryTimeStampResult(int32 InWatingResultIndex) const override;
+	virtual void GetQueryTimeStampResultFromWholeStampArray(jQueryTime* queryTimeStamp, int32 InWatingResultIndex, const std::vector<uint64>& wholeQueryTimeStampArray) const override;
 
 	static std::unordered_map<size_t, VkPipelineLayout> PipelineLayoutPool;
 	static std::unordered_map<size_t, jShaderBindings*> ShaderBindingPool;

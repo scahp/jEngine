@@ -175,7 +175,7 @@ struct jQueryTime_OpenGL : public jQueryTime
 {
 	virtual ~jQueryTime_OpenGL() {}
 
-	uint32 QueryId = 0;
+	uint32 QueryId[2] = { 0, 0 };
 };
 
 struct jQueryPrimitiveGenerated_OpenGL : public jQueryPrimitiveGenerated
@@ -297,11 +297,12 @@ public:
 	virtual void GenerateMips(const jTexture* texture) const override;
 	virtual jQueryTime* CreateQueryTime() const override;
 	virtual void ReleaseQueryTime(jQueryTime* queryTime) const override;
-	virtual void QueryTimeStamp(const jQueryTime* queryTimeStamp) const override;
+    virtual void QueryTimeStampStart(const jQueryTime* queryTimeStamp) const override;
+    virtual void QueryTimeStampEnd(const jQueryTime* queryTimeStamp) const override;
 	virtual bool IsQueryTimeStampResult(const jQueryTime* queryTimeStamp, bool isWaitUntilAvailable) const override;
 	virtual void GetQueryTimeStampResult(jQueryTime* queryTimeStamp) const override;
-	virtual void BeginQueryTimeElapsed(const jQueryTime* queryTimeElpased) const override;
-	virtual void EndQueryTimeElapsed(const jQueryTime* queryTimeElpased) const override;
+    virtual bool CanWholeQueryTimeStampResult() const override { return false; }
+	virtual std::vector<uint64> GetWholeQueryTimeStampResult(int32 InWatingResultIndex) const override { check(0); return std::vector<uint64>(); }
 	virtual void EnableWireframe(bool enable) const override;
 	virtual void SetImageTexture(int32 index, const jTexture* texture, EImageTextureAccessType type) const override;
 	virtual void SetPolygonMode(EFace face, EPolygonMode mode = EPolygonMode::FILL) override;

@@ -762,59 +762,64 @@ void jRHI_OpenGL::GenerateMips(const jTexture* texture) const
 jQueryTime* jRHI_OpenGL::CreateQueryTime() const
 {
 	auto queryTime = new jQueryTime_OpenGL();
-	glGenQueries(1, &queryTime->QueryId);
+	glGenQueries(2, &queryTime->QueryId[0]);
 	return queryTime;
 }
 
 void jRHI_OpenGL::ReleaseQueryTime(jQueryTime* queryTime) const 
 {
 	auto queryTime_gl = static_cast<jQueryTime_OpenGL*>(queryTime);
-	glDeleteQueries(1, &queryTime_gl->QueryId);
-	queryTime_gl->QueryId = 0;
+	glDeleteQueries(2, &queryTime_gl->QueryId[0]);
+	queryTime_gl->QueryId[0] = 0;
+	queryTime_gl->QueryId[1] = 0;
 	delete queryTime_gl;
 }
 
-void jRHI_OpenGL::QueryTimeStamp(const jQueryTime* queryTimeStamp) const
+void jRHI_OpenGL::QueryTimeStampStart(const jQueryTime* queryTimeStamp) const
 {
-	const auto queryTimeStamp_gl = static_cast<const jQueryTime_OpenGL*>(queryTimeStamp);
-	JASSERT(queryTimeStamp_gl->QueryId > 0);
-	glQueryCounter(queryTimeStamp_gl->QueryId, GL_TIMESTAMP);
+    const auto queryTimeStamp_gl = static_cast<const jQueryTime_OpenGL*>(queryTimeStamp);
+    JASSERT(queryTimeStamp_gl->QueryId[0] > 0);
+    glQueryCounter(queryTimeStamp_gl->QueryId[0], GL_TIMESTAMP);
+}
+
+void jRHI_OpenGL::QueryTimeStampEnd(const jQueryTime* queryTimeStamp) const
+{
+    const auto queryTimeStamp_gl = static_cast<const jQueryTime_OpenGL*>(queryTimeStamp);
+    JASSERT(queryTimeStamp_gl->QueryId[1] > 0);
+    glQueryCounter(queryTimeStamp_gl->QueryId[1], GL_TIMESTAMP);
 }
 
 bool jRHI_OpenGL::IsQueryTimeStampResult(const jQueryTime* queryTimeStamp, bool isWaitUntilAvailable) const
 {
 	auto queryTimeStamp_gl = static_cast<const jQueryTime_OpenGL*>(queryTimeStamp);
-	JASSERT(queryTimeStamp_gl->QueryId > 0);
-	uint32 available = 0;
+	JASSERT(queryTimeStamp_gl->QueryId[0] > 0);
+	JASSERT(queryTimeStamp_gl->QueryId[1] > 0);
+
+    uint32 availableStart = 0;
+    uint32 availableEnd = 0;
 	if (isWaitUntilAvailable)
 	{
-		while (!available)
-			glGetQueryObjectuiv(queryTimeStamp_gl->QueryId, GL_QUERY_RESULT_AVAILABLE, &available);
+		while (!availableStart)
+			glGetQueryObjectuiv(queryTimeStamp_gl->QueryId[0], GL_QUERY_RESULT_AVAILABLE, &availableStart);
+
+        while (!availableEnd)
+            glGetQueryObjectuiv(queryTimeStamp_gl->QueryId[1], GL_QUERY_RESULT_AVAILABLE, &availableEnd);
 	}
 	else
 	{
-		glGetQueryObjectuiv(queryTimeStamp_gl->QueryId, GL_QUERY_RESULT_AVAILABLE, &available);
+		glGetQueryObjectuiv(queryTimeStamp_gl->QueryId[0], GL_QUERY_RESULT_AVAILABLE, &availableStart);
+		glGetQueryObjectuiv(queryTimeStamp_gl->QueryId[1], GL_QUERY_RESULT_AVAILABLE, &availableEnd);
 	}
-	return !!available;
+	return (availableStart && availableEnd);
 }
 
 void jRHI_OpenGL::GetQueryTimeStampResult(jQueryTime* queryTimeStamp) const
 {
 	auto queryTimeStamp_gl = static_cast<jQueryTime_OpenGL*>(queryTimeStamp);
-	JASSERT(queryTimeStamp_gl->QueryId > 0);
-	glGetQueryObjectui64v(queryTimeStamp_gl->QueryId, GL_QUERY_RESULT, &queryTimeStamp_gl->TimeStamp);
-}
-
-void jRHI_OpenGL::BeginQueryTimeElapsed(const jQueryTime* queryTimeElpased) const
-{
-	const auto queryTimeElpased_gl = static_cast<const jQueryTime_OpenGL*>(queryTimeElpased);
-	JASSERT(queryTimeElpased_gl->QueryId > 0);
-	glBeginQuery(GL_TIME_ELAPSED, queryTimeElpased_gl->QueryId);
-}
-
-void jRHI_OpenGL::EndQueryTimeElapsed(const jQueryTime* queryTimeElpased) const 
-{
-	glEndQuery(GL_TIME_ELAPSED);
+	JASSERT(queryTimeStamp_gl->QueryId[0] > 0);
+	JASSERT(queryTimeStamp_gl->QueryId[1] > 0);
+	glGetQueryObjectui64v(queryTimeStamp_gl->QueryId[0], GL_QUERY_RESULT, &queryTimeStamp_gl->TimeStampStartEnd[0]);
+	glGetQueryObjectui64v(queryTimeStamp_gl->QueryId[1], GL_QUERY_RESULT, &queryTimeStamp_gl->TimeStampStartEnd[1]);
 }
 
 void jRHI_OpenGL::SetPolygonMode(EFace face, EPolygonMode mode)

@@ -169,4 +169,6 @@ inline void hash_combine(std::size_t& seed, const T& v)
 			return hash;\
 		}();
 
+extern const uint32 MaxQueryTimeCount;
+
 #endif //PCH_H

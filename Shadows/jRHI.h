@@ -456,9 +456,6 @@ struct jQueryTime
 	virtual ~jQueryTime() {}
 	virtual void Init() {}
 
-	uint64 TimeStamp = 0;
-
-	// 이걸로 교체 예정
 	uint64 TimeStampStartEnd[2] = { 0, 0 };
 };
 
@@ -936,11 +933,11 @@ public:
 	virtual void ReleaseQueryTime(jQueryTime* queryTime) const {}
 	virtual void QueryTimeStampStart(const jQueryTime* queryTimeStamp) const {}
 	virtual void QueryTimeStampEnd(const jQueryTime* queryTimeStamp) const {}
-	virtual void QueryTimeStamp(const jQueryTime* queryTimeStamp) const {}
 	virtual bool IsQueryTimeStampResult(const jQueryTime* queryTimeStamp, bool isWaitUntilAvailable) const { return false; }
 	virtual void GetQueryTimeStampResult(jQueryTime* queryTimeStamp) const {}
-	virtual void BeginQueryTimeElapsed(const jQueryTime* queryTimeElpased) const {}
-	virtual void EndQueryTimeElapsed(const jQueryTime* queryTimeElpased) const {}
+	virtual bool CanWholeQueryTimeStampResult() const { return false; }
+	virtual std::vector<uint64> GetWholeQueryTimeStampResult(int32 InWatingResultIndex) const { check(0);  return std::vector<uint64>(); }
+	virtual void GetQueryTimeStampResultFromWholeStampArray(jQueryTime* queryTimeStamp, int32 InWatingResultIndex, const std::vector<uint64>& wholeQueryTimeStampArray) const {}
 	virtual void EnableWireframe(bool enable) const {}
 	virtual void SetImageTexture(int32 index, const jTexture* texture, EImageTextureAccessType type) const {}
 	virtual void SetPolygonMode(EFace face, EPolygonMode mode = EPolygonMode::FILL) {}
