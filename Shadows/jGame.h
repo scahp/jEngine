@@ -1,6 +1,4 @@
 ﻿#pragma once
-#include "jShadowTypes.h"
-#include "jPostProcess.h"
 
 class jRHI;
 extern jRHI* g_rhi;
@@ -52,8 +50,6 @@ public:
 
 	void Update(float deltaTime);
 
-	void UpdateAppSetting();
-
 	void OnMouseButton();
 	void OnMouseMove(int32 xOffset, int32 yOffset);
 	void Teardown();
@@ -65,24 +61,6 @@ public:
 	jSpotLight* SpotLight = nullptr;
 	jLight* AmbientLight = nullptr;
 	jCamera* MainCamera = nullptr;
-
-	jObject* Sphere = nullptr;
-
-	jRenderer* Renderer = nullptr;
-
-	std::map<EShadowType, jRenderer*> ShadowRendererMap;
-	EShadowType ShadowType = EShadowType::MAX;
-
-	jRenderer* DeferredRenderer = nullptr;
-	jRenderer* ForwardRenderer = nullptr;
-
-	jPipelineSet* ShadowVolumePipelineSet = nullptr;
-	std::map<EShadowMapType, jPipelineSet*> ShadowPipelineSetMap;
-	std::map<EShadowMapType, jPipelineSet*> ShadowPoissonSamplePipelineSetMap;
-
-	EShadowMapType CurrentShadowMapType = EShadowMapType::SSM;
-	bool UsePoissonSample = false;
-	EShadowType CurrentShadowType = EShadowType::MAX;
 
 	jObject* DirectionalLightInfo = nullptr;
 	jObject* PointLightInfo = nullptr;

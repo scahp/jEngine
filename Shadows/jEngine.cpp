@@ -1,11 +1,7 @@
 ﻿#include "pch.h"
 #include "jEngine.h"
-#include "jAppSettings.h"
-#include "jShadowAppProperties.h"
-#include "jPipeline.h"
 #include "jShader.h"
 #include "jPerformanceProfile.h"
-#include "jSamplerStatePool.h"
 
 jEngine::jEngine()
 {
@@ -15,8 +11,6 @@ jEngine::jEngine()
 jEngine::~jEngine()
 {
 	Game.Teardown();
-
-	jShadowAppSettingProperties::GetInstance().Teardown(jAppSettings::GetInstance().Get("MainPannel"));
 }
 
 void jEngine::Init()

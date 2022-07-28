@@ -1,632 +1,561 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="Source Files">
+    <Filter Include="Code">
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
-    <Filter Include="Header Files">
-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;hm;inl;inc;ipp;xsd</Extensions>
+    <Filter Include="Code\RHI">
+      <UniqueIdentifier>{50ebfba9-291a-4c10-8bc4-aece5da26c85}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Resource Files">
-      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
-      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
-    </Filter>
-    <Filter Include="Shaders">
-      <UniqueIdentifier>{6f4943cf-ecf8-4183-a927-7a0305aeaf37}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Math">
+    <Filter Include="Code\Math">
       <UniqueIdentifier>{2b3ef8ae-2267-4362-b802-d9ca949d9d43}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Shaders\shadowmap">
-      <UniqueIdentifier>{527d965c-4437-4bf2-9733-9273495c8649}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Shaders\shadowvolume">
-      <UniqueIdentifier>{d313b9f5-56dd-4257-8c65-d60c19a35cc0}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Shaders\fullscreen">
-      <UniqueIdentifier>{a4e5db5f-666f-49b8-88c9-a503fa4162dc}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Shaders\compute">
-      <UniqueIdentifier>{3d6c23d8-7b15-4ec7-85cb-fe2c92541182}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="External">
-      <UniqueIdentifier>{73008294-ac15-42a9-9361-9c43b423dcc1}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="External\cityhash">
-      <UniqueIdentifier>{2c2f005e-cfe1-438f-999d-ee3169b02878}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core">
-      <UniqueIdentifier>{624b473a-1da7-4d3c-aab8-9738c80fead3}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Shaders\Vulkan">
-      <UniqueIdentifier>{6027e24a-4ae3-4dbf-8db8-f58d427ed687}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="External\IMGUI">
-      <UniqueIdentifier>{cd851a30-9515-458d-bda7-72967629a5ff}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ImGui">
+    <Filter Include="Code\ImGui">
       <UniqueIdentifier>{c08066e9-ebf0-484b-be22-007f35ad5e13}</UniqueIdentifier>
     </Filter>
-    <Filter Include="External\EASTL">
+    <Filter Include="Code\Core">
+      <UniqueIdentifier>{624b473a-1da7-4d3c-aab8-9738c80fead3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Code\External">
+      <UniqueIdentifier>{73008294-ac15-42a9-9361-9c43b423dcc1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Code\External\cityhash">
+      <UniqueIdentifier>{2c2f005e-cfe1-438f-999d-ee3169b02878}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Code\External\IMGUI">
+      <UniqueIdentifier>{cd851a30-9515-458d-bda7-72967629a5ff}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Code\External\EASTL">
       <UniqueIdentifier>{b4a2146e-541a-46df-8ee3-1ad8743a38e5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Code\Shaders">
+      <UniqueIdentifier>{6f4943cf-ecf8-4183-a927-7a0305aeaf37}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Code\Shaders\shadowmap">
+      <UniqueIdentifier>{527d965c-4437-4bf2-9733-9273495c8649}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Code\Shaders\shadowvolume">
+      <UniqueIdentifier>{d313b9f5-56dd-4257-8c65-d60c19a35cc0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Code\Shaders\fullscreen">
+      <UniqueIdentifier>{a4e5db5f-666f-49b8-88c9-a503fa4162dc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Code\Shaders\compute">
+      <UniqueIdentifier>{3d6c23d8-7b15-4ec7-85cb-fe2c92541182}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Code\Shaders\Vulkan">
+      <UniqueIdentifier>{6027e24a-4ae3-4dbf-8db8-f58d427ed687}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="pch.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jEngine.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jGame.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jCamera.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jLight.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jRenderer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jObject.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jPrimitiveUtil.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jInputEvent.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jUtil.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jRHI.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jRHI_OpenGL.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jRHI_DirectX11.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jRHI_Vulkan.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jCollision.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jRenderObject.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jFrameBufferPool.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jRHIType.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="Math\MathUtility.h">
-      <Filter>Math</Filter>
+      <Filter>Code\Math</Filter>
     </ClInclude>
     <ClInclude Include="Math\Matrix.h">
-      <Filter>Math</Filter>
+      <Filter>Code\Math</Filter>
     </ClInclude>
     <ClInclude Include="Math\Vector.h">
-      <Filter>Math</Filter>
+      <Filter>Code\Math</Filter>
     </ClInclude>
     <ClInclude Include="jFile.h">
-      <Filter>Source Files</Filter>
+      <Filter>Code</Filter>
     </ClInclude>
     <ClInclude Include="Math\Plane.h">
-      <Filter>Math</Filter>
-    </ClInclude>
-    <ClInclude Include="jVertexAdjacency.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jShadowVolume.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jAppSettings.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jShadowVolumeTypes.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jShadowAppProperties.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jShadowTypes.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jImageFileLoader.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="TGALoader.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="lodepng.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jHairModelLoader.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jMeshObject.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jModelLoader.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jPostProcess.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jDeferredRenderer.h">
-      <Filter>Source Files</Filter>
+      <Filter>Code\Math</Filter>
     </ClInclude>
     <ClInclude Include="jGBuffer.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jPipeline.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jForwardRenderer.h">
-      <Filter>Source Files</Filter>
+      <Filter>Code</Filter>
     </ClInclude>
     <ClInclude Include="jShader.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jPerformanceProfile.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jSamplerStatePool.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="stb_image.h">
-      <Filter>Header Files</Filter>
+      <Filter>Code</Filter>
     </ClInclude>
     <ClInclude Include="External\cityhash\city.h">
-      <Filter>External\cityhash</Filter>
+      <Filter>Code\External\cityhash</Filter>
     </ClInclude>
     <ClInclude Include="External\cityhash\citycrc.h">
-      <Filter>External\cityhash</Filter>
+      <Filter>Code\External\cityhash</Filter>
     </ClInclude>
     <ClInclude Include="Core\jName.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="jSpirvHelper.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jRenderTargetPool.h">
-      <Filter>Header Files</Filter>
+      <Filter>Code\Core</Filter>
     </ClInclude>
     <ClInclude Include="External\IMGUI\imgui_impl_vulkan.h">
-      <Filter>External\IMGUI</Filter>
+      <Filter>Code\External\IMGUI</Filter>
     </ClInclude>
     <ClInclude Include="External\IMGUI\imgui.h">
-      <Filter>External\IMGUI</Filter>
+      <Filter>Code\External\IMGUI</Filter>
     </ClInclude>
     <ClInclude Include="External\IMGUI\imgui_impl_glfw.h">
-      <Filter>External\IMGUI</Filter>
+      <Filter>Code\External\IMGUI</Filter>
     </ClInclude>
     <ClInclude Include="External\IMGUI\imgui_impl_opengl3.h">
-      <Filter>External\IMGUI</Filter>
+      <Filter>Code\External\IMGUI</Filter>
     </ClInclude>
     <ClInclude Include="External\IMGUI\imstb_rectpack.h">
-      <Filter>External\IMGUI</Filter>
+      <Filter>Code\External\IMGUI</Filter>
     </ClInclude>
     <ClInclude Include="External\IMGUI\imstb_textedit.h">
-      <Filter>External\IMGUI</Filter>
+      <Filter>Code\External\IMGUI</Filter>
     </ClInclude>
     <ClInclude Include="External\IMGUI\imstb_truetype.h">
-      <Filter>External\IMGUI</Filter>
+      <Filter>Code\External\IMGUI</Filter>
     </ClInclude>
     <ClInclude Include="External\IMGUI\imgui_internal.h">
-      <Filter>External\IMGUI</Filter>
+      <Filter>Code\External\IMGUI</Filter>
     </ClInclude>
     <ClInclude Include="ImGui\jImGui.h">
-      <Filter>ImGui</Filter>
+      <Filter>Code\ImGui</Filter>
+    </ClInclude>
+    <ClInclude Include="jCamera.h">
+      <Filter>Code</Filter>
+    </ClInclude>
+    <ClInclude Include="jCollision.h">
+      <Filter>Code</Filter>
+    </ClInclude>
+    <ClInclude Include="jEngine.h">
+      <Filter>Code</Filter>
+    </ClInclude>
+    <ClInclude Include="jFrameBufferPool.h">
+      <Filter>Code</Filter>
+    </ClInclude>
+    <ClInclude Include="jGame.h">
+      <Filter>Code</Filter>
+    </ClInclude>
+    <ClInclude Include="jHairModelLoader.h">
+      <Filter>Code</Filter>
+    </ClInclude>
+    <ClInclude Include="jImageFileLoader.h">
+      <Filter>Code</Filter>
+    </ClInclude>
+    <ClInclude Include="jInputEvent.h">
+      <Filter>Code</Filter>
+    </ClInclude>
+    <ClInclude Include="jLight.h">
+      <Filter>Code</Filter>
+    </ClInclude>
+    <ClInclude Include="jMeshObject.h">
+      <Filter>Code</Filter>
+    </ClInclude>
+    <ClInclude Include="jModelLoader.h">
+      <Filter>Code</Filter>
+    </ClInclude>
+    <ClInclude Include="jObject.h">
+      <Filter>Code</Filter>
+    </ClInclude>
+    <ClInclude Include="jPerformanceProfile.h">
+      <Filter>Code</Filter>
+    </ClInclude>
+    <ClInclude Include="jPrimitiveUtil.h">
+      <Filter>Code</Filter>
+    </ClInclude>
+    <ClInclude Include="jRenderObject.h">
+      <Filter>Code</Filter>
+    </ClInclude>
+    <ClInclude Include="jRenderTargetPool.h">
+      <Filter>Code</Filter>
+    </ClInclude>
+    <ClInclude Include="jRHI.h">
+      <Filter>Code</Filter>
+    </ClInclude>
+    <ClInclude Include="jSpirvHelper.h">
+      <Filter>Code</Filter>
+    </ClInclude>
+    <ClInclude Include="jUtil.h">
+      <Filter>Code</Filter>
+    </ClInclude>
+    <ClInclude Include="lodepng.h">
+      <Filter>Code</Filter>
+    </ClInclude>
+    <ClInclude Include="pch.h">
+      <Filter>Code</Filter>
+    </ClInclude>
+    <ClInclude Include="stb_image.h">
+      <Filter>Code</Filter>
+    </ClInclude>
+    <ClInclude Include="TGALoader.h">
+      <Filter>Code</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\jRHI_DirectX11.h">
+      <Filter>Code\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\jRHI_OpenGL.h">
+      <Filter>Code\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\jRHI_Vulkan.h">
+      <Filter>Code\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\jRHIType.h">
+      <Filter>Code\RHI</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Code</Filter>
     </ClCompile>
     <ClCompile Include="glad.c">
-      <Filter>Source Files</Filter>
+      <Filter>Code</Filter>
     </ClCompile>
     <ClCompile Include="jEngine.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Code</Filter>
     </ClCompile>
     <ClCompile Include="jGame.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Code</Filter>
     </ClCompile>
     <ClCompile Include="jCamera.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Code</Filter>
     </ClCompile>
     <ClCompile Include="jLight.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="jRenderer.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Code</Filter>
     </ClCompile>
     <ClCompile Include="jObject.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Code</Filter>
     </ClCompile>
     <ClCompile Include="jPrimitiveUtil.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Code</Filter>
     </ClCompile>
     <ClCompile Include="jInputEvent.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Code</Filter>
     </ClCompile>
     <ClCompile Include="jUtil.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Code</Filter>
     </ClCompile>
     <ClCompile Include="jRHI.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="jRHI_OpenGL.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="jRHI_DirectX11.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="jRHI_Vulkan.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Code</Filter>
     </ClCompile>
     <ClCompile Include="jCollision.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Code</Filter>
     </ClCompile>
     <ClCompile Include="jRenderObject.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Code</Filter>
     </ClCompile>
     <ClCompile Include="jFrameBufferPool.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Code</Filter>
     </ClCompile>
     <ClCompile Include="Math\Matrix.cpp">
-      <Filter>Math</Filter>
+      <Filter>Code\Math</Filter>
     </ClCompile>
     <ClCompile Include="Math\Vector.cpp">
-      <Filter>Math</Filter>
+      <Filter>Code\Math</Filter>
     </ClCompile>
     <ClCompile Include="jFile.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Code</Filter>
     </ClCompile>
     <ClCompile Include="Math\Plane.cpp">
-      <Filter>Math</Filter>
-    </ClCompile>
-    <ClCompile Include="jVertexAdjacency.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="jShadowVolume.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="jAppSettings.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="jShadowAppProperties.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Code\Math</Filter>
     </ClCompile>
     <ClCompile Include="jImageFileLoader.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Code</Filter>
     </ClCompile>
     <ClCompile Include="TGALoader.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Code</Filter>
     </ClCompile>
     <ClCompile Include="loadpng.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Code</Filter>
     </ClCompile>
     <ClCompile Include="Main.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Code</Filter>
     </ClCompile>
     <ClCompile Include="jHairModelLoader.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Code</Filter>
     </ClCompile>
     <ClCompile Include="jMeshObject.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Code</Filter>
     </ClCompile>
     <ClCompile Include="jModelLoader.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="jPostProcess.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="jDeferredRenderer.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Code</Filter>
     </ClCompile>
     <ClCompile Include="jGBuffer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="jPipeline.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="jForwardRenderer.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Code</Filter>
     </ClCompile>
     <ClCompile Include="jShader.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Code</Filter>
     </ClCompile>
     <ClCompile Include="jPerformanceProfile.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="jSamplerStatePool.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Code</Filter>
     </ClCompile>
     <ClCompile Include="External\cityhash\city.cc">
-      <Filter>External\cityhash</Filter>
+      <Filter>Code\External\cityhash</Filter>
     </ClCompile>
     <ClCompile Include="Core\jName.cpp">
-      <Filter>Core</Filter>
+      <Filter>Code\Core</Filter>
     </ClCompile>
     <ClCompile Include="jSpirvHelper.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Code</Filter>
     </ClCompile>
     <ClCompile Include="jRenderTargetPool.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Code</Filter>
     </ClCompile>
     <ClCompile Include="External\IMGUI\imgui_impl_vulkan.cpp">
-      <Filter>External\IMGUI</Filter>
+      <Filter>Code\External\IMGUI</Filter>
     </ClCompile>
     <ClCompile Include="External\IMGUI\imgui.cpp">
-      <Filter>External\IMGUI</Filter>
+      <Filter>Code\External\IMGUI</Filter>
     </ClCompile>
     <ClCompile Include="External\IMGUI\imgui_impl_glfw.cpp">
-      <Filter>External\IMGUI</Filter>
+      <Filter>Code\External\IMGUI</Filter>
     </ClCompile>
     <ClCompile Include="External\IMGUI\imgui_impl_opengl3.cpp">
-      <Filter>External\IMGUI</Filter>
+      <Filter>Code\External\IMGUI</Filter>
     </ClCompile>
     <ClCompile Include="External\IMGUI\imgui_widgets.cpp">
-      <Filter>External\IMGUI</Filter>
+      <Filter>Code\External\IMGUI</Filter>
     </ClCompile>
     <ClCompile Include="External\IMGUI\imgui_draw.cpp">
-      <Filter>External\IMGUI</Filter>
+      <Filter>Code\External\IMGUI</Filter>
     </ClCompile>
     <ClCompile Include="External\IMGUI\imgui_demo.cpp">
-      <Filter>External\IMGUI</Filter>
+      <Filter>Code\External\IMGUI</Filter>
     </ClCompile>
     <ClCompile Include="ImGui\jImGui.cpp">
-      <Filter>ImGui</Filter>
+      <Filter>Code\ImGui</Filter>
     </ClCompile>
     <ClCompile Include="External\EASTL\source\allocator_eastl.cpp">
-      <Filter>External\EASTL</Filter>
+      <Filter>Code\External\EASTL</Filter>
     </ClCompile>
     <ClCompile Include="External\EASTL\source\assert.cpp">
-      <Filter>External\EASTL</Filter>
+      <Filter>Code\External\EASTL</Filter>
     </ClCompile>
     <ClCompile Include="External\EASTL\source\atomic.cpp">
-      <Filter>External\EASTL</Filter>
+      <Filter>Code\External\EASTL</Filter>
     </ClCompile>
     <ClCompile Include="External\EASTL\source\fixed_pool.cpp">
-      <Filter>External\EASTL</Filter>
+      <Filter>Code\External\EASTL</Filter>
     </ClCompile>
     <ClCompile Include="External\EASTL\source\hashtable.cpp">
-      <Filter>External\EASTL</Filter>
+      <Filter>Code\External\EASTL</Filter>
     </ClCompile>
     <ClCompile Include="External\EASTL\source\intrusive_list.cpp">
-      <Filter>External\EASTL</Filter>
+      <Filter>Code\External\EASTL</Filter>
     </ClCompile>
     <ClCompile Include="External\EASTL\source\numeric_limits.cpp">
-      <Filter>External\EASTL</Filter>
+      <Filter>Code\External\EASTL</Filter>
     </ClCompile>
     <ClCompile Include="External\EASTL\source\red_black_tree.cpp">
-      <Filter>External\EASTL</Filter>
+      <Filter>Code\External\EASTL</Filter>
     </ClCompile>
     <ClCompile Include="External\EASTL\source\string.cpp">
-      <Filter>External\EASTL</Filter>
+      <Filter>Code\External\EASTL</Filter>
     </ClCompile>
     <ClCompile Include="External\EASTL\source\thread_support.cpp">
-      <Filter>External\EASTL</Filter>
+      <Filter>Code\External\EASTL</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\jRHI_OpenGL.cpp">
+      <Filter>Code\RHI</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\jRHI_Vulkan.cpp">
+      <Filter>Code\RHI</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\jRHI_DirectX11.cpp">
+      <Filter>Code\RHI</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="Shaders\color_only_fs.glsl">
-      <Filter>Shaders</Filter>
+      <Filter>Code\Shaders</Filter>
     </None>
     <None Include="Shaders\color_only_vs.glsl">
-      <Filter>Shaders</Filter>
+      <Filter>Code\Shaders</Filter>
     </None>
     <None Include="Shaders\tex_ui_vs.glsl">
-      <Filter>Shaders</Filter>
+      <Filter>Code\Shaders</Filter>
     </None>
     <None Include="Shaders\tex_ui_fs.glsl">
-      <Filter>Shaders</Filter>
+      <Filter>Code\Shaders</Filter>
     </None>
     <None Include="Shaders\fs_shadowMap.glsl">
-      <Filter>Shaders</Filter>
+      <Filter>Code\Shaders</Filter>
     </None>
     <None Include="Shaders\vs_shadowMap.glsl">
-      <Filter>Shaders</Filter>
+      <Filter>Code\Shaders</Filter>
     </None>
     <None Include="Shaders\common.glsl">
-      <Filter>Shaders</Filter>
+      <Filter>Code\Shaders</Filter>
     </None>
     <None Include="Shaders\shadow.glsl">
-      <Filter>Shaders</Filter>
+      <Filter>Code\Shaders</Filter>
     </None>
     <None Include="Shaders\shadowmap\fs.glsl">
-      <Filter>Shaders\shadowmap</Filter>
+      <Filter>Code\Shaders\shadowmap</Filter>
     </None>
     <None Include="Shaders\shadowmap\vs.glsl">
-      <Filter>Shaders\shadowmap</Filter>
+      <Filter>Code\Shaders\shadowmap</Filter>
     </None>
     <None Include="Shaders\shadowmap\fs_omniDirectionalShadowMap.glsl">
-      <Filter>Shaders\shadowmap</Filter>
+      <Filter>Code\Shaders\shadowmap</Filter>
     </None>
     <None Include="Shaders\shadowmap\vs_omniDirectionalShadowMap.glsl">
-      <Filter>Shaders\shadowmap</Filter>
+      <Filter>Code\Shaders\shadowmap</Filter>
     </None>
     <None Include="Shaders\shadowvolume\fs.glsl">
-      <Filter>Shaders\shadowvolume</Filter>
+      <Filter>Code\Shaders\shadowvolume</Filter>
     </None>
     <None Include="Shaders\shadowvolume\vs.glsl">
-      <Filter>Shaders\shadowvolume</Filter>
+      <Filter>Code\Shaders\shadowvolume</Filter>
     </None>
     <None Include="Shaders\shadowvolume\fs_ambientonly.glsl">
-      <Filter>Shaders\shadowvolume</Filter>
+      <Filter>Code\Shaders\shadowvolume</Filter>
     </None>
     <None Include="Shaders\fullscreen\fs_blur.glsl">
-      <Filter>Shaders\fullscreen</Filter>
+      <Filter>Code\Shaders\fullscreen</Filter>
     </None>
     <None Include="Shaders\fullscreen\fs_omnidirectional_blur.glsl">
-      <Filter>Shaders\fullscreen</Filter>
+      <Filter>Code\Shaders\fullscreen</Filter>
     </None>
     <None Include="Shaders\shadowmap\fs_EVSM.glsl">
-      <Filter>Shaders\shadowmap</Filter>
+      <Filter>Code\Shaders\shadowmap</Filter>
     </None>
     <None Include="Shaders\shadowmap\fs_exponentialShadowMap.glsl">
-      <Filter>Shaders\shadowmap</Filter>
+      <Filter>Code\Shaders\shadowmap</Filter>
     </None>
     <None Include="Shaders\shadowmap\fs_omniDirectionalEVSM.glsl">
-      <Filter>Shaders\shadowmap</Filter>
+      <Filter>Code\Shaders\shadowmap</Filter>
     </None>
     <None Include="Shaders\shadowmap\fs_omniDirectionalExponentialShadowMap.glsl">
-      <Filter>Shaders\shadowmap</Filter>
+      <Filter>Code\Shaders\shadowmap</Filter>
     </None>
     <None Include="Shaders\shadowmap\fs_shadowMap.glsl">
-      <Filter>Shaders\shadowmap</Filter>
+      <Filter>Code\Shaders\shadowmap</Filter>
     </None>
     <None Include="Shaders\shadowmap\fs_varianceShadowMap.glsl">
-      <Filter>Shaders\shadowmap</Filter>
+      <Filter>Code\Shaders\shadowmap</Filter>
     </None>
     <None Include="Shaders\shadowmap\vs_EVSM.glsl">
-      <Filter>Shaders\shadowmap</Filter>
+      <Filter>Code\Shaders\shadowmap</Filter>
     </None>
     <None Include="Shaders\shadowmap\vs_shadowMap.glsl">
-      <Filter>Shaders\shadowmap</Filter>
+      <Filter>Code\Shaders\shadowmap</Filter>
     </None>
     <None Include="Shaders\shadowmap\vs_varianceShadowMap.glsl">
-      <Filter>Shaders\shadowmap</Filter>
+      <Filter>Code\Shaders\shadowmap</Filter>
     </None>
     <None Include="Shaders\fs_boundvolume.glsl">
-      <Filter>Shaders</Filter>
+      <Filter>Code\Shaders</Filter>
     </None>
     <None Include="Shaders\vs_boundvolume.glsl">
-      <Filter>Shaders</Filter>
+      <Filter>Code\Shaders</Filter>
     </None>
     <None Include="Shaders\tex_fs.glsl">
-      <Filter>Shaders</Filter>
+      <Filter>Code\Shaders</Filter>
     </None>
     <None Include="Shaders\tex_vs.glsl">
-      <Filter>Shaders</Filter>
+      <Filter>Code\Shaders</Filter>
     </None>
     <None Include="Shaders\shadowmap\fs_hair.glsl">
-      <Filter>Shaders\shadowmap</Filter>
+      <Filter>Code\Shaders\shadowmap</Filter>
     </None>
     <None Include="Shaders\shadowmap\vs_hair.glsl">
-      <Filter>Shaders\shadowmap</Filter>
+      <Filter>Code\Shaders\shadowmap</Filter>
     </None>
     <None Include="Shaders\compute\compute_example.glsl">
-      <Filter>Shaders\compute</Filter>
+      <Filter>Code\Shaders\compute</Filter>
     </None>
     <None Include="Shaders\shadowmap\fs_deepShadowMap.glsl">
-      <Filter>Shaders\shadowmap</Filter>
+      <Filter>Code\Shaders\shadowmap</Filter>
     </None>
     <None Include="Shaders\compute\compute_sort_linkedlist.glsl">
-      <Filter>Shaders\compute</Filter>
+      <Filter>Code\Shaders\compute</Filter>
     </None>
     <None Include="Shaders\shadowmap\fs_deferred.glsl">
-      <Filter>Shaders\shadowmap</Filter>
+      <Filter>Code\Shaders\shadowmap</Filter>
     </None>
     <None Include="Shaders\shadowmap\vs_deferred.glsl">
-      <Filter>Shaders\shadowmap</Filter>
+      <Filter>Code\Shaders\shadowmap</Filter>
     </None>
     <None Include="Shaders\fullscreen\fs_deepshadow.glsl">
-      <Filter>Shaders\fullscreen</Filter>
+      <Filter>Code\Shaders\fullscreen</Filter>
     </None>
     <None Include="Shaders\compute\compute_link_linkedlist.glsl">
-      <Filter>Shaders\compute</Filter>
+      <Filter>Code\Shaders\compute</Filter>
     </None>
     <None Include="Shaders\fullscreen\fs_expdeepshadow.glsl">
-      <Filter>Shaders\fullscreen</Filter>
+      <Filter>Code\Shaders\fullscreen</Filter>
     </None>
     <None Include="Shaders\shadowmap\fs_expDeepShadowMap.glsl">
-      <Filter>Shaders\shadowmap</Filter>
+      <Filter>Code\Shaders\shadowmap</Filter>
     </None>
     <None Include="Shaders\shadowmap\fs_expDeferred.glsl">
-      <Filter>Shaders\shadowmap</Filter>
+      <Filter>Code\Shaders\shadowmap</Filter>
     </None>
     <None Include="Shaders\fullscreen\fs_deepshadow_aa.glsl">
-      <Filter>Shaders\fullscreen</Filter>
+      <Filter>Code\Shaders\fullscreen</Filter>
     </None>
     <None Include="Shaders\shadowmap\vs_expDeepShadowMap.glsl">
-      <Filter>Shaders\shadowmap</Filter>
+      <Filter>Code\Shaders\shadowmap</Filter>
     </None>
     <None Include="Shaders\shadowmap\gs_omniDirectionalShadowMap.glsl">
-      <Filter>Shaders\shadowmap</Filter>
+      <Filter>Code\Shaders\shadowmap</Filter>
     </None>
     <None Include="Shaders\fs_red.glsl">
-      <Filter>Shaders</Filter>
+      <Filter>Code\Shaders</Filter>
     </None>
     <None Include="Shaders\vs_red.glsl">
-      <Filter>Shaders</Filter>
+      <Filter>Code\Shaders</Filter>
     </None>
     <None Include="Shaders\fs_test.glsl">
-      <Filter>Shaders</Filter>
+      <Filter>Code\Shaders</Filter>
     </None>
     <None Include="Shaders\vs_test.glsl">
-      <Filter>Shaders</Filter>
+      <Filter>Code\Shaders</Filter>
     </None>
     <None Include="Shaders\shadowmap\gs_cascadeShadowMap.glsl">
-      <Filter>Shaders\shadowmap</Filter>
+      <Filter>Code\Shaders\shadowmap</Filter>
     </None>
     <None Include="Shaders\fullscreen\fs_tonemap.glsl">
-      <Filter>Shaders\fullscreen</Filter>
+      <Filter>Code\Shaders\fullscreen</Filter>
     </None>
     <None Include="Shaders\fullscreen\fs_luminanceMap.glsl">
-      <Filter>Shaders\fullscreen</Filter>
+      <Filter>Code\Shaders\fullscreen</Filter>
     </None>
     <None Include="Shaders\fullscreen\fs_adaptiveLuminance.glsl">
-      <Filter>Shaders\fullscreen</Filter>
+      <Filter>Code\Shaders\fullscreen</Filter>
     </None>
     <None Include="Shaders\fullscreen\vs_fullscreen_common.glsl">
-      <Filter>Shaders\fullscreen</Filter>
+      <Filter>Code\Shaders\fullscreen</Filter>
     </None>
     <None Include="Shaders\fullscreen\fs_bloom_threshold.glsl">
-      <Filter>Shaders\fullscreen</Filter>
+      <Filter>Code\Shaders\fullscreen</Filter>
     </None>
     <None Include="Shaders\fullscreen\fs_scale.glsl">
-      <Filter>Shaders\fullscreen</Filter>
+      <Filter>Code\Shaders\fullscreen</Filter>
     </None>
     <None Include="Shaders\fullscreen\fs_blur_gaussian_horizontal.glsl">
-      <Filter>Shaders\fullscreen</Filter>
+      <Filter>Code\Shaders\fullscreen</Filter>
     </None>
     <None Include="Shaders\fullscreen\fs_blur_gaussian_vertical.glsl">
-      <Filter>Shaders\fullscreen</Filter>
+      <Filter>Code\Shaders\fullscreen</Filter>
     </None>
     <None Include="Shaders\shadowvolume\fs_shadowvolume_gpu.glsl">
-      <Filter>Shaders\shadowvolume</Filter>
+      <Filter>Code\Shaders\shadowvolume</Filter>
     </None>
     <None Include="Shaders\shadowvolume\gs_shadowvolume_gpu.glsl">
-      <Filter>Shaders\shadowvolume</Filter>
+      <Filter>Code\Shaders\shadowvolume</Filter>
     </None>
     <None Include="Shaders\shadowvolume\vs_shadowvolume_gpu.glsl">
-      <Filter>Shaders\shadowvolume</Filter>
+      <Filter>Code\Shaders\shadowvolume</Filter>
     </None>
     <None Include="Shaders\shadowvolume\fs_shadowvolume_cpu.glsl">
-      <Filter>Shaders\shadowvolume</Filter>
+      <Filter>Code\Shaders\shadowvolume</Filter>
     </None>
     <None Include="Shaders\shadowvolume\vs_shadowvolume_cpu.glsl">
-      <Filter>Shaders\shadowvolume</Filter>
+      <Filter>Code\Shaders\shadowvolume</Filter>
     </None>
     <None Include="Shaders\fs_graph.glsl">
-      <Filter>Shaders</Filter>
+      <Filter>Code\Shaders</Filter>
     </None>
     <None Include="Shaders\vs_graph.glsl">
-      <Filter>Shaders</Filter>
+      <Filter>Code\Shaders</Filter>
     </None>
     <None Include="Shaders\Vulkan\shader_fs.glsl">
-      <Filter>Shaders\Vulkan</Filter>
+      <Filter>Code\Shaders\Vulkan</Filter>
     </None>
     <None Include="Shaders\Vulkan\shader_vs.glsl">
-      <Filter>Shaders\Vulkan</Filter>
+      <Filter>Code\Shaders\Vulkan</Filter>
     </None>
     <None Include="Shaders\Vulkan\shadow_vs.glsl">
-      <Filter>Shaders\Vulkan</Filter>
+      <Filter>Code\Shaders\Vulkan</Filter>
     </None>
     <None Include="Shaders\Vulkan\shadow_fs.glsl">
-      <Filter>Shaders\Vulkan</Filter>
+      <Filter>Code\Shaders\Vulkan</Filter>
     </None>
   </ItemGroup>
 </Project>

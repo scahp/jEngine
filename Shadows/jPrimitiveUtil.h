@@ -211,9 +211,7 @@ namespace jPrimitiveUtil
 	std::vector<float> GenerateColor(const Vector4& color, int32 elementCount);
 	jBoundBox GenerateBoundBox(const std::vector<float>& vertices);
 	jBoundSphere GenerateBoundSphere(const std::vector<float>& vertices);
-	void CreateShadowVolume(const std::vector<float>& vertices, const std::vector<uint32>& faces, jObject* ownerObject);
 	void CreateBoundObjects(const std::vector<float>& vertices, jObject* ownerObject);
-	void CreateBound(jObject* object);
 	jBoundBoxObject* CreateBoundBox(jBoundBox boundBox, jObject* ownerObject, const Vector4& color = Vector4(0.0f, 0.0f, 0.0f, 1.0f));
 	jBoundSphereObject* CreateBoundSphere(jBoundSphere boundSphere, jObject* ownerObject, const Vector4& color = Vector4(0.0f, 0.0f, 0.0f, 1.0f));
 
@@ -222,9 +220,9 @@ namespace jPrimitiveUtil
 	jObject* CreateTriangle(const Vector& pos, const Vector& size, const Vector& scale, const Vector4& color);
 	jObject* CreateCube(const Vector& pos, const Vector& size, const Vector& scale, const Vector4& color);
 	jObject* CreateCapsule(const Vector& pos, float height, float radius, int32 slice, const Vector& scale, const Vector4& color);
-	jConePrimitive* CreateCone(const Vector& pos, float height, float radius, int32 slice, const Vector& scale, const Vector4& color, bool isWireframe = false, bool createBoundInfo = true, bool createShadowVolumeInfo = true);
+	jConePrimitive* CreateCone(const Vector& pos, float height, float radius, int32 slice, const Vector& scale, const Vector4& color, bool isWireframe = false, bool createBoundInfo = true);
 	jObject* CreateCylinder(const Vector& pos, float height, float radius, int32 slice, const Vector& scale, const Vector4& color);
-	jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector& scale, const Vector4& color, bool isWireframe = false, bool createBoundInfo = true, bool createShadowVolumeInfo = true);
+	jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector& scale, const Vector4& color, bool isWireframe = false, bool createBoundInfo = true);
 	jBillboardQuadPrimitive* CreateBillobardQuad(const Vector& pos, const Vector& size, const Vector& scale, const Vector4& color, jCamera* camera);
 	jUIQuadPrimitive* CreateUIQuad(const Vector2& pos, const Vector2& size, jTexture* texture);
 	jFullscreenQuadPrimitive* CreateFullscreenQuad(jTexture* texture);

@@ -2125,7 +2125,7 @@ jQueryTime* jRHI_Vulkan::CreateQueryTime() const
 
 void jRHI_Vulkan::ReleaseQueryTime(jQueryTime* queryTime) const
 {
-    auto queryTime_gl = static_cast<jQueryTime_OpenGL*>(queryTime);
+    auto queryTime_gl = static_cast<jQueryTime_Vulkan*>(queryTime);
     // glDeleteQueries(1, &queryTime_gl->QueryId);
     delete queryTime_gl;
 }

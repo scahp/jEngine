@@ -1,8 +1,6 @@
 ﻿#include "pch.h"
 #include "jObject.h"
 #include "jRenderObject.h"
-#include "jVertexAdjacency.h"
-#include "jShadowVolume.h"
 #include "jPrimitiveUtil.h"
 
 std::list<jObject*> jObject::s_ShadowCasterObject;
@@ -169,16 +167,10 @@ jObject::~jObject()
 	delete BoundSphereObject;
 
 	delete RenderObject;
-	delete VertexAdjacency;
-	delete ShadowVolumeGPU;
-	delete ShadowVolumeCPU;
 }
 
 void jObject::Update(float deltaTime)
 {
-	if (VertexAdjacency)
-		VertexAdjacency->Update(this);
-
 	if (IsPostUpdate && PostUpdateFunc)
 		PostUpdateFunc(this, deltaTime);
 }

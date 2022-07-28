@@ -1,6 +1,5 @@
 #include "pch.h"
 #include "jImGui.h"
-#include "jRHI_Vulkan.h"
 
 jImGUI_Vulkan* jImGUI_Vulkan::s_instance = nullptr;
 

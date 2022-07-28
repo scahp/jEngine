@@ -1,8 +1,6 @@
 ﻿#pragma once
 #include "Math\Vector.h"
 #include "jRHI.h"
-#include "jRHI_OpenGL.h"
-#include "jSamplerStatePool.h"
 
 enum class ELightType
 {
@@ -54,7 +52,7 @@ namespace jLightUtil
 		FORCEINLINE bool IsValid() const { return (ShadowMapFrameBuffer && ShadowMapCamera[0] && ShadowMapCamera[1] && ShadowMapCamera[2] && ShadowMapCamera[3] && ShadowMapCamera[4] && ShadowMapCamera[5]); }
 
 		std::shared_ptr<jFrameBuffer> ShadowMapFrameBuffer;
-		std::shared_ptr<jSamplerStateInfo> ShadowMapSamplerState;
+		jSamplerStateInfo* ShadowMapSamplerState = nullptr;
 		jCamera* ShadowMapCamera[6] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
 		IUniformBufferBlock* UniformBlock = nullptr;
 	};
@@ -85,7 +83,7 @@ namespace jLightUtil
 		FORCEINLINE bool IsValid() const { return (ShadowMapCamera && ShadowMapFrameBuffer); }
 
 		std::shared_ptr<jFrameBuffer> ShadowMapFrameBuffer;
-		std::shared_ptr<jSamplerStateInfo> ShadowMapSamplerState;
+		jSamplerStateInfo* ShadowMapSamplerState = nullptr;
 		jCamera* ShadowMapCamera = nullptr;
 		IUniformBufferBlock* UniformBlock = nullptr;
 

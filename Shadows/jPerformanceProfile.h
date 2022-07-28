@@ -1,7 +1,6 @@
 ﻿#pragma once
 #include <sysinfoapi.h>
 #include "jRHI.h"
-#include "jRHI_Vulkan.h"
 
 #define ENABLE_PROFILE 1
 #define ENABLE_PROFILE_CPU (ENABLE_PROFILE && 0)

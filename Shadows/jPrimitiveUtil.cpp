@@ -2,12 +2,9 @@
 #include "jPrimitiveUtil.h"
 #include "Math/Vector.h"
 #include "jRenderObject.h"
-#include "jRHIType.h"
 #include "Math/Plane.h"
 #include "jCamera.h"
 #include "jRHI.h"
-#include "jVertexAdjacency.h"
-#include "jShadowVolume.h"
 #include "jImageFileLoader.h"
 #include "jLight.h"
 
@@ -324,16 +321,6 @@ jBoundSphere GenerateBoundSphere(const std::vector<float>& vertices)
 			maxDist = dist;
 	}
 	return { maxDist };
-}
-
-void CreateShadowVolume(const std::vector<float>& vertices, const std::vector<uint32>& faces, jObject* ownerObject)
-{
-	ownerObject->VertexAdjacency = jVertexAdjacency::GenerateVertexAdjacencyInfo(vertices, faces);
-	ownerObject->ShadowVolumeGPU = new jShadowVolumeGPU(ownerObject->VertexAdjacency);
-	//ownerObject->ShadowVolumeGPU->CreateShadowVolumeObject();
-
-	ownerObject->ShadowVolumeCPU = new jShadowVolumeCPU(ownerObject->VertexAdjacency);
-	//ownerObject->ShadowVolumeCPU->CreateShadowVolumeObject();
 }
 
 void CreateBoundObjects(const std::vector<float>& vertices, jObject* ownerObject)
@@ -688,7 +675,6 @@ jQuadPrimitive* CreateQuad(const Vector& pos, const Vector& size, const Vector& 
 	auto object = new jQuadPrimitive();
 	object->RenderObject = CreateQuad_Internal(pos, size, scale, color);
 	object->RenderObject->IsTwoSided = true;
-	CreateShadowVolume(static_cast<jStreamParam<float>*>(object->RenderObject->VertexStream->Params[0])->Data, {}, object);
 	object->CreateBoundBox();
 	return object;
 }
@@ -930,7 +916,6 @@ jObject* CreateTriangle(const Vector& pos, const Vector& size, const Vector& sca
 	object->RenderObject->SetPos(pos);
 	object->RenderObject->SetScale(scale);
 	object->RenderObject->IsTwoSided = true;
-	CreateShadowVolume({std::begin(vertices), std::end(vertices)}, {}, object);
 	object->CreateBoundBox();
 
 	return object;
@@ -1165,7 +1150,6 @@ jObject* CreateCube(const Vector& pos, const Vector& size, const Vector& scale, 
 	object->RenderObject = renderObject;
 	object->RenderObject->SetPos(pos);
 	object->RenderObject->SetScale(scale);
-	CreateShadowVolume({ std::begin(vertices), std::end(vertices) }, {}, object);
 	object->CreateBoundBox();
 
 	return object;
@@ -1324,13 +1308,12 @@ jObject* CreateCapsule(const Vector& pos, float height, float radius, int32 slic
 	object->RenderObject = renderObject;
 	object->RenderObject->SetPos(pos);
 	object->RenderObject->SetScale(scale);
-	CreateShadowVolume(vertices, faces, object);
 	object->CreateBoundBox();
 
 	return object;
 }
 
-jConePrimitive* CreateCone(const Vector& pos, float height, float radius, int32 slice, const Vector& scale, const Vector4& color, bool isWireframe /*= false*/, bool createBoundInfo/* = true*/, bool createShadowVolumeInfo/* = true*/)
+jConePrimitive* CreateCone(const Vector& pos, float height, float radius, int32 slice, const Vector& scale, const Vector4& color, bool isWireframe /*= false*/, bool createBoundInfo/* = true*/)
 {
 	const float halfHeight = height / 2.0f;
 	const Vector topVert(0.0f, halfHeight, 0.0f);
@@ -1464,8 +1447,6 @@ jConePrimitive* CreateCone(const Vector& pos, float height, float radius, int32 
 	object->Height = height;
 	object->Radius = radius;
 	object->Color = color;
-	if (createShadowVolumeInfo)
-		CreateShadowVolume(vertices, {}, object);
 	if (createBoundInfo)
 		object->CreateBoundBox();
 	return object;
@@ -1627,12 +1608,11 @@ jObject* CreateCylinder(const Vector& pos, float height, float radius, int32 sli
 	object->Height = height;
 	object->Radius = radius;
 	object->Color = color;
-	CreateShadowVolume(vertices, {}, object);
 	object->CreateBoundBox();
 	return object;
 }
 
-jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector& scale, const Vector4& color, bool isWireframe /*= false*/, bool createBoundInfo/* = true*/, bool createShadowVolumeInfo/* = true*/)
+jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector& scale, const Vector4& color, bool isWireframe /*= false*/, bool createBoundInfo/* = true*/)
 {
 	const auto offset = Vector::ZeroVector;
 
@@ -1793,8 +1773,6 @@ jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector
 	object->RenderObject = renderObject;
 	object->RenderObject->SetPos(pos);
 	object->RenderObject->SetScale(scale);
-	if (createShadowVolumeInfo)
-		CreateShadowVolume(vertices, faces, object);
 	if (createBoundInfo)
 		object->CreateBoundBox();
 	return object;
@@ -1806,7 +1784,6 @@ jBillboardQuadPrimitive* CreateBillobardQuad(const Vector& pos, const Vector& si
 	object->RenderObject = CreateQuad_Internal(pos, size, scale, color);
 	object->Camera = camera;
 	object->RenderObject->IsTwoSided = true;
-	CreateShadowVolume(static_cast<jStreamParam<float>*>(object->RenderObject->VertexStream->Params[0])->Data, {}, object);
 	return object;
 }
 
@@ -1947,7 +1924,6 @@ jSegmentPrimitive* CreateSegment(const Vector& start, const Vector& end, float t
 		auto thisSegmentObject = static_cast<jSegmentPrimitive*>(thisObject);
 		thisObject->RenderObject->SetScale(Vector(thisSegmentObject->Time));
 	};
-	CreateShadowVolume({ std::begin(vertices), std::end(vertices) }, {}, object);
 	object->CreateBoundBox();
 	return object;
 }
@@ -2009,7 +1985,7 @@ jPointLightPrimitive* CreatePointLightDebug(const Vector& scale, jCamera* target
 		object->BillboardObject->RenderObject->MaterialData.AddMaterialParam(GetCommonTextureName(1), texture);
 		object->BillboardObject->RenderObject->IsHiddenBoundBox = true;
 	}
-	object->SphereObject = CreateSphere(light->Data.Position, light->Data.MaxDistance, 20, Vector::OneVector, Vector4(light->Data.Color, 1.0f), true, false, false);
+	object->SphereObject = CreateSphere(light->Data.Position, light->Data.MaxDistance, 20, Vector::OneVector, Vector4(light->Data.Color, 1.0f), true, false);
 	object->SphereObject->RenderObject->IsHiddenBoundBox = true;
 	object->Light = light;
 	object->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
@@ -2036,9 +2012,9 @@ jSpotLightPrimitive* CreateSpotLightDebug(const Vector& scale, jCamera* targetCa
 		auto texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName(textureFilename), true).lock().get();
 		object->BillboardObject->RenderObject->MaterialData.AddMaterialParam(GetCommonTextureName(1), texture);
 	}
-	object->UmbraConeObject = jPrimitiveUtil::CreateCone(light->Data.Position, 1.0, 1.0, 20, Vector::OneVector, Vector4(light->Data.Color.x, light->Data.Color.y, light->Data.Color.z, 1.0f), true, false, false);
+	object->UmbraConeObject = jPrimitiveUtil::CreateCone(light->Data.Position, 1.0, 1.0, 20, Vector::OneVector, Vector4(light->Data.Color.x, light->Data.Color.y, light->Data.Color.z, 1.0f), true, false);
 	object->UmbraConeObject->RenderObject->IsHiddenBoundBox = true;
-	object->PenumbraConeObject = jPrimitiveUtil::CreateCone(light->Data.Position, 1.0, 1.0, 20, Vector::OneVector, Vector4(light->Data.Color.x, light->Data.Color.y, light->Data.Color.z, 0.5f), true, false, false);
+	object->PenumbraConeObject = jPrimitiveUtil::CreateCone(light->Data.Position, 1.0, 1.0, 20, Vector::OneVector, Vector4(light->Data.Color.x, light->Data.Color.y, light->Data.Color.z, 0.5f), true, false);
 	object->PenumbraConeObject->RenderObject->IsHiddenBoundBox = true;
 	object->Light = light;
 	object->PostUpdateFunc = [](jObject* thisObject, float deltaTime)

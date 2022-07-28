@@ -1,7 +1,6 @@
 ﻿#include "pch.h"
 #include "jCamera.h"
 #include "jLight.h"
-#include "jShadowAppProperties.h"
 
 std::map<int32, jCamera*> jCamera::CameraMap;
 
@@ -47,9 +46,9 @@ void jCamera::BindCamera(const jShader* shader) const
     SET_UNIFORM_BUFFER_STATIC("SpotLightESM_C", 40.0f, shader);
     SET_UNIFORM_BUFFER_STATIC("ShadowMapWidth", (int32)SM_WIDTH, shader);
     SET_UNIFORM_BUFFER_STATIC("ShadowMapHeight", (int32)SM_HEIGHT, shader);
-    SET_UNIFORM_BUFFER_STATIC("CSMDebugOn", static_cast<int>(jShadowAppSettingProperties::GetInstance().CSMDebugOn), shader);
-    SET_UNIFORM_BUFFER_STATIC("ShadowOn", jShadowAppSettingProperties::GetInstance().ShadowOn ? 1 : 0, shader);
-    SET_UNIFORM_BUFFER_STATIC("DeepShadowAlpha", jShadowAppSettingProperties::GetInstance().DeepShadowAlpha, shader);
+    //SET_UNIFORM_BUFFER_STATIC("CSMDebugOn", static_cast<int>(jShadowAppSettingProperties::GetInstance().CSMDebugOn), shader);
+    //SET_UNIFORM_BUFFER_STATIC("ShadowOn", jShadowAppSettingProperties::GetInstance().ShadowOn ? 1 : 0, shader);
+    //SET_UNIFORM_BUFFER_STATIC("DeepShadowAlpha", jShadowAppSettingProperties::GetInstance().DeepShadowAlpha, shader);
 }
 
 void jCamera::UpdateCameraFrustum()

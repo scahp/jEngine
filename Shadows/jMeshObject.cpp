@@ -2,7 +2,6 @@
 #include "jMeshObject.h"
 #include "jRenderObject.h"
 #include "jRHI.h"
-#include "jSamplerStatePool.h"
 #include "jShader.h"
 
 jMeshMaterial jMeshObject::NullMeshMateral;
@@ -97,7 +96,8 @@ void jMeshObject::DrawSubMesh(int32 meshIndex, const jCamera* camera, const jSha
 
 				jMaterialData& materialData = subMesh.MaterialData;
 
-				const jSamplerStateInfo* pSamplerState = jSamplerStatePool::GetSamplerState(jName("LinearWrapMipmap")).get();
+				const jSamplerStateInfo* pSamplerState 
+					= TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT>::Create();
 				materialData.AddMaterialParam(jMeshMaterial::MaterialTextureTypeString[i], pTexture, pSamplerState);
 
 				switch ((jMeshMaterial::EMaterialTextureType)i)

@@ -1,6 +1,4 @@
 ﻿#pragma once
-#include "jRHIType.h"
-#include "jRHI.h"
 
 class jFrameBufferPool
 {

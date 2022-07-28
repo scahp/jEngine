@@ -4,9 +4,7 @@
 #include "Math\Vector.h"
 #include "jFrameBufferPool.h"
 #include "jCamera.h"
-#include "jRHI_OpenGL.h"
 #include "jObject.h"
-#include "jSamplerStatePool.h"
 
 namespace jLightUtil
 {
@@ -44,7 +42,7 @@ namespace jLightUtil
 		// FrameBuffer 생성 필요
 		// shadowMapData->ShadowMapRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::RG32F, EDepthBufferType::DEPTH32, SM_WIDTH, SM_HEIGHT, 1, ETextureFilter::LINEAR, ETextureFilter::LINEAR });
 		shadowMapData->ShadowMapFrameBuffer = jFrameBufferPool::GetFrameBuffer({ ETextureType::TEXTURE_2D, ETextureFormat::RG32F, SM_WIDTH, SM_HEIGHT, 1/*, ETextureFilter::LINEAR, ETextureFilter::LINEAR*/ });
-		shadowMapData->ShadowMapSamplerState = jSamplerStatePool::GetSamplerState(jName("LinearClampShadow"));
+		shadowMapData->ShadowMapSamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR>::Create();
 
 		return shadowMapData;
 	}
@@ -70,7 +68,7 @@ namespace jLightUtil
 		// FrameBuffer 생성 필요
 		// shadowMapData->ShadowMapRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::RG32F, EDepthBufferType::DEPTH32, SM_WIDTH, SM_HEIGHT * NUM_CASCADES, 1, ETextureFilter::LINEAR, ETextureFilter::LINEAR });
 		shadowMapData->ShadowMapFrameBuffer = jFrameBufferPool::GetFrameBuffer({ ETextureType::TEXTURE_2D, ETextureFormat::RG32F, SM_WIDTH, SM_HEIGHT * NUM_CASCADES, 1/*, ETextureFilter::LINEAR, ETextureFilter::LINEAR*/ });
-		shadowMapData->ShadowMapSamplerState = jSamplerStatePool::GetSamplerState(jName("LinearClampShadow"));
+		shadowMapData->ShadowMapSamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR>::Create();
 
 		return shadowMapData;
 	}
@@ -91,7 +89,7 @@ namespace jLightUtil
 		// FrameBuffer 생성 필요
 		// shadowMapData->ShadowMapRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D_ARRAY_OMNISHADOW, ETextureFormat::RG32F, EDepthBufferType::DEPTH32, SM_ARRAY_WIDTH, SM_ARRAY_HEIGHT * 6, 1, ETextureFilter::NEAREST, ETextureFilter::NEAREST });
 		shadowMapData->ShadowMapFrameBuffer = jFrameBufferPool::GetFrameBuffer({ ETextureType::TEXTURE_2D, ETextureFormat::RG32F, SM_ARRAY_WIDTH, SM_ARRAY_HEIGHT * 6, 1/*, ETextureFilter::NEAREST, ETextureFilter::NEAREST*/ });
-		shadowMapData->ShadowMapSamplerState = jSamplerStatePool::GetSamplerState(jName("LinearClampShadow"));
+		shadowMapData->ShadowMapSamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR>::Create();
 
 		return shadowMapData;
 	}
@@ -370,22 +368,14 @@ void jDirectionalLight::UpdateMaterialData()
 	{
 		static auto name = jName("shadow_object");
 		MaterialData.AddMaterialParam(name, ShadowMapData->ShadowMapFrameBuffer->GetTextureDepth()
-			, ShadowMapData->ShadowMapSamplerState.get());
+			, ShadowMapData->ShadowMapSamplerState);
 	}
 
 	{
         static auto name = jName("shadow_object_test");
 		jTexture* texture = nullptr;
 
-		const auto type = jShadowAppSettingProperties::GetInstance().ShadowMapType;
-        if ((type == EShadowMapType::VSM) || (type == EShadowMapType::ESM) || (type == EShadowMapType::EVSM))
-        {
-            texture = ShadowMapData->ShadowMapFrameBuffer->GetTexture();
-        }
-        else
-        {
-            texture = ShadowMapData->ShadowMapFrameBuffer->GetTextureDepth();
-        }
+        texture = ShadowMapData->ShadowMapFrameBuffer->GetTextureDepth();
 
         MaterialData.AddMaterialParam(name, texture);
 	}
@@ -554,22 +544,13 @@ void jPointLight::UpdateMaterialData()
 	{
         static auto name = jName("shadow_object_point_shadow");
 		MaterialData.AddMaterialParam(name, ShadowMapData->ShadowMapFrameBuffer->GetTextureDepth()
-			, ShadowMapData->ShadowMapSamplerState.get());
+			, ShadowMapData->ShadowMapSamplerState);
 	}
 
 	{
         static auto name = jName("shadow_object_point");
 		jTexture* texture = nullptr;
-
-        const auto type = jShadowAppSettingProperties::GetInstance().ShadowMapType;
-        if ((type == EShadowMapType::VSM) || (type == EShadowMapType::ESM) || (type == EShadowMapType::EVSM))
-        {
-            texture = ShadowMapData->ShadowMapFrameBuffer->GetTexture();
-        }
-        else
-        {
-            texture = ShadowMapData->ShadowMapFrameBuffer->GetTextureDepth();
-        }
+		texture = ShadowMapData->ShadowMapFrameBuffer->GetTextureDepth();
 
 		MaterialData.AddMaterialParam(name, texture);
 	}
@@ -702,22 +683,14 @@ void jSpotLight::UpdateMaterialData()
 	{
 		static auto name = jName("shadow_object_spot_shadow");
 		MaterialData.AddMaterialParam(name, ShadowMapData->ShadowMapFrameBuffer->GetTextureDepth()
-			, ShadowMapData->ShadowMapSamplerState.get());
+			, ShadowMapData->ShadowMapSamplerState);
 	}
 
 	{
         static auto name = jName("shadow_object_spot");
 		jTexture* texture = nullptr;
+		texture = ShadowMapData->ShadowMapFrameBuffer->GetTextureDepth();
 
-		const auto type = jShadowAppSettingProperties::GetInstance().ShadowMapType;
-		if ((type == EShadowMapType::VSM) || (type == EShadowMapType::ESM) || (type == EShadowMapType::EVSM))
-		{
-			texture = ShadowMapData->ShadowMapFrameBuffer->GetTexture();
-		}
-		else
-		{
-			texture = ShadowMapData->ShadowMapFrameBuffer->GetTextureDepth();
-		}
 		MaterialData.AddMaterialParam(name, texture);
 	}
 }

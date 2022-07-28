@@ -57,9 +57,6 @@ public:
 	void ShowBoundBox(bool isShow);
 
 	jRenderObject* RenderObject = nullptr;
-	jVertexAdjacency* VertexAdjacency = nullptr;
-	IShadowVolume* ShadowVolumeGPU = nullptr;
-	IShadowVolume* ShadowVolumeCPU = nullptr;
 
 	bool SkipShadowMapGen = false;
 	bool SkipUpdateShadowVolume = false;

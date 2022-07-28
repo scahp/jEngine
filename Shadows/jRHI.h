@@ -1,5 +1,4 @@
 ﻿#pragma once
-#include "jRHIType.h"
 #include "Math\Matrix.h"
 #include "Core\jName.h"
 #include "Math\Vector.h"

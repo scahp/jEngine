@@ -131,7 +131,15 @@ inline void hash_combine(std::size_t& seed, const T& v)
 	seed ^= hasher(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
 }
 
-#include "jRHIType.h"
+#include "RHI/jRHIType.h"
+#include "jRHI.h"
+
+#if USE_VULKAN
+#include "RHI/jRHI_Vulkan.h"
+#elif USE_OPENGL
+#include "jRHI_OpenGL.h"
+#else
+#endif
 #include "jPerformanceProfile.h"
 
 #define TRUE_PER_MS(WaitMS)\
@@ -152,8 +160,6 @@ inline void hash_combine(std::size_t& seed, const T& v)
 #include "IMGUI/imgui_impl_glfw.h"
 #include "IMGUI/imgui_impl_opengl3.h"
 
-
-#include "jShadowAppProperties.h"
 
 #define DEBUG_OUTPUT_ON 0
 //#define DEBUG_OUTPUT_LEVEL 0	// show all

@@ -5,10 +5,6 @@
 #include <iostream>
 #include "jEngine.h"
 #include "jRHI.h"
-
-#include <AntTweakBar.h>
-#include "jAppSettings.h"
-#include "jRHI_Vulkan.h"
 #include "ImGui/jImGui.h"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
@@ -223,9 +219,6 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
-	if (TwEventKeyGLFW(GLFW_KEY_9, action))
-		return;
-
 	const char* key_name = glfwGetKeyName(key, 0);
 	if (!key_name)
 		return;
@@ -243,14 +236,10 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 
 void char_callback(GLFWwindow* window, uint32 codepoint)
 {
-	TwEventCharGLFW(codepoint, GLFW_PRESS);
 }
 
 void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
 {
-	if (TwEventMousePosGLFW(static_cast<int>(xpos), static_cast<int>(ypos)))
-		return;
-
 	static double xOld = -1.0;
 	static double yOld = -1.0;
 
@@ -268,9 +257,6 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
 
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 {
-	if (TwEventMouseButtonGLFW(button, action))
-		return;
-
 	EMouseButtonType buttonType;
 	if (GLFW_MOUSE_BUTTON_RIGHT == button)
 		buttonType = EMouseButtonType::RIGHT;
@@ -305,9 +291,6 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
-	if (TwEventMouseWheelGLFW(static_cast<int>(yoffset)))
-		return;
-
     ImGuiIO& io = ImGui::GetIO();
     io.MouseWheelH += (float)xoffset;
     io.MouseWheel += (float)yoffset;

@@ -125,7 +125,7 @@ xcopy /s /y /d  "$(ProjectDir)External\assimp\lib\*.dll" "$(OutDir)"</Command>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>./;./External/AntTweakBar/lib;./External/assimp/lib;./External/vulkan/1.2.176.1/lib;./External/glslang/lib</AdditionalLibraryDirectories>
-      <AdditionalDependencies>opengl32.lib;glfw3.lib;AntTweakBar64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>opengl32.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>
       </IgnoreSpecificDefaultLibraries>
     </Link>
@@ -183,7 +183,7 @@ xcopy /s /y /d  "$(ProjectDir)External\assimp\lib\*.dll" "$(OutDir)"</Command>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>opengl32.lib;glfw3.lib;AntTweakBar64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>opengl32.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>./;./External/AntTweakBar/lib;./External/assimp/lib;./External/vulkan/1.2.176.1/lib;./External/glslang/lib</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
@@ -204,13 +204,10 @@ xcopy /s /y /d  "$(ProjectDir)External\assimp\lib\*.dll" "$(OutDir)"</Command>
     <ClInclude Include="External\IMGUI\imstb_textedit.h" />
     <ClInclude Include="External\IMGUI\imstb_truetype.h" />
     <ClInclude Include="ImGui\jImGui.h" />
-    <ClInclude Include="jAppSettings.h" />
     <ClInclude Include="jCamera.h" />
     <ClInclude Include="jCollision.h" />
-    <ClInclude Include="jDeferredRenderer.h" />
     <ClInclude Include="jEngine.h" />
     <ClInclude Include="jFile.h" />
-    <ClInclude Include="jForwardRenderer.h" />
     <ClInclude Include="jGame.h" />
     <ClInclude Include="jGBuffer.h" />
     <ClInclude Include="jHairModelLoader.h" />
@@ -221,33 +218,24 @@ xcopy /s /y /d  "$(ProjectDir)External\assimp\lib\*.dll" "$(OutDir)"</Command>
     <ClInclude Include="jModelLoader.h" />
     <ClInclude Include="jObject.h" />
     <ClInclude Include="jPerformanceProfile.h" />
-    <ClInclude Include="jPipeline.h" />
-    <ClInclude Include="jPostProcess.h" />
     <ClInclude Include="jPrimitiveUtil.h" />
-    <ClInclude Include="jRenderer.h" />
     <ClInclude Include="jRenderObject.h" />
     <ClInclude Include="jFrameBufferPool.h" />
     <ClInclude Include="jRenderTargetPool.h" />
     <ClInclude Include="jRHI.h" />
-    <ClInclude Include="jRHIType.h" />
-    <ClInclude Include="jRHI_DirectX11.h" />
-    <ClInclude Include="jRHI_OpenGL.h" />
-    <ClInclude Include="jRHI_Vulkan.h" />
-    <ClInclude Include="jSamplerStatePool.h" />
     <ClInclude Include="jShader.h" />
-    <ClInclude Include="jShadowAppProperties.h" />
-    <ClInclude Include="jShadowTypes.h" />
-    <ClInclude Include="jShadowVolume.h" />
-    <ClInclude Include="jShadowVolumeTypes.h" />
     <ClInclude Include="jSpirvHelper.h" />
     <ClInclude Include="jUtil.h" />
-    <ClInclude Include="jVertexAdjacency.h" />
     <ClInclude Include="Math\MathUtility.h" />
     <ClInclude Include="Math\Matrix.h" />
     <ClInclude Include="Math\Plane.h" />
     <ClInclude Include="Math\Vector.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="lodepng.h" />
+    <ClInclude Include="RHI\jRHIType.h" />
+    <ClInclude Include="RHI\jRHI_DirectX11.h" />
+    <ClInclude Include="RHI\jRHI_OpenGL.h" />
+    <ClInclude Include="RHI\jRHI_Vulkan.h" />
     <ClInclude Include="stb_image.h" />
     <ClInclude Include="TGALoader.h" />
   </ItemGroup>
@@ -333,13 +321,10 @@ xcopy /s /y /d  "$(ProjectDir)External\assimp\lib\*.dll" "$(OutDir)"</Command>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="ImGui\jImGui.cpp" />
-    <ClCompile Include="jAppSettings.cpp" />
     <ClCompile Include="jCamera.cpp" />
     <ClCompile Include="jCollision.cpp" />
-    <ClCompile Include="jDeferredRenderer.cpp" />
     <ClCompile Include="jEngine.cpp" />
     <ClCompile Include="jFile.cpp" />
-    <ClCompile Include="jForwardRenderer.cpp" />
     <ClCompile Include="jGame.cpp" />
     <ClCompile Include="jGBuffer.cpp" />
     <ClCompile Include="jHairModelLoader.cpp" />
@@ -350,24 +335,14 @@ xcopy /s /y /d  "$(ProjectDir)External\assimp\lib\*.dll" "$(OutDir)"</Command>
     <ClCompile Include="jModelLoader.cpp" />
     <ClCompile Include="jObject.cpp" />
     <ClCompile Include="jPerformanceProfile.cpp" />
-    <ClCompile Include="jPipeline.cpp" />
-    <ClCompile Include="jPostProcess.cpp" />
     <ClCompile Include="jPrimitiveUtil.cpp" />
-    <ClCompile Include="jRenderer.cpp" />
     <ClCompile Include="jRenderObject.cpp" />
     <ClCompile Include="jFrameBufferPool.cpp" />
     <ClCompile Include="jRenderTargetPool.cpp" />
     <ClCompile Include="jRHI.cpp" />
-    <ClCompile Include="jRHI_DirectX11.cpp" />
-    <ClCompile Include="jRHI_OpenGL.cpp" />
-    <ClCompile Include="jRHI_Vulkan.cpp" />
-    <ClCompile Include="jSamplerStatePool.cpp" />
     <ClCompile Include="jShader.cpp" />
-    <ClCompile Include="jShadowAppProperties.cpp" />
-    <ClCompile Include="jShadowVolume.cpp" />
     <ClCompile Include="jSpirvHelper.cpp" />
     <ClCompile Include="jUtil.cpp" />
-    <ClCompile Include="jVertexAdjacency.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Math\Matrix.cpp" />
     <ClCompile Include="Math\Plane.cpp" />
@@ -379,6 +354,9 @@ xcopy /s /y /d  "$(ProjectDir)External\assimp\lib\*.dll" "$(OutDir)"</Command>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="loadpng.cpp" />
+    <ClCompile Include="RHI\jRHI_DirectX11.cpp" />
+    <ClCompile Include="RHI\jRHI_OpenGL.cpp" />
+    <ClCompile Include="RHI\jRHI_Vulkan.cpp" />
     <ClCompile Include="TGALoader.cpp" />
   </ItemGroup>
   <ItemGroup>
