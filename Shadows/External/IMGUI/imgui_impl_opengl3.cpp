@@ -1,4 +1,6 @@
 #include <pch.h>
+
+#if USE_OPENGL
 #pragma warning(disable: 4996)
 
 // dear imgui: Renderer for modern OpenGL with shaders / programmatic pipeline
@@ -634,3 +636,5 @@ void    ImGui_ImplOpenGL3_DestroyDeviceObjects()
 
     ImGui_ImplOpenGL3_DestroyFontsTexture();
 }
+
+#endif // USE_OPENGL

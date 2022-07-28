@@ -1,12 +1,11 @@
 ﻿#include "pch.h"
 #include "jPrimitiveUtil.h"
 #include "Math/Vector.h"
-#include "jRenderObject.h"
+#include "Scene/jRenderObject.h"
+#include "Scene/jCamera.h"
+#include "Scene/jLight.h"
 #include "Math/Plane.h"
-#include "jCamera.h"
-#include "jRHI.h"
-#include "jImageFileLoader.h"
-#include "jLight.h"
+#include "FileLoader/jImageFileLoader.h"
 
 struct Triangle
 {

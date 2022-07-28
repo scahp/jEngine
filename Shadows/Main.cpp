@@ -4,8 +4,7 @@
 #include "pch.h"
 #include <iostream>
 #include "jEngine.h"
-#include "jRHI.h"
-#include "ImGui/jImGui.h"
+#include "Profiler/jPerformanceProfile.h"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);

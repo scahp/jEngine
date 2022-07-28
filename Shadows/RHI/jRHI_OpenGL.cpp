@@ -1,8 +1,9 @@
 ﻿#include "pch.h"
 #include "jRHI_OpenGL.h"
-#include "jFile.h"
-#include "jRHIType.h"
-#include "jShader.h"
+
+#if USE_OPENGL
+#include "FileLoader/jFile.h"
+#include "Shader/jShader.h"
 
 jRHI_OpenGL* g_rhi_gl = nullptr;
 
@@ -2445,3 +2446,6 @@ void jRenderPass_OpenGL::Release()
 {
 
 }
+
+
+#endif // USE_OPENGL

@@ -1,7 +1,7 @@
 ﻿#pragma once
 #include "Math/Vector.h"
 #include "Math/Plane.h"
-#include "jObject.h"
+#include "Scene/jObject.h"
 #include "jBoundPrimitiveType.h"
 
 class jCamera;

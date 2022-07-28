@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "jImGui.h"
+#include "Profiler/jPerformanceProfile.h"
 
 jImGUI_Vulkan* jImGUI_Vulkan::s_instance = nullptr;
 

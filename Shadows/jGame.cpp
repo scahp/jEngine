@@ -1,20 +1,18 @@
 ﻿#include "pch.h"
 #include "jGame.h"
 #include "Math\Vector.h"
-#include "jCamera.h"
-#include "jObject.h"
-#include "jLight.h"
+#include "Scene/jCamera.h"
+#include "Scene/jObject.h"
+#include "Scene/jLight.h"
+#include "Scene/jRenderObject.h"
+#include "Scene/jMeshObject.h"
 #include "jPrimitiveUtil.h"
-#include "jRHI.h"
-#include "jRenderObject.h"
-#include "jImageFileLoader.h"
-#include "jHairModelLoader.h"
-#include "jMeshObject.h"
-#include "jModelLoader.h"
-#include "jFile.h"
-#include "jFrameBufferPool.h"
-#include "jRenderTargetPool.h"
-#include "ImGui\jImGui.h"
+#include "FileLoader/jImageFileLoader.h"
+#include "FileLoader/jModelLoader.h"
+#include "FileLoader/jFile.h"
+#include "RHI/jFrameBufferPool.h"
+#include "RHI/jRenderTargetPool.h"
+#include "Profiler/jPerformanceProfile.h"
 
 jRHI* g_rhi = nullptr;
 
@@ -129,9 +127,6 @@ void jGame::SpawnObjects(ESpawnedType spawnType)
 		SpawnedType = spawnType;
 		switch (SpawnedType)
 		{
-		case ESpawnedType::Hair:
-			SpawnHairObjects();
-			break;
 		case ESpawnedType::TestPrimitive:
 			SpawnTestPrimitives();
 			break;
@@ -389,8 +384,8 @@ void jGame::Update(float deltaTime)
 			{
 				jShaderInfo shaderInfo;
 				shaderInfo.name = jName("shadow_test");
-				shaderInfo.vs = jName("Shaders/Vulkan/shadow_vs.glsl");
-				shaderInfo.fs = jName("Shaders/Vulkan/shadow_fs.glsl");
+				shaderInfo.vs = jName("Shaders/Vulkan/glsl/shadow_vs.glsl");
+				shaderInfo.fs = jName("Shaders/Vulkan/glsl/shadow_fs.glsl");
 				Shader = g_rhi->CreateShader(shaderInfo);
 			}
 
@@ -598,19 +593,6 @@ void jGame::OnMouseMove(int32 xOffset, int32 yOffset)
 
 void jGame::Teardown()
 {
-}
-
-void jGame::SpawnHairObjects()
-{
-	RemoveSpawnedObjects();
-
-	auto hairObject = jHairModelLoader::GetInstance().CreateHairObject("Model/straight.hair");
-	jObject::AddObject(hairObject);
-	SpawnedObjects.push_back(hairObject);
-
-	auto headModel = jModelLoader::GetInstance().LoadFromFile("Model/woman.x");
-	jObject::AddObject(headModel);
-	SpawnedObjects.push_back(headModel);
 }
 
 void jGame::SpawnTestPrimitives()

@@ -88,7 +88,7 @@ public:
 #       endif
     }
 
-    void check() const {
+    void (check)() const {
         checkGuardBlock(preGuard(),  guardBlockBeginVal, "before");
         checkGuardBlock(postGuard(), guardBlockEndVal,   "after");
     }

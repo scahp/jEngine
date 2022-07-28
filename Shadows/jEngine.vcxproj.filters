@@ -1,0 +1,369 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Code">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Code\RHI">
+      <UniqueIdentifier>{50ebfba9-291a-4c10-8bc4-aece5da26c85}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Code\Math">
+      <UniqueIdentifier>{2b3ef8ae-2267-4362-b802-d9ca949d9d43}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Code\ImGui">
+      <UniqueIdentifier>{c08066e9-ebf0-484b-be22-007f35ad5e13}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Code\Core">
+      <UniqueIdentifier>{624b473a-1da7-4d3c-aab8-9738c80fead3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Code\External">
+      <UniqueIdentifier>{73008294-ac15-42a9-9361-9c43b423dcc1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Code\External\cityhash">
+      <UniqueIdentifier>{2c2f005e-cfe1-438f-999d-ee3169b02878}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Code\External\IMGUI">
+      <UniqueIdentifier>{cd851a30-9515-458d-bda7-72967629a5ff}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Code\External\EASTL">
+      <UniqueIdentifier>{b4a2146e-541a-46df-8ee3-1ad8743a38e5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Code\External\glad">
+      <UniqueIdentifier>{b694bddd-e439-48c3-9bbe-540b1df57228}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Code\External\glad\include">
+      <UniqueIdentifier>{783136f1-6246-452c-9f2c-d1e7eabed4f4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Code\External\glad\include\glad">
+      <UniqueIdentifier>{478d2430-e77a-44ae-8621-079b9853f71f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Code\External\glad\KHR">
+      <UniqueIdentifier>{89c2a4f8-0a17-4c39-a265-e9850a748ecc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Code\External\stb">
+      <UniqueIdentifier>{fc92c5ee-6c24-406f-911f-539a691efa9d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Code\Profiler">
+      <UniqueIdentifier>{3e7cc9b2-d250-4567-8baa-9784d72d9517}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Code\FilerLoader">
+      <UniqueIdentifier>{496ebfef-3961-4410-a302-f68101ed67b2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Code\Shader">
+      <UniqueIdentifier>{a1b26352-33f3-46fe-b842-39876c50aeaf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Code\Shader\Spirv">
+      <UniqueIdentifier>{a6f1ab3a-6379-4c36-a07f-76db822af54f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Code\Scene">
+      <UniqueIdentifier>{8e30f491-a752-4193-b0a3-a42e09204a99}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Code\Resource">
+      <UniqueIdentifier>{6f4943cf-ecf8-4183-a927-7a0305aeaf37}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Code\Resource\Vulkan">
+      <UniqueIdentifier>{24a9224e-7c11-46ec-b700-da1a01be617a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Code\Resource\Vulkan\glsl">
+      <UniqueIdentifier>{fad0ce8e-1a19-4c56-bc97-04b0d75ac702}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Code\External\loadpng">
+      <UniqueIdentifier>{49fc389a-de03-42a9-ac0a-288f06bf99d1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Code\External\TinyXml2">
+      <UniqueIdentifier>{bd710aee-e5d7-498d-aa99-3fb183dd5854}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Math\MathUtility.h">
+      <Filter>Code\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="Math\Matrix.h">
+      <Filter>Code\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="Math\Vector.h">
+      <Filter>Code\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="Math\Plane.h">
+      <Filter>Code\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="External\cityhash\city.h">
+      <Filter>Code\External\cityhash</Filter>
+    </ClInclude>
+    <ClInclude Include="External\cityhash\citycrc.h">
+      <Filter>Code\External\cityhash</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\jName.h">
+      <Filter>Code\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="External\IMGUI\imgui_impl_vulkan.h">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="External\IMGUI\imgui.h">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="External\IMGUI\imgui_impl_glfw.h">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="External\IMGUI\imgui_impl_opengl3.h">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="External\IMGUI\imstb_rectpack.h">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="External\IMGUI\imstb_textedit.h">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="External\IMGUI\imstb_truetype.h">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="External\IMGUI\imgui_internal.h">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGui\jImGui.h">
+      <Filter>Code\ImGui</Filter>
+    </ClInclude>
+    <ClInclude Include="jEngine.h">
+      <Filter>Code</Filter>
+    </ClInclude>
+    <ClInclude Include="jGame.h">
+      <Filter>Code</Filter>
+    </ClInclude>
+    <ClInclude Include="jPrimitiveUtil.h">
+      <Filter>Code</Filter>
+    </ClInclude>
+    <ClInclude Include="pch.h">
+      <Filter>Code</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\jRHI_DirectX11.h">
+      <Filter>Code\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\jRHI_OpenGL.h">
+      <Filter>Code\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\jRHI_Vulkan.h">
+      <Filter>Code\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\jRHIType.h">
+      <Filter>Code\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="External\glad\include\glad\glad.h">
+      <Filter>Code\External\glad\include\glad</Filter>
+    </ClInclude>
+    <ClInclude Include="External\glad\include\KHR\khrplatform.h">
+      <Filter>Code\External\glad\KHR</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\jRHI.h">
+      <Filter>Code\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="External\stb\stb_image.h">
+      <Filter>Code\External\stb</Filter>
+    </ClInclude>
+    <ClInclude Include="Profiler\jPerformanceProfile.h">
+      <Filter>Code\Profiler</Filter>
+    </ClInclude>
+    <ClInclude Include="FileLoader\jImageFileLoader.h">
+      <Filter>Code\FilerLoader</Filter>
+    </ClInclude>
+    <ClInclude Include="FileLoader\jFile.h">
+      <Filter>Code\FilerLoader</Filter>
+    </ClInclude>
+    <ClInclude Include="Shader\jShader.h">
+      <Filter>Code\Shader</Filter>
+    </ClInclude>
+    <ClInclude Include="Shader\Spirv\jSpirvHelper.h">
+      <Filter>Code\Shader\Spirv</Filter>
+    </ClInclude>
+    <ClInclude Include="FileLoader\jModelLoader.h">
+      <Filter>Code\FilerLoader</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene\jObject.h">
+      <Filter>Code\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene\jRenderObject.h">
+      <Filter>Code\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene\jMeshObject.h">
+      <Filter>Code\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene\jCamera.h">
+      <Filter>Code\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene\jLight.h">
+      <Filter>Code\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="External\loadpng\lodepng.h">
+      <Filter>Code\External\loadpng</Filter>
+    </ClInclude>
+    <ClInclude Include="External\TinyXml2\tinyxml2.h">
+      <Filter>Code\External\TinyXml2</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\jFrameBufferPool.h">
+      <Filter>Code\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\jRenderTargetPool.h">
+      <Filter>Code\RHI</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="pch.cpp">
+      <Filter>Code</Filter>
+    </ClCompile>
+    <ClCompile Include="jEngine.cpp">
+      <Filter>Code</Filter>
+    </ClCompile>
+    <ClCompile Include="jGame.cpp">
+      <Filter>Code</Filter>
+    </ClCompile>
+    <ClCompile Include="jPrimitiveUtil.cpp">
+      <Filter>Code</Filter>
+    </ClCompile>
+    <ClCompile Include="Math\Matrix.cpp">
+      <Filter>Code\Math</Filter>
+    </ClCompile>
+    <ClCompile Include="Math\Vector.cpp">
+      <Filter>Code\Math</Filter>
+    </ClCompile>
+    <ClCompile Include="Math\Plane.cpp">
+      <Filter>Code\Math</Filter>
+    </ClCompile>
+    <ClCompile Include="Main.cpp">
+      <Filter>Code</Filter>
+    </ClCompile>
+    <ClCompile Include="External\cityhash\city.cc">
+      <Filter>Code\External\cityhash</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\jName.cpp">
+      <Filter>Code\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="External\IMGUI\imgui_impl_vulkan.cpp">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="External\IMGUI\imgui.cpp">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="External\IMGUI\imgui_impl_glfw.cpp">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="External\IMGUI\imgui_impl_opengl3.cpp">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="External\IMGUI\imgui_widgets.cpp">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="External\IMGUI\imgui_draw.cpp">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="External\IMGUI\imgui_demo.cpp">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGui\jImGui.cpp">
+      <Filter>Code\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="External\EASTL\source\allocator_eastl.cpp">
+      <Filter>Code\External\EASTL</Filter>
+    </ClCompile>
+    <ClCompile Include="External\EASTL\source\assert.cpp">
+      <Filter>Code\External\EASTL</Filter>
+    </ClCompile>
+    <ClCompile Include="External\EASTL\source\atomic.cpp">
+      <Filter>Code\External\EASTL</Filter>
+    </ClCompile>
+    <ClCompile Include="External\EASTL\source\fixed_pool.cpp">
+      <Filter>Code\External\EASTL</Filter>
+    </ClCompile>
+    <ClCompile Include="External\EASTL\source\hashtable.cpp">
+      <Filter>Code\External\EASTL</Filter>
+    </ClCompile>
+    <ClCompile Include="External\EASTL\source\intrusive_list.cpp">
+      <Filter>Code\External\EASTL</Filter>
+    </ClCompile>
+    <ClCompile Include="External\EASTL\source\numeric_limits.cpp">
+      <Filter>Code\External\EASTL</Filter>
+    </ClCompile>
+    <ClCompile Include="External\EASTL\source\red_black_tree.cpp">
+      <Filter>Code\External\EASTL</Filter>
+    </ClCompile>
+    <ClCompile Include="External\EASTL\source\string.cpp">
+      <Filter>Code\External\EASTL</Filter>
+    </ClCompile>
+    <ClCompile Include="External\EASTL\source\thread_support.cpp">
+      <Filter>Code\External\EASTL</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\jRHI_OpenGL.cpp">
+      <Filter>Code\RHI</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\jRHI_Vulkan.cpp">
+      <Filter>Code\RHI</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\jRHI_DirectX11.cpp">
+      <Filter>Code\RHI</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\jRHI.cpp">
+      <Filter>Code\RHI</Filter>
+    </ClCompile>
+    <ClCompile Include="Profiler\jPerformanceProfile.cpp">
+      <Filter>Code\Profiler</Filter>
+    </ClCompile>
+    <ClCompile Include="FileLoader\jImageFileLoader.cpp">
+      <Filter>Code\FilerLoader</Filter>
+    </ClCompile>
+    <ClCompile Include="FileLoader\jFile.cpp">
+      <Filter>Code\FilerLoader</Filter>
+    </ClCompile>
+    <ClCompile Include="Shader\jShader.cpp">
+      <Filter>Code\Shader</Filter>
+    </ClCompile>
+    <ClCompile Include="Shader\Spirv\jSpirvHelper.cpp">
+      <Filter>Code\Shader\Spirv</Filter>
+    </ClCompile>
+    <ClCompile Include="FileLoader\jModelLoader.cpp">
+      <Filter>Code\FilerLoader</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene\jRenderObject.cpp">
+      <Filter>Code\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene\jMeshObject.cpp">
+      <Filter>Code\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene\jObject.cpp">
+      <Filter>Code\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene\jCamera.cpp">
+      <Filter>Code\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene\jLight.cpp">
+      <Filter>Code\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="External\glad\glad.c">
+      <Filter>Code\External\glad\include</Filter>
+    </ClCompile>
+    <ClCompile Include="External\loadpng\loadpng.cpp">
+      <Filter>Code\External\loadpng</Filter>
+    </ClCompile>
+    <ClCompile Include="External\TinyXml2\tinyxml2.cpp">
+      <Filter>Code\External\TinyXml2</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\jFrameBufferPool.cpp">
+      <Filter>Code\RHI</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\jRenderTargetPool.cpp">
+      <Filter>Code\RHI</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resource\Vulkan\glsl\shadow_fs.glsl">
+      <Filter>Code\Resource\Vulkan\glsl</Filter>
+    </None>
+    <None Include="Resource\Vulkan\glsl\shadow_vs.glsl">
+      <Filter>Code\Resource\Vulkan\glsl</Filter>
+    </None>
+    <None Include="Resource\Vulkan\glsl\shader_fs.glsl">
+      <Filter>Code\Resource\Vulkan\glsl</Filter>
+    </None>
+    <None Include="Resource\Vulkan\glsl\shader_vs.glsl">
+      <Filter>Code\Resource\Vulkan\glsl</Filter>
+    </None>
+  </ItemGroup>
+</Project>

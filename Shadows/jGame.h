@@ -32,7 +32,6 @@ public:
 	enum class ESpawnedType
 	{
 		None = 0,
-		Hair,
 		TestPrimitive,
 		CubePrimitive
 	};
@@ -40,7 +39,6 @@ public:
 	void SpawnObjects(ESpawnedType spawnType);
 
 	void RemoveSpawnedObjects();
-	void SpawnHairObjects();
 	void SpawnTestPrimitives();
 	void SapwnCubePrimitives();
 

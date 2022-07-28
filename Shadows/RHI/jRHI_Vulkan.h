@@ -3,7 +3,7 @@
 #if USE_VULKAN
 
 #include "jRHI.h"
-#include "jShader.h"
+#include "Shader/jShader.h"
 
 #define VALIDATION_LAYER_VERBOSE 0
 #define MULTIPLE_FRAME 1

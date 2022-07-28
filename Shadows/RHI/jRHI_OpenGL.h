@@ -1,8 +1,8 @@
 ﻿#pragma once
 
-#include "jRHI.h"
-#include "jRHIType.h"
-#include "jShader.h"
+#if USE_OPENGL
+
+#include "Shader/jShader.h"
 
 struct jVertexStream_OpenGL
 {
@@ -433,3 +433,5 @@ struct jShader_OpenGL : public jShader
 		AttributeLocationGatter.ClearLocation();
 	}
 };
+
+#endif // USE_OPENGL

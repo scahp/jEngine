@@ -3,17 +3,16 @@
 #if USE_VULKAN
 #include "jRHI_Vulkan.h"
 
-#define TINYOBJLOADER_IMPLEMENTATION
-#include "tiny_obj_loader.h"	// 이거 안쓸예정
-#include "jImageFileLoader.h"
-#include "jFile.h"
-#include "jFrameBufferPool.h"
-#include "jRenderTargetPool.h"
+#include "FileLoader/jImageFileLoader.h"
+#include "FileLoader/jFile.h"
+#include "RHI/jFrameBufferPool.h"
+#include "RHI/jRenderTargetPool.h"
+#include "Scene/jRenderObject.h"
+#include "Scene/jCamera.h"
 
 #include "stb_image.h"
 #include "jPrimitiveUtil.h"
-#include "jRenderObject.h"
-#include "jCamera.h"
+#include "Profiler/jPerformanceProfile.h"
 
 const std::string MODEL_PATH = "chalet.obj";
 const std::string TEXTURE_PATH = "chalet.jpg";
@@ -2126,7 +2125,6 @@ jQueryTime* jRHI_Vulkan::CreateQueryTime() const
 void jRHI_Vulkan::ReleaseQueryTime(jQueryTime* queryTime) const
 {
     auto queryTime_gl = static_cast<jQueryTime_Vulkan*>(queryTime);
-    // glDeleteQueries(1, &queryTime_gl->QueryId);
     delete queryTime_gl;
 }
 

@@ -1,7 +1,7 @@
 ﻿#include "pch.h"
 #include "jEngine.h"
-#include "jShader.h"
-#include "jPerformanceProfile.h"
+#include "Shader/jShader.h"
+#include "Profiler/jPerformanceProfile.h"
 
 jEngine::jEngine()
 {
