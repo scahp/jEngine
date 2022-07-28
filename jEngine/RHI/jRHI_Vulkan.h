@@ -145,12 +145,6 @@ struct jVertex
 //	Matrix View;					|			mat4 view;
 //	Matrix Proj;					|			mat4 proj
 //};								|		};
-struct jUniformBufferObject
-{
-	Matrix Model;
-	Matrix View;
-	Matrix Proj;
-};
 
 class jRenderPass_Vulkan : public jRenderPass
 {
@@ -790,7 +784,11 @@ public:
 	VkSemaphore renderFinishedSemaphore;
 #endif // MULTIPLE_FRAME
 	//////////////////////////////////////////////////////////////////////////
+#if _DEBUG
 	bool enableValidationLayers = true;
+#else
+	bool enableValidationLayers = false;
+#endif
 
 	const std::vector<const char*> validationLayers = {
 		"VK_LAYER_KHRONOS_validation"
@@ -1627,9 +1625,6 @@ public:
 	FORCEINLINE const VkDevice& GetDevice() const { return device; }
 
 	std::vector<jRenderPass_Vulkan*> RenderPasses;
-	jShaderBindings_Vulkan ShaderBindings;
-	std::vector<jShaderBindingInstance*> ShaderBindingInstances;
-	std::vector<IUniformBufferBlock*> UniformBuffers;
 
 	jCommandBufferManager_Vulkan CommandBufferManager;
 	VkPipelineCache PipelineCache = nullptr;

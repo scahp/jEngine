@@ -847,7 +847,7 @@ static int32 DepthCheck_BeginQueryPrimitiveGenerated = 0;
 
 void jRHI_OpenGL::BeginQueryPrimitiveGenerated(const jQueryPrimitiveGenerated* query) const
 {
-	check(1 == ++DepthCheck_BeginQueryPrimitiveGenerated);
+	verify(1 == ++DepthCheck_BeginQueryPrimitiveGenerated);
 
 	auto query_gl = static_cast<const jQueryPrimitiveGenerated_OpenGL*>(query);
 	glBeginQuery(GL_PRIMITIVES_GENERATED, query_gl->QueryId);
@@ -855,7 +855,7 @@ void jRHI_OpenGL::BeginQueryPrimitiveGenerated(const jQueryPrimitiveGenerated* q
 
 void jRHI_OpenGL::EndQueryPrimitiveGenerated() const 
 {
-	check(0 == --DepthCheck_BeginQueryPrimitiveGenerated);
+	verify(0 == --DepthCheck_BeginQueryPrimitiveGenerated);
 	glEndQuery(GL_PRIMITIVES_GENERATED);
 }
 

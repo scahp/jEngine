@@ -384,8 +384,8 @@ void jGame::Update(float deltaTime)
 			{
 				jShaderInfo shaderInfo;
 				shaderInfo.name = jName("shadow_test");
-				shaderInfo.vs = jName("Shaders/Vulkan/glsl/shadow_vs.glsl");
-				shaderInfo.fs = jName("Shaders/Vulkan/glsl/shadow_fs.glsl");
+				shaderInfo.vs = jName("Resource/Shaders/glsl/shadow_vs.glsl");
+				shaderInfo.fs = jName("Resource/Shaders/glsl/shadow_fs.glsl");
 				Shader = g_rhi->CreateShader(shaderInfo);
 			}
 
@@ -444,8 +444,8 @@ void jGame::Update(float deltaTime)
 			{
 				jShaderInfo shaderInfo;
 				shaderInfo.name = jName("default_test");
-				shaderInfo.vs = jName("Shaders/Vulkan/shader_vs.glsl");
-				shaderInfo.fs = jName("Shaders/Vulkan/shader_fs.glsl");
+                shaderInfo.vs = jName("Resource/Shaders/glsl/shader_vs.glsl");
+                shaderInfo.fs = jName("Resource/Shaders/glsl/shader_fs.glsl");
 				Shader = g_rhi->CreateShader(shaderInfo);
 			}
 

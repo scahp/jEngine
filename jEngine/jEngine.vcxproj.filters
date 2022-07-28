@@ -59,20 +59,20 @@
     <Filter Include="Code\Scene">
       <UniqueIdentifier>{8e30f491-a752-4193-b0a3-a42e09204a99}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Code\Resource">
-      <UniqueIdentifier>{6f4943cf-ecf8-4183-a927-7a0305aeaf37}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Code\Resource\Vulkan">
-      <UniqueIdentifier>{24a9224e-7c11-46ec-b700-da1a01be617a}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Code\Resource\Vulkan\glsl">
-      <UniqueIdentifier>{fad0ce8e-1a19-4c56-bc97-04b0d75ac702}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Code\External\loadpng">
       <UniqueIdentifier>{49fc389a-de03-42a9-ac0a-288f06bf99d1}</UniqueIdentifier>
     </Filter>
     <Filter Include="Code\External\TinyXml2">
       <UniqueIdentifier>{bd710aee-e5d7-498d-aa99-3fb183dd5854}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resource">
+      <UniqueIdentifier>{51d1818f-4526-4251-9e1c-d465f35a9a00}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resource\Shaders">
+      <UniqueIdentifier>{0199f0c8-e079-4cef-9182-ff1c84d635c1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resource\Shaders\glsl">
+      <UniqueIdentifier>{654d6e84-8c94-4eca-9045-6451bc5f2510}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -353,17 +353,17 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Resource\Vulkan\glsl\shadow_fs.glsl">
-      <Filter>Code\Resource\Vulkan\glsl</Filter>
+    <None Include="Resource\Shaders\glsl\shader_vs.glsl">
+      <Filter>Resource\Shaders\glsl</Filter>
     </None>
-    <None Include="Resource\Vulkan\glsl\shadow_vs.glsl">
-      <Filter>Code\Resource\Vulkan\glsl</Filter>
+    <None Include="Resource\Shaders\glsl\shadow_fs.glsl">
+      <Filter>Resource\Shaders\glsl</Filter>
     </None>
-    <None Include="Resource\Vulkan\glsl\shader_fs.glsl">
-      <Filter>Code\Resource\Vulkan\glsl</Filter>
+    <None Include="Resource\Shaders\glsl\shadow_vs.glsl">
+      <Filter>Resource\Shaders\glsl</Filter>
     </None>
-    <None Include="Resource\Vulkan\glsl\shader_vs.glsl">
-      <Filter>Code\Resource\Vulkan\glsl</Filter>
+    <None Include="Resource\Shaders\glsl\shader_fs.glsl">
+      <Filter>Resource\Shaders\glsl</Filter>
     </None>
   </ItemGroup>
 </Project>

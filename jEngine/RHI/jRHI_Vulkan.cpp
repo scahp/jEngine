@@ -572,7 +572,7 @@ bool jRHI_Vulkan::InitRHI()
     // Pipeline cache
     VkPipelineCacheCreateInfo pipelineCacheCreateInfo = {};
     pipelineCacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
-    check(VK_SUCCESS == vkCreatePipelineCache(g_rhi_vk->device, &pipelineCacheCreateInfo, nullptr, &PipelineCache));
+	verify(VK_SUCCESS == vkCreatePipelineCache(g_rhi_vk->device, &pipelineCacheCreateInfo, nullptr, &PipelineCache));
 
 	// 동적인 부분들 패스에 따라 달라짐
 	static bool s_Initializes = false;
@@ -634,27 +634,6 @@ bool jRHI_Vulkan::InitRHI()
 	//	FrameBufferTest[i].SetRenderPass(&RenderPassTest);
 	//	ensure(FrameBufferTest[i].CreateFrameBuffer(i));
 	//}
-
-	for (int32 i = 0; i < swapChainImageViews.size(); ++i)
-	{
-		IUniformBufferBlock* UniformBuffer = g_rhi->CreateUniformBufferBlock("jUniformBufferObject", sizeof(jUniformBufferObject));
-		UniformBuffer->UpdateBufferData(nullptr, sizeof(jUniformBufferObject));
-		UniformBuffers.push_back(UniformBuffer);
-	}
-	std::weak_ptr<jTexture> Texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName("chalet.jpg"), true, true);
-	jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR>::Create();
-
-	ShaderBindings.UniformBuffers.push_back(jShaderBinding(0, EShaderAccessStageFlag::VERTEX));
-	ShaderBindings.Textures.push_back(jShaderBinding(1, EShaderAccessStageFlag::FRAGMENT));
-	ShaderBindings.CreateDescriptorSetLayout();
-	ShaderBindings.CreatePool();
-	ShaderBindingInstances = ShaderBindings.CreateShaderBindingInstance((int32)swapChainImageViews.size());
-	for (int32 i = 0; i < ShaderBindingInstances.size(); ++i)
-	{
-		ShaderBindingInstances[i]->UniformBuffers.push_back(UniformBuffers[i]);
-		ShaderBindingInstances[i]->Textures.push_back({ .Texture=Texture.lock().get(), .SamplerState=SamplerState });
-		ShaderBindingInstances[i]->UpdateShaderBindings();
-	}
 
 	ensure(LoadModel());
 
@@ -1448,34 +1427,6 @@ void jRHI_Vulkan::RecreateSwapChain()
 	//CreateCommandBuffers();		// Swapchain images 과 연관 있어서 다시 만듬
 }
 
-void jRHI_Vulkan::UpdateUniformBuffer(uint32_t currentImage)
-{
-	static auto startTime = std::chrono::high_resolution_clock::now();
-
-	auto currentTime = std::chrono::high_resolution_clock::now();
-	float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-
-	jUniformBufferObject ubo = {};
-	ubo.Model.SetIdentity();
-	ubo.View.SetIdentity();
-	ubo.Proj.SetIdentity();
-	//ubo.Model = Matrix::MakeRotate(Vector(0.0f, 0.0f, 1.0f), time * DegreeToRadian(90.0f)).GetTranspose();
-	ubo.Model = Matrix::MakeRotate(Vector(0.0f, 0.0f, 1.0f), DegreeToRadian(245.0f)).GetTranspose();
-	ubo.View = jCameraUtil::CreateViewMatrix(Vector(2.0f, 2.0f, 2.0f), Vector(0.0f, 0.0f, 0.0f), Vector(0.0f, 0.0f, 1.0f)).GetTranspose();
-	ubo.Proj = jCameraUtil::CreatePerspectiveMatrix(static_cast<float>(swapChainExtent.width), static_cast<float>(swapChainExtent.height)
-		, DegreeToRadian(45.0f), 0.1f, 10.0f).GetTranspose();
-	ubo.Proj.m[1][1] *= -1;
-
-	//ubo.Model.SetTranslate({ 0.2f, 0.2f,0.2f });
-	//ubo.Model = ubo.Model.MakeRotateZ(time * DegreeToRadian(90.0f));
-
-	void* data = nullptr;
-	vkMapMemory(device, (VkDeviceMemory)UniformBuffers[currentImage]->GetBufferMemory(), 0, sizeof(ubo), 0, &data);
-	memcpy(data, &ubo, sizeof(ubo));
-	vkUnmapMemory(device, (VkDeviceMemory)UniformBuffers[currentImage]->GetBufferMemory());
-}
-
-
 jVertexBuffer* jRHI_Vulkan::CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const
 {
 	if (!streamData)
@@ -1656,8 +1607,8 @@ jTexture* jRHI_Vulkan::CreateTextureFromData(void* data, int32 width, int32 heig
     VkDeviceSize imageSize = width * height * GetVulkanTextureComponentCount(textureFormat);
     textureMipLevels = static_cast<uint32>(std::floor(std::log2(std::max<int>(width, height)))) + 1;
 
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
+    VkBuffer stagingBuffer = nullptr;
+    VkDeviceMemory stagingBufferMemory = nullptr;
 
     CreateBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
         , imageSize, stagingBuffer, stagingBufferMemory);
@@ -2387,9 +2338,9 @@ bool jRenderPass_Vulkan::CreateRenderPass()
 			subpass.pColorAttachments = &colorAttachmentRefs[0];
 		}
 
+        VkAttachmentReference depthAttachmentRef = {};
 		if (DepthAttachment)
 		{
-            VkAttachmentReference depthAttachmentRef = {};
             depthAttachmentRef.attachment = AttachmentIndex++;
             depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 

@@ -73,7 +73,11 @@ using tchar = wchar_t;
 
 #define ensure(x) (((x) || (JASSERT(0), 0)))
 #define check(x) JASSERT(x)
-
+#if _DEBUG
+#define verify(x) JASSERT(x)
+#else
+#define verify(x) (x)
+#endif
 
 #include "RHI/jRHIType.h"
 #include "RHI/jRHI.h"
