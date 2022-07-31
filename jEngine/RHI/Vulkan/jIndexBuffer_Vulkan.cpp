@@ -22,5 +22,5 @@ void jIndexBuffer_Vulkan::Bind() const
         break;
     }
     check(g_rhi_vk->CurrentCommandBuffer);
-    vkCmdBindIndexBuffer((VkCommandBuffer)g_rhi_vk->CurrentCommandBuffer->GetHandle(), IndexBuffer, 0, IndexType);
+    vkCmdBindIndexBuffer((VkCommandBuffer)g_rhi_vk->CurrentCommandBuffer->GetHandle(), Buffer.Buffer, 0, IndexType);
 }

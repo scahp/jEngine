@@ -1,11 +1,12 @@
 ﻿#include "pch.h"
 #include "jRenderPass_Vulkan.h"
+#include "jRHIType_Vulkan.h"
 
 std::unordered_map<size_t, VkRenderPass> s_renderPassPool;
 
 void jRenderPass_Vulkan::Release()
 {
-    vkDestroyRenderPass(g_rhi_vk->device, RenderPass, nullptr);
+    vkDestroyRenderPass(g_rhi_vk->Device, RenderPass, nullptr);
 }
 
 size_t jRenderPass_Vulkan::GetHash() const
@@ -307,7 +308,7 @@ bool jRenderPass_Vulkan::CreateRenderPass()
             const jTexture* texture = RT->GetTexture();
             check(texture);
 
-            ImageViews.push_back((VkImageView)texture->GetHandle());
+            ImageViews.push_back((VkImageView)texture->GetViewHandle());
         }
 
         if (DepthAttachment)
@@ -318,7 +319,7 @@ bool jRenderPass_Vulkan::CreateRenderPass()
             const jTexture* texture = RT->GetTexture();
             check(texture);
 
-            ImageViews.push_back((VkImageView)texture->GetHandle());
+            ImageViews.push_back((VkImageView)texture->GetViewHandle());
         }
 
         if (SampleCount > 1)
@@ -331,7 +332,7 @@ bool jRenderPass_Vulkan::CreateRenderPass()
             const jTexture* texture = RT->GetTexture();
             check(texture);
 
-            ImageViews.push_back((VkImageView)texture->GetHandle());
+            ImageViews.push_back((VkImageView)texture->GetViewHandle());
         }
 
         VkFramebufferCreateInfo framebufferInfo = {};
@@ -346,7 +347,7 @@ bool jRenderPass_Vulkan::CreateRenderPass()
         framebufferInfo.height = RenderExtent.y;
         framebufferInfo.layers = LayerCount;			// 이미지 배열의 레이어수(3D framebuffer에 사용할 듯)
 
-        if (!ensure(vkCreateFramebuffer(g_rhi_vk->device, &framebufferInfo, nullptr, &FrameBuffer) == VK_SUCCESS))
+        if (!ensure(vkCreateFramebuffer(g_rhi_vk->Device, &framebufferInfo, nullptr, &FrameBuffer) == VK_SUCCESS))
             return false;
     }
 

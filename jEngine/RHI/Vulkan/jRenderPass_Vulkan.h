@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include "../jRenderPass.h"
 
 class jRenderPass_Vulkan : public jRenderPass
 {

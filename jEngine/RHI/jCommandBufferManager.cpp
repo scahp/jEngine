@@ -13,7 +13,7 @@ bool jCommandBufferManager_Vulkan::CreatePool(uint32 QueueIndex)
     //													이 플래그가 없으면 모든 커맨드 버퍼들이 동시에 리셋되야 함.
     poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;		// Optional
 
-    if (!ensure(vkCreateCommandPool(g_rhi_vk->device, &poolInfo, nullptr, &CommandPool) == VK_SUCCESS))
+    if (!ensure(vkCreateCommandPool(g_rhi_vk->Device, &poolInfo, nullptr, &CommandPool) == VK_SUCCESS))
         return false;
 
     return true;
@@ -25,7 +25,7 @@ jCommandBuffer_Vulkan jCommandBufferManager_Vulkan::GetOrCreateCommandBuffer()
     {
         for (int32 i = 0; i < (int32)PendingCommandBuffers.size(); ++i)
         {
-            const VkResult Result = vkGetFenceStatus(g_rhi_vk->device, (VkFence)PendingCommandBuffers[i].GetFenceHandle());
+            const VkResult Result = vkGetFenceStatus(g_rhi_vk->Device, (VkFence)PendingCommandBuffers[i].GetFenceHandle());
             if (Result == VK_SUCCESS)		// VK_SUCCESS 면 Signaled
             {
                 jCommandBuffer_Vulkan commandBuffer = PendingCommandBuffers[i];
@@ -49,7 +49,7 @@ jCommandBuffer_Vulkan jCommandBufferManager_Vulkan::GetOrCreateCommandBuffer()
     allocInfo.commandBufferCount = 1;
 
     jCommandBuffer_Vulkan commandBuffer;
-    if (!ensure(vkAllocateCommandBuffers(g_rhi_vk->device, &allocInfo, &commandBuffer.GetRef()) == VK_SUCCESS))
+    if (!ensure(vkAllocateCommandBuffers(g_rhi_vk->Device, &allocInfo, &commandBuffer.GetRef()) == VK_SUCCESS))
         return commandBuffer;
 
     commandBuffer.SetFence(g_rhi_vk->FenceManager.GetOrCreateFence());

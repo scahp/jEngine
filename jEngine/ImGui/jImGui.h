@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Math/Vector.h"
+#include "RHI/Vulkan/jBuffer_Vulkan.h"
+#include "RHI/Vulkan/jImage_Vulkan.h"
 
 // This is modifed from here https://github.com/SaschaWillems/Vulkan/blob/master/examples/imgui/main.cpp
 
@@ -60,21 +62,15 @@ private:
     // Vulkan resources for rendering the UI
     struct jDynamicBufferData
     {
-        VkBuffer vertexBuffer = nullptr;
-        void* vertexBufferMapped = nullptr;
-        VkDeviceSize vertexBufferSize = 0;
-        VkDeviceMemory vertexBufferMemory = nullptr;
-        VkBuffer indexBuffer = nullptr;
-        void* indexBufferMapped = nullptr;
-        VkDeviceMemory indexBufferMemory = nullptr;
-        VkDeviceSize indexBufferSize = 0;
+        jBuffer_Vulkan VertexBuffer;
+        jBuffer_Vulkan IndexBuffer;
+
         int32_t vertexCount = 0;
         int32_t indexCount = 0;
     };
     std::vector<jDynamicBufferData> DynamicBufferData;
-    VkDeviceMemory fontMemory = nullptr;
-    VkImage fontImage = nullptr;
-    VkImageView fontView = nullptr;
+    jImage_Vulkan FontImage;
+
     VkPipelineLayout PipelineLayout;
     VkDescriptorPool DescriptorPool;
     VkDescriptorSetLayout DescriptorSetLayout;

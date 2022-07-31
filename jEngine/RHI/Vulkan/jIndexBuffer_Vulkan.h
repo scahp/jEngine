@@ -2,8 +2,7 @@
 
 struct jIndexBuffer_Vulkan : public jIndexBuffer
 {
-    VkBuffer IndexBuffer = nullptr;
-    VkDeviceMemory IndexBufferMemory = nullptr;
+    jBuffer_Vulkan Buffer;
 
     virtual void Bind(const jShader* shader) const override {}
     virtual void Bind() const override;

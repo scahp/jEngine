@@ -1,6 +1,8 @@
 #include "pch.h"
 #include "jImGui.h"
 #include "Profiler/jPerformanceProfile.h"
+#include "RHI/Vulkan/jTexture_Vulkan.h"
+#include "RHI/Vulkan/jVulkanBufferUtil.h"
 
 jImGUI_Vulkan* jImGUI_Vulkan::s_instance = nullptr;
 
@@ -8,7 +10,7 @@ jImGUI_Vulkan::jImGUI_Vulkan()
 {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGui_ImplGlfw_InitForOpenGL(g_rhi_vk->window, true);
+    ImGui_ImplGlfw_InitForOpenGL(g_rhi_vk->Window, true);
 }
 
 jImGUI_Vulkan::~jImGUI_Vulkan()
@@ -17,17 +19,13 @@ jImGUI_Vulkan::~jImGUI_Vulkan()
     // Release all Vulkan resources required for rendering imGui
     for (int32 i = 0; i < DynamicBufferData.size(); ++i)
     {
-        vkDestroyBuffer(g_rhi_vk->device, DynamicBufferData[i].vertexBuffer, nullptr);
-        vkFreeMemory(g_rhi_vk->device, DynamicBufferData[i].vertexBufferMemory, nullptr);
-        vkDestroyBuffer(g_rhi_vk->device, DynamicBufferData[i].indexBuffer, nullptr);
-        vkFreeMemory(g_rhi_vk->device, DynamicBufferData[i].indexBufferMemory, nullptr);
+        DynamicBufferData[i].VertexBuffer.Destroy();
+        DynamicBufferData[i].IndexBuffer.Destroy();
     }
-    vkDestroyImage(g_rhi_vk->device, fontImage, nullptr);
-    vkDestroyImageView(g_rhi_vk->device, fontView, nullptr);
-    vkFreeMemory(g_rhi_vk->device, fontMemory, nullptr);
-    vkDestroyPipelineLayout(g_rhi_vk->device, PipelineLayout, nullptr);
-    vkDestroyDescriptorPool(g_rhi_vk->device, DescriptorPool, nullptr);
-    vkDestroyDescriptorSetLayout(g_rhi_vk->device, DescriptorSetLayout, nullptr);
+    FontImage.Destroy();
+    vkDestroyPipelineLayout(g_rhi_vk->Device, PipelineLayout, nullptr);
+    vkDestroyDescriptorPool(g_rhi_vk->Device, DescriptorPool, nullptr);
+    vkDestroyDescriptorSetLayout(g_rhi_vk->Device, DescriptorSetLayout, nullptr);
 }
 
 void jImGUI_Vulkan::Initialize(float width, float height)
@@ -56,7 +54,7 @@ void jImGUI_Vulkan::Initialize(float width, float height)
     descriptorPoolInfo.poolSizeCount = static_cast<uint32>(poolSizes.size());
     descriptorPoolInfo.pPoolSizes = poolSizes.data();
     descriptorPoolInfo.maxSets = 2;
-    verify(VK_SUCCESS == vkCreateDescriptorPool(g_rhi_vk->device, &descriptorPoolInfo, nullptr, &DescriptorPool));
+    verify(VK_SUCCESS == vkCreateDescriptorPool(g_rhi_vk->Device, &descriptorPoolInfo, nullptr, &DescriptorPool));
 
     // Descriptor set layout
     std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings;
@@ -70,7 +68,7 @@ void jImGUI_Vulkan::Initialize(float width, float height)
     descriptorLayout.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     descriptorLayout.pBindings = setLayoutBindings.data();
     descriptorLayout.bindingCount = static_cast<uint32>(setLayoutBindings.size());
-    verify(VK_SUCCESS == vkCreateDescriptorSetLayout(g_rhi_vk->device, &descriptorLayout, nullptr, &DescriptorSetLayout));
+    verify(VK_SUCCESS == vkCreateDescriptorSetLayout(g_rhi_vk->Device, &descriptorLayout, nullptr, &DescriptorSetLayout));
 
     // Descriptor set
     VkDescriptorSetAllocateInfo allocInfo{};
@@ -78,7 +76,7 @@ void jImGUI_Vulkan::Initialize(float width, float height)
     allocInfo.descriptorPool = DescriptorPool;
     allocInfo.pSetLayouts = &DescriptorSetLayout;
     allocInfo.descriptorSetCount = 1;
-    verify(VK_SUCCESS == vkAllocateDescriptorSets(g_rhi_vk->device, &allocInfo, &DescriptorSet));
+    verify(VK_SUCCESS == vkAllocateDescriptorSets(g_rhi_vk->Device, &allocInfo, &DescriptorSet));
     //////////////////////////////////////////////////////////////////////////
     // 
     //////////////////////////////////////////////////////////////////////////
@@ -89,19 +87,19 @@ void jImGUI_Vulkan::Initialize(float width, float height)
     VkDeviceSize uploadSize = texWidth * texHeight * 4 * sizeof(char);
 
     // Create target image for copy
-    verify(g_rhi_vk->CreateImage(texWidth, texHeight, 1, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL
-        , VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, fontImage, fontMemory));
+    verify(jVulkanBufferUtil::CreateImage(texWidth, texHeight, 1, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL
+        , VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, FontImage));
 
     // Image view
-    fontView = g_rhi_vk->CreateImageView(fontImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, 1);
-    check(fontView);
+    FontImage.ImageView = jVulkanBufferUtil::CreateImageView(FontImage.Image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, 1);
+    check(FontImage.ImageView);
 
     jSamplerStateInfo* samplerStateInfo = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR>::Create();
     check(samplerStateInfo);
 
     VkDescriptorImageInfo fontDescriptor{};
     fontDescriptor.sampler = ((jSamplerStateInfo_Vulkan*)samplerStateInfo)->SamplerState;
-    fontDescriptor.imageView = fontView;
+    fontDescriptor.imageView = FontImage.ImageView;
     fontDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
     std::vector<VkWriteDescriptorSet> writeDescriptorSets;
@@ -112,30 +110,24 @@ void jImGUI_Vulkan::Initialize(float width, float height)
     writeDescriptorSets[0].dstBinding = 0;
     writeDescriptorSets[0].pImageInfo = &fontDescriptor;
     writeDescriptorSets[0].descriptorCount = 1;
-    vkUpdateDescriptorSets(g_rhi_vk->device, static_cast<uint32>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+    vkUpdateDescriptorSets(g_rhi_vk->Device, static_cast<uint32>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
     //////////////////////////////////////////////////////////////////////////
     // 
     //////////////////////////////////////////////////////////////////////////
     // Staging buffers for font data upload
-    VkBuffer stagingBuffer = nullptr;
-    VkDeviceMemory stagingBufferMemory = nullptr;
+    jBuffer_Vulkan stagingBuffer;
 
-    verify(g_rhi_vk->CreateBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-        , uploadSize, stagingBuffer, stagingBufferMemory));
+    verify(jVulkanBufferUtil::CreateBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+        , uploadSize, stagingBuffer));
 
-    void* mapped = nullptr;
-    vkMapMemory(g_rhi_vk->device, stagingBufferMemory, 0, uploadSize, 0, &mapped);
-    memcpy(mapped, fontData, uploadSize);
-    vkUnmapMemory(g_rhi_vk->device, stagingBufferMemory);
-    mapped = nullptr;
+    stagingBuffer.UpdateBuffer(fontData, uploadSize);
 
     // Copy buffer data to font image
-    g_rhi_vk->TransitionImageLayout(fontImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1);
-    g_rhi_vk->CopyBufferToImage(stagingBuffer, fontImage, texWidth, texHeight);
-    g_rhi_vk->TransitionImageLayout(fontImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 1);
+    g_rhi_vk->TransitionImageLayout(FontImage.Image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1);
+    jVulkanBufferUtil::CopyBufferToImage(stagingBuffer.Buffer, FontImage.Image, texWidth, texHeight);
+    g_rhi_vk->TransitionImageLayout(FontImage.Image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 1);
 
-    vkDestroyBuffer(g_rhi_vk->device, stagingBuffer, nullptr);
-    vkFreeMemory(g_rhi_vk->device, stagingBufferMemory, nullptr);
+    stagingBuffer.Destroy();
     //////////////////////////////////////////////////////////////////////////
 }
 
@@ -154,7 +146,7 @@ VkPipeline jImGUI_Vulkan::CreatePipelineState(VkRenderPass renderPass, VkQueue c
     pipelineLayoutCreateInfo.pSetLayouts = &DescriptorSetLayout;
     pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
     pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
-    verify(VK_SUCCESS == vkCreatePipelineLayout(g_rhi_vk->device, &pipelineLayoutCreateInfo, nullptr, &PipelineLayout));
+    verify(VK_SUCCESS == vkCreatePipelineLayout(g_rhi_vk->Device, &pipelineLayoutCreateInfo, nullptr, &PipelineLayout));
 
     jRasterizationStateInfo* rasterizationInfo = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::NONE, EFrontFace::CCW>::Create();
     check(rasterizationInfo);
@@ -259,7 +251,7 @@ VkPipeline jImGUI_Vulkan::CreatePipelineState(VkRenderPass renderPass, VkQueue c
             moduleCreateInfo.codeSize = size;
             moduleCreateInfo.pCode = (uint32_t*)shaderCode;
 
-            verify(VK_SUCCESS == vkCreateShaderModule(g_rhi_vk->device, &moduleCreateInfo, NULL, &shaderModule));
+            verify(VK_SUCCESS == vkCreateShaderModule(g_rhi_vk->Device, &moduleCreateInfo, NULL, &shaderModule));
             delete[] shaderCode;
 
             return shaderModule;
@@ -283,17 +275,17 @@ VkPipeline jImGUI_Vulkan::CreatePipelineState(VkRenderPass renderPass, VkQueue c
     shaderStages[1] = fragmentShaderStage;
 
     VkPipeline pipeline = nullptr;
-    verify(VK_SUCCESS == vkCreateGraphicsPipelines(g_rhi_vk->device, g_rhi_vk->PipelineCache, 1, &pipelineCreateInfo, nullptr, &pipeline));
+    verify(VK_SUCCESS == vkCreateGraphicsPipelines(g_rhi_vk->Device, g_rhi_vk->PipelineCache, 1, &pipelineCreateInfo, nullptr, &pipeline));
 
-    vkDestroyShaderModule(g_rhi_vk->device, vertexShaderStage.module, nullptr);
-    vkDestroyShaderModule(g_rhi_vk->device, fragmentShaderStage.module, nullptr);
+    vkDestroyShaderModule(g_rhi_vk->Device, vertexShaderStage.module, nullptr);
+    vkDestroyShaderModule(g_rhi_vk->Device, fragmentShaderStage.module, nullptr);
 
     return pipeline;
 }
 
 void jImGUI_Vulkan::Update(float InDeltaSeconds)
 {
-    jImGUI_Vulkan::Get().NewFrame((g_rhi_vk->currenFrame == 0));
+    jImGUI_Vulkan::Get().NewFrame((g_rhi_vk->CurrenFrameIndex == 0));
     jImGUI_Vulkan::Get().UpdateBuffers();
 }
 
@@ -359,50 +351,40 @@ void jImGUI_Vulkan::UpdateBuffers()
     if ((imDrawData->TotalVtxCount == 0) || (imDrawData->TotalIdxCount == 0))
         return;
 
-    if (DynamicBufferData.size() <= g_rhi_vk->currenFrame)
-        DynamicBufferData.resize(g_rhi_vk->currenFrame + 1);
+    if (DynamicBufferData.size() <= g_rhi_vk->CurrenFrameIndex)
+        DynamicBufferData.resize(g_rhi_vk->CurrenFrameIndex + 1);
 
-    auto& DynamicBuffer = DynamicBufferData[g_rhi_vk->currenFrame];
+    auto& DynamicBuffer = DynamicBufferData[g_rhi_vk->CurrenFrameIndex];
 
     // Update buffers only if vertex or index count has been changed compared to current buffer size
 
     // Vertex buffer
-    if ((DynamicBuffer.vertexBuffer == VK_NULL_HANDLE) || (DynamicBuffer.vertexCount != imDrawData->TotalVtxCount))
+    if ((DynamicBuffer.VertexBuffer.Buffer == VK_NULL_HANDLE) || (DynamicBuffer.vertexCount != imDrawData->TotalVtxCount))
     {
-        DynamicBuffer.vertexBufferSize = imDrawData->TotalVtxCount * sizeof(ImDrawVert);
+        const uint64 newBufferSize = imDrawData->TotalVtxCount * sizeof(ImDrawVert);
 
-        if (DynamicBuffer.vertexBufferMemory)
-            vkUnmapMemory(g_rhi_vk->device, DynamicBuffer.vertexBufferMemory);
-        if (DynamicBuffer.vertexBuffer)
-            vkDestroyBuffer(g_rhi_vk->device, DynamicBuffer.vertexBuffer, nullptr);
-        if (DynamicBuffer.vertexBufferMemory)
-            vkFreeMemory(g_rhi_vk->device, DynamicBuffer.vertexBufferMemory, nullptr);
-        verify(DynamicBuffer.vertexBufferSize = g_rhi_vk->CreateBuffer(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
-            , DynamicBuffer.vertexBufferSize, DynamicBuffer.vertexBuffer, DynamicBuffer.vertexBufferMemory));
+        DynamicBuffer.VertexBuffer.Destroy();
+        verify(jVulkanBufferUtil::CreateBuffer(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+            , newBufferSize, DynamicBuffer.VertexBuffer));
         DynamicBuffer.vertexCount = imDrawData->TotalVtxCount;
-        vkMapMemory(g_rhi_vk->device, DynamicBuffer.vertexBufferMemory, 0, DynamicBuffer.vertexBufferSize, 0, &DynamicBuffer.vertexBufferMapped);
+        DynamicBuffer.VertexBuffer.Map();
     }
 
     // Index buffer
-    if ((DynamicBuffer.indexBuffer == VK_NULL_HANDLE) || (DynamicBuffer.indexCount < imDrawData->TotalIdxCount))
+    if ((DynamicBuffer.IndexBuffer.Buffer == VK_NULL_HANDLE) || (DynamicBuffer.indexCount < imDrawData->TotalIdxCount))
     {
-        DynamicBuffer.indexBufferSize = imDrawData->TotalIdxCount * sizeof(ImDrawIdx);
+        const uint64 newBufferSize = imDrawData->TotalIdxCount * sizeof(ImDrawIdx);
 
-        if (DynamicBuffer.indexBufferMemory)
-            vkUnmapMemory(g_rhi_vk->device, DynamicBuffer.indexBufferMemory);
-        if (DynamicBuffer.indexBuffer)
-            vkDestroyBuffer(g_rhi_vk->device, DynamicBuffer.indexBuffer, nullptr);
-        if (DynamicBuffer.indexBufferMemory)
-            vkFreeMemory(g_rhi_vk->device, DynamicBuffer.indexBufferMemory, nullptr);
-        verify(DynamicBuffer.indexBufferSize = g_rhi_vk->CreateBuffer(VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
-            , DynamicBuffer.indexBufferSize, DynamicBuffer.indexBuffer, DynamicBuffer.indexBufferMemory));
+        DynamicBuffer.IndexBuffer.Destroy();
+        verify(jVulkanBufferUtil::CreateBuffer(VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+            , newBufferSize, DynamicBuffer.IndexBuffer));
         DynamicBuffer.indexCount = imDrawData->TotalIdxCount;
-        vkMapMemory(g_rhi_vk->device, DynamicBuffer.indexBufferMemory, 0, DynamicBuffer.indexBufferSize, 0, &DynamicBuffer.indexBufferMapped);
+        DynamicBuffer.IndexBuffer.Map();
     }
 
     // Upload data
-    ImDrawVert* vtxDst = (ImDrawVert*)DynamicBuffer.vertexBufferMapped;
-    ImDrawIdx* idxDst = (ImDrawIdx*)DynamicBuffer.indexBufferMapped;
+    ImDrawVert* vtxDst = (ImDrawVert*)DynamicBuffer.VertexBuffer.GetMappedPointer();
+    ImDrawIdx* idxDst = (ImDrawIdx*)DynamicBuffer.IndexBuffer.GetMappedPointer();
 
     for (int n = 0; n < imDrawData->CmdListsCount; n++) {
         const ImDrawList* cmd_list = imDrawData->CmdLists[n];
@@ -416,18 +398,18 @@ void jImGUI_Vulkan::UpdateBuffers()
     {
         VkMappedMemoryRange mappedRange = {};
         mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-        mappedRange.memory = DynamicBuffer.vertexBufferMemory;
+        mappedRange.memory = DynamicBuffer.VertexBuffer.BufferMemory;
         mappedRange.offset = 0;
-        mappedRange.size = DynamicBuffer.vertexBufferSize;
-        verify(VK_SUCCESS == vkFlushMappedMemoryRanges(g_rhi_vk->device, 1, &mappedRange));
+        mappedRange.size = DynamicBuffer.VertexBuffer.AllocatedSize;
+        verify(VK_SUCCESS == vkFlushMappedMemoryRanges(g_rhi_vk->Device, 1, &mappedRange));
     }
     {
         VkMappedMemoryRange mappedRange = {};
         mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-        mappedRange.memory = DynamicBuffer.indexBufferMemory;
+        mappedRange.memory = DynamicBuffer.IndexBuffer.BufferMemory;
         mappedRange.offset = 0;
-        mappedRange.size = DynamicBuffer.indexBufferSize;
-        verify(VK_SUCCESS == vkFlushMappedMemoryRanges(g_rhi_vk->device, 1, &mappedRange));
+        mappedRange.size = DynamicBuffer.IndexBuffer.AllocatedSize;
+        verify(VK_SUCCESS == vkFlushMappedMemoryRanges(g_rhi_vk->Device, 1, &mappedRange));
     }
 }
 
@@ -441,7 +423,7 @@ void jImGUI_Vulkan::PrepareDraw(int32 imageIndex)
         Pipelines.resize(imageIndex + 1);
 
         auto SwapChainRTPtr = jRenderTarget::CreateFromTexture<jTexture_Vulkan>(ETextureType::TEXTURE_2D, ETextureFormat::BGRA8
-            , g_rhi_vk->swapChainExtent.width, g_rhi_vk->swapChainExtent.height, false, 1, 1, g_rhi_vk->swapChainImages[imageIndex], g_rhi_vk->swapChainImageViews[imageIndex]);
+            , g_rhi_vk->Swapchain_Vulkan.Extent.x, g_rhi_vk->Swapchain_Vulkan.Extent.y, false, 1, 1, g_rhi_vk->Swapchain_Vulkan.Images[imageIndex].Image, g_rhi_vk->Swapchain_Vulkan.Images[imageIndex].ImageView);
 
         jAttachment* color = new jAttachment(SwapChainRTPtr, EAttachmentLoadStoreOp::DONTCARE_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE);
 
@@ -506,8 +488,8 @@ void jImGUI_Vulkan::Draw(VkCommandBuffer commandBuffer, int32 imageIndex)
         auto& DynamicBuffer = DynamicBufferData[imageIndex];
 
         VkDeviceSize offsets[1] = { 0 };
-        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &DynamicBuffer.vertexBuffer, offsets);
-        vkCmdBindIndexBuffer(commandBuffer, DynamicBuffer.indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &DynamicBuffer.VertexBuffer.Buffer, offsets);
+        vkCmdBindIndexBuffer(commandBuffer, DynamicBuffer.IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT16);
 
         for (int32_t i = 0; i < imDrawData->CmdListsCount; i++)
         {

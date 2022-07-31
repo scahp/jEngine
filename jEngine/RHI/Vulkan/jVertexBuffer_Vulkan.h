@@ -1,4 +1,6 @@
 ﻿#pragma once
+#include "jRHIType_Vulkan.h"
+#include "jBuffer_Vulkan.h"
 
 struct jVertexStream_Vulkan
 {
@@ -11,8 +13,7 @@ struct jVertexStream_Vulkan
     size_t Offset = 0;
     int32 InstanceDivisor = 0;
 
-    VkBuffer VertexBuffer = nullptr;
-    VkDeviceMemory VertexBufferMemory = nullptr;
+    jBuffer_Vulkan Buffer;
 };
 
 struct jVertexBuffer_Vulkan : public jVertexBuffer

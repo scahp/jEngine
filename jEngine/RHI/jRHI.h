@@ -2,126 +2,17 @@
 #include "Math\Matrix.h"
 #include "Core\jName.h"
 #include "Math\Vector.h"
+#include "jPipelineStateInfo.h"
+#include "jFrameBuffer.h"
+#include "jRenderTarget.h"
+#include "jShaderBindings.h"
+#include "jBuffer.h"
 
 extern class jRHI* g_rhi;
 
 struct jShader;
 struct jShaderInfo;
 struct jSamplerStateInfo;
-
-struct IBuffer
-{
-	virtual ~IBuffer() {}
-
-	virtual jName GetName() const { return jName::Invalid; }
-	virtual void Bind(const jShader* shader) const = 0;
-};
-
-class jCommandBuffer;
-
-struct jVertexBuffer : public IBuffer
-{
-	std::shared_ptr<jVertexStreamData> VertexStreamData;
-
-	virtual size_t GetHash() const { return 0; }
-	virtual void Bind(const jShader* shader) const {}
-	virtual void Bind() const {}
-};
-
-struct jIndexBuffer : public IBuffer
-{
-	std::shared_ptr<jIndexStreamData> IndexStreamData;
-
-	virtual void Bind(const jShader* shader) const {}
-	virtual void Bind() const {}
-};
-
-struct jTexture
-{
-	constexpr jTexture() = default;
-	constexpr jTexture(ETextureType InType, ETextureFormat InFormat, int32 InWidth, int32 InHeight
-		, int32 InLayerCount = 1, int32 InSampleCount = 1, int32 InMipLevel = 1, bool InSRGB = false, bool InHasMipLevel = false)
-		: Type(InType), Format(InFormat), Width(InWidth), Height(InHeight), LayerCount(InLayerCount)
-		, SampleCount(InSampleCount), MipLevel(InMipLevel), sRGB(InSRGB)
-	{}
-	virtual ~jTexture() {}
-	static int32 GetMipLevels(int32 InWidth, int32 InHeight)
-	{
-		return 1 + (int32)floorf(log2f(fmaxf((float)InWidth, (float)InHeight)));
-	}
-
-	virtual const void* GetHandle() const { return nullptr; }
-	virtual const void* GetSamplerStateHandle() const { return nullptr; }
-
-	FORCEINLINE bool IsDepthFormat() const { return ::IsDepthFormat(Format); }
-
-	ETextureType Type = ETextureType::MAX;
-	ETextureFormat Format = ETextureFormat::RGB8;
-	int32 LayerCount = 1;
-	int32 SampleCount = 1;
-	int32 MipLevel = 1;
-
-	int32 Width = 0;
-	int32 Height = 0;
-
-	bool sRGB = false;
-};
-
-struct jViewport
-{
-	jViewport() = default;
-	jViewport(int32 x, int32 y, int32 width, int32 height, float minDepth = 0.0f, float maxDepth = 1.0f)
-		: X(static_cast<float>(x)), Y(static_cast<float>(y))
-		, Width(static_cast<float>(width)), Height(static_cast<float>(height))
-		, MinDepth(minDepth), MaxDepth(maxDepth)
-	{}
-	jViewport(float x, float y, float width, float height, float minDepth = 0.0f, float maxDepth = 1.0f) : X(x), Y(y), Width(width), Height(height), MinDepth(minDepth), MaxDepth(maxDepth) {}
-
-	float X = 0.0f;
-	float Y = 0.0f;
-	float Width = 0.0f;
-	float Height = 0.0f;
-	float MinDepth = 0.0f;
-	float MaxDepth = 1.0f;
-
-	mutable size_t Hash = 0;
-
-	size_t GetHash() const
-	{
-		if (Hash)
-			return Hash;
-
-		Hash = CityHash64((const char*)&X, sizeof(X));
-		Hash ^= CityHash64((const char*)&Y, sizeof(Y));
-		Hash ^= CityHash64((const char*)&Width, sizeof(Width));
-		Hash ^= CityHash64((const char*)&Height, sizeof(Height));
-		Hash ^= CityHash64((const char*)&MinDepth, sizeof(MinDepth));
-		Hash ^= CityHash64((const char*)&MaxDepth, sizeof(MaxDepth));
-		return Hash;
-	}
-};
-
-struct jScissor
-{
-	jScissor() = default;
-	jScissor(int32 x, int32 y, int32 width, int32 height)
-		: Offset(x, y), Extent(width, height)
-	{}
-	Vector2i Offset;
-	Vector2i Extent;
-
-	mutable size_t Hash = 0;
-
-	FORCEINLINE size_t GetHash() const
-	{
-		if (Hash)
-			return Hash;
-
-		Hash = CityHash64((const char*)&Offset, sizeof(Offset));
-		Hash ^= CityHash64((const char*)&Extent, sizeof(Extent));
-		return Hash;
-	}
-};
 
 enum class EUniformType
 {
@@ -313,55 +204,6 @@ public:
 	~jMaterial() {}
 };
 
-//////////////////////////////////////////////////////////////////////////
-struct jFrameBufferInfo
-{
-	jFrameBufferInfo() = default;
-	jFrameBufferInfo(ETextureType textureType, ETextureFormat format, int32 width, int32 height, int32 layerCount = 1
-		, bool isGenerateMipmap = false, int32 sampleCount = 1)
-		: TextureType(textureType), Format(format), Width(width), Height(height), LayerCount(layerCount)
-		, IsGenerateMipmap(isGenerateMipmap), SampleCount(sampleCount)
-	{}
-
-	size_t GetHash() const
-	{
-		size_t result = CityHash64((const char*)&TextureType, sizeof(TextureType));
-		result ^= CityHash64((const char*)&Format, sizeof(Format));
-		result ^= CityHash64((const char*)&Width, sizeof(Width));
-		result ^= CityHash64((const char*)&Height, sizeof(Height));
-		result ^= CityHash64((const char*)&LayerCount, sizeof(LayerCount));
-		result ^= CityHash64((const char*)&IsGenerateMipmap, sizeof(IsGenerateMipmap));
-		result ^= CityHash64((const char*)&SampleCount, sizeof(SampleCount));
-		return result;
-	}
-
-	ETextureType TextureType = ETextureType::TEXTURE_2D;
-	ETextureFormat Format = ETextureFormat::RGB8;
-	int32 Width = 0;
-	int32 Height = 0;
-	int32 LayerCount = 1;
-	bool IsGenerateMipmap = false;
-	int32 SampleCount = 1;
-};
-
-struct jFrameBuffer : public std::enable_shared_from_this<jFrameBuffer>
-{
-	virtual ~jFrameBuffer() {}
-
-	virtual jTexture* GetTexture(int32 index = 0) const { return Textures[index].get(); }
-	virtual jTexture* GetTextureDepth(int32 index = 0) const { return TextureDepth.get(); }
-	virtual ETextureType GetTextureType() const { return Info.TextureType; }
-	virtual bool SetDepthAttachment(const std::shared_ptr<jTexture>& InDepth) { TextureDepth = InDepth; return true; }
-	virtual void SetDepthMipLevel(int32 InLevel) {}
-
-	virtual bool FBOBegin(int index = 0, bool mrt = false) const { return true; };
-	virtual void End() const {}
-
-	jFrameBufferInfo Info;
-	std::vector<std::shared_ptr<jTexture> > Textures;
-	std::shared_ptr<jTexture> TextureDepth;
-};
-
 class jCommandBuffer
 {
 public:
@@ -373,74 +215,6 @@ public:
 	virtual bool Begin() const { return false; }
 	virtual bool End() const { return false; }
 	virtual void Reset() const {}
-};
-
-struct jRenderTargetInfo
-{
-	constexpr jRenderTargetInfo() = default;
-	constexpr jRenderTargetInfo(ETextureType textureType, ETextureFormat format, int32 width, int32 height, int32 layerCount = 1
-		, bool isGenerateMipmap = false, int32 sampleCount = 1)
-		: Type(textureType), Format(format), Width(width), Height(height), LayerCount(layerCount)
-		, IsGenerateMipmap(isGenerateMipmap), SampleCount(sampleCount)
-	{}
-
-	size_t GetHash() const
-	{
-        size_t result = CityHash64((const char*)&Type, sizeof(Type));
-        result ^= CityHash64((const char*)&Format, sizeof(Format));
-		result ^= CityHash64((const char*)&Width, sizeof(Width));
-		result ^= CityHash64((const char*)&Height, sizeof(Height));
-		result ^= CityHash64((const char*)&LayerCount, sizeof(LayerCount));
-		result ^= CityHash64((const char*)&IsGenerateMipmap, sizeof(IsGenerateMipmap));
-		result ^= CityHash64((const char*)&SampleCount, sizeof(SampleCount));
-		return result;
-	}
-
-	ETextureType Type = ETextureType::TEXTURE_2D;
-	ETextureFormat Format = ETextureFormat::RGB8;
-	int32 Width = 0;
-	int32 Height = 0;
-	int32 LayerCount = 1;
-	bool IsGenerateMipmap = false;
-	int32 SampleCount = 1;
-};
-
-struct jRenderTarget final : public std::enable_shared_from_this<jRenderTarget>
-{
-	// Create render target from texture, It is useful to create render target from swapchain texture
-	template <typename T1, class... T2>
-	static std::shared_ptr<jRenderTarget> CreateFromTexture(const T2&... args)
-	{
-		const auto& T1Ptr = std::shared_ptr<T1>(new T1(args...));
-		return std::shared_ptr<jRenderTarget>(new jRenderTarget(T1Ptr));
-	}
-
-	constexpr jRenderTarget() = default;
-	jRenderTarget(const std::shared_ptr<jTexture>& InTexturePtr)
-		: TexturePtr(InTexturePtr)
-	{
-		jTexture* texture = TexturePtr.get();
-		if (texture)
-		{
-			Info.Type = texture->Type;
-			Info.Format = texture->Format;
-			Info.Width = texture->Width;
-			Info.Height = texture->Height;
-			Info.LayerCount = texture->LayerCount;
-			Info.SampleCount = texture->SampleCount;
-		}
-	}
-
-	jTexture* GetTexture() const { return TexturePtr.get(); }
-	const void* GetTexureHandle() const { return TexturePtr.get() ? TexturePtr->GetHandle() : nullptr; }
-
-	jRenderTargetInfo Info;
-	std::shared_ptr<jTexture> TexturePtr;
-};
-
-template <typename T1>
-struct TRenderTarget
-{
 };
 
 struct jQueryPool
@@ -469,346 +243,10 @@ struct jQueryPrimitiveGenerated
 	uint64 GetResult();
 };
 
-struct jRasterizationStateInfo
-{
-	virtual ~jRasterizationStateInfo() {}
-	virtual void Initialize() {}
-	virtual size_t GetHash() const
-	{
-		if (Hash)
-			return Hash;
-		
-		Hash = CityHash64((const char*)&PolygonMode, sizeof(PolygonMode));
-		Hash ^= CityHash64((const char*)&CullMode, sizeof(CullMode));
-		Hash ^= CityHash64((const char*)&FrontFace, sizeof(FrontFace));
-		Hash ^= CityHash64((const char*)&DepthBiasEnable, sizeof(DepthBiasEnable));
-		Hash ^= CityHash64((const char*)&DepthBiasConstantFactor, sizeof(DepthBiasConstantFactor));
-		Hash ^= CityHash64((const char*)&DepthBiasClamp, sizeof(DepthBiasClamp));
-		Hash ^= CityHash64((const char*)&DepthBiasSlopeFactor, sizeof(DepthBiasSlopeFactor));
-		Hash ^= CityHash64((const char*)&LineWidth, sizeof(LineWidth));
-		Hash ^= CityHash64((const char*)&DepthClampEnable, sizeof(DepthClampEnable));
-		Hash ^= CityHash64((const char*)&RasterizerDiscardEnable, sizeof(RasterizerDiscardEnable));
-		return Hash;
-	}
-
-	mutable size_t Hash = 0;
-
-	EPolygonMode PolygonMode = EPolygonMode::FILL;
-	ECullMode CullMode = ECullMode::BACK;
-	EFrontFace FrontFace = EFrontFace::CCW;
-	bool DepthBiasEnable = false;
-	float DepthBiasConstantFactor = 0.0f;
-	float DepthBiasClamp = 0.0f;
-	float DepthBiasSlopeFactor = 0.0f;
-	float LineWidth = 1.0f;
-	bool DepthClampEnable = false;
-	bool RasterizerDiscardEnable = false;
-};
-
-struct jMultisampleStateInfo
-{
-	virtual ~jMultisampleStateInfo() {}
-	virtual void Initialize() {}
-	virtual size_t GetHash() const
-	{
-		if (Hash)
-			return Hash;
-
-		Hash = CityHash64((const char*)&SampleCount, sizeof(SampleCount));
-		Hash ^= CityHash64((const char*)&SampleShadingEnable, sizeof(SampleShadingEnable));
-		Hash ^= CityHash64((const char*)&MinSampleShading, sizeof(MinSampleShading));
-		Hash ^= CityHash64((const char*)&AlphaToCoverageEnable, sizeof(AlphaToCoverageEnable));
-		Hash ^= CityHash64((const char*)&AlphaToOneEnable, sizeof(AlphaToOneEnable));
-		return Hash;
-	}
-
-	mutable size_t Hash = 0;
-
-	EMSAASamples SampleCount = EMSAASamples::COUNT_1;
-	bool SampleShadingEnable = true;		// Sample shading 켬	 (텍스쳐 내부에 있는 aliasing 도 완화 해줌)
-	float MinSampleShading = 0.2f;
-	bool AlphaToCoverageEnable = false;
-	bool AlphaToOneEnable = false;
-};
-
-struct jStencilOpStateInfo
-{
-	virtual ~jStencilOpStateInfo() {}
-	virtual void Initialize() {}
-	virtual size_t GetHash() const
-	{
-		if (Hash)
-			return Hash;
-
-		Hash = CityHash64((const char*)&FailOp, sizeof(FailOp));
-		Hash ^= CityHash64((const char*)&PassOp, sizeof(PassOp));
-		Hash ^= CityHash64((const char*)&DepthFailOp, sizeof(DepthFailOp));
-		Hash ^= CityHash64((const char*)&CompareOp, sizeof(CompareOp));
-		Hash ^= CityHash64((const char*)&CompareMask, sizeof(CompareMask));
-		Hash ^= CityHash64((const char*)&WriteMask, sizeof(WriteMask));
-		Hash ^= CityHash64((const char*)&Reference, sizeof(Reference));
-		return Hash;
-	}
-
-	mutable size_t Hash = 0;
-
-	EStencilOp FailOp = EStencilOp::KEEP;
-	EStencilOp PassOp = EStencilOp::KEEP;
-	EStencilOp DepthFailOp = EStencilOp::KEEP;
-	ECompareOp CompareOp = ECompareOp::NEVER;
-	uint32 CompareMask = 0;
-	uint32 WriteMask = 0;
-	uint32 Reference = 0;
-};
-
-struct jDepthStencilStateInfo
-{
-	virtual ~jDepthStencilStateInfo() {}
-	virtual void Initialize() {}
-	virtual size_t GetHash() const
-	{
-		if (Hash)
-			return Hash;
-
-		Hash = CityHash64((const char*)&DepthTestEnable, sizeof(DepthTestEnable));
-		Hash ^= CityHash64((const char*)&DepthWriteEnable, sizeof(DepthWriteEnable));
-		Hash ^= CityHash64((const char*)&DepthCompareOp, sizeof(DepthCompareOp));
-		Hash ^= CityHash64((const char*)&DepthBoundsTestEnable, sizeof(DepthBoundsTestEnable));
-		Hash ^= CityHash64((const char*)&StencilTestEnable, sizeof(StencilTestEnable));
-		if (Front)
-			Hash ^= Front->GetHash();
-		if (Back)
-			Hash ^= Back->GetHash();
-		Hash ^= CityHash64((const char*)&MinDepthBounds, sizeof(MinDepthBounds));
-		Hash ^= CityHash64((const char*)&MaxDepthBounds, sizeof(MaxDepthBounds));
-		return Hash;
-	}
-
-	mutable size_t Hash = 0;
-
-	bool DepthTestEnable = false;
-	bool DepthWriteEnable = false;
-	ECompareOp DepthCompareOp = ECompareOp::LEQUAL;
-	bool DepthBoundsTestEnable = false;
-	bool StencilTestEnable = false;
-	jStencilOpStateInfo* Front = nullptr;
-	jStencilOpStateInfo* Back = nullptr;
-	float MinDepthBounds = 0.0f;
-	float MaxDepthBounds = 1.0f;
-
-	// VkPipelineDepthStencilStateCreateFlags    flags;
-};
-
-struct jBlendingStateInfo
-{
-	virtual ~jBlendingStateInfo() {}
-	virtual void Initialize() {}
-	virtual size_t GetHash() const
-	{
-		if (Hash)
-			return Hash;
-
-		Hash = CityHash64((const char*)&BlendEnable, sizeof(BlendEnable));
-		Hash ^= CityHash64((const char*)&Src, sizeof(Src));
-		Hash ^= CityHash64((const char*)&Dest, sizeof(Dest));
-		Hash ^= CityHash64((const char*)&BlendOp, sizeof(BlendOp));
-		Hash ^= CityHash64((const char*)&SrcAlpha, sizeof(SrcAlpha));
-		Hash ^= CityHash64((const char*)&DestAlpha, sizeof(DestAlpha));
-		Hash ^= CityHash64((const char*)&AlphaBlendOp, sizeof(AlphaBlendOp));
-		Hash ^= CityHash64((const char*)&ColorWriteMask, sizeof(ColorWriteMask));
-		return Hash;
-	}
-
-	mutable size_t Hash = 0;
-
-	bool BlendEnable = false;
-	EBlendFactor Src = EBlendFactor::SRC_COLOR;
-	EBlendFactor Dest = EBlendFactor::ONE_MINUS_SRC_ALPHA;
-	EBlendOp BlendOp = EBlendOp::ADD;
-	EBlendFactor SrcAlpha = EBlendFactor::SRC_ALPHA;
-	EBlendFactor DestAlpha = EBlendFactor::ONE_MINUS_SRC_ALPHA;
-	EBlendOp AlphaBlendOp = EBlendOp::ADD;
-	EColorMask ColorWriteMask = EColorMask::NONE;
-
-	//VkPipelineColorBlendStateCreateFlags          flags;
-	//VkBool32                                      logicOpEnable;
-	//VkLogicOp                                     logicOp;
-	//uint32_t                                      attachmentCount;
-	//const VkPipelineColorBlendAttachmentState* pAttachments;
-	//float                                         blendConstants[4];
-};
-
-struct jAttachment
-{
-	jAttachment() = default;
-	jAttachment(const std::shared_ptr<jRenderTarget>& InRTPtr
-		, EAttachmentLoadStoreOp InLoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE
-		, EAttachmentLoadStoreOp InStencilLoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE
-		, Vector4 InClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f)
-		, Vector2 InClearDepth = Vector2(1.0f, 0.0f)
-		, bool InTransitToShaderReadAtFinal = false)
-		: RenderTargetPtr(InRTPtr), LoadStoreOp(InLoadStoreOp), StencilLoadStoreOp(InStencilLoadStoreOp)
-		, ClearColor(InClearColor), ClearDepth(InClearDepth), TransitToShaderReadAtFinal(InTransitToShaderReadAtFinal)
-	{}
-
-	std::shared_ptr<jRenderTarget> RenderTargetPtr;
-
-	// 아래 2가지 옵션은 렌더링 전, 후에 attachment에 있는 데이터에 무엇을 할지 결정하는 부분.
-	// 1). loadOp
-	//		- VK_ATTACHMENT_LOAD_OP_LOAD : attachment에 있는 내용을 그대로 유지
-	//		- VK_ATTACHMENT_LOAD_OP_CLEAR : attachment에 있는 내용을 constant 모두 값으로 설정함.
-	//		- VK_ATTACHMENT_LOAD_OP_DONT_CARE : attachment에 있는 내용에 대해 어떠한 것도 하지 않음. 정의되지 않은 상태.
-	// 2). storeOp
-	//		- VK_ATTACHMENT_STORE_OP_STORE : 그려진 내용이 메모리에 저장되고 추후에 읽어질 수 있음.
-	//		- VK_ATTACHMENT_STORE_OP_DONT_CARE : 렌더링을 수행한 후에 framebuffer의 내용이 어떻게 될지 모름(정의되지 않음).
-	EAttachmentLoadStoreOp LoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE;
-	EAttachmentLoadStoreOp StencilLoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE;
-
-	Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
-	Vector2 ClearDepth = Vector2(1.0f, 0.0f);
-
-	bool TransitToShaderReadAtFinal = false;
-
-	size_t GetHash() const
-	{
-		if (Hash)
-			return Hash;
-
-		Hash = 0;
-		Hash ^= CityHash64((const char*)&LoadStoreOp, sizeof(LoadStoreOp));
-		Hash ^= CityHash64((const char*)&StencilLoadStoreOp, sizeof(StencilLoadStoreOp));
-		Hash ^= CityHash64((const char*)&ClearColor, sizeof(ClearColor));
-		Hash ^= CityHash64((const char*)&ClearDepth, sizeof(ClearDepth));
-		Hash ^= CityHash64((const char*)&TransitToShaderReadAtFinal, sizeof(TransitToShaderReadAtFinal));
-		return Hash;
-	}
-
-	mutable size_t Hash = 0;
-};
-
-class jRenderPass
-{
-public:
-	virtual ~jRenderPass() {}
-
-	jRenderPass() = default;
-	jRenderPass(const jAttachment* colorAttachment, const jAttachment* depthAttachment, const jAttachment* colorResolveAttachment, const Vector2i& offset, const Vector2i& extent)
-	{
-		SetAttachemnt(colorAttachment, depthAttachment, colorResolveAttachment);
-		SetRenderArea(offset, extent);
-	}
-
-	void SetAttachemnt(const jAttachment* colorAttachment, const jAttachment* depthAttachment, const jAttachment* colorResolveAttachment)
-	{
-		if (colorAttachment)
-			ColorAttachments.push_back(colorAttachment);
-
-		DepthAttachment = depthAttachment;
-		ColorAttachmentResolve = colorResolveAttachment;
-	}
-
-	void SetRenderArea(const Vector2i& offset, const Vector2i& extent)
-	{
-		RenderOffset = offset;
-		RenderExtent = extent;
-	}
-
-	virtual bool BeginRenderPass(const jCommandBuffer* commandBuffer) { return false; }
-	virtual void EndRenderPass() {}
-
-	virtual size_t GetHash() const;
-
-	virtual void* GetRenderPass() const { return nullptr; }
-	virtual void* GetFrameBuffer() const { return nullptr; }
-
-	std::vector<const jAttachment*> ColorAttachments;
-	const jAttachment* DepthAttachment = nullptr;
-	const jAttachment* ColorAttachmentResolve = nullptr;
-	Vector2i RenderOffset;
-	Vector2i RenderExtent;
-	mutable size_t Hash = 0;
-};
-
-
-struct jShaderBinding
-{
-	jShaderBinding() = default;
-	jShaderBinding(const int32 bindingPoint, const EShaderAccessStageFlag accessStageFlags)
-		: BindingPoint(bindingPoint), AccessStageFlags(accessStageFlags)
-	{ }
-
-	FORCEINLINE size_t GetHash() const
-	{
-		size_t result = 0;
-		result ^= CityHash64((const char*)&BindingPoint, sizeof(BindingPoint));
-		result ^= CityHash64((const char*)&AccessStageFlags, sizeof(AccessStageFlags));
-		return result;
-	}
-
-	int32 BindingPoint = 0;
-	EShaderAccessStageFlag AccessStageFlags = EShaderAccessStageFlag::ALL_GRAPHICS;
-};
-
-template <typename T>
-struct TShaderBinding : public jShaderBinding
-{
-	TShaderBinding(const int32 bindingPoint, const EShaderAccessStageFlag accessStageFlags, const T& InData)
-		: jShaderBinding(bindingPoint, accessStageFlags), Data(InData)
-	{ }
-	T Data = T();
-};
-
-struct jTextureBindings
-{
-	const jTexture* Texture = nullptr;
-	const jSamplerStateInfo* SamplerState = nullptr;
-};
-
-struct jShaderBindingInstance
-{
-	virtual ~jShaderBindingInstance() {}
-
-	const struct jShaderBindings* ShaderBindings = nullptr;
-	std::vector<IUniformBufferBlock*> UniformBuffers;
-	std::vector<jTextureBindings> Textures;
-
-	virtual void UpdateShaderBindings() {}
-	virtual void Bind(void* pipelineLayout, int32 InSlot = 0) const {}
-};
-
-struct jShaderBindings
-{
-	static size_t GenerateHash(const std::vector<jShaderBinding>& InUniformBuffers, const std::vector<jShaderBinding>& InTextures);
-	FORCEINLINE static size_t CreateShaderBindingsHash(const std::vector<const jShaderBindings*>& shaderBindings)
-	{
-		size_t result = 0;
-		for(auto& bindings : shaderBindings)
-		{
-			result ^= bindings->GetHash();
-		}
-		return result;
-	}
-
-	virtual ~jShaderBindings() {}
-
-	virtual bool CreateDescriptorSetLayout() { return false; }
-	virtual void CreatePool() {}
-
-	std::vector<jShaderBinding> UniformBuffers;
-	std::vector<jShaderBinding> Textures;
-
-	FORCEINLINE int32 GetNextBindingIndex() const { return (int32)(UniformBuffers.size() + Textures.size()); };
-
-	virtual jShaderBindingInstance* CreateShaderBindingInstance() const { return nullptr; }
-	virtual std::vector<jShaderBindingInstance*> CreateShaderBindingInstance(int32 count) const { return {}; }
-
-	virtual size_t GetHash() const;
-
-	mutable size_t Hash = 0;
-};
-
 class jCamera;
 class jLight;
+struct jShaderBindingInstance;
+
 class jView
 {
 public:
@@ -961,6 +399,9 @@ public:
 	virtual jDepthStencilStateInfo* CreateDepthStencilState(const jDepthStencilStateInfo& initializer) const { return nullptr; }
 	virtual jBlendingStateInfo* CreateBlendingState(const jBlendingStateInfo& initializer) const { return nullptr; }
 
+	virtual jPipelineStateInfo* CreatePipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader
+		, const jVertexBuffer* vertexBuffer, const jRenderPass* renderPass, const std::vector<const jShaderBindings*> shaderBindings) const { return nullptr; }
+
 	virtual jShaderBindings* CreateShaderBindings(const std::vector<jShaderBinding>& InUniformBindings, const std::vector<jShaderBinding>& InTextureBindings) const { check(0); return nullptr; }
 	virtual jShaderBindingInstance* CreateShaderBindingInstance(const std::vector<TShaderBinding<IUniformBufferBlock*>>& InUniformBuffers, const std::vector<TShaderBinding<jTextureBindings>>& InTextures) const { check(0); return nullptr; }
 
@@ -1043,86 +484,76 @@ jName GetCommonTextureName(int32 index);
 jName GetCommonTextureSRGBName(int32 index);
 
 //////////////////////////////////////////////////////////////////////////
-struct jSamplerStateInfo
+
+template <typename T>
+class TResourcePool
 {
-	virtual ~jSamplerStateInfo() {}
-	virtual void Initialize() {}
-	virtual void* GetHandle() const { return nullptr; }
+public:
+    template <typename TInitializer>
+    T* GetOrCreate(const TInitializer& initializer)
+    {
+        const size_t hash = initializer.GetHash();
+        auto it_find = Pool.find(hash);
+        if (Pool.end() != it_find)
+        {
+            return it_find->second;
+        }
 
-	virtual size_t GetHash() const
-	{
-		size_t result = CityHash64((const char*)&Minification, sizeof(Minification));
-		result ^= CityHash64((const char*)&Magnification, sizeof(Magnification));
-		result ^= CityHash64((const char*)&AddressU, sizeof(AddressU));
-		result ^= CityHash64((const char*)&AddressV, sizeof(AddressV));
-		result ^= CityHash64((const char*)&AddressW, sizeof(AddressW));
-		result ^= CityHash64((const char*)&MipLODBias, sizeof(MipLODBias));
-		result ^= CityHash64((const char*)&MaxAnisotropy, sizeof(MaxAnisotropy));
-		result ^= CityHash64((const char*)&BorderColor, sizeof(BorderColor));
-		result ^= CityHash64((const char*)&MinLOD, sizeof(MinLOD));
-		result ^= CityHash64((const char*)&MaxLOD, sizeof(MaxLOD));
-		return result;
-	}
+        auto* newResource = new T(initializer);
+        newResource->Initialize();
 
-	ETextureFilter Minification = ETextureFilter::NEAREST;
-	ETextureFilter Magnification = ETextureFilter::NEAREST;
-	ETextureAddressMode AddressU = ETextureAddressMode::CLAMP_TO_EDGE;
-	ETextureAddressMode AddressV = ETextureAddressMode::CLAMP_TO_EDGE;
-	ETextureAddressMode AddressW = ETextureAddressMode::CLAMP_TO_EDGE;
-	float MipLODBias = 0.0f;
-	float MaxAnisotropy = 1.0f;			// if you anisotropy filtering tuned on, set this variable greater than 1.
-	ETextureComparisonMode TextureComparisonMode = ETextureComparisonMode::NONE;
-	ECompareOp ComparisonFunc = ECompareOp::LESS;
-	Vector4 BorderColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
-	float MinLOD = -FLT_MAX;
-	float MaxLOD = FLT_MAX;
+        Pool.insert(std::make_pair(hash, newResource));
+        return newResource;
+    }
+
+    std::unordered_map<size_t, T*> Pool;
 };
 
 template <ETextureFilter TMinification = ETextureFilter::NEAREST, ETextureFilter TMagnification = ETextureFilter::NEAREST, ETextureAddressMode TAddressU = ETextureAddressMode::CLAMP_TO_EDGE
-	, ETextureAddressMode TAddressV = ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode TAddressW = ETextureAddressMode::CLAMP_TO_EDGE, float TMipLODBias = 0.0f
-	, float TMaxAnisotropy = 1.0f, Vector4 TBorderColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f), float TMinLOD = -FLT_MAX, float TMaxLOD = FLT_MAX,
-	ECompareOp TComparisonFunc = ECompareOp::LESS, ETextureComparisonMode TTextureComparisonMode = ETextureComparisonMode::NONE>
+    , ETextureAddressMode TAddressV = ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode TAddressW = ETextureAddressMode::CLAMP_TO_EDGE, float TMipLODBias = 0.0f
+    , float TMaxAnisotropy = 1.0f, Vector4 TBorderColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f), float TMinLOD = -FLT_MAX, float TMaxLOD = FLT_MAX,
+    ECompareOp TComparisonFunc = ECompareOp::LESS, ETextureComparisonMode TTextureComparisonMode = ETextureComparisonMode::NONE>
 struct TSamplerStateInfo
 {
-	FORCEINLINE static jSamplerStateInfo* Create()
-	{
-		jSamplerStateInfo state;
-		state.Minification = TMinification;
-		state.Magnification = TMagnification;
-		state.AddressU = TAddressU;
-		state.AddressV = TAddressV;
-		state.AddressW = TAddressW;
-		state.MipLODBias = TMipLODBias;
-		state.MaxAnisotropy = TMaxAnisotropy;
-		state.TextureComparisonMode = TTextureComparisonMode;
-		state.ComparisonFunc = TComparisonFunc;
-		state.BorderColor = TBorderColor;
-		state.MinLOD = TMinLOD;
-		state.MaxLOD = TMaxLOD;
-		return g_rhi->CreateSamplerState(state);
-	}
+    FORCEINLINE static jSamplerStateInfo* Create()
+    {
+        jSamplerStateInfo state;
+        state.Minification = TMinification;
+        state.Magnification = TMagnification;
+        state.AddressU = TAddressU;
+        state.AddressV = TAddressV;
+        state.AddressW = TAddressW;
+        state.MipLODBias = TMipLODBias;
+        state.MaxAnisotropy = TMaxAnisotropy;
+        state.TextureComparisonMode = TTextureComparisonMode;
+        state.ComparisonFunc = TComparisonFunc;
+        state.BorderColor = TBorderColor;
+        state.MinLOD = TMinLOD;
+        state.MaxLOD = TMaxLOD;
+        return g_rhi->CreateSamplerState(state);
+    }
 };
 
 template <EPolygonMode TPolygonMode = EPolygonMode::FILL, ECullMode TCullMode = ECullMode::BACK, EFrontFace TFrontFace = EFrontFace::CCW,
-	bool TDepthBiasEnable = false, float TDepthBiasConstantFactor = 0.0f, float TDepthBiasClamp = 0.0f, float TDepthBiasSlopeFactor = 0.0f,
-	float TLineWidth = 1.0f, bool TDepthClampEnable = false, bool TRasterizerDiscardEnable = false>
+    bool TDepthBiasEnable = false, float TDepthBiasConstantFactor = 0.0f, float TDepthBiasClamp = 0.0f, float TDepthBiasSlopeFactor = 0.0f,
+    float TLineWidth = 1.0f, bool TDepthClampEnable = false, bool TRasterizerDiscardEnable = false>
 struct TRasterizationStateInfo
 {
-	FORCEINLINE static jRasterizationStateInfo* Create()
-	{
-		jRasterizationStateInfo initializer;
-		initializer.PolygonMode = TPolygonMode;
-		initializer.CullMode = TCullMode;
-		initializer.FrontFace = TFrontFace;
-		initializer.DepthBiasEnable = TDepthBiasEnable;
-		initializer.DepthBiasConstantFactor = TDepthBiasConstantFactor;
-		initializer.DepthBiasClamp = TDepthBiasClamp;
-		initializer.DepthBiasSlopeFactor = TDepthBiasSlopeFactor;
-		initializer.LineWidth = TLineWidth;
-		initializer.DepthClampEnable = TDepthClampEnable;
-		initializer.RasterizerDiscardEnable = TRasterizerDiscardEnable;
-		return g_rhi->CreateRasterizationState(initializer);
-	}
+    FORCEINLINE static jRasterizationStateInfo* Create()
+    {
+        jRasterizationStateInfo initializer;
+        initializer.PolygonMode = TPolygonMode;
+        initializer.CullMode = TCullMode;
+        initializer.FrontFace = TFrontFace;
+        initializer.DepthBiasEnable = TDepthBiasEnable;
+        initializer.DepthBiasConstantFactor = TDepthBiasConstantFactor;
+        initializer.DepthBiasClamp = TDepthBiasClamp;
+        initializer.DepthBiasSlopeFactor = TDepthBiasSlopeFactor;
+        initializer.LineWidth = TLineWidth;
+        initializer.DepthClampEnable = TDepthClampEnable;
+        initializer.RasterizerDiscardEnable = TRasterizerDiscardEnable;
+        return g_rhi->CreateRasterizationState(initializer);
+    }
 };
 
 template <bool TSampleShadingEnable = true, float TMinSampleShading = 0.2f,
@@ -1142,61 +573,60 @@ struct TMultisampleStateInfo
 };
 
 template <EStencilOp TFailOp = EStencilOp::KEEP, EStencilOp TPassOp = EStencilOp::KEEP, EStencilOp TDepthFailOp = EStencilOp::KEEP,
-	ECompareOp TCompareOp = ECompareOp::NEVER, uint32 TCompareMask = 0, uint32 TWriteMask = 0, uint32 TReference = 0>
+    ECompareOp TCompareOp = ECompareOp::NEVER, uint32 TCompareMask = 0, uint32 TWriteMask = 0, uint32 TReference = 0>
 struct TStencilOpStateInfo
 {
-	FORCEINLINE static jStencilOpStateInfo* Create()
-	{
-		jStencilOpStateInfo initializer;
-		initializer.FailOp = TFailOp;
-		initializer.PassOp = TPassOp;
-		initializer.DepthFailOp = TDepthFailOp;
-		initializer.CompareOp = TCompareOp;
-		initializer.CompareMask = TCompareMask;
-		initializer.WriteMask = TWriteMask;
-		initializer.Reference = TReference;
-		return g_rhi->CreateStencilOpStateInfo(initializer);
-	}
+    FORCEINLINE static jStencilOpStateInfo* Create()
+    {
+        jStencilOpStateInfo initializer;
+        initializer.FailOp = TFailOp;
+        initializer.PassOp = TPassOp;
+        initializer.DepthFailOp = TDepthFailOp;
+        initializer.CompareOp = TCompareOp;
+        initializer.CompareMask = TCompareMask;
+        initializer.WriteMask = TWriteMask;
+        initializer.Reference = TReference;
+        return g_rhi->CreateStencilOpStateInfo(initializer);
+    }
 };
 
 template <bool TDepthTestEnable = false, bool TDepthWriteEnable = false, ECompareOp TDepthCompareOp = ECompareOp::LEQUAL,
-	bool TDepthBoundsTestEnable = false, bool TStencilTestEnable = false,
-	float TMinDepthBounds = 0.0f, float TMaxDepthBounds = 1.0f>
+    bool TDepthBoundsTestEnable = false, bool TStencilTestEnable = false,
+    float TMinDepthBounds = 0.0f, float TMaxDepthBounds = 1.0f>
 struct TDepthStencilStateInfo
 {
-	FORCEINLINE static jDepthStencilStateInfo* Create(jStencilOpStateInfo* Front = nullptr, jStencilOpStateInfo* Back = nullptr)
-	{
-		jDepthStencilStateInfo initializer;
-		initializer.DepthTestEnable = TDepthTestEnable;
-		initializer.DepthWriteEnable = TDepthWriteEnable;
-		initializer.DepthCompareOp = TDepthCompareOp;
-		initializer.DepthBoundsTestEnable = TDepthBoundsTestEnable;
-		initializer.StencilTestEnable = TStencilTestEnable;
-		initializer.Front = Front;
-		initializer.Back = Back;
-		initializer.MinDepthBounds = TMinDepthBounds;
-		initializer.MaxDepthBounds = TMaxDepthBounds;
-		return g_rhi->CreateDepthStencilState(initializer);
-	}
+    FORCEINLINE static jDepthStencilStateInfo* Create(jStencilOpStateInfo* Front = nullptr, jStencilOpStateInfo* Back = nullptr)
+    {
+        jDepthStencilStateInfo initializer;
+        initializer.DepthTestEnable = TDepthTestEnable;
+        initializer.DepthWriteEnable = TDepthWriteEnable;
+        initializer.DepthCompareOp = TDepthCompareOp;
+        initializer.DepthBoundsTestEnable = TDepthBoundsTestEnable;
+        initializer.StencilTestEnable = TStencilTestEnable;
+        initializer.Front = Front;
+        initializer.Back = Back;
+        initializer.MinDepthBounds = TMinDepthBounds;
+        initializer.MaxDepthBounds = TMaxDepthBounds;
+        return g_rhi->CreateDepthStencilState(initializer);
+    }
 };
 
 template <bool TBlendEnable = false, EBlendFactor TSrc = EBlendFactor::SRC_ALPHA, EBlendFactor TDest = EBlendFactor::ONE_MINUS_SRC_ALPHA, EBlendOp TBlendOp = EBlendOp::ADD,
-	EBlendFactor TSrcAlpha = EBlendFactor::SRC_ALPHA, EBlendFactor TDestAlpha = EBlendFactor::ONE_MINUS_SRC_ALPHA, EBlendOp TAlphaBlendOp = EBlendOp::ADD,
-	EColorMask TColorWriteMask = EColorMask::ALL>
+    EBlendFactor TSrcAlpha = EBlendFactor::SRC_ALPHA, EBlendFactor TDestAlpha = EBlendFactor::ONE_MINUS_SRC_ALPHA, EBlendOp TAlphaBlendOp = EBlendOp::ADD,
+    EColorMask TColorWriteMask = EColorMask::ALL>
 struct TBlendingStateInfo
 {
-	FORCEINLINE static jBlendingStateInfo* Create()
-	{
-		jBlendingStateInfo initializer;
-		initializer.BlendEnable = TBlendEnable;
-		initializer.Src = TSrc;
-		initializer.Dest = TDest;
-		initializer.BlendOp = TBlendOp;
-		initializer.SrcAlpha = TSrcAlpha;
-		initializer.DestAlpha = TDestAlpha;
-		initializer.AlphaBlendOp = TAlphaBlendOp;
-		initializer.ColorWriteMask = TColorWriteMask;
-		return g_rhi->CreateBlendingState(initializer);
-	}
+    FORCEINLINE static jBlendingStateInfo* Create()
+    {
+        jBlendingStateInfo initializer;
+        initializer.BlendEnable = TBlendEnable;
+        initializer.Src = TSrc;
+        initializer.Dest = TDest;
+        initializer.BlendOp = TBlendOp;
+        initializer.SrcAlpha = TSrcAlpha;
+        initializer.DestAlpha = TDestAlpha;
+        initializer.AlphaBlendOp = TAlphaBlendOp;
+        initializer.ColorWriteMask = TColorWriteMask;
+        return g_rhi->CreateBlendingState(initializer);
+    }
 };
-

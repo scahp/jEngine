@@ -13,6 +13,7 @@
 #include "RHI/jFrameBufferPool.h"
 #include "RHI/jRenderTargetPool.h"
 #include "Profiler/jPerformanceProfile.h"
+#include "RHI\Vulkan\jTexture_Vulkan.h"
 
 jRHI* g_rhi = nullptr;
 
@@ -178,18 +179,17 @@ public:
 			shaderBindings.push_back(ShaderBindingInstances[i]->ShaderBindings);
 
 		// Create Pipeline
-		CurrentPipelineStateInfo = jPipelineStateInfo(PipelineStateFixed, Shader, bPositionOnly ? RenderObject->VertexBuffer_PositionOnly : RenderObject->VertexBuffer, RenderPass, shaderBindings);
-		CurrentPipelineStateInfo.CreateGraphicsPipelineState();
+		CurrentPipelineStateInfo = (jPipelineStateInfo_Vulkan*)g_rhi_vk->CreatePipelineStateInfo(PipelineStateFixed, Shader, bPositionOnly ? RenderObject->VertexBuffer_PositionOnly : RenderObject->VertexBuffer, RenderPass, shaderBindings);
 	}
 	void Draw()
 	{
 		for (int32 i = 0; i < ShaderBindingInstances.size(); ++i)
 		{
-			ShaderBindingInstances[i]->Bind(CurrentPipelineStateInfo.vkPipelineLayout, i);
+			ShaderBindingInstances[i]->Bind((VkPipelineLayout)CurrentPipelineStateInfo->GetPipelineLayoutHandle(), i);
 		}
 
 		// Bind Pipeline
-		CurrentPipelineStateInfo.Bind();
+		CurrentPipelineStateInfo->Bind();
 
 		// Draw
 		RenderObject->Draw(nullptr, Shader, {});
@@ -202,7 +202,7 @@ public:
 	jShader* Shader = nullptr;
 	jRenderObject* RenderObject = nullptr;
 	jPipelineStateFixedInfo* PipelineStateFixed = nullptr;
-	jPipelineStateInfo CurrentPipelineStateInfo;
+	jPipelineStateInfo_Vulkan* CurrentPipelineStateInfo = nullptr;
 };
 
 void jGame::Update(float deltaTime)
@@ -263,7 +263,7 @@ void jGame::Draw()
     {
         {
             auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
-			jMultisampleStateInfo* MultisampleState = TMultisampleStateInfo<true, 0.2f, false, false>::Create((EMSAASamples)g_rhi_vk->msaaSamples);
+			jMultisampleStateInfo* MultisampleState = TMultisampleStateInfo<true, 0.2f, false, false>::Create((EMSAASamples)g_rhi_vk->MsaaSamples);
             auto DepthStencilState = TDepthStencilStateInfo<true, true, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
             auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
 
@@ -295,7 +295,7 @@ void jGame::Draw()
 
             auto textureDepth = (jTexture_Vulkan*)depth->RenderTargetPtr->GetTexture();
             auto depthFormat = VK_FORMAT_D24_UNORM_S8_UINT;
-            g_rhi_vk->TransitionImageLayout(textureDepth->Image, depthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 1);
+            g_rhi_vk->TransitionImageLayout((VkImage)textureDepth->GetHandle(), depthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 1);
 
             renderPass = new jRenderPass_Vulkan(nullptr, depth, resolve, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
             renderPass->CreateRenderPass();

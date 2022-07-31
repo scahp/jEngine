@@ -14,7 +14,7 @@ VkFence jFenceManager_Vulkan::GetOrCreateFence()
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
     VkFence newFence = nullptr;
-    if (ensure(vkCreateFence(g_rhi_vk->device, &fenceInfo, nullptr, &newFence) == VK_SUCCESS))
+    if (ensure(vkCreateFence(g_rhi_vk->Device, &fenceInfo, nullptr, &newFence) == VK_SUCCESS))
         UsingFences.insert(newFence);
 
     return newFence;

@@ -21,6 +21,29 @@ FORCEINLINE decltype(auto) operator ! (ENUM_TYPE value)\
 	return !static_cast<T>(value);\
 }
 
+//////////////////////////////////////////////////////////////////////////
+// Auto generate type conversion code
+template <typename T1, typename T2>
+using ConversionTypePair = std::pair<T1, T2>;
+
+template <typename T, typename... T1>
+constexpr auto GenerateConversionTypeArray(T1... args)
+{
+    std::array<T, sizeof...(args)> newArray;
+    auto AddElementFunc = [&newArray](const auto& arg)
+    {
+        newArray[(int32)arg.first] = arg.second;
+    };
+
+    int dummy[] = { 0, (AddElementFunc(args), 0)... };
+    return newArray;
+}
+
+
+#define CONVERSION_TYPE_ELEMENT(x, y) ConversionTypePair<decltype(x), decltype(y)>(x, y)
+#define GENERATE_STATIC_CONVERSION_ARRAY(...) {static auto _TypeArray_ = GenerateConversionTypeArray<T>(__VA_ARGS__); return (T)_TypeArray_[(int32)type];}
+//////////////////////////////////////////////////////////////////////////
+
 enum class EPrimitiveType : uint8
 {
 	POINTS,
@@ -395,3 +418,25 @@ enum class EColorMask : uint8
 	ALL = 0x0F
 };
 
+struct jImage
+{
+	virtual void Destroy() = 0;
+
+    virtual void* GetHandle() const = 0;
+    virtual void* GetViewHandle() const = 0;
+    virtual void* GetMemoryHandle() const = 0;
+};
+
+struct jBuffer
+{
+    virtual void Destroy() = 0;
+
+	virtual void* GetMappedPointer() const = 0;
+    virtual void* Map(uint64 offset, uint64 size) = 0;
+	virtual void* Map() = 0;
+    virtual void Unmap() = 0;
+    virtual void UpdateBuffer(const void* data, uint64 size) = 0;
+
+    virtual void* GetHandle() const = 0;
+    virtual void* GetMemoryHandle() const = 0;
+};
