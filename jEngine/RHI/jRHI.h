@@ -39,7 +39,7 @@ template <> struct ConvertUniformType<Vector2> { operator EUniformType () { retu
 template <> struct ConvertUniformType<Vector> { operator EUniformType () { return EUniformType::VECTOR3; } };
 template <> struct ConvertUniformType<Vector4> { operator EUniformType () { return EUniformType::VECTOR4; } };
 
-struct IUniformBuffer : public IBuffer
+struct IUniformBuffer
 {
 	IUniformBuffer() = default;
 	IUniformBuffer(const jName& name)
@@ -51,7 +51,7 @@ struct IUniformBuffer : public IBuffer
 	virtual jName GetName() const { return Name; }
 	virtual EUniformType GetType() const { return EUniformType::NONE; }
 	virtual void SetUniformbuffer(const jShader* /*InShader*/) const {}
-	virtual void Bind(const jShader* shader) const override;
+	virtual void Bind(const jShader* shader) const;
 };
 
 template <typename T>
@@ -66,7 +66,7 @@ static int32 GetBindPoint()
 	return s_index++;
 }
 
-struct IUniformBufferBlock : public IBuffer
+struct IUniformBufferBlock
 {
 	IUniformBufferBlock() = default;
 	IUniformBufferBlock(const std::string& name, size_t size = 0)
@@ -80,7 +80,7 @@ struct IUniformBufferBlock : public IBuffer
 	FORCEINLINE size_t GetBufferSize() const { return Size; }
 
 	virtual void Init() = 0;
-	virtual void Bind(const jShader* shader) const override { }
+	virtual void Bind(const jShader* shader) const { }
 	virtual void UpdateBufferData(const void* newData, size_t size) = 0;
 	virtual void ClearBuffer(int32 clearValue = 0) = 0;
 	
@@ -88,7 +88,7 @@ struct IUniformBufferBlock : public IBuffer
 	virtual void* GetBufferMemory() const { return nullptr; }
 };
 
-struct IShaderStorageBufferObject : public IBuffer
+struct IShaderStorageBufferObject
 {
 	IShaderStorageBufferObject() = default;
 	IShaderStorageBufferObject(const std::string& name)
@@ -100,7 +100,7 @@ struct IShaderStorageBufferObject : public IBuffer
 	size_t Size = 0;
 
 	virtual void Init() = 0;
-	virtual void Bind(const jShader* shader) const override {}
+	virtual void Bind(const jShader* shader) const {}
 	virtual void UpdateBufferData(void* newData, size_t size) = 0;
 	virtual void GetBufferData(void* newData, size_t size) = 0;
 	virtual void ClearBuffer(int32 clearValue) = 0;
@@ -112,7 +112,7 @@ struct IShaderStorageBufferObject : public IBuffer
 	}
 };
 
-struct IAtomicCounterBuffer : public IBuffer
+struct IAtomicCounterBuffer
 {
 	IAtomicCounterBuffer() = default;
 	IAtomicCounterBuffer(const std::string& name, uint32 bindingPoint)
@@ -125,7 +125,7 @@ struct IAtomicCounterBuffer : public IBuffer
 	uint32 BindingPoint = -1;
 
 	virtual void Init() = 0;
-	virtual void Bind(const jShader* shader) const override {}
+	virtual void Bind(const jShader* shader) const {}
 	virtual void UpdateBufferData(void* newData, size_t size) = 0;
 	virtual void GetBufferData(void* newData, size_t size) = 0;
 	virtual void ClearBuffer(int32 clearValue) = 0;
@@ -137,7 +137,7 @@ struct IAtomicCounterBuffer : public IBuffer
 	}
 };
 
-struct ITransformFeedbackBuffer : public IBuffer
+struct ITransformFeedbackBuffer
 {
 	ITransformFeedbackBuffer() = default;
 	ITransformFeedbackBuffer(const std::string& name)
@@ -150,7 +150,7 @@ struct ITransformFeedbackBuffer : public IBuffer
 	std::vector<std::string> Varyings;
 
 	virtual void Init() = 0;
-	virtual void Bind(const jShader* shader) const override {}
+	virtual void Bind(const jShader* shader) const {}
 	virtual void UpdateBufferData(void* newData, size_t size) = 0;
 	virtual void GetBufferData(void* newData, size_t size) = 0;
 	virtual void ClearBuffer(int32 clearValue) = 0;
@@ -290,7 +290,6 @@ public:
 	virtual void UpdateVertexBuffer(jVertexBuffer* vb, IStreamParam* streamParam, int32 streamParamIndex) const {}
 	virtual void BindVertexBuffer(const jVertexBuffer* vb, const jShader* shader) const {}
 	virtual void BindIndexBuffer(const jIndexBuffer* ib, const jShader* shader) const {}
-	virtual void MapBufferdata(IBuffer* buffer) const;
 	virtual void SetTextureFilter(ETextureType type, int32 sampleCount, ETextureFilterTarget target, ETextureFilter filter) const {}
 	virtual void SetTextureWrap(int flag) const {}
 	virtual void SetTexture(int32 index, const jTexture* texture) const {}

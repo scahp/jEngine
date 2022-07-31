@@ -596,11 +596,6 @@ void jRHI_OpenGL::BindIndexBuffer(const jIndexBuffer* ib, const jShader* shader)
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib_gl->BufferID);
 }
 
-void jRHI_OpenGL::MapBufferdata(IBuffer* buffer) const
-{
-	throw std::logic_error("The method or operation is not implemented.");
-}
-
 void jRHI_OpenGL::DrawArrays(EPrimitiveType type, int vertStartIndex, int vertCount) const
 {
 	glDrawArrays(GetPrimitiveType(type), vertStartIndex, vertCount);

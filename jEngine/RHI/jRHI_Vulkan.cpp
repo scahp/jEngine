@@ -273,7 +273,7 @@ bool jRHI_Vulkan::InitRHI()
 		Images.resize(imageCount);
 		vkGetSwapchainImagesKHR(Device, Swapchain_Vulkan.SwapChain, &imageCount, Images.data());
 
-		Swapchain_Vulkan.ImageFormat = surfaceFormat.format;
+		Swapchain_Vulkan.Format = GetVulkanTextureFormat(surfaceFormat.format);
 		Swapchain_Vulkan.Extent = Vector2i(extent.width, extent.height);
 
 		// ImageView 생성

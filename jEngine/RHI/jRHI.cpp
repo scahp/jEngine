@@ -15,11 +15,6 @@ jRHI::jRHI()
 {
 }
 
-void jRHI::MapBufferdata(IBuffer* buffer) const
-{
-
-}
-
 void jQueryPrimitiveGenerated::Begin() const
 {
 	g_rhi->BeginQueryPrimitiveGenerated(this);

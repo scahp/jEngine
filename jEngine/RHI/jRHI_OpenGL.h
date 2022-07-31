@@ -211,7 +211,6 @@ public:
 	virtual jIndexBuffer* CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const override;
 	virtual void BindVertexBuffer(const jVertexBuffer* vb, const jShader* shader) const override;
 	virtual void BindIndexBuffer(const jIndexBuffer* ib, const jShader* shader) const override;
-	virtual void MapBufferdata(IBufferInterface* buffer) const override;
 	virtual void DrawArrays(EPrimitiveType type, int vertStartIndex, int vertCount) const override;
 	virtual void DrawArraysInstanced(EPrimitiveType type, int32 vertStartIndex, int32 vertCount, int32 instanceCount) const override;
 	virtual void DrawElements(EPrimitiveType type, int32 elementSize, int32 startIndex, int32 count) const override;

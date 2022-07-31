@@ -26,22 +26,83 @@ FORCEINLINE decltype(auto) operator ! (ENUM_TYPE value)\
 template <typename T1, typename T2>
 using ConversionTypePair = std::pair<T1, T2>;
 
-template <typename T, typename... T1>
+// Parameter Packs 의 첫번째 타입을 얻어줌
+template<typename T, typename... T1>
+using PacksType = T;
+
+template <typename... T1>
 constexpr auto GenerateConversionTypeArray(T1... args)
 {
-    std::array<T, sizeof...(args)> newArray;
+	// std::pair 로 구성된 Parameter packs 의 첫번째 타입의 second_tpype 을 얻음
+    using value_type = typename PacksType<T1...>::second_type;
+    
+	std::array<value_type, sizeof...(args)> newArray;
     auto AddElementFunc = [&newArray](const auto& arg)
     {
-        newArray[(int32)arg.first] = arg.second;
+        newArray[(int64)arg.first] = arg.second;
     };
 
     int dummy[] = { 0, (AddElementFunc(args), 0)... };
     return newArray;
 }
 
+template <typename... T1>
+constexpr auto GenerateConversionTypeMap(T1... args)
+{
+    // std::pair 로 구성된 Parameter packs 의 첫번째 타입의 first_type과 second_tpype 을 얻음
+    using key_type = typename PacksType<T1...>::first_type;
+	using value_type = typename PacksType<T1...>::second_type;
+
+	std::unordered_map<key_type, value_type> newMap;
+    auto AddElementFunc = [&newMap](const auto& arg)
+    {
+		newMap.insert(arg);
+    };
+
+    int dummy[] = { 0, (AddElementFunc(args), 0)... };
+    return newMap;
+}
+
+template <typename... T1>
+constexpr auto GenerateInverseConversionTypeMap(T1... args)
+{
+    // std::pair 로 구성된 Parameter packs 의 첫번째 타입의 first_type과 second_tpype 을 얻음
+    using key_type = typename PacksType<T1...>::second_type;
+    using value_type = typename PacksType<T1...>::first_type;
+
+    std::unordered_map<key_type, value_type> newMap;
+    auto AddElementFunc = [&newMap](const auto& arg)
+    {
+        newMap.insert(std::make_pair(arg.second, arg.first));
+    };
+
+    int dummy[] = { 0, (AddElementFunc(args), 0)... };
+    return newMap;
+}
 
 #define CONVERSION_TYPE_ELEMENT(x, y) ConversionTypePair<decltype(x), decltype(y)>(x, y)
-#define GENERATE_STATIC_CONVERSION_ARRAY(...) {static auto _TypeArray_ = GenerateConversionTypeArray<T>(__VA_ARGS__); return (T)_TypeArray_[(int32)type];}
+
+// 입력한 Elment를 Array 에 넣어줌. Engine type -> API type 전환시 사용함. Engine type 0~N 모든 정수 값을 사용하고, enum 범위가 크지 않기 때문에 배열로 사용하기 좋음.
+#define GENERATE_STATIC_CONVERSION_ARRAY(...) {static auto _TypeArray_ = GenerateConversionTypeArray(__VA_ARGS__); return _TypeArray_[(int64)type];}
+
+// 입력한 Element 를 Map 에 넣어줌. API type -> Engine type 전환시 사용함. Engine type의 경우 여러 enum 들이 섞여 있거나 해서 enum 범위가 커서 배열로 하는 경우 메모리 낭비가 큼.
+#define GENERATE_STATIC_CONVERSION_MAP(...) {static auto _TypeMap_ = GenerateConversionTypeMap(__VA_ARGS__); return _TypeMap_[type];}
+#define GENERATE_STATIC_INVERSECONVERSION_MAP(...) {static auto _TypeMap_ = GenerateInverseConversionTypeMap(__VA_ARGS__); return _TypeMap_[type];}
+
+// Variadic macro 의 첫번째 항목 얻는 매크로
+#define DEDUCE_FIRST(First, ...) First
+
+// Engine type <-> API type 전환 함수 만들어주는 매크로
+#define GENERATE_CONVERSION_FUNCTION(FunctionName, ...) \
+using FunctionName##key_type = typename decltype(DEDUCE_FIRST(__VA_ARGS__))::first_type; \
+using FunctionName##value_type = typename decltype(DEDUCE_FIRST(__VA_ARGS__))::second_type; \
+FORCEINLINE auto FunctionName(FunctionName##key_type type) { \
+	GENERATE_STATIC_CONVERSION_ARRAY(__VA_ARGS__)\
+}\
+FORCEINLINE auto FunctionName(FunctionName##value_type type) { \
+	GENERATE_STATIC_INVERSECONVERSION_MAP(__VA_ARGS__)\
+}
+
 //////////////////////////////////////////////////////////////////////////
 
 enum class EPrimitiveType : uint8

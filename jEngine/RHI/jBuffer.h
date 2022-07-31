@@ -1,26 +1,20 @@
 ﻿#pragma once
 
-struct IBuffer
-{
-    virtual ~IBuffer() {}
-
-    virtual jName GetName() const { return jName::Invalid; }
-    virtual void Bind(const jShader* shader) const = 0;
-};
-
-struct jVertexBuffer : public IBuffer
+struct jVertexBuffer
 {
     std::shared_ptr<jVertexStreamData> VertexStreamData;
 
+    virtual jName GetName() const { return jName::Invalid; }
     virtual size_t GetHash() const { return 0; }
     virtual void Bind(const jShader* shader) const {}
     virtual void Bind() const {}
 };
 
-struct jIndexBuffer : public IBuffer
+struct jIndexBuffer
 {
     std::shared_ptr<jIndexStreamData> IndexStreamData;
 
+    virtual jName GetName() const { return jName::Invalid; }
     virtual void Bind(const jShader* shader) const {}
     virtual void Bind() const {}
 };

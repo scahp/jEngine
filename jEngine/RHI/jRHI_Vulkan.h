@@ -29,7 +29,7 @@ struct jSwapchainImage_Vulkan : public jImage_Vulkan
 struct jSwapchain_Vulkan
 {
     VkSwapchainKHR SwapChain = nullptr;
-    VkFormat ImageFormat;
+	ETextureFormat Format = ETextureFormat::RGB8;
     Vector2i Extent;
     std::vector<jSwapchainImage_Vulkan> Images;
 };
