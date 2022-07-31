@@ -134,13 +134,19 @@
     <ClInclude Include="Math\Vector.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Profiler\jPerformanceProfile.h" />
+    <ClInclude Include="RHI\jCommandBufferManager.h" />
+    <ClInclude Include="RHI\jFenceManager.h" />
     <ClInclude Include="RHI\jFrameBufferPool.h" />
+    <ClInclude Include="RHI\jPipelineStateInfo.h" />
     <ClInclude Include="RHI\jRenderTargetPool.h" />
     <ClInclude Include="RHI\jRHI.h" />
     <ClInclude Include="RHI\jRHIType.h" />
     <ClInclude Include="RHI\jRHI_DirectX11.h" />
     <ClInclude Include="RHI\jRHI_OpenGL.h" />
     <ClInclude Include="RHI\jRHI_Vulkan.h" />
+    <ClInclude Include="RHI\Vulkan\jIndexBuffer_Vulkan.h" />
+    <ClInclude Include="RHI\Vulkan\jRenderPass_Vulkan.h" />
+    <ClInclude Include="RHI\Vulkan\jVertexBuffer_Vulkan.h" />
     <ClInclude Include="Scene\jCamera.h" />
     <ClInclude Include="Scene\jLight.h" />
     <ClInclude Include="Scene\jMeshObject.h" />
@@ -227,12 +233,18 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Profiler\jPerformanceProfile.cpp" />
+    <ClCompile Include="RHI\jCommandBufferManager.cpp" />
+    <ClCompile Include="RHI\jFenceManager.cpp" />
     <ClCompile Include="RHI\jFrameBufferPool.cpp" />
+    <ClCompile Include="RHI\jPipelineStateInfo.cpp" />
     <ClCompile Include="RHI\jRenderTargetPool.cpp" />
     <ClCompile Include="RHI\jRHI.cpp" />
     <ClCompile Include="RHI\jRHI_DirectX11.cpp" />
     <ClCompile Include="RHI\jRHI_OpenGL.cpp" />
     <ClCompile Include="RHI\jRHI_Vulkan.cpp" />
+    <ClCompile Include="RHI\Vulkan\jIndexBuffer_Vulkan.cpp" />
+    <ClCompile Include="RHI\Vulkan\jRenderPass_Vulkan.cpp" />
+    <ClCompile Include="RHI\Vulkan\jVertexBuffer_Vulkan.cpp" />
     <ClCompile Include="Scene\jCamera.cpp" />
     <ClCompile Include="Scene\jLight.cpp" />
     <ClCompile Include="Scene\jMeshObject.cpp" />

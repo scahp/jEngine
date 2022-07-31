@@ -170,7 +170,7 @@ VkPipeline jImGUI_Vulkan::CreatePipelineState(VkRenderPass renderPass, VkQueue c
     jDepthStencilStateInfo* depthStencilInfo = TDepthStencilStateInfo<>::Create(nullptr, stencilStateBack);
     check(depthStencilInfo);
 
-    jMultisampleStateInfo* multisamplesStateInfo = TMultisampleStateInfo<EMSAASamples::COUNT_1>::Create();
+    jMultisampleStateInfo* multisamplesStateInfo = TMultisampleStateInfo<>::Create(EMSAASamples::COUNT_1);
     check(multisamplesStateInfo);
 
     // Setup graphics pipeline for UI rendering

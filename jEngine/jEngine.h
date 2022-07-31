@@ -11,6 +11,7 @@ public:
 	void Init();
 	void ProcessInput();
 	void Update(float deltaTime);
+	void Draw();
 	void Resize(int width, int height);
 	void OnMouseButton();
 	void OnMouseMove(int32 xOffset, int32 yOffset);

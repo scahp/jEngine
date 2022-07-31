@@ -242,338 +242,197 @@ void jGame::Update(float deltaTime)
 	//// Render all objects by using selected renderer
 	//Renderer->Render(MainCamera);
 
-	uint32_t imageIndex = 0;
-	jCommandBuffer_Vulkan commandBuffer = g_rhi_vk->CommandBufferManager.GetOrCreateCommandBuffer();
-	{
-// 이 함수는 아래 3가지 기능을 수행함
-// 1. 스왑체인에서 이미지를 얻음
-// 2. Framebuffer 에서 Attachment로써 얻어온 이미지를 가지고 커맨드 버퍼를 실행
-// 3. 스왑체인 제출을 위해 이미지를 반환
+    for (auto iter : jObject::GetStaticObject())
+    {
+        iter->Update(deltaTime);
 
-// 스왑체인을 동기화는 2가지 방법
-// 1. Fences		: vkWaitForFences 를 사용하여 프로그램에서 fences의 상태에 접근 할 수 있음.
-//						Fences는 어플리케이션과 렌더링 명령의 동기화를 위해 설계됨
-// 2. Semaphores	: 세마포어는 안됨.
-//						Semaphores 는 커맨드 Queue 내부 혹은 Queue 들 사이에 명령어 동기화를 위해서 설계됨
+        iter->RenderObject->UpdateWorldMatrix();
+    }
 
-// 현재는 Draw 와 presentation 커맨드를 동기화 하는 곳에 사용할 것이므로 세마포어가 적합.
-// 2개의 세마포어를 만들 예정
-// 1. 이미지를 획득해서 렌더링 준비가 완료된 경우 Signal(Lock 이 풀리는) 되는 것 (imageAvailableSemaphore)
-// 2. 렌더링을 마쳐서 Presentation 가능한 상태에서 Signal 되는 것 (renderFinishedSemaphore)
+    // 정리해야함
+    DirectionalLight->Update(deltaTime);
+}
 
-		VkFence lastCommandBufferFence = g_rhi_vk->swapChainCommandBufferFences[g_rhi_vk->currenFrame];
+void jGame::Draw()
+{
+	SCOPE_DEBUG_EVENT(g_rhi, "Game::Draw");
 
-		// timeout 은 nanoseconds. UINT64_MAX 는 타임아웃 없음
-#if MULTIPLE_FRAME
-		VkResult acquireNextImageResult = vkAcquireNextImageKHR(g_rhi_vk->device, g_rhi_vk->swapChain, UINT64_MAX, g_rhi_vk->imageAvailableSemaphores[g_rhi_vk->currenFrame], VK_NULL_HANDLE, &imageIndex);
-		if (acquireNextImageResult != VK_SUCCESS)
-			return;
+    jCommandBuffer_Vulkan commandBuffer = g_rhi_vk->CommandBufferManager.GetOrCreateCommandBuffer();
+    const uint32_t imageIndex = g_rhi_vk->BeginRenderFrame(&commandBuffer);
 
-		// 이전 프레임에서 현재 사용하려는 이미지를 사용중에 있나? (그렇다면 펜스를 기다려라)
-		if (lastCommandBufferFence != VK_NULL_HANDLE)
-			vkWaitForFences(g_rhi_vk->device, 1, &lastCommandBufferFence, VK_TRUE, UINT64_MAX);
+    {
+        {
+            auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
+			jMultisampleStateInfo* MultisampleState = TMultisampleStateInfo<true, 0.2f, false, false>::Create((EMSAASamples)g_rhi_vk->msaaSamples);
+            auto DepthStencilState = TDepthStencilStateInfo<true, true, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
+            auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
 
-		// 이 프레임에서 펜스를 사용한다고 마크 해둠
-		g_rhi_vk->swapChainCommandBufferFences[g_rhi_vk->currenFrame] = commandBuffer.Fence;
-#else
-		VkResult acquireNextImageResult = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
-#endif // MULTIPLE_FRAME
+            g_rhi_vk->CurrentPipelineStateFixed = jPipelineStateFixedInfo(RasterizationState, MultisampleState, DepthStencilState, BlendingState
+                , jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT));
+        }
 
-		// 여기서는 VK_SUCCESS or VK_SUBOPTIMAL_KHR 은 성공했다고 보고 계속함.
-		// VK_ERROR_OUT_OF_DATE_KHR : 스왑체인이 더이상 서피스와 렌더링하는데 호환되지 않는 경우. (보통 윈도우 리사이즈 이후)
-		// VK_SUBOPTIMAL_KHR : 스왑체인이 여전히 서피스에 제출 가능하지만, 서피스의 속성이 더이상 정확하게 맞지 않음.
-		if (acquireNextImageResult == VK_ERROR_OUT_OF_DATE_KHR)
-		{
-			g_rhi_vk->RecreateSwapChain();		// 이 경우 렌더링이 더이상 불가능하므로 즉시 스왑체인을 새로 만듬.
-			return;
-		}
-		else if (acquireNextImageResult != VK_SUCCESS && acquireNextImageResult != VK_SUBOPTIMAL_KHR)
-		{
-			check(0);
-			return;
-		}
-	}
+        {
+            auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
+            jMultisampleStateInfo* MultisampleState = TMultisampleStateInfo<true, 0.2f, false, false>::Create(EMSAASamples::COUNT_1);
+            auto DepthStencilState = TDepthStencilStateInfo<true, true, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
+            auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::NONE>::Create();
 
-	{
-		{
-			auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
-			jMultisampleStateInfo* MultisampleState = nullptr;
-			switch (g_rhi_vk->msaaSamples)
-			{
-			case VK_SAMPLE_COUNT_1_BIT:
-				MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_1, true, 0.2f, false, false>::Create();
-				break;
-			case VK_SAMPLE_COUNT_2_BIT:
-				MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_2, true, 0.2f, false, false>::Create();
-				break;
-			case VK_SAMPLE_COUNT_4_BIT:
-				MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_4, true, 0.2f, false, false>::Create();
-				break;
-			case VK_SAMPLE_COUNT_8_BIT:
-				MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_8, true, 0.2f, false, false>::Create();
-				break;
-			case VK_SAMPLE_COUNT_16_BIT:
-				MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_16, true, 0.2f, false, false>::Create();
-				break;
-			case VK_SAMPLE_COUNT_32_BIT:
-				MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_32, true, 0.2f, false, false>::Create();
-				break;
-			case VK_SAMPLE_COUNT_64_BIT:
-				MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_64, true, 0.2f, false, false>::Create();
-				break;
-			default:
-				break;
-			}
-			auto DepthStencilState = TDepthStencilStateInfo<true, true, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
-			auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
+            g_rhi_vk->CurrentPipelineStateFixed_Shadow = jPipelineStateFixedInfo(RasterizationState, MultisampleState, DepthStencilState, BlendingState
+                , jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT));
+        }
 
-			g_rhi_vk->CurrentPipelineStateFixed = jPipelineStateFixedInfo(RasterizationState, MultisampleState, DepthStencilState, BlendingState
-				, jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT));
-		}
+        static jRenderPass_Vulkan* renderPass = nullptr;
+        if (!renderPass)
+        {
+            DirectionalLight->ShadowMapPtr = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget(
+                { ETextureType::TEXTURE_2D, ETextureFormat::D24_S8, SCR_WIDTH, SCR_HEIGHT, 1, /*ETextureFilter::LINEAR, ETextureFilter::LINEAR, */false, 1 }));
 
-		{
-			auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
-			jMultisampleStateInfo* MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_1, true, 0.2f, false, false>::Create();
-			auto DepthStencilState = TDepthStencilStateInfo<true, true, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
-			auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::NONE>::Create();
+            const Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
+            const Vector2 ClearDepth = Vector2(1.0f, 0.0f);
 
-			g_rhi_vk->CurrentPipelineStateFixed_Shadow = jPipelineStateFixedInfo(RasterizationState, MultisampleState, DepthStencilState, BlendingState
-				, jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT));			
-		}
+            jAttachment* depth = new jAttachment(DirectionalLight->ShadowMapPtr, EAttachmentLoadStoreOp::CLEAR_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth, true);
+            jAttachment* resolve = nullptr;
 
-		for (auto iter : jObject::GetStaticObject())
-		{
-			iter->Update(deltaTime);
+            auto textureDepth = (jTexture_Vulkan*)depth->RenderTargetPtr->GetTexture();
+            auto depthFormat = VK_FORMAT_D24_UNORM_S8_UINT;
+            g_rhi_vk->TransitionImageLayout(textureDepth->Image, depthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 1);
 
-			iter->RenderObject->UpdateWorldMatrix();
-		}
+            renderPass = new jRenderPass_Vulkan(nullptr, depth, resolve, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
+            renderPass->CreateRenderPass();
+            //RenderPasses.push_back(renderPass);
+        }
 
-		// 정리해야함
-		DirectionalLight->Update(deltaTime);
-
-		static jRenderPass_Vulkan* renderPass = nullptr;
-		if (!renderPass)
-		{
-			DirectionalLight->ShadowMapPtr = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget(
-				{ ETextureType::TEXTURE_2D, ETextureFormat::D24_S8, SCR_WIDTH, SCR_HEIGHT, 1, /*ETextureFilter::LINEAR, ETextureFilter::LINEAR, */false, 1 }));
-
-			const Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
-			const Vector2 ClearDepth = Vector2(1.0f, 0.0f);
-
-			jAttachment* depth = new jAttachment(DirectionalLight->ShadowMapPtr, EAttachmentLoadStoreOp::CLEAR_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth, true);
-			jAttachment* resolve = nullptr;
-
-			auto textureDepth = (jTexture_Vulkan*)depth->RenderTargetPtr->GetTexture();
-			auto depthFormat = VK_FORMAT_D24_UNORM_S8_UINT;
-			g_rhi_vk->TransitionImageLayout(textureDepth->Image, depthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 1);
-
-			renderPass = new jRenderPass_Vulkan(nullptr, depth, resolve, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
-			renderPass->CreateRenderPass();
-			//RenderPasses.push_back(renderPass);
-		}
-
-		// 정리 해야 함
-		DirectionalLight->PrepareShaderBindingInstance();
+        // 정리 해야 함
+        DirectionalLight->PrepareShaderBindingInstance();
 
 #define STATIC_COMMAND 0
 
-		// Shadow
-		{
-			static jShader* Shader = nullptr;
-			if (!Shader)
-			{
-				jShaderInfo shaderInfo;
-				shaderInfo.name = jName("shadow_test");
-				shaderInfo.vs = jName("Resource/Shaders/glsl/shadow_vs.glsl");
-				shaderInfo.fs = jName("Resource/Shaders/glsl/shadow_fs.glsl");
-				Shader = g_rhi->CreateShader(shaderInfo);
-			}
+        // Shadow
+        {
+            static jShader* Shader = nullptr;
+            if (!Shader)
+            {
+                jShaderInfo shaderInfo;
+                shaderInfo.name = jName("shadow_test");
+                shaderInfo.vs = jName("Resource/Shaders/glsl/shadow_vs.glsl");
+                shaderInfo.fs = jName("Resource/Shaders/glsl/shadow_fs.glsl");
+                Shader = g_rhi->CreateShader(shaderInfo);
+            }
 
-			static jView View;
-			View.Camera = DirectionalLight->GetLightCamra();
-			View.DirectionalLight = DirectionalLight;
+            static jView View;
+            View.Camera = DirectionalLight->GetLightCamra();
+            View.DirectionalLight = DirectionalLight;
 
-			g_rhi_vk->CurrentCommandBuffer = &commandBuffer;
+            g_rhi_vk->CurrentCommandBuffer = &commandBuffer;
 
 #if STATIC_COMMAND
-			static std::vector<jDrawCommand<true>> ShadowPasses;
-			if (ShadowPasses.size() <= 0)
+            static std::vector<jDrawCommand<true>> ShadowPasses;
+            if (ShadowPasses.size() <= 0)
 #else
-			std::vector<jDrawCommand<true>> ShadowPasses;
+            std::vector<jDrawCommand<true>> ShadowPasses;
 #endif
-			{
-				for (auto iter : jObject::GetStaticObject())
-				{
-					auto newCommand = jDrawCommand<true>(&View, iter->RenderObject, renderPass, Shader, &g_rhi_vk->CurrentPipelineStateFixed_Shadow, { });
-					newCommand.PrepareToDraw();
-					ShadowPasses.push_back(newCommand);
-				}
-			}
+            {
+                for (auto iter : jObject::GetStaticObject())
+                {
+                    auto newCommand = jDrawCommand<true>(&View, iter->RenderObject, renderPass, Shader, &g_rhi_vk->CurrentPipelineStateFixed_Shadow, { });
+                    newCommand.PrepareToDraw();
+                    ShadowPasses.push_back(newCommand);
+                }
+            }
 
-			//////////////////////////////////////////////////////////////////////////
-			// 여기서 부터 렌더 로직 시작
-			if (ensure(commandBuffer.Begin()))
-			{
-				g_rhi_vk->QueryPool.ResetQueryPool(&commandBuffer);
+            //////////////////////////////////////////////////////////////////////////
+            // 여기서 부터 렌더 로직 시작
+            if (ensure(commandBuffer.Begin()))
+            {
+                g_rhi_vk->QueryPool.ResetQueryPool(&commandBuffer);
 
-				{
-					SCOPE_GPU_PROFILE(ShadowPass);
-					renderPass->BeginRenderPass(&commandBuffer);
+                {
+                    SCOPE_GPU_PROFILE(ShadowPass);
+                    renderPass->BeginRenderPass(&commandBuffer);
 
-					for (auto& command : ShadowPasses)
-					{
-						command.Draw();
-					}
+                    for (auto& command : ShadowPasses)
+                    {
+                        command.Draw();
+                    }
 
-					// Finishing up
-					renderPass->EndRenderPass();
-				}
+                    // Finishing up
+                    renderPass->EndRenderPass();
+                }
 
-				//ensure(commandBuffer.End());
-			}
+                //ensure(commandBuffer.End());
+            }
 
-			// 여기 까지 렌더 로직 끝
-			//////////////////////////////////////////////////////////////////////////
-		}
+            // 여기 까지 렌더 로직 끝
+            //////////////////////////////////////////////////////////////////////////
+        }
 
-		// BasePass
-		if (1)
-		{
-			static jShader* Shader = nullptr;
-			if (!Shader)
-			{
-				jShaderInfo shaderInfo;
-				shaderInfo.name = jName("default_test");
+        // BasePass
+        if (1)
+        {
+            static jShader* Shader = nullptr;
+            if (!Shader)
+            {
+                jShaderInfo shaderInfo;
+                shaderInfo.name = jName("default_test");
                 shaderInfo.vs = jName("Resource/Shaders/glsl/shader_vs.glsl");
                 shaderInfo.fs = jName("Resource/Shaders/glsl/shader_fs.glsl");
-				Shader = g_rhi->CreateShader(shaderInfo);
-			}
+                Shader = g_rhi->CreateShader(shaderInfo);
+            }
 
-			static jView View;
-			View.Camera = MainCamera;
-			View.DirectionalLight = DirectionalLight;
+            static jView View;
+            View.Camera = MainCamera;
+            View.DirectionalLight = DirectionalLight;
 
-			g_rhi_vk->CurrentCommandBuffer = &commandBuffer;
+            g_rhi_vk->CurrentCommandBuffer = &commandBuffer;
 
 #if STATIC_COMMAND
-			static std::vector<jDrawCommand<false>> BasePasses;
-			if (BasePasses.size() <= 0)
+            static std::vector<jDrawCommand<false>> BasePasses;
+            if (BasePasses.size() <= 0)
 #else
-			std::vector<jDrawCommand<false>> BasePasses;
+            std::vector<jDrawCommand<false>> BasePasses;
 #endif
-			{
-				for (auto iter : jObject::GetStaticObject())
-				{
-					auto newCommand = jDrawCommand<false>(&View, iter->RenderObject, g_rhi_vk->RenderPasses[imageIndex], Shader, &g_rhi_vk->CurrentPipelineStateFixed, { });
-					newCommand.PrepareToDraw();
-					BasePasses.push_back(newCommand);
-				}
-			}
+            {
+                for (auto iter : jObject::GetStaticObject())
+                {
+                    auto newCommand = jDrawCommand<false>(&View, iter->RenderObject, g_rhi_vk->RenderPasses[imageIndex], Shader, &g_rhi_vk->CurrentPipelineStateFixed, { });
+                    newCommand.PrepareToDraw();
+                    BasePasses.push_back(newCommand);
+                }
+            }
 
-			//////////////////////////////////////////////////////////////////////////
-			// 여기서 부터 렌더 로직 시작
-			//if (ensure(commandBuffer.Begin()))
-			{
-				SCOPE_GPU_PROFILE(BasePass);
+            //////////////////////////////////////////////////////////////////////////
+            // 여기서 부터 렌더 로직 시작
+            //if (ensure(commandBuffer.Begin()))
+            {
+                SCOPE_GPU_PROFILE(BasePass);
 
-				g_rhi_vk->RenderPasses[imageIndex]->BeginRenderPass(&commandBuffer);
+                g_rhi_vk->RenderPasses[imageIndex]->BeginRenderPass(&commandBuffer);
 
-				//vkCmdWriteTimestamp((VkCommandBuffer)commandBuffer.GetHandle(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, g_rhi_vk->vkQueryPool, 0);
+                //vkCmdWriteTimestamp((VkCommandBuffer)commandBuffer.GetHandle(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, g_rhi_vk->vkQueryPool, 0);
 
-				for (auto command : BasePasses)
-				{
-					command.Draw();
-				}
+                for (auto command : BasePasses)
+                {
+                    command.Draw();
+                }
 
-				// Finishing up
-				g_rhi_vk->RenderPasses[imageIndex]->EndRenderPass();
+                // Finishing up
+                g_rhi_vk->RenderPasses[imageIndex]->EndRenderPass();
 
-				jImGUI_Vulkan::Get().Draw((VkCommandBuffer)commandBuffer.GetHandle(), imageIndex);
+                jImGUI_Vulkan::Get().Draw((VkCommandBuffer)commandBuffer.GetHandle(), imageIndex);
 
-				//vkCmdWriteTimestamp((VkCommandBuffer)commandBuffer.GetHandle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, g_rhi_vk->vkQueryPool, 1);
-			}
-			ensure(commandBuffer.End());
+                //vkCmdWriteTimestamp((VkCommandBuffer)commandBuffer.GetHandle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, g_rhi_vk->vkQueryPool, 1);
+            }
+            ensure(commandBuffer.End());
 
-			// 여기 까지 렌더 로직 끝
-			//////////////////////////////////////////////////////////////////////////
-		}
-	}
-	{
-		// Submitting the command buffer
-		VkSubmitInfo submitInfo = {};
-		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+            // 여기 까지 렌더 로직 끝
+            //////////////////////////////////////////////////////////////////////////
+        }
+    }
+    {
+        g_rhi_vk->EndRenderFrame(&commandBuffer);
 
-#if MULTIPLE_FRAME
-		VkSemaphore waitsemaphores[] = { g_rhi_vk->imageAvailableSemaphores[g_rhi_vk->currenFrame] };
-#else
-		VkSemaphore waitsemaphores[] = { imageAvailableSemaphore };
-#endif // MULTIPLE_FRAME
-		VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-		submitInfo.waitSemaphoreCount = 1;
-		submitInfo.pWaitSemaphores = waitsemaphores;
-		submitInfo.pWaitDstStageMask = waitStages;
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &commandBuffer.GetRef();
-
-#if MULTIPLE_FRAME
-		VkSemaphore signalSemaphores[] = { g_rhi_vk->renderFinishedSemaphores[g_rhi_vk->currenFrame] };
-#else
-		VkSemaphore signalSemaphores[] = { renderFinishedSemaphore };
-#endif // MULTIPLE_FRAME
-		submitInfo.signalSemaphoreCount = 1;
-		submitInfo.pSignalSemaphores = signalSemaphores;
-
-		// SubmitInfo를 동시에 할수도 있음.
-#if MULTIPLE_FRAME
-		vkResetFences(g_rhi_vk->device, 1, &commandBuffer.Fence);		// 세마포어와는 다르게 수동으로 펜스를 unsignaled 상태로 재설정 해줘야 함
-
-		// 마지막에 Fences 파라메터는 커맨드 버퍼가 모두 실행되고나면 Signaled 될 Fences.
-		if (!ensure(vkQueueSubmit(g_rhi_vk->GraphicsQueue.Queue, 1, &submitInfo, commandBuffer.Fence) == VK_SUCCESS))
-			return;
-#else
-		if (!ensure(vkQueueSubmit(g_rhi_vk->GraphicsQueue.Queue, 1, &submitInfo, VK_NULL_HANDLE) == VK_SUCCESS))
-			return;
-#endif // MULTIPLE_FRAME
-
-		VkPresentInfoKHR presentInfo = {};
-		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-		presentInfo.waitSemaphoreCount = 1;
-		presentInfo.pWaitSemaphores = signalSemaphores;
-
-		VkSwapchainKHR swapChains[] = { g_rhi_vk->swapChain };
-		presentInfo.swapchainCount = 1;
-		presentInfo.pSwapchains = swapChains;
-		presentInfo.pImageIndices = &imageIndex;
-
-		// 여러개의 스왑체인에 제출하는 경우만 모든 스왑체인으로 잘 제출 되었나 확인하는데 사용
-		// 1개인 경우 그냥 vkQueuePresentKHR 의 리턴값을 확인하면 됨.
-		presentInfo.pResults = nullptr;			// Optional
-		VkResult queuePresentResult = vkQueuePresentKHR(g_rhi_vk->PresentQueue.Queue, &presentInfo);
-
-		// 세마포어의 일관된 상태를 보장하기 위해서(세마포어 로직을 변경하지 않으려 노력한듯 함) vkQueuePresentKHR 이후에 framebufferResized 를 체크하는 것이 중요함.
-		if ((queuePresentResult == VK_ERROR_OUT_OF_DATE_KHR) || (queuePresentResult == VK_SUBOPTIMAL_KHR) || g_rhi_vk->framebufferResized)
-		{
-			g_rhi_vk->RecreateSwapChain();
-			g_rhi_vk->framebufferResized = false;
-		}
-		else if (queuePresentResult != VK_SUCCESS)
-		{
-			check(0);
-			return;
-		}
-
-		// CPU 가 큐에 작업을 제출하는 속도가 GPU 에서 소모하는 속도보다 빠른 경우 큐에 작업이 계속 쌓이거나 
-		// 여러 프레임에 걸쳐 동시에 imageAvailableSemaphore 와 renderFinishedSemaphore를 재사용하게 되는 문제가 있음.
-		// 1). 한프레임을 마치고 큐가 빌때까지 기다리는 것으로 해결할 수 있음. 한번에 1개의 프레임만 완성 가능(최적의 해결방법은 아님)
-		// 2). 여러개의 프레임을 동시에 처리 할수있도록 확장. 동시에 진행될 수 있는 최대 프레임수를 지정해줌.
-#if MULTIPLE_FRAME
-		g_rhi_vk->currenFrame = (g_rhi_vk->currenFrame + 1) % g_rhi_vk->swapChainImageViews.size();
-#else
-		vkQueueWaitIdle(PresentQueue);
-#endif // MULTIPLE_FRAME
-
-		g_rhi_vk->CommandBufferManager.ReturnCommandBuffer(commandBuffer);
-	}
+        g_rhi_vk->CommandBufferManager.ReturnCommandBuffer(commandBuffer);
+    }
 }
 
 void jGame::OnMouseButton()

@@ -47,6 +47,7 @@ public:
 	ESpawnedType SpawnedType = ESpawnedType::None;
 
 	void Update(float deltaTime);
+	void Draw();
 
 	void OnMouseButton();
 	void OnMouseMove(int32 xOffset, int32 yOffset);

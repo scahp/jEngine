@@ -13,6 +13,8 @@
 #include "stb_image.h"
 #include "jPrimitiveUtil.h"
 #include "Profiler/jPerformanceProfile.h"
+#include "Vulkan/jVertexBuffer_Vulkan.h"
+#include "Vulkan/jIndexBuffer_Vulkan.h"
 
 const std::string MODEL_PATH = "chalet.obj";
 const std::string TEXTURE_PATH = "chalet.jpg";
@@ -1087,281 +1089,6 @@ bool jRHI_Vulkan::CreateSyncObjects()
 	return true;
 }
 
-void jRHI_Vulkan::MainLoop()
-{
-	//while (!glfwWindowShouldClose(window))
-	//{
-		glfwPollEvents();
-		DrawFrame();
-	//}
-
-	// Logical device 가 작업을 모두 마칠때까지 기다렸다가 Destory를 진행할 수 있게 기다림.
-	vkDeviceWaitIdle(device);
-}
-
-bool jRHI_Vulkan::DrawFrame()
-{
-	{
-		auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
-		jMultisampleStateInfo* MultisampleState = nullptr;
-		switch (msaaSamples)
-		{
-		case VK_SAMPLE_COUNT_1_BIT:
-			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_1, true, 0.2f, false, false>::Create();
-			break;
-		case VK_SAMPLE_COUNT_2_BIT:
-			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_2, true, 0.2f, false, false>::Create();
-			break;
-		case VK_SAMPLE_COUNT_4_BIT:
-			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_4, true, 0.2f, false, false>::Create();
-			break;
-		case VK_SAMPLE_COUNT_8_BIT:
-			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_8, true, 0.2f, false, false>::Create();
-			break;
-		case VK_SAMPLE_COUNT_16_BIT:
-			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_16, true, 0.2f, false, false>::Create();
-			break;
-		case VK_SAMPLE_COUNT_32_BIT:
-			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_32, true, 0.2f, false, false>::Create();
-			break;
-		case VK_SAMPLE_COUNT_64_BIT:
-			MultisampleState = TMultisampleStateInfo<EMSAASamples::COUNT_64, true, 0.2f, false, false>::Create();
-			break;
-		default:
-			break;
-		}
-		auto DepthStencilState = TDepthStencilStateInfo<true, true, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
-		auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
-
-		CurrentPipelineStateFixed = jPipelineStateFixedInfo(RasterizationState, MultisampleState, DepthStencilState, BlendingState
-			, jViewport(0.0f, 0.0f, (float)swapChainExtent.width, (float)swapChainExtent.height), jScissor(0, 0, swapChainExtent.width, swapChainExtent.height));
-	}
-
-	jShaderInfo shaderInfo;
-	shaderInfo.name = jName("default_test");
-	shaderInfo.vs = jName("Shaders/Vulkan/shader_vs.glsl");
-	shaderInfo.fs = jName("Shaders/Vulkan/shader_fs.glsl");
-	static auto Shader = g_rhi->CreateShader(shaderInfo);
-
-	TestCube->RenderObject->UpdateWorldMatrix();
-
-	//ubo.Model = Matrix::MakeRotate(Vector(0.0f, 0.0f, 1.0f), DegreeToRadian(245.0f)).GetTranspose();
-	//ubo.View = jCameraUtil::CreateViewMatrix(Vector(2.0f, 2.0f, 2.0f), Vector(0.0f, 0.0f, 0.0f), Vector(0.0f, 0.0f, 1.0f)).GetTranspose();
-	//ubo.Proj = jCameraUtil::CreatePerspectiveMatrix(static_cast<float>(swapChainExtent.width), static_cast<float>(swapChainExtent.height)
-	//	, DegreeToRadian(45.0f), 0.1f, 10.0f).GetTranspose();
-	//ubo.Proj.m[1][1] *= -1;
-
-	const Vector mainCameraPos = Vector(2.0f, 2.0f, 2.0f);
-	const Vector mainCameraTarget(0.0f, 0.0f, 0.0f);
-	static auto MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 0.1f, 10.0f, SCR_WIDTH, SCR_HEIGHT, true);
-	MainCamera->UpdateCamera();
-
-	jView View;
-	View.Camera = MainCamera;
-
-	TestCube->RenderObject->UpdateRenderObjectUniformBuffer(&View);
-	TestCube->RenderObject->PrepareShaderBindingInstance();
-
-	class jDrawCommand
-	{
-	public:
-		jDrawCommand(jView* view, jRenderObject* renderObject, jRenderPass* renderPass, jShader* shader, jPipelineStateFixedInfo* pipelineStateFixed, std::vector<const jShaderBindingInstance*> shaderBindingInstances)
-			: View(view), RenderObject(renderObject), RenderPass(renderPass), Shader(shader), PipelineStateFixed(pipelineStateFixed), ShaderBindingInstances(shaderBindingInstances)
-		{}
-
-		void PrepareToDraw()
-		{
-			// GetShaderBindings
-			RenderObject->GetShaderBindingInstance(ShaderBindingInstances);
-
-			// Bind ShaderBindings
-			void* pipelineLayout = g_rhi->CreatePipelineLayout(ShaderBindingInstances);
-			std::vector<const jShaderBindings*> shaderBindings;
-			for (int32 i = 0; i < ShaderBindingInstances.size(); ++i)
-			{
-				ShaderBindingInstances[i]->Bind(pipelineLayout, i);
-				shaderBindings.push_back(ShaderBindingInstances[i]->ShaderBindings);
-			}
-
-			// Create Pipeline
-			CurrentPipelineStateInfo = jPipelineStateInfo(PipelineStateFixed, Shader, RenderObject->VertexBuffer, RenderPass, shaderBindings);
-			CurrentPipelineStateInfo.CreateGraphicsPipelineState();
-
-			// Bind Pipeline
-			CurrentPipelineStateInfo.Bind();
-		}
-		void Draw()
-		{
-			// Draw
-			RenderObject->Draw(nullptr, Shader, {});
-		}
-
-		std::vector<const jShaderBindingInstance*> ShaderBindingInstances;
-
-		jView* View = nullptr;
-		jRenderPass* RenderPass = nullptr;
-		jShader* Shader = nullptr;
-		jRenderObject* RenderObject = nullptr;
-		jPipelineStateFixedInfo* PipelineStateFixed = nullptr;
-		jPipelineStateInfo CurrentPipelineStateInfo;
-	};
-
-
-// 이 함수는 아래 3가지 기능을 수행함
-// 1. 스왑체인에서 이미지를 얻음
-// 2. Framebuffer 에서 Attachment로써 얻어온 이미지를 가지고 커맨드 버퍼를 실행
-// 3. 스왑체인 제출을 위해 이미지를 반환
-
-// 스왑체인을 동기화는 2가지 방법
-// 1. Fences		: vkWaitForFences 를 사용하여 프로그램에서 fences의 상태에 접근 할 수 있음.
-//						Fences는 어플리케이션과 렌더링 명령의 동기화를 위해 설계됨
-// 2. Semaphores	: 세마포어는 안됨.
-//						Semaphores 는 커맨드 Queue 내부 혹은 Queue 들 사이에 명령어 동기화를 위해서 설계됨
-
-// 현재는 Draw 와 presentation 커맨드를 동기화 하는 곳에 사용할 것이므로 세마포어가 적합.
-// 2개의 세마포어를 만들 예정
-// 1. 이미지를 획득해서 렌더링 준비가 완료된 경우 Signal(Lock 이 풀리는) 되는 것 (imageAvailableSemaphore)
-// 2. 렌더링을 마쳐서 Presentation 가능한 상태에서 Signal 되는 것 (renderFinishedSemaphore)
-
-#if MULTIPLE_FRAME
-	vkWaitForFences(device, 1, &inFlightFences[currenFrame], VK_TRUE, UINT64_MAX);
-#endif // MULTIPLE_FRAME
-
-	uint32_t imageIndex;
-	// timeout 은 nanoseconds. UINT64_MAX 는 타임아웃 없음
-#if MULTIPLE_FRAME
-	VkResult acquireNextImageResult = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphores[currenFrame], VK_NULL_HANDLE, &imageIndex);
-	if (acquireNextImageResult != VK_SUCCESS)
-		return false;
-
-	// 이전 프레임에서 현재 사용하려는 이미지를 사용중에 있나? (그렇다면 펜스를 기다려라)
-	if (imagesInFlight[imageIndex] != VK_NULL_HANDLE)
-		vkWaitForFences(device, 1, &imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
-
-	// 이 프레임에서 펜스를 사용한다고 마크 해둠
-	imagesInFlight[imageIndex] = inFlightFences[currenFrame];
-#else
-	VkResult acquireNextImageResult = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
-#endif // MULTIPLE_FRAME
-
-	// 여기서는 VK_SUCCESS or VK_SUBOPTIMAL_KHR 은 성공했다고 보고 계속함.
-	// VK_ERROR_OUT_OF_DATE_KHR : 스왑체인이 더이상 서피스와 렌더링하는데 호환되지 않는 경우. (보통 윈도우 리사이즈 이후)
-	// VK_SUBOPTIMAL_KHR : 스왑체인이 여전히 서피스에 제출 가능하지만, 서피스의 속성이 더이상 정확하게 맞지 않음.
-	if (acquireNextImageResult == VK_ERROR_OUT_OF_DATE_KHR)
-	{
-		RecreateSwapChain();		// 이 경우 렌더링이 더이상 불가능하므로 즉시 스왑체인을 새로 만듬.
-		return false;
-	}
-	else if (acquireNextImageResult != VK_SUCCESS && acquireNextImageResult != VK_SUBOPTIMAL_KHR)
-	{
-		check(0);
-		return false;
-	}
-
-	//////////////////////////////////////////////////////////////////////////
-	// 여기서 부터 렌더 로직 시작
-
-	//UpdateUniformBuffer(imageIndex);
-
-	auto commandBuffer = CommandBufferManager.GetOrCreateCommandBuffer();
-	if (ensure(commandBuffer.Begin()))
-	{
-		CurrentCommandBuffer = &commandBuffer;
-
-		RenderPasses[imageIndex]->BeginRenderPass(&commandBuffer);
-
-		jDrawCommand command(&View, TestCube->RenderObject, RenderPasses[imageIndex], Shader, &CurrentPipelineStateFixed, { });
-		command.PrepareToDraw();
-		command.Draw();
-
-		// Finishing up
-		RenderPasses[imageIndex]->EndRenderPass();
-
-		ensure(commandBuffer.End());
-	}
-
-	// 여기 까지 렌더 로직 끝
-	//////////////////////////////////////////////////////////////////////////
-
-	// Submitting the command buffer
-	VkSubmitInfo submitInfo = {};
-	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
-#if MULTIPLE_FRAME
-	VkSemaphore waitsemaphores[] = { imageAvailableSemaphores[currenFrame] };
-#else
-	VkSemaphore waitsemaphores[] = { imageAvailableSemaphore };
-#endif // MULTIPLE_FRAME
-	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-	submitInfo.waitSemaphoreCount = 1;
-	submitInfo.pWaitSemaphores = waitsemaphores;
-	submitInfo.pWaitDstStageMask = waitStages;
-	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &commandBuffer.GetRef();
-
-#if MULTIPLE_FRAME
-	VkSemaphore signalSemaphores[] = { renderFinishedSemaphores[currenFrame] };
-#else
-	VkSemaphore signalSemaphores[] = { renderFinishedSemaphore };
-#endif // MULTIPLE_FRAME
-	submitInfo.signalSemaphoreCount = 1;
-	submitInfo.pSignalSemaphores = signalSemaphores;
-
-	// SubmitInfo를 동시에 할수도 있음.
-#if MULTIPLE_FRAME
-	vkResetFences(device, 1, &inFlightFences[currenFrame]);		// 세마포어와는 다르게 수동으로 펜스를 unsignaled 상태로 재설정 해줘야 함
-
-	// 마지막에 Fences 파라메터는 커맨드 버퍼가 모두 실행되고나면 Signaled 될 Fences.
-	if (!ensure(vkQueueSubmit(GraphicsQueue.Queue, 1, &submitInfo, inFlightFences[currenFrame]) == VK_SUCCESS))
-		return false;
-#else
-	if (!ensure(vkQueueSubmit(GraphicsQueue.Queue, 1, &submitInfo, VK_NULL_HANDLE) == VK_SUCCESS))
-		return false;
-#endif // MULTIPLE_FRAME
-
-	VkPresentInfoKHR presentInfo = {};
-	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-	presentInfo.waitSemaphoreCount = 1;
-	presentInfo.pWaitSemaphores = signalSemaphores;
-
-	VkSwapchainKHR swapChains[] = { swapChain };
-	presentInfo.swapchainCount = 1;
-	presentInfo.pSwapchains = swapChains;
-	presentInfo.pImageIndices = &imageIndex;
-
-	// 여러개의 스왑체인에 제출하는 경우만 모든 스왑체인으로 잘 제출 되었나 확인하는데 사용
-	// 1개인 경우 그냥 vkQueuePresentKHR 의 리턴값을 확인하면 됨.
-	presentInfo.pResults = nullptr;			// Optional
-	VkResult queuePresentResult = vkQueuePresentKHR(PresentQueue.Queue, &presentInfo);
-
-	// 세마포어의 일관된 상태를 보장하기 위해서(세마포어 로직을 변경하지 않으려 노력한듯 함) vkQueuePresentKHR 이후에 framebufferResized 를 체크하는 것이 중요함.
-	if ((queuePresentResult == VK_ERROR_OUT_OF_DATE_KHR) || (queuePresentResult == VK_SUBOPTIMAL_KHR) || framebufferResized)
-	{
-		RecreateSwapChain();
-		framebufferResized = false;
-	}
-	else if (queuePresentResult != VK_SUCCESS)
-	{
-		check(0);
-		return false;
-	}
-
-
-	// CPU 가 큐에 작업을 제출하는 속도가 GPU 에서 소모하는 속도보다 빠른 경우 큐에 작업이 계속 쌓이거나 
-	// 여러 프레임에 걸쳐 동시에 imageAvailableSemaphore 와 renderFinishedSemaphore를 재사용하게 되는 문제가 있음.
-	// 1). 한프레임을 마치고 큐가 빌때까지 기다리는 것으로 해결할 수 있음. 한번에 1개의 프레임만 완성 가능(최적의 해결방법은 아님)
-	// 2). 여러개의 프레임을 동시에 처리 할수있도록 확장. 동시에 진행될 수 있는 최대 프레임수를 지정해줌.
-#if MULTIPLE_FRAME
-	currenFrame = (currenFrame + 1) % swapChainImageViews.size();
-#else
-	vkQueueWaitIdle(PresentQueue);
-#endif // MULTIPLE_FRAME
-
-	CommandBufferManager.ReturnCommandBuffer(commandBuffer);
-
-	return true;
-}
-
 void jRHI_Vulkan::CleanupSwapChain()
 {
 	vkDestroyImageView(device, colorImageView, nullptr);
@@ -2133,356 +1860,142 @@ void jRHI_Vulkan::GetQueryTimeStampResultFromWholeStampArray(jQueryTime* queryTi
 	queryTimeStamp_vk->TimeStampStartEnd[1] = wholeQueryTimeStampArray[queryEnd];
 }
 
-void jRenderPass_Vulkan::Release()
+int32 jRHI_Vulkan::BeginRenderFrame(jCommandBuffer* commandBuffer)
 {
-    vkDestroyRenderPass(g_rhi_vk->device, RenderPass, nullptr);
+	uint32 imageIndex = -1;
+
+    // 이 함수는 아래 3가지 기능을 수행함
+    // 1. 스왑체인에서 이미지를 얻음
+    // 2. Framebuffer 에서 Attachment로써 얻어온 이미지를 가지고 커맨드 버퍼를 실행
+    // 3. 스왑체인 제출을 위해 이미지를 반환
+
+    // 스왑체인을 동기화는 2가지 방법
+    // 1. Fences		: vkWaitForFences 를 사용하여 프로그램에서 fences의 상태에 접근 할 수 있음.
+    //						Fences는 어플리케이션과 렌더링 명령의 동기화를 위해 설계됨
+    // 2. Semaphores	: 세마포어는 안됨.
+    //						Semaphores 는 커맨드 Queue 내부 혹은 Queue 들 사이에 명령어 동기화를 위해서 설계됨
+
+    // 현재는 Draw 와 presentation 커맨드를 동기화 하는 곳에 사용할 것이므로 세마포어가 적합.
+    // 2개의 세마포어를 만들 예정
+    // 1. 이미지를 획득해서 렌더링 준비가 완료된 경우 Signal(Lock 이 풀리는) 되는 것 (imageAvailableSemaphore)
+    // 2. 렌더링을 마쳐서 Presentation 가능한 상태에서 Signal 되는 것 (renderFinishedSemaphore)
+
+    VkFence lastCommandBufferFence = swapChainCommandBufferFences[g_rhi_vk->currenFrame];
+
+    // timeout 은 nanoseconds. UINT64_MAX 는 타임아웃 없음
+#if MULTIPLE_FRAME
+    VkResult acquireNextImageResult = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphores[g_rhi_vk->currenFrame], VK_NULL_HANDLE, &imageIndex);
+    if (acquireNextImageResult != VK_SUCCESS)
+        return -1;
+
+    // 이전 프레임에서 현재 사용하려는 이미지를 사용중에 있나? (그렇다면 펜스를 기다려라)
+    if (lastCommandBufferFence != VK_NULL_HANDLE)
+        vkWaitForFences(g_rhi_vk->device, 1, &lastCommandBufferFence, VK_TRUE, UINT64_MAX);
+
+    // 이 프레임에서 펜스를 사용한다고 마크 해둠
+    g_rhi_vk->swapChainCommandBufferFences[g_rhi_vk->currenFrame] = (VkFence)commandBuffer->GetFenceHandle();
+#else
+    VkResult acquireNextImageResult = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+#endif // MULTIPLE_FRAME
+
+    // 여기서는 VK_SUCCESS or VK_SUBOPTIMAL_KHR 은 성공했다고 보고 계속함.
+    // VK_ERROR_OUT_OF_DATE_KHR : 스왑체인이 더이상 서피스와 렌더링하는데 호환되지 않는 경우. (보통 윈도우 리사이즈 이후)
+    // VK_SUBOPTIMAL_KHR : 스왑체인이 여전히 서피스에 제출 가능하지만, 서피스의 속성이 더이상 정확하게 맞지 않음.
+    if (acquireNextImageResult == VK_ERROR_OUT_OF_DATE_KHR)
+    {
+        g_rhi_vk->RecreateSwapChain();		// 이 경우 렌더링이 더이상 불가능하므로 즉시 스왑체인을 새로 만듬.
+        return -2;
+    }
+    else if (acquireNextImageResult != VK_SUCCESS && acquireNextImageResult != VK_SUBOPTIMAL_KHR)
+    {
+        check(0);
+        return -3;
+    }
+
+	return (int32)imageIndex;
 }
 
-size_t jRenderPass_Vulkan::GetHash() const
+void jRHI_Vulkan::EndRenderFrame(jCommandBuffer* commandBuffer)
 {
-    if (Hash)
-        return Hash;
+	check(commandBuffer);
+	VkCommandBuffer vkCommandBuffer = (VkCommandBuffer)commandBuffer->GetHandle();
+	VkFence vkFence = (VkFence)commandBuffer->GetFenceHandle();
+	const uint32 imageIndex = (uint32)currenFrame;
 
-    Hash = __super::GetHash();
-    Hash ^= STATIC_NAME_CITY_HASH("ClearValues");
-    Hash ^= CityHash64((const char*)ClearValues.data(), sizeof(VkClearValue) * ClearValues.size());
-    return Hash;
+    // Submitting the command buffer
+    VkSubmitInfo submitInfo = {};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+#if MULTIPLE_FRAME
+    VkSemaphore waitsemaphores[] = { imageAvailableSemaphores[g_rhi_vk->currenFrame] };
+#else
+    VkSemaphore waitsemaphores[] = { imageAvailableSemaphore };
+#endif // MULTIPLE_FRAME
+    VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = waitsemaphores;
+    submitInfo.pWaitDstStageMask = waitStages;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &vkCommandBuffer;
+
+#if MULTIPLE_FRAME
+    VkSemaphore signalSemaphores[] = { g_rhi_vk->renderFinishedSemaphores[g_rhi_vk->currenFrame] };
+#else
+    VkSemaphore signalSemaphores[] = { renderFinishedSemaphore };
+#endif // MULTIPLE_FRAME
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = signalSemaphores;
+
+    // SubmitInfo를 동시에 할수도 있음.
+#if MULTIPLE_FRAME
+    vkResetFences(g_rhi_vk->device, 1, &vkFence);		// 세마포어와는 다르게 수동으로 펜스를 unsignaled 상태로 재설정 해줘야 함
+
+    // 마지막에 Fences 파라메터는 커맨드 버퍼가 모두 실행되고나면 Signaled 될 Fences.
+    if (!ensure(vkQueueSubmit(g_rhi_vk->GraphicsQueue.Queue, 1, &submitInfo, vkFence) == VK_SUCCESS))
+        return;
+#else
+    if (!ensure(vkQueueSubmit(g_rhi_vk->GraphicsQueue.Queue, 1, &submitInfo, VK_NULL_HANDLE) == VK_SUCCESS))
+        return;
+#endif // MULTIPLE_FRAME
+
+    VkPresentInfoKHR presentInfo = {};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = signalSemaphores;
+
+    VkSwapchainKHR swapChains[] = { swapChain };
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = swapChains;
+    presentInfo.pImageIndices = &imageIndex;
+
+    // 여러개의 스왑체인에 제출하는 경우만 모든 스왑체인으로 잘 제출 되었나 확인하는데 사용
+    // 1개인 경우 그냥 vkQueuePresentKHR 의 리턴값을 확인하면 됨.
+    presentInfo.pResults = nullptr;			// Optional
+    VkResult queuePresentResult = vkQueuePresentKHR(PresentQueue.Queue, &presentInfo);
+
+    // 세마포어의 일관된 상태를 보장하기 위해서(세마포어 로직을 변경하지 않으려 노력한듯 함) vkQueuePresentKHR 이후에 framebufferResized 를 체크하는 것이 중요함.
+    if ((queuePresentResult == VK_ERROR_OUT_OF_DATE_KHR) || (queuePresentResult == VK_SUBOPTIMAL_KHR) || framebufferResized)
+    {
+        RecreateSwapChain();
+        framebufferResized = false;
+    }
+    else if (queuePresentResult != VK_SUCCESS)
+    {
+        check(0);
+        return;
+    }
+
+    // CPU 가 큐에 작업을 제출하는 속도가 GPU 에서 소모하는 속도보다 빠른 경우 큐에 작업이 계속 쌓이거나 
+    // 여러 프레임에 걸쳐 동시에 imageAvailableSemaphore 와 renderFinishedSemaphore를 재사용하게 되는 문제가 있음.
+    // 1). 한프레임을 마치고 큐가 빌때까지 기다리는 것으로 해결할 수 있음. 한번에 1개의 프레임만 완성 가능(최적의 해결방법은 아님)
+    // 2). 여러개의 프레임을 동시에 처리 할수있도록 확장. 동시에 진행될 수 있는 최대 프레임수를 지정해줌.
+#if MULTIPLE_FRAME
+    currenFrame = (currenFrame + 1) % swapChainImageViews.size();
+#else
+    vkQueueWaitIdle(PresentQueue);
+#endif // MULTIPLE_FRAME
 }
 
-std::unordered_map<size_t, VkRenderPass> s_renderPassPool;
-bool jRenderPass_Vulkan::CreateRenderPass()
-{
-	int32 SampleCount = 0;
-	int32 LayerCount = 0;
-
-	const auto renderPassHash = GetHash();
-	auto it_find = s_renderPassPool.find(renderPassHash);
-	if (s_renderPassPool.end() != it_find)
-	{
-		RenderPass = it_find->second;
-
-		for (int32 i = 0; i < ColorAttachments.size(); ++i)
-		{
-			const jAttachment* attachment = ColorAttachments[i];
-			check(attachment);
-			check(attachment->RenderTargetPtr.get());
-
-			const auto& color = attachment->ClearColor;
-			VkClearValue colorClear = {};
-			colorClear.color = { color.x, color.y, color.z, color.w };
-			ClearValues.push_back(colorClear);
-
-			const auto& RTInfo = attachment->RenderTargetPtr->Info;
-			
-			check(SampleCount == 0 || SampleCount == RTInfo.SampleCount);
-			check(LayerCount == 0 || LayerCount == RTInfo.LayerCount);
-			SampleCount = RTInfo.SampleCount;
-			LayerCount = RTInfo.LayerCount;
-		}
-
-		if (DepthAttachment)
-		{
-			const jAttachment* attachment = DepthAttachment;
-			check(attachment);
-			check(attachment->RenderTargetPtr.get());
-
-			VkClearValue colorClear = {};
-			colorClear.depthStencil = { DepthAttachment->ClearDepth.x, (uint32)DepthAttachment->ClearDepth.y };
-			ClearValues.push_back(colorClear);
-
-			const auto& RTInfo = attachment->RenderTargetPtr->Info;
-
-			if (SampleCount == 0)
-				SampleCount = RTInfo.SampleCount;
-			if (LayerCount == 0)
-				LayerCount = RTInfo.LayerCount;
-		}
-	}
-	else
-	{
-		int32 AttachmentIndex = 0;
-		std::vector<VkAttachmentDescription> AttachmentDescs;
-
-		const size_t Attachments = ColorAttachments.size() + (DepthAttachment ? 1 : 0) + (ColorAttachmentResolve ? 1 : 0);
-		AttachmentDescs.resize(Attachments);
-
-		std::vector<VkAttachmentReference> colorAttachmentRefs;
-		colorAttachmentRefs.resize(ColorAttachments.size());
-		for (int32 i = 0; i < ColorAttachments.size(); ++i)
-		{
-			const jAttachment* attachment = ColorAttachments[i];
-			check(attachment);
-			check(attachment->RenderTargetPtr.get());
-
-			const auto& RTInfo = attachment->RenderTargetPtr->Info;
-
-			VkAttachmentDescription& colorDesc = AttachmentDescs[AttachmentIndex];
-			colorDesc.format = GetVulkanTextureFormat(RTInfo.Format);
-			colorDesc.samples = (VkSampleCountFlagBits)RTInfo.SampleCount;
-			GetVulkanAttachmentLoadStoreOp(colorDesc.loadOp, colorDesc.storeOp, attachment->LoadStoreOp);
-			GetVulkanAttachmentLoadStoreOp(colorDesc.stencilLoadOp, colorDesc.stencilStoreOp, attachment->StencilLoadStoreOp);
-
-			check((ColorAttachmentResolve && ((int32)RTInfo.SampleCount > 1)) || (!ColorAttachmentResolve && (int32)RTInfo.SampleCount == 1));
-			check(SampleCount == 0 || SampleCount == RTInfo.SampleCount);
-			check(LayerCount == 0 || LayerCount == RTInfo.LayerCount);
-			SampleCount = RTInfo.SampleCount;
-			LayerCount = RTInfo.LayerCount;
-
-			// Texture나 Framebuffer의 경우 VkImage 객체로 특정 픽셀 형식을 표현함.
-			// 그러나 메모리의 픽셀 레이아웃은 이미지로 수행하려는 작업에 따라서 변경될 수 있음.
-			// 그래서 여기서는 수행할 작업에 적절한 레이아웃으로 image를 전환시켜주는 작업을 함.
-			// 주로 사용하는 layout의 종류
-			// 1). VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : Color attachment의 이미지
-			// 2). VK_IMAGE_LAYOUT_PRESENT_SRC_KHR : Swapchain으로 제출된 이미지
-			// 3). VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL : Memory copy 연산의 Destination으로 사용된 이미지
-			colorDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;			// RenderPass가 시작되기 전에 어떤 Image 레이아웃을 가지고 있을지 여부를 지정
-																				// VK_IMAGE_LAYOUT_UNDEFINED 은 이전 이미지 레이아웃을 무시한다는 의미.
-																				// 주의할 점은 이미지의 내용이 보존되지 않습니다. 그러나 현재는 이미지를 Clear할 것이므로 보존할 필요가 없음.
-
-			//colorDesc.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;	// RenderPass가 끝날때 자동으로 전환될 Image 레이아웃을 정의함
-			//																	// 우리는 렌더링 결과를 스왑체인에 제출할 것이기 때문에 VK_IMAGE_LAYOUT_PRESENT_SRC_KHR 사용
-
-			// MSAA 를 사용하게 되면, Swapchain에 제출전에 resolve 를 해야하므로, 아래와 같이 final layout 을 변경해줌.
-			// 그리고 reoslve를 위한 VkAttachmentDescription 을 추가함. depth buffer의 경우는 Swapchain에 제출하지 않기 때문에 이 과정이 필요없음.
-			if (SampleCount > 1)
-			{
-				if (DepthAttachment->TransitToShaderReadAtFinal)
-					colorDesc.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-				else
-					colorDesc.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-			}
-			else
-			{
-				colorDesc.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;			// MSAA 안하면 바로 Present 할 것이므로
-			}
-
-			//////////////////////////////////////////////////////////////////////////
-
-			// Subpasses
-			// 하나의 렌더링패스에는 여러개의 서브렌더패스가 존재할 수 있다. 예를 들어서 포스트프로세스를 처리할때 여러 포스트프로세스를 
-			// 서브패스로 전달하여 하나의 렌더패스로 만들 수 있다. 이렇게 하면 불칸이 Operation과 메모리 대역폭을 아껴쓸 수도 있으므로 성능이 더 나아진다.
-			// 포스프 프로세스 처리들 사이에 (GPU <-> Main memory에 계속해서 Framebuffer 내용을 올렸다 내렸다 하지 않고 계속 GPU에 올려두고 처리할 수 있음)
-			// 현재는 1개의 서브패스만 사용함.
-			VkAttachmentReference& colorAttachmentRef = colorAttachmentRefs[i];
-			colorAttachmentRef.attachment = AttachmentIndex++;							// VkAttachmentDescription 배열의 인덱스
-																						// fragment shader의 layout(location = 0) out vec4 outColor; 에 location=? 에 인덱스가 매칭됨.
-			colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;		// 서브패스에서 어떤 이미지 레이아웃을 사용할것인지를 명세함.
-																						// Vulkan에서 이 서브패스가 되면 자동으로 Image 레이아웃을 이것으로 변경함.
-																						// 우리는 VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL 으로 설정하므로써 color attachment로 사용
-
-			const auto& color = attachment->ClearColor;
-			VkClearValue colorClear = {};
-			colorClear.color = { color.x, color.y, color.z, color.w };
-			ClearValues.push_back(colorClear);
-		}
-
-		if (DepthAttachment)
-		{
-			check(DepthAttachment->RenderTargetPtr.get());
-			const auto& RTInfo = DepthAttachment->RenderTargetPtr->Info;
-
-			VkAttachmentDescription& depthAttachment = AttachmentDescs[AttachmentIndex];
-			depthAttachment.format = GetVulkanTextureFormat(RTInfo.Format);
-			depthAttachment.samples = (VkSampleCountFlagBits)RTInfo.SampleCount;
-			GetVulkanAttachmentLoadStoreOp(depthAttachment.loadOp, depthAttachment.storeOp, DepthAttachment->LoadStoreOp);
-			GetVulkanAttachmentLoadStoreOp(depthAttachment.stencilLoadOp, depthAttachment.stencilStoreOp, DepthAttachment->StencilLoadStoreOp);
-			depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-
-			// 최종 쉐이더 리로스 레이아웃 결정 - 쉐이더에서 읽는 리소스로 사용할 경우 처리
-			if (DepthAttachment->TransitToShaderReadAtFinal)
-				depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-			else
-				depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;			
-
-			//check((ColorAttachmentResolve && ((int32)RTInfo.SampleCount > 1)) || (!ColorAttachmentResolve && (int32)RTInfo.SampleCount == 1));
-			//check(SampleCount == 0 || SampleCount == RTInfo.SampleCount);
-			//check(LayerCount == 0 || LayerCount == RTInfo.LayerCount);
-			 if (SampleCount == 0)
-				SampleCount = RTInfo.SampleCount;
-			 if (LayerCount == 0)
-				LayerCount = RTInfo.LayerCount;
-
-			VkClearValue colorClear = {};
-			colorClear.depthStencil = { DepthAttachment->ClearDepth.x, (uint32)DepthAttachment->ClearDepth.y };
-			ClearValues.push_back(colorClear);
-		}
-
-		VkAttachmentReference colorAttachmentResolveRef = {};
-		if (SampleCount > 1)
-		{
-			check(ColorAttachmentResolve);
-			check(ColorAttachmentResolve->RenderTargetPtr.get());
-			const auto& RTInfo = ColorAttachmentResolve->RenderTargetPtr->Info;
-
-			VkAttachmentDescription colorAttachmentResolve = {};
-			colorAttachmentResolve.format = GetVulkanTextureFormat(RTInfo.Format);
-			colorAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT;
-			GetVulkanAttachmentLoadStoreOp(colorAttachmentResolve.loadOp, colorAttachmentResolve.storeOp, ColorAttachmentResolve->LoadStoreOp);
-			GetVulkanAttachmentLoadStoreOp(colorAttachmentResolve.stencilLoadOp, colorAttachmentResolve.stencilStoreOp, ColorAttachmentResolve->StencilLoadStoreOp);
-			colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-			colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-			AttachmentDescs.emplace_back(colorAttachmentResolve);
-
-			check(RTInfo.SampleCount == 1);
-			check(LayerCount == RTInfo.LayerCount);
-
-			colorAttachmentResolveRef.attachment = AttachmentIndex++;		// color attachments + depth attachment
-			colorAttachmentResolveRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-		}
-
-		VkSubpassDescription subpass = {};
-		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		if (colorAttachmentRefs.size() > 0)
-		{
-			subpass.colorAttachmentCount = (uint32)colorAttachmentRefs.size();
-			subpass.pColorAttachments = &colorAttachmentRefs[0];
-		}
-
-        VkAttachmentReference depthAttachmentRef = {};
-		if (DepthAttachment)
-		{
-            depthAttachmentRef.attachment = AttachmentIndex++;
-            depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-			subpass.pDepthStencilAttachment = &depthAttachmentRef;
-		}
-
-		if (SampleCount > 1)
-			subpass.pResolveAttachments = &colorAttachmentResolveRef;
-
-		VkRenderPassCreateInfo renderPassInfo = {};
-		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-		renderPassInfo.attachmentCount = static_cast<uint32_t>(AttachmentDescs.size());
-		renderPassInfo.pAttachments = AttachmentDescs.data();
-		renderPassInfo.subpassCount = 1;
-		renderPassInfo.pSubpasses = &subpass;
-
-		
-		// 1. Subpasses 들의 이미지 레이아웃 전환은 자동적으로 일어나며, 이런 전환은 subpass dependencies 로 관리 됨.
-		// 현재 서브패스를 1개 쓰고 있지만 서브패스 앞, 뒤에 암묵적인 서브페스가 있음.
-		// 2. 2개의 내장된 dependencies 가 렌더패스 시작과 끝에 있음.
-		//		- 렌더패스 시작에 있는 경우 정확한 타이밍에 발생하지 않음. 파이프라인 시작에서 전환이 발생한다고 가정되지만 우리가 아직 이미지를 얻지 못한 경우가 있을 수 있음.
-		//		 이 문제를 해결하기 위해서 2가지 방법이 있음.
-		//			1). imageAvailableSemaphore 의 waitStages를 VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT 로 변경하여, 이미지가 사용가능하기 전에 렌더패스가 시작되지 못하도록 함.
-		//			2). 렌더패스가 VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT 스테이지를 기다리게 함. (여기선 이거 씀)
-		VkSubpassDependency dependency = {};
-		// VK_SUBPASS_EXTERNAL : implicit subpass 인 before or after render pass 에서 발생하는 subpass
-		// 여기서 dstSubpass 는 0으로 해주는데 현재 1개의 subpass 만 만들어서 0번 index로 설정함.
-		// 디펜던시 그래프에서 사이클 발생을 예방하기 위해서 dstSubpass는 항상 srcSubpass 더 높아야한다. (VK_SUBPASS_EXTERNAL 은 예외)
-		dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-		dependency.dstSubpass = 0;
-
-		// 수행되길 기다려야하는 작업과 이런 작업이 수행되야할 스테이지를 명세하는 부분.
-		// 우리가 이미지에 접근하기 전에 스왑체인에서 읽기가 완료될때 까지 기다려야하는데, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT 에서 가능.
-		dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		dependency.srcAccessMask = 0;
-
-		// 기다려야하는 작업들은 Color Attachment 스테이지에 있고 Color Attachment를 읽고 쓰는 것과 관련되어 있음.
-		// 이 설정으로 실제 이미지가 필요할때 혹은 허용될때까지 전환이 발생하는것을 방지함.
-		dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-		renderPassInfo.dependencyCount = 1;
-		renderPassInfo.pDependencies = &dependency;
-		
-
-		//std::array<VkSubpassDependency, 2> dependencies;
-
-		//dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
-		//dependencies[0].dstSubpass = 0;
-		//dependencies[0].srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-		//dependencies[0].dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-		//dependencies[0].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-		//dependencies[0].dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-		//dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-
-		//dependencies[1].srcSubpass = 0;
-		//dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
-		//dependencies[1].srcStageMask = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-		//dependencies[1].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-		//dependencies[1].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-		//dependencies[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-		//dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-
-		//renderPassInfo.dependencyCount = (int32)dependencies.size();
-		//renderPassInfo.pDependencies = dependencies.data();
-
-		if (!ensure(vkCreateRenderPass(g_rhi_vk->GetDevice(), &renderPassInfo, nullptr, &RenderPass) == VK_SUCCESS))
-			return false;
-
-		s_renderPassPool.insert(std::make_pair(renderPassHash, RenderPass));
-	}
-
-	// Create RenderPassInfo
-	RenderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    RenderPassInfo.renderPass = RenderPass;
-
-    // 렌더될 영역이며, 최상의 성능을 위해 attachment의 크기와 동일해야함.
-	RenderPassInfo.renderArea.offset = { RenderOffset.x, RenderOffset.y };
-	RenderPassInfo.renderArea.extent = { (uint32)RenderExtent.x, (uint32)RenderExtent.y };
-
-	RenderPassInfo.clearValueCount = static_cast<uint32_t>(ClearValues.size());
-	RenderPassInfo.pClearValues = ClearValues.data();
-
-	// Create framebuffer
-	{
-		std::vector<VkImageView> ImageViews;
-
-		for (int32 k = 0; k < ColorAttachments.size(); ++k)
-		{
-			check(ColorAttachments[k]);
-			
-			const auto* RT = ColorAttachments[k]->RenderTargetPtr.get();
-			check(RT);
-
-			const jTexture* texture = RT->GetTexture();
-			check(texture);
-
-			ImageViews.push_back((VkImageView)texture->GetHandle());
-		}
-
-		if (DepthAttachment)
-		{
-			const auto* RT = DepthAttachment->RenderTargetPtr.get();
-			check(RT);
-
-			const jTexture* texture = RT->GetTexture();
-			check(texture);
-
-			ImageViews.push_back((VkImageView)texture->GetHandle());
-		}
-
-		if (SampleCount > 1)
-		{
-			check(ColorAttachmentResolve);
-
-			const auto* RT = ColorAttachmentResolve->RenderTargetPtr.get();
-			check(RT);
-
-			const jTexture* texture = RT->GetTexture();
-			check(texture);
-
-			ImageViews.push_back((VkImageView)texture->GetHandle());
-		}
-
-		VkFramebufferCreateInfo framebufferInfo = {};
-		framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-		framebufferInfo.renderPass = RenderPass;
-
-		// RenderPass와 같은 수와 같은 타입의 attachment 를 사용
-		framebufferInfo.attachmentCount = static_cast<uint32>(ImageViews.size());
-		framebufferInfo.pAttachments = ImageViews.data();
-
-		framebufferInfo.width = RenderExtent.x;
-		framebufferInfo.height = RenderExtent.y;
-		framebufferInfo.layers = LayerCount;			// 이미지 배열의 레이어수(3D framebuffer에 사용할 듯)
-
-		if (!ensure(vkCreateFramebuffer(g_rhi_vk->device, &framebufferInfo, nullptr, &FrameBuffer) == VK_SUCCESS))
-			return false;
-	}
-
-    return true;
-}
 
 bool jShaderBindings_Vulkan::CreateDescriptorSetLayout()
 {
@@ -2663,77 +2176,6 @@ void jShaderBindingInstance_Vulkan::Bind(void* pipelineLayout, int32 InSlot) con
 	vkCmdBindDescriptorSets((VkCommandBuffer)g_rhi_vk->CurrentCommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, (VkPipelineLayout)(pipelineLayout), InSlot, 1, &DescriptorSet, 0, nullptr);
 }
 
-bool jCommandBufferManager_Vulkan::CreatePool(uint32 QueueIndex)
-{
-	VkCommandPoolCreateInfo poolInfo = {};
-	poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-	poolInfo.queueFamilyIndex = QueueIndex;
-
-	// VK_COMMAND_POOL_CREATE_TRANSIENT_BIT : 커맨드 버퍼가 새로운 커맨드를 자주 다시 기록한다고 힌트를 줌.
-	//											(메모리 할당 동작을 변경할 것임)
-	// VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT : 커맨드 버퍼들이 개별적으로 다시 기록될 수 있다.
-	//													이 플래그가 없으면 모든 커맨드 버퍼들이 동시에 리셋되야 함.
-	poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;		// Optional
-
-	if (!ensure(vkCreateCommandPool(g_rhi_vk->device, &poolInfo, nullptr, &CommandPool) == VK_SUCCESS))
-		return false;
-
-	return true;
-}
-
-jCommandBuffer_Vulkan jCommandBufferManager_Vulkan::GetOrCreateCommandBuffer()
-{
-	if (PendingCommandBuffers.size() > 0)
-	{
-		for (int32 i = 0; i < (int32)PendingCommandBuffers.size(); ++i)
-		{
-			const VkResult Result = vkGetFenceStatus(g_rhi_vk->device, PendingCommandBuffers[i].Fence);
-			if (Result == VK_SUCCESS)		// VK_SUCCESS 면 Signaled
-			{
-				jCommandBuffer_Vulkan commandBuffer = PendingCommandBuffers[i];
-				PendingCommandBuffers.erase(PendingCommandBuffers.begin() + i);
-
-				UsingCommandBuffers.push_back(commandBuffer);
-				commandBuffer.Reset();
-
-				return commandBuffer;
-			}
-		}
-	}
-
-	VkCommandBufferAllocateInfo allocInfo = {};
-	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	allocInfo.commandPool = GetPool();
-
-	// VK_COMMAND_BUFFER_LEVEL_PRIMARY : 실행을 위해 Queue를 제출할 수 있으면 다른 커맨드버퍼로 부터 호출될 수 없다.
-	// VK_COMMAND_BUFFER_LEVEL_SECONDARY : 직접 제출할 수 없으며, Primary command buffer 로 부터 호출될 수 있다.
-	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	allocInfo.commandBufferCount = 1;
-
-	jCommandBuffer_Vulkan commandBuffer;
-	if (!ensure(vkAllocateCommandBuffers(g_rhi_vk->device, &allocInfo, &commandBuffer.GetRef()) == VK_SUCCESS))
-		return commandBuffer;
-
-	commandBuffer.Fence = g_rhi_vk->FenceManager.GetOrCreateFence();
-
-	UsingCommandBuffers.push_back(commandBuffer);
-
-	return commandBuffer;
-}
-
-void jCommandBufferManager_Vulkan::ReturnCommandBuffer(jCommandBuffer_Vulkan commandBuffer)
-{
-	for (int32 i = 0; i < UsingCommandBuffers.size(); ++i)
-	{
-		if (UsingCommandBuffers[i].GetHandle() == commandBuffer.GetHandle())
-		{
-			UsingCommandBuffers.erase(UsingCommandBuffers.begin() + i);
-			break;
-		}
-	}
-	PendingCommandBuffers.push_back(commandBuffer);
-}
-
 VkDescriptorPool jShaderBindingsManager_Vulkan::CreatePool(const jShaderBindings_Vulkan& bindings, uint32 maxAllocations) const
 {
 	auto DescriptorPoolSizes = bindings.GetDescriptorPoolSizeArray(maxAllocations);
@@ -2756,181 +2198,6 @@ void jShaderBindingsManager_Vulkan::Release(VkDescriptorPool pool) const
 {
 	if (pool)
 		vkDestroyDescriptorPool(g_rhi_vk->device, pool, nullptr);
-}
-
-void jVertexBuffer_Vulkan::Bind() const
-{
-	check(g_rhi_vk->CurrentCommandBuffer);
-	vkCmdBindVertexBuffers((VkCommandBuffer)g_rhi_vk->CurrentCommandBuffer->GetHandle(), 0, (uint32)BindInfos.Buffers.size(), &BindInfos.Buffers[0], &BindInfos.Offsets[0]);
-}
-
-void jIndexBuffer_Vulkan::Bind() const
-{
-	VkIndexType IndexType = VK_INDEX_TYPE_UINT16;
-	switch (IndexStreamData->Param->ElementType)
-	{
-	case EBufferElementType::BYTE:
-		IndexType = VK_INDEX_TYPE_UINT8_EXT;
-		break;
-	case EBufferElementType::UINT16:
-		IndexType = VK_INDEX_TYPE_UINT16;
-		break;
-	case EBufferElementType::UINT32:
-		IndexType = VK_INDEX_TYPE_UINT32;
-		break;
-	case EBufferElementType::FLOAT:
-		check(0);
-		break;
-	default:
-		break;
-	}
-	check(g_rhi_vk->CurrentCommandBuffer);
-	vkCmdBindIndexBuffer((VkCommandBuffer)g_rhi_vk->CurrentCommandBuffer->GetHandle(), IndexBuffer, 0, IndexType);
-}
-
-VkPipeline jPipelineStateInfo::CreateGraphicsPipelineState()
-{
-	// 미리 만들어 둔게 있으면 사용
-	if (vkPipeline)
-		return vkPipeline;
-
-	check(PipelineStateFixed);
-
-	Hash = GetHash();
-	check(Hash);
-	{
-		auto it_find = PipelineStatePool.find(Hash);
-		if (PipelineStatePool.end() != it_find)
-		{
-			*this = it_find->second;
-			return vkPipeline;
-		}
-	}
-
-	VkPipelineVertexInputStateCreateInfo vertexInputInfo = ((jVertexBuffer_Vulkan*)VertexBuffer)->CreateVertexInputState();
-	VkPipelineInputAssemblyStateCreateInfo inputAssembly = ((jVertexBuffer_Vulkan*)VertexBuffer)->CreateInputAssemblyState();
-
-	// 4. Viewports and scissors
-	// SwapChain의 이미지 사이즈가 이 클래스에 정의된 상수 WIDTH, HEIGHT와 다를 수 있다는 것을 기억 해야함.
-	// 그리고 Viewports 사이즈는 SwapChain 크기 이하로 마추면 됨.
-	// [minDepth ~ maxDepth] 는 [0.0 ~ 1.0] 이며 특별한 경우가 아니면 이 범위로 사용하면 된다.
-	// Scissor Rect 영역을 설정해주면 영역내에 있는 Pixel만 레스터라이저를 통과할 수 있으며 나머지는 버려(Discard)진다.
-	const auto& Viewports = PipelineStateFixed->Viewports;
-	check(Viewports.size());
-	std::vector<VkViewport> vkViewports;
-	vkViewports.resize(Viewports.size());
-	for (int32 i = 0; i < vkViewports.size(); ++i)
-	{
-		vkViewports[i].x = Viewports[i].X;
-		vkViewports[i].y = Viewports[i].Y;
-		vkViewports[i].width = Viewports[i].Width;
-		vkViewports[i].height = Viewports[i].Height;
-		vkViewports[i].minDepth = Viewports[i].MinDepth;
-		vkViewports[i].maxDepth = Viewports[i].MaxDepth;
-	}
-
-	const auto& Scissors = PipelineStateFixed->Scissors;
-	check(Scissors.size());
-	std::vector<VkRect2D> vkScissor;
-	vkScissor.resize(Scissors.size());
-	for (int32 i = 0; i < vkScissor.size(); ++i)
-	{
-		vkScissor[i].offset.x = Scissors[i].Offset.x;
-		vkScissor[i].offset.y = Scissors[i].Offset.y;
-		vkScissor[i].extent.width = Scissors[i].Extent.x;
-		vkScissor[i].extent.height = Scissors[i].Extent.y;
-	}
-
-	// Viewport와 Scissor 를 여러개 설정할 수 있는 멀티 뷰포트를 사용할 수 있기 때문임
-	VkPipelineViewportStateCreateInfo viewportState = {};
-	viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-	viewportState.viewportCount = (uint32)vkViewports.size();
-	viewportState.pViewports = &vkViewports[0];
-	viewportState.scissorCount = (uint32)vkScissor.size();
-	viewportState.pScissors = &vkScissor[0];
-
-	// 2가지 blending 방식을 모두 끌 수도있는데 그렇게 되면, 변경되지 않은 fragment color 값이 그대로 framebuffer에 쓰여짐.
-	VkPipelineColorBlendStateCreateInfo colorBlending = {};
-	colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-
-	// 2). 기존과 새로운 값을 비트 연산으로 결합한다.
-	colorBlending.logicOpEnable = VK_FALSE;			// 모든 framebuffer에 사용하는 blendEnable을 VK_FALSE로 했다면 자동으로 logicOpEnable은 꺼진다.
-	colorBlending.logicOp = VK_LOGIC_OP_COPY;		// Optional
-
-	// 1). 기존과 새로운 값을 섞어서 최종색을 만들어낸다.
-	colorBlending.attachmentCount = 1;						// framebuffer 개수에 맞게 설정해준다.
-	colorBlending.pAttachments = &((jBlendingStateInfo_Vulakn*)PipelineStateFixed->BlendingState)->ColorBlendAttachmentInfo;
-
-	colorBlending.blendConstants[0] = 0.0f;		// Optional
-	colorBlending.blendConstants[1] = 0.0f;		// Optional
-	colorBlending.blendConstants[2] = 0.0f;		// Optional
-	colorBlending.blendConstants[3] = 0.0f;		// Optional
-
-	// 9. Dynamic state
-	// 이전에 정의한 state에서 제한된 범위 내에서 새로운 pipeline을 만들지 않고 state를 변경할 수 있음. (viewport size, line width, blend constants)
-	// 이것을 하고싶으면 Dynamic state를 만들어야 함. 이경우 Pipeline에 설정된 값은 무시되고, 매 렌더링시에 새로 설정해줘야 함.
-	VkDynamicState dynamicStates[] = {
-		VK_DYNAMIC_STATE_VIEWPORT,
-		VK_DYNAMIC_STATE_LINE_WIDTH
-	};
-	// 현재는 사용하지 않음.
-	//VkPipelineDynamicStateCreateInfo dynamicState = {};
-	//dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-	//dynamicState.dynamicStateCount = 2;
-	//dynamicState.pDynamicStates = dynamicStates;
-
-	// 10. Pipeline layout
-	vkPipelineLayout = (VkPipelineLayout)g_rhi->CreatePipelineLayout(ShaderBindings);
-
-	VkGraphicsPipelineCreateInfo pipelineInfo = {};
-	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-
-	// Shader stage
-	check(Shader);
-	//pipelineInfo.stageCount = 2;
-	//pipelineInfo.pStages = shaderStage;
-	pipelineInfo.stageCount = (uint32)((jShader_Vulkan*)Shader)->ShaderStages.size();
-	pipelineInfo.pStages = ((jShader_Vulkan*)Shader)->ShaderStages.data();
-
-	// Fixed-function stage
-	pipelineInfo.pVertexInputState = &vertexInputInfo;
-	pipelineInfo.pInputAssemblyState = &inputAssembly;
-	pipelineInfo.pViewportState = &viewportState;
-	pipelineInfo.pRasterizationState = &((jRasterizationStateInfo_Vulkan*)PipelineStateFixed->RasterizationState)->RasterizationStateInfo;
-	pipelineInfo.pMultisampleState = &((jMultisampleStateInfo_Vulkan*)PipelineStateFixed->MultisampleState)->MultisampleStateInfo;
-	pipelineInfo.pDepthStencilState = &((jDepthStencilStateInfo_Vulkan*)PipelineStateFixed->DepthStencilState)->DepthStencilStateInfo;
-	pipelineInfo.pColorBlendState = &colorBlending;
-	pipelineInfo.pDynamicState = nullptr;			// Optional
-	pipelineInfo.layout = vkPipelineLayout;
-	pipelineInfo.renderPass = (VkRenderPass)RenderPass->GetRenderPass();
-	pipelineInfo.subpass = 0;		// index of subpass
-
-	// Pipeline을 상속받을 수 있는데, 아래와 같은 장점이 있다.
-	// 1). 공통된 내용이 많으면 파이프라인 설정이 저렴하다.
-	// 2). 공통된 부모를 가진 파이프라인 들끼리의 전환이 더 빠를 수 있다.
-	// BasePipelineHandle 이나 BasePipelineIndex 가 로 Pipeline 내용을 상속받을 수 있다.
-	// 이 기능을 사용하려면 VkGraphicsPipelineCreateInfo의 flags 에 VK_PIPELINE_CREATE_DERIVATIVE_BIT  가 설정되어있어야 함
-	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;		// Optional
-	pipelineInfo.basePipelineIndex = -1;					// Optional
-
-	// 여기서 두번째 파라메터 VkPipelineCache에 VK_NULL_HANDLE을 넘겼는데, VkPipelineCache는 VkPipeline을 저장하고 생성하는데 재사용할 수 있음.
-	// 또한 파일로드 저장할 수 있어서 다른 프로그램에서 다시 사용할 수도있다. VkPipelineCache를 사용하면 VkPipeline을 생성하는 시간을 
-	// 굉장히 빠르게 할수있다. (듣기로는 대략 1/10 의 속도로 생성해낼 수 있다고 함)
-	if (!ensure(vkCreateGraphicsPipelines(g_rhi_vk->device, g_rhi_vk->PipelineCache, 1, &pipelineInfo, nullptr, &vkPipeline) == VK_SUCCESS))
-	{
-		return nullptr;
-	}
-
-	PipelineStatePool.insert(std::make_pair(Hash, *this));
-
-	return vkPipeline;
-}
-
-
-void jPipelineStateInfo::Bind()
-{
-	check(vkPipeline);
-	vkCmdBindPipeline((VkCommandBuffer)g_rhi_vk->CurrentCommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipeline);
 }
 
 void jUniformBufferBlock_Vulkan::Destroy()
@@ -2976,25 +2243,6 @@ void jUniformBufferBlock_Vulkan::ClearBuffer(int32 clearValue)
 		memset(data, clearValue, Size);
 		vkUnmapMemory(g_rhi_vk->device, BufferMemory);
 	}
-}
-
-VkFence jFenceManager_Vulkan::GetOrCreateFence()
-{
-	if (PendingFences.size() > 0)
-	{
-		VkFence fence = *PendingFences.begin();
-		PendingFences.erase(PendingFences.begin());
-		UsingFences.insert(fence);
-		return fence;
-	}
-	VkFenceCreateInfo fenceInfo = {};
-	fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-	fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-	VkFence newFence = nullptr;
-	if (ensure(vkCreateFence(g_rhi_vk->device, &fenceInfo, nullptr, &newFence) == VK_SUCCESS))
-		UsingFences.insert(newFence);
-
-	return newFence;
 }
 
 //////////////////////////////////////////////////////////////////////////

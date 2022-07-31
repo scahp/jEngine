@@ -4,6 +4,10 @@
 
 #include "jRHI.h"
 #include "Shader/jShader.h"
+#include "jFenceManager.h"
+#include "jPipelineStateInfo.h"
+#include "jCommandBufferManager.h"
+#include "Vulkan/jRenderPass_Vulkan.h"
 
 #define VALIDATION_LAYER_VERBOSE 0
 #define MULTIPLE_FRAME 1
@@ -146,54 +150,6 @@ struct jVertex
 //	Matrix Proj;					|			mat4 proj
 //};								|		};
 
-class jRenderPass_Vulkan : public jRenderPass
-{
-public:
-	using jRenderPass::jRenderPass;
-
-    bool CreateRenderPass();
-    void Release();
-
-	virtual void* GetRenderPass() const override { return RenderPass; }
-	FORCEINLINE const VkRenderPass& GetRenderPassRaw() const { return RenderPass; }
-	virtual void* GetFrameBuffer() const override { return FrameBuffer; }
-
-	virtual bool BeginRenderPass(const jCommandBuffer* commandBuffer) override
-	{
-		if (!ensure(commandBuffer))
-			return false;
-
-		CommandBuffer = commandBuffer;
-
-		check(FrameBuffer);
-		RenderPassInfo.framebuffer = FrameBuffer;
-	
-        // 커맨드를 기록하는 명령어는 prefix로 모두 vkCmd 가 붙으며, 리턴값은 void 로 에러 핸들링은 따로 안함.
-        // VK_SUBPASS_CONTENTS_INLINE : 렌더 패스 명령이 Primary 커맨드 버퍼에 포함되며, Secondary 커맨드 버퍼는 실행되지 않는다.
-        // VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS : 렌더 패스 명령이 Secondary 커맨드 버퍼에서 실행된다.
-        vkCmdBeginRenderPass((VkCommandBuffer)commandBuffer->GetHandle(), &RenderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-		return true;
-    }
-
-	virtual void EndRenderPass() override
-	{
-		ensure(CommandBuffer);
-
-        // Finishing up
-        vkCmdEndRenderPass((VkCommandBuffer)CommandBuffer->GetHandle());
-		CommandBuffer = nullptr;
-	}
-
-	virtual size_t GetHash() const override;
-
-private:
-	const jCommandBuffer* CommandBuffer = nullptr;
-
-	VkRenderPassBeginInfo RenderPassInfo;
-	std::vector<VkClearValue> ClearValues;
-	VkRenderPass RenderPass = nullptr;
-	VkFramebuffer FrameBuffer = nullptr;
-};
 
 struct jShaderBindingInstance_Vulkan : public jShaderBindingInstance
 {
@@ -270,210 +226,11 @@ struct jTexture_Vulkan : public jTexture
 	static VkSampler CreateDefaultSamplerState();
 };
 
-class jCommandBuffer_Vulkan : public jCommandBuffer
-{
-public:
-	virtual void* GetHandle() const override { return CommandBuffer; }
-	FORCEINLINE VkCommandBuffer& GetRef() { return CommandBuffer; }
-
-	virtual bool Begin() const override
-	{
-		VkCommandBufferBeginInfo beginInfo = {};
-		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-
-		// VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT : 커맨드가 한번 실행된다음에 다시 기록됨
-		// VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT : Single Render Pass 범위에 있는 Secondary Command Buffer.
-		// VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT : 실행 대기중인 동안에 다시 서밋 될 수 있음.
-		beginInfo.flags = 0;					// Optional
-
-		// 이 플래그는 Secondary command buffer를 위해서만 사용하며, Primary command buffer 로 부터 상속받을 상태를 명시함.
-		beginInfo.pInheritanceInfo = nullptr;	// Optional
-
-		if (!ensure(vkBeginCommandBuffer(CommandBuffer, &beginInfo) == VK_SUCCESS))
-			return false;
-		
-		return true;
-	}
-	virtual bool End() const override
-	{
-		if (!ensure(vkEndCommandBuffer(CommandBuffer) == VK_SUCCESS))
-			return false;
-
-		return true;
-	}
-
-	virtual void Reset() const override
-	{
-		vkResetCommandBuffer(CommandBuffer, 0);
-	}
-
-	VkFence Fence = nullptr;
-
-private:
-	VkCommandBuffer CommandBuffer = nullptr;
-};
-
-class jCommandBufferManager_Vulkan // base 없음
-{
-public:
-	bool CreatePool(uint32 QueueIndex);
-	void Release()
-	{
-		//// Command buffer pool 을 다시 만들기 보다 있는 커맨드 버퍼 풀을 cleanup 하고 재사용 함.
-		//vkFreeCommandBuffers(device, CommandBufferManager.GetPool(), static_cast<uint32>(commandBuffers.size()), commandBuffers.data());
-	}
-
-	FORCEINLINE const VkCommandPool& GetPool() const { return CommandPool; };
-
-	jCommandBuffer_Vulkan GetOrCreateCommandBuffer();
-	void ReturnCommandBuffer(jCommandBuffer_Vulkan commandBuffer);
-
-private:
-	VkCommandPool CommandPool;		// 커맨드 버퍼를 저장할 메모리 관리자로 커맨드 버퍼를 생성함.
-	std::vector<jCommandBuffer_Vulkan> UsingCommandBuffers;
-	std::vector<jCommandBuffer_Vulkan> PendingCommandBuffers;
-};
-
 class jShaderBindingsManager_Vulkan // base 없음
 {
 public:
 	VkDescriptorPool CreatePool(const jShaderBindings_Vulkan& bindings, uint32 MaxAllocations = 32) const;
 	void Release(VkDescriptorPool pool) const;
-};
-
-struct jVertexStream_Vulkan
-{
-	jName Name;
-	uint32 Count;
-	EBufferType BufferType = EBufferType::STATIC;
-	EBufferElementType ElementType = EBufferElementType::BYTE;
-	bool Normalized = false;
-	int32 Stride = 0;
-	size_t Offset = 0;
-	int32 InstanceDivisor = 0;
-
-	VkBuffer VertexBuffer = nullptr;
-	VkDeviceMemory VertexBufferMemory = nullptr;
-};
-
-class jFenceManager_Vulkan	// base 없음
-{
-public:
-	VkFence GetOrCreateFence();
-	void ReturnFence(VkFence fence)
-	{
-		UsingFences.erase(fence);
-		PendingFences.insert(fence);
-	}
-
-	std::unordered_set<VkFence> UsingFences;
-	std::unordered_set<VkFence> PendingFences;
-};
-
-struct jVertexBuffer_Vulkan : public jVertexBuffer
-{
-	struct jBindInfo
-	{
-		void Reset() 
-		{
-			InputBindingDescriptions.clear();
-			AttributeDescriptions.clear();
-			Buffers.clear();
-			Offsets.clear();
-		}
-		std::vector<VkVertexInputBindingDescription> InputBindingDescriptions;
-		std::vector<VkVertexInputAttributeDescription> AttributeDescriptions;
-		std::vector<VkBuffer> Buffers;
-		std::vector<VkDeviceSize> Offsets;
-
-		VkPipelineVertexInputStateCreateInfo CreateVertexInputState() const
-		{
-			// Vertex Input
-			// 1). Bindings : 데이터 사이의 간격과 버택스당 or 인스턴스당(인스턴싱 사용시) 데이터인지 여부
-			// 2). Attribute descriptions : 버택스 쉐이더 전달되는 attributes 의 타입. 그것을 로드할 바인딩과 오프셋
-			VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
-			vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-
-			vertexInputInfo.vertexBindingDescriptionCount = (uint32)InputBindingDescriptions.size();
-			vertexInputInfo.pVertexBindingDescriptions = &InputBindingDescriptions[0];
-			vertexInputInfo.vertexAttributeDescriptionCount = (uint32)AttributeDescriptions.size();;
-			vertexInputInfo.pVertexAttributeDescriptions = &AttributeDescriptions[0];
-
-			return vertexInputInfo;
-		}
-
-		FORCEINLINE size_t GetHash() const
-		{
-			size_t result = 0;
-			result = CityHash64((const char*)InputBindingDescriptions.data(), sizeof(VkVertexInputBindingDescription) * InputBindingDescriptions.size());
-			result ^= CityHash64((const char*)AttributeDescriptions.data(), sizeof(VkVertexInputAttributeDescription) * AttributeDescriptions.size());
-			return result;
-		}
-	};
-
-	virtual size_t GetHash() const override
-	{
-		if (Hash)
-			return Hash;
-		
-		Hash = GetVertexInputStateHash() ^ GetInputAssemblyStateHash();
-		return Hash;
-	}
-
-	FORCEINLINE size_t GetVertexInputStateHash() const
-	{
-		return BindInfos.GetHash();
-	}
-
-	FORCEINLINE size_t GetInputAssemblyStateHash() const
-	{
-		VkPipelineInputAssemblyStateCreateInfo state = CreateInputAssemblyState();
-		return CityHash64((const char*)&state, sizeof(VkPipelineInputAssemblyStateCreateInfo));
-	}
-
-	FORCEINLINE VkPipelineVertexInputStateCreateInfo CreateVertexInputState() const
-	{
-		return BindInfos.CreateVertexInputState();
-	}
-
-	FORCEINLINE VkPipelineInputAssemblyStateCreateInfo CreateInputAssemblyState() const
-	{
-		check(VertexStreamData);
-
-		VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
-		inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-		inputAssembly.topology = GetVulkanPrimitiveTopology(VertexStreamData->PrimitiveType);
-
-		// primitiveRestartEnable 옵션이 VK_TRUE 이면, 인덱스버퍼의 특수한 index 0xFFFF or 0xFFFFFFFF 를 사용해서 line 과 triangle topology mode를 사용할 수 있다.
-		inputAssembly.primitiveRestartEnable = VK_FALSE;
-
-		return inputAssembly;
-	}
-
-	jBindInfo BindInfos;
-	std::vector<jVertexStream_Vulkan> Streams;
-	mutable size_t Hash = 0;
-
-	virtual void Bind(const jShader* shader) const override
-	{
-	}
-
-	virtual void Bind() const override;
-
-};
-
-struct jIndexBuffer_Vulkan : public jIndexBuffer
-{
-	VkBuffer IndexBuffer = nullptr;
-	VkDeviceMemory IndexBufferMemory = nullptr;
-	
-	virtual void Bind(const jShader* shader) const override {}
-	virtual void Bind() const override;
-
-	FORCEINLINE uint32 GetIndexCount() const
-	{
-		return IndexStreamData->ElementCount;
-	}
 };
 
 struct jSamplerStateInfo_Vulkan : public jSamplerStateInfo
@@ -537,92 +294,6 @@ struct jBlendingStateInfo_Vulakn : public jBlendingStateInfo
 	virtual void Initialize() override;
 
 	VkPipelineColorBlendAttachmentState ColorBlendAttachmentInfo = {};
-};
-
-struct jPipelineStateFixedInfo
-{
-	jPipelineStateFixedInfo() = default;
-	jPipelineStateFixedInfo(jRasterizationStateInfo* rasterizationState, jMultisampleStateInfo* multisampleState, jDepthStencilStateInfo* depthStencilState
-		, jBlendingStateInfo* blendingState, const std::vector<jViewport>& viewports, const std::vector<jScissor>& scissors)
-		: RasterizationState(rasterizationState), MultisampleState(multisampleState), DepthStencilState(depthStencilState)
-		, BlendingState(blendingState), Viewports(Viewports), Scissors(scissors)
-	{}
-	jPipelineStateFixedInfo(jRasterizationStateInfo* rasterizationState, jMultisampleStateInfo* multisampleState, jDepthStencilStateInfo* depthStencilState
-		, jBlendingStateInfo* blendingState, const jViewport& viewport, const jScissor& scissor)
-		: RasterizationState(rasterizationState), MultisampleState(multisampleState), DepthStencilState(depthStencilState)
-		, BlendingState(blendingState), Viewports({ viewport }), Scissors({ scissor })
-	{}
-
-	size_t CreateHash() const
-	{
-		if (Hash)
-			return Hash;
-
-		Hash = 0;
-		for (int32 i = 0; i < Viewports.size(); ++i)
-			Hash ^= Viewports[i].GetHash();
-
-		for (int32 i = 0; i < Scissors.size(); ++i)
-			Hash ^= Scissors[i].GetHash();
-
-		// 아래 내용들도 해시를 만들 수 있어야 함, todo
-		Hash ^= RasterizationState->GetHash();
-		Hash ^= MultisampleState->GetHash();
-		Hash ^= DepthStencilState->GetHash();
-		Hash ^= BlendingState->GetHash();
-
-		return Hash;
-	}
-
-	std::vector<jViewport> Viewports;
-	std::vector<jScissor> Scissors;
-
-	jRasterizationStateInfo* RasterizationState = nullptr;
-	jMultisampleStateInfo* MultisampleState = nullptr;
-	jDepthStencilStateInfo* DepthStencilState = nullptr;
-	jBlendingStateInfo* BlendingState = nullptr;
-
-	mutable size_t Hash = 0;
-};
-
-struct jPipelineStateInfo
-{
-	jPipelineStateInfo() = default;
-	jPipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader, const jVertexBuffer* vertexBuffer, const jRenderPass* renderPass, const std::vector<const jShaderBindings*> shaderBindings)
-		: PipelineStateFixed(pipelineStateFixed), Shader(shader), VertexBuffer(vertexBuffer), RenderPass(renderPass), ShaderBindings(shaderBindings)
-	{}
-
-	FORCEINLINE size_t GetHash() const
-	{
-		if (Hash)
-			return Hash;
-
-		check(PipelineStateFixed);
-		Hash = PipelineStateFixed->CreateHash();
-
-		Hash ^= Shader->ShaderInfo.GetHash();
-		Hash ^= VertexBuffer->GetHash();
-		Hash ^= jShaderBindings::CreateShaderBindingsHash(ShaderBindings);
-		Hash ^= RenderPass->GetHash();
-
-		return Hash;
-	}
-
-	mutable size_t Hash = 0;
-
-	const jShader* Shader = nullptr;
-	const jVertexBuffer* VertexBuffer = nullptr;
-	const jRenderPass* RenderPass = nullptr;
-	std::vector<const jShaderBindings*> ShaderBindings;
-	const jPipelineStateFixedInfo* PipelineStateFixed = nullptr;
-
-	VkPipeline vkPipeline = nullptr;
-	VkPipelineLayout vkPipelineLayout = nullptr;
-
-	VkPipeline CreateGraphicsPipelineState();
-	void Bind();
-
-	static std::unordered_map<size_t, jPipelineStateInfo> PipelineStatePool;
 };
 
 struct jUniformBufferBlock_Vulkan : public IUniformBufferBlock
@@ -1587,23 +1258,6 @@ public:
 
 		return true;
 	}
-    static std::vector<char> ReadFile(const std::string& filename)
-    {
-        // 1. std::ios::ate : 파일의 끝에서 부터 읽기 시작한다. (파일의 끝에서 부터 읽어서 파일의 크기를 얻어 올수 있음)
-        // 2. std::ios::binary : 바이너리 파일로서 파일을 읽음. (text transformations 을 피함)
-        std::ifstream file(filename, std::ios::ate | std::ios::binary);
-
-        if (!ensure(file.is_open()))
-            return std::vector<char>();
-
-        size_t fileSize = (size_t)file.tellg();
-        std::vector<char> buffer(fileSize);
-
-        file.seekg(0);		// 파일의 맨 첨으로 이동
-        file.read(buffer.data(), fileSize);
-        file.close();
-        return buffer;
-    }
 	//////////////////////////////////////////////////////////////////////////
 
 	virtual bool InitRHI() override;
@@ -1615,11 +1269,8 @@ public:
 	bool CreateSyncObjects();
 
 	// 여기 있을 것은 아님
-	void MainLoop();
-	bool DrawFrame();
 	void CleanupSwapChain();
 	void RecreateSwapChain();
-	void UpdateUniformBuffer(uint32 currentImage);
 
 	virtual void* GetWindow() const override { return window; }
 	FORCEINLINE const VkDevice& GetDevice() const { return device; }
@@ -1678,6 +1329,9 @@ public:
 	virtual bool CanWholeQueryTimeStampResult() const override { return true; }
 	virtual std::vector<uint64> GetWholeQueryTimeStampResult(int32 InWatingResultIndex) const override;
 	virtual void GetQueryTimeStampResultFromWholeStampArray(jQueryTime* queryTimeStamp, int32 InWatingResultIndex, const std::vector<uint64>& wholeQueryTimeStampArray) const override;
+
+	virtual int32 BeginRenderFrame(jCommandBuffer* commandBuffer) override;
+	virtual void EndRenderFrame(jCommandBuffer* commandBuffer) override;
 
 	static std::unordered_map<size_t, VkPipelineLayout> PipelineLayoutPool;
 	static std::unordered_map<size_t, jShaderBindings*> ShaderBindingPool;

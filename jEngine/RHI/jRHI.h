@@ -368,6 +368,8 @@ public:
 	virtual ~jCommandBuffer() {}
 
 	virtual void* GetHandle() const { return nullptr; }
+	virtual void* GetFenceHandle() const { return nullptr; }
+	virtual void SetFence(void* fence) {}
 	virtual bool Begin() const { return false; }
 	virtual bool End() const { return false; }
 	virtual void Reset() const {}
@@ -950,6 +952,8 @@ public:
 	virtual void SetLineWidth(float width) const {}
 	virtual void Flush() const {}
 	virtual void Finish() const {}
+	virtual int32 BeginRenderFrame(jCommandBuffer* commandBuffer) { return -1; }
+    virtual void EndRenderFrame(jCommandBuffer* commandBuffer) {}
 
 	virtual jRasterizationStateInfo* CreateRasterizationState(const jRasterizationStateInfo& initializer) const { return nullptr; }
 	virtual jMultisampleStateInfo* CreateMultisampleState(const jMultisampleStateInfo& initializer) const { return nullptr; }
@@ -1121,20 +1125,20 @@ struct TRasterizationStateInfo
 	}
 };
 
-template <EMSAASamples TSampleCount = EMSAASamples::COUNT_1, bool TSampleShadingEnable = true, float TMinSampleShading = 0.2f,
-	bool TAlphaToCoverageEnable = false, bool TAlphaToOneEnable = false>
+template <bool TSampleShadingEnable = true, float TMinSampleShading = 0.2f,
+    bool TAlphaToCoverageEnable = false, bool TAlphaToOneEnable = false>
 struct TMultisampleStateInfo
 {
-	FORCEINLINE static jMultisampleStateInfo* Create()
-	{
-		jMultisampleStateInfo initializer;
-		initializer.SampleCount = TSampleCount;
-		initializer.SampleShadingEnable = TSampleShadingEnable;		// Sample shading 켬	 (텍스쳐 내부에 있는 aliasing 도 완화 해줌)
-		initializer.MinSampleShading = TMinSampleShading;
-		initializer.AlphaToCoverageEnable = TAlphaToCoverageEnable;
-		initializer.AlphaToOneEnable = TAlphaToOneEnable;
-		return g_rhi->CreateMultisampleState(initializer);
-	}
+    FORCEINLINE static jMultisampleStateInfo* Create(EMSAASamples InSampleCount = EMSAASamples::COUNT_1)
+    {
+        jMultisampleStateInfo initializer;
+        initializer.SampleCount = InSampleCount;
+        initializer.SampleShadingEnable = TSampleShadingEnable;		// Sample shading 켬	 (텍스쳐 내부에 있는 aliasing 도 완화 해줌)
+        initializer.MinSampleShading = TMinSampleShading;
+        initializer.AlphaToCoverageEnable = TAlphaToCoverageEnable;
+        initializer.AlphaToOneEnable = TAlphaToOneEnable;
+        return g_rhi->CreateMultisampleState(initializer);
+    }
 };
 
 template <EStencilOp TFailOp = EStencilOp::KEEP, EStencilOp TPassOp = EStencilOp::KEEP, EStencilOp TDepthFailOp = EStencilOp::KEEP,

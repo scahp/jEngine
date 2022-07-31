@@ -46,6 +46,11 @@ void jEngine::Update(float deltaTime)
 	jShader::UpdateShaders();
 }
 
+void jEngine::Draw()
+{
+	Game.Draw();
+}
+
 void jEngine::Resize(int width, int height)
 {
 	g_rhi->SetViewport(0, 0, width, height);
