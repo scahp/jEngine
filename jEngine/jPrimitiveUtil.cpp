@@ -2471,7 +2471,7 @@ void jGraph2D::UpdateBuffer()
 				hor.SetYBasis(Vector4::UpVector);
 				hor.SetZBasis(Vector4::FowardVector);
 				hor.SetTranslate(Pos.x, Pos.y, 0.0f);
-				hor = (hor * Matrix::MakeScale(GuardLineSize.x, 1.0f, 1.0f)).GetTranspose();
+				hor = (hor * Matrix::MakeScale(GuardLineSize.x, 1.0f, 1.0f));
 				ResultMatrices[0] = (hor);
 
 				Matrix ver;
@@ -2480,7 +2480,7 @@ void jGraph2D::UpdateBuffer()
 				ver.SetYBasis(Vector4::UpVector);
 				ver.SetZBasis(Vector4::FowardVector);
 				ver.SetTranslate(Pos.x, Pos.y, 0.0f);
-				ver = (ver * Matrix::MakeScale(1.0f, -GuardLineSize.y, 1.0f)).GetTranspose();
+				ver = (ver * Matrix::MakeScale(1.0f, -GuardLineSize.y, 1.0f));
 				ResultMatrices[1] = (ver);
 			}
 
@@ -2502,7 +2502,7 @@ void jGraph2D::UpdateBuffer()
 				tr.SetYBasis(Vector4(up, 0.0f));
 				tr.SetZBasis(Vector4::FowardVector);
 				tr.SetTranslate(p1.x, p1.y, 0.0f);
-				tr = (tr * Matrix::MakeScale(lineLength, 1.0f, 1.0f)).GetTranspose();
+				tr = (tr * Matrix::MakeScale(lineLength, 1.0f, 1.0f));
 			}
 
 			if (RenderObject && RenderObject->VertexStream)

@@ -72,60 +72,60 @@ struct Matrix
 	FORCEINLINE float GetDeterminant() const
 	{
 		// Upper 2 rows's 2x2 Det
-		float const A = m11 * m00 - m10 * m01;
-		float const B = m12 * m00 - m10 * m02;
-		float const C = m13 * m00 - m10 * m03;
-		float const D = m12 * m01 - m11 * m02;
-		float const E = m13 * m01 - m11 * m03;
-		float const F = m13 * m02 - m12 * m03;
+		float const A = m11 * m00 - m01 * m10;
+		float const B = m12 * m00 - m01 * m20;
+		float const C = m13 * m00 - m01 * m30;
+		float const D = m12 * m10 - m11 * m20;
+		float const E = m13 * m10 - m11 * m30;
+		float const F = m13 * m20 - m21 * m30;
 		// Lower 2 row's 2x2 Det
-		float const G = m31 * m20 - m30 * m21;
-		float const H = m32 * m20 - m30 * m22;
-		float const I = m33 * m20 - m30 * m23;
-		float const J = m32 * m21 - m31 * m22;
-		float const K = m33 * m21 - m31 * m23;
-		float const L = m33 * m22 - m32 * m23;
+		float const G = m13 * m02 - m03 * m12;
+		float const H = m23 * m02 - m03 * m22;
+		float const I = m33 * m02 - m03 * m32;
+		float const J = m23 * m12 - m13 * m22;
+		float const K = m33 * m12 - m13 * m32;
+		float const L = m33 * m22 - m23 * m32;
 
-		// 행렬식 계산량 최적화
-		// Det calculate optimize
-		//float const det = m00 * (m11 * L - m12 * K + m13 * J) - m10 * (m01 * L - m02 * K + m03 * J)
-		//              + m20 * (m31 * F - m32 * E + m33 * D) - m30 * (m21 * F - m22 * E + m23 * D);
-		//(m11 * m00 - m10 * m01) * L;
-		//-(m12 * m00 - m10 * m02) * K;
-		//(m13 * m00 - m10 * m03) * J;
-		//(m31 * m20 - m30 * m21) * F;
-		//-(m32 * m20 - m30 * m22) * E;
-		//(m33 * m20 - m30 * m23) * D;
+        // 행렬식 계산량 최적화
+        // Det calculate optimize
+        //float const det = m00 * (m11 * L - m21 * K + m31 * J) - m01 * (m10 * L - m20 * K + m30 * J)
+        //              + m02 * (m13 * F - m23 * E + m33 * D) - m03 * (m12 * F - m22 * E + m32 * D);
+        // (m11 * m00 - m01 * m10) * L;
+        //-(m12 * m00 - m01 * m20) * K;
+        // (m13 * m00 - m01 * m30) * J;
+        // (m31 * m02 - m03 * m12) * F;
+        //-(m32 * m02 - m03 * m22) * E;
+        // (m33 * m02 - m03 * m32) * D;
 		return A * L -B * K + C * J + G * F -H * E + I * D;
 	}
 
 	FORCEINLINE Matrix GetInverse() const
 	{
 		// Upper 2 rows's 2x2 Det
-		float const A = m11 * m00 - m10 * m01;
-		float const B = m12 * m00 - m10 * m02;
-		float const C = m13 * m00 - m10 * m03;
-		float const D = m12 * m01 - m11 * m02;
-		float const E = m13 * m01 - m11 * m03;
-		float const F = m13 * m02 - m12 * m03;
+		float const A = m11 * m00 - m01 * m10;
+		float const B = m21 * m00 - m01 * m20;
+		float const C = m31 * m00 - m01 * m30;
+		float const D = m21 * m10 - m11 * m20;
+		float const E = m31 * m10 - m11 * m30;
+		float const F = m31 * m20 - m21 * m30;
 		// Lower 2 row's 2x2 Det
-		float const G = m31 * m20 - m30 * m21;
-		float const H = m32 * m20 - m30 * m22;
-		float const I = m33 * m20 - m30 * m23;
-		float const J = m32 * m21 - m31 * m22;
-		float const K = m33 * m21 - m31 * m23;
-		float const L = m33 * m22 - m32 * m23;
+		float const G = m13 * m02 - m03 * m12;
+		float const H = m23 * m02 - m03 * m22;
+		float const I = m33 * m02 - m03 * m32;
+		float const J = m23 * m12 - m13 * m22;
+		float const K = m33 * m12 - m13 * m32;
+		float const L = m33 * m22 - m23 * m32;
 
 		// 행렬식 계산량 최적화
 		// Det calculate optimize
-		//float const det = m00 * (m11 * L - m12 * K + m13 * J) - m10 * (m01 * L - m02 * K + m03 * J)
-		//              + m20 * (m31 * F - m32 * E + m33 * D) - m30 * (m21 * F - m22 * E + m23 * D);
-		//(m11 * m00 - m10 * m01) * L;
-		//-(m12 * m00 - m10 * m02) * K;
-		//(m13 * m00 - m10 * m03) * J;
-		//(m31 * m20 - m30 * m21) * F;
-		//-(m32 * m20 - m30 * m22) * E;
-		//(m33 * m20 - m30 * m23) * D;
+		//float const det = m00 * (m11 * L - m21 * K + m31 * J) - m01 * (m10 * L - m20 * K + m30 * J)
+		//              + m02 * (m13 * F - m23 * E + m33 * D) - m03 * (m12 * F - m22 * E + m32 * D);
+		// (m11 * m00 - m01 * m10) * L;
+		//-(m12 * m00 - m01 * m20) * K;
+		// (m13 * m00 - m01 * m30) * J;
+		// (m31 * m02 - m03 * m12) * F;
+		//-(m32 * m02 - m03 * m22) * E;
+		// (m33 * m02 - m03 * m32) * D;
 		float const det = A * L -B * K + C * J + G * F -H * E + I * D;
 		if (FLOAT_TOLERANCE > fabs(det))
 		{
@@ -137,21 +137,21 @@ struct Matrix
 		// 수반행렬. (-1)^(i+j) * M[i][j] 로 행렬을 만든 후 전치 시킨 행렬
 		// Adjoint matrix. Make a matrix (-1)^(i+j) * M[i][j] and then transpose the matrix.
 		Matrix inverseMatrix;
-		inverseMatrix.m[0][0] = (m11 * L - m12 * K + m13 * J) * InverseDet;
-		inverseMatrix.m[1][0] = -(m10 * L - m12 * I + m13 * H) * InverseDet;
-		inverseMatrix.m[2][0] = (m10 * K - m11 * I + m13 * G) * InverseDet;
-		inverseMatrix.m[3][0] = -(m10 * J - m11 * H + m12 * G) * InverseDet;
-		inverseMatrix.m[0][1] = -(m01 * L - m02 * K + m03 * J) * InverseDet;
+        inverseMatrix.m[0][0] = (m11 * L - m12 * K + m13 * J) * InverseDet;
+		inverseMatrix.m[0][1] = -(m10 * L - m12 * I + m13 * H) * InverseDet;
+		inverseMatrix.m[0][2] = (m10 * K - m11 * I + m13 * G) * InverseDet;
+		inverseMatrix.m[0][3] = -(m10 * J - m11 * H + m12 * G) * InverseDet;
+		inverseMatrix.m[1][0] = -(m01 * L - m02 * K + m03 * J) * InverseDet;
 		inverseMatrix.m[1][1] = (m00 * L - m02 * I + m03 * H) * InverseDet;
-		inverseMatrix.m[2][1] = -(m00 * K - m01 * I + m03 * G) * InverseDet;
-		inverseMatrix.m[3][1] = (m00 * J - m01 * H + m02 * G) * InverseDet;
-		inverseMatrix.m[0][2] = (m31 * F - m32 * E + m33 * D) * InverseDet;
-		inverseMatrix.m[1][2] = -(m30 * F - m32 * C + m33 * B) * InverseDet;
+		inverseMatrix.m[1][2] = -(m00 * K - m01 * I + m03 * G) * InverseDet;
+		inverseMatrix.m[1][3] = (m00 * J - m01 * H + m02 * G) * InverseDet;
+		inverseMatrix.m[2][0] = (m31 * F - m32 * E + m33 * D) * InverseDet;
+		inverseMatrix.m[2][1] = -(m30 * F - m32 * C + m33 * B) * InverseDet;
 		inverseMatrix.m[2][2] = (m30 * E - m31 * C + m33 * A) * InverseDet;
-		inverseMatrix.m[3][2] = -(m30 * D - m31 * B + m32 * A) * InverseDet;
-		inverseMatrix.m[0][3] = -(m21 * F - m22 * E + m23 * D) * InverseDet;
-		inverseMatrix.m[1][3] = (m20 * F - m22 * C + m23 * B) * InverseDet;
-		inverseMatrix.m[2][3] = -(m20 * E - m21 * C + m23 * A) * InverseDet;
+		inverseMatrix.m[2][3] = -(m30 * D - m31 * B + m32 * A) * InverseDet;
+		inverseMatrix.m[3][0] = -(m21 * F - m22 * E + m23 * D) * InverseDet;
+		inverseMatrix.m[3][1] = (m20 * F - m22 * C + m23 * B) * InverseDet;
+		inverseMatrix.m[3][2] = -(m20 * E - m21 * C + m23 * A) * InverseDet;
 		inverseMatrix.m[3][3] = (m20 * D - m21 * B + m22 * A) * InverseDet;
 
 		return std::move(inverseMatrix);
@@ -180,49 +180,49 @@ struct Matrix
 	FORCEINLINE const Matrix operator*(Matrix const& matrix) const
 	{
 		return Matrix(
-			m00 * matrix.m00 + m01 * matrix.m10 + m02 * matrix.m20 + m03 * matrix.m30,
-			m00 * matrix.m01 + m01 * matrix.m11 + m02 * matrix.m21 + m03 * matrix.m31,
-			m00 * matrix.m02 + m01 * matrix.m12 + m02 * matrix.m22 + m03 * matrix.m32,
-			m00 * matrix.m03 + m01 * matrix.m13 + m02 * matrix.m23 + m03 * matrix.m33,
+			m00 * matrix.m00 + m10 * matrix.m01 + m20 * matrix.m02 + m30 * matrix.m03,
+            m01 * matrix.m00 + m11 * matrix.m01 + m21 * matrix.m02 + m31 * matrix.m03,
+            m02 * matrix.m00 + m12 * matrix.m01 + m22 * matrix.m02 + m32 * matrix.m03,
+            m03 * matrix.m00 + m13 * matrix.m01 + m23 * matrix.m02 + m33 * matrix.m03,
 
-			m10 * matrix.m00 + m11 * matrix.m10 + m12 * matrix.m20 + m13 * matrix.m30,
-			m10 * matrix.m01 + m11 * matrix.m11 + m12 * matrix.m21 + m13 * matrix.m31,
-			m10 * matrix.m02 + m11 * matrix.m12 + m12 * matrix.m22 + m13 * matrix.m32,
-			m10 * matrix.m03 + m11 * matrix.m13 + m12 * matrix.m23 + m13 * matrix.m33,
+			m00 * matrix.m10 + m10 * matrix.m11 + m20 * matrix.m12 + m30 * matrix.m13,
+            m01 * matrix.m10 + m11 * matrix.m11 + m21 * matrix.m12 + m31 * matrix.m13,
+            m02 * matrix.m10 + m12 * matrix.m11 + m22 * matrix.m12 + m32 * matrix.m13,
+            m03 * matrix.m10 + m13 * matrix.m11 + m23 * matrix.m12 + m33 * matrix.m13,
 
-			m20 * matrix.m00 + m21 * matrix.m10 + m22 * matrix.m20 + m23 * matrix.m30,
-			m20 * matrix.m01 + m21 * matrix.m11 + m22 * matrix.m21 + m23 * matrix.m31,
-			m20 * matrix.m02 + m21 * matrix.m12 + m22 * matrix.m22 + m23 * matrix.m32,
-			m20 * matrix.m03 + m21 * matrix.m13 + m22 * matrix.m23 + m23 * matrix.m33,
+			m00 * matrix.m20 + m10 * matrix.m21 + m20 * matrix.m22 + m30 * matrix.m23,
+            m01 * matrix.m20 + m11 * matrix.m21 + m21 * matrix.m22 + m31 * matrix.m23,
+            m02 * matrix.m20 + m12 * matrix.m21 + m22 * matrix.m22 + m32 * matrix.m23,
+            m03 * matrix.m20 + m13 * matrix.m21 + m23 * matrix.m22 + m33 * matrix.m23,
 
-			m30 * matrix.m00 + m31 * matrix.m10 + m32 * matrix.m20 + m33 * matrix.m30,
-			m30 * matrix.m01 + m31 * matrix.m11 + m32 * matrix.m21 + m33 * matrix.m31,
-			m30 * matrix.m02 + m31 * matrix.m12 + m32 * matrix.m22 + m33 * matrix.m32,
-			m30 * matrix.m03 + m31 * matrix.m13 + m32 * matrix.m23 + m33 * matrix.m33
+			m00 * matrix.m30 + m10 * matrix.m31 + m20 * matrix.m32 + m30 * matrix.m33,
+			m01 * matrix.m30 + m11 * matrix.m31 + m21 * matrix.m32 + m31 * matrix.m33,
+			m02 * matrix.m30 + m12 * matrix.m31 + m22 * matrix.m32 + m32 * matrix.m33,
+			m03 * matrix.m30 + m13 * matrix.m31 + m23 * matrix.m32 + m33 * matrix.m33
 		);
 	}
 
 	FORCEINLINE const Matrix operator*=(Matrix const& matrix)
 	{
-		m00 = m00 * matrix.m00 + m01 * matrix.m10 + m02 * matrix.m20 + m03 * matrix.m30;
-		m01 = m00 * matrix.m01 + m01 * matrix.m11 + m02 * matrix.m21 + m03 * matrix.m31;
-		m02 = m00 * matrix.m02 + m01 * matrix.m12 + m02 * matrix.m22 + m03 * matrix.m32;
-		m03 = m00 * matrix.m03 + m01 * matrix.m13 + m02 * matrix.m23 + m03 * matrix.m33;
+		m00 = m00 * matrix.m00 + m10 * matrix.m01 + m20 * matrix.m02 + m30 * matrix.m03;
+		m10 = m00 * matrix.m10 + m10 * matrix.m11 + m20 * matrix.m12 + m30 * matrix.m13;
+		m20 = m00 * matrix.m20 + m10 * matrix.m21 + m20 * matrix.m22 + m30 * matrix.m23;
+		m30 = m00 * matrix.m30 + m10 * matrix.m31 + m20 * matrix.m32 + m30 * matrix.m33;
 
-		m10 = m10 * matrix.m00 + m11 * matrix.m10 + m12 * matrix.m20 + m13 * matrix.m30;
-		m11 = m10 * matrix.m01 + m11 * matrix.m11 + m12 * matrix.m21 + m13 * matrix.m31;
-		m12 = m10 * matrix.m02 + m11 * matrix.m12 + m12 * matrix.m22 + m13 * matrix.m32;
-		m13 = m10 * matrix.m03 + m11 * matrix.m13 + m12 * matrix.m23 + m13 * matrix.m33;
+		m01 = m01 * matrix.m00 + m11 * matrix.m01 + m21 * matrix.m02 + m31 * matrix.m03;
+		m11 = m01 * matrix.m10 + m11 * matrix.m11 + m21 * matrix.m12 + m31 * matrix.m13;
+		m21 = m01 * matrix.m20 + m11 * matrix.m21 + m21 * matrix.m22 + m31 * matrix.m23;
+		m31 = m01 * matrix.m30 + m11 * matrix.m31 + m21 * matrix.m32 + m31 * matrix.m33;
 
-		m20 = m20 * matrix.m00 + m21 * matrix.m10 + m22 * matrix.m20 + m23 * matrix.m30;
-		m21 = m20 * matrix.m01 + m21 * matrix.m11 + m22 * matrix.m21 + m23 * matrix.m31;
-		m22 = m20 * matrix.m02 + m21 * matrix.m12 + m22 * matrix.m22 + m23 * matrix.m32;
-		m23 = m20 * matrix.m03 + m21 * matrix.m13 + m22 * matrix.m23 + m23 * matrix.m33;
+		m02 = m02 * matrix.m00 + m12 * matrix.m01 + m22 * matrix.m02 + m32 * matrix.m03;
+		m12 = m02 * matrix.m10 + m12 * matrix.m11 + m22 * matrix.m12 + m32 * matrix.m13;
+		m22 = m02 * matrix.m20 + m12 * matrix.m21 + m22 * matrix.m22 + m32 * matrix.m23;
+		m32 = m02 * matrix.m30 + m12 * matrix.m31 + m22 * matrix.m32 + m32 * matrix.m33;
 
-		m30 = m30 * matrix.m00 + m31 * matrix.m10 + m32 * matrix.m20 + m33 * matrix.m30;
-		m31 = m30 * matrix.m01 + m31 * matrix.m11 + m32 * matrix.m21 + m33 * matrix.m31;
-		m32 = m30 * matrix.m02 + m31 * matrix.m12 + m32 * matrix.m22 + m33 * matrix.m32;
-		m33 = m30 * matrix.m03 + m31 * matrix.m13 + m32 * matrix.m23 + m33 * matrix.m33;
+		m03 = m03 * matrix.m00 + m13 * matrix.m01 + m23 * matrix.m02 + m33 * matrix.m03;
+		m13 = m03 * matrix.m10 + m13 * matrix.m11 + m23 * matrix.m12 + m33 * matrix.m13;
+		m23 = m03 * matrix.m20 + m13 * matrix.m21 + m23 * matrix.m22 + m33 * matrix.m23;
+		m33 = m03 * matrix.m30 + m13 * matrix.m31 + m23 * matrix.m32 + m33 * matrix.m33;
 	}
 
 	// Transform
@@ -245,10 +245,10 @@ struct Matrix
 	FORCEINLINE Vector4 Transform(Vector4 const& vector) const
 	{
 		return Vector4(
-			vector.x * m00 + vector.y * m01 + vector.z * m02 + vector.w * m03,
-			vector.x * m10 + vector.y * m11 + vector.z * m12 + vector.w * m13,
-			vector.x * m20 + vector.y * m21 + vector.z * m22 + vector.w * m23,
-			vector.x * m30 + vector.y * m31 + vector.z * m32 + vector.w * m33
+			vector.x * m00 + vector.y * m10 + vector.z * m20 + vector.w * m30,
+			vector.x * m01 + vector.y * m11 + vector.z * m21 + vector.w * m31,
+			vector.x * m02 + vector.y * m12 + vector.z * m22 + vector.w * m32,
+			vector.x * m03 + vector.y * m13 + vector.z * m23 + vector.w * m33
 		);
 	}
 
@@ -267,7 +267,7 @@ struct Matrix
 	// Translate
 	FORCEINLINE Vector GetTranslateVector() const
 	{
-		return Vector(m03, m13, m23);
+		return Vector(m30, m31, m32);
 	}
 
 	FORCEINLINE Matrix& Translate(Vector const& vector)
@@ -277,7 +277,7 @@ struct Matrix
 
 	FORCEINLINE Matrix& Translate(float fX, float fY, float fZ)
 	{
-		m03 += fX; m13 += fY; m23 += fZ;
+		m30 += fX; m31 += fY; m32 += fZ;
 		return *this;
 	}
 
@@ -288,7 +288,7 @@ struct Matrix
 
 	FORCEINLINE Matrix& SetTranslate(float fX, float fY, float fZ)
 	{
-		m03 = fX; m13 = fY; m23 = fZ;
+		m30 = fX; m31 = fY; m32 = fZ;
 		return *this;
 	}
 
@@ -304,26 +304,26 @@ struct Matrix
 
 	FORCEINLINE Matrix GetMatrixWithoutTranslate() const
 	{
-		return Matrix(m00, m01, m02, 0.0f, m10, m11, m12, 0.0f, m20, m21, m22, 0.0f, m30, m31, m32, m33);
+		return Matrix(m00, m01, m02, m03, m10, m11, m12, m13, m20, m21, m22, m33, 0.0f, 0.0f, 0.0f, m33);
 	}
 
 	static FORCEINLINE Matrix MakeTranslate(Vector const& vector)
 	{
 		return Matrix(
-			1.0f,		0.0f,		0.0f,		vector.x,
-			0.0f,		1.0f,		0.0f,		vector.y,
-			0.0f,		0.0f,		1.0f,		vector.z,
-			0.0f,		0.0f,		0.0f,		1.0f
+			1.0f,		0.0f,		0.0f,		0.0f,
+			0.0f,		1.0f,		0.0f,		0.0f,
+			0.0f,		0.0f,		1.0f,		0.0f,
+			vector.x,	vector.y,	vector.z,	1.0f
 		);
 	}
 
 	static FORCEINLINE Matrix MakeTranslate(float fX, float fY, float fZ)
 	{
 		return Matrix(
-			1.0f,	0.0f,	0.0f,	fX,
-			0.0f,	1.0f,	0.0f,	fY,
-			0.0f,	0.0f,	1.0f,	fZ,
-			0.0f,	0.0f,	0.0f,	1.0f
+			1.0f,	0.0f,	0.0f,	0.0f,
+			0.0f,	1.0f,	0.0f,	0.0f,
+			0.0f,	0.0f,	1.0f,	0.0f,
+			fX,		fY,		fZ,		1.0f
 		);
 	}
 	//////////////////////////////////////////////////////////////////////////
@@ -366,10 +366,10 @@ struct Matrix
 	{
 		auto const scale = GetScaleVector();
 		return Matrix(
-			scale.x,		0.0f,		0.0f,		m03,
-			0.0f,			scale.y,	0.0f,		m13,
-			0.0f,			0.0f,		scale.z,	m23,
-			0.0f,			0.0f,		0.0f,		1.0f
+			scale.x,		0.0f,		0.0f,		0.0f,
+			0.0f,			scale.y,	0.0f,		0.0f,
+			0.0f,			0.0f,		scale.z,	0.0f,
+			m30,			m31,		m32,		1.0f
 		);
 	}
 
@@ -377,8 +377,8 @@ struct Matrix
 	{
 		return Matrix(
 			1.0f, 0.0f,				0.0f,			0.0f,
-			0.0f, cosf(fRadian),	-sinf(fRadian),	0.0f,
-			0.0f, sinf(fRadian),	cosf(fRadian),	0.0f,
+			0.0f, cosf(fRadian),	sinf(fRadian),	0.0f,
+			0.0f, -sinf(fRadian),	cosf(fRadian),	0.0f,
 			0.0f, 0.0f,				0.0f,			1.0f
 		);
 	}
@@ -386,9 +386,9 @@ struct Matrix
 	FORCEINLINE static Matrix MakeRotateY(float fRadian)
 	{
 		return Matrix(
-			cosf(fRadian),	0.0f,	sinf(fRadian),	0.0f,
+			cosf(fRadian),	0.0f,	-sinf(fRadian),	0.0f,
 			0.0f,			1.0f,	0.0f,			0.0f,
-			-sinf(fRadian),	0.0f,	cosf(fRadian),	0.0f,
+			sinf(fRadian),	0.0f,	cosf(fRadian),	0.0f,
 			0.0f,			0.0f,	0.0f,			1.0f
 		);
 	}
@@ -396,8 +396,8 @@ struct Matrix
 	FORCEINLINE static Matrix MakeRotateZ(float fRadian) 
 	{
 		return Matrix(
-			cosf(fRadian),	-sinf(fRadian),	0.0f, 0.0f,
-			sinf(fRadian),	cosf(fRadian),	0.0f, 0.0f,
+			cosf(fRadian),	sinf(fRadian),	0.0f, 0.0f,
+			-sinf(fRadian),	cosf(fRadian),	0.0f, 0.0f,
 			0.0f,			0.0f,			1.0f, 0.0f,
 			0.0f,			0.0f,			0.0f, 1.0f
 		);
@@ -419,10 +419,26 @@ struct Matrix
 		float const CZ = cosf(fRadianZ);
 
 		return Matrix(
-			CY * CZ + SY * SX * SZ, -CY * SZ + SY * SX * CZ, SY * CX, 0.0f
-			, CX * SZ, CX * CZ, -SX, 0.0f
-			, -SY * CZ + CY * SX * SZ, SY * SZ + CY * SX * CZ, CY * CX, 0.0f
-			, 0.0f, 0.0f, 0.0f, 1.0f);
+			CY * CZ + SY * SX * SZ,
+            CX * SZ,
+            -SY * CZ + CY * SX * SZ,
+            0.0f,
+
+			-CY * SZ + SY * SX * CZ,
+            CX* CZ,
+            SY* SZ + CY * SX * CZ,
+            0.0f,
+
+			SY * CX, 
+            -SX,
+            CY* CX,
+            0.0f,
+
+			0.0f, 
+			0.0f,
+			0.0f, 
+			1.0f
+		);
 	}
 
 	FORCEINLINE static Matrix MakeRotate(Vector axis, float fRadian)
@@ -432,19 +448,27 @@ struct Matrix
 		float const fOneMinusCos = 1.0f - fCos;
 
 		axis.SetNormalize();
-		return Matrix(fOneMinusCos * axis.x * axis.x + fCos,
+		return Matrix(
+			fOneMinusCos * axis.x * axis.x + fCos,
+            fOneMinusCos * axis.y * axis.x + fSin * axis.z,
+            fOneMinusCos * axis.z * axis.x - fSin * axis.y,
+            0.0f,
+
 			fOneMinusCos * axis.x * axis.y - fSin * axis.z,
+            fOneMinusCos* axis.y* axis.y + fCos,
+            fOneMinusCos* axis.z* axis.y + fSin * axis.x,
+            0.0f,
+
 			fOneMinusCos * axis.x * axis.z + fSin * axis.y,
+            fOneMinusCos* axis.y* axis.z - fSin * axis.x,
+            fOneMinusCos* axis.z* axis.z + fCos,
+            0.0f,
+
 			0.0f,
-			fOneMinusCos * axis.y * axis.x + fSin * axis.z,
-			fOneMinusCos * axis.y * axis.y + fCos,
-			fOneMinusCos * axis.y * axis.z - fSin * axis.x,
 			0.0f,
-			fOneMinusCos * axis.z * axis.x - fSin * axis.y,
-			fOneMinusCos * axis.z * axis.y + fSin * axis.x,
-			fOneMinusCos * axis.z * axis.z + fCos,
 			0.0f,
-			0.0f, 0.0f, 0.0f, 1.0f);
+			1.0f
+		);
 	}
 	//////////////////////////////////////////////////////////////////////////
 
@@ -638,37 +662,37 @@ struct Matrix3
 	FORCEINLINE float GetDeterminant() const
 	{
 		// Rmove lower row
-		float const A = m11 * m00 - m10 * m01;
-		float const B = m12 * m00 - m10 * m02;
-		float const C = m12 * m01 - m11 * m02;
+		float const A = m11 * m00 - m01 * m10;
+		float const B = m12 * m00 - m01 * m20;
+		float const C = m12 * m10 - m11 * m20;
 		// Remove upper row
-		float const D = m21 * m10 - m20 * m11;
-		float const E = m22 * m10 - m20 * m12;
-		float const F = m22 * m11 - m21 * m12;
+		float const D = m12 * m01 - m02 * m11;
+		float const E = m22 * m01 - m02 * m21;
+		float const F = m22 * m11 - m12 * m21;
 		// Remove middle row
-		float const G = m21 * m00 - m20 * m01;
-		float const H = m22 * m00 - m20 * m02;
-		float const I = m22 * m01 - m21 * m02;
+		float const G = m12 * m00 - m02 * m10;
+		float const H = m22 * m00 - m02 * m20;
+		float const I = m22 * m10 - m12 * m20;
 
-		return m00 * F - m01 * E + m02 * D;
+		return m00 * F - m10 * E + m20 * D;
 	}
 
 	FORCEINLINE Matrix3 GetInverse() const
 	{
 		// Rmove lower row
-		float const A = m11 * m00 - m10 * m01;
-		float const B = m12 * m00 - m10 * m02;
-		float const C = m12 * m01 - m11 * m02;
+		float const A = m11 * m00 - m01 * m10;
+		float const B = m21 * m00 - m01 * m20;
+		float const C = m21 * m10 - m11 * m20;
 		// Remove upper row
-		float const D = m21 * m10 - m20 * m11;
-		float const E = m22 * m10 - m20 * m12;
-		float const F = m22 * m11 - m21 * m12;
+		float const D = m12 * m01 - m02 * m11;
+		float const E = m22 * m01 - m02 * m21;
+		float const F = m22 * m11 - m12 * m21;
 		// Remove middle row
-		float const G = m21 * m00 - m20 * m01;
-		float const H = m22 * m00 - m20 * m02;
-		float const I = m22 * m01 - m21 * m02;
+		float const G = m12 * m00 - m02 * m10;
+		float const H = m22 * m00 - m02 * m20;
+		float const I = m22 * m10 - m12 * m20;
 
-		float const det = m00 * F - m01 * E + m02 * D;
+		float const det = m00 * F - m10 * E + m20 * D;
 		if (FLOAT_TOLERANCE > fabs(det))
 		{
 			JASSERT("역행렬을 구할 수 없습니다.");
@@ -680,13 +704,13 @@ struct Matrix3
 		// Adjoint matrix. Make a matrix (-1)^(i+j) * M[i][j] and then transpose the matrix.
 		Matrix3 inverseMatrix;
 		inverseMatrix.m[0][0] = F * InverseDet;
-		inverseMatrix.m[1][0] = -E * InverseDet;
-		inverseMatrix.m[2][0] = D * InverseDet;
-		inverseMatrix.m[0][1] = -I * InverseDet;
+		inverseMatrix.m[0][1] = -E * InverseDet;
+		inverseMatrix.m[0][2] = D * InverseDet;
+		inverseMatrix.m[1][0] = -I * InverseDet;
 		inverseMatrix.m[1][1] = H * InverseDet;
-		inverseMatrix.m[2][1] = -G * InverseDet;
-		inverseMatrix.m[0][2] = C * InverseDet;
-		inverseMatrix.m[1][2] = -B * InverseDet;
+		inverseMatrix.m[1][2] = -G * InverseDet;
+		inverseMatrix.m[2][0] = C * InverseDet;
+		inverseMatrix.m[2][1] = -B * InverseDet;
 		inverseMatrix.m[2][2] = A * InverseDet;
 
 		return std::move(inverseMatrix);
@@ -719,33 +743,33 @@ struct Matrix3
 	FORCEINLINE Matrix3 operator*(Matrix3 const& matrix) const
 	{
 		return Matrix3(
-			m00 * matrix.m00 + m01 * matrix.m10 + m02 * matrix.m20,
-			m00 * matrix.m01 + m01 * matrix.m11 + m02 * matrix.m21,
-			m00 * matrix.m02 + m01 * matrix.m12 + m02 * matrix.m22,
+			m00 * matrix.m00 + m10 * matrix.m01 + m20 * matrix.m02,
+            m01 * matrix.m00 + m11 * matrix.m01 + m21 * matrix.m02,
+            m02 * matrix.m00 + m12 * matrix.m01 + m22 * matrix.m02,
 
-			m10 * matrix.m00 + m11 * matrix.m10 + m12 * matrix.m20,
-			m10 * matrix.m01 + m11 * matrix.m11 + m12 * matrix.m21,
-			m10 * matrix.m02 + m11 * matrix.m12 + m12 * matrix.m22,
+			m00 * matrix.m10 + m10 * matrix.m11 + m20 * matrix.m12,
+            m01 * matrix.m10 + m11 * matrix.m11 + m21 * matrix.m12,
+            m02 * matrix.m10 + m12 * matrix.m11 + m22 * matrix.m12,
 
-			m20 * matrix.m00 + m21 * matrix.m10 + m22 * matrix.m20,
-			m20 * matrix.m01 + m21 * matrix.m11 + m22 * matrix.m21,
-			m20 * matrix.m02 + m21 * matrix.m12 + m22 * matrix.m22
+			m00 * matrix.m20 + m10 * matrix.m21 + m20 * matrix.m22,
+			m01 * matrix.m20 + m11 * matrix.m21 + m21 * matrix.m22,
+			m02 * matrix.m20 + m12 * matrix.m21 + m22 * matrix.m22
 		);
 	}
 
 	FORCEINLINE Matrix3 operator*=(Matrix3 const& matrix)
 	{
-		m00 = m00 * matrix.m00 + m01 * matrix.m10 + m02 * matrix.m20;
-		m01 = m00 * matrix.m01 + m01 * matrix.m11 + m02 * matrix.m21;
-		m02 = m00 * matrix.m02 + m01 * matrix.m12 + m02 * matrix.m22;
+		m00 = m00 * matrix.m00 + m10 * matrix.m01 + m20 * matrix.m02;
+		m10 = m00 * matrix.m10 + m10 * matrix.m11 + m20 * matrix.m12;
+		m20 = m00 * matrix.m20 + m10 * matrix.m21 + m20 * matrix.m22;
 
-		m10 = m10 * matrix.m00 + m11 * matrix.m10 + m12 * matrix.m20;
-		m11 = m10 * matrix.m01 + m11 * matrix.m11 + m12 * matrix.m21;
-		m12 = m10 * matrix.m02 + m11 * matrix.m12 + m12 * matrix.m22;
+		m01 = m01 * matrix.m00 + m11 * matrix.m01 + m21 * matrix.m02;
+		m11 = m01 * matrix.m10 + m11 * matrix.m11 + m21 * matrix.m12;
+		m21 = m01 * matrix.m20 + m11 * matrix.m21 + m21 * matrix.m22;
 
-		m20 = m20 * matrix.m00 + m21 * matrix.m10 + m22 * matrix.m20;
-		m21 = m20 * matrix.m01 + m21 * matrix.m11 + m22 * matrix.m21;
-		m22 = m20 * matrix.m02 + m21 * matrix.m12 + m22 * matrix.m22;
+		m02 = m02 * matrix.m00 + m12 * matrix.m01 + m22 * matrix.m02;
+		m12 = m02 * matrix.m10 + m12 * matrix.m11 + m22 * matrix.m12;
+		m22 = m02 * matrix.m20 + m12 * matrix.m21 + m22 * matrix.m22;
 		
 		return *this;
 	}
@@ -755,9 +779,9 @@ struct Matrix3
 	FORCEINLINE Vector Transform(Vector const& vector) const
 	{
 		return Vector(
-			vector.x * m00 + vector.y * m01 + vector.z * m02,
-			vector.x * m10 + vector.y * m11 + vector.z * m12,
-			vector.x * m20 + vector.y * m21 + vector.z * m22
+			vector.x * m00 + vector.y * m10 + vector.z * m20,
+			vector.x * m01 + vector.y * m11 + vector.z * m21,
+			vector.x * m02 + vector.y * m12 + vector.z * m22
 		);
 	}
 
@@ -815,25 +839,25 @@ struct Matrix3
 	{
 		return Matrix3(
 			1.0f, 0.0f,				0.0f,
-			0.0f, cosf(fRadian),	-sinf(fRadian),
-			0.0f, sinf(fRadian),	cosf(fRadian)
+			0.0f, cosf(fRadian),	sinf(fRadian),
+			0.0f, -sinf(fRadian),	cosf(fRadian)
 		);
 	}
 	
 	FORCEINLINE static Matrix3 MakeRotateY(float fRadian)
 	{
 		return Matrix3(
-			cosf(fRadian),	0.0f,	sinf(fRadian),
+			cosf(fRadian),	0.0f,	-sinf(fRadian),
 			0.0f,			1.0f,	0.0f,
-			-sinf(fRadian),	0.0f,	cosf(fRadian)
+			sinf(fRadian),	0.0f,	cosf(fRadian)
 		);
 	}
 
 	FORCEINLINE static Matrix3 MakeRotateZ(float fRadian) 
 	{
 		return Matrix3(
-			cosf(fRadian),	-sinf(fRadian),	0.0f,
-			sinf(fRadian),	cosf(fRadian),	0.0f,
+			cosf(fRadian),	sinf(fRadian),	0.0f,
+			-sinf(fRadian),	cosf(fRadian),	0.0f,
 			0.0f,			0.0f,			1.0f
 		);
 	}
@@ -854,9 +878,18 @@ struct Matrix3
 		float const CZ = cosf(fRadianZ);
 
 		return Matrix3(
-			CY * CZ + SY * SX * SZ, -CY * SZ + SY * SX * CZ, SY * CX
-			, CX * SZ, CX * CZ, -SX
-			, -SY * CZ + CY * SX * SZ, SY * SZ + CY * SX * CZ, CY * CX);
+			CY * CZ + SY * SX * SZ,
+            CX * SZ,
+            -SY * CZ + CY * SX * SZ,
+
+			-CY * SZ + SY * SX * CZ,
+            CX* CZ,
+            SY* SZ + CY * SX * CZ,
+
+			SY * CX,
+			-SX, 
+			CY * CX
+		);
 	}
 
 
@@ -867,14 +900,15 @@ struct Matrix3
 		float const fOneMinusCos = 1.0f - fCos;
 
 		axis.SetNormalize();
-		return Matrix3(fOneMinusCos * axis.x * axis.x + fCos,
+		return Matrix3(
+			fOneMinusCos * axis.x * axis.x + fCos,
+            fOneMinusCos * axis.y * axis.x + fSin * axis.z,
+            fOneMinusCos * axis.z * axis.x - fSin * axis.y,
 			fOneMinusCos * axis.x * axis.y - fSin * axis.z,
+            fOneMinusCos * axis.y* axis.y + fCos,
+            fOneMinusCos * axis.z* axis.y + fSin * axis.x,
 			fOneMinusCos * axis.x * axis.z + fSin * axis.y,
-			fOneMinusCos * axis.y * axis.x + fSin * axis.z,
-			fOneMinusCos * axis.y * axis.y + fCos,
 			fOneMinusCos * axis.y * axis.z - fSin * axis.x,
-			fOneMinusCos * axis.z * axis.x - fSin * axis.y,
-			fOneMinusCos * axis.z * axis.y + fSin * axis.x,
 			fOneMinusCos * axis.z * axis.z + fCos
 			);
 	}

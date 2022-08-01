@@ -278,8 +278,8 @@ public:
 		const auto& VP = Projection * View;
 
 		jUniformBufferCamera ubo = {};
-		ubo.V = V.GetTranspose();
-		ubo.VP = VP.GetTranspose();
+		ubo.V = V;
+		ubo.VP = VP;
 		ubo.Far = Far;
 		ubo.Near = Near;
 

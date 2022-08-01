@@ -300,8 +300,8 @@ void jDirectionalLight::Update(float deltaTime)
 		camera->UpdateCamera();
 
 		jLightUtil::MakeDirectionalLightViewInfo(camera->Pos, camera->Target, camera->Up, Data.Direction);
-		Data.ShadowVP = (camera->Projection * camera->View).GetTranspose();
-		Data.ShadowV = camera->View.GetTranspose();
+		Data.ShadowVP = (camera->Projection * camera->View);
+		Data.ShadowV = camera->View;
 
 		UpdateMaterialData();
 
@@ -337,8 +337,8 @@ void jDirectionalLight::Update(float deltaTime)
 
 					const auto& renderTargetInfo = shadowMapData->ShadowMapFrameBuffer->Info;
 
-					ShadowVP_Transposed = (camera->Projection * camera->View).GetTranspose();
-					ShadowV_Transposed = (camera->View).GetTranspose();
+					ShadowVP_Transposed = (camera->Projection * camera->View);
+					ShadowV_Transposed = (camera->View);
 					LightPos = camera->Pos;
 					Near = camera->Near;
 					Far = camera->Far;
