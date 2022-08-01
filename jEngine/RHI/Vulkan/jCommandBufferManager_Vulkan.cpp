@@ -1,5 +1,5 @@
 ﻿#include "pch.h"
-#include "jCommandBufferManager.h"
+#include "jCommandBufferManager_Vulkan.h"
 
 bool jCommandBufferManager_Vulkan::CreatePool(uint32 QueueIndex)
 {
@@ -19,20 +19,20 @@ bool jCommandBufferManager_Vulkan::CreatePool(uint32 QueueIndex)
     return true;
 }
 
-jCommandBuffer_Vulkan jCommandBufferManager_Vulkan::GetOrCreateCommandBuffer()
+jCommandBuffer* jCommandBufferManager_Vulkan::GetOrCreateCommandBuffer()
 {
     if (PendingCommandBuffers.size() > 0)
     {
         for (int32 i = 0; i < (int32)PendingCommandBuffers.size(); ++i)
         {
-            const VkResult Result = vkGetFenceStatus(g_rhi_vk->Device, (VkFence)PendingCommandBuffers[i].GetFenceHandle());
+            const VkResult Result = vkGetFenceStatus(g_rhi_vk->Device, (VkFence)PendingCommandBuffers[i]->GetFenceHandle());
             if (Result == VK_SUCCESS)		// VK_SUCCESS 면 Signaled
             {
-                jCommandBuffer_Vulkan commandBuffer = PendingCommandBuffers[i];
+                jCommandBuffer_Vulkan* commandBuffer = PendingCommandBuffers[i];
                 PendingCommandBuffers.erase(PendingCommandBuffers.begin() + i);
 
                 UsingCommandBuffers.push_back(commandBuffer);
-                commandBuffer.Reset();
+                commandBuffer->Reset();
 
                 return commandBuffer;
             }
@@ -48,26 +48,31 @@ jCommandBuffer_Vulkan jCommandBufferManager_Vulkan::GetOrCreateCommandBuffer()
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     allocInfo.commandBufferCount = 1;
 
-    jCommandBuffer_Vulkan commandBuffer;
-    if (!ensure(vkAllocateCommandBuffers(g_rhi_vk->Device, &allocInfo, &commandBuffer.GetRef()) == VK_SUCCESS))
-        return commandBuffer;
+    VkCommandBuffer vkCommandBuffer = nullptr;
+    if (!ensure(vkAllocateCommandBuffers(g_rhi_vk->Device, &allocInfo, &vkCommandBuffer) == VK_SUCCESS))
+    {
+        return nullptr;
+    }
 
-    commandBuffer.SetFence(g_rhi_vk->FenceManager.GetOrCreateFence());
+    auto newCommandBuffer = new jCommandBuffer_Vulkan();
+    newCommandBuffer->GetRef() = vkCommandBuffer;
+    newCommandBuffer->SetFence(g_rhi_vk->FenceManager.GetOrCreateFence());
 
-    UsingCommandBuffers.push_back(commandBuffer);
+    UsingCommandBuffers.push_back(newCommandBuffer);
 
-    return commandBuffer;
+    return newCommandBuffer;
 }
 
-void jCommandBufferManager_Vulkan::ReturnCommandBuffer(jCommandBuffer_Vulkan commandBuffer)
+void jCommandBufferManager_Vulkan::ReturnCommandBuffer(jCommandBuffer* commandBuffer)
 {
+    check(commandBuffer);
     for (int32 i = 0; i < UsingCommandBuffers.size(); ++i)
     {
-        if (UsingCommandBuffers[i].GetHandle() == commandBuffer.GetHandle())
+        if (UsingCommandBuffers[i]->GetHandle() == commandBuffer->GetHandle())
         {
             UsingCommandBuffers.erase(UsingCommandBuffers.begin() + i);
             break;
         }
     }
-    PendingCommandBuffers.push_back(commandBuffer);
+    PendingCommandBuffers.push_back((jCommandBuffer_Vulkan*)commandBuffer);
 }

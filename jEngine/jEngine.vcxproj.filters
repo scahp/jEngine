@@ -277,6 +277,15 @@
     <ClInclude Include="RHI\Vulkan\jBuffer_Vulkan.h">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClInclude>
+    <ClInclude Include="RHI\Vulkan\jCommandBufferManager_Vulkan.h">
+      <Filter>Code\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\jSwapchain.h">
+      <Filter>Code\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Vulkan\jSwapchain_Vulkan.h">
+      <Filter>Code\RHI\Vulkan</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -435,9 +444,6 @@
     <ClCompile Include="RHI\Vulkan\jIndexBuffer_Vulkan.cpp">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\jCommandBufferManager.cpp">
-      <Filter>Code\RHI</Filter>
-    </ClCompile>
     <ClCompile Include="RHI\Vulkan\jRenderPass_Vulkan.cpp">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClCompile>
@@ -466,6 +472,12 @@
       <Filter>Code\RHI\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="RHI\Vulkan\jImage_Vulkan.cpp">
+      <Filter>Code\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\jCommandBufferManager_Vulkan.cpp">
+      <Filter>Code\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\jSwapchain_Vulkan.cpp">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClCompile>
   </ItemGroup>

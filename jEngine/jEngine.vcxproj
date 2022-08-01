@@ -149,8 +149,10 @@
     <ClInclude Include="RHI\jRHI_OpenGL.h" />
     <ClInclude Include="RHI\jRHI_Vulkan.h" />
     <ClInclude Include="RHI\jShaderBindings.h" />
+    <ClInclude Include="RHI\jSwapchain.h" />
     <ClInclude Include="RHI\jTexture.h" />
     <ClInclude Include="RHI\Vulkan\jBuffer_Vulkan.h" />
+    <ClInclude Include="RHI\Vulkan\jCommandBufferManager_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jImage_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jIndexBuffer_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jPipelineStateInfo_Vulkan.h" />
@@ -159,6 +161,7 @@
     <ClInclude Include="RHI\Vulkan\jRHIType_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jShaderBindings_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jShader_Vulkan.h" />
+    <ClInclude Include="RHI\Vulkan\jSwapchain_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jTexture_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jUniformBufferBlock_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jVertexBuffer_Vulkan.h" />
@@ -250,7 +253,6 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Profiler\jPerformanceProfile.cpp" />
-    <ClCompile Include="RHI\jCommandBufferManager.cpp" />
     <ClCompile Include="RHI\jFenceManager.cpp" />
     <ClCompile Include="RHI\jFrameBufferPool.cpp" />
     <ClCompile Include="RHI\jPipelineStateInfo.cpp" />
@@ -260,12 +262,14 @@
     <ClCompile Include="RHI\jRHI_OpenGL.cpp" />
     <ClCompile Include="RHI\jRHI_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jBuffer_Vulkan.cpp" />
+    <ClCompile Include="RHI\Vulkan\jCommandBufferManager_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jImage_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jIndexBuffer_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jPipelineStateInfo_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jQueryPool_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jRenderPass_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jShaderBindings_Vulkan.cpp" />
+    <ClCompile Include="RHI\Vulkan\jSwapchain_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jTexture_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jUniformBufferBlock_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jVertexBuffer_Vulkan.cpp" />

@@ -422,8 +422,12 @@ void jImGUI_Vulkan::PrepareDraw(int32 imageIndex)
         ImGuiRenderPasses.resize(imageIndex + 1);
         Pipelines.resize(imageIndex + 1);
 
+        const auto& extent = g_rhi_vk->Swapchain->GetExtent();
+        const auto& image = g_rhi_vk->Swapchain->GetSwapchainImage(imageIndex);
+
         auto SwapChainRTPtr = jRenderTarget::CreateFromTexture<jTexture_Vulkan>(ETextureType::TEXTURE_2D, ETextureFormat::BGRA8
-            , g_rhi_vk->Swapchain_Vulkan.Extent.x, g_rhi_vk->Swapchain_Vulkan.Extent.y, false, 1, 1, g_rhi_vk->Swapchain_Vulkan.Images[imageIndex].Image, g_rhi_vk->Swapchain_Vulkan.Images[imageIndex].ImageView);
+            , extent.x, extent.y, false, 1, 1
+            , (VkImage)image->GetHandle(), (VkImageView)image->GetViewHandle());
 
         jAttachment* color = new jAttachment(SwapChainRTPtr, EAttachmentLoadStoreOp::DONTCARE_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE);
 

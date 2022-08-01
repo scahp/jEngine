@@ -7,6 +7,7 @@
 #include "jRenderTarget.h"
 #include "jShaderBindings.h"
 #include "jBuffer.h"
+#include "jCommandBufferManager.h"
 
 extern class jRHI* g_rhi;
 
@@ -202,19 +203,6 @@ class jMaterial
 public:
 	jMaterial() {}
 	~jMaterial() {}
-};
-
-class jCommandBuffer
-{
-public:
-	virtual ~jCommandBuffer() {}
-
-	virtual void* GetHandle() const { return nullptr; }
-	virtual void* GetFenceHandle() const { return nullptr; }
-	virtual void SetFence(void* fence) {}
-	virtual bool Begin() const { return false; }
-	virtual bool End() const { return false; }
-	virtual void Reset() const {}
 };
 
 struct jQueryPool

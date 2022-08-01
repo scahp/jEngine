@@ -257,8 +257,8 @@ void jGame::Draw()
 {
 	SCOPE_DEBUG_EVENT(g_rhi, "Game::Draw");
 
-    jCommandBuffer_Vulkan commandBuffer = g_rhi_vk->CommandBufferManager.GetOrCreateCommandBuffer();
-    const uint32_t imageIndex = g_rhi_vk->BeginRenderFrame(&commandBuffer);
+    jCommandBuffer_Vulkan* commandBuffer = (jCommandBuffer_Vulkan*)g_rhi_vk->CommandBufferManager->GetOrCreateCommandBuffer();
+    const uint32_t imageIndex = g_rhi_vk->BeginRenderFrame(commandBuffer);
 
     {
         {
@@ -323,7 +323,7 @@ void jGame::Draw()
             View.Camera = DirectionalLight->GetLightCamra();
             View.DirectionalLight = DirectionalLight;
 
-            g_rhi_vk->CurrentCommandBuffer = &commandBuffer;
+            g_rhi_vk->CurrentCommandBuffer = commandBuffer;
 
 #if STATIC_COMMAND
             static std::vector<jDrawCommand<true>> ShadowPasses;
@@ -342,13 +342,13 @@ void jGame::Draw()
 
             //////////////////////////////////////////////////////////////////////////
             // 여기서 부터 렌더 로직 시작
-            if (ensure(commandBuffer.Begin()))
+            if (ensure(commandBuffer->Begin()))
             {
-                g_rhi_vk->QueryPool.ResetQueryPool(&commandBuffer);
+                g_rhi_vk->QueryPool.ResetQueryPool(commandBuffer);
 
                 {
                     SCOPE_GPU_PROFILE(ShadowPass);
-                    renderPass->BeginRenderPass(&commandBuffer);
+                    renderPass->BeginRenderPass(commandBuffer);
 
                     for (auto& command : ShadowPasses)
                     {
@@ -383,7 +383,7 @@ void jGame::Draw()
             View.Camera = MainCamera;
             View.DirectionalLight = DirectionalLight;
 
-            g_rhi_vk->CurrentCommandBuffer = &commandBuffer;
+            g_rhi_vk->CurrentCommandBuffer = commandBuffer;
 
 #if STATIC_COMMAND
             static std::vector<jDrawCommand<false>> BasePasses;
@@ -406,7 +406,7 @@ void jGame::Draw()
             {
                 SCOPE_GPU_PROFILE(BasePass);
 
-                g_rhi_vk->RenderPasses[imageIndex]->BeginRenderPass(&commandBuffer);
+                g_rhi_vk->RenderPasses[imageIndex]->BeginRenderPass(commandBuffer);
 
                 //vkCmdWriteTimestamp((VkCommandBuffer)commandBuffer.GetHandle(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, g_rhi_vk->vkQueryPool, 0);
 
@@ -418,20 +418,20 @@ void jGame::Draw()
                 // Finishing up
                 g_rhi_vk->RenderPasses[imageIndex]->EndRenderPass();
 
-                jImGUI_Vulkan::Get().Draw((VkCommandBuffer)commandBuffer.GetHandle(), imageIndex);
+                jImGUI_Vulkan::Get().Draw((VkCommandBuffer)commandBuffer->GetHandle(), imageIndex);
 
                 //vkCmdWriteTimestamp((VkCommandBuffer)commandBuffer.GetHandle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, g_rhi_vk->vkQueryPool, 1);
             }
-            ensure(commandBuffer.End());
+            ensure(commandBuffer->End());
 
             // 여기 까지 렌더 로직 끝
             //////////////////////////////////////////////////////////////////////////
         }
     }
     {
-        g_rhi_vk->EndRenderFrame(&commandBuffer);
+        g_rhi_vk->EndRenderFrame(commandBuffer);
 
-        g_rhi_vk->CommandBufferManager.ReturnCommandBuffer(commandBuffer);
+        g_rhi_vk->CommandBufferManager->ReturnCommandBuffer(commandBuffer);
     }
 }
 

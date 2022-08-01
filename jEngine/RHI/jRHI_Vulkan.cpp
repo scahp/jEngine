@@ -22,6 +22,7 @@
 #include "Vulkan/jVulkanBufferUtil.h"
 #include "Vulkan/jShader_Vulkan.h"
 #include "Vulkan/jBuffer_Vulkan.h"
+#include "Vulkan/jCommandBufferManager_Vulkan.h"
 
 jRHI_Vulkan* g_rhi_vk = nullptr;
 std::unordered_map<size_t, VkPipelineLayout> jRHI_Vulkan::PipelineLayoutPool;
@@ -207,93 +208,11 @@ bool jRHI_Vulkan::InitRHI()
 	}
 
 	// Swapchain
-	{
-		jVulkanDeviceUtil::SwapChainSupportDetails swapChainSupport = jVulkanDeviceUtil::QuerySwapChainSupport(PhysicalDevice, Surface);
+    Swapchain = new jSwapchain_Vulkan();
+	verify(Swapchain->Create());
 
-		VkSurfaceFormatKHR surfaceFormat = jVulkanDeviceUtil::ChooseSwapSurfaceFormat(swapChainSupport.formats);
-		VkPresentModeKHR presentMode = jVulkanDeviceUtil::ChooseSwapPresentMode(swapChainSupport.presentModes);
-		VkExtent2D extent = jVulkanDeviceUtil::ChooseSwapExtent(Window, swapChainSupport.capabilities);
-
-		// SwapChain 개수 설정
-		// 최소개수로 하게 되면, 우리가 렌더링할 새로운 이미지를 얻기 위해 드라이버가 내부 기능 수행을 기다려야 할 수 있으므로 min + 1로 설정.
-		uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
-
-		// maxImageCount가 0이면 최대 개수에 제한이 없음
-		if ((swapChainSupport.capabilities.maxImageCount > 0) && (imageCount > swapChainSupport.capabilities.maxImageCount))
-			imageCount = swapChainSupport.capabilities.maxImageCount;
-
-		VkSwapchainCreateInfoKHR createInfo = {};
-		createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-		createInfo.surface = Surface;
-		createInfo.imageFormat = surfaceFormat.format;
-		createInfo.minImageCount = imageCount;
-		createInfo.imageColorSpace = surfaceFormat.colorSpace;
-		createInfo.imageExtent = extent;
-		createInfo.imageArrayLayers = 1;			// Stereoscopic 3D application(VR)이 아니면 항상 1
-		createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;	// 즉시 스왑체인에 그리기 위해서 이걸로 설정
-																		// 포스트 프로세스 같은 처리를 위해 별도의 이미지를 만드는 것이면
-																		// VK_IMAGE_USAGE_TRANSFER_DST_BIT 으로 하면됨.
-
-		jVulkanDeviceUtil::QueueFamilyIndices indices = jVulkanDeviceUtil::FindQueueFamilies(PhysicalDevice, Surface);
-		uint32_t queueFamilyIndices[] = { indices.graphicsFamily.value(), indices.presentFamily.value() };
-
-		// 그림은 Graphics Queue Family와 Present Queue Family가 다른경우 아래와 같이 동작한다.
-		// - 이미지를 Graphics Queue에서 가져온 스왑체인에 그리고, Presentation Queue에 제출
-		// 1. VK_SHARING_MODE_EXCLUSIVE : 이미지를 한번에 하나의 Queue Family 가 소유함. 소유권이 다른곳으로 전달될때 명시적으로 전달 해줘야함.
-		//								이 옵션은 최고의 성능을 제공한다.
-		// 2. VK_SHARING_MODE_CONCURRENT : 이미지가 여러개의 Queue Family 로 부터 명시적인 소유권 절달 없이 사용될 수 있다.
-		if (indices.graphicsFamily != indices.presentFamily)
-		{
-			createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-			createInfo.queueFamilyIndexCount = 2;
-			createInfo.pQueueFamilyIndices = queueFamilyIndices;
-		}
-		else
-		{
-			createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-			createInfo.queueFamilyIndexCount = 0;		// Optional
-			createInfo.pQueueFamilyIndices = nullptr;	// Optional
-		}
-
-		createInfo.preTransform = swapChainSupport.capabilities.currentTransform;		// 스왑체인에 회전이나 flip 처리 할 수 있음.
-		createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;					// 알파채널을 윈도우 시스템의 다른 윈도우와 블랜딩하는데 사용해야하는지 여부
-																						// VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR 는 알파채널 무시
-		createInfo.presentMode = presentMode;
-		createInfo.clipped = VK_TRUE;			// 다른윈도우에 가려져서 보이지 않는 부분을 그리지 않을지에 대한 여부 VK_TRUE 면 안그림
-
-		// 화면 크기 변경등으로 스왑체인이 다시 만들어져야 하는경우 여기에 oldSwapchain을 넘겨준다.
-		createInfo.oldSwapchain = VK_NULL_HANDLE;
-
-		if (!ensure(vkCreateSwapchainKHR(Device, &createInfo, nullptr, &Swapchain_Vulkan.SwapChain) == VK_SUCCESS))
-			return false;
-
-		vkGetSwapchainImagesKHR(Device, Swapchain_Vulkan.SwapChain, &imageCount, nullptr);
-		
-		std::vector<VkImage> Images;
-		Images.resize(imageCount);
-		vkGetSwapchainImagesKHR(Device, Swapchain_Vulkan.SwapChain, &imageCount, Images.data());
-
-		Swapchain_Vulkan.Format = GetVulkanTextureFormat(surfaceFormat.format);
-		Swapchain_Vulkan.Extent = Vector2i(extent.width, extent.height);
-
-		// ImageView 생성
-		Swapchain_Vulkan.Images.resize(Images.size());
-		for (int32 i = 0; i < Images.size(); ++i)
-		{
-			jSwapchainImage_Vulkan& SwapchainImage = Swapchain_Vulkan.Images[i];
-
-			SwapchainImage.Image = Images[i];
-			SwapchainImage.ImageView = jVulkanBufferUtil::CreateImageView(Images[i], surfaceFormat.format, VK_IMAGE_ASPECT_COLOR_BIT, 1);
-			SwapchainImage.CommandBufferFence = nullptr;
-
-            VkSemaphoreCreateInfo semaphoreInfo = {};
-            semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-			verify(VK_SUCCESS == vkCreateSemaphore(Device, &semaphoreInfo, nullptr, &SwapchainImage.Available));
-			verify(VK_SUCCESS == vkCreateSemaphore(Device, &semaphoreInfo, nullptr, &SwapchainImage.RenderFinished));
-		}
-	}
-
-	CommandBufferManager.CreatePool(GraphicsQueue.QueueIndex);
+	CommandBufferManager = new jCommandBufferManager_Vulkan();
+	CommandBufferManager->CreatePool(GraphicsQueue.QueueIndex);
 
     // Pipeline cache
     VkPipelineCacheCreateInfo pipelineCacheCreateInfo = {};
@@ -309,7 +228,7 @@ bool jRHI_Vulkan::InitRHI()
 		//	, int32 width, int32 height, int32 textureCount = 1, ETextureFilter magnification = ETextureFilter::LINEAR
 		//	, ETextureFilter minification = ETextureFilter::LINEAR, bool isGenerateMipmap = false, bool isGenerateMipmapDepth = false, int32 sampleCount = 1)
 
-		for (int32 i = 0; i < Swapchain_Vulkan.Images.size(); ++i)
+		for (int32 i = 0; i < Swapchain->Images.size(); ++i)
 		{
 			std::shared_ptr<jRenderTarget> DepthPtr = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget(
 				{ ETextureType::TEXTURE_2D, ETextureFormat::D24_S8, SCR_WIDTH, SCR_HEIGHT, 1, /*ETextureFilter::LINEAR, ETextureFilter::LINEAR, */false, MsaaSamples }));
@@ -317,8 +236,12 @@ bool jRHI_Vulkan::InitRHI()
 			std::shared_ptr<jRenderTarget> ColorPtr;
 			std::shared_ptr<jRenderTarget> ResolveColorPtr;
 
+            const auto& extent = g_rhi_vk->Swapchain->GetExtent();
+            const auto& image = g_rhi_vk->Swapchain->GetSwapchainImage(i);
+
 			auto SwapChainRTPtr = jRenderTarget::CreateFromTexture<jTexture_Vulkan>(ETextureType::TEXTURE_2D, ETextureFormat::BGRA8
-				, Swapchain_Vulkan.Extent.x, Swapchain_Vulkan.Extent.y, false, 1, 1, Swapchain_Vulkan.Images[i].Image, Swapchain_Vulkan.Images[i].ImageView);
+				, extent.x, extent.y, false, 1, 1
+				, (VkImage)image->GetHandle(), (VkImageView)image->GetViewHandle());
 
 			if (MsaaSamples > 1)
 			{
@@ -353,13 +276,6 @@ bool jRHI_Vulkan::InitRHI()
 			RenderPasses.push_back(renderPass);
 		}
 	}
-
-	//FrameBufferTest.resize(swapChainImageViews.size());
-	//for (int32 i = 0; i < FrameBufferTest.size(); ++i)
-	//{
-	//	FrameBufferTest[i].SetRenderPass(&RenderPassTest);
-	//	ensure(FrameBufferTest[i].CreateFrameBuffer(i));
-	//}
 
 	QueryPool.Create();
 
@@ -407,10 +323,8 @@ void jRHI_Vulkan::CleanupSwapChain()
 	}
 	RenderPasses.clear();
 
-	for (auto image : Swapchain_Vulkan.Images)
-		vkDestroyImageView(Device, image.ImageView, nullptr);
-
-	vkDestroySwapchainKHR(Device, Swapchain_Vulkan.SwapChain, nullptr);
+	if (Swapchain)
+		Swapchain->Destroy();
 
 	//for (size_t i = 0; i < swapChainImages.size(); ++i)
 	//{
@@ -1151,10 +1065,11 @@ int32 jRHI_Vulkan::BeginRenderFrame(jCommandBuffer* commandBuffer)
 {
 	uint32 imageIndex = -1;
 
-    VkFence lastCommandBufferFence = Swapchain_Vulkan.Images[CurrenFrameIndex].CommandBufferFence;
+    VkFence lastCommandBufferFence = Swapchain->Images[CurrenFrameIndex]->CommandBufferFence;
 
     // timeout 은 nanoseconds. UINT64_MAX 는 타임아웃 없음
-    VkResult acquireNextImageResult = vkAcquireNextImageKHR(Device, Swapchain_Vulkan.SwapChain, UINT64_MAX, Swapchain_Vulkan.Images[CurrenFrameIndex].Available, VK_NULL_HANDLE, &imageIndex);
+    VkResult acquireNextImageResult = vkAcquireNextImageKHR(Device, (VkSwapchainKHR)Swapchain->GetHandle(), UINT64_MAX
+		, Swapchain->Images[CurrenFrameIndex]->Available, VK_NULL_HANDLE, &imageIndex);
     if (acquireNextImageResult != VK_SUCCESS)
         return -1;
 
@@ -1163,7 +1078,7 @@ int32 jRHI_Vulkan::BeginRenderFrame(jCommandBuffer* commandBuffer)
         vkWaitForFences(Device, 1, &lastCommandBufferFence, VK_TRUE, UINT64_MAX);
 
     // 이 프레임에서 펜스를 사용한다고 마크 해둠
-    Swapchain_Vulkan.Images[CurrenFrameIndex].CommandBufferFence = (VkFence)commandBuffer->GetFenceHandle();
+	Swapchain->Images[CurrenFrameIndex]->CommandBufferFence = (VkFence)commandBuffer->GetFenceHandle();
 
     // 여기서는 VK_SUCCESS or VK_SUBOPTIMAL_KHR 은 성공했다고 보고 계속함.
     // VK_ERROR_OUT_OF_DATE_KHR : 스왑체인이 더이상 서피스와 렌더링하는데 호환되지 않는 경우. (보통 윈도우 리사이즈 이후)
@@ -1193,7 +1108,7 @@ void jRHI_Vulkan::EndRenderFrame(jCommandBuffer* commandBuffer)
     VkSubmitInfo submitInfo = {};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-    VkSemaphore waitsemaphores[] = { Swapchain_Vulkan.Images[CurrenFrameIndex].Available };
+    VkSemaphore waitsemaphores[] = { Swapchain->Images[CurrenFrameIndex]->Available };
     VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
     submitInfo.waitSemaphoreCount = 1;
     submitInfo.pWaitSemaphores = waitsemaphores;
@@ -1201,7 +1116,7 @@ void jRHI_Vulkan::EndRenderFrame(jCommandBuffer* commandBuffer)
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &vkCommandBuffer;
 
-    VkSemaphore signalSemaphores[] = { Swapchain_Vulkan.Images[CurrenFrameIndex].RenderFinished };
+    VkSemaphore signalSemaphores[] = { Swapchain->Images[CurrenFrameIndex]->RenderFinished };
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
 
@@ -1217,7 +1132,7 @@ void jRHI_Vulkan::EndRenderFrame(jCommandBuffer* commandBuffer)
     presentInfo.waitSemaphoreCount = 1;
     presentInfo.pWaitSemaphores = signalSemaphores;
 
-    VkSwapchainKHR swapChains[] = { Swapchain_Vulkan.SwapChain };
+    VkSwapchainKHR swapChains[] = { Swapchain->Swapchain };
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = swapChains;
     presentInfo.pImageIndices = &imageIndex;
@@ -1243,7 +1158,7 @@ void jRHI_Vulkan::EndRenderFrame(jCommandBuffer* commandBuffer)
     // 여러 프레임에 걸쳐 동시에 imageAvailableSemaphore 와 renderFinishedSemaphore를 재사용하게 되는 문제가 있음.
     // 1). 한프레임을 마치고 큐가 빌때까지 기다리는 것으로 해결할 수 있음. 한번에 1개의 프레임만 완성 가능(최적의 해결방법은 아님)
     // 2). 여러개의 프레임을 동시에 처리 할수있도록 확장. 동시에 진행될 수 있는 최대 프레임수를 지정해줌.
-    CurrenFrameIndex = (CurrenFrameIndex + 1) % Swapchain_Vulkan.Images.size();
+    CurrenFrameIndex = (CurrenFrameIndex + 1) % Swapchain->Images.size();
 }
 
 VkCommandBuffer jRHI_Vulkan::BeginSingleTimeCommands() const
@@ -1251,7 +1166,7 @@ VkCommandBuffer jRHI_Vulkan::BeginSingleTimeCommands() const
     VkCommandBufferAllocateInfo allocInfo = {};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandPool = CommandBufferManager.GetPool();
+    allocInfo.commandPool = CommandBufferManager->GetPool();
     allocInfo.commandBufferCount = 1;
 
     VkCommandBuffer commandBuffer;
@@ -1279,7 +1194,7 @@ void jRHI_Vulkan::EndSingleTimeCommands(VkCommandBuffer commandBuffer) const
 
     // 명령 완료를 기다리기 위해서 2가지 방법이 있는데, Fence를 사용하는 방법(vkWaitForFences)과 Queue가 Idle이 될때(vkQueueWaitIdle)를 기다리는 방법이 있음.
     // fence를 사용하는 방법이 여러개의 전송을 동시에 하고 마치는 것을 기다릴 수 있게 해주기 때문에 그것을 사용함.
-    vkFreeCommandBuffers(Device, CommandBufferManager.GetPool(), 1, &commandBuffer);
+    vkFreeCommandBuffers(Device, CommandBufferManager->GetPool(), 1, &commandBuffer);
 }
 
 bool jRHI_Vulkan::TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32 mipLevels) const
