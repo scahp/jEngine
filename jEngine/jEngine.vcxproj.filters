@@ -77,6 +77,9 @@
     <Filter Include="Code\RHI\Vulkan">
       <UniqueIdentifier>{639b1f83-be1c-4d89-9ce4-32d2c7c02782}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Resource\Shaders\hlsl">
+      <UniqueIdentifier>{babba9a0-06f3-4e2e-b7f2-62fd9c95c25b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Math\MathUtility.h">
@@ -493,6 +496,18 @@
     </None>
     <None Include="Resource\Shaders\glsl\shader_fs.glsl">
       <Filter>Resource\Shaders\glsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\shader_fs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\shader_vs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\shadow_fs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\shadow_vs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
     </None>
   </ItemGroup>
 </Project>

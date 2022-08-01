@@ -289,6 +289,20 @@
     <None Include="Resource\Shaders\glsl\shadow_fs.glsl" />
     <None Include="Resource\Shaders\glsl\shadow_vs.glsl" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Resource\Shaders\hlsl\shader_fs.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Resource\Shaders\hlsl\shader_vs.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Resource\Shaders\hlsl\shadow_fs.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Resource\Shaders\hlsl\shadow_vs.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
