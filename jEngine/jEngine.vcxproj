@@ -67,7 +67,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>./;./External/assimp/lib;./External/vulkan/1.2.176.1/lib;./External/glslang/lib;./External/ShaderConductor/Lib/Debug</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>./;./External/assimp/lib;./External/vulkan/1.2.176.1/lib;./External/glslang/lib;./External/ShaderConductor/Lib/$(Configuration)</AdditionalLibraryDirectories>
       <AdditionalDependencies>opengl32.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>
       </IgnoreSpecificDefaultLibraries>
@@ -99,7 +99,7 @@ xcopy /s /y /d  "$(ProjectDir)External\ShaderConductor\Lib\Debug\*.dll" "$(OutDi
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>opengl32.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>./;./External/assimp/lib;./External/vulkan/1.2.176.1/lib;./External/glslang/lib;./External/ShaderConductor/Lib/Debug</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>./;./External/assimp/lib;./External/vulkan/1.2.176.1/lib;./External/glslang/lib;./External/ShaderConductor/Lib/$(Configuration)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Command>xcopy /s /y /d  "$(ProjectDir)External\assimp\lib\*.dll" "$(OutDir)"
