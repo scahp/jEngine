@@ -226,7 +226,7 @@ void jSpirvHelper::InitResources(TBuiltInResource& resources, const VkPhysicalDe
 	resources.minProgramTexelOffset = -8;
 }
 
-bool jSpirvHelper::GLSLtoSPV(std::vector<uint32>& OutSpirv, const EShLanguage stage, const char* pshader)
+bool jSpirvHelper::GLSLtoSpirv(std::vector<uint32>& OutSpirv, const EShLanguage stage, const char* pshader)
 {
 	check(IsInitialized);
 
@@ -263,7 +263,7 @@ bool jSpirvHelper::GLSLtoSPV(std::vector<uint32>& OutSpirv, const EShLanguage st
 	return true;
 }
 
-bool jSpirvHelper::HLSLtoSPV(std::vector<uint32>& OutSpirv, ShaderConductor::ShaderStage stage, const char* pshader)
+bool jSpirvHelper::HLSLtoSpirv(std::vector<uint32>& OutSpirv, ShaderConductor::ShaderStage stage, const char* pshader)
 {
 	ShaderConductor::Compiler::SourceDesc sourceDesc = {};
 	sourceDesc.entryPoint = "main";

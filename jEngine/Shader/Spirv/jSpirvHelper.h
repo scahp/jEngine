@@ -24,7 +24,7 @@ struct jSpirvHelper
 	//////////////////////////////////////////////////////////////////////////
 	// GLSL to SPV
 	static void InitResources(TBuiltInResource& resources, const VkPhysicalDeviceProperties& props);
-	static bool GLSLtoSPV(std::vector<uint32>& OutSpirv, const EShLanguage stage, const char* pshader);
+	static bool GLSLtoSpirv(std::vector<uint32>& OutSpirv, const EShLanguage stage, const char* pshader);
 
 	[[deprecated("Recommanded to use InitResources function that is based on VkPhysicalDeviceProperties")]]
 	static void InitResources(TBuiltInResource& Resources);
@@ -32,6 +32,6 @@ struct jSpirvHelper
 
 	//////////////////////////////////////////////////////////////////////////
 	// HLSL to SPV
-	static bool HLSLtoSPV(std::vector<uint32>& OutSpirv, ShaderConductor::ShaderStage stage, const char* pshader);
+	static bool HLSLtoSpirv(std::vector<uint32>& OutSpirv, ShaderConductor::ShaderStage stage, const char* pshader);
 	//////////////////////////////////////////////////////////////////////////
 };
