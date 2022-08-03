@@ -1,7 +1,7 @@
 struct VSInput
 {
     [[vk::location(0)]] float3 Position : POSITION0;
-    [[vk::location(1)]] float3 Color : COLOR0;
+    [[vk::location(1)]] float4 Color : COLOR0;
     [[vk::location(2)]] float3 Normal : NORMAL0;
     [[vk::location(3)]] float3 Tangent : NORMAL1;
     [[vk::location(4)]] float2 TexCoord : TEXCOORD0;
@@ -62,6 +62,7 @@ VSOutput main(VSInput input)
 
     output.Normal = normalize(mul((float3x3)RenderObjectParam.M, input.Normal));
 	
-    output.ShadowPosition = mul(DirectionalLight.ShadowVP * RenderObjectParam.M, float4(input.Position, 1.0));
+    output.ShadowPosition = mul(DirectionalLight.ShadowVP, mul(RenderObjectParam.M, float4(input.Position, 1.0)));
     output.ShadowPosition /= output.ShadowPosition.w;
+    return output;
 }

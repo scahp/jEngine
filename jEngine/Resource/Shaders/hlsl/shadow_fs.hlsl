@@ -1,4 +1,9 @@
-float4 main() : SV_TARGET
+struct VSOutput
 {
-    return float4(1.0, 0.0, 0.0, 1.0);
+    float4 Pos : SV_POSITION;
+};
+
+float4 main(VSOutput input) : SV_TARGET
+{
+    return float4(input.Pos.xyz, 1.0);
 }

@@ -47,5 +47,6 @@ struct VSOutput
 VSOutput main(VSInput input)
 {
     VSOutput output = (VSOutput) 0;
-    output.Pos = mul(DirectionalLight.ShadowVP * RenderObjectParam.M, float4(input.Position, 1.0));
+    output.Pos = mul(DirectionalLight.ShadowVP, mul(RenderObjectParam.M, float4(input.Position, 1.0)));
+    return output;
 }
