@@ -3,7 +3,11 @@
 namespace jVulkanDeviceUtil
 {
 
+#if _DEBUG
 static constexpr bool EnableValidationLayers = true;
+#else
+static constexpr bool EnableValidationLayers = false;
+#endif
 
 struct QueueFamilyIndices
 {
