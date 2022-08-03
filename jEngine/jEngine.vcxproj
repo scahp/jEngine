@@ -59,7 +59,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;_ITERATOR_DEBUG_LEVEL=0;_CONTAINER_DEBUG_LEVEL=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>./;./glad/include;./External/assimp/include;./External;./External/vulkan/1.2.176.1/Include;./External/glslang;./External/IMGUI;./External/EASTL/include;./External/EABase/include/Common;./External/glad/include;./External/stb;./External/loadpng;./External/TinyXml2</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>./;./glad/include;./External/assimp/include;./External;./External/vulkan/1.2.176.1/Include;./External/glslang;./External/IMGUI;./External/EASTL/include;./External/EABase/include/Common;./External/glad/include;./External/stb;./External/loadpng;./External/TinyXml2;./External/ShaderConductor/include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <DisableSpecificWarnings>
       </DisableSpecificWarnings>
@@ -67,13 +67,14 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>./;./External/assimp/lib;./External/vulkan/1.2.176.1/lib;./External/glslang/lib</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>./;./External/assimp/lib;./External/vulkan/1.2.176.1/lib;./External/glslang/lib;./External/ShaderConductor/Lib/Debug</AdditionalLibraryDirectories>
       <AdditionalDependencies>opengl32.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>
       </IgnoreSpecificDefaultLibraries>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy /s /y /d  "$(ProjectDir)External\assimp\lib\*.dll" "$(OutDir)"</Command>
+      <Command>xcopy /s /y /d  "$(ProjectDir)External\assimp\lib\*.dll" "$(OutDir)"
+xcopy /s /y /d  "$(ProjectDir)External\ShaderConductor\Lib\Debug\*.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -87,7 +88,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;_ITERATOR_DEBUG_LEVEL=0;_CONTAINER_DEBUG_LEVEL=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>./;./glad/include;./External/assimp/include;./External;./External/vulkan/1.2.176.1/Include;./External/glslang;./External/IMGUI;./External/EASTL/include;./External/EABase/include/Common;./External/glad/include;./External/stb;./External/loadpng;./External/TinyXml2</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>./;./glad/include;./External/assimp/include;./External;./External/vulkan/1.2.176.1/Include;./External/glslang;./External/IMGUI;./External/EASTL/include;./External/EABase/include/Common;./External/glad/include;./External/stb;./External/loadpng;./External/TinyXml2;./External/ShaderConductor/include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <DisableSpecificWarnings>
       </DisableSpecificWarnings>
@@ -98,10 +99,11 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>opengl32.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>./;./External/assimp/lib;./External/vulkan/1.2.176.1/lib;./External/glslang/lib</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>./;./External/assimp/lib;./External/vulkan/1.2.176.1/lib;./External/glslang/lib;./External/ShaderConductor/Lib/Debug</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy /s /y /d  "$(ProjectDir)External\assimp\lib\*.dll" "$(OutDir)"</Command>
+      <Command>xcopy /s /y /d  "$(ProjectDir)External\assimp\lib\*.dll" "$(OutDir)"
+xcopy /s /y /d  "$(ProjectDir)External\ShaderConductor\Lib\Debug\*.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -119,6 +121,7 @@
     <ClInclude Include="External\IMGUI\imstb_textedit.h" />
     <ClInclude Include="External\IMGUI\imstb_truetype.h" />
     <ClInclude Include="External\loadpng\lodepng.h" />
+    <ClInclude Include="External\ShaderConductor\Include\ShaderConductor\ShaderConductor.hpp" />
     <ClInclude Include="External\stb\stb_image.h" />
     <ClInclude Include="External\TinyXml2\tinyxml2.h" />
     <ClInclude Include="FileLoader\jFile.h" />

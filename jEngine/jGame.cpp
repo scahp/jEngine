@@ -14,6 +14,7 @@
 #include "RHI/jRenderTargetPool.h"
 #include "Profiler/jPerformanceProfile.h"
 #include "RHI\Vulkan\jTexture_Vulkan.h"
+#include "Shader\Spirv\jSpirvHelper.h"
 
 jRHI* g_rhi = nullptr;
 
@@ -305,6 +306,8 @@ void jGame::Draw()
         // 정리 해야 함
         DirectionalLight->PrepareShaderBindingInstance();
 
+#define USE_HLSL 1
+
 #define STATIC_COMMAND 0
 
         // Shadow
@@ -314,8 +317,13 @@ void jGame::Draw()
             {
                 jShaderInfo shaderInfo;
                 shaderInfo.name = jName("shadow_test");
+#if USE_HLSL
+                shaderInfo.vs = jName("Resource/Shaders/hlsl/shadow_vs.hlsl");
+                shaderInfo.fs = jName("Resource/Shaders/hlsl/shadow_fs.hlsl");
+#else
                 shaderInfo.vs = jName("Resource/Shaders/glsl/shadow_vs.glsl");
                 shaderInfo.fs = jName("Resource/Shaders/glsl/shadow_fs.glsl");
+#endif
                 Shader = g_rhi->CreateShader(shaderInfo);
             }
 
@@ -374,8 +382,13 @@ void jGame::Draw()
             {
                 jShaderInfo shaderInfo;
                 shaderInfo.name = jName("default_test");
+#if USE_HLSL
+                shaderInfo.vs = jName("Resource/Shaders/hlsl/shader_vs.hlsl");
+                shaderInfo.fs = jName("Resource/Shaders/hlsl/shader_fs.hlsl");
+#else
                 shaderInfo.vs = jName("Resource/Shaders/glsl/shader_vs.glsl");
                 shaderInfo.fs = jName("Resource/Shaders/glsl/shader_fs.glsl");
+#endif
                 Shader = g_rhi->CreateShader(shaderInfo);
             }
 

@@ -80,6 +80,9 @@
     <Filter Include="Resource\Shaders\hlsl">
       <UniqueIdentifier>{babba9a0-06f3-4e2e-b7f2-62fd9c95c25b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Code\External\ShaderConductor">
+      <UniqueIdentifier>{84f1e91d-2052-4ade-b434-4f4bd3dd2941}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Math\MathUtility.h">
@@ -288,6 +291,9 @@
     </ClInclude>
     <ClInclude Include="RHI\Vulkan\jSwapchain_Vulkan.h">
       <Filter>Code\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="External\ShaderConductor\Include\ShaderConductor\ShaderConductor.hpp">
+      <Filter>Code\External\ShaderConductor</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

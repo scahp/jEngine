@@ -631,7 +631,11 @@ bool jRHI_Vulkan::CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo
 		std::string csText(csFile.GetBuffer());
 
 		std::vector<uint32> SpirvCode;
-		jSpirvHelper::GLSLtoSPV(SpirvCode, EShLanguage::EShLangCompute, csText.data());
+        const bool isHLSL = !!strstr(shaderInfo.cs.ToStr(), ".hlsl");
+		if (isHLSL)
+			jSpirvHelper::HLSLtoSPV(SpirvCode, ShaderConductor::ShaderStage::ComputeShader, csText.c_str());
+		else
+            jSpirvHelper::GLSLtoSPV(SpirvCode, EShLanguage::EShLangCompute, csText.data());
 		VkShaderModule computeShaderModule = CreateShaderModule(SpirvCode);
 
 		VkPipelineShaderStageCreateInfo computeShaderStageInfo = {};
@@ -652,7 +656,11 @@ bool jRHI_Vulkan::CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo
 			std::string vsText(vsFile.GetBuffer());
 
 			std::vector<uint32> SpirvCode;
-			jSpirvHelper::GLSLtoSPV(SpirvCode, EShLanguage::EShLangVertex, vsText.data());
+            const bool isHLSL = !!strstr(shaderInfo.vs.ToStr(), ".hlsl");
+            if (isHLSL)
+                jSpirvHelper::HLSLtoSPV(SpirvCode, ShaderConductor::ShaderStage::VertexShader, vsText.c_str());
+			else
+				jSpirvHelper::GLSLtoSPV(SpirvCode, EShLanguage::EShLangVertex, vsText.data());
 			VkShaderModule vertShaderModule = CreateShaderModule(SpirvCode);
 			VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
 			vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -673,7 +681,11 @@ bool jRHI_Vulkan::CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo
 			std::string gsText(gsFile.GetBuffer());
 
 			std::vector<uint32> SpirvCode;
-			jSpirvHelper::GLSLtoSPV(SpirvCode, EShLanguage::EShLangGeometry, gsText.data());
+            const bool isHLSL = !!strstr(shaderInfo.gs.ToStr(), ".hlsl");
+            if (isHLSL)
+                jSpirvHelper::HLSLtoSPV(SpirvCode, ShaderConductor::ShaderStage::GeometryShader, gsText.c_str());
+			else
+				jSpirvHelper::GLSLtoSPV(SpirvCode, EShLanguage::EShLangGeometry, gsText.data());
 			VkShaderModule geoShaderModule = CreateShaderModule(SpirvCode);
 			VkPipelineShaderStageCreateInfo geoShaderStageInfo = {};
 			geoShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -692,7 +704,11 @@ bool jRHI_Vulkan::CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo
 			std::string fsText(fsFile.GetBuffer());
 
 			std::vector<uint32> SpirvCode;
-			jSpirvHelper::GLSLtoSPV(SpirvCode, EShLanguage::EShLangFragment, fsText.data());
+            const bool isHLSL = !!strstr(shaderInfo.fs.ToStr(), ".hlsl");
+            if (isHLSL)
+                jSpirvHelper::HLSLtoSPV(SpirvCode, ShaderConductor::ShaderStage::PixelShader, fsText.c_str());
+			else
+				jSpirvHelper::GLSLtoSPV(SpirvCode, EShLanguage::EShLangFragment, fsText.data());
 			VkShaderModule fragShaderModule = CreateShaderModule(SpirvCode);
 			VkPipelineShaderStageCreateInfo fragShaderStageInfo = {};
 			fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
