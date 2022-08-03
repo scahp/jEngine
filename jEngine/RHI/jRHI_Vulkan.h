@@ -70,6 +70,7 @@ public:
 		VkQueue Queue = nullptr;
 	};
 	jQueue_Vulkan GraphicsQueue;
+	jQueue_Vulkan ComputeQueue;
 	jQueue_Vulkan PresentQueue;
 
 	// 논리 디바이스 생성
@@ -87,7 +88,6 @@ public:
 
     VkPhysicalDeviceProperties DeviceProperties;
 
-    std::vector<jRenderPass_Vulkan*> RenderPasses;
     jCommandBuffer_Vulkan* CurrentCommandBuffer = nullptr;
     jPipelineStateFixedInfo CurrentPipelineStateFixed_Shadow;
     jPipelineStateFixedInfo CurrentPipelineStateFixed;

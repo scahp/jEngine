@@ -58,7 +58,7 @@ struct jRenderTarget final : public std::enable_shared_from_this<jRenderTarget>
     }
 
     jTexture* GetTexture() const { return TexturePtr.get(); }
-    const void* GetTexureHandle() const { return TexturePtr.get() ? TexturePtr->GetViewHandle() : nullptr; }
+    const void* GetViewHandle() const { return TexturePtr.get() ? TexturePtr->GetViewHandle() : nullptr; }
 
     jRenderTargetInfo Info;
     std::shared_ptr<jTexture> TexturePtr;

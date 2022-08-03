@@ -202,8 +202,10 @@ bool jRHI_Vulkan::InitRHI()
 
 		// 현재는 Queue가 1개 뿐이므로 QueueIndex를 0
 		GraphicsQueue.QueueIndex = indices.graphicsFamily.value();
+		ComputeQueue.QueueIndex = indices.computeFamily.value();
 		PresentQueue.QueueIndex = indices.presentFamily.value();
 		vkGetDeviceQueue(Device, GraphicsQueue.QueueIndex, 0, &GraphicsQueue.Queue);
+		vkGetDeviceQueue(Device, ComputeQueue.QueueIndex, 0, &ComputeQueue.Queue);
 		vkGetDeviceQueue(Device, PresentQueue.QueueIndex, 0, &PresentQueue.Queue);
 	}
 
@@ -218,64 +220,6 @@ bool jRHI_Vulkan::InitRHI()
     VkPipelineCacheCreateInfo pipelineCacheCreateInfo = {};
     pipelineCacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
 	verify(VK_SUCCESS == vkCreatePipelineCache(g_rhi_vk->Device, &pipelineCacheCreateInfo, nullptr, &PipelineCache));
-
-	// 동적인 부분들 패스에 따라 달라짐
-	static bool s_Initializes = false;
-	if (!s_Initializes)
-	{
-		s_Initializes = true;
-		//jRenderTargetInfo(ETextureType textureType, ETextureFormat internalFormat, ETextureFormat format, EFormatType formatType, EDepthBufferType depthBufferType
-		//	, int32 width, int32 height, int32 textureCount = 1, ETextureFilter magnification = ETextureFilter::LINEAR
-		//	, ETextureFilter minification = ETextureFilter::LINEAR, bool isGenerateMipmap = false, bool isGenerateMipmapDepth = false, int32 sampleCount = 1)
-
-		for (int32 i = 0; i < Swapchain->Images.size(); ++i)
-		{
-			std::shared_ptr<jRenderTarget> DepthPtr = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget(
-				{ ETextureType::TEXTURE_2D, ETextureFormat::D24_S8, SCR_WIDTH, SCR_HEIGHT, 1, /*ETextureFilter::LINEAR, ETextureFilter::LINEAR, */false, MsaaSamples }));
-
-			std::shared_ptr<jRenderTarget> ColorPtr;
-			std::shared_ptr<jRenderTarget> ResolveColorPtr;
-
-            const auto& extent = g_rhi_vk->Swapchain->GetExtent();
-            const auto& image = g_rhi_vk->Swapchain->GetSwapchainImage(i);
-
-			auto SwapChainRTPtr = jRenderTarget::CreateFromTexture<jTexture_Vulkan>(ETextureType::TEXTURE_2D, ETextureFormat::BGRA8
-				, extent.x, extent.y, false, 1, 1
-				, (VkImage)image->GetHandle(), (VkImageView)image->GetViewHandle());
-
-			if (MsaaSamples > 1)
-			{
-				ColorPtr = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget(
-					{ ETextureType::TEXTURE_2D, ETextureFormat::BGRA8, SCR_WIDTH, SCR_HEIGHT, 1, /*ETextureFilter::LINEAR, ETextureFilter::LINEAR, */false, MsaaSamples }));
-
-				ResolveColorPtr = SwapChainRTPtr;
-			}
-			else
-			{
-				ColorPtr = SwapChainRTPtr;
-			}
-
-			const Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
-			const Vector2 ClearDepth = Vector2(1.0f, 0.0f);
-
-			jAttachment* color = new jAttachment(ColorPtr, EAttachmentLoadStoreOp::CLEAR_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth);
-			jAttachment* depth = new jAttachment(DepthPtr, EAttachmentLoadStoreOp::CLEAR_DONTCARE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth);
-			jAttachment* resolve = nullptr;
-
-			if (MsaaSamples > 1)
-			{
-				resolve = new jAttachment(ResolveColorPtr, EAttachmentLoadStoreOp::DONTCARE_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth);
-			}
-
-			auto textureDepth = (jTexture_Vulkan*)depth->RenderTargetPtr->GetTexture();
-			auto depthFormat = GetVulkanTextureFormat(textureDepth->Format);
-			TransitionImageLayout((VkImage)textureDepth->GetHandle(), depthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 1);
-
-			jRenderPass_Vulkan* renderPass = new jRenderPass_Vulkan(color, depth, resolve, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
-			renderPass->CreateRenderPass();
-			RenderPasses.push_back(renderPass);
-		}
-	}
 
 	QueryPool.Create();
 
@@ -316,12 +260,12 @@ void jRHI_Vulkan::CleanupSwapChain()
 	// ImageViews and RenderPass 가 소멸되기전에 호출되어야 함
 	//for (auto framebuffer : swapChainFramebuffers)
 	//	vkDestroyFramebuffer(device, framebuffer, nullptr);
-	for (int32 i = 0; i < RenderPasses.size(); ++i)
-	{
-		RenderPasses[i]->Release();
-		delete RenderPasses[i];
-	}
-	RenderPasses.clear();
+	//for (int32 i = 0; i < RenderPasses.size(); ++i)
+	//{
+	//	RenderPasses[i]->Release();
+	//	delete RenderPasses[i];
+	//}
+	//RenderPasses.clear();
 
 	if (Swapchain)
 		Swapchain->Destroy();
@@ -791,7 +735,8 @@ std::shared_ptr<jRenderTarget> jRHI_Vulkan::CreateRenderTarget(const jRenderTarg
 	const VkFormat textureFormat = GetVulkanTextureFormat(info.Format);
 	const bool hasDepthAttachment = IsDepthFormat(info.Format);
 
-	const VkImageUsageFlags ImageUsageFlag = (hasDepthAttachment ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) | VK_IMAGE_USAGE_SAMPLED_BIT;
+	const VkImageUsageFlags ImageUsageFlag = (hasDepthAttachment ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT)
+		| VK_IMAGE_USAGE_SAMPLED_BIT;
 	const VkImageAspectFlags ImageAspectFlag = hasDepthAttachment ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
 
 	// VK_IMAGE_TILING_LINEAR 설정시 크래시 나서 VK_IMAGE_TILING_OPTIMAL 로 함.
@@ -1256,8 +1201,8 @@ bool jRHI_Vulkan::TransitionImageLayout(VkImage image, VkFormat format, VkImageL
 
     // Undefined -> transfer destination : 이 경우 기다릴 필요없이 바로 쓰면됨. Undefined 라 다른 곳에서 딱히 쓰거나 하는것이 없음.
     // Transfer destination -> frag shader reading : frag 쉐이더에서 읽기 전에 transfer destination 에서 쓰기가 완료 됨이 보장되어야 함. 그래서 shader 에서 읽기 가능.
-    VkPipelineStageFlags sourceStage;
-    VkPipelineStageFlags destinationStage;
+    VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+    VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
     if ((oldLayout == VK_IMAGE_LAYOUT_UNDEFINED) && (newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL))
     {
         // 이전 작업을 기다릴 필요가 없어서 srcAccessMask에 0, sourceStage 에 가능한 pipeline stage의 가장 빠른 VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
@@ -1289,8 +1234,15 @@ bool jRHI_Vulkan::TransitionImageLayout(VkImage image, VkFormat format, VkImageL
     }
     else
     {
-        check(!"Unsupported layout transition!");
-        return false;
+		if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED)
+		{
+			barrier.srcAccessMask = 0;
+		}
+		else
+		{
+			check(!"Unsupported layout transition!");
+			return false;
+		}
     }
 
     // 현재 싱글 커맨드버퍼 서브미션은 암시적으로 VK_ACCESS_HOST_WRITE_BIT 동기화를 함.

@@ -12,11 +12,12 @@ static constexpr bool EnableValidationLayers = false;
 struct QueueFamilyIndices
 {
     std::optional<uint32> graphicsFamily;
+    std::optional<uint32> computeFamily;
     std::optional<uint32> presentFamily;
 
-    bool IsComplete()
+    bool IsComplete() const
     {
-        return graphicsFamily.has_value() && presentFamily.has_value();
+        return graphicsFamily.has_value() && computeFamily.has_value() && presentFamily.has_value();
     }
 };
 

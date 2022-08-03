@@ -80,8 +80,16 @@ jVulkanDeviceUtil::QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device,
                 indices.presentFamily = i;
                 indices.graphicsFamily = i;
             }
-            break;
         }
+        
+        if (queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT)
+        {
+            indices.computeFamily = i;
+        }
+        
+        if (indices.IsComplete())
+            break;
+
         ++i;
     }
 

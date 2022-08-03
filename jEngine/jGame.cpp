@@ -15,6 +15,8 @@
 #include "Profiler/jPerformanceProfile.h"
 #include "RHI\Vulkan\jTexture_Vulkan.h"
 #include "Shader\Spirv\jSpirvHelper.h"
+#include "RHI\Vulkan\jShader_Vulkan.h"
+#include "RHI\Vulkan\jRHIType_Vulkan.h"
 
 jRHI* g_rhi = nullptr;
 
@@ -261,6 +263,8 @@ void jGame::Draw()
     jCommandBuffer_Vulkan* commandBuffer = (jCommandBuffer_Vulkan*)g_rhi_vk->CommandBufferManager->GetOrCreateCommandBuffer();
     const uint32_t imageIndex = g_rhi_vk->BeginRenderFrame(commandBuffer);
 
+    static std::shared_ptr<jRenderTarget> BasePassColorPtr[3];
+	static std::shared_ptr<jRenderTarget> FinalColorPtr[3];
     {
         {
             auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
@@ -282,8 +286,8 @@ void jGame::Draw()
                 , jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT));
         }
 
-        static jRenderPass_Vulkan* renderPass = nullptr;
-        if (!renderPass)
+        static jRenderPass_Vulkan* ShadowMapRenderPass = nullptr;
+        if (!ShadowMapRenderPass)
         {
             DirectionalLight->ShadowMapPtr = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget(
                 { ETextureType::TEXTURE_2D, ETextureFormat::D24_S8, SCR_WIDTH, SCR_HEIGHT, 1, /*ETextureFilter::LINEAR, ETextureFilter::LINEAR, */false, 1 }));
@@ -298,9 +302,77 @@ void jGame::Draw()
             auto depthFormat = VK_FORMAT_D24_UNORM_S8_UINT;
             g_rhi_vk->TransitionImageLayout((VkImage)textureDepth->GetHandle(), depthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 1);
 
-            renderPass = new jRenderPass_Vulkan(nullptr, depth, resolve, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
-            renderPass->CreateRenderPass();
+            ShadowMapRenderPass = new jRenderPass_Vulkan(nullptr, depth, resolve, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
+            ShadowMapRenderPass->CreateRenderPass();
             //RenderPasses.push_back(renderPass);
+        }
+
+        static std::vector<jRenderPass_Vulkan*> RenderPasses;
+
+        // 동적인 부분들 패스에 따라 달라짐
+        static bool s_Initializes = false;
+        if (!s_Initializes)
+        {
+            s_Initializes = true;
+            //jRenderTargetInfo(ETextureType textureType, ETextureFormat internalFormat, ETextureFormat format, EFormatType formatType, EDepthBufferType depthBufferType
+            //	, int32 width, int32 height, int32 textureCount = 1, ETextureFilter magnification = ETextureFilter::LINEAR
+            //	, ETextureFilter minification = ETextureFilter::LINEAR, bool isGenerateMipmap = false, bool isGenerateMipmapDepth = false, int32 sampleCount = 1)
+
+            for (int32 i = 0; i < g_rhi_vk->Swapchain->Images.size(); ++i)
+            {
+                std::shared_ptr<jRenderTarget> DepthPtr = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget(
+                    { ETextureType::TEXTURE_2D, ETextureFormat::D24_S8, SCR_WIDTH, SCR_HEIGHT, 1, /*ETextureFilter::LINEAR, ETextureFilter::LINEAR, */false, g_rhi_vk->MsaaSamples }));
+
+                std::shared_ptr<jRenderTarget> ResolveColorPtr;
+
+                const auto& extent = g_rhi_vk->Swapchain->GetExtent();
+                const auto& image = g_rhi_vk->Swapchain->GetSwapchainImage(i);
+
+                auto SwapChainRTPtr = jRenderTarget::CreateFromTexture<jTexture_Vulkan>(ETextureType::TEXTURE_2D, ETextureFormat::BGRA8
+                    , extent.x, extent.y, false, 1, 1, (VkImage)image->GetHandle(), (VkImageView)image->GetViewHandle());
+
+                if (g_rhi_vk->MsaaSamples > 1)
+                {
+                    BasePassColorPtr[i] = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget(
+                        { ETextureType::TEXTURE_2D, ETextureFormat::BGRA8, SCR_WIDTH, SCR_HEIGHT, 1, /*ETextureFilter::LINEAR, ETextureFilter::LINEAR, */false, g_rhi_vk->MsaaSamples }));
+
+                    ResolveColorPtr = SwapChainRTPtr;
+                }
+                else
+                {
+                    BasePassColorPtr[i] = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget(
+                        { ETextureType::TEXTURE_2D, ETextureFormat::BGRA8, SCR_WIDTH, SCR_HEIGHT, 1, /*ETextureFilter::LINEAR, ETextureFilter::LINEAR, */false, g_rhi_vk->MsaaSamples }));
+
+                    FinalColorPtr[i] = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget(
+                        { ETextureType::TEXTURE_2D, ETextureFormat::BGRA8, SCR_WIDTH, SCR_HEIGHT, 1, /*ETextureFilter::LINEAR, ETextureFilter::LINEAR, */false, g_rhi_vk->MsaaSamples }));
+
+					auto finalTexture = (jTexture_Vulkan*)FinalColorPtr[i]->GetTexture();
+					g_rhi_vk->TransitionImageLayout((VkImage)finalTexture->GetHandle(), GetVulkanTextureFormat(finalTexture->Format)
+						, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, finalTexture->MipLevel);
+
+					//BasePassColorPtr = SwapChainRTPtr;
+                }
+
+                const Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
+                const Vector2 ClearDepth = Vector2(1.0f, 0.0f);
+
+                jAttachment* color = new jAttachment(BasePassColorPtr[i], EAttachmentLoadStoreOp::CLEAR_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth);
+                jAttachment* depth = new jAttachment(DepthPtr, EAttachmentLoadStoreOp::CLEAR_DONTCARE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth);
+                jAttachment* resolve = nullptr;
+
+                if (g_rhi_vk->MsaaSamples > 1)
+                {
+                    resolve = new jAttachment(ResolveColorPtr, EAttachmentLoadStoreOp::DONTCARE_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth);
+                }
+
+                auto textureDepth = (jTexture_Vulkan*)depth->RenderTargetPtr->GetTexture();
+                auto depthFormat = GetVulkanTextureFormat(textureDepth->Format);
+                g_rhi_vk->TransitionImageLayout((VkImage)textureDepth->GetHandle(), depthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 1);
+
+                jRenderPass_Vulkan* renderPass = new jRenderPass_Vulkan(color, depth, resolve, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
+                renderPass->CreateRenderPass();
+                RenderPasses.push_back(renderPass);
+            }
         }
 
         // 정리 해야 함
@@ -342,7 +414,7 @@ void jGame::Draw()
             {
                 for (auto iter : jObject::GetStaticObject())
                 {
-                    auto newCommand = jDrawCommand<true>(&View, iter->RenderObject, renderPass, Shader, &g_rhi_vk->CurrentPipelineStateFixed_Shadow, { });
+                    auto newCommand = jDrawCommand<true>(&View, iter->RenderObject, ShadowMapRenderPass, Shader, &g_rhi_vk->CurrentPipelineStateFixed_Shadow, { });
                     newCommand.PrepareToDraw();
                     ShadowPasses.push_back(newCommand);
                 }
@@ -356,7 +428,7 @@ void jGame::Draw()
 
                 {
                     SCOPE_GPU_PROFILE(ShadowPass);
-                    renderPass->BeginRenderPass(commandBuffer);
+                    ShadowMapRenderPass->BeginRenderPass(commandBuffer);
 
                     for (auto& command : ShadowPasses)
                     {
@@ -364,7 +436,7 @@ void jGame::Draw()
                     }
 
                     // Finishing up
-                    renderPass->EndRenderPass();
+                    ShadowMapRenderPass->EndRenderPass();
                 }
 
                 //ensure(commandBuffer.End());
@@ -407,7 +479,7 @@ void jGame::Draw()
             {
                 for (auto iter : jObject::GetStaticObject())
                 {
-                    auto newCommand = jDrawCommand<false>(&View, iter->RenderObject, g_rhi_vk->RenderPasses[imageIndex], Shader, &g_rhi_vk->CurrentPipelineStateFixed, { });
+                    auto newCommand = jDrawCommand<false>(&View, iter->RenderObject, RenderPasses[imageIndex], Shader, &g_rhi_vk->CurrentPipelineStateFixed, { });
                     newCommand.PrepareToDraw();
                     BasePasses.push_back(newCommand);
                 }
@@ -419,7 +491,7 @@ void jGame::Draw()
             {
                 SCOPE_GPU_PROFILE(BasePass);
 
-                g_rhi_vk->RenderPasses[imageIndex]->BeginRenderPass(commandBuffer);
+                RenderPasses[imageIndex]->BeginRenderPass(commandBuffer);
 
                 //vkCmdWriteTimestamp((VkCommandBuffer)commandBuffer.GetHandle(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, g_rhi_vk->vkQueryPool, 0);
 
@@ -429,18 +501,153 @@ void jGame::Draw()
                 }
 
                 // Finishing up
-                g_rhi_vk->RenderPasses[imageIndex]->EndRenderPass();
-
-                jImGUI_Vulkan::Get().Draw((VkCommandBuffer)commandBuffer->GetHandle(), imageIndex);
+                RenderPasses[imageIndex]->EndRenderPass();
 
                 //vkCmdWriteTimestamp((VkCommandBuffer)commandBuffer.GetHandle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, g_rhi_vk->vkQueryPool, 1);
             }
-            ensure(commandBuffer->End());
+            //ensure(commandBuffer->End());
 
             // 여기 까지 렌더 로직 끝
             //////////////////////////////////////////////////////////////////////////
         }
     }
+	{
+		// g_rhi_vk->ComputeQueue;
+
+		static VkDescriptorSetLayout descriptorSetLayout[3] = { nullptr };
+
+		if (!descriptorSetLayout[imageIndex])
+		{
+            //VkDescriptorSetLayoutBinding setLayoutBindingReadOnly{};
+            //setLayoutBindingReadOnly.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+            //setLayoutBindingReadOnly.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+            //setLayoutBindingReadOnly.binding = 0;
+            //setLayoutBindingReadOnly.descriptorCount = 1;
+
+            VkDescriptorSetLayoutBinding setLayoutBindingWriteOnly{};
+            setLayoutBindingWriteOnly.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+            setLayoutBindingWriteOnly.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+            // setLayoutBindingWriteOnly.binding = 1;
+			setLayoutBindingWriteOnly.binding = 0;
+            setLayoutBindingWriteOnly.descriptorCount = 1;
+
+            std::vector<VkDescriptorSetLayoutBinding> setlayoutBindings = {
+                //setLayoutBindingReadOnly,		// Binding 0 : Input image (read-only)
+                //setLayoutBindingWriteOnly,		// Binding 1: Output image (write)
+
+				setLayoutBindingWriteOnly,		// Binding 0: Output image (write)
+            };
+
+			VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{};
+			descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+			descriptorSetLayoutCreateInfo.pBindings = setlayoutBindings.data();
+			descriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(setlayoutBindings.size());
+			verify(VK_SUCCESS == vkCreateDescriptorSetLayout(g_rhi_vk->Device, &descriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout[imageIndex]));
+		}
+
+		static VkPipelineLayout pipelineLayout[3] = { nullptr };
+		if (!pipelineLayout[imageIndex])
+		{
+			VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
+			pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+			pipelineLayoutCreateInfo.setLayoutCount = 1;
+			pipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayout[imageIndex];
+			verify(VK_SUCCESS == vkCreatePipelineLayout(g_rhi_vk->Device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout[imageIndex]));
+		}
+
+		static VkDescriptorPool descriptorPool[3] = { nullptr };
+		if (!descriptorPool[imageIndex])
+		{
+			VkDescriptorPoolSize descriptorPoolSize{};
+			descriptorPoolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			descriptorPoolSize.descriptorCount = 3;
+
+            VkDescriptorPoolSize descriptorPoolSize2{};
+            descriptorPoolSize2.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+            descriptorPoolSize2.descriptorCount = 3;
+
+			std::vector<VkDescriptorPoolSize> poolSizes = {
+				descriptorPoolSize,descriptorPoolSize2
+			};
+
+			VkDescriptorPoolCreateInfo descriptorPoolInfo{};
+			descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+			descriptorPoolInfo.poolSizeCount = poolSizes.size();
+			descriptorPoolInfo.pPoolSizes = poolSizes.data();
+			descriptorPoolInfo.maxSets = 3;
+			verify(VK_SUCCESS == vkCreateDescriptorPool(g_rhi_vk->Device, &descriptorPoolInfo, nullptr, &descriptorPool[imageIndex]));
+		}
+
+		static VkDescriptorSet descriptorSet[3] = { nullptr };
+		if (!descriptorSet[imageIndex])
+		{
+			VkDescriptorSetAllocateInfo descriptorSetAllocateInfo{};
+			descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+			descriptorSetAllocateInfo.descriptorPool = descriptorPool[imageIndex];
+			descriptorSetAllocateInfo.pSetLayouts = &descriptorSetLayout[imageIndex];
+			descriptorSetAllocateInfo.descriptorSetCount = 1;
+			verify(VK_SUCCESS == vkAllocateDescriptorSets(g_rhi_vk->Device, &descriptorSetAllocateInfo, &descriptorSet[imageIndex]));
+
+			//VkDescriptorImageInfo colorImageInfo{};
+			//colorImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+			//colorImageInfo.imageView = (VkImageView)BasePassColorPtr[imageIndex]->GetViewHandle();
+			//colorImageInfo.sampler = jTexture_Vulkan::CreateDefaultSamplerState();
+
+			//VkWriteDescriptorSet writeDescriptorSet{};
+			//writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			//writeDescriptorSet.dstSet = descriptorSet[imageIndex];
+			//writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+			//writeDescriptorSet.dstBinding = 0;
+			//writeDescriptorSet.pImageInfo = &colorImageInfo;
+			//writeDescriptorSet.descriptorCount = 1;
+
+			VkDescriptorImageInfo targetImageInfo{};
+			targetImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+			// targetImageInfo.imageView = (VkImageView)g_rhi_vk->Swapchain->GetSwapchainImage(imageIndex)->GetViewHandle();
+			targetImageInfo.imageView = (VkImageView)FinalColorPtr[imageIndex]->GetViewHandle();
+			targetImageInfo.sampler = jTexture_Vulkan::CreateDefaultSamplerState();
+
+			VkWriteDescriptorSet writeDescriptorSet2{};
+			writeDescriptorSet2.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			writeDescriptorSet2.dstSet = descriptorSet[imageIndex];
+			writeDescriptorSet2.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+            // writeDescriptorSet2.dstBinding = 1;
+			writeDescriptorSet2.dstBinding = 0;
+			writeDescriptorSet2.pImageInfo = &targetImageInfo;
+			writeDescriptorSet2.descriptorCount = 1;
+
+			std::vector<VkWriteDescriptorSet> computeWriteDescriptorSets = {
+				//writeDescriptorSet, 
+				writeDescriptorSet2
+			};
+			vkUpdateDescriptorSets(g_rhi_vk->Device, computeWriteDescriptorSets.size(), computeWriteDescriptorSets.data(), 0, nullptr);
+		}
+
+        static VkPipeline pipeline[3] = { nullptr };
+		if (!pipeline[imageIndex])
+		{
+			VkComputePipelineCreateInfo computePipelineCreateInfo{};
+			computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+			computePipelineCreateInfo.layout = pipelineLayout[imageIndex];
+			computePipelineCreateInfo.flags = 0;
+
+			jShaderInfo shaderInfo;
+			shaderInfo.name = jName("emboss");
+			shaderInfo.cs = jName("Resource/Shaders/hlsl/emboss_cs.hlsl");
+			static jShader_Vulkan* shader = (jShader_Vulkan*)g_rhi_vk->CreateShader(shaderInfo);
+			computePipelineCreateInfo.stage = shader->ShaderStages[0];
+
+			verify(VK_SUCCESS == vkCreateComputePipelines(g_rhi_vk->Device, g_rhi_vk->PipelineCache, 1, &computePipelineCreateInfo, nullptr, &pipeline[imageIndex]));
+		}
+
+		//vkQueueWaitIdle(g_rhi_vk->ComputeQueue.Queue);
+		vkCmdBindPipeline((VkCommandBuffer)commandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline[imageIndex]);
+		vkCmdBindDescriptorSets((VkCommandBuffer)commandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout[imageIndex], 0, 1, &descriptorSet[imageIndex], 0, 0);
+		vkCmdDispatch((VkCommandBuffer)commandBuffer->GetHandle(), g_rhi_vk->Swapchain->Extent.x / 16, g_rhi_vk->Swapchain->Extent.y / 16, 1);
+	}
+    jImGUI_Vulkan::Get().Draw((VkCommandBuffer)commandBuffer->GetHandle(), imageIndex);
+	ensure(commandBuffer->End());
+
     {
         g_rhi_vk->EndRenderFrame(commandBuffer);
 

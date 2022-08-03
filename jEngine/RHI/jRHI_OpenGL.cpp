@@ -2407,7 +2407,7 @@ bool jRenderPass_OpenGL::CreateRenderPass()
 		const std::shared_ptr<jRenderTarget>& RTPtr = attachmet->RenderTargetPtr;
 
 		const uint32 textureType = GetOpenGLTextureType(RTPtr->Info.Type, RTPtr->Info.SampleCount);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, *(uint32*)RTPtr->GetTexureHandle(), 0);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, *(uint32*)RTPtr->GetViewHandle(), 0);
 		drawBuffers.push_back(GL_COLOR_ATTACHMENT0 + i);
 	}
 
@@ -2417,7 +2417,7 @@ bool jRenderPass_OpenGL::CreateRenderPass()
 		const std::shared_ptr<jRenderTarget>& RTPtr = attachmet->RenderTargetPtr;
 		const uint32 textureType = GetOpenGLTextureType(RTPtr->Info.Type, RTPtr->Info.SampleCount);
 		const uint32 textureFormatInternal = GetOpenGLTextureFormat(RTPtr->Info.Format);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, textureType, *(uint32*)RTPtr->GetTexureHandle(), 0);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, textureType, *(uint32*)RTPtr->GetViewHandle(), 0);
 	}
 
 	if (ColorAttachmentResolve)
