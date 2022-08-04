@@ -429,7 +429,8 @@ void jImGUI_Vulkan::PrepareDraw(int32 imageIndex)
             , extent.x, extent.y, false, 1, 1
             , (VkImage)image->GetHandle(), (VkImageView)image->GetViewHandle());
 
-        jAttachment* color = new jAttachment(SwapChainRTPtr, EAttachmentLoadStoreOp::DONTCARE_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE);
+        jAttachment* color = new jAttachment(SwapChainRTPtr, EAttachmentLoadStoreOp::DONTCARE_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, Vector4(0.0f, 0.0f, 0.0f, 1.0f), Vector2(1.0f, 0.0f)
+            , EImageLayout::UNDEFINED, EImageLayout::PRESENT_SRC);
 
         auto newRenderPass = new jRenderPass_Vulkan(color, nullptr, nullptr, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
         newRenderPass->CreateRenderPass();

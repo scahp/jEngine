@@ -98,6 +98,7 @@ public:
     VkCommandBuffer BeginSingleTimeCommands() const;
     void EndSingleTimeCommands(VkCommandBuffer commandBuffer) const;
     bool TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32 mipLevels) const;
+	bool TransitionImageLayout(VkCommandBuffer commandBuffer, VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32 mipLevels) const;
 
 	//////////////////////////////////////////////////////////////////////////
 

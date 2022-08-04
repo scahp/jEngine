@@ -1,5 +1,5 @@
-//Texture2D inputImage : register(t0);
-RWTexture2D<float4> resultImage : register(u0);
+Texture2D inputImage : register(t0);
+RWTexture2D<float4> resultImage : register(u1);
 
 float conv(in float kernel[9], in float data[9], in float denom, in float offset)
 {
@@ -22,7 +22,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
  //       for (int j = -1; j < 2;++j)
  //       {
  //           ++n;
- //           float rgb = inputImage[uint2(GlobalInvocationID.x + i, GlobalInvocationID.y + j)].rgb;
+ //           float3 rgb = inputImage[uint2(GlobalInvocationID.x + i, GlobalInvocationID.y + j)].rgb;
  //           imageData[n] = (rgb.r + rgb.r + rgb.r) / 3.0;
 
  //       }
@@ -35,5 +35,6 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 
  //   float4 res = float4(conv(kernel, imageData, 1.0, 0.5).xxx, 1.0);
  //   resultImage[int2(GlobalInvocationID.xy)] = res;
-    resultImage[int2(GlobalInvocationID.xy)] = float4(1.0, 0.0, 0.0, 1.0);
+    float3 rgb = inputImage[uint2(GlobalInvocationID.xy)].rgb;
+    resultImage[int2(GlobalInvocationID.xy)] = float4(rgb, 1.0);
 }

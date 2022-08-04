@@ -8,9 +8,11 @@ struct jAttachment
         , EAttachmentLoadStoreOp InStencilLoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE
         , Vector4 InClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f)
         , Vector2 InClearDepth = Vector2(1.0f, 0.0f)
-        , bool InTransitToShaderReadAtFinal = false)
+        , EImageLayout InInitialLayout = EImageLayout::UNDEFINED
+        , EImageLayout InFinalLayout = EImageLayout::SHADER_READ_ONLY
+    )
         : RenderTargetPtr(InRTPtr), LoadStoreOp(InLoadStoreOp), StencilLoadStoreOp(InStencilLoadStoreOp)
-        , ClearColor(InClearColor), ClearDepth(InClearDepth), TransitToShaderReadAtFinal(InTransitToShaderReadAtFinal)
+        , ClearColor(InClearColor), ClearDepth(InClearDepth), InitialLayout(InInitialLayout), FinalLayout(InFinalLayout)
     {}
 
     std::shared_ptr<jRenderTarget> RenderTargetPtr;
@@ -29,7 +31,8 @@ struct jAttachment
     Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
     Vector2 ClearDepth = Vector2(1.0f, 0.0f);
 
-    bool TransitToShaderReadAtFinal = false;
+    EImageLayout InitialLayout = EImageLayout::UNDEFINED;
+    EImageLayout FinalLayout = EImageLayout::SHADER_READ_ONLY;
 
     size_t GetHash() const
     {
@@ -41,7 +44,8 @@ struct jAttachment
         Hash ^= CityHash64((const char*)&StencilLoadStoreOp, sizeof(StencilLoadStoreOp));
         Hash ^= CityHash64((const char*)&ClearColor, sizeof(ClearColor));
         Hash ^= CityHash64((const char*)&ClearDepth, sizeof(ClearDepth));
-        Hash ^= CityHash64((const char*)&TransitToShaderReadAtFinal, sizeof(TransitToShaderReadAtFinal));
+        Hash ^= CityHash64((const char*)&InitialLayout, sizeof(InitialLayout));
+        Hash ^= CityHash64((const char*)&FinalLayout, sizeof(FinalLayout));
         return Hash;
     }
 

@@ -98,33 +98,36 @@ bool jRenderPass_Vulkan::CreateRenderPass()
             SampleCount = RTInfo.SampleCount;
             LayerCount = RTInfo.LayerCount;
 
-            // Texture나 Framebuffer의 경우 VkImage 객체로 특정 픽셀 형식을 표현함.
-            // 그러나 메모리의 픽셀 레이아웃은 이미지로 수행하려는 작업에 따라서 변경될 수 있음.
-            // 그래서 여기서는 수행할 작업에 적절한 레이아웃으로 image를 전환시켜주는 작업을 함.
-            // 주로 사용하는 layout의 종류
-            // 1). VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : Color attachment의 이미지
-            // 2). VK_IMAGE_LAYOUT_PRESENT_SRC_KHR : Swapchain으로 제출된 이미지
-            // 3). VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL : Memory copy 연산의 Destination으로 사용된 이미지
-            colorDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;			// RenderPass가 시작되기 전에 어떤 Image 레이아웃을 가지고 있을지 여부를 지정
-                                                                                // VK_IMAGE_LAYOUT_UNDEFINED 은 이전 이미지 레이아웃을 무시한다는 의미.
-                                                                                // 주의할 점은 이미지의 내용이 보존되지 않습니다. 그러나 현재는 이미지를 Clear할 것이므로 보존할 필요가 없음.
+            //// Texture나 Framebuffer의 경우 VkImage 객체로 특정 픽셀 형식을 표현함.
+            //// 그러나 메모리의 픽셀 레이아웃은 이미지로 수행하려는 작업에 따라서 변경될 수 있음.
+            //// 그래서 여기서는 수행할 작업에 적절한 레이아웃으로 image를 전환시켜주는 작업을 함.
+            //// 주로 사용하는 layout의 종류
+            //// 1). VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : Color attachment의 이미지
+            //// 2). VK_IMAGE_LAYOUT_PRESENT_SRC_KHR : Swapchain으로 제출된 이미지
+            //// 3). VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL : Memory copy 연산의 Destination으로 사용된 이미지
+            //colorDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;			// RenderPass가 시작되기 전에 어떤 Image 레이아웃을 가지고 있을지 여부를 지정
+            //                                                                    // VK_IMAGE_LAYOUT_UNDEFINED 은 이전 이미지 레이아웃을 무시한다는 의미.
+            //                                                                    // 주의할 점은 이미지의 내용이 보존되지 않습니다. 그러나 현재는 이미지를 Clear할 것이므로 보존할 필요가 없음.
 
-            //colorDesc.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;	// RenderPass가 끝날때 자동으로 전환될 Image 레이아웃을 정의함
-            //																	// 우리는 렌더링 결과를 스왑체인에 제출할 것이기 때문에 VK_IMAGE_LAYOUT_PRESENT_SRC_KHR 사용
+            ////colorDesc.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;	// RenderPass가 끝날때 자동으로 전환될 Image 레이아웃을 정의함
+            ////																	// 우리는 렌더링 결과를 스왑체인에 제출할 것이기 때문에 VK_IMAGE_LAYOUT_PRESENT_SRC_KHR 사용
 
-            // MSAA 를 사용하게 되면, Swapchain에 제출전에 resolve 를 해야하므로, 아래와 같이 final layout 을 변경해줌.
-            // 그리고 reoslve를 위한 VkAttachmentDescription 을 추가함. depth buffer의 경우는 Swapchain에 제출하지 않기 때문에 이 과정이 필요없음.
-            if (SampleCount > 1)
-            {
-                if (DepthAttachment->TransitToShaderReadAtFinal)
-                    colorDesc.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                else
-                    colorDesc.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-            }
-            else
-            {
-                colorDesc.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;			// MSAA 안하면 바로 Present 할 것이므로
-            }
+            //// MSAA 를 사용하게 되면, Swapchain에 제출전에 resolve 를 해야하므로, 아래와 같이 final layout 을 변경해줌.
+            //// 그리고 reoslve를 위한 VkAttachmentDescription 을 추가함. depth buffer의 경우는 Swapchain에 제출하지 않기 때문에 이 과정이 필요없음.
+            //if (SampleCount > 1)
+            //{
+            //    if (DepthAttachment->TransitToShaderReadAtFinal)
+            //        colorDesc.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            //    else
+            //        colorDesc.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            //}
+            //else
+            //{
+            //    colorDesc.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;			// MSAA 안하면 바로 Present 할 것이므로
+            //}
+
+            colorDesc.initialLayout = GetVulkanImageLayout(attachment->InitialLayout);
+            colorDesc.finalLayout = GetVulkanImageLayout(attachment->FinalLayout);
 
             //////////////////////////////////////////////////////////////////////////
 
@@ -156,13 +159,15 @@ bool jRenderPass_Vulkan::CreateRenderPass()
             depthAttachment.samples = (VkSampleCountFlagBits)RTInfo.SampleCount;
             GetVulkanAttachmentLoadStoreOp(depthAttachment.loadOp, depthAttachment.storeOp, DepthAttachment->LoadStoreOp);
             GetVulkanAttachmentLoadStoreOp(depthAttachment.stencilLoadOp, depthAttachment.stencilStoreOp, DepthAttachment->StencilLoadStoreOp);
-            depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            //depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-            // 최종 쉐이더 리로스 레이아웃 결정 - 쉐이더에서 읽는 리소스로 사용할 경우 처리
-            if (DepthAttachment->TransitToShaderReadAtFinal)
-                depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-            else
-                depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            //// 최종 쉐이더 리로스 레이아웃 결정 - 쉐이더에서 읽는 리소스로 사용할 경우 처리
+            //if (DepthAttachment->TransitToShaderReadAtFinal)
+            //    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+            //else
+            //    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            depthAttachment.initialLayout = GetVulkanImageLayout(DepthAttachment->InitialLayout);
+            depthAttachment.finalLayout = GetVulkanImageLayout(DepthAttachment->FinalLayout);
 
             //check((ColorAttachmentResolve && ((int32)RTInfo.SampleCount > 1)) || (!ColorAttachmentResolve && (int32)RTInfo.SampleCount == 1));
             //check(SampleCount == 0 || SampleCount == RTInfo.SampleCount);
@@ -189,8 +194,10 @@ bool jRenderPass_Vulkan::CreateRenderPass()
             colorAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT;
             GetVulkanAttachmentLoadStoreOp(colorAttachmentResolve.loadOp, colorAttachmentResolve.storeOp, ColorAttachmentResolve->LoadStoreOp);
             GetVulkanAttachmentLoadStoreOp(colorAttachmentResolve.stencilLoadOp, colorAttachmentResolve.stencilStoreOp, ColorAttachmentResolve->StencilLoadStoreOp);
-            colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+            //colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            //colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+            colorAttachmentResolve.initialLayout = GetVulkanImageLayout(ColorAttachmentResolve->InitialLayout);
+            colorAttachmentResolve.finalLayout = GetVulkanImageLayout(ColorAttachmentResolve->FinalLayout);
             AttachmentDescs.emplace_back(colorAttachmentResolve);
 
             check(RTInfo.SampleCount == 1);
