@@ -30,16 +30,12 @@ public:
         return true;
     }
 
-    virtual void EndRenderPass() override
-    {
-        ensure(CommandBuffer);
-
-        // Finishing up
-        vkCmdEndRenderPass((VkCommandBuffer)CommandBuffer->GetHandle());
-        CommandBuffer = nullptr;
-    }
+    virtual void EndRenderPass() override;
 
     virtual size_t GetHash() const override;
+
+private:
+    void SetFinalLayoutToAttachment(const jAttachment* attachment) const;
 
 private:
     const jCommandBuffer* CommandBuffer = nullptr;

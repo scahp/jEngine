@@ -5,20 +5,48 @@
 #include "Math/Vector.h"
 
 #define DECLARE_ENUM_BIT_OPERATORS(ENUM_TYPE)\
-FORCEINLINE ENUM_TYPE operator | (ENUM_TYPE lhs, ENUM_TYPE rhs)\
+FORCEINLINE constexpr ENUM_TYPE operator | (ENUM_TYPE lhs, ENUM_TYPE rhs)\
 {\
 	using T = std::underlying_type<ENUM_TYPE>::type;\
 	return static_cast<ENUM_TYPE>(static_cast<T>(lhs) | static_cast<T>(rhs));\
 }\
-FORCEINLINE ENUM_TYPE operator & (ENUM_TYPE lhs, ENUM_TYPE rhs)\
+FORCEINLINE constexpr ENUM_TYPE operator & (ENUM_TYPE lhs, ENUM_TYPE rhs)\
 {\
 	using T = std::underlying_type<ENUM_TYPE>::type;\
 	return static_cast<ENUM_TYPE>(static_cast<T>(lhs) & static_cast<T>(rhs));\
 }\
-FORCEINLINE decltype(auto) operator ! (ENUM_TYPE value)\
+FORCEINLINE constexpr ENUM_TYPE operator ^ (ENUM_TYPE lhs, ENUM_TYPE rhs)\
+{\
+	using T = std::underlying_type<ENUM_TYPE>::type;\
+	return static_cast<ENUM_TYPE>(static_cast<T>(lhs) ^ static_cast<T>(rhs));\
+}\
+FORCEINLINE constexpr ENUM_TYPE& operator |= (ENUM_TYPE& lhs, ENUM_TYPE rhs)\
+{\
+	using T = std::underlying_type<ENUM_TYPE>::type;\
+	lhs = static_cast<ENUM_TYPE>(static_cast<T>(lhs) | static_cast<T>(rhs));\
+	return lhs;\
+}\
+FORCEINLINE constexpr ENUM_TYPE& operator &= (ENUM_TYPE& lhs, ENUM_TYPE rhs)\
+{\
+	using T = std::underlying_type<ENUM_TYPE>::type;\
+	lhs = static_cast<ENUM_TYPE>(static_cast<T>(lhs) & static_cast<T>(rhs));\
+	return lhs;\
+}\
+FORCEINLINE constexpr ENUM_TYPE& operator ^= (ENUM_TYPE& lhs, ENUM_TYPE rhs)\
+{\
+	using T = std::underlying_type<ENUM_TYPE>::type;\
+	lhs = static_cast<ENUM_TYPE>(static_cast<T>(lhs) ^ static_cast<T>(rhs));\
+	return lhs;\
+}\
+FORCEINLINE constexpr bool operator ! (ENUM_TYPE value)\
 {\
 	using T = std::underlying_type<ENUM_TYPE>::type;\
 	return !static_cast<T>(value);\
+}\
+FORCEINLINE constexpr ENUM_TYPE operator ~ (ENUM_TYPE value)\
+{\
+	using T = std::underlying_type<ENUM_TYPE>::type;\
+	return static_cast<ENUM_TYPE>(~static_cast<T>(value));\
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -353,7 +381,7 @@ enum class ERenderBufferType : uint32
 	MAX = 0xffffffff
 };
 
-DECLARE_ENUM_BIT_OPERATORS(ERenderBufferType);
+DECLARE_ENUM_BIT_OPERATORS(ERenderBufferType)
 
 enum class EDrawBufferType : uint8
 {
@@ -430,16 +458,17 @@ enum class ECullMode : uint8
 	MAX
 };
 
-enum class EMSAASamples : uint8
+enum class EMSAASamples : uint32
 {
-	COUNT_1 = 1,
-	COUNT_2 = 2,
-	COUNT_4 = 4,
-	COUNT_8 = 8,
-	COUNT_16 = 16,
-	COUNT_32 = 32,
-	COUNT_64 = 64
+	COUNT_1 =	0x00000001,
+	COUNT_2 =	0x00000010,
+	COUNT_4 =	0x00000100,
+	COUNT_8 =	0x00001000,
+	COUNT_16 =	0x00010000,
+	COUNT_32 =	0x00100000,
+	COUNT_64 =	0x01000000
 };
+DECLARE_ENUM_BIT_OPERATORS(EMSAASamples)
 
 enum class EAttachmentLoadStoreOp : uint8
 {
@@ -463,11 +492,7 @@ enum class EShaderAccessStageFlag : uint32
     ALL_GRAPHICS = 0x0000001F,
     ALL = 0x7FFFFFFF
 };
-
-FORCEINLINE EShaderAccessStageFlag operator|(const EShaderAccessStageFlag a, const EShaderAccessStageFlag b)
-{
-	return static_cast<EShaderAccessStageFlag>(static_cast<int32>(a) | static_cast<int32>(b));
-}
+DECLARE_ENUM_BIT_OPERATORS(EShaderAccessStageFlag)
 
 enum class EColorMask : uint8
 {
@@ -478,6 +503,7 @@ enum class EColorMask : uint8
 	A = 0x08,
 	ALL = 0x0F
 };
+DECLARE_ENUM_BIT_OPERATORS(EColorMask)
 
 enum class EImageLayout : uint8
 {

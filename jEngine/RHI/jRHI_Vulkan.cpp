@@ -267,8 +267,7 @@ void jRHI_Vulkan::CleanupSwapChain()
 	//}
 	//RenderPasses.clear();
 
-	if (Swapchain)
-		Swapchain->Destroy();
+	delete Swapchain;
 
 	//for (size_t i = 0; i < swapChainImages.size(); ++i)
 	//{
@@ -1388,8 +1387,13 @@ bool jRHI_Vulkan::TransitionImageLayout(jCommandBuffer* commandBuffer, jTexture*
 	check(texture);
 
 	auto texture_vk = (jTexture_Vulkan*)texture;
-	return TransitionImageLayout((VkCommandBuffer)commandBuffer->GetHandle(), texture_vk->Image, GetVulkanTextureFormat(texture_vk->Format)
-		, texture_vk->MipLevel, GetVulkanImageLayout(texture_vk->Layout), GetVulkanImageLayout(newLayout));
+	if (TransitionImageLayout((VkCommandBuffer)commandBuffer->GetHandle(), texture_vk->Image, GetVulkanTextureFormat(texture_vk->Format)
+		, texture_vk->MipLevel, GetVulkanImageLayout(texture_vk->Layout), GetVulkanImageLayout(newLayout)))
+	{
+		((jTexture_Vulkan*)texture)->Layout = newLayout;
+		return true;
+	}
+	return false;
 }
 
 bool jRHI_Vulkan::TransitionImageLayoutImmediate(jTexture* texture, EImageLayout newLayout) const
@@ -1404,7 +1408,9 @@ bool jRHI_Vulkan::TransitionImageLayoutImmediate(jTexture* texture, EImageLayout
 		auto texture_vk = (jTexture_Vulkan*)texture;
 		const bool ret = TransitionImageLayout(commandBuffer, texture_vk->Image, GetVulkanTextureFormat(texture_vk->Format)
 			, texture_vk->MipLevel, GetVulkanImageLayout(texture_vk->Layout), GetVulkanImageLayout(newLayout));
-		
+		if (ret)
+			((jTexture_Vulkan*)texture)->Layout = newLayout;
+
 		EndSingleTimeCommands(commandBuffer);
 		return ret;
 	}

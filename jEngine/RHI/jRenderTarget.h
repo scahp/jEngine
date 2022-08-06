@@ -41,6 +41,11 @@ struct jRenderTarget final : public std::enable_shared_from_this<jRenderTarget>
         return std::shared_ptr<jRenderTarget>(new jRenderTarget(T1Ptr));
     }
 
+    static std::shared_ptr<jRenderTarget> CreateFromTexture(const std::shared_ptr<jTexture>& texturePtr)
+    {
+        return std::shared_ptr<jRenderTarget>(new jRenderTarget(texturePtr));
+    }
+
     constexpr jRenderTarget() = default;
     jRenderTarget(const std::shared_ptr<jTexture>& InTexturePtr)
         : TexturePtr(InTexturePtr)
@@ -56,6 +61,9 @@ struct jRenderTarget final : public std::enable_shared_from_this<jRenderTarget>
             Info.SampleCount = texture->SampleCount;
         }
     }
+
+    ~jRenderTarget()
+    {}
 
     jTexture* GetTexture() const { return TexturePtr.get(); }
     const void* GetViewHandle() const { return TexturePtr.get() ? TexturePtr->GetViewHandle() : nullptr; }

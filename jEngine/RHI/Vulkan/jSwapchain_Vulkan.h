@@ -6,24 +6,20 @@ class jSwapchainImage_Vulkan : public jSwapchainImage
 public:
     virtual void Destroy() override
     {
-        if (texture)
-        {
-            texture->Destroy();
-            delete texture;
-        }
+        TexturePtr = nullptr;
     }
 
     virtual void* GetHandle() const override
     {
-        return texture ? texture->GetHandle() : nullptr;
+        return TexturePtr ? TexturePtr->GetHandle() : nullptr;
     }
     virtual void* GetViewHandle() const override
     {
-        return texture ? texture->GetViewHandle() : nullptr;
+        return TexturePtr ? TexturePtr->GetViewHandle() : nullptr;
     }
     virtual void* GetMemoryHandle() const override
     {
-        return texture ? texture->GetMemoryHandle() : nullptr;
+        return TexturePtr ? TexturePtr->GetMemoryHandle() : nullptr;
     }
 
     VkFence CommandBufferFence = nullptr;
@@ -38,6 +34,10 @@ public:
 class jSwapchain_Vulkan : public jSwapchain
 {
 public:
+    virtual ~jSwapchain_Vulkan()
+    {
+        jSwapchain_Vulkan::Destroy();
+    }
     virtual bool Create() override;
     virtual void Destroy() override;
     virtual void* GetHandle() const override { return Swapchain; }

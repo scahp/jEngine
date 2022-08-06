@@ -4,7 +4,7 @@ struct jTexture
 {
     constexpr jTexture() = default;
     constexpr jTexture(ETextureType InType, ETextureFormat InFormat, int32 InWidth, int32 InHeight
-        , int32 InLayerCount = 1, int32 InSampleCount = 1, int32 InMipLevel = 1, bool InSRGB = false, bool InHasMipLevel = false)
+        , int32 InLayerCount = 1, int32 InSampleCount = 1, int32 InMipLevel = 1, bool InSRGB = false)
         : Type(InType), Format(InFormat), Width(InWidth), Height(InHeight), LayerCount(InLayerCount)
         , SampleCount(InSampleCount), MipLevel(InMipLevel), sRGB(InSRGB)
     {}

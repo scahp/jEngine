@@ -35,7 +35,7 @@ public:
     void PrepareDraw(int32 imageIndex);
 
     // Draw current imGui frame into a command buffer
-    void Draw(VkCommandBuffer commandBuffer, int32 imageIndex);
+    void Draw(jCommandBuffer* commandBuffer, int32 imageIndex);
 
 private:
     // Starts a new imGui frame and sets up windows and ui elements
@@ -74,6 +74,6 @@ private:
     VkDescriptorPool DescriptorPool;
     VkDescriptorSetLayout DescriptorSetLayout;
     VkDescriptorSet DescriptorSet;
-    std::vector<jRenderPass*> ImGuiRenderPasses;
+    std::vector<jRenderPass*> RenderPasses;
     std::vector<VkPipeline> Pipelines;
 };

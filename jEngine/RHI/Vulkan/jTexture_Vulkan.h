@@ -3,11 +3,15 @@
 struct jTexture_Vulkan : public jTexture
 {
     jTexture_Vulkan() = default;
-    jTexture_Vulkan(ETextureType InType, ETextureFormat InFormat, int32 InWidth, int32 InHeight, bool InSRGB, int32 InLayerCount, int32 InSampleCount
+    jTexture_Vulkan(ETextureType InType, ETextureFormat InFormat, int32 InWidth, int32 InHeight, int32 InLayerCount, int32 InSampleCount, int32 InMipLevel, bool InSRGB
         , VkImage InImage, VkImageView InImageView, VkDeviceMemory InImageMemory = nullptr, EImageLayout InImageLayout = EImageLayout::UNDEFINED, VkSampler InSamplerState = nullptr)
-        : jTexture(InType, InFormat, InWidth, InHeight, InLayerCount, InSampleCount, InSRGB), Image(InImage), View(InImageView), Memory(InImageMemory)
+        : jTexture(InType, InFormat, InWidth, InHeight, InLayerCount, InSampleCount, InMipLevel, InSRGB), Image(InImage), View(InImageView), Memory(InImageMemory)
         , Layout(InImageLayout), SamplerState(InSamplerState)
     {}
+    virtual ~jTexture_Vulkan()
+    {
+        jTexture_Vulkan::Destroy();
+    }
     VkImage Image = nullptr;
     VkImageView View = nullptr;
     VkDeviceMemory Memory = nullptr;

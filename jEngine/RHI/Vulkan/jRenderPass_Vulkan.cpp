@@ -1,12 +1,42 @@
 ﻿#include "pch.h"
 #include "jRenderPass_Vulkan.h"
 #include "jRHIType_Vulkan.h"
+#include "jTexture_Vulkan.h"
 
 std::unordered_map<size_t, VkRenderPass> s_renderPassPool;
 
 void jRenderPass_Vulkan::Release()
 {
     vkDestroyRenderPass(g_rhi_vk->Device, RenderPass, nullptr);
+}
+
+void jRenderPass_Vulkan::EndRenderPass()
+{
+    ensure(CommandBuffer);
+
+    // Finishing up
+    vkCmdEndRenderPass((VkCommandBuffer)CommandBuffer->GetHandle());
+
+    // Apply layout to attachments
+    for (const jAttachment* attachment : ColorAttachments)
+    {
+        SetFinalLayoutToAttachment(attachment);
+    }
+
+    if (DepthAttachment)
+        SetFinalLayoutToAttachment(DepthAttachment);
+    if (ColorAttachmentResolve)
+        SetFinalLayoutToAttachment(ColorAttachmentResolve);
+
+    CommandBuffer = nullptr;
+}
+
+void jRenderPass_Vulkan::SetFinalLayoutToAttachment(const jAttachment* attachment) const
+{
+    check(attachment);
+    check(attachment->RenderTargetPtr);
+    jTexture_Vulkan* texture_vk = (jTexture_Vulkan*)attachment->RenderTargetPtr->GetTexture();
+    texture_vk->Layout = attachment->FinalLayout;
 }
 
 size_t jRenderPass_Vulkan::GetHash() const

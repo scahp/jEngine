@@ -251,10 +251,10 @@ FORCEINLINE VkColorComponentFlags GetVulkanBlendOp(EColorMask type)
     }
     else
     {
-        if ((int32)EColorMask::R & (int32)type) result |= VK_COLOR_COMPONENT_R_BIT;
-        if ((int32)EColorMask::G & (int32)type) result |= VK_COLOR_COMPONENT_G_BIT;
-        if ((int32)EColorMask::B & (int32)type) result |= VK_COLOR_COMPONENT_B_BIT;
-        if ((int32)EColorMask::A & (int32)type) result |= VK_COLOR_COMPONENT_A_BIT;
+        if (!!(EColorMask::R & type)) result |= VK_COLOR_COMPONENT_R_BIT;
+        if (!!(EColorMask::G & type)) result |= VK_COLOR_COMPONENT_G_BIT;
+        if (!!(EColorMask::B & type)) result |= VK_COLOR_COMPONENT_B_BIT;
+        if (!!(EColorMask::A & type)) result |= VK_COLOR_COMPONENT_A_BIT;
     }
     return result;
 }

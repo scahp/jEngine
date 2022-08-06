@@ -5,13 +5,14 @@
 class jSwapchainImage
 {
 public:
+    virtual ~jSwapchainImage() {}
     virtual void Destroy() = 0;
 
     virtual void* GetHandle() const = 0;
     virtual void* GetViewHandle() const = 0;
     virtual void* GetMemoryHandle() const = 0;
 
-    jTexture* texture = nullptr;
+    std::shared_ptr<jTexture> TexturePtr;
 };
 
 class jSwapchain

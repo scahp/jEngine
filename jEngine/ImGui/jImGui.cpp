@@ -23,10 +23,7 @@ jImGUI_Vulkan::~jImGUI_Vulkan()
         DynamicBufferData[i].IndexBuffer.Destroy();
     }
     if (FontImage)
-    {
-        FontImage->Destroy();
         delete FontImage;
-    }
     vkDestroyPipelineLayout(g_rhi_vk->Device, PipelineLayout, nullptr);
     vkDestroyDescriptorPool(g_rhi_vk->Device, DescriptorPool, nullptr);
     vkDestroyDescriptorSetLayout(g_rhi_vk->Device, DescriptorSetLayout, nullptr);
@@ -422,106 +419,86 @@ void jImGUI_Vulkan::UpdateBuffers()
 
 void jImGUI_Vulkan::PrepareDraw(int32 imageIndex)
 {
-    check(ImGuiRenderPasses.size() == Pipelines.size());
+    check(RenderPasses.size() == Pipelines.size());
 
-    if (ImGuiRenderPasses.size() <= imageIndex)
+    if (RenderPasses.size() <= imageIndex)
     {
-        ImGuiRenderPasses.resize(imageIndex + 1);
+        RenderPasses.resize(imageIndex + 1);
         Pipelines.resize(imageIndex + 1);
 
         const auto& extent = g_rhi_vk->Swapchain->GetExtent();
         const auto& image = g_rhi_vk->Swapchain->GetSwapchainImage(imageIndex);
 
-        auto SwapChainRTPtr = jRenderTarget::CreateFromTexture<jTexture_Vulkan>(ETextureType::TEXTURE_2D, ETextureFormat::BGRA8
-            , extent.x, extent.y, false, 1, 1
-            , (VkImage)image->GetHandle(), (VkImageView)image->GetViewHandle());
+        auto SwapChainRTPtr = jRenderTarget::CreateFromTexture(image->TexturePtr);
 
-        jAttachment* color = new jAttachment(SwapChainRTPtr, EAttachmentLoadStoreOp::DONTCARE_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, Vector4(0.0f, 0.0f, 0.0f, 1.0f), Vector2(1.0f, 0.0f)
-            , EImageLayout::UNDEFINED, EImageLayout::PRESENT_SRC);
+        jAttachment* color = new jAttachment(SwapChainRTPtr, EAttachmentLoadStoreOp::LOAD_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, Vector4(0.0f, 0.0f, 0.0f, 1.0f), Vector2(1.0f, 0.0f)
+            , EImageLayout::GENERAL, EImageLayout::PRESENT_SRC);
 
         auto newRenderPass = new jRenderPass_Vulkan(color, nullptr, nullptr, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
         newRenderPass->CreateRenderPass();
-        ImGuiRenderPasses[imageIndex] = newRenderPass;
-        Pipelines[imageIndex] = jImGUI_Vulkan::Get().CreatePipelineState((VkRenderPass)ImGuiRenderPasses[imageIndex]->GetRenderPass(), g_rhi_vk->GraphicsQueue.Queue);
+        RenderPasses[imageIndex] = newRenderPass;
+        Pipelines[imageIndex] = jImGUI_Vulkan::Get().CreatePipelineState((VkRenderPass)RenderPasses[imageIndex]->GetRenderPass(), g_rhi_vk->GraphicsQueue.Queue);
     }
 }
 
-void jImGUI_Vulkan::Draw(VkCommandBuffer commandBuffer, int32 imageIndex)
+void jImGUI_Vulkan::Draw(jCommandBuffer* commandBuffer, int32 imageIndex)
 {
     PrepareDraw(imageIndex);
 
-    //////////////////////////////////////////////////////////////////////////
-    // BeginRenderPass
-    VkClearValue clearValues[2];
-    clearValues[0].color = { { 0.2f, 0.2f, 0.2f, 1.0f} };
-    clearValues[1].depthStencil = { 1.0f, 0 };
-
-    VkRenderPassBeginInfo renderPassBeginInfo{};
-    renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassBeginInfo.renderPass = (VkRenderPass)ImGuiRenderPasses[imageIndex]->GetRenderPass();
-    renderPassBeginInfo.renderArea.offset.x = 0;
-    renderPassBeginInfo.renderArea.offset.y = 0;
-    renderPassBeginInfo.renderArea.extent.width = SCR_WIDTH;
-    renderPassBeginInfo.renderArea.extent.height = SCR_HEIGHT;
-    renderPassBeginInfo.clearValueCount = 2;
-    renderPassBeginInfo.pClearValues = clearValues;
-    renderPassBeginInfo.framebuffer = (VkFramebuffer)ImGuiRenderPasses[imageIndex]->GetFrameBuffer();
-
-    VkCommandBufferBeginInfo cmdBufferBeginInfo{};
-    cmdBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-
-    vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-    //////////////////////////////////////////////////////////////////////////
-
-    ImGuiIO& io = ImGui::GetIO();
-
-    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet, 0, nullptr);
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipelines[imageIndex]);
-
-    VkViewport viewport = {};
-    viewport.width = ImGui::GetIO().DisplaySize.x;
-    viewport.height = ImGui::GetIO().DisplaySize.y;
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-
-    // UI scale and translate via push constants
-    pushConstBlock.scale = Vector2(2.0f / io.DisplaySize.x, 2.0f / io.DisplaySize.y);
-    pushConstBlock.translate = Vector2(-1.0f);
-    vkCmdPushConstants(commandBuffer, PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstBlock), &pushConstBlock);
-
-    // Render commands
-    ImDrawData* imDrawData = ImGui::GetDrawData();
-    int32_t vertexOffset = 0;
-    int32_t indexOffset = 0;
-
-    if (imDrawData->CmdListsCount > 0 && DynamicBufferData.size() > imageIndex)
+    if (RenderPasses[imageIndex]->BeginRenderPass(commandBuffer))
     {
-        auto& DynamicBuffer = DynamicBufferData[imageIndex];
+        VkCommandBuffer commandbuffer_vk = (VkCommandBuffer)commandBuffer->GetHandle();
 
-        VkDeviceSize offsets[1] = { 0 };
-        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &DynamicBuffer.VertexBuffer.Buffer, offsets);
-        vkCmdBindIndexBuffer(commandBuffer, DynamicBuffer.IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT16);
+        ImGuiIO& io = ImGui::GetIO();
 
-        for (int32_t i = 0; i < imDrawData->CmdListsCount; i++)
+        vkCmdBindDescriptorSets(commandbuffer_vk, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet, 0, nullptr);
+        vkCmdBindPipeline(commandbuffer_vk, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipelines[imageIndex]);
+
+        VkViewport viewport = {};
+        viewport.width = ImGui::GetIO().DisplaySize.x;
+        viewport.height = ImGui::GetIO().DisplaySize.y;
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+        vkCmdSetViewport(commandbuffer_vk, 0, 1, &viewport);
+
+        // UI scale and translate via push constants
+        pushConstBlock.scale = Vector2(2.0f / io.DisplaySize.x, 2.0f / io.DisplaySize.y);
+        pushConstBlock.translate = Vector2(-1.0f);
+        vkCmdPushConstants(commandbuffer_vk, PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstBlock), &pushConstBlock);
+
+        // Render commands
+        ImDrawData* imDrawData = ImGui::GetDrawData();
+        int32_t vertexOffset = 0;
+        int32_t indexOffset = 0;
+
+        if (imDrawData->CmdListsCount > 0 && DynamicBufferData.size() > imageIndex)
         {
-            const ImDrawList* cmd_list = imDrawData->CmdLists[i];
-            for (int32_t j = 0; j < cmd_list->CmdBuffer.Size; j++)
-            {
-                const ImDrawCmd* pcmd = &cmd_list->CmdBuffer[j];
-                VkRect2D scissorRect;
-                scissorRect.offset.x = std::max((int32_t)(pcmd->ClipRect.x), 0);
-                scissorRect.offset.y = std::max((int32_t)(pcmd->ClipRect.y), 0);
-                scissorRect.extent.width = (uint32)(pcmd->ClipRect.z - pcmd->ClipRect.x);
-                scissorRect.extent.height = (uint32)(pcmd->ClipRect.w - pcmd->ClipRect.y);
-                vkCmdSetScissor(commandBuffer, 0, 1, &scissorRect);
-                vkCmdDrawIndexed(commandBuffer, pcmd->ElemCount, 1, indexOffset, vertexOffset, 0);
-                indexOffset += pcmd->ElemCount;
-            }
-            vertexOffset += cmd_list->VtxBuffer.Size;
-        }
-    }
+            auto& DynamicBuffer = DynamicBufferData[imageIndex];
 
-    vkCmdEndRenderPass(commandBuffer);
+            VkDeviceSize offsets[1] = { 0 };
+            vkCmdBindVertexBuffers(commandbuffer_vk, 0, 1, &DynamicBuffer.VertexBuffer.Buffer, offsets);
+            vkCmdBindIndexBuffer(commandbuffer_vk, DynamicBuffer.IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT16);
+
+            for (int32_t i = 0; i < imDrawData->CmdListsCount; i++)
+            {
+                const ImDrawList* cmd_list = imDrawData->CmdLists[i];
+                for (int32_t j = 0; j < cmd_list->CmdBuffer.Size; j++)
+                {
+                    const ImDrawCmd* pcmd = &cmd_list->CmdBuffer[j];
+                    VkRect2D scissorRect;
+                    scissorRect.offset.x = std::max((int32_t)(pcmd->ClipRect.x), 0);
+                    scissorRect.offset.y = std::max((int32_t)(pcmd->ClipRect.y), 0);
+                    scissorRect.extent.width = (uint32)(pcmd->ClipRect.z - pcmd->ClipRect.x);
+                    scissorRect.extent.height = (uint32)(pcmd->ClipRect.w - pcmd->ClipRect.y);
+                    vkCmdSetScissor(commandbuffer_vk, 0, 1, &scissorRect);
+                    vkCmdDrawIndexed(commandbuffer_vk, pcmd->ElemCount, 1, indexOffset, vertexOffset, 0);
+                    indexOffset += pcmd->ElemCount;
+                }
+                vertexOffset += cmd_list->VtxBuffer.Size;
+            }
+        }
+
+        RenderPasses[imageIndex]->EndRenderPass();
+    }
 }
 

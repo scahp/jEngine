@@ -28,7 +28,9 @@ bool jSwapchain_Vulkan::Create()
     createInfo.imageColorSpace = surfaceFormat.colorSpace;
     createInfo.imageExtent = extent;
     createInfo.imageArrayLayers = 1;			// Stereoscopic 3D application(VR)이 아니면 항상 1
-    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;	// 즉시 스왑체인에 그리기 위해서 이걸로 설정
+    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT     // 즉시 스왑체인에 그리기 위해서 이걸로 설정
+                            | VK_IMAGE_USAGE_SAMPLED_BIT
+                            | VK_IMAGE_USAGE_STORAGE_BIT;	
                                                                     // 포스트 프로세스 같은 처리를 위해 별도의 이미지를 만드는 것이면
                                                                     // VK_IMAGE_USAGE_TRANSFER_DST_BIT 으로 하면됨.
 
@@ -82,7 +84,8 @@ bool jSwapchain_Vulkan::Create()
         Images[i] = SwapchainImage;
 
         auto ImagetView = jVulkanBufferUtil::CreateImageView(vkImages[i], surfaceFormat.format, VK_IMAGE_ASPECT_COLOR_BIT, 1);
-        SwapchainImage->texture = new jTexture_Vulkan(ETextureType::TEXTURE_2D, Format, Extent.x, Extent.y, false, 1, 1, vkImages[i], ImagetView);
+        SwapchainImage->TexturePtr = std::shared_ptr<jTexture_Vulkan>(
+            new jTexture_Vulkan(ETextureType::TEXTURE_2D, Format, Extent.x, Extent.y, 1, 1, 1, false, vkImages[i], ImagetView));
         SwapchainImage->CommandBufferFence = nullptr;
 
         VkSemaphoreCreateInfo semaphoreInfo = {};
@@ -100,6 +103,6 @@ void jSwapchain_Vulkan::Destroy()
 
     for (auto& iter : Images)
     {
-        iter->Destroy();
+        delete iter;
     }
 }
