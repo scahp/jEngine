@@ -10,7 +10,6 @@
 #include "Vulkan/jShaderBindings_Vulkan.h"
 #include "Vulkan/jQueryPool_Vulkan.h"
 #include "Vulkan/jPipelineStateInfo_Vulkan.h"
-#include "Vulkan/jImage_Vulkan.h"
 #include "Vulkan/jCommandBufferManager_Vulkan.h"
 #include "Vulkan/jSwapchain_Vulkan.h"
 
@@ -97,8 +96,10 @@ public:
 
     VkCommandBuffer BeginSingleTimeCommands() const;
     void EndSingleTimeCommands(VkCommandBuffer commandBuffer) const;
-    bool TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32 mipLevels) const;
-	bool TransitionImageLayout(VkCommandBuffer commandBuffer, VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32 mipLevels) const;
+
+	bool TransitionImageLayout(VkCommandBuffer commandBuffer, VkImage image, VkFormat format, uint32 mipLevels, VkImageLayout oldLayout, VkImageLayout newLayout) const;
+	bool TransitionImageLayout(jCommandBuffer* commandBuffer, jTexture* texture, EImageLayout newLayout) const;
+    bool TransitionImageLayoutImmediate(jTexture* texture, EImageLayout newLayout) const;	
 
 	//////////////////////////////////////////////////////////////////////////
 

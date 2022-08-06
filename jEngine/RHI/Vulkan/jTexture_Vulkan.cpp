@@ -1,6 +1,18 @@
 ﻿#include "pch.h"
 #include "jTexture_Vulkan.h"
 
+void jTexture_Vulkan::Destroy()
+{
+    if (Image)
+        vkDestroyImage(g_rhi_vk->Device, Image, nullptr);
+
+    if (View)
+        vkDestroyImageView(g_rhi_vk->Device, View, nullptr);
+
+    if (Memory)
+        vkFreeMemory(g_rhi_vk->Device, Memory, nullptr);
+}
+
 VkSampler jTexture_Vulkan::CreateDefaultSamplerState()
 {
     static VkSampler sampler = nullptr;

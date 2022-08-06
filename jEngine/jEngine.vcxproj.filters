@@ -277,9 +277,6 @@
     <ClInclude Include="RHI\Vulkan\jShader_Vulkan.h">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\Vulkan\jImage_Vulkan.h">
-      <Filter>Code\RHI\Vulkan</Filter>
-    </ClInclude>
     <ClInclude Include="RHI\Vulkan\jBuffer_Vulkan.h">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClInclude>
@@ -478,9 +475,6 @@
       <Filter>Code\RHI\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="RHI\Vulkan\jBuffer_Vulkan.cpp">
-      <Filter>Code\RHI\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\Vulkan\jImage_Vulkan.cpp">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="RHI\Vulkan\jCommandBufferManager_Vulkan.cpp">

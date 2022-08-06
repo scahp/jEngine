@@ -504,15 +504,6 @@ enum class EImageLayout : uint8
     ATTACHMENT,
 };
 
-struct jImage
-{
-	virtual void Destroy() = 0;
-
-    virtual void* GetHandle() const = 0;
-    virtual void* GetViewHandle() const = 0;
-    virtual void* GetMemoryHandle() const = 0;
-};
-
 struct jBuffer
 {
     virtual void Destroy() = 0;

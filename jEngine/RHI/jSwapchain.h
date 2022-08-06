@@ -11,7 +11,7 @@ public:
     virtual void* GetViewHandle() const = 0;
     virtual void* GetMemoryHandle() const = 0;
 
-    jImage* Image = nullptr;
+    jTexture* texture = nullptr;
 };
 
 class jSwapchain

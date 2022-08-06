@@ -81,7 +81,8 @@ bool jSwapchain_Vulkan::Create()
         jSwapchainImage_Vulkan* SwapchainImage = new jSwapchainImage_Vulkan();
         Images[i] = SwapchainImage;
 
-        SwapchainImage->Image = new jImage_Vulkan(vkImages[i], jVulkanBufferUtil::CreateImageView(vkImages[i], surfaceFormat.format, VK_IMAGE_ASPECT_COLOR_BIT, 1), nullptr);
+        auto ImagetView = jVulkanBufferUtil::CreateImageView(vkImages[i], surfaceFormat.format, VK_IMAGE_ASPECT_COLOR_BIT, 1);
+        SwapchainImage->texture = new jTexture_Vulkan(ETextureType::TEXTURE_2D, Format, Extent.x, Extent.y, false, 1, 1, vkImages[i], ImagetView);
         SwapchainImage->CommandBufferFence = nullptr;
 
         VkSemaphoreCreateInfo semaphoreInfo = {};

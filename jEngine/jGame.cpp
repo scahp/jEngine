@@ -299,17 +299,7 @@ void jGame::Draw()
 				, ClearColor, ClearDepth, EImageLayout::UNDEFINED, EImageLayout::DEPTH_STENCIL_ATTACHMENT);
             jAttachment* resolve = nullptr;
 
-            //auto textureDepth = (jTexture_Vulkan*)depth->RenderTargetPtr->GetTexture();
-            //auto depthFormat = VK_FORMAT_D24_UNORM_S8_UINT;
-            //g_rhi_vk->TransitionImageLayout((VkImage)textureDepth->GetHandle(), depthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 1);
-            {
-                auto textureDepth = (jTexture_Vulkan*)DirectionalLight->ShadowMapPtr->GetTexture();
-                auto depthFormat = GetVulkanTextureFormat(textureDepth->Format);
-                auto initialLayout = GetVulkanImageLayout(EImageLayout::UNDEFINED);
-                auto finalLayout = GetVulkanImageLayout(EImageLayout::DEPTH_STENCIL_READ_ONLY);
-                g_rhi_vk->TransitionImageLayout((VkImage)textureDepth->GetHandle(), depthFormat
-                    , initialLayout, finalLayout, textureDepth->MipLevel);
-            }
+			g_rhi_vk->TransitionImageLayoutImmediate(DirectionalLight->ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_READ_ONLY);
 
 
             ShadowMapRenderPass = new jRenderPass_Vulkan(nullptr, depth, resolve, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
@@ -353,18 +343,10 @@ void jGame::Draw()
                     BasePassColorPtr[i] = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget(
                         { ETextureType::TEXTURE_2D, ETextureFormat::BGRA8, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi_vk->MsaaSamples }));
 
-     //               auto baseTexture = (jTexture_Vulkan*)BasePassColorPtr[i]->GetTexture();
-     //               g_rhi_vk->TransitionImageLayout((VkImage)baseTexture->GetHandle(), GetVulkanTextureFormat(baseTexture->Format)
-     //                   , VK_IMAGE_LAYOUT_UNDEFINED, GetVulkanImageLayout(EImageLayout::COLOR_ATTACHMENT), baseTexture->MipLevel);
-
                     FinalColorPtr[i] = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget(
                         { ETextureType::TEXTURE_2D, ETextureFormat::BGRA8, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi_vk->MsaaSamples }));
 
-					auto finalTexture = (jTexture_Vulkan*)FinalColorPtr[i]->GetTexture();
-					g_rhi_vk->TransitionImageLayout((VkImage)finalTexture->GetHandle(), GetVulkanTextureFormat(finalTexture->Format)
-						, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, finalTexture->MipLevel);
-
-					//BasePassColorPtr = SwapChainRTPtr;
+					g_rhi_vk->TransitionImageLayoutImmediate(FinalColorPtr[i]->GetTexture(), EImageLayout::GENERAL);
                 }
 
                 const Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
@@ -381,10 +363,6 @@ void jGame::Draw()
                     resolve = new jAttachment(ResolveColorPtr, EAttachmentLoadStoreOp::DONTCARE_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth
 						, EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
                 }
-
-                //auto textureDepth = (jTexture_Vulkan*)depth->RenderTargetPtr->GetTexture();
-                //auto depthFormat = GetVulkanTextureFormat(textureDepth->Format);
-                //g_rhi_vk->TransitionImageLayout((VkImage)textureDepth->GetHandle(), depthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 1);
 
                 jRenderPass_Vulkan* renderPass = new jRenderPass_Vulkan(color, depth, resolve, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
                 renderPass->CreateRenderPass();
@@ -443,15 +421,7 @@ void jGame::Draw()
             {
                 g_rhi_vk->QueryPool.ResetQueryPool(commandBuffer);
 
-
-                {
-                    auto textureDepth = (jTexture_Vulkan*)DirectionalLight->ShadowMapPtr->GetTexture();
-                    auto depthFormat = GetVulkanTextureFormat(textureDepth->Format);
-                    auto initialLayout = GetVulkanImageLayout(EImageLayout::DEPTH_STENCIL_READ_ONLY);
-                    auto finalLayout = GetVulkanImageLayout(EImageLayout::DEPTH_STENCIL_ATTACHMENT);
-                    g_rhi_vk->TransitionImageLayout((VkCommandBuffer)commandBuffer->GetHandle(), (VkImage)textureDepth->GetHandle(), depthFormat
-                        , initialLayout, finalLayout, textureDepth->MipLevel);
-                }
+				g_rhi_vk->TransitionImageLayout(commandBuffer, DirectionalLight->ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_ATTACHMENT);
 
                 {
                     SCOPE_GPU_PROFILE(ShadowPass);
@@ -512,14 +482,7 @@ void jGame::Draw()
                 }
             }
 
-			{
-				auto textureDepth = (jTexture_Vulkan*)DirectionalLight->ShadowMapPtr->GetTexture();
-				auto depthFormat = GetVulkanTextureFormat(textureDepth->Format);
-				auto initialLayout = GetVulkanImageLayout(EImageLayout::DEPTH_STENCIL_ATTACHMENT);
-				auto finalLayout = GetVulkanImageLayout(EImageLayout::DEPTH_STENCIL_READ_ONLY);
-				g_rhi_vk->TransitionImageLayout((VkCommandBuffer)commandBuffer->GetHandle(), (VkImage)textureDepth->GetHandle(), depthFormat
-					, initialLayout, finalLayout, textureDepth->MipLevel);
-			}
+			g_rhi_vk->TransitionImageLayout(commandBuffer, DirectionalLight->ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_READ_ONLY);
 
             //////////////////////////////////////////////////////////////////////////
             // 여기서 부터 렌더 로직 시작
@@ -548,20 +511,6 @@ void jGame::Draw()
         }
     }
 	{
-        //{
-        //    auto baseColor = (jTexture_Vulkan*)BasePassColorPtr[imageIndex]->GetTexture();
-        //    auto format = GetVulkanTextureFormat(baseColor->Format);
-        //    auto initialLayout = GetVulkanImageLayout(EImageLayout::COLOR_ATTACHMENT);
-        //    auto finalLayout = GetVulkanImageLayout(EImageLayout::GENERAL);
-        //    g_rhi_vk->TransitionImageLayout((VkCommandBuffer)commandBuffer->GetHandle(), (VkImage)baseColor->GetHandle(), format
-        //        , initialLayout, finalLayout, baseColor->MipLevel);
-        //}
-
-		// g_rhi_vk->ComputeQueue;
-
-		//g_rhi_vk->TransitionImageLayout((VkImage)BasePassColorPtr[imageIndex]->GetTexture()->GetHandle(), GetVulkanTextureFormat(BasePassColorPtr[imageIndex]->GetTexture()->Format)
-		//	, VkImageLayout::VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, BasePassColorPtr[imageIndex]->GetTexture()->MipLevel);
-
 		static VkDescriptorSetLayout descriptorSetLayout[3] = { nullptr };
 
 		if (!descriptorSetLayout[imageIndex])
@@ -620,7 +569,7 @@ void jGame::Draw()
 
 			VkDescriptorPoolCreateInfo descriptorPoolInfo{};
 			descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-			descriptorPoolInfo.poolSizeCount = poolSizes.size();
+			descriptorPoolInfo.poolSizeCount = (uint32)poolSizes.size();
 			descriptorPoolInfo.pPoolSizes = poolSizes.data();
 			descriptorPoolInfo.maxSets = 3;
 			verify(VK_SUCCESS == vkCreateDescriptorPool(g_rhi_vk->Device, &descriptorPoolInfo, nullptr, &descriptorPool[imageIndex]));
@@ -666,7 +615,7 @@ void jGame::Draw()
 				writeDescriptorSet, 
 				writeDescriptorSet2
 			};
-			vkUpdateDescriptorSets(g_rhi_vk->Device, computeWriteDescriptorSets.size(), computeWriteDescriptorSets.data(), 0, nullptr);
+			vkUpdateDescriptorSets(g_rhi_vk->Device, (uint32)computeWriteDescriptorSets.size(), computeWriteDescriptorSets.data(), 0, nullptr);
 		}
 
         static VkPipeline pipeline[3] = { nullptr };
@@ -686,24 +635,8 @@ void jGame::Draw()
 			verify(VK_SUCCESS == vkCreateComputePipelines(g_rhi_vk->Device, g_rhi_vk->PipelineCache, 1, &computePipelineCreateInfo, nullptr, &pipeline[imageIndex]));
 		}
 
-        {
-            auto texture = (jTexture_Vulkan*)BasePassColorPtr[imageIndex]->GetTexture();
-            auto format = GetVulkanTextureFormat(texture->Format);
-            auto initialLayout = GetVulkanImageLayout(EImageLayout::COLOR_ATTACHMENT);
-            auto finalLayout = GetVulkanImageLayout(EImageLayout::GENERAL);
-            g_rhi_vk->TransitionImageLayout((VkCommandBuffer)commandBuffer->GetHandle(), (VkImage)texture->GetHandle(), format
-                , initialLayout, finalLayout, texture->MipLevel);
-        }
-        //{
-        //    auto texture = (jTexture_Vulkan*)FinalColorPtr[imageIndex]->GetTexture();
-        //    auto format = GetVulkanTextureFormat(texture->Format);
-        //    auto initialLayout = GetVulkanImageLayout(EImageLayout::COLOR_ATTACHMENT);
-        //    auto finalLayout = GetVulkanImageLayout(EImageLayout::GENERAL);
-        //    g_rhi_vk->TransitionImageLayout((VkCommandBuffer)commandBuffer->GetHandle(), (VkImage)texture->GetHandle(), format
-        //        , initialLayout, finalLayout, texture->MipLevel);
-        //}
+		g_rhi_vk->TransitionImageLayout(commandBuffer, BasePassColorPtr[imageIndex]->GetTexture(), EImageLayout::GENERAL);
 
-		//vkQueueWaitIdle(g_rhi_vk->ComputeQueue.Queue);
 		vkCmdBindPipeline((VkCommandBuffer)commandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline[imageIndex]);
 		vkCmdBindDescriptorSets((VkCommandBuffer)commandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout[imageIndex], 0, 1, &descriptorSet[imageIndex], 0, 0);
 		vkCmdDispatch((VkCommandBuffer)commandBuffer->GetHandle(), g_rhi_vk->Swapchain->Extent.x / 16, g_rhi_vk->Swapchain->Extent.y / 16, 1);

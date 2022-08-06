@@ -2,7 +2,6 @@
 
 #include "Math/Vector.h"
 #include "RHI/Vulkan/jBuffer_Vulkan.h"
-#include "RHI/Vulkan/jImage_Vulkan.h"
 
 // This is modifed from here https://github.com/SaschaWillems/Vulkan/blob/master/examples/imgui/main.cpp
 
@@ -69,7 +68,7 @@ private:
         int32_t indexCount = 0;
     };
     std::vector<jDynamicBufferData> DynamicBufferData;
-    jImage_Vulkan FontImage;
+    jTexture* FontImage = nullptr;
 
     VkPipelineLayout PipelineLayout;
     VkDescriptorPool DescriptorPool;

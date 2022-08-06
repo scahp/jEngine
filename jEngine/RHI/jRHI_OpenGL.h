@@ -35,7 +35,7 @@ struct jIndexBuffer_OpenGL : public jIndexBuffer
 struct jTexture_OpenGL : public jTexture
 {
 	uint32 TextureID = 0;
-	virtual const void* GetHandle() const override { return &TextureID; }
+	virtual void* GetHandle() const override { return &TextureID; }
 };
 
 struct jFrameBuffer_OpenGL : public jFrameBuffer

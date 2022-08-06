@@ -14,9 +14,11 @@ struct jTexture
         return 1 + (int32)floorf(log2f(fmaxf((float)InWidth, (float)InHeight)));
     }
 
-    virtual const void* GetHandle() const { return nullptr; }
-    virtual const void* GetViewHandle() const { return nullptr; }
-    virtual const void* GetSamplerStateHandle() const { return nullptr; }
+    virtual void* GetHandle() const { return nullptr; }
+    virtual void* GetViewHandle() const { return nullptr; }
+    virtual void* GetMemoryHandle() const { return nullptr; }
+    virtual void* GetSamplerStateHandle() const { return nullptr; }
+    virtual void Destroy() {}
 
     FORCEINLINE bool IsDepthFormat() const { return ::IsDepthFormat(Format); }
 

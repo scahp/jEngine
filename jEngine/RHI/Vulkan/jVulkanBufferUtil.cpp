@@ -145,7 +145,7 @@ VkImageView CreateImageCubeView(VkImage image, VkFormat format, VkImageAspectFla
 }
 
 bool CreateImage2DArray(uint32 width, uint32 height, uint32 arrayLayers, uint32 mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage
-    , VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory)
+    , VkMemoryPropertyFlags properties, VkImageLayout imageLayout, VkImage& image, VkDeviceMemory& imageMemory)
 {
     VkImageCreateInfo imageInfo = {};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -171,7 +171,7 @@ bool CreateImage2DArray(uint32 width, uint32 height, uint32 arrayLayers, uint32 
     //		image에 업로드하고, image를 transfer source로 transition 하는 경우가 됨.
     // 하지만 지금의 경우는 첫번째 transition에서 image는 transfer destination 이 된다. 그래서 기존 데이터를 유지
     // 할 필요가 없다 그래서 VK_IMAGE_LAYOUT_UNDEFINED 로 설정한다.
-    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageInfo.initialLayout = imageLayout;
     imageInfo.usage = usage;
 
     imageInfo.samples = numSamples;
@@ -235,10 +235,8 @@ size_t CreateBuffer(VkBufferUsageFlags InUsage, VkMemoryPropertyFlags InProperti
     return memRequirements.size;
 }
 
-void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32 width, uint32 height)
+void CopyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer buffer, VkImage image, uint32 width, uint32 height)
 {
-    VkCommandBuffer commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
-
     VkBufferImageCopy region = {};
     region.bufferOffset = 0;
 
@@ -257,19 +255,11 @@ void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32 width, uint32 heig
     vkCmdCopyBufferToImage(commandBuffer, buffer, image
         , VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL		// image가 현재 어떤 레이아웃으로 사용되는지 명세
         , 1, &region);
-
-    g_rhi_vk->EndSingleTimeCommands(commandBuffer);
 }
 
-bool GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32 mipLevels)
+void GenerateMipmaps(VkCommandBuffer commandBuffer, VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32 mipLevels
+    , VkImageLayout oldLayout, VkImageLayout newLayout)
 {
-    VkFormatProperties formatProperties;
-    vkGetPhysicalDeviceFormatProperties(g_rhi_vk->PhysicalDevice, imageFormat, &formatProperties);
-    if (!ensure(formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT))
-        return false;
-
-    VkCommandBuffer commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
-
     VkImageMemoryBarrier barrier = { };
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     barrier.image = image;
@@ -285,7 +275,7 @@ bool GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int3
     for (uint32 i = 1; i < mipLevels; ++i)
     {
         barrier.subresourceRange.baseMipLevel = i - 1;
-        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        barrier.oldLayout = oldLayout;
         barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
@@ -315,7 +305,7 @@ bool GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int3
             , image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
 
         barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-        barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        barrier.newLayout = newLayout;
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
         vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0
@@ -330,7 +320,7 @@ bool GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int3
     // 마지막 mipmap 은 source 로 사용되지 않아서 아래와 같이 루프 바깥에서 Barrier 를 추가로 해줌.
     barrier.subresourceRange.baseMipLevel = mipLevels - 1;
     barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    barrier.newLayout = newLayout;
     barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
@@ -338,17 +328,10 @@ bool GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int3
         , 0, nullptr
         , 0, nullptr
         , 1, &barrier);
-
-    g_rhi_vk->EndSingleTimeCommands(commandBuffer);
-
-    return true;
 }
 
-bool CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
+void CopyBuffer(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
 {
-    // 임시 커맨드 버퍼를 통해서 메모리를 전송함.
-    VkCommandBuffer commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
-
     // VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT : 커맨드버퍼를 1번만 쓰고, 복사가 다 될때까지 기다리기 위해서 사용
 
     VkBufferCopy copyRegion = {};
@@ -356,10 +339,34 @@ bool CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
     copyRegion.dstOffset = 0;		// Optional
     copyRegion.size = size;			// 여기서는 VK_WHOLE_SIZE 사용 불가
     vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+}
 
+void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32 width, uint32 height)
+{
+    VkCommandBuffer commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
+    CopyBufferToImage(commandBuffer, buffer, image, width, height);
     g_rhi_vk->EndSingleTimeCommands(commandBuffer);
+}
 
-    return true;
+void GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32 mipLevels
+    , VkImageLayout oldLayout, VkImageLayout newLayout)
+{
+    //VkFormatProperties formatProperties;
+    //vkGetPhysicalDeviceFormatProperties(g_rhi_vk->PhysicalDevice, imageFormat, &formatProperties);
+    //if (!ensure(formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT))
+    //    return false;
+
+    VkCommandBuffer commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
+    GenerateMipmaps(commandBuffer, image, imageFormat, texWidth, texHeight, mipLevels, oldLayout, newLayout);
+    g_rhi_vk->EndSingleTimeCommands(commandBuffer);
+}
+
+void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
+{
+    // 임시 커맨드 버퍼를 통해서 메모리를 전송함.
+    VkCommandBuffer commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
+    CopyBuffer(commandBuffer, srcBuffer, dstBuffer, size);
+    g_rhi_vk->EndSingleTimeCommands(commandBuffer);
 }
 
 }

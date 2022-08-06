@@ -1,30 +1,29 @@
 ﻿#pragma once
 #include "../jSwapchain.h"
-#include "jImage_Vulkan.h"
 
 class jSwapchainImage_Vulkan : public jSwapchainImage
 {
 public:
     virtual void Destroy() override
     {
-        if (Image)
+        if (texture)
         {
-            Image->Destroy();
-            delete Image;
+            texture->Destroy();
+            delete texture;
         }
     }
 
     virtual void* GetHandle() const override
     {
-        return Image ? Image->GetHandle() : nullptr;
+        return texture ? texture->GetHandle() : nullptr;
     }
     virtual void* GetViewHandle() const override
     {
-        return Image ? Image->GetViewHandle() : nullptr;
+        return texture ? texture->GetViewHandle() : nullptr;
     }
     virtual void* GetMemoryHandle() const override
     {
-        return Image ? Image->GetMemoryHandle() : nullptr;
+        return texture ? texture->GetMemoryHandle() : nullptr;
     }
 
     VkFence CommandBufferFence = nullptr;

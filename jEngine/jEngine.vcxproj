@@ -156,7 +156,6 @@ xcopy /s /y /d  "$(ProjectDir)External\ShaderConductor\Lib\Debug\*.dll" "$(OutDi
     <ClInclude Include="RHI\jTexture.h" />
     <ClInclude Include="RHI\Vulkan\jBuffer_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jCommandBufferManager_Vulkan.h" />
-    <ClInclude Include="RHI\Vulkan\jImage_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jIndexBuffer_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jPipelineStateInfo_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jQueryPool_Vulkan.h" />
@@ -266,7 +265,6 @@ xcopy /s /y /d  "$(ProjectDir)External\ShaderConductor\Lib\Debug\*.dll" "$(OutDi
     <ClCompile Include="RHI\jRHI_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jBuffer_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jCommandBufferManager_Vulkan.cpp" />
-    <ClCompile Include="RHI\Vulkan\jImage_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jIndexBuffer_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jPipelineStateInfo_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jQueryPool_Vulkan.cpp" />
