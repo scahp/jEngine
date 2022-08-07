@@ -17,7 +17,14 @@
 #pragma comment(lib, "SPIRV.lib")
 #endif
 
-#pragma comment(lib, "ShaderConductor.lib")
+#if _DEBUG
+// Debug lib 사이즈가 깃에 올리기 너무 커서 Release lib 로 대체함
+// Debug lib 사용하고 싶으면 ShaderConductor\Lib\Debug\ShaderConductorLibDebug.7z 압축 풀고, 아래의 Debug/ShaderConductor.lib 사용
+// #pragma comment(lib, "Debug/ShaderConductor.lib")
+#pragma comment(lib, "Release/ShaderConductor.lib")
+#else
+#pragma comment(lib, "Release/ShaderConductor.lib")
+#endif
 
 bool jSpirvHelper::IsInitialized = false;
 TBuiltInResource jSpirvHelper::Resources = {};
