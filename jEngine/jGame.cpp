@@ -111,17 +111,6 @@ void jGame::Setup()
 
 	// Select spawning object type
 	SpawnObjects(ESpawnedType::TestPrimitive);
-
-	//// Prepare renderer which are both forward and deferred. It can be switched depend on shadow type
-	//const auto currentShadowPipelineSet = (jShadowAppSettingProperties::GetInstance().ShadowType == EShadowType::ShadowMap) 
-	//	? ShadowPipelineSetMap[CurrentShadowMapType]  : ShadowVolumePipelineSet;
-	//ForwardRenderer = new jForwardRenderer(currentShadowPipelineSet);
-	//ForwardRenderer->Setup();
-
-	//// FrameBuffer 생성 필요
-	//// DeferredRenderer = new jDeferredRenderer({ ETextureType::TEXTURE_2D, ETextureFormat::RGBA32F, EDepthBufferType::DEPTH16, SCR_WIDTH, SCR_HEIGHT, 4 });
-	//DeferredRenderer = new jDeferredRenderer({ ETextureType::TEXTURE_2D, ETextureFormat::RGBA32F, SCR_WIDTH, SCR_HEIGHT, 4 });
-	//DeferredRenderer->Setup();
 }
 
 void jGame::SpawnObjects(ESpawnedType spawnType)
@@ -295,15 +284,13 @@ void jGame::Draw()
             const Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
             const Vector2 ClearDepth = Vector2(1.0f, 0.0f);
 
-            jAttachment* depth = new jAttachment(DirectionalLight->ShadowMapPtr, EAttachmentLoadStoreOp::CLEAR_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE
+            jAttachment depth = jAttachment(DirectionalLight->ShadowMapPtr, EAttachmentLoadStoreOp::CLEAR_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE
 				, ClearColor, ClearDepth, EImageLayout::UNDEFINED, EImageLayout::DEPTH_STENCIL_ATTACHMENT);
-            jAttachment* resolve = nullptr;
 
 			g_rhi_vk->TransitionImageLayoutImmediate(DirectionalLight->ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_READ_ONLY);
 
 
-            ShadowMapRenderPass = new jRenderPass_Vulkan(nullptr, depth, resolve, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
-            ShadowMapRenderPass->CreateRenderPass();
+			ShadowMapRenderPass = (jRenderPass_Vulkan*)g_rhi_vk->GetOrCreateRenderPass({}, depth, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
         }
 
         static std::vector<jRenderPass_Vulkan*> RenderPasses;
@@ -317,7 +304,7 @@ void jGame::Draw()
             for (int32 i = 0; i < g_rhi_vk->Swapchain->Images.size(); ++i)
             {
                 std::shared_ptr<jRenderTarget> DepthPtr = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget(
-                    { ETextureType::TEXTURE_2D, ETextureFormat::D24_S8, SCR_WIDTH, SCR_HEIGHT, 1, /*ETextureFilter::LINEAR, ETextureFilter::LINEAR, */false, g_rhi_vk->MsaaSamples }));
+                    { ETextureType::TEXTURE_2D, ETextureFormat::D24_S8, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi_vk->MsaaSamples }));
 
                 std::shared_ptr<jRenderTarget> ResolveColorPtr;
 
@@ -328,15 +315,15 @@ void jGame::Draw()
 
                 if (g_rhi_vk->MsaaSamples > 1)
                 {
-                    BasePassColorPtr[i] = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget(
-                        { ETextureType::TEXTURE_2D, ETextureFormat::BGRA8, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi_vk->MsaaSamples }));
+                    BasePassColorPtr[i] = jRenderTargetPool::GetRenderTarget(
+                        { ETextureType::TEXTURE_2D, ETextureFormat::BGRA8, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi_vk->MsaaSamples });
 
                     ResolveColorPtr = SwapChainRTPtr;
                 }
                 else
                 {
-                    BasePassColorPtr[i] = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget(
-                        { ETextureType::TEXTURE_2D, ETextureFormat::BGRA8, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi_vk->MsaaSamples }));
+                    BasePassColorPtr[i] = jRenderTargetPool::GetRenderTarget(
+                        { ETextureType::TEXTURE_2D, ETextureFormat::BGRA8, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi_vk->MsaaSamples });
 
 					FinalColorPtr[i] = SwapChainRTPtr;
 					g_rhi_vk->TransitionImageLayoutImmediate(FinalColorPtr[i]->GetTexture(), EImageLayout::GENERAL);
@@ -345,20 +332,27 @@ void jGame::Draw()
                 const Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
                 const Vector2 ClearDepth = Vector2(1.0f, 0.0f);
 
-                jAttachment* color = new jAttachment(BasePassColorPtr[i], EAttachmentLoadStoreOp::CLEAR_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth
+                jAttachment color = jAttachment(BasePassColorPtr[i], EAttachmentLoadStoreOp::CLEAR_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth
 					, EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
-                jAttachment* depth = new jAttachment(DepthPtr, EAttachmentLoadStoreOp::CLEAR_DONTCARE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth
+                jAttachment depth = jAttachment(DepthPtr, EAttachmentLoadStoreOp::CLEAR_DONTCARE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth
 					, EImageLayout::UNDEFINED, EImageLayout::DEPTH_STENCIL_ATTACHMENT);
-                jAttachment* resolve = nullptr;
+                jAttachment resolve;
 
                 if (g_rhi_vk->MsaaSamples > 1)
                 {
-                    resolve = new jAttachment(ResolveColorPtr, EAttachmentLoadStoreOp::DONTCARE_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth
+                    resolve = jAttachment(ResolveColorPtr, EAttachmentLoadStoreOp::DONTCARE_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth
 						, EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
                 }
 
-                jRenderPass_Vulkan* renderPass = new jRenderPass_Vulkan(color, depth, resolve, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
-                renderPass->CreateRenderPass();
+				jRenderPass_Vulkan* renderPass = nullptr;
+				if (resolve.IsValid())
+				{
+					renderPass = (jRenderPass_Vulkan*)g_rhi_vk->GetOrCreateRenderPass({ color }, depth, resolve, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
+				}
+				else
+				{
+					renderPass = (jRenderPass_Vulkan*)g_rhi_vk->GetOrCreateRenderPass({ color }, depth, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
+				}
                 RenderPasses.push_back(renderPass);
             }
         }
@@ -435,202 +429,201 @@ void jGame::Draw()
             //////////////////////////////////////////////////////////////////////////
         }
 
+        g_rhi_vk->TransitionImageLayout(commandBuffer, DirectionalLight->ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_READ_ONLY);
+        g_rhi_vk->TransitionImageLayout(commandBuffer, BasePassColorPtr[imageIndex]->GetTexture(), EImageLayout::COLOR_ATTACHMENT);
+
         // BasePass
-        if (1)
-        {
-            static jShader* Shader = nullptr;
-            if (!Shader)
-            {
-                jShaderInfo shaderInfo;
-                shaderInfo.name = jName("default_test");
+		if (1)
+		{
+			static jShader* Shader = nullptr;
+			if (!Shader)
+			{
+				jShaderInfo shaderInfo;
+				shaderInfo.name = jName("default_test");
 #if USE_HLSL
-                shaderInfo.vs = jName("Resource/Shaders/hlsl/shader_vs.hlsl");
-                shaderInfo.fs = jName("Resource/Shaders/hlsl/shader_fs.hlsl");
+				shaderInfo.vs = jName("Resource/Shaders/hlsl/shader_vs.hlsl");
+				shaderInfo.fs = jName("Resource/Shaders/hlsl/shader_fs.hlsl");
 #else
-                shaderInfo.vs = jName("Resource/Shaders/glsl/shader_vs.glsl");
-                shaderInfo.fs = jName("Resource/Shaders/glsl/shader_fs.glsl");
+				shaderInfo.vs = jName("Resource/Shaders/glsl/shader_vs.glsl");
+				shaderInfo.fs = jName("Resource/Shaders/glsl/shader_fs.glsl");
 #endif
-                Shader = g_rhi->CreateShader(shaderInfo);
-            }
+				Shader = g_rhi->CreateShader(shaderInfo);
+			}
 
-            static jView View;
-            View.Camera = MainCamera;
-            View.DirectionalLight = DirectionalLight;
+			static jView View;
+			View.Camera = MainCamera;
+			View.DirectionalLight = DirectionalLight;
 
-            g_rhi_vk->CurrentCommandBuffer = commandBuffer;
+			g_rhi_vk->CurrentCommandBuffer = commandBuffer;
 
 #if STATIC_COMMAND
-            static std::vector<jDrawCommand<false>> BasePasses;
-            if (BasePasses.size() <= 0)
+			static std::vector<jDrawCommand<false>> BasePasses;
+			if (BasePasses.size() <= 0)
 #else
-            std::vector<jDrawCommand<false>> BasePasses;
+			std::vector<jDrawCommand<false>> BasePasses;
 #endif
-            {
-                for (auto iter : jObject::GetStaticObject())
-                {
-                    auto newCommand = jDrawCommand<false>(&View, iter->RenderObject, RenderPasses[imageIndex], Shader, &g_rhi_vk->CurrentPipelineStateFixed, { });
-                    newCommand.PrepareToDraw();
-                    BasePasses.push_back(newCommand);
-                }
-            }
+			{
+				for (auto iter : jObject::GetStaticObject())
+				{
+					auto newCommand = jDrawCommand<false>(&View, iter->RenderObject, RenderPasses[imageIndex], Shader, &g_rhi_vk->CurrentPipelineStateFixed, { });
+					newCommand.PrepareToDraw();
+					BasePasses.push_back(newCommand);
+				}
+			}
 
-			g_rhi_vk->TransitionImageLayout(commandBuffer, DirectionalLight->ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_READ_ONLY);
-			g_rhi_vk->TransitionImageLayout(commandBuffer, BasePassColorPtr[imageIndex]->GetTexture(), EImageLayout::COLOR_ATTACHMENT);
+			//////////////////////////////////////////////////////////////////////////
+			// 여기서 부터 렌더 로직 시작
+			//if (ensure(commandBuffer.Begin()))
+			{
+				SCOPE_GPU_PROFILE(BasePass);
 
-            //////////////////////////////////////////////////////////////////////////
-            // 여기서 부터 렌더 로직 시작
-            //if (ensure(commandBuffer.Begin()))
-            {
-                SCOPE_GPU_PROFILE(BasePass);
+				RenderPasses[imageIndex]->BeginRenderPass(commandBuffer);
 
-                RenderPasses[imageIndex]->BeginRenderPass(commandBuffer);
+				//vkCmdWriteTimestamp((VkCommandBuffer)commandBuffer.GetHandle(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, g_rhi_vk->vkQueryPool, 0);
 
-                //vkCmdWriteTimestamp((VkCommandBuffer)commandBuffer.GetHandle(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, g_rhi_vk->vkQueryPool, 0);
+				for (auto command : BasePasses)
+				{
+					command.Draw();
+				}
 
-                for (auto command : BasePasses)
-                {
-                    command.Draw();
-                }
+				// Finishing up
+				RenderPasses[imageIndex]->EndRenderPass();
 
-                // Finishing up
-                RenderPasses[imageIndex]->EndRenderPass();
+				//vkCmdWriteTimestamp((VkCommandBuffer)commandBuffer.GetHandle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, g_rhi_vk->vkQueryPool, 1);
+			}
+			//ensure(commandBuffer->End());
 
-                //vkCmdWriteTimestamp((VkCommandBuffer)commandBuffer.GetHandle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, g_rhi_vk->vkQueryPool, 1);
-            }
-            //ensure(commandBuffer->End());
+			// 여기 까지 렌더 로직 끝
+			//////////////////////////////////////////////////////////////////////////
 
-            // 여기 까지 렌더 로직 끝
-            //////////////////////////////////////////////////////////////////////////
-        }
-    }
-	{
-		g_rhi_vk->TransitionImageLayout(commandBuffer, BasePassColorPtr[imageIndex]->GetTexture(), EImageLayout::SHADER_READ_ONLY);
-        g_rhi_vk->TransitionImageLayout(commandBuffer, FinalColorPtr[imageIndex]->GetTexture(), EImageLayout::GENERAL);
+			g_rhi_vk->TransitionImageLayout(commandBuffer, BasePassColorPtr[imageIndex]->GetTexture(), EImageLayout::SHADER_READ_ONLY);
+			g_rhi_vk->TransitionImageLayout(commandBuffer, FinalColorPtr[imageIndex]->GetTexture(), EImageLayout::GENERAL);
 
-        static VkDescriptorSetLayout descriptorSetLayout[3] = { nullptr };
+			static VkDescriptorSetLayout descriptorSetLayout[3] = { nullptr };
 
-        if (!descriptorSetLayout[imageIndex])
-        {
-            VkDescriptorSetLayoutBinding setLayoutBindingReadOnly{};
-            setLayoutBindingReadOnly.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            setLayoutBindingReadOnly.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-            setLayoutBindingReadOnly.binding = 0;
-            setLayoutBindingReadOnly.descriptorCount = 1;
+			if (!descriptorSetLayout[imageIndex])
+			{
+				VkDescriptorSetLayoutBinding setLayoutBindingReadOnly{};
+				setLayoutBindingReadOnly.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+				setLayoutBindingReadOnly.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+				setLayoutBindingReadOnly.binding = 0;
+				setLayoutBindingReadOnly.descriptorCount = 1;
 
-            VkDescriptorSetLayoutBinding setLayoutBindingWriteOnly{};
-            setLayoutBindingWriteOnly.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-            setLayoutBindingWriteOnly.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-            setLayoutBindingWriteOnly.binding = 1;
-            setLayoutBindingWriteOnly.descriptorCount = 1;
+				VkDescriptorSetLayoutBinding setLayoutBindingWriteOnly{};
+				setLayoutBindingWriteOnly.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+				setLayoutBindingWriteOnly.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+				setLayoutBindingWriteOnly.binding = 1;
+				setLayoutBindingWriteOnly.descriptorCount = 1;
 
-            std::vector<VkDescriptorSetLayoutBinding> setlayoutBindings = {
-                setLayoutBindingReadOnly,		// Binding 0 : Input image (read-only)
-                setLayoutBindingWriteOnly,		// Binding 1: Output image (write)
-            };
+				std::vector<VkDescriptorSetLayoutBinding> setlayoutBindings = {
+					setLayoutBindingReadOnly,		// Binding 0 : Input image (read-only)
+					setLayoutBindingWriteOnly,		// Binding 1: Output image (write)
+				};
 
-            VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{};
-            descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-            descriptorSetLayoutCreateInfo.pBindings = setlayoutBindings.data();
-            descriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(setlayoutBindings.size());
-            verify(VK_SUCCESS == vkCreateDescriptorSetLayout(g_rhi_vk->Device, &descriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout[imageIndex]));
-        }
+				VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{};
+				descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+				descriptorSetLayoutCreateInfo.pBindings = setlayoutBindings.data();
+				descriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(setlayoutBindings.size());
+				verify(VK_SUCCESS == vkCreateDescriptorSetLayout(g_rhi_vk->Device, &descriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout[imageIndex]));
+			}
 
-        static VkPipelineLayout pipelineLayout[3] = { nullptr };
-        if (!pipelineLayout[imageIndex])
-        {
-            VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
-            pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-            pipelineLayoutCreateInfo.setLayoutCount = 1;
-            pipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayout[imageIndex];
-            verify(VK_SUCCESS == vkCreatePipelineLayout(g_rhi_vk->Device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout[imageIndex]));
-        }
+			static VkPipelineLayout pipelineLayout[3] = { nullptr };
+			if (!pipelineLayout[imageIndex])
+			{
+				VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
+				pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+				pipelineLayoutCreateInfo.setLayoutCount = 1;
+				pipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayout[imageIndex];
+				verify(VK_SUCCESS == vkCreatePipelineLayout(g_rhi_vk->Device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout[imageIndex]));
+			}
 
-        static VkDescriptorPool descriptorPool[3] = { nullptr };
-        if (!descriptorPool[imageIndex])
-        {
-            VkDescriptorPoolSize descriptorPoolSize{};
-            descriptorPoolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            descriptorPoolSize.descriptorCount = 3;
+			static VkDescriptorPool descriptorPool[3] = { nullptr };
+			if (!descriptorPool[imageIndex])
+			{
+				VkDescriptorPoolSize descriptorPoolSize{};
+				descriptorPoolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+				descriptorPoolSize.descriptorCount = 3;
 
-            VkDescriptorPoolSize descriptorPoolSize2{};
-            descriptorPoolSize2.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-            descriptorPoolSize2.descriptorCount = 3;
+				VkDescriptorPoolSize descriptorPoolSize2{};
+				descriptorPoolSize2.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+				descriptorPoolSize2.descriptorCount = 3;
 
-            std::vector<VkDescriptorPoolSize> poolSizes = {
-                descriptorPoolSize,descriptorPoolSize2
-            };
+				std::vector<VkDescriptorPoolSize> poolSizes = {
+					descriptorPoolSize,descriptorPoolSize2
+				};
 
-            VkDescriptorPoolCreateInfo descriptorPoolInfo{};
-            descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-            descriptorPoolInfo.poolSizeCount = (uint32)poolSizes.size();
-            descriptorPoolInfo.pPoolSizes = poolSizes.data();
-            descriptorPoolInfo.maxSets = 3;
-            verify(VK_SUCCESS == vkCreateDescriptorPool(g_rhi_vk->Device, &descriptorPoolInfo, nullptr, &descriptorPool[imageIndex]));
-        }
+				VkDescriptorPoolCreateInfo descriptorPoolInfo{};
+				descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+				descriptorPoolInfo.poolSizeCount = (uint32)poolSizes.size();
+				descriptorPoolInfo.pPoolSizes = poolSizes.data();
+				descriptorPoolInfo.maxSets = 3;
+				verify(VK_SUCCESS == vkCreateDescriptorPool(g_rhi_vk->Device, &descriptorPoolInfo, nullptr, &descriptorPool[imageIndex]));
+			}
 
-        static VkDescriptorSet descriptorSet[3] = { nullptr };
-        if (!descriptorSet[imageIndex])
-        {
-            VkDescriptorSetAllocateInfo descriptorSetAllocateInfo{};
-            descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-            descriptorSetAllocateInfo.descriptorPool = descriptorPool[imageIndex];
-            descriptorSetAllocateInfo.pSetLayouts = &descriptorSetLayout[imageIndex];
-            descriptorSetAllocateInfo.descriptorSetCount = 1;
-            verify(VK_SUCCESS == vkAllocateDescriptorSets(g_rhi_vk->Device, &descriptorSetAllocateInfo, &descriptorSet[imageIndex]));
+			static VkDescriptorSet descriptorSet[3] = { nullptr };
+			if (!descriptorSet[imageIndex])
+			{
+				VkDescriptorSetAllocateInfo descriptorSetAllocateInfo{};
+				descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+				descriptorSetAllocateInfo.descriptorPool = descriptorPool[imageIndex];
+				descriptorSetAllocateInfo.pSetLayouts = &descriptorSetLayout[imageIndex];
+				descriptorSetAllocateInfo.descriptorSetCount = 1;
+				verify(VK_SUCCESS == vkAllocateDescriptorSets(g_rhi_vk->Device, &descriptorSetAllocateInfo, &descriptorSet[imageIndex]));
 
-            VkDescriptorImageInfo colorImageInfo{};
-            colorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            colorImageInfo.imageView = (VkImageView)BasePassColorPtr[imageIndex]->GetViewHandle();
-            colorImageInfo.sampler = jTexture_Vulkan::CreateDefaultSamplerState();
+				VkDescriptorImageInfo colorImageInfo{};
+				colorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				colorImageInfo.imageView = (VkImageView)BasePassColorPtr[imageIndex]->GetViewHandle();
+				colorImageInfo.sampler = jTexture_Vulkan::CreateDefaultSamplerState();
 
-            VkWriteDescriptorSet writeDescriptorSet{};
-            writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            writeDescriptorSet.dstSet = descriptorSet[imageIndex];
-            writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            writeDescriptorSet.dstBinding = 0;
-            writeDescriptorSet.pImageInfo = &colorImageInfo;
-            writeDescriptorSet.descriptorCount = 1;
+				VkWriteDescriptorSet writeDescriptorSet{};
+				writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				writeDescriptorSet.dstSet = descriptorSet[imageIndex];
+				writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+				writeDescriptorSet.dstBinding = 0;
+				writeDescriptorSet.pImageInfo = &colorImageInfo;
+				writeDescriptorSet.descriptorCount = 1;
 
-            VkDescriptorImageInfo targetImageInfo{};
-            targetImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-            targetImageInfo.imageView = (VkImageView)FinalColorPtr[imageIndex]->GetViewHandle();
-            targetImageInfo.sampler = jTexture_Vulkan::CreateDefaultSamplerState();
+				VkDescriptorImageInfo targetImageInfo{};
+				targetImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+				targetImageInfo.imageView = (VkImageView)FinalColorPtr[imageIndex]->GetViewHandle();
+				targetImageInfo.sampler = jTexture_Vulkan::CreateDefaultSamplerState();
 
-            VkWriteDescriptorSet writeDescriptorSet2{};
-            writeDescriptorSet2.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            writeDescriptorSet2.dstSet = descriptorSet[imageIndex];
-            writeDescriptorSet2.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-            writeDescriptorSet2.dstBinding = 1;
-            writeDescriptorSet2.pImageInfo = &targetImageInfo;
-            writeDescriptorSet2.descriptorCount = 1;
+				VkWriteDescriptorSet writeDescriptorSet2{};
+				writeDescriptorSet2.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				writeDescriptorSet2.dstSet = descriptorSet[imageIndex];
+				writeDescriptorSet2.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+				writeDescriptorSet2.dstBinding = 1;
+				writeDescriptorSet2.pImageInfo = &targetImageInfo;
+				writeDescriptorSet2.descriptorCount = 1;
 
-            std::vector<VkWriteDescriptorSet> computeWriteDescriptorSets = {
-                writeDescriptorSet,
-                writeDescriptorSet2
-            };
-            vkUpdateDescriptorSets(g_rhi_vk->Device, (uint32)computeWriteDescriptorSets.size(), computeWriteDescriptorSets.data(), 0, nullptr);
-        }
+				std::vector<VkWriteDescriptorSet> computeWriteDescriptorSets = {
+					writeDescriptorSet,
+					writeDescriptorSet2
+				};
+				vkUpdateDescriptorSets(g_rhi_vk->Device, (uint32)computeWriteDescriptorSets.size(), computeWriteDescriptorSets.data(), 0, nullptr);
+			}
 
-        static VkPipeline pipeline[3] = { nullptr };
-        if (!pipeline[imageIndex])
-        {
-            VkComputePipelineCreateInfo computePipelineCreateInfo{};
-            computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-            computePipelineCreateInfo.layout = pipelineLayout[imageIndex];
-            computePipelineCreateInfo.flags = 0;
+			static VkPipeline pipeline[3] = { nullptr };
+			if (!pipeline[imageIndex])
+			{
+				VkComputePipelineCreateInfo computePipelineCreateInfo{};
+				computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+				computePipelineCreateInfo.layout = pipelineLayout[imageIndex];
+				computePipelineCreateInfo.flags = 0;
 
-            jShaderInfo shaderInfo;
-            shaderInfo.name = jName("emboss");
-            shaderInfo.cs = jName("Resource/Shaders/hlsl/emboss_cs.hlsl");
-            static jShader_Vulkan* shader = (jShader_Vulkan*)g_rhi_vk->CreateShader(shaderInfo);
-            computePipelineCreateInfo.stage = shader->ShaderStages[0];
+				jShaderInfo shaderInfo;
+				shaderInfo.name = jName("emboss");
+				shaderInfo.cs = jName("Resource/Shaders/hlsl/emboss_cs.hlsl");
+				static jShader_Vulkan* shader = (jShader_Vulkan*)g_rhi_vk->CreateShader(shaderInfo);
+				computePipelineCreateInfo.stage = shader->ShaderStages[0];
 
-            verify(VK_SUCCESS == vkCreateComputePipelines(g_rhi_vk->Device, g_rhi_vk->PipelineCache, 1, &computePipelineCreateInfo, nullptr, &pipeline[imageIndex]));
-        }
+				verify(VK_SUCCESS == vkCreateComputePipelines(g_rhi_vk->Device, g_rhi_vk->PipelineCache, 1, &computePipelineCreateInfo, nullptr, &pipeline[imageIndex]));
+			}
 
-		vkCmdBindPipeline((VkCommandBuffer)commandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline[imageIndex]);
-		vkCmdBindDescriptorSets((VkCommandBuffer)commandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout[imageIndex], 0, 1, &descriptorSet[imageIndex], 0, 0);
-		vkCmdDispatch((VkCommandBuffer)commandBuffer->GetHandle(), g_rhi_vk->Swapchain->Extent.x / 16, g_rhi_vk->Swapchain->Extent.y / 16, 1);
+			vkCmdBindPipeline((VkCommandBuffer)commandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline[imageIndex]);
+			vkCmdBindDescriptorSets((VkCommandBuffer)commandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout[imageIndex], 0, 1, &descriptorSet[imageIndex], 0, 0);
+			vkCmdDispatch((VkCommandBuffer)commandBuffer->GetHandle(), g_rhi_vk->Swapchain->Extent.x / 16, g_rhi_vk->Swapchain->Extent.y / 16, 1);
+		}
 	}
     jImGUI_Vulkan::Get().Draw(commandBuffer, imageIndex);
 	ensure(commandBuffer->End());

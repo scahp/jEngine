@@ -18,36 +18,30 @@ void jRenderPass_Vulkan::EndRenderPass()
     vkCmdEndRenderPass((VkCommandBuffer)CommandBuffer->GetHandle());
 
     // Apply layout to attachments
-    for (const jAttachment* attachment : ColorAttachments)
+    for (jAttachment& attachment : ColorAttachments)
     {
+        check(attachment.IsValid());
         SetFinalLayoutToAttachment(attachment);
     }
 
-    if (DepthAttachment)
+    if (DepthAttachment.IsValid())
         SetFinalLayoutToAttachment(DepthAttachment);
-    if (ColorAttachmentResolve)
+    if (ColorAttachmentResolve.IsValid())
         SetFinalLayoutToAttachment(ColorAttachmentResolve);
 
     CommandBuffer = nullptr;
 }
 
-void jRenderPass_Vulkan::SetFinalLayoutToAttachment(const jAttachment* attachment) const
+void jRenderPass_Vulkan::SetFinalLayoutToAttachment(const jAttachment& attachment) const
 {
-    check(attachment);
-    check(attachment->RenderTargetPtr);
-    jTexture_Vulkan* texture_vk = (jTexture_Vulkan*)attachment->RenderTargetPtr->GetTexture();
-    texture_vk->Layout = attachment->FinalLayout;
+    check(attachment.RenderTargetPtr);
+    jTexture_Vulkan* texture_vk = (jTexture_Vulkan*)attachment.RenderTargetPtr->GetTexture();
+    texture_vk->Layout = attachment.FinalLayout;
 }
 
-size_t jRenderPass_Vulkan::GetHash() const
+void jRenderPass_Vulkan::Initialize()
 {
-    if (Hash)
-        return Hash;
-
-    Hash = __super::GetHash();
-    Hash ^= STATIC_NAME_CITY_HASH("ClearValues");
-    Hash ^= CityHash64((const char*)ClearValues.data(), sizeof(VkClearValue) * ClearValues.size());
-    return Hash;
+    CreateRenderPass();
 }
 
 bool jRenderPass_Vulkan::CreateRenderPass()
@@ -63,16 +57,15 @@ bool jRenderPass_Vulkan::CreateRenderPass()
 
         for (int32 i = 0; i < ColorAttachments.size(); ++i)
         {
-            const jAttachment* attachment = ColorAttachments[i];
-            check(attachment);
-            check(attachment->RenderTargetPtr.get());
+            const jAttachment& attachment = ColorAttachments[i];
+            check(attachment.RenderTargetPtr.get());
 
-            const auto& color = attachment->ClearColor;
+            const auto& color = attachment.ClearColor;
             VkClearValue colorClear = {};
             colorClear.color = { color.x, color.y, color.z, color.w };
             ClearValues.push_back(colorClear);
 
-            const auto& RTInfo = attachment->RenderTargetPtr->Info;
+            const auto& RTInfo = attachment.RenderTargetPtr->Info;
 
             check(SampleCount == 0 || SampleCount == RTInfo.SampleCount);
             check(LayerCount == 0 || LayerCount == RTInfo.LayerCount);
@@ -80,17 +73,16 @@ bool jRenderPass_Vulkan::CreateRenderPass()
             LayerCount = RTInfo.LayerCount;
         }
 
-        if (DepthAttachment)
+        if (DepthAttachment.IsValid())
         {
-            const jAttachment* attachment = DepthAttachment;
-            check(attachment);
-            check(attachment->RenderTargetPtr.get());
+            const jAttachment& attachment = DepthAttachment;
+            check(attachment.RenderTargetPtr.get());
 
             VkClearValue colorClear = {};
-            colorClear.depthStencil = { DepthAttachment->ClearDepth.x, (uint32)DepthAttachment->ClearDepth.y };
+            colorClear.depthStencil = { DepthAttachment.ClearDepth.x, (uint32)DepthAttachment.ClearDepth.y };
             ClearValues.push_back(colorClear);
 
-            const auto& RTInfo = attachment->RenderTargetPtr->Info;
+            const auto& RTInfo = attachment.RenderTargetPtr->Info;
 
             if (SampleCount == 0)
                 SampleCount = RTInfo.SampleCount;
@@ -103,26 +95,25 @@ bool jRenderPass_Vulkan::CreateRenderPass()
         int32 AttachmentIndex = 0;
         std::vector<VkAttachmentDescription> AttachmentDescs;
 
-        const size_t Attachments = ColorAttachments.size() + (DepthAttachment ? 1 : 0) + (ColorAttachmentResolve ? 1 : 0);
+        const size_t Attachments = ColorAttachments.size() + (DepthAttachment.IsValid() ? 1 : 0) + (ColorAttachmentResolve.IsValid() ? 1 : 0);
         AttachmentDescs.resize(Attachments);
 
         std::vector<VkAttachmentReference> colorAttachmentRefs;
         colorAttachmentRefs.resize(ColorAttachments.size());
         for (int32 i = 0; i < ColorAttachments.size(); ++i)
         {
-            const jAttachment* attachment = ColorAttachments[i];
-            check(attachment);
-            check(attachment->RenderTargetPtr.get());
+            const jAttachment& attachment = ColorAttachments[i];
+            check(attachment.RenderTargetPtr.get());
 
-            const auto& RTInfo = attachment->RenderTargetPtr->Info;
+            const auto& RTInfo = attachment.RenderTargetPtr->Info;
 
             VkAttachmentDescription& colorDesc = AttachmentDescs[AttachmentIndex];
             colorDesc.format = GetVulkanTextureFormat(RTInfo.Format);
             colorDesc.samples = (VkSampleCountFlagBits)RTInfo.SampleCount;
-            GetVulkanAttachmentLoadStoreOp(colorDesc.loadOp, colorDesc.storeOp, attachment->LoadStoreOp);
-            GetVulkanAttachmentLoadStoreOp(colorDesc.stencilLoadOp, colorDesc.stencilStoreOp, attachment->StencilLoadStoreOp);
+            GetVulkanAttachmentLoadStoreOp(colorDesc.loadOp, colorDesc.storeOp, attachment.LoadStoreOp);
+            GetVulkanAttachmentLoadStoreOp(colorDesc.stencilLoadOp, colorDesc.stencilStoreOp, attachment.StencilLoadStoreOp);
 
-            check((ColorAttachmentResolve && ((int32)RTInfo.SampleCount > 1)) || (!ColorAttachmentResolve && (int32)RTInfo.SampleCount == 1));
+            check((ColorAttachmentResolve.IsValid() && ((int32)RTInfo.SampleCount > 1)) || (!ColorAttachmentResolve.IsValid() && (int32)RTInfo.SampleCount == 1));
             check(SampleCount == 0 || SampleCount == RTInfo.SampleCount);
             check(LayerCount == 0 || LayerCount == RTInfo.LayerCount);
             SampleCount = RTInfo.SampleCount;
@@ -156,8 +147,8 @@ bool jRenderPass_Vulkan::CreateRenderPass()
             //    colorDesc.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;			// MSAA 안하면 바로 Present 할 것이므로
             //}
 
-            colorDesc.initialLayout = GetVulkanImageLayout(attachment->InitialLayout);
-            colorDesc.finalLayout = GetVulkanImageLayout(attachment->FinalLayout);
+            colorDesc.initialLayout = GetVulkanImageLayout(attachment.InitialLayout);
+            colorDesc.finalLayout = GetVulkanImageLayout(attachment.FinalLayout);
 
             //////////////////////////////////////////////////////////////////////////
 
@@ -173,22 +164,22 @@ bool jRenderPass_Vulkan::CreateRenderPass()
                                                                                         // Vulkan에서 이 서브패스가 되면 자동으로 Image 레이아웃을 이것으로 변경함.
                                                                                         // 우리는 VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL 으로 설정하므로써 color attachment로 사용
 
-            const auto& color = attachment->ClearColor;
+            const auto& color = attachment.ClearColor;
             VkClearValue colorClear = {};
             colorClear.color = { color.x, color.y, color.z, color.w };
             ClearValues.push_back(colorClear);
         }
 
-        if (DepthAttachment)
+        if (DepthAttachment.IsValid())
         {
-            check(DepthAttachment->RenderTargetPtr.get());
-            const auto& RTInfo = DepthAttachment->RenderTargetPtr->Info;
+            check(DepthAttachment.RenderTargetPtr.get());
+            const auto& RTInfo = DepthAttachment.RenderTargetPtr->Info;
 
             VkAttachmentDescription& depthAttachment = AttachmentDescs[AttachmentIndex];
             depthAttachment.format = GetVulkanTextureFormat(RTInfo.Format);
             depthAttachment.samples = (VkSampleCountFlagBits)RTInfo.SampleCount;
-            GetVulkanAttachmentLoadStoreOp(depthAttachment.loadOp, depthAttachment.storeOp, DepthAttachment->LoadStoreOp);
-            GetVulkanAttachmentLoadStoreOp(depthAttachment.stencilLoadOp, depthAttachment.stencilStoreOp, DepthAttachment->StencilLoadStoreOp);
+            GetVulkanAttachmentLoadStoreOp(depthAttachment.loadOp, depthAttachment.storeOp, DepthAttachment.LoadStoreOp);
+            GetVulkanAttachmentLoadStoreOp(depthAttachment.stencilLoadOp, depthAttachment.stencilStoreOp, DepthAttachment.StencilLoadStoreOp);
             //depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
             //// 최종 쉐이더 리로스 레이아웃 결정 - 쉐이더에서 읽는 리소스로 사용할 경우 처리
@@ -196,8 +187,8 @@ bool jRenderPass_Vulkan::CreateRenderPass()
             //    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
             //else
             //    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-            depthAttachment.initialLayout = GetVulkanImageLayout(DepthAttachment->InitialLayout);
-            depthAttachment.finalLayout = GetVulkanImageLayout(DepthAttachment->FinalLayout);
+            depthAttachment.initialLayout = GetVulkanImageLayout(DepthAttachment.InitialLayout);
+            depthAttachment.finalLayout = GetVulkanImageLayout(DepthAttachment.FinalLayout);
 
             //check((ColorAttachmentResolve && ((int32)RTInfo.SampleCount > 1)) || (!ColorAttachmentResolve && (int32)RTInfo.SampleCount == 1));
             //check(SampleCount == 0 || SampleCount == RTInfo.SampleCount);
@@ -208,26 +199,25 @@ bool jRenderPass_Vulkan::CreateRenderPass()
                 LayerCount = RTInfo.LayerCount;
 
             VkClearValue colorClear = {};
-            colorClear.depthStencil = { DepthAttachment->ClearDepth.x, (uint32)DepthAttachment->ClearDepth.y };
+            colorClear.depthStencil = { DepthAttachment.ClearDepth.x, (uint32)DepthAttachment.ClearDepth.y };
             ClearValues.push_back(colorClear);
         }
 
         VkAttachmentReference colorAttachmentResolveRef = {};
         if (SampleCount > 1)
         {
-            check(ColorAttachmentResolve);
-            check(ColorAttachmentResolve->RenderTargetPtr.get());
-            const auto& RTInfo = ColorAttachmentResolve->RenderTargetPtr->Info;
+            check(ColorAttachmentResolve.RenderTargetPtr.get());
+            const auto& RTInfo = ColorAttachmentResolve.RenderTargetPtr->Info;
 
             VkAttachmentDescription colorAttachmentResolve = {};
             colorAttachmentResolve.format = GetVulkanTextureFormat(RTInfo.Format);
             colorAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT;
-            GetVulkanAttachmentLoadStoreOp(colorAttachmentResolve.loadOp, colorAttachmentResolve.storeOp, ColorAttachmentResolve->LoadStoreOp);
-            GetVulkanAttachmentLoadStoreOp(colorAttachmentResolve.stencilLoadOp, colorAttachmentResolve.stencilStoreOp, ColorAttachmentResolve->StencilLoadStoreOp);
+            GetVulkanAttachmentLoadStoreOp(colorAttachmentResolve.loadOp, colorAttachmentResolve.storeOp, ColorAttachmentResolve.LoadStoreOp);
+            GetVulkanAttachmentLoadStoreOp(colorAttachmentResolve.stencilLoadOp, colorAttachmentResolve.stencilStoreOp, ColorAttachmentResolve.StencilLoadStoreOp);
             //colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             //colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-            colorAttachmentResolve.initialLayout = GetVulkanImageLayout(ColorAttachmentResolve->InitialLayout);
-            colorAttachmentResolve.finalLayout = GetVulkanImageLayout(ColorAttachmentResolve->FinalLayout);
+            colorAttachmentResolve.initialLayout = GetVulkanImageLayout(ColorAttachmentResolve.InitialLayout);
+            colorAttachmentResolve.finalLayout = GetVulkanImageLayout(ColorAttachmentResolve.FinalLayout);
             AttachmentDescs.emplace_back(colorAttachmentResolve);
 
             check(RTInfo.SampleCount == 1);
@@ -246,7 +236,7 @@ bool jRenderPass_Vulkan::CreateRenderPass()
         }
 
         VkAttachmentReference depthAttachmentRef = {};
-        if (DepthAttachment)
+        if (DepthAttachment.IsValid())
         {
             depthAttachmentRef.attachment = AttachmentIndex++;
             depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
@@ -257,12 +247,12 @@ bool jRenderPass_Vulkan::CreateRenderPass()
         if (SampleCount > 1)
             subpass.pResolveAttachments = &colorAttachmentResolveRef;
 
-        VkRenderPassCreateInfo renderPassInfo = {};
-        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-        renderPassInfo.attachmentCount = static_cast<uint32_t>(AttachmentDescs.size());
-        renderPassInfo.pAttachments = AttachmentDescs.data();
-        renderPassInfo.subpassCount = 1;
-        renderPassInfo.pSubpasses = &subpass;
+        VkRenderPassCreateInfo renderPassCreateInfo = {};
+        renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        renderPassCreateInfo.attachmentCount = static_cast<uint32_t>(AttachmentDescs.size());
+        renderPassCreateInfo.pAttachments = AttachmentDescs.data();
+        renderPassCreateInfo.subpassCount = 1;
+        renderPassCreateInfo.pSubpasses = &subpass;
 
 
         // 1. Subpasses 들의 이미지 레이아웃 전환은 자동적으로 일어나며, 이런 전환은 subpass dependencies 로 관리 됨.
@@ -289,8 +279,8 @@ bool jRenderPass_Vulkan::CreateRenderPass()
         dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
         dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
-        renderPassInfo.dependencyCount = 1;
-        renderPassInfo.pDependencies = &dependency;
+        renderPassCreateInfo.dependencyCount = 1;
+        renderPassCreateInfo.pDependencies = &dependency;
 
 
         //std::array<VkSubpassDependency, 2> dependencies;
@@ -314,13 +304,14 @@ bool jRenderPass_Vulkan::CreateRenderPass()
         //renderPassInfo.dependencyCount = (int32)dependencies.size();
         //renderPassInfo.pDependencies = dependencies.data();
 
-        if (!ensure(vkCreateRenderPass(g_rhi_vk->GetDevice(), &renderPassInfo, nullptr, &RenderPass) == VK_SUCCESS))
+        if (!ensure(vkCreateRenderPass(g_rhi_vk->GetDevice(), &renderPassCreateInfo, nullptr, &RenderPass) == VK_SUCCESS))
             return false;
 
         s_renderPassPool.insert(std::make_pair(renderPassHash, RenderPass));
     }
 
     // Create RenderPassInfo
+    RenderPassInfo = {};
     RenderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     RenderPassInfo.renderPass = RenderPass;
 
@@ -337,9 +328,9 @@ bool jRenderPass_Vulkan::CreateRenderPass()
 
         for (int32 k = 0; k < ColorAttachments.size(); ++k)
         {
-            check(ColorAttachments[k]);
+            check(ColorAttachments[k].IsValid());
 
-            const auto* RT = ColorAttachments[k]->RenderTargetPtr.get();
+            const auto* RT = ColorAttachments[k].RenderTargetPtr.get();
             check(RT);
 
             const jTexture* texture = RT->GetTexture();
@@ -348,9 +339,9 @@ bool jRenderPass_Vulkan::CreateRenderPass()
             ImageViews.push_back((VkImageView)texture->GetViewHandle());
         }
 
-        if (DepthAttachment)
+        if (DepthAttachment.IsValid())
         {
-            const auto* RT = DepthAttachment->RenderTargetPtr.get();
+            const auto* RT = DepthAttachment.RenderTargetPtr.get();
             check(RT);
 
             const jTexture* texture = RT->GetTexture();
@@ -361,9 +352,9 @@ bool jRenderPass_Vulkan::CreateRenderPass()
 
         if (SampleCount > 1)
         {
-            check(ColorAttachmentResolve);
+            check(ColorAttachmentResolve.IsValid());
 
-            const auto* RT = ColorAttachmentResolve->RenderTargetPtr.get();
+            const auto* RT = ColorAttachmentResolve.RenderTargetPtr.get();
             check(RT);
 
             const jTexture* texture = RT->GetTexture();

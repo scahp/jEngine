@@ -431,11 +431,10 @@ void jImGUI_Vulkan::PrepareDraw(int32 imageIndex)
 
         auto SwapChainRTPtr = jRenderTarget::CreateFromTexture(image->TexturePtr);
 
-        jAttachment* color = new jAttachment(SwapChainRTPtr, EAttachmentLoadStoreOp::LOAD_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, Vector4(0.0f, 0.0f, 0.0f, 1.0f), Vector2(1.0f, 0.0f)
+        jAttachment color = jAttachment(SwapChainRTPtr, EAttachmentLoadStoreOp::LOAD_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, Vector4(0.0f, 0.0f, 0.0f, 1.0f), Vector2(1.0f, 0.0f)
             , EImageLayout::GENERAL, EImageLayout::PRESENT_SRC);
 
-        auto newRenderPass = new jRenderPass_Vulkan(color, nullptr, nullptr, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
-        newRenderPass->CreateRenderPass();
+        auto newRenderPass = g_rhi_vk->GetOrCreateRenderPass({ color }, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
         RenderPasses[imageIndex] = newRenderPass;
         Pipelines[imageIndex] = jImGUI_Vulkan::Get().CreatePipelineState((VkRenderPass)RenderPasses[imageIndex]->GetRenderPass(), g_rhi_vk->GraphicsQueue.Queue);
     }

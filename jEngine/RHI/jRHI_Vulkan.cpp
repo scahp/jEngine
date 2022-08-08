@@ -34,6 +34,7 @@ TResourcePool<jStencilOpStateInfo_Vulkan> jRHI_Vulkan::StencilOpStatePool;
 TResourcePool<jDepthStencilStateInfo_Vulkan> jRHI_Vulkan::DepthStencilStatePool;
 TResourcePool<jBlendingStateInfo_Vulakn> jRHI_Vulkan::BlendingStatePool;
 TResourcePool<jPipelineStateInfo_Vulkan> jRHI_Vulkan::PipelineStatePool;
+TResourcePool<jRenderPass_Vulkan> jRHI_Vulkan::RenderPassPool;
 
 struct jFrameBuffer_Vulkan : public jFrameBuffer
 {
@@ -1422,6 +1423,22 @@ jPipelineStateInfo* jRHI_Vulkan::CreatePipelineStateInfo(const jPipelineStateFix
     , const jVertexBuffer* vertexBuffer, const jRenderPass* renderPass, const std::vector<const jShaderBindings*> shaderBindings) const
 {
 	return PipelineStatePool.GetOrCreate(jPipelineStateInfo(pipelineStateFixed, shader, vertexBuffer, renderPass, shaderBindings));
+}
+
+jRenderPass* jRHI_Vulkan::GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const Vector2i& offset, const Vector2i& extent) const
+{
+	return RenderPassPool.GetOrCreate(jRenderPass_Vulkan(colorAttachments, offset, extent));
+}
+
+jRenderPass* jRHI_Vulkan::GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const jAttachment& depthAttachment, const Vector2i& offset, const Vector2i& extent) const
+{
+	return RenderPassPool.GetOrCreate(jRenderPass_Vulkan(colorAttachments, depthAttachment, offset, extent));
+}
+
+jRenderPass* jRHI_Vulkan::GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const jAttachment& depthAttachment, const jAttachment& colorResolveAttachment
+	, const Vector2i& offset, const Vector2i& extent) const
+{
+    return RenderPassPool.GetOrCreate(jRenderPass_Vulkan(colorAttachments, depthAttachment, colorResolveAttachment, offset, extent));
 }
 
 #endif // USE_VULKAN

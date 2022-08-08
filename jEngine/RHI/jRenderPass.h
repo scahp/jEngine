@@ -34,12 +34,22 @@ struct jAttachment
     EImageLayout InitialLayout = EImageLayout::UNDEFINED;
     EImageLayout FinalLayout = EImageLayout::SHADER_READ_ONLY;
 
+    bool IsValid() const
+    {
+        if (RenderTargetPtr)
+            return true;
+        return false;
+    }
+
     size_t GetHash() const
     {
         if (Hash)
             return Hash;
 
-        Hash = 0;
+        if (!RenderTargetPtr)
+            return 0;
+
+        Hash = RenderTargetPtr->GetHash();
         Hash ^= CityHash64((const char*)&LoadStoreOp, sizeof(LoadStoreOp));
         Hash ^= CityHash64((const char*)&StencilLoadStoreOp, sizeof(StencilLoadStoreOp));
         Hash ^= CityHash64((const char*)&ClearColor, sizeof(ClearColor));
@@ -58,17 +68,38 @@ public:
     virtual ~jRenderPass() {}
 
     jRenderPass() = default;
-    jRenderPass(const jAttachment* colorAttachment, const jAttachment* depthAttachment, const jAttachment* colorResolveAttachment, const Vector2i& offset, const Vector2i& extent)
+    jRenderPass(const std::vector<jAttachment>& colorAttachments, const Vector2i& offset, const Vector2i& extent)
     {
-        SetAttachemnt(colorAttachment, depthAttachment, colorResolveAttachment);
+        SetAttachemnt(colorAttachments);
         SetRenderArea(offset, extent);
     }
 
-    void SetAttachemnt(const jAttachment* colorAttachment, const jAttachment* depthAttachment, const jAttachment* colorResolveAttachment)
+    jRenderPass(const std::vector<jAttachment>& colorAttachments, const jAttachment& depthAttachment, const Vector2i& offset, const Vector2i& extent)
     {
-        if (colorAttachment)
-            ColorAttachments.push_back(colorAttachment);
+        SetAttachemnt(colorAttachments, depthAttachment);
+        SetRenderArea(offset, extent);
+    }
 
+    jRenderPass(const std::vector<jAttachment>& colorAttachments, const jAttachment& depthAttachment, const jAttachment& colorResolveAttachment, const Vector2i& offset, const Vector2i& extent)
+    {
+        SetAttachemnt(colorAttachments, depthAttachment, colorResolveAttachment);
+        SetRenderArea(offset, extent);
+    }
+
+    void SetAttachemnt(const std::vector<jAttachment>& colorAttachments)
+    {
+        ColorAttachments = colorAttachments;
+    }
+
+    void SetAttachemnt(const std::vector<jAttachment>& colorAttachments, const jAttachment& depthAttachment)
+    {
+        ColorAttachments = colorAttachments;
+        DepthAttachment = depthAttachment;
+    }
+
+    void SetAttachemnt(const std::vector<jAttachment>& colorAttachments, const jAttachment& depthAttachment, const jAttachment& colorResolveAttachment)
+    {
+        ColorAttachments = colorAttachments;
         DepthAttachment = depthAttachment;
         ColorAttachmentResolve = colorResolveAttachment;
     }
@@ -82,14 +113,14 @@ public:
     virtual bool BeginRenderPass(const jCommandBuffer* commandBuffer) { return false; }
     virtual void EndRenderPass() {}
 
-    virtual size_t GetHash() const;
+    virtual size_t GetHash() const final;
 
     virtual void* GetRenderPass() const { return nullptr; }
     virtual void* GetFrameBuffer() const { return nullptr; }
 
-    std::vector<const jAttachment*> ColorAttachments;
-    const jAttachment* DepthAttachment = nullptr;
-    const jAttachment* ColorAttachmentResolve = nullptr;
+    std::vector<jAttachment> ColorAttachments;
+    jAttachment DepthAttachment;
+    jAttachment ColorAttachmentResolve;
     Vector2i RenderOffset;
     Vector2i RenderExtent;
     mutable size_t Hash = 0;

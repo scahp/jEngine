@@ -27,6 +27,7 @@ public:
     static TResourcePool<jDepthStencilStateInfo_Vulkan> DepthStencilStatePool;
     static TResourcePool<jBlendingStateInfo_Vulakn> BlendingStatePool;
     static TResourcePool<jPipelineStateInfo_Vulkan> PipelineStatePool;
+	static TResourcePool<jRenderPass_Vulkan> RenderPassPool;
 
 	jRHI_Vulkan();
 	virtual ~jRHI_Vulkan();
@@ -159,6 +160,12 @@ public:
 	virtual void EndRenderFrame(jCommandBuffer* commandBuffer) override;
 	jPipelineStateInfo* CreatePipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader
 		, const jVertexBuffer* vertexBuffer, const jRenderPass* renderPass, const std::vector<const jShaderBindings*> shaderBindings) const override;
+
+	virtual jRenderPass* GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const Vector2i& offset, const Vector2i& extent) const override;
+	virtual jRenderPass* GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const jAttachment& depthAttachment
+		, const Vector2i& offset, const Vector2i& extent) const override;
+	virtual jRenderPass* GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const jAttachment& depthAttachment
+		, const jAttachment& colorResolveAttachment, const Vector2i& offset, const Vector2i& extent) const override;
 };
 
 extern jRHI_Vulkan* g_rhi_vk;

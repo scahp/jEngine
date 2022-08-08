@@ -6,6 +6,7 @@ class jRenderPass_Vulkan : public jRenderPass
 public:
     using jRenderPass::jRenderPass;
 
+    void Initialize();
     bool CreateRenderPass();
     void Release();
 
@@ -32,15 +33,13 @@ public:
 
     virtual void EndRenderPass() override;
 
-    virtual size_t GetHash() const override;
-
 private:
-    void SetFinalLayoutToAttachment(const jAttachment* attachment) const;
+    void SetFinalLayoutToAttachment(const jAttachment& attachment) const;
 
 private:
     const jCommandBuffer* CommandBuffer = nullptr;
 
-    VkRenderPassBeginInfo RenderPassInfo;
+    VkRenderPassBeginInfo RenderPassInfo{};
     std::vector<VkClearValue> ClearValues;
     VkRenderPass RenderPass = nullptr;
     VkFramebuffer FrameBuffer = nullptr;

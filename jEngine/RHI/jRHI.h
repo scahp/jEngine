@@ -8,6 +8,7 @@
 #include "jShaderBindings.h"
 #include "jBuffer.h"
 #include "jCommandBufferManager.h"
+#include "jRenderPass.h"
 
 extern class jRHI* g_rhi;
 
@@ -406,6 +407,10 @@ public:
 	{
 		return (T*)CreatePipelineLayout(shaderBindingInstances);
 	}
+
+	virtual jRenderPass* GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const Vector2i& offset, const Vector2i& extent) const { return nullptr; }
+	virtual jRenderPass* GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const jAttachment& depthAttachment, const Vector2i& offset, const Vector2i& extent) const { return nullptr; }
+	virtual jRenderPass* GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const jAttachment& depthAttachment, const jAttachment& colorResolveAttachment, const Vector2i& offset, const Vector2i& extent) const { return nullptr; }
 };
 
 // Not thred safe

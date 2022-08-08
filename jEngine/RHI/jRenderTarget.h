@@ -65,9 +65,21 @@ struct jRenderTarget final : public std::enable_shared_from_this<jRenderTarget>
     ~jRenderTarget()
     {}
 
+    size_t GetHash() const
+    {
+        if (Hash)
+            return Hash;
+
+        Hash = Info.GetHash();
+        Hash ^= reinterpret_cast<uint64>(GetViewHandle());
+        return Hash;
+    }
+
     jTexture* GetTexture() const { return TexturePtr.get(); }
     const void* GetViewHandle() const { return TexturePtr.get() ? TexturePtr->GetViewHandle() : nullptr; }
 
     jRenderTargetInfo Info;
     std::shared_ptr<jTexture> TexturePtr;
+
+    mutable size_t Hash = 0;
 };

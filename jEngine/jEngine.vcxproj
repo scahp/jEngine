@@ -137,6 +137,8 @@ xcopy /s /y /d  "$(ProjectDir)External\ShaderConductor\Lib\Debug\*.dll" "$(OutDi
     <ClInclude Include="Math\Vector.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Profiler\jPerformanceProfile.h" />
+    <ClInclude Include="Renderer\jForwardRenderer.h" />
+    <ClInclude Include="Renderer\jRenderer.h" />
     <ClInclude Include="RHI\jBuffer.h" />
     <ClInclude Include="RHI\jCommandBufferManager.h" />
     <ClInclude Include="RHI\jFenceManager.h" />
@@ -255,6 +257,8 @@ xcopy /s /y /d  "$(ProjectDir)External\ShaderConductor\Lib\Debug\*.dll" "$(OutDi
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Profiler\jPerformanceProfile.cpp" />
+    <ClCompile Include="Renderer\jForwardRenderer.cpp" />
+    <ClCompile Include="Renderer\jRenderer.cpp" />
     <ClCompile Include="RHI\jFenceManager.cpp" />
     <ClCompile Include="RHI\jFrameBufferPool.cpp" />
     <ClCompile Include="RHI\jPipelineStateInfo.cpp" />

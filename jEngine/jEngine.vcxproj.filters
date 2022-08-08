@@ -83,6 +83,9 @@
     <Filter Include="Code\External\ShaderConductor">
       <UniqueIdentifier>{84f1e91d-2052-4ade-b434-4f4bd3dd2941}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Code\Renderer">
+      <UniqueIdentifier>{a6ab173f-cb50-4bf7-b61c-80a5213ac7c9}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Math\MathUtility.h">
@@ -292,6 +295,12 @@
     <ClInclude Include="External\ShaderConductor\Include\ShaderConductor\ShaderConductor.hpp">
       <Filter>Code\External\ShaderConductor</Filter>
     </ClInclude>
+    <ClInclude Include="Renderer\jRenderer.h">
+      <Filter>Code\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\jForwardRenderer.h">
+      <Filter>Code\Renderer</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -482,6 +491,12 @@
     </ClCompile>
     <ClCompile Include="RHI\Vulkan\jSwapchain_Vulkan.cpp">
       <Filter>Code\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\jRenderer.cpp">
+      <Filter>Code\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\jForwardRenderer.cpp">
+      <Filter>Code\Renderer</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
