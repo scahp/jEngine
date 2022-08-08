@@ -278,8 +278,8 @@ void jGame::Draw()
         static jRenderPass_Vulkan* ShadowMapRenderPass = nullptr;
         if (!ShadowMapRenderPass)
         {
-            DirectionalLight->ShadowMapPtr = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget(
-                { ETextureType::TEXTURE_2D, ETextureFormat::D24_S8, SCR_WIDTH, SCR_HEIGHT, 1, /*ETextureFilter::LINEAR, ETextureFilter::LINEAR, */false, 1 }));
+            DirectionalLight->ShadowMapPtr = jRenderTargetPool::GetRenderTarget(
+                { ETextureType::TEXTURE_2D, ETextureFormat::D24_S8, SCR_WIDTH, SCR_HEIGHT, 1, /*ETextureFilter::LINEAR, ETextureFilter::LINEAR, */false, 1 });
 
             const Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
             const Vector2 ClearDepth = Vector2(1.0f, 0.0f);
@@ -303,8 +303,8 @@ void jGame::Draw()
 
             for (int32 i = 0; i < g_rhi_vk->Swapchain->Images.size(); ++i)
             {
-                std::shared_ptr<jRenderTarget> DepthPtr = std::shared_ptr<jRenderTarget>(jRenderTargetPool::GetRenderTarget(
-                    { ETextureType::TEXTURE_2D, ETextureFormat::D24_S8, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi_vk->MsaaSamples }));
+                std::shared_ptr<jRenderTarget> DepthPtr = jRenderTargetPool::GetRenderTarget(
+                    { ETextureType::TEXTURE_2D, ETextureFormat::D24_S8, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi_vk->MsaaSamples });
 
                 std::shared_ptr<jRenderTarget> ResolveColorPtr;
 
