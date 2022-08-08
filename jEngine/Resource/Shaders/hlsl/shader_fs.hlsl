@@ -53,7 +53,7 @@ float4 main(VSOutput input) : SV_TARGET
     if (-1.0 <= input.ShadowPosition.z && input.ShadowPosition.z <= 1.0)
 	{
         float shadowMapDist = DirectionalLightShadowMap.Sample(shadowMapSampler, input.ShadowPosition.xy * 0.5 + 0.5).r;
-        if (input.ShadowPosition.z > shadowMapDist + 0.0001)
+        if (input.ShadowPosition.z > shadowMapDist + 0.001)
 		{
 			lit = 0.5;
 		}

@@ -909,11 +909,11 @@ void* jRHI_Vulkan::CreatePipelineLayout(const std::vector<const jShaderBindings*
 	const size_t hash = jShaderBindings::CreateShaderBindingsHash(shaderBindings);
 
 	auto it_find = PipelineLayoutPool.find(hash);
-	if (PipelineLayoutPool.end() != it_find)
-	{
-		vkPipelineLayout = it_find->second;
-	}
-	else
+    if (PipelineLayoutPool.end() != it_find)
+    {
+        vkPipelineLayout = it_find->second;
+    }
+    else
 	{
 		std::vector<VkDescriptorSetLayout> DescriptorSetLayouts;
 		DescriptorSetLayouts.reserve(shaderBindings.size());

@@ -17,7 +17,6 @@ struct jShaderBindingInstance_Vulkan : public jShaderBindingInstance
 struct jShaderBindings_Vulkan : public jShaderBindings
 {
     VkDescriptorSetLayout DescriptorSetLayout = nullptr;
-    VkPipelineLayout PipelineLayout = nullptr;
 
     // Descriptor : 쉐이더가 버퍼나 이미지 같은 리소스에 자유롭게 접근하는 방법. 디스크립터의 사용방법은 아래 3가지로 구성됨.
     //	1. Pipeline 생성 도중 Descriptor Set Layout 명세

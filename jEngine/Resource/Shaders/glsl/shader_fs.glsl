@@ -51,7 +51,7 @@ void main()
 	if (-1.0 <= fragShadowPosition.z && fragShadowPosition.z <= 1.0)
 	{
 		float shadowMapDist = texture(DirectionalLightShadowMap, fragShadowPosition.xy * 0.5 + 0.5).r;
-		if (fragShadowPosition.z > shadowMapDist + 0.0001)
+		if (fragShadowPosition.z > shadowMapDist + 0.001)
 		{
 			lit = 0.5;
 		}

@@ -301,6 +301,12 @@
     <ClInclude Include="Renderer\jForwardRenderer.h">
       <Filter>Code\Renderer</Filter>
     </ClInclude>
+    <ClInclude Include="Renderer\jSceneRenderTargets.h">
+      <Filter>Code\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\jDrawCommand.h">
+      <Filter>Code\Renderer</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -496,6 +502,15 @@
       <Filter>Code\Renderer</Filter>
     </ClCompile>
     <ClCompile Include="Renderer\jForwardRenderer.cpp">
+      <Filter>Code\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\jRenderTarget.cpp">
+      <Filter>Code\RHI</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\jSceneRenderTargets.cpp">
+      <Filter>Code\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\jDrawCommand.cpp">
       <Filter>Code\Renderer</Filter>
     </ClCompile>
   </ItemGroup>

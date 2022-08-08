@@ -62,8 +62,7 @@ struct jRenderTarget final : public std::enable_shared_from_this<jRenderTarget>
         }
     }
 
-    ~jRenderTarget()
-    {}
+    ~jRenderTarget() {}
 
     size_t GetHash() const
     {
@@ -75,6 +74,8 @@ struct jRenderTarget final : public std::enable_shared_from_this<jRenderTarget>
         return Hash;
     }
 
+    void Return();
+
     jTexture* GetTexture() const { return TexturePtr.get(); }
     const void* GetViewHandle() const { return TexturePtr.get() ? TexturePtr->GetViewHandle() : nullptr; }
 
@@ -82,4 +83,5 @@ struct jRenderTarget final : public std::enable_shared_from_this<jRenderTarget>
     std::shared_ptr<jTexture> TexturePtr;
 
     mutable size_t Hash = 0;
+    bool bCreatedFromRenderTargetPool = false;
 };

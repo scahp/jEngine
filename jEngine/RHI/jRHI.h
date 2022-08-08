@@ -234,20 +234,21 @@ struct jQueryPrimitiveGenerated
 
 class jCamera;
 class jLight;
+class jDirectionalLight;
 struct jShaderBindingInstance;
 
 class jView
 {
 public:
 	jView() = default;
-	jView(const jCamera* camera, const jLight* directionalLight, const jLight* pointLight, const jLight* spotLight)
+	jView(const jCamera* camera, const jDirectionalLight* directionalLight, const jLight* pointLight, const jLight* spotLight)
 		: Camera(camera), DirectionalLight(directionalLight), PointLight(pointLight), SpotLight(spotLight)
 	{}
 
 	void GetShaderBindingInstance(std::vector<const jShaderBindingInstance*>& OutShaderBindingInstance);
 
 	const jCamera* Camera = nullptr;
-	const jLight* DirectionalLight = nullptr;
+	const jDirectionalLight* DirectionalLight = nullptr;
 	const jLight* PointLight = nullptr;
 	const jLight* SpotLight = nullptr;
 };

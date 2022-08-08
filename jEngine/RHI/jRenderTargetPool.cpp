@@ -41,6 +41,7 @@ std::shared_ptr<jRenderTarget> jRenderTargetPool::GetRenderTarget(const jRenderT
 	auto renderTargetPtr = g_rhi->CreateRenderTarget(info);
 	if (renderTargetPtr)
 	{
+		renderTargetPtr->bCreatedFromRenderTargetPool = true;
 		RenderTargetResourceMap[hash].push_back({ true, renderTargetPtr });
 		RenderTargetHashVariableMap[renderTargetPtr.get()] = hash;
 	}
