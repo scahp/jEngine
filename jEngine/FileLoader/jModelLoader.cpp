@@ -241,7 +241,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 	const int32 elementCount = static_cast<int32>(meshData->Vertices.size());
 
 	// attribute 추가
-	auto vertexStreamData = std::shared_ptr<jVertexStreamData>(new jVertexStreamData());
+	auto vertexStreamData = std::make_shared<jVertexStreamData>();
 
 	{
 		auto streamParam = new jStreamParam<float>();
@@ -315,7 +315,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 	vertexStreamData->PrimitiveType = EPrimitiveType::TRIANGLES;
 	vertexStreamData->ElementCount = elementCount;
 
-	auto indexStreamData = std::shared_ptr<jIndexStreamData>(new jIndexStreamData());
+	auto indexStreamData = std::make_shared<jIndexStreamData>();
 	indexStreamData->ElementCount = static_cast<int32>(meshData->Faces.size());
 	{
 		auto streamParam = new jStreamParam<uint32>();

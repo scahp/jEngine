@@ -40,7 +40,7 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
 	static jName ExtPNG(".png");
 	static jName ExtHDR(".hdr");
 
-	std::shared_ptr<jImageData> NewImageDataPatr(new jImageData());
+	std::shared_ptr<jImageData> NewImageDataPatr = std::make_shared<jImageData>();
 	bool IsHDR = false;
 
 	int32 width = 0;

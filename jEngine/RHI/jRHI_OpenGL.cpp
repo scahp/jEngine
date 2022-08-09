@@ -958,7 +958,7 @@ std::shared_ptr<jRenderTarget> jRHI_OpenGL::CreateRenderTarget(const jRenderTarg
 	if (info.IsGenerateMipmap)
 		glGenerateMipmap(textureType);
 
-	auto tex_gl = new jTexture_OpenGL();
+	auto tex_gl = jTexture_OpenGL();
 	tex_gl->Type = info.Type;
 	tex_gl->Format = info.Format;
 	tex_gl->Width = info.Width;

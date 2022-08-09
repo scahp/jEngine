@@ -37,13 +37,13 @@ struct jRenderTarget final : public std::enable_shared_from_this<jRenderTarget>
     template <typename T1, class... T2>
     static std::shared_ptr<jRenderTarget> CreateFromTexture(const T2&... args)
     {
-        const auto& T1Ptr = std::shared_ptr<T1>(new T1(args...));
-        return std::shared_ptr<jRenderTarget>(new jRenderTarget(T1Ptr));
+        const auto& T1Ptr = std::make_shared<T1>(args...);
+        return std::make_shared<jRenderTarget>(T1Ptr);
     }
 
     static std::shared_ptr<jRenderTarget> CreateFromTexture(const std::shared_ptr<jTexture>& texturePtr)
     {
-        return std::shared_ptr<jRenderTarget>(new jRenderTarget(texturePtr));
+        return std::make_shared<jRenderTarget>(texturePtr);
     }
 
     constexpr jRenderTarget() = default;

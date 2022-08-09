@@ -196,68 +196,28 @@ void jGame::Draw()
 {
 	SCOPE_DEBUG_EVENT(g_rhi, "Game::Draw");
 
-    jCommandBuffer_Vulkan* commandBuffer = (jCommandBuffer_Vulkan*)g_rhi_vk->CommandBufferManager->GetOrCreateCommandBuffer();
-    const uint32_t imageIndex = g_rhi_vk->BeginRenderFrame(commandBuffer);
+	std::shared_ptr<jRenderFrameContext> renderFrameContext = g_rhi_vk->BeginRenderFrame();
 
 	// 정리 해야 함
-    g_rhi_vk->CurrentCommandBuffer = commandBuffer;
+    g_rhi_vk->CurrentCommandBuffer = (jCommandBuffer_Vulkan*)renderFrameContext->CommandBuffer;
 
-    static jView View;
-    View.Camera = MainCamera;
-    View.DirectionalLight = DirectionalLight;
-
-	// SceneRenderTaget 을 관리할 객체 추가 필요
-	static std::vector<jSceneRenderTarget*> SceneRenderTarget;
-	if (SceneRenderTarget.size() <= imageIndex)
-	{
-		SceneRenderTarget.resize(imageIndex + 1, nullptr);
-	}
-
-    if (!SceneRenderTarget[imageIndex])
-        SceneRenderTarget[imageIndex] = new jSceneRenderTarget();
-
-	if (!SceneRenderTarget[imageIndex]->IsValid())
-	{
-		SceneRenderTarget[imageIndex]->Return();
-		SceneRenderTarget[imageIndex]->Create(g_rhi_vk->Swapchain->GetSwapchainImage(imageIndex));
-	}
-
-    if (g_rhi_vk->MsaaSamples <= 1)
-    {
-        if (!SceneRenderTarget[imageIndex]->FinalColorPtr)
-        {
-            const jSwapchainImage* image = g_rhi_vk->Swapchain->GetSwapchainImage(imageIndex);
-			SceneRenderTarget[imageIndex]->FinalColorPtr = jRenderTarget::CreateFromTexture(image->TexturePtr);
-        }
-        g_rhi_vk->TransitionImageLayoutImmediate(SceneRenderTarget[imageIndex]->FinalColorPtr->GetTexture(), EImageLayout::GENERAL);
-    }
-        
 	// 순서가 꼭 여기가 되야 하는데, 정리 필요
-    DirectionalLight->ShadowMapPtr = SceneRenderTarget[imageIndex]->DirectionalLightShadowMapPtr;
+    DirectionalLight->ShadowMapPtr = renderFrameContext->SceneRenderTarget->DirectionalLightShadowMapPtr;
     DirectionalLight->PrepareShaderBindingInstance();
 
-    jSceneRenderTarget& CurrentSceneRenderTarget = *SceneRenderTarget[imageIndex];
-
-    jForwardRenderer forwardRenderer;
-	forwardRenderer.View = View;
-	forwardRenderer.CommandBuffer = commandBuffer;
-	forwardRenderer.SceneRenderTarget = SceneRenderTarget[imageIndex];
+    jForwardRenderer forwardRenderer(renderFrameContext, jView(MainCamera, DirectionalLight));
     forwardRenderer.Setup();
 
-	ensure(commandBuffer->Begin());
-    g_rhi_vk->QueryPool.ResetQueryPool(commandBuffer);
-    g_rhi_vk->TransitionImageLayout(commandBuffer, View.DirectionalLight->ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_ATTACHMENT);
+	ensure(renderFrameContext->CommandBuffer->Begin());
+    g_rhi_vk->QueryPool.ResetQueryPool(renderFrameContext->CommandBuffer);
+    g_rhi_vk->TransitionImageLayout(renderFrameContext->CommandBuffer, DirectionalLight->ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_ATTACHMENT);
 
 	forwardRenderer.ShadowPass();
 	forwardRenderer.OpaquePass();
-    jImGUI_Vulkan::Get().Draw(commandBuffer, imageIndex);
-	ensure(commandBuffer->End());
+    jImGUI_Vulkan::Get().Draw(renderFrameContext->CommandBuffer, renderFrameContext->FrameIndex);
+	ensure(renderFrameContext->CommandBuffer->End());
 
-    {
-        g_rhi_vk->EndRenderFrame(commandBuffer);
-
-        g_rhi_vk->CommandBufferManager->ReturnCommandBuffer(commandBuffer);
-    }
+    g_rhi_vk->EndRenderFrame(renderFrameContext);
 }
 
 void jGame::OnMouseButton()

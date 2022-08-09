@@ -370,7 +370,7 @@ jBoundBoxObject* CreateBoundBox(jBoundBox boundBox, jObject* ownerObject, const 
 	const int32 elementCount = static_cast<int32>(_countof(vertices) / 3);
 
 	// attribute 추가
-	auto vertexStreamData = std::shared_ptr<jVertexStreamData>(new jVertexStreamData());
+	auto vertexStreamData = std::make_shared<jVertexStreamData>();
 
 	{
 		auto streamParam = new jStreamParam<float>();
@@ -454,7 +454,7 @@ jBoundSphereObject* CreateBoundSphere(jBoundSphere boundSphere, jObject* ownerOb
 	int32 elementCount = static_cast<int32>(vertices.size() / 3);
 
 	// attribute 추가
-	auto vertexStreamData = std::shared_ptr<jVertexStreamData>(new jVertexStreamData());
+	auto vertexStreamData = std::make_shared<jVertexStreamData>();
 	{
 		auto streamParam = new jStreamParam<float>();
 		streamParam->BufferType = EBufferType::STATIC;
@@ -499,7 +499,7 @@ jBoundSphereObject* CreateBoundSphere(jBoundSphere boundSphere, jObject* ownerOb
 		faces.push_back(iCount + 1);
 	}
 
-	auto indexStreamData = std::shared_ptr<jIndexStreamData>(new jIndexStreamData());
+	auto indexStreamData = std::make_shared<jIndexStreamData>();
 	indexStreamData->ElementCount = static_cast<int32>(faces.size());
 	{
 		auto streamParam = new jStreamParam<uint32>();
@@ -579,7 +579,7 @@ jRenderObject* CreateQuad_Internal(const Vector& pos, const Vector& size, const 
 	const int32 elementCount = _countof(vertices) / 3;
 
 	// attribute 추가
-	auto vertexStreamData = std::shared_ptr<jVertexStreamData>(new jVertexStreamData());
+	auto vertexStreamData = std::make_shared<jVertexStreamData>();
 
 	{
 		auto streamParam = new jStreamParam<float>();
@@ -730,7 +730,7 @@ jObject* CreateGizmo(const Vector& pos, const Vector& rot, const Vector& scale)
 	const int32 elementCount = _countof(vertices) / 3;
 
 	// attribute 추가
-	auto vertexStreamData = std::shared_ptr<jVertexStreamData>(new jVertexStreamData());
+	auto vertexStreamData = std::make_shared<jVertexStreamData>();
 
 	{
 		auto streamParam = new jStreamParam<float>();
@@ -834,7 +834,7 @@ jObject* CreateTriangle(const Vector& pos, const Vector& size, const Vector& sca
 	int32 elementCount = _countof(vertices) / 3;
 
 	// attribute 추가
-	auto vertexStreamData = std::shared_ptr<jVertexStreamData>(new jVertexStreamData());
+	auto vertexStreamData = std::make_shared<jVertexStreamData>();
 
 	{
 		auto streamParam = new jStreamParam<float>();
@@ -1060,7 +1060,7 @@ jObject* CreateCube(const Vector& pos, const Vector& size, const Vector& scale, 
 	const int32 elementCount = _countof(vertices) / 3;
 
 	// attribute 추가
-	auto vertexStreamData = std::shared_ptr<jVertexStreamData>(new jVertexStreamData());
+	auto vertexStreamData = std::make_shared<jVertexStreamData>();
 
 	{
 		auto streamParam = new jStreamParam<float>();
@@ -1208,7 +1208,7 @@ jObject* CreateCapsule(const Vector& pos, float height, float radius, int32 slic
 	int32 elementCount = static_cast<int32>(vertices.size() / 3);
 
 	// attribute 추가
-	auto vertexStreamData = std::shared_ptr<jVertexStreamData>(new jVertexStreamData());
+	auto vertexStreamData = std::make_shared<jVertexStreamData>();
 
 	{
 		auto streamParam = new jStreamParam<float>();
@@ -1287,7 +1287,7 @@ jObject* CreateCapsule(const Vector& pos, float height, float radius, int32 slic
 		}
 	}
 
-	auto indexStreamData = std::shared_ptr<jIndexStreamData>(new jIndexStreamData());
+	auto indexStreamData = std::make_shared<jIndexStreamData>();
 	indexStreamData->ElementCount = static_cast<int32>(faces.size());
 	{
 		auto streamParam = new jStreamParam<uint32>();
@@ -1373,7 +1373,7 @@ jConePrimitive* CreateCone(const Vector& pos, float height, float radius, int32 
 	}
 
 	// attribute 추가
-	auto vertexStreamData = std::shared_ptr<jVertexStreamData>(new jVertexStreamData());
+	auto vertexStreamData = std::make_shared<jVertexStreamData>();
 
 	{
 		auto streamParam = new jStreamParam<float>();
@@ -1534,7 +1534,7 @@ jObject* CreateCylinder(const Vector& pos, float height, float radius, int32 sli
 	/////////////////////////////////////////////////////
 
 	// attribute 추가
-	auto vertexStreamData = std::shared_ptr<jVertexStreamData>(new jVertexStreamData());
+	auto vertexStreamData = std::make_shared<jVertexStreamData>();
 
 	{
 		auto streamParam = new jStreamParam<float>();
@@ -1651,7 +1651,7 @@ jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector
 	int32 elementCount = static_cast<int32>(vertices.size() / 3);
 
 	// attribute 추가
-	auto vertexStreamData = std::shared_ptr<jVertexStreamData>(new jVertexStreamData());
+	auto vertexStreamData = std::make_shared<jVertexStreamData>();
 
 	{
 		auto streamParam = new jStreamParam<float>();
@@ -1752,7 +1752,7 @@ jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector
 		faces.push_back(iCount + 1);
 	}
 
-	auto indexStreamData = std::shared_ptr<jIndexStreamData>(new jIndexStreamData());
+	auto indexStreamData = std::make_shared<jIndexStreamData>();
 	indexStreamData->ElementCount = static_cast<int32>(faces.size());
 	{
 		auto streamParam = new jStreamParam<uint32>();
@@ -1798,7 +1798,7 @@ jUIQuadPrimitive* CreateUIQuad(const Vector2& pos, const Vector2& size, jTexture
 	int32 elementCount = _countof(vertices) / 2;
 
 	// attribute 추가
-	auto vertexStreamData = std::shared_ptr<jVertexStreamData>(new jVertexStreamData());
+	auto vertexStreamData = std::make_shared<jVertexStreamData>();
 
 	{
 		auto streamParam = new jStreamParam<float>();
@@ -1834,7 +1834,7 @@ jFullscreenQuadPrimitive* CreateFullscreenQuad(jTexture* texture)
 
 	uint32 elementCount = static_cast<uint32>(_countof(vertices));
 	// attribute 추가
-	auto vertexStreamData = std::shared_ptr<jVertexStreamData>(new jVertexStreamData());
+	auto vertexStreamData = std::make_shared<jVertexStreamData>();
 
 	{
 		auto streamParam = new jStreamParam<float>();
@@ -1881,7 +1881,7 @@ jSegmentPrimitive* CreateSegment(const Vector& start, const Vector& end, float t
 	int32 elementCount = static_cast<int32>(_countof(vertices) / 3);
 
 	// attribute 추가
-	auto vertexStreamData = std::shared_ptr<jVertexStreamData>(new jVertexStreamData());
+	auto vertexStreamData = std::make_shared<jVertexStreamData>();
 
 	{
 		auto streamParam = new jStreamParam<float>();
@@ -2063,7 +2063,7 @@ jGraph2D* CreateGraph2D(const Vector2& pos, const Vector2& size, const std::vect
 	const int32 elementCount = 4;
 
 	// attribute 추가
-	auto vertexStreamData = std::shared_ptr<jVertexStreamData>(new jVertexStreamData());
+	auto vertexStreamData = std::make_shared<jVertexStreamData>();
 
 	{
 		auto streamParam = new jStreamParam<Vector2>();
@@ -2336,7 +2336,7 @@ void jFrustumPrimitive::Update(float deltaTime)
 		const int32 elementCount = static_cast<int32>(_countof(vertices) / 3);
 
 		// attribute 추가
-		auto vertexStreamData = std::shared_ptr<jVertexStreamData>(new jVertexStreamData());
+		auto vertexStreamData = std::make_shared<jVertexStreamData>();
 
 		{
 			auto streamParam = new jStreamParam<float>();

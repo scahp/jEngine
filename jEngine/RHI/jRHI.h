@@ -9,6 +9,7 @@
 #include "jBuffer.h"
 #include "jCommandBufferManager.h"
 #include "jRenderPass.h"
+#include "jRenderFrameContext.h"
 
 extern class jRHI* g_rhi;
 
@@ -241,7 +242,7 @@ class jView
 {
 public:
 	jView() = default;
-	jView(const jCamera* camera, const jDirectionalLight* directionalLight, const jLight* pointLight, const jLight* spotLight)
+	jView(const jCamera* camera, const jDirectionalLight* directionalLight = nullptr, const jLight* pointLight = nullptr, const jLight* spotLight = nullptr)
 		: Camera(camera), DirectionalLight(directionalLight), PointLight(pointLight), SpotLight(spotLight)
 	{}
 
@@ -379,8 +380,8 @@ public:
 	virtual void SetLineWidth(float width) const {}
 	virtual void Flush() const {}
 	virtual void Finish() const {}
-	virtual int32 BeginRenderFrame(jCommandBuffer* commandBuffer) { return -1; }
-    virtual void EndRenderFrame(jCommandBuffer* commandBuffer) {}
+	virtual std::shared_ptr<jRenderFrameContext> BeginRenderFrame() { return nullptr; }
+    virtual void EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr) {}
 
 	virtual jRasterizationStateInfo* CreateRasterizationState(const jRasterizationStateInfo& initializer) const { return nullptr; }
 	virtual jMultisampleStateInfo* CreateMultisampleState(const jMultisampleStateInfo& initializer) const { return nullptr; }
@@ -412,6 +413,8 @@ public:
 	virtual jRenderPass* GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const Vector2i& offset, const Vector2i& extent) const { return nullptr; }
 	virtual jRenderPass* GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const jAttachment& depthAttachment, const Vector2i& offset, const Vector2i& extent) const { return nullptr; }
 	virtual jRenderPass* GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const jAttachment& depthAttachment, const jAttachment& colorResolveAttachment, const Vector2i& offset, const Vector2i& extent) const { return nullptr; }
+
+	virtual jCommandBufferManager* GetCommandBufferManager() const { return nullptr; }
 };
 
 // Not thred safe
@@ -478,13 +481,55 @@ jName GetCommonTextureSRGBName(int32 index);
 
 //////////////////////////////////////////////////////////////////////////
 
-template <typename T>
+class jLock
+{
+public:
+	virtual ~jLock() {}
+	virtual void Lock() {}
+	virtual void Unlock() {}
+};
+
+using jEmptyLock = jLock;
+
+class jMutexLock : public jLock
+{
+	void Lock()
+	{
+		lock.lock();
+	}
+	void Unlock()
+	{
+		lock.unlock();
+	}
+
+	std::mutex lock;
+};
+
+class jScopedLock
+{
+public:
+	jScopedLock(jLock* InLock)
+		: ScopedLock(InLock)
+	{
+		if (ScopedLock)
+			ScopedLock->Lock();
+	}
+	~jScopedLock()
+	{
+		if (ScopedLock)
+			ScopedLock->Unlock();
+	}
+	jLock* ScopedLock;
+};
+
+template <typename T, typename LOCK_TYPE = jEmptyLock>
 class TResourcePool
 {
 public:
     template <typename TInitializer>
     T* GetOrCreate(const TInitializer& initializer)
     {
+		jScopedLock s(&Lock);
         const size_t hash = initializer.GetHash();
         auto it_find = Pool.find(hash);
         if (Pool.end() != it_find)
@@ -500,6 +545,7 @@ public:
     }
 
     std::unordered_map<size_t, T*> Pool;
+	LOCK_TYPE Lock;
 };
 
 template <ETextureFilter TMinification = ETextureFilter::NEAREST, ETextureFilter TMagnification = ETextureFilter::NEAREST, ETextureAddressMode TAddressU = ETextureAddressMode::CLAMP_TO_EDGE

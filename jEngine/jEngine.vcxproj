@@ -147,6 +147,7 @@ xcopy /s /y /d  "$(ProjectDir)External\ShaderConductor\Lib\Debug\*.dll" "$(OutDi
     <ClInclude Include="RHI\jFrameBuffer.h" />
     <ClInclude Include="RHI\jFrameBufferPool.h" />
     <ClInclude Include="RHI\jPipelineStateInfo.h" />
+    <ClInclude Include="RHI\jRenderFrameContext.h" />
     <ClInclude Include="RHI\jRenderPass.h" />
     <ClInclude Include="RHI\jRenderTarget.h" />
     <ClInclude Include="RHI\jRenderTargetPool.h" />
@@ -266,6 +267,7 @@ xcopy /s /y /d  "$(ProjectDir)External\ShaderConductor\Lib\Debug\*.dll" "$(OutDi
     <ClCompile Include="RHI\jFenceManager.cpp" />
     <ClCompile Include="RHI\jFrameBufferPool.cpp" />
     <ClCompile Include="RHI\jPipelineStateInfo.cpp" />
+    <ClCompile Include="RHI\jRenderFrameContext.cpp" />
     <ClCompile Include="RHI\jRenderTarget.cpp" />
     <ClCompile Include="RHI\jRenderTargetPool.cpp" />
     <ClCompile Include="RHI\jRHI.cpp" />

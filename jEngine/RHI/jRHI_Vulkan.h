@@ -79,7 +79,7 @@ public:
 	jSwapchain_Vulkan* Swapchain = nullptr;
 	jCommandBufferManager_Vulkan* CommandBufferManager = nullptr;
 
-	size_t CurrenFrameIndex = 0;
+	uint32 CurrenFrameIndex = 0;
 
     VkPipelineCache PipelineCache = nullptr;
 
@@ -155,8 +155,8 @@ public:
 	virtual std::vector<uint64> GetWholeQueryTimeStampResult(int32 InWatingResultIndex) const override;
 	virtual void GetQueryTimeStampResultFromWholeStampArray(jQueryTime* queryTimeStamp, int32 InWatingResultIndex
 		, const std::vector<uint64>& wholeQueryTimeStampArray) const override;
-	virtual int32 BeginRenderFrame(jCommandBuffer* commandBuffer) override;
-	virtual void EndRenderFrame(jCommandBuffer* commandBuffer) override;
+	virtual std::shared_ptr<jRenderFrameContext> BeginRenderFrame() override;
+	virtual void EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr) override;
 	jPipelineStateInfo* CreatePipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader
 		, const jVertexBuffer* vertexBuffer, const jRenderPass* renderPass, const std::vector<const jShaderBindings*> shaderBindings) const override;
 
@@ -165,6 +165,8 @@ public:
 		, const Vector2i& offset, const Vector2i& extent) const override;
 	virtual jRenderPass* GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const jAttachment& depthAttachment
 		, const jAttachment& colorResolveAttachment, const Vector2i& offset, const Vector2i& extent) const override;
+
+	virtual jCommandBufferManager* GetCommandBufferManager() const { return CommandBufferManager; }
 };
 
 extern jRHI_Vulkan* g_rhi_vk;

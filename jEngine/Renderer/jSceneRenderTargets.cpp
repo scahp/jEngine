@@ -21,7 +21,6 @@ void jSceneRenderTarget::Create(const jSwapchainImage* image)
     {
         FinalColorPtr = jRenderTarget::CreateFromTexture(image->TexturePtr);
     }
-    g_rhi_vk->TransitionImageLayoutImmediate(FinalColorPtr->GetTexture(), EImageLayout::GENERAL);
 
     DirectionalLightShadowMapPtr = jRenderTargetPool::GetRenderTarget(
         { ETextureType::TEXTURE_2D, ETextureFormat::D24_S8, SCR_WIDTH, SCR_HEIGHT, 1, false, 1 });    

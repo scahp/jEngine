@@ -307,6 +307,9 @@
     <ClInclude Include="Renderer\jDrawCommand.h">
       <Filter>Code\Renderer</Filter>
     </ClInclude>
+    <ClInclude Include="RHI\jRenderFrameContext.h">
+      <Filter>Code\RHI</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -512,6 +515,9 @@
     </ClCompile>
     <ClCompile Include="Renderer\jDrawCommand.cpp">
       <Filter>Code\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\jRenderFrameContext.cpp">
+      <Filter>Code\RHI</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

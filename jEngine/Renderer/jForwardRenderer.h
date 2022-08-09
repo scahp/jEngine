@@ -8,6 +8,8 @@ class jRenderPass;
 class jForwardRenderer : public jRenderer
 {
 public:
+    using jRenderer::jRenderer;
+
     virtual void Setup() override;
     virtual void ShadowPass() override;
     virtual void OpaquePass() override;
@@ -16,10 +18,10 @@ public:
     // Pass 별 Context 를 만들어서 넣도록 할 예정
     jView ShadowView;
 
-    jCommandBuffer* CommandBuffer = nullptr;
-    jRenderPass* ShadowMapRenderPass = nullptr;
     std::vector<jDrawCommand> ShadowPasses;
+    std::vector<jDrawCommand> BasePasses;
 
+    jRenderPass* ShadowMapRenderPass = nullptr;
     jRenderPass* OpaqueRenderPass = nullptr;
 };
 

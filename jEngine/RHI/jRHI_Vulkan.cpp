@@ -23,6 +23,7 @@
 #include "Vulkan/jShader_Vulkan.h"
 #include "Vulkan/jBuffer_Vulkan.h"
 #include "Vulkan/jCommandBufferManager_Vulkan.h"
+#include "Renderer/jSceneRenderTargets.h"
 
 jRHI_Vulkan* g_rhi_vk = nullptr;
 std::unordered_map<size_t, VkPipelineLayout> jRHI_Vulkan::PipelineLayoutPool;
@@ -1027,7 +1028,7 @@ void jRHI_Vulkan::GetQueryTimeStampResultFromWholeStampArray(jQueryTime* queryTi
 	queryTimeStamp_vk->TimeStampStartEnd[1] = wholeQueryTimeStampArray[queryEnd];
 }
 
-int32 jRHI_Vulkan::BeginRenderFrame(jCommandBuffer* commandBuffer)
+std::shared_ptr<jRenderFrameContext> jRHI_Vulkan::BeginRenderFrame()
 {
 	uint32 imageIndex = -1;
 
@@ -1037,7 +1038,23 @@ int32 jRHI_Vulkan::BeginRenderFrame(jCommandBuffer* commandBuffer)
     VkResult acquireNextImageResult = vkAcquireNextImageKHR(Device, (VkSwapchainKHR)Swapchain->GetHandle(), UINT64_MAX
 		, Swapchain->Images[CurrenFrameIndex]->Available, VK_NULL_HANDLE, &imageIndex);
     if (acquireNextImageResult != VK_SUCCESS)
-        return -1;
+        return nullptr;
+
+	// 여기서는 VK_SUCCESS or VK_SUBOPTIMAL_KHR 은 성공했다고 보고 계속함.
+	// VK_ERROR_OUT_OF_DATE_KHR : 스왑체인이 더이상 서피스와 렌더링하는데 호환되지 않는 경우. (보통 윈도우 리사이즈 이후)
+	// VK_SUBOPTIMAL_KHR : 스왑체인이 여전히 서피스에 제출 가능하지만, 서피스의 속성이 더이상 정확하게 맞지 않음.
+	if (acquireNextImageResult == VK_ERROR_OUT_OF_DATE_KHR)
+	{
+		RecreateSwapChain();		// 이 경우 렌더링이 더이상 불가능하므로 즉시 스왑체인을 새로 만듬.
+		return nullptr;
+	}
+	else if (acquireNextImageResult != VK_SUCCESS && acquireNextImageResult != VK_SUBOPTIMAL_KHR)
+	{
+		check(0);
+		return nullptr;
+	}
+
+	jCommandBuffer_Vulkan* commandBuffer = (jCommandBuffer_Vulkan*)g_rhi_vk->CommandBufferManager->GetOrCreateCommandBuffer();
 
     // 이전 프레임에서 현재 사용하려는 이미지를 사용중에 있나? (그렇다면 펜스를 기다려라)
     if (lastCommandBufferFence != VK_NULL_HANDLE)
@@ -1046,28 +1063,20 @@ int32 jRHI_Vulkan::BeginRenderFrame(jCommandBuffer* commandBuffer)
     // 이 프레임에서 펜스를 사용한다고 마크 해둠
 	Swapchain->Images[CurrenFrameIndex]->CommandBufferFence = (VkFence)commandBuffer->GetFenceHandle();
 
-    // 여기서는 VK_SUCCESS or VK_SUBOPTIMAL_KHR 은 성공했다고 보고 계속함.
-    // VK_ERROR_OUT_OF_DATE_KHR : 스왑체인이 더이상 서피스와 렌더링하는데 호환되지 않는 경우. (보통 윈도우 리사이즈 이후)
-    // VK_SUBOPTIMAL_KHR : 스왑체인이 여전히 서피스에 제출 가능하지만, 서피스의 속성이 더이상 정확하게 맞지 않음.
-    if (acquireNextImageResult == VK_ERROR_OUT_OF_DATE_KHR)
-    {
-        RecreateSwapChain();		// 이 경우 렌더링이 더이상 불가능하므로 즉시 스왑체인을 새로 만듬.
-        return -2;
-    }
-    else if (acquireNextImageResult != VK_SUCCESS && acquireNextImageResult != VK_SUBOPTIMAL_KHR)
-    {
-        check(0);
-        return -3;
-    }
+    auto renderFrameContextPtr = std::make_shared<jRenderFrameContext>();
+	renderFrameContextPtr->FrameIndex = CurrenFrameIndex;
+	renderFrameContextPtr->CommandBuffer = commandBuffer;
+	renderFrameContextPtr->SceneRenderTarget = new jSceneRenderTarget();
+	renderFrameContextPtr->SceneRenderTarget->Create(Swapchain->GetSwapchainImage(CurrenFrameIndex));
 
-	return (int32)imageIndex;
+	return renderFrameContextPtr;
 }
 
-void jRHI_Vulkan::EndRenderFrame(jCommandBuffer* commandBuffer)
+void jRHI_Vulkan::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr)
 {
-	check(commandBuffer);
-	VkCommandBuffer vkCommandBuffer = (VkCommandBuffer)commandBuffer->GetHandle();
-	VkFence vkFence = (VkFence)commandBuffer->GetFenceHandle();
+	check(renderFrameContextPtr->CommandBuffer);
+	VkCommandBuffer vkCommandBuffer = (VkCommandBuffer)renderFrameContextPtr->CommandBuffer->GetHandle();
+	VkFence vkFence = (VkFence)renderFrameContextPtr->CommandBuffer->GetFenceHandle();
 	const uint32 imageIndex = (uint32)CurrenFrameIndex;
 
     // Submitting the command buffer
@@ -1125,6 +1134,7 @@ void jRHI_Vulkan::EndRenderFrame(jCommandBuffer* commandBuffer)
     // 1). 한프레임을 마치고 큐가 빌때까지 기다리는 것으로 해결할 수 있음. 한번에 1개의 프레임만 완성 가능(최적의 해결방법은 아님)
     // 2). 여러개의 프레임을 동시에 처리 할수있도록 확장. 동시에 진행될 수 있는 최대 프레임수를 지정해줌.
     CurrenFrameIndex = (CurrenFrameIndex + 1) % Swapchain->Images.size();
+	renderFrameContextPtr->Destroy();
 }
 
 VkCommandBuffer jRHI_Vulkan::BeginSingleTimeCommands() const
@@ -1165,6 +1175,9 @@ void jRHI_Vulkan::EndSingleTimeCommands(VkCommandBuffer commandBuffer) const
 
 bool jRHI_Vulkan::TransitionImageLayout(VkCommandBuffer commandBuffer, VkImage image, VkFormat format, uint32 mipLevels, VkImageLayout oldLayout, VkImageLayout newLayout) const
 {
+	if (oldLayout == newLayout)
+		return true;
+
 	// Layout Transition 에는 image memory barrier 사용
 	// Pipeline barrier는 리소스들 간의 synchronize 를 맞추기 위해 사용 (버퍼를 읽기전에 쓰기가 완료되는 것을 보장받기 위해)
 	// Pipeline barrier는 image layout 간의 전환과 VK_SHARING_MODE_EXCLUSIVE를 사용한 queue family ownership을 전달하는데에도 사용됨

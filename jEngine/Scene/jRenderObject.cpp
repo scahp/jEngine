@@ -23,7 +23,7 @@ void jRenderObject::CreateRenderObject(const std::shared_ptr<jVertexStreamData>&
 
 	if (VertexStream && ensure(VertexStream->Params.size()))
 	{
-		VertexStream_PositionOnly = std::shared_ptr<jVertexStreamData>(new jVertexStreamData());
+		VertexStream_PositionOnly = std::make_shared<jVertexStreamData>();
 		VertexStream_PositionOnly->Params.push_back(VertexStream->Params[0]);
 		VertexStream_PositionOnly->PrimitiveType = VertexStream->PrimitiveType;
 		VertexStream_PositionOnly->ElementCount = VertexStream->ElementCount;
@@ -41,7 +41,7 @@ void jRenderObject::UpdateVertexStream(const std::shared_ptr<jVertexStreamData>&
 
 	if (VertexStream && ensure(VertexStream->Params.size()))
 	{
-		VertexStream_PositionOnly = std::shared_ptr<jVertexStreamData>(new jVertexStreamData());
+		VertexStream_PositionOnly = std::make_shared<jVertexStreamData>();
 		VertexStream_PositionOnly->Params.push_back(VertexStream->Params[0]);
 		VertexStream_PositionOnly->PrimitiveType = VertexStream->PrimitiveType;
 		VertexStream_PositionOnly->ElementCount = VertexStream->ElementCount;

@@ -129,7 +129,7 @@ private:
 	{
 		check(pName);
 
-		return std::shared_ptr<std::string>(new std::string(pName));
+		return std::make_shared<std::string>(pName);
 	}
 
 	uint32 NameHash = -1;

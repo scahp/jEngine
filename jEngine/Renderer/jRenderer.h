@@ -2,10 +2,16 @@
 
 class jView;
 struct jSceneRenderTarget;
+struct jRenderFrameContext;
 
 class jRenderer
 {
 public:
+    jRenderer() = default;
+    jRenderer(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, const jView& InView)
+        : RenderFrameContextPtr(InRenderFrameContextPtr), View(InView)
+    {}
+
     virtual ~jRenderer() {}
 
     virtual void Setup() = 0;
@@ -20,6 +26,6 @@ public:
         TranslucentPass();
     }
 
-    jSceneRenderTarget* SceneRenderTarget = nullptr;
+    std::shared_ptr<jRenderFrameContext> RenderFrameContextPtr;
     jView View;
 };

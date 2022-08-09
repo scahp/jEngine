@@ -27,8 +27,6 @@ void jForwardRenderer::Setup()
         jAttachment depth = jAttachment(View.DirectionalLight->ShadowMapPtr, EAttachmentLoadStoreOp::CLEAR_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE
             , ClearColor, ClearDepth, EImageLayout::UNDEFINED, EImageLayout::DEPTH_STENCIL_ATTACHMENT);
 
-        g_rhi_vk->TransitionImageLayoutImmediate(View.DirectionalLight->ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_READ_ONLY);
-
         ShadowMapRenderPass = (jRenderPass_Vulkan*)g_rhi_vk->GetOrCreateRenderPass({}, depth, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
     }
     
@@ -67,15 +65,15 @@ void jForwardRenderer::Setup()
     const Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
     const Vector2 ClearDepth = Vector2(1.0f, 0.0f);
 
-    jAttachment color = jAttachment(SceneRenderTarget->ColorPtr, EAttachmentLoadStoreOp::CLEAR_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth
+    jAttachment color = jAttachment(RenderFrameContextPtr->SceneRenderTarget->ColorPtr, EAttachmentLoadStoreOp::CLEAR_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth
         , EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
-    jAttachment depth = jAttachment(SceneRenderTarget->DepthPtr, EAttachmentLoadStoreOp::CLEAR_DONTCARE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth
+    jAttachment depth = jAttachment(RenderFrameContextPtr->SceneRenderTarget->DepthPtr, EAttachmentLoadStoreOp::CLEAR_DONTCARE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth
         , EImageLayout::UNDEFINED, EImageLayout::DEPTH_STENCIL_ATTACHMENT);
     jAttachment resolve;
 
     if (g_rhi_vk->MsaaSamples > 1)
     {
-        resolve = jAttachment(SceneRenderTarget->ResolvePtr, EAttachmentLoadStoreOp::DONTCARE_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth
+        resolve = jAttachment(RenderFrameContextPtr->SceneRenderTarget->ResolvePtr, EAttachmentLoadStoreOp::DONTCARE_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth
             , EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
     }
 
@@ -93,39 +91,25 @@ void jForwardRenderer::ShadowPass()
 {
     SCOPE_GPU_PROFILE(ShadowPass);
 
-    check(CommandBuffer);
+    check(RenderFrameContextPtr->CommandBuffer);
 
-    //////////////////////////////////////////////////////////////////////////
-    // 여기서 부터 렌더 로직 시작
-    //if (ensure(CommandBuffer->Begin()))
-    //{
-    //    g_rhi_vk->QueryPool.ResetQueryPool(CommandBuffer);
-    //    g_rhi_vk->TransitionImageLayout(CommandBuffer, View.DirectionalLight->ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_ATTACHMENT);
-
+    if (ShadowMapRenderPass->BeginRenderPass(RenderFrameContextPtr->CommandBuffer))
+    {
+        for (auto& command : ShadowPasses)
         {
-            //SCOPE_GPU_PROFILE(ShadowPass);
-            ShadowMapRenderPass->BeginRenderPass(CommandBuffer);
-
-            for (auto& command : ShadowPasses)
-            {
-                command.Draw();
-            }
-
-            // Finishing up
-            ShadowMapRenderPass->EndRenderPass();
+            command.Draw();
         }
+        ShadowMapRenderPass->EndRenderPass();
+    }
 
-        //ensure(commandBuffer.End());
-    //}
-
-    g_rhi_vk->TransitionImageLayout(CommandBuffer, View.DirectionalLight->ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_READ_ONLY);
+    g_rhi_vk->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, View.DirectionalLight->ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_READ_ONLY);
 }
 
 void jForwardRenderer::OpaquePass()
 {
     SCOPE_GPU_PROFILE(BasePass);
 
-    g_rhi_vk->TransitionImageLayout(CommandBuffer, SceneRenderTarget->ColorPtr->GetTexture(), EImageLayout::COLOR_ATTACHMENT);
+    g_rhi_vk->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, RenderFrameContextPtr->SceneRenderTarget->ColorPtr->GetTexture(), EImageLayout::COLOR_ATTACHMENT);
 
     static jShader* Shader = nullptr;
     if (!Shader)
@@ -137,49 +121,30 @@ void jForwardRenderer::OpaquePass()
         Shader = g_rhi->CreateShader(shaderInfo);
     }
 
-#if STATIC_COMMAND
-    static std::vector<jDrawCommand<false>> BasePasses;
-    if (BasePasses.size() <= 0)
-#else
     std::vector<jDrawCommand> BasePasses;
-#endif
+    for (auto iter : jObject::GetStaticObject())
     {
-        for (auto iter : jObject::GetStaticObject())
-        {
-            auto newCommand = jDrawCommand(&View, iter->RenderObject, OpaqueRenderPass, Shader, &g_rhi_vk->CurrentPipelineStateFixed, { });
-            newCommand.PrepareToDraw(false);
-            BasePasses.push_back(newCommand);
-        }
+        auto newCommand = jDrawCommand(&View, iter->RenderObject, OpaqueRenderPass, Shader, &g_rhi_vk->CurrentPipelineStateFixed, { });
+        newCommand.PrepareToDraw(false);
+        BasePasses.push_back(newCommand);
     }
 
-    //////////////////////////////////////////////////////////////////////////
-    // 여기서 부터 렌더 로직 시작
-    //if (ensure(commandBuffer.Begin()))
+    if (OpaqueRenderPass->BeginRenderPass(RenderFrameContextPtr->CommandBuffer))
     {
-        //SCOPE_GPU_PROFILE(BasePass);
-
-        OpaqueRenderPass->BeginRenderPass(CommandBuffer);
-
-        //vkCmdWriteTimestamp((VkCommandBuffer)commandBuffer.GetHandle(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, g_rhi_vk->vkQueryPool, 0);
-
         for (auto command : BasePasses)
         {
             command.Draw();
         }
 
-        // Finishing up
         OpaqueRenderPass->EndRenderPass();
-
-        //vkCmdWriteTimestamp((VkCommandBuffer)commandBuffer.GetHandle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, g_rhi_vk->vkQueryPool, 1);
     }
-    //ensure(commandBuffer->End());
 
     // 여기 까지 렌더 로직 끝
     //////////////////////////////////////////////////////////////////////////
     const int32 imageIndex = (int32)g_rhi_vk->CurrenFrameIndex;
 
-    g_rhi_vk->TransitionImageLayout(CommandBuffer, SceneRenderTarget->ColorPtr->GetTexture(), EImageLayout::SHADER_READ_ONLY);
-    g_rhi_vk->TransitionImageLayout(CommandBuffer, SceneRenderTarget->FinalColorPtr->GetTexture(), EImageLayout::GENERAL);
+    g_rhi_vk->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, RenderFrameContextPtr->SceneRenderTarget->ColorPtr->GetTexture(), EImageLayout::SHADER_READ_ONLY);
+    g_rhi_vk->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, RenderFrameContextPtr->SceneRenderTarget->FinalColorPtr->GetTexture(), EImageLayout::GENERAL);
 
     static VkDescriptorSetLayout descriptorSetLayout[3] = { nullptr };
 
@@ -254,7 +219,7 @@ void jForwardRenderer::OpaquePass()
 
         VkDescriptorImageInfo colorImageInfo{};
         colorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        colorImageInfo.imageView = (VkImageView)SceneRenderTarget->ColorPtr->GetViewHandle();
+        colorImageInfo.imageView = (VkImageView)RenderFrameContextPtr->SceneRenderTarget->ColorPtr->GetViewHandle();
         colorImageInfo.sampler = jTexture_Vulkan::CreateDefaultSamplerState();
 
         VkWriteDescriptorSet writeDescriptorSet{};
@@ -267,7 +232,7 @@ void jForwardRenderer::OpaquePass()
 
         VkDescriptorImageInfo targetImageInfo{};
         targetImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-        targetImageInfo.imageView = (VkImageView)SceneRenderTarget->FinalColorPtr->GetViewHandle();
+        targetImageInfo.imageView = (VkImageView)RenderFrameContextPtr->SceneRenderTarget->FinalColorPtr->GetViewHandle();
         targetImageInfo.sampler = jTexture_Vulkan::CreateDefaultSamplerState();
 
         VkWriteDescriptorSet writeDescriptorSet2{};
@@ -302,9 +267,9 @@ void jForwardRenderer::OpaquePass()
         verify(VK_SUCCESS == vkCreateComputePipelines(g_rhi_vk->Device, g_rhi_vk->PipelineCache, 1, &computePipelineCreateInfo, nullptr, &pipeline[imageIndex]));
     }
 
-    vkCmdBindPipeline((VkCommandBuffer)CommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline[imageIndex]);
-    vkCmdBindDescriptorSets((VkCommandBuffer)CommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout[imageIndex], 0, 1, &descriptorSet[imageIndex], 0, 0);
-    vkCmdDispatch((VkCommandBuffer)CommandBuffer->GetHandle(), g_rhi_vk->Swapchain->Extent.x / 16, g_rhi_vk->Swapchain->Extent.y / 16, 1);
+    vkCmdBindPipeline((VkCommandBuffer)RenderFrameContextPtr->CommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline[imageIndex]);
+    vkCmdBindDescriptorSets((VkCommandBuffer)RenderFrameContextPtr->CommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout[imageIndex], 0, 1, &descriptorSet[imageIndex], 0, 0);
+    vkCmdDispatch((VkCommandBuffer)RenderFrameContextPtr->CommandBuffer->GetHandle(), g_rhi_vk->Swapchain->Extent.x / 16, g_rhi_vk->Swapchain->Extent.y / 16, 1);
 }
 
 void jForwardRenderer::TranslucentPass()
