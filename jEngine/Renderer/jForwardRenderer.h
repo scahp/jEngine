@@ -11,6 +11,7 @@ public:
     using jRenderer::jRenderer;
 
     virtual void Setup() override;
+    virtual void Render() override;
     virtual void ShadowPass() override;
     virtual void OpaquePass() override;
     virtual void TranslucentPass() override;

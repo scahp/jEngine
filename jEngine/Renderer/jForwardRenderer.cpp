@@ -87,11 +87,23 @@ void jForwardRenderer::Setup()
     }
 }
 
+void jForwardRenderer::Render()
+{
+    check(RenderFrameContextPtr->CommandBuffer);
+    ensure(RenderFrameContextPtr->CommandBuffer->Begin());
+    g_rhi_vk->QueryPool.ResetQueryPool(RenderFrameContextPtr->CommandBuffer);
+
+    __super::Render();
+
+    jImGUI_Vulkan::Get().Draw(RenderFrameContextPtr->CommandBuffer, RenderFrameContextPtr->FrameIndex);
+    ensure(RenderFrameContextPtr->CommandBuffer->End());
+}
+
 void jForwardRenderer::ShadowPass()
 {
     SCOPE_GPU_PROFILE(ShadowPass);
 
-    check(RenderFrameContextPtr->CommandBuffer);
+    g_rhi_vk->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, View.DirectionalLight->ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_ATTACHMENT);
 
     if (ShadowMapRenderPass->BeginRenderPass(RenderFrameContextPtr->CommandBuffer))
     {

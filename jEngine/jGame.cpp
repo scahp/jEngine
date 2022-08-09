@@ -198,24 +198,13 @@ void jGame::Draw()
 
 	std::shared_ptr<jRenderFrameContext> renderFrameContext = g_rhi_vk->BeginRenderFrame();
 
-	// 정리 해야 함
-    g_rhi_vk->CurrentCommandBuffer = (jCommandBuffer_Vulkan*)renderFrameContext->CommandBuffer;
-
 	// 순서가 꼭 여기가 되야 하는데, 정리 필요
     DirectionalLight->ShadowMapPtr = renderFrameContext->SceneRenderTarget->DirectionalLightShadowMapPtr;
     DirectionalLight->PrepareShaderBindingInstance();
 
     jForwardRenderer forwardRenderer(renderFrameContext, jView(MainCamera, DirectionalLight));
     forwardRenderer.Setup();
-
-	ensure(renderFrameContext->CommandBuffer->Begin());
-    g_rhi_vk->QueryPool.ResetQueryPool(renderFrameContext->CommandBuffer);
-    g_rhi_vk->TransitionImageLayout(renderFrameContext->CommandBuffer, DirectionalLight->ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_ATTACHMENT);
-
-	forwardRenderer.ShadowPass();
-	forwardRenderer.OpaquePass();
-    jImGUI_Vulkan::Get().Draw(renderFrameContext->CommandBuffer, renderFrameContext->FrameIndex);
-	ensure(renderFrameContext->CommandBuffer->End());
+	forwardRenderer.Render();
 
     g_rhi_vk->EndRenderFrame(renderFrameContext);
 }

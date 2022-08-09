@@ -88,7 +88,7 @@ public:
 
     VkPhysicalDeviceProperties DeviceProperties;
 
-    jCommandBuffer_Vulkan* CurrentCommandBuffer = nullptr;
+    const jCommandBuffer_Vulkan* CurrentCommandBuffer = nullptr;
     jPipelineStateFixedInfo CurrentPipelineStateFixed;
 
     jQueryPool_Vulkan QueryPool;
