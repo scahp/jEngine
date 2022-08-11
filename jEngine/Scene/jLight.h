@@ -238,20 +238,8 @@ public:
 		UniformBinding.reserve(2);
 		UniformBinding.emplace_back(TShaderBinding(BindingPoint++, EShaderAccessStageFlag::ALL_GRAPHICS, LightDataUniformBlock));
 
-		//std::vector<TShaderBinding<jTextureBindings>> TextureBinding;
-		//for (int32 i = 0; i < (int32)MaterialData.Params.size(); ++i)
-		//{
-		//	if (!MaterialData.Params[i].Texture)
-		//		continue;
-
-		//	jTextureBindings bindings;
-		//	bindings.Texture = MaterialData.Params[i].Texture;
-		//	bindings.SamplerState = MaterialData.Params[i].SamplerState;
-		//	TextureBinding.push_back(TShaderBinding(BindingPoint++, EShaderAccessStageFlag::ALL_GRAPHICS, bindings));
-		//}
-
 		std::vector<TShaderBinding<jTextureBindings>> TextureBinding;
-		if (ShadowMapPtr)
+		if (ensure(ShadowMapPtr))
 		{
 			jTextureBindings bindings;
 			bindings.Texture = ShadowMapPtr->GetTexture();

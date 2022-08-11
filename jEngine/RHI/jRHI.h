@@ -242,16 +242,16 @@ class jView
 {
 public:
 	jView() = default;
-	jView(const jCamera* camera, const jDirectionalLight* directionalLight = nullptr, const jLight* pointLight = nullptr, const jLight* spotLight = nullptr)
+	jView(jCamera* camera, jDirectionalLight* directionalLight = nullptr, jLight* pointLight = nullptr, jLight* spotLight = nullptr)
 		: Camera(camera), DirectionalLight(directionalLight), PointLight(pointLight), SpotLight(spotLight)
 	{}
 
 	void GetShaderBindingInstance(std::vector<const jShaderBindingInstance*>& OutShaderBindingInstance);
 
-	const jCamera* Camera = nullptr;
-	const jDirectionalLight* DirectionalLight = nullptr;
-	const jLight* PointLight = nullptr;
-	const jLight* SpotLight = nullptr;
+	jCamera* Camera = nullptr;
+	jDirectionalLight* DirectionalLight = nullptr;
+	jLight* PointLight = nullptr;
+	jLight* SpotLight = nullptr;
 };
 
 class jRHI

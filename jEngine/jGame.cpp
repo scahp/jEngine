@@ -198,10 +198,6 @@ void jGame::Draw()
 
 	std::shared_ptr<jRenderFrameContext> renderFrameContext = g_rhi_vk->BeginRenderFrame();
 
-	// 순서가 꼭 여기가 되야 하는데, 정리 필요
-    DirectionalLight->ShadowMapPtr = renderFrameContext->SceneRenderTarget->DirectionalLightShadowMapPtr;
-    DirectionalLight->PrepareShaderBindingInstance();
-
     jForwardRenderer forwardRenderer(renderFrameContext, jView(MainCamera, DirectionalLight));
     forwardRenderer.Setup();
 	forwardRenderer.Render();

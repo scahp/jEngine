@@ -14,7 +14,6 @@ public:
         , jRenderPass* renderPass, jShader* shader, jPipelineStateFixedInfo* pipelineStateFixed, std::vector<const jShaderBindingInstance*> shaderBindingInstances);
 
     void PrepareToDraw(bool bPositionOnly);
-
     void Draw();
 
     std::vector<const jShaderBindingInstance*> ShaderBindingInstances;

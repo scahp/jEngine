@@ -12,13 +12,23 @@
 
 void jForwardRenderer::Setup()
 {
+    SetupShadowPass();
+    SetupBasePass();
+}
+
+void jForwardRenderer::SetupShadowPass()
+{
+    // View 별로 저장 할 수 있어야 함
+    View.DirectionalLight->ShadowMapPtr = RenderFrameContextPtr->SceneRenderTarget->DirectionalLightShadowMapPtr;
+    View.DirectionalLight->PrepareShaderBindingInstance();
+
     // Prepare shadowpass pipeline
     auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
     jMultisampleStateInfo* MultisampleState = TMultisampleStateInfo<true, 0.2f, false, false>::Create(EMSAASamples::COUNT_1);
     auto DepthStencilState = TDepthStencilStateInfo<true, true, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
     auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::NONE>::Create();
 
-    jPipelineStateFixedInfo CurrentPipelineStateFixed_Shadow = jPipelineStateFixedInfo(RasterizationState, MultisampleState, DepthStencilState, BlendingState
+    jPipelineStateFixedInfo ShadpwPipelineStateFixed = jPipelineStateFixedInfo(RasterizationState, MultisampleState, DepthStencilState, BlendingState
         , jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT));
 
     {
@@ -30,40 +40,38 @@ void jForwardRenderer::Setup()
 
         ShadowMapRenderPass = (jRenderPass_Vulkan*)g_rhi_vk->GetOrCreateRenderPass({}, depth, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
     }
-    
+
     ShadowView.Camera = View.DirectionalLight->GetLightCamra();
     ShadowView.DirectionalLight = View.DirectionalLight;
 
+    static jShader* Shader = nullptr;
+    if (!Shader)
     {
-        static jShader* Shader = nullptr;
-        if (!Shader)
-        {
-            jShaderInfo shaderInfo;
-            shaderInfo.name = jName("shadow_test");
-            shaderInfo.vs = jName("Resource/Shaders/hlsl/shadow_vs.hlsl");
-            shaderInfo.fs = jName("Resource/Shaders/hlsl/shadow_fs.hlsl");
-            Shader = g_rhi->CreateShader(shaderInfo);
-        }
-
-        for (auto iter : jObject::GetStaticObject())
-        {
-            auto newCommand = jDrawCommand(RenderFrameContextPtr, &ShadowView, iter->RenderObject, ShadowMapRenderPass, Shader, &CurrentPipelineStateFixed_Shadow, { });
-            newCommand.PrepareToDraw(true);
-            ShadowPasses.push_back(newCommand);
-        }
+        jShaderInfo shaderInfo;
+        shaderInfo.name = jName("shadow_test");
+        shaderInfo.vs = jName("Resource/Shaders/hlsl/shadow_vs.hlsl");
+        shaderInfo.fs = jName("Resource/Shaders/hlsl/shadow_fs.hlsl");
+        Shader = g_rhi->CreateShader(shaderInfo);
     }
-    //////////////////////////////////////////////////////////////////////////
 
+    for (auto iter : jObject::GetStaticObject())
+    {
+        auto newCommand = jDrawCommand(RenderFrameContextPtr, &ShadowView, iter->RenderObject, ShadowMapRenderPass, Shader, &ShadpwPipelineStateFixed, { });
+        newCommand.PrepareToDraw(true);
+        ShadowPasses.push_back(newCommand);
+    }
+}
+
+void jForwardRenderer::SetupBasePass()
+{
     // Prepare basepass pipeline
-    {
-        auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
-        jMultisampleStateInfo* MultisampleState = TMultisampleStateInfo<true, 0.2f, false, false>::Create((EMSAASamples)g_rhi_vk->MsaaSamples);
-        auto DepthStencilState = TDepthStencilStateInfo<true, true, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
-        auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
+    auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
+    jMultisampleStateInfo* MultisampleState = TMultisampleStateInfo<true, 0.2f, false, false>::Create((EMSAASamples)g_rhi_vk->MsaaSamples);
+    auto DepthStencilState = TDepthStencilStateInfo<true, true, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
+    auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
 
-        g_rhi_vk->CurrentPipelineStateFixed = jPipelineStateFixedInfo(RasterizationState, MultisampleState, DepthStencilState, BlendingState
-            , jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT));
-    }
+    jPipelineStateFixedInfo BasePassPipelineStateFixed = jPipelineStateFixedInfo(RasterizationState, MultisampleState, DepthStencilState, BlendingState
+        , jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT));
 
     const Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
     const Vector2 ClearDepth = Vector2(1.0f, 0.0f);
@@ -89,23 +97,21 @@ void jForwardRenderer::Setup()
         OpaqueRenderPass = (jRenderPass_Vulkan*)g_rhi_vk->GetOrCreateRenderPass({ color }, depth, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
     }
 
+    static jShader* Shader = nullptr;
+    if (!Shader)
     {
-        static jShader* Shader = nullptr;
-        if (!Shader)
-        {
-            jShaderInfo shaderInfo;
-            shaderInfo.name = jName("default_test");
-            shaderInfo.vs = jName("Resource/Shaders/hlsl/shader_vs.hlsl");
-            shaderInfo.fs = jName("Resource/Shaders/hlsl/shader_fs.hlsl");
-            Shader = g_rhi->CreateShader(shaderInfo);
-        }
+        jShaderInfo shaderInfo;
+        shaderInfo.name = jName("default_test");
+        shaderInfo.vs = jName("Resource/Shaders/hlsl/shader_vs.hlsl");
+        shaderInfo.fs = jName("Resource/Shaders/hlsl/shader_fs.hlsl");
+        Shader = g_rhi->CreateShader(shaderInfo);
+    }
 
-        for (auto iter : jObject::GetStaticObject())
-        {
-            auto newCommand = jDrawCommand(RenderFrameContextPtr, &View, iter->RenderObject, OpaqueRenderPass, Shader, &g_rhi_vk->CurrentPipelineStateFixed, { });
-            newCommand.PrepareToDraw(false);
-            BasePasses.push_back(newCommand);
-        }
+    for (auto iter : jObject::GetStaticObject())
+    {
+        auto newCommand = jDrawCommand(RenderFrameContextPtr, &View, iter->RenderObject, OpaqueRenderPass, Shader, &BasePassPipelineStateFixed, { });
+        newCommand.PrepareToDraw(false);
+        BasePasses.push_back(newCommand);
     }
 }
 
