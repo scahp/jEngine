@@ -6,12 +6,12 @@
 void jSceneRenderTarget::Create(const jSwapchainImage* image)
 {
     ColorPtr = jRenderTargetPool::GetRenderTarget(
-        { ETextureType::TEXTURE_2D, ETextureFormat::BGRA8, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi_vk->MsaaSamples });
+        { ETextureType::TEXTURE_2D, ETextureFormat::BGRA8, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi_vk->GetSelectedMSAASamples() });
 
     DepthPtr = jRenderTargetPool::GetRenderTarget(
-        { ETextureType::TEXTURE_2D, ETextureFormat::D24_S8, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi_vk->MsaaSamples });
+        { ETextureType::TEXTURE_2D, ETextureFormat::D24_S8, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi_vk->GetSelectedMSAASamples() });
 
-    if (g_rhi_vk->MsaaSamples > 1)
+    if ((int32)g_rhi_vk->GetSelectedMSAASamples() > 1)
     {
         check(image);
         ResolvePtr = jRenderTarget::CreateFromTexture(image->TexturePtr);
@@ -23,7 +23,7 @@ void jSceneRenderTarget::Create(const jSwapchainImage* image)
     }
 
     DirectionalLightShadowMapPtr = jRenderTargetPool::GetRenderTarget(
-        { ETextureType::TEXTURE_2D, ETextureFormat::D24_S8, SCR_WIDTH, SCR_HEIGHT, 1, false, 1 });    
+        { ETextureType::TEXTURE_2D, ETextureFormat::D24_S8, SCR_WIDTH, SCR_HEIGHT, 1, false, EMSAASamples::COUNT_1 });
 }
 
 void jSceneRenderTarget::Return()

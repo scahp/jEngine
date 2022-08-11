@@ -5,7 +5,7 @@ struct jRenderTargetInfo
 {
     constexpr jRenderTargetInfo() = default;
     constexpr jRenderTargetInfo(ETextureType textureType, ETextureFormat format, int32 width, int32 height, int32 layerCount = 1
-        , bool isGenerateMipmap = false, int32 sampleCount = 1)
+        , bool isGenerateMipmap = false, EMSAASamples sampleCount = EMSAASamples::COUNT_1)
         : Type(textureType), Format(format), Width(width), Height(height), LayerCount(layerCount)
         , IsGenerateMipmap(isGenerateMipmap), SampleCount(sampleCount)
     {}
@@ -28,7 +28,7 @@ struct jRenderTargetInfo
     int32 Height = 0;
     int32 LayerCount = 1;
     bool IsGenerateMipmap = false;
-    int32 SampleCount = 1;
+    EMSAASamples SampleCount = EMSAASamples::COUNT_1;
 };
 
 struct jRenderTarget final : public std::enable_shared_from_this<jRenderTarget>

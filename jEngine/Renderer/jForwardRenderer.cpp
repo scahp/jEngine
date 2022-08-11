@@ -38,7 +38,7 @@ void jForwardRenderer::SetupShadowPass()
         jAttachment depth = jAttachment(View.DirectionalLight->ShadowMapPtr, EAttachmentLoadStoreOp::CLEAR_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE
             , ClearColor, ClearDepth, EImageLayout::UNDEFINED, EImageLayout::DEPTH_STENCIL_ATTACHMENT);
 
-        ShadowMapRenderPass = (jRenderPass_Vulkan*)g_rhi_vk->GetOrCreateRenderPass({}, depth, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
+        ShadowMapRenderPass = g_rhi->GetOrCreateRenderPass({}, depth, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
     }
 
     ShadowView.Camera = View.DirectionalLight->GetLightCamra();
@@ -62,7 +62,7 @@ void jForwardRenderer::SetupBasePass()
 {
     // Prepare basepass pipeline
     auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
-    jMultisampleStateInfo* MultisampleState = TMultisampleStateInfo<true, 0.2f, false, false>::Create((EMSAASamples)g_rhi_vk->MsaaSamples);
+    jMultisampleStateInfo* MultisampleState = TMultisampleStateInfo<true, 0.2f, false, false>::Create(g_rhi->GetSelectedMSAASamples());
     auto DepthStencilState = TDepthStencilStateInfo<true, true, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
     auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
 
@@ -78,7 +78,7 @@ void jForwardRenderer::SetupBasePass()
         , EImageLayout::UNDEFINED, EImageLayout::DEPTH_STENCIL_ATTACHMENT);
     jAttachment resolve;
 
-    if (g_rhi_vk->MsaaSamples > 1)
+    if ((int32)g_rhi->GetSelectedMSAASamples() > 1)
     {
         resolve = jAttachment(RenderFrameContextPtr->SceneRenderTarget->ResolvePtr, EAttachmentLoadStoreOp::DONTCARE_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth
             , EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
@@ -86,11 +86,11 @@ void jForwardRenderer::SetupBasePass()
 
     if (resolve.IsValid())
     {
-        OpaqueRenderPass = (jRenderPass_Vulkan*)g_rhi_vk->GetOrCreateRenderPass({ color }, depth, resolve, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
+        OpaqueRenderPass = (jRenderPass_Vulkan*)g_rhi->GetOrCreateRenderPass({ color }, depth, resolve, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
     }
     else
     {
-        OpaqueRenderPass = (jRenderPass_Vulkan*)g_rhi_vk->GetOrCreateRenderPass({ color }, depth, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
+        OpaqueRenderPass = (jRenderPass_Vulkan*)g_rhi->GetOrCreateRenderPass({ color }, depth, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
     }
 
     jShaderInfo shaderInfo;
@@ -111,7 +111,10 @@ void jForwardRenderer::Render()
 {
     check(RenderFrameContextPtr->CommandBuffer);
     ensure(RenderFrameContextPtr->CommandBuffer->Begin());
-    g_rhi_vk->QueryPool.ResetQueryPool(RenderFrameContextPtr->CommandBuffer);
+    if (g_rhi->GetQueryPool())
+    {
+        g_rhi->GetQueryPool()->ResetQueryPool(RenderFrameContextPtr->CommandBuffer);
+    }
 
     __super::Render();
 
@@ -123,7 +126,7 @@ void jForwardRenderer::ShadowPass()
 {
     SCOPE_GPU_PROFILE(RenderFrameContextPtr, ShadowPass);
 
-    g_rhi_vk->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, View.DirectionalLight->ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_ATTACHMENT);
+    g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, View.DirectionalLight->ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_ATTACHMENT);
 
     if (ShadowMapRenderPass->BeginRenderPass(RenderFrameContextPtr->CommandBuffer))
     {
@@ -134,14 +137,14 @@ void jForwardRenderer::ShadowPass()
         ShadowMapRenderPass->EndRenderPass();
     }
 
-    g_rhi_vk->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, View.DirectionalLight->ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_READ_ONLY);
+    g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, View.DirectionalLight->ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_READ_ONLY);
 }
 
 void jForwardRenderer::OpaquePass()
 {
     SCOPE_GPU_PROFILE(RenderFrameContextPtr, BasePass);
 
-    g_rhi_vk->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, RenderFrameContextPtr->SceneRenderTarget->ColorPtr->GetTexture(), EImageLayout::COLOR_ATTACHMENT);
+    g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, RenderFrameContextPtr->SceneRenderTarget->ColorPtr->GetTexture(), EImageLayout::COLOR_ATTACHMENT);
 
     if (OpaqueRenderPass->BeginRenderPass(RenderFrameContextPtr->CommandBuffer))
     {
@@ -155,10 +158,10 @@ void jForwardRenderer::OpaquePass()
 
     // 여기 까지 렌더 로직 끝
     //////////////////////////////////////////////////////////////////////////
-    const int32 imageIndex = (int32)g_rhi_vk->CurrenFrameIndex;
+    const uint32 imageIndex = RenderFrameContextPtr->FrameIndex;
 
-    g_rhi_vk->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, RenderFrameContextPtr->SceneRenderTarget->ColorPtr->GetTexture(), EImageLayout::SHADER_READ_ONLY);
-    g_rhi_vk->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, RenderFrameContextPtr->SceneRenderTarget->FinalColorPtr->GetTexture(), EImageLayout::GENERAL);
+    g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, RenderFrameContextPtr->SceneRenderTarget->ColorPtr->GetTexture(), EImageLayout::SHADER_READ_ONLY);
+    g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, RenderFrameContextPtr->SceneRenderTarget->FinalColorPtr->GetTexture(), EImageLayout::GENERAL);
 
     static VkDescriptorSetLayout descriptorSetLayout[3] = { nullptr };
 
@@ -275,7 +278,7 @@ void jForwardRenderer::OpaquePass()
         jShaderInfo shaderInfo;
         shaderInfo.name = jName("emboss");
         shaderInfo.cs = jName("Resource/Shaders/hlsl/emboss_cs.hlsl");
-        static jShader_Vulkan* shader = (jShader_Vulkan*)g_rhi_vk->CreateShader(shaderInfo);
+        static jShader_Vulkan* shader = (jShader_Vulkan*)g_rhi->CreateShader(shaderInfo);
         computePipelineCreateInfo.stage = shader->ShaderStages[0];
 
         verify(VK_SUCCESS == vkCreateComputePipelines(g_rhi_vk->Device, g_rhi_vk->PipelineCache, 1, &computePipelineCreateInfo, nullptr, &pipeline[imageIndex]));
@@ -283,7 +286,9 @@ void jForwardRenderer::OpaquePass()
 
     vkCmdBindPipeline((VkCommandBuffer)RenderFrameContextPtr->CommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline[imageIndex]);
     vkCmdBindDescriptorSets((VkCommandBuffer)RenderFrameContextPtr->CommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout[imageIndex], 0, 1, &descriptorSet[imageIndex], 0, 0);
-    vkCmdDispatch((VkCommandBuffer)RenderFrameContextPtr->CommandBuffer->GetHandle(), g_rhi_vk->Swapchain->Extent.x / 16, g_rhi_vk->Swapchain->Extent.y / 16, 1);
+
+    check(g_rhi->GetSwapchain());
+    vkCmdDispatch((VkCommandBuffer)RenderFrameContextPtr->CommandBuffer->GetHandle(), g_rhi->GetSwapchain()->GetExtent().x / 16, g_rhi->GetSwapchain()->GetExtent().y / 16, 1);
 }
 
 void jForwardRenderer::TranslucentPass()

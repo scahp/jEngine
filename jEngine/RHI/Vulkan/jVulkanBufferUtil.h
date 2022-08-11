@@ -26,7 +26,7 @@ FORCEINLINE bool CreateImage2DArray(uint32 width, uint32 height, uint32 arrayLay
         OutTexture.Height = height;
         OutTexture.LayerCount = arrayLayers;
         OutTexture.MipLevel = mipLevels;
-        OutTexture.SampleCount = numSamples;
+        OutTexture.SampleCount = (EMSAASamples)numSamples;
         OutTexture.Format = GetVulkanTextureFormat(format);
         OutTexture.Layout = GetVulkanImageLayout(imageLayout);
         return true;
@@ -50,7 +50,7 @@ FORCEINLINE bool CreateImage(uint32 width, uint32 height, uint32 mipLevels, VkSa
         OutTexture.Height = height;
         OutTexture.LayerCount = 1;
         OutTexture.MipLevel = mipLevels;
-        OutTexture.SampleCount = numSamples;
+        OutTexture.SampleCount = (EMSAASamples)numSamples;
         OutTexture.Format = GetVulkanTextureFormat(format);
         OutTexture.Layout = GetVulkanImageLayout(imageLayout);
         return true;
@@ -74,7 +74,7 @@ FORCEINLINE bool CreateImageCube(uint32 width, uint32 height, uint32 mipLevels, 
         OutTexture.Height = height;
         OutTexture.LayerCount = 6;
         OutTexture.MipLevel = mipLevels;
-        OutTexture.SampleCount = numSamples;
+        OutTexture.SampleCount = (EMSAASamples)numSamples;
         OutTexture.Format = GetVulkanTextureFormat(format);
         OutTexture.Layout = GetVulkanImageLayout(imageLayout);
         return true;

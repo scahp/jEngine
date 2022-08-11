@@ -28,6 +28,6 @@ void jQueryPool_Vulkan::ResetQueryPool(jCommandBuffer* pCommanBuffer /*= nullptr
 //////////////////////////////////////////////////////////////////////////
 void jQueryTime_Vulkan::Init()
 {
-    QueryId = g_rhi_vk->QueryPool.QueryIndex[jProfile_GPU::CurrentWatingResultListIndex];
-    g_rhi_vk->QueryPool.QueryIndex[jProfile_GPU::CurrentWatingResultListIndex] += 2;		// Need 2 Queries for Starting, Ending timestamp
+    QueryId = g_rhi_vk->QueryPool->QueryIndex[jProfile_GPU::CurrentWatingResultListIndex];
+    g_rhi_vk->QueryPool->QueryIndex[jProfile_GPU::CurrentWatingResultListIndex] += 2;		// Need 2 Queries for Starting, Ending timestamp
 }

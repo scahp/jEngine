@@ -4,7 +4,7 @@ struct jTexture
 {
     constexpr jTexture() = default;
     constexpr jTexture(ETextureType InType, ETextureFormat InFormat, int32 InWidth, int32 InHeight
-        , int32 InLayerCount = 1, int32 InSampleCount = 1, int32 InMipLevel = 1, bool InSRGB = false)
+        , int32 InLayerCount = 1, EMSAASamples InSampleCount = EMSAASamples::COUNT_1, int32 InMipLevel = 1, bool InSRGB = false)
         : Type(InType), Format(InFormat), Width(InWidth), Height(InHeight), LayerCount(InLayerCount)
         , SampleCount(InSampleCount), MipLevel(InMipLevel), sRGB(InSRGB)
     {}
@@ -25,7 +25,7 @@ struct jTexture
     ETextureType Type = ETextureType::MAX;
     ETextureFormat Format = ETextureFormat::RGB8;
     int32 LayerCount = 1;
-    int32 SampleCount = 1;
+    EMSAASamples SampleCount = EMSAASamples::COUNT_1;
     int32 MipLevel = 1;
 
     int32 Width = 0;

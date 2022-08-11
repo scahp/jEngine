@@ -85,7 +85,7 @@ bool jSwapchain_Vulkan::Create()
 
         auto ImagetView = jVulkanBufferUtil::CreateImageView(vkImages[i], surfaceFormat.format, VK_IMAGE_ASPECT_COLOR_BIT, 1);
         SwapchainImage->TexturePtr = std::shared_ptr<jTexture_Vulkan>(
-            new jTexture_Vulkan(ETextureType::TEXTURE_2D, Format, Extent.x, Extent.y, 1, 1, 1, false, vkImages[i], ImagetView));
+            new jTexture_Vulkan(ETextureType::TEXTURE_2D, Format, Extent.x, Extent.y, 1, EMSAASamples::COUNT_1, 1, false, vkImages[i], ImagetView));
         SwapchainImage->CommandBufferFence = nullptr;
 
         VkSemaphoreCreateInfo semaphoreInfo = {};

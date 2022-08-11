@@ -16,6 +16,7 @@ extern class jRHI* g_rhi;
 struct jShader;
 struct jShaderInfo;
 struct jSamplerStateInfo;
+class jSwapchain;
 
 enum class EUniformType
 {
@@ -415,6 +416,12 @@ public:
 	virtual jRenderPass* GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const jAttachment& depthAttachment, const jAttachment& colorResolveAttachment, const Vector2i& offset, const Vector2i& extent) const { return nullptr; }
 
 	virtual jCommandBufferManager* GetCommandBufferManager() const { return nullptr; }
+	virtual EMSAASamples GetSelectedMSAASamples() const { return EMSAASamples::COUNT_1; }
+
+	virtual bool TransitionImageLayout(jCommandBuffer* commandBuffer, jTexture* texture, EImageLayout newLayout) const { return true; }
+	virtual bool TransitionImageLayoutImmediate(jTexture* texture, EImageLayout newLayout) const { return true; }
+	virtual jQueryPool* GetQueryPool() const { return nullptr; }
+	virtual jSwapchain* GetSwapchain() const { return nullptr; }
 };
 
 // Not thred safe

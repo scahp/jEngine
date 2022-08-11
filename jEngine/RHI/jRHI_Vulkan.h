@@ -60,7 +60,7 @@ public:
 	// 물리 디바이스 - 물리 그래픽 카드를 선택
 	VkPhysicalDevice PhysicalDevice = VK_NULL_HANDLE;
 
-	VkSampleCountFlagBits MsaaSamples = VK_SAMPLE_COUNT_1_BIT;
+	EMSAASamples SelectedMSAASamples = EMSAASamples::COUNT_1;
 
 	// Queue Families
 	// 여러종류의 Queue type이 있을 수 있다. (ex. Compute or memory transfer related commands 만 만듬)
@@ -90,15 +90,15 @@ public:
 
     VkPhysicalDeviceProperties DeviceProperties;
 
-    jQueryPool_Vulkan QueryPool;
+    jQueryPool_Vulkan* QueryPool = nullptr;
 	//////////////////////////////////////////////////////////////////////////
 
     VkCommandBuffer BeginSingleTimeCommands() const;
     void EndSingleTimeCommands(VkCommandBuffer commandBuffer) const;
 
 	bool TransitionImageLayout(VkCommandBuffer commandBuffer, VkImage image, VkFormat format, uint32 mipLevels, VkImageLayout oldLayout, VkImageLayout newLayout) const;
-	bool TransitionImageLayout(jCommandBuffer* commandBuffer, jTexture* texture, EImageLayout newLayout) const;
-    bool TransitionImageLayoutImmediate(jTexture* texture, EImageLayout newLayout) const;	
+	virtual bool TransitionImageLayout(jCommandBuffer* commandBuffer, jTexture* texture, EImageLayout newLayout) const override;
+    virtual bool TransitionImageLayoutImmediate(jTexture* texture, EImageLayout newLayout) const override;
 
 	//////////////////////////////////////////////////////////////////////////
 
@@ -166,6 +166,9 @@ public:
 		, const jAttachment& colorResolveAttachment, const Vector2i& offset, const Vector2i& extent) const override;
 
 	virtual jCommandBufferManager* GetCommandBufferManager() const { return CommandBufferManager; }
+	virtual EMSAASamples GetSelectedMSAASamples() const { return SelectedMSAASamples; }
+	virtual jQueryPool* GetQueryPool() const override { return QueryPool; }
+	virtual jSwapchain* GetSwapchain() const override { return Swapchain; }
 };
 
 extern jRHI_Vulkan* g_rhi_vk;

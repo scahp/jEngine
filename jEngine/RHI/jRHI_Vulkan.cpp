@@ -142,7 +142,7 @@ bool jRHI_Vulkan::InitRHI()
 			{
 				PhysicalDevice = device;
 				// msaaSamples = GetMaxUsableSampleCount();
-				MsaaSamples = (VkSampleCountFlagBits)1;
+				SelectedMSAASamples = (EMSAASamples)1;
 				break;
 			}
 		}
@@ -222,9 +222,10 @@ bool jRHI_Vulkan::InitRHI()
     // Pipeline cache
     VkPipelineCacheCreateInfo pipelineCacheCreateInfo = {};
     pipelineCacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
-	verify(VK_SUCCESS == vkCreatePipelineCache(g_rhi_vk->Device, &pipelineCacheCreateInfo, nullptr, &PipelineCache));
+	verify(VK_SUCCESS == vkCreatePipelineCache(Device, &pipelineCacheCreateInfo, nullptr, &PipelineCache));
 
-	QueryPool.Create();
+	QueryPool = new jQueryPool_Vulkan();
+	QueryPool->Create();
 
 	return true;
 }
@@ -551,7 +552,7 @@ jShader* jRHI_Vulkan::CreateShader(const jShaderInfo& shaderInfo) const
 
 bool jRHI_Vulkan::CreateShaderInternal(jShader* OutShader, const jShaderInfo& shaderInfo) const
 {
-	auto CreateShaderModule = [](const std::vector<uint32>& code) -> VkShaderModule
+	auto CreateShaderModule = [Device = this->Device](const std::vector<uint32>& code) -> VkShaderModule
 	{
 		VkShaderModuleCreateInfo createInfo = {};
 		createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -562,7 +563,7 @@ bool jRHI_Vulkan::CreateShaderInternal(jShader* OutShader, const jShaderInfo& sh
 		createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
 
 		VkShaderModule shaderModule = {};
-		ensure(vkCreateShaderModule(g_rhi_vk->Device, &createInfo, nullptr, &shaderModule) == VK_SUCCESS);
+		ensure(vkCreateShaderModule(Device, &createInfo, nullptr, &shaderModule) == VK_SUCCESS);
 
 		// compiling or linking 과정이 graphics pipeline 이 생성되기 전까지 처리되지 않는다.
 		// 그래픽스 파이프라인이 생성된 후 VkShaderModule은 즉시 소멸 가능.
@@ -747,8 +748,8 @@ std::shared_ptr<jRenderTarget> jRHI_Vulkan::CreateRenderTarget(const jRenderTarg
 	//const VkImageTiling TilingMode = IsMobile ? VkImageTiling::VK_IMAGE_TILING_OPTIMAL : VkImageTiling::VK_IMAGE_TILING_LINEAR;
 	const VkImageTiling TilingMode = VkImageTiling::VK_IMAGE_TILING_OPTIMAL;
 
-	const int32 mipLevels = (info.SampleCount > VK_SAMPLE_COUNT_1_BIT || !info.IsGenerateMipmap) ? 1 : jTexture::GetMipLevels(info.Width, info.Height);		// MipLevel 은 SampleCount 1인 경우만 가능
-	JASSERT(info.SampleCount >= 1);
+	const int32 mipLevels = (info.SampleCount > EMSAASamples::COUNT_1 || !info.IsGenerateMipmap) ? 1 : jTexture::GetMipLevels(info.Width, info.Height);		// MipLevel 은 SampleCount 1인 경우만 가능
+	JASSERT((int32)info.SampleCount >= 1);
 
 	VkImage image = nullptr;
 	VkImageView imageView = nullptr;
@@ -937,7 +938,7 @@ void* jRHI_Vulkan::CreatePipelineLayout(const std::vector<const jShaderBindings*
 		pipelineLayoutInfo.pSetLayouts = &DescriptorSetLayouts[0];
 		pipelineLayoutInfo.pushConstantRangeCount = 0;		// Optional		// 쉐이더에 값을 constant 값을 전달 할 수 있음. 이후에 배움
 		pipelineLayoutInfo.pPushConstantRanges = nullptr;	// Optional
-		if (!ensure(vkCreatePipelineLayout(g_rhi_vk->Device, &pipelineLayoutInfo, nullptr, &vkPipelineLayout) == VK_SUCCESS))
+		if (!ensure(vkCreatePipelineLayout(Device, &pipelineLayoutInfo, nullptr, &vkPipelineLayout) == VK_SUCCESS))
 			return nullptr;
 
 		PipelineLayoutPool.insert(std::make_pair(hash, vkPipelineLayout));
@@ -983,14 +984,14 @@ void jRHI_Vulkan::QueryTimeStampStart(const std::shared_ptr<jRenderFrameContext>
 {
     check(InRenderFrameContext);
     check(InRenderFrameContext->CommandBuffer);
-	vkCmdWriteTimestamp((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, g_rhi_vk->QueryPool.vkQueryPool, ((jQueryTime_Vulkan*)queryTimeStamp)->QueryId);
+	vkCmdWriteTimestamp((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, QueryPool->vkQueryPool, ((jQueryTime_Vulkan*)queryTimeStamp)->QueryId);
 }
 
 void jRHI_Vulkan::QueryTimeStampEnd(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jQueryTime* queryTimeStamp) const
 {
     check(InRenderFrameContext);
     check(InRenderFrameContext->CommandBuffer);
-	vkCmdWriteTimestamp((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, g_rhi_vk->QueryPool.vkQueryPool, ((jQueryTime_Vulkan*)queryTimeStamp)->QueryId + 1);
+	vkCmdWriteTimestamp((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, QueryPool->vkQueryPool, ((jQueryTime_Vulkan*)queryTimeStamp)->QueryId + 1);
 }
 
 bool jRHI_Vulkan::IsQueryTimeStampResult(const jQueryTime* queryTimeStamp, bool isWaitUntilAvailable) const
@@ -1003,25 +1004,25 @@ bool jRHI_Vulkan::IsQueryTimeStampResult(const jQueryTime* queryTimeStamp, bool 
     {
 		while (result == VK_SUCCESS)
 		{
-			result = (vkGetQueryPoolResults(g_rhi_vk->Device, g_rhi_vk->QueryPool.vkQueryPool, queryTimeStamp_vk->QueryId, 2, sizeof(uint64) * 2, time, sizeof(uint64), VK_QUERY_RESULT_WITH_AVAILABILITY_BIT));
+			result = (vkGetQueryPoolResults(Device, QueryPool->vkQueryPool, queryTimeStamp_vk->QueryId, 2, sizeof(uint64) * 2, time, sizeof(uint64), VK_QUERY_RESULT_WITH_AVAILABILITY_BIT));
 		}
 	}
 
-    result = (vkGetQueryPoolResults(g_rhi_vk->Device, g_rhi_vk->QueryPool.vkQueryPool, queryTimeStamp_vk->QueryId, 2, sizeof(uint64) * 2, time, sizeof(uint64), VK_QUERY_RESULT_WITH_AVAILABILITY_BIT));
+    result = (vkGetQueryPoolResults(Device, QueryPool->vkQueryPool, queryTimeStamp_vk->QueryId, 2, sizeof(uint64) * 2, time, sizeof(uint64), VK_QUERY_RESULT_WITH_AVAILABILITY_BIT));
     return (result == VK_SUCCESS);
 }
 
 void jRHI_Vulkan::GetQueryTimeStampResult(jQueryTime* queryTimeStamp) const
 {
 	auto queryTimeStamp_vk = static_cast<jQueryTime_Vulkan*>(queryTimeStamp);
-	vkGetQueryPoolResults(g_rhi_vk->Device, g_rhi_vk->QueryPool.vkQueryPool, queryTimeStamp_vk->QueryId, 2, sizeof(uint64) * 2, queryTimeStamp_vk->TimeStampStartEnd, sizeof(uint64), VK_QUERY_RESULT_64_BIT);
+	vkGetQueryPoolResults(Device, QueryPool->vkQueryPool, queryTimeStamp_vk->QueryId, 2, sizeof(uint64) * 2, queryTimeStamp_vk->TimeStampStartEnd, sizeof(uint64), VK_QUERY_RESULT_64_BIT);
 }
 
 std::vector<uint64> jRHI_Vulkan::GetWholeQueryTimeStampResult(int32 InWatingResultIndex) const
 {
 	std::vector<uint64> result;
 	result.resize(MaxQueryTimeCount);
-    vkGetQueryPoolResults(g_rhi_vk->Device, g_rhi_vk->QueryPool.vkQueryPool, InWatingResultIndex * MaxQueryTimeCount, MaxQueryTimeCount, sizeof(uint64) * MaxQueryTimeCount, result.data(), sizeof(uint64), VK_QUERY_RESULT_64_BIT);
+    vkGetQueryPoolResults(Device, QueryPool->vkQueryPool, InWatingResultIndex * MaxQueryTimeCount, MaxQueryTimeCount, sizeof(uint64) * MaxQueryTimeCount, result.data(), sizeof(uint64), VK_QUERY_RESULT_64_BIT);
 	return result;
 }
 

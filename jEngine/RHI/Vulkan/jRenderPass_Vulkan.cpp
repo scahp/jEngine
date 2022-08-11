@@ -67,9 +67,9 @@ bool jRenderPass_Vulkan::CreateRenderPass()
 
             const auto& RTInfo = attachment.RenderTargetPtr->Info;
 
-            check(SampleCount == 0 || SampleCount == RTInfo.SampleCount);
+            check(SampleCount == 0 || SampleCount == (int32)RTInfo.SampleCount);
             check(LayerCount == 0 || LayerCount == RTInfo.LayerCount);
-            SampleCount = RTInfo.SampleCount;
+            SampleCount = (int32)RTInfo.SampleCount;
             LayerCount = RTInfo.LayerCount;
         }
 
@@ -85,7 +85,7 @@ bool jRenderPass_Vulkan::CreateRenderPass()
             const auto& RTInfo = attachment.RenderTargetPtr->Info;
 
             if (SampleCount == 0)
-                SampleCount = RTInfo.SampleCount;
+                SampleCount = (int32)RTInfo.SampleCount;
             if (LayerCount == 0)
                 LayerCount = RTInfo.LayerCount;
         }
@@ -114,9 +114,9 @@ bool jRenderPass_Vulkan::CreateRenderPass()
             GetVulkanAttachmentLoadStoreOp(colorDesc.stencilLoadOp, colorDesc.stencilStoreOp, attachment.StencilLoadStoreOp);
 
             check((ColorAttachmentResolve.IsValid() && ((int32)RTInfo.SampleCount > 1)) || (!ColorAttachmentResolve.IsValid() && (int32)RTInfo.SampleCount == 1));
-            check(SampleCount == 0 || SampleCount == RTInfo.SampleCount);
+            check(SampleCount == 0 || SampleCount == (int32)RTInfo.SampleCount);
             check(LayerCount == 0 || LayerCount == RTInfo.LayerCount);
-            SampleCount = RTInfo.SampleCount;
+            SampleCount = (int32)RTInfo.SampleCount;
             LayerCount = RTInfo.LayerCount;
 
             //// Texture나 Framebuffer의 경우 VkImage 객체로 특정 픽셀 형식을 표현함.
@@ -194,7 +194,7 @@ bool jRenderPass_Vulkan::CreateRenderPass()
             //check(SampleCount == 0 || SampleCount == RTInfo.SampleCount);
             //check(LayerCount == 0 || LayerCount == RTInfo.LayerCount);
             if (SampleCount == 0)
-                SampleCount = RTInfo.SampleCount;
+                SampleCount = (int32)RTInfo.SampleCount;
             if (LayerCount == 0)
                 LayerCount = RTInfo.LayerCount;
 
@@ -220,7 +220,7 @@ bool jRenderPass_Vulkan::CreateRenderPass()
             colorAttachmentResolve.finalLayout = GetVulkanImageLayout(ColorAttachmentResolve.FinalLayout);
             AttachmentDescs.emplace_back(colorAttachmentResolve);
 
-            check(RTInfo.SampleCount == 1);
+            check((int32)RTInfo.SampleCount == 1);
             check(LayerCount == RTInfo.LayerCount);
 
             colorAttachmentResolveRef.attachment = AttachmentIndex++;		// color attachments + depth attachment
