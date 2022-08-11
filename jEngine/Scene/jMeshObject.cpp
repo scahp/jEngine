@@ -40,10 +40,10 @@ jMeshObject::jMeshObject()
 {
 }
 
-void jMeshObject::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
+void jMeshObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
 {
 	if (Visible && RenderObject)
-		DrawNode(RootNode, camera, shader, lights);
+		DrawNode(InRenderFrameContext, RootNode, camera, shader, lights);
 }
 
 void jMeshObject::SetMaterialUniform(const jShader* shader, const jMeshMaterial* material) const
@@ -52,19 +52,21 @@ void jMeshObject::SetMaterialUniform(const jShader* shader, const jMeshMaterial*
 	material->Data.BindMaterialData(shader);
 }
 
-void jMeshObject::DrawNode(const jMeshNode* node, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights) const
+void jMeshObject::DrawNode(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jMeshNode* node
+	, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights) const
 {
 	if (SubMeshes.empty())
 		return;
 
 	for (auto& iter : node->MeshIndex)
-		DrawSubMesh(iter, camera, shader, lights);
+		DrawSubMesh(InRenderFrameContext, iter, camera, shader, lights);
 
 	for (auto& iter : node->childNode)
-		DrawNode(iter, camera, shader, lights);
+		DrawNode(InRenderFrameContext, iter, camera, shader, lights);
 }
 
-void jMeshObject::DrawSubMesh(int32 meshIndex, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights) const
+void jMeshObject::DrawSubMesh(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, int32 meshIndex
+	, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights) const
 {
 	auto& subMesh = SubMeshes[meshIndex];
 	{
@@ -129,8 +131,8 @@ void jMeshObject::DrawSubMesh(int32 meshIndex, const jCamera* camera, const jSha
 	}
 
 	if (subMesh.EndFace > 0)
-		RenderObject->DrawBaseVertexIndex(camera, shader, lights, subMesh.MaterialData, subMesh.StartFace, subMesh.EndFace - subMesh.StartFace, subMesh.StartVertex);
+		RenderObject->DrawBaseVertexIndex(InRenderFrameContext, camera, shader, lights, subMesh.MaterialData, subMesh.StartFace, subMesh.EndFace - subMesh.StartFace, subMesh.StartVertex);
 	else
-		RenderObject->DrawBaseVertexIndex(camera, shader, lights, subMesh.MaterialData, subMesh.StartVertex, subMesh.EndVertex - subMesh.StartVertex, subMesh.StartVertex);
+		RenderObject->DrawBaseVertexIndex(InRenderFrameContext, camera, shader, lights, subMesh.MaterialData, subMesh.StartVertex, subMesh.EndVertex - subMesh.StartVertex, subMesh.StartVertex);
 }
 

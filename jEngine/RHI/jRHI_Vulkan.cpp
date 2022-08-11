@@ -827,40 +827,46 @@ jBlendingStateInfo* jRHI_Vulkan::CreateBlendingState(const jBlendingStateInfo& i
 	return BlendingStatePool.GetOrCreate(initializer);
 }
 
-void jRHI_Vulkan::DrawArrays(EPrimitiveType type, int32 vertStartIndex, int32 vertCount) const
+void jRHI_Vulkan::DrawArrays(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 vertStartIndex, int32 vertCount) const
 {
-	check(CurrentCommandBuffer);
-	vkCmdDraw((VkCommandBuffer)CurrentCommandBuffer->GetHandle(), vertCount, 1, vertStartIndex, 0);
+    check(InRenderFrameContext);
+    check(InRenderFrameContext->CommandBuffer);
+	vkCmdDraw((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), vertCount, 1, vertStartIndex, 0);
 }
 
-void jRHI_Vulkan::DrawArraysInstanced(EPrimitiveType type, int32 vertStartIndex, int32 vertCount, int32 instanceCount) const
+void jRHI_Vulkan::DrawArraysInstanced(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 vertStartIndex, int32 vertCount, int32 instanceCount) const
 {
-	check(CurrentCommandBuffer);
-	vkCmdDraw((VkCommandBuffer)CurrentCommandBuffer->GetHandle(), vertCount, instanceCount, vertStartIndex, 0);
+    check(InRenderFrameContext);
+    check(InRenderFrameContext->CommandBuffer);
+	vkCmdDraw((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), vertCount, instanceCount, vertStartIndex, 0);
 }
 
-void jRHI_Vulkan::DrawElements(EPrimitiveType type, int32 elementSize, int32 startIndex, int32 count) const
+void jRHI_Vulkan::DrawElements(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 count) const
 {
-	check(CurrentCommandBuffer);
-	vkCmdDrawIndexed((VkCommandBuffer)CurrentCommandBuffer->GetHandle(), count, 1, startIndex, 0, 0);
+    check(InRenderFrameContext);
+    check(InRenderFrameContext->CommandBuffer);
+	vkCmdDrawIndexed((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), count, 1, startIndex, 0, 0);
 }
 
-void jRHI_Vulkan::DrawElementsInstanced(EPrimitiveType type, int32 elementSize, int32 startIndex, int32 count, int32 instanceCount) const
+void jRHI_Vulkan::DrawElementsInstanced(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 count, int32 instanceCount) const
 {
-	check(CurrentCommandBuffer);
-	vkCmdDrawIndexed((VkCommandBuffer)CurrentCommandBuffer->GetHandle(), count, instanceCount, startIndex, 0, 0);
+    check(InRenderFrameContext);
+    check(InRenderFrameContext->CommandBuffer);
+	vkCmdDrawIndexed((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), count, instanceCount, startIndex, 0, 0);
 }
 
-void jRHI_Vulkan::DrawElementsBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex) const
+void jRHI_Vulkan::DrawElementsBaseVertex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex) const
 {
-	check(CurrentCommandBuffer);
-	vkCmdDrawIndexed((VkCommandBuffer)CurrentCommandBuffer->GetHandle(), count, 1, startIndex, baseVertexIndex, 0);
+    check(InRenderFrameContext);
+    check(InRenderFrameContext->CommandBuffer);
+	vkCmdDrawIndexed((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), count, 1, startIndex, baseVertexIndex, 0);
 }
 
-void jRHI_Vulkan::DrawElementsInstancedBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex, int32 instanceCount) const
+void jRHI_Vulkan::DrawElementsInstancedBaseVertex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex, int32 instanceCount) const
 {
-	check(CurrentCommandBuffer);
-	vkCmdDrawIndexed((VkCommandBuffer)CurrentCommandBuffer->GetHandle(), count, instanceCount, startIndex, baseVertexIndex, 0);
+	check(InRenderFrameContext);
+	check(InRenderFrameContext->CommandBuffer);
+	vkCmdDrawIndexed((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), count, instanceCount, startIndex, baseVertexIndex, 0);
 }
 
 jShaderBindings* jRHI_Vulkan::CreateShaderBindings(const std::vector<jShaderBinding>& InUniformBindings, const std::vector<jShaderBinding>& InTextureBindings) const
@@ -974,14 +980,18 @@ void jRHI_Vulkan::ReleaseQueryTime(jQueryTime* queryTime) const
     delete queryTime_gl;
 }
 
-void jRHI_Vulkan::QueryTimeStampStart(const jQueryTime* queryTimeStamp) const
+void jRHI_Vulkan::QueryTimeStampStart(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jQueryTime* queryTimeStamp) const
 {
-	vkCmdWriteTimestamp((VkCommandBuffer)g_rhi_vk->CurrentCommandBuffer->GetHandle(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, g_rhi_vk->QueryPool.vkQueryPool, ((jQueryTime_Vulkan*)queryTimeStamp)->QueryId);
+    check(InRenderFrameContext);
+    check(InRenderFrameContext->CommandBuffer);
+	vkCmdWriteTimestamp((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, g_rhi_vk->QueryPool.vkQueryPool, ((jQueryTime_Vulkan*)queryTimeStamp)->QueryId);
 }
 
-void jRHI_Vulkan::QueryTimeStampEnd(const jQueryTime* queryTimeStamp) const
+void jRHI_Vulkan::QueryTimeStampEnd(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jQueryTime* queryTimeStamp) const
 {
-	vkCmdWriteTimestamp((VkCommandBuffer)g_rhi_vk->CurrentCommandBuffer->GetHandle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, g_rhi_vk->QueryPool.vkQueryPool, ((jQueryTime_Vulkan*)queryTimeStamp)->QueryId + 1);
+    check(InRenderFrameContext);
+    check(InRenderFrameContext->CommandBuffer);
+	vkCmdWriteTimestamp((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, g_rhi_vk->QueryPool.vkQueryPool, ((jQueryTime_Vulkan*)queryTimeStamp)->QueryId + 1);
 }
 
 bool jRHI_Vulkan::IsQueryTimeStampResult(const jQueryTime* queryTimeStamp, bool isWaitUntilAvailable) const

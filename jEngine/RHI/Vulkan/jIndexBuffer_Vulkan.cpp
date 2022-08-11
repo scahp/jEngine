@@ -1,7 +1,8 @@
 ﻿#include "pch.h"
 #include "jIndexBuffer_Vulkan.h"
+#include "../jRenderFrameContext.h"
 
-void jIndexBuffer_Vulkan::Bind() const
+void jIndexBuffer_Vulkan::Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const
 {
     VkIndexType IndexType = VK_INDEX_TYPE_UINT16;
     switch (IndexStreamData->Param->ElementType)
@@ -21,6 +22,7 @@ void jIndexBuffer_Vulkan::Bind() const
     default:
         break;
     }
-    check(g_rhi_vk->CurrentCommandBuffer);
-    vkCmdBindIndexBuffer((VkCommandBuffer)g_rhi_vk->CurrentCommandBuffer->GetHandle(), Buffer.Buffer, 0, IndexType);
+    check(InRenderFrameContext);
+    check(InRenderFrameContext->CommandBuffer);
+    vkCmdBindIndexBuffer((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), Buffer.Buffer, 0, IndexType);
 }

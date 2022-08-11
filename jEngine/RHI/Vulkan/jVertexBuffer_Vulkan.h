@@ -104,6 +104,6 @@ struct jVertexBuffer_Vulkan : public jVertexBuffer
     {
     }
 
-    virtual void Bind() const override;
+    virtual void Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const override;
 
 };

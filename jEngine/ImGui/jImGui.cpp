@@ -417,17 +417,18 @@ void jImGUI_Vulkan::UpdateBuffers()
     }
 }
 
-void jImGUI_Vulkan::PrepareDraw(int32 imageIndex)
+void jImGUI_Vulkan::PrepareDraw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext)
 {
     check(RenderPasses.size() == Pipelines.size());
 
-    if (RenderPasses.size() <= imageIndex)
+    const int32 frameIndex = InRenderFrameContext->FrameIndex;
+    if (RenderPasses.size() <= frameIndex)
     {
-        RenderPasses.resize(imageIndex + 1);
-        Pipelines.resize(imageIndex + 1);
+        RenderPasses.resize(frameIndex + 1);
+        Pipelines.resize(frameIndex + 1);
 
         const auto& extent = g_rhi_vk->Swapchain->GetExtent();
-        const auto& image = g_rhi_vk->Swapchain->GetSwapchainImage(imageIndex);
+        const auto& image = g_rhi_vk->Swapchain->GetSwapchainImage(frameIndex);
 
         auto SwapChainRTPtr = jRenderTarget::CreateFromTexture(image->TexturePtr);
 
@@ -435,23 +436,25 @@ void jImGUI_Vulkan::PrepareDraw(int32 imageIndex)
             , EImageLayout::GENERAL, EImageLayout::PRESENT_SRC);
 
         auto newRenderPass = g_rhi_vk->GetOrCreateRenderPass({ color }, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
-        RenderPasses[imageIndex] = newRenderPass;
-        Pipelines[imageIndex] = jImGUI_Vulkan::Get().CreatePipelineState((VkRenderPass)RenderPasses[imageIndex]->GetRenderPass(), g_rhi_vk->GraphicsQueue.Queue);
+        RenderPasses[frameIndex] = newRenderPass;
+        Pipelines[frameIndex] = jImGUI_Vulkan::Get().CreatePipelineState((VkRenderPass)RenderPasses[frameIndex]->GetRenderPass(), g_rhi_vk->GraphicsQueue.Queue);
     }
 }
 
-void jImGUI_Vulkan::Draw(jCommandBuffer* commandBuffer, int32 imageIndex)
+void jImGUI_Vulkan::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext)
 {
-    PrepareDraw(imageIndex);
+    check(InRenderFrameContext);
+    PrepareDraw(InRenderFrameContext);
 
-    if (RenderPasses[imageIndex]->BeginRenderPass(commandBuffer))
+    const int32 frameIndex = InRenderFrameContext->FrameIndex;
+    if (RenderPasses[frameIndex]->BeginRenderPass(InRenderFrameContext->CommandBuffer))
     {
-        VkCommandBuffer commandbuffer_vk = (VkCommandBuffer)commandBuffer->GetHandle();
+        VkCommandBuffer commandbuffer_vk = (VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle();
 
         ImGuiIO& io = ImGui::GetIO();
 
         vkCmdBindDescriptorSets(commandbuffer_vk, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet, 0, nullptr);
-        vkCmdBindPipeline(commandbuffer_vk, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipelines[imageIndex]);
+        vkCmdBindPipeline(commandbuffer_vk, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipelines[frameIndex]);
 
         VkViewport viewport = {};
         viewport.width = ImGui::GetIO().DisplaySize.x;
@@ -470,9 +473,9 @@ void jImGUI_Vulkan::Draw(jCommandBuffer* commandBuffer, int32 imageIndex)
         int32_t vertexOffset = 0;
         int32_t indexOffset = 0;
 
-        if (imDrawData->CmdListsCount > 0 && DynamicBufferData.size() > imageIndex)
+        if (imDrawData->CmdListsCount > 0 && DynamicBufferData.size() > frameIndex)
         {
-            auto& DynamicBuffer = DynamicBufferData[imageIndex];
+            auto& DynamicBuffer = DynamicBufferData[frameIndex];
 
             VkDeviceSize offsets[1] = { 0 };
             vkCmdBindVertexBuffers(commandbuffer_vk, 0, 1, &DynamicBuffer.VertexBuffer.Buffer, offsets);
@@ -497,7 +500,7 @@ void jImGUI_Vulkan::Draw(jCommandBuffer* commandBuffer, int32 imageIndex)
             }
         }
 
-        RenderPasses[imageIndex]->EndRenderPass();
+        RenderPasses[frameIndex]->EndRenderPass();
     }
 }
 

@@ -255,8 +255,8 @@ void* jPipelineStateInfo_Vulkan::CreateGraphicsPipelineState()
     return vkPipeline;
 }
 
-void jPipelineStateInfo_Vulkan::Bind() const
+void jPipelineStateInfo_Vulkan::Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const
 {
     check(vkPipeline);
-    vkCmdBindPipeline((VkCommandBuffer)g_rhi_vk->CurrentCommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipeline);
+    vkCmdBindPipeline((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipeline);
 }

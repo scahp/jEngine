@@ -88,9 +88,6 @@ public:
 
     VkPhysicalDeviceProperties DeviceProperties;
 
-    const jCommandBuffer_Vulkan* CurrentCommandBuffer = nullptr;
-    jPipelineStateFixedInfo CurrentPipelineStateFixed;
-
     jQueryPool_Vulkan QueryPool;
 	//////////////////////////////////////////////////////////////////////////
 
@@ -131,12 +128,12 @@ public:
 	virtual jDepthStencilStateInfo* CreateDepthStencilState(const jDepthStencilStateInfo& initializer) const override;
 	virtual jBlendingStateInfo* CreateBlendingState(const jBlendingStateInfo& initializer) const override;
 
-	virtual void DrawArrays(EPrimitiveType type, int32 vertStartIndex, int32 vertCount) const override;
-	virtual void DrawArraysInstanced(EPrimitiveType type, int32 vertStartIndex, int32 vertCount, int32 instanceCount) const override;
-	virtual void DrawElements(EPrimitiveType type, int32 elementSize, int32 startIndex, int32 count) const override;
-	virtual void DrawElementsInstanced(EPrimitiveType type, int32 elementSize, int32 startIndex, int32 count, int32 instanceCount) const override;
-	virtual void DrawElementsBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex) const override;
-	virtual void DrawElementsInstancedBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex, int32 instanceCount) const override;
+	virtual void DrawArrays(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 vertStartIndex, int32 vertCount) const override;
+	virtual void DrawArraysInstanced(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 vertStartIndex, int32 vertCount, int32 instanceCount) const override;
+	virtual void DrawElements(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 count) const override;
+	virtual void DrawElementsInstanced(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 count, int32 instanceCount) const override;
+	virtual void DrawElementsBaseVertex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex) const override;
+	virtual void DrawElementsInstancedBaseVertex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex, int32 instanceCount) const override;
 
 	virtual jShaderBindings* CreateShaderBindings(const std::vector<jShaderBinding>& InUniformBindings, const std::vector<jShaderBinding>& InTextureBindings) const override;
 	virtual jShaderBindingInstance* CreateShaderBindingInstance(const std::vector<TShaderBinding<IUniformBufferBlock*>>& InUniformBuffers, const std::vector<TShaderBinding<jTextureBindings>>& InTextures) const override;
@@ -147,8 +144,8 @@ public:
 
     virtual jQueryTime* CreateQueryTime() const override;
     virtual void ReleaseQueryTime(jQueryTime* queryTime) const override;
-	virtual void QueryTimeStampStart(const jQueryTime* queryTimeStamp) const override;
-	virtual void QueryTimeStampEnd(const jQueryTime* queryTimeStamp) const override;
+	virtual void QueryTimeStampStart(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jQueryTime* queryTimeStamp) const override;
+	virtual void QueryTimeStampEnd(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jQueryTime* queryTimeStamp) const override;
     virtual bool IsQueryTimeStampResult(const jQueryTime* queryTimeStamp, bool isWaitUntilAvailable) const override;
     virtual void GetQueryTimeStampResult(jQueryTime* queryTimeStamp) const override;
 	virtual bool CanWholeQueryTimeStampResult() const override { return true; }

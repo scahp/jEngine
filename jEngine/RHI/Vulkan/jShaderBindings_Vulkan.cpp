@@ -181,11 +181,12 @@ void jShaderBindingInstance_Vulkan::UpdateShaderBindings()
         , descriptorWrites.data(), 0, nullptr);
 }
 
-void jShaderBindingInstance_Vulkan::Bind(void* pipelineLayout, int32 InSlot) const
+void jShaderBindingInstance_Vulkan::Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot) const
 {
-    check(g_rhi_vk->CurrentCommandBuffer);
+    check(InRenderFrameContext);
+    check(InRenderFrameContext->CommandBuffer);
     check(pipelineLayout);
-    vkCmdBindDescriptorSets((VkCommandBuffer)g_rhi_vk->CurrentCommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, (VkPipelineLayout)(pipelineLayout), InSlot, 1, &DescriptorSet, 0, nullptr);
+    vkCmdBindDescriptorSets((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, (VkPipelineLayout)(pipelineLayout), InSlot, 1, &DescriptorSet, 0, nullptr);
 }
 
 //////////////////////////////////////////////////////////////////////////

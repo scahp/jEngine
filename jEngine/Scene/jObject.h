@@ -45,7 +45,7 @@ public:
 
 	virtual void Update(float deltaTime);
 	//virtual void Draw(const jCamera* camera, const jShader* shader);
-	virtual void Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount = 0) const;
+	virtual void Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount = 0) const;
 
 	void SetDirtyState() { DirtyObjectState = true; s_DirtyStateObjects.insert(this); }
 

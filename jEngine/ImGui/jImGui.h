@@ -32,10 +32,10 @@ public:
 
     void Update(float InDeltaSeconds);
 
-    void PrepareDraw(int32 imageIndex);
+    void PrepareDraw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext);
 
     // Draw current imGui frame into a command buffer
-    void Draw(jCommandBuffer* commandBuffer, int32 imageIndex);
+    void Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext);
 
 private:
     // Starts a new imGui frame and sets up windows and ui elements

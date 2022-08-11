@@ -97,10 +97,10 @@ void jBillboardQuadPrimitive::Update(float deltaTime)
 	}
 }
 
-void jUIQuadPrimitive::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 1 */) const
+void jUIQuadPrimitive::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
 {
 	SetUniformParams(shader);
-	__super::Draw(camera, shader, lights, instanceCount);
+	__super::Draw(InRenderFrameContext, camera, shader, lights, instanceCount);
 }
 
 void jUIQuadPrimitive::SetTexture(const jTexture* texture)
@@ -127,10 +127,10 @@ const jTexture* jUIQuadPrimitive::GetTexture() const
 	return nullptr;
 }
 
-void jFullscreenQuadPrimitive::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount) const
+void jFullscreenQuadPrimitive::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
 {
 	SetUniformBuffer(shader);
-	__super::Draw(camera, shader, lights, instanceCount);
+	__super::Draw(InRenderFrameContext, camera, shader, lights, instanceCount);
 }
 
 void jFullscreenQuadPrimitive::SetUniformBuffer(const jShader* shader) const
@@ -145,9 +145,9 @@ void jFullscreenQuadPrimitive::SetTexture(int index, const jTexture* texture, co
 	RenderObject->MaterialData.SetMaterialParam(index, GetCommonTextureName(index), texture, samplerState);
 }
 
-void jBoundBoxObject::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 1 */) const
+void jBoundBoxObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
 {
-	__super::Draw(camera, shader, lights);
+	__super::Draw(InRenderFrameContext, camera, shader, lights);
 }
 
 void jBoundBoxObject::SetUniformBuffer(const jShader* shader)
@@ -204,9 +204,9 @@ void jBoundBoxObject::UpdateBoundBox()
 	RenderObject->UpdateVertexStream();
 }
 
-void jBoundSphereObject::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 1 */) const
+void jBoundSphereObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
 {
-	__super::Draw(camera, shader, lights);
+	__super::Draw(InRenderFrameContext, camera, shader, lights);
 }
 
 void jBoundSphereObject::SetUniformBuffer(const jShader* shader)
@@ -225,14 +225,14 @@ void jArrowSegmentPrimitive::Update(float deltaTime)
 		ConeObject->Update(deltaTime);
 }
 
-void jArrowSegmentPrimitive::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 1 */) const
+void jArrowSegmentPrimitive::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
 {
-	__super::Draw(camera, shader, lights);
+	__super::Draw(InRenderFrameContext, camera, shader, lights);
 
 	if (SegmentObject)
-		SegmentObject->Draw(camera, shader, lights);
+		SegmentObject->Draw(InRenderFrameContext, camera, shader, lights);
 	if (ConeObject)
-		ConeObject->Draw(camera, shader, lights);
+		ConeObject->Draw(InRenderFrameContext, camera, shader, lights);
 }
 
 
@@ -2117,14 +2117,14 @@ void jDirectionalLightPrimitive::Update(float deltaTime)
 }
 
 
-void jDirectionalLightPrimitive::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 1 */) const
+void jDirectionalLightPrimitive::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
 {
-	__super::Draw(camera, shader, lights);
+	__super::Draw(InRenderFrameContext, camera, shader, lights);
 
 	if (BillboardObject)
-		BillboardObject->Draw(camera, shader, lights);
+		BillboardObject->Draw(InRenderFrameContext, camera, shader, lights);
 	if (ArrowSegementObject)
-		ArrowSegementObject->Draw(camera, shader, lights);
+		ArrowSegementObject->Draw(InRenderFrameContext, camera, shader, lights);
 }
 
 void jSegmentPrimitive::UpdateSegment()
@@ -2192,11 +2192,11 @@ void jPointLightPrimitive::Update(float deltaTime)
 	SphereObject->Update(deltaTime);
 }
 
-void jPointLightPrimitive::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 1 */) const
+void jPointLightPrimitive::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
 {
-	__super::Draw(camera, shader, lights);
-	BillboardObject->Draw(camera, shader, lights);
-	SphereObject->Draw(camera, shader, lights);
+	__super::Draw(InRenderFrameContext, camera, shader, lights);
+	BillboardObject->Draw(InRenderFrameContext, camera, shader, lights);
+	SphereObject->Draw(InRenderFrameContext, camera, shader, lights);
 }
 
 void jSpotLightPrimitive::Update(float deltaTime)
@@ -2207,12 +2207,12 @@ void jSpotLightPrimitive::Update(float deltaTime)
 	PenumbraConeObject->Update(deltaTime);
 }
 
-void jSpotLightPrimitive::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 1 */) const
+void jSpotLightPrimitive::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
 {
-	__super::Draw(camera, shader, lights);
-	BillboardObject->Draw(camera, shader, lights);
-	UmbraConeObject->Draw(camera, shader, lights);
-	PenumbraConeObject->Draw(camera, shader, lights);
+	__super::Draw(InRenderFrameContext, camera, shader, lights);
+	BillboardObject->Draw(InRenderFrameContext, camera, shader, lights);
+	UmbraConeObject->Draw(InRenderFrameContext, camera, shader, lights);
+	PenumbraConeObject->Draw(InRenderFrameContext, camera, shader, lights);
 }
 
 void jFrustumPrimitive::Update(float deltaTime)
@@ -2409,16 +2409,16 @@ void jFrustumPrimitive::Update(float deltaTime)
 	}
 }
 
-void jFrustumPrimitive::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 1 */) const
+void jFrustumPrimitive::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
 {
-	__super::Draw(camera, shader, lights);
+	__super::Draw(InRenderFrameContext, camera, shader, lights);
 	for (int32 i = 0; i < 16; ++i)
-		Segments[i]->Draw(camera, shader, lights);
+		Segments[i]->Draw(InRenderFrameContext, camera, shader, lights);
 
 	if (DrawPlane)
 	{
 		for (int32 i = 0; i < 6; ++i)
-			Plane[i]->Draw(camera, shader, lights);
+			Plane[i]->Draw(InRenderFrameContext, camera, shader, lights);
 	}
 }
 
@@ -2427,12 +2427,12 @@ void jGraph2D::Update(float deltaTime)
 	UpdateBuffer();
 }
 
-void jGraph2D::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
+void jGraph2D::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
 {
 	SET_UNIFORM_BUFFER_STATIC("InvViewportSize", Vector2(1.0f / SCR_WIDTH, 1.0f / SCR_HEIGHT), shader);
 	SET_UNIFORM_BUFFER_STATIC("LineColor", Vector4::ColorRed, shader);
 	SET_UNIFORM_BUFFER_STATIC("GuardLineColor", Vector4::ColorWhite, shader);
-	__super::Draw(camera, shader, lights, static_cast<int32>(ResultMatrices.size()));
+	__super::Draw(InRenderFrameContext, camera, shader, lights, static_cast<int32>(ResultMatrices.size()));
 }
 
 void jGraph2D::SethPos(const Vector2& pos)

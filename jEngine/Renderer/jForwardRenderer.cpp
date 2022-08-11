@@ -12,6 +12,7 @@
 
 void jForwardRenderer::Setup()
 {
+    // Prepare shadowpass pipeline
     auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
     jMultisampleStateInfo* MultisampleState = TMultisampleStateInfo<true, 0.2f, false, false>::Create(EMSAASamples::COUNT_1);
     auto DepthStencilState = TDepthStencilStateInfo<true, true, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
@@ -33,25 +34,27 @@ void jForwardRenderer::Setup()
     ShadowView.Camera = View.DirectionalLight->GetLightCamra();
     ShadowView.DirectionalLight = View.DirectionalLight;
 
-    // Shadow
-    static jShader* Shader = nullptr;
-    if (!Shader)
     {
-        jShaderInfo shaderInfo;
-        shaderInfo.name = jName("shadow_test");
-        shaderInfo.vs = jName("Resource/Shaders/hlsl/shadow_vs.hlsl");
-        shaderInfo.fs = jName("Resource/Shaders/hlsl/shadow_fs.hlsl");
-        Shader = g_rhi->CreateShader(shaderInfo);
-    }
+        static jShader* Shader = nullptr;
+        if (!Shader)
+        {
+            jShaderInfo shaderInfo;
+            shaderInfo.name = jName("shadow_test");
+            shaderInfo.vs = jName("Resource/Shaders/hlsl/shadow_vs.hlsl");
+            shaderInfo.fs = jName("Resource/Shaders/hlsl/shadow_fs.hlsl");
+            Shader = g_rhi->CreateShader(shaderInfo);
+        }
 
-    for (auto iter : jObject::GetStaticObject())
-    {
-        auto newCommand = jDrawCommand(&ShadowView, iter->RenderObject, ShadowMapRenderPass, Shader, &CurrentPipelineStateFixed_Shadow, { });
-        newCommand.PrepareToDraw(true);
-        ShadowPasses.push_back(newCommand);
+        for (auto iter : jObject::GetStaticObject())
+        {
+            auto newCommand = jDrawCommand(RenderFrameContextPtr, &ShadowView, iter->RenderObject, ShadowMapRenderPass, Shader, &CurrentPipelineStateFixed_Shadow, { });
+            newCommand.PrepareToDraw(true);
+            ShadowPasses.push_back(newCommand);
+        }
     }
-
     //////////////////////////////////////////////////////////////////////////
+
+    // Prepare basepass pipeline
     {
         auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
         jMultisampleStateInfo* MultisampleState = TMultisampleStateInfo<true, 0.2f, false, false>::Create((EMSAASamples)g_rhi_vk->MsaaSamples);
@@ -85,6 +88,25 @@ void jForwardRenderer::Setup()
     {
         OpaqueRenderPass = (jRenderPass_Vulkan*)g_rhi_vk->GetOrCreateRenderPass({ color }, depth, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
     }
+
+    {
+        static jShader* Shader = nullptr;
+        if (!Shader)
+        {
+            jShaderInfo shaderInfo;
+            shaderInfo.name = jName("default_test");
+            shaderInfo.vs = jName("Resource/Shaders/hlsl/shader_vs.hlsl");
+            shaderInfo.fs = jName("Resource/Shaders/hlsl/shader_fs.hlsl");
+            Shader = g_rhi->CreateShader(shaderInfo);
+        }
+
+        for (auto iter : jObject::GetStaticObject())
+        {
+            auto newCommand = jDrawCommand(RenderFrameContextPtr, &View, iter->RenderObject, OpaqueRenderPass, Shader, &g_rhi_vk->CurrentPipelineStateFixed, { });
+            newCommand.PrepareToDraw(false);
+            BasePasses.push_back(newCommand);
+        }
+    }
 }
 
 void jForwardRenderer::Render()
@@ -95,13 +117,13 @@ void jForwardRenderer::Render()
 
     __super::Render();
 
-    jImGUI_Vulkan::Get().Draw(RenderFrameContextPtr->CommandBuffer, RenderFrameContextPtr->FrameIndex);
+    jImGUI_Vulkan::Get().Draw(RenderFrameContextPtr);
     ensure(RenderFrameContextPtr->CommandBuffer->End());
 }
 
 void jForwardRenderer::ShadowPass()
 {
-    SCOPE_GPU_PROFILE(ShadowPass);
+    SCOPE_GPU_PROFILE(RenderFrameContextPtr, ShadowPass);
 
     g_rhi_vk->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, View.DirectionalLight->ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_ATTACHMENT);
 
@@ -119,27 +141,9 @@ void jForwardRenderer::ShadowPass()
 
 void jForwardRenderer::OpaquePass()
 {
-    SCOPE_GPU_PROFILE(BasePass);
+    SCOPE_GPU_PROFILE(RenderFrameContextPtr, BasePass);
 
     g_rhi_vk->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, RenderFrameContextPtr->SceneRenderTarget->ColorPtr->GetTexture(), EImageLayout::COLOR_ATTACHMENT);
-
-    static jShader* Shader = nullptr;
-    if (!Shader)
-    {
-        jShaderInfo shaderInfo;
-        shaderInfo.name = jName("default_test");
-        shaderInfo.vs = jName("Resource/Shaders/hlsl/shader_vs.hlsl");
-        shaderInfo.fs = jName("Resource/Shaders/hlsl/shader_fs.hlsl");
-        Shader = g_rhi->CreateShader(shaderInfo);
-    }
-
-    std::vector<jDrawCommand> BasePasses;
-    for (auto iter : jObject::GetStaticObject())
-    {
-        auto newCommand = jDrawCommand(&View, iter->RenderObject, OpaqueRenderPass, Shader, &g_rhi_vk->CurrentPipelineStateFixed, { });
-        newCommand.PrepareToDraw(false);
-        BasePasses.push_back(newCommand);
-    }
 
     if (OpaqueRenderPass->BeginRenderPass(RenderFrameContextPtr->CommandBuffer))
     {

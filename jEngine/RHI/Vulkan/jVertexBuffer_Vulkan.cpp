@@ -1,8 +1,10 @@
 ﻿#include "pch.h"
 #include "jVertexBuffer_Vulkan.h"
+#include "../jRenderFrameContext.h"
 
-void jVertexBuffer_Vulkan::Bind() const
+void jVertexBuffer_Vulkan::Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const
 {
-    check(g_rhi_vk->CurrentCommandBuffer);
-    vkCmdBindVertexBuffers((VkCommandBuffer)g_rhi_vk->CurrentCommandBuffer->GetHandle(), 0, (uint32)BindInfos.Buffers.size(), &BindInfos.Buffers[0], &BindInfos.Offsets[0]);
+    check(InRenderFrameContext);
+    check(InRenderFrameContext->CommandBuffer);
+    vkCmdBindVertexBuffers((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), 0, (uint32)BindInfos.Buffers.size(), &BindInfos.Buffers[0], &BindInfos.Offsets[0]);
 }

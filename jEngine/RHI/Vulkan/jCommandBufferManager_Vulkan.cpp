@@ -7,10 +7,6 @@
 //////////////////////////////////////////////////////////////////////////
 bool jCommandBuffer_Vulkan::Begin() const
 {
-    // 현재는 렌더커맨드가 1개라고 가정
-    check(!g_rhi_vk->CurrentCommandBuffer);
-    g_rhi_vk->CurrentCommandBuffer = this;
-
     VkCommandBufferBeginInfo beginInfo = {};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
@@ -30,10 +26,6 @@ bool jCommandBuffer_Vulkan::Begin() const
 
 bool jCommandBuffer_Vulkan::End() const
 {
-    // 현재는 렌더커맨드가 1개라고 가정
-    if (g_rhi_vk->CurrentCommandBuffer == this)
-        g_rhi_vk->CurrentCommandBuffer = nullptr;
-
     if (!ensure(vkEndCommandBuffer(CommandBuffer) == VK_SUCCESS))
         return false;
 

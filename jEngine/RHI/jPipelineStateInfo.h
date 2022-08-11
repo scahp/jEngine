@@ -337,6 +337,7 @@ struct jShader;
 struct jVertexBuffer;
 struct jShaderBindings;
 class jRenderPass;
+struct jRenderFrameContext;
 
 //////////////////////////////////////////////////////////////////////////
 // jPipelineStateInfo
@@ -368,5 +369,5 @@ struct jPipelineStateInfo
     virtual void* GetHandle() const { return nullptr; }
     virtual void* GetPipelineLayoutHandle() const { return nullptr; }
     virtual void* CreateGraphicsPipelineState() { return nullptr; }
-    virtual void Bind() const { }
+    virtual void Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const { }
 };

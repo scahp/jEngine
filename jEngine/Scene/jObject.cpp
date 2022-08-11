@@ -175,10 +175,11 @@ void jObject::Update(float deltaTime)
 		PostUpdateFunc(this, deltaTime);
 }
 
-void jObject::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
+void jObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera
+	, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
 {
 	if (Visible && RenderObject)
-		RenderObject->Draw(camera, shader, lights, 0, -1, instanceCount);
+		RenderObject->Draw(InRenderFrameContext, camera, shader, lights, 0, -1, instanceCount);
 }
 
 void jObject::CreateBoundBox(bool isShow)

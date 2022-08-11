@@ -140,7 +140,8 @@ struct jProfile_GPU
 class jScopedProfile_GPU
 {
 public:
-	jScopedProfile_GPU(const jName& name)
+	jScopedProfile_GPU(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jName& name)
+		: RenderFrameContextPtr(InRenderFrameContext)
 	{
 		Profile.Name = name;
 		//Profile.Start = jQueryTimePool::GetQueryTime();
@@ -148,7 +149,7 @@ public:
 		//g_rhi->QueryTimeStamp(Profile.Start);
 
         Profile.Query = jQueryTimePool::GetQueryTime();
-		g_rhi_vk->QueryTimeStampStart(Profile.Query);
+		g_rhi_vk->QueryTimeStampStart(InRenderFrameContext, Profile.Query);
 	}
 
 	~jScopedProfile_GPU()
@@ -156,17 +157,18 @@ public:
 		//Profile.End = jQueryTimePool::GetQueryTime();
 		//g_rhi->QueryTimeStamp(Profile.End);
 
-        g_rhi_vk->QueryTimeStampEnd(Profile.Query);
+        g_rhi_vk->QueryTimeStampEnd(RenderFrameContextPtr.lock(), Profile.Query);
 		jProfile_GPU::WatingResultList[jProfile_GPU::CurrentWatingResultListIndex].emplace_back(Profile);
 	}
 
+	std::weak_ptr<jRenderFrameContext> RenderFrameContextPtr;
 	jProfile_GPU Profile;
 };
 
 #if ENABLE_PROFILE_GPU
-#define SCOPE_GPU_PROFILE(Name) static jName Name##ScopedProfileGPUName(#Name); jScopedProfile_GPU Name##ScopedProfileGPU(Name##ScopedProfileGPUName);
+#define SCOPE_GPU_PROFILE(RenderFrameContextPtr, Name) static jName Name##ScopedProfileGPUName(#Name); jScopedProfile_GPU Name##ScopedProfileGPU(RenderFrameContextPtr, Name##ScopedProfileGPUName);
 #else
-#define SCOPE_GPU_PROFILE(Name)
+#define SCOPE_GPU_PROFILE(RenderFrameContextPtr, Name)
 #endif
 
 //////////////////////////////////////////////////////////////////////////

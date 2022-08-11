@@ -54,40 +54,8 @@ void jRenderObject::UpdateVertexStream()
 	g_rhi->UpdateVertexBuffer(VertexBuffer_PositionOnly, VertexStream_PositionOnly);
 }
 
-//void jRenderObject::Draw(const jCamera* camera, const jShader* shader, int32 startIndex, int32 count)
-//{
-//	if (VertexBuffer->VertexStreamData.expired())
-//		return;
-//
-//	g_rhi->SetShader(shader);
-//	g_rhi->EnableCullFace(camera->IsEnableCullMode && !IsTwoSided);
-//
-//	jMaterialData materialData;
-//
-//	SetRenderProperty(shader);
-//	SetCameraProperty(shader, camera);
-//	SetLightProperty(shader, camera, &materialData);
-//	SetTextureProperty(shader, &materialData);
-//	SetMaterialProperty(shader, &materialData);
-//
-//	startIndex = startIndex != -1 ? startIndex : 0;
-//
-//	auto vertexStreamData = VertexBuffer->VertexStreamData.lock();
-//	auto primitiveType = vertexStreamData->PrimitiveType;
-//	if (IndexBuffer)
-//	{
-//		auto indexStreamData = IndexBuffer->IndexStreamData.lock();		
-//		count = count != -1 ? count : indexStreamData->ElementCount;
-//		g_rhi->DrawElement(primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count);
-//	}
-//	else
-//	{
-//		count = count != -1 ? count : vertexStreamData->ElementCount;
-//		g_rhi->DrawArray(primitiveType, 0, count);
-//	}
-//}
-
-void jRenderObject::Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 startIndex, int32 count, int32 instanceCount, bool bPoisitionOnly)
+void jRenderObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader
+	, const std::list<const jLight*>& lights, int32 startIndex /*= 0*/, int32 count /*= -1*/, int32 instanceCount /*= 1*/, bool bPoisitionOnly /*= false*/)
 {
 	if (!VertexBuffer->VertexStreamData)
 		return;
@@ -100,7 +68,7 @@ void jRenderObject::Draw(const jCamera* camera, const jShader* shader, const std
 
 	DynamicMaterialData.clear();
 
-	SetRenderProperty(shader);
+	SetRenderProperty(InRenderFrameContext,shader);
 	//SetCameraProperty(shader, camera);
 	for (auto iter : lights)
 	{
@@ -120,21 +88,22 @@ void jRenderObject::Draw(const jCamera* camera, const jShader* shader, const std
 		auto& indexStreamData = IndexBuffer->IndexStreamData;
 		count = count != -1 ? count : indexStreamData->ElementCount;
 		if (instanceCount <= 0)
-			g_rhi->DrawElements(primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count);
+			g_rhi->DrawElements(InRenderFrameContext, primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count);
 		else
-			g_rhi->DrawElementsInstanced(primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count, instanceCount);
+			g_rhi->DrawElementsInstanced(InRenderFrameContext, primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count, instanceCount);
 	}
 	else
 	{
 		count = count != -1 ? count : vertexStreamData->ElementCount;
 		if (instanceCount <= 0)
-			g_rhi->DrawArrays(primitiveType, 0, count);
+			g_rhi->DrawArrays(InRenderFrameContext, primitiveType, 0, count);
 		else
-			g_rhi->DrawArraysInstanced(primitiveType, 0, count, instanceCount);
+			g_rhi->DrawArraysInstanced(InRenderFrameContext, primitiveType, 0, count, instanceCount);
 	}
 }
 
-void jRenderObject::DrawBaseVertexIndex(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, const jMaterialData& materialData, int32 startIndex, int32 count, int32 baseVertexIndex, int32 instanceCount /*= 1*/)
+void jRenderObject::DrawBaseVertexIndex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader
+	, const std::list<const jLight*>& lights, const jMaterialData& materialData, int32 startIndex, int32 count, int32 baseVertexIndex, int32 instanceCount /*= 1*/)
 {
 	if (VertexBuffer->VertexStreamData)
 		return;
@@ -147,7 +116,7 @@ void jRenderObject::DrawBaseVertexIndex(const jCamera* camera, const jShader* sh
 		std::vector<const jMaterialData*> DynamicMaterialData;
 		DynamicMaterialData.reserve(lights.size());
 
-		SetRenderProperty(shader);
+		SetRenderProperty(InRenderFrameContext,shader);
 		SetCameraProperty(shader, camera);
 		//SetLightProperty(shader, camera, lights, &DynamicMaterialData);
 		for (auto iter : lights)
@@ -168,54 +137,21 @@ void jRenderObject::DrawBaseVertexIndex(const jCamera* camera, const jShader* sh
 		{
 			auto& indexStreamData = IndexBuffer->IndexStreamData;
 			if (instanceCount <= 0)
-				g_rhi->DrawElementsBaseVertex(primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count, baseVertexIndex);
+				g_rhi->DrawElementsBaseVertex(InRenderFrameContext, primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count, baseVertexIndex);
 			else
-				g_rhi->DrawElementsInstancedBaseVertex(primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count, baseVertexIndex, instanceCount);
+				g_rhi->DrawElementsInstancedBaseVertex(InRenderFrameContext, primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count, baseVertexIndex, instanceCount);
 		}
 		else
 		{
 			if (instanceCount <= 0)
-				g_rhi->DrawArrays(primitiveType, baseVertexIndex, count);
+				g_rhi->DrawArrays(InRenderFrameContext, primitiveType, baseVertexIndex, count);
 			else
-				g_rhi->DrawArraysInstanced(primitiveType, baseVertexIndex, count, instanceCount);
+				g_rhi->DrawArraysInstanced(InRenderFrameContext, primitiveType, baseVertexIndex, count, instanceCount);
 		}
 	}
 }
 
-//void jRenderObject::Draw(const jCamera* camera, const jShader* shader, int32 startIndex, int32 count, int32 baseVertexIndex)
-//{
-//	if (VertexBuffer->VertexStreamData.expired())
-//		return;
-//
-//	g_rhi->SetShader(shader);
-//	g_rhi->EnableCullFace(camera->IsEnableCullMode && !IsTwoSided);
-//
-//	jMaterialData materialData;
-//
-//	SetRenderProperty(shader);
-//	SetCameraProperty(shader, camera);
-//	SetLightProperty(shader, camera, &materialData);
-//	SetTextureProperty(shader, &materialData);
-//	SetMaterialProperty(shader, &materialData);
-//
-//	startIndex = startIndex != -1 ? startIndex : 0;
-//
-//	auto vertexStreamData = VertexBuffer->VertexStreamData.lock();
-//	auto primitiveType = vertexStreamData->PrimitiveType;
-//	if (IndexBuffer)
-//	{
-//		auto indexStreamData = IndexBuffer->IndexStreamData.lock();
-//		count = count != -1 ? count : indexStreamData->ElementCount;
-//		g_rhi->DrawElementBaseVertex(primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count, baseVertexIndex);
-//	}
-//	else
-//	{
-//		count = count != -1 ? count : vertexStreamData->ElementCount;
-//		g_rhi->DrawArray(primitiveType, baseVertexIndex, count);
-//	}
-//}
-
-void jRenderObject::SetRenderProperty(const jShader* shader, bool bPositionOnly)
+void jRenderObject::SetRenderProperty(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jShader* shader, bool bPositionOnly /*= false*/)
 {
 #if USE_OPENGL
 	if (bPositionOnly)
@@ -234,15 +170,15 @@ void jRenderObject::SetRenderProperty(const jShader* shader, bool bPositionOnly)
 	if (bPositionOnly)
 	{
 		if (VertexBuffer_PositionOnly)
-			VertexBuffer_PositionOnly->Bind();
+			VertexBuffer_PositionOnly->Bind(InRenderFrameContext);
 	}
 	else
 	{
 		if (VertexBuffer)
-			VertexBuffer->Bind();
+			VertexBuffer->Bind(InRenderFrameContext);
 	}
 	if (IndexBuffer)
-		IndexBuffer->Bind();
+		IndexBuffer->Bind(InRenderFrameContext);
 #endif
 }
 

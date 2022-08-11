@@ -7,7 +7,7 @@ struct jVertexBuffer
     virtual jName GetName() const { return jName::Invalid; }
     virtual size_t GetHash() const { return 0; }
     virtual void Bind(const jShader* shader) const {}
-    virtual void Bind() const {}
+    virtual void Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const {}
 };
 
 struct jIndexBuffer
@@ -16,5 +16,5 @@ struct jIndexBuffer
 
     virtual jName GetName() const { return jName::Invalid; }
     virtual void Bind(const jShader* shader) const {}
-    virtual void Bind() const {}
+    virtual void Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const {}
 };

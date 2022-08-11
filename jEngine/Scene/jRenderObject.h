@@ -29,14 +29,14 @@ public:
 	void UpdateVertexStream();
 
 	//void Draw(const jCamera* camera, const jShader* shader, int32 startIndex = -1, int32 count = -1);
-	void Draw(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 startIndex = 0, int32 count = -1, int32 instanceCount = 1, bool bPoisitionOnly = false);
-	void DrawBoundBox(const jCamera* camera, const jShader* shader, const Vector& offset = Vector(ZeroType));
+	void Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader
+		, const std::list<const jLight*>& lights, int32 startIndex = 0, int32 count = -1, int32 instanceCount = 1, bool bPoisitionOnly = false);
 
 	// todo 함수를 줄일까? 아니면 이렇게 쓸까? 고민
 	//void Draw(const jCamera* camera, const jShader* shader, int32 startIndex, int32 count, int32 baseVertexIndex);
-	void DrawBaseVertexIndex(const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, const jMaterialData& materialData, int32 startIndex, int32 count, int32 baseVertexIndex, int32 instanceCount = 1);
+	void DrawBaseVertexIndex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, const jMaterialData& materialData, int32 startIndex, int32 count, int32 baseVertexIndex, int32 instanceCount = 1);
 	
-	void SetRenderProperty(const jShader* shader, bool bPositionOnly = false);
+	void SetRenderProperty(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jShader* shader, bool bPositionOnly = false);
 	void SetCameraProperty(const jShader* shader, const jCamera* camera);
 	void SetMaterialProperty(const jShader* shader, const jMaterialData* materialData, const std::vector<const jMaterialData*>& dynamicMaterialData);
 	void SetLightProperty(const jShader* shader, const jCamera* camera, const std::list<const jLight*>& lights, jMaterialData* materialData);

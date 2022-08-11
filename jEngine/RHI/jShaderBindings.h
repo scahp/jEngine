@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 struct IUniformBufferBlock;
+struct jRenderFrameContext;
 
 struct jShaderBinding
 {
@@ -45,7 +46,7 @@ struct jShaderBindingInstance
     std::vector<jTextureBindings> Textures;
 
     virtual void UpdateShaderBindings() {}
-    virtual void Bind(void* pipelineLayout, int32 InSlot = 0) const {}
+    virtual void Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const {}
 };
 
 struct jShaderBindings
