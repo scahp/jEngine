@@ -149,7 +149,7 @@ public:
 		//g_rhi->QueryTimeStamp(Profile.Start);
 
         Profile.Query = jQueryTimePool::GetQueryTime();
-		g_rhi_vk->QueryTimeStampStart(InRenderFrameContext, Profile.Query);
+		g_rhi->QueryTimeStampStart(InRenderFrameContext, Profile.Query);
 	}
 
 	~jScopedProfile_GPU()
@@ -157,7 +157,7 @@ public:
 		//Profile.End = jQueryTimePool::GetQueryTime();
 		//g_rhi->QueryTimeStamp(Profile.End);
 
-        g_rhi_vk->QueryTimeStampEnd(RenderFrameContextPtr.lock(), Profile.Query);
+        g_rhi->QueryTimeStampEnd(RenderFrameContextPtr.lock(), Profile.Query);
 		jProfile_GPU::WatingResultList[jProfile_GPU::CurrentWatingResultListIndex].emplace_back(Profile);
 	}
 

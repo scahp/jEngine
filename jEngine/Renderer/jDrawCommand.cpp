@@ -34,7 +34,7 @@ void jDrawCommand::PrepareToDraw(bool bPositionOnly)
         shaderBindings.push_back(ShaderBindingInstances[i]->ShaderBindings);
 
     // Create Pipeline
-    CurrentPipelineStateInfo = (jPipelineStateInfo_Vulkan*)g_rhi_vk->CreatePipelineStateInfo(PipelineStateFixed, Shader
+    CurrentPipelineStateInfo = (jPipelineStateInfo_Vulkan*)g_rhi->CreatePipelineStateInfo(PipelineStateFixed, Shader
         , bPositionOnly ? RenderObject->VertexBuffer_PositionOnly : RenderObject->VertexBuffer, RenderPass, shaderBindings);
 }
 

@@ -184,13 +184,13 @@ void jGame::Draw()
 {
 	SCOPE_DEBUG_EVENT(g_rhi, "Game::Draw");
 
-	std::shared_ptr<jRenderFrameContext> renderFrameContext = g_rhi_vk->BeginRenderFrame();
+	std::shared_ptr<jRenderFrameContext> renderFrameContext = g_rhi->BeginRenderFrame();
 
     jForwardRenderer forwardRenderer(renderFrameContext, jView(MainCamera, DirectionalLight));
     forwardRenderer.Setup();
 	forwardRenderer.Render();
 
-    g_rhi_vk->EndRenderFrame(renderFrameContext);
+    g_rhi->EndRenderFrame(renderFrameContext);
 }
 
 void jGame::OnMouseButton()
