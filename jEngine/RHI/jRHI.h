@@ -295,7 +295,7 @@ public:
 	virtual void SetDepthBias(float constant, float slope) const {}
 	virtual void SetShader(const jShader* shader) const {}
 	virtual jShader* CreateShader(const jShaderInfo& shaderInfo) const { return nullptr; }
-	virtual bool CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo) const { return false;  }
+    virtual bool CreateShaderInternal(jShader* OutShader, const jShaderInfo& shaderInfo) const { return false; }
 	virtual void ReleaseShader(jShader* shader) const {}
 	virtual void SetViewport(int32 x, int32 y, int32 width, int32 height) const {}
 	virtual void SetViewport(const jViewport& viewport) const {}

@@ -116,7 +116,7 @@ void jShader::UpdateShader()
 
 	if (TimeStamp < currentTimeStamp)
 	{
-		g_rhi->CreateShader(this, ShaderInfo);
+		g_rhi->CreateShaderInternal(this, ShaderInfo);
 		TimeStamp = currentTimeStamp;
 	}
 }

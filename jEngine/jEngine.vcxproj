@@ -281,6 +281,7 @@ xcopy /s /y /d  "$(ProjectDir)External\ShaderConductor\Lib\Debug\*.dll" "$(OutDi
     <ClCompile Include="RHI\Vulkan\jQueryPool_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jRenderPass_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jShaderBindings_Vulkan.cpp" />
+    <ClCompile Include="RHI\Vulkan\jShader_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jSwapchain_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jTexture_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jUniformBufferBlock_Vulkan.cpp" />

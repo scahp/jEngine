@@ -3,13 +3,10 @@
 
 struct jShader_Vulkan : public jShader
 {
-    virtual ~jShader_Vulkan()
-    {
-        for (auto& Stage : ShaderStages)
-        {
-            vkDestroyShaderModule(g_rhi_vk->Device, Stage.module, nullptr);
-        }
-    }
+    jShader_Vulkan(const jShaderInfo& shaderInfo);
+    virtual ~jShader_Vulkan();
+
+    virtual void Initialize() override;
 
     std::vector<VkPipelineShaderStageCreateInfo> ShaderStages;
 };

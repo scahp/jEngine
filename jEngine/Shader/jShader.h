@@ -6,6 +6,8 @@ struct jShaderInfo
 	static std::unordered_map<jName, jShaderInfo, jNameHashFunc> s_ShaderInfoMap;
 	static void AddShaderInfo(const jShaderInfo& shaderInfo);
 	static void CreateShaders();
+	
+	void Initialize() {}
 
 	FORCEINLINE size_t GetHash() const
 	{
@@ -48,6 +50,8 @@ struct jShaderInfo
 
 struct jShader : public std::enable_shared_from_this<jShader>
 {
+	virtual ~jShader() {}
+
 	static std::vector<std::shared_ptr<jShader> > ShaderVector;
 	static std::unordered_map<jName, std::shared_ptr<jShader>, jNameHashFunc> ShaderNameMap;
 	static jShader* GetShader(const jName& name);
@@ -60,4 +64,5 @@ struct jShader : public std::enable_shared_from_this<jShader>
 	jShaderInfo ShaderInfo;
 
 	void UpdateShader();
+	virtual void Initialize() {}
 };

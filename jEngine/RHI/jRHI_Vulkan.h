@@ -12,6 +12,7 @@
 #include "Vulkan/jPipelineStateInfo_Vulkan.h"
 #include "Vulkan/jCommandBufferManager_Vulkan.h"
 #include "Vulkan/jSwapchain_Vulkan.h"
+#include "Vulkan/jShader_Vulkan.h"
 
 #define VALIDATION_LAYER_VERBOSE 0
 
@@ -28,6 +29,7 @@ public:
     static TResourcePool<jBlendingStateInfo_Vulakn> BlendingStatePool;
     static TResourcePool<jPipelineStateInfo_Vulkan> PipelineStatePool;
 	static TResourcePool<jRenderPass_Vulkan> RenderPassPool;
+	static TResourcePool<jShader_Vulkan> ShaderPool;
 
 	jRHI_Vulkan();
 	virtual ~jRHI_Vulkan();
@@ -117,7 +119,7 @@ public:
 	virtual jTexture* CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
 		, ETextureFormat textureFormat = ETextureFormat::RGBA8, bool createMipmap = false) const override;
 	virtual jShader* CreateShader(const jShaderInfo& shaderInfo) const override;
-	virtual bool CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo) const override;
+	virtual bool CreateShaderInternal(jShader* OutShader, const jShaderInfo& shaderInfo) const override;
 	virtual jFrameBuffer* CreateFrameBuffer(const jFrameBufferInfo& info) const override;
 	virtual std::shared_ptr<jRenderTarget> CreateRenderTarget(const jRenderTargetInfo& info) const override;
 

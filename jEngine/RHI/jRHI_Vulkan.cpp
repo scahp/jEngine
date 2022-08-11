@@ -36,6 +36,7 @@ TResourcePool<jDepthStencilStateInfo_Vulkan> jRHI_Vulkan::DepthStencilStatePool;
 TResourcePool<jBlendingStateInfo_Vulakn> jRHI_Vulkan::BlendingStatePool;
 TResourcePool<jPipelineStateInfo_Vulkan> jRHI_Vulkan::PipelineStatePool;
 TResourcePool<jRenderPass_Vulkan> jRHI_Vulkan::RenderPassPool;
+TResourcePool<jShader_Vulkan> jRHI_Vulkan::ShaderPool;
 
 struct jFrameBuffer_Vulkan : public jFrameBuffer
 {
@@ -545,12 +546,10 @@ jTexture* jRHI_Vulkan::CreateTextureFromData(void* data, int32 width, int32 heig
 
 jShader* jRHI_Vulkan::CreateShader(const jShaderInfo& shaderInfo) const
 {
-	auto shader = new jShader_Vulkan();
-	CreateShader(shader, shaderInfo);
-	return shader;
+	return ShaderPool.GetOrCreate(shaderInfo);
 }
 
-bool jRHI_Vulkan::CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo) const
+bool jRHI_Vulkan::CreateShaderInternal(jShader* OutShader, const jShaderInfo& shaderInfo) const
 {
 	auto CreateShaderModule = [](const std::vector<uint32>& code) -> VkShaderModule
 	{

@@ -44,19 +44,15 @@ void jForwardRenderer::SetupShadowPass()
     ShadowView.Camera = View.DirectionalLight->GetLightCamra();
     ShadowView.DirectionalLight = View.DirectionalLight;
 
-    static jShader* Shader = nullptr;
-    if (!Shader)
-    {
-        jShaderInfo shaderInfo;
-        shaderInfo.name = jName("shadow_test");
-        shaderInfo.vs = jName("Resource/Shaders/hlsl/shadow_vs.hlsl");
-        shaderInfo.fs = jName("Resource/Shaders/hlsl/shadow_fs.hlsl");
-        Shader = g_rhi->CreateShader(shaderInfo);
-    }
+    jShaderInfo shaderInfo;
+    shaderInfo.name = jName("shadow_test");
+    shaderInfo.vs = jName("Resource/Shaders/hlsl/shadow_vs.hlsl");
+    shaderInfo.fs = jName("Resource/Shaders/hlsl/shadow_fs.hlsl");
+    jShader* ShadowShader = g_rhi->CreateShader(shaderInfo);
 
     for (auto iter : jObject::GetStaticObject())
     {
-        auto newCommand = jDrawCommand(RenderFrameContextPtr, &ShadowView, iter->RenderObject, ShadowMapRenderPass, Shader, &ShadpwPipelineStateFixed, { });
+        auto newCommand = jDrawCommand(RenderFrameContextPtr, &ShadowView, iter->RenderObject, ShadowMapRenderPass, ShadowShader, &ShadpwPipelineStateFixed, { });
         newCommand.PrepareToDraw(true);
         ShadowPasses.push_back(newCommand);
     }
@@ -97,19 +93,15 @@ void jForwardRenderer::SetupBasePass()
         OpaqueRenderPass = (jRenderPass_Vulkan*)g_rhi_vk->GetOrCreateRenderPass({ color }, depth, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
     }
 
-    static jShader* Shader = nullptr;
-    if (!Shader)
-    {
-        jShaderInfo shaderInfo;
-        shaderInfo.name = jName("default_test");
-        shaderInfo.vs = jName("Resource/Shaders/hlsl/shader_vs.hlsl");
-        shaderInfo.fs = jName("Resource/Shaders/hlsl/shader_fs.hlsl");
-        Shader = g_rhi->CreateShader(shaderInfo);
-    }
+    jShaderInfo shaderInfo;
+    shaderInfo.name = jName("default_test");
+    shaderInfo.vs = jName("Resource/Shaders/hlsl/shader_vs.hlsl");
+    shaderInfo.fs = jName("Resource/Shaders/hlsl/shader_fs.hlsl");
+    jShader* BasePassShader = g_rhi->CreateShader(shaderInfo);
 
     for (auto iter : jObject::GetStaticObject())
     {
-        auto newCommand = jDrawCommand(RenderFrameContextPtr, &View, iter->RenderObject, OpaqueRenderPass, Shader, &BasePassPipelineStateFixed, { });
+        auto newCommand = jDrawCommand(RenderFrameContextPtr, &View, iter->RenderObject, OpaqueRenderPass, BasePassShader, &BasePassPipelineStateFixed, { });
         newCommand.PrepareToDraw(false);
         BasePasses.push_back(newCommand);
     }
