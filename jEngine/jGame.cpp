@@ -5,21 +5,9 @@
 #include "Scene/jObject.h"
 #include "Scene/jLight.h"
 #include "Scene/jRenderObject.h"
-#include "Scene/jMeshObject.h"
-#include "jPrimitiveUtil.h"
-#include "FileLoader/jImageFileLoader.h"
-#include "FileLoader/jModelLoader.h"
-#include "FileLoader/jFile.h"
-#include "RHI/jFrameBufferPool.h"
-#include "RHI/jRenderTargetPool.h"
 #include "Profiler/jPerformanceProfile.h"
-#include "RHI\Vulkan\jTexture_Vulkan.h"
-#include "Shader\Spirv\jSpirvHelper.h"
-#include "RHI\Vulkan\jShader_Vulkan.h"
-#include "RHI\Vulkan\jRHIType_Vulkan.h"
-#include "Renderer\jSceneRenderTargets.h"
-#include "Renderer\jDrawcommand.h"
-#include "Renderer\jForwardRenderer.h"
+#include "Renderer/jForwardRenderer.h"
+#include "jPrimitiveUtil.h"
 
 jRHI* g_rhi = nullptr;
 
