@@ -82,6 +82,7 @@ struct jPipelineStateInfo_Vulkan : public jPipelineStateInfo
     virtual void* GetHandle() const override { return vkPipeline; }
     virtual void* GetPipelineLayoutHandle() const override { return vkPipelineLayout; }
     virtual void* CreateGraphicsPipelineState() override;
+    virtual void* CreateComputePipelineState() override;
     virtual void Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const override;
 
     VkPipeline vkPipeline = nullptr;

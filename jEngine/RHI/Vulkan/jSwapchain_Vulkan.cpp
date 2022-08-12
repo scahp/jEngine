@@ -14,7 +14,7 @@ bool jSwapchain_Vulkan::Create()
 
     // SwapChain 개수 설정
     // 최소개수로 하게 되면, 우리가 렌더링할 새로운 이미지를 얻기 위해 드라이버가 내부 기능 수행을 기다려야 할 수 있으므로 min + 1로 설정.
-    uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
+    uint32 imageCount = swapChainSupport.capabilities.minImageCount + 1;
 
     // maxImageCount가 0이면 최대 개수에 제한이 없음
     if ((swapChainSupport.capabilities.maxImageCount > 0) && (imageCount > swapChainSupport.capabilities.maxImageCount))
@@ -35,7 +35,7 @@ bool jSwapchain_Vulkan::Create()
                                                                     // VK_IMAGE_USAGE_TRANSFER_DST_BIT 으로 하면됨.
 
     jVulkanDeviceUtil::QueueFamilyIndices indices = jVulkanDeviceUtil::FindQueueFamilies(g_rhi_vk->PhysicalDevice, g_rhi_vk->Surface);
-    uint32_t queueFamilyIndices[] = { indices.graphicsFamily.value(), indices.presentFamily.value() };
+    uint32 queueFamilyIndices[] = { indices.graphicsFamily.value(), indices.presentFamily.value() };
 
     // 그림은 Graphics Queue Family와 Present Queue Family가 다른경우 아래와 같이 동작한다.
     // - 이미지를 Graphics Queue에서 가져온 스왑체인에 그리고, Presentation Queue에 제출

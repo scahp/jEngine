@@ -279,7 +279,7 @@ struct jBlendingStateInfo
     //VkPipelineColorBlendStateCreateFlags          flags;
     //VkBool32                                      logicOpEnable;
     //VkLogicOp                                     logicOp;
-    //uint32_t                                      attachmentCount;
+    //uint32                                      attachmentCount;
     //const VkPipelineColorBlendAttachmentState* pAttachments;
     //float                                         blendConstants[4];
 };
@@ -348,9 +348,16 @@ struct jPipelineStateInfo
     jPipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader, const jVertexBuffer* vertexBuffer
         , const jRenderPass* renderPass, const std::vector<const jShaderBindings*> shaderBindings)
         : PipelineStateFixed(pipelineStateFixed), Shader(shader), VertexBuffer(vertexBuffer), RenderPass(renderPass), ShaderBindings(shaderBindings)
-    {}
+    {
+        IsGraphics = true;
+    }
+    jPipelineStateInfo(const jShader* shader, const std::vector<const jShaderBindings*> shaderBindings)
+        : Shader(shader), ShaderBindings(shaderBindings)
+    {
+        IsGraphics = false;
+    }
     jPipelineStateInfo(const jPipelineStateInfo& pipelineState)
-        : PipelineStateFixed(pipelineState.PipelineStateFixed), Shader(pipelineState.Shader)
+        : PipelineStateFixed(pipelineState.PipelineStateFixed), Shader(pipelineState.Shader), IsGraphics(pipelineState.IsGraphics)
         , VertexBuffer(pipelineState.VertexBuffer), RenderPass(pipelineState.RenderPass), ShaderBindings(pipelineState.ShaderBindings)
     {}
     virtual ~jPipelineStateInfo() {}
@@ -359,6 +366,7 @@ struct jPipelineStateInfo
 
     mutable size_t Hash = 0;
 
+    bool IsGraphics = true;
     const jShader* Shader = nullptr;
     const jVertexBuffer* VertexBuffer = nullptr;
     const jRenderPass* RenderPass = nullptr;
@@ -369,5 +377,6 @@ struct jPipelineStateInfo
     virtual void* GetHandle() const { return nullptr; }
     virtual void* GetPipelineLayoutHandle() const { return nullptr; }
     virtual void* CreateGraphicsPipelineState() { return nullptr; }
+    virtual void* CreateComputePipelineState() { return nullptr; }
     virtual void Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const { }
 };

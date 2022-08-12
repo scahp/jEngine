@@ -10,35 +10,20 @@ bool jShaderBindings_Vulkan::CreateDescriptorSetLayout()
 {
     std::vector<VkDescriptorSetLayoutBinding> bindings;
 
-    for (int32 i = 0; i < UniformBuffers.size(); ++i)
+    for (int32 i = 0; i < (int32)ShaderBindings.size(); ++i)
     {
-        auto& UBBindings = UniformBuffers[i];
-
         VkDescriptorSetLayoutBinding binding = {};
-        binding.binding = UBBindings.BindingPoint;
-        binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        binding.binding = ShaderBindings[i].BindingPoint;
+        binding.descriptorType = GetVulkanShaderBindingType(ShaderBindings[i].BindingType);
         binding.descriptorCount = 1;
-        binding.stageFlags = GetVulkanShaderAccessFlags(UBBindings.AccessStageFlags);
-        binding.pImmutableSamplers = nullptr;
-        bindings.push_back(binding);
-    }
-
-    for (int32 i = 0; i < Textures.size(); ++i)
-    {
-        auto& TexBindings = Textures[i];
-
-        VkDescriptorSetLayoutBinding binding = {};
-        binding.binding = TexBindings.BindingPoint;
-        binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        binding.descriptorCount = 1;
-        binding.stageFlags = GetVulkanShaderAccessFlags(TexBindings.AccessStageFlags);
+        binding.stageFlags = GetVulkanShaderAccessFlags(ShaderBindings[i].AccessStageFlags);
         binding.pImmutableSamplers = nullptr;
         bindings.push_back(binding);
     }
 
     VkDescriptorSetLayoutCreateInfo layoutInfo = {};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+    layoutInfo.bindingCount = static_cast<uint32>(bindings.size());
     layoutInfo.pBindings = bindings.data();
 
     if (!ensure(vkCreateDescriptorSetLayout(g_rhi_vk->Device, &layoutInfo, nullptr, &DescriptorSetLayout) == VK_SUCCESS))
@@ -99,15 +84,7 @@ std::vector<jShaderBindingInstance*> jShaderBindings_Vulkan::CreateShaderBinding
 
 size_t jShaderBindings_Vulkan::GetHash() const
 {
-    size_t result = 0;
-
-    result ^= STATIC_NAME_CITY_HASH("UniformBuffer");
-    result ^= CityHash64((const char*)UniformBuffers.data(), sizeof(jShaderBinding) * UniformBuffers.size());
-
-    result ^= STATIC_NAME_CITY_HASH("Texture");
-    result ^= CityHash64((const char*)Textures.data(), sizeof(jShaderBinding) * Textures.size());
-
-    return result;
+    return CityHash64((const char*)ShaderBindings.data(), sizeof(jShaderBinding) * ShaderBindings.size());
 }
 
 void jShaderBindings_Vulkan::CreatePool()
@@ -118,75 +95,149 @@ void jShaderBindings_Vulkan::CreatePool()
 //////////////////////////////////////////////////////////////////////////
 // jShaderBindingInstance_Vulkan
 //////////////////////////////////////////////////////////////////////////
-void jShaderBindingInstance_Vulkan::UpdateShaderBindings()
+void jShaderBindingInstance_Vulkan::UpdateShaderBindings(std::vector<jShaderBinding> InShaderBindings)
 {
-    check(ShaderBindings->UniformBuffers.size() == UniformBuffers.size());
-    check(ShaderBindings->Textures.size() == Textures.size());
+    check(ShaderBindings->ShaderBindings.size() == InShaderBindings.size());
 
-    std::vector<VkDescriptorBufferInfo> descriptorBuffers;
-    descriptorBuffers.resize(ShaderBindings->UniformBuffers.size());
-    int32 bufferOffset = 0;
-    for (int32 i = 0; i < ShaderBindings->UniformBuffers.size(); ++i)
+    if (!InShaderBindings.empty())
     {
-        descriptorBuffers[i].buffer = (VkBuffer)UniformBuffers[i]->GetBuffer();
-        descriptorBuffers[i].offset = bufferOffset;
-        descriptorBuffers[i].range = UniformBuffers[i]->GetBufferSize();		// 전체 사이즈라면 VK_WHOLE_SIZE 이거 가능
+        struct jWriteDescriptorInfo
+        {
+            EShaderBindingType BindingType = EShaderBindingType::UNIFORMBUFFER;
+            std::vector<VkDescriptorBufferInfo> BufferInfo;
+            std::vector<VkDescriptorImageInfo> ImageInfo;
+        };
+        std::vector<jWriteDescriptorInfo> descriptors;
 
-        bufferOffset += (int32)UniformBuffers[i]->GetBufferSize();
+        int32 DescriptorIndex = 0;
+        EShaderBindingType PrevBindingType = InShaderBindings[0].BindingType;
+        for (int32 i = 0; i < (int32)InShaderBindings.size(); ++i)
+        {
+            if (InShaderBindings[i].BindingType != PrevBindingType)
+            {
+                PrevBindingType = InShaderBindings[i].BindingType;
+                ++DescriptorIndex;
+            }
+            if (descriptors.size() <= DescriptorIndex)
+            {
+                descriptors.resize(DescriptorIndex + 1);
+                descriptors[DescriptorIndex].BindingType = InShaderBindings[i].BindingType;
+            }
+
+            switch (InShaderBindings[i].BindingType)
+            {
+                case EShaderBindingType::UNIFORMBUFFER:
+                {
+                    jUniformBufferResource* ubor = reinterpret_cast<jUniformBufferResource*>(InShaderBindings[i].ResourcePtr.get());
+                    if (ubor && ubor->UniformBuffer)
+                    {
+                        VkDescriptorBufferInfo bufferInfo{};
+                        bufferInfo.buffer = (VkBuffer)ubor->UniformBuffer->GetBuffer();
+                        //bufferInfo.offset = bufferOffset;
+                        bufferInfo.range = ubor->UniformBuffer->GetBufferSize();		// 전체 사이즈라면 VK_WHOLE_SIZE 이거 가능
+                        //bufferOffset += (int32)ubor->UniformBuffer->GetBufferSize();
+                        descriptors[DescriptorIndex].BufferInfo.push_back(bufferInfo);
+                    }
+                    break;
+                }
+                case EShaderBindingType::TEXTURE_SAMPLER_SRV:
+                case EShaderBindingType::TEXTURE_SRV:
+                {
+                    jTextureResource* tbor = reinterpret_cast<jTextureResource*>(InShaderBindings[i].ResourcePtr.get());
+                    if (tbor && tbor->Texture)
+                    {
+                        VkDescriptorImageInfo imageInfo{};
+                        imageInfo.imageLayout = tbor->Texture->IsDepthFormat() ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
+                            : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                        imageInfo.imageView = (VkImageView)tbor->Texture->GetViewHandle();
+                        if (tbor->SamplerState)
+                            imageInfo.sampler = (VkSampler)tbor->SamplerState->GetHandle();
+                        if (!imageInfo.sampler)
+                            imageInfo.sampler = jTexture_Vulkan::CreateDefaultSamplerState();		// todo 수정 필요, 텍스쳐를 어떻게 바인드 해야할지 고민 필요
+                        descriptors[DescriptorIndex].ImageInfo.push_back(imageInfo);
+                    }
+                    break;
+                }
+                case EShaderBindingType::TEXTURE_UAV:
+                {
+                    jTextureResource* tbor = reinterpret_cast<jTextureResource*>(InShaderBindings[i].ResourcePtr.get());
+                    if (tbor && tbor->Texture)
+                    {
+                        VkDescriptorImageInfo imageInfo{};
+                        imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+                        imageInfo.imageView = (VkImageView)tbor->Texture->GetViewHandle();
+                        if (tbor->SamplerState)
+                            imageInfo.sampler = (VkSampler)tbor->SamplerState->GetHandle();
+                        if (!imageInfo.sampler)
+                            imageInfo.sampler = jTexture_Vulkan::CreateDefaultSamplerState();		// todo 수정 필요, 텍스쳐를 어떻게 바인드 해야할지 고민 필요
+                        descriptors[DescriptorIndex].ImageInfo.push_back(imageInfo);
+                    }
+                    break;
+                }
+                case EShaderBindingType::SAMPLER:
+                {
+                    jTextureResource* tbor = reinterpret_cast<jTextureResource*>(InShaderBindings[i].ResourcePtr.get());
+                    if (tbor && tbor->SamplerState)
+                    {
+                        VkDescriptorImageInfo imageInfo{};
+                        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                        imageInfo.sampler = (VkSampler)tbor->SamplerState->GetHandle();
+                        check(imageInfo.sampler);
+                        descriptors[DescriptorIndex].ImageInfo.push_back(imageInfo);
+                    }
+                    break;
+                }
+                case EShaderBindingType::BUFFER_UAV:
+                {
+                    check(0); // todo SSBO
+                    break;
+                }
+                default:
+                    check(0);
+                    break;
+            }
+        }
+
+        std::vector<VkWriteDescriptorSet> descriptorWrites;
+        descriptorWrites.resize(descriptors.size());
+        for (int32 i = 0; i < (int32)descriptorWrites.size(); ++i)
+        {
+            check(descriptors[i].ImageInfo.size() == 0 || descriptors[i].BufferInfo.size() == 0);
+            descriptorWrites[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[i].dstSet = DescriptorSet;
+            descriptorWrites[i].dstBinding = i;
+            descriptorWrites[i].dstArrayElement = 0;
+            descriptorWrites[i].descriptorType = GetVulkanShaderBindingType(descriptors[i].BindingType);
+            if (descriptors[i].ImageInfo.size() > 0)
+            {
+                descriptorWrites[i].descriptorCount = (uint32)descriptors[i].ImageInfo.size();			// Optional	(Image Data 기반에 사용)
+                descriptorWrites[i].pImageInfo = descriptors[i].ImageInfo.data();				// Optional (Buffer View 기반에 사용)
+            }
+            else if (descriptors[i].BufferInfo.size() > 0)
+            {
+                descriptorWrites[i].descriptorCount = (uint32)descriptors[i].BufferInfo.size();
+                descriptorWrites[i].pBufferInfo = descriptors[i].BufferInfo.data();		            // 현재는 Buffer 기반 Desriptor 이므로 이것을 사용
+            }
+        }
+        vkUpdateDescriptorSets(g_rhi_vk->Device, static_cast<uint32>(descriptorWrites.size())
+            , descriptorWrites.data(), 0, nullptr);
     }
-
-    std::vector<VkDescriptorImageInfo> descriptorImages;
-    descriptorImages.resize(ShaderBindings->Textures.size());
-    for (int32 i = 0; i < ShaderBindings->Textures.size(); ++i)
-    {
-        descriptorImages[i].imageLayout = Textures[i].Texture->IsDepthFormat() ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        descriptorImages[i].imageView = (VkImageView)Textures[i].Texture->GetViewHandle();
-        if (Textures[i].SamplerState)
-            descriptorImages[i].sampler = (VkSampler)Textures[i].SamplerState->GetHandle();
-
-        if (!descriptorImages[i].sampler)
-            descriptorImages[i].sampler = jTexture_Vulkan::CreateDefaultSamplerState();		// todo 수정 필요, 텍스쳐를 어떻게 바인드 해야할지 고민 필요
-    }
-
-    std::vector<VkWriteDescriptorSet> descriptorWrites;
-    descriptorWrites.resize(descriptorBuffers.size() + descriptorImages.size());
-
-    int32 writeDescIndex = 0;
-    if (descriptorBuffers.size() > 0)
-    {
-        descriptorWrites[writeDescIndex].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[writeDescIndex].dstSet = DescriptorSet;
-        descriptorWrites[writeDescIndex].dstBinding = writeDescIndex;
-        descriptorWrites[writeDescIndex].dstArrayElement = 0;
-        descriptorWrites[writeDescIndex].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptorWrites[writeDescIndex].descriptorCount = (uint32)descriptorBuffers.size();
-        descriptorWrites[writeDescIndex].pBufferInfo = &descriptorBuffers[0];		// 현재는 Buffer 기반 Desriptor 이므로 이것을 사용
-        descriptorWrites[writeDescIndex].pImageInfo = nullptr;						// Optional	(Image Data 기반에 사용)
-        descriptorWrites[writeDescIndex].pTexelBufferView = nullptr;				// Optional (Buffer View 기반에 사용)
-        ++writeDescIndex;
-    }
-    if (descriptorImages.size() > 0)
-    {
-        descriptorWrites[writeDescIndex].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[writeDescIndex].dstSet = DescriptorSet;
-        descriptorWrites[writeDescIndex].dstBinding = writeDescIndex;
-        descriptorWrites[writeDescIndex].dstArrayElement = 0;
-        descriptorWrites[writeDescIndex].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        descriptorWrites[writeDescIndex].descriptorCount = (uint32)descriptorImages.size();
-        descriptorWrites[writeDescIndex].pImageInfo = &descriptorImages[0];
-        ++writeDescIndex;
-    }
-
-    vkUpdateDescriptorSets(g_rhi_vk->Device, static_cast<uint32>(descriptorWrites.size())
-        , descriptorWrites.data(), 0, nullptr);
 }
 
-void jShaderBindingInstance_Vulkan::Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot) const
+void jShaderBindingInstance_Vulkan::BindGraphics(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot /*= 0*/) const
 {
     check(InRenderFrameContext);
     check(InRenderFrameContext->CommandBuffer);
     check(pipelineLayout);
     vkCmdBindDescriptorSets((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, (VkPipelineLayout)(pipelineLayout), InSlot, 1, &DescriptorSet, 0, nullptr);
+}
+
+void jShaderBindingInstance_Vulkan::BindCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot) const
+{
+    check(InRenderFrameContext);
+    check(InRenderFrameContext->CommandBuffer);
+    check(pipelineLayout);
+    vkCmdBindDescriptorSets((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, (VkPipelineLayout)(pipelineLayout), InSlot, 1, &DescriptorSet, 0, nullptr);
 }
 
 //////////////////////////////////////////////////////////////////////////

@@ -494,6 +494,16 @@ enum class EShaderAccessStageFlag : uint32
 };
 DECLARE_ENUM_BIT_OPERATORS(EShaderAccessStageFlag)
 
+enum class EShaderBindingType
+{
+	UNIFORMBUFFER = 0,
+	TEXTURE_SAMPLER_SRV,
+	TEXTURE_SRV,
+	TEXTURE_UAV,
+	SAMPLER,
+	BUFFER_UAV,
+};
+
 enum class EColorMask : uint8
 {
 	NONE = 0,

@@ -115,47 +115,39 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	jShaderBindingInstance* ShaderBindingInstance = nullptr;
-	bool NeedUpdateRenderObjectUniformBuffer = false;
+	bool NeedUpdateRenderObjectUniformBuffer = true;
 	void PrepareShaderBindingInstance()
 	{
 		int32 BindingPoint = 0;
-		std::vector<TShaderBinding<IUniformBufferBlock*>> UniformBinding;
-		UniformBinding.reserve(1);
-		UniformBinding.emplace_back(TShaderBinding(BindingPoint++, EShaderAccessStageFlag::ALL_GRAPHICS, RenderObjectUniformBuffer));
+		std::vector<jShaderBinding> ShaderBindings;
+		ShaderBindings.reserve(1 + MaterialData.Params.size());
+		ShaderBindings.emplace_back(jShaderBinding(BindingPoint++, EShaderBindingType::UNIFORMBUFFER
+			, EShaderAccessStageFlag::ALL_GRAPHICS, std::make_shared<jUniformBufferResource>(RenderObjectUniformBuffer)));
 
-		std::vector<TShaderBinding<jTextureBindings>> TextureBinding;
-		TextureBinding.reserve(MaterialData.Params.size());
-		for (int32 i = 0; i < (int32)MaterialData.Params.size(); ++i)
-		{
-			jTextureBindings bindings;
-			bindings.Texture = MaterialData.Params[i].Texture;
-			bindings.SamplerState = MaterialData.Params[i].SamplerState;
-			TextureBinding.emplace_back(TShaderBinding(BindingPoint++, EShaderAccessStageFlag::ALL_GRAPHICS, bindings));
-		}
+        for (int32 i = 0; i < (int32)MaterialData.Params.size(); ++i)
+        {
+			ShaderBindings.emplace_back(jShaderBinding(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV
+				, EShaderAccessStageFlag::ALL_GRAPHICS, std::make_shared<jTextureResource>(MaterialData.Params[i].Texture, MaterialData.Params[i].SamplerState)));
+        }
 
 		if (NeedUpdateRenderObjectUniformBuffer)
 		{
-			delete ShaderBindingInstance;
+			if (ShaderBindingInstance)
+			{
+				ShaderBindingInstance->UpdateShaderBindings(ShaderBindings);
+			}
+			else
+			{
+				delete ShaderBindingInstance;
+				ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindings);
+				ShaderBindingInstance->UpdateShaderBindings(ShaderBindings);
+			}
 			NeedUpdateRenderObjectUniformBuffer = false;
-		}
-
-		if (ShaderBindingInstance)
-		{
-			ShaderBindingInstance->UniformBuffers.clear();
-			ShaderBindingInstance->UniformBuffers.push_back(RenderObjectUniformBuffer);
-
-			ShaderBindingInstance->Textures.resize(TextureBinding.size());
-			for (int32 i = 0; i < (int32)TextureBinding.size(); ++i)
-				ShaderBindingInstance->Textures[i] = TextureBinding[i].Data;
-		}
-		else
-		{
-			ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(UniformBinding, TextureBinding);
-			ShaderBindingInstance->UpdateShaderBindings();
 		}
 	}
 	void GetShaderBindingInstance(std::vector<const jShaderBindingInstance*>& OutShaderBindingInstance)
 	{
+		check(ShaderBindingInstance);
 		OutShaderBindingInstance.push_back(ShaderBindingInstance);
 	}
 	//////////////////////////////////////////////////////////////////////////

@@ -42,7 +42,7 @@ void jDrawCommand::Draw()
 {
     for (int32 i = 0; i < ShaderBindingInstances.size(); ++i)
     {
-        ShaderBindingInstances[i]->Bind(RenderFrameContextPtr, (VkPipelineLayout)CurrentPipelineStateInfo->GetPipelineLayoutHandle(), i);
+        ShaderBindingInstances[i]->BindGraphics(RenderFrameContextPtr, (VkPipelineLayout)CurrentPipelineStateInfo->GetPipelineLayoutHandle(), i);
     }
 
     // Bind Pipeline

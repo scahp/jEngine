@@ -124,7 +124,10 @@ void jBlendingStateInfo_Vulakn::Initialize()
 
 void jPipelineStateInfo_Vulkan::Initialize()
 {
-    CreateGraphicsPipelineState();
+    if (IsGraphics)
+        CreateGraphicsPipelineState();
+    else
+        CreateComputePipelineState();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -255,8 +258,34 @@ void* jPipelineStateInfo_Vulkan::CreateGraphicsPipelineState()
     return vkPipeline;
 }
 
+void* jPipelineStateInfo_Vulkan::CreateComputePipelineState()
+{
+    // 미리 만들어 둔게 있으면 사용
+    if (vkPipeline)
+        return vkPipeline;
+
+    vkPipelineLayout = (VkPipelineLayout)g_rhi->CreatePipelineLayout(ShaderBindings);
+
+    VkComputePipelineCreateInfo computePipelineCreateInfo{};
+    computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    computePipelineCreateInfo.layout = vkPipelineLayout;
+    computePipelineCreateInfo.flags = 0;
+    computePipelineCreateInfo.stage = ((jShader_Vulkan*)Shader)->ShaderStages[0];
+
+    if (!ensure(VK_SUCCESS == vkCreateComputePipelines(g_rhi_vk->Device, g_rhi_vk->PipelineCache
+        , 1, &computePipelineCreateInfo, nullptr, &vkPipeline)))
+    {
+        return nullptr;
+    }
+
+    return vkPipeline;
+}
+
 void jPipelineStateInfo_Vulkan::Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const
 {
     check(vkPipeline);
-    vkCmdBindPipeline((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipeline);
+    if (IsGraphics)
+        vkCmdBindPipeline((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipeline);
+    else
+        vkCmdBindPipeline((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, vkPipeline);
 }

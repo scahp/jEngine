@@ -253,7 +253,7 @@ VkPipeline jImGUI_Vulkan::CreatePipelineState(VkRenderPass renderPass, VkQueue c
             VkShaderModuleCreateInfo moduleCreateInfo{};
             moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
             moduleCreateInfo.codeSize = size;
-            moduleCreateInfo.pCode = (uint32_t*)shaderCode;
+            moduleCreateInfo.pCode = (uint32*)shaderCode;
 
             verify(VK_SUCCESS == vkCreateShaderModule(g_rhi_vk->Device, &moduleCreateInfo, NULL, &shaderModule));
             delete[] shaderCode;

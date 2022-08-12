@@ -81,7 +81,7 @@ bool jRHI_Vulkan::InitRHI()
 
 	// add extension
 	auto extensions = jVulkanDeviceUtil::GetRequiredExtensions();
-	createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
+	createInfo.enabledExtensionCount = static_cast<uint32>(extensions.size());
 	createInfo.ppEnabledExtensionNames = extensions.data();
 
 	// check validation layer
@@ -92,7 +92,7 @@ bool jRHI_Vulkan::InitRHI()
 	VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo = {};
 	if (jVulkanDeviceUtil::EnableValidationLayers)
 	{
-		createInfo.enabledLayerCount = static_cast<uint32_t>(jVulkanDeviceUtil::validationLayers.size());
+		createInfo.enabledLayerCount = static_cast<uint32>(jVulkanDeviceUtil::validationLayers.size());
 		createInfo.ppEnabledLayerNames = jVulkanDeviceUtil::validationLayers.data();
 
 		jVulkanDeviceUtil::PopulateDebutMessengerCreateInfo(debugCreateInfo);
@@ -128,7 +128,7 @@ bool jRHI_Vulkan::InitRHI()
 
 	// Physical device
 	{
-		uint32_t deviceCount = 0;
+		uint32 deviceCount = 0;
 		vkEnumeratePhysicalDevices(Instance, &deviceCount, nullptr);
 		if (!ensure(deviceCount > 0))
 			return false;
@@ -160,10 +160,10 @@ bool jRHI_Vulkan::InitRHI()
 		jVulkanDeviceUtil::QueueFamilyIndices indices = jVulkanDeviceUtil::FindQueueFamilies(PhysicalDevice, Surface);
 
 		std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-		std::set<uint32_t> uniqueQueueFamilies = { indices.graphicsFamily.value(), indices.presentFamily.value() };
+		std::set<uint32> uniqueQueueFamilies = { indices.graphicsFamily.value(), indices.presentFamily.value() };
 
 		float queuePriority = 1.0f;			// [0.0 ~ 1.0]
-		for (uint32_t queueFamily : uniqueQueueFamilies)
+		for (uint32 queueFamily : uniqueQueueFamilies)
 		{
 			VkDeviceQueueCreateInfo queueCreateInfo = {};
 			queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
@@ -181,18 +181,18 @@ bool jRHI_Vulkan::InitRHI()
 		VkDeviceCreateInfo createInfo = {};
 		createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 		createInfo.pQueueCreateInfos = queueCreateInfos.data();
-		createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
+		createInfo.queueCreateInfoCount = static_cast<uint32>(queueCreateInfos.size());
 
 		createInfo.pEnabledFeatures = &deviceFeatures;
 
 		// extension
-		createInfo.enabledExtensionCount = static_cast<uint32_t>(jVulkanDeviceUtil::deviceExtensions.size());
+		createInfo.enabledExtensionCount = static_cast<uint32>(jVulkanDeviceUtil::deviceExtensions.size());
 		createInfo.ppEnabledExtensionNames = jVulkanDeviceUtil::deviceExtensions.data();
 
 		// 최신 버젼에서는 validation layer는 무시되지만, 오래된 버젼을 호환을 위해 vkInstance와 맞춰줌
 		if (jVulkanDeviceUtil::EnableValidationLayers)
 		{
-			createInfo.enabledLayerCount = static_cast<uint32_t>(jVulkanDeviceUtil::validationLayers.size());
+			createInfo.enabledLayerCount = static_cast<uint32>(jVulkanDeviceUtil::validationLayers.size());
 			createInfo.ppEnabledLayerNames = jVulkanDeviceUtil::validationLayers.data();
 		}
 		else
@@ -558,9 +558,9 @@ bool jRHI_Vulkan::CreateShaderInternal(jShader* OutShader, const jShaderInfo& sh
 		createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 		createInfo.codeSize = code.size() * sizeof(uint32);
 
-		// pCode 가 uint32_t* 형이라서 4 byte aligned 된 메모리를 넘겨줘야 함.
+		// pCode 가 uint32* 형이라서 4 byte aligned 된 메모리를 넘겨줘야 함.
 		// 다행히 std::vector의 default allocator가 가 메모리 할당시 4 byte aligned 을 이미 하고있어서 그대로 씀.
-		createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+		createInfo.pCode = reinterpret_cast<const uint32*>(code.data());
 
 		VkShaderModule shaderModule = {};
 		ensure(vkCreateShaderModule(Device, &createInfo, nullptr, &shaderModule) == VK_SUCCESS);
@@ -869,9 +869,9 @@ void jRHI_Vulkan::DrawElementsInstancedBaseVertex(const std::shared_ptr<jRenderF
 	vkCmdDrawIndexed((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), count, instanceCount, startIndex, baseVertexIndex, 0);
 }
 
-jShaderBindings* jRHI_Vulkan::CreateShaderBindings(const std::vector<jShaderBinding>& InUniformBindings, const std::vector<jShaderBinding>& InTextureBindings) const
+jShaderBindings* jRHI_Vulkan::CreateShaderBindings(const std::vector<jShaderBinding>& InShaderBindings) const
 {
-	const auto hash = jShaderBindings::GenerateHash(InUniformBindings, InTextureBindings);
+	const auto hash = jShaderBindings::GenerateHash(InShaderBindings);
 
 	auto it_find = ShaderBindingPool.find(hash);
 	if (ShaderBindingPool.end() != it_find)
@@ -879,8 +879,7 @@ jShaderBindings* jRHI_Vulkan::CreateShaderBindings(const std::vector<jShaderBind
 
 	auto NewShaderBinding = new jShaderBindings_Vulkan();
 
-	NewShaderBinding->UniformBuffers = InUniformBindings;
-	NewShaderBinding->Textures = InTextureBindings;
+	NewShaderBinding->ShaderBindings = InShaderBindings;
 	NewShaderBinding->CreateDescriptorSetLayout();
 	NewShaderBinding->CreatePool();
 
@@ -889,21 +888,11 @@ jShaderBindings* jRHI_Vulkan::CreateShaderBindings(const std::vector<jShaderBind
 	return NewShaderBinding;
 }
 
-jShaderBindingInstance* jRHI_Vulkan::CreateShaderBindingInstance(const std::vector<TShaderBinding<IUniformBufferBlock*>>& InUniformBuffers, const std::vector<TShaderBinding<jTextureBindings>>& InTextures) const
+jShaderBindingInstance* jRHI_Vulkan::CreateShaderBindingInstance(const std::vector<jShaderBinding>& InShaderBindings) const
 {
-	const std::vector<jShaderBinding> UniformBindings(InUniformBuffers.begin(), InUniformBuffers.end());
-	const std::vector<jShaderBinding> TextureBindings(InTextures.begin(), InTextures.end());
-
-	auto shaderBindings = CreateShaderBindings(UniformBindings, TextureBindings);
+	auto shaderBindings = CreateShaderBindings(InShaderBindings);
 	check(shaderBindings);
-
-	auto shaderBindingInstance = shaderBindings->CreateShaderBindingInstance();
-	for (int32 i = 0; i < (int32)InUniformBuffers.size(); ++i)
-		shaderBindingInstance->UniformBuffers.push_back(InUniformBuffers[i].Data);
-	
-	for (int32 i = 0; i < (int32)InTextures.size(); ++i)
-		shaderBindingInstance->Textures.push_back(InTextures[i].Data);
-	return shaderBindingInstance;
+	return shaderBindings->CreateShaderBindingInstance();
 }
 
 void* jRHI_Vulkan::CreatePipelineLayout(const std::vector<const jShaderBindings*>& shaderBindings) const
@@ -1446,6 +1435,11 @@ jPipelineStateInfo* jRHI_Vulkan::CreatePipelineStateInfo(const jPipelineStateFix
     , const jVertexBuffer* vertexBuffer, const jRenderPass* renderPass, const std::vector<const jShaderBindings*> shaderBindings) const
 {
 	return PipelineStatePool.GetOrCreate(jPipelineStateInfo(pipelineStateFixed, shader, vertexBuffer, renderPass, shaderBindings));
+}
+
+jPipelineStateInfo* jRHI_Vulkan::CreateComputePipelineStateInfo(const jShader* shader, const std::vector<const jShaderBindings*> shaderBindings) const
+{
+    return PipelineStatePool.GetOrCreate(jPipelineStateInfo(shader, shaderBindings));
 }
 
 jRenderPass* jRHI_Vulkan::GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const Vector2i& offset, const Vector2i& extent) const

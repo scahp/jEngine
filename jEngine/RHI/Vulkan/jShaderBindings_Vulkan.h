@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include "jRHIType_Vulkan.h"
 
 //////////////////////////////////////////////////////////////////////////
 // jShaderBindingInstance_Vulkan
@@ -7,8 +8,9 @@ struct jShaderBindingInstance_Vulkan : public jShaderBindingInstance
 {
     VkDescriptorSet DescriptorSet = nullptr;
 
-    virtual void UpdateShaderBindings() override;
-    virtual void Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const override;
+    virtual void UpdateShaderBindings(std::vector<jShaderBinding> InShaderBindings) override;
+    virtual void BindGraphics(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const override;
+    virtual void BindCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const override;
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -41,20 +43,35 @@ struct jShaderBindings_Vulkan : public jShaderBindings
     {
         std::vector<VkDescriptorPoolSize> resultArray;
 
-        if (UniformBuffers.size() > 0)
+        if (!ShaderBindings.empty())
         {
-            VkDescriptorPoolSize poolSize;
-            poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            poolSize.descriptorCount = static_cast<uint32>(UniformBuffers.size()) * maxAllocations;
-            resultArray.push_back(poolSize);
-        }
+            uint32 NumOfSameType = 0;
+            VkDescriptorType PrevType = GetVulkanShaderBindingType(ShaderBindings[0].BindingType);
+            for (int32 i = 0; i < (int32)ShaderBindings.size(); ++i)
+            {
+                if (PrevType == GetVulkanShaderBindingType(ShaderBindings[i].BindingType))
+                {
+                    ++NumOfSameType;
+                }
+                else
+                {
+                    VkDescriptorPoolSize poolSize;
+                    poolSize.type = PrevType;
+                    poolSize.descriptorCount = NumOfSameType * maxAllocations;
+                    resultArray.push_back(poolSize);
 
-        if (Textures.size() > 0)
-        {
-            VkDescriptorPoolSize poolSize;
-            poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            poolSize.descriptorCount = static_cast<uint32>(Textures.size()) * maxAllocations;
-            resultArray.push_back(poolSize);
+                    PrevType = GetVulkanShaderBindingType(ShaderBindings[i].BindingType);
+                    NumOfSameType = 1;
+                }
+            }
+
+            if (NumOfSameType > 0)
+            {
+                VkDescriptorPoolSize poolSize;
+                poolSize.type = PrevType;
+                poolSize.descriptorCount = NumOfSameType * maxAllocations;
+                resultArray.push_back(poolSize);
+            }
         }
 
         return std::move(resultArray);

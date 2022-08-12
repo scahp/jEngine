@@ -249,7 +249,7 @@ bool jRenderPass_Vulkan::CreateRenderPass()
 
         VkRenderPassCreateInfo renderPassCreateInfo = {};
         renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-        renderPassCreateInfo.attachmentCount = static_cast<uint32_t>(AttachmentDescs.size());
+        renderPassCreateInfo.attachmentCount = static_cast<uint32>(AttachmentDescs.size());
         renderPassCreateInfo.pAttachments = AttachmentDescs.data();
         renderPassCreateInfo.subpassCount = 1;
         renderPassCreateInfo.pSubpasses = &subpass;
@@ -319,7 +319,7 @@ bool jRenderPass_Vulkan::CreateRenderPass()
     RenderPassInfo.renderArea.offset = { RenderOffset.x, RenderOffset.y };
     RenderPassInfo.renderArea.extent = { (uint32)RenderExtent.x, (uint32)RenderExtent.y };
 
-    RenderPassInfo.clearValueCount = static_cast<uint32_t>(ClearValues.size());
+    RenderPassInfo.clearValueCount = static_cast<uint32>(ClearValues.size());
     RenderPassInfo.pClearValues = ClearValues.data();
 
     // Create framebuffer

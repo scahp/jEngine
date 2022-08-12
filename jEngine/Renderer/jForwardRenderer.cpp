@@ -159,136 +159,69 @@ void jForwardRenderer::OpaquePass()
     // 여기 까지 렌더 로직 끝
     //////////////////////////////////////////////////////////////////////////
     const uint32 imageIndex = RenderFrameContextPtr->FrameIndex;
+    jCommandBuffer* CommandBuffer = RenderFrameContextPtr->CommandBuffer;
+    jSceneRenderTarget* SceneRT = RenderFrameContextPtr->SceneRenderTarget;
 
-    g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, RenderFrameContextPtr->SceneRenderTarget->ColorPtr->GetTexture(), EImageLayout::SHADER_READ_ONLY);
-    g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, RenderFrameContextPtr->SceneRenderTarget->FinalColorPtr->GetTexture(), EImageLayout::GENERAL);
+    g_rhi->TransitionImageLayout(CommandBuffer, SceneRT->ColorPtr->GetTexture(), EImageLayout::SHADER_READ_ONLY);
+    g_rhi->TransitionImageLayout(CommandBuffer, SceneRT->FinalColorPtr->GetTexture(), EImageLayout::GENERAL);
 
-    static VkDescriptorSetLayout descriptorSetLayout[3] = { nullptr };
-
-    if (!descriptorSetLayout[imageIndex])
+    static jShaderBindingInstance* ShaderBindingInstance[3] = { nullptr };
+    jShaderBindingInstance*& CurrentBindingInstance = ShaderBindingInstance[RenderFrameContextPtr->FrameIndex];
+    if (!CurrentBindingInstance)
     {
-        VkDescriptorSetLayoutBinding setLayoutBindingReadOnly{};
-        setLayoutBindingReadOnly.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        setLayoutBindingReadOnly.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-        setLayoutBindingReadOnly.binding = 0;
-        setLayoutBindingReadOnly.descriptorCount = 1;
+        int32 BindingPoint = 0;
+        std::vector<jShaderBinding> ShaderBindings;
+        if (ensure(SceneRT->ColorPtr))
+        {
+            ShaderBindings.emplace_back(jShaderBinding(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
+                , std::make_shared<jTextureResource>(SceneRT->ColorPtr->GetTexture(), nullptr)));
+        }
+        if (ensure(SceneRT->FinalColorPtr))
+        {
+            ShaderBindings.emplace_back(jShaderBinding(BindingPoint++, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE
+                , std::make_shared<jTextureResource>(SceneRT->FinalColorPtr->GetTexture(), nullptr)));
+        }
 
-        VkDescriptorSetLayoutBinding setLayoutBindingWriteOnly{};
-        setLayoutBindingWriteOnly.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        setLayoutBindingWriteOnly.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-        setLayoutBindingWriteOnly.binding = 1;
-        setLayoutBindingWriteOnly.descriptorCount = 1;
-
-        std::vector<VkDescriptorSetLayoutBinding> setlayoutBindings = {
-            setLayoutBindingReadOnly,		// Binding 0 : Input image (read-only)
-            setLayoutBindingWriteOnly,		// Binding 1: Output image (write)
-        };
-
-        VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{};
-        descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        descriptorSetLayoutCreateInfo.pBindings = setlayoutBindings.data();
-        descriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(setlayoutBindings.size());
-        verify(VK_SUCCESS == vkCreateDescriptorSetLayout(g_rhi_vk->Device, &descriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout[imageIndex]));
+        CurrentBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindings);
+        CurrentBindingInstance->UpdateShaderBindings(ShaderBindings);
     }
 
-    static VkPipelineLayout pipelineLayout[3] = { nullptr };
-    if (!pipelineLayout[imageIndex])
-    {
-        VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
-        pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-        pipelineLayoutCreateInfo.setLayoutCount = 1;
-        pipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayout[imageIndex];
-        verify(VK_SUCCESS == vkCreatePipelineLayout(g_rhi_vk->Device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout[imageIndex]));
-    }
+    //static VkPipeline pipeline[3] = { nullptr };
+    //static VkPipelineLayout pipelineLayout[3] = { nullptr };
+    //if (!pipeline[imageIndex])
+    //{
+    //    pipelineLayout[imageIndex] = (VkPipelineLayout)g_rhi->CreatePipelineLayout({ CurrentBindingInstance->ShaderBindings });
 
-    static VkDescriptorPool descriptorPool[3] = { nullptr };
-    if (!descriptorPool[imageIndex])
-    {
-        VkDescriptorPoolSize descriptorPoolSize{};
-        descriptorPoolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        descriptorPoolSize.descriptorCount = 3;
+    //    VkComputePipelineCreateInfo computePipelineCreateInfo{};
+    //    computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    //    computePipelineCreateInfo.layout = (VkPipelineLayout)pipelineLayout[imageIndex];
+    //    computePipelineCreateInfo.flags = 0;
 
-        VkDescriptorPoolSize descriptorPoolSize2{};
-        descriptorPoolSize2.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        descriptorPoolSize2.descriptorCount = 3;
+    //    jShaderInfo shaderInfo;
+    //    shaderInfo.name = jName("emboss");
+    //    shaderInfo.cs = jName("Resource/Shaders/hlsl/emboss_cs.hlsl");
+    //    static jShader_Vulkan* shader = (jShader_Vulkan*)g_rhi->CreateShader(shaderInfo);
+    //    computePipelineCreateInfo.stage = shader->ShaderStages[0];
 
-        std::vector<VkDescriptorPoolSize> poolSizes = {
-            descriptorPoolSize,descriptorPoolSize2
-        };
+    //    verify(VK_SUCCESS == vkCreateComputePipelines(g_rhi_vk->Device, g_rhi_vk->PipelineCache
+    //        , 1, &computePipelineCreateInfo, nullptr, &pipeline[imageIndex]));
+    //}
 
-        VkDescriptorPoolCreateInfo descriptorPoolInfo{};
-        descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        descriptorPoolInfo.poolSizeCount = (uint32)poolSizes.size();
-        descriptorPoolInfo.pPoolSizes = poolSizes.data();
-        descriptorPoolInfo.maxSets = 3;
-        verify(VK_SUCCESS == vkCreateDescriptorPool(g_rhi_vk->Device, &descriptorPoolInfo, nullptr, &descriptorPool[imageIndex]));
-    }
+    jShaderInfo shaderInfo;
+    shaderInfo.name = jName("emboss");
+    shaderInfo.cs = jName("Resource/Shaders/hlsl/emboss_cs.hlsl");
+    static jShader_Vulkan* Shader = (jShader_Vulkan*)g_rhi->CreateShader(shaderInfo);
 
-    static VkDescriptorSet descriptorSet[3] = { nullptr };
-    if (!descriptorSet[imageIndex])
-    {
-        VkDescriptorSetAllocateInfo descriptorSetAllocateInfo{};
-        descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        descriptorSetAllocateInfo.descriptorPool = descriptorPool[imageIndex];
-        descriptorSetAllocateInfo.pSetLayouts = &descriptorSetLayout[imageIndex];
-        descriptorSetAllocateInfo.descriptorSetCount = 1;
-        verify(VK_SUCCESS == vkAllocateDescriptorSets(g_rhi_vk->Device, &descriptorSetAllocateInfo, &descriptorSet[imageIndex]));
+    jPipelineStateInfo* computePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, { CurrentBindingInstance->ShaderBindings });
 
-        VkDescriptorImageInfo colorImageInfo{};
-        colorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        colorImageInfo.imageView = (VkImageView)RenderFrameContextPtr->SceneRenderTarget->ColorPtr->GetViewHandle();
-        colorImageInfo.sampler = jTexture_Vulkan::CreateDefaultSamplerState();
+    computePipelineStateInfo->Bind(RenderFrameContextPtr);
+    // vkCmdBindPipeline((VkCommandBuffer)CommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline[imageIndex]);
 
-        VkWriteDescriptorSet writeDescriptorSet{};
-        writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        writeDescriptorSet.dstSet = descriptorSet[imageIndex];
-        writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        writeDescriptorSet.dstBinding = 0;
-        writeDescriptorSet.pImageInfo = &colorImageInfo;
-        writeDescriptorSet.descriptorCount = 1;
-
-        VkDescriptorImageInfo targetImageInfo{};
-        targetImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-        targetImageInfo.imageView = (VkImageView)RenderFrameContextPtr->SceneRenderTarget->FinalColorPtr->GetViewHandle();
-        targetImageInfo.sampler = jTexture_Vulkan::CreateDefaultSamplerState();
-
-        VkWriteDescriptorSet writeDescriptorSet2{};
-        writeDescriptorSet2.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        writeDescriptorSet2.dstSet = descriptorSet[imageIndex];
-        writeDescriptorSet2.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        writeDescriptorSet2.dstBinding = 1;
-        writeDescriptorSet2.pImageInfo = &targetImageInfo;
-        writeDescriptorSet2.descriptorCount = 1;
-
-        std::vector<VkWriteDescriptorSet> computeWriteDescriptorSets = {
-            writeDescriptorSet,
-            writeDescriptorSet2
-        };
-        vkUpdateDescriptorSets(g_rhi_vk->Device, (uint32)computeWriteDescriptorSets.size(), computeWriteDescriptorSets.data(), 0, nullptr);
-    }
-
-    static VkPipeline pipeline[3] = { nullptr };
-    if (!pipeline[imageIndex])
-    {
-        VkComputePipelineCreateInfo computePipelineCreateInfo{};
-        computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-        computePipelineCreateInfo.layout = pipelineLayout[imageIndex];
-        computePipelineCreateInfo.flags = 0;
-
-        jShaderInfo shaderInfo;
-        shaderInfo.name = jName("emboss");
-        shaderInfo.cs = jName("Resource/Shaders/hlsl/emboss_cs.hlsl");
-        static jShader_Vulkan* shader = (jShader_Vulkan*)g_rhi->CreateShader(shaderInfo);
-        computePipelineCreateInfo.stage = shader->ShaderStages[0];
-
-        verify(VK_SUCCESS == vkCreateComputePipelines(g_rhi_vk->Device, g_rhi_vk->PipelineCache, 1, &computePipelineCreateInfo, nullptr, &pipeline[imageIndex]));
-    }
-
-    vkCmdBindPipeline((VkCommandBuffer)RenderFrameContextPtr->CommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline[imageIndex]);
-    vkCmdBindDescriptorSets((VkCommandBuffer)RenderFrameContextPtr->CommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout[imageIndex], 0, 1, &descriptorSet[imageIndex], 0, 0);
+    CurrentBindingInstance->BindCompute(RenderFrameContextPtr, (VkPipelineLayout)computePipelineStateInfo->GetPipelineLayoutHandle());
 
     check(g_rhi->GetSwapchain());
-    vkCmdDispatch((VkCommandBuffer)RenderFrameContextPtr->CommandBuffer->GetHandle(), g_rhi->GetSwapchain()->GetExtent().x / 16, g_rhi->GetSwapchain()->GetExtent().y / 16, 1);
+    vkCmdDispatch((VkCommandBuffer)CommandBuffer->GetHandle()
+        , g_rhi->GetSwapchain()->GetExtent().x / 16, g_rhi->GetSwapchain()->GetExtent().y / 16, 1);
 }
 
 void jForwardRenderer::TranslucentPass()
