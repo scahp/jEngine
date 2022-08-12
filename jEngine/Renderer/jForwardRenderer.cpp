@@ -162,6 +162,8 @@ void jForwardRenderer::OpaquePass()
     jCommandBuffer* CommandBuffer = RenderFrameContextPtr->CommandBuffer;
     jSceneRenderTarget* SceneRT = RenderFrameContextPtr->SceneRenderTarget;
 
+    //////////////////////////////////////////////////////////////////////////
+    // Compute Pipeline
     g_rhi->TransitionImageLayout(CommandBuffer, SceneRT->ColorPtr->GetTexture(), EImageLayout::SHADER_READ_ONLY);
     g_rhi->TransitionImageLayout(CommandBuffer, SceneRT->FinalColorPtr->GetTexture(), EImageLayout::GENERAL);
 
@@ -186,27 +188,6 @@ void jForwardRenderer::OpaquePass()
         CurrentBindingInstance->UpdateShaderBindings(ShaderBindings);
     }
 
-    //static VkPipeline pipeline[3] = { nullptr };
-    //static VkPipelineLayout pipelineLayout[3] = { nullptr };
-    //if (!pipeline[imageIndex])
-    //{
-    //    pipelineLayout[imageIndex] = (VkPipelineLayout)g_rhi->CreatePipelineLayout({ CurrentBindingInstance->ShaderBindings });
-
-    //    VkComputePipelineCreateInfo computePipelineCreateInfo{};
-    //    computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-    //    computePipelineCreateInfo.layout = (VkPipelineLayout)pipelineLayout[imageIndex];
-    //    computePipelineCreateInfo.flags = 0;
-
-    //    jShaderInfo shaderInfo;
-    //    shaderInfo.name = jName("emboss");
-    //    shaderInfo.cs = jName("Resource/Shaders/hlsl/emboss_cs.hlsl");
-    //    static jShader_Vulkan* shader = (jShader_Vulkan*)g_rhi->CreateShader(shaderInfo);
-    //    computePipelineCreateInfo.stage = shader->ShaderStages[0];
-
-    //    verify(VK_SUCCESS == vkCreateComputePipelines(g_rhi_vk->Device, g_rhi_vk->PipelineCache
-    //        , 1, &computePipelineCreateInfo, nullptr, &pipeline[imageIndex]));
-    //}
-
     jShaderInfo shaderInfo;
     shaderInfo.name = jName("emboss");
     shaderInfo.cs = jName("Resource/Shaders/hlsl/emboss_cs.hlsl");
@@ -222,6 +203,7 @@ void jForwardRenderer::OpaquePass()
     check(g_rhi->GetSwapchain());
     vkCmdDispatch((VkCommandBuffer)CommandBuffer->GetHandle()
         , g_rhi->GetSwapchain()->GetExtent().x / 16, g_rhi->GetSwapchain()->GetExtent().y / 16, 1);
+    // End compute pipeline
 }
 
 void jForwardRenderer::TranslucentPass()
