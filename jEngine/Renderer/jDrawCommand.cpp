@@ -1,6 +1,6 @@
 ﻿#include "pch.h"
 #include "jDrawCommand.h"
-#include "RHI/jShaderBindings.h"
+#include "RHI/jShaderBindingLayout.h"
 #include "Scene/jRenderObject.h"
 #include "RHI/jRHI.h"
 #include "RHI/jRenderPass.h"
@@ -28,7 +28,7 @@ void jDrawCommand::PrepareToDraw(bool bPositionOnly)
     RenderObject->GetShaderBindingInstance(ShaderBindingInstances);
 
     // Bind ShaderBindings
-    std::vector<const jShaderBindings*> shaderBindings;
+    std::vector<const jShaderBindingLayout*> shaderBindings;
     shaderBindings.reserve(ShaderBindingInstances.size());
     for (int32 i = 0; i < ShaderBindingInstances.size(); ++i)
         shaderBindings.push_back(ShaderBindingInstances[i]->ShaderBindings);

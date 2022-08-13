@@ -1,12 +1,12 @@
 ﻿#include "pch.h"
-#include "jShaderBindings_Vulkan.h"
+#include "jShaderBindingLayout_Vulkan.h"
 #include "jRHIType_Vulkan.h"
 #include "jTexture_Vulkan.h"
 
 //////////////////////////////////////////////////////////////////////////
 // jShaderBindings_Vulkan
 //////////////////////////////////////////////////////////////////////////
-bool jShaderBindings_Vulkan::CreateDescriptorSetLayout()
+bool jShaderBindingLayout_Vulkan::CreateDescriptorSetLayout()
 {
     std::vector<VkDescriptorSetLayoutBinding> bindings;
 
@@ -32,7 +32,7 @@ bool jShaderBindings_Vulkan::CreateDescriptorSetLayout()
     return true;
 }
 
-jShaderBindingInstance* jShaderBindings_Vulkan::CreateShaderBindingInstance() const
+jShaderBindingInstance* jShaderBindingLayout_Vulkan::CreateShaderBindingInstance() const
 {
     VkDescriptorSetAllocateInfo allocInfo = {};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -52,7 +52,7 @@ jShaderBindingInstance* jShaderBindings_Vulkan::CreateShaderBindingInstance() co
     return Instance;
 }
 
-std::vector<jShaderBindingInstance*> jShaderBindings_Vulkan::CreateShaderBindingInstance(int32 count) const
+std::vector<jShaderBindingInstance*> jShaderBindingLayout_Vulkan::CreateShaderBindingInstance(int32 count) const
 {
     std::vector<VkDescriptorSetLayout> descSetLayout(count, DescriptorSetLayout);
     VkDescriptorSetAllocateInfo allocInfo = {};
@@ -82,12 +82,12 @@ std::vector<jShaderBindingInstance*> jShaderBindings_Vulkan::CreateShaderBinding
     return Instances;
 }
 
-size_t jShaderBindings_Vulkan::GetHash() const
+size_t jShaderBindingLayout_Vulkan::GetHash() const
 {
     return CityHash64((const char*)ShaderBindings.data(), sizeof(jShaderBinding) * ShaderBindings.size());
 }
 
-void jShaderBindings_Vulkan::CreatePool()
+void jShaderBindingLayout_Vulkan::CreatePool()
 {
     DescriptorPool = g_rhi_vk->ShaderBindingsManager.CreatePool(*this);
 }
@@ -243,7 +243,7 @@ void jShaderBindingInstance_Vulkan::BindCompute(const std::shared_ptr<jRenderFra
 //////////////////////////////////////////////////////////////////////////
 // jShaderBindingsManager_Vulkan
 //////////////////////////////////////////////////////////////////////////
-VkDescriptorPool jShaderBindingsManager_Vulkan::CreatePool(const jShaderBindings_Vulkan& bindings, uint32 maxAllocations) const
+VkDescriptorPool jShaderBindingsManager_Vulkan::CreatePool(const jShaderBindingLayout_Vulkan& bindings, uint32 maxAllocations) const
 {
     auto DescriptorPoolSizes = bindings.GetDescriptorPoolSizeArray(maxAllocations);
 

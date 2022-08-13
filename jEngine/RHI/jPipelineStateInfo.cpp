@@ -17,7 +17,7 @@ size_t jPipelineStateInfo::GetHash() const
     }
 
     Hash ^= Shader->ShaderInfo.GetHash();
-    Hash ^= jShaderBindings::CreateShaderBindingsHash(ShaderBindings);
+    Hash ^= jShaderBindingLayout::CreateShaderBindingLayoutHash(ShaderBindings);
 
     return Hash;
 }

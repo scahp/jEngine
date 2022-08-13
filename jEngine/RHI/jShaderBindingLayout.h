@@ -61,17 +61,17 @@ struct jShaderBindingInstance
 {
     virtual ~jShaderBindingInstance() {}
 
-    const struct jShaderBindings* ShaderBindings = nullptr;
+    const struct jShaderBindingLayout* ShaderBindings = nullptr;
     
     virtual void UpdateShaderBindings(std::vector<jShaderBinding> InShaderBindings) {}
     virtual void BindGraphics(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const {}
     virtual void BindCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const {}
 };
 
-struct jShaderBindings
+struct jShaderBindingLayout
 {
     static size_t GenerateHash(const std::vector<jShaderBinding>& shaderBindings);
-    FORCEINLINE static size_t CreateShaderBindingsHash(const std::vector<const jShaderBindings*>& shaderBindings)
+    FORCEINLINE static size_t CreateShaderBindingLayoutHash(const std::vector<const jShaderBindingLayout*>& shaderBindings)
     {
         size_t result = 0;
         for (auto& bindings : shaderBindings)
@@ -81,7 +81,7 @@ struct jShaderBindings
         return result;
     }
 
-    virtual ~jShaderBindings() {}
+    virtual ~jShaderBindingLayout() {}
 
     virtual bool CreateDescriptorSetLayout() { return false; }
     virtual void CreatePool() {}

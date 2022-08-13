@@ -16,7 +16,7 @@ struct jShaderBindingInstance_Vulkan : public jShaderBindingInstance
 //////////////////////////////////////////////////////////////////////////
 // jShaderBindings_Vulkan
 //////////////////////////////////////////////////////////////////////////
-struct jShaderBindings_Vulkan : public jShaderBindings
+struct jShaderBindingLayout_Vulkan : public jShaderBindingLayout
 {
     VkDescriptorSetLayout DescriptorSetLayout = nullptr;
 
@@ -84,6 +84,6 @@ struct jShaderBindings_Vulkan : public jShaderBindings
 class jShaderBindingsManager_Vulkan // base 없음
 {
 public:
-    VkDescriptorPool CreatePool(const jShaderBindings_Vulkan& bindings, uint32 MaxAllocations = 32) const;
+    VkDescriptorPool CreatePool(const jShaderBindingLayout_Vulkan& bindings, uint32 MaxAllocations = 32) const;
     void Release(VkDescriptorPool pool) const;
 };

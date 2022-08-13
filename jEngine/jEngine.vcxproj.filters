@@ -238,7 +238,7 @@
     <ClInclude Include="RHI\Vulkan\jRHIType_Vulkan.h">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\Vulkan\jShaderBindings_Vulkan.h">
+    <ClInclude Include="RHI\Vulkan\jShaderBindingLayout_Vulkan.h">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="RHI\Vulkan\jTexture_Vulkan.h">
@@ -259,7 +259,7 @@
     <ClInclude Include="RHI\Vulkan\jPipelineStateInfo_Vulkan.h">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\jShaderBindings.h">
+    <ClInclude Include="RHI\jShaderBindingLayout.h">
       <Filter>Code\RHI</Filter>
     </ClInclude>
     <ClInclude Include="RHI\jRenderPass.h">
@@ -471,7 +471,7 @@
     <ClCompile Include="RHI\Vulkan\jRenderPass_Vulkan.cpp">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\Vulkan\jShaderBindings_Vulkan.cpp">
+    <ClCompile Include="RHI\Vulkan\jShaderBindingLayout_Vulkan.cpp">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="RHI\Vulkan\jTexture_Vulkan.cpp">

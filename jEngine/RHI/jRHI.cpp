@@ -131,7 +131,7 @@ size_t jRenderPass::GetHash() const
 	return Hash;
 }
 
-size_t jShaderBindings::GenerateHash(const std::vector<jShaderBinding>& shaderBindings)
+size_t jShaderBindingLayout::GenerateHash(const std::vector<jShaderBinding>& shaderBindings)
 {
 	size_t result = 0;
 	for (int32 i = 0; i < shaderBindings.size(); ++i)
@@ -141,12 +141,12 @@ size_t jShaderBindings::GenerateHash(const std::vector<jShaderBinding>& shaderBi
 	return result;
 }
 
-size_t jShaderBindings::GetHash() const
+size_t jShaderBindingLayout::GetHash() const
 {
 	if (Hash)
 		return Hash;
 	
-	Hash = jShaderBindings::GenerateHash(ShaderBindings);
+	Hash = jShaderBindingLayout::GenerateHash(ShaderBindings);
 	return Hash;
 }
 

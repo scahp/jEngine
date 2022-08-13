@@ -7,7 +7,7 @@
 #include "jFenceManager.h"
 #include "jPipelineStateInfo.h"
 #include "Vulkan/jRenderPass_Vulkan.h"
-#include "Vulkan/jShaderBindings_Vulkan.h"
+#include "Vulkan/jShaderBindingLayout_Vulkan.h"
 #include "Vulkan/jQueryPool_Vulkan.h"
 #include "Vulkan/jPipelineStateInfo_Vulkan.h"
 #include "Vulkan/jCommandBufferManager_Vulkan.h"
@@ -20,7 +20,7 @@ class jRHI_Vulkan : public jRHI
 {
 public:
     static std::unordered_map<size_t, VkPipelineLayout> PipelineLayoutPool;
-    static std::unordered_map<size_t, jShaderBindings*> ShaderBindingPool;
+    static std::unordered_map<size_t, jShaderBindingLayout*> ShaderBindingPool;
     static TResourcePool<jSamplerStateInfo_Vulkan> SamplerStatePool;
     static TResourcePool<jRasterizationStateInfo_Vulkan> RasterizationStatePool;
     static TResourcePool<jMultisampleStateInfo_Vulkan> MultisampleStatePool;
@@ -137,9 +137,9 @@ public:
 	virtual void DrawElementsBaseVertex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex) const override;
 	virtual void DrawElementsInstancedBaseVertex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex, int32 instanceCount) const override;
 
-	virtual jShaderBindings* CreateShaderBindings(const std::vector<jShaderBinding>& InShaderBindings) const override;
+	virtual jShaderBindingLayout* CreateShaderBindings(const std::vector<jShaderBinding>& InShaderBindings) const override;
 	virtual jShaderBindingInstance* CreateShaderBindingInstance(const std::vector<jShaderBinding>& InShaderBindings) const override;
-	virtual void* CreatePipelineLayout(const std::vector<const jShaderBindings*>& shaderBindings) const override;
+	virtual void* CreatePipelineLayout(const std::vector<const jShaderBindingLayout*>& shaderBindings) const override;
 	virtual void* CreatePipelineLayout(const std::vector<const jShaderBindingInstance*>& shaderBindingInstances) const override;
 
 	virtual IUniformBufferBlock* CreateUniformBufferBlock(const char* blockname, size_t size = 0) const override;
@@ -157,8 +157,8 @@ public:
 	virtual std::shared_ptr<jRenderFrameContext> BeginRenderFrame() override;
 	virtual void EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr) override;
 	jPipelineStateInfo* CreatePipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader
-		, const jVertexBuffer* vertexBuffer, const jRenderPass* renderPass, const std::vector<const jShaderBindings*> shaderBindings) const override;
-	virtual jPipelineStateInfo* CreateComputePipelineStateInfo(const jShader* shader, const std::vector<const jShaderBindings*> shaderBindings) const override;
+		, const jVertexBuffer* vertexBuffer, const jRenderPass* renderPass, const std::vector<const jShaderBindingLayout*> shaderBindings) const override;
+	virtual jPipelineStateInfo* CreateComputePipelineStateInfo(const jShader* shader, const std::vector<const jShaderBindingLayout*> shaderBindings) const override;
 
 	virtual jRenderPass* GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const Vector2i& offset, const Vector2i& extent) const override;
 	virtual jRenderPass* GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const jAttachment& depthAttachment

@@ -27,7 +27,7 @@
 
 jRHI_Vulkan* g_rhi_vk = nullptr;
 std::unordered_map<size_t, VkPipelineLayout> jRHI_Vulkan::PipelineLayoutPool;
-std::unordered_map<size_t, jShaderBindings*> jRHI_Vulkan::ShaderBindingPool;
+std::unordered_map<size_t, jShaderBindingLayout*> jRHI_Vulkan::ShaderBindingPool;
 TResourcePool<jSamplerStateInfo_Vulkan> jRHI_Vulkan::SamplerStatePool;
 TResourcePool<jRasterizationStateInfo_Vulkan> jRHI_Vulkan::RasterizationStatePool;
 TResourcePool<jMultisampleStateInfo_Vulkan> jRHI_Vulkan::MultisampleStatePool;
@@ -869,15 +869,15 @@ void jRHI_Vulkan::DrawElementsInstancedBaseVertex(const std::shared_ptr<jRenderF
 	vkCmdDrawIndexed((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), count, instanceCount, startIndex, baseVertexIndex, 0);
 }
 
-jShaderBindings* jRHI_Vulkan::CreateShaderBindings(const std::vector<jShaderBinding>& InShaderBindings) const
+jShaderBindingLayout* jRHI_Vulkan::CreateShaderBindings(const std::vector<jShaderBinding>& InShaderBindings) const
 {
-	const auto hash = jShaderBindings::GenerateHash(InShaderBindings);
+	const auto hash = jShaderBindingLayout::GenerateHash(InShaderBindings);
 
 	auto it_find = ShaderBindingPool.find(hash);
 	if (ShaderBindingPool.end() != it_find)
 		return it_find->second;
 
-	auto NewShaderBinding = new jShaderBindings_Vulkan();
+	auto NewShaderBinding = new jShaderBindingLayout_Vulkan();
 
 	NewShaderBinding->ShaderBindings = InShaderBindings;
 	NewShaderBinding->CreateDescriptorSetLayout();
@@ -895,14 +895,14 @@ jShaderBindingInstance* jRHI_Vulkan::CreateShaderBindingInstance(const std::vect
 	return shaderBindings->CreateShaderBindingInstance();
 }
 
-void* jRHI_Vulkan::CreatePipelineLayout(const std::vector<const jShaderBindings*>& shaderBindings) const
+void* jRHI_Vulkan::CreatePipelineLayout(const std::vector<const jShaderBindingLayout*>& shaderBindings) const
 {
 	if (shaderBindings.size() <= 0)
 		return 0;
 
 	VkPipelineLayout vkPipelineLayout = nullptr;
 
-	const size_t hash = jShaderBindings::CreateShaderBindingsHash(shaderBindings);
+	const size_t hash = jShaderBindingLayout::CreateShaderBindingLayoutHash(shaderBindings);
 
 	auto it_find = PipelineLayoutPool.find(hash);
     if (PipelineLayoutPool.end() != it_find)
@@ -913,9 +913,9 @@ void* jRHI_Vulkan::CreatePipelineLayout(const std::vector<const jShaderBindings*
 	{
 		std::vector<VkDescriptorSetLayout> DescriptorSetLayouts;
 		DescriptorSetLayouts.reserve(shaderBindings.size());
-		for (const jShaderBindings* binding : shaderBindings)
+		for (const jShaderBindingLayout* binding : shaderBindings)
 		{
-			const jShaderBindings_Vulkan* binding_vulkan = (const jShaderBindings_Vulkan*)binding;
+			const jShaderBindingLayout_Vulkan* binding_vulkan = (const jShaderBindingLayout_Vulkan*)binding;
 			DescriptorSetLayouts.push_back(binding_vulkan->DescriptorSetLayout);
 		}
 
@@ -941,7 +941,7 @@ void* jRHI_Vulkan::CreatePipelineLayout(const std::vector<const jShaderBindingIn
 	if (shaderBindingInstances.size() <= 0)
 		return 0;
 
-	std::vector<const jShaderBindings*> bindings;
+	std::vector<const jShaderBindingLayout*> bindings;
 	bindings.resize(shaderBindingInstances.size());
 	for (int32 i = 0; i < shaderBindingInstances.size(); ++i)
 	{
@@ -1432,12 +1432,12 @@ bool jRHI_Vulkan::TransitionImageLayoutImmediate(jTexture* texture, EImageLayout
 }
 
 jPipelineStateInfo* jRHI_Vulkan::CreatePipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader
-    , const jVertexBuffer* vertexBuffer, const jRenderPass* renderPass, const std::vector<const jShaderBindings*> shaderBindings) const
+    , const jVertexBuffer* vertexBuffer, const jRenderPass* renderPass, const std::vector<const jShaderBindingLayout*> shaderBindings) const
 {
 	return PipelineStatePool.GetOrCreate(jPipelineStateInfo(pipelineStateFixed, shader, vertexBuffer, renderPass, shaderBindings));
 }
 
-jPipelineStateInfo* jRHI_Vulkan::CreateComputePipelineStateInfo(const jShader* shader, const std::vector<const jShaderBindings*> shaderBindings) const
+jPipelineStateInfo* jRHI_Vulkan::CreateComputePipelineStateInfo(const jShader* shader, const std::vector<const jShaderBindingLayout*> shaderBindings) const
 {
     return PipelineStatePool.GetOrCreate(jPipelineStateInfo(shader, shaderBindings));
 }
