@@ -63,7 +63,7 @@ struct jShaderBindingInstance
 
     const struct jShaderBindingLayout* ShaderBindings = nullptr;
     
-    virtual void UpdateShaderBindings(std::vector<jShaderBinding> InShaderBindings) {}
+    virtual void UpdateShaderBindings(const std::vector<jShaderBinding>& InShaderBindings) {}
     virtual void BindGraphics(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const {}
     virtual void BindCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const {}
 };

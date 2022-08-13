@@ -95,7 +95,7 @@ void jShaderBindingLayout_Vulkan::CreatePool()
 //////////////////////////////////////////////////////////////////////////
 // jShaderBindingInstance_Vulkan
 //////////////////////////////////////////////////////////////////////////
-void jShaderBindingInstance_Vulkan::UpdateShaderBindings(std::vector<jShaderBinding> InShaderBindings)
+void jShaderBindingInstance_Vulkan::UpdateShaderBindings(const std::vector<jShaderBinding>& InShaderBindings)
 {
     check(ShaderBindings->ShaderBindings.size() == InShaderBindings.size());
 

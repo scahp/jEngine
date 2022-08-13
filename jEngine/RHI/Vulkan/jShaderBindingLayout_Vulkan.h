@@ -8,7 +8,7 @@ struct jShaderBindingInstance_Vulkan : public jShaderBindingInstance
 {
     VkDescriptorSet DescriptorSet = nullptr;
 
-    virtual void UpdateShaderBindings(std::vector<jShaderBinding> InShaderBindings) override;
+    virtual void UpdateShaderBindings(const std::vector<jShaderBinding>& InShaderBindings) override;
     virtual void BindGraphics(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const override;
     virtual void BindCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const override;
 };
