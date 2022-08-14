@@ -73,17 +73,17 @@ static int32 GetBindPoint()
 struct IUniformBufferBlock
 {
 	IUniformBufferBlock() = default;
-	IUniformBufferBlock(const std::string& name, size_t size = 0)
-		: Name(name), Size(size)
+	IUniformBufferBlock(const jName& name)
+		: Name(name)
 	{}
 	virtual ~IUniformBufferBlock() {}
 
-	std::string Name;
-	size_t Size = 0;
+	jName Name;
 
-	FORCEINLINE size_t GetBufferSize() const { return Size; }
+	virtual size_t GetBufferSize() const { return 0; }
+	virtual size_t GetBufferOffset() const { return 0; }
 
-	virtual void Init() = 0;
+	virtual void Init(size_t size) = 0;
 	virtual void Bind(const jShader* shader) const { }
 	virtual void UpdateBufferData(const void* newData, size_t size) = 0;
 	virtual void ClearBuffer(int32 clearValue = 0) = 0;
@@ -247,7 +247,8 @@ public:
 		: Camera(camera), DirectionalLight(directionalLight), PointLight(pointLight), SpotLight(spotLight)
 	{}
 
-	void GetShaderBindingInstance(std::vector<const jShaderBindingInstance*>& OutShaderBindingInstance);
+	void SetupUniformBuffer();
+	void GetShaderBindingInstance(std::vector<std::shared_ptr<jShaderBindingInstance>>& OutShaderBindingInstance);
 
 	jCamera* Camera = nullptr;
 	jDirectionalLight* DirectionalLight = nullptr;
@@ -396,7 +397,7 @@ public:
 	virtual jPipelineStateInfo* CreateComputePipelineStateInfo(const jShader* shader, const std::vector<const jShaderBindingLayout*> shaderBindings) const { return nullptr; }
 
 	virtual jShaderBindingLayout* CreateShaderBindings(const std::vector<jShaderBinding>& InShaderBindings) const { check(0); return nullptr; }
-	virtual jShaderBindingInstance* CreateShaderBindingInstance(const std::vector<jShaderBinding>& InShaderBindings) const { check(0); return nullptr; }
+	virtual std::shared_ptr<jShaderBindingInstance> CreateShaderBindingInstance(const std::vector<jShaderBinding>& InShaderBindings) const { check(0); return nullptr; }
 
 	virtual void* CreatePipelineLayout(const std::vector<const jShaderBindingLayout*>& shaderBindings) const { return nullptr; }
 	virtual void* CreatePipelineLayout(const std::vector<const jShaderBindingInstance*>& shaderBindingInstances) const { return nullptr; }

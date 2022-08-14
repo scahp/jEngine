@@ -12,6 +12,7 @@ struct jUniformBufferResource : public jShaderBindingResource
 {
     jUniformBufferResource() = default;
     jUniformBufferResource(const IUniformBufferBlock* InUniformBuffer) : UniformBuffer(InUniformBuffer) {}
+    virtual ~jUniformBufferResource() {}
     const IUniformBufferBlock* UniformBuffer = nullptr;
 };
 
@@ -20,6 +21,7 @@ struct jTextureResource : public jShaderBindingResource
     jTextureResource() = default;
     jTextureResource(const jTexture* InTexture, const jSamplerStateInfo* InSamplerState)
         : Texture(InTexture), SamplerState(InSamplerState) {}
+    virtual ~jTextureResource() {}
     const jTexture* Texture = nullptr;
     const jSamplerStateInfo* SamplerState = nullptr;
 };
@@ -84,14 +86,13 @@ struct jShaderBindingLayout
     virtual ~jShaderBindingLayout() {}
 
     virtual bool CreateDescriptorSetLayout() { return false; }
-    virtual void CreatePool() {}
 
     std::vector<jShaderBinding> ShaderBindings;
 
     FORCEINLINE int32 GetNextBindingIndex() const { return (int32)(ShaderBindings.size()); };
 
-    virtual jShaderBindingInstance* CreateShaderBindingInstance() const { return nullptr; }
-    virtual std::vector<jShaderBindingInstance*> CreateShaderBindingInstance(int32 count) const { return {}; }
+    virtual std::shared_ptr<jShaderBindingInstance> CreateShaderBindingInstance() const { return nullptr; }
+    virtual std::vector<std::shared_ptr<jShaderBindingInstance>> CreateShaderBindingInstance(int32 count) const { return {}; }
 
     virtual size_t GetHash() const;
 

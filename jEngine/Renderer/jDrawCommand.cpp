@@ -9,7 +9,7 @@
 
 jDrawCommand::jDrawCommand(std::shared_ptr<jRenderFrameContext> InRenderFrameContextPtr, jView* view
     , jRenderObject* renderObject, jRenderPass* renderPass, jShader* shader
-    , jPipelineStateFixedInfo* pipelineStateFixed, std::vector<const jShaderBindingInstance*> shaderBindingInstances)
+    , jPipelineStateFixedInfo* pipelineStateFixed, std::vector<std::shared_ptr<jShaderBindingInstance>> shaderBindingInstances)
     : RenderFrameContextPtr(InRenderFrameContextPtr), View(view), RenderObject(renderObject), RenderPass(renderPass), Shader(shader), PipelineStateFixed(pipelineStateFixed)
 {
     ShaderBindingInstances.reserve(shaderBindingInstances.size() + 3);

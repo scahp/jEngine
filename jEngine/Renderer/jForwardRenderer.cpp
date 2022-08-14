@@ -12,16 +12,18 @@
 
 void jForwardRenderer::Setup()
 {
+    View.SetupUniformBuffer();
+
+    // View 별로 저장 할 수 있어야 함
+    View.DirectionalLight->ShadowMapPtr = RenderFrameContextPtr->SceneRenderTarget->DirectionalLightShadowMapPtr;
+    View.DirectionalLight->PrepareShaderBindingInstance();
+
     SetupShadowPass();
     SetupBasePass();
 }
 
 void jForwardRenderer::SetupShadowPass()
 {
-    // View 별로 저장 할 수 있어야 함
-    View.DirectionalLight->ShadowMapPtr = RenderFrameContextPtr->SceneRenderTarget->DirectionalLightShadowMapPtr;
-    View.DirectionalLight->PrepareShaderBindingInstance();
-
     // Prepare shadowpass pipeline
     auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
     jMultisampleStateInfo* MultisampleState = TMultisampleStateInfo<true, 0.2f, false, false>::Create(EMSAASamples::COUNT_1);
@@ -167,38 +169,34 @@ void jForwardRenderer::OpaquePass()
     g_rhi->TransitionImageLayout(CommandBuffer, SceneRT->ColorPtr->GetTexture(), EImageLayout::SHADER_READ_ONLY);
     g_rhi->TransitionImageLayout(CommandBuffer, SceneRT->FinalColorPtr->GetTexture(), EImageLayout::GENERAL);
 
-    static jShaderBindingInstance* ShaderBindingInstance[3] = { nullptr };
-    jShaderBindingInstance*& CurrentBindingInstance = ShaderBindingInstance[RenderFrameContextPtr->FrameIndex];
-    if (!CurrentBindingInstance)
+    std::shared_ptr<jShaderBindingInstance> CurrentBindingInstancePtr;
+    int32 BindingPoint = 0;
+    std::vector<jShaderBinding> ShaderBindings;
+    if (ensure(SceneRT->ColorPtr))
     {
-        int32 BindingPoint = 0;
-        std::vector<jShaderBinding> ShaderBindings;
-        if (ensure(SceneRT->ColorPtr))
-        {
-            ShaderBindings.emplace_back(jShaderBinding(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-                , std::make_shared<jTextureResource>(SceneRT->ColorPtr->GetTexture(), nullptr)));
-        }
-        if (ensure(SceneRT->FinalColorPtr))
-        {
-            ShaderBindings.emplace_back(jShaderBinding(BindingPoint++, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE
-                , std::make_shared<jTextureResource>(SceneRT->FinalColorPtr->GetTexture(), nullptr)));
-        }
-
-        CurrentBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindings);
-        CurrentBindingInstance->UpdateShaderBindings(ShaderBindings);
+        ShaderBindings.emplace_back(jShaderBinding(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
+            , std::make_shared<jTextureResource>(SceneRT->ColorPtr->GetTexture(), nullptr)));
     }
+    if (ensure(SceneRT->FinalColorPtr))
+    {
+        ShaderBindings.emplace_back(jShaderBinding(BindingPoint++, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE
+            , std::make_shared<jTextureResource>(SceneRT->FinalColorPtr->GetTexture(), nullptr)));
+    }
+
+    CurrentBindingInstancePtr = g_rhi->CreateShaderBindingInstance(ShaderBindings);
+    CurrentBindingInstancePtr->UpdateShaderBindings(ShaderBindings);
 
     jShaderInfo shaderInfo;
     shaderInfo.name = jName("emboss");
     shaderInfo.cs = jName("Resource/Shaders/hlsl/emboss_cs.hlsl");
     static jShader_Vulkan* Shader = (jShader_Vulkan*)g_rhi->CreateShader(shaderInfo);
 
-    jPipelineStateInfo* computePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, { CurrentBindingInstance->ShaderBindings });
+    jPipelineStateInfo* computePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, { CurrentBindingInstancePtr->ShaderBindings });
 
     computePipelineStateInfo->Bind(RenderFrameContextPtr);
     // vkCmdBindPipeline((VkCommandBuffer)CommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline[imageIndex]);
 
-    CurrentBindingInstance->BindCompute(RenderFrameContextPtr, (VkPipelineLayout)computePipelineStateInfo->GetPipelineLayoutHandle());
+    CurrentBindingInstancePtr->BindCompute(RenderFrameContextPtr, (VkPipelineLayout)computePipelineStateInfo->GetPipelineLayoutHandle());
 
     check(g_rhi->GetSwapchain());
     vkCmdDispatch((VkCommandBuffer)CommandBuffer->GetHandle()

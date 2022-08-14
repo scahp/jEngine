@@ -256,35 +256,36 @@ public:
 
 	int32 GetNumOfLight() const;
 
+	void SetupUniformBuffer();
 	// Camera Uniform buffer
-	struct jUniformBufferCamera
-	{
-		Matrix VP;
-		Matrix V;
-		float Near;
-		float Far;
-	};
-	jUniformBufferCamera Data;
-	IUniformBufferBlock* UniformBufferBlock = nullptr;
+	//struct jUniformBufferCamera
+	//{
+	//	Matrix VP;
+	//	Matrix V;
+	//	float Near;
+	//	float Far;
+	//};
+	//jUniformBufferCamera Data;
+	//IUniformBufferBlock* UniformBufferBlock = nullptr;
 
-	void UpdateUniformBuffer()
-	{
-		if (!UniformBufferBlock)
-		{
-			UniformBufferBlock = g_rhi->CreateUniformBufferBlock("Camera", sizeof(jUniformBufferCamera));
-		}
+	//void UpdateUniformBuffer()
+	//{
+	//	if (!UniformBufferBlock)
+	//	{
+	//		UniformBufferBlock = g_rhi->CreateUniformBufferBlock("Camera", sizeof(jUniformBufferCamera));
+	//	}
 
-		const auto& V = View;
-		const auto& VP = Projection * View;
+	//	const auto& V = View;
+	//	const auto& VP = Projection * View;
 
-		jUniformBufferCamera ubo = {};
-		ubo.V = V;
-		ubo.VP = VP;
-		ubo.Far = Far;
-		ubo.Near = Near;
+	//	jUniformBufferCamera ubo = {};
+	//	ubo.V = V;
+	//	ubo.VP = VP;
+	//	ubo.Far = Far;
+	//	ubo.Near = Near;
 
-		UniformBufferBlock->UpdateBufferData(&ubo, sizeof(ubo));
-	}
+	//	UniformBufferBlock->UpdateBufferData(&ubo, sizeof(ubo));
+	//}
 	//////////////////////////////////////////////////////////////////////////
 
 	ECameraType Type;

@@ -11,12 +11,12 @@ class jDrawCommand
 {
 public:
     jDrawCommand(std::shared_ptr<jRenderFrameContext> InRenderFrameContextPtr, jView* view, jRenderObject* renderObject
-        , jRenderPass* renderPass, jShader* shader, jPipelineStateFixedInfo* pipelineStateFixed, std::vector<const jShaderBindingInstance*> shaderBindingInstances);
+        , jRenderPass* renderPass, jShader* shader, jPipelineStateFixedInfo* pipelineStateFixed, std::vector<std::shared_ptr<jShaderBindingInstance>> shaderBindingInstances);
 
     void PrepareToDraw(bool bPositionOnly);
     void Draw();
 
-    std::vector<const jShaderBindingInstance*> ShaderBindingInstances;
+    std::vector<std::shared_ptr<jShaderBindingInstance>> ShaderBindingInstances;
 
     jView* View = nullptr;
     jRenderPass* RenderPass = nullptr;

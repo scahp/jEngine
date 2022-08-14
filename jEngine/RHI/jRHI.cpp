@@ -2,6 +2,7 @@
 #include "jRHI.h"
 #include "Shader/jShader.h"
 #include "Scene/jLight.h"
+#include "Scene/jCamera.h"
 
 //////////////////////////////////////////////////////////////////////////
 void IUniformBuffer::Bind(const jShader* shader) const
@@ -151,10 +152,23 @@ size_t jShaderBindingLayout::GetHash() const
 }
 
 
-void jView::GetShaderBindingInstance(std::vector<const jShaderBindingInstance*>& OutShaderBindingInstance)
+void jView::SetupUniformBuffer()
+{
+	if (Camera)
+		Camera->SetupUniformBuffer();
+	if (DirectionalLight)
+		DirectionalLight->SetupUniformBuffer();
+	if (PointLight)
+		PointLight->SetupUniformBuffer();
+	if (SpotLight)
+		SpotLight->SetupUniformBuffer();
+}
+
+void jView::GetShaderBindingInstance(std::vector<std::shared_ptr<jShaderBindingInstance>>& OutShaderBindingInstance)
 {
 	if (DirectionalLight)
 	{
-		OutShaderBindingInstance.push_back(DirectionalLight->ShaderBindingInstance);
+		check(DirectionalLight->ShaderBindingInstancePtr);
+		OutShaderBindingInstance.push_back(DirectionalLight->ShaderBindingInstancePtr);
 	}
 }

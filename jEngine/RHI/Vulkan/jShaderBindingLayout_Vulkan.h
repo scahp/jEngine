@@ -6,6 +6,8 @@
 //////////////////////////////////////////////////////////////////////////
 struct jShaderBindingInstance_Vulkan : public jShaderBindingInstance
 {
+    virtual ~jShaderBindingInstance_Vulkan();
+
     VkDescriptorSet DescriptorSet = nullptr;
 
     virtual void UpdateShaderBindings(const std::vector<jShaderBinding>& InShaderBindings) override;
@@ -20,22 +22,10 @@ struct jShaderBindingLayout_Vulkan : public jShaderBindingLayout
 {
     VkDescriptorSetLayout DescriptorSetLayout = nullptr;
 
-    // Descriptor : 쉐이더가 버퍼나 이미지 같은 리소스에 자유롭게 접근하는 방법. 디스크립터의 사용방법은 아래 3가지로 구성됨.
-    //	1. Pipeline 생성 도중 Descriptor Set Layout 명세
-    //	2. Descriptor Pool로 Descriptor Set 생성
-    //	3. Descriptor Set을 렌더링 하는 동안 묶어 주기.
-    //
-    // Descriptor set layout	: 파이프라인을 통해 접근할 리소스 타입을 명세함
-    // Descriptor set			: Descriptor 에 묶일 실제 버퍼나 이미지 리소스를 명세함.
-    VkDescriptorPool DescriptorPool = nullptr;
-
-    mutable std::vector<jShaderBindingInstance_Vulkan*> CreatedBindingInstances;
-
     virtual bool CreateDescriptorSetLayout() override;
-    virtual void CreatePool() override;
 
-    virtual jShaderBindingInstance* CreateShaderBindingInstance() const override;
-    virtual std::vector<jShaderBindingInstance*> CreateShaderBindingInstance(int32 count) const override;
+    virtual std::shared_ptr<jShaderBindingInstance> CreateShaderBindingInstance() const override;
+    virtual std::vector<std::shared_ptr<jShaderBindingInstance>> CreateShaderBindingInstance(int32 count) const override;
 
     virtual size_t GetHash() const override;
 

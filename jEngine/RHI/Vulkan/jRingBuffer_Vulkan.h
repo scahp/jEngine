@@ -1,12 +1,13 @@
 ﻿#pragma once
 #include "../jRHIType.h"
 
-struct jBuffer_Vulkan : public jBuffer
+struct jRingBuffer_Vulkan : public jBuffer
 {
-    jBuffer_Vulkan() = default;
-    jBuffer_Vulkan(VkBuffer buffer, VkDeviceMemory bufferMemory)
-        : Buffer(buffer), BufferMemory(bufferMemory)
-    {}
+    jRingBuffer_Vulkan() = default;
+
+    virtual void Create(uint64 totalSize, uint32 alignment = 16);
+    virtual void Reset();
+    virtual uint64 Alloc(uint64 allocSize);
 
     virtual void Destroy() override;
     
@@ -19,10 +20,11 @@ struct jBuffer_Vulkan : public jBuffer
     virtual void* GetHandle() const override { return Buffer; }
     virtual void* GetMemoryHandle() const override { return BufferMemory; }
 
+    uint64 RingBufferOffset = 0;
+    uint32 Alignment = 16;
     VkBuffer Buffer = nullptr;
     VkDeviceMemory BufferMemory = nullptr;
-    size_t Offset = 0;
-    size_t AllocatedSize = 0;
+    uint64 RingBufferSize = 0;
     void* MappedPointer = nullptr;
 };
 

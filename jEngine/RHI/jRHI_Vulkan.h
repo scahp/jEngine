@@ -14,6 +14,9 @@
 #include "Vulkan/jSwapchain_Vulkan.h"
 #include "Vulkan/jShader_Vulkan.h"
 
+struct jRingBuffer_Vulkan;
+struct jDescriptorPool_Vulkan;
+
 #define VALIDATION_LAYER_VERBOSE 0
 
 class jRHI_Vulkan : public jRHI
@@ -91,6 +94,8 @@ public:
     VkPhysicalDeviceProperties DeviceProperties;
 
     jQueryPool_Vulkan* QueryPool = nullptr;
+	std::vector<jRingBuffer_Vulkan*> RingBuffers;
+	std::vector<jDescriptorPool_Vulkan*> DescriptorPools;
 	//////////////////////////////////////////////////////////////////////////
 
     VkCommandBuffer BeginSingleTimeCommands() const;
@@ -138,7 +143,7 @@ public:
 	virtual void DrawElementsInstancedBaseVertex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex, int32 instanceCount) const override;
 
 	virtual jShaderBindingLayout* CreateShaderBindings(const std::vector<jShaderBinding>& InShaderBindings) const override;
-	virtual jShaderBindingInstance* CreateShaderBindingInstance(const std::vector<jShaderBinding>& InShaderBindings) const override;
+	virtual std::shared_ptr<jShaderBindingInstance> CreateShaderBindingInstance(const std::vector<jShaderBinding>& InShaderBindings) const override;
 	virtual void* CreatePipelineLayout(const std::vector<const jShaderBindingLayout*>& shaderBindings) const override;
 	virtual void* CreatePipelineLayout(const std::vector<const jShaderBindingInstance*>& shaderBindingInstances) const override;
 
@@ -170,6 +175,9 @@ public:
 	virtual EMSAASamples GetSelectedMSAASamples() const { return SelectedMSAASamples; }
 	virtual jQueryPool* GetQueryPool() const override { return QueryPool; }
 	virtual jSwapchain* GetSwapchain() const override { return Swapchain; }
+
+	jRingBuffer_Vulkan* GetRingBuffer() const { return RingBuffers[CurrenFrameIndex]; }
+	jDescriptorPool_Vulkan* GetDescriptorPools() const { return DescriptorPools[CurrenFrameIndex]; }
 };
 
 extern jRHI_Vulkan* g_rhi_vk;

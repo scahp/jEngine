@@ -87,8 +87,6 @@ void jCamera::UpdateCamera()
 {
     View = CreateView();
     Projection = CreateProjection();
-
-    UpdateUniformBuffer();
 }
 
 void jCamera::AddLight(jLight* light)
@@ -151,6 +149,11 @@ void jCamera::RemoveLight(jLight* light)
 int32 jCamera::GetNumOfLight() const
 {
     return static_cast<int32>(LightList.size());
+}
+
+void jCamera::SetupUniformBuffer()
+{
+
 }
 
 //////////////////////////////////////////////////////////////////////////

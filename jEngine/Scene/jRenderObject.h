@@ -104,8 +104,7 @@ public:
 
 	void SetupRenderObjectUniformBuffer(const jView* view)
 	{
-		if (!RenderObjectUniformBuffer)
-			RenderObjectUniformBuffer = CreateRenderObjectUniformBuffer();
+		RenderObjectUniformBuffer = CreateRenderObjectUniformBuffer();
 
 		UpdateRenderObjectUniformBuffer(view);
 	}
@@ -114,7 +113,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 
 	//////////////////////////////////////////////////////////////////////////
-	jShaderBindingInstance* ShaderBindingInstance = nullptr;
+	std::shared_ptr<jShaderBindingInstance> ShaderBindingInstancePtr;
 	bool NeedUpdateRenderObjectUniformBuffer = true;
 	void PrepareShaderBindingInstance()
 	{
@@ -130,25 +129,25 @@ public:
 				, EShaderAccessStageFlag::ALL_GRAPHICS, std::make_shared<jTextureResource>(MaterialData.Params[i].Texture, MaterialData.Params[i].SamplerState)));
         }
 
-		if (NeedUpdateRenderObjectUniformBuffer)
+		//if (NeedUpdateRenderObjectUniformBuffer)
 		{
-			if (ShaderBindingInstance)
+			//if (ShaderBindingInstancePtr)
+			//{
+				//ShaderBindingInstancePtr->UpdateShaderBindings(ShaderBindings);
+			//}
+			//else
 			{
-				ShaderBindingInstance->UpdateShaderBindings(ShaderBindings);
+				// delete ShaderBindingInstance;
+				ShaderBindingInstancePtr = g_rhi->CreateShaderBindingInstance(ShaderBindings);
+				ShaderBindingInstancePtr->UpdateShaderBindings(ShaderBindings);
 			}
-			else
-			{
-				delete ShaderBindingInstance;
-				ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindings);
-				ShaderBindingInstance->UpdateShaderBindings(ShaderBindings);
-			}
-			NeedUpdateRenderObjectUniformBuffer = false;
+			//NeedUpdateRenderObjectUniformBuffer = false;
 		}
 	}
-	void GetShaderBindingInstance(std::vector<const jShaderBindingInstance*>& OutShaderBindingInstance)
+	void GetShaderBindingInstance(std::vector<std::shared_ptr<jShaderBindingInstance>>& OutShaderBindingInstance)
 	{
-		check(ShaderBindingInstance);
-		OutShaderBindingInstance.push_back(ShaderBindingInstance);
+		check(ShaderBindingInstancePtr);
+		OutShaderBindingInstance.push_back(ShaderBindingInstancePtr);
 	}
 	//////////////////////////////////////////////////////////////////////////
 

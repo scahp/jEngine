@@ -29,7 +29,7 @@ void* jBuffer_Vulkan::Map()
 {
     check(AllocatedSize);
     check(!MappedPointer);
-    vkMapMemory(g_rhi_vk->Device, BufferMemory, 0, VK_WHOLE_SIZE, 0, &MappedPointer);
+    vkMapMemory(g_rhi_vk->Device, BufferMemory, Offset, VK_WHOLE_SIZE, 0, &MappedPointer);
     return MappedPointer;
 }
 

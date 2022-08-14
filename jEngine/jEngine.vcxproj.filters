@@ -310,6 +310,12 @@
     <ClInclude Include="RHI\jRenderFrameContext.h">
       <Filter>Code\RHI</Filter>
     </ClInclude>
+    <ClInclude Include="RHI\Vulkan\jRingBuffer_Vulkan.h">
+      <Filter>Code\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Vulkan\jDescriptorPool_Vulkan.h">
+      <Filter>Code\RHI\Vulkan</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -520,6 +526,12 @@
       <Filter>Code\RHI</Filter>
     </ClCompile>
     <ClCompile Include="RHI\Vulkan\jShader_Vulkan.cpp">
+      <Filter>Code\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\jRingBuffer_Vulkan.cpp">
+      <Filter>Code\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\jDescriptorPool_Vulkan.cpp">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClCompile>
   </ItemGroup>

@@ -2,6 +2,8 @@
 #include "jShaderBindingLayout_Vulkan.h"
 #include "jRHIType_Vulkan.h"
 #include "jTexture_Vulkan.h"
+#include "../jRHI_Vulkan.h"
+#include "jDescriptorPool_Vulkan.h"
 
 //////////////////////////////////////////////////////////////////////////
 // jShaderBindings_Vulkan
@@ -32,47 +34,35 @@ bool jShaderBindingLayout_Vulkan::CreateDescriptorSetLayout()
     return true;
 }
 
-jShaderBindingInstance* jShaderBindingLayout_Vulkan::CreateShaderBindingInstance() const
+std::shared_ptr<jShaderBindingInstance> jShaderBindingLayout_Vulkan::CreateShaderBindingInstance() const
 {
-    VkDescriptorSetAllocateInfo allocInfo = {};
-    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = DescriptorPool;
-    allocInfo.descriptorSetCount = 1;
-    allocInfo.pSetLayouts = &DescriptorSetLayout;
-
-    jShaderBindingInstance_Vulkan* Instance = new jShaderBindingInstance_Vulkan();
-    Instance->ShaderBindings = this;
-    if (!ensure(vkAllocateDescriptorSets(g_rhi_vk->Device, &allocInfo, &Instance->DescriptorSet) == VK_SUCCESS))
+    VkDescriptorSet DescriptorSet = g_rhi_vk->GetDescriptorPools()->AllocateDescriptorSet(DescriptorSetLayout);
+    if (!ensure(DescriptorSet))
     {
-        delete Instance;
         return nullptr;
     }
-    CreatedBindingInstances.push_back(Instance);
 
-    return Instance;
+    auto NewBindingInstance = std::make_shared<jShaderBindingInstance_Vulkan>();
+    NewBindingInstance->ShaderBindings = this;
+    NewBindingInstance->DescriptorSet = DescriptorSet;
+    return NewBindingInstance;
 }
 
-std::vector<jShaderBindingInstance*> jShaderBindingLayout_Vulkan::CreateShaderBindingInstance(int32 count) const
+std::vector<std::shared_ptr<jShaderBindingInstance>> jShaderBindingLayout_Vulkan::CreateShaderBindingInstance(int32 count) const
 {
     std::vector<VkDescriptorSetLayout> descSetLayout(count, DescriptorSetLayout);
-    VkDescriptorSetAllocateInfo allocInfo = {};
-    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = DescriptorPool;
-    allocInfo.descriptorSetCount = (uint32)descSetLayout.size();
-    allocInfo.pSetLayouts = descSetLayout.data();
-
-    std::vector<jShaderBindingInstance*> Instances;
-
+    std::vector<std::shared_ptr<jShaderBindingInstance>> Instances;
     std::vector<VkDescriptorSet> DescriptorSets;
-    DescriptorSets.resize(descSetLayout.size());
-    if (!ensure(vkAllocateDescriptorSets(g_rhi_vk->Device, &allocInfo, DescriptorSets.data()) == VK_SUCCESS))
+
+    if (!ensure(g_rhi_vk->GetDescriptorPools()->AllocateDescriptorSet(DescriptorSets, descSetLayout)))
+    {
         return Instances;
+    }
 
     Instances.resize(DescriptorSets.size());
     for (int32 i = 0; i < DescriptorSets.size(); ++i)		// todo opt
     {
-        auto NewBindingInstance = new jShaderBindingInstance_Vulkan();
-        CreatedBindingInstances.push_back(NewBindingInstance);
+        auto NewBindingInstance = std::make_shared<jShaderBindingInstance_Vulkan>();
         NewBindingInstance->DescriptorSet = DescriptorSets[i];
         NewBindingInstance->ShaderBindings = this;
 
@@ -87,9 +77,8 @@ size_t jShaderBindingLayout_Vulkan::GetHash() const
     return CityHash64((const char*)ShaderBindings.data(), sizeof(jShaderBinding) * ShaderBindings.size());
 }
 
-void jShaderBindingLayout_Vulkan::CreatePool()
+jShaderBindingInstance_Vulkan::~jShaderBindingInstance_Vulkan()
 {
-    DescriptorPool = g_rhi_vk->ShaderBindingsManager.CreatePool(*this);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -133,10 +122,10 @@ void jShaderBindingInstance_Vulkan::UpdateShaderBindings(const std::vector<jShad
                     {
                         VkDescriptorBufferInfo bufferInfo{};
                         bufferInfo.buffer = (VkBuffer)ubor->UniformBuffer->GetBuffer();
-                        //bufferInfo.offset = bufferOffset;
+                        bufferInfo.offset = ubor->UniformBuffer->GetBufferOffset();
                         bufferInfo.range = ubor->UniformBuffer->GetBufferSize();		// 전체 사이즈라면 VK_WHOLE_SIZE 이거 가능
-                        //bufferOffset += (int32)ubor->UniformBuffer->GetBufferSize();
                         descriptors[DescriptorIndex].BufferInfo.push_back(bufferInfo);
+                        check(bufferInfo.buffer);
                     }
                     break;
                 }
@@ -155,6 +144,7 @@ void jShaderBindingInstance_Vulkan::UpdateShaderBindings(const std::vector<jShad
                         if (!imageInfo.sampler)
                             imageInfo.sampler = jTexture_Vulkan::CreateDefaultSamplerState();		// todo 수정 필요, 텍스쳐를 어떻게 바인드 해야할지 고민 필요
                         descriptors[DescriptorIndex].ImageInfo.push_back(imageInfo);
+                        check(imageInfo.imageView);
                     }
                     break;
                 }
@@ -171,6 +161,7 @@ void jShaderBindingInstance_Vulkan::UpdateShaderBindings(const std::vector<jShad
                         if (!imageInfo.sampler)
                             imageInfo.sampler = jTexture_Vulkan::CreateDefaultSamplerState();		// todo 수정 필요, 텍스쳐를 어떻게 바인드 해야할지 고민 필요
                         descriptors[DescriptorIndex].ImageInfo.push_back(imageInfo);
+                        check(imageInfo.imageView);
                     }
                     break;
                 }

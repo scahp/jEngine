@@ -166,4 +166,11 @@ extern float g_timeDeltaSecond;
 
 extern const uint32 MaxQueryTimeCount;
 
+template <typename T>
+FORCEINLINE constexpr T Align(T value, uint64 alignment)
+{
+	static_assert(std::is_integral<T>::value || std::is_pointer<T>::value, "Align is support for int or pointer type");
+    return (T)(((uint64)value + alignment - 1) & ~(alignment - 1));
+}
+
 #endif //PCH_H

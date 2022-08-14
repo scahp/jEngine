@@ -24,6 +24,8 @@
 #include "Vulkan/jBuffer_Vulkan.h"
 #include "Vulkan/jCommandBufferManager_Vulkan.h"
 #include "Renderer/jSceneRenderTargets.h"
+#include "Vulkan/jRingBuffer_Vulkan.h"
+#include "Vulkan/jDescriptorPool_Vulkan.h"
 
 jRHI_Vulkan* g_rhi_vk = nullptr;
 std::unordered_map<size_t, VkPipelineLayout> jRHI_Vulkan::PipelineLayoutPool;
@@ -72,7 +74,7 @@ bool jRHI_Vulkan::InitRHI()
 	appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
 	appInfo.pEngineName = "No Engine";
 	appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-	appInfo.apiVersion = VK_API_VERSION_1_0;
+	appInfo.apiVersion = VK_API_VERSION_1_3;
 
 	// Must
 	VkInstanceCreateInfo createInfo = {};
@@ -226,6 +228,20 @@ bool jRHI_Vulkan::InitRHI()
 
 	QueryPool = new jQueryPool_Vulkan();
 	QueryPool->Create();
+
+	RingBuffers.resize(Swapchain->NumOfSwapchain());
+	for (auto& iter : RingBuffers)
+	{
+        iter = new jRingBuffer_Vulkan();
+		iter->Create(16 * 1024 * 1024, (uint32)DeviceProperties.limits.minUniformBufferOffsetAlignment);
+	}
+
+	DescriptorPools.resize(Swapchain->NumOfSwapchain());
+	for (auto& iter : DescriptorPools)
+	{
+		iter = new jDescriptorPool_Vulkan();
+		iter->Create();
+	}
 
 	return true;
 }
@@ -881,14 +897,13 @@ jShaderBindingLayout* jRHI_Vulkan::CreateShaderBindings(const std::vector<jShade
 
 	NewShaderBinding->ShaderBindings = InShaderBindings;
 	NewShaderBinding->CreateDescriptorSetLayout();
-	NewShaderBinding->CreatePool();
 
 	ShaderBindingPool.insert(std::make_pair(hash, NewShaderBinding));
 
 	return NewShaderBinding;
 }
 
-jShaderBindingInstance* jRHI_Vulkan::CreateShaderBindingInstance(const std::vector<jShaderBinding>& InShaderBindings) const
+std::shared_ptr<jShaderBindingInstance> jRHI_Vulkan::CreateShaderBindingInstance(const std::vector<jShaderBinding>& InShaderBindings) const
 {
 	auto shaderBindings = CreateShaderBindings(InShaderBindings);
 	check(shaderBindings);
@@ -952,8 +967,8 @@ void* jRHI_Vulkan::CreatePipelineLayout(const std::vector<const jShaderBindingIn
 
 IUniformBufferBlock* jRHI_Vulkan::CreateUniformBufferBlock(const char* blockname, size_t size /*= 0*/) const
 {
-	auto uniformBufferBlock = new jUniformBufferBlock_Vulkan(blockname, size);
-	uniformBufferBlock->Init();
+	auto uniformBufferBlock = new jUniformBufferBlock_Vulkan(jName(blockname));
+	uniformBufferBlock->Init(size);
 	return uniformBufferBlock;
 }
 
@@ -1058,6 +1073,9 @@ std::shared_ptr<jRenderFrameContext> jRHI_Vulkan::BeginRenderFrame()
     // 이전 프레임에서 현재 사용하려는 이미지를 사용중에 있나? (그렇다면 펜스를 기다려라)
     if (lastCommandBufferFence != VK_NULL_HANDLE)
         vkWaitForFences(Device, 1, &lastCommandBufferFence, VK_TRUE, UINT64_MAX);
+
+	GetRingBuffer()->Reset();
+	GetDescriptorPools()->Reset();
 
     // 이 프레임에서 펜스를 사용한다고 마크 해둠
 	Swapchain->Images[CurrenFrameIndex]->CommandBufferFence = (VkFence)commandBuffer->GetFenceHandle();

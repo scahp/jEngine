@@ -126,17 +126,18 @@ public:
 	virtual void RenderToShadowMap(const RenderToShadowMapFunc& func, const jShader* shader) const {}
 	virtual void Update(float deltaTime) { }
 	virtual IUniformBufferBlock* GetUniformBufferBlock() const { return nullptr; }
+	virtual void SetupUniformBuffer() {}
 
 	const ELightType Type = ELightType::MAX;
 	jObject* LightDebugObject = nullptr;
 	std::vector<jViewport> Viewports;
 	bool DirtyMaterialData = true;
 
-	jShaderBindingInstance* ShaderBindingInstance = nullptr;
+	std::shared_ptr<jShaderBindingInstance> ShaderBindingInstancePtr;
 	bool NeedUpdateRenderObjectUniformBuffer = true;
-	void GetShaderBindingInstance(std::vector<const jShaderBindingInstance*>& OutShaderBindingInstance)
+	void GetShaderBindingInstance(std::vector<std::shared_ptr<jShaderBindingInstance>>& OutShaderBindingInstance)
 	{
-		OutShaderBindingInstance.push_back(ShaderBindingInstance);
+		OutShaderBindingInstance.push_back(ShaderBindingInstancePtr);
 	}
 	virtual void PrepareShaderBindingInstance() {}
 };
@@ -225,6 +226,9 @@ public:
 
 	virtual void RenderToShadowMap(const RenderToShadowMapFunc& func, const jShader* shader) const override;
 	virtual void Update(float deltaTime) override;
+
+	virtual void SetupUniformBuffer() override;
+
 	virtual IUniformBufferBlock* GetUniformBufferBlock() const override { return LightDataUniformBlock; }
 
 	jMaterialData MaterialData;
@@ -245,17 +249,17 @@ public:
                 , EShaderAccessStageFlag::ALL_GRAPHICS, std::make_shared<jTextureResource>(ShadowMapPtr->GetTexture(), nullptr)));
         }
 
-		if (NeedUpdateRenderObjectUniformBuffer)
+		//if (NeedUpdateRenderObjectUniformBuffer)
 		{
-			if (ShaderBindingInstance)
+            //if (ShaderBindingInstancePtr)
+            //{
+				//ShaderBindingInstancePtr->UpdateShaderBindings(ShaderBindings);
+            //}
+            //else
 			{
-				ShaderBindingInstance->UpdateShaderBindings(ShaderBindings);
-			}
-			else
-			{
-				delete ShaderBindingInstance;
-				ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindings);
-				ShaderBindingInstance->UpdateShaderBindings(ShaderBindings);
+				//delete ShaderBindingInstance;
+				ShaderBindingInstancePtr = g_rhi->CreateShaderBindingInstance(ShaderBindings);
+				ShaderBindingInstancePtr->UpdateShaderBindings(ShaderBindings);
 			}
 			NeedUpdateRenderObjectUniformBuffer = false;
 		}
@@ -346,6 +350,9 @@ public:
 
 	virtual void RenderToShadowMap(const RenderToShadowMapFunc& func, const jShader* shader) const override;
 	virtual void Update(float deltaTime) override;
+
+	virtual void SetupUniformBuffer() override;
+
 	virtual IUniformBufferBlock* GetUniformBufferBlock() const override { return LightDataUniformBlock; }
 
 	jMaterialData MaterialData;
@@ -419,6 +426,9 @@ public:
 
 	virtual void RenderToShadowMap(const RenderToShadowMapFunc& func, const jShader* shader) const override;
 	virtual void Update(float deltaTime) override;
+
+	virtual void SetupUniformBuffer() override;
+
 	virtual IUniformBufferBlock* GetUniformBufferBlock() const override { return LightDataUniformBlock; }
 
 	jMaterialData MaterialData;
