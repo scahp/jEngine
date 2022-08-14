@@ -8,17 +8,17 @@ bool jSwapchain_Vulkan::Create()
 {
     jVulkanDeviceUtil::SwapChainSupportDetails swapChainSupport = jVulkanDeviceUtil::QuerySwapChainSupport(g_rhi_vk->PhysicalDevice, g_rhi_vk->Surface);
 
-    VkSurfaceFormatKHR surfaceFormat = jVulkanDeviceUtil::ChooseSwapSurfaceFormat(swapChainSupport.formats);
-    VkPresentModeKHR presentMode = jVulkanDeviceUtil::ChooseSwapPresentMode(swapChainSupport.presentModes);
-    VkExtent2D extent = jVulkanDeviceUtil::ChooseSwapExtent(g_rhi_vk->Window, swapChainSupport.capabilities);
+    VkSurfaceFormatKHR surfaceFormat = jVulkanDeviceUtil::ChooseSwapSurfaceFormat(swapChainSupport.Formats);
+    VkPresentModeKHR presentMode = jVulkanDeviceUtil::ChooseSwapPresentMode(swapChainSupport.PresentModes);
+    VkExtent2D extent = jVulkanDeviceUtil::ChooseSwapExtent(g_rhi_vk->Window, swapChainSupport.Capabilities);
 
     // SwapChain 개수 설정
     // 최소개수로 하게 되면, 우리가 렌더링할 새로운 이미지를 얻기 위해 드라이버가 내부 기능 수행을 기다려야 할 수 있으므로 min + 1로 설정.
-    uint32 imageCount = swapChainSupport.capabilities.minImageCount + 1;
+    uint32 imageCount = swapChainSupport.Capabilities.minImageCount + 1;
 
     // maxImageCount가 0이면 최대 개수에 제한이 없음
-    if ((swapChainSupport.capabilities.maxImageCount > 0) && (imageCount > swapChainSupport.capabilities.maxImageCount))
-        imageCount = swapChainSupport.capabilities.maxImageCount;
+    if ((swapChainSupport.Capabilities.maxImageCount > 0) && (imageCount > swapChainSupport.Capabilities.maxImageCount))
+        imageCount = swapChainSupport.Capabilities.maxImageCount;
 
     VkSwapchainCreateInfoKHR createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -35,14 +35,14 @@ bool jSwapchain_Vulkan::Create()
                                                                     // VK_IMAGE_USAGE_TRANSFER_DST_BIT 으로 하면됨.
 
     jVulkanDeviceUtil::QueueFamilyIndices indices = jVulkanDeviceUtil::FindQueueFamilies(g_rhi_vk->PhysicalDevice, g_rhi_vk->Surface);
-    uint32 queueFamilyIndices[] = { indices.graphicsFamily.value(), indices.presentFamily.value() };
+    uint32 queueFamilyIndices[] = { indices.GraphicsFamily.value(), indices.PresentFamily.value() };
 
     // 그림은 Graphics Queue Family와 Present Queue Family가 다른경우 아래와 같이 동작한다.
     // - 이미지를 Graphics Queue에서 가져온 스왑체인에 그리고, Presentation Queue에 제출
     // 1. VK_SHARING_MODE_EXCLUSIVE : 이미지를 한번에 하나의 Queue Family 가 소유함. 소유권이 다른곳으로 전달될때 명시적으로 전달 해줘야함.
     //								이 옵션은 최고의 성능을 제공한다.
     // 2. VK_SHARING_MODE_CONCURRENT : 이미지가 여러개의 Queue Family 로 부터 명시적인 소유권 절달 없이 사용될 수 있다.
-    if (indices.graphicsFamily != indices.presentFamily)
+    if (indices.GraphicsFamily != indices.PresentFamily)
     {
         createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         createInfo.queueFamilyIndexCount = 2;
@@ -55,7 +55,7 @@ bool jSwapchain_Vulkan::Create()
         createInfo.pQueueFamilyIndices = nullptr;	// Optional
     }
 
-    createInfo.preTransform = swapChainSupport.capabilities.currentTransform;		// 스왑체인에 회전이나 flip 처리 할 수 있음.
+    createInfo.preTransform = swapChainSupport.Capabilities.currentTransform;		// 스왑체인에 회전이나 flip 처리 할 수 있음.
     createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;					// 알파채널을 윈도우 시스템의 다른 윈도우와 블랜딩하는데 사용해야하는지 여부
                                                                                     // VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR 는 알파채널 무시
     createInfo.presentMode = presentMode;

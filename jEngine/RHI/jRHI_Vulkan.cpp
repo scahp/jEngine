@@ -162,7 +162,7 @@ bool jRHI_Vulkan::InitRHI()
 		jVulkanDeviceUtil::QueueFamilyIndices indices = jVulkanDeviceUtil::FindQueueFamilies(PhysicalDevice, Surface);
 
 		std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-		std::set<uint32> uniqueQueueFamilies = { indices.graphicsFamily.value(), indices.presentFamily.value() };
+		std::set<uint32> uniqueQueueFamilies = { indices.GraphicsFamily.value(), indices.PresentFamily.value() };
 
 		float queuePriority = 1.0f;			// [0.0 ~ 1.0]
 		for (uint32 queueFamily : uniqueQueueFamilies)
@@ -188,8 +188,8 @@ bool jRHI_Vulkan::InitRHI()
 		createInfo.pEnabledFeatures = &deviceFeatures;
 
 		// extension
-		createInfo.enabledExtensionCount = static_cast<uint32>(jVulkanDeviceUtil::deviceExtensions.size());
-		createInfo.ppEnabledExtensionNames = jVulkanDeviceUtil::deviceExtensions.data();
+		createInfo.enabledExtensionCount = static_cast<uint32>(jVulkanDeviceUtil::DeviceExtensions.size());
+		createInfo.ppEnabledExtensionNames = jVulkanDeviceUtil::DeviceExtensions.data();
 
 		// 최신 버젼에서는 validation layer는 무시되지만, 오래된 버젼을 호환을 위해 vkInstance와 맞춰줌
 		if (jVulkanDeviceUtil::EnableValidationLayers)
@@ -206,9 +206,9 @@ bool jRHI_Vulkan::InitRHI()
 			return false;
 
 		// 현재는 Queue가 1개 뿐이므로 QueueIndex를 0
-		GraphicsQueue.QueueIndex = indices.graphicsFamily.value();
-		ComputeQueue.QueueIndex = indices.computeFamily.value();
-		PresentQueue.QueueIndex = indices.presentFamily.value();
+		GraphicsQueue.QueueIndex = indices.GraphicsFamily.value();
+		ComputeQueue.QueueIndex = indices.ComputeFamily.value();
+		PresentQueue.QueueIndex = indices.PresentFamily.value();
 		vkGetDeviceQueue(Device, GraphicsQueue.QueueIndex, 0, &GraphicsQueue.Queue);
 		vkGetDeviceQueue(Device, ComputeQueue.QueueIndex, 0, &ComputeQueue.Queue);
 		vkGetDeviceQueue(Device, PresentQueue.QueueIndex, 0, &PresentQueue.Queue);

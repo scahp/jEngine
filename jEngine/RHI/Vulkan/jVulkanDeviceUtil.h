@@ -11,21 +11,21 @@ static constexpr bool EnableValidationLayers = false;
 
 struct QueueFamilyIndices
 {
-    std::optional<uint32> graphicsFamily;
-    std::optional<uint32> computeFamily;
-    std::optional<uint32> presentFamily;
+    std::optional<uint32> GraphicsFamily;
+    std::optional<uint32> ComputeFamily;
+    std::optional<uint32> PresentFamily;
 
     bool IsComplete() const
     {
-        return graphicsFamily.has_value() && computeFamily.has_value() && presentFamily.has_value();
+        return GraphicsFamily.has_value() && ComputeFamily.has_value() && PresentFamily.has_value();
     }
 };
 
 struct SwapChainSupportDetails
 {
-    VkSurfaceCapabilitiesKHR capabilities;
-    std::vector<VkSurfaceFormatKHR> formats;
-    std::vector<VkPresentModeKHR> presentModes;
+    VkSurfaceCapabilitiesKHR Capabilities;
+    std::vector<VkSurfaceFormatKHR> Formats;
+    std::vector<VkPresentModeKHR> PresentModes;
 };
 
 const std::vector<const char*> validationLayers = {
@@ -33,7 +33,7 @@ const std::vector<const char*> validationLayers = {
     //, "VK_LAYER_LUNARG_api_dump"		// display api call
 };
 
-const std::vector<const char*> deviceExtensions = {
+const std::vector<const char*> DeviceExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
 
