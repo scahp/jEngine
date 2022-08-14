@@ -109,4 +109,17 @@ inline uint64 Hash128to64(const uint128& x) {
   return b;
 }
 
+//////////////////////////////////////////////////////////////////////////
+// Added uint64 interface by scahp
+__forceinline uint64 CityHash64(uint64 value)
+{
+    return CityHash64((const char*)&value, sizeof(value));
+}
+
+__forceinline uint64 CityHash64WithSeed(uint64 value, uint64 seed)
+{
+    return CityHash64WithSeed((const char*)&value, sizeof(value), seed);
+}
+//////////////////////////////////////////////////////////////////////////
+
 #endif  // CITY_HASH_H_

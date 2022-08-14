@@ -162,7 +162,7 @@ extern float g_timeDeltaSecond;
 			static size_t StrLen = strlen(str); \
 			static size_t hash = CityHash64(str, StrLen); \
 			return hash;\
-		}();
+		}()
 
 extern const uint32 MaxQueryTimeCount;
 

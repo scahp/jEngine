@@ -50,12 +50,12 @@ struct jAttachment
             return 0;
 
         Hash = RenderTargetPtr->GetHash();
-        Hash ^= CityHash64((const char*)&LoadStoreOp, sizeof(LoadStoreOp));
-        Hash ^= CityHash64((const char*)&StencilLoadStoreOp, sizeof(StencilLoadStoreOp));
-        Hash ^= CityHash64((const char*)&ClearColor, sizeof(ClearColor));
-        Hash ^= CityHash64((const char*)&ClearDepth, sizeof(ClearDepth));
-        Hash ^= CityHash64((const char*)&InitialLayout, sizeof(InitialLayout));
-        Hash ^= CityHash64((const char*)&FinalLayout, sizeof(FinalLayout));
+        Hash = CityHash64WithSeed((const char*)&LoadStoreOp, sizeof(LoadStoreOp), Hash);
+        Hash = CityHash64WithSeed((const char*)&StencilLoadStoreOp, sizeof(StencilLoadStoreOp), Hash);
+        Hash = CityHash64WithSeed((const char*)&ClearColor, sizeof(ClearColor), Hash);
+        Hash = CityHash64WithSeed((const char*)&ClearDepth, sizeof(ClearDepth), Hash);
+        Hash = CityHash64WithSeed((const char*)&InitialLayout, sizeof(InitialLayout), Hash);
+        Hash = CityHash64WithSeed((const char*)&FinalLayout, sizeof(FinalLayout), Hash);
         return Hash;
     }
 

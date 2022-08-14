@@ -13,12 +13,12 @@ struct jRenderTargetInfo
     size_t GetHash() const
     {
         size_t result = CityHash64((const char*)&Type, sizeof(Type));
-        result ^= CityHash64((const char*)&Format, sizeof(Format));
-        result ^= CityHash64((const char*)&Width, sizeof(Width));
-        result ^= CityHash64((const char*)&Height, sizeof(Height));
-        result ^= CityHash64((const char*)&LayerCount, sizeof(LayerCount));
-        result ^= CityHash64((const char*)&IsGenerateMipmap, sizeof(IsGenerateMipmap));
-        result ^= CityHash64((const char*)&SampleCount, sizeof(SampleCount));
+        result = CityHash64WithSeed((const char*)&Format, sizeof(Format), result);
+        result = CityHash64WithSeed((const char*)&Width, sizeof(Width), result);
+        result = CityHash64WithSeed((const char*)&Height, sizeof(Height), result);
+        result = CityHash64WithSeed((const char*)&LayerCount, sizeof(LayerCount), result);
+        result = CityHash64WithSeed((const char*)&IsGenerateMipmap, sizeof(IsGenerateMipmap), result);
+        result = CityHash64WithSeed((const char*)&SampleCount, sizeof(SampleCount), result);
         return result;
     }
 
@@ -70,7 +70,7 @@ struct jRenderTarget final : public std::enable_shared_from_this<jRenderTarget>
             return Hash;
 
         Hash = Info.GetHash();
-        Hash ^= reinterpret_cast<uint64>(GetViewHandle());
+        Hash = CityHash64WithSeed(reinterpret_cast<uint64>(GetViewHandle()), Hash);
         return Hash;
     }
 

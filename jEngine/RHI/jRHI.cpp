@@ -122,13 +122,13 @@ size_t jRenderPass::GetHash() const
 
 	Hash = STATIC_NAME_CITY_HASH("ColorAttachments");
 	for (int32 i = 0; i < ColorAttachments.size(); ++i)
-		Hash ^= ColorAttachments[i].GetHash();
-	Hash ^= STATIC_NAME_CITY_HASH("DepthAttachment");
-	Hash ^= DepthAttachment.GetHash();
-	Hash ^= STATIC_NAME_CITY_HASH("ColorAttachmentResolve");
-	Hash ^= ColorAttachmentResolve.GetHash();
-	Hash ^= CityHash64((const char*)&RenderOffset, sizeof(RenderOffset));
-	Hash ^= CityHash64((const char*)&RenderExtent, sizeof(RenderExtent));
+		Hash = CityHash64WithSeed(ColorAttachments[i].GetHash(), Hash);
+	Hash = CityHash64WithSeed(STATIC_NAME_CITY_HASH("DepthAttachment"), Hash);
+	Hash = CityHash64WithSeed(DepthAttachment.GetHash(), Hash);
+	Hash = CityHash64WithSeed(STATIC_NAME_CITY_HASH("ColorAttachmentResolve"), Hash);
+	Hash = CityHash64WithSeed(ColorAttachmentResolve.GetHash(), Hash);
+	Hash = CityHash64WithSeed((const char*)&RenderOffset, sizeof(RenderOffset), Hash);
+	Hash = CityHash64WithSeed((const char*)&RenderExtent, sizeof(RenderExtent), Hash);
 	return Hash;
 }
 
@@ -137,7 +137,7 @@ size_t jShaderBindingLayout::GenerateHash(const std::vector<jShaderBinding>& sha
 	size_t result = 0;
 	for (int32 i = 0; i < shaderBindings.size(); ++i)
 	{
-		result ^= shaderBindings[i].GetHash();
+		result = CityHash64WithSeed(shaderBindings[i].GetHash(), result);
 	}
 	return result;
 }

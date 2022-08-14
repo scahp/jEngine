@@ -50,9 +50,8 @@ struct jVertexBuffer_Vulkan : public jVertexBuffer
 
         FORCEINLINE size_t GetHash() const
         {
-            size_t result = 0;
-            result = CityHash64((const char*)InputBindingDescriptions.data(), sizeof(VkVertexInputBindingDescription) * InputBindingDescriptions.size());
-            result ^= CityHash64((const char*)AttributeDescriptions.data(), sizeof(VkVertexInputAttributeDescription) * AttributeDescriptions.size());
+            size_t result = CityHash64((const char*)InputBindingDescriptions.data(), sizeof(VkVertexInputBindingDescription) * InputBindingDescriptions.size());
+            result = CityHash64WithSeed((const char*)AttributeDescriptions.data(), sizeof(VkVertexInputAttributeDescription) * AttributeDescriptions.size(), result);
             return result;
         }
     };

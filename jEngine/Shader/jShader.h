@@ -15,23 +15,23 @@ struct jShaderInfo
 		{
 			Hash = 0;
 			if (name.IsValid())
-				Hash ^= name;
+				Hash = CityHash64WithSeed(name, Hash);
 			if (vs.IsValid())
-				Hash ^= vs;
+				Hash = CityHash64WithSeed(vs, Hash);
 			if (gs.IsValid())
-				Hash ^= gs;
+				Hash = CityHash64WithSeed(gs, Hash);
 			if (fs.IsValid())
-				Hash ^= fs;
+				Hash = CityHash64WithSeed(fs, Hash);
 			if (cs.IsValid())
-				Hash ^= cs;
+				Hash = CityHash64WithSeed(cs, Hash);
 			if (vsPreProcessor.IsValid())
-				Hash ^= vsPreProcessor;
+				Hash = CityHash64WithSeed(vsPreProcessor, Hash);
 			if (gsPreProcessor.IsValid())
-				Hash ^= gsPreProcessor;
+				Hash = CityHash64WithSeed(gsPreProcessor, Hash);
 			if (fsPreProcessor.IsValid())
-				Hash ^= fsPreProcessor;
+				Hash = CityHash64WithSeed(fsPreProcessor, Hash);
 			if (csPreProcessor.IsValid())
-				Hash ^= csPreProcessor;
+				Hash = CityHash64WithSeed(csPreProcessor, Hash);
 		}
 		return Hash;
 	}

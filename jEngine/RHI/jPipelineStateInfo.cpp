@@ -12,12 +12,12 @@ size_t jPipelineStateInfo::GetHash() const
         check(PipelineStateFixed);
         Hash = PipelineStateFixed->CreateHash();
 
-        Hash ^= VertexBuffer->GetHash();
-        Hash ^= RenderPass->GetHash();
+        Hash = CityHash64WithSeed(VertexBuffer->GetHash(), Hash);
+        Hash = CityHash64WithSeed(RenderPass->GetHash(), Hash);
     }
 
-    Hash ^= Shader->ShaderInfo.GetHash();
-    Hash ^= jShaderBindingLayout::CreateShaderBindingLayoutHash(ShaderBindings);
+    Hash = CityHash64WithSeed(Shader->ShaderInfo.GetHash(), Hash);
+    Hash = CityHash64WithSeed(jShaderBindingLayout::CreateShaderBindingLayoutHash(ShaderBindings), Hash);
 
     return Hash;
 }

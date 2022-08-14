@@ -28,11 +28,11 @@ struct jViewport
             return Hash;
 
         Hash = CityHash64((const char*)&X, sizeof(X));
-        Hash ^= CityHash64((const char*)&Y, sizeof(Y));
-        Hash ^= CityHash64((const char*)&Width, sizeof(Width));
-        Hash ^= CityHash64((const char*)&Height, sizeof(Height));
-        Hash ^= CityHash64((const char*)&MinDepth, sizeof(MinDepth));
-        Hash ^= CityHash64((const char*)&MaxDepth, sizeof(MaxDepth));
+        Hash = CityHash64WithSeed((const char*)&Y, sizeof(Y), Hash);
+        Hash = CityHash64WithSeed((const char*)&Width, sizeof(Width), Hash);
+        Hash = CityHash64WithSeed((const char*)&Height, sizeof(Height), Hash);
+        Hash = CityHash64WithSeed((const char*)&MinDepth, sizeof(MinDepth), Hash);
+        Hash = CityHash64WithSeed((const char*)&MaxDepth, sizeof(MaxDepth), Hash);
         return Hash;
     }
 };
@@ -57,7 +57,7 @@ struct jScissor
             return Hash;
 
         Hash = CityHash64((const char*)&Offset, sizeof(Offset));
-        Hash ^= CityHash64((const char*)&Extent, sizeof(Extent));
+        Hash = CityHash64WithSeed((const char*)&Extent, sizeof(Extent), Hash);
         return Hash;
     }
 };
@@ -74,15 +74,15 @@ struct jSamplerStateInfo
     virtual size_t GetHash() const
     {
         size_t result = CityHash64((const char*)&Minification, sizeof(Minification));
-        result ^= CityHash64((const char*)&Magnification, sizeof(Magnification));
-        result ^= CityHash64((const char*)&AddressU, sizeof(AddressU));
-        result ^= CityHash64((const char*)&AddressV, sizeof(AddressV));
-        result ^= CityHash64((const char*)&AddressW, sizeof(AddressW));
-        result ^= CityHash64((const char*)&MipLODBias, sizeof(MipLODBias));
-        result ^= CityHash64((const char*)&MaxAnisotropy, sizeof(MaxAnisotropy));
-        result ^= CityHash64((const char*)&BorderColor, sizeof(BorderColor));
-        result ^= CityHash64((const char*)&MinLOD, sizeof(MinLOD));
-        result ^= CityHash64((const char*)&MaxLOD, sizeof(MaxLOD));
+        result = CityHash64WithSeed((const char*)&Magnification, sizeof(Magnification), result);
+        result = CityHash64WithSeed((const char*)&AddressU, sizeof(AddressU), result);
+        result = CityHash64WithSeed((const char*)&AddressV, sizeof(AddressV), result);
+        result = CityHash64WithSeed((const char*)&AddressW, sizeof(AddressW), result);
+        result = CityHash64WithSeed((const char*)&MipLODBias, sizeof(MipLODBias), result);
+        result = CityHash64WithSeed((const char*)&MaxAnisotropy, sizeof(MaxAnisotropy), result);
+        result = CityHash64WithSeed((const char*)&BorderColor, sizeof(BorderColor), result);
+        result = CityHash64WithSeed((const char*)&MinLOD, sizeof(MinLOD), result);
+        result = CityHash64WithSeed((const char*)&MaxLOD, sizeof(MaxLOD), result);
         return result;
     }
 
@@ -113,15 +113,15 @@ struct jRasterizationStateInfo
             return Hash;
 
         Hash = CityHash64((const char*)&PolygonMode, sizeof(PolygonMode));
-        Hash ^= CityHash64((const char*)&CullMode, sizeof(CullMode));
-        Hash ^= CityHash64((const char*)&FrontFace, sizeof(FrontFace));
-        Hash ^= CityHash64((const char*)&DepthBiasEnable, sizeof(DepthBiasEnable));
-        Hash ^= CityHash64((const char*)&DepthBiasConstantFactor, sizeof(DepthBiasConstantFactor));
-        Hash ^= CityHash64((const char*)&DepthBiasClamp, sizeof(DepthBiasClamp));
-        Hash ^= CityHash64((const char*)&DepthBiasSlopeFactor, sizeof(DepthBiasSlopeFactor));
-        Hash ^= CityHash64((const char*)&LineWidth, sizeof(LineWidth));
-        Hash ^= CityHash64((const char*)&DepthClampEnable, sizeof(DepthClampEnable));
-        Hash ^= CityHash64((const char*)&RasterizerDiscardEnable, sizeof(RasterizerDiscardEnable));
+        Hash = CityHash64WithSeed((const char*)&CullMode, sizeof(CullMode), Hash);
+        Hash = CityHash64WithSeed((const char*)&FrontFace, sizeof(FrontFace), Hash);
+        Hash = CityHash64WithSeed((const char*)&DepthBiasEnable, sizeof(DepthBiasEnable), Hash);
+        Hash = CityHash64WithSeed((const char*)&DepthBiasConstantFactor, sizeof(DepthBiasConstantFactor), Hash);
+        Hash = CityHash64WithSeed((const char*)&DepthBiasClamp, sizeof(DepthBiasClamp), Hash);
+        Hash = CityHash64WithSeed((const char*)&DepthBiasSlopeFactor, sizeof(DepthBiasSlopeFactor), Hash);
+        Hash = CityHash64WithSeed((const char*)&LineWidth, sizeof(LineWidth), Hash);
+        Hash = CityHash64WithSeed((const char*)&DepthClampEnable, sizeof(DepthClampEnable), Hash);
+        Hash = CityHash64WithSeed((const char*)&RasterizerDiscardEnable, sizeof(RasterizerDiscardEnable), Hash);
         return Hash;
     }
 
@@ -152,10 +152,10 @@ struct jMultisampleStateInfo
             return Hash;
 
         Hash = CityHash64((const char*)&SampleCount, sizeof(SampleCount));
-        Hash ^= CityHash64((const char*)&SampleShadingEnable, sizeof(SampleShadingEnable));
-        Hash ^= CityHash64((const char*)&MinSampleShading, sizeof(MinSampleShading));
-        Hash ^= CityHash64((const char*)&AlphaToCoverageEnable, sizeof(AlphaToCoverageEnable));
-        Hash ^= CityHash64((const char*)&AlphaToOneEnable, sizeof(AlphaToOneEnable));
+        Hash = CityHash64WithSeed((const char*)&SampleShadingEnable, sizeof(SampleShadingEnable), Hash);
+        Hash = CityHash64WithSeed((const char*)&MinSampleShading, sizeof(MinSampleShading), Hash);
+        Hash = CityHash64WithSeed((const char*)&AlphaToCoverageEnable, sizeof(AlphaToCoverageEnable), Hash);
+        Hash = CityHash64WithSeed((const char*)&AlphaToOneEnable, sizeof(AlphaToOneEnable), Hash);
         return Hash;
     }
 
@@ -181,12 +181,12 @@ struct jStencilOpStateInfo
             return Hash;
 
         Hash = CityHash64((const char*)&FailOp, sizeof(FailOp));
-        Hash ^= CityHash64((const char*)&PassOp, sizeof(PassOp));
-        Hash ^= CityHash64((const char*)&DepthFailOp, sizeof(DepthFailOp));
-        Hash ^= CityHash64((const char*)&CompareOp, sizeof(CompareOp));
-        Hash ^= CityHash64((const char*)&CompareMask, sizeof(CompareMask));
-        Hash ^= CityHash64((const char*)&WriteMask, sizeof(WriteMask));
-        Hash ^= CityHash64((const char*)&Reference, sizeof(Reference));
+        Hash = CityHash64WithSeed((const char*)&PassOp, sizeof(PassOp), Hash);
+        Hash = CityHash64WithSeed((const char*)&DepthFailOp, sizeof(DepthFailOp), Hash);
+        Hash = CityHash64WithSeed((const char*)&CompareOp, sizeof(CompareOp), Hash);
+        Hash = CityHash64WithSeed((const char*)&CompareMask, sizeof(CompareMask), Hash);
+        Hash = CityHash64WithSeed((const char*)&WriteMask, sizeof(WriteMask), Hash);
+        Hash = CityHash64WithSeed((const char*)&Reference, sizeof(Reference), Hash);
         return Hash;
     }
 
@@ -214,16 +214,16 @@ struct jDepthStencilStateInfo
             return Hash;
 
         Hash = CityHash64((const char*)&DepthTestEnable, sizeof(DepthTestEnable));
-        Hash ^= CityHash64((const char*)&DepthWriteEnable, sizeof(DepthWriteEnable));
-        Hash ^= CityHash64((const char*)&DepthCompareOp, sizeof(DepthCompareOp));
-        Hash ^= CityHash64((const char*)&DepthBoundsTestEnable, sizeof(DepthBoundsTestEnable));
-        Hash ^= CityHash64((const char*)&StencilTestEnable, sizeof(StencilTestEnable));
+        Hash = CityHash64WithSeed((const char*)&DepthWriteEnable, sizeof(DepthWriteEnable), Hash);
+        Hash = CityHash64WithSeed((const char*)&DepthCompareOp, sizeof(DepthCompareOp), Hash);
+        Hash = CityHash64WithSeed((const char*)&DepthBoundsTestEnable, sizeof(DepthBoundsTestEnable), Hash);
+        Hash = CityHash64WithSeed((const char*)&StencilTestEnable, sizeof(StencilTestEnable), Hash);
         if (Front)
-            Hash ^= Front->GetHash();
+            Hash = CityHash64WithSeed(Front->GetHash(), Hash);
         if (Back)
-            Hash ^= Back->GetHash();
-        Hash ^= CityHash64((const char*)&MinDepthBounds, sizeof(MinDepthBounds));
-        Hash ^= CityHash64((const char*)&MaxDepthBounds, sizeof(MaxDepthBounds));
+            Hash = CityHash64WithSeed(Back->GetHash(), Hash);
+        Hash = CityHash64WithSeed((const char*)&MinDepthBounds, sizeof(MinDepthBounds), Hash);
+        Hash = CityHash64WithSeed((const char*)&MaxDepthBounds, sizeof(MaxDepthBounds), Hash);
         return Hash;
     }
 
@@ -255,13 +255,13 @@ struct jBlendingStateInfo
             return Hash;
 
         Hash = CityHash64((const char*)&BlendEnable, sizeof(BlendEnable));
-        Hash ^= CityHash64((const char*)&Src, sizeof(Src));
-        Hash ^= CityHash64((const char*)&Dest, sizeof(Dest));
-        Hash ^= CityHash64((const char*)&BlendOp, sizeof(BlendOp));
-        Hash ^= CityHash64((const char*)&SrcAlpha, sizeof(SrcAlpha));
-        Hash ^= CityHash64((const char*)&DestAlpha, sizeof(DestAlpha));
-        Hash ^= CityHash64((const char*)&AlphaBlendOp, sizeof(AlphaBlendOp));
-        Hash ^= CityHash64((const char*)&ColorWriteMask, sizeof(ColorWriteMask));
+        Hash = CityHash64WithSeed((const char*)&Src, sizeof(Src), Hash);
+        Hash = CityHash64WithSeed((const char*)&Dest, sizeof(Dest), Hash);
+        Hash = CityHash64WithSeed((const char*)&BlendOp, sizeof(BlendOp), Hash);
+        Hash = CityHash64WithSeed((const char*)&SrcAlpha, sizeof(SrcAlpha), Hash);
+        Hash = CityHash64WithSeed((const char*)&DestAlpha, sizeof(DestAlpha), Hash);
+        Hash = CityHash64WithSeed((const char*)&AlphaBlendOp, sizeof(AlphaBlendOp), Hash);
+        Hash = CityHash64WithSeed((const char*)&ColorWriteMask, sizeof(ColorWriteMask), Hash);
         return Hash;
     }
 
@@ -308,16 +308,16 @@ struct jPipelineStateFixedInfo
 
         Hash = 0;
         for (int32 i = 0; i < Viewports.size(); ++i)
-            Hash ^= Viewports[i].GetHash();
+            Hash = CityHash64WithSeed(Viewports[i].GetHash(), Hash);
 
         for (int32 i = 0; i < Scissors.size(); ++i)
-            Hash ^= Scissors[i].GetHash();
+            Hash = CityHash64WithSeed(Scissors[i].GetHash(), Hash);
 
         // 아래 내용들도 해시를 만들 수 있어야 함, todo
-        Hash ^= RasterizationState->GetHash();
-        Hash ^= MultisampleState->GetHash();
-        Hash ^= DepthStencilState->GetHash();
-        Hash ^= BlendingState->GetHash();
+        Hash = CityHash64WithSeed(RasterizationState->GetHash(), Hash);
+        Hash = CityHash64WithSeed(MultisampleState->GetHash(), Hash);
+        Hash = CityHash64WithSeed(DepthStencilState->GetHash(), Hash);
+        Hash = CityHash64WithSeed(BlendingState->GetHash(), Hash);
 
         return Hash;
     }

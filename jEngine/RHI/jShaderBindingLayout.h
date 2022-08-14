@@ -36,10 +36,9 @@ struct jShaderBinding
 
     FORCEINLINE size_t GetHash() const
     {
-        size_t result = 0;
-        result ^= CityHash64((const char*)&BindingPoint, sizeof(BindingPoint));
-        result ^= CityHash64((const char*)&BindingType, sizeof(BindingType));
-        result ^= CityHash64((const char*)&AccessStageFlags, sizeof(AccessStageFlags));
+        size_t result = CityHash64((const char*)&BindingPoint, sizeof(BindingPoint));
+        result = CityHash64WithSeed((const char*)&BindingType, sizeof(BindingType), result);
+        result = CityHash64WithSeed((const char*)&AccessStageFlags, sizeof(AccessStageFlags), result);
         return result;
     }
 
@@ -78,7 +77,7 @@ struct jShaderBindingLayout
         size_t result = 0;
         for (auto& bindings : shaderBindings)
         {
-            result ^= bindings->GetHash();
+            result = CityHash64WithSeed(bindings->GetHash(), result);
         }
         return result;
     }
