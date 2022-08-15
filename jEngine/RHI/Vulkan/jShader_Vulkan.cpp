@@ -17,5 +17,5 @@ jShader_Vulkan::~jShader_Vulkan()
 
 void jShader_Vulkan::Initialize()
 {
-    check(g_rhi_vk->CreateShaderInternal(this, ShaderInfo));
+    verify(g_rhi_vk->CreateShaderInternal(this, ShaderInfo));
 }
