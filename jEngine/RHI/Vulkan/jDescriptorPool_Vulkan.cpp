@@ -2,6 +2,8 @@
 #include "jDescriptorPool_Vulkan.h"
 #include "Math/MathUtility.h"
 
+#define USE_RESET_DESCRIPTOR_POOL 0
+
 jDescriptorPool_Vulkan::~jDescriptorPool_Vulkan()
 {
     if (DescriptorPool)
@@ -13,6 +15,19 @@ jDescriptorPool_Vulkan::~jDescriptorPool_Vulkan()
 
 void jDescriptorPool_Vulkan::Create(uint32 InMaxDescriptorSets)
 {
+    if (DescriptorPool)
+    {
+        vkDestroyDescriptorPool(g_rhi_vk->Device, DescriptorPool, nullptr);
+        DescriptorPool = nullptr;
+
+#if !USE_RESET_DESCRIPTOR_POOL
+        PendingDescriptorSets.clear();
+        RunningDescriptorSets.clear();
+#endif
+    }
+
+    check(!DescriptorPool);
+
     MaxDescriptorSets = InMaxDescriptorSets;
 
     constexpr int32 NumOfPoolSize = _countof(DefaultPoolSizes);
@@ -40,35 +55,49 @@ void jDescriptorPool_Vulkan::Create(uint32 InMaxDescriptorSets)
 
 void jDescriptorPool_Vulkan::Reset()
 {
+#if USE_RESET_DESCRIPTOR_POOL
     verify(VK_SUCCESS == vkResetDescriptorPool(g_rhi_vk->Device, DescriptorPool, 0));
+#else
+    for (auto& iter : RunningDescriptorSets)
+    {
+        std::vector<VkDescriptorSet>& descriptorSets = PendingDescriptorSets[iter.first];
+        descriptorSets.insert(descriptorSets.end(), iter.second.begin(), iter.second.end());
+    }
+    RunningDescriptorSets.clear();
+#endif
 }
 
-VkDescriptorSet jDescriptorPool_Vulkan::AllocateDescriptorSet(VkDescriptorSetLayout Layout)
+VkDescriptorSet jDescriptorPool_Vulkan::AllocateDescriptorSet(VkDescriptorSetLayout InLayout)
 {
+#if !USE_RESET_DESCRIPTOR_POOL
+    auto it_find = PendingDescriptorSets.find(InLayout);
+    if (it_find != PendingDescriptorSets.end())
+    {
+        std::vector<VkDescriptorSet>& pendingPools = it_find->second;
+        if (!pendingPools.empty())
+        {
+            VkDescriptorSet descriptorSet = pendingPools.back();
+            pendingPools.pop_back();
+            RunningDescriptorSets[InLayout].push_back(descriptorSet);
+            return descriptorSet;
+        }
+    }
+#endif
+
     VkDescriptorSetAllocateInfo DescriptorSetAllocateInfo{};
     DescriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     DescriptorSetAllocateInfo.descriptorPool = DescriptorPool;
     DescriptorSetAllocateInfo.descriptorSetCount = 1;
-    DescriptorSetAllocateInfo.pSetLayouts = &Layout;
+    DescriptorSetAllocateInfo.pSetLayouts = &InLayout;
 
     VkDescriptorSet NewDescriptorSet = nullptr;
     if (!ensure(VK_SUCCESS == vkAllocateDescriptorSets(g_rhi_vk->Device, &DescriptorSetAllocateInfo, &NewDescriptorSet)))
         return nullptr;
 
+#if !USE_RESET_DESCRIPTOR_POOL
+    RunningDescriptorSets[InLayout].push_back(NewDescriptorSet);
+#endif
+
     return NewDescriptorSet;
 }
 
-bool jDescriptorPool_Vulkan::AllocateDescriptorSet(std::vector<VkDescriptorSet>& OutResult, std::vector<VkDescriptorSetLayout> Layout)
-{
-    VkDescriptorSetAllocateInfo DescriptorSetAllocateInfo{};
-    DescriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    DescriptorSetAllocateInfo.descriptorPool = DescriptorPool;
-    DescriptorSetAllocateInfo.descriptorSetCount = (uint32)Layout.size();
-    DescriptorSetAllocateInfo.pSetLayouts = Layout.data();
-
-    OutResult.resize(Layout.size());
-    if (ensure(VK_SUCCESS == vkAllocateDescriptorSets(g_rhi_vk->Device, &DescriptorSetAllocateInfo, OutResult.data())))
-        return false;
-
-    return true;
-}

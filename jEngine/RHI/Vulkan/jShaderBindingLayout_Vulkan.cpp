@@ -48,30 +48,6 @@ std::shared_ptr<jShaderBindingInstance> jShaderBindingLayout_Vulkan::CreateShade
     return NewBindingInstance;
 }
 
-std::vector<std::shared_ptr<jShaderBindingInstance>> jShaderBindingLayout_Vulkan::CreateShaderBindingInstance(int32 count) const
-{
-    std::vector<VkDescriptorSetLayout> descSetLayout(count, DescriptorSetLayout);
-    std::vector<std::shared_ptr<jShaderBindingInstance>> Instances;
-    std::vector<VkDescriptorSet> DescriptorSets;
-
-    if (!ensure(g_rhi_vk->GetDescriptorPools()->AllocateDescriptorSet(DescriptorSets, descSetLayout)))
-    {
-        return Instances;
-    }
-
-    Instances.resize(DescriptorSets.size());
-    for (int32 i = 0; i < DescriptorSets.size(); ++i)		// todo opt
-    {
-        auto NewBindingInstance = std::make_shared<jShaderBindingInstance_Vulkan>();
-        NewBindingInstance->DescriptorSet = DescriptorSets[i];
-        NewBindingInstance->ShaderBindings = this;
-
-        Instances[i] = NewBindingInstance;
-    }
-
-    return Instances;
-}
-
 size_t jShaderBindingLayout_Vulkan::GetHash() const
 {
     return CityHash64((const char*)ShaderBindings.data(), sizeof(jShaderBinding) * ShaderBindings.size());

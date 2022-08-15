@@ -25,7 +25,6 @@ struct jShaderBindingLayout_Vulkan : public jShaderBindingLayout
     virtual bool CreateDescriptorSetLayout() override;
 
     virtual std::shared_ptr<jShaderBindingInstance> CreateShaderBindingInstance() const override;
-    virtual std::vector<std::shared_ptr<jShaderBindingInstance>> CreateShaderBindingInstance(int32 count) const override;
 
     virtual size_t GetHash() const override;
 
