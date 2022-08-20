@@ -42,6 +42,13 @@ struct jShaderBinding
         return result;
     }
 
+    void CloneWithoutResource(jShaderBinding& OutReslut) const
+    {
+        OutReslut.BindingPoint = BindingPoint;
+        OutReslut.BindingType = BindingType;
+        OutReslut.AccessStageFlags = AccessStageFlags;
+    }
+
     int32 BindingPoint = 0;
     EShaderBindingType BindingType = EShaderBindingType::UNIFORMBUFFER;
     EShaderAccessStageFlag AccessStageFlags = EShaderAccessStageFlag::ALL_GRAPHICS;
@@ -62,17 +69,18 @@ struct jShaderBindingInstance
 {
     virtual ~jShaderBindingInstance() {}
 
-    const struct jShaderBindingLayout* ShaderBindings = nullptr;
+    const struct jShaderBindingsLayout* ShaderBindingsLayouts = nullptr;
     
+    virtual void Initialize(const std::vector<jShaderBinding>& InShaderBindings) {}
     virtual void UpdateShaderBindings(const std::vector<jShaderBinding>& InShaderBindings) {}
     virtual void BindGraphics(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const {}
     virtual void BindCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const {}
 };
 
-struct jShaderBindingLayout
+struct jShaderBindingsLayout
 {
     static size_t GenerateHash(const std::vector<jShaderBinding>& shaderBindings);
-    FORCEINLINE static size_t CreateShaderBindingLayoutHash(const std::vector<const jShaderBindingLayout*>& shaderBindings)
+    FORCEINLINE static size_t CreateShaderBindingLayoutHash(const std::vector<const jShaderBindingsLayout*>& shaderBindings)
     {
         size_t result = 0;
         for (auto& bindings : shaderBindings)
@@ -82,18 +90,15 @@ struct jShaderBindingLayout
         return result;
     }
 
-    virtual ~jShaderBindingLayout() {}
+    virtual ~jShaderBindingsLayout() {}
 
-    virtual bool CreateDescriptorSetLayout() { return false; }
-
-    std::vector<jShaderBinding> ShaderBindings;
-
-    FORCEINLINE int32 GetNextBindingIndex() const { return (int32)(ShaderBindings.size()); };
-
-    virtual std::shared_ptr<jShaderBindingInstance> CreateShaderBindingInstance() const { return nullptr; }
-    virtual std::vector<std::shared_ptr<jShaderBindingInstance>> CreateShaderBindingInstance(int32 count) const { return {}; }
-
+    virtual bool Initialize(const std::vector<jShaderBinding>& shaderBindings) { return false; }
+    virtual jShaderBindingInstance* CreateShaderBindingInstance(const std::vector<jShaderBinding>& InShaderBindings) const { return nullptr; }
     virtual size_t GetHash() const;
+    virtual const std::vector<jShaderBinding>& GetShaderBindingsLayout() const { return ShaderBindings; }
 
     mutable size_t Hash = 0;
+
+protected:
+    std::vector<jShaderBinding> ShaderBindings;     // Resource 정보는 비어있음
 };

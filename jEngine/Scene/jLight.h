@@ -133,11 +133,11 @@ public:
 	std::vector<jViewport> Viewports;
 	bool DirtyMaterialData = true;
 
-	std::shared_ptr<jShaderBindingInstance> ShaderBindingInstancePtr;
+	jShaderBindingInstance* ShaderBindingInstance = nullptr;
 	bool NeedUpdateRenderObjectUniformBuffer = true;
-	void GetShaderBindingInstance(std::vector<std::shared_ptr<jShaderBindingInstance>>& OutShaderBindingInstance)
+	void GetShaderBindingInstance(std::vector<jShaderBindingInstance*>& OutShaderBindingInstance)
 	{
-		OutShaderBindingInstance.push_back(ShaderBindingInstancePtr);
+		OutShaderBindingInstance.push_back(ShaderBindingInstance);
 	}
 	virtual void PrepareShaderBindingInstance() {}
 };
@@ -249,20 +249,7 @@ public:
                 , EShaderAccessStageFlag::ALL_GRAPHICS, std::make_shared<jTextureResource>(ShadowMapPtr->GetTexture(), nullptr)));
         }
 
-		//if (NeedUpdateRenderObjectUniformBuffer)
-		{
-            //if (ShaderBindingInstancePtr)
-            //{
-				//ShaderBindingInstancePtr->UpdateShaderBindings(ShaderBindings);
-            //}
-            //else
-			{
-				//delete ShaderBindingInstance;
-				ShaderBindingInstancePtr = g_rhi->CreateShaderBindingInstance(ShaderBindings);
-				ShaderBindingInstancePtr->UpdateShaderBindings(ShaderBindings);
-			}
-			NeedUpdateRenderObjectUniformBuffer = false;
-		}
+		ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindings);
 	}
 	//////////////////////////////////////////////////////////////////////////
 };

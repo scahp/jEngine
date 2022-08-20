@@ -1,6 +1,28 @@
 ﻿#pragma once
 #include "jRHIType_Vulkan.h"
 
+struct jWriteDescriptorInfo
+{
+    VkDescriptorBufferInfo BufferInfo{};
+    VkDescriptorImageInfo ImageInfo{};
+};
+
+struct jWriteDescriptorSet
+{
+    void Reset()
+    {
+        WriteDescriptorInfos.clear();
+        DescriptorWrites.clear();
+        IsInitialized = false;
+    }
+
+    void SetWriteDescriptorInfo(int32 InIndex, const jShaderBinding& InShaderBinding);
+
+    bool IsInitialized = false;
+    std::vector<jWriteDescriptorInfo> WriteDescriptorInfos;
+    std::vector<VkWriteDescriptorSet> DescriptorWrites;         // 이게 최종 결과임, WriteDescriptorInfos 를 사용하여 생성함.
+};
+
 //////////////////////////////////////////////////////////////////////////
 // jShaderBindingInstance_Vulkan
 //////////////////////////////////////////////////////////////////////////
@@ -8,23 +30,30 @@ struct jShaderBindingInstance_Vulkan : public jShaderBindingInstance
 {
     virtual ~jShaderBindingInstance_Vulkan();
 
-    VkDescriptorSet DescriptorSet = nullptr;
+    static void CreateWriteDescriptorSet(jWriteDescriptorSet& OutWriteDescriptorSet
+        , const VkDescriptorSet InDescriptorSet, const std::vector<jShaderBinding>& InShaderBindings);
+    static void UpdateWriteDescriptorSet(
+        jWriteDescriptorSet& OutDescriptorWrites, const std::vector<jShaderBinding>& InShaderBindings);
 
+    virtual void Initialize(const std::vector<jShaderBinding>& InShaderBindings) override;
     virtual void UpdateShaderBindings(const std::vector<jShaderBinding>& InShaderBindings) override;
     virtual void BindGraphics(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const override;
     virtual void BindCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const override;
+
+    VkDescriptorSet DescriptorSet = nullptr;
+    jWriteDescriptorSet WriteDescriptorSet;
 };
 
 //////////////////////////////////////////////////////////////////////////
 // jShaderBindings_Vulkan
 //////////////////////////////////////////////////////////////////////////
-struct jShaderBindingLayout_Vulkan : public jShaderBindingLayout
+struct jShaderBindingLayout_Vulkan : public jShaderBindingsLayout
 {
     VkDescriptorSetLayout DescriptorSetLayout = nullptr;
 
-    virtual bool CreateDescriptorSetLayout() override;
+    virtual bool Initialize(const std::vector<jShaderBinding>& shaderBindings) override;
 
-    virtual std::shared_ptr<jShaderBindingInstance> CreateShaderBindingInstance() const override;
+    virtual jShaderBindingInstance* CreateShaderBindingInstance(const std::vector<jShaderBinding>& InShaderBindings) const override;
 
     virtual size_t GetHash() const override;
 

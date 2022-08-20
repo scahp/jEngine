@@ -113,7 +113,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 
 	//////////////////////////////////////////////////////////////////////////
-	std::shared_ptr<jShaderBindingInstance> ShaderBindingInstancePtr;
+	jShaderBindingInstance* ShaderBindingInstance = nullptr;
 	bool NeedUpdateRenderObjectUniformBuffer = true;
 	void PrepareShaderBindingInstance()
 	{
@@ -129,25 +129,12 @@ public:
 				, EShaderAccessStageFlag::ALL_GRAPHICS, std::make_shared<jTextureResource>(MaterialData.Params[i].Texture, MaterialData.Params[i].SamplerState)));
         }
 
-		//if (NeedUpdateRenderObjectUniformBuffer)
-		{
-			//if (ShaderBindingInstancePtr)
-			//{
-				//ShaderBindingInstancePtr->UpdateShaderBindings(ShaderBindings);
-			//}
-			//else
-			{
-				// delete ShaderBindingInstance;
-				ShaderBindingInstancePtr = g_rhi->CreateShaderBindingInstance(ShaderBindings);
-				ShaderBindingInstancePtr->UpdateShaderBindings(ShaderBindings);
-			}
-			//NeedUpdateRenderObjectUniformBuffer = false;
-		}
+		ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindings);
 	}
-	void GetShaderBindingInstance(std::vector<std::shared_ptr<jShaderBindingInstance>>& OutShaderBindingInstance)
+	void GetShaderBindingInstance(std::vector<jShaderBindingInstance*>& OutShaderBindingInstance)
 	{
-		check(ShaderBindingInstancePtr);
-		OutShaderBindingInstance.push_back(ShaderBindingInstancePtr);
+		check(ShaderBindingInstance);
+		OutShaderBindingInstance.push_back(ShaderBindingInstance);
 	}
 	//////////////////////////////////////////////////////////////////////////
 

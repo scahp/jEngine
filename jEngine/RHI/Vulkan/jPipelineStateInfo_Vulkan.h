@@ -70,7 +70,7 @@ struct jPipelineStateInfo_Vulkan : public jPipelineStateInfo
 {
     jPipelineStateInfo_Vulkan() = default;
     jPipelineStateInfo_Vulkan(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader
-        , const jVertexBuffer* vertexBuffer, const jRenderPass* renderPass, const std::vector<const jShaderBindingLayout*> shaderBindings)
+        , const jVertexBuffer* vertexBuffer, const jRenderPass* renderPass, const std::vector<const jShaderBindingsLayout*> shaderBindings)
         : jPipelineStateInfo(pipelineStateFixed, shader, vertexBuffer, renderPass, shaderBindings)
     {}
     jPipelineStateInfo_Vulkan(const jPipelineStateInfo& pipelineState)

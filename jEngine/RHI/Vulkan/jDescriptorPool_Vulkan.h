@@ -18,15 +18,15 @@ const float DefaultPoolSizes[] =
 
 struct jDescriptorPool_Vulkan
 {
-    std::unordered_map<VkDescriptorSetLayout, std::vector<VkDescriptorSet>> PendingDescriptorSets;
-    std::unordered_map<VkDescriptorSetLayout, std::vector<VkDescriptorSet>> RunningDescriptorSets;    
+    std::unordered_map<VkDescriptorSetLayout, std::vector<jShaderBindingInstance_Vulkan*>> PendingDescriptorSets;
+    std::unordered_map<VkDescriptorSetLayout, std::vector<jShaderBindingInstance_Vulkan*>> RunningDescriptorSets;    
 
     jDescriptorPool_Vulkan() = default;
     virtual ~jDescriptorPool_Vulkan();
 
     virtual void Create(uint32 InMaxDescriptorSets = 128);
     virtual void Reset();
-    virtual VkDescriptorSet AllocateDescriptorSet(VkDescriptorSetLayout InLayout);
+    virtual jShaderBindingInstance_Vulkan* AllocateDescriptorSet(VkDescriptorSetLayout InLayout);
 
     uint32 MaxDescriptorSets = 128;
     uint32 PoolSizes[_countof(DefaultPoolSizes)];

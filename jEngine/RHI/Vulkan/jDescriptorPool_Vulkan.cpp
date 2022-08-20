@@ -60,23 +60,23 @@ void jDescriptorPool_Vulkan::Reset()
 #else
     for (auto& iter : RunningDescriptorSets)
     {
-        std::vector<VkDescriptorSet>& descriptorSets = PendingDescriptorSets[iter.first];
+        std::vector<jShaderBindingInstance_Vulkan*>& descriptorSets = PendingDescriptorSets[iter.first];
         descriptorSets.insert(descriptorSets.end(), iter.second.begin(), iter.second.end());
     }
     RunningDescriptorSets.clear();
 #endif
 }
 
-VkDescriptorSet jDescriptorPool_Vulkan::AllocateDescriptorSet(VkDescriptorSetLayout InLayout)
+jShaderBindingInstance_Vulkan* jDescriptorPool_Vulkan::AllocateDescriptorSet(VkDescriptorSetLayout InLayout)
 {
 #if !USE_RESET_DESCRIPTOR_POOL
-    auto it_find = PendingDescriptorSets.find(InLayout);
+    const auto it_find = PendingDescriptorSets.find(InLayout);
     if (it_find != PendingDescriptorSets.end())
     {
-        std::vector<VkDescriptorSet>& pendingPools = it_find->second;
+        std::vector<jShaderBindingInstance_Vulkan*>& pendingPools = it_find->second;
         if (!pendingPools.empty())
         {
-            VkDescriptorSet descriptorSet = pendingPools.back();
+            jShaderBindingInstance_Vulkan* descriptorSet = pendingPools.back();
             pendingPools.pop_back();
             RunningDescriptorSets[InLayout].push_back(descriptorSet);
             return descriptorSet;
@@ -94,10 +94,13 @@ VkDescriptorSet jDescriptorPool_Vulkan::AllocateDescriptorSet(VkDescriptorSetLay
     if (!ensure(VK_SUCCESS == vkAllocateDescriptorSets(g_rhi_vk->Device, &DescriptorSetAllocateInfo, &NewDescriptorSet)))
         return nullptr;
 
+    jShaderBindingInstance_Vulkan* NewCachedDescriptorSetPtr = new std::remove_pointer_t<jShaderBindingInstance_Vulkan*>();
+    NewCachedDescriptorSetPtr->DescriptorSet = NewDescriptorSet;
+
 #if !USE_RESET_DESCRIPTOR_POOL
-    RunningDescriptorSets[InLayout].push_back(NewDescriptorSet);
+    RunningDescriptorSets[InLayout].push_back(NewCachedDescriptorSetPtr);
 #endif
 
-    return NewDescriptorSet;
+    return NewCachedDescriptorSetPtr;
 }
 

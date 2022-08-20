@@ -259,7 +259,7 @@
     <ClInclude Include="RHI\Vulkan\jPipelineStateInfo_Vulkan.h">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\jShaderBindingLayout.h">
+    <ClInclude Include="RHI\jShaderBindingsLayout.h">
       <Filter>Code\RHI</Filter>
     </ClInclude>
     <ClInclude Include="RHI\jRenderPass.h">

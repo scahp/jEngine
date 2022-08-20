@@ -1,6 +1,6 @@
 ﻿#include "pch.h"
 #include "jDrawCommand.h"
-#include "RHI/jShaderBindingLayout.h"
+#include "RHI/jShaderBindingsLayout.h"
 #include "Scene/jRenderObject.h"
 #include "RHI/jRHI.h"
 #include "RHI/jRenderPass.h"
@@ -9,7 +9,7 @@
 
 jDrawCommand::jDrawCommand(std::shared_ptr<jRenderFrameContext> InRenderFrameContextPtr, jView* view
     , jRenderObject* renderObject, jRenderPass* renderPass, jShader* shader
-    , jPipelineStateFixedInfo* pipelineStateFixed, std::vector<std::shared_ptr<jShaderBindingInstance>> shaderBindingInstances)
+    , jPipelineStateFixedInfo* pipelineStateFixed, std::vector<jShaderBindingInstance*> shaderBindingInstances)
     : RenderFrameContextPtr(InRenderFrameContextPtr), View(view), RenderObject(renderObject), RenderPass(renderPass), Shader(shader), PipelineStateFixed(pipelineStateFixed)
 {
     ShaderBindingInstances.reserve(shaderBindingInstances.size() + 3);
@@ -28,10 +28,10 @@ void jDrawCommand::PrepareToDraw(bool bPositionOnly)
     RenderObject->GetShaderBindingInstance(ShaderBindingInstances);
 
     // Bind ShaderBindings
-    std::vector<const jShaderBindingLayout*> shaderBindings;
+    std::vector<const jShaderBindingsLayout*> shaderBindings;
     shaderBindings.reserve(ShaderBindingInstances.size());
     for (int32 i = 0; i < ShaderBindingInstances.size(); ++i)
-        shaderBindings.push_back(ShaderBindingInstances[i]->ShaderBindings);
+        shaderBindings.push_back(ShaderBindingInstances[i]->ShaderBindingsLayouts);
 
     // Create Pipeline
     CurrentPipelineStateInfo = (jPipelineStateInfo_Vulkan*)g_rhi->CreatePipelineStateInfo(PipelineStateFixed, Shader

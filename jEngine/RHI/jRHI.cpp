@@ -132,7 +132,7 @@ size_t jRenderPass::GetHash() const
 	return Hash;
 }
 
-size_t jShaderBindingLayout::GenerateHash(const std::vector<jShaderBinding>& shaderBindings)
+size_t jShaderBindingsLayout::GenerateHash(const std::vector<jShaderBinding>& shaderBindings)
 {
 	size_t result = 0;
 	for (int32 i = 0; i < shaderBindings.size(); ++i)
@@ -142,15 +142,14 @@ size_t jShaderBindingLayout::GenerateHash(const std::vector<jShaderBinding>& sha
 	return result;
 }
 
-size_t jShaderBindingLayout::GetHash() const
+size_t jShaderBindingsLayout::GetHash() const
 {
 	if (Hash)
 		return Hash;
 	
-	Hash = jShaderBindingLayout::GenerateHash(ShaderBindings);
+	Hash = jShaderBindingsLayout::GenerateHash(ShaderBindings);
 	return Hash;
 }
-
 
 void jView::SetupUniformBuffer()
 {
@@ -164,11 +163,11 @@ void jView::SetupUniformBuffer()
 		SpotLight->SetupUniformBuffer();
 }
 
-void jView::GetShaderBindingInstance(std::vector<std::shared_ptr<jShaderBindingInstance>>& OutShaderBindingInstance)
+void jView::GetShaderBindingInstance(std::vector<jShaderBindingInstance*>& OutShaderBindingInstance)
 {
 	if (DirectionalLight)
 	{
-		check(DirectionalLight->ShaderBindingInstancePtr);
-		OutShaderBindingInstance.push_back(DirectionalLight->ShaderBindingInstancePtr);
+		check(DirectionalLight->ShaderBindingInstance);
+		OutShaderBindingInstance.push_back(DirectionalLight->ShaderBindingInstance);
 	}
 }

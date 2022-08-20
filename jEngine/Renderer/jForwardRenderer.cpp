@@ -169,7 +169,7 @@ void jForwardRenderer::OpaquePass()
     g_rhi->TransitionImageLayout(CommandBuffer, SceneRT->ColorPtr->GetTexture(), EImageLayout::SHADER_READ_ONLY);
     g_rhi->TransitionImageLayout(CommandBuffer, SceneRT->FinalColorPtr->GetTexture(), EImageLayout::GENERAL);
 
-    std::shared_ptr<jShaderBindingInstance> CurrentBindingInstancePtr;
+    jShaderBindingInstance* CurrentBindingInstance = nullptr;
     int32 BindingPoint = 0;
     std::vector<jShaderBinding> ShaderBindings;
     if (ensure(SceneRT->ColorPtr))
@@ -183,20 +183,19 @@ void jForwardRenderer::OpaquePass()
             , std::make_shared<jTextureResource>(SceneRT->FinalColorPtr->GetTexture(), nullptr)));
     }
 
-    CurrentBindingInstancePtr = g_rhi->CreateShaderBindingInstance(ShaderBindings);
-    CurrentBindingInstancePtr->UpdateShaderBindings(ShaderBindings);
+    CurrentBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindings);
 
     jShaderInfo shaderInfo;
     shaderInfo.name = jName("emboss");
     shaderInfo.cs = jName("Resource/Shaders/hlsl/emboss_cs.hlsl");
     static jShader_Vulkan* Shader = (jShader_Vulkan*)g_rhi->CreateShader(shaderInfo);
 
-    jPipelineStateInfo* computePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, { CurrentBindingInstancePtr->ShaderBindings });
+    jPipelineStateInfo* computePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, { CurrentBindingInstance->ShaderBindingsLayouts });
 
     computePipelineStateInfo->Bind(RenderFrameContextPtr);
     // vkCmdBindPipeline((VkCommandBuffer)CommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline[imageIndex]);
 
-    CurrentBindingInstancePtr->BindCompute(RenderFrameContextPtr, (VkPipelineLayout)computePipelineStateInfo->GetPipelineLayoutHandle());
+    CurrentBindingInstance->BindCompute(RenderFrameContextPtr, (VkPipelineLayout)computePipelineStateInfo->GetPipelineLayoutHandle());
 
     check(g_rhi->GetSwapchain());
     vkCmdDispatch((VkCommandBuffer)CommandBuffer->GetHandle()
