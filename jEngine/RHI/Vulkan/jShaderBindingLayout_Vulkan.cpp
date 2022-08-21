@@ -8,6 +8,11 @@
 //////////////////////////////////////////////////////////////////////////
 // jShaderBindings_Vulkan
 //////////////////////////////////////////////////////////////////////////
+jShaderBindingLayout_Vulkan::~jShaderBindingLayout_Vulkan()
+{
+    Release();
+}
+
 bool jShaderBindingLayout_Vulkan::Initialize(const std::vector<jShaderBinding>& shaderBindings)
 {
     ShaderBindings.resize(shaderBindings.size());
@@ -54,6 +59,15 @@ jShaderBindingInstance* jShaderBindingLayout_Vulkan::CreateShaderBindingInstance
 size_t jShaderBindingLayout_Vulkan::GetHash() const
 {
     return CityHash64((const char*)ShaderBindings.data(), sizeof(jShaderBinding) * ShaderBindings.size());
+}
+
+void jShaderBindingLayout_Vulkan::Release()
+{
+    if (DescriptorSetLayout)
+    {
+        vkDestroyDescriptorSetLayout(g_rhi_vk->Device, DescriptorSetLayout, nullptr);
+        DescriptorSetLayout = nullptr;
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -162,33 +176,6 @@ void jShaderBindingInstance_Vulkan::BindCompute(const std::shared_ptr<jRenderFra
     check(InRenderFrameContext->CommandBuffer);
     check(pipelineLayout);
     vkCmdBindDescriptorSets((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, (VkPipelineLayout)(pipelineLayout), InSlot, 1, &DescriptorSet, 0, nullptr);
-}
-
-//////////////////////////////////////////////////////////////////////////
-// jShaderBindingsManager_Vulkan
-//////////////////////////////////////////////////////////////////////////
-VkDescriptorPool jShaderBindingsManager_Vulkan::CreatePool(const jShaderBindingLayout_Vulkan& bindings, uint32 maxAllocations) const
-{
-    auto DescriptorPoolSizes = bindings.GetDescriptorPoolSizeArray(maxAllocations);
-
-    VkDescriptorPoolCreateInfo poolInfo = {};
-    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolInfo.poolSizeCount = static_cast<uint32>(DescriptorPoolSizes.size());
-    poolInfo.pPoolSizes = DescriptorPoolSizes.data();
-    poolInfo.maxSets = maxAllocations;
-    poolInfo.flags = 0;		// Descriptor Set을 만들고나서 더 이상 손대지 않을거라 그냥 기본값 0으로 설정
-
-    VkDescriptorPool pool = nullptr;
-    if (!ensure(vkCreateDescriptorPool(g_rhi_vk->Device, &poolInfo, nullptr, &pool) == VK_SUCCESS))
-        return nullptr;
-
-    return pool;
-}
-
-void jShaderBindingsManager_Vulkan::Release(VkDescriptorPool pool) const
-{
-    if (pool)
-        vkDestroyDescriptorPool(g_rhi_vk->Device, pool, nullptr);
 }
 
 void jWriteDescriptorSet::SetWriteDescriptorInfo(int32 InIndex, const jShaderBinding& InShaderBinding)

@@ -27,6 +27,7 @@ struct jDescriptorPool_Vulkan
     virtual void Create(uint32 InMaxDescriptorSets = 128);
     virtual void Reset();
     virtual jShaderBindingInstance_Vulkan* AllocateDescriptorSet(VkDescriptorSetLayout InLayout);
+    void Release();
 
     uint32 MaxDescriptorSets = 128;
     uint32 PoolSizes[_countof(DefaultPoolSizes)];

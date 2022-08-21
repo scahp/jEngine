@@ -62,9 +62,9 @@ public:
 	jSamplerStateInfo* samplerStateTexArray = nullptr;
 
 	// todo 정리 필요.
-	int UseUniformColor = 0;
+	int32 UseUniformColor = 0;
 	Vector4 Color = Vector4::OneVector;
-	int UseMaterial = 0;
+	int32 UseMaterial = 0;
 	EShadingModel ShadingModel = EShadingModel::BASE;
 
 	Matrix World;

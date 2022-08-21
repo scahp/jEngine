@@ -52,7 +52,7 @@ public:
 	// Validation layer for LunarG
 	// 1. Instance specific : instance 같은 global vulkan object와 관련된 calls 를 체크
 	// 2. Device specific(deprecated) : 특정 GPU Device와 관련된 calls 를 체크.
-	VkDebugUtilsMessengerEXT DebugMessenger;
+	VkDebugUtilsMessengerEXT DebugMessenger = nullptr;
 
 	// Surface
 	// VkInstance를 만들고 바로 Surface를 만들어야 한다. 물리 디바이스 선택에 영향을 미치기 때문
@@ -78,20 +78,16 @@ public:
 	jQueue_Vulkan ComputeQueue;
 	jQueue_Vulkan PresentQueue;
 
+    uint32 CurrenFrameIndex = 0;
+
 	// 논리 디바이스 생성
 	VkDevice Device;
+    VkPipelineCache PipelineCache = nullptr;
+    VkPhysicalDeviceProperties DeviceProperties;
 
 	jSwapchain_Vulkan* Swapchain = nullptr;
 	jCommandBufferManager_Vulkan* CommandBufferManager = nullptr;
-
-	uint32 CurrenFrameIndex = 0;
-
-    VkPipelineCache PipelineCache = nullptr;
-
-    jShaderBindingsManager_Vulkan ShaderBindingsManager;
     jFenceManager_Vulkan FenceManager;
-
-    VkPhysicalDeviceProperties DeviceProperties;
 
     jQueryPool_Vulkan* QueryPool = nullptr;
 	std::vector<jRingBuffer_Vulkan*> RingBuffers;
@@ -178,6 +174,9 @@ public:
 
 	jRingBuffer_Vulkan* GetRingBuffer() const { return RingBuffers[CurrenFrameIndex]; }
 	jDescriptorPool_Vulkan* GetDescriptorPools() const { return DescriptorPools[CurrenFrameIndex]; }
+
+	virtual void Flush() const override;
+	virtual void Finish() const override;
 };
 
 extern jRHI_Vulkan* g_rhi_vk;

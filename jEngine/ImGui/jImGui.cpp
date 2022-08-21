@@ -11,22 +11,18 @@ jImGUI_Vulkan::jImGUI_Vulkan()
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGui_ImplGlfw_InitForOpenGL(g_rhi_vk->Window, true);
+
+    DynamicBufferData.resize(g_rhi_vk->Swapchain->GetNumOfSwapchain());
+    for (auto& iter : DynamicBufferData)
+    {
+        iter.Initialize();
+    }
 }
 
 jImGUI_Vulkan::~jImGUI_Vulkan()
 {
+    Release();
     ImGui::DestroyContext();
-    // Release all Vulkan resources required for rendering imGui
-    for (int32 i = 0; i < DynamicBufferData.size(); ++i)
-    {
-        DynamicBufferData[i].VertexBuffer.Destroy();
-        DynamicBufferData[i].IndexBuffer.Destroy();
-    }
-    if (FontImage)
-        delete FontImage;
-    vkDestroyPipelineLayout(g_rhi_vk->Device, PipelineLayout, nullptr);
-    vkDestroyDescriptorPool(g_rhi_vk->Device, DescriptorPool, nullptr);
-    vkDestroyDescriptorSetLayout(g_rhi_vk->Device, DescriptorSetLayout, nullptr);
 }
 
 void jImGUI_Vulkan::Initialize(float width, float height)
@@ -78,6 +74,21 @@ void jImGUI_Vulkan::Initialize(float width, float height)
     allocInfo.pSetLayouts = &DescriptorSetLayout;
     allocInfo.descriptorSetCount = 1;
     verify(VK_SUCCESS == vkAllocateDescriptorSets(g_rhi_vk->Device, &allocInfo, &DescriptorSet));
+
+    // Pipeline layout
+    // Push constants for UI rendering parameters
+    VkPushConstantRange pushConstantRange{};
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    pushConstantRange.offset = 0;
+    pushConstantRange.size = sizeof(PushConstBlock);
+
+    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
+    pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutCreateInfo.setLayoutCount = 1;
+    pipelineLayoutCreateInfo.pSetLayouts = &DescriptorSetLayout;
+    pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
+    pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
+    verify(VK_SUCCESS == vkCreatePipelineLayout(g_rhi_vk->Device, &pipelineLayoutCreateInfo, nullptr, &PipelineLayout));
     //////////////////////////////////////////////////////////////////////////
     // 
     //////////////////////////////////////////////////////////////////////////
@@ -131,27 +142,43 @@ void jImGUI_Vulkan::Initialize(float width, float height)
     jVulkanBufferUtil::CopyBufferToImage(stagingBuffer.Buffer, FontImage_vk->Image, texWidth, texHeight);
     g_rhi_vk->TransitionImageLayoutImmediate(FontImage, EImageLayout::SHADER_READ_ONLY);
 
-    stagingBuffer.Destroy();
+    stagingBuffer.Release();
     //////////////////////////////////////////////////////////////////////////
+}
+
+void jImGUI_Vulkan::Release()
+{
+    delete FontImage;
+    FontImage = nullptr;
+
+    DynamicBufferData.clear();
+
+    if (PipelineLayout)
+    {
+        vkDestroyPipelineLayout(g_rhi_vk->Device, PipelineLayout, nullptr);
+        PipelineLayout = nullptr;
+    }
+
+    DescriptorSet = nullptr;        // DescriptorPool 을 해제 하면되므로 따로 소멸시키지 않음
+    if (DescriptorPool)
+    {
+        vkDestroyDescriptorPool(g_rhi_vk->Device, DescriptorPool, nullptr);
+        DescriptorPool = nullptr;
+    }
+    
+    if (DescriptorSetLayout)
+    {
+        vkDestroyDescriptorSetLayout(g_rhi_vk->Device, DescriptorSetLayout, nullptr);
+        DescriptorSetLayout = nullptr;
+    }
+    
+    for (auto& iter : Pipelines)
+        vkDestroyPipeline(g_rhi_vk->Device, iter, nullptr);
+    Pipelines.clear();
 }
 
 VkPipeline jImGUI_Vulkan::CreatePipelineState(VkRenderPass renderPass, VkQueue copyQueue)
 {
-    // Pipeline layout
-    // Push constants for UI rendering parameters
-    VkPushConstantRange pushConstantRange{};
-    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    pushConstantRange.offset = 0;
-    pushConstantRange.size = sizeof(PushConstBlock);
-
-    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
-    pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutCreateInfo.setLayoutCount = 1;
-    pipelineLayoutCreateInfo.pSetLayouts = &DescriptorSetLayout;
-    pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
-    pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
-    verify(VK_SUCCESS == vkCreatePipelineLayout(g_rhi_vk->Device, &pipelineLayoutCreateInfo, nullptr, &PipelineLayout));
-
     jRasterizationStateInfo* rasterizationInfo = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::NONE, EFrontFace::CCW>::Create();
     check(rasterizationInfo);
 
@@ -355,40 +382,37 @@ void jImGUI_Vulkan::UpdateBuffers()
     if ((imDrawData->TotalVtxCount == 0) || (imDrawData->TotalIdxCount == 0))
         return;
 
-    if (DynamicBufferData.size() <= g_rhi_vk->CurrenFrameIndex)
-        DynamicBufferData.resize(g_rhi_vk->CurrenFrameIndex + 1);
-
     auto& DynamicBuffer = DynamicBufferData[g_rhi_vk->CurrenFrameIndex];
 
     // Update buffers only if vertex or index count has been changed compared to current buffer size
 
     // Vertex buffer
-    if ((DynamicBuffer.VertexBuffer.Buffer == VK_NULL_HANDLE) || (DynamicBuffer.vertexCount != imDrawData->TotalVtxCount))
+    if ((DynamicBuffer.VertexBufferPtr->Buffer == VK_NULL_HANDLE) || (DynamicBuffer.vertexCount != imDrawData->TotalVtxCount))
     {
         const uint64 newBufferSize = imDrawData->TotalVtxCount * sizeof(ImDrawVert);
 
-        DynamicBuffer.VertexBuffer.Destroy();
+        DynamicBuffer.VertexBufferPtr->Release();
         verify(jVulkanBufferUtil::CreateBuffer(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
-            , newBufferSize, DynamicBuffer.VertexBuffer));
+            , newBufferSize, *DynamicBuffer.VertexBufferPtr.get()));
         DynamicBuffer.vertexCount = imDrawData->TotalVtxCount;
-        DynamicBuffer.VertexBuffer.Map();
+        DynamicBuffer.VertexBufferPtr->Map();
     }
 
     // Index buffer
-    if ((DynamicBuffer.IndexBuffer.Buffer == VK_NULL_HANDLE) || (DynamicBuffer.indexCount < imDrawData->TotalIdxCount))
+    if ((DynamicBuffer.IndexBufferPtr->Buffer == VK_NULL_HANDLE) || (DynamicBuffer.indexCount < imDrawData->TotalIdxCount))
     {
         const uint64 newBufferSize = imDrawData->TotalIdxCount * sizeof(ImDrawIdx);
 
-        DynamicBuffer.IndexBuffer.Destroy();
+        DynamicBuffer.IndexBufferPtr->Release();
         verify(jVulkanBufferUtil::CreateBuffer(VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
-            , newBufferSize, DynamicBuffer.IndexBuffer));
+            , newBufferSize, *DynamicBuffer.IndexBufferPtr.get()));
         DynamicBuffer.indexCount = imDrawData->TotalIdxCount;
-        DynamicBuffer.IndexBuffer.Map();
+        DynamicBuffer.IndexBufferPtr->Map();
     }
 
     // Upload data
-    ImDrawVert* vtxDst = (ImDrawVert*)DynamicBuffer.VertexBuffer.GetMappedPointer();
-    ImDrawIdx* idxDst = (ImDrawIdx*)DynamicBuffer.IndexBuffer.GetMappedPointer();
+    ImDrawVert* vtxDst = (ImDrawVert*)DynamicBuffer.VertexBufferPtr->GetMappedPointer();
+    ImDrawIdx* idxDst = (ImDrawIdx*)DynamicBuffer.IndexBufferPtr->GetMappedPointer();
 
     for (int n = 0; n < imDrawData->CmdListsCount; n++) {
         const ImDrawList* cmd_list = imDrawData->CmdLists[n];
@@ -402,17 +426,17 @@ void jImGUI_Vulkan::UpdateBuffers()
     {
         VkMappedMemoryRange mappedRange = {};
         mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-        mappedRange.memory = DynamicBuffer.VertexBuffer.BufferMemory;
+        mappedRange.memory = DynamicBuffer.VertexBufferPtr->BufferMemory;
         mappedRange.offset = 0;
-        mappedRange.size = DynamicBuffer.VertexBuffer.AllocatedSize;
+        mappedRange.size = DynamicBuffer.VertexBufferPtr->AllocatedSize;
         verify(VK_SUCCESS == vkFlushMappedMemoryRanges(g_rhi_vk->Device, 1, &mappedRange));
     }
     {
         VkMappedMemoryRange mappedRange = {};
         mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-        mappedRange.memory = DynamicBuffer.IndexBuffer.BufferMemory;
+        mappedRange.memory = DynamicBuffer.IndexBufferPtr->BufferMemory;
         mappedRange.offset = 0;
-        mappedRange.size = DynamicBuffer.IndexBuffer.AllocatedSize;
+        mappedRange.size = DynamicBuffer.IndexBufferPtr->AllocatedSize;
         verify(VK_SUCCESS == vkFlushMappedMemoryRanges(g_rhi_vk->Device, 1, &mappedRange));
     }
 }
@@ -478,8 +502,8 @@ void jImGUI_Vulkan::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFra
             auto& DynamicBuffer = DynamicBufferData[frameIndex];
 
             VkDeviceSize offsets[1] = { 0 };
-            vkCmdBindVertexBuffers(commandbuffer_vk, 0, 1, &DynamicBuffer.VertexBuffer.Buffer, offsets);
-            vkCmdBindIndexBuffer(commandbuffer_vk, DynamicBuffer.IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT16);
+            vkCmdBindVertexBuffers(commandbuffer_vk, 0, 1, &DynamicBuffer.VertexBufferPtr->Buffer, offsets);
+            vkCmdBindIndexBuffer(commandbuffer_vk, DynamicBuffer.IndexBufferPtr->Buffer, 0, VK_INDEX_TYPE_UINT16);
 
             for (int32_t i = 0; i < imDrawData->CmdListsCount; i++)
             {

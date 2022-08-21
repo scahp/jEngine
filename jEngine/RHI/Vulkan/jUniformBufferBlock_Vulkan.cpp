@@ -8,45 +8,47 @@
 
 void jUniformBufferBlock_Vulkan::Destroy()
 {
-    Buffer.Destroy();
 }
 
 void jUniformBufferBlock_Vulkan::Init(size_t size)
 {
     check(size);
 
+    BufferPtr = std::make_shared<jBuffer_Vulkan>();
+
 #if USE_RINGBUFFER_FOR_UNIFORMBUFFER
-    Buffer.AllocatedSize = size;
+    BufferPtr->HasBufferOwnership = false;
+    BufferPtr->AllocatedSize = size;
 #else
     jVulkanBufferUtil::CreateBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
-        | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, VkDeviceSize(size), Buffer);
+        | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, VkDeviceSize(size), *BufferPtr.get());
 #endif
 }
 
 void jUniformBufferBlock_Vulkan::UpdateBufferData(const void* InData, size_t InSize)
 {
-    check(Buffer.AllocatedSize == InSize);
+    check(BufferPtr->AllocatedSize == InSize);
 
 #if USE_RINGBUFFER_FOR_UNIFORMBUFFER
     jRingBuffer_Vulkan* ringBuffer = g_rhi_vk->GetRingBuffer();
-    Buffer.Offset = ringBuffer->Alloc(InSize);
-    Buffer.AllocatedSize = InSize;
-    Buffer.Buffer = ringBuffer->Buffer;
-    Buffer.BufferMemory = ringBuffer->BufferMemory;
+    BufferPtr->Offset = ringBuffer->Alloc(InSize);
+    BufferPtr->AllocatedSize = InSize;
+    BufferPtr->Buffer = ringBuffer->Buffer;
+    BufferPtr->BufferMemory = ringBuffer->BufferMemory;
 #endif
 
-    check(Buffer.AllocatedSize == InSize);
+    check(BufferPtr->AllocatedSize == InSize);
     // 다르면 여기서 추가 작업을 해야 함.
 
-    if (Buffer.Buffer && Buffer.BufferMemory)
+    if (BufferPtr->Buffer && BufferPtr->BufferMemory)
     {
         void* data = nullptr;
-        vkMapMemory(g_rhi_vk->Device, Buffer.BufferMemory, Buffer.Offset, Buffer.AllocatedSize, 0, &data);
+        vkMapMemory(g_rhi_vk->Device, BufferPtr->BufferMemory, BufferPtr->Offset, BufferPtr->AllocatedSize, 0, &data);
         if (InData)
             memcpy(data, InData, InSize);
         else
             memset(data, 0, InSize);
-        vkUnmapMemory(g_rhi_vk->Device, Buffer.BufferMemory);
+        vkUnmapMemory(g_rhi_vk->Device, BufferPtr->BufferMemory);
     }
 }
 
@@ -54,17 +56,17 @@ void jUniformBufferBlock_Vulkan::ClearBuffer(int32 clearValue)
 {
 #if USE_RINGBUFFER_FOR_UNIFORMBUFFER
     jRingBuffer_Vulkan* ringBuffer = g_rhi_vk->GetRingBuffer();
-    Buffer.Offset = ringBuffer->Alloc(Buffer.AllocatedSize);
-    Buffer.AllocatedSize = Buffer.AllocatedSize;
-    Buffer.Buffer = ringBuffer->Buffer;
-    Buffer.BufferMemory = ringBuffer->BufferMemory;
+    BufferPtr->Offset = ringBuffer->Alloc(BufferPtr->AllocatedSize);
+    BufferPtr->AllocatedSize = BufferPtr->AllocatedSize;
+    BufferPtr->Buffer = ringBuffer->Buffer;
+    BufferPtr->BufferMemory = ringBuffer->BufferMemory;
 #endif
 
-    if (Buffer.Buffer && Buffer.BufferMemory)
+    if (BufferPtr->Buffer && BufferPtr->BufferMemory)
     {
         void* data = nullptr;
-        vkMapMemory(g_rhi_vk->Device, Buffer.BufferMemory, Buffer.Offset, Buffer.AllocatedSize, 0, &data);
-        memset(data, clearValue, Buffer.AllocatedSize);
-        vkUnmapMemory(g_rhi_vk->Device, Buffer.BufferMemory);
+        vkMapMemory(g_rhi_vk->Device, BufferPtr->BufferMemory, BufferPtr->Offset, BufferPtr->AllocatedSize, 0, &data);
+        memset(data, clearValue, BufferPtr->AllocatedSize);
+        vkUnmapMemory(g_rhi_vk->Device, BufferPtr->BufferMemory);
     }
 }

@@ -42,6 +42,15 @@ void jSamplerStateInfo_Vulkan::Initialize()
     ensure(vkCreateSampler(g_rhi_vk->Device, &SamplerStateInfo, nullptr, &SamplerState) == VK_SUCCESS);
 }
 
+void jSamplerStateInfo_Vulkan::Release()
+{
+    if (SamplerState)
+    {
+        vkDestroySampler(g_rhi_vk->Device, SamplerState, nullptr);
+        SamplerState = nullptr;
+    }
+}
+
 void jRasterizationStateInfo_Vulkan::Initialize()
 {
     RasterizationStateInfo = {};
@@ -120,6 +129,16 @@ void jBlendingStateInfo_Vulakn::Initialize()
     ColorBlendAttachmentInfo.dstAlphaBlendFactor = GetVulkanBlendFactor(DestAlpha);
     ColorBlendAttachmentInfo.alphaBlendOp = GetVulkanBlendOp(AlphaBlendOp);
     ColorBlendAttachmentInfo.colorWriteMask = GetVulkanBlendOp(ColorWriteMask);
+}
+
+void jPipelineStateInfo_Vulkan::Release()
+{
+    if (vkPipeline)
+    {
+        vkDestroyPipeline(g_rhi_vk->Device, vkPipeline, nullptr);
+        vkPipeline = nullptr;
+    }
+    vkPipelineLayout = nullptr;
 }
 
 void jPipelineStateInfo_Vulkan::Initialize()

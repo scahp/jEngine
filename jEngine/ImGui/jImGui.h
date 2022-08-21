@@ -16,7 +16,7 @@ public:
         return *s_instance;
     }
 
-    static void Release()
+    static void ReleaseInstance()
     {
         delete s_instance;
     }
@@ -29,6 +29,7 @@ public:
 
     // Initialize styles, keys, etc.
     void Initialize(float width, float height);
+    void Release();
 
     void Update(float InDeltaSeconds);
 
@@ -61,8 +62,14 @@ private:
     // Vulkan resources for rendering the UI
     struct jDynamicBufferData
     {
-        jBuffer_Vulkan VertexBuffer;
-        jBuffer_Vulkan IndexBuffer;
+        void Initialize()
+        {
+            VertexBufferPtr = std::make_shared<jBuffer_Vulkan>();
+            IndexBufferPtr = std::make_shared<jBuffer_Vulkan>();
+        }
+
+        std::shared_ptr<jBuffer_Vulkan> VertexBufferPtr;
+        std::shared_ptr<jBuffer_Vulkan> IndexBufferPtr;
 
         int32_t vertexCount = 0;
         int32_t indexCount = 0;
@@ -74,6 +81,6 @@ private:
     VkDescriptorPool DescriptorPool;
     VkDescriptorSetLayout DescriptorSetLayout;
     VkDescriptorSet DescriptorSet;
-    std::vector<jRenderPass*> RenderPasses;
     std::vector<VkPipeline> Pipelines;
+    std::vector<jRenderPass*> RenderPasses;         // 렌더패스는 RenderPassPool 에서 관리하기 때문에 따로 소멸처리 하지 않음
 };

@@ -170,6 +170,7 @@ public:
 	virtual ~jDirectionalLight()
 	{
 		delete LightDataUniformBlock;
+		delete ShadowMapData;
 	}
 
 	struct LightData
@@ -295,6 +296,7 @@ public:
 	virtual ~jPointLight()
 	{
 		delete LightDataUniformBlock;
+		delete ShadowMapData;
 	}
 
 	struct LightData
@@ -367,6 +369,7 @@ public:
 	virtual ~jSpotLight()
 	{
 		delete LightDataUniformBlock;
+		delete ShadowMapData;
 	}
 
 	struct LightData

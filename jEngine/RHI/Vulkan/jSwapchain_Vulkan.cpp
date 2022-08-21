@@ -4,6 +4,27 @@
 #include "jRHIType_Vulkan.h"
 #include "jVulkanBufferUtil.h"
 
+//////////////////////////////////////////////////////////////////////////
+// jSwapchainImage_Vulkan
+//////////////////////////////////////////////////////////////////////////
+void jSwapchainImage_Vulkan::Release()
+{
+    TexturePtr = nullptr;
+    if (Available)
+    {
+        vkDestroySemaphore(g_rhi_vk->Device, Available, nullptr);
+        Available = nullptr;
+    }
+    if (RenderFinished)
+    {
+        vkDestroySemaphore(g_rhi_vk->Device, RenderFinished, nullptr);
+        RenderFinished = nullptr;
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////
+// jSwapchain_Vulkan
+//////////////////////////////////////////////////////////////////////////
 bool jSwapchain_Vulkan::Create()
 {
     jVulkanDeviceUtil::SwapChainSupportDetails swapChainSupport = jVulkanDeviceUtil::QuerySwapChainSupport(g_rhi_vk->PhysicalDevice, g_rhi_vk->Surface);
@@ -97,7 +118,7 @@ bool jSwapchain_Vulkan::Create()
     return true;
 }
 
-void jSwapchain_Vulkan::Destroy()
+void jSwapchain_Vulkan::Release()
 {
     vkDestroySwapchainKHR(g_rhi_vk->Device, Swapchain, nullptr);
 

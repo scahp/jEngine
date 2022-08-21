@@ -244,7 +244,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 	auto vertexStreamData = std::make_shared<jVertexStreamData>();
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
@@ -259,7 +259,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 	{
 		JASSERT(meshData->Vertices.size() == meshData->Normals.size());
 
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -274,7 +274,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 	{
 		JASSERT(meshData->Vertices.size() == meshData->Tangents.size());
 
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -289,7 +289,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 	{
 		JASSERT(meshData->Vertices.size() == meshData->Bitangents.size());
 
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -301,7 +301,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 	}
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);

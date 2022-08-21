@@ -198,7 +198,7 @@ void jBoundBoxObject::UpdateBoundBox()
 	const int32 elementCount = static_cast<int32>(_countof(vertices) / 3);
 	JASSERT(RenderObject->VertexStream->ElementCount == elementCount);
 
-	jStreamParam<float>* PositionParam = static_cast<jStreamParam<float>*>(RenderObject->VertexStream->Params[0]);
+	jStreamParam<float>* PositionParam = static_cast<jStreamParam<float>*>(RenderObject->VertexStream->Params[0].get());
 	memcpy(&PositionParam->Data[0], vertices, sizeof(vertices));
 
 	RenderObject->UpdateVertexStream();
@@ -373,7 +373,7 @@ jBoundBoxObject* CreateBoundBox(jBoundBox boundBox, jObject* ownerObject, const 
 	auto vertexStreamData = std::make_shared<jVertexStreamData>();
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
@@ -456,7 +456,7 @@ jBoundSphereObject* CreateBoundSphere(jBoundSphere boundSphere, jObject* ownerOb
 	// attribute 추가
 	auto vertexStreamData = std::make_shared<jVertexStreamData>();
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
@@ -582,7 +582,7 @@ jRenderObject* CreateQuad_Internal(const Vector& pos, const Vector& size, const 
 	auto vertexStreamData = std::make_shared<jVertexStreamData>();
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
@@ -594,7 +594,7 @@ jRenderObject* CreateQuad_Internal(const Vector& pos, const Vector& size, const 
 	}
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -605,7 +605,7 @@ jRenderObject* CreateQuad_Internal(const Vector& pos, const Vector& size, const 
 	}
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -636,7 +636,7 @@ jRenderObject* CreateQuad_Internal(const Vector& pos, const Vector& size, const 
 			tangents.push_back(Vector(TangentArray[i].x, TangentArray[i].y, TangentArray[i].z));
 		}
 
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
@@ -648,7 +648,7 @@ jRenderObject* CreateQuad_Internal(const Vector& pos, const Vector& size, const 
 	}
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -733,7 +733,7 @@ jObject* CreateGizmo(const Vector& pos, const Vector& rot, const Vector& scale)
 	auto vertexStreamData = std::make_shared<jVertexStreamData>();
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
@@ -745,7 +745,7 @@ jObject* CreateGizmo(const Vector& pos, const Vector& rot, const Vector& scale)
 	}
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -757,7 +757,7 @@ jObject* CreateGizmo(const Vector& pos, const Vector& rot, const Vector& scale)
 	}
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -774,7 +774,7 @@ jObject* CreateGizmo(const Vector& pos, const Vector& rot, const Vector& scale)
 	}
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -791,7 +791,7 @@ jObject* CreateGizmo(const Vector& pos, const Vector& rot, const Vector& scale)
 	}
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -837,7 +837,7 @@ jObject* CreateTriangle(const Vector& pos, const Vector& size, const Vector& sca
 	auto vertexStreamData = std::make_shared<jVertexStreamData>();
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
@@ -849,7 +849,7 @@ jObject* CreateTriangle(const Vector& pos, const Vector& size, const Vector& sca
 	}
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -860,7 +860,7 @@ jObject* CreateTriangle(const Vector& pos, const Vector& size, const Vector& sca
 	}
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -877,7 +877,7 @@ jObject* CreateTriangle(const Vector& pos, const Vector& size, const Vector& sca
 	}
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -894,7 +894,7 @@ jObject* CreateTriangle(const Vector& pos, const Vector& size, const Vector& sca
 	}
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -1063,7 +1063,7 @@ jObject* CreateCube(const Vector& pos, const Vector& size, const Vector& scale, 
 	auto vertexStreamData = std::make_shared<jVertexStreamData>();
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
@@ -1075,7 +1075,7 @@ jObject* CreateCube(const Vector& pos, const Vector& size, const Vector& scale, 
 	}
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -1086,7 +1086,7 @@ jObject* CreateCube(const Vector& pos, const Vector& size, const Vector& scale, 
 	}
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -1117,7 +1117,7 @@ jObject* CreateCube(const Vector& pos, const Vector& size, const Vector& scale, 
 			tangents.push_back(Vector(TangentArray[i].x, TangentArray[i].y, TangentArray[i].z));
 		}
 
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
@@ -1129,7 +1129,7 @@ jObject* CreateCube(const Vector& pos, const Vector& size, const Vector& scale, 
 	}
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -1211,7 +1211,7 @@ jObject* CreateCapsule(const Vector& pos, float height, float radius, int32 slic
 	auto vertexStreamData = std::make_shared<jVertexStreamData>();
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
@@ -1223,7 +1223,7 @@ jObject* CreateCapsule(const Vector& pos, float height, float radius, int32 slic
 	}
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -1234,7 +1234,7 @@ jObject* CreateCapsule(const Vector& pos, float height, float radius, int32 slic
 	}
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -1247,7 +1247,7 @@ jObject* CreateCapsule(const Vector& pos, float height, float radius, int32 slic
 
 	// Dummy
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -1259,7 +1259,7 @@ jObject* CreateCapsule(const Vector& pos, float height, float radius, int32 slic
 
 	// Dummy
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -1376,7 +1376,7 @@ jConePrimitive* CreateCone(const Vector& pos, float height, float radius, int32 
 	auto vertexStreamData = std::make_shared<jVertexStreamData>();
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
@@ -1388,7 +1388,7 @@ jConePrimitive* CreateCone(const Vector& pos, float height, float radius, int32 
 	}
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -1399,7 +1399,7 @@ jConePrimitive* CreateCone(const Vector& pos, float height, float radius, int32 
 	}
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -1412,7 +1412,7 @@ jConePrimitive* CreateCone(const Vector& pos, float height, float radius, int32 
 
 	// Dummy
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -1424,7 +1424,7 @@ jConePrimitive* CreateCone(const Vector& pos, float height, float radius, int32 
 
 	// Dummy
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -1537,7 +1537,7 @@ jObject* CreateCylinder(const Vector& pos, float height, float radius, int32 sli
 	auto vertexStreamData = std::make_shared<jVertexStreamData>();
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
@@ -1549,7 +1549,7 @@ jObject* CreateCylinder(const Vector& pos, float height, float radius, int32 sli
 	}
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -1560,7 +1560,7 @@ jObject* CreateCylinder(const Vector& pos, float height, float radius, int32 sli
 	}
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -1573,7 +1573,7 @@ jObject* CreateCylinder(const Vector& pos, float height, float radius, int32 sli
 
 	// Dummy
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -1585,7 +1585,7 @@ jObject* CreateCylinder(const Vector& pos, float height, float radius, int32 sli
 
 	// Dummy
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -1654,7 +1654,7 @@ jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector
 	auto vertexStreamData = std::make_shared<jVertexStreamData>();
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
@@ -1666,7 +1666,7 @@ jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector
 	}
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -1685,7 +1685,7 @@ jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector
 	}
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -1698,7 +1698,7 @@ jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector
 
 	// Dummy
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -1710,7 +1710,7 @@ jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector
 
 	// Dummy
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -1801,7 +1801,7 @@ jUIQuadPrimitive* CreateUIQuad(const Vector2& pos, const Vector2& size, jTexture
 	auto vertexStreamData = std::make_shared<jVertexStreamData>();
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
@@ -1837,7 +1837,7 @@ jFullscreenQuadPrimitive* CreateFullscreenQuad(jTexture* texture)
 	auto vertexStreamData = std::make_shared<jVertexStreamData>();
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
@@ -1884,7 +1884,7 @@ jSegmentPrimitive* CreateSegment(const Vector& start, const Vector& end, float t
 	auto vertexStreamData = std::make_shared<jVertexStreamData>();
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::DYNAMIC;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
@@ -1896,7 +1896,7 @@ jSegmentPrimitive* CreateSegment(const Vector& start, const Vector& end, float t
 	}
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -2066,7 +2066,7 @@ jGraph2D* CreateGraph2D(const Vector2& pos, const Vector2& size, const std::vect
 	auto vertexStreamData = std::make_shared<jVertexStreamData>();
 
 	{
-		auto streamParam = new jStreamParam<Vector2>();
+		auto streamParam = std::make_shared<jStreamParam<Vector2>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
@@ -2078,7 +2078,7 @@ jGraph2D* CreateGraph2D(const Vector2& pos, const Vector2& size, const std::vect
 	}
 
 	{
-		auto streamParam = new jStreamParam<Matrix>();
+		auto streamParam = std::make_shared<jStreamParam<Matrix>>();
 		streamParam->BufferType = EBufferType::DYNAMIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -2135,8 +2135,8 @@ void jSegmentPrimitive::UpdateSegment()
 		return;
 	}
 
-	delete RenderObject->VertexStream->Params[0];
-	delete RenderObject->VertexStream->Params[1];
+	RenderObject->VertexStream->Params[0].reset();
+	RenderObject->VertexStream->Params[1].reset();
 	const auto currentEnd = GetCurrentEnd();
 
 	const float vertices[] = {
@@ -2145,7 +2145,7 @@ void jSegmentPrimitive::UpdateSegment()
 	};
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::DYNAMIC;
 		streamParam->ElementTypeSize = sizeof(float);
 		streamParam->ElementType = EBufferElementType::FLOAT;
@@ -2157,7 +2157,7 @@ void jSegmentPrimitive::UpdateSegment()
 	}
 
 	{
-		auto streamParam = new jStreamParam<float>();
+		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->ElementType = EBufferElementType::FLOAT;
 		streamParam->ElementTypeSize = sizeof(float);
@@ -2339,7 +2339,7 @@ void jFrustumPrimitive::Update(float deltaTime)
 		auto vertexStreamData = std::make_shared<jVertexStreamData>();
 
 		{
-			auto streamParam = new jStreamParam<float>();
+			auto streamParam = std::make_shared<jStreamParam<float>>();
 			streamParam->BufferType = EBufferType::STATIC;
 			streamParam->ElementTypeSize = sizeof(float);
 			streamParam->ElementType = EBufferElementType::FLOAT;
@@ -2351,7 +2351,7 @@ void jFrustumPrimitive::Update(float deltaTime)
 		}
 
 		{
-			auto streamParam = new jStreamParam<float>();
+			auto streamParam = std::make_shared<jStreamParam<float>>();
 			streamParam->BufferType = EBufferType::STATIC;
 			streamParam->ElementType = EBufferElementType::FLOAT;
 			streamParam->ElementTypeSize = sizeof(float);
@@ -2370,7 +2370,7 @@ void jFrustumPrimitive::Update(float deltaTime)
 		}
 
 		{
-			auto streamParam = new jStreamParam<float>();
+			auto streamParam = std::make_shared<jStreamParam<float>>();
 			streamParam->BufferType = EBufferType::STATIC;
 			streamParam->ElementTypeSize = sizeof(float);
 			streamParam->ElementType = EBufferElementType::FLOAT;
@@ -2512,7 +2512,7 @@ void jGraph2D::UpdateBuffer()
 				{
 					if (iter->Name == TransformName)
 					{
-						auto matStreamParam = static_cast<jStreamParam<Matrix>*>(iter);
+						auto matStreamParam = static_cast<jStreamParam<Matrix>*>(iter.get());
 						matStreamParam->Data.resize(ResultMatrices.size());
 						memcpy(&matStreamParam->Data[0], &ResultMatrices[0], ResultMatrices.size() * sizeof(Matrix));
 						break;

@@ -161,7 +161,7 @@ enum class EBufferElementType : uint8
 	MAX,
 };
 
-struct IStreamParam
+struct IStreamParam : public std::enable_shared_from_this<IStreamParam>
 {
 	IStreamParam() = default;
 	IStreamParam(const jName& name, const EBufferType& bufferType, int32 stride, EBufferElementType elementType, int32 elementTypeSize, int32 instanceDivisor = 0)
@@ -197,14 +197,12 @@ struct jVertexStreamData : public std::enable_shared_from_this<jVertexStreamData
 {
 	virtual ~jVertexStreamData()
 	{
-		for (auto param : Params)
-			delete param;
 		Params.clear();
 	}
 
-	std::vector<IStreamParam*> Params;
+	std::vector<std::shared_ptr<IStreamParam>> Params;
 	EPrimitiveType PrimitiveType;
-	int ElementCount = 0;
+	int32 ElementCount = 0;
 };
 
 struct jIndexStreamData : public std::enable_shared_from_this<jIndexStreamData>
@@ -540,9 +538,9 @@ enum class EImageLayout : uint8
     ATTACHMENT,
 };
 
-struct jBuffer
+struct jBuffer : std::enable_shared_from_this<jBuffer>
 {
-    virtual void Destroy() = 0;
+    virtual void Release() = 0;
 
 	virtual void* GetMappedPointer() const = 0;
     virtual void* Map(uint64 offset, uint64 size) = 0;

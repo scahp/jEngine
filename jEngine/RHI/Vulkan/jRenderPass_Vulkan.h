@@ -6,6 +6,11 @@ class jRenderPass_Vulkan : public jRenderPass
 public:
     using jRenderPass::jRenderPass;
 
+    virtual ~jRenderPass_Vulkan()
+    {
+        Release();
+    }
+
     void Initialize();
     bool CreateRenderPass();
     void Release();

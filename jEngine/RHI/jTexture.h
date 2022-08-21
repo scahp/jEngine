@@ -18,7 +18,7 @@ struct jTexture
     virtual void* GetViewHandle() const { return nullptr; }
     virtual void* GetMemoryHandle() const { return nullptr; }
     virtual void* GetSamplerStateHandle() const { return nullptr; }
-    virtual void Destroy() {}
+    virtual void Release() {}
     virtual EImageLayout GetLayout() const { return EImageLayout::UNDEFINED; }
 
     FORCEINLINE bool IsDepthFormat() const { return ::IsDepthFormat(Format); }

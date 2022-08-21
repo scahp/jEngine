@@ -1,24 +1,29 @@
 ﻿#include "pch.h"
 #include "jTexture_Vulkan.h"
 
-void jTexture_Vulkan::Destroy()
+void jTexture_Vulkan::Release()
 {
-    if (Image)
-        vkDestroyImage(g_rhi_vk->Device, Image, nullptr);
+    // Swapchain 으로 만든 image 인 경우 Memory 가 nullptr 이기 때문에 Image 와 Memory 소멸 필요 없음.
+    // View 의 경우 직접 생성한 것이므로 소멸 필요
+    if (Memory)
+    {
+        if (Image)
+            vkDestroyImage(g_rhi_vk->Device, Image, nullptr);
+
+        vkFreeMemory(g_rhi_vk->Device, Memory, nullptr);
+    }
 
     if (View)
         vkDestroyImageView(g_rhi_vk->Device, View, nullptr);
-
-    if (Memory)
-        vkFreeMemory(g_rhi_vk->Device, Memory, nullptr);
 }
+
+static VkSampler g_defaultSampler = nullptr;
 
 VkSampler jTexture_Vulkan::CreateDefaultSamplerState()
 {
-    static VkSampler sampler = nullptr;
-    if (sampler)
+    if (g_defaultSampler)
     {
-        return sampler;
+        return g_defaultSampler;
     }
 
     VkSamplerCreateInfo samplerInfo = {};
@@ -55,9 +60,18 @@ VkSampler jTexture_Vulkan::CreateDefaultSamplerState()
     samplerInfo.minLod = 0.0f;		// Optional
     samplerInfo.maxLod = static_cast<float>(textureMipLevels);
 
-    if (!ensure(vkCreateSampler(g_rhi_vk->Device, &samplerInfo, nullptr, &sampler) == VK_SUCCESS))
+    if (!ensure(vkCreateSampler(g_rhi_vk->Device, &samplerInfo, nullptr, &g_defaultSampler) == VK_SUCCESS))
         return nullptr;
 
-    return sampler;
+    return g_defaultSampler;
+}
+
+void jTexture_Vulkan::DestroyDefaultSamplerState()
+{
+    if (g_defaultSampler)
+    {
+        vkDestroySampler(g_rhi_vk->Device, g_defaultSampler, nullptr);
+        g_defaultSampler = nullptr;
+    }
 }
 

@@ -229,26 +229,98 @@ bool jRHI_Vulkan::InitRHI()
 	QueryPool = new jQueryPool_Vulkan();
 	QueryPool->Create();
 
-	RingBuffers.resize(Swapchain->NumOfSwapchain());
+	RingBuffers.resize(Swapchain->GetNumOfSwapchain());
 	for (auto& iter : RingBuffers)
 	{
         iter = new jRingBuffer_Vulkan();
 		iter->Create(16 * 1024 * 1024, (uint32)DeviceProperties.limits.minUniformBufferOffsetAlignment);
 	}
 
-	DescriptorPools.resize(Swapchain->NumOfSwapchain());
+	DescriptorPools.resize(Swapchain->GetNumOfSwapchain());
 	for (auto& iter : DescriptorPools)
 	{
 		iter = new jDescriptorPool_Vulkan();
 		iter->Create();
 	}
 
+    jImGUI_Vulkan::Get().Initialize((float)SCR_WIDTH, (float)SCR_HEIGHT);
+
 	return true;
 }
 
 void jRHI_Vulkan::ReleaseRHI()
 {
-	jSpirvHelper::Finalize();
+	Flush();
+
+    jImGUI_Vulkan::Get().ReleaseInstance();
+
+    RenderPassPool.Release();
+    SamplerStatePool.Release();
+    RasterizationStatePool.Release();
+    MultisampleStatePool.Release();
+    StencilOpStatePool.Release();
+    DepthStencilStatePool.Release();
+    BlendingStatePool.Release();
+    PipelineStatePool.Release();
+    ShaderPool.Release();
+
+    jTexture_Vulkan::DestroyDefaultSamplerState();
+    jFrameBufferPool::Release();
+    jRenderTargetPool::Release();
+
+	delete Swapchain;
+	Swapchain = nullptr;
+
+	delete CommandBufferManager;
+	CommandBufferManager = nullptr;
+
+	for (auto& iter : PipelineLayoutPool)
+		vkDestroyPipelineLayout(Device, iter.second, nullptr);
+	PipelineLayoutPool.clear();
+
+	for (auto& iter : ShaderBindingPool)
+		delete iter.second;
+	ShaderBindingPool.clear();
+
+	delete QueryPool;
+	QueryPool = nullptr;
+
+	for (auto& iter : RingBuffers)
+		delete iter;
+	RingBuffers.clear();
+
+	for (auto& iter : DescriptorPools)
+		delete iter;
+	DescriptorPools.clear();
+
+	vkDestroyPipelineCache(Device, PipelineCache, nullptr);
+	FenceManager.Release();
+
+	if (Device)
+	{
+		vkDestroyDevice(Device, nullptr);
+		Device = nullptr;
+	}
+
+	if (Surface)
+	{
+		vkDestroySurfaceKHR(Instance, Surface, nullptr);
+		Surface = nullptr;
+	}
+
+	if (DebugMessenger)
+	{
+		jVulkanDeviceUtil::DestroyDebugUtilsMessengerEXT(Instance, DebugMessenger, nullptr);
+		DebugMessenger = nullptr;
+	}
+
+	if (Instance)
+	{
+		vkDestroyInstance(Instance, nullptr);
+		Instance = nullptr;
+	}
+
+    jSpirvHelper::Finalize();
 }
 
 jIndexBuffer* jRHI_Vulkan::CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const
@@ -268,10 +340,11 @@ jIndexBuffer* jRHI_Vulkan::CreateIndexBuffer(const std::shared_ptr<jIndexStreamD
 
 	stagingBuffer.UpdateBuffer(streamData->Param->GetBufferData(), bufferSize);
 
-    jVulkanBufferUtil::CreateBuffer(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, bufferSize, indexBuffer->Buffer);
-    jVulkanBufferUtil::CopyBuffer(stagingBuffer.Buffer, indexBuffer->Buffer.Buffer, bufferSize);
+	indexBuffer->BufferPtr = std::make_shared<jBuffer_Vulkan>();
+    jVulkanBufferUtil::CreateBuffer(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, bufferSize, *indexBuffer->BufferPtr.get());
+    jVulkanBufferUtil::CopyBuffer(stagingBuffer.Buffer, indexBuffer->BufferPtr->Buffer, bufferSize);
 
-	stagingBuffer.Destroy();
+	stagingBuffer.Release();
 	return indexBuffer;
 }
 
@@ -376,14 +449,15 @@ jVertexBuffer* jRHI_Vulkan::CreateVertexBuffer(const std::shared_ptr<jVertexStre
 
 			// VK_BUFFER_USAGE_TRANSFER_DST_BIT : 이 버퍼가 메모리 전송 연산의 목적지가 될 수 있음.
 			// DEVICE LOCAL 메모리에 VertexBuffer를 만들었으므로 이제 vkMapMemory 같은 것은 할 수 없음.
+			stream.BufferPtr = std::make_shared<jBuffer_Vulkan>();
 			jVulkanBufferUtil::CreateBuffer(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
-				, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, bufferSize, stream.Buffer);
+				, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, bufferSize, *stream.BufferPtr.get());
 
-			jVulkanBufferUtil::CopyBuffer(stagingBuffer.Buffer, stream.Buffer.Buffer, bufferSize);
+			jVulkanBufferUtil::CopyBuffer(stagingBuffer.Buffer, stream.BufferPtr->Buffer, bufferSize);
 
-			stagingBuffer.Destroy();
+			stagingBuffer.Release();
 		}
-		vertexBuffer->BindInfos.Buffers.push_back(stream.Buffer.Buffer);
+		vertexBuffer->BindInfos.Buffers.push_back(stream.BufferPtr->Buffer);
 		vertexBuffer->BindInfos.Offsets.push_back(stream.Offset);
 
 		/////////////////////////////////////////////////////////////
@@ -541,7 +615,7 @@ jTexture* jRHI_Vulkan::CreateTextureFromData(void* data, int32 width, int32 heig
 
 	EndSingleTimeCommands(commandBuffer);
 
-	stagingBuffer.Destroy();
+	stagingBuffer.Release();
 
     // Create Texture image view
     VkImageView textureImageView = jVulkanBufferUtil::CreateImageView(TextureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, textureMipLevels);
@@ -1471,6 +1545,20 @@ jRenderPass* jRHI_Vulkan::GetOrCreateRenderPass(const std::vector<jAttachment>& 
 	, const Vector2i& offset, const Vector2i& extent) const
 {
     return RenderPassPool.GetOrCreate(jRenderPass_Vulkan(colorAttachments, depthAttachment, colorResolveAttachment, offset, extent));
+}
+
+void jRHI_Vulkan::Flush() const
+{
+	vkQueueWaitIdle(GraphicsQueue.Queue);
+	vkQueueWaitIdle(ComputeQueue.Queue);
+	vkQueueWaitIdle(PresentQueue.Queue);
+}
+
+void jRHI_Vulkan::Finish() const
+{
+    vkQueueWaitIdle(GraphicsQueue.Queue);
+    vkQueueWaitIdle(ComputeQueue.Queue);
+    vkQueueWaitIdle(PresentQueue.Queue);
 }
 
 #endif // USE_VULKAN

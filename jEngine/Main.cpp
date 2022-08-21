@@ -82,8 +82,6 @@ int main()
     ImGuiIO& io = ImGui::GetIO(); (void)io;
 
     jAppSettings::GetInstance().Init(SCR_WIDTH, SCR_HEIGHT);
-#elif USE_VULKAN
-    jImGUI_Vulkan::Get().Initialize((float)SCR_WIDTH, (float)SCR_HEIGHT);
 #endif
 
 	// render loop
@@ -186,12 +184,14 @@ int main()
 		showFPS(window);
 	}
 
+	g_Engine.Release();
+
 #if USE_OPENGL
 	ImGui_ImplOpenGL3_Shutdown();
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
 #elif USE_VULKAN
-	jImGUI_Vulkan::Release();
+	g_rhi->ReleaseRHI();
 #endif
 
 	// glfw: terminate, clearing all previously allocated GLFW resources.

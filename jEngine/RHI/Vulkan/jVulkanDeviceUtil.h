@@ -45,6 +45,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 void PopulateDebutMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo);
 VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo
     , const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger);
+void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator);
 QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface);
 bool CheckDeviceExtensionSupport(VkPhysicalDevice device);
 bool IsDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface);

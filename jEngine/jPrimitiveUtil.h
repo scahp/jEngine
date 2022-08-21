@@ -61,7 +61,6 @@ public:
 	virtual void Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount = 0) const override;
 	void SetUniformBuffer(const jShader* shader) const;
 	void SetTexture(int index, const jTexture* texture, const jSamplerStateInfo* samplerState);
-	void SetTexture(const jTexture* texture, const jSamplerStateInfo* samplerState, int32 index = 0);
 };
 
 class jBoundBoxObject : public jObject
@@ -133,6 +132,11 @@ public:
 class jDirectionalLightPrimitive : public jObject
 {
 public:
+	virtual ~jDirectionalLightPrimitive()
+	{
+        delete BillboardObject;
+		delete ArrowSegementObject;
+	}
 	virtual void Update(float deltaTime) override;
 	virtual void Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount = 0) const override;
 
@@ -145,6 +149,11 @@ public:
 class jPointLightPrimitive : public jObject
 {
 public:
+    virtual ~jPointLightPrimitive()
+    {
+        delete BillboardObject;
+    }
+
 	virtual void Update(float deltaTime) override;
 	virtual void Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount = 0) const override;
 
@@ -156,6 +165,12 @@ public:
 class jSpotLightPrimitive : public jObject
 {
 public:
+    virtual ~jSpotLightPrimitive()
+    {
+        delete BillboardObject;
+        delete UmbraConeObject;
+        delete PenumbraConeObject;
+    }
 	virtual void Update(float deltaTime) override;
 	virtual void Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount = 0) const override;
 
@@ -172,7 +187,14 @@ public:
 	jFrustumPrimitive(const jCamera* targetCamera)
 		: TargetCamera(targetCamera)
 	{}
+	virtual ~jFrustumPrimitive()
+	{
+		for (int32 i = 0; i < _countof(Segments); ++i)
+			delete Segments[i];
 
+        for (int32 i = 0; i < _countof(Plane); ++i)
+            delete Plane[i];
+	}
 	virtual void Update(float deltaTime) override;
 	virtual void Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount = 0) const override;
 
@@ -203,7 +225,6 @@ public:
 	std::vector<Vector2> Points;
 	std::vector<Vector2> ResultPoints;
 	std::vector<Matrix> ResultMatrices;
-	jObject* GuardLineObject = nullptr;
 };
 
 namespace jPrimitiveUtil

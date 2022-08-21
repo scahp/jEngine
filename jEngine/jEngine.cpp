@@ -2,6 +2,8 @@
 #include "jEngine.h"
 #include "Shader/jShader.h"
 #include "Profiler/jPerformanceProfile.h"
+#include "RHI/jRenderTargetPool.h"
+#include "RHI/jFrameBufferPool.h"
 
 jEngine::jEngine()
 {
@@ -10,7 +12,6 @@ jEngine::jEngine()
 
 jEngine::~jEngine()
 {
-	Game.Teardown();
 }
 
 void jEngine::Init()
@@ -28,6 +29,12 @@ void jEngine::Init()
 #elif USE_VULKAN
 	Game.Setup();
 #endif
+}
+
+void jEngine::Release()
+{
+	g_rhi_vk->Flush();
+	Game.Release();
 }
 
 void jEngine::ProcessInput()

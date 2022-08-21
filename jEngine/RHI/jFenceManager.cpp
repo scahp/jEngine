@@ -19,3 +19,14 @@ VkFence jFenceManager_Vulkan::GetOrCreateFence()
 
     return newFence;
 }
+
+void jFenceManager_Vulkan::Release()
+{
+    for (auto& iter : UsingFences)
+        vkDestroyFence(g_rhi_vk->Device, iter, nullptr);
+    UsingFences.clear();
+
+    for (auto& iter : PendingFences)
+        vkDestroyFence(g_rhi_vk->Device, iter, nullptr);
+    PendingFences.clear();
+}

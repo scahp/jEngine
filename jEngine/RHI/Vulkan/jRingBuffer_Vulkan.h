@@ -4,12 +4,13 @@
 struct jRingBuffer_Vulkan : public jBuffer
 {
     jRingBuffer_Vulkan() = default;
+    virtual ~jRingBuffer_Vulkan();
 
     virtual void Create(uint64 totalSize, uint32 alignment = 16);
     virtual void Reset();
     virtual uint64 Alloc(uint64 allocSize);
 
-    virtual void Destroy() override;
+    virtual void Release() override;
     
     virtual void* GetMappedPointer() const override { return MappedPointer; }
     virtual void* Map(uint64 offset, uint64 size) override;

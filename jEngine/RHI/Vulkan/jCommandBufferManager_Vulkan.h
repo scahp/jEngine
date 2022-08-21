@@ -19,19 +19,19 @@ public:
     }
 
 private:
-    VkFence Fence = nullptr;
-    VkCommandBuffer CommandBuffer = nullptr;
+    VkFence Fence = nullptr;                        // Fence manager 에서 참조하기 때문에 소멸시키지 않음
+    VkCommandBuffer CommandBuffer = nullptr;        // CommandBufferManager 에서 CommandBufferPool 을 해제하여 일시에 소멸시키므로 소멸 처리 없음
 };
 
 class jCommandBufferManager_Vulkan : public jCommandBufferManager
 {
 public:
-    virtual bool CreatePool(uint32 QueueIndex) override;
-    virtual void Release() override
+    virtual ~jCommandBufferManager_Vulkan()
     {
-        //// Command buffer pool 을 다시 만들기 보다 있는 커맨드 버퍼 풀을 cleanup 하고 재사용 함.
-        //vkFreeCommandBuffers(device, CommandBufferManager.GetPool(), static_cast<uint32>(commandBuffers.size()), commandBuffers.data());
+        jCommandBufferManager_Vulkan::Release();
     }
+    virtual bool CreatePool(uint32 QueueIndex) override;
+    virtual void Release() override;
 
     FORCEINLINE const VkCommandPool& GetPool() const { return CommandPool; };
 

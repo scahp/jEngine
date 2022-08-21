@@ -13,7 +13,7 @@ struct jVertexStream_Vulkan
     size_t Offset = 0;
     int32 InstanceDivisor = 0;
 
-    jBuffer_Vulkan Buffer;
+    std::shared_ptr<jBuffer_Vulkan> BufferPtr;
 };
 
 struct jVertexBuffer_Vulkan : public jVertexBuffer
@@ -29,6 +29,8 @@ struct jVertexBuffer_Vulkan : public jVertexBuffer
         }
         std::vector<VkVertexInputBindingDescription> InputBindingDescriptions;
         std::vector<VkVertexInputAttributeDescription> AttributeDescriptions;
+        
+        // Buffer 는 jVertexStream_Vulkan 을 레퍼런스 하고 있기 때문에 별도 소멸 필요 없음
         std::vector<VkBuffer> Buffers;
         std::vector<VkDeviceSize> Offsets;
 

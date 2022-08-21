@@ -9,6 +9,12 @@ public:
 	static std::shared_ptr<jRenderTarget> GetRenderTarget(const jRenderTargetInfo& info);
 	static void ReturnRenderTarget(jRenderTarget* renderTarget);
 
+	static void Release()
+	{
+		RenderTargetResourceMap.clear();
+		RenderTargetHashVariableMap.clear();
+	}
+
 	struct jRenderTargetPoolResource
 	{
 		bool IsUsing = false;

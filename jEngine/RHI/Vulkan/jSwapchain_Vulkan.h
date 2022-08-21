@@ -4,10 +4,12 @@
 class jSwapchainImage_Vulkan : public jSwapchainImage
 {
 public:
-    virtual void Destroy() override
+    virtual ~jSwapchainImage_Vulkan()
     {
-        TexturePtr = nullptr;
+        jSwapchainImage_Vulkan::Release();
     }
+
+    virtual void Release() override;
 
     virtual void* GetHandle() const override
     {
@@ -22,7 +24,7 @@ public:
         return TexturePtr ? TexturePtr->GetMemoryHandle() : nullptr;
     }
 
-    VkFence CommandBufferFence = nullptr;
+    VkFence CommandBufferFence = nullptr;   // 이 스왑체인에 렌더링하고 있는 이미지가 완료됨을 알 수 있는 CommandBuffer의 Fence.
 
     // Semaphore 는 GPU - GPU 간의 동기화를 맞춰줌.여러개의 프레임이 동시에 만들어질 수 있게 함.
     // Semaphores 는 커맨드 Queue 내부 혹은 Queue 들 사이에 명령어 동기화를 위해서 설계됨
@@ -36,15 +38,15 @@ class jSwapchain_Vulkan : public jSwapchain
 public:
     virtual ~jSwapchain_Vulkan()
     {
-        jSwapchain_Vulkan::Destroy();
+        jSwapchain_Vulkan::Release();
     }
     virtual bool Create() override;
-    virtual void Destroy() override;
+    virtual void Release() override;
     virtual void* GetHandle() const override { return Swapchain; }
     virtual ETextureFormat GetFormat() const override { return Format; }
     virtual const Vector2i& GetExtent() const override { return Extent; }
     virtual jSwapchainImage* GetSwapchainImage(int32 index) const override { check(Images.size() > index); return Images[index]; }
-    virtual int32 NumOfSwapchain() const override { return (int32)Images.size(); }
+    virtual int32 GetNumOfSwapchain() const override { return (int32)Images.size(); }
 
     VkSwapchainKHR Swapchain = nullptr;
     ETextureFormat Format = ETextureFormat::RGB8;

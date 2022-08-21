@@ -10,7 +10,7 @@ struct jTexture_Vulkan : public jTexture
     {}
     virtual ~jTexture_Vulkan()
     {
-        jTexture_Vulkan::Destroy();
+        jTexture_Vulkan::Release();
     }
     VkImage Image = nullptr;
     VkImageView View = nullptr;
@@ -22,8 +22,9 @@ struct jTexture_Vulkan : public jTexture
     virtual void* GetViewHandle() const override { return View; }
     virtual void* GetMemoryHandle() const override { return Memory; }
     virtual void* GetSamplerStateHandle() const override { return SamplerState; }
-    virtual void Destroy() override;
+    virtual void Release() override;
     virtual EImageLayout GetLayout() const override { return Layout; }
 
     static VkSampler CreateDefaultSamplerState();
+    static void DestroyDefaultSamplerState();
 };

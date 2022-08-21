@@ -140,7 +140,8 @@ void jGame::Update(float deltaTime)
 	// UpdateAppSetting();
 
 	// Update main camera
-	MainCamera->UpdateCamera();
+	if (MainCamera)
+		MainCamera->UpdateCamera();
 
 	//// Update lights
 	//const int32 numOfLights = MainCamera->GetNumOfLight();
@@ -177,18 +178,19 @@ void jGame::Update(float deltaTime)
     }
 
     // 정리해야함
-    DirectionalLight->Update(deltaTime);
+	if (DirectionalLight)
+		DirectionalLight->Update(deltaTime);
 }
 
 void jGame::Draw()
 {
 	SCOPE_DEBUG_EVENT(g_rhi, "Game::Draw");
 
-	std::shared_ptr<jRenderFrameContext> renderFrameContext = g_rhi->BeginRenderFrame();
+    std::shared_ptr<jRenderFrameContext> renderFrameContext = g_rhi->BeginRenderFrame();
 
     jForwardRenderer forwardRenderer(renderFrameContext, jView(MainCamera, DirectionalLight));
     forwardRenderer.Setup();
-	forwardRenderer.Render();
+    forwardRenderer.Render();
 
     g_rhi->EndRenderFrame(renderFrameContext);
 }
@@ -204,12 +206,31 @@ void jGame::OnMouseMove(int32 xOffset, int32 yOffset)
 	{
 		constexpr float PitchScale = 0.0025f;
 		constexpr float YawScale = -0.0025f;
-		MainCamera->SetEulerAngle(MainCamera->GetEulerAngle() + Vector(yOffset * PitchScale, xOffset * YawScale, 0.0f));
+		if (MainCamera)
+			MainCamera->SetEulerAngle(MainCamera->GetEulerAngle() + Vector(yOffset * PitchScale, xOffset * YawScale, 0.0f));
 	}
 }
 
-void jGame::Teardown()
+void jGame::Release()
 {
+	for (jObject* iter : SpawnedObjects)
+	{
+		delete iter;
+	}
+	SpawnedObjects.clear();
+
+    DirectionalLight = nullptr;		// 현재 사용중인 Directional light 의 레퍼런스이므로 그냥 nullptr 설정
+	delete NormalDirectionalLight;
+	delete CascadeDirectionalLight;
+	delete PointLight;
+	delete SpotLight;
+	delete AmbientLight;
+	delete MainCamera;
+
+    delete DirectionalLightInfo;
+    delete PointLightInfo;
+    delete SpotLightInfo;
+	delete DirectionalLightShadowMapUIDebug;
 }
 
 void jGame::SpawnTestPrimitives()

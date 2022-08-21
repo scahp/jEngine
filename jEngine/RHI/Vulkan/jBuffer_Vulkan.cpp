@@ -2,15 +2,24 @@
 #include "jBuffer_Vulkan.h"
 #include "../jRHI_Vulkan.h"
 
-void jBuffer_Vulkan::Destroy()
+void jBuffer_Vulkan::Release()
 {
+    if (!HasBufferOwnership)
+        return;
+
     check(g_rhi_vk->Device);
 
     if (Buffer)
+    {
         vkDestroyBuffer(g_rhi_vk->Device, Buffer, nullptr);
+        Buffer = nullptr;
+    }
 
     if (BufferMemory)
+    {
         vkFreeMemory(g_rhi_vk->Device, BufferMemory, nullptr);
+        BufferMemory = nullptr;
+    }
 
     AllocatedSize = 0;
     MappedPointer = nullptr;

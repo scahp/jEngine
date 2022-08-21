@@ -7,7 +7,17 @@ std::unordered_map<size_t, VkRenderPass> s_renderPassPool;
 
 void jRenderPass_Vulkan::Release()
 {
-    vkDestroyRenderPass(g_rhi_vk->Device, RenderPass, nullptr);
+    if (RenderPass)
+    {
+        vkDestroyRenderPass(g_rhi_vk->Device, RenderPass, nullptr);
+        RenderPass = nullptr;
+    }
+
+    if (FrameBuffer)
+    {
+        vkDestroyFramebuffer(g_rhi_vk->Device, FrameBuffer, nullptr);
+        FrameBuffer = nullptr;
+    }
 }
 
 void jRenderPass_Vulkan::EndRenderPass()

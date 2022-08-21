@@ -7,6 +7,7 @@ struct jShader_Vulkan : public jShader
     virtual ~jShader_Vulkan();
 
     virtual void Initialize() override;
+    void Release();
 
     std::vector<VkPipelineShaderStageCreateInfo> ShaderStages;
 };

@@ -213,6 +213,7 @@ struct jQueryPool
 	virtual ~jQueryPool() {}
 	virtual bool Create() { return false; }
 	virtual void ResetQueryPool(jCommandBuffer* pCommanBuffer = nullptr) {}
+	virtual void Release() {}
 };
 
 struct jQueryTime
@@ -245,7 +246,9 @@ public:
 	jView() = default;
 	jView(jCamera* camera, jDirectionalLight* directionalLight = nullptr, jLight* pointLight = nullptr, jLight* spotLight = nullptr)
 		: Camera(camera), DirectionalLight(directionalLight), PointLight(pointLight), SpotLight(spotLight)
-	{}
+	{
+		check(camera);
+	}
 
 	void SetupUniformBuffer();
 	void GetShaderBindingInstance(std::vector<jShaderBindingInstance*>& OutShaderBindingInstance);
@@ -553,6 +556,16 @@ public:
         Pool.insert(std::make_pair(hash, newResource));
         return newResource;
     }
+
+	void Release()
+	{
+		jScopedLock s(&Lock);
+		for (auto& iter : Pool)
+		{
+			delete iter.second;
+		}
+		Pool.clear();
+	}
 
     std::unordered_map<size_t, T*> Pool;
 	LOCK_TYPE Lock;

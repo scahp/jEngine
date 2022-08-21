@@ -3,9 +3,14 @@
 #include "../jRHI_Vulkan.h"
 #include "jVulkanBufferUtil.h"
 
+jRingBuffer_Vulkan::~jRingBuffer_Vulkan()
+{
+    Release();
+}
+
 void jRingBuffer_Vulkan::Create(uint64 totalSize, uint32 alignment)
 {
-    Destroy();
+    Release();
 
     jVulkanBufferUtil::CreateBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
         | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, VkDeviceSize(totalSize), Buffer, BufferMemory, RingBufferSize);
@@ -33,15 +38,21 @@ uint64 jRingBuffer_Vulkan::Alloc(uint64 allocSize)
     return 0;
 }
 
-void jRingBuffer_Vulkan::Destroy()
+void jRingBuffer_Vulkan::Release()
 {
     check(g_rhi_vk->Device);
 
     if (Buffer)
+    {
         vkDestroyBuffer(g_rhi_vk->Device, Buffer, nullptr);
+        Buffer = nullptr;
+    }
 
     if (BufferMemory)
+    {
         vkFreeMemory(g_rhi_vk->Device, BufferMemory, nullptr);
+        BufferMemory = nullptr;
+    }
 
     RingBufferSize = 0;
     MappedPointer = nullptr;

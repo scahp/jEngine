@@ -6,6 +6,7 @@ public:
     virtual ~jFenceManager() {}
     virtual VkFence GetOrCreateFence() = 0;
     virtual void ReturnFence(VkFence fence) = 0;
+    virtual void Release() = 0;
 };
 
 #if USE_OPENGL
@@ -21,6 +22,7 @@ public:
         UsingFences.erase(fence);
         PendingFences.insert(fence);
     }
+    virtual void Release() override;
 
     std::unordered_set<VkFence> UsingFences;
     std::unordered_set<VkFence> PendingFences;

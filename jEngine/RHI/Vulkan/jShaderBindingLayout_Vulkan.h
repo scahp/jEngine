@@ -40,7 +40,7 @@ struct jShaderBindingInstance_Vulkan : public jShaderBindingInstance
     virtual void BindGraphics(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const override;
     virtual void BindCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const override;
 
-    VkDescriptorSet DescriptorSet = nullptr;
+    VkDescriptorSet DescriptorSet = nullptr;        // DescriptorPool 을 해제하면 모두 처리될 수 있어서 따로 소멸시키지 않음
     jWriteDescriptorSet WriteDescriptorSet;
 };
 
@@ -49,13 +49,14 @@ struct jShaderBindingInstance_Vulkan : public jShaderBindingInstance
 //////////////////////////////////////////////////////////////////////////
 struct jShaderBindingLayout_Vulkan : public jShaderBindingsLayout
 {
+    virtual ~jShaderBindingLayout_Vulkan();
+
     VkDescriptorSetLayout DescriptorSetLayout = nullptr;
 
     virtual bool Initialize(const std::vector<jShaderBinding>& shaderBindings) override;
-
     virtual jShaderBindingInstance* CreateShaderBindingInstance(const std::vector<jShaderBinding>& InShaderBindings) const override;
-
     virtual size_t GetHash() const override;
+    void Release();
 
     std::vector<VkDescriptorPoolSize> GetDescriptorPoolSizeArray(uint32 maxAllocations) const
     {
@@ -94,14 +95,4 @@ struct jShaderBindingLayout_Vulkan : public jShaderBindingsLayout
 
         return std::move(resultArray);
     }
-};
-
-//////////////////////////////////////////////////////////////////////////
-// jShaderBindingsManager_Vulkan
-//////////////////////////////////////////////////////////////////////////
-class jShaderBindingsManager_Vulkan // base 없음
-{
-public:
-    VkDescriptorPool CreatePool(const jShaderBindingLayout_Vulkan& bindings, uint32 MaxAllocations = 32) const;
-    void Release(VkDescriptorPool pool) const;
 };

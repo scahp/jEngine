@@ -8,6 +8,11 @@ public:
 
 	static std::shared_ptr<jFrameBuffer> GetFrameBuffer(const jFrameBufferInfo& info);
 	static void ReturnFrameBuffer(jFrameBuffer* renderTarget);
+	static void Release()
+	{
+		FrameBufferResourceMap.clear();
+		FrameBufferHashVariableMap.clear();
+	}
 
 	struct jFrameBufferPoolResource
 	{

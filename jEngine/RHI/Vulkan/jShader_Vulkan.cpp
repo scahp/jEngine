@@ -9,13 +9,19 @@ jShader_Vulkan::jShader_Vulkan(const jShaderInfo& shaderInfo)
 
 jShader_Vulkan::~jShader_Vulkan()
 {
-    for (auto& Stage : ShaderStages)
-    {
-        vkDestroyShaderModule(g_rhi_vk->Device, Stage.module, nullptr);
-    }
+    Release();
 }
 
 void jShader_Vulkan::Initialize()
 {
     verify(g_rhi_vk->CreateShaderInternal(this, ShaderInfo));
+}
+
+void jShader_Vulkan::Release()
+{
+    for (auto& Stage : ShaderStages)
+    {
+        vkDestroyShaderModule(g_rhi_vk->Device, Stage.module, nullptr);
+    }
+    ShaderStages.clear();
 }

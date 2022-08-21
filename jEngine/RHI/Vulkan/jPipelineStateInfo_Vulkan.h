@@ -4,8 +4,12 @@ struct jSamplerStateInfo_Vulkan : public jSamplerStateInfo
 {
     jSamplerStateInfo_Vulkan() = default;
     jSamplerStateInfo_Vulkan(const jSamplerStateInfo& state) : jSamplerStateInfo(state) {}
-    virtual ~jSamplerStateInfo_Vulkan() {}
+    virtual ~jSamplerStateInfo_Vulkan() 
+    {
+        Release();
+    }
     virtual void Initialize() override;
+    void Release();
 
     virtual void* GetHandle() const { return SamplerState; }
 
@@ -76,7 +80,12 @@ struct jPipelineStateInfo_Vulkan : public jPipelineStateInfo
     jPipelineStateInfo_Vulkan(const jPipelineStateInfo& pipelineState)
         : jPipelineStateInfo(pipelineState)
     {}
-    virtual ~jPipelineStateInfo_Vulkan() {}
+    virtual ~jPipelineStateInfo_Vulkan()
+    {
+        Release();
+    }
+
+    void Release();
 
     virtual void Initialize() override;
     virtual void* GetHandle() const override { return vkPipeline; }
@@ -86,5 +95,5 @@ struct jPipelineStateInfo_Vulkan : public jPipelineStateInfo
     virtual void Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const override;
 
     VkPipeline vkPipeline = nullptr;
-    VkPipelineLayout vkPipelineLayout = nullptr;
+    VkPipelineLayout vkPipelineLayout = nullptr;        // PipelineLayout 은 PipelineLayoutPool 에서 캐싱해둔 거라 소멸시키지 않음
 };

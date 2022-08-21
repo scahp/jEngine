@@ -23,6 +23,15 @@ void jQueryPool_Vulkan::ResetQueryPool(jCommandBuffer* pCommanBuffer /*= nullptr
     QueryIndex[jProfile_GPU::CurrentWatingResultListIndex] = MaxQueryTimeCount * jProfile_GPU::CurrentWatingResultListIndex;
 }
 
+void jQueryPool_Vulkan::Release()
+{
+    if (vkQueryPool)
+    {
+        vkDestroyQueryPool(g_rhi_vk->Device, vkQueryPool, nullptr);
+        vkQueryPool = nullptr;
+    }
+}
+
 //////////////////////////////////////////////////////////////////////////
 // jQueryTime_Vulkan
 //////////////////////////////////////////////////////////////////////////

@@ -9,6 +9,7 @@ public:
 	~jEngine();
 
 	void Init();
+	void Release();
 	void ProcessInput();
 	void Update(float deltaTime);
 	void Draw();

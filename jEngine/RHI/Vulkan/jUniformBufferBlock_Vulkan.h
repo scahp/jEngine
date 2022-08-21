@@ -47,11 +47,11 @@ struct jUniformBufferBlock_Vulkan : public IUniformBufferBlock
 
     virtual void ClearBuffer(int32 clearValue) override;
 
-    virtual void* GetBuffer() const override { return Buffer.Buffer; }
-    virtual void* GetBufferMemory() const override { return Buffer.BufferMemory; }
+    virtual void* GetBuffer() const override { return BufferPtr->Buffer; }
+    virtual void* GetBufferMemory() const override { return BufferPtr->BufferMemory; }
 
-    virtual size_t GetBufferSize() const override { return Buffer.AllocatedSize; }
-    virtual size_t GetBufferOffset() const override { return Buffer.Offset; }
+    virtual size_t GetBufferSize() const override { return BufferPtr->AllocatedSize; }
+    virtual size_t GetBufferOffset() const override { return BufferPtr->Offset; }
 
-    jBuffer_Vulkan Buffer;
+    std::shared_ptr<jBuffer_Vulkan> BufferPtr;
 };

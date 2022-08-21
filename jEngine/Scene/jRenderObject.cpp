@@ -14,6 +14,25 @@ jRenderObject::jRenderObject()
 
 jRenderObject::~jRenderObject()
 {
+    delete VertexBuffer;
+    delete VertexBuffer_PositionOnly;
+    
+	VertexStream.reset();
+    VertexStream_PositionOnly.reset();
+
+	delete IndexBuffer;
+	MaterialData.Clear();
+	DynamicMaterialData.clear();
+
+	// 다른 곳에서 레퍼런싱 한 데이터는 nullptr 로 비워줌
+    tex_object_array = nullptr;
+    samplerStateTexArray = nullptr;
+
+	// UniofrmBuffer를 해제 해줌
+	delete RenderObjectUniformBuffer;
+	RenderObjectUniformBuffer = nullptr;
+	
+	ShaderBindingInstance = nullptr;		// Pool 에서 제거되기 때문에 nullptr 로 초기화만 해줌
 }
 
 void jRenderObject::CreateRenderObject(const std::shared_ptr<jVertexStreamData>& vertexStream, const std::shared_ptr<jIndexStreamData>& indexStream)
@@ -257,7 +276,7 @@ void jRenderObject::SetMaterialProperty(const jShader* shader, const jMaterialDa
 const std::vector<float>& jRenderObject::GetVertices() const
 {
 	if (VertexStream && !VertexStream->Params.empty())
-		return static_cast<jStreamParam<float>*>(VertexStream->Params[0])->Data;
+		return static_cast<jStreamParam<float>*>(VertexStream->Params[0].get())->Data;
 
 	static const std::vector<float> s_emtpy;
 	return s_emtpy;

@@ -15,8 +15,11 @@ void jForwardRenderer::Setup()
     View.SetupUniformBuffer();
 
     // View 별로 저장 할 수 있어야 함
-    View.DirectionalLight->ShadowMapPtr = RenderFrameContextPtr->SceneRenderTarget->DirectionalLightShadowMapPtr;
-    View.DirectionalLight->PrepareShaderBindingInstance();
+    if (View.DirectionalLight)
+    {
+        View.DirectionalLight->ShadowMapPtr = RenderFrameContextPtr->SceneRenderTarget->DirectionalLightShadowMapPtr;
+        View.DirectionalLight->PrepareShaderBindingInstance();
+    }
 
     SetupShadowPass();
     SetupBasePass();

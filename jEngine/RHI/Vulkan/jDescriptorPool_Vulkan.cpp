@@ -104,3 +104,28 @@ jShaderBindingInstance_Vulkan* jDescriptorPool_Vulkan::AllocateDescriptorSet(VkD
     return NewCachedDescriptorSetPtr;
 }
 
+void jDescriptorPool_Vulkan::Release()
+{
+    if (DescriptorPool)
+    {
+        vkDestroyDescriptorPool(g_rhi_vk->Device, DescriptorPool, nullptr);
+        DescriptorPool = nullptr;
+    }
+
+    for (auto& iter : PendingDescriptorSets)
+    {
+        std::vector<jShaderBindingInstance_Vulkan*>& instances = iter.second;
+        for (auto& inst : instances)
+            delete inst;
+    }
+    PendingDescriptorSets.clear();
+
+    for (auto& iter : RunningDescriptorSets)
+    {
+        std::vector<jShaderBindingInstance_Vulkan*>& instances = iter.second;
+        for (auto& inst : instances)
+            delete inst;
+    }
+    RunningDescriptorSets.clear();
+}
+
