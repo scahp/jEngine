@@ -631,7 +631,7 @@ jRenderObject* CreateQuad_Internal(const Vector& pos, const Vector& size, const 
 			, (const Vector*)(vertices), (const Vector*)&normals[0], &texcoords[0]);
 
 		std::vector<Vector> tangents;
-		for (int32 i = 0; i < veticesElement; ++i)
+		for (int32 i = 0; i < elementCount; ++i)
 		{
 			tangents.push_back(Vector(TangentArray[i].x, TangentArray[i].y, TangentArray[i].z));
 		}
@@ -1112,7 +1112,7 @@ jObject* CreateCube(const Vector& pos, const Vector& size, const Vector& scale, 
 			, (const Vector*)(vertices), (const Vector*)&normals[0], &texcoords[0]);
 
 		std::vector<Vector> tangents;
-		for (int32 i = 0; i < veticesElement; ++i)
+		for (int32 i = 0; i < elementCount; ++i)
 		{
 			tangents.push_back(Vector(TangentArray[i].x, TangentArray[i].y, TangentArray[i].z));
 		}
