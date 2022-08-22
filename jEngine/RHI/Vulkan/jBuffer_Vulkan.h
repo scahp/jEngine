@@ -23,6 +23,7 @@ struct jBuffer_Vulkan : public jBuffer
 
     virtual void* GetHandle() const override { return Buffer; }
     virtual void* GetMemoryHandle() const override { return BufferMemory; }
+    virtual size_t GetAllocatedSize() const override { return AllocatedSize; }
 
     VkBuffer Buffer = nullptr;
     VkDeviceMemory BufferMemory = nullptr;

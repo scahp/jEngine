@@ -20,6 +20,7 @@ struct jRingBuffer_Vulkan : public jBuffer
 
     virtual void* GetHandle() const override { return Buffer; }
     virtual void* GetMemoryHandle() const override { return BufferMemory; }
+    virtual size_t GetAllocatedSize() const override { return RingBufferSize; }
 
     uint64 RingBufferOffset = 0;
     uint32 Alignment = 16;

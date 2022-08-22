@@ -183,9 +183,10 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(int32 InIndex, const jShaderBin
     switch (InShaderBinding.BindingType)
     {
     case EShaderBindingType::UNIFORMBUFFER:
+    case EShaderBindingType::UNIFROMBUFFER_DYNAMIC:
     {
         jUniformBufferResource* ubor = reinterpret_cast<jUniformBufferResource*>(InShaderBinding.ResourcePtr.get());
-        if (ubor && ubor->UniformBuffer)
+        if (ensure(ubor && ubor->UniformBuffer))
         {
             VkDescriptorBufferInfo& bufferInfo = WriteDescriptorInfos[InIndex].BufferInfo;
             bufferInfo.buffer = (VkBuffer)ubor->UniformBuffer->GetBuffer();
@@ -197,9 +198,10 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(int32 InIndex, const jShaderBin
     }
     case EShaderBindingType::TEXTURE_SAMPLER_SRV:
     case EShaderBindingType::TEXTURE_SRV:
+    case EShaderBindingType::SUBPASS_INPUT_ATTACHMENT:
     {
         jTextureResource* tbor = reinterpret_cast<jTextureResource*>(InShaderBinding.ResourcePtr.get());
-        if (tbor && tbor->Texture)
+        if (ensure(tbor && tbor->Texture))
         {
             VkDescriptorImageInfo& imageInfo = WriteDescriptorInfos[InIndex].ImageInfo;
             imageInfo.imageLayout = tbor->Texture->IsDepthFormat() ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
@@ -216,7 +218,7 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(int32 InIndex, const jShaderBin
     case EShaderBindingType::TEXTURE_UAV:
     {
         jTextureResource* tbor = reinterpret_cast<jTextureResource*>(InShaderBinding.ResourcePtr.get());
-        if (tbor && tbor->Texture)
+        if (ensure(tbor && tbor->Texture))
         {
             VkDescriptorImageInfo& imageInfo = WriteDescriptorInfos[InIndex].ImageInfo;
             imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -232,7 +234,7 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(int32 InIndex, const jShaderBin
     case EShaderBindingType::SAMPLER:
     {
         jTextureResource* tbor = reinterpret_cast<jTextureResource*>(InShaderBinding.ResourcePtr.get());
-        if (tbor && tbor->SamplerState)
+        if (ensure(tbor && tbor->SamplerState))
         {
             VkDescriptorImageInfo& imageInfo = WriteDescriptorInfos[InIndex].ImageInfo;
             imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -241,9 +243,20 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(int32 InIndex, const jShaderBin
         }
         break;
     }
+    case EShaderBindingType::BUFFER_TEXEL_SRV:
+    case EShaderBindingType::BUFFER_TEXEL_UAV:
     case EShaderBindingType::BUFFER_UAV:
+    case EShaderBindingType::BUFFER_UAV_DYNAMIC:
     {
-        check(0); // todo SSBO
+        jBufferResource* br = reinterpret_cast<jBufferResource*>(InShaderBinding.ResourcePtr.get());
+        if (ensure(br && br->Buffer))
+        {
+            VkDescriptorBufferInfo& bufferInfo = WriteDescriptorInfos[InIndex].BufferInfo;
+            bufferInfo.buffer = (VkBuffer)br->Buffer->GetHandle();
+            bufferInfo.offset = 0;
+            bufferInfo.range = br->Buffer->GetAllocatedSize();		// 전체 사이즈라면 VK_WHOLE_SIZE 이거 가능
+            check(bufferInfo.buffer);
+        }
         break;
     }
     default:

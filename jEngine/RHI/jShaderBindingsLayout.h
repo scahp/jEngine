@@ -16,6 +16,14 @@ struct jUniformBufferResource : public jShaderBindingResource
     const IUniformBufferBlock* UniformBuffer = nullptr;
 };
 
+struct jBufferResource : public jShaderBindingResource
+{
+    jBufferResource() = default;
+    jBufferResource(const jBuffer* InBuffer) : Buffer(InBuffer) {}
+    virtual ~jBufferResource() {}
+    const jBuffer* Buffer = nullptr;
+};
+
 struct jTextureResource : public jShaderBindingResource
 {
     jTextureResource() = default;

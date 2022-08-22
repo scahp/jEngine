@@ -492,14 +492,21 @@ enum class EShaderAccessStageFlag : uint32
 };
 DECLARE_ENUM_BIT_OPERATORS(EShaderAccessStageFlag)
 
+// BindingType 별 사용법 문서
+// https://github.com/KhronosGroup/Vulkan-Guide/blob/master/chapters/mapping_data_to_shaders.adoc#storage-texel-buffer
 enum class EShaderBindingType
 {
 	UNIFORMBUFFER = 0,
+	UNIFROMBUFFER_DYNAMIC,			// 동적버퍼에 대한 설명 https://github.com/SaschaWillems/Vulkan/blob/master/examples/dynamicuniformbuffer/README.md
 	TEXTURE_SAMPLER_SRV,
 	TEXTURE_SRV,
 	TEXTURE_UAV,
 	SAMPLER,
 	BUFFER_UAV,
+	BUFFER_UAV_DYNAMIC,
+	BUFFER_TEXEL_SRV,
+	BUFFER_TEXEL_UAV,
+	SUBPASS_INPUT_ATTACHMENT,
 };
 
 enum class EColorMask : uint8
@@ -550,4 +557,5 @@ struct jBuffer : std::enable_shared_from_this<jBuffer>
 
     virtual void* GetHandle() const = 0;
     virtual void* GetMemoryHandle() const = 0;
+	virtual size_t GetAllocatedSize() const = 0;
 };
