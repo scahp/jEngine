@@ -229,12 +229,19 @@ bool jRHI_Vulkan::InitRHI()
 	QueryPool = new jQueryPool_Vulkan();
 	QueryPool->Create();
 
-	RingBuffers.resize(Swapchain->GetNumOfSwapchain());
-	for (auto& iter : RingBuffers)
+	UniformRingBuffers.resize(Swapchain->GetNumOfSwapchain());
+	for (auto& iter : UniformRingBuffers)
 	{
         iter = new jRingBuffer_Vulkan();
-		iter->Create(16 * 1024 * 1024, (uint32)DeviceProperties.limits.minUniformBufferOffsetAlignment);
+		iter->Create(EVulkanBufferBits::UNIFORM_BUFFER, 16 * 1024 * 1024, (uint32)DeviceProperties.limits.minUniformBufferOffsetAlignment);
 	}
+
+    SSBORingBuffers.resize(Swapchain->GetNumOfSwapchain());
+    for (auto& iter : SSBORingBuffers)
+    {
+        iter = new jRingBuffer_Vulkan();
+        iter->Create(EVulkanBufferBits::STORAGE_BUFFER, 16 * 1024 * 1024, (uint32)DeviceProperties.limits.minStorageBufferOffsetAlignment);
+    }
 
 	DescriptorPools.resize(Swapchain->GetNumOfSwapchain());
 	for (auto& iter : DescriptorPools)
@@ -286,9 +293,13 @@ void jRHI_Vulkan::ReleaseRHI()
 	delete QueryPool;
 	QueryPool = nullptr;
 
-	for (auto& iter : RingBuffers)
+	for (auto& iter : UniformRingBuffers)
 		delete iter;
-	RingBuffers.clear();
+	UniformRingBuffers.clear();
+
+    for (auto& iter : SSBORingBuffers)
+        delete iter;
+	SSBORingBuffers.clear();
 
 	for (auto& iter : DescriptorPools)
 		delete iter;
@@ -1146,7 +1157,7 @@ std::shared_ptr<jRenderFrameContext> jRHI_Vulkan::BeginRenderFrame()
     if (lastCommandBufferFence != VK_NULL_HANDLE)
         vkWaitForFences(Device, 1, &lastCommandBufferFence, VK_TRUE, UINT64_MAX);
 
-	GetRingBuffer()->Reset();
+	GetUniformRingBuffer()->Reset();
 	GetDescriptorPools()->Reset();
 
     // 이 프레임에서 펜스를 사용한다고 마크 해둠

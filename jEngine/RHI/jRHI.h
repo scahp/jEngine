@@ -101,13 +101,18 @@ struct IShaderStorageBufferObject
 	virtual ~IShaderStorageBufferObject() {}
 
 	std::string Name;
-	size_t Size = 0;
 
-	virtual void Init() = 0;
+    virtual size_t GetBufferSize() const { return 0; }
+    virtual size_t GetBufferOffset() const { return 0; }
+
+	virtual void Init(size_t size) = 0;
 	virtual void Bind(const jShader* shader) const {}
-	virtual void UpdateBufferData(void* newData, size_t size) = 0;
-	virtual void GetBufferData(void* newData, size_t size) = 0;
+	virtual void UpdateBufferData(const void* newData, size_t size) = 0;
+	virtual void GetBufferData(const void* newData, size_t size) = 0;
 	virtual void ClearBuffer(int32 clearValue) = 0;
+
+    virtual void* GetBuffer() const { return nullptr; }
+    virtual void* GetBufferMemory() const { return nullptr; }
 
 	template <typename T>
 	void GetBufferData(typename std::remove_reference<T>::type& out)

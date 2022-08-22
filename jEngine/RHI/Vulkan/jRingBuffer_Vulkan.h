@@ -6,7 +6,7 @@ struct jRingBuffer_Vulkan : public jBuffer
     jRingBuffer_Vulkan() = default;
     virtual ~jRingBuffer_Vulkan();
 
-    virtual void Create(uint64 totalSize, uint32 alignment = 16);
+    virtual void Create(EVulkanBufferBits bufferBits, uint64 totalSize, uint32 alignment = 16);
     virtual void Reset();
     virtual uint64 Alloc(uint64 allocSize);
 

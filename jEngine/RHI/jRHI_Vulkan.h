@@ -90,7 +90,8 @@ public:
     jFenceManager_Vulkan FenceManager;
 
     jQueryPool_Vulkan* QueryPool = nullptr;
-	std::vector<jRingBuffer_Vulkan*> RingBuffers;
+	std::vector<jRingBuffer_Vulkan*> UniformRingBuffers;
+	std::vector<jRingBuffer_Vulkan*> SSBORingBuffers;
 	std::vector<jDescriptorPool_Vulkan*> DescriptorPools;
 	//////////////////////////////////////////////////////////////////////////
 
@@ -172,7 +173,8 @@ public:
 	virtual jQueryPool* GetQueryPool() const override { return QueryPool; }
 	virtual jSwapchain* GetSwapchain() const override { return Swapchain; }
 
-	jRingBuffer_Vulkan* GetRingBuffer() const { return RingBuffers[CurrenFrameIndex]; }
+	jRingBuffer_Vulkan* GetUniformRingBuffer() const { return UniformRingBuffers[CurrenFrameIndex]; }
+	jRingBuffer_Vulkan* GetSSBORingBuffer() const { return SSBORingBuffers[CurrenFrameIndex]; }
 	jDescriptorPool_Vulkan* GetDescriptorPools() const { return DescriptorPools[CurrenFrameIndex]; }
 
 	virtual void Flush() const override;

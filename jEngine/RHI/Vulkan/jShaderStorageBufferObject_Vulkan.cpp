@@ -1,36 +1,36 @@
 ﻿#include "pch.h"
-#include "jUniformBufferBlock_Vulkan.h"
+#include "jShaderStorageBufferObject_Vulkan.h"
 #include "jVulkanBufferUtil.h"
 #include "../jRHI_Vulkan.h"
 #include "jRingBuffer_Vulkan.h"
 
-#define USE_RINGBUFFER_FOR_UNIFORMBUFFER 1
+#define USE_RINGBUFFER_FOR_SSBO 1
 
-void jUniformBufferBlock_Vulkan::Destroy()
+void jShaderStorageBufferObject_Vulkan::Destroy()
 {
 }
 
-void jUniformBufferBlock_Vulkan::Init(size_t size)
+void jShaderStorageBufferObject_Vulkan::Init(size_t size)
 {
     check(size);
 
     BufferPtr = std::make_shared<jBuffer_Vulkan>();
 
-#if USE_RINGBUFFER_FOR_UNIFORMBUFFER
+#if USE_RINGBUFFER_FOR_SSBO
     BufferPtr->HasBufferOwnership = false;
     BufferPtr->AllocatedSize = size;
 #else
-    jVulkanBufferUtil::CreateBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+    jVulkanBufferUtil::CreateBuffer(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
         | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, VkDeviceSize(size), *BufferPtr.get());
 #endif
 }
 
-void jUniformBufferBlock_Vulkan::UpdateBufferData(const void* InData, size_t InSize)
+void jShaderStorageBufferObject_Vulkan::UpdateBufferData(const void* InData, size_t InSize)
 {
     check(BufferPtr->AllocatedSize >= InSize);
 
-#if USE_RINGBUFFER_FOR_UNIFORMBUFFER
-    jRingBuffer_Vulkan* ringBuffer = g_rhi_vk->GetUniformRingBuffer();
+#if USE_RINGBUFFER_FOR_SSBO
+    jRingBuffer_Vulkan* ringBuffer = g_rhi_vk->GetSSBORingBuffer();
     BufferPtr->Offset = ringBuffer->Alloc(InSize);
     BufferPtr->AllocatedSize = InSize;
     BufferPtr->Buffer = ringBuffer->Buffer;
@@ -49,10 +49,10 @@ void jUniformBufferBlock_Vulkan::UpdateBufferData(const void* InData, size_t InS
     }
 }
 
-void jUniformBufferBlock_Vulkan::ClearBuffer(int32 clearValue)
+void jShaderStorageBufferObject_Vulkan::ClearBuffer(int32 clearValue)
 {
-#if USE_RINGBUFFER_FOR_UNIFORMBUFFER
-    jRingBuffer_Vulkan* ringBuffer = g_rhi_vk->GetUniformRingBuffer();
+#if USE_RINGBUFFER_FOR_SSBO
+    jRingBuffer_Vulkan* ringBuffer = g_rhi_vk->GetSSBORingBuffer();
     BufferPtr->Offset = ringBuffer->Alloc(BufferPtr->AllocatedSize);
     BufferPtr->AllocatedSize = BufferPtr->AllocatedSize;
     BufferPtr->Buffer = ringBuffer->Buffer;

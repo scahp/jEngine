@@ -8,11 +8,11 @@ jRingBuffer_Vulkan::~jRingBuffer_Vulkan()
     Release();
 }
 
-void jRingBuffer_Vulkan::Create(uint64 totalSize, uint32 alignment)
+void jRingBuffer_Vulkan::Create(EVulkanBufferBits bufferBits, uint64 totalSize, uint32 alignment)
 {
     Release();
 
-    jVulkanBufferUtil::CreateBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+    jVulkanBufferUtil::CreateBuffer(GetVulkanBufferBits(bufferBits), VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
         | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, VkDeviceSize(totalSize), Buffer, BufferMemory, RingBufferSize);
     
     RingBufferOffset = 0;
