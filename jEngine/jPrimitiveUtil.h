@@ -117,6 +117,11 @@ public:
 class jArrowSegmentPrimitive : public jObject
 {
 public:
+    virtual ~jArrowSegmentPrimitive()
+    {
+        delete SegmentObject;
+        delete ConeObject;
+    }
 	virtual void Update(float deltaTime) override;
 	virtual void Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount = 0) const override;
 
@@ -152,6 +157,7 @@ public:
     virtual ~jPointLightPrimitive()
     {
         delete BillboardObject;
+		delete SphereObject;
     }
 
 	virtual void Update(float deltaTime) override;

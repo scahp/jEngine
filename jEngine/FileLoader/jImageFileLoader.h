@@ -23,6 +23,18 @@ public:
 		return *_instance; 
 	}
 
+	static void ReleaseInstance()
+	{
+		if (_instance)
+		{
+			_instance->CachedImageDataMap.clear();
+			_instance->CachedTextureMap.clear();
+
+			delete _instance;
+			_instance = nullptr;
+		}
+	}
+
 	std::weak_ptr<jImageData> LoadImageDataFromFile(const jName& filename, bool sRGB = false, bool paddingRGBA = false);
 	std::weak_ptr<jTexture> LoadTextureFromFile(const jName& filename, bool sRGB = false, bool paddingRGBA = false);
 

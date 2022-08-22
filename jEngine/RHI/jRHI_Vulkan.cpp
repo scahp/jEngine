@@ -252,7 +252,8 @@ void jRHI_Vulkan::ReleaseRHI()
 {
 	Flush();
 
-    jImGUI_Vulkan::Get().ReleaseInstance();
+	jImageFileLoader::ReleaseInstance();
+    jImGUI_Vulkan::ReleaseInstance();
 
     RenderPassPool.Release();
     SamplerStatePool.Release();
