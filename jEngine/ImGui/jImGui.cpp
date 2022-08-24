@@ -10,7 +10,7 @@ jImGUI_Vulkan::jImGUI_Vulkan()
 {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGui_ImplGlfw_InitForOpenGL(g_rhi_vk->Window, true);
+    ImGui_ImplGlfw_InitForVulkan(g_rhi_vk->Window, true);
 
     DynamicBufferData.resize(g_rhi_vk->Swapchain->GetNumOfSwapchain());
     for (auto& iter : DynamicBufferData)

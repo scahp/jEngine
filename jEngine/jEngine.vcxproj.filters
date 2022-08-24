@@ -86,6 +86,9 @@
     <Filter Include="Code\Renderer">
       <UniqueIdentifier>{a6ab173f-cb50-4bf7-b61c-80a5213ac7c9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Code\RHI\DirectX12">
+      <UniqueIdentifier>{bbc6b4a7-6e2b-42a4-aa04-8cfcfd9a78ae}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Math\MathUtility.h">
@@ -108,30 +111,6 @@
     </ClInclude>
     <ClInclude Include="Core\jName.h">
       <Filter>Code\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="External\IMGUI\imgui_impl_vulkan.h">
-      <Filter>Code\External\IMGUI</Filter>
-    </ClInclude>
-    <ClInclude Include="External\IMGUI\imgui.h">
-      <Filter>Code\External\IMGUI</Filter>
-    </ClInclude>
-    <ClInclude Include="External\IMGUI\imgui_impl_glfw.h">
-      <Filter>Code\External\IMGUI</Filter>
-    </ClInclude>
-    <ClInclude Include="External\IMGUI\imgui_impl_opengl3.h">
-      <Filter>Code\External\IMGUI</Filter>
-    </ClInclude>
-    <ClInclude Include="External\IMGUI\imstb_rectpack.h">
-      <Filter>Code\External\IMGUI</Filter>
-    </ClInclude>
-    <ClInclude Include="External\IMGUI\imstb_textedit.h">
-      <Filter>Code\External\IMGUI</Filter>
-    </ClInclude>
-    <ClInclude Include="External\IMGUI\imstb_truetype.h">
-      <Filter>Code\External\IMGUI</Filter>
-    </ClInclude>
-    <ClInclude Include="External\IMGUI\imgui_internal.h">
-      <Filter>Code\External\IMGUI</Filter>
     </ClInclude>
     <ClInclude Include="ImGui\jImGui.h">
       <Filter>Code\ImGui</Filter>
@@ -322,6 +301,45 @@
     <ClInclude Include="Core\jLock.h">
       <Filter>Code\Core</Filter>
     </ClInclude>
+    <ClInclude Include="RHI\DirectX12\jShaderCompiler_DirectX12.h">
+      <Filter>Code\RHI\DirectX12</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DirectX12\jCommandQueue_DirectX12.h">
+      <Filter>Code\RHI\DirectX12</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DirectX12\jRHI_DirectX12.h">
+      <Filter>Code\RHI\DirectX12</Filter>
+    </ClInclude>
+    <ClInclude Include="External\IMGUI\imgui.h">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="External\IMGUI\imgui_impl_dx12.h">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="External\IMGUI\imgui_impl_glfw.h">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="External\IMGUI\imgui_impl_opengl3.h">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="External\IMGUI\imgui_impl_vulkan.h">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="External\IMGUI\imgui_impl_win32.h">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="External\IMGUI\imgui_internal.h">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="External\IMGUI\imstb_rectpack.h">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="External\IMGUI\imgui_impl_opengl3_loader.h">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="External\IMGUI\imstb_truetype.h">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -353,27 +371,6 @@
     </ClCompile>
     <ClCompile Include="Core\jName.cpp">
       <Filter>Code\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="External\IMGUI\imgui_impl_vulkan.cpp">
-      <Filter>Code\External\IMGUI</Filter>
-    </ClCompile>
-    <ClCompile Include="External\IMGUI\imgui.cpp">
-      <Filter>Code\External\IMGUI</Filter>
-    </ClCompile>
-    <ClCompile Include="External\IMGUI\imgui_impl_glfw.cpp">
-      <Filter>Code\External\IMGUI</Filter>
-    </ClCompile>
-    <ClCompile Include="External\IMGUI\imgui_impl_opengl3.cpp">
-      <Filter>Code\External\IMGUI</Filter>
-    </ClCompile>
-    <ClCompile Include="External\IMGUI\imgui_widgets.cpp">
-      <Filter>Code\External\IMGUI</Filter>
-    </ClCompile>
-    <ClCompile Include="External\IMGUI\imgui_draw.cpp">
-      <Filter>Code\External\IMGUI</Filter>
-    </ClCompile>
-    <ClCompile Include="External\IMGUI\imgui_demo.cpp">
-      <Filter>Code\External\IMGUI</Filter>
     </ClCompile>
     <ClCompile Include="ImGui\jImGui.cpp">
       <Filter>Code\ImGui</Filter>
@@ -542,6 +539,45 @@
     </ClCompile>
     <ClCompile Include="RHI\Vulkan\jShaderStorageBufferObject_Vulkan.cpp">
       <Filter>Code\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DirectX12\jShaderCompiler_DirectX12.cpp">
+      <Filter>Code\RHI\DirectX12</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DirectX12\jCommandQueue_DirectX12.cpp">
+      <Filter>Code\RHI\DirectX12</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DirectX12\jRHI_DirectX12.cpp">
+      <Filter>Code\RHI\DirectX12</Filter>
+    </ClCompile>
+    <ClCompile Include="External\IMGUI\imgui.cpp">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="External\IMGUI\imgui_demo.cpp">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="External\IMGUI\imgui_draw.cpp">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="External\IMGUI\imgui_impl_dx12.cpp">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="External\IMGUI\imgui_impl_glfw.cpp">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="External\IMGUI\imgui_impl_opengl3.cpp">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="External\IMGUI\imgui_impl_vulkan.cpp">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="External\IMGUI\imgui_impl_win32.cpp">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="External\IMGUI\imgui_widgets.cpp">
+      <Filter>Code\External\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="External\IMGUI\imgui_tables.cpp">
+      <Filter>Code\External\IMGUI</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

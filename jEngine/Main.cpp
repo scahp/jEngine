@@ -5,6 +5,7 @@
 #include <iostream>
 #include "jEngine.h"
 #include "Profiler/jPerformanceProfile.h"
+#include "RHI/DirectX12/jRHI_DirectX12.h"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
@@ -28,6 +29,13 @@ std::vector<VkPipeline> Pipelines;
 
 int main()
 {
+    jRHI_DirectX12 dx12;
+    dx12.m_hWnd = dx12.CreateMainWindow();
+    dx12.Initialize();
+    dx12.Run();
+    dx12.Release();
+	return 0;
+
 	//::ShowWindow(::GetConsoleWindow(), SW_HIDE);		// hide console window
 
 	g_rhi->InitRHI();

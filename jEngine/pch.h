@@ -73,15 +73,20 @@ using tchar = wchar_t;
 
 #include "External/cityhash/city.h"
 
-#define JASSERT(x) assert(x)
-#define JMESSAGE(x) MessageBoxA(0, x, "", MB_OK)
-
 #define ensure(x) (((x) || (JASSERT(0), 0)))
 #define check(x) JASSERT(x)
 #if _DEBUG
 #define verify(x) JASSERT(x)
+#define JOK(a) (SUCCEEDED(a) ? true : (assert(!(#a)), false))
+#define JFAIL(a) (!JOK(a))
+#define JASSERT(a) ((a) ? true : (assert(#a), false))
+#define JMESSAGE(x) MessageBoxA(0, x, "", MB_OK)
 #else
 #define verify(x) (x)
+#define JOK(a) (a)
+#define JFAIL(a) (a)
+#define JASSERT(a) (a)
+#define JMESSAGE(a) (a)
 #endif
 
 #include "RHI/jRHIType.h"
@@ -101,6 +106,15 @@ using tchar = wchar_t;
 #else
 #endif
 
+#include <d3d12.h>
+#include <d3dx12.h>
+#include <wrl.h>
+#include <dxgi1_6.h>
+#include <d3dcompiler.h>
+#include <DirectXMath.h>
+#include "IMGUI/imgui_impl_win32.h"
+#include "IMGUI/imgui_impl_dx12.h"
+
 // imgui
 #include "IMGUI/imgui.h"
 #include "IMGUI/imgui_impl_glfw.h"
@@ -108,23 +122,24 @@ using tchar = wchar_t;
 #include "ImGui/jImGui.h"
 
 // settings
-const unsigned int SCR_WIDTH = 1280;
-const unsigned int SCR_HEIGHT = 720;
+extern int32 SCR_WIDTH;
+extern int32 SCR_HEIGHT;
+extern bool IsSizeMinimize;
 
-const unsigned int SM_WIDTH = 1024;
-const unsigned int SM_HEIGHT = 1024;
+const uint32 SM_WIDTH = 1024;
+const uint32 SM_HEIGHT = 1024;
 
-const unsigned int SM_ARRAY_WIDTH = 512;
-const unsigned int SM_ARRAY_HEIGHT = 512;
+const uint32 SM_ARRAY_WIDTH = 512;
+const uint32 SM_ARRAY_HEIGHT = 512;
 
-const unsigned int SM_LINKED_LIST_WIDTH = SM_WIDTH;
-const unsigned int SM_LINKED_LIST_HEIGHT = SM_HEIGHT;
+const uint32 SM_LINKED_LIST_WIDTH = SM_WIDTH;
+const uint32 SM_LINKED_LIST_HEIGHT = SM_HEIGHT;
 
-const unsigned int LUMINANCE_WIDTH = 512;
-const unsigned int LUMINANCE_HEIGHT = 512;
+const uint32 LUMINANCE_WIDTH = 512;
+const uint32 LUMINANCE_HEIGHT = 512;
 
-constexpr int NUM_CASCADES = 3;
-constexpr int NUM_FRUSTUM_CORNERS = 8;
+constexpr int32 NUM_CASCADES = 3;
+constexpr int32 NUM_FRUSTUM_CORNERS = 8;
 
 #define FORCEINLINE __forceinline
 
