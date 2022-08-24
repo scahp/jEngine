@@ -35,8 +35,16 @@ void jUniformBufferBlock_Vulkan::UpdateBufferData(const void* InData, size_t InS
     BufferPtr->AllocatedSize = InSize;
     BufferPtr->Buffer = ringBuffer->Buffer;
     BufferPtr->BufferMemory = ringBuffer->BufferMemory;
-#endif
 
+    if (ensure(ringBuffer->MappedPointer))
+    {
+        char* startAddr = ((char*)ringBuffer->MappedPointer) + BufferPtr->Offset;
+        if (InData)
+            memcpy(startAddr, InData, InSize);
+        else
+            memset(startAddr, 0, InSize);
+    }
+#else
     if (BufferPtr->Buffer && BufferPtr->BufferMemory)
     {
         void* data = nullptr;
@@ -47,6 +55,7 @@ void jUniformBufferBlock_Vulkan::UpdateBufferData(const void* InData, size_t InS
             memset(data, 0, InSize);
         vkUnmapMemory(g_rhi_vk->Device, BufferPtr->BufferMemory);
     }
+#endif
 }
 
 void jUniformBufferBlock_Vulkan::ClearBuffer(int32 clearValue)
@@ -57,8 +66,13 @@ void jUniformBufferBlock_Vulkan::ClearBuffer(int32 clearValue)
     BufferPtr->AllocatedSize = BufferPtr->AllocatedSize;
     BufferPtr->Buffer = ringBuffer->Buffer;
     BufferPtr->BufferMemory = ringBuffer->BufferMemory;
-#endif
 
+    if (ensure(ringBuffer->MappedPointer))
+    {
+        char* startAddr = ((char*)ringBuffer->MappedPointer) + BufferPtr->Offset;
+        memset(startAddr, 0, BufferPtr->AllocatedSize);
+    }
+#else
     if (BufferPtr->Buffer && BufferPtr->BufferMemory)
     {
         void* data = nullptr;
@@ -66,4 +80,5 @@ void jUniformBufferBlock_Vulkan::ClearBuffer(int32 clearValue)
         memset(data, clearValue, BufferPtr->AllocatedSize);
         vkUnmapMemory(g_rhi_vk->Device, BufferPtr->BufferMemory);
     }
+#endif
 }

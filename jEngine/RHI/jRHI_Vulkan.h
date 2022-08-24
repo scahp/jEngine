@@ -24,15 +24,15 @@ class jRHI_Vulkan : public jRHI
 public:
     static std::unordered_map<size_t, VkPipelineLayout> PipelineLayoutPool;
     static std::unordered_map<size_t, jShaderBindingsLayout*> ShaderBindingPool;
-    static TResourcePool<jSamplerStateInfo_Vulkan> SamplerStatePool;
-    static TResourcePool<jRasterizationStateInfo_Vulkan> RasterizationStatePool;
-    static TResourcePool<jMultisampleStateInfo_Vulkan> MultisampleStatePool;
-    static TResourcePool<jStencilOpStateInfo_Vulkan> StencilOpStatePool;
-    static TResourcePool<jDepthStencilStateInfo_Vulkan> DepthStencilStatePool;
-    static TResourcePool<jBlendingStateInfo_Vulakn> BlendingStatePool;
-    static TResourcePool<jPipelineStateInfo_Vulkan> PipelineStatePool;
-	static TResourcePool<jRenderPass_Vulkan> RenderPassPool;
-	static TResourcePool<jShader_Vulkan> ShaderPool;
+    static TResourcePool<jSamplerStateInfo_Vulkan, jMutexLock> SamplerStatePool;
+    static TResourcePool<jRasterizationStateInfo_Vulkan, jMutexLock> RasterizationStatePool;
+    static TResourcePool<jMultisampleStateInfo_Vulkan, jMutexLock> MultisampleStatePool;
+    static TResourcePool<jStencilOpStateInfo_Vulkan, jMutexLock> StencilOpStatePool;
+    static TResourcePool<jDepthStencilStateInfo_Vulkan, jMutexLock> DepthStencilStatePool;
+    static TResourcePool<jBlendingStateInfo_Vulakn, jMutexLock> BlendingStatePool;
+    static TResourcePool<jPipelineStateInfo_Vulkan, jMutexLock> PipelineStatePool;
+	static TResourcePool<jRenderPass_Vulkan, jMutexLock> RenderPassPool;
+	static TResourcePool<jShader_Vulkan, jMutexLock> ShaderPool;
 
 	jRHI_Vulkan();
 	virtual ~jRHI_Vulkan();
@@ -93,6 +93,9 @@ public:
 	std::vector<jRingBuffer_Vulkan*> UniformRingBuffers;
 	std::vector<jRingBuffer_Vulkan*> SSBORingBuffers;
 	std::vector<jDescriptorPool_Vulkan*> DescriptorPools;
+
+	mutable jMutexLock ShaderBindingPoolLock;
+	mutable jMutexLock PipelineLayoutPoolLock;
 	//////////////////////////////////////////////////////////////////////////
 
     VkCommandBuffer BeginSingleTimeCommands() const;

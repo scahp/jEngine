@@ -1,9 +1,11 @@
 #pragma once
+#include "jLock.h"
 
 struct jName
 {
 private:
 	static std::unordered_map<uint32, std::shared_ptr<std::string>> s_NameTable;
+	static jMutexRWLock Lock;
 
 public:
 	const static jName Invalid;
@@ -47,22 +49,28 @@ public:
 		check(pName);
 		const uint32 NewNameHash = GenerateNameHash(pName, size);
 
-		const auto find_it = s_NameTable.find(NewNameHash);
-		if (s_NameTable.end() != find_it)
 		{
-			NameHash = NewNameHash;
-            NameString = find_it->second->c_str();
-            NameStringLength = find_it->second->size();
-			return;
+			jScopeReadLock sr(&Lock);
+			const auto find_it = s_NameTable.find(NewNameHash);
+			if (s_NameTable.end() != find_it)
+			{
+				NameHash = NewNameHash;
+				NameString = find_it->second->c_str();
+				NameStringLength = find_it->second->size();
+				return;
+			}
 		}
 
-		const auto it_ret = s_NameTable.emplace(NewNameHash, CreateNewName_Internal(pName, NewNameHash));
-		if (it_ret.second)
 		{
-			NameHash = NewNameHash;
-			NameString = it_ret.first->second->c_str();
-			NameStringLength = it_ret.first->second->size();
-			return;
+			jScopeWriteLock sw(&Lock);
+			const auto it_ret = s_NameTable.emplace(NewNameHash, CreateNewName_Internal(pName, NewNameHash));
+			if (it_ret.second)
+			{
+				NameHash = NewNameHash;
+				NameString = it_ret.first->second->c_str();
+				NameStringLength = it_ret.first->second->size();
+				return;
+			}
 		}
 
 		check(0);
@@ -96,14 +104,17 @@ public:
 		if (NameString)
 			return NameString;
 
-		const auto it_find = s_NameTable.find(NameHash);
-		if (it_find == s_NameTable.end())
-			return nullptr;
+		{
+			jScopeReadLock s(&Lock);
+			const auto it_find = s_NameTable.find(NameHash);
+			if (it_find == s_NameTable.end())
+				return nullptr;
 
-        NameString = it_find->second->c_str();
-        NameStringLength = it_find->second->size();
+			NameString = it_find->second->c_str();
+			NameStringLength = it_find->second->size();
 
-		return it_find->second->c_str();
+			return it_find->second->c_str();
+		}
 	}
 	FORCEINLINE const size_t GetStringLength() const
 	{
@@ -113,14 +124,17 @@ public:
 		if (!NameStringLength)
 			return NameStringLength;
 
-		const auto it_find = s_NameTable.find(NameHash);
-		if (it_find == s_NameTable.end())
-			return 0;
+		{
+			jScopeReadLock s(&Lock);
+			const auto it_find = s_NameTable.find(NameHash);
+			if (it_find == s_NameTable.end())
+				return 0;
 
-		NameString = it_find->second->c_str();
-		NameStringLength = it_find->second->size();
+			NameString = it_find->second->c_str();
+			NameStringLength = it_find->second->size();
 
-		return NameStringLength;
+			return NameStringLength;
+		}
 	}
 	FORCEINLINE uint32 GetNameHash() const { return NameHash; }
 

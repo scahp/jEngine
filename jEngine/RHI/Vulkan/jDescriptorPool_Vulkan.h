@@ -32,5 +32,6 @@ struct jDescriptorPool_Vulkan
     uint32 MaxDescriptorSets = 128;
     uint32 PoolSizes[_countof(DefaultPoolSizes)];
     VkDescriptorPool DescriptorPool = nullptr;;
+    mutable jMutexLock DescriptorPoolLock;
 };
 

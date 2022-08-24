@@ -5,6 +5,7 @@
 #include "Scene/jLight.h"
 #include "Scene/jObject.h"
 #include "RHI/jFrameBufferPool.h"
+#include "RHI/Vulkan/jUniformBufferBlock_Vulkan.h"
 
 
 jRenderObject::jRenderObject()
@@ -27,12 +28,6 @@ jRenderObject::~jRenderObject()
 	// 다른 곳에서 레퍼런싱 한 데이터는 nullptr 로 비워줌
     tex_object_array = nullptr;
     samplerStateTexArray = nullptr;
-
-	// UniofrmBuffer를 해제 해줌
-	delete RenderObjectUniformBuffer;
-	RenderObjectUniformBuffer = nullptr;
-	
-	ShaderBindingInstance = nullptr;		// Pool 에서 제거되기 때문에 nullptr 로 초기화만 해줌
 }
 
 void jRenderObject::CreateRenderObject(const std::shared_ptr<jVertexStreamData>& vertexStream, const std::shared_ptr<jIndexStreamData>& indexStream)
@@ -297,7 +292,7 @@ void jRenderObject::ClearTexture()
 	MaterialData.Clear();
 }
 
-void jRenderObject::UpdateRenderObjectUniformBuffer(const jView* view)
+jShaderBindingInstance* jRenderObject::CreateRenderObjectUniformBuffer(const jView* view)
 {
 	check(view);
 	check(view->Camera);
@@ -309,7 +304,21 @@ void jRenderObject::UpdateRenderObjectUniformBuffer(const jView* view)
 	ubo.MV = ubo.MV;
 	ubo.InvM = ubo.M;
 
-	if (!RenderObjectUniformBuffer)
-		RenderObjectUniformBuffer = CreateRenderObjectUniformBuffer();
-	RenderObjectUniformBuffer->UpdateBufferData(&ubo, sizeof(ubo));
+	jUniformBufferBlock_Vulkan OneFrameUniformBuffer(jName("RenderObjectUniformParameters"));
+	OneFrameUniformBuffer.Init(sizeof(ubo));
+	OneFrameUniformBuffer.UpdateBufferData(&ubo, sizeof(ubo));
+
+    int32 BindingPoint = 0;
+    std::vector<jShaderBinding> ShaderBindings;
+    ShaderBindings.reserve(1 + MaterialData.Params.size());
+    ShaderBindings.emplace_back(jShaderBinding(BindingPoint++, EShaderBindingType::UNIFORMBUFFER
+        , EShaderAccessStageFlag::ALL_GRAPHICS, std::make_shared<jUniformBufferResource>(&OneFrameUniformBuffer)));
+
+    for (int32 i = 0; i < (int32)MaterialData.Params.size(); ++i)
+    {
+        ShaderBindings.emplace_back(jShaderBinding(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV
+            , EShaderAccessStageFlag::ALL_GRAPHICS, std::make_shared<jTextureResource>(MaterialData.Params[i].Texture, MaterialData.Params[i].SamplerState)));
+    }
+
+    return g_rhi->CreateShaderBindingInstance(ShaderBindings);
 }

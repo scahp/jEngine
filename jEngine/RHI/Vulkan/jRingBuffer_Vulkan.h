@@ -28,5 +28,7 @@ struct jRingBuffer_Vulkan : public jBuffer
     VkDeviceMemory BufferMemory = nullptr;
     uint64 RingBufferSize = 0;
     void* MappedPointer = nullptr;
+
+    jMutexLock Lock;
 };
 

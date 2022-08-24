@@ -18,14 +18,11 @@ jDrawCommand::jDrawCommand(std::shared_ptr<jRenderFrameContext> InRenderFrameCon
 
 void jDrawCommand::PrepareToDraw(bool bPositionOnly)
 {
-    RenderObject->UpdateRenderObjectUniformBuffer(View);
-    RenderObject->PrepareShaderBindingInstance();
-
     // GetShaderBindings
     View->GetShaderBindingInstance(ShaderBindingInstances);
 
     // GetShaderBindings
-    RenderObject->GetShaderBindingInstance(ShaderBindingInstances);
+    ShaderBindingInstances.push_back(RenderObject->CreateRenderObjectUniformBuffer(View));
 
     // Bind ShaderBindings
     std::vector<const jShaderBindingsLayout*> shaderBindings;

@@ -53,7 +53,9 @@ using tchar = wchar_t;
 #include <unordered_map>
 #include <unordered_set>
 #include <thread>
+#include <future>
 #include <mutex>
+#include <shared_mutex>
 
 #include <memory>
 #include <stdexcept>
@@ -67,6 +69,7 @@ using tchar = wchar_t;
 #include <optional>
 #include <chrono>
 #include <fstream>
+#include <execution>
 
 #include "External/cityhash/city.h"
 
@@ -155,6 +158,7 @@ extern float g_timeDeltaSecond;
 //#define DEBUG_OUTPUT_LEVEL 1	// show mid priority
 #define DEBUG_OUTPUT_LEVEL 2	// show high priority
 
+#include "Core/jLock.h"
 #include "Core/jName.h"
 
 // string type city hash generator

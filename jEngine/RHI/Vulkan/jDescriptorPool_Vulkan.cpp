@@ -21,6 +21,8 @@ void jDescriptorPool_Vulkan::Create(uint32 InMaxDescriptorSets)
         DescriptorPool = nullptr;
 
 #if !USE_RESET_DESCRIPTOR_POOL
+        jScopedLock s(&DescriptorPoolLock);
+
         PendingDescriptorSets.clear();
         RunningDescriptorSets.clear();
 #endif
@@ -58,6 +60,7 @@ void jDescriptorPool_Vulkan::Reset()
 #if USE_RESET_DESCRIPTOR_POOL
     verify(VK_SUCCESS == vkResetDescriptorPool(g_rhi_vk->Device, DescriptorPool, 0));
 #else
+    jScopedLock s(&DescriptorPoolLock);
     for (auto& iter : RunningDescriptorSets)
     {
         std::vector<jShaderBindingInstance_Vulkan*>& descriptorSets = PendingDescriptorSets[iter.first];
@@ -69,6 +72,7 @@ void jDescriptorPool_Vulkan::Reset()
 
 jShaderBindingInstance_Vulkan* jDescriptorPool_Vulkan::AllocateDescriptorSet(VkDescriptorSetLayout InLayout)
 {
+    jScopedLock s(&DescriptorPoolLock);
 #if !USE_RESET_DESCRIPTOR_POOL
     const auto it_find = PendingDescriptorSets.find(InLayout);
     if (it_find != PendingDescriptorSets.end())
@@ -112,20 +116,24 @@ void jDescriptorPool_Vulkan::Release()
         DescriptorPool = nullptr;
     }
 
-    for (auto& iter : PendingDescriptorSets)
     {
-        std::vector<jShaderBindingInstance_Vulkan*>& instances = iter.second;
-        for (auto& inst : instances)
-            delete inst;
-    }
-    PendingDescriptorSets.clear();
+        jScopedLock s(&DescriptorPoolLock);
 
-    for (auto& iter : RunningDescriptorSets)
-    {
-        std::vector<jShaderBindingInstance_Vulkan*>& instances = iter.second;
-        for (auto& inst : instances)
-            delete inst;
+        for (auto& iter : PendingDescriptorSets)
+        {
+            std::vector<jShaderBindingInstance_Vulkan*>& instances = iter.second;
+            for (auto& inst : instances)
+                delete inst;
+        }
+        PendingDescriptorSets.clear();
+
+        for (auto& iter : RunningDescriptorSets)
+        {
+            std::vector<jShaderBindingInstance_Vulkan*>& instances = iter.second;
+            for (auto& inst : instances)
+                delete inst;
+        }
+        RunningDescriptorSets.clear();
     }
-    RunningDescriptorSets.clear();
 }
 

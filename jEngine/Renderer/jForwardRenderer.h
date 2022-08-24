@@ -23,6 +23,9 @@ public:
     // Pass 별 Context 를 만들어서 넣도록 할 예정
     jView ShadowView;
 
+    std::future<void> ShadowPassSetupFinishEvent;
+    std::future<void> BasePassSetupFinishEvent;
+
     std::vector<jDrawCommand> ShadowPasses;
     std::vector<jDrawCommand> BasePasses;
 

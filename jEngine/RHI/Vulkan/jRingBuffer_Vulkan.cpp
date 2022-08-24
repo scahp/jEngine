@@ -10,6 +10,8 @@ jRingBuffer_Vulkan::~jRingBuffer_Vulkan()
 
 void jRingBuffer_Vulkan::Create(EVulkanBufferBits bufferBits, uint64 totalSize, uint32 alignment)
 {
+    jScopedLock s(&Lock);
+
     Release();
 
     jVulkanBufferUtil::CreateBuffer(GetVulkanBufferBits(bufferBits), VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
@@ -17,15 +19,22 @@ void jRingBuffer_Vulkan::Create(EVulkanBufferBits bufferBits, uint64 totalSize, 
     
     RingBufferOffset = 0;
     Alignment = alignment;
+
+    // 수정할 수 있게 바로 Map 사용
+    Map(0, RingBufferSize);
 }
 
 void jRingBuffer_Vulkan::Reset()
 {
+    jScopedLock s(&Lock);
+
     RingBufferOffset = 0;
 }
 
 uint64 jRingBuffer_Vulkan::Alloc(uint64 allocSize)
 {
+    jScopedLock s(&Lock);
+
     const uint64 allocOffset = Align<uint64>(RingBufferOffset, Alignment);
     if (allocOffset + allocSize <= RingBufferSize)
     {

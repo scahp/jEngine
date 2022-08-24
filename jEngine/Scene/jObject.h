@@ -19,13 +19,13 @@ public:
 	static void RemoveObject(jObject* object);
 	static void FlushDirtyState();
 
-	static const std::list<jObject*>& GetShadowCasterObject() { return s_ShadowCasterObject; }
-	static const std::list<jObject*>& GetStaticObject() { return s_StaticObjects; }
-	static const std::list<jObject*>& GetBoundBoxObject() { return s_BoundBoxObjects; }
-	static const std::list<jObject*>& GetBoundSphereObject() { return s_BoundSphereObjects; }
-	static const std::list<jObject*>& GetDebugObject() { return s_DebugObjects; }
-	static const std::list<jObject*>& GetUIObject() { return s_UIObjects; }
-	static const std::list<jObject*>& GetUIDebugObject() { return s_UIDebugObjects; }
+	static const std::vector<jObject*>& GetShadowCasterObject() { return s_ShadowCasterObject; }
+	static const std::vector<jObject*>& GetStaticObject() { return s_StaticObjects; }
+	static const std::vector<jObject*>& GetBoundBoxObject() { return s_BoundBoxObjects; }
+	static const std::vector<jObject*>& GetBoundSphereObject() { return s_BoundSphereObjects; }
+	static const std::vector<jObject*>& GetDebugObject() { return s_DebugObjects; }
+	static const std::vector<jObject*>& GetUIObject() { return s_UIObjects; }
+	static const std::vector<jObject*>& GetUIDebugObject() { return s_UIDebugObjects; }
 
 	static void AddBoundBoxObject(jObject* object);
 	static void RemoveBoundBoxObject(jObject* object);
@@ -74,13 +74,13 @@ public:
 	jBoundSphere BoundSphere;
 
 private:
-	static std::list<jObject*> s_ShadowCasterObject;
-	static std::list<jObject*> s_StaticObjects;
-	static std::list<jObject*> s_BoundBoxObjects;
-	static std::list<jObject*> s_BoundSphereObjects;
-	static std::list<jObject*> s_DebugObjects;
-	static std::list<jObject*> s_UIObjects;
-	static std::list<jObject*> s_UIDebugObjects;
+	static std::vector<jObject*> s_ShadowCasterObject;
+	static std::vector<jObject*> s_StaticObjects;
+	static std::vector<jObject*> s_BoundBoxObjects;
+	static std::vector<jObject*> s_BoundSphereObjects;
+	static std::vector<jObject*> s_DebugObjects;
+	static std::vector<jObject*> s_UIObjects;
+	static std::vector<jObject*> s_UIDebugObjects;
 	static std::set<jObject*> s_DirtyStateObjects;
 };
 

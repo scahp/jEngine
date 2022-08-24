@@ -21,8 +21,8 @@ void jForwardRenderer::Setup()
         View.DirectionalLight->PrepareShaderBindingInstance();
     }
 
-    SetupShadowPass();
-    SetupBasePass();
+    ShadowPassSetupFinishEvent = std::async(std::launch::async, &jForwardRenderer::SetupShadowPass, this);
+    BasePassSetupFinishEvent = std::async(std::launch::async, &jForwardRenderer::SetupBasePass, this);
 }
 
 void jForwardRenderer::SetupShadowPass()
@@ -129,6 +129,8 @@ void jForwardRenderer::Render()
 
 void jForwardRenderer::ShadowPass()
 {
+    ShadowPassSetupFinishEvent.wait();
+
     SCOPE_GPU_PROFILE(RenderFrameContextPtr, ShadowPass);
 
     g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, View.DirectionalLight->ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_ATTACHMENT);
@@ -147,6 +149,8 @@ void jForwardRenderer::ShadowPass()
 
 void jForwardRenderer::OpaquePass()
 {
+    BasePassSetupFinishEvent.wait();
+
     SCOPE_GPU_PROFILE(RenderFrameContextPtr, BasePass);
 
     g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, RenderFrameContextPtr->SceneRenderTarget->ColorPtr->GetTexture(), EImageLayout::COLOR_ATTACHMENT);

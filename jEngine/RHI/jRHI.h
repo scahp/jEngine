@@ -498,48 +498,6 @@ jName GetCommonTextureName(int32 index);
 jName GetCommonTextureSRGBName(int32 index);
 
 //////////////////////////////////////////////////////////////////////////
-
-class jLock
-{
-public:
-	virtual ~jLock() {}
-	virtual void Lock() {}
-	virtual void Unlock() {}
-};
-
-using jEmptyLock = jLock;
-
-class jMutexLock : public jLock
-{
-	void Lock()
-	{
-		lock.lock();
-	}
-	void Unlock()
-	{
-		lock.unlock();
-	}
-
-	std::mutex lock;
-};
-
-class jScopedLock
-{
-public:
-	jScopedLock(jLock* InLock)
-		: ScopedLock(InLock)
-	{
-		if (ScopedLock)
-			ScopedLock->Lock();
-	}
-	~jScopedLock()
-	{
-		if (ScopedLock)
-			ScopedLock->Unlock();
-	}
-	jLock* ScopedLock;
-};
-
 template <typename T, typename LOCK_TYPE = jEmptyLock>
 class TResourcePool
 {

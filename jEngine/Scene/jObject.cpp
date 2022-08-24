@@ -3,17 +3,17 @@
 #include "jRenderObject.h"
 #include "jPrimitiveUtil.h"
 
-std::list<jObject*> jObject::s_ShadowCasterObject;
-std::list<jObject*> jObject::s_StaticObjects;
-std::list<jObject*> jObject::s_BoundBoxObjects;
-std::list<jObject*> jObject::s_BoundSphereObjects;
-std::list<jObject*> jObject::s_DebugObjects;
+std::vector<jObject*> jObject::s_ShadowCasterObject;
+std::vector<jObject*> jObject::s_StaticObjects;
+std::vector<jObject*> jObject::s_BoundBoxObjects;
+std::vector<jObject*> jObject::s_BoundSphereObjects;
+std::vector<jObject*> jObject::s_DebugObjects;
 std::set<jObject*> jObject::s_DirtyStateObjects;
-std::list<jObject*> jObject::s_UIObjects;
-std::list<jObject*> jObject::s_UIDebugObjects;
+std::vector<jObject*> jObject::s_UIObjects;
+std::vector<jObject*> jObject::s_UIDebugObjects;
 
 //std::list<jObject*> g_StaticObjectArray;
-std::list<jObject*> g_HairObjectArray;
+std::vector<jObject*> g_HairObjectArray;
 
 void jObject::AddObject(jObject* object)
 {
@@ -36,14 +36,14 @@ void jObject::RemoveObject(jObject* object)
 {
 	if (!object)
 		return;
-	s_ShadowCasterObject.remove_if([&object](jObject* param)
+	s_ShadowCasterObject.erase(std::remove_if(s_ShadowCasterObject.begin(), s_ShadowCasterObject.end(), [&object](jObject* param)
 	{
 		return (param == object);
-	});
-	s_StaticObjects.remove_if([&object](jObject* param)
+	}));
+	s_StaticObjects.erase(std::remove_if(s_StaticObjects.begin(), s_StaticObjects.end(), [&object](jObject* param)
 	{
 		return (param == object);
-	});
+	}));
 }
 
 void jObject::FlushDirtyState()
@@ -79,10 +79,10 @@ void jObject::RemoveBoundBoxObject(jObject* object)
 {
 	if (!object)
 		return;
-	s_BoundBoxObjects.remove_if([&object](jObject* param)
+	s_BoundBoxObjects.erase(std::remove_if(s_BoundBoxObjects.begin(), s_BoundBoxObjects.end(), [&object](jObject* param)
 	{
 		return (param == object);
-	});
+	}));
 }
 
 void jObject::AddBoundSphereObject(jObject* object)
@@ -96,10 +96,10 @@ void jObject::RemoveBoundSphereObject(jObject* object)
 {
 	if (!object)
 		return;
-	s_BoundSphereObjects.remove_if([&object](jObject* param)
+	s_BoundSphereObjects.erase(std::remove_if(s_BoundSphereObjects.begin(), s_BoundSphereObjects.end(), [&object](jObject* param)
 	{
 		return (param == object);
-	});
+	}));
 }
 
 void jObject::AddDebugObject(jObject* object)
@@ -113,10 +113,10 @@ void jObject::RemoveDebugObject(jObject* object)
 {
 	if (!object)
 		return;
-	s_DebugObjects.remove_if([&object](jObject* param)
-		{
-			return (param == object);
-		});
+	s_DebugObjects.erase(std::remove_if(s_DebugObjects.begin(), s_DebugObjects.end(), [&object](jObject* param)
+	{
+		return (param == object);
+	}));
 }
 
 void jObject::AddUIObject(jObject* object)
@@ -130,10 +130,10 @@ void jObject::RemoveUIObject(jObject* object)
 {
 	if (!object)
 		return;
-	s_UIObjects.remove_if([&object](jObject* param)
-		{
-			return (param == object);
-		});
+	s_UIObjects.erase(std::remove_if(s_UIObjects.begin(), s_UIObjects.end(), [&object](jObject* param)
+	{
+		return (param == object);
+	}));
 }
 
 void jObject::AddUIDebugObject(jObject* object)
@@ -147,10 +147,10 @@ void jObject::RemoveUIDebugObject(jObject* object)
 {
 	if (!object)
 		return;
-	s_UIDebugObjects.remove_if([&object](jObject* param)
-		{
-			return (param == object);
-		});
+	s_UIDebugObjects.erase(std::remove_if(s_UIDebugObjects.begin(), s_UIDebugObjects.end(), [&object](jObject* param)
+	{
+		return (param == object);
+	}));
 }
 //////////////////////////////////////////////////////////////////////////
 jObject::jObject()

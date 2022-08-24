@@ -107,6 +107,7 @@ xcopy /s /y /d  "$(ProjectDir)External\ShaderConductor\Lib\Debug\*.dll" "$(OutDi
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="Core\jLock.h" />
     <ClInclude Include="Core\jName.h" />
     <ClInclude Include="External\cityhash\city.h" />
     <ClInclude Include="External\cityhash\citycrc.h" />

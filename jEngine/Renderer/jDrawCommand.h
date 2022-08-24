@@ -10,6 +10,7 @@ struct jShaderBindingInstance;
 class jDrawCommand
 {
 public:
+    jDrawCommand() = default;
     jDrawCommand(std::shared_ptr<jRenderFrameContext> InRenderFrameContextPtr, jView* view, jRenderObject* renderObject
         , jRenderPass* renderPass, jShader* shader, jPipelineStateFixedInfo* pipelineStateFixed, std::vector<jShaderBindingInstance*> shaderBindingInstances);
 

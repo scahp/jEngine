@@ -95,47 +95,7 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// RenderObjectUniformBuffer
-	FORCEINLINE IUniformBufferBlock* CreateRenderObjectUniformBuffer() const
-	{
-		return g_rhi->CreateUniformBufferBlock("RenderObjectUniformParameters", sizeof(jRenderObjectUniformBuffer));
-	}
-
-	void UpdateRenderObjectUniformBuffer(const jView* view);
-
-	void SetupRenderObjectUniformBuffer(const jView* view)
-	{
-		RenderObjectUniformBuffer = CreateRenderObjectUniformBuffer();
-
-		UpdateRenderObjectUniformBuffer(view);
-	}
-
-	IUniformBufferBlock* RenderObjectUniformBuffer = nullptr;
-	//////////////////////////////////////////////////////////////////////////
-
-	//////////////////////////////////////////////////////////////////////////
-	jShaderBindingInstance* ShaderBindingInstance = nullptr;
-	bool NeedUpdateRenderObjectUniformBuffer = true;
-	void PrepareShaderBindingInstance()
-	{
-		int32 BindingPoint = 0;
-		std::vector<jShaderBinding> ShaderBindings;
-		ShaderBindings.reserve(1 + MaterialData.Params.size());
-		ShaderBindings.emplace_back(jShaderBinding(BindingPoint++, EShaderBindingType::UNIFORMBUFFER
-			, EShaderAccessStageFlag::ALL_GRAPHICS, std::make_shared<jUniformBufferResource>(RenderObjectUniformBuffer)));
-
-        for (int32 i = 0; i < (int32)MaterialData.Params.size(); ++i)
-        {
-			ShaderBindings.emplace_back(jShaderBinding(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV
-				, EShaderAccessStageFlag::ALL_GRAPHICS, std::make_shared<jTextureResource>(MaterialData.Params[i].Texture, MaterialData.Params[i].SamplerState)));
-        }
-
-		ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindings);
-	}
-	void GetShaderBindingInstance(std::vector<jShaderBindingInstance*>& OutShaderBindingInstance)
-	{
-		check(ShaderBindingInstance);
-		OutShaderBindingInstance.push_back(ShaderBindingInstance);
-	}
+	jShaderBindingInstance* CreateRenderObjectUniformBuffer(const jView* view);
 	//////////////////////////////////////////////////////////////////////////
 
 private:
