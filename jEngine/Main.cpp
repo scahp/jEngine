@@ -29,12 +29,12 @@ std::vector<VkPipeline> Pipelines;
 
 int main()
 {
-    jRHI_DirectX12 dx12;
-    dx12.m_hWnd = dx12.CreateMainWindow();
-    dx12.Initialize();
-    dx12.Run();
-    dx12.Release();
-	return 0;
+ //   jRHI_DirectX12 dx12;
+ //   dx12.m_hWnd = dx12.CreateMainWindow();
+ //   dx12.Initialize();
+ //   dx12.Run();
+ //   dx12.Release();
+	//return 0;
 
 	//::ShowWindow(::GetConsoleWindow(), SW_HIDE);		// hide console window
 
@@ -227,6 +227,8 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
+	ImGui_ImplGlfw_KeyCallback(window, key, scancode, action, mods);
+
 	const char* key_name = glfwGetKeyName(key, 0);
 	if (!key_name)
 		return;
@@ -246,25 +248,29 @@ void char_callback(GLFWwindow* window, uint32 codepoint)
 {
 }
 
-void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
+void cursor_position_callback(GLFWwindow* window, double x, double y)
 {
+	ImGui_ImplGlfw_CursorPosCallback(window, x, y);
+
 	static double xOld = -1.0;
 	static double yOld = -1.0;
 
 	if (-1.0 == xOld)
-		xOld = xpos;
+		xOld = x;
 
 	if (-1.0 == yOld)
-		yOld = ypos;
+		yOld = y;
 
-	g_Engine.OnMouseMove((int32)(xpos - xOld), (int32)(ypos - yOld));
+	g_Engine.OnMouseMove((int32)(x - xOld), (int32)(y - yOld));
 
-	xOld = xpos;
-	yOld = ypos;
+	xOld = x;
+	yOld = y;
 }
 
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 {
+	ImGui_ImplGlfw_MouseButtonCallback(window, button, action, mods);
+
 	EMouseButtonType buttonType;
 	if (GLFW_MOUSE_BUTTON_RIGHT == button)
 		buttonType = EMouseButtonType::RIGHT;
@@ -299,21 +305,24 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
-    ImGuiIO& io = ImGui::GetIO();
-    io.MouseWheelH += (float)xoffset;
-    io.MouseWheel += (float)yoffset;
+	ImGui_ImplGlfw_ScrollCallback(window, xoffset, yoffset);
+
+    //ImGuiIO& io = ImGui::GetIO();
+    //io.MouseWheelH += (float)xoffset;
+    //io.MouseWheel += (float)yoffset;
 }
 
 void window_focus_callback(GLFWwindow* window, int focused)
 {
-	if (focused)
-    {
-		// 윈도우가 Focus 를 얻는 경우 Mouse click callback 이 호출되는데, 
-		// 이때 아직 UI는 Mouse Hover 상태 정보를 모르기 때문에 여기서 갱신
-		ImGui_ImplGlfw_NewFrame();
-		ImGui::NewFrame();
-		ImGui::EndFrame();
-	}
+	ImGui_ImplGlfw_WindowFocusCallback(window, focused);
+	//if (focused)
+ //   {
+	//	// 윈도우가 Focus 를 얻는 경우 Mouse click callback 이 호출되는데, 
+	//	// 이때 아직 UI는 Mouse Hover 상태 정보를 모르기 때문에 여기서 갱신
+	//	ImGui_ImplGlfw_NewFrame();
+	//	ImGui::NewFrame();
+	//	ImGui::EndFrame();
+	//}
 }
 
 // https://stackoverflow.com/questions/18412120/displaying-fps-in-glfw-window-title
