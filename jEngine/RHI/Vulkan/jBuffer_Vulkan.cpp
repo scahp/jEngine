@@ -4,6 +4,11 @@
 
 void jBuffer_Vulkan::Release()
 {
+    ReleaseInternal();
+}
+
+void jBuffer_Vulkan::ReleaseInternal()
+{
     if (!HasBufferOwnership)
         return;
 

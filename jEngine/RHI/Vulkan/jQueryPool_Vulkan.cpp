@@ -25,6 +25,11 @@ void jQueryPool_Vulkan::ResetQueryPool(jCommandBuffer* pCommanBuffer /*= nullptr
 
 void jQueryPool_Vulkan::Release()
 {
+    ReleaseInstance();
+}
+
+void jQueryPool_Vulkan::ReleaseInstance()
+{
     if (vkQueryPool)
     {
         vkDestroyQueryPool(g_rhi_vk->Device, vkQueryPool, nullptr);

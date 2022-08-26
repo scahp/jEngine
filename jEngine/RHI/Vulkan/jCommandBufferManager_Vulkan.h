@@ -28,10 +28,12 @@ class jCommandBufferManager_Vulkan : public jCommandBufferManager
 public:
     virtual ~jCommandBufferManager_Vulkan()
     {
-        jCommandBufferManager_Vulkan::Release();
+        ReleaseInternal();
     }
     virtual bool CreatePool(uint32 QueueIndex) override;
     virtual void Release() override;
+
+    void ReleaseInternal();
 
     FORCEINLINE const VkCommandPool& GetPool() const { return CommandPool; };
 

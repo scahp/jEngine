@@ -10,7 +10,7 @@ struct jTexture_Vulkan : public jTexture
     {}
     virtual ~jTexture_Vulkan()
     {
-        jTexture_Vulkan::Release();
+        ReleaseInternal();
     }
     VkImage Image = nullptr;
     VkImageView View = nullptr;
@@ -18,6 +18,7 @@ struct jTexture_Vulkan : public jTexture
     EImageLayout Layout = EImageLayout::UNDEFINED;
     VkSampler SamplerState = nullptr;
 
+    void ReleaseInternal();
     virtual void* GetHandle() const override { return Image; }
     virtual void* GetViewHandle() const override { return View; }
     virtual void* GetMemoryHandle() const override { return Memory; }

@@ -9,6 +9,11 @@
 //////////////////////////////////////////////////////////////////////////
 void jSwapchainImage_Vulkan::Release()
 {
+    ReleaseInternal();
+}
+
+void jSwapchainImage_Vulkan::ReleaseInternal()
+{
     TexturePtr = nullptr;
     if (Available)
     {
@@ -119,6 +124,12 @@ bool jSwapchain_Vulkan::Create()
 }
 
 void jSwapchain_Vulkan::Release()
+{
+    ReleaseInternal();
+
+}
+
+void jSwapchain_Vulkan::ReleaseInternal()
 {
     vkDestroySwapchainKHR(g_rhi_vk->Device, Swapchain, nullptr);
 

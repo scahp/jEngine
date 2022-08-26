@@ -9,12 +9,12 @@ struct jBuffer_Vulkan : public jBuffer
     {}
     virtual ~jBuffer_Vulkan()
     {
-        if (HasBufferOwnership)
-            jBuffer_Vulkan::Release();
+        ReleaseInternal();
     }
 
     virtual void Release() override;
-    
+    void ReleaseInternal();
+
     virtual void* GetMappedPointer() const override { return MappedPointer; }
     virtual void* Map(uint64 offset, uint64 size) override;
     virtual void* Map() override;

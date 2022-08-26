@@ -7,12 +7,14 @@ struct jQueryPool_Vulkan : public jQueryPool
 {
     virtual ~jQueryPool_Vulkan() 
     {
-        jQueryPool_Vulkan::Release();
+        ReleaseInstance();
     }
 
     virtual bool Create() override;
     virtual void ResetQueryPool(jCommandBuffer* pCommanBuffer = nullptr);
     virtual void Release() override;
+
+    void ReleaseInstance();
 
     VkQueryPool vkQueryPool = nullptr;
     int32 QueryIndex[jRHI::MaxWaitingQuerySet] = { 0, };

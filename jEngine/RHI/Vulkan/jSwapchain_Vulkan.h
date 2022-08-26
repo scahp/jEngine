@@ -6,9 +6,10 @@ class jSwapchainImage_Vulkan : public jSwapchainImage
 public:
     virtual ~jSwapchainImage_Vulkan()
     {
-        jSwapchainImage_Vulkan::Release();
+        ReleaseInternal();
     }
 
+    void ReleaseInternal();
     virtual void Release() override;
 
     virtual void* GetHandle() const override
@@ -38,8 +39,10 @@ class jSwapchain_Vulkan : public jSwapchain
 public:
     virtual ~jSwapchain_Vulkan()
     {
-        jSwapchain_Vulkan::Release();
+        ReleaseInternal();
     }
+    void ReleaseInternal();
+
     virtual bool Create() override;
     virtual void Release() override;
     virtual void* GetHandle() const override { return Swapchain; }

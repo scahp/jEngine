@@ -55,6 +55,11 @@ bool jCommandBufferManager_Vulkan::CreatePool(uint32 QueueIndex)
 
 void jCommandBufferManager_Vulkan::Release()
 {
+    ReleaseInternal();
+}
+
+void jCommandBufferManager_Vulkan::ReleaseInternal()
+{
     //// Command buffer pool 을 다시 만들기 보다 있는 커맨드 버퍼 풀을 cleanup 하고 재사용 함.
     //vkFreeCommandBuffers(device, CommandBufferManager.GetPool(), static_cast<uint32>(commandBuffers.size()), commandBuffers.data());
 
