@@ -279,6 +279,12 @@ bool jSpirvHelper::HLSLtoSpirv(std::vector<uint32>& OutSpirv, ShaderConductor::S
 
 	ShaderConductor::Compiler::Options options;
 	options.packMatricesInRowMajor = false;
+
+	static std::vector<const char*> customOptions{ "-fspv-target-env=vulkan1.2" };
+
+	options.numOfCustomArgs = (int32)customOptions.size();
+	options.customArgs = customOptions.data();
+
 	ShaderConductor::Compiler::TargetDesc targetDesc = { ShaderConductor::ShadingLanguage::SpirV, "", true };
 	ShaderConductor::Compiler::ResultDesc resultDesc;
 	ShaderConductor::Compiler::Compile(sourceDesc, options, &targetDesc, 1, &resultDesc);
