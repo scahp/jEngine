@@ -131,82 +131,90 @@ void jForwardRenderer::ShadowPass()
 {
     ShadowPassSetupFinishEvent.wait();
 
-    SCOPE_GPU_PROFILE(RenderFrameContextPtr, ShadowPass);
-
-    g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, View.DirectionalLight->ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_ATTACHMENT);
-
-    if (ShadowMapRenderPass->BeginRenderPass(RenderFrameContextPtr->CommandBuffer))
     {
-        for (auto& command : ShadowPasses)
-        {
-            command.Draw();
-        }
-        ShadowMapRenderPass->EndRenderPass();
-    }
+        SCOPE_GPU_PROFILE(RenderFrameContextPtr, ShadowPass);
 
-    g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, View.DirectionalLight->ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_READ_ONLY);
+        g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, View.DirectionalLight->ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_ATTACHMENT);
+
+        if (ShadowMapRenderPass->BeginRenderPass(RenderFrameContextPtr->CommandBuffer))
+        {
+            for (auto& command : ShadowPasses)
+            {
+                command.Draw();
+            }
+            ShadowMapRenderPass->EndRenderPass();
+        }
+
+        g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, View.DirectionalLight->ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_READ_ONLY);
+    }
 }
 
 void jForwardRenderer::OpaquePass()
 {
     BasePassSetupFinishEvent.wait();
 
-    SCOPE_GPU_PROFILE(RenderFrameContextPtr, BasePass);
-
-    g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, RenderFrameContextPtr->SceneRenderTarget->ColorPtr->GetTexture(), EImageLayout::COLOR_ATTACHMENT);
-
-    if (OpaqueRenderPass->BeginRenderPass(RenderFrameContextPtr->CommandBuffer))
     {
-        for (auto command : BasePasses)
-        {
-            command.Draw();
-        }
+        SCOPE_GPU_PROFILE(RenderFrameContextPtr, BasePass);
 
-        OpaqueRenderPass->EndRenderPass();
+        g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, RenderFrameContextPtr->SceneRenderTarget->ColorPtr->GetTexture(), EImageLayout::COLOR_ATTACHMENT);
+
+        if (OpaqueRenderPass->BeginRenderPass(RenderFrameContextPtr->CommandBuffer))
+        {
+            for (auto command : BasePasses)
+            {
+                command.Draw();
+            }
+
+            OpaqueRenderPass->EndRenderPass();
+        }
     }
 
     // 여기 까지 렌더 로직 끝
     //////////////////////////////////////////////////////////////////////////
-    const uint32 imageIndex = RenderFrameContextPtr->FrameIndex;
-    jCommandBuffer* CommandBuffer = RenderFrameContextPtr->CommandBuffer;
-    jSceneRenderTarget* SceneRT = RenderFrameContextPtr->SceneRenderTarget;
-
-    //////////////////////////////////////////////////////////////////////////
-    // Compute Pipeline
-    g_rhi->TransitionImageLayout(CommandBuffer, SceneRT->ColorPtr->GetTexture(), EImageLayout::SHADER_READ_ONLY);
-    g_rhi->TransitionImageLayout(CommandBuffer, SceneRT->FinalColorPtr->GetTexture(), EImageLayout::GENERAL);
-
-    jShaderBindingInstance* CurrentBindingInstance = nullptr;
-    int32 BindingPoint = 0;
-    std::vector<jShaderBinding> ShaderBindings;
-    if (ensure(SceneRT->ColorPtr))
     {
-        ShaderBindings.emplace_back(jShaderBinding(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-            , std::make_shared<jTextureResource>(SceneRT->ColorPtr->GetTexture(), nullptr)));
+        SCOPE_GPU_PROFILE(RenderFrameContextPtr, ComputePass);
+        
+        const uint32 imageIndex = RenderFrameContextPtr->FrameIndex;
+        jCommandBuffer* CommandBuffer = RenderFrameContextPtr->CommandBuffer;
+        jSceneRenderTarget* SceneRT = RenderFrameContextPtr->SceneRenderTarget;
+
+        //////////////////////////////////////////////////////////////////////////
+        // Compute Pipeline
+        g_rhi->TransitionImageLayout(CommandBuffer, SceneRT->ColorPtr->GetTexture(), EImageLayout::SHADER_READ_ONLY);
+        g_rhi->TransitionImageLayout(CommandBuffer, SceneRT->FinalColorPtr->GetTexture(), EImageLayout::GENERAL);
+
+        jShaderBindingInstance* CurrentBindingInstance = nullptr;
+        int32 BindingPoint = 0;
+        std::vector<jShaderBinding> ShaderBindings;
+        if (ensure(SceneRT->ColorPtr))
+        {
+            ShaderBindings.emplace_back(jShaderBinding(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
+                , std::make_shared<jTextureResource>(SceneRT->ColorPtr->GetTexture(), nullptr)));
+        }
+        if (ensure(SceneRT->FinalColorPtr))
+        {
+            ShaderBindings.emplace_back(jShaderBinding(BindingPoint++, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE
+                , std::make_shared<jTextureResource>(SceneRT->FinalColorPtr->GetTexture(), nullptr)));
+        }
+
+        CurrentBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindings);
+
+        jShaderInfo shaderInfo;
+        shaderInfo.name = jName("emboss");
+        shaderInfo.cs = jName("Resource/Shaders/hlsl/emboss_cs.hlsl");
+        static jShader_Vulkan* Shader = (jShader_Vulkan*)g_rhi->CreateShader(shaderInfo);
+
+        jPipelineStateInfo* computePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, { CurrentBindingInstance->ShaderBindingsLayouts });
+
+        computePipelineStateInfo->Bind(RenderFrameContextPtr);
+        // vkCmdBindPipeline((VkCommandBuffer)CommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline[imageIndex]);
+
+        CurrentBindingInstance->BindCompute(RenderFrameContextPtr, (VkPipelineLayout)computePipelineStateInfo->GetPipelineLayoutHandle());
+
+        check(g_rhi->GetSwapchain());
+        vkCmdDispatch((VkCommandBuffer)CommandBuffer->GetHandle()
+            , g_rhi->GetSwapchain()->GetExtent().x / 16, g_rhi->GetSwapchain()->GetExtent().y / 16, 1);
     }
-    if (ensure(SceneRT->FinalColorPtr))
-    {
-        ShaderBindings.emplace_back(jShaderBinding(BindingPoint++, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE
-            , std::make_shared<jTextureResource>(SceneRT->FinalColorPtr->GetTexture(), nullptr)));
-    }
-
-    CurrentBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindings);
-
-    jShaderInfo shaderInfo;
-    shaderInfo.name = jName("emboss");
-    shaderInfo.cs = jName("Resource/Shaders/hlsl/emboss_cs.hlsl");
-    static jShader_Vulkan* Shader = (jShader_Vulkan*)g_rhi->CreateShader(shaderInfo);
-
-    jPipelineStateInfo* computePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, { CurrentBindingInstance->ShaderBindingsLayouts });
-
-    computePipelineStateInfo->Bind(RenderFrameContextPtr);
-    // vkCmdBindPipeline((VkCommandBuffer)CommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline[imageIndex]);
-
-    CurrentBindingInstance->BindCompute(RenderFrameContextPtr, (VkPipelineLayout)computePipelineStateInfo->GetPipelineLayoutHandle());
-
-    check(g_rhi->GetSwapchain());
-    vkCmdDispatch((VkCommandBuffer)CommandBuffer->GetHandle()
-        , g_rhi->GetSwapchain()->GetExtent().x / 16, g_rhi->GetSwapchain()->GetExtent().y / 16, 1);
     // End compute pipeline
 }
 

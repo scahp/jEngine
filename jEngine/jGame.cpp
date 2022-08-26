@@ -50,7 +50,7 @@ void jGame::Setup()
 	// Create main camera
 	const Vector mainCameraPos(172.66f, 160.0f, -180.63f);
 	const Vector mainCameraTarget(0.0f, 0.0f, 0.0f);
-	MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 10.0f, 1000.0f, SCR_WIDTH, SCR_HEIGHT, true);
+	MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 10.0f, 1000.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT, true);
 	jCamera::AddCamera(0, MainCamera);
 
 	// Create lights

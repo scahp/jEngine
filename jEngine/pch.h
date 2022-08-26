@@ -73,20 +73,22 @@ using tchar = wchar_t;
 
 #include "External/cityhash/city.h"
 
-#define ensure(x) (((x) || (JASSERT(0), 0)))
-#define check(x) JASSERT(x)
 #if _DEBUG
 #define verify(x) JASSERT(x)
 #define JOK(a) (SUCCEEDED(a) ? true : (assert(!(#a)), false))
 #define JFAIL(a) (!JOK(a))
-#define JASSERT(a) ((a) ? true : (assert(#a), false))
+#define JASSERT(a) ((a) ? true : (assert(!(#a)), false))
 #define JMESSAGE(x) MessageBoxA(0, x, "", MB_OK)
+#define check(x) JASSERT(x)
+#define ensure(x) (((x) || (assert(!(#x)), false)))
 #else
 #define verify(x) (x)
 #define JOK(a) (a)
 #define JFAIL(a) (a)
-#define JASSERT(a) (a)
+#define JASSERT(a) 
 #define JMESSAGE(a) (a)
+#define check(x) 
+#define ensure(x) (x)
 #endif
 
 #include "RHI/jRHIType.h"

@@ -1062,7 +1062,7 @@ bool jRHI_DirectX12::Initialize()
 
 
         m_dxrDevice->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
-        if (!JASSERT(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0))
+        if (!ensure(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0))
             return false;
     }
 
@@ -1149,7 +1149,7 @@ bool jRHI_DirectX12::Initialize()
         bottomLevelInputsSecondGeometry.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
 
         m_dxrDevice->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputsSecondGeometry, &bottomLevelPrebuildInfoSecondGeometry);
-        if (!JASSERT(bottomLevelPrebuildInfoSecondGeometry.ResultDataMaxSizeInBytes > 0))
+        if (!ensure(bottomLevelPrebuildInfoSecondGeometry.ResultDataMaxSizeInBytes > 0))
             return false;
     }
 
@@ -1172,7 +1172,7 @@ bool jRHI_DirectX12::Initialize()
 		m_commandList->ResourceBarrier(1, &barrier);
 	}
 
-    if (!JASSERT(BuildTopLevelAS(TLASBuffer, false, 0.0f, Vector::ZeroVector)))
+    if (!ensure(BuildTopLevelAS(TLASBuffer, false, 0.0f, Vector::ZeroVector)))
         return false;
 
 	if (JFAIL(m_commandList->Close()))
@@ -1415,7 +1415,7 @@ bool jRHI_DirectX12::BuildTopLevelAS(TopLevelAccelerationStructureBuffers& InBuf
 
     D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO info;
     m_dxrDevice->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &info);
-    if (!JASSERT(info.ResultDataMaxSizeInBytes > 0))
+    if (!ensure(info.ResultDataMaxSizeInBytes > 0))
         return false;
 
     if (InIsUpdate)
@@ -1534,7 +1534,7 @@ void jRHI_DirectX12::CalculateFrameStats()
         frameCnt = 0;
         elapsedTime = totalTime;
 
-        float raysPerPixels = m_sceneCB[m_frameIndex].NumOfStartingRay * g_MaxRecursionDepth;
+        float raysPerPixels = (float)(m_sceneCB[m_frameIndex].NumOfStartingRay * g_MaxRecursionDepth);
         float MRaysPerSecond = (SCR_WIDTH * SCR_HEIGHT * fps * raysPerPixels) / static_cast<float>(1e6);
 
         std::wstringstream windowText;
@@ -1793,7 +1793,7 @@ bool jRHI_DirectX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsM
 
     BackbufferFormat;
 
-    if (JASSERT(m_swapChain))
+    if (ensure(m_swapChain))
     {
         HRESULT hr = m_swapChain->ResizeBuffers(FrameCount, InWidth, InHeight, BackbufferFormat
             , (m_options & c_AllowTearing) ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0);

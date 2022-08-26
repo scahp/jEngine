@@ -35,6 +35,25 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 
  //   float4 res = float4(conv(kernel, imageData, 1.0, 0.5).xxx, 1.0);
  //   resultImage[int2(GlobalInvocationID.xy)] = res;
+    
+    //if (WaveIsFirstLane())
+    //{
+    //    resultImage[int2(GlobalInvocationID.xy)] = float4(1.0, 0.0, 0.0, 1.0);
+    //    return;
+    //}
+    //if (WaveGetLaneIndex() == WaveActiveMax(WaveGetLaneIndex()))
+    //{
+    //    resultImage[int2(GlobalInvocationID.xy)] = float4(0, 1, 0, 1.);
+    //    return;
+    //}
+    
     float3 rgb = inputImage[uint2(GlobalInvocationID.xy)].rgb;
-    resultImage[int2(GlobalInvocationID.xy)] = float4(rgb, 1.0);
+    //resultImage[int2(GlobalInvocationID.xy)] = float4(rgb, 1.0);
+    //resultImage[int2(GlobalInvocationID.xy)] = float4(WaveReadLaneFirst(rgb), 1.0);
+    
+    uint4 activeLaneMask = WaveActiveBallot(true);
+    uint numActiveLanes = countbits(activeLaneMask.x) + countbits(activeLaneMask.y) + countbits(activeLaneMask.z) + countbits(activeLaneMask.w);
+    float4 avgColor = float4(WaveActiveSum(rgb) / float(numActiveLanes), 1.0);
+    resultImage[int2(GlobalInvocationID.xy)] = avgColor;
+
 }
