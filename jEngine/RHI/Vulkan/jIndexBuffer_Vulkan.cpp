@@ -4,8 +4,9 @@
 
 void jIndexBuffer_Vulkan::Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const
 {
+    check(IndexStreamData->Param->Attributes.size());
     VkIndexType IndexType = VK_INDEX_TYPE_UINT16;
-    switch (IndexStreamData->Param->ElementType)
+    switch (IndexStreamData->Param->Attributes[0].UnderlyingType)
     {
     case EBufferElementType::BYTE:
         IndexType = VK_INDEX_TYPE_UINT8_EXT;

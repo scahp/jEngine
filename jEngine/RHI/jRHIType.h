@@ -146,6 +146,12 @@ enum class EPrimitiveType : uint8
 	MAX
 };
 
+enum class EVertexInputRate
+{
+	VERTEX,
+	INSTANCE
+};
+
 enum class EBufferType : uint8
 {
 	STATIC,
@@ -163,17 +169,25 @@ enum class EBufferElementType : uint8
 
 struct IStreamParam : public std::enable_shared_from_this<IStreamParam>
 {
+    struct jAttribute
+    {
+		jAttribute() = default;
+		jAttribute(EBufferElementType InElementType, int32 InStride) : UnderlyingType(InElementType), Stride(InStride) {}
+
+        EBufferElementType UnderlyingType = EBufferElementType::BYTE;
+		int32 Stride = 0;
+    };
+
 	IStreamParam() = default;
-	IStreamParam(const jName& name, const EBufferType& bufferType, int32 stride, EBufferElementType elementType, int32 elementTypeSize, int32 instanceDivisor = 0)
-		: Name(name), BufferType(bufferType), Stride(stride), ElementType(elementType), ElementTypeSize(elementTypeSize), InstanceDivisor(instanceDivisor)
+	IStreamParam(const jName& name, const EBufferType& bufferType, int32 stride, std::vector<jAttribute> elements, int32 instanceDivisor = 0)
+		: Name(name), BufferType(bufferType), Stride(stride), Attributes(elements), InstanceDivisor(instanceDivisor)
 	{}
 	virtual ~IStreamParam() {}
 
 	jName Name;
 	EBufferType BufferType = EBufferType::STATIC;
 	int32 Stride = 0;
-	EBufferElementType ElementType = EBufferElementType::BYTE;
-	int32 ElementTypeSize = 0;
+	std::vector<jAttribute> Attributes;
 	int32 InstanceDivisor = 0;
 
 	virtual const void* GetBufferData() const = 0;
@@ -200,9 +214,24 @@ struct jVertexStreamData : public std::enable_shared_from_this<jVertexStreamData
 		Params.clear();
 	}
 
+	virtual int32 GetEndLocation() const
+	{
+		check(ElementCount);
+
+		int32 endLocation = StartLocation;
+		for (const std::shared_ptr<IStreamParam>& iter : Params)
+		{
+			endLocation += (int32)iter->Attributes.size();
+		}
+		return endLocation;
+	}
+
 	std::vector<std::shared_ptr<IStreamParam>> Params;
-	EPrimitiveType PrimitiveType;
+	EPrimitiveType PrimitiveType = EPrimitiveType::TRIANGLES;
+	EVertexInputRate VertexInputRate = EVertexInputRate::VERTEX;
 	int32 ElementCount = 0;
+	int32 BindingIndex = 0;
+	int32 StartLocation = 0;
 };
 
 struct jIndexStreamData : public std::enable_shared_from_this<jIndexStreamData>

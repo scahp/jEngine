@@ -400,7 +400,7 @@ public:
 	virtual jBlendingStateInfo* CreateBlendingState(const jBlendingStateInfo& initializer) const { return nullptr; }
 
 	virtual jPipelineStateInfo* CreatePipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader
-		, const jVertexBuffer* vertexBuffer, const jRenderPass* renderPass, const std::vector<const jShaderBindingsLayout*> shaderBindings) const { return nullptr; }
+		, std::vector<const jVertexBuffer*> vertexBuffers, const jRenderPass* renderPass, const std::vector<const jShaderBindingsLayout*> shaderBindings) const { return nullptr; }
 
 	virtual jPipelineStateInfo* CreateComputePipelineStateInfo(const jShader* shader, const std::vector<const jShaderBindingsLayout*> shaderBindings) const { return nullptr; }
 

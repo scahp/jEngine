@@ -178,6 +178,8 @@ void jRenderObject::SetRenderProperty(const std::shared_ptr<jRenderFrameContext>
 		if (VertexBuffer)
 			VertexBuffer->Bind(shader);
 	}
+    if (VertexBuffer_InstanceData)
+        VertexBuffer_InstanceData->Bind(InRenderFrameContext);
 	if (IndexBuffer)
 		IndexBuffer->Bind(shader);
 #elif USE_VULKAN
@@ -191,6 +193,8 @@ void jRenderObject::SetRenderProperty(const std::shared_ptr<jRenderFrameContext>
 		if (VertexBuffer)
 			VertexBuffer->Bind(InRenderFrameContext);
 	}
+	if (VertexBuffer_InstanceData)
+		VertexBuffer_InstanceData->Bind(InRenderFrameContext);
 	if (IndexBuffer)
 		IndexBuffer->Bind(InRenderFrameContext);
 #endif

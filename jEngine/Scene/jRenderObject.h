@@ -49,9 +49,11 @@ public:
 	Matrix GetWorld() const;
 
 	std::shared_ptr<jVertexStreamData> VertexStream;
+	std::shared_ptr<jVertexStreamData> VertexStream_InstanceData;
 	std::shared_ptr<jVertexStreamData> VertexStream_PositionOnly;
 	jVertexBuffer* VertexBuffer = nullptr;
 	jVertexBuffer* VertexBuffer_PositionOnly = nullptr;
+	jVertexBuffer* VertexBuffer_InstanceData = nullptr;
 
 	std::shared_ptr<jIndexStreamData> IndexStream;
 	jIndexBuffer* IndexBuffer = nullptr;

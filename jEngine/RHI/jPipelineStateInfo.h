@@ -345,9 +345,9 @@ struct jRenderFrameContext;
 struct jPipelineStateInfo
 {
     jPipelineStateInfo() = default;
-    jPipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader, const jVertexBuffer* vertexBuffer
+    jPipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader, std::vector<const jVertexBuffer*> vertexBuffers
         , const jRenderPass* renderPass, const std::vector<const jShaderBindingsLayout*> shaderBindings)
-        : PipelineStateFixed(pipelineStateFixed), Shader(shader), VertexBuffer(vertexBuffer), RenderPass(renderPass), ShaderBindings(shaderBindings)
+        : PipelineStateFixed(pipelineStateFixed), Shader(shader), VertexBuffers(vertexBuffers), RenderPass(renderPass), ShaderBindings(shaderBindings)
     {
         IsGraphics = true;
     }
@@ -358,7 +358,7 @@ struct jPipelineStateInfo
     }
     jPipelineStateInfo(const jPipelineStateInfo& pipelineState)
         : PipelineStateFixed(pipelineState.PipelineStateFixed), Shader(pipelineState.Shader), IsGraphics(pipelineState.IsGraphics)
-        , VertexBuffer(pipelineState.VertexBuffer), RenderPass(pipelineState.RenderPass), ShaderBindings(pipelineState.ShaderBindings)
+        , VertexBuffers(pipelineState.VertexBuffers), RenderPass(pipelineState.RenderPass), ShaderBindings(pipelineState.ShaderBindings)
     {}
     virtual ~jPipelineStateInfo() {}
 
@@ -368,7 +368,7 @@ struct jPipelineStateInfo
 
     bool IsGraphics = true;
     const jShader* Shader = nullptr;
-    const jVertexBuffer* VertexBuffer = nullptr;
+    std::vector<const jVertexBuffer*> VertexBuffers;
     const jRenderPass* RenderPass = nullptr;
     std::vector<const jShaderBindingsLayout*> ShaderBindings;
     const jPipelineStateFixedInfo* PipelineStateFixed = nullptr;

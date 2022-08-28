@@ -51,7 +51,7 @@ void jForwardRenderer::SetupShadowPass()
 
     jShaderInfo shaderInfo;
     shaderInfo.name = jName("shadow_test");
-    shaderInfo.vs = jName("Resource/Shaders/hlsl/shadow_vs.hlsl");
+    shaderInfo.vs = jName("Resource/Shaders/hlsl/shadow_instancing_vs.hlsl");
     shaderInfo.fs = jName("Resource/Shaders/hlsl/shadow_fs.hlsl");
     jShader* ShadowShader = g_rhi->CreateShader(shaderInfo);
 
@@ -100,7 +100,7 @@ void jForwardRenderer::SetupBasePass()
 
     jShaderInfo shaderInfo;
     shaderInfo.name = jName("default_test");
-    shaderInfo.vs = jName("Resource/Shaders/hlsl/shader_vs.hlsl");
+    shaderInfo.vs = jName("Resource/Shaders/hlsl/shader_instancing_vs.hlsl");
     shaderInfo.fs = jName("Resource/Shaders/hlsl/shader_fs.hlsl");
     jShader* BasePassShader = g_rhi->CreateShader(shaderInfo);
 

@@ -5,9 +5,9 @@
 struct jVertexStream_Vulkan
 {
     jName Name;
-    uint32 Count;
+    //uint32 Count;
     EBufferType BufferType = EBufferType::STATIC;
-    EBufferElementType ElementType = EBufferElementType::BYTE;
+    //EBufferElementType ElementType = EBufferElementType::BYTE;
     bool Normalized = false;
     int32 Stride = 0;
     size_t Offset = 0;
@@ -26,6 +26,7 @@ struct jVertexBuffer_Vulkan : public jVertexBuffer
             AttributeDescriptions.clear();
             Buffers.clear();
             Offsets.clear();
+            StartBindingIndex = 0;
         }
         std::vector<VkVertexInputBindingDescription> InputBindingDescriptions;
         std::vector<VkVertexInputAttributeDescription> AttributeDescriptions;
@@ -33,6 +34,8 @@ struct jVertexBuffer_Vulkan : public jVertexBuffer
         // Buffer 는 jVertexStream_Vulkan 을 레퍼런스 하고 있기 때문에 별도 소멸 필요 없음
         std::vector<VkBuffer> Buffers;
         std::vector<VkDeviceSize> Offsets;
+
+        int32 StartBindingIndex = 0;
 
         VkPipelineVertexInputStateCreateInfo CreateVertexInputState() const
         {
@@ -97,14 +100,31 @@ struct jVertexBuffer_Vulkan : public jVertexBuffer
         return inputAssembly;
     }
 
+    static void CreateVertexInputState(VkPipelineVertexInputStateCreateInfo& OutVertexInputInfo,
+        std::vector<VkVertexInputBindingDescription>& OutBindingDescriptions, std::vector<VkVertexInputAttributeDescription>& OutAttributeDescriptions,
+        std::vector<const jVertexBuffer*> InVertexBuffers)
+    {
+        for (int32 i = 0; i < (int32)InVertexBuffers.size(); ++i)
+        {
+            if (InVertexBuffers[i])
+            {
+                const jBindInfo& bindInfo = ((const jVertexBuffer_Vulkan*)InVertexBuffers[i])->BindInfos;
+                OutBindingDescriptions.insert(OutBindingDescriptions.end(), bindInfo.InputBindingDescriptions.begin(), bindInfo.InputBindingDescriptions.end());
+                OutAttributeDescriptions.insert(OutAttributeDescriptions.end(), bindInfo.AttributeDescriptions.begin(), bindInfo.AttributeDescriptions.end());
+            }
+        }
+        
+        OutVertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+        OutVertexInputInfo.vertexBindingDescriptionCount = (uint32)OutBindingDescriptions.size();
+        OutVertexInputInfo.pVertexBindingDescriptions = OutBindingDescriptions.data();
+        OutVertexInputInfo.vertexAttributeDescriptionCount = (uint32)OutAttributeDescriptions.size();;
+        OutVertexInputInfo.pVertexAttributeDescriptions = OutAttributeDescriptions.data();
+    }
+
     jBindInfo BindInfos;
     std::vector<jVertexStream_Vulkan> Streams;
     mutable size_t Hash = 0;
 
-    virtual void Bind(const jShader* shader) const override
-    {
-    }
-
+    virtual void Bind(const jShader* shader) const override {}
     virtual void Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const override;
-
 };

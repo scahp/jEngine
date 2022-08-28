@@ -246,9 +246,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->ElementTypeSize = sizeof(float);
-		streamParam->ElementType = EBufferElementType::FLOAT;
-		streamParam->Stride = sizeof(float) * 3;
+		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
 		streamParam->Name = jName("Pos");
 		streamParam->Data.resize(elementCount * 3);
 		memcpy(&streamParam->Data[0], &meshData->Vertices[0], meshData->Vertices.size() * sizeof(Vector));
@@ -261,9 +259,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->ElementType = EBufferElementType::FLOAT;
-		streamParam->ElementTypeSize = sizeof(float);
-		streamParam->Stride = sizeof(float) * 3;
+		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
 		streamParam->Name = jName("Normal");
 		streamParam->Data.resize(elementCount * 3);
 		memcpy(&streamParam->Data[0], &meshData->Normals[0], meshData->Normals.size() * sizeof(Vector));
@@ -276,9 +272,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->ElementType = EBufferElementType::FLOAT;
-		streamParam->ElementTypeSize = sizeof(float);
-		streamParam->Stride = sizeof(float) * 3;
+		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
 		streamParam->Name = jName("Tangent");
 		streamParam->Data.resize(elementCount * 3);
 		memcpy(&streamParam->Data[0], &meshData->Tangents[0], meshData->Tangents.size() * sizeof(Vector));
@@ -291,9 +285,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->ElementType = EBufferElementType::FLOAT;
-		streamParam->ElementTypeSize = sizeof(float);
-		streamParam->Stride = sizeof(float) * 3;
+		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
 		streamParam->Name = jName("Bitangent");
 		streamParam->Data.resize(elementCount * 3);
 		memcpy(&streamParam->Data[0], &meshData->Bitangents[0], meshData->Bitangents.size() * sizeof(Vector));
@@ -303,9 +295,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->ElementType = EBufferElementType::FLOAT;
-		streamParam->ElementTypeSize = sizeof(float);
-		streamParam->Stride = sizeof(float) * 2;
+		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 2));
 		streamParam->Name = jName("TexCoord");
 		streamParam->Data.resize(elementCount * 2);
 		memcpy(&streamParam->Data[0], &meshData->TexCoord[0], meshData->TexCoord.size() * sizeof(Vector2));
@@ -320,9 +310,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 	{
 		auto streamParam = new jStreamParam<uint32>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->ElementType = EBufferElementType::FLOAT;
-		streamParam->ElementTypeSize = sizeof(uint32);
-		streamParam->Stride = sizeof(uint32) * 3;
+		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
 		streamParam->Name = jName("Index");
 		streamParam->Data.resize(meshData->Faces.size());
 		memcpy(&streamParam->Data[0], &meshData->Faces[0], meshData->Faces.size() * sizeof(uint32));

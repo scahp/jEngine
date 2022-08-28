@@ -25,5 +25,6 @@ public:
     jRenderObject* RenderObject = nullptr;
     jPipelineStateFixedInfo* PipelineStateFixed = nullptr;
     jPipelineStateInfo_Vulkan* CurrentPipelineStateInfo = nullptr;
+    std::vector<const jVertexBuffer*> VertexBuffers;
     std::shared_ptr<jRenderFrameContext> RenderFrameContextPtr;
 };

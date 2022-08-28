@@ -428,9 +428,11 @@ jVertexBuffer* jRHI_Vulkan::CreateVertexBuffer(const std::shared_ptr<jVertexStre
 	jVertexBuffer_Vulkan* vertexBuffer = new jVertexBuffer_Vulkan();
 	vertexBuffer->VertexStreamData = streamData;
 	vertexBuffer->BindInfos.Reset();
+    vertexBuffer->BindInfos.StartBindingIndex = streamData->BindingIndex;
 
 	std::list<uint32> buffers;
-	int32 index = 0;
+	int32 locationIndex = streamData->StartLocation;
+	int32 bindingIndex = streamData->BindingIndex;
 	for (const auto& iter : streamData->Params)
 	{
 		if (iter->Stride <= 0)
@@ -438,9 +440,7 @@ jVertexBuffer* jRHI_Vulkan::CreateVertexBuffer(const std::shared_ptr<jVertexStre
 
 		jVertexStream_Vulkan stream;
 		stream.Name = iter->Name;
-		stream.Count = iter->Stride / iter->ElementTypeSize;
 		stream.BufferType = EBufferType::STATIC;
-		stream.ElementType = iter->ElementType;
 		stream.Stride = iter->Stride;
 		stream.Offset = 0;
 		stream.InstanceDivisor = iter->InstanceDivisor;
@@ -481,109 +481,117 @@ jVertexBuffer* jRHI_Vulkan::CreateVertexBuffer(const std::shared_ptr<jVertexStre
 		/////////////////////////////////////////////////////////////
 		VkVertexInputBindingDescription bindingDescription = {};
 		// 모든 데이터가 하나의 배열에 있어서 binding index는 0
-		bindingDescription.binding = index;
+		bindingDescription.binding = bindingIndex;
 		bindingDescription.stride = iter->Stride;
 
 		// VK_VERTEX_INPUT_RATE_VERTEX : 각각 버택스 마다 다음 데이터로 이동
 		// VK_VERTEX_INPUT_RATE_INSTANCE : 각각의 인스턴스 마다 다음 데이터로 이동
-		bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+		bindingDescription.inputRate = GetVulkanVertexInputRate(streamData->VertexInputRate);
 		vertexBuffer->BindInfos.InputBindingDescriptions.push_back(bindingDescription);
 		/////////////////////////////////////////////////////////////
-		VkVertexInputAttributeDescription attributeDescription = {};
-		attributeDescription.binding = index;
-		attributeDescription.location = index;
 
-		VkFormat AttrFormat = VK_FORMAT_UNDEFINED;
-		switch (iter->ElementType)
+		int32 ElementStride = 0;
+		for (IStreamParam::jAttribute& element : iter->Attributes)
 		{
-		case EBufferElementType::BYTE:
-		{
-			const int32 elementCount = iter->Stride / sizeof(char);
-			switch (elementCount)
+			VkVertexInputAttributeDescription attributeDescription = {};
+			attributeDescription.binding = bindingIndex;
+			attributeDescription.location = locationIndex;
+
+			VkFormat AttrFormat = VK_FORMAT_UNDEFINED;
+			switch (element.UnderlyingType)
 			{
-			case 1:
-				AttrFormat = VK_FORMAT_R8_SINT;
+			case EBufferElementType::BYTE:
+			{
+				const int32 elementCount = element.Stride / sizeof(char);
+				switch (elementCount)
+				{
+				case 1:
+					AttrFormat = VK_FORMAT_R8_SINT;
+					break;
+				case 2:
+					AttrFormat = VK_FORMAT_R8G8_SINT;
+					break;
+				case 3:
+					AttrFormat = VK_FORMAT_R8G8B8_SINT;
+					break;
+				case 4:
+					AttrFormat = VK_FORMAT_R8G8B8A8_SINT;
+					break;
+				default:
+					check(0);
+					break;
+				}
 				break;
-			case 2:
-				AttrFormat = VK_FORMAT_R8G8_SINT;
+			}
+			case EBufferElementType::UINT32:
+			{
+				const int32 elementCount = element.Stride / sizeof(uint32);
+				switch (elementCount)
+				{
+				case 1:
+					AttrFormat = VK_FORMAT_R32_SINT;
+					break;
+				case 2:
+					AttrFormat = VK_FORMAT_R32G32_SINT;
+					break;
+				case 3:
+					AttrFormat = VK_FORMAT_R32G32B32_SINT;
+					break;
+				case 4:
+					AttrFormat = VK_FORMAT_R32G32B32A32_SINT;
+					break;
+				default:
+					check(0);
+					break;
+				}
 				break;
-			case 3:
-				AttrFormat = VK_FORMAT_R8G8B8_SINT;
+			}
+			case EBufferElementType::FLOAT:
+			{
+				const int32 elementCount = element.Stride / sizeof(float);
+				switch (elementCount)
+				{
+				case 1:
+					AttrFormat = VK_FORMAT_R32_SFLOAT;
+					break;
+				case 2:
+					AttrFormat = VK_FORMAT_R32G32_SFLOAT;
+					break;
+				case 3:
+					AttrFormat = VK_FORMAT_R32G32B32_SFLOAT;
+					break;
+				case 4:
+					AttrFormat = VK_FORMAT_R32G32B32A32_SFLOAT;
+					break;
+				default:
+					check(0);
+					break;
+				}
 				break;
-			case 4:
-				AttrFormat = VK_FORMAT_R8G8B8A8_SINT;
-				break;
+			}
 			default:
 				check(0);
 				break;
 			}
-			break;
+			check(AttrFormat != VK_FORMAT_UNDEFINED);
+			//float: VK_FORMAT_R32_SFLOAT
+			//vec2 : VK_FORMAT_R32G32_SFLOAT
+			//vec3 : VK_FORMAT_R32G32B32_SFLOAT
+			//vec4 : VK_FORMAT_R32G32B32A32_SFLOAT
+			//ivec2: VK_FORMAT_R32G32_SINT, a 2-component vector of 32-bit signed integers
+			//uvec4: VK_FORMAT_R32G32B32A32_UINT, a 4-component vector of 32-bit unsigned integers
+			//double: VK_FORMAT_R64_SFLOAT, a double-precision (64-bit) float
+			attributeDescription.format = AttrFormat;
+			attributeDescription.offset = ElementStride;
+			vertexBuffer->BindInfos.AttributeDescriptions.push_back(attributeDescription);
+
+			ElementStride += element.Stride;
+            ++locationIndex;
 		}
-		case EBufferElementType::UINT32:
-		{
-			const int32 elementCount = iter->Stride / sizeof(uint32);
-			switch (elementCount)
-			{
-			case 1:
-				AttrFormat = VK_FORMAT_R32_SINT;
-				break;
-			case 2:
-				AttrFormat = VK_FORMAT_R32G32_SINT;
-				break;
-			case 3:
-				AttrFormat = VK_FORMAT_R32G32B32_SINT;
-				break;
-			case 4:
-				AttrFormat = VK_FORMAT_R32G32B32A32_SINT;
-				break;
-			default:
-				check(0);
-				break;
-			}
-			break;
-		}
-		case EBufferElementType::FLOAT:
-		{
-			const int32 elementCount = iter->Stride / sizeof(float);
-			switch(elementCount)
-			{
-			case 1:
-				AttrFormat = VK_FORMAT_R32_SFLOAT;
-				break;
-			case 2:
-				AttrFormat = VK_FORMAT_R32G32_SFLOAT;
-				break;
-			case 3:
-				AttrFormat = VK_FORMAT_R32G32B32_SFLOAT;
-				break;
-			case 4:
-				AttrFormat = VK_FORMAT_R32G32B32A32_SFLOAT;
-				break;
-			default:
-				check(0);
-				break;
-			}
-			break;
-		}
-		default:
-			check(0);
-			break;
-		}
-		check(AttrFormat != VK_FORMAT_UNDEFINED);
-		//float: VK_FORMAT_R32_SFLOAT
-		//vec2 : VK_FORMAT_R32G32_SFLOAT
-		//vec3 : VK_FORMAT_R32G32B32_SFLOAT
-		//vec4 : VK_FORMAT_R32G32B32A32_SFLOAT
-		//ivec2: VK_FORMAT_R32G32_SINT, a 2-component vector of 32-bit signed integers
-		//uvec4: VK_FORMAT_R32G32B32A32_UINT, a 4-component vector of 32-bit unsigned integers
-		//double: VK_FORMAT_R64_SFLOAT, a double-precision (64-bit) float
-		attributeDescription.format = AttrFormat;
-		attributeDescription.offset = 0;
-		vertexBuffer->BindInfos.AttributeDescriptions.push_back(attributeDescription);
 		/////////////////////////////////////////////////////////////
 		vertexBuffer->Streams.emplace_back(stream);
 
-		++index;
+		++bindingIndex;
 	}
 
 	return vertexBuffer;
@@ -1542,9 +1550,9 @@ bool jRHI_Vulkan::TransitionImageLayoutImmediate(jTexture* texture, EImageLayout
 }
 
 jPipelineStateInfo* jRHI_Vulkan::CreatePipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader
-    , const jVertexBuffer* vertexBuffer, const jRenderPass* renderPass, const std::vector<const jShaderBindingsLayout*> shaderBindings) const
+    , std::vector<const jVertexBuffer*> vertexBuffers, const jRenderPass* renderPass, const std::vector<const jShaderBindingsLayout*> shaderBindings) const
 {
-	return PipelineStatePool.GetOrCreate(jPipelineStateInfo(pipelineStateFixed, shader, vertexBuffer, renderPass, shaderBindings));
+	return PipelineStatePool.GetOrCreate(jPipelineStateInfo(pipelineStateFixed, shader, vertexBuffers, renderPass, shaderBindings));
 }
 
 jPipelineStateInfo* jRHI_Vulkan::CreateComputePipelineStateInfo(const jShader* shader, const std::vector<const jShaderBindingsLayout*> shaderBindings) const

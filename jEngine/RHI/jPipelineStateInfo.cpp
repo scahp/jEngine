@@ -12,7 +12,12 @@ size_t jPipelineStateInfo::GetHash() const
         check(PipelineStateFixed);
         Hash = PipelineStateFixed->CreateHash();
 
-        Hash = CityHash64WithSeed(VertexBuffer->GetHash(), Hash);
+        for (int32 i = 0; i < VertexBuffers.size(); ++i)
+        {
+            if (VertexBuffers[i])
+                Hash = CityHash64WithSeed(VertexBuffers[i]->GetHash(), Hash);
+        }
+
         Hash = CityHash64WithSeed(RenderPass->GetHash(), Hash);
     }
 
