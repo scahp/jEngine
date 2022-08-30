@@ -17,6 +17,7 @@ jRenderObject::~jRenderObject()
 {
     delete VertexBuffer;
     delete VertexBuffer_PositionOnly;
+	delete VertexBuffer_InstanceData;
     
 	VertexStream.reset();
     VertexStream_PositionOnly.reset();
@@ -179,7 +180,7 @@ void jRenderObject::SetRenderProperty(const std::shared_ptr<jRenderFrameContext>
 			VertexBuffer->Bind(shader);
 	}
     if (VertexBuffer_InstanceData)
-        VertexBuffer_InstanceData->Bind(InRenderFrameContext);
+        VertexBuffer_InstanceData->Bind(shader);
 	if (IndexBuffer)
 		IndexBuffer->Bind(shader);
 #elif USE_VULKAN
