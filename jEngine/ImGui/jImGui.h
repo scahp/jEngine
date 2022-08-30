@@ -31,8 +31,6 @@ public:
     void Initialize(float width, float height);
     void Release();
 
-    void Update(float InDeltaSeconds);
-
     void PrepareDraw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext);
 
     // Draw current imGui frame into a command buffer

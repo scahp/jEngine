@@ -108,9 +108,7 @@ int main()
 		g_timeDeltaSecond = (currentTick - lastTick) * 0.001f;
 		lastTick = currentTick;
 
-		jImGUI_Vulkan::Get().Update(g_timeDeltaSecond);
-
-		g_Engine.Update(g_timeDeltaSecond);
+        g_Engine.Update(g_timeDeltaSecond);
         g_Engine.Draw();
 		jPerformanceProfile::GetInstance().Update(g_timeDeltaSecond);
 

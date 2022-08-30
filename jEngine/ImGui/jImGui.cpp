@@ -318,15 +318,6 @@ VkPipeline jImGUI_Vulkan::CreatePipelineState(VkRenderPass renderPass, VkQueue c
     return pipeline;
 }
 
-void jImGUI_Vulkan::Update(float InDeltaSeconds)
-{
-    if (!IsInitialized)
-        return;
-
-    jImGUI_Vulkan::Get().NewFrame((g_rhi_vk->CurrenFrameIndex == 0));
-    jImGUI_Vulkan::Get().UpdateBuffers();
-}
-
 void jImGUI_Vulkan::NewFrame(bool updateFrameGraph)
 {
     if (!IsInitialized)
@@ -485,6 +476,9 @@ void jImGUI_Vulkan::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFra
 {
     if (!IsInitialized)
         return;
+
+    NewFrame((g_rhi_vk->CurrenFrameIndex == 0));
+    UpdateBuffers();
 
     check(InRenderFrameContext);
     PrepareDraw(InRenderFrameContext);
