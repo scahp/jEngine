@@ -69,6 +69,10 @@ public:
 		auto it_find = CameraMap.find(id);
 		return (CameraMap.end() != it_find) ? it_find->second : nullptr;
 	}
+	FORCEINLINE static void RemoveCamera(int32 id)
+	{
+		CameraMap.erase(id);
+	}
 	FORCEINLINE static jCamera* GetMainCamera()
 	{
 		return GetCamera(0);

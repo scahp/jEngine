@@ -391,33 +391,40 @@ void jRHI_Vulkan::CleanupSwapChain()
 
 void jRHI_Vulkan::RecreateSwapChain()
 {
-	//// 윈도우 최소화 된경우 창 사이즈가 0이 되는데 이경우는 Pause 상태로 뒀다가 윈도우 사이즈가 0이 아닐때 계속 진행하도록 함.
-	//int width = 0, height = 0;
-	//glfwGetFramebufferSize(window, &width, &height);
-	//while (width == 0 || height == 0)
-	//{
-	//	glfwGetFramebufferSize(window, &width, &height);
-	//	glfwWaitEvents();
-	//}
+	Flush();
 
-	//// 사용중인 리소스에 손을 댈수 없기 때문에 모두 사용될때까지 기다림
-	//vkDeviceWaitIdle(device);
+	int32 width = 0, height = 0;
+    glfwGetFramebufferSize(Window, &width, &height);
+    while (width == 0 || height == 0)
+    {
+    	glfwGetFramebufferSize(Window, &width, &height);
+    	glfwWaitEvents();
+    }
 
-	//CleanupSwapChain();
+	SCR_WIDTH = width;
+	SCR_HEIGHT = height;
 
-	//CreateSwapChain();
-	//CreateImageViews();			// Swapchain images 과 연관 있어서 다시 만듬
-	//CreateRenderPass();			// ImageView 와 연관 있어서 다시 만듬
-	//CreateGraphicsPipeline();	// 가끔 image format 이 다르기도 함.
-	//							// Viewport나 Scissor Rectangle size 가 Graphics Pipeline 에 있으므로 재생성.
-	//							// (DynamicState로 Viewport 와 Scissor 사용하고 변경점이 이것 뿐이면 재생성 피할수 있음)
-	//CreateColorResources();
-	//CreateDepthResources();
-	//CreateFrameBuffers();		// Swapchain images 과 연관 있어서 다시 만듬
-	//CreateUniformBuffers();
-	//CreateDescriptorPool();
-	//CreateDescriptorSets();
-	//CreateCommandBuffers();		// Swapchain images 과 연관 있어서 다시 만듬
+    jFrameBufferPool::Release();
+    jRenderTargetPool::Release();
+	RenderPassPool.Release();
+	PipelineStatePool.Release();
+
+    delete Swapchain;
+    Swapchain = new jSwapchain_Vulkan();
+    verify(Swapchain->Create());
+
+    delete CommandBufferManager;
+    CommandBufferManager = new jCommandBufferManager_Vulkan();
+    verify(CommandBufferManager->CreatePool(GraphicsQueue.QueueIndex));
+	
+	FenceManager.Release();
+
+    jImGUI_Vulkan::Get().Release();
+    jImGUI_Vulkan::Get().Initialize((float)SCR_WIDTH, (float)SCR_HEIGHT);
+
+    CurrenFrameIndex = 0;
+
+	Flush();
 }
 
 jVertexBuffer* jRHI_Vulkan::CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const
@@ -1144,13 +1151,12 @@ void jRHI_Vulkan::GetQueryTimeStampResultFromWholeStampArray(jQueryTime* queryTi
 
 std::shared_ptr<jRenderFrameContext> jRHI_Vulkan::BeginRenderFrame()
 {
-	uint32 imageIndex = -1;
+    // timeout 은 nanoseconds. UINT64_MAX 는 타임아웃 없음
+    VkResult acquireNextImageResult = vkAcquireNextImageKHR(Device, (VkSwapchainKHR)Swapchain->GetHandle(), UINT64_MAX
+		, Swapchain->Images[CurrenFrameIndex]->Available, VK_NULL_HANDLE, &CurrenFrameIndex);
 
     VkFence lastCommandBufferFence = Swapchain->Images[CurrenFrameIndex]->CommandBufferFence;
 
-    // timeout 은 nanoseconds. UINT64_MAX 는 타임아웃 없음
-    VkResult acquireNextImageResult = vkAcquireNextImageKHR(Device, (VkSwapchainKHR)Swapchain->GetHandle(), UINT64_MAX
-		, Swapchain->Images[CurrenFrameIndex]->Available, VK_NULL_HANDLE, &imageIndex);
     if (acquireNextImageResult != VK_SUCCESS)
         return nullptr;
 
@@ -1216,8 +1222,17 @@ void jRHI_Vulkan::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& ren
     vkResetFences(Device, 1, &vkFence);		// 세마포어와는 다르게 수동으로 펜스를 unsignaled 상태로 재설정 해줘야 함
 
     // 마지막에 Fences 파라메터는 커맨드 버퍼가 모두 실행되고나면 Signaled 될 Fences.
-    if (!ensure(vkQueueSubmit(GraphicsQueue.Queue, 1, &submitInfo, vkFence) == VK_SUCCESS))
+	auto queueSubmitResult = vkQueueSubmit(GraphicsQueue.Queue, 1, &submitInfo, vkFence);
+    if ((queueSubmitResult == VK_ERROR_OUT_OF_DATE_KHR) || (queueSubmitResult == VK_SUBOPTIMAL_KHR))
+    {
+        RecreateSwapChain();
+		return;
+    }
+    else if (queueSubmitResult != VK_SUCCESS)
+    {
+        check(0);
         return;
+    }
 
     VkPresentInfoKHR presentInfo = {};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -1235,10 +1250,11 @@ void jRHI_Vulkan::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& ren
     VkResult queuePresentResult = vkQueuePresentKHR(PresentQueue.Queue, &presentInfo);
 
     // 세마포어의 일관된 상태를 보장하기 위해서(세마포어 로직을 변경하지 않으려 노력한듯 함) vkQueuePresentKHR 이후에 framebufferResized 를 체크하는 것이 중요함.
-    if ((queuePresentResult == VK_ERROR_OUT_OF_DATE_KHR) || (queuePresentResult == VK_SUBOPTIMAL_KHR) || framebufferResized)
+    if ((queuePresentResult == VK_ERROR_OUT_OF_DATE_KHR) || (queuePresentResult == VK_SUBOPTIMAL_KHR) || FramebufferResized)
     {
         RecreateSwapChain();
-        framebufferResized = false;
+		FramebufferResized = false;
+		return;
     }
     else if (queuePresentResult != VK_SUCCESS)
     {

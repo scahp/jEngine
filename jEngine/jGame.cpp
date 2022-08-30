@@ -236,12 +236,14 @@ void jGame::Draw()
 	SCOPE_DEBUG_EVENT(g_rhi, "Game::Draw");
 
     std::shared_ptr<jRenderFrameContext> renderFrameContext = g_rhi->BeginRenderFrame();
+	if (!renderFrameContext)
+		return;
 
-    jForwardRenderer forwardRenderer(renderFrameContext, jView(MainCamera, DirectionalLight));
-    forwardRenderer.Setup();
-    forwardRenderer.Render();
+	jForwardRenderer forwardRenderer(renderFrameContext, jView(MainCamera, DirectionalLight));
+	forwardRenderer.Setup();
+	forwardRenderer.Render();
 
-    g_rhi->EndRenderFrame(renderFrameContext);
+	g_rhi->EndRenderFrame(renderFrameContext);
 }
 
 void jGame::OnMouseButton()
@@ -257,6 +259,15 @@ void jGame::OnMouseMove(int32 xOffset, int32 yOffset)
 		constexpr float YawScale = -0.0025f;
 		if (MainCamera)
 			MainCamera->SetEulerAngle(MainCamera->GetEulerAngle() + Vector(yOffset * PitchScale, xOffset * YawScale, 0.0f));
+	}
+}
+
+void jGame::Resize(int32 width, int32 height)
+{
+	if (MainCamera)
+	{
+		MainCamera->Width = width;
+		MainCamera->Height = height;
 	}
 }
 

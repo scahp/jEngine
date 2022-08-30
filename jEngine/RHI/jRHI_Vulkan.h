@@ -38,7 +38,7 @@ public:
 	virtual ~jRHI_Vulkan();
 
 	GLFWwindow* Window = nullptr;
-	bool framebufferResized = false;
+	bool FramebufferResized = false;
 
 	VkInstance Instance;		// Instance는 Application과 Vulkan Library를 연결시켜줌, 드라이버에 어플리케이션 정보를 전달하기도 한다.
 
@@ -112,7 +112,7 @@ public:
 
 	// 여기 있을 것은 아님
 	void CleanupSwapChain();
-	void RecreateSwapChain();
+	virtual void RecreateSwapChain() override;
 
     FORCEINLINE const VkDevice& GetDevice() const { return Device; }
 

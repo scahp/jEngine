@@ -11,6 +11,15 @@ float conv(in float kernel[9], in float data[9], in float denom, in float offset
     return saturate(res / denom + offset);
 }
 
+struct CommonComputeUniformBuffer
+{
+    float Width;
+    float Height;
+    float2 Padding;
+};
+
+cbuffer ComputeCommon : register(b2) { CommonComputeUniformBuffer ComputeCommon; }
+
 [numthreads(16, 16, 1)]
 void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 {
@@ -46,6 +55,9 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     //    resultImage[int2(GlobalInvocationID.xy)] = float4(0, 1, 0, 1.);
     //    return;
     //}
+    
+    if (GlobalInvocationID.x >= ComputeCommon.Width || GlobalInvocationID.y >= ComputeCommon.Height)
+        return;
     
     float3 rgb = inputImage[uint2(GlobalInvocationID.xy)].rgb;
     resultImage[int2(GlobalInvocationID.xy)] = float4(rgb, 1.0);

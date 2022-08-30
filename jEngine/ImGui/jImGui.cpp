@@ -11,12 +11,6 @@ jImGUI_Vulkan::jImGUI_Vulkan()
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGui_ImplGlfw_InitForVulkan(g_rhi_vk->Window, true);
-
-    DynamicBufferData.resize(g_rhi_vk->Swapchain->GetNumOfSwapchain());
-    for (auto& iter : DynamicBufferData)
-    {
-        iter.Initialize();
-    }
 }
 
 jImGUI_Vulkan::~jImGUI_Vulkan()
@@ -144,6 +138,14 @@ void jImGUI_Vulkan::Initialize(float width, float height)
 
     stagingBuffer.Release();
     //////////////////////////////////////////////////////////////////////////
+
+    DynamicBufferData.resize(g_rhi_vk->Swapchain->GetNumOfSwapchain());
+    for (auto& iter : DynamicBufferData)
+    {
+        iter.Initialize();
+    }
+
+    IsInitialized = true;
 }
 
 void jImGUI_Vulkan::Release()
@@ -174,7 +176,9 @@ void jImGUI_Vulkan::Release()
     
     for (auto& iter : Pipelines)
         vkDestroyPipeline(g_rhi_vk->Device, iter, nullptr);
+    
     Pipelines.clear();
+    RenderPasses.clear();
 }
 
 VkPipeline jImGUI_Vulkan::CreatePipelineState(VkRenderPass renderPass, VkQueue copyQueue)
@@ -316,12 +320,18 @@ VkPipeline jImGUI_Vulkan::CreatePipelineState(VkRenderPass renderPass, VkQueue c
 
 void jImGUI_Vulkan::Update(float InDeltaSeconds)
 {
+    if (!IsInitialized)
+        return;
+
     jImGUI_Vulkan::Get().NewFrame((g_rhi_vk->CurrenFrameIndex == 0));
     jImGUI_Vulkan::Get().UpdateBuffers();
 }
 
 void jImGUI_Vulkan::NewFrame(bool updateFrameGraph)
 {
+    if (!IsInitialized)
+        return;
+
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
@@ -378,6 +388,9 @@ void jImGUI_Vulkan::NewFrame(bool updateFrameGraph)
 
 void jImGUI_Vulkan::UpdateBuffers()
 {
+    if (!IsInitialized)
+        return;
+
     ImDrawData* imDrawData = ImGui::GetDrawData();
     if ((imDrawData->TotalVtxCount == 0) || (imDrawData->TotalIdxCount == 0))
         return;
@@ -443,10 +456,13 @@ void jImGUI_Vulkan::UpdateBuffers()
 
 void jImGUI_Vulkan::PrepareDraw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext)
 {
+    if (!IsInitialized)
+        return;
+
     check(RenderPasses.size() == Pipelines.size());
 
     const int32 frameIndex = InRenderFrameContext->FrameIndex;
-    if (RenderPasses.size() <= frameIndex)
+    if (RenderPasses.size() <= frameIndex || !RenderPasses[frameIndex])
     {
         RenderPasses.resize(frameIndex + 1);
         Pipelines.resize(frameIndex + 1);
@@ -467,6 +483,9 @@ void jImGUI_Vulkan::PrepareDraw(const std::shared_ptr<jRenderFrameContext>& InRe
 
 void jImGUI_Vulkan::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext)
 {
+    if (!IsInitialized)
+        return;
+
     check(InRenderFrameContext);
     PrepareDraw(InRenderFrameContext);
 
@@ -501,26 +520,29 @@ void jImGUI_Vulkan::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFra
         {
             auto& DynamicBuffer = DynamicBufferData[frameIndex];
 
-            VkDeviceSize offsets[1] = { 0 };
-            vkCmdBindVertexBuffers(commandbuffer_vk, 0, 1, &DynamicBuffer.VertexBufferPtr->Buffer, offsets);
-            vkCmdBindIndexBuffer(commandbuffer_vk, DynamicBuffer.IndexBufferPtr->Buffer, 0, VK_INDEX_TYPE_UINT16);
-
-            for (int32_t i = 0; i < imDrawData->CmdListsCount; i++)
+            if (DynamicBuffer.VertexBufferPtr->Buffer && DynamicBuffer.IndexBufferPtr->Buffer)
             {
-                const ImDrawList* cmd_list = imDrawData->CmdLists[i];
-                for (int32_t j = 0; j < cmd_list->CmdBuffer.Size; j++)
+                VkDeviceSize offsets[1] = { 0 };
+                vkCmdBindVertexBuffers(commandbuffer_vk, 0, 1, &DynamicBuffer.VertexBufferPtr->Buffer, offsets);
+                vkCmdBindIndexBuffer(commandbuffer_vk, DynamicBuffer.IndexBufferPtr->Buffer, 0, VK_INDEX_TYPE_UINT16);
+
+                for (int32_t i = 0; i < imDrawData->CmdListsCount; i++)
                 {
-                    const ImDrawCmd* pcmd = &cmd_list->CmdBuffer[j];
-                    VkRect2D scissorRect;
-                    scissorRect.offset.x = std::max((int32_t)(pcmd->ClipRect.x), 0);
-                    scissorRect.offset.y = std::max((int32_t)(pcmd->ClipRect.y), 0);
-                    scissorRect.extent.width = (uint32)(pcmd->ClipRect.z - pcmd->ClipRect.x);
-                    scissorRect.extent.height = (uint32)(pcmd->ClipRect.w - pcmd->ClipRect.y);
-                    vkCmdSetScissor(commandbuffer_vk, 0, 1, &scissorRect);
-                    vkCmdDrawIndexed(commandbuffer_vk, pcmd->ElemCount, 1, indexOffset, vertexOffset, 0);
-                    indexOffset += pcmd->ElemCount;
+                    const ImDrawList* cmd_list = imDrawData->CmdLists[i];
+                    for (int32_t j = 0; j < cmd_list->CmdBuffer.Size; j++)
+                    {
+                        const ImDrawCmd* pcmd = &cmd_list->CmdBuffer[j];
+                        VkRect2D scissorRect;
+                        scissorRect.offset.x = std::max((int32_t)(pcmd->ClipRect.x), 0);
+                        scissorRect.offset.y = std::max((int32_t)(pcmd->ClipRect.y), 0);
+                        scissorRect.extent.width = (uint32)(pcmd->ClipRect.z - pcmd->ClipRect.x);
+                        scissorRect.extent.height = (uint32)(pcmd->ClipRect.w - pcmd->ClipRect.y);
+                        vkCmdSetScissor(commandbuffer_vk, 0, 1, &scissorRect);
+                        vkCmdDrawIndexed(commandbuffer_vk, pcmd->ElemCount, 1, indexOffset, vertexOffset, 0);
+                        indexOffset += pcmd->ElemCount;
+                    }
+                    vertexOffset += cmd_list->VtxBuffer.Size;
                 }
-                vertexOffset += cmd_list->VtxBuffer.Size;
             }
         }
 

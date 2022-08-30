@@ -13,7 +13,7 @@ public:
 	void ProcessInput();
 	void Update(float deltaTime);
 	void Draw();
-	void Resize(int width, int height);
+	void Resize(int32 width, int32 height);
 	void OnMouseButton();
 	void OnMouseMove(int32 xOffset, int32 yOffset);
 

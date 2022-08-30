@@ -9,6 +9,9 @@
 #include "RHI/Vulkan/jShader_Vulkan.h"
 #include "RHI/Vulkan/jTexture_Vulkan.h"
 #include "Profiler/jPerformanceProfile.h"
+#include "RHI/Vulkan/jUniformBufferBlock_Vulkan.h"
+#include "RHI/jShaderBindingsLayout.h"
+#include "RHI/jRHIType.h"
 
 void jForwardRenderer::Setup()
 {
@@ -186,15 +189,38 @@ void jForwardRenderer::OpaquePass()
         jShaderBindingInstance* CurrentBindingInstance = nullptr;
         int32 BindingPoint = 0;
         std::vector<jShaderBinding> ShaderBindings;
+
+        // Binding 0 : Source Image
         if (ensure(SceneRT->ColorPtr))
         {
             ShaderBindings.emplace_back(jShaderBinding(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
                 , std::make_shared<jTextureResource>(SceneRT->ColorPtr->GetTexture(), nullptr)));
         }
+
+        // Binding 1 : Target Image
         if (ensure(SceneRT->FinalColorPtr))
         {
             ShaderBindings.emplace_back(jShaderBinding(BindingPoint++, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE
                 , std::make_shared<jTextureResource>(SceneRT->FinalColorPtr->GetTexture(), nullptr)));
+        }
+
+        // Binding 2 : CommonComputeUniformBuffer
+        struct jCommonComputeUniformBuffer
+        {
+            float Width;
+            float Height;
+            Vector2 Padding;
+        };
+        jCommonComputeUniformBuffer CommonComputeUniformBuffer;
+        CommonComputeUniformBuffer.Width = (float)SCR_WIDTH;
+        CommonComputeUniformBuffer.Height = (float)SCR_HEIGHT;
+
+        jUniformBufferBlock_Vulkan OneFrameUniformBuffer(jName("CommonComputeUniformBuffer"));
+        OneFrameUniformBuffer.Init(sizeof(CommonComputeUniformBuffer));
+        OneFrameUniformBuffer.UpdateBufferData(&CommonComputeUniformBuffer, sizeof(CommonComputeUniformBuffer));
+        {
+            ShaderBindings.emplace_back(jShaderBinding(BindingPoint++, EShaderBindingType::UNIFORMBUFFER
+                , EShaderAccessStageFlag::COMPUTE, std::make_shared<jUniformBufferResource>(&OneFrameUniformBuffer)));
         }
 
         CurrentBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindings);
@@ -211,9 +237,12 @@ void jForwardRenderer::OpaquePass()
 
         CurrentBindingInstance->BindCompute(RenderFrameContextPtr, (VkPipelineLayout)computePipelineStateInfo->GetPipelineLayoutHandle());
 
+        Vector2i SwapchainExtent = g_rhi->GetSwapchain()->GetExtent();
+
         check(g_rhi->GetSwapchain());
         vkCmdDispatch((VkCommandBuffer)CommandBuffer->GetHandle()
-            , g_rhi->GetSwapchain()->GetExtent().x / 16, g_rhi->GetSwapchain()->GetExtent().y / 16, 1);
+            , SwapchainExtent.x / 16 + ((SwapchainExtent.x % 16) ? 1 : 0)
+            , SwapchainExtent.y / 16 + ((SwapchainExtent.y % 16) ? 1 : 0), 1);
     }
     // End compute pipeline
 }

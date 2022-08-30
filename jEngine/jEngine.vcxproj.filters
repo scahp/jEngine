@@ -340,6 +340,9 @@
     <ClInclude Include="External\IMGUI\imstb_truetype.h">
       <Filter>Code\External\IMGUI</Filter>
     </ClInclude>
+    <ClInclude Include="RHI\jSemaphoreManager.h">
+      <Filter>Code\RHI\Vulkan</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -578,6 +581,9 @@
     </ClCompile>
     <ClCompile Include="External\IMGUI\imgui_tables.cpp">
       <Filter>Code\External\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\jSemaphoreManager.cpp">
+      <Filter>Code\RHI\Vulkan</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

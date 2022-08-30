@@ -58,9 +58,15 @@ void jEngine::Draw()
 	Game.Draw();
 }
 
-void jEngine::Resize(int width, int height)
+void jEngine::Resize(int32 width, int32 height)
 {
+    Game.Resize(width, height);
+
+#if USE_OPENGL
 	g_rhi->SetViewport(0, 0, width, height);
+#elif USE_VULKAN
+	g_rhi_vk->FramebufferResized = true;
+#endif
 }
 
 void jEngine::OnMouseButton()

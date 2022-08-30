@@ -433,6 +433,7 @@ public:
 	virtual bool TransitionImageLayoutImmediate(jTexture* texture, EImageLayout newLayout) const { return true; }
 	virtual jQueryPool* GetQueryPool() const { return nullptr; }
 	virtual jSwapchain* GetSwapchain() const { return nullptr; }
+	virtual void RecreateSwapChain() {}
 };
 
 // Not thred safe

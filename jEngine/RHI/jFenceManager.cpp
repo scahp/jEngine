@@ -16,6 +16,8 @@ VkFence jFenceManager_Vulkan::GetOrCreateFence()
     VkFence newFence = nullptr;
     if (ensure(vkCreateFence(g_rhi_vk->Device, &fenceInfo, nullptr, &newFence) == VK_SUCCESS))
         UsingFences.insert(newFence);
+    else
+        check(0);
 
     return newFence;
 }

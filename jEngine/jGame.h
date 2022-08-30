@@ -51,6 +51,7 @@ public:
 
 	void OnMouseButton();
 	void OnMouseMove(int32 xOffset, int32 yOffset);
+	void Resize(int32 width, int32 height);
 	void Release();
 
 	jDirectionalLight* DirectionalLight = nullptr;

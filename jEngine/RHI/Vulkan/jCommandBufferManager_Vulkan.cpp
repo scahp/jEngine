@@ -63,19 +63,27 @@ void jCommandBufferManager_Vulkan::ReleaseInternal()
     //// Command buffer pool 을 다시 만들기 보다 있는 커맨드 버퍼 풀을 cleanup 하고 재사용 함.
     //vkFreeCommandBuffers(device, CommandBufferManager.GetPool(), static_cast<uint32>(commandBuffers.size()), commandBuffers.data());
 
+    for (auto& iter : UsingCommandBuffers)
+    {
+        VkFence fence = (VkFence)iter->GetFenceHandle();
+        vkWaitForFences(g_rhi_vk->Device, 1, &fence, VK_TRUE, UINT64_MAX);
+        delete iter;
+    }
+    UsingCommandBuffers.clear();
+
+    for (auto& iter : PendingCommandBuffers)
+    {
+        VkFence fence = (VkFence)iter->GetFenceHandle();
+        vkWaitForFences(g_rhi_vk->Device, 1, &fence, VK_TRUE, UINT64_MAX);
+        delete iter;
+    }
+    PendingCommandBuffers.clear();
+
     if (CommandPool)
     {
         vkDestroyCommandPool(g_rhi_vk->Device, CommandPool, nullptr);
         CommandPool = nullptr;
     }
-
-    for (auto& iter : UsingCommandBuffers)
-        delete iter;
-    UsingCommandBuffers.clear();
-
-    for (auto& iter : PendingCommandBuffers)
-        delete iter;
-    PendingCommandBuffers.clear();
 }
 
 jCommandBuffer* jCommandBufferManager_Vulkan::GetOrCreateCommandBuffer()
@@ -130,8 +138,8 @@ void jCommandBufferManager_Vulkan::ReturnCommandBuffer(jCommandBuffer* commandBu
         if (UsingCommandBuffers[i]->GetHandle() == commandBuffer->GetHandle())
         {
             UsingCommandBuffers.erase(UsingCommandBuffers.begin() + i);
-            break;
+            PendingCommandBuffers.push_back((jCommandBuffer_Vulkan*)commandBuffer);
+            return;
         }
     }
-    PendingCommandBuffers.push_back((jCommandBuffer_Vulkan*)commandBuffer);
 }

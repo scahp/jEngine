@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include "Math/Vector.h"
 #include "RHI/Vulkan/jBuffer_Vulkan.h"
@@ -82,5 +82,7 @@ private:
     VkDescriptorSetLayout DescriptorSetLayout;
     VkDescriptorSet DescriptorSet;
     std::vector<VkPipeline> Pipelines;
-    std::vector<jRenderPass*> RenderPasses;         // ·»´õÆĞ½º´Â RenderPassPool ¿¡¼­ °ü¸®ÇÏ±â ¶§¹®¿¡ µû·Î ¼Ò¸êÃ³¸® ÇÏÁö ¾ÊÀ½
+    std::vector<jRenderPass*> RenderPasses;         // ë Œë”íŒ¨ìŠ¤ëŠ” RenderPassPool ì—ì„œ ê´€ë¦¬í•˜ê¸° ë•Œë¬¸ì— ë”°ë¡œ ì†Œë©¸ì²˜ë¦¬ í•˜ì§€ ì•ŠìŒ
+
+    bool IsInitialized = false;
 };
