@@ -35,6 +35,7 @@ public:
 		TestPrimitive,
 		CubePrimitive,
 		InstancingPrimitive,
+		IndirectDrawPrimitive,
 	};
 
 	void SpawnObjects(ESpawnedType spawnType);
@@ -43,6 +44,7 @@ public:
 	void SpawnTestPrimitives();
 	void SapwnCubePrimitives();
 	void SpawnInstancingPrimitives();
+	void SpawnIndirectDrawPrimitives();
 
 	void SpawnGraphTestFunc();	// Test
 

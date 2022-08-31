@@ -176,9 +176,10 @@ bool jRHI_Vulkan::InitRHI()
 			queueCreateInfos.push_back(queueCreateInfo);
 		}
 
-		VkPhysicalDeviceFeatures deviceFeatures = {};
+        VkPhysicalDeviceFeatures deviceFeatures = {};
 		deviceFeatures.samplerAnisotropy = VK_TRUE;		// VkSampler 가 Anisotropy 를 사용할 수 있도록 하기 위해 true로 설정
 		deviceFeatures.sampleRateShading = VK_TRUE;		// Sample shading 켬	 (텍스쳐 내부에 있는 aliasing 도 완화 해줌)
+		deviceFeatures.multiDrawIndirect = VK_TRUE;
 
 		VkDeviceCreateInfo createInfo = {};
 		createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -978,18 +979,35 @@ void jRHI_Vulkan::DrawElementsInstanced(const std::shared_ptr<jRenderFrameContex
 	vkCmdDrawIndexed((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), count, instanceCount, startIndex, 0, 0);
 }
 
-void jRHI_Vulkan::DrawElementsBaseVertex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex) const
+void jRHI_Vulkan::DrawElementsBaseVertex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 count, int32 baseVertexIndex) const
 {
     check(InRenderFrameContext);
     check(InRenderFrameContext->CommandBuffer);
 	vkCmdDrawIndexed((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), count, 1, startIndex, baseVertexIndex, 0);
 }
 
-void jRHI_Vulkan::DrawElementsInstancedBaseVertex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex, int32 instanceCount) const
+void jRHI_Vulkan::DrawElementsInstancedBaseVertex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 count, int32 baseVertexIndex, int32 instanceCount) const
 {
 	check(InRenderFrameContext);
 	check(InRenderFrameContext->CommandBuffer);
 	vkCmdDrawIndexed((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), count, instanceCount, startIndex, baseVertexIndex, 0);
+}
+
+void jRHI_Vulkan::DrawIndirect(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, jBuffer* buffer, int32 startIndex, int32 drawCount) const
+{
+    check(InRenderFrameContext);
+    check(InRenderFrameContext->CommandBuffer);
+    vkCmdDrawIndirect((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), (VkBuffer)buffer->GetHandle()
+        , startIndex * sizeof(VkDrawIndirectCommand), drawCount, sizeof(VkDrawIndirectCommand));
+}
+
+void jRHI_Vulkan::DrawElementsIndirect(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext
+	, EPrimitiveType type, jBuffer* buffer, int32 startIndex, int32 drawCount) const
+{
+    check(InRenderFrameContext);
+    check(InRenderFrameContext->CommandBuffer);
+	vkCmdDrawIndexedIndirect((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), (VkBuffer)buffer->GetHandle()
+		, startIndex * sizeof(VkDrawIndexedIndirectCommand), drawCount, sizeof(VkDrawIndexedIndirectCommand));
 }
 
 jShaderBindingsLayout* jRHI_Vulkan::CreateShaderBindings(const std::vector<jShaderBinding>& InShaderBindings) const

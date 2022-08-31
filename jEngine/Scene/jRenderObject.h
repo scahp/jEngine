@@ -56,6 +56,7 @@ public:
 	jVertexBuffer* VertexBuffer = nullptr;
 	jVertexBuffer* VertexBuffer_PositionOnly = nullptr;
 	jVertexBuffer* VertexBuffer_InstanceData = nullptr;
+	jBuffer* IndirectCommandBuffer = nullptr;
 
 	std::shared_ptr<jIndexStreamData> IndexStream;
 	jIndexBuffer* IndexBuffer = nullptr;

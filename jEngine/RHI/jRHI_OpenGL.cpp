@@ -630,7 +630,7 @@ void jRHI_OpenGL::DrawElementsInstanced(EPrimitiveType type, int32 elementSize, 
 	glDrawElementsInstanced(GetPrimitiveType(type), count, elementType, u_offset.offset_pointer, instanceCount);
 }
 
-void jRHI_OpenGL::DrawElementsBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex) const
+void jRHI_OpenGL::DrawElementsBaseVertex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 count, int32 baseVertexIndex) const
 {
 	union jOffset
 	{
@@ -642,7 +642,7 @@ void jRHI_OpenGL::DrawElementsBaseVertex(EPrimitiveType type, int elementSize, i
 	glDrawElementsBaseVertex(GetPrimitiveType(type), count, elementType, u_offset.offset_pointer, baseVertexIndex);
 }
 
-void jRHI_OpenGL::DrawElementsInstancedBaseVertex(EPrimitiveType type, int elementSize, int32 startIndex, int32 count, int32 baseVertexIndex, int32 instanceCount) const
+void jRHI_OpenGL::DrawElementsInstancedBaseVertex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 count, int32 baseVertexIndex, int32 instanceCount) const
 {
 	union jOffset
 	{

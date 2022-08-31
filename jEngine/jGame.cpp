@@ -8,6 +8,7 @@
 #include "Profiler/jPerformanceProfile.h"
 #include "Renderer/jForwardRenderer.h"
 #include "jPrimitiveUtil.h"
+#include "RHI\Vulkan\jVulkanBufferUtil.h"
 
 jRHI* g_rhi = nullptr;
 
@@ -102,8 +103,8 @@ void jGame::Setup()
 
 	// Select spawning object type
 	//SpawnObjects(ESpawnedType::TestPrimitive);
-
-	SpawnObjects(ESpawnedType::InstancingPrimitive);
+	//SpawnObjects(ESpawnedType::InstancingPrimitive);
+	SpawnObjects(ESpawnedType::IndirectDrawPrimitive);
 }
 
 void jGame::SpawnObjects(ESpawnedType spawnType)
@@ -121,6 +122,9 @@ void jGame::SpawnObjects(ESpawnedType spawnType)
 			break;
 		case ESpawnedType::InstancingPrimitive:
 			SpawnInstancingPrimitives();
+			break;
+		case ESpawnedType::IndirectDrawPrimitive:
+			SpawnIndirectDrawPrimitives();
 			break;
 		}
 	}
@@ -465,6 +469,92 @@ void jGame::SpawnInstancingPrimitives()
         obj->RenderObject->VertexStream_InstanceData->VertexInputRate = EVertexInputRate::INSTANCE;
         obj->RenderObject->VertexStream_InstanceData->Params.push_back(streamParam);
         obj->RenderObject->VertexBuffer_InstanceData = g_rhi->CreateVertexBuffer(obj->RenderObject->VertexStream_InstanceData);
+
+        jObject::AddObject(obj);
+        SpawnedObjects.push_back(obj);
+    }
+}
+
+void jGame::SpawnIndirectDrawPrimitives()
+{
+    struct jInstanceData
+    {
+        Vector4 Color;
+        Vector W;
+    };
+    jInstanceData instanceData[100];
+
+    const float colorStep = 1.0f / (float)sqrt(_countof(instanceData));
+    Vector4 curStep = Vector4(colorStep, colorStep, colorStep, 1.0f);
+
+    for (int32 i = 0; i < _countof(instanceData); ++i)
+    {
+        float x = (float)(i / 10);
+        float y = (float)(i % 10);
+        instanceData[i].W = Vector(y * 10.0f, x * 10.0f, 0.0f);
+        instanceData[i].Color = curStep;
+        if (i < _countof(instanceData) / 3)
+            curStep.x += colorStep;
+        else if (i < _countof(instanceData) / 2)
+            curStep.y += colorStep;
+        else if (i < _countof(instanceData))
+            curStep.z += colorStep;
+    }
+
+    {
+        auto obj = jPrimitiveUtil::CreateTriangle(Vector(0.0f, 0.0f, 0.0f), Vector::OneVector * 8.0f, Vector::OneVector, Vector4(1.0f, 0.0f, 0.0f, 1.0f));
+
+        auto streamParam = std::make_shared<jStreamParam<jInstanceData>>();
+        streamParam->BufferType = EBufferType::STATIC;
+        streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(Vector4)));
+        streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(Vector)));
+        streamParam->Stride = sizeof(jInstanceData);
+        streamParam->Name = jName("InstanceData");
+        streamParam->Data.resize(100);
+        memcpy(&streamParam->Data[0], instanceData, sizeof(instanceData));
+
+        obj->RenderObject->VertexStream_InstanceData = std::make_shared<jVertexStreamData>();
+        obj->RenderObject->VertexStream_InstanceData->ElementCount = _countof(instanceData);
+        obj->RenderObject->VertexStream_InstanceData->StartLocation = (int32)obj->RenderObject->VertexStream->GetEndLocation();
+        obj->RenderObject->VertexStream_InstanceData->BindingIndex = (int32)obj->RenderObject->VertexStream->Params.size();
+        obj->RenderObject->VertexStream_InstanceData->VertexInputRate = EVertexInputRate::INSTANCE;
+        obj->RenderObject->VertexStream_InstanceData->Params.push_back(streamParam);
+        obj->RenderObject->VertexBuffer_InstanceData = g_rhi->CreateVertexBuffer(obj->RenderObject->VertexStream_InstanceData);
+
+        // Create indirect draw buffer
+        {
+            check(obj->RenderObject->VertexStream_InstanceData);
+
+            std::vector<VkDrawIndirectCommand> indrectCommands;
+
+            const int32 instanceCount = obj->RenderObject->VertexStream_InstanceData->ElementCount;
+            const int32 vertexCount = obj->RenderObject->VertexStream->ElementCount;
+            for (int32 i = 0; i < instanceCount; ++i)
+            {
+                VkDrawIndirectCommand command;
+                command.vertexCount = vertexCount;
+                command.instanceCount = 1;
+                command.firstVertex = 0;
+                command.firstInstance = i;
+                indrectCommands.emplace_back(command);
+            }
+
+            const size_t bufferSize = indrectCommands.size() * sizeof(VkDrawIndirectCommand);
+
+            jBuffer_Vulkan stagingBuffer;
+            jVulkanBufferUtil::CreateBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+                , bufferSize, stagingBuffer);
+
+            stagingBuffer.UpdateBuffer(indrectCommands.data(), bufferSize);
+
+            jBuffer_Vulkan* temp = new jBuffer_Vulkan();
+            obj->RenderObject->IndirectCommandBuffer = temp;
+            jVulkanBufferUtil::CreateBuffer(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+                , bufferSize, *temp);
+            jVulkanBufferUtil::CopyBuffer(stagingBuffer.Buffer, (VkBuffer)obj->RenderObject->IndirectCommandBuffer->GetHandle(), bufferSize);
+
+            stagingBuffer.Release();
+        }
 
         jObject::AddObject(obj);
         SpawnedObjects.push_back(obj);

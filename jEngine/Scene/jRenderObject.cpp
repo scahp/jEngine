@@ -18,6 +18,7 @@ jRenderObject::~jRenderObject()
     delete VertexBuffer;
     delete VertexBuffer_PositionOnly;
 	delete VertexBuffer_InstanceData;
+	delete IndirectCommandBuffer;
     
 	VertexStream.reset();
     VertexStream_PositionOnly.reset();
@@ -100,20 +101,36 @@ void jRenderObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFra
 	auto primitiveType = vertexStreamData->PrimitiveType;
 	if (IndexBuffer)
 	{
-		auto& indexStreamData = IndexBuffer->IndexStreamData;
-		count = count != -1 ? count : indexStreamData->ElementCount;
-		if (instanceCount <= 0)
-			g_rhi->DrawElements(InRenderFrameContext, primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count);
+        if (IndirectCommandBuffer)
+        {
+			const int32 instanceCount = VertexStream_InstanceData->ElementCount;
+            g_rhi->DrawElementsIndirect(InRenderFrameContext, primitiveType, IndirectCommandBuffer, 0, instanceCount);
+        }
 		else
-			g_rhi->DrawElementsInstanced(InRenderFrameContext, primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count, instanceCount);
+		{
+			auto& indexStreamData = IndexBuffer->IndexStreamData;
+			count = count != -1 ? count : indexStreamData->ElementCount;
+			if (instanceCount <= 0)
+				g_rhi->DrawElements(InRenderFrameContext, primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count);
+			else
+				g_rhi->DrawElementsInstanced(InRenderFrameContext, primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count, instanceCount);
+		}
 	}
 	else
 	{
-		count = count != -1 ? count : vertexStreamData->ElementCount;
-		if (instanceCount <= 0)
-			g_rhi->DrawArrays(InRenderFrameContext, primitiveType, 0, count);
+		if (IndirectCommandBuffer)
+		{
+			const int32 instanceCount = VertexStream_InstanceData->ElementCount;
+			g_rhi->DrawIndirect(InRenderFrameContext, primitiveType, IndirectCommandBuffer, 0, instanceCount);
+		}
 		else
-			g_rhi->DrawArraysInstanced(InRenderFrameContext, primitiveType, 0, count, instanceCount);
+		{
+			count = count != -1 ? count : vertexStreamData->ElementCount;
+			if (instanceCount <= 0)
+				g_rhi->DrawArrays(InRenderFrameContext, primitiveType, 0, count);
+			else
+				g_rhi->DrawArraysInstanced(InRenderFrameContext, primitiveType, 0, count, instanceCount);
+		}
 	}
 }
 
@@ -150,11 +167,18 @@ void jRenderObject::DrawBaseVertexIndex(const std::shared_ptr<jRenderFrameContex
 		auto primitiveType = vertexStreamData->PrimitiveType;
 		if (IndexBuffer)
 		{
-			auto& indexStreamData = IndexBuffer->IndexStreamData;
-			if (instanceCount <= 0)
-				g_rhi->DrawElementsBaseVertex(InRenderFrameContext, primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count, baseVertexIndex);
+			if (IndirectCommandBuffer)
+			{
+				g_rhi->DrawElementsIndirect(InRenderFrameContext, primitiveType, IndirectCommandBuffer, 0, 1);
+			}
 			else
-				g_rhi->DrawElementsInstancedBaseVertex(InRenderFrameContext, primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count, baseVertexIndex, instanceCount);
+			{
+				auto& indexStreamData = IndexBuffer->IndexStreamData;
+				if (instanceCount <= 0)
+					g_rhi->DrawElementsBaseVertex(InRenderFrameContext, primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count, baseVertexIndex);
+				else
+					g_rhi->DrawElementsInstancedBaseVertex(InRenderFrameContext, primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count, baseVertexIndex, instanceCount);
+			}
 		}
 		else
 		{
