@@ -597,6 +597,7 @@ enum class EImageLayout : uint8
 
 struct jBuffer : std::enable_shared_from_this<jBuffer>
 {
+	virtual ~jBuffer() {}
     virtual void Release() = 0;
 
 	virtual void* GetMappedPointer() const = 0;
