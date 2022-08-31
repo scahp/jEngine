@@ -52,15 +52,27 @@ void jForwardRenderer::SetupShadowPass()
     ShadowView.Camera = View.DirectionalLight->GetLightCamra();
     ShadowView.DirectionalLight = View.DirectionalLight;
 
-    jShaderInfo shaderInfo;
-    shaderInfo.name = jName("shadow_test");
-    shaderInfo.vs = jName("Resource/Shaders/hlsl/shadow_instancing_vs.hlsl");
-    shaderInfo.fs = jName("Resource/Shaders/hlsl/shadow_fs.hlsl");
-    jShader* ShadowShader = g_rhi->CreateShader(shaderInfo);
+    jShader* ShadowShader = nullptr;
+    {
+        jShaderInfo shaderInfo;
+        shaderInfo.name = jName("shadow_test");
+        shaderInfo.vs = jName("Resource/Shaders/hlsl/shadow_vs.hlsl");
+        shaderInfo.fs = jName("Resource/Shaders/hlsl/shadow_fs.hlsl");
+        ShadowShader = g_rhi->CreateShader(shaderInfo);
+    }
+    jShader* ShadowInstancingShader = nullptr;
+    {
+        jShaderInfo shaderInfo;
+        shaderInfo.name = jName("shadow_test");
+        shaderInfo.vs = jName("Resource/Shaders/hlsl/shadow_instancing_vs.hlsl");
+        shaderInfo.fs = jName("Resource/Shaders/hlsl/shadow_fs.hlsl");
+        ShadowInstancingShader = g_rhi->CreateShader(shaderInfo);
+    }
 
     for (auto iter : jObject::GetStaticObject())
     {
-        auto newCommand = jDrawCommand(RenderFrameContextPtr, &ShadowView, iter->RenderObject, ShadowMapRenderPass, ShadowShader, &ShadpwPipelineStateFixed, { });
+        auto newCommand = jDrawCommand(RenderFrameContextPtr, &ShadowView, iter->RenderObject, ShadowMapRenderPass
+            , (iter->HasInstancing() ? ShadowInstancingShader : ShadowShader), &ShadpwPipelineStateFixed, { });
         newCommand.PrepareToDraw(true);
         ShadowPasses.push_back(newCommand);
     }
@@ -101,15 +113,27 @@ void jForwardRenderer::SetupBasePass()
         OpaqueRenderPass = (jRenderPass_Vulkan*)g_rhi->GetOrCreateRenderPass({ color }, depth, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
     }
 
-    jShaderInfo shaderInfo;
-    shaderInfo.name = jName("default_test");
-    shaderInfo.vs = jName("Resource/Shaders/hlsl/shader_instancing_vs.hlsl");
-    shaderInfo.fs = jName("Resource/Shaders/hlsl/shader_fs.hlsl");
-    jShader* BasePassShader = g_rhi->CreateShader(shaderInfo);
+    jShader* BasePassShader = nullptr;
+    {
+        jShaderInfo shaderInfo;
+        shaderInfo.name = jName("default_test");
+        shaderInfo.vs = jName("Resource/Shaders/hlsl/shader_vs.hlsl");
+        shaderInfo.fs = jName("Resource/Shaders/hlsl/shader_fs.hlsl");
+        BasePassShader = g_rhi->CreateShader(shaderInfo);
+    }
+    jShader* BasePassInstancingShader = nullptr;
+    {
+        jShaderInfo shaderInfo;
+        shaderInfo.name = jName("default_test");
+        shaderInfo.vs = jName("Resource/Shaders/hlsl/shader_instancing_vs.hlsl");
+        shaderInfo.fs = jName("Resource/Shaders/hlsl/shader_fs.hlsl");
+        BasePassInstancingShader = g_rhi->CreateShader(shaderInfo);
+    }
 
     for (auto iter : jObject::GetStaticObject())
     {
-        auto newCommand = jDrawCommand(RenderFrameContextPtr, &View, iter->RenderObject, OpaqueRenderPass, BasePassShader, &BasePassPipelineStateFixed, { });
+        auto newCommand = jDrawCommand(RenderFrameContextPtr, &View, iter->RenderObject, OpaqueRenderPass
+            , (iter->HasInstancing() ? BasePassInstancingShader : BasePassShader), &BasePassPipelineStateFixed, { });
         newCommand.PrepareToDraw(false);
         BasePasses.push_back(newCommand);
     }

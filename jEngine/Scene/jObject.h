@@ -56,6 +56,8 @@ public:
 	void CreateBoundBox(bool isShow = true);
 	void ShowBoundBox(bool isShow);
 
+	bool HasInstancing() const;
+
 	jRenderObject* RenderObject = nullptr;
 
 	bool SkipShadowMapGen = false;

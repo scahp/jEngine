@@ -102,55 +102,8 @@ void jGame::Setup()
 
 	// Select spawning object type
 	//SpawnObjects(ESpawnedType::TestPrimitive);
-	//return;
 
-	struct jInstanceData
-	{
-        Vector4 Color;
-		Vector W;
-	};
-	jInstanceData instanceData[100];
-
-	const float colorStep = 1.0f / (float)sqrt(_countof(instanceData));
-	Vector4 curStep = Vector4(colorStep, colorStep, colorStep, 1.0f);
-
-	for (int32 i = 0; i < _countof(instanceData); ++i)
-	{
-		float x = (float)(i / 10);
-		float y = (float)(i % 10);
-        instanceData[i].W = Vector(y * 10.0f, x * 10.0f, 0.0f);
-		instanceData[i].Color = curStep;
-		if (i < _countof(instanceData) / 3)
-			curStep.x += colorStep;
-		else if (i < _countof(instanceData) / 2)
-            curStep.y += colorStep;
-        else if (i < _countof(instanceData))
-            curStep.z += colorStep;
-	}
-
-	{
-		auto obj = jPrimitiveUtil::CreateTriangle(Vector(0.0f, 0.0f, 0.0f), Vector::OneVector * 8.0f, Vector::OneVector, Vector4(1.0f, 0.0f, 0.0f, 1.0f));
-
-		auto streamParam = std::make_shared<jStreamParam<jInstanceData>>();
-		streamParam->BufferType = EBufferType::STATIC;
-        streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(Vector4)));
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(Vector)));
-		streamParam->Stride = sizeof(jInstanceData);
-		streamParam->Name = jName("InstanceData");
-		streamParam->Data.resize(100);
-		memcpy(&streamParam->Data[0], instanceData, sizeof(instanceData));
-			
-		obj->RenderObject->VertexStream_InstanceData = std::make_shared<jVertexStreamData>();
-		obj->RenderObject->VertexStream_InstanceData->ElementCount = _countof(instanceData);
-		obj->RenderObject->VertexStream_InstanceData->StartLocation = (int32)obj->RenderObject->VertexStream->GetEndLocation();
-		obj->RenderObject->VertexStream_InstanceData->BindingIndex = (int32)obj->RenderObject->VertexStream->Params.size();
-		obj->RenderObject->VertexStream_InstanceData->VertexInputRate = EVertexInputRate::INSTANCE;
-		obj->RenderObject->VertexStream_InstanceData->Params.push_back(streamParam);
-		obj->RenderObject->VertexBuffer_InstanceData = g_rhi->CreateVertexBuffer(obj->RenderObject->VertexStream_InstanceData);
-
-        jObject::AddObject(obj);
-        SpawnedObjects.push_back(obj);
-	}
+	SpawnObjects(ESpawnedType::InstancingPrimitive);
 }
 
 void jGame::SpawnObjects(ESpawnedType spawnType)
@@ -165,6 +118,9 @@ void jGame::SpawnObjects(ESpawnedType spawnType)
 			break;
 		case ESpawnedType::CubePrimitive:
 			SapwnCubePrimitives();
+			break;
+		case ESpawnedType::InstancingPrimitive:
+			SpawnInstancingPrimitives();
 			break;
 		}
 	}
@@ -462,4 +418,55 @@ void jGame::SapwnCubePrimitives()
 	quad->SetPlane(jPlane(Vector(0.0, 1.0, 0.0), -0.1f));
 	jObject::AddObject(quad);
 	SpawnedObjects.push_back(quad);
+}
+
+void jGame::SpawnInstancingPrimitives()
+{
+    struct jInstanceData
+    {
+        Vector4 Color;
+        Vector W;
+    };
+    jInstanceData instanceData[100];
+
+    const float colorStep = 1.0f / (float)sqrt(_countof(instanceData));
+    Vector4 curStep = Vector4(colorStep, colorStep, colorStep, 1.0f);
+
+    for (int32 i = 0; i < _countof(instanceData); ++i)
+    {
+        float x = (float)(i / 10);
+        float y = (float)(i % 10);
+        instanceData[i].W = Vector(y * 10.0f, x * 10.0f, 0.0f);
+        instanceData[i].Color = curStep;
+        if (i < _countof(instanceData) / 3)
+            curStep.x += colorStep;
+        else if (i < _countof(instanceData) / 2)
+            curStep.y += colorStep;
+        else if (i < _countof(instanceData))
+            curStep.z += colorStep;
+    }
+
+    {
+        auto obj = jPrimitiveUtil::CreateTriangle(Vector(0.0f, 0.0f, 0.0f), Vector::OneVector * 8.0f, Vector::OneVector, Vector4(1.0f, 0.0f, 0.0f, 1.0f));
+
+        auto streamParam = std::make_shared<jStreamParam<jInstanceData>>();
+        streamParam->BufferType = EBufferType::STATIC;
+        streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(Vector4)));
+        streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(Vector)));
+        streamParam->Stride = sizeof(jInstanceData);
+        streamParam->Name = jName("InstanceData");
+        streamParam->Data.resize(100);
+        memcpy(&streamParam->Data[0], instanceData, sizeof(instanceData));
+
+        obj->RenderObject->VertexStream_InstanceData = std::make_shared<jVertexStreamData>();
+        obj->RenderObject->VertexStream_InstanceData->ElementCount = _countof(instanceData);
+        obj->RenderObject->VertexStream_InstanceData->StartLocation = (int32)obj->RenderObject->VertexStream->GetEndLocation();
+        obj->RenderObject->VertexStream_InstanceData->BindingIndex = (int32)obj->RenderObject->VertexStream->Params.size();
+        obj->RenderObject->VertexStream_InstanceData->VertexInputRate = EVertexInputRate::INSTANCE;
+        obj->RenderObject->VertexStream_InstanceData->Params.push_back(streamParam);
+        obj->RenderObject->VertexBuffer_InstanceData = g_rhi->CreateVertexBuffer(obj->RenderObject->VertexStream_InstanceData);
+
+        jObject::AddObject(obj);
+        SpawnedObjects.push_back(obj);
+    }
 }

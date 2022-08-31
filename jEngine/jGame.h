@@ -33,7 +33,8 @@ public:
 	{
 		None = 0,
 		TestPrimitive,
-		CubePrimitive
+		CubePrimitive,
+		InstancingPrimitive,
 	};
 
 	void SpawnObjects(ESpawnedType spawnType);
@@ -41,6 +42,7 @@ public:
 	void RemoveSpawnedObjects();
 	void SpawnTestPrimitives();
 	void SapwnCubePrimitives();
+	void SpawnInstancingPrimitives();
 
 	void SpawnGraphTestFunc();	// Test
 

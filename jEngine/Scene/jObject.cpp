@@ -213,3 +213,8 @@ void jObject::ShowBoundBox(bool isShow)
 		jObject::RemoveBoundSphereObject(BoundSphereObject);
 	}
 }
+
+bool jObject::HasInstancing() const
+{
+    return RenderObject->HasInstancing();
+}

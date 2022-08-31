@@ -48,6 +48,8 @@ public:
 	void UpdateWorldMatrix();
 	Matrix GetWorld() const;
 
+	FORCEINLINE bool HasInstancing() const { return !!VertexBuffer_InstanceData; }
+
 	std::shared_ptr<jVertexStreamData> VertexStream;
 	std::shared_ptr<jVertexStreamData> VertexStream_InstanceData;
 	std::shared_ptr<jVertexStreamData> VertexStream_PositionOnly;
