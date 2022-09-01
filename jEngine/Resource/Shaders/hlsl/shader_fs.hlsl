@@ -47,6 +47,12 @@ cbuffer RenderObjectParam : register(b0,space1) { RenderObjectUniformBuffer Rend
 Texture2D DirectionalLightShadowMap : register(t1, space0);
 SamplerState shadowMapSampler : register(s1, space0);
 
+struct PushConsts
+{
+    float4 color;
+};
+[[vk::push_constant]] PushConsts pushConsts;
+
 float4 main(VSOutput input) : SV_TARGET
 {
     float lit = 1.0;
@@ -60,5 +66,5 @@ float4 main(VSOutput input) : SV_TARGET
 	}
 
     float Intensity = dot(input.Normal, -DirectionalLight.Direction) * lit;
-    return float4(input.Color.xyz * Intensity, 1.0);
+    return float4(pushConsts.color.rgb * input.Color.xyz * Intensity, 1.0);
 }

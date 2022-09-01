@@ -146,8 +146,8 @@ public:
 
 	virtual jShaderBindingsLayout* CreateShaderBindings(const std::vector<jShaderBinding>& InShaderBindings) const override;
 	virtual jShaderBindingInstance* CreateShaderBindingInstance(const std::vector<jShaderBinding>& InShaderBindings) const override;
-	virtual void* CreatePipelineLayout(const std::vector<const jShaderBindingsLayout*>& shaderBindings) const override;
-	virtual void* CreatePipelineLayout(const std::vector<const jShaderBindingInstance*>& shaderBindingInstances) const override;
+	virtual void* CreatePipelineLayout(const std::vector<const jShaderBindingsLayout*>& shaderBindings, const jPushConstant* pushConstant) const override;
+	virtual void* CreatePipelineLayout(const std::vector<const jShaderBindingInstance*>& shaderBindingInstances, const jPushConstant* pushConstant) const override;
 
 	virtual IUniformBufferBlock* CreateUniformBufferBlock(const char* blockname, size_t size = 0) const override;
 
@@ -163,9 +163,9 @@ public:
 		, const std::vector<uint64>& wholeQueryTimeStampArray) const override;
 	virtual std::shared_ptr<jRenderFrameContext> BeginRenderFrame() override;
 	virtual void EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr) override;
-	jPipelineStateInfo* CreatePipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader
-		, std::vector<const jVertexBuffer*> vertexBuffers, const jRenderPass* renderPass, const std::vector<const jShaderBindingsLayout*> shaderBindings) const override;
-	virtual jPipelineStateInfo* CreateComputePipelineStateInfo(const jShader* shader, const std::vector<const jShaderBindingsLayout*> shaderBindings) const override;
+	jPipelineStateInfo* CreatePipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader, const std::vector<const jVertexBuffer*>& vertexBuffers
+		, const jRenderPass* renderPass, const std::vector<const jShaderBindingsLayout*>& shaderBindings, const jPushConstant* pushConstant) const override;
+	virtual jPipelineStateInfo* CreateComputePipelineStateInfo(const jShader* shader, const std::vector<const jShaderBindingsLayout*>& shaderBindings, const jPushConstant* pushConstant) const override;
 
 	virtual jRenderPass* GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const Vector2i& offset, const Vector2i& extent) const override;
 	virtual jRenderPass* GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const jAttachment& depthAttachment

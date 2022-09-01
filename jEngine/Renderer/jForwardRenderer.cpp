@@ -13,6 +13,12 @@
 #include "RHI/jShaderBindingsLayout.h"
 #include "RHI/jRHIType.h"
 
+struct jColorPushConstant
+{
+    Vector4 Color = Vector4(0.2f, 1.0f, 0.2f, 1.0f);
+};
+static std::shared_ptr<TPushConstant<jColorPushConstant>> PushConstantPtr;
+
 void jForwardRenderer::Setup()
 {
     View.SetupUniformBuffer();
@@ -72,7 +78,7 @@ void jForwardRenderer::SetupShadowPass()
     for (auto iter : jObject::GetStaticObject())
     {
         auto newCommand = jDrawCommand(RenderFrameContextPtr, &ShadowView, iter->RenderObject, ShadowMapRenderPass
-            , (iter->HasInstancing() ? ShadowInstancingShader : ShadowShader), &ShadpwPipelineStateFixed, { });
+            , (iter->HasInstancing() ? ShadowInstancingShader : ShadowShader), &ShadpwPipelineStateFixed, {}, nullptr);
         newCommand.PrepareToDraw(true);
         ShadowPasses.push_back(newCommand);
     }
@@ -130,10 +136,12 @@ void jForwardRenderer::SetupBasePass()
         BasePassInstancingShader = g_rhi->CreateShader(shaderInfo);
     }
 
+    PushConstantPtr = std::make_shared<TPushConstant<jColorPushConstant>>(jColorPushConstant(), jPushConstantRange(EShaderAccessStageFlag::FRAGMENT, 0, sizeof(jColorPushConstant)));
+
     for (auto iter : jObject::GetStaticObject())
     {
         auto newCommand = jDrawCommand(RenderFrameContextPtr, &View, iter->RenderObject, OpaqueRenderPass
-            , (iter->HasInstancing() ? BasePassInstancingShader : BasePassShader), &BasePassPipelineStateFixed, { });
+            , (iter->HasInstancing() ? BasePassInstancingShader : BasePassShader), &BasePassPipelineStateFixed, {}, PushConstantPtr);
         newCommand.PrepareToDraw(false);
         BasePasses.push_back(newCommand);
     }
@@ -254,7 +262,7 @@ void jForwardRenderer::OpaquePass()
         shaderInfo.cs = jName("Resource/Shaders/hlsl/emboss_cs.hlsl");
         static jShader_Vulkan* Shader = (jShader_Vulkan*)g_rhi->CreateShader(shaderInfo);
 
-        jPipelineStateInfo* computePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, { CurrentBindingInstance->ShaderBindingsLayouts });
+        jPipelineStateInfo* computePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, { CurrentBindingInstance->ShaderBindingsLayouts }, {});
 
         computePipelineStateInfo->Bind(RenderFrameContextPtr);
         // vkCmdBindPipeline((VkCommandBuffer)CommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline[imageIndex]);

@@ -242,7 +242,7 @@ void* jPipelineStateInfo_Vulkan::CreateGraphicsPipelineState()
     //dynamicState.pDynamicStates = dynamicStates;
 
     // 10. Pipeline layout
-    vkPipelineLayout = (VkPipelineLayout)g_rhi->CreatePipelineLayout(ShaderBindings);
+    vkPipelineLayout = (VkPipelineLayout)g_rhi->CreatePipelineLayout(ShaderBindings, PushConstant);
 
     VkGraphicsPipelineCreateInfo pipelineInfo = {};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -292,7 +292,7 @@ void* jPipelineStateInfo_Vulkan::CreateComputePipelineState()
     if (vkPipeline)
         return vkPipeline;
 
-    vkPipelineLayout = (VkPipelineLayout)g_rhi->CreatePipelineLayout(ShaderBindings);
+    vkPipelineLayout = (VkPipelineLayout)g_rhi->CreatePipelineLayout(ShaderBindings, PushConstant);
 
     VkComputePipelineCreateInfo computePipelineCreateInfo{};
     computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;

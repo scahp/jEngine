@@ -333,6 +333,53 @@ struct jPipelineStateFixedInfo
     mutable size_t Hash = 0;
 };
 
+struct jPushConstantRange
+{
+    jPushConstantRange() = default;
+    jPushConstantRange(EShaderAccessStageFlag accessStageFlag, int32 offset, int32 size)
+        : AccessStageFlag(accessStageFlag), Offset(offset), Size(size)
+    {}
+
+    EShaderAccessStageFlag AccessStageFlag = EShaderAccessStageFlag::ALL_GRAPHICS;
+    int32 Offset = 0;
+    int32 Size = 0;
+};
+
+struct jPushConstant : std::enable_shared_from_this<jPushConstant>
+{
+    virtual size_t GetHash() const = 0;
+    virtual const void* GetConstantData() const = 0;
+    virtual int32 GetSize() const = 0;
+    virtual const std::vector<jPushConstantRange>* GetPushConstantRanges() const = 0;
+};
+
+template <typename T>
+struct TPushConstant : public jPushConstant
+{
+    TPushConstant() = default;
+    TPushConstant(const T& data, const jPushConstantRange& pushConstantRanges)
+        : Data(data)
+    {
+        PushConstantRanges.push_back(pushConstantRanges);
+    }
+    TPushConstant(const T& data, const std::vector<jPushConstantRange>& pushConstantRanges)
+        : Data(data), PushConstantRanges(pushConstantRanges)
+    {}
+
+    virtual size_t GetHash() const
+    {
+        size_t Hash = CityHash64((const char*)&Data, sizeof(Data));
+        Hash = CityHash64WithSeed((const char*)PushConstantRanges.data(), sizeof(PushConstantRanges.size()) * sizeof(jPushConstantRange), Hash);
+        return Hash;
+    }
+    virtual const void* GetConstantData() const override { return &Data; }
+    virtual int32 GetSize() const override { return sizeof(T); }
+    virtual const std::vector<jPushConstantRange>* GetPushConstantRanges() const { return &PushConstantRanges; }
+
+    std::vector<jPushConstantRange> PushConstantRanges;
+    T Data;
+};
+
 struct jShader;
 struct jVertexBuffer;
 struct jShaderBindingsLayout;
@@ -345,20 +392,21 @@ struct jRenderFrameContext;
 struct jPipelineStateInfo
 {
     jPipelineStateInfo() = default;
-    jPipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader, std::vector<const jVertexBuffer*> vertexBuffers
-        , const jRenderPass* renderPass, const std::vector<const jShaderBindingsLayout*> shaderBindings)
-        : PipelineStateFixed(pipelineStateFixed), Shader(shader), VertexBuffers(vertexBuffers), RenderPass(renderPass), ShaderBindings(shaderBindings)
+    jPipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader, const std::vector<const jVertexBuffer*>& vertexBuffers
+        , const jRenderPass* renderPass, const std::vector<const jShaderBindingsLayout*>& shaderBindings, const jPushConstant* pushConstant)
+        : PipelineStateFixed(pipelineStateFixed), Shader(shader), VertexBuffers(vertexBuffers), RenderPass(renderPass), ShaderBindings(shaderBindings), PushConstant(pushConstant)
     {
         IsGraphics = true;
     }
-    jPipelineStateInfo(const jShader* shader, const std::vector<const jShaderBindingsLayout*> shaderBindings)
-        : Shader(shader), ShaderBindings(shaderBindings)
+    jPipelineStateInfo(const jShader* shader, const std::vector<const jShaderBindingsLayout*>& shaderBindings, const jPushConstant* pushConstant)
+        : Shader(shader), ShaderBindings(shaderBindings), PushConstant(pushConstant)
     {
         IsGraphics = false;
     }
     jPipelineStateInfo(const jPipelineStateInfo& pipelineState)
         : PipelineStateFixed(pipelineState.PipelineStateFixed), Shader(pipelineState.Shader), IsGraphics(pipelineState.IsGraphics)
         , VertexBuffers(pipelineState.VertexBuffers), RenderPass(pipelineState.RenderPass), ShaderBindings(pipelineState.ShaderBindings)
+        , PushConstant(pipelineState.PushConstant)
     {}
     virtual ~jPipelineStateInfo() {}
 
@@ -371,6 +419,7 @@ struct jPipelineStateInfo
     std::vector<const jVertexBuffer*> VertexBuffers;
     const jRenderPass* RenderPass = nullptr;
     std::vector<const jShaderBindingsLayout*> ShaderBindings;
+    const jPushConstant* PushConstant;
     const jPipelineStateFixedInfo* PipelineStateFixed = nullptr;
 
     virtual void Initialize() {}

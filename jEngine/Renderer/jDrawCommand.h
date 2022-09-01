@@ -12,7 +12,8 @@ class jDrawCommand
 public:
     jDrawCommand() = default;
     jDrawCommand(std::shared_ptr<jRenderFrameContext> InRenderFrameContextPtr, jView* view, jRenderObject* renderObject
-        , jRenderPass* renderPass, jShader* shader, jPipelineStateFixedInfo* pipelineStateFixed, std::vector<jShaderBindingInstance*> shaderBindingInstances);
+        , jRenderPass* renderPass, jShader* shader, jPipelineStateFixedInfo* pipelineStateFixed
+        , const std::vector<jShaderBindingInstance*>& shaderBindingInstances, const std::shared_ptr<jPushConstant>& pushConstantPtr);
 
     void PrepareToDraw(bool bPositionOnly);
     void Draw();
@@ -26,5 +27,6 @@ public:
     jPipelineStateFixedInfo* PipelineStateFixed = nullptr;
     jPipelineStateInfo_Vulkan* CurrentPipelineStateInfo = nullptr;
     std::vector<const jVertexBuffer*> VertexBuffers;
+    std::shared_ptr<jPushConstant> PushConstantPtr;
     std::shared_ptr<jRenderFrameContext> RenderFrameContextPtr;
 };

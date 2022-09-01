@@ -24,6 +24,11 @@ size_t jPipelineStateInfo::GetHash() const
     Hash = CityHash64WithSeed(Shader->ShaderInfo.GetHash(), Hash);
     Hash = CityHash64WithSeed(jShaderBindingsLayout::CreateShaderBindingLayoutHash(ShaderBindings), Hash);
 
+    if (PushConstant)
+    {
+        Hash = CityHash64WithSeed(PushConstant->GetHash(), Hash);
+    }    
+
     return Hash;
 }
 

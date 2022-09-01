@@ -402,26 +402,26 @@ public:
 	virtual jBlendingStateInfo* CreateBlendingState(const jBlendingStateInfo& initializer) const { return nullptr; }
 
 	virtual jPipelineStateInfo* CreatePipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader
-		, std::vector<const jVertexBuffer*> vertexBuffers, const jRenderPass* renderPass, const std::vector<const jShaderBindingsLayout*> shaderBindings) const { return nullptr; }
+		, const std::vector<const jVertexBuffer*>& vertexBuffers, const jRenderPass* renderPass, const std::vector<const jShaderBindingsLayout*>& shaderBindings, const jPushConstant* pushConstant) const { return nullptr; }
 
-	virtual jPipelineStateInfo* CreateComputePipelineStateInfo(const jShader* shader, const std::vector<const jShaderBindingsLayout*> shaderBindings) const { return nullptr; }
+	virtual jPipelineStateInfo* CreateComputePipelineStateInfo(const jShader* shader, const std::vector<const jShaderBindingsLayout*>& shaderBindings, const jPushConstant* pushConstant) const { return nullptr; }
 
 	virtual jShaderBindingsLayout* CreateShaderBindings(const std::vector<jShaderBinding>& InShaderBindings) const { check(0); return nullptr; }
 	virtual jShaderBindingInstance* CreateShaderBindingInstance(const std::vector<jShaderBinding>& InShaderBindings) const { check(0); return nullptr; }
 
-	virtual void* CreatePipelineLayout(const std::vector<const jShaderBindingsLayout*>& shaderBindings) const { return nullptr; }
-	virtual void* CreatePipelineLayout(const std::vector<const jShaderBindingInstance*>& shaderBindingInstances) const { return nullptr; }
+	virtual void* CreatePipelineLayout(const std::vector<const jShaderBindingsLayout*>& shaderBindings, const jPushConstant* pushConstant) const { return nullptr; }
+	virtual void* CreatePipelineLayout(const std::vector<const jShaderBindingInstance*>& shaderBindingInstances, const jPushConstant* pushConstant) const { return nullptr; }
 
 	template <typename T>
-	FORCEINLINE T* CreatePipelineLayout(const std::vector<const jShaderBindingsLayout*>& shaderBindings)
+	FORCEINLINE T* CreatePipelineLayout(const std::vector<const jShaderBindingsLayout*>& shaderBindings, const std::vector<const jPushConstant*>& pushConstants)
 	{
-		return (T*)CreatePipelineLayout(shaderBindings);
+		return (T*)CreatePipelineLayout(shaderBindings, pushConstants);
 	}
 
 	template <typename T>
-	FORCEINLINE T* CreatePipelineLayout(const std::vector<const jShaderBindingInstance*>& shaderBindingInstances)
+	FORCEINLINE T* CreatePipelineLayout(const std::vector<const jShaderBindingInstance*>& shaderBindingInstances, const std::vector<const jPushConstant*>& pushConstants)
 	{
-		return (T*)CreatePipelineLayout(shaderBindingInstances);
+		return (T*)CreatePipelineLayout(shaderBindingInstances, pushConstants);
 	}
 
 	virtual jRenderPass* GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const Vector2i& offset, const Vector2i& extent) const { return nullptr; }

@@ -73,9 +73,9 @@ struct jBlendingStateInfo_Vulakn : public jBlendingStateInfo
 struct jPipelineStateInfo_Vulkan : public jPipelineStateInfo
 {
     jPipelineStateInfo_Vulkan() = default;
-    jPipelineStateInfo_Vulkan(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader
-        , std::vector<const jVertexBuffer*> vertexBuffers, const jRenderPass* renderPass, const std::vector<const jShaderBindingsLayout*> shaderBindings)
-        : jPipelineStateInfo(pipelineStateFixed, shader, vertexBuffers, renderPass, shaderBindings)
+    jPipelineStateInfo_Vulkan(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader, const std::vector<const jVertexBuffer*>& vertexBuffers
+        , const jRenderPass* renderPass, const std::vector<const jShaderBindingsLayout*>& shaderBindings, const jPushConstant* pushConstant)
+        : jPipelineStateInfo(pipelineStateFixed, shader, vertexBuffers, renderPass, shaderBindings, pushConstant)
     {}
     jPipelineStateInfo_Vulkan(const jPipelineStateInfo& pipelineState)
         : jPipelineStateInfo(pipelineState)

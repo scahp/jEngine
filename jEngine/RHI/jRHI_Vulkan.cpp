@@ -1034,14 +1034,19 @@ jShaderBindingInstance* jRHI_Vulkan::CreateShaderBindingInstance(const std::vect
 	return shaderBindings->CreateShaderBindingInstance(InShaderBindings);
 }
 
-void* jRHI_Vulkan::CreatePipelineLayout(const std::vector<const jShaderBindingsLayout*>& shaderBindings) const
+void* jRHI_Vulkan::CreatePipelineLayout(const std::vector<const jShaderBindingsLayout*>& shaderBindings, const jPushConstant* pushConstant) const
 {
 	if (shaderBindings.size() <= 0)
 		return 0;
 
 	VkPipelineLayout vkPipelineLayout = nullptr;
 
-	const size_t hash = jShaderBindingsLayout::CreateShaderBindingLayoutHash(shaderBindings);
+	size_t hash = jShaderBindingsLayout::CreateShaderBindingLayoutHash(shaderBindings);
+	if (pushConstant)
+	{
+		hash = CityHash64WithSeed(pushConstant->GetHash(), hash);
+	}
+	check(hash);
 
 	jScopedLock s(&PipelineLayoutPoolLock);
 	auto it_find = PipelineLayoutPool.find(hash);
@@ -1059,14 +1064,36 @@ void* jRHI_Vulkan::CreatePipelineLayout(const std::vector<const jShaderBindingsL
 			DescriptorSetLayouts.push_back(binding_vulkan->DescriptorSetLayout);
 		}
 
+		std::vector<VkPushConstantRange> PushConstantRanges;
+		if (pushConstant)
+		{
+			const std::vector<jPushConstantRange>* pushConstantRanges = pushConstant->GetPushConstantRanges();
+			check(pushConstantRanges);
+			if (pushConstantRanges)
+			{
+				PushConstantRanges.reserve(pushConstantRanges->size());
+				for (const auto& iter : *pushConstantRanges)
+				{
+					VkPushConstantRange pushConstantRange{};
+					pushConstantRange.stageFlags = GetVulkanShaderAccessFlags(iter.AccessStageFlag);
+					pushConstantRange.offset = iter.Offset;
+					pushConstantRange.size = iter.Size;
+					PushConstantRanges.emplace_back(pushConstantRange);
+				}
+			}
+		}
+
 		// 쉐이더에 전달된 Uniform 들을 명세하기 위한 오브젝트
 		// 이 오브젝트는 프로그램 실행동안 계속해서 참조되므로 cleanup 에서 제거해줌
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
 		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		pipelineLayoutInfo.setLayoutCount = (uint32)DescriptorSetLayouts.size();
 		pipelineLayoutInfo.pSetLayouts = &DescriptorSetLayouts[0];
-		pipelineLayoutInfo.pushConstantRangeCount = 0;		// Optional		// 쉐이더에 값을 constant 값을 전달 할 수 있음. 이후에 배움
-		pipelineLayoutInfo.pPushConstantRanges = nullptr;	// Optional
+		if (PushConstantRanges.size() > 0)
+		{
+			pipelineLayoutInfo.pushConstantRangeCount = (int32)PushConstantRanges.size();
+			pipelineLayoutInfo.pPushConstantRanges = PushConstantRanges.data();
+		}
 		if (!ensure(vkCreatePipelineLayout(Device, &pipelineLayoutInfo, nullptr, &vkPipelineLayout) == VK_SUCCESS))
 			return nullptr;
 
@@ -1076,7 +1103,7 @@ void* jRHI_Vulkan::CreatePipelineLayout(const std::vector<const jShaderBindingsL
 	return vkPipelineLayout;
 }
 
-void* jRHI_Vulkan::CreatePipelineLayout(const std::vector<const jShaderBindingInstance*>& shaderBindingInstances) const
+void* jRHI_Vulkan::CreatePipelineLayout(const std::vector<const jShaderBindingInstance*>& shaderBindingInstances, const jPushConstant* pushConstant) const
 {
 	if (shaderBindingInstances.size() <= 0)
 		return 0;
@@ -1087,7 +1114,7 @@ void* jRHI_Vulkan::CreatePipelineLayout(const std::vector<const jShaderBindingIn
 	{
 		bindings[i] = shaderBindingInstances[i]->ShaderBindingsLayouts;
 	}
-	return CreatePipelineLayout(bindings);
+	return CreatePipelineLayout(bindings, pushConstant);
 }
 
 IUniformBufferBlock* jRHI_Vulkan::CreateUniformBufferBlock(const char* blockname, size_t size /*= 0*/) const
@@ -1583,15 +1610,16 @@ bool jRHI_Vulkan::TransitionImageLayoutImmediate(jTexture* texture, EImageLayout
 	return false;
 }
 
-jPipelineStateInfo* jRHI_Vulkan::CreatePipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader
-    , std::vector<const jVertexBuffer*> vertexBuffers, const jRenderPass* renderPass, const std::vector<const jShaderBindingsLayout*> shaderBindings) const
+jPipelineStateInfo* jRHI_Vulkan::CreatePipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader, const std::vector<const jVertexBuffer*>& vertexBuffers
+	, const jRenderPass* renderPass, const std::vector<const jShaderBindingsLayout*>& shaderBindings, const jPushConstant* pushConstant) const
 {
-	return PipelineStatePool.GetOrCreate(jPipelineStateInfo(pipelineStateFixed, shader, vertexBuffers, renderPass, shaderBindings));
+	return PipelineStatePool.GetOrCreate(jPipelineStateInfo(pipelineStateFixed, shader, vertexBuffers, renderPass, shaderBindings, pushConstant));
 }
 
-jPipelineStateInfo* jRHI_Vulkan::CreateComputePipelineStateInfo(const jShader* shader, const std::vector<const jShaderBindingsLayout*> shaderBindings) const
+jPipelineStateInfo* jRHI_Vulkan::CreateComputePipelineStateInfo(const jShader* shader, const std::vector<const jShaderBindingsLayout*>& shaderBindings
+	, const jPushConstant* pushConstant) const
 {
-    return PipelineStatePool.GetOrCreate(jPipelineStateInfo(shader, shaderBindings));
+    return PipelineStatePool.GetOrCreate(jPipelineStateInfo(shader, shaderBindings, pushConstant));
 }
 
 jRenderPass* jRHI_Vulkan::GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const Vector2i& offset, const Vector2i& extent) const

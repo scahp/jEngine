@@ -8,9 +8,10 @@
 #include "RHI/jPipelineStateInfo.h"
 
 jDrawCommand::jDrawCommand(std::shared_ptr<jRenderFrameContext> InRenderFrameContextPtr, jView* view
-    , jRenderObject* renderObject, jRenderPass* renderPass, jShader* shader
-    , jPipelineStateFixedInfo* pipelineStateFixed, std::vector<jShaderBindingInstance*> shaderBindingInstances)
+    , jRenderObject* renderObject, jRenderPass* renderPass, jShader* shader, jPipelineStateFixedInfo* pipelineStateFixed
+    , const std::vector<jShaderBindingInstance*>& shaderBindingInstances, const std::shared_ptr<jPushConstant>& pushConstantPtr)
     : RenderFrameContextPtr(InRenderFrameContextPtr), View(view), RenderObject(renderObject), RenderPass(renderPass), Shader(shader), PipelineStateFixed(pipelineStateFixed)
+    , PushConstantPtr(pushConstantPtr)
 {
     ShaderBindingInstances.reserve(shaderBindingInstances.size() + 3);
     ShaderBindingInstances.insert(ShaderBindingInstances.begin(), shaderBindingInstances.begin(), shaderBindingInstances.end());    
@@ -38,7 +39,7 @@ void jDrawCommand::PrepareToDraw(bool bPositionOnly)
 
     // Create Pipeline
     CurrentPipelineStateInfo = (jPipelineStateInfo_Vulkan*)g_rhi->CreatePipelineStateInfo(PipelineStateFixed, Shader
-        , vertexBuffers, RenderPass, shaderBindings);
+        , vertexBuffers, RenderPass, shaderBindings, PushConstantPtr.get());
 }
 
 void jDrawCommand::Draw()
@@ -50,6 +51,19 @@ void jDrawCommand::Draw()
 
     // Bind Pipeline
     CurrentPipelineStateInfo->Bind(RenderFrameContextPtr);
+
+    if (PushConstantPtr)
+    {
+        const std::vector<jPushConstantRange>* pushConstantRanges = PushConstantPtr->GetPushConstantRanges();
+        if (ensure(pushConstantRanges))
+        {
+            for (const auto& iter : *pushConstantRanges)
+            {
+                vkCmdPushConstants((VkCommandBuffer)RenderFrameContextPtr->CommandBuffer->GetHandle(), CurrentPipelineStateInfo->vkPipelineLayout
+                    , GetVulkanShaderAccessFlags(iter.AccessStageFlag), iter.Offset, iter.Size, PushConstantPtr->GetConstantData());
+            }
+        }
+    }
 
     const int32 InstanceCount = RenderObject->VertexBuffer_InstanceData ? RenderObject->VertexBuffer_InstanceData->GetElementCount() : 1;
 
