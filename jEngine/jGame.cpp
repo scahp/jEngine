@@ -102,9 +102,9 @@ void jGame::Setup()
 	//	jObject::AddUIDebugObject(DirectionalLightShadowMapUIDebug);
 
 	// Select spawning object type
-	//SpawnObjects(ESpawnedType::TestPrimitive);
+	SpawnObjects(ESpawnedType::TestPrimitive);
 	//SpawnObjects(ESpawnedType::InstancingPrimitive);
-	SpawnObjects(ESpawnedType::IndirectDrawPrimitive);
+	//SpawnObjects(ESpawnedType::IndirectDrawPrimitive);
 }
 
 void jGame::SpawnObjects(ESpawnedType spawnType)

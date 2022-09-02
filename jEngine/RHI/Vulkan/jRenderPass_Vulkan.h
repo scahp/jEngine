@@ -27,12 +27,12 @@ public:
         CommandBuffer = commandBuffer;
 
         check(FrameBuffer);
-        RenderPassInfo.framebuffer = FrameBuffer;
+        RenderPassBeginInfo.framebuffer = FrameBuffer;
 
         // 커맨드를 기록하는 명령어는 prefix로 모두 vkCmd 가 붙으며, 리턴값은 void 로 에러 핸들링은 따로 안함.
         // VK_SUBPASS_CONTENTS_INLINE : 렌더 패스 명령이 Primary 커맨드 버퍼에 포함되며, Secondary 커맨드 버퍼는 실행되지 않는다.
         // VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS : 렌더 패스 명령이 Secondary 커맨드 버퍼에서 실행된다.
-        vkCmdBeginRenderPass((VkCommandBuffer)commandBuffer->GetHandle(), &RenderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+        vkCmdBeginRenderPass((VkCommandBuffer)commandBuffer->GetHandle(), &RenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
         return true;
     }
 
@@ -44,7 +44,7 @@ private:
 private:
     const jCommandBuffer* CommandBuffer = nullptr;
 
-    VkRenderPassBeginInfo RenderPassInfo{};
+    VkRenderPassBeginInfo RenderPassBeginInfo{};
     std::vector<VkClearValue> ClearValues;
     VkRenderPass RenderPass = nullptr;
     VkFramebuffer FrameBuffer = nullptr;

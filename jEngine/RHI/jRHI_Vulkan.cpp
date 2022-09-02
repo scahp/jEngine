@@ -1638,6 +1638,11 @@ jRenderPass* jRHI_Vulkan::GetOrCreateRenderPass(const std::vector<jAttachment>& 
     return RenderPassPool.GetOrCreate(jRenderPass_Vulkan(colorAttachments, depthAttachment, colorResolveAttachment, offset, extent));
 }
 
+jRenderPass* jRHI_Vulkan::GetOrCreateRenderPass(const jRenderPassInfo& renderPassInfo, const Vector2i& offset, const Vector2i& extent) const
+{
+	return RenderPassPool.GetOrCreate(jRenderPass_Vulkan(renderPassInfo, offset, extent));
+}
+
 void jRHI_Vulkan::Flush() const
 {
 	vkQueueWaitIdle(GraphicsQueue.Queue);

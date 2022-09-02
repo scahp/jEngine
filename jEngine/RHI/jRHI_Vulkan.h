@@ -172,6 +172,7 @@ public:
 		, const Vector2i& offset, const Vector2i& extent) const override;
 	virtual jRenderPass* GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const jAttachment& depthAttachment
 		, const jAttachment& colorResolveAttachment, const Vector2i& offset, const Vector2i& extent) const override;
+	virtual jRenderPass* GetOrCreateRenderPass(const jRenderPassInfo& renderPassInfo, const Vector2i& offset, const Vector2i& extent) const override;
 
 	virtual jCommandBufferManager* GetCommandBufferManager() const { return CommandBufferManager; }
 	virtual EMSAASamples GetSelectedMSAASamples() const { return SelectedMSAASamples; }

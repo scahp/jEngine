@@ -34,14 +34,14 @@ struct jAttachment
     EImageLayout InitialLayout = EImageLayout::UNDEFINED;
     EImageLayout FinalLayout = EImageLayout::SHADER_READ_ONLY;
 
-    bool IsValid() const
+    FORCEINLINE bool IsValid() const
     {
         if (RenderTargetPtr)
             return true;
         return false;
     }
 
-    size_t GetHash() const
+    FORCEINLINE size_t GetHash() const
     {
         if (Hash)
             return Hash;
@@ -59,7 +59,95 @@ struct jAttachment
         return Hash;
     }
 
+    FORCEINLINE bool IsDepthAttachment() const
+    {
+        check(RenderTargetPtr);
+        return IsDepthFormat(RenderTargetPtr->Info.Format);
+    }
+
+    FORCEINLINE bool IsResolveAttachment() const
+    {
+        return false;
+    }
+
     mutable size_t Hash = 0;
+};
+
+struct jSubpass
+{
+    std::vector<int32> InputAttachments;
+
+    std::vector<int32> OutputColorAttachments;
+    std::optional<int32> OutputDepthAttachment;
+    std::optional<int32> OutputResolveAttachment;
+
+    size_t GetHash() const
+    {
+        size_t Hash = 0;
+        if (InputAttachments.size() > 0)
+            Hash = CityHash64WithSeed((const char*)InputAttachments.data(), InputAttachments.size() * sizeof(int32), Hash);
+        if (OutputColorAttachments.size() > 0)
+            Hash = CityHash64WithSeed((const char*)OutputColorAttachments.data(), OutputColorAttachments.size() * sizeof(int32), Hash);
+        if (OutputDepthAttachment)
+            Hash = CityHash64WithSeed((const char*)&OutputDepthAttachment.value(), sizeof(int32), Hash);
+        if (OutputResolveAttachment)
+            Hash = CityHash64WithSeed((const char*)&OutputResolveAttachment.value(), sizeof(int32), Hash);
+        return Hash;
+    }
+};
+
+struct jRenderPassInfo
+{
+    std::vector<jAttachment> Attachments;
+    std::vector<jSubpass> Subpasses;
+
+    FORCEINLINE void Reset()
+    {
+        Attachments.clear();
+        Subpasses.clear();
+    }
+
+    FORCEINLINE size_t GetHash() const
+    {
+        int64 Hash = 0;
+        for(const auto& iter : Attachments)
+        {
+            Hash = CityHash64WithSeed(iter.GetHash(), Hash);
+        }
+        for (const auto& iter : Subpasses)
+        {
+            Hash = CityHash64WithSeed(iter.GetHash(), Hash);
+        }
+        return Hash;
+    }
+
+    FORCEINLINE bool Validate() const
+    {
+        for (const auto& iter : Subpasses)
+        {
+            for (const auto& inputIndex : iter.InputAttachments)
+            {
+                if (!ensure(Attachments.size() > inputIndex))
+                    return false;
+            }
+            for (const auto& outputIndex : iter.OutputColorAttachments)
+            {
+                if (!ensure(Attachments.size() > outputIndex))
+                    return false;
+            }
+            if (iter.OutputDepthAttachment)
+            {
+                if (!ensure(Attachments.size() > iter.OutputDepthAttachment.value()))
+                    return false;
+            }
+            if (iter.OutputResolveAttachment)
+            {
+                if (!ensure(Attachments.size() > iter.OutputResolveAttachment.value()))
+                    return false;
+            }
+        }
+        return true;
+    }
 };
 
 class jRenderPass
@@ -88,26 +176,71 @@ public:
 
     void SetAttachemnt(const std::vector<jAttachment>& colorAttachments)
     {
-        ColorAttachments = colorAttachments;
+        // Add output color attachment
+        const int32 startColorIndex = (int32)RenderPassInfo.Attachments.size();
+        RenderPassInfo.Attachments.insert(RenderPassInfo.Attachments.end(), colorAttachments.begin(), colorAttachments.end());
+
+        if (RenderPassInfo.Subpasses.empty())
+            RenderPassInfo.Subpasses.resize(1);
+
+        for (int32 i = 0; i < (int32)colorAttachments.size(); ++i)
+            RenderPassInfo.Subpasses[0].OutputColorAttachments.push_back(startColorIndex + i);
     }
 
     void SetAttachemnt(const std::vector<jAttachment>& colorAttachments, const jAttachment& depthAttachment)
     {
-        ColorAttachments = colorAttachments;
-        DepthAttachment = depthAttachment;
+        // Add output color attachment
+        const int32 startColorIndex = (int32)RenderPassInfo.Attachments.size();
+        RenderPassInfo.Attachments.insert(RenderPassInfo.Attachments.end(), colorAttachments.begin(), colorAttachments.end());
+
+        if (RenderPassInfo.Subpasses.empty())
+            RenderPassInfo.Subpasses.resize(1);
+
+        for (int32 i = 0; i < (int32)colorAttachments.size(); ++i)
+            RenderPassInfo.Subpasses[0].OutputColorAttachments.push_back(startColorIndex + i);
+
+        // Add output depth attachment
+        const int32 startDepthIndex = (int32)RenderPassInfo.Attachments.size();
+        RenderPassInfo.Attachments.push_back(depthAttachment);
+
+        RenderPassInfo.Subpasses[0].OutputDepthAttachment = startDepthIndex;
     }
 
     void SetAttachemnt(const std::vector<jAttachment>& colorAttachments, const jAttachment& depthAttachment, const jAttachment& colorResolveAttachment)
     {
-        ColorAttachments = colorAttachments;
-        DepthAttachment = depthAttachment;
-        ColorAttachmentResolve = colorResolveAttachment;
+        // Add output color attachment
+        const int32 startColorIndex = (int32)RenderPassInfo.Attachments.size();
+        RenderPassInfo.Attachments.insert(RenderPassInfo.Attachments.end(), colorAttachments.begin(), colorAttachments.end());
+
+        if (RenderPassInfo.Subpasses.empty())
+            RenderPassInfo.Subpasses.resize(1);
+
+        for (int32 i = 0; i < (int32)colorAttachments.size(); ++i)
+            RenderPassInfo.Subpasses[0].OutputColorAttachments.push_back(startColorIndex + i);
+
+        // Add output depth attachment
+        const int32 startDepthIndex = (int32)RenderPassInfo.Attachments.size();
+        RenderPassInfo.Attachments.push_back(depthAttachment);
+
+        RenderPassInfo.Subpasses[0].OutputDepthAttachment = startDepthIndex;
+
+        // Add output resolve attachment
+        const int32 startResolveIndex = (int32)RenderPassInfo.Attachments.size();
+        RenderPassInfo.Attachments.push_back(colorResolveAttachment);
+
+        RenderPassInfo.Subpasses[0].OutputResolveAttachment = startResolveIndex;
     }
 
     void SetRenderArea(const Vector2i& offset, const Vector2i& extent)
     {
         RenderOffset = offset;
         RenderExtent = extent;
+    }
+
+    jRenderPass(const jRenderPassInfo& renderPassInfo, const Vector2i& offset, const Vector2i& extent)
+    {
+        RenderPassInfo = renderPassInfo;
+        SetRenderArea(offset, extent);
     }
 
     virtual bool BeginRenderPass(const jCommandBuffer* commandBuffer) { return false; }
@@ -118,9 +251,12 @@ public:
     virtual void* GetRenderPass() const { return nullptr; }
     virtual void* GetFrameBuffer() const { return nullptr; }
 
-    std::vector<jAttachment> ColorAttachments;
-    jAttachment DepthAttachment;
-    jAttachment ColorAttachmentResolve;
+    jRenderPassInfo RenderPassInfo;
+    
+    //std::vector<jAttachment> ColorAttachments;
+    //jAttachment DepthAttachment;
+    //jAttachment ColorAttachmentResolve;
+
     Vector2i RenderOffset;
     Vector2i RenderExtent;
     mutable size_t Hash = 0;

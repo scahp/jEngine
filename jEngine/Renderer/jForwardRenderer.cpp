@@ -15,7 +15,7 @@
 
 struct jColorPushConstant
 {
-    Vector4 Color = Vector4(0.2f, 1.0f, 0.2f, 1.0f);
+    Vector4 Color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
 };
 static std::shared_ptr<TPushConstant<jColorPushConstant>> PushConstantPtr;
 
@@ -109,6 +109,33 @@ void jForwardRenderer::SetupBasePass()
         resolve = jAttachment(RenderFrameContextPtr->SceneRenderTarget->ResolvePtr, EAttachmentLoadStoreOp::DONTCARE_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth
             , EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
     }
+
+    //struct jSubpass
+    //{
+    //    std::vector<int32> InputAttachments;
+
+    //    std::vector<int32> OutputColorAttachments;
+    //    std::optional<int32> OutputDepthAttachment;
+    //    std::optional<int32> OutputResolveAttachment;
+    //};
+
+    //struct jRenderPassInfo
+    //{
+    //    std::vector<jAttachment> Attachments;
+    //    std::vector<jSubpass> Subpasses;
+    //};
+
+    //jRenderPassInfo renderPassInfo;
+    //renderPassInfo.Attachments.push_back(color);
+    //renderPassInfo.Attachments.push_back(depth);
+    //if ((int32)g_rhi->GetSelectedMSAASamples() > 1)
+    //    renderPassInfo.Attachments.push_back(resolve);
+
+    //jSubpass subpass;
+    //subpass.OutputColorAttachments.push_back(0);
+    //subpass.OutputDepthAttachment = 1;
+    //if ((int32)g_rhi->GetSelectedMSAASamples() > 1)
+    //    subpass.OutputResolveAttachment = 2;
 
     if (resolve.IsValid())
     {

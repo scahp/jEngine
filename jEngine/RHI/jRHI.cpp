@@ -120,13 +120,7 @@ size_t jRenderPass::GetHash() const
 	if (Hash)
 		return Hash;
 
-	Hash = STATIC_NAME_CITY_HASH("ColorAttachments");
-	for (int32 i = 0; i < ColorAttachments.size(); ++i)
-		Hash = CityHash64WithSeed(ColorAttachments[i].GetHash(), Hash);
-	Hash = CityHash64WithSeed(STATIC_NAME_CITY_HASH("DepthAttachment"), Hash);
-	Hash = CityHash64WithSeed(DepthAttachment.GetHash(), Hash);
-	Hash = CityHash64WithSeed(STATIC_NAME_CITY_HASH("ColorAttachmentResolve"), Hash);
-	Hash = CityHash64WithSeed(ColorAttachmentResolve.GetHash(), Hash);
+	Hash = RenderPassInfo.GetHash();
 	Hash = CityHash64WithSeed((const char*)&RenderOffset, sizeof(RenderOffset), Hash);
 	Hash = CityHash64WithSeed((const char*)&RenderExtent, sizeof(RenderExtent), Hash);
 	return Hash;
