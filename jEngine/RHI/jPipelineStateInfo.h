@@ -369,7 +369,7 @@ struct TPushConstant : public jPushConstant
     virtual size_t GetHash() const
     {
         size_t Hash = CityHash64((const char*)&Data, sizeof(Data));
-        Hash = CityHash64WithSeed((const char*)PushConstantRanges.data(), sizeof(PushConstantRanges.size()) * sizeof(jPushConstantRange), Hash);
+        Hash = CityHash64WithSeed((const char*)PushConstantRanges.data(), PushConstantRanges.size() * sizeof(jPushConstantRange), Hash);
         return Hash;
     }
     virtual const void* GetConstantData() const override { return &Data; }
