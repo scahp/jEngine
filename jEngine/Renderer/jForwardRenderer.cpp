@@ -52,7 +52,22 @@ void jForwardRenderer::SetupShadowPass()
         jAttachment depth = jAttachment(View.DirectionalLight->ShadowMapPtr, EAttachmentLoadStoreOp::CLEAR_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE
             , ClearColor, ClearDepth, EImageLayout::UNDEFINED, EImageLayout::DEPTH_STENCIL_ATTACHMENT);
 
-        ShadowMapRenderPass = g_rhi->GetOrCreateRenderPass({}, depth, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
+        // Setup attachment
+        jRenderPassInfo renderPassInfo;
+        renderPassInfo.Attachments.push_back(depth);
+
+        // Setup subpass of ShadowPass
+        jSubpass subpass;
+        subpass.SourceSubpassIndex = 0;
+        subpass.DestSubpassIndex = 1;
+        subpass.OutputDepthAttachment = 0;
+        subpass.AttachmentProducePipelineBit = EPipelineStageMask::COLOR_ATTACHMENT_OUTPUT_BIT;
+        renderPassInfo.Subpasses.push_back(subpass);
+
+        ShadowMapRenderPass = g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
+
+        // This is an example of creating RenderPass without setting subpasses
+        // ShadowMapRenderPass = g_rhi->GetOrCreateRenderPass({}, depth, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
     }
 
     ShadowView.Camera = View.DirectionalLight->GetLightCamra();
@@ -107,44 +122,38 @@ void jForwardRenderer::SetupBasePass()
     if ((int32)g_rhi->GetSelectedMSAASamples() > 1)
     {
         resolve = jAttachment(RenderFrameContextPtr->SceneRenderTarget->ResolvePtr, EAttachmentLoadStoreOp::DONTCARE_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth
-            , EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
+            , EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT, true);
     }
 
-    //struct jSubpass
+    // Setup attachment
+    jRenderPassInfo renderPassInfo;
+    renderPassInfo.Attachments.push_back(color);
+    renderPassInfo.Attachments.push_back(depth);
+    if ((int32)g_rhi->GetSelectedMSAASamples() > 1)
+        renderPassInfo.Attachments.push_back(resolve);
+
+    // Setup subpass of ShadowPass
+    jSubpass subpass;
+    subpass.SourceSubpassIndex = 0;
+    subpass.DestSubpassIndex = 1;
+    subpass.OutputColorAttachments.push_back(0);
+    subpass.OutputDepthAttachment = 1;
+    if ((int32)g_rhi->GetSelectedMSAASamples() > 1)
+        subpass.OutputResolveAttachment = 2;
+    subpass.AttachmentProducePipelineBit = EPipelineStageMask::COLOR_ATTACHMENT_OUTPUT_BIT;
+    renderPassInfo.Subpasses.push_back(subpass);
+
+    OpaqueRenderPass = (jRenderPass_Vulkan*)g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
+
+    // This is an example of creating RenderPass without setting subpasses
+    //if (resolve.IsValid())
     //{
-    //    std::vector<int32> InputAttachments;
-
-    //    std::vector<int32> OutputColorAttachments;
-    //    std::optional<int32> OutputDepthAttachment;
-    //    std::optional<int32> OutputResolveAttachment;
-    //};
-
-    //struct jRenderPassInfo
+    //    OpaqueRenderPass = (jRenderPass_Vulkan*)g_rhi->GetOrCreateRenderPass({ color }, depth, resolve, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
+    //}
+    //else
     //{
-    //    std::vector<jAttachment> Attachments;
-    //    std::vector<jSubpass> Subpasses;
-    //};
-
-    //jRenderPassInfo renderPassInfo;
-    //renderPassInfo.Attachments.push_back(color);
-    //renderPassInfo.Attachments.push_back(depth);
-    //if ((int32)g_rhi->GetSelectedMSAASamples() > 1)
-    //    renderPassInfo.Attachments.push_back(resolve);
-
-    //jSubpass subpass;
-    //subpass.OutputColorAttachments.push_back(0);
-    //subpass.OutputDepthAttachment = 1;
-    //if ((int32)g_rhi->GetSelectedMSAASamples() > 1)
-    //    subpass.OutputResolveAttachment = 2;
-
-    if (resolve.IsValid())
-    {
-        OpaqueRenderPass = (jRenderPass_Vulkan*)g_rhi->GetOrCreateRenderPass({ color }, depth, resolve, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
-    }
-    else
-    {
-        OpaqueRenderPass = (jRenderPass_Vulkan*)g_rhi->GetOrCreateRenderPass({ color }, depth, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
-    }
+    //    OpaqueRenderPass = (jRenderPass_Vulkan*)g_rhi->GetOrCreateRenderPass({ color }, depth, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
+    //}
 
     jShader* BasePassShader = nullptr;
     {

@@ -10,9 +10,11 @@ struct jAttachment
         , Vector2 InClearDepth = Vector2(1.0f, 0.0f)
         , EImageLayout InInitialLayout = EImageLayout::UNDEFINED
         , EImageLayout InFinalLayout = EImageLayout::SHADER_READ_ONLY
+        , bool InIsResolveAttachment = false
     )
         : RenderTargetPtr(InRTPtr), LoadStoreOp(InLoadStoreOp), StencilLoadStoreOp(InStencilLoadStoreOp)
         , ClearColor(InClearColor), ClearDepth(InClearDepth), InitialLayout(InInitialLayout), FinalLayout(InFinalLayout)
+        , bResolveAttachment(InIsResolveAttachment)
     {}
 
     std::shared_ptr<jRenderTarget> RenderTargetPtr;
@@ -33,6 +35,8 @@ struct jAttachment
 
     EImageLayout InitialLayout = EImageLayout::UNDEFINED;
     EImageLayout FinalLayout = EImageLayout::SHADER_READ_ONLY;
+
+    bool bResolveAttachment = false;
 
     FORCEINLINE bool IsValid() const
     {
@@ -67,7 +71,7 @@ struct jAttachment
 
     FORCEINLINE bool IsResolveAttachment() const
     {
-        return false;
+        return bResolveAttachment;
     }
 
     mutable size_t Hash = 0;
@@ -81,6 +85,27 @@ struct jSubpass
     std::optional<int32> OutputDepthAttachment;
     std::optional<int32> OutputResolveAttachment;
 
+    // If both SourceSubpass and DstSubpass of all subpasses are -1, subpasses will be executed in order
+    int32 SourceSubpassIndex = -1;
+    int32 DestSubpassIndex = -1;
+
+    // Default is the most strong pipeline stage mask
+    EPipelineStageMask AttachmentProducePipelineBit = EPipelineStageMask::BOTTOM_OF_PIPE_BIT;
+    EPipelineStageMask AttachmentComsumePipelineBit = EPipelineStageMask::TOP_OF_PIPE_BIT;
+
+    bool IsSubpassForExecuteInOrder() const
+    {
+        if ((SourceSubpassIndex == -1) && (DestSubpassIndex == -1))
+            return true;
+
+        if (SourceSubpassIndex != -1 && DestSubpassIndex != -1)
+            return false;
+
+        // Subpass indices have to be either -1 for all or not for all.
+        check(0);
+        return false;
+    }
+
     size_t GetHash() const
     {
         size_t Hash = 0;
@@ -92,6 +117,10 @@ struct jSubpass
             Hash = CityHash64WithSeed((const char*)&OutputDepthAttachment.value(), sizeof(int32), Hash);
         if (OutputResolveAttachment)
             Hash = CityHash64WithSeed((const char*)&OutputResolveAttachment.value(), sizeof(int32), Hash);
+        Hash = CityHash64WithSeed((const char*)&SourceSubpassIndex, sizeof(int32), Hash);
+        Hash = CityHash64WithSeed((const char*)&DestSubpassIndex, sizeof(int32), Hash);
+        Hash = CityHash64WithSeed((const char*)&AttachmentProducePipelineBit, sizeof(EPipelineStageMask), Hash);
+        Hash = CityHash64WithSeed((const char*)&AttachmentComsumePipelineBit, sizeof(EPipelineStageMask), Hash);
         return Hash;
     }
 };
@@ -99,6 +128,7 @@ struct jSubpass
 struct jRenderPassInfo
 {
     std::vector<jAttachment> Attachments;
+    jAttachment ResolveAttachment;
     std::vector<jSubpass> Subpasses;
 
     FORCEINLINE void Reset()
@@ -119,6 +149,24 @@ struct jRenderPassInfo
             Hash = CityHash64WithSeed(iter.GetHash(), Hash);
         }
         return Hash;
+    }
+
+    // If both SourceSubpass and DstSubpass of all subpasses are -1, subpasses will be executed in order
+    bool IsSubpassForExecuteInOrder() const
+    {
+        check(Subpasses.size());
+
+        int32 i = 0;
+        bool isSubpassForExecuteInOrder = Subpasses[i++].IsSubpassForExecuteInOrder();
+        for (;i<(int32)Subpasses.size();++i)
+        {
+            // All isSubpassForExecuteInOrder of subpasses must be same.
+            check(isSubpassForExecuteInOrder == Subpasses[i].IsSubpassForExecuteInOrder());
+
+            if (isSubpassForExecuteInOrder != Subpasses[i].IsSubpassForExecuteInOrder())
+                return false;
+        }
+        return isSubpassForExecuteInOrder;
     }
 
     FORCEINLINE bool Validate() const
