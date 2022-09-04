@@ -755,14 +755,14 @@ void jRHI_OpenGL::GenerateMips(const jTexture* texture) const
 	glBindTexture(textureType, 0);
 }
 
-jQueryTime* jRHI_OpenGL::CreateQueryTime() const
+jQuery* jRHI_OpenGL::CreateQueryTime() const
 {
 	auto queryTime = new jQueryTime_OpenGL();
 	glGenQueries(2, &queryTime->QueryId[0]);
 	return queryTime;
 }
 
-void jRHI_OpenGL::ReleaseQueryTime(jQueryTime* queryTime) const 
+void jRHI_OpenGL::ReleaseQueryTime(jQuery* queryTime) const 
 {
 	auto queryTime_gl = static_cast<jQueryTime_OpenGL*>(queryTime);
 	glDeleteQueries(2, &queryTime_gl->QueryId[0]);
@@ -771,21 +771,21 @@ void jRHI_OpenGL::ReleaseQueryTime(jQueryTime* queryTime) const
 	delete queryTime_gl;
 }
 
-void jRHI_OpenGL::QueryTimeStampStart(const jQueryTime* queryTimeStamp) const
+void jRHI_OpenGL::QueryTimeStampStart(const jQuery* queryTimeStamp) const
 {
     const auto queryTimeStamp_gl = static_cast<const jQueryTime_OpenGL*>(queryTimeStamp);
     JASSERT(queryTimeStamp_gl->QueryId[0] > 0);
     glQueryCounter(queryTimeStamp_gl->QueryId[0], GL_TIMESTAMP);
 }
 
-void jRHI_OpenGL::QueryTimeStampEnd(const jQueryTime* queryTimeStamp) const
+void jRHI_OpenGL::QueryTimeStampEnd(const jQuery* queryTimeStamp) const
 {
     const auto queryTimeStamp_gl = static_cast<const jQueryTime_OpenGL*>(queryTimeStamp);
     JASSERT(queryTimeStamp_gl->QueryId[1] > 0);
     glQueryCounter(queryTimeStamp_gl->QueryId[1], GL_TIMESTAMP);
 }
 
-bool jRHI_OpenGL::IsQueryTimeStampResult(const jQueryTime* queryTimeStamp, bool isWaitUntilAvailable) const
+bool jRHI_OpenGL::IsQueryTimeStampResult(const jQuery* queryTimeStamp, bool isWaitUntilAvailable) const
 {
 	auto queryTimeStamp_gl = static_cast<const jQueryTime_OpenGL*>(queryTimeStamp);
 	JASSERT(queryTimeStamp_gl->QueryId[0] > 0);
@@ -809,7 +809,7 @@ bool jRHI_OpenGL::IsQueryTimeStampResult(const jQueryTime* queryTimeStamp, bool 
 	return (availableStart && availableEnd);
 }
 
-void jRHI_OpenGL::GetQueryTimeStampResult(jQueryTime* queryTimeStamp) const
+void jRHI_OpenGL::GetQueryTimeStampResult(jQuery* queryTimeStamp) const
 {
 	auto queryTimeStamp_gl = static_cast<jQueryTime_OpenGL*>(queryTimeStamp);
 	JASSERT(queryTimeStamp_gl->QueryId[0] > 0);

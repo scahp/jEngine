@@ -7,8 +7,8 @@ std::unordered_map<jName, uint64, jNameHashFunc> ScopedProfileCPUMap[MaxProfileF
 std::unordered_map<jName, uint64, jNameHashFunc> ScopedProfileGPUMap[MaxProfileFrame];
 static int32 PerformanceFrame = 0;
 
-std::unordered_set<jQueryTime*> jQueryTimePool::s_running;
-std::unordered_set<jQueryTime*> jQueryTimePool::s_resting;
+std::unordered_set<jQuery*> jQueryTimePool::s_running;
+std::unordered_set<jQuery*> jQueryTimePool::s_resting;
 
 std::vector<jProfile_GPU> jProfile_GPU::WatingResultList[jRHI::MaxWaitingQuerySet];
 int32 jProfile_GPU::CurrentWatingResultListIndex = 0;

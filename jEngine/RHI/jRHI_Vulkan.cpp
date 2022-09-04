@@ -1124,33 +1124,33 @@ IUniformBufferBlock* jRHI_Vulkan::CreateUniformBufferBlock(const char* blockname
 	return uniformBufferBlock;
 }
 
-jQueryTime* jRHI_Vulkan::CreateQueryTime() const
+jQuery* jRHI_Vulkan::CreateQueryTime() const
 {
 	auto queryTime = new jQueryTime_Vulkan();
 	return queryTime;
 }
 
-void jRHI_Vulkan::ReleaseQueryTime(jQueryTime* queryTime) const
+void jRHI_Vulkan::ReleaseQueryTime(jQuery* queryTime) const
 {
     auto queryTime_gl = static_cast<jQueryTime_Vulkan*>(queryTime);
     delete queryTime_gl;
 }
 
-void jRHI_Vulkan::QueryTimeStampStart(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jQueryTime* queryTimeStamp) const
+void jRHI_Vulkan::QueryTimeStampStart(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jQuery* queryTimeStamp) const
 {
     check(InRenderFrameContext);
     check(InRenderFrameContext->CommandBuffer);
 	vkCmdWriteTimestamp((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, QueryPoolTime->vkQueryPool, ((jQueryTime_Vulkan*)queryTimeStamp)->QueryId);
 }
 
-void jRHI_Vulkan::QueryTimeStampEnd(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jQueryTime* queryTimeStamp) const
+void jRHI_Vulkan::QueryTimeStampEnd(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jQuery* queryTimeStamp) const
 {
     check(InRenderFrameContext);
     check(InRenderFrameContext->CommandBuffer);
 	vkCmdWriteTimestamp((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, QueryPoolTime->vkQueryPool, ((jQueryTime_Vulkan*)queryTimeStamp)->QueryId + 1);
 }
 
-bool jRHI_Vulkan::IsQueryTimeStampResult(const jQueryTime* queryTimeStamp, bool isWaitUntilAvailable) const
+bool jRHI_Vulkan::IsQueryTimeStampResult(const jQuery* queryTimeStamp, bool isWaitUntilAvailable) const
 {
 	auto queryTimeStamp_vk = static_cast<const jQueryTime_Vulkan*>(queryTimeStamp);
 
@@ -1168,7 +1168,7 @@ bool jRHI_Vulkan::IsQueryTimeStampResult(const jQueryTime* queryTimeStamp, bool 
     return (result == VK_SUCCESS);
 }
 
-void jRHI_Vulkan::GetQueryTimeStampResult(jQueryTime* queryTimeStamp) const
+void jRHI_Vulkan::GetQueryTimeStampResult(jQuery* queryTimeStamp) const
 {
 	auto queryTimeStamp_vk = static_cast<jQueryTime_Vulkan*>(queryTimeStamp);
 	vkGetQueryPoolResults(Device, QueryPoolTime->vkQueryPool, queryTimeStamp_vk->QueryId, 2, sizeof(uint64) * 2, queryTimeStamp_vk->TimeStampStartEnd, sizeof(uint64), VK_QUERY_RESULT_64_BIT);
@@ -1182,7 +1182,7 @@ std::vector<uint64> jRHI_Vulkan::GetWholeQueryTimeStampResult(int32 InWatingResu
 	return result;
 }
 
-void jRHI_Vulkan::GetQueryTimeStampResultFromWholeStampArray(jQueryTime* queryTimeStamp, int32 InWatingResultIndex, const std::vector<uint64>& wholeQueryTimeStampArray) const
+void jRHI_Vulkan::GetQueryTimeStampResultFromWholeStampArray(jQuery* queryTimeStamp, int32 InWatingResultIndex, const std::vector<uint64>& wholeQueryTimeStampArray) const
 {
 	auto queryTimeStamp_vk = static_cast<jQueryTime_Vulkan*>(queryTimeStamp);
 	const uint32 queryStart = (queryTimeStamp_vk->QueryId) - InWatingResultIndex * MaxQueryTimeCount;

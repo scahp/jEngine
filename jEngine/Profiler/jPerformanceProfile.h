@@ -9,7 +9,7 @@ static constexpr int32 MaxProfileFrame = 10;
 
 extern std::unordered_map<jName, uint64, jNameHashFunc> ScopedProfileCPUMap[MaxProfileFrame];
 extern std::unordered_map<jName, uint64, jNameHashFunc> ScopedProfileGPUMap[MaxProfileFrame];
-struct jQueryTime;
+struct jQuery;
 
 void ClearScopedProfileCPU();
 void AddScopedProfileCPU(const jName& name, uint64 elapsedTick);
@@ -48,9 +48,9 @@ public:
 struct jQueryTimePool
 {
 public:
-	static jQueryTime* GetQueryTime()
+	static jQuery* GetQueryTime()
 	{
-		jQueryTime* queryTime = nullptr;
+		jQuery* queryTime = nullptr;
 		if (s_resting.empty())
 		{
 			queryTime = g_rhi->CreateQueryTime();
@@ -66,7 +66,7 @@ public:
 		JASSERT(queryTime);
 		return queryTime;
 	}
-	static void ReturnQueryTime(jQueryTime* queryTime)
+	static void ReturnQueryTime(jQuery* queryTime)
 	{
 		s_running.erase(queryTime);
 		s_resting.insert(queryTime);
@@ -83,8 +83,8 @@ public:
 	}
 
 private:
-	static std::unordered_set<jQueryTime*> s_running;
-	static std::unordered_set<jQueryTime*> s_resting;
+	static std::unordered_set<jQuery*> s_running;
+	static std::unordered_set<jQuery*> s_resting;
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -92,7 +92,7 @@ private:
 struct jProfile_GPU
 {
 	jName Name;
-	jQueryTime* Query = nullptr;
+	jQuery* Query = nullptr;
 
 	static int32 CurrentWatingResultListIndex;
 	static std::vector<jProfile_GPU> WatingResultList[jRHI::MaxWaitingQuerySet];

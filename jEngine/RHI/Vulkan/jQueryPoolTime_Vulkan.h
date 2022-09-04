@@ -24,7 +24,7 @@ struct jQueryPoolTime_Vulkan : public jQueryPool
 //////////////////////////////////////////////////////////////////////////
 // jQueryTime_Vulkan
 //////////////////////////////////////////////////////////////////////////
-struct jQueryTime_Vulkan : public jQueryTime
+struct jQueryTime_Vulkan : public jQuery
 {
     virtual ~jQueryTime_Vulkan() {}
     virtual void Init() override;

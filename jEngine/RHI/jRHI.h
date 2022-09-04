@@ -221,9 +221,9 @@ struct jQueryPool
 	virtual void Release() {}
 };
 
-struct jQueryTime
+struct jQuery
 {
-	virtual ~jQueryTime() {}
+	virtual ~jQuery() {}
 	virtual void Init() {}
 
 	uint64 TimeStampStartEnd[2] = { 0, 0 };
@@ -368,15 +368,15 @@ public:
 	virtual void BeginDebugEvent(const char* name) const {}
 	virtual void EndDebugEvent() const {}
 	virtual void GenerateMips(const jTexture* texture) const {}
-	virtual jQueryTime* CreateQueryTime() const { return nullptr;  }
-	virtual void ReleaseQueryTime(jQueryTime* queryTime) const {}
-	virtual void QueryTimeStampStart(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jQueryTime* queryTimeStamp) const {}
-	virtual void QueryTimeStampEnd(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jQueryTime* queryTimeStamp) const {}
-	virtual bool IsQueryTimeStampResult(const jQueryTime* queryTimeStamp, bool isWaitUntilAvailable) const { return false; }
-	virtual void GetQueryTimeStampResult(jQueryTime* queryTimeStamp) const {}
+	virtual jQuery* CreateQueryTime() const { return nullptr;  }
+	virtual void ReleaseQueryTime(jQuery* queryTime) const {}
+	virtual void QueryTimeStampStart(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jQuery* queryTimeStamp) const {}
+	virtual void QueryTimeStampEnd(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jQuery* queryTimeStamp) const {}
+	virtual bool IsQueryTimeStampResult(const jQuery* queryTimeStamp, bool isWaitUntilAvailable) const { return false; }
+	virtual void GetQueryTimeStampResult(jQuery* queryTimeStamp) const {}
 	virtual bool CanWholeQueryTimeStampResult() const { return false; }
 	virtual std::vector<uint64> GetWholeQueryTimeStampResult(int32 InWatingResultIndex) const { check(0);  return std::vector<uint64>(); }
-	virtual void GetQueryTimeStampResultFromWholeStampArray(jQueryTime* queryTimeStamp, int32 InWatingResultIndex, const std::vector<uint64>& wholeQueryTimeStampArray) const {}
+	virtual void GetQueryTimeStampResultFromWholeStampArray(jQuery* queryTimeStamp, int32 InWatingResultIndex, const std::vector<uint64>& wholeQueryTimeStampArray) const {}
 	virtual void EnableWireframe(bool enable) const {}
 	virtual void SetImageTexture(int32 index, const jTexture* texture, EImageTextureAccessType type) const {}
 	virtual void SetPolygonMode(EFace face, EPolygonMode mode = EPolygonMode::FILL) {}

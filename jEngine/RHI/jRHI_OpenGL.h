@@ -171,7 +171,7 @@ private:
 };
 
 
-struct jQueryTime_OpenGL : public jQueryTime
+struct jQueryTime_OpenGL : public jQuery
 {
 	virtual ~jQueryTime_OpenGL() {}
 
@@ -294,12 +294,12 @@ public:
 	virtual void BeginDebugEvent(const char* name) const override;
 	virtual void EndDebugEvent() const override;
 	virtual void GenerateMips(const jTexture* texture) const override;
-	virtual jQueryTime* CreateQueryTime() const override;
-	virtual void ReleaseQueryTime(jQueryTime* queryTime) const override;
-    virtual void QueryTimeStampStart(const jQueryTime* queryTimeStamp) const override;
-    virtual void QueryTimeStampEnd(const jQueryTime* queryTimeStamp) const override;
-	virtual bool IsQueryTimeStampResult(const jQueryTime* queryTimeStamp, bool isWaitUntilAvailable) const override;
-	virtual void GetQueryTimeStampResult(jQueryTime* queryTimeStamp) const override;
+	virtual jQuery* CreateQueryTime() const override;
+	virtual void ReleaseQueryTime(jQuery* queryTime) const override;
+    virtual void QueryTimeStampStart(const jQuery* queryTimeStamp) const override;
+    virtual void QueryTimeStampEnd(const jQuery* queryTimeStamp) const override;
+	virtual bool IsQueryTimeStampResult(const jQuery* queryTimeStamp, bool isWaitUntilAvailable) const override;
+	virtual void GetQueryTimeStampResult(jQuery* queryTimeStamp) const override;
     virtual bool CanWholeQueryTimeStampResult() const override { return false; }
 	virtual std::vector<uint64> GetWholeQueryTimeStampResult(int32 InWatingResultIndex) const override { check(0); return std::vector<uint64>(); }
 	virtual void EnableWireframe(bool enable) const override;

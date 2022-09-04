@@ -151,15 +151,15 @@ public:
 
 	virtual IUniformBufferBlock* CreateUniformBufferBlock(const char* blockname, size_t size = 0) const override;
 
-    virtual jQueryTime* CreateQueryTime() const override;
-    virtual void ReleaseQueryTime(jQueryTime* queryTime) const override;
-	virtual void QueryTimeStampStart(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jQueryTime* queryTimeStamp) const override;
-	virtual void QueryTimeStampEnd(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jQueryTime* queryTimeStamp) const override;
-    virtual bool IsQueryTimeStampResult(const jQueryTime* queryTimeStamp, bool isWaitUntilAvailable) const override;
-    virtual void GetQueryTimeStampResult(jQueryTime* queryTimeStamp) const override;
+    virtual jQuery* CreateQueryTime() const override;
+    virtual void ReleaseQueryTime(jQuery* queryTime) const override;
+	virtual void QueryTimeStampStart(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jQuery* queryTimeStamp) const override;
+	virtual void QueryTimeStampEnd(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jQuery* queryTimeStamp) const override;
+    virtual bool IsQueryTimeStampResult(const jQuery* queryTimeStamp, bool isWaitUntilAvailable) const override;
+    virtual void GetQueryTimeStampResult(jQuery* queryTimeStamp) const override;
 	virtual bool CanWholeQueryTimeStampResult() const override { return true; }
 	virtual std::vector<uint64> GetWholeQueryTimeStampResult(int32 InWatingResultIndex) const override;
-	virtual void GetQueryTimeStampResultFromWholeStampArray(jQueryTime* queryTimeStamp, int32 InWatingResultIndex
+	virtual void GetQueryTimeStampResultFromWholeStampArray(jQuery* queryTimeStamp, int32 InWatingResultIndex
 		, const std::vector<uint64>& wholeQueryTimeStampArray) const override;
 	virtual std::shared_ptr<jRenderFrameContext> BeginRenderFrame() override;
 	virtual void EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr) override;
