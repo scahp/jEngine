@@ -226,7 +226,7 @@
     <ClInclude Include="RHI\Vulkan\jUniformBufferBlock_Vulkan.h">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\Vulkan\jQueryPool_Vulkan.h">
+    <ClInclude Include="RHI\Vulkan\jQueryPoolTime_Vulkan.h">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="RHI\Vulkan\jVulkanDeviceUtil.h">
@@ -489,7 +489,7 @@
     <ClCompile Include="RHI\Vulkan\jTexture_Vulkan.cpp">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\Vulkan\jQueryPool_Vulkan.cpp">
+    <ClCompile Include="RHI\Vulkan\jQueryPoolTime_Vulkan.cpp">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="RHI\Vulkan\jUniformBufferBlock_Vulkan.cpp">

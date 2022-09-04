@@ -1,11 +1,12 @@
 ﻿#pragma once
+#include "../jRHI.h"
 
 //////////////////////////////////////////////////////////////////////////
-// jQueryPool_Vulkan
+// jQueryPoolTime_Vulkan
 //////////////////////////////////////////////////////////////////////////
-struct jQueryPool_Vulkan : public jQueryPool
+struct jQueryPoolTime_Vulkan : public jQueryPool
 {
-    virtual ~jQueryPool_Vulkan() 
+    virtual ~jQueryPoolTime_Vulkan() 
     {
         ReleaseInstance();
     }

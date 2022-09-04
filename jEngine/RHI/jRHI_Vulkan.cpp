@@ -227,8 +227,8 @@ bool jRHI_Vulkan::InitRHI()
     pipelineCacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
 	verify(VK_SUCCESS == vkCreatePipelineCache(Device, &pipelineCacheCreateInfo, nullptr, &PipelineCache));
 
-	QueryPool = new jQueryPool_Vulkan();
-	QueryPool->Create();
+	QueryPoolTime = new jQueryPoolTime_Vulkan();
+	QueryPoolTime->Create();
 
 	UniformRingBuffers.resize(Swapchain->GetNumOfSwapchain());
 	for (auto& iter : UniformRingBuffers)
@@ -297,8 +297,8 @@ void jRHI_Vulkan::ReleaseRHI()
 		ShaderBindingPool.clear();
 	}
 
-	delete QueryPool;
-	QueryPool = nullptr;
+	delete QueryPoolTime;
+	QueryPoolTime = nullptr;
 
 	for (auto& iter : UniformRingBuffers)
 		delete iter;
@@ -1140,14 +1140,14 @@ void jRHI_Vulkan::QueryTimeStampStart(const std::shared_ptr<jRenderFrameContext>
 {
     check(InRenderFrameContext);
     check(InRenderFrameContext->CommandBuffer);
-	vkCmdWriteTimestamp((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, QueryPool->vkQueryPool, ((jQueryTime_Vulkan*)queryTimeStamp)->QueryId);
+	vkCmdWriteTimestamp((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, QueryPoolTime->vkQueryPool, ((jQueryTime_Vulkan*)queryTimeStamp)->QueryId);
 }
 
 void jRHI_Vulkan::QueryTimeStampEnd(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jQueryTime* queryTimeStamp) const
 {
     check(InRenderFrameContext);
     check(InRenderFrameContext->CommandBuffer);
-	vkCmdWriteTimestamp((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, QueryPool->vkQueryPool, ((jQueryTime_Vulkan*)queryTimeStamp)->QueryId + 1);
+	vkCmdWriteTimestamp((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, QueryPoolTime->vkQueryPool, ((jQueryTime_Vulkan*)queryTimeStamp)->QueryId + 1);
 }
 
 bool jRHI_Vulkan::IsQueryTimeStampResult(const jQueryTime* queryTimeStamp, bool isWaitUntilAvailable) const
@@ -1160,25 +1160,25 @@ bool jRHI_Vulkan::IsQueryTimeStampResult(const jQueryTime* queryTimeStamp, bool 
     {
 		while (result == VK_SUCCESS)
 		{
-			result = (vkGetQueryPoolResults(Device, QueryPool->vkQueryPool, queryTimeStamp_vk->QueryId, 2, sizeof(uint64) * 2, time, sizeof(uint64), VK_QUERY_RESULT_WITH_AVAILABILITY_BIT));
+			result = (vkGetQueryPoolResults(Device, QueryPoolTime->vkQueryPool, queryTimeStamp_vk->QueryId, 2, sizeof(uint64) * 2, time, sizeof(uint64), VK_QUERY_RESULT_WITH_AVAILABILITY_BIT));
 		}
 	}
 
-    result = (vkGetQueryPoolResults(Device, QueryPool->vkQueryPool, queryTimeStamp_vk->QueryId, 2, sizeof(uint64) * 2, time, sizeof(uint64), VK_QUERY_RESULT_WITH_AVAILABILITY_BIT));
+    result = (vkGetQueryPoolResults(Device, QueryPoolTime->vkQueryPool, queryTimeStamp_vk->QueryId, 2, sizeof(uint64) * 2, time, sizeof(uint64), VK_QUERY_RESULT_WITH_AVAILABILITY_BIT));
     return (result == VK_SUCCESS);
 }
 
 void jRHI_Vulkan::GetQueryTimeStampResult(jQueryTime* queryTimeStamp) const
 {
 	auto queryTimeStamp_vk = static_cast<jQueryTime_Vulkan*>(queryTimeStamp);
-	vkGetQueryPoolResults(Device, QueryPool->vkQueryPool, queryTimeStamp_vk->QueryId, 2, sizeof(uint64) * 2, queryTimeStamp_vk->TimeStampStartEnd, sizeof(uint64), VK_QUERY_RESULT_64_BIT);
+	vkGetQueryPoolResults(Device, QueryPoolTime->vkQueryPool, queryTimeStamp_vk->QueryId, 2, sizeof(uint64) * 2, queryTimeStamp_vk->TimeStampStartEnd, sizeof(uint64), VK_QUERY_RESULT_64_BIT);
 }
 
 std::vector<uint64> jRHI_Vulkan::GetWholeQueryTimeStampResult(int32 InWatingResultIndex) const
 {
 	std::vector<uint64> result;
 	result.resize(MaxQueryTimeCount);
-    vkGetQueryPoolResults(Device, QueryPool->vkQueryPool, InWatingResultIndex * MaxQueryTimeCount, MaxQueryTimeCount, sizeof(uint64) * MaxQueryTimeCount, result.data(), sizeof(uint64), VK_QUERY_RESULT_64_BIT);
+    vkGetQueryPoolResults(Device, QueryPoolTime->vkQueryPool, InWatingResultIndex * MaxQueryTimeCount, MaxQueryTimeCount, sizeof(uint64) * MaxQueryTimeCount, result.data(), sizeof(uint64), VK_QUERY_RESULT_64_BIT);
 	return result;
 }
 

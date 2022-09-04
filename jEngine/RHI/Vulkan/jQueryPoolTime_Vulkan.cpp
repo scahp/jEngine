@@ -1,11 +1,11 @@
 ﻿#include "pch.h"
-#include "jQueryPool_Vulkan.h"
+#include "jQueryPoolTime_Vulkan.h"
 #include "Profiler/jPerformanceProfile.h"
 
 //////////////////////////////////////////////////////////////////////////
 // jQueryPool_Vulkan
 //////////////////////////////////////////////////////////////////////////
-bool jQueryPool_Vulkan::Create()
+bool jQueryPoolTime_Vulkan::Create()
 {
     VkQueryPoolCreateInfo querPoolCreateInfo = {};
     querPoolCreateInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
@@ -17,18 +17,18 @@ bool jQueryPool_Vulkan::Create()
     return (res == VK_SUCCESS);
 }
 
-void jQueryPool_Vulkan::ResetQueryPool(jCommandBuffer* pCommanBuffer /*= nullptr*/)
+void jQueryPoolTime_Vulkan::ResetQueryPool(jCommandBuffer* pCommanBuffer /*= nullptr*/)
 {
     vkCmdResetQueryPool((VkCommandBuffer)pCommanBuffer->GetHandle(), vkQueryPool, MaxQueryTimeCount * jProfile_GPU::CurrentWatingResultListIndex, MaxQueryTimeCount);
     QueryIndex[jProfile_GPU::CurrentWatingResultListIndex] = MaxQueryTimeCount * jProfile_GPU::CurrentWatingResultListIndex;
 }
 
-void jQueryPool_Vulkan::Release()
+void jQueryPoolTime_Vulkan::Release()
 {
     ReleaseInstance();
 }
 
-void jQueryPool_Vulkan::ReleaseInstance()
+void jQueryPoolTime_Vulkan::ReleaseInstance()
 {
     if (vkQueryPool)
     {
@@ -42,6 +42,6 @@ void jQueryPool_Vulkan::ReleaseInstance()
 //////////////////////////////////////////////////////////////////////////
 void jQueryTime_Vulkan::Init()
 {
-    QueryId = g_rhi_vk->QueryPool->QueryIndex[jProfile_GPU::CurrentWatingResultListIndex];
-    g_rhi_vk->QueryPool->QueryIndex[jProfile_GPU::CurrentWatingResultListIndex] += 2;		// Need 2 Queries for Starting, Ending timestamp
+    QueryId = g_rhi_vk->QueryPoolTime->QueryIndex[jProfile_GPU::CurrentWatingResultListIndex];
+    g_rhi_vk->QueryPoolTime->QueryIndex[jProfile_GPU::CurrentWatingResultListIndex] += 2;		// Need 2 Queries for Starting, Ending timestamp
 }

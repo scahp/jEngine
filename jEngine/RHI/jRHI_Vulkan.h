@@ -8,7 +8,7 @@
 #include "jPipelineStateInfo.h"
 #include "Vulkan/jRenderPass_Vulkan.h"
 #include "Vulkan/jShaderBindingLayout_Vulkan.h"
-#include "Vulkan/jQueryPool_Vulkan.h"
+#include "Vulkan/jQueryPoolTime_Vulkan.h"
 #include "Vulkan/jPipelineStateInfo_Vulkan.h"
 #include "Vulkan/jCommandBufferManager_Vulkan.h"
 #include "Vulkan/jSwapchain_Vulkan.h"
@@ -89,7 +89,7 @@ public:
 	jCommandBufferManager_Vulkan* CommandBufferManager = nullptr;
     jFenceManager_Vulkan FenceManager;
 
-    jQueryPool_Vulkan* QueryPool = nullptr;
+    jQueryPoolTime_Vulkan* QueryPoolTime = nullptr;
 	std::vector<jRingBuffer_Vulkan*> UniformRingBuffers;
 	std::vector<jRingBuffer_Vulkan*> SSBORingBuffers;
 	std::vector<jDescriptorPool_Vulkan*> DescriptorPools;
@@ -176,7 +176,7 @@ public:
 
 	virtual jCommandBufferManager* GetCommandBufferManager() const { return CommandBufferManager; }
 	virtual EMSAASamples GetSelectedMSAASamples() const { return SelectedMSAASamples; }
-	virtual jQueryPool* GetQueryPool() const override { return QueryPool; }
+	virtual jQueryPool* GetQueryPool() const override { return QueryPoolTime; }
 	virtual jSwapchain* GetSwapchain() const override { return Swapchain; }
 
 	jRingBuffer_Vulkan* GetUniformRingBuffer() const { return UniformRingBuffers[CurrenFrameIndex]; }
