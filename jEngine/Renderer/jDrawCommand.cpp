@@ -9,9 +9,9 @@
 
 jDrawCommand::jDrawCommand(std::shared_ptr<jRenderFrameContext> InRenderFrameContextPtr, jView* view
     , jRenderObject* renderObject, jRenderPass* renderPass, jShader* shader, jPipelineStateFixedInfo* pipelineStateFixed
-    , const std::vector<jShaderBindingInstance*>& shaderBindingInstances, const std::shared_ptr<jPushConstant>& pushConstantPtr)
+    , const std::vector<jShaderBindingInstance*>& shaderBindingInstances, const std::shared_ptr<jPushConstant>& pushConstantPtr, jQuery* occlusionQuery)
     : RenderFrameContextPtr(InRenderFrameContextPtr), View(view), RenderObject(renderObject), RenderPass(renderPass), Shader(shader), PipelineStateFixed(pipelineStateFixed)
-    , PushConstantPtr(pushConstantPtr)
+    , PushConstantPtr(pushConstantPtr), OcclusionQuery(occlusionQuery)
 {
     ShaderBindingInstances.reserve(shaderBindingInstances.size() + 3);
     ShaderBindingInstances.insert(ShaderBindingInstances.begin(), shaderBindingInstances.begin(), shaderBindingInstances.end());    
@@ -42,7 +42,7 @@ void jDrawCommand::PrepareToDraw(bool bPositionOnly)
         , vertexBuffers, RenderPass, shaderBindings, PushConstantPtr.get());
 }
 
-void jDrawCommand::Draw()
+void jDrawCommand::Draw() const
 {
     for (int32 i = 0; i < ShaderBindingInstances.size(); ++i)
     {
@@ -67,6 +67,12 @@ void jDrawCommand::Draw()
 
     const int32 InstanceCount = RenderObject->VertexBuffer_InstanceData ? RenderObject->VertexBuffer_InstanceData->GetElementCount() : 1;
 
+    if (OcclusionQuery)
+        OcclusionQuery->BeginQuery(RenderFrameContextPtr->CommandBuffer);
+
     // Draw
     RenderObject->Draw(RenderFrameContextPtr, nullptr, Shader, {}, 0, -1, InstanceCount);
+
+    if (OcclusionQuery)
+        OcclusionQuery->EndQuery(RenderFrameContextPtr->CommandBuffer);
 }

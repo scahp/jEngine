@@ -2,6 +2,7 @@
 
 #include "jRenderer.h"
 #include "jDrawCommand.h"
+#include "RHI/Vulkan/jQueryPoolOcclusion_Vulkan.h"
 
 class jRenderPass;
 
@@ -31,5 +32,10 @@ public:
 
     jRenderPass* ShadowMapRenderPass = nullptr;
     jRenderPass* OpaqueRenderPass = nullptr;
+
+    jQueryOcclusion_Vulkan ShadowpassOcclusionTest;
+    jQueryOcclusion_Vulkan BasepassOcclusionTest;
+
+    int32 FrameIndex = 0;
 };
 

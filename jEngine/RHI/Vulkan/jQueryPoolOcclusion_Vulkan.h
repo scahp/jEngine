@@ -1,14 +1,14 @@
 ﻿#pragma once
 #include "../jRHI.h"
 
-extern const uint32 MaxQueryTimeCount;
+extern const uint32 MaxQueryOcclusionCount;
 
 //////////////////////////////////////////////////////////////////////////
-// jQueryPoolTime_Vulkan
+// jQueryPoolOcclusion_Vulkan
 //////////////////////////////////////////////////////////////////////////
-struct jQueryPoolTime_Vulkan : public jQueryPool
+struct jQueryPoolOcclusion_Vulkan : public jQueryPool
 {
-    virtual ~jQueryPoolTime_Vulkan() 
+    virtual ~jQueryPoolOcclusion_Vulkan()
     {
         ReleaseInstance();
     }
@@ -17,11 +17,12 @@ struct jQueryPoolTime_Vulkan : public jQueryPool
     virtual void ResetQueryPool(jCommandBuffer* pCommanBuffer = nullptr);
     virtual void Release() override;
     virtual void* GetHandle() const override { return QueryPool; }
-    virtual int32 GetUsedQueryCount(int32 InFrameIndex) const override;
 
     virtual bool CanWholeQueryResult() const override { return true; }
     virtual std::vector<uint64> GetWholeQueryResult(int32 InFrameIndex, int32 InCount) const override;
     virtual std::vector<uint64> GetWholeQueryResult(int32 InFrameIndex) const override;
+
+    virtual int32 GetUsedQueryCount(int32 InFrameIndex) const override;
 
     void ReleaseInstance();
 
@@ -30,22 +31,19 @@ struct jQueryPoolTime_Vulkan : public jQueryPool
 };
 
 //////////////////////////////////////////////////////////////////////////
-// jQueryTime_Vulkan
+// jQueryOcclusion_Vulkan
 //////////////////////////////////////////////////////////////////////////
-struct jQueryTime_Vulkan : public jQuery
+struct jQueryOcclusion_Vulkan : public jQuery
 {
-    virtual ~jQueryTime_Vulkan() {}
+    virtual ~jQueryOcclusion_Vulkan() {}
     virtual void Init() override;
-    
+
     virtual void BeginQuery(const jCommandBuffer* commandBuffer) const override;
     virtual void EndQuery(const jCommandBuffer* commandBuffer) const override;
-
-    virtual bool IsQueryTimeStampResult(bool isWaitUntilAvailable) const override;
-    virtual void GetQueryResult() const override;
     virtual void GetQueryResultFromQueryArray(int32 InWatingResultIndex, const std::vector<uint64>& wholeQueryArray) const override;
 
-    virtual uint64 GetElpasedTime() const override { return TimeStampStartEnd[1] - TimeStampStartEnd[0]; }
+    uint64 GetQueryResult();
 
-    mutable uint64 TimeStampStartEnd[2] = { 0, 0 };
     uint32 QueryId = 0;
+    mutable uint64 Result = 0;
 };

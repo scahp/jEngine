@@ -108,26 +108,28 @@ struct jProfile_GPU
 			prevIndex = (int32)!CurrentWatingResultListIndex;
 		}
 
+		const bool CanWholeQueryTimeStampResult = g_rhi->GetQueryTimePool()->CanWholeQueryResult();
+
 		// Query 결과를 한번에 다 받아올 수 있는 API 는 그렇게 처리하고, 아니면 개별로 결과를 얻어오도록 함
         std::vector<uint64> WholeQueryTimeStampArray;
-		if (g_rhi->CanWholeQueryTimeStampResult())
+		if (CanWholeQueryTimeStampResult)
 		{
-			WholeQueryTimeStampArray = g_rhi->GetWholeQueryTimeStampResult(prevIndex);
+			WholeQueryTimeStampArray = g_rhi->GetQueryTimePool()->GetWholeQueryResult(prevIndex);
 		}
 
 		auto& prevList = WatingResultList[prevIndex];
 		for (auto rit = prevList.rbegin(); prevList.rend() != rit;++rit)
 		{
 			const auto& iter = *rit;
-			if (g_rhi->CanWholeQueryTimeStampResult())
+			if (CanWholeQueryTimeStampResult)
 			{
-				g_rhi->GetQueryTimeStampResultFromWholeStampArray(iter.Query, prevIndex, WholeQueryTimeStampArray);
+				iter.Query->GetQueryResultFromQueryArray(prevIndex, WholeQueryTimeStampArray);
 			}
 			else
 			{
-				g_rhi->GetQueryTimeStampResult(iter.Query);
+				iter.Query->GetQueryResult();
 			}
-			AddScopedProfileGPU(iter.Name, iter.Query->TimeStampStartEnd[1] - iter.Query->TimeStampStartEnd[0]);
+			AddScopedProfileGPU(iter.Name, iter.Query->GetElpasedTime());
             jQueryTimePool::ReturnQueryTime(iter.Query);
 		}
 		prevList.clear();
@@ -149,7 +151,7 @@ public:
 		//g_rhi->QueryTimeStamp(Profile.Start);
 
         Profile.Query = jQueryTimePool::GetQueryTime();
-		g_rhi->QueryTimeStampStart(InRenderFrameContext, Profile.Query);
+		Profile.Query->BeginQuery(InRenderFrameContext->CommandBuffer);
 	}
 
 	~jScopedProfile_GPU()
@@ -157,7 +159,7 @@ public:
 		//Profile.End = jQueryTimePool::GetQueryTime();
 		//g_rhi->QueryTimeStamp(Profile.End);
 
-        g_rhi->QueryTimeStampEnd(RenderFrameContextPtr.lock(), Profile.Query);
+		Profile.Query->EndQuery(RenderFrameContextPtr.lock()->CommandBuffer);
 		jProfile_GPU::WatingResultList[jProfile_GPU::CurrentWatingResultListIndex].emplace_back(Profile);
 	}
 

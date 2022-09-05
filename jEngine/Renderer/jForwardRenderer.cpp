@@ -21,6 +21,8 @@ static std::shared_ptr<TPushConstant<jColorPushConstant>> PushConstantPtr;
 
 void jForwardRenderer::Setup()
 {
+    FrameIndex = g_rhi_vk->CurrenFrameIndex;
+
     View.SetupUniformBuffer();
 
     // View 별로 저장 할 수 있어야 함
@@ -187,10 +189,17 @@ void jForwardRenderer::Render()
 {
     check(RenderFrameContextPtr->CommandBuffer);
     ensure(RenderFrameContextPtr->CommandBuffer->Begin());
-    if (g_rhi->GetQueryPool())
+    if (g_rhi->GetQueryTimePool())
     {
-        g_rhi->GetQueryPool()->ResetQueryPool(RenderFrameContextPtr->CommandBuffer);
+        g_rhi->GetQueryTimePool()->ResetQueryPool(RenderFrameContextPtr->CommandBuffer);
     }
+    if (g_rhi->GetQueryOcclusionPool())
+    {
+        g_rhi->GetQueryOcclusionPool()->ResetQueryPool(RenderFrameContextPtr->CommandBuffer);
+    }
+
+    ShadowpassOcclusionTest.Init();
+    BasepassOcclusionTest.Init();
 
     __super::Render();
 
@@ -209,11 +218,13 @@ void jForwardRenderer::ShadowPass()
 
         if (ShadowMapRenderPass->BeginRenderPass(RenderFrameContextPtr->CommandBuffer))
         {
-            for (auto& command : ShadowPasses)
+            ShadowpassOcclusionTest.BeginQuery(RenderFrameContextPtr->CommandBuffer);
+            for (const auto& command : ShadowPasses)
             {
                 command.Draw();
             }
-            ShadowMapRenderPass->EndRenderPass();
+            ShadowpassOcclusionTest.EndQuery(RenderFrameContextPtr->CommandBuffer);
+            ShadowMapRenderPass->EndRenderPass();            
         }
 
         g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, View.DirectionalLight->ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_READ_ONLY);
@@ -231,11 +242,12 @@ void jForwardRenderer::OpaquePass()
 
         if (OpaqueRenderPass->BeginRenderPass(RenderFrameContextPtr->CommandBuffer))
         {
-            for (auto command : BasePasses)
+            BasepassOcclusionTest.BeginQuery(RenderFrameContextPtr->CommandBuffer);
+            for (const auto& command : BasePasses)
             {
                 command.Draw();
             }
-
+            BasepassOcclusionTest.EndQuery(RenderFrameContextPtr->CommandBuffer);
             OpaqueRenderPass->EndRenderPass();
         }
     }

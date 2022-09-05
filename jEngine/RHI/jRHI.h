@@ -213,12 +213,20 @@ public:
 	~jMaterial() {}
 };
 
+struct jQuery;
+
 struct jQueryPool
 {
 	virtual ~jQueryPool() {}
 	virtual bool Create() { return false; }
 	virtual void ResetQueryPool(jCommandBuffer* pCommanBuffer = nullptr) {}
 	virtual void Release() {}
+	virtual void* GetHandle() const { return nullptr; }
+	virtual int32 GetUsedQueryCount(int32 InFrameIndex) const { return -1; }
+
+    virtual bool CanWholeQueryResult() const { return false; }
+    virtual std::vector<uint64> GetWholeQueryResult(int32 InFrameIndex, int32 InCount) const { check(0);  return std::vector<uint64>(); }
+	virtual std::vector<uint64> GetWholeQueryResult(int32 InFrameIndex) const { check(0);  return std::vector<uint64>(); }
 };
 
 struct jQuery
@@ -226,7 +234,14 @@ struct jQuery
 	virtual ~jQuery() {}
 	virtual void Init() {}
 
-	uint64 TimeStampStartEnd[2] = { 0, 0 };
+	virtual void BeginQuery(const jCommandBuffer* commandBuffer) const {}
+	virtual void EndQuery(const jCommandBuffer* commandBuffer) const {}
+	
+	virtual bool IsQueryTimeStampResult(bool isWaitUntilAvailable) const { return false; }
+	virtual void GetQueryResult() const {}
+	virtual void GetQueryResultFromQueryArray(int32 InWatingResultIndex, const std::vector<uint64>& wholeQueryArray) const {}
+
+	virtual uint64 GetElpasedTime() const { return 0; }
 };
 
 struct jQueryPrimitiveGenerated
@@ -370,13 +385,6 @@ public:
 	virtual void GenerateMips(const jTexture* texture) const {}
 	virtual jQuery* CreateQueryTime() const { return nullptr;  }
 	virtual void ReleaseQueryTime(jQuery* queryTime) const {}
-	virtual void QueryTimeStampStart(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jQuery* queryTimeStamp) const {}
-	virtual void QueryTimeStampEnd(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jQuery* queryTimeStamp) const {}
-	virtual bool IsQueryTimeStampResult(const jQuery* queryTimeStamp, bool isWaitUntilAvailable) const { return false; }
-	virtual void GetQueryTimeStampResult(jQuery* queryTimeStamp) const {}
-	virtual bool CanWholeQueryTimeStampResult() const { return false; }
-	virtual std::vector<uint64> GetWholeQueryTimeStampResult(int32 InWatingResultIndex) const { check(0);  return std::vector<uint64>(); }
-	virtual void GetQueryTimeStampResultFromWholeStampArray(jQuery* queryTimeStamp, int32 InWatingResultIndex, const std::vector<uint64>& wholeQueryTimeStampArray) const {}
 	virtual void EnableWireframe(bool enable) const {}
 	virtual void SetImageTexture(int32 index, const jTexture* texture, EImageTextureAccessType type) const {}
 	virtual void SetPolygonMode(EFace face, EPolygonMode mode = EPolygonMode::FILL) {}
@@ -434,9 +442,11 @@ public:
 
 	virtual bool TransitionImageLayout(jCommandBuffer* commandBuffer, jTexture* texture, EImageLayout newLayout) const { return true; }
 	virtual bool TransitionImageLayoutImmediate(jTexture* texture, EImageLayout newLayout) const { return true; }
-	virtual jQueryPool* GetQueryPool() const { return nullptr; }
+	virtual jQueryPool* GetQueryTimePool() const { return nullptr; }
 	virtual jSwapchain* GetSwapchain() const { return nullptr; }
 	virtual void RecreateSwapChain() {}
+
+    virtual jQueryPool* GetQueryOcclusionPool() const { return nullptr; }
 };
 
 // Not thred safe

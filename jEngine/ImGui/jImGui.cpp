@@ -340,6 +340,11 @@ void jImGUI_Vulkan::NewFrame(bool updateFrameGraph)
     {
         ImGui::Text("%s : %lf ms", pair.first.ToStr(), pair.second.AvgElapsedMS);
     }
+    ImGui::NewLine();
+    for (auto& pair : CounterMap)
+    {
+        ImGui::Text("%s : %lld", pair.first.ToStr(), pair.second);
+    }
     ImGui::End();
 
     //// Update frame time display

@@ -343,6 +343,9 @@
     <ClInclude Include="RHI\jSemaphoreManager.h">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClInclude>
+    <ClInclude Include="RHI\Vulkan\jQueryPoolOcclusion_Vulkan.h">
+      <Filter>Code\RHI\Vulkan</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -583,6 +586,9 @@
       <Filter>Code\External\IMGUI</Filter>
     </ClCompile>
     <ClCompile Include="RHI\jSemaphoreManager.cpp">
+      <Filter>Code\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\jQueryPoolOcclusion_Vulkan.cpp">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClCompile>
   </ItemGroup>

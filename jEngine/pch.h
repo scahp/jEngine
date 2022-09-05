@@ -185,8 +185,6 @@ extern float g_timeDeltaSecond;
 			return hash;\
 		}()
 
-extern const uint32 MaxQueryTimeCount;
-
 template <typename T>
 FORCEINLINE constexpr T Align(T value, uint64 alignment)
 {

@@ -13,6 +13,7 @@
 #include "Vulkan/jCommandBufferManager_Vulkan.h"
 #include "Vulkan/jSwapchain_Vulkan.h"
 #include "Vulkan/jShader_Vulkan.h"
+#include "Vulkan/jQueryPoolOcclusion_Vulkan.h"
 
 struct jRingBuffer_Vulkan;
 struct jDescriptorPool_Vulkan;
@@ -90,6 +91,7 @@ public:
     jFenceManager_Vulkan FenceManager;
 
     jQueryPoolTime_Vulkan* QueryPoolTime = nullptr;
+	jQueryPoolOcclusion_Vulkan* QueryPoolOcclusion = nullptr;
 	std::vector<jRingBuffer_Vulkan*> UniformRingBuffers;
 	std::vector<jRingBuffer_Vulkan*> SSBORingBuffers;
 	std::vector<jDescriptorPool_Vulkan*> DescriptorPools;
@@ -153,14 +155,6 @@ public:
 
     virtual jQuery* CreateQueryTime() const override;
     virtual void ReleaseQueryTime(jQuery* queryTime) const override;
-	virtual void QueryTimeStampStart(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jQuery* queryTimeStamp) const override;
-	virtual void QueryTimeStampEnd(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jQuery* queryTimeStamp) const override;
-    virtual bool IsQueryTimeStampResult(const jQuery* queryTimeStamp, bool isWaitUntilAvailable) const override;
-    virtual void GetQueryTimeStampResult(jQuery* queryTimeStamp) const override;
-	virtual bool CanWholeQueryTimeStampResult() const override { return true; }
-	virtual std::vector<uint64> GetWholeQueryTimeStampResult(int32 InWatingResultIndex) const override;
-	virtual void GetQueryTimeStampResultFromWholeStampArray(jQuery* queryTimeStamp, int32 InWatingResultIndex
-		, const std::vector<uint64>& wholeQueryTimeStampArray) const override;
 	virtual std::shared_ptr<jRenderFrameContext> BeginRenderFrame() override;
 	virtual void EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr) override;
 	jPipelineStateInfo* CreatePipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader, const std::vector<const jVertexBuffer*>& vertexBuffers
@@ -176,7 +170,8 @@ public:
 
 	virtual jCommandBufferManager* GetCommandBufferManager() const { return CommandBufferManager; }
 	virtual EMSAASamples GetSelectedMSAASamples() const { return SelectedMSAASamples; }
-	virtual jQueryPool* GetQueryPool() const override { return QueryPoolTime; }
+	virtual jQueryPool* GetQueryTimePool() const override { return QueryPoolTime; }
+	virtual jQueryPool* GetQueryOcclusionPool() const override { return QueryPoolOcclusion; }
 	virtual jSwapchain* GetSwapchain() const override { return Swapchain; }
 
 	jRingBuffer_Vulkan* GetUniformRingBuffer() const { return UniformRingBuffers[CurrenFrameIndex]; }

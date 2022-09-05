@@ -13,10 +13,11 @@ public:
     jDrawCommand() = default;
     jDrawCommand(std::shared_ptr<jRenderFrameContext> InRenderFrameContextPtr, jView* view, jRenderObject* renderObject
         , jRenderPass* renderPass, jShader* shader, jPipelineStateFixedInfo* pipelineStateFixed
-        , const std::vector<jShaderBindingInstance*>& shaderBindingInstances, const std::shared_ptr<jPushConstant>& pushConstantPtr);
+        , const std::vector<jShaderBindingInstance*>& shaderBindingInstances, const std::shared_ptr<jPushConstant>& pushConstantPtr
+        , jQuery* occlusionQuery = nullptr);
 
     void PrepareToDraw(bool bPositionOnly);
-    void Draw();
+    void Draw() const;
 
     std::vector<jShaderBindingInstance*> ShaderBindingInstances;
 
@@ -29,4 +30,5 @@ public:
     std::vector<const jVertexBuffer*> VertexBuffers;
     std::shared_ptr<jPushConstant> PushConstantPtr;
     std::shared_ptr<jRenderFrameContext> RenderFrameContextPtr;
+    jQuery* OcclusionQuery = nullptr;
 };
