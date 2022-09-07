@@ -280,6 +280,11 @@ bool jSpirvHelper::HLSLtoSpirv(std::vector<uint32>& OutSpirv, ShaderConductor::S
 	ShaderConductor::Compiler::Options options;
 	options.packMatricesInRowMajor = false;
 
+	// To support Variable Rate Shading(VRS) and SV_ShadingRate semantic
+	options.shaderModel.major_ver = 6;
+	options.shaderModel.minor_ver = 4;
+
+	// To support wave-intrinsics, use the vulkan 1.2
 	static std::vector<const char*> customOptions{ "-fspv-target-env=vulkan1.2" };
 
 	options.numOfCustomArgs = (int32)customOptions.size();
@@ -303,5 +308,6 @@ bool jSpirvHelper::HLSLtoSpirv(std::vector<uint32>& OutSpirv, ShaderConductor::S
 
 	OutSpirv.resize(totalElement);
 	memcpy(OutSpirv.data(), target_ptr, resultDesc.target.Size());
+
 	return true;
 }
