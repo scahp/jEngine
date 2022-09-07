@@ -34,7 +34,8 @@ const std::vector<const char*> validationLayers = {
 };
 
 const std::vector<const char*> DeviceExtensions = {
-    VK_KHR_SWAPCHAIN_EXTENSION_NAME
+    VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+    VK_NV_SHADING_RATE_IMAGE_EXTENSION_NAME
 };
 
 VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
@@ -54,7 +55,7 @@ VkSurfaceFormatKHR ChooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>
 VkPresentModeKHR ChooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
 VkExtent2D ChooseSwapExtent(GLFWwindow* window, const VkSurfaceCapabilitiesKHR& capabilities);
 SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface);
-std::vector<const char*> GetRequiredExtensions();
+std::vector<const char*> GetRequiredInstanceExtensions();
 bool CheckValidationLayerSupport();
 
 }

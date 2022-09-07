@@ -53,7 +53,9 @@ struct PushConsts
 };
 [[vk::push_constant]] PushConsts pushConsts;
 
-float4 main(VSOutput input) : SV_TARGET
+float4 main(VSOutput input
+, uint shadingRate : SV_ShadingRate
+) : SV_TARGET
 {
     float lit = 1.0;
     if (-1.0 <= input.ShadowPosition.z && input.ShadowPosition.z <= 1.0)
@@ -66,5 +68,32 @@ float4 main(VSOutput input) : SV_TARGET
 	}
 
     float Intensity = dot(input.Normal, -DirectionalLight.Direction) * lit;
-    return float4(pushConsts.color.rgb * input.Color.xyz * Intensity, 1.0);
+    float4 color = float4(pushConsts.color.rgb * input.Color.xyz * Intensity, 1.0);
+    
+    const uint SHADING_RATE_PER_PIXEL = 0x0;
+    const uint SHADING_RATE_PER_2X1_PIXELS = 6;
+    const uint SHADING_RATE_PER_1X2_PIXELS = 7;
+    const uint SHADING_RATE_PER_2X2_PIXELS = 8;
+    const uint SHADING_RATE_PER_4X2_PIXELS = 9;
+    const uint SHADING_RATE_PER_2X4_PIXELS = 10;
+    
+    switch (shadingRate)
+    {
+        case SHADING_RATE_PER_PIXEL:
+            return color * float4(0.0, 0.8, 0.4, 1.0);
+        case SHADING_RATE_PER_2X1_PIXELS:
+            return color * float4(0.2, 0.6, 1.0, 1.0);
+        case SHADING_RATE_PER_1X2_PIXELS:
+            return color * float4(0.0, 0.4, 0.8, 1.0);
+        case SHADING_RATE_PER_2X2_PIXELS:
+            return color * float4(1.0, 1.0, 0.2, 1.0);
+        case SHADING_RATE_PER_4X2_PIXELS:
+            return color * float4(0.8, 0.8, 0.0, 1.0);
+        case SHADING_RATE_PER_2X4_PIXELS:
+            return color * float4(1.0, 0.4, 0.2, 1.0);
+        default:
+            return color * float4(0.8, 0.0, 0.0, 1.0);
+    }
+
+    return color;
 }

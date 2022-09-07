@@ -126,6 +126,12 @@ bool IsDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface)
     VkPhysicalDeviceFeatures deviceFeatures = {};
     vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
 
+    PFN_vkGetPhysicalDeviceProperties2KHR vkGetPhysicalDeviceProperties2KHR = reinterpret_cast<PFN_vkGetPhysicalDeviceProperties2KHR>(vkGetInstanceProcAddr(g_rhi_vk->Instance, "vkGetPhysicalDeviceProperties2KHR"));
+    assert(vkGetPhysicalDeviceProperties2KHR);
+    VkPhysicalDeviceProperties2KHR deviceProps2{};
+    deviceProps2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2_KHR;
+    vkGetPhysicalDeviceProperties2KHR(device, &deviceProps2);
+
     // 현재는 Geometry Shader 지원 여부만 판단
     if (deviceProperties.deviceType != VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU || !deviceFeatures.geometryShader)
         return false;
@@ -239,7 +245,7 @@ jVulkanDeviceUtil::SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevic
     return details;
 }
 
-std::vector<const char*> GetRequiredExtensions()
+std::vector<const char*> GetRequiredInstanceExtensions()
 {
     uint32 glfwExtensionCount = 0;
     const char** glfwExtensions = nullptr;
@@ -249,6 +255,8 @@ std::vector<const char*> GetRequiredExtensions()
 
     if (jVulkanDeviceUtil::EnableValidationLayers)
         extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);	// VK_EXT_debug_utils 임
+
+    extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 
     return extensions;
 }

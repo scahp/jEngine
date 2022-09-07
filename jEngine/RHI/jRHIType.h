@@ -291,6 +291,7 @@ enum class ETextureFormat
 	R8,
 	R16F,
 	R32F,
+	R8UI,
 	R32UI,
 
 	RG8,

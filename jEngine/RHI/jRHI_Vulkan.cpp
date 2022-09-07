@@ -83,7 +83,7 @@ bool jRHI_Vulkan::InitRHI()
 	createInfo.pApplicationInfo = &appInfo;
 
 	// add extension
-	auto extensions = jVulkanDeviceUtil::GetRequiredExtensions();
+	auto extensions = jVulkanDeviceUtil::GetRequiredInstanceExtensions();
 	createInfo.enabledExtensionCount = static_cast<uint32>(extensions.size());
 	createInfo.ppEnabledExtensionNames = extensions.data();
 
@@ -177,17 +177,29 @@ bool jRHI_Vulkan::InitRHI()
 			queueCreateInfos.push_back(queueCreateInfo);
 		}
 
-        VkPhysicalDeviceFeatures deviceFeatures = {};
-		deviceFeatures.samplerAnisotropy = VK_TRUE;		// VkSampler 가 Anisotropy 를 사용할 수 있도록 하기 위해 true로 설정
-		deviceFeatures.sampleRateShading = VK_TRUE;		// Sample shading 켬	 (텍스쳐 내부에 있는 aliasing 도 완화 해줌)
-		deviceFeatures.multiDrawIndirect = VK_TRUE;
-
 		VkDeviceCreateInfo createInfo = {};
 		createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 		createInfo.pQueueCreateInfos = queueCreateInfos.data();
 		createInfo.queueCreateInfoCount = static_cast<uint32>(queueCreateInfos.size());
 
-		createInfo.pEnabledFeatures = &deviceFeatures;
+		VkPhysicalDeviceFeatures deviceFeatures = {};
+		deviceFeatures.samplerAnisotropy = VK_TRUE;		// VkSampler 가 Anisotropy 를 사용할 수 있도록 하기 위해 true로 설정
+		deviceFeatures.sampleRateShading = VK_TRUE;		// Sample shading 켬	 (텍스쳐 내부에 있는 aliasing 도 완화 해줌)
+		deviceFeatures.multiDrawIndirect = VK_TRUE;
+
+        VkPhysicalDeviceFeatures2 physicalDeviceFeatures2{};
+        physicalDeviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+        physicalDeviceFeatures2.features = deviceFeatures;		// VkSampler 가 Anisotropy 를 사용할 수 있도록 하기 위해 true로 설정
+
+		VkPhysicalDeviceShadingRateImageFeaturesNV enabledPhysicalDeviceShadingRateImageFeaturesNV{};
+        enabledPhysicalDeviceShadingRateImageFeaturesNV.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADING_RATE_IMAGE_FEATURES_NV;
+        enabledPhysicalDeviceShadingRateImageFeaturesNV.shadingRateImage = VK_TRUE;
+		physicalDeviceFeatures2.pNext = &enabledPhysicalDeviceShadingRateImageFeaturesNV;
+
+		createInfo.pNext = &physicalDeviceFeatures2;
+
+		// createInfo.pEnabledFeatures = &deviceFeatures;
+		createInfo.pEnabledFeatures = nullptr;
 
 		// extension
 		createInfo.enabledExtensionCount = static_cast<uint32>(jVulkanDeviceUtil::DeviceExtensions.size());
