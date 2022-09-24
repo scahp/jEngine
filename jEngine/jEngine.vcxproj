@@ -135,6 +135,7 @@ xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"</Command
     <ClInclude Include="ImGui\jImGui.h" />
     <ClInclude Include="jEngine.h" />
     <ClInclude Include="jGame.h" />
+    <ClInclude Include="jOptions.h" />
     <ClInclude Include="jPrimitiveUtil.h" />
     <ClInclude Include="Math\MathUtility.h" />
     <ClInclude Include="Math\Matrix.h" />
@@ -296,6 +297,7 @@ xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"</Command
     <ClCompile Include="ImGui\jImGui.cpp" />
     <ClCompile Include="jEngine.cpp" />
     <ClCompile Include="jGame.cpp" />
+    <ClCompile Include="jOptions.cpp" />
     <ClCompile Include="jPrimitiveUtil.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Math\Matrix.cpp" />

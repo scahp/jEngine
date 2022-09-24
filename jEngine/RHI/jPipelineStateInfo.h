@@ -291,14 +291,14 @@ struct jPipelineStateFixedInfo
 {
     jPipelineStateFixedInfo() = default;
     jPipelineStateFixedInfo(jRasterizationStateInfo* rasterizationState, jMultisampleStateInfo* multisampleState, jDepthStencilStateInfo* depthStencilState
-        , jBlendingStateInfo* blendingState, const std::vector<jViewport>& viewports, const std::vector<jScissor>& scissors)
+        , jBlendingStateInfo* blendingState, const std::vector<jViewport>& viewports, const std::vector<jScissor>& scissors, bool isUseVRS)
         : RasterizationState(rasterizationState), MultisampleState(multisampleState), DepthStencilState(depthStencilState)
-        , BlendingState(blendingState), Viewports(Viewports), Scissors(scissors)
+        , BlendingState(blendingState), Viewports(Viewports), Scissors(scissors), IsUseVRS(isUseVRS)
     {}
     jPipelineStateFixedInfo(jRasterizationStateInfo* rasterizationState, jMultisampleStateInfo* multisampleState, jDepthStencilStateInfo* depthStencilState
-        , jBlendingStateInfo* blendingState, const jViewport& viewport, const jScissor& scissor)
+        , jBlendingStateInfo* blendingState, const jViewport& viewport, const jScissor& scissor, bool isUseVRS)
         : RasterizationState(rasterizationState), MultisampleState(multisampleState), DepthStencilState(depthStencilState)
-        , BlendingState(blendingState), Viewports({ viewport }), Scissors({ scissor })
+        , BlendingState(blendingState), Viewports({ viewport }), Scissors({ scissor }), IsUseVRS(isUseVRS)
     {}
 
     size_t CreateHash() const
@@ -318,6 +318,7 @@ struct jPipelineStateFixedInfo
         Hash = CityHash64WithSeed(MultisampleState->GetHash(), Hash);
         Hash = CityHash64WithSeed(DepthStencilState->GetHash(), Hash);
         Hash = CityHash64WithSeed(BlendingState->GetHash(), Hash);
+        Hash = CityHash64WithSeed((uint64)IsUseVRS, Hash);
 
         return Hash;
     }
@@ -329,6 +330,7 @@ struct jPipelineStateFixedInfo
     jMultisampleStateInfo* MultisampleState = nullptr;
     jDepthStencilStateInfo* DepthStencilState = nullptr;
     jBlendingStateInfo* BlendingState = nullptr;
+    bool IsUseVRS = false;
 
     mutable size_t Hash = 0;
 };

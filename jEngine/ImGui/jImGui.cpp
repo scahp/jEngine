@@ -3,6 +3,7 @@
 #include "Profiler/jPerformanceProfile.h"
 #include "RHI/Vulkan/jTexture_Vulkan.h"
 #include "RHI/Vulkan/jVulkanBufferUtil.h"
+#include "jOptions.h"
 
 jImGUI_Vulkan* jImGUI_Vulkan::s_instance = nullptr;
 
@@ -334,13 +335,18 @@ void jImGUI_Vulkan::NewFrame(bool updateFrameGraph)
     //ImGui::TextUnformatted(g_rhi_vk->DeviceProperties.deviceName);
 
     ImGui::SetNextWindowSize(ImVec2(200.0f, 200.0f), ImGuiCond_FirstUseEver);
-    ImGui::Begin("GPU Time Stamp");
+    ImGui::Begin("Panel");
+
+    ImGui::Checkbox("UseVRS", &gOptions.UseVRS);
+    ImGui::Checkbox("ShowVRSArea", &gOptions.ShowVRSArea);
+    ImGui::Separator();
+
     const std::map<jName, jPerformanceProfile::jAvgProfile>& GPUAvgProfileMap = jPerformanceProfile::GetInstance().GetGPUAvgProfileMap();
     for (auto& pair : GPUAvgProfileMap)
     {
         ImGui::Text("%s : %lf ms", pair.first.ToStr(), pair.second.AvgElapsedMS);
     }
-    ImGui::NewLine();
+    ImGui::Separator();
     for (auto& pair : CounterMap)
     {
         ImGui::Text("%s : %lld", pair.first.ToStr(), pair.second);

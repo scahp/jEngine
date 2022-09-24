@@ -720,7 +720,15 @@ bool jRHI_Vulkan::CreateShaderInternal(jShader* OutShader, const jShaderInfo& sh
 		jFile csFile;
 		csFile.OpenFile(shaderInfo.cs.ToStr(), FileType::TEXT, ReadWriteType::READ);
 		csFile.ReadFileToBuffer(false);
-		std::string csText(csFile.GetBuffer());
+		std::string csText;
+
+		if (shaderInfo.csPreProcessor.GetStringLength() > 0)
+		{
+			csText += shaderInfo.csPreProcessor.ToStr();
+			csText += "\r\n";
+		}
+
+		csText += csFile.GetBuffer();
 
 		std::vector<uint32> SpirvCode;
         const bool isHLSL = !!strstr(shaderInfo.cs.ToStr(), ".hlsl");
@@ -745,7 +753,15 @@ bool jRHI_Vulkan::CreateShaderInternal(jShader* OutShader, const jShaderInfo& sh
 			jFile vsFile;
 			vsFile.OpenFile(shaderInfo.vs.ToStr(), FileType::TEXT, ReadWriteType::READ);
 			vsFile.ReadFileToBuffer(false);
-			std::string vsText(vsFile.GetBuffer());
+			std::string vsText;
+			
+			if (shaderInfo.vsPreProcessor.GetStringLength() > 0)
+			{
+				vsText += shaderInfo.vsPreProcessor.ToStr();
+				vsText += "\r\n";
+			}
+			
+			vsText += vsFile.GetBuffer();
 
 			std::vector<uint32> SpirvCode;
             const bool isHLSL = !!strstr(shaderInfo.vs.ToStr(), ".hlsl");
@@ -770,7 +786,15 @@ bool jRHI_Vulkan::CreateShaderInternal(jShader* OutShader, const jShaderInfo& sh
 			jFile gsFile;
 			gsFile.OpenFile(shaderInfo.gs.ToStr(), FileType::TEXT, ReadWriteType::READ);
 			gsFile.ReadFileToBuffer(false);
-			std::string gsText(gsFile.GetBuffer());
+			std::string gsText;
+
+			if (shaderInfo.gsPreProcessor.GetStringLength() > 0)
+			{
+				gsText += shaderInfo.gsPreProcessor.ToStr();
+				gsText += "\r\n";
+			}
+
+			gsText += gsFile.GetBuffer();
 
 			std::vector<uint32> SpirvCode;
             const bool isHLSL = !!strstr(shaderInfo.gs.ToStr(), ".hlsl");
@@ -793,7 +817,15 @@ bool jRHI_Vulkan::CreateShaderInternal(jShader* OutShader, const jShaderInfo& sh
 			jFile fsFile;
 			fsFile.OpenFile(shaderInfo.fs.ToStr(), FileType::TEXT, ReadWriteType::READ);
 			fsFile.ReadFileToBuffer(false);
-			std::string fsText(fsFile.GetBuffer());
+			std::string fsText;
+
+			if (shaderInfo.fsPreProcessor.GetStringLength() > 0)
+			{
+				fsText += shaderInfo.fsPreProcessor.ToStr();
+				fsText += "\r\n";
+			}
+
+			fsText += fsFile.GetBuffer();
 
 			std::vector<uint32> SpirvCode;
             const bool isHLSL = !!strstr(shaderInfo.fs.ToStr(), ".hlsl");

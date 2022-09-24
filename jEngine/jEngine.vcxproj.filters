@@ -346,6 +346,9 @@
     <ClInclude Include="RHI\Vulkan\jQueryPoolOcclusion_Vulkan.h">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClInclude>
+    <ClInclude Include="jOptions.h">
+      <Filter>Code</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -590,6 +593,9 @@
     </ClCompile>
     <ClCompile Include="RHI\Vulkan\jQueryPoolOcclusion_Vulkan.cpp">
       <Filter>Code\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="jOptions.cpp">
+      <Filter>Code</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

@@ -12,12 +12,14 @@
 #include "RHI/Vulkan/jUniformBufferBlock_Vulkan.h"
 #include "RHI/jShaderBindingsLayout.h"
 #include "RHI/jRHIType.h"
+#include "jOptions.h"
 
-struct jColorPushConstant
+struct jSimplePushConstant
 {
     Vector4 Color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+    bool ShowVRSArea = false;
 };
-static std::shared_ptr<TPushConstant<jColorPushConstant>> PushConstantPtr;
+static std::shared_ptr<TPushConstant<jSimplePushConstant>> PushConstantPtr;
 
 void jForwardRenderer::Setup()
 {
@@ -45,7 +47,7 @@ void jForwardRenderer::SetupShadowPass()
     auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::NONE>::Create();
 
     jPipelineStateFixedInfo ShadpwPipelineStateFixed = jPipelineStateFixedInfo(RasterizationState, MultisampleState, DepthStencilState, BlendingState
-        , jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT));
+        , jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT), false);
 
     {
         const Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
@@ -110,7 +112,7 @@ void jForwardRenderer::SetupBasePass()
     auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
 
     jPipelineStateFixedInfo BasePassPipelineStateFixed = jPipelineStateFixedInfo(RasterizationState, MultisampleState, DepthStencilState, BlendingState
-        , jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT));
+        , jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT), gOptions.UseVRS);
 
     const Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
     const Vector2 ClearDepth = Vector2(1.0f, 0.0f);
@@ -163,6 +165,8 @@ void jForwardRenderer::SetupBasePass()
         shaderInfo.name = jName("default_test");
         shaderInfo.vs = jName("Resource/Shaders/hlsl/shader_vs.hlsl");
         shaderInfo.fs = jName("Resource/Shaders/hlsl/shader_fs.hlsl");
+        if (gOptions.UseVRS)
+            shaderInfo.fsPreProcessor = jName("#define USE_VARIABLE_SHADING_RATE 1");
         BasePassShader = g_rhi->CreateShader(shaderInfo);
     }
     jShader* BasePassInstancingShader = nullptr;
@@ -174,7 +178,8 @@ void jForwardRenderer::SetupBasePass()
         BasePassInstancingShader = g_rhi->CreateShader(shaderInfo);
     }
 
-    PushConstantPtr = std::make_shared<TPushConstant<jColorPushConstant>>(jColorPushConstant(), jPushConstantRange(EShaderAccessStageFlag::FRAGMENT, 0, sizeof(jColorPushConstant)));
+    PushConstantPtr = std::make_shared<TPushConstant<jSimplePushConstant>>(jSimplePushConstant(), jPushConstantRange(EShaderAccessStageFlag::FRAGMENT, 0, sizeof(jSimplePushConstant)));
+    PushConstantPtr->Data.ShowVRSArea = gOptions.ShowVRSArea;
 
     for (auto iter : jObject::GetStaticObject())
     {

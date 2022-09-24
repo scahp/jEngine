@@ -275,30 +275,36 @@ void* jPipelineStateInfo_Vulkan::CreateGraphicsPipelineState()
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;		// Optional
     pipelineInfo.basePipelineIndex = -1;					// Optional
 
-    // Shading Rate Palette
-    const std::vector<VkShadingRatePaletteEntryNV> shadingRatePaletteEntries = {
-    VK_SHADING_RATE_PALETTE_ENTRY_NO_INVOCATIONS_NV,
-    VK_SHADING_RATE_PALETTE_ENTRY_16_INVOCATIONS_PER_PIXEL_NV,
-    VK_SHADING_RATE_PALETTE_ENTRY_8_INVOCATIONS_PER_PIXEL_NV,
-    VK_SHADING_RATE_PALETTE_ENTRY_4_INVOCATIONS_PER_PIXEL_NV,
-    VK_SHADING_RATE_PALETTE_ENTRY_2_INVOCATIONS_PER_PIXEL_NV,
-    VK_SHADING_RATE_PALETTE_ENTRY_1_INVOCATION_PER_PIXEL_NV,
-    VK_SHADING_RATE_PALETTE_ENTRY_1_INVOCATION_PER_2X1_PIXELS_NV,
-    VK_SHADING_RATE_PALETTE_ENTRY_1_INVOCATION_PER_1X2_PIXELS_NV,
-    VK_SHADING_RATE_PALETTE_ENTRY_1_INVOCATION_PER_2X2_PIXELS_NV,
-    VK_SHADING_RATE_PALETTE_ENTRY_1_INVOCATION_PER_4X2_PIXELS_NV,
-    VK_SHADING_RATE_PALETTE_ENTRY_1_INVOCATION_PER_2X4_PIXELS_NV,
-    VK_SHADING_RATE_PALETTE_ENTRY_1_INVOCATION_PER_4X4_PIXELS_NV,
-    };
     VkShadingRatePaletteNV shadingRatePalette{};
-    shadingRatePalette.shadingRatePaletteEntryCount = static_cast<uint32_t>(shadingRatePaletteEntries.size());
-    shadingRatePalette.pShadingRatePaletteEntries = shadingRatePaletteEntries.data();
     VkPipelineViewportShadingRateImageStateCreateInfoNV pipelineViewportShadingRateImageStateCI{};
-    pipelineViewportShadingRateImageStateCI.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_SHADING_RATE_IMAGE_STATE_CREATE_INFO_NV;
-    pipelineViewportShadingRateImageStateCI.shadingRateImageEnable = VK_TRUE;
-    pipelineViewportShadingRateImageStateCI.viewportCount = viewportState.viewportCount;
-    pipelineViewportShadingRateImageStateCI.pShadingRatePalettes = &shadingRatePalette;
-    viewportState.pNext = &pipelineViewportShadingRateImageStateCI;
+    
+    static const std::vector<VkShadingRatePaletteEntryNV> shadingRatePaletteEntries = {
+        VK_SHADING_RATE_PALETTE_ENTRY_NO_INVOCATIONS_NV,
+        VK_SHADING_RATE_PALETTE_ENTRY_16_INVOCATIONS_PER_PIXEL_NV,
+        VK_SHADING_RATE_PALETTE_ENTRY_8_INVOCATIONS_PER_PIXEL_NV,
+        VK_SHADING_RATE_PALETTE_ENTRY_4_INVOCATIONS_PER_PIXEL_NV,
+        VK_SHADING_RATE_PALETTE_ENTRY_2_INVOCATIONS_PER_PIXEL_NV,
+        VK_SHADING_RATE_PALETTE_ENTRY_1_INVOCATION_PER_PIXEL_NV,
+        VK_SHADING_RATE_PALETTE_ENTRY_1_INVOCATION_PER_2X1_PIXELS_NV,
+        VK_SHADING_RATE_PALETTE_ENTRY_1_INVOCATION_PER_1X2_PIXELS_NV,
+        VK_SHADING_RATE_PALETTE_ENTRY_1_INVOCATION_PER_2X2_PIXELS_NV,
+        VK_SHADING_RATE_PALETTE_ENTRY_1_INVOCATION_PER_4X2_PIXELS_NV,
+        VK_SHADING_RATE_PALETTE_ENTRY_1_INVOCATION_PER_2X4_PIXELS_NV,
+        VK_SHADING_RATE_PALETTE_ENTRY_1_INVOCATION_PER_4X4_PIXELS_NV,
+    };
+
+     if (PipelineStateFixed->IsUseVRS)
+    {
+        // Shading Rate Palette
+        shadingRatePalette.shadingRatePaletteEntryCount = static_cast<uint32_t>(shadingRatePaletteEntries.size());
+        shadingRatePalette.pShadingRatePaletteEntries = shadingRatePaletteEntries.data();
+
+        pipelineViewportShadingRateImageStateCI.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_SHADING_RATE_IMAGE_STATE_CREATE_INFO_NV;
+        pipelineViewportShadingRateImageStateCI.shadingRateImageEnable = VK_TRUE;
+        pipelineViewportShadingRateImageStateCI.viewportCount = viewportState.viewportCount;
+        pipelineViewportShadingRateImageStateCI.pShadingRatePalettes = &shadingRatePalette;
+        viewportState.pNext = &pipelineViewportShadingRateImageStateCI;
+    }
 
     // 여기서 두번째 파라메터 VkPipelineCache에 VK_NULL_HANDLE을 넘겼는데, VkPipelineCache는 VkPipeline을 저장하고 생성하는데 재사용할 수 있음.
     // 또한 파일로드 저장할 수 있어서 다른 프로그램에서 다시 사용할 수도있다. VkPipelineCache를 사용하면 VkPipeline을 생성하는 시간을 
