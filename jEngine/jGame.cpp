@@ -1,6 +1,6 @@
 ﻿#include "pch.h"
 #include "jGame.h"
-#include "Math\Vector.h"
+#include "Math/Vector.h"
 #include "Scene/jCamera.h"
 #include "Scene/jObject.h"
 #include "Scene/jLight.h"
@@ -8,7 +8,7 @@
 #include "Profiler/jPerformanceProfile.h"
 #include "Renderer/jForwardRenderer.h"
 #include "jPrimitiveUtil.h"
-#include "RHI\Vulkan\jVulkanBufferUtil.h"
+#include "RHI/Vulkan/jVulkanBufferUtil.h"
 
 jRHI* g_rhi = nullptr;
 
@@ -576,3 +576,4 @@ void jGame::SpawnIndirectDrawPrimitives()
         SpawnedObjects.push_back(obj);
     }
 }
+

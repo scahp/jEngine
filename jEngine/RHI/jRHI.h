@@ -447,6 +447,7 @@ public:
 	virtual void RecreateSwapChain() {}
 
     virtual jQueryPool* GetQueryOcclusionPool() const { return nullptr; }
+	virtual void BindShadingRateImage(jCommandBuffer* commandBuffer, jTexture* vrstexture) const {}
 };
 
 // Not thred safe

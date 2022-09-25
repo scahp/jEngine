@@ -228,6 +228,9 @@ bool jRHI_Vulkan::InitRHI()
 		vkGetDeviceQueue(Device, PresentQueue.QueueIndex, 0, &PresentQueue.Queue);
 	}
 
+	// Get vkCmdBindShadingRateImageNV function pointer for VRS
+	vkCmdBindShadingRateImageNV = reinterpret_cast<PFN_vkCmdBindShadingRateImageNV>(vkGetDeviceProcAddr(g_rhi_vk->Device, "vkCmdBindShadingRateImageNV"));
+
 	// Swapchain
     Swapchain = new jSwapchain_Vulkan();
 	verify(Swapchain->Create());
@@ -269,12 +272,16 @@ bool jRHI_Vulkan::InitRHI()
 
     jImGUI_Vulkan::Get().Initialize((float)SCR_WIDTH, (float)SCR_HEIGHT);
 
+	CreateSampleVRSTexture();
+
 	return true;
 }
 
 void jRHI_Vulkan::ReleaseRHI()
 {
 	Flush();
+
+    delete SampleVRSTexture;
 
 	jImageFileLoader::ReleaseInstance();
     jImGUI_Vulkan::ReleaseInstance();
@@ -1648,6 +1655,94 @@ void jRHI_Vulkan::Finish() const
     vkQueueWaitIdle(GraphicsQueue.Queue);
     vkQueueWaitIdle(ComputeQueue.Queue);
     vkQueueWaitIdle(PresentQueue.Queue);
+}
+
+void jRHI_Vulkan::BindShadingRateImage(jCommandBuffer* commandBuffer, jTexture* vrstexture) const
+{
+	check(commandBuffer);
+	check(vrstexture);
+    g_rhi_vk->vkCmdBindShadingRateImageNV((VkCommandBuffer)commandBuffer->GetHandle()
+        , (VkImageView)vrstexture->GetViewHandle(), VK_IMAGE_LAYOUT_SHADING_RATE_OPTIMAL_NV);
+}
+
+jTexture* jRHI_Vulkan::CreateSampleVRSTexture()
+{
+    if (ensure(!SampleVRSTexture))
+    {
+        VkPhysicalDeviceShadingRateImagePropertiesNV physicalDeviceShadingRateImagePropertiesNV{};
+        physicalDeviceShadingRateImagePropertiesNV.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADING_RATE_IMAGE_PROPERTIES_NV;
+        VkPhysicalDeviceProperties2 deviceProperties2{};
+        deviceProperties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+        deviceProperties2.pNext = &physicalDeviceShadingRateImagePropertiesNV;
+        vkGetPhysicalDeviceProperties2(g_rhi_vk->PhysicalDevice, &deviceProperties2);
+
+        VkExtent3D imageExtent{};
+        imageExtent.width = static_cast<uint32_t>(ceil(SCR_WIDTH / (float)physicalDeviceShadingRateImagePropertiesNV.shadingRateTexelSize.width));
+        imageExtent.height = static_cast<uint32_t>(ceil(SCR_HEIGHT / (float)physicalDeviceShadingRateImagePropertiesNV.shadingRateTexelSize.height));
+        imageExtent.depth = 1;
+
+		auto NewVRSTexture = new jTexture_Vulkan();
+
+        jVulkanBufferUtil::CreateImage(imageExtent.width, imageExtent.height, 1, (VkSampleCountFlagBits)1, GetVulkanTextureFormat(ETextureFormat::R8UI), VK_IMAGE_TILING_OPTIMAL
+            , VK_IMAGE_USAGE_SHADING_RATE_IMAGE_BIT_NV | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, *NewVRSTexture);
+
+        VkDeviceSize imageSize = imageExtent.width * imageExtent.height * GetVulkanTextureComponentCount(ETextureFormat::R8UI);
+        jBuffer_Vulkan stagingBuffer;
+
+        jVulkanBufferUtil::CreateBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+            , imageSize, stagingBuffer);
+
+        VkCommandBuffer commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
+        ensure(g_rhi_vk->TransitionImageLayout(commandBuffer, (VkImage)NewVRSTexture->GetHandle(), GetVulkanTextureFormat(ETextureFormat::R8UI), 1, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
+
+        jVulkanBufferUtil::CopyBufferToImage(commandBuffer, stagingBuffer.Buffer, (VkImage)NewVRSTexture->GetHandle()
+            , static_cast<uint32>(imageExtent.width), static_cast<uint32>(imageExtent.height));
+
+        // Create a circular pattern with decreasing sampling rates outwards (max. range, pattern)
+        std::map<float, VkShadingRatePaletteEntryNV> patternLookup = {
+            { 1.5f * 8.0f, VK_SHADING_RATE_PALETTE_ENTRY_1_INVOCATION_PER_PIXEL_NV },
+            { 1.5f * 12.0f, VK_SHADING_RATE_PALETTE_ENTRY_1_INVOCATION_PER_2X1_PIXELS_NV },
+            { 1.5f * 16.0f, VK_SHADING_RATE_PALETTE_ENTRY_1_INVOCATION_PER_1X2_PIXELS_NV },
+            { 1.5f * 18.0f, VK_SHADING_RATE_PALETTE_ENTRY_1_INVOCATION_PER_2X2_PIXELS_NV },
+            { 1.5f * 20.0f, VK_SHADING_RATE_PALETTE_ENTRY_1_INVOCATION_PER_4X2_PIXELS_NV },
+            { 1.5f * 24.0f, VK_SHADING_RATE_PALETTE_ENTRY_1_INVOCATION_PER_2X4_PIXELS_NV }
+        };
+
+        VkDeviceSize bufferSize = imageExtent.width * imageExtent.height * sizeof(uint8);
+        uint8_t val = VK_SHADING_RATE_PALETTE_ENTRY_1_INVOCATION_PER_4X4_PIXELS_NV;
+        uint8_t* shadingRatePatternData = new uint8_t[bufferSize];
+        memset(shadingRatePatternData, val, bufferSize);
+        uint8_t* ptrData = shadingRatePatternData;
+        for (uint32_t y = 0; y < imageExtent.height; y++) {
+            for (uint32_t x = 0; x < imageExtent.width; x++) {
+                const float deltaX = (float)imageExtent.width / 2.0f - (float)x;
+                const float deltaY = ((float)imageExtent.height / 2.0f - (float)y) * ((float)SCR_WIDTH / (float)SCR_HEIGHT);
+                const float dist = std::sqrt(deltaX * deltaX + deltaY * deltaY);
+                for (auto pattern : patternLookup) {
+                    if (dist < pattern.first) {
+                        *ptrData = pattern.second;
+                        break;
+                    }
+                }
+                ptrData++;
+            }
+        }
+
+        check(imageSize == bufferSize);
+
+        stagingBuffer.UpdateBuffer(shadingRatePatternData, bufferSize);
+
+        g_rhi_vk->EndSingleTimeCommands(commandBuffer);
+
+        stagingBuffer.Release();
+        delete[]shadingRatePatternData;
+
+		NewVRSTexture->View = jVulkanBufferUtil::CreateImageView((VkImage)NewVRSTexture->GetHandle(), GetVulkanTextureFormat(NewVRSTexture->Format)
+            , VK_IMAGE_ASPECT_COLOR_BIT, 1);
+
+		SampleVRSTexture = NewVRSTexture;
+    }
+	return SampleVRSTexture;
 }
 
 #endif // USE_VULKAN

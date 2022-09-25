@@ -180,6 +180,14 @@ public:
 
 	virtual void Flush() const override;
 	virtual void Finish() const override;
+
+	PFN_vkCmdBindShadingRateImageNV vkCmdBindShadingRateImageNV = nullptr;		// Function pointer of VRS
+	virtual void BindShadingRateImage(jCommandBuffer* commandBuffer, jTexture* vrstexture) const override;
+
+	// Temporary VRS Texture
+	jTexture* CreateSampleVRSTexture();
+	FORCEINLINE jTexture* GetSampleVRSTexture() const { return SampleVRSTexture; }
+	jTexture* SampleVRSTexture = nullptr;
 };
 
 extern jRHI_Vulkan* g_rhi_vk;
