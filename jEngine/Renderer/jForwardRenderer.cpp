@@ -17,7 +17,12 @@
 struct jSimplePushConstant
 {
     Vector4 Color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+    
     bool ShowVRSArea = false;
+    bool Padding[3];
+    
+    bool ShowGrid = true;
+    bool Padding2[3];
 };
 static std::shared_ptr<TPushConstant<jSimplePushConstant>> PushConstantPtr;
 
@@ -180,6 +185,7 @@ void jForwardRenderer::SetupBasePass()
 
     PushConstantPtr = std::make_shared<TPushConstant<jSimplePushConstant>>(jSimplePushConstant(), jPushConstantRange(EShaderAccessStageFlag::FRAGMENT, 0, sizeof(jSimplePushConstant)));
     PushConstantPtr->Data.ShowVRSArea = gOptions.ShowVRSArea;
+    PushConstantPtr->Data.ShowGrid = gOptions.ShowGrid;
 
     for (auto iter : jObject::GetStaticObject())
     {

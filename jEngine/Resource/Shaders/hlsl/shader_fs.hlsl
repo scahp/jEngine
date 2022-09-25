@@ -55,6 +55,7 @@ struct PushConsts
 {
     float4 color;
     bool ShowVRSArea;
+    bool ShowGrid;
 };
 [[vk::push_constant]] PushConsts pushConsts;
 
@@ -106,6 +107,22 @@ float4 main(VSOutput input
         }
     }
 #endif
+
+    // Draw Grid by using shadow position
+    if (pushConsts.ShowGrid)
+    {
+        float2 center = (input.ShadowPosition.xy * 0.5 + 0.5);
+        
+        float resolution = 100.0;
+        float cellSpace = 1.0;
+        float2 cells = abs(frac(center * resolution / cellSpace) - 0.5);
+        
+        float distToEdge = (0.5 - max(cells.x, cells.y)) * cellSpace;
+        
+        float lineWidth = 0.1;
+        float lines = smoothstep(0.0, lineWidth, distToEdge);
+        color = lerp(float4(0.0, 1.0, 0.0, 1.0), color, lines);
+    }
     
     return color;
 }

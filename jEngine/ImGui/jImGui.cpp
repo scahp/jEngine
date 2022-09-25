@@ -339,6 +339,7 @@ void jImGUI_Vulkan::NewFrame(bool updateFrameGraph)
 
     ImGui::Checkbox("UseVRS", &gOptions.UseVRS);
     ImGui::Checkbox("ShowVRSArea", &gOptions.ShowVRSArea);
+    ImGui::Checkbox("ShowGrid", &gOptions.ShowGrid);
     ImGui::Separator();
 
     const std::map<jName, jPerformanceProfile::jAvgProfile>& GPUAvgProfileMap = jPerformanceProfile::GetInstance().GetGPUAvgProfileMap();
