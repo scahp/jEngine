@@ -2,9 +2,9 @@
 
 struct jOptions
 {
-    bool UseVRS = true;
+    bool UseVRS = false;
     bool ShowVRSArea = false;
-    bool ShowGrid = true;
+    bool ShowGrid = false;
 };
 
 extern jOptions gOptions;
