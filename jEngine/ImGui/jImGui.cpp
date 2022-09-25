@@ -4,6 +4,8 @@
 #include "RHI/Vulkan/jTexture_Vulkan.h"
 #include "RHI/Vulkan/jVulkanBufferUtil.h"
 #include "jOptions.h"
+#include "RHI/jRenderFrameContext.h"
+#include "Renderer/jSceneRenderTargets.h"
 
 jImGUI_Vulkan* jImGUI_Vulkan::s_instance = nullptr;
 
@@ -343,10 +345,13 @@ void jImGUI_Vulkan::NewFrame(bool updateFrameGraph)
     ImGui::Separator();
 
     const std::map<jName, jPerformanceProfile::jAvgProfile>& GPUAvgProfileMap = jPerformanceProfile::GetInstance().GetGPUAvgProfileMap();
+    double TotalPassesMS = 0.0;
     for (auto& pair : GPUAvgProfileMap)
     {
         ImGui::Text("%s : %lf ms", pair.first.ToStr(), pair.second.AvgElapsedMS);
+        TotalPassesMS += pair.second.AvgElapsedMS;
     }
+    ImGui::Text("Total Passes : %lf ms", TotalPassesMS);
     ImGui::Separator();
     for (auto& pair : CounterMap)
     {
@@ -473,10 +478,10 @@ void jImGUI_Vulkan::PrepareDraw(const std::shared_ptr<jRenderFrameContext>& InRe
         const auto& extent = g_rhi_vk->Swapchain->GetExtent();
         const auto& image = g_rhi_vk->Swapchain->GetSwapchainImage(frameIndex);
 
-        auto SwapChainRTPtr = jRenderTarget::CreateFromTexture(image->TexturePtr);
+        const auto& FinalColorPtr = InRenderFrameContext->SceneRenderTarget->FinalColorPtr;
 
-        jAttachment color = jAttachment(SwapChainRTPtr, EAttachmentLoadStoreOp::LOAD_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, Vector4(0.0f, 0.0f, 0.0f, 1.0f), Vector2(1.0f, 0.0f)
-            , EImageLayout::GENERAL, EImageLayout::PRESENT_SRC);
+        jAttachment color = jAttachment(FinalColorPtr, EAttachmentLoadStoreOp::LOAD_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, Vector4(0.0f, 0.0f, 0.0f, 1.0f), Vector2(1.0f, 0.0f)
+            , FinalColorPtr->GetLayout(), EImageLayout::PRESENT_SRC);
 
         auto newRenderPass = g_rhi_vk->GetOrCreateRenderPass({ color }, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
         RenderPasses[frameIndex] = newRenderPass;
