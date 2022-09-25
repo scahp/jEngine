@@ -282,6 +282,7 @@ void jRHI_Vulkan::ReleaseRHI()
 	Flush();
 
     delete SampleVRSTexture;
+	SampleVRSTexture = nullptr;
 
 	jImageFileLoader::ReleaseInstance();
     jImGUI_Vulkan::ReleaseInstance();
@@ -450,6 +451,10 @@ void jRHI_Vulkan::RecreateSwapChain()
     jImGUI_Vulkan::Get().Initialize((float)SCR_WIDTH, (float)SCR_HEIGHT);
 
     CurrenFrameIndex = 0;
+
+	delete SampleVRSTexture;
+	SampleVRSTexture = nullptr;
+	CreateSampleVRSTexture();
 
 	Flush();
 }
