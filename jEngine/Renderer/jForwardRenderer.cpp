@@ -122,7 +122,7 @@ void jForwardRenderer::SetupBasePass()
     const Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
     const Vector2 ClearDepth = Vector2(1.0f, 0.0f);
 
-    jAttachment color = jAttachment(RenderFrameContextPtr->SceneRenderTarget->ColorPtr, EAttachmentLoadStoreOp::CLEAR_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth
+    jAttachment color = jAttachment(RenderFrameContextPtr->SceneRenderTarget->FinalColorPtr, EAttachmentLoadStoreOp::CLEAR_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth
         , EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
     jAttachment depth = jAttachment(RenderFrameContextPtr->SceneRenderTarget->DepthPtr, EAttachmentLoadStoreOp::CLEAR_DONTCARE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth
         , EImageLayout::UNDEFINED, EImageLayout::DEPTH_STENCIL_ATTACHMENT);
@@ -262,80 +262,6 @@ void jForwardRenderer::OpaquePass()
             OpaqueRenderPass->EndRenderPass();
         }
     }
-
-    // 여기 까지 렌더 로직 끝
-    //////////////////////////////////////////////////////////////////////////
-    {
-        SCOPE_GPU_PROFILE(RenderFrameContextPtr, ComputePass);
-        
-        const uint32 imageIndex = RenderFrameContextPtr->FrameIndex;
-        jCommandBuffer* CommandBuffer = RenderFrameContextPtr->CommandBuffer;
-        jSceneRenderTarget* SceneRT = RenderFrameContextPtr->SceneRenderTarget;
-
-        //////////////////////////////////////////////////////////////////////////
-        // Compute Pipeline
-        g_rhi->TransitionImageLayout(CommandBuffer, SceneRT->ColorPtr->GetTexture(), EImageLayout::SHADER_READ_ONLY);
-        g_rhi->TransitionImageLayout(CommandBuffer, SceneRT->FinalColorPtr->GetTexture(), EImageLayout::GENERAL);
-
-        jShaderBindingInstance* CurrentBindingInstance = nullptr;
-        int32 BindingPoint = 0;
-        std::vector<jShaderBinding> ShaderBindings;
-
-        // Binding 0 : Source Image
-        if (ensure(SceneRT->ColorPtr))
-        {
-            ShaderBindings.emplace_back(jShaderBinding(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-                , std::make_shared<jTextureResource>(SceneRT->ColorPtr->GetTexture(), nullptr)));
-        }
-
-        // Binding 1 : Target Image
-        if (ensure(SceneRT->FinalColorPtr))
-        {
-            ShaderBindings.emplace_back(jShaderBinding(BindingPoint++, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE
-                , std::make_shared<jTextureResource>(SceneRT->FinalColorPtr->GetTexture(), nullptr)));
-        }
-
-        // Binding 2 : CommonComputeUniformBuffer
-        struct jCommonComputeUniformBuffer
-        {
-            float Width;
-            float Height;
-            Vector2 Padding;
-        };
-        jCommonComputeUniformBuffer CommonComputeUniformBuffer;
-        CommonComputeUniformBuffer.Width = (float)SCR_WIDTH;
-        CommonComputeUniformBuffer.Height = (float)SCR_HEIGHT;
-
-        jUniformBufferBlock_Vulkan OneFrameUniformBuffer(jName("CommonComputeUniformBuffer"));
-        OneFrameUniformBuffer.Init(sizeof(CommonComputeUniformBuffer));
-        OneFrameUniformBuffer.UpdateBufferData(&CommonComputeUniformBuffer, sizeof(CommonComputeUniformBuffer));
-        {
-            ShaderBindings.emplace_back(jShaderBinding(BindingPoint++, EShaderBindingType::UNIFORMBUFFER
-                , EShaderAccessStageFlag::COMPUTE, std::make_shared<jUniformBufferResource>(&OneFrameUniformBuffer)));
-        }
-
-        CurrentBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindings);
-
-        jShaderInfo shaderInfo;
-        shaderInfo.name = jName("emboss");
-        shaderInfo.cs = jName("Resource/Shaders/hlsl/emboss_cs.hlsl");
-        static jShader_Vulkan* Shader = (jShader_Vulkan*)g_rhi->CreateShader(shaderInfo);
-
-        jPipelineStateInfo* computePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, { CurrentBindingInstance->ShaderBindingsLayouts }, {});
-
-        computePipelineStateInfo->Bind(RenderFrameContextPtr);
-        // vkCmdBindPipeline((VkCommandBuffer)CommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline[imageIndex]);
-
-        CurrentBindingInstance->BindCompute(RenderFrameContextPtr, (VkPipelineLayout)computePipelineStateInfo->GetPipelineLayoutHandle());
-
-        Vector2i SwapchainExtent = g_rhi->GetSwapchain()->GetExtent();
-
-        check(g_rhi->GetSwapchain());
-        vkCmdDispatch((VkCommandBuffer)CommandBuffer->GetHandle()
-            , SwapchainExtent.x / 16 + ((SwapchainExtent.x % 16) ? 1 : 0)
-            , SwapchainExtent.y / 16 + ((SwapchainExtent.y % 16) ? 1 : 0), 1);
-    }
-    // End compute pipeline
 }
 
 void jForwardRenderer::TranslucentPass()
