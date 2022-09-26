@@ -15,58 +15,30 @@ struct CommonComputeUniformBuffer
 {
     float Width;
     float Height;
-    float2 Padding;
+    float UseWaveIntrinsics;
+    float Padding;
 };
 
 cbuffer ComputeCommon : register(b2) { CommonComputeUniformBuffer ComputeCommon; }
 
 [numthreads(16, 16, 1)]
 void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
-{
- //   float imageData[9];
-    
- //   int n = -1;
- //   for (int i = -1; i < 2; ++i)
- //   {
- //       for (int j = -1; j < 2;++j)
- //       {
- //           ++n;
- //           float3 rgb = inputImage[uint2(GlobalInvocationID.x + i, GlobalInvocationID.y + j)].rgb;
- //           imageData[n] = (rgb.r + rgb.r + rgb.r) / 3.0;
-
- //       }
- //   }
-    
- //   float kernel[9];
- //   kernel[0] = -1.0; kernel[1] =  0.0; kernel[2] =  0.0;
-	//kernel[3] = 0.0; kernel[4] = -1.0; kernel[5] =  0.0;
-	//kernel[6] = 0.0; kernel[7] =  0.0; kernel[8] = 2.0;
-
- //   float4 res = float4(conv(kernel, imageData, 1.0, 0.5).xxx, 1.0);
- //   resultImage[int2(GlobalInvocationID.xy)] = res;
-    
-    //if (WaveIsFirstLane())
-    //{
-    //    resultImage[int2(GlobalInvocationID.xy)] = float4(1.0, 0.0, 0.0, 1.0);
-    //    return;
-    //}
-    //if (WaveGetLaneIndex() == WaveActiveMax(WaveGetLaneIndex()))
-    //{
-    //    resultImage[int2(GlobalInvocationID.xy)] = float4(0, 1, 0, 1.);
-    //    return;
-    //}
-    
+{   
     if (GlobalInvocationID.x >= ComputeCommon.Width || GlobalInvocationID.y >= ComputeCommon.Height)
         return;
     
     float3 rgb = inputImage[uint2(GlobalInvocationID.xy)].rgb;
-    resultImage[int2(GlobalInvocationID.xy)] = float4(rgb, 1.0);
-    //resultImage[int2(GlobalInvocationID.xy)] = float4(WaveReadLaneFirst(rgb), 1.0);
     
     // Wave operation test
-    //uint4 activeLaneMask = WaveActiveBallot(true);
-    //uint numActiveLanes = countbits(activeLaneMask.x) + countbits(activeLaneMask.y) + countbits(activeLaneMask.z) + countbits(activeLaneMask.w);
-    //float4 avgColor = float4(WaveActiveSum(rgb) / float(numActiveLanes), 1.0);
-    //resultImage[int2(GlobalInvocationID.xy)] = avgColor;
-
+    if (ComputeCommon.UseWaveIntrinsics <= 0)
+    {
+        resultImage[int2(GlobalInvocationID.xy)] = float4(rgb, 1.0);
+    }
+    else
+    {
+        uint4 activeLaneMask = WaveActiveBallot(true);
+        uint numActiveLanes = countbits(activeLaneMask.x) + countbits(activeLaneMask.y) + countbits(activeLaneMask.z) + countbits(activeLaneMask.w);
+        float4 avgColor = float4(WaveActiveSum(rgb) / float(numActiveLanes), 1.0);
+        resultImage[int2(GlobalInvocationID.xy)] = avgColor;
+    }
 }

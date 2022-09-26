@@ -300,11 +300,13 @@ void jForwardRenderer::OpaquePass()
         {
             float Width;
             float Height;
-            Vector2 Padding;
+            float UseWaveIntrinsics;
+            float Padding;
         };
         jCommonComputeUniformBuffer CommonComputeUniformBuffer;
         CommonComputeUniformBuffer.Width = (float)SCR_WIDTH;
         CommonComputeUniformBuffer.Height = (float)SCR_HEIGHT;
+        CommonComputeUniformBuffer.UseWaveIntrinsics = gOptions.UseWaveIntrinsics;
 
         jUniformBufferBlock_Vulkan OneFrameUniformBuffer(jName("CommonComputeUniformBuffer"));
         OneFrameUniformBuffer.Init(sizeof(CommonComputeUniformBuffer));
