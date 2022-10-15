@@ -19,7 +19,6 @@ void jSamplerStateInfo_Vulkan::Initialize()
     SamplerStateInfo.addressModeU = GetVulkanTextureAddressMode(AddressU);
     SamplerStateInfo.addressModeV = GetVulkanTextureAddressMode(AddressV);
     SamplerStateInfo.addressModeW = GetVulkanTextureAddressMode(AddressW);
-    SamplerStateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
 
     SamplerStateInfo.anisotropyEnable = (MaxAnisotropy > 1);
     SamplerStateInfo.maxAnisotropy = MaxAnisotropy;
@@ -38,6 +37,13 @@ void jSamplerStateInfo_Vulkan::Initialize()
     SamplerStateInfo.mipLodBias = 0.0f;		// Optional
     SamplerStateInfo.minLod = MinLOD;		// Optional
     SamplerStateInfo.maxLod = MaxLOD;
+
+    SamplerStateInfo.borderColor = VK_BORDER_COLOR_FLOAT_CUSTOM_EXT;
+
+    VkSamplerCustomBorderColorCreateInfoEXT CustomBorderColor{};
+    CustomBorderColor.sType = VK_STRUCTURE_TYPE_SAMPLER_CUSTOM_BORDER_COLOR_CREATE_INFO_EXT;
+    memcpy(CustomBorderColor.customBorderColor.float32, &BorderColor, sizeof(BorderColor));
+    SamplerStateInfo.pNext = &CustomBorderColor;
 
     ensure(vkCreateSampler(g_rhi_vk->Device, &SamplerStateInfo, nullptr, &SamplerState) == VK_SUCCESS);
 }

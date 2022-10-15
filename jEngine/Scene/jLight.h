@@ -246,8 +246,15 @@ public:
 
         if (ensure(ShadowMapPtr))
         {
+            //ETextureFilter TMinification = ETextureFilter::NEAREST, ETextureFilter TMagnification = ETextureFilter::NEAREST, ETextureAddressMode TAddressU = ETextureAddressMode::CLAMP_TO_EDGE
+            //, ETextureAddressMode TAddressV = ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode TAddressW = ETextureAddressMode::CLAMP_TO_EDGE, float TMipLODBias = 0.0f
+            //, float TMaxAnisotropy = 1.0f, Vector4 TBorderColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f)
+
+			const jSamplerStateInfo* ShadowSamplerStateInfo = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+				, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
+				, 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
             ShaderBindings.emplace_back(jShaderBinding(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV
-                , EShaderAccessStageFlag::ALL_GRAPHICS, std::make_shared<jTextureResource>(ShadowMapPtr->GetTexture(), nullptr)));
+                , EShaderAccessStageFlag::ALL_GRAPHICS, std::make_shared<jTextureResource>(ShadowMapPtr->GetTexture(), ShadowSamplerStateInfo)));
         }
 
 		ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindings);
