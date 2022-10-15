@@ -31,15 +31,15 @@
 jRHI_Vulkan* g_rhi_vk = nullptr;
 std::unordered_map<size_t, VkPipelineLayout> jRHI_Vulkan::PipelineLayoutPool;
 std::unordered_map<size_t, jShaderBindingsLayout*> jRHI_Vulkan::ShaderBindingPool;
-TResourcePool<jSamplerStateInfo_Vulkan, jMutexLock> jRHI_Vulkan::SamplerStatePool;
-TResourcePool<jRasterizationStateInfo_Vulkan, jMutexLock> jRHI_Vulkan::RasterizationStatePool;
-TResourcePool<jMultisampleStateInfo_Vulkan, jMutexLock> jRHI_Vulkan::MultisampleStatePool;
-TResourcePool<jStencilOpStateInfo_Vulkan, jMutexLock> jRHI_Vulkan::StencilOpStatePool;
-TResourcePool<jDepthStencilStateInfo_Vulkan, jMutexLock> jRHI_Vulkan::DepthStencilStatePool;
-TResourcePool<jBlendingStateInfo_Vulakn, jMutexLock> jRHI_Vulkan::BlendingStatePool;
-TResourcePool<jPipelineStateInfo_Vulkan, jMutexLock> jRHI_Vulkan::PipelineStatePool;
-TResourcePool<jRenderPass_Vulkan, jMutexLock> jRHI_Vulkan::RenderPassPool;
-TResourcePool<jShader_Vulkan, jMutexLock> jRHI_Vulkan::ShaderPool;
+TResourcePool<jSamplerStateInfo_Vulkan, jMutexRWLock> jRHI_Vulkan::SamplerStatePool;
+TResourcePool<jRasterizationStateInfo_Vulkan, jMutexRWLock> jRHI_Vulkan::RasterizationStatePool;
+TResourcePool<jMultisampleStateInfo_Vulkan, jMutexRWLock> jRHI_Vulkan::MultisampleStatePool;
+TResourcePool<jStencilOpStateInfo_Vulkan, jMutexRWLock> jRHI_Vulkan::StencilOpStatePool;
+TResourcePool<jDepthStencilStateInfo_Vulkan, jMutexRWLock> jRHI_Vulkan::DepthStencilStatePool;
+TResourcePool<jBlendingStateInfo_Vulakn, jMutexRWLock> jRHI_Vulkan::BlendingStatePool;
+TResourcePool<jPipelineStateInfo_Vulkan, jMutexRWLock> jRHI_Vulkan::PipelineStatePool;
+TResourcePool<jRenderPass_Vulkan, jMutexRWLock> jRHI_Vulkan::RenderPassPool;
+TResourcePool<jShader_Vulkan, jMutexRWLock> jRHI_Vulkan::ShaderPool;
 
 struct jFrameBuffer_Vulkan : public jFrameBuffer
 {
@@ -308,14 +308,14 @@ void jRHI_Vulkan::ReleaseRHI()
 	CommandBufferManager = nullptr;
 
 	{
-		jScopedLock s(&PipelineLayoutPoolLock);
+		jScopeWriteLock s(&PipelineLayoutPoolLock);
 		for (auto& iter : PipelineLayoutPool)
 			vkDestroyPipelineLayout(Device, iter.second, nullptr);
 		PipelineLayoutPool.clear();
 	}
 
 	{
-		jScopedLock s(&ShaderBindingPoolLock);
+		jScopeWriteLock s(&ShaderBindingPoolLock);
 		for (auto& iter : ShaderBindingPool)
 			delete iter.second;
 		ShaderBindingPool.clear();
@@ -1077,17 +1077,28 @@ jShaderBindingsLayout* jRHI_Vulkan::CreateShaderBindings(const std::vector<jShad
 {
 	const auto hash = jShaderBindingsLayout::GenerateHash(InShaderBindings);
 
-	jScopedLock s(&ShaderBindingPoolLock);
+	{
+		jScopeReadLock sr(&ShaderBindingPoolLock);
 
-	auto it_find = ShaderBindingPool.find(hash);
-	if (ShaderBindingPool.end() != it_find)
-		return it_find->second;
+		auto it_find = ShaderBindingPool.find(hash);
+		if (ShaderBindingPool.end() != it_find)
+			return it_find->second;
+	}
 
-	auto NewShaderBinding = new jShaderBindingLayout_Vulkan();
-	NewShaderBinding->Initialize(InShaderBindings);
-	ShaderBindingPool.insert(std::make_pair(hash, NewShaderBinding));
+	{
+		jScopeWriteLock sw(&ShaderBindingPoolLock);
 
-	return NewShaderBinding;
+		// Try again, to avoid entering creation section simultanteously.
+        auto it_find = ShaderBindingPool.find(hash);
+        if (ShaderBindingPool.end() != it_find)
+            return it_find->second;
+
+		auto NewShaderBinding = new jShaderBindingLayout_Vulkan();
+		NewShaderBinding->Initialize(InShaderBindings);
+		ShaderBindingPool.insert(std::make_pair(hash, NewShaderBinding));
+
+		return NewShaderBinding;
+	}
 }
 
 jShaderBindingInstance* jRHI_Vulkan::CreateShaderBindingInstance(const std::vector<jShaderBinding>& InShaderBindings) const
@@ -1111,14 +1122,27 @@ void* jRHI_Vulkan::CreatePipelineLayout(const std::vector<const jShaderBindingsL
 	}
 	check(hash);
 
-	jScopedLock s(&PipelineLayoutPoolLock);
-	auto it_find = PipelineLayoutPool.find(hash);
-    if (PipelineLayoutPool.end() != it_find)
-    {
-        vkPipelineLayout = it_find->second;
-    }
-    else
 	{
+		jScopeReadLock sr(&PipelineLayoutPoolLock);
+		auto it_find = PipelineLayoutPool.find(hash);
+		if (PipelineLayoutPool.end() != it_find)
+		{
+			vkPipelineLayout = it_find->second;
+			return vkPipelineLayout;
+		}
+	}
+
+	{
+		jScopeWriteLock sw(&PipelineLayoutPoolLock);
+
+		// Try again, to avoid entering creation section simultanteously.
+        auto it_find = PipelineLayoutPool.find(hash);
+        if (PipelineLayoutPool.end() != it_find)
+        {
+            vkPipelineLayout = it_find->second;
+            return vkPipelineLayout;
+        }
+
 		std::vector<VkDescriptorSetLayout> DescriptorSetLayouts;
 		DescriptorSetLayouts.reserve(shaderBindings.size());
 		for (const jShaderBindingsLayout* binding : shaderBindings)

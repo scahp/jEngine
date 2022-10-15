@@ -25,15 +25,15 @@ class jRHI_Vulkan : public jRHI
 public:
     static std::unordered_map<size_t, VkPipelineLayout> PipelineLayoutPool;
     static std::unordered_map<size_t, jShaderBindingsLayout*> ShaderBindingPool;
-    static TResourcePool<jSamplerStateInfo_Vulkan, jMutexLock> SamplerStatePool;
-    static TResourcePool<jRasterizationStateInfo_Vulkan, jMutexLock> RasterizationStatePool;
-    static TResourcePool<jMultisampleStateInfo_Vulkan, jMutexLock> MultisampleStatePool;
-    static TResourcePool<jStencilOpStateInfo_Vulkan, jMutexLock> StencilOpStatePool;
-    static TResourcePool<jDepthStencilStateInfo_Vulkan, jMutexLock> DepthStencilStatePool;
-    static TResourcePool<jBlendingStateInfo_Vulakn, jMutexLock> BlendingStatePool;
-    static TResourcePool<jPipelineStateInfo_Vulkan, jMutexLock> PipelineStatePool;
-	static TResourcePool<jRenderPass_Vulkan, jMutexLock> RenderPassPool;
-	static TResourcePool<jShader_Vulkan, jMutexLock> ShaderPool;
+    static TResourcePool<jSamplerStateInfo_Vulkan, jMutexRWLock> SamplerStatePool;
+    static TResourcePool<jRasterizationStateInfo_Vulkan, jMutexRWLock> RasterizationStatePool;
+    static TResourcePool<jMultisampleStateInfo_Vulkan, jMutexRWLock> MultisampleStatePool;
+    static TResourcePool<jStencilOpStateInfo_Vulkan, jMutexRWLock> StencilOpStatePool;
+    static TResourcePool<jDepthStencilStateInfo_Vulkan, jMutexRWLock> DepthStencilStatePool;
+    static TResourcePool<jBlendingStateInfo_Vulakn, jMutexRWLock> BlendingStatePool;
+    static TResourcePool<jPipelineStateInfo_Vulkan, jMutexRWLock> PipelineStatePool;
+	static TResourcePool<jRenderPass_Vulkan, jMutexRWLock> RenderPassPool;
+	static TResourcePool<jShader_Vulkan, jMutexRWLock> ShaderPool;
 
 	jRHI_Vulkan();
 	virtual ~jRHI_Vulkan();
@@ -96,8 +96,8 @@ public:
 	std::vector<jRingBuffer_Vulkan*> SSBORingBuffers;
 	std::vector<jDescriptorPool_Vulkan*> DescriptorPools;
 
-	mutable jMutexLock ShaderBindingPoolLock;
-	mutable jMutexLock PipelineLayoutPoolLock;
+	mutable jMutexRWLock ShaderBindingPoolLock;
+	mutable jMutexRWLock PipelineLayoutPoolLock;
 	//////////////////////////////////////////////////////////////////////////
 
     VkCommandBuffer BeginSingleTimeCommands() const;

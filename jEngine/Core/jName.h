@@ -49,20 +49,32 @@ public:
 		check(pName);
 		const uint32 NewNameHash = GenerateNameHash(pName, size);
 
+		auto find_func = [&]()
+		{
+            const auto find_it = s_NameTable.find(NewNameHash);
+            if (s_NameTable.end() != find_it)
+            {
+                NameHash = NewNameHash;
+                NameString = find_it->second->c_str();
+                NameStringLength = find_it->second->size();
+                return true;
+            }
+			return false;
+		};
+
 		{
 			jScopeReadLock sr(&Lock);
-			const auto find_it = s_NameTable.find(NewNameHash);
-			if (s_NameTable.end() != find_it)
-			{
-				NameHash = NewNameHash;
-				NameString = find_it->second->c_str();
-				NameStringLength = find_it->second->size();
+			if (find_func())
 				return;
-			}
 		}
 
 		{
 			jScopeWriteLock sw(&Lock);
+			
+			// Try again, to avoid entering creation section simultanteously.
+            if (find_func())
+                return;
+
 			const auto it_ret = s_NameTable.emplace(NewNameHash, CreateNewName_Internal(pName, NewNameHash));
 			if (it_ret.second)
 			{

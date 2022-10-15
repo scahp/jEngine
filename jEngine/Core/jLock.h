@@ -3,15 +3,15 @@
 class jLock
 {
 public:
-    virtual ~jLock() {}
-    virtual void Lock() {}
-    virtual void Unlock() {}
+    void Lock() {}
+    void Unlock() {}
 };
 
 using jEmptyLock = jLock;
 
-class jMutexLock : public jLock
+class jMutexLock
 {
+public:
     void Lock()
     {
         lock.lock();
@@ -27,32 +27,31 @@ class jMutexLock : public jLock
 class jRWLock
 {
 public:
-    virtual void LockRead() {}
-    virtual void UnlockRead() {}
-    virtual void LockWrite() {}
-    virtual void UnlockWrite() {}
+    void LockRead() {}
+    void UnlockRead() {}
+    void LockWrite() {}
+    void UnlockWrite() {}
 };
 
 using jEmtpyRWLock = jRWLock;
 
 // RW lock 으로 교체 예정
-class jMutexRWLock : public jRWLock
+class jMutexRWLock
 {
 public:
-    virtual ~jMutexRWLock() {}
-    virtual void LockRead() override
+    void LockRead()
     {
         lock.lock_shared();
     }
-    virtual void UnlockRead() override
+    void UnlockRead()
     {
         lock.unlock_shared();
     }
-    virtual void LockWrite() override
+    void LockWrite()
     {
         lock.lock();
     }
-    virtual void UnlockWrite() override
+    void UnlockWrite()
     {
         lock.unlock();
     }
@@ -60,53 +59,50 @@ public:
     std::shared_mutex lock;
 };
 
+template <typename T>
 class jScopedLock
 {
 public:
-    jScopedLock(jLock* InLock)
+    jScopedLock(T* InLock)
         : ScopedLock(InLock)
     {
-        if (ScopedLock)
-            ScopedLock->Lock();
+        ScopedLock->Lock();
     }
     ~jScopedLock()
     {
-        if (ScopedLock)
-            ScopedLock->Unlock();
+        ScopedLock->Unlock();
     }
-    jLock* ScopedLock;
+    T* ScopedLock;
 };
 
+template <typename T>
 class jScopeReadLock
 {
 public:
-    jScopeReadLock(jRWLock* InLock)
+    jScopeReadLock(T* InLock)
         : ScopedLock(InLock)
     {
-        if (ScopedLock)
-            ScopedLock->LockRead();
+        ScopedLock->LockRead();
     }
     ~jScopeReadLock()
     {
-        if (ScopedLock)
-            ScopedLock->UnlockRead();
+        ScopedLock->UnlockRead();
     }
-    jRWLock* ScopedLock;
+    T* ScopedLock;
 };
 
+template <typename T>
 class jScopeWriteLock
 {
 public:
-    jScopeWriteLock(jRWLock* InLock)
+    jScopeWriteLock(T* InLock)
         : ScopedLock(InLock)
     {
-        if (ScopedLock)
-            ScopedLock->LockWrite();
+        ScopedLock->LockWrite();
     }
     ~jScopeWriteLock()
     {
-        if (ScopedLock)
-            ScopedLock->UnlockWrite();
+        ScopedLock->UnlockWrite();
     }
-    jRWLock* ScopedLock;
+    T* ScopedLock;
 };

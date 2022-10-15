@@ -513,31 +513,43 @@ jName GetCommonTextureName(int32 index);
 jName GetCommonTextureSRGBName(int32 index);
 
 //////////////////////////////////////////////////////////////////////////
-template <typename T, typename LOCK_TYPE = jEmptyLock>
+template <typename T, typename LOCK_TYPE = jEmtpyRWLock>
 class TResourcePool
 {
 public:
     template <typename TInitializer>
     T* GetOrCreate(const TInitializer& initializer)
     {
-		jScopedLock s(&Lock);
         const size_t hash = initializer.GetHash();
-        auto it_find = Pool.find(hash);
-        if (Pool.end() != it_find)
-        {
-            return it_find->second;
-        }
+		{
+			jScopeReadLock sr(&Lock);
+			auto it_find = Pool.find(hash);
+			if (Pool.end() != it_find)
+			{
+				return it_find->second;
+			}
+		}
 
-        auto* newResource = new T(initializer);
-        newResource->Initialize();
+		{
+			jScopeWriteLock sw(&Lock);
+			
+			// Try again, to avoid entering creation section simultanteously.
+            auto it_find = Pool.find(hash);
+            if (Pool.end() != it_find)
+            {
+                return it_find->second;
+            }
 
-        Pool.insert(std::make_pair(hash, newResource));
-        return newResource;
+			auto* newResource = new T(initializer);
+			newResource->Initialize();
+			Pool.insert(std::make_pair(hash, newResource));
+			return newResource;
+		}
     }
 
 	void Release()
 	{
-		jScopedLock s(&Lock);
+		jScopeWriteLock sw(&Lock);
 		for (auto& iter : Pool)
 		{
 			delete iter.second;
