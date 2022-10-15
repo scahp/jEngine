@@ -5,7 +5,7 @@ struct jOptions
     bool UseVRS = false;
     bool ShowVRSArea = false;
     bool ShowGrid = false;
-    bool UseWaveIntrinsics = true;
+    bool UseWaveIntrinsics = false;
 };
 
 extern jOptions gOptions;
