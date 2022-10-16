@@ -220,7 +220,8 @@ void jForwardRenderer::Render()
 
 void jForwardRenderer::ShadowPass()
 {
-    ShadowPassSetupFinishEvent.wait();
+    if (ShadowPassSetupFinishEvent.valid())
+        ShadowPassSetupFinishEvent.wait();
 
     {
         SCOPE_GPU_PROFILE(RenderFrameContextPtr, ShadowPass);
@@ -244,7 +245,8 @@ void jForwardRenderer::ShadowPass()
 
 void jForwardRenderer::OpaquePass()
 {
-    BasePassSetupFinishEvent.wait();
+    if (BasePassSetupFinishEvent.valid())
+        BasePassSetupFinishEvent.wait();
 
     {
         SCOPE_GPU_PROFILE(RenderFrameContextPtr, BasePass);
