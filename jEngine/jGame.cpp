@@ -6,7 +6,7 @@
 #include "Scene/jLight.h"
 #include "Scene/jRenderObject.h"
 #include "Profiler/jPerformanceProfile.h"
-#include "Renderer/jForwardRenderer.h"
+#include "Renderer/jRenderer.h"
 #include "jPrimitiveUtil.h"
 #include "RHI/Vulkan/jVulkanBufferUtil.h"
 
@@ -199,25 +199,25 @@ void jGame::Draw()
 	if (!renderFrameContext)
 		return;
 
-	jForwardRenderer forwardRenderer(renderFrameContext, jView(MainCamera, DirectionalLight));
-	forwardRenderer.Setup();
-	forwardRenderer.Render();
+	jRenderer renderer(renderFrameContext, jView(MainCamera, DirectionalLight));
+	renderer.Setup();
+	renderer.Render();
 
 	g_rhi->EndRenderFrame(renderFrameContext);
 
 	// Get a whole occlusion queries
 	std::vector<uint64> passedSamplesQueries = g_rhi->GetQueryOcclusionPool()->GetWholeQueryResult(
-		forwardRenderer.FrameIndex, g_rhi->GetQueryOcclusionPool()->GetUsedQueryCount(forwardRenderer.FrameIndex));
+		renderer.FrameIndex, g_rhi->GetQueryOcclusionPool()->GetUsedQueryCount(renderer.FrameIndex));
 	
 	//uint64 shadowPasses = forwardRenderer.ShadowpassOcclusionTest.GetQueryResult();
-	forwardRenderer.ShadowpassOcclusionTest.GetQueryResultFromQueryArray(forwardRenderer.FrameIndex, passedSamplesQueries);
-	uint64 shadowPasses = forwardRenderer.ShadowpassOcclusionTest.Result;
+	renderer.ShadowpassOcclusionTest.GetQueryResultFromQueryArray(renderer.FrameIndex, passedSamplesQueries);
+	uint64 shadowPasses = renderer.ShadowpassOcclusionTest.Result;
     static jName PassedSamplesInShadowPass("ShadowPassSamples");
     jImGUI_Vulkan::Get().CounterMap[PassedSamplesInShadowPass] = shadowPasses;
 
     //uint64 basePass = forwardRenderer.BasepassOcclusionTest.GetQueryResult();
-    forwardRenderer.BasepassOcclusionTest.GetQueryResultFromQueryArray(forwardRenderer.FrameIndex, passedSamplesQueries);
-    uint64 basePass = forwardRenderer.BasepassOcclusionTest.Result;
+    renderer.BasepassOcclusionTest.GetQueryResultFromQueryArray(renderer.FrameIndex, passedSamplesQueries);
+    uint64 basePass = renderer.BasepassOcclusionTest.Result;
     static jName PassedSamplesInBasePass("BasePassSamples");
     jImGUI_Vulkan::Get().CounterMap[PassedSamplesInBasePass] = basePass;
 }

@@ -3,8 +3,8 @@
 
 jPerformanceProfile* jPerformanceProfile::_instance = nullptr;
 
-std::unordered_map<jName, uint64, jNameHashFunc> ScopedProfileCPUMap[MaxProfileFrame];
-std::unordered_map<jName, uint64, jNameHashFunc> ScopedProfileGPUMap[MaxProfileFrame];
+std::unordered_map<jPriorityName, uint64, jPriorityNameHashFunc> ScopedProfileCPUMap[MaxProfileFrame];
+std::unordered_map<jPriorityName, uint64, jPriorityNameHashFunc> ScopedProfileGPUMap[MaxProfileFrame];
 static int32 PerformanceFrame = 0;
 
 std::unordered_set<jQuery*> jQueryTimePool::s_running;
@@ -25,7 +25,7 @@ void ClearScopedProfileCPU()
 		ScopedProfileCPUMap[i].clear();
 }
 
-void AddScopedProfileCPU(const jName& name, uint64 elapsedTick)
+void AddScopedProfileCPU(const jPriorityName& name, uint64 elapsedTick)
 {
 	ScopedProfileCPUMap[PerformanceFrame][name] = elapsedTick;
 }
@@ -36,7 +36,7 @@ void ClearScopedProfileGPU()
 		ScopedProfileGPUMap[i].clear();
 }
 
-void AddScopedProfileGPU(const jName& name, uint64 elapsedTick)
+void AddScopedProfileGPU(const jPriorityName& name, uint64 elapsedTick)
 {
 	ScopedProfileGPUMap[PerformanceFrame][name] = elapsedTick;
 }

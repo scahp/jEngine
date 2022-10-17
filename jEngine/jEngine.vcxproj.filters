@@ -277,9 +277,6 @@
     <ClInclude Include="Renderer\jRenderer.h">
       <Filter>Code\Renderer</Filter>
     </ClInclude>
-    <ClInclude Include="Renderer\jForwardRenderer.h">
-      <Filter>Code\Renderer</Filter>
-    </ClInclude>
     <ClInclude Include="Renderer\jSceneRenderTargets.h">
       <Filter>Code\Renderer</Filter>
     </ClInclude>
@@ -522,9 +519,6 @@
     <ClCompile Include="Renderer\jRenderer.cpp">
       <Filter>Code\Renderer</Filter>
     </ClCompile>
-    <ClCompile Include="Renderer\jForwardRenderer.cpp">
-      <Filter>Code\Renderer</Filter>
-    </ClCompile>
     <ClCompile Include="RHI\jRenderTarget.cpp">
       <Filter>Code\RHI</Filter>
     </ClCompile>
@@ -630,6 +624,9 @@
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
     <None Include="Resource\Shaders\hlsl\shadow_instancing_vs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\copy_cs.hlsl">
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
   </ItemGroup>

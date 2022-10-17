@@ -144,7 +144,6 @@ xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"</Command
     <ClInclude Include="pch.h" />
     <ClInclude Include="Profiler\jPerformanceProfile.h" />
     <ClInclude Include="Renderer\jDrawCommand.h" />
-    <ClInclude Include="Renderer\jForwardRenderer.h" />
     <ClInclude Include="Renderer\jRenderer.h" />
     <ClInclude Include="Renderer\jSceneRenderTargets.h" />
     <ClInclude Include="RHI\DirectX12\jCommandQueue_DirectX12.h" />
@@ -309,7 +308,6 @@ xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"</Command
     </ClCompile>
     <ClCompile Include="Profiler\jPerformanceProfile.cpp" />
     <ClCompile Include="Renderer\jDrawCommand.cpp" />
-    <ClCompile Include="Renderer\jForwardRenderer.cpp" />
     <ClCompile Include="Renderer\jRenderer.cpp" />
     <ClCompile Include="Renderer\jSceneRenderTargets.cpp" />
     <ClCompile Include="RHI\DirectX12\jCommandQueue_DirectX12.cpp" />
@@ -384,6 +382,11 @@ xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"</Command
   </ItemGroup>
   <ItemGroup>
     <None Include="Resource\Shaders\hlsl\shadow_instancing_vs.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resource\Shaders\hlsl\copy_cs.hlsl">
       <FileType>Document</FileType>
     </None>
   </ItemGroup>

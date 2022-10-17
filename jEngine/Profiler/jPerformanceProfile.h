@@ -7,15 +7,15 @@
 
 static constexpr int32 MaxProfileFrame = 10;
 
-extern std::unordered_map<jName, uint64, jNameHashFunc> ScopedProfileCPUMap[MaxProfileFrame];
-extern std::unordered_map<jName, uint64, jNameHashFunc> ScopedProfileGPUMap[MaxProfileFrame];
+extern std::unordered_map<jPriorityName, uint64, jPriorityNameHashFunc> ScopedProfileCPUMap[MaxProfileFrame];
+extern std::unordered_map<jPriorityName, uint64, jPriorityNameHashFunc> ScopedProfileGPUMap[MaxProfileFrame];
 struct jQuery;
 
 void ClearScopedProfileCPU();
-void AddScopedProfileCPU(const jName& name, uint64 elapsedTick);
+void AddScopedProfileCPU(const jPriorityName& name, uint64 elapsedTick);
 
 void ClearScopedProfileGPU();
-void AddScopedProfileGPU(const jName& name, uint64 elapsedTick);
+void AddScopedProfileGPU(const jPriorityName& name, uint64 elapsedTick);
 
 //////////////////////////////////////////////////////////////////////////
 // jScopedProfile_CPU
@@ -30,7 +30,7 @@ public:
 
 	~jScopedProfile_CPU()
 	{
-		AddScopedProfileCPU(Name, GetTickCount64() - StartTick);
+		AddScopedProfileCPU(jPriorityName(Name, 0), GetTickCount64() - StartTick);
 	}
 
 	jName Name;
@@ -118,9 +118,10 @@ struct jProfile_GPU
 		}
 
 		auto& prevList = WatingResultList[prevIndex];
-		for (auto rit = prevList.rbegin(); prevList.rend() != rit;++rit)
+		uint32 priority = 0;
+		for (auto it = prevList.begin(); prevList.end() != it;++it)
 		{
-			const auto& iter = *rit;
+			const auto& iter = *it;
 			if (CanWholeQueryTimeStampResult)
 			{
 				iter.Query->GetQueryResultFromQueryArray(prevIndex, WholeQueryTimeStampArray);
@@ -129,7 +130,7 @@ struct jProfile_GPU
 			{
 				iter.Query->GetQueryResult();
 			}
-			AddScopedProfileGPU(iter.Name, iter.Query->GetElpasedTime());
+			AddScopedProfileGPU(jPriorityName(iter.Name, priority++), iter.Query->GetElpasedTime());
             jQueryTimePool::ReturnQueryTime(iter.Query);
 		}
 		prevList.clear();
@@ -185,16 +186,18 @@ public:
 		int32 TotalSampleCount = 0;
 	};
 
+	using AvgProfileMapType = std::map<jPriorityName, jAvgProfile, jPriorityNameComapreFunc>;
+
 	void Update(float deltaTime);
 	void CalcAvg();
 	void PrintOutputDebugString();
 
-	const std::map<jName, jAvgProfile>& GetAvgProfileMap() const { return AvgProfileMap; }
-	const std::map<jName, jAvgProfile>& GetGPUAvgProfileMap() const { return GPUAvgProfileMap; }
+    const AvgProfileMapType& GetAvgProfileMap() const { return AvgProfileMap; }
+    const AvgProfileMapType& GetGPUAvgProfileMap() const { return GPUAvgProfileMap; }
 
 private:
-	std::map<jName, jAvgProfile> AvgProfileMap;			// ms
-	std::map<jName, jAvgProfile> GPUAvgProfileMap;		// ms
+    AvgProfileMapType AvgProfileMap;		// ms
+    AvgProfileMapType GPUAvgProfileMap;		// ms
 
 public:
 	static jPerformanceProfile& GetInstance()

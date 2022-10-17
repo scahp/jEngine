@@ -170,3 +170,46 @@ struct jNameHashFunc
         return static_cast<size_t>(name.GetNameHash());
     }
 };
+
+struct jPriorityName : public jName
+{
+	jPriorityName() = default;
+
+    FORCEINLINE explicit jPriorityName(uint32 InNameHash, uint32 InPriority)
+		: jName(InNameHash), Priority(InPriority)
+    {}
+
+    FORCEINLINE explicit jPriorityName(const char* pName, uint32 InPriority)
+        : jName(pName), Priority(InPriority)
+    {}
+
+    FORCEINLINE explicit jPriorityName(const char* pName, size_t size, uint32 InPriority)
+        : jName(pName, size), Priority(InPriority)
+    {}
+
+    FORCEINLINE explicit jPriorityName(const std::string& name, uint32 InPriority)
+        : jName(name), Priority(InPriority)
+    {}
+
+    FORCEINLINE explicit jPriorityName(const jName& name, uint32 InPriority)
+        : jName(name), Priority(InPriority)
+    {}
+
+	uint32 Priority = 0;
+};
+
+struct jPriorityNameHashFunc
+{
+    std::size_t operator()(const jPriorityName& name) const
+    {
+        return name.Priority;
+    }
+};
+
+struct jPriorityNameComapreFunc
+{
+    bool operator()(const jPriorityName& lhs, const jPriorityName& rhs) const
+    {
+        return lhs.Priority < rhs.Priority;
+    }
+};

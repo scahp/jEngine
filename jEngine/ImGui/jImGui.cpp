@@ -345,7 +345,7 @@ void jImGUI_Vulkan::NewFrame(bool updateFrameGraph)
     ImGui::Checkbox("UseWaveIntrinsics", &gOptions.UseWaveIntrinsics);
     ImGui::Separator();
 
-    const std::map<jName, jPerformanceProfile::jAvgProfile>& GPUAvgProfileMap = jPerformanceProfile::GetInstance().GetGPUAvgProfileMap();
+    const auto& GPUAvgProfileMap = jPerformanceProfile::GetInstance().GetGPUAvgProfileMap();
     double TotalPassesMS = 0.0;
     for (auto& pair : GPUAvgProfileMap)
     {
