@@ -35,7 +35,8 @@ const std::vector<const char*> validationLayers = {
 
 const std::vector<const char*> DeviceExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-    VK_NV_SHADING_RATE_IMAGE_EXTENSION_NAME
+    VK_NV_SHADING_RATE_IMAGE_EXTENSION_NAME,
+    VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME
 };
 
 VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(

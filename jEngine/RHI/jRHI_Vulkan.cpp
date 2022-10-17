@@ -191,12 +191,21 @@ bool jRHI_Vulkan::InitRHI()
         physicalDeviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
         physicalDeviceFeatures2.features = deviceFeatures;		// VkSampler 가 Anisotropy 를 사용할 수 있도록 하기 위해 true로 설정
 
+		// Added VariableShadingRate features
 		VkPhysicalDeviceShadingRateImageFeaturesNV enabledPhysicalDeviceShadingRateImageFeaturesNV{};
         enabledPhysicalDeviceShadingRateImageFeaturesNV.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADING_RATE_IMAGE_FEATURES_NV;
         enabledPhysicalDeviceShadingRateImageFeaturesNV.shadingRateImage = VK_TRUE;
 		physicalDeviceFeatures2.pNext = &enabledPhysicalDeviceShadingRateImageFeaturesNV;
+		physicalDeviceFeatures2.pNext = (void*)createInfo.pNext;
+        createInfo.pNext = &physicalDeviceFeatures2;
 
-		createInfo.pNext = &physicalDeviceFeatures2;
+		// Added CustomBorderColor features
+		VkPhysicalDeviceCustomBorderColorFeaturesEXT enabledCustomBorderColorFeaturesEXT{};
+		enabledCustomBorderColorFeaturesEXT.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CUSTOM_BORDER_COLOR_FEATURES_EXT;
+		enabledCustomBorderColorFeaturesEXT.customBorderColors = true;
+		enabledCustomBorderColorFeaturesEXT.customBorderColorWithoutFormat = true;
+		enabledCustomBorderColorFeaturesEXT.pNext = (void*)createInfo.pNext;
+        createInfo.pNext = &enabledCustomBorderColorFeaturesEXT;
 
 		// createInfo.pEnabledFeatures = &deviceFeatures;
 		createInfo.pEnabledFeatures = nullptr;
