@@ -38,8 +38,14 @@ void jRenderer::Setup()
     }
 
 #if ASYNC_WITH_SETUP
-    ShadowPassSetupFinishEvent = std::async(std::launch::async, &jRenderer::SetupShadowPass, this);
-    BasePassSetupFinishEvent = std::async(std::launch::async, &jRenderer::SetupBasePass, this);
+    ShadowPassSetupFinishEvent = std::async(std::launch::deferred, &jRenderer::SetupShadowPass, this);
+    BasePassSetupFinishEvent = std::async(std::launch::deferred, &jRenderer::SetupBasePass, this);
+
+    // Dependency : ShadowPassSetup then BasePassSetup
+    std::async(std::launch::async, [&]() {
+        ShadowPassSetupFinishEvent.get();
+        BasePassSetupFinishEvent.get();
+        });
 #else
     jRenderer::SetupShadowPass();
     jRenderer::SetupBasePass();
