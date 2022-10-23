@@ -1,7 +1,10 @@
 ﻿#pragma once
+#include "Core/jResourceContainer.h"
 
 struct IUniformBufferBlock;
 struct jRenderFrameContext;
+struct jTexture;
+struct jSamplerStateInfo;
 
 struct jShaderBindingResource : public std::enable_shared_from_this<jShaderBindingResource>
 {
@@ -34,20 +37,44 @@ struct jTextureResource : public jShaderBindingResource
     const jSamplerStateInfo* SamplerState = nullptr;
 };
 
+struct jShaderBindingResourceInlineAllocator
+{
+    template <typename T, typename... T1>
+    T* Alloc(T1... args)
+    {
+        check((Offset + sizeof(T)) < sizeof(Data));
+
+        T* AllocatedAddress = new (&Data[0] + Offset) T(args...);
+        Offset += sizeof(T);
+        return AllocatedAddress;
+    }
+
+    void Reset()
+    {
+        Offset = 0;
+    }
+
+    uint8 Data[1024];
+    int32 Offset = 0;
+};
+
 struct jShaderBinding
 {
     jShaderBinding() = default;
     jShaderBinding(const int32 bindingPoint, const EShaderBindingType bindingType
-        , const EShaderAccessStageFlag accessStageFlags, std::shared_ptr<jShaderBindingResource> resourcePtr = nullptr)
-        : BindingPoint(bindingPoint), BindingType(bindingType), AccessStageFlags(accessStageFlags), ResourcePtr(resourcePtr)
-    { }
+        , const EShaderAccessStageFlag accessStageFlags, const jShaderBindingResource* InResource = nullptr)
+        : BindingPoint(bindingPoint), BindingType(bindingType), AccessStageFlags(accessStageFlags), Resource(InResource)
+    {
+        GetHash();
+    }
 
     FORCEINLINE size_t GetHash() const
     {
-        size_t result = CityHash64((const char*)&BindingPoint, sizeof(BindingPoint));
-        result = CityHash64WithSeed((const char*)&BindingType, sizeof(BindingType), result);
-        result = CityHash64WithSeed((const char*)&AccessStageFlags, sizeof(AccessStageFlags), result);
-        return result;
+        if (Hash)
+            return Hash;
+
+        Hash = BindingPoint ^ (uint32)BindingType ^ (uint32)AccessStageFlags;
+        return Hash;
     }
 
     void CloneWithoutResource(jShaderBinding& OutReslut) const
@@ -55,13 +82,70 @@ struct jShaderBinding
         OutReslut.BindingPoint = BindingPoint;
         OutReslut.BindingType = BindingType;
         OutReslut.AccessStageFlags = AccessStageFlags;
+        OutReslut.Hash = Hash;
     }
+
+    mutable size_t Hash = 0;
 
     int32 BindingPoint = 0;
     EShaderBindingType BindingType = EShaderBindingType::UNIFORMBUFFER;
     EShaderAccessStageFlag AccessStageFlags = EShaderAccessStageFlag::ALL_GRAPHICS;
 
-    std::shared_ptr<jShaderBindingResource> ResourcePtr;
+    // std::shared_ptr<jShaderBindingResource> ResourcePtr;
+    const jShaderBindingResource* Resource = nullptr;
+};
+
+struct jShaderBindingArray
+{
+    static constexpr int32 NumOfInlineData = 10;
+
+    template <typename... T>
+    void Add(T... args)
+    {
+        check(NumOfInlineData > NumOfData);
+        const int32 AddressOffset = (NumOfData) * sizeof(jShaderBinding);
+        new (&Data[0] + AddressOffset) jShaderBinding(args...);
+        ++NumOfData;
+    }
+
+    size_t GetHash() const
+    {
+        size_t Hash = 0;
+        jShaderBinding* Address = (jShaderBinding*)&Data[0];
+        for (int32 i = 0; i < NumOfData; ++i)
+        {
+            Hash ^= ((Address + i)->GetHash() ^ i);
+        }
+        return Hash;
+    }
+
+    FORCEINLINE jShaderBindingArray& operator = (const jShaderBindingArray& In)
+    {
+        memcpy(&Data[0], &In.Data[0], sizeof(jShaderBinding) * In.NumOfData);
+        return *this;
+    }
+
+    FORCEINLINE const jShaderBinding* operator[] (int32 InIndex) const
+    {
+        check(InIndex < NumOfData);
+        return (jShaderBinding*)(&Data[InIndex * sizeof(jShaderBinding)]);
+    }
+
+    FORCEINLINE void CloneWithoutResource(jShaderBindingArray& OutResult) const
+    {
+        memcpy(&OutResult.Data[0], &Data[0], sizeof(jShaderBinding) * NumOfData);
+                
+        for (int32 i = 0; i < NumOfData; ++i)
+        {
+            jShaderBinding* SrcAddress = (jShaderBinding*)&Data[i];
+            jShaderBinding* DstAddress = (jShaderBinding*)&OutResult.Data[i];
+            SrcAddress->CloneWithoutResource(*DstAddress);
+        }
+        OutResult.NumOfData = NumOfData;
+    }
+
+    uint8 Data[NumOfInlineData * sizeof(jShaderBinding)];
+    int32 NumOfData = 0;
 };
 
 template <typename T>
@@ -73,40 +157,59 @@ struct TShaderBinding : public jShaderBinding
     T Data = T();
 };
 
+//struct jShaderBindingArray
+//{
+//    static constexpr int32 NumOfInlineBindings = 10;
+//    struct Allocator
+//    {
+//        uint8* InlineStrage[NumOfInlineBindings] = {};
+//        uint8* GetAddress() const { return InlineStrage[0]; }
+//        void SetHeapMemeory(uint8* InHeap) { InlineStrage[0] = InHeap; }
+//    };
+//    Allocator Data{};
+//    uint64 AllocateOffset = 0;
+//
+//    template <typename T>
+//    void Add(const TShaderBinding<T>& InShaderBinding)
+//    {
+//        const bool NotEnoughInlineStorage = (sizeof(Data) < AllocateOffset + sizeof(InShaderBinding));
+//        if (NotEnoughInlineStorage)
+//        {
+//            // 추가 메모리 할당
+//            check(0);
+//        }
+//
+//        memcpy(Data.GetAddress() + AllocateOffset, InShaderBinding, sizeof(InShaderBinding));
+//    }
+//};
+
 struct jShaderBindingInstance
 {
     virtual ~jShaderBindingInstance() {}
 
     const struct jShaderBindingsLayout* ShaderBindingsLayouts = nullptr;
     
-    virtual void Initialize(const std::vector<jShaderBinding>& InShaderBindings) {}
-    virtual void UpdateShaderBindings(const std::vector<jShaderBinding>& InShaderBindings) {}
+    virtual void Initialize(const jShaderBindingArray& InShaderBindingArray) {}
+    virtual void UpdateShaderBindings(const jShaderBindingArray& InShaderBindingArray) {}
     virtual void BindGraphics(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const {}
     virtual void BindCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const {}
 };
 
+using jShaderBindingInstanceArray = jResourceContainer<const jShaderBindingInstance>;
+
 struct jShaderBindingsLayout
 {
-    static size_t GenerateHash(const std::vector<jShaderBinding>& shaderBindings);
-    FORCEINLINE static size_t CreateShaderBindingLayoutHash(const std::vector<const jShaderBindingsLayout*>& shaderBindings)
-    {
-        size_t result = 0;
-        for (auto& bindings : shaderBindings)
-        {
-            result = CityHash64WithSeed(bindings->GetHash(), result);
-        }
-        return result;
-    }
-
     virtual ~jShaderBindingsLayout() {}
 
-    virtual bool Initialize(const std::vector<jShaderBinding>& shaderBindings) { return false; }
-    virtual jShaderBindingInstance* CreateShaderBindingInstance(const std::vector<jShaderBinding>& InShaderBindings) const { return nullptr; }
+    virtual bool Initialize(const jShaderBindingArray& InShaderBindingArray) { return false; }
+    virtual jShaderBindingInstance* CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray) const { return nullptr; }
     virtual size_t GetHash() const;
-    virtual const std::vector<jShaderBinding>& GetShaderBindingsLayout() const { return ShaderBindings; }
+    virtual const jShaderBindingArray& GetShaderBindingsLayout() const { return ShaderBindingArray; }
 
     mutable size_t Hash = 0;
 
 protected:
-    std::vector<jShaderBinding> ShaderBindings;     // Resource 정보는 비어있음
+    jShaderBindingArray ShaderBindingArray;     // Resource 정보는 비어있음
 };
+
+using jShaderBindingsLayoutArray = jResourceContainer<const jShaderBindingsLayout>;

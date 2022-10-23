@@ -1,10 +1,12 @@
 #pragma once
 #include "jLock.h"
 
+#define jNameStatic(STRING) [&]() {static jName name(STRING); return name; }()
+
 struct jName
 {
 private:
-	static std::unordered_map<uint32, std::shared_ptr<std::string>> s_NameTable;
+	static robin_hood::unordered_map<uint32, std::shared_ptr<std::string>> s_NameTable;
 	static jMutexRWLock Lock;
 
 public:
@@ -202,7 +204,7 @@ struct jPriorityNameHashFunc
 {
     std::size_t operator()(const jPriorityName& name) const
     {
-        return name.Priority;
+        return name.GetNameHash();
     }
 };
 

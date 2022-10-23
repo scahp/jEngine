@@ -16,7 +16,7 @@ struct jWriteDescriptorSet
         IsInitialized = false;
     }
 
-    void SetWriteDescriptorInfo(int32 InIndex, const jShaderBinding& InShaderBinding);
+    void SetWriteDescriptorInfo(int32 InIndex, const jShaderBinding* InShaderBinding);
 
     bool IsInitialized = false;
     std::vector<jWriteDescriptorInfo> WriteDescriptorInfos;
@@ -31,12 +31,12 @@ struct jShaderBindingInstance_Vulkan : public jShaderBindingInstance
     virtual ~jShaderBindingInstance_Vulkan();
 
     static void CreateWriteDescriptorSet(jWriteDescriptorSet& OutWriteDescriptorSet
-        , const VkDescriptorSet InDescriptorSet, const std::vector<jShaderBinding>& InShaderBindings);
+        , const VkDescriptorSet InDescriptorSet, const jShaderBindingArray& InShaderBindingArray);
     static void UpdateWriteDescriptorSet(
-        jWriteDescriptorSet& OutDescriptorWrites, const std::vector<jShaderBinding>& InShaderBindings);
+        jWriteDescriptorSet& OutDescriptorWrites, const jShaderBindingArray& InShaderBindingArray);
 
-    virtual void Initialize(const std::vector<jShaderBinding>& InShaderBindings) override;
-    virtual void UpdateShaderBindings(const std::vector<jShaderBinding>& InShaderBindings) override;
+    virtual void Initialize(const jShaderBindingArray& InShaderBindingArray) override;
+    virtual void UpdateShaderBindings(const jShaderBindingArray& InShaderBindingArray) override;
     virtual void BindGraphics(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const override;
     virtual void BindCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const override;
 
@@ -53,8 +53,8 @@ struct jShaderBindingLayout_Vulkan : public jShaderBindingsLayout
 
     VkDescriptorSetLayout DescriptorSetLayout = nullptr;
 
-    virtual bool Initialize(const std::vector<jShaderBinding>& shaderBindings) override;
-    virtual jShaderBindingInstance* CreateShaderBindingInstance(const std::vector<jShaderBinding>& InShaderBindings) const override;
+    virtual bool Initialize(const jShaderBindingArray& InShaderBindingArray) override;
+    virtual jShaderBindingInstance* CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray) const override;
     virtual size_t GetHash() const override;
     void Release();
 
@@ -62,13 +62,13 @@ struct jShaderBindingLayout_Vulkan : public jShaderBindingsLayout
     {
         std::vector<VkDescriptorPoolSize> resultArray;
 
-        if (!ShaderBindings.empty())
+        if (!ShaderBindingArray.NumOfData)
         {
             uint32 NumOfSameType = 0;
-            VkDescriptorType PrevType = GetVulkanShaderBindingType(ShaderBindings[0].BindingType);
-            for (int32 i = 0; i < (int32)ShaderBindings.size(); ++i)
+            VkDescriptorType PrevType = GetVulkanShaderBindingType(ShaderBindingArray[0]->BindingType);
+            for (int32 i = 0; i < ShaderBindingArray.NumOfData; ++i)
             {
-                if (PrevType == GetVulkanShaderBindingType(ShaderBindings[i].BindingType))
+                if (PrevType == GetVulkanShaderBindingType(ShaderBindingArray[i]->BindingType))
                 {
                     ++NumOfSameType;
                 }
@@ -79,7 +79,7 @@ struct jShaderBindingLayout_Vulkan : public jShaderBindingsLayout
                     poolSize.descriptorCount = NumOfSameType * maxAllocations;
                     resultArray.push_back(poolSize);
 
-                    PrevType = GetVulkanShaderBindingType(ShaderBindings[i].BindingType);
+                    PrevType = GetVulkanShaderBindingType(ShaderBindingArray[i]->BindingType);
                     NumOfSameType = 1;
                 }
             }

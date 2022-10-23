@@ -32,15 +32,15 @@ namespace jLightUtil
 	{
 		jShadowMapArrayData()
 		{
-			UniformBlock = g_rhi->CreateUniformBufferBlock("ShadowMapBlock");
+			UniformBlock = g_rhi->CreateUniformBufferBlock(jNameStatic("ShadowMapBlock"), jLifeTimeType::MultiFrame);
 		}
 
 		jShadowMapArrayData(const char* prefix)
 		{
 			if (prefix)
-				UniformBlock = g_rhi->CreateUniformBufferBlock((std::string(prefix) + "ShadowMapBlock").c_str());
+				UniformBlock = g_rhi->CreateUniformBufferBlock(jNameStatic(std::string(prefix) + "ShadowMapBlock"), jLifeTimeType::MultiFrame);
 			else
-				UniformBlock = g_rhi->CreateUniformBufferBlock("ShadowMapBlock");
+				UniformBlock = g_rhi->CreateUniformBufferBlock(jNameStatic("ShadowMapBlock"), jLifeTimeType::MultiFrame);
 		}
 
 		~jShadowMapArrayData()
@@ -165,7 +165,7 @@ public:
 	jDirectionalLight()
 		: jLight(ELightType::DIRECTIONAL)
 	{
-		LightDataUniformBlock = g_rhi->CreateUniformBufferBlock("DirectionalLightBlock", sizeof(LightData));
+		LightDataUniformBlock = g_rhi->CreateUniformBufferBlock(jNameStatic("DirectionalLightBlock"), jLifeTimeType::MultiFrame, sizeof(LightData));
 	}
 	virtual ~jDirectionalLight()
 	{
@@ -239,26 +239,24 @@ public:
 	virtual void PrepareShaderBindingInstance() override
 	{
 		int32 BindingPoint = 0;
-		std::vector<jShaderBinding> ShaderBindings;
-        ShaderBindings.reserve(2);
-        ShaderBindings.emplace_back(jShaderBinding(BindingPoint++, EShaderBindingType::UNIFORMBUFFER
-            , EShaderAccessStageFlag::ALL_GRAPHICS, std::make_shared<jUniformBufferResource>(LightDataUniformBlock)));
+		jShaderBindingArray ShaderBindingArray;
+		jShaderBindingResourceInlineAllocator ResourceInlineAllocator;
+
+		ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_GRAPHICS
+			, ResourceInlineAllocator.Alloc<jUniformBufferResource>(LightDataUniformBlock));
 
         if (ensure(ShadowMapPtr))
         {
-            //ETextureFilter TMinification = ETextureFilter::NEAREST, ETextureFilter TMagnification = ETextureFilter::NEAREST, ETextureAddressMode TAddressU = ETextureAddressMode::CLAMP_TO_EDGE
-            //, ETextureAddressMode TAddressV = ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode TAddressW = ETextureAddressMode::CLAMP_TO_EDGE, float TMipLODBias = 0.0f
-            //, float TMaxAnisotropy = 1.0f, Vector4 TBorderColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f)
+            const jSamplerStateInfo* ShadowSamplerStateInfo = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+                , ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
+                , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
 
-			const jSamplerStateInfo* ShadowSamplerStateInfo = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
-				, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
-				, 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
-            ShaderBindings.emplace_back(jShaderBinding(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV
-                , EShaderAccessStageFlag::ALL_GRAPHICS, std::make_shared<jTextureResource>(ShadowMapPtr->GetTexture(), ShadowSamplerStateInfo)));
+			ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
+				, ResourceInlineAllocator.Alloc<jTextureResource>(ShadowMapPtr->GetTexture(), ShadowSamplerStateInfo));
         }
 
-		ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindings);
-	}
+        ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray);
+    }
 	//////////////////////////////////////////////////////////////////////////
 };
 
@@ -290,7 +288,7 @@ public:
 	jPointLight()
 		: jLight(ELightType::POINT) 
 	{
-		LightDataUniformBlock = g_rhi->CreateUniformBufferBlock("PointLightBlock");
+		LightDataUniformBlock = g_rhi->CreateUniformBufferBlock(jNameStatic("PointLightBlock"), jLifeTimeType::MultiFrame);
 		
 		char szTemp[128] = { 0, };
 		for (int i = 0; i < 6; ++i)
@@ -363,7 +361,7 @@ public:
 	jSpotLight()
 		: jLight(ELightType::SPOT)
 	{
-		LightDataUniformBlock = g_rhi->CreateUniformBufferBlock("SpotLightBlock");
+		LightDataUniformBlock = g_rhi->CreateUniformBufferBlock(jNameStatic("SpotLightBlock"), jLifeTimeType::MultiFrame);
 
 		char szTemp[128] = { 0, };
 		for (int i = 0; i < 6; ++i)

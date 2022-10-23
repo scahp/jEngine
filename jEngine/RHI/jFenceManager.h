@@ -24,8 +24,8 @@ public:
     }
     virtual void Release() override;
 
-    std::unordered_set<VkFence> UsingFences;
-    std::unordered_set<VkFence> PendingFences;
+    robin_hood::unordered_set<VkFence> UsingFences;
+    robin_hood::unordered_set<VkFence> PendingFences;
 };
 
 #endif

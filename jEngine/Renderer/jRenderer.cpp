@@ -7,6 +7,9 @@
 #include "RHI/Vulkan/jUniformBufferBlock_Vulkan.h"
 #include "Profiler/jPerformanceProfile.h"
 
+#define ASYNC_WITH_SETUP 1
+#define PARALLELFOR_WITH_PASSSETUP 1
+
 struct jSimplePushConstant
 {
     Vector4 Color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
@@ -21,6 +24,8 @@ static std::shared_ptr<TPushConstant<jSimplePushConstant>> PushConstantPtr;
 
 void jRenderer::Setup()
 {
+    SCOPE_CPU_PROFILE(Renderer_Setup);
+
     FrameIndex = g_rhi_vk->CurrenFrameIndex;
 
     View.SetupUniformBuffer();
@@ -32,12 +37,19 @@ void jRenderer::Setup()
         View.DirectionalLight->PrepareShaderBindingInstance();
     }
 
+#if ASYNC_WITH_SETUP
     ShadowPassSetupFinishEvent = std::async(std::launch::async, &jRenderer::SetupShadowPass, this);
     BasePassSetupFinishEvent = std::async(std::launch::async, &jRenderer::SetupBasePass, this);
+#else
+    jRenderer::SetupShadowPass();
+    jRenderer::SetupBasePass();
+#endif
 }
 
 void jRenderer::SetupShadowPass()
 {
+    SCOPE_CPU_PROFILE(Renderer_SetupShadowPass);
+
     // Prepare shadowpass pipeline
     auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
     jMultisampleStateInfo* MultisampleState = TMultisampleStateInfo<true, 0.2f, false, false>::Create(EMSAASamples::COUNT_1);
@@ -78,31 +90,46 @@ void jRenderer::SetupShadowPass()
     jShader* ShadowShader = nullptr;
     {
         jShaderInfo shaderInfo;
-        shaderInfo.name = jName("shadow_test");
-        shaderInfo.vs = jName("Resource/Shaders/hlsl/shadow_vs.hlsl");
-        shaderInfo.fs = jName("Resource/Shaders/hlsl/shadow_fs.hlsl");
+        shaderInfo.name = jNameStatic("shadow_test");
+        shaderInfo.vs = jNameStatic("Resource/Shaders/hlsl/shadow_vs.hlsl");
+        shaderInfo.fs = jNameStatic("Resource/Shaders/hlsl/shadow_fs.hlsl");
         ShadowShader = g_rhi->CreateShader(shaderInfo);
     }
     jShader* ShadowInstancingShader = nullptr;
     {
         jShaderInfo shaderInfo;
-        shaderInfo.name = jName("shadow_test");
-        shaderInfo.vs = jName("Resource/Shaders/hlsl/shadow_instancing_vs.hlsl");
-        shaderInfo.fs = jName("Resource/Shaders/hlsl/shadow_fs.hlsl");
+        shaderInfo.name = jNameStatic("shadow_test");
+        shaderInfo.vs = jNameStatic("Resource/Shaders/hlsl/shadow_instancing_vs.hlsl");
+        shaderInfo.fs = jNameStatic("Resource/Shaders/hlsl/shadow_fs.hlsl");
         ShadowInstancingShader = g_rhi->CreateShader(shaderInfo);
     }
 
+#if PARALLELFOR_WITH_PASSSETUP
+    ShadowPasses.resize(jObject::GetStaticObject().size());
+    jParallelFor::ParallelForWithTaskPerThread(MaxPassSetupTaskPerThreadCount, jObject::GetStaticObject()
+        , [&](size_t InIndex, const jObject* InObject)
+    {
+        new (&ShadowPasses[InIndex]) jDrawCommand(RenderFrameContextPtr, &ShadowView, InObject->RenderObject, ShadowMapRenderPass
+            , (InObject->HasInstancing() ? ShadowInstancingShader : ShadowShader), &ShadpwPipelineStateFixed, {}, nullptr);
+        ShadowPasses[InIndex].PrepareToDraw(false);
+    });
+#else
+    ShadowPasses.resize(jObject::GetStaticObject().size());
+    int32 i = 0;
     for (auto iter : jObject::GetStaticObject())
     {
-        auto newCommand = jDrawCommand(RenderFrameContextPtr, &ShadowView, iter->RenderObject, ShadowMapRenderPass
+        new (&ShadowPasses[i]) jDrawCommand(RenderFrameContextPtr, &ShadowView, iter->RenderObject, ShadowMapRenderPass
             , (iter->HasInstancing() ? ShadowInstancingShader : ShadowShader), &ShadpwPipelineStateFixed, {}, nullptr);
-        newCommand.PrepareToDraw(true);
-        ShadowPasses.push_back(newCommand);
+        ShadowPasses[i].PrepareToDraw(true);
+        ++i;
     }
+#endif
 }
 
 void jRenderer::SetupBasePass()
 {
+    SCOPE_CPU_PROFILE(Renderer_SetupBasePass);
+
     // Prepare basepass pipeline
     auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
     jMultisampleStateInfo* MultisampleState = TMultisampleStateInfo<true, 0.2f, false, false>::Create(g_rhi->GetSelectedMSAASamples());
@@ -160,33 +187,50 @@ void jRenderer::SetupBasePass()
     jShader* BasePassShader = nullptr;
     {
         jShaderInfo shaderInfo;
-        shaderInfo.name = jName("default_test");
-        shaderInfo.vs = jName("Resource/Shaders/hlsl/shader_vs.hlsl");
-        shaderInfo.fs = jName("Resource/Shaders/hlsl/shader_fs.hlsl");
+        shaderInfo.name = jNameStatic("default_test");
+        shaderInfo.vs = jNameStatic("Resource/Shaders/hlsl/shader_vs.hlsl");
+        shaderInfo.fs = jNameStatic("Resource/Shaders/hlsl/shader_fs.hlsl");
         if (gOptions.UseVRS)
-            shaderInfo.fsPreProcessor = jName("#define USE_VARIABLE_SHADING_RATE 1");
+            shaderInfo.fsPreProcessor = jNameStatic("#define USE_VARIABLE_SHADING_RATE 1");
         BasePassShader = g_rhi->CreateShader(shaderInfo);
     }
     jShader* BasePassInstancingShader = nullptr;
     {
         jShaderInfo shaderInfo;
-        shaderInfo.name = jName("default_test");
-        shaderInfo.vs = jName("Resource/Shaders/hlsl/shader_instancing_vs.hlsl");
-        shaderInfo.fs = jName("Resource/Shaders/hlsl/shader_fs.hlsl");
+        shaderInfo.name = jNameStatic("default_test");
+        shaderInfo.vs = jNameStatic("Resource/Shaders/hlsl/shader_instancing_vs.hlsl");
+        shaderInfo.fs = jNameStatic("Resource/Shaders/hlsl/shader_fs.hlsl");
         BasePassInstancingShader = g_rhi->CreateShader(shaderInfo);
     }
-
-    PushConstantPtr = std::make_shared<TPushConstant<jSimplePushConstant>>(jSimplePushConstant(), jPushConstantRange(EShaderAccessStageFlag::FRAGMENT, 0, sizeof(jSimplePushConstant)));
+    
+    if (!PushConstantPtr)
+    {
+        PushConstantPtr = std::make_shared<TPushConstant<jSimplePushConstant>>(jSimplePushConstant()
+            , jPushConstantRange(EShaderAccessStageFlag::FRAGMENT, 0, sizeof(jSimplePushConstant)));
+    }
     PushConstantPtr->Data.ShowVRSArea = gOptions.ShowVRSArea;
     PushConstantPtr->Data.ShowGrid = gOptions.ShowGrid;
 
+#if PARALLELFOR_WITH_PASSSETUP
+    BasePasses.resize(jObject::GetStaticObject().size());
+    jParallelFor::ParallelForWithTaskPerThread(MaxPassSetupTaskPerThreadCount, jObject::GetStaticObject()
+        , [&](size_t InIndex, const jObject* InObject)
+    {
+        new (&BasePasses[InIndex]) jDrawCommand(RenderFrameContextPtr, &View, InObject->RenderObject, OpaqueRenderPass
+            , (InObject->HasInstancing() ? BasePassInstancingShader : BasePassShader), &BasePassPipelineStateFixed, {}, PushConstantPtr);
+        BasePasses[InIndex].PrepareToDraw(false);
+    });
+#else
+    BasePasses.resize(jObject::GetStaticObject().size());
+    int32 i = 0;
     for (auto iter : jObject::GetStaticObject())
     {
-        auto newCommand = jDrawCommand(RenderFrameContextPtr, &View, iter->RenderObject, OpaqueRenderPass
+        new (&BasePasses[i]) jDrawCommand(RenderFrameContextPtr, &View, iter->RenderObject, OpaqueRenderPass
             , (iter->HasInstancing() ? BasePassInstancingShader : BasePassShader), &BasePassPipelineStateFixed, {}, PushConstantPtr);
-        newCommand.PrepareToDraw(false);
-        BasePasses.push_back(newCommand);
+        BasePasses[i].PrepareToDraw(false);
+        ++i;
     }
+#endif
 }
 
 void jRenderer::ShadowPass()
@@ -195,11 +239,12 @@ void jRenderer::ShadowPass()
         ShadowPassSetupFinishEvent.wait();
 
     {
+        SCOPE_CPU_PROFILE(Renderer_ShadowPass);
         SCOPE_GPU_PROFILE(RenderFrameContextPtr, ShadowPass);
 
         g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, View.DirectionalLight->ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_ATTACHMENT);
 
-        if (ShadowMapRenderPass->BeginRenderPass(RenderFrameContextPtr->CommandBuffer))
+        if (ShadowMapRenderPass && ShadowMapRenderPass->BeginRenderPass(RenderFrameContextPtr->CommandBuffer))
         {
             ShadowpassOcclusionTest.BeginQuery(RenderFrameContextPtr->CommandBuffer);
             for (const auto& command : ShadowPasses)
@@ -220,11 +265,12 @@ void jRenderer::OpaquePass()
         BasePassSetupFinishEvent.wait();
 
     {
+        SCOPE_CPU_PROFILE(Renderer_OpaquePass);
         SCOPE_GPU_PROFILE(RenderFrameContextPtr, BasePass);
 
         g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, RenderFrameContextPtr->SceneRenderTarget->ColorPtr->GetTexture(), EImageLayout::COLOR_ATTACHMENT);
 
-        if (OpaqueRenderPass->BeginRenderPass(RenderFrameContextPtr->CommandBuffer))
+        if (OpaqueRenderPass && OpaqueRenderPass->BeginRenderPass(RenderFrameContextPtr->CommandBuffer))
         {
             BasepassOcclusionTest.BeginQuery(RenderFrameContextPtr->CommandBuffer);
             for (const auto& command : BasePasses)
@@ -239,11 +285,12 @@ void jRenderer::OpaquePass()
 
 void jRenderer::TranslucentPass()
 {
-
+    // SCOPE_CPU_PROFILE(Renderer_TranslucentPass);
 }
 
 void jRenderer::PostProcess()
 {
+    SCOPE_CPU_PROFILE(Renderer_PostProcess);
     {
         SCOPE_GPU_PROFILE(RenderFrameContextPtr, CopyCS);
 
@@ -258,20 +305,21 @@ void jRenderer::PostProcess()
 
         jShaderBindingInstance* CurrentBindingInstance = nullptr;
         int32 BindingPoint = 0;
-        std::vector<jShaderBinding> ShaderBindings;
+        jShaderBindingArray ShaderBindingArray;
+        jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
 
         // Binding 0 : Source Image
         if (ensure(SceneRT->ColorPtr))
         {
-            ShaderBindings.emplace_back(jShaderBinding(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-                , std::make_shared<jTextureResource>(SceneRT->ColorPtr->GetTexture(), nullptr)));
+            ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
+                , ResourceInlineAllactor.Alloc<jTextureResource>(SceneRT->ColorPtr->GetTexture(), nullptr));
         }
 
         // Binding 1 : Target Image
         if (ensure(SceneRT->FinalColorPtr))
         {
-            ShaderBindings.emplace_back(jShaderBinding(BindingPoint++, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE
-                , std::make_shared<jTextureResource>(SceneRT->FinalColorPtr->GetTexture(), nullptr)));
+            ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE
+                , ResourceInlineAllactor.Alloc<jTextureResource>(SceneRT->FinalColorPtr->GetTexture(), nullptr));
         }
 
         // Binding 2 : CommonComputeUniformBuffer
@@ -287,22 +335,25 @@ void jRenderer::PostProcess()
         CommonComputeUniformBuffer.Height = (float)SCR_HEIGHT;
         CommonComputeUniformBuffer.UseWaveIntrinsics = gOptions.UseWaveIntrinsics;
 
-        jUniformBufferBlock_Vulkan OneFrameUniformBuffer(jName("CommonComputeUniformBuffer"));
+        jUniformBufferBlock_Vulkan OneFrameUniformBuffer(jNameStatic("CommonComputeUniformBuffer"), jLifeTimeType::OneFrame);
         OneFrameUniformBuffer.Init(sizeof(CommonComputeUniformBuffer));
         OneFrameUniformBuffer.UpdateBufferData(&CommonComputeUniformBuffer, sizeof(CommonComputeUniformBuffer));
         {
-            ShaderBindings.emplace_back(jShaderBinding(BindingPoint++, EShaderBindingType::UNIFORMBUFFER
-                , EShaderAccessStageFlag::COMPUTE, std::make_shared<jUniformBufferResource>(&OneFrameUniformBuffer)));
+            ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::COMPUTE
+                , ResourceInlineAllactor.Alloc<jUniformBufferResource>(&OneFrameUniformBuffer));
         }
 
-        CurrentBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindings);
+        CurrentBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray);
 
         jShaderInfo shaderInfo;
-        shaderInfo.name = jName("emboss");
-        shaderInfo.cs = jName("Resource/Shaders/hlsl/copy_cs.hlsl");
+        shaderInfo.name = jNameStatic("emboss");
+        shaderInfo.cs = jNameStatic("Resource/Shaders/hlsl/copy_cs.hlsl");
         static jShader_Vulkan* Shader = (jShader_Vulkan*)g_rhi->CreateShader(shaderInfo);
 
-        jPipelineStateInfo* computePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, { CurrentBindingInstance->ShaderBindingsLayouts }, {});
+        jShaderBindingsLayoutArray ShaderBindingLayoutArray;
+        ShaderBindingLayoutArray.Add(CurrentBindingInstance->ShaderBindingsLayouts);
+
+        jPipelineStateInfo* computePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingLayoutArray, {});
 
         computePipelineStateInfo->Bind(RenderFrameContextPtr);
 
@@ -319,20 +370,26 @@ void jRenderer::PostProcess()
 
 void jRenderer::Render()
 {
-    check(RenderFrameContextPtr->CommandBuffer);
-    ensure(RenderFrameContextPtr->CommandBuffer->Begin());
-    if (g_rhi->GetQueryTimePool())
+    SCOPE_CPU_PROFILE(Renderer_Render);
+
     {
-        g_rhi->GetQueryTimePool()->ResetQueryPool(RenderFrameContextPtr->CommandBuffer);
-    }
-    if (g_rhi->GetQueryOcclusionPool())
-    {
-        g_rhi->GetQueryOcclusionPool()->ResetQueryPool(RenderFrameContextPtr->CommandBuffer);
+        SCOPE_CPU_PROFILE(Renderer_PoolReset);
+        check(RenderFrameContextPtr->CommandBuffer);
+        ensure(RenderFrameContextPtr->CommandBuffer->Begin());
+        if (g_rhi->GetQueryTimePool())
+        {
+            g_rhi->GetQueryTimePool()->ResetQueryPool(RenderFrameContextPtr->CommandBuffer);
+        }
+        if (g_rhi->GetQueryOcclusionPool())
+        {
+            g_rhi->GetQueryOcclusionPool()->ResetQueryPool(RenderFrameContextPtr->CommandBuffer);
+        }
+
+        ShadowpassOcclusionTest.Init();
+        BasepassOcclusionTest.Init();
     }
 
-    ShadowpassOcclusionTest.Init();
-    BasepassOcclusionTest.Init();
-
+    Setup();
     ShadowPass();
     OpaquePass();
     TranslucentPass();

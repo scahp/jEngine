@@ -3,7 +3,7 @@
 #include "jRHIType_Vulkan.h"
 #include "jTexture_Vulkan.h"
 
-std::unordered_map<size_t, VkRenderPass> s_renderPassPool;
+robin_hood::unordered_map<size_t, VkRenderPass> s_renderPassPool;
 
 void jRenderPass_Vulkan::Release()
 {
@@ -243,7 +243,7 @@ bool jRenderPass_Vulkan::CreateRenderPass()
         if (!ensure(vkCreateRenderPass(g_rhi_vk->GetDevice(), &renderPassCreateInfo, nullptr, &RenderPass) == VK_SUCCESS))
             return false;
 
-        s_renderPassPool.insert(std::make_pair(renderPassHash, RenderPass));
+        s_renderPassPool[renderPassHash] = RenderPass;
     }
 
     // Create RenderPassBeginInfo

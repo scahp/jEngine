@@ -103,10 +103,11 @@ int main()
 
 		// render
 		// ------
-		static int64 lastTick = GetTickCount64();
-		int64 currentTick = GetTickCount64();
-		g_timeDeltaSecond = (currentTick - lastTick) * 0.001f;
-		lastTick = currentTick;
+		static std::chrono::system_clock::time_point lastTime = std::chrono::system_clock::now();
+		std::chrono::system_clock::time_point currentTime = std::chrono::system_clock::now();
+        const std::chrono::seconds seconds
+            = std::chrono::duration_cast<std::chrono::seconds>(currentTime - lastTime);
+		lastTime = currentTime;
 
         g_Engine.Update(g_timeDeltaSecond);
         g_Engine.Draw();

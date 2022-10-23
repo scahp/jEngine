@@ -165,18 +165,18 @@ void* jPipelineStateInfo_Vulkan::CreateGraphicsPipelineState()
         return vkPipeline;
 
     check(PipelineStateFixed);
-    check(VertexBuffers.size());
+    check(VertexBufferArray.NumOfData);
 
-    VkPipelineVertexInputStateCreateInfo vertexInputInfo2 = ((jVertexBuffer_Vulkan*)VertexBuffers[0])->CreateVertexInputState();
+    VkPipelineVertexInputStateCreateInfo vertexInputInfo2 = ((jVertexBuffer_Vulkan*)VertexBufferArray[0])->CreateVertexInputState();
 
     // vkCreateGraphicsPipelines 호출 전까지 아래 bindingDescriptions, attributeDescriptions 소멸해제 안되야 함.
     std::vector<VkVertexInputBindingDescription> bindingDescriptions;
     std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
 
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
-    jVertexBuffer_Vulkan::CreateVertexInputState(vertexInputInfo, bindingDescriptions, attributeDescriptions, VertexBuffers);
+    jVertexBuffer_Vulkan::CreateVertexInputState(vertexInputInfo, bindingDescriptions, attributeDescriptions, VertexBufferArray);
 
-    VkPipelineInputAssemblyStateCreateInfo inputAssembly = ((jVertexBuffer_Vulkan*)VertexBuffers[0])->CreateInputAssemblyState();
+    VkPipelineInputAssemblyStateCreateInfo inputAssembly = ((jVertexBuffer_Vulkan*)VertexBufferArray[0])->CreateInputAssemblyState();
 
     // 4. Viewports and scissors
     // SwapChain의 이미지 사이즈가 이 클래스에 정의된 상수 WIDTH, HEIGHT와 다를 수 있다는 것을 기억 해야함.
@@ -248,7 +248,7 @@ void* jPipelineStateInfo_Vulkan::CreateGraphicsPipelineState()
     //dynamicState.pDynamicStates = dynamicStates;
 
     // 10. Pipeline layout
-    vkPipelineLayout = (VkPipelineLayout)g_rhi->CreatePipelineLayout(ShaderBindings, PushConstant);
+    vkPipelineLayout = (VkPipelineLayout)g_rhi->CreatePipelineLayout(ShaderBindingLayoutArray, PushConstant);
 
     VkGraphicsPipelineCreateInfo pipelineInfo = {};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -329,7 +329,7 @@ void* jPipelineStateInfo_Vulkan::CreateComputePipelineState()
     if (vkPipeline)
         return vkPipeline;
 
-    vkPipelineLayout = (VkPipelineLayout)g_rhi->CreatePipelineLayout(ShaderBindings, PushConstant);
+    vkPipelineLayout = (VkPipelineLayout)g_rhi->CreatePipelineLayout(ShaderBindingLayoutArray, PushConstant);
 
     VkComputePipelineCreateInfo computePipelineCreateInfo{};
     computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;

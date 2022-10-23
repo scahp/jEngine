@@ -81,7 +81,7 @@ constexpr auto GenerateConversionTypeMap(T1... args)
     using key_type = typename PacksType<T1...>::first_type;
 	using value_type = typename PacksType<T1...>::second_type;
 
-	std::unordered_map<key_type, value_type> newMap;
+	robin_hood::unordered_map<key_type, value_type> newMap;
     auto AddElementFunc = [&newMap](const auto& arg)
     {
 		newMap.insert(arg);
@@ -98,10 +98,10 @@ constexpr auto GenerateInverseConversionTypeMap(T1... args)
     using key_type = typename PacksType<T1...>::second_type;
     using value_type = typename PacksType<T1...>::first_type;
 
-    std::unordered_map<key_type, value_type> newMap;
+	robin_hood::unordered_map<key_type, value_type> newMap;
     auto AddElementFunc = [&newMap](const auto& arg)
     {
-        newMap.insert(std::make_pair(arg.second, arg.first));
+		newMap[arg.second] = arg.first;
     };
 
     int dummy[] = { 0, (AddElementFunc(args), 0)... };
@@ -524,7 +524,7 @@ DECLARE_ENUM_BIT_OPERATORS(EShaderAccessStageFlag)
 
 // BindingType 별 사용법 문서
 // https://github.com/KhronosGroup/Vulkan-Guide/blob/master/chapters/mapping_data_to_shaders.adoc#storage-texel-buffer
-enum class EShaderBindingType
+enum class EShaderBindingType : uint32
 {
 	UNIFORMBUFFER = 0,
 	UNIFROMBUFFER_DYNAMIC,			// 동적버퍼에 대한 설명 https://github.com/SaschaWillems/Vulkan/blob/master/examples/dynamicuniformbuffer/README.md
@@ -539,7 +539,7 @@ enum class EShaderBindingType
 	SUBPASS_INPUT_ATTACHMENT,
 };
 
-enum class EVulkanBufferBits
+enum class EVulkanBufferBits : uint32
 {
     TRANSFER_SRC = 0x00000001,
     TRANSFER_DST = 0x00000002,

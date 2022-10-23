@@ -126,22 +126,12 @@ size_t jRenderPass::GetHash() const
 	return Hash;
 }
 
-size_t jShaderBindingsLayout::GenerateHash(const std::vector<jShaderBinding>& shaderBindings)
-{
-	size_t result = 0;
-	for (int32 i = 0; i < shaderBindings.size(); ++i)
-	{
-		result = CityHash64WithSeed(shaderBindings[i].GetHash(), result);
-	}
-	return result;
-}
-
 size_t jShaderBindingsLayout::GetHash() const
 {
 	if (Hash)
 		return Hash;
 	
-	Hash = jShaderBindingsLayout::GenerateHash(ShaderBindings);
+	Hash = ShaderBindingArray.GetHash();
 	return Hash;
 }
 
@@ -157,11 +147,11 @@ void jView::SetupUniformBuffer()
 		SpotLight->SetupUniformBuffer();
 }
 
-void jView::GetShaderBindingInstance(std::vector<jShaderBindingInstance*>& OutShaderBindingInstance)
+void jView::GetShaderBindingInstance(jShaderBindingInstanceArray& OutShaderBindingInstanceArray)
 {
 	if (DirectionalLight)
 	{
 		check(DirectionalLight->ShaderBindingInstance);
-		OutShaderBindingInstance.push_back(DirectionalLight->ShaderBindingInstance);
+		OutShaderBindingInstanceArray.Add(DirectionalLight->ShaderBindingInstance);
 	}
 }

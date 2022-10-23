@@ -70,15 +70,25 @@ static int32 GetBindPoint()
 	return s_index++;
 }
 
+enum jLifeTimeType : uint8
+{
+    OneFrame = 0,
+    MultiFrame,
+    MAX
+};
+
 struct IUniformBufferBlock
 {
 	IUniformBufferBlock() = default;
-	IUniformBufferBlock(const jName& name)
-		: Name(name)
+	IUniformBufferBlock(const jName& InName, jLifeTimeType InLifeType)
+		: Name(InName), LifeType(InLifeType)
 	{}
 	virtual ~IUniformBufferBlock() {}
 
 	jName Name;
+	const jLifeTimeType LifeType = MultiFrame;
+
+	virtual bool IsUseRingBuffer() const { return (LifeType == OneFrame); }
 
 	virtual size_t GetBufferSize() const { return 0; }
 	virtual size_t GetBufferOffset() const { return 0; }
@@ -95,12 +105,15 @@ struct IUniformBufferBlock
 struct IShaderStorageBufferObject
 {
 	IShaderStorageBufferObject() = default;
-	IShaderStorageBufferObject(const std::string& name)
-		: Name(name)
+	IShaderStorageBufferObject(const jName& InName, jLifeTimeType InLifeType)
+		: Name(InName)
 	{}
 	virtual ~IShaderStorageBufferObject() {}
 
-	std::string Name;
+	jName Name;
+	const jLifeTimeType LifeType = MultiFrame;
+
+	virtual bool IsUseRingBuffer() const { return (LifeType == OneFrame); }
 
     virtual size_t GetBufferSize() const { return 0; }
     virtual size_t GetBufferOffset() const { return 0; }
@@ -271,7 +284,7 @@ public:
 	}
 
 	void SetupUniformBuffer();
-	void GetShaderBindingInstance(std::vector<jShaderBindingInstance*>& OutShaderBindingInstance);
+	void GetShaderBindingInstance(jShaderBindingInstanceArray& OutShaderBindingInstanceArray);
 
 	jCamera* Camera = nullptr;
 	jDirectionalLight* DirectionalLight = nullptr;
@@ -374,7 +387,7 @@ public:
 	virtual void SetDepthFunc(ECompareOp func) const {}
 	virtual void SetDepthMask(bool enable) const {}
 	virtual void SetColorMask(bool r, bool g, bool b, bool a) const {}
-	virtual IUniformBufferBlock* CreateUniformBufferBlock(const char* blockname, size_t size = 0) const { return nullptr; }
+	virtual IUniformBufferBlock* CreateUniformBufferBlock(jName InName, jLifeTimeType InLifeTimeType, size_t InSize = 0) const { return nullptr; }
 	virtual IShaderStorageBufferObject* CreateShaderStorageBufferObject(const char* blockname) const { return nullptr; }
 	virtual IAtomicCounterBuffer* CreateAtomicCounterBuffer(const char* name, int32 bindingPoint) const { return nullptr; }
 	virtual ITransformFeedbackBuffer* CreateTransformFeedbackBuffer(const char* name) const { return nullptr; }
@@ -410,15 +423,14 @@ public:
 	virtual jBlendingStateInfo* CreateBlendingState(const jBlendingStateInfo& initializer) const { return nullptr; }
 
 	virtual jPipelineStateInfo* CreatePipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader
-		, const std::vector<const jVertexBuffer*>& vertexBuffers, const jRenderPass* renderPass, const std::vector<const jShaderBindingsLayout*>& shaderBindings, const jPushConstant* pushConstant) const { return nullptr; }
+		, const jVertexBufferArray& InVertexBufferArray, const jRenderPass* renderPass, const jShaderBindingsLayoutArray& InShaderBindingArray, const jPushConstant* pushConstant) const { return nullptr; }
 
-	virtual jPipelineStateInfo* CreateComputePipelineStateInfo(const jShader* shader, const std::vector<const jShaderBindingsLayout*>& shaderBindings, const jPushConstant* pushConstant) const { return nullptr; }
+	virtual jPipelineStateInfo* CreateComputePipelineStateInfo(const jShader* shader, const jShaderBindingsLayoutArray& InShaderBindingArray, const jPushConstant* pushConstant) const { return nullptr; }
 
-	virtual jShaderBindingsLayout* CreateShaderBindings(const std::vector<jShaderBinding>& InShaderBindings) const { check(0); return nullptr; }
-	virtual jShaderBindingInstance* CreateShaderBindingInstance(const std::vector<jShaderBinding>& InShaderBindings) const { check(0); return nullptr; }
+	virtual jShaderBindingsLayout* CreateShaderBindings(const jShaderBindingArray& InShaderBindingArray) const { check(0); return nullptr; }
+	virtual jShaderBindingInstance* CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray) const { check(0); return nullptr; }
 
-	virtual void* CreatePipelineLayout(const std::vector<const jShaderBindingsLayout*>& shaderBindings, const jPushConstant* pushConstant) const { return nullptr; }
-	virtual void* CreatePipelineLayout(const std::vector<const jShaderBindingInstance*>& shaderBindingInstances, const jPushConstant* pushConstant) const { return nullptr; }
+	virtual void* CreatePipelineLayout(const jShaderBindingsLayoutArray& InShaderBindingLayoutArray, const jPushConstant* pushConstant) const { return nullptr; }
 
 	template <typename T>
 	FORCEINLINE T* CreatePipelineLayout(const std::vector<const jShaderBindingsLayout*>& shaderBindings, const std::vector<const jPushConstant*>& pushConstants)
@@ -542,9 +554,39 @@ public:
 
 			auto* newResource = new T(initializer);
 			newResource->Initialize();
-			Pool.insert(std::make_pair(hash, newResource));
+			Pool[hash] = newResource;
 			return newResource;
 		}
+    }
+
+    template <typename TInitializer>
+    T* GetOrCreateMove(TInitializer&& initializer)
+    {
+        const size_t hash = initializer.GetHash();
+        {
+            jScopeReadLock sr(&Lock);
+            auto it_find = Pool.find(hash);
+            if (Pool.end() != it_find)
+            {
+                return it_find->second;
+            }
+        }
+
+        {
+            jScopeWriteLock sw(&Lock);
+
+            // Try again, to avoid entering creation section simultanteously.
+            auto it_find = Pool.find(hash);
+            if (Pool.end() != it_find)
+            {
+                return it_find->second;
+            }
+
+            auto* newResource = new T(std::move(initializer));
+            newResource->Initialize();
+			Pool[hash] = newResource;
+            return newResource;
+        }
     }
 
 	void Release()
@@ -557,7 +599,7 @@ public:
 		Pool.clear();
 	}
 
-    std::unordered_map<size_t, T*> Pool;
+	robin_hood::unordered_map<size_t, T*> Pool;
 	LOCK_TYPE Lock;
 };
 
@@ -569,20 +611,26 @@ struct TSamplerStateInfo
 {
     FORCEINLINE static jSamplerStateInfo* Create()
     {
-        jSamplerStateInfo state;
-        state.Minification = TMinification;
-        state.Magnification = TMagnification;
-        state.AddressU = TAddressU;
-        state.AddressV = TAddressV;
-        state.AddressW = TAddressW;
-        state.MipLODBias = TMipLODBias;
-        state.MaxAnisotropy = TMaxAnisotropy;
-        state.TextureComparisonMode = TTextureComparisonMode;
-        state.ComparisonFunc = TComparisonFunc;
-        state.BorderColor = TBorderColor;
-        state.MinLOD = TMinLOD;
-        state.MaxLOD = TMaxLOD;
-        return g_rhi->CreateSamplerState(state);
+        static jSamplerStateInfo* CachedInfo = nullptr;
+        if (CachedInfo)
+            return CachedInfo;
+
+        jSamplerStateInfo initializer;
+        initializer.Minification = TMinification;
+        initializer.Magnification = TMagnification;
+        initializer.AddressU = TAddressU;
+        initializer.AddressV = TAddressV;
+        initializer.AddressW = TAddressW;
+        initializer.MipLODBias = TMipLODBias;
+        initializer.MaxAnisotropy = TMaxAnisotropy;
+        initializer.TextureComparisonMode = TTextureComparisonMode;
+        initializer.ComparisonFunc = TComparisonFunc;
+        initializer.BorderColor = TBorderColor;
+        initializer.MinLOD = TMinLOD;
+        initializer.MaxLOD = TMaxLOD;
+		initializer.GetHash();
+		CachedInfo = g_rhi->CreateSamplerState(initializer);
+		return CachedInfo;
     }
 };
 
@@ -593,6 +641,10 @@ struct TRasterizationStateInfo
 {
     FORCEINLINE static jRasterizationStateInfo* Create()
     {
+        static jRasterizationStateInfo* CachedInfo = nullptr;
+        if (CachedInfo)
+            return CachedInfo;
+
         jRasterizationStateInfo initializer;
         initializer.PolygonMode = TPolygonMode;
         initializer.CullMode = TCullMode;
@@ -604,7 +656,9 @@ struct TRasterizationStateInfo
         initializer.LineWidth = TLineWidth;
         initializer.DepthClampEnable = TDepthClampEnable;
         initializer.RasterizerDiscardEnable = TRasterizerDiscardEnable;
-        return g_rhi->CreateRasterizationState(initializer);
+		initializer.GetHash();
+		CachedInfo = g_rhi->CreateRasterizationState(initializer);
+		return CachedInfo;
     }
 };
 
@@ -614,13 +668,19 @@ struct TMultisampleStateInfo
 {
     FORCEINLINE static jMultisampleStateInfo* Create(EMSAASamples InSampleCount = EMSAASamples::COUNT_1)
     {
+		static jMultisampleStateInfo* CachedInfo = nullptr;
+		if (CachedInfo)
+			return CachedInfo;
+
         jMultisampleStateInfo initializer;
         initializer.SampleCount = InSampleCount;
         initializer.SampleShadingEnable = TSampleShadingEnable;		// Sample shading 켬	 (텍스쳐 내부에 있는 aliasing 도 완화 해줌)
         initializer.MinSampleShading = TMinSampleShading;
         initializer.AlphaToCoverageEnable = TAlphaToCoverageEnable;
         initializer.AlphaToOneEnable = TAlphaToOneEnable;
-        return g_rhi->CreateMultisampleState(initializer);
+		initializer.GetHash();
+		CachedInfo = g_rhi->CreateMultisampleState(initializer);
+		return CachedInfo;
     }
 };
 
@@ -630,7 +690,11 @@ struct TStencilOpStateInfo
 {
     FORCEINLINE static jStencilOpStateInfo* Create()
     {
-        jStencilOpStateInfo initializer;
+        static jStencilOpStateInfo* CachedInfo = nullptr;
+        if (CachedInfo)
+            return CachedInfo;
+
+		jStencilOpStateInfo initializer;
         initializer.FailOp = TFailOp;
         initializer.PassOp = TPassOp;
         initializer.DepthFailOp = TDepthFailOp;
@@ -638,7 +702,9 @@ struct TStencilOpStateInfo
         initializer.CompareMask = TCompareMask;
         initializer.WriteMask = TWriteMask;
         initializer.Reference = TReference;
-        return g_rhi->CreateStencilOpStateInfo(initializer);
+		initializer.GetHash();
+		CachedInfo = g_rhi->CreateStencilOpStateInfo(initializer);
+		return CachedInfo;
     }
 };
 
@@ -649,6 +715,10 @@ struct TDepthStencilStateInfo
 {
     FORCEINLINE static jDepthStencilStateInfo* Create(jStencilOpStateInfo* Front = nullptr, jStencilOpStateInfo* Back = nullptr)
     {
+        static jDepthStencilStateInfo* CachedInfo = nullptr;
+        if (CachedInfo)
+            return CachedInfo;
+
         jDepthStencilStateInfo initializer;
         initializer.DepthTestEnable = TDepthTestEnable;
         initializer.DepthWriteEnable = TDepthWriteEnable;
@@ -659,7 +729,9 @@ struct TDepthStencilStateInfo
         initializer.Back = Back;
         initializer.MinDepthBounds = TMinDepthBounds;
         initializer.MaxDepthBounds = TMaxDepthBounds;
-        return g_rhi->CreateDepthStencilState(initializer);
+		initializer.GetHash();
+		CachedInfo = g_rhi->CreateDepthStencilState(initializer);
+		return CachedInfo;
     }
 };
 
@@ -670,6 +742,10 @@ struct TBlendingStateInfo
 {
     FORCEINLINE static jBlendingStateInfo* Create()
     {
+        static jBlendingStateInfo* CachedInfo = nullptr;
+        if (CachedInfo)
+            return CachedInfo;
+
         jBlendingStateInfo initializer;
         initializer.BlendEnable = TBlendEnable;
         initializer.Src = TSrc;
@@ -679,6 +755,8 @@ struct TBlendingStateInfo
         initializer.DestAlpha = TDestAlpha;
         initializer.AlphaBlendOp = TAlphaBlendOp;
         initializer.ColorWriteMask = TColorWriteMask;
-        return g_rhi->CreateBlendingState(initializer);
+		initializer.GetHash();
+		CachedInfo =  g_rhi->CreateBlendingState(initializer);
+		return CachedInfo;
     }
 };

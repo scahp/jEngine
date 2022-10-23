@@ -1,4 +1,6 @@
 ﻿#pragma once
+#include "jShaderBindingsLayout.h"
+#include "jBuffer.h"
 
 //////////////////////////////////////////////////////////////////////////
 // jViewport
@@ -73,18 +75,23 @@ struct jSamplerStateInfo
 
     virtual size_t GetHash() const
     {
-        size_t result = CityHash64((const char*)&Minification, sizeof(Minification));
-        result = CityHash64WithSeed((const char*)&Magnification, sizeof(Magnification), result);
-        result = CityHash64WithSeed((const char*)&AddressU, sizeof(AddressU), result);
-        result = CityHash64WithSeed((const char*)&AddressV, sizeof(AddressV), result);
-        result = CityHash64WithSeed((const char*)&AddressW, sizeof(AddressW), result);
-        result = CityHash64WithSeed((const char*)&MipLODBias, sizeof(MipLODBias), result);
-        result = CityHash64WithSeed((const char*)&MaxAnisotropy, sizeof(MaxAnisotropy), result);
-        result = CityHash64WithSeed((const char*)&BorderColor, sizeof(BorderColor), result);
-        result = CityHash64WithSeed((const char*)&MinLOD, sizeof(MinLOD), result);
-        result = CityHash64WithSeed((const char*)&MaxLOD, sizeof(MaxLOD), result);
-        return result;
+        if (Hash)
+            return Hash;
+
+        Hash = CityHash64((const char*)&Minification, sizeof(Minification));
+        Hash = CityHash64WithSeed((const char*)&Magnification, sizeof(Magnification), Hash);
+        Hash = CityHash64WithSeed((const char*)&AddressU, sizeof(AddressU), Hash);
+        Hash = CityHash64WithSeed((const char*)&AddressV, sizeof(AddressV), Hash);
+        Hash = CityHash64WithSeed((const char*)&AddressW, sizeof(AddressW), Hash);
+        Hash = CityHash64WithSeed((const char*)&MipLODBias, sizeof(MipLODBias), Hash);
+        Hash = CityHash64WithSeed((const char*)&MaxAnisotropy, sizeof(MaxAnisotropy), Hash);
+        Hash = CityHash64WithSeed((const char*)&BorderColor, sizeof(BorderColor), Hash);
+        Hash = CityHash64WithSeed((const char*)&MinLOD, sizeof(MinLOD), Hash);
+        Hash = CityHash64WithSeed((const char*)&MaxLOD, sizeof(MaxLOD), Hash);
+        return Hash;
     }
+
+    mutable size_t Hash = 0;
 
     ETextureFilter Minification = ETextureFilter::NEAREST;
     ETextureFilter Magnification = ETextureFilter::NEAREST;
@@ -308,17 +315,17 @@ struct jPipelineStateFixedInfo
 
         Hash = 0;
         for (int32 i = 0; i < Viewports.size(); ++i)
-            Hash = CityHash64WithSeed(Viewports[i].GetHash(), Hash);
+            Hash ^= (Viewports[i].GetHash() ^ (i + 1));
 
         for (int32 i = 0; i < Scissors.size(); ++i)
-            Hash = CityHash64WithSeed(Scissors[i].GetHash(), Hash);
+            Hash ^= (Scissors[i].GetHash() ^ (i + 1));
 
         // 아래 내용들도 해시를 만들 수 있어야 함, todo
-        Hash = CityHash64WithSeed(RasterizationState->GetHash(), Hash);
-        Hash = CityHash64WithSeed(MultisampleState->GetHash(), Hash);
-        Hash = CityHash64WithSeed(DepthStencilState->GetHash(), Hash);
-        Hash = CityHash64WithSeed(BlendingState->GetHash(), Hash);
-        Hash = CityHash64WithSeed((uint64)IsUseVRS, Hash);
+        Hash ^= RasterizationState->GetHash();
+        Hash ^= MultisampleState->GetHash();
+        Hash ^= DepthStencilState->GetHash();
+        Hash ^= BlendingState->GetHash();
+        Hash ^= (uint64)IsUseVRS;
 
         return Hash;
     }
@@ -363,14 +370,20 @@ struct TPushConstant : public jPushConstant
         : Data(data)
     {
         PushConstantRanges.push_back(pushConstantRanges);
+        GetHash();
     }
     TPushConstant(const T& data, const std::vector<jPushConstantRange>& pushConstantRanges)
         : Data(data), PushConstantRanges(pushConstantRanges)
-    {}
+    {
+        GetHash();
+    }
 
     virtual size_t GetHash() const
     {
-        size_t Hash = CityHash64((const char*)&Data, sizeof(Data));
+        if (Hash)
+            return Hash;
+
+        Hash = CityHash64((const char*)&Data, sizeof(Data));
         Hash = CityHash64WithSeed((const char*)PushConstantRanges.data(), PushConstantRanges.size() * sizeof(jPushConstantRange), Hash);
         return Hash;
     }
@@ -378,6 +391,7 @@ struct TPushConstant : public jPushConstant
     virtual int32 GetSize() const override { return sizeof(T); }
     virtual const std::vector<jPushConstantRange>* GetPushConstantRanges() const { return &PushConstantRanges; }
 
+    mutable size_t Hash = 0;
     std::vector<jPushConstantRange> PushConstantRanges;
     T Data;
 };
@@ -394,21 +408,26 @@ struct jRenderFrameContext;
 struct jPipelineStateInfo
 {
     jPipelineStateInfo() = default;
-    jPipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader, const std::vector<const jVertexBuffer*>& vertexBuffers
-        , const jRenderPass* renderPass, const std::vector<const jShaderBindingsLayout*>& shaderBindings, const jPushConstant* pushConstant)
-        : PipelineStateFixed(pipelineStateFixed), Shader(shader), VertexBuffers(vertexBuffers), RenderPass(renderPass), ShaderBindings(shaderBindings), PushConstant(pushConstant)
+    jPipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader, const jVertexBufferArray& InVertexBufferArray
+        , const jRenderPass* renderPass, const jShaderBindingsLayoutArray& InShaderBindingLayoutArray, const jPushConstant* pushConstant)
+        : PipelineStateFixed(pipelineStateFixed), Shader(shader), VertexBufferArray(InVertexBufferArray), RenderPass(renderPass), ShaderBindingLayoutArray(InShaderBindingLayoutArray), PushConstant(pushConstant)
     {
         IsGraphics = true;
     }
-    jPipelineStateInfo(const jShader* shader, const std::vector<const jShaderBindingsLayout*>& shaderBindings, const jPushConstant* pushConstant)
-        : Shader(shader), ShaderBindings(shaderBindings), PushConstant(pushConstant)
+    jPipelineStateInfo(const jShader* shader, const jShaderBindingsLayoutArray& InShaderBindingLayoutArray, const jPushConstant* pushConstant)
+        : Shader(shader), ShaderBindingLayoutArray(InShaderBindingLayoutArray), PushConstant(pushConstant)
     {
         IsGraphics = false;
     }
     jPipelineStateInfo(const jPipelineStateInfo& pipelineState)
         : PipelineStateFixed(pipelineState.PipelineStateFixed), Shader(pipelineState.Shader), IsGraphics(pipelineState.IsGraphics)
-        , VertexBuffers(pipelineState.VertexBuffers), RenderPass(pipelineState.RenderPass), ShaderBindings(pipelineState.ShaderBindings)
-        , PushConstant(pipelineState.PushConstant)
+        , VertexBufferArray(pipelineState.VertexBufferArray), RenderPass(pipelineState.RenderPass), ShaderBindingLayoutArray(pipelineState.ShaderBindingLayoutArray)
+        , PushConstant(pipelineState.PushConstant), Hash(pipelineState.Hash)
+    {}
+    jPipelineStateInfo(jPipelineStateInfo&& pipelineState) noexcept
+        : PipelineStateFixed(pipelineState.PipelineStateFixed), Shader(pipelineState.Shader), IsGraphics(pipelineState.IsGraphics)
+        , VertexBufferArray(pipelineState.VertexBufferArray), RenderPass(pipelineState.RenderPass), ShaderBindingLayoutArray(pipelineState.ShaderBindingLayoutArray)
+        , PushConstant(pipelineState.PushConstant), Hash(pipelineState.Hash)
     {}
     virtual ~jPipelineStateInfo() {}
 
@@ -418,9 +437,9 @@ struct jPipelineStateInfo
 
     bool IsGraphics = true;
     const jShader* Shader = nullptr;
-    std::vector<const jVertexBuffer*> VertexBuffers;
     const jRenderPass* RenderPass = nullptr;
-    std::vector<const jShaderBindingsLayout*> ShaderBindings;
+    jVertexBufferArray VertexBufferArray;
+    jShaderBindingsLayoutArray ShaderBindingLayoutArray;
     const jPushConstant* PushConstant;
     const jPipelineStateFixedInfo* PipelineStateFixed = nullptr;
 

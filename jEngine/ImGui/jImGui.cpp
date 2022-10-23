@@ -345,14 +345,27 @@ void jImGUI_Vulkan::NewFrame(bool updateFrameGraph)
     ImGui::Checkbox("UseWaveIntrinsics", &gOptions.UseWaveIntrinsics);
     ImGui::Separator();
 
-    const auto& GPUAvgProfileMap = jPerformanceProfile::GetInstance().GetGPUAvgProfileMap();
-    double TotalPassesMS = 0.0;
-    for (auto& pair : GPUAvgProfileMap)
     {
-        ImGui::Text("%s : %lf ms", pair.first.ToStr(), pair.second.AvgElapsedMS);
-        TotalPassesMS += pair.second.AvgElapsedMS;
+        const auto& CPUAvgProfileMap = jPerformanceProfile::GetInstance().GetCPUAvgProfileMap();
+        double TotalPassesMS = 0.0;
+        for (auto& pair : CPUAvgProfileMap)
+        {
+            ImGui::Text("%s : %lf ms", pair.first.ToStr(), pair.second.AvgElapsedMS);
+            TotalPassesMS += pair.second.AvgElapsedMS;
+        }
+        // ImGui::Text("Total Passes : %lf ms", TotalPassesMS);
     }
-    ImGui::Text("Total Passes : %lf ms", TotalPassesMS);
+    ImGui::Separator();
+    {
+        const auto& GPUAvgProfileMap = jPerformanceProfile::GetInstance().GetGPUAvgProfileMap();
+        double TotalPassesMS = 0.0;
+        for (auto& pair : GPUAvgProfileMap)
+        {
+            ImGui::Text("%s : %lf ms", pair.first.ToStr(), pair.second.AvgElapsedMS);
+            TotalPassesMS += pair.second.AvgElapsedMS;
+        }
+        ImGui::Text("Total Passes : %lf ms", TotalPassesMS);
+    }
     ImGui::Separator();
     for (auto& pair : CounterMap)
     {

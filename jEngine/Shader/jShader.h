@@ -3,7 +3,6 @@
 
 struct jShaderInfo
 {
-	static std::unordered_map<jName, jShaderInfo, jNameHashFunc> s_ShaderInfoMap;
 	static void AddShaderInfo(const jShaderInfo& shaderInfo);
 	static void CreateShaders();
 	
@@ -53,7 +52,7 @@ struct jShader : public std::enable_shared_from_this<jShader>
 	virtual ~jShader() {}
 
 	static std::vector<std::shared_ptr<jShader> > ShaderVector;
-	static std::unordered_map<jName, std::shared_ptr<jShader>, jNameHashFunc> ShaderNameMap;
+	static robin_hood::unordered_map<jName, std::shared_ptr<jShader>, jNameHashFunc> ShaderNameMap;
 	static jShader* GetShader(const jName& name);
 	static jShader* CreateShader(const jShaderInfo& shaderInfo);
 	static std::shared_ptr<jShader> GetShaderPtr(const jName& name);

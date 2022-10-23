@@ -16,3 +16,9 @@ bool IsSizeMinimize = false;
 #pragma comment(lib,"dxgi.lib")
 #pragma comment(lib,"d3dcompiler.lib")
 #pragma comment(lib,"dxguid.lib")
+
+uint32 GetMaxThreadCount()
+{
+    static uint32 MaxThreadCount = Max((uint32)1, std::thread::hardware_concurrency());
+    return MaxThreadCount;
+}

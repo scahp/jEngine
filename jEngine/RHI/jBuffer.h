@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+struct jShader;
+
 struct jVertexBuffer
 {
     std::shared_ptr<jVertexStreamData> VertexStreamData;
@@ -21,4 +23,23 @@ struct jIndexBuffer
     virtual void Bind(const jShader* shader) const {}
     virtual void Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const {}
     virtual int32 GetElementCount() const { return IndexStreamData ? IndexStreamData->ElementCount : 0; }
+};
+
+struct jVertexBufferArray : public jResourceContainer<const jVertexBuffer>
+{
+    size_t GetHash() const
+    {
+        if (Hash)
+            return Hash;
+
+        Hash = 0;
+        for (int32 i = 0; i < NumOfData; ++i)
+        {
+            Hash ^= (Data[i]->GetHash() ^ i);
+        }
+        return Hash;
+    }
+
+private:
+    mutable size_t Hash = 0;
 };

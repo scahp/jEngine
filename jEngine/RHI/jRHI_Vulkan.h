@@ -23,8 +23,8 @@ struct jDescriptorPool_Vulkan;
 class jRHI_Vulkan : public jRHI
 {
 public:
-    static std::unordered_map<size_t, VkPipelineLayout> PipelineLayoutPool;
-    static std::unordered_map<size_t, jShaderBindingsLayout*> ShaderBindingPool;
+    static robin_hood::unordered_map<size_t, VkPipelineLayout> PipelineLayoutPool;
+    static robin_hood::unordered_map<size_t, jShaderBindingsLayout*> ShaderBindingPool;
     static TResourcePool<jSamplerStateInfo_Vulkan, jMutexRWLock> SamplerStatePool;
     static TResourcePool<jRasterizationStateInfo_Vulkan, jMutexRWLock> RasterizationStatePool;
     static TResourcePool<jMultisampleStateInfo_Vulkan, jMutexRWLock> MultisampleStatePool;
@@ -146,20 +146,19 @@ public:
 	virtual void DrawIndirect(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, jBuffer* buffer, int32 startIndex, int32 drawCount) const override;
 	virtual void DrawElementsIndirect(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, jBuffer* buffer, int32 startIndex, int32 drawCount) const override;
 
-	virtual jShaderBindingsLayout* CreateShaderBindings(const std::vector<jShaderBinding>& InShaderBindings) const override;
-	virtual jShaderBindingInstance* CreateShaderBindingInstance(const std::vector<jShaderBinding>& InShaderBindings) const override;
-	virtual void* CreatePipelineLayout(const std::vector<const jShaderBindingsLayout*>& shaderBindings, const jPushConstant* pushConstant) const override;
-	virtual void* CreatePipelineLayout(const std::vector<const jShaderBindingInstance*>& shaderBindingInstances, const jPushConstant* pushConstant) const override;
+	virtual jShaderBindingsLayout* CreateShaderBindings(const jShaderBindingArray& InShaderBindingArray) const override;
+	virtual jShaderBindingInstance* CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray) const override;
+	virtual void* CreatePipelineLayout(const jShaderBindingsLayoutArray& InShaderBindingLayoutArray, const jPushConstant* pushConstant) const override;
 
-	virtual IUniformBufferBlock* CreateUniformBufferBlock(const char* blockname, size_t size = 0) const override;
+	virtual IUniformBufferBlock* CreateUniformBufferBlock(jName InName, jLifeTimeType InLifeTimeType, size_t InSize = 0) const override;
 
     virtual jQuery* CreateQueryTime() const override;
     virtual void ReleaseQueryTime(jQuery* queryTime) const override;
 	virtual std::shared_ptr<jRenderFrameContext> BeginRenderFrame() override;
 	virtual void EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr) override;
-	jPipelineStateInfo* CreatePipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader, const std::vector<const jVertexBuffer*>& vertexBuffers
-		, const jRenderPass* renderPass, const std::vector<const jShaderBindingsLayout*>& shaderBindings, const jPushConstant* pushConstant) const override;
-	virtual jPipelineStateInfo* CreateComputePipelineStateInfo(const jShader* shader, const std::vector<const jShaderBindingsLayout*>& shaderBindings, const jPushConstant* pushConstant) const override;
+	jPipelineStateInfo* CreatePipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader, const jVertexBufferArray& InVertexBufferArray
+		, const jRenderPass* renderPass, const jShaderBindingsLayoutArray& InShaderBindingArray, const jPushConstant* pushConstant) const override;
+	virtual jPipelineStateInfo* CreateComputePipelineStateInfo(const jShader* shader, const jShaderBindingsLayoutArray& InShaderBindingArray, const jPushConstant* pushConstant) const override;
 
 	virtual jRenderPass* GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const Vector2i& offset, const Vector2i& extent) const override;
 	virtual jRenderPass* GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const jAttachment& depthAttachment

@@ -217,7 +217,7 @@ void ShaderTable::push_back(const ShaderRecord& InShaderRecord)
     m_mappedShaderRecords += m_shaderRecordSize;
 }
 
-void ShaderTable::DebugPrint(std::unordered_map<void*, std::wstring> shaderIdToStringMap)
+void ShaderTable::DebugPrint(robin_hood::unordered_map<void*, std::wstring> shaderIdToStringMap)
 {
 #if _DEBUG
 	std::wstringstream wstr;

@@ -72,11 +72,11 @@ jShaderBindingInstance_Vulkan* jDescriptorPool_Vulkan::AllocateDescriptorSet(VkD
     const auto it_find = PendingDescriptorSets.find(InLayout);
     if (it_find != PendingDescriptorSets.end())
     {
-        std::vector<jShaderBindingInstance_Vulkan*>& pendingPools = it_find->second;
-        if (!pendingPools.empty())
+        jShaderBindingInstanceVulkanArray& pendingPools = it_find->second;
+        if (pendingPools.NumOfData)
         {
-            jShaderBindingInstance_Vulkan* descriptorSet = pendingPools.back();
-            pendingPools.pop_back();
+            jShaderBindingInstance_Vulkan* descriptorSet = pendingPools.Back();
+            pendingPools.PopBack();
             return descriptorSet;
         }
     }
@@ -92,14 +92,14 @@ jShaderBindingInstance_Vulkan* jDescriptorPool_Vulkan::AllocateDescriptorSet(VkD
     if (!ensure(VK_SUCCESS == vkAllocateDescriptorSets(g_rhi_vk->Device, &DescriptorSetAllocateInfo, &NewDescriptorSet)))
         return nullptr;
 
-    jShaderBindingInstance_Vulkan* NewCachedDescriptorSetPtr = new jShaderBindingInstance_Vulkan();
-    NewCachedDescriptorSetPtr->DescriptorSet = NewDescriptorSet;
+    jShaderBindingInstance_Vulkan* NewCachedDescriptorSet = new jShaderBindingInstance_Vulkan();
+    NewCachedDescriptorSet->DescriptorSet = NewDescriptorSet;
 
 #if !USE_RESET_DESCRIPTOR_POOL
-    AllocatedDescriptorSets[InLayout].push_back(NewCachedDescriptorSetPtr);
+    AllocatedDescriptorSets[InLayout].Add(NewCachedDescriptorSet);
 #endif
 
-    return NewCachedDescriptorSetPtr;
+    return NewCachedDescriptorSet;
 }
 
 void jDescriptorPool_Vulkan::Release()
@@ -115,9 +115,11 @@ void jDescriptorPool_Vulkan::Release()
 
         for (auto& iter : AllocatedDescriptorSets)
         {
-            std::vector<jShaderBindingInstance_Vulkan*>& instances = iter.second;
-            for (auto& inst : instances)
-                delete inst;
+            jShaderBindingInstanceVulkanArray& instances = iter.second;
+            for (int32 i = 0; i < instances.NumOfData; ++i)
+            {
+                delete instances[i];
+            }
         }
         AllocatedDescriptorSets.clear();
     }

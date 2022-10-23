@@ -89,6 +89,9 @@
     <Filter Include="Code\RHI\DirectX12">
       <UniqueIdentifier>{bbc6b4a7-6e2b-42a4-aa04-8cfcfd9a78ae}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Code\External\robin-hood-hashing">
+      <UniqueIdentifier>{2b1caad5-b7d8-4673-a375-267c33335ade}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Math\MathUtility.h">
@@ -346,6 +349,18 @@
     <ClInclude Include="jOptions.h">
       <Filter>Code</Filter>
     </ClInclude>
+    <ClInclude Include="Core\jMemStackAllocator.h">
+      <Filter>Code\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\jResourceContainer.h">
+      <Filter>Code\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="External\robin-hood-hashing\robin_hood.h">
+      <Filter>Code\External\robin-hood-hashing</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\jParallelFor.h">
+      <Filter>Code\Core</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -590,6 +605,9 @@
     </ClCompile>
     <ClCompile Include="jOptions.cpp">
       <Filter>Code</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\jMemStackAllocator.cpp">
+      <Filter>Code\Core</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

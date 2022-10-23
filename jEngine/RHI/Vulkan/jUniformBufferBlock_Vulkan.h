@@ -36,22 +36,22 @@ struct jUniformBufferBlock_Vulkan : public IUniformBufferBlock
     using IUniformBufferBlock::IUniformBufferBlock;
     using IUniformBufferBlock::UpdateBufferData;
     virtual ~jUniformBufferBlock_Vulkan()
-    {
-        Destroy();
-    }
-
-    void Destroy();
+    {}
 
     virtual void Init(size_t size) override;
     virtual void UpdateBufferData(const void* InData, size_t InSize) override;
 
     virtual void ClearBuffer(int32 clearValue) override;
 
-    virtual void* GetBuffer() const override { return BufferPtr->Buffer; }
-    virtual void* GetBufferMemory() const override { return BufferPtr->BufferMemory; }
+    virtual void* GetBuffer() const override { return Buffer.Buffer; }
+    virtual void* GetBufferMemory() const override { return Buffer.BufferMemory; }
 
-    virtual size_t GetBufferSize() const override { return BufferPtr->AllocatedSize; }
-    virtual size_t GetBufferOffset() const override { return BufferPtr->Offset; }
+    virtual size_t GetBufferSize() const override { return Buffer.AllocatedSize; }
+    virtual size_t GetBufferOffset() const override { return Buffer.Offset; }
 
-    std::shared_ptr<jBuffer_Vulkan> BufferPtr;
+    jBuffer_Vulkan Buffer;
+
+private:
+    jUniformBufferBlock_Vulkan(const jUniformBufferBlock_Vulkan&) = delete;
+    jUniformBufferBlock_Vulkan& operator=(const jUniformBufferBlock_Vulkan&) = delete;
 };

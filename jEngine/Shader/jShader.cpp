@@ -4,10 +4,10 @@
 
 //////////////////////////////////////////////////////////////////////////
 // jShaderInfo
-std::unordered_map<jName, jShaderInfo, jNameHashFunc> jShaderInfo::s_ShaderInfoMap;
+static robin_hood::unordered_map<jName, jShaderInfo, jNameHashFunc> s_ShaderInfoMap;
 void jShaderInfo::AddShaderInfo(const jShaderInfo& shaderInfo)
 {
-	s_ShaderInfoMap.insert(std::make_pair(shaderInfo.name, shaderInfo));
+	s_ShaderInfoMap[shaderInfo.name] = shaderInfo;
 }
 
 void jShaderInfo::CreateShaders()
@@ -24,7 +24,7 @@ struct jShaderInfoCreation
 
 //////////////////////////////////////////////////////////////////////////
 std::vector<std::shared_ptr<jShader> > jShader::ShaderVector;
-std::unordered_map<jName, std::shared_ptr<jShader>, jNameHashFunc> jShader::ShaderNameMap;
+robin_hood::unordered_map<jName, std::shared_ptr<jShader>, jNameHashFunc> jShader::ShaderNameMap;
 
 jShader* jShader::GetShader(const jName& name)
 {
@@ -54,7 +54,7 @@ std::shared_ptr<jShader> jShader::CreateShaderPtr(const jShaderInfo& shaderInfo)
 	if (shaderPtr)
 	{
 		if (ShaderNameMap.end() == ShaderNameMap.find(shaderInfo.name))
-			ShaderNameMap.insert(std::make_pair(shaderInfo.name, shaderPtr));
+			ShaderNameMap[shaderInfo.name] = shaderPtr;
 		else
 			JASSERT(!"The shader was already created before.");
 		return shaderPtr;

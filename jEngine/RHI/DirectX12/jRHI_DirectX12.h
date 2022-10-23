@@ -91,7 +91,7 @@ public:
 	void push_back(const ShaderRecord& InShaderRecord);
 
 	// Pretty-print the shader records.
-	void DebugPrint(std::unordered_map<void*, std::wstring> shaderIdToStringMap);
+	void DebugPrint(robin_hood::unordered_map<void*, std::wstring> shaderIdToStringMap);
 	
 private:
 	uint8* m_mappedShaderRecords = nullptr;

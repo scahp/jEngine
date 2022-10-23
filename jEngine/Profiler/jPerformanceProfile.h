@@ -2,13 +2,13 @@
 #include <sysinfoapi.h>
 
 #define ENABLE_PROFILE 1
-#define ENABLE_PROFILE_CPU (ENABLE_PROFILE && 0)
+#define ENABLE_PROFILE_CPU (ENABLE_PROFILE && 1)
 #define ENABLE_PROFILE_GPU (ENABLE_PROFILE && 1)
 
 static constexpr int32 MaxProfileFrame = 10;
 
-extern std::unordered_map<jPriorityName, uint64, jPriorityNameHashFunc> ScopedProfileCPUMap[MaxProfileFrame];
-extern std::unordered_map<jPriorityName, uint64, jPriorityNameHashFunc> ScopedProfileGPUMap[MaxProfileFrame];
+extern robin_hood::unordered_map<jPriorityName, uint64, jPriorityNameHashFunc> ScopedProfileCPUMap[MaxProfileFrame];
+extern robin_hood::unordered_map<jPriorityName, uint64, jPriorityNameHashFunc> ScopedProfileGPUMap[MaxProfileFrame];
 struct jQuery;
 
 void ClearScopedProfileCPU();
@@ -22,25 +22,34 @@ void AddScopedProfileGPU(const jPriorityName& name, uint64 elapsedTick);
 class jScopedProfile_CPU
 {
 public:
+	static int32 s_priority;
+
+	static void ResetPriority() { s_priority = 0; }
+
 	jScopedProfile_CPU(const jName& name)
 		: Name(name)
 	{
-		StartTick = GetTickCount64();
+		Start = std::chrono::system_clock::now();
+		Priority = s_priority++;
 	}
 
 	~jScopedProfile_CPU()
 	{
-		AddScopedProfileCPU(jPriorityName(Name, 0), GetTickCount64() - StartTick);
+        const std::chrono::nanoseconds nano_seconds 
+			= std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now() - Start);
+		AddScopedProfileCPU(jPriorityName(Name, Priority), nano_seconds.count());
 	}
 
 	jName Name;
 	uint64 StartTick = 0;
+    std::chrono::system_clock::time_point Start;
+	int32 Priority = 0;
 };
 
 #if ENABLE_PROFILE_CPU
-#define SCOPE_PROFILE(Name) static jName Name##ScopedProfileCPUName(#Name); jScopedProfile_CPU Name##ScopedProfileCPU(Name##ScopedProfileCPUName);
+#define SCOPE_CPU_PROFILE(Name) jScopedProfile_CPU Name##ScopedProfileCPU(jNameStatic(#Name));
 #else
-#define SCOPE_PROFILE(Name)
+#define SCOPE_CPU_PROFILE(Name)
 #endif
 
 //////////////////////////////////////////////////////////////////////////
@@ -83,8 +92,8 @@ public:
 	}
 
 private:
-	static std::unordered_set<jQuery*> s_running;
-	static std::unordered_set<jQuery*> s_resting;
+	static robin_hood::unordered_set<jQuery*> s_running;
+	static robin_hood::unordered_set<jQuery*> s_resting;
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -169,7 +178,7 @@ public:
 };
 
 #if ENABLE_PROFILE_GPU
-#define SCOPE_GPU_PROFILE(RenderFrameContextPtr, Name) static jName Name##ScopedProfileGPUName(#Name); jScopedProfile_GPU Name##ScopedProfileGPU(RenderFrameContextPtr, Name##ScopedProfileGPUName);
+#define SCOPE_GPU_PROFILE(RenderFrameContextPtr, Name) jScopedProfile_GPU Name##ScopedProfileGPU(RenderFrameContextPtr, jNameStatic(#Name));
 #else
 #define SCOPE_GPU_PROFILE(RenderFrameContextPtr, Name)
 #endif
@@ -192,11 +201,11 @@ public:
 	void CalcAvg();
 	void PrintOutputDebugString();
 
-    const AvgProfileMapType& GetAvgProfileMap() const { return AvgProfileMap; }
+    const AvgProfileMapType& GetCPUAvgProfileMap() const { return CPUAvgProfileMap; }
     const AvgProfileMapType& GetGPUAvgProfileMap() const { return GPUAvgProfileMap; }
 
 private:
-    AvgProfileMapType AvgProfileMap;		// ms
+    AvgProfileMapType CPUAvgProfileMap;		// ms
     AvgProfileMapType GPUAvgProfileMap;		// ms
 
 public:

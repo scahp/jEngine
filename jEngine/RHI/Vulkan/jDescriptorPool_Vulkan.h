@@ -16,10 +16,12 @@ const float DefaultPoolSizes[] =
     1 / 8.0	    // VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT
 };
 
+using jShaderBindingInstanceVulkanArray = jResourceContainer<jShaderBindingInstance_Vulkan, 1000>;
+
 struct jDescriptorPool_Vulkan
 {
-    std::unordered_map<VkDescriptorSetLayout, std::vector<jShaderBindingInstance_Vulkan*>> PendingDescriptorSets;
-    std::unordered_map<VkDescriptorSetLayout, std::vector<jShaderBindingInstance_Vulkan*>> AllocatedDescriptorSets;
+    robin_hood::unordered_map<VkDescriptorSetLayout, jShaderBindingInstanceVulkanArray> PendingDescriptorSets;
+    robin_hood::unordered_map<VkDescriptorSetLayout, jShaderBindingInstanceVulkanArray> AllocatedDescriptorSets;
 
     jDescriptorPool_Vulkan() = default;
     virtual ~jDescriptorPool_Vulkan();
@@ -32,6 +34,7 @@ struct jDescriptorPool_Vulkan
     uint32 MaxDescriptorSets = 128;
     uint32 PoolSizes[_countof(DefaultPoolSizes)];
     VkDescriptorPool DescriptorPool = nullptr;;
+    // mutable jMutexLock DescriptorPoolLock;
     mutable jMutexLock DescriptorPoolLock;
 };
 

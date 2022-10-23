@@ -37,7 +37,7 @@ public:
     void Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext);
 
     // Todo : remove this for generalization of ui datas
-    std::unordered_map<jName, uint64, jNameHashFunc> CounterMap;
+    robin_hood::unordered_map<jName, uint64, jNameHashFunc> CounterMap;
 
 private:
     // Starts a new imGui frame and sets up windows and ui elements

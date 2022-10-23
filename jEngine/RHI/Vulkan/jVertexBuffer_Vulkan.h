@@ -102,16 +102,14 @@ struct jVertexBuffer_Vulkan : public jVertexBuffer
 
     static void CreateVertexInputState(VkPipelineVertexInputStateCreateInfo& OutVertexInputInfo,
         std::vector<VkVertexInputBindingDescription>& OutBindingDescriptions, std::vector<VkVertexInputAttributeDescription>& OutAttributeDescriptions,
-        std::vector<const jVertexBuffer*> InVertexBuffers)
+        const jVertexBufferArray& InVertexBufferArray)
     {
-        for (int32 i = 0; i < (int32)InVertexBuffers.size(); ++i)
+        for (int32 i = 0; i < InVertexBufferArray.NumOfData; ++i)
         {
-            if (InVertexBuffers[i])
-            {
-                const jBindInfo& bindInfo = ((const jVertexBuffer_Vulkan*)InVertexBuffers[i])->BindInfos;
-                OutBindingDescriptions.insert(OutBindingDescriptions.end(), bindInfo.InputBindingDescriptions.begin(), bindInfo.InputBindingDescriptions.end());
-                OutAttributeDescriptions.insert(OutAttributeDescriptions.end(), bindInfo.AttributeDescriptions.begin(), bindInfo.AttributeDescriptions.end());
-            }
+            check(InVertexBufferArray[i]);
+            const jBindInfo& bindInfo = ((const jVertexBuffer_Vulkan*)InVertexBufferArray[i])->BindInfos;
+            OutBindingDescriptions.insert(OutBindingDescriptions.end(), bindInfo.InputBindingDescriptions.begin(), bindInfo.InputBindingDescriptions.end());
+            OutAttributeDescriptions.insert(OutAttributeDescriptions.end(), bindInfo.AttributeDescriptions.begin(), bindInfo.AttributeDescriptions.end());
         }
         
         OutVertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;

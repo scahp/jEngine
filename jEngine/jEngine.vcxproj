@@ -109,8 +109,11 @@ xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"</Command
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="Core\jMemStackAllocator.h" />
     <ClInclude Include="Core\jLock.h" />
     <ClInclude Include="Core\jName.h" />
+    <ClInclude Include="Core\jParallelFor.h" />
+    <ClInclude Include="Core\jResourceContainer.h" />
     <ClInclude Include="External\cityhash\city.h" />
     <ClInclude Include="External\cityhash\citycrc.h" />
     <ClInclude Include="External\glad\include\glad\glad.h" />
@@ -126,6 +129,7 @@ xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"</Command
     <ClInclude Include="External\IMGUI\imstb_rectpack.h" />
     <ClInclude Include="External\IMGUI\imstb_truetype.h" />
     <ClInclude Include="External\loadpng\lodepng.h" />
+    <ClInclude Include="External\robin-hood-hashing\robin_hood.h" />
     <ClInclude Include="External\ShaderConductor\Include\ShaderConductor\ShaderConductor.hpp" />
     <ClInclude Include="External\stb\stb_image.h" />
     <ClInclude Include="External\TinyXml2\tinyxml2.h" />
@@ -196,6 +200,7 @@ xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"</Command
     <ClInclude Include="Shader\Spirv\jSpirvHelper.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Core\jMemStackAllocator.cpp" />
     <ClCompile Include="Core\jName.cpp" />
     <ClCompile Include="External\cityhash\city.cc">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>

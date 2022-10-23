@@ -24,8 +24,8 @@ public:
     }
     void ReleaseInternal();
 
-    std::unordered_set<VkSemaphore> UsingSemaphore;
-    std::unordered_set<VkSemaphore> PendingSemaphore;
+    robin_hood::unordered_set<VkSemaphore> UsingSemaphore;
+    robin_hood::unordered_set<VkSemaphore> PendingSemaphore;
 };
 
 #endif

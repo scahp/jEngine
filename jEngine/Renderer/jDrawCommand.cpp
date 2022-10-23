@@ -12,44 +12,43 @@
 
 jDrawCommand::jDrawCommand(std::shared_ptr<jRenderFrameContext> InRenderFrameContextPtr, jView* view
     , jRenderObject* renderObject, jRenderPass* renderPass, jShader* shader, jPipelineStateFixedInfo* pipelineStateFixed
-    , const std::vector<jShaderBindingInstance*>& shaderBindingInstances, const std::shared_ptr<jPushConstant>& pushConstantPtr, jQuery* occlusionQuery)
+    , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const std::shared_ptr<jPushConstant>& pushConstantPtr, jQuery* occlusionQuery)
     : RenderFrameContextPtr(InRenderFrameContextPtr), View(view), RenderObject(renderObject), RenderPass(renderPass), Shader(shader), PipelineStateFixed(pipelineStateFixed)
-    , PushConstantPtr(pushConstantPtr), OcclusionQuery(occlusionQuery)
+    , PushConstantPtr(pushConstantPtr), OcclusionQuery(occlusionQuery), ShaderBindingInstanceArray(InShaderBindingInstanceArray)
 {
-    ShaderBindingInstances.reserve(shaderBindingInstances.size() + 3);
-    ShaderBindingInstances.insert(ShaderBindingInstances.begin(), shaderBindingInstances.begin(), shaderBindingInstances.end());    
 }
 
 void jDrawCommand::PrepareToDraw(bool bPositionOnly)
 {
     // GetShaderBindings
-    View->GetShaderBindingInstance(ShaderBindingInstances);
+    View->GetShaderBindingInstance(ShaderBindingInstanceArray);
 
     // GetShaderBindings
-    ShaderBindingInstances.push_back(RenderObject->CreateRenderObjectUniformBuffer(View));
+    jShaderBindingInstance* OneRenderObjectUniformBuffer = RenderObject->CreateRenderObjectUniformBuffer(View);
+    ShaderBindingInstanceArray.Add(OneRenderObjectUniformBuffer);
 
     // Bind ShaderBindings
-    std::vector<const jShaderBindingsLayout*> shaderBindings;
-    shaderBindings.reserve(ShaderBindingInstances.size());
-    for (int32 i = 0; i < ShaderBindingInstances.size(); ++i)
-        shaderBindings.push_back(ShaderBindingInstances[i]->ShaderBindingsLayouts);
+    jShaderBindingsLayoutArray ShaderBindingLayoutArray;
+    for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
+        ShaderBindingLayoutArray.Add(ShaderBindingInstanceArray[i]->ShaderBindingsLayouts);
 
-    std::vector<const jVertexBuffer*> vertexBuffers;
+    jVertexBufferArray VertexBufferArray;
+    VertexBufferArray.Add(bPositionOnly ? RenderObject->VertexBuffer_PositionOnly : RenderObject->VertexBuffer);
     if (RenderObject->VertexBuffer_InstanceData)
-        vertexBuffers = { (bPositionOnly ? RenderObject->VertexBuffer_PositionOnly : RenderObject->VertexBuffer), RenderObject->VertexBuffer_InstanceData };
-    else
-        vertexBuffers = { (bPositionOnly ? RenderObject->VertexBuffer_PositionOnly : RenderObject->VertexBuffer) };
+    {
+        VertexBufferArray.Add(RenderObject->VertexBuffer_InstanceData);
+    }
 
     // Create Pipeline
     CurrentPipelineStateInfo = (jPipelineStateInfo_Vulkan*)g_rhi->CreatePipelineStateInfo(PipelineStateFixed, Shader
-        , vertexBuffers, RenderPass, shaderBindings, PushConstantPtr.get());
+        , VertexBufferArray, RenderPass, ShaderBindingLayoutArray, PushConstantPtr.get());
 }
 
 void jDrawCommand::Draw() const
 {
-    for (int32 i = 0; i < ShaderBindingInstances.size(); ++i)
+    for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
     {
-        ShaderBindingInstances[i]->BindGraphics(RenderFrameContextPtr, (VkPipelineLayout)CurrentPipelineStateInfo->GetPipelineLayoutHandle(), i);
+        ShaderBindingInstanceArray[i]->BindGraphics(RenderFrameContextPtr, (VkPipelineLayout)CurrentPipelineStateInfo->GetPipelineLayoutHandle(), i);
     }
 
     // Bind the image that contains the shading rate patterns
@@ -80,7 +79,7 @@ void jDrawCommand::Draw() const
         OcclusionQuery->BeginQuery(RenderFrameContextPtr->CommandBuffer);
 
     // Draw
-    RenderObject->Draw(RenderFrameContextPtr, nullptr, Shader, {}, 0, -1, InstanceCount);
+    RenderObject->Draw(RenderFrameContextPtr, nullptr, Shader, nullptr, 0, -1, InstanceCount);
 
     if (OcclusionQuery)
         OcclusionQuery->EndQuery(RenderFrameContextPtr->CommandBuffer);

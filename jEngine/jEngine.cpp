@@ -44,7 +44,7 @@ void jEngine::ProcessInput()
 
 void jEngine::Update(float deltaTime)
 {
-	SCOPE_PROFILE(Engine_Update);
+	//SCOPE_CPU_PROFILE(Engine_Update);
 	//SCOPE_GPU_PROFILE(Engine_Update);
 
 	g_timeDeltaSecond = deltaTime;
@@ -55,6 +55,7 @@ void jEngine::Update(float deltaTime)
 
 void jEngine::Draw()
 {
+    SCOPE_CPU_PROFILE(Engine_Draw);
 	Game.Draw();
 }
 

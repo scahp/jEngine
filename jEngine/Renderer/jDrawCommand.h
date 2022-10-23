@@ -13,13 +13,13 @@ public:
     jDrawCommand() = default;
     jDrawCommand(std::shared_ptr<jRenderFrameContext> InRenderFrameContextPtr, jView* view, jRenderObject* renderObject
         , jRenderPass* renderPass, jShader* shader, jPipelineStateFixedInfo* pipelineStateFixed
-        , const std::vector<jShaderBindingInstance*>& shaderBindingInstances, const std::shared_ptr<jPushConstant>& pushConstantPtr
+        , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const std::shared_ptr<jPushConstant>& pushConstantPtr
         , jQuery* occlusionQuery = nullptr);
 
     void PrepareToDraw(bool bPositionOnly);
     void Draw() const;
 
-    std::vector<jShaderBindingInstance*> ShaderBindingInstances;
+    jShaderBindingInstanceArray ShaderBindingInstanceArray;
 
     jView* View = nullptr;
     jRenderPass* RenderPass = nullptr;

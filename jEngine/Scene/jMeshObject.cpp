@@ -70,7 +70,7 @@ void jMeshObject::DrawSubMesh(const std::shared_ptr<jRenderFrameContext>& InRend
 {
 	auto& subMesh = SubMeshes[meshIndex];
 	{
-		//SCOPE_PROFILE(jMeshObject_DrawSubMesh_SetMaterialUniform);
+		//SCOPE_CPU_PROFILE(jMeshObject_DrawSubMesh_SetMaterialUniform);
 
 		//if (subMesh.MaterialData.Params.empty())
 		//	subMesh.MaterialData.Params.resize((int32)jMeshMaterial::EMaterialTextureType::Max);
@@ -130,9 +130,9 @@ void jMeshObject::DrawSubMesh(const std::shared_ptr<jRenderFrameContext>& InRend
 		SET_UNIFORM_BUFFER_STATIC("UseNormalSampler", UseNormalSampler, shader);
 	}
 
-	if (subMesh.EndFace > 0)
-		RenderObject->DrawBaseVertexIndex(InRenderFrameContext, camera, shader, lights, subMesh.MaterialData, subMesh.StartFace, subMesh.EndFace - subMesh.StartFace, subMesh.StartVertex);
-	else
-		RenderObject->DrawBaseVertexIndex(InRenderFrameContext, camera, shader, lights, subMesh.MaterialData, subMesh.StartVertex, subMesh.EndVertex - subMesh.StartVertex, subMesh.StartVertex);
+	//if (subMesh.EndFace > 0)
+	//	RenderObject->DrawBaseVertexIndex(InRenderFrameContext, camera, shader, lights, subMesh.MaterialData, subMesh.StartFace, subMesh.EndFace - subMesh.StartFace, subMesh.StartVertex);
+	//else
+	//	RenderObject->DrawBaseVertexIndex(InRenderFrameContext, camera, shader, lights, subMesh.MaterialData, subMesh.StartVertex, subMesh.EndVertex - subMesh.StartVertex, subMesh.StartVertex);
 }
 

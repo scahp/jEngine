@@ -70,8 +70,10 @@ using tchar = wchar_t;
 #include <chrono>
 #include <fstream>
 #include <execution>
+#include <ppl.h>
 
 #include "External/cityhash/city.h"
+#include "External/robin-hood-hashing/robin_hood.h"
 
 #if _DEBUG
 #define verify(x) JASSERT(x)
@@ -90,6 +92,8 @@ using tchar = wchar_t;
 #define check(x) 
 #define ensure(x) (x)
 #endif
+
+#include "Math/MathUtility.h"
 
 #include "RHI/jRHIType.h"
 #include "RHI/jRHI.h"
@@ -160,11 +164,12 @@ extern float g_timeDeltaSecond;
 #define TRUE_PER_MS(WaitMS)\
 [waitMS = WaitMS]() -> bool\
 {\
-	static int64 lastTick = GetTickCount64();\
-	int64 currentTick = GetTickCount64();\
-	if (currentTick - lastTick >= waitMS)\
+	static std::chrono::system_clock::time_point lastTime = std::chrono::system_clock::now();\
+	const std::chrono::system_clock::time_point currentTime = std::chrono::system_clock::now();\
+	const std::chrono::milliseconds MS = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - lastTime);\
+	if (MS >= waitMS)\
 	{\
-		lastTick = currentTick;\
+		lastTime = currentTime;\
 		return true;\
 	}\
 	return false;\
@@ -191,5 +196,10 @@ FORCEINLINE constexpr T Align(T value, uint64 alignment)
 	static_assert(std::is_integral<T>::value || std::is_pointer<T>::value, "Align is support for int or pointer type");
     return (T)(((uint64)value + alignment - 1) & ~(alignment - 1));
 }
+
+#include "Core/jMemStackAllocator.h"
+#include "Core/jParallelFor.h"
+
+extern uint32 GetMaxThreadCount();
 
 #endif //PCH_H

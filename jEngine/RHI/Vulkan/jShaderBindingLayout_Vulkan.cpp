@@ -13,21 +13,18 @@ jShaderBindingLayout_Vulkan::~jShaderBindingLayout_Vulkan()
     Release();
 }
 
-bool jShaderBindingLayout_Vulkan::Initialize(const std::vector<jShaderBinding>& shaderBindings)
+bool jShaderBindingLayout_Vulkan::Initialize(const jShaderBindingArray& InShaderBindingArray)
 {
-    ShaderBindings.resize(shaderBindings.size());
-
     std::vector<VkDescriptorSetLayoutBinding> bindings;
 
-    for (int32 i = 0; i < (int32)ShaderBindings.size(); ++i)
+    InShaderBindingArray.CloneWithoutResource(ShaderBindingArray);
+    for (int32 i = 0; i < (int32)ShaderBindingArray.NumOfData; ++i)
     {
-        shaderBindings[i].CloneWithoutResource(ShaderBindings[i]);
-
         VkDescriptorSetLayoutBinding binding = {};
-        binding.binding = ShaderBindings[i].BindingPoint;
-        binding.descriptorType = GetVulkanShaderBindingType(ShaderBindings[i].BindingType);
+        binding.binding = ShaderBindingArray[i]->BindingPoint;
+        binding.descriptorType = GetVulkanShaderBindingType(ShaderBindingArray[i]->BindingType);
         binding.descriptorCount = 1;
-        binding.stageFlags = GetVulkanShaderAccessFlags(ShaderBindings[i].AccessStageFlags);
+        binding.stageFlags = GetVulkanShaderAccessFlags(ShaderBindingArray[i]->AccessStageFlags);
         binding.pImmutableSamplers = nullptr;
         bindings.push_back(binding);
     }
@@ -43,7 +40,7 @@ bool jShaderBindingLayout_Vulkan::Initialize(const std::vector<jShaderBinding>& 
     return true;
 }
 
-jShaderBindingInstance* jShaderBindingLayout_Vulkan::CreateShaderBindingInstance(const std::vector<jShaderBinding>& InShaderBindings) const
+jShaderBindingInstance* jShaderBindingLayout_Vulkan::CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray) const
 {
     jShaderBindingInstance_Vulkan* DescriptorSet = g_rhi_vk->GetDescriptorPools()->AllocateDescriptorSet(DescriptorSetLayout);
     if (!ensure(DescriptorSet))
@@ -52,13 +49,17 @@ jShaderBindingInstance* jShaderBindingLayout_Vulkan::CreateShaderBindingInstance
     }
 
     DescriptorSet->ShaderBindingsLayouts = this;
-    DescriptorSet->Initialize(InShaderBindings);
+    DescriptorSet->Initialize(InShaderBindingArray);
     return DescriptorSet;
 }
 
 size_t jShaderBindingLayout_Vulkan::GetHash() const
 {
-    return CityHash64((const char*)ShaderBindings.data(), sizeof(jShaderBinding) * ShaderBindings.size());
+    if (Hash)
+        return Hash;
+
+    Hash = ShaderBindingArray.GetHash();
+    return Hash;
 }
 
 void jShaderBindingLayout_Vulkan::Release()
@@ -78,28 +79,28 @@ jShaderBindingInstance_Vulkan::~jShaderBindingInstance_Vulkan()
 }
 
 void jShaderBindingInstance_Vulkan::CreateWriteDescriptorSet(
-    jWriteDescriptorSet& OutDescriptorWrites, const VkDescriptorSet InDescriptorSet, const std::vector<jShaderBinding>& InShaderBindings)
+    jWriteDescriptorSet& OutDescriptorWrites, const VkDescriptorSet InDescriptorSet, const jShaderBindingArray& InShaderBindingArray)
 {
-    if (!ensure(!InShaderBindings.empty()))
+    if (!ensure(InShaderBindingArray.NumOfData))
         return;
 
     OutDescriptorWrites.Reset();
 
     std::vector<jWriteDescriptorInfo>& descriptors = OutDescriptorWrites.WriteDescriptorInfos;
     std::vector<VkWriteDescriptorSet>& descriptorWrites = OutDescriptorWrites.DescriptorWrites;
-    descriptors.resize(InShaderBindings.size());
-    descriptorWrites.resize(InShaderBindings.size());
+    descriptors.resize(InShaderBindingArray.NumOfData);
+    descriptorWrites.resize(InShaderBindingArray.NumOfData);
 
-    for (int32 i = 0; i < (int32)InShaderBindings.size(); ++i)
+    for (int32 i = 0; i < InShaderBindingArray.NumOfData; ++i)
     {
-        OutDescriptorWrites.SetWriteDescriptorInfo(i, InShaderBindings[i]);
+        OutDescriptorWrites.SetWriteDescriptorInfo(i, InShaderBindingArray[i]);
 
         VkWriteDescriptorSet& CurDescriptorWrite = descriptorWrites[i];
         CurDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         CurDescriptorWrite.dstSet = InDescriptorSet;
         CurDescriptorWrite.dstBinding = i;
         CurDescriptorWrite.dstArrayElement = 0;
-        CurDescriptorWrite.descriptorType = GetVulkanShaderBindingType(InShaderBindings[i].BindingType);
+        CurDescriptorWrite.descriptorType = GetVulkanShaderBindingType(InShaderBindingArray[i]->BindingType);
         CurDescriptorWrite.descriptorCount = 1;
         if (descriptors[i].BufferInfo.buffer)
         {
@@ -119,43 +120,43 @@ void jShaderBindingInstance_Vulkan::CreateWriteDescriptorSet(
 }
 
 void jShaderBindingInstance_Vulkan::UpdateWriteDescriptorSet(
-    jWriteDescriptorSet& OutDescriptorWrites, const std::vector<jShaderBinding>& InShaderBindings)
+    jWriteDescriptorSet& OutDescriptorWrites, const jShaderBindingArray& InShaderBindingArray)
 {
-    check(InShaderBindings.size() == OutDescriptorWrites.DescriptorWrites.size());
+    check(InShaderBindingArray.NumOfData == OutDescriptorWrites.DescriptorWrites.size());
 
-    for (int32 i = 0; i < (int32)InShaderBindings.size(); ++i)
+    for (int32 i = 0; i < InShaderBindingArray.NumOfData; ++i)
     {
-        OutDescriptorWrites.SetWriteDescriptorInfo(i, InShaderBindings[i]);
+        OutDescriptorWrites.SetWriteDescriptorInfo(i, InShaderBindingArray[i]);
     }
 }
 
-void jShaderBindingInstance_Vulkan::Initialize(const std::vector<jShaderBinding>& InShaderBindings)
+void jShaderBindingInstance_Vulkan::Initialize(const jShaderBindingArray& InShaderBindingArray)
 {
     if (!WriteDescriptorSet.IsInitialized)
     {
-        CreateWriteDescriptorSet(WriteDescriptorSet, DescriptorSet, InShaderBindings);
+        CreateWriteDescriptorSet(WriteDescriptorSet, DescriptorSet, InShaderBindingArray);
     }
     else
     {
-        UpdateWriteDescriptorSet(WriteDescriptorSet, InShaderBindings);
+        UpdateWriteDescriptorSet(WriteDescriptorSet, InShaderBindingArray);
     }
 
     vkUpdateDescriptorSets(g_rhi_vk->Device, static_cast<uint32>(WriteDescriptorSet.DescriptorWrites.size())
         , WriteDescriptorSet.DescriptorWrites.data(), 0, nullptr);
 }
 
-void jShaderBindingInstance_Vulkan::UpdateShaderBindings(const std::vector<jShaderBinding>& InShaderBindings)
+void jShaderBindingInstance_Vulkan::UpdateShaderBindings(const jShaderBindingArray& InShaderBindingArray)
 {
-    check(ShaderBindingsLayouts->GetShaderBindingsLayout().size() == InShaderBindings.size());
-    check(!InShaderBindings.empty());
+    check(ShaderBindingsLayouts->GetShaderBindingsLayout().NumOfData == InShaderBindingArray.NumOfData);
+    check(InShaderBindingArray.NumOfData);
 
     if (!WriteDescriptorSet.IsInitialized)
     {
-        CreateWriteDescriptorSet(WriteDescriptorSet, DescriptorSet, InShaderBindings);
+        CreateWriteDescriptorSet(WriteDescriptorSet, DescriptorSet, InShaderBindingArray);
     }
     else
     {
-        UpdateWriteDescriptorSet(WriteDescriptorSet, InShaderBindings);
+        UpdateWriteDescriptorSet(WriteDescriptorSet, InShaderBindingArray);
     }
     
     vkUpdateDescriptorSets(g_rhi_vk->Device, static_cast<uint32>(WriteDescriptorSet.DescriptorWrites.size())
@@ -178,14 +179,14 @@ void jShaderBindingInstance_Vulkan::BindCompute(const std::shared_ptr<jRenderFra
     vkCmdBindDescriptorSets((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, (VkPipelineLayout)(pipelineLayout), InSlot, 1, &DescriptorSet, 0, nullptr);
 }
 
-void jWriteDescriptorSet::SetWriteDescriptorInfo(int32 InIndex, const jShaderBinding& InShaderBinding)
+void jWriteDescriptorSet::SetWriteDescriptorInfo(int32 InIndex, const jShaderBinding* InShaderBinding)
 {
-    switch (InShaderBinding.BindingType)
+    switch (InShaderBinding->BindingType)
     {
     case EShaderBindingType::UNIFORMBUFFER:
     case EShaderBindingType::UNIFROMBUFFER_DYNAMIC:
     {
-        jUniformBufferResource* ubor = reinterpret_cast<jUniformBufferResource*>(InShaderBinding.ResourcePtr.get());
+        const jUniformBufferResource* ubor = reinterpret_cast<const jUniformBufferResource*>(InShaderBinding->Resource);
         if (ensure(ubor && ubor->UniformBuffer))
         {
             VkDescriptorBufferInfo& bufferInfo = WriteDescriptorInfos[InIndex].BufferInfo;
@@ -200,7 +201,7 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(int32 InIndex, const jShaderBin
     case EShaderBindingType::TEXTURE_SRV:
     case EShaderBindingType::SUBPASS_INPUT_ATTACHMENT:
     {
-        jTextureResource* tbor = reinterpret_cast<jTextureResource*>(InShaderBinding.ResourcePtr.get());
+        const jTextureResource* tbor = reinterpret_cast<const jTextureResource*>(InShaderBinding->Resource);
         if (ensure(tbor && tbor->Texture))
         {
             VkDescriptorImageInfo& imageInfo = WriteDescriptorInfos[InIndex].ImageInfo;
@@ -217,7 +218,7 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(int32 InIndex, const jShaderBin
     }
     case EShaderBindingType::TEXTURE_UAV:
     {
-        jTextureResource* tbor = reinterpret_cast<jTextureResource*>(InShaderBinding.ResourcePtr.get());
+        const jTextureResource* tbor = reinterpret_cast<const jTextureResource*>(InShaderBinding->Resource);
         if (ensure(tbor && tbor->Texture))
         {
             VkDescriptorImageInfo& imageInfo = WriteDescriptorInfos[InIndex].ImageInfo;
@@ -233,7 +234,7 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(int32 InIndex, const jShaderBin
     }
     case EShaderBindingType::SAMPLER:
     {
-        jTextureResource* tbor = reinterpret_cast<jTextureResource*>(InShaderBinding.ResourcePtr.get());
+        const jTextureResource* tbor = reinterpret_cast<const jTextureResource*>(InShaderBinding->Resource);
         if (ensure(tbor && tbor->SamplerState))
         {
             VkDescriptorImageInfo& imageInfo = WriteDescriptorInfos[InIndex].ImageInfo;
@@ -248,7 +249,7 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(int32 InIndex, const jShaderBin
     case EShaderBindingType::BUFFER_UAV:
     case EShaderBindingType::BUFFER_UAV_DYNAMIC:
     {
-        jBufferResource* br = reinterpret_cast<jBufferResource*>(InShaderBinding.ResourcePtr.get());
+        const jBufferResource* br = reinterpret_cast<const jBufferResource*>(InShaderBinding->Resource);
         if (ensure(br && br->Buffer))
         {
             VkDescriptorBufferInfo& bufferInfo = WriteDescriptorInfos[InIndex].BufferInfo;

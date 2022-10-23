@@ -368,18 +368,16 @@ void jDirectionalLight::UpdateMaterialData()
 
 	MaterialData.Params.clear();
 	{
-		static auto name = jName("shadow_object");
-		MaterialData.AddMaterialParam(name, ShadowMapData->ShadowMapFrameBuffer->GetTextureDepth()
+		MaterialData.AddMaterialParam(jNameStatic("shadow_object"), ShadowMapData->ShadowMapFrameBuffer->GetTextureDepth()
 			, ShadowMapData->ShadowMapSamplerState);
 	}
 
 	{
-        static auto name = jName("shadow_object_test");
 		jTexture* texture = nullptr;
 
         texture = ShadowMapData->ShadowMapFrameBuffer->GetTextureDepth();
 
-        MaterialData.AddMaterialParam(name, texture);
+        MaterialData.AddMaterialParam(jNameStatic("shadow_object_test"), texture);
 	}
 }
 
@@ -550,17 +548,15 @@ void jPointLight::UpdateMaterialData()
 
 	MaterialData.Params.clear();
 	{
-        static auto name = jName("shadow_object_point_shadow");
-		MaterialData.AddMaterialParam(name, ShadowMapData->ShadowMapFrameBuffer->GetTextureDepth()
+		MaterialData.AddMaterialParam(jNameStatic("shadow_object_point_shadow"), ShadowMapData->ShadowMapFrameBuffer->GetTextureDepth()
 			, ShadowMapData->ShadowMapSamplerState);
 	}
 
 	{
-        static auto name = jName("shadow_object_point");
 		jTexture* texture = nullptr;
 		texture = ShadowMapData->ShadowMapFrameBuffer->GetTextureDepth();
 
-		MaterialData.AddMaterialParam(name, texture);
+		MaterialData.AddMaterialParam(jNameStatic("shadow_object_point"), texture);
 	}
 }
 
@@ -695,17 +691,15 @@ void jSpotLight::UpdateMaterialData()
 
 	MaterialData.Params.clear();
 	{
-		static auto name = jName("shadow_object_spot_shadow");
-		MaterialData.AddMaterialParam(name, ShadowMapData->ShadowMapFrameBuffer->GetTextureDepth()
+		MaterialData.AddMaterialParam(jNameStatic("shadow_object_spot_shadow"), ShadowMapData->ShadowMapFrameBuffer->GetTextureDepth()
 			, ShadowMapData->ShadowMapSamplerState);
 	}
 
 	{
-        static auto name = jName("shadow_object_spot");
 		jTexture* texture = nullptr;
 		texture = ShadowMapData->ShadowMapFrameBuffer->GetTextureDepth();
 
-		MaterialData.AddMaterialParam(name, texture);
+		MaterialData.AddMaterialParam(jNameStatic("shadow_object_spot"), texture);
 	}
 }
 //////////////////////////////////////////////////////////////////////////

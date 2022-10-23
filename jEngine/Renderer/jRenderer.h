@@ -46,5 +46,9 @@ public:
     jQueryOcclusion_Vulkan ShadowpassOcclusionTest;
     jQueryOcclusion_Vulkan BasepassOcclusionTest;
 
+    // Current FrameIndex
     int32 FrameIndex = 0;
+
+    // Thread per task for PassSetup
+    const int32 MaxPassSetupTaskPerThreadCount = 100;
 };

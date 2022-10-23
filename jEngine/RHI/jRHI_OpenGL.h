@@ -353,7 +353,7 @@ template <typename T>
 struct TTryGetLocation
 {
 #if USE_CACHED_LOCATION_HASH
-	mutable std::unordered_map<uint32, int32> NameLocationMap;		// <jNameHash, location>
+	mutable robin_hood::unordered_map<uint32, int32> NameLocationMap;		// <jNameHash, location>
 #elif USE_CACHED_LOCATION_ARRAY
 	struct jLocationInfo
 	{

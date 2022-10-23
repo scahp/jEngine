@@ -193,33 +193,36 @@ void jGame::Update(float deltaTime)
 
 void jGame::Draw()
 {
+	SCOPE_CPU_PROFILE(Game_Draw);
 	SCOPE_DEBUG_EVENT(g_rhi, "Game::Draw");
 
-    std::shared_ptr<jRenderFrameContext> renderFrameContext = g_rhi->BeginRenderFrame();
-	if (!renderFrameContext)
-		return;
+	{
+		std::shared_ptr<jRenderFrameContext> renderFrameContext = g_rhi->BeginRenderFrame();
+		if (!renderFrameContext)
+			return;
 
-	jRenderer renderer(renderFrameContext, jView(MainCamera, DirectionalLight));
-	renderer.Setup();
-	renderer.Render();
+		jRenderer renderer(renderFrameContext, jView(MainCamera, DirectionalLight));
+		renderer.Render();
 
-	g_rhi->EndRenderFrame(renderFrameContext);
+		g_rhi->EndRenderFrame(renderFrameContext);
 
-	// Get a whole occlusion queries
-	std::vector<uint64> passedSamplesQueries = g_rhi->GetQueryOcclusionPool()->GetWholeQueryResult(
-		renderer.FrameIndex, g_rhi->GetQueryOcclusionPool()->GetUsedQueryCount(renderer.FrameIndex));
-	
-	//uint64 shadowPasses = forwardRenderer.ShadowpassOcclusionTest.GetQueryResult();
-	renderer.ShadowpassOcclusionTest.GetQueryResultFromQueryArray(renderer.FrameIndex, passedSamplesQueries);
-	uint64 shadowPasses = renderer.ShadowpassOcclusionTest.Result;
-    static jName PassedSamplesInShadowPass("ShadowPassSamples");
-    jImGUI_Vulkan::Get().CounterMap[PassedSamplesInShadowPass] = shadowPasses;
+		// Get a whole occlusion queries
+		std::vector<uint64> passedSamplesQueries = g_rhi->GetQueryOcclusionPool()->GetWholeQueryResult(
+			renderer.FrameIndex, g_rhi->GetQueryOcclusionPool()->GetUsedQueryCount(renderer.FrameIndex));
 
-    //uint64 basePass = forwardRenderer.BasepassOcclusionTest.GetQueryResult();
-    renderer.BasepassOcclusionTest.GetQueryResultFromQueryArray(renderer.FrameIndex, passedSamplesQueries);
-    uint64 basePass = renderer.BasepassOcclusionTest.Result;
-    static jName PassedSamplesInBasePass("BasePassSamples");
-    jImGUI_Vulkan::Get().CounterMap[PassedSamplesInBasePass] = basePass;
+		//uint64 shadowPasses = forwardRenderer.ShadowpassOcclusionTest.GetQueryResult();
+		renderer.ShadowpassOcclusionTest.GetQueryResultFromQueryArray(renderer.FrameIndex, passedSamplesQueries);
+		uint64 shadowPasses = renderer.ShadowpassOcclusionTest.Result;
+		static jName PassedSamplesInShadowPass("ShadowPassSamples");
+		jImGUI_Vulkan::Get().CounterMap[PassedSamplesInShadowPass] = shadowPasses;
+
+		//uint64 basePass = forwardRenderer.BasepassOcclusionTest.GetQueryResult();
+		renderer.BasepassOcclusionTest.GetQueryResultFromQueryArray(renderer.FrameIndex, passedSamplesQueries);
+		uint64 basePass = renderer.BasepassOcclusionTest.Result;
+		static jName PassedSamplesInBasePass("BasePassSamples");
+		jImGUI_Vulkan::Get().CounterMap[PassedSamplesInBasePass] = basePass;
+	}
+    jMemStack::Get()->Flush();
 }
 
 void jGame::OnMouseButton()
@@ -366,6 +369,21 @@ void jGame::SpawnTestPrimitives()
 	auto billboard = jPrimitiveUtil::CreateBillobardQuad(Vector(0.0f, 60.0f, 80.0f), Vector::OneVector, Vector(20.0f, 20.0f, 20.0f), Vector4(1.0f, 0.0f, 1.0f, 1.0f), MainCamera);
 	jObject::AddObject(billboard);
 	SpawnedObjects.push_back(billboard);
+
+	//const float Size = 20.0f;
+
+	//for (int32 i = 0; i < 10; ++i)
+	//{
+	//	for (int32 j = 0; j < 10; ++j)
+	//	{
+	//		for (int32 k = 0; k < 5; ++k)
+	//		{
+	//			auto cube = jPrimitiveUtil::CreateCube(Vector(i * 25.0f, k * 25.0f, j * 25.0f), Vector::OneVector, Vector(Size), Vector4(0.7f, 0.7f, 0.7f, 1.0f));
+	//			jObject::AddObject(cube);
+	//			SpawnedObjects.push_back(cube);
+	//		}
+	//	}
+	//}
 }
 
 void jGame::SpawnGraphTestFunc()
