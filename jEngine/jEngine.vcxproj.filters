@@ -361,6 +361,12 @@
     <ClInclude Include="Core\jParallelFor.h">
       <Filter>Code\Core</Filter>
     </ClInclude>
+    <ClInclude Include="RHI\jMemoryPool.h">
+      <Filter>Code\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Vulkan\jMemoryPool_Vulkan.h">
+      <Filter>Code\RHI\Vulkan</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -608,6 +614,12 @@
     </ClCompile>
     <ClCompile Include="Core\jMemStackAllocator.cpp">
       <Filter>Code\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\jMemoryPool.cpp">
+      <Filter>Code\RHI</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\jMemoryPool_Vulkan.cpp">
+      <Filter>Code\RHI\Vulkan</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

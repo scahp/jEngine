@@ -256,6 +256,36 @@ GENERATE_CONVERSION_FUNCTION(GetVulkanShaderBindingType,
     CONVERSION_TYPE_ELEMENT(EShaderBindingType::BUFFER_TEXEL_UAV, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER),
     CONVERSION_TYPE_ELEMENT(EShaderBindingType::SUBPASS_INPUT_ATTACHMENT, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT))
 
+FORCEINLINE auto GetVulkanMemoryPropertyFlagBits(EVulkanMemoryBits type)
+{
+    switch (type)
+    {
+    case EVulkanMemoryBits::DEVICE_LOCAL:
+        return VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+    case EVulkanMemoryBits::HOST_VISIBLE:
+        return VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+    case EVulkanMemoryBits::HOST_COHERENT:
+        return VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    case EVulkanMemoryBits::HOST_CACHED:
+        return VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
+    case EVulkanMemoryBits::LAZILY_ALLOCATED:
+        return VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT;
+    case EVulkanMemoryBits::PROTECTED:
+        return VK_MEMORY_PROPERTY_PROTECTED_BIT;
+    case EVulkanMemoryBits::DEVICE_COHERENT_AMD:
+        return VK_MEMORY_PROPERTY_DEVICE_COHERENT_BIT_AMD;
+    case EVulkanMemoryBits::DEVICE_UNCACHED_AMD:
+        return VK_MEMORY_PROPERTY_DEVICE_UNCACHED_BIT_AMD;
+    case EVulkanMemoryBits::RDMA_CAPABLE_NV:
+        return VK_MEMORY_PROPERTY_RDMA_CAPABLE_BIT_NV;
+    case EVulkanMemoryBits::FLAG_BITS_MAX_ENUM:
+        return VK_MEMORY_PROPERTY_FLAG_BITS_MAX_ENUM;
+    default:
+        break;
+    }
+    return static_cast<VkMemoryPropertyFlagBits>(type);
+}
+
 FORCEINLINE auto GetVulkanBufferBits(EVulkanBufferBits type)
 {
     switch (type)
@@ -293,10 +323,9 @@ FORCEINLINE auto GetVulkanBufferBits(EVulkanBufferBits type)
     case EVulkanBufferBits::SHADER_BINDING_TABLE:
         return VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
     default:
-        check(0);
         break;
     }
-    return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    return static_cast<VkBufferUsageFlagBits>(type);
 }
 
 FORCEINLINE VkColorComponentFlags GetVulkanBlendOp(EColorMask type)

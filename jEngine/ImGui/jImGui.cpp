@@ -128,15 +128,14 @@ void jImGUI_Vulkan::Initialize(float width, float height)
     //////////////////////////////////////////////////////////////////////////
     // Staging buffers for font data upload
     jBuffer_Vulkan stagingBuffer;
-
-    verify(jVulkanBufferUtil::CreateBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+    verify(jVulkanBufferUtil::AllocateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
         , uploadSize, stagingBuffer));
 
     stagingBuffer.UpdateBuffer(fontData, uploadSize);
 
     // Copy buffer data to font image
     g_rhi_vk->TransitionImageLayoutImmediate(FontImage, EImageLayout::TRANSFER_DST);
-    jVulkanBufferUtil::CopyBufferToImage(stagingBuffer.Buffer, FontImage_vk->Image, texWidth, texHeight);
+    jVulkanBufferUtil::CopyBufferToImage(stagingBuffer.Buffer, stagingBuffer.Offset, FontImage_vk->Image, texWidth, texHeight);
     g_rhi_vk->TransitionImageLayoutImmediate(FontImage, EImageLayout::SHADER_READ_ONLY);
 
     stagingBuffer.Release();
@@ -427,10 +426,10 @@ void jImGUI_Vulkan::UpdateBuffers()
         const uint64 newBufferSize = imDrawData->TotalVtxCount * sizeof(ImDrawVert);
 
         DynamicBuffer.VertexBufferPtr->Release();
-        verify(jVulkanBufferUtil::CreateBuffer(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+        verify(jVulkanBufferUtil::AllocateBuffer(EVulkanBufferBits::VERTEX_BUFFER, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
             , newBufferSize, *DynamicBuffer.VertexBufferPtr.get()));
-        DynamicBuffer.vertexCount = imDrawData->TotalVtxCount;
         DynamicBuffer.VertexBufferPtr->Map();
+        DynamicBuffer.vertexCount = imDrawData->TotalVtxCount;
     }
 
     // Index buffer
@@ -439,40 +438,23 @@ void jImGUI_Vulkan::UpdateBuffers()
         const uint64 newBufferSize = imDrawData->TotalIdxCount * sizeof(ImDrawIdx);
 
         DynamicBuffer.IndexBufferPtr->Release();
-        verify(jVulkanBufferUtil::CreateBuffer(VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+        verify(jVulkanBufferUtil::AllocateBuffer(EVulkanBufferBits::INDEX_BUFFER, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
             , newBufferSize, *DynamicBuffer.IndexBufferPtr.get()));
-        DynamicBuffer.indexCount = imDrawData->TotalIdxCount;
         DynamicBuffer.IndexBufferPtr->Map();
+        DynamicBuffer.indexCount = imDrawData->TotalIdxCount;
     }
 
     // Upload data
     ImDrawVert* vtxDst = (ImDrawVert*)DynamicBuffer.VertexBufferPtr->GetMappedPointer();
     ImDrawIdx* idxDst = (ImDrawIdx*)DynamicBuffer.IndexBufferPtr->GetMappedPointer();
 
-    for (int n = 0; n < imDrawData->CmdListsCount; n++) {
+    for (int n = 0; n < imDrawData->CmdListsCount; n++) 
+    {
         const ImDrawList* cmd_list = imDrawData->CmdLists[n];
         memcpy(vtxDst, cmd_list->VtxBuffer.Data, cmd_list->VtxBuffer.Size * sizeof(ImDrawVert));
         memcpy(idxDst, cmd_list->IdxBuffer.Data, cmd_list->IdxBuffer.Size * sizeof(ImDrawIdx));
         vtxDst += cmd_list->VtxBuffer.Size;
         idxDst += cmd_list->IdxBuffer.Size;
-    }
-
-    // Flush to make writes visible to GPU
-    {
-        VkMappedMemoryRange mappedRange = {};
-        mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-        mappedRange.memory = DynamicBuffer.VertexBufferPtr->BufferMemory;
-        mappedRange.offset = 0;
-        mappedRange.size = DynamicBuffer.VertexBufferPtr->AllocatedSize;
-        verify(VK_SUCCESS == vkFlushMappedMemoryRanges(g_rhi_vk->Device, 1, &mappedRange));
-    }
-    {
-        VkMappedMemoryRange mappedRange = {};
-        mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-        mappedRange.memory = DynamicBuffer.IndexBufferPtr->BufferMemory;
-        mappedRange.offset = 0;
-        mappedRange.size = DynamicBuffer.IndexBufferPtr->AllocatedSize;
-        verify(VK_SUCCESS == vkFlushMappedMemoryRanges(g_rhi_vk->Device, 1, &mappedRange));
     }
 }
 

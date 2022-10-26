@@ -237,6 +237,8 @@ bool jRHI_Vulkan::InitRHI()
 		vkGetDeviceQueue(Device, PresentQueue.QueueIndex, 0, &PresentQueue.Queue);
 	}
 
+	MemoryPool = new jMemoryPool_Vulkan();
+
 	// Get vkCmdBindShadingRateImageNV function pointer for VRS
 	vkCmdBindShadingRateImageNV = reinterpret_cast<PFN_vkCmdBindShadingRateImageNV>(vkGetDeviceProcAddr(g_rhi_vk->Device, "vkCmdBindShadingRateImageNV"));
 
@@ -391,13 +393,13 @@ jIndexBuffer* jRHI_Vulkan::CreateIndexBuffer(const std::shared_ptr<jIndexStreamD
 	VkDeviceSize bufferSize = streamData->Param->GetBufferSize();
 
 	jBuffer_Vulkan stagingBuffer;
-	jVulkanBufferUtil::CreateBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferSize, stagingBuffer);
+	jVulkanBufferUtil::AllocateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT, bufferSize, stagingBuffer);
 
 	stagingBuffer.UpdateBuffer(streamData->Param->GetBufferData(), bufferSize);
 
 	indexBuffer->BufferPtr = std::make_shared<jBuffer_Vulkan>();
-    jVulkanBufferUtil::CreateBuffer(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, bufferSize, *indexBuffer->BufferPtr.get());
-    jVulkanBufferUtil::CopyBuffer(stagingBuffer.Buffer, indexBuffer->BufferPtr->Buffer, bufferSize);
+	jVulkanBufferUtil::AllocateBuffer(EVulkanBufferBits::TRANSFER_DST | EVulkanBufferBits::INDEX_BUFFER, EVulkanMemoryBits::DEVICE_LOCAL, bufferSize, *indexBuffer->BufferPtr.get());
+    jVulkanBufferUtil::CopyBuffer(stagingBuffer, *indexBuffer->BufferPtr.get(), bufferSize);
 
 	stagingBuffer.Release();
 
@@ -469,6 +471,12 @@ void jRHI_Vulkan::RecreateSwapChain()
 	Flush();
 }
 
+uint32 jRHI_Vulkan::GetMaxSwapchainCount() const
+{
+	check(Swapchain);
+	return (uint32)Swapchain->Images.size();
+}
+
 jVertexBuffer* jRHI_Vulkan::CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const
 {
 	if (!streamData)
@@ -499,8 +507,8 @@ jVertexBuffer* jRHI_Vulkan::CreateVertexBuffer(const std::shared_ptr<jVertexStre
 			jBuffer_Vulkan stagingBuffer;
 
 			// VK_BUFFER_USAGE_TRANSFER_SRC_BIT : 이 버퍼가 메모리 전송 연산의 소스가 될 수 있음.
-			jVulkanBufferUtil::CreateBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT
-				, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferSize, stagingBuffer);
+			jVulkanBufferUtil::AllocateBuffer(EVulkanBufferBits::TRANSFER_SRC
+				, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT, bufferSize, stagingBuffer);
 
 			//// 마지막 파라메터 0은 메모리 영역의 offset 임.
 			//// 이 값이 0이 아니면 memRequirements.alignment 로 나눠야 함. (align 되어있다는 의미)
@@ -517,15 +525,15 @@ jVertexBuffer* jRHI_Vulkan::CreateVertexBuffer(const std::shared_ptr<jVertexStre
 			// VK_BUFFER_USAGE_TRANSFER_DST_BIT : 이 버퍼가 메모리 전송 연산의 목적지가 될 수 있음.
 			// DEVICE LOCAL 메모리에 VertexBuffer를 만들었으므로 이제 vkMapMemory 같은 것은 할 수 없음.
 			stream.BufferPtr = std::make_shared<jBuffer_Vulkan>();
-			jVulkanBufferUtil::CreateBuffer(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
-				, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, bufferSize, *stream.BufferPtr.get());
+            jVulkanBufferUtil::AllocateBuffer(EVulkanBufferBits::TRANSFER_DST | EVulkanBufferBits::VERTEX_BUFFER
+                , EVulkanMemoryBits::DEVICE_LOCAL, bufferSize, *stream.BufferPtr.get());
 
-			jVulkanBufferUtil::CopyBuffer(stagingBuffer.Buffer, stream.BufferPtr->Buffer, bufferSize);
+			jVulkanBufferUtil::CopyBuffer(stagingBuffer, *stream.BufferPtr.get(), bufferSize);
 
 			stagingBuffer.Release();
 		}
 		vertexBuffer->BindInfos.Buffers.push_back(stream.BufferPtr->Buffer);
-		vertexBuffer->BindInfos.Offsets.push_back(stream.Offset);
+		vertexBuffer->BindInfos.Offsets.push_back(stream.Offset + stream.BufferPtr->Offset);
 
 		/////////////////////////////////////////////////////////////
 		VkVertexInputBindingDescription bindingDescription = {};
@@ -655,8 +663,7 @@ jTexture* jRHI_Vulkan::CreateTextureFromData(void* data, int32 width, int32 heig
     uint32 textureMipLevels = static_cast<uint32>(std::floor(std::log2(std::max<int>(width, height)))) + 1;
 
 	jBuffer_Vulkan stagingBuffer;
-
-	jVulkanBufferUtil::CreateBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+	jVulkanBufferUtil::AllocateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
         , imageSize, stagingBuffer);
 
 	stagingBuffer.UpdateBuffer(data, imageSize);
@@ -665,7 +672,7 @@ jTexture* jRHI_Vulkan::CreateTextureFromData(void* data, int32 width, int32 heig
 
 	VkImage TextureImage;
 	VkDeviceMemory TextureImageMemory;
-    if (!ensure(jVulkanBufferUtil::CreateImage(static_cast<uint32>(width), static_cast<uint32>(height), textureMipLevels, VK_SAMPLE_COUNT_1_BIT, vkTextureFormat
+    if (!ensure(jVulkanBufferUtil::CreateImage((uint32)width, (uint32)height, textureMipLevels, VK_SAMPLE_COUNT_1_BIT, vkTextureFormat
         , VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT
         | VK_IMAGE_USAGE_SAMPLED_BIT	// image를 shader 에서 접근가능하게 하고 싶은 경우
         , VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, TextureImage, TextureImageMemory)))
@@ -676,7 +683,7 @@ jTexture* jRHI_Vulkan::CreateTextureFromData(void* data, int32 width, int32 heig
     VkCommandBuffer commandBuffer = BeginSingleTimeCommands();
 	ensure(TransitionImageLayout(commandBuffer, TextureImage, vkTextureFormat, textureMipLevels, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
 
-	jVulkanBufferUtil::CopyBufferToImage(commandBuffer, stagingBuffer.Buffer, TextureImage, static_cast<uint32>(width), static_cast<uint32>(height));
+	jVulkanBufferUtil::CopyBufferToImage(commandBuffer, stagingBuffer.Buffer, stagingBuffer.Offset, TextureImage, (uint32)width, (uint32)height);
 
     // 밉맵을 만드는 동안 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL 으로 전환됨.
     if (createMipmap)
@@ -1713,14 +1720,13 @@ jTexture* jRHI_Vulkan::CreateSampleVRSTexture()
 
         VkDeviceSize imageSize = imageExtent.width * imageExtent.height * GetVulkanTextureComponentCount(ETextureFormat::R8UI);
         jBuffer_Vulkan stagingBuffer;
-
-        jVulkanBufferUtil::CreateBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+        jVulkanBufferUtil::AllocateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
             , imageSize, stagingBuffer);
 
-        VkCommandBuffer commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
+		VkCommandBuffer commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
         ensure(g_rhi_vk->TransitionImageLayout(commandBuffer, (VkImage)NewVRSTexture->GetHandle(), GetVulkanTextureFormat(ETextureFormat::R8UI), 1, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
 
-        jVulkanBufferUtil::CopyBufferToImage(commandBuffer, stagingBuffer.Buffer, (VkImage)NewVRSTexture->GetHandle()
+        jVulkanBufferUtil::CopyBufferToImage(commandBuffer, stagingBuffer.Buffer, stagingBuffer.Offset, (VkImage)NewVRSTexture->GetHandle()
             , static_cast<uint32>(imageExtent.width), static_cast<uint32>(imageExtent.height));
 
         // Create a circular pattern with decreasing sampling rates outwards (max. range, pattern)

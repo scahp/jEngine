@@ -206,17 +206,16 @@ void jGame::Draw()
 
 		g_rhi->EndRenderFrame(renderFrameContext);
 
-		// Get a whole occlusion queries
+		// Get a whole occlusion queries from previous frame
+		const int32 LastFrameIndex = (renderer.FrameIndex + 1) % g_rhi->GetMaxSwapchainCount();
 		std::vector<uint64> passedSamplesQueries = g_rhi->GetQueryOcclusionPool()->GetWholeQueryResult(
-			renderer.FrameIndex, g_rhi->GetQueryOcclusionPool()->GetUsedQueryCount(renderer.FrameIndex));
+			LastFrameIndex, g_rhi->GetQueryOcclusionPool()->GetUsedQueryCount(LastFrameIndex));
 
-		//uint64 shadowPasses = forwardRenderer.ShadowpassOcclusionTest.GetQueryResult();
 		renderer.ShadowpassOcclusionTest.GetQueryResultFromQueryArray(renderer.FrameIndex, passedSamplesQueries);
 		uint64 shadowPasses = renderer.ShadowpassOcclusionTest.Result;
 		static jName PassedSamplesInShadowPass("ShadowPassSamples");
 		jImGUI_Vulkan::Get().CounterMap[PassedSamplesInShadowPass] = shadowPasses;
 
-		//uint64 basePass = forwardRenderer.BasepassOcclusionTest.GetQueryResult();
 		renderer.BasepassOcclusionTest.GetQueryResultFromQueryArray(renderer.FrameIndex, passedSamplesQueries);
 		uint64 basePass = renderer.BasepassOcclusionTest.Result;
 		static jName PassedSamplesInBasePass("BasePassSamples");
@@ -576,16 +575,18 @@ void jGame::SpawnIndirectDrawPrimitives()
             const size_t bufferSize = indrectCommands.size() * sizeof(VkDrawIndirectCommand);
 
             jBuffer_Vulkan stagingBuffer;
-            jVulkanBufferUtil::CreateBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+            jVulkanBufferUtil::AllocateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
                 , bufferSize, stagingBuffer);
 
             stagingBuffer.UpdateBuffer(indrectCommands.data(), bufferSize);
 
             jBuffer_Vulkan* temp = new jBuffer_Vulkan();
+			check(!obj->RenderObject->IndirectCommandBuffer);
             obj->RenderObject->IndirectCommandBuffer = temp;
-            jVulkanBufferUtil::CreateBuffer(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+            jVulkanBufferUtil::AllocateBuffer(EVulkanBufferBits::TRANSFER_DST | EVulkanBufferBits::INDIRECT_BUFFER, EVulkanMemoryBits::DEVICE_LOCAL
                 , bufferSize, *temp);
-            jVulkanBufferUtil::CopyBuffer(stagingBuffer.Buffer, (VkBuffer)obj->RenderObject->IndirectCommandBuffer->GetHandle(), bufferSize);
+            jVulkanBufferUtil::CopyBuffer(stagingBuffer.Buffer, (VkBuffer)obj->RenderObject->IndirectCommandBuffer->GetHandle(), bufferSize
+				, stagingBuffer.AllocatedSize, obj->RenderObject->IndirectCommandBuffer->GetAllocatedSize());
 
             stagingBuffer.Release();
         }

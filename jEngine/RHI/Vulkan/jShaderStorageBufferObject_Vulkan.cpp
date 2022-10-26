@@ -16,8 +16,8 @@ void jShaderStorageBufferObject_Vulkan::Init(size_t size)
     }
     else
     {
-        jVulkanBufferUtil::CreateBuffer(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
-            | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, VkDeviceSize(size), Buffer);
+        jVulkanBufferUtil::AllocateBuffer(EVulkanBufferBits::STORAGE_BUFFER, EVulkanMemoryBits::HOST_VISIBLE
+            | EVulkanMemoryBits::HOST_COHERENT, VkDeviceSize(size), Buffer);
     }
 }
 
@@ -35,7 +35,7 @@ void jShaderStorageBufferObject_Vulkan::UpdateBufferData(const void* InData, siz
         
         if (ensure(ringBuffer->MappedPointer))
         {
-            char* startAddr = ((char*)ringBuffer->MappedPointer) + Buffer.Offset;
+            uint8* startAddr = ((uint8*)ringBuffer->MappedPointer) + Buffer.Offset;
             if (InData)
                 memcpy(startAddr, InData, InSize);
             else
@@ -44,6 +44,16 @@ void jShaderStorageBufferObject_Vulkan::UpdateBufferData(const void* InData, siz
     }
     else
     {
+#if USE_VK_MEMORY_POOL
+        if (ensure(Buffer.MappedPointer))
+        {
+            uint8* startAddr = ((uint8*)Buffer.MappedPointer) + Buffer.Offset;
+            if (InData)
+                memcpy(startAddr, InData, InSize);
+            else
+                memset(startAddr, 0, InSize);
+        }
+#else
         if (Buffer.Buffer && Buffer.BufferMemory)
         {
             void* data = nullptr;
@@ -54,6 +64,7 @@ void jShaderStorageBufferObject_Vulkan::UpdateBufferData(const void* InData, siz
                 memset(data, 0, InSize);
             vkUnmapMemory(g_rhi_vk->Device, Buffer.BufferMemory);
         }
+#endif
     }
 }
 
@@ -69,12 +80,17 @@ void jShaderStorageBufferObject_Vulkan::ClearBuffer(int32 clearValue)
 
         if (ensure(ringBuffer->MappedPointer))
         {
-            char* startAddr = ((char*)ringBuffer->MappedPointer) + Buffer.Offset;
-            memset(startAddr, 0, Buffer.AllocatedSize);
+            memset(((uint8*)ringBuffer->MappedPointer) + Buffer.Offset, 0, Buffer.AllocatedSize);
         }
     }
     else
     {
+#if USE_VK_MEMORY_POOL
+        if (ensure(Buffer.MappedPointer))
+        {
+            memset(((uint8*)Buffer.MappedPointer) + Buffer.Offset, 0, Buffer.AllocatedSize);
+        }
+#else
         if (Buffer.Buffer && Buffer.BufferMemory)
         {
             void* data = nullptr;
@@ -82,5 +98,6 @@ void jShaderStorageBufferObject_Vulkan::ClearBuffer(int32 clearValue)
             memset(data, clearValue, Buffer.AllocatedSize);
             vkUnmapMemory(g_rhi_vk->Device, Buffer.BufferMemory);
         }
+#endif
     }
 }

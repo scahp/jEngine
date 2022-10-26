@@ -82,20 +82,28 @@ FORCEINLINE bool CreateImageCube(uint32 width, uint32 height, uint32 mipLevels, 
     return false;
 }
 
-size_t CreateBuffer(VkBufferUsageFlags InUsage, VkMemoryPropertyFlags InProperties, VkDeviceSize InSize, VkBuffer& OutBuffer, VkDeviceMemory& OutBufferMemory, uint64& OutAllocatedSize);
-
-FORCEINLINE size_t CreateBuffer(VkBufferUsageFlags InUsage, VkMemoryPropertyFlags InProperties, VkDeviceSize InSize, jBuffer_Vulkan& OutBuffer)
+size_t CreateBuffer(EVulkanBufferBits InUsage, EVulkanMemoryBits InProperties, uint64 InSize, VkBuffer& OutBuffer, VkDeviceMemory& OutBufferMemory, uint64& OutAllocatedSize);
+FORCEINLINE size_t AllocateBuffer(EVulkanBufferBits InUsage, EVulkanMemoryBits InProperties, uint64 InSize, jBuffer_Vulkan& OutBuffer)
 {
+#if USE_VK_MEMORY_POOL
+    check(g_rhi->GetMemoryPool());
+    const jMemory& Memory = g_rhi->GetMemoryPool()->Alloc(InUsage, InProperties, InSize);
+    OutBuffer.InitializeWithMemory(Memory);
+    return OutBuffer.AllocatedSize;
+#else
     return CreateBuffer(InUsage, InProperties, InSize, OutBuffer.Buffer, OutBuffer.BufferMemory, OutBuffer.AllocatedSize);
+#endif
 }
 
-void CopyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer buffer, VkImage image, uint32 width, uint32 height);
+void CopyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer buffer, uint64 bufferOffset, VkImage image, uint32 width, uint32 height);
 void GenerateMipmaps(VkCommandBuffer commandBuffer, VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32 mipLevels
     , VkImageLayout oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VkImageLayout newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-void CopyBuffer(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+void CopyBuffer(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VkDeviceSize srcOffset, VkDeviceSize dstOffset);
+void CopyBuffer(VkCommandBuffer commandBuffer, const jBuffer_Vulkan& srcBuffer, const jBuffer_Vulkan& dstBuffer, VkDeviceSize size);
 
-void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32 width, uint32 height);
+void CopyBufferToImage(VkBuffer buffer, uint64 bufferOffset, VkImage image, uint32 width, uint32 height);
 void GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32 mipLevels
     , VkImageLayout oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VkImageLayout newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VkDeviceSize srcOffset, VkDeviceSize dstOffset);
+void CopyBuffer(const jBuffer_Vulkan& srcBuffer, const jBuffer_Vulkan& dstBuffer, VkDeviceSize size);
 }

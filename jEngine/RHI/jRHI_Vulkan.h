@@ -14,6 +14,7 @@
 #include "Vulkan/jSwapchain_Vulkan.h"
 #include "Vulkan/jShader_Vulkan.h"
 #include "Vulkan/jQueryPoolOcclusion_Vulkan.h"
+#include "Vulkan/jMemoryPool_Vulkan.h"
 
 struct jRingBuffer_Vulkan;
 struct jDescriptorPool_Vulkan;
@@ -89,6 +90,7 @@ public:
 	jSwapchain_Vulkan* Swapchain = nullptr;
 	jCommandBufferManager_Vulkan* CommandBufferManager = nullptr;
     jFenceManager_Vulkan FenceManager;
+	jMemoryPool_Vulkan* MemoryPool = nullptr;
 
     jQueryPoolTime_Vulkan* QueryPoolTime = nullptr;
 	jQueryPoolOcclusion_Vulkan* QueryPoolOcclusion = nullptr;
@@ -115,6 +117,7 @@ public:
 	// 여기 있을 것은 아님
 	void CleanupSwapChain();
 	virtual void RecreateSwapChain() override;
+	virtual uint32 GetMaxSwapchainCount() const override;
 
     FORCEINLINE const VkDevice& GetDevice() const { return Device; }
 
@@ -167,8 +170,8 @@ public:
 		, const jAttachment& colorResolveAttachment, const Vector2i& offset, const Vector2i& extent) const override;
 	virtual jRenderPass* GetOrCreateRenderPass(const jRenderPassInfo& renderPassInfo, const Vector2i& offset, const Vector2i& extent) const override;
 
-	virtual jCommandBufferManager* GetCommandBufferManager() const { return CommandBufferManager; }
-	virtual EMSAASamples GetSelectedMSAASamples() const { return SelectedMSAASamples; }
+	virtual jCommandBufferManager* GetCommandBufferManager() const override { return CommandBufferManager; }
+	virtual EMSAASamples GetSelectedMSAASamples() const override { return SelectedMSAASamples; }
 	virtual jQueryPool* GetQueryTimePool() const override { return QueryPoolTime; }
 	virtual jQueryPool* GetQueryOcclusionPool() const override { return QueryPoolOcclusion; }
 	virtual jSwapchain* GetSwapchain() const override { return Swapchain; }
@@ -182,6 +185,8 @@ public:
 
 	PFN_vkCmdBindShadingRateImageNV vkCmdBindShadingRateImageNV = nullptr;		// Function pointer of VRS
 	virtual void BindShadingRateImage(jCommandBuffer* commandBuffer, jTexture* vrstexture) const override;
+	
+	virtual jMemoryPool* GetMemoryPool() const override { return MemoryPool; }
 
 	// Temporary VRS Texture
 	jTexture* CreateSampleVRSTexture();

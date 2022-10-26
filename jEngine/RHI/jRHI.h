@@ -17,6 +17,7 @@ struct jShader;
 struct jShaderInfo;
 struct jSamplerStateInfo;
 class jSwapchain;
+class jMemoryPool;
 
 enum class EUniformType
 {
@@ -457,9 +458,11 @@ public:
 	virtual jQueryPool* GetQueryTimePool() const { return nullptr; }
 	virtual jSwapchain* GetSwapchain() const { return nullptr; }
 	virtual void RecreateSwapChain() {}
+	virtual uint32 GetMaxSwapchainCount() const { return 0; }
 
     virtual jQueryPool* GetQueryOcclusionPool() const { return nullptr; }
 	virtual void BindShadingRateImage(jCommandBuffer* commandBuffer, jTexture* vrstexture) const {}
+	virtual jMemoryPool* GetMemoryPool() const { return nullptr; }
 };
 
 // Not thred safe

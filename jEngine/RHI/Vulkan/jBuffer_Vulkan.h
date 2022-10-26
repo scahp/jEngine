@@ -1,15 +1,32 @@
 ﻿#pragma once
 #include "../jRHIType.h"
+#include "../jMemoryPool.h"
 
 struct jBuffer_Vulkan : public jBuffer
 {
     jBuffer_Vulkan() = default;
-    jBuffer_Vulkan(VkBuffer buffer, VkDeviceMemory bufferMemory)
-        : Buffer(buffer), BufferMemory(bufferMemory)
+    jBuffer_Vulkan(VkBuffer InBuffer, VkDeviceMemory InBufferMemory)
+        : Buffer(InBuffer), BufferMemory(InBufferMemory)
     {}
+    jBuffer_Vulkan(const jMemory& InMemory)
+    {
+        InitializeWithMemory(InMemory);
+    }
     virtual ~jBuffer_Vulkan()
     {
         ReleaseInternal();
+    }
+
+    void InitializeWithMemory(const jMemory& InMemory)
+    {
+        check(InMemory.IsValid());
+        HasBufferOwnership = false;
+        Buffer = (VkBuffer)InMemory.GetBuffer();
+        MappedPointer = InMemory.GetMappedPointer();
+        BufferMemory = (VkDeviceMemory)InMemory.GetMemory();
+        Offset = InMemory.Range.Offset;
+        AllocatedSize = InMemory.Range.DataSize;
+        Memory = InMemory;
     }
 
     virtual void Release() override;
@@ -25,6 +42,7 @@ struct jBuffer_Vulkan : public jBuffer
     virtual void* GetMemoryHandle() const override { return BufferMemory; }
     virtual size_t GetAllocatedSize() const override { return AllocatedSize; }
 
+    jMemory Memory;
     VkBuffer Buffer = nullptr;
     VkDeviceMemory BufferMemory = nullptr;
     size_t Offset = 0;

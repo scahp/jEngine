@@ -198,7 +198,7 @@ bool CreateImage2DArray(uint32 width, uint32 height, uint32 arrayLayers, uint32 
     return true;
 }
 
-size_t CreateBuffer(VkBufferUsageFlags InUsage, VkMemoryPropertyFlags InProperties, VkDeviceSize InSize, VkBuffer& OutBuffer, VkDeviceMemory& OutBufferMemory, uint64& OutAllocatedSize)
+size_t CreateBuffer(EVulkanBufferBits InUsage, EVulkanMemoryBits InProperties, uint64 InSize, VkBuffer& OutBuffer, VkDeviceMemory& OutBufferMemory, uint64& OutAllocatedSize)
 {
     check(InSize);
     VkBufferCreateInfo bufferInfo = {};
@@ -206,7 +206,7 @@ size_t CreateBuffer(VkBufferUsageFlags InUsage, VkMemoryPropertyFlags InProperti
     bufferInfo.size = InSize;
 
     // OR 비트연산자를 사용해 다양한 버퍼용도로 사용할 수 있음.
-    bufferInfo.usage = InUsage;
+    bufferInfo.usage = GetVulkanBufferBits(InUsage);
 
     // swapchain과 마찬가지로 버퍼또한 특정 queue family가 소유하거나 혹은 여러 Queue에서 공유됨
     bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -221,7 +221,7 @@ size_t CreateBuffer(VkBufferUsageFlags InUsage, VkMemoryPropertyFlags InProperti
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize = memRequirements.size;
     allocInfo.memoryTypeIndex = jVulkanBufferUtil::FindMemoryType(g_rhi_vk->PhysicalDevice, memRequirements.memoryTypeBits
-        , InProperties);
+        , GetVulkanMemoryPropertyFlagBits(InProperties));
 
     if (!ensure(vkAllocateMemory(g_rhi_vk->Device, &allocInfo, nullptr, &OutBufferMemory) == VK_SUCCESS))
         return 0;
@@ -230,15 +230,15 @@ size_t CreateBuffer(VkBufferUsageFlags InUsage, VkMemoryPropertyFlags InProperti
 
     // 마지막 파라메터 0은 메모리 영역의 offset 임.
     // 이 값이 0이 아니면 memRequirements.alignment 로 나눠야 함. (align 되어있다는 의미)
-    vkBindBufferMemory(g_rhi_vk->Device, OutBuffer, OutBufferMemory, 0);
+    check(VK_SUCCESS == vkBindBufferMemory(g_rhi_vk->Device, OutBuffer, OutBufferMemory, 0));
 
     return memRequirements.size;
 }
 
-void CopyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer buffer, VkImage image, uint32 width, uint32 height)
+void CopyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer buffer, uint64 bufferOffset, VkImage image, uint32 width, uint32 height)
 {
     VkBufferImageCopy region = {};
-    region.bufferOffset = 0;
+    region.bufferOffset = bufferOffset;
 
     // 아래 2가지는 얼마나 많은 pixel이 들어있는지 설명, 둘다 0, 0이면 전체
     region.bufferRowLength = 0;
@@ -330,21 +330,27 @@ void GenerateMipmaps(VkCommandBuffer commandBuffer, VkImage image, VkFormat imag
         , 1, &barrier);
 }
 
-void CopyBuffer(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
+void CopyBuffer(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VkDeviceSize srcOffset, VkDeviceSize dstOffset)
 {
     // VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT : 커맨드버퍼를 1번만 쓰고, 복사가 다 될때까지 기다리기 위해서 사용
 
     VkBufferCopy copyRegion = {};
-    copyRegion.srcOffset = 0;		// Optional
-    copyRegion.dstOffset = 0;		// Optional
+    copyRegion.srcOffset = srcOffset;		// Optional
+    copyRegion.dstOffset = dstOffset;		// Optional
     copyRegion.size = size;			// 여기서는 VK_WHOLE_SIZE 사용 불가
     vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
 }
 
-void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32 width, uint32 height)
+void CopyBuffer(VkCommandBuffer commandBuffer, const jBuffer_Vulkan& srcBuffer, const jBuffer_Vulkan& dstBuffer, VkDeviceSize size)
+{
+    check(srcBuffer.AllocatedSize >= size && dstBuffer.AllocatedSize >= size);
+    CopyBuffer(commandBuffer, srcBuffer.Buffer, dstBuffer.Buffer, size, srcBuffer.Offset, dstBuffer.Offset);
+}
+
+void CopyBufferToImage(VkBuffer buffer, uint64 bufferOffset, VkImage image, uint32 width, uint32 height)
 {
     VkCommandBuffer commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
-    CopyBufferToImage(commandBuffer, buffer, image, width, height);
+    CopyBufferToImage(commandBuffer, buffer, bufferOffset, image, width, height);
     g_rhi_vk->EndSingleTimeCommands(commandBuffer);
 }
 
@@ -361,11 +367,19 @@ void GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int3
     g_rhi_vk->EndSingleTimeCommands(commandBuffer);
 }
 
-void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
+void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VkDeviceSize srcOffset, VkDeviceSize dstOffset)
 {
-    // 임시 커맨드 버퍼를 통해서 메모리를 전송함.
+     // 임시 커맨드 버퍼를 통해서 메모리를 전송함.
     VkCommandBuffer commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
-    CopyBuffer(commandBuffer, srcBuffer, dstBuffer, size);
+    CopyBuffer(commandBuffer, srcBuffer, dstBuffer, size, srcOffset, dstOffset);
+    g_rhi_vk->EndSingleTimeCommands(commandBuffer);
+}
+
+void CopyBuffer(const jBuffer_Vulkan& srcBuffer, const jBuffer_Vulkan& dstBuffer, VkDeviceSize size)
+{
+    check(srcBuffer.AllocatedSize >= size && dstBuffer.AllocatedSize >= size);
+    VkCommandBuffer commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
+    CopyBuffer(commandBuffer, srcBuffer.Buffer, dstBuffer.Buffer, size, srcBuffer.Offset, dstBuffer.Offset);
     g_rhi_vk->EndSingleTimeCommands(commandBuffer);
 }
 

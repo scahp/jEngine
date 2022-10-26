@@ -110,7 +110,7 @@ void jRenderer::SetupShadowPass()
     {
         new (&ShadowPasses[InIndex]) jDrawCommand(RenderFrameContextPtr, &ShadowView, InObject->RenderObject, ShadowMapRenderPass
             , (InObject->HasInstancing() ? ShadowInstancingShader : ShadowShader), &ShadpwPipelineStateFixed, {}, nullptr);
-        ShadowPasses[InIndex].PrepareToDraw(false);
+        ShadowPasses[InIndex].PrepareToDraw(true);
     });
 #else
     ShadowPasses.resize(jObject::GetStaticObject().size());

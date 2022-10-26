@@ -15,6 +15,9 @@ bool jQueryPoolOcclusion_Vulkan::Create()
     querPoolCreateInfo.queryType = VK_QUERY_TYPE_OCCLUSION;
     querPoolCreateInfo.queryCount = MaxQueryOcclusionCount * jRHI::MaxWaitingQuerySet;
 
+    for (int32 i = 0; i < jRHI::MaxWaitingQuerySet; ++i)
+        QueryIndex[i] = MaxQueryOcclusionCount * i;
+
     const VkResult res = vkCreateQueryPool(g_rhi_vk->Device, &querPoolCreateInfo, nullptr, &QueryPool);
     return (res == VK_SUCCESS);
 }
@@ -32,20 +35,22 @@ void jQueryPoolOcclusion_Vulkan::Release()
 
 std::vector<uint64> jQueryPoolOcclusion_Vulkan::GetWholeQueryResult(int32 InFrameIndex, int32 InCount) const
 {
-    std::vector<uint64> result;
-    result.resize(InCount);
-    vkGetQueryPoolResults(g_rhi_vk->Device, QueryPool, InFrameIndex * MaxQueryOcclusionCount, InCount
-        , sizeof(uint64) * InCount, result.data(), sizeof(uint64), VK_QUERY_RESULT_64_BIT);
-    return result;
+    std::vector<uint64> queryResult;
+    queryResult.resize(InCount);
+    VkResult result = vkGetQueryPoolResults(g_rhi_vk->Device, QueryPool, InFrameIndex * MaxQueryOcclusionCount, InCount
+        , sizeof(uint64) * InCount, queryResult.data(), sizeof(uint64), VK_QUERY_RESULT_64_BIT);
+    ensure(result == VK_SUCCESS);
+    return queryResult;
 }
 
 std::vector<uint64> jQueryPoolOcclusion_Vulkan::GetWholeQueryResult(int32 InFrameIndex) const
 {
-    std::vector<uint64> result;
-    result.resize(MaxQueryOcclusionCount);
-    vkGetQueryPoolResults(g_rhi_vk->Device, QueryPool, InFrameIndex * MaxQueryOcclusionCount, MaxQueryOcclusionCount
-        , sizeof(uint64) * MaxQueryOcclusionCount, result.data(), sizeof(uint64), VK_QUERY_RESULT_64_BIT);
-    return result;
+    std::vector<uint64> queryResult;
+    queryResult.resize(MaxQueryOcclusionCount);
+    VkResult result = vkGetQueryPoolResults(g_rhi_vk->Device, QueryPool, InFrameIndex * MaxQueryOcclusionCount, MaxQueryOcclusionCount
+        , sizeof(uint64) * MaxQueryOcclusionCount, queryResult.data(), sizeof(uint64), VK_QUERY_RESULT_64_BIT);
+    ensure(result == VK_SUCCESS);
+    return queryResult;
 }
 
 int32 jQueryPoolOcclusion_Vulkan::GetUsedQueryCount(int32 InFrameIndex) const
@@ -91,6 +96,9 @@ uint64 jQueryOcclusion_Vulkan::GetQueryResult()
 
 void jQueryOcclusion_Vulkan::GetQueryResultFromQueryArray(int32 InWatingResultIndex, const std::vector<uint64>& wholeQueryTimeStampArray) const
 {
-    const uint32 queryIndex = (QueryId) - InWatingResultIndex * MaxQueryOcclusionCount;
-    Result = wholeQueryTimeStampArray[queryIndex];
+    if (wholeQueryTimeStampArray.size() && (QueryId >= InWatingResultIndex * MaxQueryOcclusionCount))
+    {
+        const uint32 queryIndex = QueryId - InWatingResultIndex * MaxQueryOcclusionCount;
+        Result = wholeQueryTimeStampArray[queryIndex];
+    }
 }
