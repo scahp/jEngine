@@ -36,6 +36,9 @@ void jQueryPoolOcclusion_Vulkan::Release()
 std::vector<uint64> jQueryPoolOcclusion_Vulkan::GetWholeQueryResult(int32 InFrameIndex, int32 InCount) const
 {
     std::vector<uint64> queryResult;
+    if (InCount <= 0)
+        return queryResult;
+
     queryResult.resize(InCount);
     VkResult result = vkGetQueryPoolResults(g_rhi_vk->Device, QueryPool, InFrameIndex * MaxQueryOcclusionCount, InCount
         , sizeof(uint64) * InCount, queryResult.data(), sizeof(uint64), VK_QUERY_RESULT_64_BIT);
