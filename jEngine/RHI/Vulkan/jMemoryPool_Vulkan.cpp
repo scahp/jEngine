@@ -17,6 +17,6 @@ void jSubMemoryAllocator_Vulkan::Initialize(EVulkanBufferBits InUsage, EVulkanMe
 
     if (!(EVulkanBufferBits::TRANSFER_DST & InUsage))
     {
-        check(VK_SUCCESS == vkMapMemory(g_rhi_vk->Device, DeviceMemory, 0, SubMemoryRange.DataSize, 0, &MappedPointer));
+        verify(VK_SUCCESS == vkMapMemory(g_rhi_vk->Device, DeviceMemory, 0, SubMemoryRange.DataSize, 0, &MappedPointer));
     }
 }

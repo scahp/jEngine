@@ -230,7 +230,7 @@ size_t CreateBuffer(EVulkanBufferBits InUsage, EVulkanMemoryBits InProperties, u
 
     // 마지막 파라메터 0은 메모리 영역의 offset 임.
     // 이 값이 0이 아니면 memRequirements.alignment 로 나눠야 함. (align 되어있다는 의미)
-    check(VK_SUCCESS == vkBindBufferMemory(g_rhi_vk->Device, OutBuffer, OutBufferMemory, 0));
+    verify(VK_SUCCESS == vkBindBufferMemory(g_rhi_vk->Device, OutBuffer, OutBufferMemory, 0));
 
     return memRequirements.size;
 }
