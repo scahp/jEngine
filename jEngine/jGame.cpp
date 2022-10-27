@@ -193,7 +193,7 @@ void jGame::Update(float deltaTime)
 
 void jGame::Draw()
 {
-	SCOPE_CPU_PROFILE(Game_Draw);
+	SCOPE_CPU_PROFILE(Draw);
 	SCOPE_DEBUG_EVENT(g_rhi, "Game::Draw");
 
 	{

@@ -24,7 +24,7 @@ static std::shared_ptr<TPushConstant<jSimplePushConstant>> PushConstantPtr;
 
 void jRenderer::Setup()
 {
-    SCOPE_CPU_PROFILE(Renderer_Setup);
+    SCOPE_CPU_PROFILE(Setup);
 
     FrameIndex = g_rhi_vk->CurrenFrameIndex;
 
@@ -47,7 +47,7 @@ void jRenderer::Setup()
 
 void jRenderer::SetupShadowPass()
 {
-    SCOPE_CPU_PROFILE(Renderer_SetupShadowPass);
+    SCOPE_CPU_PROFILE(SetupShadowPass);
 
     // Prepare shadowpass pipeline
     auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
@@ -127,7 +127,7 @@ void jRenderer::SetupShadowPass()
 
 void jRenderer::SetupBasePass()
 {
-    SCOPE_CPU_PROFILE(Renderer_SetupBasePass);
+    SCOPE_CPU_PROFILE(SetupBasePass);
 
     // Prepare basepass pipeline
     auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
@@ -242,7 +242,7 @@ void jRenderer::ShadowPass()
 #endif
 
     {
-        SCOPE_CPU_PROFILE(Renderer_ShadowPass);
+        SCOPE_CPU_PROFILE(ShadowPass);
         SCOPE_GPU_PROFILE(RenderFrameContextPtr, ShadowPass);
 
         g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, View.DirectionalLight->ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_ATTACHMENT);
@@ -268,7 +268,7 @@ void jRenderer::OpaquePass()
         BasePassSetupFinishEvent.wait();
 
     {
-        SCOPE_CPU_PROFILE(Renderer_OpaquePass);
+        SCOPE_CPU_PROFILE(OpaquePass);
         SCOPE_GPU_PROFILE(RenderFrameContextPtr, BasePass);
 
         g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, RenderFrameContextPtr->SceneRenderTarget->ColorPtr->GetTexture(), EImageLayout::COLOR_ATTACHMENT);
@@ -288,12 +288,12 @@ void jRenderer::OpaquePass()
 
 void jRenderer::TranslucentPass()
 {
-    // SCOPE_CPU_PROFILE(Renderer_TranslucentPass);
+    // SCOPE_CPU_PROFILE(TranslucentPass);
 }
 
 void jRenderer::PostProcess()
 {
-    SCOPE_CPU_PROFILE(Renderer_PostProcess);
+    SCOPE_CPU_PROFILE(PostProcess);
     {
         SCOPE_GPU_PROFILE(RenderFrameContextPtr, CopyCS);
 
@@ -373,10 +373,10 @@ void jRenderer::PostProcess()
 
 void jRenderer::Render()
 {
-    SCOPE_CPU_PROFILE(Renderer_Render);
+    SCOPE_CPU_PROFILE(Render);
 
     {
-        SCOPE_CPU_PROFILE(Renderer_PoolReset);
+        SCOPE_CPU_PROFILE(PoolReset);
         check(RenderFrameContextPtr->CommandBuffer);
         ensure(RenderFrameContextPtr->CommandBuffer->Begin());
         if (g_rhi->GetQueryTimePool())

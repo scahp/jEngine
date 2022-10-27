@@ -4,7 +4,7 @@ namespace jVulkanDeviceUtil
 {
 
 #if _DEBUG
-static constexpr bool EnableValidationLayers = true;
+static constexpr bool EnableValidationLayers = false;
 #else
 static constexpr bool EnableValidationLayers = false;
 #endif

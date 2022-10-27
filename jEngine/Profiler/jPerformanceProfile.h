@@ -7,22 +7,32 @@
 
 static constexpr int32 MaxProfileFrame = 10;
 
-extern robin_hood::unordered_map<jPriorityName, uint64, jPriorityNameHashFunc> ScopedProfileCPUMap[MaxProfileFrame];
-extern robin_hood::unordered_map<jPriorityName, uint64, jPriorityNameHashFunc> ScopedProfileGPUMap[MaxProfileFrame];
+struct jScopedProfileData
+{
+	uint64 ElapsedTick = 0;
+	int32 Indent = 0;
+	std::thread::id ThreadId;
+};
+
+extern robin_hood::unordered_map<jPriorityName, jScopedProfileData, jPriorityNameHashFunc> ScopedProfileCPUMap[MaxProfileFrame];
+extern robin_hood::unordered_map<jPriorityName, jScopedProfileData, jPriorityNameHashFunc> ScopedProfileGPUMap[MaxProfileFrame];
 struct jQuery;
 
 void ClearScopedProfileCPU();
-void AddScopedProfileCPU(const jPriorityName& name, uint64 elapsedTick);
+void AddScopedProfileCPU(const jPriorityName& name, uint64 elapsedTick, int32 Indent = 0);
 
 void ClearScopedProfileGPU();
-void AddScopedProfileGPU(const jPriorityName& name, uint64 elapsedTick);
+void AddScopedProfileGPU(const jPriorityName& name, uint64 elapsedTick, int32 Indent = 0);
+
+extern thread_local std::atomic<int32> ScopedProfilerCPUIndent;
+extern thread_local std::atomic<int32> ScopedProfilerGPUIndent;
 
 //////////////////////////////////////////////////////////////////////////
 // jScopedProfile_CPU
 class jScopedProfile_CPU
 {
 public:
-	static int32 s_priority;
+	static std::atomic<int32> s_priority;
 
 	static void ResetPriority() { s_priority = 0; }
 
@@ -30,20 +40,23 @@ public:
 		: Name(name)
 	{
 		Start = std::chrono::system_clock::now();
-		Priority = s_priority++;
+		Priority = s_priority.fetch_add(1);
+		Indent = ScopedProfilerCPUIndent.fetch_add(1);
 	}
 
 	~jScopedProfile_CPU()
 	{
         const std::chrono::nanoseconds nano_seconds 
 			= std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now() - Start);
-		AddScopedProfileCPU(jPriorityName(Name, Priority), nano_seconds.count());
+		AddScopedProfileCPU(jPriorityName(Name, Priority), nano_seconds.count(), Indent);
+		ScopedProfilerCPUIndent.fetch_add(-1);
 	}
 
 	jName Name;
 	uint64 StartTick = 0;
     std::chrono::system_clock::time_point Start;
 	int32 Priority = 0;
+	int32 Indent = 0;
 };
 
 #if ENABLE_PROFILE_CPU
@@ -102,6 +115,7 @@ struct jProfile_GPU
 {
 	jName Name;
 	jQuery* Query = nullptr;
+	int32 Indent = 0;
 
 	static int32 CurrentWatingResultListIndex;
 	static std::vector<jProfile_GPU> WatingResultList[jRHI::MaxWaitingQuerySet];
@@ -139,7 +153,7 @@ struct jProfile_GPU
 			{
 				iter.Query->GetQueryResult();
 			}
-			AddScopedProfileGPU(jPriorityName(iter.Name, priority++), iter.Query->GetElpasedTime());
+			AddScopedProfileGPU(jPriorityName(iter.Name, priority++), iter.Query->GetElpasedTime(), iter.Indent);
             jQueryTimePool::ReturnQueryTime(iter.Query);
 		}
 		prevList.clear();
@@ -162,6 +176,7 @@ public:
 
         Profile.Query = jQueryTimePool::GetQueryTime();
 		Profile.Query->BeginQuery(InRenderFrameContext->CommandBuffer);
+		Profile.Indent = ScopedProfilerGPUIndent.fetch_add(1);
 	}
 
 	~jScopedProfile_GPU()
@@ -171,6 +186,7 @@ public:
 
 		Profile.Query->EndQuery(RenderFrameContextPtr.lock()->CommandBuffer);
 		jProfile_GPU::WatingResultList[jProfile_GPU::CurrentWatingResultListIndex].emplace_back(Profile);
+		ScopedProfilerGPUIndent.fetch_add(-1);
 	}
 
 	std::weak_ptr<jRenderFrameContext> RenderFrameContextPtr;
@@ -193,6 +209,8 @@ public:
 		uint64 TotalElapsedTick = 0;
 		double AvgElapsedMS = 0;
 		int32 TotalSampleCount = 0;
+		int32 Indent = 0;
+		std::thread::id ThreadId;
 	};
 
 	using AvgProfileMapType = std::map<jPriorityName, jAvgProfile, jPriorityNameComapreFunc>;

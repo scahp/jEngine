@@ -55,7 +55,6 @@ void jEngine::Update(float deltaTime)
 
 void jEngine::Draw()
 {
-    SCOPE_CPU_PROFILE(Engine_Draw);
 	Game.Draw();
 }
 

@@ -344,13 +344,28 @@ void jImGUI_Vulkan::NewFrame(bool updateFrameGraph)
     ImGui::Checkbox("UseWaveIntrinsics", &gOptions.UseWaveIntrinsics);
     ImGui::Separator();
 
+    constexpr float IndentSpace = 10.0f;
+    const std::thread::id CurrentThreadId = std::this_thread::get_id();
+    const ImVec4 OtherThreadColor = { 0.2f, 0.6f, 0.2f, 1.0f };
     {
         const auto& CPUAvgProfileMap = jPerformanceProfile::GetInstance().GetCPUAvgProfileMap();
         double TotalPassesMS = 0.0;
         for (auto& pair : CPUAvgProfileMap)
         {
-            ImGui::Text("%s : %lf ms", pair.first.ToStr(), pair.second.AvgElapsedMS);
-            TotalPassesMS += pair.second.AvgElapsedMS;
+            const jPerformanceProfile::jAvgProfile& AvgProfile = pair.second;
+            const float Indent = IndentSpace * (float)AvgProfile.Indent;
+            if (Indent > 0)
+                ImGui::Indent(Indent);
+
+            if (CurrentThreadId == AvgProfile.ThreadId)
+                ImGui::Text("%s : %lf ms", pair.first.ToStr(), AvgProfile.AvgElapsedMS);
+            else
+                ImGui::TextColored(OtherThreadColor, "%s : %lf ms [0x%p]", pair.first.ToStr(), AvgProfile.AvgElapsedMS, AvgProfile.ThreadId);
+            
+            if (Indent > 0)
+                ImGui::Unindent(Indent);
+            
+            TotalPassesMS += AvgProfile.AvgElapsedMS;
         }
         // ImGui::Text("Total Passes : %lf ms", TotalPassesMS);
     }
@@ -360,8 +375,20 @@ void jImGUI_Vulkan::NewFrame(bool updateFrameGraph)
         double TotalPassesMS = 0.0;
         for (auto& pair : GPUAvgProfileMap)
         {
-            ImGui::Text("%s : %lf ms", pair.first.ToStr(), pair.second.AvgElapsedMS);
-            TotalPassesMS += pair.second.AvgElapsedMS;
+            const jPerformanceProfile::jAvgProfile& AvgProfile = pair.second;
+            const float Indent = IndentSpace * (float)AvgProfile.Indent;
+            if (Indent > 0)
+                ImGui::Indent(Indent);
+
+            if (CurrentThreadId == AvgProfile.ThreadId)
+                ImGui::Text("%s : %lf ms", pair.first.ToStr(), AvgProfile.AvgElapsedMS);
+            else
+                ImGui::TextColored(OtherThreadColor, "%s : %lf ms [0x%p]", pair.first.ToStr(), AvgProfile.AvgElapsedMS, AvgProfile.ThreadId);
+            
+            if (Indent > 0)
+                ImGui::Unindent(Indent);
+
+            TotalPassesMS += AvgProfile.AvgElapsedMS;
         }
         ImGui::Text("Total Passes : %lf ms", TotalPassesMS);
     }

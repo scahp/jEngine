@@ -3,14 +3,17 @@
 
 jPerformanceProfile* jPerformanceProfile::_instance = nullptr;
 
-robin_hood::unordered_map<jPriorityName, uint64, jPriorityNameHashFunc> ScopedProfileCPUMap[MaxProfileFrame];
-robin_hood::unordered_map<jPriorityName, uint64, jPriorityNameHashFunc> ScopedProfileGPUMap[MaxProfileFrame];
+robin_hood::unordered_map<jPriorityName, jScopedProfileData, jPriorityNameHashFunc> ScopedProfileCPUMap[MaxProfileFrame];
+robin_hood::unordered_map<jPriorityName, jScopedProfileData, jPriorityNameHashFunc> ScopedProfileGPUMap[MaxProfileFrame];
 static int32 PerformanceFrame = 0;
 
 robin_hood::unordered_set<jQuery*> jQueryTimePool::s_running;
 robin_hood::unordered_set<jQuery*> jQueryTimePool::s_resting;
 
-int32 jScopedProfile_CPU::s_priority = 0;
+std::atomic<int32> jScopedProfile_CPU::s_priority = 0;
+
+thread_local std::atomic<int32> ScopedProfilerCPUIndent;
+thread_local std::atomic<int32> ScopedProfilerGPUIndent;
 
 std::vector<jProfile_GPU> jProfile_GPU::WatingResultList[jRHI::MaxWaitingQuerySet];
 int32 jProfile_GPU::CurrentWatingResultListIndex = 0;
@@ -29,9 +32,9 @@ void ClearScopedProfileCPU()
 		ScopedProfileCPUMap[i].clear();
 }
 
-void AddScopedProfileCPU(const jPriorityName& name, uint64 elapsedTick)
+void AddScopedProfileCPU(const jPriorityName& name, uint64 elapsedTick, int32 Indent)
 {
-	ScopedProfileCPUMap[PerformanceFrame][name] = elapsedTick;
+	ScopedProfileCPUMap[PerformanceFrame][name] = jScopedProfileData(elapsedTick, Indent, std::this_thread::get_id());
 }
 
 void ClearScopedProfileGPU()
@@ -40,9 +43,9 @@ void ClearScopedProfileGPU()
 		ScopedProfileGPUMap[i].clear();
 }
 
-void AddScopedProfileGPU(const jPriorityName& name, uint64 elapsedTick)
+void AddScopedProfileGPU(const jPriorityName& name, uint64 elapsedTick, int32 Indent)
 {
-	ScopedProfileGPUMap[PerformanceFrame][name] = elapsedTick;
+	ScopedProfileGPUMap[PerformanceFrame][name] = jScopedProfileData(elapsedTick, Indent, std::this_thread::get_id());
 }
 
 void jPerformanceProfile::Update(float deltaTime)
@@ -67,7 +70,9 @@ void jPerformanceProfile::CalcAvg()
 			for (auto& iter : scopedProfileMap)
 			{
 				auto& avgProfile = CPUAvgProfileMap[iter.first];
-				avgProfile.TotalElapsedTick += iter.second;
+				avgProfile.TotalElapsedTick += iter.second.ElapsedTick;
+				avgProfile.Indent = iter.second.Indent;
+				avgProfile.ThreadId = iter.second.ThreadId;
 				++avgProfile.TotalSampleCount;
 			}
 		}
@@ -88,7 +93,9 @@ void jPerformanceProfile::CalcAvg()
 			for (auto& iter : scopedProfileMap)
 			{
 				auto& avgProfile = GPUAvgProfileMap[iter.first];
-				avgProfile.TotalElapsedTick += iter.second;
+				avgProfile.TotalElapsedTick += iter.second.ElapsedTick;
+				avgProfile.Indent = iter.second.Indent;
+				avgProfile.ThreadId = iter.second.ThreadId;
 				++avgProfile.TotalSampleCount;
 			}
 		}
