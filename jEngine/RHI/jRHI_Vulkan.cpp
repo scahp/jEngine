@@ -196,7 +196,7 @@ bool jRHI_Vulkan::InitRHI()
         enabledPhysicalDeviceShadingRateImageFeaturesNV.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADING_RATE_IMAGE_FEATURES_NV;
         enabledPhysicalDeviceShadingRateImageFeaturesNV.shadingRateImage = VK_TRUE;
 		physicalDeviceFeatures2.pNext = &enabledPhysicalDeviceShadingRateImageFeaturesNV;
-		physicalDeviceFeatures2.pNext = (void*)createInfo.pNext;
+		// physicalDeviceFeatures2.pNext = (void*)createInfo.pNext;		// disable VRS
         createInfo.pNext = &physicalDeviceFeatures2;
 
 		// Added CustomBorderColor features
