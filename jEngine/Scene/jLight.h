@@ -123,7 +123,6 @@ public:
 	virtual jFrameBuffer* GetShadowMapFrameBuffer() const { return nullptr; }
 	virtual std::shared_ptr<jFrameBuffer> GetShadowMapFrameBufferPtr() const { return nullptr; }
 	virtual jCamera* GetLightCamra(int index = 0) const { return nullptr; }
-	virtual void RenderToShadowMap(const RenderToShadowMapFunc& func, const jShader* shader) const {}
 	virtual void Update(float deltaTime) { }
 	virtual IUniformBufferBlock* GetUniformBufferBlock() const { return nullptr; }
 	virtual void SetupUniformBuffer() {}
@@ -225,7 +224,6 @@ public:
 	jLightUtil::jShadowMapData* ShadowMapData = nullptr;
 	jTexture* GetShadowMap() const;
 
-	virtual void RenderToShadowMap(const RenderToShadowMapFunc& func, const jShader* shader) const override;
 	virtual void Update(float deltaTime) override;
 
 	virtual void SetupUniformBuffer() override;
@@ -274,7 +272,6 @@ public:
 			CascadeEndsW[i].Name = jName(szTemp);
 		}
 	}
-	virtual void RenderToShadowMap(const RenderToShadowMapFunc& func, const jShader* shader) const override;
 	virtual void Update(float deltaTime) override;
 	virtual void BindLight(const jShader* shader) const override;
 
@@ -342,7 +339,6 @@ public:
 
 	jLightUtil::jShadowMapArrayData* ShadowMapData = nullptr;
 
-	virtual void RenderToShadowMap(const RenderToShadowMapFunc& func, const jShader* shader) const override;
 	virtual void Update(float deltaTime) override;
 
 	virtual void SetupUniformBuffer() override;
@@ -419,7 +415,6 @@ public:
 
 	jLightUtil::jShadowMapArrayData* ShadowMapData = nullptr;
 
-	virtual void RenderToShadowMap(const RenderToShadowMapFunc& func, const jShader* shader) const override;
 	virtual void Update(float deltaTime) override;
 
 	virtual void SetupUniformBuffer() override;

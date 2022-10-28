@@ -22,17 +22,17 @@ jName jMeshMaterial::MaterialTextureTypeString[(int32)jMeshMaterial::EMaterialTe
 
 //////////////////////////////////////////////////////////////////////////
 // LightData
-void jMeshMaterial::Material::BindMaterialData(const jShader* shader) const
-{
-	SET_UNIFORM_BUFFER_STATIC("Material.Ambient", Ambient, shader);
-	SET_UNIFORM_BUFFER_STATIC("Material.Diffuse", Diffuse, shader);
-	SET_UNIFORM_BUFFER_STATIC("Material.Specular", Specular, shader);
-	SET_UNIFORM_BUFFER_STATIC("Material.Emissive", Emissive, shader);
-	SET_UNIFORM_BUFFER_STATIC("Material.SpecularShiness", SpecularShiness, shader);
-	SET_UNIFORM_BUFFER_STATIC("Material.Opacity", Opacity, shader);
-	SET_UNIFORM_BUFFER_STATIC("Material.Reflectivity", Reflectivity, shader);
-	SET_UNIFORM_BUFFER_STATIC("Material.IndexOfRefraction", IndexOfRefraction, shader);
-}
+//void jMeshMaterial::Material::BindMaterialData(const jShader* shader) const
+//{
+//	SET_UNIFORM_BUFFER_STATIC("Material.Ambient", Ambient, shader);
+//	SET_UNIFORM_BUFFER_STATIC("Material.Diffuse", Diffuse, shader);
+//	SET_UNIFORM_BUFFER_STATIC("Material.Specular", Specular, shader);
+//	SET_UNIFORM_BUFFER_STATIC("Material.Emissive", Emissive, shader);
+//	SET_UNIFORM_BUFFER_STATIC("Material.SpecularShiness", SpecularShiness, shader);
+//	SET_UNIFORM_BUFFER_STATIC("Material.Opacity", Opacity, shader);
+//	SET_UNIFORM_BUFFER_STATIC("Material.Reflectivity", Reflectivity, shader);
+//	SET_UNIFORM_BUFFER_STATIC("Material.IndexOfRefraction", IndexOfRefraction, shader);
+//}
 
 //////////////////////////////////////////////////////////////////////////
 // jMeshObject
@@ -46,10 +46,12 @@ void jMeshObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrame
 		DrawNode(InRenderFrameContext, RootNode, camera, shader, lights);
 }
 
-void jMeshObject::SetMaterialUniform(const jShader* shader, const jMeshMaterial* material) const
+void jMeshObject::SetMaterialUniform(const jMeshMaterial* material) const
 {
-	g_rhi->SetShader(shader);
-	material->Data.BindMaterialData(shader);
+	// todo
+	check(0);
+	//g_rhi->SetShader(shader);
+	//material->Data.BindMaterialData(shader);
 }
 
 void jMeshObject::DrawNode(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jMeshNode* node
@@ -82,47 +84,49 @@ void jMeshObject::DrawSubMesh(const std::shared_ptr<jRenderFrameContext>& InRend
 
 		subMesh.MaterialData.Params.clear();
 
-		auto it_find = MeshData->Materials.find(subMesh.MaterialIndex);
-		if (MeshData->Materials.end() != it_find)
-		{
-			const jMeshMaterial* curMeshMaterial = it_find->second;
-			JASSERT(curMeshMaterial);
+		// todo
+		check(0);
+		//auto it_find = MeshData->Materials.find(subMesh.MaterialIndex);
+		//if (MeshData->Materials.end() != it_find)
+		//{
+		//	const jMeshMaterial* curMeshMaterial = it_find->second;
+		//	JASSERT(curMeshMaterial);
 
-			for (int32 i = (int32)jMeshMaterial::EMaterialTextureType::DiffuseSampler; i < (int32)jMeshMaterial::EMaterialTextureType::Max; ++i)
-			{
-				const jMeshMaterial::TextureData& TextureData = curMeshMaterial->TexData[i];
-				const jTexture* pTexture = TextureData.GetTexture();
-				if (!pTexture)
-					continue;
+		//	for (int32 i = (int32)jMeshMaterial::EMaterialTextureType::DiffuseSampler; i < (int32)jMeshMaterial::EMaterialTextureType::Max; ++i)
+		//	{
+		//		const jMeshMaterial::TextureData& TextureData = curMeshMaterial->TexData[i];
+		//		const jTexture* pTexture = TextureData.GetTexture();
+		//		if (!pTexture)
+		//			continue;
 
-				jMaterialData& materialData = subMesh.MaterialData;
+		//		jMaterialData& materialData = subMesh.MaterialData;
 
-				const jSamplerStateInfo* pSamplerState 
-					= TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT>::Create();
-				materialData.AddMaterialParam(jMeshMaterial::MaterialTextureTypeString[i], pTexture, pSamplerState);
+		//		const jSamplerStateInfo* pSamplerState 
+		//			= TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT>::Create();
+		//		materialData.AddMaterialParam(jMeshMaterial::MaterialTextureTypeString[i], pTexture, pSamplerState);
 
-				switch ((jMeshMaterial::EMaterialTextureType)i)
-				{
-				case jMeshMaterial::EMaterialTextureType::OpacitySampler:
-					UseOpacitySampler = true;
-					break;
-				case jMeshMaterial::EMaterialTextureType::DisplacementSampler:
-					UseDisplacementSampler = true;
-					break;
-				case jMeshMaterial::EMaterialTextureType::AmbientSampler:
-					UseAmbientSampler = true;
-					break;
-				case jMeshMaterial::EMaterialTextureType::NormalSampler:
-					UseNormalSampler = true;
-					break;
-				}
-			}
-			SetMaterialUniform(shader, it_find->second);
-		}
-		else
-		{
-			SetMaterialUniform(shader, &NullMeshMateral);
-		}
+		//		switch ((jMeshMaterial::EMaterialTextureType)i)
+		//		{
+		//		case jMeshMaterial::EMaterialTextureType::OpacitySampler:
+		//			UseOpacitySampler = true;
+		//			break;
+		//		case jMeshMaterial::EMaterialTextureType::DisplacementSampler:
+		//			UseDisplacementSampler = true;
+		//			break;
+		//		case jMeshMaterial::EMaterialTextureType::AmbientSampler:
+		//			UseAmbientSampler = true;
+		//			break;
+		//		case jMeshMaterial::EMaterialTextureType::NormalSampler:
+		//			UseNormalSampler = true;
+		//			break;
+		//		}
+		//	}
+		//	SetMaterialUniform(shader, it_find->second);
+		//}
+		//else
+		//{
+		//	SetMaterialUniform(shader, &NullMeshMateral);
+		//}
 				
 		SET_UNIFORM_BUFFER_STATIC("UseOpacitySampler", UseOpacitySampler, shader);
 		SET_UNIFORM_BUFFER_STATIC("UseDisplacementSampler", UseDisplacementSampler, shader);

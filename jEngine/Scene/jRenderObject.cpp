@@ -24,11 +24,6 @@ jRenderObject::~jRenderObject()
     VertexStream_PositionOnly.reset();
 
 	delete IndexBuffer;
-	MaterialData.Clear();	
-
-	// 다른 곳에서 레퍼런싱 한 데이터는 nullptr 로 비워줌
-    tex_object_array = nullptr;
-    samplerStateTexArray = nullptr;
 }
 
 void jRenderObject::CreateRenderObject(const std::shared_ptr<jVertexStreamData>& vertexStream, const std::shared_ptr<jIndexStreamData>& indexStream)
@@ -69,38 +64,15 @@ void jRenderObject::UpdateVertexStream()
 	g_rhi->UpdateVertexBuffer(VertexBuffer_PositionOnly, VertexStream_PositionOnly);
 }
 
-void jRenderObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader
-	, const std::list<const jLight*>* lights, int32 startIndex /*= 0*/, int32 count /*= -1*/, int32 instanceCount /*= 1*/, bool bPoisitionOnly /*= false*/)
+void jRenderObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext
+	, int32 startIndex, int32 count, int32 instanceCount)
 {
-	if (!VertexBuffer->VertexStreamData)
+	if (!VertexStream)
 		return;
-
-	g_rhi->SetShader(shader);
-	if (camera)
-		g_rhi->EnableCullFace(camera->IsEnableCullMode && !IsTwoSided);
-	else
-		g_rhi->EnableCullFace(!IsTwoSided);
-
-	DynamicMaterialDataArray.Reset();
-
-	SetRenderProperty(InRenderFrameContext,shader);
-	//SetCameraProperty(shader, camera);
-	if (lights)
-	{
-		for (auto& iter : *lights)
-		{
-			auto pMatData = iter->GetMaterialData();
-			if (pMatData)
-				DynamicMaterialDataArray.Add(pMatData);
-		}
-	}
-	SetTextureProperty(shader, &MaterialData);
-	SetMaterialProperty(shader, &MaterialData, DynamicMaterialDataArray);
 	
 	startIndex = startIndex != -1 ? startIndex : 0;
 
-	auto& vertexStreamData = VertexBuffer->VertexStreamData;
-	auto primitiveType = vertexStreamData->PrimitiveType;
+	const EPrimitiveType primitiveType = GetPrimitiveType();
 	if (IndexBuffer)
 	{
         if (IndirectCommandBuffer)
@@ -127,7 +99,7 @@ void jRenderObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFra
 		}
 		else
 		{
-			count = count != -1 ? count : vertexStreamData->ElementCount;
+			count = count != -1 ? count : VertexStream->ElementCount;
 			if (instanceCount <= 0)
 				g_rhi->DrawArrays(InRenderFrameContext, primitiveType, 0, count);
 			else
@@ -192,39 +164,22 @@ void jRenderObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFra
 //	}
 //}
 
-void jRenderObject::SetRenderProperty(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jShader* shader, bool bPositionOnly /*= false*/)
+void jRenderObject::BindBuffers(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, bool InPositionOnly) const
 {
-#if USE_OPENGL
-	if (bPositionOnly)
-	{
-		if (VertexBuffer_PositionOnly)
-			VertexBuffer_PositionOnly->Bind(shader);
-	}
-	else
-	{
-		if (VertexBuffer)
-			VertexBuffer->Bind(shader);
-	}
+    if (InPositionOnly)
+    {
+        if (VertexBuffer_PositionOnly)
+            VertexBuffer_PositionOnly->Bind(InRenderFrameContext);
+    }
+    else
+    {
+        if (VertexBuffer)
+            VertexBuffer->Bind(InRenderFrameContext);
+    }
     if (VertexBuffer_InstanceData)
-        VertexBuffer_InstanceData->Bind(shader);
-	if (IndexBuffer)
-		IndexBuffer->Bind(shader);
-#elif USE_VULKAN
-	if (bPositionOnly)
-	{
-		if (VertexBuffer_PositionOnly)
-			VertexBuffer_PositionOnly->Bind(InRenderFrameContext);
-	}
-	else
-	{
-		if (VertexBuffer)
-			VertexBuffer->Bind(InRenderFrameContext);
-	}
-	if (VertexBuffer_InstanceData)
-		VertexBuffer_InstanceData->Bind(InRenderFrameContext);
-	if (IndexBuffer)
-		IndexBuffer->Bind(InRenderFrameContext);
-#endif
+        VertexBuffer_InstanceData->Bind(InRenderFrameContext);
+    if (IndexBuffer)
+        IndexBuffer->Bind(InRenderFrameContext);
 }
 
 void jRenderObject::UpdateWorldMatrix()
@@ -240,65 +195,6 @@ void jRenderObject::UpdateWorldMatrix()
     }
 }
 
-Matrix jRenderObject::GetWorld() const
-{
-	return World;
-}
-
-void jRenderObject::SetCameraProperty(const jShader* shader, const jCamera* camera)
-{
-	if (!camera)
-		return;
-
-	if (static_cast<int32>(DirtyFlags) & static_cast<int32>(EDirty::POS_ROT_SCALE))
-	{
-		auto posMatrix = Matrix::MakeTranslate(Pos);
-		auto rotMatrix = Matrix::MakeRotate(Rot);
-		auto scaleMatrix = Matrix::MakeScale(Scale);
-		World = posMatrix * rotMatrix * scaleMatrix;
-
-		ClearDirtyFlags(EDirty::POS_ROT_SCALE);
-	}
-
-	auto MV = camera->View * World;
-	auto MVP = camera->Projection * MV;
-
-	SET_UNIFORM_BUFFER_STATIC("MVP", MVP, shader);
-	SET_UNIFORM_BUFFER_STATIC("MV", MV, shader);
-	SET_UNIFORM_BUFFER_STATIC("M", World, shader);
-	SET_UNIFORM_BUFFER_STATIC("InvM", World.GetInverse(), shader);
-	SET_UNIFORM_BUFFER_STATIC("Collided", Collided, shader);
-	SET_UNIFORM_BUFFER_STATIC("UseUniformColor", UseUniformColor, shader);
-	SET_UNIFORM_BUFFER_STATIC("Color", Color, shader);
-	SET_UNIFORM_BUFFER_STATIC("UseMaterial", UseMaterial, shader);
-	SET_UNIFORM_BUFFER_STATIC("ShadingModel", static_cast<int>(ShadingModel), shader);
-	SET_UNIFORM_BUFFER_STATIC("IsTwoSided", IsTwoSided, shader);
-}
-
-void jRenderObject::SetLightProperty(const jShader* shader, const jCamera* camera, const std::list<const jLight*>& lights, jMaterialData* materialData)
-{
-	for (auto iter : lights)
-		iter->GetMaterialData(materialData);
-}
-
-void jRenderObject::SetTextureProperty(const jShader* shader, const jMaterialData* materialData)
-{
-	const bool useTexture = (materialData->Params.size() > 0);
-	SET_UNIFORM_BUFFER_STATIC("UseTexture", useTexture, shader);
-}
-
-void jRenderObject::SetMaterialProperty(const jShader* shader, const jMaterialData* materialData, const jMaterialDataArray& InDynamicMaterialDataArray)
-{
-	int32 lastIndex = 0;
-	if (materialData)
-		lastIndex = g_rhi->SetMatetrial(materialData, shader, lastIndex);
-	
-	for (int32 i = 0; i < InDynamicMaterialDataArray.NumOfData; ++i)
-	{
-		lastIndex = g_rhi->SetMatetrial(InDynamicMaterialDataArray[i], shader, lastIndex);
-	}
-}
-
 const std::vector<float>& jRenderObject::GetVertices() const
 {
 	if (VertexStream && !VertexStream->Params.empty())
@@ -308,22 +204,7 @@ const std::vector<float>& jRenderObject::GetVertices() const
 	return s_emtpy;
 }
 
-void jRenderObject::SetTexture(int32 index, const jName& name, const jTexture* texture, const jSamplerStateInfo* samplerState)
-{
-	MaterialData.SetMaterialParam(index, name, texture, samplerState);
-}
-
-void jRenderObject::SetTextureWithCommonName(int32 index, const jTexture* texture, const jSamplerStateInfo* samplerState)
-{
-	MaterialData.SetMaterialParam(index, GetCommonTextureName(index), texture, samplerState);
-}
-
-void jRenderObject::ClearTexture()
-{
-	MaterialData.Clear();
-}
-
-jShaderBindingInstance* jRenderObject::CreateRenderObjectUniformBuffer(const jView* view)
+jShaderBindingInstance* jRenderObject::CreateShaderBindingInstance(const jView* view)
 {
 	check(view);
 	check(view->Camera);
@@ -346,11 +227,11 @@ jShaderBindingInstance* jRenderObject::CreateRenderObjectUniformBuffer(const jVi
 	ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_GRAPHICS
 		, ResourceInlineAllactor.Alloc<jUniformBufferResource>(&OneFrameUniformBuffer));
 
-    for (int32 i = 0; i < (int32)MaterialData.Params.size(); ++i)
-    {
-		ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
-			, ResourceInlineAllactor.Alloc<jTextureResource>(MaterialData.Params[i].Texture, MaterialData.Params[i].SamplerState));
-    }
+  //  for (int32 i = 0; i < (int32)MaterialData.Params.size(); ++i)
+  //  {
+		//ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
+		//	, ResourceInlineAllactor.Alloc<jTextureResource>(MaterialData.Params[i].Texture, MaterialData.Params[i].SamplerState));
+  //  }
 
     return g_rhi->CreateShaderBindingInstance(ShaderBindingArray);
 }

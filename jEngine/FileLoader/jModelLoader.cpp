@@ -319,7 +319,6 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 
 	auto renderObject = new jRenderObject();
 	renderObject->CreateRenderObject(vertexStreamData, indexStreamData);
-	renderObject->UseMaterial = 1;
 	object->RenderObject = renderObject;
 	return object;
 }

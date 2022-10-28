@@ -179,7 +179,7 @@ void jObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameCont
 	, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
 {
 	if (Visible && RenderObject)
-		RenderObject->Draw(InRenderFrameContext, camera, shader, &lights, 0, -1, instanceCount);
+		RenderObject->Draw(InRenderFrameContext, 0, -1, instanceCount);
 }
 
 void jObject::CreateBoundBox(bool isShow)

@@ -35,7 +35,7 @@ struct jMeshMaterial
 		float Reflectivity = 0.0f;
 		float IndexOfRefraction = 1.0f;		// 1.0 means lights will not refract
 
-		void BindMaterialData(const jShader* shader) const;
+		// void BindMaterialData(const jShader* shader) const;
 	};
 
 	struct TextureData
@@ -101,7 +101,7 @@ public:
 
 	virtual void Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount = 0 ) const override;
 
-	void SetMaterialUniform(const jShader* shader, const jMeshMaterial* material) const;
+	void SetMaterialUniform(const jMeshMaterial* material) const;
 
 	void DrawNode(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jMeshNode* node, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights) const;
 	void DrawSubMesh(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, int32 meshIndex, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights) const;

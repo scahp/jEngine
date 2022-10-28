@@ -18,13 +18,13 @@ jDrawCommand::jDrawCommand(std::shared_ptr<jRenderFrameContext> InRenderFrameCon
 {
 }
 
-void jDrawCommand::PrepareToDraw(bool bPositionOnly)
+void jDrawCommand::PrepareToDraw(bool InIsPositionOnly)
 {
     // GetShaderBindings
     View->GetShaderBindingInstance(ShaderBindingInstanceArray);
 
     // GetShaderBindings
-    jShaderBindingInstance* OneRenderObjectUniformBuffer = RenderObject->CreateRenderObjectUniformBuffer(View);
+    jShaderBindingInstance* OneRenderObjectUniformBuffer = RenderObject->CreateShaderBindingInstance(View);
     ShaderBindingInstanceArray.Add(OneRenderObjectUniformBuffer);
 
     // Bind ShaderBindings
@@ -33,7 +33,7 @@ void jDrawCommand::PrepareToDraw(bool bPositionOnly)
         ShaderBindingLayoutArray.Add(ShaderBindingInstanceArray[i]->ShaderBindingsLayouts);
 
     jVertexBufferArray VertexBufferArray;
-    VertexBufferArray.Add(bPositionOnly ? RenderObject->VertexBuffer_PositionOnly : RenderObject->VertexBuffer);
+    VertexBufferArray.Add(InIsPositionOnly ? RenderObject->VertexBuffer_PositionOnly : RenderObject->VertexBuffer);
     if (RenderObject->VertexBuffer_InstanceData)
     {
         VertexBufferArray.Add(RenderObject->VertexBuffer_InstanceData);
@@ -42,6 +42,8 @@ void jDrawCommand::PrepareToDraw(bool bPositionOnly)
     // Create Pipeline
     CurrentPipelineStateInfo = (jPipelineStateInfo_Vulkan*)g_rhi->CreatePipelineStateInfo(PipelineStateFixed, Shader
         , VertexBufferArray, RenderPass, ShaderBindingLayoutArray, PushConstantPtr.get());
+
+    IsPositionOnly = InIsPositionOnly;
 }
 
 void jDrawCommand::Draw() const
@@ -73,13 +75,14 @@ void jDrawCommand::Draw() const
         }
     }
 
-    const int32 InstanceCount = RenderObject->VertexBuffer_InstanceData ? RenderObject->VertexBuffer_InstanceData->GetElementCount() : 1;
+    RenderObject->BindBuffers(RenderFrameContextPtr, IsPositionOnly);
 
     if (OcclusionQuery)
         OcclusionQuery->BeginQuery(RenderFrameContextPtr->CommandBuffer);
 
     // Draw
-    RenderObject->Draw(RenderFrameContextPtr, nullptr, Shader, nullptr, 0, -1, InstanceCount);
+    const int32 InstanceCount = RenderObject->VertexBuffer_InstanceData ? RenderObject->VertexBuffer_InstanceData->GetElementCount() : 1;
+    RenderObject->Draw(RenderFrameContextPtr, 0, -1, InstanceCount);
 
     if (OcclusionQuery)
         OcclusionQuery->EndQuery(RenderFrameContextPtr->CommandBuffer);

@@ -27,8 +27,8 @@ public:
     jRenderObject* RenderObject = nullptr;
     jPipelineStateFixedInfo* PipelineStateFixed = nullptr;
     jPipelineStateInfo_Vulkan* CurrentPipelineStateInfo = nullptr;
-    std::vector<const jVertexBuffer*> VertexBuffers;
     std::shared_ptr<jPushConstant> PushConstantPtr;
     std::shared_ptr<jRenderFrameContext> RenderFrameContextPtr;
     jQuery* OcclusionQuery = nullptr;
+    bool IsPositionOnly = false;
 };

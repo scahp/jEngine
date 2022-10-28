@@ -105,25 +105,32 @@ void jUIQuadPrimitive::Draw(const std::shared_ptr<jRenderFrameContext>& InRender
 
 void jUIQuadPrimitive::SetTexture(const jTexture* texture)
 {
-	if (RenderObject->MaterialData.Params.size() > 0)
-		RenderObject->MaterialData.SetMaterialParam(0, texture);
-	else
-		RenderObject->MaterialData.AddMaterialParam(GetCommonTextureName(0), texture);
+	//if (RenderObject->MaterialData.Params.size() > 0)
+	//	RenderObject->MaterialData.SetMaterialParam(0, texture);
+	//else
+	//	RenderObject->MaterialData.AddMaterialParam(GetCommonTextureName(0), texture);
+	// todo
+	check(0);
 }
 
 void jUIQuadPrimitive::SetUniformParams(const jShader* shader) const
 {
-	g_rhi->SetShader(shader);
-	SET_UNIFORM_BUFFER_STATIC("PixelSize", Vector2(1.0f / SCR_WIDTH, 1.0f / SCR_HEIGHT), shader);
-	SET_UNIFORM_BUFFER_STATIC("Pos", Pos, shader);
-	SET_UNIFORM_BUFFER_STATIC("Size", Size, shader);
+	//g_rhi->SetShader(shader);
+	//SET_UNIFORM_BUFFER_STATIC("PixelSize", Vector2(1.0f / SCR_WIDTH, 1.0f / SCR_HEIGHT), shader);
+	//SET_UNIFORM_BUFFER_STATIC("Pos", Pos, shader);
+	//SET_UNIFORM_BUFFER_STATIC("Size", Size, shader);
+
+	// Todo
+	check(0);
 }
 
 const jTexture* jUIQuadPrimitive::GetTexture() const
 {
-	if (RenderObject && (RenderObject->MaterialData.Params.size() > 0))
-		return RenderObject->MaterialData.Params[0].Texture;
+	//if (RenderObject && (RenderObject->MaterialData.Params.size() > 0))
+	//	return RenderObject->MaterialData.Params[0].Texture;
 
+	// Todo
+	check(0);
 	return nullptr;
 }
 
@@ -135,14 +142,19 @@ void jFullscreenQuadPrimitive::Draw(const std::shared_ptr<jRenderFrameContext>& 
 
 void jFullscreenQuadPrimitive::SetUniformBuffer(const jShader* shader) const
 {
-	g_rhi->SetShader(shader);
-	SET_UNIFORM_BUFFER_STATIC("PixelSize", Vector2(1.0f / SCR_WIDTH, 1.0f / SCR_HEIGHT), shader);
+	//g_rhi->SetShader(shader);
+	//SET_UNIFORM_BUFFER_STATIC("PixelSize", Vector2(1.0f / SCR_WIDTH, 1.0f / SCR_HEIGHT), shader);
+
+	// Todo
+	check(0);
 }
 
 void jFullscreenQuadPrimitive::SetTexture(int index, const jTexture* texture, const jSamplerStateInfo* samplerState)
 {
-	RenderObject->MaterialData.Params.resize(index + 1);
-	RenderObject->MaterialData.SetMaterialParam(index, GetCommonTextureName(index), texture, samplerState);
+	// Todo
+	check(0);
+	//RenderObject->MaterialData.Params.resize(index + 1);
+	//RenderObject->MaterialData.SetMaterialParam(index, GetCommonTextureName(index), texture, samplerState);
 }
 
 void jBoundBoxObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
@@ -152,8 +164,11 @@ void jBoundBoxObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderF
 
 void jBoundBoxObject::SetUniformBuffer(const jShader* shader)
 {
-	g_rhi->SetShader(shader);
-	SET_UNIFORM_BUFFER_STATIC("Color", Color, shader);
+	// g_rhi->SetShader(shader);
+	// SET_UNIFORM_BUFFER_STATIC("Color", Color, shader);
+
+	// Todo
+	check(0);
 }
 void jBoundBoxObject::UpdateBoundBox(const jBoundBox& boundBox)
 {
@@ -211,8 +226,11 @@ void jBoundSphereObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRend
 
 void jBoundSphereObject::SetUniformBuffer(const jShader* shader)
 {
-	g_rhi->SetShader(shader);
-	SET_UNIFORM_BUFFER_STATIC("Color", Color, shader);
+	// g_rhi->SetShader(shader);
+	// SET_UNIFORM_BUFFER_STATIC("Color", Color, shader);
+
+	// Todo
+	check(0);
 }
 
 void jArrowSegmentPrimitive::Update(float deltaTime)
@@ -1773,8 +1791,10 @@ jUIQuadPrimitive* CreateUIQuad(const Vector2& pos, const Vector2& size, jTexture
 	auto renderObject = new jRenderObject();
 	renderObject->CreateRenderObject(vertexStreamData, nullptr);
 	object->RenderObject = renderObject;
-	if (texture)
-		object->RenderObject->MaterialData.AddMaterialParam(GetCommonTextureName(0), texture);
+	// Todo
+	check(0);
+	//if (texture)
+	//	object->RenderObject->MaterialData.AddMaterialParam(GetCommonTextureName(0), texture);
 	object->Pos = pos;
 	object->Size = size;
 
@@ -1808,8 +1828,10 @@ jFullscreenQuadPrimitive* CreateFullscreenQuad(jTexture* texture)
 	auto renderObject = new jRenderObject();
 	renderObject->CreateRenderObject(vertexStreamData, nullptr);
 	object->RenderObject = renderObject;
-	if (texture)
-		object->RenderObject->MaterialData.AddMaterialParam(GetCommonTextureName(0), texture);
+	// Todo
+	check(0);
+	//if (texture)
+	//	object->RenderObject->MaterialData.AddMaterialParam(GetCommonTextureName(0), texture);
 	return object;
 }
 
@@ -1902,7 +1924,9 @@ jDirectionalLightPrimitive* CreateDirectionalLightDebug(const Vector& pos, const
     if (data.lock()->ImageData.size() > 0)
     {
         auto texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName(textureFilename), true).lock().get();
-        object->BillboardObject->RenderObject->MaterialData.AddMaterialParam(GetCommonTextureName(1), texture);
+		// todo
+		//check(0);
+        //object->BillboardObject->RenderObject->MaterialData.AddMaterialParam(GetCommonTextureName(1), texture);
         object->BillboardObject->RenderObject->IsHiddenBoundBox = true;
     }
     object->ArrowSegementObject = jPrimitiveUtil::CreateArrowSegment(Vector::ZeroVector, light->Data.Direction * length, 1.0f, scale.x, scale.x / 2, Vector4(0.8f, 0.2f, 0.3f, 1.0f));
@@ -1932,7 +1956,9 @@ jPointLightPrimitive* CreatePointLightDebug(const Vector& scale, jCamera* target
 	if (data.lock()->ImageData.size() > 0)
 	{
 		auto texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName(textureFilename), true).lock().get();
-		object->BillboardObject->RenderObject->MaterialData.AddMaterialParam(GetCommonTextureName(1), texture);
+		// todo
+		check(0);
+		// object->BillboardObject->RenderObject->MaterialData.AddMaterialParam(GetCommonTextureName(1), texture);
 		object->BillboardObject->RenderObject->IsHiddenBoundBox = true;
 	}
 	object->SphereObject = CreateSphere(light->Data.Position, light->Data.MaxDistance, 20, Vector::OneVector, Vector4(light->Data.Color, 1.0f), true, false);
@@ -1960,7 +1986,9 @@ jSpotLightPrimitive* CreateSpotLightDebug(const Vector& scale, jCamera* targetCa
 	if (data.lock()->ImageData.size() > 0)
 	{
 		auto texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName(textureFilename), true).lock().get();
-		object->BillboardObject->RenderObject->MaterialData.AddMaterialParam(GetCommonTextureName(1), texture);
+        // todo
+        check(0);
+		//object->BillboardObject->RenderObject->MaterialData.AddMaterialParam(GetCommonTextureName(1), texture);
 	}
 	object->UmbraConeObject = jPrimitiveUtil::CreateCone(light->Data.Position, 1.0, 1.0, 20, Vector::OneVector, Vector4(light->Data.Color.x, light->Data.Color.y, light->Data.Color.z, 1.0f), true, false);
 	object->UmbraConeObject->RenderObject->IsHiddenBoundBox = true;

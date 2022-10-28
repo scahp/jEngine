@@ -334,7 +334,6 @@ public:
 	virtual void DispatchCompute(uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ) const {}
 	virtual void EnableDepthBias(bool enable, EPolygonMode polygonMode = EPolygonMode::FILL) const {}
 	virtual void SetDepthBias(float constant, float slope) const {}
-	virtual void SetShader(const jShader* shader) const {}
 	virtual jShader* CreateShader(const jShaderInfo& shaderInfo) const { return nullptr; }
     virtual bool CreateShaderInternal(jShader* OutShader, const jShaderInfo& shaderInfo) const { return false; }
 	virtual void ReleaseShader(jShader* shader) const {}
@@ -369,10 +368,6 @@ public:
 		, ETextureFormat textureFormat = ETextureFormat::RGBA8, bool createMipmap = false) const { return nullptr; }
 	virtual jTexture* CreateCubeTextureFromData(std::vector<void*> faces, int32 width, int32 height, bool sRGB
 		, ETextureFormat textureFormat = ETextureFormat::RGBA8, bool createMipmap = false) const { return nullptr; }
-	virtual int32 SetMatetrial(const jMaterialData* materialData, const jShader* shader, int32 baseBindingIndex = 0) const { return baseBindingIndex; }
-	virtual void EnableCullFace(bool enable) const {}
-	virtual void SetFrontFace(EFrontFace frontFace) const {}
-	virtual void EnableCullMode(ECullMode cullMode) const {}
 	virtual jFrameBuffer* CreateFrameBuffer(const jFrameBufferInfo& info) const { return nullptr; }
 	virtual std::shared_ptr<jRenderTarget> CreateRenderTarget(const jRenderTargetInfo& info) const { return nullptr; }
 	virtual void EnableDepthTest(bool enable) const {}

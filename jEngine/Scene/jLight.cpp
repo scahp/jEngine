@@ -284,14 +284,6 @@ jTexture* jDirectionalLight::GetShadowMap() const
 	return (ShadowMapData && ShadowMapData->ShadowMapFrameBuffer) ? ShadowMapData->ShadowMapFrameBuffer->GetTexture() : nullptr;
 }
 
-void jDirectionalLight::RenderToShadowMap(const RenderToShadowMapFunc& func, const jShader* shader) const
-{
-	JASSERT(ShadowMapData);
-	JASSERT(ShadowMapData->ShadowMapFrameBuffer);
-	g_rhi->SetShader(shader);
-	func(ShadowMapData->ShadowMapFrameBuffer.get(), 0, ShadowMapData->ShadowMapCamera, Viewports);
-}
-
 void jDirectionalLight::Update(float deltaTime)
 {
 	if (ShadowMapData && ShadowMapData->ShadowMapCamera)
@@ -383,13 +375,6 @@ void jDirectionalLight::UpdateMaterialData()
 
 //////////////////////////////////////////////////////////////////////////
 // jCascadeDirectionalLight
-void jCascadeDirectionalLight::RenderToShadowMap(const RenderToShadowMapFunc& func, const jShader* shader) const
-{
-	g_rhi->SetShader(shader);
-	func(ShadowMapData->ShadowMapFrameBuffer.get(), 0, ShadowMapData->ShadowMapCamera, Viewports);
-}
-
-
 void jCascadeDirectionalLight::Update(float deltaTime)
 {
 	__super::Update(deltaTime);
@@ -455,17 +440,6 @@ jCamera* jPointLight::GetLightCamra(int index /*= 0*/) const
 {
 	JASSERT(ShadowMapData && _countof(ShadowMapData->ShadowMapCamera) <= index);
 	return (ShadowMapData ? ShadowMapData->ShadowMapCamera[index] : nullptr);
-}
-
-void jPointLight::RenderToShadowMap(const RenderToShadowMapFunc& func, const jShader* shader) const
-{
-	JASSERT(ShadowMapData);
-	JASSERT(ShadowMapData->ShadowMapFrameBuffer);
-	if (ShadowMapData)
-	{	
-		g_rhi->SetShader(shader);
-		func(ShadowMapData->ShadowMapFrameBuffer.get(), 0, ShadowMapData->ShadowMapCamera[0], Viewports);
-	}
 }
 
 void jPointLight::Update(float deltaTime)
@@ -600,17 +574,6 @@ jCamera* jSpotLight::GetLightCamra(int index /*= 0*/) const
 {
 	JASSERT(ShadowMapData && _countof(ShadowMapData->ShadowMapCamera) <= index);
 	return (ShadowMapData ? ShadowMapData->ShadowMapCamera[index] : nullptr);
-}
-
-void jSpotLight::RenderToShadowMap(const RenderToShadowMapFunc& func, const jShader* shader) const
-{
-	JASSERT(ShadowMapData);
-	JASSERT(ShadowMapData->ShadowMapFrameBuffer);
-	if (ShadowMapData)
-	{
-		g_rhi->SetShader(shader);
-		func(ShadowMapData->ShadowMapFrameBuffer.get(), 0, ShadowMapData->ShadowMapCamera[0], Viewports);
-	}
 }
 
 void jSpotLight::Update(float deltaTime)
