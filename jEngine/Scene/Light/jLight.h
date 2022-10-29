@@ -6,7 +6,7 @@ enum class ELightType
 	AMBIENT = 0,
 	DIRECTIONAL,
 	POINT,
-	SPOT,	
+	SPOT,
 	MAX
 };
 
@@ -151,9 +151,9 @@ public:
 		Vector Color;
 		Vector Intensity;
 	};
-	
+
 	LightData Data;
-	
+
 	virtual void BindLight(const jShader* shader) const override;
 
 };
@@ -188,7 +188,7 @@ public:
 
 		Matrix ShadowVP;
 		Matrix ShadowV;
-		
+
 		Vector LightPos;
 		float padding3;
 
@@ -198,9 +198,9 @@ public:
 
 		bool operator == (const LightData& rhs) const
 		{
-			return (Direction == rhs.Direction && Color == rhs.Color && DiffuseIntensity == rhs.DiffuseIntensity 
+			return (Direction == rhs.Direction && Color == rhs.Color && DiffuseIntensity == rhs.DiffuseIntensity
 				&& SpecularIntensity == rhs.SpecularIntensity && SpecularPow == rhs.SpecularPow && ShadowVP == rhs.ShadowVP
-				&& ShadowV == rhs.ShadowV && LightPos == rhs.LightPos && ShadowMapSize == rhs.ShadowMapSize 
+				&& ShadowV == rhs.ShadowV && LightPos == rhs.LightPos && ShadowMapSize == rhs.ShadowMapSize
 				&& Near == rhs.Near && Far == rhs.Far);
 		}
 
@@ -243,18 +243,18 @@ public:
 		ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_GRAPHICS
 			, ResourceInlineAllocator.Alloc<jUniformBufferResource>(LightDataUniformBlock));
 
-        if (ensure(ShadowMapPtr))
-        {
-            const jSamplerStateInfo* ShadowSamplerStateInfo = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
-                , ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
-                , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
+		if (ensure(ShadowMapPtr))
+		{
+			const jSamplerStateInfo* ShadowSamplerStateInfo = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+				, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
+				, 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
 
 			ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
 				, ResourceInlineAllocator.Alloc<jTextureResource>(ShadowMapPtr->GetTexture(), ShadowSamplerStateInfo));
-        }
+		}
 
-        ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray);
-    }
+		ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray);
+	}
 	//////////////////////////////////////////////////////////////////////////
 };
 
@@ -283,10 +283,10 @@ class jPointLight : public jLight
 {
 public:
 	jPointLight()
-		: jLight(ELightType::POINT) 
+		: jLight(ELightType::POINT)
 	{
 		LightDataUniformBlock = g_rhi->CreateUniformBufferBlock(jNameStatic("PointLightBlock"), jLifeTimeType::MultiFrame);
-		
+
 		char szTemp[128] = { 0, };
 		for (int i = 0; i < 6; ++i)
 		{
@@ -311,8 +311,8 @@ public:
 
 		Vector DiffuseIntensity;
 		float padding0;
-		
-		Vector SpecularIntensity;		
+
+		Vector SpecularIntensity;
 		float padding1;
 
 		bool operator == (const LightData& rhs) const

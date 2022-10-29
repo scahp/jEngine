@@ -37,7 +37,7 @@ namespace jLightUtil
 		const float nearDist = 10.0f;
 		const float farDist = 1000.0f;
 		shadowMapData->ShadowMapCamera = jOrthographicCamera::CreateCamera(pos, target, up, -width / 2.0f, -height / 2.0f, width / 2.0f, height / 2.0f, nearDist, farDist);
-		
+
 		// FrameBuffer 생성 필요
 		// shadowMapData->ShadowMapRenderTarget = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::RG32F, EDepthBufferType::DEPTH32, SM_WIDTH, SM_HEIGHT, 1, ETextureFilter::LINEAR, ETextureFilter::LINEAR });
 		shadowMapData->ShadowMapFrameBuffer = jFrameBufferPool::GetFrameBuffer({ ETextureType::TEXTURE_2D, ETextureFormat::RG32F, SM_WIDTH, SM_HEIGHT, 1/*, ETextureFilter::LINEAR, ETextureFilter::LINEAR*/ });
@@ -99,10 +99,10 @@ jLight* jLight::CreateAmbientLight(const Vector& color, const Vector& intensity)
 {
 	auto ambientLight = new jAmbientLight();
 	JASSERT(ambientLight);
-	
+
 	ambientLight->Data.Color = color;
 	ambientLight->Data.Intensity = intensity;
-	
+
 	return ambientLight;
 }
 
@@ -301,55 +301,55 @@ void jDirectionalLight::Update(float deltaTime)
 
 void jDirectionalLight::SetupUniformBuffer()
 {
-    LightDataUniformBlock->UpdateBufferData(&Data, sizeof(Data));
+	LightDataUniformBlock->UpdateBufferData(&Data, sizeof(Data));
 
-    if (ShadowMapData && ShadowMapData->IsValid())
-    {
-        struct ShadowData
-        {
-            Matrix ShadowVP_Transposed;
-            Matrix ShadowV_Transposed;
-            Vector LightPos;
-            float Near;
-            float Far;
-            float padding0;
-            Vector2 ShadowMapSize;
+	if (ShadowMapData && ShadowMapData->IsValid())
+	{
+		struct ShadowData
+		{
+			Matrix ShadowVP_Transposed;
+			Matrix ShadowV_Transposed;
+			Vector LightPos;
+			float Near;
+			float Far;
+			float padding0;
+			Vector2 ShadowMapSize;
 
-            bool operator == (const ShadowData& rhs) const
-            {
-                return (ShadowVP_Transposed == rhs.ShadowVP_Transposed) && (ShadowV_Transposed == rhs.ShadowV_Transposed)
-                    && (LightPos == rhs.LightPos) && (Near == rhs.Near) && (Far == rhs.Far) && (ShadowMapSize == rhs.ShadowMapSize);
-            }
+			bool operator == (const ShadowData& rhs) const
+			{
+				return (ShadowVP_Transposed == rhs.ShadowVP_Transposed) && (ShadowV_Transposed == rhs.ShadowV_Transposed)
+					&& (LightPos == rhs.LightPos) && (Near == rhs.Near) && (Far == rhs.Far) && (ShadowMapSize == rhs.ShadowMapSize);
+			}
 
-            bool operator != (const ShadowData& rhs) const
-            {
-                return !(*this == rhs);
-            }
+			bool operator != (const ShadowData& rhs) const
+			{
+				return !(*this == rhs);
+			}
 
-            void SetData(jLightUtil::jShadowMapData* shadowMapData)
-            {
-                auto camera = shadowMapData->ShadowMapCamera;
-                JASSERT(camera);
+			void SetData(jLightUtil::jShadowMapData* shadowMapData)
+			{
+				auto camera = shadowMapData->ShadowMapCamera;
+				JASSERT(camera);
 
-                const auto& renderTargetInfo = shadowMapData->ShadowMapFrameBuffer->Info;
+				const auto& renderTargetInfo = shadowMapData->ShadowMapFrameBuffer->Info;
 
-                ShadowVP_Transposed = (camera->Projection * camera->View);
-                ShadowV_Transposed = (camera->View);
-                LightPos = camera->Pos;
-                Near = camera->Near;
-                Far = camera->Far;
-                ShadowMapSize.x = static_cast<float>(renderTargetInfo.Width);
-                ShadowMapSize.y = static_cast<float>(renderTargetInfo.Height);
-            }
-        };
+				ShadowVP_Transposed = (camera->Projection * camera->View);
+				ShadowV_Transposed = (camera->View);
+				LightPos = camera->Pos;
+				Near = camera->Near;
+				Far = camera->Far;
+				ShadowMapSize.x = static_cast<float>(renderTargetInfo.Width);
+				ShadowMapSize.y = static_cast<float>(renderTargetInfo.Height);
+			}
+		};
 
-        ShadowData shadowData;
-        shadowData.SetData(ShadowMapData);
+		ShadowData shadowData;
+		shadowData.SetData(ShadowMapData);
 
-        IUniformBufferBlock* shadowDataUniformBlock = ShadowMapData->UniformBlock;
-        if (shadowDataUniformBlock)
-            shadowDataUniformBlock->UpdateBufferData(&shadowData, sizeof(shadowData));
-    }
+		IUniformBufferBlock* shadowDataUniformBlock = ShadowMapData->UniformBlock;
+		if (shadowDataUniformBlock)
+			shadowDataUniformBlock->UpdateBufferData(&shadowData, sizeof(shadowData));
+	}
 }
 
 void jDirectionalLight::UpdateMaterialData()
@@ -367,9 +367,9 @@ void jDirectionalLight::UpdateMaterialData()
 	{
 		jTexture* texture = nullptr;
 
-        texture = ShadowMapData->ShadowMapFrameBuffer->GetTextureDepth();
+		texture = ShadowMapData->ShadowMapFrameBuffer->GetTextureDepth();
 
-        MaterialData.AddMaterialParam(jNameStatic("shadow_object_test"), texture);
+		MaterialData.AddMaterialParam(jNameStatic("shadow_object_test"), texture);
 	}
 }
 
@@ -472,46 +472,46 @@ void jPointLight::Update(float deltaTime)
 
 void jPointLight::SetupUniformBuffer()
 {
-    LightDataUniformBlock->UpdateBufferData(&Data, sizeof(Data));
+	LightDataUniformBlock->UpdateBufferData(&Data, sizeof(Data));
 
-    if (ShadowMapData && ShadowMapData->IsValid())
-    {
-        struct ShadowData
-        {
-            float Near;
-            float Far;
-            Vector2 ShadowMapSize;
+	if (ShadowMapData && ShadowMapData->IsValid())
+	{
+		struct ShadowData
+		{
+			float Near;
+			float Far;
+			Vector2 ShadowMapSize;
 
-            bool operator == (const ShadowData& rhs) const
-            {
-                return (Near == rhs.Near) && (Far == rhs.Far) && (ShadowMapSize == rhs.ShadowMapSize);
-            }
+			bool operator == (const ShadowData& rhs) const
+			{
+				return (Near == rhs.Near) && (Far == rhs.Far) && (ShadowMapSize == rhs.ShadowMapSize);
+			}
 
-            bool operator != (const ShadowData& rhs) const
-            {
-                return !(*this == rhs);
-            }
+			bool operator != (const ShadowData& rhs) const
+			{
+				return !(*this == rhs);
+			}
 
-            void SetData(jLightUtil::jShadowMapArrayData* shadowMapData)
-            {
-                auto camera = shadowMapData->ShadowMapCamera[0];
-                JASSERT(camera);
+			void SetData(jLightUtil::jShadowMapArrayData* shadowMapData)
+			{
+				auto camera = shadowMapData->ShadowMapCamera[0];
+				JASSERT(camera);
 
-                const auto& renderTargetInfo = shadowMapData->ShadowMapFrameBuffer->Info;
+				const auto& renderTargetInfo = shadowMapData->ShadowMapFrameBuffer->Info;
 
-                Near = camera->Near;
-                Far = camera->Far;
-                ShadowMapSize.x = static_cast<float>(renderTargetInfo.Width);
-                ShadowMapSize.y = static_cast<float>(renderTargetInfo.Height);
-            }
-        };
+				Near = camera->Near;
+				Far = camera->Far;
+				ShadowMapSize.x = static_cast<float>(renderTargetInfo.Width);
+				ShadowMapSize.y = static_cast<float>(renderTargetInfo.Height);
+			}
+		};
 
-        ShadowData shadowData;
-        shadowData.SetData(ShadowMapData);
+		ShadowData shadowData;
+		shadowData.SetData(ShadowMapData);
 
-        IUniformBufferBlock* shadowDataUniformBlock = ShadowMapData->UniformBlock;
-        shadowDataUniformBlock->UpdateBufferData(&shadowData, sizeof(shadowData));
-    }
+		IUniformBufferBlock* shadowDataUniformBlock = ShadowMapData->UniformBlock;
+		shadowDataUniformBlock->UpdateBufferData(&shadowData, sizeof(shadowData));
+	}
 }
 
 void jPointLight::UpdateMaterialData()
@@ -596,54 +596,54 @@ void jSpotLight::Update(float deltaTime)
 
 void jSpotLight::SetupUniformBuffer()
 {
-    LightDataUniformBlock->UpdateBufferData(&Data, sizeof(Data));
-    if (ShadowMapData && ShadowMapData->IsValid())
-    {
-        // Both near and far are all the same within camera array.
-        struct ShadowData
-        {
-            float Near;
-            float Far;
-            Vector2 ShadowMapSize;
-            // 16 byte aligned don't need a padding
+	LightDataUniformBlock->UpdateBufferData(&Data, sizeof(Data));
+	if (ShadowMapData && ShadowMapData->IsValid())
+	{
+		// Both near and far are all the same within camera array.
+		struct ShadowData
+		{
+			float Near;
+			float Far;
+			Vector2 ShadowMapSize;
+			// 16 byte aligned don't need a padding
 
-            bool operator == (const ShadowData& rhs) const
-            {
-                return (Near == rhs.Near) && (Far == rhs.Far) && (ShadowMapSize == rhs.ShadowMapSize);
-            }
+			bool operator == (const ShadowData& rhs) const
+			{
+				return (Near == rhs.Near) && (Far == rhs.Far) && (ShadowMapSize == rhs.ShadowMapSize);
+			}
 
-            bool operator != (const ShadowData& rhs) const
-            {
-                return !(*this == rhs);
-            }
+			bool operator != (const ShadowData& rhs) const
+			{
+				return !(*this == rhs);
+			}
 
-            void SetData(jLightUtil::jShadowMapArrayData* shadowMapData)
-            {
-                auto camera = shadowMapData->ShadowMapCamera[0];
-                JASSERT(camera);
+			void SetData(jLightUtil::jShadowMapArrayData* shadowMapData)
+			{
+				auto camera = shadowMapData->ShadowMapCamera[0];
+				JASSERT(camera);
 
-                const auto& renderTargetInfo = shadowMapData->ShadowMapFrameBuffer->Info;
+				const auto& renderTargetInfo = shadowMapData->ShadowMapFrameBuffer->Info;
 
-                Near = camera->Near;
-                Far = camera->Far;
-                ShadowMapSize.x = static_cast<float>(renderTargetInfo.Width);
-                ShadowMapSize.y = static_cast<float>(renderTargetInfo.Height);
-            }
-        };
+				Near = camera->Near;
+				Far = camera->Far;
+				ShadowMapSize.x = static_cast<float>(renderTargetInfo.Width);
+				ShadowMapSize.y = static_cast<float>(renderTargetInfo.Height);
+			}
+		};
 
-        ShadowData shadowData;
-        shadowData.SetData(ShadowMapData);
+		ShadowData shadowData;
+		shadowData.SetData(ShadowMapData);
 
-        IUniformBufferBlock* shadowDataUniformBlock = ShadowMapData->UniformBlock;
-        shadowDataUniformBlock->UpdateBufferData(&shadowData, sizeof(shadowData));
+		IUniformBufferBlock* shadowDataUniformBlock = ShadowMapData->UniformBlock;
+		shadowDataUniformBlock->UpdateBufferData(&shadowData, sizeof(shadowData));
 
-        for (int i = 0; i < 6; ++i)
-        {
-            auto camera = ShadowMapData->ShadowMapCamera[i];
-            const auto vp = (camera->Projection * camera->View);
-            OmniShadowMapVP[i].Data = vp;
-        }
-    }
+		for (int i = 0; i < 6; ++i)
+		{
+			auto camera = ShadowMapData->ShadowMapCamera[i];
+			const auto vp = (camera->Projection * camera->View);
+			OmniShadowMapVP[i].Data = vp;
+		}
+	}
 }
 
 void jSpotLight::UpdateMaterialData()
