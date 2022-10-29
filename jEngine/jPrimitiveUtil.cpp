@@ -3,7 +3,7 @@
 #include "Math/Vector.h"
 #include "Scene/jRenderObject.h"
 #include "Scene/jCamera.h"
-#include "Scene/jLight.h"
+#include "Scene/Light/jDirectionalLight.h"
 #include "Math/Plane.h"
 #include "FileLoader/jImageFileLoader.h"
 
@@ -1929,7 +1929,7 @@ jDirectionalLightPrimitive* CreateDirectionalLightDebug(const Vector& pos, const
         //object->BillboardObject->RenderObject->MaterialData.AddMaterialParam(GetCommonTextureName(1), texture);
         object->BillboardObject->RenderObject->IsHiddenBoundBox = true;
     }
-    object->ArrowSegementObject = jPrimitiveUtil::CreateArrowSegment(Vector::ZeroVector, light->Data.Direction * length, 1.0f, scale.x, scale.x / 2, Vector4(0.8f, 0.2f, 0.3f, 1.0f));
+    object->ArrowSegementObject = jPrimitiveUtil::CreateArrowSegment(Vector::ZeroVector, light->GetLightData().Direction * length, 1.0f, scale.x, scale.x / 2, Vector4(0.8f, 0.2f, 0.3f, 1.0f));
     object->ArrowSegementObject->ConeObject->RenderObject->IsHiddenBoundBox = true;
     object->ArrowSegementObject->SegmentObject->RenderObject->IsHiddenBoundBox = true;
     object->Pos = pos;
@@ -1939,7 +1939,7 @@ jDirectionalLightPrimitive* CreateDirectionalLightDebug(const Vector& pos, const
         auto thisDirectionalLightObject = static_cast<jDirectionalLightPrimitive*>(thisObject);
         thisDirectionalLightObject->BillboardObject->RenderObject->SetPos(thisDirectionalLightObject->Pos);
         thisDirectionalLightObject->ArrowSegementObject->SetPos(thisDirectionalLightObject->Pos);
-        thisDirectionalLightObject->ArrowSegementObject->SetEnd(thisDirectionalLightObject->Light->Data.Direction * length);
+        thisDirectionalLightObject->ArrowSegementObject->SetEnd(thisDirectionalLightObject->Light->GetLightData().Direction * length);
     };
 	object->SkipShadowMapGen = true;
 	object->SkipUpdateShadowVolume = true;

@@ -3,7 +3,7 @@
 #include "Math/Vector.h"
 #include "Scene/jCamera.h"
 #include "Scene/jObject.h"
-#include "Scene/jLight.h"
+#include "Scene/Light/jDirectionalLight.h"
 #include "Scene/jRenderObject.h"
 #include "Profiler/jPerformanceProfile.h"
 #include "Renderer/jRenderer.h"
@@ -259,7 +259,7 @@ void jGame::Release()
 
     DirectionalLight = nullptr;		// 현재 사용중인 Directional light 의 레퍼런스이므로 그냥 nullptr 설정
 	delete NormalDirectionalLight;
-	delete CascadeDirectionalLight;
+	//delete CascadeDirectionalLight;
 	delete PointLight;
 	delete SpotLight;
 	delete AmbientLight;

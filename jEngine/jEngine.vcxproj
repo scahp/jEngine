@@ -194,10 +194,11 @@ xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"</Command
     <ClInclude Include="RHI\Vulkan\jVulkanBufferUtil.h" />
     <ClInclude Include="RHI\Vulkan\jVulkanDeviceUtil.h" />
     <ClInclude Include="Scene\jCamera.h" />
-    <ClInclude Include="Scene\jLight.h" />
     <ClInclude Include="Scene\jMeshObject.h" />
     <ClInclude Include="Scene\jObject.h" />
     <ClInclude Include="Scene\jRenderObject.h" />
+    <ClInclude Include="Scene\Light\jDirectionalLight.h" />
+    <ClInclude Include="Scene\Light\jLight.h" />
     <ClInclude Include="Shader\jShader.h" />
     <ClInclude Include="Shader\Spirv\jSpirvHelper.h" />
   </ItemGroup>
@@ -352,10 +353,11 @@ xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"</Command
     <ClCompile Include="RHI\Vulkan\jVulkanBufferUtil.cpp" />
     <ClCompile Include="RHI\Vulkan\jVulkanDeviceUtil.cpp" />
     <ClCompile Include="Scene\jCamera.cpp" />
-    <ClCompile Include="Scene\jLight.cpp" />
     <ClCompile Include="Scene\jMeshObject.cpp" />
     <ClCompile Include="Scene\jObject.cpp" />
     <ClCompile Include="Scene\jRenderObject.cpp" />
+    <ClCompile Include="Scene\Light\jDirectionalLight.cpp" />
+    <ClCompile Include="Scene\Light\jLight.cpp" />
     <ClCompile Include="Shader\jShader.cpp" />
     <ClCompile Include="Shader\Spirv\jSpirvHelper.cpp" />
   </ItemGroup>

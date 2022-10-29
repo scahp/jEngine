@@ -1,6 +1,6 @@
 ﻿#include "pch.h"
 #include "jCamera.h"
-#include "jLight.h"
+#include "Light/jLight.h"
 
 std::map<int32, jCamera*> jCamera::CameraMap;
 
@@ -89,72 +89,67 @@ void jCamera::UpdateCamera()
     Projection = CreateProjection();
 }
 
-void jCamera::AddLight(jLight* light)
-{
-    if (light)
-    {
-        LightList.push_back(light);
-        if (light->Type == ELightType::AMBIENT)
-            Ambient = static_cast<jAmbientLight*>(light);
-    }
-}
-
-jLight* jCamera::GetLight(int32 index) const
-{
-    JASSERT(index >= 0 && LightList.size() > index);
-    return LightList[index];
-}
-
-jLight* jCamera::GetLight(ELightType type) const
-{
-    for (auto& iter : LightList)
-    {
-        if (iter->Type == type)
-            return iter;
-    }
-    return nullptr;
-}
-
-void jCamera::RemoveLight(int32 index)
-{
-    LightList.erase(LightList.begin() + index);
-}
-
-void jCamera::RemoveLight(ELightType type)
-{
-    for (auto it = LightList.begin(); it != LightList.end();)
-    {
-        if ((*it)->Type == type)
-        {
-            it = LightList.erase(it);
-            continue;
-        }
-        ++it;
-    }
-}
-
-void jCamera::RemoveLight(jLight* light)
-{
-    for (auto it = LightList.begin(); it != LightList.end();)
-    {
-        if (*it == light)
-        {
-            it = LightList.erase(it);
-            continue;
-        }
-        ++it;
-    }
-}
-
-int32 jCamera::GetNumOfLight() const
-{
-    return static_cast<int32>(LightList.size());
-}
-
-void jCamera::SetupUniformBuffer()
-{
-
-}
+//void jCamera::AddLight(jLight* light)
+//{
+//    if (light)
+//    {
+//        LightList.push_back(light);
+//        if (light->Type == ELightType::AMBIENT)
+//            Ambient = static_cast<jAmbientLight*>(light);
+//    }
+//}
+//
+//jLight* jCamera::GetLight(int32 index) const
+//{
+//    JASSERT(index >= 0 && LightList.size() > index);
+//    return LightList[index];
+//}
+//
+//jLight* jCamera::GetLight(ELightType type) const
+//{
+//    for (auto& iter : LightList)
+//    {
+//        if (iter->Type == type)
+//            return iter;
+//    }
+//    return nullptr;
+//}
+//
+//void jCamera::RemoveLight(int32 index)
+//{
+//    LightList.erase(LightList.begin() + index);
+//}
+//
+//void jCamera::RemoveLight(ELightType type)
+//{
+//    for (auto it = LightList.begin(); it != LightList.end();)
+//    {
+//        if ((*it)->Type == type)
+//        {
+//            it = LightList.erase(it);
+//            continue;
+//        }
+//        ++it;
+//    }
+//}
+//
+//void jCamera::RemoveLight(jLight* light)
+//{
+//    for (auto it = LightList.begin(); it != LightList.end();)
+//    {
+//        if (*it == light)
+//        {
+//            it = LightList.erase(it);
+//            continue;
+//        }
+//        ++it;
+//    }
+//}
+//
+//int32 jCamera::GetNumOfLight() const
+//{
+//    return static_cast<int32>(LightList.size());
+//}
 
 //////////////////////////////////////////////////////////////////////////
 // jOrthographicCamera

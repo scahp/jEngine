@@ -1,6 +1,6 @@
 ﻿#include "pch.h"
 #include "jRenderer.h"
-#include "Scene/jLight.h"
+#include "Scene/Light/jDirectionalLight.h"
 #include "jSceneRenderTargets.h"
 #include "Scene/jObject.h"
 #include "jOptions.h"
@@ -28,13 +28,11 @@ void jRenderer::Setup()
 
     FrameIndex = g_rhi_vk->CurrenFrameIndex;
 
-    View.SetupUniformBuffer();
-
     // View 별로 저장 할 수 있어야 함
-    if (View.DirectionalLight)
+    if (View.DirectionalLight.Light)
     {
-        View.DirectionalLight->ShadowMapPtr = RenderFrameContextPtr->SceneRenderTarget->DirectionalLightShadowMapPtr;
-        View.DirectionalLight->PrepareShaderBindingInstance();
+        View.DirectionalLight.ShadowMapPtr = RenderFrameContextPtr->SceneRenderTarget->DirectionalLightShadowMapPtr;
+        View.DirectionalLight.ShaderBindingInstance = View.DirectionalLight.Light->PrepareShaderBindingInstance(View.DirectionalLight.ShadowMapPtr->GetTexture());
     }
 
 #if ASYNC_WITH_SETUP
@@ -62,7 +60,7 @@ void jRenderer::SetupShadowPass()
         const Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
         const Vector2 ClearDepth = Vector2(1.0f, 0.0f);
 
-        jAttachment depth = jAttachment(View.DirectionalLight->ShadowMapPtr, EAttachmentLoadStoreOp::CLEAR_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE
+        jAttachment depth = jAttachment(View.DirectionalLight.ShadowMapPtr, EAttachmentLoadStoreOp::CLEAR_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE
             , ClearColor, ClearDepth, EImageLayout::UNDEFINED, EImageLayout::DEPTH_STENCIL_ATTACHMENT);
 
         // Setup attachment
@@ -83,7 +81,7 @@ void jRenderer::SetupShadowPass()
         // ShadowMapRenderPass = g_rhi->GetOrCreateRenderPass({}, depth, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
     }
 
-    ShadowView.Camera = View.DirectionalLight->GetLightCamra();
+    ShadowView.Camera = View.DirectionalLight.Light->GetLightCamra();
     ShadowView.DirectionalLight = View.DirectionalLight;
 
     jShader* ShadowShader = nullptr;
@@ -245,7 +243,7 @@ void jRenderer::ShadowPass()
         SCOPE_CPU_PROFILE(ShadowPass);
         SCOPE_GPU_PROFILE(RenderFrameContextPtr, ShadowPass);
 
-        g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, View.DirectionalLight->ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_ATTACHMENT);
+        g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, View.DirectionalLight.ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_ATTACHMENT);
 
         if (ShadowMapRenderPass && ShadowMapRenderPass->BeginRenderPass(RenderFrameContextPtr->CommandBuffer))
         {
@@ -258,7 +256,7 @@ void jRenderer::ShadowPass()
             ShadowMapRenderPass->EndRenderPass();
         }
 
-        g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, View.DirectionalLight->ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_READ_ONLY);
+        g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, View.DirectionalLight.ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_READ_ONLY);
     }
 }
 

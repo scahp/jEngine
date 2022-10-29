@@ -2,7 +2,7 @@
 #include "jRenderObject.h"
 #include "jGame.h"
 #include "Scene/jCamera.h"
-#include "Scene/jLight.h"
+#include "Scene/Light/jLight.h"
 #include "Scene/jObject.h"
 #include "RHI/jFrameBufferPool.h"
 #include "RHI/Vulkan/jUniformBufferBlock_Vulkan.h"

@@ -3,10 +3,9 @@
 #include "Math\Matrix.h"
 #include "Math\Vector.h"
 #include "Math\Plane.h"
-#include "jLight.h"
 
-class jLight;
-class jAmbientLight;
+//class jLight;
+//class jAmbientLight;
 
 struct jFrustumPlane
 {
@@ -251,16 +250,15 @@ public:
 
 	FORCEINLINE Vector GetEulerAngle() const { return EulerAngle; }
 
-	void AddLight(jLight* light);
-	jLight* GetLight(int32 index) const;
-	jLight* GetLight(ELightType type) const;
-	void RemoveLight(int32 index);
-	void RemoveLight(ELightType type);
-	void RemoveLight(jLight* light);
+	//void AddLight(jLight* light);
+	//jLight* GetLight(int32 index) const;
+	//jLight* GetLight(ELightType type) const;
+	//void RemoveLight(int32 index);
+	//void RemoveLight(ELightType type);
+	//void RemoveLight(jLight* light);
 
-	int32 GetNumOfLight() const;
+	//int32 GetNumOfLight() const;
 
-	void SetupUniformBuffer();
 	// Camera Uniform buffer
 	//struct jUniformBufferCamera
 	//{
@@ -312,8 +310,8 @@ public:
 	float Near = 0.0f;
 	float Far = 0.0f;
 
-	std::vector<jLight*> LightList;
-	jAmbientLight* Ambient = nullptr;
+	//std::vector<jLight*> LightList;
+	//jAmbientLight* Ambient = nullptr;
 	bool UseAmbient = false;
 	jFrustumPlane Frustum;
 	int32 Width = 0;

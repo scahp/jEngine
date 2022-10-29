@@ -190,36 +190,6 @@ struct ITransformFeedbackBuffer
 	}
 };
 
-struct jMaterialParam
-{
-	jMaterialParam() = default;
-	jMaterialParam(const jName& name, const jTexture* texture, const jSamplerStateInfo* samplerstate)
-		: Name(name), Texture(texture), SamplerState(samplerstate)
-	{}
-	virtual ~jMaterialParam() {}
-
-	jName Name;
-	const jTexture* Texture = nullptr;
-	const jSamplerStateInfo* SamplerState = nullptr;
-};
-
-struct jMaterialData
-{
-	~jMaterialData()
-	{
-		Clear();
-	}
-
-	void AddMaterialParam(const jName& name, const jTexture* texture, const jSamplerStateInfo* samplerState = nullptr);
-    void SetMaterialParam(int32 index, const jName& name, const jTexture* texture, const jSamplerStateInfo* samplerState = nullptr);
-	void SetMaterialParam(int32 index, const jName& name);
-	void SetMaterialParam(int32 index, const jTexture* texture);
-	void SetMaterialParam(int32 index, const jSamplerStateInfo* samplerState);
-	void Clear() { Params.clear(); }
-
-	std::vector<jMaterialParam> Params;
-};
-
 class jMaterial
 {
 public:
@@ -278,19 +248,32 @@ class jView
 {
 public:
 	jView() = default;
-	jView(jCamera* camera, jDirectionalLight* directionalLight = nullptr, jLight* pointLight = nullptr, jLight* spotLight = nullptr)
+	jView(const jCamera* camera, const jDirectionalLight* directionalLight = nullptr, jLight* pointLight = nullptr, jLight* spotLight = nullptr)
 		: Camera(camera), DirectionalLight(directionalLight), PointLight(pointLight), SpotLight(spotLight)
 	{
 		check(camera);
 	}
 
-	void SetupUniformBuffer();
 	void GetShaderBindingInstance(jShaderBindingInstanceArray& OutShaderBindingInstanceArray);
 
-	jCamera* Camera = nullptr;
-	jDirectionalLight* DirectionalLight = nullptr;
-	jLight* PointLight = nullptr;
-	jLight* SpotLight = nullptr;
+	struct jViewLight
+	{
+		jViewLight() = default;
+		jViewLight(const jDirectionalLight* InDirectionalLight)
+		 : Light(InDirectionalLight)
+		{ }
+
+		const jDirectionalLight* Light = nullptr;
+        jShaderBindingInstance* ShaderBindingInstance = nullptr;
+		jShaderBindingInstance* TT = nullptr;
+		std::shared_ptr<jRenderTarget> ShadowMapPtr;
+	};
+
+	const jCamera* Camera = nullptr;
+	// const jDirectionalLight* DirectionalLight = nullptr;
+	jViewLight DirectionalLight;
+	const jLight* PointLight = nullptr;
+	const jLight* SpotLight = nullptr;
 };
 
 class jRHI

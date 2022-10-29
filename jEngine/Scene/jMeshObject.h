@@ -75,7 +75,7 @@ struct jSubMesh
 	int32 EndFace = -1;
 	int32 MaterialIndex = -1;
 
-	jMaterialData MaterialData;
+	// jMaterialData MaterialData;
 	std::string Name;
 };
 

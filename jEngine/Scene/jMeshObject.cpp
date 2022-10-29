@@ -82,7 +82,9 @@ void jMeshObject::DrawSubMesh(const std::shared_ptr<jRenderFrameContext>& InRend
 		bool UseAmbientSampler = false;
 		bool UseNormalSampler = false;
 
-		subMesh.MaterialData.Params.clear();
+		// todo
+		check(0);
+		// subMesh.MaterialData.Params.clear();
 
 		// todo
 		check(0);

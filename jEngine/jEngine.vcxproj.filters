@@ -92,6 +92,9 @@
     <Filter Include="Code\External\robin-hood-hashing">
       <UniqueIdentifier>{2b1caad5-b7d8-4673-a375-267c33335ade}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Code\Scene\Light">
+      <UniqueIdentifier>{4727e332-b3ad-46d8-978e-3efd50b6a8eb}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Math\MathUtility.h">
@@ -182,9 +185,6 @@
       <Filter>Code\Scene</Filter>
     </ClInclude>
     <ClInclude Include="Scene\jCamera.h">
-      <Filter>Code\Scene</Filter>
-    </ClInclude>
-    <ClInclude Include="Scene\jLight.h">
       <Filter>Code\Scene</Filter>
     </ClInclude>
     <ClInclude Include="External\loadpng\lodepng.h">
@@ -367,6 +367,12 @@
     <ClInclude Include="RHI\Vulkan\jMemoryPool_Vulkan.h">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClInclude>
+    <ClInclude Include="Scene\Light\jLight.h">
+      <Filter>Code\Scene\Light</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene\Light\jDirectionalLight.h">
+      <Filter>Code\Scene\Light</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -472,9 +478,6 @@
       <Filter>Code\Scene</Filter>
     </ClCompile>
     <ClCompile Include="Scene\jCamera.cpp">
-      <Filter>Code\Scene</Filter>
-    </ClCompile>
-    <ClCompile Include="Scene\jLight.cpp">
       <Filter>Code\Scene</Filter>
     </ClCompile>
     <ClCompile Include="External\glad\glad.c">
@@ -620,6 +623,12 @@
     </ClCompile>
     <ClCompile Include="RHI\Vulkan\jMemoryPool_Vulkan.cpp">
       <Filter>Code\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene\Light\jLight.cpp">
+      <Filter>Code\Scene\Light</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene\Light\jDirectionalLight.cpp">
+      <Filter>Code\Scene\Light</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

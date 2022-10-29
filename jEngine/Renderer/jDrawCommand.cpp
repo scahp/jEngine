@@ -77,6 +77,7 @@ void jDrawCommand::Draw() const
 
     RenderObject->BindBuffers(RenderFrameContextPtr, IsPositionOnly);
 
+    // Todo : OcclusionQuery will be moved to another visibility passes
     if (OcclusionQuery)
         OcclusionQuery->BeginQuery(RenderFrameContextPtr->CommandBuffer);
 

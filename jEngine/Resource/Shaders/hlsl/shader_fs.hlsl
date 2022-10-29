@@ -53,7 +53,7 @@ SamplerState shadowMapSampler : register(s1, space0);
 
 struct PushConsts
 {
-    float4 color;
+    float4 Color;
     bool ShowVRSArea;
     bool ShowGrid;
 };
@@ -76,7 +76,7 @@ float4 main(VSOutput input
 	}
 
     float Intensity = dot(input.Normal, -DirectionalLight.Direction) * lit;
-    float4 color = float4(pushConsts.color.rgb * input.Color.xyz * Intensity, 1.0);
+    float4 color = float4(pushConsts.Color.rgb * input.Color.xyz * Intensity, 1.0);
     
 #if USE_VARIABLE_SHADING_RATE
     if (pushConsts.ShowVRSArea)
