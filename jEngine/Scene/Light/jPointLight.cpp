@@ -58,6 +58,29 @@ void jPointLight::Initialize(const Vector& InPos, const Vector& InColor, float I
 //	}
 //}
 
+jShaderBindingInstance* jPointLight::PrepareShaderBindingInstance(jTexture* InShadowMap) const
+{
+    int32 BindingPoint = 0;
+    jShaderBindingArray ShaderBindingArray;
+    jShaderBindingResourceInlineAllocator ResourceInlineAllocator;
+
+    ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_GRAPHICS
+        , ResourceInlineAllocator.Alloc<jUniformBufferResource>(LightDataUniformBlock));
+
+    if (ensure(InShadowMap))
+    {
+        const jSamplerStateInfo* ShadowSamplerStateInfo = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+            , ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
+            , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
+
+        ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
+            , ResourceInlineAllocator.Alloc<jTextureResource>(InShadowMap, ShadowSamplerStateInfo));
+    }
+
+    return g_rhi->CreateShaderBindingInstance(ShaderBindingArray);
+}
+
+
 jCamera* jPointLight::GetLightCamra(int index /*= 0*/) const
 {
     check(index < _countof(Camera));
@@ -74,18 +97,11 @@ void jPointLight::Update(float deltaTime)
         currentCamera->Target += offset;
         currentCamera->Up += offset;
         currentCamera->UpdateCamera();
+
+        LightData.ShadowVP[i] = currentCamera->Projection * currentCamera->View;
     }
 
-    check(0); // todo
-    //SetupUniformBuffer();
-    return;
-
-    //for (int32 i = 0; i < 6; ++i)
-    //{
-    //    auto currentCamera = Camera[i];
-    //    const auto vp = (currentCamera->Projection * currentCamera->View);
-    //    OmniShadowMapVP[i].Data = vp;
-    //}
+    LightDataUniformBlock->UpdateBufferData(&LightData, sizeof(LightData));
 }
 
 //void jPointLight::SetupUniformBuffer()

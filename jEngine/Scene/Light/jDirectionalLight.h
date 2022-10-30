@@ -55,7 +55,6 @@ public:
     virtual void Update(float deltaTime) override;
 	virtual IUniformBufferBlock* GetUniformBufferBlock() const override { return LightDataUniformBlock; }
     virtual const jCamera* GetLightCamra(int32 index = 0) const override;
-
     virtual jShaderBindingInstance* PrepareShaderBindingInstance(jTexture* InShadowMap) const override;
 
     FORCEINLINE const jDirectionalLightUniformBufferData& GetLightData() const { return LightData; }

@@ -18,11 +18,13 @@ struct jSpotLightUniformBufferData
     Vector SpecularIntensity;
     float padding0;
 
+    Matrix ShadowVP[6];
+
     bool operator == (const jSpotLightUniformBufferData& rhs) const
     {
         return (Position == rhs.Position && Direction == rhs.Direction && Color == rhs.Color && DiffuseIntensity == rhs.DiffuseIntensity
             && SpecularIntensity == rhs.SpecularIntensity && SpecularPow == rhs.SpecularPow && MaxDistance == rhs.MaxDistance
-            && PenumbraRadian == rhs.PenumbraRadian && UmbraRadian == rhs.UmbraRadian);
+            && PenumbraRadian == rhs.PenumbraRadian && UmbraRadian == rhs.UmbraRadian && !memcmp(ShadowVP, rhs.ShadowVP, sizeof(ShadowVP)));
     }
 
     bool operator != (const jSpotLightUniformBufferData& rhs) const
@@ -51,6 +53,9 @@ public:
     virtual void Update(float deltaTime) override;
     virtual IUniformBufferBlock* GetUniformBufferBlock() const override { return LightDataUniformBlock; }
     virtual jCamera* GetLightCamra(int index = 0) const;
+    virtual jShaderBindingInstance* PrepareShaderBindingInstance(jTexture* InShadowMap) const override;
+
+    FORCEINLINE const jSpotLightUniformBufferData& GetLightData() const { return LightData; }
 
     jCamera* Camera[6] = { 0, };
     jUniformBuffer<Matrix> OmniShadowMapVP[6];
