@@ -4,6 +4,8 @@
 #include "Scene/jCamera.h"
 #include "Scene/jObject.h"
 #include "Scene/Light/jDirectionalLight.h"
+#include "Scene/Light/jPointLight.h"
+#include "Scene/Light/jSpotLight.h"
 #include "Scene/jRenderObject.h"
 #include "Profiler/jPerformanceProfile.h"
 #include "Renderer/jRenderer.h"

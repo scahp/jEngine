@@ -1,7 +1,7 @@
 ﻿#pragma once
 #include "jLight.h"
 
-struct jLightDataUniformBuffer
+struct jDirectionalLightUniformBufferData
 {
     Vector Direction;
     float SpecularPow = 0.0f;
@@ -25,7 +25,7 @@ struct jLightDataUniformBuffer
     float Near;
     float Far;
 
-    bool operator == (const jLightDataUniformBuffer& rhs) const
+    bool operator == (const jDirectionalLightUniformBufferData& rhs) const
     {
         return (Direction == rhs.Direction && Color == rhs.Color && DiffuseIntensity == rhs.DiffuseIntensity
             && SpecularIntensity == rhs.SpecularIntensity && SpecularPow == rhs.SpecularPow && ShadowVP == rhs.ShadowVP
@@ -33,7 +33,7 @@ struct jLightDataUniformBuffer
             && Near == rhs.Near && Far == rhs.Far);
     }
 
-    bool operator != (const jLightDataUniformBuffer& rhs) const
+    bool operator != (const jDirectionalLightUniformBufferData& rhs) const
     {
         return !(*this == rhs);
     }
@@ -42,8 +42,8 @@ struct jLightDataUniformBuffer
 class jDirectionalLight : public jLight
 {
 public:
-    static constexpr float SM_Width = 512;
-    static constexpr float SM_Height = 512;
+    static constexpr int32 SM_Width = 512;
+    static constexpr int32 SM_Height = 512;
     static constexpr float SM_NearDist = 10.0f;
     static constexpr float SM_FarDist = 1000.0f;
 
@@ -78,10 +78,10 @@ public:
         return g_rhi->CreateShaderBindingInstance(ShaderBindingArray);
     }
 
-    FORCEINLINE const jLightDataUniformBuffer& GetLightData() const { return LightData; }
+    FORCEINLINE const jDirectionalLightUniformBufferData& GetLightData() const { return LightData; }
 
 private:
     jCamera* Camera = nullptr;
-    jLightDataUniformBuffer LightData;
+    jDirectionalLightUniformBufferData LightData;
     IUniformBufferBlock* LightDataUniformBlock = nullptr;
 };

@@ -199,6 +199,8 @@ xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"</Command
     <ClInclude Include="Scene\jRenderObject.h" />
     <ClInclude Include="Scene\Light\jDirectionalLight.h" />
     <ClInclude Include="Scene\Light\jLight.h" />
+    <ClInclude Include="Scene\Light\jPointLight.h" />
+    <ClInclude Include="Scene\Light\jSpotLight.h" />
     <ClInclude Include="Shader\jShader.h" />
     <ClInclude Include="Shader\Spirv\jSpirvHelper.h" />
   </ItemGroup>
@@ -358,6 +360,8 @@ xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"</Command
     <ClCompile Include="Scene\jRenderObject.cpp" />
     <ClCompile Include="Scene\Light\jDirectionalLight.cpp" />
     <ClCompile Include="Scene\Light\jLight.cpp" />
+    <ClCompile Include="Scene\Light\jPointLight.cpp" />
+    <ClCompile Include="Scene\Light\jSpotLight.cpp" />
     <ClCompile Include="Shader\jShader.cpp" />
     <ClCompile Include="Shader\Spirv\jSpirvHelper.cpp" />
   </ItemGroup>

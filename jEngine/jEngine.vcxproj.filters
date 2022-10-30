@@ -373,6 +373,12 @@
     <ClInclude Include="Scene\Light\jDirectionalLight.h">
       <Filter>Code\Scene\Light</Filter>
     </ClInclude>
+    <ClInclude Include="Scene\Light\jPointLight.h">
+      <Filter>Code\Scene\Light</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene\Light\jSpotLight.h">
+      <Filter>Code\Scene\Light</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -628,6 +634,12 @@
       <Filter>Code\Scene\Light</Filter>
     </ClCompile>
     <ClCompile Include="Scene\Light\jDirectionalLight.cpp">
+      <Filter>Code\Scene\Light</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene\Light\jPointLight.cpp">
+      <Filter>Code\Scene\Light</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene\Light\jSpotLight.cpp">
       <Filter>Code\Scene\Light</Filter>
     </ClCompile>
   </ItemGroup>

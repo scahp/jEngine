@@ -3,7 +3,7 @@
 
 jDirectionalLight::jDirectionalLight() : jLight(ELightType::DIRECTIONAL)
 {
-    LightDataUniformBlock = g_rhi->CreateUniformBufferBlock(jNameStatic("DirectionalLightBlock"), jLifeTimeType::MultiFrame, sizeof(jLightDataUniformBuffer));
+    LightDataUniformBlock = g_rhi->CreateUniformBufferBlock(jNameStatic("DirectionalLightBlock"), jLifeTimeType::MultiFrame, sizeof(jDirectionalLightUniformBufferData));
 }
 
 jDirectionalLight::~jDirectionalLight()
