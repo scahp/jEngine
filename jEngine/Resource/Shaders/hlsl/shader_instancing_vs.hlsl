@@ -36,16 +36,22 @@ struct DirectionalLightUniformBuffer
     float Far;
 };
 
+struct ViewUniformBuffer
+{
+    float4x4 V;
+    float4x4 P;
+    float4x4 VP;
+};
+
 struct RenderObjectUniformBuffer
 {
     float4x4 M;
-    float4x4 MV;
-    float4x4 MVP;
     float4x4 InvM;
 };
 
-cbuffer DirectionalLight : register(b0,space0) { DirectionalLightUniformBuffer DirectionalLight; }
-cbuffer RenderObjectParam : register(b0,space1) { RenderObjectUniformBuffer RenderObjectParam; }
+cbuffer ViewParam : register(b0,space0) { ViewUniformBuffer ViewParam; }
+cbuffer DirectionalLight : register(b0,space1) { DirectionalLightUniformBuffer DirectionalLight; }
+cbuffer RenderObjectParam : register(b0,space2) { RenderObjectUniformBuffer RenderObjectParam; }
 
 struct VSOutput
 {
@@ -62,7 +68,7 @@ VSOutput main(VSInput input)
     
     float3 pos = input.Position + input.InstancingWorld;
     
-    output.Pos = mul(RenderObjectParam.MVP, float4(pos, 1.0));
+    output.Pos = mul(ViewParam.VP, mul(RenderObjectParam.M, float4(pos, 1.0)));
     output.Color = input.InstancingColor;
     //output.Color = input.Color;
     output.TexCoord = input.TexCoord;

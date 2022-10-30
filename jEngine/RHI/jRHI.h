@@ -244,36 +244,33 @@ class jLight;
 class jDirectionalLight;
 struct jShaderBindingInstance;
 
+// View 에서 사용할 라이트 정보
+class jViewLight
+{
+public:
+    jViewLight() = default;
+    jViewLight(const jLight* InLight)
+        : Light(InLight)
+    { }
+
+    const jLight* Light = nullptr;
+    jShaderBindingInstance* ShaderBindingInstance = nullptr;
+    std::shared_ptr<jRenderTarget> ShadowMapPtr;
+};
+
 class jView
 {
 public:
 	jView() = default;
-	jView(const jCamera* camera, const jDirectionalLight* directionalLight = nullptr, jLight* pointLight = nullptr, jLight* spotLight = nullptr)
-		: Camera(camera), DirectionalLight(directionalLight), PointLight(pointLight), SpotLight(spotLight)
-	{
-		check(camera);
-	}
+	jView(const jCamera* camera, const jDirectionalLight* directionalLight = nullptr, jLight* pointLight = nullptr, jLight* spotLight = nullptr);
 
-	void GetShaderBindingInstance(jShaderBindingInstanceArray& OutShaderBindingInstanceArray);
-
-	struct jViewLight
-	{
-		jViewLight() = default;
-		jViewLight(const jDirectionalLight* InDirectionalLight)
-		 : Light(InDirectionalLight)
-		{ }
-
-		const jDirectionalLight* Light = nullptr;
-        jShaderBindingInstance* ShaderBindingInstance = nullptr;
-		jShaderBindingInstance* TT = nullptr;
-		std::shared_ptr<jRenderTarget> ShadowMapPtr;
-	};
+	void PrepareViewUniformBufferShaderBindingInstance();
+	void GetShaderBindingInstance(jShaderBindingInstanceArray& OutShaderBindingInstanceArray) const;
 
 	const jCamera* Camera = nullptr;
-	// const jDirectionalLight* DirectionalLight = nullptr;
-	jViewLight DirectionalLight;
-	const jLight* PointLight = nullptr;
-	const jLight* SpotLight = nullptr;
+	std::vector<jViewLight> Lights;
+	std::shared_ptr<IUniformBufferBlock> ViewUniformBufferPtr;
+	jShaderBindingInstance* ViewUniformBufferShaderBindingInstance = nullptr;
 };
 
 class jRHI

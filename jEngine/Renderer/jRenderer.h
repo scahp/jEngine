@@ -7,6 +7,29 @@ class jView;
 struct jSceneRenderTarget;
 struct jRenderFrameContext;
 
+// Light 별로 렌더링할 정보들을 갖고 있는 객체
+struct jShadowDrawInfo
+{
+    jShadowDrawInfo() = default;
+    jShadowDrawInfo(const jViewLight& InViewLight)
+    {
+        ViewLight = InViewLight;
+    }
+
+    const jViewLight& GetViewLight() const
+    {
+        return ViewLight;
+    }
+
+    const std::shared_ptr<jRenderTarget>& GetShadowMapPtr() const
+    {
+        return ViewLight.ShadowMapPtr;
+    }
+
+    jViewLight ViewLight;
+    std::vector<jDrawCommand> DrawCommands;
+};
+
 class jRenderer
 {
 public:
@@ -31,13 +54,10 @@ public:
     std::shared_ptr<jRenderFrameContext> RenderFrameContextPtr;
     jView View;
 
-    // Pass 별 Context 를 만들어서 넣도록 할 예정
-    jView ShadowView;
-
     std::future<void> ShadowPassSetupFinishEvent;
     std::future<void> BasePassSetupFinishEvent;
 
-    std::vector<jDrawCommand> ShadowPasses;
+    std::vector<jShadowDrawInfo> ShadowDrawInfo;
     std::vector<jDrawCommand> BasePasses;
 
     jRenderPass* ShadowMapRenderPass = nullptr;

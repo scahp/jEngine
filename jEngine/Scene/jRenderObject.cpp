@@ -204,16 +204,10 @@ const std::vector<float>& jRenderObject::GetVertices() const
 	return s_emtpy;
 }
 
-jShaderBindingInstance* jRenderObject::CreateShaderBindingInstance(const jView* view)
+jShaderBindingInstance* jRenderObject::CreateShaderBindingInstance()
 {
-	check(view);
-	check(view->Camera);
-
 	jRenderObjectUniformBuffer ubo;
 	ubo.M = World;
-	ubo.MV = (view->Camera->View * World);
-	ubo.MVP = (view->Camera->Projection * ubo.MV);
-	ubo.MV = ubo.MV;
 	ubo.InvM = ubo.M;
 
     int32 BindingPoint = 0;

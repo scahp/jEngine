@@ -3,6 +3,7 @@
 #include "Shader/jShader.h"
 #include "Scene/Light/jDirectionalLight.h"
 #include "Scene/jCamera.h"
+#include "Vulkan/jUniformBufferBlock_Vulkan.h"
 
 //////////////////////////////////////////////////////////////////////////
 void IUniformBuffer::Bind(const jShader* shader) const
@@ -93,11 +94,59 @@ size_t jShaderBindingsLayout::GetHash() const
 	return Hash;
 }
 
-void jView::GetShaderBindingInstance(jShaderBindingInstanceArray& OutShaderBindingInstanceArray)
+jView::jView(const jCamera* camera, const jDirectionalLight* directionalLight, jLight* pointLight, jLight* spotLight)
+	: Camera(camera)
 {
-	if (DirectionalLight.Light)
+    check(camera);
+	if (directionalLight)
+		Lights.push_back(jViewLight(directionalLight));
+	if (pointLight)
+		Lights.push_back(jViewLight(pointLight));
+	if (spotLight)
+		Lights.push_back(jViewLight(spotLight));
+}
+
+void jView::PrepareViewUniformBufferShaderBindingInstance()
+{
+    // Prepare & Get ViewUniformBuffer
+    struct jViewUniformBuffer
+    {
+        Matrix V;
+        Matrix P;
+        Matrix VP;
+    };
+
+    jViewUniformBuffer ubo;
+    ubo.P = Camera->Projection;
+    ubo.V = Camera->View;
+    ubo.VP = Camera->Projection * Camera->View;
+
+    ViewUniformBufferPtr = std::make_shared<jUniformBufferBlock_Vulkan>(jNameStatic("ViewUniformParameters"), jLifeTimeType::OneFrame);
+    ViewUniformBufferPtr->Init(sizeof(ubo));
+    ViewUniformBufferPtr->UpdateBufferData(&ubo, sizeof(ubo));
+
+    int32 BindingPoint = 0;
+    jShaderBindingArray ShaderBindingArray;
+    jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
+
+    ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_GRAPHICS
+        , ResourceInlineAllactor.Alloc<jUniformBufferResource>(ViewUniformBufferPtr.get()));
+
+	ViewUniformBufferShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray);
+}
+
+void jView::GetShaderBindingInstance(jShaderBindingInstanceArray& OutShaderBindingInstanceArray) const
+{
+	OutShaderBindingInstanceArray.Add(ViewUniformBufferShaderBindingInstance);
+
+	// Get light uniform buffers
+	for (int32 i = 0; i < Lights.size(); ++i)
 	{
-		check(DirectionalLight.ShaderBindingInstance);
-		OutShaderBindingInstanceArray.Add(DirectionalLight.ShaderBindingInstance);
+		const jViewLight& ViewLight = Lights[i];
+		if (ViewLight.Light)
+		{
+			check(ViewLight.ShaderBindingInstance);
+			OutShaderBindingInstanceArray.Add(ViewLight.ShaderBindingInstance);
+		}
 	}
 }

@@ -33,6 +33,28 @@ const jCamera* jDirectionalLight::GetLightCamra(int32 index) const
     return Camera;
 }
 
+jShaderBindingInstance* jDirectionalLight::PrepareShaderBindingInstance(jTexture* InShadowMap) const
+{
+    int32 BindingPoint = 0;
+    jShaderBindingArray ShaderBindingArray;
+    jShaderBindingResourceInlineAllocator ResourceInlineAllocator;
+
+    ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_GRAPHICS
+        , ResourceInlineAllocator.Alloc<jUniformBufferResource>(LightDataUniformBlock));
+
+    if (ensure(InShadowMap))
+    {
+        const jSamplerStateInfo* ShadowSamplerStateInfo = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+            , ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
+            , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
+
+        ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
+            , ResourceInlineAllocator.Alloc<jTextureResource>(InShadowMap, ShadowSamplerStateInfo));
+    }
+
+    return g_rhi->CreateShaderBindingInstance(ShaderBindingArray);
+}
+
 void jDirectionalLight::Update(float deltaTime)
 {
     check(Camera);

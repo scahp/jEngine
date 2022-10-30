@@ -26,8 +26,6 @@ struct DirectionalLightUniformBuffer
 struct RenderObjectUniformBuffer
 {
     float4x4 M;
-    float4x4 MV;
-    float4x4 MVP;
     float4x4 InvM;
 };
 

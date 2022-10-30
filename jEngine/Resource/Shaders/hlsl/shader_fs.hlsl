@@ -37,19 +37,25 @@ struct DirectionalLightUniformBuffer
     float Far;
 };
 
+struct ViewUniformBuffer
+{
+    float4x4 V;
+    float4x4 P;
+    float4x4 VP;
+};
+
 struct RenderObjectUniformBuffer
 {
     float4x4 M;
-    float4x4 MV;
-    float4x4 MVP;
     float4x4 InvM;
 };
 
-cbuffer DirectionalLight : register(b0,space0) { DirectionalLightUniformBuffer DirectionalLight; }
-cbuffer RenderObjectParam : register(b0,space1) { RenderObjectUniformBuffer RenderObjectParam; }
+cbuffer ViewParam : register(b0,space0) { ViewUniformBuffer ViewParam; }
+cbuffer DirectionalLight : register(b0,space1) { DirectionalLightUniformBuffer DirectionalLight; }
+cbuffer RenderObjectParam : register(b0,space2) { RenderObjectUniformBuffer RenderObjectParam; }
 
-Texture2D DirectionalLightShadowMap : register(t1, space0);
-SamplerState shadowMapSampler : register(s1, space0);
+Texture2D DirectionalLightShadowMap : register(t1, space1);
+SamplerState ShadowMapSampler : register(s1, space1);
 
 struct PushConsts
 {
@@ -68,7 +74,7 @@ float4 main(VSOutput input
     float lit = 1.0;
     if (-1.0 <= input.ShadowPosition.z && input.ShadowPosition.z <= 1.0)
 	{
-        float shadowMapDist = DirectionalLightShadowMap.Sample(shadowMapSampler, input.ShadowPosition.xy * 0.5 + 0.5).r;
+        float shadowMapDist = DirectionalLightShadowMap.Sample(ShadowMapSampler, input.ShadowPosition.xy * 0.5 + 0.5).r;
         if (input.ShadowPosition.z > shadowMapDist + 0.001)
 		{
 			lit = 0.5;

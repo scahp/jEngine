@@ -29,10 +29,15 @@ void jRenderer::Setup()
     FrameIndex = g_rhi_vk->CurrenFrameIndex;
 
     // View 별로 저장 할 수 있어야 함
-    if (View.DirectionalLight.Light)
+    for (int32 i = 0; i < View.Lights.size(); ++i)
     {
-        View.DirectionalLight.ShadowMapPtr = RenderFrameContextPtr->SceneRenderTarget->DirectionalLightShadowMapPtr;
-        View.DirectionalLight.ShaderBindingInstance = View.DirectionalLight.Light->PrepareShaderBindingInstance(View.DirectionalLight.ShadowMapPtr->GetTexture());
+        jViewLight& ViewLight = View.Lights[i];
+
+        if (ViewLight.Light)
+        {
+            ViewLight.ShadowMapPtr = RenderFrameContextPtr->SceneRenderTarget->DirectionalLightShadowMapPtr;
+            ViewLight.ShaderBindingInstance = ViewLight.Light->PrepareShaderBindingInstance(ViewLight.ShadowMapPtr->GetTexture());
+        }
     }
 
 #if ASYNC_WITH_SETUP
@@ -47,80 +52,88 @@ void jRenderer::SetupShadowPass()
 {
     SCOPE_CPU_PROFILE(SetupShadowPass);
 
-    // Prepare shadowpass pipeline
-    auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
-    jMultisampleStateInfo* MultisampleState = TMultisampleStateInfo<true, 0.2f, false, false>::Create(EMSAASamples::COUNT_1);
-    auto DepthStencilState = TDepthStencilStateInfo<true, true, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
-    auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::NONE>::Create();
+    ShadowDrawInfo.resize(View.Lights.size());
 
-    jPipelineStateFixedInfo ShadpwPipelineStateFixed = jPipelineStateFixedInfo(RasterizationState, MultisampleState, DepthStencilState, BlendingState
-        , jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT), false);
-
+    for (int32 i = 0; i < View.Lights.size(); ++i)
     {
-        const Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
-        const Vector2 ClearDepth = Vector2(1.0f, 0.0f);
+        jViewLight& ViewLight = View.Lights[i];
+        jShadowDrawInfo& ShadowPasses = ShadowDrawInfo[i];
 
-        jAttachment depth = jAttachment(View.DirectionalLight.ShadowMapPtr, EAttachmentLoadStoreOp::CLEAR_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE
-            , ClearColor, ClearDepth, EImageLayout::UNDEFINED, EImageLayout::DEPTH_STENCIL_ATTACHMENT);
+        // Prepare shadowpass pipeline
+        auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
+        jMultisampleStateInfo* MultisampleState = TMultisampleStateInfo<true, 0.2f, false, false>::Create(EMSAASamples::COUNT_1);
+        auto DepthStencilState = TDepthStencilStateInfo<true, true, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
+        auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::NONE>::Create();
 
-        // Setup attachment
-        jRenderPassInfo renderPassInfo;
-        renderPassInfo.Attachments.push_back(depth);
+        jPipelineStateFixedInfo ShadpwPipelineStateFixed = jPipelineStateFixedInfo(RasterizationState, MultisampleState, DepthStencilState, BlendingState
+            , jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT), false);
 
-        // Setup subpass of ShadowPass
-        jSubpass subpass;
-        subpass.SourceSubpassIndex = 0;
-        subpass.DestSubpassIndex = 1;
-        subpass.OutputDepthAttachment = 0;
-        subpass.AttachmentProducePipelineBit = EPipelineStageMask::COLOR_ATTACHMENT_OUTPUT_BIT;
-        renderPassInfo.Subpasses.push_back(subpass);
+        {
+            const Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
+            const Vector2 ClearDepth = Vector2(1.0f, 0.0f);
 
-        ShadowMapRenderPass = g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
+            jAttachment depth = jAttachment(ViewLight.ShadowMapPtr, EAttachmentLoadStoreOp::CLEAR_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE
+                , ClearColor, ClearDepth, EImageLayout::UNDEFINED, EImageLayout::DEPTH_STENCIL_ATTACHMENT);
 
-        // This is an example of creating RenderPass without setting subpasses
-        // ShadowMapRenderPass = g_rhi->GetOrCreateRenderPass({}, depth, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
-    }
+            // Setup attachment
+            jRenderPassInfo renderPassInfo;
+            renderPassInfo.Attachments.push_back(depth);
 
-    ShadowView.Camera = View.DirectionalLight.Light->GetLightCamra();
-    ShadowView.DirectionalLight = View.DirectionalLight;
+            // Setup subpass of ShadowPass
+            jSubpass subpass;
+            subpass.SourceSubpassIndex = 0;
+            subpass.DestSubpassIndex = 1;
+            subpass.OutputDepthAttachment = 0;
+            subpass.AttachmentProducePipelineBit = EPipelineStageMask::COLOR_ATTACHMENT_OUTPUT_BIT;
+            renderPassInfo.Subpasses.push_back(subpass);
 
-    jShader* ShadowShader = nullptr;
-    {
-        jShaderInfo shaderInfo;
-        shaderInfo.name = jNameStatic("shadow_test");
-        shaderInfo.vs = jNameStatic("Resource/Shaders/hlsl/shadow_vs.hlsl");
-        shaderInfo.fs = jNameStatic("Resource/Shaders/hlsl/shadow_fs.hlsl");
-        ShadowShader = g_rhi->CreateShader(shaderInfo);
-    }
-    jShader* ShadowInstancingShader = nullptr;
-    {
-        jShaderInfo shaderInfo;
-        shaderInfo.name = jNameStatic("shadow_test");
-        shaderInfo.vs = jNameStatic("Resource/Shaders/hlsl/shadow_instancing_vs.hlsl");
-        shaderInfo.fs = jNameStatic("Resource/Shaders/hlsl/shadow_fs.hlsl");
-        ShadowInstancingShader = g_rhi->CreateShader(shaderInfo);
-    }
+            ShadowMapRenderPass = g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
+
+            // This is an example of creating RenderPass without setting subpasses
+            // ShadowMapRenderPass = g_rhi->GetOrCreateRenderPass({}, depth, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
+        }
+
+        // Shadow 기준 View 를 생성, 현재 Light 가 가진 Shadow Camera 와 ViewLight를 설정해줌
+        ShadowPasses.ViewLight = ViewLight;
+
+        jShader* ShadowShader = nullptr;
+        {
+            jShaderInfo shaderInfo;
+            shaderInfo.name = jNameStatic("shadow_test");
+            shaderInfo.vs = jNameStatic("Resource/Shaders/hlsl/shadow_vs.hlsl");
+            shaderInfo.fs = jNameStatic("Resource/Shaders/hlsl/shadow_fs.hlsl");
+            ShadowShader = g_rhi->CreateShader(shaderInfo);
+        }
+        jShader* ShadowInstancingShader = nullptr;
+        {
+            jShaderInfo shaderInfo;
+            shaderInfo.name = jNameStatic("shadow_test");
+            shaderInfo.vs = jNameStatic("Resource/Shaders/hlsl/shadow_instancing_vs.hlsl");
+            shaderInfo.fs = jNameStatic("Resource/Shaders/hlsl/shadow_fs.hlsl");
+            ShadowInstancingShader = g_rhi->CreateShader(shaderInfo);
+        }
 
 #if PARALLELFOR_WITH_PASSSETUP
-    ShadowPasses.resize(jObject::GetStaticObject().size());
-    jParallelFor::ParallelForWithTaskPerThread(MaxPassSetupTaskPerThreadCount, jObject::GetStaticObject()
-        , [&](size_t InIndex, const jObject* InObject)
-    {
-        new (&ShadowPasses[InIndex]) jDrawCommand(RenderFrameContextPtr, &ShadowView, InObject->RenderObject, ShadowMapRenderPass
-            , (InObject->HasInstancing() ? ShadowInstancingShader : ShadowShader), &ShadpwPipelineStateFixed, {}, nullptr);
-        ShadowPasses[InIndex].PrepareToDraw(true);
-    });
+        ShadowPasses.DrawCommands.resize(jObject::GetStaticObject().size());
+        jParallelFor::ParallelForWithTaskPerThread(MaxPassSetupTaskPerThreadCount, jObject::GetStaticObject()
+            , [&](size_t InIndex, const jObject* InObject)
+            {
+                new (&ShadowPasses.DrawCommands[InIndex]) jDrawCommand(RenderFrameContextPtr, &ShadowPasses.ViewLight, InObject->RenderObject, ShadowMapRenderPass
+                    , (InObject->HasInstancing() ? ShadowInstancingShader : ShadowShader), &ShadpwPipelineStateFixed, {}, nullptr);
+                ShadowPasses.DrawCommands[InIndex].PrepareToDraw(true);
+            });
 #else
-    ShadowPasses.resize(jObject::GetStaticObject().size());
-    int32 i = 0;
-    for (auto iter : jObject::GetStaticObject())
-    {
-        new (&ShadowPasses[i]) jDrawCommand(RenderFrameContextPtr, &ShadowView, iter->RenderObject, ShadowMapRenderPass
-            , (iter->HasInstancing() ? ShadowInstancingShader : ShadowShader), &ShadpwPipelineStateFixed, {}, nullptr);
-        ShadowPasses[i].PrepareToDraw(true);
-        ++i;
-    }
+        ShadowPasses.DrawCommands.resize(jObject::GetStaticObject().size());
+        int32 i = 0;
+        for (auto iter : jObject::GetStaticObject())
+        {
+            new (&ShadowPasses.DrawCommands[i]) jDrawCommand(RenderFrameContextPtr, &ShadowPasses.ViewLight, iter->RenderObject, ShadowMapRenderPass
+                , (iter->HasInstancing() ? ShadowInstancingShader : ShadowShader), &ShadpwPipelineStateFixed, {}, nullptr);
+            ShadowPasses.DrawCommands[i].PrepareToDraw(true);
+            ++i;
+        }
 #endif
+    }
 }
 
 void jRenderer::SetupBasePass()
@@ -239,16 +252,20 @@ void jRenderer::ShadowPass()
     BasePassSetupFinishEvent = std::async(std::launch::async, &jRenderer::SetupBasePass, this);
 #endif
 
+    for (int32 i = 0; i < ShadowDrawInfo.size(); ++i)
     {
         SCOPE_CPU_PROFILE(ShadowPass);
         SCOPE_GPU_PROFILE(RenderFrameContextPtr, ShadowPass);
 
-        g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, View.DirectionalLight.ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_ATTACHMENT);
+        jShadowDrawInfo& ShadowPasses = ShadowDrawInfo[i];
+        const std::shared_ptr<jRenderTarget>& ShadowMapPtr = ShadowPasses.GetShadowMapPtr();
+
+        g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_ATTACHMENT);
 
         if (ShadowMapRenderPass && ShadowMapRenderPass->BeginRenderPass(RenderFrameContextPtr->CommandBuffer))
         {
             ShadowpassOcclusionTest.BeginQuery(RenderFrameContextPtr->CommandBuffer);
-            for (const auto& command : ShadowPasses)
+            for (const auto& command : ShadowPasses.DrawCommands)
             {
                 command.Draw();
             }
@@ -256,7 +273,7 @@ void jRenderer::ShadowPass()
             ShadowMapRenderPass->EndRenderPass();
         }
 
-        g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, View.DirectionalLight.ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_READ_ONLY);
+        g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_READ_ONLY);
     }
 }
 

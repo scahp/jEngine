@@ -203,7 +203,10 @@ void jGame::Draw()
 		if (!renderFrameContext)
 			return;
 
-		jRenderer renderer(renderFrameContext, jView(MainCamera, DirectionalLight));
+		jView View(MainCamera, DirectionalLight);
+		View.PrepareViewUniformBufferShaderBindingInstance();
+
+		jRenderer renderer(renderFrameContext, View);
 		renderer.Render();
 
 		g_rhi->EndRenderFrame(renderFrameContext);

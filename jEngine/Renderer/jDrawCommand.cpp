@@ -16,15 +16,28 @@ jDrawCommand::jDrawCommand(std::shared_ptr<jRenderFrameContext> InRenderFrameCon
     : RenderFrameContextPtr(InRenderFrameContextPtr), View(view), RenderObject(renderObject), RenderPass(renderPass), Shader(shader), PipelineStateFixed(pipelineStateFixed)
     , PushConstantPtr(pushConstantPtr), OcclusionQuery(occlusionQuery), ShaderBindingInstanceArray(InShaderBindingInstanceArray)
 {
+    IsViewLight = false;
+}
+
+jDrawCommand::jDrawCommand(std::shared_ptr<jRenderFrameContext> InRenderFrameContextPtr, jViewLight* viewLight
+    , jRenderObject* renderObject, jRenderPass* renderPass, jShader* shader, jPipelineStateFixedInfo* pipelineStateFixed
+    , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const std::shared_ptr<jPushConstant>& pushConstantPtr, jQuery* occlusionQuery)
+    : RenderFrameContextPtr(InRenderFrameContextPtr), ViewLight(viewLight), RenderObject(renderObject), RenderPass(renderPass), Shader(shader), PipelineStateFixed(pipelineStateFixed)
+    , PushConstantPtr(pushConstantPtr), OcclusionQuery(occlusionQuery), ShaderBindingInstanceArray(InShaderBindingInstanceArray)
+{
+    IsViewLight = true;
 }
 
 void jDrawCommand::PrepareToDraw(bool InIsPositionOnly)
 {
     // GetShaderBindings
-    View->GetShaderBindingInstance(ShaderBindingInstanceArray);
-
+    if (IsViewLight)
+        ShaderBindingInstanceArray.Add(ViewLight->ShaderBindingInstance);
+    else
+        View->GetShaderBindingInstance(ShaderBindingInstanceArray);
+    
     // GetShaderBindings
-    jShaderBindingInstance* OneRenderObjectUniformBuffer = RenderObject->CreateShaderBindingInstance(View);
+    jShaderBindingInstance* OneRenderObjectUniformBuffer = RenderObject->CreateShaderBindingInstance();
     ShaderBindingInstanceArray.Add(OneRenderObjectUniformBuffer);
 
     // Bind ShaderBindings

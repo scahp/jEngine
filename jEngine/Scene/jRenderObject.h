@@ -68,14 +68,12 @@ public:
 	struct jRenderObjectUniformBuffer
 	{
 		Matrix M;
-		Matrix MV;
-		Matrix MVP;
 		Matrix InvM;
 	};
 
 	//////////////////////////////////////////////////////////////////////////
 	// RenderObjectUniformBuffer
-	jShaderBindingInstance* CreateShaderBindingInstance(const jView* view);
+	jShaderBindingInstance* CreateShaderBindingInstance();
 	//////////////////////////////////////////////////////////////////////////
 
 private:
