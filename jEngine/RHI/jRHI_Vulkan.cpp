@@ -183,9 +183,10 @@ bool jRHI_Vulkan::InitRHI()
 		createInfo.queueCreateInfoCount = static_cast<uint32>(queueCreateInfos.size());
 
 		VkPhysicalDeviceFeatures deviceFeatures = {};
-		deviceFeatures.samplerAnisotropy = VK_TRUE;		// VkSampler 가 Anisotropy 를 사용할 수 있도록 하기 위해 true로 설정
-		deviceFeatures.sampleRateShading = VK_TRUE;		// Sample shading 켬	 (텍스쳐 내부에 있는 aliasing 도 완화 해줌)
-		deviceFeatures.multiDrawIndirect = VK_TRUE;
+		deviceFeatures.samplerAnisotropy = true;		// VkSampler 가 Anisotropy 를 사용할 수 있도록 하기 위해 true로 설정
+		deviceFeatures.sampleRateShading = true;		// Sample shading 켬	 (텍스쳐 내부에 있는 aliasing 도 완화 해줌)
+		deviceFeatures.multiDrawIndirect = true;
+		deviceFeatures.geometryShader = true;
 
         VkPhysicalDeviceFeatures2 physicalDeviceFeatures2{};
         physicalDeviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
@@ -195,11 +196,11 @@ bool jRHI_Vulkan::InitRHI()
 #if USE_VARIABLE_SHADING_RATE_TIER2
 		VkPhysicalDeviceShadingRateImageFeaturesNV enabledPhysicalDeviceShadingRateImageFeaturesNV{};
         enabledPhysicalDeviceShadingRateImageFeaturesNV.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADING_RATE_IMAGE_FEATURES_NV;
-        enabledPhysicalDeviceShadingRateImageFeaturesNV.shadingRateImage = VK_TRUE;
+        enabledPhysicalDeviceShadingRateImageFeaturesNV.shadingRateImage = true;
 		physicalDeviceFeatures2.pNext = &enabledPhysicalDeviceShadingRateImageFeaturesNV;
         createInfo.pNext = &physicalDeviceFeatures2;
 #else
-        physicalDeviceFeatures2.pNext = (void*)createInfo.pNext;		// disable VRS
+		createInfo.pNext = &physicalDeviceFeatures2;		// disable VRS
 #endif
 
 		// Added CustomBorderColor features

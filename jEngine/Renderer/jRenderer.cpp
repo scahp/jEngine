@@ -222,8 +222,10 @@ void jRenderer::SetupBasePass()
         shaderInfo.name = jNameStatic("default_test");
         shaderInfo.vs = jNameStatic("Resource/Shaders/hlsl/shader_vs.hlsl");
         shaderInfo.fs = jNameStatic("Resource/Shaders/hlsl/shader_fs.hlsl");
+#if USE_VARIABLE_SHADING_RATE_TIER2
         if (gOptions.UseVRS)
             shaderInfo.fsPreProcessor = jNameStatic("#define USE_VARIABLE_SHADING_RATE 1");
+#endif
         BasePassShader = g_rhi->CreateShader(shaderInfo);
     }
     jShader* BasePassInstancingShader = nullptr;

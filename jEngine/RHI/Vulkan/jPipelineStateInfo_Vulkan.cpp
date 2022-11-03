@@ -84,7 +84,11 @@ void jMultisampleStateInfo_Vulkan::Initialize()
     MultisampleStateInfo = {};
     MultisampleStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     MultisampleStateInfo.rasterizationSamples = (VkSampleCountFlagBits)SampleCount;
+#if USE_VARIABLE_SHADING_RATE_TIER2
     MultisampleStateInfo.sampleShadingEnable = SampleShadingEnable;			// Sample shading 켬	 (텍스쳐 내부에 있는 aliasing 도 완화 해줌)
+#else
+    MultisampleStateInfo.sampleShadingEnable = false;
+#endif
     MultisampleStateInfo.minSampleShading = MinSampleShading;
     MultisampleStateInfo.alphaToCoverageEnable = AlphaToCoverageEnable;		// Optional
     MultisampleStateInfo.alphaToOneEnable = AlphaToOneEnable;				// Optional

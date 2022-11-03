@@ -67,10 +67,12 @@ void jDrawCommand::Draw() const
     }
 
     // Bind the image that contains the shading rate patterns
+#if USE_VARIABLE_SHADING_RATE_TIER2
     if (gOptions.UseVRS)
     {
         g_rhi_vk->BindShadingRateImage(RenderFrameContextPtr->CommandBuffer, g_rhi_vk->GetSampleVRSTexture());
     }
+#endif
 
     // Bind Pipeline
     CurrentPipelineStateInfo->Bind(RenderFrameContextPtr);

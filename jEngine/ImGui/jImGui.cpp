@@ -338,7 +338,9 @@ void jImGUI_Vulkan::NewFrame(bool updateFrameGraph)
     ImGui::SetNextWindowSize(ImVec2(200.0f, 200.0f), ImGuiCond_FirstUseEver);
     ImGui::Begin("Panel");
 
+#if USE_VARIABLE_SHADING_RATE_TIER2
     ImGui::Checkbox("UseVRS", &gOptions.UseVRS);
+#endif
     ImGui::Checkbox("ShowVRSArea", &gOptions.ShowVRSArea);
     ImGui::Checkbox("ShowGrid", &gOptions.ShowGrid);
     ImGui::Checkbox("UseWaveIntrinsics", &gOptions.UseWaveIntrinsics);
