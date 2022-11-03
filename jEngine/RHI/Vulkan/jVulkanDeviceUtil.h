@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+#include "jVulkanFeatureSwitch.h"
+
 namespace jVulkanDeviceUtil
 {
 
@@ -35,7 +37,10 @@ const std::vector<const char*> validationLayers = {
 
 const std::vector<const char*> DeviceExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+    VK_KHR_MAINTENANCE1_EXTENSION_NAME,
+#if USE_VARIABLE_SHADING_RATE_TIER2
     VK_NV_SHADING_RATE_IMAGE_EXTENSION_NAME,
+#endif
     VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME
 };
 

@@ -397,6 +397,8 @@ void jImGUI_Vulkan::NewFrame(bool updateFrameGraph)
     {
         ImGui::Text("%s : %lld", pair.first.ToStr(), pair.second);
     }
+    ImGui::Separator();
+    ImGui::Text("CameraPos : %.2f, %.2f, %.2f", gOptions.CameraPos.x, gOptions.CameraPos.y, gOptions.CameraPos.z);
     ImGui::End();
 
     //// Update frame time display

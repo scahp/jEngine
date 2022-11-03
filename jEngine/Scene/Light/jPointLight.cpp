@@ -4,7 +4,7 @@
 jPointLight::jPointLight()
     : jLight(ELightType::POINT)
 {
-    LightDataUniformBlock = g_rhi->CreateUniformBufferBlock(jNameStatic("PointLightBlock"), jLifeTimeType::MultiFrame);
+    LightDataUniformBlock = g_rhi->CreateUniformBufferBlock(jNameStatic("PointLightBlock"), jLifeTimeType::MultiFrame, sizeof(jPointLightUniformBufferData));
 
     char szTemp[128] = { 0, };
     for (int i = 0; i < 6; ++i)
@@ -33,13 +33,14 @@ void jPointLight::Initialize(const Vector& InPos, const Vector& InColor, float I
     LightData.SpecularPow = InSpecularPower;
     LightData.MaxDistance = InMaxDist;
 
-    Camera[0] = jCamera::CreateCamera(InPos, InPos + Vector(1.0f, 0.0f, 0.0f), InPos + Vector(0.0f, 1.0f, 0.0f), DegreeToRadian(90.0f), SM_NearDist, SM_FarDist, SM_Width, SM_Height, true);
-    Camera[1] = jCamera::CreateCamera(InPos, InPos + Vector(-1.0f, 0.0f, 0.0f), InPos + Vector(0.0f, 1.0f, 0.0f), DegreeToRadian(90.0f), SM_NearDist, SM_FarDist, SM_Width, SM_Height, true);
-    Camera[2] = jCamera::CreateCamera(InPos, InPos + Vector(0.0f, 1.0f, 0.0f), InPos + Vector(0.0f, 0.0f, -1.0f), DegreeToRadian(90.0f), SM_NearDist, SM_FarDist, SM_Width, SM_Height, true);
-    Camera[3] = jCamera::CreateCamera(InPos, InPos + Vector(0.0f, -1.0f, 0.0f), InPos + Vector(0.0f, 0.0f, 1.0f), DegreeToRadian(90.0f), SM_NearDist, SM_FarDist, SM_Width, SM_Height, true);
-    Camera[4] = jCamera::CreateCamera(InPos, InPos + Vector(0.0f, 0.0f, 1.0f), InPos + Vector(0.0f, 1.0f, 0.0f), DegreeToRadian(90.0f), SM_NearDist, SM_FarDist, SM_Width, SM_Height, true);
-    Camera[5] = jCamera::CreateCamera(InPos, InPos + Vector(0.0f, 0.0f, -1.0f), InPos + Vector(0.0f, 1.0f, 0.0f), DegreeToRadian(90.0f), SM_NearDist, SM_FarDist, SM_Width, SM_Height, true);
+    constexpr float FOV = PI / 2.0f;
 
+    Camera[0] = jCamera::CreateCamera(InPos, InPos + Vector(1.0f, 0.0f, 0.0f),     InPos + Vector(0.0f, 1.0f, 0.0f), FOV, SM_NearDist, SM_FarDist, SM_Width, SM_Height, true);
+    Camera[1] = jCamera::CreateCamera(InPos, InPos + Vector(-1.0f, 0.0f, 0.0f),    InPos + Vector(0.0f, 1.0f, 0.0f), FOV, SM_NearDist, SM_FarDist, SM_Width, SM_Height, true);
+    Camera[2] = jCamera::CreateCamera(InPos, InPos + Vector(0.0f, 1.0f, 0.0f),     InPos + Vector(0.0f, 0.0f, -1.0f), FOV, SM_NearDist, SM_FarDist, SM_Width, SM_Height, true);
+    Camera[3] = jCamera::CreateCamera(InPos, InPos + Vector(0.0f, -1.0f, 0.0f),    InPos + Vector(0.0f, 0.0f, 1.0f), FOV, SM_NearDist, SM_FarDist, SM_Width, SM_Height, true);
+    Camera[4] = jCamera::CreateCamera(InPos, InPos + Vector(0.0f, 0.0f, 1.0f),     InPos + Vector(0.0f, 1.0f, 0.0f), FOV, SM_NearDist, SM_FarDist, SM_Width, SM_Height, true);
+    Camera[5] = jCamera::CreateCamera(InPos, InPos + Vector(0.0f, 0.0f, -1.0f),    InPos + Vector(0.0f, 1.0f, 0.0f), FOV, SM_NearDist, SM_FarDist, SM_Width, SM_Height, true);
 }
 
 //void jPointLight::BindLight(const jShader* shader) const

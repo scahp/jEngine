@@ -10,31 +10,49 @@ struct VSOutput
     [[vk::location(1)]] float2 TexCoord : TEXCOORD0;
     [[vk::location(2)]] float3 Normal : NORMAL0;
     [[vk::location(3)]] float4 ShadowPosition : TEXCOORD1;
+    [[vk::location(4)]] float4 WorldPos : TEXCOORD2;
 };
 
-struct DirectionalLightUniformBuffer
+//struct DirectionalLightUniformBuffer
+//{
+//    float3 Direction;
+//    float SpecularPow;
+//
+//    float3 Color;
+//    float padding0;
+//
+//    float3 DiffuseIntensity;
+//    float padding1;
+//
+//    float3 SpecularIntensity;
+//    float padding2;
+//
+//    float4x4 ShadowVP;
+//    float4x4 ShadowV;
+//		
+//    float3 LightPos;
+//    float padding3;
+//
+//    float2 ShadowMapSize;
+//    float Near;
+//    float Far;
+//};
+
+struct jPointLightUniformBufferData
 {
-    float3 Direction;
+    float3 Position;
     float SpecularPow;
 
     float3 Color;
-    float padding0;
+    float MaxDistance;
 
     float3 DiffuseIntensity;
-    float padding1;
+    float padding0;
 
     float3 SpecularIntensity;
-    float padding2;
+    float padding1;
 
-    float4x4 ShadowVP;
-    float4x4 ShadowV;
-		
-    float3 LightPos;
-    float padding3;
-
-    float2 ShadowMapSize;
-    float Near;
-    float Far;
+    float4x4 ShadowVP[6];
 };
 
 struct ViewUniformBuffer
@@ -51,11 +69,15 @@ struct RenderObjectUniformBuffer
 };
 
 cbuffer ViewParam : register(b0,space0) { ViewUniformBuffer ViewParam; }
-cbuffer DirectionalLight : register(b0,space1) { DirectionalLightUniformBuffer DirectionalLight; }
+// cbuffer DirectionalLight : register(b0,space1) { DirectionalLightUniformBuffer DirectionalLight; }
+cbuffer PointLight : register(b0,space1) { jPointLightUniformBufferData PointLight; }
 cbuffer RenderObjectParam : register(b0,space2) { RenderObjectUniformBuffer RenderObjectParam; }
 
-Texture2D DirectionalLightShadowMap : register(t1, space1);
-SamplerState ShadowMapSampler : register(s1, space1);
+//Texture2D DirectionalLightShadowMap : register(t1, space1);
+//SamplerState ShadowMapSampler : register(s1, space1);
+
+TextureCube PointLightShadowCubeMap : register(t1,space1);
+SamplerState ShadowMapSampler : register(s1,space1);
 
 struct PushConsts
 {
@@ -72,18 +94,39 @@ float4 main(VSOutput input
 ) : SV_TARGET
 {
     float lit = 1.0;
-    if (-1.0 <= input.ShadowPosition.z && input.ShadowPosition.z <= 1.0)
-	{
-        float shadowMapDist = DirectionalLightShadowMap.Sample(ShadowMapSampler, input.ShadowPosition.xy * 0.5 + 0.5).r;
-        if (input.ShadowPosition.z > shadowMapDist + 0.001)
-		{
-			lit = 0.5;
-		}
-	}
 
-    float Intensity = dot(input.Normal, -DirectionalLight.Direction) * lit;
+    // Point light shadow map
+    float3 LightDir = input.WorldPos.xyz - PointLight.Position;
+    float DistanceToLight = length(LightDir);
+    if (DistanceToLight <= PointLight.MaxDistance)
+    {
+        float NormalizedDistance = DistanceToLight / PointLight.MaxDistance;
+        float shadowMapDist = PointLightShadowCubeMap.Sample(ShadowMapSampler, LightDir.xyz).r;
+
+        const float ShadowBias = 0.005f;
+        if (NormalizedDistance > shadowMapDist + ShadowBias)
+        {
+            lit = 0.5;
+        }
+    }
+
+    // Directional light shadow map
+ //   float lit = 1.0;
+ //   if (-1.0 <= input.ShadowPosition.z && input.ShadowPosition.z <= 1.0)
+	//{
+ //       float shadowMapDist = DirectionalLightShadowMap.Sample(ShadowMapSampler, input.ShadowPosition.xy * 0.5 + 0.5).r;
+ //       if (input.ShadowPosition.z > shadowMapDist + 0.001)
+	//	{
+	//		lit = 0.5;
+	//	}
+	//}
+
+    // float Intensity = dot(input.Normal, -DirectionalLight.Direction) * lit;
+    float Intensity = lit;
     float4 color = float4(pushConsts.Color.rgb * input.Color.xyz * Intensity, 1.0);
-    
+
+    color.x += PointLightShadowCubeMap.Sample(ShadowMapSampler, float3(0, 0, 0)).x * 0.01;
+
 #if USE_VARIABLE_SHADING_RATE
     if (pushConsts.ShowVRSArea)
     {

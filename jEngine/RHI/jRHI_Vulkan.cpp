@@ -192,12 +192,15 @@ bool jRHI_Vulkan::InitRHI()
         physicalDeviceFeatures2.features = deviceFeatures;		// VkSampler 가 Anisotropy 를 사용할 수 있도록 하기 위해 true로 설정
 
 		// Added VariableShadingRate features
+#if USE_VARIABLE_SHADING_RATE_TIER2
 		VkPhysicalDeviceShadingRateImageFeaturesNV enabledPhysicalDeviceShadingRateImageFeaturesNV{};
         enabledPhysicalDeviceShadingRateImageFeaturesNV.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADING_RATE_IMAGE_FEATURES_NV;
         enabledPhysicalDeviceShadingRateImageFeaturesNV.shadingRateImage = VK_TRUE;
 		physicalDeviceFeatures2.pNext = &enabledPhysicalDeviceShadingRateImageFeaturesNV;
-		// physicalDeviceFeatures2.pNext = (void*)createInfo.pNext;		// disable VRS
         createInfo.pNext = &physicalDeviceFeatures2;
+#else
+        physicalDeviceFeatures2.pNext = (void*)createInfo.pNext;		// disable VRS
+#endif
 
 		// Added CustomBorderColor features
 		VkPhysicalDeviceCustomBorderColorFeaturesEXT enabledCustomBorderColorFeaturesEXT{};
@@ -681,7 +684,7 @@ jTexture* jRHI_Vulkan::CreateTextureFromData(void* data, int32 width, int32 heig
     }
 
     VkCommandBuffer commandBuffer = BeginSingleTimeCommands();
-	ensure(TransitionImageLayout(commandBuffer, TextureImage, vkTextureFormat, textureMipLevels, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
+	ensure(TransitionImageLayout(commandBuffer, TextureImage, vkTextureFormat, textureMipLevels, 1, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
 
 	jVulkanBufferUtil::CopyBufferToImage(commandBuffer, stagingBuffer.Buffer, stagingBuffer.Offset, TextureImage, (uint32)width, (uint32)height);
 
@@ -693,7 +696,7 @@ jTexture* jRHI_Vulkan::CreateTextureFromData(void* data, int32 width, int32 heig
     }
 	else
 	{
-        ensure(TransitionImageLayout(commandBuffer, TextureImage, vkTextureFormat, textureMipLevels
+        ensure(TransitionImageLayout(commandBuffer, TextureImage, vkTextureFormat, textureMipLevels, 1
 			, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL));
 	}
 
@@ -909,7 +912,7 @@ jFrameBuffer* jRHI_Vulkan::CreateFrameBuffer(const jFrameBufferInfo& info) const
 		break;
 	case ETextureType::TEXTURE_2D_ARRAY:
 		jVulkanBufferUtil::CreateImage2DArray(info.Width, info.Height, info.LayerCount, mipLevels, (VkSampleCountFlagBits)info.SampleCount
-			, textureFormat, TilingMode, ImageUsageFlagBit, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, image, imageMemory);
+			, textureFormat, TilingMode, ImageUsageFlagBit, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VkImageCreateFlagBits(0), image, imageMemory);
 		imageView = jVulkanBufferUtil::CreateImage2DArrayView(image, info.LayerCount, textureFormat, ImageAspectFlagBit, mipLevels);
 		break;
 	case ETextureType::TEXTURE_CUBE:
@@ -970,10 +973,11 @@ std::shared_ptr<jRenderTarget> jRHI_Vulkan::CreateRenderTarget(const jRenderTarg
 		break;
 	case ETextureType::TEXTURE_2D_ARRAY:
 		jVulkanBufferUtil::CreateImage2DArray(info.Width, info.Height, info.LayerCount, mipLevels, (VkSampleCountFlagBits)info.SampleCount
-			, textureFormat, TilingMode, ImageUsageFlag, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, image, imageMemory);
+			, textureFormat, TilingMode, ImageUsageFlag, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VkImageCreateFlagBits(0), image, imageMemory);
 		imageView = jVulkanBufferUtil::CreateImage2DArrayView(image, info.LayerCount, textureFormat, ImageAspectFlag, mipLevels);
 		break;
 	case ETextureType::TEXTURE_CUBE:
+		check(info.LayerCount == 6);
 		jVulkanBufferUtil::CreateImageCube(info.Width, info.Height, mipLevels, (VkSampleCountFlagBits)info.SampleCount
 			, textureFormat, TilingMode, ImageUsageFlag, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, image, imageMemory);
 		imageView = jVulkanBufferUtil::CreateImageCubeView(image, textureFormat, ImageAspectFlag, mipLevels);
@@ -1384,7 +1388,7 @@ void jRHI_Vulkan::EndSingleTimeCommands(VkCommandBuffer commandBuffer) const
     vkFreeCommandBuffers(Device, CommandBufferManager->GetPool(), 1, &commandBuffer);
 }
 
-bool jRHI_Vulkan::TransitionImageLayout(VkCommandBuffer commandBuffer, VkImage image, VkFormat format, uint32 mipLevels, VkImageLayout oldLayout, VkImageLayout newLayout) const
+bool jRHI_Vulkan::TransitionImageLayout(VkCommandBuffer commandBuffer, VkImage image, VkFormat format, uint32 mipLevels, uint32 layoutCount, VkImageLayout oldLayout, VkImageLayout newLayout) const
 {
 	if (oldLayout == newLayout)
 		return true;
@@ -1435,7 +1439,7 @@ bool jRHI_Vulkan::TransitionImageLayout(VkCommandBuffer commandBuffer, VkImage i
 	barrier.subresourceRange.baseMipLevel = 0;
 	barrier.subresourceRange.levelCount = mipLevels;
 	barrier.subresourceRange.baseArrayLayer = 0;
-	barrier.subresourceRange.layerCount = 1;
+	barrier.subresourceRange.layerCount = layoutCount;
 	barrier.srcAccessMask = 0;	// TODO
 	barrier.dstAccessMask = 0;	// TODO
 
@@ -1613,7 +1617,7 @@ bool jRHI_Vulkan::TransitionImageLayout(jCommandBuffer* commandBuffer, jTexture*
 
 	auto texture_vk = (jTexture_Vulkan*)texture;
 	if (TransitionImageLayout((VkCommandBuffer)commandBuffer->GetHandle(), texture_vk->Image, GetVulkanTextureFormat(texture_vk->Format)
-		, texture_vk->MipLevel, GetVulkanImageLayout(texture_vk->Layout), GetVulkanImageLayout(newLayout)))
+		, texture_vk->MipLevel, texture_vk->LayerCount, GetVulkanImageLayout(texture_vk->Layout), GetVulkanImageLayout(newLayout)))
 	{
 		((jTexture_Vulkan*)texture)->Layout = newLayout;
 		return true;
@@ -1632,7 +1636,7 @@ bool jRHI_Vulkan::TransitionImageLayoutImmediate(jTexture* texture, EImageLayout
 
 		auto texture_vk = (jTexture_Vulkan*)texture;
 		const bool ret = TransitionImageLayout(commandBuffer, texture_vk->Image, GetVulkanTextureFormat(texture_vk->Format)
-			, texture_vk->MipLevel, GetVulkanImageLayout(texture_vk->Layout), GetVulkanImageLayout(newLayout));
+			, texture_vk->MipLevel, 1, GetVulkanImageLayout(texture_vk->Layout), GetVulkanImageLayout(newLayout));
 		if (ret)
 			((jTexture_Vulkan*)texture)->Layout = newLayout;
 
@@ -1724,7 +1728,7 @@ jTexture* jRHI_Vulkan::CreateSampleVRSTexture()
             , imageSize, stagingBuffer);
 
 		VkCommandBuffer commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
-        ensure(g_rhi_vk->TransitionImageLayout(commandBuffer, (VkImage)NewVRSTexture->GetHandle(), GetVulkanTextureFormat(ETextureFormat::R8UI), 1, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
+        ensure(g_rhi_vk->TransitionImageLayout(commandBuffer, (VkImage)NewVRSTexture->GetHandle(), GetVulkanTextureFormat(ETextureFormat::R8UI), 1, 1, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
 
         jVulkanBufferUtil::CopyBufferToImage(commandBuffer, stagingBuffer.Buffer, stagingBuffer.Offset, (VkImage)NewVRSTexture->GetHandle()
             , static_cast<uint32>(imageExtent.width), static_cast<uint32>(imageExtent.height));

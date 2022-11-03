@@ -379,6 +379,9 @@
     <ClInclude Include="Scene\Light\jSpotLight.h">
       <Filter>Code\Scene\Light</Filter>
     </ClInclude>
+    <ClInclude Include="RHI\Vulkan\jVulkanFeatureSwitch.h">
+      <Filter>Code\RHI\Vulkan</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -678,6 +681,15 @@
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
     <None Include="Resource\Shaders\hlsl\copy_cs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\omni_shadow_vs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\omni_shadow_fs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\omni_shadow_gs.hlsl">
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
   </ItemGroup>

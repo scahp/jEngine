@@ -66,7 +66,11 @@ void jRasterizationStateInfo_Vulkan::Initialize()
     RasterizationStateInfo.polygonMode = GetVulkanPolygonMode(PolygonMode);			// FILL, LINE, POINT 세가지가 있음
     RasterizationStateInfo.lineWidth = LineWidth;
     RasterizationStateInfo.cullMode = GetVulkanCullMode(CullMode);
+#if VULKAN_NDC_Y_FLIP
+    RasterizationStateInfo.frontFace = GetVulkanFrontFace((EFrontFace::CCW == FrontFace) ? EFrontFace::CW : EFrontFace::CCW);
+#else
     RasterizationStateInfo.frontFace = GetVulkanFrontFace(FrontFace);
+#endif
     RasterizationStateInfo.depthBiasEnable = DepthBiasEnable;						// 쉐도우맵 용
     RasterizationStateInfo.depthBiasConstantFactor = DepthBiasConstantFactor;		// Optional
     RasterizationStateInfo.depthBiasClamp = DepthBiasClamp;							// Optional
@@ -190,9 +194,16 @@ void* jPipelineStateInfo_Vulkan::CreateGraphicsPipelineState()
     for (int32 i = 0; i < vkViewports.size(); ++i)
     {
         vkViewports[i].x = Viewports[i].X;
-        vkViewports[i].y = Viewports[i].Y;
         vkViewports[i].width = Viewports[i].Width;
+        
+#if VULKAN_NDC_Y_FLIP
+        vkViewports[i].y = Viewports[i].Height - Viewports[i].Y;
+        vkViewports[i].height = -Viewports[i].Height;
+#else
+        vkViewports[i].y = Viewports[i].Y;
         vkViewports[i].height = Viewports[i].Height;
+#endif
+
         vkViewports[i].minDepth = Viewports[i].MinDepth;
         vkViewports[i].maxDepth = Viewports[i].MaxDepth;
     }

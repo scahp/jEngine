@@ -163,13 +163,8 @@ Matrix jCameraUtil::CreateViewMatrix(const Vector& pos, const Vector& target, co
 {
     const auto zAxis = (target - pos).GetNormalize();
     auto yAxis = (up - pos).GetNormalize();
-#if RIGHT_HANDED
-    const auto xAxis = zAxis.CrossProduct(yAxis).GetNormalize();
-    yAxis = xAxis.CrossProduct(zAxis).GetNormalize();
-#else
-    const auto xAxis = yAxis.CrossProduct(zAxis).GetNormalize();
-    yAxis = zAxis.CrossProduct(xAxis).GetNormalize();
-#endif
+	const auto xAxis = yAxis.CrossProduct(zAxis).GetNormalize();
+	yAxis = zAxis.CrossProduct(xAxis).GetNormalize();
 
     Matrix InvRot{ IdentityType };
     InvRot.m[0][0] = xAxis.x;

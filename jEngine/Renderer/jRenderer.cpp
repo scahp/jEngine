@@ -35,7 +35,17 @@ void jRenderer::Setup()
 
         if (ViewLight.Light)
         {
-            ViewLight.ShadowMapPtr = RenderFrameContextPtr->SceneRenderTarget->DirectionalLightShadowMapPtr;
+            switch (ViewLight.Light->Type)
+            {
+            case ELightType::DIRECTIONAL:
+                ViewLight.ShadowMapPtr = RenderFrameContextPtr->SceneRenderTarget->DirectionalLightShadowMapPtr;
+                break;
+            case ELightType::POINT:
+            case ELightType::SPOT:
+                ViewLight.ShadowMapPtr = RenderFrameContextPtr->SceneRenderTarget->CubeShadowMapPtr;
+                break;
+            }
+
             ViewLight.ShaderBindingInstance = ViewLight.Light->PrepareShaderBindingInstance(ViewLight.ShadowMapPtr->GetTexture());
         }
     }
@@ -63,10 +73,14 @@ void jRenderer::SetupShadowPass()
         auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
         jMultisampleStateInfo* MultisampleState = TMultisampleStateInfo<true, 0.2f, false, false>::Create(EMSAASamples::COUNT_1);
         auto DepthStencilState = TDepthStencilStateInfo<true, true, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
-        auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::NONE>::Create();
+        auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE
+            , EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::NONE>::Create();
+
+        const int32 RTWidth = ViewLight.ShadowMapPtr->Info.Width;
+        const int32 RTHeight = ViewLight.ShadowMapPtr->Info.Height;
 
         jPipelineStateFixedInfo ShadpwPipelineStateFixed = jPipelineStateFixedInfo(RasterizationState, MultisampleState, DepthStencilState, BlendingState
-            , jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT), false);
+            , jViewport(0.0f, 0.0f, (float)RTWidth, (float)RTHeight), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT), false);
 
         {
             const Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
@@ -87,7 +101,7 @@ void jRenderer::SetupShadowPass()
             subpass.AttachmentProducePipelineBit = EPipelineStageMask::COLOR_ATTACHMENT_OUTPUT_BIT;
             renderPassInfo.Subpasses.push_back(subpass);
 
-            ShadowMapRenderPass = g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
+            ShadowMapRenderPass = g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { RTWidth, RTHeight });
 
             // This is an example of creating RenderPass without setting subpasses
             // ShadowMapRenderPass = g_rhi->GetOrCreateRenderPass({}, depth, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
@@ -99,9 +113,13 @@ void jRenderer::SetupShadowPass()
         jShader* ShadowShader = nullptr;
         {
             jShaderInfo shaderInfo;
+            //shaderInfo.name = jNameStatic("shadow_test");
+            //shaderInfo.vs = jNameStatic("Resource/Shaders/hlsl/shadow_vs.hlsl");
+            //shaderInfo.fs = jNameStatic("Resource/Shaders/hlsl/shadow_fs.hlsl");
             shaderInfo.name = jNameStatic("shadow_test");
-            shaderInfo.vs = jNameStatic("Resource/Shaders/hlsl/shadow_vs.hlsl");
-            shaderInfo.fs = jNameStatic("Resource/Shaders/hlsl/shadow_fs.hlsl");
+            shaderInfo.vs = jNameStatic("Resource/Shaders/hlsl/omni_shadow_vs.hlsl");
+            shaderInfo.gs = jNameStatic("Resource/Shaders/hlsl/omni_shadow_gs.hlsl");
+            shaderInfo.fs = jNameStatic("Resource/Shaders/hlsl/omni_shadow_fs.hlsl");
             ShadowShader = g_rhi->CreateShader(shaderInfo);
         }
         jShader* ShadowInstancingShader = nullptr;
@@ -114,8 +132,9 @@ void jRenderer::SetupShadowPass()
         }
 
 #if PARALLELFOR_WITH_PASSSETUP
-        ShadowPasses.DrawCommands.resize(jObject::GetStaticObject().size());
-        jParallelFor::ParallelForWithTaskPerThread(MaxPassSetupTaskPerThreadCount, jObject::GetStaticObject()
+        const auto& ShadowCaterObjects = jObject::GetShadowCasterObject();
+        ShadowPasses.DrawCommands.resize(ShadowCaterObjects.size());
+        jParallelFor::ParallelForWithTaskPerThread(MaxPassSetupTaskPerThreadCount, ShadowCaterObjects
             , [&](size_t InIndex, const jObject* InObject)
             {
                 new (&ShadowPasses.DrawCommands[InIndex]) jDrawCommand(RenderFrameContextPtr, &ShadowPasses.ViewLight, InObject->RenderObject, ShadowMapRenderPass
@@ -123,9 +142,9 @@ void jRenderer::SetupShadowPass()
                 ShadowPasses.DrawCommands[InIndex].PrepareToDraw(true);
             });
 #else
-        ShadowPasses.DrawCommands.resize(jObject::GetStaticObject().size());
+        ShadowPasses.DrawCommands.resize(ShadowCaterObjects.size());
         int32 i = 0;
-        for (auto iter : jObject::GetStaticObject())
+        for (auto iter : ShadowCaterObjects)
         {
             new (&ShadowPasses.DrawCommands[i]) jDrawCommand(RenderFrameContextPtr, &ShadowPasses.ViewLight, iter->RenderObject, ShadowMapRenderPass
                 , (iter->HasInstancing() ? ShadowInstancingShader : ShadowShader), &ShadpwPipelineStateFixed, {}, nullptr);
@@ -152,15 +171,18 @@ void jRenderer::SetupBasePass()
     const Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
     const Vector2 ClearDepth = Vector2(1.0f, 0.0f);
 
-    jAttachment color = jAttachment(RenderFrameContextPtr->SceneRenderTarget->ColorPtr, EAttachmentLoadStoreOp::CLEAR_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth
+    jAttachment color = jAttachment(RenderFrameContextPtr->SceneRenderTarget->ColorPtr, EAttachmentLoadStoreOp::CLEAR_STORE
+        , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth
         , EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
-    jAttachment depth = jAttachment(RenderFrameContextPtr->SceneRenderTarget->DepthPtr, EAttachmentLoadStoreOp::CLEAR_DONTCARE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth
+    jAttachment depth = jAttachment(RenderFrameContextPtr->SceneRenderTarget->DepthPtr, EAttachmentLoadStoreOp::CLEAR_DONTCARE
+        , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth
         , EImageLayout::UNDEFINED, EImageLayout::DEPTH_STENCIL_ATTACHMENT);
     jAttachment resolve;
 
     if ((int32)g_rhi->GetSelectedMSAASamples() > 1)
     {
-        resolve = jAttachment(RenderFrameContextPtr->SceneRenderTarget->ResolvePtr, EAttachmentLoadStoreOp::DONTCARE_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth
+        resolve = jAttachment(RenderFrameContextPtr->SceneRenderTarget->ResolvePtr, EAttachmentLoadStoreOp::DONTCARE_STORE
+            , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth
             , EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT, true);
     }
 

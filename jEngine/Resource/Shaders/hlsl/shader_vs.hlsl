@@ -56,13 +56,15 @@ struct VSOutput
     [[vk::location(1)]] float2 TexCoord : TEXCOORD0;
     [[vk::location(2)]] float3 Normal : NORMAL0;
     [[vk::location(3)]] float4 ShadowPosition : TEXCOORD1;
+    [[vk::location(4)]] float4 WorldPos : TEXCOORD2;
 };
 
 VSOutput main(VSInput input)
 {
     VSOutput output = (VSOutput) 0;
     
-    output.Pos = mul(ViewParam.VP, mul(RenderObjectParam.M, float4(input.Position, 1.0)));
+    output.WorldPos = mul(RenderObjectParam.M, float4(input.Position, 1.0));
+    output.Pos = mul(ViewParam.VP, output.WorldPos);
     output.Color = input.Color;
     output.TexCoord = input.TexCoord;
 

@@ -14,12 +14,12 @@ VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags a
 VkImageView CreateImage2DArrayView(VkImage image, uint32 layerCount, VkFormat format, VkImageAspectFlags aspectMask, uint32 mipLevels);
 VkImageView CreateImageCubeView(VkImage image, VkFormat format, VkImageAspectFlags aspectMask, uint32 mipLevels);
 bool CreateImage2DArray(uint32 width, uint32 height, uint32 arrayLayers, uint32 mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage
-    , VkMemoryPropertyFlags properties, VkImageLayout imageLayout, VkImage& image, VkDeviceMemory& imageMemory);
+    , VkMemoryPropertyFlags properties, VkImageLayout imageLayout, VkImageCreateFlagBits imageCreateFlagBits, VkImage& image, VkDeviceMemory& imageMemory);
 
 FORCEINLINE bool CreateImage2DArray(uint32 width, uint32 height, uint32 arrayLayers, uint32 mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage
     , VkMemoryPropertyFlags properties, VkImageLayout imageLayout, jTexture_Vulkan& OutTexture)
 {
-    if (CreateImage2DArray(width, height, arrayLayers, mipLevels, numSamples, format, tiling, usage, properties, imageLayout, OutTexture.Image, OutTexture.Memory))
+    if (CreateImage2DArray(width, height, arrayLayers, mipLevels, numSamples, format, tiling, usage, properties, imageLayout, VkImageCreateFlagBits(0), OutTexture.Image, OutTexture.Memory))
     {
         OutTexture.Type = ETextureType::TEXTURE_2D_ARRAY;
         OutTexture.Width = width;
@@ -37,13 +37,13 @@ FORCEINLINE bool CreateImage2DArray(uint32 width, uint32 height, uint32 arrayLay
 FORCEINLINE bool CreateImage(uint32 width, uint32 height, uint32 mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage
     , VkMemoryPropertyFlags properties, VkImageLayout imageLayout, VkImage& image, VkDeviceMemory& imageMemory)
 {
-    return CreateImage2DArray(width, height, 1, mipLevels, numSamples, format, tiling, usage, properties, imageLayout, image, imageMemory);
+    return CreateImage2DArray(width, height, 1, mipLevels, numSamples, format, tiling, usage, properties, imageLayout, VkImageCreateFlagBits(0), image, imageMemory);
 }
 
 FORCEINLINE bool CreateImage(uint32 width, uint32 height, uint32 mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage
     , VkMemoryPropertyFlags properties, VkImageLayout imageLayout, jTexture_Vulkan& OutTexture)
 {
-    if (CreateImage2DArray(width, height, 1, mipLevels, numSamples, format, tiling, usage, properties, imageLayout, OutTexture.Image, OutTexture.Memory))
+    if (CreateImage2DArray(width, height, 1, mipLevels, numSamples, format, tiling, usage, properties, imageLayout, VkImageCreateFlagBits(0), OutTexture.Image, OutTexture.Memory))
     {
         OutTexture.Type = ETextureType::TEXTURE_2D;
         OutTexture.Width = width;
@@ -61,13 +61,13 @@ FORCEINLINE bool CreateImage(uint32 width, uint32 height, uint32 mipLevels, VkSa
 FORCEINLINE bool CreateImageCube(uint32 width, uint32 height, uint32 mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage
     , VkMemoryPropertyFlags properties, VkImageLayout imageLayout, VkImage& image, VkDeviceMemory& imageMemory)
 {
-    return CreateImage2DArray(width, height, 6, mipLevels, numSamples, format, tiling, usage, properties, imageLayout, image, imageMemory);
+    return CreateImage2DArray(width, height, 6, mipLevels, numSamples, format, tiling, usage, properties, imageLayout, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT, image, imageMemory);
 }
 
 FORCEINLINE bool CreateImageCube(uint32 width, uint32 height, uint32 mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage
     , VkMemoryPropertyFlags properties, VkImageLayout imageLayout, jTexture_Vulkan& OutTexture)
 {
-    if (CreateImage2DArray(width, height, 6, mipLevels, numSamples, format, tiling, usage, properties, imageLayout, OutTexture.Image, OutTexture.Memory))
+    if (CreateImage2DArray(width, height, 6, mipLevels, numSamples, format, tiling, usage, properties, imageLayout, VkImageCreateFlagBits(0), OutTexture.Image, OutTexture.Memory))
     {
         OutTexture.Type = ETextureType::TEXTURE_CUBE;
         OutTexture.Width = width;

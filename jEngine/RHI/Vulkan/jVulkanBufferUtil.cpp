@@ -120,7 +120,7 @@ VkImageView CreateImageCubeView(VkImage image, VkFormat format, VkImageAspectFla
 
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     viewInfo.image = image;
-    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_CUBE_ARRAY;
+    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
     viewInfo.format = format;
 
     // SubresourceRange에 이미지의 목적과 이미지의 어떤 파트에 접근할 것인지를 명세한다.
@@ -145,7 +145,7 @@ VkImageView CreateImageCubeView(VkImage image, VkFormat format, VkImageAspectFla
 }
 
 bool CreateImage2DArray(uint32 width, uint32 height, uint32 arrayLayers, uint32 mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage
-    , VkMemoryPropertyFlags properties, VkImageLayout imageLayout, VkImage& image, VkDeviceMemory& imageMemory)
+    , VkMemoryPropertyFlags properties, VkImageLayout imageLayout, VkImageCreateFlagBits imageCreateFlagBits, VkImage& image, VkDeviceMemory& imageMemory)
 {
     VkImageCreateInfo imageInfo = {};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -175,10 +175,10 @@ bool CreateImage2DArray(uint32 width, uint32 height, uint32 arrayLayers, uint32 
     imageInfo.usage = usage;
 
     imageInfo.samples = numSamples;
-    imageInfo.flags = 0;		// Optional
-                                // Sparse image 에 대한 정보를 설정가능
-                                // Sparse image는 특정 영역의 정보를 메모리에 담아두는 것임. 예를들어 3D image의 경우
-                                // 복셀영역의 air 부분의 표현을 위해 많은 메모리를 할당하는것을 피하게 해줌.
+    imageInfo.flags = imageCreateFlagBits;		// Optional
+                                                // Sparse image 에 대한 정보를 설정가능
+                                                // Sparse image는 특정 영역의 정보를 메모리에 담아두는 것임. 예를들어 3D image의 경우
+                                                // 복셀영역의 air 부분의 표현을 위해 많은 메모리를 할당하는것을 피하게 해줌.
 
     if (!ensure(vkCreateImage(g_rhi_vk->Device, &imageInfo, nullptr, &image) == VK_SUCCESS))
         return false;

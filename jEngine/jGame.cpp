@@ -11,6 +11,7 @@
 #include "Renderer/jRenderer.h"
 #include "jPrimitiveUtil.h"
 #include "RHI/Vulkan/jVulkanBufferUtil.h"
+#include "jOptions.h"
 
 jRHI* g_rhi = nullptr;
 
@@ -51,9 +52,9 @@ void jGame::Setup()
 	srand(static_cast<uint32>(time(NULL)));
 
 	// Create main camera
-    const Vector mainCameraPos(172.66f, 160.0f, -180.63f);
+    const Vector mainCameraPos(172.66f, 160.0f, 180.63f);
     const Vector mainCameraTarget(0.0f, 0.0f, 0.0f);
-	MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 10.0f, 1000.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT, true);
+	MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 10.0f, 1500.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT, true);
 	jCamera::AddCamera(0, MainCamera);
 
 	// Create lights
@@ -62,24 +63,23 @@ void jGame::Setup()
 	//CascadeDirectionalLight = jLight::CreateCascadeDirectionalLight(AppSettings.DirecionalLightDirection
 	//	, Vector4(0.6f), Vector(1.0f), Vector(1.0f), 64);
 	//AmbientLight = jLight::CreateAmbientLight(Vector(0.2f, 0.5f, 1.0f), Vector(0.05f));		// sky light color
-	//PointLight = jLight::CreatePointLight(jShadowAppSettingProperties::GetInstance().PointLightPosition, Vector4(2.0f, 0.7f, 0.7f, 1.0f), 500.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
+	PointLight = jLight::CreatePointLight(Vector(10.0f, 100.0f, 10.0f), Vector4(2.0f, 0.7f, 0.7f, 1.0f), 1500.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
 	//SpotLight = jLight::CreateSpotLight(jShadowAppSettingProperties::GetInstance().SpotLightPosition, jShadowAppSettingProperties::GetInstance().SpotLightDirection, Vector4(0.0f, 1.0f, 0.0f, 1.0f), 500.0f, 0.7f, 1.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
 
 	// Select one of directional light
 	DirectionalLight = NormalDirectionalLight;
 
 	// Create light info for debugging light infomation
-	if (DirectionalLight)
-	{
-		DirectionalLightInfo = jPrimitiveUtil::CreateDirectionalLightDebug(Vector(250, 260, 0) * 0.5f, Vector::OneVector * 10.0f, 10.0f, MainCamera, DirectionalLight, "Image/sun.png");
-		jObject::AddDebugObject(DirectionalLightInfo);
-	}
+	//if (DirectionalLight)
+	//{
+	//	DirectionalLightInfo = jPrimitiveUtil::CreateDirectionalLightDebug(Vector(250, 260, 0) * 0.5f, Vector::OneVector * 10.0f, 10.0f, MainCamera, DirectionalLight, "Image/sun.png");
+	//	jObject::AddDebugObject(DirectionalLightInfo);
+	//}
 
 	//if (PointLight)
 	//{
 	//	PointLightInfo = jPrimitiveUtil::CreatePointLightDebug(Vector(10.0f), MainCamera, PointLight, "Image/bulb.png");
-	//	if (AppSettings.ShowPointLightInfo)
-	//		jObject::AddDebugObject(PointLightInfo);
+	//	jObject::AddDebugObject(PointLightInfo);
 	//}
 
 	//if (SpotLight)
@@ -154,6 +154,8 @@ void jGame::Update(float deltaTime)
 	if (MainCamera)
 		MainCamera->UpdateCamera();
 
+	gOptions.CameraPos = MainCamera->Pos;
+
 	//// Update lights
 	//const int32 numOfLights = MainCamera->GetNumOfLight();
 	//for (int32 i = 0; i < numOfLights; ++i)
@@ -191,6 +193,8 @@ void jGame::Update(float deltaTime)
     // 정리해야함
 	if (DirectionalLight)
 		DirectionalLight->Update(deltaTime);
+	if (PointLight)
+		PointLight->Update(deltaTime);
 }
 
 void jGame::Draw()
@@ -203,7 +207,7 @@ void jGame::Draw()
 		if (!renderFrameContext)
 			return;
 
-		jView View(MainCamera, DirectionalLight);
+		jView View(MainCamera, DirectionalLight, PointLight);
 		View.PrepareViewUniformBufferShaderBindingInstance();
 
 		jRenderer renderer(renderFrameContext, View);
@@ -211,20 +215,20 @@ void jGame::Draw()
 
 		g_rhi->EndRenderFrame(renderFrameContext);
 
-		// Get a whole occlusion queries from previous frame
-		const int32 LastFrameIndex = (renderer.FrameIndex + 1) % g_rhi->GetMaxSwapchainCount();
-		std::vector<uint64> passedSamplesQueries = g_rhi->GetQueryOcclusionPool()->GetWholeQueryResult(
-			LastFrameIndex, g_rhi->GetQueryOcclusionPool()->GetUsedQueryCount(LastFrameIndex));
+		//// Get a whole occlusion queries from previous frame
+		//const int32 LastFrameIndex = (renderer.FrameIndex + 1) % g_rhi->GetMaxSwapchainCount();
+		//std::vector<uint64> passedSamplesQueries = g_rhi->GetQueryOcclusionPool()->GetWholeQueryResult(
+		//	LastFrameIndex, g_rhi->GetQueryOcclusionPool()->GetUsedQueryCount(LastFrameIndex));
 
-		renderer.ShadowpassOcclusionTest.GetQueryResultFromQueryArray(renderer.FrameIndex, passedSamplesQueries);
-		uint64 shadowPasses = renderer.ShadowpassOcclusionTest.Result;
-		static jName PassedSamplesInShadowPass("ShadowPassSamples");
-		jImGUI_Vulkan::Get().CounterMap[PassedSamplesInShadowPass] = shadowPasses;
+		//renderer.ShadowpassOcclusionTest.GetQueryResultFromQueryArray(renderer.FrameIndex, passedSamplesQueries);
+		//uint64 shadowPasses = renderer.ShadowpassOcclusionTest.Result;
+		//static jName PassedSamplesInShadowPass("ShadowPassSamples");
+		//jImGUI_Vulkan::Get().CounterMap[PassedSamplesInShadowPass] = shadowPasses;
 
-		renderer.BasepassOcclusionTest.GetQueryResultFromQueryArray(renderer.FrameIndex, passedSamplesQueries);
-		uint64 basePass = renderer.BasepassOcclusionTest.Result;
-		static jName PassedSamplesInBasePass("BasePassSamples");
-		jImGUI_Vulkan::Get().CounterMap[PassedSamplesInBasePass] = basePass;
+		//renderer.BasepassOcclusionTest.GetQueryResultFromQueryArray(renderer.FrameIndex, passedSamplesQueries);
+		//uint64 basePass = renderer.BasepassOcclusionTest.Result;
+		//static jName PassedSamplesInBasePass("BasePassSamples");
+		//jImGUI_Vulkan::Get().CounterMap[PassedSamplesInBasePass] = basePass;
 	}
     jMemStack::Get()->Flush();
 }
@@ -239,7 +243,7 @@ void jGame::OnMouseMove(int32 xOffset, int32 yOffset)
 	if (g_MouseState[EMouseButtonType::LEFT])
 	{
 		constexpr float PitchScale = 0.0025f;
-		constexpr float YawScale = -0.0025f;
+		constexpr float YawScale = 0.0025f;
 		if (MainCamera)
 			MainCamera->SetEulerAngle(MainCamera->GetEulerAngle() + Vector(yOffset * PitchScale, xOffset * YawScale, 0.0f));
 	}

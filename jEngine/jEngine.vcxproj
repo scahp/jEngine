@@ -193,6 +193,7 @@ xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"</Command
     <ClInclude Include="RHI\Vulkan\jVertexBuffer_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jVulkanBufferUtil.h" />
     <ClInclude Include="RHI\Vulkan\jVulkanDeviceUtil.h" />
+    <ClInclude Include="RHI\Vulkan\jVulkanFeatureSwitch.h" />
     <ClInclude Include="Scene\jCamera.h" />
     <ClInclude Include="Scene\jMeshObject.h" />
     <ClInclude Include="Scene\jObject.h" />
@@ -402,6 +403,20 @@ xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"</Command
   </ItemGroup>
   <ItemGroup>
     <None Include="Resource\Shaders\hlsl\copy_cs.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resource\Shaders\hlsl\omni_shadow_fs.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Resource\Shaders\hlsl\omni_shadow_gs.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Resource\Shaders\hlsl\omni_shadow_vs.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <FileType>Document</FileType>
     </None>
   </ItemGroup>

@@ -1927,7 +1927,7 @@ jDirectionalLightPrimitive* CreateDirectionalLightDebug(const Vector& pos, const
     {
         auto texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName(textureFilename), true).lock().get();
 		// todo
-		//check(0);
+		check(0);
         //object->BillboardObject->RenderObject->MaterialData.AddMaterialParam(GetCommonTextureName(1), texture);
         object->BillboardObject->RenderObject->IsHiddenBoundBox = true;
     }

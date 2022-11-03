@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include "Math/Vector.h"
 
 struct jOptions
 {
@@ -6,6 +7,7 @@ struct jOptions
     bool ShowVRSArea = false;
     bool ShowGrid = false;
     bool UseWaveIntrinsics = false;
+    Vector CameraPos = Vector::ZeroVector;
 };
 
 extern jOptions gOptions;

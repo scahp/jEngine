@@ -88,13 +88,11 @@ public:
 		OutForward = InEulerAngle.GetDirectionFromEulerAngle().GetNormalize();
 
 		const bool IsInvert = (InEulerAngle.x < 0 || PI < InEulerAngle.x);
-		auto t = RadianToDegree(InEulerAngle.x);
-#if RIGHT_HANDED
-		OutRight = OutForward.CrossProduct(IsInvert ? Vector::UpVector : -Vector::UpVector).GetNormalize();
-#else
-		OutRight = (IsInvert ? Vector::UpVector : -Vector::UpVector).CrossProduct(OutForward).GetNormalize();
-#endif
 
+		const Vector UpVector = (IsInvert ? -Vector::UpVector : Vector::UpVector);
+		OutRight = (IsInvert ? -Vector::UpVector : Vector::UpVector).CrossProduct(OutForward).GetNormalize();
+		if (IsNearlyZero(OutRight.LengthSQ()))
+			OutRight = (IsInvert ? -Vector::FowardVector : Vector::FowardVector).CrossProduct(OutForward).GetNormalize();
 		OutUp = OutForward.CrossProduct(OutRight).GetNormalize();
 	}
 	FORCEINLINE static void SetCamera(jCamera* OutCamera, const Vector& pos, const Vector& target, const Vector& up
@@ -102,7 +100,9 @@ public:
 	{
 		const auto toTarget = (target - pos);
 		OutCamera->Pos = pos;
-		OutCamera->Distance = distance;
+        OutCamera->Target = target;
+        OutCamera->Up = up;
+        OutCamera->Distance = distance;
 		OutCamera->SetEulerAngle(Vector::GetEulerAngleFrom(toTarget));
 
 		OutCamera->FOVRad = fovRad;
@@ -145,23 +145,17 @@ public:
 
 	FORCEINLINE Vector GetForwardVector() const
 	{
-		return (Target - Pos).GetNormalize();
+		return View.GetColumn(2);
 	}
 
 	FORCEINLINE Vector GetUpVector() const
 	{
-		return (Up - Pos).GetNormalize();
+		return View.GetColumn(1);
 	}
 
 	FORCEINLINE Vector GetRightVector() const
 	{
-		auto toForward = GetForwardVector();
-		auto toUp = GetUpVector();
-#if RIGHT_HANDED
-		return toForward.CrossProduct(toUp).GetNormalize();
-#else
-		return toUp.CrossProduct(toForward).GetNormalize();
-#endif
+		return View.GetColumn(0);
 	}
 
 	FORCEINLINE void MoveShift(float dist)
@@ -339,6 +333,8 @@ public:
 	{
 		const auto toTarget = (target - pos);
 		OutCamera->Pos = pos;
+		OutCamera->Target = target;
+		OutCamera->Up = up;
 		OutCamera->Distance = distance;
 		OutCamera->SetEulerAngle(Vector::GetEulerAngleFrom(toTarget));
 

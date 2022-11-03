@@ -105,6 +105,7 @@ using tchar = wchar_t;
 #include "imgui_impl_vulkan.h"
 #include "RHI/jRHI_Vulkan.h"
 #include "Shader/Spirv/jSpirvHelper.h"
+#include "RHI/Vulkan/jVulkanFeatureSwitch.h"
 #elif USE_OPENGL
 #include <GLFW/glfw3.h>
 #include "jRHI_OpenGL.h"
