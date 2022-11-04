@@ -215,20 +215,20 @@ void jGame::Draw()
 
 		g_rhi->EndRenderFrame(renderFrameContext);
 
-		//// Get a whole occlusion queries from previous frame
-		//const int32 LastFrameIndex = (renderer.FrameIndex + 1) % g_rhi->GetMaxSwapchainCount();
-		//std::vector<uint64> passedSamplesQueries = g_rhi->GetQueryOcclusionPool()->GetWholeQueryResult(
-		//	LastFrameIndex, g_rhi->GetQueryOcclusionPool()->GetUsedQueryCount(LastFrameIndex));
+		// Get a whole occlusion queries from previous frame
+		const int32 LastFrameIndex = (renderer.FrameIndex + 1) % g_rhi->GetMaxSwapchainCount();
+		std::vector<uint64> passedSamplesQueries = g_rhi->GetQueryOcclusionPool()->GetWholeQueryResult(
+			LastFrameIndex, g_rhi->GetQueryOcclusionPool()->GetUsedQueryCount(LastFrameIndex));
 
 		//renderer.ShadowpassOcclusionTest.GetQueryResultFromQueryArray(renderer.FrameIndex, passedSamplesQueries);
 		//uint64 shadowPasses = renderer.ShadowpassOcclusionTest.Result;
 		//static jName PassedSamplesInShadowPass("ShadowPassSamples");
 		//jImGUI_Vulkan::Get().CounterMap[PassedSamplesInShadowPass] = shadowPasses;
 
-		//renderer.BasepassOcclusionTest.GetQueryResultFromQueryArray(renderer.FrameIndex, passedSamplesQueries);
-		//uint64 basePass = renderer.BasepassOcclusionTest.Result;
-		//static jName PassedSamplesInBasePass("BasePassSamples");
-		//jImGUI_Vulkan::Get().CounterMap[PassedSamplesInBasePass] = basePass;
+		renderer.BasepassOcclusionTest.GetQueryResultFromQueryArray(renderer.FrameIndex, passedSamplesQueries);
+		uint64 basePass = renderer.BasepassOcclusionTest.Result;
+		static jName PassedSamplesInBasePass("BasePassSamples");
+		jImGUI_Vulkan::Get().CounterMap[PassedSamplesInBasePass] = basePass;
 	}
     jMemStack::Get()->Flush();
 }

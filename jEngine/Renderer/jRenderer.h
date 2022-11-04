@@ -27,6 +27,7 @@ struct jShadowDrawInfo
     }
 
     jViewLight ViewLight;
+    jRenderPass* ShadowMapRenderPass = nullptr;
     std::vector<jDrawCommand> DrawCommands;
 };
 
@@ -60,10 +61,9 @@ public:
     std::vector<jShadowDrawInfo> ShadowDrawInfo;
     std::vector<jDrawCommand> BasePasses;
 
-    jRenderPass* ShadowMapRenderPass = nullptr;
     jRenderPass* OpaqueRenderPass = nullptr;
 
-    jQueryOcclusion_Vulkan ShadowpassOcclusionTest;
+    //jQueryOcclusion_Vulkan ShadowpassOcclusionTest;
     jQueryOcclusion_Vulkan BasepassOcclusionTest;
 
     // Current FrameIndex

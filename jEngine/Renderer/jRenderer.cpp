@@ -101,10 +101,7 @@ void jRenderer::SetupShadowPass()
             subpass.AttachmentProducePipelineBit = EPipelineStageMask::COLOR_ATTACHMENT_OUTPUT_BIT;
             renderPassInfo.Subpasses.push_back(subpass);
 
-            ShadowMapRenderPass = g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { RTWidth, RTHeight });
-
-            // This is an example of creating RenderPass without setting subpasses
-            // ShadowMapRenderPass = g_rhi->GetOrCreateRenderPass({}, depth, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
+            ShadowPasses.ShadowMapRenderPass = g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { RTWidth, RTHeight });
         }
 
         // Shadow 기준 View 를 생성, 현재 Light 가 가진 Shadow Camera 와 ViewLight를 설정해줌
@@ -113,13 +110,19 @@ void jRenderer::SetupShadowPass()
         jShader* ShadowShader = nullptr;
         {
             jShaderInfo shaderInfo;
-            //shaderInfo.name = jNameStatic("shadow_test");
-            //shaderInfo.vs = jNameStatic("Resource/Shaders/hlsl/shadow_vs.hlsl");
-            //shaderInfo.fs = jNameStatic("Resource/Shaders/hlsl/shadow_fs.hlsl");
+
             shaderInfo.name = jNameStatic("shadow_test");
-            shaderInfo.vs = jNameStatic("Resource/Shaders/hlsl/omni_shadow_vs.hlsl");
-            shaderInfo.gs = jNameStatic("Resource/Shaders/hlsl/omni_shadow_gs.hlsl");
-            shaderInfo.fs = jNameStatic("Resource/Shaders/hlsl/omni_shadow_fs.hlsl");
+            if (ViewLight.Light->IsOmnidirectional())
+            {
+                shaderInfo.vs = jNameStatic("Resource/Shaders/hlsl/omni_shadow_vs.hlsl");
+                shaderInfo.gs = jNameStatic("Resource/Shaders/hlsl/omni_shadow_gs.hlsl");
+                shaderInfo.fs = jNameStatic("Resource/Shaders/hlsl/omni_shadow_fs.hlsl");
+            }
+            else
+            {
+                shaderInfo.vs = jNameStatic("resource/shaders/hlsl/shadow_vs.hlsl");
+                shaderInfo.fs = jNameStatic("resource/shaders/hlsl/shadow_fs.hlsl");
+            }
             ShadowShader = g_rhi->CreateShader(shaderInfo);
         }
         jShader* ShadowInstancingShader = nullptr;
@@ -137,7 +140,7 @@ void jRenderer::SetupShadowPass()
         jParallelFor::ParallelForWithTaskPerThread(MaxPassSetupTaskPerThreadCount, ShadowCaterObjects
             , [&](size_t InIndex, const jObject* InObject)
             {
-                new (&ShadowPasses.DrawCommands[InIndex]) jDrawCommand(RenderFrameContextPtr, &ShadowPasses.ViewLight, InObject->RenderObject, ShadowMapRenderPass
+                new (&ShadowPasses.DrawCommands[InIndex]) jDrawCommand(RenderFrameContextPtr, &ShadowPasses.ViewLight, InObject->RenderObject, ShadowPasses.ShadowMapRenderPass
                     , (InObject->HasInstancing() ? ShadowInstancingShader : ShadowShader), &ShadpwPipelineStateFixed, {}, nullptr);
                 ShadowPasses.DrawCommands[InIndex].PrepareToDraw(true);
             });
@@ -286,15 +289,15 @@ void jRenderer::ShadowPass()
 
         g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_ATTACHMENT);
 
-        if (ShadowMapRenderPass && ShadowMapRenderPass->BeginRenderPass(RenderFrameContextPtr->CommandBuffer))
+        if (ShadowPasses.ShadowMapRenderPass && ShadowPasses.ShadowMapRenderPass->BeginRenderPass(RenderFrameContextPtr->CommandBuffer))
         {
-            ShadowpassOcclusionTest.BeginQuery(RenderFrameContextPtr->CommandBuffer);
+            //ShadowpassOcclusionTest.BeginQuery(RenderFrameContextPtr->CommandBuffer);
             for (const auto& command : ShadowPasses.DrawCommands)
             {
                 command.Draw();
             }
-            ShadowpassOcclusionTest.EndQuery(RenderFrameContextPtr->CommandBuffer);
-            ShadowMapRenderPass->EndRenderPass();
+            //ShadowpassOcclusionTest.EndQuery(RenderFrameContextPtr->CommandBuffer);
+            ShadowPasses.ShadowMapRenderPass->EndRenderPass();
         }
 
         g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_READ_ONLY);
@@ -427,7 +430,7 @@ void jRenderer::Render()
             g_rhi->GetQueryOcclusionPool()->ResetQueryPool(RenderFrameContextPtr->CommandBuffer);
         }
 
-        ShadowpassOcclusionTest.Init();
+        //ShadowpassOcclusionTest.Init();
         BasepassOcclusionTest.Init();
     }
 

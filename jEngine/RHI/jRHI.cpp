@@ -98,10 +98,10 @@ jView::jView(const jCamera* camera, const jDirectionalLight* directionalLight, j
 	: Camera(camera)
 {
     check(camera);
-	//if (directionalLight)
-	//	Lights.push_back(jViewLight(directionalLight));
-	if (pointLight)
-		Lights.push_back(jViewLight(pointLight));
+	if (directionalLight)
+		Lights.push_back(jViewLight(directionalLight));
+    if (pointLight)
+        Lights.push_back(jViewLight(pointLight));
 	//if (spotLight)
 	//	Lights.push_back(jViewLight(spotLight));
 }

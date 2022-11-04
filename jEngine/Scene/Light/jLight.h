@@ -90,6 +90,7 @@ public:
 	jLight(ELightType type) :Type(type) {}
 	virtual ~jLight() {}
 
+	virtual bool IsOmnidirectional() const { return false; }
 	virtual void Update(float deltaTime) { }
 	virtual IUniformBufferBlock* GetUniformBufferBlock() const { return nullptr; }
 

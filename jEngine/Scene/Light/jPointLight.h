@@ -46,6 +46,7 @@ public:
     jPointLightUniformBufferData LightData;
     IUniformBufferBlock* LightDataUniformBlock = nullptr;
 
+    virtual bool IsOmnidirectional() const override { return true; }
     virtual void Update(float deltaTime) override;
     virtual IUniformBufferBlock* GetUniformBufferBlock() const override { return LightDataUniformBlock; }
     virtual jCamera* GetLightCamra(int index = 0) const;

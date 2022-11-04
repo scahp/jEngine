@@ -47,9 +47,18 @@ struct RenderObjectUniformBuffer
     float4x4 InvM;
 };
 
-cbuffer ViewParam : register(b0,space0) { ViewUniformBuffer ViewParam; }
-cbuffer DirectionalLight : register(b0,space1) { DirectionalLightUniformBuffer DirectionalLight; }
-cbuffer RenderObjectParam : register(b0,space2) { RenderObjectUniformBuffer RenderObjectParam; }
+cbuffer ViewParam : register(b0, space0) { ViewUniformBuffer ViewParam; }
+
+cbuffer DirectionalLight : register(b0, space1) { DirectionalLightUniformBuffer DirectionalLight; }
+Texture2D DirectionalLightShadowMap : register(t1, space1);
+SamplerState DirectionalLightShadowMapSampler : register(s1, space1);
+
+//cbuffer PointLight : register(b0, space2) { jPointLightUniformBufferData PointLight; }
+//TextureCube PointLightShadowCubeMap : register(t1, space2);
+//SamplerState PointLightShadowMapSampler : register(s1, space2);
+
+cbuffer RenderObjectParam : register(b0, space3) { RenderObjectUniformBuffer RenderObjectParam; }
+
 
 struct VSOutput
 {
@@ -74,5 +83,6 @@ VSOutput main(VSInput input)
 	
     output.ShadowPosition = mul(DirectionalLight.ShadowVP, mul(RenderObjectParam.M, float4(input.Position, 1.0)));
     output.ShadowPosition /= output.ShadowPosition.w;
+    output.ShadowPosition.y = -output.ShadowPosition.y;
     return output;
 }
