@@ -37,6 +37,8 @@ struct ViewUniformBuffer
     float4x4 V;
     float4x4 P;
     float4x4 VP;
+    float3 EyeWorld;
+    float padding0;
 };
 
 struct RenderObjectUniformBuffer

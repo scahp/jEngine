@@ -60,6 +60,8 @@ struct ViewUniformBuffer
     float4x4 V;
     float4x4 P;
     float4x4 VP;
+    float3 EyeWorld;
+    float padding0;
 };
 
 struct RenderObjectUniformBuffer
@@ -87,13 +89,45 @@ struct PushConsts
 };
 [[vk::push_constant]] PushConsts pushConsts;
 
+float WindowingFunction(float value, float maxValue)
+{
+    return pow(max(0.0, 1.0 - pow(value / maxValue, 4.0)), 2.0);
+}
+
+float DistanceAttenuation(float distance, float maxDistance)
+{
+    const float refDistance = 50.0;
+    float attenuation = (refDistance * refDistance) / ((distance * distance) + 1.0);
+    return attenuation * WindowingFunction(distance, maxDistance);
+}
+
+float3 GetPointLightDiffuse(jPointLightUniformBufferData light, float3 normal, float3 lightDir)
+{
+    return light.Color * clamp(dot(lightDir, normal), 0.0, 1.0) * light.DiffuseIntensity;
+}
+
+float3 GetPointLightSpecular(jPointLightUniformBufferData light, float3 reflectLightDir, float3 viewDir)
+{
+    return light.Color * pow(clamp(dot(reflectLightDir, viewDir), 0.0, 1.0), light.SpecularPow) * light.SpecularIntensity;
+}
+
+float3 GetPointLight(jPointLightUniformBufferData light, float3 normal, float3 pixelPos, float3 viewDir)
+{
+    float3 lightDir = light.Position - pixelPos;
+    float pointLightDistance = length(lightDir);
+    lightDir = normalize(lightDir);
+    float3 reflectLightDir = 2.0 * clamp(dot(lightDir, normal), 0.0, 1.0) * normal - lightDir;
+
+    return (GetPointLightDiffuse(light, normal, lightDir) + GetPointLightSpecular(light, reflectLightDir, viewDir)) * DistanceAttenuation(pointLightDistance, light.MaxDistance);
+}
+
 float4 main(VSOutput input
 #if USE_VARIABLE_SHADING_RATE
-, uint shadingRate : SV_ShadingRate
+    , uint shadingRate : SV_ShadingRate
 #endif
 ) : SV_TARGET
 {
-    float lit = 1.0;
+    float3 light = 0.0f;
 
     // Point light shadow map
     float3 LightDir = input.WorldPos.xyz - PointLight.Position;
@@ -104,9 +138,10 @@ float4 main(VSOutput input
         float shadowMapDist = PointLightShadowCubeMap.Sample(ShadowMapSampler, LightDir.xyz).r;
 
         const float ShadowBias = 0.005f;
-        if (NormalizedDistance > shadowMapDist + ShadowBias)
+        if (NormalizedDistance <= shadowMapDist + ShadowBias)
         {
-            lit = 0.5;
+            float3 ViewWorld = normalize(ViewParam.EyeWorld - input.WorldPos.xyz);
+            light = GetPointLight(PointLight, input.Normal, input.WorldPos.xyz, ViewWorld);
         }
     }
 
@@ -122,8 +157,7 @@ float4 main(VSOutput input
 	//}
 
     // float Intensity = dot(input.Normal, -DirectionalLight.Direction) * lit;
-    float Intensity = lit;
-    float4 color = float4(pushConsts.Color.rgb * input.Color.xyz * Intensity, 1.0);
+    float4 color = float4(pushConsts.Color.rgb * input.Color.xyz * light, 1.0);
 
     color.x += PointLightShadowCubeMap.Sample(ShadowMapSampler, float3(0, 0, 0)).x * 0.01;
 

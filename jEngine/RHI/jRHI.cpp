@@ -114,12 +114,15 @@ void jView::PrepareViewUniformBufferShaderBindingInstance()
         Matrix V;
         Matrix P;
         Matrix VP;
+		Vector EyeWorld;
+		float padding0;
     };
 
     jViewUniformBuffer ubo;
     ubo.P = Camera->Projection;
     ubo.V = Camera->View;
     ubo.VP = Camera->Projection * Camera->View;
+	ubo.EyeWorld = Camera->Pos;
 
     ViewUniformBufferPtr = std::make_shared<jUniformBufferBlock_Vulkan>(jNameStatic("ViewUniformParameters"), jLifeTimeType::OneFrame);
     ViewUniformBufferPtr->Init(sizeof(ubo));
