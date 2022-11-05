@@ -11,7 +11,7 @@ struct VSInput
     [[vk::location(6)]] float3 InstancingWorld : TEXCOORD2;
 };
 
-struct DirectionalLightUniformBuffer
+struct jDirectionalLightUniformBuffer
 {
     float3 Direction;
     float SpecularPow;
@@ -52,7 +52,7 @@ struct RenderObjectUniformBuffer
 };
 
 cbuffer ViewParam : register(b0,space0) { ViewUniformBuffer ViewParam; }
-cbuffer DirectionalLight : register(b0,space1) { DirectionalLightUniformBuffer DirectionalLight; }
+cbuffer DirectionalLight : register(b0,space1) { jDirectionalLightUniformBuffer DirectionalLight; }
 cbuffer RenderObjectParam : register(b0,space2) { RenderObjectUniformBuffer RenderObjectParam; }
 
 struct VSOutput

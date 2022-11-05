@@ -25,7 +25,6 @@ void jDirectionalLight::Initialize(const Vector& InDirection, const Vector& InCo
     jLightUtil::MakeDirectionalLightViewInfo(pos, target, up, InDirection);
 
     Camera = jOrthographicCamera::CreateCamera(pos, target, up, -SM_Width / 2.0f, -SM_Height / 2.0f, SM_Width / 2.0f, SM_Height / 2.0f, SM_NearDist, SM_FarDist);
-
 }
 
 const jCamera* jDirectionalLight::GetLightCamra(int32 index) const
@@ -58,6 +57,7 @@ jShaderBindingInstance* jDirectionalLight::PrepareShaderBindingInstance(jTexture
 void jDirectionalLight::Update(float deltaTime)
 {
     check(Camera);
+    Camera->SetEulerAngle(Vector::GetEulerAngleFrom(LightData.Direction));
     Camera->UpdateCamera();
 
     // Need dirty check

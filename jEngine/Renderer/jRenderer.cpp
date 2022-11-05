@@ -41,8 +41,10 @@ void jRenderer::Setup()
                 ViewLight.ShadowMapPtr = RenderFrameContextPtr->SceneRenderTarget->DirectionalLightShadowMapPtr;
                 break;
             case ELightType::POINT:
-            case ELightType::SPOT:
                 ViewLight.ShadowMapPtr = RenderFrameContextPtr->SceneRenderTarget->CubeShadowMapPtr;
+                break;
+            case ELightType::SPOT:
+                ViewLight.ShadowMapPtr = RenderFrameContextPtr->SceneRenderTarget->SpotLightShadowMapPtr;
                 break;
             }
 
@@ -120,8 +122,16 @@ void jRenderer::SetupShadowPass()
             }
             else
             {
-                shaderInfo.vs = jNameStatic("resource/shaders/hlsl/shadow_vs.hlsl");
-                shaderInfo.fs = jNameStatic("resource/shaders/hlsl/shadow_fs.hlsl");
+                if (ViewLight.Light->Type == ELightType::SPOT)
+                {
+                    shaderInfo.vs = jNameStatic("resource/shaders/hlsl/spot_shadow_vs.hlsl");
+                    shaderInfo.fs = jNameStatic("resource/shaders/hlsl/spot_shadow_fs.hlsl");
+                }
+                else
+                {
+                    shaderInfo.vs = jNameStatic("resource/shaders/hlsl/shadow_vs.hlsl");
+                    shaderInfo.fs = jNameStatic("resource/shaders/hlsl/shadow_fs.hlsl");
+                }
             }
             ShadowShader = g_rhi->CreateShader(shaderInfo);
         }

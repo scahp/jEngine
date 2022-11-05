@@ -7,7 +7,7 @@ struct VSInput
     [[vk::location(4)]] float2 TexCoord : TEXCOORD0;
 };
 
-struct DirectionalLightUniformBuffer
+struct jDirectionalLightUniformBuffer
 {
     float3 Direction;
     float SpecularPow;
@@ -32,6 +32,26 @@ struct DirectionalLightUniformBuffer
     float Far;
 };
 
+struct jSpotLightUniformBufferData
+{
+    float3 Position;
+    float MaxDistance;
+
+    float3 Direction;
+    float PenumbraRadian;
+
+    float3 Color;
+    float UmbraRadian;
+
+    float3 DiffuseIntensity;
+    float SpecularPow;
+
+    float3 SpecularIntensity;
+    float padding0;
+
+    float4x4 ShadowVP;
+};
+
 struct ViewUniformBuffer
 {
     float4x4 V;
@@ -49,7 +69,7 @@ struct RenderObjectUniformBuffer
 
 cbuffer ViewParam : register(b0, space0) { ViewUniformBuffer ViewParam; }
 
-cbuffer DirectionalLight : register(b0, space1) { DirectionalLightUniformBuffer DirectionalLight; }
+cbuffer DirectionalLight : register(b0, space1) { jDirectionalLightUniformBuffer DirectionalLight; }
 Texture2D DirectionalLightShadowMap : register(t1, space1);
 SamplerState DirectionalLightShadowMapSampler : register(s1, space1);
 
@@ -57,17 +77,22 @@ SamplerState DirectionalLightShadowMapSampler : register(s1, space1);
 //TextureCube PointLightShadowCubeMap : register(t1, space2);
 //SamplerState PointLightShadowMapSampler : register(s1, space2);
 
-cbuffer RenderObjectParam : register(b0, space3) { RenderObjectUniformBuffer RenderObjectParam; }
+cbuffer SpotLight : register(b0, space3) { jSpotLightUniformBufferData SpotLight; }
+TextureCube SpotLightShadowCubeMap : register(t1, space3);
+SamplerState SpotLightShadowMapSampler : register(s1, space3);
+
+cbuffer RenderObjectParam : register(b0, space4) { RenderObjectUniformBuffer RenderObjectParam; }
 
 
 struct VSOutput
 {
     float4 Pos : SV_POSITION;
-    [[vk::location(0)]] float4 Color : COLOR0;
-    [[vk::location(1)]] float2 TexCoord : TEXCOORD0;
-    [[vk::location(2)]] float3 Normal : NORMAL0;
-    [[vk::location(3)]] float4 ShadowPosition : TEXCOORD1;
-    [[vk::location(4)]] float4 WorldPos : TEXCOORD2;
+    float4 Color : COLOR0;
+    float2 TexCoord : TEXCOORD0;
+    float3 Normal : NORMAL0;
+    float4 DirectionalLightShadowPosition : TEXCOORD1;
+    float4 SpotLightShadowPosition : TEXCOORD2;
+    float4 WorldPos : TEXCOORD3;
 };
 
 VSOutput main(VSInput input)
@@ -80,9 +105,8 @@ VSOutput main(VSInput input)
     output.TexCoord = input.TexCoord;
 
     output.Normal = normalize(mul((float3x3)RenderObjectParam.M, input.Normal));
-	
-    output.ShadowPosition = mul(DirectionalLight.ShadowVP, mul(RenderObjectParam.M, float4(input.Position, 1.0)));
-    output.ShadowPosition /= output.ShadowPosition.w;
-    output.ShadowPosition.y = -output.ShadowPosition.y;
+
+    output.DirectionalLightShadowPosition = mul(DirectionalLight.ShadowVP, output.WorldPos);
+    output.SpotLightShadowPosition = mul(SpotLight.ShadowVP, output.WorldPos);
     return output;
 }

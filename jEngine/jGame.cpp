@@ -64,7 +64,7 @@ void jGame::Setup()
 	//	, Vector4(0.6f), Vector(1.0f), Vector(1.0f), 64);
 	//AmbientLight = jLight::CreateAmbientLight(Vector(0.2f, 0.5f, 1.0f), Vector(0.05f));		// sky light color
 	PointLight = jLight::CreatePointLight(Vector(10.0f, 100.0f, 10.0f), Vector4(2.0f, 0.7f, 0.7f, 1.0f), 1500.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
-	//SpotLight = jLight::CreateSpotLight(jShadowAppSettingProperties::GetInstance().SpotLightPosition, jShadowAppSettingProperties::GetInstance().SpotLightDirection, Vector4(0.0f, 1.0f, 0.0f, 1.0f), 500.0f, 0.7f, 1.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
+	SpotLight = jLight::CreateSpotLight(Vector(0.0f, 60.0f, 5.0f), Vector(-1.0f, -1.0f, -0.4f).GetNormalize(), Vector4(0.0f, 1.0f, 0.0f, 1.0f), 500.0f, 0.7f, 1.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
 
 	// Select one of directional light
 	DirectionalLight = NormalDirectionalLight;
@@ -195,6 +195,11 @@ void jGame::Update(float deltaTime)
 		DirectionalLight->Update(deltaTime);
 	if (PointLight)
 		PointLight->Update(deltaTime);
+	if (SpotLight)
+	{
+		SpotLight->LightData.Direction = Matrix::MakeRotateY(0.01f).TransformDirection(SpotLight->LightData.Direction);
+		SpotLight->Update(deltaTime);
+	}
 }
 
 void jGame::Draw()
@@ -207,7 +212,7 @@ void jGame::Draw()
 		if (!renderFrameContext)
 			return;
 
-		jView View(MainCamera, DirectionalLight, PointLight);
+		jView View(MainCamera, DirectionalLight, PointLight, SpotLight);
 		View.PrepareViewUniformBufferShaderBindingInstance();
 
 		jRenderer renderer(renderFrameContext, View);

@@ -6,14 +6,15 @@
 struct VSOutput
 {
     float4 Pos : SV_POSITION;
-    [[vk::location(0)]] float4 Color : COLOR0;
-    [[vk::location(1)]] float2 TexCoord : TEXCOORD0;
-    [[vk::location(2)]] float3 Normal : NORMAL0;
-    [[vk::location(3)]] float4 ShadowPosition : TEXCOORD1;
-    [[vk::location(4)]] float4 WorldPos : TEXCOORD2;
+    float4 Color : COLOR0;
+    float2 TexCoord : TEXCOORD0;
+    float3 Normal : NORMAL0;
+    float4 DirectionalLightShadowPosition : TEXCOORD1;
+    float4 SpotLightShadowPosition : TEXCOORD2;
+    float4 WorldPos : TEXCOORD3;
 };
 
-struct DirectionalLightUniformBuffer
+struct jDirectionalLightUniformBuffer
 {
     float3 Direction;
     float SpecularPow;
@@ -55,6 +56,26 @@ struct jPointLightUniformBufferData
     float4x4 ShadowVP[6];
 };
 
+struct jSpotLightUniformBufferData
+{
+    float3 Position;
+    float MaxDistance;
+
+    float3 Direction;
+    float PenumbraRadian;
+
+    float3 Color;
+    float UmbraRadian;
+
+    float3 DiffuseIntensity;
+    float SpecularPow;
+
+    float3 SpecularIntensity;
+    float padding0;
+
+    float4x4 ShadowVP;
+};
+
 struct ViewUniformBuffer
 {
     float4x4 V;
@@ -72,7 +93,7 @@ struct RenderObjectUniformBuffer
 
 cbuffer ViewParam : register(b0,space0) { ViewUniformBuffer ViewParam; }
 
-cbuffer DirectionalLight : register(b0, space1) { DirectionalLightUniformBuffer DirectionalLight; }
+cbuffer DirectionalLight : register(b0, space1) { jDirectionalLightUniformBuffer DirectionalLight; }
 Texture2D DirectionalLightShadowMap : register(t1, space1);
 SamplerState DirectionalLightShadowMapSampler : register(s1, space1);
 
@@ -80,7 +101,11 @@ cbuffer PointLight : register(b0, space2) { jPointLightUniformBufferData PointLi
 TextureCube PointLightShadowCubeMap : register(t1, space2);
 SamplerState PointLightShadowMapSampler : register(s1, space2);
 
-cbuffer RenderObjectParam : register(b0, space3) { RenderObjectUniformBuffer RenderObjectParam; }
+cbuffer SpotLight : register(b0, space3) { jSpotLightUniformBufferData SpotLight; }
+Texture2D SpotLightShadowMap : register(t1, space3);
+SamplerState SpotLightShadowMapSampler : register(s1, space3);
+
+cbuffer RenderObjectParam : register(b0, space4) { RenderObjectUniformBuffer RenderObjectParam; }
 
 struct PushConsts
 {
@@ -100,6 +125,29 @@ float DistanceAttenuation(float distance, float maxDistance)
     const float refDistance = 50.0;
     float attenuation = (refDistance * refDistance) / ((distance * distance) + 1.0);
     return attenuation * WindowingFunction(distance, maxDistance);
+}
+
+float DiretionalFalloff(float lightRadian, float penumbraRadian, float umbraRadian)
+{
+    float t = clamp((cos(lightRadian) - cos(umbraRadian)) / (cos(penumbraRadian) - cos(umbraRadian)), 0.0, 1.0);
+    return t * t;
+}
+
+float3 GetDirectionalLightDiffuse(jDirectionalLightUniformBuffer light, float3 normal)
+{
+    return light.Color * clamp(dot(-light.Direction, normal), 0.0, 1.0) * light.DiffuseIntensity;
+}
+
+float3 GetDirectionalLightSpecular(jDirectionalLightUniformBuffer light, float3 reflectLightDir, float3 viewDir)
+{
+    return light.Color * pow(clamp(dot(reflectLightDir, viewDir), 0.0, 1.0), light.SpecularPow) * light.SpecularIntensity;
+}
+
+float3 GetDirectionalLight(jDirectionalLightUniformBuffer light, float3 normal, float3 viewDir)
+{
+    float3 lightDir = normalize(-light.Direction);
+    float3 reflectLightDir = 2.0 * clamp(dot(lightDir, normal), 0.0, 1.0) * normal - lightDir;
+    return (GetDirectionalLightDiffuse(light, normal) + GetDirectionalLightSpecular(light, reflectLightDir, viewDir));
 }
 
 float3 GetPointLightDiffuse(jPointLightUniformBufferData light, float3 normal, float3 lightDir)
@@ -122,6 +170,31 @@ float3 GetPointLight(jPointLightUniformBufferData light, float3 normal, float3 p
     return (GetPointLightDiffuse(light, normal, lightDir) + GetPointLightSpecular(light, reflectLightDir, viewDir)) * DistanceAttenuation(pointLightDistance, light.MaxDistance);
 }
 
+float3 GetSpotLightDiffuse(jSpotLightUniformBufferData light, float3 normal, float3 lightDir)
+{
+    return light.Color * clamp(dot(lightDir, normal), 0.0, 1.0) * light.DiffuseIntensity;
+}
+
+float3 GetSpotLightSpecular(jSpotLightUniformBufferData light, float3 reflectLightDir, float3 viewDir)
+{
+    return light.Color * pow(clamp(dot(reflectLightDir, viewDir), 0.0, 1.0), light.SpecularPow) * light.SpecularIntensity;
+}
+
+float3 GetSpotLight(jSpotLightUniformBufferData light, float3 normal, float3 pixelPos, float3 viewDir)
+{
+    float3 lightDir = light.Position - pixelPos;
+    float distance = length(lightDir);
+    lightDir = normalize(lightDir);
+    float3 reflectLightDir = 2.0 * clamp(dot(lightDir, normal), 0.0, 1.0) * normal - lightDir;
+
+    float lightRadian = acos(dot(lightDir, -light.Direction));
+
+    return (GetSpotLightDiffuse(light, normal, lightDir)
+        + GetSpotLightSpecular(light, reflectLightDir, viewDir))
+        * DistanceAttenuation(distance, light.MaxDistance)
+        * DiretionalFalloff(lightRadian, light.PenumbraRadian, light.UmbraRadian);
+}
+
 float4 main(VSOutput input
 #if USE_VARIABLE_SHADING_RATE
     , uint shadingRate : SV_ShadingRate
@@ -129,6 +202,7 @@ float4 main(VSOutput input
 ) : SV_TARGET
 {
     float3 light = 0.0f;
+    float3 ViewWorld = normalize(ViewParam.EyeWorld - input.WorldPos.xyz);
 
     // Point light shadow map
     float3 LightDir = input.WorldPos.xyz - PointLight.Position;
@@ -141,24 +215,41 @@ float4 main(VSOutput input
         const float ShadowBias = 0.005f;
         if (NormalizedDistance <= shadowMapDist + ShadowBias)
         {
-            float3 ViewWorld = normalize(ViewParam.EyeWorld - input.WorldPos.xyz);
             light = GetPointLight(PointLight, input.Normal, input.WorldPos.xyz, ViewWorld);
         }
     }
 
     // Directional light shadow map
-    float DirectionalLightLit = 1.0f;
-    if (-1.0 <= input.ShadowPosition.z && input.ShadowPosition.z <= 1.0)
+    float3 DirectionalLightShadowPosition = input.DirectionalLightShadowPosition.xyz / input.DirectionalLightShadowPosition.w;
+    DirectionalLightShadowPosition.y = -DirectionalLightShadowPosition.y;
+
+    float3 DirectionalLightLit = GetDirectionalLight(DirectionalLight, input.Normal, ViewWorld);
+    if (-1.0 <= DirectionalLightShadowPosition.z && DirectionalLightShadowPosition.z <= 1.0)
     {
-        float shadowMapDist = DirectionalLightShadowMap.Sample(DirectionalLightShadowMapSampler, input.ShadowPosition.xy * 0.5 + 0.5).r;
-        if (input.ShadowPosition.z > shadowMapDist + 0.001)
+        float shadowMapDist = DirectionalLightShadowMap.Sample(DirectionalLightShadowMapSampler, DirectionalLightShadowPosition.xy * 0.5 + 0.5).r;
+        if (DirectionalLightShadowPosition.z > shadowMapDist + 0.001)
         {
             DirectionalLightLit = 0.0f;
         }
     }
 
-    DirectionalLightLit *= dot(input.Normal, -DirectionalLight.Direction);
-    float4 color = (1.0 / 3.14) * float4(pushConsts.Color.rgb * input.Color.xyz * (light + DirectionalLightLit), 1.0);
+    // Spot light shadow map
+
+    float3 SpotLightShadowPosition = input.SpotLightShadowPosition.xyz / input.SpotLightShadowPosition.w;
+    SpotLightShadowPosition.y = -SpotLightShadowPosition.y;
+
+    float3 SpotLightLit = GetSpotLight(SpotLight, input.Normal, input.WorldPos.xyz, ViewWorld);
+
+    if (-1.0 <= SpotLightShadowPosition.z && SpotLightShadowPosition.z <= 1.0)
+    {
+        float shadowMapDist = SpotLightShadowMap.Sample(SpotLightShadowMapSampler, SpotLightShadowPosition.xy * 0.5 + 0.5).r;
+        if (SpotLightShadowPosition.z > shadowMapDist + 0.001)
+        {
+            SpotLightLit = 0.0f;
+        }
+    }
+
+    float4 color = (1.0 / 3.14) * float4(pushConsts.Color.rgb * input.Color.xyz * (light + DirectionalLightLit + SpotLightLit), 1.0);
 
 #if USE_VARIABLE_SHADING_RATE
     if (pushConsts.ShowVRSArea)
@@ -193,7 +284,7 @@ float4 main(VSOutput input
     // Draw Grid by using shadow position
     if (pushConsts.ShowGrid)
     {
-        float2 center = (input.ShadowPosition.xy * 0.5 + 0.5);
+        float2 center = (input.DirectionalLightShadowPosition.xy * 0.5 + 0.5);
         
         float resolution = 100.0;
         float cellSpace = 1.0;

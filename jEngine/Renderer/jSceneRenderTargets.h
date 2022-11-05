@@ -11,6 +11,7 @@ struct jSceneRenderTarget
     
     std::shared_ptr<jRenderTarget> DirectionalLightShadowMapPtr;
     std::shared_ptr<jRenderTarget> CubeShadowMapPtr;
+    std::shared_ptr<jRenderTarget> SpotLightShadowMapPtr;
 
     std::shared_ptr<jRenderTarget> FinalColorPtr;
 

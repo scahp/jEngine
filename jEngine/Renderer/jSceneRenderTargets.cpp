@@ -4,6 +4,7 @@
 #include "RHI/jSwapchain.h"
 #include "Scene/Light/jDirectionalLight.h"
 #include "Scene/Light/jPointLight.h"
+#include "Scene/Light/jSpotLight.h"
 
 void jSceneRenderTarget::Create(const jSwapchainImage* image)
 {
@@ -29,6 +30,9 @@ void jSceneRenderTarget::Create(const jSwapchainImage* image)
 
     CubeShadowMapPtr = jRenderTargetPool::GetRenderTarget(
         { ETextureType::TEXTURE_CUBE, ETextureFormat::D24_S8, jPointLight::SM_Width, jPointLight::SM_Height, 6, false, EMSAASamples::COUNT_1 });
+
+    SpotLightShadowMapPtr = jRenderTargetPool::GetRenderTarget(
+        { ETextureType::TEXTURE_2D, ETextureFormat::D24_S8, jSpotLight::SM_Width, jSpotLight::SM_Height, 1, false, EMSAASamples::COUNT_1 });
 }
 
 void jSceneRenderTarget::Return()
@@ -43,6 +47,8 @@ void jSceneRenderTarget::Return()
         DirectionalLightShadowMapPtr->Return();
     if (CubeShadowMapPtr)
         CubeShadowMapPtr->Return();
+    if (SpotLightShadowMapPtr)
+        SpotLightShadowMapPtr->Return();
 }
 
 bool jSceneRenderTarget::IsValid() const

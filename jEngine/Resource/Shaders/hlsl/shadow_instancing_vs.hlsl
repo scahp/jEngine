@@ -1,4 +1,4 @@
-struct DirectionalLightUniformBuffer
+struct jDirectionalLightUniformBuffer
 {
     float3 Direction;
     float SpecularPow;
@@ -29,7 +29,7 @@ struct RenderObjectUniformBuffer
     float4x4 InvM;
 };
 
-cbuffer DirectionalLight : register(b0,space0) { DirectionalLightUniformBuffer DirectionalLight; }
+cbuffer DirectionalLight : register(b0,space0) { jDirectionalLightUniformBuffer DirectionalLight; }
 cbuffer RenderObjectParam : register(b0,space1) { RenderObjectUniformBuffer RenderObjectParam; }
 
 struct VSInput

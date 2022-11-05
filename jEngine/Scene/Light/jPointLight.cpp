@@ -5,13 +5,6 @@ jPointLight::jPointLight()
     : jLight(ELightType::POINT)
 {
     LightDataUniformBlock = g_rhi->CreateUniformBufferBlock(jNameStatic("PointLightBlock"), jLifeTimeType::MultiFrame, sizeof(jPointLightUniformBufferData));
-
-    char szTemp[128] = { 0, };
-    for (int i = 0; i < 6; ++i)
-    {
-        sprintf_s(szTemp, sizeof(szTemp), "OmniShadowMapVP[%d]", i);
-        OmniShadowMapVP[i].Name = jName(szTemp);
-    }
 }
 
 jPointLight::~jPointLight()
@@ -42,22 +35,6 @@ void jPointLight::Initialize(const Vector& InPos, const Vector& InColor, float I
     Camera[4] = jCamera::CreateCamera(InPos, InPos + Vector(0.0f, 0.0f, 1.0f),     InPos + Vector(0.0f, 1.0f, 0.0f), FOV, SM_NearDist, SM_FarDist, SM_Width, SM_Height, true);
     Camera[5] = jCamera::CreateCamera(InPos, InPos + Vector(0.0f, 0.0f, -1.0f),    InPos + Vector(0.0f, 1.0f, 0.0f), FOV, SM_NearDist, SM_FarDist, SM_Width, SM_Height, true);
 }
-
-//void jPointLight::BindLight(const jShader* shader) const
-//{
-//	LightDataUniformBlock->Bind(shader);
-//
-//	if (ShadowMapData && ShadowMapData->IsValid())
-//	{
-//		const IUniformBufferBlock* shadowDataUniformBlock = ShadowMapData->UniformBlock;
-//		shadowDataUniformBlock->Bind(shader);
-//	}
-//
-//	for (int i = 0; i < 6; ++i)
-//	{
-//		OmniShadowMapVP[i].SetUniformbuffer(shader);
-//	}
-//}
 
 jShaderBindingInstance* jPointLight::PrepareShaderBindingInstance(jTexture* InShadowMap) const
 {
@@ -104,65 +81,3 @@ void jPointLight::Update(float deltaTime)
 
     LightDataUniformBlock->UpdateBufferData(&LightData, sizeof(LightData));
 }
-
-//void jPointLight::SetupUniformBuffer()
-//{
-//    LightDataUniformBlock->UpdateBufferData(&Data, sizeof(Data));
-//
-//    if (ShadowMapData && ShadowMapData->IsValid())
-//    {
-//        struct ShadowData
-//        {
-//            float Near;
-//            float Far;
-//            Vector2 ShadowMapSize;
-//
-//            bool operator == (const ShadowData& rhs) const
-//            {
-//                return (Near == rhs.Near) && (Far == rhs.Far) && (ShadowMapSize == rhs.ShadowMapSize);
-//            }
-//
-//            bool operator != (const ShadowData& rhs) const
-//            {
-//                return !(*this == rhs);
-//            }
-//
-//            void SetData(jLightUtil::jShadowMapArrayData* shadowMapData)
-//            {
-//                auto camera = shadowMapData->ShadowMapCamera[0];
-//                JASSERT(camera);
-//
-//				// todo
-//				check(0);
-//                //const auto& renderTargetInfo = shadowMapData->ShadowMapFrameBuffer->Info;
-//
-//                //Near = camera->Near;
-//                //Far = camera->Far;
-//                //ShadowMapSize.x = static_cast<float>(renderTargetInfo.Width);
-//                //ShadowMapSize.y = static_cast<float>(renderTargetInfo.Height);
-//            }
-//        };
-//
-//        ShadowData shadowData;
-//        shadowData.SetData(ShadowMapData);
-//
-//        IUniformBufferBlock* shadowDataUniformBlock = ShadowMapData->UniformBlock;
-//        shadowDataUniformBlock->UpdateBufferData(&shadowData, sizeof(shadowData));
-//    }
-//}
-
-//void jSpotLight::BindLight(const jShader* shader) const
-//{
-//	LightDataUniformBlock->Bind(shader);
-//
-//	if (ShadowMapData && ShadowMapData->IsValid())
-//	{
-//		const IUniformBufferBlock* shadowDataUniformBlock = ShadowMapData->UniformBlock;
-//		shadowDataUniformBlock->Bind(shader);
-//	}
-//
-//	for (int i = 0; i < 6; ++i)
-//	{
-//		OmniShadowMapVP[i].SetUniformbuffer(shader);
-//	}
-//}

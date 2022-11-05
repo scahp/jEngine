@@ -1,26 +1,21 @@
-struct jDirectionalLightUniformBuffer
+struct jSpotLightUniformBufferData
 {
+    float3 Position;
+    float MaxDistance;
+
     float3 Direction;
-    float SpecularPow;
+    float PenumbraRadian;
 
     float3 Color;
-    float padding0;
+    float UmbraRadian;
 
     float3 DiffuseIntensity;
-    float padding1;
+    float SpecularPow;
 
     float3 SpecularIntensity;
-    float padding2;
+    float padding0;
 
     float4x4 ShadowVP;
-    float4x4 ShadowV;
-		
-    float3 LightPos;
-    float padding3;
-
-    float2 ShadowMapSize;
-    float Near;
-    float Far;
 };
 
 struct RenderObjectUniformBuffer
@@ -29,7 +24,7 @@ struct RenderObjectUniformBuffer
     float4x4 InvM;
 };
 
-cbuffer DirectionalLight : register(b0,space0) { jDirectionalLightUniformBuffer DirectionalLight; }
+cbuffer SpotLight : register(b0, space0) { jSpotLightUniformBufferData SpotLight; }
 cbuffer RenderObjectParam : register(b0,space1) { RenderObjectUniformBuffer RenderObjectParam; }
 
 struct VSInput
@@ -45,6 +40,6 @@ struct VSOutput
 VSOutput main(VSInput input)
 {
     VSOutput output = (VSOutput) 0;
-    output.Pos = mul(DirectionalLight.ShadowVP, mul(RenderObjectParam.M, float4(input.Position, 1.0)));
+    output.Pos = mul(SpotLight.ShadowVP, mul(RenderObjectParam.M, float4(input.Position, 1.0)));
     return output;
 }

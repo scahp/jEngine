@@ -55,5 +55,4 @@ public:
     FORCEINLINE const jPointLightUniformBufferData& GetLightData() const { return LightData; }
 
     jCamera* Camera[6] = {0,};
-    jUniformBuffer<Matrix> OmniShadowMapVP[6];
 };
