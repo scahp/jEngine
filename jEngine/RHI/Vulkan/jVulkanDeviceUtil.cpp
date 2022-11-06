@@ -253,8 +253,9 @@ std::vector<const char*> GetRequiredInstanceExtensions()
 
     std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
 
-    if (jVulkanDeviceUtil::EnableValidationLayers)
-        extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);	// VK_EXT_debug_utils 임
+#if ENABLE_VALIDATION_LAYER
+    extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);	// VK_EXT_debug_utils 임
+#endif
 
     extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 
