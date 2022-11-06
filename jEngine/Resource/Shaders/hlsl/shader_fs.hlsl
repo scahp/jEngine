@@ -95,15 +95,15 @@ cbuffer ViewParam : register(b0,space0) { ViewUniformBuffer ViewParam; }
 
 cbuffer DirectionalLight : register(b0, space1) { jDirectionalLightUniformBuffer DirectionalLight; }
 Texture2D DirectionalLightShadowMap : register(t1, space1);
-SamplerState DirectionalLightShadowMapSampler : register(s1, space1);
+SamplerComparisonState DirectionalLightShadowMapSampler : register(s1, space1);
 
 cbuffer PointLight : register(b0, space2) { jPointLightUniformBufferData PointLight; }
 TextureCube PointLightShadowCubeMap : register(t1, space2);
-SamplerState PointLightShadowMapSampler : register(s1, space2);
+SamplerComparisonState PointLightShadowMapSampler : register(s1, space2);
 
 cbuffer SpotLight : register(b0, space3) { jSpotLightUniformBufferData SpotLight; }
 Texture2D SpotLightShadowMap : register(t1, space3);
-SamplerState SpotLightShadowMapSampler : register(s1, space3);
+SamplerComparisonState SpotLightShadowMapSampler : register(s1, space3);
 
 cbuffer RenderObjectParam : register(b0, space4) { RenderObjectUniformBuffer RenderObjectParam; }
 
@@ -201,7 +201,7 @@ float4 main(VSOutput input
 #endif
 ) : SV_TARGET
 {
-    float3 light = 0.0f;
+    float3 PointLightLit = 0.0f;
     float3 ViewWorld = normalize(ViewParam.EyeWorld - input.WorldPos.xyz);
 
     // Point light shadow map
@@ -210,12 +210,12 @@ float4 main(VSOutput input
     if (DistanceToLight <= PointLight.MaxDistance)
     {
         float NormalizedDistance = DistanceToLight / PointLight.MaxDistance;
-        float shadowMapDist = PointLightShadowCubeMap.Sample(PointLightShadowMapSampler, LightDir.xyz).r;
 
-        const float ShadowBias = 0.005f;
-        if (NormalizedDistance <= shadowMapDist + ShadowBias)
+        const float Bias = 0.005f;
+        float Shadow = PointLightShadowCubeMap.SampleCmpLevelZero(PointLightShadowMapSampler, LightDir.xyz, NormalizedDistance - Bias);
+        if (Shadow > 0.0f)
         {
-            light = GetPointLight(PointLight, input.Normal, input.WorldPos.xyz, ViewWorld);
+            PointLightLit = Shadow * GetPointLight(PointLight, input.Normal, input.WorldPos.xyz, ViewWorld);
         }
     }
 
@@ -226,11 +226,10 @@ float4 main(VSOutput input
     float3 DirectionalLightLit = GetDirectionalLight(DirectionalLight, input.Normal, ViewWorld);
     if (-1.0 <= DirectionalLightShadowPosition.z && DirectionalLightShadowPosition.z <= 1.0)
     {
-        float shadowMapDist = DirectionalLightShadowMap.Sample(DirectionalLightShadowMapSampler, DirectionalLightShadowPosition.xy * 0.5 + 0.5).r;
-        if (DirectionalLightShadowPosition.z > shadowMapDist + 0.001)
-        {
-            DirectionalLightLit = 0.0f;
-        }
+        const float Bias = 0.01f;
+        float Shadow = DirectionalLightShadowMap.SampleCmpLevelZero(
+            DirectionalLightShadowMapSampler, (DirectionalLightShadowPosition.xy * 0.5 + 0.5), (DirectionalLightShadowPosition.z - Bias));
+        DirectionalLightLit *= Shadow;
     }
 
     // Spot light shadow map
@@ -238,18 +237,19 @@ float4 main(VSOutput input
     float3 SpotLightShadowPosition = input.SpotLightShadowPosition.xyz / input.SpotLightShadowPosition.w;
     SpotLightShadowPosition.y = -SpotLightShadowPosition.y;
 
-    float3 SpotLightLit = GetSpotLight(SpotLight, input.Normal, input.WorldPos.xyz, ViewWorld);
+    float3 SpotLightLit = 0.0f;
 
     if (-1.0 <= SpotLightShadowPosition.z && SpotLightShadowPosition.z <= 1.0)
     {
-        float shadowMapDist = SpotLightShadowMap.Sample(SpotLightShadowMapSampler, SpotLightShadowPosition.xy * 0.5 + 0.5).r;
-        if (SpotLightShadowPosition.z > shadowMapDist + 0.001)
+        const float Bias = 0.01f;
+        float Shadow = SpotLightShadowMap.SampleCmpLevelZero(SpotLightShadowMapSampler, SpotLightShadowPosition.xy * 0.5 + 0.5, SpotLightShadowPosition.z - Bias);
+        if (Shadow > 0.0f)
         {
-            SpotLightLit = 0.0f;
+            SpotLightLit = Shadow * GetSpotLight(SpotLight, input.Normal, input.WorldPos.xyz, ViewWorld);
         }
     }
 
-    float4 color = (1.0 / 3.14) * float4(pushConsts.Color.rgb * input.Color.xyz * (light + DirectionalLightLit + SpotLightLit), 1.0);
+    float4 color = (1.0 / 3.14) * float4(pushConsts.Color.rgb * input.Color.xyz * (PointLightLit + DirectionalLightLit + SpotLightLit), 1.0);
 
 #if USE_VARIABLE_SHADING_RATE
     if (pushConsts.ShowVRSArea)

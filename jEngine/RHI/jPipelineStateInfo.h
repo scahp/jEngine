@@ -85,6 +85,10 @@ struct jSamplerStateInfo
         Hash = CityHash64WithSeed((const char*)&AddressW, sizeof(AddressW), Hash);
         Hash = CityHash64WithSeed((const char*)&MipLODBias, sizeof(MipLODBias), Hash);
         Hash = CityHash64WithSeed((const char*)&MaxAnisotropy, sizeof(MaxAnisotropy), Hash);
+        Hash = CityHash64WithSeed((const char*)&TextureComparisonMode, sizeof(TextureComparisonMode), Hash);
+        Hash = CityHash64WithSeed((const char*)&IsEnableComparisonMode, sizeof(IsEnableComparisonMode), Hash);
+        Hash = CityHash64WithSeed((const char*)&ComparisonFunc, sizeof(ComparisonFunc), Hash);
+        Hash = CityHash64WithSeed((const char*)&ComparisonFunc, sizeof(ComparisonFunc), Hash);
         Hash = CityHash64WithSeed((const char*)&BorderColor, sizeof(BorderColor), Hash);
         Hash = CityHash64WithSeed((const char*)&MinLOD, sizeof(MinLOD), Hash);
         Hash = CityHash64WithSeed((const char*)&MaxLOD, sizeof(MaxLOD), Hash);
@@ -101,6 +105,7 @@ struct jSamplerStateInfo
     float MipLODBias = 0.0f;
     float MaxAnisotropy = 1.0f;			// if you anisotropy filtering tuned on, set this variable greater than 1.
     ETextureComparisonMode TextureComparisonMode = ETextureComparisonMode::NONE;
+    bool IsEnableComparisonMode = false;
     ECompareOp ComparisonFunc = ECompareOp::LESS;
     Vector4 BorderColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
     float MinLOD = -FLT_MAX;
