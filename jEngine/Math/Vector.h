@@ -249,6 +249,8 @@ struct Vector4
 	FORCEINLINE constexpr Vector4(zero_type /*ZeroType*/) { x = 0.0f; y = 0.0f; z = 0.0f; w = 0.0f; }
 	FORCEINLINE constexpr explicit Vector4(float fValue) : x(fValue), y(fValue), z(fValue), w(fValue) { }
 	FORCEINLINE constexpr Vector4(float fX, float fY, float fZ, float fW) : x(fX), y(fY), z(fZ), w(fW) { }
+	FORCEINLINE Vector4(const Vector& InVector);
+	Vector4(const Vector2& InA, const Vector2& InB);
 	FORCEINLINE Vector4(Vector vector, float fW) : x(vector.x), y(vector.y), z(vector.z), w(fW) { }
 
 	FORCEINLINE Vector4 operator*(float fValue) const
@@ -430,6 +432,8 @@ struct Vector2
 	constexpr Vector2() { }
 	constexpr Vector2(zero_type /*ZeroType*/) { x = 0.0f; y = 0.0f; }
 	constexpr Vector2(float fValue) : x(fValue), y(fValue) { }
+	Vector2(const Vector& InVector);
+	Vector2(const Vector4& InVector);
 	constexpr Vector2(float fX, float fY) : x(fX), y(fY) { }
 
 	FORCEINLINE Vector2 operator*(float fValue) const
@@ -664,3 +668,46 @@ struct Vector4i
 		int32 v[4];
 	};
 };
+
+//////////////////////////////////////////////////////////////////////////
+// Min, Max
+FORCEINLINE Vector2i Min(const Vector2i& A, const Vector2i& B)
+{
+    return Vector2i(Min(A.x, B.x), Min(A.y, B.y));
+}
+
+FORCEINLINE Vector2 Min(const Vector2& A, const Vector2& B)
+{
+    return Vector2(Min(A.x, B.x), Min(A.y, B.y));
+}
+
+FORCEINLINE Vector Min(const Vector& A, const Vector& B)
+{
+    return Vector(Min(A.x, B.x), Min(A.y, B.y), Min(A.z, B.z));
+}
+
+FORCEINLINE Vector4 Min(const Vector4& A, const Vector4& B)
+{
+    return Vector4(Min(A.x, B.x), Min(A.y, B.y), Min(A.z, B.z), Min(A.w, B.w));
+}
+
+FORCEINLINE Vector2i Max(const Vector2i& A, const Vector2i& B)
+{
+    return Vector2i(Max(A.x, B.x), Max(A.y, B.y));
+}
+
+FORCEINLINE Vector2 Max(const Vector2& A, const Vector2& B)
+{
+    return Vector2(Max(A.x, B.x), Max(A.y, B.y));
+}
+
+FORCEINLINE Vector Max(const Vector& A, const Vector& B)
+{
+    return Vector(Max(A.x, B.x), Max(A.y, B.y), Max(A.z, B.z));
+}
+
+FORCEINLINE Vector4 Max(const Vector4& A, const Vector4& B)
+{
+    return Vector4(Max(A.x, B.x), Max(A.y, B.y), Max(A.z, B.z), Max(A.w, B.w));
+}
+//////////////////////////////////////////////////////////////////////////

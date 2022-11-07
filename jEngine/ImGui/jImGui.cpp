@@ -344,6 +344,7 @@ void jImGUI_Vulkan::NewFrame(bool updateFrameGraph)
     ImGui::Checkbox("ShowVRSArea", &gOptions.ShowVRSArea);
     ImGui::Checkbox("ShowGrid", &gOptions.ShowGrid);
     ImGui::Checkbox("UseWaveIntrinsics", &gOptions.UseWaveIntrinsics);
+    ImGui::Checkbox("UseDeferredRenderer", &gOptions.UseDeferredRenderer);
     ImGui::Separator();
 
     constexpr float IndentSpace = 10.0f;

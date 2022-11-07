@@ -233,12 +233,10 @@ float4 main(VSOutput input
     }
 
     // Spot light shadow map
-
     float3 SpotLightShadowPosition = input.SpotLightShadowPosition.xyz / input.SpotLightShadowPosition.w;
     SpotLightShadowPosition.y = -SpotLightShadowPosition.y;
 
     float3 SpotLightLit = 0.0f;
-
     if (-1.0 <= SpotLightShadowPosition.z && SpotLightShadowPosition.z <= 1.0)
     {
         const float Bias = 0.01f;

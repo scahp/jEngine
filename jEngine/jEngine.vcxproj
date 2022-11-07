@@ -430,6 +430,40 @@ xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"</Command
       <FileType>Document</FileType>
     </None>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Resource\Shaders\hlsl\gbuffer_fs.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Resource\Shaders\hlsl\gbuffer_vs.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resource\Shaders\hlsl\fullscreenquad_vs.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resource\Shaders\hlsl\directionallight_fs.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resource\Shaders\hlsl\pointlight_fs.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Resource\Shaders\hlsl\pointlight_vs.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resource\Shaders\hlsl\spotlight_fs.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Resource\Shaders\hlsl\spotlight_vs.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

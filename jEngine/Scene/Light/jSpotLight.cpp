@@ -26,6 +26,8 @@ void jSpotLight::Initialize(const Vector& InPos, const Vector& InDirection, cons
     LightData.PenumbraRadian = InPenumbraRadian;
     LightData.UmbraRadian = InUmbraRadian;
 
+    SM_FarDist = InMaxDistance;
+
     constexpr float FOV = PI / 2.0f;
     Camera = jCamera::CreateCamera(InPos, InPos + InDirection, InPos + Vector(0.0f, 1.0f, 0.0f), DegreeToRadian(120.0f), SM_NearDist, SM_FarDist, SM_Width, SM_Height, true);
 }

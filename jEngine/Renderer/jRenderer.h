@@ -44,6 +44,9 @@ public:
     virtual void Setup();
     virtual void ShadowPass();
     virtual void OpaquePass();
+
+    void DeferredLightPass_TodoRefactoring();
+
     virtual void TranslucentPass();
     virtual void PostProcess();
 
@@ -51,6 +54,8 @@ public:
     void SetupBasePass();
 
     virtual void Render();
+
+    bool UseForwardRenderer = false;
 
     std::shared_ptr<jRenderFrameContext> RenderFrameContextPtr;
     jView View;

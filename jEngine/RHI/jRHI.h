@@ -265,7 +265,7 @@ public:
 	jView(const jCamera* camera, const jDirectionalLight* directionalLight = nullptr, jLight* pointLight = nullptr, jLight* spotLight = nullptr);
 
 	void PrepareViewUniformBufferShaderBindingInstance();
-	void GetShaderBindingInstance(jShaderBindingInstanceArray& OutShaderBindingInstanceArray) const;
+	void GetShaderBindingInstance(jShaderBindingInstanceArray& OutShaderBindingInstanceArray, bool InIsForwardRenderer = false) const;
 
 	const jCamera* Camera = nullptr;
 	std::vector<jViewLight> Lights;

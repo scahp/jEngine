@@ -12,8 +12,7 @@ void jRenderFrameContext::Destroy()
 {
     if (SceneRenderTarget)
     {
-        if (SceneRenderTarget->IsValid())
-            SceneRenderTarget->Return();
+        SceneRenderTarget->Return();
         delete SceneRenderTarget;
         SceneRenderTarget = nullptr;
     }

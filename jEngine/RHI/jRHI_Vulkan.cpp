@@ -27,6 +27,7 @@
 #include "Vulkan/jRingBuffer_Vulkan.h"
 #include "Vulkan/jDescriptorPool_Vulkan.h"
 #include "Vulkan/jQueryPoolOcclusion_Vulkan.h"
+#include "jOptions.h"
 
 jRHI_Vulkan* g_rhi_vk = nullptr;
 robin_hood::unordered_map<size_t, VkPipelineLayout> jRHI_Vulkan::PipelineLayoutPool;
@@ -185,6 +186,7 @@ bool jRHI_Vulkan::InitRHI()
 		deviceFeatures.sampleRateShading = true;		// Sample shading 켬	 (텍스쳐 내부에 있는 aliasing 도 완화 해줌)
 		deviceFeatures.multiDrawIndirect = true;
 		deviceFeatures.geometryShader = true;
+		deviceFeatures.depthClamp = true;
 
         VkPhysicalDeviceFeatures2 physicalDeviceFeatures2{};
         physicalDeviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
@@ -1265,6 +1267,7 @@ std::shared_ptr<jRenderFrameContext> jRHI_Vulkan::BeginRenderFrame()
 	Swapchain->Images[CurrenFrameIndex]->CommandBufferFence = (VkFence)commandBuffer->GetFenceHandle();
 
     auto renderFrameContextPtr = std::make_shared<jRenderFrameContext>();
+	renderFrameContextPtr->UseForwardRenderer = !gOptions.UseDeferredRenderer;
 	renderFrameContextPtr->FrameIndex = CurrenFrameIndex;
 	renderFrameContextPtr->CommandBuffer = commandBuffer;
 	renderFrameContextPtr->SceneRenderTarget = new jSceneRenderTarget();

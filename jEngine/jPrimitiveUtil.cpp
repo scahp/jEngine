@@ -1763,12 +1763,21 @@ jBillboardQuadPrimitive* CreateBillobardQuad(const Vector& pos, const Vector& si
 
 jUIQuadPrimitive* CreateUIQuad(const Vector2& pos, const Vector2& size, jTexture* texture)
 {
+#if VULKAN_NDC_Y_FLIP
+    float vertices[] = {
+        0.0f, 0.0f,
+		0.0f, 1.0f,
+        1.0f, 0.0f,
+		1.0f, 1.0f,
+	};
+#else
 	float vertices[] = {
 		0.0f, 1.0f,
 		0.0f, 0.0f,
 		1.0f, 1.0f,
 		1.0f, 0.0f,
 	};
+#endif
 
 	int32 elementCount = _countof(vertices) / 2;
 
@@ -1793,10 +1802,6 @@ jUIQuadPrimitive* CreateUIQuad(const Vector2& pos, const Vector2& size, jTexture
 	auto renderObject = new jRenderObject();
 	renderObject->CreateRenderObject(vertexStreamData, nullptr);
 	object->RenderObject = renderObject;
-	// Todo
-	check(0);
-	//if (texture)
-	//	object->RenderObject->MaterialData.AddMaterialParam(GetCommonTextureName(0), texture);
 	object->Pos = pos;
 	object->Size = size;
 
@@ -1806,7 +1811,11 @@ jUIQuadPrimitive* CreateUIQuad(const Vector2& pos, const Vector2& size, jTexture
 
 jFullscreenQuadPrimitive* CreateFullscreenQuad(jTexture* texture)
 {
-	float vertices[] = { 0.0f, 1.0f, 2.0f, 3.0f };
+#if VULKAN_NDC_Y_FLIP
+	float vertices[] = { 0.0f, 2.0f, 1.0f };
+#else
+	float vertices[] = { 0.0f, 1.0f, 2.0f };
+#endif
 
 	uint32 elementCount = static_cast<uint32>(_countof(vertices));
 	// attribute 추가
@@ -1830,10 +1839,6 @@ jFullscreenQuadPrimitive* CreateFullscreenQuad(jTexture* texture)
 	auto renderObject = new jRenderObject();
 	renderObject->CreateRenderObject(vertexStreamData, nullptr);
 	object->RenderObject = renderObject;
-	// Todo
-	check(0);
-	//if (texture)
-	//	object->RenderObject->MaterialData.AddMaterialParam(GetCommonTextureName(0), texture);
 	return object;
 }
 

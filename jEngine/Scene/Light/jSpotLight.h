@@ -39,7 +39,7 @@ public:
     static constexpr int32 SM_Width = 512;
     static constexpr int32 SM_Height = 512;
     static constexpr float SM_NearDist = 10.0f;
-    static constexpr float SM_FarDist = 1000.0f;
+    float SM_FarDist = 1000.0f;
 
     jSpotLight();
     virtual ~jSpotLight();

@@ -46,6 +46,16 @@ const Vector4 Vector4::ColorRed = Vector4(1.0f, 0.0f, 0.0f, 1.0f);
 const Vector4 Vector4::ColorWhite = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
 const Vector4 Vector4::ColorBlack = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
 
+Vector4::Vector4(const Vector& InVector)
+	: x(InVector.x), y(InVector.y), z(InVector.z), w(0.0f)
+{
+}
+
+Vector4::Vector4(const Vector2& InA, const Vector2& InB)
+	: x(InA.x), y(InA.y), z(InB.x), w(InB.y)
+{
+}
+
 void Vector4::operator=(struct Vector2 const& vector)
 {
 	x = vector.x;
@@ -66,6 +76,16 @@ void Vector4::operator=(struct Vector const& vector)
 
 
 // Vector2
+Vector2::Vector2(const Vector& InVector)
+	: x(InVector.x), y(InVector.y)
+{
+}
+
+Vector2::Vector2(const Vector4& InVector)
+	: x(InVector.x), y(InVector.y)
+{
+}
+
 void Vector2::operator=(struct Vector const& vector)
 {
 	x = vector.x;

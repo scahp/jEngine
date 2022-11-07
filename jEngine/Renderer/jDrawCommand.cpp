@@ -32,9 +32,13 @@ void jDrawCommand::PrepareToDraw(bool InIsPositionOnly)
 {
     // GetShaderBindings
     if (IsViewLight)
+    {
         ShaderBindingInstanceArray.Add(ViewLight->ShaderBindingInstance);
+    }
     else
-        View->GetShaderBindingInstance(ShaderBindingInstanceArray);
+    {        
+        View->GetShaderBindingInstance(ShaderBindingInstanceArray, RenderFrameContextPtr->UseForwardRenderer);
+    }
     
     // GetShaderBindings
     jShaderBindingInstance* OneRenderObjectUniformBuffer = RenderObject->CreateShaderBindingInstance();

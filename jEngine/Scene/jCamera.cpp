@@ -89,6 +89,110 @@ void jCamera::UpdateCamera()
     Projection = CreateProjection();
 }
 
+void jCamera::GetRectInNDCSpace(Vector& OutPosMin, Vector& OutPosMax, const Matrix& InVP) const
+{
+    Vector far_lt;
+    Vector far_rt;
+    Vector far_lb;
+    Vector far_rb;
+
+    Vector near_lt;
+    Vector near_rt;
+    Vector near_lb;
+    Vector near_rb;
+
+    const auto origin = Pos;
+    const float n = Near;
+    const float f = Far;
+
+    if (IsPerspectiveProjection)
+    {
+        const float InvAspect = ((float)Width / (float)Height);
+        const float length = tanf(FOVRad * 0.5f);
+        Vector targetVec = GetForwardVector().GetNormalize();
+        Vector rightVec = GetRightVector().GetNormalize() * length * InvAspect;
+        Vector upVec = GetUpVector().GetNormalize() * length;
+
+        Vector rightUp = (targetVec + rightVec + upVec);
+        Vector leftUp = (targetVec - rightVec + upVec);
+        Vector rightDown = (targetVec + rightVec - upVec);
+        Vector leftDown = (targetVec - rightVec - upVec);
+
+        far_lt = origin + leftUp * f;
+        far_rt = origin + rightUp * f;
+        far_lb = origin + leftDown * f;
+        far_rb = origin + rightDown * f;
+
+        near_lt = origin + leftUp * n;
+        near_rt = origin + rightUp * n;
+        near_lb = origin + leftDown * n;
+        near_rb = origin + rightDown * n;
+    }
+    else
+    {
+        const float w = (float)Width;
+        const float h = (float)Height;
+
+        Vector targetVec = GetForwardVector().GetNormalize();
+        Vector rightVec = GetRightVector().GetNormalize();
+        Vector upVec = GetUpVector().GetNormalize();
+
+        far_lt = origin + targetVec * f - rightVec * w * 0.5f + upVec * h * 0.5f;
+        far_rt = origin + targetVec * f + rightVec * w * 0.5f + upVec * h * 0.5f;
+        far_lb = origin + targetVec * f - rightVec * w * 0.5f - upVec * h * 0.5f;
+        far_rb = origin + targetVec * f + rightVec * w * 0.5f - upVec * h * 0.5f;
+
+        near_lt = origin + targetVec * n - rightVec * w * 0.5f + upVec * h * 0.5f;
+        near_rt = origin + targetVec * n + rightVec * w * 0.5f + upVec * h * 0.5f;
+        near_lb = origin + targetVec * n - rightVec * w * 0.5f - upVec * h * 0.5f;
+        near_rb = origin + targetVec * n + rightVec * w * 0.5f - upVec * h * 0.5f;
+    }
+
+    // Transform to NDC space
+    {
+        far_lt = InVP.TransformPoint(far_lt);
+        far_rt = InVP.TransformPoint(far_rt);
+        far_lb = InVP.TransformPoint(far_lb);
+        far_rb = InVP.TransformPoint(far_rb);
+
+        near_lt = InVP.TransformPoint(near_lt);
+        near_rt = InVP.TransformPoint(near_rt);
+        near_lb = InVP.TransformPoint(near_lb);
+        near_rb = InVP.TransformPoint(near_rb);
+    }
+
+    OutPosMin = Min(far_lt, far_rt);
+    OutPosMin = Min(OutPosMin, far_lb);
+    OutPosMin = Min(OutPosMin, far_rb);
+    OutPosMin = Min(OutPosMin, near_lt);
+    OutPosMin = Min(OutPosMin, near_rt);
+    OutPosMin = Min(OutPosMin, near_lb);
+    OutPosMin = Min(OutPosMin, near_rb);
+
+    OutPosMax = Max(far_lt, far_rt);
+    OutPosMax = Max(OutPosMax, far_lb);
+    OutPosMax = Max(OutPosMax, far_rb);
+    OutPosMax = Max(OutPosMax, near_lt);
+    OutPosMax = Max(OutPosMax, near_rt);
+    OutPosMax = Max(OutPosMax, near_lb);
+    OutPosMax = Max(OutPosMax, near_rb);
+}
+
+void jCamera::GetRectInScreenSpace(Vector& OutPosMin, Vector& OutPosMax, const Matrix& InVP, const Vector2& InScreenSize) const
+{
+    GetRectInNDCSpace(OutPosMin, OutPosMax, InVP);
+    
+    // Min XY
+    OutPosMin = Max(OutPosMin, Vector(-1.0f, -1.0f, -1.0f));
+    OutPosMin.x = (OutPosMin.x * 0.5 + 0.5) * InScreenSize.x;
+    OutPosMin.y = (OutPosMin.y * 0.5 + 0.5) * InScreenSize.y;
+
+    // Max XY
+    OutPosMax = Min(OutPosMax, Vector(1.0f, 1.0f, 1.0f));
+    OutPosMax.x = (OutPosMax.x * 0.5 + 0.5) * InScreenSize.x;
+    OutPosMax.y = (OutPosMax.y * 0.5 + 0.5) * InScreenSize.y;
+}
+
 //void jCamera::AddLight(jLight* light)
 //{
 //    if (light)

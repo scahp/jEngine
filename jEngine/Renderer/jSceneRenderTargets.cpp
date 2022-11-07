@@ -33,6 +33,12 @@ void jSceneRenderTarget::Create(const jSwapchainImage* image)
 
     SpotLightShadowMapPtr = jRenderTargetPool::GetRenderTarget(
         { ETextureType::TEXTURE_2D, ETextureFormat::D24_S8, jSpotLight::SM_Width, jSpotLight::SM_Height, 1, false, EMSAASamples::COUNT_1 });
+
+    for (int32 i = 0; i < _countof(GBuffer); ++i)
+    {
+        GBuffer[i] = jRenderTargetPool::GetRenderTarget(
+            { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi_vk->GetSelectedMSAASamples() });
+    }
 }
 
 void jSceneRenderTarget::Return()
@@ -49,9 +55,28 @@ void jSceneRenderTarget::Return()
         CubeShadowMapPtr->Return();
     if (SpotLightShadowMapPtr)
         SpotLightShadowMapPtr->Return();
+    for (int32 i = 0; i < _countof(GBuffer); ++i)
+    {
+        if (GBuffer[i])
+            GBuffer[i]->Return();
+    }
 }
 
-bool jSceneRenderTarget::IsValid() const
+jShaderBindingInstance* jSceneRenderTarget::PrepareGBufferShaderBindingInstance() const
 {
-    return ColorPtr || DepthPtr || ResolvePtr || DirectionalLightShadowMapPtr || CubeShadowMapPtr;
+    int32 BindingPoint = 0;
+    jShaderBindingArray ShaderBindingArray;
+    jShaderBindingResourceInlineAllocator ResourceInlineAllocator;
+
+    for (int32 i = 0; i < _countof(GBuffer); ++i)
+    {
+        const jSamplerStateInfo* ShadowSamplerStateInfo = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+            , ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
+            , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), true, ECompareOp::LESS>::Create();
+
+        ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
+            , ResourceInlineAllocator.Alloc<jTextureResource>(GBuffer[i]->GetTexture(), ShadowSamplerStateInfo));
+    }
+
+    return g_rhi->CreateShaderBindingInstance(ShaderBindingArray);
 }

@@ -23,6 +23,10 @@ int32 NextFrame()
 	jScopedProfile_CPU::ResetPriority();
 
 	PerformanceFrame = (PerformanceFrame + 1) % MaxProfileFrame;
+
+	// 이번에 수집할 프로파일링 데이터 초기화
+	ScopedProfileCPUMap[PerformanceFrame].clear();
+	ScopedProfileGPUMap[PerformanceFrame].clear();
 	return PerformanceFrame;
 }
 
@@ -62,14 +66,13 @@ void jPerformanceProfile::Update(float deltaTime)
 void jPerformanceProfile::CalcAvg()
 {
 	{
-		CPUAvgProfileMap.clear();
-
+		robin_hood::unordered_map<jPriorityName, jAvgProfile, jPriorityNameHashFunc> SumOfScopedProfileCPUMap;
 		for (int32 i = 0; i < MaxProfileFrame; ++i)
 		{
 			const auto& scopedProfileMap = ScopedProfileCPUMap[i];
 			for (auto& iter : scopedProfileMap)
 			{
-				auto& avgProfile = CPUAvgProfileMap[iter.first];
+				auto& avgProfile = SumOfScopedProfileCPUMap[iter.first];
 				avgProfile.TotalElapsedTick += iter.second.ElapsedTick;
 				avgProfile.Indent = iter.second.Indent;
 				avgProfile.ThreadId = iter.second.ThreadId;
@@ -77,22 +80,23 @@ void jPerformanceProfile::CalcAvg()
 			}
 		}
 
-		for (auto& iter : CPUAvgProfileMap)
+		CPUAvgProfileMap.clear();
+		for (auto& iter : SumOfScopedProfileCPUMap)
 		{
 			JASSERT(iter.second.TotalSampleCount > 0);
 			iter.second.AvgElapsedMS = (iter.second.TotalElapsedTick / static_cast<double>(iter.second.TotalSampleCount)) * 0.000001;	// ns -> ms
+			CPUAvgProfileMap[iter.first] = iter.second;
 		}
 	}
 
 	{
-		GPUAvgProfileMap.clear();
-
+		robin_hood::unordered_map<jPriorityName, jAvgProfile, jPriorityNameHashFunc> SumOfScopedProfileGPUMap;
 		for (int32 i = 0; i < MaxProfileFrame; ++i)
 		{
 			const auto& scopedProfileMap = ScopedProfileGPUMap[i];
 			for (auto& iter : scopedProfileMap)
 			{
-				auto& avgProfile = GPUAvgProfileMap[iter.first];
+				auto& avgProfile = SumOfScopedProfileGPUMap[iter.first];
 				avgProfile.TotalElapsedTick += iter.second.ElapsedTick;
 				avgProfile.Indent = iter.second.Indent;
 				avgProfile.ThreadId = iter.second.ThreadId;
@@ -100,10 +104,12 @@ void jPerformanceProfile::CalcAvg()
 			}
 		}
 
-		for (auto& iter : GPUAvgProfileMap)
+        GPUAvgProfileMap.clear();
+		for (auto& iter : SumOfScopedProfileGPUMap)
 		{
 			JASSERT(iter.second.TotalSampleCount > 0);
 			iter.second.AvgElapsedMS = (iter.second.TotalElapsedTick / static_cast<double>(iter.second.TotalSampleCount)) * 0.000001;	// ns -> ms
+			GPUAvgProfileMap[iter.first] = iter.second;
 		}
 	}
 }

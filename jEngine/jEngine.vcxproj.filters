@@ -698,5 +698,29 @@
     <None Include="Resource\Shaders\hlsl\spot_shadow_fs.hlsl">
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
+    <None Include="Resource\Shaders\hlsl\gbuffer_fs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\gbuffer_vs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\fullscreenquad_vs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\directionallight_fs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\pointlight_vs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\pointlight_fs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\spotlight_fs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\spotlight_vs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
   </ItemGroup>
 </Project>
