@@ -345,6 +345,7 @@ void jImGUI_Vulkan::NewFrame(bool updateFrameGraph)
     ImGui::Checkbox("ShowGrid", &gOptions.ShowGrid);
     ImGui::Checkbox("UseWaveIntrinsics", &gOptions.UseWaveIntrinsics);
     ImGui::Checkbox("UseDeferredRenderer", &gOptions.UseDeferredRenderer);
+    ImGui::Checkbox("UseSubpass", &gOptions.UseSubpass);
     ImGui::Separator();
 
     constexpr float IndentSpace = 10.0f;
@@ -370,7 +371,7 @@ void jImGUI_Vulkan::NewFrame(bool updateFrameGraph)
             
             TotalPassesMS += AvgProfile.AvgElapsedMS;
         }
-        // ImGui::Text("Total Passes : %lf ms", TotalPassesMS);
+        ImGui::Text("[CPU]Total Passes : %lf ms", TotalPassesMS);
     }
     ImGui::Separator();
     {
@@ -393,7 +394,7 @@ void jImGUI_Vulkan::NewFrame(bool updateFrameGraph)
 
             TotalPassesMS += AvgProfile.AvgElapsedMS;
         }
-        ImGui::Text("Total Passes : %lf ms", TotalPassesMS);
+        ImGui::Text("[GPU]Total Passes : %lf ms", TotalPassesMS);
     }
     ImGui::Separator();
     for (auto& pair : CounterMap)

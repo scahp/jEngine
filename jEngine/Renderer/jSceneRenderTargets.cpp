@@ -63,7 +63,7 @@ void jSceneRenderTarget::Return()
     }
 }
 
-jShaderBindingInstance* jSceneRenderTarget::PrepareGBufferShaderBindingInstance() const
+jShaderBindingInstance* jSceneRenderTarget::PrepareGBufferShaderBindingInstance(bool InUseAsSubpassInput) const
 {
     int32 BindingPoint = 0;
     jShaderBindingArray ShaderBindingArray;
@@ -71,8 +71,20 @@ jShaderBindingInstance* jSceneRenderTarget::PrepareGBufferShaderBindingInstance(
 
     for (int32 i = 0; i < _countof(GBuffer); ++i)
     {
-        ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::SUBPASS_INPUT_ATTACHMENT, EShaderAccessStageFlag::FRAGMENT
-            , ResourceInlineAllocator.Alloc<jTextureResource>(GBuffer[i]->GetTexture(), nullptr));
+        if (InUseAsSubpassInput)
+        {
+            ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::SUBPASS_INPUT_ATTACHMENT, EShaderAccessStageFlag::FRAGMENT
+                , ResourceInlineAllocator.Alloc<jTextureResource>(GBuffer[i]->GetTexture(), nullptr));
+        }
+        else
+        {
+            const jSamplerStateInfo* ShadowSamplerStateInfo = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+                , ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
+                , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), true, ECompareOp::LESS>::Create();
+
+            ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
+                , ResourceInlineAllocator.Alloc<jTextureResource>(GBuffer[i]->GetTexture(), ShadowSamplerStateInfo));
+        }
     }
 
     return g_rhi->CreateShaderBindingInstance(ShaderBindingArray);

@@ -19,5 +19,5 @@ struct jSceneRenderTarget
 
     void Create(const jSwapchainImage* image);
     void Return();
-    jShaderBindingInstance* PrepareGBufferShaderBindingInstance() const;
+    jShaderBindingInstance* PrepareGBufferShaderBindingInstance(bool InUseAsSubpassInput) const;
 };
