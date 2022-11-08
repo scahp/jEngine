@@ -10,20 +10,20 @@
 #include "RHI/Vulkan/jVulkanBufferUtil.h"
 #include "jOptions.h"
 
-jDrawCommand::jDrawCommand(std::shared_ptr<jRenderFrameContext> InRenderFrameContextPtr, jView* view
-    , jRenderObject* renderObject, jRenderPass* renderPass, jShader* shader, jPipelineStateFixedInfo* pipelineStateFixed
-    , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const std::shared_ptr<jPushConstant>& pushConstantPtr, jQuery* occlusionQuery)
-    : RenderFrameContextPtr(InRenderFrameContextPtr), View(view), RenderObject(renderObject), RenderPass(renderPass), Shader(shader), PipelineStateFixed(pipelineStateFixed)
-    , PushConstantPtr(pushConstantPtr), OcclusionQuery(occlusionQuery), ShaderBindingInstanceArray(InShaderBindingInstanceArray)
+jDrawCommand::jDrawCommand(std::shared_ptr<jRenderFrameContext> InRenderFrameContextPtr, jView* InView
+    , jRenderObject* InRenderObject, jRenderPass* InRenderPass, jShader* InShader, jPipelineStateFixedInfo* InPipelineStateFixed
+    , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const std::shared_ptr<jPushConstant>& InPushConstantPtr, jQuery* InOcclusionQuery, int32 InSubpassIndex)
+    : RenderFrameContextPtr(InRenderFrameContextPtr), View(InView), RenderObject(InRenderObject), RenderPass(InRenderPass), Shader(InShader), PipelineStateFixed(InPipelineStateFixed)
+    , PushConstantPtr(InPushConstantPtr), OcclusionQuery(InOcclusionQuery), ShaderBindingInstanceArray(InShaderBindingInstanceArray), SubpassIndex(InSubpassIndex)
 {
     IsViewLight = false;
 }
 
-jDrawCommand::jDrawCommand(std::shared_ptr<jRenderFrameContext> InRenderFrameContextPtr, jViewLight* viewLight
-    , jRenderObject* renderObject, jRenderPass* renderPass, jShader* shader, jPipelineStateFixedInfo* pipelineStateFixed
-    , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const std::shared_ptr<jPushConstant>& pushConstantPtr, jQuery* occlusionQuery)
-    : RenderFrameContextPtr(InRenderFrameContextPtr), ViewLight(viewLight), RenderObject(renderObject), RenderPass(renderPass), Shader(shader), PipelineStateFixed(pipelineStateFixed)
-    , PushConstantPtr(pushConstantPtr), OcclusionQuery(occlusionQuery), ShaderBindingInstanceArray(InShaderBindingInstanceArray)
+jDrawCommand::jDrawCommand(std::shared_ptr<jRenderFrameContext> InRenderFrameContextPtr, jViewLight* InViewLight
+    , jRenderObject* InRenderObject, jRenderPass* InRenderPass, jShader* InShader, jPipelineStateFixedInfo* InPipelineStateFixed
+    , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const std::shared_ptr<jPushConstant>& InPushConstantPtr, jQuery* InOcclusionQuery, int32 InSubpassIndex)
+    : RenderFrameContextPtr(InRenderFrameContextPtr), ViewLight(InViewLight), RenderObject(InRenderObject), RenderPass(InRenderPass), Shader(InShader), PipelineStateFixed(InPipelineStateFixed)
+    , PushConstantPtr(InPushConstantPtr), OcclusionQuery(InOcclusionQuery), ShaderBindingInstanceArray(InShaderBindingInstanceArray), SubpassIndex(InSubpassIndex)
 {
     IsViewLight = true;
 }
@@ -58,7 +58,7 @@ void jDrawCommand::PrepareToDraw(bool InIsPositionOnly)
 
     // Create Pipeline
     CurrentPipelineStateInfo = (jPipelineStateInfo_Vulkan*)g_rhi->CreatePipelineStateInfo(PipelineStateFixed, Shader
-        , VertexBufferArray, RenderPass, ShaderBindingLayoutArray, PushConstantPtr.get());
+        , VertexBufferArray, RenderPass, ShaderBindingLayoutArray, PushConstantPtr.get(), SubpassIndex);
 
     IsPositionOnly = InIsPositionOnly;
 }

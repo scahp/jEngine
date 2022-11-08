@@ -36,8 +36,9 @@ void jSceneRenderTarget::Create(const jSwapchainImage* image)
 
     for (int32 i = 0; i < _countof(GBuffer); ++i)
     {
+        constexpr bool UseAsSubpassInput = true;
         GBuffer[i] = jRenderTargetPool::GetRenderTarget(
-            { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi_vk->GetSelectedMSAASamples() });
+            { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi_vk->GetSelectedMSAASamples(), UseAsSubpassInput });
     }
 }
 
@@ -70,12 +71,8 @@ jShaderBindingInstance* jSceneRenderTarget::PrepareGBufferShaderBindingInstance(
 
     for (int32 i = 0; i < _countof(GBuffer); ++i)
     {
-        const jSamplerStateInfo* ShadowSamplerStateInfo = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
-            , ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
-            , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), true, ECompareOp::LESS>::Create();
-
-        ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
-            , ResourceInlineAllocator.Alloc<jTextureResource>(GBuffer[i]->GetTexture(), ShadowSamplerStateInfo));
+        ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::SUBPASS_INPUT_ATTACHMENT, EShaderAccessStageFlag::FRAGMENT
+            , ResourceInlineAllocator.Alloc<jTextureResource>(GBuffer[i]->GetTexture(), nullptr));
     }
 
     return g_rhi->CreateShaderBindingInstance(ShaderBindingArray);

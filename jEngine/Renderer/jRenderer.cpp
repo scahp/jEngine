@@ -103,10 +103,8 @@ void jRenderer::SetupShadowPass()
 
             // Setup subpass of ShadowPass
             jSubpass subpass;
-            subpass.SourceSubpassIndex = 0;
-            subpass.DestSubpassIndex = 1;
+            subpass.Initialize(0, 1, EPipelineStageMask::COLOR_ATTACHMENT_OUTPUT_BIT, EPipelineStageMask::FRAGMENT_SHADER_BIT);
             subpass.OutputDepthAttachment = 0;
-            subpass.AttachmentProducePipelineBit = EPipelineStageMask::COLOR_ATTACHMENT_OUTPUT_BIT;
             renderPassInfo.Subpasses.push_back(subpass);
 
             ShadowPasses.ShadowMapRenderPass = g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { RTWidth, RTHeight });
@@ -207,14 +205,7 @@ void jRenderer::SetupBasePass()
 
     // Setup attachment
     jRenderPassInfo renderPassInfo;
-    if (UseForwardRenderer)
-    {
-        jAttachment color = jAttachment(RenderFrameContextPtr->SceneRenderTarget->ColorPtr, EAttachmentLoadStoreOp::CLEAR_STORE
-            , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth
-            , EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
-        renderPassInfo.Attachments.push_back(color);
-    }
-    else
+    if (!UseForwardRenderer)
     {
         for (int32 i = 0; i < _countof(RenderFrameContextPtr->SceneRenderTarget->GBuffer); ++i)
         {
@@ -224,6 +215,14 @@ void jRenderer::SetupBasePass()
             renderPassInfo.Attachments.push_back(color);
         }
     }
+
+    const int32 LightPassAttachmentIndex = (int32)renderPassInfo.Attachments.size();
+
+    jAttachment color = jAttachment(RenderFrameContextPtr->SceneRenderTarget->ColorPtr, EAttachmentLoadStoreOp::CLEAR_STORE
+        , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth
+        , EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
+    renderPassInfo.Attachments.push_back(color);
+
     const int32 DepthAttachmentIndex = (int32)renderPassInfo.Attachments.size();
     renderPassInfo.Attachments.push_back(depth);
 
@@ -234,25 +233,55 @@ void jRenderer::SetupBasePass()
             renderPassInfo.Attachments.push_back(resolve);
     }
 
+    //////////////////////////////////////////////////////////////////////////
     // Setup subpass of ShadowPass
-    jSubpass subpass;
-    subpass.SourceSubpassIndex = 0;
-    subpass.DestSubpassIndex = 1;
-
-    for (int32 i = 0; i < DepthAttachmentIndex; ++i)
     {
-        subpass.OutputColorAttachments.push_back(i);
+        // First subpass, Geometry pass
+        jSubpass subpass;
+        subpass.Initialize(0, 1, EPipelineStageMask::COLOR_ATTACHMENT_OUTPUT_BIT, EPipelineStageMask::FRAGMENT_SHADER_BIT);
+
+        if (UseForwardRenderer)
+        {
+            subpass.OutputColorAttachments.push_back(0);
+        }
+        else
+        {
+            const int32 GBufferCount = LightPassAttachmentIndex;
+            for (int32 i = 0; i < GBufferCount; ++i)
+            {
+                subpass.OutputColorAttachments.push_back(i);
+            }
+        }
+
+        subpass.OutputDepthAttachment = DepthAttachmentIndex;
+        if (UseForwardRenderer)
+        {
+            if ((int32)g_rhi->GetSelectedMSAASamples() > 1)
+                subpass.OutputResolveAttachment = ResolveAttachemntIndex;
+        }
+        renderPassInfo.Subpasses.push_back(subpass);
     }
-
-    subpass.OutputDepthAttachment = DepthAttachmentIndex;
-    if (UseForwardRenderer)
+    if (!UseForwardRenderer)
     {
+        // Second subpass, Lighting pass
+        jSubpass subpass;
+        subpass.Initialize(1, 2, EPipelineStageMask::COLOR_ATTACHMENT_OUTPUT_BIT, EPipelineStageMask::FRAGMENT_SHADER_BIT);
+
+        const int32 GBufferCount = LightPassAttachmentIndex;
+        for (int32 i = 0; i < GBufferCount; ++i)
+        {
+            subpass.InputAttachments.push_back(i);
+        }
+
+        subpass.OutputColorAttachments.push_back(LightPassAttachmentIndex);
+        subpass.OutputDepthAttachment = DepthAttachmentIndex;
+
         if ((int32)g_rhi->GetSelectedMSAASamples() > 1)
             subpass.OutputResolveAttachment = ResolveAttachemntIndex;
-    }
-    subpass.AttachmentProducePipelineBit = EPipelineStageMask::COLOR_ATTACHMENT_OUTPUT_BIT;
-    renderPassInfo.Subpasses.push_back(subpass);
 
+        renderPassInfo.Subpasses.push_back(subpass);
+    }
+    //////////////////////////////////////////////////////////////////////////
     OpaqueRenderPass = (jRenderPass_Vulkan*)g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
 
     // This is an example of creating RenderPass without setting subpasses
@@ -386,29 +415,33 @@ void jRenderer::OpaquePass()
             {
                 command.Draw();
             }
+
+            if (!UseForwardRenderer)
+            {
+                g_rhi->NextSubpass(RenderFrameContextPtr->CommandBuffer);
+
+                DeferredLightPass_TodoRefactoring(OpaqueRenderPass);
+            }
+
             BasepassOcclusionTest.EndQuery(RenderFrameContextPtr->CommandBuffer);
             OpaqueRenderPass->EndRenderPass();
         }
     }
-
-    if (!UseForwardRenderer)
-    {
-        DeferredLightPass_TodoRefactoring();
-    }
 }
 
-void jRenderer::DeferredLightPass_TodoRefactoring()
+void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
 {
     SCOPE_CPU_PROFILE(LightingPass);
     SCOPE_GPU_PROFILE(RenderFrameContextPtr, LightingPass);
 
-    g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, RenderFrameContextPtr->SceneRenderTarget->ColorPtr->GetTexture(), EImageLayout::COLOR_ATTACHMENT);
-    for (int32 i = 0; i < _countof(RenderFrameContextPtr->SceneRenderTarget->GBuffer); ++i)
-    {
-        g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, RenderFrameContextPtr->SceneRenderTarget->GBuffer[i]->GetTexture(), EImageLayout::SHADER_READ_ONLY);
-    }
+    //g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, RenderFrameContextPtr->SceneRenderTarget->ColorPtr->GetTexture(), EImageLayout::COLOR_ATTACHMENT);
+    //for (int32 i = 0; i < _countof(RenderFrameContextPtr->SceneRenderTarget->GBuffer); ++i)
+    //{
+    //    g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, RenderFrameContextPtr->SceneRenderTarget->GBuffer[i]->GetTexture(), EImageLayout::SHADER_READ_ONLY);
+    //}
 
     {
+        int32 SubpassIndex = 1;
         auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, true, false>::Create();
         jMultisampleStateInfo* MultisampleState = TMultisampleStateInfo<true, 0.2f, false, false>::Create(g_rhi->GetSelectedMSAASamples());
         auto DepthStencilState = TDepthStencilStateInfo<true, false, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
@@ -424,36 +457,36 @@ void jRenderer::DeferredLightPass_TodoRefactoring()
         const Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
         const Vector2 ClearDepth = Vector2(1.0f, 0.0f);
 
-        jAttachment depth = jAttachment(RenderFrameContextPtr->SceneRenderTarget->DepthPtr, EAttachmentLoadStoreOp::LOAD_DONTCARE
-            , EAttachmentLoadStoreOp::LOAD_DONTCARE, ClearColor, ClearDepth
-            , RenderFrameContextPtr->SceneRenderTarget->DepthPtr->GetLayout(), EImageLayout::DEPTH_STENCIL_ATTACHMENT);
+        //jAttachment depth = jAttachment(RenderFrameContextPtr->SceneRenderTarget->DepthPtr, EAttachmentLoadStoreOp::LOAD_DONTCARE
+        //    , EAttachmentLoadStoreOp::LOAD_DONTCARE, ClearColor, ClearDepth
+        //    , RenderFrameContextPtr->SceneRenderTarget->DepthPtr->GetLayout(), EImageLayout::DEPTH_STENCIL_ATTACHMENT);
 
-        // Setup attachment
-        jRenderPassInfo renderPassInfo;
-        jAttachment color = jAttachment(RenderFrameContextPtr->SceneRenderTarget->ColorPtr, EAttachmentLoadStoreOp::CLEAR_STORE
-            , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth
-            , EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
-        renderPassInfo.Attachments.push_back(color);
+        //// Setup attachment
+        //jRenderPassInfo renderPassInfo;
+        //jAttachment color = jAttachment(RenderFrameContextPtr->SceneRenderTarget->ColorPtr, EAttachmentLoadStoreOp::CLEAR_STORE
+        //    , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth
+        //    , EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
+        //renderPassInfo.Attachments.push_back(color);
 
-        const int32 DepthAttachmentIndex = (int32)renderPassInfo.Attachments.size();
-        renderPassInfo.Attachments.push_back(depth);
+        //const int32 DepthAttachmentIndex = (int32)renderPassInfo.Attachments.size();
+        //renderPassInfo.Attachments.push_back(depth);
 
-        // Setup subpass of ShadowPass
-        jSubpass subpass;
-        subpass.SourceSubpassIndex = 0;
-        subpass.DestSubpassIndex = 1;
+        //// Setup subpass of ShadowPass
+        //jSubpass subpass;
+        //subpass.SourceSubpassIndex = 0;
+        //subpass.DestSubpassIndex = 1;
 
-        //for (int32 i = 0; i < DepthAttachmentIndex; ++i)
-        //{
-        //    subpass.OutputColorAttachments.push_back(i);
-        //}
-        subpass.OutputColorAttachments.push_back(0);
+        ////for (int32 i = 0; i < DepthAttachmentIndex; ++i)
+        ////{
+        ////    subpass.OutputColorAttachments.push_back(i);
+        ////}
+        //subpass.OutputColorAttachments.push_back(0);
 
-        subpass.OutputDepthAttachment = DepthAttachmentIndex;
-        subpass.AttachmentProducePipelineBit = EPipelineStageMask::COLOR_ATTACHMENT_OUTPUT_BIT;
-        renderPassInfo.Subpasses.push_back(subpass);
+        //subpass.OutputDepthAttachment = DepthAttachmentIndex;
+        //subpass.AttachmentProducePipelineBit = EPipelineStageMask::COLOR_ATTACHMENT_OUTPUT_BIT;
+        //renderPassInfo.Subpasses.push_back(subpass);
 
-        auto DeferredLightingRenderPass = (jRenderPass_Vulkan*)g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
+        //auto DeferredLightingRenderPass = (jRenderPass_Vulkan*)g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
 
         jShader* DirectionalLightShader = nullptr;
         {
@@ -471,6 +504,10 @@ void jRenderer::DeferredLightPass_TodoRefactoring()
 
         //////////////////////////////////////////////////////////////////////////
         jShaderBindingInstanceArray DirectionalLightShaderBindingInstanceArray;
+
+        // GBuffer Input attachment 추가
+        jShaderBindingInstance* GBufferShaderBindingInstance = RenderFrameContextPtr->SceneRenderTarget->PrepareGBufferShaderBindingInstance();
+        DirectionalLightShaderBindingInstanceArray.Add(GBufferShaderBindingInstance);
         DirectionalLightShaderBindingInstanceArray.Add(View.ViewUniformBufferShaderBindingInstance);
 
         for (int32 i = 0; i < View.Lights.size(); ++i)
@@ -481,9 +518,6 @@ void jRenderer::DeferredLightPass_TodoRefactoring()
                 break;
             }
         }
-
-        jShaderBindingInstance* GBufferShaderBindingInstance = RenderFrameContextPtr->SceneRenderTarget->PrepareGBufferShaderBindingInstance();
-        DirectionalLightShaderBindingInstanceArray.Add(GBufferShaderBindingInstance);
         //////////////////////////////////////////////////////////////////////////
 
         jShaderBindingsLayoutArray DirectionalLightShaderBindingLayoutArray;
@@ -494,7 +528,7 @@ void jRenderer::DeferredLightPass_TodoRefactoring()
 
         // Directional light create pipeline
         jPipelineStateInfo_Vulkan* DirectionalLightPSO = (jPipelineStateInfo_Vulkan*)g_rhi->CreatePipelineStateInfo(&PipelineStateFixed, DirectionalLightShader
-            , FullScreenQuadVertexBufferArray, DeferredLightingRenderPass, DirectionalLightShaderBindingLayoutArray, nullptr);
+            , FullScreenQuadVertexBufferArray, InRenderPass, DirectionalLightShaderBindingLayoutArray, nullptr, SubpassIndex);
 
         //////////////////////////////////////////////////////////////////////////
         // Point light create pipeline
@@ -526,9 +560,9 @@ void jRenderer::DeferredLightPass_TodoRefactoring()
 
         jShaderBindingInstanceArray PointLightShaderBindingInstanceArray;
         // ShaderBindingInstanceArray 에 필요한 내용을 여기 추가하자
+        PointLightShaderBindingInstanceArray.Add(GBufferShaderBindingInstance);
         PointLightShaderBindingInstanceArray.Add(View.ViewUniformBufferShaderBindingInstance);
         PointLightShaderBindingInstanceArray.Add(View.Lights[PointLightIndex].ShaderBindingInstance);
-        PointLightShaderBindingInstanceArray.Add(GBufferShaderBindingInstance);
 
         jShaderBindingsLayoutArray PointLightShaderBindingLayoutArray;
         for (int32 i = 0; i < PointLightShaderBindingInstanceArray.NumOfData; ++i)
@@ -554,7 +588,7 @@ void jRenderer::DeferredLightPass_TodoRefactoring()
             , jViewport(0.0f, 0.0f, (float)RTWidth, (float)RTHeight), jScissor(0, 0, RTWidth, RTHeight), gOptions.UseVRS);
 
         jPipelineStateInfo_Vulkan* PointLightPSO = (jPipelineStateInfo_Vulkan*)g_rhi->CreatePipelineStateInfo(&PointLightPipelineStateFixed, PointLightShader
-            , PointLightSphereVertexBufferArray, DeferredLightingRenderPass, PointLightShaderBindingLayoutArray, PointLightPushConstantPtr.get());
+            , PointLightSphereVertexBufferArray, InRenderPass, PointLightShaderBindingLayoutArray, PointLightPushConstantPtr.get(), SubpassIndex);
         //////////////////////////////////////////////////////////////////////////
 
         //////////////////////////////////////////////////////////////////////////
@@ -586,9 +620,9 @@ void jRenderer::DeferredLightPass_TodoRefactoring()
         SpotLightSphereVertexBufferArray.Add(SpotLightUIQuad->RenderObject->VertexBuffer);
 
         jShaderBindingInstanceArray SpotLightShaderBindingInstanceArray;
+        SpotLightShaderBindingInstanceArray.Add(GBufferShaderBindingInstance);
         SpotLightShaderBindingInstanceArray.Add(View.ViewUniformBufferShaderBindingInstance);
         SpotLightShaderBindingInstanceArray.Add(View.Lights[SpotLightIndex].ShaderBindingInstance);
-        SpotLightShaderBindingInstanceArray.Add(GBufferShaderBindingInstance);
 
         jShaderBindingsLayoutArray SpotLightShaderBindingLayoutArray;
         for (int32 i = 0; i < SpotLightShaderBindingInstanceArray.NumOfData; ++i)
@@ -628,10 +662,10 @@ void jRenderer::DeferredLightPass_TodoRefactoring()
             , jViewport(0.0f, 0.0f, (float)RTWidth, (float)RTHeight), jScissor(0, 0, RTWidth, RTHeight), gOptions.UseVRS);
 
         jPipelineStateInfo_Vulkan* SpotLightPSO = (jPipelineStateInfo_Vulkan*)g_rhi->CreatePipelineStateInfo(&SpotLightPipelineStateFixed, SpotLightShader
-            , SpotLightSphereVertexBufferArray, DeferredLightingRenderPass, SpotLightShaderBindingLayoutArray, SpotLightPushConstantPtr.get());
+            , SpotLightSphereVertexBufferArray, InRenderPass, SpotLightShaderBindingLayoutArray, SpotLightPushConstantPtr.get(), SubpassIndex);
         //////////////////////////////////////////////////////////////////////////
 
-        if (DeferredLightingRenderPass && DeferredLightingRenderPass->BeginRenderPass(RenderFrameContextPtr->CommandBuffer))
+        //if (DeferredLightingRenderPass && DeferredLightingRenderPass->BeginRenderPass(RenderFrameContextPtr->CommandBuffer))
         {
             //////////////////////////////////////////////////////////////////////////
             // Directional light
@@ -692,7 +726,7 @@ void jRenderer::DeferredLightPass_TodoRefactoring()
             SpotLightUIQuad->RenderObject->Draw(RenderFrameContextPtr, 0, -1, 1);
             //////////////////////////////////////////////////////////////////////////
 
-            DeferredLightingRenderPass->EndRenderPass();
+            //DeferredLightingRenderPass->EndRenderPass();
         }
     }
 }

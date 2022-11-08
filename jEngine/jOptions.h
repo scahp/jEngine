@@ -7,7 +7,7 @@ struct jOptions
     bool ShowVRSArea = false;
     bool ShowGrid = false;
     bool UseWaveIntrinsics = false;
-    bool UseDeferredRenderer = false;
+    bool UseDeferredRenderer = true;
     Vector CameraPos = Vector::ZeroVector;
 };
 

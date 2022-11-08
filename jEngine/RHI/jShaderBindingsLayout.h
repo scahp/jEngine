@@ -65,6 +65,8 @@ struct jShaderBinding
         , const EShaderAccessStageFlag accessStageFlags, const jShaderBindingResource* InResource = nullptr)
         : BindingPoint(bindingPoint), BindingType(bindingType), AccessStageFlags(accessStageFlags), Resource(InResource)
     {
+        check(EShaderBindingType::SUBPASS_INPUT_ATTACHMENT != bindingType || accessStageFlags == EShaderAccessStageFlag::FRAGMENT);        // SubpassInputAttachment must have the stageflag 0.
+
         GetHash();
     }
 

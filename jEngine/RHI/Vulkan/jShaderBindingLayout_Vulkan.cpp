@@ -199,7 +199,6 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(int32 InIndex, const jShaderBin
     }
     case EShaderBindingType::TEXTURE_SAMPLER_SRV:
     case EShaderBindingType::TEXTURE_SRV:
-    case EShaderBindingType::SUBPASS_INPUT_ATTACHMENT:
     {
         const jTextureResource* tbor = reinterpret_cast<const jTextureResource*>(InShaderBinding->Resource);
         if (ensure(tbor && tbor->Texture))
@@ -212,6 +211,18 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(int32 InIndex, const jShaderBin
                 imageInfo.sampler = (VkSampler)tbor->SamplerState->GetHandle();
             if (!imageInfo.sampler)
                 imageInfo.sampler = jTexture_Vulkan::CreateDefaultSamplerState();		// todo 수정 필요, 텍스쳐를 어떻게 바인드 해야할지 고민 필요
+            check(imageInfo.imageView);
+        }
+        break;
+    }
+    case EShaderBindingType::SUBPASS_INPUT_ATTACHMENT:
+    {
+        const jTextureResource* tbor = reinterpret_cast<const jTextureResource*>(InShaderBinding->Resource);
+        if (ensure(tbor && tbor->Texture))
+        {
+            VkDescriptorImageInfo& imageInfo = WriteDescriptorInfos[InIndex].ImageInfo;
+            imageInfo.imageLayout = (tbor->Texture->IsDepthFormat() ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            imageInfo.imageView = (VkImageView)tbor->Texture->GetViewHandle();
             check(imageInfo.imageView);
         }
         break;

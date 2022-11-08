@@ -17,13 +17,13 @@ size_t jPipelineStateInfo::GetHash() const
     }
 
     Hash ^= Shader->ShaderInfo.GetHash();
-
     Hash ^= ShaderBindingLayoutArray.GetHash();
 
     if (PushConstant)
     {
         Hash ^= PushConstant->GetHash();
-    }    
+    }
+    Hash ^= SubpassIndex;
 
     return Hash;
 }

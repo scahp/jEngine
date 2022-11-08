@@ -242,20 +242,23 @@ void* jPipelineStateInfo_Vulkan::CreateGraphicsPipelineState()
 
     // 1). 기존과 새로운 값을 섞어서 최종색을 만들어낸다.
     // 사용하는 ColorAttachment 의 숫자를 계산
-    int32 ColorAttachmentCount = 0;
-    for (int32 i = 0; i < (int32)RenderPass->RenderPassInfo.Attachments.size(); ++i)
+    int32 ColorAttachmentCountInSubpass = 0;
+    check(RenderPass->RenderPassInfo.Subpasses.size() > SubpassIndex);
+    const jSubpass& SelectedSubpass = RenderPass->RenderPassInfo.Subpasses[SubpassIndex];
+    for (int32 i = 0; i < (int32)SelectedSubpass.OutputColorAttachments.size(); ++i)
     {
-        const bool IsColorAttachment = !RenderPass->RenderPassInfo.Attachments[i].IsDepthAttachment() &&
-            !RenderPass->RenderPassInfo.Attachments[i].IsResolveAttachment();
+        const int32 AttchmentIndex = SelectedSubpass.OutputColorAttachments[i];
+        const bool IsColorAttachment = !RenderPass->RenderPassInfo.Attachments[AttchmentIndex].IsDepthAttachment() &&
+            !RenderPass->RenderPassInfo.Attachments[AttchmentIndex].IsResolveAttachment();
         if (IsColorAttachment)
-            ++ColorAttachmentCount;
+            ++ColorAttachmentCountInSubpass;
     }
     // todo : 모든 ColorAttachment 에 동일한 ColorBlend 를 설정하는데 개별 설정하는 것이 필요하면 작업해야 함
     std::vector<VkPipelineColorBlendAttachmentState> ColorBlendAttachmentStates;
-    if (ColorAttachmentCount > 1)
+    if (ColorAttachmentCountInSubpass > 1)
     {
-        ColorBlendAttachmentStates.resize(ColorAttachmentCount, ((jBlendingStateInfo_Vulakn*)PipelineStateFixed->BlendingState)->ColorBlendAttachmentInfo);
-        colorBlending.attachmentCount = ColorAttachmentCount;
+        ColorBlendAttachmentStates.resize(ColorAttachmentCountInSubpass, ((jBlendingStateInfo_Vulakn*)PipelineStateFixed->BlendingState)->ColorBlendAttachmentInfo);
+        colorBlending.attachmentCount = ColorAttachmentCountInSubpass;
         colorBlending.pAttachments = &ColorBlendAttachmentStates[0];
     }
     else
@@ -306,7 +309,7 @@ void* jPipelineStateInfo_Vulkan::CreateGraphicsPipelineState()
     pipelineInfo.pDynamicState = nullptr;			// Optional
     pipelineInfo.layout = vkPipelineLayout;
     pipelineInfo.renderPass = (VkRenderPass)RenderPass->GetRenderPass();
-    pipelineInfo.subpass = 0;		// index of subpass
+    pipelineInfo.subpass = SubpassIndex;		// index of subpass
 
     // Pipeline을 상속받을 수 있는데, 아래와 같은 장점이 있다.
     // 1). 공통된 내용이 많으면 파이프라인 설정이 저렴하다.

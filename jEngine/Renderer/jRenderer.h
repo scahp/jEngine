@@ -45,7 +45,7 @@ public:
     virtual void ShadowPass();
     virtual void OpaquePass();
 
-    void DeferredLightPass_TodoRefactoring();
+    void DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass);
 
     virtual void TranslucentPass();
     virtual void PostProcess();

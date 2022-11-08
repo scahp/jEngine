@@ -184,13 +184,13 @@ void jCamera::GetRectInScreenSpace(Vector& OutPosMin, Vector& OutPosMax, const M
     
     // Min XY
     OutPosMin = Max(OutPosMin, Vector(-1.0f, -1.0f, -1.0f));
-    OutPosMin.x = (OutPosMin.x * 0.5 + 0.5) * InScreenSize.x;
-    OutPosMin.y = (OutPosMin.y * 0.5 + 0.5) * InScreenSize.y;
+    OutPosMin.x = (OutPosMin.x * 0.5f + 0.5f) * InScreenSize.x;
+    OutPosMin.y = (OutPosMin.y * 0.5f + 0.5f) * InScreenSize.y;
 
     // Max XY
     OutPosMax = Min(OutPosMax, Vector(1.0f, 1.0f, 1.0f));
-    OutPosMax.x = (OutPosMax.x * 0.5 + 0.5) * InScreenSize.x;
-    OutPosMax.y = (OutPosMax.y * 0.5 + 0.5) * InScreenSize.y;
+    OutPosMax.x = (OutPosMax.x * 0.5f + 0.5f) * InScreenSize.x;
+    OutPosMax.y = (OutPosMax.y * 0.5f + 0.5f) * InScreenSize.y;
 }
 
 //void jCamera::AddLight(jLight* light)

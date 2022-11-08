@@ -399,7 +399,7 @@ public:
 	virtual jBlendingStateInfo* CreateBlendingState(const jBlendingStateInfo& initializer) const { return nullptr; }
 
 	virtual jPipelineStateInfo* CreatePipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader
-		, const jVertexBufferArray& InVertexBufferArray, const jRenderPass* renderPass, const jShaderBindingsLayoutArray& InShaderBindingArray, const jPushConstant* pushConstant) const { return nullptr; }
+		, const jVertexBufferArray& InVertexBufferArray, const jRenderPass* renderPass, const jShaderBindingsLayoutArray& InShaderBindingArray, const jPushConstant* InPushConstant, int32 InSubpassIndex) const { return nullptr; }
 
 	virtual jPipelineStateInfo* CreateComputePipelineStateInfo(const jShader* shader, const jShaderBindingsLayoutArray& InShaderBindingArray, const jPushConstant* pushConstant) const { return nullptr; }
 
@@ -438,6 +438,8 @@ public:
     virtual jQueryPool* GetQueryOcclusionPool() const { return nullptr; }
 	virtual void BindShadingRateImage(jCommandBuffer* commandBuffer, jTexture* vrstexture) const {}
 	virtual jMemoryPool* GetMemoryPool() const { return nullptr; }
+
+	virtual void NextSubpass(const jCommandBuffer* commandBuffer) const {}
 };
 
 // Not thred safe

@@ -947,8 +947,10 @@ std::shared_ptr<jRenderTarget> jRHI_Vulkan::CreateRenderTarget(const jRenderTarg
 	const VkFormat textureFormat = GetVulkanTextureFormat(info.Format);
 	const bool hasDepthAttachment = IsDepthFormat(info.Format);
 
-	const VkImageUsageFlags ImageUsageFlag = (hasDepthAttachment ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT)
-		| VK_IMAGE_USAGE_SAMPLED_BIT;
+	const VkImageUsageFlags ImageUsageFlag = 
+		(hasDepthAttachment ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT)
+		| VK_IMAGE_USAGE_SAMPLED_BIT 
+		| (info.IsUseAsSubpassInput ? VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT : 0);
 	const VkImageAspectFlags ImageAspectFlag = hasDepthAttachment ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
 
 	// VK_IMAGE_TILING_LINEAR 설정시 크래시 나서 VK_IMAGE_TILING_OPTIMAL 로 함.
@@ -1646,10 +1648,10 @@ bool jRHI_Vulkan::TransitionImageLayoutImmediate(jTexture* texture, EImageLayout
 	return false;
 }
 
-jPipelineStateInfo* jRHI_Vulkan::CreatePipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader, const jVertexBufferArray& InVertexBufferArray
-	, const jRenderPass* renderPass, const jShaderBindingsLayoutArray& InShaderBindingArray, const jPushConstant* pushConstant) const
+jPipelineStateInfo* jRHI_Vulkan::CreatePipelineStateInfo(const jPipelineStateFixedInfo* InPipelineStateFixed, const jShader* InShader, const jVertexBufferArray& InVertexBufferArray
+	, const jRenderPass* InRenderPass, const jShaderBindingsLayoutArray& InShaderBindingArray, const jPushConstant* InPushConstant, int32 InSubpassIndex) const
 {
-	return PipelineStatePool.GetOrCreateMove(std::move(jPipelineStateInfo(pipelineStateFixed, shader, InVertexBufferArray, renderPass, InShaderBindingArray, pushConstant)));
+	return PipelineStatePool.GetOrCreateMove(std::move(jPipelineStateInfo(InPipelineStateFixed, InShader, InVertexBufferArray, InRenderPass, InShaderBindingArray, InPushConstant, InSubpassIndex)));
 }
 
 jPipelineStateInfo* jRHI_Vulkan::CreateComputePipelineStateInfo(const jShader* shader, const jShaderBindingsLayoutArray& InShaderBindingArray
@@ -1698,6 +1700,12 @@ void jRHI_Vulkan::BindShadingRateImage(jCommandBuffer* commandBuffer, jTexture* 
 	check(commandBuffer);
     g_rhi_vk->vkCmdBindShadingRateImageNV((VkCommandBuffer)commandBuffer->GetHandle()
         , (vrstexture ? (VkImageView)vrstexture->GetViewHandle() : nullptr), VK_IMAGE_LAYOUT_SHADING_RATE_OPTIMAL_NV);
+}
+
+void jRHI_Vulkan::NextSubpass(const jCommandBuffer* commandBuffer) const
+{
+	check(commandBuffer);
+	vkCmdNextSubpass((VkCommandBuffer)commandBuffer->GetHandle(), VK_SUBPASS_CONTENTS_INLINE);
 }
 
 jTexture* jRHI_Vulkan::CreateSampleVRSTexture()

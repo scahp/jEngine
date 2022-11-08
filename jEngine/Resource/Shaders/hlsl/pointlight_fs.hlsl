@@ -30,20 +30,25 @@ struct jPointLightUniformBufferData
     float4x4 ShadowVP[6];
 };
 
-cbuffer ViewParam : register(b0, space0) { ViewUniformBuffer ViewParam; }
+// space 0
+[[vk::input_attachment_index(0)]] [[vk::binding(0)]] SubpassInput GBuffer0;
+[[vk::input_attachment_index(1)]] [[vk::binding(1)]] SubpassInput GBuffer1;
+[[vk::input_attachment_index(2)]] [[vk::binding(2)]] SubpassInput GBuffer2;
 
-cbuffer PointLight : register(b0, space1) { jPointLightUniformBufferData PointLight; }
-TextureCube PointLightShadowCubeMap : register(t1, space1);
-SamplerComparisonState PointLightShadowMapSampler : register(s1, space1);
+cbuffer ViewParam : register(b0, space1) { ViewUniformBuffer ViewParam; }
 
-Texture2D GBuffer0 : register(t0, space2);
-SamplerState GBuffer0SamplerState : register(s0, space2);
+cbuffer PointLight : register(b0, space2) { jPointLightUniformBufferData PointLight; }
+TextureCube PointLightShadowCubeMap : register(t1, space2);
+SamplerComparisonState PointLightShadowMapSampler : register(s1, space2);
 
-Texture2D GBuffer1 : register(t1, space2);
-SamplerState GBuffer1SamplerState : register(s1, space2);
-
-Texture2D GBuffer2 : register(t2, space2);
-SamplerState GBuffer2SamplerState : register(s2, space2);
+//Texture2D GBuffer0 : register(t0, space2);
+//SamplerState GBuffer0SamplerState : register(s0, space2);
+//
+//Texture2D GBuffer1 : register(t1, space2);
+//SamplerState GBuffer1SamplerState : register(s1, space2);
+//
+//Texture2D GBuffer2 : register(t2, space2);
+//SamplerState GBuffer2SamplerState : register(s2, space2);
 
 float WindowingFunction(float value, float maxValue)
 {
@@ -84,9 +89,9 @@ float4 main(VSOutput input) : SV_TARGET
 
     float4 color = 0;
 
-    float3 WorldPos = GBuffer0.Sample(GBuffer0SamplerState, UV).xyz;
-    float3 WorldNormal = GBuffer1.Sample(GBuffer1SamplerState, UV).xyz;
-    float3 Albedo = GBuffer2.Sample(GBuffer2SamplerState, UV).xyz;
+    float3 WorldPos = GBuffer0.SubpassLoad().xyz;
+    float3 WorldNormal = GBuffer1.SubpassLoad().xyz;
+    float3 Albedo = GBuffer2.SubpassLoad().xyz;
 
     float3 PointLightLit = 0.0f;
     float3 ViewWorld = normalize(ViewParam.EyeWorld - WorldPos);

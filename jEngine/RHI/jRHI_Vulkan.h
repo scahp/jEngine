@@ -159,8 +159,8 @@ public:
     virtual void ReleaseQueryTime(jQuery* queryTime) const override;
 	virtual std::shared_ptr<jRenderFrameContext> BeginRenderFrame() override;
 	virtual void EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr) override;
-	jPipelineStateInfo* CreatePipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader, const jVertexBufferArray& InVertexBufferArray
-		, const jRenderPass* renderPass, const jShaderBindingsLayoutArray& InShaderBindingArray, const jPushConstant* pushConstant) const override;
+	jPipelineStateInfo* CreatePipelineStateInfo(const jPipelineStateFixedInfo* InPipelineStateFixed, const jShader* InShader, const jVertexBufferArray& InVertexBufferArray
+		, const jRenderPass* InRenderPass, const jShaderBindingsLayoutArray& InShaderBindingArray, const jPushConstant* InPushConstant, int32 InSubpassIndex) const override;
 	virtual jPipelineStateInfo* CreateComputePipelineStateInfo(const jShader* shader, const jShaderBindingsLayoutArray& InShaderBindingArray, const jPushConstant* pushConstant) const override;
 
 	virtual jRenderPass* GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const Vector2i& offset, const Vector2i& extent) const override;
@@ -187,6 +187,8 @@ public:
 	virtual void BindShadingRateImage(jCommandBuffer* commandBuffer, jTexture* vrstexture) const override;
 	
 	virtual jMemoryPool* GetMemoryPool() const override { return MemoryPool; }
+
+	virtual void NextSubpass(const jCommandBuffer* commandBuffer) const override;
 
 	// Temporary VRS Texture
 	jTexture* CreateSampleVRSTexture();

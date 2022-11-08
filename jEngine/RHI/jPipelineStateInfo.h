@@ -413,26 +413,27 @@ struct jRenderFrameContext;
 struct jPipelineStateInfo
 {
     jPipelineStateInfo() = default;
-    jPipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader, const jVertexBufferArray& InVertexBufferArray
-        , const jRenderPass* renderPass, const jShaderBindingsLayoutArray& InShaderBindingLayoutArray, const jPushConstant* pushConstant)
-        : PipelineStateFixed(pipelineStateFixed), Shader(shader), VertexBufferArray(InVertexBufferArray), RenderPass(renderPass), ShaderBindingLayoutArray(InShaderBindingLayoutArray), PushConstant(pushConstant)
+    jPipelineStateInfo(const jPipelineStateFixedInfo* InPipelineStateFixed, const jShader* InShader, const jVertexBufferArray& InVertexBufferArray
+        , const jRenderPass* InRenderPass, const jShaderBindingsLayoutArray& InShaderBindingLayoutArray, const jPushConstant* InPushConstant = nullptr, int32 InSubpassIndex = 0)
+        : PipelineStateFixed(InPipelineStateFixed), Shader(InShader), VertexBufferArray(InVertexBufferArray), RenderPass(InRenderPass), ShaderBindingLayoutArray(InShaderBindingLayoutArray)
+        , PushConstant(InPushConstant), SubpassIndex(InSubpassIndex)
     {
         IsGraphics = true;
     }
-    jPipelineStateInfo(const jShader* shader, const jShaderBindingsLayoutArray& InShaderBindingLayoutArray, const jPushConstant* pushConstant)
-        : Shader(shader), ShaderBindingLayoutArray(InShaderBindingLayoutArray), PushConstant(pushConstant)
+    jPipelineStateInfo(const jShader* InShader, const jShaderBindingsLayoutArray& InShaderBindingLayoutArray, const jPushConstant* InPushConstant = nullptr, int32 InSubpassIndex = 0)
+        : Shader(InShader), ShaderBindingLayoutArray(InShaderBindingLayoutArray), PushConstant(InPushConstant), SubpassIndex(InSubpassIndex)
     {
         IsGraphics = false;
     }
-    jPipelineStateInfo(const jPipelineStateInfo& pipelineState)
-        : PipelineStateFixed(pipelineState.PipelineStateFixed), Shader(pipelineState.Shader), IsGraphics(pipelineState.IsGraphics)
-        , VertexBufferArray(pipelineState.VertexBufferArray), RenderPass(pipelineState.RenderPass), ShaderBindingLayoutArray(pipelineState.ShaderBindingLayoutArray)
-        , PushConstant(pipelineState.PushConstant), Hash(pipelineState.Hash)
+    jPipelineStateInfo(const jPipelineStateInfo& InPipelineState)
+        : PipelineStateFixed(InPipelineState.PipelineStateFixed), Shader(InPipelineState.Shader), IsGraphics(InPipelineState.IsGraphics)
+        , VertexBufferArray(InPipelineState.VertexBufferArray), RenderPass(InPipelineState.RenderPass), ShaderBindingLayoutArray(InPipelineState.ShaderBindingLayoutArray)
+        , PushConstant(InPipelineState.PushConstant), Hash(InPipelineState.Hash), SubpassIndex(InPipelineState.SubpassIndex)
     {}
-    jPipelineStateInfo(jPipelineStateInfo&& pipelineState) noexcept
-        : PipelineStateFixed(pipelineState.PipelineStateFixed), Shader(pipelineState.Shader), IsGraphics(pipelineState.IsGraphics)
-        , VertexBufferArray(pipelineState.VertexBufferArray), RenderPass(pipelineState.RenderPass), ShaderBindingLayoutArray(pipelineState.ShaderBindingLayoutArray)
-        , PushConstant(pipelineState.PushConstant), Hash(pipelineState.Hash)
+    jPipelineStateInfo(jPipelineStateInfo&& InPipelineState) noexcept
+        : PipelineStateFixed(InPipelineState.PipelineStateFixed), Shader(InPipelineState.Shader), IsGraphics(InPipelineState.IsGraphics)
+        , VertexBufferArray(InPipelineState.VertexBufferArray), RenderPass(InPipelineState.RenderPass), ShaderBindingLayoutArray(InPipelineState.ShaderBindingLayoutArray)
+        , PushConstant(InPipelineState.PushConstant), Hash(InPipelineState.Hash), SubpassIndex(InPipelineState.SubpassIndex)
     {}
     virtual ~jPipelineStateInfo() {}
 
@@ -447,6 +448,7 @@ struct jPipelineStateInfo
     jShaderBindingsLayoutArray ShaderBindingLayoutArray;
     const jPushConstant* PushConstant;
     const jPipelineStateFixedInfo* PipelineStateFixed = nullptr;
+    int32 SubpassIndex = 0;
 
     virtual void Initialize() {}
     virtual void* GetHandle() const { return nullptr; }

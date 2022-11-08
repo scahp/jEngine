@@ -79,6 +79,14 @@ struct jAttachment
 
 struct jSubpass
 {
+    void Initialize(int32 InSourceSubpassIndex, int32 InDestSubpassIndex, EPipelineStageMask InAttachmentProducePipelineBit, EPipelineStageMask InAttachmentComsumePipelineBit)
+    {
+        SourceSubpassIndex = InSourceSubpassIndex;
+        DestSubpassIndex = InDestSubpassIndex;
+        AttachmentProducePipelineBit = InAttachmentProducePipelineBit;
+        AttachmentComsumePipelineBit = InAttachmentComsumePipelineBit;
+    }
+
     std::vector<int32> InputAttachments;
 
     std::vector<int32> OutputColorAttachments;
@@ -90,8 +98,8 @@ struct jSubpass
     int32 DestSubpassIndex = -1;
 
     // Default is the most strong pipeline stage mask
-    EPipelineStageMask AttachmentProducePipelineBit = EPipelineStageMask::BOTTOM_OF_PIPE_BIT;
-    EPipelineStageMask AttachmentComsumePipelineBit = EPipelineStageMask::TOP_OF_PIPE_BIT;
+    EPipelineStageMask AttachmentProducePipelineBit = EPipelineStageMask::COLOR_ATTACHMENT_OUTPUT_BIT;      // The pipeline which attachments would use for this subpass
+    EPipelineStageMask AttachmentComsumePipelineBit = EPipelineStageMask::FRAGMENT_SHADER_BIT;              // The pipeline which attachments would use for next subapss
 
     bool IsSubpassForExecuteInOrder() const
     {
