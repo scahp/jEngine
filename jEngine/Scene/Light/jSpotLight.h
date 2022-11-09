@@ -54,9 +54,11 @@ public:
     virtual void Update(float deltaTime) override;
     virtual IUniformBufferBlock* GetUniformBufferBlock() const override { return LightDataUniformBlock; }
     virtual jCamera* GetLightCamra(int index = 0) const;
+    virtual const Matrix* GetLightWorldMatrix() const override;
     virtual jShaderBindingInstance* PrepareShaderBindingInstance(jTexture* InShadowMap) const override;
 
     FORCEINLINE const jSpotLightUniformBufferData& GetLightData() const { return LightData; }
 
     jCamera* Camera = nullptr;
+    Matrix LightWorldMatrix;
 };

@@ -59,12 +59,21 @@ jShaderBindingInstance* jSpotLight::PrepareShaderBindingInstance(jTexture* InSha
     return g_rhi->CreateShaderBindingInstance(ShaderBindingArray);
 }
 
+const Matrix* jSpotLight::GetLightWorldMatrix() const
+{
+    return &LightWorldMatrix;
+}
+
 void jSpotLight::Update(float deltaTime)
 {
     check(Camera);
     Camera->SetEulerAngle(Vector::GetEulerAngleFrom(LightData.Direction));
     Camera->UpdateCamera();
-    LightData.ShadowVP = Camera->Projection * Camera->View;
 
+    // Prepare light data for uniform buffer
+    LightData.ShadowVP = Camera->Projection * Camera->View;
     LightDataUniformBlock->UpdateBufferData(&LightData, sizeof(LightData));
+
+    // Prepare light world matrix for push constant
+    LightWorldMatrix = Matrix::MakeTranlsateAndScale(LightData.Position, Vector(LightData.MaxDistance));
 }

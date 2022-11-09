@@ -96,6 +96,9 @@ public:
 
 	virtual const jCamera* GetLightCamra(int32 index = 0) const { return nullptr; }
 	virtual const jTexture* GetShadowMap(int32 index = 0) const { return nullptr; };
+	
+	// Light world matrix by using light's Position and MaxDistance
+	virtual const Matrix* GetLightWorldMatrix() const { return nullptr; }
 
 	const ELightType Type = ELightType::MAX;
 	jObject* LightDebugObject = nullptr;

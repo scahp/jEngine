@@ -450,6 +450,9 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
         }
     }
 
+    std::vector<jDrawCommand> LightPasses;
+    LightPasses.resize(View.Lights.size());
+
     {
         const int32 SubpassIndex = (!UseForwardRenderer && gOptions.UseSubpass) ? 1 : 0;
 
@@ -461,12 +464,32 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
         const int32 RTWidth = RenderFrameContextPtr->SceneRenderTarget->ColorPtr->Info.Width;
         const int32 RTHeight = RenderFrameContextPtr->SceneRenderTarget->ColorPtr->Info.Height;
 
-        jPipelineStateFixedInfo PipelineStateFixed = jPipelineStateFixedInfo(RasterizationState, MultisampleState, DepthStencilState, BlendingState
+        jPipelineStateFixedInfo DirectionalLightPipelineStateFixed = jPipelineStateFixedInfo(RasterizationState, MultisampleState, DepthStencilState, BlendingState
             , jViewport(0.0f, 0.0f, (float)RTWidth, (float)RTHeight), jScissor(0, 0, RTWidth, RTHeight), gOptions.UseVRS);
 
         //////////////////////////////////////////////////////////////////////////
         const Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
         const Vector2 ClearDepth = Vector2(1.0f, 0.0f);
+
+        // WorldMatrix 는 Push Constant 로 전달하는 것으로 하자
+        struct jPointLightPushConstant
+        {
+            Matrix MVP;
+        };
+        static std::shared_ptr<TPushConstant<jPointLightPushConstant>> PointLightPushConstantPtr = std::make_shared<TPushConstant<jPointLightPushConstant>>(
+            jPointLightPushConstant(), jPushConstantRange(EShaderAccessStageFlag::ALL, 0, sizeof(jPointLightPushConstant)));
+
+        // Rect 정보는 Push Constant 로 전달하는 것으로 하자
+        struct jSpotLightPushConstant
+        {
+            Vector2 Pos;
+            Vector2 Size;
+            Vector2 PixelSize;
+            float Depth;
+            float padding;
+        };
+        static std::shared_ptr<TPushConstant<jSpotLightPushConstant>> SpotLightPushConstantPtr = std::make_shared<TPushConstant<jSpotLightPushConstant>>(
+            jSpotLightPushConstant(), jPushConstantRange(EShaderAccessStageFlag::ALL, 0, sizeof(jSpotLightPushConstant)));
 
         if (!gOptions.UseSubpass)
         {
@@ -514,53 +537,13 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
 
         static jFullscreenQuadPrimitive* FullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
 
-        jVertexBufferArray FullScreenQuadVertexBufferArray;
-        FullScreenQuadVertexBufferArray.Add(FullscreenPrimitive->RenderObject->VertexBuffer);
-
-        //////////////////////////////////////////////////////////////////////////
-        jShaderBindingInstanceArray DirectionalLightShaderBindingInstanceArray;
-
         // GBuffer Input attachment 추가
         jShaderBindingInstance* GBufferShaderBindingInstance 
             = RenderFrameContextPtr->SceneRenderTarget->PrepareGBufferShaderBindingInstance(gOptions.UseSubpass);
-        DirectionalLightShaderBindingInstanceArray.Add(GBufferShaderBindingInstance);
-        DirectionalLightShaderBindingInstanceArray.Add(View.ViewUniformBufferShaderBindingInstance);
-
-        for (int32 i = 0; i < View.Lights.size(); ++i)
-        {
-            if (View.Lights[i].Light->Type == ELightType::DIRECTIONAL)
-            {
-                DirectionalLightShaderBindingInstanceArray.Add(View.Lights[i].ShaderBindingInstance);
-                break;
-            }
-        }
-        //////////////////////////////////////////////////////////////////////////
-
-        jShaderBindingsLayoutArray DirectionalLightShaderBindingLayoutArray;
-        for (int32 i = 0; i < DirectionalLightShaderBindingInstanceArray.NumOfData; ++i)
-        {
-            DirectionalLightShaderBindingLayoutArray.Add(DirectionalLightShaderBindingInstanceArray[i]->ShaderBindingsLayouts);
-        }
-
-        // Directional light create pipeline
-        jPipelineStateInfo_Vulkan* DirectionalLightPSO = (jPipelineStateInfo_Vulkan*)g_rhi->CreatePipelineStateInfo(&PipelineStateFixed, DirectionalLightShader
-            , FullScreenQuadVertexBufferArray, InRenderPass, DirectionalLightShaderBindingLayoutArray, nullptr, SubpassIndex);
 
         //////////////////////////////////////////////////////////////////////////
         // Point light create pipeline
         static auto PointLightSphere = jPrimitiveUtil::CreateSphere(Vector::ZeroVector, 1.0, 16, Vector(1.0f), Vector4::OneVector);
-
-        int32 PointLightIndex = 0;
-        jPointLight* PointLight = nullptr;
-        for (int32 i = 0; i < View.Lights.size(); ++i)
-        {
-            if (View.Lights[i].Light->Type == ELightType::POINT)
-            {
-                PointLight = (jPointLight*)View.Lights[i].Light;
-                PointLightIndex = i;
-                break;
-            }
-        }
 
         jShader* PointLightShader = nullptr;
         {
@@ -573,57 +556,17 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
             PointLightShader = g_rhi->CreateShader(shaderInfo);
         }
 
-        jVertexBufferArray PointLightSphereVertexBufferArray;
-        PointLightSphereVertexBufferArray.Add(PointLightSphere->RenderObject->VertexBuffer);
-
-        jShaderBindingInstanceArray PointLightShaderBindingInstanceArray;
-        // ShaderBindingInstanceArray 에 필요한 내용을 여기 추가하자
-        PointLightShaderBindingInstanceArray.Add(GBufferShaderBindingInstance);
-        PointLightShaderBindingInstanceArray.Add(View.ViewUniformBufferShaderBindingInstance);
-        PointLightShaderBindingInstanceArray.Add(View.Lights[PointLightIndex].ShaderBindingInstance);
-
-        jShaderBindingsLayoutArray PointLightShaderBindingLayoutArray;
-        for (int32 i = 0; i < PointLightShaderBindingInstanceArray.NumOfData; ++i)
-        {
-            PointLightShaderBindingLayoutArray.Add(PointLightShaderBindingInstanceArray[i]->ShaderBindingsLayouts);
-        }
-
-        // WorldMatrix 는 Push Constant 로 전달하는 것으로 하자
-        struct jPointLightPushConstant
-        {
-            Matrix MVP;
-        };
-        static std::shared_ptr<TPushConstant<jPointLightPushConstant>> PointLightPushConstantPtr = std::make_shared<TPushConstant<jPointLightPushConstant>>(
-            jPointLightPushConstant(), jPushConstantRange(EShaderAccessStageFlag::ALL, 0, sizeof(jPointLightPushConstant)));
-        PointLightPushConstantPtr->Data.MVP = View.Camera->Projection * View.Camera->View
-            * Matrix::MakeTranslate(PointLight->LightData.Position) * Matrix::MakeScale(Vector(PointLight->LightData.MaxDistance));
-
         // PointLight 의 경우 카메라에서 가장 먼쪽에 있는 Mesh 면을 렌더링하고, 그 면 부터 카메라 사이에 있는 공간에 대해서만 라이트를 적용함.
         auto PointLightRasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CW, false, 0.0f, 0.0f, 0.0f, 1.0f, true, false>::Create();
         auto PointLightDepthStencilState = TDepthStencilStateInfo<true, false, ECompareOp::GREATER, false, false, 0.0f, 1.0f>::Create();
 
         jPipelineStateFixedInfo PointLightPipelineStateFixed = jPipelineStateFixedInfo(PointLightRasterizationState, MultisampleState, PointLightDepthStencilState, BlendingState
             , jViewport(0.0f, 0.0f, (float)RTWidth, (float)RTHeight), jScissor(0, 0, RTWidth, RTHeight), gOptions.UseVRS);
-
-        jPipelineStateInfo_Vulkan* PointLightPSO = (jPipelineStateInfo_Vulkan*)g_rhi->CreatePipelineStateInfo(&PointLightPipelineStateFixed, PointLightShader
-            , PointLightSphereVertexBufferArray, InRenderPass, PointLightShaderBindingLayoutArray, PointLightPushConstantPtr.get(), SubpassIndex);
         //////////////////////////////////////////////////////////////////////////
 
         //////////////////////////////////////////////////////////////////////////
         // Spot light create pipeline
         static jUIQuadPrimitive* SpotLightUIQuad = jPrimitiveUtil::CreateUIQuad(Vector2(), Vector2(), nullptr);
-
-        jSpotLight* SpotLight = nullptr;
-        int32 SpotLightIndex = 0;
-        for (int32 i = 0; i < View.Lights.size(); ++i)
-        {
-            if (View.Lights[i].Light->Type == ELightType::SPOT)
-            {
-                SpotLight = (jSpotLight*)View.Lights[i].Light;
-                SpotLightIndex = i;
-                break;
-            }
-        }
 
         jShader* SpotLightShader = nullptr;
         {
@@ -636,54 +579,10 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
             SpotLightShader = g_rhi->CreateShader(shaderInfo);
         }
 
-        jVertexBufferArray SpotLightSphereVertexBufferArray;
-        SpotLightSphereVertexBufferArray.Add(SpotLightUIQuad->RenderObject->VertexBuffer);
-
-        jShaderBindingInstanceArray SpotLightShaderBindingInstanceArray;
-        SpotLightShaderBindingInstanceArray.Add(GBufferShaderBindingInstance);
-        SpotLightShaderBindingInstanceArray.Add(View.ViewUniformBufferShaderBindingInstance);
-        SpotLightShaderBindingInstanceArray.Add(View.Lights[SpotLightIndex].ShaderBindingInstance);
-
-        jShaderBindingsLayoutArray SpotLightShaderBindingLayoutArray;
-        for (int32 i = 0; i < SpotLightShaderBindingInstanceArray.NumOfData; ++i)
-        {
-            SpotLightShaderBindingLayoutArray.Add(SpotLightShaderBindingInstanceArray[i]->ShaderBindingsLayouts);
-        }
-
-        // Rect 정보는 Push Constant 로 전달하는 것으로 하자
-        struct jSpotLightPushConstant
-        {
-            Vector2 Pos;
-            Vector2 Size;
-            Vector2 PixelSize;
-            float Depth;
-            float padding;
-        };
-        static std::shared_ptr<TPushConstant<jSpotLightPushConstant>> SpotLightPushConstantPtr = std::make_shared<TPushConstant<jSpotLightPushConstant>>(
-            jSpotLightPushConstant(), jPushConstantRange(EShaderAccessStageFlag::ALL, 0, sizeof(jSpotLightPushConstant)));
-
-        Vector MinPos;
-        Vector MaxPos;
-        Vector2 ScreenSize;
-        if (SpotLight && SpotLight->GetLightCamra())
-        {
-            ScreenSize.x = (float)RenderFrameContextPtr->SceneRenderTarget->ColorPtr->Info.Width;
-            ScreenSize.y = (float)RenderFrameContextPtr->SceneRenderTarget->ColorPtr->Info.Height;
-            SpotLight->GetLightCamra()->GetRectInScreenSpace(MinPos, MaxPos, View.Camera->GetViewProjectionMatrix(), ScreenSize);
-        }
-        SpotLightPushConstantPtr->Data.Pos = Vector2(MinPos.x, MinPos.y);
-        SpotLightPushConstantPtr->Data.Size = Vector2(MaxPos.x - MinPos.x, MaxPos.y - MinPos.y);
-        SpotLightPushConstantPtr->Data.PixelSize = Vector2(1.0f) / ScreenSize;
-        SpotLightPushConstantPtr->Data.Depth = MaxPos.z;
-
         // SpotLight 의 경우 카메라에서 가장 먼쪽에 있는 Mesh 면을 렌더링하고(Quad 를 렌더링하기 때문에 MaxPos.z 로 컨트롤), 그 면 부터 카메라 사이에 있는 공간에 대해서만 라이트를 적용함.
         auto SpotLightDepthStencilState = TDepthStencilStateInfo<true, false, ECompareOp::GREATER, false, false, 0.0f, 1.0f>::Create();
         jPipelineStateFixedInfo SpotLightPipelineStateFixed = jPipelineStateFixedInfo(RasterizationState, MultisampleState, SpotLightDepthStencilState, BlendingState
             , jViewport(0.0f, 0.0f, (float)RTWidth, (float)RTHeight), jScissor(0, 0, RTWidth, RTHeight), gOptions.UseVRS);
-
-        jPipelineStateInfo_Vulkan* SpotLightPSO = (jPipelineStateInfo_Vulkan*)g_rhi->CreatePipelineStateInfo(&SpotLightPipelineStateFixed, SpotLightShader
-            , SpotLightSphereVertexBufferArray, InRenderPass, SpotLightShaderBindingLayoutArray, SpotLightPushConstantPtr.get(), SubpassIndex);
-        //////////////////////////////////////////////////////////////////////////
 
         if (!gOptions.UseSubpass)
         {
@@ -691,65 +590,95 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
             InRenderPass->BeginRenderPass(RenderFrameContextPtr->CommandBuffer);
         }
 
+        jShaderBindingInstanceArray DirectionalLightShaderBindingInstances;
+        jShaderBindingInstanceArray PointLightShaderBindingInstances;
+        jShaderBindingInstanceArray SpotLightShaderBindingInstances;
         {
-            //////////////////////////////////////////////////////////////////////////
+             //////////////////////////////////////////////////////////////////////////
             // Directional light
-            for (int32 i = 0; i < DirectionalLightShaderBindingInstanceArray.NumOfData; ++i)
-                DirectionalLightShaderBindingInstanceArray[i]->BindGraphics(RenderFrameContextPtr, (VkPipelineLayout)DirectionalLightPSO->GetPipelineLayoutHandle(), i);
-
-            DirectionalLightPSO->Bind(RenderFrameContextPtr);
-
-            FullscreenPrimitive->RenderObject->BindBuffers(RenderFrameContextPtr, false);
-            FullscreenPrimitive->RenderObject->Draw(RenderFrameContextPtr, 0, -1, 1);
-            //////////////////////////////////////////////////////////////////////////
+            DirectionalLightShaderBindingInstances.Add(GBufferShaderBindingInstance);
+            DirectionalLightShaderBindingInstances.Add(View.ViewUniformBufferShaderBindingInstance);
 
             //////////////////////////////////////////////////////////////////////////
             // Point light
-            for (int32 i = 0; i < PointLightShaderBindingInstanceArray.NumOfData; ++i)
-                PointLightShaderBindingInstanceArray[i]->BindGraphics(RenderFrameContextPtr, (VkPipelineLayout)PointLightPSO->GetPipelineLayoutHandle(), i);
-
-            PointLightPSO->Bind(RenderFrameContextPtr);
-
-            if (PointLightPushConstantPtr)
-            {
-                const std::vector<jPushConstantRange>* pushConstantRanges = PointLightPushConstantPtr->GetPushConstantRanges();
-                if (ensure(pushConstantRanges))
-                {
-                    for (const auto& iter : *pushConstantRanges)
-                    {
-                        vkCmdPushConstants((VkCommandBuffer)RenderFrameContextPtr->CommandBuffer->GetHandle(), PointLightPSO->vkPipelineLayout
-                            , GetVulkanShaderAccessFlags(iter.AccessStageFlag), iter.Offset, iter.Size, PointLightPushConstantPtr->GetConstantData());
-                    }
-                }
-            }
-
-            PointLightSphere->RenderObject->BindBuffers(RenderFrameContextPtr, false);
-            PointLightSphere->RenderObject->Draw(RenderFrameContextPtr, 0, -1, 1);
-            //////////////////////////////////////////////////////////////////////////
+            PointLightShaderBindingInstances.Add(GBufferShaderBindingInstance);
+            PointLightShaderBindingInstances.Add(View.ViewUniformBufferShaderBindingInstance);
 
             //////////////////////////////////////////////////////////////////////////
             // Spot light
-            for (int32 i = 0; i < SpotLightShaderBindingInstanceArray.NumOfData; ++i)
-                SpotLightShaderBindingInstanceArray[i]->BindGraphics(RenderFrameContextPtr, (VkPipelineLayout)SpotLightPSO->GetPipelineLayoutHandle(), i);
+            SpotLightShaderBindingInstances.Add(GBufferShaderBindingInstance);
+            SpotLightShaderBindingInstances.Add(View.ViewUniformBufferShaderBindingInstance);
+        }
 
-            SpotLightPSO->Bind(RenderFrameContextPtr);
-
-            if (SpotLightPushConstantPtr)
+        for (int32 i = 0; i < (int32)View.Lights.size(); ++i)
+        {
+            jShaderBindingInstanceArray* SelectedShaderBindingInstanceArray = nullptr;
+            jPipelineStateFixedInfo* SelectedPipelineStateFixedInfo = nullptr;
+            jShader* SelectedShader = nullptr;
+            jRenderObject* SeelctedRenderObject = nullptr;
+            std::shared_ptr<jPushConstant> SelectedPushConstantPtr;
+            switch (View.Lights[i].Light->Type)
             {
-                const std::vector<jPushConstantRange>* pushConstantRanges = SpotLightPushConstantPtr->GetPushConstantRanges();
-                if (ensure(pushConstantRanges))
+            case ELightType::AMBIENT:
+                check(0);
+                break;
+            case ELightType::DIRECTIONAL:
+                SelectedShaderBindingInstanceArray = &DirectionalLightShaderBindingInstances;
+                SelectedPipelineStateFixedInfo = &DirectionalLightPipelineStateFixed;
+                SelectedShader = DirectionalLightShader;
+                SeelctedRenderObject = FullscreenPrimitive->RenderObject;
+                break;
+            case ELightType::POINT:
+            {
+                SelectedShaderBindingInstanceArray = &PointLightShaderBindingInstances;
+                SelectedPipelineStateFixedInfo = &PointLightPipelineStateFixed;
+                SelectedShader = PointLightShader;
+                SelectedPushConstantPtr = PointLightPushConstantPtr;
+                SeelctedRenderObject = PointLightSphere->RenderObject;
+
+                PointLightPushConstantPtr->Data.MVP = View.Camera->Projection * View.Camera->View
+                    * (*View.Lights[i].Light->GetLightWorldMatrix());
+                break;
+            }
+            case ELightType::SPOT:
+            {
+                SelectedShaderBindingInstanceArray = &SpotLightShaderBindingInstances;
+                SelectedPipelineStateFixedInfo = &SpotLightPipelineStateFixed;
+                SelectedShader = SpotLightShader;
+                SelectedPushConstantPtr = SpotLightPushConstantPtr;
+                SeelctedRenderObject = SpotLightUIQuad->RenderObject;
+
+                Vector MinPos;
+                Vector MaxPos;
+                Vector2 ScreenSize;
+                const jLight* SpotLight = View.Lights[i].Light;
+                if (SpotLight && SpotLight->GetLightCamra())
                 {
-                    for (const auto& iter : *pushConstantRanges)
-                    {
-                        vkCmdPushConstants((VkCommandBuffer)RenderFrameContextPtr->CommandBuffer->GetHandle(), SpotLightPSO->vkPipelineLayout
-                            , GetVulkanShaderAccessFlags(iter.AccessStageFlag), iter.Offset, iter.Size, SpotLightPushConstantPtr->GetConstantData());
-                    }
+                    ScreenSize.x = (float)RenderFrameContextPtr->SceneRenderTarget->ColorPtr->Info.Width;
+                    ScreenSize.y = (float)RenderFrameContextPtr->SceneRenderTarget->ColorPtr->Info.Height;
+                    SpotLight->GetLightCamra()->GetRectInScreenSpace(MinPos, MaxPos, View.Camera->GetViewProjectionMatrix(), ScreenSize);
                 }
+                SpotLightPushConstantPtr->Data.Pos = Vector2(MinPos.x, MinPos.y);
+                SpotLightPushConstantPtr->Data.Size = Vector2(MaxPos.x - MinPos.x, MaxPos.y - MinPos.y);
+                SpotLightPushConstantPtr->Data.PixelSize = Vector2(1.0f) / ScreenSize;
+                SpotLightPushConstantPtr->Data.Depth = MaxPos.z;
+
+
+                break;
+            }
+            default:
+                check(0);
+                break;
             }
 
-            SpotLightUIQuad->RenderObject->BindBuffers(RenderFrameContextPtr, false);
-            SpotLightUIQuad->RenderObject->Draw(RenderFrameContextPtr, 0, -1, 1);
-            //////////////////////////////////////////////////////////////////////////
+            new (&LightPasses[i]) jDrawCommand(RenderFrameContextPtr, &View.Lights[i], SeelctedRenderObject, InRenderPass
+                , SelectedShader, SelectedPipelineStateFixedInfo, *SelectedShaderBindingInstanceArray, SelectedPushConstantPtr, nullptr, SubpassIndex);
+            LightPasses[i].PrepareToDraw(false);
+        }
+
+        for (int32 i = 0; i < (int32)LightPasses.size(); ++i)
+        {
+            LightPasses[i].Draw();
         }
 
         if (!gOptions.UseSubpass)

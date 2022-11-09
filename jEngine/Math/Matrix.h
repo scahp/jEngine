@@ -541,6 +541,15 @@ struct Matrix
 	}
 	//////////////////////////////////////////////////////////////////////////
 
+    FORCEINLINE static Matrix MakeTranlsateAndScale(Vector const& translate, Vector const& scale)
+    {
+		return Matrix(
+			scale.x,		0.0f,			0.0f,			0.0f,
+			0.0f,			scale.y,		0.0f,			0.0f,
+			0.0f,			0.0f,			scale.z,		0.0f,
+			translate.x,	translate.y,	translate.z,	1.0f
+		);
+    }
 
 	FORCEINLINE Vector4 GetColumn(uint32 iIndex) const
 	{

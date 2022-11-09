@@ -65,8 +65,14 @@ jCamera* jPointLight::GetLightCamra(int index /*= 0*/) const
     return Camera[index];
 }
 
+const Matrix* jPointLight::GetLightWorldMatrix() const 
+{
+    return &LightWorldMatrix;
+}
+
 void jPointLight::Update(float deltaTime)
 {
+    // Prepare light data for uniform buffer
     for (int32 i = 0; i < _countof(Camera); ++i)
     {
         auto currentCamera = Camera[i];
@@ -80,4 +86,7 @@ void jPointLight::Update(float deltaTime)
     }
 
     LightDataUniformBlock->UpdateBufferData(&LightData, sizeof(LightData));
+
+    // Prepare light world matrix for push constant
+    LightWorldMatrix = Matrix::MakeTranlsateAndScale(LightData.Position, Vector(LightData.MaxDistance));
 }
