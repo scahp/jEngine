@@ -14,6 +14,8 @@ struct jScopedProfileData
 	std::thread::id ThreadId;
 };
 
+extern jMutexRWLock ScopedCPULock;
+extern jMutexRWLock ScopedGPULock;
 extern robin_hood::unordered_map<jPriorityName, jScopedProfileData, jPriorityNameHashFunc> ScopedProfileCPUMap[MaxProfileFrame];
 extern robin_hood::unordered_map<jPriorityName, jScopedProfileData, jPriorityNameHashFunc> ScopedProfileGPUMap[MaxProfileFrame];
 struct jQuery;

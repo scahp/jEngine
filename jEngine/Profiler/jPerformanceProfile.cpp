@@ -1,8 +1,10 @@
-#include "pch.h"
+Ôªø#include "pch.h"
 #include "jPerformanceProfile.h"
 
 jPerformanceProfile* jPerformanceProfile::_instance = nullptr;
 
+jMutexRWLock ScopedCPULock;
+jMutexRWLock ScopedGPULock;
 robin_hood::unordered_map<jPriorityName, jScopedProfileData, jPriorityNameHashFunc> ScopedProfileCPUMap[MaxProfileFrame];
 robin_hood::unordered_map<jPriorityName, jScopedProfileData, jPriorityNameHashFunc> ScopedProfileGPUMap[MaxProfileFrame];
 static int32 PerformanceFrame = 0;
@@ -24,31 +26,42 @@ int32 NextFrame()
 
 	PerformanceFrame = (PerformanceFrame + 1) % MaxProfileFrame;
 
-	// ¿Ãπ¯ø° ºˆ¡˝«“ «¡∑Œ∆ƒ¿œ∏µ µ•¿Ã≈Õ √ ±‚»≠
-	ScopedProfileCPUMap[PerformanceFrame].clear();
-	ScopedProfileGPUMap[PerformanceFrame].clear();
+	// Ïù¥Î≤àÏóê ÏàòÏßëÌï† ÌîÑÎ°úÌååÏùºÎßÅ Îç∞Ïù¥ÌÑ∞ Ï¥àÍ∏∞Ìôî
+	{
+		jScopeWriteLock s(&ScopedCPULock);
+		ScopedProfileCPUMap[PerformanceFrame].clear();
+	}
+	{
+		jScopeWriteLock s(&ScopedGPULock);
+		ScopedProfileGPUMap[PerformanceFrame].clear();
+	}
 	return PerformanceFrame;
 }
 
 void ClearScopedProfileCPU()
 {
+	jScopeWriteLock s(&ScopedCPULock);
+
 	for (int32 i = 0; i < MaxProfileFrame; ++i)
 		ScopedProfileCPUMap[i].clear();
 }
 
 void AddScopedProfileCPU(const jPriorityName& name, uint64 elapsedTick, int32 Indent)
 {
+	jScopeWriteLock s(&ScopedCPULock);
 	ScopedProfileCPUMap[PerformanceFrame][name] = jScopedProfileData(elapsedTick, Indent, std::this_thread::get_id());
 }
 
 void ClearScopedProfileGPU()
 {
+	jScopeWriteLock s(&ScopedGPULock);
 	for (int32 i = 0; i < MaxProfileFrame; ++i)
 		ScopedProfileGPUMap[i].clear();
 }
 
 void AddScopedProfileGPU(const jPriorityName& name, uint64 elapsedTick, int32 Indent)
 {
+	jScopeWriteLock s(&ScopedGPULock);
 	ScopedProfileGPUMap[PerformanceFrame][name] = jScopedProfileData(elapsedTick, Indent, std::this_thread::get_id());
 }
 
@@ -66,17 +79,20 @@ void jPerformanceProfile::Update(float deltaTime)
 void jPerformanceProfile::CalcAvg()
 {
 	{
-		robin_hood::unordered_map<jPriorityName, jAvgProfile, jPriorityNameHashFunc> SumOfScopedProfileCPUMap;
-		for (int32 i = 0; i < MaxProfileFrame; ++i)
+        robin_hood::unordered_map<jPriorityName, jAvgProfile, jPriorityNameHashFunc> SumOfScopedProfileCPUMap;
 		{
-			const auto& scopedProfileMap = ScopedProfileCPUMap[i];
-			for (auto& iter : scopedProfileMap)
+			jScopeReadLock s(&ScopedCPULock);
+			for (int32 i = 0; i < MaxProfileFrame; ++i)
 			{
-				auto& avgProfile = SumOfScopedProfileCPUMap[iter.first];
-				avgProfile.TotalElapsedTick += iter.second.ElapsedTick;
-				avgProfile.Indent = iter.second.Indent;
-				avgProfile.ThreadId = iter.second.ThreadId;
-				++avgProfile.TotalSampleCount;
+				const auto& scopedProfileMap = ScopedProfileCPUMap[i];
+				for (auto& iter : scopedProfileMap)
+				{
+					auto& avgProfile = SumOfScopedProfileCPUMap[iter.first];
+					avgProfile.TotalElapsedTick += iter.second.ElapsedTick;
+					avgProfile.Indent = iter.second.Indent;
+					avgProfile.ThreadId = iter.second.ThreadId;
+					++avgProfile.TotalSampleCount;
+				}
 			}
 		}
 
@@ -91,16 +107,19 @@ void jPerformanceProfile::CalcAvg()
 
 	{
 		robin_hood::unordered_map<jPriorityName, jAvgProfile, jPriorityNameHashFunc> SumOfScopedProfileGPUMap;
-		for (int32 i = 0; i < MaxProfileFrame; ++i)
 		{
-			const auto& scopedProfileMap = ScopedProfileGPUMap[i];
-			for (auto& iter : scopedProfileMap)
+			jScopeReadLock s(&ScopedGPULock);
+			for (int32 i = 0; i < MaxProfileFrame; ++i)
 			{
-				auto& avgProfile = SumOfScopedProfileGPUMap[iter.first];
-				avgProfile.TotalElapsedTick += iter.second.ElapsedTick;
-				avgProfile.Indent = iter.second.Indent;
-				avgProfile.ThreadId = iter.second.ThreadId;
-				++avgProfile.TotalSampleCount;
+				const auto& scopedProfileMap = ScopedProfileGPUMap[i];
+				for (auto& iter : scopedProfileMap)
+				{
+					auto& avgProfile = SumOfScopedProfileGPUMap[iter.first];
+					avgProfile.TotalElapsedTick += iter.second.ElapsedTick;
+					avgProfile.Indent = iter.second.Indent;
+					avgProfile.ThreadId = iter.second.ThreadId;
+					++avgProfile.TotalSampleCount;
+				}
 			}
 		}
 
