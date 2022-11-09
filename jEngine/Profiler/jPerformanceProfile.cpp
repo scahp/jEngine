@@ -13,6 +13,7 @@ robin_hood::unordered_set<jQuery*> jQueryTimePool::s_running;
 robin_hood::unordered_set<jQuery*> jQueryTimePool::s_resting;
 
 std::atomic<int32> jScopedProfile_CPU::s_priority = 0;
+std::atomic<int32> jScopedProfile_GPU::s_priority = 0;
 
 thread_local std::atomic<int32> ScopedProfilerCPUIndent;
 thread_local std::atomic<int32> ScopedProfilerGPUIndent;
@@ -23,6 +24,7 @@ int32 jProfile_GPU::CurrentWatingResultListIndex = 0;
 int32 NextFrame()
 {
 	jScopedProfile_CPU::ResetPriority();
+	jScopedProfile_GPU::ResetPriority();
 
 	PerformanceFrame = (PerformanceFrame + 1) % MaxProfileFrame;
 

@@ -115,7 +115,7 @@ private:
 // jProfile_GPU
 struct jProfile_GPU
 {
-	jName Name;
+	jPriorityName Name;
 	jQuery* Query = nullptr;
 	int32 Indent = 0;
 
@@ -143,7 +143,6 @@ struct jProfile_GPU
 		}
 
 		auto& prevList = WatingResultList[prevIndex];
-		uint32 priority = 0;
 		for (auto it = prevList.begin(); prevList.end() != it;++it)
 		{
 			const auto& iter = *it;
@@ -155,7 +154,7 @@ struct jProfile_GPU
 			{
 				iter.Query->GetQueryResult();
 			}
-			AddScopedProfileGPU(jPriorityName(iter.Name, priority++), iter.Query->GetElpasedTime(), iter.Indent);
+			AddScopedProfileGPU(iter.Name, iter.Query->GetElpasedTime(), iter.Indent);
             jQueryTimePool::ReturnQueryTime(iter.Query);
 		}
 		prevList.clear();
@@ -168,17 +167,17 @@ struct jProfile_GPU
 class jScopedProfile_GPU
 {
 public:
+	static std::atomic<int32> s_priority;
+	static void ResetPriority() { s_priority = 0; }
+
 	jScopedProfile_GPU(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jName& name)
 		: RenderFrameContextPtr(InRenderFrameContext)
 	{
-		Profile.Name = name;
-		//Profile.Start = jQueryTimePool::GetQueryTime();
-		//JASSERT(Profile.Start);
-		//g_rhi->QueryTimeStamp(Profile.Start);
-
-        Profile.Query = jQueryTimePool::GetQueryTime();
+		Profile.Name = jPriorityName(name, s_priority.fetch_add(1));
+        Profile.Indent = ScopedProfilerGPUIndent.fetch_add(1);
+        
+		Profile.Query = jQueryTimePool::GetQueryTime();
 		Profile.Query->BeginQuery(InRenderFrameContext->CommandBuffer);
-		Profile.Indent = ScopedProfilerGPUIndent.fetch_add(1);
 	}
 
 	~jScopedProfile_GPU()
