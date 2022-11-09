@@ -69,6 +69,16 @@ float DistanceAttenuation(float distance, float maxDistance)
     return attenuation * WindowingFunction(distance, maxDistance);
 }
 
+float Square(float x)
+{
+    return x * x;
+}
+
+float DistanceAttenuation2(float DistanceSqr, float InvMaxDistance)
+{
+    return Square(saturate(1 - Square(DistanceSqr * Square(InvMaxDistance))));
+}
+
 float3 GetPointLightDiffuse(jPointLightUniformBufferData light, float3 normal, float3 lightDir)
 {
     return light.Color * clamp(dot(lightDir, normal), 0.0, 1.0) * light.DiffuseIntensity;
@@ -82,11 +92,11 @@ float3 GetPointLightSpecular(jPointLightUniformBufferData light, float3 reflectL
 float3 GetPointLight(jPointLightUniformBufferData light, float3 normal, float3 pixelPos, float3 viewDir)
 {
     float3 lightDir = light.Position - pixelPos;
-    float pointLightDistance = length(lightDir);
+    float distanceSqr = dot(lightDir, lightDir);
     lightDir = normalize(lightDir);
     float3 reflectLightDir = 2.0 * clamp(dot(lightDir, normal), 0.0, 1.0) * normal - lightDir;
 
-    return (GetPointLightDiffuse(light, normal, lightDir) + GetPointLightSpecular(light, reflectLightDir, viewDir)) * DistanceAttenuation(pointLightDistance, light.MaxDistance);
+    return (GetPointLightDiffuse(light, normal, lightDir) + GetPointLightSpecular(light, reflectLightDir, viewDir)) * DistanceAttenuation2(distanceSqr, 1.0f / light.MaxDistance);
 }
 
 float4 main(VSOutput input) : SV_TARGET
@@ -116,7 +126,7 @@ float4 main(VSOutput input) : SV_TARGET
     {
         float NormalizedDistance = DistanceToLight / PointLight.MaxDistance;
 
-        const float Bias = 0.005f;
+        const float Bias = 0.01f;
         float Shadow = PointLightShadowCubeMap.SampleCmpLevelZero(PointLightShadowMapSampler, LightDir.xyz, NormalizedDistance - Bias);
         if (Shadow > 0.0f)
         {

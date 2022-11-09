@@ -69,24 +69,6 @@ cbuffer DirectionalLight : register(b0, space2) { jDirectionalLightUniformBuffer
 Texture2D DirectionalLightShadowMap : register(t1, space2);
 SamplerComparisonState DirectionalLightShadowMapSampler : register(s1, space2);
 
-float WindowingFunction(float value, float maxValue)
-{
-    return pow(max(0.0, 1.0 - pow(value / maxValue, 4.0)), 2.0);
-}
-
-float DistanceAttenuation(float distance, float maxDistance)
-{
-    const float refDistance = 50.0;
-    float attenuation = (refDistance * refDistance) / ((distance * distance) + 1.0);
-    return attenuation * WindowingFunction(distance, maxDistance);
-}
-
-float DiretionalFalloff(float lightRadian, float penumbraRadian, float umbraRadian)
-{
-    float t = clamp((cos(lightRadian) - cos(umbraRadian)) / (cos(penumbraRadian) - cos(umbraRadian)), 0.0, 1.0);
-    return t * t;
-}
-
 float3 GetDirectionalLightDiffuse(jDirectionalLightUniformBuffer light, float3 normal)
 {
     return light.Color * clamp(dot(-light.Direction, normal), 0.0, 1.0) * light.DiffuseIntensity;

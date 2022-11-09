@@ -769,7 +769,7 @@ void jRenderer::PostProcess()
 {
     SCOPE_CPU_PROFILE(PostProcess);
     {
-        SCOPE_GPU_PROFILE(RenderFrameContextPtr, CopyCS);
+        SCOPE_GPU_PROFILE(RenderFrameContextPtr, TonemapCS);
 
         const uint32 imageIndex = RenderFrameContextPtr->FrameIndex;
         jCommandBuffer* CommandBuffer = RenderFrameContextPtr->CommandBuffer;
@@ -824,7 +824,7 @@ void jRenderer::PostProcess()
 
         jShaderInfo shaderInfo;
         shaderInfo.name = jNameStatic("emboss");
-        shaderInfo.cs = jNameStatic("Resource/Shaders/hlsl/copy_cs.hlsl");
+        shaderInfo.cs = jNameStatic("Resource/Shaders/hlsl/tonemap_cs.hlsl");
         static jShader_Vulkan* Shader = (jShader_Vulkan*)g_rhi->CreateShader(shaderInfo);
 
         jShaderBindingsLayoutArray ShaderBindingLayoutArray;
