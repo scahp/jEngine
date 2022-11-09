@@ -5,9 +5,9 @@ struct jRenderTargetInfo
 {
     constexpr jRenderTargetInfo() = default;
     constexpr jRenderTargetInfo(ETextureType textureType, ETextureFormat format, int32 width, int32 height, int32 layerCount = 1
-        , bool isGenerateMipmap = false, EMSAASamples sampleCount = EMSAASamples::COUNT_1, bool InIsUseAsSubpassInput = false)
-        : Type(textureType), Format(format), Width(width), Height(height), LayerCount(layerCount)
-        , IsGenerateMipmap(isGenerateMipmap), SampleCount(sampleCount), IsUseAsSubpassInput(InIsUseAsSubpassInput)
+        , bool isGenerateMipmap = false, EMSAASamples sampleCount = EMSAASamples::COUNT_1, bool InIsUseAsSubpassInput = false, bool InIsMemoryless = false)
+        : Type(textureType), Format(format), Width(width), Height(height), LayerCount(layerCount), IsGenerateMipmap(isGenerateMipmap)
+        , SampleCount(sampleCount), IsUseAsSubpassInput(InIsUseAsSubpassInput), IsMemoryless(InIsMemoryless)
     {}
 
     size_t GetHash() const
@@ -20,6 +20,7 @@ struct jRenderTargetInfo
         result = CityHash64WithSeed((const char*)&IsGenerateMipmap, sizeof(IsGenerateMipmap), result);
         result = CityHash64WithSeed((const char*)&SampleCount, sizeof(SampleCount), result);
         result = CityHash64WithSeed((const char*)&IsUseAsSubpassInput, sizeof(IsUseAsSubpassInput), result);
+        result = CityHash64WithSeed((const char*)&IsMemoryless, sizeof(IsMemoryless), result);
         return result;
     }
 
@@ -31,6 +32,7 @@ struct jRenderTargetInfo
     bool IsGenerateMipmap = false;
     EMSAASamples SampleCount = EMSAASamples::COUNT_1;
     bool IsUseAsSubpassInput = false;
+    bool IsMemoryless = false;
 };
 
 struct jRenderTarget final : public std::enable_shared_from_this<jRenderTarget>

@@ -346,6 +346,7 @@ void jImGUI_Vulkan::NewFrame(bool updateFrameGraph)
     ImGui::Checkbox("UseWaveIntrinsics", &gOptions.UseWaveIntrinsics);
     ImGui::Checkbox("UseDeferredRenderer", &gOptions.UseDeferredRenderer);
     ImGui::Checkbox("UseSubpass", &gOptions.UseSubpass);
+    ImGui::Checkbox("UseMemoryless", &gOptions.UseMemoryless);
     ImGui::Separator();
 
     constexpr float IndentSpace = 10.0f;

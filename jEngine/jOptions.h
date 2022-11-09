@@ -9,6 +9,7 @@ struct jOptions
     bool UseWaveIntrinsics = false;
     bool UseDeferredRenderer = true;
     bool UseSubpass = true;
+    bool UseMemoryless = true;
     Vector CameraPos = Vector::ZeroVector;
 };
 

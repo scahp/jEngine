@@ -5,6 +5,7 @@
 #include "Scene/Light/jDirectionalLight.h"
 #include "Scene/Light/jPointLight.h"
 #include "Scene/Light/jSpotLight.h"
+#include "jOptions.h"
 
 void jSceneRenderTarget::Create(const jSwapchainImage* image)
 {
@@ -36,9 +37,10 @@ void jSceneRenderTarget::Create(const jSwapchainImage* image)
 
     for (int32 i = 0; i < _countof(GBuffer); ++i)
     {
-        constexpr bool UseAsSubpassInput = true;
-        GBuffer[i] = jRenderTargetPool::GetRenderTarget(
-            { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi_vk->GetSelectedMSAASamples(), UseAsSubpassInput });
+        const bool UseAsSubpassInput = gOptions.UseSubpass;
+        const bool IsMemoryless = gOptions.UseMemoryless && gOptions.UseSubpass;
+        GBuffer[i] = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, SCR_WIDTH, SCR_HEIGHT
+            , 1, false, g_rhi_vk->GetSelectedMSAASamples(), UseAsSubpassInput, IsMemoryless });
     }
 }
 
