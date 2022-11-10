@@ -11,7 +11,7 @@ struct jResourceContainer
         NumOfData = InData.NumOfData;
     }
 
-    void Add(T* ShaderBindingLayout)
+    void Add(T ShaderBindingLayout)
     {
         check(NumOfInlineData > NumOfData);
 
@@ -27,13 +27,14 @@ struct jResourceContainer
         }
     }
 
-    T* Back()
+    const T& Back()
     {
         if (NumOfData > 0)
         {
             return Data[NumOfData-1];
         }
-        return nullptr;
+        static auto EmptyValue = T();
+        return EmptyValue;
     }
 
     size_t GetHash() const
@@ -58,12 +59,18 @@ struct jResourceContainer
         return *this;
     }
 
-    FORCEINLINE T* operator[] (int32 InIndex) const
+    FORCEINLINE T& operator[] (int32 InIndex)
     {
         check(InIndex < NumOfData);
         return Data[InIndex];
     }
 
-    T* Data[NumOfInlineData];
+    FORCEINLINE const T& operator[] (int32 InIndex) const
+    {
+        check(InIndex < NumOfData);
+        return Data[InIndex];
+    }
+
+    T Data[NumOfInlineData];
     int32 NumOfData = 0;
 };

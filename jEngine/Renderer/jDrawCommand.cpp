@@ -10,20 +10,20 @@
 #include "RHI/Vulkan/jVulkanBufferUtil.h"
 #include "jOptions.h"
 
-jDrawCommand::jDrawCommand(std::shared_ptr<jRenderFrameContext> InRenderFrameContextPtr, jView* InView
+jDrawCommand::jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, const jView* InView
     , jRenderObject* InRenderObject, jRenderPass* InRenderPass, jShader* InShader, jPipelineStateFixedInfo* InPipelineStateFixed
-    , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const std::shared_ptr<jPushConstant>& InPushConstantPtr, jQuery* InOcclusionQuery, int32 InSubpassIndex)
+    , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant, int32 InSubpassIndex)
     : RenderFrameContextPtr(InRenderFrameContextPtr), View(InView), RenderObject(InRenderObject), RenderPass(InRenderPass), Shader(InShader), PipelineStateFixed(InPipelineStateFixed)
-    , PushConstantPtr(InPushConstantPtr), OcclusionQuery(InOcclusionQuery), ShaderBindingInstanceArray(InShaderBindingInstanceArray), SubpassIndex(InSubpassIndex)
+    , PushConstant(InPushConstant), ShaderBindingInstanceArray(InShaderBindingInstanceArray), SubpassIndex(InSubpassIndex)
 {
     IsViewLight = false;
 }
 
-jDrawCommand::jDrawCommand(std::shared_ptr<jRenderFrameContext> InRenderFrameContextPtr, jViewLight* InViewLight
+jDrawCommand::jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, const jViewLight* InViewLight
     , jRenderObject* InRenderObject, jRenderPass* InRenderPass, jShader* InShader, jPipelineStateFixedInfo* InPipelineStateFixed
-    , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const std::shared_ptr<jPushConstant>& InPushConstantPtr, jQuery* InOcclusionQuery, int32 InSubpassIndex)
+    , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant, int32 InSubpassIndex)
     : RenderFrameContextPtr(InRenderFrameContextPtr), ViewLight(InViewLight), RenderObject(InRenderObject), RenderPass(InRenderPass), Shader(InShader), PipelineStateFixed(InPipelineStateFixed)
-    , PushConstantPtr(InPushConstantPtr), OcclusionQuery(InOcclusionQuery), ShaderBindingInstanceArray(InShaderBindingInstanceArray), SubpassIndex(InSubpassIndex)
+    , PushConstant(InPushConstant), ShaderBindingInstanceArray(InShaderBindingInstanceArray), SubpassIndex(InSubpassIndex)
 {
     IsViewLight = true;
 }
@@ -58,7 +58,7 @@ void jDrawCommand::PrepareToDraw(bool InIsPositionOnly)
 
     // Create Pipeline
     CurrentPipelineStateInfo = (jPipelineStateInfo_Vulkan*)g_rhi->CreatePipelineStateInfo(PipelineStateFixed, Shader
-        , VertexBufferArray, RenderPass, ShaderBindingLayoutArray, PushConstantPtr.get(), SubpassIndex);
+        , VertexBufferArray, RenderPass, ShaderBindingLayoutArray, PushConstant, SubpassIndex);
 
     IsPositionOnly = InIsPositionOnly;
 }
@@ -81,29 +81,23 @@ void jDrawCommand::Draw() const
     // Bind Pipeline
     CurrentPipelineStateInfo->Bind(RenderFrameContextPtr);
 
-    if (PushConstantPtr)
+    if (PushConstant && PushConstant->IsValid())
     {
-        const std::vector<jPushConstantRange>* pushConstantRanges = PushConstantPtr->GetPushConstantRanges();
+        const jResourceContainer<jPushConstantRange>* pushConstantRanges = PushConstant->GetPushConstantRanges();
         if (ensure(pushConstantRanges))
         {
-            for (const auto& iter : *pushConstantRanges)
+            for (int32 i = 0; i < pushConstantRanges->NumOfData; ++i)
             {
+                const jPushConstantRange& range = (*pushConstantRanges)[i];
                 vkCmdPushConstants((VkCommandBuffer)RenderFrameContextPtr->CommandBuffer->GetHandle(), CurrentPipelineStateInfo->vkPipelineLayout
-                    , GetVulkanShaderAccessFlags(iter.AccessStageFlag), iter.Offset, iter.Size, PushConstantPtr->GetConstantData());
+                    , GetVulkanShaderAccessFlags(range.AccessStageFlag), range.Offset, range.Size, PushConstant->GetConstantData());
             }
         }
     }
 
     RenderObject->BindBuffers(RenderFrameContextPtr, IsPositionOnly);
 
-    // Todo : OcclusionQuery will be moved to another visibility passes
-    if (OcclusionQuery)
-        OcclusionQuery->BeginQuery(RenderFrameContextPtr->CommandBuffer);
-
     // Draw
     const int32 InstanceCount = RenderObject->VertexBuffer_InstanceData ? RenderObject->VertexBuffer_InstanceData->GetElementCount() : 1;
     RenderObject->Draw(RenderFrameContextPtr, 0, -1, InstanceCount);
-
-    if (OcclusionQuery)
-        OcclusionQuery->EndQuery(RenderFrameContextPtr->CommandBuffer);
 }

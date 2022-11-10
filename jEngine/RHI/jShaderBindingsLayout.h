@@ -197,7 +197,7 @@ struct jShaderBindingInstance
     virtual void BindCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const {}
 };
 
-using jShaderBindingInstanceArray = jResourceContainer<const jShaderBindingInstance>;
+using jShaderBindingInstanceArray = jResourceContainer<const jShaderBindingInstance*>;
 
 struct jShaderBindingsLayout
 {
@@ -214,4 +214,4 @@ protected:
     jShaderBindingArray ShaderBindingArray;     // Resource 정보는 비어있음
 };
 
-using jShaderBindingsLayoutArray = jResourceContainer<const jShaderBindingsLayout>;
+using jShaderBindingsLayoutArray = jResourceContainer<const jShaderBindingsLayout*>;

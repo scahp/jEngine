@@ -25,7 +25,6 @@ struct jSimplePushConstant
     bool ShowGrid = true;
     bool Padding2[3];
 };
-static std::shared_ptr<TPushConstant<jSimplePushConstant>> PushConstantPtr;
 
 void jRenderer::Setup()
 {
@@ -326,13 +325,11 @@ void jRenderer::SetupBasePass()
         BasePassInstancingShader = g_rhi->CreateShader(shaderInfo);
     }
     
-    if (!PushConstantPtr)
-    {
-        PushConstantPtr = std::make_shared<TPushConstant<jSimplePushConstant>>(jSimplePushConstant()
-            , jPushConstantRange(EShaderAccessStageFlag::FRAGMENT, 0, sizeof(jSimplePushConstant)));
-    }
-    PushConstantPtr->Data.ShowVRSArea = gOptions.ShowVRSArea;
-    PushConstantPtr->Data.ShowGrid = gOptions.ShowGrid;
+    jSimplePushConstant SimplePushConstantData;
+    SimplePushConstantData.ShowVRSArea = gOptions.ShowVRSArea;
+    SimplePushConstantData.ShowGrid = gOptions.ShowGrid;
+
+    jPushConstant* SimplePushConstant = new(jMemStack::Get()->Alloc<jPushConstant>()) jPushConstant(SimplePushConstantData, EShaderAccessStageFlag::FRAGMENT);
 
 #if PARALLELFOR_WITH_PASSSETUP
     BasePasses.resize(jObject::GetStaticObject().size());
@@ -340,7 +337,7 @@ void jRenderer::SetupBasePass()
         , [&](size_t InIndex, const jObject* InObject)
     {
         new (&BasePasses[InIndex]) jDrawCommand(RenderFrameContextPtr, &View, InObject->RenderObject, OpaqueRenderPass
-            , (InObject->HasInstancing() ? BasePassInstancingShader : BasePassShader), &BasePassPipelineStateFixed, {}, PushConstantPtr);
+            , (InObject->HasInstancing() ? BasePassInstancingShader : BasePassShader), &BasePassPipelineStateFixed, {}, SimplePushConstant);
         BasePasses[InIndex].PrepareToDraw(false);
     });
 #else
@@ -349,7 +346,7 @@ void jRenderer::SetupBasePass()
     for (auto iter : jObject::GetStaticObject())
     {
         new (&BasePasses[i]) jDrawCommand(RenderFrameContextPtr, &View, iter->RenderObject, OpaqueRenderPass
-            , (iter->HasInstancing() ? BasePassInstancingShader : BasePassShader), &BasePassPipelineStateFixed, {}, PushConstantPtr);
+            , (iter->HasInstancing() ? BasePassInstancingShader : BasePassShader), &BasePassPipelineStateFixed, {}, SimplePushConstant);
         BasePasses[i].PrepareToDraw(false);
         ++i;
     }
@@ -414,11 +411,13 @@ void jRenderer::OpaquePass()
         BasepassOcclusionTest.BeginQuery(RenderFrameContextPtr->CommandBuffer);
         if (OpaqueRenderPass && OpaqueRenderPass->BeginRenderPass(RenderFrameContextPtr->CommandBuffer))
         {
+            // Draw G-Buffer : subpass 0 
             for (const auto& command : BasePasses)
             {
                 command.Draw();
             }
 
+            // Draw Light : subpass 1
             if (!UseForwardRenderer && gOptions.UseSubpass)
             {
                 g_rhi->NextSubpass(RenderFrameContextPtr->CommandBuffer);
@@ -450,35 +449,138 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
         }
     }
 
+    //////////////////////////////////////////////////////////////////////////
+    // GBuffer Input attachment 추가
+    jShaderBindingInstance* GBufferShaderBindingInstance
+        = RenderFrameContextPtr->SceneRenderTarget->PrepareGBufferShaderBindingInstance(gOptions.UseSubpass);
+
+    jShaderBindingInstanceArray DefaultLightPassShaderBindingInstances;
+    DefaultLightPassShaderBindingInstances.Add(GBufferShaderBindingInstance);
+    DefaultLightPassShaderBindingInstances.Add(View.ViewUniformBufferShaderBindingInstance);
+    //////////////////////////////////////////////////////////////////////////
+
     std::vector<jDrawCommand> LightPasses;
     LightPasses.resize(View.Lights.size());
 
+    //////////////////////////////////////////////////////////////////////////
+    // Directional light jDrawCommand generator
+    static jObject* GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
+    class jDeferredLightPass_DirectionalLight
     {
-        const int32 SubpassIndex = (!UseForwardRenderer && gOptions.UseSubpass) ? 1 : 0;
+    public:
+        jDeferredLightPass_DirectionalLight(const jShaderBindingInstanceArray& InShaderBindingInstances)
+            : ShaderBindingInstances(InShaderBindingInstances)
+        {}
 
-        auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, true, false>::Create();
-        jMultisampleStateInfo* MultisampleState = TMultisampleStateInfo<true, 0.2f, false, false>::Create(g_rhi->GetSelectedMSAASamples());
-        auto DepthStencilState = TDepthStencilStateInfo<true, false, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
-        auto BlendingState = TBlendingStateInfo<true, EBlendFactor::ONE, EBlendFactor::ONE, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ONE, EBlendOp::ADD, EColorMask::ALL>::Create();
+        void Initialize(int32 InRTWidth, int32 InRTHeight)
+        {
+            RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, true, false>::Create();
+            MultisampleState = TMultisampleStateInfo<true, 0.2f, false, false>::Create(g_rhi->GetSelectedMSAASamples());
+            DepthStencilState = TDepthStencilStateInfo<true, false, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
+            BlendingState = TBlendingStateInfo<true, EBlendFactor::ONE, EBlendFactor::ONE, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ONE, EBlendOp::ADD, EColorMask::ALL>::Create();
 
-        const int32 RTWidth = RenderFrameContextPtr->SceneRenderTarget->ColorPtr->Info.Width;
-        const int32 RTHeight = RenderFrameContextPtr->SceneRenderTarget->ColorPtr->Info.Height;
+            PipelineStateFixedInfo = jPipelineStateFixedInfo(RasterizationState, MultisampleState, DepthStencilState, BlendingState
+                , jViewport(0.0f, 0.0f, (float)InRTWidth, (float)InRTHeight), jScissor(0, 0, InRTWidth, InRTHeight), gOptions.UseVRS);
 
-        jPipelineStateFixedInfo DirectionalLightPipelineStateFixed = jPipelineStateFixedInfo(RasterizationState, MultisampleState, DepthStencilState, BlendingState
-            , jViewport(0.0f, 0.0f, (float)RTWidth, (float)RTHeight), jScissor(0, 0, RTWidth, RTHeight), gOptions.UseVRS);
+            {
+                jShaderInfo shaderInfo;
+                shaderInfo.name = jNameStatic("DirectionalLightShader");
+                shaderInfo.vs = jNameStatic("Resource/Shaders/hlsl/fullscreenquad_vs.hlsl");
+                shaderInfo.fs = jNameStatic("Resource/Shaders/hlsl/directionallight_fs.hlsl");
+                if (gOptions.UseSubpass)
+                    shaderInfo.fsPreProcessor = jNameStatic("#define USE_SUBPASS 1");
+                Shader = g_rhi->CreateShader(shaderInfo);
+            }
+        }
 
-        //////////////////////////////////////////////////////////////////////////
-        const Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
-        const Vector2 ClearDepth = Vector2(1.0f, 0.0f);
+        void GenerateDrawCommand(jDrawCommand* OutDestDrawCommand, const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr
+            , const jView* InView, const jViewLight& InLightView, jRenderPass* InRenderPass, int32 InSubpassIndex)
+        {
+            check(OutDestDrawCommand);
+            new (OutDestDrawCommand) jDrawCommand(InRenderFrameContextPtr, &InLightView, GlobalFullscreenPrimitive->RenderObject, InRenderPass
+                , Shader, &PipelineStateFixedInfo, ShaderBindingInstances, {}, InSubpassIndex);
+            OutDestDrawCommand->PrepareToDraw(false);
+        }
 
-        // WorldMatrix 는 Push Constant 로 전달하는 것으로 하자
+        jRasterizationStateInfo* RasterizationState = nullptr;
+        jMultisampleStateInfo* MultisampleState = nullptr;
+        jDepthStencilStateInfo* DepthStencilState = nullptr;
+        jBlendingStateInfo* BlendingState = nullptr;
+        jPipelineStateFixedInfo PipelineStateFixedInfo;
+
+        jShader* Shader = nullptr;
+        std::shared_ptr<jPushConstant> PushConstantPtr;
+        const jShaderBindingInstanceArray& ShaderBindingInstances;
+    };
+
+    //////////////////////////////////////////////////////////////////////////
+    // // Point light jDrawCommand generator
+    static auto PointLightSphere = jPrimitiveUtil::CreateSphere(Vector::ZeroVector, 1.0, 16, Vector(1.0f), Vector4::OneVector);
+    class jDeferredLightPass_PointLight
+    {
+    public:
         struct jPointLightPushConstant
         {
+            jPointLightPushConstant() = default;
+            jPointLightPushConstant(const Matrix& InMVP) : MVP(InMVP) {}
             Matrix MVP;
         };
-        static std::shared_ptr<TPushConstant<jPointLightPushConstant>> PointLightPushConstantPtr = std::make_shared<TPushConstant<jPointLightPushConstant>>(
-            jPointLightPushConstant(), jPushConstantRange(EShaderAccessStageFlag::ALL, 0, sizeof(jPointLightPushConstant)));
 
+        jDeferredLightPass_PointLight(const jShaderBindingInstanceArray& InShaderBindingInstances)
+            : ShaderBindingInstances(InShaderBindingInstances)
+        {}
+
+        void Initialize(int32 InRTWidth, int32 InRTHeight)
+        {
+            MultisampleState = TMultisampleStateInfo<true, 0.2f, false, false>::Create(g_rhi->GetSelectedMSAASamples());
+            BlendingState = TBlendingStateInfo<true, EBlendFactor::ONE, EBlendFactor::ONE, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ONE, EBlendOp::ADD, EColorMask::ALL>::Create();
+
+            // PointLight 의 경우 카메라에서 가장 먼쪽에 있는 Mesh 면을 렌더링하고, 그 면 부터 카메라 사이에 있는 공간에 대해서만 라이트를 적용함.
+            RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CW, false, 0.0f, 0.0f, 0.0f, 1.0f, true, false>::Create();
+            DepthStencilState = TDepthStencilStateInfo<true, false, ECompareOp::GREATER, false, false, 0.0f, 1.0f>::Create();
+
+            PipelineStateFixedInfo = jPipelineStateFixedInfo(RasterizationState, MultisampleState, DepthStencilState, BlendingState
+                , jViewport(0.0f, 0.0f, (float)InRTWidth, (float)InRTHeight), jScissor(0, 0, InRTWidth, InRTHeight), gOptions.UseVRS);
+
+            {
+                jShaderInfo shaderInfo;
+                shaderInfo.name = jNameStatic("PointLightShader");
+                shaderInfo.vs = jNameStatic("Resource/Shaders/hlsl/pointlight_vs.hlsl");
+                shaderInfo.fs = jNameStatic("Resource/Shaders/hlsl/pointlight_fs.hlsl");
+                if (gOptions.UseSubpass)
+                    shaderInfo.fsPreProcessor = jNameStatic("#define USE_SUBPASS 1");
+                Shader = g_rhi->CreateShader(shaderInfo);
+            }
+        }
+
+        void GenerateDrawCommand(jDrawCommand* OutDestDrawCommand, const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr
+            , const jView* InView, const jViewLight& InLightView, jRenderPass* InRenderPass, int32 InSubpassIndex)
+        {
+            jPushConstant* SimplePushConstant = new(jMemStack::Get()->Alloc<jPushConstant>()) jPushConstant(
+                jPointLightPushConstant(InView->Camera->Projection * InView->Camera->View * (*InLightView.Light->GetLightWorldMatrix())), EShaderAccessStageFlag::ALL);
+
+            check(OutDestDrawCommand);
+            new (OutDestDrawCommand) jDrawCommand(InRenderFrameContextPtr, &InLightView, PointLightSphere->RenderObject, InRenderPass
+                , Shader, &PipelineStateFixedInfo, ShaderBindingInstances, SimplePushConstant, InSubpassIndex);
+            OutDestDrawCommand->PrepareToDraw(false);
+        }
+ 
+        jRasterizationStateInfo* RasterizationState = nullptr;
+        jMultisampleStateInfo* MultisampleState = nullptr;
+        jDepthStencilStateInfo* DepthStencilState = nullptr;
+        jBlendingStateInfo* BlendingState = nullptr;
+        jPipelineStateFixedInfo PipelineStateFixedInfo;
+
+        jShader* Shader = nullptr;
+        const jShaderBindingInstanceArray& ShaderBindingInstances;
+    };
+
+    //////////////////////////////////////////////////////////////////////////
+    // Spot light jDrawCommand generator
+    static jUIQuadPrimitive* SpotLightUIQuad = jPrimitiveUtil::CreateUIQuad(Vector2(), Vector2(), nullptr);
+    class jDeferredLightPass_SpotLight
+    {
+    public:
         // Rect 정보는 Push Constant 로 전달하는 것으로 하자
         struct jSpotLightPushConstant
         {
@@ -488,11 +590,90 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
             float Depth;
             float padding;
         };
-        static std::shared_ptr<TPushConstant<jSpotLightPushConstant>> SpotLightPushConstantPtr = std::make_shared<TPushConstant<jSpotLightPushConstant>>(
-            jSpotLightPushConstant(), jPushConstantRange(EShaderAccessStageFlag::ALL, 0, sizeof(jSpotLightPushConstant)));
+
+        jDeferredLightPass_SpotLight(const jShaderBindingInstanceArray& InShaderBindingInstances)
+            : ShaderBindingInstances(InShaderBindingInstances)
+        {}
+
+        void Initialize(int32 InRTWidth, int32 InRTHeight)
+        {
+            RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, true, false>::Create();
+            MultisampleState = TMultisampleStateInfo<true, 0.2f, false, false>::Create(g_rhi->GetSelectedMSAASamples());
+            BlendingState = TBlendingStateInfo<true, EBlendFactor::ONE, EBlendFactor::ONE, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ONE, EBlendOp::ADD, EColorMask::ALL>::Create();
+
+            // SpotLight 의 경우 카메라에서 가장 먼쪽에 있는 Mesh 면을 렌더링하고(Quad 를 렌더링하기 때문에 MaxPos.z 로 컨트롤), 그 면 부터 카메라 사이에 있는 공간에 대해서만 라이트를 적용함.
+            DepthStencilState = TDepthStencilStateInfo<true, false, ECompareOp::GREATER, false, false, 0.0f, 1.0f>::Create();
+            PipelineStateFixedInfo = jPipelineStateFixedInfo(RasterizationState, MultisampleState, DepthStencilState, BlendingState
+                , jViewport(0.0f, 0.0f, (float)InRTWidth, (float)InRTHeight), jScissor(0, 0, InRTWidth, InRTHeight), gOptions.UseVRS);
+
+            {
+                jShaderInfo shaderInfo;
+                shaderInfo.name = jNameStatic("SpotLightShader");
+                shaderInfo.vs = jNameStatic("Resource/Shaders/hlsl/spotlight_vs.hlsl");
+                shaderInfo.fs = jNameStatic("Resource/Shaders/hlsl/spotlight_fs.hlsl");
+                if (gOptions.UseSubpass)
+                    shaderInfo.fsPreProcessor = jNameStatic("#define USE_SUBPASS 1");
+                Shader = g_rhi->CreateShader(shaderInfo);
+            }
+
+            ScreenSize.x = (float)InRTWidth;
+            ScreenSize.y = (float)InRTHeight;
+        }
+
+        void GenerateDrawCommand(jDrawCommand* OutDestDrawCommand, const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr
+            , const jView* InView, const jViewLight& InLightView, jRenderPass* InRenderPass, int32 InSubpassIndex)
+        {
+            jPushConstant* PushConstant = new(jMemStack::Get()->Alloc<jPushConstant>()) jPushConstant(jSpotLightPushConstant(), EShaderAccessStageFlag::ALL);
+            jSpotLightPushConstant& SpotLightPushConstant = PushConstant->Get<jSpotLightPushConstant>();
+
+            Vector MinPos;
+            Vector MaxPos;
+            const jLight* SpotLight = InLightView.Light;
+            if (SpotLight && SpotLight->GetLightCamra())
+            {
+                SpotLight->GetLightCamra()->GetRectInScreenSpace(MinPos, MaxPos, InView->Camera->GetViewProjectionMatrix(), ScreenSize);
+            }
+            SpotLightPushConstant.Pos = Vector2(MinPos.x, MinPos.y);
+            SpotLightPushConstant.Size = Vector2(MaxPos.x - MinPos.x, MaxPos.y - MinPos.y);
+            SpotLightPushConstant.PixelSize = Vector2(1.0f) / ScreenSize;
+            SpotLightPushConstant.Depth = MaxPos.z;
+
+            check(OutDestDrawCommand);
+            new (OutDestDrawCommand) jDrawCommand(InRenderFrameContextPtr, &InLightView, SpotLightUIQuad->RenderObject, InRenderPass
+                , Shader, &PipelineStateFixedInfo, ShaderBindingInstances, PushConstant, InSubpassIndex);
+            OutDestDrawCommand->PrepareToDraw(false);
+        }
+
+        jRasterizationStateInfo* RasterizationState = nullptr;
+        jMultisampleStateInfo* MultisampleState = nullptr;
+        jDepthStencilStateInfo* DepthStencilState = nullptr;
+        jBlendingStateInfo* BlendingState = nullptr;
+        jPipelineStateFixedInfo PipelineStateFixedInfo;
+
+        jShader* Shader = nullptr;
+        Vector2 ScreenSize;
+        const jShaderBindingInstanceArray& ShaderBindingInstances;
+    };
+
+    const int32 RTWidth = RenderFrameContextPtr->SceneRenderTarget->ColorPtr->Info.Width;
+    const int32 RTHeight = RenderFrameContextPtr->SceneRenderTarget->ColorPtr->Info.Height;
+    jDeferredLightPass_DirectionalLight DirectionalLightPass(DefaultLightPassShaderBindingInstances);
+    DirectionalLightPass.Initialize(RTWidth, RTHeight);
+
+    jDeferredLightPass_PointLight PointLightPass(DefaultLightPassShaderBindingInstances);
+    PointLightPass.Initialize(RTWidth, RTHeight);
+
+    jDeferredLightPass_SpotLight SpotLightPass(DefaultLightPassShaderBindingInstances);
+    SpotLightPass.Initialize(RTWidth, RTHeight);
+
+    {
+        const int32 SubpassIndex = (!UseForwardRenderer && gOptions.UseSubpass) ? 1 : 0;
 
         if (!gOptions.UseSubpass)
         {
+            const Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
+            const Vector2 ClearDepth = Vector2(1.0f, 0.0f);
+
             jAttachment depth = jAttachment(RenderFrameContextPtr->SceneRenderTarget->DepthPtr, EAttachmentLoadStoreOp::LOAD_DONTCARE
                 , EAttachmentLoadStoreOp::LOAD_DONTCARE, ClearColor, ClearDepth
                 , RenderFrameContextPtr->SceneRenderTarget->DepthPtr->GetLayout(), EImageLayout::DEPTH_STENCIL_ATTACHMENT);
@@ -522,158 +703,19 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
             renderPassInfo.Subpasses.push_back(subpass);
 
             InRenderPass = (jRenderPass_Vulkan*)g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
-        }
 
-        jShader* DirectionalLightShader = nullptr;
-        {
-            jShaderInfo shaderInfo;
-            shaderInfo.name = jNameStatic("DirectionalLightShader");
-            shaderInfo.vs = jNameStatic("Resource/Shaders/hlsl/fullscreenquad_vs.hlsl");
-            shaderInfo.fs = jNameStatic("Resource/Shaders/hlsl/directionallight_fs.hlsl");
-            if (gOptions.UseSubpass)
-                shaderInfo.fsPreProcessor = jNameStatic("#define USE_SUBPASS 1");
-            DirectionalLightShader = g_rhi->CreateShader(shaderInfo);
-        }
-
-        static jFullscreenQuadPrimitive* FullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
-
-        // GBuffer Input attachment 추가
-        jShaderBindingInstance* GBufferShaderBindingInstance 
-            = RenderFrameContextPtr->SceneRenderTarget->PrepareGBufferShaderBindingInstance(gOptions.UseSubpass);
-
-        //////////////////////////////////////////////////////////////////////////
-        // Point light create pipeline
-        static auto PointLightSphere = jPrimitiveUtil::CreateSphere(Vector::ZeroVector, 1.0, 16, Vector(1.0f), Vector4::OneVector);
-
-        jShader* PointLightShader = nullptr;
-        {
-            jShaderInfo shaderInfo;
-            shaderInfo.name = jNameStatic("PointLightShader");
-            shaderInfo.vs = jNameStatic("Resource/Shaders/hlsl/pointlight_vs.hlsl");
-            shaderInfo.fs = jNameStatic("Resource/Shaders/hlsl/pointlight_fs.hlsl");
-            if (gOptions.UseSubpass)
-                shaderInfo.fsPreProcessor = jNameStatic("#define USE_SUBPASS 1");
-            PointLightShader = g_rhi->CreateShader(shaderInfo);
-        }
-
-        // PointLight 의 경우 카메라에서 가장 먼쪽에 있는 Mesh 면을 렌더링하고, 그 면 부터 카메라 사이에 있는 공간에 대해서만 라이트를 적용함.
-        auto PointLightRasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CW, false, 0.0f, 0.0f, 0.0f, 1.0f, true, false>::Create();
-        auto PointLightDepthStencilState = TDepthStencilStateInfo<true, false, ECompareOp::GREATER, false, false, 0.0f, 1.0f>::Create();
-
-        jPipelineStateFixedInfo PointLightPipelineStateFixed = jPipelineStateFixedInfo(PointLightRasterizationState, MultisampleState, PointLightDepthStencilState, BlendingState
-            , jViewport(0.0f, 0.0f, (float)RTWidth, (float)RTHeight), jScissor(0, 0, RTWidth, RTHeight), gOptions.UseVRS);
-        //////////////////////////////////////////////////////////////////////////
-
-        //////////////////////////////////////////////////////////////////////////
-        // Spot light create pipeline
-        static jUIQuadPrimitive* SpotLightUIQuad = jPrimitiveUtil::CreateUIQuad(Vector2(), Vector2(), nullptr);
-
-        jShader* SpotLightShader = nullptr;
-        {
-            jShaderInfo shaderInfo;
-            shaderInfo.name = jNameStatic("SpotLightShader");
-            shaderInfo.vs = jNameStatic("Resource/Shaders/hlsl/spotlight_vs.hlsl");
-            shaderInfo.fs = jNameStatic("Resource/Shaders/hlsl/spotlight_fs.hlsl");
-            if (gOptions.UseSubpass)
-                shaderInfo.fsPreProcessor = jNameStatic("#define USE_SUBPASS 1");
-            SpotLightShader = g_rhi->CreateShader(shaderInfo);
-        }
-
-        // SpotLight 의 경우 카메라에서 가장 먼쪽에 있는 Mesh 면을 렌더링하고(Quad 를 렌더링하기 때문에 MaxPos.z 로 컨트롤), 그 면 부터 카메라 사이에 있는 공간에 대해서만 라이트를 적용함.
-        auto SpotLightDepthStencilState = TDepthStencilStateInfo<true, false, ECompareOp::GREATER, false, false, 0.0f, 1.0f>::Create();
-        jPipelineStateFixedInfo SpotLightPipelineStateFixed = jPipelineStateFixedInfo(RasterizationState, MultisampleState, SpotLightDepthStencilState, BlendingState
-            , jViewport(0.0f, 0.0f, (float)RTWidth, (float)RTHeight), jScissor(0, 0, RTWidth, RTHeight), gOptions.UseVRS);
-
-        if (!gOptions.UseSubpass)
-        {
             check(InRenderPass);
             InRenderPass->BeginRenderPass(RenderFrameContextPtr->CommandBuffer);
         }
 
-        jShaderBindingInstanceArray DirectionalLightShaderBindingInstances;
-        jShaderBindingInstanceArray PointLightShaderBindingInstances;
-        jShaderBindingInstanceArray SpotLightShaderBindingInstances;
-        {
-             //////////////////////////////////////////////////////////////////////////
-            // Directional light
-            DirectionalLightShaderBindingInstances.Add(GBufferShaderBindingInstance);
-            DirectionalLightShaderBindingInstances.Add(View.ViewUniformBufferShaderBindingInstance);
-
-            //////////////////////////////////////////////////////////////////////////
-            // Point light
-            PointLightShaderBindingInstances.Add(GBufferShaderBindingInstance);
-            PointLightShaderBindingInstances.Add(View.ViewUniformBufferShaderBindingInstance);
-
-            //////////////////////////////////////////////////////////////////////////
-            // Spot light
-            SpotLightShaderBindingInstances.Add(GBufferShaderBindingInstance);
-            SpotLightShaderBindingInstances.Add(View.ViewUniformBufferShaderBindingInstance);
-        }
-
         for (int32 i = 0; i < (int32)View.Lights.size(); ++i)
         {
-            jShaderBindingInstanceArray* SelectedShaderBindingInstanceArray = nullptr;
-            jPipelineStateFixedInfo* SelectedPipelineStateFixedInfo = nullptr;
-            jShader* SelectedShader = nullptr;
-            jRenderObject* SeelctedRenderObject = nullptr;
-            std::shared_ptr<jPushConstant> SelectedPushConstantPtr;
-            switch (View.Lights[i].Light->Type)
-            {
-            case ELightType::AMBIENT:
-                check(0);
-                break;
-            case ELightType::DIRECTIONAL:
-                SelectedShaderBindingInstanceArray = &DirectionalLightShaderBindingInstances;
-                SelectedPipelineStateFixedInfo = &DirectionalLightPipelineStateFixed;
-                SelectedShader = DirectionalLightShader;
-                SeelctedRenderObject = FullscreenPrimitive->RenderObject;
-                break;
-            case ELightType::POINT:
-            {
-                SelectedShaderBindingInstanceArray = &PointLightShaderBindingInstances;
-                SelectedPipelineStateFixedInfo = &PointLightPipelineStateFixed;
-                SelectedShader = PointLightShader;
-                SelectedPushConstantPtr = PointLightPushConstantPtr;
-                SeelctedRenderObject = PointLightSphere->RenderObject;
-
-                PointLightPushConstantPtr->Data.MVP = View.Camera->Projection * View.Camera->View
-                    * (*View.Lights[i].Light->GetLightWorldMatrix());
-                break;
-            }
-            case ELightType::SPOT:
-            {
-                SelectedShaderBindingInstanceArray = &SpotLightShaderBindingInstances;
-                SelectedPipelineStateFixedInfo = &SpotLightPipelineStateFixed;
-                SelectedShader = SpotLightShader;
-                SelectedPushConstantPtr = SpotLightPushConstantPtr;
-                SeelctedRenderObject = SpotLightUIQuad->RenderObject;
-
-                Vector MinPos;
-                Vector MaxPos;
-                Vector2 ScreenSize;
-                const jLight* SpotLight = View.Lights[i].Light;
-                if (SpotLight && SpotLight->GetLightCamra())
-                {
-                    ScreenSize.x = (float)RenderFrameContextPtr->SceneRenderTarget->ColorPtr->Info.Width;
-                    ScreenSize.y = (float)RenderFrameContextPtr->SceneRenderTarget->ColorPtr->Info.Height;
-                    SpotLight->GetLightCamra()->GetRectInScreenSpace(MinPos, MaxPos, View.Camera->GetViewProjectionMatrix(), ScreenSize);
-                }
-                SpotLightPushConstantPtr->Data.Pos = Vector2(MinPos.x, MinPos.y);
-                SpotLightPushConstantPtr->Data.Size = Vector2(MaxPos.x - MinPos.x, MaxPos.y - MinPos.y);
-                SpotLightPushConstantPtr->Data.PixelSize = Vector2(1.0f) / ScreenSize;
-                SpotLightPushConstantPtr->Data.Depth = MaxPos.z;
-
-
-                break;
-            }
-            default:
-                check(0);
-                break;
-            }
-
-            new (&LightPasses[i]) jDrawCommand(RenderFrameContextPtr, &View.Lights[i], SeelctedRenderObject, InRenderPass
-                , SelectedShader, SelectedPipelineStateFixedInfo, *SelectedShaderBindingInstanceArray, SelectedPushConstantPtr, nullptr, SubpassIndex);
-            LightPasses[i].PrepareToDraw(false);
+            if (View.Lights[i].Light->Type == ELightType::DIRECTIONAL)
+                DirectionalLightPass.GenerateDrawCommand(&LightPasses[i], RenderFrameContextPtr, &View, View.Lights[i], InRenderPass, SubpassIndex);
+            else if (View.Lights[i].Light->Type == ELightType::POINT)
+                PointLightPass.GenerateDrawCommand(&LightPasses[i], RenderFrameContextPtr, &View, View.Lights[i], InRenderPass, SubpassIndex);
+            else if (View.Lights[i].Light->Type == ELightType::SPOT)
+                SpotLightPass.GenerateDrawCommand(&LightPasses[i], RenderFrameContextPtr, &View, View.Lights[i], InRenderPass, SubpassIndex);
         }
 
         for (int32 i = 0; i < (int32)LightPasses.size(); ++i)

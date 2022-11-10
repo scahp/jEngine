@@ -359,46 +359,125 @@ struct jPushConstantRange
     int32 Size = 0;
 };
 
-struct jPushConstant : std::enable_shared_from_this<jPushConstant>
+struct jPushConstant
 {
-    virtual size_t GetHash() const = 0;
-    virtual const void* GetConstantData() const = 0;
-    virtual int32 GetSize() const = 0;
-    virtual const std::vector<jPushConstantRange>* GetPushConstantRanges() const = 0;
-};
-
-template <typename T>
-struct TPushConstant : public jPushConstant
-{
-    TPushConstant() = default;
-    TPushConstant(const T& data, const jPushConstantRange& pushConstantRanges)
-        : Data(data)
+    jPushConstant() = default;
+    jPushConstant(const jPushConstant& InPushConstant)
     {
-        PushConstantRanges.push_back(pushConstantRanges);
+        check(InPushConstant.UsedSize < 256);
+
+        UsedSize = InPushConstant.UsedSize;
+        memcpy(Data, InPushConstant.Data, InPushConstant.UsedSize);
+        PushConstantRanges = InPushConstant.PushConstantRanges;
+        Hash = InPushConstant.Hash;
+    }
+    jPushConstant(const char* InData, int32 InSize, EShaderAccessStageFlag InShaderAccessStageFlag)
+    {
+        check(InSize < 256);
+
+        UsedSize = InSize;
+        memcpy(Data, InData, InSize);
+        PushConstantRanges.Add(jPushConstantRange(InShaderAccessStageFlag, 0, InSize));
         GetHash();
     }
-    TPushConstant(const T& data, const std::vector<jPushConstantRange>& pushConstantRanges)
-        : Data(data), PushConstantRanges(pushConstantRanges)
+    jPushConstant(const char* InData, int32 InSize, const jPushConstantRange& InPushConstantRange)
     {
+        check(InSize < 256);
+
+        UsedSize = InSize;
+        memcpy(Data, InData, InSize);
+        PushConstantRanges.Add(InPushConstantRange);
+        GetHash();
+    }
+    jPushConstant(const char* InData, int32 InSize, const jResourceContainer<jPushConstantRange>& InPushConstantRanges)
+        : PushConstantRanges(InPushConstantRanges)
+    {
+        check(InSize < 256);
+
+        UsedSize = InSize;
+        memcpy(Data, InData, InSize);
+        GetHash();
+    }
+    
+    template <typename T>
+    jPushConstant(const T& InData, EShaderAccessStageFlag InShaderAccessStageFlag)
+    {
+        Set(InData, jPushConstantRange(InShaderAccessStageFlag, 0, sizeof(T)));
+    }
+
+    template <typename T>
+    jPushConstant(const T& InData, const jPushConstantRange& InPushConstantRange)
+    {
+        Set(InData, InPushConstantRange);
+    }
+
+    template <typename T>
+    jPushConstant(const T& InData, const jResourceContainer<jPushConstantRange>& InPushConstantRanges)
+    {
+        Set(InData, InPushConstantRanges);
+    }
+
+    template <typename T>
+    void Set(const T& InData, const jPushConstantRange& InPushConstantRange)
+    {
+        check(sizeof(T) < 256);
+
+        UsedSize = sizeof(T);
+        memcpy(Data, &InData, sizeof(T));
+        PushConstantRanges.Add(InPushConstantRange);
         GetHash();
     }
 
-    virtual size_t GetHash() const
+    template <typename T>
+    void Set(const T& InData, const jResourceContainer<jPushConstantRange>& InPushConstantRanges)
+    {
+        check(sizeof(T) < 256);
+
+        UsedSize = sizeof(T);
+        memcpy(Data, &InData, sizeof(T));
+        PushConstantRanges = InPushConstantRanges;
+        GetHash();
+    }
+
+    template <typename T>
+    T& Get() const
+    {
+        return *(T*)&Data[0];
+    }
+
+    FORCEINLINE bool IsValid() const
+    {
+        return UsedSize > 0;
+    }
+
+    jPushConstant& operator = (const jPushConstant& InPushConstant)
+    {
+        check(InPushConstant.UsedSize < 256);
+
+        UsedSize = InPushConstant.UsedSize;
+        memcpy(Data, InPushConstant.Data, InPushConstant.UsedSize);
+        PushConstantRanges = InPushConstant.PushConstantRanges;
+        Hash = InPushConstant.Hash;
+        return *this;
+    }
+
+    size_t GetHash() const
     {
         if (Hash)
             return Hash;
 
-        Hash = CityHash64((const char*)&Data, sizeof(Data));
-        Hash = CityHash64WithSeed((const char*)PushConstantRanges.data(), PushConstantRanges.size() * sizeof(jPushConstantRange), Hash);
+        Hash = CityHash64((const char*)Data, UsedSize);
+        Hash = CityHash64WithSeed((const char*)PushConstantRanges.Data, PushConstantRanges.NumOfData * sizeof(jPushConstantRange), Hash);
         return Hash;
     }
-    virtual const void* GetConstantData() const override { return &Data; }
-    virtual int32 GetSize() const override { return sizeof(T); }
-    virtual const std::vector<jPushConstantRange>* GetPushConstantRanges() const { return &PushConstantRanges; }
+    const void* GetConstantData() const { return (void*)&Data[0]; }
+    int32 GetSize() const { return UsedSize; }
+    const jResourceContainer<jPushConstantRange>* GetPushConstantRanges() const { return &PushConstantRanges; }
 
     mutable size_t Hash = 0;
-    std::vector<jPushConstantRange> PushConstantRanges;
-    T Data;
+    jResourceContainer<jPushConstantRange> PushConstantRanges;
+    uint8 Data[256];
+    int32 UsedSize = 0;
 };
 
 struct jShader;

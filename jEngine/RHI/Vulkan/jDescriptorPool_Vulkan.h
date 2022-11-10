@@ -16,7 +16,7 @@ const float DefaultPoolSizes[] =
     1 / 8.0	    // VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT
 };
 
-using jShaderBindingInstanceVulkanArray = jResourceContainer<jShaderBindingInstance_Vulkan, 2000>;
+using jShaderBindingInstanceVulkanArray = jResourceContainer<jShaderBindingInstance_Vulkan*, 2000>;
 
 struct jDescriptorPool_Vulkan
 {

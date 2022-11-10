@@ -162,6 +162,12 @@ public:
         return s_memStack;
     }
 
+    template <typename T>
+    T* Alloc()
+    {
+        return (T*)Alloc(sizeof(T));
+    }
+
     void* Alloc(uint64 InNumOfBytes)
     {
         if (InNumOfBytes >= jPageAllocator::MaxMemoryChunkSize)

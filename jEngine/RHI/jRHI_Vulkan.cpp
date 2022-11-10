@@ -1180,17 +1180,19 @@ void* jRHI_Vulkan::CreatePipelineLayout(const jShaderBindingsLayoutArray& InShad
 		std::vector<VkPushConstantRange> PushConstantRanges;
 		if (pushConstant)
 		{
-			const std::vector<jPushConstantRange>* pushConstantRanges = pushConstant->GetPushConstantRanges();
+			const jResourceContainer<jPushConstantRange>* pushConstantRanges = pushConstant->GetPushConstantRanges();
 			check(pushConstantRanges);
 			if (pushConstantRanges)
 			{
-				PushConstantRanges.reserve(pushConstantRanges->size());
-				for (const auto& iter : *pushConstantRanges)
+				PushConstantRanges.reserve(pushConstantRanges->NumOfData);
+				for (int32 i = 0; i < pushConstantRanges->NumOfData; ++i)
 				{
+					const jPushConstantRange& range = (*pushConstantRanges)[i];
+
 					VkPushConstantRange pushConstantRange{};
-					pushConstantRange.stageFlags = GetVulkanShaderAccessFlags(iter.AccessStageFlag);
-					pushConstantRange.offset = iter.Offset;
-					pushConstantRange.size = iter.Size;
+					pushConstantRange.stageFlags = GetVulkanShaderAccessFlags(range.AccessStageFlag);
+					pushConstantRange.offset = range.Offset;
+					pushConstantRange.size = range.Size;
 					PushConstantRanges.emplace_back(pushConstantRange);
 				}
 			}

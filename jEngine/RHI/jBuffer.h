@@ -25,7 +25,7 @@ struct jIndexBuffer
     virtual int32 GetElementCount() const { return IndexStreamData ? IndexStreamData->ElementCount : 0; }
 };
 
-struct jVertexBufferArray : public jResourceContainer<const jVertexBuffer>
+struct jVertexBufferArray : public jResourceContainer<const jVertexBuffer*>
 {
     size_t GetHash() const
     {
