@@ -10,7 +10,8 @@ jObject* jSpotLightDrawCommandGenerator::SpotLightUIQuad = nullptr;
 jSpotLightDrawCommandGenerator::jSpotLightDrawCommandGenerator(const jShaderBindingInstanceArray& InShaderBindingInstances)
     : ShaderBindingInstances(InShaderBindingInstances)
 {
-    SpotLightUIQuad = jPrimitiveUtil::CreateUIQuad(Vector2(), Vector2(), nullptr);
+    if (!SpotLightUIQuad)
+        SpotLightUIQuad = jPrimitiveUtil::CreateUIQuad(Vector2(), Vector2(), nullptr);
 }
 
 void jSpotLightDrawCommandGenerator::Initialize(int32 InRTWidth, int32 InRTHeight)
