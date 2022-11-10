@@ -42,3 +42,14 @@ public:
     bool IsPositionOnly = false;
     int32 SubpassIndex = 0;
 };
+
+// jDrawCommand generator
+class jDrawCommandGenerator
+{
+public:
+    virtual ~jDrawCommandGenerator() {}
+    virtual void Initialize(int32 InRTWidth, int32 InRTHeight) = 0;
+    virtual void GenerateDrawCommand(jDrawCommand* OutDestDrawCommand, const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr
+        , const jView* InView, const jViewLight& InLightView, jRenderPass* InRenderPass, int32 InSubpassIndex) = 0;
+};
+

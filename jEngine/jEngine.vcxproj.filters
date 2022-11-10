@@ -382,6 +382,15 @@
     <ClInclude Include="RHI\Vulkan\jVulkanFeatureSwitch.h">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClInclude>
+    <ClInclude Include="Renderer\jDirectionalLightDrawCommandGenerator.h">
+      <Filter>Code\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\jPointLightDrawCommandGenerator.h">
+      <Filter>Code\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\jSpotLightDrawCommandGenerator.h">
+      <Filter>Code\Renderer</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -644,6 +653,15 @@
     </ClCompile>
     <ClCompile Include="Scene\Light\jSpotLight.cpp">
       <Filter>Code\Scene\Light</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\jDirectionalLightDrawCommandGenerator.cpp">
+      <Filter>Code\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\jSpotLightDrawCommandGenerator.cpp">
+      <Filter>Code\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\jPointLightDrawCommandGenerator.cpp">
+      <Filter>Code\Renderer</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
