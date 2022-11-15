@@ -391,6 +391,9 @@
     <ClInclude Include="Renderer\jSpotLightDrawCommandGenerator.h">
       <Filter>Code\Renderer</Filter>
     </ClInclude>
+    <ClInclude Include="Core\TResourcePool.h">
+      <Filter>Code\Core</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">

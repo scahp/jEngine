@@ -221,11 +221,20 @@ jShaderBindingInstance* jRenderObject::CreateShaderBindingInstance()
 	ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_GRAPHICS
 		, ResourceInlineAllactor.Alloc<jUniformBufferResource>(&OneFrameUniformBuffer));
 
-  //  for (int32 i = 0; i < (int32)MaterialData.Params.size(); ++i)
-  //  {
-		//ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
-		//	, ResourceInlineAllactor.Alloc<jTextureResource>(MaterialData.Params[i].Texture, MaterialData.Params[i].SamplerState));
-  //  }
+	if (TextureSamplers.size() <= 0)
+	{
+        ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
+            , ResourceInlineAllactor.Alloc<jTextureResource>(GWhiteTexture, nullptr));
+	}
+	else
+	{
+		for (auto& iter : TextureSamplers)
+		{
+			check(iter.Texture);
+			ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
+				, ResourceInlineAllactor.Alloc<jTextureResource>(iter.Texture, iter.SamplerState));
+		}
+	}
 
     return g_rhi->CreateShaderBindingInstance(ShaderBindingArray);
 }

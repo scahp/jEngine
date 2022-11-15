@@ -40,7 +40,6 @@ TResourcePool<jDepthStencilStateInfo_Vulkan, jMutexRWLock> jRHI_Vulkan::DepthSte
 TResourcePool<jBlendingStateInfo_Vulakn, jMutexRWLock> jRHI_Vulkan::BlendingStatePool;
 TResourcePool<jPipelineStateInfo_Vulkan, jMutexRWLock> jRHI_Vulkan::PipelineStatePool;
 TResourcePool<jRenderPass_Vulkan, jMutexRWLock> jRHI_Vulkan::RenderPassPool;
-TResourcePool<jShader_Vulkan, jMutexRWLock> jRHI_Vulkan::ShaderPool;
 
 struct jFrameBuffer_Vulkan : public jFrameBuffer
 {
@@ -307,7 +306,6 @@ void jRHI_Vulkan::ReleaseRHI()
     DepthStencilStatePool.Release();
     BlendingStatePool.Release();
     PipelineStatePool.Release();
-    ShaderPool.Release();
 
     jTexture_Vulkan::DestroyDefaultSamplerState();
     jFrameBufferPool::Release();
@@ -720,11 +718,6 @@ jTexture* jRHI_Vulkan::CreateTextureFromData(void* data, int32 width, int32 heig
 	return texture;
 }
 
-jShader* jRHI_Vulkan::CreateShader(const jShaderInfo& shaderInfo) const
-{
-	return ShaderPool.GetOrCreate(shaderInfo);
-}
-
 bool jRHI_Vulkan::CreateShaderInternal(jShader* OutShader, const jShaderInfo& shaderInfo) const
 {
 	auto CreateShaderModule = [Device = this->Device](const std::vector<uint32>& code) -> VkShaderModule
@@ -745,137 +738,77 @@ bool jRHI_Vulkan::CreateShaderInternal(jShader* OutShader, const jShaderInfo& sh
 		return shaderModule;
 	};
 
-	jShader_Vulkan* shader_vk = (jShader_Vulkan*)OutShader;
-
-	if (shaderInfo.cs.GetStringLength() > 0)
+	jShader* shader_vk = OutShader;
+	check(shader_vk->GetPermutationCount());
 	{
-		jFile csFile;
-		csFile.OpenFile(shaderInfo.cs.ToStr(), FileType::TEXT, ReadWriteType::READ);
-		csFile.ReadFileToBuffer(false);
-		std::string csText;
+		check(!shader_vk->CompiledShader);
+		jCompiledShader_Vulkan* CurCompiledShader = new jCompiledShader_Vulkan();
+		shader_vk->CompiledShader = CurCompiledShader;
 
-		if (shaderInfo.csPreProcessor.GetStringLength() > 0)
+		// PermutationId 를 설정하여 컴파일을 준비함
+        shader_vk->SetPermutationId(shaderInfo.GetPermutationId());
+
+		std::string PermutationDefines;
+		shader_vk->GetPermutationDefines(PermutationDefines);
+
+		VkShaderStageFlagBits ShaderFlagBits;
+		ShaderConductor::ShaderStage ShaderConductorShaderStage;
+		EShLanguage ShaderLangShaderStage;
+		switch (shaderInfo.GetShaderType())
 		{
-			csText += shaderInfo.csPreProcessor.ToStr();
-			csText += "\r\n";
+		case EShaderAccessStageFlag::VERTEX:
+			ShaderFlagBits = VK_SHADER_STAGE_VERTEX_BIT;
+			ShaderConductorShaderStage = ShaderConductor::ShaderStage::VertexShader;
+			ShaderLangShaderStage = EShLangVertex;
+			break;
+		case EShaderAccessStageFlag::GEOMETRY:
+			ShaderFlagBits = VK_SHADER_STAGE_GEOMETRY_BIT;
+			ShaderConductorShaderStage = ShaderConductor::ShaderStage::GeometryShader;
+			ShaderLangShaderStage = EShLangGeometry;
+			break;
+		case EShaderAccessStageFlag::FRAGMENT:
+			ShaderFlagBits = VK_SHADER_STAGE_FRAGMENT_BIT;
+			ShaderConductorShaderStage = ShaderConductor::ShaderStage::PixelShader;
+			ShaderLangShaderStage = EShLangFragment;
+			break;
+		case EShaderAccessStageFlag::COMPUTE:
+			ShaderFlagBits = VK_SHADER_STAGE_COMPUTE_BIT;
+			ShaderConductorShaderStage = ShaderConductor::ShaderStage::ComputeShader;
+			ShaderLangShaderStage = EShLangCompute;
+			break;
+		default:
+			check(0);
+			break;
 		}
 
-		csText += csFile.GetBuffer();
+        jFile ShaderFile;
+        ShaderFile.OpenFile(shaderInfo.GetShaderFilepath().ToStr(), FileType::TEXT, ReadWriteType::READ);
+        ShaderFile.ReadFileToBuffer(false);
+        std::string ShaderText;
 
-		std::vector<uint32> SpirvCode;
-        const bool isHLSL = !!strstr(shaderInfo.cs.ToStr(), ".hlsl");
-		if (isHLSL)
-			jSpirvHelper::HLSLtoSpirv(SpirvCode, ShaderConductor::ShaderStage::ComputeShader, csText.c_str());
-		else
-            jSpirvHelper::GLSLtoSpirv(SpirvCode, EShLanguage::EShLangCompute, csText.data());
-		VkShaderModule computeShaderModule = CreateShaderModule(SpirvCode);
+		if (shaderInfo.GetPreProcessors().GetStringLength() > 0)
+        {
+            ShaderText += shaderInfo.GetPreProcessors().ToStr();
+            ShaderText += "\r\n";
+        }
+        ShaderText += PermutationDefines;
+        ShaderText += "\r\n";
 
-		VkPipelineShaderStageCreateInfo computeShaderStageInfo = {};
-		computeShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-		computeShaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-		computeShaderStageInfo.module = computeShaderModule;
-		computeShaderStageInfo.pName = "main";
+        ShaderText += ShaderFile.GetBuffer();
 
-		shader_vk->ShaderStages.push_back(computeShaderStageInfo);
+        std::vector<uint32> SpirvCode;
+        const bool isHLSL = !!strstr(shaderInfo.GetShaderFilepath().ToStr(), ".hlsl");
+        if (isHLSL)
+            jSpirvHelper::HLSLtoSpirv(SpirvCode, ShaderConductorShaderStage, ShaderText.c_str());
+        else
+            jSpirvHelper::GLSLtoSpirv(SpirvCode, ShaderLangShaderStage, ShaderText.data());
+        VkShaderModule computeShaderModule = CreateShaderModule(SpirvCode);
+
+		CurCompiledShader->ShaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		CurCompiledShader->ShaderStage.stage = ShaderFlagBits;
+		CurCompiledShader->ShaderStage.module = computeShaderModule;
+		CurCompiledShader->ShaderStage.pName = "main";
 	}
-	else
-	{
-		if (shaderInfo.vs.GetStringLength() > 0)
-		{
-			jFile vsFile;
-			vsFile.OpenFile(shaderInfo.vs.ToStr(), FileType::TEXT, ReadWriteType::READ);
-			vsFile.ReadFileToBuffer(false);
-			std::string vsText;
-			
-			if (shaderInfo.vsPreProcessor.GetStringLength() > 0)
-			{
-				vsText += shaderInfo.vsPreProcessor.ToStr();
-				vsText += "\r\n";
-			}
-			
-			vsText += vsFile.GetBuffer();
-
-			std::vector<uint32> SpirvCode;
-            const bool isHLSL = !!strstr(shaderInfo.vs.ToStr(), ".hlsl");
-            if (isHLSL)
-                jSpirvHelper::HLSLtoSpirv(SpirvCode, ShaderConductor::ShaderStage::VertexShader, vsText.c_str());
-			else
-				jSpirvHelper::GLSLtoSpirv(SpirvCode, EShLanguage::EShLangVertex, vsText.data());
-			VkShaderModule vertShaderModule = CreateShaderModule(SpirvCode);
-			VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
-			vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-			vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-			vertShaderStageInfo.module = vertShaderModule;
-			vertShaderStageInfo.pName = "main";
-			// pSpecializationInfo 을 통해 쉐이더에서 사용하는 상수값을 설정해줄 수 있음. 이 상수 값에 따라 if 분기문에 없어지거나 하는 최적화가 일어날 수 있음.
-			//vertShaderStageInfo.pSpecializationInfo
-
-			shader_vk->ShaderStages.push_back(vertShaderStageInfo);
-		}
-
-		if (shaderInfo.gs.GetStringLength() > 0)
-		{
-			jFile gsFile;
-			gsFile.OpenFile(shaderInfo.gs.ToStr(), FileType::TEXT, ReadWriteType::READ);
-			gsFile.ReadFileToBuffer(false);
-			std::string gsText;
-
-			if (shaderInfo.gsPreProcessor.GetStringLength() > 0)
-			{
-				gsText += shaderInfo.gsPreProcessor.ToStr();
-				gsText += "\r\n";
-			}
-
-			gsText += gsFile.GetBuffer();
-
-			std::vector<uint32> SpirvCode;
-            const bool isHLSL = !!strstr(shaderInfo.gs.ToStr(), ".hlsl");
-            if (isHLSL)
-                jSpirvHelper::HLSLtoSpirv(SpirvCode, ShaderConductor::ShaderStage::GeometryShader, gsText.c_str());
-			else
-				jSpirvHelper::GLSLtoSpirv(SpirvCode, EShLanguage::EShLangGeometry, gsText.data());
-			VkShaderModule geoShaderModule = CreateShaderModule(SpirvCode);
-			VkPipelineShaderStageCreateInfo geoShaderStageInfo = {};
-			geoShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-			geoShaderStageInfo.stage = VK_SHADER_STAGE_GEOMETRY_BIT;
-			geoShaderStageInfo.module = geoShaderModule;
-			geoShaderStageInfo.pName = "main";
-
-			shader_vk->ShaderStages.push_back(geoShaderStageInfo);
-		}
-
-		if (shaderInfo.fs.GetStringLength() > 0)
-		{
-			jFile fsFile;
-			fsFile.OpenFile(shaderInfo.fs.ToStr(), FileType::TEXT, ReadWriteType::READ);
-			fsFile.ReadFileToBuffer(false);
-			std::string fsText;
-
-			if (shaderInfo.fsPreProcessor.GetStringLength() > 0)
-			{
-				fsText += shaderInfo.fsPreProcessor.ToStr();
-				fsText += "\r\n";
-			}
-
-			fsText += fsFile.GetBuffer();
-
-			std::vector<uint32> SpirvCode;
-            const bool isHLSL = !!strstr(shaderInfo.fs.ToStr(), ".hlsl");
-            if (isHLSL)
-                jSpirvHelper::HLSLtoSpirv(SpirvCode, ShaderConductor::ShaderStage::PixelShader, fsText.c_str());
-			else
-				jSpirvHelper::GLSLtoSpirv(SpirvCode, EShLanguage::EShLangFragment, fsText.data());
-			VkShaderModule fragShaderModule = CreateShaderModule(SpirvCode);
-			VkPipelineShaderStageCreateInfo fragShaderStageInfo = {};
-			fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-			fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-			fragShaderStageInfo.module = fragShaderModule;
-			fragShaderStageInfo.pName = "main";
-
-			shader_vk->ShaderStages.push_back(fragShaderStageInfo);
-		}
-	}
-
 	shader_vk->ShaderInfo = shaderInfo;
 
 	return true;
@@ -1654,7 +1587,7 @@ bool jRHI_Vulkan::TransitionImageLayoutImmediate(jTexture* texture, EImageLayout
 	return false;
 }
 
-jPipelineStateInfo* jRHI_Vulkan::CreatePipelineStateInfo(const jPipelineStateFixedInfo* InPipelineStateFixed, const jShader* InShader, const jVertexBufferArray& InVertexBufferArray
+jPipelineStateInfo* jRHI_Vulkan::CreatePipelineStateInfo(const jPipelineStateFixedInfo* InPipelineStateFixed, const jGraphicsPipelineShader InShader, const jVertexBufferArray& InVertexBufferArray
 	, const jRenderPass* InRenderPass, const jShaderBindingsLayoutArray& InShaderBindingArray, const jPushConstant* InPushConstant, int32 InSubpassIndex) const
 {
 	return PipelineStatePool.GetOrCreateMove(std::move(jPipelineStateInfo(InPipelineStateFixed, InShader, InVertexBufferArray, InRenderPass, InShaderBindingArray, InPushConstant, InSubpassIndex)));

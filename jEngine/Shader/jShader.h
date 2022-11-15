@@ -1,67 +1,240 @@
 ﻿#pragma once
 #include "Core/jName.h"
 
+// Shader Permutation Define
+#define DECLARE_DEFINE(Name, ...) \
+class Name \
+{ \
+public: \
+    static constexpr char DefineName[] = #Name; \
+    static constexpr int Value[] = { __VA_ARGS__ }; \
+    static constexpr int Count = _countof(Value); \
+};
+
+// Shader Permutation. by using Shader Permutation Define, generate permutation of defines and convert it to permutation id.
+template <typename ... T>
+class jPermutation
+{
+public:
+    static int GetPermutationCount() { return 1; }
+
+    template <typename K>
+    static int GetDefineCount() { return 1; }
+
+    template <typename K>
+    int Get() const { return int(); }
+
+    template <typename K>
+    int GetIndex() const { return int(); }
+
+    template <typename K>
+    void SetIndex(int) { }
+
+    int GetPermutationId() const { return 0; }
+    void SetFromPermutationId(int) {}
+    void GetPermutationDefines(std::string&) const {}
+};
+
+template <typename T, typename ... T1>
+class jPermutation<T, T1...> : public jPermutation<T1...>
+{
+public:
+    using Type = T;
+    using Super = jPermutation<T1...>;
+
+    static int GetPermutationCount()
+    {
+        return T::Count * Super::GetPermutationCount();
+    }
+
+    template <typename K>
+    static int GetDefineCount()
+    {
+        if (std::is_same<T, K>::value)
+            return T::Count;
+
+        return Super::template GetDefineCount<K>();
+    }
+
+    template <typename K>
+    int Get() const
+    {
+        if (std::is_same<T, K>::value)
+            return T::Value[ValueIndex];
+
+        return Super::template Get<K>();
+    }
+
+    template <typename K>
+    int GetIndex() const
+    {
+        if (std::is_same<T, K>::value)
+            return ValueIndex;
+
+        return Super::template GetIndex<K>();
+    }
+
+    template <typename K>
+    void SetIndex(int value)
+    {
+        if (std::is_same<T, K>::value)
+        {
+            ValueIndex = value;
+            return;
+        }
+
+        return jPermutation<T1...>::template SetIndex<K>(value);
+    }
+
+    int GetPermutationId() const
+    {
+        return ValueIndex * Super::GetPermutationCount() + Super::GetPermutationId();
+    }
+
+    void SetFromPermutationId(int permutationId)
+    {
+        ValueIndex = (permutationId / Super::GetPermutationCount()) % T::Count;
+        Super::SetFromPermutationId(permutationId);
+    }
+
+    void GetPermutationDefines(std::string& OutDefines) const
+    {
+        OutDefines += "#define ";
+        OutDefines += Type::DefineName;
+        OutDefines += " ";
+        OutDefines += std::to_string(T::Value[ValueIndex]);
+        OutDefines += "\r\n";
+
+        Super::GetPermutationDefines(OutDefines);
+    }
+
+    int ValueIndex = 0;
+};
+
 struct jShaderInfo
 {
-	static void AddShaderInfo(const jShaderInfo& shaderInfo);
-	static void CreateShaders();
-	
-	void Initialize() {}
+    jShaderInfo() = default;
+    jShaderInfo(jName InName, jName InShaderFilepath, jName InPreProcessors, EShaderAccessStageFlag InShaderType)
+        : Name(InName), ShaderFilepath(InShaderFilepath), PreProcessors(InPreProcessors), ShaderType(InShaderType)
+    {}
+
+    void Initialize() {}
 
 	FORCEINLINE size_t GetHash() const
 	{
-		if (!Hash)
+        if (Hash)
+            return Hash;
+
 		{
-			Hash = 0;
-			if (name.IsValid())
-				Hash = CityHash64WithSeed(name, Hash);
-			if (vs.IsValid())
-				Hash = CityHash64WithSeed(vs, Hash);
-			if (gs.IsValid())
-				Hash = CityHash64WithSeed(gs, Hash);
-			if (fs.IsValid())
-				Hash = CityHash64WithSeed(fs, Hash);
-			if (cs.IsValid())
-				Hash = CityHash64WithSeed(cs, Hash);
-			if (vsPreProcessor.IsValid())
-				Hash = CityHash64WithSeed(vsPreProcessor, Hash);
-			if (gsPreProcessor.IsValid())
-				Hash = CityHash64WithSeed(gsPreProcessor, Hash);
-			if (fsPreProcessor.IsValid())
-				Hash = CityHash64WithSeed(fsPreProcessor, Hash);
-			if (csPreProcessor.IsValid())
-				Hash = CityHash64WithSeed(csPreProcessor, Hash);
+			if (Name.IsValid())
+				Hash = CityHash64WithSeed(Name, Hash);
+            if (ShaderFilepath.IsValid())
+                Hash = CityHash64WithSeed(ShaderFilepath, Hash);
+            if (PreProcessors.IsValid())
+                Hash = CityHash64WithSeed(PreProcessors, Hash);
+            Hash = CityHash64WithSeed((uint64)ShaderType, Hash);
+            Hash = CityHash64WithSeed((uint64)PermutationId, Hash);
 		}
 		return Hash;
 	}
-	mutable size_t Hash = 0;
+    mutable size_t Hash = 0;
 
-	jName name;
-	jName vs;
-	jName gs;
-	jName fs;
-	jName cs;
-	jName vsPreProcessor;
-	jName gsPreProcessor;
-	jName fsPreProcessor;
-	jName csPreProcessor;
+    const jName& GetName() const { return Name; }
+    const jName& GetShaderFilepath() const { return ShaderFilepath; }
+    const jName& GetPreProcessors() const { return PreProcessors; }
+    const EShaderAccessStageFlag GetShaderType() const { return ShaderType; }
+    const uint32& GetPermutationId() const { return PermutationId; }
+
+    void SetName(const jName& InName) { Name = InName; Hash = 0; }
+    void SetShaderFilepath(const jName& InShaderFilepath) { ShaderFilepath = InShaderFilepath; Hash = 0; }
+    void SetPreProcessors(const jName& InPreProcessors) { PreProcessors = InPreProcessors; Hash = 0; }
+    void SetShaderType(const EShaderAccessStageFlag InShaderType) { ShaderType = InShaderType; Hash = 0; }
+    void SetPermutationId(const uint32 InPermutationId) { PermutationId = InPermutationId; Hash = 0; }
+
+private:
+	jName Name;
+    jName ShaderFilepath;
+    jName PreProcessors;
+    EShaderAccessStageFlag ShaderType = (EShaderAccessStageFlag)0;
+    uint32 PermutationId = 0;
+};
+
+struct jCompiledShader
+{
+	virtual ~jCompiledShader() {}
 };
 
 struct jShader : public std::enable_shared_from_this<jShader>
 {
-	virtual ~jShader() {}
+	jShader()
+	{}
+    jShader(const jShaderInfo& shaderInfo)
+        : ShaderInfo(shaderInfo)
+    { }
+	virtual ~jShader();
 
-	static std::vector<std::shared_ptr<jShader> > ShaderVector;
-	static robin_hood::unordered_map<jName, std::shared_ptr<jShader>, jNameHashFunc> ShaderNameMap;
-	static jShader* GetShader(const jName& name);
-	static jShader* CreateShader(const jShaderInfo& shaderInfo);
-	static std::shared_ptr<jShader> GetShaderPtr(const jName& name);
-	static std::shared_ptr<jShader> CreateShaderPtr(const jShaderInfo& shaderInfo);
 	static void UpdateShaders();
+
+    void UpdateShader();
+    virtual void Initialize();
 
 	uint64 TimeStamp = 0;
 	jShaderInfo ShaderInfo;
 
-	void UpdateShader();
-	virtual void Initialize() {}
+	jCompiledShader* GetCompiledShader() const
+	{
+		return CompiledShader;
+	}
+
+    virtual void SetPermutationId(int32 InPermutaitonId) { }
+    virtual int32 GetPermutationId() const { return 0; }
+    virtual int32 GetPermutationCount() const { return 1; };
+    virtual void GetPermutationDefines(std::string& OutResult) const { }
+    jCompiledShader* CompiledShader = nullptr;
 };
+
+struct jShaderGBuffer : public jShader
+{
+    DECLARE_DEFINE(USE_VERTEX_COLOR, 0, 1);
+    DECLARE_DEFINE(USE_ALBEDO_TEXTURE, 0, 1);
+    DECLARE_DEFINE(USE_VARIABLE_SHADING_RATE, 0, 1);
+    
+    using ShaderPermutation = jPermutation<USE_VERTEX_COLOR, USE_ALBEDO_TEXTURE, USE_VARIABLE_SHADING_RATE>;
+    ShaderPermutation Permutation;
+
+    static jShaderInfo GShaderInfo;
+    static jShaderGBuffer* CreateShader(const jShaderGBuffer::ShaderPermutation& InPermutation);
+
+    using jShader::jShader;
+
+    virtual void SetPermutationId(int32 InPermutaitonId) override { Permutation.SetFromPermutationId(InPermutaitonId); }
+    virtual int32 GetPermutationId() const override { return Permutation.GetPermutationId(); }
+    virtual int32 GetPermutationCount() const override { return Permutation.GetPermutationCount(); }
+    virtual void GetPermutationDefines(std::string& OutResult) const
+    { 
+        Permutation.GetPermutationDefines(OutResult);
+    }
+};
+
+struct jGraphicsPipelineShader
+{
+    jShader* VertexShader = nullptr;
+    jShader* GeometryShader = nullptr;
+    jShader* PixelShader = nullptr;
+
+    size_t GetHash() const
+    {
+        size_t hash = 0;
+        if (VertexShader)
+            hash ^= VertexShader->ShaderInfo.GetHash();
+        
+        if (GeometryShader)
+            hash ^= GeometryShader->ShaderInfo.GetHash();
+        
+        if (PixelShader)
+            hash ^= PixelShader->ShaderInfo.GetHash();
+
+        return hash;
+    }
+};
+

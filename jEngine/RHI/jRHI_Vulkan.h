@@ -34,7 +34,6 @@ public:
     static TResourcePool<jBlendingStateInfo_Vulakn, jMutexRWLock> BlendingStatePool;
     static TResourcePool<jPipelineStateInfo_Vulkan, jMutexRWLock> PipelineStatePool;
 	static TResourcePool<jRenderPass_Vulkan, jMutexRWLock> RenderPassPool;
-	static TResourcePool<jShader_Vulkan, jMutexRWLock> ShaderPool;
 
 	jRHI_Vulkan();
 	virtual ~jRHI_Vulkan();
@@ -128,7 +127,6 @@ public:
 	virtual jIndexBuffer* CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const override;
 	virtual jTexture* CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
 		, ETextureFormat textureFormat = ETextureFormat::RGBA8, bool createMipmap = false) const override;
-	virtual jShader* CreateShader(const jShaderInfo& shaderInfo) const override;
 	virtual bool CreateShaderInternal(jShader* OutShader, const jShaderInfo& shaderInfo) const override;
 	virtual jFrameBuffer* CreateFrameBuffer(const jFrameBufferInfo& info) const override;
 	virtual std::shared_ptr<jRenderTarget> CreateRenderTarget(const jRenderTargetInfo& info) const override;
@@ -159,7 +157,7 @@ public:
     virtual void ReleaseQueryTime(jQuery* queryTime) const override;
 	virtual std::shared_ptr<jRenderFrameContext> BeginRenderFrame() override;
 	virtual void EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr) override;
-	jPipelineStateInfo* CreatePipelineStateInfo(const jPipelineStateFixedInfo* InPipelineStateFixed, const jShader* InShader, const jVertexBufferArray& InVertexBufferArray
+	jPipelineStateInfo* CreatePipelineStateInfo(const jPipelineStateFixedInfo* InPipelineStateFixed, const jGraphicsPipelineShader InShader, const jVertexBufferArray& InVertexBufferArray
 		, const jRenderPass* InRenderPass, const jShaderBindingsLayoutArray& InShaderBindingArray, const jPushConstant* InPushConstant, int32 InSubpassIndex) const override;
 	virtual jPipelineStateInfo* CreateComputePipelineStateInfo(const jShader* shader, const jShaderBindingsLayoutArray& InShaderBindingArray, const jPushConstant* pushConstant) const override;
 

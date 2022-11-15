@@ -1,13 +1,9 @@
 ﻿#pragma once
 #include "Shader/jShader.h"
 
-struct jShader_Vulkan : public jShader
+struct jCompiledShader_Vulkan : public jCompiledShader
 {
-    jShader_Vulkan(const jShaderInfo& shaderInfo);
-    virtual ~jShader_Vulkan();
+    virtual ~jCompiledShader_Vulkan();
 
-    virtual void Initialize() override;
-    void Release();
-
-    std::vector<VkPipelineShaderStageCreateInfo> ShaderStages;
+    VkPipelineShaderStageCreateInfo ShaderStage{};
 };

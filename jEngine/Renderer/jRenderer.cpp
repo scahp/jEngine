@@ -115,39 +115,67 @@ void jRenderer::SetupShadowPass()
         // Shadow 기준 View 를 생성, 현재 Light 가 가진 Shadow Camera 와 ViewLight를 설정해줌
         ShadowPasses.ViewLight = ViewLight;
 
-        jShader* ShadowShader = nullptr;
+        jGraphicsPipelineShader ShadowShader;
         {
             jShaderInfo shaderInfo;
 
-            shaderInfo.name = jNameStatic("shadow_test");
             if (ViewLight.Light->IsOmnidirectional())
             {
-                shaderInfo.vs = jNameStatic("Resource/Shaders/hlsl/omni_shadow_vs.hlsl");
-                shaderInfo.gs = jNameStatic("Resource/Shaders/hlsl/omni_shadow_gs.hlsl");
-                shaderInfo.fs = jNameStatic("Resource/Shaders/hlsl/omni_shadow_fs.hlsl");
+                shaderInfo.SetName(jNameStatic("shadow_testVS"));
+                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/omni_shadow_vs.hlsl"));
+                shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
+                ShadowShader.VertexShader = g_rhi->CreateShader(shaderInfo);
+
+                shaderInfo.SetName(jNameStatic("shadow_testGS"));
+                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/omni_shadow_gs.hlsl"));
+                shaderInfo.SetShaderType(EShaderAccessStageFlag::GEOMETRY);
+                ShadowShader.GeometryShader = g_rhi->CreateShader(shaderInfo);
+
+                shaderInfo.SetName(jNameStatic("shadow_testPS"));
+                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/omni_shadow_fs.hlsl"));
+                shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
+                ShadowShader.PixelShader = g_rhi->CreateShader(shaderInfo);
             }
             else
             {
                 if (ViewLight.Light->Type == ELightType::SPOT)
                 {
-                    shaderInfo.vs = jNameStatic("resource/shaders/hlsl/spot_shadow_vs.hlsl");
-                    shaderInfo.fs = jNameStatic("resource/shaders/hlsl/spot_shadow_fs.hlsl");
+                    shaderInfo.SetName(jNameStatic("shadow_testVS"));
+                    shaderInfo.SetShaderFilepath(jNameStatic("resource/shaders/hlsl/spot_shadow_vs.hlsl"));
+                    shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
+                    ShadowShader.VertexShader = g_rhi->CreateShader(shaderInfo);
+
+                    shaderInfo.SetName(jNameStatic("shadow_testPS"));
+                    shaderInfo.SetShaderFilepath(jNameStatic("resource/shaders/hlsl/spot_shadow_fs.hlsl"));
+                    shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
+                    ShadowShader.PixelShader = g_rhi->CreateShader(shaderInfo);
                 }
                 else
                 {
-                    shaderInfo.vs = jNameStatic("resource/shaders/hlsl/shadow_vs.hlsl");
-                    shaderInfo.fs = jNameStatic("resource/shaders/hlsl/shadow_fs.hlsl");
+                    shaderInfo.SetName(jNameStatic("shadow_testVS"));
+                    shaderInfo.SetShaderFilepath(jNameStatic("resource/shaders/hlsl/shadow_vs.hlsl"));
+                    shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
+                    ShadowShader.VertexShader = g_rhi->CreateShader(shaderInfo);
+
+                    shaderInfo.SetName(jNameStatic("shadow_testPS"));
+                    shaderInfo.SetShaderFilepath(jNameStatic("resource/shaders/hlsl/shadow_fs.hlsl"));
+                    shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
+                    ShadowShader.PixelShader = g_rhi->CreateShader(shaderInfo);
                 }
             }
-            ShadowShader = g_rhi->CreateShader(shaderInfo);
         }
-        jShader* ShadowInstancingShader = nullptr;
+        jGraphicsPipelineShader ShadowInstancingShader;
         {
             jShaderInfo shaderInfo;
-            shaderInfo.name = jNameStatic("shadow_test");
-            shaderInfo.vs = jNameStatic("Resource/Shaders/hlsl/shadow_instancing_vs.hlsl");
-            shaderInfo.fs = jNameStatic("Resource/Shaders/hlsl/shadow_fs.hlsl");
-            ShadowInstancingShader = g_rhi->CreateShader(shaderInfo);
+            shaderInfo.SetName(jNameStatic("shadow_testVS"));
+            shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/shadow_instancing_vs.hlsl"));
+            shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
+            ShadowInstancingShader.VertexShader = g_rhi->CreateShader(shaderInfo);
+
+            shaderInfo.SetName(jNameStatic("shadow_testGS"));
+            shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/shadow_fs.hlsl"));
+            shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
+            ShadowInstancingShader.PixelShader = g_rhi->CreateShader(shaderInfo);
         }
 
 #if PARALLELFOR_WITH_PASSSETUP
@@ -287,45 +315,52 @@ void jRenderer::SetupBasePass()
         renderPassInfo.Subpasses.push_back(subpass);
     }
     //////////////////////////////////////////////////////////////////////////
-    OpaqueRenderPass = (jRenderPass_Vulkan*)g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
+    BaseRenderPass = (jRenderPass_Vulkan*)g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
 
-    // This is an example of creating RenderPass without setting subpasses
-    //if (resolve.IsValid())
-    //{
-    //    OpaqueRenderPass = (jRenderPass_Vulkan*)g_rhi->GetOrCreateRenderPass({ color }, depth, resolve, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
-    //}
-    //else
-    //{
-    //    OpaqueRenderPass = (jRenderPass_Vulkan*)g_rhi->GetOrCreateRenderPass({ color }, depth, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
-    //}
-
-    jShader* BasePassShader = nullptr;
+    jGraphicsPipelineShader BasePassShader;
+    jShaderInfo shaderInfo;
+    if (UseForwardRenderer)
     {
-        jShaderInfo shaderInfo;
-        shaderInfo.name = jNameStatic("default_test");
-        if (UseForwardRenderer)
-        {
-            shaderInfo.vs = jNameStatic("Resource/Shaders/hlsl/shader_vs.hlsl");
-            shaderInfo.fs = jNameStatic("Resource/Shaders/hlsl/shader_fs.hlsl");
-        }
-        else
-        {
-            shaderInfo.vs = jNameStatic("Resource/Shaders/hlsl/gbuffer_vs.hlsl");
-            shaderInfo.fs = jNameStatic("Resource/Shaders/hlsl/gbuffer_fs.hlsl");
-        }
+        shaderInfo.SetName(jNameStatic("default_testVS"));
+        shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/shader_vs.hlsl"));
+        shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
+        BasePassShader.VertexShader = g_rhi->CreateShader(shaderInfo);
+
+        shaderInfo.SetName(jNameStatic("default_testPS"));
+        shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/shader_fs.hlsl"));
+        shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
 #if USE_VARIABLE_SHADING_RATE_TIER2
         if (gOptions.UseVRS)
-            shaderInfo.fsPreProcessor = jNameStatic("#define USE_VARIABLE_SHADING_RATE 1");
+            shaderInfo.PreProcessors = jNameStatic("#define USE_VARIABLE_SHADING_RATE 1");
 #endif
-        BasePassShader = g_rhi->CreateShader(shaderInfo);
+        BasePassShader.PixelShader = g_rhi->CreateShader(shaderInfo);
     }
-    jShader* BasePassInstancingShader = nullptr;
+    else
+    {
+        shaderInfo.SetName(jNameStatic("default_testVS"));
+        shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/gbuffer_vs.hlsl"));
+        shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
+        BasePassShader.VertexShader = g_rhi->CreateShader(shaderInfo);
+
+        jShaderGBuffer::ShaderPermutation ShaderPermutation;
+        ShaderPermutation.SetIndex<jShaderGBuffer::USE_VERTEX_COLOR>(1);
+        ShaderPermutation.SetIndex<jShaderGBuffer::USE_ALBEDO_TEXTURE>(1);
+        ShaderPermutation.SetIndex<jShaderGBuffer::USE_VARIABLE_SHADING_RATE>(USE_VARIABLE_SHADING_RATE_TIER2);
+        BasePassShader.PixelShader = jShaderGBuffer::CreateShader(ShaderPermutation);
+    }
+
+    jGraphicsPipelineShader BasePassInstancingShader;
     {
         jShaderInfo shaderInfo;
-        shaderInfo.name = jNameStatic("default_test");
-        shaderInfo.vs = jNameStatic("Resource/Shaders/hlsl/shader_instancing_vs.hlsl");
-        shaderInfo.fs = jNameStatic("Resource/Shaders/hlsl/shader_fs.hlsl");
-        BasePassInstancingShader = g_rhi->CreateShader(shaderInfo);
+        shaderInfo.SetName(jNameStatic("default_testVS"));
+        shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/shader_instancing_vs.hlsl"));
+        shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
+        BasePassInstancingShader.VertexShader = g_rhi->CreateShader(shaderInfo);
+
+        shaderInfo.SetName(jNameStatic("default_testPS"));
+        shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/shader_fs.hlsl"));
+        shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
+        BasePassInstancingShader.PixelShader = g_rhi->CreateShader(shaderInfo);
     }
     
     jSimplePushConstant SimplePushConstantData;
@@ -339,7 +374,7 @@ void jRenderer::SetupBasePass()
     jParallelFor::ParallelForWithTaskPerThread(MaxPassSetupTaskPerThreadCount, jObject::GetStaticObject()
         , [&](size_t InIndex, const jObject* InObject)
     {
-        new (&BasePasses[InIndex]) jDrawCommand(RenderFrameContextPtr, &View, InObject->RenderObject, OpaqueRenderPass
+        new (&BasePasses[InIndex]) jDrawCommand(RenderFrameContextPtr, &View, InObject->RenderObject, BaseRenderPass
             , (InObject->HasInstancing() ? BasePassInstancingShader : BasePassShader), &BasePassPipelineStateFixed, {}, SimplePushConstant);
         BasePasses[InIndex].PrepareToDraw(false);
     });
@@ -348,7 +383,7 @@ void jRenderer::SetupBasePass()
     int32 i = 0;
     for (auto iter : jObject::GetStaticObject())
     {
-        new (&BasePasses[i]) jDrawCommand(RenderFrameContextPtr, &View, iter->RenderObject, OpaqueRenderPass
+        new (&BasePasses[i]) jDrawCommand(RenderFrameContextPtr, &View, iter->RenderObject, BaseRenderPass
             , (iter->HasInstancing() ? BasePassInstancingShader : BasePassShader), &BasePassPipelineStateFixed, {}, SimplePushConstant);
         BasePasses[i].PrepareToDraw(false);
         ++i;
@@ -390,13 +425,13 @@ void jRenderer::ShadowPass()
     }
 }
 
-void jRenderer::OpaquePass()
+void jRenderer::BasePass()
 {
     if (BasePassSetupFinishEvent.valid())
         BasePassSetupFinishEvent.wait();
 
     {
-        SCOPE_CPU_PROFILE(OpaquePass);
+        SCOPE_CPU_PROFILE(BasePass);
         SCOPE_GPU_PROFILE(RenderFrameContextPtr, BasePass);
 
         if (UseForwardRenderer)
@@ -412,7 +447,7 @@ void jRenderer::OpaquePass()
         }
 
         BasepassOcclusionTest.BeginQuery(RenderFrameContextPtr->CommandBuffer);
-        if (OpaqueRenderPass && OpaqueRenderPass->BeginRenderPass(RenderFrameContextPtr->CommandBuffer))
+        if (BaseRenderPass && BaseRenderPass->BeginRenderPass(RenderFrameContextPtr->CommandBuffer))
         {
             // Draw G-Buffer : subpass 0 
             for (const auto& command : BasePasses)
@@ -424,15 +459,17 @@ void jRenderer::OpaquePass()
             if (!UseForwardRenderer && gOptions.UseSubpass)
             {
                 g_rhi->NextSubpass(RenderFrameContextPtr->CommandBuffer);
-                DeferredLightPass_TodoRefactoring(OpaqueRenderPass);
+                DeferredLightPass_TodoRefactoring(BaseRenderPass);
             }
 
-            OpaqueRenderPass->EndRenderPass();
+
+
+            BaseRenderPass->EndRenderPass();
         }
 
         if (!UseForwardRenderer && !gOptions.UseSubpass)
         {
-            DeferredLightPass_TodoRefactoring(OpaqueRenderPass);
+            DeferredLightPass_TodoRefactoring(BaseRenderPass);
         }
         BasepassOcclusionTest.EndQuery(RenderFrameContextPtr->CommandBuffer);
     }
@@ -541,11 +578,6 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
     }
 }
 
-void jRenderer::TranslucentPass()
-{
-    // SCOPE_CPU_PROFILE(TranslucentPass);
-}
-
 void jRenderer::PostProcess()
 {
     SCOPE_CPU_PROFILE(PostProcess);
@@ -604,9 +636,10 @@ void jRenderer::PostProcess()
         CurrentBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray);
 
         jShaderInfo shaderInfo;
-        shaderInfo.name = jNameStatic("emboss");
-        shaderInfo.cs = jNameStatic("Resource/Shaders/hlsl/tonemap_cs.hlsl");
-        static jShader_Vulkan* Shader = (jShader_Vulkan*)g_rhi->CreateShader(shaderInfo);
+        shaderInfo.SetName(jNameStatic("emboss"));
+        shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/tonemap_cs.hlsl"));
+        shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
+        static jShader* Shader = g_rhi->CreateShader(shaderInfo);
 
         jShaderBindingsLayoutArray ShaderBindingLayoutArray;
         ShaderBindingLayoutArray.Add(CurrentBindingInstance->ShaderBindingsLayouts);
@@ -649,8 +682,7 @@ void jRenderer::Render()
 
     Setup();
     ShadowPass();
-    OpaquePass();
-    TranslucentPass();
+    BasePass();
     PostProcess();
 
     jImGUI_Vulkan::Get().Draw(RenderFrameContextPtr);

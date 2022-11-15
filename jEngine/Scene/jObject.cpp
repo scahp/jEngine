@@ -216,5 +216,5 @@ void jObject::ShowBoundBox(bool isShow)
 
 bool jObject::HasInstancing() const
 {
-    return RenderObject->HasInstancing();
+	return RenderObject ? RenderObject->HasInstancing() : false;
 }

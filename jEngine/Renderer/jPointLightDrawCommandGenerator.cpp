@@ -28,12 +28,20 @@ void jPointLightDrawCommandGenerator::Initialize(int32 InRTWidth, int32 InRTHeig
 
     {
         jShaderInfo shaderInfo;
-        shaderInfo.name = jNameStatic("PointLightShader");
-        shaderInfo.vs = jNameStatic("Resource/Shaders/hlsl/pointlight_vs.hlsl");
-        shaderInfo.fs = jNameStatic("Resource/Shaders/hlsl/pointlight_fs.hlsl");
+        shaderInfo.SetName(jNameStatic("PointLightShaderVS"));
+        shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/pointlight_vs.hlsl"));
+        shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
+        Shader.VertexShader = g_rhi->CreateShader(shaderInfo);
+    }
+
+    {
+        jShaderInfo shaderInfo;
+        shaderInfo.SetName(jNameStatic("PointLightShaderVS"));
+        shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/pointlight_fs.hlsl"));
         if (gOptions.UseSubpass)
-            shaderInfo.fsPreProcessor = jNameStatic("#define USE_SUBPASS 1");
-        Shader = g_rhi->CreateShader(shaderInfo);
+            shaderInfo.SetPreProcessors(jNameStatic("#define USE_SUBPASS 1"));
+        shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
+        Shader.PixelShader = g_rhi->CreateShader(shaderInfo);
     }
 }
 

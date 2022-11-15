@@ -36,6 +36,6 @@ public:
     jBlendingStateInfo* BlendingState = nullptr;
     jPipelineStateFixedInfo PipelineStateFixedInfo;
 
-    jShader* Shader = nullptr;
+    jGraphicsPipelineShader Shader;
     const jShaderBindingInstanceArray& ShaderBindingInstances;
 };

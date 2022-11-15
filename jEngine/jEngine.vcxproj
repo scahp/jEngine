@@ -114,6 +114,7 @@ xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"</Command
     <ClInclude Include="Core\jName.h" />
     <ClInclude Include="Core\jParallelFor.h" />
     <ClInclude Include="Core\jResourceContainer.h" />
+    <ClInclude Include="Core\TResourcePool.h" />
     <ClInclude Include="External\cityhash\city.h" />
     <ClInclude Include="External\cityhash\citycrc.h" />
     <ClInclude Include="External\glad\include\glad\glad.h" />

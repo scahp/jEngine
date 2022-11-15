@@ -5,6 +5,9 @@
 #include "Scene/jCamera.h"
 #include "Vulkan/jUniformBufferBlock_Vulkan.h"
 
+jTexture* GWhiteTexture = nullptr;
+jTexture* GBlackTexture = nullptr;
+
 //////////////////////////////////////////////////////////////////////////
 void IUniformBuffer::Bind(const jShader* shader) const
 {
@@ -12,6 +15,28 @@ void IUniformBuffer::Bind(const jShader* shader) const
 }
 
 //////////////////////////////////////////////////////////////////////////
+TResourcePool<jShader, jMutexRWLock> jRHI::ShaderPool;
+
+bool jRHI::InitRHI()
+{
+    return false;
+}
+
+void jRHI::OnInitRHI()
+{
+	uint8 WhiteData[4] = { 255, 255, 255, 255 };
+	GWhiteTexture = CreateTextureFromData(&WhiteData, 1, 1, false, ETextureFormat::RGBA8, false);
+
+	uint8 BlackData[4] = { 0, 0, 0, 0 };
+	GBlackTexture = CreateTextureFromData(&BlackData, 1, 1, false, ETextureFormat::RGBA8, false);
+}
+
+void jRHI::ReleaseRHI()
+{
+	delete GWhiteTexture;
+	delete GBlackTexture;
+	ShaderPool.Release();
+}
 
 jRHI::jRHI()
 {

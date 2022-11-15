@@ -43,11 +43,10 @@ public:
 
     virtual void Setup();
     virtual void ShadowPass();
-    virtual void OpaquePass();
+    virtual void BasePass();
 
     void DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass);
 
-    virtual void TranslucentPass();
     virtual void PostProcess();
 
     void SetupShadowPass();
@@ -66,7 +65,7 @@ public:
     std::vector<jShadowDrawInfo> ShadowDrawInfo;
     std::vector<jDrawCommand> BasePasses;
 
-    jRenderPass* OpaqueRenderPass = nullptr;
+    jRenderPass* BaseRenderPass = nullptr;
 
     //jQueryOcclusion_Vulkan ShadowpassOcclusionTest;
     jQueryOcclusion_Vulkan BasepassOcclusionTest;

@@ -39,6 +39,7 @@ int main()
 	//::ShowWindow(::GetConsoleWindow(), SW_HIDE);		// hide console window
 
 	g_rhi->InitRHI();
+	g_rhi->OnInitRHI();
 
 	GLFWwindow* window = static_cast<GLFWwindow*>(g_rhi->GetWindow());
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);

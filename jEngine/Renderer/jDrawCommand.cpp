@@ -11,7 +11,7 @@
 #include "jOptions.h"
 
 jDrawCommand::jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, const jView* InView
-    , jRenderObject* InRenderObject, jRenderPass* InRenderPass, jShader* InShader, jPipelineStateFixedInfo* InPipelineStateFixed
+    , jRenderObject* InRenderObject, jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed
     , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant, int32 InSubpassIndex)
     : RenderFrameContextPtr(InRenderFrameContextPtr), View(InView), RenderObject(InRenderObject), RenderPass(InRenderPass), Shader(InShader), PipelineStateFixed(InPipelineStateFixed)
     , PushConstant(InPushConstant), ShaderBindingInstanceArray(InShaderBindingInstanceArray), SubpassIndex(InSubpassIndex)
@@ -20,7 +20,7 @@ jDrawCommand::jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderF
 }
 
 jDrawCommand::jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, const jViewLight* InViewLight
-    , jRenderObject* InRenderObject, jRenderPass* InRenderPass, jShader* InShader, jPipelineStateFixedInfo* InPipelineStateFixed
+    , jRenderObject* InRenderObject, jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed
     , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant, int32 InSubpassIndex)
     : RenderFrameContextPtr(InRenderFrameContextPtr), ViewLight(InViewLight), RenderObject(InRenderObject), RenderPass(InRenderPass), Shader(InShader), PipelineStateFixed(InPipelineStateFixed)
     , PushConstant(InPushConstant), ShaderBindingInstanceArray(InShaderBindingInstanceArray), SubpassIndex(InSubpassIndex)

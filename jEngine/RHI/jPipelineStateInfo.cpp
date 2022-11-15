@@ -14,9 +14,14 @@ size_t jPipelineStateInfo::GetHash() const
         Hash ^= PipelineStateFixed->CreateHash();
         Hash ^= VertexBufferArray.GetHash();
         Hash ^= RenderPass->GetHash();
+        Hash ^= GraphicsShader.GetHash();
+    }
+    else
+    {
+        check(ComputeShader);
+        Hash ^= ComputeShader->ShaderInfo.GetHash();
     }
 
-    Hash ^= Shader->ShaderInfo.GetHash();
     Hash ^= ShaderBindingLayoutArray.GetHash();
 
     if (PushConstant)

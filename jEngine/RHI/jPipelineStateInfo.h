@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include "jShaderBindingsLayout.h"
 #include "jBuffer.h"
+#include "Shader/jShader.h"
 
 //////////////////////////////////////////////////////////////////////////
 // jViewport
@@ -481,6 +482,7 @@ struct jPushConstant
 };
 
 struct jShader;
+struct jGraphicsPipelineShader;
 struct jVertexBuffer;
 struct jShaderBindingsLayout;
 class jRenderPass;
@@ -492,25 +494,25 @@ struct jRenderFrameContext;
 struct jPipelineStateInfo
 {
     jPipelineStateInfo() = default;
-    jPipelineStateInfo(const jPipelineStateFixedInfo* InPipelineStateFixed, const jShader* InShader, const jVertexBufferArray& InVertexBufferArray
+    jPipelineStateInfo(const jPipelineStateFixedInfo* InPipelineStateFixed, const jGraphicsPipelineShader InShader, const jVertexBufferArray& InVertexBufferArray
         , const jRenderPass* InRenderPass, const jShaderBindingsLayoutArray& InShaderBindingLayoutArray, const jPushConstant* InPushConstant = nullptr, int32 InSubpassIndex = 0)
-        : PipelineStateFixed(InPipelineStateFixed), Shader(InShader), VertexBufferArray(InVertexBufferArray), RenderPass(InRenderPass), ShaderBindingLayoutArray(InShaderBindingLayoutArray)
+        : PipelineStateFixed(InPipelineStateFixed), GraphicsShader(InShader), VertexBufferArray(InVertexBufferArray), RenderPass(InRenderPass), ShaderBindingLayoutArray(InShaderBindingLayoutArray)
         , PushConstant(InPushConstant), SubpassIndex(InSubpassIndex)
     {
         IsGraphics = true;
     }
-    jPipelineStateInfo(const jShader* InShader, const jShaderBindingsLayoutArray& InShaderBindingLayoutArray, const jPushConstant* InPushConstant = nullptr, int32 InSubpassIndex = 0)
-        : Shader(InShader), ShaderBindingLayoutArray(InShaderBindingLayoutArray), PushConstant(InPushConstant), SubpassIndex(InSubpassIndex)
+    jPipelineStateInfo(const jShader* InComputeShader, const jShaderBindingsLayoutArray& InShaderBindingLayoutArray, const jPushConstant* InPushConstant = nullptr, int32 InSubpassIndex = 0)
+        : ComputeShader(InComputeShader), ShaderBindingLayoutArray(InShaderBindingLayoutArray), PushConstant(InPushConstant), SubpassIndex(InSubpassIndex)
     {
         IsGraphics = false;
     }
     jPipelineStateInfo(const jPipelineStateInfo& InPipelineState)
-        : PipelineStateFixed(InPipelineState.PipelineStateFixed), Shader(InPipelineState.Shader), IsGraphics(InPipelineState.IsGraphics)
+        : PipelineStateFixed(InPipelineState.PipelineStateFixed), GraphicsShader(InPipelineState.GraphicsShader), ComputeShader(InPipelineState.ComputeShader), IsGraphics(InPipelineState.IsGraphics)
         , VertexBufferArray(InPipelineState.VertexBufferArray), RenderPass(InPipelineState.RenderPass), ShaderBindingLayoutArray(InPipelineState.ShaderBindingLayoutArray)
         , PushConstant(InPipelineState.PushConstant), Hash(InPipelineState.Hash), SubpassIndex(InPipelineState.SubpassIndex)
     {}
     jPipelineStateInfo(jPipelineStateInfo&& InPipelineState) noexcept
-        : PipelineStateFixed(InPipelineState.PipelineStateFixed), Shader(InPipelineState.Shader), IsGraphics(InPipelineState.IsGraphics)
+        : PipelineStateFixed(InPipelineState.PipelineStateFixed), GraphicsShader(InPipelineState.GraphicsShader), ComputeShader(InPipelineState.ComputeShader), IsGraphics(InPipelineState.IsGraphics)
         , VertexBufferArray(InPipelineState.VertexBufferArray), RenderPass(InPipelineState.RenderPass), ShaderBindingLayoutArray(InPipelineState.ShaderBindingLayoutArray)
         , PushConstant(InPipelineState.PushConstant), Hash(InPipelineState.Hash), SubpassIndex(InPipelineState.SubpassIndex)
     {}
@@ -521,7 +523,8 @@ struct jPipelineStateInfo
     mutable size_t Hash = 0;
 
     bool IsGraphics = true;
-    const jShader* Shader = nullptr;
+    const jGraphicsPipelineShader GraphicsShader;
+    const jShader* ComputeShader = nullptr;
     const jRenderPass* RenderPass = nullptr;
     jVertexBufferArray VertexBufferArray;
     jShaderBindingsLayoutArray ShaderBindingLayoutArray;

@@ -69,12 +69,14 @@ void jGame::Setup()
 	// Select one of directional light
 	DirectionalLight = NormalDirectionalLight;
 
-	// Create light info for debugging light infomation
-	//if (DirectionalLight)
-	//{
-	//	DirectionalLightInfo = jPrimitiveUtil::CreateDirectionalLightDebug(Vector(250, 260, 0) * 0.5f, Vector::OneVector * 10.0f, 10.0f, MainCamera, DirectionalLight, "Image/sun.png");
-	//	jObject::AddDebugObject(DirectionalLightInfo);
-	//}
+	//// Create light info for debugging light infomation
+ //   if (DirectionalLight)
+ //   {
+ //       DirectionalLightInfo = jPrimitiveUtil::CreateDirectionalLightDebug(Vector(250, 260, 0) * 0.5f, Vector::OneVector * 10.0f, 10.0f, MainCamera, DirectionalLight, "Image/sun.png");
+ //       // jObject::AddDebugObject(DirectionalLightInfo);
+	//	jObject::AddObject(DirectionalLightInfo->BillboardObject);
+	//	// jObject::AddObject(DirectionalLightInfo->ArrowSegementObject);
+ //   }
 
 	//if (PointLight)
 	//{
@@ -187,7 +189,8 @@ void jGame::Update(float deltaTime)
     {
         iter->Update(deltaTime);
 
-        iter->RenderObject->UpdateWorldMatrix();
+		if (iter->RenderObject)
+			iter->RenderObject->UpdateWorldMatrix();
     }
 
     // 정리해야함

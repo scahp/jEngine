@@ -292,11 +292,25 @@ void* jPipelineStateInfo_Vulkan::CreateGraphicsPipelineState()
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 
     // Shader stage
-    check(Shader);
-    //pipelineInfo.stageCount = 2;
-    //pipelineInfo.pStages = shaderStage;
-    pipelineInfo.stageCount = (uint32)((jShader_Vulkan*)Shader)->ShaderStages.size();
-    pipelineInfo.pStages = ((jShader_Vulkan*)Shader)->ShaderStages.data();
+    VkPipelineShaderStageCreateInfo ShaderStages[5];
+    uint32 ShaderStageIndex = 0;
+    if (IsGraphics)
+    {
+        if (GraphicsShader.VertexShader)
+            ShaderStages[ShaderStageIndex++] = ((jCompiledShader_Vulkan*)GraphicsShader.VertexShader->GetCompiledShader())->ShaderStage;
+        if (GraphicsShader.GeometryShader)
+            ShaderStages[ShaderStageIndex++] = ((jCompiledShader_Vulkan*)GraphicsShader.GeometryShader->GetCompiledShader())->ShaderStage;
+        if (GraphicsShader.PixelShader)
+            ShaderStages[ShaderStageIndex++] = ((jCompiledShader_Vulkan*)GraphicsShader.PixelShader->GetCompiledShader())->ShaderStage;
+    }
+    else
+    {
+        check(0);
+    }
+
+    check(ShaderStageIndex > 0);
+    pipelineInfo.stageCount = ShaderStageIndex;
+    pipelineInfo.pStages = &ShaderStages[0];
 
     // Fixed-function stage
     pipelineInfo.pVertexInputState = &vertexInputInfo;
@@ -373,7 +387,7 @@ void* jPipelineStateInfo_Vulkan::CreateComputePipelineState()
     computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
     computePipelineCreateInfo.layout = vkPipelineLayout;
     computePipelineCreateInfo.flags = 0;
-    computePipelineCreateInfo.stage = ((jShader_Vulkan*)Shader)->ShaderStages[0];
+    computePipelineCreateInfo.stage = ((jCompiledShader_Vulkan*)ComputeShader->GetCompiledShader())->ShaderStage;
 
     if (!ensure(VK_SUCCESS == vkCreateComputePipelines(g_rhi_vk->Device, g_rhi_vk->PipelineCache
         , 1, &computePipelineCreateInfo, nullptr, &vkPipeline)))

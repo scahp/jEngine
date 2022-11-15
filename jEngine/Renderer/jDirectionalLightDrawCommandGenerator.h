@@ -3,6 +3,7 @@
 #include "RHI/jShaderBindingsLayout.h"
 #include "RHI/jRHI.h"
 #include "RHI/jPipelineStateInfo.h"
+#include "Shader/jShader.h"
 
 class jObject;
 struct jRenderFrameContext;
@@ -29,6 +30,6 @@ public:
     jBlendingStateInfo* BlendingState = nullptr;
     jPipelineStateFixedInfo PipelineStateFixedInfo;
 
-    jShader* Shader = nullptr;
+    jGraphicsPipelineShader Shader;
     const jShaderBindingInstanceArray& ShaderBindingInstances;
 };

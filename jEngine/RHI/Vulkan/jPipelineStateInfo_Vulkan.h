@@ -73,7 +73,7 @@ struct jBlendingStateInfo_Vulakn : public jBlendingStateInfo
 struct jPipelineStateInfo_Vulkan : public jPipelineStateInfo
 {
     jPipelineStateInfo_Vulkan() = default;
-    jPipelineStateInfo_Vulkan(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader, const jVertexBufferArray& InVertexBufferArray
+    jPipelineStateInfo_Vulkan(const jPipelineStateFixedInfo* pipelineStateFixed, const jGraphicsPipelineShader shader, const jVertexBufferArray& InVertexBufferArray
         , const jRenderPass* renderPass, const jShaderBindingsLayoutArray& InShaderBindingLayoutArray, const jPushConstant* pushConstant)
         : jPipelineStateInfo(pipelineStateFixed, shader, InVertexBufferArray, renderPass, InShaderBindingLayoutArray, pushConstant)
     {}

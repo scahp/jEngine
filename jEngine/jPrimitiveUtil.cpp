@@ -1931,9 +1931,7 @@ jDirectionalLightPrimitive* CreateDirectionalLightDebug(const Vector& pos, const
     if (data.lock()->ImageData.size() > 0)
     {
         auto texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName(textureFilename), true).lock().get();
-		// todo
-		check(0);
-        //object->BillboardObject->RenderObject->MaterialData.AddMaterialParam(GetCommonTextureName(1), texture);
+		object->BillboardObject->RenderObject->TextureSamplers.push_back({ .Texture = texture, .SamplerState = nullptr });
         object->BillboardObject->RenderObject->IsHiddenBoundBox = true;
     }
     object->ArrowSegementObject = jPrimitiveUtil::CreateArrowSegment(Vector::ZeroVector, light->GetLightData().Direction * length, 1.0f, scale.x, scale.x / 2, Vector4(0.8f, 0.2f, 0.3f, 1.0f));

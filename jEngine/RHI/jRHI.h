@@ -10,8 +10,12 @@
 #include "jCommandBufferManager.h"
 #include "jRenderPass.h"
 #include "jRenderFrameContext.h"
+#include "Core/TResourcePool.h"
 
 extern class jRHI* g_rhi;
+
+extern jTexture* GWhiteTexture;
+extern jTexture* GBlackTexture;
 
 struct jShader;
 struct jShaderInfo;
@@ -71,7 +75,7 @@ static int32 GetBindPoint()
 	return s_index++;
 }
 
-enum jLifeTimeType : uint8
+enum class jLifeTimeType : uint8
 {
     OneFrame = 0,
     MultiFrame,
@@ -87,9 +91,9 @@ struct IUniformBufferBlock
 	virtual ~IUniformBufferBlock() {}
 
 	jName Name;
-	const jLifeTimeType LifeType = MultiFrame;
+	const jLifeTimeType LifeType = jLifeTimeType::MultiFrame;
 
-	virtual bool IsUseRingBuffer() const { return (LifeType == OneFrame); }
+	virtual bool IsUseRingBuffer() const { return (LifeType == jLifeTimeType::OneFrame); }
 
 	virtual size_t GetBufferSize() const { return 0; }
 	virtual size_t GetBufferOffset() const { return 0; }
@@ -112,9 +116,9 @@ struct IShaderStorageBufferObject
 	virtual ~IShaderStorageBufferObject() {}
 
 	jName Name;
-	const jLifeTimeType LifeType = MultiFrame;
+	const jLifeTimeType LifeType = jLifeTimeType::MultiFrame;
 
-	virtual bool IsUseRingBuffer() const { return (LifeType == OneFrame); }
+	virtual bool IsUseRingBuffer() const { return (LifeType == jLifeTimeType::OneFrame); }
 
     virtual size_t GetBufferSize() const { return 0; }
     virtual size_t GetBufferOffset() const { return 0; }
@@ -279,10 +283,19 @@ public:
 	jRHI();
 	virtual ~jRHI() {}
 
+    static TResourcePool<jShader, jMutexRWLock> ShaderPool;
+
     static constexpr int32 MaxWaitingQuerySet = 3;
 
-	virtual bool InitRHI() { return false; }
-	virtual void ReleaseRHI() {}
+	template <typename T = jShader>
+	T* CreateShader(const jShaderInfo& shaderInfo) const
+	{
+		return (T*)ShaderPool.GetOrCreate<jShaderInfo, T>(shaderInfo);
+	}
+
+	virtual bool InitRHI();
+	virtual void OnInitRHI();
+	virtual void ReleaseRHI();
 	virtual void* GetWindow() const { return nullptr; }
 	virtual jSamplerStateInfo* CreateSamplerState(const jSamplerStateInfo& info) const { return nullptr; }
 	virtual void ReleaseSamplerState(jSamplerStateInfo* samplerState) const {}
@@ -314,7 +327,6 @@ public:
 	virtual void DispatchCompute(uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ) const {}
 	virtual void EnableDepthBias(bool enable, EPolygonMode polygonMode = EPolygonMode::FILL) const {}
 	virtual void SetDepthBias(float constant, float slope) const {}
-	virtual jShader* CreateShader(const jShaderInfo& shaderInfo) const { return nullptr; }
     virtual bool CreateShaderInternal(jShader* OutShader, const jShaderInfo& shaderInfo) const { return false; }
 	virtual void ReleaseShader(jShader* shader) const {}
 	virtual void SetViewport(int32 x, int32 y, int32 width, int32 height) const {}
@@ -398,7 +410,7 @@ public:
 	virtual jDepthStencilStateInfo* CreateDepthStencilState(const jDepthStencilStateInfo& initializer) const { return nullptr; }
 	virtual jBlendingStateInfo* CreateBlendingState(const jBlendingStateInfo& initializer) const { return nullptr; }
 
-	virtual jPipelineStateInfo* CreatePipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jShader* shader
+	virtual jPipelineStateInfo* CreatePipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jGraphicsPipelineShader shader
 		, const jVertexBufferArray& InVertexBufferArray, const jRenderPass* renderPass, const jShaderBindingsLayoutArray& InShaderBindingArray, const jPushConstant* InPushConstant, int32 InSubpassIndex) const { return nullptr; }
 
 	virtual jPipelineStateInfo* CreateComputePipelineStateInfo(const jShader* shader, const jShaderBindingsLayoutArray& InShaderBindingArray, const jPushConstant* pushConstant) const { return nullptr; }
@@ -505,83 +517,6 @@ jName GetCommonTextureName(int32 index);
 jName GetCommonTextureSRGBName(int32 index);
 
 //////////////////////////////////////////////////////////////////////////
-template <typename T, typename LOCK_TYPE = jEmtpyRWLock>
-class TResourcePool
-{
-public:
-    template <typename TInitializer>
-    T* GetOrCreate(const TInitializer& initializer)
-    {
-        const size_t hash = initializer.GetHash();
-		{
-			jScopeReadLock sr(&Lock);
-			auto it_find = Pool.find(hash);
-			if (Pool.end() != it_find)
-			{
-				return it_find->second;
-			}
-		}
-
-		{
-			jScopeWriteLock sw(&Lock);
-			
-			// Try again, to avoid entering creation section simultanteously.
-            auto it_find = Pool.find(hash);
-            if (Pool.end() != it_find)
-            {
-                return it_find->second;
-            }
-
-			auto* newResource = new T(initializer);
-			newResource->Initialize();
-			Pool[hash] = newResource;
-			return newResource;
-		}
-    }
-
-    template <typename TInitializer>
-    T* GetOrCreateMove(TInitializer&& initializer)
-    {
-        const size_t hash = initializer.GetHash();
-        {
-            jScopeReadLock sr(&Lock);
-            auto it_find = Pool.find(hash);
-            if (Pool.end() != it_find)
-            {
-                return it_find->second;
-            }
-        }
-
-        {
-            jScopeWriteLock sw(&Lock);
-
-            // Try again, to avoid entering creation section simultanteously.
-            auto it_find = Pool.find(hash);
-            if (Pool.end() != it_find)
-            {
-                return it_find->second;
-            }
-
-            auto* newResource = new T(std::move(initializer));
-            newResource->Initialize();
-			Pool[hash] = newResource;
-            return newResource;
-        }
-    }
-
-	void Release()
-	{
-		jScopeWriteLock sw(&Lock);
-		for (auto& iter : Pool)
-		{
-			delete iter.second;
-		}
-		Pool.clear();
-	}
-
-	robin_hood::unordered_map<size_t, T*> Pool;
-	LOCK_TYPE Lock;
-};
 
 template <ETextureFilter TMinification = ETextureFilter::NEAREST, ETextureFilter TMagnification = ETextureFilter::NEAREST, ETextureAddressMode TAddressU = ETextureAddressMode::CLAMP_TO_EDGE
     , ETextureAddressMode TAddressV = ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode TAddressW = ETextureAddressMode::CLAMP_TO_EDGE, float TMipLODBias = 0.0f

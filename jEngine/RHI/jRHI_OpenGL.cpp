@@ -1242,7 +1242,7 @@ bool jRHI_OpenGL::CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo
 				glGetProgramInfoLog(program, maxLength, &maxLength, &errorLog[0]);
 				if (maxLength > 0)
 					errorLog.resize(maxLength - 1);	// remove null character to concatenate
-				JMESSAGE(std::string("Shader name : " + std::string(shaderInfo.name.ToStr()) + "\n-----\n" + errorLog).c_str());
+				JMESSAGE(std::string("Shader name : " + std::string(shaderInfo.Name.ToStr()) + "\n-----\n" + errorLog).c_str());
 			}
 			glDeleteShader(vs);
 			glDeleteShader(fs);
@@ -1266,7 +1266,7 @@ bool jRHI_OpenGL::CreateShader(jShader* OutShader, const jShaderInfo& shaderInfo
 				glGetProgramInfoLog(program, maxLength, &maxLength, &errorLog[0]);
 				if (maxLength > 0)
 					errorLog.resize(maxLength - 1);	// remove null character to concatenate
-				JMESSAGE(std::string("Shader name : " + std::string(shaderInfo.name.ToStr()) + "\n-----\n" + errorLog).c_str());
+				JMESSAGE(std::string("Shader name : " + std::string(shaderInfo.Name.ToStr()) + "\n-----\n" + errorLog).c_str());
 			}
 			glDeleteShader(vs);
 			glDeleteShader(fs);

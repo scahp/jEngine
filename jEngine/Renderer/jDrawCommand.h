@@ -5,6 +5,7 @@ class jView;
 class jViewLight;
 class jRenderPass;
 struct jShader;
+struct jGraphicsPipelineShader;
 struct jPipelineStateFixedInfo;
 struct jShaderBindingInstance;
 
@@ -13,11 +14,11 @@ class jDrawCommand
 public:
     jDrawCommand() = default;
     jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, const jView* InView, jRenderObject* InRenderObject
-        , jRenderPass* InRenderPass, jShader* InShader, jPipelineStateFixedInfo* InPipelineStateFixed
+        , jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed
         , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant
         , int32 InSubpassIndex = 0);
     jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, const jViewLight* InViewLight, jRenderObject* InRenderObject
-        , jRenderPass* InRenderPass, jShader* InShader, jPipelineStateFixedInfo* InPipelineStateFixed
+        , jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed
         , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant
         , int32 InSubpassIndex = 0);
 
@@ -33,7 +34,7 @@ public:
         const jViewLight* ViewLight;
     };
     jRenderPass* RenderPass = nullptr;
-    jShader* Shader = nullptr;
+    jGraphicsPipelineShader Shader;
     jRenderObject* RenderObject = nullptr;
     jPipelineStateFixedInfo* PipelineStateFixed = nullptr;
     jPipelineStateInfo_Vulkan* CurrentPipelineStateInfo = nullptr;

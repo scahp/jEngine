@@ -27,12 +27,17 @@ void jSpotLightDrawCommandGenerator::Initialize(int32 InRTWidth, int32 InRTHeigh
 
     {
         jShaderInfo shaderInfo;
-        shaderInfo.name = jNameStatic("SpotLightShader");
-        shaderInfo.vs = jNameStatic("Resource/Shaders/hlsl/spotlight_vs.hlsl");
-        shaderInfo.fs = jNameStatic("Resource/Shaders/hlsl/spotlight_fs.hlsl");
+        shaderInfo.SetName(jNameStatic("SpotLightShaderVS"));
+        shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/spotlight_vs.hlsl"));
+        shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
+        Shader.VertexShader = g_rhi->CreateShader(shaderInfo);
+
+        shaderInfo.SetName(jNameStatic("SpotLightShaderPS"));
+        shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/spotlight_fs.hlsl"));
+        shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
         if (gOptions.UseSubpass)
-            shaderInfo.fsPreProcessor = jNameStatic("#define USE_SUBPASS 1");
-        Shader = g_rhi->CreateShader(shaderInfo);
+            shaderInfo.SetPreProcessors(jNameStatic("#define USE_SUBPASS 1"));
+        Shader.PixelShader = g_rhi->CreateShader(shaderInfo);
     }
 
     ScreenSize.x = (float)InRTWidth;

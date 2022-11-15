@@ -106,6 +106,8 @@ Texture2D SpotLightShadowMap : register(t1, space3);
 SamplerComparisonState SpotLightShadowMapSampler : register(s1, space3);
 
 cbuffer RenderObjectParam : register(b0, space4) { RenderObjectUniformBuffer RenderObjectParam; }
+Texture2D DiffuseTexture : register(t1, space4);
+SamplerState DiffuseTextureSampler : register(s1, space4);
 
 struct PushConsts
 {
@@ -257,7 +259,9 @@ float4 main(VSOutput input
         }
     }
 
-    float4 color = (1.0 / 3.14) * float4(pushConsts.Color.rgb * input.Color.xyz * (PointLightLit + DirectionalLightLit + SpotLightLit), 1.0);
+    float3 DiffuseColor = DiffuseTexture.Sample(DiffuseTextureSampler, input.TexCoord.xy).xyz;// *input.Color.xyz;
+
+    float4 color = (1.0 / 3.14) * float4(pushConsts.Color.rgb * DiffuseColor * (PointLightLit + DirectionalLightLit + SpotLightLit), 1.0);
 
 #if USE_VARIABLE_SHADING_RATE
     if (pushConsts.ShowVRSArea)
@@ -304,6 +308,6 @@ float4 main(VSOutput input
         float lines = smoothstep(0.0, lineWidth, distToEdge);
         color = lerp(float4(0.0, 1.0, 0.0, 1.0), color, lines);
     }
-    
+
     return color;
 }

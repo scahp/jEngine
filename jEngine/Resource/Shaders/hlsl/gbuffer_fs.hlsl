@@ -29,6 +29,10 @@ struct RenderObjectUniformBuffer
 
 cbuffer ViewParam : register(b0, space0) { ViewUniformBuffer ViewParam; }
 cbuffer RenderObjectParam : register(b0, space1) { RenderObjectUniformBuffer RenderObjectParam; }
+#if USE_ALBEDO_TEXTURE
+Texture2D DiffuseTexture : register(t1, space1);
+SamplerState DiffuseTextureSampler : register(s1, space1);
+#endif
 
 struct PushConsts
 {
@@ -51,7 +55,13 @@ FSOutput main(VSOutput input
 #endif
 )
 {
-    float4 color = input.Color;
+    float4 color = 1;
+#if USE_VERTEX_COLOR
+    color *= input.Color;
+#endif
+#if USE_ALBEDO_TEXTURE
+    color *= DiffuseTexture.Sample(DiffuseTextureSampler, input.TexCoord.xy);
+#endif
 
 #if USE_VARIABLE_SHADING_RATE
     if (pushConsts.ShowVRSArea)
@@ -66,19 +76,19 @@ FSOutput main(VSOutput input
         switch (shadingRate)
         {
             case SHADING_RATE_PER_PIXEL:
-                return color * float4(0.0, 0.8, 0.4, 1.0);
+                color *= float4(0.0, 0.8, 0.4, 1.0);
             case SHADING_RATE_PER_2X1_PIXELS:
-                return color * float4(0.2, 0.6, 1.0, 1.0);
+                color *= float4(0.2, 0.6, 1.0, 1.0);
             case SHADING_RATE_PER_1X2_PIXELS:
-                return color * float4(0.0, 0.4, 0.8, 1.0);
+                color *= float4(0.0, 0.4, 0.8, 1.0);
             case SHADING_RATE_PER_2X2_PIXELS:
-                return color * float4(1.0, 1.0, 0.2, 1.0);
+                color *= float4(1.0, 1.0, 0.2, 1.0);
             case SHADING_RATE_PER_4X2_PIXELS:
-                return color * float4(0.8, 0.8, 0.0, 1.0);
+                color *= float4(0.8, 0.8, 0.0, 1.0);
             case SHADING_RATE_PER_2X4_PIXELS:
-                return color * float4(1.0, 0.4, 0.2, 1.0);
+                color *= float4(1.0, 0.4, 0.2, 1.0);
             default:
-                return color * float4(0.8, 0.0, 0.0, 1.0);
+                color *= float4(0.8, 0.0, 0.0, 1.0);
         }
     }
 #endif

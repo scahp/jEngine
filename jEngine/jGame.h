@@ -19,6 +19,7 @@ class jObject;
 class jPipelineSet;
 class jCascadeDirectionalLight;
 class jUIQuadPrimitive;
+class jDirectionalLightPrimitive;
 
 class jGame
 {
@@ -66,7 +67,7 @@ public:
 	jLight* AmbientLight = nullptr;
 	jCamera* MainCamera = nullptr;
 
-	jObject* DirectionalLightInfo = nullptr;
+	jDirectionalLightPrimitive* DirectionalLightInfo = nullptr;
 	jObject* PointLightInfo = nullptr;
 	jObject* SpotLightInfo = nullptr;
 	jUIQuadPrimitive* DirectionalLightShadowMapUIDebug = nullptr;

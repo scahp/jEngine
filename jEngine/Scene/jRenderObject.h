@@ -71,6 +71,14 @@ public:
 		Matrix InvM;
 	};
 
+	struct jTextureSampler
+	{
+		jTexture* Texture = nullptr;
+		jSamplerStateInfo* SamplerState = nullptr;
+	};
+
+	std::vector<jTextureSampler> TextureSamplers;
+
 	//////////////////////////////////////////////////////////////////////////
 	// RenderObjectUniformBuffer
 	jShaderBindingInstance* CreateShaderBindingInstance();
