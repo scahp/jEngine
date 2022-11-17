@@ -6,10 +6,11 @@
 struct VSOutput
 {
     float4 Pos : SV_POSITION;
-    float4 Color : COLOR0;
+    //float4 Color : COLOR0;
     float2 TexCoord : TEXCOORD0;
     float3 Normal : NORMAL0;
     float4 WorldPos : TEXCOORD1;
+    float3x3 TBN : TEXCOORD2;
 };
 
 struct ViewUniformBuffer
@@ -30,8 +31,10 @@ struct RenderObjectUniformBuffer
 cbuffer ViewParam : register(b0, space0) { ViewUniformBuffer ViewParam; }
 cbuffer RenderObjectParam : register(b0, space1) { RenderObjectUniformBuffer RenderObjectParam; }
 #if USE_ALBEDO_TEXTURE
-Texture2D DiffuseTexture : register(t1, space1);
-SamplerState DiffuseTextureSampler : register(s1, space1);
+Texture2D DiffuseTexture : register(t0, space2);
+SamplerState DiffuseTextureSampler : register(s0, space2);
+Texture2D NormalTexture : register(t1, space2);
+SamplerState NormalTextureSampler : register(s1, space2);
 #endif
 
 struct PushConsts
@@ -56,11 +59,19 @@ FSOutput main(VSOutput input
 )
 {
     float4 color = 1;
-#if USE_VERTEX_COLOR
-    color *= input.Color;
-#endif
+//#if USE_VERTEX_COLOR
+//    color *= input.Color;
+//#endif
 #if USE_ALBEDO_TEXTURE
     color *= DiffuseTexture.Sample(DiffuseTextureSampler, input.TexCoord.xy);
+    if (color.w < 0.5f)
+    {
+        discard;
+    }
+
+    float3 normal = NormalTexture.Sample(NormalTextureSampler, input.TexCoord.xy).xyz;
+    normal = normal * 2.0f - 1.0f;
+    float3 WorldNormal = normalize(mul(input.TBN, normal));
 #endif
 
 #if USE_VARIABLE_SHADING_RATE
@@ -111,7 +122,7 @@ FSOutput main(VSOutput input
     FSOutput output = (FSOutput)0;
 
     output.GBuffer0.xyz = input.WorldPos.xyz / input.WorldPos.w;
-    output.GBuffer1.xyz = input.Normal;
+    output.GBuffer1.xyz = WorldNormal;
     output.GBuffer2.xyz = color.xyz;
 
     return output;

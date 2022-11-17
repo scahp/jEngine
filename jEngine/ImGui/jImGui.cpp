@@ -355,6 +355,7 @@ void jImGUI_Vulkan::NewFrame(bool updateFrameGraph)
     {
         const auto& CPUAvgProfileMap = jPerformanceProfile::GetInstance().GetCPUAvgProfileMap();
         double TotalPassesMS = 0.0;
+        int32 MostLeastIndent = INT_MAX;
         for (auto& pair : CPUAvgProfileMap)
         {
             const jPerformanceProfile::jAvgProfile& AvgProfile = pair.second;
@@ -370,7 +371,20 @@ void jImGUI_Vulkan::NewFrame(bool updateFrameGraph)
             if (Indent > 0)
                 ImGui::Unindent(Indent);
             
-            TotalPassesMS += AvgProfile.AvgElapsedMS;
+            // 최 상위에 있는 Pass 의 평균 MS 만 더하면 하위에 있는 모든 MS 는 다 포함됨
+            // 다른 스레드에 한 작업도 렌더링 프레임이 종료 되기 전에 마치기 때문에 추가로 더해줄 필요 없음
+            if (CurrentThreadId == AvgProfile.ThreadId)
+            {
+                if (MostLeastIndent > AvgProfile.Indent)
+                {
+                    MostLeastIndent = AvgProfile.Indent;
+                    TotalPassesMS = AvgProfile.AvgElapsedMS;
+                }
+                else if (MostLeastIndent == AvgProfile.Indent)
+                {
+                    TotalPassesMS += AvgProfile.AvgElapsedMS;
+                }
+            }
         }
         ImGui::Text("[CPU]Total Passes : %lf ms", TotalPassesMS);
     }
@@ -378,6 +392,7 @@ void jImGUI_Vulkan::NewFrame(bool updateFrameGraph)
     {
         const auto& GPUAvgProfileMap = jPerformanceProfile::GetInstance().GetGPUAvgProfileMap();
         double TotalPassesMS = 0.0;
+        int32 MostLeastIndent = INT_MAX;
         for (auto& pair : GPUAvgProfileMap)
         {
             const jPerformanceProfile::jAvgProfile& AvgProfile = pair.second;
@@ -393,7 +408,20 @@ void jImGUI_Vulkan::NewFrame(bool updateFrameGraph)
             if (Indent > 0)
                 ImGui::Unindent(Indent);
 
-            TotalPassesMS += AvgProfile.AvgElapsedMS;
+            // 최 상위에 있는 Pass 의 평균 MS 만 더하면 하위에 있는 모든 MS 는 다 포함됨
+            // 다른 스레드에 한 작업도 렌더링 프레임이 종료 되기 전에 마치기 때문에 추가로 더해줄 필요 없음
+            if (CurrentThreadId == AvgProfile.ThreadId)
+            {
+                if (MostLeastIndent > AvgProfile.Indent)
+                {
+                    MostLeastIndent = AvgProfile.Indent;
+                    TotalPassesMS = AvgProfile.AvgElapsedMS;
+                }
+                else if (MostLeastIndent == AvgProfile.Indent)
+                {
+                    TotalPassesMS += AvgProfile.AvgElapsedMS;
+                }
+            }
         }
         ImGui::Text("[GPU]Total Passes : %lf ms", TotalPassesMS);
     }

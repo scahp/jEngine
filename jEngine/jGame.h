@@ -20,6 +20,7 @@ class jPipelineSet;
 class jCascadeDirectionalLight;
 class jUIQuadPrimitive;
 class jDirectionalLightPrimitive;
+class jMeshObject;
 
 class jGame
 {
@@ -71,7 +72,12 @@ public:
 	jObject* PointLightInfo = nullptr;
 	jObject* SpotLightInfo = nullptr;
 	jUIQuadPrimitive* DirectionalLightShadowMapUIDebug = nullptr;
+	jMeshObject* Sponza = nullptr;
 
 	std::vector<jObject*> SpawnedObjects;
+
+	std::future<void> ResourceLoadCompleteEvent;
+	std::vector<jObject*> CompletedAsyncLoadObjects;
+	jMutexLock AsyncLoadLock;
 };
 

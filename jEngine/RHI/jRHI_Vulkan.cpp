@@ -1172,6 +1172,8 @@ void jRHI_Vulkan::ReleaseQueryTime(jQuery* queryTime) const
 
 std::shared_ptr<jRenderFrameContext> jRHI_Vulkan::BeginRenderFrame()
 {
+	SCOPE_CPU_PROFILE(BeginRenderFrame);
+
     // timeout 은 nanoseconds. UINT64_MAX 는 타임아웃 없음
     VkResult acquireNextImageResult = vkAcquireNextImageKHR(Device, (VkSwapchainKHR)Swapchain->GetHandle(), UINT64_MAX
 		, Swapchain->Images[CurrenFrameIndex]->Available, VK_NULL_HANDLE, &CurrenFrameIndex);
@@ -1219,6 +1221,8 @@ std::shared_ptr<jRenderFrameContext> jRHI_Vulkan::BeginRenderFrame()
 
 void jRHI_Vulkan::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr)
 {
+	SCOPE_CPU_PROFILE(EndRenderFrame);
+
 	check(renderFrameContextPtr->CommandBuffer);
 	VkCommandBuffer vkCommandBuffer = (VkCommandBuffer)renderFrameContextPtr->CommandBuffer->GetHandle();
 	VkFence vkFence = (VkFence)renderFrameContextPtr->CommandBuffer->GetFenceHandle();

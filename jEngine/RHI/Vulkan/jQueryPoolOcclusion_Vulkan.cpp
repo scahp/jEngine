@@ -42,7 +42,7 @@ std::vector<uint64> jQueryPoolOcclusion_Vulkan::GetWholeQueryResult(int32 InFram
     queryResult.resize(InCount);
     VkResult result = vkGetQueryPoolResults(g_rhi_vk->Device, QueryPool, InFrameIndex * MaxQueryOcclusionCount, InCount
         , sizeof(uint64) * InCount, queryResult.data(), sizeof(uint64), VK_QUERY_RESULT_64_BIT);
-    ensure(result == VK_SUCCESS);
+    // ensure(result == VK_SUCCESS);
     return queryResult;
 }
 
@@ -52,7 +52,7 @@ std::vector<uint64> jQueryPoolOcclusion_Vulkan::GetWholeQueryResult(int32 InFram
     queryResult.resize(MaxQueryOcclusionCount);
     VkResult result = vkGetQueryPoolResults(g_rhi_vk->Device, QueryPool, InFrameIndex * MaxQueryOcclusionCount, MaxQueryOcclusionCount
         , sizeof(uint64) * MaxQueryOcclusionCount, queryResult.data(), sizeof(uint64), VK_QUERY_RESULT_64_BIT);
-    ensure(result == VK_SUCCESS);
+    // ensure(result == VK_SUCCESS);
     return queryResult;
 }
 

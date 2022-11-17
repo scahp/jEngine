@@ -61,7 +61,7 @@ void jRenderer::Setup()
     }
 
 #if ASYNC_WITH_SETUP
-    ShadowPassSetupFinishEvent = std::async(std::launch::async, &jRenderer::SetupShadowPass, this);
+    ShadowPassSetupCompleteEvent = std::async(std::launch::async, &jRenderer::SetupShadowPass, this);
 #else
     jRenderer::SetupShadowPass();
     jRenderer::SetupBasePass();
@@ -179,19 +179,18 @@ void jRenderer::SetupShadowPass()
         }
 
 #if PARALLELFOR_WITH_PASSSETUP
-        const auto& ShadowCaterObjects = jObject::GetShadowCasterObject();
-        ShadowPasses.DrawCommands.resize(ShadowCaterObjects.size());
-        jParallelFor::ParallelForWithTaskPerThread(MaxPassSetupTaskPerThreadCount, ShadowCaterObjects
-            , [&](size_t InIndex, const jObject* InObject)
+        ShadowPasses.DrawCommands.resize(jObject::GetShadowCasterRenderObject().size());
+        jParallelFor::ParallelForWithTaskPerThread(MaxPassSetupTaskPerThreadCount, jObject::GetShadowCasterRenderObject()
+            , [&](size_t InIndex, jRenderObject* InRenderObject)
             {
-                new (&ShadowPasses.DrawCommands[InIndex]) jDrawCommand(RenderFrameContextPtr, &ShadowPasses.ViewLight, InObject->RenderObject, ShadowPasses.ShadowMapRenderPass
-                    , (InObject->HasInstancing() ? ShadowInstancingShader : ShadowShader), &ShadpwPipelineStateFixed, {}, nullptr);
+                new (&ShadowPasses.DrawCommands[InIndex]) jDrawCommand(RenderFrameContextPtr, &ShadowPasses.ViewLight, InRenderObject, ShadowPasses.ShadowMapRenderPass
+                    , (InRenderObject->HasInstancing() ? ShadowInstancingShader : ShadowShader), &ShadpwPipelineStateFixed, {}, nullptr);
                 ShadowPasses.DrawCommands[InIndex].PrepareToDraw(true);
             });
 #else
-        ShadowPasses.DrawCommands.resize(ShadowCaterObjects.size());
+        ShadowPasses.DrawCommands.resize(ShadowCaterRenderObjects.size());
         int32 i = 0;
-        for (auto iter : ShadowCaterObjects)
+        for (auto iter : ShadowCaterRenderObjects)
         {
             new (&ShadowPasses.DrawCommands[i]) jDrawCommand(RenderFrameContextPtr, &ShadowPasses.ViewLight, iter->RenderObject, ShadowMapRenderPass
                 , (iter->HasInstancing() ? ShadowInstancingShader : ShadowShader), &ShadpwPipelineStateFixed, {}, nullptr);
@@ -213,6 +212,10 @@ void jRenderer::SetupBasePass()
     auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
 
     jPipelineStateFixedInfo BasePassPipelineStateFixed = jPipelineStateFixedInfo(RasterizationState, MultisampleState, DepthStencilState, BlendingState
+        , jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT), gOptions.UseVRS);
+
+    auto TranslucentBlendingState = TBlendingStateInfo<true, EBlendFactor::SRC_ALPHA, EBlendFactor::ONE_MINUS_SRC_ALPHA, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
+    jPipelineStateFixedInfo TranslucentPassPipelineStateFixed = jPipelineStateFixedInfo(RasterizationState, MultisampleState, DepthStencilState, TranslucentBlendingState
         , jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT), gOptions.UseVRS);
 
     const Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
@@ -343,21 +346,35 @@ void jRenderer::SetupBasePass()
         BasePassShader.VertexShader = g_rhi->CreateShader(shaderInfo);
 
         jShaderGBuffer::ShaderPermutation ShaderPermutation;
-        ShaderPermutation.SetIndex<jShaderGBuffer::USE_VERTEX_COLOR>(1);
+        ShaderPermutation.SetIndex<jShaderGBuffer::USE_VERTEX_COLOR>(0);
         ShaderPermutation.SetIndex<jShaderGBuffer::USE_ALBEDO_TEXTURE>(1);
         ShaderPermutation.SetIndex<jShaderGBuffer::USE_VARIABLE_SHADING_RATE>(USE_VARIABLE_SHADING_RATE_TIER2);
         BasePassShader.PixelShader = jShaderGBuffer::CreateShader(ShaderPermutation);
     }
 
+    jGraphicsPipelineShader TranslucentPassShader;
+    {
+        shaderInfo.SetName(jNameStatic("default_testVS"));
+        shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/gbuffer_vs.hlsl"));
+        shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
+        TranslucentPassShader.VertexShader = g_rhi->CreateShader(shaderInfo);
+
+        jShaderGBuffer::ShaderPermutation ShaderPermutation;
+        ShaderPermutation.SetIndex<jShaderGBuffer::USE_VERTEX_COLOR>(0);
+        ShaderPermutation.SetIndex<jShaderGBuffer::USE_ALBEDO_TEXTURE>(1);
+        ShaderPermutation.SetIndex<jShaderGBuffer::USE_VARIABLE_SHADING_RATE>(USE_VARIABLE_SHADING_RATE_TIER2);
+        TranslucentPassShader.PixelShader = jShaderGBuffer::CreateShader(ShaderPermutation);
+    }
+
     jGraphicsPipelineShader BasePassInstancingShader;
     {
         jShaderInfo shaderInfo;
-        shaderInfo.SetName(jNameStatic("default_testVS"));
+        shaderInfo.SetName(jNameStatic("default_instancing_testVS"));
         shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/shader_instancing_vs.hlsl"));
         shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
         BasePassInstancingShader.VertexShader = g_rhi->CreateShader(shaderInfo);
 
-        shaderInfo.SetName(jNameStatic("default_testPS"));
+        shaderInfo.SetName(jNameStatic("default_instancing_testPS"));
         shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/shader_fs.hlsl"));
         shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
         BasePassInstancingShader.PixelShader = g_rhi->CreateShader(shaderInfo);
@@ -370,12 +387,20 @@ void jRenderer::SetupBasePass()
     jPushConstant* SimplePushConstant = new(jMemStack::Get()->Alloc<jPushConstant>()) jPushConstant(SimplePushConstantData, EShaderAccessStageFlag::FRAGMENT);
 
 #if PARALLELFOR_WITH_PASSSETUP
-    BasePasses.resize(jObject::GetStaticObject().size());
-    jParallelFor::ParallelForWithTaskPerThread(MaxPassSetupTaskPerThreadCount, jObject::GetStaticObject()
-        , [&](size_t InIndex, const jObject* InObject)
+    BasePasses.resize(jObject::GetStaticRenderObject().size());
+    jParallelFor::ParallelForWithTaskPerThread(MaxPassSetupTaskPerThreadCount, jObject::GetStaticRenderObject()
+        , [&](size_t InIndex, jRenderObject* InRenderObject)
     {
-        new (&BasePasses[InIndex]) jDrawCommand(RenderFrameContextPtr, &View, InObject->RenderObject, BaseRenderPass
-            , (InObject->HasInstancing() ? BasePassInstancingShader : BasePassShader), &BasePassPipelineStateFixed, {}, SimplePushConstant);
+        if (InRenderObject->IsTranslucent())
+        {
+            new (&BasePasses[InIndex]) jDrawCommand(RenderFrameContextPtr, &View, InRenderObject, BaseRenderPass
+                , BasePassShader, &BasePassPipelineStateFixed, {}, SimplePushConstant);
+        }
+        else
+        {
+            new (&BasePasses[InIndex]) jDrawCommand(RenderFrameContextPtr, &View, InRenderObject, BaseRenderPass
+                , (InRenderObject->HasInstancing() ? BasePassInstancingShader : BasePassShader), &BasePassPipelineStateFixed, {}, SimplePushConstant);
+        }
         BasePasses[InIndex].PrepareToDraw(false);
     });
 #else
@@ -394,10 +419,10 @@ void jRenderer::SetupBasePass()
 void jRenderer::ShadowPass()
 {
 #if ASYNC_WITH_SETUP
-    if (ShadowPassSetupFinishEvent.valid())
-        ShadowPassSetupFinishEvent.wait();
+    if (ShadowPassSetupCompleteEvent.valid())
+        ShadowPassSetupCompleteEvent.wait();
 
-    BasePassSetupFinishEvent = std::async(std::launch::async, &jRenderer::SetupBasePass, this);
+    BasePassSetupCompleteEvent = std::async(std::launch::async, &jRenderer::SetupBasePass, this);
 #endif
 
     SCOPE_CPU_PROFILE(ShadowPass);
@@ -427,8 +452,8 @@ void jRenderer::ShadowPass()
 
 void jRenderer::BasePass()
 {
-    if (BasePassSetupFinishEvent.valid())
-        BasePassSetupFinishEvent.wait();
+    if (BasePassSetupCompleteEvent.valid())
+        BasePassSetupCompleteEvent.wait();
 
     {
         SCOPE_CPU_PROFILE(BasePass);
@@ -446,13 +471,20 @@ void jRenderer::BasePass()
             }
         }
 
-        BasepassOcclusionTest.BeginQuery(RenderFrameContextPtr->CommandBuffer);
+        //BasepassOcclusionTest.BeginQuery(RenderFrameContextPtr->CommandBuffer);
         if (BaseRenderPass && BaseRenderPass->BeginRenderPass(RenderFrameContextPtr->CommandBuffer))
         {
             // Draw G-Buffer : subpass 0 
             for (const auto& command : BasePasses)
             {
-                command.Draw();
+                if (!command.RenderObject->IsTranslucent())
+                    command.Draw();
+            }
+
+            for (const auto& command : BasePasses)
+            {
+                if (command.RenderObject->IsTranslucent())
+                    command.Draw();
             }
 
             // Draw Light : subpass 1
@@ -462,8 +494,6 @@ void jRenderer::BasePass()
                 DeferredLightPass_TodoRefactoring(BaseRenderPass);
             }
 
-
-
             BaseRenderPass->EndRenderPass();
         }
 
@@ -471,7 +501,7 @@ void jRenderer::BasePass()
         {
             DeferredLightPass_TodoRefactoring(BaseRenderPass);
         }
-        BasepassOcclusionTest.EndQuery(RenderFrameContextPtr->CommandBuffer);
+        //BasepassOcclusionTest.EndQuery(RenderFrameContextPtr->CommandBuffer);
     }
 }
 
@@ -677,7 +707,7 @@ void jRenderer::Render()
         }
 
         //ShadowpassOcclusionTest.Init();
-        BasepassOcclusionTest.Init();
+        //BasepassOcclusionTest.Init();
     }
 
     Setup();

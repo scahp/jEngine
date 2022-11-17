@@ -59,8 +59,8 @@ public:
     std::shared_ptr<jRenderFrameContext> RenderFrameContextPtr;
     jView View;
 
-    std::future<void> ShadowPassSetupFinishEvent;
-    std::future<void> BasePassSetupFinishEvent;
+    std::future<void> ShadowPassSetupCompleteEvent;
+    std::future<void> BasePassSetupCompleteEvent;
 
     std::vector<jShadowDrawInfo> ShadowDrawInfo;
     std::vector<jDrawCommand> BasePasses;
@@ -68,7 +68,7 @@ public:
     jRenderPass* BaseRenderPass = nullptr;
 
     //jQueryOcclusion_Vulkan ShadowpassOcclusionTest;
-    jQueryOcclusion_Vulkan BasepassOcclusionTest;
+    // jQueryOcclusion_Vulkan BasepassOcclusionTest;
 
     // Current FrameIndex
     int32 FrameIndex = 0;

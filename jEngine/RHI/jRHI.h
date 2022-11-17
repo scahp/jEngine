@@ -12,10 +12,14 @@
 #include "jRenderFrameContext.h"
 #include "Core/TResourcePool.h"
 
+class jMaterial;
+
 extern class jRHI* g_rhi;
 
 extern jTexture* GWhiteTexture;
 extern jTexture* GBlackTexture;
+extern jTexture* GNormalTexture;
+extern jMaterial* GDefaultMaterial;
 
 struct jShader;
 struct jShaderInfo;
@@ -192,13 +196,6 @@ struct ITransformFeedbackBuffer
 	{
 		GetBufferData(&out, sizeof(T));
 	}
-};
-
-class jMaterial
-{
-public:
-	jMaterial() {}
-	~jMaterial() {}
 };
 
 struct jQuery;

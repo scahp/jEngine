@@ -4,9 +4,12 @@
 #include "Scene/Light/jDirectionalLight.h"
 #include "Scene/jCamera.h"
 #include "Vulkan/jUniformBufferBlock_Vulkan.h"
+#include "Material/jMaterial.h"
 
 jTexture* GWhiteTexture = nullptr;
 jTexture* GBlackTexture = nullptr;
+jTexture* GNormalTexture = nullptr;
+jMaterial* GDefaultMaterial = nullptr;
 
 //////////////////////////////////////////////////////////////////////////
 void IUniformBuffer::Bind(const jShader* shader) const
@@ -29,12 +32,20 @@ void jRHI::OnInitRHI()
 
 	uint8 BlackData[4] = { 0, 0, 0, 0 };
 	GBlackTexture = CreateTextureFromData(&BlackData, 1, 1, false, ETextureFormat::RGBA8, false);
+
+    uint8 NormalData[4] = { 0, 0, 255, 0 };
+	GNormalTexture = CreateTextureFromData(&NormalData, 1, 1, false, ETextureFormat::RGBA8, false);
+
+	GDefaultMaterial = new jMaterial();
+	for (int32 i = 0; i < _countof(GDefaultMaterial->TexData); ++i)
+		GDefaultMaterial->TexData[i].Texture = GWhiteTexture;
 }
 
 void jRHI::ReleaseRHI()
 {
 	delete GWhiteTexture;
 	delete GBlackTexture;
+	delete GNormalTexture;
 	ShaderPool.Release();
 }
 

@@ -95,6 +95,9 @@
     <Filter Include="Code\Scene\Light">
       <UniqueIdentifier>{4727e332-b3ad-46d8-978e-3efd50b6a8eb}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Code\Material">
+      <UniqueIdentifier>{9f49ecf6-e64d-4766-8e48-286bc40f83f5}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Math\MathUtility.h">
@@ -394,6 +397,9 @@
     <ClInclude Include="Core\TResourcePool.h">
       <Filter>Code\Core</Filter>
     </ClInclude>
+    <ClInclude Include="Material\jMaterial.h">
+      <Filter>Code\Material</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -665,6 +671,9 @@
     </ClCompile>
     <ClCompile Include="Renderer\jPointLightDrawCommandGenerator.cpp">
       <Filter>Code\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="Material\jMaterial.cpp">
+      <Filter>Code\Material</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

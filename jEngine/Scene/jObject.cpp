@@ -4,7 +4,9 @@
 #include "jPrimitiveUtil.h"
 
 std::vector<jObject*> jObject::s_ShadowCasterObject;
+std::vector<jRenderObject*> jObject::s_ShadowCasterRenderObject;
 std::vector<jObject*> jObject::s_StaticObjects;
+std::vector<jRenderObject*> jObject::s_StaticRenderObjects;
 std::vector<jObject*> jObject::s_BoundBoxObjects;
 std::vector<jObject*> jObject::s_BoundSphereObjects;
 std::vector<jObject*> jObject::s_DebugObjects;
@@ -30,6 +32,22 @@ void jObject::AddObject(jObject* object)
 		s_ShadowCasterObject.push_back(object);
 	}
 	s_StaticObjects.push_back(object);
+	
+	if (object->RenderObject)
+	{
+        s_StaticRenderObjects.push_back(object->RenderObject);
+		if (!object->SkipShadowMapGen)
+			s_ShadowCasterRenderObject.push_back(object->RenderObject);
+	}
+	else
+	{
+		for (auto& RenderObject : object->RenderObjects)
+		{
+			s_StaticRenderObjects.push_back(RenderObject);
+            if (!object->SkipShadowMapGen)
+                s_ShadowCasterRenderObject.push_back(RenderObject);
+		}
+	}
 }
 
 void jObject::RemoveObject(jObject* object)
@@ -44,6 +62,34 @@ void jObject::RemoveObject(jObject* object)
 	{
 		return (param == object);
 	}));
+
+	if (object->RenderObject)
+	{
+		s_ShadowCasterRenderObject.erase(std::remove_if(s_ShadowCasterRenderObject.begin(), s_ShadowCasterRenderObject.end(), [&object](jRenderObject* param)
+        {
+            return (param == object->RenderObject);
+        }));
+		
+		s_StaticRenderObjects.erase(std::remove_if(s_StaticRenderObjects.begin(), s_StaticRenderObjects.end(), [&object](jRenderObject* param)
+		{
+			return (param == object->RenderObject);
+		}));
+	}
+	else
+	{
+		for (auto& RenderObject : object->RenderObjects)
+		{
+			s_ShadowCasterRenderObject.erase(std::remove_if(s_ShadowCasterRenderObject.begin(), s_ShadowCasterRenderObject.end(), [&RenderObject](jRenderObject* param)
+			{
+				return (param == RenderObject);
+			}));
+
+			s_StaticRenderObjects.erase(std::remove_if(s_StaticRenderObjects.begin(), s_StaticRenderObjects.end(), [&RenderObject](jRenderObject* param)
+			{
+				return (param == RenderObject);
+			}));
+		}
+	}
 }
 
 void jObject::FlushDirtyState()
@@ -54,16 +100,16 @@ void jObject::FlushDirtyState()
 		{
 			auto it_find = std::find(s_ShadowCasterObject.begin(), s_ShadowCasterObject.end(), iter);
 			const bool existInShadowCasterObject = s_ShadowCasterObject.end() != it_find;
-			if (iter->SkipShadowMapGen)
-			{
-				if (existInShadowCasterObject)
-					s_ShadowCasterObject.erase(it_find);
-			}
-			else
-			{
-				if (!existInShadowCasterObject)
-					s_ShadowCasterObject.push_back(iter);
-			}
+			//if (iter->SkipShadowMapGen)
+			//{
+			//	if (existInShadowCasterObject)
+			//		s_ShadowCasterObject.erase(it_find);
+			//}
+			//else
+			//{
+			//	if (!existInShadowCasterObject)
+			//		s_ShadowCasterObject.push_back(iter);
+			//}
 		}
 	}
 }
@@ -179,7 +225,7 @@ void jObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameCont
 	, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
 {
 	if (Visible && RenderObject)
-		RenderObject->Draw(InRenderFrameContext, 0, -1, instanceCount);
+		RenderObject->Draw(InRenderFrameContext, 0, -1, 0, -1, instanceCount);
 }
 
 void jObject::CreateBoundBox(bool isShow)

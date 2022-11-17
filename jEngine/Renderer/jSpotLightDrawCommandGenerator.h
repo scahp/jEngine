@@ -16,16 +16,13 @@ struct jShader;
 class jSpotLightDrawCommandGenerator : public jDrawCommandGenerator
 {
 public:
-    static jObject* SpotLightUIQuad;
+    static jObject* SpotLightCone;
 
-    // Rect 정보는 Push Constant 로 전달하는 것으로 하자
     struct jSpotLightPushConstant
     {
-        Vector2 Pos;
-        Vector2 Size;
-        Vector2 PixelSize;
-        float Depth;
-        float padding;
+        jSpotLightPushConstant() = default;
+        jSpotLightPushConstant(const Matrix& InMVP) : MVP(InMVP) {}
+        Matrix MVP;
     };
 
     jSpotLightDrawCommandGenerator(const jShaderBindingInstanceArray& InShaderBindingInstances);

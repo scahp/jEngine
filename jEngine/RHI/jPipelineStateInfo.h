@@ -467,8 +467,9 @@ struct jPushConstant
         if (Hash)
             return Hash;
 
-        Hash = CityHash64((const char*)Data, UsedSize);
-        Hash = CityHash64WithSeed((const char*)PushConstantRanges.Data, PushConstantRanges.NumOfData * sizeof(jPushConstantRange), Hash);
+        if (PushConstantRanges.NumOfData > 0)
+            CityHash64WithSeed((const char*)&PushConstantRanges[0], sizeof(jPushConstantRange) * PushConstantRanges.NumOfData, Hash);
+
         return Hash;
     }
     const void* GetConstantData() const { return (void*)&Data[0]; }

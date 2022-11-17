@@ -9,6 +9,7 @@
 #include "RHI/Vulkan/jTexture_Vulkan.h"
 #include "RHI/Vulkan/jVulkanBufferUtil.h"
 #include "jOptions.h"
+#include "Material/jMaterial.h"
 
 jDrawCommand::jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, const jView* InView
     , jRenderObject* InRenderObject, jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed
@@ -16,6 +17,7 @@ jDrawCommand::jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderF
     : RenderFrameContextPtr(InRenderFrameContextPtr), View(InView), RenderObject(InRenderObject), RenderPass(InRenderPass), Shader(InShader), PipelineStateFixed(InPipelineStateFixed)
     , PushConstant(InPushConstant), ShaderBindingInstanceArray(InShaderBindingInstanceArray), SubpassIndex(InSubpassIndex)
 {
+    check(RenderObject);
     IsViewLight = false;
 }
 
@@ -25,6 +27,7 @@ jDrawCommand::jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderF
     : RenderFrameContextPtr(InRenderFrameContextPtr), ViewLight(InViewLight), RenderObject(InRenderObject), RenderPass(InRenderPass), Shader(InShader), PipelineStateFixed(InPipelineStateFixed)
     , PushConstant(InPushConstant), ShaderBindingInstanceArray(InShaderBindingInstanceArray), SubpassIndex(InSubpassIndex)
 {
+    check(RenderObject);
     IsViewLight = true;
 }
 
@@ -43,6 +46,19 @@ void jDrawCommand::PrepareToDraw(bool InIsPositionOnly)
     // GetShaderBindings
     jShaderBindingInstance* OneRenderObjectUniformBuffer = RenderObject->CreateShaderBindingInstance();
     ShaderBindingInstanceArray.Add(OneRenderObjectUniformBuffer);
+
+    if (RenderObject->Material)
+    {
+        jShaderBindingInstance* MaterialShaderBindingInstance = RenderObject->Material->CreateShaderBindingInstance();
+        if (MaterialShaderBindingInstance)
+            ShaderBindingInstanceArray.Add(MaterialShaderBindingInstance);
+    }
+    else
+    {
+        jShaderBindingInstance* MaterialShaderBindingInstance = GDefaultMaterial->CreateShaderBindingInstance();
+        if (MaterialShaderBindingInstance)
+            ShaderBindingInstanceArray.Add(MaterialShaderBindingInstance);
+    }
 
     // Bind ShaderBindings
     jShaderBindingsLayoutArray ShaderBindingLayoutArray;
@@ -99,5 +115,5 @@ void jDrawCommand::Draw() const
 
     // Draw
     const int32 InstanceCount = RenderObject->VertexBuffer_InstanceData ? RenderObject->VertexBuffer_InstanceData->GetElementCount() : 1;
-    RenderObject->Draw(RenderFrameContextPtr, 0, -1, InstanceCount);
+    RenderObject->Draw(RenderFrameContextPtr, InstanceCount);
 }

@@ -6,6 +6,7 @@
 #include "Scene/jObject.h"
 #include "RHI/jFrameBufferPool.h"
 #include "RHI/Vulkan/jUniformBufferBlock_Vulkan.h"
+#include "Material/jMaterial.h"
 
 
 jRenderObject::jRenderObject()
@@ -65,7 +66,7 @@ void jRenderObject::UpdateVertexStream()
 }
 
 void jRenderObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext
-	, int32 startIndex, int32 count, int32 instanceCount)
+	, int32 startIndex, int32 indexCount, int32 startVertex, int32 vertexCount, int32 instanceCount)
 {
 	if (!VertexStream)
 		return;
@@ -78,16 +79,16 @@ void jRenderObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFra
         if (IndirectCommandBuffer)
         {
 			const int32 instanceCount = VertexStream_InstanceData->ElementCount;
-            g_rhi->DrawElementsIndirect(InRenderFrameContext, primitiveType, IndirectCommandBuffer, 0, instanceCount);
+            g_rhi->DrawElementsIndirect(InRenderFrameContext, primitiveType, IndirectCommandBuffer, startIndex, instanceCount);
         }
 		else
 		{
 			auto& indexStreamData = IndexBuffer->IndexStreamData;
-			count = count != -1 ? count : indexStreamData->ElementCount;
+			indexCount = indexCount != -1 ? indexCount : indexStreamData->ElementCount;
 			if (instanceCount <= 0)
-				g_rhi->DrawElements(InRenderFrameContext, primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count);
+				g_rhi->DrawElementsBaseVertex(InRenderFrameContext, primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, indexCount, startVertex);
 			else
-				g_rhi->DrawElementsInstanced(InRenderFrameContext, primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count, instanceCount);
+				g_rhi->DrawElementsInstancedBaseVertex(InRenderFrameContext, primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, indexCount, startVertex, instanceCount);
 		}
 	}
 	else
@@ -95,17 +96,22 @@ void jRenderObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFra
 		if (IndirectCommandBuffer)
 		{
 			const int32 instanceCount = VertexStream_InstanceData->ElementCount;
-			g_rhi->DrawIndirect(InRenderFrameContext, primitiveType, IndirectCommandBuffer, 0, instanceCount);
+			g_rhi->DrawIndirect(InRenderFrameContext, primitiveType, IndirectCommandBuffer, startVertex, instanceCount);
 		}
 		else
 		{
-			count = count != -1 ? count : VertexStream->ElementCount;
+			vertexCount = vertexCount != -1 ? vertexCount : VertexStream->ElementCount;
 			if (instanceCount <= 0)
-				g_rhi->DrawArrays(InRenderFrameContext, primitiveType, 0, count);
+				g_rhi->DrawArrays(InRenderFrameContext, primitiveType, startVertex, vertexCount);
 			else
-				g_rhi->DrawArraysInstanced(InRenderFrameContext, primitiveType, 0, count, instanceCount);
+				g_rhi->DrawArraysInstanced(InRenderFrameContext, primitiveType, startVertex, vertexCount, instanceCount);
 		}
 	}
+}
+
+void jRenderObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, int32 instanceCount)
+{
+	Draw(InRenderFrameContext, 0, -1, 0, -1, 1);
 }
 
 //void jRenderObject::DrawBaseVertexIndex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader
@@ -221,20 +227,10 @@ jShaderBindingInstance* jRenderObject::CreateShaderBindingInstance()
 	ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_GRAPHICS
 		, ResourceInlineAllactor.Alloc<jUniformBufferResource>(&OneFrameUniformBuffer));
 
-	if (TextureSamplers.size() <= 0)
-	{
-        ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
-            , ResourceInlineAllactor.Alloc<jTextureResource>(GWhiteTexture, nullptr));
-	}
-	else
-	{
-		for (auto& iter : TextureSamplers)
-		{
-			check(iter.Texture);
-			ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
-				, ResourceInlineAllactor.Alloc<jTextureResource>(iter.Texture, iter.SamplerState));
-		}
-	}
-
     return g_rhi->CreateShaderBindingInstance(ShaderBindingArray);
+}
+
+bool jRenderObject::IsTranslucent() const
+{
+    return Material ? Material->IsTranslucent() : false;
 }

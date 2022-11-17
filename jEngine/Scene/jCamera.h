@@ -246,6 +246,7 @@ public:
 
 	void GetRectInNDCSpace(Vector& OutPosMin, Vector& OutPosMax, const Matrix& InVP) const;
 	void GetRectInScreenSpace(Vector& OutPosMin, Vector& OutPosMax, const Matrix& InVP, const Vector2& InScreenSize = Vector2(1.0f, 1.0f)) const;
+	void GetFrustumVertexInWorld(Vector* OutVertexArray) const;
 
 	//void AddLight(jLight* light);
 	//jLight* GetLight(int32 index) const;
