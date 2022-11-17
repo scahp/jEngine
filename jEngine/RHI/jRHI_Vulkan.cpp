@@ -69,7 +69,7 @@ bool jRHI_Vulkan::InitRHI()
     Window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Vulkan", nullptr, nullptr);
     glfwSetWindowUserPointer(Window, this);
 
-	VkApplicationInfo appInfo;
+	VkApplicationInfo appInfo{};
 	appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 	appInfo.pApplicationName = "Vulkan";
 	appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
@@ -78,7 +78,7 @@ bool jRHI_Vulkan::InitRHI()
 	appInfo.apiVersion = VK_API_VERSION_1_3;
 
 	// Must
-	VkInstanceCreateInfo createInfo = {};
+	VkInstanceCreateInfo createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 	createInfo.pApplicationInfo = &appInfo;
 
