@@ -54,8 +54,10 @@ SamplerState GBuffer2SamplerState : register(s2, space0);
 cbuffer ViewParam : register(b0, space1) { ViewUniformBuffer ViewParam; }
 
 cbuffer PointLight : register(b0, space2) { jPointLightUniformBufferData PointLight; }
+#if USE_SHADOW_MAP
 TextureCube PointLightShadowCubeMap : register(t1, space2);
 SamplerComparisonState PointLightShadowMapSampler : register(s1, space2);
+#endif
 
 float WindowingFunction(float value, float maxValue)
 {
@@ -120,6 +122,7 @@ float4 main(VSOutput input) : SV_TARGET
     float3 ViewWorld = normalize(ViewParam.EyeWorld - WorldPos);
 
     // Point light shadow map
+#if USE_SHADOW_MAP
     float3 LightDir = WorldPos.xyz - PointLight.Position;
     float DistanceToLight = length(LightDir);
     if (DistanceToLight <= PointLight.MaxDistance)
@@ -133,6 +136,9 @@ float4 main(VSOutput input) : SV_TARGET
             PointLightLit = Shadow * GetPointLight(PointLight, WorldNormal, WorldPos.xyz, ViewWorld);
         }
     }
+#else
+    PointLightLit = GetPointLight(PointLight, WorldNormal, WorldPos.xyz, ViewWorld);
+#endif
 
     color = (1.0 / 3.141592653) * float4(Albedo * PointLightLit, 1.0);
     return color;

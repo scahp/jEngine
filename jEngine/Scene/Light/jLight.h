@@ -101,6 +101,7 @@ public:
 	virtual const Matrix* GetLightWorldMatrix() const { return nullptr; }
 
 	const ELightType Type = ELightType::MAX;
+	bool IsShadowCaster = true;
 	jObject* LightDebugObject = nullptr;
 	virtual jShaderBindingInstance* PrepareShaderBindingInstance(jTexture* InShadowMap) const { return nullptr; }
 };

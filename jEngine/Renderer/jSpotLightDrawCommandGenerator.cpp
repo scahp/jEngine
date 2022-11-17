@@ -35,13 +35,6 @@ void jSpotLightDrawCommandGenerator::Initialize(int32 InRTWidth, int32 InRTHeigh
         shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/spotlight_vs.hlsl"));
         shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
         Shader.VertexShader = g_rhi->CreateShader(shaderInfo);
-
-        shaderInfo.SetName(jNameStatic("SpotLightShaderPS"));
-        shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/spotlight_fs.hlsl"));
-        shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
-        if (gOptions.UseSubpass)
-            shaderInfo.SetPreProcessors(jNameStatic("#define USE_SUBPASS 1"));
-        Shader.PixelShader = g_rhi->CreateShader(shaderInfo);
     }
 
     ScreenSize.x = (float)InRTWidth;
@@ -61,6 +54,11 @@ void jSpotLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* OutDestDr
 
     jPushConstant* PushConstant = new(jMemStack::Get()->Alloc<jPushConstant>()) jPushConstant(
         jSpotLightPushConstant(InView->Camera->Projection * InView->Camera->View * WorldMat), EShaderAccessStageFlag::ALL);
+
+    jShaderSpotLight::ShaderPermutation ShaderPermutation;
+    ShaderPermutation.SetIndex<jShaderSpotLight::USE_SUBPASS>(gOptions.UseSubpass);
+    ShaderPermutation.SetIndex<jShaderSpotLight::USE_SHADOW_MAP>(InLightView.ShadowMapPtr ? 1 : 0);
+    Shader.PixelShader = jShaderSpotLight::CreateShader(ShaderPermutation);
 
     check(OutDestDrawCommand);
     new (OutDestDrawCommand) jDrawCommand(InRenderFrameContextPtr, &InLightView, SpotLightCone->RenderObject, InRenderPass

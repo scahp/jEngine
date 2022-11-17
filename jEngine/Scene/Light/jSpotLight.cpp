@@ -46,7 +46,7 @@ jShaderBindingInstance* jSpotLight::PrepareShaderBindingInstance(jTexture* InSha
     ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_GRAPHICS
         , ResourceInlineAllocator.Alloc<jUniformBufferResource>(LightDataUniformBlock));
 
-    if (ensure(InShadowMap))
+    if (InShadowMap)
     {
         const jSamplerStateInfo* ShadowSamplerStateInfo = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
             , ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER

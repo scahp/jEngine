@@ -66,8 +66,10 @@ SamplerState GBuffer2SamplerState : register(s2, space0);
 cbuffer ViewParam : register(b0, space1) { ViewUniformBuffer ViewParam; }
 
 cbuffer DirectionalLight : register(b0, space2) { jDirectionalLightUniformBuffer DirectionalLight; }
+#if USE_SHADOW_MAP
 Texture2D DirectionalLightShadowMap : register(t1, space2);
 SamplerComparisonState DirectionalLightShadowMapSampler : register(s1, space2);
+#endif
 
 float3 GetDirectionalLightDiffuse(jDirectionalLightUniformBuffer light, float3 normal)
 {
@@ -112,6 +114,7 @@ float4 main(VSOutput input
     DirectionalLightShadowPosition.y = -DirectionalLightShadowPosition.y;
 
     float3 DirectionalLightLit = GetDirectionalLight(DirectionalLight, WorldNormal, ViewWorld);
+#if USE_SHADOW_MAP
     if (-1.0 <= DirectionalLightShadowPosition.z && DirectionalLightShadowPosition.z <= 1.0)
     {
         const float Bias = 0.01f;
@@ -119,6 +122,7 @@ float4 main(VSOutput input
             DirectionalLightShadowMapSampler, (DirectionalLightShadowPosition.xy * 0.5 + 0.5), (DirectionalLightShadowPosition.z - Bias));
         DirectionalLightLit *= Shadow;
     }
+#endif
 
     color = (1.0 / 3.141592653) * float4(Albedo * DirectionalLightLit, 1.0);
     return color;

@@ -61,3 +61,54 @@ jShaderGBuffer* jShaderGBuffer::CreateShader(const jShaderGBuffer::ShaderPermuta
 	Shader->Permutation = InPermutation;
     return Shader;
 }
+//////////////////////////////////////////////////////////////////////////
+jShaderInfo jShaderDirectionalLight::GShaderInfo(
+    jNameStatic("DirectionalLightShaderPS"),
+    jNameStatic("Resource/Shaders/hlsl/directionallight_fs.hlsl"),
+    jNameStatic(""),
+    EShaderAccessStageFlag::FRAGMENT
+);
+
+jShaderDirectionalLight* jShaderDirectionalLight::CreateShader(const jShaderDirectionalLight::ShaderPermutation& InPermutation)
+{
+    jShaderInfo TempShaderInfo = GShaderInfo;
+    TempShaderInfo.SetPermutationId(InPermutation.GetPermutationId());
+
+    jShaderDirectionalLight* Shader = g_rhi->CreateShader<jShaderDirectionalLight>(TempShaderInfo);
+    Shader->Permutation = InPermutation;
+    return Shader;
+}
+//////////////////////////////////////////////////////////////////////////
+jShaderInfo jShaderPointLight::GShaderInfo(
+    jNameStatic("PointLightShaderPS"),
+    jNameStatic("Resource/Shaders/hlsl/pointlight_fs.hlsl"),
+    jNameStatic(""),
+    EShaderAccessStageFlag::FRAGMENT
+);
+
+jShaderPointLight* jShaderPointLight::CreateShader(const jShaderPointLight::ShaderPermutation& InPermutation)
+{
+    jShaderInfo TempShaderInfo = GShaderInfo;
+    TempShaderInfo.SetPermutationId(InPermutation.GetPermutationId());
+
+	jShaderPointLight* Shader = g_rhi->CreateShader<jShaderPointLight>(TempShaderInfo);
+    Shader->Permutation = InPermutation;
+    return Shader;
+}
+//////////////////////////////////////////////////////////////////////////
+jShaderInfo jShaderSpotLight::GShaderInfo(
+    jNameStatic("SpotLightShaderPS"),
+    jNameStatic("Resource/Shaders/hlsl/spotlight_fs.hlsl"),
+    jNameStatic(""),
+    EShaderAccessStageFlag::FRAGMENT
+);
+
+jShaderSpotLight* jShaderSpotLight::CreateShader(const jShaderSpotLight::ShaderPermutation& InPermutation)
+{
+    jShaderInfo TempShaderInfo = GShaderInfo;
+    TempShaderInfo.SetPermutationId(InPermutation.GetPermutationId());
+
+	jShaderSpotLight* Shader = g_rhi->CreateShader<jShaderSpotLight>(TempShaderInfo);
+    Shader->Permutation = InPermutation;
+    return Shader;
+}

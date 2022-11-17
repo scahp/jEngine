@@ -33,16 +33,6 @@ void jPointLightDrawCommandGenerator::Initialize(int32 InRTWidth, int32 InRTHeig
         shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
         Shader.VertexShader = g_rhi->CreateShader(shaderInfo);
     }
-
-    {
-        jShaderInfo shaderInfo;
-        shaderInfo.SetName(jNameStatic("PointLightShaderVS"));
-        shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/pointlight_fs.hlsl"));
-        if (gOptions.UseSubpass)
-            shaderInfo.SetPreProcessors(jNameStatic("#define USE_SUBPASS 1"));
-        shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
-        Shader.PixelShader = g_rhi->CreateShader(shaderInfo);
-    }
 }
 
 void jPointLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* OutDestDrawCommand, const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr
@@ -50,6 +40,11 @@ void jPointLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* OutDestD
 {
     jPushConstant* PushConstant = new(jMemStack::Get()->Alloc<jPushConstant>()) jPushConstant(
         jPointLightPushConstant(InView->Camera->Projection * InView->Camera->View * (*InLightView.Light->GetLightWorldMatrix())), EShaderAccessStageFlag::ALL);
+
+    jShaderPointLight::ShaderPermutation ShaderPermutation;
+    ShaderPermutation.SetIndex<jShaderPointLight::USE_SUBPASS>(gOptions.UseSubpass);
+    ShaderPermutation.SetIndex<jShaderPointLight::USE_SHADOW_MAP>(InLightView.ShadowMapPtr ? 1 : 0);
+    Shader.PixelShader = jShaderPointLight::CreateShader(ShaderPermutation);
 
     check(OutDestDrawCommand);
     new (OutDestDrawCommand) jDrawCommand(InRenderFrameContextPtr, &InLightView, PointLightSphere->RenderObject, InRenderPass

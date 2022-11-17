@@ -43,20 +43,23 @@ void jRenderer::Setup()
 
         if (ViewLight.Light)
         {
-            switch (ViewLight.Light->Type)
+            if (ViewLight.Light->IsShadowCaster)
             {
-            case ELightType::DIRECTIONAL:
-                ViewLight.ShadowMapPtr = RenderFrameContextPtr->SceneRenderTarget->DirectionalLightShadowMapPtr;
-                break;
-            case ELightType::POINT:
-                ViewLight.ShadowMapPtr = RenderFrameContextPtr->SceneRenderTarget->CubeShadowMapPtr;
-                break;
-            case ELightType::SPOT:
-                ViewLight.ShadowMapPtr = RenderFrameContextPtr->SceneRenderTarget->SpotLightShadowMapPtr;
-                break;
+                switch (ViewLight.Light->Type)
+                {
+                case ELightType::DIRECTIONAL:
+                    ViewLight.ShadowMapPtr = RenderFrameContextPtr->SceneRenderTarget->DirectionalLightShadowMapPtr;
+                    break;
+                case ELightType::POINT:
+                    ViewLight.ShadowMapPtr = RenderFrameContextPtr->SceneRenderTarget->CubeShadowMapPtr;
+                    break;
+                case ELightType::SPOT:
+                    ViewLight.ShadowMapPtr = RenderFrameContextPtr->SceneRenderTarget->SpotLightShadowMapPtr;
+                    break;
+                }
             }
 
-            ViewLight.ShaderBindingInstance = ViewLight.Light->PrepareShaderBindingInstance(ViewLight.ShadowMapPtr->GetTexture());
+            ViewLight.ShaderBindingInstance = ViewLight.Light->PrepareShaderBindingInstance(ViewLight.ShadowMapPtr ? ViewLight.ShadowMapPtr->GetTexture() : nullptr);
         }
     }
 
@@ -72,12 +75,16 @@ void jRenderer::SetupShadowPass()
 {
     SCOPE_CPU_PROFILE(SetupShadowPass);
 
-    ShadowDrawInfo.resize(View.Lights.size());
+    ShadowDrawInfo.reserve(View.Lights.size());
 
     for (int32 i = 0; i < View.Lights.size(); ++i)
     {
         jViewLight& ViewLight = View.Lights[i];
-        jShadowDrawInfo& ShadowPasses = ShadowDrawInfo[i];
+        if (!ViewLight.Light->IsShadowCaster)
+            continue;
+
+        ShadowDrawInfo.push_back(jShadowDrawInfo());
+        jShadowDrawInfo& ShadowPasses = ShadowDrawInfo[ShadowDrawInfo.size() - 1];
 
         // Prepare shadowpass pipeline
         auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();

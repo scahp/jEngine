@@ -57,9 +57,10 @@ SamplerState GBuffer2SamplerState : register(s2, space0);
 cbuffer ViewParam : register(b0, space1) { ViewUniformBuffer ViewParam; }
 
 cbuffer SpotLight : register(b0, space2) { jSpotLightUniformBufferData SpotLight; }
+#if USE_SHADOW_MAP
 Texture2D SpotLightShadowMap : register(t1, space2);
 SamplerComparisonState SpotLightShadowMapSampler : register(s1, space2);
-
+#endif
 
 float WindowingFunction(float value, float maxValue)
 {
@@ -140,6 +141,7 @@ float4 main(VSOutput input) : SV_TARGET
     SpotLightShadowPosition.y = -SpotLightShadowPosition.y;
 
     float3 SpotLightLit = 0.0f;
+#if USE_SHADOW_MAP
     if (-1.0 <= SpotLightShadowPosition.z && SpotLightShadowPosition.z <= 1.0)
     {
         const float Bias = 0.01f;
@@ -149,6 +151,9 @@ float4 main(VSOutput input) : SV_TARGET
             SpotLightLit = Shadow * GetSpotLight(SpotLight, WorldNormal, WorldPos.xyz, ViewWorld);
         }
     }
+#else
+    SpotLightLit = GetSpotLight(SpotLight, WorldNormal, WorldPos.xyz, ViewWorld);
+#endif
 
     color = (1.0 / 3.141592653) * float4(Albedo * SpotLightLit, 1.0);
     return color;
