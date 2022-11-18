@@ -230,7 +230,3 @@ jShaderBindingInstance* jRenderObject::CreateShaderBindingInstance()
     return g_rhi->CreateShaderBindingInstance(ShaderBindingArray);
 }
 
-bool jRenderObject::IsTranslucent() const
-{
-    return Material ? Material->IsTranslucent() : false;
-}

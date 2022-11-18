@@ -48,6 +48,7 @@ public:
     void DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass);
 
     virtual void PostProcess();
+    virtual void DebugPasses();
 
     void SetupShadowPass();
     void SetupBasePass();

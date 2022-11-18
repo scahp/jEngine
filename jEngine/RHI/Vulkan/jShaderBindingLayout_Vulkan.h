@@ -57,6 +57,7 @@ struct jShaderBindingLayout_Vulkan : public jShaderBindingsLayout
     virtual jShaderBindingInstance* CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray) const override;
     virtual size_t GetHash() const override;
     void Release();
+    virtual void* GetHandle() const override { return DescriptorSetLayout; }
 
     std::vector<VkDescriptorPoolSize> GetDescriptorPoolSizeArray(uint32 maxAllocations) const
     {

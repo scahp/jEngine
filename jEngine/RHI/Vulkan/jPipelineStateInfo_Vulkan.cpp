@@ -192,7 +192,6 @@ void* jPipelineStateInfo_Vulkan::CreateGraphicsPipelineState()
     // [minDepth ~ maxDepth] 는 [0.0 ~ 1.0] 이며 특별한 경우가 아니면 이 범위로 사용하면 된다.
     // Scissor Rect 영역을 설정해주면 영역내에 있는 Pixel만 레스터라이저를 통과할 수 있으며 나머지는 버려(Discard)진다.
     const auto& Viewports = PipelineStateFixed->Viewports;
-    check(Viewports.size());
     std::vector<VkViewport> vkViewports;
     vkViewports.resize(Viewports.size());
     for (int32 i = 0; i < vkViewports.size(); ++i)
@@ -213,7 +212,6 @@ void* jPipelineStateInfo_Vulkan::CreateGraphicsPipelineState()
     }
 
     const auto& Scissors = PipelineStateFixed->Scissors;
-    check(Scissors.size());
     std::vector<VkRect2D> vkScissor;
     vkScissor.resize(Scissors.size());
     for (int32 i = 0; i < vkScissor.size(); ++i)
@@ -227,10 +225,10 @@ void* jPipelineStateInfo_Vulkan::CreateGraphicsPipelineState()
     // Viewport와 Scissor 를 여러개 설정할 수 있는 멀티 뷰포트를 사용할 수 있기 때문임
     VkPipelineViewportStateCreateInfo viewportState = {};
     viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-    viewportState.viewportCount = (uint32)vkViewports.size();
-    viewportState.pViewports = &vkViewports[0];
-    viewportState.scissorCount = (uint32)vkScissor.size();
-    viewportState.pScissors = &vkScissor[0];
+    viewportState.viewportCount = Max<uint32>(1, (uint32)vkViewports.size());
+    viewportState.pViewports = vkViewports.size() ? &vkViewports[0] : nullptr;
+    viewportState.scissorCount = Max<uint32>(1, (uint32)vkScissor.size());
+    viewportState.pScissors = vkScissor.size() ? &vkScissor[0] : nullptr;
 
     // 2가지 blending 방식을 모두 끌 수도있는데 그렇게 되면, 변경되지 않은 fragment color 값이 그대로 framebuffer에 쓰여짐.
     VkPipelineColorBlendStateCreateInfo colorBlending = {};
@@ -275,15 +273,22 @@ void* jPipelineStateInfo_Vulkan::CreateGraphicsPipelineState()
     // 9. Dynamic state
     // 이전에 정의한 state에서 제한된 범위 내에서 새로운 pipeline을 만들지 않고 state를 변경할 수 있음. (viewport size, line width, blend constants)
     // 이것을 하고싶으면 Dynamic state를 만들어야 함. 이경우 Pipeline에 설정된 값은 무시되고, 매 렌더링시에 새로 설정해줘야 함.
-    VkDynamicState dynamicStates[] = {
-        VK_DYNAMIC_STATE_VIEWPORT,
-        VK_DYNAMIC_STATE_LINE_WIDTH
-    };
-    // 현재는 사용하지 않음.
-    //VkPipelineDynamicStateCreateInfo dynamicState = {};
-    //dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-    //dynamicState.dynamicStateCount = 2;
-    //dynamicState.pDynamicStates = dynamicStates;
+    VkPipelineDynamicStateCreateInfo dynamicState = {};
+    dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+
+    std::vector<VkDynamicState> dynamicStates;
+    if (PipelineStateFixed->DynamicStates.size() > 0)
+    {
+        dynamicStates.resize(PipelineStateFixed->DynamicStates.size());
+
+        for (int32 i=0;i<(int32)PipelineStateFixed->DynamicStates.size();++i)
+        {
+            dynamicStates[i] = GetVulkanPipelineDynamicState(PipelineStateFixed->DynamicStates[i]);
+        }        
+
+        dynamicState.dynamicStateCount = (uint32)dynamicStates.size();
+        dynamicState.pDynamicStates = &dynamicStates[0];
+    }
 
     // 10. Pipeline layout
     vkPipelineLayout = (VkPipelineLayout)g_rhi->CreatePipelineLayout(ShaderBindingLayoutArray, PushConstant);
@@ -320,7 +325,7 @@ void* jPipelineStateInfo_Vulkan::CreateGraphicsPipelineState()
     pipelineInfo.pMultisampleState = &((jMultisampleStateInfo_Vulkan*)PipelineStateFixed->MultisampleState)->MultisampleStateInfo;
     pipelineInfo.pDepthStencilState = &((jDepthStencilStateInfo_Vulkan*)PipelineStateFixed->DepthStencilState)->DepthStencilStateInfo;
     pipelineInfo.pColorBlendState = &colorBlending;
-    pipelineInfo.pDynamicState = nullptr;			// Optional
+    pipelineInfo.pDynamicState = &dynamicState;
     pipelineInfo.layout = vkPipelineLayout;
     pipelineInfo.renderPass = (VkRenderPass)RenderPass->GetRenderPass();
     pipelineInfo.subpass = SubpassIndex;		// index of subpass

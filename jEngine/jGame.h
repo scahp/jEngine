@@ -21,6 +21,8 @@ class jCascadeDirectionalLight;
 class jUIQuadPrimitive;
 class jDirectionalLightPrimitive;
 class jMeshObject;
+class jPointLightPrimitive;
+class jSpotLightPrimitive;
 
 class jGame
 {
@@ -69,8 +71,8 @@ public:
 	jCamera* MainCamera = nullptr;
 
 	jDirectionalLightPrimitive* DirectionalLightInfo = nullptr;
-	jObject* PointLightInfo = nullptr;
-	jObject* SpotLightInfo = nullptr;
+	jPointLightPrimitive* PointLightInfo = nullptr;
+	jSpotLightPrimitive* SpotLightInfo = nullptr;
 	jUIQuadPrimitive* DirectionalLightShadowMapUIDebug = nullptr;
 	jMeshObject* Sponza = nullptr;
 

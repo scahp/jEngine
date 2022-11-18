@@ -32,7 +32,5 @@ public:
 
     TextureData TexData[static_cast<int32>(EMaterialTextureType::Max)];
 
-    FORCEINLINE bool IsTranslucent() const { return TexData[(int32)EMaterialTextureType::OpacitySampler].Texture; }
-
     jShaderBindingInstance* CreateShaderBindingInstance();
 };

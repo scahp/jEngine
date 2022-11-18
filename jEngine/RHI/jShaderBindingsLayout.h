@@ -207,6 +207,7 @@ struct jShaderBindingsLayout
     virtual jShaderBindingInstance* CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray) const { return nullptr; }
     virtual size_t GetHash() const;
     virtual const jShaderBindingArray& GetShaderBindingsLayout() const { return ShaderBindingArray; }
+    virtual void* GetHandle() const { return nullptr; }
 
     mutable size_t Hash = 0;
 

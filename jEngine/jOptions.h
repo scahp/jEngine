@@ -10,6 +10,7 @@ struct jOptions
     bool UseDeferredRenderer = true;
     bool UseSubpass = true;
     bool UseMemoryless = true;
+    bool ShowDebugObject = false;
     Vector CameraPos = Vector::ZeroVector;
 };
 

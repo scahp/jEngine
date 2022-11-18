@@ -47,9 +47,9 @@ void jDrawCommand::PrepareToDraw(bool InIsPositionOnly)
     jShaderBindingInstance* OneRenderObjectUniformBuffer = RenderObject->CreateShaderBindingInstance();
     ShaderBindingInstanceArray.Add(OneRenderObjectUniformBuffer);
 
-    if (RenderObject->Material)
+    if (RenderObject->MaterialPtr)
     {
-        jShaderBindingInstance* MaterialShaderBindingInstance = RenderObject->Material->CreateShaderBindingInstance();
+        jShaderBindingInstance* MaterialShaderBindingInstance = RenderObject->MaterialPtr->CreateShaderBindingInstance();
         if (MaterialShaderBindingInstance)
             ShaderBindingInstanceArray.Add(MaterialShaderBindingInstance);
     }

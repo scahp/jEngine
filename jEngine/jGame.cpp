@@ -75,27 +75,26 @@ void jGame::Setup()
 	// Select one of directional light
 	DirectionalLight = NormalDirectionalLight;
 
-	//// Create light info for debugging light infomation
- //   if (DirectionalLight)
- //   {
- //       DirectionalLightInfo = jPrimitiveUtil::CreateDirectionalLightDebug(Vector(250, 260, 0) * 0.5f, Vector::OneVector * 10.0f, 10.0f, MainCamera, DirectionalLight, "Image/sun.png");
- //       // jObject::AddDebugObject(DirectionalLightInfo);
-	//	jObject::AddObject(DirectionalLightInfo->BillboardObject);
-	//	// jObject::AddObject(DirectionalLightInfo->ArrowSegementObject);
- //   }
+	// Create light info for debugging light infomation
+    if (DirectionalLight)
+    {
+        DirectionalLightInfo = jPrimitiveUtil::CreateDirectionalLightDebug(Vector(250, 400, 0) * 0.5f, Vector::OneVector * 10.0f, 10.0f, MainCamera, DirectionalLight, "Image/sun.png");
+        // jObject::AddDebugObject(DirectionalLightInfo);
+		jObject::AddDebugObject(DirectionalLightInfo->BillboardObject);
+		// jObject::AddDebugObject(DirectionalLightInfo->ArrowSegementObject);
+    }
 
-	//if (PointLight)
-	//{
-	//	PointLightInfo = jPrimitiveUtil::CreatePointLightDebug(Vector(10.0f), MainCamera, PointLight, "Image/bulb.png");
-	//	jObject::AddDebugObject(PointLightInfo);
-	//}
+    if (PointLight)
+    {
+        PointLightInfo = jPrimitiveUtil::CreatePointLightDebug(Vector(10.0f), MainCamera, PointLight, "Image/bulb.png");
+        jObject::AddDebugObject(PointLightInfo->BillboardObject);
+    }
 
-	//if (SpotLight)
-	//{
-	//	SpotLightInfo = jPrimitiveUtil::CreateSpotLightDebug(Vector(10.0f), MainCamera, SpotLight, "Image/spot.png");
-	//	if (AppSettings.ShowSpotLightInfo)
-	//		jObject::AddDebugObject(SpotLightInfo);
-	//}
+    if (SpotLight)
+    {
+        SpotLightInfo = jPrimitiveUtil::CreateSpotLightDebug(Vector(10.0f), MainCamera, SpotLight, "Image/spot.png");
+        jObject::AddDebugObject(SpotLightInfo->BillboardObject);
+    }
 
 	//// Main camera is linked with lights which will be used.
 	//if (DirectionalLight)
@@ -214,7 +213,7 @@ void jGame::Update(float deltaTime)
 	//// Render all objects by using selected renderer
 	//Renderer->Render(MainCamera);
 
-    for (auto iter : jObject::GetStaticObject())
+    for (auto& iter : jObject::GetStaticObject())
     {
         iter->Update(deltaTime);
 
@@ -228,6 +227,21 @@ void jGame::Update(float deltaTime)
 				iter->RenderObjects[i]->UpdateWorldMatrix();
 		}
     }
+
+	for (auto& iter : jObject::GetDebugObject())
+	{
+		iter->Update(deltaTime);
+
+        if (iter->RenderObject)
+        {
+            iter->RenderObject->UpdateWorldMatrix();
+        }
+        else
+        {
+            for (int32 i = 0; i < iter->RenderObjects.size(); ++i)
+                iter->RenderObjects[i]->UpdateWorldMatrix();
+        }
+	}
 
     // 정리해야함
 	if (DirectionalLight)

@@ -214,7 +214,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 		newMeshMaterial->Data.Reflectivity = Reflectivity;
 		newMeshMaterial->Data.IndexOfRefraction = IndexOfRefraction;
 
-		meshData->Materials.emplace(std::make_pair(i, newMeshMaterial));
+		meshData->Materials.emplace(std::make_pair(i, std::shared_ptr<jMaterial>(newMeshMaterial)));
 	}
 
 	JASSERT(scene->mRootNode);
@@ -339,7 +339,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 
 		auto StaticMeshRenderObject = new jStaticMeshRenderObject();
 		StaticMeshRenderObject->SubMesh = subMesh;
-		StaticMeshRenderObject->Material = meshData->Materials[subMesh.MaterialIndex];
+		StaticMeshRenderObject->MaterialPtr = meshData->Materials[subMesh.MaterialIndex];
 		StaticMeshRenderObject->CreateRenderObject(vertexStreamData, indexStreamData);
 		object->RenderObjects.push_back(StaticMeshRenderObject);
 	}

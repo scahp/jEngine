@@ -84,7 +84,7 @@ struct jMeshData
 	std::vector<Vector> Tangents;
 	std::vector<Vector> Bitangents;
 	std::vector<Vector2> TexCoord;
-	std::map<int32, jMeshMaterial*> Materials;
+	std::map<int32, std::shared_ptr<jMaterial>> Materials;
 	std::vector<uint32> Faces;
 };
 

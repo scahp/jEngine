@@ -313,6 +313,11 @@ struct jPipelineStateFixedInfo
         : RasterizationState(rasterizationState), MultisampleState(multisampleState), DepthStencilState(depthStencilState)
         , BlendingState(blendingState), Viewports({ viewport }), Scissors({ scissor }), IsUseVRS(isUseVRS)
     {}
+    jPipelineStateFixedInfo(jRasterizationStateInfo* rasterizationState, jMultisampleStateInfo* multisampleState, jDepthStencilStateInfo* depthStencilState
+        , jBlendingStateInfo* blendingState, const std::vector<EPipelineDynamicState>& InDynamicStates, bool isUseVRS)
+        : RasterizationState(rasterizationState), MultisampleState(multisampleState), DepthStencilState(depthStencilState)
+        , BlendingState(blendingState), DynamicStates(InDynamicStates), IsUseVRS(isUseVRS)
+    {}
 
     size_t CreateHash() const
     {
@@ -326,6 +331,9 @@ struct jPipelineStateFixedInfo
         for (int32 i = 0; i < Scissors.size(); ++i)
             Hash ^= (Scissors[i].GetHash() ^ (i + 1));
 
+        if (DynamicStates.size() > 0)
+            Hash = CityHash64WithSeed((const char*)&DynamicStates[0], sizeof(EPipelineDynamicState) * DynamicStates.size(), Hash);
+
         // 아래 내용들도 해시를 만들 수 있어야 함, todo
         Hash ^= RasterizationState->GetHash();
         Hash ^= MultisampleState->GetHash();
@@ -338,6 +346,7 @@ struct jPipelineStateFixedInfo
 
     std::vector<jViewport> Viewports;
     std::vector<jScissor> Scissors;
+    std::vector<EPipelineDynamicState> DynamicStates;
 
     jRasterizationStateInfo* RasterizationState = nullptr;
     jMultisampleStateInfo* MultisampleState = nullptr;

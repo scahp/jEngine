@@ -85,8 +85,7 @@ public:
 	virtual jShaderBindingInstance* CreateShaderBindingInstance();
 	//////////////////////////////////////////////////////////////////////////
 
-    jMaterial* Material = nullptr;
-	bool IsTranslucent() const;
+    std::shared_ptr<jMaterial> MaterialPtr;
 
 private:
 	enum EDirty : int8

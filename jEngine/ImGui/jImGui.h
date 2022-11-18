@@ -3,6 +3,8 @@
 #include "Math/Vector.h"
 #include "RHI/Vulkan/jBuffer_Vulkan.h"
 
+struct jPushConstant;
+
 // This is modifed from here https://github.com/SaschaWillems/Vulkan/blob/master/examples/imgui/main.cpp
 
 class jImGUI_Vulkan final
@@ -31,8 +33,6 @@ public:
     void Initialize(float width, float height);
     void Release();
 
-    void PrepareDraw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext);
-
     // Draw current imGui frame into a command buffer
     void Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext);
 
@@ -47,7 +47,7 @@ private:
     void UpdateBuffers();
 
     // Initialize all Vulkan resources used by the ui
-    VkPipeline CreatePipelineState(VkRenderPass renderPass, VkQueue copyQueue);
+    jPipelineStateInfo* CreatePipelineState(jRenderPass* renderPass, VkQueue copyQueue);
 
 private:
     // Singletone variables and functions
@@ -78,12 +78,12 @@ private:
     std::vector<jDynamicBufferData> DynamicBufferData;
     jTexture* FontImage = nullptr;
 
-    VkPipelineLayout PipelineLayout;
+    // VkPipelineLayout PipelineLayout;
     VkDescriptorPool DescriptorPool;
-    VkDescriptorSetLayout DescriptorSetLayout;
     VkDescriptorSet DescriptorSet;
-    std::vector<VkPipeline> Pipelines;
-    std::vector<jRenderPass*> RenderPasses;         // 렌더패스는 RenderPassPool 에서 관리하기 때문에 따로 소멸처리 하지 않음
+    jVertexBuffer* EmptyVertexBuffer = nullptr;
+    jShaderBindingsLayout* EmptyShaderBindingLayout = nullptr;
+    std::shared_ptr<jPushConstant> PushConstBlockPtr;
 
     bool IsInitialized = false;
 };

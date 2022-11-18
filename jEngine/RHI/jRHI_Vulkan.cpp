@@ -501,6 +501,7 @@ jVertexBuffer* jRHI_Vulkan::CreateVertexBuffer(const std::shared_ptr<jVertexStre
 		stream.Offset = 0;
 		stream.InstanceDivisor = iter->InstanceDivisor;
 
+		if (iter->GetBufferSize() > 0)
 		{
 			VkDeviceSize bufferSize = iter->GetBufferSize();
 			jBuffer_Vulkan stagingBuffer;
@@ -530,9 +531,10 @@ jVertexBuffer* jRHI_Vulkan::CreateVertexBuffer(const std::shared_ptr<jVertexStre
 			jVulkanBufferUtil::CopyBuffer(stagingBuffer, *stream.BufferPtr.get(), bufferSize);
 
 			stagingBuffer.Release();
+		
+			vertexBuffer->BindInfos.Buffers.push_back(stream.BufferPtr->Buffer);
+			vertexBuffer->BindInfos.Offsets.push_back(stream.Offset + stream.BufferPtr->Offset);
 		}
-		vertexBuffer->BindInfos.Buffers.push_back(stream.BufferPtr->Buffer);
-		vertexBuffer->BindInfos.Offsets.push_back(stream.Offset + stream.BufferPtr->Offset);
 
 		/////////////////////////////////////////////////////////////
 		VkVertexInputBindingDescription bindingDescription = {};
@@ -579,6 +581,29 @@ jVertexBuffer* jRHI_Vulkan::CreateVertexBuffer(const std::shared_ptr<jVertexStre
 				}
 				break;
 			}
+            case EBufferElementType::BYTE_UNORM:
+            {
+                const int32 elementCount = element.Stride / sizeof(char);
+                switch (elementCount)
+                {
+                case 1:
+                    AttrFormat = VK_FORMAT_R8_UNORM;
+                    break;
+                case 2:
+                    AttrFormat = VK_FORMAT_R8G8_UNORM;
+                    break;
+                case 3:
+                    AttrFormat = VK_FORMAT_R8G8B8_UNORM;
+                    break;
+                case 4:
+                    AttrFormat = VK_FORMAT_R8G8B8A8_UNORM;
+                    break;
+                default:
+                    check(0);
+                    break;
+                }
+                break;
+            }
 			case EBufferElementType::UINT32:
 			{
 				const int32 elementCount = element.Stride / sizeof(uint32);
@@ -738,6 +763,34 @@ bool jRHI_Vulkan::CreateShaderInternal(jShader* OutShader, const jShaderInfo& sh
 		return shaderModule;
 	};
 
+    auto LoadShaderFromSRV = [](const char* fileName) -> VkShaderModule
+    {
+        std::ifstream is(fileName, std::ios::binary | std::ios::in | std::ios::ate);
+
+        if (is.is_open())
+        {
+            size_t size = is.tellg();
+            is.seekg(0, std::ios::beg);
+            char* shaderCode = new char[size];
+            is.read(shaderCode, size);
+            is.close();
+
+            assert(size > 0);
+
+            VkShaderModule shaderModule = nullptr;
+            VkShaderModuleCreateInfo moduleCreateInfo{};
+            moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+            moduleCreateInfo.codeSize = size;
+            moduleCreateInfo.pCode = (uint32*)shaderCode;
+
+            verify(VK_SUCCESS == vkCreateShaderModule(g_rhi_vk->Device, &moduleCreateInfo, NULL, &shaderModule));
+            delete[] shaderCode;
+
+            return shaderModule;
+        }
+        return nullptr;
+    };
+
 	jShader* shader_vk = OutShader;
 	check(shader_vk->GetPermutationCount());
 	{
@@ -781,32 +834,43 @@ bool jRHI_Vulkan::CreateShaderInternal(jShader* OutShader, const jShaderInfo& sh
 			break;
 		}
 
-        jFile ShaderFile;
-        ShaderFile.OpenFile(shaderInfo.GetShaderFilepath().ToStr(), FileType::TEXT, ReadWriteType::READ);
-        ShaderFile.ReadFileToBuffer(false);
-        std::string ShaderText;
+		VkShaderModule shaderModule{};
 
-		if (shaderInfo.GetPreProcessors().GetStringLength() > 0)
-        {
-            ShaderText += shaderInfo.GetPreProcessors().ToStr();
+		const bool isSpirv = !!strstr(shaderInfo.GetShaderFilepath().ToStr(), ".spv");
+		if (isSpirv)
+		{
+			shaderModule = LoadShaderFromSRV(shaderInfo.GetShaderFilepath().ToStr());
+		}
+		else
+		{
+            jFile ShaderFile;
+            ShaderFile.OpenFile(shaderInfo.GetShaderFilepath().ToStr(), FileType::TEXT, ReadWriteType::READ);
+            ShaderFile.ReadFileToBuffer(false);
+            std::string ShaderText;
+
+            if (shaderInfo.GetPreProcessors().GetStringLength() > 0)
+            {
+                ShaderText += shaderInfo.GetPreProcessors().ToStr();
+                ShaderText += "\r\n";
+            }
+            ShaderText += PermutationDefines;
             ShaderText += "\r\n";
-        }
-        ShaderText += PermutationDefines;
-        ShaderText += "\r\n";
 
-        ShaderText += ShaderFile.GetBuffer();
+            ShaderText += ShaderFile.GetBuffer();
 
-        std::vector<uint32> SpirvCode;
-        const bool isHLSL = !!strstr(shaderInfo.GetShaderFilepath().ToStr(), ".hlsl");
-        if (isHLSL)
-            jSpirvHelper::HLSLtoSpirv(SpirvCode, ShaderConductorShaderStage, ShaderText.c_str());
-        else
-            jSpirvHelper::GLSLtoSpirv(SpirvCode, ShaderLangShaderStage, ShaderText.data());
-        VkShaderModule computeShaderModule = CreateShaderModule(SpirvCode);
+            std::vector<uint32> SpirvCode;
+			const bool isHLSL = !!strstr(shaderInfo.GetShaderFilepath().ToStr(), ".hlsl");
+			if (isHLSL)
+				jSpirvHelper::HLSLtoSpirv(SpirvCode, ShaderConductorShaderStage, ShaderText.c_str());
+			else
+				jSpirvHelper::GLSLtoSpirv(SpirvCode, ShaderLangShaderStage, ShaderText.data());
+
+			shaderModule = CreateShaderModule(SpirvCode);
+		}
 
 		CurCompiledShader->ShaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 		CurCompiledShader->ShaderStage.stage = ShaderFlagBits;
-		CurCompiledShader->ShaderStage.module = computeShaderModule;
+		CurCompiledShader->ShaderStage.module = shaderModule;
 		CurCompiledShader->ShaderStage.pName = "main";
 	}
 	shader_vk->ShaderInfo = shaderInfo;

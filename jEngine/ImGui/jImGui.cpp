@@ -6,6 +6,7 @@
 #include "jOptions.h"
 #include "RHI/jRenderFrameContext.h"
 #include "Renderer/jSceneRenderTargets.h"
+#include "RHI/jPipelineStateInfo.h"
 
 jImGUI_Vulkan* jImGUI_Vulkan::s_instance = nullptr;
 
@@ -51,18 +52,18 @@ void jImGUI_Vulkan::Initialize(float width, float height)
     verify(VK_SUCCESS == vkCreateDescriptorPool(g_rhi_vk->Device, &descriptorPoolInfo, nullptr, &DescriptorPool));
 
     // Descriptor set layout
-    std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings;
-    setLayoutBindings.resize(1);
-    setLayoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    setLayoutBindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    setLayoutBindings[0].binding = 0;
-    setLayoutBindings[0].descriptorCount = 1;
+    {
+        int32 BindingPoint = 0;
+        jShaderBindingArray ShaderBindingArray;
+        jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
 
-    VkDescriptorSetLayoutCreateInfo descriptorLayout{};
-    descriptorLayout.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    descriptorLayout.pBindings = setLayoutBindings.data();
-    descriptorLayout.bindingCount = static_cast<uint32>(setLayoutBindings.size());
-    verify(VK_SUCCESS == vkCreateDescriptorSetLayout(g_rhi_vk->Device, &descriptorLayout, nullptr, &DescriptorSetLayout));
+        ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
+            , ResourceInlineAllactor.Alloc<jTextureResource>(nullptr, nullptr));
+
+        EmptyShaderBindingLayout = g_rhi->CreateShaderBindings(ShaderBindingArray);
+    }
+
+    VkDescriptorSetLayout DescriptorSetLayout = (VkDescriptorSetLayout)EmptyShaderBindingLayout->GetHandle();
 
     // Descriptor set
     VkDescriptorSetAllocateInfo allocInfo{};
@@ -72,20 +73,7 @@ void jImGUI_Vulkan::Initialize(float width, float height)
     allocInfo.descriptorSetCount = 1;
     verify(VK_SUCCESS == vkAllocateDescriptorSets(g_rhi_vk->Device, &allocInfo, &DescriptorSet));
 
-    // Pipeline layout
-    // Push constants for UI rendering parameters
-    VkPushConstantRange pushConstantRange{};
-    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    pushConstantRange.offset = 0;
-    pushConstantRange.size = sizeof(PushConstBlock);
-
-    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
-    pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutCreateInfo.setLayoutCount = 1;
-    pipelineLayoutCreateInfo.pSetLayouts = &DescriptorSetLayout;
-    pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
-    pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
-    verify(VK_SUCCESS == vkCreatePipelineLayout(g_rhi_vk->Device, &pipelineLayoutCreateInfo, nullptr, &PipelineLayout));
+    PushConstBlockPtr = std::make_shared<jPushConstant>(PushConstBlock(), EShaderAccessStageFlag::VERTEX);
     //////////////////////////////////////////////////////////////////////////
     // 
     //////////////////////////////////////////////////////////////////////////
@@ -147,6 +135,26 @@ void jImGUI_Vulkan::Initialize(float width, float height)
         iter.Initialize();
     }
 
+    // CreateEmptyVertexBuffer to store vertex stream type
+    {
+        auto vertexStreamData = std::make_shared<jVertexStreamData>();
+        {
+            auto streamParam = std::make_shared<jStreamParam<float>>();
+            streamParam->BufferType = EBufferType::STATIC;
+            streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 2));
+            streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 2));
+            streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::BYTE_UNORM, sizeof(unsigned char) * 4));
+            streamParam->Stride = (sizeof(float) * 2) + (sizeof(float) * 2) + (sizeof(unsigned char) * 4);
+            streamParam->Name = jName("Position_UV_Color");
+            vertexStreamData->Params.push_back(streamParam);
+        }
+
+        vertexStreamData->PrimitiveType = EPrimitiveType::TRIANGLES;
+        vertexStreamData->ElementCount = 0;
+
+        EmptyVertexBuffer = g_rhi->CreateVertexBuffer(vertexStreamData);
+    }
+
     IsInitialized = true;
 }
 
@@ -157,33 +165,20 @@ void jImGUI_Vulkan::Release()
 
     DynamicBufferData.clear();
 
-    if (PipelineLayout)
-    {
-        vkDestroyPipelineLayout(g_rhi_vk->Device, PipelineLayout, nullptr);
-        PipelineLayout = nullptr;
-    }
-
     DescriptorSet = nullptr;        // DescriptorPool 을 해제 하면되므로 따로 소멸시키지 않음
     if (DescriptorPool)
     {
         vkDestroyDescriptorPool(g_rhi_vk->Device, DescriptorPool, nullptr);
         DescriptorPool = nullptr;
     }
-    
-    if (DescriptorSetLayout)
-    {
-        vkDestroyDescriptorSetLayout(g_rhi_vk->Device, DescriptorSetLayout, nullptr);
-        DescriptorSetLayout = nullptr;
-    }
-    
-    for (auto& iter : Pipelines)
-        vkDestroyPipeline(g_rhi_vk->Device, iter, nullptr);
-    
-    Pipelines.clear();
-    RenderPasses.clear();
+ 
+    PushConstBlockPtr.reset();
+
+    delete EmptyVertexBuffer;
+    EmptyVertexBuffer = nullptr;
 }
 
-VkPipeline jImGUI_Vulkan::CreatePipelineState(VkRenderPass renderPass, VkQueue copyQueue)
+jPipelineStateInfo* jImGUI_Vulkan::CreatePipelineState(jRenderPass* renderPass, VkQueue copyQueue)
 {
     jRasterizationStateInfo* rasterizationInfo = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::NONE, EFrontFace::CCW>::Create();
     check(rasterizationInfo);
@@ -202,122 +197,33 @@ VkPipeline jImGUI_Vulkan::CreatePipelineState(VkRenderPass renderPass, VkQueue c
     jMultisampleStateInfo* multisamplesStateInfo = TMultisampleStateInfo<>::Create(EMSAASamples::COUNT_1);
     check(multisamplesStateInfo);
 
-    // Setup graphics pipeline for UI rendering
-    VkPipelineInputAssemblyStateCreateInfo inputAssemblyState{};
-    inputAssemblyState.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    inputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-    inputAssemblyState.flags = 0;
-    inputAssemblyState.primitiveRestartEnable = VK_FALSE;
+    static std::vector<EPipelineDynamicState> PipelineDynamicStates = { EPipelineDynamicState::VIEWPORT, EPipelineDynamicState::SCISSOR };
+    jPipelineStateFixedInfo PipelineStateFixed(rasterizationInfo, multisamplesStateInfo, depthStencilInfo, blendStateInfo, PipelineDynamicStates, false);
 
-    VkPipelineColorBlendStateCreateInfo colorBlendState{};
-    colorBlendState.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    colorBlendState.attachmentCount = 1;
-    colorBlendState.pAttachments = &((jBlendingStateInfo_Vulakn*)blendStateInfo)->ColorBlendAttachmentInfo;
+    jVertexBufferArray VertexBufferArray;
+    VertexBufferArray.Add(EmptyVertexBuffer);
 
-    VkPipelineViewportStateCreateInfo viewportState{};
-    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-    viewportState.viewportCount = 1;
-    viewportState.scissorCount = 1;
-    viewportState.flags = 0;
+    jShaderBindingsLayoutArray ShaderBindingsLayoutArray;
+    ShaderBindingsLayoutArray.Add(EmptyShaderBindingLayout);
 
-    std::vector<VkDynamicState> dynamicStateEnables = {
-        VK_DYNAMIC_STATE_VIEWPORT,
-        VK_DYNAMIC_STATE_SCISSOR
-    };
-    VkPipelineDynamicStateCreateInfo dynamicState{};
-    dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-    dynamicState.pDynamicStates = dynamicStateEnables.data();
-    dynamicState.dynamicStateCount = static_cast<uint32>(dynamicStateEnables.size());
-    dynamicState.flags = 0;
-
-    std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages{};
-
-    VkGraphicsPipelineCreateInfo pipelineCreateInfo{};
-    pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipelineCreateInfo.layout = PipelineLayout;
-    pipelineCreateInfo.renderPass = renderPass;
-    pipelineCreateInfo.flags = 0;
-    pipelineCreateInfo.basePipelineIndex = -1;
-    pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
-
-    pipelineCreateInfo.pInputAssemblyState = &inputAssemblyState;
-    pipelineCreateInfo.pColorBlendState = &colorBlendState;
-    pipelineCreateInfo.pViewportState = &viewportState;
-    pipelineCreateInfo.pRasterizationState = &((jRasterizationStateInfo_Vulkan*)rasterizationInfo)->RasterizationStateInfo;
-    pipelineCreateInfo.pMultisampleState = &((jMultisampleStateInfo_Vulkan*)multisamplesStateInfo)->MultisampleStateInfo;
-    pipelineCreateInfo.pDepthStencilState = &((jDepthStencilStateInfo_Vulkan*)depthStencilInfo)->DepthStencilStateInfo;
-    pipelineCreateInfo.pDynamicState = &dynamicState;
-    pipelineCreateInfo.stageCount = static_cast<uint32>(shaderStages.size());
-    pipelineCreateInfo.pStages = shaderStages.data();
-
-    // Vertex bindings an attributes based on ImGui vertex definition
-    std::vector<VkVertexInputBindingDescription> vertexInputBindings = {
-        VkVertexInputBindingDescription(0, sizeof(ImDrawVert), VK_VERTEX_INPUT_RATE_VERTEX),
-    };
-    std::vector<VkVertexInputAttributeDescription> vertexInputAttributes = {
-        VkVertexInputAttributeDescription(0, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(ImDrawVert, pos)),	// Location 0: Position
-        VkVertexInputAttributeDescription(1, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(ImDrawVert, uv)),	// Location 1: UV
-        VkVertexInputAttributeDescription(2, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(ImDrawVert, col)),	// Location 0: Color
-    };
-    VkPipelineVertexInputStateCreateInfo vertexInputState{};
-    vertexInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInputState.vertexBindingDescriptionCount = static_cast<uint32>(vertexInputBindings.size());
-    vertexInputState.pVertexBindingDescriptions = vertexInputBindings.data();
-    vertexInputState.vertexAttributeDescriptionCount = static_cast<uint32>(vertexInputAttributes.size());
-    vertexInputState.pVertexAttributeDescriptions = vertexInputAttributes.data();
-
-    pipelineCreateInfo.pVertexInputState = &vertexInputState;
-
-    auto LoadShaderFromSRV = [](const char* fileName) -> VkShaderModule
+    jGraphicsPipelineShader Shader;
     {
-        std::ifstream is(fileName, std::ios::binary | std::ios::in | std::ios::ate);
+        jShaderInfo shaderInfo;
+        shaderInfo.SetName(jNameStatic("imgui_VS"));
+        shaderInfo.SetShaderFilepath(jNameStatic("External/IMGUI/ui.vert.spv"));
+        shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
+        Shader.VertexShader = g_rhi->CreateShader(shaderInfo);
+    }
+    {
+        jShaderInfo shaderInfo;
+        shaderInfo.SetName(jNameStatic("imgui_PS"));
+        shaderInfo.SetShaderFilepath(jNameStatic("External/IMGUI/ui.frag.spv"));
+        shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
+        Shader.PixelShader = g_rhi->CreateShader(shaderInfo);
+    }
 
-        if (is.is_open())
-        {
-            size_t size = is.tellg();
-            is.seekg(0, std::ios::beg);
-            char* shaderCode = new char[size];
-            is.read(shaderCode, size);
-            is.close();
-
-            assert(size > 0);
-
-            VkShaderModule shaderModule = nullptr;
-            VkShaderModuleCreateInfo moduleCreateInfo{};
-            moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-            moduleCreateInfo.codeSize = size;
-            moduleCreateInfo.pCode = (uint32*)shaderCode;
-
-            verify(VK_SUCCESS == vkCreateShaderModule(g_rhi_vk->Device, &moduleCreateInfo, NULL, &shaderModule));
-            delete[] shaderCode;
-
-            return shaderModule;
-        }
-        return nullptr;
-    };
-
-    VkPipelineShaderStageCreateInfo vertexShaderStage = {};
-    vertexShaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    vertexShaderStage.stage = VK_SHADER_STAGE_VERTEX_BIT;
-    vertexShaderStage.module = LoadShaderFromSRV("External/IMGUI/ui.vert.spv");
-    vertexShaderStage.pName = "main";
-
-    VkPipelineShaderStageCreateInfo fragmentShaderStage = {};
-    fragmentShaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    fragmentShaderStage.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-    fragmentShaderStage.module = LoadShaderFromSRV("External/IMGUI/ui.frag.spv");
-    fragmentShaderStage.pName = "main";
-
-    shaderStages[0] = vertexShaderStage;
-    shaderStages[1] = fragmentShaderStage;
-
-    VkPipeline pipeline = nullptr;
-    verify(VK_SUCCESS == vkCreateGraphicsPipelines(g_rhi_vk->Device, g_rhi_vk->PipelineCache, 1, &pipelineCreateInfo, nullptr, &pipeline));
-
-    vkDestroyShaderModule(g_rhi_vk->Device, vertexShaderStage.module, nullptr);
-    vkDestroyShaderModule(g_rhi_vk->Device, fragmentShaderStage.module, nullptr);
-
-    return pipeline;
+    return g_rhi->CreatePipelineStateInfo(&PipelineStateFixed, Shader
+        , VertexBufferArray, renderPass, ShaderBindingsLayoutArray, PushConstBlockPtr.get(), 0);
 }
 
 void jImGUI_Vulkan::NewFrame(bool updateFrameGraph)
@@ -347,6 +253,7 @@ void jImGUI_Vulkan::NewFrame(bool updateFrameGraph)
     ImGui::Checkbox("UseDeferredRenderer", &gOptions.UseDeferredRenderer);
     ImGui::Checkbox("UseSubpass", &gOptions.UseSubpass);
     ImGui::Checkbox("UseMemoryless", &gOptions.UseMemoryless);
+    ImGui::Checkbox("ShowDebugObject", &gOptions.ShowDebugObject);
     ImGui::Separator();
 
     constexpr float IndentSpace = 10.0f;
@@ -520,33 +427,6 @@ void jImGUI_Vulkan::UpdateBuffers()
     }
 }
 
-void jImGUI_Vulkan::PrepareDraw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext)
-{
-    if (!IsInitialized)
-        return;
-
-    check(RenderPasses.size() == Pipelines.size());
-
-    const int32 frameIndex = InRenderFrameContext->FrameIndex;
-    if (RenderPasses.size() <= frameIndex || !RenderPasses[frameIndex])
-    {
-        RenderPasses.resize(frameIndex + 1);
-        Pipelines.resize(frameIndex + 1);
-
-        const auto& extent = g_rhi_vk->Swapchain->GetExtent();
-        const auto& image = g_rhi_vk->Swapchain->GetSwapchainImage(frameIndex);
-
-        const auto& FinalColorPtr = InRenderFrameContext->SceneRenderTarget->FinalColorPtr;
-
-        jAttachment color = jAttachment(FinalColorPtr, EAttachmentLoadStoreOp::LOAD_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, Vector4(0.0f, 0.0f, 0.0f, 1.0f), Vector2(1.0f, 0.0f)
-            , FinalColorPtr->GetLayout(), EImageLayout::PRESENT_SRC);
-
-        auto newRenderPass = g_rhi_vk->GetOrCreateRenderPass({ color }, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
-        RenderPasses[frameIndex] = newRenderPass;
-        Pipelines[frameIndex] = jImGUI_Vulkan::Get().CreatePipelineState((VkRenderPass)RenderPasses[frameIndex]->GetRenderPass(), g_rhi_vk->GraphicsQueue.Queue);
-    }
-}
-
 void jImGUI_Vulkan::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext)
 {
     if (!IsInitialized)
@@ -556,17 +436,36 @@ void jImGUI_Vulkan::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFra
     UpdateBuffers();
 
     check(InRenderFrameContext);
-    PrepareDraw(InRenderFrameContext);
+
+    // Prepare draw
+    jRenderPass* RenderPass = nullptr;
+    jPipelineStateInfo_Vulkan* PiplineStateInfo = nullptr;
+    {
+        const auto& extent = g_rhi_vk->Swapchain->GetExtent();
+        const auto& image = g_rhi_vk->Swapchain->GetSwapchainImage(InRenderFrameContext->FrameIndex);
+
+        const auto& FinalColorPtr = InRenderFrameContext->SceneRenderTarget->FinalColorPtr;
+
+        jAttachment color = jAttachment(FinalColorPtr, EAttachmentLoadStoreOp::LOAD_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, Vector4(0.0f, 0.0f, 0.0f, 1.0f), Vector2(1.0f, 0.0f)
+            , FinalColorPtr->GetLayout(), EImageLayout::PRESENT_SRC);
+
+        RenderPass = g_rhi_vk->GetOrCreateRenderPass({ color }, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
+        PiplineStateInfo = (jPipelineStateInfo_Vulkan*)jImGUI_Vulkan::Get().CreatePipelineState(RenderPass, g_rhi_vk->GraphicsQueue.Queue);
+    }
+    check(RenderPass);
+    check(PiplineStateInfo);
 
     const int32 frameIndex = InRenderFrameContext->FrameIndex;
-    if (RenderPasses[frameIndex]->BeginRenderPass(InRenderFrameContext->CommandBuffer))
+    if (RenderPass->BeginRenderPass(InRenderFrameContext->CommandBuffer))
     {
         VkCommandBuffer commandbuffer_vk = (VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle();
 
         ImGuiIO& io = ImGui::GetIO();
 
-        vkCmdBindDescriptorSets(commandbuffer_vk, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescriptorSet, 0, nullptr);
-        vkCmdBindPipeline(commandbuffer_vk, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipelines[frameIndex]);
+        const VkPipelineLayout pipelineLayout = PiplineStateInfo->vkPipelineLayout;
+
+        vkCmdBindDescriptorSets(commandbuffer_vk, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &DescriptorSet, 0, nullptr);
+        vkCmdBindPipeline(commandbuffer_vk, VK_PIPELINE_BIND_POINT_GRAPHICS, PiplineStateInfo->vkPipeline);
 
         VkViewport viewport = {};
         viewport.width = ImGui::GetIO().DisplaySize.x;
@@ -578,7 +477,7 @@ void jImGUI_Vulkan::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFra
         // UI scale and translate via push constants
         pushConstBlock.scale = Vector2(2.0f / io.DisplaySize.x, 2.0f / io.DisplaySize.y);
         pushConstBlock.translate = Vector2(-1.0f);
-        vkCmdPushConstants(commandbuffer_vk, PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstBlock), &pushConstBlock);
+        vkCmdPushConstants(commandbuffer_vk, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstBlock), &pushConstBlock);
 
         // Render commands
         ImDrawData* imDrawData = ImGui::GetDrawData();
@@ -615,7 +514,7 @@ void jImGUI_Vulkan::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFra
             }
         }
 
-        RenderPasses[frameIndex]->EndRenderPass();
+        RenderPass->EndRenderPass();
     }
 }
 

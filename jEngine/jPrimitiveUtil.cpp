@@ -8,6 +8,7 @@
 #include "Scene/Light/jSpotLight.h"
 #include "Math/Plane.h"
 #include "FileLoader/jImageFileLoader.h"
+#include "Material/jMaterial.h"
 
 struct Triangle
 {
@@ -585,12 +586,12 @@ jRenderObject* CreateQuad_Internal(const Vector& pos, const Vector& size, const 
 	};
 
 	Vector2 texcoords[] = {
-		Vector2(0.0f, 1.0f),
-		Vector2(1.0f, 0.0f),
+		Vector2(0.0f, 0.0f),
 		Vector2(1.0f, 1.0f),
 		Vector2(1.0f, 0.0f),
-		Vector2(0.0f, 1.0f),
+		Vector2(1.0f, 1.0f),
 		Vector2(0.0f, 0.0f),
+		Vector2(0.0f, 1.0f),
 	};
 
 	const int32 elementCount = _countof(vertices) / 3;
@@ -1930,8 +1931,10 @@ jDirectionalLightPrimitive* CreateDirectionalLightDebug(const Vector& pos, const
     object->BillboardObject = jPrimitiveUtil::CreateBillobardQuad(pos, Vector::OneVector, scale, Vector4(1.0f), targetCamera);
     if (data.lock()->ImageData.size() > 0)
     {
-        auto texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName(textureFilename), true).lock().get();
+        jTexture* texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName(textureFilename), true).lock().get();
 		//object->BillboardObject->RenderObject->TextureSamplers.push_back({ .Texture = texture, .SamplerState = nullptr });
+		object->BillboardObject->RenderObject->MaterialPtr = std::make_shared<jMaterial>();
+		object->BillboardObject->RenderObject->MaterialPtr->TexData[static_cast<int32>(jMaterial::EMaterialTextureType::DiffuseSampler)].Texture = texture;
         object->BillboardObject->RenderObject->IsHiddenBoundBox = true;
     }
     object->ArrowSegementObject = jPrimitiveUtil::CreateArrowSegment(Vector::ZeroVector, light->GetLightData().Direction * length, 1.0f, scale.x, scale.x / 2, Vector4(0.8f, 0.2f, 0.3f, 1.0f));
@@ -1961,9 +1964,8 @@ jPointLightPrimitive* CreatePointLightDebug(const Vector& scale, jCamera* target
 	if (data.lock()->ImageData.size() > 0)
 	{
 		auto texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName(textureFilename), true).lock().get();
-		// todo
-		check(0);
-		// object->BillboardObject->RenderObject->MaterialData.AddMaterialParam(GetCommonTextureName(1), texture);
+        object->BillboardObject->RenderObject->MaterialPtr = std::make_shared<jMaterial>();
+        object->BillboardObject->RenderObject->MaterialPtr->TexData[static_cast<int32>(jMaterial::EMaterialTextureType::DiffuseSampler)].Texture = texture;
 		object->BillboardObject->RenderObject->IsHiddenBoundBox = true;
 	}
 	object->SphereObject = CreateSphere(light->LightData.Position, light->LightData.MaxDistance, 20, Vector::OneVector, Vector4(light->LightData.Color, 1.0f), true, false);
@@ -1991,9 +1993,8 @@ jSpotLightPrimitive* CreateSpotLightDebug(const Vector& scale, jCamera* targetCa
 	if (data.lock()->ImageData.size() > 0)
 	{
 		auto texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName(textureFilename), true).lock().get();
-        // todo
-        check(0);
-		//object->BillboardObject->RenderObject->MaterialData.AddMaterialParam(GetCommonTextureName(1), texture);
+        object->BillboardObject->RenderObject->MaterialPtr = std::make_shared<jMaterial>();
+        object->BillboardObject->RenderObject->MaterialPtr->TexData[static_cast<int32>(jMaterial::EMaterialTextureType::DiffuseSampler)].Texture = texture;
 	}
 	object->UmbraConeObject = jPrimitiveUtil::CreateCone(light->LightData.Position, 1.0, 1.0, 20, Vector::OneVector, Vector4(light->LightData.Color.x, light->LightData.Color.y, light->LightData.Color.z, 1.0f), true, false);
 	object->UmbraConeObject->RenderObject->IsHiddenBoundBox = true;
