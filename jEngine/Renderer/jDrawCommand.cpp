@@ -84,13 +84,13 @@ void jDrawCommand::PrepareToDraw(bool InIsPositionOnly)
 
 void jDrawCommand::Draw() const
 {
-    g_rhi->BindGraphicsShaderBindingInstances(RenderFrameContextPtr->CommandBuffer, CurrentPipelineStateInfo, ShaderBindingInstanceCombiner, 0);
+    g_rhi->BindGraphicsShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), CurrentPipelineStateInfo, ShaderBindingInstanceCombiner, 0);
 
     // Bind the image that contains the shading rate patterns
 #if USE_VARIABLE_SHADING_RATE_TIER2
     if (gOptions.UseVRS)
     {
-        g_rhi_vk->BindShadingRateImage(RenderFrameContextPtr->CommandBuffer, g_rhi_vk->GetSampleVRSTexture());
+        g_rhi_vk->BindShadingRateImage(RenderFrameContextPtr->GetActiveCommandBuffer(), g_rhi_vk->GetSampleVRSTexture());
     }
 #endif
 
@@ -105,7 +105,7 @@ void jDrawCommand::Draw() const
             for (int32 i = 0; i < pushConstantRanges->NumOfData; ++i)
             {
                 const jPushConstantRange& range = (*pushConstantRanges)[i];
-                vkCmdPushConstants((VkCommandBuffer)RenderFrameContextPtr->CommandBuffer->GetHandle(), CurrentPipelineStateInfo->vkPipelineLayout
+                vkCmdPushConstants((VkCommandBuffer)RenderFrameContextPtr->GetActiveCommandBuffer()->GetHandle(), CurrentPipelineStateInfo->vkPipelineLayout
                     , GetVulkanShaderAccessFlags(range.AccessStageFlag), range.Offset, range.Size, PushConstant->GetConstantData());
             }
         }

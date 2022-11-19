@@ -351,6 +351,7 @@ void jRHI_Vulkan::ReleaseRHI()
 
 	vkDestroyPipelineCache(Device, PipelineCache, nullptr);
 	FenceManager.Release();
+	SemaphoreManager.Release();
 
 	if (Device)
 	{
@@ -457,6 +458,7 @@ void jRHI_Vulkan::RecreateSwapChain()
     verify(CommandBufferManager->CreatePool(GraphicsQueue.QueueIndex));
 	
 	FenceManager.Release();
+	SemaphoreManager.Release();
 
     jImGUI_Vulkan::Get().Release();
     jImGUI_Vulkan::Get().Initialize((float)SCR_WIDTH, (float)SCR_HEIGHT);
@@ -1041,50 +1043,50 @@ jBlendingStateInfo* jRHI_Vulkan::CreateBlendingState(const jBlendingStateInfo& i
 void jRHI_Vulkan::DrawArrays(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 vertStartIndex, int32 vertCount) const
 {
     check(InRenderFrameContext);
-    check(InRenderFrameContext->CommandBuffer);
-	vkCmdDraw((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), vertCount, 1, vertStartIndex, 0);
+    check(InRenderFrameContext->GetActiveCommandBuffer());
+	vkCmdDraw((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), vertCount, 1, vertStartIndex, 0);
 }
 
 void jRHI_Vulkan::DrawArraysInstanced(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 vertStartIndex, int32 vertCount, int32 instanceCount) const
 {
     check(InRenderFrameContext);
-    check(InRenderFrameContext->CommandBuffer);
-	vkCmdDraw((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), vertCount, instanceCount, vertStartIndex, 0);
+    check(InRenderFrameContext->GetActiveCommandBuffer());
+	vkCmdDraw((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), vertCount, instanceCount, vertStartIndex, 0);
 }
 
 void jRHI_Vulkan::DrawElements(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 count) const
 {
     check(InRenderFrameContext);
-    check(InRenderFrameContext->CommandBuffer);
-	vkCmdDrawIndexed((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), count, 1, startIndex, 0, 0);
+    check(InRenderFrameContext->GetActiveCommandBuffer());
+	vkCmdDrawIndexed((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), count, 1, startIndex, 0, 0);
 }
 
 void jRHI_Vulkan::DrawElementsInstanced(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 count, int32 instanceCount) const
 {
     check(InRenderFrameContext);
-    check(InRenderFrameContext->CommandBuffer);
-	vkCmdDrawIndexed((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), count, instanceCount, startIndex, 0, 0);
+    check(InRenderFrameContext->GetActiveCommandBuffer());
+	vkCmdDrawIndexed((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), count, instanceCount, startIndex, 0, 0);
 }
 
 void jRHI_Vulkan::DrawElementsBaseVertex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 count, int32 baseVertexIndex) const
 {
     check(InRenderFrameContext);
-    check(InRenderFrameContext->CommandBuffer);
-	vkCmdDrawIndexed((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), count, 1, startIndex, baseVertexIndex, 0);
+    check(InRenderFrameContext->GetActiveCommandBuffer());
+	vkCmdDrawIndexed((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), count, 1, startIndex, baseVertexIndex, 0);
 }
 
 void jRHI_Vulkan::DrawElementsInstancedBaseVertex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 count, int32 baseVertexIndex, int32 instanceCount) const
 {
 	check(InRenderFrameContext);
-	check(InRenderFrameContext->CommandBuffer);
-	vkCmdDrawIndexed((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), count, instanceCount, startIndex, baseVertexIndex, 0);
+	check(InRenderFrameContext->GetActiveCommandBuffer());
+	vkCmdDrawIndexed((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), count, instanceCount, startIndex, baseVertexIndex, 0);
 }
 
 void jRHI_Vulkan::DrawIndirect(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, jBuffer* buffer, int32 startIndex, int32 drawCount) const
 {
     check(InRenderFrameContext);
-    check(InRenderFrameContext->CommandBuffer);
-    vkCmdDrawIndirect((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), (VkBuffer)buffer->GetHandle()
+    check(InRenderFrameContext->GetActiveCommandBuffer());
+    vkCmdDrawIndirect((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), (VkBuffer)buffer->GetHandle()
         , startIndex * sizeof(VkDrawIndirectCommand), drawCount, sizeof(VkDrawIndirectCommand));
 }
 
@@ -1092,8 +1094,8 @@ void jRHI_Vulkan::DrawElementsIndirect(const std::shared_ptr<jRenderFrameContext
 	, EPrimitiveType type, jBuffer* buffer, int32 startIndex, int32 drawCount) const
 {
     check(InRenderFrameContext);
-    check(InRenderFrameContext->CommandBuffer);
-	vkCmdDrawIndexedIndirect((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), (VkBuffer)buffer->GetHandle()
+    check(InRenderFrameContext->GetActiveCommandBuffer());
+	vkCmdDrawIndexedIndirect((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), (VkBuffer)buffer->GetHandle()
 		, startIndex * sizeof(VkDrawIndexedIndirectCommand), drawCount, sizeof(VkDrawIndexedIndirectCommand));
 }
 
@@ -1240,7 +1242,7 @@ std::shared_ptr<jRenderFrameContext> jRHI_Vulkan::BeginRenderFrame()
 
     // timeout 은 nanoseconds. UINT64_MAX 는 타임아웃 없음
     VkResult acquireNextImageResult = vkAcquireNextImageKHR(Device, (VkSwapchainKHR)Swapchain->GetHandle(), UINT64_MAX
-		, Swapchain->Images[CurrenFrameIndex]->Available, VK_NULL_HANDLE, &CurrenFrameIndex);
+		, (VkSemaphore)Swapchain->Images[CurrenFrameIndex]->Available->GetHandle(), VK_NULL_HANDLE, &CurrenFrameIndex);
 
     VkFence lastCommandBufferFence = Swapchain->Images[CurrenFrameIndex]->CommandBufferFence;
 
@@ -1273,12 +1275,12 @@ std::shared_ptr<jRenderFrameContext> jRHI_Vulkan::BeginRenderFrame()
     // 이 프레임에서 펜스를 사용한다고 마크 해둠
 	Swapchain->Images[CurrenFrameIndex]->CommandBufferFence = (VkFence)commandBuffer->GetFenceHandle();
 
-    auto renderFrameContextPtr = std::make_shared<jRenderFrameContext>();
+    auto renderFrameContextPtr = std::make_shared<jRenderFrameContext>(commandBuffer);
 	renderFrameContextPtr->UseForwardRenderer = !gOptions.UseDeferredRenderer;
 	renderFrameContextPtr->FrameIndex = CurrenFrameIndex;
-	renderFrameContextPtr->CommandBuffer = commandBuffer;
 	renderFrameContextPtr->SceneRenderTarget = new jSceneRenderTarget();
 	renderFrameContextPtr->SceneRenderTarget->Create(Swapchain->GetSwapchainImage(CurrenFrameIndex));
+	renderFrameContextPtr->CurrentWaitSemaphore = Swapchain->Images[CurrenFrameIndex]->Available;
 
 	return renderFrameContextPtr;
 }
@@ -1287,52 +1289,55 @@ void jRHI_Vulkan::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& ren
 {
 	SCOPE_CPU_PROFILE(EndRenderFrame);
 
-	check(renderFrameContextPtr->CommandBuffer);
-	VkCommandBuffer vkCommandBuffer = (VkCommandBuffer)renderFrameContextPtr->CommandBuffer->GetHandle();
-	VkFence vkFence = (VkFence)renderFrameContextPtr->CommandBuffer->GetFenceHandle();
-	const uint32 imageIndex = (uint32)CurrenFrameIndex;
+	//check(renderFrameContextPtr->CommandBuffer);
+	//VkCommandBuffer vkCommandBuffer = (VkCommandBuffer)renderFrameContextPtr->CommandBuffer->GetHandle();
+	//VkFence vkFence = (VkFence)renderFrameContextPtr->CommandBuffer->GetFenceHandle();
+	//const uint32 imageIndex = (uint32)CurrenFrameIndex;
 
-    // Submitting the command buffer
-    VkSubmitInfo submitInfo = {};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+ //   // Submitting the command buffer
+ //   VkSubmitInfo submitInfo = {};
+ //   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-    VkSemaphore waitsemaphores[] = { Swapchain->Images[CurrenFrameIndex]->Available };
-    VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-    submitInfo.waitSemaphoreCount = 1;
-    submitInfo.pWaitSemaphores = waitsemaphores;
-    submitInfo.pWaitDstStageMask = waitStages;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &vkCommandBuffer;
+ //   VkSemaphore waitsemaphores[] = { Swapchain->Images[CurrenFrameIndex]->Available };
+ //   VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+ //   submitInfo.waitSemaphoreCount = 1;
+ //   submitInfo.pWaitSemaphores = waitsemaphores;
+ //   submitInfo.pWaitDstStageMask = waitStages;
+ //   submitInfo.commandBufferCount = 1;
+ //   submitInfo.pCommandBuffers = &vkCommandBuffer;
 
-    VkSemaphore signalSemaphores[] = { Swapchain->Images[CurrenFrameIndex]->RenderFinished };
-    submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = signalSemaphores;
+ //   VkSemaphore signalSemaphores[] = { Swapchain->Images[CurrenFrameIndex]->RenderFinished };
+ //   submitInfo.signalSemaphoreCount = 1;
+ //   submitInfo.pSignalSemaphores = signalSemaphores;
 
-    // SubmitInfo를 동시에 할수도 있음.
-    vkResetFences(Device, 1, &vkFence);		// 세마포어와는 다르게 수동으로 펜스를 unsignaled 상태로 재설정 해줘야 함
+ //   // SubmitInfo를 동시에 할수도 있음.
+ //   vkResetFences(Device, 1, &vkFence);		// 세마포어와는 다르게 수동으로 펜스를 unsignaled 상태로 재설정 해줘야 함
 
-    // 마지막에 Fences 파라메터는 커맨드 버퍼가 모두 실행되고나면 Signaled 될 Fences.
-	auto queueSubmitResult = vkQueueSubmit(GraphicsQueue.Queue, 1, &submitInfo, vkFence);
-    if ((queueSubmitResult == VK_ERROR_OUT_OF_DATE_KHR) || (queueSubmitResult == VK_SUBOPTIMAL_KHR))
-    {
-        RecreateSwapChain();
-		return;
-    }
-    else if (queueSubmitResult != VK_SUCCESS)
-    {
-        check(0);
-        return;
-    }
+ //   // 마지막에 Fences 파라메터는 커맨드 버퍼가 모두 실행되고나면 Signaled 될 Fences.
+	//auto queueSubmitResult = vkQueueSubmit(GraphicsQueue.Queue, 1, &submitInfo, vkFence);
+ //   if ((queueSubmitResult == VK_ERROR_OUT_OF_DATE_KHR) || (queueSubmitResult == VK_SUBOPTIMAL_KHR))
+ //   {
+ //       RecreateSwapChain();
+	//	return;
+ //   }
+ //   else if (queueSubmitResult != VK_SUCCESS)
+ //   {
+ //       check(0);
+ //       return;
+ //   }
+
+	VkSemaphore signalSemaphore[] = { (VkSemaphore)Swapchain->Images[CurrenFrameIndex]->RenderFinished->GetHandle() };
+	QueueSubmit(renderFrameContextPtr, Swapchain->Images[CurrenFrameIndex]->RenderFinished);
 
     VkPresentInfoKHR presentInfo = {};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = signalSemaphores;
+    presentInfo.pWaitSemaphores = signalSemaphore;
 
     VkSwapchainKHR swapChains[] = { Swapchain->Swapchain };
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = swapChains;
-    presentInfo.pImageIndices = &imageIndex;
+    presentInfo.pImageIndices = &CurrenFrameIndex;
 
     // 여러개의 스왑체인에 제출하는 경우만 모든 스왑체인으로 잘 제출 되었나 확인하는데 사용
     // 1개인 경우 그냥 vkQueuePresentKHR 의 리턴값을 확인하면 됨.
@@ -1358,6 +1363,47 @@ void jRHI_Vulkan::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& ren
     // 2). 여러개의 프레임을 동시에 처리 할수있도록 확장. 동시에 진행될 수 있는 최대 프레임수를 지정해줌.
     CurrenFrameIndex = (CurrenFrameIndex + 1) % Swapchain->Images.size();
 	renderFrameContextPtr->Destroy();
+}
+
+void jRHI_Vulkan::QueueSubmit(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr, jSemaphore* InSignalSemaphore)
+{
+    SCOPE_CPU_PROFILE(QueueSubmit);
+
+    check(renderFrameContextPtr->GetActiveCommandBuffer());
+    VkCommandBuffer vkCommandBuffer = (VkCommandBuffer)renderFrameContextPtr->GetActiveCommandBuffer()->GetHandle();
+    VkFence vkFence = (VkFence)renderFrameContextPtr->GetActiveCommandBuffer()->GetFenceHandle();
+	
+    // Submitting the command buffer
+    VkSubmitInfo submitInfo = {};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+    VkSemaphore waitsemaphores[] = { (VkSemaphore)renderFrameContextPtr->CurrentWaitSemaphore->GetHandle() };
+    VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = waitsemaphores;
+    submitInfo.pWaitDstStageMask = waitStages;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &vkCommandBuffer;
+
+	renderFrameContextPtr->CurrentWaitSemaphore = InSignalSemaphore;
+
+    VkSemaphore signalSemaphores[] = { (VkSemaphore)InSignalSemaphore->GetHandle() };
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = signalSemaphores;
+
+    // SubmitInfo를 동시에 할수도 있음.
+    vkResetFences(Device, 1, &vkFence);		// 세마포어와는 다르게 수동으로 펜스를 unsignaled 상태로 재설정 해줘야 함
+
+    // 마지막에 Fences 파라메터는 커맨드 버퍼가 모두 실행되고나면 Signaled 될 Fences.
+    auto queueSubmitResult = vkQueueSubmit(GraphicsQueue.Queue, 1, &submitInfo, vkFence);
+    if ((queueSubmitResult == VK_ERROR_OUT_OF_DATE_KHR) || (queueSubmitResult == VK_SUBOPTIMAL_KHR))
+    {
+        RecreateSwapChain();
+    }
+    else if (queueSubmitResult != VK_SUCCESS)
+    {
+        check(0);
+    }
 }
 
 VkCommandBuffer jRHI_Vulkan::BeginSingleTimeCommands() const

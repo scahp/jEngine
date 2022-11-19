@@ -15,6 +15,7 @@
 #include "Vulkan/jShader_Vulkan.h"
 #include "Vulkan/jQueryPoolOcclusion_Vulkan.h"
 #include "Vulkan/jMemoryPool_Vulkan.h"
+#include "jSemaphoreManager.h"
 
 struct jRingBuffer_Vulkan;
 struct jDescriptorPool_Vulkan;
@@ -89,6 +90,7 @@ public:
 	jSwapchain_Vulkan* Swapchain = nullptr;
 	jCommandBufferManager_Vulkan* CommandBufferManager = nullptr;
     jFenceManager_Vulkan FenceManager;
+	jSemaphoreManager_Vulkan SemaphoreManager;
 	jMemoryPool_Vulkan* MemoryPool = nullptr;
 
     jQueryPoolTime_Vulkan* QueryPoolTime = nullptr;
@@ -157,6 +159,7 @@ public:
     virtual void ReleaseQueryTime(jQuery* queryTime) const override;
 	virtual std::shared_ptr<jRenderFrameContext> BeginRenderFrame() override;
 	virtual void EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr) override;
+    virtual void QueueSubmit(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr, jSemaphore* InSignalSemaphore) override;
 	jPipelineStateInfo* CreatePipelineStateInfo(const jPipelineStateFixedInfo* InPipelineStateFixed, const jGraphicsPipelineShader InShader, const jVertexBufferArray& InVertexBufferArray
 		, const jRenderPass* InRenderPass, const jShaderBindingsLayoutArray& InShaderBindingArray, const jPushConstant* InPushConstant, int32 InSubpassIndex) const override;
 	virtual jPipelineStateInfo* CreateComputePipelineStateInfo(const jShader* shader, const jShaderBindingsLayoutArray& InShaderBindingArray, const jPushConstant* pushConstant) const override;
@@ -195,6 +198,9 @@ public:
 
 	virtual void BindGraphicsShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineStateLayout, const jResourceContainer<void*>& InShaderBindingInstanceCombiner, uint32 InFirstSet) const override;
 	virtual void BindComputeShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineStateLayout, const jResourceContainer<void*>& InShaderBindingInstanceCombiner, uint32 InFirstSet) const override;
+
+    virtual jFenceManager* GetFenceManager() { return &FenceManager; }
+    virtual jSemaphoreManager* GetSemaphoreManager() { return &SemaphoreManager; }
 };
 
 extern jRHI_Vulkan* g_rhi_vk;

@@ -8,6 +8,33 @@ jRenderFrameContext::~jRenderFrameContext()
     Destroy();
 }
 
+bool jRenderFrameContext::BeginActiveCommandBuffer()
+{
+    check(!IsBeginActiveCommandbuffer);
+    IsBeginActiveCommandbuffer = true;
+    return CommandBuffer->Begin();
+}
+
+bool jRenderFrameContext::EndActiveCommandBuffer()
+{
+    check(IsBeginActiveCommandbuffer);
+    IsBeginActiveCommandbuffer = false;
+    return CommandBuffer->End();
+}
+
+void jRenderFrameContext::QueueSubmitCurrentActiveCommandBuffer()
+{
+    if (CommandBuffer)
+    {
+        g_rhi->QueueSubmit(shared_from_this(), g_rhi_vk->Swapchain->Images[FrameIndex]->RenderFinishedAfterShadow);
+        g_rhi->GetCommandBufferManager()->ReturnCommandBuffer(CommandBuffer);
+
+        // get new commandbuffer
+        CommandBuffer = g_rhi_vk->CommandBufferManager->GetOrCreateCommandBuffer();
+        g_rhi_vk->Swapchain->Images[FrameIndex]->CommandBufferFence = (VkFence)CommandBuffer->GetFenceHandle();
+    }
+}
+
 void jRenderFrameContext::Destroy()
 {
     if (SceneRenderTarget)

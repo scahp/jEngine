@@ -17,13 +17,18 @@ void jSwapchainImage_Vulkan::ReleaseInternal()
     TexturePtr = nullptr;
     if (Available)
     {
-        vkDestroySemaphore(g_rhi_vk->Device, Available, nullptr);
+        g_rhi->GetSemaphoreManager()->ReturnSemaphore(Available);
         Available = nullptr;
     }
     if (RenderFinished)
     {
-        vkDestroySemaphore(g_rhi_vk->Device, RenderFinished, nullptr);
+        g_rhi->GetSemaphoreManager()->ReturnSemaphore(RenderFinished);
         RenderFinished = nullptr;
+    }
+    if (RenderFinishedAfterShadow)
+    {
+        g_rhi->GetSemaphoreManager()->ReturnSemaphore(RenderFinishedAfterShadow);
+        RenderFinishedAfterShadow = nullptr;
     }
 }
 
@@ -114,10 +119,9 @@ bool jSwapchain_Vulkan::Create()
             new jTexture_Vulkan(ETextureType::TEXTURE_2D, Format, Extent.x, Extent.y, 1, EMSAASamples::COUNT_1, 1, false, vkImages[i], ImagetView));
         SwapchainImage->CommandBufferFence = nullptr;
 
-        VkSemaphoreCreateInfo semaphoreInfo = {};
-        semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-        verify(VK_SUCCESS == vkCreateSemaphore(g_rhi_vk->Device, &semaphoreInfo, nullptr, &SwapchainImage->Available));
-        verify(VK_SUCCESS == vkCreateSemaphore(g_rhi_vk->Device, &semaphoreInfo, nullptr, &SwapchainImage->RenderFinished));
+        SwapchainImage->Available = g_rhi->GetSemaphoreManager()->GetOrCreateSemaphore();
+        SwapchainImage->RenderFinished = g_rhi->GetSemaphoreManager()->GetOrCreateSemaphore();
+        SwapchainImage->RenderFinishedAfterShadow = g_rhi->GetSemaphoreManager()->GetOrCreateSemaphore();
     }
 
     return true;

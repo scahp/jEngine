@@ -1,31 +1,48 @@
 ﻿#pragma once
 
+class jSemaphore
+{
+public:
+    virtual ~jSemaphore() {}
+    virtual void* GetHandle() const = 0;
+};
+
 class jSemaphoreManager
 {
 public:
     virtual ~jSemaphoreManager() {}
-    virtual VkSemaphore GetOrCreateSemaphore() = 0;
-    virtual void ReturnSemaphore(VkSemaphore fence) = 0;
+    virtual jSemaphore* GetOrCreateSemaphore() = 0;
+    virtual void ReturnSemaphore(jSemaphore* fence) = 0;
 };
 
 #if USE_OPENGL
 
 #elif USE_VULKAN
 
+class jSemaphore_Vulkan : public jSemaphore
+{
+public:
+    virtual ~jSemaphore_Vulkan() {}
+    void* GetHandle() const { return Semaphore; }
+
+    VkSemaphore Semaphore = nullptr;
+};
+
+
 class jSemaphoreManager_Vulkan : public jSemaphoreManager
 {
 public:
     virtual ~jSemaphoreManager_Vulkan();
-    virtual VkSemaphore GetOrCreateSemaphore() override;
-    virtual void ReturnSemaphore(VkSemaphore fence) override
+    virtual jSemaphore* GetOrCreateSemaphore() override;
+    virtual void ReturnSemaphore(jSemaphore* fence) override
     {
         UsingSemaphore.erase(fence);
         PendingSemaphore.insert(fence);
     }
-    void ReleaseInternal();
+    void Release();
 
-    robin_hood::unordered_set<VkSemaphore> UsingSemaphore;
-    robin_hood::unordered_set<VkSemaphore> PendingSemaphore;
+    robin_hood::unordered_set<jSemaphore*> UsingSemaphore;
+    robin_hood::unordered_set<jSemaphore*> PendingSemaphore;
 };
 
 #endif

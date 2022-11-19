@@ -29,8 +29,9 @@ public:
 
     // Semaphore 는 GPU - GPU 간의 동기화를 맞춰줌.여러개의 프레임이 동시에 만들어질 수 있게 함.
     // Semaphores 는 커맨드 Queue 내부 혹은 Queue 들 사이에 명령어 동기화를 위해서 설계됨
-    VkSemaphore Available = nullptr;		// 이미지를 획득해서 렌더링 준비가 완료된 경우 Signal(Lock 이 풀리는) 되는 것
-    VkSemaphore RenderFinished = nullptr;	// 렌더링을 마쳐서 Presentation 가능한 상태에서 Signal 되는 것
+    jSemaphore* Available = nullptr;		// 이미지를 획득해서 렌더링 준비가 완료된 경우 Signal(Lock 이 풀리는) 되는 것
+    jSemaphore* RenderFinished = nullptr;	// 렌더링을 마쳐서 Presentation 가능한 상태에서 Signal 되는 것
+    jSemaphore* RenderFinishedAfterShadow = nullptr;	// 렌더링을 마쳐서 Presentation 가능한 상태에서 Signal 되는 것
 };
 
 // Swapchain

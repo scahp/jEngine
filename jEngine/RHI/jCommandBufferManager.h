@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+class jFence;
+
 class jCommandBuffer
 {
 public:
@@ -11,6 +13,7 @@ public:
     virtual bool Begin() const { return false; }
     virtual bool End() const { return false; }
     virtual void Reset() const {}
+    virtual jFence* GetFence() const { return nullptr; }
 };
 
 class jCommandBufferManager

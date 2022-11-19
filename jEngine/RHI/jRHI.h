@@ -26,6 +26,8 @@ struct jShaderInfo;
 struct jSamplerStateInfo;
 class jSwapchain;
 class jMemoryPool;
+class jFenceManager;
+class jSemaphoreManager;
 
 enum class EUniformType
 {
@@ -400,6 +402,7 @@ public:
 	virtual void Finish() const {}
 	virtual std::shared_ptr<jRenderFrameContext> BeginRenderFrame() { return nullptr; }
     virtual void EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr) {}
+	virtual void QueueSubmit(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr, jSemaphore* InSignalSemaphore) {}
 
 	virtual jRasterizationStateInfo* CreateRasterizationState(const jRasterizationStateInfo& initializer) const { return nullptr; }
 	virtual jMultisampleStateInfo* CreateMultisampleState(const jMultisampleStateInfo& initializer) const { return nullptr; }
@@ -451,6 +454,9 @@ public:
 	virtual void NextSubpass(const jCommandBuffer* commandBuffer) const {}
 	virtual void BindGraphicsShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineStateLayout, const jResourceContainer<void*>& InShaderBindingInstanceCombiner, uint32 InFirstSet) const {}
 	virtual void BindComputeShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineStateLayout, const jResourceContainer<void*>& InShaderBindingInstanceCombiner, uint32 InFirstSet) const {}
+
+	virtual jFenceManager* GetFenceManager() { return nullptr; }
+	virtual jSemaphoreManager* GetSemaphoreManager() { return nullptr; }
 };
 
 // Not thred safe

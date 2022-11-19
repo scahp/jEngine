@@ -24,6 +24,6 @@ void jIndexBuffer_Vulkan::Bind(const std::shared_ptr<jRenderFrameContext>& InRen
         break;
     }
     check(InRenderFrameContext);
-    check(InRenderFrameContext->CommandBuffer);
-    vkCmdBindIndexBuffer((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), BufferPtr->Buffer, BufferPtr->Offset, IndexType);
+    check(InRenderFrameContext->GetActiveCommandBuffer());
+    vkCmdBindIndexBuffer((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), BufferPtr->Buffer, BufferPtr->Offset, IndexType);
 }

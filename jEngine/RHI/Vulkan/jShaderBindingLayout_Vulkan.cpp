@@ -166,17 +166,17 @@ void jShaderBindingInstance_Vulkan::UpdateShaderBindings(const jShaderBindingArr
 void jShaderBindingInstance_Vulkan::BindGraphics(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot /*= 0*/) const
 {
     check(InRenderFrameContext);
-    check(InRenderFrameContext->CommandBuffer);
+    check(InRenderFrameContext->GetActiveCommandBuffer());
     check(pipelineLayout);
-    vkCmdBindDescriptorSets((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, (VkPipelineLayout)(pipelineLayout), InSlot, 1, &DescriptorSet, 0, nullptr);
+    vkCmdBindDescriptorSets((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, (VkPipelineLayout)(pipelineLayout), InSlot, 1, &DescriptorSet, 0, nullptr);
 }
 
 void jShaderBindingInstance_Vulkan::BindCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot) const
 {
     check(InRenderFrameContext);
-    check(InRenderFrameContext->CommandBuffer);
+    check(InRenderFrameContext->GetActiveCommandBuffer());
     check(pipelineLayout);
-    vkCmdBindDescriptorSets((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, (VkPipelineLayout)(pipelineLayout), InSlot, 1, &DescriptorSet, 0, nullptr);
+    vkCmdBindDescriptorSets((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, (VkPipelineLayout)(pipelineLayout), InSlot, 1, &DescriptorSet, 0, nullptr);
 }
 
 void jWriteDescriptorSet::SetWriteDescriptorInfo(int32 InIndex, const jShaderBinding* InShaderBinding)

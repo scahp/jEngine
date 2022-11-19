@@ -6,9 +6,10 @@ class jCommandBuffer_Vulkan : public jCommandBuffer
 public:
     FORCEINLINE VkCommandBuffer& GetRef() { return CommandBuffer; }
     virtual void* GetHandle() const override { return CommandBuffer; }
-    virtual void* GetFenceHandle() const override { return Fence; }
+    virtual void* GetFenceHandle() const override { return Fence ? Fence->GetHandle() : nullptr; }
+    virtual jFence* GetFence() const override { return Fence; }
 
-    virtual void SetFence(void* fence) { Fence = (VkFence)fence; }
+    virtual void SetFence(jFence* fence) { Fence = fence; }
 
     virtual bool Begin() const override;
     virtual bool End() const override;
@@ -19,7 +20,7 @@ public:
     }
 
 private:
-    VkFence Fence = nullptr;                        // Fence manager 에서 참조하기 때문에 소멸시키지 않음
+    jFence* Fence = nullptr;                        // Fence manager 에서 참조하기 때문에 소멸시키지 않음
     VkCommandBuffer CommandBuffer = nullptr;        // CommandBufferManager 에서 CommandBufferPool 을 해제하여 일시에 소멸시키므로 소멸 처리 없음
 };
 

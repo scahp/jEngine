@@ -177,7 +177,7 @@ public:
         Profile.Indent = ScopedProfilerGPUIndent.fetch_add(1);
         
 		Profile.Query = jQueryTimePool::GetQueryTime();
-		Profile.Query->BeginQuery(InRenderFrameContext->CommandBuffer);
+		Profile.Query->BeginQuery(InRenderFrameContext->GetActiveCommandBuffer());
 	}
 
 	~jScopedProfile_GPU()
@@ -185,7 +185,7 @@ public:
 		//Profile.End = jQueryTimePool::GetQueryTime();
 		//g_rhi->QueryTimeStamp(Profile.End);
 
-		Profile.Query->EndQuery(RenderFrameContextPtr.lock()->CommandBuffer);
+		Profile.Query->EndQuery(RenderFrameContextPtr.lock()->GetActiveCommandBuffer());
 		jProfile_GPU::WatingResultList[jProfile_GPU::CurrentWatingResultListIndex].emplace_back(Profile);
 		ScopedProfilerGPUIndent.fetch_add(-1);
 	}

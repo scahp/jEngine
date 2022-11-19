@@ -407,7 +407,7 @@ void jPipelineStateInfo_Vulkan::Bind(const std::shared_ptr<jRenderFrameContext>&
 {
     check(vkPipeline);
     if (IsGraphics)
-        vkCmdBindPipeline((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipeline);
+        vkCmdBindPipeline((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipeline);
     else
-        vkCmdBindPipeline((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, vkPipeline);
+        vkCmdBindPipeline((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, vkPipeline);
 }

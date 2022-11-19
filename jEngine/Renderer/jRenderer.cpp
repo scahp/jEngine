@@ -432,20 +432,41 @@ void jRenderer::ShadowPass()
         jShadowDrawInfo& ShadowPasses = ShadowDrawInfo[i];
         const std::shared_ptr<jRenderTarget>& ShadowMapPtr = ShadowPasses.GetShadowMapPtr();
 
-        g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_ATTACHMENT);
+        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_ATTACHMENT);
 
-        if (ShadowPasses.ShadowMapRenderPass && ShadowPasses.ShadowMapRenderPass->BeginRenderPass(RenderFrameContextPtr->CommandBuffer))
+        if (ShadowPasses.ShadowMapRenderPass && ShadowPasses.ShadowMapRenderPass->BeginRenderPass(RenderFrameContextPtr->GetActiveCommandBuffer()))
         {
-            //ShadowpassOcclusionTest.BeginQuery(RenderFrameContextPtr->CommandBuffer);
+            //ShadowpassOcclusionTest.BeginQuery(RenderFrameContextPtr->GetActiveCommandBuffer());
             for (const auto& command : ShadowPasses.DrawCommands)
             {
                 command.Draw();
             }
-            //ShadowpassOcclusionTest.EndQuery(RenderFrameContextPtr->CommandBuffer);
+            //ShadowpassOcclusionTest.EndQuery(RenderFrameContextPtr->GetActiveCommandBuffer());
             ShadowPasses.ShadowMapRenderPass->EndRenderPass();
         }
 
-        g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_READ_ONLY);
+        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_READ_ONLY);
+    }
+
+    {
+        RenderFrameContextPtr->GetActiveCommandBuffer()->End();
+        
+        RenderFrameContextPtr->QueueSubmitCurrentActiveCommandBuffer();
+        //g_rhi->GetCommandBufferManager()->ReturnCommandBuffer(RenderFrameContextPtr->GetActiveCommandBuffer());
+        //RenderFrameContextPtr->GetActiveCommandBuffer() = (jCommandBuffer_Vulkan*)g_rhi_vk->CommandBufferManager->GetOrCreateCommandBuffer();
+        //g_rhi_vk->Swapchain->Images[RenderFrameContextPtr->FrameIndex]->CommandBufferFence = (VkFence)RenderFrameContextPtr->GetActiveCommandBuffer()->GetFenceHandle();
+        RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
+
+        //// 이전 프레임에서 현재 사용하려는 이미지를 사용중에 있나? (그렇다면 펜스를 기다려라)
+        //if (lastCommandBufferFence != VK_NULL_HANDLE)
+        //    vkWaitForFences(Device, 1, &lastCommandBufferFence, VK_TRUE, UINT64_MAX);
+
+        //GetUniformRingBuffer()->Reset();
+        //GetDescriptorPools()->Reset();
+
+        // 이 프레임에서 펜스를 사용한다고 마크 해둠
+        //Swapchain->Images[CurrenFrameIndex]->CommandBufferFence = (VkFence)commandBuffer->GetFenceHandle();
+
     }
 }
 
@@ -460,18 +481,18 @@ void jRenderer::BasePass()
 
         if (UseForwardRenderer)
         {
-            g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, RenderFrameContextPtr->SceneRenderTarget->ColorPtr->GetTexture(), EImageLayout::COLOR_ATTACHMENT);
+            g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTarget->ColorPtr->GetTexture(), EImageLayout::COLOR_ATTACHMENT);
         }
         else
         {
             for (int32 i = 0; i < _countof(RenderFrameContextPtr->SceneRenderTarget->GBuffer); ++i)
             {
-                g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, RenderFrameContextPtr->SceneRenderTarget->GBuffer[i]->GetTexture(), EImageLayout::COLOR_ATTACHMENT);
+                g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTarget->GBuffer[i]->GetTexture(), EImageLayout::COLOR_ATTACHMENT);
             }
         }
 
-        //BasepassOcclusionTest.BeginQuery(RenderFrameContextPtr->CommandBuffer);
-        if (BaseRenderPass && BaseRenderPass->BeginRenderPass(RenderFrameContextPtr->CommandBuffer))
+        //BasepassOcclusionTest.BeginQuery(RenderFrameContextPtr->GetActiveCommandBuffer());
+        if (BaseRenderPass && BaseRenderPass->BeginRenderPass(RenderFrameContextPtr->GetActiveCommandBuffer()))
         {
             // Draw G-Buffer : subpass 0 
             for (const auto& command : BasePasses)
@@ -482,7 +503,7 @@ void jRenderer::BasePass()
             // Draw Light : subpass 1
             if (!UseForwardRenderer && gOptions.UseSubpass)
             {
-                g_rhi->NextSubpass(RenderFrameContextPtr->CommandBuffer);
+                g_rhi->NextSubpass(RenderFrameContextPtr->GetActiveCommandBuffer());
                 DeferredLightPass_TodoRefactoring(BaseRenderPass);
             }
 
@@ -493,7 +514,7 @@ void jRenderer::BasePass()
         {
             DeferredLightPass_TodoRefactoring(BaseRenderPass);
         }
-        //BasepassOcclusionTest.EndQuery(RenderFrameContextPtr->CommandBuffer);
+        //BasepassOcclusionTest.EndQuery(RenderFrameContextPtr->GetActiveCommandBuffer());
     }
 }
 
@@ -504,10 +525,10 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
 
     if (!gOptions.UseSubpass)
     {
-        g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, RenderFrameContextPtr->SceneRenderTarget->ColorPtr->GetTexture(), EImageLayout::COLOR_ATTACHMENT);
+        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTarget->ColorPtr->GetTexture(), EImageLayout::COLOR_ATTACHMENT);
         for (int32 i = 0; i < _countof(RenderFrameContextPtr->SceneRenderTarget->GBuffer); ++i)
         {
-            g_rhi->TransitionImageLayout(RenderFrameContextPtr->CommandBuffer, RenderFrameContextPtr->SceneRenderTarget->GBuffer[i]->GetTexture(), EImageLayout::SHADER_READ_ONLY);
+            g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTarget->GBuffer[i]->GetTexture(), EImageLayout::SHADER_READ_ONLY);
         }
     }
 
@@ -579,7 +600,7 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
             InRenderPass = (jRenderPass_Vulkan*)g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
 
             check(InRenderPass);
-            InRenderPass->BeginRenderPass(RenderFrameContextPtr->CommandBuffer);
+            InRenderPass->BeginRenderPass(RenderFrameContextPtr->GetActiveCommandBuffer());
         }
 
         for (int32 i = 0; i < (int32)View.Lights.size(); ++i)
@@ -607,7 +628,7 @@ void jRenderer::PostProcess()
         SCOPE_GPU_PROFILE(RenderFrameContextPtr, TonemapCS);
 
         const uint32 imageIndex = RenderFrameContextPtr->FrameIndex;
-        jCommandBuffer* CommandBuffer = RenderFrameContextPtr->CommandBuffer;
+        jCommandBuffer* CommandBuffer = RenderFrameContextPtr->GetActiveCommandBuffer();
         jSceneRenderTarget* SceneRT = RenderFrameContextPtr->SceneRenderTarget;
 
         //////////////////////////////////////////////////////////////////////////
@@ -780,7 +801,7 @@ void jRenderer::DebugPasses()
         DebugDrawCommand[i].PrepareToDraw(false);
     }
 
-    if (DebugRenderPass && DebugRenderPass->BeginRenderPass(RenderFrameContextPtr->CommandBuffer))
+    if (DebugRenderPass && DebugRenderPass->BeginRenderPass(RenderFrameContextPtr->GetActiveCommandBuffer()))
     {
         for (auto& command : DebugDrawCommand)
         {
@@ -796,15 +817,15 @@ void jRenderer::Render()
 
     {
         SCOPE_CPU_PROFILE(PoolReset);
-        check(RenderFrameContextPtr->CommandBuffer);
-        ensure(RenderFrameContextPtr->CommandBuffer->Begin());
+        check(RenderFrameContextPtr->GetActiveCommandBuffer());
+        ensure(RenderFrameContextPtr->GetActiveCommandBuffer()->Begin());
         if (g_rhi->GetQueryTimePool())
         {
-            g_rhi->GetQueryTimePool()->ResetQueryPool(RenderFrameContextPtr->CommandBuffer);
+            g_rhi->GetQueryTimePool()->ResetQueryPool(RenderFrameContextPtr->GetActiveCommandBuffer());
         }
         if (g_rhi->GetQueryOcclusionPool())
         {
-            g_rhi->GetQueryOcclusionPool()->ResetQueryPool(RenderFrameContextPtr->CommandBuffer);
+            g_rhi->GetQueryOcclusionPool()->ResetQueryPool(RenderFrameContextPtr->GetActiveCommandBuffer());
         }
 
         //ShadowpassOcclusionTest.Init();
@@ -818,6 +839,6 @@ void jRenderer::Render()
     DebugPasses();
 
     jImGUI_Vulkan::Get().Draw(RenderFrameContextPtr);
-    ensure(RenderFrameContextPtr->CommandBuffer->End());
+    ensure(RenderFrameContextPtr->GetActiveCommandBuffer()->End());
 
 }

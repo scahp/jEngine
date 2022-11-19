@@ -3,38 +3,44 @@
 
 jSemaphoreManager_Vulkan::~jSemaphoreManager_Vulkan()
 {
-    ReleaseInternal();
+    Release();
 }
 
-void jSemaphoreManager_Vulkan::ReleaseInternal()
+void jSemaphoreManager_Vulkan::Release()
 {
     for (auto& iter : UsingSemaphore)
-        vkDestroySemaphore(g_rhi_vk->Device, iter, nullptr);
+    {
+        vkDestroySemaphore(g_rhi_vk->Device, (VkSemaphore)iter->GetHandle(), nullptr);
+        delete iter;
+    }
     UsingSemaphore.clear();
 
     for (auto& iter : PendingSemaphore)
-        vkDestroySemaphore(g_rhi_vk->Device, iter, nullptr);
+    {
+        vkDestroySemaphore(g_rhi_vk->Device, (VkSemaphore)iter->GetHandle(), nullptr);
+        delete iter;
+    }
     PendingSemaphore.clear();
 }
 
-VkSemaphore jSemaphoreManager_Vulkan::GetOrCreateSemaphore()
+jSemaphore* jSemaphoreManager_Vulkan::GetOrCreateSemaphore()
 {
     if (PendingSemaphore.size() > 0)
     {
-        VkSemaphore semaphore = *PendingSemaphore.begin();
+        jSemaphore* semaphore = *PendingSemaphore.begin();
         PendingSemaphore.erase(PendingSemaphore.begin());
         UsingSemaphore.insert(semaphore);
         return semaphore;
     }
-
-    VkSemaphore semaphore;
+    
+    jSemaphore_Vulkan* newSemaphore = new jSemaphore_Vulkan();
     VkSemaphoreCreateInfo semaphoreInfo = {};
     semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-    if (ensure(VK_SUCCESS == vkCreateSemaphore(g_rhi_vk->Device, &semaphoreInfo, nullptr, &semaphore)))
-        UsingSemaphore.insert(semaphore);
+    if (ensure(VK_SUCCESS == vkCreateSemaphore(g_rhi_vk->Device, &semaphoreInfo, nullptr, &newSemaphore->Semaphore)))
+        UsingSemaphore.insert(newSemaphore);
     else
         check(0);
 
-    return semaphore;
+    return newSemaphore;
 }
 

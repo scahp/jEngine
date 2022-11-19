@@ -456,9 +456,9 @@ void jImGUI_Vulkan::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFra
     check(PiplineStateInfo);
 
     const int32 frameIndex = InRenderFrameContext->FrameIndex;
-    if (RenderPass->BeginRenderPass(InRenderFrameContext->CommandBuffer))
+    if (RenderPass->BeginRenderPass(InRenderFrameContext->GetActiveCommandBuffer()))
     {
-        VkCommandBuffer commandbuffer_vk = (VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle();
+        VkCommandBuffer commandbuffer_vk = (VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle();
 
         ImGuiIO& io = ImGui::GetIO();
 

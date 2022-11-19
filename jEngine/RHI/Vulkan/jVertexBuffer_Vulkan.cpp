@@ -5,7 +5,7 @@
 void jVertexBuffer_Vulkan::Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const
 {
     check(InRenderFrameContext);
-    check(InRenderFrameContext->CommandBuffer);
-    vkCmdBindVertexBuffers((VkCommandBuffer)InRenderFrameContext->CommandBuffer->GetHandle(), BindInfos.StartBindingIndex
+    check(InRenderFrameContext->GetActiveCommandBuffer());
+    vkCmdBindVertexBuffers((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), BindInfos.StartBindingIndex
         , (uint32)BindInfos.Buffers.size(), &BindInfos.Buffers[0], &BindInfos.Offsets[0]);
 }
