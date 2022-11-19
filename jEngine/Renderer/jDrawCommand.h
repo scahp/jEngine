@@ -26,6 +26,7 @@ public:
     void Draw() const;
 
     jShaderBindingInstanceArray ShaderBindingInstanceArray;
+    jResourceContainer<void*> ShaderBindingInstanceCombiner;
 
     bool IsViewLight = false;
     union

@@ -130,16 +130,15 @@ size_t jShaderBindingsLayout::GetHash() const
 	return Hash;
 }
 
-jView::jView(const jCamera* camera, const jDirectionalLight* directionalLight, jLight* pointLight, jLight* spotLight)
+jView::jView(const jCamera* camera, const std::vector<jLight*>& InLights)
 	: Camera(camera)
 {
     check(camera);
-    if (directionalLight)
-        Lights.push_back(jViewLight(directionalLight));
-    if (pointLight)
-        Lights.push_back(jViewLight(pointLight));
-	if (spotLight)
-		Lights.push_back(jViewLight(spotLight));
+	Lights.resize(InLights.size());
+	for (int32 i=0;i<(int32)Lights.size();++i)
+	{
+		new(&Lights[i]) jViewLight(InLights[i]);
+	}
 }
 
 void jView::PrepareViewUniformBufferShaderBindingInstance()

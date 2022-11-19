@@ -192,6 +192,9 @@ public:
 	jTexture* CreateSampleVRSTexture();
 	FORCEINLINE jTexture* GetSampleVRSTexture() const { return SampleVRSTexture; }
 	jTexture* SampleVRSTexture = nullptr;
+
+	virtual void BindGraphicsShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineStateLayout, const jResourceContainer<void*>& InShaderBindingInstanceCombiner, uint32 InFirstSet) const override;
+	virtual void BindComputeShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineStateLayout, const jResourceContainer<void*>& InShaderBindingInstanceCombiner, uint32 InFirstSet) const override;
 };
 
 extern jRHI_Vulkan* g_rhi_vk;

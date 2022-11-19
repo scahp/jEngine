@@ -85,6 +85,17 @@ public:
 		, const Vector& specularIntensity, float specularPower);
 	static jSpotLight* CreateSpotLight(const Vector& pos, const Vector& direction, const Vector& color, float maxDistance
 		, float penumbraRadian, float umbraRadian, const Vector& diffuseIntensity, const Vector& specularIntensity, float specularPower);
+	
+	static const std::vector<jLight*>& GetLights() { return s_Lights; }
+	static const void AddLights(jLight* InLight) { return s_Lights.push_back(InLight); }
+	static const void RemoveLights(jLight* InLight) 
+	{
+		s_Lights.erase(std::remove_if(s_Lights.begin(), s_Lights.end(), [&InLight](jLight* param)
+            {
+                return (param == InLight);
+            }));
+	}
+	static std::vector<jLight*> s_Lights;
 
 	jLight() = default;
 	jLight(ELightType type) :Type(type) {}

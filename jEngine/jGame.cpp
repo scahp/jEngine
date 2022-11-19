@@ -68,6 +68,13 @@ void jGame::Setup()
 	PointLight = jLight::CreatePointLight(Vector(10.0f, 100.0f, 10.0f), Vector4(1.0f, 0.75f, 0.75f, 1.0f), 150.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
 	SpotLight = jLight::CreateSpotLight(Vector(0.0f, 60.0f, 5.0f), Vector(1.0f, -1.0f, 0.4f).GetNormalize(), Vector4(0.0f, 1.0f, 0.0f, 1.0f), 200.0f, 0.35f, 0.5f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
 
+	jLight::AddLights(NormalDirectionalLight);
+	jLight::AddLights(PointLight);
+	jLight::AddLights(SpotLight);
+
+	//PointLight->IsShadowCaster = false;
+	//SpotLight->IsShadowCaster = false;
+
     //auto cube = jPrimitiveUtil::CreateCube(Vector(0.0f, 60.0f, 5.0f), Vector::OneVector, Vector::OneVector * 10.f, Vector4(0.7f, 0.7f, 0.7f, 1.0f));
     //jObject::AddObject(cube);
     //SpawnedObjects.push_back(cube);
@@ -265,8 +272,8 @@ void jGame::Draw()
 		std::shared_ptr<jRenderFrameContext> renderFrameContext = g_rhi->BeginRenderFrame();
 		if (!renderFrameContext)
 			return;
-
-		jView View(MainCamera, DirectionalLight, PointLight, SpotLight);
+		
+		jView View(MainCamera, jLight::GetLights());
 		View.PrepareViewUniformBufferShaderBindingInstance();
 
 		jRenderer renderer(renderFrameContext, View);

@@ -1794,4 +1794,27 @@ jTexture* jRHI_Vulkan::CreateSampleVRSTexture()
 	return SampleVRSTexture;
 }
 
+void jRHI_Vulkan::BindGraphicsShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineStateLayout
+	, const jResourceContainer<void*>& InShaderBindingInstanceCombiner, uint32 InFirstSet) const
+{
+	if (InShaderBindingInstanceCombiner.NumOfData)
+	{
+		check(InCommandBuffer);
+		vkCmdBindDescriptorSets((VkCommandBuffer)InCommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS
+			, (VkPipelineLayout)InPiplineStateLayout->GetPipelineLayoutHandle(), InFirstSet, InShaderBindingInstanceCombiner.NumOfData
+			, (const VkDescriptorSet*)&InShaderBindingInstanceCombiner[0], 0, nullptr);
+	}
+}
+
+void jRHI_Vulkan::BindComputeShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineStateLayout, const jResourceContainer<void*>& InShaderBindingInstanceCombiner, uint32 InFirstSet) const
+{
+	if (InShaderBindingInstanceCombiner.NumOfData)
+	{
+		check(InCommandBuffer);
+		vkCmdBindDescriptorSets((VkCommandBuffer)InCommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE
+			, (VkPipelineLayout)InPiplineStateLayout->GetPipelineLayoutHandle(), InFirstSet, InShaderBindingInstanceCombiner.NumOfData
+			, (const VkDescriptorSet*)&InShaderBindingInstanceCombiner[0], 0, nullptr);
+	}
+}
+
 #endif // USE_VULKAN

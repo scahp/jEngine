@@ -39,6 +39,7 @@ struct jShaderBindingInstance_Vulkan : public jShaderBindingInstance
     virtual void UpdateShaderBindings(const jShaderBindingArray& InShaderBindingArray) override;
     virtual void BindGraphics(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const override;
     virtual void BindCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const override;
+    virtual void* GetHandle() const override { return DescriptorSet; }
 
     VkDescriptorSet DescriptorSet = nullptr;        // DescriptorPool 을 해제하면 모두 처리될 수 있어서 따로 소멸시키지 않음
     jWriteDescriptorSet WriteDescriptorSet;

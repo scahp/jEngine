@@ -8,6 +8,8 @@
 #include "jPointLight.h"
 #include "jSpotLight.h"
 
+std::vector<jLight*> jLight::s_Lights;
+
 namespace jLightUtil
 {
 	void MakeDirectionalLightViewInfo(Vector& outPos, Vector& outTarget, Vector& outUp, const Vector& direction)

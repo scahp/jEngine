@@ -263,7 +263,7 @@ class jView
 {
 public:
 	jView() = default;
-	jView(const jCamera* camera, const jDirectionalLight* directionalLight = nullptr, jLight* pointLight = nullptr, jLight* spotLight = nullptr);
+	jView(const jCamera* camera, const std::vector<jLight*>& InLights);
 
 	void PrepareViewUniformBufferShaderBindingInstance();
 	void GetShaderBindingInstance(jShaderBindingInstanceArray& OutShaderBindingInstanceArray, bool InIsForwardRenderer = false) const;
@@ -449,6 +449,8 @@ public:
 	virtual jMemoryPool* GetMemoryPool() const { return nullptr; }
 
 	virtual void NextSubpass(const jCommandBuffer* commandBuffer) const {}
+	virtual void BindGraphicsShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineStateLayout, const jResourceContainer<void*>& InShaderBindingInstanceCombiner, uint32 InFirstSet) const {}
+	virtual void BindComputeShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineStateLayout, const jResourceContainer<void*>& InShaderBindingInstanceCombiner, uint32 InFirstSet) const {}
 };
 
 // Not thred safe

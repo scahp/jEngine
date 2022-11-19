@@ -63,7 +63,10 @@ void jDrawCommand::PrepareToDraw(bool InIsPositionOnly)
     // Bind ShaderBindings
     jShaderBindingsLayoutArray ShaderBindingLayoutArray;
     for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
+    {
         ShaderBindingLayoutArray.Add(ShaderBindingInstanceArray[i]->ShaderBindingsLayouts);
+        ShaderBindingInstanceCombiner.Add(ShaderBindingInstanceArray[i]->GetHandle());
+    }
 
     jVertexBufferArray VertexBufferArray;
     VertexBufferArray.Add(InIsPositionOnly ? RenderObject->VertexBuffer_PositionOnly : RenderObject->VertexBuffer);
@@ -81,10 +84,7 @@ void jDrawCommand::PrepareToDraw(bool InIsPositionOnly)
 
 void jDrawCommand::Draw() const
 {
-    for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
-    {
-        ShaderBindingInstanceArray[i]->BindGraphics(RenderFrameContextPtr, (VkPipelineLayout)CurrentPipelineStateInfo->GetPipelineLayoutHandle(), i);
-    }
+    g_rhi->BindGraphicsShaderBindingInstances(RenderFrameContextPtr->CommandBuffer, CurrentPipelineStateInfo, ShaderBindingInstanceCombiner, 0);
 
     // Bind the image that contains the shading rate patterns
 #if USE_VARIABLE_SHADING_RATE_TIER2

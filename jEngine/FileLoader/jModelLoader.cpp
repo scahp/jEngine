@@ -322,15 +322,27 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 
 	auto indexStreamData = std::make_shared<jIndexStreamData>();
 	indexStreamData->ElementCount = static_cast<int32>(meshData->Faces.size());
+	if (indexStreamData->ElementCount > 65535)
 	{
 		auto streamParam = new jStreamParam<uint32>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::UINT32, sizeof(float) * 3));
+		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::UINT32, sizeof(int32) * 3));
 		streamParam->Name = jName("Index");
 		streamParam->Data.resize(meshData->Faces.size());
 		streamParam->Stride = sizeof(uint32) * 3;
 		memcpy(&streamParam->Data[0], &meshData->Faces[0], meshData->Faces.size() * sizeof(uint32));
 		indexStreamData->Param = streamParam;
+	}
+	else
+	{
+        auto streamParam = new jStreamParam<uint16>();
+        streamParam->BufferType = EBufferType::STATIC;
+        streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::UINT16, sizeof(uint16) * 3));
+        streamParam->Name = jName("Index");
+        streamParam->Data.resize(meshData->Faces.size());
+        streamParam->Stride = sizeof(uint16) * 3;
+        memcpy(&streamParam->Data[0], &meshData->Faces[0], meshData->Faces.size() * sizeof(uint16));
+        indexStreamData->Param = streamParam;
 	}
 
 	for (int32 i = 0; i < (int32)object->SubMeshes.size(); ++i)
