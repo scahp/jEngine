@@ -457,9 +457,6 @@ void jRHI_Vulkan::RecreateSwapChain()
     CommandBufferManager = new jCommandBufferManager_Vulkan();
     verify(CommandBufferManager->CreatePool(GraphicsQueue.QueueIndex));
 	
-	FenceManager.Release();
-	SemaphoreManager.Release();
-
     jImGUI_Vulkan::Get().Release();
     jImGUI_Vulkan::Get().Initialize((float)SCR_WIDTH, (float)SCR_HEIGHT);
 
