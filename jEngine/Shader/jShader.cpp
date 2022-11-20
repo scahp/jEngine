@@ -45,70 +45,29 @@ void jShader::Initialize()
 }
 
 //////////////////////////////////////////////////////////////////////////
-jShaderInfo jShaderGBuffer::GShaderInfo(
-    jNameStatic("default_testPS"),
-    jNameStatic("Resource/Shaders/hlsl/gbuffer_fs.hlsl"),
-    jNameStatic(""),
-    EShaderAccessStageFlag::FRAGMENT
-);
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderGBuffer
+	, "GBufferPS"
+	, "Resource/Shaders/hlsl/gbuffer_fs.hlsl"
+	, ""
+	, EShaderAccessStageFlag::FRAGMENT)
 
-jShaderGBuffer* jShaderGBuffer::CreateShader(const jShaderGBuffer::ShaderPermutation& InPermutation)
-{
-	jShaderInfo TempShaderInfo = GShaderInfo;
-	TempShaderInfo.SetPermutationId(InPermutation.GetPermutationId());
-
-	jShaderGBuffer* Shader = g_rhi->CreateShader<jShaderGBuffer>(TempShaderInfo);
-	Shader->Permutation = InPermutation;
-    return Shader;
-}
 //////////////////////////////////////////////////////////////////////////
-jShaderInfo jShaderDirectionalLight::GShaderInfo(
-    jNameStatic("DirectionalLightShaderPS"),
-    jNameStatic("Resource/Shaders/hlsl/directionallight_fs.hlsl"),
-    jNameStatic(""),
-    EShaderAccessStageFlag::FRAGMENT
-);
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderDirectionalLight
+    , "DirectionalLightShaderPS"
+    , "Resource/Shaders/hlsl/directionallight_fs.hlsl"
+    , ""
+    , EShaderAccessStageFlag::FRAGMENT)
 
-jShaderDirectionalLight* jShaderDirectionalLight::CreateShader(const jShaderDirectionalLight::ShaderPermutation& InPermutation)
-{
-    jShaderInfo TempShaderInfo = GShaderInfo;
-    TempShaderInfo.SetPermutationId(InPermutation.GetPermutationId());
-
-    jShaderDirectionalLight* Shader = g_rhi->CreateShader<jShaderDirectionalLight>(TempShaderInfo);
-    Shader->Permutation = InPermutation;
-    return Shader;
-}
 //////////////////////////////////////////////////////////////////////////
-jShaderInfo jShaderPointLight::GShaderInfo(
-    jNameStatic("PointLightShaderPS"),
-    jNameStatic("Resource/Shaders/hlsl/pointlight_fs.hlsl"),
-    jNameStatic(""),
-    EShaderAccessStageFlag::FRAGMENT
-);
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderPointLight
+    , "PointLightShaderPS"
+    , "Resource/Shaders/hlsl/pointlight_fs.hlsl"
+    , ""
+    , EShaderAccessStageFlag::FRAGMENT)
 
-jShaderPointLight* jShaderPointLight::CreateShader(const jShaderPointLight::ShaderPermutation& InPermutation)
-{
-    jShaderInfo TempShaderInfo = GShaderInfo;
-    TempShaderInfo.SetPermutationId(InPermutation.GetPermutationId());
-
-	jShaderPointLight* Shader = g_rhi->CreateShader<jShaderPointLight>(TempShaderInfo);
-    Shader->Permutation = InPermutation;
-    return Shader;
-}
 //////////////////////////////////////////////////////////////////////////
-jShaderInfo jShaderSpotLight::GShaderInfo(
-    jNameStatic("SpotLightShaderPS"),
-    jNameStatic("Resource/Shaders/hlsl/spotlight_fs.hlsl"),
-    jNameStatic(""),
-    EShaderAccessStageFlag::FRAGMENT
-);
-
-jShaderSpotLight* jShaderSpotLight::CreateShader(const jShaderSpotLight::ShaderPermutation& InPermutation)
-{
-    jShaderInfo TempShaderInfo = GShaderInfo;
-    TempShaderInfo.SetPermutationId(InPermutation.GetPermutationId());
-
-	jShaderSpotLight* Shader = g_rhi->CreateShader<jShaderSpotLight>(TempShaderInfo);
-    Shader->Permutation = InPermutation;
-    return Shader;
-}
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderSpotLight
+    , "SpotLightShaderPS"
+    , "Resource/Shaders/hlsl/spotlight_fs.hlsl"
+    , ""
+    , EShaderAccessStageFlag::FRAGMENT)

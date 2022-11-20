@@ -193,6 +193,32 @@ struct jShader : public std::enable_shared_from_this<jShader>
     jCompiledShader* CompiledShader = nullptr;
 };
 
+#define DECLARE_SHADER_WITH_PERMUTATION(ShaderClass, PermutationVariable) \
+public: \
+    static jShaderInfo GShaderInfo; \
+    static ShaderClass* CreateShader(const ShaderClass::ShaderPermutation& InPermutation); \
+    using jShader::jShader; \
+    virtual void SetPermutationId(int32 InPermutaitonId) override { PermutationVariable.SetFromPermutationId(InPermutaitonId); } \
+    virtual int32 GetPermutationId() const override { return PermutationVariable.GetPermutationId(); } \
+    virtual int32 GetPermutationCount() const override { return PermutationVariable.GetPermutationCount(); } \
+    virtual void GetPermutationDefines(std::string& OutResult) const { PermutationVariable.GetPermutationDefines(OutResult); }
+
+#define IMPLEMENT_SHADER_WITH_PERMUTATION(ShaderClass, Name, Filepath, Preprocessor, ShaderAccesssStageFlag) \
+jShaderInfo ShaderClass::GShaderInfo( \
+    jNameStatic(Name), \
+    jNameStatic(Filepath), \
+    jNameStatic(Preprocessor), \
+    ShaderAccesssStageFlag \
+); \
+ShaderClass* ShaderClass::CreateShader(const ShaderClass::ShaderPermutation& InPermutation) \
+{ \
+    jShaderInfo TempShaderInfo = GShaderInfo; \
+    TempShaderInfo.SetPermutationId(InPermutation.GetPermutationId()); \
+    ShaderClass* Shader = g_rhi->CreateShader<ShaderClass>(TempShaderInfo); \
+    Shader->Permutation = InPermutation; \
+    return Shader; \
+}
+
 struct jShaderGBuffer : public jShader
 {
     DECLARE_DEFINE(USE_VERTEX_COLOR, 0, 1);
@@ -202,18 +228,7 @@ struct jShaderGBuffer : public jShader
     using ShaderPermutation = jPermutation<USE_VERTEX_COLOR, USE_ALBEDO_TEXTURE, USE_VARIABLE_SHADING_RATE>;
     ShaderPermutation Permutation;
 
-    static jShaderInfo GShaderInfo;
-    static jShaderGBuffer* CreateShader(const jShaderGBuffer::ShaderPermutation& InPermutation);
-
-    using jShader::jShader;
-
-    virtual void SetPermutationId(int32 InPermutaitonId) override { Permutation.SetFromPermutationId(InPermutaitonId); }
-    virtual int32 GetPermutationId() const override { return Permutation.GetPermutationId(); }
-    virtual int32 GetPermutationCount() const override { return Permutation.GetPermutationCount(); }
-    virtual void GetPermutationDefines(std::string& OutResult) const
-    { 
-        Permutation.GetPermutationDefines(OutResult);
-    }
+    DECLARE_SHADER_WITH_PERMUTATION(jShaderGBuffer, Permutation)
 };
 
 struct jShaderDirectionalLight : public jShader
@@ -224,18 +239,7 @@ struct jShaderDirectionalLight : public jShader
     using ShaderPermutation = jPermutation<USE_SUBPASS, USE_SHADOW_MAP>;
     ShaderPermutation Permutation;
 
-    static jShaderInfo GShaderInfo;
-    static jShaderDirectionalLight* CreateShader(const jShaderDirectionalLight::ShaderPermutation& InPermutation);
-
-    using jShader::jShader;
-
-    virtual void SetPermutationId(int32 InPermutaitonId) override { Permutation.SetFromPermutationId(InPermutaitonId); }
-    virtual int32 GetPermutationId() const override { return Permutation.GetPermutationId(); }
-    virtual int32 GetPermutationCount() const override { return Permutation.GetPermutationCount(); }
-    virtual void GetPermutationDefines(std::string& OutResult) const
-    {
-        Permutation.GetPermutationDefines(OutResult);
-    }
+    DECLARE_SHADER_WITH_PERMUTATION(jShaderDirectionalLight, Permutation)
 };
 
 struct jShaderPointLight : public jShader
@@ -246,18 +250,7 @@ struct jShaderPointLight : public jShader
     using ShaderPermutation = jPermutation<USE_SUBPASS, USE_SHADOW_MAP>;
     ShaderPermutation Permutation;
 
-    static jShaderInfo GShaderInfo;
-    static jShaderPointLight* CreateShader(const jShaderPointLight::ShaderPermutation& InPermutation);
-
-    using jShader::jShader;
-
-    virtual void SetPermutationId(int32 InPermutaitonId) override { Permutation.SetFromPermutationId(InPermutaitonId); }
-    virtual int32 GetPermutationId() const override { return Permutation.GetPermutationId(); }
-    virtual int32 GetPermutationCount() const override { return Permutation.GetPermutationCount(); }
-    virtual void GetPermutationDefines(std::string& OutResult) const
-    {
-        Permutation.GetPermutationDefines(OutResult);
-    }
+    DECLARE_SHADER_WITH_PERMUTATION(jShaderPointLight, Permutation)
 };
 
 struct jShaderSpotLight : public jShader
@@ -268,18 +261,7 @@ struct jShaderSpotLight : public jShader
     using ShaderPermutation = jPermutation<USE_SUBPASS, USE_SHADOW_MAP>;
     ShaderPermutation Permutation;
 
-    static jShaderInfo GShaderInfo;
-    static jShaderSpotLight* CreateShader(const jShaderSpotLight::ShaderPermutation& InPermutation);
-
-    using jShader::jShader;
-
-    virtual void SetPermutationId(int32 InPermutaitonId) override { Permutation.SetFromPermutationId(InPermutaitonId); }
-    virtual int32 GetPermutationId() const override { return Permutation.GetPermutationId(); }
-    virtual int32 GetPermutationCount() const override { return Permutation.GetPermutationCount(); }
-    virtual void GetPermutationDefines(std::string& OutResult) const
-    {
-        Permutation.GetPermutationDefines(OutResult);
-    }
+    DECLARE_SHADER_WITH_PERMUTATION(jShaderSpotLight, Permutation)
 };
 
 
