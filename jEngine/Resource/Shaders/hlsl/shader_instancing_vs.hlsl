@@ -1,3 +1,5 @@
+#include "common.hlsl"
+
 struct VSInput
 {
     [[vk::location(0)]] float3 Position : POSITION0;
@@ -9,46 +11,6 @@ struct VSInput
     // instancing data
     [[vk::location(5)]] float4 InstancingColor : TEXCOORD1;
     [[vk::location(6)]] float3 InstancingWorld : TEXCOORD2;
-};
-
-struct jDirectionalLightUniformBuffer
-{
-    float3 Direction;
-    float SpecularPow;
-
-    float3 Color;
-    float padding0;
-
-    float3 DiffuseIntensity;
-    float padding1;
-
-    float3 SpecularIntensity;
-    float padding2;
-
-    float4x4 ShadowVP;
-    float4x4 ShadowV;
-		
-    float3 LightPos;
-    float padding3;
-
-    float2 ShadowMapSize;
-    float Near;
-    float Far;
-};
-
-struct ViewUniformBuffer
-{
-    float4x4 V;
-    float4x4 P;
-    float4x4 VP;
-    float3 EyeWorld;
-    float padding0;
-};
-
-struct RenderObjectUniformBuffer
-{
-    float4x4 M;
-    float4x4 InvM;
 };
 
 cbuffer ViewParam : register(b0,space0) { ViewUniformBuffer ViewParam; }

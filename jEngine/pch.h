@@ -71,6 +71,7 @@ using tchar = wchar_t;
 #include <fstream>
 #include <execution>
 #include <ppl.h>
+#include <filesystem>
 
 #include "External/cityhash/city.h"
 #include "External/robin-hood-hashing/robin_hood.h"

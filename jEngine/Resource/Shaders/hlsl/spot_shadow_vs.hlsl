@@ -1,28 +1,4 @@
-struct jSpotLightUniformBufferData
-{
-    float3 Position;
-    float MaxDistance;
-
-    float3 Direction;
-    float PenumbraRadian;
-
-    float3 Color;
-    float UmbraRadian;
-
-    float3 DiffuseIntensity;
-    float SpecularPow;
-
-    float3 SpecularIntensity;
-    float padding0;
-
-    float4x4 ShadowVP;
-};
-
-struct RenderObjectUniformBuffer
-{
-    float4x4 M;
-    float4x4 InvM;
-};
+#include "common.hlsl"
 
 cbuffer SpotLight : register(b0, space0) { jSpotLightUniformBufferData SpotLight; }
 cbuffer RenderObjectParam : register(b0,space1) { RenderObjectUniformBuffer RenderObjectParam; }

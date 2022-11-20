@@ -842,6 +842,8 @@ bool jRHI_Vulkan::CreateShaderInternal(jShader* OutShader, const jShaderInfo& sh
 		}
 		else
 		{
+            const bool isHLSL = !!strstr(shaderInfo.GetShaderFilepath().ToStr(), ".hlsl");
+
             jFile ShaderFile;
             ShaderFile.OpenFile(shaderInfo.GetShaderFilepath().ToStr(), FileType::TEXT, ReadWriteType::READ);
             ShaderFile.ReadFileToBuffer(false);
@@ -857,8 +859,47 @@ bool jRHI_Vulkan::CreateShaderInternal(jShader* OutShader, const jShaderInfo& sh
 
             ShaderText += ShaderFile.GetBuffer();
 
+			// Find relative file path
+			constexpr char includePrefixString[] = "#include \"";
+			constexpr int32 includePrefixLength = sizeof(includePrefixString) - 1;
+
+			const std::filesystem::path shaderFilePath(shaderInfo.GetShaderFilepath().ToStr());
+			const std::string includeShaderPath = shaderFilePath.has_parent_path() ? (shaderFilePath.parent_path().string() + "/") : "";
+
+			std::set<std::string> AlreadyIncludedSets;
+			while (1)
+			{
+				size_t startOfInclude = ShaderText.find(includePrefixString);
+				if (startOfInclude == std::string::npos)
+					break;
+
+				// Parse include file path
+				startOfInclude += includePrefixLength;
+				size_t endOfInclude = ShaderText.find("\"", startOfInclude);
+				std::string includeFilepath = includeShaderPath + ShaderText.substr(startOfInclude, endOfInclude - startOfInclude);
+
+                // Replace range '#include "filepath"' with shader file content
+                const size_t ReplaceStartPos = startOfInclude - includePrefixLength;
+                const size_t ReplaceCount = endOfInclude - ReplaceStartPos + 1;
+
+				if (AlreadyIncludedSets.contains(includeFilepath))
+				{
+					ShaderText.replace(ReplaceStartPos, ReplaceCount, "");
+					continue;
+				}
+
+				// If already included file, skip it.
+				AlreadyIncludedSets.insert(includeFilepath);
+
+				// Load include shader file
+                jFile IncludeShaderFile;
+                IncludeShaderFile.OpenFile(includeFilepath.c_str(), FileType::TEXT, ReadWriteType::READ);
+                IncludeShaderFile.ReadFileToBuffer(false);
+				ShaderText.replace(ReplaceStartPos, ReplaceCount, IncludeShaderFile.GetBuffer());
+				IncludeShaderFile.CloseFile();
+			}
+
             std::vector<uint32> SpirvCode;
-			const bool isHLSL = !!strstr(shaderInfo.GetShaderFilepath().ToStr(), ".hlsl");
 			if (isHLSL)
 				jSpirvHelper::HLSLtoSpirv(SpirvCode, ShaderConductorShaderStage, ShaderText.c_str());
 			else

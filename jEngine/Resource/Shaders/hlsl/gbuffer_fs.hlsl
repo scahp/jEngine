@@ -1,3 +1,4 @@
+#include "common.hlsl"
 
 #ifndef USE_VARIABLE_SHADING_RATE
 #define USE_VARIABLE_SHADING_RATE 0
@@ -11,21 +12,6 @@ struct VSOutput
     float3 Normal : NORMAL0;
     float4 WorldPos : TEXCOORD1;
     float3x3 TBN : TEXCOORD2;
-};
-
-struct ViewUniformBuffer
-{
-    float4x4 V;
-    float4x4 P;
-    float4x4 VP;
-    float3 EyeWorld;
-    float padding0;
-};
-
-struct RenderObjectUniformBuffer
-{
-    float4x4 M;
-    float4x4 InvM;
 };
 
 cbuffer ViewParam : register(b0, space0) { ViewUniformBuffer ViewParam; }

@@ -1,8 +1,4 @@
-struct RenderObjectUniformBuffer
-{
-    float4x4 M;
-    float4x4 InvM;
-};
+#include "common.hlsl"
 
 cbuffer RenderObjectParam : register(b0,space1) { RenderObjectUniformBuffer RenderObjectParam; }
 

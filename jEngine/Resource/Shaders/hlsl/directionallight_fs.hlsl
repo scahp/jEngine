@@ -1,3 +1,5 @@
+#include "common.hlsl"
+#include "lightutil.hlsl"
 
 #ifndef USE_VARIABLE_SHADING_RATE
 #define USE_VARIABLE_SHADING_RATE 0
@@ -11,40 +13,6 @@ struct VSOutput
 {
     float4 Pos : SV_POSITION;
     float2 TexCoord : TEXCOORD0;
-};
-
-struct ViewUniformBuffer
-{
-    float4x4 V;
-    float4x4 P;
-    float4x4 VP;
-    float3 EyeWorld;
-    float padding0;
-};
-
-struct jDirectionalLightUniformBuffer
-{
-    float3 Direction;
-    float SpecularPow;
-
-    float3 Color;
-    float padding0;
-
-    float3 DiffuseIntensity;
-    float padding1;
-
-    float3 SpecularIntensity;
-    float padding2;
-
-    float4x4 ShadowVP;
-    float4x4 ShadowV;
-
-    float3 LightPos;
-    float padding3;
-
-    float2 ShadowMapSize;
-    float Near;
-    float Far;
 };
 
 // space 0
@@ -70,23 +38,6 @@ cbuffer DirectionalLight : register(b0, space2) { jDirectionalLightUniformBuffer
 Texture2D DirectionalLightShadowMap : register(t1, space2);
 SamplerComparisonState DirectionalLightShadowMapSampler : register(s1, space2);
 #endif
-
-float3 GetDirectionalLightDiffuse(jDirectionalLightUniformBuffer light, float3 normal)
-{
-    return light.Color * clamp(dot(-light.Direction, normal), 0.0, 1.0) * light.DiffuseIntensity;
-}
-
-float3 GetDirectionalLightSpecular(jDirectionalLightUniformBuffer light, float3 reflectLightDir, float3 viewDir)
-{
-    return light.Color * pow(clamp(dot(reflectLightDir, viewDir), 0.0, 1.0), light.SpecularPow) * light.SpecularIntensity;
-}
-
-float3 GetDirectionalLight(jDirectionalLightUniformBuffer light, float3 normal, float3 viewDir)
-{
-    float3 lightDir = normalize(-light.Direction);
-    float3 reflectLightDir = 2.0 * clamp(dot(lightDir, normal), 0.0, 1.0) * normal - lightDir;
-    return (GetDirectionalLightDiffuse(light, normal) + GetDirectionalLightSpecular(light, reflectLightDir, viewDir));
-}
 
 float4 main(VSOutput input
 #if USE_VARIABLE_SHADING_RATE
