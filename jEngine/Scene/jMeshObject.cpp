@@ -6,7 +6,7 @@ jMeshMaterial jMeshObject::NullMeshMateral;
 
 //////////////////////////////////////////////////////////////////////////
 // jStaticMeshRenderObject
-void jStaticMeshRenderObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, int32 instanceCount)
+void jRenderObjectElement::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, int32 instanceCount)
 {
 	__super::Draw(InRenderFrameContext, SubMesh.StartFace, (SubMesh.EndFace - SubMesh.StartFace), SubMesh.StartVertex, (SubMesh.EndVertex - SubMesh.StartVertex), instanceCount);
 }

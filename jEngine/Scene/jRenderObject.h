@@ -9,51 +9,59 @@ struct jTexture;
 struct jSamplerStateInfo;
 class jMaterial;
 
+class jRenderObjectGeometryData
+{
+public:
+	jRenderObjectGeometryData() = default;
+	jRenderObjectGeometryData(const std::shared_ptr<jVertexStreamData>& vertexStream, const std::shared_ptr<jIndexStreamData>& indexStream);
+	~jRenderObjectGeometryData();
+
+	void Create(const std::shared_ptr<jVertexStreamData>& vertexStream, const std::shared_ptr<jIndexStreamData>& indexStream);
+
+    // Vertex buffers
+    void UpdateVertexStream(const std::shared_ptr<jVertexStreamData>& vertexStream);
+    void UpdateVertexStream();
+
+	EPrimitiveType GetPrimitiveType() const { return VertexStream ? VertexStream->PrimitiveType : EPrimitiveType::MAX; }
+	FORCEINLINE bool HasInstancing() const { return !!VertexBuffer_InstanceData; }
+
+    std::shared_ptr<jVertexStreamData> VertexStream;
+    std::shared_ptr<jVertexStreamData> VertexStream_InstanceData;
+    std::shared_ptr<jVertexStreamData> VertexStream_PositionOnly;
+
+    // Index buffer
+    std::shared_ptr<jIndexStreamData> IndexStream;
+
+    jVertexBuffer* VertexBuffer = nullptr;
+    jVertexBuffer* VertexBuffer_PositionOnly = nullptr;
+    jVertexBuffer* VertexBuffer_InstanceData = nullptr;
+    jIndexBuffer* IndexBuffer = nullptr;
+
+    // IndirectCommand buffer
+    jBuffer* IndirectCommandBuffer = nullptr;
+};
+
 class jRenderObject
 {
 public:
 	jRenderObject();
 	virtual ~jRenderObject();
 
-	virtual void CreateRenderObject(const std::shared_ptr<jVertexStreamData>& vertexStream, const std::shared_ptr<jIndexStreamData>& indexStream);
+    virtual void CreateRenderObject(const std::shared_ptr<jRenderObjectGeometryData>& InRenderObjectGeometryData);
 
 	virtual void Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext
 		, int32 startIndex, int32 indexCount, int32 startVertex, int32 vertexCount, int32 instanceCount);
 	virtual void Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, int32 instanceCount = 1);
 
-	// todo 함수를 줄일까? 아니면 이렇게 쓸까? 고민
-	//void Draw(const jCamera* camera, const jShader* shader, int32 startIndex, int32 count, int32 baseVertexIndex);
-	//void DrawBaseVertexIndex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, const jMaterialData& materialData, int32 startIndex, int32 count, int32 baseVertexIndex, int32 instanceCount = 1);
-	
-	EPrimitiveType GetPrimitiveType() const { return VertexStream ? VertexStream->PrimitiveType : EPrimitiveType::MAX; }
+	EPrimitiveType GetPrimitiveType() const { return GeometryDataPtr->GetPrimitiveType(); }
 	virtual void BindBuffers(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, bool InPositionOnly) const;
-
 	const std::vector<float>& GetVertices() const;
+	FORCEINLINE bool HasInstancing() const { return GeometryDataPtr->HasInstancing(); }
 
-	void UpdateWorldMatrix();
-	Matrix GetWorld() const;
+    void UpdateWorldMatrix();
+    Matrix World;
 
-	FORCEINLINE bool HasInstancing() const { return !!VertexBuffer_InstanceData; }
-
-	// Vertex buffers
-	virtual void UpdateVertexStream(const std::shared_ptr<jVertexStreamData>& vertexStream);
-	virtual void UpdateVertexStream();
-
-	std::shared_ptr<jVertexStreamData> VertexStream;
-	std::shared_ptr<jVertexStreamData> VertexStream_InstanceData;
-	std::shared_ptr<jVertexStreamData> VertexStream_PositionOnly;
-	jVertexBuffer* VertexBuffer = nullptr;
-	jVertexBuffer* VertexBuffer_PositionOnly = nullptr;
-	jVertexBuffer* VertexBuffer_InstanceData = nullptr;
-
-	// Index buffer
-	std::shared_ptr<jIndexStreamData> IndexStream;
-	jIndexBuffer* IndexBuffer = nullptr;
-
-	// IndirectCommand buffer
-    jBuffer* IndirectCommandBuffer = nullptr;
-
-	Matrix World;
+	std::shared_ptr<jRenderObjectGeometryData> GeometryDataPtr;
 
 	FORCEINLINE void SetPos(const Vector& InPos) { Pos = InPos; SetDirtyFlags(EDirty::POS); }
 	FORCEINLINE void SetRot(const Vector& InRot) { Rot = InRot; SetDirtyFlags(EDirty::ROT); }
@@ -71,14 +79,6 @@ public:
 		Matrix M;
 		Matrix InvM;
 	};
-
-	//struct jTextureSampler
-	//{
-	//	jTexture* Texture = nullptr;
-	//	jSamplerStateInfo* SamplerState = nullptr;
-	//};
-
-	//std::vector<jTextureSampler> TextureSamplers;
 
 	//////////////////////////////////////////////////////////////////////////
 	// RenderObjectUniformBuffer

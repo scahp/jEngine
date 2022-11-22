@@ -109,7 +109,7 @@ struct jMeshNode
 	std::vector<jMeshNode*> childNode;
 };
 
-class jStaticMeshRenderObject : public jRenderObject
+class jRenderObjectElement : public jRenderObject
 {
 public:
 	virtual void Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, int32 instanceCount) override;

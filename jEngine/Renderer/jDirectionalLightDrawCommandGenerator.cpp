@@ -40,7 +40,7 @@ void jDirectionalLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* Ou
     Shader.PixelShader = jShaderDirectionalLight::CreateShader(ShaderPermutation);
 
     check(OutDestDrawCommand);
-    new (OutDestDrawCommand) jDrawCommand(InRenderFrameContextPtr, &InLightView, GlobalFullscreenPrimitive->RenderObject, InRenderPass
+    new (OutDestDrawCommand) jDrawCommand(InRenderFrameContextPtr, &InLightView, GlobalFullscreenPrimitive->RenderObjects[0], InRenderPass
         , Shader, &PipelineStateFixedInfo, ShaderBindingInstances, {}, InSubpassIndex);
     OutDestDrawCommand->PrepareToDraw(false);
 }

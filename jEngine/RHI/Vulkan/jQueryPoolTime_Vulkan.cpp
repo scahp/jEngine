@@ -37,20 +37,20 @@ int32 jQueryPoolTime_Vulkan::GetUsedQueryCount(int32 InFrameIndex) const
 
 std::vector<uint64> jQueryPoolTime_Vulkan::GetWholeQueryResult(int32 InFrameIndex, int32 InCount) const
 {
-    std::vector<uint64> result;
-    result.resize(InCount);
-    vkGetQueryPoolResults(g_rhi_vk->Device, QueryPool, InFrameIndex * MaxQueryTimeCount, InCount
-        , sizeof(uint64) * InCount, result.data(), sizeof(uint64), VK_QUERY_RESULT_64_BIT);
-    return result;
+    std::vector<uint64> queryResult;
+    queryResult.resize(InCount);
+    VkResult result = vkGetQueryPoolResults(g_rhi_vk->Device, QueryPool, InFrameIndex * MaxQueryTimeCount, InCount
+        , sizeof(uint64) * InCount, queryResult.data(), sizeof(uint64), VK_QUERY_RESULT_64_BIT);
+    return queryResult;
 }
 
 std::vector<uint64> jQueryPoolTime_Vulkan::GetWholeQueryResult(int32 InFrameIndex) const
 {
-    std::vector<uint64> result;
-    result.resize(MaxQueryTimeCount);
-    vkGetQueryPoolResults(g_rhi_vk->Device, QueryPool, InFrameIndex * MaxQueryTimeCount, MaxQueryTimeCount
-        , sizeof(uint64) * MaxQueryTimeCount, result.data(), sizeof(uint64), VK_QUERY_RESULT_64_BIT);
-    return result;
+    std::vector<uint64> queryResult;
+    queryResult.resize(MaxQueryTimeCount);
+    VkResult result = vkGetQueryPoolResults(g_rhi_vk->Device, QueryPool, InFrameIndex * MaxQueryTimeCount, MaxQueryTimeCount
+        , sizeof(uint64) * MaxQueryTimeCount, queryResult.data(), sizeof(uint64), VK_QUERY_RESULT_64_BIT);
+    return queryResult;
 }
 
 void jQueryPoolTime_Vulkan::ReleaseInstance()

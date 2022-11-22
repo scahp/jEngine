@@ -81,18 +81,18 @@ void CalculateTangents(Vector4* OutTangentArray, int32 InTriangleCount, const Tr
 void jQuadPrimitive::SetPlane(const jPlane& plane)
 {
 	Plane = plane;
-	RenderObject->SetRot(plane.n.GetEulerAngleFrom());
-	RenderObject->SetPos(plane.n * plane.d);
+	RenderObjects[0]->SetRot(plane.n.GetEulerAngleFrom());
+	RenderObjects[0]->SetPos(plane.n * plane.d);
 }
 
 void jBillboardQuadPrimitive::Update(float deltaTime)
 {
 	if (Camera)
 	{
-		const Vector normalizedCameraDir = (Camera->Pos - RenderObject->GetPos()).GetNormalize();
+		const Vector normalizedCameraDir = (Camera->Pos - RenderObjects[0]->GetPos()).GetNormalize();
 		const Vector eularAngleOfCameraDir = normalizedCameraDir.GetEulerAngleFrom();
 
-		RenderObject->SetRot(eularAngleOfCameraDir);
+		RenderObjects[0]->SetRot(eularAngleOfCameraDir);
 	}
 	else
 	{
@@ -100,11 +100,11 @@ void jBillboardQuadPrimitive::Update(float deltaTime)
 	}
 }
 
-void jUIQuadPrimitive::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
-{
-	SetUniformParams(shader);
-	__super::Draw(InRenderFrameContext, camera, shader, lights, instanceCount);
-}
+//void jUIQuadPrimitive::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
+//{
+//	SetUniformParams(shader);
+//	__super::Draw(InRenderFrameContext, camera, shader, lights, instanceCount);
+//}
 
 void jUIQuadPrimitive::SetTexture(const jTexture* texture)
 {
@@ -137,11 +137,11 @@ const jTexture* jUIQuadPrimitive::GetTexture() const
 	return nullptr;
 }
 
-void jFullscreenQuadPrimitive::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
-{
-	SetUniformBuffer(shader);
-	__super::Draw(InRenderFrameContext, camera, shader, lights, instanceCount);
-}
+//void jFullscreenQuadPrimitive::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
+//{
+//	SetUniformBuffer(shader);
+//	__super::Draw(InRenderFrameContext, camera, shader, lights, instanceCount);
+//}
 
 void jFullscreenQuadPrimitive::SetUniformBuffer(const jShader* shader) const
 {
@@ -158,11 +158,6 @@ void jFullscreenQuadPrimitive::SetTexture(int index, const jTexture* texture, co
 	check(0);
 	//RenderObject->MaterialData.Params.resize(index + 1);
 	//RenderObject->MaterialData.SetMaterialParam(index, GetCommonTextureName(index), texture, samplerState);
-}
-
-void jBoundBoxObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
-{
-	__super::Draw(InRenderFrameContext, camera, shader, lights);
 }
 
 void jBoundBoxObject::SetUniformBuffer(const jShader* shader)
@@ -214,17 +209,12 @@ void jBoundBoxObject::UpdateBoundBox()
 	};
 
 	const int32 elementCount = static_cast<int32>(_countof(vertices) / 3);
-	JASSERT(RenderObject->VertexStream->ElementCount == elementCount);
+	JASSERT(RenderObjectGeometryDataPtr->VertexStream->ElementCount == elementCount);
 
-	jStreamParam<float>* PositionParam = static_cast<jStreamParam<float>*>(RenderObject->VertexStream->Params[0].get());
+	jStreamParam<float>* PositionParam = static_cast<jStreamParam<float>*>(RenderObjectGeometryDataPtr->VertexStream->Params[0].get());
 	memcpy(&PositionParam->Data[0], vertices, sizeof(vertices));
 
-	RenderObject->UpdateVertexStream();
-}
-
-void jBoundSphereObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
-{
-	__super::Draw(InRenderFrameContext, camera, shader, lights);
+	RenderObjectGeometryDataPtr->UpdateVertexStream();
 }
 
 void jBoundSphereObject::SetUniformBuffer(const jShader* shader)
@@ -246,20 +236,20 @@ void jArrowSegmentPrimitive::Update(float deltaTime)
 		ConeObject->Update(deltaTime);
 }
 
-void jArrowSegmentPrimitive::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
-{
-	__super::Draw(InRenderFrameContext, camera, shader, lights);
-
-	if (SegmentObject)
-		SegmentObject->Draw(InRenderFrameContext, camera, shader, lights);
-	if (ConeObject)
-		ConeObject->Draw(InRenderFrameContext, camera, shader, lights);
-}
+//void jArrowSegmentPrimitive::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
+//{
+//	__super::Draw(InRenderFrameContext, camera, shader, lights);
+//
+//	if (SegmentObject)
+//		SegmentObject->Draw(InRenderFrameContext, camera, shader, lights);
+//	if (ConeObject)
+//		ConeObject->Draw(InRenderFrameContext, camera, shader, lights);
+//}
 
 
 void jArrowSegmentPrimitive::SetPos(const Vector& pos)
 {
-	SegmentObject->RenderObject->SetPos(pos);
+	SegmentObject->RenderObjects[0]->SetPos(pos);
 }
 
 void jArrowSegmentPrimitive::SetStart(const Vector& start)
@@ -409,8 +399,9 @@ jBoundBoxObject* CreateBoundBox(jBoundBox boundBox, jObject* ownerObject, const 
 
 	auto object = new jBoundBoxObject();
 	auto renderObject = new jRenderObject();
-	renderObject->CreateRenderObject(vertexStreamData, nullptr);
-	object->RenderObject = renderObject;
+	object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>(vertexStreamData, nullptr);
+	renderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
+	object->RenderObjects.push_back(renderObject);
 	object->SkipShadowMapGen = true;
 	object->SkipUpdateShadowVolume = true;
 	object->OwnerObject = ownerObject;
@@ -428,9 +419,9 @@ jBoundBoxObject* CreateBoundBox(jBoundBox boundBox, jObject* ownerObject, const 
 			JASSERT(boundBoxObject->OwnerObject);
 			auto ownerObject = boundBoxObject->OwnerObject;
 
-			boundBoxObject->RenderObject->SetPos(ownerObject->RenderObject->GetPos());
-			boundBoxObject->RenderObject->SetRot(ownerObject->RenderObject->GetRot());
-			boundBoxObject->RenderObject->SetScale(ownerObject->RenderObject->GetScale());
+			boundBoxObject->RenderObjects[0]->SetPos(ownerObject->RenderObjects[0]->GetPos());
+			boundBoxObject->RenderObjects[0]->SetRot(ownerObject->RenderObjects[0]->GetRot());
+			boundBoxObject->RenderObjects[0]->SetScale(ownerObject->RenderObjects[0]->GetScale());
 			boundBoxObject->Visible = ownerObject->Visible;
 		};
 	}
@@ -533,8 +524,9 @@ jBoundSphereObject* CreateBoundSphere(jBoundSphere boundSphere, jObject* ownerOb
 
 	auto object = new jBoundSphereObject();
 	auto renderObject = new jRenderObject();
-	renderObject->CreateRenderObject(vertexStreamData, indexStreamData);
-	object->RenderObject = renderObject;
+	object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>(vertexStreamData, indexStreamData);
+	renderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
+	object->RenderObjects.push_back(renderObject);
 	object->SkipShadowMapGen = true;
 	object->SkipUpdateShadowVolume = true;
 	object->OwnerObject = ownerObject;
@@ -550,9 +542,9 @@ jBoundSphereObject* CreateBoundSphere(jBoundSphere boundSphere, jObject* ownerOb
 		JASSERT(boundSphereObject->OwnerObject);
 		auto ownerObject = boundSphereObject->OwnerObject;
 
-		boundSphereObject->RenderObject->SetPos(ownerObject->RenderObject->GetPos());
-		boundSphereObject->RenderObject->SetRot(ownerObject->RenderObject->GetRot());
-		boundSphereObject->RenderObject->SetScale(ownerObject->RenderObject->GetScale());
+		boundSphereObject->RenderObjects[0]->SetPos(ownerObject->RenderObjects[0]->GetPos());
+		boundSphereObject->RenderObjects[0]->SetRot(ownerObject->RenderObjects[0]->GetRot());
+		boundSphereObject->RenderObjects[0]->SetScale(ownerObject->RenderObjects[0]->GetScale());
 		boundSphereObject->Visible = ownerObject->Visible;
 	};
 
@@ -676,7 +668,7 @@ jRenderObject* CreateQuad_Internal(const Vector& pos, const Vector& size, const 
 	vertexStreamData->ElementCount = elementCount;
 
 	auto renderObject = new jRenderObject();
-	renderObject->CreateRenderObject(vertexStreamData, nullptr);
+    renderObject->CreateRenderObject(std::make_shared<jRenderObjectGeometryData>(vertexStreamData, nullptr));
 	renderObject->SetPos(pos);
 	renderObject->SetScale(scale);
 	return renderObject;
@@ -685,9 +677,11 @@ jRenderObject* CreateQuad_Internal(const Vector& pos, const Vector& size, const 
 jQuadPrimitive* CreateQuad(const Vector& pos, const Vector& size, const Vector& scale, const Vector4& color)
 {
 	auto object = new jQuadPrimitive();
-	object->RenderObject = CreateQuad_Internal(pos, size, scale, color);
-	object->RenderObject->IsTwoSided = true;
-	object->CreateBoundBox();
+	auto RenderObject = CreateQuad_Internal(pos, size, scale, color);
+	object->RenderObjectGeometryDataPtr = RenderObject->GeometryDataPtr;
+	object->RenderObjects.push_back(RenderObject);
+	RenderObject->IsTwoSided = true;
+	// object->CreateBoundBox();
 	return object;
 }
 
@@ -814,11 +808,12 @@ jObject* CreateGizmo(const Vector& pos, const Vector& rot, const Vector& scale)
 
 	auto object = new jQuadPrimitive();
 	auto renderObject = new jRenderObject();
-	renderObject->CreateRenderObject(vertexStreamData, nullptr);
-	object->RenderObject = renderObject;
-	object->RenderObject->SetPos(pos);
-	object->RenderObject->SetScale(scale);
-	object->CreateBoundBox();
+	object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>(vertexStreamData, nullptr);
+	renderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
+	object->RenderObjects.push_back(renderObject);
+	renderObject->SetPos(pos);
+	renderObject->SetScale(scale);
+	// object->CreateBoundBox();
 	return object;
 }
 
@@ -913,12 +908,13 @@ jObject* CreateTriangle(const Vector& pos, const Vector& size, const Vector& sca
 
 	auto object = new jObject();
 	auto renderObject = new jRenderObject();
-	renderObject->CreateRenderObject(vertexStreamData, nullptr);
-	object->RenderObject = renderObject;
-	object->RenderObject->SetPos(pos);
-	object->RenderObject->SetScale(scale);
-	object->RenderObject->IsTwoSided = true;
-	object->CreateBoundBox();
+    object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>(vertexStreamData, nullptr);
+    renderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
+    object->RenderObjects.push_back(renderObject);
+	renderObject->SetPos(pos);
+	renderObject->SetScale(scale);
+	renderObject->IsTwoSided = true;
+	// object->CreateBoundBox();
 
 	return object;
 }
@@ -1143,11 +1139,12 @@ jObject* CreateCube(const Vector& pos, const Vector& size, const Vector& scale, 
 
 	auto object = new jObject();
 	auto renderObject = new jRenderObject();
-	renderObject->CreateRenderObject(vertexStreamData, nullptr);
-	object->RenderObject = renderObject;
-	object->RenderObject->SetPos(pos);
-	object->RenderObject->SetScale(scale);
-	object->CreateBoundBox();
+    object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>(vertexStreamData, nullptr);
+    renderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
+    object->RenderObjects.push_back(renderObject);
+	renderObject->SetPos(pos);
+	renderObject->SetScale(scale);
+	// object->CreateBoundBox();
 
 	return object;
 }
@@ -1295,11 +1292,12 @@ jObject* CreateCapsule(const Vector& pos, float height, float radius, int32 slic
 
 	auto object = new jObject();
 	auto renderObject = new jRenderObject();
-	renderObject->CreateRenderObject(vertexStreamData, indexStreamData);
-	object->RenderObject = renderObject;
-	object->RenderObject->SetPos(pos);
-	object->RenderObject->SetScale(scale);
-	object->CreateBoundBox();
+    object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>(vertexStreamData, indexStreamData);
+    renderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
+    object->RenderObjects.push_back(renderObject);
+	renderObject->SetPos(pos);
+	renderObject->SetScale(scale);
+	// object->CreateBoundBox();
 
 	return object;
 }
@@ -1426,15 +1424,16 @@ jConePrimitive* CreateCone(const Vector& pos, float height, float radius, int32 
 
 	auto object = new jConePrimitive();
 	auto renderObject = new jRenderObject();
-	renderObject->CreateRenderObject(vertexStreamData, nullptr);
-	object->RenderObject = renderObject;
-	object->RenderObject->SetPos(pos);
-	object->RenderObject->SetScale(scale);
+    object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>(vertexStreamData, nullptr);
+    renderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
+    object->RenderObjects.push_back(renderObject);
+	renderObject->SetPos(pos);
+	renderObject->SetScale(scale);
 	object->Height = height;
 	object->Radius = radius;
 	object->Color = color;
-	if (createBoundInfo)
-		object->CreateBoundBox();
+	//if (createBoundInfo)
+	//	object->CreateBoundBox();
 	return object;
 }
 
@@ -1582,14 +1581,15 @@ jObject* CreateCylinder(const Vector& pos, float height, float radius, int32 sli
 
 	auto object = new jCylinderPrimitive();
 	auto renderObject = new jRenderObject();
-	renderObject->CreateRenderObject(vertexStreamData, nullptr);
-	object->RenderObject = renderObject;
-	object->RenderObject->SetPos(pos);
-	object->RenderObject->SetScale(scale);
+    object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>(vertexStreamData, nullptr);
+    renderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
+    object->RenderObjects.push_back(renderObject);
+	renderObject->SetPos(pos);
+	renderObject->SetScale(scale);
 	object->Height = height;
 	object->Radius = radius;
 	object->Color = color;
-	object->CreateBoundBox();
+	// object->CreateBoundBox();
 	return object;
 }
 
@@ -1744,21 +1744,24 @@ jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector
 
 	auto object = new jObject();
 	auto renderObject = new jRenderObject();
-	renderObject->CreateRenderObject(vertexStreamData, indexStreamData);
-	object->RenderObject = renderObject;
-	object->RenderObject->SetPos(pos);
-	object->RenderObject->SetScale(scale);
-	if (createBoundInfo)
-		object->CreateBoundBox();
+    object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>(vertexStreamData, indexStreamData);
+    renderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
+    object->RenderObjects.push_back(renderObject);
+	renderObject->SetPos(pos);
+	renderObject->SetScale(scale);
+	//if (createBoundInfo)
+	//	object->CreateBoundBox();
 	return object;
 }
 
 jBillboardQuadPrimitive* CreateBillobardQuad(const Vector& pos, const Vector& size, const Vector& scale, const Vector4& color, jCamera* camera)
 {
 	auto object = new jBillboardQuadPrimitive();
-	object->RenderObject = CreateQuad_Internal(pos, size, scale, color);
+    auto RenderObject = CreateQuad_Internal(pos, size, scale, color);
+    object->RenderObjectGeometryDataPtr = RenderObject->GeometryDataPtr;
+    object->RenderObjects.push_back(RenderObject);
 	object->Camera = camera;
-	object->RenderObject->IsTwoSided = true;
+	RenderObject->IsTwoSided = true;
 	return object;
 }
 
@@ -1801,8 +1804,9 @@ jUIQuadPrimitive* CreateUIQuad(const Vector2& pos, const Vector2& size, jTexture
 
 	auto object = new jUIQuadPrimitive();
 	auto renderObject = new jRenderObject();
-	renderObject->CreateRenderObject(vertexStreamData, nullptr);
-	object->RenderObject = renderObject;
+    object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>(vertexStreamData, nullptr);
+    renderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
+    object->RenderObjects.push_back(renderObject);
 	object->Pos = pos;
 	object->Size = size;
 
@@ -1838,8 +1842,9 @@ jFullscreenQuadPrimitive* CreateFullscreenQuad(jTexture* texture)
 
 	auto object = new jFullscreenQuadPrimitive();
 	auto renderObject = new jRenderObject();
-	renderObject->CreateRenderObject(vertexStreamData, nullptr);
-	object->RenderObject = renderObject;
+    object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>(vertexStreamData, nullptr);
+    renderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
+    object->RenderObjects.push_back(renderObject);
 	return object;
 }
 
@@ -1892,9 +1897,11 @@ jSegmentPrimitive* CreateSegment(const Vector& start, const Vector& end, float t
 
 	auto object = new jSegmentPrimitive();
 	auto renderObject = new jRenderObject();
-	renderObject->CreateRenderObject(vertexStreamData, nullptr);
-	object->RenderObject = renderObject;
-	object->RenderObject->SetScale(Vector(time));
+    object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>(vertexStreamData, nullptr);
+    renderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
+    object->RenderObjects.push_back(renderObject);
+	renderObject = renderObject;
+	renderObject->SetScale(Vector(time));
 	object->Time = time;
 	object->Start = start;
 	object->End = end;
@@ -1902,9 +1909,9 @@ jSegmentPrimitive* CreateSegment(const Vector& start, const Vector& end, float t
 	object->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
 	{
 		auto thisSegmentObject = static_cast<jSegmentPrimitive*>(thisObject);
-		thisObject->RenderObject->SetScale(Vector(thisSegmentObject->Time));
+		thisObject->RenderObjects[0]->SetScale(Vector(thisSegmentObject->Time));
 	};
-	object->CreateBoundBox();
+	// object->CreateBoundBox();
 	return object;
 }
 
@@ -1916,8 +1923,8 @@ jArrowSegmentPrimitive* CreateArrowSegment(const Vector& start, const Vector& en
 	object->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
 	{
 		auto thisArrowSegmentObject = static_cast<jArrowSegmentPrimitive*>(thisObject);
-		thisArrowSegmentObject->ConeObject->RenderObject->SetPos(thisArrowSegmentObject->SegmentObject->RenderObject->GetPos() + thisArrowSegmentObject->SegmentObject->GetCurrentEnd());
-		thisArrowSegmentObject->ConeObject->RenderObject->SetRot(thisArrowSegmentObject->SegmentObject->GetDirectionNormalized().GetEulerAngleFrom());
+		thisArrowSegmentObject->ConeObject->RenderObjects[0]->SetPos(thisArrowSegmentObject->SegmentObject->RenderObjects[0]->GetPos() + thisArrowSegmentObject->SegmentObject->GetCurrentEnd());
+		thisArrowSegmentObject->ConeObject->RenderObjects[0]->SetRot(thisArrowSegmentObject->SegmentObject->GetDirectionNormalized().GetEulerAngleFrom());
 	};
 
 	return object;
@@ -1933,19 +1940,19 @@ jDirectionalLightPrimitive* CreateDirectionalLightDebug(const Vector& pos, const
     {
         jTexture* texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName(textureFilename), true).lock().get();
 		//object->BillboardObject->RenderObject->TextureSamplers.push_back({ .Texture = texture, .SamplerState = nullptr });
-		object->BillboardObject->RenderObject->MaterialPtr = std::make_shared<jMaterial>();
-		object->BillboardObject->RenderObject->MaterialPtr->TexData[static_cast<int32>(jMaterial::EMaterialTextureType::DiffuseSampler)].Texture = texture;
-        object->BillboardObject->RenderObject->IsHiddenBoundBox = true;
+		object->BillboardObject->RenderObjects[0]->MaterialPtr = std::make_shared<jMaterial>();
+		object->BillboardObject->RenderObjects[0]->MaterialPtr->TexData[static_cast<int32>(jMaterial::EMaterialTextureType::DiffuseSampler)].Texture = texture;
+        object->BillboardObject->RenderObjects[0]->IsHiddenBoundBox = true;
     }
     object->ArrowSegementObject = jPrimitiveUtil::CreateArrowSegment(Vector::ZeroVector, light->GetLightData().Direction * length, 1.0f, scale.x, scale.x / 2, Vector4(0.8f, 0.2f, 0.3f, 1.0f));
-    object->ArrowSegementObject->ConeObject->RenderObject->IsHiddenBoundBox = true;
-    object->ArrowSegementObject->SegmentObject->RenderObject->IsHiddenBoundBox = true;
+    object->ArrowSegementObject->ConeObject->RenderObjects[0]->IsHiddenBoundBox = true;
+    object->ArrowSegementObject->SegmentObject->RenderObjects[0]->IsHiddenBoundBox = true;
     object->Pos = pos;
     object->Light = light;
     object->PostUpdateFunc = [length](jObject* thisObject, float deltaTime)
     {
         auto thisDirectionalLightObject = static_cast<jDirectionalLightPrimitive*>(thisObject);
-        thisDirectionalLightObject->BillboardObject->RenderObject->SetPos(thisDirectionalLightObject->Pos);
+        thisDirectionalLightObject->BillboardObject->RenderObjects[0]->SetPos(thisDirectionalLightObject->Pos);
         thisDirectionalLightObject->ArrowSegementObject->SetPos(thisDirectionalLightObject->Pos);
         thisDirectionalLightObject->ArrowSegementObject->SetEnd(thisDirectionalLightObject->Light->GetLightData().Direction * length);
     };
@@ -1964,19 +1971,19 @@ jPointLightPrimitive* CreatePointLightDebug(const Vector& scale, jCamera* target
 	if (data.lock()->ImageData.size() > 0)
 	{
 		auto texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName(textureFilename), true).lock().get();
-        object->BillboardObject->RenderObject->MaterialPtr = std::make_shared<jMaterial>();
-        object->BillboardObject->RenderObject->MaterialPtr->TexData[static_cast<int32>(jMaterial::EMaterialTextureType::DiffuseSampler)].Texture = texture;
-		object->BillboardObject->RenderObject->IsHiddenBoundBox = true;
+        object->BillboardObject->RenderObjects[0]->MaterialPtr = std::make_shared<jMaterial>();
+        object->BillboardObject->RenderObjects[0]->MaterialPtr->TexData[static_cast<int32>(jMaterial::EMaterialTextureType::DiffuseSampler)].Texture = texture;
+		object->BillboardObject->RenderObjects[0]->IsHiddenBoundBox = true;
 	}
 	object->SphereObject = CreateSphere(light->LightData.Position, light->LightData.MaxDistance, 20, Vector::OneVector, Vector4(light->LightData.Color, 1.0f), true, false);
-	object->SphereObject->RenderObject->IsHiddenBoundBox = true;
+	object->SphereObject->RenderObjects[0]->IsHiddenBoundBox = true;
 	object->Light = light;
 	object->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
 	{
 		auto pointLightPrimitive = static_cast<jPointLightPrimitive*>(thisObject);
-		pointLightPrimitive->BillboardObject->RenderObject->SetPos(pointLightPrimitive->Light->LightData.Position);
-		pointLightPrimitive->SphereObject->RenderObject->SetPos(pointLightPrimitive->Light->LightData.Position);
-		pointLightPrimitive->SphereObject->RenderObject->SetScale(Vector(pointLightPrimitive->Light->LightData.MaxDistance));
+		pointLightPrimitive->BillboardObject->RenderObjects[0]->SetPos(pointLightPrimitive->Light->LightData.Position);
+		pointLightPrimitive->SphereObject->RenderObjects[0]->SetPos(pointLightPrimitive->Light->LightData.Position);
+		pointLightPrimitive->SphereObject->RenderObjects[0]->SetScale(Vector(pointLightPrimitive->Light->LightData.MaxDistance));
 	};
 	object->SkipShadowMapGen = true;
 	object->SkipUpdateShadowVolume = true;
@@ -1993,32 +2000,32 @@ jSpotLightPrimitive* CreateSpotLightDebug(const Vector& scale, jCamera* targetCa
 	if (data.lock()->ImageData.size() > 0)
 	{
 		auto texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName(textureFilename), true).lock().get();
-        object->BillboardObject->RenderObject->MaterialPtr = std::make_shared<jMaterial>();
-        object->BillboardObject->RenderObject->MaterialPtr->TexData[static_cast<int32>(jMaterial::EMaterialTextureType::DiffuseSampler)].Texture = texture;
+        object->BillboardObject->RenderObjects[0]->MaterialPtr = std::make_shared<jMaterial>();
+        object->BillboardObject->RenderObjects[0]->MaterialPtr->TexData[static_cast<int32>(jMaterial::EMaterialTextureType::DiffuseSampler)].Texture = texture;
 	}
 	object->UmbraConeObject = jPrimitiveUtil::CreateCone(light->LightData.Position, 1.0, 1.0, 20, Vector::OneVector, Vector4(light->LightData.Color.x, light->LightData.Color.y, light->LightData.Color.z, 1.0f), true, false);
-	object->UmbraConeObject->RenderObject->IsHiddenBoundBox = true;
+	object->UmbraConeObject->RenderObjects[0]->IsHiddenBoundBox = true;
 	object->PenumbraConeObject = jPrimitiveUtil::CreateCone(light->LightData.Position, 1.0, 1.0, 20, Vector::OneVector, Vector4(light->LightData.Color.x, light->LightData.Color.y, light->LightData.Color.z, 0.5f), true, false);
-	object->PenumbraConeObject->RenderObject->IsHiddenBoundBox = true;
+	object->PenumbraConeObject->RenderObjects[0]->IsHiddenBoundBox = true;
 	object->Light = light;
 	object->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
 	{
 		auto spotLightObject = static_cast<jSpotLightPrimitive*>(thisObject);
-		spotLightObject->BillboardObject->RenderObject->SetPos(spotLightObject->Light->LightData.Position);
+		spotLightObject->BillboardObject->RenderObjects[0]->SetPos(spotLightObject->Light->LightData.Position);
 
 		const auto lightDir = -spotLightObject->Light->LightData.Direction;
 		const auto directionToRot = lightDir.GetEulerAngleFrom();
-		const auto spotLightPos = spotLightObject->Light->LightData.Position + lightDir * (-spotLightObject->UmbraConeObject->RenderObject->GetScale().y / 2.0f);
+		const auto spotLightPos = spotLightObject->Light->LightData.Position + lightDir * (-spotLightObject->UmbraConeObject->RenderObjects[0]->GetScale().y / 2.0f);
 
 		const auto umbraRadius = tanf(spotLightObject->Light->LightData.UmbraRadian) * spotLightObject->Light->LightData.MaxDistance;
-		spotLightObject->UmbraConeObject->RenderObject->SetScale(Vector(umbraRadius, spotLightObject->Light->LightData.MaxDistance, umbraRadius));
-		spotLightObject->UmbraConeObject->RenderObject->SetPos(spotLightPos);
-		spotLightObject->UmbraConeObject->RenderObject->SetRot(directionToRot);
+		spotLightObject->UmbraConeObject->RenderObjects[0]->SetScale(Vector(umbraRadius, spotLightObject->Light->LightData.MaxDistance, umbraRadius));
+		spotLightObject->UmbraConeObject->RenderObjects[0]->SetPos(spotLightPos);
+		spotLightObject->UmbraConeObject->RenderObjects[0]->SetRot(directionToRot);
 
 		const auto penumbraRadius = tanf(spotLightObject->Light->LightData.PenumbraRadian) * spotLightObject->Light->LightData.MaxDistance;
-		spotLightObject->PenumbraConeObject->RenderObject->SetScale(Vector(penumbraRadius, spotLightObject->Light->LightData.MaxDistance, penumbraRadius));
-		spotLightObject->PenumbraConeObject->RenderObject->SetPos(spotLightPos);
-		spotLightObject->PenumbraConeObject->RenderObject->SetRot(directionToRot);
+		spotLightObject->PenumbraConeObject->RenderObjects[0]->SetScale(Vector(penumbraRadius, spotLightObject->Light->LightData.MaxDistance, penumbraRadius));
+		spotLightObject->PenumbraConeObject->RenderObjects[0]->SetPos(spotLightPos);
+		spotLightObject->PenumbraConeObject->RenderObjects[0]->SetRot(directionToRot);
 	};
 	object->SkipShadowMapGen = true;
 	object->SkipUpdateShadowVolume = true;
@@ -2077,9 +2084,9 @@ jGraph2D* CreateGraph2D(const Vector2& pos, const Vector2& size, const std::vect
 
 	auto object = new jGraph2D();
 	auto renderObject = new jRenderObject();
-	renderObject->CreateRenderObject(vertexStreamData, nullptr);
-	object->RenderObject = renderObject;
-
+    object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>(vertexStreamData, nullptr);
+    renderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
+    object->RenderObjects.push_back(renderObject);
 	object->SethPos(pos);
 	object->SetGuardLineSize(size);
 	object->SetPoints(points);
@@ -2100,26 +2107,26 @@ void jDirectionalLightPrimitive::Update(float deltaTime)
 }
 
 
-void jDirectionalLightPrimitive::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
-{
-	__super::Draw(InRenderFrameContext, camera, shader, lights);
-
-	if (BillboardObject)
-		BillboardObject->Draw(InRenderFrameContext, camera, shader, lights);
-	if (ArrowSegementObject)
-		ArrowSegementObject->Draw(InRenderFrameContext, camera, shader, lights);
-}
+//void jDirectionalLightPrimitive::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
+//{
+//	__super::Draw(InRenderFrameContext, camera, shader, lights);
+//
+//	if (BillboardObject)
+//		BillboardObject->Draw(InRenderFrameContext, camera, shader, lights);
+//	if (ArrowSegementObject)
+//		ArrowSegementObject->Draw(InRenderFrameContext, camera, shader, lights);
+//}
 
 void jSegmentPrimitive::UpdateSegment()
 {
-	if (RenderObject->VertexStream->Params.size() < 2)
+	if (RenderObjectGeometryDataPtr->VertexStream->Params.size() < 2)
 	{
 		JASSERT(0);
 		return;
 	}
 
-	RenderObject->VertexStream->Params[0].reset();
-	RenderObject->VertexStream->Params[1].reset();
+	RenderObjectGeometryDataPtr->VertexStream->Params[0].reset();
+	RenderObjectGeometryDataPtr->VertexStream->Params[1].reset();
 	const auto currentEnd = GetCurrentEnd();
 
 	const float vertices[] = {
@@ -2135,7 +2142,7 @@ void jSegmentPrimitive::UpdateSegment()
 		streamParam->Name = jName("Pos");
 		streamParam->Data.resize(_countof(vertices));
 		memcpy(&streamParam->Data[0], &vertices[0], sizeof(vertices));
-		RenderObject->VertexStream->Params[0] = streamParam;
+		RenderObjectGeometryDataPtr->VertexStream->Params[0] = streamParam;
 	}
 
 	{
@@ -2145,9 +2152,9 @@ void jSegmentPrimitive::UpdateSegment()
 		streamParam->Stride = sizeof(float) * 4;
 		streamParam->Name = jName("Color");
 		streamParam->Data = std::move(jPrimitiveUtil::GenerateColor(Color, 2));
-		RenderObject->VertexStream->Params[1] = streamParam;
+		RenderObjectGeometryDataPtr->VertexStream->Params[1] = streamParam;
 	}
-	g_rhi->UpdateVertexBuffer(RenderObject->VertexBuffer, RenderObject->VertexStream);
+	g_rhi->UpdateVertexBuffer(RenderObjectGeometryDataPtr->VertexBuffer, RenderObjectGeometryDataPtr->VertexStream);
 }
 
 void jSegmentPrimitive::UpdateSegment(const Vector& start, const Vector& end, const Vector4& color, float time)
@@ -2173,12 +2180,12 @@ void jPointLightPrimitive::Update(float deltaTime)
 	SphereObject->Update(deltaTime);
 }
 
-void jPointLightPrimitive::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
-{
-	__super::Draw(InRenderFrameContext, camera, shader, lights);
-	BillboardObject->Draw(InRenderFrameContext, camera, shader, lights);
-	SphereObject->Draw(InRenderFrameContext, camera, shader, lights);
-}
+//void jPointLightPrimitive::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
+//{
+//	__super::Draw(InRenderFrameContext, camera, shader, lights);
+//	BillboardObject->Draw(InRenderFrameContext, camera, shader, lights);
+//	SphereObject->Draw(InRenderFrameContext, camera, shader, lights);
+//}
 
 void jSpotLightPrimitive::Update(float deltaTime)
 {
@@ -2188,13 +2195,13 @@ void jSpotLightPrimitive::Update(float deltaTime)
 	PenumbraConeObject->Update(deltaTime);
 }
 
-void jSpotLightPrimitive::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
-{
-	__super::Draw(InRenderFrameContext, camera, shader, lights);
-	BillboardObject->Draw(InRenderFrameContext, camera, shader, lights);
-	UmbraConeObject->Draw(InRenderFrameContext, camera, shader, lights);
-	PenumbraConeObject->Draw(InRenderFrameContext, camera, shader, lights);
-}
+//void jSpotLightPrimitive::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
+//{
+//	__super::Draw(InRenderFrameContext, camera, shader, lights);
+//	BillboardObject->Draw(InRenderFrameContext, camera, shader, lights);
+//	UmbraConeObject->Draw(InRenderFrameContext, camera, shader, lights);
+//	PenumbraConeObject->Draw(InRenderFrameContext, camera, shader, lights);
+//}
 
 void jFrustumPrimitive::Update(float deltaTime)
 {
@@ -2362,7 +2369,7 @@ void jFrustumPrimitive::Update(float deltaTime)
 		vertexStreamData->PrimitiveType = EPrimitiveType::TRIANGLES;
 		vertexStreamData->ElementCount = elementCount;
 
-		quad->RenderObject->UpdateVertexStream(vertexStreamData);
+		quad->RenderObjectGeometryDataPtr->UpdateVertexStream(vertexStreamData);
 	};
 
 	updateQuadFunc(Plane[0], far_lt, near_lt, far_lb, near_lb, Vector4(0.0f, 1.0f, 0.0f, 0.3f));
@@ -2374,44 +2381,44 @@ void jFrustumPrimitive::Update(float deltaTime)
 
 	for (int32 i = 0; i < 16; ++i)
 	{
-		Segments[i]->RenderObject->SetPos(Offset);
-		Segments[i]->RenderObject->SetScale(Scale);
+		Segments[i]->RenderObjects[0]->SetPos(Offset);
+		Segments[i]->RenderObjects[0]->SetScale(Scale);
 		Segments[i]->Update(deltaTime);
 	}
 
 	for (int32 i = 0; i < 6; ++i)
 	{
-		Plane[i]->RenderObject->SetPos(Offset);
-		Plane[i]->RenderObject->SetScale(Scale);
+		Plane[i]->RenderObjects[0]->SetPos(Offset);
+		Plane[i]->RenderObjects[0]->SetScale(Scale);
 		Plane[i]->Update(deltaTime);
 	}
 }
 
-void jFrustumPrimitive::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
-{
-	__super::Draw(InRenderFrameContext, camera, shader, lights);
-	for (int32 i = 0; i < 16; ++i)
-		Segments[i]->Draw(InRenderFrameContext, camera, shader, lights);
-
-	if (DrawPlane)
-	{
-		for (int32 i = 0; i < 6; ++i)
-			Plane[i]->Draw(InRenderFrameContext, camera, shader, lights);
-	}
-}
+//void jFrustumPrimitive::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
+//{
+//	__super::Draw(InRenderFrameContext, camera, shader, lights);
+//	for (int32 i = 0; i < 16; ++i)
+//		Segments[i]->Draw(InRenderFrameContext, camera, shader, lights);
+//
+//	if (DrawPlane)
+//	{
+//		for (int32 i = 0; i < 6; ++i)
+//			Plane[i]->Draw(InRenderFrameContext, camera, shader, lights);
+//	}
+//}
 
 void jGraph2D::Update(float deltaTime)
 {
 	UpdateBuffer();
 }
 
-void jGraph2D::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
-{
-	SET_UNIFORM_BUFFER_STATIC("InvViewportSize", Vector2(1.0f / SCR_WIDTH, 1.0f / SCR_HEIGHT), shader);
-	SET_UNIFORM_BUFFER_STATIC("LineColor", Vector4::ColorRed, shader);
-	SET_UNIFORM_BUFFER_STATIC("GuardLineColor", Vector4::ColorWhite, shader);
-	__super::Draw(InRenderFrameContext, camera, shader, lights, static_cast<int32>(ResultMatrices.size()));
-}
+//void jGraph2D::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
+//{
+//	SET_UNIFORM_BUFFER_STATIC("InvViewportSize", Vector2(1.0f / SCR_WIDTH, 1.0f / SCR_HEIGHT), shader);
+//	SET_UNIFORM_BUFFER_STATIC("LineColor", Vector4::ColorRed, shader);
+//	SET_UNIFORM_BUFFER_STATIC("GuardLineColor", Vector4::ColorWhite, shader);
+//	__super::Draw(InRenderFrameContext, camera, shader, lights, static_cast<int32>(ResultMatrices.size()));
+//}
 
 void jGraph2D::SethPos(const Vector2& pos)
 {
@@ -2483,10 +2490,10 @@ void jGraph2D::UpdateBuffer()
 				tr = (tr * Matrix::MakeScale(lineLength, 1.0f, 1.0f));
 			}
 
-			if (RenderObject && RenderObject->VertexStream)
+			if (RenderObjectGeometryDataPtr->VertexStream)
 			{
 				static jName TransformName("Transform");
-				for (auto& iter : RenderObject->VertexStream->Params)
+				for (auto& iter : RenderObjectGeometryDataPtr->VertexStream->Params)
 				{
 					if (iter->Name == TransformName)
 					{
@@ -2496,7 +2503,7 @@ void jGraph2D::UpdateBuffer()
 						break;
 					}
 				}
-				RenderObject->UpdateVertexStream();
+				RenderObjectGeometryDataPtr->UpdateVertexStream();
 			}
 		}
 		else

@@ -345,14 +345,17 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
         indexStreamData->Param = streamParam;
 	}
 
+    object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>();
+	object->RenderObjectGeometryDataPtr->Create(vertexStreamData, indexStreamData);
+
 	for (int32 i = 0; i < (int32)object->SubMeshes.size(); ++i)
 	{
 		const jSubMesh& subMesh = object->SubMeshes[i];
 
-		auto StaticMeshRenderObject = new jStaticMeshRenderObject();
+		auto StaticMeshRenderObject = new jRenderObjectElement();
 		StaticMeshRenderObject->SubMesh = subMesh;
 		StaticMeshRenderObject->MaterialPtr = meshData->Materials[subMesh.MaterialIndex];
-		StaticMeshRenderObject->CreateRenderObject(vertexStreamData, indexStreamData);
+		StaticMeshRenderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
 		object->RenderObjects.push_back(StaticMeshRenderObject);
 	}
 

@@ -224,30 +224,16 @@ void jGame::Update(float deltaTime)
     {
         iter->Update(deltaTime);
 
-		if (iter->RenderObject)
-		{
-			iter->RenderObject->UpdateWorldMatrix();
-		}
-		else
-		{
-			for(int32 i=0;i<iter->RenderObjects.size();++i)
-				iter->RenderObjects[i]->UpdateWorldMatrix();
-		}
+		for(auto& RenderObject : iter->RenderObjects)
+			RenderObject->UpdateWorldMatrix();
     }
 
 	for (auto& iter : jObject::GetDebugObject())
 	{
 		iter->Update(deltaTime);
 
-        if (iter->RenderObject)
-        {
-            iter->RenderObject->UpdateWorldMatrix();
-        }
-        else
-        {
-            for (int32 i = 0; i < iter->RenderObjects.size(); ++i)
-                iter->RenderObjects[i]->UpdateWorldMatrix();
-        }
+        for (auto& RenderObject : iter->RenderObjects)
+            RenderObject->UpdateWorldMatrix();
 	}
 
     // 정리해야함
@@ -364,7 +350,7 @@ void jGame::SpawnTestPrimitives()
 	auto triangle = jPrimitiveUtil::CreateTriangle(Vector(60.0, 100.0, 20.0), Vector::OneVector, Vector(40.0, 40.0, 40.0), Vector4(0.5f, 0.1f, 1.0f, 1.0f));
 	triangle->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
 	{
-		thisObject->RenderObject->SetRot(thisObject->RenderObject->GetRot() + Vector(0.05f, 0.0f, 0.0f));
+		thisObject->RenderObjects[0]->SetRot(thisObject->RenderObjects[0]->GetRot() + Vector(0.05f, 0.0f, 0.0f));
 	};
 	jObject::AddObject(triangle);
 	SpawnedObjects.push_back(triangle);
@@ -372,7 +358,7 @@ void jGame::SpawnTestPrimitives()
 	auto cube = jPrimitiveUtil::CreateCube(Vector(-60.0f, 55.0f, -20.0f), Vector::OneVector, Vector(50.0f, 50.0f, 50.0f), Vector4(0.7f, 0.7f, 0.7f, 1.0f));
 	cube->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
 	{
-		thisObject->RenderObject->SetRot(thisObject->RenderObject->GetRot() + Vector(0.0f, 0.0f, 0.005f));
+		thisObject->RenderObjects[0]->SetRot(thisObject->RenderObjects[0]->GetRot() + Vector(0.0f, 0.0f, 0.005f));
 	};
 	jObject::AddObject(cube);
 	SpawnedObjects.push_back(cube);
@@ -384,7 +370,7 @@ void jGame::SpawnTestPrimitives()
 	auto capsule = jPrimitiveUtil::CreateCapsule(Vector(30.0f, 30.0f, -80.0f), 40.0f, 10.0f, 20, Vector(1.0f), Vector4(1.0f, 1.0f, 0.0f, 1.0f));
 	capsule->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
 	{
-		thisObject->RenderObject->SetRot(thisObject->RenderObject->GetRot() + Vector(-0.01f, 0.0f, 0.0f));
+		thisObject->RenderObjects[0]->SetRot(thisObject->RenderObjects[0]->GetRot() + Vector(-0.01f, 0.0f, 0.0f));
 	};
 	jObject::AddObject(capsule);
 	SpawnedObjects.push_back(capsule);
@@ -392,7 +378,7 @@ void jGame::SpawnTestPrimitives()
 	auto cone = jPrimitiveUtil::CreateCone(Vector(0.0f, 50.0f, 60.0f), 40.0f, 20.0f, 15, Vector::OneVector, Vector4(1.0f, 1.0f, 0.0f, 1.0f));
 	cone->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
 	{
-		thisObject->RenderObject->SetRot(thisObject->RenderObject->GetRot() + Vector(0.0f, 0.03f, 0.0f));
+		thisObject->RenderObjects[0]->SetRot(thisObject->RenderObjects[0]->GetRot() + Vector(0.0f, 0.03f, 0.0f));
 	};
 	jObject::AddObject(cone);
 	SpawnedObjects.push_back(cone);
@@ -400,7 +386,7 @@ void jGame::SpawnTestPrimitives()
 	auto cylinder = jPrimitiveUtil::CreateCylinder(Vector(-30.0f, 60.0f, -60.0f), 20.0f, 10.0f, 20, Vector::OneVector, Vector4(0.0f, 0.0f, 1.0f, 1.0f));
 	cylinder->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
 	{
-		thisObject->RenderObject->SetRot(thisObject->RenderObject->GetRot() + Vector(0.05f, 0.0f, 0.0f));
+		thisObject->RenderObjects[0]->SetRot(thisObject->RenderObjects[0]->GetRot() + Vector(0.05f, 0.0f, 0.0f));
 	};
 	jObject::AddObject(cylinder);
 	SpawnedObjects.push_back(cylinder);
@@ -408,7 +394,7 @@ void jGame::SpawnTestPrimitives()
 	auto quad2 = jPrimitiveUtil::CreateQuad(Vector(-20.0f, 80.0f, 40.0f), Vector::OneVector, Vector(20.0f, 20.0f, 20.0f), Vector4(0.0f, 0.0f, 1.0f, 1.0f));
 	quad2->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
 	{
-		thisObject->RenderObject->SetRot(thisObject->RenderObject->GetRot() + Vector(0.0f, 0.0f, 0.08f));
+		thisObject->RenderObjects[0]->SetRot(thisObject->RenderObjects[0]->GetRot() + Vector(0.0f, 0.0f, 0.08f));
 	};
 	jObject::AddObject(quad2);
 	SpawnedObjects.push_back(quad2);
@@ -416,7 +402,7 @@ void jGame::SpawnTestPrimitives()
 	auto sphere = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f), 1.0, 16, Vector(30.0f), Vector4(0.8f, 0.0f, 0.0f, 1.0f));
 	sphere->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
 	{
-		thisObject->RenderObject->SetRot(thisObject->RenderObject->GetRot() + Vector(0.0f, 0.0f, DegreeToRadian(180.0f)));
+		thisObject->RenderObjects[0]->SetRot(thisObject->RenderObjects[0]->GetRot() + Vector(0.0f, 0.0f, DegreeToRadian(180.0f)));
 	};
 	jObject::AddObject(sphere);
 	SpawnedObjects.push_back(sphere);
@@ -428,14 +414,14 @@ void jGame::SpawnTestPrimitives()
 		const float endY = 100;
 		const float speed = 1.5f;
 		static bool dir = true;
-		auto Pos = thisObject->RenderObject->GetPos();
+		auto Pos = thisObject->RenderObjects[0]->GetPos();
 		Pos.y += dir ? speed : -speed;
 		if (Pos.y < startY || Pos.y > endY)
 		{
 			dir = !dir;
 			Pos.y += dir ? speed : -speed;
 		}
-		thisObject->RenderObject->SetPos(Pos);
+		thisObject->RenderObjects[0]->SetPos(Pos);
 	};
 	jObject::AddObject(sphere2);
 	SpawnedObjects.push_back(sphere2);
@@ -570,13 +556,15 @@ void jGame::SpawnInstancingPrimitives()
         streamParam->Data.resize(100);
         memcpy(&streamParam->Data[0], instanceData, sizeof(instanceData));
 
-        obj->RenderObject->VertexStream_InstanceData = std::make_shared<jVertexStreamData>();
-        obj->RenderObject->VertexStream_InstanceData->ElementCount = _countof(instanceData);
-        obj->RenderObject->VertexStream_InstanceData->StartLocation = (int32)obj->RenderObject->VertexStream->GetEndLocation();
-        obj->RenderObject->VertexStream_InstanceData->BindingIndex = (int32)obj->RenderObject->VertexStream->Params.size();
-        obj->RenderObject->VertexStream_InstanceData->VertexInputRate = EVertexInputRate::INSTANCE;
-        obj->RenderObject->VertexStream_InstanceData->Params.push_back(streamParam);
-        obj->RenderObject->VertexBuffer_InstanceData = g_rhi->CreateVertexBuffer(obj->RenderObject->VertexStream_InstanceData);
+		auto& GeometryDataPtr = obj->RenderObjects[0]->GeometryDataPtr;
+
+        GeometryDataPtr->VertexStream_InstanceData = std::make_shared<jVertexStreamData>();
+        GeometryDataPtr->VertexStream_InstanceData->ElementCount = _countof(instanceData);
+        GeometryDataPtr->VertexStream_InstanceData->StartLocation = (int32)GeometryDataPtr->VertexStream->GetEndLocation();
+        GeometryDataPtr->VertexStream_InstanceData->BindingIndex = (int32)GeometryDataPtr->VertexStream->Params.size();
+        GeometryDataPtr->VertexStream_InstanceData->VertexInputRate = EVertexInputRate::INSTANCE;
+        GeometryDataPtr->VertexStream_InstanceData->Params.push_back(streamParam);
+        GeometryDataPtr->VertexBuffer_InstanceData = g_rhi->CreateVertexBuffer(GeometryDataPtr->VertexStream_InstanceData);
 
         jObject::AddObject(obj);
         SpawnedObjects.push_back(obj);
@@ -621,22 +609,23 @@ void jGame::SpawnIndirectDrawPrimitives()
         streamParam->Data.resize(100);
         memcpy(&streamParam->Data[0], instanceData, sizeof(instanceData));
 
-        obj->RenderObject->VertexStream_InstanceData = std::make_shared<jVertexStreamData>();
-        obj->RenderObject->VertexStream_InstanceData->ElementCount = _countof(instanceData);
-        obj->RenderObject->VertexStream_InstanceData->StartLocation = (int32)obj->RenderObject->VertexStream->GetEndLocation();
-        obj->RenderObject->VertexStream_InstanceData->BindingIndex = (int32)obj->RenderObject->VertexStream->Params.size();
-        obj->RenderObject->VertexStream_InstanceData->VertexInputRate = EVertexInputRate::INSTANCE;
-        obj->RenderObject->VertexStream_InstanceData->Params.push_back(streamParam);
-        obj->RenderObject->VertexBuffer_InstanceData = g_rhi->CreateVertexBuffer(obj->RenderObject->VertexStream_InstanceData);
+		auto& GeometryDataPtr = obj->RenderObjects[0]->GeometryDataPtr;
+        GeometryDataPtr->VertexStream_InstanceData = std::make_shared<jVertexStreamData>();
+        GeometryDataPtr->VertexStream_InstanceData->ElementCount = _countof(instanceData);
+        GeometryDataPtr->VertexStream_InstanceData->StartLocation = (int32)GeometryDataPtr->VertexStream->GetEndLocation();
+        GeometryDataPtr->VertexStream_InstanceData->BindingIndex = (int32)GeometryDataPtr->VertexStream->Params.size();
+        GeometryDataPtr->VertexStream_InstanceData->VertexInputRate = EVertexInputRate::INSTANCE;
+        GeometryDataPtr->VertexStream_InstanceData->Params.push_back(streamParam);
+        GeometryDataPtr->VertexBuffer_InstanceData = g_rhi->CreateVertexBuffer(GeometryDataPtr->VertexStream_InstanceData);
 
         // Create indirect draw buffer
         {
-            check(obj->RenderObject->VertexStream_InstanceData);
+            check(GeometryDataPtr->VertexStream_InstanceData);
 
             std::vector<VkDrawIndirectCommand> indrectCommands;
 
-            const int32 instanceCount = obj->RenderObject->VertexStream_InstanceData->ElementCount;
-            const int32 vertexCount = obj->RenderObject->VertexStream->ElementCount;
+            const int32 instanceCount = GeometryDataPtr->VertexStream_InstanceData->ElementCount;
+            const int32 vertexCount = GeometryDataPtr->VertexStream->ElementCount;
             for (int32 i = 0; i < instanceCount; ++i)
             {
                 VkDrawIndirectCommand command;
@@ -656,12 +645,12 @@ void jGame::SpawnIndirectDrawPrimitives()
             stagingBuffer.UpdateBuffer(indrectCommands.data(), bufferSize);
 
             jBuffer_Vulkan* temp = new jBuffer_Vulkan();
-			check(!obj->RenderObject->IndirectCommandBuffer);
-            obj->RenderObject->IndirectCommandBuffer = temp;
+			check(!GeometryDataPtr->IndirectCommandBuffer);
+			GeometryDataPtr->IndirectCommandBuffer = temp;
             jVulkanBufferUtil::AllocateBuffer(EVulkanBufferBits::TRANSFER_DST | EVulkanBufferBits::INDIRECT_BUFFER, EVulkanMemoryBits::DEVICE_LOCAL
                 , bufferSize, *temp);
-            jVulkanBufferUtil::CopyBuffer(stagingBuffer.Buffer, (VkBuffer)obj->RenderObject->IndirectCommandBuffer->GetHandle(), bufferSize
-				, stagingBuffer.AllocatedSize, obj->RenderObject->IndirectCommandBuffer->GetAllocatedSize());
+            jVulkanBufferUtil::CopyBuffer(stagingBuffer.Buffer, (VkBuffer)GeometryDataPtr->IndirectCommandBuffer->GetHandle(), bufferSize
+				, stagingBuffer.AllocatedSize, GeometryDataPtr->IndirectCommandBuffer->GetAllocatedSize());
 
             stagingBuffer.Release();
         }

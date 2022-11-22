@@ -33,13 +33,6 @@ void jObject::AddObject(jObject* object)
 	}
 	s_StaticObjects.push_back(object);
 	
-	if (object->RenderObject)
-	{
-        s_StaticRenderObjects.push_back(object->RenderObject);
-		if (!object->SkipShadowMapGen)
-			s_ShadowCasterRenderObject.push_back(object->RenderObject);
-	}
-	else
 	{
 		for (auto& RenderObject : object->RenderObjects)
 		{
@@ -63,19 +56,6 @@ void jObject::RemoveObject(jObject* object)
 		return (param == object);
 	}));
 
-	if (object->RenderObject)
-	{
-		s_ShadowCasterRenderObject.erase(std::remove_if(s_ShadowCasterRenderObject.begin(), s_ShadowCasterRenderObject.end(), [&object](jRenderObject* param)
-        {
-            return (param == object->RenderObject);
-        }));
-		
-		s_StaticRenderObjects.erase(std::remove_if(s_StaticRenderObjects.begin(), s_StaticRenderObjects.end(), [&object](jRenderObject* param)
-		{
-			return (param == object->RenderObject);
-		}));
-	}
-	else
 	{
 		for (auto& RenderObject : object->RenderObjects)
 		{
@@ -212,7 +192,9 @@ jObject::~jObject()
 	jObject::RemoveBoundSphereObject(BoundSphereObject);
 	delete BoundSphereObject;
 
-	delete RenderObject;
+	for(auto& RenderObject : RenderObjects)
+		delete RenderObject;
+	RenderObjects.clear();
 }
 
 void jObject::Update(float deltaTime)
@@ -221,30 +203,30 @@ void jObject::Update(float deltaTime)
 		PostUpdateFunc(this, deltaTime);
 }
 
-void jObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera
-	, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
-{
-	if (Visible && RenderObject)
-		RenderObject->Draw(InRenderFrameContext, 0, -1, 0, -1, instanceCount);
-}
+//void jObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera
+//	, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
+//{
+//	if (Visible && RenderObject)
+//		RenderObject->Draw(InRenderFrameContext, 0, -1, 0, -1, instanceCount);
+//}
 
-void jObject::CreateBoundBox(bool isShow)
-{
-	if (RenderObject)
-	{
-		BoundBox.CreateBoundBox(RenderObject->GetVertices());
-		BoundBoxObject = jPrimitiveUtil::CreateBoundBox(BoundBox, this);
-		
-		BoundSphere.CreateBoundSphere(RenderObject->GetVertices());
-		BoundSphereObject = jPrimitiveUtil::CreateBoundSphere(BoundSphere, this);
-
-		if (isShow)
-		{
-			jObject::AddBoundBoxObject(BoundBoxObject);
-			jObject::AddBoundSphereObject(BoundSphereObject);
-		}
-	}
-}
+//void jObject::CreateBoundBox(bool isShow)
+//{
+//	if (RenderObject)
+//	{
+//		BoundBox.CreateBoundBox(RenderObject->GetVertices());
+//		BoundBoxObject = jPrimitiveUtil::CreateBoundBox(BoundBox, this);
+//		
+//		BoundSphere.CreateBoundSphere(RenderObject->GetVertices());
+//		BoundSphereObject = jPrimitiveUtil::CreateBoundSphere(BoundSphere, this);
+//
+//		if (isShow)
+//		{
+//			jObject::AddBoundBoxObject(BoundBoxObject);
+//			jObject::AddBoundSphereObject(BoundSphereObject);
+//		}
+//	}
+//}
 
 void jObject::ShowBoundBox(bool isShow)
 {
@@ -262,5 +244,5 @@ void jObject::ShowBoundBox(bool isShow)
 
 bool jObject::HasInstancing() const
 {
-	return RenderObject ? RenderObject->HasInstancing() : false;
+	return RenderObjects[0] ? RenderObjects[0]->HasInstancing() : false;
 }

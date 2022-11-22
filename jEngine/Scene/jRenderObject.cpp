@@ -8,82 +8,96 @@
 #include "RHI/Vulkan/jUniformBufferBlock_Vulkan.h"
 #include "Material/jMaterial.h"
 
+// jRenderObjectGeometryData
+jRenderObjectGeometryData::jRenderObjectGeometryData(const std::shared_ptr<jVertexStreamData>& vertexStream, const std::shared_ptr<jIndexStreamData>& indexStream)
+{
+    Create(vertexStream, indexStream);
+}
 
+jRenderObjectGeometryData::~jRenderObjectGeometryData()
+{
+    delete VertexBuffer;
+    delete VertexBuffer_PositionOnly;
+    delete VertexBuffer_InstanceData;
+    delete IndexBuffer;
+    delete IndirectCommandBuffer;
+
+    VertexStream.reset();
+    VertexStream_PositionOnly.reset();
+}
+
+void jRenderObjectGeometryData::Create(const std::shared_ptr<jVertexStreamData>& vertexStream, const std::shared_ptr<jIndexStreamData>& indexStream)
+{
+    VertexStream = vertexStream;
+    IndexStream = indexStream;
+
+    if (VertexStream && ensure(VertexStream->Params.size()))
+    {
+        VertexStream_PositionOnly = std::make_shared<jVertexStreamData>();
+        VertexStream_PositionOnly->Params.push_back(VertexStream->Params[0]);
+        VertexStream_PositionOnly->PrimitiveType = VertexStream->PrimitiveType;
+        VertexStream_PositionOnly->ElementCount = VertexStream->ElementCount;
+    }
+
+    VertexBuffer = g_rhi->CreateVertexBuffer(VertexStream);
+    VertexBuffer_PositionOnly = g_rhi->CreateVertexBuffer(VertexStream_PositionOnly);
+    IndexBuffer = g_rhi->CreateIndexBuffer(IndexStream);
+}
+
+void jRenderObjectGeometryData::UpdateVertexStream(const std::shared_ptr<jVertexStreamData>& vertexStream)
+{
+    VertexStream = vertexStream;
+    g_rhi->UpdateVertexBuffer(VertexBuffer, VertexStream);
+
+    if (VertexStream && ensure(VertexStream->Params.size()))
+    {
+        VertexStream_PositionOnly = std::make_shared<jVertexStreamData>();
+        VertexStream_PositionOnly->Params.push_back(VertexStream->Params[0]);
+        VertexStream_PositionOnly->PrimitiveType = VertexStream->PrimitiveType;
+        VertexStream_PositionOnly->ElementCount = VertexStream->ElementCount;
+    }
+}
+
+void jRenderObjectGeometryData::UpdateVertexStream()
+{
+    g_rhi->UpdateVertexBuffer(VertexBuffer, VertexStream);
+    g_rhi->UpdateVertexBuffer(VertexBuffer_PositionOnly, VertexStream_PositionOnly);
+}
+
+// jRenderObject
 jRenderObject::jRenderObject()
 {
 }
 
-
 jRenderObject::~jRenderObject()
 {
-    delete VertexBuffer;
-    delete VertexBuffer_PositionOnly;
-	delete VertexBuffer_InstanceData;
-	delete IndirectCommandBuffer;
-    
-	VertexStream.reset();
-    VertexStream_PositionOnly.reset();
 
-	delete IndexBuffer;
 }
 
-void jRenderObject::CreateRenderObject(const std::shared_ptr<jVertexStreamData>& vertexStream, const std::shared_ptr<jIndexStreamData>& indexStream)
+void jRenderObject::CreateRenderObject(const std::shared_ptr<jRenderObjectGeometryData>& InRenderObjectGeometryData)
 {
-	VertexStream = vertexStream;
-	IndexStream = indexStream;
-
-	if (VertexStream && ensure(VertexStream->Params.size()))
-	{
-		VertexStream_PositionOnly = std::make_shared<jVertexStreamData>();
-		VertexStream_PositionOnly->Params.push_back(VertexStream->Params[0]);
-		VertexStream_PositionOnly->PrimitiveType = VertexStream->PrimitiveType;
-		VertexStream_PositionOnly->ElementCount = VertexStream->ElementCount;
-	}
-
-	VertexBuffer = g_rhi->CreateVertexBuffer(VertexStream);
-	VertexBuffer_PositionOnly = g_rhi->CreateVertexBuffer(VertexStream_PositionOnly);
-	IndexBuffer = g_rhi->CreateIndexBuffer(IndexStream);
-}
-
-void jRenderObject::UpdateVertexStream(const std::shared_ptr<jVertexStreamData>& vertexStream)
-{
-	VertexStream = vertexStream;
-	g_rhi->UpdateVertexBuffer(VertexBuffer, VertexStream);
-
-	if (VertexStream && ensure(VertexStream->Params.size()))
-	{
-		VertexStream_PositionOnly = std::make_shared<jVertexStreamData>();
-		VertexStream_PositionOnly->Params.push_back(VertexStream->Params[0]);
-		VertexStream_PositionOnly->PrimitiveType = VertexStream->PrimitiveType;
-		VertexStream_PositionOnly->ElementCount = VertexStream->ElementCount;
-	}
-}
-
-void jRenderObject::UpdateVertexStream()
-{
-	g_rhi->UpdateVertexBuffer(VertexBuffer, VertexStream);
-	g_rhi->UpdateVertexBuffer(VertexBuffer_PositionOnly, VertexStream_PositionOnly);
+    GeometryDataPtr = InRenderObjectGeometryData;
 }
 
 void jRenderObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext
 	, int32 startIndex, int32 indexCount, int32 startVertex, int32 vertexCount, int32 instanceCount)
 {
-	if (!VertexStream)
+	if (!GeometryDataPtr)
 		return;
 	
 	startIndex = startIndex != -1 ? startIndex : 0;
 
 	const EPrimitiveType primitiveType = GetPrimitiveType();
-	if (IndexBuffer)
+	if (GeometryDataPtr->IndexBuffer)
 	{
-        if (IndirectCommandBuffer)
+        if (GeometryDataPtr->IndirectCommandBuffer)
         {
-			const int32 instanceCount = VertexStream_InstanceData->ElementCount;
-            g_rhi->DrawElementsIndirect(InRenderFrameContext, primitiveType, IndirectCommandBuffer, startIndex, instanceCount);
+			const int32 instanceCount = GeometryDataPtr->VertexStream_InstanceData->ElementCount;
+            g_rhi->DrawElementsIndirect(InRenderFrameContext, primitiveType, GeometryDataPtr->IndirectCommandBuffer, startIndex, instanceCount);
         }
 		else
 		{
-			auto& indexStreamData = IndexBuffer->IndexStreamData;
+			auto& indexStreamData = GeometryDataPtr->IndexBuffer->IndexStreamData;
 			indexCount = indexCount != -1 ? indexCount : indexStreamData->ElementCount;
 			if (instanceCount <= 0)
 				g_rhi->DrawElementsBaseVertex(InRenderFrameContext, primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, indexCount, startVertex);
@@ -93,14 +107,14 @@ void jRenderObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFra
 	}
 	else
 	{
-		if (IndirectCommandBuffer)
+		if (GeometryDataPtr->IndirectCommandBuffer)
 		{
-			const int32 instanceCount = VertexStream_InstanceData->ElementCount;
-			g_rhi->DrawIndirect(InRenderFrameContext, primitiveType, IndirectCommandBuffer, startVertex, instanceCount);
+			const int32 instanceCount = GeometryDataPtr->VertexStream_InstanceData->ElementCount;
+			g_rhi->DrawIndirect(InRenderFrameContext, primitiveType, GeometryDataPtr->IndirectCommandBuffer, startVertex, instanceCount);
 		}
 		else
 		{
-			vertexCount = vertexCount != -1 ? vertexCount : VertexStream->ElementCount;
+			vertexCount = vertexCount != -1 ? vertexCount : GeometryDataPtr->VertexStream->ElementCount;
 			if (instanceCount <= 0)
 				g_rhi->DrawArrays(InRenderFrameContext, primitiveType, startVertex, vertexCount);
 			else
@@ -114,78 +128,22 @@ void jRenderObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFra
 	Draw(InRenderFrameContext, 0, -1, 0, -1, 1);
 }
 
-//void jRenderObject::DrawBaseVertexIndex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader
-//	, const std::list<const jLight*>& lights, const jMaterialData& materialData, int32 startIndex, int32 count, int32 baseVertexIndex, int32 instanceCount /*= 1*/)
-//{
-//	if (VertexBuffer->VertexStreamData)
-//		return;
-//
-//	g_rhi->SetShader(shader);
-//	g_rhi->EnableCullFace(camera->IsEnableCullMode && !IsTwoSided);
-//
-//	{
-//		//SCOPE_CPU_PROFILE(jRenderObject_UpdateMaterialData);
-//		std::vector<const jMaterialData*> DynamicMaterialData;
-//		DynamicMaterialData.reserve(lights.size());
-//
-//		SetRenderProperty(InRenderFrameContext,shader);
-//		SetCameraProperty(shader, camera);
-//		//SetLightProperty(shader, camera, lights, &DynamicMaterialData);
-//		for (auto iter : lights)
-//		{
-//			auto matData = iter->GetMaterialData();
-//			if (matData)
-//				DynamicMaterialData.push_back(matData);
-//		}
-//		SetTextureProperty(shader, &materialData);
-//		SetMaterialProperty(shader, &materialData, DynamicMaterialData);
-//	}
-//
-//	{
-//		//SCOPE_CPU_PROFILE(jRenderObject_DrawBaseVertexIndex);
-//		auto& vertexStreamData = VertexBuffer->VertexStreamData;
-//		auto primitiveType = vertexStreamData->PrimitiveType;
-//		if (IndexBuffer)
-//		{
-//			if (IndirectCommandBuffer)
-//			{
-//				g_rhi->DrawElementsIndirect(InRenderFrameContext, primitiveType, IndirectCommandBuffer, 0, 1);
-//			}
-//			else
-//			{
-//				auto& indexStreamData = IndexBuffer->IndexStreamData;
-//				if (instanceCount <= 0)
-//					g_rhi->DrawElementsBaseVertex(InRenderFrameContext, primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count, baseVertexIndex);
-//				else
-//					g_rhi->DrawElementsInstancedBaseVertex(InRenderFrameContext, primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, count, baseVertexIndex, instanceCount);
-//			}
-//		}
-//		else
-//		{
-//			if (instanceCount <= 0)
-//				g_rhi->DrawArrays(InRenderFrameContext, primitiveType, baseVertexIndex, count);
-//			else
-//				g_rhi->DrawArraysInstanced(InRenderFrameContext, primitiveType, baseVertexIndex, count, instanceCount);
-//		}
-//	}
-//}
-
 void jRenderObject::BindBuffers(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, bool InPositionOnly) const
 {
     if (InPositionOnly)
     {
-        if (VertexBuffer_PositionOnly)
-            VertexBuffer_PositionOnly->Bind(InRenderFrameContext);
+        if (GeometryDataPtr->VertexBuffer_PositionOnly)
+            GeometryDataPtr->VertexBuffer_PositionOnly->Bind(InRenderFrameContext);
     }
     else
     {
-        if (VertexBuffer)
-            VertexBuffer->Bind(InRenderFrameContext);
+        if (GeometryDataPtr->VertexBuffer)
+            GeometryDataPtr->VertexBuffer->Bind(InRenderFrameContext);
     }
-    if (VertexBuffer_InstanceData)
-        VertexBuffer_InstanceData->Bind(InRenderFrameContext);
-    if (IndexBuffer)
-        IndexBuffer->Bind(InRenderFrameContext);
+    if (GeometryDataPtr->VertexBuffer_InstanceData)
+        GeometryDataPtr->VertexBuffer_InstanceData->Bind(InRenderFrameContext);
+    if (GeometryDataPtr->IndexBuffer)
+        GeometryDataPtr->IndexBuffer->Bind(InRenderFrameContext);
 }
 
 void jRenderObject::UpdateWorldMatrix()
@@ -203,8 +161,8 @@ void jRenderObject::UpdateWorldMatrix()
 
 const std::vector<float>& jRenderObject::GetVertices() const
 {
-	if (VertexStream && !VertexStream->Params.empty())
-		return static_cast<jStreamParam<float>*>(VertexStream->Params[0].get())->Data;
+    if (GeometryDataPtr->VertexStream && !GeometryDataPtr->VertexStream->Params.empty())
+		return static_cast<jStreamParam<float>*>(GeometryDataPtr->VertexStream->Params[0].get())->Data;
 
 	static const std::vector<float> s_emtpy;
 	return s_emtpy;

@@ -794,9 +794,7 @@ void jRenderer::DebugPasses()
     DebugDrawCommand.resize(DebugObjects.size());
     for (int32 i = 0; i < (int32)DebugObjects.size(); ++i)
     {
-        auto RenderObject = DebugObjects[i]->RenderObject;
-
-        new (&DebugDrawCommand[i]) jDrawCommand(RenderFrameContextPtr, &View, RenderObject, DebugRenderPass
+        new (&DebugDrawCommand[i]) jDrawCommand(RenderFrameContextPtr, &View, DebugObjects[i]->RenderObjects[0], DebugRenderPass
             , DebugObjectShader, &DebugPassPipelineStateFixed, {}, nullptr);
         DebugDrawCommand[i].PrepareToDraw(false);
     }

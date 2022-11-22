@@ -123,15 +123,8 @@ struct jProfile_GPU
 	static std::vector<jProfile_GPU> WatingResultList[jRHI::MaxWaitingQuerySet];
 	static void ProcessWaitings()
 	{
-		int32 prevIndex = CurrentWatingResultListIndex;
-		if (jRHI::MaxWaitingQuerySet > 2)
-		{
-			prevIndex = (CurrentWatingResultListIndex + 2) % jRHI::MaxWaitingQuerySet;
-		}
-		else if (jRHI::MaxWaitingQuerySet > 1)
-		{
-			prevIndex = (int32)!CurrentWatingResultListIndex;
-		}
+		int32 prevIndex = CurrentWatingResultListIndex + 1;
+		prevIndex %= jRHI::MaxWaitingQuerySet;
 
 		const bool CanWholeQueryTimeStampResult = g_rhi->GetQueryTimePool()->CanWholeQueryResult();
 
@@ -182,9 +175,6 @@ public:
 
 	~jScopedProfile_GPU()
 	{
-		//Profile.End = jQueryTimePool::GetQueryTime();
-		//g_rhi->QueryTimeStamp(Profile.End);
-
 		Profile.Query->EndQuery(RenderFrameContextPtr.lock()->GetActiveCommandBuffer());
 		jProfile_GPU::WatingResultList[jProfile_GPU::CurrentWatingResultListIndex].emplace_back(Profile);
 		ScopedProfilerGPUIndent.fetch_add(-1);

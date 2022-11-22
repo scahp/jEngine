@@ -68,11 +68,13 @@ void jDrawCommand::PrepareToDraw(bool InIsPositionOnly)
         ShaderBindingInstanceCombiner.Add(ShaderBindingInstanceArray[i]->GetHandle());
     }
 
+    const auto& RenderObjectGeoDataPtr = RenderObject->GeometryDataPtr;
+
     jVertexBufferArray VertexBufferArray;
-    VertexBufferArray.Add(InIsPositionOnly ? RenderObject->VertexBuffer_PositionOnly : RenderObject->VertexBuffer);
-    if (RenderObject->VertexBuffer_InstanceData)
+    VertexBufferArray.Add(InIsPositionOnly ? RenderObjectGeoDataPtr->VertexBuffer_PositionOnly : RenderObjectGeoDataPtr->VertexBuffer);
+    if (RenderObjectGeoDataPtr->VertexBuffer_InstanceData)
     {
-        VertexBufferArray.Add(RenderObject->VertexBuffer_InstanceData);
+        VertexBufferArray.Add(RenderObjectGeoDataPtr->VertexBuffer_InstanceData);
     }
 
     // Create Pipeline
@@ -114,6 +116,7 @@ void jDrawCommand::Draw() const
     RenderObject->BindBuffers(RenderFrameContextPtr, IsPositionOnly);
 
     // Draw
-    const int32 InstanceCount = RenderObject->VertexBuffer_InstanceData ? RenderObject->VertexBuffer_InstanceData->GetElementCount() : 1;
+    const auto& RenderObjectGeoDataPtr = RenderObject->GeometryDataPtr;
+    const int32 InstanceCount = RenderObjectGeoDataPtr->VertexBuffer_InstanceData ? RenderObjectGeoDataPtr->VertexBuffer_InstanceData->GetElementCount() : 1;
     RenderObject->Draw(RenderFrameContextPtr, InstanceCount);
 }

@@ -7,6 +7,7 @@ struct jShader;
 class jLight;
 class jVertexAdjacency;
 class IShadowVolume;
+class jRenderObjectGeometryData;
 
 class jObject
 {
@@ -48,7 +49,7 @@ public:
 
 	virtual void Update(float deltaTime);
 	//virtual void Draw(const jCamera* camera, const jShader* shader);
-	virtual void Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount = 0) const;
+	// virtual void Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount = 0) const;
 
 	void SetDirtyState() { DirtyObjectState = true; s_DirtyStateObjects.insert(this); }
 
@@ -56,12 +57,12 @@ public:
 	void SetSkipUpdateShadowVolume(bool skipUpdateShadowVolume) { SkipUpdateShadowVolume = skipUpdateShadowVolume; SetDirtyState(); }
 	void SetVisible(bool visible) { Visible = visible; SetDirtyState(); }
 
-	void CreateBoundBox(bool isShow = true);
+	//void CreateBoundBox(bool isShow = true);
 	void ShowBoundBox(bool isShow);
 
 	bool HasInstancing() const;
 
-	jRenderObject* RenderObject = nullptr;
+	std::shared_ptr<jRenderObjectGeometryData> RenderObjectGeometryDataPtr;
 	std::vector<jRenderObject*> RenderObjects;
 
 	bool SkipShadowMapGen = false;

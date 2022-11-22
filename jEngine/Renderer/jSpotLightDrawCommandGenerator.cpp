@@ -61,7 +61,7 @@ void jSpotLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* OutDestDr
     Shader.PixelShader = jShaderSpotLight::CreateShader(ShaderPermutation);
 
     check(OutDestDrawCommand);
-    new (OutDestDrawCommand) jDrawCommand(InRenderFrameContextPtr, &InLightView, SpotLightCone->RenderObject, InRenderPass
+    new (OutDestDrawCommand) jDrawCommand(InRenderFrameContextPtr, &InLightView, SpotLightCone->RenderObjects[0], InRenderPass
         , Shader, &PipelineStateFixedInfo, ShaderBindingInstances, PushConstant, InSubpassIndex);
     OutDestDrawCommand->PrepareToDraw(false);
 }
