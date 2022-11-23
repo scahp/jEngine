@@ -284,7 +284,7 @@ public:
 
     static TResourcePool<jShader, jMutexRWLock> ShaderPool;
 
-    static constexpr int32 MaxWaitingQuerySet = 3;
+    static constexpr int32 MaxWaitingQuerySet = 4;
 
 	template <typename T = jShader>
 	T* CreateShader(const jShaderInfo& shaderInfo) const
