@@ -40,6 +40,7 @@ float3 GetDirectionalLight(jDirectionalLightUniformBuffer light, float3 normal, 
     return (GetDirectionalLightDiffuse(light, normal) + GetDirectionalLightSpecular(light, reflectLightDir, viewDir));
 }
 
+// Inverse attenuation from UE5
 float DistanceAttenuation2(float DistanceSqr, float InvMaxDistance)
 {
     return Square(saturate(1 - Square(DistanceSqr * Square(InvMaxDistance))));

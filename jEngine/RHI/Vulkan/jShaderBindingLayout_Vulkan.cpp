@@ -207,8 +207,7 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(int32 InIndex, const jShaderBin
             imageInfo.imageLayout = tbor->Texture->IsDepthFormat() ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
                 : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             imageInfo.imageView = (VkImageView)tbor->Texture->GetViewHandle();
-            if (tbor->SamplerState)
-                imageInfo.sampler = (VkSampler)tbor->SamplerState->GetHandle();
+            imageInfo.sampler = tbor->SamplerState ? (VkSampler)tbor->SamplerState->GetHandle() : nullptr;
             if (!imageInfo.sampler)
                 imageInfo.sampler = jTexture_Vulkan::CreateDefaultSamplerState();		// todo 수정 필요, 텍스쳐를 어떻게 바인드 해야할지 고민 필요
             check(imageInfo.imageView);

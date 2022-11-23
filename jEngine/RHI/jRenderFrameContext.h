@@ -17,7 +17,7 @@ struct jRenderFrameContext : public std::enable_shared_from_this<jRenderFrameCon
     FORCEINLINE jCommandBuffer* GetActiveCommandBuffer() const { return CommandBuffer; }
     bool BeginActiveCommandBuffer();
     bool EndActiveCommandBuffer();
-    void QueueSubmitCurrentActiveCommandBuffer();
+    void QueueSubmitCurrentActiveCommandBuffer(jSemaphore* InSignalSemaphore);
 
 public:
     jSceneRenderTarget* SceneRenderTarget = nullptr;

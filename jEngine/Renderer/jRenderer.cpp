@@ -449,24 +449,10 @@ void jRenderer::ShadowPass()
     }
 
     {
+        SCOPE_CPU_PROFILE(QueueSubmitAfterShadowPass);
         RenderFrameContextPtr->GetActiveCommandBuffer()->End();
-        
-        RenderFrameContextPtr->QueueSubmitCurrentActiveCommandBuffer();
-        //g_rhi->GetCommandBufferManager()->ReturnCommandBuffer(RenderFrameContextPtr->GetActiveCommandBuffer());
-        //RenderFrameContextPtr->GetActiveCommandBuffer() = (jCommandBuffer_Vulkan*)g_rhi_vk->CommandBufferManager->GetOrCreateCommandBuffer();
-        //g_rhi_vk->Swapchain->Images[RenderFrameContextPtr->FrameIndex]->CommandBufferFence = (VkFence)RenderFrameContextPtr->GetActiveCommandBuffer()->GetFenceHandle();
+        RenderFrameContextPtr->QueueSubmitCurrentActiveCommandBuffer(g_rhi_vk->Swapchain->Images[FrameIndex]->RenderFinishedAfterShadow);
         RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
-
-        //// 이전 프레임에서 현재 사용하려는 이미지를 사용중에 있나? (그렇다면 펜스를 기다려라)
-        //if (lastCommandBufferFence != VK_NULL_HANDLE)
-        //    vkWaitForFences(Device, 1, &lastCommandBufferFence, VK_TRUE, UINT64_MAX);
-
-        //GetUniformRingBuffer()->Reset();
-        //GetDescriptorPools()->Reset();
-
-        // 이 프레임에서 펜스를 사용한다고 마크 해둠
-        //Swapchain->Images[CurrenFrameIndex]->CommandBufferFence = (VkFence)commandBuffer->GetFenceHandle();
-
     }
 }
 
@@ -515,6 +501,13 @@ void jRenderer::BasePass()
             DeferredLightPass_TodoRefactoring(BaseRenderPass);
         }
         //BasepassOcclusionTest.EndQuery(RenderFrameContextPtr->GetActiveCommandBuffer());
+    }
+
+    {
+        SCOPE_CPU_PROFILE(QueueSubmitAfterBasePass);
+        RenderFrameContextPtr->GetActiveCommandBuffer()->End();
+        RenderFrameContextPtr->QueueSubmitCurrentActiveCommandBuffer(g_rhi_vk->Swapchain->Images[FrameIndex]->RenderFinishedAfterBasePass);
+        RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
     }
 }
 
@@ -623,6 +616,110 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
 
 void jRenderer::PostProcess()
 {
+    auto AddPostProcessPass = [&](const std::vector<jTexture*> InShaderInputs, const std::shared_ptr<jRenderTarget>& InRenderTargetPtr
+        , jName VertexShader, jName PixelShader, bool IsBloom = false)
+    {
+        static jFullscreenQuadPrimitive* GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
+
+        auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
+        jMultisampleStateInfo* MultisampleState = TMultisampleStateInfo<true, 0.2f, false, false>::Create(g_rhi->GetSelectedMSAASamples());
+        auto DepthStencilState = TDepthStencilStateInfo<false, false, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
+        auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
+
+        const int32 RTWidth = InRenderTargetPtr->Info.Width;
+        const int32 RTHeight = InRenderTargetPtr->Info.Height;
+
+        // Create fixed pipeline states
+        jPipelineStateFixedInfo PostProcessPassPipelineStateFixed(RasterizationState, MultisampleState, DepthStencilState, BlendingState
+            , jViewport(0.0f, 0.0f, (float)RTWidth, (float)RTHeight), jScissor(0, 0, RTWidth, RTHeight), gOptions.UseVRS);
+
+        const Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
+        const Vector2 ClearDepth = Vector2(1.0f, 0.0f);
+
+        jRenderPassInfo renderPassInfo;
+        jAttachment color = jAttachment(InRenderTargetPtr, EAttachmentLoadStoreOp::CLEAR_STORE
+            , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth, EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
+        renderPassInfo.Attachments.push_back(color);
+
+        // Setup subpass of LightingPass
+        jSubpass subpass;
+        subpass.SourceSubpassIndex = 0;
+        subpass.DestSubpassIndex = 1;
+        subpass.OutputColorAttachments.push_back(0);
+        subpass.AttachmentProducePipelineBit = EPipelineStageMask::COLOR_ATTACHMENT_OUTPUT_BIT;
+        renderPassInfo.Subpasses.push_back(subpass);
+
+        // Create RenderPass
+        jRenderPass* RenderPass = g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { RTWidth, RTHeight });
+
+        int32 BindingPoint = 0;
+        jShaderBindingArray ShaderBindingArray;
+        jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
+        jShaderBindingInstanceArray ShaderBindingInstanceArray;
+
+        struct jBloomUniformBuffer
+        {
+            Vector4 BufferSizeAndInvSize;
+        };
+        jBloomUniformBuffer ubo;
+        ubo.BufferSizeAndInvSize.x = (float)RTWidth;
+        ubo.BufferSizeAndInvSize.y = (float)RTHeight;
+        ubo.BufferSizeAndInvSize.z = 1.0f / (float)RTWidth;
+        ubo.BufferSizeAndInvSize.w = 1.0f / (float)RTHeight;
+
+        jUniformBufferBlock_Vulkan OneFrameUniformBuffer(jNameStatic("BloomUniformBuffer"), jLifeTimeType::OneFrame);
+        if (IsBloom)
+        {
+            OneFrameUniformBuffer.Init(sizeof(ubo));
+            OneFrameUniformBuffer.UpdateBufferData(&ubo, sizeof(ubo));
+        }
+
+        {
+            if (IsBloom)
+            {
+                ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_GRAPHICS
+                    , ResourceInlineAllactor.Alloc<jUniformBufferResource>(&OneFrameUniformBuffer));
+            }
+
+            const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+                , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
+                , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), true, ECompareOp::LESS>::Create();
+
+            for (int32 i = 0; i < (int32)InShaderInputs.size(); ++i)
+            {
+                ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
+                    , ResourceInlineAllactor.Alloc<jTextureResource>(InShaderInputs[i], SamplerState));
+            }
+
+            ShaderBindingInstanceArray.Add(g_rhi->CreateShaderBindingInstance(ShaderBindingArray));
+        }
+
+        jGraphicsPipelineShader Shader;
+        {
+            jShaderInfo shaderInfo;
+            shaderInfo.SetName(VertexShader);
+            shaderInfo.SetShaderFilepath(VertexShader);
+            shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
+            Shader.VertexShader = g_rhi->CreateShader(shaderInfo);
+
+            shaderInfo.SetName(PixelShader);
+            shaderInfo.SetShaderFilepath(PixelShader);
+            shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
+            Shader.PixelShader = g_rhi->CreateShader(shaderInfo);
+        }
+
+        jDrawCommand DrawCommand(RenderFrameContextPtr, GlobalFullscreenPrimitive->RenderObjects[0], RenderPass
+            , Shader, &PostProcessPassPipelineStateFixed, ShaderBindingInstanceArray, nullptr);
+        DrawCommand.Test = true;
+        DrawCommand.PrepareToDraw(false);
+
+        if (RenderPass && RenderPass->BeginRenderPass(RenderFrameContextPtr->GetActiveCommandBuffer()))
+        {
+            DrawCommand.Draw();
+            RenderPass->EndRenderPass();
+        }
+    };
+
     SCOPE_CPU_PROFILE(PostProcess);
     {
         SCOPE_GPU_PROFILE(RenderFrameContextPtr, TonemapCS);
@@ -630,6 +727,37 @@ void jRenderer::PostProcess()
         const uint32 imageIndex = RenderFrameContextPtr->FrameIndex;
         jCommandBuffer* CommandBuffer = RenderFrameContextPtr->GetActiveCommandBuffer();
         jSceneRenderTarget* SceneRT = RenderFrameContextPtr->SceneRenderTarget;
+
+        g_rhi->TransitionImageLayout(CommandBuffer, SceneRT->ColorPtr->GetTexture(), EImageLayout::SHADER_READ_ONLY);
+
+        jTexture* SourceRT = SceneRT->ColorPtr->GetTexture();
+        
+        AddPostProcessPass({ SourceRT }, SceneRT->BloomSetup
+            , jNameStatic("Resource/Shaders/hlsl/bloom_setup_vs.hlsl"), jNameStatic("Resource/Shaders/hlsl/bloom_setup_ps.hlsl"));
+        SourceRT = SceneRT->BloomSetup->GetTexture();
+        g_rhi->TransitionImageLayout(CommandBuffer, SourceRT, EImageLayout::SHADER_READ_ONLY);
+
+        for (int32 i = 0; i < _countof(SceneRT->DownSample); ++i)
+        {
+            AddPostProcessPass({ SourceRT }, SceneRT->DownSample[i]
+                , jNameStatic("Resource/Shaders/hlsl/bloom_down_vs.hlsl"), jNameStatic("Resource/Shaders/hlsl/bloom_down_ps.hlsl"), true);
+            SourceRT = SceneRT->DownSample[i]->GetTexture();
+            g_rhi->TransitionImageLayout(CommandBuffer, SourceRT, EImageLayout::SHADER_READ_ONLY);
+        }
+
+        for (int32 i = 0; i < _countof(SceneRT->UpSample); ++i)
+        {
+            AddPostProcessPass({ SourceRT }, SceneRT->UpSample[i]
+                , jNameStatic("Resource/Shaders/hlsl/bloom_up_vs.hlsl"), jNameStatic("Resource/Shaders/hlsl/bloom_up_ps.hlsl"), true);
+            SourceRT = SceneRT->UpSample[i]->GetTexture();
+            g_rhi->TransitionImageLayout(CommandBuffer, SourceRT, EImageLayout::SHADER_READ_ONLY);
+        }
+
+        AddPostProcessPass({ SourceRT, SceneRT->ColorPtr->GetTexture() }, SceneRT->FinalColorPtr
+            , jNameStatic("Resource/Shaders/hlsl/fullscreenquad_vs.hlsl"), jNameStatic("Resource/Shaders/hlsl/tonemap_ps.hlsl"));
+
+        return;
+
 
         //////////////////////////////////////////////////////////////////////////
         // Compute Pipeline

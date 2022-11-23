@@ -31,33 +31,45 @@ jDrawCommand::jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderF
     IsViewLight = true;
 }
 
+jDrawCommand::jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr
+    , jRenderObject* InRenderObject, jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed
+    , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant, int32 InSubpassIndex)
+    : RenderFrameContextPtr(InRenderFrameContextPtr), RenderObject(InRenderObject), RenderPass(InRenderPass), Shader(InShader), PipelineStateFixed(InPipelineStateFixed)
+    , PushConstant(InPushConstant), ShaderBindingInstanceArray(InShaderBindingInstanceArray), SubpassIndex(InSubpassIndex)
+{
+    check(RenderObject);
+}
+
 void jDrawCommand::PrepareToDraw(bool InIsPositionOnly)
 {
-    // GetShaderBindings
-    if (IsViewLight)
+    if (!Test)
     {
-        ShaderBindingInstanceArray.Add(ViewLight->ShaderBindingInstance);
-    }
-    else
-    {        
-        View->GetShaderBindingInstance(ShaderBindingInstanceArray, RenderFrameContextPtr->UseForwardRenderer);
-    }
+        // GetShaderBindings
+        if (IsViewLight)
+        {
+            ShaderBindingInstanceArray.Add(ViewLight->ShaderBindingInstance);
+        }
+        else if (View)
+        {
+            View->GetShaderBindingInstance(ShaderBindingInstanceArray, RenderFrameContextPtr->UseForwardRenderer);
+        }
     
-    // GetShaderBindings
-    jShaderBindingInstance* OneRenderObjectUniformBuffer = RenderObject->CreateShaderBindingInstance();
-    ShaderBindingInstanceArray.Add(OneRenderObjectUniformBuffer);
+        // GetShaderBindings
+        jShaderBindingInstance* OneRenderObjectUniformBuffer = RenderObject->CreateShaderBindingInstance();
+        ShaderBindingInstanceArray.Add(OneRenderObjectUniformBuffer);
 
-    if (RenderObject->MaterialPtr)
-    {
-        jShaderBindingInstance* MaterialShaderBindingInstance = RenderObject->MaterialPtr->CreateShaderBindingInstance();
-        if (MaterialShaderBindingInstance)
-            ShaderBindingInstanceArray.Add(MaterialShaderBindingInstance);
-    }
-    else
-    {
-        jShaderBindingInstance* MaterialShaderBindingInstance = GDefaultMaterial->CreateShaderBindingInstance();
-        if (MaterialShaderBindingInstance)
-            ShaderBindingInstanceArray.Add(MaterialShaderBindingInstance);
+        if (RenderObject->MaterialPtr)
+        {
+            jShaderBindingInstance* MaterialShaderBindingInstance = RenderObject->MaterialPtr->CreateShaderBindingInstance();
+            if (MaterialShaderBindingInstance)
+                ShaderBindingInstanceArray.Add(MaterialShaderBindingInstance);
+        }
+        else
+        {
+            jShaderBindingInstance* MaterialShaderBindingInstance = GDefaultMaterial->CreateShaderBindingInstance();
+            if (MaterialShaderBindingInstance)
+                ShaderBindingInstanceArray.Add(MaterialShaderBindingInstance);
+        }
     }
 
     // Bind ShaderBindings

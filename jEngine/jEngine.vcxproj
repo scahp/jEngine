@@ -496,6 +496,38 @@ xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"</Command
       <FileType>Document</FileType>
     </None>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Resource\Shaders\hlsl\copy_ps.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resource\Shaders\hlsl\bloom_down_ps.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Resource\Shaders\hlsl\bloom_down_vs.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Resource\Shaders\hlsl\bloom_up_ps.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Resource\Shaders\hlsl\bloom_up_vs.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resource\Shaders\hlsl\bloom_setup_ps.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Resource\Shaders\hlsl\bloom_setup_vs.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resource\Shaders\hlsl\tonemap_ps.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

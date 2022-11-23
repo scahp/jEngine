@@ -21,6 +21,10 @@ public:
         , jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed
         , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant
         , int32 InSubpassIndex = 0);
+    jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jRenderObject* InRenderObject
+        , jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed
+        , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant
+        , int32 InSubpassIndex = 0);
 
     void PrepareToDraw(bool bPositionOnly);
     void Draw() const;
@@ -43,6 +47,7 @@ public:
     std::shared_ptr<jRenderFrameContext> RenderFrameContextPtr;
     bool IsPositionOnly = false;
     int32 SubpassIndex = 0;
+    bool Test = false;
 };
 
 // jDrawCommand generator

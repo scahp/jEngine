@@ -30,6 +30,11 @@ void jSwapchainImage_Vulkan::ReleaseInternal()
         g_rhi->GetSemaphoreManager()->ReturnSemaphore(RenderFinishedAfterShadow);
         RenderFinishedAfterShadow = nullptr;
     }
+    if (RenderFinishedAfterBasePass)
+    {
+        g_rhi->GetSemaphoreManager()->ReturnSemaphore(RenderFinishedAfterBasePass);
+        RenderFinishedAfterBasePass = nullptr;
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -122,6 +127,7 @@ bool jSwapchain_Vulkan::Create()
         SwapchainImage->Available = g_rhi->GetSemaphoreManager()->GetOrCreateSemaphore();
         SwapchainImage->RenderFinished = g_rhi->GetSemaphoreManager()->GetOrCreateSemaphore();
         SwapchainImage->RenderFinishedAfterShadow = g_rhi->GetSemaphoreManager()->GetOrCreateSemaphore();
+        SwapchainImage->RenderFinishedAfterBasePass = g_rhi->GetSemaphoreManager()->GetOrCreateSemaphore();
     }
 
     return true;

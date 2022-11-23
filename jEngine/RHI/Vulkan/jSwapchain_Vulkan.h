@@ -32,6 +32,7 @@ public:
     jSemaphore* Available = nullptr;		// 이미지를 획득해서 렌더링 준비가 완료된 경우 Signal(Lock 이 풀리는) 되는 것
     jSemaphore* RenderFinished = nullptr;	// 렌더링을 마쳐서 Presentation 가능한 상태에서 Signal 되는 것
     jSemaphore* RenderFinishedAfterShadow = nullptr;	// 렌더링을 마쳐서 Presentation 가능한 상태에서 Signal 되는 것
+    jSemaphore* RenderFinishedAfterBasePass = nullptr;	// 렌더링을 마쳐서 Presentation 가능한 상태에서 Signal 되는 것
 };
 
 // Swapchain

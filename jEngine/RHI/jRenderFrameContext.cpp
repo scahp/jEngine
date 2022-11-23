@@ -22,11 +22,11 @@ bool jRenderFrameContext::EndActiveCommandBuffer()
     return CommandBuffer->End();
 }
 
-void jRenderFrameContext::QueueSubmitCurrentActiveCommandBuffer()
+void jRenderFrameContext::QueueSubmitCurrentActiveCommandBuffer(jSemaphore* InSignalSemaphore)
 {
     if (CommandBuffer)
     {
-        g_rhi->QueueSubmit(shared_from_this(), g_rhi_vk->Swapchain->Images[FrameIndex]->RenderFinishedAfterShadow);
+        g_rhi->QueueSubmit(shared_from_this(), InSignalSemaphore);
         g_rhi->GetCommandBufferManager()->ReturnCommandBuffer(CommandBuffer);
 
         // get new commandbuffer

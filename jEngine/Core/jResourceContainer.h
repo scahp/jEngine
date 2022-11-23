@@ -42,7 +42,7 @@ struct jResourceContainer
         size_t Hash = 0;
         for (int32 i = 0; i < NumOfData; ++i)
         {
-            Hash ^= (Data[i]->GetHash() ^ i);
+            Hash ^= (Data[i]->GetHash() << i);
         }
         return Hash;
     }

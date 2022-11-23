@@ -116,7 +116,7 @@ struct jShaderBindingArray
         jShaderBinding* Address = (jShaderBinding*)&Data[0];
         for (int32 i = 0; i < NumOfData; ++i)
         {
-            Hash ^= ((Address + i)->GetHash() ^ i);
+            Hash ^= ((Address + i)->GetHash() << i);
         }
         return Hash;
     }
