@@ -1,5 +1,8 @@
 ﻿#pragma once
 
+extern std::shared_ptr<jRenderTarget> g_EyeAdaptationARTPtr;
+extern std::shared_ptr<jRenderTarget> g_EyeAdaptationBRTPtr;
+
 class jRenderTargetPool
 {
 public:
@@ -11,6 +14,11 @@ public:
 
 	static void Release()
 	{
+        g_EyeAdaptationARTPtr->Return();
+        g_EyeAdaptationBRTPtr->Return();
+		g_EyeAdaptationARTPtr.reset();
+		g_EyeAdaptationBRTPtr.reset();
+
 		RenderTargetResourceMap.clear();
 		RenderTargetHashVariableMap.clear();
 	}

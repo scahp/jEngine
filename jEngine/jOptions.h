@@ -12,6 +12,7 @@ struct jOptions
     bool UseMemoryless = true;
     bool ShowDebugObject = false;
     Vector CameraPos = Vector::ZeroVector;
+    float AutoExposureKeyValueScale = 1.0f;
 };
 
 extern jOptions gOptions;

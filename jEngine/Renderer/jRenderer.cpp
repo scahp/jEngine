@@ -14,6 +14,7 @@
 #include "jDirectionalLightDrawCommandGenerator.h"
 #include "jPointLightDrawCommandGenerator.h"
 #include "jSpotLightDrawCommandGenerator.h"
+#include "RHI/jRenderTargetPool.h"
 
 #define ASYNC_WITH_SETUP 1
 #define PARALLELFOR_WITH_PASSSETUP 1
@@ -728,12 +729,34 @@ void jRenderer::PostProcess()
         jCommandBuffer* CommandBuffer = RenderFrameContextPtr->GetActiveCommandBuffer();
         jSceneRenderTarget* SceneRT = RenderFrameContextPtr->SceneRenderTarget;
 
+        //////////////////////////////////////////////////////////////////////////
+        // Todo remove this hardcode
+        if (!g_EyeAdaptationARTPtr)
+        {
+            g_EyeAdaptationARTPtr = jRenderTargetPool::GetRenderTarget(
+                { ETextureType::TEXTURE_2D, ETextureFormat::R16F, 1, 1, 1, false, g_rhi_vk->GetSelectedMSAASamples() });
+        }
+        if (!g_EyeAdaptationBRTPtr)
+        {
+            g_EyeAdaptationBRTPtr = jRenderTargetPool::GetRenderTarget(
+                { ETextureType::TEXTURE_2D, ETextureFormat::R16F, 1, 1, 1, false, g_rhi_vk->GetSelectedMSAASamples() });
+        }
+
+        static bool FlipEyeAdaptation = false;
+        FlipEyeAdaptation = !FlipEyeAdaptation;
+
+        jTexture* EyeAdaptationTextureOld = FlipEyeAdaptation ? g_EyeAdaptationARTPtr->GetTexture() : g_EyeAdaptationBRTPtr->GetTexture();
+        jTexture* EyeAdaptationTextureCurrent = FlipEyeAdaptation ? g_EyeAdaptationBRTPtr->GetTexture() : g_EyeAdaptationARTPtr->GetTexture();
+
+        g_rhi->TransitionImageLayout(CommandBuffer, EyeAdaptationTextureOld, EImageLayout::SHADER_READ_ONLY);
+        //////////////////////////////////////////////////////////////////////////
+
         g_rhi->TransitionImageLayout(CommandBuffer, SceneRT->ColorPtr->GetTexture(), EImageLayout::SHADER_READ_ONLY);
 
         jTexture* SourceRT = SceneRT->ColorPtr->GetTexture();
         
-        AddPostProcessPass({ SourceRT }, SceneRT->BloomSetup
-            , jNameStatic("Resource/Shaders/hlsl/bloom_setup_vs.hlsl"), jNameStatic("Resource/Shaders/hlsl/bloom_setup_ps.hlsl"));
+        AddPostProcessPass({ SourceRT, EyeAdaptationTextureOld }, SceneRT->BloomSetup
+            , jNameStatic("Resource/Shaders/hlsl/fullscreenquad_vs.hlsl"), jNameStatic("Resource/Shaders/hlsl/bloom_and_eyeadaptation_setup_ps.hlsl"));
         SourceRT = SceneRT->BloomSetup->GetTexture();
         g_rhi->TransitionImageLayout(CommandBuffer, SourceRT, EImageLayout::SHADER_READ_ONLY);
 
@@ -745,6 +768,89 @@ void jRenderer::PostProcess()
             g_rhi->TransitionImageLayout(CommandBuffer, SourceRT, EImageLayout::SHADER_READ_ONLY);
         }
 
+        g_rhi->TransitionImageLayout(CommandBuffer, EyeAdaptationTextureOld, EImageLayout::SHADER_READ_ONLY);
+        g_rhi->TransitionImageLayout(CommandBuffer, EyeAdaptationTextureCurrent, EImageLayout::GENERAL);
+
+        // Todo make a function for each postprocess steps
+        // 여기서 EyeAdaptation 계산하는 Compute shader 추가
+        {
+            //////////////////////////////////////////////////////////////////////////
+            // Compute Pipeline
+            jShaderBindingInstance* CurrentBindingInstance = nullptr;
+            int32 BindingPoint = 0;
+            jShaderBindingArray ShaderBindingArray;
+            jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
+
+            // Binding 0 : Source Log2Average Image
+            if (ensure(SourceRT))
+            {
+                ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
+                    , ResourceInlineAllactor.Alloc<jTextureResource>(SourceRT, nullptr));
+            }
+
+            // Binding 1 : Prev frame EyeAdaptation Image
+            if (ensure(EyeAdaptationTextureOld))
+            {
+                ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
+                    , ResourceInlineAllactor.Alloc<jTextureResource>(EyeAdaptationTextureOld, nullptr));
+            }
+
+            // Binding 2 : Current frame EyeAdaptation Image
+            if (ensure(EyeAdaptationTextureCurrent))
+            {
+                ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE
+                    , ResourceInlineAllactor.Alloc<jTextureResource>(EyeAdaptationTextureCurrent, nullptr));
+            }
+
+            // Binding 3 : CommonComputeUniformBuffer
+            struct jEyeAdaptationUniformBuffer
+            {
+                Vector2 ViewportMin;
+                Vector2 ViewportMax;
+                float MinLuminanceAverage;
+                float MaxLuminanceAverage;
+                float DeltaFrametime;
+                float AdaptationSpeed;
+                float ExposureCompensation;
+            };
+            jEyeAdaptationUniformBuffer EyeAdaptationUniformBuffer;
+            EyeAdaptationUniformBuffer.ViewportMin = Vector2(0.0f, 0.0f);
+            EyeAdaptationUniformBuffer.ViewportMax = Vector2((float)SourceRT->Width, (float)SourceRT->Height);
+            EyeAdaptationUniformBuffer.MinLuminanceAverage = 0.03f;
+            EyeAdaptationUniformBuffer.MaxLuminanceAverage = 8.0f;
+            EyeAdaptationUniformBuffer.DeltaFrametime = 1.0f / 60.0f;
+            EyeAdaptationUniformBuffer.AdaptationSpeed = 1.0f;
+            EyeAdaptationUniformBuffer.ExposureCompensation = gOptions.AutoExposureKeyValueScale;
+
+            jUniformBufferBlock_Vulkan OneFrameUniformBuffer(jNameStatic("EyeAdaptationUniformBuffer"), jLifeTimeType::OneFrame);
+            OneFrameUniformBuffer.Init(sizeof(EyeAdaptationUniformBuffer));
+            OneFrameUniformBuffer.UpdateBufferData(&EyeAdaptationUniformBuffer, sizeof(EyeAdaptationUniformBuffer));
+            {
+                ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::COMPUTE
+                    , ResourceInlineAllactor.Alloc<jUniformBufferResource>(&OneFrameUniformBuffer));
+            }
+
+            CurrentBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray);
+
+            jShaderInfo shaderInfo;
+            shaderInfo.SetName(jNameStatic("eyeadaptation"));
+            shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/eyeadaptation_cs.hlsl"));
+            shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
+            static jShader* Shader = g_rhi->CreateShader(shaderInfo);
+
+            jShaderBindingsLayoutArray ShaderBindingLayoutArray;
+            ShaderBindingLayoutArray.Add(CurrentBindingInstance->ShaderBindingsLayouts);
+
+            jPipelineStateInfo* computePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingLayoutArray, {});
+
+            computePipelineStateInfo->Bind(RenderFrameContextPtr);
+
+            CurrentBindingInstance->BindCompute(RenderFrameContextPtr, (VkPipelineLayout)computePipelineStateInfo->GetPipelineLayoutHandle());
+
+            vkCmdDispatch((VkCommandBuffer)CommandBuffer->GetHandle(), 1, 1, 1);
+        }
+        //////////////////////////////////////////////////////////////////////////
+
         for (int32 i = 0; i < _countof(SceneRT->UpSample); ++i)
         {
             AddPostProcessPass({ SourceRT }, SceneRT->UpSample[i]
@@ -753,7 +859,9 @@ void jRenderer::PostProcess()
             g_rhi->TransitionImageLayout(CommandBuffer, SourceRT, EImageLayout::SHADER_READ_ONLY);
         }
 
-        AddPostProcessPass({ SourceRT, SceneRT->ColorPtr->GetTexture() }, SceneRT->FinalColorPtr
+        g_rhi->TransitionImageLayout(CommandBuffer, EyeAdaptationTextureCurrent, EImageLayout::SHADER_READ_ONLY);
+
+        AddPostProcessPass({ SourceRT, SceneRT->ColorPtr->GetTexture(), EyeAdaptationTextureCurrent }, SceneRT->FinalColorPtr
             , jNameStatic("Resource/Shaders/hlsl/fullscreenquad_vs.hlsl"), jNameStatic("Resource/Shaders/hlsl/tonemap_ps.hlsl"));
 
         return;
@@ -762,6 +870,7 @@ void jRenderer::PostProcess()
         //////////////////////////////////////////////////////////////////////////
         // Compute Pipeline
         g_rhi->TransitionImageLayout(CommandBuffer, SceneRT->ColorPtr->GetTexture(), EImageLayout::SHADER_READ_ONLY);
+        g_rhi->TransitionImageLayout(CommandBuffer, EyeAdaptationTextureCurrent, EImageLayout::SHADER_READ_ONLY);
         g_rhi->TransitionImageLayout(CommandBuffer, SceneRT->FinalColorPtr->GetTexture(), EImageLayout::GENERAL);
 
         jShaderBindingInstance* CurrentBindingInstance = nullptr;
@@ -776,14 +885,21 @@ void jRenderer::PostProcess()
                 , ResourceInlineAllactor.Alloc<jTextureResource>(SceneRT->ColorPtr->GetTexture(), nullptr));
         }
 
-        // Binding 1 : Target Image
+        // Binding 1 : Source Image
+        if (ensure(EyeAdaptationTextureCurrent))
+        {
+            ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
+                , ResourceInlineAllactor.Alloc<jTextureResource>(EyeAdaptationTextureCurrent, nullptr));
+        }
+
+        // Binding 2 : Target Image
         if (ensure(SceneRT->FinalColorPtr))
         {
             ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE
                 , ResourceInlineAllactor.Alloc<jTextureResource>(SceneRT->FinalColorPtr->GetTexture(), nullptr));
         }
 
-        // Binding 2 : CommonComputeUniformBuffer
+        // Binding 3 : CommonComputeUniformBuffer
         struct jCommonComputeUniformBuffer
         {
             float Width;
@@ -807,7 +923,7 @@ void jRenderer::PostProcess()
         CurrentBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray);
 
         jShaderInfo shaderInfo;
-        shaderInfo.SetName(jNameStatic("emboss"));
+        shaderInfo.SetName(jNameStatic("tonemap cs"));
         shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/tonemap_cs.hlsl"));
         shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
         static jShader* Shader = g_rhi->CreateShader(shaderInfo);

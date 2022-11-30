@@ -55,6 +55,9 @@ FSOutput main(VSOutput input
         discard;
     }
 
+    // Convert to linear space
+    color.rgb = pow(color.rgb, 2.2);
+
     float3 normal = NormalTexture.Sample(NormalTextureSampler, input.TexCoord.xy).xyz;
     normal = normal * 2.0f - 1.0f;
     float3 WorldNormal = normalize(mul(input.TBN, normal));

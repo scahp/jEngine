@@ -54,7 +54,7 @@ void jGame::Setup()
 	srand(static_cast<uint32>(time(NULL)));
 
 	// Create main camera
-    const Vector mainCameraPos(-17.6049919f, 17.5289001f, 2.12897372f);
+    const Vector mainCameraPos(-111.6f, 17.49f, 3.11f);
     const Vector mainCameraTarget(282.378632f, 17.6663227f, -1.00448179f);
 	MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 10.0f, 1500.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT, true);
 	jCamera::AddCamera(0, MainCamera);

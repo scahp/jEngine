@@ -1,5 +1,6 @@
-Texture2D inputImage : register(t0);
-RWTexture2D<float4> resultImage : register(u1);
+Texture2D InputImage : register(t0);
+Texture2D EyeAdaptationImage : register(t1);
+RWTexture2D<float4> ResultImage : register(u2);
 
 struct CommonComputeUniformBuffer
 {
@@ -9,7 +10,7 @@ struct CommonComputeUniformBuffer
     float Padding;
 };
 
-cbuffer ComputeCommon : register(b2)
+cbuffer ComputeCommon : register(b3)
 {
     CommonComputeUniformBuffer ComputeCommon;
 }
@@ -51,15 +52,21 @@ float3 FilmicToneMapALU(float3 linearColor)
     return pow(color, 2.2);
 }
 
+float GetExposureScale()
+{
+    return EyeAdaptationImage.Load(int3(0, 0, 0)).x;
+}
+
 [numthreads(16, 16, 1)]
 void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 {   
     if (GlobalInvocationID.x >= ComputeCommon.Width || GlobalInvocationID.y >= ComputeCommon.Height)
         return;
     
-    float4 color = inputImage[uint2(GlobalInvocationID.xy)];
-    color.xyz = FilmicToneMapALU(color.xyz);
+    float4 color = InputImage[uint2(GlobalInvocationID.xy)];
+    color.xyz *= GetExposureScale();
+    color.xyz = Uncharted2Tonemap(color.xyz);
 
     color.xyz = pow(color.xyz, 1.0 / 2.2);
-    resultImage[int2(GlobalInvocationID.xy)] = color;
+    ResultImage[int2(GlobalInvocationID.xy)] = color;
 }

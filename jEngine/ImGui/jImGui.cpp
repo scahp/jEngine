@@ -254,6 +254,7 @@ void jImGUI_Vulkan::NewFrame(bool updateFrameGraph)
     ImGui::Checkbox("UseSubpass", &gOptions.UseSubpass);
     ImGui::Checkbox("UseMemoryless", &gOptions.UseMemoryless);
     ImGui::Checkbox("ShowDebugObject", &gOptions.ShowDebugObject);
+    ImGui::SliderFloat("AutoExposureKeyValueScale", &gOptions.AutoExposureKeyValueScale, -3.0f, 12.0f);    
     ImGui::Separator();
 
     constexpr float IndentSpace = 10.0f;

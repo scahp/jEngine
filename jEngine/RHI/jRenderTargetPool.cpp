@@ -2,6 +2,9 @@
 #include "jRenderTargetPool.h"
 #include "jRHI.h"
 
+std::shared_ptr<jRenderTarget> g_EyeAdaptationARTPtr;
+std::shared_ptr<jRenderTarget> g_EyeAdaptationBRTPtr;
+
 std::map<size_t, std::list<jRenderTargetPool::jRenderTargetPoolResource> > jRenderTargetPool::RenderTargetResourceMap;
 std::map<jRenderTarget*, size_t> jRenderTargetPool::RenderTargetHashVariableMap;
 

@@ -516,15 +516,17 @@ xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"</Command
     </None>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Resource\Shaders\hlsl\bloom_setup_ps.hlsl">
-      <FileType>Document</FileType>
-    </None>
-    <None Include="Resource\Shaders\hlsl\bloom_setup_vs.hlsl">
+    <None Include="Resource\Shaders\hlsl\bloom_and_eyeadaptation_setup_ps.hlsl">
       <FileType>Document</FileType>
     </None>
   </ItemGroup>
   <ItemGroup>
     <None Include="Resource\Shaders\hlsl\tonemap_ps.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resource\Shaders\hlsl\eyeadaptation_cs.hlsl">
       <FileType>Document</FileType>
     </None>
   </ItemGroup>

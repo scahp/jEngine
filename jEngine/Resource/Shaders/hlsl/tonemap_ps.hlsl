@@ -8,6 +8,8 @@ Texture2D BloomTexture : register(t0, space0);
 SamplerState BloomTextureSampler : register(s0, space0);
 Texture2D Texture : register(t1, space0);
 SamplerState TextureSampler : register(s1, space0);
+Texture2D EyeAdaptationTexture : register(t2, space0);
+SamplerState EyeAdaptationTextureSampler : register(s2, space0);
 
 // http://filmicworlds.com/blog/filmic-tonemapping-with-piecewise-power-curves/		// wait for implementation
 // Applies the filmic curve from John Hable's presentation
@@ -20,12 +22,17 @@ float3 FilmicToneMapALU(float3 linearColor)
     return pow(color, 2.2);
 }
 
+float GetExposureScale()
+{
+    return EyeAdaptationTexture.Sample(EyeAdaptationTextureSampler, float2(0, 0)).x;
+}
+
 float4 main(VSOutput input) : SV_TARGET
 {
     float4 SceneColor = Texture.Sample(TextureSampler, input.TexCoord);
 
-    float ExposureScale = 1.0f;     // todo apply eye adaptation.
-    SceneColor.rgb *= ExposureScale;
+    // Apply Exposure
+    SceneColor.rgb *= GetExposureScale();
 
     float BloomMagnitude = 1.0f;    // todo apply eye adaptation.
     float4 BloomColor = BloomTexture.Sample(BloomTextureSampler, input.TexCoord);

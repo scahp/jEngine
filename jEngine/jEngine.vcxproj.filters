@@ -782,13 +782,13 @@
     <None Include="Resource\Shaders\hlsl\bloom_up_ps.hlsl">
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
-    <None Include="Resource\Shaders\hlsl\bloom_setup_ps.hlsl">
-      <Filter>Resource\Shaders\hlsl</Filter>
-    </None>
-    <None Include="Resource\Shaders\hlsl\bloom_setup_vs.hlsl">
+    <None Include="Resource\Shaders\hlsl\bloom_and_eyeadaptation_setup_ps.hlsl">
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
     <None Include="Resource\Shaders\hlsl\tonemap_ps.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\eyeadaptation_cs.hlsl">
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
   </ItemGroup>
