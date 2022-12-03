@@ -110,9 +110,13 @@ void main(uint GIndex : SV_GroupIndex, uint2 GTId : SV_GroupThreadID)
 
     // the exposure changes over time
     float AdaptedLuminance = ComputeEyeAdaptation(LuminanceAverageOld, LuminanceAverage, EyeAdaptation.DeltaFrametime);
-    AdaptedLuminance = clamp(AdaptedLuminance, EyeAdaptation.MinLuminanceAverage, EyeAdaptation.MaxLuminanceAverage);
 
-    const float AdaptedExposureScale = KeyValue / max(AdaptedLuminance, 0.0001f);
+    // This range check commented to make smooth transition for the KeyValue.
+    //  - If the KeyValue is changed in this frame, the KeyValue is not matched with the KeyValue that applied ExposureScaleOld.
+    //    So the ApdatedLuminance range will not be in Min or Max Luminance average. and I commented it.
+    // AdaptedLuminance = clamp(AdaptedLuminance, EyeAdaptation.MinLuminanceAverage, EyeAdaptation.MaxLuminanceAverage);
+
+    const float AdaptedExposureScale = KeyValue / clamp(AdaptedLuminance, 0.0001f, 10000.0f);
 
     if (GIndex == 0)
     {

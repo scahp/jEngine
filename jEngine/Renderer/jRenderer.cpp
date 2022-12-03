@@ -820,7 +820,7 @@ void jRenderer::PostProcess()
             EyeAdaptationUniformBuffer.MaxLuminanceAverage = 8.0f;
             EyeAdaptationUniformBuffer.DeltaFrametime = 1.0f / 60.0f;
             EyeAdaptationUniformBuffer.AdaptationSpeed = 1.0f;
-            EyeAdaptationUniformBuffer.ExposureCompensation = gOptions.AutoExposureKeyValueScale;
+            EyeAdaptationUniformBuffer.ExposureCompensation = exp2(gOptions.AutoExposureKeyValueScale);
 
             jUniformBufferBlock_Vulkan OneFrameUniformBuffer(jNameStatic("EyeAdaptationUniformBuffer"), jLifeTimeType::OneFrame);
             OneFrameUniformBuffer.Init(sizeof(EyeAdaptationUniformBuffer));
