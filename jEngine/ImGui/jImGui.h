@@ -34,7 +34,7 @@ public:
     void Release();
 
     // Draw current imGui frame into a command buffer
-    void Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext);
+    void Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr);
 
     // Todo : remove this for generalization of ui datas
     robin_hood::unordered_map<jName, uint64, jNameHashFunc> CounterMap;

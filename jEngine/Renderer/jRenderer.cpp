@@ -427,10 +427,28 @@ void jRenderer::ShadowPass()
 
     SCOPE_CPU_PROFILE(ShadowPass);
     SCOPE_GPU_PROFILE(RenderFrameContextPtr, ShadowPass);
+    DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "ShadowPass", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
 
     for (int32 i = 0; i < ShadowDrawInfo.size(); ++i)
     {
         jShadowDrawInfo& ShadowPasses = ShadowDrawInfo[i];
+
+        const char* ShadowPassEventName = nullptr;
+        switch (ShadowPasses.ViewLight.Light->Type)
+        {
+        case ELightType::DIRECTIONAL:
+            ShadowPassEventName = "DirectionalLight";
+            break;
+        case ELightType::POINT:
+            ShadowPassEventName = "PointLight";
+            break;
+        case ELightType::SPOT:
+            ShadowPassEventName = "SpotLight";
+            break;
+        }
+        
+        DEBUG_EVENT(RenderFrameContextPtr, ShadowPassEventName);
+
         const std::shared_ptr<jRenderTarget>& ShadowMapPtr = ShadowPasses.GetShadowMapPtr();
 
         g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_ATTACHMENT);
@@ -448,13 +466,6 @@ void jRenderer::ShadowPass()
 
         g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_READ_ONLY);
     }
-
-    {
-        SCOPE_CPU_PROFILE(QueueSubmitAfterShadowPass);
-        RenderFrameContextPtr->GetActiveCommandBuffer()->End();
-        RenderFrameContextPtr->QueueSubmitCurrentActiveCommandBuffer(g_rhi_vk->Swapchain->Images[FrameIndex]->RenderFinishedAfterShadow);
-        RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
-    }
 }
 
 void jRenderer::BasePass()
@@ -465,6 +476,7 @@ void jRenderer::BasePass()
     {
         SCOPE_CPU_PROFILE(BasePass);
         SCOPE_GPU_PROFILE(RenderFrameContextPtr, BasePass);
+        DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "BasePass", Vector4(0.8f, 0.8f, 0.0f, 1.0f));
 
         if (UseForwardRenderer)
         {
@@ -503,19 +515,13 @@ void jRenderer::BasePass()
         }
         //BasepassOcclusionTest.EndQuery(RenderFrameContextPtr->GetActiveCommandBuffer());
     }
-
-    {
-        SCOPE_CPU_PROFILE(QueueSubmitAfterBasePass);
-        RenderFrameContextPtr->GetActiveCommandBuffer()->End();
-        RenderFrameContextPtr->QueueSubmitCurrentActiveCommandBuffer(g_rhi_vk->Swapchain->Images[FrameIndex]->RenderFinishedAfterBasePass);
-        RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
-    }
 }
 
 void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
 {
     SCOPE_CPU_PROFILE(LightingPass);
     SCOPE_GPU_PROFILE(RenderFrameContextPtr, LightingPass);
+    DEBUG_EVENT(RenderFrameContextPtr, "LightingPass");
 
     if (!gOptions.UseSubpass)
     {
@@ -617,9 +623,11 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
 
 void jRenderer::PostProcess()
 {
-    auto AddPostProcessPass = [&](const std::vector<jTexture*> InShaderInputs, const std::shared_ptr<jRenderTarget>& InRenderTargetPtr
+    auto AddFullQuadPass = [&](const char* InDebugName, const std::vector<jTexture*> InShaderInputs, const std::shared_ptr<jRenderTarget>& InRenderTargetPtr
         , jName VertexShader, jName PixelShader, bool IsBloom = false)
     {
+        DEBUG_EVENT(RenderFrameContextPtr, InDebugName);
+
         static jFullscreenQuadPrimitive* GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
 
         auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
@@ -638,7 +646,7 @@ void jRenderer::PostProcess()
         const Vector2 ClearDepth = Vector2(1.0f, 0.0f);
 
         jRenderPassInfo renderPassInfo;
-        jAttachment color = jAttachment(InRenderTargetPtr, EAttachmentLoadStoreOp::CLEAR_STORE
+        jAttachment color = jAttachment(InRenderTargetPtr, EAttachmentLoadStoreOp::DONTCARE_STORE
             , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth, EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
         renderPassInfo.Attachments.push_back(color);
 
@@ -723,7 +731,8 @@ void jRenderer::PostProcess()
 
     SCOPE_CPU_PROFILE(PostProcess);
     {
-        SCOPE_GPU_PROFILE(RenderFrameContextPtr, TonemapCS);
+        SCOPE_GPU_PROFILE(RenderFrameContextPtr, PostProcess);
+        DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "PostProcess", Vector4(0.0f, 0.8f, 0.8f, 1.0f));
 
         const uint32 imageIndex = RenderFrameContextPtr->FrameIndex;
         jCommandBuffer* CommandBuffer = RenderFrameContextPtr->GetActiveCommandBuffer();
@@ -754,15 +763,19 @@ void jRenderer::PostProcess()
         g_rhi->TransitionImageLayout(CommandBuffer, SceneRT->ColorPtr->GetTexture(), EImageLayout::SHADER_READ_ONLY);
 
         jTexture* SourceRT = SceneRT->ColorPtr->GetTexture();
-        
-        AddPostProcessPass({ SourceRT, EyeAdaptationTextureOld }, SceneRT->BloomSetup
+
+        char szDebugEventTemp[1024] = { 0, };
+        sprintf_s(szDebugEventTemp, sizeof(szDebugEventTemp), "BloomEyeAdaptationSetup %dx%d", SceneRT->BloomSetup->Info.Width, SceneRT->BloomSetup->Info.Height);
+        AddFullQuadPass(szDebugEventTemp, { SourceRT, EyeAdaptationTextureOld }, SceneRT->BloomSetup
             , jNameStatic("Resource/Shaders/hlsl/fullscreenquad_vs.hlsl"), jNameStatic("Resource/Shaders/hlsl/bloom_and_eyeadaptation_setup_ps.hlsl"));
         SourceRT = SceneRT->BloomSetup->GetTexture();
         g_rhi->TransitionImageLayout(CommandBuffer, SourceRT, EImageLayout::SHADER_READ_ONLY);
 
         for (int32 i = 0; i < _countof(SceneRT->DownSample); ++i)
         {
-            AddPostProcessPass({ SourceRT }, SceneRT->DownSample[i]
+            const auto& RTInfo = SceneRT->DownSample[i]->Info;
+            sprintf_s(szDebugEventTemp, sizeof(szDebugEventTemp), "BloomDownsample %dx%d", RTInfo.Width, RTInfo.Height);
+            AddFullQuadPass(szDebugEventTemp, { SourceRT }, SceneRT->DownSample[i]
                 , jNameStatic("Resource/Shaders/hlsl/bloom_down_vs.hlsl"), jNameStatic("Resource/Shaders/hlsl/bloom_down_ps.hlsl"), true);
             SourceRT = SceneRT->DownSample[i]->GetTexture();
             g_rhi->TransitionImageLayout(CommandBuffer, SourceRT, EImageLayout::SHADER_READ_ONLY);
@@ -774,6 +787,8 @@ void jRenderer::PostProcess()
         // Todo make a function for each postprocess steps
         // 여기서 EyeAdaptation 계산하는 Compute shader 추가
         {
+            sprintf_s(szDebugEventTemp, sizeof(szDebugEventTemp), "EyeAdaptationCS %dx%d", EyeAdaptationTextureCurrent->Width, EyeAdaptationTextureCurrent->Height);
+            DEBUG_EVENT(RenderFrameContextPtr, szDebugEventTemp);
             //////////////////////////////////////////////////////////////////////////
             // Compute Pipeline
             jShaderBindingInstance* CurrentBindingInstance = nullptr;
@@ -853,7 +868,9 @@ void jRenderer::PostProcess()
 
         for (int32 i = 0; i < _countof(SceneRT->UpSample); ++i)
         {
-            AddPostProcessPass({ SourceRT }, SceneRT->UpSample[i]
+            const auto& RTInfo = SceneRT->UpSample[i]->Info;
+            sprintf_s(szDebugEventTemp, sizeof(szDebugEventTemp), "BloomUpsample %dx%d", RTInfo.Width, RTInfo.Height);
+            AddFullQuadPass(szDebugEventTemp, { SourceRT }, SceneRT->UpSample[i]
                 , jNameStatic("Resource/Shaders/hlsl/bloom_up_vs.hlsl"), jNameStatic("Resource/Shaders/hlsl/bloom_up_ps.hlsl"), true);
             SourceRT = SceneRT->UpSample[i]->GetTexture();
             g_rhi->TransitionImageLayout(CommandBuffer, SourceRT, EImageLayout::SHADER_READ_ONLY);
@@ -861,7 +878,8 @@ void jRenderer::PostProcess()
 
         g_rhi->TransitionImageLayout(CommandBuffer, EyeAdaptationTextureCurrent, EImageLayout::SHADER_READ_ONLY);
 
-        AddPostProcessPass({ SourceRT, SceneRT->ColorPtr->GetTexture(), EyeAdaptationTextureCurrent }, SceneRT->FinalColorPtr
+        sprintf_s(szDebugEventTemp, sizeof(szDebugEventTemp), "Tonemap %dx%d", SceneRT->FinalColorPtr->Info.Width, SceneRT->FinalColorPtr->Info.Height);
+        AddFullQuadPass(szDebugEventTemp, { SourceRT, SceneRT->ColorPtr->GetTexture(), EyeAdaptationTextureCurrent }, SceneRT->FinalColorPtr
             , jNameStatic("Resource/Shaders/hlsl/fullscreenquad_vs.hlsl"), jNameStatic("Resource/Shaders/hlsl/tonemap_ps.hlsl"));
 
         return;
@@ -953,6 +971,7 @@ void jRenderer::DebugPasses()
 
     SCOPE_CPU_PROFILE(DebugPasses);
     SCOPE_GPU_PROFILE(RenderFrameContextPtr, DebugPasses);
+    DEBUG_EVENT(RenderFrameContextPtr, "DebugPasses");
 
     // Prepare basepass pipeline
     auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
@@ -1076,7 +1095,25 @@ void jRenderer::Render()
 
     Setup();
     ShadowPass();
+
+    // Queue submit to prepare shadowmap for basepass 
+    {
+        SCOPE_CPU_PROFILE(QueueSubmitAfterShadowPass);
+        RenderFrameContextPtr->GetActiveCommandBuffer()->End();
+        RenderFrameContextPtr->QueueSubmitCurrentActiveCommandBuffer(g_rhi_vk->Swapchain->Images[FrameIndex]->RenderFinishedAfterShadow);
+        RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
+    }
+
     BasePass();
+
+    // Queue submit to prepare scenecolor RT for postprocess
+    {
+        SCOPE_CPU_PROFILE(QueueSubmitAfterBasePass);
+        RenderFrameContextPtr->GetActiveCommandBuffer()->End();
+        RenderFrameContextPtr->QueueSubmitCurrentActiveCommandBuffer(g_rhi_vk->Swapchain->Images[FrameIndex]->RenderFinishedAfterBasePass);
+        RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
+    }
+
     PostProcess();
     DebugPasses();
 

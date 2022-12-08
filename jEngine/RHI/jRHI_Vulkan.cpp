@@ -41,6 +41,52 @@ TResourcePool<jBlendingStateInfo_Vulakn, jMutexRWLock> jRHI_Vulkan::BlendingStat
 TResourcePool<jPipelineStateInfo_Vulkan, jMutexRWLock> jRHI_Vulkan::PipelineStatePool;
 TResourcePool<jRenderPass_Vulkan, jMutexRWLock> jRHI_Vulkan::RenderPassPool;
 
+// jGPUDebugEvent
+jGPUDebugEvent::jGPUDebugEvent(const char* InName, jCommandBuffer* InCommandBuffer)
+{
+	if (g_rhi_vk->vkCmdDebugMarkerBegin)
+	{
+		CommandBuffer = InCommandBuffer;
+
+		check(CommandBuffer);
+		VkDebugMarkerMarkerInfoEXT markerInfo = {};
+		markerInfo.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_MARKER_INFO_EXT;
+
+		const float DefaultColor[4] = { 0.0f, 1.0f, 0.0f, 1.0f };
+		memcpy(markerInfo.color, &DefaultColor[0], sizeof(float) * 4);
+
+		markerInfo.pMarkerName = InName;
+		g_rhi_vk->vkCmdDebugMarkerBegin((VkCommandBuffer)CommandBuffer->GetHandle(), &markerInfo);
+	}
+}
+
+jGPUDebugEvent::jGPUDebugEvent(const char* InName, jCommandBuffer* InCommandBuffer, const Vector4& InColor)
+{
+    if (g_rhi_vk->vkCmdDebugMarkerBegin)
+    {
+        CommandBuffer = InCommandBuffer;
+
+        check(CommandBuffer);
+        VkDebugMarkerMarkerInfoEXT markerInfo = {};
+        markerInfo.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_MARKER_INFO_EXT;
+
+		static_assert(sizeof(markerInfo.color) == sizeof(Vector4));
+        memcpy(markerInfo.color, &InColor, sizeof(markerInfo.color));
+
+		markerInfo.pMarkerName = InName;
+        g_rhi_vk->vkCmdDebugMarkerBegin((VkCommandBuffer)CommandBuffer->GetHandle(), &markerInfo);
+    }
+}
+
+jGPUDebugEvent::~jGPUDebugEvent()
+{
+	if (g_rhi_vk->vkCmdDebugMarkerEnd)
+	{
+		g_rhi_vk->vkCmdDebugMarkerEnd((VkCommandBuffer)CommandBuffer->GetHandle());
+	}
+}
+
+// jFrameBuffer_Vulkan
 struct jFrameBuffer_Vulkan : public jFrameBuffer
 {
 	bool IsInitialized = false;
@@ -49,6 +95,7 @@ struct jFrameBuffer_Vulkan : public jFrameBuffer
 	virtual jTexture* GetTexture(int32 index = 0) const { return AllTextures[index].get(); }
 };
 
+// jRHI_Vulkan
 jRHI_Vulkan::jRHI_Vulkan()
 {
 	g_rhi_vk = this;
@@ -156,6 +203,14 @@ bool jRHI_Vulkan::InitRHI()
 
 	jSpirvHelper::Init(DeviceProperties);
 
+	// Get All device extension properties
+    uint32 extensionCount;
+    vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &extensionCount, nullptr);
+    std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+    vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &extensionCount, availableExtensions.data());
+
+	bool IsSupportDebugMarker = false;
+
 	// Logical device
 	{
 		jVulkanDeviceUtil::QueueFamilyIndices indices = jVulkanDeviceUtil::FindQueueFamilies(PhysicalDevice, Surface);
@@ -214,8 +269,22 @@ bool jRHI_Vulkan::InitRHI()
 		createInfo.pEnabledFeatures = nullptr;
 
 		// extension
-		createInfo.enabledExtensionCount = static_cast<uint32>(jVulkanDeviceUtil::DeviceExtensions.size());
-		createInfo.ppEnabledExtensionNames = jVulkanDeviceUtil::DeviceExtensions.data();
+		// Prepare extensions
+		std::vector<const char*> DeviceExtensions(jVulkanDeviceUtil::DeviceExtensions);
+
+		// Add debug marker extension when it can be enabled
+		for (auto& extension : availableExtensions)
+		{
+			if (!strcmp(extension.extensionName, VK_EXT_DEBUG_MARKER_EXTENSION_NAME))
+			{
+				DeviceExtensions.push_back(VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
+				IsSupportDebugMarker = true;
+				break;
+			}
+		}
+
+		createInfo.enabledExtensionCount = static_cast<uint32>(DeviceExtensions.size());
+		createInfo.ppEnabledExtensionNames = DeviceExtensions.data();
 
 #if ENABLE_VALIDATION_LAYER
 		// 최신 버젼에서는 validation layer는 무시되지만, 오래된 버젼을 호환을 위해 vkInstance와 맞춰줌
@@ -240,7 +309,17 @@ bool jRHI_Vulkan::InitRHI()
 	MemoryPool = new jMemoryPool_Vulkan();
 
 	// Get vkCmdBindShadingRateImageNV function pointer for VRS
-	vkCmdBindShadingRateImageNV = reinterpret_cast<PFN_vkCmdBindShadingRateImageNV>(vkGetDeviceProcAddr(g_rhi_vk->Device, "vkCmdBindShadingRateImageNV"));
+	vkCmdBindShadingRateImageNV = reinterpret_cast<PFN_vkCmdBindShadingRateImageNV>(vkGetDeviceProcAddr(Device, "vkCmdBindShadingRateImageNV"));
+
+	// Get debug marker function pointer
+	if (IsSupportDebugMarker)
+	{
+        vkDebugMarkerSetObjectTag = (PFN_vkDebugMarkerSetObjectTagEXT)vkGetDeviceProcAddr(Device, "vkDebugMarkerSetObjectTagEXT");
+        vkDebugMarkerSetObjectName = (PFN_vkDebugMarkerSetObjectNameEXT)vkGetDeviceProcAddr(Device, "vkDebugMarkerSetObjectNameEXT");
+        vkCmdDebugMarkerBegin = (PFN_vkCmdDebugMarkerBeginEXT)vkGetDeviceProcAddr(Device, "vkCmdDebugMarkerBeginEXT");
+        vkCmdDebugMarkerEnd = (PFN_vkCmdDebugMarkerEndEXT)vkGetDeviceProcAddr(Device, "vkCmdDebugMarkerEndEXT");
+        vkCmdDebugMarkerInsert = (PFN_vkCmdDebugMarkerInsertEXT)vkGetDeviceProcAddr(Device, "vkCmdDebugMarkerInsertEXT");
+	}
 
 	// Swapchain
     Swapchain = new jSwapchain_Vulkan();

@@ -7,6 +7,7 @@
 #include "RHI/jRenderFrameContext.h"
 #include "Renderer/jSceneRenderTargets.h"
 #include "RHI/jPipelineStateInfo.h"
+#include "RHI/jRHI.h"
 
 jImGUI_Vulkan* jImGUI_Vulkan::s_instance = nullptr;
 
@@ -428,7 +429,7 @@ void jImGUI_Vulkan::UpdateBuffers()
     }
 }
 
-void jImGUI_Vulkan::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext)
+void jImGUI_Vulkan::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
 {
     if (!IsInitialized)
         return;
@@ -436,16 +437,17 @@ void jImGUI_Vulkan::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFra
     NewFrame((g_rhi_vk->CurrenFrameIndex == 0));
     UpdateBuffers();
 
-    check(InRenderFrameContext);
+    DEBUG_EVENT_WITH_COLOR(InRenderFrameContextPtr, "ImGUI", Vector4(0.8f, 0.8f, 0.8f, 1.0f));
+    check(InRenderFrameContextPtr);
 
     // Prepare draw
     jRenderPass* RenderPass = nullptr;
     jPipelineStateInfo_Vulkan* PiplineStateInfo = nullptr;
     {
         const auto& extent = g_rhi_vk->Swapchain->GetExtent();
-        const auto& image = g_rhi_vk->Swapchain->GetSwapchainImage(InRenderFrameContext->FrameIndex);
+        const auto& image = g_rhi_vk->Swapchain->GetSwapchainImage(InRenderFrameContextPtr->FrameIndex);
 
-        const auto& FinalColorPtr = InRenderFrameContext->SceneRenderTarget->FinalColorPtr;
+        const auto& FinalColorPtr = InRenderFrameContextPtr->SceneRenderTarget->FinalColorPtr;
 
         jAttachment color = jAttachment(FinalColorPtr, EAttachmentLoadStoreOp::LOAD_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, Vector4(0.0f, 0.0f, 0.0f, 1.0f), Vector2(1.0f, 0.0f)
             , FinalColorPtr->GetLayout(), EImageLayout::PRESENT_SRC);
@@ -456,10 +458,10 @@ void jImGUI_Vulkan::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFra
     check(RenderPass);
     check(PiplineStateInfo);
 
-    const int32 frameIndex = InRenderFrameContext->FrameIndex;
-    if (RenderPass->BeginRenderPass(InRenderFrameContext->GetActiveCommandBuffer()))
+    const int32 frameIndex = InRenderFrameContextPtr->FrameIndex;
+    if (RenderPass->BeginRenderPass(InRenderFrameContextPtr->GetActiveCommandBuffer()))
     {
-        VkCommandBuffer commandbuffer_vk = (VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle();
+        VkCommandBuffer commandbuffer_vk = (VkCommandBuffer)InRenderFrameContextPtr->GetActiveCommandBuffer()->GetHandle();
 
         ImGuiIO& io = ImGui::GetIO();
 

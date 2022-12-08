@@ -681,3 +681,17 @@ struct TBlendingStateInfo
 		return CachedInfo;
     }
 };
+
+class jGPUDebugEvent
+{
+public:
+	jGPUDebugEvent(const char* InName, jCommandBuffer* InCommandBuffer);
+	jGPUDebugEvent(const char* InName, jCommandBuffer* InCommandBuffer, const Vector4& InColor);
+	~jGPUDebugEvent();
+    const jCommandBuffer* CommandBuffer = nullptr;
+};
+
+#define DEBUG_EVENT_NAME(Name, Line) Name##Line
+#define DEBUG_EVENT(RenderFrameContextPtr, Name) jGPUDebugEvent DEBUG_EVENT_NAME(DebugEvent_, __LINE__)(Name, RenderFrameContextPtr->GetActiveCommandBuffer());
+#define DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, Name, ColorVec4) jGPUDebugEvent DEBUG_EVENT_NAME(DebugEvent_, __LINE__)(Name, RenderFrameContextPtr->GetActiveCommandBuffer(), ColorVec4);
+

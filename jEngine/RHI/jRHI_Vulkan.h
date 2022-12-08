@@ -184,9 +184,17 @@ public:
 	virtual void Flush() const override;
 	virtual void Finish() const override;
 
+	// VRS
 	PFN_vkCmdBindShadingRateImageNV vkCmdBindShadingRateImageNV = nullptr;		// Function pointer of VRS
 	virtual void BindShadingRateImage(jCommandBuffer* commandBuffer, jTexture* vrstexture) const override;
 	
+	// DebugMarker
+    PFN_vkDebugMarkerSetObjectTagEXT vkDebugMarkerSetObjectTag = nullptr;
+    PFN_vkDebugMarkerSetObjectNameEXT vkDebugMarkerSetObjectName = nullptr;
+    PFN_vkCmdDebugMarkerBeginEXT vkCmdDebugMarkerBegin = nullptr;
+    PFN_vkCmdDebugMarkerEndEXT vkCmdDebugMarkerEnd = nullptr;
+    PFN_vkCmdDebugMarkerInsertEXT vkCmdDebugMarkerInsert = nullptr;
+
 	virtual jMemoryPool* GetMemoryPool() const override { return MemoryPool; }
 
 	virtual void NextSubpass(const jCommandBuffer* commandBuffer) const override;
