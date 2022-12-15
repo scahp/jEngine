@@ -8,6 +8,7 @@
 #include "Renderer/jSceneRenderTargets.h"
 #include "RHI/jPipelineStateInfo.h"
 #include "RHI/jRHI.h"
+#include "imgui_internal.h"
 
 jImGUI_Vulkan* jImGUI_Vulkan::s_instance = nullptr;
 
@@ -248,20 +249,25 @@ void jImGUI_Vulkan::NewFrame(bool updateFrameGraph)
 #if USE_VARIABLE_SHADING_RATE_TIER2
     ImGui::Checkbox("UseVRS", &gOptions.UseVRS);
 #endif
-    ImGui::Checkbox("ShowVRSArea", &gOptions.ShowVRSArea);
-    ImGui::Checkbox("ShowGrid", &gOptions.ShowGrid);
-    ImGui::Checkbox("UseWaveIntrinsics", &gOptions.UseWaveIntrinsics);
-    ImGui::Checkbox("UseDeferredRenderer", &gOptions.UseDeferredRenderer);
-    ImGui::Checkbox("UseSubpass", &gOptions.UseSubpass);
-    ImGui::Checkbox("UseMemoryless", &gOptions.UseMemoryless);
+    //ImGui::Checkbox("ShowVRSArea", &gOptions.ShowVRSArea);
+    //ImGui::Checkbox("ShowGrid", &gOptions.ShowGrid);
+    //ImGui::Checkbox("UseWaveIntrinsics", &gOptions.UseWaveIntrinsics);
+    {
+        ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+        ImGui::Checkbox("[ReadOnly]UseDeferredRenderer", &gOptions.UseDeferredRenderer);
+        ImGui::Checkbox("[ReadOnly]UseSubpass", &gOptions.UseSubpass);
+        ImGui::Checkbox("[ReadOnly]UseMemoryless", &gOptions.UseMemoryless);
+        ImGui::PopItemFlag();
+    }
     ImGui::Checkbox("ShowDebugObject", &gOptions.ShowDebugObject);
-    ImGui::SliderFloat("AutoExposureKeyValueScale", &gOptions.AutoExposureKeyValueScale, -12.0f, 12.0f);    
+    ImGui::SliderFloat("AutoExposureKeyValueScale", &gOptions.AutoExposureKeyValueScale, -12.0f, 12.0f);
     ImGui::Separator();
 
     constexpr float IndentSpace = 10.0f;
     const std::thread::id CurrentThreadId = std::this_thread::get_id();
     const ImVec4 OtherThreadColor = { 0.2f, 0.6f, 0.2f, 1.0f };
     {
+        ImGui::Text("[CPU]");
         const auto& CPUAvgProfileMap = jPerformanceProfile::GetInstance().GetCPUAvgProfileMap();
         double TotalPassesMS = 0.0;
         int32 MostLeastIndent = INT_MAX;
@@ -299,6 +305,7 @@ void jImGUI_Vulkan::NewFrame(bool updateFrameGraph)
     }
     ImGui::Separator();
     {
+        ImGui::Text("[GPU]");
         const auto& GPUAvgProfileMap = jPerformanceProfile::GetInstance().GetGPUAvgProfileMap();
         double TotalPassesMS = 0.0;
         int32 MostLeastIndent = INT_MAX;
