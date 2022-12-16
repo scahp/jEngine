@@ -528,7 +528,7 @@ void jRHI_Vulkan::RecreateSwapChain()
 	verify(CommandBufferManager->CreatePool(GraphicsQueue.QueueIndex));
 
     jFrameBufferPool::Release();
-    jRenderTargetPool::Release();
+    jRenderTargetPool::ReleaseForRecreateSwapchain();
 	PipelineStatePool.Release();
     RenderPassPool.Release();
 

@@ -12,12 +12,18 @@ public:
 	static std::shared_ptr<jRenderTarget> GetRenderTarget(const jRenderTargetInfo& info);
 	static void ReturnRenderTarget(jRenderTarget* renderTarget);
 
+	static void ReleaseForRecreateSwapchain()
+	{
+        RenderTargetResourceMap.clear();
+        RenderTargetHashVariableMap.clear();
+	}
+
 	static void Release()
 	{
         g_EyeAdaptationARTPtr->Return();
         g_EyeAdaptationBRTPtr->Return();
-		g_EyeAdaptationARTPtr.reset();
-		g_EyeAdaptationBRTPtr.reset();
+        g_EyeAdaptationARTPtr.reset();
+        g_EyeAdaptationBRTPtr.reset();
 
 		RenderTargetResourceMap.clear();
 		RenderTargetHashVariableMap.clear();
