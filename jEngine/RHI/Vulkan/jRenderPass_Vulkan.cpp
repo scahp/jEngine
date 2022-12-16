@@ -3,20 +3,18 @@
 #include "jRHIType_Vulkan.h"
 #include "jTexture_Vulkan.h"
 
-robin_hood::unordered_map<size_t, VkRenderPass> s_renderPassPool;
-
 void jRenderPass_Vulkan::Release()
 {
-    if (RenderPass)
-    {
-        vkDestroyRenderPass(g_rhi_vk->Device, RenderPass, nullptr);
-        RenderPass = nullptr;
-    }
-
     if (FrameBuffer)
     {
         vkDestroyFramebuffer(g_rhi_vk->Device, FrameBuffer, nullptr);
         FrameBuffer = nullptr;
+    }
+
+    if (RenderPass)
+    {
+        vkDestroyRenderPass(g_rhi_vk->Device, RenderPass, nullptr);
+        RenderPass = nullptr;
     }
 }
 
@@ -54,37 +52,7 @@ bool jRenderPass_Vulkan::CreateRenderPass()
     int32 SampleCount = 0;
     int32 LayerCount = 0;
 
-    const auto renderPassHash = GetHash();
-    auto it_find = s_renderPassPool.find(renderPassHash);
-    if (s_renderPassPool.end() != it_find)
-    {
-        RenderPass = it_find->second;
-
-        for (int32 i = 0; i < RenderPassInfo.Attachments.size(); ++i)
-        {
-            const jAttachment& attachment = RenderPassInfo.Attachments[i];
-            check(attachment.RenderTargetPtr.get());
-
-            VkClearValue colorClear = {};
-            if (attachment.IsDepthAttachment())
-                colorClear.depthStencil = { attachment.ClearDepth.x, (uint32)attachment.ClearDepth.y };
-            else
-                colorClear.color = { attachment.ClearColor.x, attachment.ClearColor.y, attachment.ClearColor.z, attachment.ClearColor.w };
-            ClearValues.push_back(colorClear);
-
-            const bool IsInvalidSampleCountAndLayerCount = (SampleCount == 0) || (LayerCount == 0);
-            if (!attachment.IsDepthAttachment() || IsInvalidSampleCountAndLayerCount)
-            {
-                const auto& RTInfo = attachment.RenderTargetPtr->Info;
-
-                check(SampleCount == 0 || SampleCount == (int32)RTInfo.SampleCount);
-                check(LayerCount == 0 || LayerCount == RTInfo.LayerCount);
-                SampleCount = (int32)RTInfo.SampleCount;
-                LayerCount = RTInfo.LayerCount;
-            }
-        }
-    }
-    else
+    // Create RenderPass
     {
         std::vector<VkAttachmentDescription> AttachmentDescs;
         AttachmentDescs.resize(RenderPassInfo.Attachments.size());
@@ -242,8 +210,6 @@ bool jRenderPass_Vulkan::CreateRenderPass()
 
         if (!ensure(vkCreateRenderPass(g_rhi_vk->GetDevice(), &renderPassCreateInfo, nullptr, &RenderPass) == VK_SUCCESS))
             return false;
-
-        s_renderPassPool[renderPassHash] = RenderPass;
     }
 
     // Create RenderPassBeginInfo

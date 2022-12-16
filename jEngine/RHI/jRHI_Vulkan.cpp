@@ -523,19 +523,19 @@ void jRHI_Vulkan::RecreateSwapChain()
 	SCR_WIDTH = width;
 	SCR_HEIGHT = height;
 
+    delete CommandBufferManager;
+	CommandBufferManager = new jCommandBufferManager_Vulkan();
+	verify(CommandBufferManager->CreatePool(GraphicsQueue.QueueIndex));
+
     jFrameBufferPool::Release();
     jRenderTargetPool::Release();
-	RenderPassPool.Release();
 	PipelineStatePool.Release();
+    RenderPassPool.Release();
 
     delete Swapchain;
     Swapchain = new jSwapchain_Vulkan();
     verify(Swapchain->Create());
 
-    delete CommandBufferManager;
-    CommandBufferManager = new jCommandBufferManager_Vulkan();
-    verify(CommandBufferManager->CreatePool(GraphicsQueue.QueueIndex));
-	
     jImGUI_Vulkan::Get().Release();
     jImGUI_Vulkan::Get().Initialize((float)SCR_WIDTH, (float)SCR_HEIGHT);
 
@@ -1461,6 +1461,13 @@ void jRHI_Vulkan::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& ren
     presentInfo.pResults = nullptr;			// Optional
     VkResult queuePresentResult = vkQueuePresentKHR(PresentQueue.Queue, &presentInfo);
 
+	// CPU 가 큐에 작업을 제출하는 속도가 GPU 에서 소모하는 속도보다 빠른 경우 큐에 작업이 계속 쌓이거나 
+    // 여러 프레임에 걸쳐 동시에 imageAvailableSemaphore 와 renderFinishedSemaphore를 재사용하게 되는 문제가 있음.
+    // 1). 한프레임을 마치고 큐가 빌때까지 기다리는 것으로 해결할 수 있음. 한번에 1개의 프레임만 완성 가능(최적의 해결방법은 아님)
+    // 2). 여러개의 프레임을 동시에 처리 할수있도록 확장. 동시에 진행될 수 있는 최대 프레임수를 지정해줌.
+    CurrenFrameIndex = (CurrenFrameIndex + 1) % Swapchain->Images.size();
+    renderFrameContextPtr->Destroy();
+
     // 세마포어의 일관된 상태를 보장하기 위해서(세마포어 로직을 변경하지 않으려 노력한듯 함) vkQueuePresentKHR 이후에 framebufferResized 를 체크하는 것이 중요함.
     if ((queuePresentResult == VK_ERROR_OUT_OF_DATE_KHR) || (queuePresentResult == VK_SUBOPTIMAL_KHR) || FramebufferResized)
     {
@@ -1473,13 +1480,6 @@ void jRHI_Vulkan::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& ren
         check(0);
         return;
     }
-
-    // CPU 가 큐에 작업을 제출하는 속도가 GPU 에서 소모하는 속도보다 빠른 경우 큐에 작업이 계속 쌓이거나 
-    // 여러 프레임에 걸쳐 동시에 imageAvailableSemaphore 와 renderFinishedSemaphore를 재사용하게 되는 문제가 있음.
-    // 1). 한프레임을 마치고 큐가 빌때까지 기다리는 것으로 해결할 수 있음. 한번에 1개의 프레임만 완성 가능(최적의 해결방법은 아님)
-    // 2). 여러개의 프레임을 동시에 처리 할수있도록 확장. 동시에 진행될 수 있는 최대 프레임수를 지정해줌.
-    CurrenFrameIndex = (CurrenFrameIndex + 1) % Swapchain->Images.size();
-	renderFrameContextPtr->Destroy();
 }
 
 void jRHI_Vulkan::QueueSubmit(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr, jSemaphore* InSignalSemaphore)
