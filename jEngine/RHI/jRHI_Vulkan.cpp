@@ -369,17 +369,17 @@ bool jRHI_Vulkan::InitRHI()
 	{
         struct jFaceInstanceData
         {
-            uint32 LayerIndex = 0;
+            uint16 LayerIndex = 0;
         };
         jFaceInstanceData instanceData[6];
-        for (int32 i = 0; i < _countof(instanceData); ++i)
+        for (int16 i = 0; i < _countof(instanceData); ++i)
         {
             instanceData[i].LayerIndex = i;
         }
 
         auto streamParam = std::make_shared<jStreamParam<jFaceInstanceData>>();
         streamParam->BufferType = EBufferType::STATIC;
-        streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::UINT32, sizeof(uint32)));
+        streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::UINT16, sizeof(uint16)));
         streamParam->Stride = sizeof(jFaceInstanceData);
         streamParam->Name = jName("InstanceData");
         streamParam->Data.resize(6);
