@@ -41,6 +41,6 @@ void jDirectionalLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* Ou
 
     check(OutDestDrawCommand);
     new (OutDestDrawCommand) jDrawCommand(InRenderFrameContextPtr, &InLightView, GlobalFullscreenPrimitive->RenderObjects[0], InRenderPass
-        , Shader, &PipelineStateFixedInfo, ShaderBindingInstances, {}, InSubpassIndex);
+        , Shader, &PipelineStateFixedInfo, ShaderBindingInstances, {}, nullptr, InSubpassIndex);
     OutDestDrawCommand->PrepareToDraw(false);
 }

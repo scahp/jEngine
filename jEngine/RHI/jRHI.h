@@ -283,8 +283,8 @@ public:
 	virtual ~jRHI() {}
 
     static TResourcePool<jShader, jMutexRWLock> ShaderPool;
-
     static constexpr int32 MaxWaitingQuerySet = 4;
+    static jVertexBuffer* CubeMapInstanceDataForSixFace;
 
 	template <typename T = jShader>
 	T* CreateShader(const jShaderInfo& shaderInfo) const

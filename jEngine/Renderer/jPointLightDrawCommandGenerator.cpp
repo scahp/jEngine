@@ -48,6 +48,6 @@ void jPointLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* OutDestD
 
     check(OutDestDrawCommand);
     new (OutDestDrawCommand) jDrawCommand(InRenderFrameContextPtr, &InLightView, PointLightSphere->RenderObjects[0], InRenderPass
-        , Shader, &PipelineStateFixedInfo, ShaderBindingInstances, PushConstant, InSubpassIndex);
+        , Shader, &PipelineStateFixedInfo, ShaderBindingInstances, PushConstant, nullptr, InSubpassIndex);
     OutDestDrawCommand->PrepareToDraw(false);
 }

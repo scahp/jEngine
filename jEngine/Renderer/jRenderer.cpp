@@ -134,11 +134,6 @@ void jRenderer::SetupShadowPass()
                 shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
                 ShadowShader.VertexShader = g_rhi->CreateShader(shaderInfo);
 
-                shaderInfo.SetName(jNameStatic("shadow_testGS"));
-                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/omni_shadow_gs.hlsl"));
-                shaderInfo.SetShaderType(EShaderAccessStageFlag::GEOMETRY);
-                ShadowShader.GeometryShader = g_rhi->CreateShader(shaderInfo);
-
                 shaderInfo.SetName(jNameStatic("shadow_testPS"));
                 shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/omni_shadow_fs.hlsl"));
                 shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
@@ -191,8 +186,11 @@ void jRenderer::SetupShadowPass()
         jParallelFor::ParallelForWithTaskPerThread(MaxPassSetupTaskPerThreadCount, jObject::GetShadowCasterRenderObject()
             , [&](size_t InIndex, jRenderObject* InRenderObject)
             {
+                const bool ShouldUseOnePassPointLightShadow = (ViewLight.Light->Type == ELightType::POINT);
+                const jVertexBuffer* OverrideInstanceData = (ShouldUseOnePassPointLightShadow ? jRHI::CubeMapInstanceDataForSixFace : nullptr);
+
                 new (&ShadowPasses.DrawCommands[InIndex]) jDrawCommand(RenderFrameContextPtr, &ShadowPasses.ViewLight, InRenderObject, ShadowPasses.ShadowMapRenderPass
-                    , (InRenderObject->HasInstancing() ? ShadowInstancingShader : ShadowShader), &ShadpwPipelineStateFixed, {}, nullptr);
+                    , (InRenderObject->HasInstancing() ? ShadowInstancingShader : ShadowShader), &ShadpwPipelineStateFixed, {}, nullptr, OverrideInstanceData);
                 ShadowPasses.DrawCommands[InIndex].PrepareToDraw(true);
             });
 #else

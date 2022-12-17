@@ -19,6 +19,7 @@ void IUniformBuffer::Bind(const jShader* shader) const
 
 //////////////////////////////////////////////////////////////////////////
 TResourcePool<jShader, jMutexRWLock> jRHI::ShaderPool;
+jVertexBuffer* jRHI::CubeMapInstanceDataForSixFace = nullptr;
 
 bool jRHI::InitRHI()
 {

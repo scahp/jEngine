@@ -13,9 +13,9 @@
 
 jDrawCommand::jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, const jView* InView
     , jRenderObject* InRenderObject, jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed
-    , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant, int32 InSubpassIndex)
+    , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant, const jVertexBuffer* InOverrideInstanceData, int32 InSubpassIndex)
     : RenderFrameContextPtr(InRenderFrameContextPtr), View(InView), RenderObject(InRenderObject), RenderPass(InRenderPass), Shader(InShader), PipelineStateFixed(InPipelineStateFixed)
-    , PushConstant(InPushConstant), ShaderBindingInstanceArray(InShaderBindingInstanceArray), SubpassIndex(InSubpassIndex)
+    , PushConstant(InPushConstant), ShaderBindingInstanceArray(InShaderBindingInstanceArray), OverrideInstanceData(InOverrideInstanceData), SubpassIndex(InSubpassIndex)
 {
     check(RenderObject);
     IsViewLight = false;
@@ -23,9 +23,9 @@ jDrawCommand::jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderF
 
 jDrawCommand::jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, const jViewLight* InViewLight
     , jRenderObject* InRenderObject, jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed
-    , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant, int32 InSubpassIndex)
+    , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant, const jVertexBuffer* InOverrideInstanceData, int32 InSubpassIndex)
     : RenderFrameContextPtr(InRenderFrameContextPtr), ViewLight(InViewLight), RenderObject(InRenderObject), RenderPass(InRenderPass), Shader(InShader), PipelineStateFixed(InPipelineStateFixed)
-    , PushConstant(InPushConstant), ShaderBindingInstanceArray(InShaderBindingInstanceArray), SubpassIndex(InSubpassIndex)
+    , PushConstant(InPushConstant), ShaderBindingInstanceArray(InShaderBindingInstanceArray), OverrideInstanceData(InOverrideInstanceData), SubpassIndex(InSubpassIndex)
 {
     check(RenderObject);
     IsViewLight = true;
@@ -33,9 +33,9 @@ jDrawCommand::jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderF
 
 jDrawCommand::jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr
     , jRenderObject* InRenderObject, jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed
-    , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant, int32 InSubpassIndex)
+    , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant, const jVertexBuffer* InOverrideInstanceData, int32 InSubpassIndex)
     : RenderFrameContextPtr(InRenderFrameContextPtr), RenderObject(InRenderObject), RenderPass(InRenderPass), Shader(InShader), PipelineStateFixed(InPipelineStateFixed)
-    , PushConstant(InPushConstant), ShaderBindingInstanceArray(InShaderBindingInstanceArray), SubpassIndex(InSubpassIndex)
+    , PushConstant(InPushConstant), ShaderBindingInstanceArray(InShaderBindingInstanceArray), OverrideInstanceData(InOverrideInstanceData), SubpassIndex(InSubpassIndex)
 {
     check(RenderObject);
 }
@@ -84,7 +84,11 @@ void jDrawCommand::PrepareToDraw(bool InIsPositionOnly)
 
     jVertexBufferArray VertexBufferArray;
     VertexBufferArray.Add(InIsPositionOnly ? RenderObjectGeoDataPtr->VertexBuffer_PositionOnly : RenderObjectGeoDataPtr->VertexBuffer);
-    if (RenderObjectGeoDataPtr->VertexBuffer_InstanceData)
+    if (OverrideInstanceData)
+    {
+        VertexBufferArray.Add(OverrideInstanceData);
+    }
+    else if (RenderObjectGeoDataPtr->VertexBuffer_InstanceData)
     {
         VertexBufferArray.Add(RenderObjectGeoDataPtr->VertexBuffer_InstanceData);
     }
@@ -125,10 +129,11 @@ void jDrawCommand::Draw() const
         }
     }
 
-    RenderObject->BindBuffers(RenderFrameContextPtr, IsPositionOnly);
+    RenderObject->BindBuffers(RenderFrameContextPtr, IsPositionOnly, OverrideInstanceData);
 
     // Draw
     const auto& RenderObjectGeoDataPtr = RenderObject->GeometryDataPtr;
-    const int32 InstanceCount = RenderObjectGeoDataPtr->VertexBuffer_InstanceData ? RenderObjectGeoDataPtr->VertexBuffer_InstanceData->GetElementCount() : 1;
+    const jVertexBuffer* InstanceData = OverrideInstanceData ? OverrideInstanceData : RenderObjectGeoDataPtr->VertexBuffer_InstanceData;
+    const int32 InstanceCount = InstanceData ? InstanceData->GetElementCount() : 1;
     RenderObject->Draw(RenderFrameContextPtr, InstanceCount);
 }

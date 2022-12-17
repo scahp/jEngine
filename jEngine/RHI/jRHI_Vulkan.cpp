@@ -364,6 +364,36 @@ bool jRHI_Vulkan::InitRHI()
 
 	CreateSampleVRSTexture();
 
+	// Create InstanceVertexBuffer for cube map six face
+	// todo : It will be removed, when I have a system that can generate per instance data for visible faces
+	{
+        struct jFaceInstanceData
+        {
+            uint32 LayerIndex = 0;
+        };
+        jFaceInstanceData instanceData[6];
+        for (int32 i = 0; i < _countof(instanceData); ++i)
+        {
+            instanceData[i].LayerIndex = i;
+        }
+
+        auto streamParam = std::make_shared<jStreamParam<jFaceInstanceData>>();
+        streamParam->BufferType = EBufferType::STATIC;
+        streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::UINT32, sizeof(uint32)));
+        streamParam->Stride = sizeof(jFaceInstanceData);
+        streamParam->Name = jName("InstanceData");
+        streamParam->Data.resize(6);
+        memcpy(&streamParam->Data[0], instanceData, sizeof(instanceData));
+
+        auto VertexStream_InstanceData = std::make_shared<jVertexStreamData>();
+        VertexStream_InstanceData->ElementCount = _countof(instanceData);
+        VertexStream_InstanceData->StartLocation = 1;
+        VertexStream_InstanceData->BindingIndex = 1;
+        VertexStream_InstanceData->VertexInputRate = EVertexInputRate::INSTANCE;
+        VertexStream_InstanceData->Params.push_back(streamParam);
+		CubeMapInstanceDataForSixFace = g_rhi->CreateVertexBuffer(VertexStream_InstanceData);
+	}
+
 	return true;
 }
 
@@ -454,6 +484,12 @@ void jRHI_Vulkan::ReleaseRHI()
 	{
 		vkDestroyInstance(Instance, nullptr);
 		Instance = nullptr;
+	}
+
+	if (CubeMapInstanceDataForSixFace)
+	{
+		delete CubeMapInstanceDataForSixFace;
+		CubeMapInstanceDataForSixFace = nullptr;
 	}
 
     jSpirvHelper::Finalize();
@@ -682,22 +718,45 @@ jVertexBuffer* jRHI_Vulkan::CreateVertexBuffer(const std::shared_ptr<jVertexStre
                 }
                 break;
             }
+            case EBufferElementType::UINT16:
+            {
+                const int32 elementCount = element.Stride / sizeof(uint16);
+                switch (elementCount)
+                {
+                case 1:
+                    AttrFormat = VK_FORMAT_R16_UINT;
+                    break;
+                case 2:
+                    AttrFormat = VK_FORMAT_R16G16_UINT;
+                    break;
+                case 3:
+                    AttrFormat = VK_FORMAT_R16G16B16_UINT;
+                    break;
+                case 4:
+                    AttrFormat = VK_FORMAT_R16G16B16A16_UINT;
+                    break;
+                default:
+                    check(0);
+                    break;
+                }
+                break;
+            }
 			case EBufferElementType::UINT32:
 			{
 				const int32 elementCount = element.Stride / sizeof(uint32);
 				switch (elementCount)
 				{
 				case 1:
-					AttrFormat = VK_FORMAT_R32_SINT;
+					AttrFormat = VK_FORMAT_R32_UINT;
 					break;
 				case 2:
-					AttrFormat = VK_FORMAT_R32G32_SINT;
+					AttrFormat = VK_FORMAT_R32G32_UINT;
 					break;
 				case 3:
-					AttrFormat = VK_FORMAT_R32G32B32_SINT;
+					AttrFormat = VK_FORMAT_R32G32B32_UINT;
 					break;
 				case 4:
-					AttrFormat = VK_FORMAT_R32G32B32A32_SINT;
+					AttrFormat = VK_FORMAT_R32G32B32A32_UINT;
 					break;
 				default:
 					check(0);

@@ -62,6 +62,6 @@ void jSpotLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* OutDestDr
 
     check(OutDestDrawCommand);
     new (OutDestDrawCommand) jDrawCommand(InRenderFrameContextPtr, &InLightView, SpotLightCone->RenderObjects[0], InRenderPass
-        , Shader, &PipelineStateFixedInfo, ShaderBindingInstances, PushConstant, InSubpassIndex);
+        , Shader, &PipelineStateFixedInfo, ShaderBindingInstances, PushConstant, nullptr, InSubpassIndex);
     OutDestDrawCommand->PrepareToDraw(false);
 }

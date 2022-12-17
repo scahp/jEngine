@@ -128,7 +128,7 @@ void jRenderObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFra
 	Draw(InRenderFrameContext, 0, -1, 0, -1, 1);
 }
 
-void jRenderObject::BindBuffers(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, bool InPositionOnly) const
+void jRenderObject::BindBuffers(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, bool InPositionOnly, const jVertexBuffer* InOverrideInstanceData) const
 {
     if (InPositionOnly)
     {
@@ -140,8 +140,12 @@ void jRenderObject::BindBuffers(const std::shared_ptr<jRenderFrameContext>& InRe
         if (GeometryDataPtr->VertexBuffer)
             GeometryDataPtr->VertexBuffer->Bind(InRenderFrameContext);
     }
-    if (GeometryDataPtr->VertexBuffer_InstanceData)
+    
+    if (InOverrideInstanceData)
+        InOverrideInstanceData->Bind(InRenderFrameContext);
+    else if (GeometryDataPtr->VertexBuffer_InstanceData)
         GeometryDataPtr->VertexBuffer_InstanceData->Bind(InRenderFrameContext);
+
     if (GeometryDataPtr->IndexBuffer)
         GeometryDataPtr->IndexBuffer->Bind(InRenderFrameContext);
 }

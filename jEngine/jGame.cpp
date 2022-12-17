@@ -68,8 +68,6 @@ void jGame::Setup()
 	PointLight = jLight::CreatePointLight(Vector(10.0f, 100.0f, 10.0f), Vector4(1.0f, 0.75f, 0.75f, 1.0f), 150.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
 	SpotLight = jLight::CreateSpotLight(Vector(0.0f, 60.0f, 5.0f), Vector(1.0f, -1.0f, 0.4f).GetNormalize(), Vector4(0.0f, 1.0f, 0.0f, 1.0f), 200.0f, 0.35f, 0.5f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
 
-	PointLight->IsShadowCaster = false;		// PointLight Shadow Pass 의 Geometry Shader 사용 시 퍼포먼스가 좋지 않아 수정 예정.
-
 	if (NormalDirectionalLight)
 		jLight::AddLights(NormalDirectionalLight);
 	if (PointLight)
