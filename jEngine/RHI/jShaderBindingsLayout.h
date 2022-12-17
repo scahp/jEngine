@@ -196,6 +196,7 @@ struct jShaderBindingInstance
     virtual void BindGraphics(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const {}
     virtual void BindCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const {}
     virtual void* GetHandle() const { return nullptr; }
+    virtual const std::vector<uint32>* GetDynamicOffsets() const { return nullptr; }
 };
 
 using jShaderBindingInstanceArray = jResourceContainer<const jShaderBindingInstance*>;

@@ -2017,25 +2017,28 @@ jTexture* jRHI_Vulkan::CreateSampleVRSTexture()
 }
 
 void jRHI_Vulkan::BindGraphicsShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineStateLayout
-	, const jResourceContainer<void*>& InShaderBindingInstanceCombiner, uint32 InFirstSet) const
+	, const jShaderBindingInstanceCombiner& InShaderBindingInstanceCombiner, uint32 InFirstSet) const
 {
-	if (InShaderBindingInstanceCombiner.NumOfData)
+	if (InShaderBindingInstanceCombiner.DescriptorSetHandles.NumOfData)
 	{
 		check(InCommandBuffer);
 		vkCmdBindDescriptorSets((VkCommandBuffer)InCommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS
-			, (VkPipelineLayout)InPiplineStateLayout->GetPipelineLayoutHandle(), InFirstSet, InShaderBindingInstanceCombiner.NumOfData
-			, (const VkDescriptorSet*)&InShaderBindingInstanceCombiner[0], 0, nullptr);
-	}
+			, (VkPipelineLayout)InPiplineStateLayout->GetPipelineLayoutHandle(), InFirstSet
+			, InShaderBindingInstanceCombiner.DescriptorSetHandles.NumOfData, (const VkDescriptorSet*)&InShaderBindingInstanceCombiner.DescriptorSetHandles[0]
+			, InShaderBindingInstanceCombiner.DynamicOffsets.NumOfData, (InShaderBindingInstanceCombiner.DynamicOffsets.NumOfData ? &InShaderBindingInstanceCombiner.DynamicOffsets[0] : nullptr));
+	}	
 }
 
-void jRHI_Vulkan::BindComputeShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineStateLayout, const jResourceContainer<void*>& InShaderBindingInstanceCombiner, uint32 InFirstSet) const
+void jRHI_Vulkan::BindComputeShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineStateLayout
+	, const jShaderBindingInstanceCombiner& InShaderBindingInstanceCombiner, uint32 InFirstSet) const
 {
-	if (InShaderBindingInstanceCombiner.NumOfData)
+	if (InShaderBindingInstanceCombiner.DescriptorSetHandles.NumOfData)
 	{
 		check(InCommandBuffer);
 		vkCmdBindDescriptorSets((VkCommandBuffer)InCommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE
-			, (VkPipelineLayout)InPiplineStateLayout->GetPipelineLayoutHandle(), InFirstSet, InShaderBindingInstanceCombiner.NumOfData
-			, (const VkDescriptorSet*)&InShaderBindingInstanceCombiner[0], 0, nullptr);
+			, (VkPipelineLayout)InPiplineStateLayout->GetPipelineLayoutHandle(), InFirstSet
+			, InShaderBindingInstanceCombiner.DescriptorSetHandles.NumOfData, (const VkDescriptorSet*)&InShaderBindingInstanceCombiner.DescriptorSetHandles[0]
+			, InShaderBindingInstanceCombiner.DynamicOffsets.NumOfData, (InShaderBindingInstanceCombiner.DynamicOffsets.NumOfData ? &InShaderBindingInstanceCombiner.DynamicOffsets[0] : nullptr));
 	}
 }
 

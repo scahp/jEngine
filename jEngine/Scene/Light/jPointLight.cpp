@@ -42,7 +42,7 @@ jShaderBindingInstance* jPointLight::PrepareShaderBindingInstance(jTexture* InSh
     jShaderBindingArray ShaderBindingArray;
     jShaderBindingResourceInlineAllocator ResourceInlineAllocator;
 
-    ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_GRAPHICS
+    ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::ALL_GRAPHICS
         , ResourceInlineAllocator.Alloc<jUniformBufferResource>(LightDataUniformBlock));
 
     if (InShadowMap)

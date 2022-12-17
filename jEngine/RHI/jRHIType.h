@@ -528,7 +528,7 @@ DECLARE_ENUM_BIT_OPERATORS(EShaderAccessStageFlag)
 enum class EShaderBindingType : uint32
 {
 	UNIFORMBUFFER = 0,
-	UNIFROMBUFFER_DYNAMIC,			// 동적버퍼에 대한 설명 https://github.com/SaschaWillems/Vulkan/blob/master/examples/dynamicuniformbuffer/README.md
+	UNIFORMBUFFER_DYNAMIC,			// 동적버퍼에 대한 설명 https://github.com/SaschaWillems/Vulkan/blob/master/examples/dynamicuniformbuffer/README.md
 	TEXTURE_SAMPLER_SRV,
 	TEXTURE_SRV,
 	TEXTURE_UAV,

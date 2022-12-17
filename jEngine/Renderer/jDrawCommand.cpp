@@ -72,12 +72,20 @@ void jDrawCommand::PrepareToDraw(bool InIsPositionOnly)
         }
     }
 
-    // Bind ShaderBindings
+    // Gather ShaderBindings
     jShaderBindingsLayoutArray ShaderBindingLayoutArray;
     for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
     {
+        // Add DescriptorSetLayout data
         ShaderBindingLayoutArray.Add(ShaderBindingInstanceArray[i]->ShaderBindingsLayouts);
-        ShaderBindingInstanceCombiner.Add(ShaderBindingInstanceArray[i]->GetHandle());
+
+        // Add ShaderBindingInstanceCombiner data : DescriptorSets, DynamicOffsets
+        ShaderBindingInstanceCombiner.DescriptorSetHandles.Add(ShaderBindingInstanceArray[i]->GetHandle());
+        const std::vector<uint32>* pDynamicOffsetTest = ShaderBindingInstanceArray[i]->GetDynamicOffsets();
+        if (pDynamicOffsetTest && pDynamicOffsetTest->size())
+        {
+            ShaderBindingInstanceCombiner.DynamicOffsets.Add((void*)pDynamicOffsetTest->data(), (int32)pDynamicOffsetTest->size());
+        }
     }
 
     const auto& RenderObjectGeoDataPtr = RenderObject->GeometryDataPtr;

@@ -90,6 +90,8 @@ void jShaderBindingInstance_Vulkan::CreateWriteDescriptorSet(
     std::vector<VkWriteDescriptorSet>& descriptorWrites = OutDescriptorWrites.DescriptorWrites;
     descriptors.resize(InShaderBindingArray.NumOfData);
     descriptorWrites.resize(InShaderBindingArray.NumOfData);
+    OutDescriptorWrites.DynamicOffsets.clear();
+    OutDescriptorWrites.DynamicOffsets.reserve(InShaderBindingArray.NumOfData);
 
     for (int32 i = 0; i < InShaderBindingArray.NumOfData; ++i)
     {
@@ -123,7 +125,8 @@ void jShaderBindingInstance_Vulkan::UpdateWriteDescriptorSet(
     jWriteDescriptorSet& OutDescriptorWrites, const jShaderBindingArray& InShaderBindingArray)
 {
     check(InShaderBindingArray.NumOfData == OutDescriptorWrites.DescriptorWrites.size());
-
+    
+    OutDescriptorWrites.DynamicOffsets.clear();
     for (int32 i = 0; i < InShaderBindingArray.NumOfData; ++i)
     {
         OutDescriptorWrites.SetWriteDescriptorInfo(i, InShaderBindingArray[i]);
@@ -168,7 +171,8 @@ void jShaderBindingInstance_Vulkan::BindGraphics(const std::shared_ptr<jRenderFr
     check(InRenderFrameContext);
     check(InRenderFrameContext->GetActiveCommandBuffer());
     check(pipelineLayout);
-    vkCmdBindDescriptorSets((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, (VkPipelineLayout)(pipelineLayout), InSlot, 1, &DescriptorSet, 0, nullptr);
+    vkCmdBindDescriptorSets((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, (VkPipelineLayout)(pipelineLayout), InSlot
+        , 1, &DescriptorSet, (uint32)WriteDescriptorSet.DynamicOffsets.size(), WriteDescriptorSet.DynamicOffsets.data());
 }
 
 void jShaderBindingInstance_Vulkan::BindCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot) const
@@ -176,7 +180,8 @@ void jShaderBindingInstance_Vulkan::BindCompute(const std::shared_ptr<jRenderFra
     check(InRenderFrameContext);
     check(InRenderFrameContext->GetActiveCommandBuffer());
     check(pipelineLayout);
-    vkCmdBindDescriptorSets((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, (VkPipelineLayout)(pipelineLayout), InSlot, 1, &DescriptorSet, 0, nullptr);
+    vkCmdBindDescriptorSets((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, (VkPipelineLayout)(pipelineLayout), InSlot
+        , 1, &DescriptorSet, (uint32)WriteDescriptorSet.DynamicOffsets.size(), WriteDescriptorSet.DynamicOffsets.data());
 }
 
 void jWriteDescriptorSet::SetWriteDescriptorInfo(int32 InIndex, const jShaderBinding* InShaderBinding)
@@ -184,7 +189,6 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(int32 InIndex, const jShaderBin
     switch (InShaderBinding->BindingType)
     {
     case EShaderBindingType::UNIFORMBUFFER:
-    case EShaderBindingType::UNIFROMBUFFER_DYNAMIC:
     {
         const jUniformBufferResource* ubor = reinterpret_cast<const jUniformBufferResource*>(InShaderBinding->Resource);
         if (ensure(ubor && ubor->UniformBuffer))
@@ -194,6 +198,21 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(int32 InIndex, const jShaderBin
             bufferInfo.offset = ubor->UniformBuffer->GetBufferOffset();
             bufferInfo.range = ubor->UniformBuffer->GetBufferSize();		// 전체 사이즈라면 VK_WHOLE_SIZE 이거 가능
             check(bufferInfo.buffer);
+        }
+        break;
+    }
+    case EShaderBindingType::UNIFORMBUFFER_DYNAMIC:
+    {
+        const jUniformBufferResource* ubor = reinterpret_cast<const jUniformBufferResource*>(InShaderBinding->Resource);
+        if (ensure(ubor && ubor->UniformBuffer))
+        {
+            VkDescriptorBufferInfo& bufferInfo = WriteDescriptorInfos[InIndex].BufferInfo;
+            bufferInfo.buffer = (VkBuffer)ubor->UniformBuffer->GetBuffer();
+            bufferInfo.offset = 0;
+            bufferInfo.range = ubor->UniformBuffer->GetBufferSize();		// 전체 사이즈라면 VK_WHOLE_SIZE 이거 가능
+            check(bufferInfo.buffer);
+
+            DynamicOffsets.push_back((uint32)ubor->UniformBuffer->GetBufferOffset());
         }
         break;
     }

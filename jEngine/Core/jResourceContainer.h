@@ -11,12 +11,21 @@ struct jResourceContainer
         NumOfData = InData.NumOfData;
     }
 
-    void Add(T ShaderBindingLayout)
+    void Add(T InElement)
     {
         check(NumOfInlineData > NumOfData);
 
-        Data[NumOfData] = ShaderBindingLayout;
+        Data[NumOfData] = InElement;
         ++NumOfData;
+    }
+
+    void Add(void* InElementAddress, int32 InCount)
+    {
+        check(NumOfInlineData > (NumOfData + InCount));
+        check(InElementAddress);
+
+        memcpy(&Data[NumOfData], InElementAddress, InCount * sizeof(T));
+        NumOfData += InCount;
     }
 
     void PopBack()

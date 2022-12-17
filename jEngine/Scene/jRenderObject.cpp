@@ -186,7 +186,7 @@ jShaderBindingInstance* jRenderObject::CreateShaderBindingInstance()
     OneFrameUniformBuffer.Init(sizeof(ubo));
     OneFrameUniformBuffer.UpdateBufferData(&ubo, sizeof(ubo));
 	
-	ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_GRAPHICS
+	ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::ALL_GRAPHICS
 		, ResourceInlineAllactor.Alloc<jUniformBufferResource>(&OneFrameUniformBuffer));
 
     return g_rhi->CreateShaderBindingInstance(ShaderBindingArray);

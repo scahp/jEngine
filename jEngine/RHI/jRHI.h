@@ -276,6 +276,13 @@ public:
 	jShaderBindingInstance* ViewUniformBufferShaderBindingInstance = nullptr;
 };
 
+// BindGraphicsShaderBindingInstances 에서 바인딩 할 ShaderBindingInstance 배열을 얻어오는데 사용하는 구조체
+struct jShaderBindingInstanceCombiner
+{
+    jResourceContainer<void*> DescriptorSetHandles;
+    jResourceContainer<uint32> DynamicOffsets;
+};
+
 class jRHI
 {
 public:
@@ -452,8 +459,10 @@ public:
 	virtual jMemoryPool* GetMemoryPool() const { return nullptr; }
 
 	virtual void NextSubpass(const jCommandBuffer* commandBuffer) const {}
-	virtual void BindGraphicsShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineStateLayout, const jResourceContainer<void*>& InShaderBindingInstanceCombiner, uint32 InFirstSet) const {}
-	virtual void BindComputeShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineStateLayout, const jResourceContainer<void*>& InShaderBindingInstanceCombiner, uint32 InFirstSet) const {}
+	virtual void BindGraphicsShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineStateLayout
+		, const jShaderBindingInstanceCombiner& InShaderBindingInstanceCombiner, uint32 InFirstSet) const {}
+	virtual void BindComputeShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineStateLayout
+		, const jShaderBindingInstanceCombiner& InShaderBindingInstanceCombiner, uint32 InFirstSet) const {}
 
 	virtual jFenceManager* GetFenceManager() { return nullptr; }
 	virtual jSemaphoreManager* GetSemaphoreManager() { return nullptr; }

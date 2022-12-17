@@ -684,7 +684,7 @@ void jRenderer::PostProcess()
         {
             if (IsBloom)
             {
-                ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_GRAPHICS
+                ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::ALL_GRAPHICS
                     , ResourceInlineAllactor.Alloc<jUniformBufferResource>(&OneFrameUniformBuffer));
             }
 
@@ -839,7 +839,7 @@ void jRenderer::PostProcess()
             OneFrameUniformBuffer.Init(sizeof(EyeAdaptationUniformBuffer));
             OneFrameUniformBuffer.UpdateBufferData(&EyeAdaptationUniformBuffer, sizeof(EyeAdaptationUniformBuffer));
             {
-                ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::COMPUTE
+                ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
                     , ResourceInlineAllactor.Alloc<jUniformBufferResource>(&OneFrameUniformBuffer));
             }
 
@@ -932,7 +932,7 @@ void jRenderer::PostProcess()
         OneFrameUniformBuffer.Init(sizeof(CommonComputeUniformBuffer));
         OneFrameUniformBuffer.UpdateBufferData(&CommonComputeUniformBuffer, sizeof(CommonComputeUniformBuffer));
         {
-            ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::COMPUTE
+            ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
                 , ResourceInlineAllactor.Alloc<jUniformBufferResource>(&OneFrameUniformBuffer));
         }
 

@@ -13,6 +13,7 @@ struct jWriteDescriptorSet
     {
         WriteDescriptorInfos.clear();
         DescriptorWrites.clear();
+        DynamicOffsets.clear();
         IsInitialized = false;
     }
 
@@ -21,6 +22,7 @@ struct jWriteDescriptorSet
     bool IsInitialized = false;
     std::vector<jWriteDescriptorInfo> WriteDescriptorInfos;
     std::vector<VkWriteDescriptorSet> DescriptorWrites;         // 이게 최종 결과임, WriteDescriptorInfos 를 사용하여 생성함.
+    std::vector<uint32> DynamicOffsets;
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -40,6 +42,7 @@ struct jShaderBindingInstance_Vulkan : public jShaderBindingInstance
     virtual void BindGraphics(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const override;
     virtual void BindCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const override;
     virtual void* GetHandle() const override { return DescriptorSet; }
+    virtual const std::vector<uint32>* GetDynamicOffsets() const override { return &WriteDescriptorSet.DynamicOffsets; }
 
     VkDescriptorSet DescriptorSet = nullptr;        // DescriptorPool 을 해제하면 모두 처리될 수 있어서 따로 소멸시키지 않음
     jWriteDescriptorSet WriteDescriptorSet;
