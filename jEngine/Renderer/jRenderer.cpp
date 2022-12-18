@@ -1095,6 +1095,7 @@ void jRenderer::Render()
     ShadowPass();
 
     // Queue submit to prepare shadowmap for basepass 
+    if (gOptions.QueueSubmitAfterShadowPass)
     {
         SCOPE_CPU_PROFILE(QueueSubmitAfterShadowPass);
         RenderFrameContextPtr->GetActiveCommandBuffer()->End();
@@ -1105,6 +1106,7 @@ void jRenderer::Render()
     BasePass();
 
     // Queue submit to prepare scenecolor RT for postprocess
+    if (gOptions.QueueSubmitAfterBasePass)
     {
         SCOPE_CPU_PROFILE(QueueSubmitAfterBasePass);
         RenderFrameContextPtr->GetActiveCommandBuffer()->End();

@@ -260,6 +260,8 @@ void jImGUI_Vulkan::NewFrame(bool updateFrameGraph)
         ImGui::PopItemFlag();
     }
     ImGui::Checkbox("ShowDebugObject", &gOptions.ShowDebugObject);
+    ImGui::Checkbox("QueueSubmitAfterShadowPass", &gOptions.QueueSubmitAfterShadowPass);
+    ImGui::Checkbox("QueueSubmitAfterBasePass", &gOptions.QueueSubmitAfterBasePass);
     ImGui::SliderFloat("AutoExposureKeyValueScale", &gOptions.AutoExposureKeyValueScale, -12.0f, 12.0f);
     ImGui::Separator();
 

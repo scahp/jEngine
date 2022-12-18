@@ -11,6 +11,8 @@ struct jOptions
     bool UseSubpass = true;
     bool UseMemoryless = true;
     bool ShowDebugObject = false;
+    bool QueueSubmitAfterShadowPass = false;
+    bool QueueSubmitAfterBasePass = false;
     Vector CameraPos = Vector::ZeroVector;
     float AutoExposureKeyValueScale = 1.0f;
 };
