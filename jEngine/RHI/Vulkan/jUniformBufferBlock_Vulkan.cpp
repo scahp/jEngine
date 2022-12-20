@@ -16,8 +16,38 @@ void jUniformBufferBlock_Vulkan::Init(size_t size)
     }
     else
     {
-        jVulkanBufferUtil::AllocateBuffer(EVulkanBufferBits::UNIFORM_BUFFER, EVulkanMemoryBits::HOST_VISIBLE
-            | EVulkanMemoryBits::HOST_COHERENT, VkDeviceSize(size), Buffer);
+        Buffer.HasBufferOwnership = false;          // Prevent destroy the ring buffer
+        Buffer.AllocatedSize = size;
+
+        //jVulkanBufferUtil::AllocateBuffer(EVulkanBufferBits::UNIFORM_BUFFER, EVulkanMemoryBits::HOST_VISIBLE
+        //    | EVulkanMemoryBits::HOST_COHERENT, VkDeviceSize(size), Buffer);
+    }
+}
+
+void jUniformBufferBlock_Vulkan::AllocBufferFromGlobalMemory(size_t size)
+{
+    // If we have allocated memory frame global memory, reallocate it again.
+    if (Memory.IsValid())
+    {
+        g_rhi->GetMemoryPool()->Free(Memory);
+    }
+
+    Memory = g_rhi->GetMemoryPool()->Alloc(EVulkanBufferBits::UNIFORM_BUFFER
+        , EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT, VkDeviceSize(size));
+
+    check(Memory.IsValid());
+
+    Buffer.Buffer = (VkBuffer)Memory.Buffer;
+    Buffer.AllocatedSize = Memory.Range.DataSize;
+    Buffer.Offset = Memory.Range.Offset;
+    Buffer.MappedPointer = Memory.GetMappedPointer();
+}
+
+void jUniformBufferBlock_Vulkan::Release()
+{
+    if (Memory.IsValid())
+    {
+        g_rhi->GetMemoryPool()->Free(Memory);
     }
 }
 
@@ -27,7 +57,7 @@ void jUniformBufferBlock_Vulkan::UpdateBufferData(const void* InData, size_t InS
 
     if (IsUseRingBuffer())
     {
-        jRingBuffer_Vulkan* ringBuffer = g_rhi_vk->GetUniformRingBuffer();
+        jRingBuffer_Vulkan* ringBuffer = g_rhi_vk->GetOneFrameUniformRingBuffer();
         Buffer.Offset = ringBuffer->Alloc(InSize);
         Buffer.AllocatedSize = InSize;
         Buffer.Buffer = ringBuffer->Buffer;
@@ -45,6 +75,9 @@ void jUniformBufferBlock_Vulkan::UpdateBufferData(const void* InData, size_t InS
     else
     {
 #if USE_VK_MEMORY_POOL
+        check(Buffer.AllocatedSize);
+        AllocBufferFromGlobalMemory(Buffer.AllocatedSize);
+
         if (ensure(Buffer.MappedPointer))
         {
             uint8* startAddr = ((uint8*)Buffer.MappedPointer) + Buffer.Offset;
@@ -72,7 +105,7 @@ void jUniformBufferBlock_Vulkan::ClearBuffer(int32 clearValue)
 {
     if (IsUseRingBuffer())
     {
-        jRingBuffer_Vulkan* ringBuffer = g_rhi_vk->GetUniformRingBuffer();
+        jRingBuffer_Vulkan* ringBuffer = g_rhi_vk->GetOneFrameUniformRingBuffer();
         Buffer.Offset = ringBuffer->Alloc(Buffer.AllocatedSize);
         Buffer.AllocatedSize = Buffer.AllocatedSize;
         Buffer.Buffer = ringBuffer->Buffer;
@@ -86,6 +119,9 @@ void jUniformBufferBlock_Vulkan::ClearBuffer(int32 clearValue)
     else
     {
 #if USE_VK_MEMORY_POOL
+        check(Buffer.AllocatedSize);
+        AllocBufferFromGlobalMemory(Buffer.AllocatedSize);
+
         if (ensure(Buffer.MappedPointer))
         {
             memset(((uint8*)Buffer.MappedPointer) + Buffer.Offset, 0, Buffer.AllocatedSize);

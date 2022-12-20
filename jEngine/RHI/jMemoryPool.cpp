@@ -3,7 +3,7 @@
 
 void* jMemory::GetMappedPointer() const
 {
-    return SubMemoryAllocator->MappedPointer;
+    return SubMemoryAllocator->GetMappedPointer();
 }
 
 void* jMemory::GetMemory() const
@@ -15,7 +15,7 @@ void* jMemory::GetMemory() const
 // jMemory
 void jMemory::Free()
 {
-    SubMemoryAllocator->Free(*this);
+    g_rhi->GetMemoryPool()->Free(*this);
     Reset();
 }
 
@@ -96,4 +96,47 @@ jMemory jMemoryPool::Alloc(EVulkanBufferBits InUsages, EVulkanMemoryBits InPrope
     check(alloc.IsValid());
 
     return alloc;
+}
+
+void jMemoryPool::Free(const jMemory& InFreeMemory)
+{
+    jScopedLock s(&Lock);
+
+    const int32 CurrentFrameNumber = g_rhi->GetCurrentFrameNumber();
+    const int32 OldestFrameToKeep = CurrentFrameNumber - NumOfFramesToWaitBeforeReleasing;
+
+    // ProcessPendingMemoryFree
+    {
+        // Check it is too early
+        if (CurrentFrameNumber >= CanReleasePendingFreeMemoryFrameNumber)
+        {
+            // Release pending memory
+            int32 i = 0;
+            for (; i < PendingFree.size(); ++i)
+            {
+                jPendingFreeMemory& PendingFreeMemory = PendingFree[i];
+                if (PendingFreeMemory.FrameIndex < OldestFrameToKeep)
+                {
+                    check(PendingFreeMemory.Memory.SubMemoryAllocator);
+                    PendingFreeMemory.Memory.SubMemoryAllocator->Free(PendingFreeMemory.Memory);
+                }
+                else
+                {
+                    CanReleasePendingFreeMemoryFrameNumber = PendingFreeMemory.FrameIndex + NumOfFramesToWaitBeforeReleasing + 1;
+                    break;
+                }
+            }
+            if (i > 0)
+            {
+                const size_t RemainingSize = (PendingFree.size() - i);
+                if (RemainingSize > 0)
+                {
+                    memcpy(&PendingFree[0], &PendingFree[i], sizeof(jPendingFreeMemory) * RemainingSize);
+                }
+                PendingFree.resize(RemainingSize);
+            }
+        }
+    }
+
+    PendingFree.emplace_back(jPendingFreeMemory(CurrentFrameNumber, InFreeMemory));
 }

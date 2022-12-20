@@ -34,7 +34,7 @@ void jRenderer::Setup()
 {
     SCOPE_CPU_PROFILE(Setup);
 
-    FrameIndex = g_rhi_vk->CurrenFrameIndex;
+    FrameIndex = g_rhi_vk->CurrentFrameIndex;
     UseForwardRenderer = RenderFrameContextPtr->UseForwardRenderer;
 
     // View 별로 저장 할 수 있어야 함

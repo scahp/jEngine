@@ -80,7 +80,8 @@ public:
 	jQueue_Vulkan ComputeQueue;
 	jQueue_Vulkan PresentQueue;
 
-    uint32 CurrenFrameIndex = 0;
+    uint32 CurrentFrameIndex = 0;		// FrameIndex is swapchain number that is currently used.
+	uint32 CurrentFrameNumber = 0;		// FrameNumber is just Incremented frame by frame.
 
 	// 논리 디바이스 생성
 	VkDevice Device;
@@ -95,7 +96,7 @@ public:
 
     jQueryPoolTime_Vulkan* QueryPoolTime = nullptr;
 	jQueryPoolOcclusion_Vulkan* QueryPoolOcclusion = nullptr;
-	std::vector<jRingBuffer_Vulkan*> UniformRingBuffers;
+	std::vector<jRingBuffer_Vulkan*> OneFrameUniformRingBuffers;
 	std::vector<jRingBuffer_Vulkan*> SSBORingBuffers;
 	std::vector<jDescriptorPool_Vulkan*> DescriptorPools;
 
@@ -176,10 +177,13 @@ public:
 	virtual jQueryPool* GetQueryTimePool() const override { return QueryPoolTime; }
 	virtual jQueryPool* GetQueryOcclusionPool() const override { return QueryPoolOcclusion; }
 	virtual jSwapchain* GetSwapchain() const override { return Swapchain; }
+	virtual uint32 GetCurrentFrameIndex() const override { return CurrentFrameIndex; }
+	virtual uint32 GetCurrentFrameNumber() const override { return CurrentFrameNumber; }
+	virtual void IncrementFrameNumber() { ++CurrentFrameNumber; }
 
-	jRingBuffer_Vulkan* GetUniformRingBuffer() const { return UniformRingBuffers[CurrenFrameIndex]; }
-	jRingBuffer_Vulkan* GetSSBORingBuffer() const { return SSBORingBuffers[CurrenFrameIndex]; }
-	jDescriptorPool_Vulkan* GetDescriptorPools() const { return DescriptorPools[CurrenFrameIndex]; }
+	jRingBuffer_Vulkan* GetOneFrameUniformRingBuffer() const { return OneFrameUniformRingBuffers[CurrentFrameIndex]; }
+	jRingBuffer_Vulkan* GetSSBORingBuffer() const { return SSBORingBuffers[CurrentFrameIndex]; }
+	jDescriptorPool_Vulkan* GetDescriptorPools() const { return DescriptorPools[CurrentFrameIndex]; }
 
 	virtual void Flush() const override;
 	virtual void Finish() const override;

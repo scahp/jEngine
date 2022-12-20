@@ -66,7 +66,9 @@ void jRenderObjectGeometryData::UpdateVertexStream()
 
 // jRenderObject
 jRenderObject::jRenderObject()
+    : RenderObjectUniformParameters(jNameStatic("RenderObjectUniformParameters"), jLifeTimeType::MultiFrame)
 {
+    RenderObjectUniformParameters.Init(sizeof(jRenderObjectUniformBuffer));
 }
 
 jRenderObject::~jRenderObject()
@@ -77,6 +79,7 @@ jRenderObject::~jRenderObject()
 void jRenderObject::CreateRenderObject(const std::shared_ptr<jRenderObjectGeometryData>& InRenderObjectGeometryData)
 {
     GeometryDataPtr = InRenderObjectGeometryData;
+    UpdateWorldMatrix();
 }
 
 void jRenderObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext
@@ -159,6 +162,8 @@ void jRenderObject::UpdateWorldMatrix()
         auto scaleMatrix = Matrix::MakeScale(Scale);
         World = posMatrix * rotMatrix * scaleMatrix;
 
+        NeedToUpdateRenderObjectUniformParameters = true;
+
         ClearDirtyFlags(EDirty::POS_ROT_SCALE);
     }
 }
@@ -174,20 +179,24 @@ const std::vector<float>& jRenderObject::GetVertices() const
 
 jShaderBindingInstance* jRenderObject::CreateShaderBindingInstance()
 {
-	jRenderObjectUniformBuffer ubo;
-	ubo.M = World;
-	ubo.InvM = ubo.M;
-
     int32 BindingPoint = 0;
 	jShaderBindingArray ShaderBindingArray;
 	jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
 
-    jUniformBufferBlock_Vulkan OneFrameUniformBuffer(jNameStatic("RenderObjectUniformParameters"), jLifeTimeType::OneFrame);
-    OneFrameUniformBuffer.Init(sizeof(ubo));
-    OneFrameUniformBuffer.UpdateBufferData(&ubo, sizeof(ubo));
+    // Update uniform buffer if it need to.
+    if (NeedToUpdateRenderObjectUniformParameters)
+    {
+        NeedToUpdateRenderObjectUniformParameters = false;
+
+        jRenderObjectUniformBuffer ubo;
+        ubo.M = World;
+        ubo.InvM = ubo.M;
+
+        RenderObjectUniformParameters.UpdateBufferData(&ubo, sizeof(ubo));
+    }
 	
 	ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::ALL_GRAPHICS
-		, ResourceInlineAllactor.Alloc<jUniformBufferResource>(&OneFrameUniformBuffer));
+		, ResourceInlineAllactor.Alloc<jUniformBufferResource>(&RenderObjectUniformParameters));
 
     return g_rhi->CreateShaderBindingInstance(ShaderBindingArray);
 }

@@ -39,6 +39,10 @@ struct jUniformBufferBlock_Vulkan : public IUniformBufferBlock
     {}
 
     virtual void Init(size_t size) override;
+
+    void AllocBufferFromGlobalMemory(size_t size);
+
+    virtual void Release() override;
     virtual void UpdateBufferData(const void* InData, size_t InSize) override;
 
     virtual void ClearBuffer(int32 clearValue) override;
@@ -50,6 +54,7 @@ struct jUniformBufferBlock_Vulkan : public IUniformBufferBlock
     virtual size_t GetBufferOffset() const override { return Buffer.Offset; }
 
     jBuffer_Vulkan Buffer;
+    jMemory Memory;
 
 private:
     jUniformBufferBlock_Vulkan(const jUniformBufferBlock_Vulkan&) = delete;

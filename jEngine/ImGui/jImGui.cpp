@@ -396,7 +396,7 @@ void jImGUI_Vulkan::UpdateBuffers()
     if ((imDrawData->TotalVtxCount == 0) || (imDrawData->TotalIdxCount == 0))
         return;
 
-    auto& DynamicBuffer = DynamicBufferData[g_rhi_vk->CurrenFrameIndex];
+    auto& DynamicBuffer = DynamicBufferData[g_rhi_vk->CurrentFrameIndex];
 
     // Update buffers only if vertex or index count has been changed compared to current buffer size
 
@@ -443,7 +443,7 @@ void jImGUI_Vulkan::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFra
     if (!IsInitialized)
         return;
 
-    NewFrame((g_rhi_vk->CurrenFrameIndex == 0));
+    NewFrame((g_rhi_vk->CurrentFrameIndex == 0));
     UpdateBuffers();
 
     DEBUG_EVENT_WITH_COLOR(InRenderFrameContextPtr, "ImGUI", Vector4(0.8f, 0.8f, 0.8f, 1.0f));

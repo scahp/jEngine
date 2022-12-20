@@ -339,8 +339,8 @@ bool jRHI_Vulkan::InitRHI()
 	QueryPoolOcclusion = new jQueryPoolOcclusion_Vulkan();
 	QueryPoolOcclusion->Create();
 
-	UniformRingBuffers.resize(Swapchain->GetNumOfSwapchain());
-	for (auto& iter : UniformRingBuffers)
+	OneFrameUniformRingBuffers.resize(Swapchain->GetNumOfSwapchain());
+	for (auto& iter : OneFrameUniformRingBuffers)
 	{
         iter = new jRingBuffer_Vulkan();
 		iter->Create(EVulkanBufferBits::UNIFORM_BUFFER, 16 * 1024 * 1024, (uint32)DeviceProperties.limits.minUniformBufferOffsetAlignment);
@@ -446,9 +446,9 @@ void jRHI_Vulkan::ReleaseRHI()
 	delete QueryPoolOcclusion;
 	QueryPoolOcclusion = nullptr;
 
-	for (auto& iter : UniformRingBuffers)
+	for (auto& iter : OneFrameUniformRingBuffers)
 		delete iter;
-	UniformRingBuffers.clear();
+	OneFrameUniformRingBuffers.clear();
 
     for (auto& iter : SSBORingBuffers)
         delete iter;
@@ -575,7 +575,7 @@ void jRHI_Vulkan::RecreateSwapChain()
     jImGUI_Vulkan::Get().Release();
     jImGUI_Vulkan::Get().Initialize((float)SCR_WIDTH, (float)SCR_HEIGHT);
 
-    CurrenFrameIndex = 0;
+    CurrentFrameIndex = 0;
 
 	delete SampleVRSTexture;
 	SampleVRSTexture = nullptr;
@@ -1418,9 +1418,9 @@ std::shared_ptr<jRenderFrameContext> jRHI_Vulkan::BeginRenderFrame()
 
     // timeout 은 nanoseconds. UINT64_MAX 는 타임아웃 없음
     VkResult acquireNextImageResult = vkAcquireNextImageKHR(Device, (VkSwapchainKHR)Swapchain->GetHandle(), UINT64_MAX
-		, (VkSemaphore)Swapchain->Images[CurrenFrameIndex]->Available->GetHandle(), VK_NULL_HANDLE, &CurrenFrameIndex);
+		, (VkSemaphore)Swapchain->Images[CurrentFrameIndex]->Available->GetHandle(), VK_NULL_HANDLE, &CurrentFrameIndex);
 
-    VkFence lastCommandBufferFence = Swapchain->Images[CurrenFrameIndex]->CommandBufferFence;
+    VkFence lastCommandBufferFence = Swapchain->Images[CurrentFrameIndex]->CommandBufferFence;
 
     if (acquireNextImageResult != VK_SUCCESS)
         return nullptr;
@@ -1445,18 +1445,18 @@ std::shared_ptr<jRenderFrameContext> jRHI_Vulkan::BeginRenderFrame()
     if (lastCommandBufferFence != VK_NULL_HANDLE)
         vkWaitForFences(Device, 1, &lastCommandBufferFence, VK_TRUE, UINT64_MAX);
 
-	GetUniformRingBuffer()->Reset();
+	GetOneFrameUniformRingBuffer()->Reset();
 	GetDescriptorPools()->Reset();
 
     // 이 프레임에서 펜스를 사용한다고 마크 해둠
-	Swapchain->Images[CurrenFrameIndex]->CommandBufferFence = (VkFence)commandBuffer->GetFenceHandle();
+	Swapchain->Images[CurrentFrameIndex]->CommandBufferFence = (VkFence)commandBuffer->GetFenceHandle();
 
     auto renderFrameContextPtr = std::make_shared<jRenderFrameContext>(commandBuffer);
 	renderFrameContextPtr->UseForwardRenderer = !gOptions.UseDeferredRenderer;
-	renderFrameContextPtr->FrameIndex = CurrenFrameIndex;
+	renderFrameContextPtr->FrameIndex = CurrentFrameIndex;
 	renderFrameContextPtr->SceneRenderTarget = new jSceneRenderTarget();
-	renderFrameContextPtr->SceneRenderTarget->Create(Swapchain->GetSwapchainImage(CurrenFrameIndex));
-	renderFrameContextPtr->CurrentWaitSemaphore = Swapchain->Images[CurrenFrameIndex]->Available;
+	renderFrameContextPtr->SceneRenderTarget->Create(Swapchain->GetSwapchainImage(CurrentFrameIndex));
+	renderFrameContextPtr->CurrentWaitSemaphore = Swapchain->Images[CurrentFrameIndex]->Available;
 
 	return renderFrameContextPtr;
 }
@@ -1502,8 +1502,8 @@ void jRHI_Vulkan::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& ren
  //       return;
  //   }
 
-	VkSemaphore signalSemaphore[] = { (VkSemaphore)Swapchain->Images[CurrenFrameIndex]->RenderFinished->GetHandle() };
-	QueueSubmit(renderFrameContextPtr, Swapchain->Images[CurrenFrameIndex]->RenderFinished);
+	VkSemaphore signalSemaphore[] = { (VkSemaphore)Swapchain->Images[CurrentFrameIndex]->RenderFinished->GetHandle() };
+	QueueSubmit(renderFrameContextPtr, Swapchain->Images[CurrentFrameIndex]->RenderFinished);
 
     VkPresentInfoKHR presentInfo = {};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -1513,7 +1513,7 @@ void jRHI_Vulkan::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& ren
     VkSwapchainKHR swapChains[] = { Swapchain->Swapchain };
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = swapChains;
-    presentInfo.pImageIndices = &CurrenFrameIndex;
+    presentInfo.pImageIndices = &CurrentFrameIndex;
 
     // 여러개의 스왑체인에 제출하는 경우만 모든 스왑체인으로 잘 제출 되었나 확인하는데 사용
     // 1개인 경우 그냥 vkQueuePresentKHR 의 리턴값을 확인하면 됨.
@@ -1524,7 +1524,7 @@ void jRHI_Vulkan::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& ren
     // 여러 프레임에 걸쳐 동시에 imageAvailableSemaphore 와 renderFinishedSemaphore를 재사용하게 되는 문제가 있음.
     // 1). 한프레임을 마치고 큐가 빌때까지 기다리는 것으로 해결할 수 있음. 한번에 1개의 프레임만 완성 가능(최적의 해결방법은 아님)
     // 2). 여러개의 프레임을 동시에 처리 할수있도록 확장. 동시에 진행될 수 있는 최대 프레임수를 지정해줌.
-    CurrenFrameIndex = (CurrenFrameIndex + 1) % Swapchain->Images.size();
+    CurrentFrameIndex = (CurrentFrameIndex + 1) % Swapchain->Images.size();
     renderFrameContextPtr->Destroy();
 
     // 세마포어의 일관된 상태를 보장하기 위해서(세마포어 로직을 변경하지 않으려 노력한듯 함) vkQueuePresentKHR 이후에 framebufferResized 를 체크하는 것이 중요함.
@@ -1561,7 +1561,7 @@ void jRHI_Vulkan::QueueSubmit(const std::shared_ptr<jRenderFrameContext>& render
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &vkCommandBuffer;
 
-	renderFrameContextPtr->CurrentWaitSemaphore = InSignalSemaphore;
+    renderFrameContextPtr->CurrentWaitSemaphore = InSignalSemaphore;
 
     VkSemaphore signalSemaphores[] = { (VkSemaphore)InSignalSemaphore->GetHandle() };
     submitInfo.signalSemaphoreCount = 1;

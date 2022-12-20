@@ -110,6 +110,7 @@ int main()
             = std::chrono::duration_cast<std::chrono::seconds>(currentTime - lastTime);
 		lastTime = currentTime;
 
+		g_rhi->IncrementFrameNumber();
         g_Engine.Update(g_timeDeltaSecond);
         g_Engine.Draw();
 		jPerformanceProfile::GetInstance().Update(g_timeDeltaSecond);

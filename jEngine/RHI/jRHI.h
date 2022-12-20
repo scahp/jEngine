@@ -105,6 +105,7 @@ struct IUniformBufferBlock
 	virtual size_t GetBufferOffset() const { return 0; }
 
 	virtual void Init(size_t size) = 0;
+	virtual void Release() = 0;
 	virtual void Bind(const jShader* shader) const { }
 	virtual void UpdateBufferData(const void* newData, size_t size) = 0;
 	virtual void ClearBuffer(int32 clearValue = 0) = 0;
@@ -466,6 +467,9 @@ public:
 
 	virtual jFenceManager* GetFenceManager() { return nullptr; }
 	virtual jSemaphoreManager* GetSemaphoreManager() { return nullptr; }
+	virtual uint32 GetCurrentFrameIndex() const { return 0; }
+	virtual uint32 GetCurrentFrameNumber() const { return 0; }
+	virtual void IncrementFrameNumber() {}
 };
 
 // Not thred safe

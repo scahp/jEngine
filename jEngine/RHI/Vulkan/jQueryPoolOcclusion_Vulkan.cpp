@@ -24,8 +24,8 @@ bool jQueryPoolOcclusion_Vulkan::Create()
 
 void jQueryPoolOcclusion_Vulkan::ResetQueryPool(jCommandBuffer* pCommanBuffer /*= nullptr*/)
 {
-    vkCmdResetQueryPool((VkCommandBuffer)pCommanBuffer->GetHandle(), QueryPool, MaxQueryOcclusionCount * g_rhi_vk->CurrenFrameIndex, MaxQueryOcclusionCount);
-    QueryIndex[g_rhi_vk->CurrenFrameIndex] = MaxQueryOcclusionCount * g_rhi_vk->CurrenFrameIndex;
+    vkCmdResetQueryPool((VkCommandBuffer)pCommanBuffer->GetHandle(), QueryPool, MaxQueryOcclusionCount * g_rhi_vk->CurrentFrameIndex, MaxQueryOcclusionCount);
+    QueryIndex[g_rhi_vk->CurrentFrameIndex] = MaxQueryOcclusionCount * g_rhi_vk->CurrentFrameIndex;
 }
 
 void jQueryPoolOcclusion_Vulkan::Release()
@@ -66,8 +66,8 @@ int32 jQueryPoolOcclusion_Vulkan::GetUsedQueryCount(int32 InFrameIndex) const
 //////////////////////////////////////////////////////////////////////////
 void jQueryOcclusion_Vulkan::Init()
 {
-    QueryId = g_rhi_vk->QueryPoolOcclusion->QueryIndex[g_rhi_vk->CurrenFrameIndex];
-    g_rhi_vk->QueryPoolOcclusion->QueryIndex[g_rhi_vk->CurrenFrameIndex] += 1;		// Need 1 Query for sample count.
+    QueryId = g_rhi_vk->QueryPoolOcclusion->QueryIndex[g_rhi_vk->CurrentFrameIndex];
+    g_rhi_vk->QueryPoolOcclusion->QueryIndex[g_rhi_vk->CurrentFrameIndex] += 1;		// Need 1 Query for sample count.
 
     Result = 0;
 }

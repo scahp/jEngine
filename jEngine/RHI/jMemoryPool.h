@@ -27,21 +27,35 @@ struct jMemory
 class jSubMemoryAllocator
 {
 public:
+    friend class jMemoryPool;
+
     virtual ~jSubMemoryAllocator() {}
 
     virtual void Initialize(EVulkanBufferBits InUsage, EVulkanMemoryBits InProperties, uint64 InSize) = 0;
     virtual void* GetBuffer() const { return nullptr; }
     virtual void* GetMemory() const { return nullptr; }
-    virtual void* GetMappedPointer() const { return nullptr; }
+    virtual void* GetMappedPointer() const { return MappedPointer; }
     virtual jMemory Alloc(uint64 InRequstedSize);
     virtual bool IsMatchType(EVulkanBufferBits InUsages, EVulkanMemoryBits InProperties) const
     {
         return (Usages == InUsages) && (Properties == InProperties);
     }
+
+protected:
     virtual void Free(const jMemory& InFreeMemory)
     {
         jScopedLock s(&Lock);
-        FreeLists.push_back(InFreeMemory.Range);
+        
+        // If All of the allocated memory returned then clear allocated list to use all area of the submemory allocator
+        if (AllAllocatedLists.size() == FreeLists.size() + 1)
+        {
+            AllAllocatedLists.clear();
+            FreeLists.clear();
+        }
+        else
+        {
+            FreeLists.push_back(InFreeMemory.Range);
+        }
     }
 
     jMutexLock Lock;
@@ -96,6 +110,17 @@ public:
         1024 * 1024,
     };
 
+    struct jPendingFreeMemory
+    {
+        jPendingFreeMemory() = default;
+        jPendingFreeMemory(int32 InFrameIndex, const jMemory& InMemory) : FrameIndex(InFrameIndex), Memory(InMemory) {}
+
+        int32 FrameIndex = 0;
+        jMemory Memory;
+    };
+
+    static constexpr int32 NumOfFramesToWaitBeforeReleasing = 3;
+
     virtual jSubMemoryAllocator* CreateSubMemoryAllocator() const = 0;
 
     // 적절한 PoolSize 선택 함수
@@ -113,14 +138,10 @@ public:
 
     virtual jMemory Alloc(EVulkanBufferBits InUsages, EVulkanMemoryBits InProperties, uint64 InSize);
 
-    virtual void Free(const jMemory& InFreeMemory)
-    {
-        jScopedLock s(&Lock);
-
-        check(InFreeMemory.SubMemoryAllocator);
-        InFreeMemory.SubMemoryAllocator->Free(InFreeMemory);
-    }
+    virtual void Free(const jMemory& InFreeMemory);
 
     jMutexLock Lock;
     std::vector<jSubMemoryAllocator*> MemoryPools[(int32)EPoolSizeType::MAX + 1];
+    std::vector<jPendingFreeMemory> PendingFree;
+    int32 CanReleasePendingFreeMemoryFrameNumber = 0;
 };
