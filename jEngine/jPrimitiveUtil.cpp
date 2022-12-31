@@ -1967,7 +1967,8 @@ jPointLightPrimitive* CreatePointLightDebug(const Vector& scale, jCamera* target
 	jPointLightPrimitive* object = new jPointLightPrimitive();
 
 	std::weak_ptr<jImageData> data = jImageFileLoader::GetInstance().LoadImageDataFromFile(jName(textureFilename), true);
-	object->BillboardObject = jPrimitiveUtil::CreateBillobardQuad(light->LightData.Position, Vector::OneVector, scale, Vector4(1.0f), targetCamera);
+	const jPointLightUniformBufferData& LightData = light->GetLightData();
+	object->BillboardObject = jPrimitiveUtil::CreateBillobardQuad(LightData.Position, Vector::OneVector, scale, Vector4(1.0f), targetCamera);
 	if (data.lock()->ImageData.size() > 0)
 	{
 		auto texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName(textureFilename), true).lock().get();
@@ -1975,15 +1976,16 @@ jPointLightPrimitive* CreatePointLightDebug(const Vector& scale, jCamera* target
         object->BillboardObject->RenderObjects[0]->MaterialPtr->TexData[static_cast<int32>(jMaterial::EMaterialTextureType::DiffuseSampler)].Texture = texture;
 		object->BillboardObject->RenderObjects[0]->IsHiddenBoundBox = true;
 	}
-	object->SphereObject = CreateSphere(light->LightData.Position, light->LightData.MaxDistance, 20, Vector::OneVector, Vector4(light->LightData.Color, 1.0f), true, false);
+	object->SphereObject = CreateSphere(LightData.Position, LightData.MaxDistance, 20, Vector::OneVector, Vector4(LightData.Color, 1.0f), true, false);
 	object->SphereObject->RenderObjects[0]->IsHiddenBoundBox = true;
 	object->Light = light;
 	object->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
 	{
 		auto pointLightPrimitive = static_cast<jPointLightPrimitive*>(thisObject);
-		pointLightPrimitive->BillboardObject->RenderObjects[0]->SetPos(pointLightPrimitive->Light->LightData.Position);
-		pointLightPrimitive->SphereObject->RenderObjects[0]->SetPos(pointLightPrimitive->Light->LightData.Position);
-		pointLightPrimitive->SphereObject->RenderObjects[0]->SetScale(Vector(pointLightPrimitive->Light->LightData.MaxDistance));
+		const jPointLightUniformBufferData& LightData = pointLightPrimitive->Light->GetLightData();
+		pointLightPrimitive->BillboardObject->RenderObjects[0]->SetPos(LightData.Position);
+		pointLightPrimitive->SphereObject->RenderObjects[0]->SetPos(LightData.Position);
+		pointLightPrimitive->SphereObject->RenderObjects[0]->SetScale(Vector(LightData.MaxDistance));
 	};
 	object->SkipShadowMapGen = true;
 	object->SkipUpdateShadowVolume = true;
@@ -1996,34 +1998,36 @@ jSpotLightPrimitive* CreateSpotLightDebug(const Vector& scale, jCamera* targetCa
 	jSpotLightPrimitive* object = new jSpotLightPrimitive();
 
 	std::weak_ptr<jImageData> data = jImageFileLoader::GetInstance().LoadImageDataFromFile(jName(textureFilename), true);
-	object->BillboardObject = jPrimitiveUtil::CreateBillobardQuad(light->LightData.Position, Vector::OneVector, scale, Vector4(1.0f), targetCamera);
+	const jSpotLightUniformBufferData& LightData = light->GetLightData();
+	object->BillboardObject = jPrimitiveUtil::CreateBillobardQuad(LightData.Position, Vector::OneVector, scale, Vector4(1.0f), targetCamera);
 	if (data.lock()->ImageData.size() > 0)
 	{
 		auto texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName(textureFilename), true).lock().get();
         object->BillboardObject->RenderObjects[0]->MaterialPtr = std::make_shared<jMaterial>();
         object->BillboardObject->RenderObjects[0]->MaterialPtr->TexData[static_cast<int32>(jMaterial::EMaterialTextureType::DiffuseSampler)].Texture = texture;
 	}
-	object->UmbraConeObject = jPrimitiveUtil::CreateCone(light->LightData.Position, 1.0, 1.0, 20, Vector::OneVector, Vector4(light->LightData.Color.x, light->LightData.Color.y, light->LightData.Color.z, 1.0f), true, false);
+	object->UmbraConeObject = jPrimitiveUtil::CreateCone(LightData.Position, 1.0, 1.0, 20, Vector::OneVector, Vector4(LightData.Color.x, LightData.Color.y, LightData.Color.z, 1.0f), true, false);
 	object->UmbraConeObject->RenderObjects[0]->IsHiddenBoundBox = true;
-	object->PenumbraConeObject = jPrimitiveUtil::CreateCone(light->LightData.Position, 1.0, 1.0, 20, Vector::OneVector, Vector4(light->LightData.Color.x, light->LightData.Color.y, light->LightData.Color.z, 0.5f), true, false);
+	object->PenumbraConeObject = jPrimitiveUtil::CreateCone(LightData.Position, 1.0, 1.0, 20, Vector::OneVector, Vector4(LightData.Color.x, LightData.Color.y, LightData.Color.z, 0.5f), true, false);
 	object->PenumbraConeObject->RenderObjects[0]->IsHiddenBoundBox = true;
 	object->Light = light;
 	object->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
 	{
 		auto spotLightObject = static_cast<jSpotLightPrimitive*>(thisObject);
-		spotLightObject->BillboardObject->RenderObjects[0]->SetPos(spotLightObject->Light->LightData.Position);
+		const jSpotLightUniformBufferData& LightData = spotLightObject->Light->GetLightData();
+		spotLightObject->BillboardObject->RenderObjects[0]->SetPos(LightData.Position);
 
-		const auto lightDir = -spotLightObject->Light->LightData.Direction;
+		const auto lightDir = -LightData.Direction;
 		const auto directionToRot = lightDir.GetEulerAngleFrom();
-		const auto spotLightPos = spotLightObject->Light->LightData.Position + lightDir * (-spotLightObject->UmbraConeObject->RenderObjects[0]->GetScale().y / 2.0f);
+		const auto spotLightPos = LightData.Position + lightDir * (-spotLightObject->UmbraConeObject->RenderObjects[0]->GetScale().y / 2.0f);
 
-		const auto umbraRadius = tanf(spotLightObject->Light->LightData.UmbraRadian) * spotLightObject->Light->LightData.MaxDistance;
-		spotLightObject->UmbraConeObject->RenderObjects[0]->SetScale(Vector(umbraRadius, spotLightObject->Light->LightData.MaxDistance, umbraRadius));
+		const auto umbraRadius = tanf(LightData.UmbraRadian) * LightData.MaxDistance;
+		spotLightObject->UmbraConeObject->RenderObjects[0]->SetScale(Vector(umbraRadius, LightData.MaxDistance, umbraRadius));
 		spotLightObject->UmbraConeObject->RenderObjects[0]->SetPos(spotLightPos);
 		spotLightObject->UmbraConeObject->RenderObjects[0]->SetRot(directionToRot);
 
-		const auto penumbraRadius = tanf(spotLightObject->Light->LightData.PenumbraRadian) * spotLightObject->Light->LightData.MaxDistance;
-		spotLightObject->PenumbraConeObject->RenderObjects[0]->SetScale(Vector(penumbraRadius, spotLightObject->Light->LightData.MaxDistance, penumbraRadius));
+		const auto penumbraRadius = tanf(LightData.PenumbraRadian) * LightData.MaxDistance;
+		spotLightObject->PenumbraConeObject->RenderObjects[0]->SetScale(Vector(penumbraRadius, LightData.MaxDistance, penumbraRadius));
 		spotLightObject->PenumbraConeObject->RenderObjects[0]->SetPos(spotLightPos);
 		spotLightObject->PenumbraConeObject->RenderObjects[0]->SetRot(directionToRot);
 	};

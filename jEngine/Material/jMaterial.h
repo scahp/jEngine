@@ -33,4 +33,6 @@ public:
     TextureData TexData[static_cast<int32>(EMaterialTextureType::Max)];
 
     jShaderBindingInstance* CreateShaderBindingInstance();
+    jShaderBindingInstance* ShaderBindingInstance = nullptr;
+    mutable bool NeedToUpdateShaderBindingInstance = true;
 };

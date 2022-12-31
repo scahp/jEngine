@@ -698,7 +698,7 @@ void jRenderer::PostProcess()
                     , ResourceInlineAllactor.Alloc<jTextureResource>(InShaderInputs[i], SamplerState));
             }
 
-            ShaderBindingInstanceArray.Add(g_rhi->CreateShaderBindingInstance(ShaderBindingArray));
+            ShaderBindingInstanceArray.Add(g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame));
         }
 
         jGraphicsPipelineShader Shader;
@@ -843,7 +843,7 @@ void jRenderer::PostProcess()
                     , ResourceInlineAllactor.Alloc<jUniformBufferResource>(&OneFrameUniformBuffer));
             }
 
-            CurrentBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray);
+            CurrentBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
 
             jShaderInfo shaderInfo;
             shaderInfo.SetName(jNameStatic("eyeadaptation"));
@@ -936,7 +936,7 @@ void jRenderer::PostProcess()
                 , ResourceInlineAllactor.Alloc<jUniformBufferResource>(&OneFrameUniformBuffer));
         }
 
-        CurrentBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray);
+        CurrentBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
 
         jShaderInfo shaderInfo;
         shaderInfo.SetName(jNameStatic("tonemap cs"));

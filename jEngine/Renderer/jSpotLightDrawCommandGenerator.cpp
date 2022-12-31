@@ -45,12 +45,13 @@ void jSpotLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* OutDestDr
     , const jView* InView, const jViewLight& InLightView, jRenderPass* InRenderPass, int32 InSubpassIndex)
 {
     jSpotLight* spotLight = (jSpotLight*)InLightView.Light;
-    
-    const auto lightDir = -spotLight->LightData.Direction;
+    const jSpotLightUniformBufferData& LightData = spotLight->GetLightData();
+
+    const auto lightDir = -LightData.Direction;
     const auto directionToRot = lightDir.GetEulerAngleFrom();
-    const auto spotLightPos = spotLight->LightData.Position + lightDir * (-spotLight->LightData.MaxDistance / 2.0f);
-    const auto umbraRadius = tanf(spotLight->LightData.UmbraRadian) * spotLight->LightData.MaxDistance;
-    Matrix WorldMat = Matrix::MakeTranslate(spotLightPos) * Matrix::MakeRotate(directionToRot) * Matrix::MakeScale(Vector(umbraRadius, spotLight->LightData.MaxDistance, umbraRadius));
+    const auto spotLightPos = LightData.Position + lightDir * (-LightData.MaxDistance / 2.0f);
+    const auto umbraRadius = tanf(LightData.UmbraRadian) * LightData.MaxDistance;
+    Matrix WorldMat = Matrix::MakeTranslate(spotLightPos) * Matrix::MakeRotate(directionToRot) * Matrix::MakeScale(Vector(umbraRadius, LightData.MaxDistance, umbraRadius));
 
     jPushConstant* PushConstant = new(jMemStack::Get()->Alloc<jPushConstant>()) jPushConstant(
         jSpotLightPushConstant(InView->Camera->Projection * InView->Camera->View * WorldMat), EShaderAccessStageFlag::ALL);

@@ -99,6 +99,7 @@ public:
 	std::vector<jRingBuffer_Vulkan*> OneFrameUniformRingBuffers;
 	std::vector<jRingBuffer_Vulkan*> SSBORingBuffers;
 	std::vector<jDescriptorPool_Vulkan*> DescriptorPools;
+	jDescriptorPool_Vulkan* DescriptorPools2 = nullptr;
 
 	mutable jMutexRWLock ShaderBindingPoolLock;
 	mutable jMutexRWLock PipelineLayoutPoolLock;
@@ -151,7 +152,7 @@ public:
 	virtual void DrawElementsIndirect(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, jBuffer* buffer, int32 startIndex, int32 drawCount) const override;
 
 	virtual jShaderBindingsLayout* CreateShaderBindings(const jShaderBindingArray& InShaderBindingArray) const override;
-	virtual jShaderBindingInstance* CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray) const override;
+	virtual jShaderBindingInstance* CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const override;
 	virtual void* CreatePipelineLayout(const jShaderBindingsLayoutArray& InShaderBindingLayoutArray, const jPushConstant* pushConstant) const override;
 
 	virtual IUniformBufferBlock* CreateUniformBufferBlock(jName InName, jLifeTimeType InLifeTimeType, size_t InSize = 0) const override;
@@ -183,7 +184,8 @@ public:
 
 	jRingBuffer_Vulkan* GetOneFrameUniformRingBuffer() const { return OneFrameUniformRingBuffers[CurrentFrameIndex]; }
 	jRingBuffer_Vulkan* GetSSBORingBuffer() const { return SSBORingBuffers[CurrentFrameIndex]; }
-	jDescriptorPool_Vulkan* GetDescriptorPools() const { return DescriptorPools[CurrentFrameIndex]; }
+	jDescriptorPool_Vulkan* GetDescriptorPoolForSingleFrame() const { return DescriptorPools[CurrentFrameIndex]; }
+	jDescriptorPool_Vulkan* GetDescriptorPoolMultiFrame() const { return DescriptorPools2; }
 
 	virtual void Flush() const override;
 	virtual void Finish() const override;

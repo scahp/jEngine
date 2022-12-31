@@ -29,6 +29,7 @@ struct jDescriptorPool_Vulkan
     virtual void Create(uint32 InMaxDescriptorSets = 128);
     virtual void Reset();
     virtual jShaderBindingInstance_Vulkan* AllocateDescriptorSet(VkDescriptorSetLayout InLayout);
+    virtual void Free(jShaderBindingInstance* InShaderBindingInstance);
     void Release();
 
     uint32 MaxDescriptorSets = 128;
@@ -36,5 +37,17 @@ struct jDescriptorPool_Vulkan
     VkDescriptorPool DescriptorPool = nullptr;;
     // mutable jMutexLock DescriptorPoolLock;
     mutable jMutexLock DescriptorPoolLock;
+
+    static constexpr int32 NumOfFramesToWaitBeforeReleasing = 3;
+    struct jPendingFreeShaderBindingInstance
+    {
+        jPendingFreeShaderBindingInstance() = default;
+        jPendingFreeShaderBindingInstance(int32 InFrameIndex, jShaderBindingInstance* InShaderBindingInstance) : FrameIndex(InFrameIndex), ShaderBindingInstance(InShaderBindingInstance) {}
+
+        int32 FrameIndex = 0;
+        jShaderBindingInstance* ShaderBindingInstance = nullptr;
+    };
+    std::vector<jPendingFreeShaderBindingInstance> PendingFree;
+    int32 CanReleasePendingFreeShaderBindingInstanceFrameNumber = 0;
 };
 

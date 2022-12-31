@@ -36,28 +36,44 @@ void jPointLight::Initialize(const Vector& InPos, const Vector& InColor, float I
     Camera[5] = jCamera::CreateCamera(InPos, InPos + Vector(0.0f, 0.0f, -1.0f),    InPos + Vector(0.0f, 1.0f, 0.0f), FOV, SM_NearDist, SM_FarDist, SM_Width, SM_Height, true);
 }
 
-jShaderBindingInstance* jPointLight::PrepareShaderBindingInstance(jTexture* InShadowMap) const
+jShaderBindingInstance* jPointLight::PrepareShaderBindingInstance(jTexture* InShadowMap)
 {
-    int32 BindingPoint = 0;
-    jShaderBindingArray ShaderBindingArray;
-    jShaderBindingResourceInlineAllocator ResourceInlineAllocator;
-
-    ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::ALL_GRAPHICS
-        , ResourceInlineAllocator.Alloc<jUniformBufferResource>(LightDataUniformBlock));
-
-    if (InShadowMap)
+    if (LastUsedShadowMap != InShadowMap)
     {
-        const jSamplerStateInfo* ShadowSamplerStateInfo = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
-            , ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
-            , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), true, ECompareOp::LESS>::Create();
-        
-        ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
-            , ResourceInlineAllocator.Alloc<jTextureResource>(InShadowMap, ShadowSamplerStateInfo));
+        IsNeedToUpdateShaderBindingInstance = true;
     }
 
-    return g_rhi->CreateShaderBindingInstance(ShaderBindingArray);
-}
+    if (IsNeedToUpdateShaderBindingInstance)
+    {
+        IsNeedToUpdateShaderBindingInstance = false;
 
+        LightDataUniformBlock->UpdateBufferData(&LightData, sizeof(LightData));
+
+        int32 BindingPoint = 0;
+        jShaderBindingArray ShaderBindingArray;
+        jShaderBindingResourceInlineAllocator ResourceInlineAllocator;
+
+        ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::ALL_GRAPHICS
+            , ResourceInlineAllocator.Alloc<jUniformBufferResource>(LightDataUniformBlock));
+
+        if (InShadowMap)
+        {
+            const jSamplerStateInfo* ShadowSamplerStateInfo = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+                , ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
+                , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), true, ECompareOp::LESS>::Create();
+
+            ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
+                , ResourceInlineAllocator.Alloc<jTextureResource>(InShadowMap, ShadowSamplerStateInfo));
+        }
+        LastUsedShadowMap = InShadowMap;
+        
+        if (ShaderBindingInstance)
+            ShaderBindingInstance->Free();
+
+        ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::MultiFrame);
+    }
+    return ShaderBindingInstance;
+}
 
 jCamera* jPointLight::GetLightCamra(int index /*= 0*/) const
 {
@@ -82,10 +98,13 @@ void jPointLight::Update(float deltaTime)
         currentCamera->Up += offset;
         currentCamera->UpdateCamera();
 
-        LightData.ShadowVP[i] = currentCamera->Projection * currentCamera->View;
+        const Matrix VP = currentCamera->Projection * currentCamera->View;
+        if (LightData.ShadowVP[i] != VP)
+        {
+            LightData.ShadowVP[i] = VP;
+            IsNeedToUpdateShaderBindingInstance = true;
+        }
     }
-
-    LightDataUniformBlock->UpdateBufferData(&LightData, sizeof(LightData));
 
     // Prepare light world matrix for push constant
     LightWorldMatrix = Matrix::MakeTranlsateAndScale(LightData.Position, Vector(LightData.MaxDistance));

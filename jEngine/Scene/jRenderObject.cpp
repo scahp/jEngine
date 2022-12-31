@@ -179,10 +179,6 @@ const std::vector<float>& jRenderObject::GetVertices() const
 
 jShaderBindingInstance* jRenderObject::CreateShaderBindingInstance()
 {
-    int32 BindingPoint = 0;
-	jShaderBindingArray ShaderBindingArray;
-	jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
-
     // Update uniform buffer if it need to.
     if (NeedToUpdateRenderObjectUniformParameters)
     {
@@ -193,11 +189,25 @@ jShaderBindingInstance* jRenderObject::CreateShaderBindingInstance()
         ubo.InvM = ubo.M;
 
         RenderObjectUniformParameters.UpdateBufferData(&ubo, sizeof(ubo));
+
+        int32 BindingPoint = 0;
+        jShaderBindingArray ShaderBindingArray;
+        jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
+
+        ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::ALL_GRAPHICS
+            , ResourceInlineAllactor.Alloc<jUniformBufferResource>(&RenderObjectUniformParameters));
+
+        if (RenderObjectShaderBindingInstance)
+            RenderObjectShaderBindingInstance->Free();
+
+        RenderObjectShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::MultiFrame);
     }
 	
-	ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::ALL_GRAPHICS
-		, ResourceInlineAllactor.Alloc<jUniformBufferResource>(&RenderObjectUniformParameters));
+	//ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::ALL_GRAPHICS
+	//	, ResourceInlineAllactor.Alloc<jUniformBufferResource>(&RenderObjectUniformParameters));
 
-    return g_rhi->CreateShaderBindingInstance(ShaderBindingArray);
+ //   return g_rhi->CreateShaderBindingInstance(ShaderBindingArray);
+
+    return RenderObjectShaderBindingInstance;
 }
 

@@ -253,11 +253,11 @@ class jViewLight
 {
 public:
     jViewLight() = default;
-    jViewLight(const jLight* InLight)
+    jViewLight(jLight* InLight)
         : Light(InLight)
     { }
 
-    const jLight* Light = nullptr;
+    jLight* Light = nullptr;
     jShaderBindingInstance* ShaderBindingInstance = nullptr;
     std::shared_ptr<jRenderTarget> ShadowMapPtr;
 };
@@ -424,7 +424,7 @@ public:
 	virtual jPipelineStateInfo* CreateComputePipelineStateInfo(const jShader* shader, const jShaderBindingsLayoutArray& InShaderBindingArray, const jPushConstant* pushConstant) const { return nullptr; }
 
 	virtual jShaderBindingsLayout* CreateShaderBindings(const jShaderBindingArray& InShaderBindingArray) const { check(0); return nullptr; }
-	virtual jShaderBindingInstance* CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray) const { check(0); return nullptr; }
+	virtual jShaderBindingInstance* CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const { check(0); return nullptr; }
 
 	virtual void* CreatePipelineLayout(const jShaderBindingsLayoutArray& InShaderBindingLayoutArray, const jPushConstant* pushConstant) const { return nullptr; }
 

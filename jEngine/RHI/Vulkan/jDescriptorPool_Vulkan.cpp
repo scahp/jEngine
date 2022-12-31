@@ -102,6 +102,52 @@ jShaderBindingInstance_Vulkan* jDescriptorPool_Vulkan::AllocateDescriptorSet(VkD
     return NewCachedDescriptorSet;
 }
 
+void jDescriptorPool_Vulkan::Free(jShaderBindingInstance* InShaderBindingInstance)
+{
+    check(InShaderBindingInstance);
+    jScopedLock s(&DescriptorPoolLock);
+    
+    const int32 CurrentFrameNumber = g_rhi->GetCurrentFrameNumber();
+    const int32 OldestFrameToKeep = CurrentFrameNumber - NumOfFramesToWaitBeforeReleasing;
+
+    // ProcessPendingDescriptorPoolFree
+    {
+        // Check it is too early
+        if (CurrentFrameNumber >= CanReleasePendingFreeShaderBindingInstanceFrameNumber)
+        {
+            // Release pending memory
+            int32 i = 0;
+            for (; i < PendingFree.size(); ++i)
+            {
+                jPendingFreeShaderBindingInstance& PendingFreeShaderBindingInstance = PendingFree[i];
+                if (PendingFreeShaderBindingInstance.FrameIndex < OldestFrameToKeep)
+                {
+                    // Return to pending descriptor set
+                    check(PendingFreeShaderBindingInstance.ShaderBindingInstance);
+                    const VkDescriptorSetLayout DescriptorSetLayout = (VkDescriptorSetLayout)PendingFreeShaderBindingInstance.ShaderBindingInstance->ShaderBindingsLayouts->GetHandle();
+                    PendingDescriptorSets[DescriptorSetLayout].Add((jShaderBindingInstance_Vulkan*)PendingFreeShaderBindingInstance.ShaderBindingInstance);
+                }
+                else
+                {
+                    CanReleasePendingFreeShaderBindingInstanceFrameNumber = PendingFreeShaderBindingInstance.FrameIndex + NumOfFramesToWaitBeforeReleasing + 1;
+                    break;
+                }
+            }
+            if (i > 0)
+            {
+                const size_t RemainingSize = (PendingFree.size() - i);
+                if (RemainingSize > 0)
+                {
+                    memcpy(&PendingFree[0], &PendingFree[i], sizeof(jPendingFreeShaderBindingInstance) * RemainingSize);
+                }
+                PendingFree.resize(RemainingSize);
+            }
+        }
+    }
+
+    PendingFree.emplace_back(jPendingFreeShaderBindingInstance(CurrentFrameNumber, InShaderBindingInstance));
+}
+
 void jDescriptorPool_Vulkan::Release()
 {
     if (DescriptorPool)

@@ -246,7 +246,7 @@ void jGame::Update(float deltaTime)
 		PointLight->Update(deltaTime);
 	if (SpotLight)
 	{
-		SpotLight->LightData.Direction = Matrix::MakeRotateY(0.01f).TransformDirection(SpotLight->LightData.Direction);
+		SpotLight->SetDirection(Matrix::MakeRotateY(0.01f).TransformDirection(SpotLight->GetLightData().Direction));
 		SpotLight->Update(deltaTime);
     } 
 

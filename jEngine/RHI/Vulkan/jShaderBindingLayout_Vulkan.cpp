@@ -40,9 +40,24 @@ bool jShaderBindingLayout_Vulkan::Initialize(const jShaderBindingArray& InShader
     return true;
 }
 
-jShaderBindingInstance* jShaderBindingLayout_Vulkan::CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray) const
+jShaderBindingInstance* jShaderBindingLayout_Vulkan::CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const
 {
-    jShaderBindingInstance_Vulkan* DescriptorSet = g_rhi_vk->GetDescriptorPools()->AllocateDescriptorSet(DescriptorSetLayout);
+    jDescriptorPool_Vulkan* DescriptorPool = nullptr;
+    switch (InType)
+    {
+    case jShaderBindingInstanceType::SingleFrame:
+        DescriptorPool = g_rhi_vk->GetDescriptorPoolForSingleFrame();
+        break;
+    case jShaderBindingInstanceType::MultiFrame:
+        DescriptorPool = g_rhi_vk->GetDescriptorPoolMultiFrame();
+        break;
+    case jShaderBindingInstanceType::Max:
+    default:
+        check(0);
+        break;
+    }
+
+    jShaderBindingInstance_Vulkan* DescriptorSet = DescriptorPool->AllocateDescriptorSet(DescriptorSetLayout);
     if (!ensure(DescriptorSet))
     {
         return nullptr;
@@ -50,6 +65,7 @@ jShaderBindingInstance* jShaderBindingLayout_Vulkan::CreateShaderBindingInstance
 
     DescriptorSet->ShaderBindingsLayouts = this;
     DescriptorSet->Initialize(InShaderBindingArray);
+    DescriptorSet->SetType(InType);
     return DescriptorSet;
 }
 
@@ -182,6 +198,11 @@ void jShaderBindingInstance_Vulkan::BindCompute(const std::shared_ptr<jRenderFra
     check(pipelineLayout);
     vkCmdBindDescriptorSets((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, (VkPipelineLayout)(pipelineLayout), InSlot
         , 1, &DescriptorSet, (uint32)WriteDescriptorSet.DynamicOffsets.size(), WriteDescriptorSet.DynamicOffsets.data());
+}
+
+void jShaderBindingInstance_Vulkan::Free()
+{
+    g_rhi_vk->GetDescriptorPoolMultiFrame()->Free(this);
 }
 
 void jWriteDescriptorSet::SetWriteDescriptorInfo(int32 InIndex, const jShaderBinding* InShaderBinding)

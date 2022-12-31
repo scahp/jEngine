@@ -43,7 +43,6 @@ public:
 
     void Initialize(const Vector& InPos, const Vector& InColor, float InMaxDist, const Vector& InDiffuseIntensity, const Vector& InSpecularIntensity, float InSpecularPower);
 
-    jPointLightUniformBufferData LightData;
     IUniformBufferBlock* LightDataUniformBlock = nullptr;
 
     virtual bool IsOmnidirectional() const override { return true; }
@@ -51,10 +50,17 @@ public:
     virtual IUniformBufferBlock* GetUniformBufferBlock() const override { return LightDataUniformBlock; }
     virtual jCamera* GetLightCamra(int index = 0) const;
     virtual const Matrix* GetLightWorldMatrix() const override;
-    virtual jShaderBindingInstance* PrepareShaderBindingInstance(jTexture* InShadowMap) const override;
+    virtual jShaderBindingInstance* PrepareShaderBindingInstance(jTexture* InShadowMap) override;
 
     FORCEINLINE const jPointLightUniformBufferData& GetLightData() const { return LightData; }
 
     jCamera* Camera[6] = {0,};
     Matrix LightWorldMatrix;
+
+    jShaderBindingInstance* ShaderBindingInstance = nullptr;
+    bool IsNeedToUpdateShaderBindingInstance = true;                // 위치가 달라지는 경우도 업데이트 되도록... 업데이트 규칙을 좀 만들어야 함
+    jTexture* LastUsedShadowMap = nullptr;
+
+private:
+    jPointLightUniformBufferData LightData;
 };

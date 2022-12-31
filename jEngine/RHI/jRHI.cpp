@@ -171,7 +171,7 @@ void jView::PrepareViewUniformBufferShaderBindingInstance()
     ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::ALL_GRAPHICS
         , ResourceInlineAllactor.Alloc<jUniformBufferResource>(ViewUniformBufferPtr.get()));
 
-	ViewUniformBufferShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray);
+	ViewUniformBufferShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
 }
 
 void jView::GetShaderBindingInstance(jShaderBindingInstanceArray& OutShaderBindingInstanceArray, bool InIsForwardRenderer) const

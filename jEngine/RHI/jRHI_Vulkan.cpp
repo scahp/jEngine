@@ -360,6 +360,9 @@ bool jRHI_Vulkan::InitRHI()
 		iter->Create(10000);
 	}
 
+	DescriptorPools2 = new jDescriptorPool_Vulkan();
+	DescriptorPools2->Create(10000);
+
     jImGUI_Vulkan::Get().Initialize((float)SCR_WIDTH, (float)SCR_HEIGHT);
 
 	CreateSampleVRSTexture();
@@ -1304,11 +1307,11 @@ jShaderBindingsLayout* jRHI_Vulkan::CreateShaderBindings(const jShaderBindingArr
 	}
 }
 
-jShaderBindingInstance* jRHI_Vulkan::CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray) const
+jShaderBindingInstance* jRHI_Vulkan::CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const
 {
 	auto shaderBindingsLayout = CreateShaderBindings(InShaderBindingArray);
 	check(shaderBindingsLayout);
-	return shaderBindingsLayout->CreateShaderBindingInstance(InShaderBindingArray);
+	return shaderBindingsLayout->CreateShaderBindingInstance(InShaderBindingArray, InType);
 }
 
 void* jRHI_Vulkan::CreatePipelineLayout(const jShaderBindingsLayoutArray& InShaderBindingLayoutArray, const jPushConstant* pushConstant) const
@@ -1446,7 +1449,7 @@ std::shared_ptr<jRenderFrameContext> jRHI_Vulkan::BeginRenderFrame()
         vkWaitForFences(Device, 1, &lastCommandBufferFence, VK_TRUE, UINT64_MAX);
 
 	GetOneFrameUniformRingBuffer()->Reset();
-	GetDescriptorPools()->Reset();
+	GetDescriptorPoolForSingleFrame()->Reset();
 
     // 이 프레임에서 펜스를 사용한다고 마크 해둠
 	Swapchain->Images[CurrentFrameIndex]->CommandBufferFence = (VkFence)commandBuffer->GetFenceHandle();

@@ -185,6 +185,13 @@ struct TShaderBinding : public jShaderBinding
 //    }
 //};
 
+enum class jShaderBindingInstanceType : uint8
+{
+    SingleFrame = 0,
+    MultiFrame,
+    Max
+};
+
 struct jShaderBindingInstance
 {
     virtual ~jShaderBindingInstance() {}
@@ -197,6 +204,12 @@ struct jShaderBindingInstance
     virtual void BindCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const {}
     virtual void* GetHandle() const { return nullptr; }
     virtual const std::vector<uint32>* GetDynamicOffsets() const { return nullptr; }
+    virtual void Free() {}
+    virtual jShaderBindingInstanceType GetType() const { return Type; }
+    virtual void SetType(const jShaderBindingInstanceType InType) { Type = InType; }
+
+private:
+    jShaderBindingInstanceType Type = jShaderBindingInstanceType::SingleFrame;
 };
 
 using jShaderBindingInstanceArray = jResourceContainer<const jShaderBindingInstance*>;
@@ -206,7 +219,7 @@ struct jShaderBindingsLayout
     virtual ~jShaderBindingsLayout() {}
 
     virtual bool Initialize(const jShaderBindingArray& InShaderBindingArray) { return false; }
-    virtual jShaderBindingInstance* CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray) const { return nullptr; }
+    virtual jShaderBindingInstance* CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const { return nullptr; }
     virtual size_t GetHash() const;
     virtual const jShaderBindingArray& GetShaderBindingsLayout() const { return ShaderBindingArray; }
     virtual void* GetHandle() const { return nullptr; }

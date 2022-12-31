@@ -121,5 +121,5 @@ jShaderBindingInstance* jSceneRenderTarget::PrepareGBufferShaderBindingInstance(
         }
     }
 
-    return g_rhi->CreateShaderBindingInstance(ShaderBindingArray);
+    return g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
 }

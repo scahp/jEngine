@@ -116,5 +116,6 @@ private:
 
 	bool NeedToUpdateRenderObjectUniformParameters = false;
 	jUniformBufferBlock_Vulkan RenderObjectUniformParameters;
+	jShaderBindingInstance* RenderObjectShaderBindingInstance = nullptr;
 };
 
