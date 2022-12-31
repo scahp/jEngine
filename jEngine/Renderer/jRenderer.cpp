@@ -346,12 +346,12 @@ void jRenderer::SetupBasePass()
     else
     {
         jShaderGBufferVertexShader::ShaderPermutation ShaderPermutationVS;
-        ShaderPermutationVS.SetIndex<jShaderGBufferVertexShader::USE_VERTEX_COLOR>(0);
+        ShaderPermutationVS.SetIndex<jShaderGBufferVertexShader::USE_VERTEX_COLOR>(1);
         BasePassShader.VertexShader = jShaderGBufferVertexShader::CreateShader(ShaderPermutationVS);
 
         jShaderGBufferPixelShader::ShaderPermutation ShaderPermutationPS;
-        ShaderPermutationPS.SetIndex<jShaderGBufferPixelShader::USE_VERTEX_COLOR>(0);
-        ShaderPermutationPS.SetIndex<jShaderGBufferPixelShader::USE_ALBEDO_TEXTURE>(1);
+        ShaderPermutationPS.SetIndex<jShaderGBufferPixelShader::USE_VERTEX_COLOR>(1);
+        ShaderPermutationPS.SetIndex<jShaderGBufferPixelShader::USE_ALBEDO_TEXTURE>(0);
         ShaderPermutationPS.SetIndex<jShaderGBufferPixelShader::USE_VARIABLE_SHADING_RATE>(USE_VARIABLE_SHADING_RATE_TIER2);
         BasePassShader.PixelShader = jShaderGBufferPixelShader::CreateShader(ShaderPermutationPS);
     }
