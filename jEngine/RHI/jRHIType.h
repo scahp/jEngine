@@ -284,7 +284,7 @@ enum class ETextureFormat
 	RGBA8,
 	RGBA16F,
 	RGBA32F,
-	RGBA8I,
+	RGBA8SI,
 	RGBA8UI,
 
 	BGRA8,
