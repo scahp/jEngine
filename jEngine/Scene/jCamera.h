@@ -43,6 +43,7 @@ namespace jCameraUtil
 
 	Matrix CreatePerspectiveMatrix(float width, float height, float fov, float nearDist, float farDist);
 	Matrix CreatePerspectiveMatrixFarAtInfinity(float width, float height, float fov, float nearDist);
+	Matrix CreateReverseZPerspectiveMatrix(float width, float height, float fov, float nearDist, float farDist);		// For the shadow map
 
 	Matrix CreateOrthogonalMatrix(float width, float height, float nearDist, float farDist);
 	Matrix CreateOrthogonalMatrix(float left, float right, float top, float bottom, float nearDist, float farDist);
@@ -299,6 +300,7 @@ public:
 	
 	Matrix View;
 	Matrix Projection;
+	Matrix ReverseZProjection;
 	bool IsPerspectiveProjection = true;
 	bool IsInfinityFar = false;
 

@@ -87,10 +87,13 @@ void jRenderer::SetupShadowPass()
         ShadowDrawInfo.push_back(jShadowDrawInfo());
         jShadowDrawInfo& ShadowPasses = ShadowDrawInfo[ShadowDrawInfo.size() - 1];
 
+        const bool IsUseReverseZShadow = USE_REVERSEZ_PERSPECTIVE_SHADOW && (ViewLight.Light->IsUseRevereZPerspective());
+
         // Prepare shadowpass pipeline
         auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
         jMultisampleStateInfo* MultisampleState = TMultisampleStateInfo<true, 0.2f, false, false>::Create(EMSAASamples::COUNT_1);
-        auto DepthStencilState = TDepthStencilStateInfo<true, true, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
+        auto DepthStencilState = IsUseReverseZShadow ? TDepthStencilStateInfo<true, true, ECompareOp::GREATER, false, false, 0.0f, 1.0f>::Create()
+            : TDepthStencilStateInfo<true, true, ECompareOp::LEQUAL, false, false, 0.0f, 1.0f>::Create();
         auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE
             , EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::NONE>::Create();
 
@@ -100,9 +103,9 @@ void jRenderer::SetupShadowPass()
         jPipelineStateFixedInfo ShadpwPipelineStateFixed = jPipelineStateFixedInfo(RasterizationState, MultisampleState, DepthStencilState, BlendingState
             , jViewport(0.0f, 0.0f, (float)RTWidth, (float)RTHeight), jScissor(0, 0, RTWidth, RTHeight), false);
 
-        {
+        {            
             const Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
-            const Vector2 ClearDepth = Vector2(1.0f, 0.0f);
+            const Vector2 ClearDepth = IsUseReverseZShadow ? Vector2(0.0f, 0.0f) : Vector2(1.0f, 0.0f);
 
             jAttachment depth = jAttachment(ViewLight.ShadowMapPtr, EAttachmentLoadStoreOp::CLEAR_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE
                 , ClearColor, ClearDepth, EImageLayout::UNDEFINED, EImageLayout::DEPTH_STENCIL_ATTACHMENT);
@@ -335,14 +338,10 @@ void jRenderer::SetupBasePass()
         shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
         BasePassShader.VertexShader = g_rhi->CreateShader(shaderInfo);
 
-        shaderInfo.SetName(jNameStatic("default_testPS"));
-        shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/shader_fs.hlsl"));
-        shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
-#if USE_VARIABLE_SHADING_RATE_TIER2
-        if (gOptions.UseVRS)
-            shaderInfo.PreProcessors = jNameStatic("#define USE_VARIABLE_SHADING_RATE 1");
-#endif
-        BasePassShader.PixelShader = g_rhi->CreateShader(shaderInfo);
+        jShaderForward::ShaderPermutation ShaderPermutation;
+		ShaderPermutation.SetIndex<jShaderForward::USE_VARIABLE_SHADING_RATE>(USE_VARIABLE_SHADING_RATE_TIER2);
+        ShaderPermutation.SetIndex<jShaderForward::USE_REVERSEZ>(USE_REVERSEZ_PERSPECTIVE_SHADOW);
+		BasePassShader.PixelShader = jShaderForward::CreateShader(ShaderPermutation);
     }
     else
     {

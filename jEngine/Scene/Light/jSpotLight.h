@@ -55,6 +55,7 @@ public:
     virtual jCamera* GetLightCamra(int index = 0) const;
     virtual const Matrix* GetLightWorldMatrix() const override;
     virtual jShaderBindingInstance* PrepareShaderBindingInstance(jTexture* InShadowMap) override;
+    virtual bool IsUseRevereZPerspective() const { return true; }
 
     FORCEINLINE const jSpotLightUniformBufferData& GetLightData() const { return LightData; }
 

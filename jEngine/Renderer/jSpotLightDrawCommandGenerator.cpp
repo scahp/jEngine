@@ -59,6 +59,7 @@ void jSpotLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* OutDestDr
     jShaderSpotLight::ShaderPermutation ShaderPermutation;
     ShaderPermutation.SetIndex<jShaderSpotLight::USE_SUBPASS>(gOptions.UseSubpass);
     ShaderPermutation.SetIndex<jShaderSpotLight::USE_SHADOW_MAP>(InLightView.ShadowMapPtr ? 1 : 0);
+    ShaderPermutation.SetIndex<jShaderSpotLight::USE_REVERSEZ>(USE_REVERSEZ_PERSPECTIVE_SHADOW);
     Shader.PixelShader = jShaderSpotLight::CreateShader(ShaderPermutation);
 
     check(OutDestDrawCommand);

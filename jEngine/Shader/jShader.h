@@ -219,6 +219,17 @@ ShaderClass* ShaderClass::CreateShader(const ShaderClass::ShaderPermutation& InP
     return Shader; \
 }
 
+struct jShaderForward : public jShader
+{
+	DECLARE_DEFINE(USE_VARIABLE_SHADING_RATE, 0, 1);
+    DECLARE_DEFINE(USE_REVERSEZ, 0, 1);
+
+	using ShaderPermutation = jPermutation<USE_VARIABLE_SHADING_RATE, USE_REVERSEZ>;
+	ShaderPermutation Permutation;
+
+	DECLARE_SHADER_WITH_PERMUTATION(jShaderForward, Permutation)
+};
+
 struct jShaderGBuffer : public jShader
 {
     DECLARE_DEFINE(USE_VERTEX_COLOR, 0, 1);
@@ -257,8 +268,9 @@ struct jShaderSpotLight : public jShader
 {
     DECLARE_DEFINE(USE_SUBPASS, 0, 1);
     DECLARE_DEFINE(USE_SHADOW_MAP, 0, 1);
+    DECLARE_DEFINE(USE_REVERSEZ, 0, 1);
 
-    using ShaderPermutation = jPermutation<USE_SUBPASS, USE_SHADOW_MAP>;
+    using ShaderPermutation = jPermutation<USE_SUBPASS, USE_SHADOW_MAP, USE_REVERSEZ>;
     ShaderPermutation Permutation;
 
     DECLARE_SHADER_WITH_PERMUTATION(jShaderSpotLight, Permutation)

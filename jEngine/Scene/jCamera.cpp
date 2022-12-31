@@ -87,6 +87,14 @@ void jCamera::UpdateCamera()
 {
     View = CreateView();
     Projection = CreateProjection();
+    if (IsPerspectiveProjection)
+    {
+        #if USE_REVERSEZ_PERSPECTIVE_SHADOW
+        ReverseZProjection = jCameraUtil::CreateReverseZPerspectiveMatrix((float)Width, (float)Height, FOVRad, Near, Far);
+        #else
+        ReverseZProjection = Projection;
+        #endif
+    }
 }
 
 void jCamera::GetRectInNDCSpace(Vector& OutPosMin, Vector& OutPosMax, const Matrix& InVP) const
@@ -410,6 +418,27 @@ Matrix jCameraUtil::CreatePerspectiveMatrixFarAtInfinity(float width, float heig
     projMat.m[0][3] = 0.0f;					projMat.m[1][3] = 0.0f;      projMat.m[2][3] = 1.0f;                      projMat.m[3][3] = 0.0f;
 #endif
     return projMat;
+}
+
+Matrix jCameraUtil::CreateReverseZPerspectiveMatrix(float width, float height, float fov, float nearDist, float farDist)
+{
+	const float F = 1.0f / tanf(fov / 2.0f);
+	const float farSubNear = (farDist - nearDist);
+
+	Matrix projMat;
+#if RIGHT_HANDED
+    check(0);
+	//projMat.m[0][0] = F * (height / width);	projMat.m[1][0] = 0.0f;     projMat.m[2][0] = 0.0f;									projMat.m[3][0] = 0.0f;
+	//projMat.m[0][1] = 0.0f;					projMat.m[1][1] = F;        projMat.m[2][1] = 0.0f;									projMat.m[3][1] = 0.0f;
+	//projMat.m[0][2] = 0.0f;					projMat.m[1][2] = 0.0f;     projMat.m[2][2] = -(farDist + nearDist) / farSubNear;	projMat.m[3][2] = -(2.0f * nearDist * farDist) / farSubNear;
+	//projMat.m[0][3] = 0.0f;					projMat.m[1][3] = 0.0f;     projMat.m[2][3] = -1.0f;								projMat.m[3][3] = 0.0f;
+#else
+	projMat.m[0][0] = F * (height / width);	projMat.m[1][0] = 0.0f;		projMat.m[2][0] = 0.0f;								    projMat.m[3][0] = 0.0f;
+	projMat.m[0][1] = 0.0f;					projMat.m[1][1] = F;		projMat.m[2][1] = 0.0f;								    projMat.m[3][1] = 0.0f;
+	projMat.m[0][2] = 0.0f;					projMat.m[1][2] = 0.0f;		projMat.m[2][2] = -nearDist / farSubNear;				projMat.m[3][2] = nearDist * farDist / farSubNear;
+	projMat.m[0][3] = 0.0f;					projMat.m[1][3] = 0.0f;		projMat.m[2][3] = 1.0f;								    projMat.m[3][3] = 0.0f;
+#endif
+	return projMat;
 }
 
 Matrix jCameraUtil::CreateOrthogonalMatrix(float width, float height, float nearDist, float farDist)

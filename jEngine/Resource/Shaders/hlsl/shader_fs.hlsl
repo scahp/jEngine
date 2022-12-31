@@ -176,7 +176,11 @@ float4 main(VSOutput input
     if (-1.0 <= SpotLightShadowPosition.z && SpotLightShadowPosition.z <= 1.0)
     {
         const float Bias = 0.01f;
+        #if USE_REVERSEZ
+		float Shadow = 1.0f - SpotLightShadowMap.SampleCmpLevelZero(SpotLightShadowMapSampler, SpotLightShadowPosition.xy * 0.5 + 0.5, SpotLightShadowPosition.z + Bias);
+        #else
         float Shadow = SpotLightShadowMap.SampleCmpLevelZero(SpotLightShadowMapSampler, SpotLightShadowPosition.xy * 0.5 + 0.5, SpotLightShadowPosition.z - Bias);
+        #endif
         if (Shadow > 0.0f)
         {
             SpotLightLit = Shadow * GetSpotLight(SpotLight, input.Normal, input.WorldPos.xyz, ViewWorld);

@@ -45,6 +45,13 @@ void jShader::Initialize()
 }
 
 //////////////////////////////////////////////////////////////////////////
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderForward
+	, "ForwardPS"
+	, "Resource/Shaders/hlsl/shader_fs.hlsl"
+	, ""
+	, EShaderAccessStageFlag::FRAGMENT)
+
+//////////////////////////////////////////////////////////////////////////
 IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderGBuffer
 	, "GBufferPS"
 	, "Resource/Shaders/hlsl/gbuffer_fs.hlsl"

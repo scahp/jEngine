@@ -91,7 +91,11 @@ void jSpotLight::Update(float deltaTime)
     const Matrix VP = Camera->Projection * Camera->View;
     if (LightData.ShadowVP != VP)
     {
-        LightData.ShadowVP = VP;
+	    #if USE_REVERSEZ_PERSPECTIVE_SHADOW
+	    LightData.ShadowVP = Camera->ReverseZProjection * Camera->View;
+	    #else
+	    LightData.ShadowVP = Camera->Projection * Camera->View;
+	    #endif
         IsNeedToUpdateShaderBindingInstance = true;
     }
 
