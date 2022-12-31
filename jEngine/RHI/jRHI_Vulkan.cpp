@@ -1649,7 +1649,10 @@ bool jRHI_Vulkan::TransitionImageLayout(VkCommandBuffer commandBuffer, VkImage i
 	case VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL:
 	case VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL:
 	case VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL:
-		barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+		if (IsDepthOnlyFormat(GetVulkanTextureFormat(format)))
+			barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+		else
+	        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 		break;
 	case VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL:
 	case VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL:

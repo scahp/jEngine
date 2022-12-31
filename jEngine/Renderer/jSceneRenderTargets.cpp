@@ -53,13 +53,13 @@ void jSceneRenderTarget::Create(const jSwapchainImage* image)
     }
 
     DirectionalLightShadowMapPtr = jRenderTargetPool::GetRenderTarget(
-        { ETextureType::TEXTURE_2D, ETextureFormat::D24_S8, jDirectionalLight::SM_Width, jDirectionalLight::SM_Height, 1, false, EMSAASamples::COUNT_1 });
+        { ETextureType::TEXTURE_2D, ETextureFormat::D16, jDirectionalLight::SM_Width, jDirectionalLight::SM_Height, 1, false, EMSAASamples::COUNT_1 });
 
     CubeShadowMapPtr = jRenderTargetPool::GetRenderTarget(
-        { ETextureType::TEXTURE_CUBE, ETextureFormat::D24_S8, jPointLight::SM_Width, jPointLight::SM_Height, 6, false, EMSAASamples::COUNT_1 });
+        { ETextureType::TEXTURE_CUBE, ETextureFormat::D16, jPointLight::SM_Width, jPointLight::SM_Height, 6, false, EMSAASamples::COUNT_1 });
 
     SpotLightShadowMapPtr = jRenderTargetPool::GetRenderTarget(
-        { ETextureType::TEXTURE_2D, ETextureFormat::D24_S8, jSpotLight::SM_Width, jSpotLight::SM_Height, 1, false, EMSAASamples::COUNT_1 });
+        { ETextureType::TEXTURE_2D, ETextureFormat::D16, jSpotLight::SM_Width, jSpotLight::SM_Height, 1, false, EMSAASamples::COUNT_1 });
 
     for (int32 i = 0; i < _countof(GBuffer); ++i)
     {

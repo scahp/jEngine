@@ -326,6 +326,19 @@ static bool IsDepthFormat(ETextureFormat format)
 	return false;
 }
 
+static bool IsDepthOnlyFormat(ETextureFormat format)
+{
+    switch (format)
+    {
+    case ETextureFormat::D16:
+    case ETextureFormat::D24:
+    case ETextureFormat::D32:
+        return true;
+    }
+
+    return false;
+}
+
 enum class EFormatType : uint8
 {
 	BYTE = 0,

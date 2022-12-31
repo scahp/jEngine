@@ -22,6 +22,7 @@ struct jTexture
     virtual EImageLayout GetLayout() const { return EImageLayout::UNDEFINED; }
 
     FORCEINLINE bool IsDepthFormat() const { return ::IsDepthFormat(Format); }
+    FORCEINLINE bool IsDepthOnlyFormat() const { return ::IsDepthOnlyFormat(Format); }
 
     ETextureType Type = ETextureType::MAX;
     ETextureFormat Format = ETextureFormat::RGB8;
