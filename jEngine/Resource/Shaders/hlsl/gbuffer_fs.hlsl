@@ -1,13 +1,15 @@
 #include "common.hlsl"
 
-#ifndef USE_VARIABLE_SHADING_RATE
-#define USE_VARIABLE_SHADING_RATE 0
+#ifndef USE_VERTEX_COLOR
+#define USE_VERTEX_COLOR 0
 #endif
 
 struct VSOutput
 {
     float4 Pos : SV_POSITION;
-    //float4 Color : COLOR0;
+#if USE_VERTEX_COLOR
+    float4 Color : COLOR0;
+#endif
     float2 TexCoord : TEXCOORD0;
     float3 Normal : NORMAL0;
     float4 WorldPos : TEXCOORD1;
@@ -45,9 +47,9 @@ FSOutput main(VSOutput input
 )
 {
     float4 color = 1;
-//#if USE_VERTEX_COLOR
-//    color *= input.Color;
-//#endif
+#if USE_VERTEX_COLOR
+    color *= input.Color;
+#endif
 #if USE_ALBEDO_TEXTURE
     color *= DiffuseTexture.Sample(DiffuseTextureSampler, input.TexCoord.xy);
     if (color.w < 0.5f)
@@ -61,6 +63,8 @@ FSOutput main(VSOutput input
     float3 normal = NormalTexture.Sample(NormalTextureSampler, input.TexCoord.xy).xyz;
     normal = normal * 2.0f - 1.0f;
     float3 WorldNormal = normalize(mul(input.TBN, normal));
+#else
+    float3 WorldNormal = input.Normal;
 #endif
 
 #if USE_VARIABLE_SHADING_RATE

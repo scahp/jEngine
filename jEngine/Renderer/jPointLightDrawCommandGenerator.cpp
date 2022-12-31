@@ -41,10 +41,10 @@ void jPointLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* OutDestD
     jPushConstant* PushConstant = new(jMemStack::Get()->Alloc<jPushConstant>()) jPushConstant(
         jPointLightPushConstant(InView->Camera->Projection * InView->Camera->View * (*InLightView.Light->GetLightWorldMatrix())), EShaderAccessStageFlag::ALL);
 
-    jShaderPointLight::ShaderPermutation ShaderPermutation;
-    ShaderPermutation.SetIndex<jShaderPointLight::USE_SUBPASS>(gOptions.UseSubpass);
-    ShaderPermutation.SetIndex<jShaderPointLight::USE_SHADOW_MAP>(InLightView.ShadowMapPtr ? 1 : 0);
-    Shader.PixelShader = jShaderPointLight::CreateShader(ShaderPermutation);
+    jShaderPointLightPixelShader::ShaderPermutation ShaderPermutation;
+    ShaderPermutation.SetIndex<jShaderPointLightPixelShader::USE_SUBPASS>(gOptions.UseSubpass);
+    ShaderPermutation.SetIndex<jShaderPointLightPixelShader::USE_SHADOW_MAP>(InLightView.ShadowMapPtr ? 1 : 0);
+    Shader.PixelShader = jShaderPointLightPixelShader::CreateShader(ShaderPermutation);
 
     check(OutDestDrawCommand);
     new (OutDestDrawCommand) jDrawCommand(InRenderFrameContextPtr, &InLightView, PointLightSphere->RenderObjects[0], InRenderPass

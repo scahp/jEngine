@@ -56,6 +56,8 @@ void jGame::Setup()
 	// Create main camera
     const Vector mainCameraPos(-111.6f, 17.49f, 3.11f);
     const Vector mainCameraTarget(282.378632f, 17.6663227f, -1.00448179f);
+    //const Vector mainCameraPos(172.66f, 160.0f, -180.63f);
+    //const Vector mainCameraTarget(0.0f, 0.0f, 0.0f);
 	MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 10.0f, 1500.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT, true);
 	jCamera::AddCamera(0, MainCamera);
 
@@ -127,9 +129,9 @@ void jGame::Setup()
 
 	//ResourceLoadCompleteEvent = std::async(std::launch::async, [&]()
 	//{
-        Sponza = jModelLoader::GetInstance().LoadFromFile("Resource/sponza/sponza.dae", "Resource/");
+		Sponza = jModelLoader::GetInstance().LoadFromFile("Resource/sponza/sponza.dae", "Resource/");
 		jObject::AddObject(Sponza);
-        SpawnedObjects.push_back(Sponza);
+		SpawnedObjects.push_back(Sponza);
 
 		//{
 		//	jScopedLock s(&AsyncLoadLock);

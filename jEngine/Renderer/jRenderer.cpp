@@ -338,23 +338,22 @@ void jRenderer::SetupBasePass()
         shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
         BasePassShader.VertexShader = g_rhi->CreateShader(shaderInfo);
 
-        jShaderForward::ShaderPermutation ShaderPermutation;
-		ShaderPermutation.SetIndex<jShaderForward::USE_VARIABLE_SHADING_RATE>(USE_VARIABLE_SHADING_RATE_TIER2);
-        ShaderPermutation.SetIndex<jShaderForward::USE_REVERSEZ>(USE_REVERSEZ_PERSPECTIVE_SHADOW);
-		BasePassShader.PixelShader = jShaderForward::CreateShader(ShaderPermutation);
+        jShaderForwardPixelShader::ShaderPermutation ShaderPermutation;
+		ShaderPermutation.SetIndex<jShaderForwardPixelShader::USE_VARIABLE_SHADING_RATE>(USE_VARIABLE_SHADING_RATE_TIER2);
+        ShaderPermutation.SetIndex<jShaderForwardPixelShader::USE_REVERSEZ>(USE_REVERSEZ_PERSPECTIVE_SHADOW);
+		BasePassShader.PixelShader = jShaderForwardPixelShader::CreateShader(ShaderPermutation);
     }
     else
     {
-        shaderInfo.SetName(jNameStatic("default_testVS"));
-        shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/gbuffer_vs.hlsl"));
-        shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
-        BasePassShader.VertexShader = g_rhi->CreateShader(shaderInfo);
+        jShaderGBufferVertexShader::ShaderPermutation ShaderPermutationVS;
+        ShaderPermutationVS.SetIndex<jShaderGBufferVertexShader::USE_VERTEX_COLOR>(0);
+        BasePassShader.VertexShader = jShaderGBufferVertexShader::CreateShader(ShaderPermutationVS);
 
-        jShaderGBuffer::ShaderPermutation ShaderPermutation;
-        ShaderPermutation.SetIndex<jShaderGBuffer::USE_VERTEX_COLOR>(0);
-        ShaderPermutation.SetIndex<jShaderGBuffer::USE_ALBEDO_TEXTURE>(1);
-        ShaderPermutation.SetIndex<jShaderGBuffer::USE_VARIABLE_SHADING_RATE>(USE_VARIABLE_SHADING_RATE_TIER2);
-        BasePassShader.PixelShader = jShaderGBuffer::CreateShader(ShaderPermutation);
+        jShaderGBufferPixelShader::ShaderPermutation ShaderPermutationPS;
+        ShaderPermutationPS.SetIndex<jShaderGBufferPixelShader::USE_VERTEX_COLOR>(0);
+        ShaderPermutationPS.SetIndex<jShaderGBufferPixelShader::USE_ALBEDO_TEXTURE>(1);
+        ShaderPermutationPS.SetIndex<jShaderGBufferPixelShader::USE_VARIABLE_SHADING_RATE>(USE_VARIABLE_SHADING_RATE_TIER2);
+        BasePassShader.PixelShader = jShaderGBufferPixelShader::CreateShader(ShaderPermutationPS);
     }
 
     jGraphicsPipelineShader TranslucentPassShader;
@@ -364,11 +363,11 @@ void jRenderer::SetupBasePass()
         shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
         TranslucentPassShader.VertexShader = g_rhi->CreateShader(shaderInfo);
 
-        jShaderGBuffer::ShaderPermutation ShaderPermutation;
-        ShaderPermutation.SetIndex<jShaderGBuffer::USE_VERTEX_COLOR>(0);
-        ShaderPermutation.SetIndex<jShaderGBuffer::USE_ALBEDO_TEXTURE>(1);
-        ShaderPermutation.SetIndex<jShaderGBuffer::USE_VARIABLE_SHADING_RATE>(USE_VARIABLE_SHADING_RATE_TIER2);
-        TranslucentPassShader.PixelShader = jShaderGBuffer::CreateShader(ShaderPermutation);
+        jShaderGBufferPixelShader::ShaderPermutation ShaderPermutation;
+        ShaderPermutation.SetIndex<jShaderGBufferPixelShader::USE_VERTEX_COLOR>(0);
+        ShaderPermutation.SetIndex<jShaderGBufferPixelShader::USE_ALBEDO_TEXTURE>(1);
+        ShaderPermutation.SetIndex<jShaderGBufferPixelShader::USE_VARIABLE_SHADING_RATE>(USE_VARIABLE_SHADING_RATE_TIER2);
+        TranslucentPassShader.PixelShader = jShaderGBufferPixelShader::CreateShader(ShaderPermutation);
     }
 
     jGraphicsPipelineShader BasePassInstancingShader;

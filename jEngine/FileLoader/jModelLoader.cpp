@@ -292,19 +292,19 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 		vertexStreamData->Params.push_back(streamParam);
 	}
 
-	if (!meshData->Bitangents.empty())
-	{
-		JASSERT(meshData->Vertices.size() == meshData->Bitangents.size());
+	//if (!meshData->Bitangents.empty())
+	//{
+	//	JASSERT(meshData->Vertices.size() == meshData->Bitangents.size());
 
-		auto streamParam = std::make_shared<jStreamParam<float>>();
-		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
-		streamParam->Name = jName("Bitangent");
-		streamParam->Data.resize(elementCount * 3);
-		streamParam->Stride = sizeof(float) * 3;
-		memcpy(&streamParam->Data[0], &meshData->Bitangents[0], meshData->Bitangents.size() * sizeof(Vector));
-		vertexStreamData->Params.push_back(streamParam);
-	}
+	//	auto streamParam = std::make_shared<jStreamParam<float>>();
+	//	streamParam->BufferType = EBufferType::STATIC;
+	//	streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
+	//	streamParam->Name = jName("Bitangent");
+	//	streamParam->Data.resize(elementCount * 3);
+	//	streamParam->Stride = sizeof(float) * 3;
+	//	memcpy(&streamParam->Data[0], &meshData->Bitangents[0], meshData->Bitangents.size() * sizeof(Vector));
+	//	vertexStreamData->Params.push_back(streamParam);
+	//}
 
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();

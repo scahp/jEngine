@@ -219,7 +219,7 @@ ShaderClass* ShaderClass::CreateShader(const ShaderClass::ShaderPermutation& InP
     return Shader; \
 }
 
-struct jShaderForward : public jShader
+struct jShaderForwardPixelShader : public jShader
 {
 	DECLARE_DEFINE(USE_VARIABLE_SHADING_RATE, 0, 1);
     DECLARE_DEFINE(USE_REVERSEZ, 0, 1);
@@ -227,10 +227,20 @@ struct jShaderForward : public jShader
 	using ShaderPermutation = jPermutation<USE_VARIABLE_SHADING_RATE, USE_REVERSEZ>;
 	ShaderPermutation Permutation;
 
-	DECLARE_SHADER_WITH_PERMUTATION(jShaderForward, Permutation)
+	DECLARE_SHADER_WITH_PERMUTATION(jShaderForwardPixelShader, Permutation)
 };
 
-struct jShaderGBuffer : public jShader
+struct jShaderGBufferVertexShader : public jShader
+{
+    DECLARE_DEFINE(USE_VERTEX_COLOR, 0, 1);
+
+    using ShaderPermutation = jPermutation<USE_VERTEX_COLOR>;
+    ShaderPermutation Permutation;
+
+    DECLARE_SHADER_WITH_PERMUTATION(jShaderGBufferVertexShader, Permutation)
+};
+
+struct jShaderGBufferPixelShader : public jShader
 {
     DECLARE_DEFINE(USE_VERTEX_COLOR, 0, 1);
     DECLARE_DEFINE(USE_ALBEDO_TEXTURE, 0, 1);
@@ -239,10 +249,10 @@ struct jShaderGBuffer : public jShader
     using ShaderPermutation = jPermutation<USE_VERTEX_COLOR, USE_ALBEDO_TEXTURE, USE_VARIABLE_SHADING_RATE>;
     ShaderPermutation Permutation;
 
-    DECLARE_SHADER_WITH_PERMUTATION(jShaderGBuffer, Permutation)
+    DECLARE_SHADER_WITH_PERMUTATION(jShaderGBufferPixelShader, Permutation)
 };
 
-struct jShaderDirectionalLight : public jShader
+struct jShaderDirectionalLightPixelShader : public jShader
 {
     DECLARE_DEFINE(USE_SUBPASS, 0, 1);
     DECLARE_DEFINE(USE_SHADOW_MAP, 0, 1);
@@ -250,10 +260,10 @@ struct jShaderDirectionalLight : public jShader
     using ShaderPermutation = jPermutation<USE_SUBPASS, USE_SHADOW_MAP>;
     ShaderPermutation Permutation;
 
-    DECLARE_SHADER_WITH_PERMUTATION(jShaderDirectionalLight, Permutation)
+    DECLARE_SHADER_WITH_PERMUTATION(jShaderDirectionalLightPixelShader, Permutation)
 };
 
-struct jShaderPointLight : public jShader
+struct jShaderPointLightPixelShader : public jShader
 {
     DECLARE_DEFINE(USE_SUBPASS, 0, 1);
     DECLARE_DEFINE(USE_SHADOW_MAP, 0, 1);
@@ -261,10 +271,10 @@ struct jShaderPointLight : public jShader
     using ShaderPermutation = jPermutation<USE_SUBPASS, USE_SHADOW_MAP>;
     ShaderPermutation Permutation;
 
-    DECLARE_SHADER_WITH_PERMUTATION(jShaderPointLight, Permutation)
+    DECLARE_SHADER_WITH_PERMUTATION(jShaderPointLightPixelShader, Permutation)
 };
 
-struct jShaderSpotLight : public jShader
+struct jShaderSpotLightPixelShader : public jShader
 {
     DECLARE_DEFINE(USE_SUBPASS, 0, 1);
     DECLARE_DEFINE(USE_SHADOW_MAP, 0, 1);
@@ -273,7 +283,7 @@ struct jShaderSpotLight : public jShader
     using ShaderPermutation = jPermutation<USE_SUBPASS, USE_SHADOW_MAP, USE_REVERSEZ>;
     ShaderPermutation Permutation;
 
-    DECLARE_SHADER_WITH_PERMUTATION(jShaderSpotLight, Permutation)
+    DECLARE_SHADER_WITH_PERMUTATION(jShaderSpotLightPixelShader, Permutation)
 };
 
 

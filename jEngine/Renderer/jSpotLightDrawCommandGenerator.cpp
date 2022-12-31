@@ -56,11 +56,11 @@ void jSpotLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* OutDestDr
     jPushConstant* PushConstant = new(jMemStack::Get()->Alloc<jPushConstant>()) jPushConstant(
         jSpotLightPushConstant(InView->Camera->Projection * InView->Camera->View * WorldMat), EShaderAccessStageFlag::ALL);
 
-    jShaderSpotLight::ShaderPermutation ShaderPermutation;
-    ShaderPermutation.SetIndex<jShaderSpotLight::USE_SUBPASS>(gOptions.UseSubpass);
-    ShaderPermutation.SetIndex<jShaderSpotLight::USE_SHADOW_MAP>(InLightView.ShadowMapPtr ? 1 : 0);
-    ShaderPermutation.SetIndex<jShaderSpotLight::USE_REVERSEZ>(USE_REVERSEZ_PERSPECTIVE_SHADOW);
-    Shader.PixelShader = jShaderSpotLight::CreateShader(ShaderPermutation);
+    jShaderSpotLightPixelShader::ShaderPermutation ShaderPermutation;
+    ShaderPermutation.SetIndex<jShaderSpotLightPixelShader::USE_SUBPASS>(gOptions.UseSubpass);
+    ShaderPermutation.SetIndex<jShaderSpotLightPixelShader::USE_SHADOW_MAP>(InLightView.ShadowMapPtr ? 1 : 0);
+    ShaderPermutation.SetIndex<jShaderSpotLightPixelShader::USE_REVERSEZ>(USE_REVERSEZ_PERSPECTIVE_SHADOW);
+    Shader.PixelShader = jShaderSpotLightPixelShader::CreateShader(ShaderPermutation);
 
     check(OutDestDrawCommand);
     new (OutDestDrawCommand) jDrawCommand(InRenderFrameContextPtr, &InLightView, SpotLightCone->RenderObjects[0], InRenderPass

@@ -45,35 +45,41 @@ void jShader::Initialize()
 }
 
 //////////////////////////////////////////////////////////////////////////
-IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderForward
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderForwardPixelShader
 	, "ForwardPS"
 	, "Resource/Shaders/hlsl/shader_fs.hlsl"
 	, ""
 	, EShaderAccessStageFlag::FRAGMENT)
 
 //////////////////////////////////////////////////////////////////////////
-IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderGBuffer
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderGBufferVertexShader
+    , "GBufferVS"
+    , "Resource/Shaders/hlsl/gbuffer_vs.hlsl"
+    , ""
+    , EShaderAccessStageFlag::VERTEX)
+
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderGBufferPixelShader
 	, "GBufferPS"
 	, "Resource/Shaders/hlsl/gbuffer_fs.hlsl"
 	, ""
 	, EShaderAccessStageFlag::FRAGMENT)
 
 //////////////////////////////////////////////////////////////////////////
-IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderDirectionalLight
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderDirectionalLightPixelShader
     , "DirectionalLightShaderPS"
     , "Resource/Shaders/hlsl/directionallight_fs.hlsl"
     , ""
     , EShaderAccessStageFlag::FRAGMENT)
 
 //////////////////////////////////////////////////////////////////////////
-IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderPointLight
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderPointLightPixelShader
     , "PointLightShaderPS"
     , "Resource/Shaders/hlsl/pointlight_fs.hlsl"
     , ""
     , EShaderAccessStageFlag::FRAGMENT)
 
 //////////////////////////////////////////////////////////////////////////
-IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderSpotLight
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderSpotLightPixelShader
     , "SpotLightShaderPS"
     , "Resource/Shaders/hlsl/spotlight_fs.hlsl"
     , ""
