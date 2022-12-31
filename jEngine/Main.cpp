@@ -330,7 +330,7 @@ void window_focus_callback(GLFWwindow* window, int focused)
 void showFPS(GLFWwindow* pWindow)
 {
 	// Measure speed
-	static double lastTime = glfwGetTime();;
+	static double lastTime = glfwGetTime();
 	double currentTime = glfwGetTime();
 	double delta = currentTime - lastTime;
 	static int32 nbFrames = 0;
@@ -346,7 +346,7 @@ void showFPS(GLFWwindow* pWindow)
 #else USE_OPENGL
 		ss << "OpenGL" 
 #endif
-			<< " " << 0.1 << " [" << fps << " FPS]";
+			<< " " << 0.1 << " [" << fps << " FPS]" << " - " << (float)(delta * 1000.0f / nbFrames) << " ms";
 
 		glfwSetWindowTitle(pWindow, ss.str().c_str());
 
