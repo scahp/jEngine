@@ -20,10 +20,16 @@ public:
 
 	static void Release()
 	{
-        g_EyeAdaptationARTPtr->Return();
-        g_EyeAdaptationBRTPtr->Return();
-        g_EyeAdaptationARTPtr.reset();
-        g_EyeAdaptationBRTPtr.reset();
+		if (g_EyeAdaptationARTPtr)
+		{
+			g_EyeAdaptationARTPtr->Return();
+			g_EyeAdaptationARTPtr.reset();
+		}
+		if (g_EyeAdaptationBRTPtr)
+		{
+			g_EyeAdaptationBRTPtr->Return();
+			g_EyeAdaptationBRTPtr.reset();
+		}
 
 		RenderTargetResourceMap.clear();
 		RenderTargetHashVariableMap.clear();
