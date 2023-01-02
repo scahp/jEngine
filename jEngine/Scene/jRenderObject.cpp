@@ -95,7 +95,6 @@ void jRenderObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFra
 	{
         if (GeometryDataPtr->IndirectCommandBuffer)
         {
-			const int32 instanceCount = GeometryDataPtr->VertexStream_InstanceData->ElementCount;
             g_rhi->DrawElementsIndirect(InRenderFrameContext, primitiveType, GeometryDataPtr->IndirectCommandBuffer, startIndex, instanceCount);
         }
 		else
@@ -112,7 +111,6 @@ void jRenderObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFra
 	{
 		if (GeometryDataPtr->IndirectCommandBuffer)
 		{
-			const int32 instanceCount = GeometryDataPtr->VertexStream_InstanceData->ElementCount;
 			g_rhi->DrawIndirect(InRenderFrameContext, primitiveType, GeometryDataPtr->IndirectCommandBuffer, startVertex, instanceCount);
 		}
 		else
@@ -128,7 +126,7 @@ void jRenderObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFra
 
 void jRenderObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, int32 instanceCount)
 {
-	Draw(InRenderFrameContext, 0, -1, 0, -1, 1);
+	Draw(InRenderFrameContext, 0, -1, 0, -1, instanceCount);
 }
 
 void jRenderObject::BindBuffers(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, bool InPositionOnly, const jVertexBuffer* InOverrideInstanceData) const
