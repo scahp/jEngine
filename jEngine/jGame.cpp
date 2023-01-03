@@ -68,7 +68,7 @@ void jGame::Setup()
 	//	, Vector4(0.6f), Vector(1.0f), Vector(1.0f), 64);
 	//AmbientLight = jLight::CreateAmbientLight(Vector(0.2f, 0.5f, 1.0f), Vector(0.05f));		// sky light color
 	PointLight = jLight::CreatePointLight(Vector(10.0f, 100.0f, 10.0f), Vector4(1.0f, 0.75f, 0.75f, 1.0f), 150.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
-	SpotLight = jLight::CreateSpotLight(Vector(0.0f, 60.0f, 5.0f), Vector(1.0f, -1.0f, 0.4f).GetNormalize(), Vector4(0.0f, 1.0f, 0.0f, 1.0f), 200.0f, 0.35f, 0.5f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
+	SpotLight = jLight::CreateSpotLight(Vector(0.0f, 80.0f, 5.0f), Vector(1.0f, -1.0f, 0.4f).GetNormalize(), Vector4(0.2f, 1.0f, 0.2f, 1.0f), 200.0f, 0.35f, 0.5f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
 
 	if (NormalDirectionalLight)
 		jLight::AddLights(NormalDirectionalLight);
@@ -404,7 +404,7 @@ void jGame::SpawnTestPrimitives()
 	jObject::AddObject(quad2);
 	SpawnedObjects.push_back(quad2);
 
-	auto sphere = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f), 1.0, 16, Vector(30.0f), Vector4(0.8f, 0.0f, 0.0f, 1.0f));
+	auto sphere = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f), 1.0, 150, Vector(30.0f), Vector4(0.8f, 0.0f, 0.0f, 1.0f));
 	sphere->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
 	{
 		thisObject->RenderObjects[0]->SetRot(thisObject->RenderObjects[0]->GetRot() + Vector(0.0f, 0.0f, DegreeToRadian(180.0f)));
@@ -412,7 +412,7 @@ void jGame::SpawnTestPrimitives()
 	jObject::AddObject(sphere);
 	SpawnedObjects.push_back(sphere);
 
-	auto sphere2 = jPrimitiveUtil::CreateSphere(Vector(150.0f, 5.0f, 0.0f), 1.0, 16, Vector(10.0f), Vector4(0.8f, 0.4f, 0.6f, 1.0f));
+	auto sphere2 = jPrimitiveUtil::CreateSphere(Vector(150.0f, 5.0f, 0.0f), 1.0, 150, Vector(10.0f), Vector4(0.8f, 0.4f, 0.6f, 1.0f));
 	sphere2->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
 	{
 		const float startY = 5.0f;

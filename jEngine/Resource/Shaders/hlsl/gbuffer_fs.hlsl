@@ -64,7 +64,7 @@ FSOutput main(VSOutput input
     normal = normal * 2.0f - 1.0f;
     float3 WorldNormal = normalize(mul(input.TBN, normal));
 #else
-    float3 WorldNormal = input.Normal;
+    float3 WorldNormal = normalize(input.Normal);
 #endif
 
 #if USE_VARIABLE_SHADING_RATE
@@ -115,7 +115,11 @@ FSOutput main(VSOutput input
     FSOutput output = (FSOutput)0;
 
     output.GBuffer0.xyz = input.WorldPos.xyz / input.WorldPos.w;
+    output.GBuffer0.w = RenderObjectParam.Metallic;
+    
     output.GBuffer1.xyz = WorldNormal;
+    output.GBuffer1.w = RenderObjectParam.Roughness;
+    
     output.GBuffer2.xyz = color.xyz;
 
     return output;

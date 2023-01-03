@@ -7,6 +7,7 @@
 #include "RHI/jFrameBufferPool.h"
 #include "RHI/Vulkan/jUniformBufferBlock_Vulkan.h"
 #include "Material/jMaterial.h"
+#include "jOptions.h"
 
 // jRenderObjectGeometryData
 jRenderObjectGeometryData::jRenderObjectGeometryData(const std::shared_ptr<jVertexStreamData>& vertexStream, const std::shared_ptr<jIndexStreamData>& indexStream)
@@ -177,6 +178,10 @@ const std::vector<float>& jRenderObject::GetVertices() const
 
 jShaderBindingInstance* jRenderObject::CreateShaderBindingInstance()
 {
+    // Special code for PBR test
+    if (LastMetallic != gOptions.Metallic || LastRoughness != gOptions.Roughness)
+        NeedToUpdateRenderObjectUniformParameters = true;
+
     // Update uniform buffer if it need to.
     if (NeedToUpdateRenderObjectUniformParameters)
     {
@@ -184,7 +189,9 @@ jShaderBindingInstance* jRenderObject::CreateShaderBindingInstance()
 
         jRenderObjectUniformBuffer ubo;
         ubo.M = World;
-        ubo.InvM = ubo.M;
+        ubo.InvM = ubo.M.GetInverse();
+        ubo.Metallic = gOptions.Metallic;
+        ubo.Roughness = gOptions.Roughness;
 
         RenderObjectUniformParameters.UpdateBufferData(&ubo, sizeof(ubo));
 

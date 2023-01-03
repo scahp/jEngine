@@ -1,5 +1,6 @@
 #include "common.hlsl"
 #include "lightutil.hlsl"
+#include "PBR.hlsl"
 
 #ifndef USE_SUBPASS
 #define USE_SUBPASS 0
@@ -43,42 +44,61 @@ float4 main(VSOutput input) : SV_TARGET
     float4 color = 0;
 
 #if USE_SUBPASS
-    float3 WorldPos = GBuffer0.SubpassLoad().xyz;
-    float3 WorldNormal = GBuffer1.SubpassLoad().xyz;
-    float3 Albedo = GBuffer2.SubpassLoad().xyz;
+    float4 GBufferData0 = GBuffer0.SubpassLoad();
+    float4 GBufferData1 = GBuffer1.SubpassLoad();
+    float4 GBufferData2 = GBuffer2.SubpassLoad();
 #else   // USE_SUBPASS
-    float3 WorldPos = GBuffer0.Sample(GBuffer0SamplerState, UV).xyz;
-    float3 WorldNormal = GBuffer1.Sample(GBuffer1SamplerState, UV).xyz;
-    float3 Albedo = GBuffer2.Sample(GBuffer2SamplerState, UV).xyz;
+    float4 GBufferData0 = GBuffer0.Sample(GBuffer0SamplerState, UV);
+    float4 GBufferData1 = GBuffer1.Sample(GBuffer1SamplerState, UV);
+    float4 GBufferData2 = GBuffer2.Sample(GBuffer2SamplerState, UV);
 #endif  // USE_SUBPASS
+
+    float3 WorldPos = GBufferData0.xyz;
+    float Metallic = GBufferData0.w;
+    float3 WorldNormal = GBufferData1.xyz;
+    float Roughness = GBufferData1.w;
+    float3 Albedo = GBufferData2.xyz;
 
     float3 PointLightLit = 0.0f;
     float3 ViewWorld = normalize(ViewParam.EyeWorld - WorldPos);
+    float3 LightDir = normalize(WorldPos.xyz - SpotLight.Position);
+    float DistanceToLight = length(WorldPos.xyz - SpotLight.Position);
 
     // Spot light shadow map
     float4 SpotLightShadowPosition = mul(SpotLight.ShadowVP, float4(WorldPos, 1.0));
     SpotLightShadowPosition = SpotLightShadowPosition / SpotLightShadowPosition.w;
     SpotLightShadowPosition.y = -SpotLightShadowPosition.y;
 
-    float3 SpotLightLit = 0.0f;
+    float Lit = 1.0f;
 #if USE_SHADOW_MAP
     if (-1.0 <= SpotLightShadowPosition.z && SpotLightShadowPosition.z <= 1.0)
     {
         const float Bias = 0.01f;
         #if USE_REVERSEZ
-        float Shadow = 1.0f - SpotLightShadowMap.SampleCmpLevelZero(SpotLightShadowMapSampler, SpotLightShadowPosition.xy * 0.5 + 0.5, SpotLightShadowPosition.z + Bias);
+        Lit = 1.0f - SpotLightShadowMap.SampleCmpLevelZero(SpotLightShadowMapSampler, SpotLightShadowPosition.xy * 0.5 + 0.5, SpotLightShadowPosition.z + Bias);
         #else
-        float Shadow = SpotLightShadowMap.SampleCmpLevelZero(SpotLightShadowMapSampler, SpotLightShadowPosition.xy * 0.5 + 0.5, SpotLightShadowPosition.z - Bias);
+        Lit = SpotLightShadowMap.SampleCmpLevelZero(SpotLightShadowMapSampler, SpotLightShadowPosition.xy * 0.5 + 0.5, SpotLightShadowPosition.z - Bias);
         #endif
-        if (Shadow > 0.0f)
+        if (Lit > 0.0f)
         {
-            SpotLightLit = Shadow * GetSpotLight(SpotLight, WorldNormal, WorldPos.xyz, ViewWorld);
+            // SpotLightLit = Shadow * GetSpotLight(SpotLight, WorldNormal, WorldPos.xyz, ViewWorld);
         }
     }
 #else
-    SpotLightLit = GetSpotLight(SpotLight, WorldNormal, WorldPos.xyz, ViewWorld);
+    //SpotLightLit = GetSpotLight(SpotLight, WorldNormal, WorldPos.xyz, ViewWorld);
 #endif
 
-    color = (1.0 / 3.141592653) * float4(Albedo * SpotLightLit, 1.0);
+    float lightRadian = acos(dot(-LightDir, -SpotLight.Direction));
+    float SpotLightAttenuate = DistanceAttenuation2(DistanceToLight * DistanceToLight, 1.0f / SpotLight.MaxDistance)
+        * DiretionalFalloff(lightRadian, SpotLight.PenumbraRadian, SpotLight.UmbraRadian);
+    
+    float3 L = -LightDir;
+    float3 N = WorldNormal;
+    float3 V = ViewWorld;
+    color.xyz = PBR(L, N, V, Albedo, SpotLight.Color, DistanceToLight * 0.01f, Metallic, Roughness) * SpotLightAttenuate * Lit;
+    color.w = 1.0f;
     return color;
+    
+    //color = (1.0 / 3.141592653) * float4(Albedo * SpotLightLit, 1.0);
+    //return color;
 }

@@ -1,7 +1,11 @@
+#define PI 3.141592653f
+
 struct RenderObjectUniformBuffer
 {
     float4x4 M;
     float4x4 InvM;
+    float Metallic;
+    float Roughness;
 };
 
 struct ViewUniformBuffer

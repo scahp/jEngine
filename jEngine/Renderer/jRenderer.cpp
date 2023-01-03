@@ -347,6 +347,7 @@ void jRenderer::SetupBasePass()
     {
         jShaderGBufferVertexShader::ShaderPermutation ShaderPermutationVS;
         ShaderPermutationVS.SetIndex<jShaderGBufferVertexShader::USE_VERTEX_COLOR>(1);
+        ShaderPermutationVS.SetIndex<jShaderGBufferVertexShader::USE_ALBEDO_TEXTURE>(0);
         BasePassShader.VertexShader = jShaderGBufferVertexShader::CreateShader(ShaderPermutationVS);
 
         jShaderGBufferPixelShader::ShaderPermutation ShaderPermutationPS;

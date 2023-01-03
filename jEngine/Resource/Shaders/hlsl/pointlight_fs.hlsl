@@ -1,5 +1,6 @@
 #include "common.hlsl"
 #include "lightutil.hlsl"
+#include "PBR.hlsl"
 
 #ifndef USE_SUBPASS
 #define USE_SUBPASS 0
@@ -43,37 +44,53 @@ float4 main(VSOutput input) : SV_TARGET
     float4 color = 0;
 
 #if USE_SUBPASS
-    float3 WorldPos = GBuffer0.SubpassLoad().xyz;
-    float3 WorldNormal = GBuffer1.SubpassLoad().xyz;
-    float3 Albedo = GBuffer2.SubpassLoad().xyz;
+    float4 GBufferData0 = GBuffer0.SubpassLoad();
+    float4 GBufferData1 = GBuffer1.SubpassLoad();
+    float4 GBufferData2 = GBuffer2.SubpassLoad();
 #else   // USE_SUBPASS
-    float3 WorldPos = GBuffer0.Sample(GBuffer0SamplerState, UV).xyz;
-    float3 WorldNormal = GBuffer1.Sample(GBuffer1SamplerState, UV).xyz;
-    float3 Albedo = GBuffer2.Sample(GBuffer2SamplerState, UV).xyz;
+    float4 GBufferData0 = GBuffer0.Sample(GBuffer0SamplerState, UV);
+    float4 GBufferData1 = GBuffer1.Sample(GBuffer1SamplerState, UV);
+    float4 GBufferData2 = GBuffer2.Sample(GBuffer2SamplerState, UV);
 #endif  // USE_SUBPASS
+
+    float3 WorldPos = GBufferData0.xyz;
+    float Metallic = GBufferData0.w;
+    float3 WorldNormal = GBufferData1.xyz;
+    float Roughness = GBufferData1.w;
+    float3 Albedo = GBufferData2.xyz;
 
     float3 PointLightLit = 0.0f;
     float3 ViewWorld = normalize(ViewParam.EyeWorld - WorldPos);
+    float3 LightDir = normalize(WorldPos.xyz - PointLight.Position);
+    float DistanceToLight = length(WorldPos.xyz - PointLight.Position);
 
     // Point light shadow map
+    float Lit = 1.0f;
 #if USE_SHADOW_MAP
-    float3 LightDir = WorldPos.xyz - PointLight.Position;
-    float DistanceToLight = length(LightDir);
     if (DistanceToLight <= PointLight.MaxDistance)
     {
         float NormalizedDistance = DistanceToLight / PointLight.MaxDistance;
 
         const float Bias = 0.01f;
-        float Shadow = PointLightShadowCubeMap.SampleCmpLevelZero(PointLightShadowMapSampler, LightDir.xyz, NormalizedDistance - Bias);
-        if (Shadow > 0.0f)
+        Lit = PointLightShadowCubeMap.SampleCmpLevelZero(PointLightShadowMapSampler, LightDir.xyz, NormalizedDistance - Bias);
+        if (Lit > 0.0f)
         {
-            PointLightLit = Shadow * GetPointLight(PointLight, WorldNormal, WorldPos.xyz, ViewWorld);
+            // PointLightLit = Shadow * GetPointLight(PointLight, WorldNormal, WorldPos.xyz, ViewWorld);
         }
     }
 #else
-    PointLightLit = GetPointLight(PointLight, WorldNormal, WorldPos.xyz, ViewWorld);
+    //PointLightLit = GetPointLight(PointLight, WorldNormal, WorldPos.xyz, ViewWorld);
 #endif
 
-    color = (1.0 / 3.141592653) * float4(Albedo * PointLightLit, 1.0);
+    float PointLightAttenuate = DistanceAttenuation2(DistanceToLight * DistanceToLight, 1.0f / PointLight.MaxDistance);
+    
+    float3 L = -LightDir;
+    float3 N = WorldNormal;
+    float3 V = ViewWorld;
+    color.xyz = PBR(L, N, V, Albedo, PointLight.Color, DistanceToLight * 0.01f, Metallic, Roughness) * PointLightAttenuate * Lit;
+    color.w = 1.0f;
     return color;
+    
+    //color = (1.0 / 3.141592653) * float4(Albedo * PointLightLit, 1.0);
+    //return color;
 }

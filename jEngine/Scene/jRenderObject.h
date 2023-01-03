@@ -79,6 +79,8 @@ public:
 	{
 		Matrix M;
 		Matrix InvM;
+		float Metallic;
+		float Roughness;
 	};
 
 	//////////////////////////////////////////////////////////////////////////
@@ -117,5 +119,9 @@ private:
 	bool NeedToUpdateRenderObjectUniformParameters = false;
 	jUniformBufferBlock_Vulkan RenderObjectUniformParameters;
 	jShaderBindingInstance* RenderObjectShaderBindingInstance = nullptr;
+
+	// Special code for PBR test
+    float LastMetallic = 0.0f;
+    float LastRoughness = 0.0f;
 };
 

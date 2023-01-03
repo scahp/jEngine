@@ -16,6 +16,8 @@ struct jOptions
     bool QueueSubmitAfterBasePass = false;
     Vector CameraPos = Vector::ZeroVector;
     float AutoExposureKeyValueScale = 1.0f;
+    float Metallic = 0.0f;
+    float Roughness = 0.2f;
 };
 
 extern jOptions gOptions;

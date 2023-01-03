@@ -42,12 +42,14 @@ VSOutput main(VSInput input)
     output.TexCoord = input.TexCoord;
     output.Normal = normalize(mul((float3x3)RenderObjectParam.M, input.Normal));
     
+#if USE_ALBEDO_TEXTURE
     float4 Bitangent = float4(cross(input.Normal, input.Tangent), 0.0);
     float3 T = normalize(mul(RenderObjectParam.M, float4(input.Tangent, 0.0)).xyz);
     float3 B = normalize(mul(RenderObjectParam.M, Bitangent).xyz);
     float3 N = normalize(mul(RenderObjectParam.M, float4(input.Normal, 0.0)).xyz);
     output.TBN = float3x3(T, B, N);
     output.TBN = transpose(output.TBN);
+#endif
 
     return output;
 }

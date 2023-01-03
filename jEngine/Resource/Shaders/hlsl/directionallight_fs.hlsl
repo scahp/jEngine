@@ -1,5 +1,6 @@
 #include "common.hlsl"
 #include "lightutil.hlsl"
+#include "PBR.hlsl"
 
 #ifndef USE_VARIABLE_SHADING_RATE
 #define USE_VARIABLE_SHADING_RATE 0
@@ -48,14 +49,20 @@ float4 main(VSOutput input
     float4 color = 0;
 
 #if USE_SUBPASS
-    float3 WorldPos = GBuffer0.SubpassLoad().xyz;
-    float3 WorldNormal = GBuffer1.SubpassLoad().xyz;
-    float3 Albedo = GBuffer2.SubpassLoad().xyz;
+    float4 GBufferData0 = GBuffer0.SubpassLoad();
+    float4 GBufferData1 = GBuffer1.SubpassLoad();
+    float4 GBufferData2 = GBuffer2.SubpassLoad();
 #else   // USE_SUBPASS
-    float3 WorldPos = GBuffer0.Sample(GBuffer0SamplerState, input.TexCoord).xyz;
-    float3 WorldNormal = GBuffer1.Sample(GBuffer1SamplerState, input.TexCoord).xyz;
-    float3 Albedo = GBuffer2.Sample(GBuffer2SamplerState, input.TexCoord).xyz;
+    float4 GBufferData0 = GBuffer0.Sample(GBuffer0SamplerState, input.TexCoord);
+    float4 GBufferData1 = GBuffer1.Sample(GBuffer1SamplerState, input.TexCoord);
+    float4 GBufferData2 = GBuffer2.Sample(GBuffer2SamplerState, input.TexCoord);
 #endif  // USE_SUBPASS
+
+    float3 WorldPos = GBufferData0.xyz;
+    float Metallic = GBufferData0.w;
+    float3 WorldNormal = GBufferData1.xyz;
+    float Roughness = GBufferData1.w;
+    float3 Albedo = GBufferData2.xyz;
 
     float3 ViewWorld = normalize(ViewParam.EyeWorld - WorldPos);
 
@@ -64,17 +71,25 @@ float4 main(VSOutput input
     DirectionalLightShadowPosition = DirectionalLightShadowPosition / DirectionalLightShadowPosition.w;
     DirectionalLightShadowPosition.y = -DirectionalLightShadowPosition.y;
 
-    float3 DirectionalLightLit = GetDirectionalLight(DirectionalLight, WorldNormal, ViewWorld);
+    //float3 DirectionalLightLit = GetDirectionalLight(DirectionalLight, WorldNormal, ViewWorld);
+    float Lit = 1.0f;
 #if USE_SHADOW_MAP
     if (-1.0 <= DirectionalLightShadowPosition.z && DirectionalLightShadowPosition.z <= 1.0)
     {
         const float Bias = 0.01f;
-        float Shadow = DirectionalLightShadowMap.SampleCmpLevelZero(
+        Lit = DirectionalLightShadowMap.SampleCmpLevelZero(
             DirectionalLightShadowMapSampler, (DirectionalLightShadowPosition.xy * 0.5 + 0.5), (DirectionalLightShadowPosition.z - Bias));
-        DirectionalLightLit *= Shadow;
+        // DirectionalLightLit *= Shadow;
     }
 #endif
 
-    color = (1.0 / 3.141592653) * float4(Albedo * DirectionalLightLit, 1.0);
+    float3 L = -DirectionalLight.Direction;
+    float3 N = WorldNormal;
+    float3 V = ViewWorld;
+    color.xyz = PBR(L, N, V, Albedo, DirectionalLight.Color, 100.0f * 0.01f, Metallic, Roughness) * Lit;
+    color.w = 1.0f;
     return color;
+    
+    //color = (1.0 / 3.141592653) * float4(Albedo * DirectionalLightLit, 1.0);
+    //return color;
 }

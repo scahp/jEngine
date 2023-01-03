@@ -265,6 +265,10 @@ void jImGUI_Vulkan::NewFrame(bool updateFrameGraph)
     ImGui::Checkbox("QueueSubmitAfterBasePass", &gOptions.QueueSubmitAfterBasePass);
     ImGui::SliderFloat("AutoExposureKeyValueScale", &gOptions.AutoExposureKeyValueScale, -12.0f, 12.0f);
     ImGui::Separator();
+    ImGui::Text("PBR properties");
+    ImGui::SliderFloat("Metallic", &gOptions.Metallic, 0.0f, 1.0f);
+    ImGui::SliderFloat("Roughness", &gOptions.Roughness, 0.0f, 1.0f);
+    ImGui::Separator();
 
     constexpr float IndentSpace = 10.0f;
     const std::thread::id CurrentThreadId = std::this_thread::get_id();

@@ -791,5 +791,8 @@
     <None Include="Resource\Shaders\hlsl\eyeadaptation_cs.hlsl">
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
+    <None Include="Resource\Shaders\hlsl\PBR.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
   </ItemGroup>
 </Project>
