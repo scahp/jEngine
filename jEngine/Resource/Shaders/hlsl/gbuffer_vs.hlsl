@@ -40,7 +40,7 @@ VSOutput main(VSInput input)
     output.Color = input.Color;
 #endif
     output.TexCoord = input.TexCoord;
-    output.Normal = normalize(mul((float3x3)RenderObjectParam.M, input.Normal));
+    output.Normal = mul((float3x3)RenderObjectParam.M, input.Normal);
     
 #if USE_ALBEDO_TEXTURE
     float4 Bitangent = float4(cross(input.Normal, input.Tangent), 0.0);
