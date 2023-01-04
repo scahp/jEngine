@@ -60,7 +60,7 @@ float4 main(VSOutput input
 
     float3 WorldPos = GBufferData0.xyz;
     float Metallic = GBufferData0.w;
-    float3 WorldNormal = GBufferData1.xyz;
+    float3 WorldNormal = normalize(GBufferData1.xyz);       // Need to normalize again to avoid noise of specular light, even though it is stored normalized normal at GBuffer.
     float Roughness = GBufferData1.w;
     float3 Albedo = GBufferData2.xyz;
 
