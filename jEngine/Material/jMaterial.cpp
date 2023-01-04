@@ -12,7 +12,6 @@ jShaderBindingInstance* jMaterial::CreateShaderBindingInstance()
         jShaderBindingArray ShaderBindingArray;
         jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
 
-        // for (int32 i = 0; i < (int32)EMaterialTextureType::Max; ++i)
         for (int32 i = 0; i < (int32)EMaterialTextureType::Max; ++i)
         {
             const TextureData& TextureData = TexData[i];
@@ -20,7 +19,7 @@ jShaderBindingInstance* jMaterial::CreateShaderBindingInstance()
 
             if (!Texture)
             {
-                if ((int32)EMaterialTextureType::NormalSampler == i)
+                if ((int32)EMaterialTextureType::Normal == i)
                     Texture = GNormalTexture;
                 else
                     Texture = GWhiteTexture;

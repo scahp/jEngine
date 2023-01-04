@@ -32,7 +32,7 @@ jGame::~jGame()
 
 void jGame::ProcessInput()
 {
-	static float speed = 1.0f;
+	static float speed = 0.1f;
 
 	// Process Key Event
 	if (g_KeyState['a'] || g_KeyState['A']) MainCamera->MoveShift(-speed);

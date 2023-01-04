@@ -11,9 +11,9 @@ public:
 
     enum class EMaterialTextureType : int8
     {
-        DiffuseSampler = 0,
-        NormalSampler,
-        OpacitySampler,
+        Albedo = 0,
+        Normal,
+        Opacity,
         Max
     };
 
@@ -29,6 +29,8 @@ public:
             return Texture;
         }
     };
+
+    bool HasAlbedoTexture() const { return TexData[(int32)EMaterialTextureType::Albedo].Texture; }
 
     TextureData TexData[static_cast<int32>(EMaterialTextureType::Max)];
 

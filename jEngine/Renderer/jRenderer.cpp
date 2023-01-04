@@ -15,6 +15,7 @@
 #include "jPointLightDrawCommandGenerator.h"
 #include "jSpotLightDrawCommandGenerator.h"
 #include "RHI/jRenderTargetPool.h"
+#include "Material/jMaterial.h"
 
 #define ASYNC_WITH_SETUP 1
 #define PARALLELFOR_WITH_PASSSETUP 1
@@ -329,34 +330,60 @@ void jRenderer::SetupBasePass()
     //////////////////////////////////////////////////////////////////////////
     BaseRenderPass = (jRenderPass_Vulkan*)g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
 
-    jGraphicsPipelineShader BasePassShader;
+    auto GetOrCreateShaderFunc = [UseForwardRenderer = this->UseForwardRenderer](const jRenderObject* InRenderObject)
+    {
+        jGraphicsPipelineShader Shaders;
+        jShaderInfo shaderInfo;
+
+        if (InRenderObject->HasInstancing())
+        {
+            check(UseForwardRenderer);
+
+            jShaderInfo shaderInfo;
+            shaderInfo.SetName(jNameStatic("default_instancing_testVS"));
+            shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/shader_instancing_vs.hlsl"));
+            shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
+            Shaders.VertexShader = g_rhi->CreateShader(shaderInfo);
+
+            shaderInfo.SetName(jNameStatic("default_instancing_testPS"));
+            shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/shader_fs.hlsl"));
+            shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
+            Shaders.PixelShader = g_rhi->CreateShader(shaderInfo);
+            return Shaders;
+        }
+
+        if (UseForwardRenderer)
+        {
+            shaderInfo.SetName(jNameStatic("default_testVS"));
+            shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/shader_vs.hlsl"));
+            shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
+            Shaders.VertexShader = g_rhi->CreateShader(shaderInfo);
+
+            jShaderForwardPixelShader::ShaderPermutation ShaderPermutation;
+            ShaderPermutation.SetIndex<jShaderForwardPixelShader::USE_VARIABLE_SHADING_RATE>(USE_VARIABLE_SHADING_RATE_TIER2);
+            ShaderPermutation.SetIndex<jShaderForwardPixelShader::USE_REVERSEZ>(USE_REVERSEZ_PERSPECTIVE_SHADOW);
+            Shaders.PixelShader = jShaderForwardPixelShader::CreateShader(ShaderPermutation);
+        }
+        else
+        {
+            const bool HasAlbedoTexture = InRenderObject->MaterialPtr && InRenderObject->MaterialPtr->HasAlbedoTexture();
+            const bool HasVertexColor = InRenderObject->GeometryDataPtr && InRenderObject->GeometryDataPtr->HasVertexColor();
+
+            jShaderGBufferVertexShader::ShaderPermutation ShaderPermutationVS;
+            ShaderPermutationVS.SetIndex<jShaderGBufferVertexShader::USE_VERTEX_COLOR>(HasVertexColor);
+            ShaderPermutationVS.SetIndex<jShaderGBufferVertexShader::USE_ALBEDO_TEXTURE>(HasAlbedoTexture);
+            Shaders.VertexShader = jShaderGBufferVertexShader::CreateShader(ShaderPermutationVS);
+
+            jShaderGBufferPixelShader::ShaderPermutation ShaderPermutationPS;
+            ShaderPermutationPS.SetIndex<jShaderGBufferPixelShader::USE_VERTEX_COLOR>(HasVertexColor);
+            ShaderPermutationPS.SetIndex<jShaderGBufferPixelShader::USE_ALBEDO_TEXTURE>(HasAlbedoTexture);
+            ShaderPermutationPS.SetIndex<jShaderGBufferPixelShader::USE_VARIABLE_SHADING_RATE>(USE_VARIABLE_SHADING_RATE_TIER2);
+            Shaders.PixelShader = jShaderGBufferPixelShader::CreateShader(ShaderPermutationPS);
+        }
+        return Shaders;
+    };
+
     jShaderInfo shaderInfo;
-    if (UseForwardRenderer)
-    {
-        shaderInfo.SetName(jNameStatic("default_testVS"));
-        shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/shader_vs.hlsl"));
-        shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
-        BasePassShader.VertexShader = g_rhi->CreateShader(shaderInfo);
-
-        jShaderForwardPixelShader::ShaderPermutation ShaderPermutation;
-		ShaderPermutation.SetIndex<jShaderForwardPixelShader::USE_VARIABLE_SHADING_RATE>(USE_VARIABLE_SHADING_RATE_TIER2);
-        ShaderPermutation.SetIndex<jShaderForwardPixelShader::USE_REVERSEZ>(USE_REVERSEZ_PERSPECTIVE_SHADOW);
-		BasePassShader.PixelShader = jShaderForwardPixelShader::CreateShader(ShaderPermutation);
-    }
-    else
-    {
-        jShaderGBufferVertexShader::ShaderPermutation ShaderPermutationVS;
-        ShaderPermutationVS.SetIndex<jShaderGBufferVertexShader::USE_VERTEX_COLOR>(1);
-        ShaderPermutationVS.SetIndex<jShaderGBufferVertexShader::USE_ALBEDO_TEXTURE>(0);
-        BasePassShader.VertexShader = jShaderGBufferVertexShader::CreateShader(ShaderPermutationVS);
-
-        jShaderGBufferPixelShader::ShaderPermutation ShaderPermutationPS;
-        ShaderPermutationPS.SetIndex<jShaderGBufferPixelShader::USE_VERTEX_COLOR>(1);
-        ShaderPermutationPS.SetIndex<jShaderGBufferPixelShader::USE_ALBEDO_TEXTURE>(0);
-        ShaderPermutationPS.SetIndex<jShaderGBufferPixelShader::USE_VARIABLE_SHADING_RATE>(USE_VARIABLE_SHADING_RATE_TIER2);
-        BasePassShader.PixelShader = jShaderGBufferPixelShader::CreateShader(ShaderPermutationPS);
-    }
-
     jGraphicsPipelineShader TranslucentPassShader;
     {
         shaderInfo.SetName(jNameStatic("default_testVS"));
@@ -371,20 +398,6 @@ void jRenderer::SetupBasePass()
         TranslucentPassShader.PixelShader = jShaderGBufferPixelShader::CreateShader(ShaderPermutation);
     }
 
-    jGraphicsPipelineShader BasePassInstancingShader;
-    {
-        jShaderInfo shaderInfo;
-        shaderInfo.SetName(jNameStatic("default_instancing_testVS"));
-        shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/shader_instancing_vs.hlsl"));
-        shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
-        BasePassInstancingShader.VertexShader = g_rhi->CreateShader(shaderInfo);
-
-        shaderInfo.SetName(jNameStatic("default_instancing_testPS"));
-        shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/shader_fs.hlsl"));
-        shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
-        BasePassInstancingShader.PixelShader = g_rhi->CreateShader(shaderInfo);
-    }
-    
     jSimplePushConstant SimplePushConstantData;
     SimplePushConstantData.ShowVRSArea = gOptions.ShowVRSArea;
     SimplePushConstantData.ShowGrid = gOptions.ShowGrid;
@@ -397,7 +410,10 @@ void jRenderer::SetupBasePass()
         , [&](size_t InIndex, jRenderObject* InRenderObject)
     {
         new (&BasePasses[InIndex]) jDrawCommand(RenderFrameContextPtr, &View, InRenderObject, BaseRenderPass
-            , (InRenderObject->HasInstancing() ? BasePassInstancingShader : BasePassShader), &BasePassPipelineStateFixed, {}, SimplePushConstant);
+            , GetOrCreateShaderFunc(InRenderObject), &BasePassPipelineStateFixed, {}, SimplePushConstant);
+
+        //new (&BasePasses[InIndex]) jDrawCommand(RenderFrameContextPtr, &View, InRenderObject, BaseRenderPass
+        //    , (InRenderObject->HasInstancing() ? BasePassInstancingShader : BasePassShader), &BasePassPipelineStateFixed, {}, SimplePushConstant);
         BasePasses[InIndex].PrepareToDraw(false);
     });
 #else

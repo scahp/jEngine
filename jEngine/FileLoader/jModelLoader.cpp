@@ -130,11 +130,11 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 
 			int32 Index = 0;
 			if (k == aiTextureType_DIFFUSE)
-				Index = (int32)jMaterial::EMaterialTextureType::DiffuseSampler;
+				Index = (int32)jMaterial::EMaterialTextureType::Albedo;
 			else if (k == aiTextureType_NORMALS)
-				Index = (int32)jMaterial::EMaterialTextureType::NormalSampler;
+				Index = (int32)jMaterial::EMaterialTextureType::Normal;
 			else if (k == aiTextureType_OPACITY)
-				Index = (int32)jMaterial::EMaterialTextureType::OpacitySampler;
+				Index = (int32)jMaterial::EMaterialTextureType::Opacity;
 			else
 				continue;
 
@@ -346,7 +346,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 	}
 
     object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>();
-	object->RenderObjectGeometryDataPtr->Create(vertexStreamData, indexStreamData);
+	object->RenderObjectGeometryDataPtr->Create(vertexStreamData, indexStreamData, false);
 
 	for (int32 i = 0; i < (int32)object->SubMeshes.size(); ++i)
 	{

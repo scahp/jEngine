@@ -1941,7 +1941,7 @@ jDirectionalLightPrimitive* CreateDirectionalLightDebug(const Vector& pos, const
         jTexture* texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName(textureFilename), true).lock().get();
 		//object->BillboardObject->RenderObject->TextureSamplers.push_back({ .Texture = texture, .SamplerState = nullptr });
 		object->BillboardObject->RenderObjects[0]->MaterialPtr = std::make_shared<jMaterial>();
-		object->BillboardObject->RenderObjects[0]->MaterialPtr->TexData[static_cast<int32>(jMaterial::EMaterialTextureType::DiffuseSampler)].Texture = texture;
+		object->BillboardObject->RenderObjects[0]->MaterialPtr->TexData[static_cast<int32>(jMaterial::EMaterialTextureType::Albedo)].Texture = texture;
         object->BillboardObject->RenderObjects[0]->IsHiddenBoundBox = true;
     }
     object->ArrowSegementObject = jPrimitiveUtil::CreateArrowSegment(Vector::ZeroVector, light->GetLightData().Direction * length, 1.0f, scale.x, scale.x / 2, Vector4(0.8f, 0.2f, 0.3f, 1.0f));
@@ -1973,7 +1973,7 @@ jPointLightPrimitive* CreatePointLightDebug(const Vector& scale, jCamera* target
 	{
 		auto texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName(textureFilename), true).lock().get();
         object->BillboardObject->RenderObjects[0]->MaterialPtr = std::make_shared<jMaterial>();
-        object->BillboardObject->RenderObjects[0]->MaterialPtr->TexData[static_cast<int32>(jMaterial::EMaterialTextureType::DiffuseSampler)].Texture = texture;
+        object->BillboardObject->RenderObjects[0]->MaterialPtr->TexData[static_cast<int32>(jMaterial::EMaterialTextureType::Albedo)].Texture = texture;
 		object->BillboardObject->RenderObjects[0]->IsHiddenBoundBox = true;
 	}
 	object->SphereObject = CreateSphere(LightData.Position, LightData.MaxDistance, 20, Vector::OneVector, Vector4(LightData.Color, 1.0f), true, false);
@@ -2004,7 +2004,7 @@ jSpotLightPrimitive* CreateSpotLightDebug(const Vector& scale, jCamera* targetCa
 	{
 		auto texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName(textureFilename), true).lock().get();
         object->BillboardObject->RenderObjects[0]->MaterialPtr = std::make_shared<jMaterial>();
-        object->BillboardObject->RenderObjects[0]->MaterialPtr->TexData[static_cast<int32>(jMaterial::EMaterialTextureType::DiffuseSampler)].Texture = texture;
+        object->BillboardObject->RenderObjects[0]->MaterialPtr->TexData[static_cast<int32>(jMaterial::EMaterialTextureType::Albedo)].Texture = texture;
 	}
 	object->UmbraConeObject = jPrimitiveUtil::CreateCone(LightData.Position, 1.0, 1.0, 20, Vector::OneVector, Vector4(LightData.Color.x, LightData.Color.y, LightData.Color.z, 1.0f), true, false);
 	object->UmbraConeObject->RenderObjects[0]->IsHiddenBoundBox = true;
