@@ -24,7 +24,12 @@ void jDirectionalLight::Initialize(const Vector& InDirection, const Vector& InCo
     pos = Vector(350.0f, 360.0f, 100.0f);
     jLightUtil::MakeDirectionalLightViewInfo(pos, target, up, InDirection);
 
-    Camera = jOrthographicCamera::CreateCamera(pos, target, up, -SM_Width / 2.0f, -SM_Height / 2.0f, SM_Width / 2.0f, SM_Height / 2.0f, SM_NearDist, SM_FarDist);
+    // 임시 코드, 쉐도우맵 해상도 대비 절반 크기를 카메라의 렌더링 영역으로 잡음.
+    // 이 항목은 외부에서 설정 가능하게 뺄 예정
+    const float CameraWidth = SM_Width * 0.5f;
+    const float CameraHeight = SM_Height * 0.5f;
+
+    Camera = jOrthographicCamera::CreateCamera(pos, target, up, -CameraWidth / 2.0f, -CameraHeight / 2.0f, CameraWidth / 2.0f, CameraHeight / 2.0f, SM_NearDist, SM_FarDist);
 }
 
 const jCamera* jDirectionalLight::GetLightCamra(int32 index) const
