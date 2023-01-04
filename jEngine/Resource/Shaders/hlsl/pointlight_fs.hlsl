@@ -71,7 +71,7 @@ float4 main(VSOutput input) : SV_TARGET
     {
         float NormalizedDistance = DistanceToLight / PointLight.MaxDistance;
 
-        const float Bias = 0.01f;
+        const float Bias = 0.02f;
         Lit = PointLightShadowCubeMap.SampleCmpLevelZero(PointLightShadowMapSampler, LightDir.xyz, NormalizedDistance - Bias);
         if (Lit > 0.0f)
         {
