@@ -28,14 +28,18 @@ bool jRHI::InitRHI()
 
 void jRHI::OnInitRHI()
 {
+
 	uint8 WhiteData[4] = { 255, 255, 255, 255 };
 	GWhiteTexture = CreateTextureFromData(&WhiteData, 1, 1, false, ETextureFormat::RGBA8, false);
+	g_rhi->TransitionImageLayoutImmediate(GWhiteTexture, EImageLayout::SHADER_READ_ONLY);
 
 	uint8 BlackData[4] = { 0, 0, 0, 0 };
 	GBlackTexture = CreateTextureFromData(&BlackData, 1, 1, false, ETextureFormat::RGBA8, false);
+	g_rhi->TransitionImageLayoutImmediate(GBlackTexture, EImageLayout::SHADER_READ_ONLY);
 
     uint8 NormalData[4] = { 0, 0, 255, 0 };
 	GNormalTexture = CreateTextureFromData(&NormalData, 1, 1, false, ETextureFormat::RGBA8, false);
+	g_rhi->TransitionImageLayoutImmediate(GNormalTexture, EImageLayout::SHADER_READ_ONLY);
 
 	GDefaultMaterial = new jMaterial();
 	for (int32 i = 0; i < _countof(GDefaultMaterial->TexData); ++i)

@@ -16,9 +16,12 @@
 #include "jSpotLightDrawCommandGenerator.h"
 #include "RHI/jRenderTargetPool.h"
 #include "Material/jMaterial.h"
+#include "FileLoader/jImageFileLoader.h"
 
 #define ASYNC_WITH_SETUP 1
 #define PARALLELFOR_WITH_PASSSETUP 1
+
+std::shared_ptr<jRenderTarget> jRenderer::IrradianceMap;
 
 struct jSimplePushConstant
 {
@@ -409,6 +412,12 @@ void jRenderer::SetupBasePass()
     jParallelFor::ParallelForWithTaskPerThread(MaxPassSetupTaskPerThreadCount, jObject::GetStaticRenderObject()
         , [&](size_t InIndex, jRenderObject* InRenderObject)
     {
+        if (!InRenderObject->MaterialPtr)
+        {
+            InRenderObject->MaterialPtr = std::shared_ptr<jMaterial>(new jMaterial());
+            InRenderObject->MaterialPtr->TexData[0].Texture = IrradianceMap->GetTexture();
+        }
+
         new (&BasePasses[InIndex]) jDrawCommand(RenderFrameContextPtr, &View, InRenderObject, BaseRenderPass
             , GetOrCreateShaderFunc(InRenderObject), &BasePassPipelineStateFixed, {}, SimplePushConstant);
 
@@ -427,6 +436,89 @@ void jRenderer::SetupBasePass()
         ++i;
     }
 #endif
+}
+
+void jRenderer::TempPass()
+{
+    DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "TempPass", Vector4(0.0f, 1.0f, 0.0f, 1.0f));
+
+    const int32 Width = 512;
+    const int32 Height = 512;
+
+    // Prepare basepass pipeline
+    auto RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false>::Create();
+    jMultisampleStateInfo* MultisampleState = TMultisampleStateInfo<true, 0.2f, false, false>::Create(g_rhi->GetSelectedMSAASamples());
+    auto DepthStencilState = TDepthStencilStateInfo<false, true, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
+    auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
+
+    jPipelineStateFixedInfo TempPipelineStateFixed = jPipelineStateFixedInfo(RasterizationState, MultisampleState, DepthStencilState, BlendingState
+        , jViewport(0.0f, 0.0f, (float)Width, (float)Height), jScissor(0, 0, Width, Height), gOptions.UseVRS);
+
+    if (!IrradianceMap)
+    {
+        IrradianceMap = jRenderTargetPool::GetRenderTarget(
+            { ETextureType::TEXTURE_CUBE, ETextureFormat::RGBA16F, Width, Height, 6, false, EMSAASamples::COUNT_1 });
+    }
+
+    const Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
+    const Vector2 ClearDepth = Vector2(1.0f, 0.0f);
+
+    // Setup attachment
+    jRenderPassInfo renderPassInfo;
+    jAttachment color = jAttachment(IrradianceMap, EAttachmentLoadStoreOp::DONTCARE_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, ClearDepth
+        , EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
+    renderPassInfo.Attachments.push_back(color);
+    
+    // Setup subpass of ShadowPass
+    jSubpass subpass;
+    subpass.Initialize(0, 1, EPipelineStageMask::COLOR_ATTACHMENT_OUTPUT_BIT, EPipelineStageMask::FRAGMENT_SHADER_BIT);
+    subpass.OutputColorAttachments.push_back(0);
+    renderPassInfo.Subpasses.push_back(subpass);
+
+    auto TempRenderPass = (jRenderPass_Vulkan*)g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { Width, Height });
+
+    jGraphicsPipelineShader Shaders;
+    jShaderInfo shaderInfo;
+    shaderInfo.SetName(jNameStatic("gen_irradiancemap_vs"));
+    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/gen_irradiancemap_vs.hlsl"));
+    shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
+    Shaders.VertexShader = g_rhi->CreateShader(shaderInfo);
+
+    shaderInfo.SetName(jNameStatic("gen_irradiancemap_fs"));
+    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/gen_irradiancemap_fs.hlsl"));
+    shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
+    Shaders.PixelShader = g_rhi->CreateShader(shaderInfo);
+
+    int32 BindingPoint = 0;
+    jShaderBindingArray ShaderBindingArray;
+    jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
+    jShaderBindingInstanceArray ShaderBindingInstanceArray;
+
+    jTexture* TwoMirrorBallEnvTexture = jImageFileLoader::GetInstance().GetTempEnvironmentMap();
+    if (ensure(TwoMirrorBallEnvTexture))
+    {
+        ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
+            , ResourceInlineAllactor.Alloc<jTextureResource>(TwoMirrorBallEnvTexture, nullptr));
+    }
+    ShaderBindingInstanceArray.Add(g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame));
+
+    static jFullscreenQuadPrimitive* GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
+
+    jDrawCommand tempCommand(RenderFrameContextPtr, GlobalFullscreenPrimitive->RenderObjects[0]
+        , TempRenderPass, Shaders, &TempPipelineStateFixed, ShaderBindingInstanceArray, nullptr, jRHI::CubeMapInstanceDataForSixFace);
+
+    tempCommand.Test = true;
+    tempCommand.PrepareToDraw(false);
+
+    g_rhi_vk->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), IrradianceMap->GetTexture(), EImageLayout::COLOR_ATTACHMENT);
+
+    if (TempRenderPass && TempRenderPass->BeginRenderPass(RenderFrameContextPtr->GetActiveCommandBuffer()))
+    {
+        tempCommand.Draw();
+        TempRenderPass->EndRenderPass();
+    }
+
+    g_rhi_vk->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), IrradianceMap->GetTexture(), EImageLayout::READ_ONLY);
 }
 
 void jRenderer::ShadowPass()
@@ -753,6 +845,8 @@ void jRenderer::PostProcess()
         char szDebugEventTemp[1024] = { 0, };
 
         jSceneRenderTarget* SceneRT = RenderFrameContextPtr->SceneRenderTarget;
+        g_rhi->TransitionImageLayout(CommandBuffer, SceneRT->ColorPtr->GetTexture(), EImageLayout::SHADER_READ_ONLY);
+
         jTexture* SourceRT = nullptr;
         jTexture* EyeAdaptationTextureCurrent = nullptr;
         if (gOptions.BloomEyeAdaptation)
@@ -778,8 +872,6 @@ void jRenderer::PostProcess()
 
             g_rhi->TransitionImageLayout(CommandBuffer, EyeAdaptationTextureOld, EImageLayout::SHADER_READ_ONLY);
             //////////////////////////////////////////////////////////////////////////
-
-            g_rhi->TransitionImageLayout(CommandBuffer, SceneRT->ColorPtr->GetTexture(), EImageLayout::SHADER_READ_ONLY);
 
             SourceRT = SceneRT->ColorPtr->GetTexture();
 
@@ -1118,6 +1210,7 @@ void jRenderer::Render()
     }
 
     Setup();
+    // TempPass();
     ShadowPass();
 
     // Queue submit to prepare shadowmap for basepass 

@@ -85,6 +85,41 @@ FORCEINLINE auto GetVulkanTextureComponentCount(ETextureFormat type)
     );
 }
 
+FORCEINLINE auto GetVulkanTextureTexelSizeInByte(ETextureFormat type)
+{
+    GENERATE_STATIC_CONVERSION_ARRAY(
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB8, 24),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB32F, 96),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB16F, 48),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::R11G11B10F, 32),
+
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8, 32),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA16F, 64),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA32F, 128),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8SI, 32),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8UI, 32),
+
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::BGRA8, 32),
+
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::R8, 8),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::R16F, 16),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::R32F, 32),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::R8UI, 8),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::R32UI, 32),
+
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RG8, 16),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RG16F, 32),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RG32F, 64),
+
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::D16, 16),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::D16_S8, 24),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::D24, 24),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::D24_S8, 32),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::D32, 32),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::D32_S8, 40)
+    );
+}
+
 FORCEINLINE void GetVulkanAttachmentLoadStoreOp(VkAttachmentLoadOp& OutLoadOp, VkAttachmentStoreOp& OutStoreOp, EAttachmentLoadStoreOp InType)
 {
     switch (InType)

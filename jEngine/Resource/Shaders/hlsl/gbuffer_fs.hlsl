@@ -11,7 +11,8 @@ struct VSOutput
     float4 Color : COLOR0;
 #endif
     float2 TexCoord : TEXCOORD0;
-    float3 Normal : NORMAL0;
+    float3 WorldNormal : NORMAL0;
+    float3 Normal : NORMAL1;
     float4 WorldPos : TEXCOORD1;
     float3x3 TBN : TEXCOORD2;
 };
@@ -19,10 +20,12 @@ struct VSOutput
 cbuffer ViewParam : register(b0, space0) { ViewUniformBuffer ViewParam; }
 cbuffer RenderObjectParam : register(b0, space1) { RenderObjectUniformBuffer RenderObjectParam; }
 #if USE_ALBEDO_TEXTURE
-Texture2D DiffuseTexture : register(t0, space2);
-SamplerState DiffuseTextureSampler : register(s0, space2);
-Texture2D NormalTexture : register(t1, space2);
-SamplerState NormalTextureSampler : register(s1, space2);
+//Texture2D DiffuseTexture : register(t0, space2);
+//SamplerState DiffuseTextureSampler : register(s0, space2);
+//Texture2D NormalTexture : register(t1, space2);
+//SamplerState NormalTextureSampler : register(s1, space2);
+TextureCube textureCubeMap : register(t0, space2);
+SamplerState samplerCubeMap : register(s0, space2);
 #endif
 
 struct PushConsts
@@ -50,22 +53,23 @@ FSOutput main(VSOutput input
 #if USE_VERTEX_COLOR
     color *= input.Color;
 #endif
-#if USE_ALBEDO_TEXTURE
-    color *= DiffuseTexture.Sample(DiffuseTextureSampler, input.TexCoord.xy);
-    if (color.w < 0.5f)
-    {
-        discard;
-    }
-
-    // Convert to linear space
-    color.rgb = pow(color.rgb, 2.2);
-
-    float3 normal = NormalTexture.Sample(NormalTextureSampler, input.TexCoord.xy).xyz;
-    normal = normal * 2.0f - 1.0f;
-    float3 WorldNormal = normalize(mul(input.TBN, normal));
-#else
-    float3 WorldNormal = normalize(input.Normal);
-#endif
+//#if USE_ALBEDO_TEXTURE
+//    color *= DiffuseTexture.Sample(DiffuseTextureSampler, input.TexCoord.xy);
+//    if (color.w < 0.5f)
+//    {
+//        discard;
+//    }
+//
+//    // Convert to linear space
+//    color.rgb = pow(color.rgb, 2.2);
+//
+//    float3 normal = NormalTexture.Sample(NormalTextureSampler, input.TexCoord.xy).xyz;
+//    normal = normal * 2.0f - 1.0f;
+//    float3 WorldNormal = normalize(mul(input.TBN, normal));
+//#else
+    float3 WorldNormal = normalize(input.WorldNormal);
+    color = textureCubeMap.Sample(samplerCubeMap, input.Normal);
+//#endif
 
 #if USE_VARIABLE_SHADING_RATE
     if (pushConsts.ShowVRSArea)

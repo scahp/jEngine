@@ -125,6 +125,8 @@ bool jRenderPass_Vulkan::CreateRenderPass()
         {
             const jSubpass& subPass = RenderPassInfo.Subpasses[i];
 
+            check(subPass.OutputColorAttachments.size() > 0 || subPass.OutputDepthAttachment.has_value());      // It must have 1 or more output attachment
+
             std::vector<VkAttachmentReference>& InputAttachmentRefs = subpassAttachmentRefs[i].InputAttachmentRefs;
             std::vector<VkAttachmentReference>& OutputColorAttachmentRefs = subpassAttachmentRefs[i].OutputColorAttachmentRefs;
             std::optional<VkAttachmentReference>& OutputDepthAttachmentRef = subpassAttachmentRefs[i].OutputDepthAttachmentRef;

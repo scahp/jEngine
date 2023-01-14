@@ -30,7 +30,7 @@ VkFormat FindDepthFormat(VkPhysicalDevice physicalDevice)
     // VK_FORMAT_D24_UNORM_S8_UINT : 24bit float for depth, 8bit stencil
 
     return FindSupportedFormat(physicalDevice, { VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT }
-    , VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+    , g_rhi_vk->DefaultTilingMode, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 }
 
 uint32 FindMemoryType(VkPhysicalDevice physicalDevice, uint32 typeFilter, VkMemoryPropertyFlags properties)
