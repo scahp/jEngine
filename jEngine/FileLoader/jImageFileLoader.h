@@ -35,13 +35,6 @@ public:
 		}
 	}
 
-	// 임시로 만든거라 곧 제거 예정
-	jTexture* GetTempEnvironmentMap()
-	{
-		static jTexture* TwoMirrorBallEnvTexture = jImageFileLoader::GetInstance().LoadTextureFromFile(jNameStatic("Image/grace_probe.hdr"), false, true).lock().get();
-		return TwoMirrorBallEnvTexture;
-	}
-
 	std::weak_ptr<jImageData> LoadImageDataFromFile(const jName& filename, bool sRGB = false, bool paddingRGBA = false);
 	std::weak_ptr<jTexture> LoadTextureFromFile(const jName& filename, bool sRGB = false, bool paddingRGBA = false);
 

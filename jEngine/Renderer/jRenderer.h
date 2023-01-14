@@ -53,7 +53,6 @@ public:
     void SetupShadowPass();
     void SetupBasePass();
 
-    void TempPass();
     virtual void Render();
 
     bool UseForwardRenderer = false;
@@ -77,6 +76,4 @@ public:
 
     // Thread per task for PassSetup
     const int32 MaxPassSetupTaskPerThreadCount = 100;
-
-    static std::shared_ptr<jRenderTarget> IrradianceMap;
 };

@@ -15,15 +15,15 @@ public:
     jDrawCommand() = default;
     jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, const jView* InView, jRenderObject* InRenderObject
         , jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed
-        , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant = nullptr, const jVertexBuffer* InOverrideInstanceData = nullptr
+        , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant, const jVertexBuffer* InOverrideInstanceData = nullptr
         , int32 InSubpassIndex = 0);
     jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, const jViewLight* InViewLight, jRenderObject* InRenderObject
         , jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed
-        , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant = nullptr, const jVertexBuffer* InOverrideInstanceData = nullptr
+        , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant, const jVertexBuffer* InOverrideInstanceData = nullptr
         , int32 InSubpassIndex = 0);
     jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jRenderObject* InRenderObject
         , jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed
-        , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant = nullptr, const jVertexBuffer* InOverrideInstanceData = nullptr
+        , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant, const jVertexBuffer* InOverrideInstanceData = nullptr
         , int32 InSubpassIndex = 0);
 
     void PrepareToDraw(bool bPositionOnly);

@@ -25,8 +25,7 @@ struct VSOutput
     float4 Color : COLOR0;
 #endif
     float2 TexCoord : TEXCOORD0;
-    float3 WorldNormal : NORMAL0;
-    float3 Normal : NORMAL1;
+    float3 Normal : NORMAL0;
     float4 WorldPos : TEXCOORD1;
     float3x3 TBN : TEXCOORD2;
 };
@@ -41,8 +40,7 @@ VSOutput main(VSInput input)
     output.Color = input.Color;
 #endif
     output.TexCoord = input.TexCoord;
-    output.WorldNormal = mul((float3x3)RenderObjectParam.M, input.Normal);
-    output.Normal = normalize(input.Position.xyz);
+    output.Normal = mul((float3x3)RenderObjectParam.M, input.Normal);
     
 #if USE_ALBEDO_TEXTURE
     float4 Bitangent = float4(cross(input.Normal, input.Tangent), 0.0);

@@ -36,8 +36,6 @@ public:
     static TResourcePool<jPipelineStateInfo_Vulkan, jMutexRWLock> PipelineStatePool;
 	static TResourcePool<jRenderPass_Vulkan, jMutexRWLock> RenderPassPool;
 
-	static constexpr VkImageTiling DefaultTilingMode = VkImageTiling::VK_IMAGE_TILING_OPTIMAL;
-
 	jRHI_Vulkan();
 	virtual ~jRHI_Vulkan();
 
