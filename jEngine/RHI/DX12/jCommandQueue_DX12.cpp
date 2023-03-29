@@ -1,7 +1,7 @@
 ﻿#include "pch.h"
-#include "jCommandQueue_DirectX12.h"
+#include "jCommandQueue_DX12.h"
 
-bool jCommandQueue_DirectX12::Initialize(ComPtr<ID3D12Device> InDevice, D3D12_COMMAND_LIST_TYPE InType)
+bool jCommandQueue_DX12::Initialize(ComPtr<ID3D12Device> InDevice, D3D12_COMMAND_LIST_TYPE InType)
 {
 	JASSERT(InDevice);
 	Device = InDevice;
@@ -30,7 +30,7 @@ bool jCommandQueue_DirectX12::Initialize(ComPtr<ID3D12Device> InDevice, D3D12_CO
 	return true;
 }
 
-uint64 jCommandQueue_DirectX12::ExecuteCommandList(ComPtr<ID3D12GraphicsCommandList2> InCommandListPtr)
+uint64 jCommandQueue_DX12::ExecuteCommandList(ComPtr<ID3D12GraphicsCommandList4> InCommandListPtr)
 {
 	if (FAILED(InCommandListPtr->Close()))
 		return -1;
@@ -52,7 +52,7 @@ uint64 jCommandQueue_DirectX12::ExecuteCommandList(ComPtr<ID3D12GraphicsCommandL
 	return fenceValue;
 }
 
-ComPtr<ID3D12CommandAllocator> jCommandQueue_DirectX12::GetAvailableAllocator()
+ComPtr<ID3D12CommandAllocator> jCommandQueue_DX12::GetAvailableAllocator()
 {
 	ComPtr<ID3D12CommandAllocator> CommandAllocator;
 	if (!AvailableCommandAllocatorQueue.empty() && IsFenceComplete(AvailableCommandAllocatorQueue.front().FenceValue))
@@ -70,9 +70,9 @@ ComPtr<ID3D12CommandAllocator> jCommandQueue_DirectX12::GetAvailableAllocator()
 	return CommandAllocator;
 }
 
-ComPtr<ID3D12GraphicsCommandList2> jCommandQueue_DirectX12::GetAvailableCommandList()
+ComPtr<ID3D12GraphicsCommandList4> jCommandQueue_DX12::GetAvailableCommandList()
 {
-	ComPtr<ID3D12GraphicsCommandList2> CommandList;
+	ComPtr<ID3D12GraphicsCommandList4> CommandList;
 	ComPtr<ID3D12CommandAllocator> AvailableCommandAllocator = GetAvailableAllocator();
 	if (AvailableCommandListQueue.empty())
 	{

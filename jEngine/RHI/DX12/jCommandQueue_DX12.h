@@ -5,15 +5,15 @@
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
 
-class jCommandQueue_DirectX12
+class jCommandQueue_DX12
 {
 public:
-	jCommandQueue_DirectX12()
+	jCommandQueue_DX12()
 		: FenceValue(0)
 		, CommandListType(D3D12_COMMAND_LIST_TYPE_DIRECT)
 	{ }
 
-	virtual ~jCommandQueue_DirectX12() {}
+	virtual ~jCommandQueue_DX12() {}
 
 	bool Initialize(ComPtr<ID3D12Device> InDevice, D3D12_COMMAND_LIST_TYPE InType = D3D12_COMMAND_LIST_TYPE_DIRECT);
 
@@ -45,8 +45,8 @@ public:
 	FORCEINLINE ComPtr<ID3D12CommandQueue> GetCommandQueue() const { return CommandQueue; }
 
 	// CommandList
-	uint64 ExecuteCommandList(ComPtr<ID3D12GraphicsCommandList2> InCommandListPtr);
-	ComPtr<ID3D12GraphicsCommandList2> GetAvailableCommandList();
+	uint64 ExecuteCommandList(ComPtr<ID3D12GraphicsCommandList4> InCommandListPtr);
+	ComPtr<ID3D12GraphicsCommandList4> GetAvailableCommandList();
 
 private:
 	FORCEINLINE ComPtr<ID3D12CommandAllocator> CreateCommandAllocator() const
@@ -58,9 +58,9 @@ private:
 		return commandAllocator;
 	}
 
-	FORCEINLINE ComPtr<ID3D12GraphicsCommandList2> CreateCommandList(ComPtr<ID3D12CommandAllocator> InAllocatorPtr) const
+	FORCEINLINE ComPtr<ID3D12GraphicsCommandList4> CreateCommandList(ComPtr<ID3D12CommandAllocator> InAllocatorPtr) const
 	{
-		ComPtr<ID3D12GraphicsCommandList2> commandList;
+		ComPtr<ID3D12GraphicsCommandList4> commandList;
 		if (FAILED(Device->CreateCommandList(0, CommandListType, InAllocatorPtr.Get(), nullptr, IID_PPV_ARGS(&commandList))))
 			return nullptr;
 
@@ -81,7 +81,7 @@ private:
 	};
 
 	std::queue<jCommandAllocatorEntry> AvailableCommandAllocatorQueue;
-	std::queue<ComPtr<ID3D12GraphicsCommandList2>> AvailableCommandListQueue;
+	std::queue<ComPtr<ID3D12GraphicsCommandList4>> AvailableCommandListQueue;
 
 	D3D12_COMMAND_LIST_TYPE CommandListType = D3D12_COMMAND_LIST_TYPE_DIRECT;
 	ComPtr<ID3D12Device> Device;

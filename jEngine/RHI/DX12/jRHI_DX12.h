@@ -9,7 +9,7 @@
 #include <dxgi1_6.h>
 #include <d3dcompiler.h>
 #include <DirectXMath.h>
-#include "jCommandQueue_DirectX12.h"
+#include "jCommandQueue_DX12.h"
 
 
 using Microsoft::WRL::ComPtr;
@@ -104,7 +104,7 @@ private:
 #endif
 };
 
-class jRHI_DirectX12 : public jRHI
+class jRHI_DX12 : public jRHI
 {
 public:
 	static const wchar_t* c_raygenShaderName;
@@ -116,19 +116,17 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// 1. Device
-	ComPtr<ID3D12Device> m_device;
-    uint32 m_options = 0;
+	ComPtr<ID3D12Device5> Device;
+    uint32 Options = 0;
 
 	//////////////////////////////////////////////////////////////////////////
 	// 2. Command
-	ComPtr<ID3D12CommandQueue> m_commandQueue;
-	ComPtr<ID3D12CommandAllocator> m_commandAllocator[FrameCount];
-	ComPtr<ID3D12GraphicsCommandList> m_commandList;
+	jCommandQueue_DX12* GraphicsCommandQueue = nullptr;
 
 	//////////////////////////////////////////////////////////////////////////
 	// 3. Swapchain
-	int32 m_frameIndex = 0;
-	ComPtr<IDXGISwapChain3> m_swapChain;
+	int32 FrameIndex = 0;
+	ComPtr<IDXGISwapChain3> SwapChain;
 
 	//////////////////////////////////////////////////////////////////////////
 	// 4. Heap
@@ -172,8 +170,6 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// 8. Raytracing device and commandlist
-	ComPtr<ID3D12Device5> m_dxrDevice;
-	ComPtr<ID3D12GraphicsCommandList4> m_dxrCommandList;
 
 	//////////////////////////////////////////////////////////////////////////
 	// 9. CreateRootSignature
@@ -254,7 +250,6 @@ public:
 	XMVECTOR m_at;
 	XMVECTOR m_up;
 	void UpdateCameraMatrices();
-	void CreateConstantBuffer();
 
 	static_assert(sizeof(SceneConstantBuffer) < D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT, "Checking the size here");
 
@@ -290,7 +285,7 @@ public:
     };
     TopLevelAccelerationStructureBuffers TLASBuffer;
 
-    bool BuildTopLevelAS(TopLevelAccelerationStructureBuffers& InBuffers, bool InIsUpdate, float InRotationY, Vector InTranslation);
+    bool BuildTopLevelAS(ComPtr<ID3D12GraphicsCommandList4>& InCommandList, TopLevelAccelerationStructureBuffers& InBuffers, bool InIsUpdate, float InRotationY, Vector InTranslation);
 
     bool OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimized);
     bool OnHandleDeviceLost();

@@ -155,9 +155,9 @@ xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"</Command
     <ClInclude Include="Renderer\jRenderer.h" />
     <ClInclude Include="Renderer\jSceneRenderTargets.h" />
     <ClInclude Include="Renderer\jSpotLightDrawCommandGenerator.h" />
-    <ClInclude Include="RHI\DirectX12\jCommandQueue_DirectX12.h" />
-    <ClInclude Include="RHI\DirectX12\jRHI_DirectX12.h" />
-    <ClInclude Include="RHI\DirectX12\jShaderCompiler_DirectX12.h" />
+    <ClInclude Include="RHI\DX12\jCommandQueue_DX12.h" />
+    <ClInclude Include="RHI\DX12\jRHI_DX12.h" />
+    <ClInclude Include="RHI\DX12\jShaderCompiler_DX12.h" />
     <ClInclude Include="RHI\jBuffer.h" />
     <ClInclude Include="RHI\jCommandBufferManager.h" />
     <ClInclude Include="RHI\jFenceManager.h" />
@@ -330,9 +330,9 @@ xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"</Command
     <ClCompile Include="Renderer\jRenderer.cpp" />
     <ClCompile Include="Renderer\jSceneRenderTargets.cpp" />
     <ClCompile Include="Renderer\jSpotLightDrawCommandGenerator.cpp" />
-    <ClCompile Include="RHI\DirectX12\jCommandQueue_DirectX12.cpp" />
-    <ClCompile Include="RHI\DirectX12\jRHI_DirectX12.cpp" />
-    <ClCompile Include="RHI\DirectX12\jShaderCompiler_DirectX12.cpp" />
+    <ClCompile Include="RHI\DX12\jCommandQueue_DX12.cpp" />
+    <ClCompile Include="RHI\DX12\jRHI_DX12.cpp" />
+    <ClCompile Include="RHI\DX12\jShaderCompiler_DX12.cpp" />
     <ClCompile Include="RHI\jFenceManager.cpp" />
     <ClCompile Include="RHI\jFrameBufferPool.cpp" />
     <ClCompile Include="RHI\jPipelineStateInfo.cpp" />

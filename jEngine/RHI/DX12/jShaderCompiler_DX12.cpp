@@ -1,5 +1,5 @@
 ﻿#include "pch.h"
-#include "jShaderCompiler_DirectX12.h"
+#include "jShaderCompiler_DX12.h"
 
 //////////////////////////////////////////////////////////////////////////
 // jDXC
@@ -90,15 +90,15 @@ HMODULE jDXC::Detach()
 }
 
 //////////////////////////////////////////////////////////////////////////
-// jShaderCompiler_DirectX12
-jShaderCompiler_DirectX12* jShaderCompiler_DirectX12::_instance = nullptr;
+// jShaderCompiler_DX12
+jShaderCompiler_DX12* jShaderCompiler_DX12::_instance = nullptr;
 
-HRESULT jShaderCompiler_DirectX12::Initialize()
+HRESULT jShaderCompiler_DX12::Initialize()
 {
 	return m_dxc.Initialize();
 }
 
-ComPtr<IDxcBlob> jShaderCompiler_DirectX12::Compile(const wchar_t* InFilename, const wchar_t* InTargetString) const
+ComPtr<IDxcBlob> jShaderCompiler_DX12::Compile(const wchar_t* InFilename, const wchar_t* InTargetString) const
 {
 	if (!m_dxc.IsEnable())
 		return nullptr;

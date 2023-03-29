@@ -1,17 +1,17 @@
 ﻿#include "pch.h"
-#include "jRHI_DirectX12.h"
-#include "jShaderCompiler_DirectX12.h"
+#include "jRHI_DX12.h"
+#include "jShaderCompiler_DX12.h"
 #include <iomanip>
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
 
-const wchar_t* jRHI_DirectX12::c_raygenShaderName = L"MyRaygenShader";
-const wchar_t* jRHI_DirectX12::c_closestHitShaderName = L"MyClosestHitShader";
-const wchar_t* jRHI_DirectX12::c_missShaderName = L"MyMissShader";
-const wchar_t* jRHI_DirectX12::c_triHitGroupName = L"TriHitGroup";
-const wchar_t* jRHI_DirectX12::c_planeHitGroupName = L"PlaneHitGroup";
-const wchar_t* jRHI_DirectX12::c_planeclosestHitShaderName = L"MyPlaneClosestHitShader";
+const wchar_t* jRHI_DX12::c_raygenShaderName = L"MyRaygenShader";
+const wchar_t* jRHI_DX12::c_closestHitShaderName = L"MyClosestHitShader";
+const wchar_t* jRHI_DX12::c_missShaderName = L"MyMissShader";
+const wchar_t* jRHI_DX12::c_triHitGroupName = L"TriHitGroup";
+const wchar_t* jRHI_DX12::c_planeHitGroupName = L"PlaneHitGroup";
+const wchar_t* jRHI_DX12::c_planeclosestHitShaderName = L"MyPlaneClosestHitShader";
 
 constexpr uint32 c_AllowTearing = 0x1;
 constexpr uint32 c_RequireTearingSupport = 0x2;
@@ -196,8 +196,8 @@ ShaderTable::ShaderTable(ID3D12Device* InDevice, uint32 InNumOfShaderRecords, ui
 
 void ShaderTable::push_back(const ShaderRecord& InShaderRecord)
 {
-    if (ensure(m_shaderRecords.size() >= m_shaderRecords.capacity()))
-        return;
+    //if (ensure(m_shaderRecords.size() >= m_shaderRecords.capacity()))
+    //    return;
 
 	m_shaderRecords.push_back(InShaderRecord);
 
@@ -238,7 +238,7 @@ void ShaderTable::DebugPrint(robin_hood::unordered_map<void*, std::wstring> shad
 #endif
 }
 
-jRHI_DirectX12* pRHIDirectX12 = nullptr;
+jRHI_DX12* pRHIDirectX12 = nullptr;
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -320,7 +320,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 	return DefWindowProc(hWnd, message, wParam, lParam);
 }
 
-HWND jRHI_DirectX12::CreateMainWindow() const
+HWND jRHI_DX12::CreateMainWindow() const
 {
 	auto hInstance = GetModuleHandle(NULL);
 
@@ -408,23 +408,24 @@ int32 GetHardwareAdapter(IDXGIFactory1* InFactory, IDXGIAdapter1** InAdapter
     return adapterIndex;
 }
 
-void jRHI_DirectX12::WaitForGPU()
+void jRHI_DX12::WaitForGPU()
 {
-	if (m_commandQueue && m_fence && m_fenceEvent)
+	auto Queue = GraphicsCommandQueue->GetCommandQueue();
+	if (Queue && m_fence && m_fenceEvent)
 	{
-		uint64 fenceValue = m_fenceValue[m_frameIndex];
-		if (JFAIL(m_commandQueue->Signal(m_fence.Get(), fenceValue)))
+		uint64 fenceValue = m_fenceValue[FrameIndex];
+		if (JFAIL(Queue->Signal(m_fence.Get(), fenceValue)))
 			return;
 
 		if (JFAIL(m_fence->SetEventOnCompletion(fenceValue, m_fenceEvent)))
 			return;
 
 		WaitForSingleObjectEx(m_fenceEvent, INFINITE, false);
-		++m_fenceValue[m_frameIndex];
+		++m_fenceValue[FrameIndex];
 	}
 }
 
-bool jRHI_DirectX12::Initialize()
+bool jRHI_DX12::Initialize()
 {
 	// 1. Device
 	uint32 dxgiFactoryFlags = 0;
@@ -458,15 +459,15 @@ bool jRHI_DirectX12::Initialize()
         if (FAILED(hr) || !allowTearing)
         {
             OutputDebugStringA("WARNING: Variable refresh rate displays are not supported.\n");
-            if (m_options & c_RequireTearingSupport)
+            if (Options & c_RequireTearingSupport)
             {
                 JASSERT(!L"Error: Sample must be run on an OS with tearing support.\n");
             }
-            m_options &= ~c_AllowTearing;
+            Options &= ~c_AllowTearing;
         }
         else
         {
-            m_options |= c_AllowTearing;
+            Options |= c_AllowTearing;
         }
     }
 
@@ -477,7 +478,7 @@ bool jRHI_DirectX12::Initialize()
 		if (JFAIL(factory->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter))))
 			return false;
 
-		if (JFAIL((D3D12CreateDevice(warpAdapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_device)))))
+		if (JFAIL((D3D12CreateDevice(warpAdapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&Device)))))
 			return false;
 	}
 	else
@@ -485,7 +486,7 @@ bool jRHI_DirectX12::Initialize()
 		ComPtr<IDXGIAdapter1> hardwareAdapter;
 		const int32 ResultAdapterID = GetHardwareAdapter(factory.Get(), &hardwareAdapter);
 
-        if (JFAIL(D3D12CreateDevice(hardwareAdapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_device))))
+        if (JFAIL(D3D12CreateDevice(hardwareAdapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&Device))))
         {
             return false;
         }
@@ -505,12 +506,11 @@ bool jRHI_DirectX12::Initialize()
 	}
 
 	// 2. Command
-	D3D12_COMMAND_QUEUE_DESC queueDesc{};
-	queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-	queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-
-	if (JFAIL(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue))))
-		return false;
+	GraphicsCommandQueue = new jCommandQueue_DX12();
+	GraphicsCommandQueue->Initialize(Device, D3D12_COMMAND_LIST_TYPE_DIRECT);
+	//D3D12_COMMAND_QUEUE_DESC queueDesc{};
+	//queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+	//queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 
 	// 3. Swapchain
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc{};
@@ -521,10 +521,10 @@ bool jRHI_DirectX12::Initialize()
 	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 	swapChainDesc.SampleDesc.Count = 1;
-    swapChainDesc.Flags = (m_options & c_AllowTearing) ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
+    swapChainDesc.Flags = (Options & c_AllowTearing) ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
 
 	ComPtr<IDXGISwapChain1> swapChain;
-	if (JFAIL(factory->CreateSwapChainForHwnd(m_commandQueue.Get(), m_hWnd
+	if (JFAIL(factory->CreateSwapChainForHwnd(GraphicsCommandQueue->GetCommandQueue().Get(), m_hWnd
 		, &swapChainDesc, nullptr, nullptr, &swapChain)))
 	{
 		return false;
@@ -533,21 +533,21 @@ bool jRHI_DirectX12::Initialize()
 	// 풀스크린으로 전환하지 않을 것이므로 아래 처럼 설정
 	// factory->MakeWindowAssociation(hWnd, DXGI_MWA_NO_ALT_ENTER);
 
-	swapChain.As(&m_swapChain);
-	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
+	swapChain.As(&SwapChain);
+	FrameIndex = SwapChain->GetCurrentBackBufferIndex();
 
  	// 4. Heap
 	D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc{};
 	rtvHeapDesc.NumDescriptors = FrameCount;
 	rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 	rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-	if (JFAIL(m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap))))
+	if (JFAIL(Device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap))))
 		return false;
 
     //////////////////////////////////////////////////////////////////////////
     // 5. Initialize Camera and lighting
     {
-        auto frameIndex = m_swapChain->GetCurrentBackBufferIndex();
+        auto frameIndex = SwapChain->GetCurrentBackBufferIndex();
 
         // Setup material
         m_cubeCB.albedo = XMFLOAT4(0.8f, 0.8f, 0.8f, 1.0f);
@@ -602,39 +602,30 @@ bool jRHI_DirectX12::Initialize()
 	cbvHeapDesc.NumDescriptors = 5;
 	cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-	if (JFAIL(m_device->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_cbvHeap))))
+	if (JFAIL(Device->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_cbvHeap))))
 		return false;
 
-	m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	m_cbvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	m_rtvDescriptorSize = Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	m_cbvDescriptorSize = Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 	// 6. CommandAllocators, Commandlist, RTV for FrameCount
 	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
 
 	for (uint32 i = 0; i < FrameCount; ++i)
 	{
-		if (JFAIL(m_swapChain->GetBuffer(i, IID_PPV_ARGS(&m_renderTargets[i]))))
+		if (JFAIL(SwapChain->GetBuffer(i, IID_PPV_ARGS(&m_renderTargets[i]))))
 			return false;
 
-		m_device->CreateRenderTargetView(m_renderTargets[i].Get(), nullptr, rtvHandle);
+		Device->CreateRenderTargetView(m_renderTargets[i].Get(), nullptr, rtvHandle);
 		rtvHandle.Offset(1, m_rtvDescriptorSize);
 
-		if (JFAIL(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator[i]))))
-			return false;
 	}
-
-	if (JFAIL(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator[0].Get()
-		, nullptr, IID_PPV_ARGS(&m_commandList))))
-	{
-		return false;
-	}
-	m_commandList->Close();
 
 	// 7. Create sync object
-	if (JFAIL(m_device->CreateFence(m_fenceValue[m_frameIndex], D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence))))
+	if (JFAIL(Device->CreateFence(m_fenceValue[FrameIndex], D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence))))
 		return false;
 
-	++m_fenceValue[m_frameIndex];
+	++m_fenceValue[FrameIndex];
 
 	m_fenceEvent = CreateEvent(nullptr, false, false, nullptr);
 	if (!m_fenceEvent)
@@ -647,16 +638,10 @@ bool jRHI_DirectX12::Initialize()
 
 	// 8. Raytracing device and commandlist
 	D3D12_FEATURE_DATA_D3D12_OPTIONS5 featureSupportData{};
-	if (JFAIL(m_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &featureSupportData, sizeof(featureSupportData))))
+	if (JFAIL(Device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &featureSupportData, sizeof(featureSupportData))))
 		return false;
 
 	if (featureSupportData.RaytracingTier == D3D12_RAYTRACING_TIER_NOT_SUPPORTED)
-		return false;
-
-	if (JFAIL(m_device->QueryInterface(IID_PPV_ARGS(&m_dxrDevice))))
-		return false;
-
-	if (JFAIL(m_commandList->QueryInterface(IID_PPV_ARGS(&m_dxrCommandList))))
 		return false;
 
 	// 9. CreateRootSignatures
@@ -688,7 +673,7 @@ bool jRHI_DirectX12::Initialize()
 			return false;
 		}
 
-		if (JFAIL(m_device->CreateRootSignature(1, blob->GetBufferPointer(), blob->GetBufferSize()
+		if (JFAIL(Device->CreateRootSignature(1, blob->GetBufferPointer(), blob->GetBufferSize()
 			, IID_PPV_ARGS(&m_raytracingGlobalRootSignature))))
 		{
 			return false;
@@ -715,7 +700,7 @@ bool jRHI_DirectX12::Initialize()
 			return false;
 		}
 
-		if (JFAIL(m_device->CreateRootSignature(1, blob->GetBufferPointer(), blob->GetBufferSize()
+		if (JFAIL(Device->CreateRootSignature(1, blob->GetBufferPointer(), blob->GetBufferSize()
 			, IID_PPV_ARGS(&m_raytracingLocalRootSignature))))
 		{
 			return false;
@@ -741,10 +726,10 @@ bool jRHI_DirectX12::Initialize()
 	std::vector<std::wstring> exportName;
 	{
 		D3D12_STATE_SUBOBJECT subobject{};
-		ShaderBlob = jShaderCompiler_DirectX12::Get().Compile(TEXT("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"), TEXT("lib_6_3"));
+		ShaderBlob = jShaderCompiler_DX12::Get().Compile(TEXT("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"), TEXT("lib_6_3"));
 		if (ShaderBlob)
 		{
-			const wchar_t* entryPoint[] = { jRHI_DirectX12::c_raygenShaderName, jRHI_DirectX12::c_closestHitShaderName, jRHI_DirectX12::c_missShaderName, jRHI_DirectX12::c_planeclosestHitShaderName };
+			const wchar_t* entryPoint[] = { jRHI_DX12::c_raygenShaderName, jRHI_DX12::c_closestHitShaderName, jRHI_DX12::c_missShaderName, jRHI_DX12::c_planeclosestHitShaderName };
 			subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
 			subobject.pDesc = &dxilDesc;
 
@@ -772,8 +757,8 @@ bool jRHI_DirectX12::Initialize()
 	D3D12_HIT_GROUP_DESC hitgroupDesc{};
 	{
 		hitgroupDesc.AnyHitShaderImport = nullptr;
-		hitgroupDesc.ClosestHitShaderImport = jRHI_DirectX12::c_closestHitShaderName;
-		hitgroupDesc.HitGroupExport = jRHI_DirectX12::c_triHitGroupName;
+		hitgroupDesc.ClosestHitShaderImport = jRHI_DX12::c_closestHitShaderName;
+		hitgroupDesc.HitGroupExport = jRHI_DX12::c_triHitGroupName;
 		hitgroupDesc.Type = D3D12_HIT_GROUP_TYPE_TRIANGLES;
 
 		D3D12_STATE_SUBOBJECT subobject{};
@@ -786,8 +771,8 @@ bool jRHI_DirectX12::Initialize()
     D3D12_HIT_GROUP_DESC planeHitGroupDesc{};
     {
         planeHitGroupDesc.AnyHitShaderImport = nullptr;
-        planeHitGroupDesc.ClosestHitShaderImport = jRHI_DirectX12::c_planeclosestHitShaderName;
-        planeHitGroupDesc.HitGroupExport = jRHI_DirectX12::c_planeHitGroupName;
+        planeHitGroupDesc.ClosestHitShaderImport = jRHI_DX12::c_planeclosestHitShaderName;
+        planeHitGroupDesc.HitGroupExport = jRHI_DX12::c_planeHitGroupName;
         planeHitGroupDesc.Type = D3D12_HIT_GROUP_TYPE_TRIANGLES;
 
         D3D12_STATE_SUBOBJECT subobject{};
@@ -820,7 +805,7 @@ bool jRHI_DirectX12::Initialize()
 		subobjects[index] = subobject;
 
 		association.NumExports = 1;
-		association.pExports = &jRHI_DirectX12::c_triHitGroupName;
+		association.pExports = &jRHI_DX12::c_triHitGroupName;
 		association.pSubobjectToAssociate = &subobjects[index++];
 
 		D3D12_STATE_SUBOBJECT subobject2{};
@@ -854,7 +839,7 @@ bool jRHI_DirectX12::Initialize()
             return false;
         }
 
-        if (JFAIL(m_device->CreateRootSignature(1, blob->GetBufferPointer(), blob->GetBufferSize()
+        if (JFAIL(Device->CreateRootSignature(1, blob->GetBufferPointer(), blob->GetBufferSize()
             , IID_PPV_ARGS(&m_raytracingEmptyLocalRootSignature))))
         {
             return false;
@@ -906,14 +891,12 @@ bool jRHI_DirectX12::Initialize()
 	PrintStateObjectDesc(&stateObjectDesc);
 #endif
 
-	if (JFAIL(m_dxrDevice->CreateStateObject(&stateObjectDesc, IID_PPV_ARGS(&m_dxrStateObject))))
+	if (JFAIL(Device->CreateStateObject(&stateObjectDesc, IID_PPV_ARGS(&m_dxrStateObject))))
 		return false;
 
 	//////////////////////////////////////////////////////////////////////////
 	// 11. Create vertex and index buffer
-
-    if (JFAIL(m_commandList->Reset(m_commandAllocator[m_frameIndex].Get(), nullptr)))
-        return false;
+	auto GraphicsCommandList = GraphicsCommandQueue->GetAvailableCommandList();
 
     const int32 slice = 100;
     const int32 verticesCount = ((slice + 1) * (slice / 2) + 2);
@@ -986,8 +969,8 @@ bool jRHI_DirectX12::Initialize()
         ++cnt;
     }
 
-	BufferUtil::AllocateUploadBuffer(&m_vertexBuffer, m_device.Get(), vertices, sizeof(vertices), TEXT("SphereVB"));
-	BufferUtil::AllocateUploadBuffer(&m_indexBuffer, m_device.Get(), indices, sizeof(indices), TEXT("SphereIB"));
+	BufferUtil::AllocateUploadBuffer(&m_vertexBuffer, Device.Get(), vertices, sizeof(vertices), TEXT("SphereVB"));
+	BufferUtil::AllocateUploadBuffer(&m_indexBuffer, Device.Get(), indices, sizeof(indices), TEXT("SphereIB"));
 
 	// 버택스 버퍼와 인덱스 버퍼는 디스크립터 테이블로 쉐이더로 전달됨
 	// 디스크립터 힙에서 버택스 버퍼 디스크립터는 인덱스 버퍼 디스크립터에 바로다음에 있어야 함
@@ -1008,7 +991,7 @@ bool jRHI_DirectX12::Initialize()
 		}
 		m_indexBufferCpuDescriptor = CD3DX12_CPU_DESCRIPTOR_HANDLE(m_cbvHeap->GetCPUDescriptorHandleForHeapStart(), descriptorIndex, m_cbvDescriptorSize);
 
-		m_device->CreateShaderResourceView(m_indexBuffer.Get(), &srvDesc, m_indexBufferCpuDescriptor);
+		Device->CreateShaderResourceView(m_indexBuffer.Get(), &srvDesc, m_indexBufferCpuDescriptor);
 		m_indexBufferGpuDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_cbvHeap->GetGPUDescriptorHandleForHeapStart(), descriptorIndex, m_cbvDescriptorSize);
 	}
 	{
@@ -1028,7 +1011,7 @@ bool jRHI_DirectX12::Initialize()
 		}
 		m_vertexBufferCpuDescriptor = CD3DX12_CPU_DESCRIPTOR_HANDLE(m_cbvHeap->GetCPUDescriptorHandleForHeapStart(), descriptorIndex, m_cbvDescriptorSize);
 
-		m_device->CreateShaderResourceView(m_vertexBuffer.Get(), &srvDesc, m_vertexBufferCpuDescriptor);
+		Device->CreateShaderResourceView(m_vertexBuffer.Get(), &srvDesc, m_vertexBufferCpuDescriptor);
 		m_vertexBufferGpuDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_cbvHeap->GetGPUDescriptorHandleForHeapStart(), descriptorIndex, m_cbvDescriptorSize);
 	}
 
@@ -1061,7 +1044,7 @@ bool jRHI_DirectX12::Initialize()
         bottomLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
 
 
-        m_dxrDevice->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
+		Device->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
         if (!ensure(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0))
             return false;
     }
@@ -1074,12 +1057,12 @@ bool jRHI_DirectX12::Initialize()
     // - 시스템은 백그라운드에서 Acceleration structure 빌드를 구현할 때 이러한 유형의 액세스를 수행할 것입니다.
     // - 앱의 관점에서, acceleration structure에 쓰기/읽기의 동기화는 UAV barriers를 통해서 얻어짐.
     D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
-    BufferUtil::AllocateUAVBuffer(&m_bottomLevelAccelerationStructure, m_device.Get()
+    BufferUtil::AllocateUAVBuffer(&m_bottomLevelAccelerationStructure, Device.Get()
         , bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, initialResourceState, TEXT("BottomLevelAccelerationStructure"));
 
     // Bottom level acceleration structure desc
     ComPtr<ID3D12Resource> scratchResource;
-    BufferUtil::AllocateUAVBuffer(&scratchResource, m_device.Get(), bottomLevelPrebuildInfo.ScratchDataSizeInBytes
+    BufferUtil::AllocateUAVBuffer(&scratchResource, Device.Get(), bottomLevelPrebuildInfo.ScratchDataSizeInBytes
         , D3D12_RESOURCE_STATE_UNORDERED_ACCESS, L"ScratchResourceGeometry1");
 
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc{};
@@ -1087,10 +1070,10 @@ bool jRHI_DirectX12::Initialize()
     bottomLevelBuildDesc.ScratchAccelerationStructureData = scratchResource->GetGPUVirtualAddress();
     bottomLevelBuildDesc.DestAccelerationStructureData = m_bottomLevelAccelerationStructure->GetGPUVirtualAddress();
 
-    m_dxrCommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
+	GraphicsCommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
 	{
 		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::UAV(m_bottomLevelAccelerationStructure.Get());
-		m_commandList->ResourceBarrier(1, &barrier);
+		GraphicsCommandList->ResourceBarrier(1, &barrier);
 	}
 
     //////////////////////////////////////////////////////////////////////////
@@ -1106,7 +1089,7 @@ bool jRHI_DirectX12::Initialize()
             XMFLOAT3(100.0f, -1.0f, 100.0f),   XMFLOAT3(0.0f, 1.0f, 0.0f),
     };
 
-    BufferUtil::AllocateUploadBuffer(&m_vertexBufferSecondGeometry, m_device.Get(), secondVertices, sizeof(secondVertices), TEXT("SecondGeometryVB"));
+    BufferUtil::AllocateUploadBuffer(&m_vertexBufferSecondGeometry, Device.Get(), secondVertices, sizeof(secondVertices), TEXT("SecondGeometryVB"));
 
     {
         // VertexBuffer SRV
@@ -1125,7 +1108,7 @@ bool jRHI_DirectX12::Initialize()
         }
         m_vertexBufferCpuDescriptorSecondGeometry = CD3DX12_CPU_DESCRIPTOR_HANDLE(m_cbvHeap->GetCPUDescriptorHandleForHeapStart(), descriptorIndex, m_cbvDescriptorSize);
 
-        m_device->CreateShaderResourceView(m_vertexBufferSecondGeometry.Get(), &srvDesc, m_vertexBufferCpuDescriptorSecondGeometry);
+        Device->CreateShaderResourceView(m_vertexBufferSecondGeometry.Get(), &srvDesc, m_vertexBufferCpuDescriptorSecondGeometry);
         m_vertexBufferGpuDescriptorSecondGeometry = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_cbvHeap->GetGPUDescriptorHandleForHeapStart(), descriptorIndex, m_cbvDescriptorSize);
     }
 
@@ -1148,16 +1131,16 @@ bool jRHI_DirectX12::Initialize()
         bottomLevelInputsSecondGeometry.NumDescs = 1;
         bottomLevelInputsSecondGeometry.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
 
-        m_dxrDevice->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputsSecondGeometry, &bottomLevelPrebuildInfoSecondGeometry);
+		Device->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputsSecondGeometry, &bottomLevelPrebuildInfoSecondGeometry);
         if (!ensure(bottomLevelPrebuildInfoSecondGeometry.ResultDataMaxSizeInBytes > 0))
             return false;
     }
 
-    BufferUtil::AllocateUAVBuffer(&m_bottomLevelAccelerationStructureSecondGeometry, m_device.Get()
+    BufferUtil::AllocateUAVBuffer(&m_bottomLevelAccelerationStructureSecondGeometry, Device.Get()
         , bottomLevelPrebuildInfoSecondGeometry.ResultDataMaxSizeInBytes, initialResourceState, TEXT("BottomLevelAccelerationStructure"));
 
     ComPtr<ID3D12Resource> scratchResourceSecondGeometry;
-    BufferUtil::AllocateUAVBuffer(&scratchResourceSecondGeometry, m_device.Get(), bottomLevelPrebuildInfoSecondGeometry.ScratchDataSizeInBytes
+    BufferUtil::AllocateUAVBuffer(&scratchResourceSecondGeometry, Device.Get(), bottomLevelPrebuildInfoSecondGeometry.ScratchDataSizeInBytes
         , D3D12_RESOURCE_STATE_UNORDERED_ACCESS, L"ScratchResourceGeometry2");
 
     // Bottom level acceleration structure desc
@@ -1166,19 +1149,16 @@ bool jRHI_DirectX12::Initialize()
     bottomLevelBuildDescSecondGeometry.ScratchAccelerationStructureData = scratchResourceSecondGeometry->GetGPUVirtualAddress();
     bottomLevelBuildDescSecondGeometry.DestAccelerationStructureData = m_bottomLevelAccelerationStructureSecondGeometry->GetGPUVirtualAddress();
 
-    m_dxrCommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDescSecondGeometry, 0, nullptr);
+	GraphicsCommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDescSecondGeometry, 0, nullptr);
 	{
 		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::UAV(m_bottomLevelAccelerationStructureSecondGeometry.Get());
-		m_commandList->ResourceBarrier(1, &barrier);
+		GraphicsCommandList->ResourceBarrier(1, &barrier);
 	}
 
-    if (!ensure(BuildTopLevelAS(TLASBuffer, false, 0.0f, Vector::ZeroVector)))
+    if (!ensure(BuildTopLevelAS(GraphicsCommandList, TLASBuffer, false, 0.0f, Vector::ZeroVector)))
         return false;
 
-	if (JFAIL(m_commandList->Close()))
-		return false;
-	ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
-	m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+	GraphicsCommandQueue->ExecuteCommandList(GraphicsCommandList);
 
 	WaitForGPU();
 
@@ -1197,7 +1177,7 @@ bool jRHI_DirectX12::Initialize()
 	{
 		const uint16 numShaderRecords = 1;
 		const uint16 shaderRecordSize = shaderIdentifierSize;
-		ShaderTable rayGenShaderTable(m_device.Get(), numShaderRecords, shaderRecordSize, TEXT("RayGenShaderTable"));
+		ShaderTable rayGenShaderTable(Device.Get(), numShaderRecords, shaderRecordSize, TEXT("RayGenShaderTable"));
 		rayGenShaderTable.push_back(ShaderRecord(rayGenShaderIdentifier, shaderIdentifierSize));
 		m_rayGenShaderTable = rayGenShaderTable.GetResource();
 	}
@@ -1206,7 +1186,7 @@ bool jRHI_DirectX12::Initialize()
 	{
 		const uint16 numShaderRecords = 1;
 		const uint16 shaderRecordSize = shaderIdentifierSize;
-		ShaderTable missShaderTable(m_device.Get(), numShaderRecords, shaderRecordSize, TEXT("MissShaderTable"));
+		ShaderTable missShaderTable(Device.Get(), numShaderRecords, shaderRecordSize, TEXT("MissShaderTable"));
 		missShaderTable.push_back(ShaderRecord(misssShaderIdentifier, shaderIdentifierSize));
 		m_missShaderTable = missShaderTable.GetResource();
 	}
@@ -1222,7 +1202,7 @@ bool jRHI_DirectX12::Initialize()
 
 		const uint16 numShaderRecords = 2;
 		const uint16 shaderRecordSize = shaderIdentifierSize + sizeof(rootArguments);       // 큰 사이즈 기준으로 2개 만듬
-		ShaderTable hitGroupShaderTable(m_device.Get(), numShaderRecords, shaderRecordSize, TEXT("HitGroupShaderTable"));
+		ShaderTable hitGroupShaderTable(Device.Get(), numShaderRecords, shaderRecordSize, TEXT("HitGroupShaderTable"));
 		hitGroupShaderTable.push_back(ShaderRecord(triHitGroupShaderIdentifier, shaderIdentifierSize, &rootArguments, sizeof(rootArguments)));
 
         RootArguments planeRootArguments;
@@ -1238,7 +1218,7 @@ bool jRHI_DirectX12::Initialize()
 	auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(BackbufferFormat
 		, SCR_WIDTH, SCR_HEIGHT, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 	auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-	if (JFAIL(m_device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE
+	if (JFAIL(Device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE
 		, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_raytracingOutput))))
 	{
 		return false;
@@ -1255,7 +1235,7 @@ bool jRHI_DirectX12::Initialize()
 
 	D3D12_UNORDERED_ACCESS_VIEW_DESC UAVDesc{};
 	UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-	m_device->CreateUnorderedAccessView(m_raytracingOutput.Get(), nullptr, &UAVDesc, uavDescriptorHandle);
+	Device->CreateUnorderedAccessView(m_raytracingOutput.Get(), nullptr, &UAVDesc, uavDescriptorHandle);
 	m_raytracingOutputResourceUAVGpuDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_cbvHeap->GetGPUDescriptorHandleForHeapStart()
 		, m_raytracingOutputResourceUAVDescriptorHeapIndex, m_cbvDescriptorSize);
 
@@ -1268,7 +1248,7 @@ bool jRHI_DirectX12::Initialize()
 	size_t cbSize = FrameCount * sizeof(AlignedSceneConstantBuffer);
 	const D3D12_RESOURCE_DESC constantBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(cbSize);
 
-	if (JFAIL(m_device->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE
+	if (JFAIL(Device->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE
 		, &constantBufferDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_perFrameConstants))))
 	{
 		return false;
@@ -1289,7 +1269,7 @@ bool jRHI_DirectX12::Initialize()
     return true;
 }
 
-bool jRHI_DirectX12::Run()
+bool jRHI_DX12::Run()
 {
     MSG msg = {};
     while (msg.message != WM_QUIT)
@@ -1305,7 +1285,7 @@ bool jRHI_DirectX12::Run()
     return true;
 }
 
-void jRHI_DirectX12::Release()
+void jRHI_DX12::Release()
 {
 	WaitForGPU();
     
@@ -1343,8 +1323,7 @@ void jRHI_DirectX12::Release()
 
 	//////////////////////////////////////////////////////////////////////////
 	// 8. Raytracing device and commandlist
-	m_dxrDevice.Reset();
-	m_dxrCommandList.Reset();
+	Device.Reset();
 
 	//////////////////////////////////////////////////////////////////////////
 	// 7. Create sync object
@@ -1368,26 +1347,21 @@ void jRHI_DirectX12::Release()
 
 	//////////////////////////////////////////////////////////////////////////
 	// 3. Swapchain
-	m_swapChain.Reset();
+	SwapChain.Reset();
 
 	//////////////////////////////////////////////////////////////////////////
 	// 2. Command
-	m_commandList.Reset();
-	for (uint32 i = 0; i < FrameCount; ++i)
-	{
-		m_commandAllocator[i].Reset();
-	}
-	m_commandQueue.Reset();
+	delete GraphicsCommandQueue;
 
 	//////////////////////////////////////////////////////////////////////////
 	// 1. Device
-	m_device.Reset();
+	Device.Reset();
 
 }
 
-void jRHI_DirectX12::UpdateCameraMatrices()
+void jRHI_DX12::UpdateCameraMatrices()
 {
-	auto frameIndex = m_swapChain->GetCurrentBackBufferIndex();
+	auto frameIndex = SwapChain->GetCurrentBackBufferIndex();
 
 	m_sceneCB[frameIndex].cameraPosition = m_eye;
 
@@ -1403,7 +1377,7 @@ void jRHI_DirectX12::UpdateCameraMatrices()
     m_sceneCB[frameIndex].NumOfStartingRay = 20;        // 첫 Ray 생성시 NumOfStartingRay 개를 쏴서 보간하도록 함. 노이즈를 줄여줌
 }
 
-bool jRHI_DirectX12::BuildTopLevelAS(TopLevelAccelerationStructureBuffers& InBuffers, bool InIsUpdate, float InRotationY, Vector InTranslation)
+bool jRHI_DX12::BuildTopLevelAS(ComPtr<ID3D12GraphicsCommandList4>& InCommandList, TopLevelAccelerationStructureBuffers& InBuffers, bool InIsUpdate, float InRotationY, Vector InTranslation)
 {
     int32 w = 11, h = 11;
     int32 totalCount = (w * 2 * h * 2) + 3 + 1;     // small balls, big balls, plane
@@ -1414,7 +1388,7 @@ bool jRHI_DirectX12::BuildTopLevelAS(TopLevelAccelerationStructureBuffers& InBuf
     inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
 
     D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO info;
-    m_dxrDevice->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &info);
+	Device->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &info);
     if (!ensure(info.ResultDataMaxSizeInBytes > 0))
         return false;
 
@@ -1426,14 +1400,14 @@ bool jRHI_DirectX12::BuildTopLevelAS(TopLevelAccelerationStructureBuffers& InBuf
         D3D12_RESOURCE_BARRIER uavBarrier = {};
         uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
         uavBarrier.UAV.pResource = InBuffers.Result.Get();
-        m_dxrCommandList->ResourceBarrier(1, &uavBarrier);
+		InCommandList->ResourceBarrier(1, &uavBarrier);
     }
     else
     {
         // Update 요청이 아니면, 버퍼를 새로 만들어야 함, 그렇지 않으면 그대로 refit(이미 존재하는 TLAS를 업데이트) 될 것임.
-        BufferUtil::AllocateUAVBuffer(&InBuffers.Scratch, m_device.Get(), info.ScratchDataSizeInBytes, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, TEXT("TLAS Scratch Buffer"));
-        BufferUtil::AllocateUAVBuffer(&InBuffers.Result, m_device.Get(), info.ResultDataMaxSizeInBytes, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, TEXT("TLAS Result Buffer"));
-        BufferUtil::AllocateUploadBuffer(&InBuffers.InstanceDesc, m_device.Get(), nullptr, sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * totalCount, TEXT("TLAS Instance Desc"));
+        BufferUtil::AllocateUAVBuffer(&InBuffers.Scratch, Device.Get(), info.ScratchDataSizeInBytes, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, TEXT("TLAS Scratch Buffer"));
+        BufferUtil::AllocateUAVBuffer(&InBuffers.Result, Device.Get(), info.ResultDataMaxSizeInBytes, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, TEXT("TLAS Result Buffer"));
+        BufferUtil::AllocateUploadBuffer(&InBuffers.InstanceDesc, Device.Get(), nullptr, sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * totalCount, TEXT("TLAS Instance Desc"));
     }
 
     D3D12_RAYTRACING_INSTANCE_DESC* instanceDescs = nullptr;
@@ -1507,18 +1481,18 @@ bool jRHI_DirectX12::BuildTopLevelAS(TopLevelAccelerationStructureBuffers& InBuf
         asDesc.SourceAccelerationStructureData = InBuffers.Result->GetGPUVirtualAddress();
     }
 
-    m_dxrCommandList->BuildRaytracingAccelerationStructure(&asDesc, 0, nullptr);
+	InCommandList->BuildRaytracingAccelerationStructure(&asDesc, 0, nullptr);
 
     // 레이트레이싱 연산에서 Acceleration structure를 사용하기 전에 UAV 베리어를 추가해야 함.
     D3D12_RESOURCE_BARRIER uavBarrier = {};
     uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
     uavBarrier.UAV.pResource = InBuffers.Result.Get();
-    m_dxrCommandList->ResourceBarrier(1, &uavBarrier);
+	InCommandList->ResourceBarrier(1, &uavBarrier);
 
     return true;
 }
 
-void jRHI_DirectX12::CalculateFrameStats()
+void jRHI_DX12::CalculateFrameStats()
 {
     static int frameCnt = 0;
     static double elapsedTime = 0.0f;
@@ -1534,7 +1508,7 @@ void jRHI_DirectX12::CalculateFrameStats()
         frameCnt = 0;
         elapsedTime = totalTime;
 
-        float raysPerPixels = (float)(m_sceneCB[m_frameIndex].NumOfStartingRay * g_MaxRecursionDepth);
+        float raysPerPixels = (float)(m_sceneCB[FrameIndex].NumOfStartingRay * g_MaxRecursionDepth);
         float MRaysPerSecond = (SCR_WIDTH * SCR_HEIGHT * fps * raysPerPixels) / static_cast<float>(1e6);
 
         std::wstringstream windowText;
@@ -1546,11 +1520,11 @@ void jRHI_DirectX12::CalculateFrameStats()
     }
 }
 
-void jRHI_DirectX12::Update()
+void jRHI_DX12::Update()
 {
     CalculateFrameStats();
 
-	int32 prevFrameIndex = m_frameIndex - 1;
+	int32 prevFrameIndex = FrameIndex - 1;
 	if (prevFrameIndex < 0)
 		prevFrameIndex = FrameCount - 1;
 
@@ -1582,24 +1556,21 @@ void jRHI_DirectX12::Update()
 
 		XMMATRIX rotate = XMMatrixRotationY(XMConvertToRadians(accAngle));
         constexpr XMVECTOR rotationRadius = { 0.0f, 0.0f, 8.0f };
-		m_sceneCB[m_frameIndex].lightPosition = XMVector3Transform(rotationRadius, rotate);
+		m_sceneCB[FrameIndex].lightPosition = XMVector3Transform(rotationRadius, rotate);
 	}
 
     {
-        auto frameIndex = m_swapChain->GetCurrentBackBufferIndex();
+        auto frameIndex = SwapChain->GetCurrentBackBufferIndex();
 
         m_sceneCB[frameIndex].focalDistance = m_focalDistance;
         m_sceneCB[frameIndex].lensRadius = m_lensRadius;
     }
 }
 
-void jRHI_DirectX12::Render()
+void jRHI_DX12::Render()
 {
 	// Prepare
-	if (JFAIL(m_commandAllocator[m_frameIndex]->Reset()))
-		return;
-	if (JFAIL(m_commandList->Reset(m_commandAllocator[m_frameIndex].Get(), nullptr)))
-		return;
+	auto GraphicsCommandList = GraphicsCommandQueue->GetAvailableCommandList();
 
     static float elapsedTime = 0.0f;
     elapsedTime = 0.01f;
@@ -1629,24 +1600,24 @@ void jRHI_DirectX12::Render()
 
 	{
 		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-			m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-		m_commandList->ResourceBarrier(1, &barrier);
+			m_renderTargets[FrameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		GraphicsCommandList->ResourceBarrier(1, &barrier);
 	}
 	// DoRaytracing
-	m_commandList->SetComputeRootSignature(m_raytracingGlobalRootSignature.Get());
+	GraphicsCommandList->SetComputeRootSignature(m_raytracingGlobalRootSignature.Get());
 
-	memcpy(&m_mappedConstantData[m_frameIndex].constants, &m_sceneCB[m_frameIndex], sizeof(m_sceneCB[m_frameIndex]));
-	auto cbGpuAddress = m_perFrameConstants->GetGPUVirtualAddress() + m_frameIndex * sizeof(m_mappedConstantData[0]);
-	m_commandList->SetComputeRootConstantBufferView(GlobalRootSignatureParams::SceneConstantSlot, cbGpuAddress);
+	memcpy(&m_mappedConstantData[FrameIndex].constants, &m_sceneCB[FrameIndex], sizeof(m_sceneCB[FrameIndex]));
+	auto cbGpuAddress = m_perFrameConstants->GetGPUVirtualAddress() + FrameIndex * sizeof(m_mappedConstantData[0]);
+	GraphicsCommandList->SetComputeRootConstantBufferView(GlobalRootSignatureParams::SceneConstantSlot, cbGpuAddress);
 
 	D3D12_DISPATCH_RAYS_DESC dispatchDesc{};
-	m_commandList->SetDescriptorHeaps(1, m_cbvHeap.GetAddressOf());
-	m_commandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::VertexBuffersSlot, m_indexBufferGpuDescriptor);
-    m_commandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::PlaneVertexBufferSlot
+	GraphicsCommandList->SetDescriptorHeaps(1, m_cbvHeap.GetAddressOf());
+	GraphicsCommandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::VertexBuffersSlot, m_indexBufferGpuDescriptor);
+	GraphicsCommandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::PlaneVertexBufferSlot
         , m_vertexBufferGpuDescriptorSecondGeometry);
-    m_commandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::OutputViewSlot
+	GraphicsCommandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::OutputViewSlot
         , m_raytracingOutputResourceUAVGpuDescriptor);
-	m_commandList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot
+	GraphicsCommandList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot
 		, TLASBuffer.Result->GetGPUVirtualAddress());
 
 	// 각 Shader table은 단 한개의 shader record를 가지기 때문에 stride가 그 사이즈와 동일함
@@ -1665,45 +1636,42 @@ void jRHI_DirectX12::Render()
 	dispatchDesc.Height = SCR_HEIGHT;
 	dispatchDesc.Depth = 1;
 
-	m_dxrCommandList->SetPipelineState1(m_dxrStateObject.Get());
-	m_dxrCommandList->DispatchRays(&dispatchDesc);
+	GraphicsCommandList->SetPipelineState1(m_dxrStateObject.Get());
+	GraphicsCommandList->DispatchRays(&dispatchDesc);
 
 	// CopyRaytracingOutputToBackbuffer
 	D3D12_RESOURCE_BARRIER preCopyBarriers[2];
-	preCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get()
+	preCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[FrameIndex].Get()
 		, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_DEST);
 	preCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_raytracingOutput.Get()
 		, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
-	m_commandList->ResourceBarrier(_countof(preCopyBarriers), preCopyBarriers);
+	GraphicsCommandList->ResourceBarrier(_countof(preCopyBarriers), preCopyBarriers);
 
-	m_commandList->CopyResource(m_renderTargets[m_frameIndex].Get(), m_raytracingOutput.Get());
+	GraphicsCommandList->CopyResource(m_renderTargets[FrameIndex].Get(), m_raytracingOutput.Get());
 
 	{
 		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(m_raytracingOutput.Get()
 			, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-        m_commandList->ResourceBarrier(1, &barrier);
+		GraphicsCommandList->ResourceBarrier(1, &barrier);
 	}
 
-    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex* m_rtvDescriptorSize);
-    RenderUI(m_commandList.Get(), m_renderTargets[m_frameIndex].Get(), rtvHandle, m_imgui_SrvDescHeap.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
+    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), FrameIndex* m_rtvDescriptorSize);
+    RenderUI(GraphicsCommandList.Get(), m_renderTargets[FrameIndex].Get(), rtvHandle, m_imgui_SrvDescHeap.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
     //////////////////////////////////////////////////////////////////////////
 
 	// Present
-	if (JFAIL(m_commandList->Close()))
-		return;
-	ID3D12CommandList* commandLists[] = { m_commandList.Get() };
-	m_commandQueue->ExecuteCommandLists(_countof(commandLists), commandLists);
+	GraphicsCommandQueue->ExecuteCommandList(GraphicsCommandList);
 
 	HRESULT hr = S_OK;
-	if (m_options & c_AllowTearing)
+	if (Options & c_AllowTearing)
 	{
-		hr = m_swapChain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
+		hr = SwapChain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
 	}
 	else
 	{
 		// 첫번째 아규먼트는 VSync가 될때까지 기다림, 어플리케이션은 다음 VSync까지 잠재운다.
 		// 이렇게 하는 것은 렌더링 한 프레임 중 화면에 나오지 못하는 프레임의 cycle을 아끼기 위해서임.
-		hr = m_swapChain->Present(1, 0);
+		hr = SwapChain->Present(1, 0);
 	}
 
 	if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
@@ -1713,7 +1681,7 @@ void jRHI_DirectX12::Render()
 #ifdef _DEBUG
         char buff[64] = {};
         sprintf_s(buff, "Device Lost on ResizeBuffers: Reason code 0x%08X\n"
-            , (hr == DXGI_ERROR_DEVICE_REMOVED) ? m_device->GetDeviceRemovedReason() : hr);
+            , (hr == DXGI_ERROR_DEVICE_REMOVED) ? Device->GetDeviceRemovedReason() : hr);
         OutputDebugStringA(buff);
 #endif
 
@@ -1725,24 +1693,24 @@ void jRHI_DirectX12::Render()
 		if (JFAIL(hr))
 			return;
 
-		const uint64 currentFenceValue = m_fenceValue[m_frameIndex];
-		if (JFAIL(m_commandQueue->Signal(m_fence.Get(), currentFenceValue)))
+		const uint64 currentFenceValue = m_fenceValue[FrameIndex];
+		if (JFAIL(GraphicsCommandQueue->GetCommandQueue()->Signal(m_fence.Get(), currentFenceValue)))
 			return;
 
-		m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
+		FrameIndex = SwapChain->GetCurrentBackBufferIndex();
 
-		if (m_fence->GetCompletedValue() < m_fenceValue[m_frameIndex])
+		if (m_fence->GetCompletedValue() < m_fenceValue[FrameIndex])
 		{
-			if (JFAIL(m_fence->SetEventOnCompletion(m_fenceValue[m_frameIndex], m_fenceEvent)))
+			if (JFAIL(m_fence->SetEventOnCompletion(m_fenceValue[FrameIndex], m_fenceEvent)))
 				return;
 			WaitForSingleObjectEx(m_fenceEvent, INFINITE, false);
 		}
-		m_fenceValue[m_frameIndex] = currentFenceValue + 1;
+		m_fenceValue[FrameIndex] = currentFenceValue + 1;
 	}
 }
 
 
-void jRHI_DirectX12::OnDeviceLost()
+void jRHI_DX12::OnDeviceLost()
 {
 	m_rayGenShaderTable.Reset();
 	m_missShaderTable.Reset();
@@ -1752,8 +1720,7 @@ void jRHI_DirectX12::OnDeviceLost()
 	m_raytracingGlobalRootSignature.Reset();
 	m_raytracingLocalRootSignature.Reset();
 
-	m_dxrDevice.Reset();
-	m_dxrCommandList.Reset();
+	Device.Reset();
 	m_dxrStateObject.Reset();
 
 	m_cbvHeap.Reset();
@@ -1767,12 +1734,12 @@ void jRHI_DirectX12::OnDeviceLost()
     TLASBuffer.Result.Reset();
 }
 
-void jRHI_DirectX12::OnDeviceRestored()
+void jRHI_DX12::OnDeviceRestored()
 {
 	// 7. Raytracing device and commandlist ~ 13. Raytracing Output Resouce
 }
 
-bool jRHI_DirectX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimized)
+bool jRHI_DX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimized)
 {
     JASSERT(InWidth > 0);
     JASSERT(InHeight > 0);
@@ -1788,22 +1755,22 @@ bool jRHI_DirectX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsM
     for (int32 i = 0; i < FrameCount; ++i)
     {
         m_renderTargets[i].Reset();
-        m_fenceValue[i] = m_fenceValue[m_frameIndex];
+        m_fenceValue[i] = m_fenceValue[FrameIndex];
     }
 
     BackbufferFormat;
 
-    if (ensure(m_swapChain))
+    if (ensure(SwapChain))
     {
-        HRESULT hr = m_swapChain->ResizeBuffers(FrameCount, InWidth, InHeight, BackbufferFormat
-            , (m_options & c_AllowTearing) ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0);
+        HRESULT hr = SwapChain->ResizeBuffers(FrameCount, InWidth, InHeight, BackbufferFormat
+            , (Options & c_AllowTearing) ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0);
 
         if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
         {
 #ifdef _DEBUG
             char buff[64] = {};
             sprintf_s(buff, "Device Lost on ResizeBuffers: Reason code 0x%08X\n"
-                , (hr == DXGI_ERROR_DEVICE_REMOVED) ? m_device->GetDeviceRemovedReason() : hr);
+                , (hr == DXGI_ERROR_DEVICE_REMOVED) ? Device->GetDeviceRemovedReason() : hr);
             OutputDebugStringA(buff);
 #endif
             if (!OnHandleDeviceLost() || !OnHandleDeviceRestored())
@@ -1822,10 +1789,10 @@ bool jRHI_DirectX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsM
 
     for (int32 i = 0; i < FrameCount; ++i)
     {
-        if (JFAIL(m_swapChain->GetBuffer(i, IID_PPV_ARGS(&m_renderTargets[i]))))
+        if (JFAIL(SwapChain->GetBuffer(i, IID_PPV_ARGS(&m_renderTargets[i]))))
             return false;
 
-        m_device->CreateRenderTargetView(m_renderTargets[i].Get(), nullptr, rtvHandle);
+        Device->CreateRenderTargetView(m_renderTargets[i].Get(), nullptr, rtvHandle);
         rtvHandle.Offset(1, m_rtvDescriptorSize);
 
         //////////////////////////////////////////////////////////////////////////
@@ -1843,7 +1810,7 @@ bool jRHI_DirectX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsM
         m_sceneCB[i].lensRadius = m_lensRadius;
     }
 
-    m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
+    FrameIndex = SwapChain->GetCurrentBackBufferIndex();
 
     //////////////////////////////////////////////////////////////////////////
     // ReleaseWindowSizeDependentResources
@@ -1857,7 +1824,7 @@ bool jRHI_DirectX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsM
     auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(BackbufferFormat
         , InWidth, InHeight, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
     auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-    if (JFAIL(m_device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE
+    if (JFAIL(Device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE
         , &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_raytracingOutput))))
     {
         return false;
@@ -1878,7 +1845,7 @@ bool jRHI_DirectX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsM
 
     D3D12_UNORDERED_ACCESS_VIEW_DESC UAVDesc{};
     UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-    m_device->CreateUnorderedAccessView(m_raytracingOutput.Get(), nullptr, &UAVDesc, uavDescriptorHandle);
+    Device->CreateUnorderedAccessView(m_raytracingOutput.Get(), nullptr, &UAVDesc, uavDescriptorHandle);
     m_raytracingOutputResourceUAVGpuDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_cbvHeap->GetGPUDescriptorHandleForHeapStart()
         , m_raytracingOutputResourceUAVDescriptorHeapIndex, m_cbvDescriptorSize);
 
@@ -1898,7 +1865,7 @@ bool jRHI_DirectX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsM
     {
         const uint16 numShaderRecords = 1;
         const uint16 shaderRecordSize = shaderIdentifierSize;
-        ShaderTable rayGenShaderTable(m_device.Get(), numShaderRecords, shaderRecordSize, TEXT("RayGenShaderTable"));
+        ShaderTable rayGenShaderTable(Device.Get(), numShaderRecords, shaderRecordSize, TEXT("RayGenShaderTable"));
         rayGenShaderTable.push_back(ShaderRecord(rayGenShaderIdentifier, shaderIdentifierSize));
         m_rayGenShaderTable = rayGenShaderTable.GetResource();
     }
@@ -1907,7 +1874,7 @@ bool jRHI_DirectX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsM
     {
         const uint16 numShaderRecords = 1;
         const uint16 shaderRecordSize = shaderIdentifierSize;
-        ShaderTable missShaderTable(m_device.Get(), numShaderRecords, shaderRecordSize, TEXT("MissShaderTable"));
+        ShaderTable missShaderTable(Device.Get(), numShaderRecords, shaderRecordSize, TEXT("MissShaderTable"));
         missShaderTable.push_back(ShaderRecord(misssShaderIdentifier, shaderIdentifierSize));
         m_missShaderTable = missShaderTable.GetResource();
     }
@@ -1923,7 +1890,7 @@ bool jRHI_DirectX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsM
 
         const uint16 numShaderRecords = 2;
         const uint16 shaderRecordSize = shaderIdentifierSize + sizeof(rootArguments);       // 큰 사이즈 기준으로 2개 만듬
-        ShaderTable hitGroupShaderTable(m_device.Get(), numShaderRecords, shaderRecordSize, TEXT("HitGroupShaderTable"));
+        ShaderTable hitGroupShaderTable(Device.Get(), numShaderRecords, shaderRecordSize, TEXT("HitGroupShaderTable"));
         hitGroupShaderTable.push_back(ShaderRecord(triHitGroupShaderIdentifier, shaderIdentifierSize, &rootArguments, sizeof(rootArguments)));
 
         RootArguments planeRootArguments;
@@ -1935,7 +1902,7 @@ bool jRHI_DirectX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsM
     return true;
 }
 
-bool jRHI_DirectX12::OnHandleDeviceLost()
+bool jRHI_DX12::OnHandleDeviceLost()
 {
     //////////////////////////////////////////////////////////////////////////
     // ReleaseWindowSizeDependentResources
@@ -1948,8 +1915,7 @@ bool jRHI_DirectX12::OnHandleDeviceLost()
     m_raytracingEmptyLocalRootSignature.Reset();
 
     m_dxrStateObject.Reset();
-    m_dxrCommandList.Reset();
-    m_dxrDevice.Reset();
+	Device.Reset();
 
     m_allocatedDescriptors = 0;
     m_raytracingOutputResourceUAVDescriptorHeapIndex = UINT_MAX;
@@ -1970,19 +1936,19 @@ bool jRHI_DirectX12::OnHandleDeviceLost()
     return true;
 }
 
-bool jRHI_DirectX12::OnHandleDeviceRestored()
+bool jRHI_DX12::OnHandleDeviceRestored()
 {
     Initialize();
     return true;
 }
 
-void jRHI_DirectX12::InitializeImGui()
+void jRHI_DX12::InitializeImGui()
 {
     D3D12_DESCRIPTOR_HEAP_DESC desc = {};
     desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
     desc.NumDescriptors = 1;
     desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-    if (JFAIL(m_device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_imgui_SrvDescHeap))))
+    if (JFAIL(Device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_imgui_SrvDescHeap))))
         return;
 
     IMGUI_CHECKVERSION();
@@ -1995,13 +1961,13 @@ void jRHI_DirectX12::InitializeImGui()
     // Setup Platform/Renderer backends
     ImGui_ImplWin32_Init(m_hWnd);
 
-    ImGui_ImplDX12_Init(m_device.Get(), FrameCount,
+    ImGui_ImplDX12_Init(Device.Get(), FrameCount,
         DXGI_FORMAT_R8G8B8A8_UNORM, m_imgui_SrvDescHeap.Get(),
         m_imgui_SrvDescHeap->GetCPUDescriptorHandleForHeapStart(),
         m_imgui_SrvDescHeap->GetGPUDescriptorHandleForHeapStart());
 }
 
-void jRHI_DirectX12::ReleaseImGui()
+void jRHI_DX12::ReleaseImGui()
 {
     // Cleanup
     ImGui_ImplDX12_Shutdown();
@@ -2011,7 +1977,7 @@ void jRHI_DirectX12::ReleaseImGui()
     m_imgui_SrvDescHeap.Reset();
 }
 
-void jRHI_DirectX12::RenderUI(ID3D12GraphicsCommandList* pCommandList, ID3D12Resource* pRenderTarget, CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle
+void jRHI_DX12::RenderUI(ID3D12GraphicsCommandList* pCommandList, ID3D12Resource* pRenderTarget, CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle
     , ID3D12DescriptorHeap* pDescriptorHeap, D3D12_RESOURCE_STATES beforeResourceState, D3D12_RESOURCE_STATES afterResourceState)
 {
     ImGui_ImplDX12_NewFrame();
@@ -2044,7 +2010,6 @@ void jRHI_DirectX12::RenderUI(ID3D12GraphicsCommandList* pCommandList, ID3D12Res
 	}
     const float clear_color_with_alpha[4] = { clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w };
 
-    //m_commandList->ClearRenderTargetView(rtvHandle, clear_color_with_alpha, 0, NULL);
     pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, NULL);
     pCommandList->SetDescriptorHeaps(1, &pDescriptorHeap);
     ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), pCommandList);

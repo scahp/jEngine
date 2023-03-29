@@ -55,15 +55,15 @@ private:
 };
 
 //////////////////////////////////////////////////////////////////////////
-// jShaderCompiler_DirectX12
-class jShaderCompiler_DirectX12
+// jShaderCompiler_DX12
+class jShaderCompiler_DX12
 {
 public:
-	static jShaderCompiler_DirectX12& Get()
+	static jShaderCompiler_DX12& Get()
 	{
 		if (!_instance)
 		{
-			_instance = new jShaderCompiler_DirectX12();
+			_instance = new jShaderCompiler_DX12();
 			_instance->Initialize();
 		}
 		return *_instance;
@@ -77,15 +77,15 @@ public:
 	ComPtr<IDxcBlob> Compile(const wchar_t* InFilename, const wchar_t* InTargetString) const;
 
 public:
-	jShaderCompiler_DirectX12(jShaderCompiler_DirectX12 const&) = delete;
-	jShaderCompiler_DirectX12& operator=(jShaderCompiler_DirectX12 const&) = delete;
-	jShaderCompiler_DirectX12(jShaderCompiler_DirectX12&&) = delete;
-	jShaderCompiler_DirectX12& operator=(jShaderCompiler_DirectX12&&) = delete;
+	jShaderCompiler_DX12(jShaderCompiler_DX12 const&) = delete;
+	jShaderCompiler_DX12& operator=(jShaderCompiler_DX12 const&) = delete;
+	jShaderCompiler_DX12(jShaderCompiler_DX12&&) = delete;
+	jShaderCompiler_DX12& operator=(jShaderCompiler_DX12&&) = delete;
 
 private:
 	jDXC m_dxc;
 
 private:
-	jShaderCompiler_DirectX12() {}
-	static jShaderCompiler_DirectX12* _instance;
+	jShaderCompiler_DX12() {}
+	static jShaderCompiler_DX12* _instance;
 };
