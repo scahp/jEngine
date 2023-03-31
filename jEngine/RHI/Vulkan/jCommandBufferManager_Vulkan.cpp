@@ -65,8 +65,7 @@ void jCommandBufferManager_Vulkan::ReleaseInternal()
 
     for (auto& iter : UsingCommandBuffers)
     {
-        VkFence fence = (VkFence)iter->GetFenceHandle();
-        vkWaitForFences(g_rhi_vk->Device, 1, &fence, VK_TRUE, UINT64_MAX);
+        iter->GetFence()->WaitForFence();
         g_rhi->GetFenceManager()->ReturnFence(iter->GetFence());
         delete iter;
     }
@@ -74,8 +73,7 @@ void jCommandBufferManager_Vulkan::ReleaseInternal()
 
     for (auto& iter : PendingCommandBuffers)
     {
-        VkFence fence = (VkFence)iter->GetFenceHandle();
-        vkWaitForFences(g_rhi_vk->Device, 1, &fence, VK_TRUE, UINT64_MAX);
+        iter->GetFence()->WaitForFence();
         g_rhi->GetFenceManager()->ReturnFence(iter->GetFence());
         delete iter;
     }

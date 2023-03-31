@@ -86,9 +86,6 @@
     <Filter Include="Code\Renderer">
       <UniqueIdentifier>{a6ab173f-cb50-4bf7-b61c-80a5213ac7c9}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Code\RHI\DirectX12">
-      <UniqueIdentifier>{bbc6b4a7-6e2b-42a4-aa04-8cfcfd9a78ae}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Code\External\robin-hood-hashing">
       <UniqueIdentifier>{2b1caad5-b7d8-4673-a375-267c33335ade}</UniqueIdentifier>
     </Filter>
@@ -97,6 +94,9 @@
     </Filter>
     <Filter Include="Code\Material">
       <UniqueIdentifier>{9f49ecf6-e64d-4766-8e48-286bc40f83f5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Code\RHI\DX12">
+      <UniqueIdentifier>{bbc6b4a7-6e2b-42a4-aa04-8cfcfd9a78ae}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -304,15 +304,6 @@
     <ClInclude Include="Core\jLock.h">
       <Filter>Code\Core</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DirectX12\jShaderCompiler_DirectX12.h">
-      <Filter>Code\RHI\DirectX12</Filter>
-    </ClInclude>
-    <ClInclude Include="RHI\DirectX12\jCommandQueue_DirectX12.h">
-      <Filter>Code\RHI\DirectX12</Filter>
-    </ClInclude>
-    <ClInclude Include="RHI\DirectX12\jRHI_DirectX12.h">
-      <Filter>Code\RHI\DirectX12</Filter>
-    </ClInclude>
     <ClInclude Include="External\IMGUI\imgui.h">
       <Filter>Code\External\IMGUI</Filter>
     </ClInclude>
@@ -399,6 +390,39 @@
     </ClInclude>
     <ClInclude Include="Material\jMaterial.h">
       <Filter>Code\Material</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\jShaderCompiler_DX12.h">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\jBufferUtil_DX12.h">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\jCommandQueue_DX12.h">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\jRHI_DX12.h">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\jBuffer_DX12.h">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\jTexture_DX12.h">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\jRHIType_DX12.h">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\jDescriptorHeap_DX12.h">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\jSwapchain_DX12.h">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Vulkan\jFenceManager_Vulkan.h">
+      <Filter>Code\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\jFenceManager_DX12.h">
+      <Filter>Code\RHI\DX12</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -522,9 +546,6 @@
     <ClCompile Include="RHI\jRenderTargetPool.cpp">
       <Filter>Code\RHI</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\jFenceManager.cpp">
-      <Filter>Code\RHI</Filter>
-    </ClCompile>
     <ClCompile Include="RHI\jPipelineStateInfo.cpp">
       <Filter>Code\RHI</Filter>
     </ClCompile>
@@ -593,15 +614,6 @@
     </ClCompile>
     <ClCompile Include="RHI\Vulkan\jShaderStorageBufferObject_Vulkan.cpp">
       <Filter>Code\RHI\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\DirectX12\jShaderCompiler_DirectX12.cpp">
-      <Filter>Code\RHI\DirectX12</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\DirectX12\jCommandQueue_DirectX12.cpp">
-      <Filter>Code\RHI\DirectX12</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\DirectX12\jRHI_DirectX12.cpp">
-      <Filter>Code\RHI\DirectX12</Filter>
     </ClCompile>
     <ClCompile Include="External\IMGUI\imgui.cpp">
       <Filter>Code\External\IMGUI</Filter>
@@ -674,6 +686,36 @@
     </ClCompile>
     <ClCompile Include="Material\jMaterial.cpp">
       <Filter>Code\Material</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\jShaderCompiler_DX12.cpp">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\jBufferUtil_DX12.cpp">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\jCommandQueue_DX12.cpp">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\jRHI_DX12.cpp">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\jBuffer_DX12.cpp">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\jTexture_DX12.cpp">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\jDescriptorHeap_DX12.cpp">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\jSwapchain_DX12.cpp">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\jFenceManager_Vulkan.cpp">
+      <Filter>Code\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\jFenceManager_DX12.cpp">
+      <Filter>Code\RHI\DX12</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

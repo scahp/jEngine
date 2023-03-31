@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include "../jCommandBufferManager.h"
+#include "../jFenceManager.h"
 
 class jCommandBuffer_Vulkan : public jCommandBuffer
 {

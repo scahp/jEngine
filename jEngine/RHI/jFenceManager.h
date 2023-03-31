@@ -5,6 +5,10 @@ class jFence
 public:
     virtual ~jFence() {}
     virtual void* GetHandle() const = 0;
+    virtual void Release() = 0;
+    virtual void WaitForFence(uint64 InTimeoutNanoSec = UINT64_MAX) = 0;
+    virtual bool SetFenceValue(uint64 InFenceValue) { return false; }
+    virtual bool IsValid() const { return false; }
 };
 
 class jFenceManager
@@ -15,33 +19,3 @@ public:
     virtual void ReturnFence(jFence* fence) = 0;
     virtual void Release() = 0;
 };
-
-#if USE_OPENGL
-
-#elif USE_VULKAN
-
-class jFence_Vulkan : public jFence
-{
-public:
-    virtual ~jFence_Vulkan() {}
-    void* GetHandle() const { return Fence; }
-
-    VkFence Fence = nullptr;
-};
-
-class jFenceManager_Vulkan : public jFenceManager
-{
-public:
-    virtual jFence* GetOrCreateFence() override;
-    virtual void ReturnFence(jFence* fence) override
-    {
-        UsingFences.erase(fence);
-        PendingFences.insert(fence);
-    }
-    virtual void Release() override;
-
-    robin_hood::unordered_set<jFence*> UsingFences;
-    robin_hood::unordered_set<jFence*> PendingFences;
-};
-
-#endif

@@ -704,3 +704,12 @@ enum class EPipelineDynamicState : uint8
     LOGIC_OP_EXT,
     COLOR_WRITE_ENABLE_EXT,
 };
+
+enum class EDescriptorHeapTypeDX12
+{
+    CBV_SRV_UAV = 0,
+    SAMPLER,
+    RTV,
+    DSV,
+    MAX
+};

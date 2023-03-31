@@ -2,10 +2,18 @@
 #include "jRHI_DX12.h"
 #include "jShaderCompiler_DX12.h"
 #include <iomanip>
+#include "jBufferUtil_DX12.h"
+#include "jRHIType_DX12.h"
+#include "jTexture_DX12.h"
+#include "jSwapchain_DX12.h"
+#include "jBuffer_DX12.h"
+#include "../jSwapchain.h"
+#include "jFenceManager_DX12.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
 
+jRHI_DX12* g_rhi_dx12 = nullptr;
 const wchar_t* jRHI_DX12::c_raygenShaderName = L"MyRaygenShader";
 const wchar_t* jRHI_DX12::c_closestHitShaderName = L"MyClosestHitShader";
 const wchar_t* jRHI_DX12::c_missShaderName = L"MyMissShader";
@@ -135,63 +143,24 @@ inline void PrintStateObjectDesc(const D3D12_STATE_OBJECT_DESC* desc)
 	OutputDebugStringW(wstr.str().c_str());
 }
 
-bool BufferUtil::AllocateUploadBuffer(ID3D12Resource** OutResource, ID3D12Device* InDevice
-	, void* InData, uint64 InDataSize, const wchar_t* InResourceName)
-{
-	auto uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-	auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(InDataSize);
-	if (JFAIL(InDevice->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE
-		, &bufferDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(OutResource))))
-	{
-		return false;
-	}
-
-	if (InResourceName)
-		(*OutResource)->SetName(InResourceName);
-	
-	if (InData && InDataSize > 0)
-	{
-		void* pMappedData = nullptr;
-		(*OutResource)->Map(0, nullptr, &pMappedData);
-		memcpy(pMappedData, InData, InDataSize);
-		(*OutResource)->Unmap(0, nullptr);
-	}
-	return true;
-}
-
-bool BufferUtil::AllocateUAVBuffer(ID3D12Resource** OutResource, ID3D12Device* InDevice
-	, uint64 InBufferSize, D3D12_RESOURCE_STATES InInitialResourceState
-	, const wchar_t* InResourceName)
-{
-	auto uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-	auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(InBufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-	if (JFAIL(InDevice->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE
-		, &bufferDesc, InInitialResourceState, nullptr, IID_PPV_ARGS(OutResource))))
-	{
-		return false;
-	}
-
-	if (InResourceName)
-		(*OutResource)->SetName(InResourceName);
-
-	return true;
-}
-
 ShaderTable::ShaderTable(ID3D12Device* InDevice, uint32 InNumOfShaderRecords, uint32 InShaderRecordSize, const wchar_t* InResourceName /*= nullptr*/)
 {
 	m_shaderRecords.reserve(InNumOfShaderRecords);
 
 	m_shaderRecordSize = Align(InShaderRecordSize, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
 	const uint32 bufferSize = InNumOfShaderRecords * m_shaderRecordSize;
-	BufferUtil::AllocateUploadBuffer(&m_resource, InDevice, nullptr, bufferSize, InResourceName);
+	Buffer = jBufferUtil_DX12::CreateBuffer(bufferSize, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT, true, false, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, 0, InResourceName);
 
 #if _DEBUG
 	m_name = InResourceName;
 #endif
 
-	CD3DX12_RANGE readRange(0, 0);
-	if (JFAIL(m_resource->Map(0, &readRange, reinterpret_cast<void**>(&m_mappedShaderRecords))))
-		return;
+	m_mappedShaderRecords = (uint8*)Buffer->Map();
+}
+
+ComPtr<ID3D12Resource> ShaderTable::GetResource() const
+{
+    return Buffer->Buffer;
 }
 
 void ShaderTable::push_back(const ShaderRecord& InShaderRecord)
@@ -320,6 +289,34 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 	return DefWindowProc(hWnd, message, wParam, lParam);
 }
 
+//////////////////////////////////////////////////////////////////////////
+// jRHI_DX12::TopLevelAccelerationStructureBuffers
+//////////////////////////////////////////////////////////////////////////
+void jRHI_DX12::TopLevelAccelerationStructureBuffers::Release()
+{
+    delete Scratch;
+    Scratch = nullptr;
+
+    delete Result;
+    Result = nullptr;
+
+    delete InstanceDesc;
+    InstanceDesc = nullptr;
+}
+
+//////////////////////////////////////////////////////////////////////////
+// jRHI_DX12
+//////////////////////////////////////////////////////////////////////////
+jRHI_DX12::jRHI_DX12()
+{
+	g_rhi_dx12 = this;
+}
+
+jRHI_DX12::~jRHI_DX12()
+{
+
+}
+
 HWND jRHI_DX12::CreateMainWindow() const
 {
 	auto hInstance = GetModuleHandle(NULL);
@@ -410,18 +407,21 @@ int32 GetHardwareAdapter(IDXGIFactory1* InFactory, IDXGIAdapter1** InAdapter
 
 void jRHI_DX12::WaitForGPU()
 {
+	check(SwapChain);
+
 	auto Queue = GraphicsCommandQueue->GetCommandQueue();
-	if (Queue && m_fence && m_fenceEvent)
+    check(Queue);
+
+	if (Queue && SwapChain)
 	{
-		uint64 fenceValue = m_fenceValue[FrameIndex];
-		if (JFAIL(Queue->Signal(m_fence.Get(), fenceValue)))
+		jSwapchainImage_DX12* CurrentSwapchainImage = (jSwapchainImage_DX12*)SwapChain->GetSwapchainImage(CurrentFrameIndex);
+		if (JFAIL(Queue->Signal((ID3D12Fence*)SwapChain->Fence->GetHandle(), CurrentSwapchainImage->FenceValue)))
 			return;
 
-		if (JFAIL(m_fence->SetEventOnCompletion(fenceValue, m_fenceEvent)))
-			return;
+		if (SwapChain->Fence->SetFenceValue(CurrentSwapchainImage->FenceValue))
+			SwapChain->Fence->WaitForFence();
 
-		WaitForSingleObjectEx(m_fenceEvent, INFINITE, false);
-		++m_fenceValue[FrameIndex];
+		++CurrentSwapchainImage->FenceValue;
 	}
 }
 
@@ -449,12 +449,11 @@ bool jRHI_DX12::Initialize()
 	if (JFAIL(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory))))
 		return false;
 
-    ComPtr<IDXGIFactory5> factory5;
-    HRESULT hr = factory.As(&factory5);
+    HRESULT hr = factory.As(&Factory);
     if (SUCCEEDED(hr))
     {
         BOOL allowTearing = false;
-        hr = factory5->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &allowTearing, sizeof(allowTearing));
+        hr = Factory->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &allowTearing, sizeof(allowTearing));
 
         if (FAILED(hr) || !allowTearing)
         {
@@ -508,41 +507,18 @@ bool jRHI_DX12::Initialize()
 	// 2. Command
 	GraphicsCommandQueue = new jCommandQueue_DX12();
 	GraphicsCommandQueue->Initialize(Device, D3D12_COMMAND_LIST_TYPE_DIRECT);
-	//D3D12_COMMAND_QUEUE_DESC queueDesc{};
-	//queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-	//queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+	CopyCommandQueue = new jCommandQueue_DX12();
+	CopyCommandQueue->Initialize(Device, D3D12_COMMAND_LIST_TYPE_COPY);
+
+    // 4. Heap	
+    RTVDescriptorHeap.Initialize(EDescriptorHeapTypeDX12::RTV, false);
+    DSVDescriptorHeap.Initialize(EDescriptorHeapTypeDX12::DSV, false);
+    SRVDescriptorHeap.Initialize(EDescriptorHeapTypeDX12::CBV_SRV_UAV, true);
+    //UAVDescriptorHeap.Initialize(EDescriptorHeapTypeDX12::CBV_SRV_UAV, false);
 
 	// 3. Swapchain
-	DXGI_SWAP_CHAIN_DESC1 swapChainDesc{};
-	swapChainDesc.BufferCount = FrameCount;
-	swapChainDesc.Width = SCR_WIDTH;
-	swapChainDesc.Height = SCR_HEIGHT;
-	swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-	swapChainDesc.SampleDesc.Count = 1;
-    swapChainDesc.Flags = (Options & c_AllowTearing) ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
-
-	ComPtr<IDXGISwapChain1> swapChain;
-	if (JFAIL(factory->CreateSwapChainForHwnd(GraphicsCommandQueue->GetCommandQueue().Get(), m_hWnd
-		, &swapChainDesc, nullptr, nullptr, &swapChain)))
-	{
-		return false;
-	}
-
-	// 풀스크린으로 전환하지 않을 것이므로 아래 처럼 설정
-	// factory->MakeWindowAssociation(hWnd, DXGI_MWA_NO_ALT_ENTER);
-
-	swapChain.As(&SwapChain);
-	FrameIndex = SwapChain->GetCurrentBackBufferIndex();
-
- 	// 4. Heap
-	D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc{};
-	rtvHeapDesc.NumDescriptors = FrameCount;
-	rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-	rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-	if (JFAIL(Device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap))))
-		return false;
+	SwapChain = new jSwapchain_DX12();
+	SwapChain->Create();
 
     //////////////////////////////////////////////////////////////////////////
     // 5. Initialize Camera and lighting
@@ -594,46 +570,15 @@ bool jRHI_DX12::Initialize()
     }
 
 
-	D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc{};
+	//D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc{};
 	// 2 - vertex and index buffer SRV for Cube
     // 1 - vertex buffer SRV for Plane
 	// 1 - ratracing output texture UAV
     // 1 - imgui
-	cbvHeapDesc.NumDescriptors = 5;
-	cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-	cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-	if (JFAIL(Device->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_cbvHeap))))
-		return false;
 
-	m_rtvDescriptorSize = Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	m_cbvDescriptorSize = Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-	// 6. CommandAllocators, Commandlist, RTV for FrameCount
-	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
-
-	for (uint32 i = 0; i < FrameCount; ++i)
-	{
-		if (JFAIL(SwapChain->GetBuffer(i, IID_PPV_ARGS(&m_renderTargets[i]))))
-			return false;
-
-		Device->CreateRenderTargetView(m_renderTargets[i].Get(), nullptr, rtvHandle);
-		rtvHandle.Offset(1, m_rtvDescriptorSize);
-
-	}
+	// 6. CommandAllocators, Commandlist, RTV for FrameCount	
 
 	// 7. Create sync object
-	if (JFAIL(Device->CreateFence(m_fenceValue[FrameIndex], D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence))))
-		return false;
-
-	++m_fenceValue[FrameIndex];
-
-	m_fenceEvent = CreateEvent(nullptr, false, false, nullptr);
-	if (!m_fenceEvent)
-	{
-		if (JFAIL(HRESULT_FROM_WIN32(GetLastError())))
-			return false;
-	}
-
 	WaitForGPU();
 
 	// 8. Raytracing device and commandlist
@@ -815,7 +760,6 @@ bool jRHI_DX12::Initialize()
 	}
 
     // empty root signature and associate it with the plane hit group and miss shader
-    //D3D12_ROOT_SIGNATURE_DESC emptyDesc{};
     CD3DX12_ROOT_PARAMETER rootParametersSecondGeometry[LocalRootSignatureParams::Count];
     rootParametersSecondGeometry[LocalRootSignatureParams::CubeConstantSlot].InitAsConstants(SizeOfInUint32(m_cubeCB), 1);
 
@@ -969,63 +913,29 @@ bool jRHI_DX12::Initialize()
         ++cnt;
     }
 
-	BufferUtil::AllocateUploadBuffer(&m_vertexBuffer, Device.Get(), vertices, sizeof(vertices), TEXT("SphereVB"));
-	BufferUtil::AllocateUploadBuffer(&m_indexBuffer, Device.Get(), indices, sizeof(indices), TEXT("SphereIB"));
+	VertexBuffer = jBufferUtil_DX12::CreateBuffer(sizeof(vertices), 0, true, false, D3D12_RESOURCE_STATE_COMMON, vertices, sizeof(vertices), TEXT("SphereVB"));
+	IndexBuffer = jBufferUtil_DX12::CreateBuffer(sizeof(indices), 0, true, false, D3D12_RESOURCE_STATE_COMMON, indices, sizeof(indices), TEXT("SphereIB"));
 
 	// 버택스 버퍼와 인덱스 버퍼는 디스크립터 테이블로 쉐이더로 전달됨
 	// 디스크립터 힙에서 버택스 버퍼 디스크립터는 인덱스 버퍼 디스크립터에 바로다음에 있어야 함
-	{
-		// IndexBuffer SRV
-		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		srvDesc.Buffer.NumElements = sizeof(indices) / 4;
-		srvDesc.Format = DXGI_FORMAT_R32_TYPELESS;
-		srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
-		srvDesc.Buffer.StructureByteStride = 0;
 
-		uint32 descriptorIndex = UINT_MAX;
-		if (descriptorIndex >= m_cbvHeap->GetDesc().NumDescriptors)
-		{
-			descriptorIndex = m_allocatedDescriptors++;
-		}
-		m_indexBufferCpuDescriptor = CD3DX12_CPU_DESCRIPTOR_HANDLE(m_cbvHeap->GetCPUDescriptorHandleForHeapStart(), descriptorIndex, m_cbvDescriptorSize);
+	// IndexBuffer SRV
+	jBufferUtil_DX12::CreateShaderResourceView(IndexBuffer);
 
-		Device->CreateShaderResourceView(m_indexBuffer.Get(), &srvDesc, m_indexBufferCpuDescriptor);
-		m_indexBufferGpuDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_cbvHeap->GetGPUDescriptorHandleForHeapStart(), descriptorIndex, m_cbvDescriptorSize);
-	}
-	{
-		// VertexBuffer SRV
-		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		srvDesc.Buffer.NumElements = _countof(vertices);
-		srvDesc.Format = DXGI_FORMAT_UNKNOWN;
-		srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-		srvDesc.Buffer.StructureByteStride = sizeof(vertices[0]);
-
-		uint32 descriptorIndex = UINT_MAX;
-		if (descriptorIndex >= m_cbvHeap->GetDesc().NumDescriptors)
-		{
-			descriptorIndex = m_allocatedDescriptors++;
-		}
-		m_vertexBufferCpuDescriptor = CD3DX12_CPU_DESCRIPTOR_HANDLE(m_cbvHeap->GetCPUDescriptorHandleForHeapStart(), descriptorIndex, m_cbvDescriptorSize);
-
-		Device->CreateShaderResourceView(m_vertexBuffer.Get(), &srvDesc, m_vertexBufferCpuDescriptor);
-		m_vertexBufferGpuDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_cbvHeap->GetGPUDescriptorHandleForHeapStart(), descriptorIndex, m_cbvDescriptorSize);
-	}
+	// VertexBuffer SRV
+	jBufferUtil_DX12::CreateShaderResourceView(VertexBuffer);
 
 	//////////////////////////////////////////////////////////////////////////
 	// 12. AccelerationStructures
 	D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc{};
 	geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-	geometryDesc.Triangles.IndexBuffer = m_indexBuffer->GetGPUVirtualAddress();
-	geometryDesc.Triangles.IndexCount = static_cast<uint32>(m_indexBuffer->GetDesc().Width) / sizeof(uint16);
+	geometryDesc.Triangles.IndexBuffer = IndexBuffer->GetGPUAddress();
+	geometryDesc.Triangles.IndexCount = static_cast<uint32>(IndexBuffer->GetAllocatedSize() / sizeof(uint16));
 	geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R16_UINT;
 	geometryDesc.Triangles.Transform3x4 = 0;
 	geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-	geometryDesc.Triangles.VertexCount = static_cast<uint32>(m_vertexBuffer->GetDesc().Width) / sizeof(Vertex);
-	geometryDesc.Triangles.VertexBuffer.StartAddress = m_vertexBuffer->GetGPUVirtualAddress();
+	geometryDesc.Triangles.VertexCount = static_cast<uint32>(VertexBuffer->GetAllocatedSize()) / sizeof(Vertex);
+	geometryDesc.Triangles.VertexBuffer.StartAddress = VertexBuffer->GetGPUAddress();
 	geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(Vertex);
 
 	// Opaque로 지오메트를 등록하면, 히트 쉐이더에서 더이상 쉐이더를 만들지 않을 것이므로 최적화에 좋다.
@@ -1057,22 +967,22 @@ bool jRHI_DX12::Initialize()
     // - 시스템은 백그라운드에서 Acceleration structure 빌드를 구현할 때 이러한 유형의 액세스를 수행할 것입니다.
     // - 앱의 관점에서, acceleration structure에 쓰기/읽기의 동기화는 UAV barriers를 통해서 얻어짐.
     D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
-    BufferUtil::AllocateUAVBuffer(&m_bottomLevelAccelerationStructure, Device.Get()
-        , bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, initialResourceState, TEXT("BottomLevelAccelerationStructure"));
+	BottomLevelAccelerationStructureBuffer = jBufferUtil_DX12::CreateBuffer(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, 0, false, true
+		, initialResourceState, nullptr, 0, TEXT("BottomLevelAccelerationStructure"));
+	check(BottomLevelAccelerationStructureBuffer);
 
     // Bottom level acceleration structure desc
-    ComPtr<ID3D12Resource> scratchResource;
-    BufferUtil::AllocateUAVBuffer(&scratchResource, Device.Get(), bottomLevelPrebuildInfo.ScratchDataSizeInBytes
-        , D3D12_RESOURCE_STATE_UNORDERED_ACCESS, L"ScratchResourceGeometry1");
+    jBuffer_DX12* ScratchResourceBuffer = jBufferUtil_DX12::CreateBuffer(bottomLevelPrebuildInfo.ScratchDataSizeInBytes, 0, false, true
+        , D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, 0, TEXT("ScratchResourceGeometry1"));
 
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc{};
     bottomLevelBuildDesc.Inputs = bottomLevelInputs;
-    bottomLevelBuildDesc.ScratchAccelerationStructureData = scratchResource->GetGPUVirtualAddress();
-    bottomLevelBuildDesc.DestAccelerationStructureData = m_bottomLevelAccelerationStructure->GetGPUVirtualAddress();
+    bottomLevelBuildDesc.ScratchAccelerationStructureData = ScratchResourceBuffer->GetGPUAddress();
+    bottomLevelBuildDesc.DestAccelerationStructureData = BottomLevelAccelerationStructureBuffer->GetGPUAddress();
 
 	GraphicsCommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
 	{
-		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::UAV(m_bottomLevelAccelerationStructure.Get());
+		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::UAV(BottomLevelAccelerationStructureBuffer->Buffer.Get());
 		GraphicsCommandList->ResourceBarrier(1, &barrier);
 	}
 
@@ -1089,36 +999,19 @@ bool jRHI_DX12::Initialize()
             XMFLOAT3(100.0f, -1.0f, 100.0f),   XMFLOAT3(0.0f, 1.0f, 0.0f),
     };
 
-    BufferUtil::AllocateUploadBuffer(&m_vertexBufferSecondGeometry, Device.Get(), secondVertices, sizeof(secondVertices), TEXT("SecondGeometryVB"));
+	VertexBufferSecondGeometry = jBufferUtil_DX12::CreateBuffer(sizeof(secondVertices), 0, true, false, D3D12_RESOURCE_STATE_COMMON, secondVertices, sizeof(secondVertices), TEXT("SecondGeometryVB"));
+	check(VertexBufferSecondGeometry);
 
-    {
-        // VertexBuffer SRV
-        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        srvDesc.Buffer.NumElements = _countof(secondVertices);
-        srvDesc.Format = DXGI_FORMAT_UNKNOWN;
-        srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-        srvDesc.Buffer.StructureByteStride = sizeof(secondVertices[0]);
-
-        uint32 descriptorIndex = UINT_MAX;
-        if (descriptorIndex >= m_cbvHeap->GetDesc().NumDescriptors)
-        {
-            descriptorIndex = m_allocatedDescriptors++;
-        }
-        m_vertexBufferCpuDescriptorSecondGeometry = CD3DX12_CPU_DESCRIPTOR_HANDLE(m_cbvHeap->GetCPUDescriptorHandleForHeapStart(), descriptorIndex, m_cbvDescriptorSize);
-
-        Device->CreateShaderResourceView(m_vertexBufferSecondGeometry.Get(), &srvDesc, m_vertexBufferCpuDescriptorSecondGeometry);
-        m_vertexBufferGpuDescriptorSecondGeometry = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_cbvHeap->GetGPUDescriptorHandleForHeapStart(), descriptorIndex, m_cbvDescriptorSize);
-    }
+    // VertexBuffer SRV
+	jBufferUtil_DX12::CreateShaderResourceView(VertexBufferSecondGeometry);
 
     D3D12_RAYTRACING_GEOMETRY_DESC secondGeometryDesc{};
     secondGeometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
     secondGeometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
     secondGeometryDesc.Triangles.Transform3x4 = 0;
     secondGeometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-    secondGeometryDesc.Triangles.VertexCount = static_cast<uint32>(m_vertexBufferSecondGeometry->GetDesc().Width) / sizeof(Vertex);
-    secondGeometryDesc.Triangles.VertexBuffer.StartAddress = m_vertexBufferSecondGeometry->GetGPUVirtualAddress();
+    secondGeometryDesc.Triangles.VertexCount = static_cast<uint32>(VertexBufferSecondGeometry->Size) / sizeof(Vertex);
+	secondGeometryDesc.Triangles.VertexBuffer.StartAddress = VertexBufferSecondGeometry->GetGPUAddress();
     secondGeometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(Vertex);
 
 
@@ -1136,22 +1029,22 @@ bool jRHI_DX12::Initialize()
             return false;
     }
 
-    BufferUtil::AllocateUAVBuffer(&m_bottomLevelAccelerationStructureSecondGeometry, Device.Get()
-        , bottomLevelPrebuildInfoSecondGeometry.ResultDataMaxSizeInBytes, initialResourceState, TEXT("BottomLevelAccelerationStructure"));
+	BottomLevelAccelerationStructureSecondGeometryBuffer = jBufferUtil_DX12::CreateBuffer(bottomLevelPrebuildInfoSecondGeometry.ResultDataMaxSizeInBytes, 0, false, true
+		, initialResourceState, nullptr, 0, TEXT("BottomLevelAccelerationStructure"));
 
-    ComPtr<ID3D12Resource> scratchResourceSecondGeometry;
-    BufferUtil::AllocateUAVBuffer(&scratchResourceSecondGeometry, Device.Get(), bottomLevelPrebuildInfoSecondGeometry.ScratchDataSizeInBytes
-        , D3D12_RESOURCE_STATE_UNORDERED_ACCESS, L"ScratchResourceGeometry2");
+	jBuffer_DX12* scratchResourceSecondGeometryBuffer = nullptr;
+	scratchResourceSecondGeometryBuffer = jBufferUtil_DX12::CreateBuffer(bottomLevelPrebuildInfoSecondGeometry.ScratchDataSizeInBytes, 0, false, true
+        , D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, 0, TEXT("ScratchResourceGeometry2"));
 
     // Bottom level acceleration structure desc
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDescSecondGeometry{};
     bottomLevelBuildDescSecondGeometry.Inputs = bottomLevelInputsSecondGeometry;
-    bottomLevelBuildDescSecondGeometry.ScratchAccelerationStructureData = scratchResourceSecondGeometry->GetGPUVirtualAddress();
-    bottomLevelBuildDescSecondGeometry.DestAccelerationStructureData = m_bottomLevelAccelerationStructureSecondGeometry->GetGPUVirtualAddress();
+    bottomLevelBuildDescSecondGeometry.ScratchAccelerationStructureData = scratchResourceSecondGeometryBuffer->GetGPUAddress();
+    bottomLevelBuildDescSecondGeometry.DestAccelerationStructureData = BottomLevelAccelerationStructureSecondGeometryBuffer->GetGPUAddress();
 
 	GraphicsCommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDescSecondGeometry, 0, nullptr);
 	{
-		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::UAV(m_bottomLevelAccelerationStructureSecondGeometry.Get());
+		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::UAV(BottomLevelAccelerationStructureSecondGeometryBuffer->Buffer.Get());
 		GraphicsCommandList->ResourceBarrier(1, &barrier);
 	}
 
@@ -1161,6 +1054,9 @@ bool jRHI_DX12::Initialize()
 	GraphicsCommandQueue->ExecuteCommandList(GraphicsCommandList);
 
 	WaitForGPU();
+
+    delete ScratchResourceBuffer;
+    delete scratchResourceSecondGeometryBuffer;
 
 	// 13. ShaderTable
 	const uint16 shaderIdentifierSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
@@ -1215,51 +1111,27 @@ bool jRHI_DX12::Initialize()
 	// 14. Raytracing Output Resouce
 
 	// 출력 리소스를 생성. 차원과 포맷은 swap-chain과 매치 되어야 함
-	auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(BackbufferFormat
-		, SCR_WIDTH, SCR_HEIGHT, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-	auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-	if (JFAIL(Device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE
-		, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_raytracingOutput))))
-	{
+	RayTacingOutputTexture = jBufferUtil_DX12::CreateImage(SCR_WIDTH, SCR_HEIGHT, 1, 1, 1, ETextureType::TEXTURE_2D, ETextureFormat::RGBA8, false, true);
+	if (!ensure(RayTacingOutputTexture))
 		return false;
-	}
 
-	D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle;
-	auto descriptorHeapCpuBase = m_cbvHeap->GetCPUDescriptorHandleForHeapStart();
-	if (m_raytracingOutputResourceUAVDescriptorHeapIndex >= m_cbvHeap->GetDesc().NumDescriptors)
-	{
-		m_raytracingOutputResourceUAVDescriptorHeapIndex = m_allocatedDescriptors++;
-		uavDescriptorHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(descriptorHeapCpuBase
-			, m_raytracingOutputResourceUAVDescriptorHeapIndex, m_cbvDescriptorSize);
-	}
-
-	D3D12_UNORDERED_ACCESS_VIEW_DESC UAVDesc{};
-	UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-	Device->CreateUnorderedAccessView(m_raytracingOutput.Get(), nullptr, &UAVDesc, uavDescriptorHandle);
-	m_raytracingOutputResourceUAVGpuDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_cbvHeap->GetGPUDescriptorHandleForHeapStart()
-		, m_raytracingOutputResourceUAVDescriptorHeapIndex, m_cbvDescriptorSize);
+	jBufferUtil_DX12::CreateUnorderedAccessView(RayTacingOutputTexture);
 
 	//////////////////////////////////////////////////////////////////////////
 	// 15. CreateConstantBuffers
 	// 상수 버퍼 메모리를 만들고 CPU와 GPU 주소를 매핑함
-	const D3D12_HEAP_PROPERTIES uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 
-	// 프레임별 상수버퍼를 만든다, 매프레임 업데이트 되기 때문
-	size_t cbSize = FrameCount * sizeof(AlignedSceneConstantBuffer);
-	const D3D12_RESOURCE_DESC constantBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(cbSize);
+    // 프레임별 상수버퍼를 만든다, 매프레임 업데이트 되기 때문
+    const size_t cbSize = MaxFrameCount * sizeof(AlignedSceneConstantBuffer);
+	PerFrameConstantBuffer = jBufferUtil_DX12::CreateBuffer(cbSize, 0, true, false, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, 0);
+	if (!ensure(PerFrameConstantBuffer))
+		return false;
 
-	if (JFAIL(Device->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE
-		, &constantBufferDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_perFrameConstants))))
+	if (!PerFrameConstantBuffer->GetMappedPointer())
 	{
-		return false;
+		PerFrameConstantBuffer->Map();
 	}
-
-	// 상수 버퍼를 매핑하고 heap 포인터를 캐싱한다.
-	// 앱 종료시 까지 매핑을 해제하지 않음. 살아있는 동안 버퍼의 매핑을 유지해도 괜찮음.
-	CD3DX12_RANGE readRange(0, 0);		// CPU에서 읽지 않으려는 의도
-	if (JFAIL(m_perFrameConstants->Map(0, nullptr, reinterpret_cast<void**>(&m_mappedConstantData))))
-		return false;
-
+	
 	//////////////////////////////////////////////////////////////////////////
 	ShowWindow(m_hWnd, SW_SHOW);
     pRHIDirectX12 = this;
@@ -1293,7 +1165,8 @@ void jRHI_DX12::Release()
 
 	//////////////////////////////////////////////////////////////////////////
 	// 14. Raytracing Output Resouce
-	m_raytracingOutput.Reset();
+	delete RayTacingOutputTexture;
+	RayTacingOutputTexture = nullptr;
 
 	//////////////////////////////////////////////////////////////////////////
 	// 13. ShaderTable
@@ -1303,14 +1176,17 @@ void jRHI_DX12::Release()
 
 	//////////////////////////////////////////////////////////////////////////
 	// 12. AccelerationStructures
-	m_bottomLevelAccelerationStructure.Reset();
-	//m_topLevelAccelerationStructure.Reset();
-    TLASBuffer.Result.Reset();
+	delete BottomLevelAccelerationStructureBuffer;
+	BottomLevelAccelerationStructureBuffer = nullptr;
+	TLASBuffer.Release();
 
 	//////////////////////////////////////////////////////////////////////////
 	// 11. Create vertex and index buffer
-	m_vertexBuffer.Reset();
-	m_indexBuffer.Reset();
+	delete VertexBuffer;
+	VertexBuffer = nullptr;
+	
+	delete IndexBuffer;
+	IndexBuffer = nullptr;
 
 	//////////////////////////////////////////////////////////////////////////
 	// 10. DXR PipeplineStateObject
@@ -1327,27 +1203,23 @@ void jRHI_DX12::Release()
 
 	//////////////////////////////////////////////////////////////////////////
 	// 7. Create sync object
-	m_fence.Reset();
-	CloseHandle(m_fenceEvent);
 
 	//////////////////////////////////////////////////////////////////////////
 	// 6. CommandAllocators, Commandlist, RTV for FrameCount
-	for (uint32 i = 0; i < FrameCount; ++i)
-	{
-		m_renderTargets[i].Reset();
-	}
 
     //////////////////////////////////////////////////////////////////////////
     // 5. Initialize Camera and lighting
 
 	//////////////////////////////////////////////////////////////////////////
 	// 4. Heap
-	m_rtvHeap.Reset();
-	m_cbvHeap.Reset();
+	RTVDescriptorHeap.Release();
+	DSVDescriptorHeap.Release();
+	SRVDescriptorHeap.Release();
 
 	//////////////////////////////////////////////////////////////////////////
 	// 3. Swapchain
-	SwapChain.Reset();
+	SwapChain->Release();
+	delete SwapChain;
 
 	//////////////////////////////////////////////////////////////////////////
 	// 2. Command
@@ -1394,25 +1266,30 @@ bool jRHI_DX12::BuildTopLevelAS(ComPtr<ID3D12GraphicsCommandList4>& InCommandLis
 
     if (InIsUpdate)
     {
+		check(InBuffers.Result);
+
         // Update 요청이 온다면 TLAS 는 이미 DispatchRay()의 호출에서 사용되고있다.
         // 버퍼가 업데이트 되기 전에 UAV 베리어를 read 연산의 끝에 넣어줘야 한다.
 
         D3D12_RESOURCE_BARRIER uavBarrier = {};
         uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-        uavBarrier.UAV.pResource = InBuffers.Result.Get();
+        uavBarrier.UAV.pResource = InBuffers.Result->Buffer.Get();
 		InCommandList->ResourceBarrier(1, &uavBarrier);
     }
     else
     {
         // Update 요청이 아니면, 버퍼를 새로 만들어야 함, 그렇지 않으면 그대로 refit(이미 존재하는 TLAS를 업데이트) 될 것임.
-        BufferUtil::AllocateUAVBuffer(&InBuffers.Scratch, Device.Get(), info.ScratchDataSizeInBytes, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, TEXT("TLAS Scratch Buffer"));
-        BufferUtil::AllocateUAVBuffer(&InBuffers.Result, Device.Get(), info.ResultDataMaxSizeInBytes, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, TEXT("TLAS Result Buffer"));
-        BufferUtil::AllocateUploadBuffer(&InBuffers.InstanceDesc, Device.Get(), nullptr, sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * totalCount, TEXT("TLAS Instance Desc"));
+		InBuffers.Scratch = jBufferUtil_DX12::CreateBuffer(info.ScratchDataSizeInBytes, 0, false, true
+			, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, 0, TEXT("TLAS Scratch Buffer"));
+		InBuffers.Result = jBufferUtil_DX12::CreateBuffer(info.ResultDataMaxSizeInBytes, 0, false, true
+			, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nullptr, 0, TEXT("TLAS Result Buffer"));
+		InBuffers.InstanceDesc = jBufferUtil_DX12::CreateBuffer(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * totalCount, 0, true, false
+			, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, 0, TEXT("TLAS Instance Desc"));
     }
 
     D3D12_RAYTRACING_INSTANCE_DESC* instanceDescs = nullptr;
-    auto hr = InBuffers.InstanceDesc->Map(0, nullptr, (void**)&instanceDescs);
-    if (JFAIL(hr))
+	instanceDescs = (D3D12_RAYTRACING_INSTANCE_DESC*)InBuffers.InstanceDesc->Map();
+    if (!instanceDescs)
         return false;
 
     ZeroMemory(instanceDescs, sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * totalCount);
@@ -1437,7 +1314,7 @@ bool jRHI_DX12::BuildTopLevelAS(ComPtr<ID3D12GraphicsCommandList4>& InCommandLis
             instanceDescs[cnt].InstanceContributionToHitGroupIndex = 0;
             memcpy(instanceDescs[cnt].Transform, &m, sizeof(instanceDescs[cnt].Transform));
             instanceDescs[cnt].InstanceMask = 1;
-            instanceDescs[cnt].AccelerationStructure = m_bottomLevelAccelerationStructure->GetGPUVirtualAddress();
+            instanceDescs[cnt].AccelerationStructure = BottomLevelAccelerationStructureBuffer->GetGPUAddress();
         }
     }
 
@@ -1451,7 +1328,7 @@ bool jRHI_DX12::BuildTopLevelAS(ComPtr<ID3D12GraphicsCommandList4>& InCommandLis
         instanceDescs[cnt].InstanceContributionToHitGroupIndex = 0;
         memcpy(instanceDescs[cnt].Transform, &m, sizeof(instanceDescs[cnt].Transform));
         instanceDescs[cnt].InstanceMask = 1;
-        instanceDescs[cnt].AccelerationStructure = m_bottomLevelAccelerationStructure->GetGPUVirtualAddress();
+        instanceDescs[cnt].AccelerationStructure = BottomLevelAccelerationStructureBuffer->GetGPUAddress();
 
         ++cnt;
     }
@@ -1462,23 +1339,23 @@ bool jRHI_DX12::BuildTopLevelAS(ComPtr<ID3D12GraphicsCommandList4>& InCommandLis
     instanceDescs[cnt].InstanceContributionToHitGroupIndex = 1;
     memcpy(instanceDescs[cnt].Transform, &mIdentity, sizeof(instanceDescs[cnt].Transform));
     instanceDescs[cnt].InstanceMask = 1;
-    instanceDescs[cnt].AccelerationStructure = m_bottomLevelAccelerationStructureSecondGeometry->GetGPUVirtualAddress();
+    instanceDescs[cnt].AccelerationStructure = BottomLevelAccelerationStructureSecondGeometryBuffer->GetGPUAddress();
     instanceDescs[cnt].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_CULL_DISABLE;
 
-    InBuffers.InstanceDesc->Unmap(0, nullptr);
+    InBuffers.InstanceDesc->Unmap();
 
     // TLAS 생성
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC asDesc = {};
     asDesc.Inputs = inputs;
-    asDesc.Inputs.InstanceDescs = InBuffers.InstanceDesc->GetGPUVirtualAddress();
-    asDesc.DestAccelerationStructureData = InBuffers.Result->GetGPUVirtualAddress();
-    asDesc.ScratchAccelerationStructureData = InBuffers.Scratch->GetGPUVirtualAddress();
+    asDesc.Inputs.InstanceDescs = InBuffers.InstanceDesc->GetGPUAddress();
+    asDesc.DestAccelerationStructureData = InBuffers.Result->GetGPUAddress();
+    asDesc.ScratchAccelerationStructureData = InBuffers.Scratch->GetGPUAddress();
 
     // 만약 업데이트 중이라면 source buffer에 업데이트 플래그를 설정해준다.
     if (InIsUpdate)
     {
         asDesc.Inputs.Flags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
-        asDesc.SourceAccelerationStructureData = InBuffers.Result->GetGPUVirtualAddress();
+        asDesc.SourceAccelerationStructureData = InBuffers.Result->GetGPUAddress();
     }
 
 	InCommandList->BuildRaytracingAccelerationStructure(&asDesc, 0, nullptr);
@@ -1486,7 +1363,7 @@ bool jRHI_DX12::BuildTopLevelAS(ComPtr<ID3D12GraphicsCommandList4>& InCommandLis
     // 레이트레이싱 연산에서 Acceleration structure를 사용하기 전에 UAV 베리어를 추가해야 함.
     D3D12_RESOURCE_BARRIER uavBarrier = {};
     uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-    uavBarrier.UAV.pResource = InBuffers.Result.Get();
+    uavBarrier.UAV.pResource = InBuffers.Result->Buffer.Get();
 	InCommandList->ResourceBarrier(1, &uavBarrier);
 
     return true;
@@ -1508,7 +1385,7 @@ void jRHI_DX12::CalculateFrameStats()
         frameCnt = 0;
         elapsedTime = totalTime;
 
-        float raysPerPixels = (float)(m_sceneCB[FrameIndex].NumOfStartingRay * g_MaxRecursionDepth);
+        float raysPerPixels = (float)(m_sceneCB[CurrentFrameIndex].NumOfStartingRay * g_MaxRecursionDepth);
         float MRaysPerSecond = (SCR_WIDTH * SCR_HEIGHT * fps * raysPerPixels) / static_cast<float>(1e6);
 
         std::wstringstream windowText;
@@ -1524,9 +1401,9 @@ void jRHI_DX12::Update()
 {
     CalculateFrameStats();
 
-	int32 prevFrameIndex = FrameIndex - 1;
+	int32 prevFrameIndex = CurrentFrameIndex - 1;
 	if (prevFrameIndex < 0)
-		prevFrameIndex = FrameCount - 1;
+		prevFrameIndex = MaxFrameCount - 1;
 
     static bool enableCameraRotation = false;
 
@@ -1556,7 +1433,7 @@ void jRHI_DX12::Update()
 
 		XMMATRIX rotate = XMMatrixRotationY(XMConvertToRadians(accAngle));
         constexpr XMVECTOR rotationRadius = { 0.0f, 0.0f, 8.0f };
-		m_sceneCB[FrameIndex].lightPosition = XMVector3Transform(rotationRadius, rotate);
+		m_sceneCB[CurrentFrameIndex].lightPosition = XMVector3Transform(rotationRadius, rotate);
 	}
 
     {
@@ -1595,30 +1472,30 @@ void jRHI_DX12::Render()
         TranslationOffsetX -= 0.01f;
     }
 
-    //if (!JASSERT(BuildTopLevelAS(TLASBuffer, true, accumulatedRotation, { TranslationOffsetX, 0.0f, 0.0f })))
-    //    return;
+    jSwapchainImage* SwapchainImage = SwapChain->GetSwapchainImage(CurrentFrameIndex);
+    jTexture_DX12* SwapchainRT = (jTexture_DX12*)SwapchainImage->TexturePtr.get();
 
 	{
 		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-			m_renderTargets[FrameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+			SwapchainRT->Image.Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		GraphicsCommandList->ResourceBarrier(1, &barrier);
 	}
-	// DoRaytracing
 	GraphicsCommandList->SetComputeRootSignature(m_raytracingGlobalRootSignature.Get());
 
-	memcpy(&m_mappedConstantData[FrameIndex].constants, &m_sceneCB[FrameIndex], sizeof(m_sceneCB[FrameIndex]));
-	auto cbGpuAddress = m_perFrameConstants->GetGPUVirtualAddress() + FrameIndex * sizeof(m_mappedConstantData[0]);
+	AlignedSceneConstantBuffer* CurFrameConstantBuffer = (AlignedSceneConstantBuffer*)PerFrameConstantBuffer->GetMappedPointer();
+	memcpy(&CurFrameConstantBuffer[CurrentFrameIndex].constants, &m_sceneCB[CurrentFrameIndex], sizeof(m_sceneCB[CurrentFrameIndex]));
+	auto cbGpuAddress = PerFrameConstantBuffer->GetGPUAddress() + CurrentFrameIndex * sizeof(AlignedSceneConstantBuffer);
 	GraphicsCommandList->SetComputeRootConstantBufferView(GlobalRootSignatureParams::SceneConstantSlot, cbGpuAddress);
 
 	D3D12_DISPATCH_RAYS_DESC dispatchDesc{};
-	GraphicsCommandList->SetDescriptorHeaps(1, m_cbvHeap.GetAddressOf());
-	GraphicsCommandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::VertexBuffersSlot, m_indexBufferGpuDescriptor);
+	GraphicsCommandList->SetDescriptorHeaps(1, SRVDescriptorHeap.Heap.GetAddressOf());
+	GraphicsCommandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::VertexBuffersSlot, IndexBuffer->SRV.GPUHandle);
 	GraphicsCommandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::PlaneVertexBufferSlot
-        , m_vertexBufferGpuDescriptorSecondGeometry);
+        , VertexBufferSecondGeometry->SRV.GPUHandle);
 	GraphicsCommandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::OutputViewSlot
-        , m_raytracingOutputResourceUAVGpuDescriptor);
+        , RayTacingOutputTexture->UAV.GPUHandle);
 	GraphicsCommandList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot
-		, TLASBuffer.Result->GetGPUVirtualAddress());
+		, TLASBuffer.Result->GetGPUAddress());
 
 	// 각 Shader table은 단 한개의 shader record를 가지기 때문에 stride가 그 사이즈와 동일함
 	dispatchDesc.HitGroupTable.StartAddress = m_hitGroupShaderTable->GetGPUVirtualAddress();
@@ -1641,22 +1518,22 @@ void jRHI_DX12::Render()
 
 	// CopyRaytracingOutputToBackbuffer
 	D3D12_RESOURCE_BARRIER preCopyBarriers[2];
-	preCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[FrameIndex].Get()
+	preCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(SwapchainRT->Image.Get()
 		, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_DEST);
-	preCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_raytracingOutput.Get()
+	preCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(RayTacingOutputTexture->Image.Get()
 		, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
 	GraphicsCommandList->ResourceBarrier(_countof(preCopyBarriers), preCopyBarriers);
 
-	GraphicsCommandList->CopyResource(m_renderTargets[FrameIndex].Get(), m_raytracingOutput.Get());
+	GraphicsCommandList->CopyResource(SwapchainRT->Image.Get(), RayTacingOutputTexture->Image.Get());
 
 	{
-		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(m_raytracingOutput.Get()
+		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(RayTacingOutputTexture->Image.Get()
 			, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		GraphicsCommandList->ResourceBarrier(1, &barrier);
 	}
 
-    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), FrameIndex* m_rtvDescriptorSize);
-    RenderUI(GraphicsCommandList.Get(), m_renderTargets[FrameIndex].Get(), rtvHandle, m_imgui_SrvDescHeap.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
+	// CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), FrameIndex* m_rtvDescriptorSize);
+    RenderUI(GraphicsCommandList.Get(), SwapchainRT->Image.Get(), SwapchainRT->RTV.CPUHandle, m_imgui_SrvDescHeap.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
     //////////////////////////////////////////////////////////////////////////
 
 	// Present
@@ -1665,13 +1542,13 @@ void jRHI_DX12::Render()
 	HRESULT hr = S_OK;
 	if (Options & c_AllowTearing)
 	{
-		hr = SwapChain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
+		hr = SwapChain->SwapChain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
 	}
 	else
 	{
 		// 첫번째 아규먼트는 VSync가 될때까지 기다림, 어플리케이션은 다음 VSync까지 잠재운다.
 		// 이렇게 하는 것은 렌더링 한 프레임 중 화면에 나오지 못하는 프레임의 cycle을 아끼기 위해서임.
-		hr = SwapChain->Present(1, 0);
+		hr = SwapChain->SwapChain->Present(1, 0);
 	}
 
 	if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
@@ -1693,19 +1570,9 @@ void jRHI_DX12::Render()
 		if (JFAIL(hr))
 			return;
 
-		const uint64 currentFenceValue = m_fenceValue[FrameIndex];
-		if (JFAIL(GraphicsCommandQueue->GetCommandQueue()->Signal(m_fence.Get(), currentFenceValue)))
-			return;
+		WaitForGPU();
 
-		FrameIndex = SwapChain->GetCurrentBackBufferIndex();
-
-		if (m_fence->GetCompletedValue() < m_fenceValue[FrameIndex])
-		{
-			if (JFAIL(m_fence->SetEventOnCompletion(m_fenceValue[FrameIndex], m_fenceEvent)))
-				return;
-			WaitForSingleObjectEx(m_fenceEvent, INFINITE, false);
-		}
-		m_fenceValue[FrameIndex] = currentFenceValue + 1;
+		CurrentFrameIndex = SwapChain->GetCurrentBackBufferIndex();
 	}
 }
 
@@ -1715,7 +1582,8 @@ void jRHI_DX12::OnDeviceLost()
 	m_rayGenShaderTable.Reset();
 	m_missShaderTable.Reset();
 	m_hitGroupShaderTable.Reset();
-	m_raytracingOutput.Reset();
+	delete RayTacingOutputTexture;
+	RayTacingOutputTexture = nullptr;
 
 	m_raytracingGlobalRootSignature.Reset();
 	m_raytracingLocalRootSignature.Reset();
@@ -1723,15 +1591,20 @@ void jRHI_DX12::OnDeviceLost()
 	Device.Reset();
 	m_dxrStateObject.Reset();
 
-	m_cbvHeap.Reset();
+	SRVDescriptorHeap.Release();
 	m_allocatedDescriptors = 0;
 	m_raytracingOutputResourceUAVDescriptorHeapIndex = UINT_MAX;
-	m_indexBuffer.Reset();
-	m_vertexBuffer.Reset();
+	
+	delete VertexBuffer;
+	VertexBuffer = nullptr;
 
-	m_bottomLevelAccelerationStructure.Reset();
-	// m_topLevelAccelerationStructure.Reset();
-    TLASBuffer.Result.Reset();
+	delete IndexBuffer;
+	IndexBuffer = nullptr;
+
+	delete BottomLevelAccelerationStructureBuffer;
+	BottomLevelAccelerationStructureBuffer = nullptr;
+
+	TLASBuffer.Release();
 }
 
 void jRHI_DX12::OnDeviceRestored()
@@ -1752,17 +1625,9 @@ bool jRHI_DX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimi
 
     WaitForGPU();
 
-    for (int32 i = 0; i < FrameCount; ++i)
+    if (ensure(SwapChain && SwapChain->SwapChain))
     {
-        m_renderTargets[i].Reset();
-        m_fenceValue[i] = m_fenceValue[FrameIndex];
-    }
-
-    BackbufferFormat;
-
-    if (ensure(SwapChain))
-    {
-        HRESULT hr = SwapChain->ResizeBuffers(FrameCount, InWidth, InHeight, BackbufferFormat
+        HRESULT hr = SwapChain->SwapChain->ResizeBuffers(MaxFrameCount, InWidth, InHeight, BackbufferFormat
             , (Options & c_AllowTearing) ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0);
 
         if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
@@ -1785,15 +1650,14 @@ bool jRHI_DX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimi
         }
     }
 
-    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
-
-    for (int32 i = 0; i < FrameCount; ++i)
+    for (int32 i = 0; i < MaxFrameCount; ++i)
     {
-        if (JFAIL(SwapChain->GetBuffer(i, IID_PPV_ARGS(&m_renderTargets[i]))))
+		jSwapchainImage* SwapchainImage = SwapChain->GetSwapchainImage(i);
+		jTexture_DX12* SwapchainRT = (jTexture_DX12*)SwapchainImage->TexturePtr.get();
+        if (JFAIL(SwapChain->SwapChain->GetBuffer(i, IID_PPV_ARGS(&SwapchainRT->Image))))
             return false;
 
-        Device->CreateRenderTargetView(m_renderTargets[i].Get(), nullptr, rtvHandle);
-        rtvHandle.Offset(1, m_rtvDescriptorSize);
+		jBufferUtil_DX12::CreateRenderTargetView(SwapchainRT);
 
         //////////////////////////////////////////////////////////////////////////
         m_sceneCB[i].cameraPosition = m_eye;
@@ -1810,44 +1674,23 @@ bool jRHI_DX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimi
         m_sceneCB[i].lensRadius = m_lensRadius;
     }
 
-    FrameIndex = SwapChain->GetCurrentBackBufferIndex();
+    CurrentFrameIndex = SwapChain->GetCurrentBackBufferIndex();
 
     //////////////////////////////////////////////////////////////////////////
     // ReleaseWindowSizeDependentResources
     m_rayGenShaderTable.Reset();
     m_missShaderTable.Reset();
     m_hitGroupShaderTable.Reset();
-    m_raytracingOutput.Reset();
+	delete RayTacingOutputTexture;
+	RayTacingOutputTexture = nullptr;
     
     //////////////////////////////////////////////////////////////////////////
     // CreateWindowSizeDependentResources
-    auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(BackbufferFormat
-        , InWidth, InHeight, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-    auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-    if (JFAIL(Device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE
-        , &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_raytracingOutput))))
-    {
+    RayTacingOutputTexture = jBufferUtil_DX12::CreateImage(SCR_WIDTH, SCR_HEIGHT, 1, 1, 1, ETextureType::TEXTURE_2D, ETextureFormat::RGBA8, false, true);
+    if (!ensure(RayTacingOutputTexture))
         return false;
-    }
 
-    // 이미 만들어 둔 인덱스가 있어서 괜찮다.
-    //D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle;
-    //auto descriptorHeapCpuBase = m_cbvHeap->GetCPUDescriptorHandleForHeapStart();
-    //if (m_raytracingOutputResourceUAVDescriptorHeapIndex >= m_cbvHeap->GetDesc().NumDescriptors)
-    //{
-    //    m_raytracingOutputResourceUAVDescriptorHeapIndex = m_allocatedDescriptors++;
-    //    uavDescriptorHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(descriptorHeapCpuBase
-    //        , m_raytracingOutputResourceUAVDescriptorHeapIndex, m_cbvDescriptorSize);
-    //}
-
-    D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(
-        m_cbvHeap->GetCPUDescriptorHandleForHeapStart(), m_raytracingOutputResourceUAVDescriptorHeapIndex, m_cbvDescriptorSize);
-
-    D3D12_UNORDERED_ACCESS_VIEW_DESC UAVDesc{};
-    UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-    Device->CreateUnorderedAccessView(m_raytracingOutput.Get(), nullptr, &UAVDesc, uavDescriptorHandle);
-    m_raytracingOutputResourceUAVGpuDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_cbvHeap->GetGPUDescriptorHandleForHeapStart()
-        , m_raytracingOutputResourceUAVDescriptorHeapIndex, m_cbvDescriptorSize);
+    jBufferUtil_DX12::CreateUnorderedAccessView(RayTacingOutputTexture);
 
     //////////////////////////////////////////////////////////////////////////
     // RecreateShaderTable
@@ -1906,7 +1749,9 @@ bool jRHI_DX12::OnHandleDeviceLost()
 {
     //////////////////////////////////////////////////////////////////////////
     // ReleaseWindowSizeDependentResources
-    m_raytracingOutput.Reset();
+    //m_raytracingOutput.Reset();
+	delete RayTacingOutputTexture;
+	RayTacingOutputTexture = nullptr;
 
     //////////////////////////////////////////////////////////////////////////
     // ReleaseDeviceDependentResources
@@ -1919,19 +1764,31 @@ bool jRHI_DX12::OnHandleDeviceLost()
 
     m_allocatedDescriptors = 0;
     m_raytracingOutputResourceUAVDescriptorHeapIndex = UINT_MAX;
-    m_cbvHeap.Reset();
-    m_indexBuffer.Reset();
-    m_vertexBuffer.Reset();
-    m_vertexBufferSecondGeometry.Reset();
-    m_perFrameConstants.Reset();
+	SRVDescriptorHeap.Release();
+	
+    delete VertexBuffer;
+    VertexBuffer = nullptr;
+
+	delete IndexBuffer;
+	IndexBuffer = nullptr;
+
+	delete VertexBufferSecondGeometry;
+	VertexBufferSecondGeometry = nullptr;
+
+	delete PerFrameConstantBuffer;
+	PerFrameConstantBuffer = nullptr;
+
     m_rayGenShaderTable.Reset();
     m_missShaderTable.Reset();
     m_hitGroupShaderTable.Reset();
 
-    m_bottomLevelAccelerationStructure.Reset();
-    m_bottomLevelAccelerationStructureSecondGeometry.Reset();
+	delete BottomLevelAccelerationStructureBuffer;
+	BottomLevelAccelerationStructureBuffer = nullptr;
 
-    TLASBuffer.Reset();
+	delete BottomLevelAccelerationStructureSecondGeometryBuffer;
+	BottomLevelAccelerationStructureSecondGeometryBuffer = nullptr;
+
+	TLASBuffer.Release();
 
     return true;
 }
@@ -1940,6 +1797,16 @@ bool jRHI_DX12::OnHandleDeviceRestored()
 {
     Initialize();
     return true;
+}
+
+ComPtr<ID3D12GraphicsCommandList4> jRHI_DX12::BeginSingleTimeCopyCommands()
+{
+	return CopyCommandQueue->GetAvailableCommandList();
+}
+
+void jRHI_DX12::EndSingleTimeCopyCommands(const ComPtr<ID3D12GraphicsCommandList4>& commandBuffer)
+{
+	CopyCommandQueue->ExecuteCommandList(commandBuffer);
 }
 
 void jRHI_DX12::InitializeImGui()
@@ -1961,7 +1828,7 @@ void jRHI_DX12::InitializeImGui()
     // Setup Platform/Renderer backends
     ImGui_ImplWin32_Init(m_hWnd);
 
-    ImGui_ImplDX12_Init(Device.Get(), FrameCount,
+    ImGui_ImplDX12_Init(Device.Get(), MaxFrameCount,
         DXGI_FORMAT_R8G8B8A8_UNORM, m_imgui_SrvDescHeap.Get(),
         m_imgui_SrvDescHeap->GetCPUDescriptorHandleForHeapStart(),
         m_imgui_SrvDescHeap->GetGPUDescriptorHandleForHeapStart());
@@ -1977,7 +1844,7 @@ void jRHI_DX12::ReleaseImGui()
     m_imgui_SrvDescHeap.Reset();
 }
 
-void jRHI_DX12::RenderUI(ID3D12GraphicsCommandList* pCommandList, ID3D12Resource* pRenderTarget, CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle
+void jRHI_DX12::RenderUI(ID3D12GraphicsCommandList* pCommandList, ID3D12Resource* pRenderTarget, D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle
     , ID3D12DescriptorHeap* pDescriptorHeap, D3D12_RESOURCE_STATES beforeResourceState, D3D12_RESOURCE_STATES afterResourceState)
 {
     ImGui_ImplDX12_NewFrame();
@@ -2019,4 +1886,45 @@ void jRHI_DX12::RenderUI(ID3D12GraphicsCommandList* pCommandList, ID3D12Resource
 			pRenderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, afterResourceState);
 		pCommandList->ResourceBarrier(1, &barrier);
 	}
+}
+
+jTexture* jRHI_DX12::CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
+    , ETextureFormat textureFormat, bool createMipmap) const
+{
+	// const uint32 standardMSAAPattern = 0xFFFFFFFF;
+	const uint16 MipLevels = static_cast<uint32>(std::floor(std::log2(std::max<int>(width, height)))) + 1;
+	const bool CreateRTV = true;
+	const bool CreateUAV = true;
+
+    D3D12_RESOURCE_DESC textureDesc = { };
+    textureDesc.MipLevels = MipLevels;
+    textureDesc.Format = GetDX12TextureFormat(textureFormat);
+    textureDesc.Width = width;
+    textureDesc.Height = height;
+    if (CreateRTV)
+        textureDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+    if (CreateUAV)
+        textureDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+    textureDesc.DepthOrArraySize = 1;
+    textureDesc.SampleDesc.Count = 1;
+    textureDesc.SampleDesc.Quality = 0;
+    textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    textureDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    textureDesc.Alignment = 0;
+
+	const D3D12_HEAP_PROPERTIES HeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+
+	ComPtr<ID3D12Resource> Resource;
+    D3D12_CLEAR_VALUE clearValue = { };
+    clearValue.Format = textureDesc.Format;
+    if (JFAIL(Device->CreateCommittedResource(&HeapProperties, D3D12_HEAP_FLAG_NONE, &textureDesc,
+		D3D12_RESOURCE_STATE_COMMON, CreateRTV ? &clearValue : nullptr, IID_PPV_ARGS(&Resource))))
+	{
+		return nullptr;
+	}
+
+	jTexture_DX12* Texture = new jTexture_DX12(ETextureType::TEXTURE_2D, textureFormat, width, height, 1, EMSAASamples::COUNT_1
+		, MipLevels, sRGB, Resource);
+
+	return Texture;
 }

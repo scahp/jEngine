@@ -4,7 +4,6 @@
 
 #include "jRHI.h"
 #include "Shader/jShader.h"
-#include "jFenceManager.h"
 #include "jPipelineStateInfo.h"
 #include "Vulkan/jRenderPass_Vulkan.h"
 #include "Vulkan/jShaderBindingLayout_Vulkan.h"
@@ -15,6 +14,7 @@
 #include "Vulkan/jShader_Vulkan.h"
 #include "Vulkan/jQueryPoolOcclusion_Vulkan.h"
 #include "Vulkan/jMemoryPool_Vulkan.h"
+#include "Vulkan/jFenceManager_Vulkan.h"
 #include "jSemaphoreManager.h"
 
 struct jRingBuffer_Vulkan;
@@ -215,8 +215,8 @@ public:
 	virtual void BindComputeShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineStateLayout
 		, const jShaderBindingInstanceCombiner& InShaderBindingInstanceCombiner, uint32 InFirstSet) const override;
 
-    virtual jFenceManager* GetFenceManager() { return &FenceManager; }
-    virtual jSemaphoreManager* GetSemaphoreManager() { return &SemaphoreManager; }
+    virtual jFenceManager* GetFenceManager() override { return &FenceManager; }
+    virtual jSemaphoreManager* GetSemaphoreManager() override { return &SemaphoreManager; }
 };
 
 extern jRHI_Vulkan* g_rhi_vk;

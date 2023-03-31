@@ -122,6 +122,7 @@ using tchar = wchar_t;
 #include <DirectXMath.h>
 #include "IMGUI/imgui_impl_win32.h"
 #include "IMGUI/imgui_impl_dx12.h"
+#include "RHI/DX12/jRHI_DX12.h"
 
 // imgui
 #include "IMGUI/imgui.h"

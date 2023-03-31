@@ -1,5 +1,17 @@
 ﻿#include "pch.h"
-#include "jFenceManager.h"
+#include "jFenceManager_Vulkan.h"
+
+void jFence_Vulkan::Release()
+{
+    if (VK_NULL_HANDLE != Fence)
+        vkDestroyFence(g_rhi_vk->Device, Fence, nullptr);
+}
+
+void jFence_Vulkan::WaitForFence(uint64 InTimeoutNanoSec)
+{
+    check(VK_NULL_HANDLE != Fence);
+    vkWaitForFences(g_rhi_vk->Device, 1, &Fence, true, UINT64_MAX);
+}
 
 jFence* jFenceManager_Vulkan::GetOrCreateFence()
 {
@@ -27,13 +39,13 @@ void jFenceManager_Vulkan::Release()
 {
     for (auto& iter : UsingFences)
     {
-        vkDestroyFence(g_rhi_vk->Device, (VkFence)iter->GetHandle(), nullptr);
+        iter->Release();
     }
     UsingFences.clear();
 
     for (auto& iter : PendingFences)
     {
-        vkDestroyFence(g_rhi_vk->Device, (VkFence)iter->GetHandle(), nullptr);
+        iter->Release();
     }
     PendingFences.clear();
 }

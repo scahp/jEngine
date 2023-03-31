@@ -34,7 +34,7 @@ jMemory jSubMemoryAllocator::Alloc(uint64 InRequstedSize)
     jScopedLock s(&Lock);
 
     jMemory AllocMem;
-    const uint64 AlignedRequestedSize = Align(InRequstedSize, Alignment);
+    const uint64 AlignedRequestedSize = (Alignment > 0) ? Align(InRequstedSize, Alignment) : InRequstedSize;
 
     for (int32 i = 0; i < (int32)FreeLists.size(); ++i)
     {
@@ -56,7 +56,7 @@ jMemory jSubMemoryAllocator::Alloc(uint64 InRequstedSize)
         AllocMem.Buffer = GetBuffer();
         check(AllocMem.Buffer);
 
-        AllocMem.Range.Offset = Align(SubMemoryRange.Offset, Alignment);
+        AllocMem.Range.Offset = (Alignment > 0) ? Align(SubMemoryRange.Offset, Alignment) : SubMemoryRange.Offset;
         AllocMem.Range.DataSize = AlignedRequestedSize;
         AllocMem.SubMemoryAllocator = this;
         

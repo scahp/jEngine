@@ -58,12 +58,12 @@ VkSampler jTexture_Vulkan::CreateDefaultSamplerState()
     samplerInfo.compareEnable = VK_FALSE;
     samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
 
-    uint32 textureMipLevels = static_cast<uint32>(std::floor(std::log2(std::max<int>(SCR_WIDTH, SCR_HEIGHT)))) + 1;		// 이것도 수정 필요. SamplerState 는 텍스쳐에 바인딩 해야 할듯 
+    const uint32 MipLevels = static_cast<uint32>(std::floor(std::log2(std::max<int>(SCR_WIDTH, SCR_HEIGHT)))) + 1;		// 이것도 수정 필요. SamplerState 는 텍스쳐에 바인딩 해야 할듯 
 
     samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
     samplerInfo.mipLodBias = 0.0f;	// Optional
     samplerInfo.minLod = 0.0f;		// Optional
-    samplerInfo.maxLod = static_cast<float>(textureMipLevels);
+    samplerInfo.maxLod = static_cast<float>(MipLevels);
 
     if (!ensure(vkCreateSampler(g_rhi_vk->Device, &samplerInfo, nullptr, &g_defaultSampler) == VK_SUCCESS))
         return nullptr;

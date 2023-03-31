@@ -824,7 +824,7 @@ jTexture* jRHI_Vulkan::CreateTextureFromData(void* data, int32 width, int32 heig
 	, ETextureFormat textureFormat, bool createMipmap) const
 {
     VkDeviceSize imageSize = width * height * GetVulkanTextureComponentCount(textureFormat);
-    uint32 textureMipLevels = static_cast<uint32>(std::floor(std::log2(std::max<int>(width, height)))) + 1;
+    const uint32 MipLevels = static_cast<uint32>(std::floor(std::log2(std::max<int>(width, height)))) + 1;
 
 	jBuffer_Vulkan stagingBuffer;
 	jVulkanBufferUtil::AllocateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
@@ -836,7 +836,7 @@ jTexture* jRHI_Vulkan::CreateTextureFromData(void* data, int32 width, int32 heig
 
 	VkImage TextureImage;
 	VkDeviceMemory TextureImageMemory;
-    if (!ensure(jVulkanBufferUtil::CreateImage((uint32)width, (uint32)height, textureMipLevels, VK_SAMPLE_COUNT_1_BIT, vkTextureFormat
+    if (!ensure(jVulkanBufferUtil::CreateImage((uint32)width, (uint32)height, MipLevels, VK_SAMPLE_COUNT_1_BIT, vkTextureFormat
         , VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT
         | VK_IMAGE_USAGE_SAMPLED_BIT	// image를 shader 에서 접근가능하게 하고 싶은 경우
         , VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, TextureImage, TextureImageMemory)))
@@ -845,19 +845,19 @@ jTexture* jRHI_Vulkan::CreateTextureFromData(void* data, int32 width, int32 heig
     }
 
     VkCommandBuffer commandBuffer = BeginSingleTimeCommands();
-	ensure(TransitionImageLayout(commandBuffer, TextureImage, vkTextureFormat, textureMipLevels, 1, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
+	ensure(TransitionImageLayout(commandBuffer, TextureImage, vkTextureFormat, MipLevels, 1, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
 
 	jVulkanBufferUtil::CopyBufferToImage(commandBuffer, stagingBuffer.Buffer, stagingBuffer.Offset, TextureImage, (uint32)width, (uint32)height);
 
     // 밉맵을 만드는 동안 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL 으로 전환됨.
     if (createMipmap)
     {
-        jVulkanBufferUtil::GenerateMipmaps(commandBuffer, TextureImage, vkTextureFormat, width, height, textureMipLevels
+        jVulkanBufferUtil::GenerateMipmaps(commandBuffer, TextureImage, vkTextureFormat, width, height, MipLevels
 			, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
 	else
 	{
-        ensure(TransitionImageLayout(commandBuffer, TextureImage, vkTextureFormat, textureMipLevels, 1
+        ensure(TransitionImageLayout(commandBuffer, TextureImage, vkTextureFormat, MipLevels, 1
 			, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL));
 	}
 
@@ -866,7 +866,7 @@ jTexture* jRHI_Vulkan::CreateTextureFromData(void* data, int32 width, int32 heig
 	stagingBuffer.Release();
 
     // Create Texture image view
-    VkImageView textureImageView = jVulkanBufferUtil::CreateImageView(TextureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, textureMipLevels);
+    VkImageView textureImageView = jVulkanBufferUtil::CreateImageView(TextureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, MipLevels);
 
     auto texture = new jTexture_Vulkan();
     texture->sRGB = sRGB;

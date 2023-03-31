@@ -10,12 +10,18 @@
 #include <d3dcompiler.h>
 #include <DirectXMath.h>
 #include "jCommandQueue_DX12.h"
+#include "jDescriptorHeap_DX12.h"
+#include "jFenceManager_DX12.h"
+
+class jSwapchain_DX12;
+struct jBuffer_DX12;
+struct jTexture_DX12;
+struct jBuffer_DX12;
 
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
 
-static const UINT FrameCount = 2;
 static const uint32 cbvCountPerFrame = 3;
 static constexpr DXGI_FORMAT BackbufferFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 
@@ -35,22 +41,6 @@ struct LocalRootSignatureParams {
 		CubeConstantSlot = 0,
 		Count
 	};
-};
-
-struct BufferUtil
-{
-	static bool AllocateUploadBuffer(ID3D12Resource** OutResource, ID3D12Device* InDevice
-		, void* InData, uint64 InDataSize, const wchar_t* resourceName = nullptr);
-
-	static bool AllocateUploadBuffer(ID3D12Resource** OutResource, ID3D12Device* InDevice
-		, const wchar_t* resourceName = nullptr)
-	{
-		return AllocateUploadBuffer(OutResource, InDevice, nullptr, 0, resourceName);
-	}
-	
-	static bool AllocateUAVBuffer(ID3D12Resource** OutResource, ID3D12Device* InDevice
-		, uint64 InBufferSize, D3D12_RESOURCE_STATES InInitialResourceState
-		, const wchar_t* InResourceName = nullptr);
 };
 
 inline UINT Align(UINT size, UINT alignment)
@@ -86,7 +76,7 @@ public:
 	ShaderTable(ID3D12Device* InDevice, uint32 InNumOfShaderRecords, uint32 InShaderRecordSize
 		, const wchar_t* InResourceName = nullptr);
 
-	ComPtr<ID3D12Resource> GetResource() { return m_resource; }
+	ComPtr<ID3D12Resource> GetResource() const;
 
 	void push_back(const ShaderRecord& InShaderRecord);
 
@@ -96,8 +86,8 @@ public:
 private:
 	uint8* m_mappedShaderRecords = nullptr;
 	uint32 m_shaderRecordSize = 0;
+    jBuffer_DX12* Buffer = nullptr;
 	std::vector<ShaderRecord> m_shaderRecords;
-	ComPtr<ID3D12Resource> m_resource;
 
 #if _DEBUG
 	std::wstring m_name;
@@ -107,6 +97,8 @@ private:
 class jRHI_DX12 : public jRHI
 {
 public:
+    static constexpr UINT MaxFrameCount = 3;
+
 	static const wchar_t* c_raygenShaderName;
 	static const wchar_t* c_closestHitShaderName;
 	static const wchar_t* c_missShaderName;
@@ -114,26 +106,31 @@ public:
     static const wchar_t* c_planeHitGroupName;
     static const wchar_t* c_planeclosestHitShaderName;
 
+	jRHI_DX12();
+	virtual ~jRHI_DX12();
+
 	//////////////////////////////////////////////////////////////////////////
 	// 1. Device
 	ComPtr<ID3D12Device5> Device;
     uint32 Options = 0;
+	ComPtr<IDXGIFactory5> Factory;
 
 	//////////////////////////////////////////////////////////////////////////
 	// 2. Command
 	jCommandQueue_DX12* GraphicsCommandQueue = nullptr;
+	jCommandQueue_DX12* CopyCommandQueue = nullptr;
 
 	//////////////////////////////////////////////////////////////////////////
 	// 3. Swapchain
-	int32 FrameIndex = 0;
-	ComPtr<IDXGISwapChain3> SwapChain;
+	jSwapchain_DX12* SwapChain = nullptr;
+	int32 CurrentFrameIndex = 0;
 
 	//////////////////////////////////////////////////////////////////////////
 	// 4. Heap
-	ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
-	ComPtr<ID3D12DescriptorHeap> m_cbvHeap;
-	uint32 m_rtvDescriptorSize = 0;
-	uint32 m_cbvDescriptorSize = 0;
+	jDescriptorHeap_DX12 RTVDescriptorHeap;
+	jDescriptorHeap_DX12 DSVDescriptorHeap;
+	jDescriptorHeap_DX12 SRVDescriptorHeap;
+	//jDescriptorHeap_DX12 UAVDescriptorHeap;
 
     //////////////////////////////////////////////////////////////////////////
     // 5. Initialize Camera and lighting
@@ -153,19 +150,19 @@ public:
         float focalDistance;
         float lensRadius;
     };
-    SceneConstantBuffer m_sceneCB[FrameCount];
+    SceneConstantBuffer m_sceneCB[MaxFrameCount];
     CubeConstantBuffer m_cubeCB;
     CubeConstantBuffer m_planeCB;
 
 	//////////////////////////////////////////////////////////////////////////
 	// 6. CommandAllocators, Commandlist, RTV for FrameCount
-	ComPtr<ID3D12Resource> m_renderTargets[FrameCount];
 
 	//////////////////////////////////////////////////////////////////////////
 	// 7. Create sync object
-	HANDLE m_fenceEvent = nullptr;
-	uint64 m_fenceValue[FrameCount]{};
-	ComPtr<ID3D12Fence> m_fence;
+	//HANDLE m_fenceEvent = nullptr;
+	//uint64 m_fenceValue[MaxFrameCount]{};
+	//ComPtr<ID3D12Fence> m_fence;
+	jFenceManager_DX12 FenceManager;
 	void WaitForGPU();
 
 	//////////////////////////////////////////////////////////////////////////
@@ -183,17 +180,14 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// 11. Create vertex and index buffer
-	ComPtr<ID3D12Resource> m_vertexBuffer;
-	D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
-	ComPtr<ID3D12Resource> m_indexBuffer;
-	D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
-    ComPtr<ID3D12Resource> m_vertexBufferSecondGeometry;        // Second Geometry
+	jBuffer_DX12* VertexBuffer = nullptr;
+	jBuffer_DX12* IndexBuffer = nullptr;
+	jBuffer_DX12* VertexBufferSecondGeometry = nullptr;
 
 	//////////////////////////////////////////////////////////////////////////
 	// 12. AccelerationStructures
-	ComPtr<ID3D12Resource> m_bottomLevelAccelerationStructure;
-    ComPtr<ID3D12Resource> m_bottomLevelAccelerationStructureSecondGeometry;
-	//ComPtr<ID3D12Resource> m_topLevelAccelerationStructure;
+	jBuffer_DX12* BottomLevelAccelerationStructureBuffer = nullptr;
+	jBuffer_DX12* BottomLevelAccelerationStructureSecondGeometryBuffer = nullptr;
 
 	//////////////////////////////////////////////////////////////////////////
 	// 13. ShaderTable
@@ -203,7 +197,8 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// 14. Raytracing Output Resouce
-	ComPtr<ID3D12Resource> m_raytracingOutput;
+	//ComPtr<ID3D12Resource> m_raytracingOutput;
+	jTexture_DX12* RayTacingOutputTexture = nullptr;
 	D3D12_GPU_DESCRIPTOR_HANDLE m_raytracingOutputResourceUAVGpuDescriptor;
 	uint32 m_raytracingOutputResourceUAVDescriptorHeapIndex = UINT_MAX;
 	uint32 m_allocatedDescriptors = 0;
@@ -216,7 +211,7 @@ public:
 
     void InitializeImGui();
     void ReleaseImGui();
-    void RenderUI(ID3D12GraphicsCommandList* pCommandList, ID3D12Resource* pRenderTarget, CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle
+    void RenderUI(ID3D12GraphicsCommandList* pCommandList, ID3D12Resource* pRenderTarget, D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle
         , ID3D12DescriptorHeap* pDescriptorHeap, D3D12_RESOURCE_STATES beforeResourceState, D3D12_RESOURCE_STATES afterResourceState);
 
     float m_focalDistance = 10.0f;
@@ -258,30 +253,15 @@ public:
 		SceneConstantBuffer constants;
 		uint8 alignedPadding[D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT];
 	};
-	AlignedSceneConstantBuffer* m_mappedConstantData;
-	ComPtr<ID3D12Resource> m_perFrameConstants;
-
-	D3D12_CPU_DESCRIPTOR_HANDLE m_indexBufferCpuDescriptor;
-	D3D12_GPU_DESCRIPTOR_HANDLE m_indexBufferGpuDescriptor;
-
-	D3D12_CPU_DESCRIPTOR_HANDLE m_vertexBufferCpuDescriptor;
-	D3D12_GPU_DESCRIPTOR_HANDLE m_vertexBufferGpuDescriptor;
-    
-    D3D12_CPU_DESCRIPTOR_HANDLE m_vertexBufferCpuDescriptorSecondGeometry;
-    D3D12_GPU_DESCRIPTOR_HANDLE m_vertexBufferGpuDescriptorSecondGeometry;
+	jBuffer_DX12* PerFrameConstantBuffer = nullptr;
 
     struct TopLevelAccelerationStructureBuffers
     {
-        ComPtr<ID3D12Resource> Scratch;
-        ComPtr<ID3D12Resource> Result;
-        ComPtr<ID3D12Resource> InstanceDesc;    // Used only for top-level AS
+		jBuffer_DX12* Scratch = nullptr;
+		jBuffer_DX12* Result = nullptr;
+		jBuffer_DX12* InstanceDesc = nullptr;    // Used only for top-level AS
 
-        void Reset()
-        {
-            Scratch.Reset();
-            Result.Reset();
-            InstanceDesc.Reset();
-        }
+		void Release();
     };
     TopLevelAccelerationStructureBuffers TLASBuffer;
 
@@ -290,5 +270,13 @@ public:
     bool OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimized);
     bool OnHandleDeviceLost();
     bool OnHandleDeviceRestored();
+
+	ComPtr<ID3D12GraphicsCommandList4> BeginSingleTimeCopyCommands();
+    void EndSingleTimeCopyCommands(const ComPtr<ID3D12GraphicsCommandList4>& commandBuffer);
+
+	virtual jTexture* CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
+		, ETextureFormat textureFormat = ETextureFormat::RGBA8, bool createMipmap = false) const override;
+	virtual jFenceManager* GetFenceManager() override { return &FenceManager; }
 };
 
+extern jRHI_DX12* g_rhi_dx12;

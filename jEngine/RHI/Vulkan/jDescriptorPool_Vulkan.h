@@ -51,3 +51,62 @@ struct jDescriptorPool_Vulkan
     int32 CanReleasePendingFreeShaderBindingInstanceFrameNumber = 0;
 };
 
+//// The Pool is called by Heap in DX12.
+//struct jDescriptorPool_DX12
+//{
+//    //robin_hood::unordered_map<VkDescriptorSetLayout, jShaderBindingInstanceVulkanArray> PendingDescriptorSets;
+//    //robin_hood::unordered_map<VkDescriptorSetLayout, jShaderBindingInstanceVulkanArray> AllocatedDescriptorSets;
+//
+//    jDescriptorPool_DX12() = default;
+//    virtual ~jDescriptorPool_DX12() {}
+//
+//    virtual void Create(uint32 InMaxDescriptorSets = 128)
+//    {
+//        D3D12_DESCRIPTOR_HEAP_DESC heapDesc = { };
+//        heapDesc.NumDescriptors = InMaxDescriptorSets;
+//        heapDesc.Type = HeapType;
+//        heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+//
+//        const bool IsShaderVisible = true;
+//        if (IsShaderVisible)
+//            heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+//
+//        check(g_rhi_dx12);
+//        check(g_rhi_dx12->Device);
+//        if (JFAIL(g_rhi_dx12->Device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&DescriptorHeap))))
+//            return;
+//        CPUDescStart = DescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+//        GPUDescStart = DescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+//
+//        DescriptorSize = g_rhi_dx12->Device->GetDescriptorHandleIncrementSize(HeapType);
+//    }
+//    //virtual void Reset()
+//    //{
+//
+//    //}
+//    //virtual jShaderBindingInstance_DX12* AllocateDescriptorSet(VkDescriptorSetLayout InLayout);
+//    //virtual void Free(jShaderBindingInstance* InShaderBindingInstance);
+//    //void Release();
+//
+//    uint32 MaxDescriptorSets = 128;
+//    uint32 PoolSizes[_countof(DefaultPoolSizes)];
+//    ComPtr<ID3D12DescriptorHeap> DescriptorHeap;
+//    D3D12_DESCRIPTOR_HEAP_TYPE HeapType = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+//    D3D12_CPU_DESCRIPTOR_HANDLE CPUDescStart = { };
+//    D3D12_GPU_DESCRIPTOR_HANDLE GPUDescStart = { };
+//    uint32 DescriptorSize = 0;
+//    // mutable jMutexLock DescriptorPoolLock;
+//    mutable jMutexLock DescriptorPoolLock;
+//
+//    static constexpr int32 NumOfFramesToWaitBeforeReleasing = 3;
+//    struct jPendingFreeShaderBindingInstance
+//    {
+//        jPendingFreeShaderBindingInstance() = default;
+//        jPendingFreeShaderBindingInstance(int32 InFrameIndex, jShaderBindingInstance* InShaderBindingInstance) : FrameIndex(InFrameIndex), ShaderBindingInstance(InShaderBindingInstance) {}
+//
+//        int32 FrameIndex = 0;
+//        jShaderBindingInstance* ShaderBindingInstance = nullptr;
+//    };
+//    std::vector<jPendingFreeShaderBindingInstance> PendingFree;
+//    int32 CanReleasePendingFreeShaderBindingInstanceFrameNumber = 0;
+//};
