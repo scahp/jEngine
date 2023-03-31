@@ -8,10 +8,10 @@ struct jTexture_DX12;
 namespace jBufferUtil_DX12
 {
 
-ComPtr<ID3D12Resource> CreateBufferInternal(uint64 InSize, uint64 InAlignment, bool InIsCPUAccess, bool InAllowUAV
+ComPtr<ID3D12Resource> CreateBufferInternal(uint64 InSize, uint16 InAlignment, bool InIsCPUAccess, bool InAllowUAV
     , D3D12_RESOURCE_STATES InInitialState = D3D12_RESOURCE_STATE_COMMON, const wchar_t* InResourceName = nullptr);
 
-jBuffer_DX12* CreateBuffer(uint64 InSize, uint64 InAlignment, bool InIsCPUAccess, bool InAllowUAV
+jBuffer_DX12* CreateBuffer(uint64 InSize, uint16 InAlignment, bool InIsCPUAccess, bool InAllowUAV
     , D3D12_RESOURCE_STATES InInitialState = D3D12_RESOURCE_STATE_COMMON, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr);
 
 ComPtr<ID3D12Resource> CreateImageInternal(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, uint32 InNumOfSample
@@ -26,6 +26,7 @@ void CopyBuffer(ID3D12Resource* InSrcBuffer, ID3D12Resource* InDstBuffer, uint64
 
 void CreateConstantBufferView(jBuffer_DX12* InBuffer);
 void CreateShaderResourceView(jBuffer_DX12* InBuffer);
+void CreateShaderResourceView(jBuffer_DX12* InBuffer, uint32 InStride, uint32 InCount, ETextureFormat InFormat = ETextureFormat::MAX);
 void CreateUnorderedAccessView(jBuffer_DX12* InBuffer);
 void CreateShaderResourceView(jTexture_DX12* InTexture);
 void CreateUnorderedAccessView(jTexture_DX12* InTexture);

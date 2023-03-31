@@ -18,13 +18,16 @@ void jFence_DX12::Release()
 
 void jFence_DX12::WaitForFence(uint64 InTimeoutNanoSec)
 {
+    if (LastFenceValue == uint64(-1))
+        return;
+
     check(Fence);
-    check(LastFenceValue != uint64(-1));
     if (Fence->GetCompletedValue() > LastFenceValue)
         return;
 
     check(FenceEvent);
     WaitForSingleObjectEx(FenceEvent, (DWORD)(InTimeoutNanoSec / 1000000), false);;
+    LastFenceValue = uint64(-1);
 }
 
 bool jFence_DX12::SetFenceValue(uint64 InFenceValue)

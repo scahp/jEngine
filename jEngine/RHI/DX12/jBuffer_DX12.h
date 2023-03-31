@@ -5,7 +5,7 @@
 struct jBuffer_DX12 : public jBuffer
 {
     jBuffer_DX12() = default;
-    jBuffer_DX12(ComPtr<ID3D12Resource> InBuffer, uint64 InSize, uint64 InAlignment, bool InIsCPUAccess = false, bool InAllowUAV = false)
+    jBuffer_DX12(ComPtr<ID3D12Resource> InBuffer, uint64 InSize, uint16 InAlignment, bool InIsCPUAccess = false, bool InAllowUAV = false)
         : Buffer(InBuffer), Size(InSize), Alignment(InAlignment), IsCPUAccess(InIsCPUAccess), AllowUAV(InAllowUAV)
     { }
     virtual ~jBuffer_DX12() {}
@@ -66,13 +66,13 @@ struct jBuffer_DX12 : public jBuffer
 
     virtual void* GetHandle() const override { return Buffer.Get(); }
     virtual void* GetMemoryHandle() const override { return Buffer.Get(); }
-    virtual size_t GetAllocatedSize() const override { return Size; }
+    virtual uint32 GetAllocatedSize() const override { return (uint32)Size; }
     FORCEINLINE uint64 GetGPUAddress() const { return Buffer->GetGPUVirtualAddress(); }
 
     bool IsCPUAccess = false;
     bool AllowUAV = false;
     uint64 Size = 0;
-    uint64 Alignment = 0;
+    uint16 Alignment = 0;
     uint8* CPUAddress = nullptr;
     ComPtr<ID3D12Resource> Buffer;
     jDescriptor_DX12 CBV;

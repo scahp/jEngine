@@ -638,7 +638,7 @@ struct jBuffer : std::enable_shared_from_this<jBuffer>
 
     virtual void* GetHandle() const = 0;
     virtual void* GetMemoryHandle() const = 0;
-	virtual size_t GetAllocatedSize() const = 0;
+	virtual uint32 GetAllocatedSize() const = 0;
 };
 
 enum class EPipelineStageMask : uint32

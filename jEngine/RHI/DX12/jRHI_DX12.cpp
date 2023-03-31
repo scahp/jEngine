@@ -920,10 +920,10 @@ bool jRHI_DX12::Initialize()
 	// 디스크립터 힙에서 버택스 버퍼 디스크립터는 인덱스 버퍼 디스크립터에 바로다음에 있어야 함
 
 	// IndexBuffer SRV
-	jBufferUtil_DX12::CreateShaderResourceView(IndexBuffer);
+	jBufferUtil_DX12::CreateShaderResourceView(IndexBuffer, 0, sizeof(indices) / 4, ETextureFormat::R32UI);
 
 	// VertexBuffer SRV
-	jBufferUtil_DX12::CreateShaderResourceView(VertexBuffer);
+	jBufferUtil_DX12::CreateShaderResourceView(VertexBuffer, sizeof(vertices[0]), _countof(vertices));
 
 	//////////////////////////////////////////////////////////////////////////
 	// 12. AccelerationStructures

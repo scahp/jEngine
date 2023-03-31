@@ -7,7 +7,7 @@
 namespace jBufferUtil_DX12
 {
 
-ComPtr<ID3D12Resource> CreateBufferInternal(uint64 InSize, uint64 InAlignment, bool InIsCPUAccess, bool InAllowUAV
+ComPtr<ID3D12Resource> CreateBufferInternal(uint64 InSize, uint16 InAlignment, bool InIsCPUAccess, bool InAllowUAV
     , D3D12_RESOURCE_STATES InInitialState, const wchar_t* InResourceName)
 {
     InSize = (InAlignment > 0) ? Align(InSize, InAlignment) : InSize;
@@ -48,7 +48,7 @@ ComPtr<ID3D12Resource> CreateBufferInternal(uint64 InSize, uint64 InAlignment, b
     return Buffer;
 }
 
-jBuffer_DX12* CreateBuffer(uint64 InSize, uint64 InAlignment, bool InIsCPUAccess, bool InAllowUAV
+jBuffer_DX12* CreateBuffer(uint64 InSize, uint16 InAlignment, bool InIsCPUAccess, bool InAllowUAV
     , D3D12_RESOURCE_STATES InInitialState, const void* InData, uint64 InDataSize, const wchar_t* InResourceName)
 {
     ComPtr<ID3D12Resource> BufferInternal = CreateBufferInternal(InSize, InAlignment, InIsCPUAccess, InAllowUAV, InInitialState, InResourceName);
@@ -186,6 +186,12 @@ void CreateConstantBufferView(jBuffer_DX12* InBuffer)
 
 void CreateShaderResourceView(jBuffer_DX12* InBuffer)
 {
+    CreateShaderResourceView(InBuffer, (uint32)InBuffer->Size, 1);
+}
+
+void CreateShaderResourceView(jBuffer_DX12* InBuffer, uint32 InStride, uint32 InCount
+    , ETextureFormat InFormat)
+{
     check(g_rhi_dx12);
     check(g_rhi_dx12->Device);
 
@@ -197,13 +203,13 @@ void CreateShaderResourceView(jBuffer_DX12* InBuffer)
 
     D3D12_SHADER_RESOURCE_VIEW_DESC Desc = {};
     Desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    Desc.Format = DXGI_FORMAT_UNKNOWN;
+    Desc.Format = (InFormat == ETextureFormat::MAX) ? DXGI_FORMAT_UNKNOWN : GetDX12TextureFormat(InFormat);
     Desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
 
     Desc.Buffer.FirstElement = 0;
     Desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-    Desc.Buffer.NumElements = 1;
-    Desc.Buffer.StructureByteStride = (uint32)InBuffer->Size;
+    Desc.Buffer.NumElements = InCount;
+    Desc.Buffer.StructureByteStride = InStride;
 
     g_rhi_dx12->Device->CreateShaderResourceView(InBuffer->Buffer.Get()
         , &Desc, InBuffer->SRV.CPUHandle);

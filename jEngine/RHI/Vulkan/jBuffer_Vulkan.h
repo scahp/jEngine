@@ -40,7 +40,7 @@ struct jBuffer_Vulkan : public jBuffer
 
     virtual void* GetHandle() const override { return Buffer; }
     virtual void* GetMemoryHandle() const override { return BufferMemory; }
-    virtual size_t GetAllocatedSize() const override { return AllocatedSize; }
+    virtual uint32 GetAllocatedSize() const override { return (uint32)AllocatedSize; }
 
     jMemory Memory;
     VkBuffer Buffer = nullptr;

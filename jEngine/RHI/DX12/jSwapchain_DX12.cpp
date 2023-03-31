@@ -105,9 +105,15 @@ void jSwapchain_DX12::ReleaseInternal()
         Fence->WaitForFence();
         if (ensure(g_rhi_dx12->GetFenceManager()))
             g_rhi_dx12->GetFenceManager()->ReturnFence(Fence);
+
+        Fence = nullptr;
     }
 
-    SwapChain->Release();
+    if (SwapChain)
+    {
+        SwapChain->Release();
+        SwapChain = nullptr;
+    }
 
     for (auto& iter : Images)
     {
