@@ -21,8 +21,9 @@
 #define USE_OPENGL 0
 #endif
 
-#define LEFT_HANDED !USE_OPENGL
-#define RIGHT_HANDED USE_OPENGL
+//#define LEFT_HANDED !USE_OPENGL
+#define LEFT_HANDED 1
+#define RIGHT_HANDED !LEFT_HANDED
 
 using int8 = char;
 using uint8 = unsigned char;

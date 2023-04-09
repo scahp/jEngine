@@ -159,49 +159,45 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// 7. Create sync object
-	//HANDLE m_fenceEvent = nullptr;
-	//uint64 m_fenceValue[MaxFrameCount]{};
-	//ComPtr<ID3D12Fence> m_fence;
 	jFenceManager_DX12 FenceManager;
 	void WaitForGPU();
 
 	//////////////////////////////////////////////////////////////////////////
 	// 8. Raytracing device and commandlist
 
-	//////////////////////////////////////////////////////////////////////////
-	// 9. CreateRootSignature
-	ComPtr<ID3D12RootSignature> m_raytracingGlobalRootSignature;
-	ComPtr<ID3D12RootSignature> m_raytracingLocalRootSignature;
-    ComPtr<ID3D12RootSignature> m_raytracingEmptyLocalRootSignature;
+	////////////////////////////////////////////////////////////////////////////
+	//// 9. CreateRootSignature
+	//ComPtr<ID3D12RootSignature> m_raytracingGlobalRootSignature;
+	//ComPtr<ID3D12RootSignature> m_raytracingLocalRootSignature;
+ //   ComPtr<ID3D12RootSignature> m_raytracingEmptyLocalRootSignature;
 
-	//////////////////////////////////////////////////////////////////////////
-	// 10. DXR PipeplineStateObject
-	ComPtr<ID3D12StateObject> m_dxrStateObject;
+	////////////////////////////////////////////////////////////////////////////
+	//// 10. DXR PipeplineStateObject
+	//ComPtr<ID3D12StateObject> m_dxrStateObject;
 
 	//////////////////////////////////////////////////////////////////////////
 	// 11. Create vertex and index buffer
 	jBuffer_DX12* VertexBuffer = nullptr;
 	jBuffer_DX12* IndexBuffer = nullptr;
-	jBuffer_DX12* VertexBufferSecondGeometry = nullptr;
+	//jBuffer_DX12* VertexBufferSecondGeometry = nullptr;
 
-	//////////////////////////////////////////////////////////////////////////
-	// 12. AccelerationStructures
-	jBuffer_DX12* BottomLevelAccelerationStructureBuffer = nullptr;
-	jBuffer_DX12* BottomLevelAccelerationStructureSecondGeometryBuffer = nullptr;
+	////////////////////////////////////////////////////////////////////////////
+	//// 12. AccelerationStructures
+	//jBuffer_DX12* BottomLevelAccelerationStructureBuffer = nullptr;
+	//jBuffer_DX12* BottomLevelAccelerationStructureSecondGeometryBuffer = nullptr;
 
-	//////////////////////////////////////////////////////////////////////////
-	// 13. ShaderTable
-	ComPtr<ID3D12Resource> m_rayGenShaderTable;
-	ComPtr<ID3D12Resource> m_missShaderTable;
-	ComPtr<ID3D12Resource> m_hitGroupShaderTable;
+	////////////////////////////////////////////////////////////////////////////
+	//// 13. ShaderTable
+	//ComPtr<ID3D12Resource> m_rayGenShaderTable;
+	//ComPtr<ID3D12Resource> m_missShaderTable;
+	//ComPtr<ID3D12Resource> m_hitGroupShaderTable;
+
+	ComPtr<ID3D12RootSignature> SimpleRootSignature;
+	ComPtr<ID3D12PipelineState> SimplePipelineState;
 
 	//////////////////////////////////////////////////////////////////////////
 	// 14. Raytracing Output Resouce
-	//ComPtr<ID3D12Resource> m_raytracingOutput;
 	jTexture_DX12* RayTacingOutputTexture = nullptr;
-	D3D12_GPU_DESCRIPTOR_HANDLE m_raytracingOutputResourceUAVGpuDescriptor;
-	uint32 m_raytracingOutputResourceUAVDescriptorHeapIndex = UINT_MAX;
-	uint32 m_allocatedDescriptors = 0;
 
     HWND m_hWnd = 0;
 
@@ -255,17 +251,19 @@ public:
 	};
 	jBuffer_DX12* PerFrameConstantBuffer = nullptr;
 
-    struct TopLevelAccelerationStructureBuffers
-    {
-		jBuffer_DX12* Scratch = nullptr;
-		jBuffer_DX12* Result = nullptr;
-		jBuffer_DX12* InstanceDesc = nullptr;    // Used only for top-level AS
+  //  struct TopLevelAccelerationStructureBuffers
+  //  {
+		//jBuffer_DX12* Scratch = nullptr;
+		//jBuffer_DX12* Result = nullptr;
+		//jBuffer_DX12* InstanceDesc = nullptr;    // Used only for top-level AS
 
-		void Release();
-    };
-    TopLevelAccelerationStructureBuffers TLASBuffer;
+		//void Release();
+  //  };
+  //  TopLevelAccelerationStructureBuffers TLASBuffer;
 
-    bool BuildTopLevelAS(ComPtr<ID3D12GraphicsCommandList4>& InCommandList, TopLevelAccelerationStructureBuffers& InBuffers, bool InIsUpdate, float InRotationY, Vector InTranslation);
+  //  bool BuildTopLevelAS(ComPtr<ID3D12GraphicsCommandList4>& InCommandList, TopLevelAccelerationStructureBuffers& InBuffers, bool InIsUpdate, float InRotationY, Vector InTranslation);
+
+	jBuffer_DX12* SimpleConstantBuffer = nullptr;
 
     bool OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimized);
     bool OnHandleDeviceLost();

@@ -109,15 +109,15 @@ void jSwapchain_DX12::ReleaseInternal()
         Fence = nullptr;
     }
 
-    if (SwapChain)
-    {
-        SwapChain->Release();
-        SwapChain = nullptr;
-    }
-
     for (auto& iter : Images)
     {
         delete iter;
     }
     Images.clear();
+
+    if (SwapChain)
+    {
+        //SwapChain->Release();
+        SwapChain = nullptr;
+    }
 }

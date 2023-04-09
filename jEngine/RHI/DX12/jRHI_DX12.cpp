@@ -9,6 +9,7 @@
 #include "jBuffer_DX12.h"
 #include "../jSwapchain.h"
 #include "jFenceManager_DX12.h"
+#include "Scene/jCamera.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -207,8 +208,6 @@ void ShaderTable::DebugPrint(robin_hood::unordered_map<void*, std::wstring> shad
 #endif
 }
 
-jRHI_DX12* pRHIDirectX12 = nullptr;
-
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -253,8 +252,8 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
             if (!sIsDraging)
             {
                 sSizeChanged = false;
-                if (pRHIDirectX12)
-                    pRHIDirectX12->OnHandleResized(SCR_WIDTH, SCR_HEIGHT, IsSizeMinimize);
+                if (g_rhi_dx12)
+					g_rhi_dx12->OnHandleResized(SCR_WIDTH, SCR_HEIGHT, IsSizeMinimize);
             }
         }
     }
@@ -267,17 +266,17 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         if (sSizeChanged && sIsDraging)
         {
             sSizeChanged = false;
-            if (pRHIDirectX12)
-                pRHIDirectX12->OnHandleResized(SCR_WIDTH, SCR_HEIGHT, IsSizeMinimize);
+            if (g_rhi_dx12)
+				g_rhi_dx12->OnHandleResized(SCR_WIDTH, SCR_HEIGHT, IsSizeMinimize);
         }
         sIsDraging = false;
     }
     return 0;
     case WM_PAINT:
-        if (pRHIDirectX12)
+        if (g_rhi_dx12)
         {
-            pRHIDirectX12->Update();
-            pRHIDirectX12->Render();
+			g_rhi_dx12->Update();
+			g_rhi_dx12->Render();
         }
     return 0;
 	case WM_DESTROY:
@@ -289,20 +288,20 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 	return DefWindowProc(hWnd, message, wParam, lParam);
 }
 
-//////////////////////////////////////////////////////////////////////////
-// jRHI_DX12::TopLevelAccelerationStructureBuffers
-//////////////////////////////////////////////////////////////////////////
-void jRHI_DX12::TopLevelAccelerationStructureBuffers::Release()
-{
-    delete Scratch;
-    Scratch = nullptr;
-
-    delete Result;
-    Result = nullptr;
-
-    delete InstanceDesc;
-    InstanceDesc = nullptr;
-}
+////////////////////////////////////////////////////////////////////////////
+//// jRHI_DX12::TopLevelAccelerationStructureBuffers
+////////////////////////////////////////////////////////////////////////////
+//void jRHI_DX12::TopLevelAccelerationStructureBuffers::Release()
+//{
+//    delete Scratch;
+//    Scratch = nullptr;
+//
+//    delete Result;
+//    Result = nullptr;
+//
+//    delete InstanceDesc;
+//    InstanceDesc = nullptr;
+//}
 
 //////////////////////////////////////////////////////////////////////////
 // jRHI_DX12
@@ -520,6 +519,8 @@ bool jRHI_DX12::Initialize()
 	SwapChain = new jSwapchain_DX12();
 	SwapChain->Create();
 
+	ShowWindow(m_hWnd, SW_SHOW);
+
     //////////////////////////////////////////////////////////////////////////
     // 5. Initialize Camera and lighting
     {
@@ -586,257 +587,257 @@ bool jRHI_DX12::Initialize()
 	if (JFAIL(Device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &featureSupportData, sizeof(featureSupportData))))
 		return false;
 
-	if (featureSupportData.RaytracingTier == D3D12_RAYTRACING_TIER_NOT_SUPPORTED)
-		return false;
+	//if (!ensure(featureSupportData.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED))
+	//	return false;
 
-	// 9. CreateRootSignatures
-	{
-		// global root signature는 DispatchRays 함수 호출로 만들어지는 레이트레이싱 쉐이더의 전체에 공유됨.
+	//// 9. CreateRootSignatures
+	//{
+	//	// global root signature는 DispatchRays 함수 호출로 만들어지는 레이트레이싱 쉐이더의 전체에 공유됨.
 
-		CD3DX12_DESCRIPTOR_RANGE ranges[3];		// 가장 빈번히 사용되는 것을 앞에 둘 수록 최적화에 좋음
-		ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);		// 1 output texture
-		ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 1);		// 2 static index and vertex buffer for cube
-        ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 3);		// 1 vertex buffer for plane
+	//	CD3DX12_DESCRIPTOR_RANGE ranges[3];		// 가장 빈번히 사용되는 것을 앞에 둘 수록 최적화에 좋음
+	//	ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);		// 1 output texture
+	//	ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 1);		// 2 static index and vertex buffer for cube
+ //       ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 3);		// 1 vertex buffer for plane
 
-		CD3DX12_ROOT_PARAMETER rootParameters[GlobalRootSignatureParams::Count];
-		rootParameters[GlobalRootSignatureParams::VertexBuffersSlot].InitAsDescriptorTable(1, &ranges[1]);
-        rootParameters[GlobalRootSignatureParams::PlaneVertexBufferSlot].InitAsDescriptorTable(1, &ranges[2]);
-		rootParameters[GlobalRootSignatureParams::OutputViewSlot].InitAsDescriptorTable(1, &ranges[0]);
-		rootParameters[GlobalRootSignatureParams::AccelerationStructureSlot].InitAsShaderResourceView(0);
-		rootParameters[GlobalRootSignatureParams::SceneConstantSlot].InitAsConstantBufferView(0);
+	//	CD3DX12_ROOT_PARAMETER rootParameters[GlobalRootSignatureParams::Count];
+	//	rootParameters[GlobalRootSignatureParams::VertexBuffersSlot].InitAsDescriptorTable(1, &ranges[1]);
+ //       rootParameters[GlobalRootSignatureParams::PlaneVertexBufferSlot].InitAsDescriptorTable(1, &ranges[2]);
+	//	rootParameters[GlobalRootSignatureParams::OutputViewSlot].InitAsDescriptorTable(1, &ranges[0]);
+	//	rootParameters[GlobalRootSignatureParams::AccelerationStructureSlot].InitAsShaderResourceView(0);
+	//	rootParameters[GlobalRootSignatureParams::SceneConstantSlot].InitAsConstantBufferView(0);
 
-		CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc(_countof(rootParameters), rootParameters);
-		ComPtr<ID3DBlob> blob;
-		ComPtr<ID3DBlob> error;
-		if (JFAIL(D3D12SerializeRootSignature(&globalRootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &error)))
-		{
-			if (error)
-			{
-				OutputDebugStringA(reinterpret_cast<const char*>(error->GetBufferPointer()));
-				error->Release();
-			}
-			return false;
-		}
+	//	CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc(_countof(rootParameters), rootParameters);
+	//	ComPtr<ID3DBlob> blob;
+	//	ComPtr<ID3DBlob> error;
+	//	if (JFAIL(D3D12SerializeRootSignature(&globalRootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &error)))
+	//	{
+	//		if (error)
+	//		{
+	//			OutputDebugStringA(reinterpret_cast<const char*>(error->GetBufferPointer()));
+	//			error->Release();
+	//		}
+	//		return false;
+	//	}
 
-		if (JFAIL(Device->CreateRootSignature(1, blob->GetBufferPointer(), blob->GetBufferSize()
-			, IID_PPV_ARGS(&m_raytracingGlobalRootSignature))))
-		{
-			return false;
-		}
-	}
+	//	if (JFAIL(Device->CreateRootSignature(1, blob->GetBufferPointer(), blob->GetBufferSize()
+	//		, IID_PPV_ARGS(&m_raytracingGlobalRootSignature))))
+	//	{
+	//		return false;
+	//	}
+	//}
 
-	{
-#define SizeOfInUint32(obj) ((sizeof(obj) - 1) / sizeof(UINT32) + 1)
+//	{
+//#define SizeOfInUint32(obj) ((sizeof(obj) - 1) / sizeof(UINT32) + 1)
+//
+//		CD3DX12_ROOT_PARAMETER rootParameters[LocalRootSignatureParams::Count];
+//		rootParameters[LocalRootSignatureParams::CubeConstantSlot].InitAsConstants(SizeOfInUint32(m_cubeCB), 1);
+//
+//		CD3DX12_ROOT_SIGNATURE_DESC localRootSignatureDesc(_countof(rootParameters), rootParameters);
+//		localRootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
+//		ComPtr<ID3DBlob> blob;
+//		ComPtr<ID3DBlob> error;
+//		if (JFAIL(D3D12SerializeRootSignature(&localRootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &error)))
+//		{
+//			if (error)
+//			{
+//				OutputDebugStringA(reinterpret_cast<const char*>(error->GetBufferPointer()));
+//				error->Release();
+//			}
+//			return false;
+//		}
+//
+//		if (JFAIL(Device->CreateRootSignature(1, blob->GetBufferPointer(), blob->GetBufferSize()
+//			, IID_PPV_ARGS(&m_raytracingLocalRootSignature))))
+//		{
+//			return false;
+//		}
+//	}
 
-		CD3DX12_ROOT_PARAMETER rootParameters[LocalRootSignatureParams::Count];
-		rootParameters[LocalRootSignatureParams::CubeConstantSlot].InitAsConstants(SizeOfInUint32(m_cubeCB), 1);
-
-		CD3DX12_ROOT_SIGNATURE_DESC localRootSignatureDesc(_countof(rootParameters), rootParameters);
-		localRootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
-		ComPtr<ID3DBlob> blob;
-		ComPtr<ID3DBlob> error;
-		if (JFAIL(D3D12SerializeRootSignature(&localRootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &error)))
-		{
-			if (error)
-			{
-				OutputDebugStringA(reinterpret_cast<const char*>(error->GetBufferPointer()));
-				error->Release();
-			}
-			return false;
-		}
-
-		if (JFAIL(Device->CreateRootSignature(1, blob->GetBufferPointer(), blob->GetBufferSize()
-			, IID_PPV_ARGS(&m_raytracingLocalRootSignature))))
-		{
-			return false;
-		}
-	}
-
-	// 10. DXR PipeplineStateObject
-	// ----------------------------------------------------
-	// 1 - DXIL Library
-	// 2 - Triangle and plane hit group
-	// 1 - Shader config
-	// 4 - Local root signature and association
-	// 1 - Global root signature
-	// 1 - Pipeline config
-	// ----------------------------------------------------
-	std::array<D3D12_STATE_SUBOBJECT, 10> subobjects;
-	uint32 index = 0;
-
-	// 1). DXIL 라이브러리 생성
-	D3D12_DXIL_LIBRARY_DESC dxilDesc{};
-	std::vector<D3D12_EXPORT_DESC> exportDesc;
-	ComPtr<IDxcBlob> ShaderBlob;
-	std::vector<std::wstring> exportName;
-	{
-		D3D12_STATE_SUBOBJECT subobject{};
-		ShaderBlob = jShaderCompiler_DX12::Get().Compile(TEXT("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"), TEXT("lib_6_3"));
-		if (ShaderBlob)
-		{
-			const wchar_t* entryPoint[] = { jRHI_DX12::c_raygenShaderName, jRHI_DX12::c_closestHitShaderName, jRHI_DX12::c_missShaderName, jRHI_DX12::c_planeclosestHitShaderName };
-			subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
-			subobject.pDesc = &dxilDesc;
-
-			exportDesc.resize(_countof(entryPoint));
-			exportName.resize(_countof(entryPoint));
-			
-			dxilDesc.DXILLibrary.pShaderBytecode = ShaderBlob->GetBufferPointer();
-			dxilDesc.DXILLibrary.BytecodeLength = ShaderBlob->GetBufferSize();
-			dxilDesc.NumExports = _countof(entryPoint);
-			dxilDesc.pExports = exportDesc.data();
-
-			for (uint32 i = 0; i < _countof(entryPoint); ++i)
-			{
-				exportName[i] = entryPoint[i];
-				exportDesc[i].Name = exportName[i].c_str();
-				exportDesc[i].Flags = D3D12_EXPORT_FLAG_NONE;
-				exportDesc[i].ExportToRename = nullptr;
-			}
-		}
-		subobjects[index++] = subobject;
-	}
-
-	// 2). Triangle and plane hit group
-    // Triangle hit group
-	D3D12_HIT_GROUP_DESC hitgroupDesc{};
-	{
-		hitgroupDesc.AnyHitShaderImport = nullptr;
-		hitgroupDesc.ClosestHitShaderImport = jRHI_DX12::c_closestHitShaderName;
-		hitgroupDesc.HitGroupExport = jRHI_DX12::c_triHitGroupName;
-		hitgroupDesc.Type = D3D12_HIT_GROUP_TYPE_TRIANGLES;
-
-		D3D12_STATE_SUBOBJECT subobject{};
-		subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
-		subobject.pDesc = &hitgroupDesc;
-		subobjects[index++] = subobject;
-	}
-
-    // Plane hit group
-    D3D12_HIT_GROUP_DESC planeHitGroupDesc{};
-    {
-        planeHitGroupDesc.AnyHitShaderImport = nullptr;
-        planeHitGroupDesc.ClosestHitShaderImport = jRHI_DX12::c_planeclosestHitShaderName;
-        planeHitGroupDesc.HitGroupExport = jRHI_DX12::c_planeHitGroupName;
-        planeHitGroupDesc.Type = D3D12_HIT_GROUP_TYPE_TRIANGLES;
-
-        D3D12_STATE_SUBOBJECT subobject{};
-        subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
-        subobject.pDesc = &planeHitGroupDesc;
-        subobjects[index++] = subobject;
-    }
-
-	// 3). Shader Config
-	D3D12_RAYTRACING_SHADER_CONFIG shaderConfig;
-	{
-		shaderConfig.MaxAttributeSizeInBytes = 2 * sizeof(float);	// float2 barycentrics
-		shaderConfig.MaxPayloadSizeInBytes = 4 * sizeof(float) + sizeof(int32);		// float4 color + float maxDepth
-
-		D3D12_STATE_SUBOBJECT subobject{};
-		subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG;
-		subobject.pDesc = &shaderConfig;
-		subobjects[index++] = subobject;
-	}
-
-	// 4). Local root signature and association
-
-    // triangle hit root signature and association
-    D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION association{};
-	{
-		D3D12_STATE_SUBOBJECT subobject{};
-
-		subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE;
-		subobject.pDesc = m_raytracingLocalRootSignature.GetAddressOf();
-		subobjects[index] = subobject;
-
-		association.NumExports = 1;
-		association.pExports = &jRHI_DX12::c_triHitGroupName;
-		association.pSubobjectToAssociate = &subobjects[index++];
-
-		D3D12_STATE_SUBOBJECT subobject2{};
-		subobject2.Type = D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION;
-		subobject2.pDesc = &association;
-		subobjects[index++] = subobject2;
-	}
-
-    // empty root signature and associate it with the plane hit group and miss shader
-    CD3DX12_ROOT_PARAMETER rootParametersSecondGeometry[LocalRootSignatureParams::Count];
-    rootParametersSecondGeometry[LocalRootSignatureParams::CubeConstantSlot].InitAsConstants(SizeOfInUint32(m_cubeCB), 1);
-
-    CD3DX12_ROOT_SIGNATURE_DESC emptyDesc(_countof(rootParametersSecondGeometry), rootParametersSecondGeometry);
-    emptyDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
-    
-    const WCHAR* emptyRootExport[] = { c_planeclosestHitShaderName, c_missShaderName };
-    D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION emptyAssociation{};
-    {
-#define SizeOfInUint32(obj) ((sizeof(obj) - 1) / sizeof(UINT32) + 1)
-
-        ComPtr<ID3DBlob> blob;
-        ComPtr<ID3DBlob> error;
-        if (JFAIL(D3D12SerializeRootSignature(&emptyDesc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &error)))
-        {
-            if (error)
-            {
-                OutputDebugStringA(reinterpret_cast<const char*>(error->GetBufferPointer()));
-                error->Release();
-            }
-            return false;
-        }
-
-        if (JFAIL(Device->CreateRootSignature(1, blob->GetBufferPointer(), blob->GetBufferSize()
-            , IID_PPV_ARGS(&m_raytracingEmptyLocalRootSignature))))
-        {
-            return false;
-        }
-
-        D3D12_STATE_SUBOBJECT subobject;
-        subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE;
-        subobject.pDesc = m_raytracingEmptyLocalRootSignature.GetAddressOf();
-        subobjects[index] = subobject;
-
-        association.NumExports = _countof(emptyRootExport);
-        association.pExports = emptyRootExport;
-        association.pSubobjectToAssociate = &subobjects[index++];
-
-        D3D12_STATE_SUBOBJECT subobject2{};
-        subobject2.Type = D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION;
-        subobject2.pDesc = &association;
-        subobjects[index++] = subobject2;
-    }
-
-	// 5). Global root signature
-	{
-		D3D12_STATE_SUBOBJECT subobject{};
-		subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE;
-		subobject.pDesc = m_raytracingGlobalRootSignature.GetAddressOf();
-		subobjects[index++] = subobject;
-	}
-
-	// 6). Pipeline Config
-	D3D12_RAYTRACING_PIPELINE_CONFIG pipelineConfig;
-	{
-		// pipelineConfig.MaxTraceRecursionDepth = D3D12_RAYTRACING_MAX_DECLARABLE_TRACE_RECURSION_DEPTH;
-        pipelineConfig.MaxTraceRecursionDepth = g_MaxRecursionDepth;
-
-		D3D12_STATE_SUBOBJECT subobject{};
-		subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG;
-		subobject.pDesc = &pipelineConfig;
-
-		subobjects[index++] = subobject;
-	}
-
-	// Create pipeline state
-	D3D12_STATE_OBJECT_DESC stateObjectDesc;
-	stateObjectDesc.NumSubobjects = index;
-	stateObjectDesc.pSubobjects = subobjects.data();
-	stateObjectDesc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
-
-#if _DEBUG
-	PrintStateObjectDesc(&stateObjectDesc);
-#endif
-
-	if (JFAIL(Device->CreateStateObject(&stateObjectDesc, IID_PPV_ARGS(&m_dxrStateObject))))
-		return false;
+//	// 10. DXR PipeplineStateObject
+//	// ----------------------------------------------------
+//	// 1 - DXIL Library
+//	// 2 - Triangle and plane hit group
+//	// 1 - Shader config
+//	// 4 - Local root signature and association
+//	// 1 - Global root signature
+//	// 1 - Pipeline config
+//	// ----------------------------------------------------
+//	std::array<D3D12_STATE_SUBOBJECT, 10> subobjects;
+//	uint32 index = 0;
+//
+//	// 1). DXIL 라이브러리 생성
+//	D3D12_DXIL_LIBRARY_DESC dxilDesc{};
+//	std::vector<D3D12_EXPORT_DESC> exportDesc;
+//	ComPtr<IDxcBlob> ShaderBlob;
+//	std::vector<std::wstring> exportName;
+//	{
+//		D3D12_STATE_SUBOBJECT subobject{};
+//		ShaderBlob = jShaderCompiler_DX12::Get().Compile(TEXT("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"), TEXT("lib_6_3"));
+//		if (ShaderBlob)
+//		{
+//			const wchar_t* entryPoint[] = { jRHI_DX12::c_raygenShaderName, jRHI_DX12::c_closestHitShaderName, jRHI_DX12::c_missShaderName, jRHI_DX12::c_planeclosestHitShaderName };
+//			subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
+//			subobject.pDesc = &dxilDesc;
+//
+//			exportDesc.resize(_countof(entryPoint));
+//			exportName.resize(_countof(entryPoint));
+//			
+//			dxilDesc.DXILLibrary.pShaderBytecode = ShaderBlob->GetBufferPointer();
+//			dxilDesc.DXILLibrary.BytecodeLength = ShaderBlob->GetBufferSize();
+//			dxilDesc.NumExports = _countof(entryPoint);
+//			dxilDesc.pExports = exportDesc.data();
+//
+//			for (uint32 i = 0; i < _countof(entryPoint); ++i)
+//			{
+//				exportName[i] = entryPoint[i];
+//				exportDesc[i].Name = exportName[i].c_str();
+//				exportDesc[i].Flags = D3D12_EXPORT_FLAG_NONE;
+//				exportDesc[i].ExportToRename = nullptr;
+//			}
+//		}
+//		subobjects[index++] = subobject;
+//	}
+//
+//	// 2). Triangle and plane hit group
+//    // Triangle hit group
+//	D3D12_HIT_GROUP_DESC hitgroupDesc{};
+//	{
+//		hitgroupDesc.AnyHitShaderImport = nullptr;
+//		hitgroupDesc.ClosestHitShaderImport = jRHI_DX12::c_closestHitShaderName;
+//		hitgroupDesc.HitGroupExport = jRHI_DX12::c_triHitGroupName;
+//		hitgroupDesc.Type = D3D12_HIT_GROUP_TYPE_TRIANGLES;
+//
+//		D3D12_STATE_SUBOBJECT subobject{};
+//		subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
+//		subobject.pDesc = &hitgroupDesc;
+//		subobjects[index++] = subobject;
+//	}
+//
+//    // Plane hit group
+//    D3D12_HIT_GROUP_DESC planeHitGroupDesc{};
+//    {
+//        planeHitGroupDesc.AnyHitShaderImport = nullptr;
+//        planeHitGroupDesc.ClosestHitShaderImport = jRHI_DX12::c_planeclosestHitShaderName;
+//        planeHitGroupDesc.HitGroupExport = jRHI_DX12::c_planeHitGroupName;
+//        planeHitGroupDesc.Type = D3D12_HIT_GROUP_TYPE_TRIANGLES;
+//
+//        D3D12_STATE_SUBOBJECT subobject{};
+//        subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
+//        subobject.pDesc = &planeHitGroupDesc;
+//        subobjects[index++] = subobject;
+//    }
+//
+//	// 3). Shader Config
+//	D3D12_RAYTRACING_SHADER_CONFIG shaderConfig;
+//	{
+//		shaderConfig.MaxAttributeSizeInBytes = 2 * sizeof(float);	// float2 barycentrics
+//		shaderConfig.MaxPayloadSizeInBytes = 4 * sizeof(float) + sizeof(int32);		// float4 color + float maxDepth
+//
+//		D3D12_STATE_SUBOBJECT subobject{};
+//		subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG;
+//		subobject.pDesc = &shaderConfig;
+//		subobjects[index++] = subobject;
+//	}
+//
+//	// 4). Local root signature and association
+//
+//    // triangle hit root signature and association
+//    D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION association{};
+//	{
+//		D3D12_STATE_SUBOBJECT subobject{};
+//
+//		subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE;
+//		subobject.pDesc = m_raytracingLocalRootSignature.GetAddressOf();
+//		subobjects[index] = subobject;
+//
+//		association.NumExports = 1;
+//		association.pExports = &jRHI_DX12::c_triHitGroupName;
+//		association.pSubobjectToAssociate = &subobjects[index++];
+//
+//		D3D12_STATE_SUBOBJECT subobject2{};
+//		subobject2.Type = D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION;
+//		subobject2.pDesc = &association;
+//		subobjects[index++] = subobject2;
+//	}
+//
+//    // empty root signature and associate it with the plane hit group and miss shader
+//    CD3DX12_ROOT_PARAMETER rootParametersSecondGeometry[LocalRootSignatureParams::Count];
+//    rootParametersSecondGeometry[LocalRootSignatureParams::CubeConstantSlot].InitAsConstants(SizeOfInUint32(m_cubeCB), 1);
+//
+//    CD3DX12_ROOT_SIGNATURE_DESC emptyDesc(_countof(rootParametersSecondGeometry), rootParametersSecondGeometry);
+//    emptyDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
+//    
+//    const WCHAR* emptyRootExport[] = { c_planeclosestHitShaderName, c_missShaderName };
+//    D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION emptyAssociation{};
+//    {
+//#define SizeOfInUint32(obj) ((sizeof(obj) - 1) / sizeof(UINT32) + 1)
+//
+//        ComPtr<ID3DBlob> blob;
+//        ComPtr<ID3DBlob> error;
+//        if (JFAIL(D3D12SerializeRootSignature(&emptyDesc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &error)))
+//        {
+//            if (error)
+//            {
+//                OutputDebugStringA(reinterpret_cast<const char*>(error->GetBufferPointer()));
+//                error->Release();
+//            }
+//            return false;
+//        }
+//
+//        if (JFAIL(Device->CreateRootSignature(1, blob->GetBufferPointer(), blob->GetBufferSize()
+//            , IID_PPV_ARGS(&m_raytracingEmptyLocalRootSignature))))
+//        {
+//            return false;
+//        }
+//
+//        D3D12_STATE_SUBOBJECT subobject;
+//        subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE;
+//        subobject.pDesc = m_raytracingEmptyLocalRootSignature.GetAddressOf();
+//        subobjects[index] = subobject;
+//
+//        association.NumExports = _countof(emptyRootExport);
+//        association.pExports = emptyRootExport;
+//        association.pSubobjectToAssociate = &subobjects[index++];
+//
+//        D3D12_STATE_SUBOBJECT subobject2{};
+//        subobject2.Type = D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION;
+//        subobject2.pDesc = &association;
+//        subobjects[index++] = subobject2;
+//    }
+//
+//	// 5). Global root signature
+//	{
+//		D3D12_STATE_SUBOBJECT subobject{};
+//		subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE;
+//		subobject.pDesc = m_raytracingGlobalRootSignature.GetAddressOf();
+//		subobjects[index++] = subobject;
+//	}
+//
+//	// 6). Pipeline Config
+//	D3D12_RAYTRACING_PIPELINE_CONFIG pipelineConfig;
+//	{
+//		// pipelineConfig.MaxTraceRecursionDepth = D3D12_RAYTRACING_MAX_DECLARABLE_TRACE_RECURSION_DEPTH;
+//        pipelineConfig.MaxTraceRecursionDepth = g_MaxRecursionDepth;
+//
+//		D3D12_STATE_SUBOBJECT subobject{};
+//		subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG;
+//		subobject.pDesc = &pipelineConfig;
+//
+//		subobjects[index++] = subobject;
+//	}
+//
+//	// Create pipeline state
+//	D3D12_STATE_OBJECT_DESC stateObjectDesc;
+//	stateObjectDesc.NumSubobjects = index;
+//	stateObjectDesc.pSubobjects = subobjects.data();
+//	stateObjectDesc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
+//
+//#if _DEBUG
+//	PrintStateObjectDesc(&stateObjectDesc);
+//#endif
+//
+//	if (JFAIL(Device->CreateStateObject(&stateObjectDesc, IID_PPV_ARGS(&m_dxrStateObject))))
+//		return false;
 
 	//////////////////////////////////////////////////////////////////////////
 	// 11. Create vertex and index buffer
@@ -846,7 +847,7 @@ bool jRHI_DX12::Initialize()
     const int32 verticesCount = ((slice + 1) * (slice / 2) + 2);
     const int32 verticesElementCount = ((slice + 1) * (slice / 2) + 2) / 3;
 
-    uint16 indices[((slice) / 2 - 2) * slice * 6 + (slice * 2 * 3)];
+    uint32 indices[((slice) / 2 - 2) * slice * 6 + (slice * 2 * 3)];
 
     int32 iCount = 0;
     int32 toNextSlice = slice + 1;
@@ -877,7 +878,6 @@ bool jRHI_DX12::Initialize()
 
 	// Vertex and normal
     Vertex vertices[verticesCount];
-
 
     const float stepRadian = DegreeToRadian(360.0f / slice);
     const float radius = 1.0f;
@@ -913,6 +913,55 @@ bool jRHI_DX12::Initialize()
         ++cnt;
     }
 
+ //   float AspectRatio = SCR_WIDTH / (float)SCR_HEIGHT;
+ //   Vertex vertices[] =
+ //   {
+ //       { { 0.0f, 0.25f * AspectRatio, 0.0f }, { 1.0f, 0.0f, 0.0f } },
+ //       { { 0.25f, -0.25f * AspectRatio, 0.0f }, { 0.0f, 1.0f, 0.0f } },
+ //       { { -0.25f, -0.25f * AspectRatio, 0.0f }, { 0.0f, 0.0f, 1.0f } }
+ //   };
+
+	//uint32 indices[] = { 0, 1, 2 };
+
+ //   static const Vertex vertices[] = {
+	//{{-1.0f,-1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{-1.0f,-1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{-1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{1.0f, 1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{-1.0f,-1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{-1.0f, 1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{1.0f,-1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{-1.0f,-1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{1.0f,-1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{1.0f, 1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{1.0f,-1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{-1.0f,-1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{-1.0f,-1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{-1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{-1.0f, 1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{1.0f,-1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{-1.0f,-1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{-1.0f,-1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{-1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{-1.0f,-1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{1.0f,-1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{1.0f,-1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{1.0f, 1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{1.0f,-1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{1.0f,-1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{1.0f, 1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{-1.0f, 1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{-1.0f, 1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{-1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   {{-1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   { {1.0f,-1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
+ //   };
+
 	VertexBuffer = jBufferUtil_DX12::CreateBuffer(sizeof(vertices), 0, true, false, D3D12_RESOURCE_STATE_COMMON, vertices, sizeof(vertices), TEXT("SphereVB"));
 	IndexBuffer = jBufferUtil_DX12::CreateBuffer(sizeof(indices), 0, true, false, D3D12_RESOURCE_STATE_COMMON, indices, sizeof(indices), TEXT("SphereIB"));
 
@@ -925,187 +974,284 @@ bool jRHI_DX12::Initialize()
 	// VertexBuffer SRV
 	jBufferUtil_DX12::CreateShaderResourceView(VertexBuffer, sizeof(vertices[0]), _countof(vertices));
 
-	//////////////////////////////////////////////////////////////////////////
-	// 12. AccelerationStructures
-	D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc{};
-	geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-	geometryDesc.Triangles.IndexBuffer = IndexBuffer->GetGPUAddress();
-	geometryDesc.Triangles.IndexCount = static_cast<uint32>(IndexBuffer->GetAllocatedSize() / sizeof(uint16));
-	geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R16_UINT;
-	geometryDesc.Triangles.Transform3x4 = 0;
-	geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-	geometryDesc.Triangles.VertexCount = static_cast<uint32>(VertexBuffer->GetAllocatedSize()) / sizeof(Vertex);
-	geometryDesc.Triangles.VertexBuffer.StartAddress = VertexBuffer->GetGPUAddress();
-	geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(Vertex);
-
-	// Opaque로 지오메트를 등록하면, 히트 쉐이더에서 더이상 쉐이더를 만들지 않을 것이므로 최적화에 좋다.
-	geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
-
-	// Acceleration structure 에 필요한 크기를 요청함
-    // 첫번째 지오메트리
-    D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO bottomLevelPrebuildInfo{};
-    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS bottomLevelInputs{};
+    struct jSimpleConstantBuffer
     {
-        D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
-        bottomLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-        bottomLevelInputs.Flags = buildFlags;
-        bottomLevelInputs.pGeometryDescs = &geometryDesc;
-        bottomLevelInputs.NumDescs = 1;
-        bottomLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
+        Matrix M;
+    };
+
+	jSimpleConstantBuffer ConstantBuffer;
+	ConstantBuffer.M.SetIdentity();
+	Matrix Projection = jCameraUtil::CreatePerspectiveMatrix(SCR_WIDTH, SCR_HEIGHT, DegreeToRadian(90.0f), 0.01f, 1000.0f);
+	Matrix Camera = jCameraUtil::CreateViewMatrix(Vector::FowardVector * 500.0f, Vector::ZeroVector, Vector::UpVector);
+	ConstantBuffer.M = Projection * Camera * ConstantBuffer.M;
+	
+	//ConstantBuffer.M.Scale(10);
+	//ConstantBuffer.M.m30 = 0.5f;
+	//ConstantBuffer.M.m31 = 0.5f;
+	//ConstantBuffer.M.m32 = 0.5f;
+	//ConstantBuffer.M.SetTranspose();
+
+    const float m_aspectRatio = SCR_WIDTH / (float)SCR_HEIGHT;
+
+    const float fovAngleY = 45.0f;
+	const XMMATRIX view = XMMatrixLookAtLH({ 0.0f, 0.0f, 5.0f }, { 0.0f, 0.0f, 0.0f }, {0.0f, 1.0f, 0.0f});
+    const XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(fovAngleY), m_aspectRatio, 0.01f, 125.0f);
+    const XMMATRIX viewProj = view * proj;
+	check(sizeof(ConstantBuffer) == sizeof(viewProj));
+	memcpy(&ConstantBuffer, &viewProj, sizeof(viewProj));
+    //m_sceneCB[i].cameraDirection = XMVector3Normalize(m_at - m_eye);
+	ConstantBuffer.M.SetTranspose();
+
+	SimpleConstantBuffer = jBufferUtil_DX12::CreateBuffer(sizeof(ConstantBuffer)
+		, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT, true, false, D3D12_RESOURCE_STATE_INDEX_BUFFER, &ConstantBuffer, sizeof(ConstantBuffer));
+	jBufferUtil_DX12::CreateConstantBufferView(SimpleConstantBuffer);
+
+	memcpy(SimpleConstantBuffer->GetMappedPointer(), &ConstantBuffer, sizeof(ConstantBuffer));
+
+	////////////////////////////////////////////////////////////////////////////
+	//// 12. AccelerationStructures
+	//D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc{};
+	//geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
+	//geometryDesc.Triangles.IndexBuffer = IndexBuffer->GetGPUAddress();
+	//geometryDesc.Triangles.IndexCount = static_cast<uint32>(IndexBuffer->GetAllocatedSize() / sizeof(uint16));
+	//geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R16_UINT;
+	//geometryDesc.Triangles.Transform3x4 = 0;
+	//geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+	//geometryDesc.Triangles.VertexCount = static_cast<uint32>(VertexBuffer->GetAllocatedSize()) / sizeof(Vertex);
+	//geometryDesc.Triangles.VertexBuffer.StartAddress = VertexBuffer->GetGPUAddress();
+	//geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(Vertex);
+
+	//// Opaque로 지오메트를 등록하면, 히트 쉐이더에서 더이상 쉐이더를 만들지 않을 것이므로 최적화에 좋다.
+	//geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
+
+	//// Acceleration structure 에 필요한 크기를 요청함
+ //   // 첫번째 지오메트리
+ //   D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO bottomLevelPrebuildInfo{};
+ //   D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS bottomLevelInputs{};
+ //   {
+ //       D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+ //       bottomLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+ //       bottomLevelInputs.Flags = buildFlags;
+ //       bottomLevelInputs.pGeometryDescs = &geometryDesc;
+ //       bottomLevelInputs.NumDescs = 1;
+ //       bottomLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
 
 
-		Device->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
-        if (!ensure(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0))
-            return false;
-    }
+	//	Device->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
+ //       if (!ensure(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0))
+ //           return false;
+ //   }
 
-    // Acceleration structure를 위한 리소스를 할당함
-    // Acceleration structure는 default heap에서 생성된 리소스에만 있을 수 있음. (또는 그에 상응하는 heap)
-    // Default heap은 CPU 읽기/쓰기 접근이 필요없기 때문에 괜찮음.
-    // Acceleration structure를 포함하는 리소스는 D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE 상태로 생성해야 함.
-    // 그리고 D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS 플래그를 가져야 함. ALLOW_UNORDERED_ACCESS는 두가지 간단한 정보를 요구함:
-    // - 시스템은 백그라운드에서 Acceleration structure 빌드를 구현할 때 이러한 유형의 액세스를 수행할 것입니다.
-    // - 앱의 관점에서, acceleration structure에 쓰기/읽기의 동기화는 UAV barriers를 통해서 얻어짐.
-    D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
-	BottomLevelAccelerationStructureBuffer = jBufferUtil_DX12::CreateBuffer(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, 0, false, true
-		, initialResourceState, nullptr, 0, TEXT("BottomLevelAccelerationStructure"));
-	check(BottomLevelAccelerationStructureBuffer);
+ //   // Acceleration structure를 위한 리소스를 할당함
+ //   // Acceleration structure는 default heap에서 생성된 리소스에만 있을 수 있음. (또는 그에 상응하는 heap)
+ //   // Default heap은 CPU 읽기/쓰기 접근이 필요없기 때문에 괜찮음.
+ //   // Acceleration structure를 포함하는 리소스는 D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE 상태로 생성해야 함.
+ //   // 그리고 D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS 플래그를 가져야 함. ALLOW_UNORDERED_ACCESS는 두가지 간단한 정보를 요구함:
+ //   // - 시스템은 백그라운드에서 Acceleration structure 빌드를 구현할 때 이러한 유형의 액세스를 수행할 것입니다.
+ //   // - 앱의 관점에서, acceleration structure에 쓰기/읽기의 동기화는 UAV barriers를 통해서 얻어짐.
+ //   D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
+	//BottomLevelAccelerationStructureBuffer = jBufferUtil_DX12::CreateBuffer(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, 0, false, true
+	//	, initialResourceState, nullptr, 0, TEXT("BottomLevelAccelerationStructure"));
+	//check(BottomLevelAccelerationStructureBuffer);
 
-    // Bottom level acceleration structure desc
-    jBuffer_DX12* ScratchResourceBuffer = jBufferUtil_DX12::CreateBuffer(bottomLevelPrebuildInfo.ScratchDataSizeInBytes, 0, false, true
-        , D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, 0, TEXT("ScratchResourceGeometry1"));
+ //   // Bottom level acceleration structure desc
+ //   jBuffer_DX12* ScratchResourceBuffer = jBufferUtil_DX12::CreateBuffer(bottomLevelPrebuildInfo.ScratchDataSizeInBytes, 0, false, true
+ //       , D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, 0, TEXT("ScratchResourceGeometry1"));
 
-    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc{};
-    bottomLevelBuildDesc.Inputs = bottomLevelInputs;
-    bottomLevelBuildDesc.ScratchAccelerationStructureData = ScratchResourceBuffer->GetGPUAddress();
-    bottomLevelBuildDesc.DestAccelerationStructureData = BottomLevelAccelerationStructureBuffer->GetGPUAddress();
+ //   D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc{};
+ //   bottomLevelBuildDesc.Inputs = bottomLevelInputs;
+ //   bottomLevelBuildDesc.ScratchAccelerationStructureData = ScratchResourceBuffer->GetGPUAddress();
+ //   bottomLevelBuildDesc.DestAccelerationStructureData = BottomLevelAccelerationStructureBuffer->GetGPUAddress();
 
-	GraphicsCommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
-	{
-		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::UAV(BottomLevelAccelerationStructureBuffer->Buffer.Get());
-		GraphicsCommandList->ResourceBarrier(1, &barrier);
-	}
+	//GraphicsCommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
+	//{
+	//	CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::UAV(BottomLevelAccelerationStructureBuffer->Buffer.Get());
+	//	GraphicsCommandList->ResourceBarrier(1, &barrier);
+	//}
 
     //////////////////////////////////////////////////////////////////////////
 
-    // 두번째 지오메트리
-    Vertex secondVertices[] = {
-            XMFLOAT3(-100.0f, -1.0f, -100.0f),    XMFLOAT3(0.0f, 1.0f, 0.0f),
-            XMFLOAT3(100.0f, -1.0f, 100.f),    XMFLOAT3(0.0f, 1.0f, 0.0f),
-            XMFLOAT3(-100.0f, -1.0f, 100.0f),   XMFLOAT3(0.0f, 1.0f, 0.0f),
+ //   // 두번째 지오메트리
+ //   Vertex secondVertices[] = {
+ //           XMFLOAT3(-100.0f, -1.0f, -100.0f),    XMFLOAT3(0.0f, 1.0f, 0.0f),
+ //           XMFLOAT3(100.0f, -1.0f, 100.f),    XMFLOAT3(0.0f, 1.0f, 0.0f),
+ //           XMFLOAT3(-100.0f, -1.0f, 100.0f),   XMFLOAT3(0.0f, 1.0f, 0.0f),
 
-            XMFLOAT3(-100.0f, -1.0f, -100.0f),    XMFLOAT3(0.0f, 1.0f, 0.0f),
-            XMFLOAT3(100.0f, -1.0f, -100.0f),    XMFLOAT3(0.0f, 1.0f, 0.0f),
-            XMFLOAT3(100.0f, -1.0f, 100.0f),   XMFLOAT3(0.0f, 1.0f, 0.0f),
-    };
+ //           XMFLOAT3(-100.0f, -1.0f, -100.0f),    XMFLOAT3(0.0f, 1.0f, 0.0f),
+ //           XMFLOAT3(100.0f, -1.0f, -100.0f),    XMFLOAT3(0.0f, 1.0f, 0.0f),
+ //           XMFLOAT3(100.0f, -1.0f, 100.0f),   XMFLOAT3(0.0f, 1.0f, 0.0f),
+ //   };
 
-	VertexBufferSecondGeometry = jBufferUtil_DX12::CreateBuffer(sizeof(secondVertices), 0, true, false, D3D12_RESOURCE_STATE_COMMON, secondVertices, sizeof(secondVertices), TEXT("SecondGeometryVB"));
-	check(VertexBufferSecondGeometry);
+	//VertexBufferSecondGeometry = jBufferUtil_DX12::CreateBuffer(sizeof(secondVertices), 0, true, false, D3D12_RESOURCE_STATE_COMMON, secondVertices, sizeof(secondVertices), TEXT("SecondGeometryVB"));
+	//check(VertexBufferSecondGeometry);
 
-    // VertexBuffer SRV
-	jBufferUtil_DX12::CreateShaderResourceView(VertexBufferSecondGeometry);
+ //   // VertexBuffer SRV
+	//jBufferUtil_DX12::CreateShaderResourceView(VertexBufferSecondGeometry);
 
-    D3D12_RAYTRACING_GEOMETRY_DESC secondGeometryDesc{};
-    secondGeometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-    secondGeometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
-    secondGeometryDesc.Triangles.Transform3x4 = 0;
-    secondGeometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-    secondGeometryDesc.Triangles.VertexCount = static_cast<uint32>(VertexBufferSecondGeometry->Size) / sizeof(Vertex);
-	secondGeometryDesc.Triangles.VertexBuffer.StartAddress = VertexBufferSecondGeometry->GetGPUAddress();
-    secondGeometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(Vertex);
+ //   D3D12_RAYTRACING_GEOMETRY_DESC secondGeometryDesc{};
+ //   secondGeometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
+ //   secondGeometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
+ //   secondGeometryDesc.Triangles.Transform3x4 = 0;
+ //   secondGeometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+ //   secondGeometryDesc.Triangles.VertexCount = static_cast<uint32>(VertexBufferSecondGeometry->Size) / sizeof(Vertex);
+	//secondGeometryDesc.Triangles.VertexBuffer.StartAddress = VertexBufferSecondGeometry->GetGPUAddress();
+ //   secondGeometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(Vertex);
 
 
-    D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO bottomLevelPrebuildInfoSecondGeometry{};
-    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS bottomLevelInputsSecondGeometry{};
-    {
-        D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
-        bottomLevelInputsSecondGeometry.Flags = buildFlags;
-        bottomLevelInputsSecondGeometry.pGeometryDescs = &secondGeometryDesc;
-        bottomLevelInputsSecondGeometry.NumDescs = 1;
-        bottomLevelInputsSecondGeometry.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
+ //   D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO bottomLevelPrebuildInfoSecondGeometry{};
+ //   D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS bottomLevelInputsSecondGeometry{};
+ //   {
+ //       D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+ //       bottomLevelInputsSecondGeometry.Flags = buildFlags;
+ //       bottomLevelInputsSecondGeometry.pGeometryDescs = &secondGeometryDesc;
+ //       bottomLevelInputsSecondGeometry.NumDescs = 1;
+ //       bottomLevelInputsSecondGeometry.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
 
-		Device->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputsSecondGeometry, &bottomLevelPrebuildInfoSecondGeometry);
-        if (!ensure(bottomLevelPrebuildInfoSecondGeometry.ResultDataMaxSizeInBytes > 0))
-            return false;
-    }
+	//	Device->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputsSecondGeometry, &bottomLevelPrebuildInfoSecondGeometry);
+ //       if (!ensure(bottomLevelPrebuildInfoSecondGeometry.ResultDataMaxSizeInBytes > 0))
+ //           return false;
+ //   }
 
-	BottomLevelAccelerationStructureSecondGeometryBuffer = jBufferUtil_DX12::CreateBuffer(bottomLevelPrebuildInfoSecondGeometry.ResultDataMaxSizeInBytes, 0, false, true
-		, initialResourceState, nullptr, 0, TEXT("BottomLevelAccelerationStructure"));
+	//BottomLevelAccelerationStructureSecondGeometryBuffer = jBufferUtil_DX12::CreateBuffer(bottomLevelPrebuildInfoSecondGeometry.ResultDataMaxSizeInBytes, 0, false, true
+	//	, initialResourceState, nullptr, 0, TEXT("BottomLevelAccelerationStructure"));
 
-	jBuffer_DX12* scratchResourceSecondGeometryBuffer = nullptr;
-	scratchResourceSecondGeometryBuffer = jBufferUtil_DX12::CreateBuffer(bottomLevelPrebuildInfoSecondGeometry.ScratchDataSizeInBytes, 0, false, true
-        , D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, 0, TEXT("ScratchResourceGeometry2"));
+	//jBuffer_DX12* scratchResourceSecondGeometryBuffer = nullptr;
+	//scratchResourceSecondGeometryBuffer = jBufferUtil_DX12::CreateBuffer(bottomLevelPrebuildInfoSecondGeometry.ScratchDataSizeInBytes, 0, false, true
+ //       , D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, 0, TEXT("ScratchResourceGeometry2"));
 
-    // Bottom level acceleration structure desc
-    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDescSecondGeometry{};
-    bottomLevelBuildDescSecondGeometry.Inputs = bottomLevelInputsSecondGeometry;
-    bottomLevelBuildDescSecondGeometry.ScratchAccelerationStructureData = scratchResourceSecondGeometryBuffer->GetGPUAddress();
-    bottomLevelBuildDescSecondGeometry.DestAccelerationStructureData = BottomLevelAccelerationStructureSecondGeometryBuffer->GetGPUAddress();
+ //   // Bottom level acceleration structure desc
+ //   D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDescSecondGeometry{};
+ //   bottomLevelBuildDescSecondGeometry.Inputs = bottomLevelInputsSecondGeometry;
+ //   bottomLevelBuildDescSecondGeometry.ScratchAccelerationStructureData = scratchResourceSecondGeometryBuffer->GetGPUAddress();
+ //   bottomLevelBuildDescSecondGeometry.DestAccelerationStructureData = BottomLevelAccelerationStructureSecondGeometryBuffer->GetGPUAddress();
 
-	GraphicsCommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDescSecondGeometry, 0, nullptr);
-	{
-		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::UAV(BottomLevelAccelerationStructureSecondGeometryBuffer->Buffer.Get());
-		GraphicsCommandList->ResourceBarrier(1, &barrier);
-	}
+	//GraphicsCommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDescSecondGeometry, 0, nullptr);
+	//{
+	//	CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::UAV(BottomLevelAccelerationStructureSecondGeometryBuffer->Buffer.Get());
+	//	GraphicsCommandList->ResourceBarrier(1, &barrier);
+	//}
 
-    if (!ensure(BuildTopLevelAS(GraphicsCommandList, TLASBuffer, false, 0.0f, Vector::ZeroVector)))
-        return false;
+ //   if (!ensure(BuildTopLevelAS(GraphicsCommandList, TLASBuffer, false, 0.0f, Vector::ZeroVector)))
+ //       return false;
 
 	GraphicsCommandQueue->ExecuteCommandList(GraphicsCommandList);
 
 	WaitForGPU();
 
-    delete ScratchResourceBuffer;
-    delete scratchResourceSecondGeometryBuffer;
+	D3D12_ROOT_SIGNATURE_DESC1 rootSignatureDesc = {};
+	D3D12_DESCRIPTOR_RANGE1 range[1];
+	range[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+	range[0].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
+	range[0].NumDescriptors = 1;
+	range[0].BaseShaderRegister = 0;
+	range[0].RegisterSpace = 0;
+	range[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-	// 13. ShaderTable
-	const uint16 shaderIdentifierSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
-	ComPtr<ID3D12StateObjectProperties> stateObjectProperties;
-	if (JFAIL(m_dxrStateObject.As(&stateObjectProperties)))
+	D3D12_ROOT_PARAMETER1 rootParameter[1];
+	rootParameter[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    rootParameter[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	rootParameter[0].DescriptorTable.NumDescriptorRanges = 1;
+	rootParameter[0].DescriptorTable.pDescriptorRanges = range;
+
+	rootSignatureDesc.NumParameters = 1;
+	rootSignatureDesc.pParameters = rootParameter;
+	rootSignatureDesc.NumStaticSamplers = 0;
+	rootSignatureDesc.pStaticSamplers = nullptr;
+	rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+
+    D3D12_VERSIONED_ROOT_SIGNATURE_DESC versionedDesc = { };
+    versionedDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
+    versionedDesc.Desc_1_1 = rootSignatureDesc;
+
+	ComPtr<ID3DBlob> signature;
+	ComPtr<ID3DBlob> error;
+	if (JFAIL(D3D12SerializeVersionedRootSignature(&versionedDesc, &signature, &error)))
 		return false;
+
+	if (JFAIL(Device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&SimpleRootSignature))))
+		return false;
+
+	D3D12_INPUT_ELEMENT_DESC VSInputElementDesc[] = {
+		{ .SemanticName = "POSITION", .SemanticIndex = 0, .Format = DXGI_FORMAT_R32G32B32_FLOAT, .InputSlot = 0, .AlignedByteOffset = 0, .InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, .InstanceDataStepRate = 0 },
+		{ .SemanticName = "NORMAL", .SemanticIndex = 0, .Format = DXGI_FORMAT_R32G32B32_FLOAT, .InputSlot = 0, .AlignedByteOffset = 12, .InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, .InstanceDataStepRate = 0 },
+	};
+
+	ComPtr<IDxcBlob> VSShaderBlob;
+	VSShaderBlob = jShaderCompiler_DX12::Get().Compile(TEXT("Resource/Shaders/hlsl/DXSampleHelloTriangle.hlsl"), TEXT("vs_6_3"), TEXT("VSMain"));
+	check(VSShaderBlob);
+
+    ComPtr<IDxcBlob> PSShaderBlob;
+	PSShaderBlob = jShaderCompiler_DX12::Get().Compile(TEXT("Resource/Shaders/hlsl/DXSampleHelloTriangle.hlsl"), TEXT("ps_6_3"), TEXT("PSMain"));
+	check(PSShaderBlob);
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+	psoDesc.InputLayout = { .pInputElementDescs = VSInputElementDesc, .NumElements = _countof(VSInputElementDesc) };
+	psoDesc.pRootSignature = SimpleRootSignature.Get();
+	psoDesc.VS = { .pShaderBytecode = VSShaderBlob->GetBufferPointer(), .BytecodeLength = VSShaderBlob->GetBufferSize() };
+	psoDesc.PS = { .pShaderBytecode = PSShaderBlob->GetBufferPointer(), .BytecodeLength = PSShaderBlob->GetBufferSize() };
+    psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+    psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+	psoDesc.DepthStencilState.DepthEnable = FALSE;
+    psoDesc.DepthStencilState.StencilEnable = FALSE;
+    psoDesc.SampleMask = UINT_MAX;
+    psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    psoDesc.NumRenderTargets = 1;
+    psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+    psoDesc.SampleDesc.Count = 1;
+	if (JFAIL(Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&SimplePipelineState))))
+		return false;
+
+    //delete ScratchResourceBuffer;
+    //delete scratchResourceSecondGeometryBuffer;
+
+	//// 13. ShaderTable
+	//const uint16 shaderIdentifierSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+	//ComPtr<ID3D12StateObjectProperties> stateObjectProperties;
+	//if (JFAIL(m_dxrStateObject.As(&stateObjectProperties)))
+	//	return false;
 	
-	void* rayGenShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_raygenShaderName);
-	void* misssShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_missShaderName);
-	void* triHitGroupShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_triHitGroupName);
-    void* planeHitGroupShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_planeHitGroupName);
+	//void* rayGenShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_raygenShaderName);
+	//void* misssShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_missShaderName);
+	//void* triHitGroupShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_triHitGroupName);
+ //   void* planeHitGroupShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_planeHitGroupName);
 
-	// Raygen shader table
-	{
-		const uint16 numShaderRecords = 1;
-		const uint16 shaderRecordSize = shaderIdentifierSize;
-		ShaderTable rayGenShaderTable(Device.Get(), numShaderRecords, shaderRecordSize, TEXT("RayGenShaderTable"));
-		rayGenShaderTable.push_back(ShaderRecord(rayGenShaderIdentifier, shaderIdentifierSize));
-		m_rayGenShaderTable = rayGenShaderTable.GetResource();
-	}
+	//// Raygen shader table
+	//{
+	//	const uint16 numShaderRecords = 1;
+	//	const uint16 shaderRecordSize = shaderIdentifierSize;
+	//	ShaderTable rayGenShaderTable(Device.Get(), numShaderRecords, shaderRecordSize, TEXT("RayGenShaderTable"));
+	//	rayGenShaderTable.push_back(ShaderRecord(rayGenShaderIdentifier, shaderIdentifierSize));
+	//	m_rayGenShaderTable = rayGenShaderTable.GetResource();
+	//}
 
-	// Miss shader table
-	{
-		const uint16 numShaderRecords = 1;
-		const uint16 shaderRecordSize = shaderIdentifierSize;
-		ShaderTable missShaderTable(Device.Get(), numShaderRecords, shaderRecordSize, TEXT("MissShaderTable"));
-		missShaderTable.push_back(ShaderRecord(misssShaderIdentifier, shaderIdentifierSize));
-		m_missShaderTable = missShaderTable.GetResource();
-	}
+	//// Miss shader table
+	//{
+	//	const uint16 numShaderRecords = 1;
+	//	const uint16 shaderRecordSize = shaderIdentifierSize;
+	//	ShaderTable missShaderTable(Device.Get(), numShaderRecords, shaderRecordSize, TEXT("MissShaderTable"));
+	//	missShaderTable.push_back(ShaderRecord(misssShaderIdentifier, shaderIdentifierSize));
+	//	m_missShaderTable = missShaderTable.GetResource();
+	//}
 
-	// Triangle Hit group shader table
-	{
-		struct RootArguments
-		{
-			CubeConstantBuffer cb;
-		};
-		RootArguments rootArguments;
-		rootArguments.cb = m_cubeCB;
+	//// Triangle Hit group shader table
+	//{
+	//	struct RootArguments
+	//	{
+	//		CubeConstantBuffer cb;
+	//	};
+	//	RootArguments rootArguments;
+	//	rootArguments.cb = m_cubeCB;
 
-		const uint16 numShaderRecords = 2;
-		const uint16 shaderRecordSize = shaderIdentifierSize + sizeof(rootArguments);       // 큰 사이즈 기준으로 2개 만듬
-		ShaderTable hitGroupShaderTable(Device.Get(), numShaderRecords, shaderRecordSize, TEXT("HitGroupShaderTable"));
-		hitGroupShaderTable.push_back(ShaderRecord(triHitGroupShaderIdentifier, shaderIdentifierSize, &rootArguments, sizeof(rootArguments)));
+	//	const uint16 numShaderRecords = 2;
+	//	const uint16 shaderRecordSize = shaderIdentifierSize + sizeof(rootArguments);       // 큰 사이즈 기준으로 2개 만듬
+	//	ShaderTable hitGroupShaderTable(Device.Get(), numShaderRecords, shaderRecordSize, TEXT("HitGroupShaderTable"));
+	//	hitGroupShaderTable.push_back(ShaderRecord(triHitGroupShaderIdentifier, shaderIdentifierSize, &rootArguments, sizeof(rootArguments)));
 
-        RootArguments planeRootArguments;
-        planeRootArguments.cb = m_planeCB;
-        hitGroupShaderTable.push_back(ShaderRecord(planeHitGroupShaderIdentifier, shaderIdentifierSize, &planeRootArguments, sizeof(planeRootArguments)));
-		m_hitGroupShaderTable = hitGroupShaderTable.GetResource();
-	}
+ //       RootArguments planeRootArguments;
+ //       planeRootArguments.cb = m_planeCB;
+ //       hitGroupShaderTable.push_back(ShaderRecord(planeHitGroupShaderIdentifier, shaderIdentifierSize, &planeRootArguments, sizeof(planeRootArguments)));
+	//	m_hitGroupShaderTable = hitGroupShaderTable.GetResource();
+	//}
 
 	//////////////////////////////////////////////////////////////////////////
 	// 14. Raytracing Output Resouce
@@ -1134,7 +1280,6 @@ bool jRHI_DX12::Initialize()
 	
 	//////////////////////////////////////////////////////////////////////////
 	ShowWindow(m_hWnd, SW_SHOW);
-    pRHIDirectX12 = this;
 
     InitializeImGui();
 
@@ -1168,17 +1313,17 @@ void jRHI_DX12::Release()
 	delete RayTacingOutputTexture;
 	RayTacingOutputTexture = nullptr;
 
-	//////////////////////////////////////////////////////////////////////////
-	// 13. ShaderTable
-	m_rayGenShaderTable.Reset();
-	m_missShaderTable.Reset();
-	m_hitGroupShaderTable.Reset();
+	////////////////////////////////////////////////////////////////////////////
+	//// 13. ShaderTable
+	//m_rayGenShaderTable.Reset();
+	//m_missShaderTable.Reset();
+	//m_hitGroupShaderTable.Reset();
 
-	//////////////////////////////////////////////////////////////////////////
-	// 12. AccelerationStructures
-	delete BottomLevelAccelerationStructureBuffer;
-	BottomLevelAccelerationStructureBuffer = nullptr;
-	TLASBuffer.Release();
+	////////////////////////////////////////////////////////////////////////////
+	//// 12. AccelerationStructures
+	//delete BottomLevelAccelerationStructureBuffer;
+	//BottomLevelAccelerationStructureBuffer = nullptr;
+	//TLASBuffer.Release();
 
 	//////////////////////////////////////////////////////////////////////////
 	// 11. Create vertex and index buffer
@@ -1188,14 +1333,17 @@ void jRHI_DX12::Release()
 	delete IndexBuffer;
 	IndexBuffer = nullptr;
 
-	//////////////////////////////////////////////////////////////////////////
-	// 10. DXR PipeplineStateObject
-	m_dxrStateObject.Reset();
+	delete SimpleConstantBuffer;
+	SimpleConstantBuffer = nullptr;
 
-	//////////////////////////////////////////////////////////////////////////
-	// 9. CreateRootSignature
-	m_raytracingGlobalRootSignature.Reset();
-	m_raytracingLocalRootSignature.Reset();
+	////////////////////////////////////////////////////////////////////////////
+	//// 10. DXR PipeplineStateObject
+	//m_dxrStateObject.Reset();
+
+	////////////////////////////////////////////////////////////////////////////
+	//// 9. CreateRootSignature
+	//m_raytracingGlobalRootSignature.Reset();
+	//m_raytracingLocalRootSignature.Reset();
 
 	//////////////////////////////////////////////////////////////////////////
 	// 8. Raytracing device and commandlist
@@ -1218,8 +1366,8 @@ void jRHI_DX12::Release()
 
 	//////////////////////////////////////////////////////////////////////////
 	// 3. Swapchain
-	SwapChain->Release();
-	delete SwapChain;
+    SwapChain->Release();
+    delete SwapChain;
 
 	//////////////////////////////////////////////////////////////////////////
 	// 2. Command
@@ -1249,125 +1397,125 @@ void jRHI_DX12::UpdateCameraMatrices()
     m_sceneCB[frameIndex].NumOfStartingRay = 20;        // 첫 Ray 생성시 NumOfStartingRay 개를 쏴서 보간하도록 함. 노이즈를 줄여줌
 }
 
-bool jRHI_DX12::BuildTopLevelAS(ComPtr<ID3D12GraphicsCommandList4>& InCommandList, TopLevelAccelerationStructureBuffers& InBuffers, bool InIsUpdate, float InRotationY, Vector InTranslation)
-{
-    int32 w = 11, h = 11;
-    int32 totalCount = (w * 2 * h * 2) + 3 + 1;     // small balls, big balls, plane
-    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
-    inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-    inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
-    inputs.NumDescs = totalCount;
-    inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
-
-    D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO info;
-	Device->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &info);
-    if (!ensure(info.ResultDataMaxSizeInBytes > 0))
-        return false;
-
-    if (InIsUpdate)
-    {
-		check(InBuffers.Result);
-
-        // Update 요청이 온다면 TLAS 는 이미 DispatchRay()의 호출에서 사용되고있다.
-        // 버퍼가 업데이트 되기 전에 UAV 베리어를 read 연산의 끝에 넣어줘야 한다.
-
-        D3D12_RESOURCE_BARRIER uavBarrier = {};
-        uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-        uavBarrier.UAV.pResource = InBuffers.Result->Buffer.Get();
-		InCommandList->ResourceBarrier(1, &uavBarrier);
-    }
-    else
-    {
-        // Update 요청이 아니면, 버퍼를 새로 만들어야 함, 그렇지 않으면 그대로 refit(이미 존재하는 TLAS를 업데이트) 될 것임.
-		InBuffers.Scratch = jBufferUtil_DX12::CreateBuffer(info.ScratchDataSizeInBytes, 0, false, true
-			, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, 0, TEXT("TLAS Scratch Buffer"));
-		InBuffers.Result = jBufferUtil_DX12::CreateBuffer(info.ResultDataMaxSizeInBytes, 0, false, true
-			, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nullptr, 0, TEXT("TLAS Result Buffer"));
-		InBuffers.InstanceDesc = jBufferUtil_DX12::CreateBuffer(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * totalCount, 0, true, false
-			, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, 0, TEXT("TLAS Instance Desc"));
-    }
-
-    D3D12_RAYTRACING_INSTANCE_DESC* instanceDescs = nullptr;
-	instanceDescs = (D3D12_RAYTRACING_INSTANCE_DESC*)InBuffers.InstanceDesc->Map();
-    if (!instanceDescs)
-        return false;
-
-    ZeroMemory(instanceDescs, sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * totalCount);
-
-    int32 cnt = 0;
-
-    srand(123);
-    const float radius = 0.3f;
-    for (int32 i = -w; i < w; ++i)
-    {
-        for (int32 j = -h; j < h; ++j, ++cnt)
-        {
-            float r = radius;
-            auto s = XMMatrixScaling(r, r, r);
-            auto t = XMMatrixTranslation(
-                (float)(i * radius * 5.0f) + (radius * 4.0f * random_double())
-                , -0.7f
-                , (float)(j * radius * 5.0f) + (radius * 4.0f * random_double()));
-            auto m = XMMatrixTranspose(XMMatrixMultiply(s, t));
-
-            instanceDescs[cnt].InstanceID = cnt;
-            instanceDescs[cnt].InstanceContributionToHitGroupIndex = 0;
-            memcpy(instanceDescs[cnt].Transform, &m, sizeof(instanceDescs[cnt].Transform));
-            instanceDescs[cnt].InstanceMask = 1;
-            instanceDescs[cnt].AccelerationStructure = BottomLevelAccelerationStructureBuffer->GetGPUAddress();
-        }
-    }
-
-    for (int32 i = 0; i < 3; ++i)
-    {
-        auto s = XMMatrixScaling(1.0f, 1.0f, 1.0f);
-        auto t = XMMatrixTranslation(0.0f + i * 2, 0.0f, 0.0f + i * 2);
-        auto m = XMMatrixTranspose(XMMatrixMultiply(s, t));
-
-        instanceDescs[cnt].InstanceID = cnt;
-        instanceDescs[cnt].InstanceContributionToHitGroupIndex = 0;
-        memcpy(instanceDescs[cnt].Transform, &m, sizeof(instanceDescs[cnt].Transform));
-        instanceDescs[cnt].InstanceMask = 1;
-        instanceDescs[cnt].AccelerationStructure = BottomLevelAccelerationStructureBuffer->GetGPUAddress();
-
-        ++cnt;
-    }
-
-    auto mIdentity = XMMatrixTranspose(XMMatrixIdentity());
-
-    instanceDescs[cnt].InstanceID = cnt;
-    instanceDescs[cnt].InstanceContributionToHitGroupIndex = 1;
-    memcpy(instanceDescs[cnt].Transform, &mIdentity, sizeof(instanceDescs[cnt].Transform));
-    instanceDescs[cnt].InstanceMask = 1;
-    instanceDescs[cnt].AccelerationStructure = BottomLevelAccelerationStructureSecondGeometryBuffer->GetGPUAddress();
-    instanceDescs[cnt].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_CULL_DISABLE;
-
-    InBuffers.InstanceDesc->Unmap();
-
-    // TLAS 생성
-    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC asDesc = {};
-    asDesc.Inputs = inputs;
-    asDesc.Inputs.InstanceDescs = InBuffers.InstanceDesc->GetGPUAddress();
-    asDesc.DestAccelerationStructureData = InBuffers.Result->GetGPUAddress();
-    asDesc.ScratchAccelerationStructureData = InBuffers.Scratch->GetGPUAddress();
-
-    // 만약 업데이트 중이라면 source buffer에 업데이트 플래그를 설정해준다.
-    if (InIsUpdate)
-    {
-        asDesc.Inputs.Flags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
-        asDesc.SourceAccelerationStructureData = InBuffers.Result->GetGPUAddress();
-    }
-
-	InCommandList->BuildRaytracingAccelerationStructure(&asDesc, 0, nullptr);
-
-    // 레이트레이싱 연산에서 Acceleration structure를 사용하기 전에 UAV 베리어를 추가해야 함.
-    D3D12_RESOURCE_BARRIER uavBarrier = {};
-    uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-    uavBarrier.UAV.pResource = InBuffers.Result->Buffer.Get();
-	InCommandList->ResourceBarrier(1, &uavBarrier);
-
-    return true;
-}
+//bool jRHI_DX12::BuildTopLevelAS(ComPtr<ID3D12GraphicsCommandList4>& InCommandList, TopLevelAccelerationStructureBuffers& InBuffers, bool InIsUpdate, float InRotationY, Vector InTranslation)
+//{
+//    int32 w = 11, h = 11;
+//    int32 totalCount = (w * 2 * h * 2) + 3 + 1;     // small balls, big balls, plane
+//    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
+//    inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+//    inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
+//    inputs.NumDescs = totalCount;
+//    inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
+//
+//    D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO info;
+//	Device->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &info);
+//    if (!ensure(info.ResultDataMaxSizeInBytes > 0))
+//        return false;
+//
+//    if (InIsUpdate)
+//    {
+//		check(InBuffers.Result);
+//
+//        // Update 요청이 온다면 TLAS 는 이미 DispatchRay()의 호출에서 사용되고있다.
+//        // 버퍼가 업데이트 되기 전에 UAV 베리어를 read 연산의 끝에 넣어줘야 한다.
+//
+//        D3D12_RESOURCE_BARRIER uavBarrier = {};
+//        uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+//        uavBarrier.UAV.pResource = InBuffers.Result->Buffer.Get();
+//		InCommandList->ResourceBarrier(1, &uavBarrier);
+//    }
+//    else
+//    {
+//        // Update 요청이 아니면, 버퍼를 새로 만들어야 함, 그렇지 않으면 그대로 refit(이미 존재하는 TLAS를 업데이트) 될 것임.
+//		InBuffers.Scratch = jBufferUtil_DX12::CreateBuffer(info.ScratchDataSizeInBytes, 0, false, true
+//			, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, 0, TEXT("TLAS Scratch Buffer"));
+//		InBuffers.Result = jBufferUtil_DX12::CreateBuffer(info.ResultDataMaxSizeInBytes, 0, false, true
+//			, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nullptr, 0, TEXT("TLAS Result Buffer"));
+//		InBuffers.InstanceDesc = jBufferUtil_DX12::CreateBuffer(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * totalCount, 0, true, false
+//			, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, 0, TEXT("TLAS Instance Desc"));
+//    }
+//
+//    D3D12_RAYTRACING_INSTANCE_DESC* instanceDescs = nullptr;
+//	instanceDescs = (D3D12_RAYTRACING_INSTANCE_DESC*)InBuffers.InstanceDesc->Map();
+//    if (!instanceDescs)
+//        return false;
+//
+//    ZeroMemory(instanceDescs, sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * totalCount);
+//
+//    int32 cnt = 0;
+//
+//    srand(123);
+//    const float radius = 0.3f;
+//    for (int32 i = -w; i < w; ++i)
+//    {
+//        for (int32 j = -h; j < h; ++j, ++cnt)
+//        {
+//            float r = radius;
+//            auto s = XMMatrixScaling(r, r, r);
+//            auto t = XMMatrixTranslation(
+//                (float)(i * radius * 5.0f) + (radius * 4.0f * random_double())
+//                , -0.7f
+//                , (float)(j * radius * 5.0f) + (radius * 4.0f * random_double()));
+//            auto m = XMMatrixTranspose(XMMatrixMultiply(s, t));
+//
+//            instanceDescs[cnt].InstanceID = cnt;
+//            instanceDescs[cnt].InstanceContributionToHitGroupIndex = 0;
+//            memcpy(instanceDescs[cnt].Transform, &m, sizeof(instanceDescs[cnt].Transform));
+//            instanceDescs[cnt].InstanceMask = 1;
+//            instanceDescs[cnt].AccelerationStructure = BottomLevelAccelerationStructureBuffer->GetGPUAddress();
+//        }
+//    }
+//
+//    for (int32 i = 0; i < 3; ++i)
+//    {
+//        auto s = XMMatrixScaling(1.0f, 1.0f, 1.0f);
+//        auto t = XMMatrixTranslation(0.0f + i * 2, 0.0f, 0.0f + i * 2);
+//        auto m = XMMatrixTranspose(XMMatrixMultiply(s, t));
+//
+//        instanceDescs[cnt].InstanceID = cnt;
+//        instanceDescs[cnt].InstanceContributionToHitGroupIndex = 0;
+//        memcpy(instanceDescs[cnt].Transform, &m, sizeof(instanceDescs[cnt].Transform));
+//        instanceDescs[cnt].InstanceMask = 1;
+//        instanceDescs[cnt].AccelerationStructure = BottomLevelAccelerationStructureBuffer->GetGPUAddress();
+//
+//        ++cnt;
+//    }
+//
+//    auto mIdentity = XMMatrixTranspose(XMMatrixIdentity());
+//
+//    instanceDescs[cnt].InstanceID = cnt;
+//    instanceDescs[cnt].InstanceContributionToHitGroupIndex = 1;
+//    memcpy(instanceDescs[cnt].Transform, &mIdentity, sizeof(instanceDescs[cnt].Transform));
+//    instanceDescs[cnt].InstanceMask = 1;
+//    instanceDescs[cnt].AccelerationStructure = BottomLevelAccelerationStructureSecondGeometryBuffer->GetGPUAddress();
+//    instanceDescs[cnt].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_CULL_DISABLE;
+//
+//    InBuffers.InstanceDesc->Unmap();
+//
+//    // TLAS 생성
+//    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC asDesc = {};
+//    asDesc.Inputs = inputs;
+//    asDesc.Inputs.InstanceDescs = InBuffers.InstanceDesc->GetGPUAddress();
+//    asDesc.DestAccelerationStructureData = InBuffers.Result->GetGPUAddress();
+//    asDesc.ScratchAccelerationStructureData = InBuffers.Scratch->GetGPUAddress();
+//
+//    // 만약 업데이트 중이라면 source buffer에 업데이트 플래그를 설정해준다.
+//    if (InIsUpdate)
+//    {
+//        asDesc.Inputs.Flags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
+//        asDesc.SourceAccelerationStructureData = InBuffers.Result->GetGPUAddress();
+//    }
+//
+//	InCommandList->BuildRaytracingAccelerationStructure(&asDesc, 0, nullptr);
+//
+//    // 레이트레이싱 연산에서 Acceleration structure를 사용하기 전에 UAV 베리어를 추가해야 함.
+//    D3D12_RESOURCE_BARRIER uavBarrier = {};
+//    uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+//    uavBarrier.UAV.pResource = InBuffers.Result->Buffer.Get();
+//	InCommandList->ResourceBarrier(1, &uavBarrier);
+//
+//    return true;
+//}
 
 void jRHI_DX12::CalculateFrameStats()
 {
@@ -1449,92 +1597,132 @@ void jRHI_DX12::Render()
 	// Prepare
 	auto GraphicsCommandList = GraphicsCommandQueue->GetAvailableCommandList();
 
-    static float elapsedTime = 0.0f;
-    elapsedTime = 0.01f;
+ //   static float elapsedTime = 0.0f;
+ //   elapsedTime = 0.01f;
 
-    float secondsToRotateAround = 24.0f;
-    float angleToRotateBy = 360.0f * (elapsedTime / secondsToRotateAround);
-    static float accumulatedRotation = 0.0f;
-    accumulatedRotation += angleToRotateBy;
+ //   float secondsToRotateAround = 24.0f;
+ //   float angleToRotateBy = 360.0f * (elapsedTime / secondsToRotateAround);
+ //   static float accumulatedRotation = 0.0f;
+ //   accumulatedRotation += angleToRotateBy;
 
-    static float TranslationOffsetX = 0.0f;
-    static bool TranslateDirRight = 1;
-    if (TranslateDirRight)
-    {
-        if (TranslationOffsetX > 2.0f)
-            TranslateDirRight = false;
-        TranslationOffsetX += 0.01f;
-    }
-    else
-    {
-        if (TranslationOffsetX < -2.0f)
-            TranslateDirRight = true;
-        TranslationOffsetX -= 0.01f;
-    }
+ //   static float TranslationOffsetX = 0.0f;
+ //   static bool TranslateDirRight = 1;
+ //   if (TranslateDirRight)
+ //   {
+ //       if (TranslationOffsetX > 2.0f)
+ //           TranslateDirRight = false;
+ //       TranslationOffsetX += 0.01f;
+ //   }
+ //   else
+ //   {
+ //       if (TranslationOffsetX < -2.0f)
+ //           TranslateDirRight = true;
+ //       TranslationOffsetX -= 0.01f;
+ //   }
 
     jSwapchainImage* SwapchainImage = SwapChain->GetSwapchainImage(CurrentFrameIndex);
     jTexture_DX12* SwapchainRT = (jTexture_DX12*)SwapchainImage->TexturePtr.get();
+
+	D3D12_VIEWPORT viewport;
+	viewport.TopLeftX = 0;
+	viewport.TopLeftY = 0;
+	viewport.Width = SCR_WIDTH;
+	viewport.Height = SCR_HEIGHT;
+	viewport.MinDepth = D3D12_MIN_DEPTH;
+	viewport.MaxDepth = D3D12_MAX_DEPTH;
+
+	D3D12_RECT ScissorRect;
+	ScissorRect.left = 0;
+	ScissorRect.right = SCR_WIDTH;
+	ScissorRect.top = 0;
+	ScissorRect.bottom = SCR_HEIGHT;
+
+	GraphicsCommandList->SetGraphicsRootSignature(SimpleRootSignature.Get());
+
+	ID3D12DescriptorHeap* ppHeaps[] = { SRVDescriptorHeap.Heap.Get() };
+	GraphicsCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+	GraphicsCommandList->SetGraphicsRootDescriptorTable(0, SimpleConstantBuffer->CBV.GPUHandle);
+
+	GraphicsCommandList->RSSetViewports(1, &viewport);
+	GraphicsCommandList->RSSetScissorRects(1, &ScissorRect);
 
 	{
 		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 			SwapchainRT->Image.Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		GraphicsCommandList->ResourceBarrier(1, &barrier);
 	}
-	GraphicsCommandList->SetComputeRootSignature(m_raytracingGlobalRootSignature.Get());
 
-	AlignedSceneConstantBuffer* CurFrameConstantBuffer = (AlignedSceneConstantBuffer*)PerFrameConstantBuffer->GetMappedPointer();
-	memcpy(&CurFrameConstantBuffer[CurrentFrameIndex].constants, &m_sceneCB[CurrentFrameIndex], sizeof(m_sceneCB[CurrentFrameIndex]));
-	auto cbGpuAddress = PerFrameConstantBuffer->GetGPUAddress() + CurrentFrameIndex * sizeof(AlignedSceneConstantBuffer);
-	GraphicsCommandList->SetComputeRootConstantBufferView(GlobalRootSignatureParams::SceneConstantSlot, cbGpuAddress);
+	GraphicsCommandList->OMSetRenderTargets(1, &SwapchainRT->RTV.CPUHandle, false, nullptr);
 
-	D3D12_DISPATCH_RAYS_DESC dispatchDesc{};
-	GraphicsCommandList->SetDescriptorHeaps(1, SRVDescriptorHeap.Heap.GetAddressOf());
-	GraphicsCommandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::VertexBuffersSlot, IndexBuffer->SRV.GPUHandle);
-	GraphicsCommandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::PlaneVertexBufferSlot
-        , VertexBufferSecondGeometry->SRV.GPUHandle);
-	GraphicsCommandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::OutputViewSlot
-        , RayTacingOutputTexture->UAV.GPUHandle);
-	GraphicsCommandList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot
-		, TLASBuffer.Result->GetGPUAddress());
+	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
+	GraphicsCommandList->ClearRenderTargetView(SwapchainRT->RTV.CPUHandle, clearColor, 0, nullptr);
+	GraphicsCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-	// 각 Shader table은 단 한개의 shader record를 가지기 때문에 stride가 그 사이즈와 동일함
-	dispatchDesc.HitGroupTable.StartAddress = m_hitGroupShaderTable->GetGPUVirtualAddress();
-	dispatchDesc.HitGroupTable.SizeInBytes = m_hitGroupShaderTable->GetDesc().Width;
-	dispatchDesc.HitGroupTable.StrideInBytes = dispatchDesc.HitGroupTable.SizeInBytes / 2;  // 2개의 HitGroupTable이 등록되었으므로 개수 만큼 나눠줌
+	D3D12_VERTEX_BUFFER_VIEW vertexBufferView = { .BufferLocation = VertexBuffer->GetGPUAddress(), .SizeInBytes = (uint32)VertexBuffer->Size, .StrideInBytes = sizeof(Vertex) };
+	GraphicsCommandList->IASetVertexBuffers(0, 1, &vertexBufferView);
+	D3D12_INDEX_BUFFER_VIEW indexBufferView = {.BufferLocation = IndexBuffer->GetGPUAddress(), .SizeInBytes = IndexBuffer->GetAllocatedSize(), .Format = DXGI_FORMAT_R32_UINT };
+	GraphicsCommandList->IASetIndexBuffer(&indexBufferView);
+	GraphicsCommandList->SetPipelineState(SimplePipelineState.Get());
+	//GraphicsCommandList->DrawInstanced(3, 1, 0, 0);
+	GraphicsCommandList->DrawIndexedInstanced(IndexBuffer->GetAllocatedSize() / sizeof(uint32), 1, 0, 0, 0);
 
-	dispatchDesc.MissShaderTable.StartAddress = m_missShaderTable->GetGPUVirtualAddress();
-	dispatchDesc.MissShaderTable.SizeInBytes = m_missShaderTable->GetDesc().Width;
-	dispatchDesc.MissShaderTable.StrideInBytes = dispatchDesc.MissShaderTable.SizeInBytes;
+	//GraphicsCommandList->SetComputeRootSignature(m_raytracingGlobalRootSignature.Get());
 
-	dispatchDesc.RayGenerationShaderRecord.StartAddress = m_rayGenShaderTable->GetGPUVirtualAddress();
-	dispatchDesc.RayGenerationShaderRecord.SizeInBytes = m_rayGenShaderTable->GetDesc().Width;
+	//AlignedSceneConstantBuffer* CurFrameConstantBuffer = (AlignedSceneConstantBuffer*)PerFrameConstantBuffer->GetMappedPointer();
+	//memcpy(&CurFrameConstantBuffer[CurrentFrameIndex].constants, &m_sceneCB[CurrentFrameIndex], sizeof(m_sceneCB[CurrentFrameIndex]));
+	//auto cbGpuAddress = PerFrameConstantBuffer->GetGPUAddress() + CurrentFrameIndex * sizeof(AlignedSceneConstantBuffer);
+	//GraphicsCommandList->SetComputeRootConstantBufferView(GlobalRootSignatureParams::SceneConstantSlot, cbGpuAddress);
 
-	dispatchDesc.Width = SCR_WIDTH;
-	dispatchDesc.Height = SCR_HEIGHT;
-	dispatchDesc.Depth = 1;
+	//D3D12_DISPATCH_RAYS_DESC dispatchDesc{};
+	//GraphicsCommandList->SetDescriptorHeaps(1, SRVDescriptorHeap.Heap.GetAddressOf());
+	//GraphicsCommandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::VertexBuffersSlot, IndexBuffer->SRV.GPUHandle);
+	//GraphicsCommandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::PlaneVertexBufferSlot
+ //       , VertexBufferSecondGeometry->SRV.GPUHandle);
+	//GraphicsCommandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::OutputViewSlot
+ //       , RayTacingOutputTexture->UAV.GPUHandle);
+	//GraphicsCommandList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot
+	//	, TLASBuffer.Result->GetGPUAddress());
 
-	GraphicsCommandList->SetPipelineState1(m_dxrStateObject.Get());
-	GraphicsCommandList->DispatchRays(&dispatchDesc);
+	//// 각 Shader table은 단 한개의 shader record를 가지기 때문에 stride가 그 사이즈와 동일함
+	//dispatchDesc.HitGroupTable.StartAddress = m_hitGroupShaderTable->GetGPUVirtualAddress();
+	//dispatchDesc.HitGroupTable.SizeInBytes = m_hitGroupShaderTable->GetDesc().Width;
+	//dispatchDesc.HitGroupTable.StrideInBytes = dispatchDesc.HitGroupTable.SizeInBytes / 2;  // 2개의 HitGroupTable이 등록되었으므로 개수 만큼 나눠줌
 
-	// CopyRaytracingOutputToBackbuffer
-	D3D12_RESOURCE_BARRIER preCopyBarriers[2];
-	preCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(SwapchainRT->Image.Get()
-		, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_DEST);
-	preCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(RayTacingOutputTexture->Image.Get()
-		, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
-	GraphicsCommandList->ResourceBarrier(_countof(preCopyBarriers), preCopyBarriers);
+	//dispatchDesc.MissShaderTable.StartAddress = m_missShaderTable->GetGPUVirtualAddress();
+	//dispatchDesc.MissShaderTable.SizeInBytes = m_missShaderTable->GetDesc().Width;
+	//dispatchDesc.MissShaderTable.StrideInBytes = dispatchDesc.MissShaderTable.SizeInBytes;
 
-	GraphicsCommandList->CopyResource(SwapchainRT->Image.Get(), RayTacingOutputTexture->Image.Get());
+	//dispatchDesc.RayGenerationShaderRecord.StartAddress = m_rayGenShaderTable->GetGPUVirtualAddress();
+	//dispatchDesc.RayGenerationShaderRecord.SizeInBytes = m_rayGenShaderTable->GetDesc().Width;
 
-	{
-		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(RayTacingOutputTexture->Image.Get()
-			, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		GraphicsCommandList->ResourceBarrier(1, &barrier);
-	}
+	//dispatchDesc.Width = SCR_WIDTH;
+	//dispatchDesc.Height = SCR_HEIGHT;
+	//dispatchDesc.Depth = 1;
+
+	//GraphicsCommandList->SetPipelineState1(m_dxrStateObject.Get());
+	//GraphicsCommandList->DispatchRays(&dispatchDesc);
+
+	//// CopyRaytracingOutputToBackbuffer
+	//D3D12_RESOURCE_BARRIER preCopyBarriers[2];
+	//preCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(SwapchainRT->Image.Get()
+	//	, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_DEST);
+	//preCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(RayTacingOutputTexture->Image.Get()
+	//	, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+	//GraphicsCommandList->ResourceBarrier(_countof(preCopyBarriers), preCopyBarriers);
+
+	//GraphicsCommandList->CopyResource(SwapchainRT->Image.Get(), RayTacingOutputTexture->Image.Get());
+
+	//{
+	//	CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(RayTacingOutputTexture->Image.Get()
+	//		, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	//	GraphicsCommandList->ResourceBarrier(1, &barrier);
+	//}
 
 	// CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), FrameIndex* m_rtvDescriptorSize);
-    RenderUI(GraphicsCommandList.Get(), SwapchainRT->Image.Get(), SwapchainRT->RTV.CPUHandle, m_imgui_SrvDescHeap.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
+    //RenderUI(GraphicsCommandList.Get(), SwapchainRT->Image.Get(), SwapchainRT->RTV.CPUHandle, m_imgui_SrvDescHeap.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
     //////////////////////////////////////////////////////////////////////////
+
+	RenderUI(GraphicsCommandList.Get(), SwapchainRT->Image.Get(), SwapchainRT->RTV.CPUHandle, m_imgui_SrvDescHeap.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
 
 	// Present
 	GraphicsCommandQueue->ExecuteCommandList(GraphicsCommandList);
@@ -1579,21 +1767,19 @@ void jRHI_DX12::Render()
 
 void jRHI_DX12::OnDeviceLost()
 {
-	m_rayGenShaderTable.Reset();
-	m_missShaderTable.Reset();
-	m_hitGroupShaderTable.Reset();
+	//m_rayGenShaderTable.Reset();
+	//m_missShaderTable.Reset();
+	//m_hitGroupShaderTable.Reset();
 	delete RayTacingOutputTexture;
 	RayTacingOutputTexture = nullptr;
 
-	m_raytracingGlobalRootSignature.Reset();
-	m_raytracingLocalRootSignature.Reset();
+	//m_raytracingGlobalRootSignature.Reset();
+	//m_raytracingLocalRootSignature.Reset();
 
 	Device.Reset();
-	m_dxrStateObject.Reset();
+	//m_dxrStateObject.Reset();
 
 	SRVDescriptorHeap.Release();
-	m_allocatedDescriptors = 0;
-	m_raytracingOutputResourceUAVDescriptorHeapIndex = UINT_MAX;
 	
 	delete VertexBuffer;
 	VertexBuffer = nullptr;
@@ -1601,10 +1787,10 @@ void jRHI_DX12::OnDeviceLost()
 	delete IndexBuffer;
 	IndexBuffer = nullptr;
 
-	delete BottomLevelAccelerationStructureBuffer;
-	BottomLevelAccelerationStructureBuffer = nullptr;
+	//delete BottomLevelAccelerationStructureBuffer;
+	//BottomLevelAccelerationStructureBuffer = nullptr;
 
-	TLASBuffer.Release();
+	//TLASBuffer.Release();
 }
 
 void jRHI_DX12::OnDeviceRestored()
@@ -1678,9 +1864,9 @@ bool jRHI_DX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimi
 
     //////////////////////////////////////////////////////////////////////////
     // ReleaseWindowSizeDependentResources
-    m_rayGenShaderTable.Reset();
-    m_missShaderTable.Reset();
-    m_hitGroupShaderTable.Reset();
+    //m_rayGenShaderTable.Reset();
+    //m_missShaderTable.Reset();
+    //m_hitGroupShaderTable.Reset();
 	delete RayTacingOutputTexture;
 	RayTacingOutputTexture = nullptr;
     
@@ -1692,55 +1878,55 @@ bool jRHI_DX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimi
 
     jBufferUtil_DX12::CreateUnorderedAccessView(RayTacingOutputTexture);
 
-    //////////////////////////////////////////////////////////////////////////
-    // RecreateShaderTable
-    const uint16 shaderIdentifierSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
-    ComPtr<ID3D12StateObjectProperties> stateObjectProperties;
-    if (JFAIL(m_dxrStateObject.As(&stateObjectProperties)))
-        return false;
+    ////////////////////////////////////////////////////////////////////////////
+    //// RecreateShaderTable
+    //const uint16 shaderIdentifierSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+    //ComPtr<ID3D12StateObjectProperties> stateObjectProperties;
+    //if (JFAIL(m_dxrStateObject.As(&stateObjectProperties)))
+    //    return false;
 
-    void* rayGenShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_raygenShaderName);
-    void* misssShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_missShaderName);
-    void* triHitGroupShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_triHitGroupName);
-    void* planeHitGroupShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_planeHitGroupName);
+    //void* rayGenShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_raygenShaderName);
+    //void* misssShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_missShaderName);
+    //void* triHitGroupShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_triHitGroupName);
+    //void* planeHitGroupShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_planeHitGroupName);
 
-    // Raygen shader table
-    {
-        const uint16 numShaderRecords = 1;
-        const uint16 shaderRecordSize = shaderIdentifierSize;
-        ShaderTable rayGenShaderTable(Device.Get(), numShaderRecords, shaderRecordSize, TEXT("RayGenShaderTable"));
-        rayGenShaderTable.push_back(ShaderRecord(rayGenShaderIdentifier, shaderIdentifierSize));
-        m_rayGenShaderTable = rayGenShaderTable.GetResource();
-    }
+    //// Raygen shader table
+    //{
+    //    const uint16 numShaderRecords = 1;
+    //    const uint16 shaderRecordSize = shaderIdentifierSize;
+    //    ShaderTable rayGenShaderTable(Device.Get(), numShaderRecords, shaderRecordSize, TEXT("RayGenShaderTable"));
+    //    rayGenShaderTable.push_back(ShaderRecord(rayGenShaderIdentifier, shaderIdentifierSize));
+    //    m_rayGenShaderTable = rayGenShaderTable.GetResource();
+    //}
 
-    // Miss shader table
-    {
-        const uint16 numShaderRecords = 1;
-        const uint16 shaderRecordSize = shaderIdentifierSize;
-        ShaderTable missShaderTable(Device.Get(), numShaderRecords, shaderRecordSize, TEXT("MissShaderTable"));
-        missShaderTable.push_back(ShaderRecord(misssShaderIdentifier, shaderIdentifierSize));
-        m_missShaderTable = missShaderTable.GetResource();
-    }
+    //// Miss shader table
+    //{
+    //    const uint16 numShaderRecords = 1;
+    //    const uint16 shaderRecordSize = shaderIdentifierSize;
+    //    ShaderTable missShaderTable(Device.Get(), numShaderRecords, shaderRecordSize, TEXT("MissShaderTable"));
+    //    missShaderTable.push_back(ShaderRecord(misssShaderIdentifier, shaderIdentifierSize));
+    //    m_missShaderTable = missShaderTable.GetResource();
+    //}
 
-    // Triangle Hit group shader table
-    {
-        struct RootArguments
-        {
-            CubeConstantBuffer cb;
-        };
-        RootArguments rootArguments;
-        rootArguments.cb = m_cubeCB;
+    //// Triangle Hit group shader table
+    //{
+    //    struct RootArguments
+    //    {
+    //        CubeConstantBuffer cb;
+    //    };
+    //    RootArguments rootArguments;
+    //    rootArguments.cb = m_cubeCB;
 
-        const uint16 numShaderRecords = 2;
-        const uint16 shaderRecordSize = shaderIdentifierSize + sizeof(rootArguments);       // 큰 사이즈 기준으로 2개 만듬
-        ShaderTable hitGroupShaderTable(Device.Get(), numShaderRecords, shaderRecordSize, TEXT("HitGroupShaderTable"));
-        hitGroupShaderTable.push_back(ShaderRecord(triHitGroupShaderIdentifier, shaderIdentifierSize, &rootArguments, sizeof(rootArguments)));
+    //    const uint16 numShaderRecords = 2;
+    //    const uint16 shaderRecordSize = shaderIdentifierSize + sizeof(rootArguments);       // 큰 사이즈 기준으로 2개 만듬
+    //    ShaderTable hitGroupShaderTable(Device.Get(), numShaderRecords, shaderRecordSize, TEXT("HitGroupShaderTable"));
+    //    hitGroupShaderTable.push_back(ShaderRecord(triHitGroupShaderIdentifier, shaderIdentifierSize, &rootArguments, sizeof(rootArguments)));
 
-        RootArguments planeRootArguments;
-        planeRootArguments.cb = m_planeCB;
-        hitGroupShaderTable.push_back(ShaderRecord(planeHitGroupShaderIdentifier, shaderIdentifierSize, &planeRootArguments, sizeof(planeRootArguments)));
-        m_hitGroupShaderTable = hitGroupShaderTable.GetResource();
-    }
+    //    RootArguments planeRootArguments;
+    //    planeRootArguments.cb = m_planeCB;
+    //    hitGroupShaderTable.push_back(ShaderRecord(planeHitGroupShaderIdentifier, shaderIdentifierSize, &planeRootArguments, sizeof(planeRootArguments)));
+    //    m_hitGroupShaderTable = hitGroupShaderTable.GetResource();
+    //}
 
     return true;
 }
@@ -1755,15 +1941,13 @@ bool jRHI_DX12::OnHandleDeviceLost()
 
     //////////////////////////////////////////////////////////////////////////
     // ReleaseDeviceDependentResources
-    m_raytracingGlobalRootSignature.Reset();
-    m_raytracingLocalRootSignature.Reset();
-    m_raytracingEmptyLocalRootSignature.Reset();
+    //m_raytracingGlobalRootSignature.Reset();
+    //m_raytracingLocalRootSignature.Reset();
+    //m_raytracingEmptyLocalRootSignature.Reset();
 
-    m_dxrStateObject.Reset();
+    //m_dxrStateObject.Reset();
 	Device.Reset();
 
-    m_allocatedDescriptors = 0;
-    m_raytracingOutputResourceUAVDescriptorHeapIndex = UINT_MAX;
 	SRVDescriptorHeap.Release();
 	
     delete VertexBuffer;
@@ -1772,23 +1956,23 @@ bool jRHI_DX12::OnHandleDeviceLost()
 	delete IndexBuffer;
 	IndexBuffer = nullptr;
 
-	delete VertexBufferSecondGeometry;
-	VertexBufferSecondGeometry = nullptr;
+	//delete VertexBufferSecondGeometry;
+	//VertexBufferSecondGeometry = nullptr;
 
 	delete PerFrameConstantBuffer;
 	PerFrameConstantBuffer = nullptr;
 
-    m_rayGenShaderTable.Reset();
-    m_missShaderTable.Reset();
-    m_hitGroupShaderTable.Reset();
+ //   m_rayGenShaderTable.Reset();
+ //   m_missShaderTable.Reset();
+ //   m_hitGroupShaderTable.Reset();
 
-	delete BottomLevelAccelerationStructureBuffer;
-	BottomLevelAccelerationStructureBuffer = nullptr;
+	//delete BottomLevelAccelerationStructureBuffer;
+	//BottomLevelAccelerationStructureBuffer = nullptr;
 
-	delete BottomLevelAccelerationStructureSecondGeometryBuffer;
-	BottomLevelAccelerationStructureSecondGeometryBuffer = nullptr;
+	//delete BottomLevelAccelerationStructureSecondGeometryBuffer;
+	//BottomLevelAccelerationStructureSecondGeometryBuffer = nullptr;
 
-	TLASBuffer.Release();
+	//TLASBuffer.Release();
 
     return true;
 }
@@ -1837,11 +2021,14 @@ void jRHI_DX12::InitializeImGui()
 void jRHI_DX12::ReleaseImGui()
 {
     // Cleanup
-    ImGui_ImplDX12_Shutdown();
-    ImGui_ImplWin32_Shutdown();
-    ImGui::DestroyContext();
+	if (m_imgui_SrvDescHeap)
+	{
+		ImGui_ImplDX12_Shutdown();
+		ImGui_ImplWin32_Shutdown();
+		ImGui::DestroyContext();
 
-    m_imgui_SrvDescHeap.Reset();
+		m_imgui_SrvDescHeap.Reset();
+	}
 }
 
 void jRHI_DX12::RenderUI(ID3D12GraphicsCommandList* pCommandList, ID3D12Resource* pRenderTarget, D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle
@@ -1870,6 +2057,7 @@ void jRHI_DX12::RenderUI(ID3D12GraphicsCommandList* pCommandList, ID3D12Resource
     // Rendering UI
     ImGui::Render();
 
+	if (beforeResourceState != D3D12_RESOURCE_STATE_RENDER_TARGET)
 	{
 		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 			pRenderTarget, beforeResourceState, D3D12_RESOURCE_STATE_RENDER_TARGET);
@@ -1881,6 +2069,7 @@ void jRHI_DX12::RenderUI(ID3D12GraphicsCommandList* pCommandList, ID3D12Resource
     pCommandList->SetDescriptorHeaps(1, &pDescriptorHeap);
     ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), pCommandList);
 
+	if (D3D12_RESOURCE_STATE_RENDER_TARGET != afterResourceState)
 	{
 		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 			pRenderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, afterResourceState);

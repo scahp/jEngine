@@ -74,7 +74,7 @@ public:
 	}
 
 	HRESULT Initialize();
-	ComPtr<IDxcBlob> Compile(const wchar_t* InFilename, const wchar_t* InTargetString) const;
+	ComPtr<IDxcBlob> Compile(const wchar_t* InFilename, const wchar_t* InTargetString, const wchar_t* InEntryPoint = nullptr, bool InRowMajorMatrix = false) const;
 
 public:
 	jShaderCompiler_DX12(jShaderCompiler_DX12 const&) = delete;

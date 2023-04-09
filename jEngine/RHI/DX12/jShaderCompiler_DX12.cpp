@@ -98,7 +98,7 @@ HRESULT jShaderCompiler_DX12::Initialize()
 	return m_dxc.Initialize();
 }
 
-ComPtr<IDxcBlob> jShaderCompiler_DX12::Compile(const wchar_t* InFilename, const wchar_t* InTargetString) const
+ComPtr<IDxcBlob> jShaderCompiler_DX12::Compile(const wchar_t* InFilename, const wchar_t* InTargetString, const wchar_t* InEntryPoint, bool InRowMajorMatrix) const
 {
 	if (!m_dxc.IsEnable())
 		return nullptr;
@@ -127,7 +127,9 @@ ComPtr<IDxcBlob> jShaderCompiler_DX12::Compile(const wchar_t* InFilename, const 
 
 	std::vector<const wchar_t*> options;
 	options.push_back(TEXT("-WX"));				// Treat warnings as errors.
-	options.push_back(TEXT("-Zpr"));			// Pack matrices in row-major order.
+	
+	if (InRowMajorMatrix)
+		options.push_back(TEXT("-Zpr"));			// Pack matrices in row-major order.
 
 #ifdef _DEBUG
 	options.push_back(TEXT("-Zi"));				// Debug info.
@@ -139,7 +141,7 @@ ComPtr<IDxcBlob> jShaderCompiler_DX12::Compile(const wchar_t* InFilename, const 
 
 	// Compile
 	ComPtr<IDxcOperationResult> result;
-	if (JFAIL(Compiler->Compile(textBlob.Get(), InFilename, TEXT(""), InTargetString
+	if (JFAIL(Compiler->Compile(textBlob.Get(), InFilename, InEntryPoint, InTargetString
 		, &options[0], (uint32)options.size(), nullptr, 0, nullptr, &result)))
 	{
 		return nullptr;
