@@ -994,7 +994,7 @@ bool jRHI_DX12::Initialize()
 	StructuredBufferColor[1] = { 0.0f, 1.0f, 0.0f, 1.0f };
 	StructuredBufferColor[2] = { 0.0f, 0.0f, 1.0f, 1.0f };
     SimpleStructuredBuffer = jBufferUtil_DX12::CreateBuffer(sizeof(StructuredBufferColor)
-        , D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT, true, false, D3D12_RESOURCE_STATE_COMMON, &StructuredBufferColor, sizeof(StructuredBufferColor));
+        , sizeof(Vector4), true, false, D3D12_RESOURCE_STATE_COMMON, &StructuredBufferColor, sizeof(StructuredBufferColor));
 	jBufferUtil_DX12::CreateShaderResourceView(SimpleStructuredBuffer, sizeof(StructuredBufferColor[0]), _countof(StructuredBufferColor));
 	//////////////////////////////////////////////////////////////////////////
 
