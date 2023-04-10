@@ -264,6 +264,7 @@ public:
   //  bool BuildTopLevelAS(ComPtr<ID3D12GraphicsCommandList4>& InCommandList, TopLevelAccelerationStructureBuffers& InBuffers, bool InIsUpdate, float InRotationY, Vector InTranslation);
 
 	jBuffer_DX12* SimpleConstantBuffer = nullptr;
+	jBuffer_DX12* SimpleStructuredBuffer = nullptr;
 
     bool OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimized);
     bool OnHandleDeviceLost();

@@ -979,32 +979,24 @@ bool jRHI_DX12::Initialize()
 
 	jSimpleConstantBuffer ConstantBuffer;
 	ConstantBuffer.M.SetIdentity();
-	Matrix Projection = jCameraUtil::CreatePerspectiveMatrix(SCR_WIDTH, SCR_HEIGHT, DegreeToRadian(90.0f), 0.01f, 1000.0f);
-	Matrix Camera = jCameraUtil::CreateViewMatrix(Vector::FowardVector * 500.0f, Vector::ZeroVector, Vector::UpVector);
+	Matrix Projection = jCameraUtil::CreatePerspectiveMatrix((float)SCR_WIDTH, (float)SCR_HEIGHT, DegreeToRadian(90.0f), 0.01f, 1000.0f);
+	Matrix Camera = jCameraUtil::CreateViewMatrix(Vector::FowardVector * 5.0f, Vector::ZeroVector, Vector::UpVector);
 	ConstantBuffer.M = Projection * Camera * ConstantBuffer.M;
-	
-	//ConstantBuffer.M.Scale(10);
-	//ConstantBuffer.M.m30 = 0.5f;
-	//ConstantBuffer.M.m31 = 0.5f;
-	//ConstantBuffer.M.m32 = 0.5f;
-	//ConstantBuffer.M.SetTranspose();
-
-    const float m_aspectRatio = SCR_WIDTH / (float)SCR_HEIGHT;
-
-    const float fovAngleY = 45.0f;
-	const XMMATRIX view = XMMatrixLookAtLH({ 0.0f, 0.0f, 5.0f }, { 0.0f, 0.0f, 0.0f }, {0.0f, 1.0f, 0.0f});
-    const XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(fovAngleY), m_aspectRatio, 0.01f, 125.0f);
-    const XMMATRIX viewProj = view * proj;
-	check(sizeof(ConstantBuffer) == sizeof(viewProj));
-	memcpy(&ConstantBuffer, &viewProj, sizeof(viewProj));
-    //m_sceneCB[i].cameraDirection = XMVector3Normalize(m_at - m_eye);
-	ConstantBuffer.M.SetTranspose();
+    ConstantBuffer.M.SetTranspose();
 
 	SimpleConstantBuffer = jBufferUtil_DX12::CreateBuffer(sizeof(ConstantBuffer)
-		, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT, true, false, D3D12_RESOURCE_STATE_INDEX_BUFFER, &ConstantBuffer, sizeof(ConstantBuffer));
+		, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT, true, false, D3D12_RESOURCE_STATE_COMMON, &ConstantBuffer, sizeof(ConstantBuffer));
 	jBufferUtil_DX12::CreateConstantBufferView(SimpleConstantBuffer);
 
-	memcpy(SimpleConstantBuffer->GetMappedPointer(), &ConstantBuffer, sizeof(ConstantBuffer));
+    // StructuredBuffer test
+    Vector4 StructuredBufferColor[3];
+	StructuredBufferColor[0] = { 1.0f, 0.0f, 0.0f, 1.0f };
+	StructuredBufferColor[1] = { 0.0f, 1.0f, 0.0f, 1.0f };
+	StructuredBufferColor[2] = { 0.0f, 0.0f, 1.0f, 1.0f };
+    SimpleStructuredBuffer = jBufferUtil_DX12::CreateBuffer(sizeof(StructuredBufferColor)
+        , D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT, true, false, D3D12_RESOURCE_STATE_COMMON, &StructuredBufferColor, sizeof(StructuredBufferColor));
+	jBufferUtil_DX12::CreateShaderResourceView(SimpleStructuredBuffer, sizeof(StructuredBufferColor[0]), _countof(StructuredBufferColor));
+	//////////////////////////////////////////////////////////////////////////
 
 	////////////////////////////////////////////////////////////////////////////
 	//// 12. AccelerationStructures
@@ -1137,21 +1129,30 @@ bool jRHI_DX12::Initialize()
 	WaitForGPU();
 
 	D3D12_ROOT_SIGNATURE_DESC1 rootSignatureDesc = {};
-	D3D12_DESCRIPTOR_RANGE1 range[1];
+
+	D3D12_DESCRIPTOR_RANGE1 range[2];
 	range[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
 	range[0].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
 	range[0].NumDescriptors = 1;
 	range[0].BaseShaderRegister = 0;
 	range[0].RegisterSpace = 0;
-	range[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	range[0].OffsetInDescriptorsFromTableStart = SimpleConstantBuffer->CBV.Index;				// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
+
+	// StructuredBuffer test
+    range[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    range[1].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
+    range[1].NumDescriptors = 1;
+    range[1].BaseShaderRegister = 0;
+    range[1].RegisterSpace = 0;
+	range[1].OffsetInDescriptorsFromTableStart = SimpleStructuredBuffer->SRV.Index;				// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
 
 	D3D12_ROOT_PARAMETER1 rootParameter[1];
 	rootParameter[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
     rootParameter[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-	rootParameter[0].DescriptorTable.NumDescriptorRanges = 1;
+	rootParameter[0].DescriptorTable.NumDescriptorRanges = _countof(range);
 	rootParameter[0].DescriptorTable.pDescriptorRanges = range;
 
-	rootSignatureDesc.NumParameters = 1;
+	rootSignatureDesc.NumParameters = _countof(rootParameter);
 	rootSignatureDesc.pParameters = rootParameter;
 	rootSignatureDesc.NumStaticSamplers = 0;
 	rootSignatureDesc.pStaticSamplers = nullptr;
@@ -1163,8 +1164,12 @@ bool jRHI_DX12::Initialize()
 
 	ComPtr<ID3DBlob> signature;
 	ComPtr<ID3DBlob> error;
-	if (JFAIL(D3D12SerializeVersionedRootSignature(&versionedDesc, &signature, &error)))
+	if (S_OK != D3D12SerializeVersionedRootSignature(&versionedDesc, &signature, &error))
+	{
+		OutputDebugStringA(reinterpret_cast<const char*>(error->GetBufferPointer()));
+        check(0);
 		return false;
+	}
 
 	if (JFAIL(Device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&SimpleRootSignature))))
 		return false;
@@ -1333,6 +1338,10 @@ void jRHI_DX12::Release()
 
 	delete SimpleConstantBuffer;
 	SimpleConstantBuffer = nullptr;
+
+	// StructuredBuffer test
+	delete SimpleStructuredBuffer;
+	SimpleStructuredBuffer = nullptr;
 
 	////////////////////////////////////////////////////////////////////////////
 	//// 10. DXR PipeplineStateObject
@@ -1624,8 +1633,8 @@ void jRHI_DX12::Render()
 	D3D12_VIEWPORT viewport;
 	viewport.TopLeftX = 0;
 	viewport.TopLeftY = 0;
-	viewport.Width = SCR_WIDTH;
-	viewport.Height = SCR_HEIGHT;
+	viewport.Width = (float)SCR_WIDTH;
+	viewport.Height = (float)SCR_HEIGHT;
 	viewport.MinDepth = D3D12_MIN_DEPTH;
 	viewport.MaxDepth = D3D12_MAX_DEPTH;
 
@@ -1639,7 +1648,7 @@ void jRHI_DX12::Render()
 
 	ID3D12DescriptorHeap* ppHeaps[] = { SRVDescriptorHeap.Heap.Get() };
 	GraphicsCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
-	GraphicsCommandList->SetGraphicsRootDescriptorTable(0, SimpleConstantBuffer->CBV.GPUHandle);
+	GraphicsCommandList->SetGraphicsRootDescriptorTable(0, SRVDescriptorHeap.GPUHandleStart);		// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
 
 	GraphicsCommandList->RSSetViewports(1, &viewport);
 	GraphicsCommandList->RSSetScissorRects(1, &ScissorRect);
