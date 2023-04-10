@@ -519,8 +519,6 @@ bool jRHI_DX12::Initialize()
 	SwapChain = new jSwapchain_DX12();
 	SwapChain->Create();
 
-	ShowWindow(m_hWnd, SW_SHOW);
-
     //////////////////////////////////////////////////////////////////////////
     // 5. Initialize Camera and lighting
     {
@@ -1279,9 +1277,9 @@ bool jRHI_DX12::Initialize()
 	}
 	
 	//////////////////////////////////////////////////////////////////////////
-	ShowWindow(m_hWnd, SW_SHOW);
-
     InitializeImGui();
+
+	ShowWindow(m_hWnd, SW_SHOW);
 
     return true;
 }

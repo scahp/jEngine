@@ -20,7 +20,7 @@ struct TransformBuffer
     float4x4 World;
 };
 
-cbuffer TransformParam : register(b0, space0) { TransformBuffer TransformParam; }
+ConstantBuffer<TransformBuffer> TransformParam : register(b0, space0);
 
 PSInput VSMain(float3 position : POSITION, float3 normal : NORMAL)
 {
