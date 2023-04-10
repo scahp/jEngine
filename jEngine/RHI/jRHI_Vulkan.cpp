@@ -823,7 +823,7 @@ jVertexBuffer* jRHI_Vulkan::CreateVertexBuffer(const std::shared_ptr<jVertexStre
 jTexture* jRHI_Vulkan::CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
 	, ETextureFormat textureFormat, bool createMipmap) const
 {
-    VkDeviceSize imageSize = width * height * GetVulkanTextureComponentCount(textureFormat);
+    VkDeviceSize imageSize = width * height * GetVulkanTexturePixelSize(textureFormat);
     const uint32 MipLevels = static_cast<uint32>(std::floor(std::log2(std::max<int>(width, height)))) + 1;
 
 	jBuffer_Vulkan stagingBuffer;
@@ -1964,7 +1964,7 @@ jTexture* jRHI_Vulkan::CreateSampleVRSTexture()
         jVulkanBufferUtil::CreateImage(imageExtent.width, imageExtent.height, 1, (VkSampleCountFlagBits)1, GetVulkanTextureFormat(ETextureFormat::R8UI), VK_IMAGE_TILING_OPTIMAL
             , VK_IMAGE_USAGE_SHADING_RATE_IMAGE_BIT_NV | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, *NewVRSTexture);
 
-        VkDeviceSize imageSize = imageExtent.width * imageExtent.height * GetVulkanTextureComponentCount(ETextureFormat::R8UI);
+        VkDeviceSize imageSize = imageExtent.width * imageExtent.height * GetVulkanTexturePixelSize(ETextureFormat::R8UI);
         jBuffer_Vulkan stagingBuffer;
         jVulkanBufferUtil::AllocateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
             , imageSize, stagingBuffer);
