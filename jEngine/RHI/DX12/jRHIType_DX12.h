@@ -62,6 +62,41 @@ FORCEINLINE auto GetDX12TextureComponentCount(ETextureFormat type)
     );
 }
 
+FORCEINLINE auto GetDX12TexturePixelSize(ETextureFormat type)
+{
+    GENERATE_STATIC_CONVERSION_ARRAY(
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB8, 4),                       // not support rgb8 -> rgba8
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB32F, 12),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB16F, 8),                     // not support rgb16 -> rgba16
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::R11G11B10F, 4),
+
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8, 4),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA16F, 8),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA32F, 16),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8SI, 4),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8UI, 4),
+
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::BGRA8, 4),
+
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::R8, 1),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::R16F, 2),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::R32F, 4),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::R8UI, 1),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::R32UI, 4),
+
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RG8, 2),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RG16F, 2),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::RG32F, 4),
+
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::D16, 2),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::D16_S8, 3),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::D24, 3),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::D24_S8, 4),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::D32, 4),
+        CONVERSION_TYPE_ELEMENT(ETextureFormat::D32_S8, 5)
+    );
+}
+
 GENERATE_CONVERSION_FUNCTION(GetDX12TextureDemension,
     CONVERSION_TYPE_ELEMENT(ETextureType::TEXTURE_2D, D3D12_RESOURCE_DIMENSION_TEXTURE2D),
     CONVERSION_TYPE_ELEMENT(ETextureType::TEXTURE_2D_ARRAY, D3D12_RESOURCE_DIMENSION_TEXTURE2D),

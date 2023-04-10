@@ -10,6 +10,7 @@
 #include "../jSwapchain.h"
 #include "jFenceManager_DX12.h"
 #include "Scene/jCamera.h"
+#include "FileLoader/jImageFileLoader.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -424,8 +425,10 @@ void jRHI_DX12::WaitForGPU()
 	}
 }
 
-bool jRHI_DX12::Initialize()
+bool jRHI_DX12::InitRHI()
 {
+	g_rhi = this;
+
 	// 1. Device
 	uint32 dxgiFactoryFlags = 0;
 
@@ -839,7 +842,7 @@ bool jRHI_DX12::Initialize()
 
 	//////////////////////////////////////////////////////////////////////////
 	// 11. Create vertex and index buffer
-	auto GraphicsCommandList = GraphicsCommandQueue->GetAvailableCommandList();
+	// auto GraphicsCommandList = GraphicsCommandQueue->GetAvailableCommandList();
 
     const int32 slice = 100;
     const int32 verticesCount = ((slice + 1) * (slice / 2) + 2);
@@ -921,45 +924,6 @@ bool jRHI_DX12::Initialize()
 
 	//uint32 indices[] = { 0, 1, 2 };
 
- //   static const Vertex vertices[] = {
-	//{{-1.0f,-1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{-1.0f,-1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{-1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{1.0f, 1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{-1.0f,-1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{-1.0f, 1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{1.0f,-1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{-1.0f,-1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{1.0f,-1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{1.0f, 1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{1.0f,-1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{-1.0f,-1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{-1.0f,-1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{-1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{-1.0f, 1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{1.0f,-1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{-1.0f,-1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{-1.0f,-1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{-1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{-1.0f,-1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{1.0f,-1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{1.0f,-1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{1.0f, 1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{1.0f,-1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{1.0f,-1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{1.0f, 1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{-1.0f, 1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{-1.0f, 1.0f,-1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{-1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
- //   {{-1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
- //   { {1.0f,-1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
- //   };
-
 	VertexBuffer = jBufferUtil_DX12::CreateBuffer(sizeof(vertices), 0, true, false, D3D12_RESOURCE_STATE_COMMON, vertices, sizeof(vertices), TEXT("SphereVB"));
 	IndexBuffer = jBufferUtil_DX12::CreateBuffer(sizeof(indices), 0, true, false, D3D12_RESOURCE_STATE_COMMON, indices, sizeof(indices), TEXT("SphereIB"));
 
@@ -980,7 +944,7 @@ bool jRHI_DX12::Initialize()
 	jSimpleConstantBuffer ConstantBuffer;
 	ConstantBuffer.M.SetIdentity();
 	Matrix Projection = jCameraUtil::CreatePerspectiveMatrix((float)SCR_WIDTH, (float)SCR_HEIGHT, DegreeToRadian(90.0f), 0.01f, 1000.0f);
-	Matrix Camera = jCameraUtil::CreateViewMatrix(Vector::FowardVector * 5.0f, Vector::ZeroVector, Vector::UpVector);
+	Matrix Camera = jCameraUtil::CreateViewMatrix(Vector::FowardVector * 2.0f, Vector::ZeroVector, Vector::UpVector);
 	ConstantBuffer.M = Projection * Camera * ConstantBuffer.M;
     ConstantBuffer.M.SetTranspose();
 
@@ -997,6 +961,10 @@ bool jRHI_DX12::Initialize()
         , sizeof(Vector4), true, false, D3D12_RESOURCE_STATE_COMMON, &StructuredBufferColor, sizeof(StructuredBufferColor));
 	jBufferUtil_DX12::CreateShaderResourceView(SimpleStructuredBuffer, sizeof(StructuredBufferColor[0]), _countof(StructuredBufferColor));
 	//////////////////////////////////////////////////////////////////////////
+
+	// Texture test
+	SimpleTexture = (jTexture_DX12*)jImageFileLoader::GetInstance().LoadTextureFromFile(jName("Image/eye.png"), true).lock().get();
+
 
 	////////////////////////////////////////////////////////////////////////////
 	//// 12. AccelerationStructures
@@ -1124,13 +1092,13 @@ bool jRHI_DX12::Initialize()
  //   if (!ensure(BuildTopLevelAS(GraphicsCommandList, TLASBuffer, false, 0.0f, Vector::ZeroVector)))
  //       return false;
 
-	GraphicsCommandQueue->ExecuteCommandList(GraphicsCommandList);
+	//GraphicsCommandQueue->ExecuteCommandList(GraphicsCommandList);
 
 	WaitForGPU();
 
 	D3D12_ROOT_SIGNATURE_DESC1 rootSignatureDesc = {};
 
-	D3D12_DESCRIPTOR_RANGE1 range[2];
+	D3D12_DESCRIPTOR_RANGE1 range[3];
 	range[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
 	range[0].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
 	range[0].NumDescriptors = 1;
@@ -1146,16 +1114,40 @@ bool jRHI_DX12::Initialize()
     range[1].RegisterSpace = 0;
 	range[1].OffsetInDescriptorsFromTableStart = SimpleStructuredBuffer->SRV.Index;				// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
 
+    // Texture test
+    range[2].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    range[2].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
+    range[2].NumDescriptors = 1;
+    range[2].BaseShaderRegister = 1;
+    range[2].RegisterSpace = 0;
+    range[2].OffsetInDescriptorsFromTableStart = SimpleTexture->SRV.Index;						// Texture test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
+
 	D3D12_ROOT_PARAMETER1 rootParameter[1];
 	rootParameter[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
     rootParameter[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 	rootParameter[0].DescriptorTable.NumDescriptorRanges = _countof(range);
 	rootParameter[0].DescriptorTable.pDescriptorRanges = range;
 
+	// Texture test
+    D3D12_STATIC_SAMPLER_DESC sampler = {};
+    sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+    sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+    sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+    sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+    sampler.MipLODBias = 0;
+    sampler.MaxAnisotropy = 0;
+    sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+    sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+    sampler.MinLOD = 0.0f;
+    sampler.MaxLOD = D3D12_FLOAT32_MAX;
+    sampler.ShaderRegister = 0;
+    sampler.RegisterSpace = 0;
+    sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
 	rootSignatureDesc.NumParameters = _countof(rootParameter);
 	rootSignatureDesc.pParameters = rootParameter;
-	rootSignatureDesc.NumStaticSamplers = 0;
-	rootSignatureDesc.pStaticSamplers = nullptr;
+	rootSignatureDesc.NumStaticSamplers = 1;				// Texture test
+	rootSignatureDesc.pStaticSamplers = &sampler;			// Texture test
 	rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
     D3D12_VERSIONED_ROOT_SIGNATURE_DESC versionedDesc = { };
@@ -1342,6 +1334,10 @@ void jRHI_DX12::Release()
 	// StructuredBuffer test
 	delete SimpleStructuredBuffer;
 	SimpleStructuredBuffer = nullptr;
+
+	// Texture test
+	delete SimpleTexture;
+	SimpleTexture = nullptr;
 
 	////////////////////////////////////////////////////////////////////////////
 	//// 10. DXR PipeplineStateObject
@@ -1986,7 +1982,7 @@ bool jRHI_DX12::OnHandleDeviceLost()
 
 bool jRHI_DX12::OnHandleDeviceRestored()
 {
-    Initialize();
+    InitRHI();
     return true;
 }
 
@@ -1998,6 +1994,8 @@ ComPtr<ID3D12GraphicsCommandList4> jRHI_DX12::BeginSingleTimeCopyCommands()
 void jRHI_DX12::EndSingleTimeCopyCommands(const ComPtr<ID3D12GraphicsCommandList4>& commandBuffer)
 {
 	CopyCommandQueue->ExecuteCommandList(commandBuffer);
+
+	WaitForGPU();
 }
 
 void jRHI_DX12::InitializeImGui()
@@ -2087,40 +2085,25 @@ void jRHI_DX12::RenderUI(ID3D12GraphicsCommandList* pCommandList, ID3D12Resource
 jTexture* jRHI_DX12::CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
     , ETextureFormat textureFormat, bool createMipmap) const
 {
-	// const uint32 standardMSAAPattern = 0xFFFFFFFF;
-	const uint16 MipLevels = static_cast<uint32>(std::floor(std::log2(std::max<int>(width, height)))) + 1;
-	const bool CreateRTV = true;
-	const bool CreateUAV = true;
+	const uint16 MipLevels = createMipmap ? static_cast<uint32>(std::floor(std::log2(std::max<int>(width, height)))) + 1 : 1;
+	jTexture_DX12* Texture = jBufferUtil_DX12::CreateImage(width, height, 1, MipLevels, 1, ETextureType::TEXTURE_2D, textureFormat, false, true);
 
-    D3D12_RESOURCE_DESC textureDesc = { };
-    textureDesc.MipLevels = MipLevels;
-    textureDesc.Format = GetDX12TextureFormat(textureFormat);
-    textureDesc.Width = width;
-    textureDesc.Height = height;
-    if (CreateRTV)
-        textureDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-    if (CreateUAV)
-        textureDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-    textureDesc.DepthOrArraySize = 1;
-    textureDesc.SampleDesc.Count = 1;
-    textureDesc.SampleDesc.Quality = 0;
-    textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    textureDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-    textureDesc.Alignment = 0;
+	// Copy image data from buffer
+	const auto Desc = Texture->Image->GetDesc();
+	uint64 RequiredSize = 0;
+	Device->GetCopyableFootprints(&Desc, 0, 1, 0, nullptr, nullptr, nullptr, &RequiredSize);
 
-	const D3D12_HEAP_PROPERTIES HeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+    const uint64 ImageSize = width * height * GetDX12TexturePixelSize(textureFormat);
+	jBuffer_DX12* buffer = jBufferUtil_DX12::CreateBuffer(RequiredSize, 0, true, false, D3D12_RESOURCE_STATE_GENERIC_READ, data, ImageSize);
+	check(buffer);
 
-	ComPtr<ID3D12Resource> Resource;
-    D3D12_CLEAR_VALUE clearValue = { };
-    clearValue.Format = textureDesc.Format;
-    if (JFAIL(Device->CreateCommittedResource(&HeapProperties, D3D12_HEAP_FLAG_NONE, &textureDesc,
-		D3D12_RESOURCE_STATE_COMMON, CreateRTV ? &clearValue : nullptr, IID_PPV_ARGS(&Resource))))
-	{
-		return nullptr;
-	}
-
-	jTexture_DX12* Texture = new jTexture_DX12(ETextureType::TEXTURE_2D, textureFormat, width, height, 1, EMSAASamples::COUNT_1
-		, MipLevels, sRGB, Resource);
+	ComPtr<ID3D12GraphicsCommandList4> commandList = g_rhi_dx12->BeginSingleTimeCopyCommands();
+	jBufferUtil_DX12::CopyBufferToImage(commandList.Get(), buffer->Buffer.Get(), 0, Texture->Image.Get(), width * height * GetDX12TexturePixelSize(textureFormat));
+	g_rhi_dx12->EndSingleTimeCopyCommands(commandList);
+	delete buffer;
+	
+	// Create SRV
+	jBufferUtil_DX12::CreateShaderResourceView(Texture);
 
 	return Texture;
 }

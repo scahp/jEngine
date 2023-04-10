@@ -214,7 +214,7 @@ public:
     float m_lensRadius = 0.2f;
     //////////////////////////////////////////////////////////////////////////
 
-	bool Initialize();
+	virtual bool InitRHI() override;
     bool Run();
 	void Release();
     
@@ -264,7 +264,8 @@ public:
   //  bool BuildTopLevelAS(ComPtr<ID3D12GraphicsCommandList4>& InCommandList, TopLevelAccelerationStructureBuffers& InBuffers, bool InIsUpdate, float InRotationY, Vector InTranslation);
 
 	jBuffer_DX12* SimpleConstantBuffer = nullptr;
-	jBuffer_DX12* SimpleStructuredBuffer = nullptr;
+	jBuffer_DX12* SimpleStructuredBuffer = nullptr;			// StructuredBuffer test
+	jTexture_DX12* SimpleTexture = nullptr;					// Texture test
 
     bool OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimized);
     bool OnHandleDeviceLost();

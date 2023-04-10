@@ -424,7 +424,9 @@ jRHI_OpenGL::~jRHI_OpenGL()
 
 bool jRHI_OpenGL::InitRHI()
 {
-    // glfw: initialize and configure
+    g_rhi = this;
+
+	// glfw: initialize and configure
 // ------------------------------
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);

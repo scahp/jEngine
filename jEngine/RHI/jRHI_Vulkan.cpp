@@ -108,6 +108,8 @@ jRHI_Vulkan::~jRHI_Vulkan()
 
 bool jRHI_Vulkan::InitRHI()
 {
+    g_rhi = this;
+
     glfwInit();
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);

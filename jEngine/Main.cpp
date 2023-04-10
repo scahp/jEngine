@@ -31,7 +31,7 @@ int main()
 {
     jRHI_DX12 dx12;
     dx12.m_hWnd = dx12.CreateMainWindow();
-    dx12.Initialize();
+    dx12.InitRHI();
     dx12.Run();
     dx12.Release();
 	return 0;
