@@ -516,6 +516,7 @@ bool jRHI_DX12::InitRHI()
     RTVDescriptorHeap.Initialize(EDescriptorHeapTypeDX12::RTV, false);
     DSVDescriptorHeap.Initialize(EDescriptorHeapTypeDX12::DSV, false);
     SRVDescriptorHeap.Initialize(EDescriptorHeapTypeDX12::CBV_SRV_UAV, true);
+	SamplerDescriptorHeap.Initialize(EDescriptorHeapTypeDX12::SAMPLER, true);		// SamplerState test
     //UAVDescriptorHeap.Initialize(EDescriptorHeapTypeDX12::CBV_SRV_UAV, false);
 
 	// 3. Swapchain
@@ -965,6 +966,19 @@ bool jRHI_DX12::InitRHI()
 	// Texture test
 	SimpleTexture = (jTexture_DX12*)jImageFileLoader::GetInstance().LoadTextureFromFile(jName("Image/eye.png"), true).lock().get();
 
+    // SamplerState test
+    D3D12_SAMPLER_DESC samplerDesc = {};
+    samplerDesc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+    samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    samplerDesc.MinLOD = 0;
+    samplerDesc.MaxLOD = D3D12_FLOAT32_MAX;
+    samplerDesc.MipLODBias = 0.0f;
+    samplerDesc.MaxAnisotropy = 1;
+    samplerDesc.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+    SimpleSamplerState = SamplerDescriptorHeap.Alloc();
+    Device->CreateSampler(&samplerDesc, SimpleSamplerState.CPUHandle);
 
 	////////////////////////////////////////////////////////////////////////////
 	//// 12. AccelerationStructures
@@ -1122,32 +1136,31 @@ bool jRHI_DX12::InitRHI()
     range[2].RegisterSpace = 0;
     range[2].OffsetInDescriptorsFromTableStart = SimpleTexture->SRV.Index;						// Texture test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
 
-	D3D12_ROOT_PARAMETER1 rootParameter[1];
+	D3D12_ROOT_PARAMETER1 rootParameter[2];
 	rootParameter[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
     rootParameter[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 	rootParameter[0].DescriptorTable.NumDescriptorRanges = _countof(range);
 	rootParameter[0].DescriptorTable.pDescriptorRanges = range;
 
-	// Texture test
-    D3D12_STATIC_SAMPLER_DESC sampler = {};
-    sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
-    sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-    sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-    sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-    sampler.MipLODBias = 0;
-    sampler.MaxAnisotropy = 0;
-    sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
-    sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
-    sampler.MinLOD = 0.0f;
-    sampler.MaxLOD = D3D12_FLOAT32_MAX;
-    sampler.ShaderRegister = 0;
-    sampler.RegisterSpace = 0;
-    sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	// SamplerState test
+    D3D12_DESCRIPTOR_RANGE1 rangeSecond[1];
+    rangeSecond[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
+    rangeSecond[0].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE;
+    rangeSecond[0].NumDescriptors = 1;
+    rangeSecond[0].BaseShaderRegister = 0;
+    rangeSecond[0].RegisterSpace = 0;
+    rangeSecond[0].OffsetInDescriptorsFromTableStart = SimpleSamplerState.Index;				// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
+
+    rootParameter[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    rootParameter[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+    rootParameter[1].DescriptorTable.NumDescriptorRanges = _countof(rangeSecond);
+    rootParameter[1].DescriptorTable.pDescriptorRanges = rangeSecond;
+	//////////////////////////////////////////////////////////////////////////
 
 	rootSignatureDesc.NumParameters = _countof(rootParameter);
 	rootSignatureDesc.pParameters = rootParameter;
-	rootSignatureDesc.NumStaticSamplers = 1;				// Texture test
-	rootSignatureDesc.pStaticSamplers = &sampler;			// Texture test
+	rootSignatureDesc.NumStaticSamplers = 0;
+	rootSignatureDesc.pStaticSamplers = nullptr;
 	rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
     D3D12_VERSIONED_ROOT_SIGNATURE_DESC versionedDesc = { };
@@ -1366,6 +1379,7 @@ void jRHI_DX12::Release()
 	RTVDescriptorHeap.Release();
 	DSVDescriptorHeap.Release();
 	SRVDescriptorHeap.Release();
+	SamplerDescriptorHeap.Release();		// SamplerState test
 
 	//////////////////////////////////////////////////////////////////////////
 	// 3. Swapchain
@@ -1642,9 +1656,10 @@ void jRHI_DX12::Render()
 
 	GraphicsCommandList->SetGraphicsRootSignature(SimpleRootSignature.Get());
 
-	ID3D12DescriptorHeap* ppHeaps[] = { SRVDescriptorHeap.Heap.Get() };
+	ID3D12DescriptorHeap* ppHeaps[] = { SRVDescriptorHeap.Heap.Get(), SamplerDescriptorHeap.Heap.Get() };		// SamplerState test
 	GraphicsCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 	GraphicsCommandList->SetGraphicsRootDescriptorTable(0, SRVDescriptorHeap.GPUHandleStart);		// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
+	GraphicsCommandList->SetGraphicsRootDescriptorTable(1, SamplerDescriptorHeap.GPUHandleStart);	// SamplerState test
 
 	GraphicsCommandList->RSSetViewports(1, &viewport);
 	GraphicsCommandList->RSSetScissorRects(1, &ScissorRect);
@@ -1783,6 +1798,7 @@ void jRHI_DX12::OnDeviceLost()
 	//m_dxrStateObject.Reset();
 
 	SRVDescriptorHeap.Release();
+	SamplerDescriptorHeap.Release();		// SamplerState test
 	
 	delete VertexBuffer;
 	VertexBuffer = nullptr;
@@ -1952,6 +1968,7 @@ bool jRHI_DX12::OnHandleDeviceLost()
 	Device.Reset();
 
 	SRVDescriptorHeap.Release();
+	SamplerDescriptorHeap.Release();		// SamplerState test
 	
     delete VertexBuffer;
     VertexBuffer = nullptr;

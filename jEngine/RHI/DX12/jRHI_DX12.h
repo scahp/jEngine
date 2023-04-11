@@ -130,6 +130,7 @@ public:
 	jDescriptorHeap_DX12 RTVDescriptorHeap;
 	jDescriptorHeap_DX12 DSVDescriptorHeap;
 	jDescriptorHeap_DX12 SRVDescriptorHeap;
+	jDescriptorHeap_DX12 SamplerDescriptorHeap;		// SamplerState test
 	//jDescriptorHeap_DX12 UAVDescriptorHeap;
 
     //////////////////////////////////////////////////////////////////////////
@@ -194,6 +195,7 @@ public:
 
 	ComPtr<ID3D12RootSignature> SimpleRootSignature;
 	ComPtr<ID3D12PipelineState> SimplePipelineState;
+    jDescriptor_DX12 SimpleSamplerState;					// SamplerState test
 
 	//////////////////////////////////////////////////////////////////////////
 	// 14. Raytracing Output Resouce
