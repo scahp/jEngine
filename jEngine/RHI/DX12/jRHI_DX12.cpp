@@ -611,7 +611,7 @@ bool jRHI_DX12::InitRHI()
 	//	CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc(_countof(rootParameters), rootParameters);
 	//	ComPtr<ID3DBlob> blob;
 	//	ComPtr<ID3DBlob> error;
-	//	if (JFAIL(D3D12SerializeRootSignature(&globalRootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &error)))
+	//	if (JFAIL_E(D3D12SerializeRootSignature(&globalRootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &error), error))
 	//	{
 	//		if (error)
 	//		{
@@ -638,7 +638,7 @@ bool jRHI_DX12::InitRHI()
 //		localRootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
 //		ComPtr<ID3DBlob> blob;
 //		ComPtr<ID3DBlob> error;
-//		if (JFAIL(D3D12SerializeRootSignature(&localRootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &error)))
+//		if (JFAIL_E(D3D12SerializeRootSignature(&localRootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &error), error))
 //		{
 //			if (error)
 //			{
@@ -776,7 +776,7 @@ bool jRHI_DX12::InitRHI()
 //
 //        ComPtr<ID3DBlob> blob;
 //        ComPtr<ID3DBlob> error;
-//        if (JFAIL(D3D12SerializeRootSignature(&emptyDesc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &error)))
+//        if (JFAIL_E(D3D12SerializeRootSignature(&emptyDesc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &error), error))
 //        {
 //            if (error)
 //            {
@@ -1169,12 +1169,8 @@ bool jRHI_DX12::InitRHI()
 
 	ComPtr<ID3DBlob> signature;
 	ComPtr<ID3DBlob> error;
-	if (S_OK != D3D12SerializeVersionedRootSignature(&versionedDesc, &signature, &error))
-	{
-		OutputDebugStringA(reinterpret_cast<const char*>(error->GetBufferPointer()));
-        check(0);
+	if (JFAIL_E(D3D12SerializeVersionedRootSignature(&versionedDesc, &signature, &error), error))
 		return false;
-	}
 
 	if (JFAIL(Device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&SimpleRootSignature))))
 		return false;

@@ -81,6 +81,8 @@ using tchar = wchar_t;
 #define verify(x) JASSERT(x)
 #define JOK(a) (SUCCEEDED(a) ? true : (assert(!(#a)), false))
 #define JFAIL(a) (!JOK(a))
+#define JOK_E(a, errorBlob) (SUCCEEDED(a) ? true : [&errorBlob](){ if (errorBlob) {OutputDebugStringA((const char*)errorBlob->GetBufferPointer());} assert(!#a); return false; }())
+#define JFAIL_E(a, errorBlob) (!JOK_E(a, errorBlob))
 #define JASSERT(a) ((a) ? true : (assert(!(#a)), false))
 #define JMESSAGE(x) MessageBoxA(0, x, "", MB_OK)
 #define check(x) JASSERT(x)

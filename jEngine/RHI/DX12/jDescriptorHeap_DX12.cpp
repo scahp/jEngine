@@ -20,7 +20,10 @@ void jDescriptorHeap_DX12::Initialize(EDescriptorHeapTypeDX12 InHeapType, bool I
         return;
 
     CPUHandleStart = Heap->GetCPUDescriptorHandleForHeapStart();
-    GPUHandleStart = Heap->GetGPUDescriptorHandleForHeapStart();
+    if (InShaderVisible)
+        GPUHandleStart = Heap->GetGPUDescriptorHandleForHeapStart();
+    else
+        GPUHandleStart.ptr = (UINT64)-1;
 
     DescriptorSize = g_rhi_dx12->Device->GetDescriptorHandleIncrementSize(HeapTypeDX12);
     NumOfDescriptors = InNumOfDescriptors;

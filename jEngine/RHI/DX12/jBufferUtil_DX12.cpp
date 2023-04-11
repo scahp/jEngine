@@ -116,6 +116,7 @@ ComPtr<ID3D12Resource> CreateImageInternal(uint32 InWidth, uint32 InHeight, uint
 
     ComPtr<ID3D12Resource> Image;
     D3D12_CLEAR_VALUE clearValue = { };
+    clearValue.Format = InFormat;
     if (JFAIL(g_rhi_dx12->Device->CreateCommittedResource(&HeapProperties, D3D12_HEAP_FLAG_NONE,
         &TexDesc, InResourceState, InIsRTV ? &clearValue : nullptr, IID_PPV_ARGS(&Image))))
     {
@@ -336,6 +337,12 @@ void CreateUnorderedAccessView(jTexture_DX12* InTexture)
         Desc.Texture2DArray.FirstArraySlice = 0;
         Desc.Texture2DArray.MipSlice = 0;
         Desc.Texture2DArray.PlaneSlice = 0;
+        break;
+    case ETextureType::TEXTURE_CUBE:
+        Desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+        Desc.Texture3D.FirstWSlice = 0;
+        Desc.Texture3D.MipSlice = 0;
+        Desc.Texture3D.WSize = InTexture->LayerCount;
         break;
     default:
         check(0);
