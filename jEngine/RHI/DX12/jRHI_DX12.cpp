@@ -12,6 +12,8 @@
 #include "Scene/jCamera.h"
 #include "FileLoader/jImageFileLoader.h"
 
+#define USE_INLINE_DESCRIPTOR 0
+
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
 
@@ -1112,6 +1114,7 @@ bool jRHI_DX12::InitRHI()
 
 	D3D12_ROOT_SIGNATURE_DESC1 rootSignatureDesc = {};
 
+#if USE_DESCRIPTOR_TABLE
 	D3D12_DESCRIPTOR_RANGE1 range[3];
 	range[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
 	range[0].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
@@ -1155,13 +1158,62 @@ bool jRHI_DX12::InitRHI()
     rootParameter[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
     rootParameter[1].DescriptorTable.NumDescriptorRanges = _countof(rangeSecond);
     rootParameter[1].DescriptorTable.pDescriptorRanges = rangeSecond;
-	//////////////////////////////////////////////////////////////////////////
 
-	rootSignatureDesc.NumParameters = _countof(rootParameter);
-	rootSignatureDesc.pParameters = rootParameter;
-	rootSignatureDesc.NumStaticSamplers = 0;
-	rootSignatureDesc.pStaticSamplers = nullptr;
-	rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+    rootSignatureDesc.NumParameters = _countof(rootParameter);
+    rootSignatureDesc.pParameters = rootParameter;
+    rootSignatureDesc.NumStaticSamplers = 0;
+    rootSignatureDesc.pStaticSamplers = nullptr;
+    rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+#else
+	D3D12_ROOT_PARAMETER1 rootParameter[3];
+	rootParameter[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParameter[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	rootParameter[0].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
+	rootParameter[0].Descriptor.ShaderRegister = 0;
+	rootParameter[0].Descriptor.RegisterSpace = 0;
+
+    rootParameter[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+    rootParameter[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+    rootParameter[1].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
+    rootParameter[1].Descriptor.ShaderRegister = 0;									// SRV is different register from CBV, so restarting index
+    rootParameter[1].Descriptor.RegisterSpace = 0;
+
+	// Inline SRV can only be Raw or Structurred buffers, so texture resource could be bound by using DescriptorTable
+	D3D12_DESCRIPTOR_RANGE1 range[1];
+    range[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    range[0].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
+    range[0].NumDescriptors = 1;
+    range[0].BaseShaderRegister = 1;
+    range[0].RegisterSpace = 0;
+    range[0].OffsetInDescriptorsFromTableStart = SimpleTexture->SRV.Index;						// Texture test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
+
+    rootParameter[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    rootParameter[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	rootParameter[2].DescriptorTable.NumDescriptorRanges = 1;
+	rootParameter[2].DescriptorTable.pDescriptorRanges = range;
+
+    D3D12_STATIC_SAMPLER_DESC staticSamplerDesc = {};
+    staticSamplerDesc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+    staticSamplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    staticSamplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    staticSamplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    staticSamplerDesc.MinLOD = 0;
+    staticSamplerDesc.MaxLOD = D3D12_FLOAT32_MAX;
+    staticSamplerDesc.MipLODBias = 0.0f;
+    staticSamplerDesc.MaxAnisotropy = 1;
+    staticSamplerDesc.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+	staticSamplerDesc.ShaderRegister = 0;
+	staticSamplerDesc.RegisterSpace = 0;
+	staticSamplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+    rootSignatureDesc.NumParameters = _countof(rootParameter);
+    rootSignatureDesc.pParameters = rootParameter;
+    rootSignatureDesc.NumStaticSamplers = 1;
+    rootSignatureDesc.pStaticSamplers = &staticSamplerDesc;
+    rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+#endif
+
+	//////////////////////////////////////////////////////////////////////////
 
     D3D12_VERSIONED_ROOT_SIGNATURE_DESC versionedDesc = { };
     versionedDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
@@ -1652,10 +1704,18 @@ void jRHI_DX12::Render()
 
 	GraphicsCommandList->SetGraphicsRootSignature(SimpleRootSignature.Get());
 
+#if USE_DESCRIPTOR_TABLE
 	ID3D12DescriptorHeap* ppHeaps[] = { SRVDescriptorHeap.Heap.Get(), SamplerDescriptorHeap.Heap.Get() };		// SamplerState test
 	GraphicsCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 	GraphicsCommandList->SetGraphicsRootDescriptorTable(0, SRVDescriptorHeap.GPUHandleStart);		// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
 	GraphicsCommandList->SetGraphicsRootDescriptorTable(1, SamplerDescriptorHeap.GPUHandleStart);	// SamplerState test
+#else
+	ID3D12DescriptorHeap* ppHeaps[] = { SRVDescriptorHeap.Heap.Get() };								// SamplerState test
+	GraphicsCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+	GraphicsCommandList->SetGraphicsRootConstantBufferView(0, SimpleConstantBuffer->GetGPUAddress());
+	GraphicsCommandList->SetGraphicsRootShaderResourceView(1, SimpleStructuredBuffer->GetGPUAddress());
+	GraphicsCommandList->SetGraphicsRootDescriptorTable(2, SRVDescriptorHeap.GPUHandleStart);		// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
+#endif
 
 	GraphicsCommandList->RSSetViewports(1, &viewport);
 	GraphicsCommandList->RSSetScissorRects(1, &ScissorRect);
