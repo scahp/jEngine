@@ -144,15 +144,10 @@ jTexture_DX12* CreateImage(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers
     return Texture;
 }
 
-void CopyBufferToImage(ID3D12GraphicsCommandList4* InCommandBuffer, ID3D12Resource* InBuffer, uint64 InBufferOffset, ID3D12Resource* InImage, uint32 InSize)
+uint64 CopyBufferToImage(ID3D12GraphicsCommandList4* InCommandBuffer, ID3D12Resource* InBuffer, uint64 InBufferOffset, ID3D12Resource* InImage, int32 InImageSubresourceIndex)
 {
     check(InCommandBuffer);
 
-    D3D12_TEXTURE_COPY_LOCATION dst = {};
-    dst.pResource = InImage;
-    dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-    dst.SubresourceIndex = 0;
-    
     const auto imageDesc = InImage->GetDesc();
     D3D12_PLACED_SUBRESOURCE_FOOTPRINT layout = {};
     uint32 numRow = 0;
@@ -162,12 +157,29 @@ void CopyBufferToImage(ID3D12GraphicsCommandList4* InCommandBuffer, ID3D12Resour
     check(g_rhi_dx12->Device);
     g_rhi_dx12->Device->GetCopyableFootprints(&imageDesc, 0, 1, 0, &layout, &numRow, &rowSize, &textureMemorySize);
 
+    D3D12_TEXTURE_COPY_LOCATION dst = {};
+    dst.pResource = InImage;
+    dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+    dst.SubresourceIndex = InImageSubresourceIndex;
+    
     D3D12_TEXTURE_COPY_LOCATION src = {};
     src.pResource = InBuffer;
     src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
     src.PlacedFootprint = layout;
-    src.PlacedFootprint.Offset = 0;
+    src.PlacedFootprint.Offset = InBufferOffset;
     InCommandBuffer->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+
+    return textureMemorySize;
+}
+
+uint64 CopyBufferToImage(ID3D12GraphicsCommandList4* InCommandBuffer, ID3D12Resource* InBuffer, uint64 InBufferOffset, ID3D12Resource* InImage
+    , int32 InNumOfImageSubresource, int32 InStartImageSubresource)
+{
+    for (int32 i = 0; i < InNumOfImageSubresource; ++i)
+    {
+        InBufferOffset += CopyBufferToImage(InCommandBuffer, InBuffer, InBufferOffset, InImage, i);
+    }
+    return InBufferOffset;      // total size of copy data
 }
 
 void CopyBuffer(ID3D12GraphicsCommandList4* InCommandBuffer, ID3D12Resource* InSrcBuffer, ID3D12Resource* InDstBuffer, uint64 InSize, uint64 InSrcOffset, uint64 InDstOffset)

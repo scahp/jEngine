@@ -24,6 +24,7 @@ struct TransformBuffer
 ConstantBuffer<TransformBuffer> TransformParam : register(b0, space0);
 StructuredBuffer<float4> Colors : register(t0, space0);                                 // StructuredBuffer test
 Texture2D SimpleTexture : register(t1, space0);
+TextureCube textureCubeMap : register(t2, space0);                                      // Cube texture test
 SamplerState SimpleSamplerState : register(s0, space0);
 
 PSInput VSMain(float3 position : POSITION, float3 normal : NORMAL)
@@ -41,5 +42,7 @@ PSInput VSMain(float3 position : POSITION, float3 normal : NORMAL)
 
 float4 PSMain(PSInput input) : SV_TARGET
 {
-    return SimpleTexture.Sample(SimpleSamplerState, input.uv * 0.5 + 0.5) + input.color;
+    float4 Tex2DColor = SimpleTexture.Sample(SimpleSamplerState, input.uv * 0.5 + 0.5);         // Texture test
+    float4 TexCubeColor = textureCubeMap.Sample(SimpleSamplerState, float3(input.uv, 0.0));     // Cube texture test
+    return Tex2DColor + TexCubeColor + input.color;
 }

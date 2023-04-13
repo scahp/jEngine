@@ -968,6 +968,58 @@ bool jRHI_DX12::InitRHI()
 	// Texture test
 	SimpleTexture = (jTexture_DX12*)jImageFileLoader::GetInstance().LoadTextureFromFile(jName("Image/eye.png"), true).lock().get();
 
+	// Cube texture test
+	{
+        const uint64 CubeMapRes = 128;
+        const uint64 NumTexels = CubeMapRes * CubeMapRes * 6;
+
+		std::vector<Vector4> texels;
+		texels.resize(CubeMapRes* CubeMapRes * 6);
+
+		Vector4 faceColor[6] = {
+			Vector4(1.0f, 0.0f, 0.0f, 1.0f),
+			Vector4(0.0f, 1.0f, 0.0f, 1.0f),
+			Vector4(1.0f, 1.0f, 0.0f, 1.0f),
+			Vector4(0.0f, 0.0f, 1.0f, 1.0f),
+			Vector4(1.0f, 0.0f, 1.0f, 1.0f),
+			Vector4(1.0f, 1.0f, 1.0f, 1.0f)
+		};
+
+        for (uint64 s = 0; s < 6; ++s)
+        {
+            for (uint64 y = 0; y < CubeMapRes; ++y)
+            {
+                for (uint64 x = 0; x < CubeMapRes; ++x)
+                {
+					const uint64 idx = (s * CubeMapRes * CubeMapRes) + (y * CubeMapRes) + x;
+					texels[idx] = faceColor[s];
+                }
+            }
+        }
+
+		const ETextureFormat simpleTextureFormat = ETextureFormat::RGBA32F;
+		SimpleTextureCube = jBufferUtil_DX12::CreateImage(CubeMapRes, CubeMapRes, 6, 1, 1, ETextureType::TEXTURE_CUBE, simpleTextureFormat, false, false);
+
+        // Copy image data from buffer
+        const auto Desc = SimpleTextureCube->Image->GetDesc();
+        uint64 RequiredSize = 0;
+        Device->GetCopyableFootprints(&Desc, 0, 6, 0, nullptr, nullptr, nullptr, &RequiredSize);
+
+        const uint64 ImageSize = CubeMapRes * CubeMapRes * GetDX12TexturePixelSize(simpleTextureFormat) * 6;
+
+        // todo : recycle temp buffer
+        jBuffer_DX12* buffer = jBufferUtil_DX12::CreateBuffer(RequiredSize, 0, true, false, D3D12_RESOURCE_STATE_GENERIC_READ, &texels[0], ImageSize);
+        check(buffer);
+
+        ComPtr<ID3D12GraphicsCommandList4> commandList = g_rhi_dx12->BeginSingleTimeCopyCommands();
+        jBufferUtil_DX12::CopyBufferToImage(commandList.Get(), buffer->Buffer.Get(), 0, SimpleTextureCube->Image.Get(), 6, 0);
+
+        g_rhi_dx12->EndSingleTimeCopyCommands(commandList);
+        delete buffer;
+
+		jBufferUtil_DX12::CreateShaderResourceView(SimpleTextureCube);
+	}
+
     // SamplerState test
     D3D12_SAMPLER_DESC samplerDesc = {};
     samplerDesc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
@@ -1179,7 +1231,7 @@ bool jRHI_DX12::InitRHI()
     rootParameter[1].Descriptor.RegisterSpace = 0;
 
 	// Inline SRV can only be Raw or Structurred buffers, so texture resource could be bound by using DescriptorTable
-	D3D12_DESCRIPTOR_RANGE1 range[1];
+	D3D12_DESCRIPTOR_RANGE1 range[2];
     range[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
     range[0].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
     range[0].NumDescriptors = 1;
@@ -1187,9 +1239,17 @@ bool jRHI_DX12::InitRHI()
     range[0].RegisterSpace = 0;
     range[0].OffsetInDescriptorsFromTableStart = SimpleTexture->SRV.Index;						// Texture test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
 
+	// Cube texture test
+    range[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    range[1].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
+    range[1].NumDescriptors = 1;
+    range[1].BaseShaderRegister = 2;
+    range[1].RegisterSpace = 0;
+    range[1].OffsetInDescriptorsFromTableStart = SimpleTextureCube->SRV.Index;						// Texture test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
+
     rootParameter[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
     rootParameter[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-	rootParameter[2].DescriptorTable.NumDescriptorRanges = 1;
+	rootParameter[2].DescriptorTable.NumDescriptorRanges = _countof(range);
 	rootParameter[2].DescriptorTable.pDescriptorRanges = range;
 
     D3D12_STATIC_SAMPLER_DESC staticSamplerDesc = {};
@@ -2167,11 +2227,13 @@ jTexture* jRHI_DX12::CreateTextureFromData(void* data, int32 width, int32 height
 	Device->GetCopyableFootprints(&Desc, 0, 1, 0, nullptr, nullptr, nullptr, &RequiredSize);
 
     const uint64 ImageSize = width * height * GetDX12TexturePixelSize(textureFormat);
+
+	// todo : recycle temp buffer
 	jBuffer_DX12* buffer = jBufferUtil_DX12::CreateBuffer(RequiredSize, 0, true, false, D3D12_RESOURCE_STATE_GENERIC_READ, data, ImageSize);
 	check(buffer);
 
 	ComPtr<ID3D12GraphicsCommandList4> commandList = g_rhi_dx12->BeginSingleTimeCopyCommands();
-	jBufferUtil_DX12::CopyBufferToImage(commandList.Get(), buffer->Buffer.Get(), 0, Texture->Image.Get(), width * height * GetDX12TexturePixelSize(textureFormat));
+	jBufferUtil_DX12::CopyBufferToImage(commandList.Get(), buffer->Buffer.Get(), 0, Texture->Image.Get());
 	g_rhi_dx12->EndSingleTimeCopyCommands(commandList);
 	delete buffer;
 	
