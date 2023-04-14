@@ -162,6 +162,7 @@ xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"</Command
     <ClInclude Include="RHI\DX12\jFenceManager_DX12.h" />
     <ClInclude Include="RHI\DX12\jRHIType_DX12.h" />
     <ClInclude Include="RHI\DX12\jRHI_DX12.h" />
+    <ClInclude Include="RHI\DX12\jRingBuffer_DX12.h" />
     <ClInclude Include="RHI\DX12\jShaderCompiler_DX12.h" />
     <ClInclude Include="RHI\DX12\jSwapchain_DX12.h" />
     <ClInclude Include="RHI\DX12\jTexture_DX12.h" />
@@ -344,6 +345,7 @@ xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"</Command
     <ClCompile Include="RHI\DX12\jDescriptorHeap_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jFenceManager_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jRHI_DX12.cpp" />
+    <ClCompile Include="RHI\DX12\jRingBuffer_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jShaderCompiler_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jSwapchain_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jTexture_DX12.cpp" />

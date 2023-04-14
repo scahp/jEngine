@@ -17,7 +17,7 @@ class jSwapchain_DX12;
 struct jBuffer_DX12;
 struct jTexture_DX12;
 struct jBuffer_DX12;
-
+struct jRingBuffer_DX12;
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -280,6 +280,11 @@ public:
 	virtual jTexture* CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
 		, ETextureFormat textureFormat = ETextureFormat::RGBA8, bool createMipmap = false) const override;
 	virtual jFenceManager* GetFenceManager() override { return &FenceManager; }
+
+	std::vector<jRingBuffer_DX12*> OneFrameUniformRingBuffers;
+
+	ComPtr<ID3D12RootSignature> OneFrameRootSignature[3];
+	jRingBuffer_DX12* GetOneFrameUniformRingBuffer() const { return OneFrameUniformRingBuffers[CurrentFrameIndex]; }
 };
 
 extern jRHI_DX12* g_rhi_dx12;

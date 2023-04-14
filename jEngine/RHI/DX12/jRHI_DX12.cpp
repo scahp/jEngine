@@ -11,11 +11,18 @@
 #include "jFenceManager_DX12.h"
 #include "Scene/jCamera.h"
 #include "FileLoader/jImageFileLoader.h"
+#include "jRingBuffer_DX12.h"
 
-#define USE_INLINE_DESCRIPTOR 0
+#define USE_INLINE_DESCRIPTOR 1												// InlineDescriptor 를 쓸것인지? DescriptorTable 를 쓸것인지 여부
+#define USE_ONE_FRAME_BUFFER_AND_DESCRIPTOR (USE_INLINE_DESCRIPTOR && 1)	// 현재 프레임에만 사용하고 버리는 임시 Descriptor 와 Buffer 를 사용할 것인지 여부
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
+
+struct jSimpleConstantBuffer
+{
+    Matrix M;
+};
 
 jRHI_DX12* g_rhi_dx12 = nullptr;
 const wchar_t* jRHI_DX12::c_raygenShaderName = L"MyRaygenShader";
@@ -525,6 +532,13 @@ bool jRHI_DX12::InitRHI()
 	SwapChain = new jSwapchain_DX12();
 	SwapChain->Create();
 
+	OneFrameUniformRingBuffers.resize(SwapChain->GetNumOfSwapchain());
+	for(jRingBuffer_DX12*& iter : OneFrameUniformRingBuffers)
+	{
+		iter = new jRingBuffer_DX12();
+		iter->Create(16 * 1024 * 1024);
+	}
+
     //////////////////////////////////////////////////////////////////////////
     // 5. Initialize Camera and lighting
     {
@@ -939,11 +953,6 @@ bool jRHI_DX12::InitRHI()
 	// VertexBuffer SRV
 	jBufferUtil_DX12::CreateShaderResourceView(VertexBuffer, sizeof(vertices[0]), _countof(vertices));
 
-    struct jSimpleConstantBuffer
-    {
-        Matrix M;
-    };
-
 	jSimpleConstantBuffer ConstantBuffer;
 	ConstantBuffer.M.SetIdentity();
 	Matrix Projection = jCameraUtil::CreatePerspectiveMatrix((float)SCR_WIDTH, (float)SCR_HEIGHT, DegreeToRadian(90.0f), 0.01f, 1000.0f);
@@ -1166,57 +1175,7 @@ bool jRHI_DX12::InitRHI()
 
 	D3D12_ROOT_SIGNATURE_DESC1 rootSignatureDesc = {};
 
-#if USE_DESCRIPTOR_TABLE
-	D3D12_DESCRIPTOR_RANGE1 range[3];
-	range[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-	range[0].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
-	range[0].NumDescriptors = 1;
-	range[0].BaseShaderRegister = 0;
-	range[0].RegisterSpace = 0;
-	range[0].OffsetInDescriptorsFromTableStart = SimpleConstantBuffer->CBV.Index;				// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
-
-	// StructuredBuffer test
-    range[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    range[1].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
-    range[1].NumDescriptors = 1;
-    range[1].BaseShaderRegister = 0;
-    range[1].RegisterSpace = 0;
-	range[1].OffsetInDescriptorsFromTableStart = SimpleStructuredBuffer->SRV.Index;				// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
-
-    // Texture test
-    range[2].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    range[2].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
-    range[2].NumDescriptors = 1;
-    range[2].BaseShaderRegister = 1;
-    range[2].RegisterSpace = 0;
-    range[2].OffsetInDescriptorsFromTableStart = SimpleTexture->SRV.Index;						// Texture test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
-
-	D3D12_ROOT_PARAMETER1 rootParameter[2];
-	rootParameter[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    rootParameter[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-	rootParameter[0].DescriptorTable.NumDescriptorRanges = _countof(range);
-	rootParameter[0].DescriptorTable.pDescriptorRanges = range;
-
-	// SamplerState test
-    D3D12_DESCRIPTOR_RANGE1 rangeSecond[1];
-    rangeSecond[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
-    rangeSecond[0].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE;
-    rangeSecond[0].NumDescriptors = 1;
-    rangeSecond[0].BaseShaderRegister = 0;
-    rangeSecond[0].RegisterSpace = 0;
-    rangeSecond[0].OffsetInDescriptorsFromTableStart = SimpleSamplerState.Index;				// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
-
-    rootParameter[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    rootParameter[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-    rootParameter[1].DescriptorTable.NumDescriptorRanges = _countof(rangeSecond);
-    rootParameter[1].DescriptorTable.pDescriptorRanges = rangeSecond;
-
-    rootSignatureDesc.NumParameters = _countof(rootParameter);
-    rootSignatureDesc.pParameters = rootParameter;
-    rootSignatureDesc.NumStaticSamplers = 0;
-    rootSignatureDesc.pStaticSamplers = nullptr;
-    rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-#else
+#if USE_INLINE_DESCRIPTOR
 	D3D12_ROOT_PARAMETER1 rootParameter[3];
 	rootParameter[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameter[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
@@ -1270,6 +1229,64 @@ bool jRHI_DX12::InitRHI()
     rootSignatureDesc.pParameters = rootParameter;
     rootSignatureDesc.NumStaticSamplers = 1;
     rootSignatureDesc.pStaticSamplers = &staticSamplerDesc;
+    rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+#else
+    D3D12_DESCRIPTOR_RANGE1 range[4];
+    range[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+    range[0].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
+    range[0].NumDescriptors = 1;
+    range[0].BaseShaderRegister = 0;
+    range[0].RegisterSpace = 0;
+    range[0].OffsetInDescriptorsFromTableStart = SimpleConstantBuffer->CBV.Index;				// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
+
+    // StructuredBuffer test
+    range[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    range[1].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
+    range[1].NumDescriptors = 1;
+    range[1].BaseShaderRegister = 0;
+    range[1].RegisterSpace = 0;
+    range[1].OffsetInDescriptorsFromTableStart = SimpleStructuredBuffer->SRV.Index;				// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
+
+    // Texture test
+    range[2].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    range[2].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
+    range[2].NumDescriptors = 1;
+    range[2].BaseShaderRegister = 1;
+    range[2].RegisterSpace = 0;
+    range[2].OffsetInDescriptorsFromTableStart = SimpleTexture->SRV.Index;						// Texture test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
+
+    // Cube texture test
+    range[3].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    range[3].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
+    range[3].NumDescriptors = 1;
+    range[3].BaseShaderRegister = 2;
+    range[3].RegisterSpace = 0;
+    range[3].OffsetInDescriptorsFromTableStart = SimpleTextureCube->SRV.Index;						// Texture test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
+
+    D3D12_ROOT_PARAMETER1 rootParameter[2];
+    rootParameter[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    rootParameter[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+    rootParameter[0].DescriptorTable.NumDescriptorRanges = _countof(range);
+    rootParameter[0].DescriptorTable.pDescriptorRanges = range;
+
+    // SamplerState test
+    D3D12_DESCRIPTOR_RANGE1 rangeSecond[1];
+    rangeSecond[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
+    rangeSecond[0].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE;
+    rangeSecond[0].NumDescriptors = 1;
+    rangeSecond[0].BaseShaderRegister = 0;
+    rangeSecond[0].RegisterSpace = 0;
+    rangeSecond[0].OffsetInDescriptorsFromTableStart = SimpleSamplerState.Index;				// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
+
+    rootParameter[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    rootParameter[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+    rootParameter[1].DescriptorTable.NumDescriptorRanges = _countof(rangeSecond);
+    rootParameter[1].DescriptorTable.pDescriptorRanges = rangeSecond;
+
+    rootSignatureDesc.NumParameters = _countof(rootParameter);
+    rootSignatureDesc.pParameters = rootParameter;
+    rootSignatureDesc.NumStaticSamplers = 0;
+    rootSignatureDesc.pStaticSamplers = nullptr;
     rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 #endif
 
@@ -1719,6 +1736,8 @@ void jRHI_DX12::Update()
 
 void jRHI_DX12::Render()
 {
+	GetOneFrameUniformRingBuffer()->Reset();
+
 	// Prepare
 	auto GraphicsCommandList = GraphicsCommandQueue->GetAvailableCommandList();
 
@@ -1762,19 +1781,58 @@ void jRHI_DX12::Render()
 	ScissorRect.top = 0;
 	ScissorRect.bottom = SCR_HEIGHT;
 
-	GraphicsCommandList->SetGraphicsRootSignature(SimpleRootSignature.Get());
+    GraphicsCommandList->SetGraphicsRootSignature(SimpleRootSignature.Get());
 
-#if USE_DESCRIPTOR_TABLE
-	ID3D12DescriptorHeap* ppHeaps[] = { SRVDescriptorHeap.Heap.Get(), SamplerDescriptorHeap.Heap.Get() };		// SamplerState test
-	GraphicsCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
-	GraphicsCommandList->SetGraphicsRootDescriptorTable(0, SRVDescriptorHeap.GPUHandleStart);		// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
-	GraphicsCommandList->SetGraphicsRootDescriptorTable(1, SamplerDescriptorHeap.GPUHandleStart);	// SamplerState test
-#else
+#if USE_INLINE_DESCRIPTOR
 	ID3D12DescriptorHeap* ppHeaps[] = { SRVDescriptorHeap.Heap.Get() };								// SamplerState test
 	GraphicsCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+
+	#if USE_ONE_FRAME_BUFFER_AND_DESCRIPTOR
+    jRingBuffer_DX12* CurrentRingBuffer = GetOneFrameUniformRingBuffer();
+
+	// 1. Transform ConstantBuffer by using OneFrameBuffer
+	{
+		jSimpleConstantBuffer ConstantBuffer;
+		ConstantBuffer.M.SetIdentity();
+		Matrix Projection = jCameraUtil::CreatePerspectiveMatrix((float)SCR_WIDTH, (float)SCR_HEIGHT, DegreeToRadian(90.0f), 0.01f, 1000.0f);
+		Matrix Camera = jCameraUtil::CreateViewMatrix(Vector::FowardVector * 2.0f, Vector::ZeroVector, Vector::UpVector);
+		ConstantBuffer.M = Projection * Camera * ConstantBuffer.M;
+		ConstantBuffer.M.SetTranspose();
+
+		const uint64 TempBufferOffset = CurrentRingBuffer->Alloc(Align(sizeof(ConstantBuffer), 256));
+		uint8* DestAddress = ((uint8*)CurrentRingBuffer->GetMappedPointer()) + TempBufferOffset;
+		memcpy(DestAddress, &ConstantBuffer, sizeof(ConstantBuffer));
+
+		const uint64 GPUAddress = CurrentRingBuffer->GetGPUAddress() + TempBufferOffset;
+		GraphicsCommandList->SetGraphicsRootConstantBufferView(0, GPUAddress);
+	}
+
+	// 2. Transform StructuredBuffer by using OneFrameBuffer
+	{
+        Vector4 StructuredBufferColor[3];
+        StructuredBufferColor[0] = { 1.0f, 0.0f, 0.0f, 1.0f };
+        StructuredBufferColor[1] = { 0.0f, 1.0f, 0.0f, 1.0f };
+        StructuredBufferColor[2] = { 0.0f, 0.0f, 1.0f, 1.0f };
+
+		const uint64 TempBufferOffset = CurrentRingBuffer->Alloc(Align(sizeof(StructuredBufferColor), 256));
+        uint8* DestAddress = ((uint8*)CurrentRingBuffer->GetMappedPointer()) + TempBufferOffset;
+        memcpy(DestAddress, &StructuredBufferColor, sizeof(StructuredBufferColor));
+
+        const uint64 GPUAddress = CurrentRingBuffer->GetGPUAddress() + TempBufferOffset;
+		const uint32 stride = sizeof(StructuredBufferColor[0]);
+		
+        GraphicsCommandList->SetGraphicsRootShaderResourceView(1, GPUAddress);
+	}
+	#else
 	GraphicsCommandList->SetGraphicsRootConstantBufferView(0, SimpleConstantBuffer->GetGPUAddress());
 	GraphicsCommandList->SetGraphicsRootShaderResourceView(1, SimpleStructuredBuffer->GetGPUAddress());
+	#endif
 	GraphicsCommandList->SetGraphicsRootDescriptorTable(2, SRVDescriptorHeap.GPUHandleStart);		// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
+#else
+    ID3D12DescriptorHeap* ppHeaps[] = { SRVDescriptorHeap.Heap.Get(), SamplerDescriptorHeap.Heap.Get() };		// SamplerState test
+    GraphicsCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+    GraphicsCommandList->SetGraphicsRootDescriptorTable(0, SRVDescriptorHeap.GPUHandleStart);		// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
+    GraphicsCommandList->SetGraphicsRootDescriptorTable(1, SamplerDescriptorHeap.GPUHandleStart);	// SamplerState test
 #endif
 
 	GraphicsCommandList->RSSetViewports(1, &viewport);
