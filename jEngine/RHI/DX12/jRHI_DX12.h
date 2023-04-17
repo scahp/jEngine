@@ -267,7 +267,7 @@ public:
 
 	jBuffer_DX12* SimpleConstantBuffer = nullptr;
 	jBuffer_DX12* SimpleStructuredBuffer = nullptr;			// StructuredBuffer test
-	jTexture_DX12* SimpleTexture = nullptr;					// Texture test
+	jTexture_DX12* SimpleTexture[3] = { nullptr, nullptr, nullptr };					// Texture test
 	jTexture_DX12* SimpleTextureCube = nullptr;				// Cube texture test
 
     bool OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimized);

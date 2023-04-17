@@ -22,6 +22,7 @@ using namespace DirectX;
 struct jSimpleConstantBuffer
 {
     Matrix M;
+	int32 TexIndex = 0;
 };
 
 jRHI_DX12* g_rhi_dx12 = nullptr;
@@ -975,7 +976,9 @@ bool jRHI_DX12::InitRHI()
 	//////////////////////////////////////////////////////////////////////////
 
 	// Texture test
-	SimpleTexture = (jTexture_DX12*)jImageFileLoader::GetInstance().LoadTextureFromFile(jName("Image/eye.png"), true).lock().get();
+	SimpleTexture[0] = (jTexture_DX12*)jImageFileLoader::GetInstance().LoadTextureFromFile(jName("Image/eye.png"), true).lock().get();
+	SimpleTexture[1] = (jTexture_DX12*)jImageFileLoader::GetInstance().LoadTextureFromFile(jName("Image/bulb.png"), true).lock().get();
+	SimpleTexture[2] = (jTexture_DX12*)jImageFileLoader::GetInstance().LoadTextureFromFile(jName("Image/sun.png"), true).lock().get();
 
 	// Cube texture test
 	{
@@ -1196,15 +1199,15 @@ bool jRHI_DX12::InitRHI()
     range[0].NumDescriptors = 1;
     range[0].BaseShaderRegister = 1;
     range[0].RegisterSpace = 0;
-    range[0].OffsetInDescriptorsFromTableStart = SimpleTexture->SRV.Index;						// Texture test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
+    range[0].OffsetInDescriptorsFromTableStart = SimpleTextureCube->SRV.Index;						// Texture test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
 
 	// Cube texture test
     range[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
     range[1].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
-    range[1].NumDescriptors = 1;
+    range[1].NumDescriptors = 3;
     range[1].BaseShaderRegister = 2;
     range[1].RegisterSpace = 0;
-    range[1].OffsetInDescriptorsFromTableStart = SimpleTextureCube->SRV.Index;						// Texture test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
+    range[1].OffsetInDescriptorsFromTableStart = SimpleTexture[0]->SRV.Index;						// Texture test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
 
     rootParameter[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
     rootParameter[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
@@ -1253,15 +1256,15 @@ bool jRHI_DX12::InitRHI()
     range[2].NumDescriptors = 1;
     range[2].BaseShaderRegister = 1;
     range[2].RegisterSpace = 0;
-    range[2].OffsetInDescriptorsFromTableStart = SimpleTexture->SRV.Index;						// Texture test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
+    range[2].OffsetInDescriptorsFromTableStart = SimpleTextureCube->SRV.Index;						// Texture test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
 
     // Cube texture test
     range[3].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
     range[3].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
-    range[3].NumDescriptors = 1;
+    range[3].NumDescriptors = 3;
     range[3].BaseShaderRegister = 2;
     range[3].RegisterSpace = 0;
-    range[3].OffsetInDescriptorsFromTableStart = SimpleTextureCube->SRV.Index;						// Texture test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
+    range[3].OffsetInDescriptorsFromTableStart = SimpleTexture[0]->SRV.Index;						// Texture test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
 
     D3D12_ROOT_PARAMETER1 rootParameter[2];
     rootParameter[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
@@ -1474,8 +1477,11 @@ void jRHI_DX12::Release()
 	SimpleStructuredBuffer = nullptr;
 
 	// Texture test
-	delete SimpleTexture;
-	SimpleTexture = nullptr;
+	for (int32 i = 0; i < _countof(SimpleTexture); ++i)
+	{
+		delete SimpleTexture[i];
+		SimpleTexture[i] = nullptr;
+	}
 
 	////////////////////////////////////////////////////////////////////////////
 	//// 10. DXR PipeplineStateObject
@@ -1795,9 +1801,20 @@ void jRHI_DX12::Render()
 		jSimpleConstantBuffer ConstantBuffer;
 		ConstantBuffer.M.SetIdentity();
 		Matrix Projection = jCameraUtil::CreatePerspectiveMatrix((float)SCR_WIDTH, (float)SCR_HEIGHT, DegreeToRadian(90.0f), 0.01f, 1000.0f);
-		Matrix Camera = jCameraUtil::CreateViewMatrix(Vector::FowardVector * 2.0f, Vector::ZeroVector, Vector::UpVector);
+		Matrix Camera = jCameraUtil::CreateViewMatrix(Vector::FowardVector * 1.2f, Vector::ZeroVector, Vector::UpVector);
 		ConstantBuffer.M = Projection * Camera * ConstantBuffer.M;
 		ConstantBuffer.M.SetTranspose();
+
+		// Dynamic indexing with constantbuffer index
+		static DWORD OldTick = GetTickCount();
+		static int32 TexIndex = 0;
+		DWORD time = GetTickCount() - OldTick;
+		if (time > 2000)
+		{
+			OldTick = GetTickCount();
+			TexIndex = (TexIndex + 1) % _countof(SimpleTexture);			
+		}
+		ConstantBuffer.TexIndex = TexIndex;
 
 		const uint64 TempBufferOffset = CurrentRingBuffer->Alloc(Align(sizeof(ConstantBuffer), 256));
 		uint8* DestAddress = ((uint8*)CurrentRingBuffer->GetMappedPointer()) + TempBufferOffset;
@@ -2179,14 +2196,17 @@ bool jRHI_DX12::OnHandleDeviceRestored()
 
 ComPtr<ID3D12GraphicsCommandList4> jRHI_DX12::BeginSingleTimeCopyCommands()
 {
+	check(CopyCommandQueue);
 	return CopyCommandQueue->GetAvailableCommandList();
 }
 
 void jRHI_DX12::EndSingleTimeCopyCommands(const ComPtr<ID3D12GraphicsCommandList4>& commandBuffer)
 {
+	check(CopyCommandQueue);
 	CopyCommandQueue->ExecuteCommandList(commandBuffer);
 
-	WaitForGPU();
+	CopyCommandQueue->Signal();
+	CopyCommandQueue->WaitForFenceValue();
 }
 
 void jRHI_DX12::InitializeImGui()
