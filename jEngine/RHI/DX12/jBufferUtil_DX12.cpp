@@ -32,12 +32,18 @@ ComPtr<ID3D12Resource> CreateBufferInternal(uint64 InSize, uint16 InAlignment, b
     }
 
     check(g_rhi_dx12);
-    check(g_rhi_dx12->Device);
-
-    const D3D12_HEAP_PROPERTIES HeapProperties = CD3DX12_HEAP_PROPERTIES(InIsCPUAccess ? D3D12_HEAP_TYPE_UPLOAD : D3D12_HEAP_TYPE_DEFAULT);
 
     ComPtr<ID3D12Resource> Buffer;
-    if (JFAIL(g_rhi_dx12->Device->CreateCommittedResource(&HeapProperties, D3D12_HEAP_FLAG_NONE, &resourceDesc, resourceState, nullptr, IID_PPV_ARGS(&Buffer))))
+    if (InIsCPUAccess)
+    {
+        Buffer = g_rhi_dx12->CreateUploadResource(&resourceDesc, resourceState);
+    }
+    else
+    {
+        Buffer = g_rhi_dx12->CreateResource(&resourceDesc, resourceState);
+    }
+
+    if (!ensure(Buffer))
     {
         return nullptr;
     }
@@ -88,8 +94,6 @@ ComPtr<ID3D12Resource> CreateImageInternal(uint32 InWidth, uint32 InHeight, uint
     check(g_rhi_dx12);
     check(g_rhi_dx12->Device);
 
-    const D3D12_HEAP_PROPERTIES HeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-
     D3D12_RESOURCE_DESC TexDesc = { };
     TexDesc.MipLevels = InMipLevels;
     TexDesc.Format = InFormat;
@@ -116,12 +120,9 @@ ComPtr<ID3D12Resource> CreateImageInternal(uint32 InWidth, uint32 InHeight, uint
 
     ComPtr<ID3D12Resource> Image;
     D3D12_CLEAR_VALUE clearValue = { };
-    clearValue.Format = InFormat;
-    if (JFAIL(g_rhi_dx12->Device->CreateCommittedResource(&HeapProperties, D3D12_HEAP_FLAG_NONE,
-        &TexDesc, InResourceState, InIsRTV ? &clearValue : nullptr, IID_PPV_ARGS(&Image))))
-    {
+    Image = g_rhi_dx12->CreateResource(&TexDesc, InResourceState, (InIsRTV ? &clearValue : nullptr));
+    if (!ensure(Image))
         return nullptr;
-    }
 
     if (InResourceName)
         Image->SetName(InResourceName);

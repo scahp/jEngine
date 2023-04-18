@@ -111,6 +111,7 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// 1. Device
+	ComPtr<IDXGIAdapter3> Adapter;
 	ComPtr<ID3D12Device5> Device;
     uint32 Options = 0;
 	ComPtr<IDXGIFactory5> Factory;
@@ -269,6 +270,68 @@ public:
 	jBuffer_DX12* SimpleStructuredBuffer = nullptr;			// StructuredBuffer test
 	jTexture_DX12* SimpleTexture[3] = { nullptr, nullptr, nullptr };					// Texture test
 	jTexture_DX12* SimpleTextureCube = nullptr;				// Cube texture test
+
+	//////////////////////////////////////////////////////////////////////////
+	// PlacedResouce test
+	ComPtr<ID3D12Heap> PlacedResourceDefaultHeap;
+	uint64 PlacedResourceDefaultHeapOffset = 0;
+
+    ComPtr<ID3D12Heap> PlacedResourceUploadHeap;
+    uint64 PlacedResourceDefaultUploadOffset = 0;
+
+    static constexpr uint64 DefaultPlacedResourceHeapSize = 128 * 1024 * 1024;
+	static bool IsUsePlacedResource;
+
+	template <typename T>
+	ComPtr<ID3D12Resource> CreateResource(T&& InDesc, D3D12_RESOURCE_STATES InResourceState, D3D12_CLEAR_VALUE* InClearValue = nullptr)
+	{
+		check(Device);
+
+		ComPtr<ID3D12Resource> NewResource;
+		if (IsUsePlacedResource)
+		{
+			check(PlacedResourceDefaultHeap);
+
+			JFAIL(Device->CreatePlacedResource(PlacedResourceDefaultHeap.Get(), PlacedResourceDefaultHeapOffset
+				, std::forward<T>(InDesc), InResourceState, InClearValue, IID_PPV_ARGS(&NewResource)));
+
+			const D3D12_RESOURCE_ALLOCATION_INFO info = Device->GetResourceAllocationInfo(0, 1, InDesc);
+			PlacedResourceDefaultHeapOffset += info.SizeInBytes;
+
+			return NewResource;
+		}
+
+		const CD3DX12_HEAP_PROPERTIES& HeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+		JFAIL(Device->CreateCommittedResource(&HeapProperties, D3D12_HEAP_FLAG_NONE
+			, std::forward<T>(InDesc), InResourceState, InClearValue, IID_PPV_ARGS(&NewResource)));
+		return NewResource;
+	}
+
+    template <typename T>
+    ComPtr<ID3D12Resource> CreateUploadResource(T&& InDesc, D3D12_RESOURCE_STATES InResourceState, D3D12_CLEAR_VALUE* InClearValue = nullptr)
+    {
+        check(Device);
+
+        ComPtr<ID3D12Resource> NewResource;
+        if (IsUsePlacedResource)
+        {
+            check(PlacedResourceUploadHeap);
+
+            JFAIL(Device->CreatePlacedResource(PlacedResourceUploadHeap.Get(), PlacedResourceDefaultUploadOffset
+                , std::forward<T>(InDesc), InResourceState, InClearValue, IID_PPV_ARGS(&NewResource)));
+
+            const D3D12_RESOURCE_ALLOCATION_INFO info = Device->GetResourceAllocationInfo(0, 1, InDesc);
+			PlacedResourceDefaultUploadOffset += info.SizeInBytes;
+
+            return NewResource;
+        }
+
+        const CD3DX12_HEAP_PROPERTIES& HeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+        JFAIL(Device->CreateCommittedResource(&HeapProperties, D3D12_HEAP_FLAG_NONE
+            , std::forward<T>(InDesc), InResourceState, InClearValue, IID_PPV_ARGS(&NewResource)));
+        return NewResource;
+    }
+	//////////////////////////////////////////////////////////////////////////
 
     bool OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimized);
     bool OnHandleDeviceLost();

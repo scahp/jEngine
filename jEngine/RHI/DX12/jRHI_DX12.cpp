@@ -32,6 +32,7 @@ const wchar_t* jRHI_DX12::c_missShaderName = L"MyMissShader";
 const wchar_t* jRHI_DX12::c_triHitGroupName = L"TriHitGroup";
 const wchar_t* jRHI_DX12::c_planeHitGroupName = L"PlaneHitGroup";
 const wchar_t* jRHI_DX12::c_planeclosestHitShaderName = L"MyPlaneClosestHitShader";
+bool jRHI_DX12::IsUsePlacedResource = true;			// PlacedResouce test
 
 constexpr uint32 c_AllowTearing = 0x1;
 constexpr uint32 c_RequireTearingSupport = 0x2;
@@ -485,26 +486,26 @@ bool jRHI_DX12::InitRHI()
 	bool UseWarpDevice = false;		// Software rasterizer 사용 여부
 	if (UseWarpDevice)
 	{
-		ComPtr<IDXGIAdapter> warpAdapter;
-		if (JFAIL(factory->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter))))
+		if (JFAIL(factory->EnumWarpAdapter(IID_PPV_ARGS(&Adapter))))
 			return false;
 
-		if (JFAIL((D3D12CreateDevice(warpAdapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&Device)))))
+		if (JFAIL((D3D12CreateDevice(Adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&Device)))))
 			return false;
 	}
 	else
 	{
 		ComPtr<IDXGIAdapter1> hardwareAdapter;
 		const int32 ResultAdapterID = GetHardwareAdapter(factory.Get(), &hardwareAdapter);
+		hardwareAdapter.As(&Adapter);
 
-        if (JFAIL(D3D12CreateDevice(hardwareAdapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&Device))))
+        if (JFAIL(D3D12CreateDevice(Adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&Device))))
         {
             return false;
         }
         else
         {
             DXGI_ADAPTER_DESC desc;
-            hardwareAdapter->GetDesc(&desc);
+			Adapter->GetDesc(&desc);
             AdapterID = ResultAdapterID;
             AdapterName = desc.Description;
 
@@ -515,6 +516,37 @@ bool jRHI_DX12::InitRHI()
 #endif
         }
 	}
+
+    //////////////////////////////////////////////////////////////////////////
+    // PlacedResouce test
+	{
+		D3D12_HEAP_DESC heapDesc;
+		heapDesc.SizeInBytes = DefaultPlacedResourceHeapSize;
+		heapDesc.Properties.Type = D3D12_HEAP_TYPE_DEFAULT;
+		heapDesc.Properties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+		heapDesc.Properties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+		heapDesc.Properties.CreationNodeMask = 1;
+		heapDesc.Properties.VisibleNodeMask = 1;
+		heapDesc.Alignment = 0;
+		heapDesc.Flags = D3D12_HEAP_FLAG_NONE;
+		if (JFAIL(Device->CreateHeap(&heapDesc, IID_PPV_ARGS(&PlacedResourceDefaultHeap))))
+			return false;
+	}
+
+	{
+        D3D12_HEAP_DESC heapDesc;
+        heapDesc.SizeInBytes = DefaultPlacedResourceHeapSize;
+        heapDesc.Properties.Type = D3D12_HEAP_TYPE_UPLOAD;
+        heapDesc.Properties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        heapDesc.Properties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        heapDesc.Properties.CreationNodeMask = 1;
+        heapDesc.Properties.VisibleNodeMask = 1;
+        heapDesc.Alignment = 0;
+        heapDesc.Flags = D3D12_HEAP_FLAG_NONE;
+        if (JFAIL(Device->CreateHeap(&heapDesc, IID_PPV_ARGS(&PlacedResourceUploadHeap))))
+            return false;
+	}
+	//////////////////////////////////////////////////////////////////////////
 
 	// 2. Command
 	GraphicsCommandQueue = new jCommandQueue_DX12();
@@ -1689,6 +1721,33 @@ void jRHI_DX12::CalculateFrameStats()
         windowText << std::setprecision(2) << std::fixed
             << L"    fps: " << fps << L"     ~Million Primary Rays/s: " << MRaysPerSecond
             << L"    GPU[" << AdapterID << L"]: " << AdapterName;
+
+        //////////////////////////////////////////////////////////////////////////
+		// PlacedResouce test
+		{
+            DXGI_QUERY_VIDEO_MEMORY_INFO memoryInfo;
+            Adapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &memoryInfo);
+
+            WCHAR usageString[20];
+            const UINT64 mb = 1 << 20;
+            const UINT64 kb = 1 << 10;
+            if (memoryInfo.CurrentUsage > mb)
+            {
+                swprintf_s(usageString, L"%.1f MB", static_cast<float>(memoryInfo.CurrentUsage) / mb);
+            }
+            else if (memoryInfo.CurrentUsage > kb)
+            {
+                swprintf_s(usageString, L"%.1f KB", static_cast<float>(memoryInfo.CurrentUsage) / kb);
+            }
+            else
+            {
+                swprintf_s(usageString, L"%I64d B", memoryInfo.CurrentUsage);
+            }
+
+			windowText << L" - " << (IsUsePlacedResource ? L"[Placed]" : L"[Committed]") << L" Memory Used : " << usageString;
+		}
+		//////////////////////////////////////////////////////////////////////////
+
         SetWindowText(m_hWnd, windowText.str().c_str());
     }
 }

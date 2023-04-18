@@ -25,14 +25,9 @@ void jRingBuffer_DX12::Create(uint64 totalSize, uint32 alignment /*= 16*/)
     desc.Alignment = 0;
 
     check(g_rhi_dx12);
-    check(g_rhi_dx12->Device);
-
-    const D3D12_HEAP_PROPERTIES HeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-    if (JFAIL(g_rhi_dx12->Device->CreateCommittedResource(&HeapProperties, D3D12_HEAP_FLAG_NONE, &desc
-        , D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&Buffer))))
-    {
+    Buffer = g_rhi_dx12->CreateUploadResource(&desc, D3D12_RESOURCE_STATE_GENERIC_READ);
+    if (!ensure(Buffer))
         return;
-    }
 
     D3D12_RANGE readRange = { };
     if (JFAIL(Buffer->Map(0, &readRange, reinterpret_cast<void**>(&MappedPointer))))
