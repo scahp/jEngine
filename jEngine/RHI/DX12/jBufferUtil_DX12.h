@@ -5,6 +5,8 @@
 struct jBuffer_DX12;
 struct jTexture_DX12;
 
+namespace
+{
 size_t BitsPerPixel(DXGI_FORMAT fmt)
 {
     switch (static_cast<int>(fmt))
@@ -175,7 +177,7 @@ const D3D12_HEAP_PROPERTIES& GetDefaultHeap()
     return HeapProp;
 }
 
-D3D12_RESOURCE_DESC GetUploadResourceDesc(int64 InSize)
+const D3D12_RESOURCE_DESC& GetUploadResourceDesc(uint64 InSize)
 {
     static D3D12_RESOURCE_DESC Desc{
         .Dimension = D3D12_RESOURCE_DIMENSION_BUFFER,
@@ -193,9 +195,9 @@ D3D12_RESOURCE_DESC GetUploadResourceDesc(int64 InSize)
     return Desc;
 }
 
-ComPtr<ID3D12Resource> CreateStagingBuffer(const void* InInitData, int64 InSize, int32 InAlignment = 1)
+ComPtr<ID3D12Resource> CreateStagingBuffer(const void* InInitData, int64 InSize, uint64 InAlignment = 1)
 {
-    const int64 AlignedSize = Align(InSize, InAlignment);
+    const uint64 AlignedSize = Align(InSize, InAlignment);
 
     ComPtr<ID3D12Resource> UploadResourceRHI;
     g_rhi_dx12->Device->CreateCommittedResource(&GetUploadHeap(), D3D12_HEAP_FLAG_NONE, &GetUploadResourceDesc(AlignedSize)
@@ -209,11 +211,11 @@ ComPtr<ID3D12Resource> CreateStagingBuffer(const void* InInitData, int64 InSize,
     return UploadResourceRHI;
 }
 
-void UploadByUsingStagingBuffer(ComPtr<ID3D12Resource>& DestBuffer, const void* InInitData, int64 InSize, int32 InAlignment = 1)
+void UploadByUsingStagingBuffer(ComPtr<ID3D12Resource>& DestBuffer, const void* InInitData, uint64 InSize, uint64 InAlignment = 1)
 {
     check(DestBuffer);
 
-    const int64 AlignedSize = Align(InSize, InAlignment);
+    const uint64 AlignedSize = Align(InSize, InAlignment);
     check(DestBuffer->GetDesc().Width >= AlignedSize);
 
     ComPtr<ID3D12Resource> StagingBuffer = CreateStagingBuffer(InInitData, InSize, InAlignment);
@@ -224,7 +226,7 @@ void UploadByUsingStagingBuffer(ComPtr<ID3D12Resource>& DestBuffer, const void* 
     g_rhi_dx12->EndSingleTimeCopyCommands(commandBuffer);
 }
 
-D3D12_RESOURCE_DESC GetDefaultResourceDesc(int64 InAlignedSize, bool InIsAllowUAV)
+D3D12_RESOURCE_DESC GetDefaultResourceDesc(uint64 InAlignedSize, bool InIsAllowUAV)
 {
     static D3D12_RESOURCE_DESC Desc{
         .Dimension = D3D12_RESOURCE_DIMENSION_BUFFER,
@@ -242,7 +244,7 @@ D3D12_RESOURCE_DESC GetDefaultResourceDesc(int64 InAlignedSize, bool InIsAllowUA
     return Desc;
 }
 
-ComPtr<ID3D12Resource> CreateDefaultResource(int64 InAlignedSize, D3D12_RESOURCE_STATES InInitialState
+ComPtr<ID3D12Resource> CreateDefaultResource(uint64 InAlignedSize, D3D12_RESOURCE_STATES InInitialState
     , bool InIsAllowUAV, bool InIsCPUAccessible, const wchar_t* InName = nullptr)
 {
     const D3D12_RESOURCE_DESC Desc = GetDefaultResourceDesc(InAlignedSize, false);
@@ -292,6 +294,7 @@ void* CopyInitialData(ComPtr<ID3D12Resource>& InDest, const void* InInitData, ui
     }
     return nullptr;
 }
+}
 
 struct jConstantBuffer
 {
@@ -323,6 +326,16 @@ struct jConstantBuffer
     {
         return MappedPointer;
     }
+
+    void BindGraphics(ID3D12GraphicsCommandList4* InCmdList, uint32 InRootParameter) const
+    {
+        InCmdList->SetGraphicsRootConstantBufferView(InRootParameter, ResourceRHI->GetGPUVirtualAddress());
+    }
+
+    void BindCompute(ID3D12GraphicsCommandList4* InCmdList, uint32 InRootParameter) const
+    {
+        InCmdList->SetComputeRootConstantBufferView(InRootParameter, ResourceRHI->GetGPUVirtualAddress());
+    }
 };
 
 struct jStructuredBuffer
@@ -346,16 +359,43 @@ struct jStructuredBuffer
         CopyInitialData(ResourceRHI, InitData, Stride * NumElements, Stride, IsCPUAccessible);
 
         // SRV 생성
+        D3D12_SHADER_RESOURCE_VIEW_DESC SrvDesc;
+        SrvDesc.Format = DXGI_FORMAT_UNKNOWN;
+        SrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+        SrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        SrvDesc.Buffer.FirstElement = 0;
+        SrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+        SrvDesc.Buffer.NumElements = uint32(NumElements);
+        SrvDesc.Buffer.StructureByteStride = uint32(Stride);
+
+        SRV = g_rhi_dx12->SRVDescriptorHeap.Alloc();
+        g_rhi_dx12->Device->CreateShaderResourceView(ResourceRHI.Get(), &SrvDesc, SRV.CPUHandle);
 
         // UAV 생성
         if (IsAllowUAV)
         {
+            D3D12_UNORDERED_ACCESS_VIEW_DESC UavDesc = { };
+            UavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+            UavDesc.Format = DXGI_FORMAT_UNKNOWN;
+            UavDesc.Buffer.CounterOffsetInBytes = 0;
+            UavDesc.Buffer.FirstElement = 0;
+            UavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+            UavDesc.Buffer.NumElements = uint32(NumElements);
+            UavDesc.Buffer.StructureByteStride = uint32(Stride);
 
+            UAV = g_rhi_dx12->SRVDescriptorHeap.Alloc();
+            g_rhi_dx12->Device->CreateUnorderedAccessView(ResourceRHI.Get(), nullptr, &UavDesc, UAV.CPUHandle);
         }
     }
 
     void Release()
     {
+        if (SRV.IsValid())
+            g_rhi_dx12->SRVDescriptorHeap.Free(SRV.Index);
+
+        if (UAV.IsValid())
+            g_rhi_dx12->SRVDescriptorHeap.Free(UAV.Index);
+
         ResourceRHI.Reset();
     }
 };
@@ -370,6 +410,8 @@ struct jFormattedBuffer
     D3D12_RESOURCE_STATES InitialState = D3D12_RESOURCE_STATE_GENERIC_READ;
     const wchar_t* Name = nullptr;
     ComPtr<ID3D12Resource> ResourceRHI;
+    jDescriptor_DX12 SRV;
+    jDescriptor_DX12 UAV;
 
     void Initialize()
     {
@@ -381,16 +423,41 @@ struct jFormattedBuffer
         CopyInitialData(ResourceRHI, InitData, Stride * NumElements, Stride, IsCPUAccessible);
 
         // SRV 생성
+        D3D12_SHADER_RESOURCE_VIEW_DESC SrvDesc;
+        SrvDesc.Format = Format;
+        SrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+        SrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        SrvDesc.Buffer.FirstElement = 0;
+        SrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+        SrvDesc.Buffer.NumElements = uint32(NumElements);
+
+        SRV = g_rhi_dx12->SRVDescriptorHeap.Alloc();
+        g_rhi_dx12->Device->CreateShaderResourceView(ResourceRHI.Get(), &SrvDesc, SRV.CPUHandle);
 
         // UAV 생성
         if (IsAllowUAV)
         {
+            D3D12_UNORDERED_ACCESS_VIEW_DESC UavDesc = { };
+            UavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+            UavDesc.Format = Format;
+            UavDesc.Buffer.CounterOffsetInBytes = 0;
+            UavDesc.Buffer.FirstElement = 0;
+            UavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+            UavDesc.Buffer.NumElements = uint32(NumElements);
 
+            UAV = g_rhi_dx12->SRVDescriptorHeap.Alloc();
+            g_rhi_dx12->Device->CreateUnorderedAccessView(ResourceRHI.Get(), nullptr, &UavDesc, UAV.CPUHandle);
         }
     }
 
     void Release()
     {
+        if (SRV.IsValid())
+            g_rhi_dx12->SRVDescriptorHeap.Free(SRV.Index);
+
+        if (UAV.IsValid())
+            g_rhi_dx12->SRVDescriptorHeap.Free(UAV.Index);
+
         ResourceRHI.Reset();
     }
 };
@@ -406,6 +473,8 @@ struct jRawBufferInit
     D3D12_RESOURCE_STATES InitialState = D3D12_RESOURCE_STATE_GENERIC_READ;
     const wchar_t* Name = nullptr;
     ComPtr<ID3D12Resource> ResourceRHI;
+    jDescriptor_DX12 SRV;
+    jDescriptor_DX12 UAV;
 
     void Initialize()
     {
@@ -415,16 +484,41 @@ struct jRawBufferInit
         CopyInitialData(ResourceRHI, InitData, Stride * NumElements, Stride, IsCPUAccessible);
 
         // SRV 생성
+        D3D12_SHADER_RESOURCE_VIEW_DESC SrvDesc = {};
+        SrvDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+        SrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+        SrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        SrvDesc.Buffer.FirstElement = 0;
+        SrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
+        SrvDesc.Buffer.NumElements = uint32(NumElements);
+
+        SRV = g_rhi_dx12->SRVDescriptorHeap.Alloc();
+        g_rhi_dx12->Device->CreateShaderResourceView(ResourceRHI.Get(), &SrvDesc, SRV.CPUHandle);
 
         // UAV 생성
         if (IsAllowUAV)
         {
+            D3D12_UNORDERED_ACCESS_VIEW_DESC UavDesc = { };
+            UavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+            UavDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+            UavDesc.Buffer.CounterOffsetInBytes = 0;
+            UavDesc.Buffer.FirstElement = 0;
+            UavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_RAW;
+            UavDesc.Buffer.NumElements = uint32(NumElements);
 
+            UAV = g_rhi_dx12->SRVDescriptorHeap.Alloc();
+            g_rhi_dx12->Device->CreateUnorderedAccessView(ResourceRHI.Get(), nullptr, &UavDesc, UAV.CPUHandle);
         }
     }
 
     void Release()
     {
+        if (SRV.IsValid())
+            g_rhi_dx12->SRVDescriptorHeap.Free(SRV.Index);
+
+        if (UAV.IsValid())
+            g_rhi_dx12->SRVDescriptorHeap.Free(UAV.Index);
+
         ResourceRHI.Reset();
     }
 };

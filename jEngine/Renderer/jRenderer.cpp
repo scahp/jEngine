@@ -699,7 +699,7 @@ void jRenderer::PostProcess()
         {
             if (IsBloom)
             {
-                ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::ALL_GRAPHICS
+                ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::ALL_GRAPHICS
                     , ResourceInlineAllactor.Alloc<jUniformBufferResource>(&OneFrameUniformBuffer));
             }
 
@@ -709,7 +709,7 @@ void jRenderer::PostProcess()
 
             for (int32 i = 0; i < (int32)InShaderInputs.size(); ++i)
             {
-                ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
+                ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
                     , ResourceInlineAllactor.Alloc<jTextureResource>(InShaderInputs[i], SamplerState));
             }
 
@@ -817,21 +817,21 @@ void jRenderer::PostProcess()
                 // Binding 0 : Source Log2Average Image
                 if (ensure(SourceRT))
                 {
-                    ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
+                    ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
                         , ResourceInlineAllactor.Alloc<jTextureResource>(SourceRT, nullptr));
                 }
 
                 // Binding 1 : Prev frame EyeAdaptation Image
                 if (ensure(EyeAdaptationTextureOld))
                 {
-                    ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
+                    ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
                         , ResourceInlineAllactor.Alloc<jTextureResource>(EyeAdaptationTextureOld, nullptr));
                 }
 
                 // Binding 2 : Current frame EyeAdaptation Image
                 if (ensure(EyeAdaptationTextureCurrent))
                 {
-                    ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE
+                    ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE
                         , ResourceInlineAllactor.Alloc<jTextureResource>(EyeAdaptationTextureCurrent, nullptr));
                 }
 
@@ -859,7 +859,7 @@ void jRenderer::PostProcess()
                 OneFrameUniformBuffer.Init(sizeof(EyeAdaptationUniformBuffer));
                 OneFrameUniformBuffer.UpdateBufferData(&EyeAdaptationUniformBuffer, sizeof(EyeAdaptationUniformBuffer));
                 {
-                    ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
+                    ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
                         , ResourceInlineAllactor.Alloc<jUniformBufferResource>(&OneFrameUniformBuffer));
                 }
 
@@ -922,21 +922,21 @@ void jRenderer::PostProcess()
         // Binding 0 : Source Image
         if (ensure(SceneRT->ColorPtr))
         {
-            ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
+            ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
                 , ResourceInlineAllactor.Alloc<jTextureResource>(SceneRT->ColorPtr->GetTexture(), nullptr));
         }
 
         // Binding 1 : Source Image
         if (ensure(EyeAdaptationTextureCurrent))
         {
-            ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
+            ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
                 , ResourceInlineAllactor.Alloc<jTextureResource>(EyeAdaptationTextureCurrent, nullptr));
         }
 
         // Binding 2 : Target Image
         if (ensure(SceneRT->FinalColorPtr))
         {
-            ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE
+            ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE
                 , ResourceInlineAllactor.Alloc<jTextureResource>(SceneRT->FinalColorPtr->GetTexture(), nullptr));
         }
 
@@ -957,7 +957,7 @@ void jRenderer::PostProcess()
         OneFrameUniformBuffer.Init(sizeof(CommonComputeUniformBuffer));
         OneFrameUniformBuffer.UpdateBufferData(&CommonComputeUniformBuffer, sizeof(CommonComputeUniformBuffer));
         {
-            ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
+            ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
                 , ResourceInlineAllactor.Alloc<jUniformBufferResource>(&OneFrameUniformBuffer));
         }
 

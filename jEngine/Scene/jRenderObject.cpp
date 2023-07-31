@@ -201,7 +201,7 @@ jShaderBindingInstance* jRenderObject::CreateShaderBindingInstance()
         jShaderBindingArray ShaderBindingArray;
         jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
 
-        ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::ALL_GRAPHICS
+        ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::ALL_GRAPHICS
             , ResourceInlineAllactor.Alloc<jUniformBufferResource>(&RenderObjectUniformParameters));
 
         if (RenderObjectShaderBindingInstance)
@@ -210,7 +210,7 @@ jShaderBindingInstance* jRenderObject::CreateShaderBindingInstance()
         RenderObjectShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::MultiFrame);
     }
 	
-	//ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::ALL_GRAPHICS
+	//ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::ALL_GRAPHICS
 	//	, ResourceInlineAllactor.Alloc<jUniformBufferResource>(&RenderObjectUniformParameters));
 
  //   return g_rhi->CreateShaderBindingInstance(ShaderBindingArray);

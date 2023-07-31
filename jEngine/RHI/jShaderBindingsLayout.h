@@ -14,27 +14,47 @@ struct jShaderBindingResource : public std::enable_shared_from_this<jShaderBindi
 struct jUniformBufferResource : public jShaderBindingResource
 {
     jUniformBufferResource() = default;
-    jUniformBufferResource(const IUniformBufferBlock* InUniformBuffer) : UniformBuffer(InUniformBuffer) {}
+    jUniformBufferResource(const IUniformBufferBlock* InUniformBuffer, bool InIsInline = false) : UniformBuffer(InUniformBuffer), IsInline(InIsInline) {}
     virtual ~jUniformBufferResource() {}
+    bool IsInline = false;
     const IUniformBufferBlock* UniformBuffer = nullptr;
 };
 
 struct jBufferResource : public jShaderBindingResource
 {
     jBufferResource() = default;
-    jBufferResource(const jBuffer* InBuffer) : Buffer(InBuffer) {}
+    jBufferResource(const jBuffer* InBuffer, bool InIsInline = false) : Buffer(InBuffer), IsInline(InIsInline) {}
     virtual ~jBufferResource() {}
+    bool IsInline = false;
     const jBuffer* Buffer = nullptr;
 };
 
-struct jTextureResource : public jShaderBindingResource
+struct jSamplerResource : public jShaderBindingResource
+{
+    jSamplerResource() = default;
+    jSamplerResource(const jSamplerStateInfo* InSamplerState)
+        : SamplerState(InSamplerState) {}
+    virtual ~jSamplerResource() {}
+    const jSamplerStateInfo* SamplerState = nullptr;
+};
+
+struct jTextureResource : public jSamplerResource
 {
     jTextureResource() = default;
     jTextureResource(const jTexture* InTexture, const jSamplerStateInfo* InSamplerState)
-        : Texture(InTexture), SamplerState(InSamplerState) {}
+        : jSamplerResource(InSamplerState), Texture(InTexture) {}
     virtual ~jTextureResource() {}
     const jTexture* Texture = nullptr;
-    const jSamplerStateInfo* SamplerState = nullptr;
+};
+
+struct jTextureArrayResource : public jShaderBindingResource
+{
+    jTextureArrayResource() = default;
+    jTextureArrayResource(const jTexture** InTextureArray, const int32 InNumOfTexure)
+        : TextureArray(InTextureArray), NumOfTexure(InNumOfTexure) {}
+    virtual ~jTextureArrayResource() {}
+    const jTexture** TextureArray = nullptr;
+    const int32 NumOfTexure = 1;
 };
 
 struct jShaderBindingResourceInlineAllocator
@@ -61,11 +81,11 @@ struct jShaderBindingResourceInlineAllocator
 struct jShaderBinding
 {
     jShaderBinding() = default;
-    jShaderBinding(const int32 bindingPoint, const EShaderBindingType bindingType
-        , const EShaderAccessStageFlag accessStageFlags, const jShaderBindingResource* InResource = nullptr)
-        : BindingPoint(bindingPoint), BindingType(bindingType), AccessStageFlags(accessStageFlags), Resource(InResource)
+    jShaderBinding(const int32 InBindingPoint, const int32 InNumOfDescriptors, const EShaderBindingType InBindingType
+        , const EShaderAccessStageFlag InAccessStageFlags, const jShaderBindingResource* InResource = nullptr)
+        : BindingPoint(InBindingPoint), NumOfDescriptors(InNumOfDescriptors), BindingType(InBindingType), AccessStageFlags(InAccessStageFlags), Resource(InResource)
     {
-        check(EShaderBindingType::SUBPASS_INPUT_ATTACHMENT != bindingType || accessStageFlags == EShaderAccessStageFlag::FRAGMENT);        // SubpassInputAttachment must have the stageflag 0.
+        check(EShaderBindingType::SUBPASS_INPUT_ATTACHMENT != InBindingType || InAccessStageFlags == EShaderAccessStageFlag::FRAGMENT);        // SubpassInputAttachment must have the stageflag 0.
 
         GetHash();
     }
@@ -75,13 +95,14 @@ struct jShaderBinding
         if (Hash)
             return Hash;
 
-        Hash = BindingPoint ^ (uint32)BindingType ^ (uint32)AccessStageFlags;
+        Hash = BindingPoint ^ (uint32)BindingType ^ (uint32)AccessStageFlags & (int32)NumOfDescriptors;
         return Hash;
     }
 
     void CloneWithoutResource(jShaderBinding& OutReslut) const
     {
         OutReslut.BindingPoint = BindingPoint;
+        OutReslut.NumOfDescriptors = NumOfDescriptors;
         OutReslut.BindingType = BindingType;
         OutReslut.AccessStageFlags = AccessStageFlags;
         OutReslut.Hash = Hash;
@@ -90,6 +111,7 @@ struct jShaderBinding
     mutable size_t Hash = 0;
 
     int32 BindingPoint = 0;
+    int32 NumOfDescriptors = 1;
     EShaderBindingType BindingType = EShaderBindingType::UNIFORMBUFFER;
     EShaderAccessStageFlag AccessStageFlags = EShaderAccessStageFlag::ALL_GRAPHICS;
 
@@ -153,8 +175,8 @@ struct jShaderBindingArray
 template <typename T>
 struct TShaderBinding : public jShaderBinding
 {
-    TShaderBinding(const int32 bindingPoint, const EShaderBindingType bindingType, const EShaderAccessStageFlag accessStageFlags, const T& InData)
-        : jShaderBinding(bindingPoint, bindingType, accessStageFlags), Data(InData)
+    TShaderBinding(const int32 InBindingPoint, const int32 InNumOfDescriptors, const EShaderBindingType InBindingType, const EShaderAccessStageFlag InAccessStageFlags, const T& InData)
+        : jShaderBinding(InBindingPoint, InNumOfDescriptors, InBindingType, InAccessStageFlags), Data(InData)
     { }
     T Data = T();
 };

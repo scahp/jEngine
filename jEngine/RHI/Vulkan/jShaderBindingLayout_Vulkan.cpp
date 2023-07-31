@@ -23,7 +23,7 @@ bool jShaderBindingLayout_Vulkan::Initialize(const jShaderBindingArray& InShader
         VkDescriptorSetLayoutBinding binding = {};
         binding.binding = ShaderBindingArray[i]->BindingPoint;
         binding.descriptorType = GetVulkanShaderBindingType(ShaderBindingArray[i]->BindingType);
-        binding.descriptorCount = 1;
+        binding.descriptorCount = ShaderBindingArray[i]->NumOfDescriptors;
         binding.stageFlags = GetVulkanShaderAccessFlags(ShaderBindingArray[i]->AccessStageFlags);
         binding.pImmutableSamplers = nullptr;
         bindings.push_back(binding);
@@ -254,6 +254,14 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(int32 InIndex, const jShaderBin
         }
         break;
     }
+    case EShaderBindingType::TEXTURE_ARRAY_SRV:
+    {
+        const jTextureArrayResource* tbor = reinterpret_cast<const jTextureArrayResource*>(InShaderBinding->Resource);
+        if (ensure(tbor && tbor->TextureArray))
+        {
+        }
+        break;
+    }
     case EShaderBindingType::SUBPASS_INPUT_ATTACHMENT:
     {
         const jTextureResource* tbor = reinterpret_cast<const jTextureResource*>(InShaderBinding->Resource);
@@ -284,18 +292,19 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(int32 InIndex, const jShaderBin
     }
     case EShaderBindingType::SAMPLER:
     {
-        const jTextureResource* tbor = reinterpret_cast<const jTextureResource*>(InShaderBinding->Resource);
-        if (ensure(tbor && tbor->SamplerState))
+        const jSamplerResource* sr = reinterpret_cast<const jSamplerResource*>(InShaderBinding->Resource);
+        if (ensure(sr && sr->SamplerState))
         {
             VkDescriptorImageInfo& imageInfo = WriteDescriptorInfos[InIndex].ImageInfo;
             imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            imageInfo.sampler = (VkSampler)tbor->SamplerState->GetHandle();
+            imageInfo.sampler = (VkSampler)sr->SamplerState->GetHandle();
             check(imageInfo.sampler);
         }
         break;
     }
     case EShaderBindingType::BUFFER_TEXEL_SRV:
     case EShaderBindingType::BUFFER_TEXEL_UAV:
+    case EShaderBindingType::BUFFER_SRV:
     case EShaderBindingType::BUFFER_UAV:
     case EShaderBindingType::BUFFER_UAV_DYNAMIC:
     {

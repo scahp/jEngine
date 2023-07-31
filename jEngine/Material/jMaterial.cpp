@@ -25,7 +25,7 @@ jShaderBindingInstance* jMaterial::CreateShaderBindingInstance()
                     Texture = GWhiteTexture;
             }
 
-            ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
+            ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
                 , ResourceInlineAllactor.Alloc<jTextureResource>(Texture, nullptr));
         }
 

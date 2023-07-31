@@ -1211,6 +1211,42 @@ bool jRHI_DX12::InitRHI()
 	D3D12_ROOT_SIGNATURE_DESC1 rootSignatureDesc = {};
 
 #if USE_INLINE_DESCRIPTOR
+ //   jUniformBufferBlock_DX12 UniformBuffer;
+	//jBuffer StructuredBuffer;
+
+	//{
+ //       int32 BindingPoint = 0;
+ //       jShaderBindingArray ShaderBindingArray;
+ //       jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
+
+	//	// ShaderBindingInstance 가 Space 가 된다.
+
+	//	//UniformBuffer.Init(sizeof(jRenderObjectUniformBuffer));
+
+	//	// cbv
+ //       ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_GRAPHICS
+ //           , ResourceInlineAllactor.Alloc<jUniformBufferResource>(&UniformBuffer, true));
+
+	//	// structured buffer
+ //       ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
+ //           , ResourceInlineAllactor.Alloc<jBufferResource>(&StructuredBuffer, true));
+
+	//	// Descriptor 0 (1 개, BaseRegister, 이전에 들어간것들을 기반으로 자동으로 올려야 함.)
+ //       ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
+ //           , ResourceInlineAllactor.Alloc<jTextureResource>(&SimpleTextureCube, nullptr));
+
+	//	// Descriptor 1 (3 개, BaseRegister)
+ //       ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
+ //           , ResourceInlineAllactor.Alloc<jTextureArrayResource>(&SimpleTexture[0], 3));
+
+	//	const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+	//		, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT>::Create();
+ //       ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::SAMPLER, EShaderAccessStageFlag::ALL_GRAPHICS
+ //           , ResourceInlineAllactor.Alloc<jSamplerResource>(SamplerState));
+
+	//	jShaderBindingsLayout* ShaderBindingLayout = g_rhi->CreateShaderBindings(ShaderBindingArray);
+	//}
+
 	D3D12_ROOT_PARAMETER1 rootParameter[3];
 	rootParameter[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameter[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
@@ -1245,6 +1281,7 @@ bool jRHI_DX12::InitRHI()
     rootParameter[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 	rootParameter[2].DescriptorTable.NumDescriptorRanges = _countof(range);
 	rootParameter[2].DescriptorTable.pDescriptorRanges = range;
+	
 
     D3D12_STATIC_SAMPLER_DESC staticSamplerDesc = {};
     staticSamplerDesc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;

@@ -545,12 +545,15 @@ enum class EShaderBindingType : uint32
 	TEXTURE_SAMPLER_SRV,
 	TEXTURE_SRV,
 	TEXTURE_UAV,
+	TEXTURE_ARRAY_SRV,
 	SAMPLER,
+	BUFFER_SRV,						// SSBO or StructuredBuffer
 	BUFFER_UAV,
 	BUFFER_UAV_DYNAMIC,
 	BUFFER_TEXEL_SRV,
 	BUFFER_TEXEL_UAV,
 	SUBPASS_INPUT_ATTACHMENT,
+	MAX,
 };
 
 enum class EVulkanBufferBits : uint32

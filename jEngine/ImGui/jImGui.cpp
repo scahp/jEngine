@@ -59,7 +59,7 @@ void jImGUI_Vulkan::Initialize(float width, float height)
         jShaderBindingArray ShaderBindingArray;
         jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
 
-        ShaderBindingArray.Add(BindingPoint++, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
+        ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
             , ResourceInlineAllactor.Alloc<jTextureResource>(nullptr, nullptr));
 
         EmptyShaderBindingLayout = g_rhi->CreateShaderBindings(ShaderBindingArray);
