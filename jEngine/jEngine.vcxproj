@@ -166,6 +166,7 @@ xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"</Command
     <ClInclude Include="RHI\DX12\jShaderCompiler_DX12.h" />
     <ClInclude Include="RHI\DX12\jSwapchain_DX12.h" />
     <ClInclude Include="RHI\DX12\jTexture_DX12.h" />
+    <ClInclude Include="RHI\DX12\jUniformBufferBlock_DX12.h" />
     <ClInclude Include="RHI\jBuffer.h" />
     <ClInclude Include="RHI\jCommandBufferManager.h" />
     <ClInclude Include="RHI\jFenceManager.h" />
@@ -349,6 +350,7 @@ xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"</Command
     <ClCompile Include="RHI\DX12\jShaderCompiler_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jSwapchain_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jTexture_DX12.cpp" />
+    <ClCompile Include="RHI\DX12\jUniformBufferBlock_DX12.cpp" />
     <ClCompile Include="RHI\jFrameBufferPool.cpp" />
     <ClCompile Include="RHI\jPipelineStateInfo.cpp" />
     <ClCompile Include="RHI\jRenderFrameContext.cpp" />

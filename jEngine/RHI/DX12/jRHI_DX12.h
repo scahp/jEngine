@@ -348,6 +348,8 @@ public:
 
 	ComPtr<ID3D12RootSignature> OneFrameRootSignature[3];
 	jRingBuffer_DX12* GetOneFrameUniformRingBuffer() const { return OneFrameUniformRingBuffers[CurrentFrameIndex]; }
+
+	virtual jShaderBindingsLayout* CreateShaderBindings(const jShaderBindingArray& InShaderBindingArray) const override;
 };
 
 extern jRHI_DX12* g_rhi_dx12;
