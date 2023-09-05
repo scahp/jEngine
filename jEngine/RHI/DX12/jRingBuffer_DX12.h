@@ -90,5 +90,7 @@ struct jRingBuffer_DX12 : public jBuffer
     uint64 RingBufferSize = 0;
     void* MappedPointer = nullptr;
 
+    jDescriptor_DX12 CBV;
+
     jMutexLock Lock;
 };

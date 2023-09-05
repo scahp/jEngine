@@ -13,8 +13,11 @@
 #include "FileLoader/jImageFileLoader.h"
 #include "jRingBuffer_DX12.h"
 #include "jUniformBufferBlock_DX12.h"
+#include "jShaderBindingInstance_DX12.h"
+#include "jShaderBindingsLayout_DX12.h"
+#include "jPipelineStateInfo_DX12.h"
 
-#define USE_INLINE_DESCRIPTOR 1												// InlineDescriptor 를 쓸것인지? DescriptorTable 를 쓸것인지 여부
+#define USE_INLINE_DESCRIPTOR 0												// InlineDescriptor 를 쓸것인지? DescriptorTable 를 쓸것인지 여부
 #define USE_ONE_FRAME_BUFFER_AND_DESCRIPTOR (USE_INLINE_DESCRIPTOR && 1)	// 현재 프레임에만 사용하고 버리는 임시 Descriptor 와 Buffer 를 사용할 것인지 여부
 
 using Microsoft::WRL::ComPtr;
@@ -558,9 +561,15 @@ bool jRHI_DX12::InitRHI()
     // 4. Heap	
     RTVDescriptorHeap.Initialize(EDescriptorHeapTypeDX12::RTV, false);
     DSVDescriptorHeap.Initialize(EDescriptorHeapTypeDX12::DSV, false);
-    SRVDescriptorHeap.Initialize(EDescriptorHeapTypeDX12::CBV_SRV_UAV, true);
-	SamplerDescriptorHeap.Initialize(EDescriptorHeapTypeDX12::SAMPLER, true);		// SamplerState test
+    //SRVDescriptorHeap.Initialize(EDescriptorHeapTypeDX12::CBV_SRV_UAV, true);
+	//SamplerDescriptorHeap.Initialize(EDescriptorHeapTypeDX12::SAMPLER, true);		// SamplerState test
     //UAVDescriptorHeap.Initialize(EDescriptorHeapTypeDX12::CBV_SRV_UAV, false);
+
+	DescriptorHeaps.Initialize(EDescriptorHeapTypeDX12::CBV_SRV_UAV);
+	SamplerDescriptorHeaps.Initialize(EDescriptorHeapTypeDX12::SAMPLER);
+
+	OnlineDescriptorHeapBlocks.Initialize(EDescriptorHeapTypeDX12::CBV_SRV_UAV);
+	OnlineSamplerDescriptorHeapBlocks.Initialize(EDescriptorHeapTypeDX12::SAMPLER);
 
 	// 3. Swapchain
 	SwapChain = new jSwapchain_DX12();
@@ -570,7 +579,8 @@ bool jRHI_DX12::InitRHI()
 	for(jRingBuffer_DX12*& iter : OneFrameUniformRingBuffers)
 	{
 		iter = new jRingBuffer_DX12();
-		iter->Create(16 * 1024 * 1024);
+		// iter->Create(16 * 1024 * 1024);
+		iter->Create(65536);
 	}
 
     //////////////////////////////////////////////////////////////////////////
@@ -1056,8 +1066,8 @@ bool jRHI_DX12::InitRHI()
         jBuffer_DX12* buffer = jBufferUtil_DX12::CreateBuffer(RequiredSize, 0, true, false, D3D12_RESOURCE_STATE_GENERIC_READ, &texels[0], ImageSize);
         check(buffer);
 
-        ComPtr<ID3D12GraphicsCommandList4> commandList = g_rhi_dx12->BeginSingleTimeCopyCommands();
-        jBufferUtil_DX12::CopyBufferToImage(commandList.Get(), buffer->Buffer.Get(), 0, SimpleTextureCube->Image.Get(), 6, 0);
+        jCommandBuffer_DX12* commandList = g_rhi_dx12->BeginSingleTimeCopyCommands();
+        jBufferUtil_DX12::CopyBufferToImage(commandList->Get(), buffer->Buffer.Get(), 0, SimpleTextureCube->Image.Get(), 6, 0);
 
         g_rhi_dx12->EndSingleTimeCopyCommands(commandList);
         delete buffer;
@@ -1076,7 +1086,7 @@ bool jRHI_DX12::InitRHI()
     samplerDesc.MipLODBias = 0.0f;
     samplerDesc.MaxAnisotropy = 1;
     samplerDesc.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-    SimpleSamplerState = SamplerDescriptorHeap.Alloc();
+    SimpleSamplerState = SamplerDescriptorHeaps.Alloc();
     Device->CreateSampler(&samplerDesc, SimpleSamplerState.CPUHandle);
 
 	////////////////////////////////////////////////////////////////////////////
@@ -1211,308 +1221,45 @@ bool jRHI_DX12::InitRHI()
 
 	D3D12_ROOT_SIGNATURE_DESC1 rootSignatureDesc = {};
 
-#if USE_INLINE_DESCRIPTOR
-	jUniformBufferBlock_DX12 UniformBuffer;
-	jBuffer_DX12 StructuredBuffer;
+    SimpleUniformBuffer = new jUniformBufferBlock_DX12(jNameStatic("SimpleUniform"), jLifeTimeType::OneFrame);
+	SimpleUniformBuffer->Init(sizeof(ConstantBuffer));	
+	SimpleUniformBuffer->UpdateBufferData(&ConstantBuffer, sizeof(ConstantBuffer));
 
-	{
+    {
         int32 BindingPoint = 0;
         jShaderBindingArray ShaderBindingArray;
         jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
 
-		// ShaderBindingInstance 가 Space 가 된다.
+        // ShaderBindingInstance 가 Space 가 된다.
 
-		//UniformBuffer.Init(sizeof(jRenderObjectUniformBuffer));
+        //UniformBuffer.Init(sizeof(jRenderObjectUniformBuffer));
 
-		// cbv
-        ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_GRAPHICS
-            , ResourceInlineAllactor.Alloc<jUniformBufferResource>(&UniformBuffer, true));
+        // cbv
+        ShaderBindingArray.Add(-1, 1, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_GRAPHICS
+            , ResourceInlineAllactor.Alloc<jUniformBufferResource>(SimpleUniformBuffer, true));
 
-		// structured buffer
-        ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
-            , ResourceInlineAllactor.Alloc<jBufferResource>(&StructuredBuffer, true));
+        // structured buffer
+        ShaderBindingArray.Add(-1, 1, EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
+            , ResourceInlineAllactor.Alloc<jBufferResource>(SimpleStructuredBuffer, true));
 
-		// Descriptor 0 (1 개, BaseRegister, 이전에 들어간것들을 기반으로 자동으로 올려야 함.)
-        ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
+        // Descriptor 0 (1 개, BaseRegister, 이전에 들어간것들을 기반으로 자동으로 올려야 함.)
+        ShaderBindingArray.Add(-1, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
             , ResourceInlineAllactor.Alloc<jTextureResource>(SimpleTextureCube, nullptr));
 
-		// Descriptor 1 (3 개, BaseRegister)
-        ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
+        // Descriptor 1 (3 개, BaseRegister)
+        ShaderBindingArray.Add(-1, 3, EShaderBindingType::TEXTURE_ARRAY_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
             , ResourceInlineAllactor.Alloc<jTextureArrayResource>((const jTexture**)SimpleTexture, 3));
 
-		const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
-			, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT>::Create();
-        ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::SAMPLER, EShaderAccessStageFlag::ALL_GRAPHICS
+        const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+            , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT>::Create();
+        ShaderBindingArray.Add(-1, 1, EShaderBindingType::SAMPLER, EShaderAccessStageFlag::ALL_GRAPHICS
             , ResourceInlineAllactor.Alloc<jSamplerResource>(SamplerState));
 
-        struct jShaderBindingsLayout_DX12 : public jShaderBindingsLayout
-        {
-            virtual ~jShaderBindingsLayout_DX12() {}
+        TestShaderBindingLayout = (jShaderBindingsLayout_DX12*)g_rhi->CreateShaderBindings(ShaderBindingArray);
+		TestShaderBindingInstance = (jShaderBindingInstance_DX12*)TestShaderBindingLayout->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::MultiFrame);
+    }
 
-			virtual bool Initialize(const jShaderBindingArray& InShaderBindingArray) override
-			{
-                int32 SRVIndex = 0;
-                int32 UAVIndex = 0;
-                int32 CBVIndex = 0;
-                int32 SamplerIndex = 0;
-
-                std::vector<D3D12_DESCRIPTOR_RANGE1> Descriptors;
-                std::vector<D3D12_DESCRIPTOR_RANGE1> SamplerDescriptors;
-
-                InShaderBindingArray.CloneWithoutResource(ShaderBindingArray);
-                for (int32 i = 0; i < ShaderBindingArray.NumOfData; ++i)
-                {
-                    const jShaderBinding* ShaderBinding = ShaderBindingArray[i];					
-
-                    switch (ShaderBinding->BindingType)
-                    {
-                    case EShaderBindingType::UNIFORMBUFFER:
-                    case EShaderBindingType::UNIFORMBUFFER_DYNAMIC:
-                    {
-                        Descriptors.push_back({});
-                        D3D12_DESCRIPTOR_RANGE1& range = Descriptors[Descriptors.size() - 1];
-                        range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-                        range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
-                        range.NumDescriptors = ShaderBinding->NumOfDescriptors;
-                        range.BaseShaderRegister = CBVIndex;
-                        range.RegisterSpace = 0;
-                        range.OffsetInDescriptorsFromTableStart = (ShaderBinding->BindingPoint == -1) 
-							? D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND : ShaderBinding->BindingPoint;
-
-                        CBVIndex += ShaderBinding->NumOfDescriptors;
-                        break;
-                    }
-                    case EShaderBindingType::TEXTURE_SAMPLER_SRV:
-                    case EShaderBindingType::TEXTURE_SRV:
-                    case EShaderBindingType::TEXTURE_ARRAY_SRV:
-                    case EShaderBindingType::BUFFER_SRV:
-                    case EShaderBindingType::BUFFER_TEXEL_SRV:
-                    {
-                        Descriptors.push_back({});
-                        D3D12_DESCRIPTOR_RANGE1& range = Descriptors[Descriptors.size() - 1];
-                        range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-                        range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
-                        range.NumDescriptors = ShaderBinding->NumOfDescriptors;
-                        range.BaseShaderRegister = SRVIndex;
-                        range.RegisterSpace = 0;
-                        range.OffsetInDescriptorsFromTableStart = (ShaderBinding->BindingPoint == -1)
-                            ? D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND : ShaderBinding->BindingPoint;
-
-                        SRVIndex += ShaderBinding->NumOfDescriptors;
-                        break;
-                    }
-                    case EShaderBindingType::TEXTURE_UAV:
-                    case EShaderBindingType::BUFFER_UAV:
-                    case EShaderBindingType::BUFFER_UAV_DYNAMIC:
-                    case EShaderBindingType::BUFFER_TEXEL_UAV:
-                    {
-                        Descriptors.push_back({});
-                        D3D12_DESCRIPTOR_RANGE1& range = Descriptors[Descriptors.size() - 1];
-                        range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-                        range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
-                        range.NumDescriptors = ShaderBinding->NumOfDescriptors;
-                        range.BaseShaderRegister = UAVIndex;
-                        range.RegisterSpace = 0;
-                        range.OffsetInDescriptorsFromTableStart = (ShaderBinding->BindingPoint == -1)
-                            ? D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND : ShaderBinding->BindingPoint;
-
-                        ++UAVIndex;
-                        break;
-                    }
-                    case EShaderBindingType::SAMPLER:
-                    {
-                        SamplerDescriptors.push_back({});
-                        D3D12_DESCRIPTOR_RANGE1& range = SamplerDescriptors[SamplerDescriptors.size() - 1];
-                        range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
-                        range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE;
-                        range.NumDescriptors = ShaderBinding->NumOfDescriptors;
-                        range.BaseShaderRegister = SamplerIndex;
-                        range.RegisterSpace = 0;
-                        range.OffsetInDescriptorsFromTableStart = (ShaderBinding->BindingPoint == -1)
-                            ? D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND : ShaderBinding->BindingPoint;
-
-                        SamplerIndex += ShaderBinding->NumOfDescriptors;
-                        break;
-                    }
-                    case EShaderBindingType::SUBPASS_INPUT_ATTACHMENT:
-                    case EShaderBindingType::MAX:
-                    default:
-                        check(0);
-                        break;
-                    }
-                }
-
-                D3D12_ROOT_PARAMETER1 rootParameter[2];
-                rootParameter[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-                rootParameter[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-                rootParameter[0].DescriptorTable.NumDescriptorRanges = Descriptors.size();
-                rootParameter[0].DescriptorTable.pDescriptorRanges = &Descriptors[0];
-
-                rootParameter[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-                rootParameter[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-                rootParameter[1].DescriptorTable.NumDescriptorRanges = SamplerDescriptors.size();
-                rootParameter[1].DescriptorTable.pDescriptorRanges = &SamplerDescriptors[0];
-
-                // RootSignature 생성
-                D3D12_ROOT_SIGNATURE_DESC1 rootSignatureDesc = {};
-                rootSignatureDesc.NumParameters = _countof(rootParameter);
-                rootSignatureDesc.pParameters = rootParameter;
-                rootSignatureDesc.NumStaticSamplers = 0;
-                rootSignatureDesc.pStaticSamplers = nullptr;
-                rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-
-                D3D12_VERSIONED_ROOT_SIGNATURE_DESC versionedDesc = { };
-                versionedDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
-                versionedDesc.Desc_1_1 = rootSignatureDesc;
-
-                ComPtr<ID3DBlob> signature;
-                ComPtr<ID3DBlob> error;
-                if (JFAIL_E(D3D12SerializeVersionedRootSignature(&versionedDesc, &signature, &error), error))
-                    return false;
-
-                if (JFAIL(g_rhi_dx12->Device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&RootSignature))))
-                    return false;
-
-                return true;
-			}
-            virtual jShaderBindingInstance* CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const override
-			{ 
-				return nullptr; 
-			}
-			virtual size_t GetHash() const
-			{
-                if (Hash)
-                    return Hash;
-
-                Hash = ShaderBindingArray.GetHash();
-                return Hash;
-			}
-            virtual const jShaderBindingArray& GetShaderBindingsLayout() const { return ShaderBindingArray; }
-            virtual void* GetHandle() const { return RootSignature.Get(); }
-
-            mutable size_t Hash = 0;
-
-			ComPtr<ID3D12RootSignature> RootSignature;
-
-        protected:
-            jShaderBindingArray ShaderBindingArray;     // Resource 정보는 비어있음
-        };
-
-		// jShaderBindingsLayout* ShaderBindingLayout = g_rhi->CreateShaderBindings(ShaderBindingArray);
-
-		//////////////////////////////////////////////////////////////////////////
-		// jShaderBindingInstance_DX12
-		//////////////////////////////////////////////////////////////////////////
-		struct jShaderBindingInstance_DX12 : public jShaderBindingInstance
-		{
-			virtual ~jShaderBindingInstance_DX12() {}
-
-			virtual void Initialize(const jShaderBindingArray& InShaderBindingArray) override 
-			{
-
-			}
-			virtual void UpdateShaderBindings(const jShaderBindingArray& InShaderBindingArray) override 
-			{
-				// online descriptor set 에 디스크립터 복사하자. CopySimpleDescriptor
-                // descriptor layout 찾아서 바인딩 해주는 것으로 하자.
-                // layout 으로 부터 복사해서 실제로 루트 시그니처를 만들어야 함? 이 부분을 고민해보자.
-
-                check(ShaderBindingLayout);
-                check(ShaderBindingLayout->GetShaderBindingsLayout().NumOfData == InShaderBindingArray.NumOfData);
-
-				Descriptors.clear();
-				SamplerDescriptors.clear();
-
-                for (int32 i = 0; i < InShaderBindingArray.NumOfData; ++i)
-                {
-                    const jShaderBinding* ShaderBinding = InShaderBindingArray[i];
-                    check(ShaderBinding);
-                    check(ShaderBinding->Resource);
-
-                    switch (ShaderBinding->BindingType)
-                    {
-                    case EShaderBindingType::UNIFORMBUFFER:
-                    case EShaderBindingType::UNIFORMBUFFER_DYNAMIC:
-                    {
-                        jUniformBufferBlock_DX12* UniformBuffer = (jUniformBufferBlock_DX12*)ShaderBinding->Resource;
-                        check(UniformBuffer->Buffer);
-                        Descriptors.push_back(UniformBuffer->Buffer->CBV);
-                        break;
-                    }
-                    case EShaderBindingType::TEXTURE_SAMPLER_SRV:
-                    case EShaderBindingType::TEXTURE_SRV:
-                    {
-                        jTexture_DX12* Tex = (jTexture_DX12*)ShaderBinding->Resource;
-                        Descriptors.push_back(Tex->SRV);
-                        break;
-                    }
-                    case EShaderBindingType::TEXTURE_ARRAY_SRV:
-                    {
-                        check(0);
-                        break;
-                    }
-                    case EShaderBindingType::BUFFER_SRV:
-                    case EShaderBindingType::BUFFER_TEXEL_SRV:
-                    {
-                        jBuffer_DX12* Buf = (jBuffer_DX12*)ShaderBinding->Resource;
-                        check(Buf->Buffer);
-                        Descriptors.push_back(Buf->SRV);
-                        break;
-                    }
-                    case EShaderBindingType::TEXTURE_UAV:
-                    {
-                        jTexture_DX12* Tex = (jTexture_DX12*)ShaderBinding->Resource;
-                        Descriptors.push_back(Tex->UAV);
-                        break;
-                    }
-                    case EShaderBindingType::BUFFER_UAV:
-                    case EShaderBindingType::BUFFER_UAV_DYNAMIC:
-                    case EShaderBindingType::BUFFER_TEXEL_UAV:
-                    {
-                        jBuffer_DX12* Buf = (jBuffer_DX12*)ShaderBinding->Resource;
-                        check(Buf->Buffer);
-                        Descriptors.push_back(Buf->UAV);
-                        break;
-                    }
-                    case EShaderBindingType::SAMPLER:
-                    {
-                        check(0);
-                        jSamplerStateInfo* Sampler = (jSamplerStateInfo*)ShaderBinding->Resource;
-                        //SamplerDescriptors.push_back({});
-                        //D3D12_DESCRIPTOR_RANGE1& range = SamplerDescriptors[SamplerDescriptors.size() - 1];
-                        //range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
-                        //range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE;
-                        //range.NumDescriptors = ShaderBinding->NumOfDescriptors;
-                        //range.BaseShaderRegister = SamplerIndex;
-                        //range.RegisterSpace = 0;
-                        //range.OffsetInDescriptorsFromTableStart = (ShaderBinding->BindingPoint == -1)
-                        //    ? D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND : ShaderBinding->BindingPoint;
-
-                        //SamplerIndex += ShaderBinding->NumOfDescriptors;
-                        break;
-                    }
-                    case EShaderBindingType::SUBPASS_INPUT_ATTACHMENT:
-                    case EShaderBindingType::MAX:
-                    default:
-                        check(0);
-                        break;
-                    }
-                }
-			}
-			virtual void BindGraphics(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const override {}
-			virtual void BindCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const override {}
-			virtual void* GetHandle() const override { return ShaderBindingLayout->GetHandle(); }
-			virtual const std::vector<uint32>* GetDynamicOffsets() const override { return 0; }
-			virtual void Free() override {}
-
-			//VkDescriptorSet DescriptorSet = nullptr;        // DescriptorPool 을 해제하면 모두 처리될 수 있어서 따로 소멸시키지 않음
-			//jWriteDescriptorSet WriteDescriptorSet;
-			std::vector<jDescriptor_DX12> Descriptors;
-            std::vector<jDescriptor_DX12> SamplerDescriptors;
-			jShaderBindingsLayout_DX12* ShaderBindingLayout = nullptr;
-		};
-	}
-
+#if USE_INLINE_DESCRIPTOR
 	D3D12_ROOT_PARAMETER1 rootParameter[3];
 	rootParameter[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameter[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
@@ -1657,7 +1404,11 @@ bool jRHI_DX12::InitRHI()
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
 	psoDesc.InputLayout = { .pInputElementDescs = VSInputElementDesc, .NumElements = _countof(VSInputElementDesc) };
+#if USE_INLINE_DESCRIPTOR
 	psoDesc.pRootSignature = SimpleRootSignature.Get();
+#else
+	psoDesc.pRootSignature = (ID3D12RootSignature*)TestShaderBindingLayout->GetHandle();
+#endif
 	psoDesc.VS = { .pShaderBytecode = VSShaderBlob->GetBufferPointer(), .BytecodeLength = VSShaderBlob->GetBufferSize() };
 	psoDesc.PS = { .pShaderBytecode = PSShaderBlob->GetBufferPointer(), .BytecodeLength = PSShaderBlob->GetBufferSize() };
     psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
@@ -1844,8 +1595,14 @@ void jRHI_DX12::Release()
 	// 4. Heap
 	RTVDescriptorHeap.Release();
 	DSVDescriptorHeap.Release();
-	SRVDescriptorHeap.Release();
-	SamplerDescriptorHeap.Release();		// SamplerState test
+	//SRVDescriptorHeap.Release();
+	//SamplerDescriptorHeap.Release();		// SamplerState test
+
+	DescriptorHeaps.Release();
+	SamplerDescriptorHeaps.Release();
+
+	OnlineDescriptorHeapBlocks.Release();
+	OnlineSamplerDescriptorHeapBlocks.Release();
 
 	//////////////////////////////////////////////////////////////////////////
 	// 3. Swapchain
@@ -2107,7 +1864,8 @@ void jRHI_DX12::Render()
 	GetOneFrameUniformRingBuffer()->Reset();
 
 	// Prepare
-	auto GraphicsCommandList = GraphicsCommandQueue->GetAvailableCommandList();
+	jCommandBuffer_DX12* CommandBuffer = GraphicsCommandQueue->GetAvailableCommandList();
+	auto GraphicsCommandList = CommandBuffer->Get();
 
  //   static float elapsedTime = 0.0f;
  //   elapsedTime = 0.01f;
@@ -2149,7 +1907,39 @@ void jRHI_DX12::Render()
 	ScissorRect.top = 0;
 	ScissorRect.bottom = SCR_HEIGHT;
 
-    GraphicsCommandList->SetGraphicsRootSignature(SimpleRootSignature.Get());
+    // GraphicsCommandList->SetGraphicsRootSignature(SimpleRootSignature.Get());
+	GraphicsCommandList->SetGraphicsRootSignature((ID3D12RootSignature*)TestShaderBindingLayout->GetHandle());
+
+	{
+        jSimpleConstantBuffer ConstantBuffer;
+        ConstantBuffer.M.SetIdentity();
+        Matrix Projection = jCameraUtil::CreatePerspectiveMatrix((float)SCR_WIDTH, (float)SCR_HEIGHT, DegreeToRadian(90.0f), 0.01f, 1000.0f);
+        Matrix Camera = jCameraUtil::CreateViewMatrix(Vector::FowardVector * 1.2f, Vector::ZeroVector, Vector::UpVector);
+        ConstantBuffer.M = Projection * Camera * ConstantBuffer.M;
+        ConstantBuffer.M.SetTranspose();
+
+        // Dynamic indexing with constantbuffer index
+        static DWORD OldTick = GetTickCount();
+        static int32 TexIndex = 0;
+        DWORD time = GetTickCount() - OldTick;
+        if (time > 2000)
+        {
+            OldTick = GetTickCount();
+            TexIndex = (TexIndex + 1) % _countof(SimpleTexture);
+        }
+        ConstantBuffer.TexIndex = TexIndex;
+		SimpleUniformBuffer->UpdateBufferData(&ConstantBuffer, sizeof(ConstantBuffer));
+	}
+
+	//uint32 Index = *g_rhi_dx12->SRVDescriptorHeap.Pools.begin();
+	//auto testDescriptorStartCpuHandle = g_rhi_dx12->SRVDescriptorHeap.GPUHandleStart;
+	//testDescriptorStartCpuHandle.ptr += Index * g_rhi_dx12->SRVDescriptorHeap.DescriptorSize;
+
+ //   uint32 Index2 = *g_rhi_dx12->SamplerDescriptorHeap.Pools.begin();
+ //   auto testDescriptorStartCpuHandle2 = g_rhi_dx12->SamplerDescriptorHeap.GPUHandleStart;
+ //   testDescriptorStartCpuHandle2.ptr += Index2 * g_rhi_dx12->SamplerDescriptorHeap.DescriptorSize;
+
+	TestShaderBindingInstance->CopyToOnlineDescriptorHeap(CommandBuffer);
 
 #if USE_INLINE_DESCRIPTOR
 	ID3D12DescriptorHeap* ppHeaps[] = { SRVDescriptorHeap.Heap.Get() };								// SamplerState test
@@ -2208,10 +1998,15 @@ void jRHI_DX12::Render()
 	#endif
 	GraphicsCommandList->SetGraphicsRootDescriptorTable(2, SRVDescriptorHeap.GPUHandleStart);		// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
 #else
-    ID3D12DescriptorHeap* ppHeaps[] = { SRVDescriptorHeap.Heap.Get(), SamplerDescriptorHeap.Heap.Get() };		// SamplerState test
+	CommandBuffer->OnlineDescriptorHeap->GetCPUHandle();
+    ID3D12DescriptorHeap* ppHeaps[] = 
+	{ 
+		CommandBuffer->OnlineDescriptorHeap->GetHeap(),
+		CommandBuffer->OnlineSamplerDescriptorHeap->GetHeap()
+	};
     GraphicsCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
-    GraphicsCommandList->SetGraphicsRootDescriptorTable(0, SRVDescriptorHeap.GPUHandleStart);		// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
-    GraphicsCommandList->SetGraphicsRootDescriptorTable(1, SamplerDescriptorHeap.GPUHandleStart);	// SamplerState test
+    GraphicsCommandList->SetGraphicsRootDescriptorTable(0, CommandBuffer->OnlineDescriptorHeap->GetGPUHandle());		// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
+    GraphicsCommandList->SetGraphicsRootDescriptorTable(1, CommandBuffer->OnlineSamplerDescriptorHeap->GetGPUHandle());	// SamplerState test
 #endif
 
 	GraphicsCommandList->RSSetViewports(1, &viewport);
@@ -2232,8 +2027,8 @@ void jRHI_DX12::Render()
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView = { .BufferLocation = VertexBuffer->GetGPUAddress(), .SizeInBytes = (uint32)VertexBuffer->Size, .StrideInBytes = sizeof(Vertex) };
 	GraphicsCommandList->IASetVertexBuffers(0, 1, &vertexBufferView);
 	D3D12_INDEX_BUFFER_VIEW indexBufferView = {.BufferLocation = IndexBuffer->GetGPUAddress(), .SizeInBytes = IndexBuffer->GetAllocatedSize(), .Format = DXGI_FORMAT_R32_UINT };
-	GraphicsCommandList->IASetIndexBuffer(&indexBufferView);
-	GraphicsCommandList->SetPipelineState(SimplePipelineState.Get());
+    GraphicsCommandList->IASetIndexBuffer(&indexBufferView);
+    GraphicsCommandList->SetPipelineState(SimplePipelineState.Get());
 	//GraphicsCommandList->DrawInstanced(3, 1, 0, 0);
 	GraphicsCommandList->DrawIndexedInstanced(IndexBuffer->GetAllocatedSize() / sizeof(uint32), 1, 0, 0, 0);
 
@@ -2293,10 +2088,10 @@ void jRHI_DX12::Render()
     //RenderUI(GraphicsCommandList.Get(), SwapchainRT->Image.Get(), SwapchainRT->RTV.CPUHandle, m_imgui_SrvDescHeap.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
     //////////////////////////////////////////////////////////////////////////
 
-	RenderUI(GraphicsCommandList.Get(), SwapchainRT->Image.Get(), SwapchainRT->RTV.CPUHandle, m_imgui_SrvDescHeap.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+	RenderUI(GraphicsCommandList, SwapchainRT->Image.Get(), SwapchainRT->RTV.CPUHandle, m_imgui_SrvDescHeap.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
 
 	// Present
-	GraphicsCommandQueue->ExecuteCommandList(GraphicsCommandList);
+	GraphicsCommandQueue->ExecuteCommandList(CommandBuffer);
 
 	HRESULT hr = S_OK;
 	if (Options & c_AllowTearing)
@@ -2333,6 +2128,11 @@ void jRHI_DX12::Render()
 
 		CurrentFrameIndex = SwapChain->GetCurrentBackBufferIndex();
 	}
+
+	// 임시로 여기에 만들어 둠.
+	g_rhi->IncrementFrameNumber();
+	//SRVDescriptorHeap.ProcessPendingDescriptorPoolFree();
+	//SamplerDescriptorHeap.ProcessPendingDescriptorPoolFree();
 }
 
 
@@ -2350,8 +2150,8 @@ void jRHI_DX12::OnDeviceLost()
 	Device.Reset();
 	//m_dxrStateObject.Reset();
 
-	SRVDescriptorHeap.Release();
-	SamplerDescriptorHeap.Release();		// SamplerState test
+	//SRVDescriptorHeap.Release();
+	//SamplerDescriptorHeap.Release();		// SamplerState test
 	
 	delete VertexBuffer;
 	VertexBuffer = nullptr;
@@ -2520,8 +2320,8 @@ bool jRHI_DX12::OnHandleDeviceLost()
     //m_dxrStateObject.Reset();
 	Device.Reset();
 
-	SRVDescriptorHeap.Release();
-	SamplerDescriptorHeap.Release();		// SamplerState test
+	//SRVDescriptorHeap.Release();
+	//SamplerDescriptorHeap.Release();		// SamplerState test
 	
     delete VertexBuffer;
     VertexBuffer = nullptr;
@@ -2556,13 +2356,13 @@ bool jRHI_DX12::OnHandleDeviceRestored()
     return true;
 }
 
-ComPtr<ID3D12GraphicsCommandList4> jRHI_DX12::BeginSingleTimeCopyCommands()
+jCommandBuffer_DX12* jRHI_DX12::BeginSingleTimeCopyCommands()
 {
 	check(CopyCommandQueue);
 	return CopyCommandQueue->GetAvailableCommandList();
 }
 
-void jRHI_DX12::EndSingleTimeCopyCommands(const ComPtr<ID3D12GraphicsCommandList4>& commandBuffer)
+void jRHI_DX12::EndSingleTimeCopyCommands(jCommandBuffer_DX12* commandBuffer)
 {
 	check(CopyCommandQueue);
 	CopyCommandQueue->ExecuteCommandList(commandBuffer);
@@ -2672,8 +2472,8 @@ jTexture* jRHI_DX12::CreateTextureFromData(void* data, int32 width, int32 height
 	jBuffer_DX12* buffer = jBufferUtil_DX12::CreateBuffer(RequiredSize, 0, true, false, D3D12_RESOURCE_STATE_GENERIC_READ, data, ImageSize);
 	check(buffer);
 
-	ComPtr<ID3D12GraphicsCommandList4> commandList = g_rhi_dx12->BeginSingleTimeCopyCommands();
-	jBufferUtil_DX12::CopyBufferToImage(commandList.Get(), buffer->Buffer.Get(), 0, Texture->Image.Get());
+	jCommandBuffer_DX12* commandList = g_rhi_dx12->BeginSingleTimeCopyCommands();
+	jBufferUtil_DX12::CopyBufferToImage(commandList->Get(), buffer->Buffer.Get(), 0, Texture->Image.Get());
 	g_rhi_dx12->EndSingleTimeCopyCommands(commandList);
 	delete buffer;
 	
@@ -2685,5 +2485,15 @@ jTexture* jRHI_DX12::CreateTextureFromData(void* data, int32 width, int32 height
 
 jShaderBindingsLayout* jRHI_DX12::CreateShaderBindings(const jShaderBindingArray& InShaderBindingArray) const
 {
-	return nullptr;
+	auto ShaderBindingsLayout = new jShaderBindingsLayout_DX12();
+	check(ShaderBindingsLayout);
+	ShaderBindingsLayout->Initialize(InShaderBindingArray);
+	return ShaderBindingsLayout;
+}
+
+jSamplerStateInfo* jRHI_DX12::CreateSamplerState(const jSamplerStateInfo& initializer) const
+{
+	auto SamplerState = new jSamplerStateInfo_DX12(initializer);
+	SamplerState->Initialize();
+	return SamplerState;
 }

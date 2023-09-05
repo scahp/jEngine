@@ -220,9 +220,9 @@ void UploadByUsingStagingBuffer(ComPtr<ID3D12Resource>& DestBuffer, const void* 
 
     ComPtr<ID3D12Resource> StagingBuffer = CreateStagingBuffer(InInitData, InSize, InAlignment);
 
-    ComPtr<ID3D12GraphicsCommandList4> commandBuffer = g_rhi_dx12->BeginSingleTimeCopyCommands();
-    check(commandBuffer);
-    commandBuffer->CopyBufferRegion(DestBuffer.Get(), 0, StagingBuffer.Get(), 0, AlignedSize);
+    jCommandBuffer_DX12* commandBuffer = g_rhi_dx12->BeginSingleTimeCopyCommands();
+    check(commandBuffer->IsValid());
+    commandBuffer->Get()->CopyBufferRegion(DestBuffer.Get(), 0, StagingBuffer.Get(), 0, AlignedSize);
     g_rhi_dx12->EndSingleTimeCopyCommands(commandBuffer);
 }
 
@@ -368,7 +368,7 @@ struct jStructuredBuffer
         SrvDesc.Buffer.NumElements = uint32(NumElements);
         SrvDesc.Buffer.StructureByteStride = uint32(Stride);
 
-        SRV = g_rhi_dx12->SRVDescriptorHeap.Alloc();
+        SRV = g_rhi_dx12->DescriptorHeaps.Alloc();
         g_rhi_dx12->Device->CreateShaderResourceView(ResourceRHI.Get(), &SrvDesc, SRV.CPUHandle);
 
         // UAV 생성
@@ -383,18 +383,15 @@ struct jStructuredBuffer
             UavDesc.Buffer.NumElements = uint32(NumElements);
             UavDesc.Buffer.StructureByteStride = uint32(Stride);
 
-            UAV = g_rhi_dx12->SRVDescriptorHeap.Alloc();
+            UAV = g_rhi_dx12->DescriptorHeaps.Alloc();
             g_rhi_dx12->Device->CreateUnorderedAccessView(ResourceRHI.Get(), nullptr, &UavDesc, UAV.CPUHandle);
         }
     }
 
     void Release()
     {
-        if (SRV.IsValid())
-            g_rhi_dx12->SRVDescriptorHeap.Free(SRV.Index);
-
-        if (UAV.IsValid())
-            g_rhi_dx12->SRVDescriptorHeap.Free(UAV.Index);
+        SRV.Free();
+        UAV.Free();
 
         ResourceRHI.Reset();
     }
@@ -431,7 +428,7 @@ struct jFormattedBuffer
         SrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
         SrvDesc.Buffer.NumElements = uint32(NumElements);
 
-        SRV = g_rhi_dx12->SRVDescriptorHeap.Alloc();
+        SRV = g_rhi_dx12->DescriptorHeaps.Alloc();
         g_rhi_dx12->Device->CreateShaderResourceView(ResourceRHI.Get(), &SrvDesc, SRV.CPUHandle);
 
         // UAV 생성
@@ -445,18 +442,15 @@ struct jFormattedBuffer
             UavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
             UavDesc.Buffer.NumElements = uint32(NumElements);
 
-            UAV = g_rhi_dx12->SRVDescriptorHeap.Alloc();
+            UAV = g_rhi_dx12->DescriptorHeaps.Alloc();
             g_rhi_dx12->Device->CreateUnorderedAccessView(ResourceRHI.Get(), nullptr, &UavDesc, UAV.CPUHandle);
         }
     }
 
     void Release()
     {
-        if (SRV.IsValid())
-            g_rhi_dx12->SRVDescriptorHeap.Free(SRV.Index);
-
-        if (UAV.IsValid())
-            g_rhi_dx12->SRVDescriptorHeap.Free(UAV.Index);
+        SRV.Free();
+        UAV.Free();
 
         ResourceRHI.Reset();
     }
@@ -492,7 +486,7 @@ struct jRawBufferInit
         SrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
         SrvDesc.Buffer.NumElements = uint32(NumElements);
 
-        SRV = g_rhi_dx12->SRVDescriptorHeap.Alloc();
+        SRV = g_rhi_dx12->DescriptorHeaps.Alloc();
         g_rhi_dx12->Device->CreateShaderResourceView(ResourceRHI.Get(), &SrvDesc, SRV.CPUHandle);
 
         // UAV 생성
@@ -506,18 +500,15 @@ struct jRawBufferInit
             UavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_RAW;
             UavDesc.Buffer.NumElements = uint32(NumElements);
 
-            UAV = g_rhi_dx12->SRVDescriptorHeap.Alloc();
+            UAV = g_rhi_dx12->DescriptorHeaps.Alloc();
             g_rhi_dx12->Device->CreateUnorderedAccessView(ResourceRHI.Get(), nullptr, &UavDesc, UAV.CPUHandle);
         }
     }
 
     void Release()
     {
-        if (SRV.IsValid())
-            g_rhi_dx12->SRVDescriptorHeap.Free(SRV.Index);
-
-        if (UAV.IsValid())
-            g_rhi_dx12->SRVDescriptorHeap.Free(UAV.Index);
+        SRV.Free();
+        UAV.Free();
 
         ResourceRHI.Reset();
     }

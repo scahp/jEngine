@@ -29,6 +29,17 @@ void jRingBuffer_DX12::Create(uint64 totalSize, uint32 alignment /*= 16*/)
     if (!ensure(Buffer))
         return;
 
+    {
+        check(!CBV.IsValid());
+        CBV = g_rhi_dx12->DescriptorHeaps.Alloc();
+
+        D3D12_CONSTANT_BUFFER_VIEW_DESC Desc;
+        Desc.BufferLocation = Buffer->GetGPUVirtualAddress();
+        Desc.SizeInBytes = RingBufferSize;
+
+        g_rhi_dx12->Device->CreateConstantBufferView(&Desc, CBV.CPUHandle);
+    }
+
     D3D12_RANGE readRange = { };
     if (JFAIL(Buffer->Map(0, &readRange, reinterpret_cast<void**>(&MappedPointer))))
     {

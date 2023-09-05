@@ -2,6 +2,21 @@
 #include "jDescriptorHeap_DX12.h"
 #include "jRingBuffer_DX12.h"
 
+//////////////////////////////////////////////////////////////////////////
+// jDescriptor_DX12
+//////////////////////////////////////////////////////////////////////////
+void jDescriptor_DX12::Free()
+{
+    if (IsValid())
+    {
+        check(DescriptorHeap);
+        DescriptorHeap->Free(Index);
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////
+// jDescriptorHeap_DX12
+//////////////////////////////////////////////////////////////////////////
 void jDescriptorHeap_DX12::Initialize(EDescriptorHeapTypeDX12 InHeapType, bool InShaderVisible, uint32 InNumOfDescriptors)
 {
     jScopedLock s(&DescriptorLock);
@@ -49,79 +64,162 @@ void jDescriptorHeap_DX12::Release()
 
 void jDescriptorHeap_DX12::Free(uint32 InIndex, uint32 InDelayFrames)
 {
-    PendingFree.push_back({ .DescriptorIndex = InIndex, .FrameIndex = g_rhi_dx12->GetCurrentFrameIndex() });
+    PendingFree.push_back({ .DescriptorIndex = InIndex, .FrameIndex = g_rhi_dx12->GetCurrentFrameNumber() });
+    ProcessPendingDescriptorPoolFree();
+}
 
+void jDescriptorHeap_DX12::ProcessPendingDescriptorPoolFree()
+{
     const int32 CurrentFrameNumber = g_rhi->GetCurrentFrameNumber();
     const int32 OldestFrameToKeep = CurrentFrameNumber - NumOfFramesToWaitBeforeReleasing;
 
-    // ProcessPendingDescriptorPoolFree
+    // Check it is too early
+    if (OldestFrameToKeep >= 0 && CurrentFrameNumber >= CanReleasePendingFreeShaderBindingInstanceFrameNumber)
     {
-        // Check it is too early
-        if (CurrentFrameNumber >= CanReleasePendingFreeShaderBindingInstanceFrameNumber)
+        // Release pending memory
+        int32 i = 0;
+        for (; i < PendingFree.size(); ++i)
         {
-            // Release pending memory
-            int32 i = 0;
-            for (; i < PendingFree.size(); ++i)
+            PendingForFree& PendingFreeInstance = PendingFree[i];
+            if (PendingFreeInstance.FrameIndex < OldestFrameToKeep)
             {
-                PendingForFree& PendingFreeInstance = PendingFree[i];
-                if (PendingFreeInstance.FrameIndex < OldestFrameToKeep)
-                {
-                    Pools.insert(PendingFreeInstance.DescriptorIndex);
-                }
-                else
-                {
-                    CanReleasePendingFreeShaderBindingInstanceFrameNumber = PendingFreeInstance.FrameIndex + NumOfFramesToWaitBeforeReleasing + 1;
-                    break;
-                }
+                Pools.insert(PendingFreeInstance.DescriptorIndex);
             }
-            if (i > 0)
+            else
             {
-                const size_t RemainingSize = (PendingFree.size() - i);
-                if (RemainingSize > 0)
-                {
-                    memcpy(&PendingFree[0], &PendingFree[i], sizeof(PendingForFree) * RemainingSize);
-                }
-                PendingFree.resize(RemainingSize);
+                CanReleasePendingFreeShaderBindingInstanceFrameNumber = PendingFreeInstance.FrameIndex + NumOfFramesToWaitBeforeReleasing + 1;
+                break;
             }
+        }
+        if (i > 0)
+        {
+            const size_t RemainingSize = (PendingFree.size() - i);
+            if (RemainingSize > 0)
+            {
+                memcpy(&PendingFree[0], &PendingFree[i], sizeof(PendingForFree) * RemainingSize);
+            }
+            PendingFree.resize(RemainingSize);
         }
     }
 }
 
-jDescriptor_DX12 jDescriptorHeap_DX12::OneFrameCreateConstantBufferView(jRingBuffer_DX12* InBuffer, uint64 InOffset, uint32 InSize, ETextureFormat InFormat)
+//jDescriptor_DX12 jDescriptorHeap_DX12::OneFrameCreateConstantBufferView(jRingBuffer_DX12* InBuffer, uint64 InOffset, uint32 InSize, ETextureFormat InFormat)
+//{
+//    check(g_rhi_dx12);
+//    check(g_rhi_dx12->Device);
+//
+//    jDescriptor_DX12 Descriptor = OneFrameAlloc();
+//
+//    check(InBuffer);
+//    check(InBuffer->Buffer);
+//
+//    D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = { };
+//    cbvDesc.BufferLocation = InBuffer->GetGPUAddress() + InOffset;
+//    cbvDesc.SizeInBytes = uint32(Align(InSize, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+//    g_rhi_dx12->Device->CreateConstantBufferView(&cbvDesc, Descriptor.CPUHandle);
+//    return Descriptor;
+//}
+
+//jDescriptor_DX12 jDescriptorHeap_DX12::OneFrameCreateShaderResourceView(jRingBuffer_DX12* InBuffer, uint64 InOffset, uint32 InStride, uint32 InNumOfElement, ETextureFormat InFormat)
+//{
+//    check(g_rhi_dx12);
+//    check(g_rhi_dx12->Device);
+//
+//    D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
+//    desc.Format = (InFormat == ETextureFormat::MAX) ? DXGI_FORMAT_UNKNOWN : GetDX12TextureFormat(InFormat);
+//    desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+//    desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+//    desc.Buffer.FirstElement = uint32(InOffset / InStride);
+//    desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+//    desc.Buffer.NumElements = InNumOfElement;
+//    desc.Buffer.StructureByteStride = InStride;
+//
+//    jDescriptor_DX12 Descriptor = OneFrameAlloc();
+//
+//    check(InBuffer);
+//    check(InBuffer->Buffer);
+//    g_rhi_dx12->Device->CreateShaderResourceView(InBuffer->Buffer.Get(), &desc, Descriptor.CPUHandle);
+//    return Descriptor;
+//}
+
+//////////////////////////////////////////////////////////////////////////
+// jOnlineDescriptorHeap_DX12
+//////////////////////////////////////////////////////////////////////////
+void jOnlineDescriptorHeapBlocks_DX12::Initialize(EDescriptorHeapTypeDX12 InHeapType, uint32 InNumOfDescriptors /*= 1024*/)
 {
+    jScopedLock s(&DescriptorBlockLock);
+
+    check((InHeapType == EDescriptorHeapTypeDX12::CBV_SRV_UAV) || (InHeapType == EDescriptorHeapTypeDX12::SAMPLER));
+
+    const auto HeapTypeDX12 = GetDX12DescriptorHeapType(InHeapType);
+
+    D3D12_DESCRIPTOR_HEAP_DESC heapDesc = { };
+    heapDesc.NumDescriptors = InNumOfDescriptors;
+    heapDesc.Type = HeapTypeDX12;
+    heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+
     check(g_rhi_dx12);
     check(g_rhi_dx12->Device);
+    if (JFAIL(g_rhi_dx12->Device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&Heap))))
+        return;
 
-    jDescriptor_DX12 Descriptor = OneFrameAlloc();
+    CPUHandleStart = Heap->GetCPUDescriptorHandleForHeapStart();
+    GPUHandleStart = Heap->GetGPUDescriptorHandleForHeapStart();
 
-    check(InBuffer);
-    check(InBuffer->Buffer);
+    DescriptorSize = g_rhi_dx12->Device->GetDescriptorHandleIncrementSize(HeapTypeDX12);
+    NumOfDescriptors = InNumOfDescriptors;
 
-    D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = { };
-    cbvDesc.BufferLocation = InBuffer->GetGPUAddress() + InOffset;
-    cbvDesc.SizeInBytes = uint32(Align(InSize, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
-    g_rhi_dx12->Device->CreateConstantBufferView(&cbvDesc, Descriptor.CPUHandle);
-    return Descriptor;
+    DescriptorBlocks.resize((NumOfDescriptors / 20) + ((NumOfDescriptors % 20) ? 1 : 0));
+    OnlineDescriptorHeap.resize((NumOfDescriptors / 20) + ((NumOfDescriptors % 20) ? 1 : 0));
+
+    int32 Index = 0;
+    for(int32 i=0;i<NumOfDescriptors;++i)
+    {
+        int32 AllocatedSize = DescriptorBlocks[Index].AllocatedSize;
+        if (AllocatedSize >= jDescriptorBlock_DX12::NumOfDescriptorsInBlock)
+        {
+            ++Index;
+            AllocatedSize = DescriptorBlocks[Index].AllocatedSize;
+        }
+
+        jDescriptor_DX12& Descriptor = DescriptorBlocks[Index].Descriptors[AllocatedSize];
+        Descriptor.Index = i;
+        Descriptor.CPUHandle = CPUHandleStart;
+        Descriptor.CPUHandle.ptr += Descriptor.Index * DescriptorSize;
+
+        Descriptor.GPUHandle = GPUHandleStart;
+        Descriptor.GPUHandle.ptr += Descriptor.Index * DescriptorSize;
+
+        ++DescriptorBlocks[Index].AllocatedSize;
+    }
+
+    for (int32 i = 0; i < DescriptorBlocks.size(); ++i)
+    {
+        DescriptorBlocks[i].DescriptorHeapBlocks = this;
+        DescriptorBlocks[i].Index = i;
+        DescriptorBlocks[i].HeapType = HeapType;
+        
+        OnlineDescriptorHeap[i] = new jOnlineDescriptorHeap_DX12();
+        OnlineDescriptorHeap[i]->Initialize(&DescriptorBlocks[i]);
+
+        FreeLists.insert(i);
+    }
 }
 
-jDescriptor_DX12 jDescriptorHeap_DX12::OneFrameCreateShaderResourceView(jRingBuffer_DX12* InBuffer, uint64 InOffset, uint32 InStride, uint32 InNumOfElement, ETextureFormat InFormat)
+void jOnlineDescriptorHeapBlocks_DX12::Release()
 {
-    check(g_rhi_dx12);
-    check(g_rhi_dx12->Device);
+    jScopedLock s(&DescriptorBlockLock);
 
-    D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
-    desc.Format = (InFormat == ETextureFormat::MAX) ? DXGI_FORMAT_UNKNOWN : GetDX12TextureFormat(InFormat);
-    desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-    desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    desc.Buffer.FirstElement = uint32(InOffset / InStride);
-    desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-    desc.Buffer.NumElements = InNumOfElement;
-    desc.Buffer.StructureByteStride = InStride;
+    Heap->Release();
+    CPUHandleStart = { };
+    GPUHandleStart = { };
+    DescriptorSize = 0;
+    NumOfDescriptors = 0;
+    DescriptorBlocks.clear();
 
-    jDescriptor_DX12 Descriptor = OneFrameAlloc();
-
-    check(InBuffer);
-    check(InBuffer->Buffer);
-    g_rhi_dx12->Device->CreateShaderResourceView(InBuffer->Buffer.Get(), &desc, Descriptor.CPUHandle);
-    return Descriptor;
+    for(int32 i=0;i< OnlineDescriptorHeap.size();++i)
+    {
+        delete OnlineDescriptorHeap[i];
+    }
+    OnlineDescriptorHeap.clear();
 }

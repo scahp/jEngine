@@ -9,6 +9,9 @@ struct jSamplerStateInfo;
 struct jShaderBindingResource : public std::enable_shared_from_this<jShaderBindingResource>
 {
     virtual ~jShaderBindingResource() {}
+    virtual const void* GetResource() const { return nullptr; }
+    virtual int32 NumOfResource() const { return 1; }
+    virtual bool GetIsInline() const { return false; }
 };
 
 struct jUniformBufferResource : public jShaderBindingResource
@@ -16,6 +19,9 @@ struct jUniformBufferResource : public jShaderBindingResource
     jUniformBufferResource() = default;
     jUniformBufferResource(const IUniformBufferBlock* InUniformBuffer, bool InIsInline = false) : UniformBuffer(InUniformBuffer), IsInline(InIsInline) {}
     virtual ~jUniformBufferResource() {}
+    virtual const void* GetResource() const override { return UniformBuffer; }
+    virtual bool GetIsInline() const override { return IsInline; }
+
     bool IsInline = false;
     const IUniformBufferBlock* UniformBuffer = nullptr;
 };
@@ -25,6 +31,9 @@ struct jBufferResource : public jShaderBindingResource
     jBufferResource() = default;
     jBufferResource(const jBuffer* InBuffer, bool InIsInline = false) : Buffer(InBuffer), IsInline(InIsInline) {}
     virtual ~jBufferResource() {}
+    virtual const void* GetResource() const override { return Buffer; }
+    virtual bool GetIsInline() const override { return IsInline; }
+
     bool IsInline = false;
     const jBuffer* Buffer = nullptr;
 };
@@ -35,6 +44,8 @@ struct jSamplerResource : public jShaderBindingResource
     jSamplerResource(const jSamplerStateInfo* InSamplerState)
         : SamplerState(InSamplerState) {}
     virtual ~jSamplerResource() {}
+    virtual const void* GetResource() const override { return SamplerState; }
+
     const jSamplerStateInfo* SamplerState = nullptr;
 };
 
@@ -44,6 +55,8 @@ struct jTextureResource : public jSamplerResource
     jTextureResource(const jTexture* InTexture, const jSamplerStateInfo* InSamplerState)
         : jSamplerResource(InSamplerState), Texture(InTexture) {}
     virtual ~jTextureResource() {}
+    virtual const void* GetResource() const override { return Texture; }
+
     const jTexture* Texture = nullptr;
 };
 
@@ -53,6 +66,9 @@ struct jTextureArrayResource : public jShaderBindingResource
     jTextureArrayResource(const jTexture** InTextureArray, const int32 InNumOfTexure)
         : TextureArray(InTextureArray), NumOfTexure(InNumOfTexure) {}
     virtual ~jTextureArrayResource() {}
+    virtual const void* GetResource() const override { return TextureArray; }
+    virtual int32 NumOfResource() const override { return NumOfTexure; }
+
     const jTexture** TextureArray = nullptr;
     const int32 NumOfTexure = 1;
 };

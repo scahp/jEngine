@@ -5,6 +5,27 @@
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
 
+struct jCommandBuffer_DX12
+{
+	ComPtr<ID3D12CommandAllocator> CommandAllocator;
+	ComPtr<ID3D12GraphicsCommandList4> CommandList;
+	uint64 FenceValue = 0;
+
+	class jOnlineDescriptorHeap_DX12* OnlineDescriptorHeap = nullptr;
+	class jOnlineDescriptorHeap_DX12* OnlineSamplerDescriptorHeap = nullptr;
+
+	ID3D12GraphicsCommandList4* Get()
+    {
+        return CommandList.Get();
+    }
+	bool IsValid() const
+	{
+		return CommandList.Get();
+	}
+	void Reset();
+	bool Close();
+};
+
 class jCommandQueue_DX12
 {
 public:
@@ -25,7 +46,8 @@ public:
 	}
 	FORCEINLINE bool IsFenceComplete(uint64 InFenceValue) const
 	{
-		return Fence->GetCompletedValue() >= InFenceValue;
+		uint64 CompletedFenceValue = Fence->GetCompletedValue();
+		return CompletedFenceValue >= InFenceValue;
 	}
 	FORCEINLINE void WaitForFenceValue() const { WaitForFenceValue(FenceValue); }
 	FORCEINLINE void WaitForFenceValue(uint64 InFenceValue) const
@@ -45,8 +67,8 @@ public:
 	FORCEINLINE ComPtr<ID3D12CommandQueue> GetCommandQueue() const { return CommandQueue; }
 
 	// CommandList
-	uint64 ExecuteCommandList(ComPtr<ID3D12GraphicsCommandList4> InCommandListPtr);
-	ComPtr<ID3D12GraphicsCommandList4> GetAvailableCommandList();
+	uint64 ExecuteCommandList(jCommandBuffer_DX12* InCommandList);
+	jCommandBuffer_DX12* GetAvailableCommandList();
 
 private:
 	FORCEINLINE ComPtr<ID3D12CommandAllocator> CreateCommandAllocator() const
@@ -58,30 +80,23 @@ private:
 		return commandAllocator;
 	}
 
-	FORCEINLINE ComPtr<ID3D12GraphicsCommandList4> CreateCommandList(ComPtr<ID3D12CommandAllocator> InAllocatorPtr) const
-	{
-		ComPtr<ID3D12GraphicsCommandList4> commandList;
-		if (FAILED(Device->CreateCommandList(0, CommandListType, InAllocatorPtr.Get(), nullptr, IID_PPV_ARGS(&commandList))))
-			return nullptr;
+	jCommandBuffer_DX12* CreateCommandList() const;
 
-		return commandList;
-	}
+	//ComPtr<ID3D12CommandAllocator> GetAvailableAllocator();
 
-	ComPtr<ID3D12CommandAllocator> GetAvailableAllocator();
+	//struct jCommandAllocatorEntry
+	//{
+	//	jCommandAllocatorEntry() = default;
+	//	jCommandAllocatorEntry(const uint64 InFenceValue, const ComPtr<ID3D12CommandAllocator>& InCommandAllocator)
+	//		: FenceValue(InFenceValue), CommandAllocator(InCommandAllocator)
+	//	{ }
 
-	struct jCommandAllocatorEntry
-	{
-		jCommandAllocatorEntry() = default;
-		jCommandAllocatorEntry(const uint64 InFenceValue, const ComPtr<ID3D12CommandAllocator>& InCommandAllocator)
-			: FenceValue(InFenceValue), CommandAllocator(InCommandAllocator)
-		{ }
+	//	uint64 FenceValue;
+	//	ComPtr<ID3D12CommandAllocator> CommandAllocator;
+	//};
 
-		uint64 FenceValue;
-		ComPtr<ID3D12CommandAllocator> CommandAllocator;
-	};
-
-	std::queue<jCommandAllocatorEntry> AvailableCommandAllocatorQueue;
-	std::queue<ComPtr<ID3D12GraphicsCommandList4>> AvailableCommandListQueue;
+	//std::queue<jCommandAllocatorEntry> AvailableCommandAllocatorQueue;
+	std::vector<jCommandBuffer_DX12*> AvailableCommandLists;
 
 	D3D12_COMMAND_LIST_TYPE CommandListType = D3D12_COMMAND_LIST_TYPE_DIRECT;
 	ComPtr<ID3D12Device> Device;

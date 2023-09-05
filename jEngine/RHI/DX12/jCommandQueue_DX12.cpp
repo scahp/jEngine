@@ -1,6 +1,22 @@
 ﻿#include "pch.h"
 #include "jCommandQueue_DX12.h"
 
+void jCommandBuffer_DX12::Reset()
+{
+    CommandAllocator->Reset();
+    CommandList->Reset(CommandAllocator.Get(), nullptr);
+    OnlineDescriptorHeap->Reset();
+    OnlineSamplerDescriptorHeap->Reset();
+}
+
+bool jCommandBuffer_DX12::Close()
+{
+    if (FAILED(CommandList->Close()))
+        return false;
+
+	return true;
+}
+
 bool jCommandQueue_DX12::Initialize(ComPtr<ID3D12Device> InDevice, D3D12_COMMAND_LIST_TYPE InType)
 {
 	JASSERT(InDevice);
@@ -30,65 +46,79 @@ bool jCommandQueue_DX12::Initialize(ComPtr<ID3D12Device> InDevice, D3D12_COMMAND
 	return true;
 }
 
-uint64 jCommandQueue_DX12::ExecuteCommandList(ComPtr<ID3D12GraphicsCommandList4> InCommandListPtr)
+uint64 jCommandQueue_DX12::ExecuteCommandList(jCommandBuffer_DX12* InCommandList)
 {
-	if (FAILED(InCommandListPtr->Close()))
+	if (!InCommandList->Close())
 		return -1;
 
-	ID3D12CommandAllocator* commandAllocator = nullptr;
-	uint32 dataSize = sizeof(commandAllocator);
-	if (FAILED(InCommandListPtr->GetPrivateData(__uuidof(ID3D12CommandAllocator), &dataSize, &commandAllocator)))
-		return -1;
+	//ID3D12CommandAllocator* commandAllocator = nullptr;
+	//uint32 dataSize = sizeof(commandAllocator);
+	//if (FAILED(InCommandList->GetPrivateData(__uuidof(ID3D12CommandAllocator), &dataSize, &commandAllocator)))
+	//	return -1;
 
-	ID3D12CommandList* pCommandLists[] = { InCommandListPtr.Get() };
+	ID3D12CommandList* pCommandLists[] = { InCommandList->Get() };
 	CommandQueue->ExecuteCommandLists(1, pCommandLists);
 	const uint64 fenceValue = Signal();
 
-	AvailableCommandAllocatorQueue.emplace(jCommandAllocatorEntry(fenceValue, commandAllocator));
-	AvailableCommandListQueue.push(InCommandListPtr);
+	//AvailableCommandAllocatorQueue.emplace(jCommandAllocatorEntry(fenceValue, commandAllocator));
+	InCommandList->FenceValue = fenceValue;
+	AvailableCommandLists.push_back(InCommandList);
 
-	commandAllocator->Release();
+    //InCommandList->CommandAllocator->Release();
+
+	//commandAllocator->Release();
 
 	return fenceValue;
 }
 
-ComPtr<ID3D12CommandAllocator> jCommandQueue_DX12::GetAvailableAllocator()
+jCommandBuffer_DX12* jCommandQueue_DX12::CreateCommandList() const
 {
-	ComPtr<ID3D12CommandAllocator> CommandAllocator;
-	if (!AvailableCommandAllocatorQueue.empty() && IsFenceComplete(AvailableCommandAllocatorQueue.front().FenceValue))
+    jCommandBuffer_DX12* commandList = new jCommandBuffer_DX12();
+	commandList->CommandAllocator = CreateCommandAllocator();
+	if (FAILED(Device->CreateCommandList(0, CommandListType
+		, commandList->CommandAllocator.Get(), nullptr, IID_PPV_ARGS(&commandList->CommandList))))
 	{
-		CommandAllocator = AvailableCommandAllocatorQueue.front().CommandAllocator;
-		AvailableCommandAllocatorQueue.pop();
-
-		if (FAILED(CommandAllocator->Reset()))
-			return nullptr;
-	}
-	else
-	{
-		CommandAllocator = CreateCommandAllocator();
-	}
-	return CommandAllocator;
-}
-
-ComPtr<ID3D12GraphicsCommandList4> jCommandQueue_DX12::GetAvailableCommandList()
-{
-	ComPtr<ID3D12GraphicsCommandList4> CommandList;
-	ComPtr<ID3D12CommandAllocator> AvailableCommandAllocator = GetAvailableAllocator();
-	if (AvailableCommandListQueue.empty())
-	{
-		CommandList = CreateCommandList(AvailableCommandAllocator);
-	}
-	else
-	{
-		CommandList = AvailableCommandListQueue.front();
-		AvailableCommandListQueue.pop();
-
-		if (FAILED(CommandList->Reset(AvailableCommandAllocator.Get(), nullptr)))
-			return nullptr;
-	}
-
-	if (FAILED(CommandList->SetPrivateDataInterface(__uuidof(ID3D12CommandAllocator), AvailableCommandAllocator.Get())))
+		delete commandList;
 		return nullptr;
+	}
 
-	return CommandList;
+    commandList->OnlineDescriptorHeap = g_rhi_dx12->OnlineDescriptorHeapBlocks.Alloc();
+	commandList->OnlineSamplerDescriptorHeap = g_rhi_dx12->OnlineSamplerDescriptorHeapBlocks.Alloc();
+
+    return commandList;
 }
+
+//ComPtr<ID3D12CommandAllocator> jCommandQueue_DX12::GetAvailableAllocator()
+//{
+//	ComPtr<ID3D12CommandAllocator> CommandAllocator;
+//	if (!AvailableCommandAllocatorQueue.empty() && IsFenceComplete(AvailableCommandAllocatorQueue.front().FenceValue))
+//	{
+//		CommandAllocator = AvailableCommandAllocatorQueue.front().CommandAllocator;
+//		AvailableCommandAllocatorQueue.pop();
+//
+//		if (FAILED(CommandAllocator->Reset()))
+//			return nullptr;
+//	}
+//	else
+//	{
+//		CommandAllocator = CreateCommandAllocator();
+//	}
+//	return CommandAllocator;
+//}
+
+jCommandBuffer_DX12* jCommandQueue_DX12::GetAvailableCommandList()
+{
+	for(int32 i=0;i<AvailableCommandLists.size();++i)
+	{
+		if (IsFenceComplete(AvailableCommandLists[i]->FenceValue))
+		{
+			jCommandBuffer_DX12* SelectedCmdBuffer = AvailableCommandLists[i];
+			AvailableCommandLists.erase(AvailableCommandLists.begin() + i);
+			SelectedCmdBuffer->Reset();
+			return SelectedCmdBuffer;
+		}
+	}
+
+	return CreateCommandList();
+}
+

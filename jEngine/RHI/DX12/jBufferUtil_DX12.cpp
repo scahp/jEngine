@@ -77,10 +77,10 @@ jBuffer_DX12* CreateBuffer(uint64 InSize, uint16 InAlignment, bool InIsCPUAccess
             ComPtr<ID3D12Resource> StagingBuffer = CreateBufferInternal(InSize, InAlignment, true, InAllowUAV, InInitialState);
             check(StagingBuffer);
 
-            ComPtr<ID3D12GraphicsCommandList4> commandBuffer = g_rhi_dx12->BeginSingleTimeCopyCommands();
-            check(commandBuffer);
+            jCommandBuffer_DX12* commandBuffer = g_rhi_dx12->BeginSingleTimeCopyCommands();
+            check(commandBuffer->IsValid());
 
-            commandBuffer->CopyBufferRegion((ID3D12Resource*)Buffer->GetHandle(), 0, StagingBuffer.Get(), 0, InSize);
+            commandBuffer->Get()->CopyBufferRegion((ID3D12Resource*)Buffer->GetHandle(), 0, StagingBuffer.Get(), 0, InSize);
             g_rhi_dx12->EndSingleTimeCopyCommands(commandBuffer);
         }
     }
@@ -194,8 +194,8 @@ void CopyBuffer(ID3D12GraphicsCommandList4* InCommandBuffer, ID3D12Resource* InS
 
 void CopyBuffer(ID3D12Resource* InSrcBuffer, ID3D12Resource* InDstBuffer, uint64 InSize, uint64 InSrcOffset, uint64 InDstOffset)
 {
-    ComPtr<ID3D12GraphicsCommandList4> commandBuffer = g_rhi_dx12->BeginSingleTimeCopyCommands();
-    CopyBuffer(commandBuffer.Get(), InSrcBuffer, InDstBuffer, InSize, InSrcOffset, InDstOffset);
+    jCommandBuffer_DX12* commandBuffer = g_rhi_dx12->BeginSingleTimeCopyCommands();
+    CopyBuffer(commandBuffer->Get(), InSrcBuffer, InDstBuffer, InSize, InSrcOffset, InDstOffset);
     g_rhi_dx12->EndSingleTimeCopyCommands(commandBuffer);
 }
 
@@ -210,7 +210,7 @@ void CreateConstantBufferView(jBuffer_DX12* InBuffer)
         return;
 
     check(!InBuffer->CBV.IsValid());
-    InBuffer->CBV = g_rhi_dx12->SRVDescriptorHeap.Alloc();
+    InBuffer->CBV = g_rhi_dx12->DescriptorHeaps.Alloc();
 
     D3D12_CONSTANT_BUFFER_VIEW_DESC Desc;
     Desc.BufferLocation = InBuffer->GetGPUAddress();
@@ -234,7 +234,7 @@ void CreateShaderResourceView(jBuffer_DX12* InBuffer, uint32 InStride, uint32 In
         return;
 
     check(!InBuffer->SRV.IsValid());
-    InBuffer->SRV = g_rhi_dx12->SRVDescriptorHeap.Alloc();
+    InBuffer->SRV = g_rhi_dx12->DescriptorHeaps.Alloc();
 
     D3D12_SHADER_RESOURCE_VIEW_DESC Desc = {};
     Desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -259,7 +259,7 @@ void CreateUnorderedAccessView(jBuffer_DX12* InBuffer)
         return;
 
     check(!InBuffer->UAV.IsValid());
-    InBuffer->UAV = g_rhi_dx12->SRVDescriptorHeap.Alloc();
+    InBuffer->UAV = g_rhi_dx12->DescriptorHeaps.Alloc();
 
     D3D12_UNORDERED_ACCESS_VIEW_DESC Desc = { };
     Desc.Format = DXGI_FORMAT_UNKNOWN;
@@ -282,7 +282,7 @@ void CreateShaderResourceView(jTexture_DX12* InTexture)
         return;
 
     check(!InTexture->SRV.IsValid());
-    InTexture->SRV = g_rhi_dx12->SRVDescriptorHeap.Alloc();
+    InTexture->SRV = g_rhi_dx12->DescriptorHeaps.Alloc();
 
     D3D12_SHADER_RESOURCE_VIEW_DESC Desc = {};
     Desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -333,7 +333,7 @@ void CreateUnorderedAccessView(jTexture_DX12* InTexture)
 
     check(!InTexture->UAV.IsValid());
     //InTexture->UAV = g_rhi_dx12->UAVDescriptorHeap.Alloc();
-    InTexture->UAV = g_rhi_dx12->SRVDescriptorHeap.Alloc();
+    InTexture->UAV = g_rhi_dx12->DescriptorHeaps.Alloc();
 
     D3D12_UNORDERED_ACCESS_VIEW_DESC Desc = { };
     Desc.Format = GetDX12TextureFormat(InTexture->Format);

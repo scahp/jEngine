@@ -12,6 +12,7 @@
 #include "jCommandQueue_DX12.h"
 #include "jDescriptorHeap_DX12.h"
 #include "jFenceManager_DX12.h"
+#include "jUniformBufferBlock_DX12.h"
 
 class jSwapchain_DX12;
 struct jBuffer_DX12;
@@ -130,9 +131,15 @@ public:
 	// 4. Heap
 	jDescriptorHeap_DX12 RTVDescriptorHeap;
 	jDescriptorHeap_DX12 DSVDescriptorHeap;
-	jDescriptorHeap_DX12 SRVDescriptorHeap;
-	jDescriptorHeap_DX12 SamplerDescriptorHeap;		// SamplerState test
+	//jDescriptorHeap_DX12 SRVDescriptorHeap;
+	//jDescriptorHeap_DX12 SamplerDescriptorHeap;		// SamplerState test
 	//jDescriptorHeap_DX12 UAVDescriptorHeap;
+
+    jOfflineDescriptorHeap_DX12 DescriptorHeaps;
+    jOfflineDescriptorHeap_DX12 SamplerDescriptorHeaps;
+
+	jOnlineDescriptorHeapBlocks_DX12 OnlineDescriptorHeapBlocks;
+	jOnlineDescriptorHeapBlocks_DX12 OnlineSamplerDescriptorHeapBlocks;
 
     //////////////////////////////////////////////////////////////////////////
     // 5. Initialize Camera and lighting
@@ -266,6 +273,7 @@ public:
 
   //  bool BuildTopLevelAS(ComPtr<ID3D12GraphicsCommandList4>& InCommandList, TopLevelAccelerationStructureBuffers& InBuffers, bool InIsUpdate, float InRotationY, Vector InTranslation);
 
+	jUniformBufferBlock_DX12* SimpleUniformBuffer = nullptr;
 	jBuffer_DX12* SimpleConstantBuffer = nullptr;
 	jBuffer_DX12* SimpleStructuredBuffer = nullptr;			// StructuredBuffer test
 	jTexture_DX12* SimpleTexture[3] = { nullptr, nullptr, nullptr };					// Texture test
@@ -337,8 +345,8 @@ public:
     bool OnHandleDeviceLost();
     bool OnHandleDeviceRestored();
 
-	ComPtr<ID3D12GraphicsCommandList4> BeginSingleTimeCopyCommands();
-    void EndSingleTimeCopyCommands(const ComPtr<ID3D12GraphicsCommandList4>& commandBuffer);
+	jCommandBuffer_DX12* BeginSingleTimeCopyCommands();
+    void EndSingleTimeCopyCommands(jCommandBuffer_DX12* commandBuffer);
 
 	virtual jTexture* CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
 		, ETextureFormat textureFormat = ETextureFormat::RGBA8, bool createMipmap = false) const override;
@@ -350,6 +358,15 @@ public:
 	jRingBuffer_DX12* GetOneFrameUniformRingBuffer() const { return OneFrameUniformRingBuffers[CurrentFrameIndex]; }
 
 	virtual jShaderBindingsLayout* CreateShaderBindings(const jShaderBindingArray& InShaderBindingArray) const override;
+
+	struct jShaderBindingsLayout_DX12* TestShaderBindingLayout = nullptr;
+	struct jShaderBindingInstance_DX12* TestShaderBindingInstance = nullptr;
+
+	virtual jSamplerStateInfo* CreateSamplerState(const jSamplerStateInfo& initializer) const override;
+
+	uint32 CurrentFrameNumber = 0;		// FrameNumber is just Incremented frame by frame.
+    virtual uint32 GetCurrentFrameNumber() const override { return CurrentFrameNumber; }
+    virtual void IncrementFrameNumber() { ++CurrentFrameNumber; }
 };
 
 extern jRHI_DX12* g_rhi_dx12;

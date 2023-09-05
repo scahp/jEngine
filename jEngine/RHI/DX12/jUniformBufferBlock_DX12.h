@@ -15,15 +15,21 @@ struct jUniformBufferBlock_DX12 : public IUniformBufferBlock
 
     virtual void ClearBuffer(int32 clearValue) override;
 
-    virtual void* GetBuffer() const override { return Buffer->GetHandle(); }
-    virtual void* GetBufferMemory() const override { return Buffer->CPUAddress; }
+    virtual void* GetBuffer() const override;
+    virtual void* GetBufferMemory() const override;
 
-    virtual size_t GetBufferSize() const override { return Buffer->Size; }
+    virtual size_t GetBufferSize() const override;
     virtual size_t GetBufferOffset() const override { return 0; }
 
-    jBuffer_DX12* Buffer = nullptr;
+    const jDescriptor_DX12& GetCBV() const;
 
 private:
     jUniformBufferBlock_DX12(const jUniformBufferBlock_DX12&) = delete;
     jUniformBufferBlock_DX12& operator=(const jUniformBufferBlock_DX12&) = delete;
+
+    jBuffer_DX12* Buffer = nullptr;
+
+    jRingBuffer_DX12* RingBuffer = nullptr;
+    uint8* RingBufferDestAddress = nullptr;
+    size_t RingBufferAllocatedSize = 0;
 };
