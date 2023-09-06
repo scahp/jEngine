@@ -11,30 +11,25 @@ struct jShaderBindingResource : public std::enable_shared_from_this<jShaderBindi
     virtual ~jShaderBindingResource() {}
     virtual const void* GetResource() const { return nullptr; }
     virtual int32 NumOfResource() const { return 1; }
-    virtual bool GetIsInline() const { return false; }
 };
 
 struct jUniformBufferResource : public jShaderBindingResource
 {
     jUniformBufferResource() = default;
-    jUniformBufferResource(const IUniformBufferBlock* InUniformBuffer, bool InIsInline = false) : UniformBuffer(InUniformBuffer), IsInline(InIsInline) {}
+    jUniformBufferResource(const IUniformBufferBlock* InUniformBuffer, bool InIsInline = false) : UniformBuffer(InUniformBuffer) {}
     virtual ~jUniformBufferResource() {}
     virtual const void* GetResource() const override { return UniformBuffer; }
-    virtual bool GetIsInline() const override { return IsInline; }
 
-    bool IsInline = false;
     const IUniformBufferBlock* UniformBuffer = nullptr;
 };
 
 struct jBufferResource : public jShaderBindingResource
 {
     jBufferResource() = default;
-    jBufferResource(const jBuffer* InBuffer, bool InIsInline = false) : Buffer(InBuffer), IsInline(InIsInline) {}
+    jBufferResource(const jBuffer* InBuffer, bool InIsInline = false) : Buffer(InBuffer) {}
     virtual ~jBufferResource() {}
     virtual const void* GetResource() const override { return Buffer; }
-    virtual bool GetIsInline() const override { return IsInline; }
 
-    bool IsInline = false;
     const jBuffer* Buffer = nullptr;
 };
 
@@ -98,8 +93,9 @@ struct jShaderBinding
 {
     jShaderBinding() = default;
     jShaderBinding(const int32 InBindingPoint, const int32 InNumOfDescriptors, const EShaderBindingType InBindingType
-        , const EShaderAccessStageFlag InAccessStageFlags, const jShaderBindingResource* InResource = nullptr)
-        : BindingPoint(InBindingPoint), NumOfDescriptors(InNumOfDescriptors), BindingType(InBindingType), AccessStageFlags(InAccessStageFlags), Resource(InResource)
+        , const EShaderAccessStageFlag InAccessStageFlags, const jShaderBindingResource* InResource = nullptr, bool InIsInline = false)
+        : BindingPoint(InBindingPoint), NumOfDescriptors(InNumOfDescriptors), BindingType(InBindingType)
+        , AccessStageFlags(InAccessStageFlags), Resource(InResource), IsInline(InIsInline)
     {
         check(EShaderBindingType::SUBPASS_INPUT_ATTACHMENT != InBindingType || InAccessStageFlags == EShaderAccessStageFlag::FRAGMENT);        // SubpassInputAttachment must have the stageflag 0.
 
@@ -111,12 +107,13 @@ struct jShaderBinding
         if (Hash)
             return Hash;
 
-        Hash = BindingPoint ^ (uint32)BindingType ^ (uint32)AccessStageFlags & (int32)NumOfDescriptors;
+        Hash = BindingPoint ^ (uint32)BindingType ^ (uint32)AccessStageFlags & (int32)NumOfDescriptors & (int32)IsInline;
         return Hash;
     }
 
     void CloneWithoutResource(jShaderBinding& OutReslut) const
     {
+        OutReslut.IsInline = IsInline;
         OutReslut.BindingPoint = BindingPoint;
         OutReslut.NumOfDescriptors = NumOfDescriptors;
         OutReslut.BindingType = BindingType;
@@ -126,6 +123,7 @@ struct jShaderBinding
 
     mutable size_t Hash = 0;
 
+    bool IsInline = false;
     int32 BindingPoint = 0;
     int32 NumOfDescriptors = 1;
     EShaderBindingType BindingType = EShaderBindingType::UNIFORMBUFFER;

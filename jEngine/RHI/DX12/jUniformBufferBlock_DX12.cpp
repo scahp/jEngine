@@ -46,8 +46,8 @@ void jUniformBufferBlock_DX12::UpdateBufferData(const void* InData, size_t InSiz
     {
         RingBuffer = g_rhi_dx12->GetOneFrameUniformRingBuffer();
         RingBufferAllocatedSize = Align(InSize, 256);
-        const uint64 TempBufferOffset = RingBuffer->Alloc(RingBufferAllocatedSize);
-        RingBufferDestAddress = ((uint8*)RingBuffer->GetMappedPointer()) + TempBufferOffset;
+        RingBufferOffset = RingBuffer->Alloc(RingBufferAllocatedSize);
+        RingBufferDestAddress = ((uint8*)RingBuffer->GetMappedPointer()) + RingBufferOffset;
         if (InData)
             memcpy(RingBufferDestAddress, InData, InSize);
         else
@@ -86,4 +86,9 @@ const jDescriptor_DX12& jUniformBufferBlock_DX12::GetCBV() const
     }
 
     return RingBuffer->CBV;
+}
+
+uint64 jUniformBufferBlock_DX12::GetGPUAddress() const
+{
+    return (jLifeTimeType::MultiFrame == LifeType) ? Buffer->GetGPUAddress() : (RingBuffer->GetGPUAddress() + RingBufferOffset);
 }

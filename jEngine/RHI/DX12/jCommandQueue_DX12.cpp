@@ -108,17 +108,41 @@ jCommandBuffer_DX12* jCommandQueue_DX12::CreateCommandList() const
 
 jCommandBuffer_DX12* jCommandQueue_DX12::GetAvailableCommandList()
 {
+	jCommandBuffer_DX12* SelectedCmdBuffer = nullptr;
 	for(int32 i=0;i<AvailableCommandLists.size();++i)
 	{
 		if (IsFenceComplete(AvailableCommandLists[i]->FenceValue))
 		{
-			jCommandBuffer_DX12* SelectedCmdBuffer = AvailableCommandLists[i];
+			SelectedCmdBuffer = AvailableCommandLists[i];
 			AvailableCommandLists.erase(AvailableCommandLists.begin() + i);
 			SelectedCmdBuffer->Reset();
-			return SelectedCmdBuffer;
+			break;
 		}
 	}
 
-	return CreateCommandList();
+	if (!SelectedCmdBuffer)
+	{
+		SelectedCmdBuffer = CreateCommandList();
+		check(SelectedCmdBuffer);
+	}
+
+	if (D3D12_COMMAND_LIST_TYPE_COPY != CommandListType)
+	{
+		ID3D12DescriptorHeap* ppHeaps[] =
+		{
+			SelectedCmdBuffer->OnlineDescriptorHeap->GetHeap(),
+			SelectedCmdBuffer->OnlineSamplerDescriptorHeap->GetHeap()
+		};
+		SelectedCmdBuffer->CommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+	}
+
+ //   ID3D12DescriptorHeap* ppHeaps[] =
+ //   {
+ //       SelectedCmdBuffer->OnlineDescriptorHeap->GetHeap(),
+ //       SelectedCmdBuffer->OnlineSamplerDescriptorHeap->GetHeap()
+ //   };
+	//SelectedCmdBuffer->Get()->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+
+	return SelectedCmdBuffer;
 }
 

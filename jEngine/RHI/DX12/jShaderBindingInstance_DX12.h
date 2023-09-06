@@ -17,7 +17,22 @@ struct jShaderBindingInstance_DX12 : public jShaderBindingInstance
     virtual const std::vector<uint32>* GetDynamicOffsets() const override { return 0; }
     virtual void Free() override {}
 
+    void BindGraphics(jCommandBuffer_DX12* InCommandList);
+    void BindCompute(jCommandBuffer_DX12* InCommandList);
     void CopyToOnlineDescriptorHeap(jCommandBuffer_DX12* InCommandList);
+
+    struct jInlineRootParamType
+    {
+        enum Enum
+        {
+            CBV = 0,
+            SRV,
+            UAV,
+            NumOfType
+        };
+    };
+
+    std::vector<std::pair<jInlineRootParamType::Enum, D3D12_GPU_VIRTUAL_ADDRESS>> RootParameterInlines;
 
     std::vector<jDescriptor_DX12> Descriptors;
     std::vector<jDescriptor_DX12> SamplerDescriptors;

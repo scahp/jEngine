@@ -9,6 +9,7 @@ bool jShaderBindingsLayout_DX12::Initialize(const jShaderBindingArray& InShaderB
     int32 CBVIndex = 0;
     int32 SamplerIndex = 0;
 
+    std::vector<D3D12_ROOT_PARAMETER1> RootParameters;
     std::vector<D3D12_DESCRIPTOR_RANGE1> Descriptors;
     std::vector<D3D12_DESCRIPTOR_RANGE1> SamplerDescriptors;
 
@@ -16,21 +17,40 @@ bool jShaderBindingsLayout_DX12::Initialize(const jShaderBindingArray& InShaderB
     for (int32 i = 0; i < ShaderBindingArray.NumOfData; ++i)
     {
         const jShaderBinding* ShaderBinding = ShaderBindingArray[i];
+        
+        check(!ShaderBinding->IsInline || (ShaderBinding->IsInline &&
+            (ShaderBinding->BindingType == EShaderBindingType::UNIFORMBUFFER
+                || ShaderBinding->BindingType == EShaderBindingType::UNIFORMBUFFER_DYNAMIC
+                || ShaderBinding->BindingType == EShaderBindingType::BUFFER_SRV
+                || ShaderBinding->BindingType == EShaderBindingType::BUFFER_UAV)));
 
         switch (ShaderBinding->BindingType)
         {
         case EShaderBindingType::UNIFORMBUFFER:
         case EShaderBindingType::UNIFORMBUFFER_DYNAMIC:
         {
-            Descriptors.push_back({});
-            D3D12_DESCRIPTOR_RANGE1& range = Descriptors[Descriptors.size() - 1];
-            range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-            range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
-            range.NumDescriptors = ShaderBinding->NumOfDescriptors;
-            range.BaseShaderRegister = CBVIndex;
-            range.RegisterSpace = 0;
-            range.OffsetInDescriptorsFromTableStart = (ShaderBinding->BindingPoint == -1)
-                ? D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND : ShaderBinding->BindingPoint;
+            if (ShaderBinding->IsInline)
+            {
+                RootParameters.push_back({});
+                D3D12_ROOT_PARAMETER1& rootParameter = RootParameters[RootParameters.size() - 1];
+                rootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+                rootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+                rootParameter.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
+                rootParameter.Descriptor.ShaderRegister = CBVIndex;
+                rootParameter.Descriptor.RegisterSpace = 0;
+            }
+            else
+            {
+                Descriptors.push_back({});
+                D3D12_DESCRIPTOR_RANGE1& range = Descriptors[Descriptors.size() - 1];
+                range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+                range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
+                range.NumDescriptors = ShaderBinding->NumOfDescriptors;
+                range.BaseShaderRegister = CBVIndex;
+                range.RegisterSpace = 0;
+                range.OffsetInDescriptorsFromTableStart = (ShaderBinding->BindingPoint == -1)
+                    ? D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND : ShaderBinding->BindingPoint;
+            }
 
             CBVIndex += ShaderBinding->NumOfDescriptors;
             break;
@@ -41,15 +61,28 @@ bool jShaderBindingsLayout_DX12::Initialize(const jShaderBindingArray& InShaderB
         case EShaderBindingType::BUFFER_SRV:
         case EShaderBindingType::BUFFER_TEXEL_SRV:
         {
-            Descriptors.push_back({});
-            D3D12_DESCRIPTOR_RANGE1& range = Descriptors[Descriptors.size() - 1];
-            range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-            range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
-            range.NumDescriptors = ShaderBinding->NumOfDescriptors;
-            range.BaseShaderRegister = SRVIndex;
-            range.RegisterSpace = 0;
-            range.OffsetInDescriptorsFromTableStart = (ShaderBinding->BindingPoint == -1)
-                ? D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND : ShaderBinding->BindingPoint;
+            if (ShaderBinding->IsInline && (ShaderBinding->BindingType == EShaderBindingType::BUFFER_SRV))
+            {
+                RootParameters.push_back({});
+                D3D12_ROOT_PARAMETER1& rootParameter = RootParameters[RootParameters.size() - 1];
+                rootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+                rootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+                rootParameter.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
+                rootParameter.Descriptor.ShaderRegister = SRVIndex;
+                rootParameter.Descriptor.RegisterSpace = 0;
+            }
+            else
+            {
+                Descriptors.push_back({});
+                D3D12_DESCRIPTOR_RANGE1& range = Descriptors[Descriptors.size() - 1];
+                range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+                range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
+                range.NumDescriptors = ShaderBinding->NumOfDescriptors;
+                range.BaseShaderRegister = SRVIndex;
+                range.RegisterSpace = 0;
+                range.OffsetInDescriptorsFromTableStart = (ShaderBinding->BindingPoint == -1)
+                    ? D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND : ShaderBinding->BindingPoint;
+            }
 
             SRVIndex += ShaderBinding->NumOfDescriptors;
             break;
@@ -59,15 +92,28 @@ bool jShaderBindingsLayout_DX12::Initialize(const jShaderBindingArray& InShaderB
         case EShaderBindingType::BUFFER_UAV_DYNAMIC:
         case EShaderBindingType::BUFFER_TEXEL_UAV:
         {
-            Descriptors.push_back({});
-            D3D12_DESCRIPTOR_RANGE1& range = Descriptors[Descriptors.size() - 1];
-            range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-            range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
-            range.NumDescriptors = ShaderBinding->NumOfDescriptors;
-            range.BaseShaderRegister = UAVIndex;
-            range.RegisterSpace = 0;
-            range.OffsetInDescriptorsFromTableStart = (ShaderBinding->BindingPoint == -1)
-                ? D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND : ShaderBinding->BindingPoint;
+            if (ShaderBinding->IsInline && (ShaderBinding->BindingType == EShaderBindingType::BUFFER_SRV))
+            {
+                RootParameters.push_back({});
+                D3D12_ROOT_PARAMETER1& rootParameter = RootParameters[RootParameters.size() - 1];
+                rootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_UAV;
+                rootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+                rootParameter.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
+                rootParameter.Descriptor.ShaderRegister = UAVIndex;
+                rootParameter.Descriptor.RegisterSpace = 0;
+            }
+            else
+            {
+                Descriptors.push_back({});
+                D3D12_DESCRIPTOR_RANGE1& range = Descriptors[Descriptors.size() - 1];
+                range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+                range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
+                range.NumDescriptors = ShaderBinding->NumOfDescriptors;
+                range.BaseShaderRegister = UAVIndex;
+                range.RegisterSpace = 0;
+                range.OffsetInDescriptorsFromTableStart = (ShaderBinding->BindingPoint == -1)
+                    ? D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND : ShaderBinding->BindingPoint;
+            }
 
             ++UAVIndex;
             break;
@@ -95,21 +141,30 @@ bool jShaderBindingsLayout_DX12::Initialize(const jShaderBindingArray& InShaderB
         }
     }
 
-    D3D12_ROOT_PARAMETER1 rootParameter[2];
-    rootParameter[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    rootParameter[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-    rootParameter[0].DescriptorTable.NumDescriptorRanges = Descriptors.size();
-    rootParameter[0].DescriptorTable.pDescriptorRanges = &Descriptors[0];
+    {
+        RootParameters.push_back({});
+        D3D12_ROOT_PARAMETER1& rootParameter = RootParameters[RootParameters.size() - 1];
 
-    rootParameter[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    rootParameter[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-    rootParameter[1].DescriptorTable.NumDescriptorRanges = SamplerDescriptors.size();
-    rootParameter[1].DescriptorTable.pDescriptorRanges = &SamplerDescriptors[0];
+        rootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        rootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+        rootParameter.DescriptorTable.NumDescriptorRanges = (uint32)Descriptors.size();
+        rootParameter.DescriptorTable.pDescriptorRanges = &Descriptors[0];
+    }
+
+    {
+        RootParameters.push_back({});
+        D3D12_ROOT_PARAMETER1& rootParameter = RootParameters[RootParameters.size() - 1];
+        
+        rootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        rootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+        rootParameter.DescriptorTable.NumDescriptorRanges = (uint32)SamplerDescriptors.size();
+        rootParameter.DescriptorTable.pDescriptorRanges = &SamplerDescriptors[0];
+    }
 
     // RootSignature 생성
     D3D12_ROOT_SIGNATURE_DESC1 rootSignatureDesc = {};
-    rootSignatureDesc.NumParameters = _countof(rootParameter);
-    rootSignatureDesc.pParameters = rootParameter;
+    rootSignatureDesc.NumParameters = (uint32)RootParameters.size();
+    rootSignatureDesc.pParameters = &RootParameters[0];
     rootSignatureDesc.NumStaticSamplers = 0;
     rootSignatureDesc.pStaticSamplers = nullptr;
     rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;

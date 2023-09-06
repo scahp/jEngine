@@ -1232,11 +1232,11 @@ bool jRHI_DX12::InitRHI()
 
         // cbv
         ShaderBindingArray.Add(-1, 1, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_GRAPHICS
-            , ResourceInlineAllactor.Alloc<jUniformBufferResource>(SimpleUniformBuffer, true));
+            , ResourceInlineAllactor.Alloc<jUniformBufferResource>(SimpleUniformBuffer), true);
 
         // structured buffer
         ShaderBindingArray.Add(-1, 1, EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
-            , ResourceInlineAllactor.Alloc<jBufferResource>(SimpleStructuredBuffer, true));
+            , ResourceInlineAllactor.Alloc<jBufferResource>(SimpleStructuredBuffer), true);
 
         // Descriptor 0 (1 개, BaseRegister, 이전에 들어간것들을 기반으로 자동으로 올려야 함.)
         ShaderBindingArray.Add(-1, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
@@ -1991,15 +1991,8 @@ void jRHI_DX12::Render()
 	#endif
 	GraphicsCommandList->SetGraphicsRootDescriptorTable(2, SRVDescriptorHeap.GPUHandleStart);		// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
 #else
-	CommandBuffer->OnlineDescriptorHeap->GetCPUHandle();
-    ID3D12DescriptorHeap* ppHeaps[] = 
-	{ 
-		CommandBuffer->OnlineDescriptorHeap->GetHeap(),
-		CommandBuffer->OnlineSamplerDescriptorHeap->GetHeap()
-	};
-    GraphicsCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
-    GraphicsCommandList->SetGraphicsRootDescriptorTable(0, CommandBuffer->OnlineDescriptorHeap->GetGPUHandle());		// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
-    GraphicsCommandList->SetGraphicsRootDescriptorTable(1, CommandBuffer->OnlineSamplerDescriptorHeap->GetGPUHandle());	// SamplerState test
+
+	TestShaderBindingInstance->BindGraphics(CommandBuffer);
 #endif
 
 	GraphicsCommandList->RSSetViewports(1, &viewport);

@@ -22,6 +22,7 @@ struct jUniformBufferBlock_DX12 : public IUniformBufferBlock
     virtual size_t GetBufferOffset() const override { return 0; }
 
     const jDescriptor_DX12& GetCBV() const;
+    uint64 GetGPUAddress() const;
 
 private:
     jUniformBufferBlock_DX12(const jUniformBufferBlock_DX12&) = delete;
@@ -30,6 +31,7 @@ private:
     jBuffer_DX12* Buffer = nullptr;
 
     jRingBuffer_DX12* RingBuffer = nullptr;
+    int64 RingBufferOffset = 0;
     uint8* RingBufferDestAddress = nullptr;
     size_t RingBufferAllocatedSize = 0;
 };

@@ -23,6 +23,7 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
 
     Descriptors.clear();
     SamplerDescriptors.clear();
+    RootParameterInlines.clear();
 
     for (int32 i = 0; i < InShaderBindingArray.NumOfData; ++i)
     {
@@ -37,7 +38,15 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
         {
             jUniformBufferBlock_DX12* UniformBuffer = (jUniformBufferBlock_DX12*)ShaderBinding->Resource->GetResource();
             check(UniformBuffer->GetBuffer());
-            Descriptors.push_back(UniformBuffer->GetCBV());
+
+            if (ShaderBinding->IsInline)
+            {
+                RootParameterInlines.push_back(std::make_pair(jInlineRootParamType::CBV, UniformBuffer->GetGPUAddress()));
+            }
+            else
+            {
+                Descriptors.push_back(UniformBuffer->GetCBV());
+            }            
             break;
         }
         case EShaderBindingType::TEXTURE_SAMPLER_SRV:
@@ -62,7 +71,15 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
         {
             jBuffer_DX12* Buf = (jBuffer_DX12*)ShaderBinding->Resource->GetResource();
             check(Buf->Buffer);
-            Descriptors.push_back(Buf->SRV);
+            
+            if (ShaderBinding->IsInline)
+            {
+                RootParameterInlines.push_back(std::make_pair(jInlineRootParamType::SRV, Buf->GetGPUAddress()));
+            }
+            else
+            {
+                Descriptors.push_back(Buf->SRV);
+            }
             break;
         }
         case EShaderBindingType::TEXTURE_UAV:
@@ -77,7 +94,14 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
         {
             jBuffer_DX12* Buf = (jBuffer_DX12*)ShaderBinding->Resource->GetResource();
             check(Buf->Buffer);
-            Descriptors.push_back(Buf->UAV);
+            if (ShaderBinding->IsInline)
+            {
+                RootParameterInlines.push_back(std::make_pair(jInlineRootParamType::UAV, Buf->GetGPUAddress()));
+            }
+            else
+            {
+                Descriptors.push_back(Buf->UAV);
+            }
             break;
         }
         case EShaderBindingType::SAMPLER:
@@ -109,6 +133,56 @@ void jShaderBindingInstance_DX12::BindCompute(const std::shared_ptr<jRenderFrame
 void* jShaderBindingInstance_DX12::GetHandle() const
 {
     return ShaderBindingLayout->GetHandle();
+}
+
+void jShaderBindingInstance_DX12::BindGraphics(jCommandBuffer_DX12* InCommandList)
+{
+    auto CommandList = InCommandList->Get();
+    
+    int32 index = 0;
+    for (index = 0; index < RootParameterInlines.size(); ++index)
+    {
+        switch(RootParameterInlines[index].first)
+        {
+        case jInlineRootParamType::CBV:
+            CommandList->SetGraphicsRootConstantBufferView(index, RootParameterInlines[index].second);
+            break;
+        case jInlineRootParamType::SRV:
+            CommandList->SetGraphicsRootShaderResourceView(index, RootParameterInlines[index].second);
+            break;
+        case jInlineRootParamType::UAV:
+            CommandList->SetGraphicsRootUnorderedAccessView(index, RootParameterInlines[index].second);
+        default:
+            break;
+        }        
+    }
+    CommandList->SetGraphicsRootDescriptorTable(index++, InCommandList->OnlineDescriptorHeap->GetGPUHandle());		// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
+    CommandList->SetGraphicsRootDescriptorTable(index++, InCommandList->OnlineSamplerDescriptorHeap->GetGPUHandle());	// SamplerState test
+}
+
+void jShaderBindingInstance_DX12::BindCompute(jCommandBuffer_DX12* InCommandList)
+{
+    auto CommandList = InCommandList->Get();
+
+    int32 index = 0;
+    for (index = 0; index < RootParameterInlines.size(); ++index)
+    {
+        switch (RootParameterInlines[index].first)
+        {
+        case jInlineRootParamType::CBV:
+            CommandList->SetComputeRootConstantBufferView(index, RootParameterInlines[index].second);
+            break;
+        case jInlineRootParamType::SRV:
+            CommandList->SetComputeRootShaderResourceView(index, RootParameterInlines[index].second);
+            break;
+        case jInlineRootParamType::UAV:
+            CommandList->SetComputeRootUnorderedAccessView(index, RootParameterInlines[index].second);
+        default:
+            break;
+        }
+    }
+    CommandList->SetComputeRootDescriptorTable(index++, InCommandList->OnlineDescriptorHeap->GetGPUHandle());		// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
+    CommandList->SetComputeRootDescriptorTable(index++, InCommandList->OnlineSamplerDescriptorHeap->GetGPUHandle());	// SamplerState test
 }
 
 void jShaderBindingInstance_DX12::CopyToOnlineDescriptorHeap(jCommandBuffer_DX12* InCommandList)
