@@ -375,7 +375,7 @@ void CreateRenderTargetView(jTexture_DX12* InTexture)
         return;
 
     check(!InTexture->RTV.IsValid());
-    InTexture->RTV = g_rhi_dx12->RTVDescriptorHeap.Alloc();
+    InTexture->RTV = g_rhi_dx12->RTVDescriptorHeaps.Alloc();
 
     D3D12_RENDER_TARGET_VIEW_DESC Desc = { };
     Desc.Format = GetDX12TextureFormat(InTexture->Format);

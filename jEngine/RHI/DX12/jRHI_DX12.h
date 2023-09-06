@@ -129,12 +129,8 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// 4. Heap
-	jDescriptorHeap_DX12 RTVDescriptorHeap;
-	jDescriptorHeap_DX12 DSVDescriptorHeap;
-	//jDescriptorHeap_DX12 SRVDescriptorHeap;
-	//jDescriptorHeap_DX12 SamplerDescriptorHeap;		// SamplerState test
-	//jDescriptorHeap_DX12 UAVDescriptorHeap;
-
+	jOfflineDescriptorHeap_DX12 RTVDescriptorHeaps;
+	jOfflineDescriptorHeap_DX12 DSVDescriptorHeaps;
     jOfflineDescriptorHeap_DX12 DescriptorHeaps;
     jOfflineDescriptorHeap_DX12 SamplerDescriptorHeaps;
 

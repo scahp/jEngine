@@ -559,12 +559,8 @@ bool jRHI_DX12::InitRHI()
 	CopyCommandQueue->Initialize(Device, D3D12_COMMAND_LIST_TYPE_COPY);
 
     // 4. Heap	
-    RTVDescriptorHeap.Initialize(EDescriptorHeapTypeDX12::RTV, false);
-    DSVDescriptorHeap.Initialize(EDescriptorHeapTypeDX12::DSV, false);
-    //SRVDescriptorHeap.Initialize(EDescriptorHeapTypeDX12::CBV_SRV_UAV, true);
-	//SamplerDescriptorHeap.Initialize(EDescriptorHeapTypeDX12::SAMPLER, true);		// SamplerState test
-    //UAVDescriptorHeap.Initialize(EDescriptorHeapTypeDX12::CBV_SRV_UAV, false);
-
+	RTVDescriptorHeaps.Initialize(EDescriptorHeapTypeDX12::RTV);
+	DSVDescriptorHeaps.Initialize(EDescriptorHeapTypeDX12::DSV);
 	DescriptorHeaps.Initialize(EDescriptorHeapTypeDX12::CBV_SRV_UAV);
 	SamplerDescriptorHeaps.Initialize(EDescriptorHeapTypeDX12::SAMPLER);
 
@@ -1593,11 +1589,8 @@ void jRHI_DX12::Release()
 
 	//////////////////////////////////////////////////////////////////////////
 	// 4. Heap
-	RTVDescriptorHeap.Release();
-	DSVDescriptorHeap.Release();
-	//SRVDescriptorHeap.Release();
-	//SamplerDescriptorHeap.Release();		// SamplerState test
-
+	RTVDescriptorHeaps.Release();
+	DSVDescriptorHeaps.Release();
 	DescriptorHeaps.Release();
 	SamplerDescriptorHeaps.Release();
 
