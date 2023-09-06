@@ -106,8 +106,8 @@ int main()
 		// ------
 		static std::chrono::system_clock::time_point lastTime = std::chrono::system_clock::now();
 		std::chrono::system_clock::time_point currentTime = std::chrono::system_clock::now();
-        const std::chrono::seconds seconds
-            = std::chrono::duration_cast<std::chrono::seconds>(currentTime - lastTime);
+        std::chrono::duration<double> elapsed_seconds = currentTime - lastTime;
+		g_timeDeltaSecond = (float)elapsed_seconds.count();
 		lastTime = currentTime;
 
 		g_rhi->IncrementFrameNumber();
