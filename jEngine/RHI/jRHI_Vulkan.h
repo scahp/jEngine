@@ -217,6 +217,8 @@ public:
 
     virtual jFenceManager* GetFenceManager() { return &FenceManager; }
     virtual jSemaphoreManager* GetSemaphoreManager() { return &SemaphoreManager; }
+	
+	virtual bool IsSupportVSync() const override { return false; }
 };
 
 extern jRHI_Vulkan* g_rhi_vk;
