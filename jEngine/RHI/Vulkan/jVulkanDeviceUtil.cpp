@@ -195,8 +195,16 @@ VkPresentModeKHR ChooseSwapPresentMode(const std::vector<VkPresentModeKHR>& avai
 
     for (const auto& availablePresentMode : availablePresentModes)
     {
-        if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR)
-            return availablePresentMode;
+        if (g_rhi_vk->IsSupportVSync())
+        {
+            if (availablePresentMode == VK_PRESENT_MODE_FIFO_KHR)
+                return availablePresentMode;
+        }
+        else
+        {
+            if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR)
+                return availablePresentMode;
+        }
     }
 
     return VK_PRESENT_MODE_FIFO_KHR;

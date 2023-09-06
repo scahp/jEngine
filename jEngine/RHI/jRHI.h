@@ -470,6 +470,7 @@ public:
 	virtual uint32 GetCurrentFrameIndex() const { return 0; }
 	virtual uint32 GetCurrentFrameNumber() const { return 0; }
 	virtual void IncrementFrameNumber() {}
+	virtual bool IsSupportVSync() const { return false; }
 };
 
 // Not thred safe
