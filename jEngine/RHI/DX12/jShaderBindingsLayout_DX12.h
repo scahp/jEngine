@@ -18,6 +18,8 @@ struct jShaderBindingsLayout_DX12 : public jShaderBindingsLayout
     virtual const jShaderBindingArray& GetShaderBindingsLayout() const { return ShaderBindingArray; }
     virtual void* GetHandle() const { return RootSignature.Get(); }
 
+    ID3D12RootSignature* GetRootSignature() const { return RootSignature.Get(); }
+
     mutable size_t Hash = 0;
 
     ComPtr<ID3D12RootSignature> RootSignature;

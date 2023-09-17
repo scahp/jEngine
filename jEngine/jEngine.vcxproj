@@ -202,7 +202,7 @@ xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"</Command
     <ClInclude Include="RHI\Vulkan\jRenderPass_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jRHIType_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jRingBuffer_Vulkan.h" />
-    <ClInclude Include="RHI\Vulkan\jShaderBindingLayout_Vulkan.h" />
+    <ClInclude Include="RHI\Vulkan\jShaderBindingsLayout_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jShaderStorageBufferObject_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jShader_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jSwapchain_Vulkan.h" />
@@ -379,7 +379,7 @@ xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"</Command
     <ClCompile Include="RHI\Vulkan\jQueryPoolTime_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jRenderPass_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jRingBuffer_Vulkan.cpp" />
-    <ClCompile Include="RHI\Vulkan\jShaderBindingLayout_Vulkan.cpp" />
+    <ClCompile Include="RHI\Vulkan\jShaderBindingsLayout_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jShaderStorageBufferObject_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jShader_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jSwapchain_Vulkan.cpp" />

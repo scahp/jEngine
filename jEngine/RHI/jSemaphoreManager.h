@@ -15,9 +15,9 @@ public:
     virtual void ReturnSemaphore(jSemaphore* fence) = 0;
 };
 
-#if USE_OPENGL
-
-#elif USE_VULKAN
+//#if USE_OPENGL
+//
+//#elif USE_VULKAN
 
 class jSemaphore_Vulkan : public jSemaphore
 {
@@ -45,4 +45,4 @@ public:
     robin_hood::unordered_set<jSemaphore*> PendingSemaphore;
 };
 
-#endif
+//#endif

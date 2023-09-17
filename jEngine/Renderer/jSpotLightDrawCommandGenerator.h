@@ -32,7 +32,6 @@ public:
         , const jView* InView, const jViewLight& InLightView, jRenderPass* InRenderPass, int32 InSubpassIndex) override;
 
     jRasterizationStateInfo* RasterizationState = nullptr;
-    jMultisampleStateInfo* MultisampleState = nullptr;
     jDepthStencilStateInfo* DepthStencilState = nullptr;
     jBlendingStateInfo* BlendingState = nullptr;
     jPipelineStateFixedInfo PipelineStateFixedInfo;

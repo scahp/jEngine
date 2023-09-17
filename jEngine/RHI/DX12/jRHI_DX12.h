@@ -13,6 +13,7 @@
 #include "jDescriptorHeap_DX12.h"
 #include "jFenceManager_DX12.h"
 #include "jUniformBufferBlock_DX12.h"
+#include "jPipelineStateInfo_DX12.h"
 
 class jSwapchain_DX12;
 struct jBuffer_DX12;
@@ -355,7 +356,6 @@ public:
 
 	virtual jShaderBindingsLayout* CreateShaderBindings(const jShaderBindingArray& InShaderBindingArray) const override;
 
-	struct jShaderBindingsLayout_DX12* TestShaderBindingLayout = nullptr;
 	struct jShaderBindingInstance_DX12* TestShaderBindingInstance = nullptr;
 
 	virtual jSamplerStateInfo* CreateSamplerState(const jSamplerStateInfo& initializer) const override;
@@ -363,6 +363,18 @@ public:
 	uint32 CurrentFrameNumber = 0;		// FrameNumber is just Incremented frame by frame.
     virtual uint32 GetCurrentFrameNumber() const override { return CurrentFrameNumber; }
     virtual void IncrementFrameNumber() { ++CurrentFrameNumber; }
+
+	static robin_hood::unordered_map<size_t, jShaderBindingsLayout*> ShaderBindingPool;
+	mutable jMutexRWLock ShaderBindingPoolLock;
+
+    static TResourcePool<jSamplerStateInfo_DX12, jMutexRWLock> SamplerStatePool;
+    //static TResourcePool<jRasterizationStateInfo_DX12, jMutexRWLock> RasterizationStatePool;
+    //static TResourcePool<jMultisampleStateInfo_Vulkan, jMutexRWLock> MultisampleStatePool;
+    //static TResourcePool<jStencilOpStateInfo_Vulkan, jMutexRWLock> StencilOpStatePool;
+    //static TResourcePool<jDepthStencilStateInfo_Vulkan, jMutexRWLock> DepthStencilStatePool;
+    //static TResourcePool<jBlendingStateInfo_Vulakn, jMutexRWLock> BlendingStatePool;
+    //static TResourcePool<jPipelineStateInfo_Vulkan, jMutexRWLock> PipelineStatePool;
+    //static TResourcePool<jRenderPass_Vulkan, jMutexRWLock> RenderPassPool;
 };
 
 extern jRHI_DX12* g_rhi_dx12;

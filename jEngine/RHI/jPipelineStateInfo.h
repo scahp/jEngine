@@ -135,6 +135,12 @@ struct jRasterizationStateInfo
         Hash = CityHash64WithSeed((const char*)&LineWidth, sizeof(LineWidth), Hash);
         Hash = CityHash64WithSeed((const char*)&DepthClampEnable, sizeof(DepthClampEnable), Hash);
         Hash = CityHash64WithSeed((const char*)&RasterizerDiscardEnable, sizeof(RasterizerDiscardEnable), Hash);
+
+        Hash = CityHash64WithSeed((const char*)&SampleCount, sizeof(SampleCount), Hash);
+        Hash = CityHash64WithSeed((const char*)&SampleShadingEnable, sizeof(SampleShadingEnable), Hash);
+        Hash = CityHash64WithSeed((const char*)&MinSampleShading, sizeof(MinSampleShading), Hash);
+        Hash = CityHash64WithSeed((const char*)&AlphaToCoverageEnable, sizeof(AlphaToCoverageEnable), Hash);
+        Hash = CityHash64WithSeed((const char*)&AlphaToOneEnable, sizeof(AlphaToOneEnable), Hash);
         return Hash;
     }
 
@@ -150,29 +156,6 @@ struct jRasterizationStateInfo
     float LineWidth = 1.0f;
     bool DepthClampEnable = false;
     bool RasterizerDiscardEnable = false;
-};
-
-//////////////////////////////////////////////////////////////////////////
-// jMultisampleStateInfo
-//////////////////////////////////////////////////////////////////////////
-struct jMultisampleStateInfo
-{
-    virtual ~jMultisampleStateInfo() {}
-    virtual void Initialize() {}
-    virtual size_t GetHash() const
-    {
-        if (Hash)
-            return Hash;
-
-        Hash = CityHash64((const char*)&SampleCount, sizeof(SampleCount));
-        Hash = CityHash64WithSeed((const char*)&SampleShadingEnable, sizeof(SampleShadingEnable), Hash);
-        Hash = CityHash64WithSeed((const char*)&MinSampleShading, sizeof(MinSampleShading), Hash);
-        Hash = CityHash64WithSeed((const char*)&AlphaToCoverageEnable, sizeof(AlphaToCoverageEnable), Hash);
-        Hash = CityHash64WithSeed((const char*)&AlphaToOneEnable, sizeof(AlphaToOneEnable), Hash);
-        return Hash;
-    }
-
-    mutable size_t Hash = 0;
 
     EMSAASamples SampleCount = EMSAASamples::COUNT_1;
     bool SampleShadingEnable = true;		// Sample shading 켬	 (텍스쳐 내부에 있는 aliasing 도 완화 해줌)
@@ -180,6 +163,35 @@ struct jMultisampleStateInfo
     bool AlphaToCoverageEnable = false;
     bool AlphaToOneEnable = false;
 };
+
+////////////////////////////////////////////////////////////////////////////
+//// jMultisampleStateInfo
+////////////////////////////////////////////////////////////////////////////
+//struct jMultisampleStateInfo
+//{
+//    virtual ~jMultisampleStateInfo() {}
+//    virtual void Initialize() {}
+//    virtual size_t GetHash() const
+//    {
+//        if (Hash)
+//            return Hash;
+//
+//        Hash = CityHash64((const char*)&SampleCount, sizeof(SampleCount));
+//        Hash = CityHash64WithSeed((const char*)&SampleShadingEnable, sizeof(SampleShadingEnable), Hash);
+//        Hash = CityHash64WithSeed((const char*)&MinSampleShading, sizeof(MinSampleShading), Hash);
+//        Hash = CityHash64WithSeed((const char*)&AlphaToCoverageEnable, sizeof(AlphaToCoverageEnable), Hash);
+//        Hash = CityHash64WithSeed((const char*)&AlphaToOneEnable, sizeof(AlphaToOneEnable), Hash);
+//        return Hash;
+//    }
+//
+//    mutable size_t Hash = 0;
+//
+//    EMSAASamples SampleCount = EMSAASamples::COUNT_1;
+//    bool SampleShadingEnable = true;		// Sample shading 켬	 (텍스쳐 내부에 있는 aliasing 도 완화 해줌)
+//    float MinSampleShading = 0.2f;
+//    bool AlphaToCoverageEnable = false;
+//    bool AlphaToOneEnable = false;
+//};
 
 //////////////////////////////////////////////////////////////////////////
 // jStencilOpStateInfo
@@ -303,19 +315,19 @@ struct jBlendingStateInfo
 struct jPipelineStateFixedInfo
 {
     jPipelineStateFixedInfo() = default;
-    jPipelineStateFixedInfo(jRasterizationStateInfo* rasterizationState, jMultisampleStateInfo* multisampleState, jDepthStencilStateInfo* depthStencilState
+    jPipelineStateFixedInfo(jRasterizationStateInfo* rasterizationState, jDepthStencilStateInfo* depthStencilState
         , jBlendingStateInfo* blendingState, const std::vector<jViewport>& viewports, const std::vector<jScissor>& scissors, bool isUseVRS)
-        : RasterizationState(rasterizationState), MultisampleState(multisampleState), DepthStencilState(depthStencilState)
+        : RasterizationState(rasterizationState), DepthStencilState(depthStencilState)
         , BlendingState(blendingState), Viewports(Viewports), Scissors(scissors), IsUseVRS(isUseVRS)
     {}
-    jPipelineStateFixedInfo(jRasterizationStateInfo* rasterizationState, jMultisampleStateInfo* multisampleState, jDepthStencilStateInfo* depthStencilState
+    jPipelineStateFixedInfo(jRasterizationStateInfo* rasterizationState, jDepthStencilStateInfo* depthStencilState
         , jBlendingStateInfo* blendingState, const jViewport& viewport, const jScissor& scissor, bool isUseVRS)
-        : RasterizationState(rasterizationState), MultisampleState(multisampleState), DepthStencilState(depthStencilState)
+        : RasterizationState(rasterizationState), DepthStencilState(depthStencilState)
         , BlendingState(blendingState), Viewports({ viewport }), Scissors({ scissor }), IsUseVRS(isUseVRS)
     {}
-    jPipelineStateFixedInfo(jRasterizationStateInfo* rasterizationState, jMultisampleStateInfo* multisampleState, jDepthStencilStateInfo* depthStencilState
+    jPipelineStateFixedInfo(jRasterizationStateInfo* rasterizationState, jDepthStencilStateInfo* depthStencilState
         , jBlendingStateInfo* blendingState, const std::vector<EPipelineDynamicState>& InDynamicStates, bool isUseVRS)
-        : RasterizationState(rasterizationState), MultisampleState(multisampleState), DepthStencilState(depthStencilState)
+        : RasterizationState(rasterizationState), DepthStencilState(depthStencilState)
         , BlendingState(blendingState), DynamicStates(InDynamicStates), IsUseVRS(isUseVRS)
     {}
 
@@ -336,7 +348,6 @@ struct jPipelineStateFixedInfo
 
         // 아래 내용들도 해시를 만들 수 있어야 함, todo
         Hash ^= RasterizationState->GetHash();
-        Hash ^= MultisampleState->GetHash();
         Hash ^= DepthStencilState->GetHash();
         Hash ^= BlendingState->GetHash();
         Hash ^= (uint64)IsUseVRS;
@@ -349,7 +360,6 @@ struct jPipelineStateFixedInfo
     std::vector<EPipelineDynamicState> DynamicStates;
 
     jRasterizationStateInfo* RasterizationState = nullptr;
-    jMultisampleStateInfo* MultisampleState = nullptr;
     jDepthStencilStateInfo* DepthStencilState = nullptr;
     jBlendingStateInfo* BlendingState = nullptr;
     bool IsUseVRS = false;

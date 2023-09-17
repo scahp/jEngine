@@ -5,12 +5,14 @@
 
 #include <windows.h>
 
-#define API_TYPE 1
+#define API_TYPE 3
 
 #if (API_TYPE == 1)
 #define USE_VULKAN 1
 #elif (API_TYPE == 2)
 #define USE_OPENGL 1
+#elif (API_TYPE == 3)
+#define USE_DX12 1
 #endif
 
 #ifndef USE_VULKAN
@@ -102,7 +104,8 @@ using tchar = wchar_t;
 #include "RHI/jRHIType.h"
 #include "RHI/jRHI.h"
 
-#if USE_VULKAN
+//////////////////////////////////////////////////////////////////////////
+// USE_VULKAN 여부에 따라서 불필요한 include 도 제거하도록 해야 함.
 #include <vulkan/vulkan.h>
 #include <GLFW/glfw3.h>
 #define GLFW_INCLUDE_VULKAN
@@ -110,6 +113,9 @@ using tchar = wchar_t;
 #include "RHI/jRHI_Vulkan.h"
 #include "Shader/Spirv/jSpirvHelper.h"
 #include "RHI/Vulkan/jVulkanFeatureSwitch.h"
+
+#if USE_VULKAN
+
 #elif USE_OPENGL
 #include <GLFW/glfw3.h>
 #include "jRHI_OpenGL.h"
@@ -126,6 +132,7 @@ using tchar = wchar_t;
 #include "IMGUI/imgui_impl_win32.h"
 #include "IMGUI/imgui_impl_dx12.h"
 #include "RHI/DX12/jRHI_DX12.h"
+//////////////////////////////////////////////////////////////////////////
 
 // imgui
 #include "IMGUI/imgui.h"

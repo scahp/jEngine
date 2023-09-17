@@ -25,17 +25,18 @@ struct jRasterizationStateInfo_Vulkan : public jRasterizationStateInfo
     virtual void Initialize() override;
 
     VkPipelineRasterizationStateCreateInfo RasterizationStateInfo = {};
-};
-
-struct jMultisampleStateInfo_Vulkan : public jMultisampleStateInfo
-{
-    jMultisampleStateInfo_Vulkan() = default;
-    jMultisampleStateInfo_Vulkan(const jMultisampleStateInfo& state) : jMultisampleStateInfo(state) {}
-    virtual ~jMultisampleStateInfo_Vulkan() {}
-    virtual void Initialize() override;
-
     VkPipelineMultisampleStateCreateInfo MultisampleStateInfo = {};
 };
+
+//struct jMultisampleStateInfo_Vulkan : public jMultisampleStateInfo
+//{
+//    jMultisampleStateInfo_Vulkan() = default;
+//    jMultisampleStateInfo_Vulkan(const jMultisampleStateInfo& state) : jMultisampleStateInfo(state) {}
+//    virtual ~jMultisampleStateInfo_Vulkan() {}
+//    virtual void Initialize() override;
+//
+//    VkPipelineMultisampleStateCreateInfo MultisampleStateInfo = {};
+//};
 
 struct jStencilOpStateInfo_Vulkan : public jStencilOpStateInfo
 {
@@ -57,11 +58,11 @@ struct jDepthStencilStateInfo_Vulkan : public jDepthStencilStateInfo
     VkPipelineDepthStencilStateCreateInfo DepthStencilStateInfo = {};
 };
 
-struct jBlendingStateInfo_Vulakn : public jBlendingStateInfo
+struct jBlendingStateInfo_Vulkan : public jBlendingStateInfo
 {
-    jBlendingStateInfo_Vulakn() = default;
-    jBlendingStateInfo_Vulakn(const jBlendingStateInfo& state) : jBlendingStateInfo(state) {}
-    virtual ~jBlendingStateInfo_Vulakn() {}
+    jBlendingStateInfo_Vulkan() = default;
+    jBlendingStateInfo_Vulkan(const jBlendingStateInfo& state) : jBlendingStateInfo(state) {}
+    virtual ~jBlendingStateInfo_Vulkan() {}
     virtual void Initialize() override;
 
     VkPipelineColorBlendAttachmentState ColorBlendAttachmentInfo = {};

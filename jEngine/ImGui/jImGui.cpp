@@ -196,11 +196,11 @@ jPipelineStateInfo* jImGUI_Vulkan::CreatePipelineState(jRenderPass* renderPass, 
     jDepthStencilStateInfo* depthStencilInfo = TDepthStencilStateInfo<>::Create(nullptr, stencilStateBack);
     check(depthStencilInfo);
 
-    jMultisampleStateInfo* multisamplesStateInfo = TMultisampleStateInfo<>::Create(EMSAASamples::COUNT_1);
-    check(multisamplesStateInfo);
+    //jMultisampleStateInfo* multisamplesStateInfo = TMultisampleStateInfo<>::Create(EMSAASamples::COUNT_1);
+    //check(multisamplesStateInfo);
 
     static std::vector<EPipelineDynamicState> PipelineDynamicStates = { EPipelineDynamicState::VIEWPORT, EPipelineDynamicState::SCISSOR };
-    jPipelineStateFixedInfo PipelineStateFixed(rasterizationInfo, multisamplesStateInfo, depthStencilInfo, blendStateInfo, PipelineDynamicStates, false);
+    jPipelineStateFixedInfo PipelineStateFixed(rasterizationInfo, depthStencilInfo, blendStateInfo, PipelineDynamicStates, false);
 
     jVertexBufferArray VertexBufferArray;
     VertexBufferArray.Add(EmptyVertexBuffer);

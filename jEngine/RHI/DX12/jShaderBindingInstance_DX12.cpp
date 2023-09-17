@@ -122,7 +122,6 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
 
 void jShaderBindingInstance_DX12::BindGraphics(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot /*= 0*/) const
 {
-
 }
 
 void jShaderBindingInstance_DX12::BindCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot /*= 0*/) const
@@ -137,8 +136,12 @@ void* jShaderBindingInstance_DX12::GetHandle() const
 
 void jShaderBindingInstance_DX12::BindGraphics(jCommandBuffer_DX12* InCommandList)
 {
+    check(InCommandList);
+
     auto CommandList = InCommandList->Get();
-    
+    check(CommandList);
+    CommandList->SetGraphicsRootSignature((ID3D12RootSignature*)ShaderBindingLayout->GetHandle());
+
     int32 index = 0;
     for (index = 0; index < RootParameterInlines.size(); ++index)
     {
@@ -162,7 +165,11 @@ void jShaderBindingInstance_DX12::BindGraphics(jCommandBuffer_DX12* InCommandLis
 
 void jShaderBindingInstance_DX12::BindCompute(jCommandBuffer_DX12* InCommandList)
 {
+    check(InCommandList);
+
     auto CommandList = InCommandList->Get();
+    check(CommandList);
+    CommandList->SetComputeRootSignature((ID3D12RootSignature*)ShaderBindingLayout->GetHandle());
 
     int32 index = 0;
     for (index = 0; index < RootParameterInlines.size(); ++index)
@@ -229,4 +236,9 @@ void jShaderBindingInstance_DX12::CopyToOnlineDescriptorHeap(jCommandBuffer_DX12
         g_rhi_dx12->Device->CopyDescriptors(DestSamplerDescriptor.size(), &DestSamplerDescriptor[0], nullptr
             , SrcSamplerDescriptor.size(), &SrcSamplerDescriptor[0], nullptr, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
     }
+}
+
+ID3D12RootSignature* jShaderBindingInstance_DX12::GetRootSignature() const
+{
+    return ShaderBindingLayout->GetRootSignature();
 }

@@ -1,5 +1,5 @@
 ﻿#include "pch.h"
-#include "jShaderBindingLayout_Vulkan.h"
+#include "jShaderBindingsLayout_Vulkan.h"
 #include "jRHIType_Vulkan.h"
 #include "jTexture_Vulkan.h"
 #include "../jRHI_Vulkan.h"
@@ -8,12 +8,12 @@
 //////////////////////////////////////////////////////////////////////////
 // jShaderBindings_Vulkan
 //////////////////////////////////////////////////////////////////////////
-jShaderBindingLayout_Vulkan::~jShaderBindingLayout_Vulkan()
+jShaderBindingsLayout_Vulkan::~jShaderBindingsLayout_Vulkan()
 {
     Release();
 }
 
-bool jShaderBindingLayout_Vulkan::Initialize(const jShaderBindingArray& InShaderBindingArray)
+bool jShaderBindingsLayout_Vulkan::Initialize(const jShaderBindingArray& InShaderBindingArray)
 {
     std::vector<VkDescriptorSetLayoutBinding> bindings;
 
@@ -40,7 +40,7 @@ bool jShaderBindingLayout_Vulkan::Initialize(const jShaderBindingArray& InShader
     return true;
 }
 
-jShaderBindingInstance* jShaderBindingLayout_Vulkan::CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const
+jShaderBindingInstance* jShaderBindingsLayout_Vulkan::CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const
 {
     jDescriptorPool_Vulkan* DescriptorPool = nullptr;
     switch (InType)
@@ -69,7 +69,7 @@ jShaderBindingInstance* jShaderBindingLayout_Vulkan::CreateShaderBindingInstance
     return DescriptorSet;
 }
 
-size_t jShaderBindingLayout_Vulkan::GetHash() const
+size_t jShaderBindingsLayout_Vulkan::GetHash() const
 {
     if (Hash)
         return Hash;
@@ -78,7 +78,7 @@ size_t jShaderBindingLayout_Vulkan::GetHash() const
     return Hash;
 }
 
-void jShaderBindingLayout_Vulkan::Release()
+void jShaderBindingsLayout_Vulkan::Release()
 {
     if (DescriptorSetLayout)
     {

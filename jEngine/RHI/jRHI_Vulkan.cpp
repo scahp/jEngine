@@ -1,6 +1,6 @@
 ﻿#include "pch.h"
 
-#if USE_VULKAN
+//#if USE_VULKAN
 #include "jRHI_Vulkan.h"
 
 #include "FileLoader/jImageFileLoader.h"
@@ -34,10 +34,10 @@ robin_hood::unordered_map<size_t, VkPipelineLayout> jRHI_Vulkan::PipelineLayoutP
 robin_hood::unordered_map<size_t, jShaderBindingsLayout*> jRHI_Vulkan::ShaderBindingPool;
 TResourcePool<jSamplerStateInfo_Vulkan, jMutexRWLock> jRHI_Vulkan::SamplerStatePool;
 TResourcePool<jRasterizationStateInfo_Vulkan, jMutexRWLock> jRHI_Vulkan::RasterizationStatePool;
-TResourcePool<jMultisampleStateInfo_Vulkan, jMutexRWLock> jRHI_Vulkan::MultisampleStatePool;
+//TResourcePool<jMultisampleStateInfo_Vulkan, jMutexRWLock> jRHI_Vulkan::MultisampleStatePool;
 TResourcePool<jStencilOpStateInfo_Vulkan, jMutexRWLock> jRHI_Vulkan::StencilOpStatePool;
 TResourcePool<jDepthStencilStateInfo_Vulkan, jMutexRWLock> jRHI_Vulkan::DepthStencilStatePool;
-TResourcePool<jBlendingStateInfo_Vulakn, jMutexRWLock> jRHI_Vulkan::BlendingStatePool;
+TResourcePool<jBlendingStateInfo_Vulkan, jMutexRWLock> jRHI_Vulkan::BlendingStatePool;
 TResourcePool<jPipelineStateInfo_Vulkan, jMutexRWLock> jRHI_Vulkan::PipelineStatePool;
 TResourcePool<jRenderPass_Vulkan, jMutexRWLock> jRHI_Vulkan::RenderPassPool;
 
@@ -415,7 +415,6 @@ void jRHI_Vulkan::ReleaseRHI()
     RenderPassPool.Release();
     SamplerStatePool.Release();
     RasterizationStatePool.Release();
-    MultisampleStatePool.Release();
     StencilOpStatePool.Release();
     DepthStencilStatePool.Release();
     BlendingStatePool.Release();
@@ -1201,11 +1200,6 @@ jRasterizationStateInfo* jRHI_Vulkan::CreateRasterizationState(const jRasterizat
 	return RasterizationStatePool.GetOrCreate(initializer);
 }
 
-jMultisampleStateInfo* jRHI_Vulkan::CreateMultisampleState(const jMultisampleStateInfo& initializer) const
-{
-	return MultisampleStatePool.GetOrCreate(initializer);
-}
-
 jStencilOpStateInfo* jRHI_Vulkan::CreateStencilOpStateInfo(const jStencilOpStateInfo& initializer) const
 {
 	return StencilOpStatePool.GetOrCreate(initializer);
@@ -1300,7 +1294,7 @@ jShaderBindingsLayout* jRHI_Vulkan::CreateShaderBindings(const jShaderBindingArr
         if (ShaderBindingPool.end() != it_find)
             return it_find->second;
 
-		auto NewShaderBinding = new jShaderBindingLayout_Vulkan();
+		auto NewShaderBinding = new jShaderBindingsLayout_Vulkan();
 		NewShaderBinding->Initialize(InShaderBindingArray);
 		NewShaderBinding->Hash = hash;
 		ShaderBindingPool[hash] = NewShaderBinding;
@@ -1353,7 +1347,7 @@ void* jRHI_Vulkan::CreatePipelineLayout(const jShaderBindingsLayoutArray& InShad
 		DescriptorSetLayouts.reserve(InShaderBindingLayoutArray.NumOfData);
 		for (int32 i = 0; i < InShaderBindingLayoutArray.NumOfData; ++i)
 		{
-			const jShaderBindingLayout_Vulkan* binding_vulkan = (const jShaderBindingLayout_Vulkan*)InShaderBindingLayoutArray[i];
+			const jShaderBindingsLayout_Vulkan* binding_vulkan = (const jShaderBindingsLayout_Vulkan*)InShaderBindingLayoutArray[i];
 			DescriptorSetLayouts.push_back(binding_vulkan->DescriptorSetLayout);
 		}
 
@@ -2050,4 +2044,4 @@ void jRHI_Vulkan::BindComputeShaderBindingInstances(const jCommandBuffer* InComm
 	}
 }
 
-#endif // USE_VULKAN
+//#endif // USE_VULKAN

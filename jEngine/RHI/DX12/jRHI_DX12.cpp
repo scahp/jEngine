@@ -15,7 +15,6 @@
 #include "jUniformBufferBlock_DX12.h"
 #include "jShaderBindingInstance_DX12.h"
 #include "jShaderBindingsLayout_DX12.h"
-#include "jPipelineStateInfo_DX12.h"
 
 #define USE_INLINE_DESCRIPTOR 0												// InlineDescriptor 를 쓸것인지? DescriptorTable 를 쓸것인지 여부
 #define USE_ONE_FRAME_BUFFER_AND_DESCRIPTOR (USE_INLINE_DESCRIPTOR && 1)	// 현재 프레임에만 사용하고 버리는 임시 Descriptor 와 Buffer 를 사용할 것인지 여부
@@ -30,6 +29,9 @@ struct jSimpleConstantBuffer
 };
 
 jRHI_DX12* g_rhi_dx12 = nullptr;
+robin_hood::unordered_map<size_t, jShaderBindingsLayout*> jRHI_DX12::ShaderBindingPool;
+TResourcePool<jSamplerStateInfo_DX12, jMutexRWLock> jRHI_DX12::SamplerStatePool;
+
 const wchar_t* jRHI_DX12::c_raygenShaderName = L"MyRaygenShader";
 const wchar_t* jRHI_DX12::c_closestHitShaderName = L"MyClosestHitShader";
 const wchar_t* jRHI_DX12::c_missShaderName = L"MyMissShader";
@@ -1251,67 +1253,10 @@ bool jRHI_DX12::InitRHI()
         ShaderBindingArray.Add(-1, 1, EShaderBindingType::SAMPLER, EShaderAccessStageFlag::ALL_GRAPHICS
             , ResourceInlineAllactor.Alloc<jSamplerResource>(SamplerState));
 
-        TestShaderBindingLayout = (jShaderBindingsLayout_DX12*)g_rhi->CreateShaderBindings(ShaderBindingArray);
+        auto TestShaderBindingLayout = (jShaderBindingsLayout_DX12*)g_rhi->CreateShaderBindings(ShaderBindingArray);
 		TestShaderBindingInstance = (jShaderBindingInstance_DX12*)TestShaderBindingLayout->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::MultiFrame);
     }
 
-#if USE_INLINE_DESCRIPTOR
-	D3D12_ROOT_PARAMETER1 rootParameter[3];
-	rootParameter[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-	rootParameter[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-	rootParameter[0].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
-	rootParameter[0].Descriptor.ShaderRegister = 0;
-	rootParameter[0].Descriptor.RegisterSpace = 0;
-
-    rootParameter[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
-    rootParameter[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-    rootParameter[1].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
-    rootParameter[1].Descriptor.ShaderRegister = 0;									// SRV is different register from CBV, so restarting index
-    rootParameter[1].Descriptor.RegisterSpace = 0;
-
-	// Inline SRV can only be Raw or Structurred buffers, so texture resource could be bound by using DescriptorTable
-	D3D12_DESCRIPTOR_RANGE1 range[2];
-    range[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    range[0].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
-    range[0].NumDescriptors = 1;
-    range[0].BaseShaderRegister = 1;
-    range[0].RegisterSpace = 0;
-    range[0].OffsetInDescriptorsFromTableStart = SimpleTextureCube->SRV.Index;						// Texture test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
-
-	// Cube texture test
-    range[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    range[1].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
-    range[1].NumDescriptors = 3;
-    range[1].BaseShaderRegister = 2;
-    range[1].RegisterSpace = 0;
-    range[1].OffsetInDescriptorsFromTableStart = SimpleTexture[0]->SRV.Index;						// Texture test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
-
-    rootParameter[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    rootParameter[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-	rootParameter[2].DescriptorTable.NumDescriptorRanges = _countof(range);
-	rootParameter[2].DescriptorTable.pDescriptorRanges = range;
-	
-
-    D3D12_STATIC_SAMPLER_DESC staticSamplerDesc = {};
-    staticSamplerDesc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-    staticSamplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    staticSamplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    staticSamplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    staticSamplerDesc.MinLOD = 0;
-    staticSamplerDesc.MaxLOD = D3D12_FLOAT32_MAX;
-    staticSamplerDesc.MipLODBias = 0.0f;
-    staticSamplerDesc.MaxAnisotropy = 1;
-    staticSamplerDesc.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-	staticSamplerDesc.ShaderRegister = 0;
-	staticSamplerDesc.RegisterSpace = 0;
-	staticSamplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-
-    rootSignatureDesc.NumParameters = _countof(rootParameter);
-    rootSignatureDesc.pParameters = rootParameter;
-    rootSignatureDesc.NumStaticSamplers = 1;
-    rootSignatureDesc.pStaticSamplers = &staticSamplerDesc;
-    rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-#else
     D3D12_DESCRIPTOR_RANGE1 range[4];
     range[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
     range[0].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
@@ -1369,7 +1314,6 @@ bool jRHI_DX12::InitRHI()
     rootSignatureDesc.NumStaticSamplers = 0;
     rootSignatureDesc.pStaticSamplers = nullptr;
     rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-#endif
 
 	//////////////////////////////////////////////////////////////////////////
 
@@ -1400,11 +1344,7 @@ bool jRHI_DX12::InitRHI()
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
 	psoDesc.InputLayout = { .pInputElementDescs = VSInputElementDesc, .NumElements = _countof(VSInputElementDesc) };
-#if USE_INLINE_DESCRIPTOR
-	psoDesc.pRootSignature = SimpleRootSignature.Get();
-#else
-	psoDesc.pRootSignature = (ID3D12RootSignature*)TestShaderBindingLayout->GetHandle();
-#endif
+	psoDesc.pRootSignature = TestShaderBindingInstance->GetRootSignature();
 	psoDesc.VS = { .pShaderBytecode = VSShaderBlob->GetBufferPointer(), .BytecodeLength = VSShaderBlob->GetBufferSize() };
 	psoDesc.PS = { .pShaderBytecode = PSShaderBlob->GetBufferPointer(), .BytecodeLength = PSShaderBlob->GetBufferSize() };
     psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
@@ -1564,6 +1504,16 @@ void jRHI_DX12::Release()
 		delete SimpleTexture[i];
 		SimpleTexture[i] = nullptr;
 	}
+
+	SamplerStatePool.Release();
+    
+	{
+        jScopeWriteLock s(&ShaderBindingPoolLock);
+        for (auto& iter : ShaderBindingPool)
+            delete iter.second;
+        ShaderBindingPool.clear();
+    }
+
 
 	////////////////////////////////////////////////////////////////////////////
 	//// 10. DXR PipeplineStateObject
@@ -1860,29 +1810,6 @@ void jRHI_DX12::Render()
 	jCommandBuffer_DX12* CommandBuffer = GraphicsCommandQueue->GetAvailableCommandList();
 	auto GraphicsCommandList = CommandBuffer->Get();
 
- //   static float elapsedTime = 0.0f;
- //   elapsedTime = 0.01f;
-
- //   float secondsToRotateAround = 24.0f;
- //   float angleToRotateBy = 360.0f * (elapsedTime / secondsToRotateAround);
- //   static float accumulatedRotation = 0.0f;
- //   accumulatedRotation += angleToRotateBy;
-
- //   static float TranslationOffsetX = 0.0f;
- //   static bool TranslateDirRight = 1;
- //   if (TranslateDirRight)
- //   {
- //       if (TranslationOffsetX > 2.0f)
- //           TranslateDirRight = false;
- //       TranslationOffsetX += 0.01f;
- //   }
- //   else
- //   {
- //       if (TranslationOffsetX < -2.0f)
- //           TranslateDirRight = true;
- //       TranslationOffsetX -= 0.01f;
- //   }
-
     jSwapchainImage* SwapchainImage = SwapChain->GetSwapchainImage(CurrentFrameIndex);
     jTexture_DX12* SwapchainRT = (jTexture_DX12*)SwapchainImage->TexturePtr.get();
 
@@ -1899,9 +1826,6 @@ void jRHI_DX12::Render()
 	ScissorRect.right = SCR_WIDTH;
 	ScissorRect.top = 0;
 	ScissorRect.bottom = SCR_HEIGHT;
-
-    // GraphicsCommandList->SetGraphicsRootSignature(SimpleRootSignature.Get());
-	GraphicsCommandList->SetGraphicsRootSignature((ID3D12RootSignature*)TestShaderBindingLayout->GetHandle());
 
 	{
         jSimpleConstantBuffer ConstantBuffer;
@@ -1924,76 +1848,8 @@ void jRHI_DX12::Render()
 		SimpleUniformBuffer->UpdateBufferData(&ConstantBuffer, sizeof(ConstantBuffer));
 	}
 
-	//uint32 Index = *g_rhi_dx12->SRVDescriptorHeap.Pools.begin();
-	//auto testDescriptorStartCpuHandle = g_rhi_dx12->SRVDescriptorHeap.GPUHandleStart;
-	//testDescriptorStartCpuHandle.ptr += Index * g_rhi_dx12->SRVDescriptorHeap.DescriptorSize;
-
- //   uint32 Index2 = *g_rhi_dx12->SamplerDescriptorHeap.Pools.begin();
- //   auto testDescriptorStartCpuHandle2 = g_rhi_dx12->SamplerDescriptorHeap.GPUHandleStart;
- //   testDescriptorStartCpuHandle2.ptr += Index2 * g_rhi_dx12->SamplerDescriptorHeap.DescriptorSize;
-
 	TestShaderBindingInstance->CopyToOnlineDescriptorHeap(CommandBuffer);
-
-#if USE_INLINE_DESCRIPTOR
-	ID3D12DescriptorHeap* ppHeaps[] = { SRVDescriptorHeap.Heap.Get() };								// SamplerState test
-	GraphicsCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
-
-	#if USE_ONE_FRAME_BUFFER_AND_DESCRIPTOR
-    jRingBuffer_DX12* CurrentRingBuffer = GetOneFrameUniformRingBuffer();
-
-	// 1. Transform ConstantBuffer by using OneFrameBuffer
-	{
-		jSimpleConstantBuffer ConstantBuffer;
-		ConstantBuffer.M.SetIdentity();
-		Matrix Projection = jCameraUtil::CreatePerspectiveMatrix((float)SCR_WIDTH, (float)SCR_HEIGHT, DegreeToRadian(90.0f), 0.01f, 1000.0f);
-		Matrix Camera = jCameraUtil::CreateViewMatrix(Vector::FowardVector * 1.2f, Vector::ZeroVector, Vector::UpVector);
-		ConstantBuffer.M = Projection * Camera * ConstantBuffer.M;
-		ConstantBuffer.M.SetTranspose();
-
-		// Dynamic indexing with constantbuffer index
-		static DWORD OldTick = GetTickCount();
-		static int32 TexIndex = 0;
-		DWORD time = GetTickCount() - OldTick;
-		if (time > 2000)
-		{
-			OldTick = GetTickCount();
-			TexIndex = (TexIndex + 1) % _countof(SimpleTexture);			
-		}
-		ConstantBuffer.TexIndex = TexIndex;
-
-		const uint64 TempBufferOffset = CurrentRingBuffer->Alloc(Align(sizeof(ConstantBuffer), 256));
-		uint8* DestAddress = ((uint8*)CurrentRingBuffer->GetMappedPointer()) + TempBufferOffset;
-		memcpy(DestAddress, &ConstantBuffer, sizeof(ConstantBuffer));
-
-		const uint64 GPUAddress = CurrentRingBuffer->GetGPUAddress() + TempBufferOffset;
-		GraphicsCommandList->SetGraphicsRootConstantBufferView(0, GPUAddress);
-	}
-
-	// 2. Transform StructuredBuffer by using OneFrameBuffer
-	{
-        Vector4 StructuredBufferColor[3];
-        StructuredBufferColor[0] = { 1.0f, 0.0f, 0.0f, 1.0f };
-        StructuredBufferColor[1] = { 0.0f, 1.0f, 0.0f, 1.0f };
-        StructuredBufferColor[2] = { 0.0f, 0.0f, 1.0f, 1.0f };
-
-		const uint64 TempBufferOffset = CurrentRingBuffer->Alloc(Align(sizeof(StructuredBufferColor), 256));
-        uint8* DestAddress = ((uint8*)CurrentRingBuffer->GetMappedPointer()) + TempBufferOffset;
-        memcpy(DestAddress, &StructuredBufferColor, sizeof(StructuredBufferColor));
-
-        const uint64 GPUAddress = CurrentRingBuffer->GetGPUAddress() + TempBufferOffset;
-		const uint32 stride = sizeof(StructuredBufferColor[0]);
-		
-        GraphicsCommandList->SetGraphicsRootShaderResourceView(1, GPUAddress);
-	}
-	#else
-	GraphicsCommandList->SetGraphicsRootConstantBufferView(0, SimpleConstantBuffer->GetGPUAddress());
-	GraphicsCommandList->SetGraphicsRootShaderResourceView(1, SimpleStructuredBuffer->GetGPUAddress());
-	#endif
-	GraphicsCommandList->SetGraphicsRootDescriptorTable(2, SRVDescriptorHeap.GPUHandleStart);		// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
-#else
-
-	TestShaderBindingInstance->BindGraphics(CommandBuffer);
-#endif
+    TestShaderBindingInstance->BindGraphics(CommandBuffer);
 
 	GraphicsCommandList->RSSetViewports(1, &viewport);
 	GraphicsCommandList->RSSetScissorRects(1, &ScissorRect);
@@ -2015,7 +1871,6 @@ void jRHI_DX12::Render()
 	D3D12_INDEX_BUFFER_VIEW indexBufferView = {.BufferLocation = IndexBuffer->GetGPUAddress(), .SizeInBytes = IndexBuffer->GetAllocatedSize(), .Format = DXGI_FORMAT_R32_UINT };
     GraphicsCommandList->IASetIndexBuffer(&indexBufferView);
     GraphicsCommandList->SetPipelineState(SimplePipelineState.Get());
-	//GraphicsCommandList->DrawInstanced(3, 1, 0, 0);
 	GraphicsCommandList->DrawIndexedInstanced(IndexBuffer->GetAllocatedSize() / sizeof(uint32), 1, 0, 0, 0);
 
 	//GraphicsCommandList->SetComputeRootSignature(m_raytracingGlobalRootSignature.Get());
@@ -2471,15 +2326,34 @@ jTexture* jRHI_DX12::CreateTextureFromData(void* data, int32 width, int32 height
 
 jShaderBindingsLayout* jRHI_DX12::CreateShaderBindings(const jShaderBindingArray& InShaderBindingArray) const
 {
-	auto ShaderBindingsLayout = new jShaderBindingsLayout_DX12();
-	check(ShaderBindingsLayout);
-	ShaderBindingsLayout->Initialize(InShaderBindingArray);
-	return ShaderBindingsLayout;
+    size_t hash = InShaderBindingArray.GetHash();
+
+    {
+        jScopeReadLock sr(&ShaderBindingPoolLock);
+
+        auto it_find = ShaderBindingPool.find(hash);
+        if (ShaderBindingPool.end() != it_find)
+            return it_find->second;
+    }
+
+    {
+        jScopeWriteLock sw(&ShaderBindingPoolLock);
+
+        // Try again, to avoid entering creation section simultanteously.
+        auto it_find = ShaderBindingPool.find(hash);
+        if (ShaderBindingPool.end() != it_find)
+            return it_find->second;
+
+        auto NewShaderBinding = new jShaderBindingsLayout_DX12();
+        NewShaderBinding->Initialize(InShaderBindingArray);
+        NewShaderBinding->Hash = hash;
+        ShaderBindingPool[hash] = NewShaderBinding;
+
+        return NewShaderBinding;
+    }
 }
 
 jSamplerStateInfo* jRHI_DX12::CreateSamplerState(const jSamplerStateInfo& initializer) const
 {
-	auto SamplerState = new jSamplerStateInfo_DX12(initializer);
-	SamplerState->Initialize();
-	return SamplerState;
+	return SamplerStatePool.GetOrCreate(initializer);
 }

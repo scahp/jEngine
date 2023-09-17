@@ -223,7 +223,7 @@
     <ClInclude Include="RHI\Vulkan\jRHIType_Vulkan.h">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\Vulkan\jShaderBindingLayout_Vulkan.h">
+    <ClInclude Include="RHI\Vulkan\jShaderBindingsLayout_Vulkan.h">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="RHI\Vulkan\jTexture_Vulkan.h">
@@ -430,6 +430,9 @@
     <ClInclude Include="RHI\DX12\jUniformBufferBlock_DX12.h">
       <Filter>Code\RHI\DX12</Filter>
     </ClInclude>
+    <ClInclude Include="RHI\DX12\jPipelineStateInfo_DX12.h" />
+    <ClInclude Include="RHI\DX12\jShaderBindingInstance_DX12.h" />
+    <ClInclude Include="RHI\DX12\jShaderBindingsLayout_DX12.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -564,7 +567,7 @@
     <ClCompile Include="RHI\Vulkan\jRenderPass_Vulkan.cpp">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\Vulkan\jShaderBindingLayout_Vulkan.cpp">
+    <ClCompile Include="RHI\Vulkan\jShaderBindingsLayout_Vulkan.cpp">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="RHI\Vulkan\jTexture_Vulkan.cpp">
@@ -728,6 +731,15 @@
     </ClCompile>
     <ClCompile Include="RHI\DX12\jUniformBufferBlock_DX12.cpp">
       <Filter>Code\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\jPipelineStateInfo_DX12.cpp">
+      <Filter>Code</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\jShaderBindingInstance_DX12.cpp">
+      <Filter>Code</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\jShaderBindingsLayout_DX12.cpp">
+      <Filter>Code</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

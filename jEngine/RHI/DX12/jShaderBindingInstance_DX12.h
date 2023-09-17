@@ -20,6 +20,7 @@ struct jShaderBindingInstance_DX12 : public jShaderBindingInstance
     void BindGraphics(jCommandBuffer_DX12* InCommandList);
     void BindCompute(jCommandBuffer_DX12* InCommandList);
     void CopyToOnlineDescriptorHeap(jCommandBuffer_DX12* InCommandList);
+    ID3D12RootSignature* GetRootSignature() const;
 
     struct jInlineRootParamType
     {

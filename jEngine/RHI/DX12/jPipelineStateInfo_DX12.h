@@ -19,3 +19,79 @@ struct jSamplerStateInfo_DX12 : public jSamplerStateInfo
     jDescriptor_DX12 SamplerSRV;
 };
 
+struct jRasterizationStateInfo_DX12 : public jRasterizationStateInfo
+{
+    jRasterizationStateInfo_DX12() = default;
+    jRasterizationStateInfo_DX12(const jRasterizationStateInfo& state) : jRasterizationStateInfo(state) {}
+    virtual ~jRasterizationStateInfo_DX12() {}
+    virtual void Initialize() override;
+
+    D3D12_RASTERIZER_DESC RasterizeDesc = {};
+    DXGI_SAMPLE_DESC MultiSampleDesc = {};
+};
+
+struct jStencilOpStateInfo_DX12 : public jStencilOpStateInfo
+{
+    jStencilOpStateInfo_DX12() = default;
+    jStencilOpStateInfo_DX12(const jStencilOpStateInfo& state) : jStencilOpStateInfo(state) {}
+    virtual ~jStencilOpStateInfo_DX12() {}
+    virtual void Initialize() override;
+
+    D3D12_DEPTH_STENCILOP_DESC StencilOpStateDesc = {};
+};
+
+struct jDepthStencilStateInfo_DX12 : public jDepthStencilStateInfo
+{
+    jDepthStencilStateInfo_DX12() = default;
+    jDepthStencilStateInfo_DX12(const jDepthStencilStateInfo& state) : jDepthStencilStateInfo(state) {}
+    virtual ~jDepthStencilStateInfo_DX12() {}
+    virtual void Initialize() override;
+
+    D3D12_DEPTH_STENCIL_DESC DepthStencilStateDesc = {};
+};
+
+struct jBlendingStateInfo_DX12 : public jBlendingStateInfo
+{
+    jBlendingStateInfo_DX12() = default;
+    jBlendingStateInfo_DX12(const jBlendingStateInfo& state) : jBlendingStateInfo(state) {}
+    virtual ~jBlendingStateInfo_DX12() {}
+    virtual void Initialize() override;
+
+    D3D12_BLEND_DESC BlendDesc = {};
+};
+
+//////////////////////////////////////////////////////////////////////////
+// jPipelineStateInfo_DX12
+//////////////////////////////////////////////////////////////////////////
+struct jPipelineStateInfo_DX12 : public jPipelineStateInfo
+{
+    jPipelineStateInfo_DX12() = default;
+    jPipelineStateInfo_DX12(const jPipelineStateFixedInfo* pipelineStateFixed, const jGraphicsPipelineShader shader, const jVertexBufferArray& InVertexBufferArray
+        , const jRenderPass* renderPass, const jShaderBindingsLayoutArray& InShaderBindingLayoutArray, const jPushConstant* pushConstant)
+        : jPipelineStateInfo(pipelineStateFixed, shader, InVertexBufferArray, renderPass, InShaderBindingLayoutArray, pushConstant)
+    {}
+    jPipelineStateInfo_DX12(const jPipelineStateInfo& pipelineState)
+        : jPipelineStateInfo(pipelineState)
+    {}
+    jPipelineStateInfo_DX12(jPipelineStateInfo&& pipelineState)
+        : jPipelineStateInfo(std::move(pipelineState))
+    {}
+    virtual ~jPipelineStateInfo_DX12()
+    {
+        Release();
+    }
+
+    void Release();
+
+    virtual void Initialize() override;
+    virtual void* GetHandle() const override { return nullptr; }
+    virtual void* GetPipelineLayoutHandle() const override { return nullptr; }
+    virtual void* CreateGraphicsPipelineState() override;
+    virtual void* CreateComputePipelineState() override;
+    virtual void Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const override;
+
+    ComPtr<ID3D12PipelineState> PipelineState;
+
+    // VkPipeline vkPipeline = nullptr;
+    // VkPipelineLayout vkPipelineLayout = nullptr;        // PipelineLayout 은 PipelineLayoutPool 에서 캐싱해둔 거라 소멸시키지 않음
+};

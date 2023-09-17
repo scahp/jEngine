@@ -77,10 +77,7 @@ void jRasterizationStateInfo_Vulkan::Initialize()
     RasterizationStateInfo.depthBiasSlopeFactor = DepthBiasSlopeFactor;				// Optional
 
     // VkPipelineRasterizationStateCreateFlags flags;
-}
 
-void jMultisampleStateInfo_Vulkan::Initialize()
-{
     MultisampleStateInfo = {};
     MultisampleStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     MultisampleStateInfo.rasterizationSamples = (VkSampleCountFlagBits)SampleCount;
@@ -92,10 +89,25 @@ void jMultisampleStateInfo_Vulkan::Initialize()
     MultisampleStateInfo.minSampleShading = MinSampleShading;
     MultisampleStateInfo.alphaToCoverageEnable = AlphaToCoverageEnable;		// Optional
     MultisampleStateInfo.alphaToOneEnable = AlphaToOneEnable;				// Optional
-
-    // VkPipelineMultisampleStateCreateFlags flags;
-    // const VkSampleMask* pSampleMask;
 }
+
+//void jMultisampleStateInfo_Vulkan::Initialize()
+//{
+//    MultisampleStateInfo = {};
+//    MultisampleStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+//    MultisampleStateInfo.rasterizationSamples = (VkSampleCountFlagBits)SampleCount;
+//#if USE_VARIABLE_SHADING_RATE_TIER2
+//    MultisampleStateInfo.sampleShadingEnable = SampleShadingEnable;			// Sample shading 켬	 (텍스쳐 내부에 있는 aliasing 도 완화 해줌)
+//#else
+//    MultisampleStateInfo.sampleShadingEnable = false;
+//#endif
+//    MultisampleStateInfo.minSampleShading = MinSampleShading;
+//    MultisampleStateInfo.alphaToCoverageEnable = AlphaToCoverageEnable;		// Optional
+//    MultisampleStateInfo.alphaToOneEnable = AlphaToOneEnable;				// Optional
+//
+//    // VkPipelineMultisampleStateCreateFlags flags;
+//    // const VkSampleMask* pSampleMask;
+//}
 
 void jStencilOpStateInfo_Vulkan::Initialize()
 {
@@ -132,7 +144,7 @@ void jDepthStencilStateInfo_Vulkan::Initialize()
     // VkPipelineDepthStencilStateCreateFlags    flags;
 }
 
-void jBlendingStateInfo_Vulakn::Initialize()
+void jBlendingStateInfo_Vulkan::Initialize()
 {
     ColorBlendAttachmentInfo = {};
     ColorBlendAttachmentInfo.blendEnable = BlendEnable;
@@ -255,14 +267,14 @@ void* jPipelineStateInfo_Vulkan::CreateGraphicsPipelineState()
     std::vector<VkPipelineColorBlendAttachmentState> ColorBlendAttachmentStates;
     if (ColorAttachmentCountInSubpass > 1)
     {
-        ColorBlendAttachmentStates.resize(ColorAttachmentCountInSubpass, ((jBlendingStateInfo_Vulakn*)PipelineStateFixed->BlendingState)->ColorBlendAttachmentInfo);
+        ColorBlendAttachmentStates.resize(ColorAttachmentCountInSubpass, ((jBlendingStateInfo_Vulkan*)PipelineStateFixed->BlendingState)->ColorBlendAttachmentInfo);
         colorBlending.attachmentCount = ColorAttachmentCountInSubpass;
         colorBlending.pAttachments = &ColorBlendAttachmentStates[0];
     }
     else
     {
         colorBlending.attachmentCount = 1;						// framebuffer 개수에 맞게 설정해준다.
-        colorBlending.pAttachments = &((jBlendingStateInfo_Vulakn*)PipelineStateFixed->BlendingState)->ColorBlendAttachmentInfo;
+        colorBlending.pAttachments = &((jBlendingStateInfo_Vulkan*)PipelineStateFixed->BlendingState)->ColorBlendAttachmentInfo;
     }
 
     colorBlending.blendConstants[0] = 0.0f;		// Optional
@@ -322,7 +334,7 @@ void* jPipelineStateInfo_Vulkan::CreateGraphicsPipelineState()
     pipelineInfo.pInputAssemblyState = &inputAssembly;
     pipelineInfo.pViewportState = &viewportState;
     pipelineInfo.pRasterizationState = &((jRasterizationStateInfo_Vulkan*)PipelineStateFixed->RasterizationState)->RasterizationStateInfo;
-    pipelineInfo.pMultisampleState = &((jMultisampleStateInfo_Vulkan*)PipelineStateFixed->MultisampleState)->MultisampleStateInfo;
+    pipelineInfo.pMultisampleState = &((jRasterizationStateInfo_Vulkan*)PipelineStateFixed->RasterizationState)->MultisampleStateInfo;
     pipelineInfo.pDepthStencilState = &((jDepthStencilStateInfo_Vulkan*)PipelineStateFixed->DepthStencilState)->DepthStencilStateInfo;
     pipelineInfo.pColorBlendState = &colorBlending;
     pipelineInfo.pDynamicState = &dynamicState;

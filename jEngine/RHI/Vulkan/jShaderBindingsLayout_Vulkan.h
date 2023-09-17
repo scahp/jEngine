@@ -52,9 +52,9 @@ struct jShaderBindingInstance_Vulkan : public jShaderBindingInstance
 //////////////////////////////////////////////////////////////////////////
 // jShaderBindings_Vulkan
 //////////////////////////////////////////////////////////////////////////
-struct jShaderBindingLayout_Vulkan : public jShaderBindingsLayout
+struct jShaderBindingsLayout_Vulkan : public jShaderBindingsLayout
 {
-    virtual ~jShaderBindingLayout_Vulkan();
+    virtual ~jShaderBindingsLayout_Vulkan();
 
     VkDescriptorSetLayout DescriptorSetLayout = nullptr;
 

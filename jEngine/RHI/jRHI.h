@@ -413,7 +413,6 @@ public:
 	virtual void QueueSubmit(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr, jSemaphore* InSignalSemaphore) {}
 
 	virtual jRasterizationStateInfo* CreateRasterizationState(const jRasterizationStateInfo& initializer) const { return nullptr; }
-	virtual jMultisampleStateInfo* CreateMultisampleState(const jMultisampleStateInfo& initializer) const { return nullptr; }
 	virtual jStencilOpStateInfo* CreateStencilOpStateInfo(const jStencilOpStateInfo& initializer) const { return nullptr; }
 	virtual jDepthStencilStateInfo* CreateDepthStencilState(const jDepthStencilStateInfo& initializer) const { return nullptr; }
 	virtual jBlendingStateInfo* CreateBlendingState(const jBlendingStateInfo& initializer) const { return nullptr; }
@@ -570,7 +569,8 @@ struct TSamplerStateInfo
 
 template <EPolygonMode TPolygonMode = EPolygonMode::FILL, ECullMode TCullMode = ECullMode::BACK, EFrontFace TFrontFace = EFrontFace::CCW,
     bool TDepthBiasEnable = false, float TDepthBiasConstantFactor = 0.0f, float TDepthBiasClamp = 0.0f, float TDepthBiasSlopeFactor = 0.0f,
-    float TLineWidth = 1.0f, bool TDepthClampEnable = false, bool TRasterizerDiscardEnable = false>
+    float TLineWidth = 1.0f, bool TDepthClampEnable = false, bool TRasterizerDiscardEnable = false, EMSAASamples TSampleCount = EMSAASamples::COUNT_1, 
+	bool TSampleShadingEnable = true, float TMinSampleShading = 0.2f, bool TAlphaToCoverageEnable = false, bool TAlphaToOneEnable = false>
 struct TRasterizationStateInfo
 {
     FORCEINLINE static jRasterizationStateInfo* Create()
@@ -590,33 +590,40 @@ struct TRasterizationStateInfo
         initializer.LineWidth = TLineWidth;
         initializer.DepthClampEnable = TDepthClampEnable;
         initializer.RasterizerDiscardEnable = TRasterizerDiscardEnable;
+
+		initializer.SampleCount = TSampleCount;
+		initializer.SampleShadingEnable = TSampleShadingEnable;		// Sample shading 켬	 (텍스쳐 내부에 있는 aliasing 도 완화 해줌)
+		initializer.MinSampleShading = TMinSampleShading;
+		initializer.AlphaToCoverageEnable = TAlphaToCoverageEnable;
+		initializer.AlphaToOneEnable = TAlphaToOneEnable;
+
 		initializer.GetHash();
 		CachedInfo = g_rhi->CreateRasterizationState(initializer);
 		return CachedInfo;
     }
 };
 
-template <bool TSampleShadingEnable = true, float TMinSampleShading = 0.2f,
-    bool TAlphaToCoverageEnable = false, bool TAlphaToOneEnable = false>
-struct TMultisampleStateInfo
-{
-    FORCEINLINE static jMultisampleStateInfo* Create(EMSAASamples InSampleCount = EMSAASamples::COUNT_1)
-    {
-		static jMultisampleStateInfo* CachedInfo = nullptr;
-		if (CachedInfo)
-			return CachedInfo;
-
-        jMultisampleStateInfo initializer;
-        initializer.SampleCount = InSampleCount;
-        initializer.SampleShadingEnable = TSampleShadingEnable;		// Sample shading 켬	 (텍스쳐 내부에 있는 aliasing 도 완화 해줌)
-        initializer.MinSampleShading = TMinSampleShading;
-        initializer.AlphaToCoverageEnable = TAlphaToCoverageEnable;
-        initializer.AlphaToOneEnable = TAlphaToOneEnable;
-		initializer.GetHash();
-		CachedInfo = g_rhi->CreateMultisampleState(initializer);
-		return CachedInfo;
-    }
-};
+//template <bool TSampleShadingEnable = true, float TMinSampleShading = 0.2f,
+//    bool TAlphaToCoverageEnable = false, bool TAlphaToOneEnable = false>
+//struct TMultisampleStateInfo
+//{
+//    FORCEINLINE static jMultisampleStateInfo* Create(EMSAASamples InSampleCount = EMSAASamples::COUNT_1)
+//    {
+//		static jMultisampleStateInfo* CachedInfo = nullptr;
+//		if (CachedInfo)
+//			return CachedInfo;
+//
+//        jMultisampleStateInfo initializer;
+//        initializer.SampleCount = InSampleCount;
+//        initializer.SampleShadingEnable = TSampleShadingEnable;		// Sample shading 켬	 (텍스쳐 내부에 있는 aliasing 도 완화 해줌)
+//        initializer.MinSampleShading = TMinSampleShading;
+//        initializer.AlphaToCoverageEnable = TAlphaToCoverageEnable;
+//        initializer.AlphaToOneEnable = TAlphaToOneEnable;
+//		initializer.GetHash();
+//		CachedInfo = g_rhi->CreateMultisampleState(initializer);
+//		return CachedInfo;
+//    }
+//};
 
 template <EStencilOp TFailOp = EStencilOp::KEEP, EStencilOp TPassOp = EStencilOp::KEEP, EStencilOp TDepthFailOp = EStencilOp::KEEP,
     ECompareOp TCompareOp = ECompareOp::NEVER, uint32 TCompareMask = 0, uint32 TWriteMask = 0, uint32 TReference = 0>

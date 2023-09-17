@@ -1,12 +1,12 @@
 ﻿#pragma once
 
-#if USE_VULKAN
+//#if USE_VULKAN
 
 #include "jRHI.h"
 #include "Shader/jShader.h"
 #include "jPipelineStateInfo.h"
 #include "Vulkan/jRenderPass_Vulkan.h"
-#include "Vulkan/jShaderBindingLayout_Vulkan.h"
+#include "Vulkan/jShaderBindingsLayout_Vulkan.h"
 #include "Vulkan/jQueryPoolTime_Vulkan.h"
 #include "Vulkan/jPipelineStateInfo_Vulkan.h"
 #include "Vulkan/jCommandBufferManager_Vulkan.h"
@@ -29,10 +29,10 @@ public:
     static robin_hood::unordered_map<size_t, jShaderBindingsLayout*> ShaderBindingPool;
     static TResourcePool<jSamplerStateInfo_Vulkan, jMutexRWLock> SamplerStatePool;
     static TResourcePool<jRasterizationStateInfo_Vulkan, jMutexRWLock> RasterizationStatePool;
-    static TResourcePool<jMultisampleStateInfo_Vulkan, jMutexRWLock> MultisampleStatePool;
+    //static TResourcePool<jMultisampleStateInfo_Vulkan, jMutexRWLock> MultisampleStatePool;
     static TResourcePool<jStencilOpStateInfo_Vulkan, jMutexRWLock> StencilOpStatePool;
     static TResourcePool<jDepthStencilStateInfo_Vulkan, jMutexRWLock> DepthStencilStatePool;
-    static TResourcePool<jBlendingStateInfo_Vulakn, jMutexRWLock> BlendingStatePool;
+    static TResourcePool<jBlendingStateInfo_Vulkan, jMutexRWLock> BlendingStatePool;
     static TResourcePool<jPipelineStateInfo_Vulkan, jMutexRWLock> PipelineStatePool;
 	static TResourcePool<jRenderPass_Vulkan, jMutexRWLock> RenderPassPool;
 
@@ -137,7 +137,6 @@ public:
 
 	virtual jSamplerStateInfo* CreateSamplerState(const jSamplerStateInfo& initializer) const override;
 	virtual jRasterizationStateInfo* CreateRasterizationState(const jRasterizationStateInfo& initializer) const override;
-	virtual jMultisampleStateInfo* CreateMultisampleState(const jMultisampleStateInfo& initializer) const override;
 	virtual jStencilOpStateInfo* CreateStencilOpStateInfo(const jStencilOpStateInfo& initializer) const override;
 	virtual jDepthStencilStateInfo* CreateDepthStencilState(const jDepthStencilStateInfo& initializer) const override;
 	virtual jBlendingStateInfo* CreateBlendingState(const jBlendingStateInfo& initializer) const override;
@@ -221,4 +220,4 @@ public:
 
 extern jRHI_Vulkan* g_rhi_vk;
 
-#endif // USE_VULKAN
+//#endif // USE_VULKAN
