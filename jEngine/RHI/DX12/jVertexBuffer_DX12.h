@@ -88,13 +88,12 @@ struct jVertexBuffer_DX12 : public jVertexBuffer
         }
     }
 
-    virtual bool Initialize(const std::shared_ptr<jVertexStreamData>& InStreamData);
-
     jBindInfo BindInfos;
     std::vector<jVertexStream_DX12> Streams;
     std::vector<D3D12_VERTEX_BUFFER_VIEW> VBView;
     mutable size_t Hash = 0;
 
+    virtual bool Initialize(const std::shared_ptr<jVertexStreamData>& InStreamData) override;
     virtual void Bind(const jShader* shader) const override {}
     virtual void Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const override;
     virtual void Bind(jCommandBuffer_DX12* InCommandList);

@@ -9,6 +9,7 @@ struct jIndexBuffer_Vulkan : public jIndexBuffer
 
     virtual void Bind(const jShader* shader) const override {}
     virtual void Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const override;
+    virtual bool Initialize(const std::shared_ptr<jIndexStreamData>& InStreamData) override;
 
     FORCEINLINE uint32 GetIndexCount() const
     {

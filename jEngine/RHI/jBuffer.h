@@ -12,6 +12,7 @@ struct jVertexBuffer
     virtual void Bind(const jShader* shader) const {}
     virtual void Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const {}
     virtual int32 GetElementCount() const { return VertexStreamData ? VertexStreamData->ElementCount : 0; }
+    virtual bool Initialize(const std::shared_ptr<jVertexStreamData>& InStreamData) { return false; }
 };
 
 struct jIndexBuffer
@@ -23,6 +24,7 @@ struct jIndexBuffer
     virtual void Bind(const jShader* shader) const {}
     virtual void Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const {}
     virtual int32 GetElementCount() const { return IndexStreamData ? IndexStreamData->ElementCount : 0; }
+    virtual bool Initialize(const std::shared_ptr<jIndexStreamData>& InStreamData) { return false; }
 };
 
 struct jVertexBufferArray : public jResourceContainer<const jVertexBuffer*>
