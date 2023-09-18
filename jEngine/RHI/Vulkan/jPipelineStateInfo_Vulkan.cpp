@@ -154,7 +154,7 @@ void jBlendingStateInfo_Vulkan::Initialize()
     ColorBlendAttachmentInfo.srcAlphaBlendFactor = GetVulkanBlendFactor(SrcAlpha);
     ColorBlendAttachmentInfo.dstAlphaBlendFactor = GetVulkanBlendFactor(DestAlpha);
     ColorBlendAttachmentInfo.alphaBlendOp = GetVulkanBlendOp(AlphaBlendOp);
-    ColorBlendAttachmentInfo.colorWriteMask = GetVulkanBlendOp(ColorWriteMask);
+    ColorBlendAttachmentInfo.colorWriteMask = GetVulkanColorMask(ColorWriteMask);
 }
 
 void jPipelineStateInfo_Vulkan::Release()

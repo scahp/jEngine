@@ -25,6 +25,65 @@ void jSamplerStateInfo_DX12::Initialize()
     g_rhi_dx12->Device->CreateSampler(&samplerDesc, SamplerSRV.CPUHandle);
 }
 
+void jRasterizationStateInfo_DX12::Initialize()
+{
+    RasterizeDesc.FillMode = GetDX12PolygonMode(PolygonMode);
+    RasterizeDesc.CullMode = GetDX12CullMode(CullMode);
+    RasterizeDesc.FrontCounterClockwise = FrontFace == EFrontFace::CCW;
+    RasterizeDesc.DepthBias = (int32)(DepthBiasEnable ? DepthBiasConstantFactor : 0);
+    RasterizeDesc.DepthBiasClamp = DepthBiasClamp;
+    RasterizeDesc.SlopeScaledDepthBias = DepthBiasSlopeFactor;
+    RasterizeDesc.DepthClipEnable = DepthClampEnable;
+    RasterizeDesc.MultisampleEnable = (int32)SampleCount > 1;
+
+    //RasterizeDesc.AntialiasedLineEnable;
+    //RasterizeDesc.ForcedSampleCount;
+    //RasterizeDesc.ConservativeRaster;
+
+    MultiSampleDesc.Count = (int32)SampleCount;
+}
+
+void jStencilOpStateInfo_DX12::Initialize()
+{
+    StencilOpStateDesc.StencilDepthFailOp = GetDX12StencilOp(DepthFailOp);
+    StencilOpStateDesc.StencilFailOp = GetDX12StencilOp(FailOp);
+    StencilOpStateDesc.StencilFunc = GetDX12CompareOp(CompareOp);
+    StencilOpStateDesc.StencilPassOp = GetDX12StencilOp(PassOp);
+}
+
+void jDepthStencilStateInfo_DX12::Initialize()
+{
+    DepthStencilStateDesc.DepthEnable = DepthTestEnable;
+    DepthStencilStateDesc.DepthWriteMask = DepthWriteEnable ? D3D12_DEPTH_WRITE_MASK_ALL : D3D12_DEPTH_WRITE_MASK_ZERO;
+    DepthStencilStateDesc.DepthFunc = GetDX12CompareOp(DepthCompareOp);
+    DepthStencilStateDesc.StencilEnable = StencilTestEnable;
+    //DepthStencilStateDesc.StencilReadMask;
+    //DepthStencilStateDesc.StencilWriteMask;
+    if (Front)
+        DepthStencilStateDesc.FrontFace = ((jStencilOpStateInfo_DX12*)Front)->StencilOpStateDesc;
+
+    if (Back)
+        DepthStencilStateDesc.BackFace = ((jStencilOpStateInfo_DX12*)Back)->StencilOpStateDesc;
+
+    // MinDepthBounds;
+    // MaxDepthBounds;
+}
+
+void jBlendingStateInfo_DX12::Initialize()
+{
+    BlendDesc.BlendEnable = BlendEnable;
+    BlendDesc.SrcBlend = GetDX12BlendFactor(Src);
+    BlendDesc.DestBlend = GetDX12BlendFactor(Dest);
+    BlendDesc.BlendOp = GetDX12BlendOp(BlendOp);
+    BlendDesc.SrcBlendAlpha = GetDX12BlendFactor(SrcAlpha);
+    BlendDesc.DestBlendAlpha = GetDX12BlendFactor(DestAlpha);
+    BlendDesc.BlendOpAlpha = GetDX12BlendOp(AlphaBlendOp);
+    BlendDesc.RenderTargetWriteMask = GetDX12ColorMask(ColorWriteMask);
+
+    //BlendDesc.LogicOpEnable;
+    //BlendDesc.LogicOp;
+}
+
 void jSamplerStateInfo_DX12::Release()
 {
     SamplerSRV.Free();
@@ -70,13 +129,6 @@ void* jPipelineStateInfo_DX12::CreateComputePipelineState()
     //const jPipelineStateFixedInfo* PipelineStateFixed = nullptr;
     //int32 SubpassIndex = 0;
 
-    psoDesc.RasterizerState = ((jRasterizationStateInfo_DX12*)PipelineStateFixed->RasterizationState)->RasterizeDesc;
-    psoDesc.BlendState = ((jBlendingStateInfo_DX12*)PipelineStateFixed->BlendingState)->BlendDesc;
-    psoDesc.SampleMask = UINT_MAX;
-    psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-    psoDesc.DepthStencilState = ((jDepthStencilStateInfo_DX12*)PipelineStateFixed->DepthStencilState)->DepthStencilStateDesc;
-    psoDesc.SampleDesc.Count = ((jRasterizationStateInfo_DX12*)PipelineStateFixed->RasterizationState)->MultiSampleDesc.Count;
-
     int32 ColorAttachmentCountInSubpass = 0;
     check(RenderPass->RenderPassInfo.Subpasses.size() > SubpassIndex);
     const jSubpass& SelectedSubpass = RenderPass->RenderPassInfo.Subpasses[SubpassIndex];
@@ -97,6 +149,16 @@ void* jPipelineStateInfo_DX12::CreateComputePipelineState()
         }
     }
     psoDesc.NumRenderTargets = ColorAttachmentCountInSubpass;
+
+    psoDesc.RasterizerState = ((jRasterizationStateInfo_DX12*)PipelineStateFixed->RasterizationState)->RasterizeDesc;
+    for (int32 i = 0; i < psoDesc.NumRenderTargets; ++i)
+    {
+        psoDesc.BlendState.RenderTarget[i] = ((jBlendingStateInfo_DX12*)PipelineStateFixed->BlendingState)->BlendDesc;
+    }
+    psoDesc.SampleMask = UINT_MAX;
+    psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    psoDesc.DepthStencilState = ((jDepthStencilStateInfo_DX12*)PipelineStateFixed->DepthStencilState)->DepthStencilStateDesc;
+    psoDesc.SampleDesc.Count = ((jRasterizationStateInfo_DX12*)PipelineStateFixed->RasterizationState)->MultiSampleDesc.Count;
 
     if (JFAIL(g_rhi_dx12->Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&PipelineState))))
         return nullptr;

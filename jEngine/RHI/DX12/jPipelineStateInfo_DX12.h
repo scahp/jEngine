@@ -57,7 +57,7 @@ struct jBlendingStateInfo_DX12 : public jBlendingStateInfo
     virtual ~jBlendingStateInfo_DX12() {}
     virtual void Initialize() override;
 
-    D3D12_BLEND_DESC BlendDesc = {};
+    D3D12_RENDER_TARGET_BLEND_DESC BlendDesc = {};
 };
 
 //////////////////////////////////////////////////////////////////////////

@@ -112,7 +112,7 @@ ComPtr<IDxcBlob> jShaderCompiler_DX12::CompileFromFile(const wchar_t* InFilename
 	strStream << shaderFile.rdbuf();
 	
 	const std::string shader = strStream.str();
-	return Compile(shader.c_str(), shader.size(), InShadingModel, InEntryPoint, InRowMajorMatrix);
+	return Compile(shader.c_str(), (uint32)shader.size(), InShadingModel, InEntryPoint, InRowMajorMatrix);
 }
 
 ComPtr<IDxcBlob> jShaderCompiler_DX12::Compile(const char* InShaderCode, uint32 InShaderCodeLength, const wchar_t* InShadingModel

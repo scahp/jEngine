@@ -442,6 +442,9 @@
     <ClInclude Include="RHI\DX12\jShader_DX12.h">
       <Filter>Code\RHI\DX12</Filter>
     </ClInclude>
+    <ClInclude Include="RHI\DX12\jRenderPass_DX12.h">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -757,6 +760,9 @@
       <Filter>Code\RHI\DX12</Filter>
     </ClCompile>
     <ClCompile Include="RHI\DX12\jShader_DX12.cpp">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\jRenderPass_DX12.cpp">
       <Filter>Code\RHI\DX12</Filter>
     </ClCompile>
   </ItemGroup>

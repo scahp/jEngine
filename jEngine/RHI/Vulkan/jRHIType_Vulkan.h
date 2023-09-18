@@ -404,7 +404,7 @@ FORCEINLINE auto GetVulkanBufferBits(EVulkanBufferBits type)
     return static_cast<VkBufferUsageFlagBits>(type);
 }
 
-FORCEINLINE VkColorComponentFlags GetVulkanBlendOp(EColorMask type)
+FORCEINLINE VkColorComponentFlags GetVulkanColorMask(EColorMask type)
 {
     VkColorComponentFlags result = 0;
 

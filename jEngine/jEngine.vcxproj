@@ -162,6 +162,7 @@ xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"</Command
     <ClInclude Include="RHI\DX12\jFenceManager_DX12.h" />
     <ClInclude Include="RHI\DX12\jIndexBuffer_DX12.h" />
     <ClInclude Include="RHI\DX12\jPipelineStateInfo_DX12.h" />
+    <ClInclude Include="RHI\DX12\jRenderPass_DX12.h" />
     <ClInclude Include="RHI\DX12\jRHIType_DX12.h" />
     <ClInclude Include="RHI\DX12\jRHI_DX12.h" />
     <ClInclude Include="RHI\DX12\jRingBuffer_DX12.h" />
@@ -353,6 +354,7 @@ xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"</Command
     <ClCompile Include="RHI\DX12\jFenceManager_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jIndexBuffer_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jPipelineStateInfo_DX12.cpp" />
+    <ClCompile Include="RHI\DX12\jRenderPass_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jRHI_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jRingBuffer_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jShaderBindingInstance_DX12.cpp" />

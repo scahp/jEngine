@@ -216,5 +216,6 @@ void jVertexBuffer_DX12::Bind(const std::shared_ptr<jRenderFrameContext>& InRend
 void jVertexBuffer_DX12::Bind(jCommandBuffer_DX12* InCommandList)
 {
     check(InCommandList->CommandList);
+    InCommandList->CommandList->IASetPrimitiveTopology(GetTopology());
     InCommandList->CommandList->IASetVertexBuffers(0, (uint32)VBView.size(), &VBView[0]);
 }

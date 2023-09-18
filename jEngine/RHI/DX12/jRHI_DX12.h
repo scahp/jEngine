@@ -22,6 +22,7 @@ struct jBuffer_DX12;
 struct jRingBuffer_DX12;
 struct jVertexBuffer_DX12;
 struct jIndexBuffer_DX12;
+class jRenderPass_DX12;
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -190,6 +191,7 @@ public:
 	//jBuffer_DX12* VertexBufferSecondGeometry = nullptr;
 
 	jGraphicsPipelineShader GraphicsPipelineShader;
+	jRenderPass_DX12* RenderPass = nullptr;
 
 	////////////////////////////////////////////////////////////////////////////
 	//// 12. AccelerationStructures
@@ -363,6 +365,10 @@ public:
 	struct jShaderBindingInstance_DX12* TestShaderBindingInstance = nullptr;
 
 	virtual jSamplerStateInfo* CreateSamplerState(const jSamplerStateInfo& initializer) const override;
+    virtual jRasterizationStateInfo* CreateRasterizationState(const jRasterizationStateInfo& initializer) const override;
+    virtual jStencilOpStateInfo* CreateStencilOpStateInfo(const jStencilOpStateInfo& initializer) const override;
+    virtual jDepthStencilStateInfo* CreateDepthStencilState(const jDepthStencilStateInfo& initializer) const override;
+    virtual jBlendingStateInfo* CreateBlendingState(const jBlendingStateInfo& initializer) const override;
 
 	uint32 CurrentFrameNumber = 0;		// FrameNumber is just Incremented frame by frame.
     virtual uint32 GetCurrentFrameNumber() const override { return CurrentFrameNumber; }
@@ -372,15 +378,21 @@ public:
 	mutable jMutexRWLock ShaderBindingPoolLock;
 
     static TResourcePool<jSamplerStateInfo_DX12, jMutexRWLock> SamplerStatePool;
-    //static TResourcePool<jRasterizationStateInfo_DX12, jMutexRWLock> RasterizationStatePool;
-    //static TResourcePool<jMultisampleStateInfo_Vulkan, jMutexRWLock> MultisampleStatePool;
-    //static TResourcePool<jStencilOpStateInfo_Vulkan, jMutexRWLock> StencilOpStatePool;
-    //static TResourcePool<jDepthStencilStateInfo_Vulkan, jMutexRWLock> DepthStencilStatePool;
-    //static TResourcePool<jBlendingStateInfo_Vulakn, jMutexRWLock> BlendingStatePool;
+    static TResourcePool<jRasterizationStateInfo_DX12, jMutexRWLock> RasterizationStatePool;
+    static TResourcePool<jStencilOpStateInfo_DX12, jMutexRWLock> StencilOpStatePool;
+    static TResourcePool<jDepthStencilStateInfo_DX12, jMutexRWLock> DepthStencilStatePool;
+    static TResourcePool<jBlendingStateInfo_DX12, jMutexRWLock> BlendingStatePool;
     //static TResourcePool<jPipelineStateInfo_Vulkan, jMutexRWLock> PipelineStatePool;
-    //static TResourcePool<jRenderPass_Vulkan, jMutexRWLock> RenderPassPool;
+    static TResourcePool<jRenderPass_DX12, jMutexRWLock> RenderPassPool;
 
 	virtual bool CreateShaderInternal(jShader* OutShader, const jShaderInfo& shaderInfo) const override;
+
+    virtual jRenderPass* GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const Vector2i& offset, const Vector2i& extent) const override;
+    virtual jRenderPass* GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const jAttachment& depthAttachment
+        , const Vector2i& offset, const Vector2i& extent) const override;
+    virtual jRenderPass* GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const jAttachment& depthAttachment
+        , const jAttachment& colorResolveAttachment, const Vector2i& offset, const Vector2i& extent) const override;
+    virtual jRenderPass* GetOrCreateRenderPass(const jRenderPassInfo& renderPassInfo, const Vector2i& offset, const Vector2i& extent) const override;
 };
 
 extern jRHI_DX12* g_rhi_dx12;

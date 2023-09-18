@@ -19,6 +19,9 @@
 #include "jIndexBuffer_DX12.h"
 #include "jShader_DX12.h"
 #include "FileLoader/jFile.h"
+#include "jPipelineStateInfo_DX12.h"
+#include "Renderer/jSceneRenderTargets.h"
+#include "jRenderPass_DX12.h"
 
 #define USE_INLINE_DESCRIPTOR 0												// InlineDescriptor 를 쓸것인지? DescriptorTable 를 쓸것인지 여부
 #define USE_ONE_FRAME_BUFFER_AND_DESCRIPTOR (USE_INLINE_DESCRIPTOR && 1)	// 현재 프레임에만 사용하고 버리는 임시 Descriptor 와 Buffer 를 사용할 것인지 여부
@@ -35,6 +38,11 @@ struct jSimpleConstantBuffer
 jRHI_DX12* g_rhi_dx12 = nullptr;
 robin_hood::unordered_map<size_t, jShaderBindingsLayout*> jRHI_DX12::ShaderBindingPool;
 TResourcePool<jSamplerStateInfo_DX12, jMutexRWLock> jRHI_DX12::SamplerStatePool;
+TResourcePool<jRasterizationStateInfo_DX12, jMutexRWLock> jRHI_DX12::RasterizationStatePool;
+TResourcePool<jStencilOpStateInfo_DX12, jMutexRWLock> jRHI_DX12::StencilOpStatePool;
+TResourcePool<jDepthStencilStateInfo_DX12, jMutexRWLock> jRHI_DX12::DepthStencilStatePool;
+TResourcePool<jBlendingStateInfo_DX12, jMutexRWLock> jRHI_DX12::BlendingStatePool;
+TResourcePool<jRenderPass_DX12, jMutexRWLock> jRHI_DX12::RenderPassPool;
 
 const wchar_t* jRHI_DX12::c_raygenShaderName = L"MyRaygenShader";
 const wchar_t* jRHI_DX12::c_closestHitShaderName = L"MyClosestHitShader";
@@ -1407,15 +1415,49 @@ bool jRHI_DX12::InitRHI()
         check(PS_Compiled);
 		psoDesc.PS = { .pShaderBytecode = PS_Compiled->ShaderBlob->GetBufferPointer(), .BytecodeLength = PS_Compiled->ShaderBlob->GetBufferSize() };
 	}
-    psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-    psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-	psoDesc.DepthStencilState.DepthEnable = FALSE;
-    psoDesc.DepthStencilState.StencilEnable = FALSE;
+
+	jRasterizationStateInfo_DX12* RasterizationStateInfo = (jRasterizationStateInfo_DX12*)TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, true, false, (EMSAASamples)1, true, 0.2f, false, false>::Create();
+	jBlendingStateInfo_DX12* BlendStateInfo = (jBlendingStateInfo_DX12*)TBlendingStateInfo<true, EBlendFactor::SRC_ALPHA, EBlendFactor::ONE_MINUS_SRC_ALPHA, EBlendOp::ADD
+        , EBlendFactor::ONE_MINUS_SRC_ALPHA, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
+	jDepthStencilStateInfo_DX12* DepthStencilState = (jDepthStencilStateInfo_DX12*)TDepthStencilStateInfo<true, false, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
+	
+    jSwapchainImage* SwapchainImage = SwapChain->GetSwapchainImage(CurrentFrameIndex);
+	auto SceneRT = std::make_shared<jRenderTarget>(SwapchainImage->TexturePtr);
+
+	jRenderPassInfo renderPassInfo;
+    {
+		const Vector4 clearColor = { 0.0f, 0.2f, 0.4f, 1.0f };
+		const Vector2 clearDepth = { 1.0f, 0.0f };
+
+        jAttachment color = jAttachment(SceneRT, EAttachmentLoadStoreOp::CLEAR_STORE
+            , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, clearColor, clearDepth
+            , EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
+        renderPassInfo.Attachments.push_back(color);
+    }
+	RenderPass = (jRenderPass_DX12*)g_rhi_dx12->GetOrCreateRenderPass(
+		renderPassInfo, Vector2i(0, 0), Vector2i(SwapchainImage->TexturePtr->Width, SwapchainImage->TexturePtr->Height));
+
+	psoDesc.RasterizerState = RasterizationStateInfo->RasterizeDesc;
+    psoDesc.SampleDesc.Count = RasterizationStateInfo->MultiSampleDesc.Count;
+    
+	// Blending Operation 을 따로 적게 해줄건가? RenderPass 의 현재 지원을 확인해보자.
+	for (int32 i = 0; i < (int32)RenderPass->GetRTVFormats().size(); ++i)
+	{
+		psoDesc.BlendState.RenderTarget[i] = BlendStateInfo->BlendDesc;
+	}
+	psoDesc.DepthStencilState = DepthStencilState->DepthStencilStateDesc;
     psoDesc.SampleMask = UINT_MAX;
-    psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-    psoDesc.NumRenderTargets = 1;
-    psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-    psoDesc.SampleDesc.Count = 1;
+    psoDesc.PrimitiveTopologyType = VertexBuffer->GetTopologyTypeOnly();
+    
+	psoDesc.NumRenderTargets = (uint32)RenderPass->GetRTVFormats().size();
+	
+	const int32 NumOfRTVs = Min((int32)_countof(psoDesc.RTVFormats), (int32)RenderPass->GetRTVFormats().size());
+	for (int32 i = 0; i < NumOfRTVs; ++i)
+	{
+		psoDesc.RTVFormats[i] = RenderPass->GetRTVFormats()[i];
+	}
+	psoDesc.DSVFormat = RenderPass->GetDSVFormat();
+	
 	if (JFAIL(Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&SimplePipelineState))))
 		return false;
 
@@ -1920,17 +1962,14 @@ void jRHI_DX12::Render()
 		GraphicsCommandList->ResourceBarrier(1, &barrier);
 	}
 
-	GraphicsCommandList->OMSetRenderTargets(1, &SwapchainRT->RTV.CPUHandle, false, nullptr);
-
-	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
-	GraphicsCommandList->ClearRenderTargetView(SwapchainRT->RTV.CPUHandle, clearColor, 0, nullptr);
-	GraphicsCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
+	RenderPass->BeginRenderPass(CommandBuffer, SwapchainRT->RTV.CPUHandle);
+	
 	VertexBuffer->Bind(CommandBuffer);
 	IndexBuffer->Bind(CommandBuffer);
     GraphicsCommandList->SetPipelineState(SimplePipelineState.Get());
 	GraphicsCommandList->DrawIndexedInstanced(IndexBuffer->GetIndexCount(), 1, 0, 0, 0);
 
+	RenderPass->EndRenderPass();
 	//GraphicsCommandList->SetComputeRootSignature(m_raytracingGlobalRootSignature.Get());
 
 	//AlignedSceneConstantBuffer* CurFrameConstantBuffer = (AlignedSceneConstantBuffer*)PerFrameConstantBuffer->GetMappedPointer();
@@ -2416,6 +2455,26 @@ jSamplerStateInfo* jRHI_DX12::CreateSamplerState(const jSamplerStateInfo& initia
 	return SamplerStatePool.GetOrCreate(initializer);
 }
 
+jRasterizationStateInfo* jRHI_DX12::CreateRasterizationState(const jRasterizationStateInfo& initializer) const
+{
+	return RasterizationStatePool.GetOrCreate(initializer);
+}
+
+jStencilOpStateInfo* jRHI_DX12::CreateStencilOpStateInfo(const jStencilOpStateInfo& initializer) const
+{
+	return StencilOpStatePool.GetOrCreate(initializer);
+}
+
+jDepthStencilStateInfo* jRHI_DX12::CreateDepthStencilState(const jDepthStencilStateInfo& initializer) const
+{
+	return DepthStencilStatePool.GetOrCreate(initializer);
+}
+
+jBlendingStateInfo* jRHI_DX12::CreateBlendingState(const jBlendingStateInfo& initializer) const
+{
+	return BlendingStatePool.GetOrCreate(initializer);
+}
+
 bool jRHI_DX12::CreateShaderInternal(jShader* OutShader, const jShaderInfo& shaderInfo) const
 {
     jShader* shader_dx12 = OutShader;
@@ -2515,7 +2574,7 @@ bool jRHI_DX12::CreateShaderInternal(jShader* OutShader, const jShaderInfo& shad
 				check(EntryPointLength < 128);
 
 				MultiByteToWideChar(CP_ACP, 0, shaderInfo.GetEntryPoint().ToStr()
-					, shaderInfo.GetEntryPoint().GetStringLength(), EntryPoint, _countof(EntryPoint) - 1);
+					, (int32)shaderInfo.GetEntryPoint().GetStringLength(), EntryPoint, (int32)(_countof(EntryPoint) - 1));
 				EntryPoint[_countof(EntryPoint) - 1] = 0;
 			}
 			
@@ -2526,4 +2585,26 @@ bool jRHI_DX12::CreateShaderInternal(jShader* OutShader, const jShaderInfo& shad
     shader_dx12->ShaderInfo = shaderInfo;
 
     return true;
+}
+
+jRenderPass* jRHI_DX12::GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const Vector2i& offset, const Vector2i& extent) const
+{
+	return RenderPassPool.GetOrCreate(jRenderPass_DX12(colorAttachments, offset, extent));
+}
+
+jRenderPass* jRHI_DX12::GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const jAttachment& depthAttachment
+	, const Vector2i& offset, const Vector2i& extent) const
+{
+	return RenderPassPool.GetOrCreate(jRenderPass_DX12(colorAttachments, depthAttachment, offset, extent));
+}
+
+jRenderPass* jRHI_DX12::GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const jAttachment& depthAttachment
+	, const jAttachment& colorResolveAttachment, const Vector2i& offset, const Vector2i& extent) const
+{
+	return RenderPassPool.GetOrCreate(jRenderPass_DX12(colorAttachments, depthAttachment, colorResolveAttachment, offset, extent));
+}
+
+jRenderPass* jRHI_DX12::GetOrCreateRenderPass(const jRenderPassInfo& renderPassInfo, const Vector2i& offset, const Vector2i& extent) const
+{
+	return RenderPassPool.GetOrCreate(jRenderPass_DX12(renderPassInfo, offset, extent));
 }

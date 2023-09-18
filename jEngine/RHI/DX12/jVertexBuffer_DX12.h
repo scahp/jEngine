@@ -72,7 +72,12 @@ struct jVertexBuffer_DX12 : public jVertexBuffer
         return BindInfos.CreateVertexInputLayoutDesc();
     }
 
-    FORCEINLINE D3D12_PRIMITIVE_TOPOLOGY_TYPE GetTopologyType() const
+    FORCEINLINE D3D12_PRIMITIVE_TOPOLOGY_TYPE GetTopologyTypeOnly() const
+    {
+        return GetDX12PrimitiveTopologyTypeOnly(VertexStreamData->PrimitiveType);
+    }
+
+    FORCEINLINE D3D12_PRIMITIVE_TOPOLOGY GetTopology() const
     {
         return GetDX12PrimitiveTopology(VertexStreamData->PrimitiveType);
     }
