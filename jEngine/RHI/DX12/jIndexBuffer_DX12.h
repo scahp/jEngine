@@ -1,14 +1,19 @@
 ﻿#pragma once
 #include "../jBuffer.h"
 
-struct jBuffer_Vulkan;
+struct jBuffer_DX12;
 
-struct jIndexBuffer_Vulkan : public jIndexBuffer
+struct jIndexBuffer_DX12 : public jIndexBuffer
 {
-    std::shared_ptr<jBuffer_Vulkan> BufferPtr;
+    std::shared_ptr<jBuffer_DX12> BufferPtr;
 
     virtual void Bind(const jShader* shader) const override {}
     virtual void Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const override;
+    virtual void Bind(jCommandBuffer_DX12* InCommandList);
+
+    virtual bool Initialize(const std::shared_ptr<jIndexStreamData>& InStreamData);
+
+    D3D12_INDEX_BUFFER_VIEW IBView;
 
     FORCEINLINE uint32 GetIndexCount() const
     {

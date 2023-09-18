@@ -433,6 +433,12 @@
     <ClInclude Include="RHI\DX12\jPipelineStateInfo_DX12.h" />
     <ClInclude Include="RHI\DX12\jShaderBindingInstance_DX12.h" />
     <ClInclude Include="RHI\DX12\jShaderBindingsLayout_DX12.h" />
+    <ClInclude Include="RHI\DX12\jVertexBuffer_DX12.h">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\jIndexBuffer_DX12.h">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -740,6 +746,12 @@
     </ClCompile>
     <ClCompile Include="RHI\DX12\jShaderBindingsLayout_DX12.cpp">
       <Filter>Code</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\jVertexBuffer_DX12.cpp">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\jIndexBuffer_DX12.cpp">
+      <Filter>Code\RHI\DX12</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

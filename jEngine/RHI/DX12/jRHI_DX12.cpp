@@ -15,6 +15,8 @@
 #include "jUniformBufferBlock_DX12.h"
 #include "jShaderBindingInstance_DX12.h"
 #include "jShaderBindingsLayout_DX12.h"
+#include "jVertexBuffer_DX12.h"
+#include "jIndexBuffer_DX12.h"
 
 #define USE_INLINE_DESCRIPTOR 0												// InlineDescriptor 를 쓸것인지? DescriptorTable 를 쓸것인지 여부
 #define USE_ONE_FRAME_BUFFER_AND_DESCRIPTOR (USE_INLINE_DESCRIPTOR && 1)	// 현재 프레임에만 사용하고 버리는 임시 Descriptor 와 Buffer 를 사용할 것인지 여부
@@ -938,6 +940,8 @@ bool jRHI_DX12::InitRHI()
 
 	// Vertex and normal
     Vertex vertices[verticesCount];
+	XMFLOAT3 vertpos[verticesCount];
+	XMFLOAT3 vertnormal[verticesCount];
 
     const float stepRadian = DegreeToRadian(360.0f / slice);
     const float radius = 1.0f;
@@ -954,6 +958,9 @@ bool jRHI_DX12::InitRHI()
             
             const Vector normal = temp.GetNormalize();
             vertices[cnt].normal = XMFLOAT3(normal.x, normal.y, normal.z);
+
+			vertpos[cnt] = vertices[cnt].position;
+			vertnormal[cnt] = vertices[cnt].normal;
         }
     }
 
@@ -962,6 +969,9 @@ bool jRHI_DX12::InitRHI()
         vertices[cnt].position = XMFLOAT3(0.0f, radius, 0.0f);
         Vector normal = Vector(0.0f, radius, 0.0f).GetNormalize();
         vertices[cnt].normal = XMFLOAT3(normal.x, normal.y, normal.z);
+
+        vertpos[cnt] = vertices[cnt].position;
+        vertnormal[cnt] = vertices[cnt].normal;
         ++cnt;
     }
 
@@ -970,6 +980,9 @@ bool jRHI_DX12::InitRHI()
         vertices[cnt].position = XMFLOAT3(0.0f, -radius, 0.0f);
         Vector normal = Vector(0.0f, -radius, 0.0f).GetNormalize();
         vertices[cnt].normal = XMFLOAT3(normal.x, normal.y, normal.z);
+
+        vertpos[cnt] = vertices[cnt].position;
+        vertnormal[cnt] = vertices[cnt].normal;
         ++cnt;
     }
 
@@ -983,17 +996,51 @@ bool jRHI_DX12::InitRHI()
 
 	//uint32 indices[] = { 0, 1, 2 };
 
-	VertexBuffer = jBufferUtil_DX12::CreateBuffer(sizeof(vertices), 0, true, false, D3D12_RESOURCE_STATE_COMMON, vertices, sizeof(vertices), TEXT("SphereVB"));
-	IndexBuffer = jBufferUtil_DX12::CreateBuffer(sizeof(indices), 0, true, false, D3D12_RESOURCE_STATE_COMMON, indices, sizeof(indices), TEXT("SphereIB"));
+	VertexBuffer = new jVertexBuffer_DX12();
+	std::shared_ptr<jVertexStreamData> vertexStreamData = std::make_shared<jVertexStreamData>();
+	{
+		{
+			auto streamParam = std::make_shared<jStreamParam<float>>();
+			streamParam->BufferType = EBufferType::STATIC;
+			streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
+			streamParam->Stride = sizeof(float) * 3;
+			streamParam->Name = jName("POSITION");
+			streamParam->Data.resize(verticesCount * 3);
+			memcpy(&streamParam->Data[0], vertpos, sizeof(vertpos));
+			vertexStreamData->Params.push_back(streamParam);
+		}
+
+        {
+            auto streamParam = std::make_shared<jStreamParam<float>>();
+            streamParam->BufferType = EBufferType::STATIC;
+            streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
+            streamParam->Stride = sizeof(float) * 3;
+            streamParam->Name = jName("NORMAL");
+            streamParam->Data.resize(verticesCount * 3);
+            memcpy(&streamParam->Data[0], vertnormal, sizeof(vertnormal));
+            vertexStreamData->Params.push_back(streamParam);
+        }
+	}
+	VertexBuffer->Initialize(vertexStreamData);
+	
+	IndexBuffer = new jIndexBuffer_DX12();
+    auto indexStreamData = std::make_shared<jIndexStreamData>();
+	{
+        indexStreamData->ElementCount = _countof(indices);
+         
+		auto streamParam = new jStreamParam<uint32>();
+        streamParam->BufferType = EBufferType::STATIC;
+        streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::UINT32, sizeof(uint32)));
+        streamParam->Stride = sizeof(uint32) * 3;
+        streamParam->Name = jName("Index");
+        streamParam->Data.resize(_countof(indices));
+        memcpy(&streamParam->Data[0], &indices[0], sizeof(indices));
+        indexStreamData->Param = streamParam;
+	}
+	IndexBuffer->Initialize(indexStreamData);
 
 	// 버택스 버퍼와 인덱스 버퍼는 디스크립터 테이블로 쉐이더로 전달됨
 	// 디스크립터 힙에서 버택스 버퍼 디스크립터는 인덱스 버퍼 디스크립터에 바로다음에 있어야 함
-
-	// IndexBuffer SRV
-	jBufferUtil_DX12::CreateShaderResourceView(IndexBuffer, 0, sizeof(indices) / 4, ETextureFormat::R32UI);
-
-	// VertexBuffer SRV
-	jBufferUtil_DX12::CreateShaderResourceView(VertexBuffer, sizeof(vertices[0]), _countof(vertices));
 
 	jSimpleConstantBuffer ConstantBuffer;
 	ConstantBuffer.M.SetIdentity();
@@ -1329,11 +1376,6 @@ bool jRHI_DX12::InitRHI()
 	if (JFAIL(Device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&SimpleRootSignature))))
 		return false;
 
-	D3D12_INPUT_ELEMENT_DESC VSInputElementDesc[] = {
-		{ .SemanticName = "POSITION", .SemanticIndex = 0, .Format = DXGI_FORMAT_R32G32B32_FLOAT, .InputSlot = 0, .AlignedByteOffset = 0, .InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, .InstanceDataStepRate = 0 },
-		{ .SemanticName = "NORMAL", .SemanticIndex = 0, .Format = DXGI_FORMAT_R32G32B32_FLOAT, .InputSlot = 0, .AlignedByteOffset = 12, .InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, .InstanceDataStepRate = 0 },
-	};
-
 	ComPtr<IDxcBlob> VSShaderBlob;
 	VSShaderBlob = jShaderCompiler_DX12::Get().Compile(TEXT("Resource/Shaders/hlsl/DXSampleHelloTriangle.hlsl"), TEXT("vs_6_3"), TEXT("VSMain"));
 	check(VSShaderBlob);
@@ -1343,7 +1385,7 @@ bool jRHI_DX12::InitRHI()
 	check(PSShaderBlob);
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-	psoDesc.InputLayout = { .pInputElementDescs = VSInputElementDesc, .NumElements = _countof(VSInputElementDesc) };
+	psoDesc.InputLayout = VertexBuffer->CreateVertexInputLayoutDesc();
 	psoDesc.pRootSignature = TestShaderBindingInstance->GetRootSignature();
 	psoDesc.VS = { .pShaderBytecode = VSShaderBlob->GetBufferPointer(), .BytecodeLength = VSShaderBlob->GetBufferSize() };
 	psoDesc.PS = { .pShaderBytecode = PSShaderBlob->GetBufferPointer(), .BytecodeLength = PSShaderBlob->GetBufferSize() };
@@ -1866,12 +1908,10 @@ void jRHI_DX12::Render()
 	GraphicsCommandList->ClearRenderTargetView(SwapchainRT->RTV.CPUHandle, clearColor, 0, nullptr);
 	GraphicsCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferView = { .BufferLocation = VertexBuffer->GetGPUAddress(), .SizeInBytes = (uint32)VertexBuffer->Size, .StrideInBytes = sizeof(Vertex) };
-	GraphicsCommandList->IASetVertexBuffers(0, 1, &vertexBufferView);
-	D3D12_INDEX_BUFFER_VIEW indexBufferView = {.BufferLocation = IndexBuffer->GetGPUAddress(), .SizeInBytes = IndexBuffer->GetAllocatedSize(), .Format = DXGI_FORMAT_R32_UINT };
-    GraphicsCommandList->IASetIndexBuffer(&indexBufferView);
+	VertexBuffer->Bind(CommandBuffer);
+	IndexBuffer->Bind(CommandBuffer);
     GraphicsCommandList->SetPipelineState(SimplePipelineState.Get());
-	GraphicsCommandList->DrawIndexedInstanced(IndexBuffer->GetAllocatedSize() / sizeof(uint32), 1, 0, 0, 0);
+	GraphicsCommandList->DrawIndexedInstanced(IndexBuffer->GetIndexCount(), 1, 0, 0, 0);
 
 	//GraphicsCommandList->SetComputeRootSignature(m_raytracingGlobalRootSignature.Get());
 

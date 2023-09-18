@@ -20,6 +20,8 @@ struct jBuffer_DX12;
 struct jTexture_DX12;
 struct jBuffer_DX12;
 struct jRingBuffer_DX12;
+struct jVertexBuffer_DX12;
+struct jIndexBuffer_DX12;
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -183,8 +185,8 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// 11. Create vertex and index buffer
-	jBuffer_DX12* VertexBuffer = nullptr;
-	jBuffer_DX12* IndexBuffer = nullptr;
+	jVertexBuffer_DX12* VertexBuffer = nullptr;
+	jIndexBuffer_DX12* IndexBuffer = nullptr;
 	//jBuffer_DX12* VertexBufferSecondGeometry = nullptr;
 
 	////////////////////////////////////////////////////////////////////////////

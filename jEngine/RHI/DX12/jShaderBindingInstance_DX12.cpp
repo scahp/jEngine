@@ -213,8 +213,8 @@ void jShaderBindingInstance_DX12::CopyToOnlineDescriptorHeap(jCommandBuffer_DX12
             DestDescriptor[i] = Descriptor.CPUHandle;
         }
 
-        g_rhi_dx12->Device->CopyDescriptors(DestDescriptor.size(), &DestDescriptor[0], nullptr
-            , SrcDescriptor.size(), &SrcDescriptor[0], nullptr, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        g_rhi_dx12->Device->CopyDescriptors((uint32)DestDescriptor.size(), &DestDescriptor[0], nullptr
+            , (uint32)SrcDescriptor.size(), &SrcDescriptor[0], nullptr, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
 
     {
@@ -233,8 +233,8 @@ void jShaderBindingInstance_DX12::CopyToOnlineDescriptorHeap(jCommandBuffer_DX12
             DestSamplerDescriptor[i] = Descriptor.CPUHandle;
         }
 
-        g_rhi_dx12->Device->CopyDescriptors(DestSamplerDescriptor.size(), &DestSamplerDescriptor[0], nullptr
-            , SrcSamplerDescriptor.size(), &SrcSamplerDescriptor[0], nullptr, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+        g_rhi_dx12->Device->CopyDescriptors((uint32)DestSamplerDescriptor.size(), &DestSamplerDescriptor[0], nullptr
+            , (uint32)SrcSamplerDescriptor.size(), &SrcSamplerDescriptor[0], nullptr, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
     }
 }
 

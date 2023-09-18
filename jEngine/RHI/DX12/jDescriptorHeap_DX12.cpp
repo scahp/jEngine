@@ -81,7 +81,7 @@ void jDescriptorHeap_DX12::ProcessPendingDescriptorPoolFree()
         for (; i < PendingFree.size(); ++i)
         {
             PendingForFree& PendingFreeInstance = PendingFree[i];
-            if (PendingFreeInstance.FrameIndex < OldestFrameToKeep)
+            if ((int32)PendingFreeInstance.FrameIndex < OldestFrameToKeep)
             {
                 Pools.insert(PendingFreeInstance.DescriptorIndex);
             }
@@ -173,7 +173,7 @@ void jOnlineDescriptorHeapBlocks_DX12::Initialize(EDescriptorHeapTypeDX12 InHeap
     OnlineDescriptorHeap.resize((NumOfDescriptors / 20) + ((NumOfDescriptors % 20) ? 1 : 0));
 
     int32 Index = 0;
-    for(int32 i=0;i<NumOfDescriptors;++i)
+    for(uint32 i=0;i<NumOfDescriptors;++i)
     {
         int32 AllocatedSize = DescriptorBlocks[Index].AllocatedSize;
         if (AllocatedSize >= jDescriptorBlock_DX12::NumOfDescriptorsInBlock)

@@ -77,6 +77,15 @@ jBuffer_DX12* CreateBuffer(uint64 InSize, uint16 InAlignment, bool InIsCPUAccess
             ComPtr<ID3D12Resource> StagingBuffer = CreateBufferInternal(InSize, InAlignment, true, InAllowUAV, InInitialState);
             check(StagingBuffer);
 
+            void* MappedPointer = nullptr;
+            D3D12_RANGE Range = {};
+            if (JOK(StagingBuffer->Map(0, &Range, &MappedPointer)))
+            {
+                check(MappedPointer);
+                memcpy(MappedPointer, InData, InDataSize);
+                StagingBuffer->Unmap(0, nullptr);
+            }
+
             jCommandBuffer_DX12* commandBuffer = g_rhi_dx12->BeginSingleTimeCopyCommands();
             check(commandBuffer->IsValid());
 

@@ -35,7 +35,7 @@ void jRingBuffer_DX12::Create(uint64 totalSize, uint32 alignment /*= 16*/)
 
         D3D12_CONSTANT_BUFFER_VIEW_DESC Desc;
         Desc.BufferLocation = Buffer->GetGPUVirtualAddress();
-        Desc.SizeInBytes = RingBufferSize;
+        Desc.SizeInBytes = (uint32)RingBufferSize;
 
         g_rhi_dx12->Device->CreateConstantBufferView(&Desc, CBV.CPUHandle);
     }

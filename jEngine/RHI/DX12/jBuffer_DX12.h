@@ -73,6 +73,7 @@ struct jBuffer_DX12 : public jBuffer
     bool AllowUAV = false;
     uint64 Size = 0;
     uint16 Alignment = 0;
+    uint32 Offset = 0;
     uint8* CPUAddress = nullptr;
     ComPtr<ID3D12Resource> Buffer;
     jDescriptor_DX12 CBV;

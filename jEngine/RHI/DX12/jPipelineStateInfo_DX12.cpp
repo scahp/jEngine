@@ -12,7 +12,7 @@ void jSamplerStateInfo_DX12::Initialize()
     samplerDesc.MinLOD = MinLOD;
     samplerDesc.MaxLOD = MaxLOD;
     samplerDesc.MipLODBias = MipLODBias;
-    samplerDesc.MaxAnisotropy = MaxAnisotropy;
+    samplerDesc.MaxAnisotropy = (uint32)MaxAnisotropy;
     samplerDesc.ComparisonFunc = GetDX12CompareOp(ComparisonFunc);
 
     check(sizeof(samplerDesc.BorderColor) == sizeof(BorderColor));
