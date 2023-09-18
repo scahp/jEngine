@@ -98,17 +98,10 @@ HRESULT jShaderCompiler_DX12::Initialize()
 	return m_dxc.Initialize();
 }
 
-ComPtr<IDxcBlob> jShaderCompiler_DX12::Compile(const wchar_t* InFilename, const wchar_t* InTargetString, const wchar_t* InEntryPoint, bool InRowMajorMatrix) const
+ComPtr<IDxcBlob> jShaderCompiler_DX12::CompileFromFile(const wchar_t* InFilename, const wchar_t* InShadingModel
+	, const wchar_t* InEntryPoint, bool InRowMajorMatrix) const
 {
 	if (!m_dxc.IsEnable())
-		return nullptr;
-
-	ComPtr<IDxcCompiler> Compiler;
-	ComPtr<IDxcLibrary> Library;
-	if (JFAIL(m_dxc.CreateInstance(CLSID_DxcCompiler, Compiler.GetAddressOf())))
-		return nullptr;
-
-	if (JFAIL(m_dxc.CreateInstance(CLSID_DxcLibrary, Library.GetAddressOf())))
 		return nullptr;
 
 	std::ifstream shaderFile(InFilename);
@@ -118,52 +111,68 @@ ComPtr<IDxcBlob> jShaderCompiler_DX12::Compile(const wchar_t* InFilename, const 
 	std::stringstream strStream;
 	strStream << shaderFile.rdbuf();
 	
-	std::string shader = strStream.str();
+	const std::string shader = strStream.str();
+	return Compile(shader.c_str(), shader.size(), InShadingModel, InEntryPoint, InRowMajorMatrix);
+}
 
-	// Shader 로부터 Blob 생성
-	ComPtr<IDxcBlobEncoding> textBlob;
-	if (JFAIL(Library->CreateBlobWithEncodingFromPinned((LPBYTE)shader.c_str(), (uint32)shader.size(), 0, &textBlob)))
-		return nullptr;
+ComPtr<IDxcBlob> jShaderCompiler_DX12::Compile(const char* InShaderCode, uint32 InShaderCodeLength, const wchar_t* InShadingModel
+	, const wchar_t* InEntryPoint, bool InRowMajorMatrix) const
+{
+    if (!m_dxc.IsEnable())
+        return nullptr;
 
-	std::vector<const wchar_t*> options;
-	options.push_back(TEXT("-WX"));				// Treat warnings as errors.
-	
-	if (InRowMajorMatrix)
-		options.push_back(TEXT("-Zpr"));			// Pack matrices in row-major order.
+	ComPtr<IDxcCompiler> Compiler;
+    ComPtr<IDxcLibrary> Library;
+    if (JFAIL(m_dxc.CreateInstance(CLSID_DxcCompiler, Compiler.GetAddressOf())))
+        return nullptr;
+
+    if (JFAIL(m_dxc.CreateInstance(CLSID_DxcLibrary, Library.GetAddressOf())))
+        return nullptr;
+
+    // Shader 로부터 Blob 생성
+    ComPtr<IDxcBlobEncoding> textBlob;
+    if (JFAIL(Library->CreateBlobWithEncodingFromPinned((LPBYTE)InShaderCode, InShaderCodeLength, 0, &textBlob)))
+        return nullptr;
+
+    std::vector<const wchar_t*> options;
+    options.push_back(TEXT("-WX"));				// Treat warnings as errors.
+
+    if (InRowMajorMatrix)
+        options.push_back(TEXT("-Zpr"));			// Pack matrices in row-major order.
 
 #ifdef _DEBUG
-	options.push_back(TEXT("-Zi"));				// Debug info.
-	options.push_back(TEXT("-Qembed_debug"));	// Embed PDB in shader container
-	options.push_back(TEXT("-Od"));				// Disable optimization
+    options.push_back(TEXT("-Zi"));				// Debug info.
+    options.push_back(TEXT("-Qembed_debug"));	// Embed PDB in shader container
+    options.push_back(TEXT("-Od"));				// Disable optimization
 #else
-	options.push_back(TEXT("-O3"));				// Optimization Level 3 (Default)
+    options.push_back(TEXT("-O3"));				// Optimization Level 3 (Default)
 #endif
 
-	// Compile
-	ComPtr<IDxcOperationResult> result;
-	if (JFAIL(Compiler->Compile(textBlob.Get(), InFilename, InEntryPoint, InTargetString
-		, &options[0], (uint32)options.size(), nullptr, 0, nullptr, &result)))
-	{
-		return nullptr;
-	}
+    // Compile
+    ComPtr<IDxcOperationResult> result;
+    if (JFAIL(Compiler->Compile(textBlob.Get(), nullptr, InEntryPoint, InShadingModel
+        , &options[0], (uint32)options.size(), nullptr, 0, nullptr, &result)))
+    {
+        return nullptr;
+    }
 
-	HRESULT resultCode;
-	if (JFAIL(result->GetStatus(&resultCode)))
-		return nullptr;
+    HRESULT resultCode;
+    if (JFAIL(result->GetStatus(&resultCode)))
+        return nullptr;
 
-	if (FAILED(resultCode))
-	{
-		ComPtr<IDxcBlobEncoding> error;
-		result->GetErrorBuffer(&error);
+    if (FAILED(resultCode))
+    {
+        ComPtr<IDxcBlobEncoding> error;
+        result->GetErrorBuffer(&error);
         auto tt = reinterpret_cast<const char*>(error->GetBufferPointer());
-		OutputDebugStringA(reinterpret_cast<const char*>(error->GetBufferPointer()));
+        OutputDebugStringA(reinterpret_cast<const char*>(error->GetBufferPointer()));
         JFAIL(resultCode);
         return nullptr;
-	}
+    }
 
-	ComPtr<IDxcBlob> Blob;
-	if (JFAIL(result->GetResult(&Blob)))
-		return nullptr;
+    ComPtr<IDxcBlob> Blob;
+    if (JFAIL(result->GetResult(&Blob)))
+        return nullptr;
 
 	return Blob;
 }

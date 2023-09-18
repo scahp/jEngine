@@ -189,6 +189,8 @@ public:
 	jIndexBuffer_DX12* IndexBuffer = nullptr;
 	//jBuffer_DX12* VertexBufferSecondGeometry = nullptr;
 
+	jGraphicsPipelineShader GraphicsPipelineShader;
+
 	////////////////////////////////////////////////////////////////////////////
 	//// 12. AccelerationStructures
 	//jBuffer_DX12* BottomLevelAccelerationStructureBuffer = nullptr;
@@ -377,6 +379,8 @@ public:
     //static TResourcePool<jBlendingStateInfo_Vulakn, jMutexRWLock> BlendingStatePool;
     //static TResourcePool<jPipelineStateInfo_Vulkan, jMutexRWLock> PipelineStatePool;
     //static TResourcePool<jRenderPass_Vulkan, jMutexRWLock> RenderPassPool;
+
+	virtual bool CreateShaderInternal(jShader* OutShader, const jShaderInfo& shaderInfo) const override;
 };
 
 extern jRHI_DX12* g_rhi_dx12;

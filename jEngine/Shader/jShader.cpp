@@ -49,6 +49,7 @@ IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderForwardPixelShader
 	, "ForwardPS"
 	, "Resource/Shaders/hlsl/shader_fs.hlsl"
 	, ""
+	, "main"
 	, EShaderAccessStageFlag::FRAGMENT)
 
 //////////////////////////////////////////////////////////////////////////
@@ -56,12 +57,14 @@ IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderGBufferVertexShader
     , "GBufferVS"
     , "Resource/Shaders/hlsl/gbuffer_vs.hlsl"
     , ""
+	, "main"
     , EShaderAccessStageFlag::VERTEX)
 
 IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderGBufferPixelShader
 	, "GBufferPS"
 	, "Resource/Shaders/hlsl/gbuffer_fs.hlsl"
 	, ""
+	, "main"
 	, EShaderAccessStageFlag::FRAGMENT)
 
 //////////////////////////////////////////////////////////////////////////
@@ -69,6 +72,7 @@ IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderDirectionalLightPixelShader
     , "DirectionalLightShaderPS"
     , "Resource/Shaders/hlsl/directionallight_fs.hlsl"
     , ""
+	, "main"
     , EShaderAccessStageFlag::FRAGMENT)
 
 //////////////////////////////////////////////////////////////////////////
@@ -76,6 +80,7 @@ IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderPointLightPixelShader
     , "PointLightShaderPS"
     , "Resource/Shaders/hlsl/pointlight_fs.hlsl"
     , ""
+	, "main"
     , EShaderAccessStageFlag::FRAGMENT)
 
 //////////////////////////////////////////////////////////////////////////
@@ -83,4 +88,5 @@ IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderSpotLightPixelShader
     , "SpotLightShaderPS"
     , "Resource/Shaders/hlsl/spotlight_fs.hlsl"
     , ""
+	, "main"
     , EShaderAccessStageFlag::FRAGMENT)

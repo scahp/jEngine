@@ -210,7 +210,10 @@ void jOnlineDescriptorHeapBlocks_DX12::Release()
 {
     jScopedLock s(&DescriptorBlockLock);
 
-    Heap->Release();
+    if (Heap)
+    {
+        Heap->Release();
+    }
     CPUHandleStart = { };
     GPUHandleStart = { };
     DescriptorSize = 0;

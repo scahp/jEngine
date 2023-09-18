@@ -114,8 +114,8 @@ public:
 struct jShaderInfo
 {
     jShaderInfo() = default;
-    jShaderInfo(jName InName, jName InShaderFilepath, jName InPreProcessors, EShaderAccessStageFlag InShaderType)
-        : Name(InName), ShaderFilepath(InShaderFilepath), PreProcessors(InPreProcessors), ShaderType(InShaderType)
+    jShaderInfo(jName InName, jName InShaderFilepath, jName InPreProcessors, jName InEntryPoint, EShaderAccessStageFlag InShaderType)
+        : Name(InName), ShaderFilepath(InShaderFilepath), PreProcessors(InPreProcessors), EntryPoint(InEntryPoint), ShaderType(InShaderType)
     {}
 
     void Initialize() {}
@@ -132,6 +132,8 @@ struct jShaderInfo
                 Hash = CityHash64WithSeed(ShaderFilepath, Hash);
             if (PreProcessors.IsValid())
                 Hash = CityHash64WithSeed(PreProcessors, Hash);
+            if (EntryPoint.IsValid())
+                Hash = CityHash64WithSeed(EntryPoint, Hash);
             Hash = CityHash64WithSeed((uint64)ShaderType, Hash);
             Hash = CityHash64WithSeed((uint64)PermutationId, Hash);
 		}
@@ -142,12 +144,14 @@ struct jShaderInfo
     const jName& GetName() const { return Name; }
     const jName& GetShaderFilepath() const { return ShaderFilepath; }
     const jName& GetPreProcessors() const { return PreProcessors; }
+    const jName& GetEntryPoint() const { return EntryPoint; }
     const EShaderAccessStageFlag GetShaderType() const { return ShaderType; }
     const uint32& GetPermutationId() const { return PermutationId; }
 
     void SetName(const jName& InName) { Name = InName; Hash = 0; }
     void SetShaderFilepath(const jName& InShaderFilepath) { ShaderFilepath = InShaderFilepath; Hash = 0; }
     void SetPreProcessors(const jName& InPreProcessors) { PreProcessors = InPreProcessors; Hash = 0; }
+    void SetEntryPoint(const jName& InEntryPoint) { EntryPoint = InEntryPoint; Hash = 0; }
     void SetShaderType(const EShaderAccessStageFlag InShaderType) { ShaderType = InShaderType; Hash = 0; }
     void SetPermutationId(const uint32 InPermutationId) { PermutationId = InPermutationId; Hash = 0; }
 
@@ -155,6 +159,7 @@ private:
 	jName Name;
     jName ShaderFilepath;
     jName PreProcessors;
+    jName EntryPoint;
     EShaderAccessStageFlag ShaderType = (EShaderAccessStageFlag)0;
     uint32 PermutationId = 0;
 };
@@ -203,11 +208,12 @@ public: \
     virtual int32 GetPermutationCount() const override { return PermutationVariable.GetPermutationCount(); } \
     virtual void GetPermutationDefines(std::string& OutResult) const { PermutationVariable.GetPermutationDefines(OutResult); }
 
-#define IMPLEMENT_SHADER_WITH_PERMUTATION(ShaderClass, Name, Filepath, Preprocessor, ShaderAccesssStageFlag) \
+#define IMPLEMENT_SHADER_WITH_PERMUTATION(ShaderClass, Name, Filepath, Preprocessor, EntryName, ShaderAccesssStageFlag) \
 jShaderInfo ShaderClass::GShaderInfo( \
     jNameStatic(Name), \
     jNameStatic(Filepath), \
     jNameStatic(Preprocessor), \
+    jNameStatic(EntryName), \
     ShaderAccesssStageFlag \
 ); \
 ShaderClass* ShaderClass::CreateShader(const ShaderClass::ShaderPermutation& InPermutation) \

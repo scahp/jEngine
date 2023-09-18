@@ -17,6 +17,8 @@
 #include "jShaderBindingsLayout_DX12.h"
 #include "jVertexBuffer_DX12.h"
 #include "jIndexBuffer_DX12.h"
+#include "jShader_DX12.h"
+#include "FileLoader/jFile.h"
 
 #define USE_INLINE_DESCRIPTOR 0												// InlineDescriptor 를 쓸것인지? DescriptorTable 를 쓸것인지 여부
 #define USE_ONE_FRAME_BUFFER_AND_DESCRIPTOR (USE_INLINE_DESCRIPTOR && 1)	// 현재 프레임에만 사용하고 버리는 임시 Descriptor 와 Buffer 를 사용할 것인지 여부
@@ -1376,19 +1378,35 @@ bool jRHI_DX12::InitRHI()
 	if (JFAIL(Device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&SimpleRootSignature))))
 		return false;
 
-	ComPtr<IDxcBlob> VSShaderBlob;
-	VSShaderBlob = jShaderCompiler_DX12::Get().Compile(TEXT("Resource/Shaders/hlsl/DXSampleHelloTriangle.hlsl"), TEXT("vs_6_3"), TEXT("VSMain"));
-	check(VSShaderBlob);
+	{
+		jShaderInfo shaderInfo(jNameStatic("TestVS"), jNameStatic("Resource/Shaders/hlsl/DXSampleHelloTriangle.hlsl")
+			, jNameStatic(""), jNameStatic("VSMain"), EShaderAccessStageFlag::VERTEX);
+		GraphicsPipelineShader.VertexShader = new jShader(shaderInfo);
+		GraphicsPipelineShader.VertexShader->Initialize();
+	}
 
-    ComPtr<IDxcBlob> PSShaderBlob;
-	PSShaderBlob = jShaderCompiler_DX12::Get().Compile(TEXT("Resource/Shaders/hlsl/DXSampleHelloTriangle.hlsl"), TEXT("ps_6_3"), TEXT("PSMain"));
-	check(PSShaderBlob);
+	{
+        jShaderInfo shaderInfo(jNameStatic("TestPS"), jNameStatic("Resource/Shaders/hlsl/DXSampleHelloTriangle.hlsl")
+            , jNameStatic(""), jNameStatic("PSMain"), EShaderAccessStageFlag::FRAGMENT);
+		GraphicsPipelineShader.PixelShader = new jShader(shaderInfo);
+		GraphicsPipelineShader.PixelShader->Initialize();
+	}
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
 	psoDesc.InputLayout = VertexBuffer->CreateVertexInputLayoutDesc();
 	psoDesc.pRootSignature = TestShaderBindingInstance->GetRootSignature();
-	psoDesc.VS = { .pShaderBytecode = VSShaderBlob->GetBufferPointer(), .BytecodeLength = VSShaderBlob->GetBufferSize() };
-	psoDesc.PS = { .pShaderBytecode = PSShaderBlob->GetBufferPointer(), .BytecodeLength = PSShaderBlob->GetBufferSize() };
+	if (GraphicsPipelineShader.VertexShader)
+	{
+        auto VS_Compiled = (jCompiledShader_DX12*)GraphicsPipelineShader.VertexShader->GetCompiledShader();
+        check(VS_Compiled);
+		psoDesc.VS = { .pShaderBytecode = VS_Compiled->ShaderBlob->GetBufferPointer(), .BytecodeLength = VS_Compiled->ShaderBlob->GetBufferSize() };
+	}
+	if (GraphicsPipelineShader.PixelShader)
+	{
+        auto PS_Compiled = (jCompiledShader_DX12*)GraphicsPipelineShader.PixelShader->GetCompiledShader();
+        check(PS_Compiled);
+		psoDesc.PS = { .pShaderBytecode = PS_Compiled->ShaderBlob->GetBufferPointer(), .BytecodeLength = PS_Compiled->ShaderBlob->GetBufferSize() };
+	}
     psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
     psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 	psoDesc.DepthStencilState.DepthEnable = FALSE;
@@ -2396,4 +2414,116 @@ jShaderBindingsLayout* jRHI_DX12::CreateShaderBindings(const jShaderBindingArray
 jSamplerStateInfo* jRHI_DX12::CreateSamplerState(const jSamplerStateInfo& initializer) const
 {
 	return SamplerStatePool.GetOrCreate(initializer);
+}
+
+bool jRHI_DX12::CreateShaderInternal(jShader* OutShader, const jShaderInfo& shaderInfo) const
+{
+    jShader* shader_dx12 = OutShader;
+    check(shader_dx12->GetPermutationCount());
+    {
+        check(!shader_dx12->CompiledShader);
+        jCompiledShader_DX12* CurCompiledShader = new jCompiledShader_DX12();
+        shader_dx12->CompiledShader = CurCompiledShader;
+
+        // PermutationId 를 설정하여 컴파일을 준비함
+        shader_dx12->SetPermutationId(shaderInfo.GetPermutationId());
+
+        std::string PermutationDefines;
+        shader_dx12->GetPermutationDefines(PermutationDefines);
+
+		const wchar_t* ShadingModel = nullptr;
+        switch (shaderInfo.GetShaderType())
+        {
+        case EShaderAccessStageFlag::VERTEX:
+			ShadingModel = TEXT("vs_6_3");
+            break;
+        case EShaderAccessStageFlag::GEOMETRY:
+			ShadingModel = TEXT("gs_6_3");
+            break;
+        case EShaderAccessStageFlag::FRAGMENT:
+			ShadingModel = TEXT("ps_6_3");
+            break;
+        case EShaderAccessStageFlag::COMPUTE:
+			ShadingModel = TEXT("cs_6_3");
+            break;
+        default:
+            check(0);
+            break;
+        }
+
+		{
+            const bool isHLSL = !!strstr(shaderInfo.GetShaderFilepath().ToStr(), ".hlsl");
+
+            jFile ShaderFile;
+            ShaderFile.OpenFile(shaderInfo.GetShaderFilepath().ToStr(), FileType::TEXT, ReadWriteType::READ);
+            ShaderFile.ReadFileToBuffer(false);
+            std::string ShaderText;
+
+            if (shaderInfo.GetPreProcessors().GetStringLength() > 0)
+            {
+                ShaderText += shaderInfo.GetPreProcessors().ToStr();
+                ShaderText += "\r\n";
+            }
+            ShaderText += PermutationDefines;
+            ShaderText += "\r\n";
+
+            ShaderText += ShaderFile.GetBuffer();
+
+            // Find relative file path
+            constexpr char includePrefixString[] = "#include \"";
+            constexpr int32 includePrefixLength = sizeof(includePrefixString) - 1;
+
+            const std::filesystem::path shaderFilePath(shaderInfo.GetShaderFilepath().ToStr());
+            const std::string includeShaderPath = shaderFilePath.has_parent_path() ? (shaderFilePath.parent_path().string() + "/") : "";
+
+            std::set<std::string> AlreadyIncludedSets;
+            while (1)
+            {
+                size_t startOfInclude = ShaderText.find(includePrefixString);
+                if (startOfInclude == std::string::npos)
+                    break;
+
+                // Parse include file path
+                startOfInclude += includePrefixLength;
+                size_t endOfInclude = ShaderText.find("\"", startOfInclude);
+                std::string includeFilepath = includeShaderPath + ShaderText.substr(startOfInclude, endOfInclude - startOfInclude);
+
+                // Replace range '#include "filepath"' with shader file content
+                const size_t ReplaceStartPos = startOfInclude - includePrefixLength;
+                const size_t ReplaceCount = endOfInclude - ReplaceStartPos + 1;
+
+                if (AlreadyIncludedSets.contains(includeFilepath))
+                {
+                    ShaderText.replace(ReplaceStartPos, ReplaceCount, "");
+                    continue;
+                }
+
+                // If already included file, skip it.
+                AlreadyIncludedSets.insert(includeFilepath);
+
+                // Load include shader file
+                jFile IncludeShaderFile;
+                IncludeShaderFile.OpenFile(includeFilepath.c_str(), FileType::TEXT, ReadWriteType::READ);
+                IncludeShaderFile.ReadFileToBuffer(false);
+                ShaderText.replace(ReplaceStartPos, ReplaceCount, IncludeShaderFile.GetBuffer());
+                IncludeShaderFile.CloseFile();
+            }
+
+            wchar_t EntryPoint[128] = { 0, };
+			{
+				const int32 EntryPointLength = MultiByteToWideChar(CP_ACP, 0, shaderInfo.GetEntryPoint().ToStr(), -1, NULL, NULL);
+				check(EntryPointLength < 128);
+
+				MultiByteToWideChar(CP_ACP, 0, shaderInfo.GetEntryPoint().ToStr()
+					, shaderInfo.GetEntryPoint().GetStringLength(), EntryPoint, _countof(EntryPoint) - 1);
+				EntryPoint[_countof(EntryPoint) - 1] = 0;
+			}
+			
+			CurCompiledShader->ShaderBlob = jShaderCompiler_DX12::Get().Compile(ShaderText.c_str(), (uint32)ShaderText.size()
+				, ShadingModel, EntryPoint);
+        }
+    }
+    shader_dx12->ShaderInfo = shaderInfo;
+
+    return true;
 }
