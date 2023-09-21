@@ -1,11 +1,17 @@
 ﻿#include "pch.h"
 #include "jPipelineStateInfo_DX12.h"
 #include "jRHI_DX12.h"
+#include "jVertexBuffer_DX12.h"
+#include "jShader_DX12.h"
+#include "dxcapi.h"
+#include "jRenderPass_DX12.h"
+#include "jShaderBindingsLayout_DX12.h"
 
 void jSamplerStateInfo_DX12::Initialize()
 {
     D3D12_SAMPLER_DESC samplerDesc = {};
-    samplerDesc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+
+    samplerDesc.Filter = GetDX12TextureFilter(Minification, Magnification);
     samplerDesc.AddressU = GetDX12TextureAddressMode(AddressU);
     samplerDesc.AddressV = GetDX12TextureAddressMode(AddressV);
     samplerDesc.AddressW = GetDX12TextureAddressMode(AddressW);
@@ -109,61 +115,98 @@ void jPipelineStateInfo_DX12::Initialize()
 
 void* jPipelineStateInfo_DX12::CreateGraphicsPipelineState()
 {
-    return nullptr;
+    PipelineState = nullptr;
+
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+        
+    check(VertexBufferArray.NumOfData > 0);
+
+    std::vector<D3D12_INPUT_ELEMENT_DESC> OutInputElementDescs;
+    jVertexBuffer_DX12::CreateVertexInputState(OutInputElementDescs, VertexBufferArray);
+    psoDesc.InputLayout.pInputElementDescs = OutInputElementDescs.data();
+    psoDesc.InputLayout.NumElements = (uint32)OutInputElementDescs.size();
+
+    // DX12 에서는 한개만 사용할 수 있도록 되어있는데, 변경 예정. 1개로 할지, 여러개로 할지 협의 봐야 함.
+    ComPtr<ID3D12RootSignature> RootSignature = jShaderBindingsLayout_DX12::CreateRootSignature(ShaderBindingLayoutArray);
+    psoDesc.pRootSignature = RootSignature.Get();
+
+    if (GraphicsShader.VertexShader)
+    {
+        auto VS_Compiled = (jCompiledShader_DX12*)GraphicsShader.VertexShader->GetCompiledShader();
+        check(VS_Compiled);
+        psoDesc.VS = { .pShaderBytecode = VS_Compiled->ShaderBlob->GetBufferPointer(), .BytecodeLength = VS_Compiled->ShaderBlob->GetBufferSize() };
+    }
+    if (GraphicsShader.GeometryShader)
+    {
+        auto GS_Compiled = (jCompiledShader_DX12*)GraphicsShader.GeometryShader->GetCompiledShader();
+        check(GS_Compiled);
+        psoDesc.GS = { .pShaderBytecode = GS_Compiled->ShaderBlob->GetBufferPointer(), .BytecodeLength = GS_Compiled->ShaderBlob->GetBufferSize() };
+    }
+    if (GraphicsShader.PixelShader)
+    {
+        auto PS_Compiled = (jCompiledShader_DX12*)GraphicsShader.PixelShader->GetCompiledShader();
+        check(PS_Compiled);
+        psoDesc.PS = { .pShaderBytecode = PS_Compiled->ShaderBlob->GetBufferPointer(), .BytecodeLength = PS_Compiled->ShaderBlob->GetBufferSize() };
+    }
+
+    psoDesc.RasterizerState = ((jRasterizationStateInfo_DX12*)PipelineStateFixed->RasterizationState)->RasterizeDesc;
+    psoDesc.SampleDesc.Count = ((jRasterizationStateInfo_DX12*)PipelineStateFixed->RasterizationState)->MultiSampleDesc.Count;
+
+    jRenderPass_DX12* RenderPassDX12 = (jRenderPass_DX12*)RenderPass;
+
+    // Blending Operation 을 따로 적게 해줄건가? RenderPass 의 현재 지원을 확인해보자.
+    for (int32 i = 0; i < (int32)RenderPassDX12->GetRTVFormats().size(); ++i)
+    {
+        psoDesc.BlendState.RenderTarget[i] = ((jBlendingStateInfo_DX12*)PipelineStateFixed->BlendingState)->BlendDesc;
+    }
+    psoDesc.DepthStencilState = ((jDepthStencilStateInfo_DX12*)(PipelineStateFixed->DepthStencilState))->DepthStencilStateDesc;
+    psoDesc.SampleMask = UINT_MAX;
+    psoDesc.PrimitiveTopologyType = ((jVertexBuffer_DX12*)VertexBufferArray[0])->GetTopologyTypeOnly();
+
+    psoDesc.NumRenderTargets = (uint32)RenderPassDX12->GetRTVFormats().size();
+
+    const int32 NumOfRTVs = Min((int32)_countof(psoDesc.RTVFormats), (int32)RenderPassDX12->GetRTVFormats().size());
+    for (int32 i = 0; i < NumOfRTVs; ++i)
+    {
+        psoDesc.RTVFormats[i] = RenderPassDX12->GetRTVFormats()[i];
+    }
+    psoDesc.DSVFormat = RenderPassDX12->GetDSVFormat();
+
+    check(g_rhi_dx12);
+    check(g_rhi_dx12->Device);
+    if (JFAIL(g_rhi_dx12->Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&PipelineState))))
+        return nullptr;
+
+    Viewports.resize(PipelineStateFixed->Viewports.size());
+    for (int32 i = 0; i < (int32)PipelineStateFixed->Viewports.size(); ++i)
+    {
+        const jViewport& Src = PipelineStateFixed->Viewports[i];
+        D3D12_VIEWPORT& Dst = Viewports[i];
+        Dst.TopLeftX = Src.X;
+        Dst.TopLeftY = Src.Y;
+        Dst.Width = Src.Width;
+        Dst.Height = Src.Height;
+        Dst.MinDepth = Src.MinDepth;
+        Dst.MaxDepth = Src.MaxDepth;
+    }
+
+    Scissors.resize(PipelineStateFixed->Scissors.size());
+    for (int32 i = 0; i < (int32)PipelineStateFixed->Scissors.size(); ++i)
+    {
+        const jScissor& Src = PipelineStateFixed->Scissors[i];
+        D3D12_RECT& Dst = Scissors[i];
+        Dst.left = Src.Offset.x;
+        Dst.right = Src.Offset.x + Src.Extent.x;
+        Dst.top = Src.Offset.y;
+        Dst.bottom = Src.Offset.y + Src.Extent.y;
+    }
+
+    return PipelineState.Get();
 }
 
 void* jPipelineStateInfo_DX12::CreateComputePipelineState()
 {
-    D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-    //psoDesc.InputLayout = { .pInputElementDescs = VSInputElementDesc, .NumElements = _countof(VSInputElementDesc) };
-    //psoDesc.pRootSignature = TestShaderBindingInstance->GetRootSignature();
-    //psoDesc.VS = { .pShaderBytecode = VSShaderBlob->GetBufferPointer(), .BytecodeLength = VSShaderBlob->GetBufferSize() };
-    //psoDesc.PS = { .pShaderBytecode = PSShaderBlob->GetBufferPointer(), .BytecodeLength = PSShaderBlob->GetBufferSize() };
-
-    //const jGraphicsPipelineShader GraphicsShader;
-    //const jShader* ComputeShader = nullptr;
-    //const jRenderPass* RenderPass = nullptr;
-    //jVertexBufferArray VertexBufferArray;
-    //jShaderBindingsLayoutArray ShaderBindingLayoutArray;
-    //const jPushConstant* PushConstant;
-    //const jPipelineStateFixedInfo* PipelineStateFixed = nullptr;
-    //int32 SubpassIndex = 0;
-
-    int32 ColorAttachmentCountInSubpass = 0;
-    check(RenderPass->RenderPassInfo.Subpasses.size() > SubpassIndex);
-    const jSubpass& SelectedSubpass = RenderPass->RenderPassInfo.Subpasses[SubpassIndex];
-    for (int32 i = 0; i < (int32)SelectedSubpass.OutputColorAttachments.size(); ++i)
-    {
-        const int32 AttchmentIndex = SelectedSubpass.OutputColorAttachments[i];
-        const jAttachment& Attachment = RenderPass->RenderPassInfo.Attachments[AttchmentIndex];
-        const bool IsColorAttachment = !Attachment.IsDepthAttachment() &&
-            !Attachment.IsResolveAttachment();
-        if (IsColorAttachment)
-        {
-            psoDesc.RTVFormats[ColorAttachmentCountInSubpass] = GetDX12TextureFormat(Attachment.RenderTargetPtr->Info.Format);
-            ++ColorAttachmentCountInSubpass;
-        }
-        else if (RenderPass->RenderPassInfo.Attachments[AttchmentIndex].IsDepthAttachment())
-        {
-            psoDesc.DSVFormat = GetDX12TextureFormat(Attachment.RenderTargetPtr->Info.Format);
-        }
-    }
-    psoDesc.NumRenderTargets = ColorAttachmentCountInSubpass;
-
-    psoDesc.RasterizerState = ((jRasterizationStateInfo_DX12*)PipelineStateFixed->RasterizationState)->RasterizeDesc;
-    for (int32 i = 0; i < psoDesc.NumRenderTargets; ++i)
-    {
-        psoDesc.BlendState.RenderTarget[i] = ((jBlendingStateInfo_DX12*)PipelineStateFixed->BlendingState)->BlendDesc;
-    }
-    psoDesc.SampleMask = UINT_MAX;
-    psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-    psoDesc.DepthStencilState = ((jDepthStencilStateInfo_DX12*)PipelineStateFixed->DepthStencilState)->DepthStencilStateDesc;
-    psoDesc.SampleDesc.Count = ((jRasterizationStateInfo_DX12*)PipelineStateFixed->RasterizationState)->MultiSampleDesc.Count;
-
-    if (JFAIL(g_rhi_dx12->Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&PipelineState))))
-        return nullptr;
-
-    return PipelineState.Get();
+    return nullptr;
 }
 
 void jPipelineStateInfo_DX12::Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const
@@ -173,4 +216,14 @@ void jPipelineStateInfo_DX12::Bind(const std::shared_ptr<jRenderFrameContext>& I
     //    vkCmdBindPipeline((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipeline);
     //else
     //    vkCmdBindPipeline((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, vkPipeline);
+}
+
+void jPipelineStateInfo_DX12::Bind(jCommandBuffer_DX12* InCommandList)
+{
+    check(InCommandList->CommandList);
+    check(PipelineState);
+    InCommandList->CommandList->SetPipelineState(PipelineState.Get());
+
+    InCommandList->CommandList->RSSetViewports((uint32)Viewports.size(), Viewports.data());
+    InCommandList->CommandList->RSSetScissorRects((uint32)Scissors.size(), Scissors.data());
 }

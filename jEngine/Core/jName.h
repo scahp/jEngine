@@ -73,7 +73,7 @@ public:
 		{
 			jScopeWriteLock sw(&Lock);
 			
-			// Try again, to avoid entering creation section simultanteously.
+			// Try again, to avoid entering creation section simultaneously.
             if (find_func())
                 return;
 

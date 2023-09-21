@@ -18,8 +18,8 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
     // descriptor layout 찾아서 바인딩 해주는 것으로 하자.
     // layout 으로 부터 복사해서 실제로 루트 시그니처를 만들어야 함? 이 부분을 고민해보자.
 
-    check(ShaderBindingLayout);
-    check(ShaderBindingLayout->GetShaderBindingsLayout().NumOfData == InShaderBindingArray.NumOfData);
+    check(ShaderBindingsLayouts);
+    check(ShaderBindingsLayouts->GetShaderBindingsLayout().NumOfData == InShaderBindingArray.NumOfData);
 
     Descriptors.clear();
     SamplerDescriptors.clear();
@@ -131,36 +131,39 @@ void jShaderBindingInstance_DX12::BindCompute(const std::shared_ptr<jRenderFrame
 
 void* jShaderBindingInstance_DX12::GetHandle() const
 {
-    return ShaderBindingLayout->GetHandle();
+    return ShaderBindingsLayouts->GetHandle();
 }
 
-void jShaderBindingInstance_DX12::BindGraphics(jCommandBuffer_DX12* InCommandList)
+void jShaderBindingInstance_DX12::BindGraphics(jCommandBuffer_DX12* InCommandList, int32& InOutStartIndex) const
 {
     check(InCommandList);
 
     auto CommandList = InCommandList->Get();
     check(CommandList);
-    CommandList->SetGraphicsRootSignature((ID3D12RootSignature*)ShaderBindingLayout->GetHandle());
 
     int32 index = 0;
-    for (index = 0; index < RootParameterInlines.size(); ++index)
+    for (index = 0; index < RootParameterInlines.size(); ++index, ++InOutStartIndex)
     {
         switch(RootParameterInlines[index].first)
         {
         case jInlineRootParamType::CBV:
-            CommandList->SetGraphicsRootConstantBufferView(index, RootParameterInlines[index].second);
+            CommandList->SetGraphicsRootConstantBufferView(InOutStartIndex, RootParameterInlines[index].second);
             break;
         case jInlineRootParamType::SRV:
-            CommandList->SetGraphicsRootShaderResourceView(index, RootParameterInlines[index].second);
+            CommandList->SetGraphicsRootShaderResourceView(InOutStartIndex, RootParameterInlines[index].second);
             break;
         case jInlineRootParamType::UAV:
-            CommandList->SetGraphicsRootUnorderedAccessView(index, RootParameterInlines[index].second);
+            CommandList->SetGraphicsRootUnorderedAccessView(InOutStartIndex, RootParameterInlines[index].second);
         default:
             break;
         }        
     }
-    CommandList->SetGraphicsRootDescriptorTable(index++, InCommandList->OnlineDescriptorHeap->GetGPUHandle());		// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
-    CommandList->SetGraphicsRootDescriptorTable(index++, InCommandList->OnlineSamplerDescriptorHeap->GetGPUHandle());	// SamplerState test
+
+    if (Descriptors.size() > 0)
+        CommandList->SetGraphicsRootDescriptorTable(InOutStartIndex++, InCommandList->OnlineDescriptorHeap->GetGPUHandle());		// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
+
+    if (SamplerDescriptors.size() > 0)
+        CommandList->SetGraphicsRootDescriptorTable(InOutStartIndex++, InCommandList->OnlineSamplerDescriptorHeap->GetGPUHandle());	// SamplerState test
 }
 
 void jShaderBindingInstance_DX12::BindCompute(jCommandBuffer_DX12* InCommandList)
@@ -169,7 +172,7 @@ void jShaderBindingInstance_DX12::BindCompute(jCommandBuffer_DX12* InCommandList
 
     auto CommandList = InCommandList->Get();
     check(CommandList);
-    CommandList->SetComputeRootSignature((ID3D12RootSignature*)ShaderBindingLayout->GetHandle());
+    CommandList->SetComputeRootSignature((ID3D12RootSignature*)ShaderBindingsLayouts->GetHandle());
 
     int32 index = 0;
     for (index = 0; index < RootParameterInlines.size(); ++index)
@@ -238,7 +241,7 @@ void jShaderBindingInstance_DX12::CopyToOnlineDescriptorHeap(jCommandBuffer_DX12
     }
 }
 
-ID3D12RootSignature* jShaderBindingInstance_DX12::GetRootSignature() const
-{
-    return ShaderBindingLayout->GetRootSignature();
-}
+//ID3D12RootSignature* jShaderBindingInstance_DX12::GetRootSignature() const
+//{
+//    return ShaderBindingLayout->GetRootSignature();
+//}

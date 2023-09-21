@@ -21,7 +21,7 @@ public:
         {
             jScopeWriteLock sw(&Lock);
 
-            // Try again, to avoid entering creation section simultanteously.
+            // Try again, to avoid entering creation section simultaneously.
             auto it_find = Pool.find(hash);
             if (Pool.end() != it_find)
             {
@@ -51,7 +51,7 @@ public:
         {
             jScopeWriteLock sw(&Lock);
 
-            // Try again, to avoid entering creation section simultanteously.
+            // Try again, to avoid entering creation section simultaneously.
             auto it_find = Pool.find(hash);
             if (Pool.end() != it_find)
             {

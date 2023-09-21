@@ -23,6 +23,7 @@ struct jRingBuffer_DX12;
 struct jVertexBuffer_DX12;
 struct jIndexBuffer_DX12;
 class jRenderPass_DX12;
+struct jPipelineStateInfo_DX12;
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -164,49 +165,18 @@ public:
     CubeConstantBuffer m_planeCB;
 
 	//////////////////////////////////////////////////////////////////////////
-	// 6. CommandAllocators, Commandlist, RTV for FrameCount
-
-	//////////////////////////////////////////////////////////////////////////
 	// 7. Create sync object
 	jFenceManager_DX12 FenceManager;
 	void WaitForGPU();
 
 	//////////////////////////////////////////////////////////////////////////
-	// 8. Raytracing device and commandlist
-
-	////////////////////////////////////////////////////////////////////////////
-	//// 9. CreateRootSignature
-	//ComPtr<ID3D12RootSignature> m_raytracingGlobalRootSignature;
-	//ComPtr<ID3D12RootSignature> m_raytracingLocalRootSignature;
- //   ComPtr<ID3D12RootSignature> m_raytracingEmptyLocalRootSignature;
-
-	////////////////////////////////////////////////////////////////////////////
-	//// 10. DXR PipeplineStateObject
-	//ComPtr<ID3D12StateObject> m_dxrStateObject;
-
-	//////////////////////////////////////////////////////////////////////////
 	// 11. Create vertex and index buffer
 	jVertexBuffer_DX12* VertexBuffer = nullptr;
 	jIndexBuffer_DX12* IndexBuffer = nullptr;
-	//jBuffer_DX12* VertexBufferSecondGeometry = nullptr;
 
 	jGraphicsPipelineShader GraphicsPipelineShader;
 	jRenderPass_DX12* RenderPass = nullptr;
-
-	////////////////////////////////////////////////////////////////////////////
-	//// 12. AccelerationStructures
-	//jBuffer_DX12* BottomLevelAccelerationStructureBuffer = nullptr;
-	//jBuffer_DX12* BottomLevelAccelerationStructureSecondGeometryBuffer = nullptr;
-
-	////////////////////////////////////////////////////////////////////////////
-	//// 13. ShaderTable
-	//ComPtr<ID3D12Resource> m_rayGenShaderTable;
-	//ComPtr<ID3D12Resource> m_missShaderTable;
-	//ComPtr<ID3D12Resource> m_hitGroupShaderTable;
-
-	ComPtr<ID3D12RootSignature> SimpleRootSignature;
-	ComPtr<ID3D12PipelineState> SimplePipelineState;
-    jDescriptor_DX12 SimpleSamplerState;					// SamplerState test
+	jPipelineStateInfo_DX12* PipelineStateInfo = nullptr;
 
 	//////////////////////////////////////////////////////////////////////////
 	// 14. Raytracing Output Resouce
@@ -263,18 +233,6 @@ public:
 		uint8 alignedPadding[D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT];
 	};
 	jBuffer_DX12* PerFrameConstantBuffer = nullptr;
-
-  //  struct TopLevelAccelerationStructureBuffers
-  //  {
-		//jBuffer_DX12* Scratch = nullptr;
-		//jBuffer_DX12* Result = nullptr;
-		//jBuffer_DX12* InstanceDesc = nullptr;    // Used only for top-level AS
-
-		//void Release();
-  //  };
-  //  TopLevelAccelerationStructureBuffers TLASBuffer;
-
-  //  bool BuildTopLevelAS(ComPtr<ID3D12GraphicsCommandList4>& InCommandList, TopLevelAccelerationStructureBuffers& InBuffers, bool InIsUpdate, float InRotationY, Vector InTranslation);
 
 	jUniformBufferBlock_DX12* SimpleUniformBuffer = nullptr;
 	jBuffer_DX12* SimpleConstantBuffer = nullptr;
@@ -363,6 +321,7 @@ public:
 	virtual jShaderBindingsLayout* CreateShaderBindings(const jShaderBindingArray& InShaderBindingArray) const override;
 
 	struct jShaderBindingInstance_DX12* TestShaderBindingInstance = nullptr;
+	struct jShaderBindingInstance_DX12* TestShaderBindingInstance2 = nullptr;
 
 	virtual jSamplerStateInfo* CreateSamplerState(const jSamplerStateInfo& initializer) const override;
     virtual jRasterizationStateInfo* CreateRasterizationState(const jRasterizationStateInfo& initializer) const override;
@@ -382,7 +341,7 @@ public:
     static TResourcePool<jStencilOpStateInfo_DX12, jMutexRWLock> StencilOpStatePool;
     static TResourcePool<jDepthStencilStateInfo_DX12, jMutexRWLock> DepthStencilStatePool;
     static TResourcePool<jBlendingStateInfo_DX12, jMutexRWLock> BlendingStatePool;
-    //static TResourcePool<jPipelineStateInfo_Vulkan, jMutexRWLock> PipelineStatePool;
+    static TResourcePool<jPipelineStateInfo_DX12, jMutexRWLock> PipelineStatePool;
     static TResourcePool<jRenderPass_DX12, jMutexRWLock> RenderPassPool;
 
 	virtual bool CreateShaderInternal(jShader* OutShader, const jShaderInfo& shaderInfo) const override;
@@ -393,6 +352,10 @@ public:
     virtual jRenderPass* GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const jAttachment& depthAttachment
         , const jAttachment& colorResolveAttachment, const Vector2i& offset, const Vector2i& extent) const override;
     virtual jRenderPass* GetOrCreateRenderPass(const jRenderPassInfo& renderPassInfo, const Vector2i& offset, const Vector2i& extent) const override;
+
+    virtual jPipelineStateInfo* CreatePipelineStateInfo(const jPipelineStateFixedInfo* InPipelineStateFixed, const jGraphicsPipelineShader InShader, const jVertexBufferArray& InVertexBufferArray
+        , const jRenderPass* InRenderPass, const jShaderBindingsLayoutArray& InShaderBindingArray, const jPushConstant* InPushConstant, int32 InSubpassIndex) const override;
+    virtual jPipelineStateInfo* CreateComputePipelineStateInfo(const jShader* shader, const jShaderBindingsLayoutArray& InShaderBindingArray, const jPushConstant* pushConstant) const override;
 };
 
 extern jRHI_DX12* g_rhi_dx12;

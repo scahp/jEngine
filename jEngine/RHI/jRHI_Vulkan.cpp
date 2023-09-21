@@ -1058,7 +1058,7 @@ jShaderBindingsLayout* jRHI_Vulkan::CreateShaderBindings(const jShaderBindingArr
 	{
 		jScopeWriteLock sw(&ShaderBindingPoolLock);
 
-		// Try again, to avoid entering creation section simultanteously.
+		// Try again, to avoid entering creation section simultaneously.
         auto it_find = ShaderBindingPool.find(hash);
         if (ShaderBindingPool.end() != it_find)
             return it_find->second;
@@ -1104,7 +1104,7 @@ void* jRHI_Vulkan::CreatePipelineLayout(const jShaderBindingsLayoutArray& InShad
 	{
 		jScopeWriteLock sw(&PipelineLayoutPoolLock);
 
-		// Try again, to avoid entering creation section simultanteously.
+		// Try again, to avoid entering creation section simultaneously.
         auto it_find = PipelineLayoutPool.find(hash);
         if (PipelineLayoutPool.end() != it_find)
         {
