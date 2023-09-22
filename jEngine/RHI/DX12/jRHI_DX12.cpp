@@ -856,7 +856,7 @@ bool jRHI_DX12::InitRHI()
 
         // cbv
         ShaderBindingArray.Add(-1, 1, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_GRAPHICS
-            , ResourceInlineAllactor.Alloc<jUniformBufferResource>(SimpleUniformBuffer), false);
+            , ResourceInlineAllactor.Alloc<jUniformBufferResource>(SimpleUniformBuffer), true);
 
         //// structured buffer
         //ShaderBindingArray.Add(-1, 1, EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
@@ -885,7 +885,7 @@ bool jRHI_DX12::InitRHI()
         jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
 
 		// structured buffer
-        ShaderBindingArray.Add(2, 1, EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
+        ShaderBindingArray.Add(-1, 1, EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
             , ResourceInlineAllactor.Alloc<jBufferResource>(SimpleStructuredBuffer), false);
 
         // Descriptor 1 (3 개, BaseRegister)
@@ -894,7 +894,7 @@ bool jRHI_DX12::InitRHI()
 
         const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::NEAREST, ETextureFilter::NEAREST
             , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT>::Create();
-        ShaderBindingArray.Add(1, 1, EShaderBindingType::SAMPLER, EShaderAccessStageFlag::ALL_GRAPHICS
+        ShaderBindingArray.Add(-1, 1, EShaderBindingType::SAMPLER, EShaderAccessStageFlag::ALL_GRAPHICS
             , ResourceInlineAllactor.Alloc<jSamplerResource>(SamplerState));
 
 		auto TestShaderBindingLayout2 = (jShaderBindingsLayout_DX12*)g_rhi->CreateShaderBindings(ShaderBindingArray);
@@ -1218,13 +1218,6 @@ void jRHI_DX12::Render()
 		SimpleUniformBuffer->UpdateBufferData(&ConstantBuffer, sizeof(ConstantBuffer));
 	}
 
-	TestShaderBindingInstance->CopyToOnlineDescriptorHeap(CommandBuffer);
-	TestShaderBindingInstance2->CopyToOnlineDescriptorHeap(CommandBuffer);
-
-	jShaderBindingInstanceArray ShaderBindingInstanceArray;
-	ShaderBindingInstanceArray.Add(TestShaderBindingInstance);
-	ShaderBindingInstanceArray.Add(TestShaderBindingInstance2);
-
 	{
 		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 			SwapchainRT->Image.Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
@@ -1234,22 +1227,40 @@ void jRHI_DX12::Render()
 	RenderPass->BeginRenderPass(CommandBuffer, SwapchainRT->RTV.CPUHandle);
 
     PipelineStateInfo->Bind(CommandBuffer);
-	GraphicsCommandList->SetGraphicsRootSignature(jShaderBindingsLayout_DX12::CreateRootSignature(ShaderBindingInstanceArray));
-    //TestShaderBindingInstance->BindGraphics(CommandBuffer);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Graphics ShaderBinding
+
+	// 이 부분은 구조화 하게 되면, 이전에 만들어둔 것을 그대로 사용
+    jShaderBindingInstanceArray ShaderBindingInstanceArray;
+    ShaderBindingInstanceArray.Add(TestShaderBindingInstance);
+    ShaderBindingInstanceArray.Add(TestShaderBindingInstance2);
+    GraphicsCommandList->SetGraphicsRootSignature(jShaderBindingsLayout_DX12::CreateRootSignature(ShaderBindingInstanceArray));
 
 	int32 RootParameterIndex = 0;
+	bool HasDescriptor = false;
+	bool HasSamplerDescriptor = false;
     for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
     {
 		jShaderBindingInstance_DX12* Instance = (jShaderBindingInstance_DX12*)ShaderBindingInstanceArray[i];
         jShaderBindingsLayout_DX12* Layout = (jShaderBindingsLayout_DX12*)(Instance->ShaderBindingsLayouts);
-        int32 RootParameterSize = (int32)Layout->RootParameters.size();
+
+		Instance->CopyToOnlineDescriptorHeap(CommandBuffer);
+        HasDescriptor |= Instance->Descriptors.size() > 0;
+        HasSamplerDescriptor |= Instance->SamplerDescriptors.size() > 0;
+
 		Instance->BindGraphics(CommandBuffer, RootParameterIndex);
-		RootParameterIndex += RootParameterSize;
     }
+	// DescriptorTable 은 항상 마지막에 바인딩
+    if (HasDescriptor)
+		GraphicsCommandList->SetGraphicsRootDescriptorTable(RootParameterIndex++, CommandBuffer->OnlineDescriptorHeap->GetGPUHandle());		// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
+
+    if (HasSamplerDescriptor)
+		GraphicsCommandList->SetGraphicsRootDescriptorTable(RootParameterIndex++, CommandBuffer->OnlineSamplerDescriptorHeap->GetGPUHandle());	// SamplerState test
+	//////////////////////////////////////////////////////////////////////////
 
 	VertexBuffer->Bind(CommandBuffer);
 	IndexBuffer->Bind(CommandBuffer);
-    //GraphicsCommandList->SetPipelineState(SimplePipelineState.Get());
 	GraphicsCommandList->DrawIndexedInstanced(IndexBuffer->GetIndexCount(), 1, 0, 0, 0);
 
 	RenderPass->EndRenderPass();

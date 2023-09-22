@@ -46,12 +46,19 @@ struct jResourceContainer
         return EmptyValue;
     }
 
+    template <typename T2>
+    static void GetHash(size_t& InOutHash, int32 index, const T2& InData)
+    {
+        InOutHash ^= (InData->GetHash() << index);
+    }
+
     size_t GetHash() const
     {
         size_t Hash = 0;
         for (int32 i = 0; i < NumOfData; ++i)
         {
-            Hash ^= (Data[i]->GetHash() << i);
+            //Hash ^= (Data[i]->GetHash() << i);
+            GetHash(Hash, i, Data[i]);
         }
         return Hash;
     }

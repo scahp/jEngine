@@ -158,12 +158,6 @@ void jShaderBindingInstance_DX12::BindGraphics(jCommandBuffer_DX12* InCommandLis
             break;
         }        
     }
-
-    if (Descriptors.size() > 0)
-        CommandList->SetGraphicsRootDescriptorTable(InOutStartIndex++, InCommandList->OnlineDescriptorHeap->GetGPUHandle());		// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
-
-    if (SamplerDescriptors.size() > 0)
-        CommandList->SetGraphicsRootDescriptorTable(InOutStartIndex++, InCommandList->OnlineSamplerDescriptorHeap->GetGPUHandle());	// SamplerState test
 }
 
 void jShaderBindingInstance_DX12::BindCompute(jCommandBuffer_DX12* InCommandList)

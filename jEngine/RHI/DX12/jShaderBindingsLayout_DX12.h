@@ -1,6 +1,30 @@
 ﻿#pragma once
 #include "../jShaderBindingsLayout.h"
 
+struct jRootParameterExtractor
+{
+public:
+    int32 NumOfInlineRootParameter = 0;
+    int32 CBVIndex = 0;
+    int32 SRVIndex = 0;
+    int32 UAVIndex = 0;
+    int32 SamplerIndex = 0;
+    std::vector<D3D12_ROOT_PARAMETER1> RootParameters;
+    std::vector<D3D12_DESCRIPTOR_RANGE1> Descriptors;
+    std::vector<D3D12_DESCRIPTOR_RANGE1> SamplerDescriptors;
+
+    void Extract(const jShaderBindingsLayoutArray& InBindingLayoutArray, int32 InRegisterSpace = 0);    
+    void Extract(const jShaderBindingInstanceArray& InBindingLayoutArray, int32 InRegisterSpace = 0);
+
+protected:
+    void Extract(const jShaderBindingArray& InShaderBindingArray, int32 InRegisterSpace = 0);
+};
+
+struct jRootParameterShaderBindingInstaceExtractor
+{
+
+};
+
 struct jShaderBindingsLayout_DX12 : public jShaderBindingsLayout
 {
     virtual ~jShaderBindingsLayout_DX12() {}
@@ -28,15 +52,18 @@ struct jShaderBindingsLayout_DX12 : public jShaderBindingsLayout
     std::vector<D3D12_DESCRIPTOR_RANGE1> Descriptors;
     std::vector<D3D12_DESCRIPTOR_RANGE1> SamplerDescriptors;
 
-    static void GetRootParameters(std::vector<D3D12_ROOT_PARAMETER1>& OutRootParameters, std::vector<D3D12_DESCRIPTOR_RANGE1>& OutDescriptors
-        , std::vector<D3D12_DESCRIPTOR_RANGE1>& OutSamplerDescriptors, const jShaderBindingArray& InShaderBindingArray, int32 InRegisterSpace);
-
     static robin_hood::unordered_map<size_t, ComPtr<ID3D12RootSignature>> GRootSignaturePool;
     static jMutexRWLock GRootSignatureLock;
 
+    //////////////////////////////////////////////////////////////////////////
+    // RootSignature extractor utility
+    using FuncGetRootParameterExtractor = std::function<void(jRootParameterExtractor&)>;
+
+    static ID3D12RootSignature* CreateRootSignatureInternal(size_t InHash, FuncGetRootParameterExtractor InFunc);
     static ID3D12RootSignature* CreateRootSignature(const jShaderBindingInstanceArray& InBindingInstanceArray);
     static ID3D12RootSignature* CreateRootSignature(const jShaderBindingsLayoutArray& InBindingLayoutArray);
 
 protected:
     jShaderBindingArray ShaderBindingArray;     // Resource 정보는 비어있음
 };
+

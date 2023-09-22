@@ -162,7 +162,6 @@ void* jPipelineStateInfo_DX12::CreateGraphicsPipelineState()
     psoDesc.DepthStencilState = ((jDepthStencilStateInfo_DX12*)(PipelineStateFixed->DepthStencilState))->DepthStencilStateDesc;
     psoDesc.SampleMask = UINT_MAX;
     psoDesc.PrimitiveTopologyType = ((jVertexBuffer_DX12*)VertexBufferArray[0])->GetTopologyTypeOnly();
-
     psoDesc.NumRenderTargets = (uint32)RenderPassDX12->GetRTVFormats().size();
 
     const int32 NumOfRTVs = Min((int32)_countof(psoDesc.RTVFormats), (int32)RenderPassDX12->GetRTVFormats().size());
