@@ -28,6 +28,7 @@
 #include "Vulkan/jDescriptorPool_Vulkan.h"
 #include "Vulkan/jQueryPoolOcclusion_Vulkan.h"
 #include "jOptions.h"
+#include "Vulkan/jRenderFrameContext_Vulkan.h"
 
 jRHI_Vulkan* g_rhi_vk = nullptr;
 robin_hood::unordered_map<size_t, VkPipelineLayout> jRHI_Vulkan::PipelineLayoutPool;
@@ -1219,7 +1220,7 @@ std::shared_ptr<jRenderFrameContext> jRHI_Vulkan::BeginRenderFrame()
     // 이 프레임에서 펜스를 사용한다고 마크 해둠
 	Swapchain->Images[CurrentFrameIndex]->CommandBufferFence = (VkFence)commandBuffer->GetFenceHandle();
 
-    auto renderFrameContextPtr = std::make_shared<jRenderFrameContext>(commandBuffer);
+    auto renderFrameContextPtr = std::make_shared<jRenderFrameContext_Vulkan>(commandBuffer);
 	renderFrameContextPtr->UseForwardRenderer = !gOptions.UseDeferredRenderer;
 	renderFrameContextPtr->FrameIndex = CurrentFrameIndex;
 	renderFrameContextPtr->SceneRenderTarget = new jSceneRenderTarget();
@@ -1313,15 +1314,18 @@ void jRHI_Vulkan::QueueSubmit(const std::shared_ptr<jRenderFrameContext>& render
 {
     SCOPE_CPU_PROFILE(QueueSubmit);
 
-    check(renderFrameContextPtr->GetActiveCommandBuffer());
-    VkCommandBuffer vkCommandBuffer = (VkCommandBuffer)renderFrameContextPtr->GetActiveCommandBuffer()->GetHandle();
-    VkFence vkFence = (VkFence)renderFrameContextPtr->GetActiveCommandBuffer()->GetFenceHandle();
+	auto renderFrameContext = (jRenderFrameContext_Vulkan*)renderFrameContextPtr.get();
+	check(renderFrameContext);
+
+    check(renderFrameContext->GetActiveCommandBuffer());
+    VkCommandBuffer vkCommandBuffer = (VkCommandBuffer)renderFrameContext->GetActiveCommandBuffer()->GetHandle();
+    VkFence vkFence = (VkFence)renderFrameContext->GetActiveCommandBuffer()->GetFenceHandle();
 	
     // Submitting the command buffer
     VkSubmitInfo submitInfo = {};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-    VkSemaphore waitsemaphores[] = { (VkSemaphore)renderFrameContextPtr->CurrentWaitSemaphore->GetHandle() };
+    VkSemaphore waitsemaphores[] = { (VkSemaphore)renderFrameContext->CurrentWaitSemaphore->GetHandle() };
     VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
     submitInfo.waitSemaphoreCount = 1;
     submitInfo.pWaitSemaphores = waitsemaphores;
@@ -1329,7 +1333,7 @@ void jRHI_Vulkan::QueueSubmit(const std::shared_ptr<jRenderFrameContext>& render
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &vkCommandBuffer;
 
-    renderFrameContextPtr->CurrentWaitSemaphore = InSignalSemaphore;
+	renderFrameContext->CurrentWaitSemaphore = InSignalSemaphore;
 
     VkSemaphore signalSemaphores[] = { (VkSemaphore)InSignalSemaphore->GetHandle() };
     submitInfo.signalSemaphoreCount = 1;

@@ -397,9 +397,6 @@
     <ClInclude Include="RHI\DX12\jBufferUtil_DX12.h">
       <Filter>Code\RHI\DX12</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX12\jCommandQueue_DX12.h">
-      <Filter>Code\RHI\DX12</Filter>
-    </ClInclude>
     <ClInclude Include="RHI\DX12\jRHI_DX12.h">
       <Filter>Code\RHI\DX12</Filter>
     </ClInclude>
@@ -443,6 +440,15 @@
       <Filter>Code\RHI\DX12</Filter>
     </ClInclude>
     <ClInclude Include="RHI\DX12\jRenderPass_DX12.h">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\jCommandBufferManager_DX12.h">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Vulkan\jRenderFrameContext_Vulkan.h">
+      <Filter>Code\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\jRenderFrameContext_DX12.h">
       <Filter>Code\RHI\DX12</Filter>
     </ClInclude>
   </ItemGroup>
@@ -714,9 +720,6 @@
     <ClCompile Include="RHI\DX12\jBufferUtil_DX12.cpp">
       <Filter>Code\RHI\DX12</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\jCommandQueue_DX12.cpp">
-      <Filter>Code\RHI\DX12</Filter>
-    </ClCompile>
     <ClCompile Include="RHI\DX12\jRHI_DX12.cpp">
       <Filter>Code\RHI\DX12</Filter>
     </ClCompile>
@@ -763,6 +766,15 @@
       <Filter>Code\RHI\DX12</Filter>
     </ClCompile>
     <ClCompile Include="RHI\DX12\jRenderPass_DX12.cpp">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\jCommandBufferManager_DX12.cpp">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\jRenderFrameContext_Vulkan.cpp">
+      <Filter>Code\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\jRenderFrameContext_DX12.cpp">
       <Filter>Code\RHI\DX12</Filter>
     </ClCompile>
   </ItemGroup>

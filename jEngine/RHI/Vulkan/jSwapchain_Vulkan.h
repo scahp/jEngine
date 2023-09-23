@@ -1,6 +1,8 @@
 ﻿#pragma once
 #include "../jSwapchain.h"
 
+class jSemaphore;
+
 class jSwapchainImage_Vulkan : public jSwapchainImage
 {
 public:

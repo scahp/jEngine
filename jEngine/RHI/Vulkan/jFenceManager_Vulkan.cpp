@@ -13,6 +13,12 @@ void jFence_Vulkan::WaitForFence(uint64 InTimeoutNanoSec)
     vkWaitForFences(g_rhi_vk->Device, 1, &Fence, true, UINT64_MAX);
 }
 
+bool jFence_Vulkan::IsComplete() const
+{
+    const VkResult Result = vkGetFenceStatus(g_rhi_vk->Device, Fence);
+    return (Result == VK_SUCCESS);		// VK_SUCCESS 면 Signaled
+}
+
 jFence* jFenceManager_Vulkan::GetOrCreateFence()
 {
     if (PendingFences.size() > 0)

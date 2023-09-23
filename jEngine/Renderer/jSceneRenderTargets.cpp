@@ -10,14 +10,14 @@
 void jSceneRenderTarget::Create(const jSwapchainImage* image)
 {
     ColorPtr = jRenderTargetPool::GetRenderTarget(
-        { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi_vk->GetSelectedMSAASamples() });
+        { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi->GetSelectedMSAASamples() });
 
     {
         int32 Width = SCR_WIDTH / 4;
         int32 Height = SCR_HEIGHT / 4;
 
         BloomSetup = jRenderTargetPool::GetRenderTarget(
-            { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, Width, Height, 1, false, g_rhi_vk->GetSelectedMSAASamples() });
+            { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, Width, Height, 1, false, g_rhi->GetSelectedMSAASamples() });
 
         for (int32 i = 0; i < _countof(DownSample); ++i)
         {
@@ -25,7 +25,7 @@ void jSceneRenderTarget::Create(const jSwapchainImage* image)
             Height /= 2;
 
             DownSample[i] = jRenderTargetPool::GetRenderTarget(
-                { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, Width, Height, 1, false, g_rhi_vk->GetSelectedMSAASamples() });
+                { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, Width, Height, 1, false, g_rhi->GetSelectedMSAASamples() });
         }
 
         for (int32 i = 0; i < _countof(UpSample); ++i)
@@ -34,14 +34,14 @@ void jSceneRenderTarget::Create(const jSwapchainImage* image)
             Height *= 2;
 
             UpSample[i] = jRenderTargetPool::GetRenderTarget(
-                { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, Width, Height, 1, false, g_rhi_vk->GetSelectedMSAASamples() });
+                { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, Width, Height, 1, false, g_rhi->GetSelectedMSAASamples() });
         }
     }
 
     DepthPtr = jRenderTargetPool::GetRenderTarget(
-        { ETextureType::TEXTURE_2D, ETextureFormat::D24_S8, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi_vk->GetSelectedMSAASamples() });
+        { ETextureType::TEXTURE_2D, ETextureFormat::D24_S8, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi->GetSelectedMSAASamples() });
 
-    if ((int32)g_rhi_vk->GetSelectedMSAASamples() > 1)
+    if ((int32)g_rhi->GetSelectedMSAASamples() > 1)
     {
         check(image);
         ResolvePtr = jRenderTarget::CreateFromTexture(image->TexturePtr);
@@ -66,7 +66,7 @@ void jSceneRenderTarget::Create(const jSwapchainImage* image)
         const bool UseAsSubpassInput = gOptions.UseSubpass;
         const bool IsMemoryless = gOptions.UseMemoryless && gOptions.UseSubpass;
         GBuffer[i] = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, SCR_WIDTH, SCR_HEIGHT
-            , 1, false, g_rhi_vk->GetSelectedMSAASamples(), UseAsSubpassInput, IsMemoryless });
+            , 1, false, g_rhi->GetSelectedMSAASamples(), UseAsSubpassInput, IsMemoryless });
     }
 }
 
@@ -87,9 +87,15 @@ void jSceneRenderTarget::Return()
     if (BloomSetup)
         BloomSetup->Return();
     for (int32 i = 0; i < _countof(DownSample); ++i)
-        DownSample[i]->Return();
+    {
+        if (DownSample[i])
+            DownSample[i]->Return();
+    }
     for (int32 i = 0; i < _countof(UpSample); ++i)
-        UpSample[i]->Return();
+    {
+        if (UpSample[i])
+            UpSample[i]->Return();
+    }
     for (int32 i = 0; i < _countof(GBuffer); ++i)
     {
         if (GBuffer[i])

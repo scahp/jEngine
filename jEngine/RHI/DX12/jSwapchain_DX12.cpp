@@ -15,7 +15,6 @@ void jSwapchainImage_DX12::Release()
 void jSwapchainImage_DX12::ReleaseInternal()
 {
     TexturePtr = nullptr;
-    FenceValue = 0;
     //if (Available)
     //{
     //    g_rhi->GetSemaphoreManager()->ReturnSemaphore(Available);
@@ -57,10 +56,10 @@ bool jSwapchain_DX12::Create()
     check(g_rhi_dx12);
     check(!!g_rhi_dx12->m_hWnd);
     check(g_rhi_dx12->Factory);
-    check(g_rhi_dx12->GraphicsCommandQueue);
+    check(g_rhi_dx12->CommandBufferManager);
     
     ComPtr<IDXGISwapChain1> swapChainTemp;
-    if (JFAIL(g_rhi_dx12->Factory->CreateSwapChainForHwnd(g_rhi_dx12->GraphicsCommandQueue->GetCommandQueue().Get(), g_rhi_dx12->m_hWnd
+    if (JFAIL(g_rhi_dx12->Factory->CreateSwapChainForHwnd(g_rhi_dx12->CommandBufferManager->GetCommandQueue().Get(), g_rhi_dx12->m_hWnd
         , &swapChainDesc, nullptr, nullptr, &swapChainTemp)))
     {
         return false;
@@ -85,6 +84,9 @@ bool jSwapchain_DX12::Create()
         SwapchainImage->TexturePtr = std::make_shared<jTexture_DX12>(
             ETextureType::TEXTURE_2D, Format, Extent.x, Extent.y, 1, EMSAASamples::COUNT_1, 1, false, renderTarget);
         jBufferUtil_DX12::CreateRenderTargetView((jTexture_DX12*)SwapchainImage->TexturePtr.get());
+
+        if (ensure(g_rhi_dx12->GetFenceManager()))
+            SwapchainImage->CommandBufferFence = (jFence_DX12*)g_rhi_dx12->GetFenceManager()->GetOrCreateFence();
     }
 
     if (ensure(g_rhi_dx12->GetFenceManager()))

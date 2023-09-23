@@ -32,7 +32,7 @@ public:
     {
         ReleaseInternal();
     }
-    virtual bool CreatePool(uint32 QueueIndex) override;
+    virtual bool CreatePool(uint32 QueueIndex);
     virtual void Release() override;
 
     void ReleaseInternal();

@@ -157,11 +157,12 @@ xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"</Command
     <ClInclude Include="Renderer\jSpotLightDrawCommandGenerator.h" />
     <ClInclude Include="RHI\DX12\jBufferUtil_DX12.h" />
     <ClInclude Include="RHI\DX12\jBuffer_DX12.h" />
-    <ClInclude Include="RHI\DX12\jCommandQueue_DX12.h" />
+    <ClInclude Include="RHI\DX12\jCommandBufferManager_DX12.h" />
     <ClInclude Include="RHI\DX12\jDescriptorHeap_DX12.h" />
     <ClInclude Include="RHI\DX12\jFenceManager_DX12.h" />
     <ClInclude Include="RHI\DX12\jIndexBuffer_DX12.h" />
     <ClInclude Include="RHI\DX12\jPipelineStateInfo_DX12.h" />
+    <ClInclude Include="RHI\DX12\jRenderFrameContext_DX12.h" />
     <ClInclude Include="RHI\DX12\jRenderPass_DX12.h" />
     <ClInclude Include="RHI\DX12\jRHIType_DX12.h" />
     <ClInclude Include="RHI\DX12\jRHI_DX12.h" />
@@ -203,6 +204,7 @@ xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"</Command
     <ClInclude Include="RHI\Vulkan\jPipelineStateInfo_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jQueryPoolOcclusion_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jQueryPoolTime_Vulkan.h" />
+    <ClInclude Include="RHI\Vulkan\jRenderFrameContext_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jRenderPass_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jRHIType_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jRingBuffer_Vulkan.h" />
@@ -349,11 +351,12 @@ xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"</Command
     <ClCompile Include="Renderer\jSpotLightDrawCommandGenerator.cpp" />
     <ClCompile Include="RHI\DX12\jBufferUtil_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jBuffer_DX12.cpp" />
-    <ClCompile Include="RHI\DX12\jCommandQueue_DX12.cpp" />
+    <ClCompile Include="RHI\DX12\jCommandBufferManager_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jDescriptorHeap_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jFenceManager_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jIndexBuffer_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jPipelineStateInfo_DX12.cpp" />
+    <ClCompile Include="RHI\DX12\jRenderFrameContext_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jRenderPass_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jRHI_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jRingBuffer_DX12.cpp" />
@@ -385,6 +388,7 @@ xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"</Command
     <ClCompile Include="RHI\Vulkan\jPipelineStateInfo_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jQueryPoolOcclusion_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jQueryPoolTime_Vulkan.cpp" />
+    <ClCompile Include="RHI\Vulkan\jRenderFrameContext_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jRenderPass_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jRingBuffer_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jShaderBindingsLayout_Vulkan.cpp" />

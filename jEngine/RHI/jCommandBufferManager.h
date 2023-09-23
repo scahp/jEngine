@@ -21,7 +21,6 @@ class jCommandBufferManager
 public:
     virtual ~jCommandBufferManager() {}
 
-    virtual bool CreatePool(uint32 QueueIndex) = 0;
     virtual void Release() = 0;
 
     virtual jCommandBuffer* GetOrCreateCommandBuffer() = 0;

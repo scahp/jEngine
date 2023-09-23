@@ -9,6 +9,7 @@ public:
     virtual void Release() override;
     virtual void WaitForFence(uint64 InTimeoutNanoSec = UINT64_MAX) override;
     virtual bool IsValid() const override { return !!Fence; }
+    virtual bool IsComplete() const override;
 
     VkFence Fence = nullptr;
 };

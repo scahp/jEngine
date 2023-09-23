@@ -2,7 +2,6 @@
 
 class jCommandBuffer;
 struct jSceneRenderTarget;
-class jSemaphore;
 
 struct jRenderFrameContext : public std::enable_shared_from_this<jRenderFrameContext>
 {
@@ -12,20 +11,18 @@ struct jRenderFrameContext : public std::enable_shared_from_this<jRenderFrameCon
     {}
     virtual ~jRenderFrameContext();
 
-    void Destroy();
+    virtual void Destroy();
 
-    FORCEINLINE jCommandBuffer* GetActiveCommandBuffer() const { return CommandBuffer; }
-    bool BeginActiveCommandBuffer();
-    bool EndActiveCommandBuffer();
-    void QueueSubmitCurrentActiveCommandBuffer(jSemaphore* InSignalSemaphore);
+    FORCEINLINE virtual jCommandBuffer* GetActiveCommandBuffer() const { return CommandBuffer; }
+    virtual bool BeginActiveCommandBuffer();
+    virtual bool EndActiveCommandBuffer();
 
 public:
     jSceneRenderTarget* SceneRenderTarget = nullptr;
     uint32 FrameIndex = -1;
-    jSemaphore* CurrentWaitSemaphore = nullptr;
     bool UseForwardRenderer = true;
     bool IsBeginActiveCommandbuffer = false;
 
-private:
+protected:
     jCommandBuffer* CommandBuffer = nullptr;
 };

@@ -22,6 +22,10 @@
 #include "jPipelineStateInfo_DX12.h"
 #include "Renderer/jSceneRenderTargets.h"
 #include "jRenderPass_DX12.h"
+#include "Profiler/jPerformanceProfile.h"
+#include "jOptions.h"
+#include "../jRenderFrameContext.h"
+#include "jRenderFrameContext_DX12.h"
 
 #define USE_INLINE_DESCRIPTOR 0												// InlineDescriptor 를 쓸것인지? DescriptorTable 를 쓸것인지 여부
 #define USE_ONE_FRAME_BUFFER_AND_DESCRIPTOR (USE_INLINE_DESCRIPTOR && 1)	// 현재 프레임에만 사용하고 버리는 임시 Descriptor 와 Buffer 를 사용할 것인지 여부
@@ -304,12 +308,8 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
     }
     return 0;
     case WM_PAINT:
-        if (g_rhi_dx12)
-        {
-			g_rhi_dx12->Update();
-			g_rhi_dx12->Render();
-        }
-    return 0;
+
+		break;
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		return 0;
@@ -422,21 +422,15 @@ int32 GetHardwareAdapter(IDXGIFactory1* InFactory, IDXGIAdapter1** InAdapter
 
 void jRHI_DX12::WaitForGPU()
 {
-	check(SwapChain);
+	check(Swapchain);
 
-	auto Queue = GraphicsCommandQueue->GetCommandQueue();
+	auto Queue = CommandBufferManager->GetCommandQueue();
     check(Queue);
 
-	if (Queue && SwapChain)
+	if (Queue && Swapchain)
 	{
-		jSwapchainImage_DX12* CurrentSwapchainImage = (jSwapchainImage_DX12*)SwapChain->GetSwapchainImage(CurrentFrameIndex);
-		if (JFAIL(Queue->Signal((ID3D12Fence*)SwapChain->Fence->GetHandle(), CurrentSwapchainImage->FenceValue)))
-			return;
-
-		if (SwapChain->Fence->SetFenceValue(CurrentSwapchainImage->FenceValue))
-			SwapChain->Fence->WaitForFence();
-
-		++CurrentSwapchainImage->FenceValue;
+		jSwapchainImage_DX12* CurrentSwapchainImage = (jSwapchainImage_DX12*)Swapchain->GetSwapchainImage(CurrentFrameIndex);
+		Swapchain->Fence->SignalWithNextFenceValue(Queue.Get(), true);
 	}
 }
 
@@ -553,10 +547,10 @@ bool jRHI_DX12::InitRHI()
 	//////////////////////////////////////////////////////////////////////////
 
 	// 2. Command
-	GraphicsCommandQueue = new jCommandQueue_DX12();
-	GraphicsCommandQueue->Initialize(Device, D3D12_COMMAND_LIST_TYPE_DIRECT);
-	CopyCommandQueue = new jCommandQueue_DX12();
-	CopyCommandQueue->Initialize(Device, D3D12_COMMAND_LIST_TYPE_COPY);
+	CommandBufferManager = new jCommandBufferManager_DX12();
+	CommandBufferManager->Initialize(Device, D3D12_COMMAND_LIST_TYPE_DIRECT);
+	CopyCommandBufferManager = new jCommandBufferManager_DX12();
+	CopyCommandBufferManager->Initialize(Device, D3D12_COMMAND_LIST_TYPE_COPY);
 
     // 4. Heap	
 	RTVDescriptorHeaps.Initialize(EDescriptorHeapTypeDX12::RTV);
@@ -568,10 +562,10 @@ bool jRHI_DX12::InitRHI()
 	OnlineSamplerDescriptorHeapBlocks.Initialize(EDescriptorHeapTypeDX12::SAMPLER);
 
 	// 3. Swapchain
-	SwapChain = new jSwapchain_DX12();
-	SwapChain->Create();
+	Swapchain = new jSwapchain_DX12();
+	Swapchain->Create();
 
-	OneFrameUniformRingBuffers.resize(SwapChain->GetNumOfSwapchain());
+	OneFrameUniformRingBuffers.resize(Swapchain->GetNumOfSwapchain());
 	for(jRingBuffer_DX12*& iter : OneFrameUniformRingBuffers)
 	{
 		iter = new jRingBuffer_DX12();
@@ -582,7 +576,7 @@ bool jRHI_DX12::InitRHI()
     //////////////////////////////////////////////////////////////////////////
     // 5. Initialize Camera and lighting
     {
-        auto frameIndex = SwapChain->GetCurrentBackBufferIndex();
+        auto frameIndex = Swapchain->GetCurrentBackBufferIndex();
 
         // Setup material
         m_cubeCB.albedo = XMFLOAT4(0.8f, 0.8f, 0.8f, 1.0f);
@@ -929,7 +923,7 @@ bool jRHI_DX12::InitRHI()
 	VertexBufferArray.Add(VertexBuffer);
 
 	{
-        jSwapchainImage* SwapchainImage = SwapChain->GetSwapchainImage(CurrentFrameIndex);
+        jSwapchainImage* SwapchainImage = Swapchain->GetSwapchainImage(CurrentFrameIndex);
         auto SceneRT = std::make_shared<jRenderTarget>(SwapchainImage->TexturePtr);
 
         jRenderPassInfo renderPassInfo;
@@ -967,15 +961,20 @@ bool jRHI_DX12::InitRHI()
 bool jRHI_DX12::Run()
 {
     MSG msg = {};
-    while (msg.message != WM_QUIT)
-    {
-        // Process any messages in the queue.
-        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+	while (::IsWindow(m_hWnd))
+	{
+        if (g_rhi_dx12)
         {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            g_rhi_dx12->Update();
+            g_rhi_dx12->Render();
         }
-    }
+
+        while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+        {
+            ::TranslateMessage(&msg);
+            ::DispatchMessage(&msg);
+        }
+	}
 
     return true;
 }
@@ -984,6 +983,12 @@ void jRHI_DX12::Release()
 {
 	WaitForGPU();
     
+	if (CommandBufferManager)
+		CommandBufferManager->Release();
+
+	if (CopyCommandBufferManager)
+		CopyCommandBufferManager->Release();
+
     ReleaseImGui();
 
 	//////////////////////////////////////////////////////////////////////////
@@ -1039,12 +1044,12 @@ void jRHI_DX12::Release()
 
 	//////////////////////////////////////////////////////////////////////////
 	// 3. Swapchain
-    SwapChain->Release();
-    delete SwapChain;
+    Swapchain->Release();
+    delete Swapchain;
 
 	//////////////////////////////////////////////////////////////////////////
 	// 2. Command
-	delete GraphicsCommandQueue;
+	delete CommandBufferManager;
 
 	//////////////////////////////////////////////////////////////////////////
 	// 1. Device
@@ -1054,7 +1059,7 @@ void jRHI_DX12::Release()
 
 void jRHI_DX12::UpdateCameraMatrices()
 {
-	auto frameIndex = SwapChain->GetCurrentBackBufferIndex();
+	auto frameIndex = Swapchain->GetCurrentBackBufferIndex();
 
 	m_sceneCB[frameIndex].cameraPosition = m_eye;
 
@@ -1092,7 +1097,8 @@ void jRHI_DX12::CalculateFrameStats()
         std::wstringstream windowText;
 
         windowText << std::setprecision(2) << std::fixed
-            << L"    fps: " << fps << L"     ~Million Primary Rays/s: " << MRaysPerSecond
+            << L"    fps: " << fps 
+			//<< L"     ~Million Primary Rays/s: " << MRaysPerSecond
             << L"    GPU[" << AdapterID << L"]: " << AdapterName;
 
         //////////////////////////////////////////////////////////////////////////
@@ -1165,7 +1171,7 @@ void jRHI_DX12::Update()
 	}
 
     {
-        auto frameIndex = SwapChain->GetCurrentBackBufferIndex();
+        auto frameIndex = Swapchain->GetCurrentBackBufferIndex();
 
         m_sceneCB[frameIndex].focalDistance = m_focalDistance;
         m_sceneCB[frameIndex].lensRadius = m_lensRadius;
@@ -1176,111 +1182,113 @@ void jRHI_DX12::Render()
 {
 	GetOneFrameUniformRingBuffer()->Reset();
 
-	// Prepare
-	jCommandBuffer_DX12* CommandBuffer = GraphicsCommandQueue->GetAvailableCommandList();
-	auto GraphicsCommandList = CommandBuffer->Get();
-
-    jSwapchainImage* SwapchainImage = SwapChain->GetSwapchainImage(CurrentFrameIndex);
-    jTexture_DX12* SwapchainRT = (jTexture_DX12*)SwapchainImage->TexturePtr.get();
-
-	D3D12_VIEWPORT viewport;
-	viewport.TopLeftX = 0;
-	viewport.TopLeftY = 0;
-	viewport.Width = (float)SCR_WIDTH;
-	viewport.Height = (float)SCR_HEIGHT;
-	viewport.MinDepth = D3D12_MIN_DEPTH;
-	viewport.MaxDepth = D3D12_MAX_DEPTH;
-
-	D3D12_RECT ScissorRect;
-	ScissorRect.left = 0;
-	ScissorRect.right = SCR_WIDTH;
-	ScissorRect.top = 0;
-	ScissorRect.bottom = SCR_HEIGHT;
-
+	if (std::shared_ptr<jRenderFrameContext> renderFrameContext = g_rhi->BeginRenderFrame())
 	{
-        jSimpleConstantBuffer ConstantBuffer;
-        ConstantBuffer.M.SetIdentity();
-        Matrix Projection = jCameraUtil::CreatePerspectiveMatrix((float)SCR_WIDTH, (float)SCR_HEIGHT, DegreeToRadian(90.0f), 0.01f, 1000.0f);
-        Matrix Camera = jCameraUtil::CreateViewMatrix(Vector::FowardVector * 1.2f, Vector::ZeroVector, Vector::UpVector);
-        ConstantBuffer.M = Projection * Camera * ConstantBuffer.M;
-        ConstantBuffer.M.SetTranspose();
+		// Prepare
+		jCommandBuffer_DX12* CommandBuffer = (jCommandBuffer_DX12*)renderFrameContext->GetActiveCommandBuffer();
+		auto GraphicsCommandList = CommandBuffer->Get();
 
-        // Dynamic indexing with constantbuffer index
-        static DWORD OldTick = GetTickCount();
-        static int32 TexIndex = 0;
-        DWORD time = GetTickCount() - OldTick;
-        if (time > 2000)
-        {
-            OldTick = GetTickCount();
-            TexIndex = (TexIndex + 1) % _countof(SimpleTexture);
-        }
-        ConstantBuffer.TexIndex = TexIndex;
-		SimpleUniformBuffer->UpdateBufferData(&ConstantBuffer, sizeof(ConstantBuffer));
+		jSwapchainImage* SwapchainImage = Swapchain->GetSwapchainImage(CurrentFrameIndex);
+		jTexture_DX12* SwapchainRT = (jTexture_DX12*)SwapchainImage->TexturePtr.get();
+
+		D3D12_VIEWPORT viewport;
+		viewport.TopLeftX = 0;
+		viewport.TopLeftY = 0;
+		viewport.Width = (float)SCR_WIDTH;
+		viewport.Height = (float)SCR_HEIGHT;
+		viewport.MinDepth = D3D12_MIN_DEPTH;
+		viewport.MaxDepth = D3D12_MAX_DEPTH;
+
+		D3D12_RECT ScissorRect;
+		ScissorRect.left = 0;
+		ScissorRect.right = SCR_WIDTH;
+		ScissorRect.top = 0;
+		ScissorRect.bottom = SCR_HEIGHT;
+
+		{
+			jSimpleConstantBuffer ConstantBuffer;
+			ConstantBuffer.M.SetIdentity();
+			Matrix Projection = jCameraUtil::CreatePerspectiveMatrix((float)SCR_WIDTH, (float)SCR_HEIGHT, DegreeToRadian(90.0f), 0.01f, 1000.0f);
+			Matrix Camera = jCameraUtil::CreateViewMatrix(Vector::FowardVector * 1.2f, Vector::ZeroVector, Vector::UpVector);
+			ConstantBuffer.M = Projection * Camera * ConstantBuffer.M;
+			ConstantBuffer.M.SetTranspose();
+
+			// Dynamic indexing with constantbuffer index
+			static DWORD OldTick = GetTickCount();
+			static int32 TexIndex = 0;
+			DWORD time = GetTickCount() - OldTick;
+			if (time > 2000)
+			{
+				OldTick = GetTickCount();
+				TexIndex = (TexIndex + 1) % _countof(SimpleTexture);
+			}
+			ConstantBuffer.TexIndex = TexIndex;
+			SimpleUniformBuffer->UpdateBufferData(&ConstantBuffer, sizeof(ConstantBuffer));
+		}
+
+		{
+			CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+				SwapchainRT->Image.Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+			GraphicsCommandList->ResourceBarrier(1, &barrier);
+		}
+
+		RenderPass->BeginRenderPass(CommandBuffer, SwapchainRT->RTV.CPUHandle);
+
+		PipelineStateInfo->Bind(CommandBuffer);
+
+		//////////////////////////////////////////////////////////////////////////
+		// Graphics ShaderBinding
+
+		// 이 부분은 구조화 하게 되면, 이전에 만들어둔 것을 그대로 사용
+		jShaderBindingInstanceArray ShaderBindingInstanceArray;
+		ShaderBindingInstanceArray.Add(TestShaderBindingInstance);
+		ShaderBindingInstanceArray.Add(TestShaderBindingInstance2);
+		GraphicsCommandList->SetGraphicsRootSignature(jShaderBindingsLayout_DX12::CreateRootSignature(ShaderBindingInstanceArray));
+
+		int32 RootParameterIndex = 0;
+		bool HasDescriptor = false;
+		bool HasSamplerDescriptor = false;
+		for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
+		{
+			jShaderBindingInstance_DX12* Instance = (jShaderBindingInstance_DX12*)ShaderBindingInstanceArray[i];
+			jShaderBindingsLayout_DX12* Layout = (jShaderBindingsLayout_DX12*)(Instance->ShaderBindingsLayouts);
+
+			Instance->CopyToOnlineDescriptorHeap(CommandBuffer);
+			HasDescriptor |= Instance->Descriptors.size() > 0;
+			HasSamplerDescriptor |= Instance->SamplerDescriptors.size() > 0;
+
+			Instance->BindGraphics(CommandBuffer, RootParameterIndex);
+		}
+		// DescriptorTable 은 항상 마지막에 바인딩
+		if (HasDescriptor)
+			GraphicsCommandList->SetGraphicsRootDescriptorTable(RootParameterIndex++, CommandBuffer->OnlineDescriptorHeap->GetGPUHandle());		// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
+
+		if (HasSamplerDescriptor)
+			GraphicsCommandList->SetGraphicsRootDescriptorTable(RootParameterIndex++, CommandBuffer->OnlineSamplerDescriptorHeap->GetGPUHandle());	// SamplerState test
+		//////////////////////////////////////////////////////////////////////////
+
+		VertexBuffer->Bind(CommandBuffer);
+		IndexBuffer->Bind(CommandBuffer);
+		GraphicsCommandList->DrawIndexedInstanced(IndexBuffer->GetIndexCount(), 1, 0, 0, 0);
+
+		RenderPass->EndRenderPass();
+
+		RenderUI(GraphicsCommandList, SwapchainRT->Image.Get(), SwapchainRT->RTV.CPUHandle, m_imgui_SrvDescHeap.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+
+        g_rhi->EndRenderFrame(renderFrameContext);
 	}
 
-	{
-		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-			SwapchainRT->Image.Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-		GraphicsCommandList->ResourceBarrier(1, &barrier);
-	}
-
-	RenderPass->BeginRenderPass(CommandBuffer, SwapchainRT->RTV.CPUHandle);
-
-    PipelineStateInfo->Bind(CommandBuffer);
-
-	//////////////////////////////////////////////////////////////////////////
-	// Graphics ShaderBinding
-
-	// 이 부분은 구조화 하게 되면, 이전에 만들어둔 것을 그대로 사용
-    jShaderBindingInstanceArray ShaderBindingInstanceArray;
-    ShaderBindingInstanceArray.Add(TestShaderBindingInstance);
-    ShaderBindingInstanceArray.Add(TestShaderBindingInstance2);
-    GraphicsCommandList->SetGraphicsRootSignature(jShaderBindingsLayout_DX12::CreateRootSignature(ShaderBindingInstanceArray));
-
-	int32 RootParameterIndex = 0;
-	bool HasDescriptor = false;
-	bool HasSamplerDescriptor = false;
-    for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
+    HRESULT hr = S_OK;
+    if (Options & c_AllowTearing)
     {
-		jShaderBindingInstance_DX12* Instance = (jShaderBindingInstance_DX12*)ShaderBindingInstanceArray[i];
-        jShaderBindingsLayout_DX12* Layout = (jShaderBindingsLayout_DX12*)(Instance->ShaderBindingsLayouts);
-
-		Instance->CopyToOnlineDescriptorHeap(CommandBuffer);
-        HasDescriptor |= Instance->Descriptors.size() > 0;
-        HasSamplerDescriptor |= Instance->SamplerDescriptors.size() > 0;
-
-		Instance->BindGraphics(CommandBuffer, RootParameterIndex);
+        hr = Swapchain->SwapChain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
     }
-	// DescriptorTable 은 항상 마지막에 바인딩
-    if (HasDescriptor)
-		GraphicsCommandList->SetGraphicsRootDescriptorTable(RootParameterIndex++, CommandBuffer->OnlineDescriptorHeap->GetGPUHandle());		// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
-
-    if (HasSamplerDescriptor)
-		GraphicsCommandList->SetGraphicsRootDescriptorTable(RootParameterIndex++, CommandBuffer->OnlineSamplerDescriptorHeap->GetGPUHandle());	// SamplerState test
-	//////////////////////////////////////////////////////////////////////////
-
-	VertexBuffer->Bind(CommandBuffer);
-	IndexBuffer->Bind(CommandBuffer);
-	GraphicsCommandList->DrawIndexedInstanced(IndexBuffer->GetIndexCount(), 1, 0, 0, 0);
-
-	RenderPass->EndRenderPass();
-
-	RenderUI(GraphicsCommandList, SwapchainRT->Image.Get(), SwapchainRT->RTV.CPUHandle, m_imgui_SrvDescHeap.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
-
-	// Present
-	GraphicsCommandQueue->ExecuteCommandList(CommandBuffer);
-
-	HRESULT hr = S_OK;
-	if (Options & c_AllowTearing)
-	{
-		hr = SwapChain->SwapChain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
-	}
-	else
-	{
-		// 첫번째 아규먼트는 VSync가 될때까지 기다림, 어플리케이션은 다음 VSync까지 잠재운다.
-		// 이렇게 하는 것은 렌더링 한 프레임 중 화면에 나오지 못하는 프레임의 cycle을 아끼기 위해서임.
-		hr = SwapChain->SwapChain->Present(1, 0);
-	}
+    else
+    {
+        // 첫번째 아규먼트는 VSync가 될때까지 기다림, 어플리케이션은 다음 VSync까지 잠재운다.
+        // 이렇게 하는 것은 렌더링 한 프레임 중 화면에 나오지 못하는 프레임의 cycle을 아끼기 위해서임.
+        hr = Swapchain->SwapChain->Present(1, 0);
+    }
 
 	if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
 	{
@@ -1303,7 +1311,7 @@ void jRHI_DX12::Render()
 
 		WaitForGPU();
 
-		CurrentFrameIndex = SwapChain->GetCurrentBackBufferIndex();
+		CurrentFrameIndex = Swapchain->GetCurrentBackBufferIndex();
 	}
 
 	// 임시로 여기에 만들어 둠.
@@ -1342,9 +1350,9 @@ bool jRHI_DX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimi
 
     WaitForGPU();
 
-    if (ensure(SwapChain && SwapChain->SwapChain))
+    if (ensure(Swapchain && Swapchain->SwapChain))
     {
-        HRESULT hr = SwapChain->SwapChain->ResizeBuffers(MaxFrameCount, InWidth, InHeight, BackbufferFormat
+        HRESULT hr = Swapchain->SwapChain->ResizeBuffers(MaxFrameCount, InWidth, InHeight, BackbufferFormat
             , (Options & c_AllowTearing) ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0);
 
         if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
@@ -1369,9 +1377,9 @@ bool jRHI_DX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimi
 
     for (int32 i = 0; i < MaxFrameCount; ++i)
     {
-		jSwapchainImage* SwapchainImage = SwapChain->GetSwapchainImage(i);
+		jSwapchainImage* SwapchainImage = Swapchain->GetSwapchainImage(i);
 		jTexture_DX12* SwapchainRT = (jTexture_DX12*)SwapchainImage->TexturePtr.get();
-        if (JFAIL(SwapChain->SwapChain->GetBuffer(i, IID_PPV_ARGS(&SwapchainRT->Image))))
+        if (JFAIL(Swapchain->SwapChain->GetBuffer(i, IID_PPV_ARGS(&SwapchainRT->Image))))
             return false;
 
 		jBufferUtil_DX12::CreateRenderTargetView(SwapchainRT);
@@ -1391,7 +1399,7 @@ bool jRHI_DX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimi
         m_sceneCB[i].lensRadius = m_lensRadius;
     }
 
-    CurrentFrameIndex = SwapChain->GetCurrentBackBufferIndex();
+    CurrentFrameIndex = Swapchain->GetCurrentBackBufferIndex();
 
 	delete RayTacingOutputTexture;
 	RayTacingOutputTexture = nullptr;
@@ -1429,17 +1437,15 @@ bool jRHI_DX12::OnHandleDeviceRestored()
 
 jCommandBuffer_DX12* jRHI_DX12::BeginSingleTimeCopyCommands()
 {
-	check(CopyCommandQueue);
-	return CopyCommandQueue->GetAvailableCommandList();
+	check(CopyCommandBufferManager);
+	return CopyCommandBufferManager->GetOrCreateCommandBuffer();
 }
 
 void jRHI_DX12::EndSingleTimeCopyCommands(jCommandBuffer_DX12* commandBuffer)
 {
-	check(CopyCommandQueue);
-	CopyCommandQueue->ExecuteCommandList(commandBuffer);
-
-	CopyCommandQueue->Signal();
-	CopyCommandQueue->WaitForFenceValue();
+	check(CopyCommandBufferManager);
+	CopyCommandBufferManager->ExecuteCommandList(commandBuffer, true);
+	CopyCommandBufferManager->ReturnCommandBuffer(commandBuffer);
 }
 
 void jRHI_DX12::InitializeImGui()
@@ -1756,3 +1762,39 @@ jPipelineStateInfo* jRHI_DX12::CreateComputePipelineStateInfo(const jShader* sha
 	return PipelineStatePool.GetOrCreateMove(std::move(jPipelineStateInfo(shader, InShaderBindingArray, pushConstant)));
 }
 
+std::shared_ptr<jRenderFrameContext> jRHI_DX12::BeginRenderFrame()
+{
+	SCOPE_CPU_PROFILE(BeginRenderFrame);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Acquire new swapchain image
+	jSwapchainImage_DX12* CurrentSwapchainImage = (jSwapchainImage_DX12*)Swapchain->GetSwapchainImage(CurrentFrameIndex);
+	CurrentSwapchainImage->CommandBufferFence->WaitForFence();
+	//////////////////////////////////////////////////////////////////////////
+
+	jCommandBuffer_DX12* commandBuffer = (jCommandBuffer_DX12*)g_rhi_dx12->CommandBufferManager->GetOrCreateCommandBuffer();
+
+    auto renderFrameContextPtr = std::make_shared<jRenderFrameContext_DX12>(commandBuffer);
+    renderFrameContextPtr->UseForwardRenderer = !gOptions.UseDeferredRenderer;
+    renderFrameContextPtr->FrameIndex = CurrentFrameIndex;
+    renderFrameContextPtr->SceneRenderTarget = new jSceneRenderTarget();
+    renderFrameContextPtr->SceneRenderTarget->Create(Swapchain->GetSwapchainImage(CurrentFrameIndex));
+
+	return renderFrameContextPtr;
+}
+
+void jRHI_DX12::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr)
+{
+	SCOPE_CPU_PROFILE(EndRenderFrame);
+
+	jCommandBuffer_DX12* CommandBuffer = (jCommandBuffer_DX12*)renderFrameContextPtr->GetActiveCommandBuffer();
+	CommandBufferManager->ExecuteCommandList(CommandBuffer);
+	CommandBufferManager->ReturnCommandBuffer(CommandBuffer);
+
+    jSwapchainImage_DX12* CurrentSwapchainImage = (jSwapchainImage_DX12*)Swapchain->GetSwapchainImage(CurrentFrameIndex);
+	CurrentSwapchainImage->CommandBufferFence = CommandBuffer->Fence;
+    CurrentSwapchainImage->CommandBufferFence->SignalWithNextFenceValue(CommandBufferManager->GetCommandQueue().Get());
+
+	CurrentFrameIndex = (CurrentFrameIndex + 1) % Swapchain->Images.size();
+	renderFrameContextPtr->Destroy();
+}

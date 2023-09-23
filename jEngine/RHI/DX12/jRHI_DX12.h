@@ -9,7 +9,7 @@
 #include <dxgi1_6.h>
 #include <d3dcompiler.h>
 #include <DirectXMath.h>
-#include "jCommandQueue_DX12.h"
+#include "jCommandBufferManager_DX12.h"
 #include "jDescriptorHeap_DX12.h"
 #include "jFenceManager_DX12.h"
 #include "jUniformBufferBlock_DX12.h"
@@ -124,12 +124,12 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// 2. Command
-	jCommandQueue_DX12* GraphicsCommandQueue = nullptr;
-	jCommandQueue_DX12* CopyCommandQueue = nullptr;
+	jCommandBufferManager_DX12* CommandBufferManager = nullptr;
+	jCommandBufferManager_DX12* CopyCommandBufferManager = nullptr;
 
 	//////////////////////////////////////////////////////////////////////////
 	// 3. Swapchain
-	jSwapchain_DX12* SwapChain = nullptr;
+	jSwapchain_DX12* Swapchain = nullptr;
 	int32 CurrentFrameIndex = 0;
 
 	//////////////////////////////////////////////////////////////////////////
@@ -356,6 +356,11 @@ public:
     virtual jPipelineStateInfo* CreatePipelineStateInfo(const jPipelineStateFixedInfo* InPipelineStateFixed, const jGraphicsPipelineShader InShader, const jVertexBufferArray& InVertexBufferArray
         , const jRenderPass* InRenderPass, const jShaderBindingsLayoutArray& InShaderBindingArray, const jPushConstant* InPushConstant, int32 InSubpassIndex) const override;
     virtual jPipelineStateInfo* CreateComputePipelineStateInfo(const jShader* shader, const jShaderBindingsLayoutArray& InShaderBindingArray, const jPushConstant* pushConstant) const override;
+
+	virtual std::shared_ptr<jRenderFrameContext> BeginRenderFrame() override;
+	virtual void EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr) override;
+	virtual jCommandBufferManager_DX12* GetCommandBufferManager() const override { return CommandBufferManager; }
+	virtual jCommandBufferManager_DX12* GetCopyCommandBufferManager() const { return CopyCommandBufferManager; }
 };
 
 extern jRHI_DX12* g_rhi_dx12;

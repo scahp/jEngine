@@ -169,8 +169,10 @@ void jOnlineDescriptorHeapBlocks_DX12::Initialize(EDescriptorHeapTypeDX12 InHeap
     DescriptorSize = g_rhi_dx12->Device->GetDescriptorHandleIncrementSize(HeapTypeDX12);
     NumOfDescriptors = InNumOfDescriptors;
 
-    DescriptorBlocks.resize((NumOfDescriptors / 20) + ((NumOfDescriptors % 20) ? 1 : 0));
-    OnlineDescriptorHeap.resize((NumOfDescriptors / 20) + ((NumOfDescriptors % 20) ? 1 : 0));
+    DescriptorBlocks.resize((NumOfDescriptors / jDescriptorBlock_DX12::NumOfDescriptorsInBlock) 
+        + ((NumOfDescriptors % jDescriptorBlock_DX12::NumOfDescriptorsInBlock) ? 1 : 0));
+    OnlineDescriptorHeap.resize((NumOfDescriptors / jDescriptorBlock_DX12::NumOfDescriptorsInBlock) 
+        + ((NumOfDescriptors % jDescriptorBlock_DX12::NumOfDescriptorsInBlock) ? 1 : 0));
 
     int32 Index = 0;
     for(uint32 i=0;i<NumOfDescriptors;++i)

@@ -18,26 +18,44 @@ void jFence_DX12::Release()
 
 void jFence_DX12::WaitForFence(uint64 InTimeoutNanoSec)
 {
-    if (LastFenceValue == uint64(-1))
+    if (LastFenceValue == InitialFenceValue)
         return;
 
     check(Fence);
-    if (Fence->GetCompletedValue() > LastFenceValue)
+    if (Fence->GetCompletedValue() >= LastFenceValue)
         return;
 
     check(FenceEvent);
-    WaitForSingleObjectEx(FenceEvent, (DWORD)(InTimeoutNanoSec / 1000000), false);;
-    LastFenceValue = uint64(-1);
+    WaitForSingleObjectEx(FenceEvent, (DWORD)(InTimeoutNanoSec / 1000000), false);
+    //LastFenceValue = InitialFenceValue;
 }
 
 bool jFence_DX12::SetFenceValue(uint64 InFenceValue)
 {
     LastFenceValue = InFenceValue;
-    if (Fence->GetCompletedValue() > InFenceValue)
+    if (Fence->GetCompletedValue() >= InFenceValue)
         return false;
 
     JFAIL(Fence->SetEventOnCompletion(InFenceValue, FenceEvent));
     return true;
+}
+
+bool jFence_DX12::IsComplete() const
+{
+    return (Fence->GetCompletedValue() >= LastFenceValue);
+}
+
+void jFence_DX12::SignalWithNextFenceValue(ID3D12CommandQueue* InCommandQueue, bool bWaitUntilExecuteComplete)
+{
+    const auto NewFenceValue = LastFenceValue + 1;
+    if (JFAIL(InCommandQueue->Signal(Fence.Get(), NewFenceValue)))
+        return;
+
+    if (SetFenceValue(NewFenceValue))
+    {
+        if (bWaitUntilExecuteComplete)
+            WaitForFence();
+    }
 }
 
 jFence* jFenceManager_DX12::GetOrCreateFence()
@@ -54,9 +72,9 @@ jFence* jFenceManager_DX12::GetOrCreateFence()
     check(g_rhi_dx12->Device);
 
     jFence_DX12* newFence = new jFence_DX12();
-    if (JOK(g_rhi_dx12->Device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&newFence->Fence))))
+    if (JOK(g_rhi_dx12->Device->CreateFence(jFence_DX12::InitialFenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&newFence->Fence))))
     {
-        newFence->FenceEvent = CreateEvent(nullptr, false, false, nullptr);
+        newFence->FenceEvent = ::CreateEvent(nullptr, false, false, nullptr);
         if (newFence->FenceEvent)
         {
             UsingFences.insert(newFence);

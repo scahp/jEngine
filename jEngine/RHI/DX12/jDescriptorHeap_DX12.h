@@ -91,12 +91,13 @@ struct jDescriptorBlock_DX12
     jDescriptor_DX12 Descriptors[NumOfDescriptorsInBlock];
 };
 
+class jOnlineDescriptorHeap_DX12;
 class jOnlineDescriptorHeapBlocks_DX12
 {
 public:
     static constexpr int32 NumOfFramesToWaitBeforeReleasing = 3;
 
-    void Initialize(EDescriptorHeapTypeDX12 InHeapType, uint32 InNumOfDescriptors = 1024);
+    void Initialize(EDescriptorHeapTypeDX12 InHeapType, uint32 InNumOfDescriptors = jDescriptorBlock_DX12::NumOfDescriptorsInBlock * 52);
     void Release();
 
     jOnlineDescriptorHeap_DX12* Alloc()
@@ -127,7 +128,7 @@ public:
     uint32 NumOfDescriptors = 0;
     std::set<uint32> FreeLists;
     
-    std::vector<class jOnlineDescriptorHeap_DX12*> OnlineDescriptorHeap;
+    std::vector<jOnlineDescriptorHeap_DX12*> OnlineDescriptorHeap;
     std::vector<jDescriptorBlock_DX12> DescriptorBlocks;
 
     mutable jMutexLock DescriptorBlockLock;

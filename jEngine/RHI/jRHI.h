@@ -410,7 +410,7 @@ public:
 	virtual void Finish() const {}
 	virtual std::shared_ptr<jRenderFrameContext> BeginRenderFrame() { return nullptr; }
     virtual void EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr) {}
-	virtual void QueueSubmit(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr, jSemaphore* InSignalSemaphore) {}
+	virtual void QueueSubmit(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr, class jSemaphore* InSignalSemaphore) {}
 
 	virtual jRasterizationStateInfo* CreateRasterizationState(const jRasterizationStateInfo& initializer) const { return nullptr; }
 	virtual jStencilOpStateInfo* CreateStencilOpStateInfo(const jStencilOpStateInfo& initializer) const { return nullptr; }

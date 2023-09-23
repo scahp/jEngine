@@ -16,6 +16,7 @@
 #include "jSpotLightDrawCommandGenerator.h"
 #include "RHI/jRenderTargetPool.h"
 #include "Material/jMaterial.h"
+#include "RHI/Vulkan/jRenderFrameContext_Vulkan.h"
 
 #define ASYNC_WITH_SETUP 1
 #define PARALLELFOR_WITH_PASSSETUP 1
@@ -1176,7 +1177,7 @@ void jRenderer::Render()
     {
         SCOPE_CPU_PROFILE(QueueSubmitAfterShadowPass);
         RenderFrameContextPtr->GetActiveCommandBuffer()->End();
-        RenderFrameContextPtr->QueueSubmitCurrentActiveCommandBuffer(g_rhi_vk->Swapchain->Images[FrameIndex]->RenderFinishedAfterShadow);
+        ((jRenderFrameContext_Vulkan*)RenderFrameContextPtr.get())->QueueSubmitCurrentActiveCommandBuffer(g_rhi_vk->Swapchain->Images[FrameIndex]->RenderFinishedAfterShadow);
         RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
     }
 
@@ -1187,7 +1188,7 @@ void jRenderer::Render()
     {
         SCOPE_CPU_PROFILE(QueueSubmitAfterBasePass);
         RenderFrameContextPtr->GetActiveCommandBuffer()->End();
-        RenderFrameContextPtr->QueueSubmitCurrentActiveCommandBuffer(g_rhi_vk->Swapchain->Images[FrameIndex]->RenderFinishedAfterBasePass);
+        ((jRenderFrameContext_Vulkan*)RenderFrameContextPtr.get())->QueueSubmitCurrentActiveCommandBuffer(g_rhi_vk->Swapchain->Images[FrameIndex]->RenderFinishedAfterBasePass);
         RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
     }
 

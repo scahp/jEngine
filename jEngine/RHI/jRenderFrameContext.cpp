@@ -22,19 +22,6 @@ bool jRenderFrameContext::EndActiveCommandBuffer()
     return CommandBuffer->End();
 }
 
-void jRenderFrameContext::QueueSubmitCurrentActiveCommandBuffer(jSemaphore* InSignalSemaphore)
-{
-    if (CommandBuffer)
-    {
-        g_rhi->QueueSubmit(shared_from_this(), InSignalSemaphore);
-        g_rhi->GetCommandBufferManager()->ReturnCommandBuffer(CommandBuffer);
-
-        // get new commandbuffer
-        CommandBuffer = g_rhi_vk->CommandBufferManager->GetOrCreateCommandBuffer();
-        g_rhi_vk->Swapchain->Images[FrameIndex]->CommandBufferFence = (VkFence)CommandBuffer->GetFenceHandle();
-    }
-}
-
 void jRenderFrameContext::Destroy()
 {
     if (SceneRenderTarget)
