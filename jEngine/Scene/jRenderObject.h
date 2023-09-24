@@ -2,7 +2,6 @@
 #include "Math\Vector.h"
 #include "Math\Matrix.h"
 #include "jBoundPrimitiveType.h"
-#include "RHI\Vulkan\jUniformBufferBlock_Vulkan.h"
 
 struct jVertexBuffer;
 struct jIndexBuffer;
@@ -120,7 +119,7 @@ private:
 	Vector Scale = Vector::OneVector;
 
 	bool NeedToUpdateRenderObjectUniformParameters = false;
-	jUniformBufferBlock_Vulkan RenderObjectUniformParameters;
+	IUniformBufferBlock* RenderObjectUniformParameters = nullptr;
 	jShaderBindingInstance* RenderObjectShaderBindingInstance = nullptr;
 
 	// Special code for PBR test

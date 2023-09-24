@@ -83,12 +83,12 @@ public:
 
 struct jDescriptorBlock_DX12
 {
-    static constexpr int32 NumOfDescriptorsInBlock = 20;
+    static constexpr int32 MaxDescriptorsInBlock = 2000;
     class jOnlineDescriptorHeapBlocks_DX12* DescriptorHeapBlocks = nullptr;
     EDescriptorHeapTypeDX12 HeapType = EDescriptorHeapTypeDX12::CBV_SRV_UAV;
     int32 Index = 0;
     int32 AllocatedSize = 0;
-    jDescriptor_DX12 Descriptors[NumOfDescriptorsInBlock];
+    jDescriptor_DX12 Descriptors[MaxDescriptorsInBlock];
 };
 
 class jOnlineDescriptorHeap_DX12;
@@ -97,7 +97,7 @@ class jOnlineDescriptorHeapBlocks_DX12
 public:
     static constexpr int32 NumOfFramesToWaitBeforeReleasing = 3;
 
-    void Initialize(EDescriptorHeapTypeDX12 InHeapType, uint32 InNumOfDescriptors = jDescriptorBlock_DX12::NumOfDescriptorsInBlock * 52);
+    void Initialize(EDescriptorHeapTypeDX12 InHeapType, uint32 InNumOfDescriptorsInBlock = jDescriptorBlock_DX12::MaxDescriptorsInBlock, uint32 InNumOfBlock = 100);
     void Release();
 
     jOnlineDescriptorHeap_DX12* Alloc()
@@ -158,7 +158,7 @@ public:
     }
     jDescriptor_DX12 Alloc()
     {
-        if (NumOfAllocated < jDescriptorBlock_DX12::NumOfDescriptorsInBlock)
+        if (NumOfAllocated < jDescriptorBlock_DX12::MaxDescriptorsInBlock)
             return DescriptorBlocks->Descriptors[NumOfAllocated++];
 
         return jDescriptor_DX12();
@@ -167,6 +167,9 @@ public:
     {
         NumOfAllocated = 0;
     }
+    int32 GetNumOfAllocated() const { return NumOfAllocated; }
+    D3D12_GPU_DESCRIPTOR_HANDLE GetGPUHandle(size_t InIndex) const { return D3D12_GPU_DESCRIPTOR_HANDLE(GPUHandle.ptr + InIndex * DescriptorBlocks->DescriptorHeapBlocks->DescriptorSize); }
+
     D3D12_CPU_DESCRIPTOR_HANDLE GetCPUHandle() const { return CPUHandle; }
     D3D12_GPU_DESCRIPTOR_HANDLE GetGPUHandle() const { return GPUHandle; }
     ID3D12DescriptorHeap* GetHeap() const { return Heap; }

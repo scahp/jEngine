@@ -207,13 +207,13 @@ bool jVertexBuffer_DX12::Initialize(const std::shared_ptr<jVertexStreamData>& In
 
 void jVertexBuffer_DX12::Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const
 {
-    //check(InRenderFrameContext);
-    //check(InRenderFrameContext->GetActiveCommandBuffer());
-    //vkCmdBindVertexBuffers((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), BindInfos.StartBindingIndex
-    //    , (uint32)BindInfos.Buffers.size(), &BindInfos.Buffers[0], &BindInfos.Offsets[0]);
+    auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
+    check(CommandBuffer_DX12);
+    
+    Bind(CommandBuffer_DX12);
 }
 
-void jVertexBuffer_DX12::Bind(jCommandBuffer_DX12* InCommandList)
+void jVertexBuffer_DX12::Bind(jCommandBuffer_DX12* InCommandList) const
 {
     check(InCommandList->CommandList);
     InCommandList->CommandList->IASetPrimitiveTopology(GetTopology());

@@ -9,6 +9,8 @@ void jRootParameterExtractor::Extract(const jShaderBindingArray& InShaderBinding
 {
     // InRootParameters 의 맨 앞쪽에 inline descriptor 를 무조건 먼저 배치함.
 
+#define FORCE_USE_D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND 1
+
     for (int32 i = 0; i < InShaderBindingArray.NumOfData; ++i)
     {
         const jShaderBinding* ShaderBinding = InShaderBindingArray[i];
@@ -42,8 +44,12 @@ void jRootParameterExtractor::Extract(const jShaderBindingArray& InShaderBinding
                 range.NumDescriptors = ShaderBinding->NumOfDescriptors;
                 range.BaseShaderRegister = CBVIndex;
                 range.RegisterSpace = InRegisterSpace;
+#if FORCE_USE_D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND
+                range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+#else
                 range.OffsetInDescriptorsFromTableStart = (ShaderBinding->BindingPoint == -1)
                     ? D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND : ShaderBinding->BindingPoint;
+#endif
                 Descriptors.emplace_back(range);
             }
 
@@ -74,8 +80,12 @@ void jRootParameterExtractor::Extract(const jShaderBindingArray& InShaderBinding
                 range.NumDescriptors = ShaderBinding->NumOfDescriptors;
                 range.BaseShaderRegister = SRVIndex;
                 range.RegisterSpace = InRegisterSpace;
+#if FORCE_USE_D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND
+                range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+#else
                 range.OffsetInDescriptorsFromTableStart = (ShaderBinding->BindingPoint == -1)
                     ? D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND : ShaderBinding->BindingPoint;
+#endif
                 Descriptors.emplace_back(range);
             }
 
@@ -105,8 +115,12 @@ void jRootParameterExtractor::Extract(const jShaderBindingArray& InShaderBinding
                 range.NumDescriptors = ShaderBinding->NumOfDescriptors;
                 range.BaseShaderRegister = UAVIndex;
                 range.RegisterSpace = InRegisterSpace;
+#if FORCE_USE_D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND
+                range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+#else
                 range.OffsetInDescriptorsFromTableStart = (ShaderBinding->BindingPoint == -1)
                     ? D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND : ShaderBinding->BindingPoint;
+#endif
                 Descriptors.emplace_back(range);
             }
 
@@ -121,8 +135,12 @@ void jRootParameterExtractor::Extract(const jShaderBindingArray& InShaderBinding
             range.NumDescriptors = ShaderBinding->NumOfDescriptors;
             range.BaseShaderRegister = SamplerIndex;
             range.RegisterSpace = InRegisterSpace;
+#if FORCE_USE_D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND
+            range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+#else
             range.OffsetInDescriptorsFromTableStart = (ShaderBinding->BindingPoint == -1)
                 ? D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND : ShaderBinding->BindingPoint;
+#endif
             SamplerDescriptors.emplace_back(range);
 
             SamplerIndex += ShaderBinding->NumOfDescriptors;

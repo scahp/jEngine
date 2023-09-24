@@ -145,7 +145,7 @@ void jDescriptorHeap_DX12::ProcessPendingDescriptorPoolFree()
 //////////////////////////////////////////////////////////////////////////
 // jOnlineDescriptorHeap_DX12
 //////////////////////////////////////////////////////////////////////////
-void jOnlineDescriptorHeapBlocks_DX12::Initialize(EDescriptorHeapTypeDX12 InHeapType, uint32 InNumOfDescriptors /*= 1024*/)
+void jOnlineDescriptorHeapBlocks_DX12::Initialize(EDescriptorHeapTypeDX12 InHeapType, uint32 InNumOfDescriptorsInBlock, uint32 InNumOfBlock)
 {
     jScopedLock s(&DescriptorBlockLock);
 
@@ -153,8 +153,10 @@ void jOnlineDescriptorHeapBlocks_DX12::Initialize(EDescriptorHeapTypeDX12 InHeap
 
     const auto HeapTypeDX12 = GetDX12DescriptorHeapType(InHeapType);
 
+    NumOfDescriptors = InNumOfDescriptorsInBlock * InNumOfBlock;
+
     D3D12_DESCRIPTOR_HEAP_DESC heapDesc = { };
-    heapDesc.NumDescriptors = InNumOfDescriptors;
+    heapDesc.NumDescriptors = NumOfDescriptors;
     heapDesc.Type = HeapTypeDX12;
     heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 
@@ -167,18 +169,16 @@ void jOnlineDescriptorHeapBlocks_DX12::Initialize(EDescriptorHeapTypeDX12 InHeap
     GPUHandleStart = Heap->GetGPUDescriptorHandleForHeapStart();
 
     DescriptorSize = g_rhi_dx12->Device->GetDescriptorHandleIncrementSize(HeapTypeDX12);
-    NumOfDescriptors = InNumOfDescriptors;
+    
 
-    DescriptorBlocks.resize((NumOfDescriptors / jDescriptorBlock_DX12::NumOfDescriptorsInBlock) 
-        + ((NumOfDescriptors % jDescriptorBlock_DX12::NumOfDescriptorsInBlock) ? 1 : 0));
-    OnlineDescriptorHeap.resize((NumOfDescriptors / jDescriptorBlock_DX12::NumOfDescriptorsInBlock) 
-        + ((NumOfDescriptors % jDescriptorBlock_DX12::NumOfDescriptorsInBlock) ? 1 : 0));
+    DescriptorBlocks.resize(InNumOfBlock);
+    OnlineDescriptorHeap.resize(InNumOfBlock);
 
     int32 Index = 0;
     for(uint32 i=0;i<NumOfDescriptors;++i)
     {
         int32 AllocatedSize = DescriptorBlocks[Index].AllocatedSize;
-        if (AllocatedSize >= jDescriptorBlock_DX12::NumOfDescriptorsInBlock)
+        if (AllocatedSize >= InNumOfDescriptorsInBlock)
         {
             ++Index;
             AllocatedSize = DescriptorBlocks[Index].AllocatedSize;

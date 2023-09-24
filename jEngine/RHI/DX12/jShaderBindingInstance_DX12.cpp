@@ -194,6 +194,7 @@ void jShaderBindingInstance_DX12::CopyToOnlineDescriptorHeap(jCommandBuffer_DX12
     check(g_rhi_dx12);
     check(g_rhi_dx12->Device);
 
+    if (Descriptors.size() > 0)
     {
         std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> DestDescriptor;
         DestDescriptor.resize(Descriptors.size());
@@ -214,6 +215,7 @@ void jShaderBindingInstance_DX12::CopyToOnlineDescriptorHeap(jCommandBuffer_DX12
             , (uint32)SrcDescriptor.size(), &SrcDescriptor[0], nullptr, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
 
+    if (SamplerDescriptors.size() > 0)
     {
         std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> DestSamplerDescriptor;
         DestSamplerDescriptor.resize(SamplerDescriptors.size());

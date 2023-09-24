@@ -69,14 +69,18 @@ void jRenderObjectGeometryData::UpdateVertexStream()
 
 // jRenderObject
 jRenderObject::jRenderObject()
-    : RenderObjectUniformParameters(jNameStatic("RenderObjectUniformParameters"), jLifeTimeType::MultiFrame)
 {
-    RenderObjectUniformParameters.Init(sizeof(jRenderObjectUniformBuffer));
+    RenderObjectUniformParameters = g_rhi->CreateUniformBufferBlock(
+        jNameStatic("RenderObjectUniformParameters"), jLifeTimeType::MultiFrame, sizeof(jRenderObjectUniformBuffer));
 }
 
 jRenderObject::~jRenderObject()
 {
-
+    if (RenderObjectUniformParameters)
+    {
+        delete RenderObjectUniformParameters;
+        RenderObjectUniformParameters = nullptr;
+    }
 }
 
 void jRenderObject::CreateRenderObject(const std::shared_ptr<jRenderObjectGeometryData>& InRenderObjectGeometryData)
@@ -195,14 +199,14 @@ jShaderBindingInstance* jRenderObject::CreateShaderBindingInstance()
         ubo.Metallic = gOptions.Metallic;
         ubo.Roughness = gOptions.Roughness;
 
-        RenderObjectUniformParameters.UpdateBufferData(&ubo, sizeof(ubo));
+        RenderObjectUniformParameters->UpdateBufferData(&ubo, sizeof(ubo));
 
         int32 BindingPoint = 0;
         jShaderBindingArray ShaderBindingArray;
         jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
 
         ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::ALL_GRAPHICS
-            , ResourceInlineAllactor.Alloc<jUniformBufferResource>(&RenderObjectUniformParameters));
+            , ResourceInlineAllactor.Alloc<jUniformBufferResource>(RenderObjectUniformParameters));
 
         if (RenderObjectShaderBindingInstance)
             RenderObjectShaderBindingInstance->Free();

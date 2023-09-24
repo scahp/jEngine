@@ -215,9 +215,14 @@ void jPipelineStateInfo_DX12::Bind(const std::shared_ptr<jRenderFrameContext>& I
     //    vkCmdBindPipeline((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipeline);
     //else
     //    vkCmdBindPipeline((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, vkPipeline);
+
+    auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
+    check(CommandBuffer_DX12);
+
+    Bind(CommandBuffer_DX12);
 }
 
-void jPipelineStateInfo_DX12::Bind(jCommandBuffer_DX12* InCommandList)
+void jPipelineStateInfo_DX12::Bind(jCommandBuffer_DX12* InCommandList) const
 {
     check(InCommandList->CommandList);
     check(PipelineState);

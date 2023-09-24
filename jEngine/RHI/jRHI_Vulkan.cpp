@@ -999,32 +999,32 @@ void jRHI_Vulkan::DrawArraysInstanced(const std::shared_ptr<jRenderFrameContext>
 	vkCmdDraw((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), vertCount, instanceCount, vertStartIndex, 0);
 }
 
-void jRHI_Vulkan::DrawElements(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 count) const
+void jRHI_Vulkan::DrawElements(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 indexCount) const
 {
     check(InRenderFrameContext);
     check(InRenderFrameContext->GetActiveCommandBuffer());
-	vkCmdDrawIndexed((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), count, 1, startIndex, 0, 0);
+	vkCmdDrawIndexed((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), indexCount, 1, startIndex, 0, 0);
 }
 
-void jRHI_Vulkan::DrawElementsInstanced(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 count, int32 instanceCount) const
+void jRHI_Vulkan::DrawElementsInstanced(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 indexCount, int32 instanceCount) const
 {
     check(InRenderFrameContext);
     check(InRenderFrameContext->GetActiveCommandBuffer());
-	vkCmdDrawIndexed((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), count, instanceCount, startIndex, 0, 0);
+	vkCmdDrawIndexed((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), indexCount, instanceCount, startIndex, 0, 0);
 }
 
-void jRHI_Vulkan::DrawElementsBaseVertex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 count, int32 baseVertexIndex) const
+void jRHI_Vulkan::DrawElementsBaseVertex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 indexCount, int32 baseVertexIndex) const
 {
     check(InRenderFrameContext);
     check(InRenderFrameContext->GetActiveCommandBuffer());
-	vkCmdDrawIndexed((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), count, 1, startIndex, baseVertexIndex, 0);
+	vkCmdDrawIndexed((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), indexCount, 1, startIndex, baseVertexIndex, 0);
 }
 
-void jRHI_Vulkan::DrawElementsInstancedBaseVertex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 count, int32 baseVertexIndex, int32 instanceCount) const
+void jRHI_Vulkan::DrawElementsInstancedBaseVertex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 indexCount, int32 baseVertexIndex, int32 instanceCount) const
 {
 	check(InRenderFrameContext);
 	check(InRenderFrameContext->GetActiveCommandBuffer());
-	vkCmdDrawIndexed((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), count, instanceCount, startIndex, baseVertexIndex, 0);
+	vkCmdDrawIndexed((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), indexCount, instanceCount, startIndex, baseVertexIndex, 0);
 }
 
 void jRHI_Vulkan::DrawIndirect(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, jBuffer* buffer, int32 startIndex, int32 drawCount) const

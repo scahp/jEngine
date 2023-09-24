@@ -3,7 +3,6 @@
 #include "Shader/jShader.h"
 #include "Scene/Light/jDirectionalLight.h"
 #include "Scene/jCamera.h"
-#include "Vulkan/jUniformBufferBlock_Vulkan.h"
 #include "Material/jMaterial.h"
 
 jTexture* GWhiteTexture = nullptr;
@@ -160,8 +159,7 @@ void jView::PrepareViewUniformBufferShaderBindingInstance()
     ubo.VP = Camera->Projection * Camera->View;
 	ubo.EyeWorld = Camera->Pos;
 
-    ViewUniformBufferPtr = std::make_shared<jUniformBufferBlock_Vulkan>(jNameStatic("ViewUniformParameters"), jLifeTimeType::OneFrame);
-    ViewUniformBufferPtr->Init(sizeof(ubo));
+	ViewUniformBufferPtr = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(jNameStatic("ViewUniformParameters"), jLifeTimeType::OneFrame, sizeof(ubo)));
     ViewUniformBufferPtr->UpdateBufferData(&ubo, sizeof(ubo));
 
     int32 BindingPoint = 0;
@@ -191,4 +189,23 @@ void jView::GetShaderBindingInstance(jShaderBindingInstanceArray& OutShaderBindi
 			}
 		}
 	}
+}
+
+void jView::GetShaderBindingLayout(jShaderBindingsLayoutArray& OutShaderBindingsLayoutArray, bool InIsForwardRenderer /*= false*/) const
+{
+	OutShaderBindingsLayoutArray.Add(ViewUniformBufferShaderBindingInstance->ShaderBindingsLayouts);
+
+    // Get light uniform buffers
+    if (InIsForwardRenderer)
+    {
+        for (int32 i = 0; i < Lights.size(); ++i)
+        {
+            const jViewLight& ViewLight = Lights[i];
+            if (ViewLight.Light)
+            {
+                check(ViewLight.ShaderBindingInstance);
+				OutShaderBindingsLayoutArray.Add(ViewLight.ShaderBindingInstance->ShaderBindingsLayouts);
+            }
+        }
+    }
 }

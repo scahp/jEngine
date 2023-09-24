@@ -6,8 +6,6 @@
 #include "RHI/jRenderPass.h"
 #include "Shader/jShader.h"
 #include "RHI/jPipelineStateInfo.h"
-#include "RHI/Vulkan/jTexture_Vulkan.h"
-#include "RHI/Vulkan/jVulkanBufferUtil.h"
 #include "jOptions.h"
 #include "Material/jMaterial.h"
 
@@ -66,9 +64,12 @@ void jDrawCommand::PrepareToDraw(bool InIsPositionOnly)
         }
         else
         {
-            jShaderBindingInstance* MaterialShaderBindingInstance = GDefaultMaterial->CreateShaderBindingInstance();
-            if (MaterialShaderBindingInstance)
-                ShaderBindingInstanceArray.Add(MaterialShaderBindingInstance);
+            if (GDefaultMaterial)
+            {
+                jShaderBindingInstance* MaterialShaderBindingInstance = GDefaultMaterial->CreateShaderBindingInstance();
+                if (MaterialShaderBindingInstance)
+                    ShaderBindingInstanceArray.Add(MaterialShaderBindingInstance);
+            }
         }
     }
 
@@ -87,6 +88,7 @@ void jDrawCommand::PrepareToDraw(bool InIsPositionOnly)
             ShaderBindingInstanceCombiner.DynamicOffsets.Add((void*)pDynamicOffsetTest->data(), (int32)pDynamicOffsetTest->size());
         }
     }
+    ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
 
     const auto& RenderObjectGeoDataPtr = RenderObject->GeometryDataPtr;
 
@@ -102,7 +104,7 @@ void jDrawCommand::PrepareToDraw(bool InIsPositionOnly)
     }
 
     // Create Pipeline
-    CurrentPipelineStateInfo = (jPipelineStateInfo_Vulkan*)g_rhi->CreatePipelineStateInfo(PipelineStateFixed, Shader
+    CurrentPipelineStateInfo = (jPipelineStateInfo*)g_rhi->CreatePipelineStateInfo(PipelineStateFixed, Shader
         , VertexBufferArray, RenderPass, ShaderBindingLayoutArray, PushConstant, SubpassIndex);
 
     IsPositionOnly = InIsPositionOnly;
@@ -123,6 +125,7 @@ void jDrawCommand::Draw() const
     // Bind Pipeline
     CurrentPipelineStateInfo->Bind(RenderFrameContextPtr);
 
+#if USE_VULKAN
     if (PushConstant && PushConstant->IsValid())
     {
         const jResourceContainer<jPushConstantRange>* pushConstantRanges = PushConstant->GetPushConstantRanges();
@@ -136,6 +139,7 @@ void jDrawCommand::Draw() const
             }
         }
     }
+#endif
 
     RenderObject->BindBuffers(RenderFrameContextPtr, IsPositionOnly, OverrideInstanceData);
 

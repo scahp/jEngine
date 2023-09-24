@@ -270,6 +270,7 @@ public:
 
 	void PrepareViewUniformBufferShaderBindingInstance();
 	void GetShaderBindingInstance(jShaderBindingInstanceArray& OutShaderBindingInstanceArray, bool InIsForwardRenderer = false) const;
+	void GetShaderBindingLayout(jShaderBindingsLayoutArray& OutShaderBindingsLayoutArray, bool InIsForwardRenderer = false) const;
 
 	const jCamera* Camera = nullptr;
 	std::vector<jViewLight> Lights;
@@ -280,6 +281,8 @@ public:
 // BindGraphicsShaderBindingInstances 에서 바인딩 할 ShaderBindingInstance 배열을 얻어오는데 사용하는 구조체
 struct jShaderBindingInstanceCombiner
 {
+	const jShaderBindingInstanceArray* ShaderBindingInstanceArray = nullptr;
+
     jResourceContainer<void*> DescriptorSetHandles;
     jResourceContainer<uint32> DynamicOffsets;
 };
@@ -325,10 +328,10 @@ public:
 	virtual void SetTexture(int32 index, const jTexture* texture) const {}
 	virtual void DrawArrays(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 vertStartIndex, int32 vertCount) const {}
 	virtual void DrawArraysInstanced(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 vertStartIndex, int32 vertCount, int32 instanceCount) const {}
-	virtual void DrawElements(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 count) const {}
-	virtual void DrawElementsInstanced(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 count, int32 instanceCount) const {}
-	virtual void DrawElementsBaseVertex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 count, int32 baseVertexIndex) const {}
-	virtual void DrawElementsInstancedBaseVertex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 count, int32 baseVertexIndex, int32 instanceCount) const {}
+	virtual void DrawElements(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 indexCount) const {}
+	virtual void DrawElementsInstanced(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 indexCount, int32 instanceCount) const {}
+	virtual void DrawElementsBaseVertex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 indexCount, int32 baseVertexIndex) const {}
+	virtual void DrawElementsInstancedBaseVertex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 indexCount, int32 baseVertexIndex, int32 instanceCount) const {}
 	virtual void DrawIndirect(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, jBuffer* buffer, int32 startIndex, int32 drawCount) const {}
 	virtual void DrawElementsIndirect(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, jBuffer* buffer, int32 startIndex, int32 drawCount) const {}
 	virtual void DispatchCompute(uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ) const {}

@@ -26,6 +26,8 @@
 #include "jOptions.h"
 #include "../jRenderFrameContext.h"
 #include "jRenderFrameContext_DX12.h"
+#include "jPrimitiveUtil.h"
+#include "Scene/jRenderObject.h"
 
 #define USE_INLINE_DESCRIPTOR 0												// InlineDescriptor 를 쓸것인지? DescriptorTable 를 쓸것인지 여부
 #define USE_ONE_FRAME_BUFFER_AND_DESCRIPTOR (USE_INLINE_DESCRIPTOR && 1)	// 현재 프레임에만 사용하고 버리는 임시 Descriptor 와 Buffer 를 사용할 것인지 여부
@@ -558,8 +560,8 @@ bool jRHI_DX12::InitRHI()
 	DescriptorHeaps.Initialize(EDescriptorHeapTypeDX12::CBV_SRV_UAV);
 	SamplerDescriptorHeaps.Initialize(EDescriptorHeapTypeDX12::SAMPLER);
 
-	OnlineDescriptorHeapBlocks.Initialize(EDescriptorHeapTypeDX12::CBV_SRV_UAV);
-	OnlineSamplerDescriptorHeapBlocks.Initialize(EDescriptorHeapTypeDX12::SAMPLER);
+	OnlineDescriptorHeapBlocks.Initialize(EDescriptorHeapTypeDX12::CBV_SRV_UAV, jDescriptorBlock_DX12::MaxDescriptorsInBlock, 250);
+	OnlineSamplerDescriptorHeapBlocks.Initialize(EDescriptorHeapTypeDX12::SAMPLER, 20, 102);
 
 	// 3. Swapchain
 	Swapchain = new jSwapchain_DX12();
@@ -896,13 +898,13 @@ bool jRHI_DX12::InitRHI()
 	}
     
 	
-	jRasterizationStateInfo_DX12* RasterizationStateInfo = (jRasterizationStateInfo_DX12*)TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, true, false, (EMSAASamples)1, true, 0.2f, false, false>::Create();
+	jRasterizationStateInfo_DX12* RasterizationStateInfo = (jRasterizationStateInfo_DX12*)TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::NONE, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, true, false, (EMSAASamples)1, true, 0.2f, false, false>::Create();
     jBlendingStateInfo_DX12* BlendStateInfo = (jBlendingStateInfo_DX12*)TBlendingStateInfo<true, EBlendFactor::SRC_ALPHA, EBlendFactor::ONE_MINUS_SRC_ALPHA, EBlendOp::ADD
         , EBlendFactor::ONE_MINUS_SRC_ALPHA, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
     jDepthStencilStateInfo_DX12* DepthStencilState = (jDepthStencilStateInfo_DX12*)TDepthStencilStateInfo<true, false, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
 
 
-	jPipelineStateFixedInfo FixedInfo(RasterizationStateInfo, DepthStencilState, BlendStateInfo
+	FixedPipelineStateInfo = jPipelineStateFixedInfo(RasterizationStateInfo, DepthStencilState, BlendStateInfo
 		, jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT), false);
 	{
 		{
@@ -947,8 +949,65 @@ bool jRHI_DX12::InitRHI()
 
 	jPushConstant* PushConstant = nullptr;
 
-	PipelineStateInfo = (jPipelineStateInfo_DX12*)g_rhi->CreatePipelineStateInfo(
-		&FixedInfo, GraphicsPipelineShader, VertexBufferArray, RenderPass, ShaderBindingsLayoutArray, nullptr, 0);
+    {
+        jShaderInfo shaderInfo(jNameStatic("TestVS2"), jNameStatic("Resource/Shaders/hlsl/DXSample.hlsl")
+            , jNameStatic(""), jNameStatic("VSMain"), EShaderAccessStageFlag::VERTEX);
+        GraphicsPipelineShader2.VertexShader = new jShader(shaderInfo);
+        GraphicsPipelineShader2.VertexShader->Initialize();
+    }
+
+    {
+        jShaderInfo shaderInfo(jNameStatic("TestPS2"), jNameStatic("Resource/Shaders/hlsl/DXSample.hlsl")
+            , jNameStatic(""), jNameStatic("PSMain"), EShaderAccessStageFlag::FRAGMENT);
+		GraphicsPipelineShader2.PixelShader = new jShader(shaderInfo);
+		GraphicsPipelineShader2.PixelShader->Initialize();
+    }
+
+	CubePrimitive = jPrimitiveUtil::CreateCube(Vector(-60.0f, 55.0f, -20.0f), Vector::OneVector, Vector(50.0f, 50.0f, 50.0f), Vector4(0.7f, 0.7f, 0.7f, 1.0f));
+
+	{
+        auto quad = jPrimitiveUtil::CreateQuad(Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), Vector(1000.0f, 1000.0f, 1000.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+        SpawnedObjects.push_back(quad);
+
+        auto gizmo = jPrimitiveUtil::CreateGizmo(Vector::ZeroVector, Vector::ZeroVector, Vector::OneVector);
+        SpawnedObjects.push_back(gizmo);
+
+        auto triangle = jPrimitiveUtil::CreateTriangle(Vector(60.0, 100.0, 20.0), Vector::OneVector, Vector(40.0, 40.0, 40.0), Vector4(0.5f, 0.1f, 1.0f, 1.0f));
+        SpawnedObjects.push_back(triangle);
+
+        auto cube = jPrimitiveUtil::CreateCube(Vector(-60.0f, 55.0f, -20.0f), Vector::OneVector, Vector(50.0f, 50.0f, 50.0f), Vector4(0.7f, 0.7f, 0.7f, 1.0f));
+        SpawnedObjects.push_back(cube);
+
+        auto cube2 = jPrimitiveUtil::CreateCube(Vector(-65.0f, 35.0f, 10.0f), Vector::OneVector, Vector(50.0f, 50.0f, 50.0f), Vector4(0.7f, 0.7f, 0.7f, 1.0f));
+        SpawnedObjects.push_back(cube2);
+
+        auto capsule = jPrimitiveUtil::CreateCapsule(Vector(30.0f, 30.0f, -80.0f), 40.0f, 10.0f, 20, Vector(1.0f), Vector4(1.0f, 1.0f, 0.0f, 1.0f));
+        SpawnedObjects.push_back(capsule);
+
+        auto cone = jPrimitiveUtil::CreateCone(Vector(0.0f, 50.0f, 60.0f), 40.0f, 20.0f, 15, Vector::OneVector, Vector4(1.0f, 1.0f, 0.0f, 1.0f));
+        SpawnedObjects.push_back(cone);
+
+        auto cylinder = jPrimitiveUtil::CreateCylinder(Vector(-30.0f, 60.0f, -60.0f), 20.0f, 10.0f, 20, Vector::OneVector, Vector4(0.0f, 0.0f, 1.0f, 1.0f));
+        SpawnedObjects.push_back(cylinder);
+
+        auto quad2 = jPrimitiveUtil::CreateQuad(Vector(-20.0f, 80.0f, 40.0f), Vector::OneVector, Vector(20.0f, 20.0f, 20.0f), Vector4(0.0f, 0.0f, 1.0f, 1.0f));
+        SpawnedObjects.push_back(quad2);
+
+        auto sphere = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f), 1.0, 150, Vector(30.0f), Vector4(0.8f, 0.0f, 0.0f, 1.0f));
+        SpawnedObjects.push_back(sphere);
+
+        auto sphere2 = jPrimitiveUtil::CreateSphere(Vector(150.0f, 5.0f, 0.0f), 1.0, 150, Vector(10.0f), Vector4(0.8f, 0.4f, 0.6f, 1.0f));
+        SpawnedObjects.push_back(sphere2);
+
+        auto billboard = jPrimitiveUtil::CreateBillobardQuad(Vector(0.0f, 60.0f, 80.0f), Vector::OneVector, Vector(20.0f, 20.0f, 20.0f), Vector4(1.0f, 0.0f, 1.0f, 1.0f), MainCamera);
+        SpawnedObjects.push_back(billboard);
+	}
+
+
+    const Vector mainCameraPos(172.66f, 160.0f, -180.63f);
+    const Vector mainCameraTarget(0.0f, 0.0f, 0.0f);
+    MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 10.0f, 1500.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT, true);
+	MainCamera->UpdateCamera();
 
 	//////////////////////////////////////////////////////////////////////////
     InitializeImGui();
@@ -1180,10 +1239,58 @@ void jRHI_DX12::Update()
 
 void jRHI_DX12::Render()
 {
+    //class jView
+    //{
+    //public:
+    //    jView() = default;
+    //    jView(const jCamera* camera, const std::vector<jLight*>& InLights);
+
+    //    void PrepareViewUniformBufferShaderBindingInstance();
+    //    void GetShaderBindingInstance(jShaderBindingInstanceArray& OutShaderBindingInstanceArray, bool InIsForwardRenderer = false) const;
+
+    //    const jCamera* Camera = nullptr;
+    //    std::vector<jViewLight> Lights;
+    //    std::shared_ptr<IUniformBufferBlock> ViewUniformBufferPtr;
+    //    jShaderBindingInstance* ViewUniformBufferShaderBindingInstance = nullptr;
+    //};
+
 	GetOneFrameUniformRingBuffer()->Reset();
+
+    jView View(MainCamera, {});
+    View.PrepareViewUniformBufferShaderBindingInstance();
+
+	CubePrimitive->RenderObjects[0]->UpdateWorldMatrix();
+
+    //jShaderBindingsLayoutArray ShaderBindingsLayoutArray2;
+    //View.GetShaderBindingLayout(ShaderBindingsLayoutArray2);
+    //ShaderBindingsLayoutArray2.Add(CubePrimitive->RenderObjects[0]->CreateShaderBindingInstance()->ShaderBindingsLayouts);
+
+    //jVertexBufferArray VertexBufferArray2;
+    //VertexBufferArray2.Add(CubePrimitive->RenderObjects[0]->GeometryDataPtr->VertexBuffer);
+    //PipelineStateInfo = (jPipelineStateInfo_DX12*)g_rhi->CreatePipelineStateInfo(
+    //    &FixedPipelineStateInfo, GraphicsPipelineShader2, VertexBufferArray2, RenderPass, ShaderBindingsLayoutArray2, nullptr, 0);
 
 	if (std::shared_ptr<jRenderFrameContext> renderFrameContext = g_rhi->BeginRenderFrame())
 	{
+		DrawCommands.resize(SpawnedObjects.size());
+        for (int32 i = 0; i < SpawnedObjects.size(); ++i)
+        {
+			SpawnedObjects[i]->RenderObjects[0]->UpdateWorldMatrix();
+
+            jShaderBindingsLayoutArray ShaderBindingsLayoutArray2;
+            View.GetShaderBindingLayout(ShaderBindingsLayoutArray2);
+            ShaderBindingsLayoutArray2.Add(SpawnedObjects[i]->RenderObjects[0]->CreateShaderBindingInstance()->ShaderBindingsLayouts);
+
+            jVertexBufferArray VertexBufferArray2;
+            VertexBufferArray2.Add(SpawnedObjects[i]->RenderObjects[0]->GeometryDataPtr->VertexBuffer);
+            PipelineStateInfo = (jPipelineStateInfo_DX12*)g_rhi->CreatePipelineStateInfo(
+                &FixedPipelineStateInfo, GraphicsPipelineShader2, VertexBufferArray2, RenderPass, ShaderBindingsLayoutArray2, nullptr, 0);
+
+			DrawCommands[i] = jDrawCommand(renderFrameContext, &View, SpawnedObjects[i]->RenderObjects[0], RenderPass
+                , GraphicsPipelineShader2, &FixedPipelineStateInfo, {}, nullptr);
+			DrawCommands[i].PrepareToDraw(false);
+        }
+
 		// Prepare
 		jCommandBuffer_DX12* CommandBuffer = (jCommandBuffer_DX12*)renderFrameContext->GetActiveCommandBuffer();
 		auto GraphicsCommandList = CommandBuffer->Get();
@@ -1232,46 +1339,52 @@ void jRHI_DX12::Render()
 			GraphicsCommandList->ResourceBarrier(1, &barrier);
 		}
 
-		RenderPass->BeginRenderPass(CommandBuffer, SwapchainRT->RTV.CPUHandle);
+        
 
-		PipelineStateInfo->Bind(CommandBuffer);
-
-		//////////////////////////////////////////////////////////////////////////
-		// Graphics ShaderBinding
-
-		// 이 부분은 구조화 하게 되면, 이전에 만들어둔 것을 그대로 사용
-		jShaderBindingInstanceArray ShaderBindingInstanceArray;
-		ShaderBindingInstanceArray.Add(TestShaderBindingInstance);
-		ShaderBindingInstanceArray.Add(TestShaderBindingInstance2);
-		GraphicsCommandList->SetGraphicsRootSignature(jShaderBindingsLayout_DX12::CreateRootSignature(ShaderBindingInstanceArray));
-
-		int32 RootParameterIndex = 0;
-		bool HasDescriptor = false;
-		bool HasSamplerDescriptor = false;
-		for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
+		if (RenderPass->BeginRenderPass(CommandBuffer, SwapchainRT->RTV.CPUHandle))
 		{
-			jShaderBindingInstance_DX12* Instance = (jShaderBindingInstance_DX12*)ShaderBindingInstanceArray[i];
-			jShaderBindingsLayout_DX12* Layout = (jShaderBindingsLayout_DX12*)(Instance->ShaderBindingsLayouts);
+			for(int32 i=0;i< DrawCommands.size();++i)
+			{
+				DrawCommands[i].Draw();
+			}
 
-			Instance->CopyToOnlineDescriptorHeap(CommandBuffer);
-			HasDescriptor |= Instance->Descriptors.size() > 0;
-			HasSamplerDescriptor |= Instance->SamplerDescriptors.size() > 0;
+			////////////////////////////////////////////////////////////////////////////
+			//// Graphics ShaderBinding
 
-			Instance->BindGraphics(CommandBuffer, RootParameterIndex);
+			//// 이 부분은 구조화 하게 되면, 이전에 만들어둔 것을 그대로 사용
+			//jShaderBindingInstanceArray ShaderBindingInstanceArray;
+			//ShaderBindingInstanceArray.Add(TestShaderBindingInstance);
+			//ShaderBindingInstanceArray.Add(TestShaderBindingInstance2);
+			//GraphicsCommandList->SetGraphicsRootSignature(jShaderBindingsLayout_DX12::CreateRootSignature(ShaderBindingInstanceArray));
+
+			//int32 RootParameterIndex = 0;
+			//bool HasDescriptor = false;
+			//bool HasSamplerDescriptor = false;
+			//for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
+			//{
+			//	jShaderBindingInstance_DX12* Instance = (jShaderBindingInstance_DX12*)ShaderBindingInstanceArray[i];
+			//	jShaderBindingsLayout_DX12* Layout = (jShaderBindingsLayout_DX12*)(Instance->ShaderBindingsLayouts);
+
+			//	Instance->CopyToOnlineDescriptorHeap(CommandBuffer);
+			//	HasDescriptor |= Instance->Descriptors.size() > 0;
+			//	HasSamplerDescriptor |= Instance->SamplerDescriptors.size() > 0;
+
+			//	Instance->BindGraphics(CommandBuffer, RootParameterIndex);
+			//}
+			//// DescriptorTable 은 항상 마지막에 바인딩
+			//if (HasDescriptor)
+			//	GraphicsCommandList->SetGraphicsRootDescriptorTable(RootParameterIndex++, CommandBuffer->OnlineDescriptorHeap->GetGPUHandle());		// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
+
+			//if (HasSamplerDescriptor)
+			//	GraphicsCommandList->SetGraphicsRootDescriptorTable(RootParameterIndex++, CommandBuffer->OnlineSamplerDescriptorHeap->GetGPUHandle());	// SamplerState test
+			////////////////////////////////////////////////////////////////////////////
+
+			//VertexBuffer->Bind(CommandBuffer);
+			//IndexBuffer->Bind(CommandBuffer);
+			//GraphicsCommandList->DrawIndexedInstanced(IndexBuffer->GetIndexCount(), 1, 0, 0, 0);
+
+			RenderPass->EndRenderPass();
 		}
-		// DescriptorTable 은 항상 마지막에 바인딩
-		if (HasDescriptor)
-			GraphicsCommandList->SetGraphicsRootDescriptorTable(RootParameterIndex++, CommandBuffer->OnlineDescriptorHeap->GetGPUHandle());		// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
-
-		if (HasSamplerDescriptor)
-			GraphicsCommandList->SetGraphicsRootDescriptorTable(RootParameterIndex++, CommandBuffer->OnlineSamplerDescriptorHeap->GetGPUHandle());	// SamplerState test
-		//////////////////////////////////////////////////////////////////////////
-
-		VertexBuffer->Bind(CommandBuffer);
-		IndexBuffer->Bind(CommandBuffer);
-		GraphicsCommandList->DrawIndexedInstanced(IndexBuffer->GetIndexCount(), 1, 0, 0, 0);
-
-		RenderPass->EndRenderPass();
 
 		RenderUI(GraphicsCommandList, SwapchainRT->Image.Get(), SwapchainRT->RTV.CPUHandle, m_imgui_SrvDescHeap.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
 
@@ -1339,6 +1452,8 @@ void jRHI_DX12::OnDeviceRestored()
 
 bool jRHI_DX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimized)
 {
+	return false;	// todo : need to support RecreateSwapchain
+
     JASSERT(InWidth > 0);
     JASSERT(InHeight > 0);
 
@@ -1797,4 +1912,154 @@ void jRHI_DX12::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& rende
 
 	CurrentFrameIndex = (CurrentFrameIndex + 1) % Swapchain->Images.size();
 	renderFrameContextPtr->Destroy();
+}
+
+IUniformBufferBlock* jRHI_DX12::CreateUniformBufferBlock(jName InName, jLifeTimeType InLifeTimeType, size_t InSize /*= 0*/) const
+{
+    auto uniformBufferBlock = new jUniformBufferBlock_DX12(InName, InLifeTimeType);
+    uniformBufferBlock->Init(InSize);
+    return uniformBufferBlock;
+}
+
+void jRHI_DX12::BindGraphicsShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineStateLayout
+	, const jShaderBindingInstanceCombiner& InShaderBindingInstanceCombiner, uint32 InFirstSet) const
+{
+    // 이 부분은 구조화 하게 되면, 이전에 만들어둔 것을 그대로 사용
+	if (InShaderBindingInstanceCombiner.ShaderBindingInstanceArray)
+	{
+        auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InCommandBuffer;
+        check(CommandBuffer_DX12);
+
+		const jShaderBindingInstanceArray& ShaderBindingInstanceArray = *(InShaderBindingInstanceCombiner.ShaderBindingInstanceArray);
+		CommandBuffer_DX12->CommandList->SetGraphicsRootSignature(jShaderBindingsLayout_DX12::CreateRootSignature(ShaderBindingInstanceArray));
+
+		int32 RootParameterIndex = 0;
+		bool HasDescriptor = false;
+		bool HasSamplerDescriptor = false;
+
+		const D3D12_GPU_DESCRIPTOR_HANDLE FirstGPUDescriptorHandle 
+			= CommandBuffer_DX12->OnlineDescriptorHeap->GetGPUHandle(CommandBuffer_DX12->OnlineDescriptorHeap->GetNumOfAllocated());
+		const D3D12_GPU_DESCRIPTOR_HANDLE FirstGPUSamplerDescriptorHandle 
+			= CommandBuffer_DX12->OnlineSamplerDescriptorHeap->GetGPUHandle(CommandBuffer_DX12->OnlineSamplerDescriptorHeap->GetNumOfAllocated());
+
+		for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
+		{
+			jShaderBindingInstance_DX12* Instance = (jShaderBindingInstance_DX12*)ShaderBindingInstanceArray[i];
+			jShaderBindingsLayout_DX12* Layout = (jShaderBindingsLayout_DX12*)(Instance->ShaderBindingsLayouts);
+
+			Instance->CopyToOnlineDescriptorHeap(CommandBuffer_DX12);
+
+			HasDescriptor |= Instance->Descriptors.size() > 0;
+			HasSamplerDescriptor |= Instance->SamplerDescriptors.size() > 0;
+
+			Instance->BindGraphics(CommandBuffer_DX12, RootParameterIndex);
+		}
+
+		// DescriptorTable 은 항상 마지막에 바인딩
+		if (HasDescriptor)
+			CommandBuffer_DX12->CommandList->SetGraphicsRootDescriptorTable(RootParameterIndex++, FirstGPUDescriptorHandle);		// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
+
+		if (HasSamplerDescriptor)
+			CommandBuffer_DX12->CommandList->SetGraphicsRootDescriptorTable(RootParameterIndex++, FirstGPUSamplerDescriptorHandle);	// SamplerState test
+	}
+}
+
+jVertexBuffer* jRHI_DX12::CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const
+{
+    if (!streamData)
+        return nullptr;
+
+	jVertexBuffer_DX12* vertexBuffer = new jVertexBuffer_DX12();
+    vertexBuffer->Initialize(streamData);
+    return vertexBuffer;
+}
+
+jIndexBuffer* jRHI_DX12::CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const
+{
+    if (!streamData)
+        return nullptr;
+
+    check(streamData);
+    check(streamData->Param);
+    jIndexBuffer_DX12* indexBuffer = new jIndexBuffer_DX12();
+    indexBuffer->Initialize(streamData);
+    return indexBuffer;
+}
+
+jShaderBindingInstance* jRHI_DX12::CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const
+{
+    auto shaderBindingsLayout = CreateShaderBindings(InShaderBindingArray);
+    check(shaderBindingsLayout);
+    return shaderBindingsLayout->CreateShaderBindingInstance(InShaderBindingArray, InType);
+}
+
+void jRHI_DX12::DrawArrays(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 vertStartIndex, int32 vertCount) const
+{
+    auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
+    check(CommandBuffer_DX12);
+
+	CommandBuffer_DX12->CommandList->DrawInstanced(vertCount, 1, vertStartIndex, 0);
+}
+
+void jRHI_DX12::DrawArraysInstanced(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type
+	, int32 vertStartIndex, int32 vertCount, int32 instanceCount) const
+{
+    auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
+    check(CommandBuffer_DX12);
+
+	CommandBuffer_DX12->CommandList->DrawInstanced(vertCount, instanceCount, vertStartIndex, 0);
+}
+
+void jRHI_DX12::DrawElements(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type
+	, int32 elementSize, int32 startIndex, int32 indexCount) const
+{
+    auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
+    check(CommandBuffer_DX12);
+	
+	CommandBuffer_DX12->CommandList->DrawIndexedInstanced(indexCount, 1, startIndex, 0, 0);
+}
+
+void jRHI_DX12::DrawElementsInstanced(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type
+	, int32 elementSize, int32 startIndex, int32 indexCount, int32 instanceCount) const
+{
+    auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
+    check(CommandBuffer_DX12);
+
+    CommandBuffer_DX12->CommandList->DrawIndexedInstanced(indexCount, instanceCount, startIndex, 0, 0);
+}
+
+void jRHI_DX12::DrawElementsBaseVertex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type
+	, int32 elementSize, int32 startIndex, int32 indexCount, int32 baseVertexIndex) const
+{
+    auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
+    check(CommandBuffer_DX12);
+
+    CommandBuffer_DX12->CommandList->DrawIndexedInstanced(indexCount, 1, startIndex, baseVertexIndex, 0);
+}
+
+void jRHI_DX12::DrawElementsInstancedBaseVertex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext
+	, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 indexCount, int32 baseVertexIndex, int32 instanceCount) const
+{
+    auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
+    check(CommandBuffer_DX12);
+
+    CommandBuffer_DX12->CommandList->DrawIndexedInstanced(indexCount, instanceCount, startIndex, baseVertexIndex, 0);
+}
+
+void jRHI_DX12::DrawIndirect(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type
+	, jBuffer* buffer, int32 startIndex, int32 drawCount) const
+{
+    auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
+    check(CommandBuffer_DX12);
+
+	check(0);
+}
+
+void jRHI_DX12::DrawElementsIndirect(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type
+	, jBuffer* buffer, int32 startIndex, int32 drawCount) const
+{
+    auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
+    check(CommandBuffer_DX12);
+
+	check(0);
 }

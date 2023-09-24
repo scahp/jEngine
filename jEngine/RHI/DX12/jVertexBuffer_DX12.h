@@ -101,5 +101,5 @@ struct jVertexBuffer_DX12 : public jVertexBuffer
     virtual bool Initialize(const std::shared_ptr<jVertexStreamData>& InStreamData) override;
     virtual void Bind(const jShader* shader) const override {}
     virtual void Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const override;
-    virtual void Bind(jCommandBuffer_DX12* InCommandList);
+    virtual void Bind(jCommandBuffer_DX12* InCommandList) const;
 };

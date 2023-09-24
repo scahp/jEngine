@@ -42,7 +42,7 @@ public:
     jGraphicsPipelineShader Shader;
     jRenderObject* RenderObject = nullptr;
     jPipelineStateFixedInfo* PipelineStateFixed = nullptr;
-    jPipelineStateInfo_Vulkan* CurrentPipelineStateInfo = nullptr;
+    jPipelineStateInfo* CurrentPipelineStateInfo = nullptr;
     const jPushConstant* PushConstant = nullptr;
     const jVertexBuffer* OverrideInstanceData = nullptr;
     std::shared_ptr<jRenderFrameContext> RenderFrameContextPtr;

@@ -257,7 +257,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
-		streamParam->Name = jName("Pos");
+		streamParam->Name = jName("POSITION");
 		streamParam->Data.resize(elementCount * 3);
 		streamParam->Stride = sizeof(float) * 3;
 		memcpy(&streamParam->Data[0], &meshData->Vertices[0], meshData->Vertices.size() * sizeof(Vector));
@@ -271,7 +271,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
-		streamParam->Name = jName("Normal");
+		streamParam->Name = jName("NORMAL");
 		streamParam->Data.resize(elementCount * 3);
 		streamParam->Stride = sizeof(float) * 3;
 		memcpy(&streamParam->Data[0], &meshData->Normals[0], meshData->Normals.size() * sizeof(Vector));
@@ -285,7 +285,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
-		streamParam->Name = jName("Tangent");
+		streamParam->Name = jName("TANGENT");
 		streamParam->Data.resize(elementCount * 3);
 		streamParam->Stride = sizeof(float) * 3;
 		memcpy(&streamParam->Data[0], &meshData->Tangents[0], meshData->Tangents.size() * sizeof(Vector));
@@ -310,7 +310,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 2));
-		streamParam->Name = jName("TexCoord");
+		streamParam->Name = jName("TEXCOORD");
 		streamParam->Data.resize(elementCount * 2);
 		streamParam->Stride = sizeof(float) * 2;
 		memcpy(&streamParam->Data[0], &meshData->TexCoord[0], meshData->TexCoord.size() * sizeof(Vector2));

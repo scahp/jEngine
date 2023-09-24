@@ -14,6 +14,7 @@
 #include "jFenceManager_DX12.h"
 #include "jUniformBufferBlock_DX12.h"
 #include "jPipelineStateInfo_DX12.h"
+#include "Renderer/jDrawCommand.h"
 
 class jSwapchain_DX12;
 struct jBuffer_DX12;
@@ -361,6 +362,30 @@ public:
 	virtual void EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr) override;
 	virtual jCommandBufferManager_DX12* GetCommandBufferManager() const override { return CommandBufferManager; }
 	virtual jCommandBufferManager_DX12* GetCopyCommandBufferManager() const { return CopyCommandBufferManager; }
+
+	class jObject* CubePrimitive = nullptr;
+	jPipelineStateFixedInfo FixedPipelineStateInfo;
+	class jCamera* MainCamera = nullptr;
+	jGraphicsPipelineShader GraphicsPipelineShader2;
+	std::vector<jObject*> SpawnedObjects;
+	std::vector<jDrawCommand> DrawCommands;
+
+	virtual IUniformBufferBlock* CreateUniformBufferBlock(jName InName, jLifeTimeType InLifeTimeType, size_t InSize = 0) const override;
+    virtual void BindGraphicsShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineStateLayout
+        , const jShaderBindingInstanceCombiner& InShaderBindingInstanceCombiner, uint32 InFirstSet) const override;
+
+	virtual jVertexBuffer* CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const override;
+	virtual jIndexBuffer* CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const override;
+	virtual jShaderBindingInstance* CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const override;
+
+	virtual void DrawArrays(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 vertStartIndex, int32 vertCount) const override;
+	virtual void DrawArraysInstanced(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 vertStartIndex, int32 vertCount, int32 instanceCount) const override;
+    virtual void DrawElements(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 indexCount) const override;
+    virtual void DrawElementsInstanced(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 indexCount, int32 instanceCount) const override;
+    virtual void DrawElementsBaseVertex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 indexCount, int32 baseVertexIndex) const override;
+    virtual void DrawElementsInstancedBaseVertex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 indexCount, int32 baseVertexIndex, int32 instanceCount) const override;
+    virtual void DrawIndirect(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, jBuffer* buffer, int32 startIndex, int32 drawCount) const override;
+    virtual void DrawElementsIndirect(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, jBuffer* buffer, int32 startIndex, int32 drawCount) const override;
 };
 
 extern jRHI_DX12* g_rhi_dx12;

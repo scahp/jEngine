@@ -899,5 +899,8 @@
     <None Include="Resource\Shaders\hlsl\DXSampleHelloTriangle.hlsl">
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
+    <None Include="Resource\Shaders\hlsl\DXSample.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
   </ItemGroup>
 </Project>

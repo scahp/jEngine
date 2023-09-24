@@ -5,31 +5,13 @@
 
 void jIndexBuffer_DX12::Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const
 {
-    //check(IndexStreamData->Param->Attributes.size());
-    //VkIndexType IndexType = VK_INDEX_TYPE_UINT16;
-    //switch (IndexStreamData->Param->Attributes[0].UnderlyingType)
-    //{
-    //case EBufferElementType::BYTE:
-    //    IndexType = VK_INDEX_TYPE_UINT8_EXT;
-    //    break;
-    //case EBufferElementType::UINT16:
-    //    IndexType = VK_INDEX_TYPE_UINT16;
-    //    break;
-    //case EBufferElementType::UINT32:
-    //    IndexType = VK_INDEX_TYPE_UINT32;
-    //    break;
-    //case EBufferElementType::FLOAT:
-    //    check(0);
-    //    break;
-    //default:
-    //    break;
-    //}
-    //check(InRenderFrameContext);
-    //check(InRenderFrameContext->GetActiveCommandBuffer());
-    //vkCmdBindIndexBuffer((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), BufferPtr->Buffer, BufferPtr->Offset, IndexType);
+    auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
+    check(CommandBuffer_DX12);
+
+    Bind(CommandBuffer_DX12);
 }
 
-void jIndexBuffer_DX12::Bind(jCommandBuffer_DX12* InCommandList)
+void jIndexBuffer_DX12::Bind(jCommandBuffer_DX12* InCommandList) const
 {
     check(InCommandList->CommandList);
     InCommandList->CommandList->IASetIndexBuffer(&IBView);

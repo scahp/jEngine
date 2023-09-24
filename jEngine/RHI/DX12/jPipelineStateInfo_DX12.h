@@ -89,7 +89,7 @@ struct jPipelineStateInfo_DX12 : public jPipelineStateInfo
     virtual void* CreateGraphicsPipelineState() override;
     virtual void* CreateComputePipelineState() override;
     virtual void Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const override;
-    void Bind(jCommandBuffer_DX12* InCommandList);
+    void Bind(jCommandBuffer_DX12* InCommandList) const;
 
     ComPtr<ID3D12PipelineState> PipelineState;
     std::vector<D3D12_VIEWPORT> Viewports;
