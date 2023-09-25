@@ -26,7 +26,7 @@ void jEngine::Init()
 	Game.Setup();
 
 	jShadowAppSettingProperties::GetInstance().Setup(jAppSettings::GetInstance().Get("MainPannel"));
-#elif USE_VULKAN
+#elif USE_VULKAN || USE_DX12
 	Game.Setup();
 #endif
 }

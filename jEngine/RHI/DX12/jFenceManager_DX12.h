@@ -10,11 +10,10 @@ public:
     virtual void* GetHandle() const override { return Fence.Get(); }
     virtual void Release() override;
     virtual void WaitForFence(uint64 InTimeoutNanoSec = UINT64_MAX) override;
-    virtual bool SetFenceValue(uint64 InFenceValue) override;
     virtual bool IsValid() const override { return (Fence && FenceEvent); }
     virtual bool IsComplete() const override;
 
-    void SignalWithNextFenceValue(ID3D12CommandQueue* InCommandQueue, bool bWaitUntilExecuteComplete = false);
+    uint64 SignalWithNextFenceValue(ID3D12CommandQueue* InCommandQueue, bool bWaitUntilExecuteComplete = false);
 
     ComPtr<ID3D12Fence> Fence;
     HANDLE FenceEvent = nullptr;

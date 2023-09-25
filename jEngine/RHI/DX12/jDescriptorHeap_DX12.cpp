@@ -178,7 +178,7 @@ void jOnlineDescriptorHeapBlocks_DX12::Initialize(EDescriptorHeapTypeDX12 InHeap
     for(uint32 i=0;i<NumOfDescriptors;++i)
     {
         int32 AllocatedSize = DescriptorBlocks[Index].AllocatedSize;
-        if (AllocatedSize >= InNumOfDescriptorsInBlock)
+        if (AllocatedSize >= (int32)InNumOfDescriptorsInBlock)
         {
             ++Index;
             AllocatedSize = DescriptorBlocks[Index].AllocatedSize;

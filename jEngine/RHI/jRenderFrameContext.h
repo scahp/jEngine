@@ -5,6 +5,12 @@ struct jSceneRenderTarget;
 
 struct jRenderFrameContext : public std::enable_shared_from_this<jRenderFrameContext>
 {
+    enum ECurrentRenderPass
+    {
+        ShadowPass,
+        BasePass,
+    };
+
     jRenderFrameContext() = default;
     jRenderFrameContext(jCommandBuffer* InCommandBuffer)
         : CommandBuffer(InCommandBuffer)
@@ -16,6 +22,8 @@ struct jRenderFrameContext : public std::enable_shared_from_this<jRenderFrameCon
     FORCEINLINE virtual jCommandBuffer* GetActiveCommandBuffer() const { return CommandBuffer; }
     virtual bool BeginActiveCommandBuffer();
     virtual bool EndActiveCommandBuffer();
+
+    virtual void SubmitCurrentActiveCommandBuffer(ECurrentRenderPass InCurrentRenderPass) {}
 
 public:
     jSceneRenderTarget* SceneRenderTarget = nullptr;

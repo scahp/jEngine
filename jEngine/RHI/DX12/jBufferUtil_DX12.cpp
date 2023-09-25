@@ -109,8 +109,9 @@ ComPtr<ID3D12Resource> CreateImageInternal(uint32 InWidth, uint32 InHeight, uint
     TexDesc.Width = InWidth;
     TexDesc.Height = InHeight;
     TexDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
     if (InIsRTV)
-        TexDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+        TexDesc.Flags = IsDepthFormat(GetDX12TextureFormat(InFormat)) ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
     if (InIsUAV)
         TexDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
     TexDesc.DepthOrArraySize = InArrayLayers;
@@ -129,6 +130,7 @@ ComPtr<ID3D12Resource> CreateImageInternal(uint32 InWidth, uint32 InHeight, uint
 
     ComPtr<ID3D12Resource> Image;
     D3D12_CLEAR_VALUE clearValue = { };
+    clearValue.Format = InFormat;
     Image = g_rhi_dx12->CreateResource(&TexDesc, InResourceState, (InIsRTV ? &clearValue : nullptr));
     if (!ensure(Image))
         return nullptr;

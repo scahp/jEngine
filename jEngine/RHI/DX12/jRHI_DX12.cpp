@@ -440,6 +440,8 @@ bool jRHI_DX12::InitRHI()
 {
 	g_rhi = this;
 
+    m_hWnd = CreateMainWindow();
+
 	// 1. Device
 	uint32 dxgiFactoryFlags = 0;
 
@@ -575,54 +577,54 @@ bool jRHI_DX12::InitRHI()
 		iter->Create(65536);
 	}
 
-    //////////////////////////////////////////////////////////////////////////
-    // 5. Initialize Camera and lighting
-    {
-        auto frameIndex = Swapchain->GetCurrentBackBufferIndex();
+    ////////////////////////////////////////////////////////////////////////////
+    //// 5. Initialize Camera and lighting
+    //{
+    //    auto frameIndex = Swapchain->GetCurrentBackBufferIndex();
 
-        // Setup material
-        m_cubeCB.albedo = XMFLOAT4(0.8f, 0.8f, 0.8f, 1.0f);
-        m_planeCB.albedo = XMFLOAT4(0.5, 0.5, 0.5, 1.0f);
+    //    // Setup material
+    //    m_cubeCB.albedo = XMFLOAT4(0.8f, 0.8f, 0.8f, 1.0f);
+    //    m_planeCB.albedo = XMFLOAT4(0.5, 0.5, 0.5, 1.0f);
 
-        // Setup camera
-        m_eye = { 9.0f, 1.0f, 5.0f, 1.0f };
-        m_at = { 0.0f, 0.0f, 0.0f, 1.0f };
-        XMVECTOR right = { 1.0f, 0.0f, 0.0f, 0.0f };
+    //    // Setup camera
+    //    m_eye = { 9.0f, 1.0f, 5.0f, 1.0f };
+    //    m_at = { 0.0f, 0.0f, 0.0f, 1.0f };
+    //    XMVECTOR right = { 1.0f, 0.0f, 0.0f, 0.0f };
 
-        XMVECTOR direction = XMVector4Normalize(m_at - m_eye);
-        // m_up = XMVector3Normalize(XMVector3Cross(direction, right));
-        m_up = { 0.0f, 1.0f, 0.0f };
+    //    XMVECTOR direction = XMVector4Normalize(m_at - m_eye);
+    //    // m_up = XMVector3Normalize(XMVector3Cross(direction, right));
+    //    m_up = { 0.0f, 1.0f, 0.0f };
 
-        //// Rotate camera around Y axis
-        //XMMATRIX rotate = XMMatrixRotationY(XMConvertToRadians(0.0f));
-        //m_eye = XMVector3Transform(m_eye, rotate);
-        //m_up = XMVector3Transform(m_up, rotate);
+    //    //// Rotate camera around Y axis
+    //    //XMMATRIX rotate = XMMatrixRotationY(XMConvertToRadians(0.0f));
+    //    //m_eye = XMVector3Transform(m_eye, rotate);
+    //    //m_up = XMVector3Transform(m_up, rotate);
 
-        UpdateCameraMatrices();
+    //    UpdateCameraMatrices();
 
-        // Setup lights
-        XMFLOAT4 lightPosition;
-        XMFLOAT4 lightAmbientColor;
-        XMFLOAT4 lightDiffuseColor;
+    //    // Setup lights
+    //    XMFLOAT4 lightPosition;
+    //    XMFLOAT4 lightAmbientColor;
+    //    XMFLOAT4 lightDiffuseColor;
 
-        lightPosition = XMFLOAT4(0.0f, 1.8f, -3.0f, 0.0f);
-        m_sceneCB[frameIndex].lightPosition = XMLoadFloat4(&lightPosition);
+    //    lightPosition = XMFLOAT4(0.0f, 1.8f, -3.0f, 0.0f);
+    //    m_sceneCB[frameIndex].lightPosition = XMLoadFloat4(&lightPosition);
 
-        lightAmbientColor = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
-        m_sceneCB[frameIndex].lightAmbientColor = XMLoadFloat4(&lightAmbientColor);
+    //    lightAmbientColor = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
+    //    m_sceneCB[frameIndex].lightAmbientColor = XMLoadFloat4(&lightAmbientColor);
 
-        lightDiffuseColor = XMFLOAT4(0.5f, 0.3f, 0.3f, 1.0f);
-        m_sceneCB[frameIndex].lightDiffuseColor = XMLoadFloat4(&lightDiffuseColor);
+    //    lightDiffuseColor = XMFLOAT4(0.5f, 0.3f, 0.3f, 1.0f);
+    //    m_sceneCB[frameIndex].lightDiffuseColor = XMLoadFloat4(&lightDiffuseColor);
 
-        m_sceneCB[frameIndex].focalDistance = m_focalDistance;
-        m_sceneCB[frameIndex].lensRadius = m_lensRadius;
+    //    m_sceneCB[frameIndex].focalDistance = m_focalDistance;
+    //    m_sceneCB[frameIndex].lensRadius = m_lensRadius;
 
-        // 모든 프레임의 버퍼 인스턴스에 초기값을 설정해줌
-        for (auto& sceneCB : m_sceneCB)
-        {
-            sceneCB = m_sceneCB[frameIndex];
-        }
-    }
+    //    // 모든 프레임의 버퍼 인스턴스에 초기값을 설정해줌
+    //    for (auto& sceneCB : m_sceneCB)
+    //    {
+    //        sceneCB = m_sceneCB[frameIndex];
+    //    }
+    //}
 
 	// 7. Create sync object
 	WaitForGPU();
@@ -631,7 +633,7 @@ bool jRHI_DX12::InitRHI()
 	D3D12_FEATURE_DATA_D3D12_OPTIONS5 featureSupportData{};
 	if (JFAIL(Device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &featureSupportData, sizeof(featureSupportData))))
 		return false;
-
+	/*
     const int32 slice = 100;
     const int32 verticesCount = ((slice + 1) * (slice / 2) + 2);
     const int32 verticesElementCount = ((slice + 1) * (slice / 2) + 2) / 3;
@@ -1006,7 +1008,7 @@ bool jRHI_DX12::InitRHI()
     const Vector mainCameraTarget(0.0f, 0.0f, 0.0f);
     MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 10.0f, 1500.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT, true);
 	MainCamera->UpdateCamera();
-
+	*/
 	//////////////////////////////////////////////////////////////////////////
     InitializeImGui();
 
@@ -1036,7 +1038,7 @@ bool jRHI_DX12::Run()
     return true;
 }
 
-void jRHI_DX12::Release()
+void jRHI_DX12::ReleaseRHI()
 {
 	WaitForGPU();
     
@@ -1061,19 +1063,19 @@ void jRHI_DX12::Release()
 	delete IndexBuffer;
 	IndexBuffer = nullptr;
 
-	delete SimpleConstantBuffer;
-	SimpleConstantBuffer = nullptr;
+	//delete SimpleConstantBuffer;
+	//SimpleConstantBuffer = nullptr;
 
-	// StructuredBuffer test
-	delete SimpleStructuredBuffer;
-	SimpleStructuredBuffer = nullptr;
+	//// StructuredBuffer test
+	//delete SimpleStructuredBuffer;
+	//SimpleStructuredBuffer = nullptr;
 
-	// Texture test
-	for (int32 i = 0; i < _countof(SimpleTexture); ++i)
-	{
-		delete SimpleTexture[i];
-		SimpleTexture[i] = nullptr;
-	}
+	//// Texture test
+	//for (int32 i = 0; i < _countof(SimpleTexture); ++i)
+	//{
+	//	delete SimpleTexture[i];
+	//	SimpleTexture[i] = nullptr;
+	//}
 
 	SamplerStatePool.Release();
     
@@ -1114,23 +1116,23 @@ void jRHI_DX12::Release()
 
 }
 
-void jRHI_DX12::UpdateCameraMatrices()
-{
-	auto frameIndex = Swapchain->GetCurrentBackBufferIndex();
-
-	m_sceneCB[frameIndex].cameraPosition = m_eye;
-
-	const float m_aspectRatio = SCR_WIDTH / (float)SCR_HEIGHT;
-
-	const float fovAngleY = 45.0f;
-	const XMMATRIX view = XMMatrixLookAtLH(m_eye, m_at, m_up);
-	const XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(fovAngleY), m_aspectRatio, 1.0f, 125.0f);
-	const XMMATRIX viewProj = view * proj;
-
-    m_sceneCB[frameIndex].cameraDirection = XMVector3Normalize(m_at - m_eye);
-	m_sceneCB[frameIndex].projectionToWorld = XMMatrixInverse(nullptr, viewProj);
-    m_sceneCB[frameIndex].NumOfStartingRay = 20;        // 첫 Ray 생성시 NumOfStartingRay 개를 쏴서 보간하도록 함. 노이즈를 줄여줌
-}
+//void jRHI_DX12::UpdateCameraMatrices()
+//{
+//	auto frameIndex = Swapchain->GetCurrentBackBufferIndex();
+//
+//	m_sceneCB[frameIndex].cameraPosition = m_eye;
+//
+//	const float m_aspectRatio = SCR_WIDTH / (float)SCR_HEIGHT;
+//
+//	const float fovAngleY = 45.0f;
+//	const XMMATRIX view = XMMatrixLookAtLH(m_eye, m_at, m_up);
+//	const XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(fovAngleY), m_aspectRatio, 1.0f, 125.0f);
+//	const XMMATRIX viewProj = view * proj;
+//
+//    m_sceneCB[frameIndex].cameraDirection = XMVector3Normalize(m_at - m_eye);
+//	m_sceneCB[frameIndex].projectionToWorld = XMMatrixInverse(nullptr, viewProj);
+//    m_sceneCB[frameIndex].NumOfStartingRay = 20;        // 첫 Ray 생성시 NumOfStartingRay 개를 쏴서 보간하도록 함. 노이즈를 줄여줌
+//}
 
 void jRHI_DX12::CalculateFrameStats()
 {
@@ -1148,8 +1150,8 @@ void jRHI_DX12::CalculateFrameStats()
         frameCnt = 0;
         elapsedTime = totalTime;
 
-        float raysPerPixels = (float)(m_sceneCB[CurrentFrameIndex].NumOfStartingRay * g_MaxRecursionDepth);
-        float MRaysPerSecond = (SCR_WIDTH * SCR_HEIGHT * fps * raysPerPixels) / static_cast<float>(1e6);
+        //float raysPerPixels = (float)(m_sceneCB[CurrentFrameIndex].NumOfStartingRay * g_MaxRecursionDepth);
+        //float MRaysPerSecond = (SCR_WIDTH * SCR_HEIGHT * fps * raysPerPixels) / static_cast<float>(1e6);
 
         std::wstringstream windowText;
 
@@ -1192,47 +1194,47 @@ void jRHI_DX12::Update()
 {
     CalculateFrameStats();
 
-	int32 prevFrameIndex = CurrentFrameIndex - 1;
-	if (prevFrameIndex < 0)
-		prevFrameIndex = MaxFrameCount - 1;
+	//int32 prevFrameIndex = CurrentFrameIndex - 1;
+	//if (prevFrameIndex < 0)
+	//	prevFrameIndex = MaxFrameCount - 1;
 
-    static bool enableCameraRotation = false;
+ //   static bool enableCameraRotation = false;
 
-    static float elapsedTime = 0.0f;
-    elapsedTime = 0.05f;
+ //   static float elapsedTime = 0.0f;
+ //   elapsedTime = 0.05f;
     
-    // Y 축 주변으로 카메라를 회전
-    if (enableCameraRotation)
-	{
-        float secondsToRotateAround = 24.0f;
-        static float angleToRotateBy = 360.0f * (elapsedTime / secondsToRotateAround);
+ //   // Y 축 주변으로 카메라를 회전
+ //   if (enableCameraRotation)
+	//{
+ //       float secondsToRotateAround = 24.0f;
+ //       static float angleToRotateBy = 360.0f * (elapsedTime / secondsToRotateAround);
 
-        XMMATRIX rotate = XMMatrixRotationY(XMConvertToRadians(angleToRotateBy));
-        m_eye = XMVector3Transform(m_eye, rotate);
-        m_up = XMVector3Transform(m_up, rotate);
-        m_at = XMVector3Transform(m_at, rotate);
-        UpdateCameraMatrices();
-	}
+ //       XMMATRIX rotate = XMMatrixRotationY(XMConvertToRadians(angleToRotateBy));
+ //       m_eye = XMVector3Transform(m_eye, rotate);
+ //       m_up = XMVector3Transform(m_up, rotate);
+ //       m_at = XMVector3Transform(m_at, rotate);
+ //       UpdateCameraMatrices();
+	//}
 
-	// Y 축 주변으로 두번째 라이트를 회전
-	{
-        constexpr float secondsToRotateAround = 8.0f;
-		float angleToRotateBy = -360.0f * (elapsedTime / secondsToRotateAround);
+	//// Y 축 주변으로 두번째 라이트를 회전
+	//{
+ //       constexpr float secondsToRotateAround = 8.0f;
+	//	float angleToRotateBy = -360.0f * (elapsedTime / secondsToRotateAround);
 
-        static float accAngle = 0.0f;
-        accAngle += angleToRotateBy;
+ //       static float accAngle = 0.0f;
+ //       accAngle += angleToRotateBy;
 
-		XMMATRIX rotate = XMMatrixRotationY(XMConvertToRadians(accAngle));
-        constexpr XMVECTOR rotationRadius = { 0.0f, 0.0f, 8.0f };
-		m_sceneCB[CurrentFrameIndex].lightPosition = XMVector3Transform(rotationRadius, rotate);
-	}
+	//	XMMATRIX rotate = XMMatrixRotationY(XMConvertToRadians(accAngle));
+ //       constexpr XMVECTOR rotationRadius = { 0.0f, 0.0f, 8.0f };
+	//	m_sceneCB[CurrentFrameIndex].lightPosition = XMVector3Transform(rotationRadius, rotate);
+	//}
 
-    {
-        auto frameIndex = Swapchain->GetCurrentBackBufferIndex();
+ //   {
+ //       auto frameIndex = Swapchain->GetCurrentBackBufferIndex();
 
-        m_sceneCB[frameIndex].focalDistance = m_focalDistance;
-        m_sceneCB[frameIndex].lensRadius = m_lensRadius;
-    }
+ //       m_sceneCB[frameIndex].focalDistance = m_focalDistance;
+ //       m_sceneCB[frameIndex].lensRadius = m_lensRadius;
+ //   }
 }
 
 void jRHI_DX12::Render()
@@ -1252,170 +1254,170 @@ void jRHI_DX12::Render()
     //    jShaderBindingInstance* ViewUniformBufferShaderBindingInstance = nullptr;
     //};
 
-	GetOneFrameUniformRingBuffer()->Reset();
-
-    jView View(MainCamera, {});
-    View.PrepareViewUniformBufferShaderBindingInstance();
-
-	if (std::shared_ptr<jRenderFrameContext> renderFrameContext = g_rhi->BeginRenderFrame())
-	{
-		DrawCommands.resize(SpawnedObjects.size());
-        for (int32 i = 0; i < SpawnedObjects.size(); ++i)
-        {
-			SpawnedObjects[i]->RenderObjects[0]->UpdateWorldMatrix();
-
-            jShaderBindingsLayoutArray ShaderBindingsLayoutArray2;
-            View.GetShaderBindingLayout(ShaderBindingsLayoutArray2);
-            ShaderBindingsLayoutArray2.Add(SpawnedObjects[i]->RenderObjects[0]->CreateShaderBindingInstance()->ShaderBindingsLayouts);
-
-            jVertexBufferArray VertexBufferArray2;
-            VertexBufferArray2.Add(SpawnedObjects[i]->RenderObjects[0]->GeometryDataPtr->VertexBuffer);
-            PipelineStateInfo = (jPipelineStateInfo_DX12*)g_rhi->CreatePipelineStateInfo(
-                &FixedPipelineStateInfo, GraphicsPipelineShader2, VertexBufferArray2, RenderPass, ShaderBindingsLayoutArray2, nullptr, 0);
-
-			DrawCommands[i] = jDrawCommand(renderFrameContext, &View, SpawnedObjects[i]->RenderObjects[0], RenderPass
-                , GraphicsPipelineShader2, &FixedPipelineStateInfo, {}, nullptr);
-			DrawCommands[i].PrepareToDraw(false);
-        }
-
-		// Prepare
-		jCommandBuffer_DX12* CommandBuffer = (jCommandBuffer_DX12*)renderFrameContext->GetActiveCommandBuffer();
-		auto GraphicsCommandList = CommandBuffer->Get();
-
-		jSwapchainImage* SwapchainImage = Swapchain->GetSwapchainImage(CurrentFrameIndex);
-		jTexture_DX12* SwapchainRT = (jTexture_DX12*)SwapchainImage->TexturePtr.get();
-
-		D3D12_VIEWPORT viewport;
-		viewport.TopLeftX = 0;
-		viewport.TopLeftY = 0;
-		viewport.Width = (float)SCR_WIDTH;
-		viewport.Height = (float)SCR_HEIGHT;
-		viewport.MinDepth = D3D12_MIN_DEPTH;
-		viewport.MaxDepth = D3D12_MAX_DEPTH;
-
-		D3D12_RECT ScissorRect;
-		ScissorRect.left = 0;
-		ScissorRect.right = SCR_WIDTH;
-		ScissorRect.top = 0;
-		ScissorRect.bottom = SCR_HEIGHT;
-
-		{
-			jSimpleConstantBuffer ConstantBuffer;
-			ConstantBuffer.M.SetIdentity();
-			Matrix Projection = jCameraUtil::CreatePerspectiveMatrix((float)SCR_WIDTH, (float)SCR_HEIGHT, DegreeToRadian(90.0f), 0.01f, 1000.0f);
-			Matrix Camera = jCameraUtil::CreateViewMatrix(Vector::FowardVector * 1.2f, Vector::ZeroVector, Vector::UpVector);
-			ConstantBuffer.M = Projection * Camera * ConstantBuffer.M;
-			ConstantBuffer.M.SetTranspose();
-
-			// Dynamic indexing with constantbuffer index
-			static DWORD OldTick = GetTickCount();
-			static int32 TexIndex = 0;
-			DWORD time = GetTickCount() - OldTick;
-			if (time > 2000)
-			{
-				OldTick = GetTickCount();
-				TexIndex = (TexIndex + 1) % _countof(SimpleTexture);
-			}
-			ConstantBuffer.TexIndex = TexIndex;
-			SimpleUniformBuffer->UpdateBufferData(&ConstantBuffer, sizeof(ConstantBuffer));
-		}
-
-		{
-			CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-				SwapchainRT->Image.Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-			GraphicsCommandList->ResourceBarrier(1, &barrier);
-		}
-
-        
-
-		if (RenderPass->BeginRenderPass(CommandBuffer, SwapchainRT->RTV.CPUHandle))
-		{
-			for(int32 i=0;i< DrawCommands.size();++i)
-			{
-				DrawCommands[i].Draw();
-			}
-
-			////////////////////////////////////////////////////////////////////////////
-			//// Graphics ShaderBinding
-
-			//// 이 부분은 구조화 하게 되면, 이전에 만들어둔 것을 그대로 사용
-			//jShaderBindingInstanceArray ShaderBindingInstanceArray;
-			//ShaderBindingInstanceArray.Add(TestShaderBindingInstance);
-			//ShaderBindingInstanceArray.Add(TestShaderBindingInstance2);
-			//GraphicsCommandList->SetGraphicsRootSignature(jShaderBindingsLayout_DX12::CreateRootSignature(ShaderBindingInstanceArray));
-
-			//int32 RootParameterIndex = 0;
-			//bool HasDescriptor = false;
-			//bool HasSamplerDescriptor = false;
-			//for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
-			//{
-			//	jShaderBindingInstance_DX12* Instance = (jShaderBindingInstance_DX12*)ShaderBindingInstanceArray[i];
-			//	jShaderBindingsLayout_DX12* Layout = (jShaderBindingsLayout_DX12*)(Instance->ShaderBindingsLayouts);
-
-			//	Instance->CopyToOnlineDescriptorHeap(CommandBuffer);
-			//	HasDescriptor |= Instance->Descriptors.size() > 0;
-			//	HasSamplerDescriptor |= Instance->SamplerDescriptors.size() > 0;
-
-			//	Instance->BindGraphics(CommandBuffer, RootParameterIndex);
-			//}
-			//// DescriptorTable 은 항상 마지막에 바인딩
-			//if (HasDescriptor)
-			//	GraphicsCommandList->SetGraphicsRootDescriptorTable(RootParameterIndex++, CommandBuffer->OnlineDescriptorHeap->GetGPUHandle());		// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
-
-			//if (HasSamplerDescriptor)
-			//	GraphicsCommandList->SetGraphicsRootDescriptorTable(RootParameterIndex++, CommandBuffer->OnlineSamplerDescriptorHeap->GetGPUHandle());	// SamplerState test
-			////////////////////////////////////////////////////////////////////////////
-
-			//VertexBuffer->Bind(CommandBuffer);
-			//IndexBuffer->Bind(CommandBuffer);
-			//GraphicsCommandList->DrawIndexedInstanced(IndexBuffer->GetIndexCount(), 1, 0, 0, 0);
-
-			RenderPass->EndRenderPass();
-		}
-
-		RenderUI(GraphicsCommandList, SwapchainRT->Image.Get(), SwapchainRT->RTV.CPUHandle, m_imgui_SrvDescHeap.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
-
-        g_rhi->EndRenderFrame(renderFrameContext);
-	}
-
-    HRESULT hr = S_OK;
-    if (Options & c_AllowTearing)
-    {
-        hr = Swapchain->SwapChain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
-    }
-    else
-    {
-        // 첫번째 아규먼트는 VSync가 될때까지 기다림, 어플리케이션은 다음 VSync까지 잠재운다.
-        // 이렇게 하는 것은 렌더링 한 프레임 중 화면에 나오지 못하는 프레임의 cycle을 아끼기 위해서임.
-        hr = Swapchain->SwapChain->Present(1, 0);
-    }
-
-	if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
-	{
-		// 디바이스 로스트 처리
-
-#ifdef _DEBUG
-        char buff[64] = {};
-        sprintf_s(buff, "Device Lost on ResizeBuffers: Reason code 0x%08X\n"
-            , (hr == DXGI_ERROR_DEVICE_REMOVED) ? Device->GetDeviceRemovedReason() : hr);
-        OutputDebugStringA(buff);
-#endif
-
-        OnHandleDeviceLost();
-        OnHandleDeviceRestored();
-	}
-	else
-	{
-		if (JFAIL(hr))
-			return;
-
-		WaitForGPU();
-
-		CurrentFrameIndex = Swapchain->GetCurrentBackBufferIndex();
-	}
-
-	// 임시로 여기에 만들어 둠.
-	g_rhi->IncrementFrameNumber();
+//	GetOneFrameUniformRingBuffer()->Reset();
+//
+//    jView View(MainCamera, {});
+//    View.PrepareViewUniformBufferShaderBindingInstance();
+//
+//	if (std::shared_ptr<jRenderFrameContext> renderFrameContext = g_rhi->BeginRenderFrame())
+//	{
+//		DrawCommands.resize(SpawnedObjects.size());
+//        for (int32 i = 0; i < SpawnedObjects.size(); ++i)
+//        {
+//			SpawnedObjects[i]->RenderObjects[0]->UpdateWorldMatrix();
+//
+//            jShaderBindingsLayoutArray ShaderBindingsLayoutArray2;
+//            View.GetShaderBindingLayout(ShaderBindingsLayoutArray2);
+//            ShaderBindingsLayoutArray2.Add(SpawnedObjects[i]->RenderObjects[0]->CreateShaderBindingInstance()->ShaderBindingsLayouts);
+//
+//            jVertexBufferArray VertexBufferArray2;
+//            VertexBufferArray2.Add(SpawnedObjects[i]->RenderObjects[0]->GeometryDataPtr->VertexBuffer);
+//            PipelineStateInfo = (jPipelineStateInfo_DX12*)g_rhi->CreatePipelineStateInfo(
+//                &FixedPipelineStateInfo, GraphicsPipelineShader2, VertexBufferArray2, RenderPass, ShaderBindingsLayoutArray2, nullptr, 0);
+//
+//			DrawCommands[i] = jDrawCommand(renderFrameContext, &View, SpawnedObjects[i]->RenderObjects[0], RenderPass
+//                , GraphicsPipelineShader2, &FixedPipelineStateInfo, {}, nullptr);
+//			DrawCommands[i].PrepareToDraw(false);
+//        }
+//
+//		// Prepare
+//		jCommandBuffer_DX12* CommandBuffer = (jCommandBuffer_DX12*)renderFrameContext->GetActiveCommandBuffer();
+//		auto GraphicsCommandList = CommandBuffer->Get();
+//
+//		jSwapchainImage* SwapchainImage = Swapchain->GetSwapchainImage(CurrentFrameIndex);
+//		jTexture_DX12* SwapchainRT = (jTexture_DX12*)SwapchainImage->TexturePtr.get();
+//
+//		D3D12_VIEWPORT viewport;
+//		viewport.TopLeftX = 0;
+//		viewport.TopLeftY = 0;
+//		viewport.Width = (float)SCR_WIDTH;
+//		viewport.Height = (float)SCR_HEIGHT;
+//		viewport.MinDepth = D3D12_MIN_DEPTH;
+//		viewport.MaxDepth = D3D12_MAX_DEPTH;
+//
+//		D3D12_RECT ScissorRect;
+//		ScissorRect.left = 0;
+//		ScissorRect.right = SCR_WIDTH;
+//		ScissorRect.top = 0;
+//		ScissorRect.bottom = SCR_HEIGHT;
+//
+//		{
+//			jSimpleConstantBuffer ConstantBuffer;
+//			ConstantBuffer.M.SetIdentity();
+//			Matrix Projection = jCameraUtil::CreatePerspectiveMatrix((float)SCR_WIDTH, (float)SCR_HEIGHT, DegreeToRadian(90.0f), 0.01f, 1000.0f);
+//			Matrix Camera = jCameraUtil::CreateViewMatrix(Vector::FowardVector * 1.2f, Vector::ZeroVector, Vector::UpVector);
+//			ConstantBuffer.M = Projection * Camera * ConstantBuffer.M;
+//			ConstantBuffer.M.SetTranspose();
+//
+//			// Dynamic indexing with constantbuffer index
+//			static DWORD OldTick = GetTickCount();
+//			static int32 TexIndex = 0;
+//			DWORD time = GetTickCount() - OldTick;
+//			if (time > 2000)
+//			{
+//				OldTick = GetTickCount();
+//				TexIndex = (TexIndex + 1) % _countof(SimpleTexture);
+//			}
+//			ConstantBuffer.TexIndex = TexIndex;
+//			SimpleUniformBuffer->UpdateBufferData(&ConstantBuffer, sizeof(ConstantBuffer));
+//		}
+//
+//		{
+//			CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+//				SwapchainRT->Image.Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+//			GraphicsCommandList->ResourceBarrier(1, &barrier);
+//		}
+//
+//        
+//
+//		if (RenderPass->BeginRenderPass(CommandBuffer, SwapchainRT->RTV.CPUHandle))
+//		{
+//			for(int32 i=0;i< DrawCommands.size();++i)
+//			{
+//				DrawCommands[i].Draw();
+//			}
+//
+//			////////////////////////////////////////////////////////////////////////////
+//			//// Graphics ShaderBinding
+//
+//			//// 이 부분은 구조화 하게 되면, 이전에 만들어둔 것을 그대로 사용
+//			//jShaderBindingInstanceArray ShaderBindingInstanceArray;
+//			//ShaderBindingInstanceArray.Add(TestShaderBindingInstance);
+//			//ShaderBindingInstanceArray.Add(TestShaderBindingInstance2);
+//			//GraphicsCommandList->SetGraphicsRootSignature(jShaderBindingsLayout_DX12::CreateRootSignature(ShaderBindingInstanceArray));
+//
+//			//int32 RootParameterIndex = 0;
+//			//bool HasDescriptor = false;
+//			//bool HasSamplerDescriptor = false;
+//			//for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
+//			//{
+//			//	jShaderBindingInstance_DX12* Instance = (jShaderBindingInstance_DX12*)ShaderBindingInstanceArray[i];
+//			//	jShaderBindingsLayout_DX12* Layout = (jShaderBindingsLayout_DX12*)(Instance->ShaderBindingsLayouts);
+//
+//			//	Instance->CopyToOnlineDescriptorHeap(CommandBuffer);
+//			//	HasDescriptor |= Instance->Descriptors.size() > 0;
+//			//	HasSamplerDescriptor |= Instance->SamplerDescriptors.size() > 0;
+//
+//			//	Instance->BindGraphics(CommandBuffer, RootParameterIndex);
+//			//}
+//			//// DescriptorTable 은 항상 마지막에 바인딩
+//			//if (HasDescriptor)
+//			//	GraphicsCommandList->SetGraphicsRootDescriptorTable(RootParameterIndex++, CommandBuffer->OnlineDescriptorHeap->GetGPUHandle());		// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
+//
+//			//if (HasSamplerDescriptor)
+//			//	GraphicsCommandList->SetGraphicsRootDescriptorTable(RootParameterIndex++, CommandBuffer->OnlineSamplerDescriptorHeap->GetGPUHandle());	// SamplerState test
+//			////////////////////////////////////////////////////////////////////////////
+//
+//			//VertexBuffer->Bind(CommandBuffer);
+//			//IndexBuffer->Bind(CommandBuffer);
+//			//GraphicsCommandList->DrawIndexedInstanced(IndexBuffer->GetIndexCount(), 1, 0, 0, 0);
+//
+//			RenderPass->EndRenderPass();
+//		}
+//
+//		RenderUI(GraphicsCommandList, SwapchainRT->Image.Get(), SwapchainRT->RTV.CPUHandle, m_imgui_SrvDescHeap.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+//
+//        g_rhi->EndRenderFrame(renderFrameContext);
+//	}
+//
+//    HRESULT hr = S_OK;
+//    if (Options & c_AllowTearing)
+//    {
+//        hr = Swapchain->SwapChain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
+//    }
+//    else
+//    {
+//        // 첫번째 아규먼트는 VSync가 될때까지 기다림, 어플리케이션은 다음 VSync까지 잠재운다.
+//        // 이렇게 하는 것은 렌더링 한 프레임 중 화면에 나오지 못하는 프레임의 cycle을 아끼기 위해서임.
+//        hr = Swapchain->SwapChain->Present(1, 0);
+//    }
+//
+//	if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
+//	{
+//		// 디바이스 로스트 처리
+//
+//#ifdef _DEBUG
+//        char buff[64] = {};
+//        sprintf_s(buff, "Device Lost on ResizeBuffers: Reason code 0x%08X\n"
+//            , (hr == DXGI_ERROR_DEVICE_REMOVED) ? Device->GetDeviceRemovedReason() : hr);
+//        OutputDebugStringA(buff);
+//#endif
+//
+//        OnHandleDeviceLost();
+//        OnHandleDeviceRestored();
+//	}
+//	else
+//	{
+//		if (JFAIL(hr))
+//			return;
+//
+//		WaitForGPU();
+//
+//		CurrentFrameIndex = Swapchain->GetCurrentBackBufferIndex();
+//	}
+//
+//	// 임시로 여기에 만들어 둠.
+//	g_rhi->IncrementFrameNumber();
 }
 
 
@@ -1486,19 +1488,19 @@ bool jRHI_DX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimi
 
 		jBufferUtil_DX12::CreateRenderTargetView(SwapchainRT);
 
-        //////////////////////////////////////////////////////////////////////////
-        m_sceneCB[i].cameraPosition = m_eye;
-        const float m_aspectRatio = SCR_WIDTH / (float)SCR_HEIGHT;
+        ////////////////////////////////////////////////////////////////////////////
+        //m_sceneCB[i].cameraPosition = m_eye;
+        //const float m_aspectRatio = SCR_WIDTH / (float)SCR_HEIGHT;
 
-        const float fovAngleY = 45.0f;
-        const XMMATRIX view = XMMatrixLookAtLH(m_eye, m_at, m_up);
-        const XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(fovAngleY), m_aspectRatio, 1.0f, 125.0f);
-        const XMMATRIX viewProj = view * proj;
-        m_sceneCB[i].projectionToWorld = XMMatrixInverse(nullptr, viewProj);
-        m_sceneCB[i].cameraDirection = XMVector3Normalize(m_at - m_eye);
+        //const float fovAngleY = 45.0f;
+        //const XMMATRIX view = XMMatrixLookAtLH(m_eye, m_at, m_up);
+        //const XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(fovAngleY), m_aspectRatio, 1.0f, 125.0f);
+        //const XMMATRIX viewProj = view * proj;
+        //m_sceneCB[i].projectionToWorld = XMMatrixInverse(nullptr, viewProj);
+        //m_sceneCB[i].cameraDirection = XMVector3Normalize(m_at - m_eye);
 
-        m_sceneCB[i].focalDistance = m_focalDistance;
-        m_sceneCB[i].lensRadius = m_lensRadius;
+        //m_sceneCB[i].focalDistance = m_focalDistance;
+        //m_sceneCB[i].lensRadius = m_lensRadius;
     }
 
     CurrentFrameIndex = Swapchain->GetCurrentBackBufferIndex();
@@ -2049,4 +2051,17 @@ void jRHI_DX12::DrawElementsIndirect(const std::shared_ptr<jRenderFrameContext>&
     check(CommandBuffer_DX12);
 
 	check(0);
+}
+
+std::shared_ptr<jRenderTarget> jRHI_DX12::CreateRenderTarget(const jRenderTargetInfo& info) const
+{
+    const uint16 MipLevels = info.IsGenerateMipmap ? static_cast<uint32>(std::floor(std::log2(std::max<int>(info.Width, info.Height)))) + 1 : 1;
+    jTexture_DX12* Texture = jBufferUtil_DX12::CreateImage(info.Width, info.Height, info.LayerCount, MipLevels, (uint32)info.SampleCount, info.Type, info.Format, true, false);
+
+    auto rt = new jRenderTarget();
+    check(rt);
+    rt->Info = info;
+    rt->TexturePtr = std::shared_ptr<jTexture>(Texture);
+
+    return std::shared_ptr<jRenderTarget>(rt);
 }

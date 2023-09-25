@@ -454,6 +454,7 @@ public:
 	virtual bool TransitionImageLayoutImmediate(jTexture* texture, EImageLayout newLayout) const { return true; }
 	virtual jQueryPool* GetQueryTimePool() const { return nullptr; }
 	virtual jSwapchain* GetSwapchain() const { return nullptr; }
+	virtual class jSwapchainImage* GetSwapchainImage(int32 InIndex) const { return nullptr; }
 	virtual void RecreateSwapChain() {}
 	virtual uint32 GetMaxSwapchainCount() const { return 0; }
 

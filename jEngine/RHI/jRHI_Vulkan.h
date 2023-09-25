@@ -216,6 +216,7 @@ public:
 
     virtual jFenceManager* GetFenceManager() override { return &FenceManager; }
     virtual jSemaphoreManager* GetSemaphoreManager() override { return &SemaphoreManager; }
+	virtual jSwapchainImage* GetSwapchainImage(int32 InIndex) const override { return Swapchain->Images[InIndex]; }
 };
 
 extern jRHI_Vulkan* g_rhi_vk;

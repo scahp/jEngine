@@ -131,7 +131,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// 3. Swapchain
 	jSwapchain_DX12* Swapchain = nullptr;
-	int32 CurrentFrameIndex = 0;
+	uint32 CurrentFrameIndex = 0;
 
 	//////////////////////////////////////////////////////////////////////////
 	// 4. Heap
@@ -143,27 +143,27 @@ public:
 	jOnlineDescriptorHeapBlocks_DX12 OnlineDescriptorHeapBlocks;
 	jOnlineDescriptorHeapBlocks_DX12 OnlineSamplerDescriptorHeapBlocks;
 
-    //////////////////////////////////////////////////////////////////////////
-    // 5. Initialize Camera and lighting
-    struct CubeConstantBuffer
-    {
-        XMFLOAT4 albedo;
-    };
-    struct SceneConstantBuffer
-    {
-        XMMATRIX projectionToWorld;
-        XMVECTOR cameraPosition;
-        XMVECTOR lightPosition;
-        XMVECTOR lightAmbientColor;
-        XMVECTOR lightDiffuseColor;
-        XMVECTOR cameraDirection;
-        uint32 NumOfStartingRay;
-        float focalDistance;
-        float lensRadius;
-    };
-    SceneConstantBuffer m_sceneCB[MaxFrameCount];
-    CubeConstantBuffer m_cubeCB;
-    CubeConstantBuffer m_planeCB;
+    ////////////////////////////////////////////////////////////////////////////
+    //// 5. Initialize Camera and lighting
+    //struct CubeConstantBuffer
+    //{
+    //    XMFLOAT4 albedo;
+    //};
+    //struct SceneConstantBuffer
+    //{
+    //    XMMATRIX projectionToWorld;
+    //    XMVECTOR cameraPosition;
+    //    XMVECTOR lightPosition;
+    //    XMVECTOR lightAmbientColor;
+    //    XMVECTOR lightDiffuseColor;
+    //    XMVECTOR cameraDirection;
+    //    uint32 NumOfStartingRay;
+    //    float focalDistance;
+    //    float lensRadius;
+    //};
+    //SceneConstantBuffer m_sceneCB[MaxFrameCount];
+    //CubeConstantBuffer m_cubeCB;
+    //CubeConstantBuffer m_planeCB;
 
 	//////////////////////////////////////////////////////////////////////////
 	// 7. Create sync object
@@ -200,7 +200,7 @@ public:
 
 	virtual bool InitRHI() override;
     bool Run();
-	void Release();
+	virtual void ReleaseRHI() override;
     
     uint32 AdapterID = -1;
     std::wstring AdapterName;
@@ -214,32 +214,32 @@ public:
 	void OnDeviceLost();
 	void OnDeviceRestored();
 
-	// Raytracing scene
-	struct Vertex
-	{
-		XMFLOAT3 position;
-		XMFLOAT3 normal;
-	};
+	//// Raytracing scene
+	//struct Vertex
+	//{
+	//	XMFLOAT3 position;
+	//	XMFLOAT3 normal;
+	//};
 
-	XMVECTOR m_eye;
-	XMVECTOR m_at;
-	XMVECTOR m_up;
-	void UpdateCameraMatrices();
+	//XMVECTOR m_eye;
+	//XMVECTOR m_at;
+	//XMVECTOR m_up;
+	//void UpdateCameraMatrices();
 
-	static_assert(sizeof(SceneConstantBuffer) < D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT, "Checking the size here");
+	//static_assert(sizeof(SceneConstantBuffer) < D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT, "Checking the size here");
 
-	union AlignedSceneConstantBuffer
-	{
-		SceneConstantBuffer constants;
-		uint8 alignedPadding[D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT];
-	};
-	jBuffer_DX12* PerFrameConstantBuffer = nullptr;
+	//union AlignedSceneConstantBuffer
+	//{
+	//	SceneConstantBuffer constants;
+	//	uint8 alignedPadding[D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT];
+	//};
+	//jBuffer_DX12* PerFrameConstantBuffer = nullptr;
 
-	jUniformBufferBlock_DX12* SimpleUniformBuffer = nullptr;
-	jBuffer_DX12* SimpleConstantBuffer = nullptr;
-	jBuffer_DX12* SimpleStructuredBuffer = nullptr;			// StructuredBuffer test
-	jTexture_DX12* SimpleTexture[3] = { nullptr, nullptr, nullptr };					// Texture test
-	jTexture_DX12* SimpleTextureCube = nullptr;				// Cube texture test
+	//jUniformBufferBlock_DX12* SimpleUniformBuffer = nullptr;
+	//jBuffer_DX12* SimpleConstantBuffer = nullptr;
+	//jBuffer_DX12* SimpleStructuredBuffer = nullptr;			// StructuredBuffer test
+	//jTexture_DX12* SimpleTexture[3] = { nullptr, nullptr, nullptr };					// Texture test
+	//jTexture_DX12* SimpleTextureCube = nullptr;				// Cube texture test
 
 	//////////////////////////////////////////////////////////////////////////
 	// PlacedResouce test
@@ -249,13 +249,15 @@ public:
     ComPtr<ID3D12Heap> PlacedResourceUploadHeap;
     uint64 PlacedResourceDefaultUploadOffset = 0;
 
-    static constexpr uint64 DefaultPlacedResourceHeapSize = 128 * 1024 * 1024;
+    static constexpr uint64 DefaultPlacedResourceHeapSize = 256 * 1024 * 1024;
 	static bool IsUsePlacedResource;
 
 	template <typename T>
 	ComPtr<ID3D12Resource> CreateResource(T&& InDesc, D3D12_RESOURCE_STATES InResourceState, D3D12_CLEAR_VALUE* InClearValue = nullptr)
 	{
 		check(Device);
+
+        const D3D12_RESOURCE_ALLOCATION_INFO info = Device->GetResourceAllocationInfo(0, 1, InDesc);
 
 		ComPtr<ID3D12Resource> NewResource;
 		if (IsUsePlacedResource)
@@ -265,7 +267,6 @@ public:
 			JFAIL(Device->CreatePlacedResource(PlacedResourceDefaultHeap.Get(), PlacedResourceDefaultHeapOffset
 				, std::forward<T>(InDesc), InResourceState, InClearValue, IID_PPV_ARGS(&NewResource)));
 
-			const D3D12_RESOURCE_ALLOCATION_INFO info = Device->GetResourceAllocationInfo(0, 1, InDesc);
 			PlacedResourceDefaultHeapOffset += info.SizeInBytes;
 
 			return NewResource;
@@ -331,8 +332,9 @@ public:
     virtual jBlendingStateInfo* CreateBlendingState(const jBlendingStateInfo& initializer) const override;
 
 	uint32 CurrentFrameNumber = 0;		// FrameNumber is just Incremented frame by frame.
-    virtual uint32 GetCurrentFrameNumber() const override { return CurrentFrameNumber; }
     virtual void IncrementFrameNumber() { ++CurrentFrameNumber; }
+    virtual uint32 GetCurrentFrameNumber() const override { return CurrentFrameNumber; }
+	virtual uint32 GetCurrentFrameIndex() const { return CurrentFrameIndex; }
 
 	static robin_hood::unordered_map<size_t, jShaderBindingsLayout*> ShaderBindingPool;
 	mutable jMutexRWLock ShaderBindingPoolLock;
@@ -363,11 +365,11 @@ public:
 	virtual jCommandBufferManager_DX12* GetCommandBufferManager() const override { return CommandBufferManager; }
 	virtual jCommandBufferManager_DX12* GetCopyCommandBufferManager() const { return CopyCommandBufferManager; }
 
-	jPipelineStateFixedInfo FixedPipelineStateInfo;
-	class jCamera* MainCamera = nullptr;
-	jGraphicsPipelineShader GraphicsPipelineShader2;
-	std::vector<class jObject*> SpawnedObjects;
-	std::vector<jDrawCommand> DrawCommands;
+	//jPipelineStateFixedInfo FixedPipelineStateInfo;
+	//class jCamera* MainCamera = nullptr;
+	//jGraphicsPipelineShader GraphicsPipelineShader2;
+	//std::vector<class jObject*> SpawnedObjects;
+	//std::vector<jDrawCommand> DrawCommands;
 
 	virtual IUniformBufferBlock* CreateUniformBufferBlock(jName InName, jLifeTimeType InLifeTimeType, size_t InSize = 0) const override;
     virtual void BindGraphicsShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineStateLayout
@@ -385,6 +387,9 @@ public:
     virtual void DrawElementsInstancedBaseVertex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 indexCount, int32 baseVertexIndex, int32 instanceCount) const override;
     virtual void DrawIndirect(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, jBuffer* buffer, int32 startIndex, int32 drawCount) const override;
     virtual void DrawElementsIndirect(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, jBuffer* buffer, int32 startIndex, int32 drawCount) const override;
+
+	virtual void* GetWindow() const override { return m_hWnd; }
+	virtual std::shared_ptr<jRenderTarget> CreateRenderTarget(const jRenderTargetInfo& info) const override;
 };
 
 extern jRHI_DX12* g_rhi_dx12;

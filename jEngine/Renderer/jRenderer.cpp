@@ -36,7 +36,7 @@ void jRenderer::Setup()
 {
     SCOPE_CPU_PROFILE(Setup);
 
-    FrameIndex = g_rhi_vk->CurrentFrameIndex;
+    FrameIndex = g_rhi->GetCurrentFrameIndex();
     UseForwardRenderer = RenderFrameContextPtr->UseForwardRenderer;
 
     // View 별로 저장 할 수 있어야 함
@@ -797,12 +797,12 @@ void jRenderer::PostProcess()
             if (!g_EyeAdaptationARTPtr)
             {
                 g_EyeAdaptationARTPtr = jRenderTargetPool::GetRenderTarget(
-                    { ETextureType::TEXTURE_2D, ETextureFormat::R16F, 1, 1, 1, false, g_rhi_vk->GetSelectedMSAASamples() });
+                    { ETextureType::TEXTURE_2D, ETextureFormat::R16F, 1, 1, 1, false, g_rhi->GetSelectedMSAASamples() });
             }
             if (!g_EyeAdaptationBRTPtr)
             {
                 g_EyeAdaptationBRTPtr = jRenderTargetPool::GetRenderTarget(
-                    { ETextureType::TEXTURE_2D, ETextureFormat::R16F, 1, 1, 1, false, g_rhi_vk->GetSelectedMSAASamples() });
+                    { ETextureType::TEXTURE_2D, ETextureFormat::R16F, 1, 1, 1, false, g_rhi->GetSelectedMSAASamples() });
             }
 
             static bool FlipEyeAdaptation = false;
@@ -1177,7 +1177,7 @@ void jRenderer::Render()
     {
         SCOPE_CPU_PROFILE(QueueSubmitAfterShadowPass);
         RenderFrameContextPtr->GetActiveCommandBuffer()->End();
-        ((jRenderFrameContext_Vulkan*)RenderFrameContextPtr.get())->QueueSubmitCurrentActiveCommandBuffer(g_rhi_vk->Swapchain->Images[FrameIndex]->RenderFinishedAfterShadow);
+        RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::ShadowPass);
         RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
     }
 
@@ -1188,7 +1188,7 @@ void jRenderer::Render()
     {
         SCOPE_CPU_PROFILE(QueueSubmitAfterBasePass);
         RenderFrameContextPtr->GetActiveCommandBuffer()->End();
-        ((jRenderFrameContext_Vulkan*)RenderFrameContextPtr.get())->QueueSubmitCurrentActiveCommandBuffer(g_rhi_vk->Swapchain->Images[FrameIndex]->RenderFinishedAfterBasePass);
+        RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::BasePass);
         RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
     }
 

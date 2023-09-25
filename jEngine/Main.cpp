@@ -29,20 +29,21 @@ std::vector<VkPipeline> Pipelines;
 
 int main()
 {
-#if USE_DX12
-    jRHI_DX12 dx12;
-    dx12.m_hWnd = dx12.CreateMainWindow();
-    dx12.InitRHI();
-    dx12.Run();
-    dx12.Release();
-	return 0;
-#endif
+//#if USE_DX12
+//    jRHI_DX12 dx12;
+//    dx12.m_hWnd = dx12.CreateMainWindow();
+//    dx12.InitRHI();
+//    dx12.Run();
+//    dx12.Release();
+//    return 0;
+//#endif
 
 	//::ShowWindow(::GetConsoleWindow(), SW_HIDE);		// hide console window
 
 	g_rhi->InitRHI();
 	g_rhi->OnInitRHI();
 
+#if USE_VULKAN || USE_OPENGL
 	GLFWwindow* window = static_cast<GLFWwindow*>(g_rhi->GetWindow());
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 	glfwSetKeyCallback(window, key_callback);
@@ -51,6 +52,7 @@ int main()
 	glfwSetMouseButtonCallback(window, mouse_button_callback);
 	glfwSetScrollCallback(window, scroll_callback);
 	glfwSetWindowFocusCallback(window, window_focus_callback);
+#endif
 
 	//int major, minor, rev;
 	//glfwGetVersion(&major, &minor, &rev);
@@ -97,6 +99,24 @@ int main()
 
 	// render loop
 	// -----------
+#if USE_DX12
+    MSG msg = {};
+    while (::IsWindow((HWND)g_rhi->GetWindow()))
+    {
+        if (g_rhi_dx12)
+        {
+            g_rhi->IncrementFrameNumber();
+            g_Engine.Update(g_timeDeltaSecond);
+            g_Engine.Draw();
+        }
+
+        while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+        {
+            ::TranslateMessage(&msg);
+            ::DispatchMessage(&msg);
+        }
+    }
+#else
 	while (!glfwWindowShouldClose(window))
 	{
 		// input
@@ -131,54 +151,9 @@ int main()
 			ImGui_ImplGlfw_NewFrame();
 			ImGui::NewFrame();
 
-			//static bool show_demo_window = true;
-			//static bool show_another_window = false;
-			//ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-
-			//// 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-			//if (show_demo_window)
-			//	ImGui::ShowDemoWindow(&show_demo_window);
-
-			//// 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
-			//{
-			//	static float f = 0.0f;
-			//	static int counter = 0;
-
-			//	ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
-
-			//	ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-			//	ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
-			//	ImGui::Checkbox("Another Window", &show_another_window);
-
-			//	ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-			//	ImGui::ColorEdit3("clear color", (float*)& clear_color); // Edit 3 floats representing a color
-
-			//	if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-			//		counter++;
-			//	ImGui::SameLine();
-			//	ImGui::Text("counter = %d", counter);
-
-			//	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-			//	ImGui::End();
-			//}
-
-			//// 3. Show another simple window.
-			//if (show_another_window)
-			//{
-			//	ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-			//	ImGui::Text("Hello from another window!");
-			//	if (ImGui::Button("Close Me"))
-			//		show_another_window = false;
-			//	ImGui::End();
-			//}
-
 			ImGui::EndFrame();
 			ImGui::Render();
-			//int display_w, display_h;
-			//glfwGetFramebufferSize(window, &display_w, &display_h);
-			//glViewport(0, 0, display_w, display_h);
-			//glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-			//glClear(GL_COLOR_BUFFER_BIT);
+
 			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 		}
 		#endif
@@ -194,6 +169,7 @@ int main()
 
 		showFPS(window);
 	}
+#endif // USE_DX12
 
 	g_Engine.Release();
 
@@ -201,9 +177,8 @@ int main()
 	ImGui_ImplOpenGL3_Shutdown();
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
-#elif USE_VULKAN
-	g_rhi->ReleaseRHI();
 #endif
+	g_rhi->ReleaseRHI();
 
 	// glfw: terminate, clearing all previously allocated GLFW resources.
 	// ------------------------------------------------------------------

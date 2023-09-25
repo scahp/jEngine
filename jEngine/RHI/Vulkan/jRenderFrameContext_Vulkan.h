@@ -13,6 +13,8 @@ struct jRenderFrameContext_Vulkan : public jRenderFrameContext
     {}
     virtual ~jRenderFrameContext_Vulkan() {}
 
+    virtual void SubmitCurrentActiveCommandBuffer(ECurrentRenderPass InCurrentRenderPass) override;
+
     virtual void QueueSubmitCurrentActiveCommandBuffer(jSemaphore* InSignalSemaphore);
 
 public:

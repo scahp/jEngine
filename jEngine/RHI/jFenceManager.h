@@ -7,8 +7,8 @@ public:
     virtual void* GetHandle() const = 0;
     virtual void Release() = 0;
     virtual void WaitForFence(uint64 InTimeoutNanoSec = UINT64_MAX) = 0;
-    virtual bool SetFenceValue(uint64 InFenceValue) { return false; }
     virtual bool IsValid() const { return false; }
+    virtual bool IsComplete(uint64 InFenceValue) const { return false; }
     virtual bool IsComplete() const { return false; }
 };
 
