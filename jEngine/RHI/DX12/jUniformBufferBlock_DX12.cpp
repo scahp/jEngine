@@ -8,11 +8,11 @@ void jUniformBufferBlock_DX12::Init(size_t size)
 {
     check(size);
 
-    // size = Align<uint64>(size, g_rhi_vk->DeviceProperties.limits.minUniformBufferOffsetAlignment);
+    size = Align<uint64>(size, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
 
     if (jLifeTimeType::MultiFrame == LifeType)
     {
-        Buffer = jBufferUtil_DX12::CreateBuffer(size, 0, true, false);
+        Buffer = jBufferUtil_DX12::CreateBuffer(size, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT, true, false);
         jBufferUtil_DX12::CreateConstantBufferView(Buffer);
     }
 }
