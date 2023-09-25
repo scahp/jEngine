@@ -135,7 +135,9 @@ ComPtr<IDxcBlob> jShaderCompiler_DX12::Compile(const char* InShaderCode, uint32 
         return nullptr;
 
     std::vector<const wchar_t*> options;
-    options.push_back(TEXT("-WX"));				// Treat warnings as errors.
+
+	// DXC compile Option referece : https://simoncoenen.com/blog/programming/graphics/DxcCompiling, or 'dxc.exe -help'
+    //options.push_back(TEXT("-WX"));				// Treat warnings as errors.
 
     if (InRowMajorMatrix)
         options.push_back(TEXT("-Zpr"));			// Pack matrices in row-major order.
