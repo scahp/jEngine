@@ -962,10 +962,8 @@ bool jRHI_DX12::InitRHI()
 		GraphicsPipelineShader2.PixelShader = new jShader(shaderInfo);
 		GraphicsPipelineShader2.PixelShader->Initialize();
     }
-
-	CubePrimitive = jPrimitiveUtil::CreateCube(Vector(-60.0f, 55.0f, -20.0f), Vector::OneVector, Vector(50.0f, 50.0f, 50.0f), Vector4(0.7f, 0.7f, 0.7f, 1.0f));
-
 	{
+
         auto quad = jPrimitiveUtil::CreateQuad(Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), Vector(1000.0f, 1000.0f, 1000.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
         SpawnedObjects.push_back(quad);
 
@@ -1258,17 +1256,6 @@ void jRHI_DX12::Render()
 
     jView View(MainCamera, {});
     View.PrepareViewUniformBufferShaderBindingInstance();
-
-	CubePrimitive->RenderObjects[0]->UpdateWorldMatrix();
-
-    //jShaderBindingsLayoutArray ShaderBindingsLayoutArray2;
-    //View.GetShaderBindingLayout(ShaderBindingsLayoutArray2);
-    //ShaderBindingsLayoutArray2.Add(CubePrimitive->RenderObjects[0]->CreateShaderBindingInstance()->ShaderBindingsLayouts);
-
-    //jVertexBufferArray VertexBufferArray2;
-    //VertexBufferArray2.Add(CubePrimitive->RenderObjects[0]->GeometryDataPtr->VertexBuffer);
-    //PipelineStateInfo = (jPipelineStateInfo_DX12*)g_rhi->CreatePipelineStateInfo(
-    //    &FixedPipelineStateInfo, GraphicsPipelineShader2, VertexBufferArray2, RenderPass, ShaderBindingsLayoutArray2, nullptr, 0);
 
 	if (std::shared_ptr<jRenderFrameContext> renderFrameContext = g_rhi->BeginRenderFrame())
 	{

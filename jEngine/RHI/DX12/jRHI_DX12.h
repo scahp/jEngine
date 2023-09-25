@@ -363,11 +363,10 @@ public:
 	virtual jCommandBufferManager_DX12* GetCommandBufferManager() const override { return CommandBufferManager; }
 	virtual jCommandBufferManager_DX12* GetCopyCommandBufferManager() const { return CopyCommandBufferManager; }
 
-	class jObject* CubePrimitive = nullptr;
 	jPipelineStateFixedInfo FixedPipelineStateInfo;
 	class jCamera* MainCamera = nullptr;
 	jGraphicsPipelineShader GraphicsPipelineShader2;
-	std::vector<jObject*> SpawnedObjects;
+	std::vector<class jObject*> SpawnedObjects;
 	std::vector<jDrawCommand> DrawCommands;
 
 	virtual IUniformBufferBlock* CreateUniformBufferBlock(jName InName, jLifeTimeType InLifeTimeType, size_t InSize = 0) const override;
