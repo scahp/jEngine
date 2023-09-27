@@ -539,6 +539,7 @@ void CreateShaderResourceView(jBuffer_DX12* InBuffer);
 void CreateShaderResourceView(jBuffer_DX12* InBuffer, uint32 InStride, uint32 InCount, ETextureFormat InFormat = ETextureFormat::MAX);
 void CreateUnorderedAccessView(jBuffer_DX12* InBuffer);
 void CreateShaderResourceView(jTexture_DX12* InTexture);
+void CreateDepthStencilView(jTexture_DX12* InTexture);
 void CreateUnorderedAccessView(jTexture_DX12* InTexture);
 void CreateRenderTargetView(jTexture_DX12* InTexture);
 

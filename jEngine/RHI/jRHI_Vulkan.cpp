@@ -45,6 +45,7 @@ TResourcePool<jRenderPass_Vulkan, jMutexRWLock> jRHI_Vulkan::RenderPassPool;
 // jGPUDebugEvent
 jGPUDebugEvent::jGPUDebugEvent(const char* InName, jCommandBuffer* InCommandBuffer)
 {
+#if USE_VULKAN
 	if (g_rhi_vk->vkCmdDebugMarkerBegin)
 	{
 		CommandBuffer = InCommandBuffer;
@@ -59,10 +60,12 @@ jGPUDebugEvent::jGPUDebugEvent(const char* InName, jCommandBuffer* InCommandBuff
 		markerInfo.pMarkerName = InName;
 		g_rhi_vk->vkCmdDebugMarkerBegin((VkCommandBuffer)CommandBuffer->GetHandle(), &markerInfo);
 	}
+#endif // USE_VULKAN
 }
 
 jGPUDebugEvent::jGPUDebugEvent(const char* InName, jCommandBuffer* InCommandBuffer, const Vector4& InColor)
 {
+#if USE_VULKAN
     if (g_rhi_vk->vkCmdDebugMarkerBegin)
     {
         CommandBuffer = InCommandBuffer;
@@ -77,14 +80,17 @@ jGPUDebugEvent::jGPUDebugEvent(const char* InName, jCommandBuffer* InCommandBuff
 		markerInfo.pMarkerName = InName;
         g_rhi_vk->vkCmdDebugMarkerBegin((VkCommandBuffer)CommandBuffer->GetHandle(), &markerInfo);
     }
+#endif // USE_VULKAN
 }
 
 jGPUDebugEvent::~jGPUDebugEvent()
 {
+#if USE_VULKAN
 	if (g_rhi_vk->vkCmdDebugMarkerEnd)
 	{
 		g_rhi_vk->vkCmdDebugMarkerEnd((VkCommandBuffer)CommandBuffer->GetHandle());
 	}
+#endif // USE_VULKAN
 }
 
 // jFrameBuffer_Vulkan

@@ -85,9 +85,9 @@ public:
 			queryTime = *iter;
 			s_resting.erase(iter);
 		}
+        JASSERT(queryTime);
 		queryTime->Init();
 		s_running.insert(queryTime);
-		JASSERT(queryTime);
 		return queryTime;
 	}
 	static void ReturnQueryTime(jQuery* queryTime)

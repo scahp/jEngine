@@ -29,15 +29,7 @@ public:
     //FORCEINLINE const VkRenderPass& GetRenderPassRaw() const { return RenderPass; }
     //virtual void* GetFrameBuffer() const override { return FrameBuffer; }
 
-    virtual bool BeginRenderPass(const jCommandBuffer* commandBuffer) override
-    {
-        if (!ensure(commandBuffer))
-            return false;
-
-        CommandBuffer = commandBuffer;
-
-        return true;
-    }
+    virtual bool BeginRenderPass(const jCommandBuffer* commandBuffer) override;
 
     // 제거해야 함. jCommandBuffer_DX12 와 jCommandBuffer 관계 정리 마치고.
     bool BeginRenderPass(const jCommandBuffer_DX12* commandBuffer, D3D12_CPU_DESCRIPTOR_HANDLE InTempRTV)
@@ -45,11 +37,11 @@ public:
         if (!ensure(commandBuffer))
             return false;
 
-        // RenderPass 를 매 프레임 새로 갱신하게 만들게 되면, 이 코드를 제거하고 아래 코드를 사용.
-        commandBuffer->CommandList->OMSetRenderTargets(1, &InTempRTV, false, nullptr);
-        const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
-        commandBuffer->CommandList->ClearRenderTargetView(InTempRTV, clearColor, 0, nullptr);
-        return true;
+        //// RenderPass 를 매 프레임 새로 갱신하게 만들게 되면, 이 코드를 제거하고 아래 코드를 사용.
+        //commandBuffer->CommandList->OMSetRenderTargets(1, &InTempRTV, false, nullptr);
+        //const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
+        //commandBuffer->CommandList->ClearRenderTargetView(InTempRTV, clearColor, 0, nullptr);
+        //return true;
 
         commandBuffer->CommandList->OMSetRenderTargets((uint32)RTVCPUHandles.size(), &RTVCPUHandles[0], false, &DSVCPUDHandle);
 
@@ -91,7 +83,7 @@ private:
     void SetFinalLayoutToAttachment(const jAttachment& attachment) const;
 
 private:
-    const jCommandBuffer* CommandBuffer = nullptr;
+    const jCommandBuffer_DX12* CommandBuffer = nullptr;
 
     std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> RTVCPUHandles;
     D3D12_CPU_DESCRIPTOR_HANDLE DSVCPUDHandle;

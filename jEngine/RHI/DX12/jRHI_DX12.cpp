@@ -1539,6 +1539,19 @@ bool jRHI_DX12::OnHandleDeviceRestored()
     return true;
 }
 
+jCommandBuffer_DX12* jRHI_DX12::BeginSingleTimeCommands()
+{
+    check(CommandBufferManager);
+    return CommandBufferManager->GetOrCreateCommandBuffer();
+}
+
+void jRHI_DX12::EndSingleTimeCommands(jCommandBuffer_DX12* commandBuffer)
+{
+    check(CommandBufferManager);
+    CommandBufferManager->ExecuteCommandList(commandBuffer, true);
+    CommandBufferManager->ReturnCommandBuffer(commandBuffer);
+}
+
 jCommandBuffer_DX12* jRHI_DX12::BeginSingleTimeCopyCommands()
 {
 	check(CopyCommandBufferManager);
@@ -1657,9 +1670,6 @@ jTexture* jRHI_DX12::CreateTextureFromData(void* data, int32 width, int32 height
 	jBufferUtil_DX12::CopyBufferToImage(commandList->Get(), buffer->Buffer.Get(), 0, Texture->Image.Get());
 	g_rhi_dx12->EndSingleTimeCopyCommands(commandList);
 	delete buffer;
-	
-	// Create SRV
-	jBufferUtil_DX12::CreateShaderResourceView(Texture);
 
 	return Texture;
 }
@@ -2065,3 +2075,61 @@ std::shared_ptr<jRenderTarget> jRHI_DX12::CreateRenderTarget(const jRenderTarget
 
     return std::shared_ptr<jRenderTarget>(rt);
 }
+
+jQuery* jRHI_DX12::CreateQueryTime() const
+{
+    auto queryTime = new jQuery();
+    return queryTime;
+}
+
+void jRHI_DX12::ReleaseQueryTime(jQuery* queryTime) const
+{
+    auto queryTime_gl = static_cast<jQuery*>(queryTime);
+    delete queryTime_gl;
+}
+
+bool jRHI_DX12::TransitionImageLayout(jCommandBuffer* commandBuffer, jTexture* texture, EImageLayout newLayout) const
+{
+    check(commandBuffer);
+    check(texture);
+
+    auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)commandBuffer;
+    auto Texture_DX12 = (jTexture_DX12*)texture;
+
+    D3D12_RESOURCE_BARRIER barrier = { };
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+    barrier.Transition.pResource = Texture_DX12->Image.Get();
+    barrier.Transition.StateBefore = GetDX12ImageLayout(Texture_DX12->Layout);
+    barrier.Transition.StateAfter = GetDX12ImageLayout(newLayout);
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    CommandBuffer_DX12->CommandList->ResourceBarrier(1, &barrier);
+
+    //auto texture_dx12 = (jTexture_DX12*)texture;
+    //if (TransitionImageLayout((VkCommandBuffer)commandBuffer->GetHandle(), texture_dx12->Image, GetVulkanTextureFormat(texture_dx12->Format)
+    //    , texture_dx12->MipLevel, texture_dx12->LayerCount, GetVulkanImageLayout(texture_dx12->Layout), GetVulkanImageLayout(newLayout)))
+    //{
+    //    ((jTexture_DX12*)texture)->Layout = newLayout;
+    //    return true;
+    //}
+    return true;
+}
+
+bool jRHI_DX12::TransitionImageLayoutImmediate(jTexture* texture, EImageLayout newLayout) const
+{
+    check(texture);
+
+    VkCommandBuffer commandBuffer = BeginSingleTimeCommands();
+    check(commandBuffer);
+
+    if (commandBuffer)
+    {
+        auto ret = TransitionImageLayout(commandBuffer, texture, newLayout);
+
+        EndSingleTimeCommands(commandBuffer);
+        return ret;
+    }
+
+    return false;
+}
+

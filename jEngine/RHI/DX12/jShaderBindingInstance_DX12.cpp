@@ -118,6 +118,15 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
             break;
         }
     }
+
+#if _DEBUG
+    // validation
+    for(int32 i=0;i<(int32)Descriptors.size();++i)
+    {
+        const jShaderBinding* ShaderBinding = InShaderBindingArray[i];
+        ensure(Descriptors[i].IsValid());
+    }
+#endif
 }
 
 void jShaderBindingInstance_DX12::BindGraphics(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot /*= 0*/) const

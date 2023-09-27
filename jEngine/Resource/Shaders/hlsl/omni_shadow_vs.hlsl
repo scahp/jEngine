@@ -1,7 +1,7 @@
 #include "common.hlsl"
 
 cbuffer PointLight : register(b0, space0) { jPointLightUniformBufferData PointLight; }
-cbuffer RenderObjectParam : register(b0,space1) { RenderObjectUniformBuffer RenderObjectParam; }
+cbuffer RenderObjectParam : register(b1,space0) { RenderObjectUniformBuffer RenderObjectParam; }
 
 struct VSInput
 {

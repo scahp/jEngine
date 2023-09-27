@@ -105,7 +105,16 @@ ComPtr<ID3D12Resource> CreateImageInternal(uint32 InWidth, uint32 InHeight, uint
 
     D3D12_RESOURCE_DESC TexDesc = { };
     TexDesc.MipLevels = InMipLevels;
-    TexDesc.Format = InFormat;
+    if (IsDepthFormat(GetDX12TextureFormat(InFormat)))
+    {
+        DXGI_FORMAT TexFormat, SrvFormat;
+        GetDepthFormatForSRV(TexFormat, SrvFormat, InFormat);
+        TexDesc.Format = TexFormat;
+    }
+    else
+    {
+        TexDesc.Format = InFormat;
+    }
     TexDesc.Width = InWidth;
     TexDesc.Height = InHeight;
     TexDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
@@ -152,6 +161,20 @@ jTexture_DX12* CreateImage(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers
     jTexture_DX12* Texture = new jTexture_DX12(InType, InFormat, InWidth, InHeight, InArrayLayers
         , EMSAASamples::COUNT_1, InMipLevels, false, TextureInternal);
     check(Texture);
+
+    if (IsDepthFormat(InFormat))
+    {
+        CreateShaderResourceView(Texture);
+        CreateDepthStencilView(Texture);
+    }
+    else
+    {
+        CreateShaderResourceView(Texture);
+        if (InIsRTV)
+            CreateRenderTargetView(Texture);
+        if (InIsUAV)
+            CreateUnorderedAccessView(Texture);
+    }
 
     return Texture;
 }
@@ -297,7 +320,16 @@ void CreateShaderResourceView(jTexture_DX12* InTexture)
 
     D3D12_SHADER_RESOURCE_VIEW_DESC Desc = {};
     Desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    Desc.Format = GetDX12TextureFormat(InTexture->Format);
+    if (IsDepthFormat(InTexture->Format))
+    {
+        DXGI_FORMAT TexFormat, SrvFormat;
+        GetDepthFormatForSRV(TexFormat, SrvFormat, GetDX12TextureFormat(InTexture->Format));
+        Desc.Format = SrvFormat;
+    }
+    else
+    {
+        Desc.Format = GetDX12TextureFormat(InTexture->Format);
+    }
 
     switch(InTexture->Type)
     {
@@ -332,6 +364,58 @@ void CreateShaderResourceView(jTexture_DX12* InTexture)
 
     g_rhi_dx12->Device->CreateShaderResourceView(InTexture->Image.Get()
         , &Desc, InTexture->SRV.CPUHandle);
+}
+
+void CreateDepthStencilView(jTexture_DX12* InTexture)
+{
+    check(g_rhi_dx12);
+    check(g_rhi_dx12->Device);
+
+    if (!ensure(InTexture))
+        return;
+
+    check(!InTexture->DSV.IsValid());
+    InTexture->DSV = g_rhi_dx12->DSVDescriptorHeaps.Alloc();
+    D3D12_DEPTH_STENCIL_VIEW_DESC Desc = {};
+
+    Desc.Format = GetDX12TextureFormat(InTexture->Format);
+    const bool IsMultisampled = ((int32)InTexture->SampleCount > 1);
+    switch (InTexture->Type)
+    {
+    case ETextureType::TEXTURE_2D:
+        Desc.ViewDimension = IsMultisampled
+            ? D3D12_DSV_DIMENSION_TEXTURE2DMS : D3D12_DSV_DIMENSION_TEXTURE2D;
+        Desc.Texture2D.MipSlice = 0;
+        break;
+    case ETextureType::TEXTURE_2D_ARRAY:
+    case ETextureType::TEXTURE_CUBE:
+        if (IsMultisampled)
+        {
+            Desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DMSARRAY;
+            Desc.Texture2DMSArray.FirstArraySlice = 0;
+            Desc.Texture2DMSArray.ArraySize = InTexture->LayerCount;
+        }
+        else
+        {
+            Desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
+            Desc.Texture2DArray.FirstArraySlice = 0;
+            Desc.Texture2DArray.ArraySize = InTexture->LayerCount;
+            Desc.Texture2DArray.MipSlice = 0;
+        }
+        break;
+    default:
+        check(0);
+        break;
+    }
+
+    //const bool HasStencil = !IsDepthOnlyFormat(InTexture->Format);
+    //Desc.Flags = D3D12_DSV_FLAG_READ_ONLY_DEPTH;
+    //if (HasStencil)
+    //    Desc.Flags |= D3D12_DSV_FLAG_READ_ONLY_STENCIL;
+    Desc.Flags = D3D12_DSV_FLAG_NONE;
+
+    g_rhi_dx12->Device->CreateDepthStencilView(InTexture->Image.Get()
+        , &Desc, InTexture->DSV.CPUHandle);
 }
 
 void CreateUnorderedAccessView(jTexture_DX12* InTexture)

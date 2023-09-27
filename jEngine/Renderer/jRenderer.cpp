@@ -19,7 +19,7 @@
 #include "RHI/Vulkan/jRenderFrameContext_Vulkan.h"
 
 #define ASYNC_WITH_SETUP 1
-#define PARALLELFOR_WITH_PASSSETUP 1
+#define PARALLELFOR_WITH_PASSSETUP 0
 
 struct jSimplePushConstant
 {
@@ -196,17 +196,19 @@ void jRenderer::SetupShadowPass()
 
                 new (&ShadowPasses.DrawCommands[InIndex]) jDrawCommand(RenderFrameContextPtr, &ShadowPasses.ViewLight, InRenderObject, ShadowPasses.ShadowMapRenderPass
                     , (InRenderObject->HasInstancing() ? ShadowInstancingShader : ShadowShader), &ShadpwPipelineStateFixed, {}, nullptr, OverrideInstanceData);
-                ShadowPasses.DrawCommands[InIndex].PrepareToDraw(true);
+                ShadowPasses.DrawCommands[InIndex].PrepareToDraw(false);        // todo : test 로 false 로 고침
             });
 #else
-        ShadowPasses.DrawCommands.resize(ShadowCaterRenderObjects.size());
-        int32 i = 0;
-        for (auto iter : ShadowCaterRenderObjects)
+        ShadowPasses.DrawCommands.resize(jObject::GetShadowCasterRenderObject().size());
         {
-            new (&ShadowPasses.DrawCommands[i]) jDrawCommand(RenderFrameContextPtr, &ShadowPasses.ViewLight, iter->RenderObject, ShadowMapRenderPass
-                , (iter->HasInstancing() ? ShadowInstancingShader : ShadowShader), &ShadpwPipelineStateFixed, {}, nullptr);
-            ShadowPasses.DrawCommands[i].PrepareToDraw(true);
-            ++i;
+            int32 i = 0;
+            for (auto iter : jObject::GetShadowCasterRenderObject())
+            {
+                new (&ShadowPasses.DrawCommands[i]) jDrawCommand(RenderFrameContextPtr, &ShadowPasses.ViewLight, iter, ShadowPasses.ShadowMapRenderPass
+                    , (iter->HasInstancing() ? ShadowInstancingShader : ShadowShader), &ShadpwPipelineStateFixed, {}, nullptr);
+                ShadowPasses.DrawCommands[i].PrepareToDraw(false);        // todo : test 로 false 로 고침
+                ++i;
+            }
         }
 #endif
     }
@@ -439,8 +441,10 @@ void jRenderer::SetupBasePass()
     int32 i = 0;
     for (auto iter : jObject::GetStaticObject())
     {
-        new (&BasePasses[i]) jDrawCommand(RenderFrameContextPtr, &View, iter->RenderObject, BaseRenderPass
-            , (iter->HasInstancing() ? BasePassInstancingShader : BasePassShader), &BasePassPipelineStateFixed, {}, SimplePushConstant);
+        new (&BasePasses[i]) jDrawCommand(RenderFrameContextPtr, &View, iter->RenderObjects[0], BaseRenderPass
+            , GetOrCreateShaderFunc(iter->RenderObjects[0]), &BasePassPipelineStateFixed, {}, SimplePushConstant);
+        //new (&BasePasses[i]) jDrawCommand(RenderFrameContextPtr, &View, iter->RenderObject, BaseRenderPass
+        //    , (iter->HasInstancing() ? BasePassInstancingShader : BasePassShader), &BasePassPipelineStateFixed, {}, SimplePushConstant);
         BasePasses[i].PrepareToDraw(false);
         ++i;
     }

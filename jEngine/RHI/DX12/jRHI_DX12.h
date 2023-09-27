@@ -308,6 +308,9 @@ public:
     bool OnHandleDeviceLost();
     bool OnHandleDeviceRestored();
 
+    jCommandBuffer_DX12* BeginSingleTimeCommands();
+    void EndSingleTimeCommands(jCommandBuffer_DX12* commandBuffer);
+
 	jCommandBuffer_DX12* BeginSingleTimeCopyCommands();
     void EndSingleTimeCopyCommands(jCommandBuffer_DX12* commandBuffer);
 
@@ -390,6 +393,12 @@ public:
 
 	virtual void* GetWindow() const override { return m_hWnd; }
 	virtual std::shared_ptr<jRenderTarget> CreateRenderTarget(const jRenderTargetInfo& info) const override;
+
+	virtual jQuery* CreateQueryTime() const override;
+	virtual void ReleaseQueryTime(jQuery* queryTime) const override;
+
+	virtual bool TransitionImageLayout(jCommandBuffer* commandBuffer, jTexture* texture, EImageLayout newLayout) const override;
+	virtual bool TransitionImageLayoutImmediate(jTexture* texture, EImageLayout newLayout) const override;
 };
 
 extern jRHI_DX12* g_rhi_dx12;
