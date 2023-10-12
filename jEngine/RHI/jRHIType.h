@@ -716,3 +716,81 @@ enum class EDescriptorHeapTypeDX12
     DSV,
     MAX
 };
+
+enum class ERTClearType
+{
+    None = 0,
+    Color,
+    DepthStencil
+};
+
+struct jDepthStencilClearType
+{
+    float Depth;
+    uint32 Stencil;
+};
+
+class jRTClearValue
+{
+public:
+    static const jRTClearValue Invalid;
+
+	union jClearValueType
+	{
+		float Color[4];
+		jDepthStencilClearType DepthStencil;
+	};
+
+	constexpr jRTClearValue() = default;
+    constexpr jRTClearValue(const Vector4& InColor)
+        : Type(ERTClearType::Color)
+    {
+        ClearValue.Color[0] = InColor.x;
+        ClearValue.Color[1] = InColor.y;
+        ClearValue.Color[2] = InColor.z;
+        ClearValue.Color[3] = InColor.w;
+    }
+	constexpr jRTClearValue(float InR, float InG, float InB, float InA)
+		: Type(ERTClearType::Color)
+	{
+		ClearValue.Color[0] = InR;
+		ClearValue.Color[1] = InG;
+		ClearValue.Color[2] = InB;
+		ClearValue.Color[3] = InA;
+	}
+    constexpr jRTClearValue(float InDepth, uint32 InStencil)
+        : Type(ERTClearType::DepthStencil)
+    {
+        ClearValue.DepthStencil.Depth = InDepth;
+		ClearValue.DepthStencil.Stencil = InStencil;
+    }
+
+    void SetColor(const Vector4& InColor)
+    {
+        Type = ERTClearType::Color;
+        ClearValue.Color[0] = InColor.x;
+        ClearValue.Color[1] = InColor.y;
+        ClearValue.Color[2] = InColor.z;
+        ClearValue.Color[3] = InColor.w;
+    }
+
+    void SetDepthStencil(float InDepth, uint8 InStencil)
+    {
+		Type = ERTClearType::DepthStencil;
+        ClearValue.DepthStencil.Depth = InDepth;
+        ClearValue.DepthStencil.Stencil = InStencil;
+    }
+
+	const float* GetCleraColor() const { return &ClearValue.Color[0]; }
+	jDepthStencilClearType GetCleraDepthStencil() const { return ClearValue.DepthStencil; }
+	float GetCleraDepth() const { return ClearValue.DepthStencil.Depth; }
+	uint32 GetCleraStencil() const { return ClearValue.DepthStencil.Stencil; }
+	jClearValueType GetClearValue() const { return ClearValue; }
+
+	void ResetToNoneType() { Type = ERTClearType::None; }
+	ERTClearType GetType() const { return Type; }
+
+private:
+	ERTClearType Type = ERTClearType::None;
+	jClearValueType ClearValue;
+};

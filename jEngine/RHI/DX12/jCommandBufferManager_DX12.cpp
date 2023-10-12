@@ -10,8 +10,11 @@ void jCommandBuffer_DX12::Reset() const
 {
     CommandAllocator->Reset();
     CommandList->Reset(CommandAllocator.Get(), nullptr);
-    OnlineDescriptorHeap->Reset();
-    OnlineSamplerDescriptorHeap->Reset();
+    if (OnlineDescriptorHeap)
+        OnlineDescriptorHeap->Reset();
+    if (OnlineSamplerDescriptorHeap)
+        OnlineSamplerDescriptorHeap->Reset();
+    IsClosed = false;
 }
 
 void* jCommandBuffer_DX12::GetFenceHandle() const
@@ -31,9 +34,13 @@ jFence* jCommandBuffer_DX12::GetFence() const
 
 bool jCommandBuffer_DX12::End() const
 {
+    if (IsClosed)
+        return true;
+
     if (FAILED(CommandList->Close()))
         return false;
 
+    IsClosed = true;
     return true;
 }
 
@@ -147,11 +154,20 @@ jCommandBuffer_DX12* jCommandBufferManager_DX12::CreateCommandList() const
     }
 
     commandBuffer->SetFence(g_rhi_dx12->FenceManager.GetOrCreateFence());
-    commandBuffer->OnlineDescriptorHeap = g_rhi_dx12->OnlineDescriptorHeapBlocks.Alloc();
-    commandBuffer->OnlineSamplerDescriptorHeap = g_rhi_dx12->OnlineSamplerDescriptorHeapBlocks.Alloc();
+    if (D3D12_COMMAND_LIST_TYPE_COPY != CommandListType)
+    {
+        // todo : 반환했다가 다시 받아가는 식으로 하는게 좋은 듯
+        commandBuffer->OnlineDescriptorHeap = g_rhi_dx12->OnlineDescriptorHeapBlocks.Alloc();
+        if (!commandBuffer->OnlineDescriptorHeap)
+            commandBuffer->OnlineDescriptorHeap = g_rhi_dx12->OnlineDescriptorHeapBlocks2.Alloc();
 
-    check(commandBuffer->OnlineDescriptorHeap);
-    check(commandBuffer->OnlineSamplerDescriptorHeap);
+        commandBuffer->OnlineSamplerDescriptorHeap = g_rhi_dx12->OnlineSamplerDescriptorHeapBlocks.Alloc();
+        if (!commandBuffer->OnlineSamplerDescriptorHeap)
+            commandBuffer->OnlineSamplerDescriptorHeap = g_rhi_dx12->OnlineSamplerDescriptorHeapBlocks2.Alloc();
+
+        check(commandBuffer->OnlineDescriptorHeap);
+        check(commandBuffer->OnlineSamplerDescriptorHeap);
+    }
 
     return commandBuffer;
 }

@@ -563,11 +563,15 @@ bool jRHI_DX12::InitRHI()
 	SamplerDescriptorHeaps.Initialize(EDescriptorHeapTypeDX12::SAMPLER);
 
 	OnlineDescriptorHeapBlocks.Initialize(EDescriptorHeapTypeDX12::CBV_SRV_UAV, jDescriptorBlock_DX12::MaxDescriptorsInBlock, 250);
-	OnlineSamplerDescriptorHeapBlocks.Initialize(EDescriptorHeapTypeDX12::SAMPLER, 20, 102);
+	OnlineSamplerDescriptorHeapBlocks.Initialize(EDescriptorHeapTypeDX12::SAMPLER, 100, 20);
+    
+    OnlineDescriptorHeapBlocks2.Initialize(EDescriptorHeapTypeDX12::CBV_SRV_UAV, jDescriptorBlock_DX12::MaxDescriptorsInBlock, 250);
+    OnlineSamplerDescriptorHeapBlocks2.Initialize(EDescriptorHeapTypeDX12::SAMPLER, 100, 20);
 
 	// 3. Swapchain
 	Swapchain = new jSwapchain_DX12();
 	Swapchain->Create();
+    CurrentFrameIndex = Swapchain->GetCurrentBackBufferIndex();
 
 	OneFrameUniformRingBuffers.resize(Swapchain->GetNumOfSwapchain());
 	for(jRingBuffer_DX12*& iter : OneFrameUniformRingBuffers)
@@ -1886,6 +1890,8 @@ std::shared_ptr<jRenderFrameContext> jRHI_DX12::BeginRenderFrame()
 	CurrentSwapchainImage->CommandBufferFence->WaitForFence();
 	//////////////////////////////////////////////////////////////////////////
 
+    GetOneFrameUniformRingBuffer()->Reset();
+
 	jCommandBuffer_DX12* commandBuffer = (jCommandBuffer_DX12*)g_rhi_dx12->CommandBufferManager->GetOrCreateCommandBuffer();
 
     auto renderFrameContextPtr = std::make_shared<jRenderFrameContext_DX12>(commandBuffer);
@@ -1902,6 +1908,10 @@ void jRHI_DX12::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& rende
 	SCOPE_CPU_PROFILE(EndRenderFrame);
 
 	jCommandBuffer_DX12* CommandBuffer = (jCommandBuffer_DX12*)renderFrameContextPtr->GetActiveCommandBuffer();
+
+    jSwapchainImage* SwapchainImage = Swapchain->GetCurrentSwapchainImage();
+    g_rhi->TransitionImageLayout(CommandBuffer, SwapchainImage->TexturePtr.get(), EImageLayout::PRESENT_SRC);
+
 	CommandBufferManager->ExecuteCommandList(CommandBuffer);
 	CommandBufferManager->ReturnCommandBuffer(CommandBuffer);
 
@@ -1909,7 +1919,20 @@ void jRHI_DX12::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& rende
 	CurrentSwapchainImage->CommandBufferFence = CommandBuffer->Fence;
     CurrentSwapchainImage->CommandBufferFence->SignalWithNextFenceValue(CommandBufferManager->GetCommandQueue().Get());
 
-	CurrentFrameIndex = (CurrentFrameIndex + 1) % Swapchain->Images.size();
+    HRESULT hr = S_OK;
+    if (Options & c_AllowTearing)
+    {
+        hr = Swapchain->SwapChain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
+    }
+    else
+    {
+        // 첫번째 아규먼트는 VSync가 될때까지 기다림, 어플리케이션은 다음 VSync까지 잠재운다.
+        // 이렇게 하는 것은 렌더링 한 프레임 중 화면에 나오지 못하는 프레임의 cycle을 아끼기 위해서임.
+        hr = Swapchain->SwapChain->Present(1, 0);
+    }
+
+	// CurrentFrameIndex = (CurrentFrameIndex + 1) % Swapchain->Images.size();
+    CurrentFrameIndex = Swapchain->GetCurrentBackBufferIndex();
 	renderFrameContextPtr->Destroy();
 }
 
@@ -2066,7 +2089,26 @@ void jRHI_DX12::DrawElementsIndirect(const std::shared_ptr<jRenderFrameContext>&
 std::shared_ptr<jRenderTarget> jRHI_DX12::CreateRenderTarget(const jRenderTargetInfo& info) const
 {
     const uint16 MipLevels = info.IsGenerateMipmap ? static_cast<uint32>(std::floor(std::log2(std::max<int>(info.Width, info.Height)))) + 1 : 1;
-    jTexture_DX12* Texture = jBufferUtil_DX12::CreateImage(info.Width, info.Height, info.LayerCount, MipLevels, (uint32)info.SampleCount, info.Type, info.Format, true, false);
+    
+    D3D12_CLEAR_VALUE ClearValue{};
+    if (info.RTClearValue.GetType() == ERTClearType::Color)
+    {
+        ClearValue.Color[0] = info.RTClearValue.GetCleraColor()[0];
+        ClearValue.Color[1] = info.RTClearValue.GetCleraColor()[1];
+        ClearValue.Color[2] = info.RTClearValue.GetCleraColor()[2];
+        ClearValue.Color[3] = info.RTClearValue.GetCleraColor()[3];
+        ClearValue.Format = GetDX12TextureFormat(info.Format);
+    }
+    else if (info.RTClearValue.GetType() == ERTClearType::DepthStencil)
+    {
+        ClearValue.DepthStencil.Depth = info.RTClearValue.GetCleraDepth();
+        ClearValue.DepthStencil.Stencil = info.RTClearValue.GetCleraStencil();
+        ClearValue.Format = GetDX12TextureFormat(info.Format);
+    }
+    const bool HasClearValue = info.RTClearValue.GetType() != ERTClearType::None;
+    
+    jTexture_DX12* Texture = jBufferUtil_DX12::CreateImage(info.Width, info.Height, info.LayerCount, MipLevels, (uint32)info.SampleCount, info.Type, info.Format
+        , true, false, D3D12_RESOURCE_STATE_COMMON, (HasClearValue ? &ClearValue : nullptr));
 
     auto rt = new jRenderTarget();
     check(rt);
@@ -2093,8 +2135,11 @@ bool jRHI_DX12::TransitionImageLayout(jCommandBuffer* commandBuffer, jTexture* t
     check(commandBuffer);
     check(texture);
 
-    auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)commandBuffer;
     auto Texture_DX12 = (jTexture_DX12*)texture;
+    if (Texture_DX12->Layout == newLayout)
+        return true;
+
+    auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)commandBuffer;
 
     D3D12_RESOURCE_BARRIER barrier = { };
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -2105,6 +2150,7 @@ bool jRHI_DX12::TransitionImageLayout(jCommandBuffer* commandBuffer, jTexture* t
     barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
     CommandBuffer_DX12->CommandList->ResourceBarrier(1, &barrier);
 
+    Texture_DX12->Layout = newLayout;
     //auto texture_dx12 = (jTexture_DX12*)texture;
     //if (TransitionImageLayout((VkCommandBuffer)commandBuffer->GetHandle(), texture_dx12->Image, GetVulkanTextureFormat(texture_dx12->Format)
     //    , texture_dx12->MipLevel, texture_dx12->LayerCount, GetVulkanImageLayout(texture_dx12->Layout), GetVulkanImageLayout(newLayout)))
@@ -2119,14 +2165,14 @@ bool jRHI_DX12::TransitionImageLayoutImmediate(jTexture* texture, EImageLayout n
 {
     check(texture);
 
-    VkCommandBuffer commandBuffer = BeginSingleTimeCommands();
+    jCommandBuffer_DX12* commandBuffer = const_cast<jRHI_DX12*>(this)->BeginSingleTimeCommands();
     check(commandBuffer);
 
     if (commandBuffer)
     {
         auto ret = TransitionImageLayout(commandBuffer, texture, newLayout);
 
-        EndSingleTimeCommands(commandBuffer);
+        const_cast<jRHI_DX12*>(this)->EndSingleTimeCommands(commandBuffer);
         return ret;
     }
 

@@ -81,12 +81,12 @@ bool jRenderPass_Vulkan::CreateRenderPass()
             attachmentDesc.initialLayout = GetVulkanImageLayout(attachment.InitialLayout);
             attachmentDesc.finalLayout = GetVulkanImageLayout(attachment.FinalLayout);
 
-            const auto& color = attachment.ClearColor;
+            const auto& RTClearColor = attachment.RTClearValue.GetCleraColor();
             VkClearValue clearValue = {};
             if (attachment.IsDepthAttachment())
-                clearValue.depthStencil = { attachment.ClearDepth.x, (uint32)attachment.ClearDepth.y };
+                clearValue.depthStencil = { attachment.RTClearValue.GetCleraDepth(), attachment.RTClearValue.GetCleraStencil() };
             else
-                clearValue.color = { attachment.ClearColor.x, attachment.ClearColor.y, attachment.ClearColor.z, attachment.ClearColor.w };
+                clearValue.color = { RTClearColor[0], RTClearColor[1], RTClearColor[2], RTClearColor[3] };
             ClearValues.push_back(clearValue);
         }
 

@@ -81,9 +81,12 @@ bool jSwapchain_DX12::Create()
 
         Images[i] = SwapchainImage;        
 
-        SwapchainImage->TexturePtr = std::make_shared<jTexture_DX12>(
+        auto TextureDX12Ptr = std::make_shared<jTexture_DX12>(
             ETextureType::TEXTURE_2D, Format, Extent.x, Extent.y, 1, EMSAASamples::COUNT_1, 1, false, renderTarget);
+        SwapchainImage->TexturePtr = TextureDX12Ptr;
+
         jBufferUtil_DX12::CreateRenderTargetView((jTexture_DX12*)SwapchainImage->TexturePtr.get());
+        TextureDX12Ptr->Layout = EImageLayout::PRESENT_SRC;
 
         if (ensure(g_rhi_dx12->GetFenceManager()))
             SwapchainImage->CommandBufferFence = (jFence_DX12*)g_rhi_dx12->GetFenceManager()->GetOrCreateFence();

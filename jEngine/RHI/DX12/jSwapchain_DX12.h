@@ -48,6 +48,7 @@ public:
     virtual jSwapchainImage* GetSwapchainImage(int32 index) const override { check(Images.size() > index); return Images[index]; }
     virtual int32 GetNumOfSwapchain() const override { return (int32)Images.size(); }
     uint32 GetCurrentBackBufferIndex() const { return SwapChain->GetCurrentBackBufferIndex(); }
+    jSwapchainImage* GetCurrentSwapchainImage() const { return Images[GetCurrentBackBufferIndex()]; }
 
     ComPtr<IDXGISwapChain3> SwapChain;
     ETextureFormat Format = ETextureFormat::RGB8;

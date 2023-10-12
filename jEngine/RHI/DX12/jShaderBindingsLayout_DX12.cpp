@@ -40,7 +40,7 @@ void jRootParameterExtractor::Extract(const jShaderBindingArray& InShaderBinding
             {
                 D3D12_DESCRIPTOR_RANGE1 range = {};
                 range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-                range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
+                range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE;
                 range.NumDescriptors = ShaderBinding->NumOfDescriptors;
                 range.BaseShaderRegister = CBVIndex;
                 range.RegisterSpace = InRegisterSpace;
@@ -67,7 +67,7 @@ void jRootParameterExtractor::Extract(const jShaderBindingArray& InShaderBinding
                 D3D12_ROOT_PARAMETER1 rootParameter = {};
                 rootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
                 rootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-                rootParameter.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
+                rootParameter.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE;
                 rootParameter.Descriptor.ShaderRegister = SRVIndex;
                 rootParameter.Descriptor.RegisterSpace = InRegisterSpace;
                 RootParameters.emplace_back(rootParameter);
@@ -76,7 +76,7 @@ void jRootParameterExtractor::Extract(const jShaderBindingArray& InShaderBinding
             {
                 D3D12_DESCRIPTOR_RANGE1 range = {};
                 range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-                range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
+                range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE;
                 range.NumDescriptors = ShaderBinding->NumOfDescriptors;
                 range.BaseShaderRegister = SRVIndex;
                 range.RegisterSpace = InRegisterSpace;
@@ -90,6 +90,26 @@ void jRootParameterExtractor::Extract(const jShaderBindingArray& InShaderBinding
             }
 
             SRVIndex += ShaderBinding->NumOfDescriptors;
+
+            // todo : Texture Sampler SRV 는 Texture 와 Sampler 를 동시에 정의하기 때문에 여기에 Sampler 를 추가. Vulkan 문법이라 사용하지 않는 것도 고민해봐야 함.
+            if (ShaderBinding->BindingType == EShaderBindingType::TEXTURE_SAMPLER_SRV)
+            {
+                D3D12_DESCRIPTOR_RANGE1 range = {};
+                range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
+                range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE;
+                range.NumDescriptors = ShaderBinding->NumOfDescriptors;
+                range.BaseShaderRegister = SamplerIndex;
+                range.RegisterSpace = InRegisterSpace;
+#if FORCE_USE_D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND
+                range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+#else
+                range.OffsetInDescriptorsFromTableStart = (ShaderBinding->BindingPoint == -1)
+                    ? D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND : ShaderBinding->BindingPoint;
+#endif
+                SamplerDescriptors.emplace_back(range);
+
+                SamplerIndex += ShaderBinding->NumOfDescriptors;
+            }
             break;
         }
         case EShaderBindingType::TEXTURE_UAV:
@@ -102,7 +122,7 @@ void jRootParameterExtractor::Extract(const jShaderBindingArray& InShaderBinding
                 D3D12_ROOT_PARAMETER1 rootParameter = {};
                 rootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_UAV;
                 rootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-                rootParameter.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
+                rootParameter.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_VOLATILE;
                 rootParameter.Descriptor.ShaderRegister = UAVIndex;
                 rootParameter.Descriptor.RegisterSpace = InRegisterSpace;
                 RootParameters.emplace_back(rootParameter);
@@ -111,7 +131,7 @@ void jRootParameterExtractor::Extract(const jShaderBindingArray& InShaderBinding
             {
                 D3D12_DESCRIPTOR_RANGE1 range = {};
                 range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-                range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
+                range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
                 range.NumDescriptors = ShaderBinding->NumOfDescriptors;
                 range.BaseShaderRegister = UAVIndex;
                 range.RegisterSpace = InRegisterSpace;

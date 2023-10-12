@@ -10,14 +10,14 @@
 void jSceneRenderTarget::Create(const jSwapchainImage* image)
 {
     ColorPtr = jRenderTargetPool::GetRenderTarget(
-        { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi->GetSelectedMSAASamples() });
+        { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f) });
 
     {
         int32 Width = SCR_WIDTH / 4;
         int32 Height = SCR_HEIGHT / 4;
 
         BloomSetup = jRenderTargetPool::GetRenderTarget(
-            { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, Width, Height, 1, false, g_rhi->GetSelectedMSAASamples() });
+            { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, Width, Height, 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f) });
 
         for (int32 i = 0; i < _countof(DownSample); ++i)
         {
@@ -25,7 +25,7 @@ void jSceneRenderTarget::Create(const jSwapchainImage* image)
             Height /= 2;
 
             DownSample[i] = jRenderTargetPool::GetRenderTarget(
-                { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, Width, Height, 1, false, g_rhi->GetSelectedMSAASamples() });
+                { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, Width, Height, 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f) });
         }
 
         for (int32 i = 0; i < _countof(UpSample); ++i)
@@ -34,12 +34,12 @@ void jSceneRenderTarget::Create(const jSwapchainImage* image)
             Height *= 2;
 
             UpSample[i] = jRenderTargetPool::GetRenderTarget(
-                { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, Width, Height, 1, false, g_rhi->GetSelectedMSAASamples() });
+                { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, Width, Height, 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f) });
         }
     }
 
     DepthPtr = jRenderTargetPool::GetRenderTarget(
-        { ETextureType::TEXTURE_2D, ETextureFormat::D24_S8, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi->GetSelectedMSAASamples() });
+        { ETextureType::TEXTURE_2D, ETextureFormat::D24_S8, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(1.0f, 0) });
 
     if ((int32)g_rhi->GetSelectedMSAASamples() > 1)
     {
@@ -52,21 +52,24 @@ void jSceneRenderTarget::Create(const jSwapchainImage* image)
         FinalColorPtr = jRenderTarget::CreateFromTexture(image->TexturePtr);
     }
 
+    const bool IsUseReverseZShadow = USE_REVERSEZ_PERSPECTIVE_SHADOW;// && (ViewLight.Light->IsUseRevereZPerspective());
+    const jRTClearValue RTClearValue = IsUseReverseZShadow ? jRTClearValue(1.0f, 0) : jRTClearValue(0.0f, 0);
+
     DirectionalLightShadowMapPtr = jRenderTargetPool::GetRenderTarget(
-        { ETextureType::TEXTURE_2D, ETextureFormat::D16, jDirectionalLight::SM_Width, jDirectionalLight::SM_Height, 1, false, EMSAASamples::COUNT_1 });
+        { ETextureType::TEXTURE_2D, ETextureFormat::D16, jDirectionalLight::SM_Width, jDirectionalLight::SM_Height, 1, false, EMSAASamples::COUNT_1, RTClearValue });
 
     CubeShadowMapPtr = jRenderTargetPool::GetRenderTarget(
-        { ETextureType::TEXTURE_CUBE, ETextureFormat::D16, jPointLight::SM_Width, jPointLight::SM_Height, 6, false, EMSAASamples::COUNT_1 });
+        { ETextureType::TEXTURE_CUBE, ETextureFormat::D16, jPointLight::SM_Width, jPointLight::SM_Height, 6, false, EMSAASamples::COUNT_1,RTClearValue });
 
     SpotLightShadowMapPtr = jRenderTargetPool::GetRenderTarget(
-        { ETextureType::TEXTURE_2D, ETextureFormat::D16, jSpotLight::SM_Width, jSpotLight::SM_Height, 1, false, EMSAASamples::COUNT_1 });
+        { ETextureType::TEXTURE_2D, ETextureFormat::D16, jSpotLight::SM_Width, jSpotLight::SM_Height, 1, false, EMSAASamples::COUNT_1, RTClearValue });
 
     for (int32 i = 0; i < _countof(GBuffer); ++i)
     {
         const bool UseAsSubpassInput = gOptions.UseSubpass;
         const bool IsMemoryless = gOptions.UseMemoryless && gOptions.UseSubpass;
         GBuffer[i] = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, SCR_WIDTH, SCR_HEIGHT
-            , 1, false, g_rhi->GetSelectedMSAASamples(), UseAsSubpassInput, IsMemoryless });
+            , 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f), UseAsSubpassInput, IsMemoryless });
     }
 }
 
@@ -120,7 +123,7 @@ jShaderBindingInstance* jSceneRenderTarget::PrepareGBufferShaderBindingInstance(
         {
             const jSamplerStateInfo* ShadowSamplerStateInfo = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
                 , ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
-                , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), true, ECompareOp::LESS>::Create();
+                , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
 
             ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
                 , ResourceInlineAllocator.Alloc<jTextureResource>(GBuffer[i]->GetTexture(), ShadowSamplerStateInfo));

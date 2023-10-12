@@ -11,7 +11,7 @@ void jSamplerStateInfo_DX12::Initialize()
 {
     D3D12_SAMPLER_DESC samplerDesc = {};
 
-    samplerDesc.Filter = GetDX12TextureFilter(Minification, Magnification);
+    samplerDesc.Filter = GetDX12TextureFilter(Minification, Magnification, IsEnableComparisonMode);
     samplerDesc.AddressU = GetDX12TextureAddressMode(AddressU);
     samplerDesc.AddressV = GetDX12TextureAddressMode(AddressV);
     samplerDesc.AddressW = GetDX12TextureAddressMode(AddressW);

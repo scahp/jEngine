@@ -107,7 +107,13 @@ struct jShaderBinding
         if (Hash)
             return Hash;
 
-        Hash = BindingPoint ^ (uint32)BindingType ^ (uint32)AccessStageFlags & (int32)NumOfDescriptors & (int32)IsInline;
+        Hash = BindingPoint;
+        Hash = (Hash << 32) | (uint32)BindingType;
+        Hash = (Hash << 32) | (uint32)AccessStageFlags;
+        Hash = (Hash << 32) | (uint32)NumOfDescriptors;
+        Hash ^= (uint32)IsInline;
+
+        //Hash = BindingPoint ^ (uint32)BindingType ^ (uint32)AccessStageFlags ^ (int32)NumOfDescriptors ^ (int32)IsInline;
         return Hash;
     }
 
@@ -160,6 +166,7 @@ struct jShaderBindingArray
     FORCEINLINE jShaderBindingArray& operator = (const jShaderBindingArray& In)
     {
         memcpy(&Data[0], &In.Data[0], sizeof(jShaderBinding) * In.NumOfData);
+        NumOfData = In.NumOfData;
         return *this;
     }
 

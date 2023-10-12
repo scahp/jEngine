@@ -8,12 +8,12 @@ struct jOptions
     bool ShowGrid = false;
     bool UseWaveIntrinsics = false;
     bool UseDeferredRenderer = true;
-    bool UseSubpass = true;
+    bool UseSubpass = false;
     bool UseMemoryless = true;
     bool ShowDebugObject = false;
     bool BloomEyeAdaptation = false;
-    bool QueueSubmitAfterShadowPass = false;
-    bool QueueSubmitAfterBasePass = false;
+    bool QueueSubmitAfterShadowPass = true;
+    bool QueueSubmitAfterBasePass = true;
     Vector CameraPos = Vector::ZeroVector;
     float AutoExposureKeyValueScale = 1.0f;
     float Metallic = 0.0f;

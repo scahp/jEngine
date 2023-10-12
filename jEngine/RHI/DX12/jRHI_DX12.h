@@ -15,6 +15,7 @@
 #include "jUniformBufferBlock_DX12.h"
 #include "jPipelineStateInfo_DX12.h"
 #include "Renderer/jDrawCommand.h"
+#include "jSwapchain_DX12.h"
 
 class jSwapchain_DX12;
 struct jBuffer_DX12;
@@ -142,6 +143,9 @@ public:
 
 	jOnlineDescriptorHeapBlocks_DX12 OnlineDescriptorHeapBlocks;
 	jOnlineDescriptorHeapBlocks_DX12 OnlineSamplerDescriptorHeapBlocks;
+
+	jOnlineDescriptorHeapBlocks_DX12 OnlineDescriptorHeapBlocks2;			// todo : need to replace with manager of descriptor heap block
+	jOnlineDescriptorHeapBlocks_DX12 OnlineSamplerDescriptorHeapBlocks2;	// todo : need to replace with manager of descriptor heap block
 
     ////////////////////////////////////////////////////////////////////////////
     //// 5. Initialize Camera and lighting
@@ -399,6 +403,10 @@ public:
 
 	virtual bool TransitionImageLayout(jCommandBuffer* commandBuffer, jTexture* texture, EImageLayout newLayout) const override;
 	virtual bool TransitionImageLayoutImmediate(jTexture* texture, EImageLayout newLayout) const override;
+
+    virtual jSwapchain* GetSwapchain() const override { return Swapchain; }
+    virtual jSwapchainImage* GetSwapchainImage(int32 InIndex) const override { return Swapchain->GetSwapchainImage(InIndex); }
+
 };
 
 extern jRHI_DX12* g_rhi_dx12;

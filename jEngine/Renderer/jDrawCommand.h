@@ -8,21 +8,22 @@ struct jShader;
 struct jGraphicsPipelineShader;
 struct jPipelineStateFixedInfo;
 struct jShaderBindingInstance;
+class jMaterial;
 
 class jDrawCommand
 {
 public:
     jDrawCommand() = default;
     jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, const jView* InView, jRenderObject* InRenderObject
-        , jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed
+        , jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed, jMaterial* InMaterial
         , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant, const jVertexBuffer* InOverrideInstanceData = nullptr
         , int32 InSubpassIndex = 0);
     jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, const jViewLight* InViewLight, jRenderObject* InRenderObject
-        , jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed
+        , jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed, jMaterial* InMaterial
         , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant, const jVertexBuffer* InOverrideInstanceData = nullptr
         , int32 InSubpassIndex = 0);
     jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jRenderObject* InRenderObject
-        , jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed
+        , jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed, jMaterial* InMaterial
         , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant, const jVertexBuffer* InOverrideInstanceData = nullptr
         , int32 InSubpassIndex = 0);
 
@@ -43,6 +44,7 @@ public:
     jRenderObject* RenderObject = nullptr;
     jPipelineStateFixedInfo* PipelineStateFixed = nullptr;
     jPipelineStateInfo* CurrentPipelineStateInfo = nullptr;
+    jMaterial* Material = nullptr;
     const jPushConstant* PushConstant = nullptr;
     const jVertexBuffer* OverrideInstanceData = nullptr;
     std::shared_ptr<jRenderFrameContext> RenderFrameContextPtr;

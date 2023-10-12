@@ -12,6 +12,7 @@ struct jCommandBuffer_DX12 : public jCommandBuffer
     ComPtr<ID3D12CommandAllocator> CommandAllocator;
     ComPtr<ID3D12GraphicsCommandList4> CommandList;
     jFence_DX12* Fence = nullptr;                        // Fence manager 에서 참조하기 때문에 소멸시키지 않음
+    mutable bool IsClosed = false;
 
     class jOnlineDescriptorHeap_DX12* OnlineDescriptorHeap = nullptr;
     class jOnlineDescriptorHeap_DX12* OnlineSamplerDescriptorHeap = nullptr;

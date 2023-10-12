@@ -4,6 +4,7 @@
 #include "jOptions.h"
 #include "Scene/jCamera.h"
 #include "Scene/Light/jLight.h"
+#include "Scene/jRenderObject.h"
 
 jObject* jPointLightDrawCommandGenerator::PointLightSphere = nullptr;
 
@@ -62,8 +63,12 @@ void jPointLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* OutDestD
     ShaderPermutation.SetIndex<jShaderPointLightPixelShader::USE_SHADOW_MAP>(InLightView.ShadowMapPtr ? 1 : 0);
     Shader.PixelShader = jShaderPointLightPixelShader::CreateShader(ShaderPermutation);
 
+    jShaderBindingInstanceArray CopyShaderBindingInstances = ShaderBindingInstances;
+    CopyShaderBindingInstances.Add(InLightView.ShaderBindingInstance);
+
     check(OutDestDrawCommand);
     new (OutDestDrawCommand) jDrawCommand(InRenderFrameContextPtr, &InLightView, PointLightSphere->RenderObjects[0], InRenderPass
-        , Shader, &PipelineStateFixedInfo, ShaderBindingInstances, PushConstant, nullptr, InSubpassIndex);
+        , Shader, &PipelineStateFixedInfo, PointLightSphere->RenderObjects[0]->MaterialPtr.get(), ShaderBindingInstances, PushConstant, nullptr, InSubpassIndex);
+    OutDestDrawCommand->Test = true;
     OutDestDrawCommand->PrepareToDraw(false);
 }

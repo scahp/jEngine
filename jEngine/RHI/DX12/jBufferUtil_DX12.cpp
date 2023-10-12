@@ -98,7 +98,7 @@ jBuffer_DX12* CreateBuffer(uint64 InSize, uint16 InAlignment, bool InIsCPUAccess
 }
 
 ComPtr<ID3D12Resource> CreateImageInternal(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, uint32 InNumOfSample
-    , D3D12_RESOURCE_DIMENSION InType, DXGI_FORMAT InFormat, bool InIsRTV, bool InIsUAV, D3D12_RESOURCE_STATES InResourceState, const wchar_t* InResourceName)
+    , D3D12_RESOURCE_DIMENSION InType, DXGI_FORMAT InFormat, bool InIsRTV, bool InIsUAV, D3D12_RESOURCE_STATES InResourceState, D3D12_CLEAR_VALUE* InClearValue, const wchar_t* InResourceName)
 {
     check(g_rhi_dx12);
     check(g_rhi_dx12->Device);
@@ -138,9 +138,7 @@ ComPtr<ID3D12Resource> CreateImageInternal(uint32 InWidth, uint32 InHeight, uint
     // ensure(TexDesc.Width == info.SizeInBytes);
 
     ComPtr<ID3D12Resource> Image;
-    D3D12_CLEAR_VALUE clearValue = { };
-    clearValue.Format = InFormat;
-    Image = g_rhi_dx12->CreateResource(&TexDesc, InResourceState, (InIsRTV ? &clearValue : nullptr));
+    Image = g_rhi_dx12->CreateResource(&TexDesc, InResourceState, InClearValue);
     if (!ensure(Image))
         return nullptr;
 
@@ -151,10 +149,10 @@ ComPtr<ID3D12Resource> CreateImageInternal(uint32 InWidth, uint32 InHeight, uint
 }
 
 jTexture_DX12* CreateImage(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, uint32 InNumOfSample
-    , ETextureType InType, ETextureFormat InFormat, bool InIsRTV, bool InIsUAV, D3D12_RESOURCE_STATES InResourceState, const wchar_t* InResourceName)
+    , ETextureType InType, ETextureFormat InFormat, bool InIsRTV, bool InIsUAV, D3D12_RESOURCE_STATES InResourceState, D3D12_CLEAR_VALUE* InClearValue, const wchar_t* InResourceName)
 {
     ComPtr<ID3D12Resource> TextureInternal = CreateImageInternal(InWidth, InHeight, InArrayLayers, InMipLevels, InNumOfSample
-        , GetDX12TextureDemension(InType), GetDX12TextureFormat(InFormat), InIsRTV, InIsUAV, InResourceState, InResourceName);
+        , GetDX12TextureDemension(InType), GetDX12TextureFormat(InFormat), InIsRTV, InIsUAV, InResourceState, InClearValue, InResourceName);
     if (!ensure(TextureInternal))
         return nullptr;
 

@@ -43,7 +43,7 @@ Texture2D DirectionalLightShadowMap : register(t3, space0);
 Texture2D DirectionalLightShadowMap : register(t1, space0);
 #endif
 
-SamplerComparisonState DirectionalLightShadowMapSampler : register(s1, space0);
+SamplerComparisonState DirectionalLightShadowMapSampler : register(s3, space0);
 
 #endif
 

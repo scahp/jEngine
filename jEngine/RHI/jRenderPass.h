@@ -6,14 +6,13 @@ struct jAttachment
     jAttachment(const std::shared_ptr<jRenderTarget>& InRTPtr
         , EAttachmentLoadStoreOp InLoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE
         , EAttachmentLoadStoreOp InStencilLoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE
-        , Vector4 InClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f)
-        , Vector2 InClearDepth = Vector2(1.0f, 0.0f)
+        , jRTClearValue RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f)
         , EImageLayout InInitialLayout = EImageLayout::UNDEFINED
         , EImageLayout InFinalLayout = EImageLayout::SHADER_READ_ONLY
         , bool InIsResolveAttachment = false
     )
         : RenderTargetPtr(InRTPtr), LoadStoreOp(InLoadStoreOp), StencilLoadStoreOp(InStencilLoadStoreOp)
-        , ClearColor(InClearColor), ClearDepth(InClearDepth), InitialLayout(InInitialLayout), FinalLayout(InFinalLayout)
+        , RTClearValue(RTClearValue), InitialLayout(InInitialLayout), FinalLayout(InFinalLayout)
         , bResolveAttachment(InIsResolveAttachment)
     {}
 
@@ -30,8 +29,7 @@ struct jAttachment
     EAttachmentLoadStoreOp LoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE;
     EAttachmentLoadStoreOp StencilLoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE;
 
-    Vector4 ClearColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f);
-    Vector2 ClearDepth = Vector2(1.0f, 0.0f);
+    jRTClearValue RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f);
 
     EImageLayout InitialLayout = EImageLayout::UNDEFINED;
     EImageLayout FinalLayout = EImageLayout::SHADER_READ_ONLY;
@@ -56,8 +54,7 @@ struct jAttachment
         Hash = RenderTargetPtr->GetHash();
         Hash = CityHash64WithSeed((const char*)&LoadStoreOp, sizeof(LoadStoreOp), Hash);
         Hash = CityHash64WithSeed((const char*)&StencilLoadStoreOp, sizeof(StencilLoadStoreOp), Hash);
-        Hash = CityHash64WithSeed((const char*)&ClearColor, sizeof(ClearColor), Hash);
-        Hash = CityHash64WithSeed((const char*)&ClearDepth, sizeof(ClearDepth), Hash);
+        Hash = CityHash64WithSeed((const char*)&RTClearValue, sizeof(RTClearValue), Hash);
         Hash = CityHash64WithSeed((const char*)&InitialLayout, sizeof(InitialLayout), Hash);
         Hash = CityHash64WithSeed((const char*)&FinalLayout, sizeof(FinalLayout), Hash);
         return Hash;

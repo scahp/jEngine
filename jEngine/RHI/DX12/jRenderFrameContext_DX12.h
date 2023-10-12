@@ -13,4 +13,5 @@ struct jRenderFrameContext_DX12 : public jRenderFrameContext
     virtual ~jRenderFrameContext_DX12() {}
 
     virtual void QueueSubmitCurrentActiveCommandBuffer();
+    virtual void SubmitCurrentActiveCommandBuffer(ECurrentRenderPass InCurrentRenderPass) override;
 };

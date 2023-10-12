@@ -26,20 +26,20 @@ bool jRenderPass_DX12::BeginRenderPass(const jCommandBuffer* commandBuffer)
     CommandBuffer = (const jCommandBuffer_DX12*)commandBuffer;
 
     if (RTVCPUHandles.size() > 0)
-        CommandBuffer->CommandList->OMSetRenderTargets((uint32)RTVCPUHandles.size(), &RTVCPUHandles[0], false, &DSVCPUDHandle);
+        CommandBuffer->CommandList->OMSetRenderTargets((uint32)RTVCPUHandles.size(), &RTVCPUHandles[0], false, (DSVCPUDHandle.ptr ? &DSVCPUDHandle : nullptr));
     else
-        CommandBuffer->CommandList->OMSetRenderTargets(0, nullptr, false, &DSVCPUDHandle);
+        CommandBuffer->CommandList->OMSetRenderTargets(0, nullptr, false, (DSVCPUDHandle.ptr ? &DSVCPUDHandle : nullptr));
 
     for (int32 i = 0; i < RTVClears.size(); ++i)
     {
-        if (!RTVClears[i].bClear)
+        if (RTVClears[i].GetType() != ERTClearType::Color)
             continue;
 
-        CommandBuffer->CommandList->ClearRenderTargetView(RTVCPUHandles[i], RTVClears[i].Color.v, 0, nullptr);
+        CommandBuffer->CommandList->ClearRenderTargetView(RTVCPUHandles[i], RTVClears[i].GetCleraColor(), 0, nullptr);
     }
 
 
-    if (DSVClear.bClear)
+    if (DSVClear.GetType() == ERTClearType::DepthStencil)
     {
         if (DSVDepthClear || DSVStencilClear)
         {
@@ -50,9 +50,7 @@ bool jRenderPass_DX12::BeginRenderPass(const jCommandBuffer* commandBuffer)
             if (DSVStencilClear)
                 DSVClearFlags |= D3D12_CLEAR_FLAG_STENCIL;
 
-            const float DepthClear = DSVClear.DepthStencil.x;
-            const float StencilClear = DSVClear.DepthStencil.y;
-            CommandBuffer->CommandList->ClearDepthStencilView(DSVCPUDHandle, DSVClearFlags, DepthClear, (uint8)StencilClear, 0, nullptr);
+            CommandBuffer->CommandList->ClearDepthStencilView(DSVCPUDHandle, DSVClearFlags, DSVClear.GetCleraDepth(), (uint8)DSVClear.GetCleraStencil(), 0, nullptr);
         }
     }
 
@@ -105,8 +103,7 @@ bool jRenderPass_DX12::CreateRenderPass()
             if (attachment.IsDepthAttachment())
             {
                 DSVFormat = GetDX12TextureFormat(RTInfo.Format);
-                DSVClear.bClear = HasClear;
-                DSVClear.DepthStencil = attachment.ClearDepth;
+                DSVClear = attachment.RTClearValue;
 
                 DSVDepthClear = HasClear;
                 DSVStencilClear = (attachment.StencilLoadStoreOp == EAttachmentLoadStoreOp::CLEAR_STORE ||
@@ -117,7 +114,7 @@ bool jRenderPass_DX12::CreateRenderPass()
             else
             {                
                 RTVCPUHandles.push_back(TextureDX12->RTV.CPUHandle);
-                RTVClears.push_back({.bClear = HasClear, .Color = attachment.ClearColor});
+                RTVClears.push_back(attachment.RTClearValue);
 
                 RTVFormats.push_back(GetDX12TextureFormat(RTInfo.Format));
             }

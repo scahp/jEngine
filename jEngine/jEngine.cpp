@@ -33,7 +33,9 @@ void jEngine::Init()
 
 void jEngine::Release()
 {
-	g_rhi_vk->Flush();
+	if (g_rhi_vk)
+		g_rhi_vk->Flush();
+
 	Game.Release();
 }
 

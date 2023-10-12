@@ -78,8 +78,12 @@ void jSpotLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* OutDestDr
     ShaderPermutation.SetIndex<jShaderSpotLightPixelShader::USE_REVERSEZ>(USE_REVERSEZ_PERSPECTIVE_SHADOW);
     Shader.PixelShader = jShaderSpotLightPixelShader::CreateShader(ShaderPermutation);
 
+    jShaderBindingInstanceArray CopyShaderBindingInstances = ShaderBindingInstances;
+    CopyShaderBindingInstances.Add(InLightView.ShaderBindingInstance);
+
     check(OutDestDrawCommand);
     new (OutDestDrawCommand) jDrawCommand(InRenderFrameContextPtr, &InLightView, SpotLightCone->RenderObjects[0], InRenderPass
-        , Shader, &PipelineStateFixedInfo, ShaderBindingInstances, PushConstant, nullptr, InSubpassIndex);
+        , Shader, &PipelineStateFixedInfo, SpotLightCone->RenderObjects[0]->MaterialPtr.get(), ShaderBindingInstances, PushConstant, nullptr, InSubpassIndex);
+    OutDestDrawCommand->Test = true;
     OutDestDrawCommand->PrepareToDraw(false);
 }

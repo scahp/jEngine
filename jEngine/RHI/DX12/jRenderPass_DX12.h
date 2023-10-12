@@ -1,16 +1,6 @@
 ﻿#pragma once
 #include "../jRenderPass.h"
 
-struct jClearValue_DX12
-{
-    bool bClear = false;
-    union
-    {
-        Vector4 Color;
-        Vector2 DepthStencil;
-    };
-};
-
 class jRenderPass_DX12 : public jRenderPass
 {
 public:
@@ -47,14 +37,14 @@ public:
 
         for (int32 i = 0; i < RTVClears.size(); ++i)
         {
-            if (!RTVClears[i].bClear)
+            if (RTVClears[i].GetType() != ERTClearType::Color)
                 continue;
 
-            commandBuffer->CommandList->ClearRenderTargetView(RTVCPUHandles[i], RTVClears[i].Color.v, 0, nullptr);
+            commandBuffer->CommandList->ClearRenderTargetView(RTVCPUHandles[i], RTVClears[i].GetCleraColor(), 0, nullptr);
         }
 
         
-        if (DSVClear.bClear)
+        if (DSVClear.GetType() == ERTClearType::DepthStencil)
         {
             if (DSVDepthClear || DSVStencilClear)
             {
@@ -65,9 +55,7 @@ public:
                 if (DSVStencilClear)
                     DSVClearFlags |= D3D12_CLEAR_FLAG_STENCIL;
 
-                const float DepthClear = DSVClear.DepthStencil.x;
-                const float StencilClear = DSVClear.DepthStencil.y;
-                commandBuffer->CommandList->ClearDepthStencilView(DSVCPUDHandle, DSVClearFlags, DepthClear, (uint8)StencilClear, 0, nullptr);
+                commandBuffer->CommandList->ClearDepthStencilView(DSVCPUDHandle, DSVClearFlags, DSVClear.GetCleraDepth(), (uint8)DSVClear.GetCleraStencil(), 0, nullptr);
             }
         }
 
@@ -86,10 +74,10 @@ private:
     const jCommandBuffer_DX12* CommandBuffer = nullptr;
 
     std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> RTVCPUHandles;
-    D3D12_CPU_DESCRIPTOR_HANDLE DSVCPUDHandle;
+    D3D12_CPU_DESCRIPTOR_HANDLE DSVCPUDHandle = {};
 
-    std::vector<jClearValue_DX12> RTVClears;
-    jClearValue_DX12 DSVClear = { .bClear = false, .DepthStencil = {1.0f, 0.0f} };
+    std::vector<jRTClearValue> RTVClears;
+    jRTClearValue DSVClear = jRTClearValue(1.0f, 0);
     bool DSVDepthClear = false;
     bool DSVStencilClear = false;
 

@@ -17,21 +17,21 @@ struct VSOutput
 
 cbuffer ViewParam : register(b0,space0) { ViewUniformBuffer ViewParam; }
 
-cbuffer DirectionalLight : register(b0, space1) { jDirectionalLightUniformBuffer DirectionalLight; }
-Texture2D DirectionalLightShadowMap : register(t1, space1);
-SamplerComparisonState DirectionalLightShadowMapSampler : register(s1, space1);
+cbuffer DirectionalLight : register(b1, space0) { jDirectionalLightUniformBuffer DirectionalLight; }
+Texture2D DirectionalLightShadowMap : register(t0, space0);
+SamplerComparisonState DirectionalLightShadowMapSampler : register(s0, space0);
 
-cbuffer PointLight : register(b0, space2) { jPointLightUniformBufferData PointLight; }
-TextureCube PointLightShadowCubeMap : register(t1, space2);
-SamplerComparisonState PointLightShadowMapSampler : register(s1, space2);
+cbuffer PointLight : register(b2, space0) { jPointLightUniformBufferData PointLight; }
+TextureCube PointLightShadowCubeMap : register(t1, space0);
+SamplerComparisonState PointLightShadowMapSampler : register(s1, space0);
 
-cbuffer SpotLight : register(b0, space3) { jSpotLightUniformBufferData SpotLight; }
-Texture2D SpotLightShadowMap : register(t1, space3);
-SamplerComparisonState SpotLightShadowMapSampler : register(s1, space3);
+cbuffer SpotLight : register(b3, space0) { jSpotLightUniformBufferData SpotLight; }
+Texture2D SpotLightShadowMap : register(t2, space0);
+SamplerComparisonState SpotLightShadowMapSampler : register(s2, space0);
 
-cbuffer RenderObjectParam : register(b0, space4) { RenderObjectUniformBuffer RenderObjectParam; }
-Texture2D DiffuseTexture : register(t1, space4);
-SamplerState DiffuseTextureSampler : register(s1, space4);
+cbuffer RenderObjectParam : register(b4, space0) { RenderObjectUniformBuffer RenderObjectParam; }
+Texture2D DiffuseTexture : register(t3, space0);
+SamplerState DiffuseTextureSampler : register(s3, space0);
 
 struct PushConsts
 {

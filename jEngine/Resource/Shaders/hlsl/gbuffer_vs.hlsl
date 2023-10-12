@@ -11,7 +11,7 @@ struct VSInput
     [[vk::location((1))]] float4 Color : COLOR0;
 #endif
     [[vk::location((1+USE_VERTEX_COLOR))]] float3 Normal : NORMAL0;
-    [[vk::location((2+USE_VERTEX_COLOR))]] float3 Tangent : NORMAL1;
+    [[vk::location((2+USE_VERTEX_COLOR))]] float3 Tangent : TANGENT0;
     [[vk::location((3+USE_VERTEX_COLOR))]] float2 TexCoord : TEXCOORD0;
 };
 

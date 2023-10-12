@@ -50,6 +50,31 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
             break;
         }
         case EShaderBindingType::TEXTURE_SAMPLER_SRV:
+        {
+            const jTextureResource* tbor = reinterpret_cast<const jTextureResource*>(ShaderBinding->Resource);
+            if (ensure(tbor && tbor->Texture))
+            {
+                jTexture_DX12* TexDX12 = (jTexture_DX12*)tbor->Texture;
+                Descriptors.push_back(TexDX12->SRV);
+
+                if (tbor->SamplerState)
+                {
+                    jSamplerStateInfo_DX12* SamplerDX12 = (jSamplerStateInfo_DX12*)tbor->SamplerState;
+                    check(SamplerDX12);
+                    SamplerDescriptors.push_back(SamplerDX12->SamplerSRV);
+                }
+                else
+                {
+                    // check(0);   // todo : need to set DefaultSamplerState
+
+                    const jSamplerStateInfo_DX12* SamplerDX12 = (jSamplerStateInfo_DX12*)TSamplerStateInfo<ETextureFilter::NEAREST, ETextureFilter::NEAREST
+                        , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT>::Create();
+                    check(SamplerDX12);
+                    SamplerDescriptors.push_back(SamplerDX12->SamplerSRV);
+                }
+            }
+            break;
+        }
         case EShaderBindingType::TEXTURE_SRV:
         {
             jTexture_DX12* Tex = (jTexture_DX12*)ShaderBinding->Resource->GetResource();

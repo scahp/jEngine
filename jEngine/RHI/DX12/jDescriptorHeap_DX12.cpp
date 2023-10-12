@@ -23,6 +23,7 @@ void jDescriptorHeap_DX12::Initialize(EDescriptorHeapTypeDX12 InHeapType, bool I
 
     check(!InShaderVisible || (InShaderVisible && (InHeapType != EDescriptorHeapTypeDX12::RTV && InHeapType != EDescriptorHeapTypeDX12::DSV)));
 
+    HeapType = InHeapType;
     const auto HeapTypeDX12 = GetDX12DescriptorHeapType(InHeapType);
 
     D3D12_DESCRIPTOR_HEAP_DESC heapDesc = { };

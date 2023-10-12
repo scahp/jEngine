@@ -10,29 +10,29 @@
 #include "Material/jMaterial.h"
 
 jDrawCommand::jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, const jView* InView
-    , jRenderObject* InRenderObject, jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed
+    , jRenderObject* InRenderObject, jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed, jMaterial* InMaterial
     , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant, const jVertexBuffer* InOverrideInstanceData, int32 InSubpassIndex)
     : RenderFrameContextPtr(InRenderFrameContextPtr), View(InView), RenderObject(InRenderObject), RenderPass(InRenderPass), Shader(InShader), PipelineStateFixed(InPipelineStateFixed)
-    , PushConstant(InPushConstant), ShaderBindingInstanceArray(InShaderBindingInstanceArray), OverrideInstanceData(InOverrideInstanceData), SubpassIndex(InSubpassIndex)
+    , Material(InMaterial), PushConstant(InPushConstant), ShaderBindingInstanceArray(InShaderBindingInstanceArray), OverrideInstanceData(InOverrideInstanceData), SubpassIndex(InSubpassIndex)
 {
     check(RenderObject);
     IsViewLight = false;
 }
 
 jDrawCommand::jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, const jViewLight* InViewLight
-    , jRenderObject* InRenderObject, jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed
+    , jRenderObject* InRenderObject, jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed, jMaterial* InMaterial
     , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant, const jVertexBuffer* InOverrideInstanceData, int32 InSubpassIndex)
     : RenderFrameContextPtr(InRenderFrameContextPtr), ViewLight(InViewLight), RenderObject(InRenderObject), RenderPass(InRenderPass), Shader(InShader), PipelineStateFixed(InPipelineStateFixed)
-    , PushConstant(InPushConstant), ShaderBindingInstanceArray(InShaderBindingInstanceArray), OverrideInstanceData(InOverrideInstanceData), SubpassIndex(InSubpassIndex)
+    , Material(InMaterial), PushConstant(InPushConstant), ShaderBindingInstanceArray(InShaderBindingInstanceArray), OverrideInstanceData(InOverrideInstanceData), SubpassIndex(InSubpassIndex)
 {
     check(RenderObject);
     IsViewLight = true;
 }
 
 jDrawCommand::jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr
-    , jRenderObject* InRenderObject, jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed
+    , jRenderObject* InRenderObject, jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed, jMaterial* InMaterial
     , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant, const jVertexBuffer* InOverrideInstanceData, int32 InSubpassIndex)
-    : RenderFrameContextPtr(InRenderFrameContextPtr), RenderObject(InRenderObject), RenderPass(InRenderPass), Shader(InShader), PipelineStateFixed(InPipelineStateFixed)
+    : RenderFrameContextPtr(InRenderFrameContextPtr), RenderObject(InRenderObject), RenderPass(InRenderPass), Shader(InShader), PipelineStateFixed(InPipelineStateFixed), Material(InMaterial)
     , PushConstant(InPushConstant), ShaderBindingInstanceArray(InShaderBindingInstanceArray), OverrideInstanceData(InOverrideInstanceData), SubpassIndex(InSubpassIndex)
 {
     check(RenderObject);
@@ -56,20 +56,9 @@ void jDrawCommand::PrepareToDraw(bool InIsPositionOnly)
         jShaderBindingInstance* OneRenderObjectUniformBuffer = RenderObject->CreateShaderBindingInstance();
         ShaderBindingInstanceArray.Add(OneRenderObjectUniformBuffer);
 
-        if (RenderObject->MaterialPtr)
+        if (Material)
         {
-            jShaderBindingInstance* MaterialShaderBindingInstance = RenderObject->MaterialPtr->CreateShaderBindingInstance();
-            if (MaterialShaderBindingInstance)
-                ShaderBindingInstanceArray.Add(MaterialShaderBindingInstance);
-        }
-        else
-        {
-            if (GDefaultMaterial)
-            {
-                jShaderBindingInstance* MaterialShaderBindingInstance = GDefaultMaterial->CreateShaderBindingInstance();
-                if (MaterialShaderBindingInstance)
-                    ShaderBindingInstanceArray.Add(MaterialShaderBindingInstance);
-            }
+            ShaderBindingInstanceArray.Add(Material->CreateShaderBindingInstance());
         }
     }
 

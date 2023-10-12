@@ -19,3 +19,19 @@ void jRenderFrameContext_DX12::QueueSubmitCurrentActiveCommandBuffer()
         g_rhi_dx12->Swapchain->Images[FrameIndex]->CommandBufferFence = (jFence_DX12*)CommandBuffer_DX12->GetFence();
     }
 }
+
+void jRenderFrameContext_DX12::SubmitCurrentActiveCommandBuffer(ECurrentRenderPass InCurrentRenderPass)
+{
+    if (CommandBuffer)
+    {
+        jCommandBuffer_DX12* CommandBuffer_DX12 = (jCommandBuffer_DX12*)CommandBuffer;
+
+        auto CommandBufferManager = g_rhi_dx12->GetCommandBufferManager();
+        CommandBufferManager->ExecuteCommandList(CommandBuffer_DX12);
+        CommandBufferManager->ReturnCommandBuffer(CommandBuffer_DX12);
+
+        // get new commandbuffer
+        CommandBuffer = CommandBufferManager->GetOrCreateCommandBuffer();
+        g_rhi_dx12->Swapchain->Images[FrameIndex]->CommandBufferFence = (jFence_DX12*)CommandBuffer_DX12->GetFence();
+    }
+}

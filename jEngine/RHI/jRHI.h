@@ -274,6 +274,7 @@ public:
 
 	const jCamera* Camera = nullptr;
 	std::vector<jViewLight> Lights;
+	std::vector<jViewLight> ShadowCasterLights;
 	std::shared_ptr<IUniformBufferBlock> ViewUniformBufferPtr;
 	jShaderBindingInstance* ViewUniformBufferShaderBindingInstance = nullptr;
 };

@@ -243,73 +243,145 @@ FORCEINLINE uint8 GetDX12ColorMask(EColorMask type)
     return result;
 }
 
-FORCEINLINE D3D12_FILTER GetDX12TextureFilter(ETextureFilter InMinification, ETextureFilter InMagnification)
+FORCEINLINE D3D12_FILTER GetDX12TextureFilter(ETextureFilter InMinification, ETextureFilter InMagnification, bool InIsComparison = false)
 {
-    D3D12_FILTER Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
-    switch (InMinification)
+    // Comparison 은 ShadowMap 에 사용됨
+    if (InIsComparison)
     {
-    case ETextureFilter::NEAREST:
-    case ETextureFilter::NEAREST_MIPMAP_NEAREST:
-        if (InMagnification == ETextureFilter::NEAREST)
-            Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
-        else if (InMagnification == ETextureFilter::LINEAR)
-            Filter = D3D12_FILTER_MIN_POINT_MAG_LINEAR_MIP_POINT;
-        else if (InMagnification == ETextureFilter::NEAREST_MIPMAP_NEAREST)
-            Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
-        else if (InMagnification == ETextureFilter::LINEAR_MIPMAP_NEAREST)
-            Filter = D3D12_FILTER_MIN_POINT_MAG_LINEAR_MIP_POINT;
-        else if (InMagnification == ETextureFilter::NEAREST_MIPMAP_LINEAR)
-            Filter = D3D12_FILTER_MIN_MAG_POINT_MIP_LINEAR;
-        else if (InMagnification == ETextureFilter::LINEAR_MIPMAP_LINEAR)
-            Filter = D3D12_FILTER_MIN_POINT_MAG_MIP_LINEAR;
-        break;
-    case ETextureFilter::LINEAR:
-    case ETextureFilter::LINEAR_MIPMAP_NEAREST:
-        if (InMagnification == ETextureFilter::NEAREST)
-            Filter = D3D12_FILTER_MIN_LINEAR_MAG_MIP_POINT;
-        else if (InMagnification == ETextureFilter::LINEAR)
-            Filter = D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;
-        else if (InMagnification == ETextureFilter::NEAREST_MIPMAP_NEAREST)
-            Filter = D3D12_FILTER_MIN_LINEAR_MAG_MIP_POINT;
-        else if (InMagnification == ETextureFilter::LINEAR_MIPMAP_NEAREST)
-            Filter = D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;
-        else if (InMagnification == ETextureFilter::NEAREST_MIPMAP_LINEAR)
-            Filter = D3D12_FILTER_MIN_LINEAR_MAG_POINT_MIP_LINEAR;
-        else if (InMagnification == ETextureFilter::LINEAR_MIPMAP_LINEAR)
-            Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-        break;
-    case ETextureFilter::NEAREST_MIPMAP_LINEAR:
-        if (InMagnification == ETextureFilter::NEAREST)
-            Filter = D3D12_FILTER_MIN_MAG_POINT_MIP_LINEAR;
-        else if (InMagnification == ETextureFilter::LINEAR)
-            Filter = D3D12_FILTER_MIN_POINT_MAG_MIP_LINEAR;
-        else if (InMagnification == ETextureFilter::NEAREST_MIPMAP_NEAREST)   // mipmap 이 겹치면 linear 로 올려서 처리, 정리필요
-            Filter = D3D12_FILTER_MIN_MAG_POINT_MIP_LINEAR;
-        else if (InMagnification == ETextureFilter::LINEAR_MIPMAP_NEAREST)    // mipmap 이 겹치면 linear 로 올려서 처리, 정리필요
-            Filter = D3D12_FILTER_MIN_POINT_MAG_MIP_LINEAR;
-        else if (InMagnification == ETextureFilter::NEAREST_MIPMAP_LINEAR)
-            Filter = D3D12_FILTER_MIN_MAG_POINT_MIP_LINEAR;
-        else if (InMagnification == ETextureFilter::LINEAR_MIPMAP_LINEAR)
-            Filter = D3D12_FILTER_MIN_POINT_MAG_MIP_LINEAR;
-        break;
-    case ETextureFilter::LINEAR_MIPMAP_LINEAR:
-        if (InMagnification == ETextureFilter::NEAREST)
-            Filter = D3D12_FILTER_MIN_LINEAR_MAG_POINT_MIP_LINEAR;
-        else if (InMagnification == ETextureFilter::LINEAR)
-            Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-        else if (InMagnification == ETextureFilter::NEAREST_MIPMAP_NEAREST)   // mipmap 이 겹치면 linear 로 올려서 처리, 정리필요
-            Filter = D3D12_FILTER_MIN_LINEAR_MAG_POINT_MIP_LINEAR;
-        else if (InMagnification == ETextureFilter::LINEAR_MIPMAP_NEAREST)    // mipmap 이 겹치면 linear 로 올려서 처리, 정리필요
-            Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-        else if (InMagnification == ETextureFilter::NEAREST_MIPMAP_LINEAR)
-            Filter = D3D12_FILTER_MIN_LINEAR_MAG_POINT_MIP_LINEAR;
-        else if (InMagnification == ETextureFilter::LINEAR_MIPMAP_LINEAR)
-            Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-        break;
-    default:
-        break;
+        D3D12_FILTER Filter = D3D12_FILTER_COMPARISON_MIN_MAG_MIP_POINT;
+        switch (InMinification)
+        {
+        case ETextureFilter::NEAREST:
+        case ETextureFilter::NEAREST_MIPMAP_NEAREST:
+            if (InMagnification == ETextureFilter::NEAREST)
+                Filter = D3D12_FILTER_COMPARISON_MIN_MAG_MIP_POINT;
+            else if (InMagnification == ETextureFilter::LINEAR)
+                Filter = D3D12_FILTER_COMPARISON_MIN_POINT_MAG_LINEAR_MIP_POINT;
+            else if (InMagnification == ETextureFilter::NEAREST_MIPMAP_NEAREST)
+                Filter = D3D12_FILTER_COMPARISON_MIN_MAG_MIP_POINT;
+            else if (InMagnification == ETextureFilter::LINEAR_MIPMAP_NEAREST)
+                Filter = D3D12_FILTER_COMPARISON_MIN_POINT_MAG_LINEAR_MIP_POINT;
+            else if (InMagnification == ETextureFilter::NEAREST_MIPMAP_LINEAR)
+                Filter = D3D12_FILTER_COMPARISON_MIN_MAG_POINT_MIP_LINEAR;
+            else if (InMagnification == ETextureFilter::LINEAR_MIPMAP_LINEAR)
+                Filter = D3D12_FILTER_COMPARISON_MIN_POINT_MAG_MIP_LINEAR;
+            break;
+        case ETextureFilter::LINEAR:
+        case ETextureFilter::LINEAR_MIPMAP_NEAREST:
+            if (InMagnification == ETextureFilter::NEAREST)
+                Filter = D3D12_FILTER_COMPARISON_MIN_LINEAR_MAG_MIP_POINT;
+            else if (InMagnification == ETextureFilter::LINEAR)
+                Filter = D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT;
+            else if (InMagnification == ETextureFilter::NEAREST_MIPMAP_NEAREST)
+                Filter = D3D12_FILTER_COMPARISON_MIN_LINEAR_MAG_MIP_POINT;
+            else if (InMagnification == ETextureFilter::LINEAR_MIPMAP_NEAREST)
+                Filter = D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT;
+            else if (InMagnification == ETextureFilter::NEAREST_MIPMAP_LINEAR)
+                Filter = D3D12_FILTER_COMPARISON_MIN_LINEAR_MAG_POINT_MIP_LINEAR;
+            else if (InMagnification == ETextureFilter::LINEAR_MIPMAP_LINEAR)
+                Filter = D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR;
+            break;
+        case ETextureFilter::NEAREST_MIPMAP_LINEAR:
+            if (InMagnification == ETextureFilter::NEAREST)
+                Filter = D3D12_FILTER_COMPARISON_MIN_MAG_POINT_MIP_LINEAR;
+            else if (InMagnification == ETextureFilter::LINEAR)
+                Filter = D3D12_FILTER_COMPARISON_MIN_POINT_MAG_MIP_LINEAR;
+            else if (InMagnification == ETextureFilter::NEAREST_MIPMAP_NEAREST)   // mipmap 이 겹치면 linear 로 올려서 처리, 정리필요
+                Filter = D3D12_FILTER_COMPARISON_MIN_MAG_POINT_MIP_LINEAR;
+            else if (InMagnification == ETextureFilter::LINEAR_MIPMAP_NEAREST)    // mipmap 이 겹치면 linear 로 올려서 처리, 정리필요
+                Filter = D3D12_FILTER_COMPARISON_MIN_POINT_MAG_MIP_LINEAR;
+            else if (InMagnification == ETextureFilter::NEAREST_MIPMAP_LINEAR)
+                Filter = D3D12_FILTER_COMPARISON_MIN_MAG_POINT_MIP_LINEAR;
+            else if (InMagnification == ETextureFilter::LINEAR_MIPMAP_LINEAR)
+                Filter = D3D12_FILTER_COMPARISON_MIN_POINT_MAG_MIP_LINEAR;
+            break;
+        case ETextureFilter::LINEAR_MIPMAP_LINEAR:
+            if (InMagnification == ETextureFilter::NEAREST)
+                Filter = D3D12_FILTER_COMPARISON_MIN_LINEAR_MAG_POINT_MIP_LINEAR;
+            else if (InMagnification == ETextureFilter::LINEAR)
+                Filter = D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR;
+            else if (InMagnification == ETextureFilter::NEAREST_MIPMAP_NEAREST)   // mipmap 이 겹치면 linear 로 올려서 처리, 정리필요
+                Filter = D3D12_FILTER_COMPARISON_MIN_LINEAR_MAG_POINT_MIP_LINEAR;
+            else if (InMagnification == ETextureFilter::LINEAR_MIPMAP_NEAREST)    // mipmap 이 겹치면 linear 로 올려서 처리, 정리필요
+                Filter = D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR;
+            else if (InMagnification == ETextureFilter::NEAREST_MIPMAP_LINEAR)
+                Filter = D3D12_FILTER_COMPARISON_MIN_LINEAR_MAG_POINT_MIP_LINEAR;
+            else if (InMagnification == ETextureFilter::LINEAR_MIPMAP_LINEAR)
+                Filter = D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR;
+            break;
+        default:
+            break;
+        }
+        return Filter;
     }
-    return Filter;
+    else
+    {
+        D3D12_FILTER Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+        switch (InMinification)
+        {
+        case ETextureFilter::NEAREST:
+        case ETextureFilter::NEAREST_MIPMAP_NEAREST:
+            if (InMagnification == ETextureFilter::NEAREST)
+                Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+            else if (InMagnification == ETextureFilter::LINEAR)
+                Filter = D3D12_FILTER_MIN_POINT_MAG_LINEAR_MIP_POINT;
+            else if (InMagnification == ETextureFilter::NEAREST_MIPMAP_NEAREST)
+                Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+            else if (InMagnification == ETextureFilter::LINEAR_MIPMAP_NEAREST)
+                Filter = D3D12_FILTER_MIN_POINT_MAG_LINEAR_MIP_POINT;
+            else if (InMagnification == ETextureFilter::NEAREST_MIPMAP_LINEAR)
+                Filter = D3D12_FILTER_MIN_MAG_POINT_MIP_LINEAR;
+            else if (InMagnification == ETextureFilter::LINEAR_MIPMAP_LINEAR)
+                Filter = D3D12_FILTER_MIN_POINT_MAG_MIP_LINEAR;
+            break;
+        case ETextureFilter::LINEAR:
+        case ETextureFilter::LINEAR_MIPMAP_NEAREST:
+            if (InMagnification == ETextureFilter::NEAREST)
+                Filter = D3D12_FILTER_MIN_LINEAR_MAG_MIP_POINT;
+            else if (InMagnification == ETextureFilter::LINEAR)
+                Filter = D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;
+            else if (InMagnification == ETextureFilter::NEAREST_MIPMAP_NEAREST)
+                Filter = D3D12_FILTER_MIN_LINEAR_MAG_MIP_POINT;
+            else if (InMagnification == ETextureFilter::LINEAR_MIPMAP_NEAREST)
+                Filter = D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;
+            else if (InMagnification == ETextureFilter::NEAREST_MIPMAP_LINEAR)
+                Filter = D3D12_FILTER_MIN_LINEAR_MAG_POINT_MIP_LINEAR;
+            else if (InMagnification == ETextureFilter::LINEAR_MIPMAP_LINEAR)
+                Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+            break;
+        case ETextureFilter::NEAREST_MIPMAP_LINEAR:
+            if (InMagnification == ETextureFilter::NEAREST)
+                Filter = D3D12_FILTER_MIN_MAG_POINT_MIP_LINEAR;
+            else if (InMagnification == ETextureFilter::LINEAR)
+                Filter = D3D12_FILTER_MIN_POINT_MAG_MIP_LINEAR;
+            else if (InMagnification == ETextureFilter::NEAREST_MIPMAP_NEAREST)   // mipmap 이 겹치면 linear 로 올려서 처리, 정리필요
+                Filter = D3D12_FILTER_MIN_MAG_POINT_MIP_LINEAR;
+            else if (InMagnification == ETextureFilter::LINEAR_MIPMAP_NEAREST)    // mipmap 이 겹치면 linear 로 올려서 처리, 정리필요
+                Filter = D3D12_FILTER_MIN_POINT_MAG_MIP_LINEAR;
+            else if (InMagnification == ETextureFilter::NEAREST_MIPMAP_LINEAR)
+                Filter = D3D12_FILTER_MIN_MAG_POINT_MIP_LINEAR;
+            else if (InMagnification == ETextureFilter::LINEAR_MIPMAP_LINEAR)
+                Filter = D3D12_FILTER_MIN_POINT_MAG_MIP_LINEAR;
+            break;
+        case ETextureFilter::LINEAR_MIPMAP_LINEAR:
+            if (InMagnification == ETextureFilter::NEAREST)
+                Filter = D3D12_FILTER_MIN_LINEAR_MAG_POINT_MIP_LINEAR;
+            else if (InMagnification == ETextureFilter::LINEAR)
+                Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+            else if (InMagnification == ETextureFilter::NEAREST_MIPMAP_NEAREST)   // mipmap 이 겹치면 linear 로 올려서 처리, 정리필요
+                Filter = D3D12_FILTER_MIN_LINEAR_MAG_POINT_MIP_LINEAR;
+            else if (InMagnification == ETextureFilter::LINEAR_MIPMAP_NEAREST)    // mipmap 이 겹치면 linear 로 올려서 처리, 정리필요
+                Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+            else if (InMagnification == ETextureFilter::NEAREST_MIPMAP_LINEAR)
+                Filter = D3D12_FILTER_MIN_LINEAR_MAG_POINT_MIP_LINEAR;
+            else if (InMagnification == ETextureFilter::LINEAR_MIPMAP_LINEAR)
+                Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+            break;
+        default:
+            break;
+        }
+        return Filter;
+    }
 }
 
 FORCEINLINE void GetDepthFormatForSRV(DXGI_FORMAT& OutTexFormat, DXGI_FORMAT& OutSrvFormat, DXGI_FORMAT InOriginalTexFormat)
@@ -340,17 +412,23 @@ FORCEINLINE void GetDepthFormatForSRV(DXGI_FORMAT& OutTexFormat, DXGI_FORMAT& Ou
 
 //D3D12_RESOURCE_STATE_COMMON = 0,
 //D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER = 0x1,
+
 //D3D12_RESOURCE_STATE_INDEX_BUFFER = 0x2,
 //D3D12_RESOURCE_STATE_RENDER_TARGET = 0x4,
 //D3D12_RESOURCE_STATE_UNORDERED_ACCESS = 0x8,
+
 //D3D12_RESOURCE_STATE_DEPTH_WRITE = 0x10,
 //D3D12_RESOURCE_STATE_DEPTH_READ = 0x20,
+// 
 //D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE = 0x40,
 //D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE = 0x80,
+// 
 //D3D12_RESOURCE_STATE_STREAM_OUT = 0x100,
 //D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT = 0x200,
+
 //D3D12_RESOURCE_STATE_COPY_DEST = 0x400,
 //D3D12_RESOURCE_STATE_COPY_SOURCE = 0x800,
+
 //D3D12_RESOURCE_STATE_RESOLVE_DEST = 0x1000,
 //D3D12_RESOURCE_STATE_RESOLVE_SOURCE = 0x2000,
 //D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE = 0x400000,
@@ -367,24 +445,24 @@ FORCEINLINE void GetDepthFormatForSRV(DXGI_FORMAT& OutTexFormat, DXGI_FORMAT& Ou
 //D3D12_RESOURCE_STATE_VIDEO_ENCODE_WRITE = 0x800000
 
 GENERATE_CONVERSION_FUNCTION(GetDX12ImageLayout,
-    CONVERSION_TYPE_ELEMENT(EImageLayout::UNDEFINED, VK_IMAGE_LAYOUT_UNDEFINED),
-    CONVERSION_TYPE_ELEMENT(EImageLayout::GENERAL, VK_IMAGE_LAYOUT_GENERAL),
-    CONVERSION_TYPE_ELEMENT(EImageLayout::COLOR_ATTACHMENT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL),
-    CONVERSION_TYPE_ELEMENT(EImageLayout::DEPTH_STENCIL_ATTACHMENT, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL),
-    CONVERSION_TYPE_ELEMENT(EImageLayout::DEPTH_STENCIL_READ_ONLY, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL),
-    CONVERSION_TYPE_ELEMENT(EImageLayout::SHADER_READ_ONLY, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
-    CONVERSION_TYPE_ELEMENT(EImageLayout::TRANSFER_SRC, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
-    CONVERSION_TYPE_ELEMENT(EImageLayout::TRANSFER_DST, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
-    CONVERSION_TYPE_ELEMENT(EImageLayout::PREINITIALIZED, VK_IMAGE_LAYOUT_PREINITIALIZED),
-    CONVERSION_TYPE_ELEMENT(EImageLayout::DEPTH_READ_ONLY_STENCIL_ATTACHMENT, VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL),
-    CONVERSION_TYPE_ELEMENT(EImageLayout::DEPTH_ATTACHMENT_STENCIL_READ_ONLY, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL),
-    CONVERSION_TYPE_ELEMENT(EImageLayout::DEPTH_ATTACHMENT, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL),
-    CONVERSION_TYPE_ELEMENT(EImageLayout::DEPTH_READ_ONLY, VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL),
-    CONVERSION_TYPE_ELEMENT(EImageLayout::STENCIL_ATTACHMENT, VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL),
-    CONVERSION_TYPE_ELEMENT(EImageLayout::STENCIL_READ_ONLY, VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL),
-    CONVERSION_TYPE_ELEMENT(EImageLayout::PRESENT_SRC, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR),
-    CONVERSION_TYPE_ELEMENT(EImageLayout::SHARED_PRESENT, VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR),
-    CONVERSION_TYPE_ELEMENT(EImageLayout::SHADING_RATE_NV, VK_IMAGE_LAYOUT_SHADING_RATE_OPTIMAL_NV),
-    CONVERSION_TYPE_ELEMENT(EImageLayout::FRAGMENT_DENSITY_MAP_EXT, VK_IMAGE_LAYOUT_FRAGMENT_DENSITY_MAP_OPTIMAL_EXT),
-    CONVERSION_TYPE_ELEMENT(EImageLayout::READ_ONLY, VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL_KHR),
-    CONVERSION_TYPE_ELEMENT(EImageLayout::ATTACHMENT, VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR))
+    CONVERSION_TYPE_ELEMENT(EImageLayout::UNDEFINED, D3D12_RESOURCE_STATE_COMMON),
+    CONVERSION_TYPE_ELEMENT(EImageLayout::GENERAL, D3D12_RESOURCE_STATE_COMMON),
+    CONVERSION_TYPE_ELEMENT(EImageLayout::COLOR_ATTACHMENT, D3D12_RESOURCE_STATE_RENDER_TARGET),
+    CONVERSION_TYPE_ELEMENT(EImageLayout::DEPTH_STENCIL_ATTACHMENT, D3D12_RESOURCE_STATE_DEPTH_WRITE),
+    CONVERSION_TYPE_ELEMENT(EImageLayout::DEPTH_STENCIL_READ_ONLY, D3D12_RESOURCE_STATE_DEPTH_READ),
+    CONVERSION_TYPE_ELEMENT(EImageLayout::SHADER_READ_ONLY, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE),
+    CONVERSION_TYPE_ELEMENT(EImageLayout::TRANSFER_SRC, D3D12_RESOURCE_STATE_COPY_SOURCE),
+    CONVERSION_TYPE_ELEMENT(EImageLayout::TRANSFER_DST, D3D12_RESOURCE_STATE_RESOLVE_DEST),
+    CONVERSION_TYPE_ELEMENT(EImageLayout::PREINITIALIZED, D3D12_RESOURCE_STATE_COMMON),
+    CONVERSION_TYPE_ELEMENT(EImageLayout::DEPTH_READ_ONLY_STENCIL_ATTACHMENT, D3D12_RESOURCE_STATE_DEPTH_WRITE),
+    CONVERSION_TYPE_ELEMENT(EImageLayout::DEPTH_ATTACHMENT_STENCIL_READ_ONLY, D3D12_RESOURCE_STATE_DEPTH_WRITE),
+    CONVERSION_TYPE_ELEMENT(EImageLayout::DEPTH_ATTACHMENT, D3D12_RESOURCE_STATE_DEPTH_WRITE),
+    CONVERSION_TYPE_ELEMENT(EImageLayout::DEPTH_READ_ONLY, D3D12_RESOURCE_STATE_DEPTH_READ),
+    CONVERSION_TYPE_ELEMENT(EImageLayout::STENCIL_ATTACHMENT, D3D12_RESOURCE_STATE_DEPTH_WRITE),
+    CONVERSION_TYPE_ELEMENT(EImageLayout::STENCIL_READ_ONLY, D3D12_RESOURCE_STATE_DEPTH_READ),
+    CONVERSION_TYPE_ELEMENT(EImageLayout::PRESENT_SRC, D3D12_RESOURCE_STATE_PRESENT),
+    CONVERSION_TYPE_ELEMENT(EImageLayout::SHARED_PRESENT, D3D12_RESOURCE_STATE_PRESENT),
+    CONVERSION_TYPE_ELEMENT(EImageLayout::SHADING_RATE_NV, D3D12_RESOURCE_STATE_SHADING_RATE_SOURCE),
+    CONVERSION_TYPE_ELEMENT(EImageLayout::FRAGMENT_DENSITY_MAP_EXT, D3D12_RESOURCE_STATE_COMMON),
+    CONVERSION_TYPE_ELEMENT(EImageLayout::READ_ONLY, D3D12_RESOURCE_STATE_GENERIC_READ),
+    CONVERSION_TYPE_ELEMENT(EImageLayout::ATTACHMENT, D3D12_RESOURCE_STATE_RENDER_TARGET))

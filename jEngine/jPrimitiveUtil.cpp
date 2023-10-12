@@ -560,12 +560,12 @@ jRenderObject* CreateQuad_Internal(const Vector& pos, const Vector& size, const 
 	auto offset = Vector::ZeroVector;
 
 	float vertices[] = {
-		offset.x + (-halfSize.x), 0.0f, offset.z + (-halfSize.z),
-		offset.x + (halfSize.x), 0.0f, offset.z + (halfSize.z),
-		offset.x + (halfSize.x), 0.0f, offset.z + (-halfSize.z),
-		offset.x + (halfSize.x), 0.0f, offset.z + (halfSize.z),
-		offset.x + (-halfSize.x), 0.0f, offset.z + (-halfSize.z),
-		offset.x + (-halfSize.x), 0.0f, offset.z + (halfSize.z),
+        offset.x + (halfSize.x),	0.0f,	offset.z + -(-halfSize.z),
+		offset.x + (-halfSize.x),	0.0f,	offset.z + -(-halfSize.z),
+		offset.x + (halfSize.x),	0.0f,	offset.z + -(halfSize.z),
+        offset.x + (-halfSize.x),	0.0f,	offset.z + -(halfSize.z),
+		offset.x + (halfSize.x),	0.0f,	offset.z + -(halfSize.z),
+        offset.x + (-halfSize.x),	0.0f,	offset.z + -(-halfSize.z),
 	};
 
 	float normals[] = {
@@ -578,11 +578,11 @@ jRenderObject* CreateQuad_Internal(const Vector& pos, const Vector& size, const 
 	};
 
 	Vector2 texcoords[] = {
-		Vector2(0.0f, 0.0f),
 		Vector2(1.0f, 1.0f),
+		Vector2(0.0f, 0.0f),
 		Vector2(1.0f, 0.0f),
-		Vector2(1.0f, 1.0f),
 		Vector2(0.0f, 0.0f),
+		Vector2(1.0f, 1.0f),
 		Vector2(0.0f, 1.0f),
 	};
 
@@ -824,8 +824,8 @@ jObject* CreateTriangle(const Vector& pos, const Vector& size, const Vector& sca
 
 	float vertices[] = {
 		offset.x + (halfSize.x), 0.0, offset.z + (-halfSize.z),
-		offset.x + (-halfSize.x), 0.0, offset.z + (-halfSize.z),
 		offset.x + (halfSize.x), 0.0, offset.z + (halfSize.z),
+		offset.x + (-halfSize.x), 0.0, offset.z + (-halfSize.z),
 	};
 
 	Vector2 texcoords[] = {
@@ -925,46 +925,46 @@ jObject* CreateCube(const Vector& pos, const Vector& size, const Vector& scale, 
 	const Vector offset = Vector::ZeroVector;
 
 	float vertices[] = {
-		offset.x + (-halfSize.x),  offset.y + (-halfSize.y),     offset.z + (-halfSize.z),
 		offset.x + (halfSize.x),  offset.y + (-halfSize.y),    offset.z + (halfSize.z),
+		offset.x + (-halfSize.x),  offset.y + (-halfSize.y),     offset.z + (-halfSize.z),
 		offset.x + (-halfSize.x),   offset.y + (-halfSize.y),     offset.z + (halfSize.z),		
+		offset.x + (-halfSize.x),   offset.y + (-halfSize.y),     offset.z + (-halfSize.z),
 		offset.x + (halfSize.x),  offset.y + (-halfSize.y),     offset.z + (halfSize.z),
-		offset.x + (-halfSize.x),   offset.y + (-halfSize.y),     offset.z + (-halfSize.z),
 		offset.x + (halfSize.x),   offset.y + (-halfSize.y),     offset.z + (-halfSize.z),
 
-		offset.x + (-halfSize.x),   offset.y + (halfSize.y),     offset.z + (-halfSize.z),
 		offset.x + (halfSize.x),   offset.y + (halfSize.y),     offset.z + (halfSize.z),
+		offset.x + (-halfSize.x),   offset.y + (halfSize.y),     offset.z + (-halfSize.z),
 		offset.x + (halfSize.x),   offset.y + (halfSize.y),     offset.z + (-halfSize.z),
-		offset.x + (halfSize.x),   offset.y + (halfSize.y),     offset.z + (halfSize.z),
 		offset.x + (-halfSize.x),   offset.y + (halfSize.y),     offset.z + (-halfSize.z),
+		offset.x + (halfSize.x),   offset.y + (halfSize.y),     offset.z + (halfSize.z),
 		offset.x + (-halfSize.x),   offset.y + (halfSize.y),     offset.z + (halfSize.z),
 
-		offset.x + (-halfSize.x),   offset.y + (-halfSize.y),     offset.z + (-halfSize.z),
 		offset.x + (halfSize.x),   offset.y + (halfSize.y),     offset.z + (-halfSize.z),
+		offset.x + (-halfSize.x),   offset.y + (-halfSize.y),     offset.z + (-halfSize.z),
 		offset.x + (halfSize.x),   offset.y + (-halfSize.y),     offset.z + (-halfSize.z),
-		offset.x + (halfSize.x),   offset.y + (halfSize.y),     offset.z + (-halfSize.z),
 		offset.x + (-halfSize.x),   offset.y + (-halfSize.y),     offset.z + (-halfSize.z),
+		offset.x + (halfSize.x),   offset.y + (halfSize.y),     offset.z + (-halfSize.z),
 		offset.x + (-halfSize.x),   offset.y + (halfSize.y),     offset.z + (-halfSize.z),
 
-		offset.x + (halfSize.x),   offset.y + (-halfSize.y),     offset.z + (-halfSize.z),
 		offset.x + (halfSize.x),   offset.y + (halfSize.y),     offset.z + (halfSize.z),
+		offset.x + (halfSize.x),   offset.y + (-halfSize.y),     offset.z + (-halfSize.z),
 		offset.x + (halfSize.x),   offset.y + (-halfSize.y),     offset.z + (halfSize.z),
-		offset.x + (halfSize.x),   offset.y + (halfSize.y),     offset.z + (halfSize.z),
 		offset.x + (halfSize.x),   offset.y + (-halfSize.y),     offset.z + (-halfSize.z),
+		offset.x + (halfSize.x),   offset.y + (halfSize.y),     offset.z + (halfSize.z),
 		offset.x + (halfSize.x),   offset.y + (halfSize.y),     offset.z + (-halfSize.z),
 
-		offset.x + (halfSize.x),   offset.y + (-halfSize.y),     offset.z + (halfSize.z),
-		offset.x + (-halfSize.x),   offset.y + (halfSize.y),     offset.z + (halfSize.z),
-		offset.x + (-halfSize.x),   offset.y + (-halfSize.y),     offset.z + (halfSize.z),
 		offset.x + (-halfSize.x),   offset.y + (halfSize.y),     offset.z + (halfSize.z),
 		offset.x + (halfSize.x),   offset.y + (-halfSize.y),     offset.z + (halfSize.z),
+		offset.x + (-halfSize.x),   offset.y + (-halfSize.y),     offset.z + (halfSize.z),
+		offset.x + (halfSize.x),   offset.y + (-halfSize.y),     offset.z + (halfSize.z),
+		offset.x + (-halfSize.x),   offset.y + (halfSize.y),     offset.z + (halfSize.z),
 		offset.x + (halfSize.x),   offset.y + (halfSize.y),     offset.z + (halfSize.z),
 
-		offset.x + (-halfSize.x),   offset.y + (-halfSize.y),     offset.z + (halfSize.z),
 		offset.x + (-halfSize.x),   offset.y + (halfSize.y),     offset.z + (-halfSize.z),
+		offset.x + (-halfSize.x),   offset.y + (-halfSize.y),     offset.z + (halfSize.z),
 		offset.x + (-halfSize.x),   offset.y + (-halfSize.y),     offset.z + (-halfSize.z),
-		offset.x + (-halfSize.x),   offset.y + (halfSize.y),     offset.z + (-halfSize.z),
 		offset.x + (-halfSize.x),   offset.y + (-halfSize.y),     offset.z + (halfSize.z),
+		offset.x + (-halfSize.x),   offset.y + (halfSize.y),     offset.z + (-halfSize.z),
 		offset.x + (-halfSize.x),   offset.y + (halfSize.y),     offset.z + (halfSize.z),
 	};
 
@@ -1013,46 +1013,46 @@ jObject* CreateCube(const Vector& pos, const Vector& size, const Vector& scale, 
 	};
 
 	Vector2 texcoords[] = {
-		Vector2(1.0f, 1.0f),
 		Vector2(0.0f, 0.0f),
+		Vector2(1.0f, 1.0f),
 		Vector2(1.0f, 0.0f),
-		Vector2(0.0f, 0.0f),
 		Vector2(1.0f, 1.0f),
+		Vector2(0.0f, 0.0f),
 		Vector2(0.0f, 1.0f),
 
-		Vector2(0.0f, 1.0f),
 		Vector2(1.0f, 0.0f),
+		Vector2(0.0f, 1.0f),
 		Vector2(1.0f, 1.0f),
-		Vector2(1.0f, 0.0f),
 		Vector2(0.0f, 1.0f),
+		Vector2(1.0f, 0.0f),
 		Vector2(0.0f, 0.0f),
 
-		Vector2(0.0f, 1.0f),
 		Vector2(1.0f, 0.0f),
+		Vector2(0.0f, 1.0f),
 		Vector2(1.0f, 1.0f),
-		Vector2(1.0f, 0.0f),
 		Vector2(0.0f, 1.0f),
+		Vector2(1.0f, 0.0f),
 		Vector2(0.0f, 0.0f),
 
-		Vector2(0.0f, 1.0f),
 		Vector2(1.0f, 0.0f),
+		Vector2(0.0f, 1.0f),
 		Vector2(1.0f, 1.0f),
-		Vector2(1.0f, 0.0f),
 		Vector2(0.0f, 1.0f),
+		Vector2(1.0f, 0.0f),
 		Vector2(0.0f, 0.0f),
 
-		Vector2(0.0f, 1.0f),
 		Vector2(1.0f, 0.0f),
+		Vector2(0.0f, 1.0f),
 		Vector2(1.0f, 1.0f),
-		Vector2(1.0f, 0.0f),
 		Vector2(0.0f, 1.0f),
+		Vector2(1.0f, 0.0f),
 		Vector2(0.0f, 0.0f),
 
-		Vector2(0.0f, 1.0f),
 		Vector2(1.0f, 0.0f),
+		Vector2(0.0f, 1.0f),
 		Vector2(1.0f, 1.0f),
-		Vector2(1.0f, 0.0f),
 		Vector2(0.0f, 1.0f),
+		Vector2(1.0f, 0.0f),
 		Vector2(0.0f, 0.0f),
 	};
 
@@ -1272,8 +1272,8 @@ jObject* CreateCapsule(const Vector& pos, float height, float radius, int32 slic
 	{
 		for (int32 i = 0; i < (slice - 1); ++i, iCount += 1)
 		{
-			faces.push_back(iCount); faces.push_back(iCount + 1); faces.push_back(iCount + toNextSlice);
-			faces.push_back(iCount + toNextSlice); faces.push_back(iCount + 1); faces.push_back(iCount + toNextSlice + 1);
+			faces.push_back(iCount + 1); faces.push_back(iCount); faces.push_back(iCount + toNextSlice);
+			faces.push_back(iCount + 1); faces.push_back(iCount + toNextSlice); faces.push_back(iCount + toNextSlice + 1);
 		}
 	}
 
@@ -1318,16 +1318,16 @@ jConePrimitive* CreateCone(const Vector& pos, float height, float radius, int32 
 		const float rad = i * stepRadian;
 		const float prevRad = rad - stepRadian;
 
-		float* currentPos = &vertices[(i - 1) * 18];
+		Vector* currentPos = (Vector*)&vertices[(i - 1) * 18];
 		// Top
-		memcpy(&currentPos[0], &topVert, sizeof(topVert));
-		currentPos[3] = cosf(rad) * radius;			currentPos[4] = bottomVert.y;		currentPos[5] = sinf(rad) * radius;
-		currentPos[6] = cosf(prevRad) * radius;		currentPos[7] = bottomVert.y;		currentPos[8] = sinf(prevRad) * radius;
+		*currentPos = Vector(cosf(rad) * radius,		bottomVert.y,		sinf(rad) * radius);		++currentPos;
+		*currentPos = Vector(topVert);	++currentPos;
+		*currentPos = Vector(cosf(prevRad) * radius,	bottomVert.y,		sinf(prevRad) * radius);	++currentPos;
 
 		// Bottom
-		memcpy(&currentPos[9], &bottomVert, sizeof(bottomVert));
-		currentPos[12] = cosf(prevRad) * radius;	currentPos[13] = bottomVert.y;		currentPos[14] = sinf(prevRad) * radius;
-		currentPos[15] = cosf(rad) * radius;		currentPos[16] = bottomVert.y;		currentPos[17] = sinf(rad) * radius;
+		*currentPos = Vector(cosf(prevRad) * radius,	bottomVert.y,		sinf(prevRad) * radius);	++currentPos;
+		*currentPos = Vector(bottomVert);	++currentPos;
+		*currentPos = Vector(cosf(rad) * radius,		bottomVert.y,		sinf(rad) * radius);		++currentPos;
 	}
 
 	int32 elementCount = static_cast<int32>(vertices.size() / 3);
@@ -1454,26 +1454,26 @@ jObject* CreateCylinder(const Vector& pos, float height, float radius, int32 sli
 		float rad = i * stepRadian;
 		float prevRad = rad - stepRadian;
 
-		float* currentPos = &vertices[i * 36];
+		Vector* currentPos = (Vector*)&vertices[i * 36];
 
 		// Top
-		memcpy(&currentPos[0], &topVert, sizeof(topVert));
-		currentPos[3] = cosf(rad) * radius;			currentPos[4] = topVert.y;		currentPos[5] = sinf(rad) * radius;
-		currentPos[6] = cosf(prevRad) * radius;		currentPos[7] = topVert.y;		currentPos[8] = sinf(prevRad) * radius;
+		*currentPos = Vector(topVert); ++currentPos;
+		*currentPos = Vector(cosf(prevRad) * radius,	topVert.y,		sinf(prevRad) * radius);	++currentPos;
+		*currentPos = Vector(cosf(rad) * radius,		topVert.y,		sinf(rad) * radius);		++currentPos;
 
 		// Mid
-		currentPos[9] = cosf(prevRad) * radius;		currentPos[10] = topVert.y;		currentPos[11] = sinf(prevRad) * radius;
-		currentPos[12] = cosf(rad) * radius;		currentPos[13] = topVert.y;		currentPos[14] = sinf(rad) * radius;
-		currentPos[15] = cosf(prevRad) * radius;	currentPos[16] = bottomVert.y;	currentPos[17] = sinf(prevRad) * radius;
+		*currentPos = Vector(cosf(prevRad) * radius,	topVert.y,		sinf(prevRad) * radius);	++currentPos;
+		*currentPos = Vector(cosf(prevRad) * radius,	bottomVert.y,	sinf(prevRad) * radius);	++currentPos;
+		*currentPos = Vector(cosf(rad) * radius,		topVert.y,		sinf(rad) * radius);		++currentPos;
 
-		currentPos[18] = cosf(prevRad) * radius;	currentPos[19] = bottomVert.y;	currentPos[20] = sinf(prevRad) * radius;
-		currentPos[21] = cosf(rad) * radius;		currentPos[22] = topVert.y;		currentPos[23] = sinf(rad) * radius;
-		currentPos[24] = cosf(rad) * radius;		currentPos[25] = bottomVert.y;	currentPos[26] = sinf(rad) * radius;
+		*currentPos = Vector(cosf(prevRad) * radius,	bottomVert.y,	sinf(prevRad) * radius);	++currentPos;
+		*currentPos = Vector(cosf(rad) * radius,		bottomVert.y,	sinf(rad) * radius);		++currentPos;
+		*currentPos = Vector(cosf(rad) * radius,		topVert.y,		sinf(rad) * radius);		++currentPos;
 
 		// Bottom
-		currentPos[27] = bottomVert.x;				currentPos[28] = bottomVert.y;		currentPos[29] = bottomVert.z;
-		currentPos[30] = cosf(prevRad) * radius;	currentPos[31] = bottomVert.y;		currentPos[32] = sinf(prevRad) * radius;
-		currentPos[33] = cosf(rad) * radius;		currentPos[34] = bottomVert.y;		currentPos[35] = sinf(rad) * radius;
+		*currentPos = Vector(bottomVert.x,				bottomVert.y,	bottomVert.z);				++currentPos;
+		*currentPos = Vector(cosf(rad) * radius,		bottomVert.y,	sinf(rad) * radius);		++currentPos;
+		*currentPos = Vector(cosf(prevRad) * radius,	bottomVert.y,	sinf(prevRad) * radius);	++currentPos;
 	}
 
 	int32 elementCount = static_cast<int32>(vertices.size() / 3);
@@ -1494,28 +1494,28 @@ jObject* CreateCylinder(const Vector& pos, float height, float radius, int32 sli
 		const float rad = i * stepRadian;
 		const float prevRad = rad - stepRadian;
 
-		float* currentPos = &normals[i * 36];
+		Vector* currentPos = (Vector*)&normals[i * 36];
 
 		// Top
 		const Vector temp(0.0f, 1.0f, 0.0f);
-		memcpy(&currentPos[0], &temp, sizeof(temp));
-		memcpy(&currentPos[3], &temp, sizeof(temp));
-		memcpy(&currentPos[6], &temp, sizeof(temp));
+		*currentPos = Vector(temp); ++currentPos;
+		*currentPos = Vector(temp); ++currentPos;
+		*currentPos = Vector(temp); ++currentPos;
 
 		// Mid
-		currentPos[9] = cosf(prevRad);		currentPos[10] = 0.0f;		currentPos[11] = sinf(prevRad);
-		currentPos[12] = cosf(rad);			currentPos[13] = 0.0f;		currentPos[14] = sinf(rad);
-		currentPos[15] = cosf(prevRad);		currentPos[16] = 0.0f;		currentPos[17] = sinf(prevRad);
+		*currentPos = Vector(cosf(prevRad),		0.0f,		sinf(prevRad));			++currentPos;
+		*currentPos = Vector(cosf(prevRad),		0.0f,		sinf(prevRad));			++currentPos;
+		*currentPos = Vector(cosf(rad),			0.0f,		sinf(rad));				++currentPos;
 
-		currentPos[18] = cosf(prevRad);		currentPos[19] = 0.0f;		currentPos[20] = sinf(prevRad);
-		currentPos[21] = cosf(rad);			currentPos[22] = 0.0f;		currentPos[23] = sinf(rad);
-		currentPos[24] = cosf(rad);			currentPos[25] = 0.0f;		currentPos[26] = sinf(rad);
+		*currentPos = Vector(cosf(prevRad),		0.0f,		sinf(prevRad));			++currentPos;
+		*currentPos = Vector(cosf(rad),			0.0f,		sinf(rad));				++currentPos;
+		*currentPos = Vector(cosf(rad),			0.0f,		sinf(rad));				++currentPos;
 
 		// Bottom
 		const Vector temp2(0.0f, -1.0f, 0.0f);
-		memcpy(&currentPos[27], &temp2, sizeof(temp2));
-		memcpy(&currentPos[30], &temp2, sizeof(temp2));
-		memcpy(&currentPos[33], &temp2, sizeof(temp2));
+        *currentPos = Vector(temp2); ++currentPos;
+        *currentPos = Vector(temp2); ++currentPos;
+        *currentPos = Vector(temp2); ++currentPos;
 	}
 	/////////////////////////////////////////////////////
 
@@ -1709,23 +1709,23 @@ jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector
 	{
 		for (int32 i = 0; i < slice; ++i, iCount += 1)
 		{
-			faces.push_back(iCount); faces.push_back(iCount + 1); faces.push_back(iCount + toNextSlice);
-			faces.push_back(iCount + toNextSlice); faces.push_back(iCount + 1); faces.push_back(iCount + toNextSlice + 1);
+			faces.push_back(iCount + 1); faces.push_back(iCount); faces.push_back(iCount + toNextSlice);
+			faces.push_back(iCount + 1); faces.push_back(iCount + toNextSlice); faces.push_back(iCount + toNextSlice + 1);
 		}
 	}
 
 	for (int32 i = 0; i < slice; ++i, iCount += 1)
 	{
-		faces.push_back(iCount);
 		faces.push_back(iCount + 1);
+		faces.push_back(iCount);
 		faces.push_back(elementCount - 1);
 	}
 
 	iCount = 0;
 	for (int32 i = 0; i < slice; ++i, iCount += 1)
 	{
-		faces.push_back(iCount);
 		faces.push_back(elementCount - 2);
+		faces.push_back(iCount);
 		faces.push_back(iCount + 1);
 	}
 
@@ -1831,7 +1831,7 @@ jFullscreenQuadPrimitive* CreateFullscreenQuad(jTexture* texture)
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float)));
 		streamParam->Stride = sizeof(float);
-		streamParam->Name = jName("VertID");
+		streamParam->Name = jName("POSITION");
 		streamParam->Data.resize(_countof(vertices));
 		memcpy(&streamParam->Data[0], &vertices[0], sizeof(vertices));
 		vertexStreamData->Params.push_back(streamParam);

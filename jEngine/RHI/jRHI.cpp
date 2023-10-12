@@ -4,6 +4,9 @@
 #include "Scene/Light/jDirectionalLight.h"
 #include "Scene/jCamera.h"
 #include "Material/jMaterial.h"
+#include "jRHIType.h"
+
+const jRTClearValue jRTClearValue::Invalid(0.0f, 0.0f, 0.0f, 0.0f);
 
 jTexture* GWhiteTexture = nullptr;
 jTexture* GBlackTexture = nullptr;

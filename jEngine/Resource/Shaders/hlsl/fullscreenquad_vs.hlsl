@@ -1,6 +1,6 @@
 struct VSInput
 {
-    [[vk::location(0)]] float VertID : POSITION0;
+    [[vk::location(0)]] float VertID : POSITION;
 };
 
 struct VSOutput
@@ -15,7 +15,8 @@ VSOutput main(VSInput input)
 
     int vert = int(input.VertID);
 
-    output.TexCoord = float2((vert << 1) & 2, vert & 2);
+    output.TexCoord = float2((vert << 1) & 2, vert & 2);  // CCW
+    //output.TexCoord = float2(vert & 2, (vert << 1) & 2);    // CW
     output.Pos = float4(output.TexCoord * float2(2.0, 2.0) - float2(1.0, 1.0), 0.5, 1.0);
     
 // todo VULKAN_NDC_Y_FLIP
