@@ -23,6 +23,24 @@ void IUniformBuffer::Bind(const jShader* shader) const
 TResourcePool<jShader, jMutexRWLock> jRHI::ShaderPool;
 jVertexBuffer* jRHI::CubeMapInstanceDataForSixFace = nullptr;
 
+// jGPUDebugEvent
+jGPUDebugEvent::jGPUDebugEvent(jCommandBuffer* InCommandBuffer, const char* InName)
+{
+    CommandBuffer = InCommandBuffer;
+    g_rhi->BeginDebugEvent(CommandBuffer, InName);
+}
+
+jGPUDebugEvent::jGPUDebugEvent(jCommandBuffer* InCommandBuffer, const char* InName, const Vector4& InColor)
+{
+    CommandBuffer = InCommandBuffer;
+    g_rhi->BeginDebugEvent(CommandBuffer, InName, InColor);
+}
+
+jGPUDebugEvent::~jGPUDebugEvent()
+{
+    g_rhi->EndDebugEvent(CommandBuffer);
+}
+
 bool jRHI::InitRHI()
 {
     return false;

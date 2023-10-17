@@ -2195,3 +2195,19 @@ bool jRHI_DX12::TransitionImageLayoutImmediate(jTexture* texture, EImageLayout n
     return false;
 }
 
+void jRHI_DX12::BeginDebugEvent(jCommandBuffer* InCommandBuffer, const char* InName, const Vector4& InColor /*= Vector4::ColorGreen*/) const
+{
+    jCommandBuffer_DX12* commandList = (jCommandBuffer_DX12*)InCommandBuffer;
+    check(commandList);
+
+    PIXBeginEvent(commandList->Get(), PIX_COLOR((BYTE)(255 * InColor.x), (BYTE)(255 * InColor.y), (BYTE)(255 * InColor.z)), InName);
+}
+
+void jRHI_DX12::EndDebugEvent(jCommandBuffer* InCommandBuffer) const
+{
+    jCommandBuffer_DX12* commandList = (jCommandBuffer_DX12*)InCommandBuffer;
+    check(commandList);
+
+    PIXEndEvent(commandList->Get());
+}
+

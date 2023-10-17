@@ -42,57 +42,6 @@ TResourcePool<jBlendingStateInfo_Vulkan, jMutexRWLock> jRHI_Vulkan::BlendingStat
 TResourcePool<jPipelineStateInfo_Vulkan, jMutexRWLock> jRHI_Vulkan::PipelineStatePool;
 TResourcePool<jRenderPass_Vulkan, jMutexRWLock> jRHI_Vulkan::RenderPassPool;
 
-// jGPUDebugEvent
-jGPUDebugEvent::jGPUDebugEvent(const char* InName, jCommandBuffer* InCommandBuffer)
-{
-#if USE_VULKAN
-	if (g_rhi_vk->vkCmdDebugMarkerBegin)
-	{
-		CommandBuffer = InCommandBuffer;
-
-		check(CommandBuffer);
-		VkDebugMarkerMarkerInfoEXT markerInfo = {};
-		markerInfo.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_MARKER_INFO_EXT;
-
-		const float DefaultColor[4] = { 0.0f, 1.0f, 0.0f, 1.0f };
-		memcpy(markerInfo.color, &DefaultColor[0], sizeof(float) * 4);
-
-		markerInfo.pMarkerName = InName;
-		g_rhi_vk->vkCmdDebugMarkerBegin((VkCommandBuffer)CommandBuffer->GetHandle(), &markerInfo);
-	}
-#endif // USE_VULKAN
-}
-
-jGPUDebugEvent::jGPUDebugEvent(const char* InName, jCommandBuffer* InCommandBuffer, const Vector4& InColor)
-{
-#if USE_VULKAN
-    if (g_rhi_vk->vkCmdDebugMarkerBegin)
-    {
-        CommandBuffer = InCommandBuffer;
-
-        check(CommandBuffer);
-        VkDebugMarkerMarkerInfoEXT markerInfo = {};
-        markerInfo.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_MARKER_INFO_EXT;
-
-		static_assert(sizeof(markerInfo.color) == sizeof(Vector4));
-        memcpy(markerInfo.color, &InColor, sizeof(markerInfo.color));
-
-		markerInfo.pMarkerName = InName;
-        g_rhi_vk->vkCmdDebugMarkerBegin((VkCommandBuffer)CommandBuffer->GetHandle(), &markerInfo);
-    }
-#endif // USE_VULKAN
-}
-
-jGPUDebugEvent::~jGPUDebugEvent()
-{
-#if USE_VULKAN
-	if (g_rhi_vk->vkCmdDebugMarkerEnd)
-	{
-		g_rhi_vk->vkCmdDebugMarkerEnd((VkCommandBuffer)CommandBuffer->GetHandle());
-	}
-#endif // USE_VULKAN
-}
-
 // jFrameBuffer_Vulkan
 struct jFrameBuffer_Vulkan : public jFrameBuffer
 {
@@ -1821,6 +1770,30 @@ void jRHI_Vulkan::BindComputeShaderBindingInstances(const jCommandBuffer* InComm
 			, InShaderBindingInstanceCombiner.DescriptorSetHandles.NumOfData, (const VkDescriptorSet*)&InShaderBindingInstanceCombiner.DescriptorSetHandles[0]
 			, InShaderBindingInstanceCombiner.DynamicOffsets.NumOfData, (InShaderBindingInstanceCombiner.DynamicOffsets.NumOfData ? &InShaderBindingInstanceCombiner.DynamicOffsets[0] : nullptr));
 	}
+}
+
+void jRHI_Vulkan::BeginDebugEvent(jCommandBuffer* InCommandBuffer, const char* InName, const Vector4& InColor) const
+{
+    if (g_rhi_vk->vkCmdDebugMarkerBegin)
+    {
+        check(InCommandBuffer);
+        VkDebugMarkerMarkerInfoEXT markerInfo = {};
+        markerInfo.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_MARKER_INFO_EXT;
+
+        const float DefaultColor[4] = { 0.0f, 1.0f, 0.0f, 1.0f };
+        memcpy(markerInfo.color, &InColor, sizeof(InColor));
+
+        markerInfo.pMarkerName = InName;
+        g_rhi_vk->vkCmdDebugMarkerBegin((VkCommandBuffer)InCommandBuffer->GetHandle(), &markerInfo);
+    }
+}
+
+void jRHI_Vulkan::EndDebugEvent(jCommandBuffer* InCommandBuffer) const
+{
+    if (g_rhi_vk->vkCmdDebugMarkerEnd)
+    {
+        g_rhi_vk->vkCmdDebugMarkerEnd((VkCommandBuffer)InCommandBuffer->GetHandle());
+    }
 }
 
 //#endif // USE_VULKAN

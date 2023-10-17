@@ -22,3 +22,7 @@ uint32 GetMaxThreadCount()
     static uint32 MaxThreadCount = Max((uint32)1, std::thread::hardware_concurrency());
     return MaxThreadCount;
 }
+
+#if USE_PIX
+#pragma comment(lib, "WinPixEventRuntime.lib")
+#endif

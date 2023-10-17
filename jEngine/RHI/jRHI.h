@@ -394,6 +394,8 @@ public:
 	virtual void EnableDepthClip(bool enable) const {  }
 	virtual void BeginDebugEvent(const char* name) const {}
 	virtual void EndDebugEvent() const {}
+    virtual void BeginDebugEvent(jCommandBuffer* InCommandBuffer, const char* InName, const Vector4& InColor = Vector4::ColorGreen) const {}
+    virtual void EndDebugEvent(jCommandBuffer* InCommandBuffer) const {}
 	virtual void GenerateMips(const jTexture* texture) const {}
 	virtual jQuery* CreateQueryTime() const { return nullptr;  }
 	virtual void ReleaseQueryTime(jQuery* queryTime) const {}
@@ -710,13 +712,13 @@ struct TBlendingStateInfo
 class jGPUDebugEvent
 {
 public:
-	jGPUDebugEvent(const char* InName, jCommandBuffer* InCommandBuffer);
-	jGPUDebugEvent(const char* InName, jCommandBuffer* InCommandBuffer, const Vector4& InColor);
+	jGPUDebugEvent(jCommandBuffer* InCommandBuffer, const char* InName);
+	jGPUDebugEvent(jCommandBuffer* InCommandBuffer, const char* InName, const Vector4& InColor);
 	~jGPUDebugEvent();
-    const jCommandBuffer* CommandBuffer = nullptr;
+    jCommandBuffer* CommandBuffer = nullptr;
 };
 
 #define DEBUG_EVENT_NAME(Name, Line) Name##Line
-#define DEBUG_EVENT(RenderFrameContextPtr, Name) jGPUDebugEvent DEBUG_EVENT_NAME(DebugEvent_, __LINE__)(Name, RenderFrameContextPtr->GetActiveCommandBuffer());
-#define DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, Name, ColorVec4) jGPUDebugEvent DEBUG_EVENT_NAME(DebugEvent_, __LINE__)(Name, RenderFrameContextPtr->GetActiveCommandBuffer(), ColorVec4);
+#define DEBUG_EVENT(RenderFrameContextPtr, Name) jGPUDebugEvent DEBUG_EVENT_NAME(DebugEvent_, __LINE__)(RenderFrameContextPtr->GetActiveCommandBuffer(), Name);
+#define DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, Name, ColorVec4) jGPUDebugEvent DEBUG_EVENT_NAME(DebugEvent_, __LINE__)(RenderFrameContextPtr->GetActiveCommandBuffer(), Name, ColorVec4);
 

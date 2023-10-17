@@ -242,6 +242,8 @@ struct Vector4
 	static const Vector4 RightVector;
 	static const Vector4 UpVector;
 	static const Vector4 ColorRed;
+	static const Vector4 ColorGreen;
+	static const Vector4 ColorBlue;
 	static const Vector4 ColorWhite;
 	static const Vector4 ColorBlack;
 

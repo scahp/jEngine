@@ -217,6 +217,9 @@ public:
     virtual jFenceManager* GetFenceManager() override { return &FenceManager; }
     virtual jSemaphoreManager* GetSemaphoreManager() override { return &SemaphoreManager; }
 	virtual jSwapchainImage* GetSwapchainImage(int32 InIndex) const override { return Swapchain->Images[InIndex]; }
+
+	virtual void BeginDebugEvent(jCommandBuffer* InCommandBuffer, const char* InName, const Vector4& InColor = Vector4::ColorGreen) const override;
+	virtual void EndDebugEvent(jCommandBuffer* InCommandBuffer) const override;
 };
 
 extern jRHI_Vulkan* g_rhi_vk;

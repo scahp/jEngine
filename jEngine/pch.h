@@ -215,4 +215,9 @@ FORCEINLINE constexpr T Align(T value, uint64 alignment)
 
 extern uint32 GetMaxThreadCount();
 
+#define USE_PIX 1
+#if USE_PIX
+#include "pix3.h"
+#endif
+
 #endif //PCH_H
