@@ -4,7 +4,8 @@ struct GSOutput
 {
     float4 Pos : SV_POSITION;
     float4 WorldPos : TEXCOORD0;
-    min16uint LayerIndex : SV_RenderTargetArrayIndex;
+    //min16uint LayerIndex : SV_RenderTargetArrayIndex;
+    uint LayerIndex : SV_RenderTargetArrayIndex;
 };
 
 cbuffer PointLight : register(b0, space0) { jPointLightUniformBufferData PointLight; }

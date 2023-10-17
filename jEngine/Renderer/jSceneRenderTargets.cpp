@@ -7,7 +7,7 @@
 #include "Scene/Light/jSpotLight.h"
 #include "jOptions.h"
 
-void jSceneRenderTarget::Create(const jSwapchainImage* image)
+void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::vector<jLight*>* InLights)
 {
     ColorPtr = jRenderTargetPool::GetRenderTarget(
         { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f) });
@@ -43,26 +43,44 @@ void jSceneRenderTarget::Create(const jSwapchainImage* image)
 
     if ((int32)g_rhi->GetSelectedMSAASamples() > 1)
     {
-        check(image);
-        ResolvePtr = jRenderTarget::CreateFromTexture(image->TexturePtr);
+        check(InSwapchain);
+        ResolvePtr = jRenderTarget::CreateFromTexture(InSwapchain->TexturePtr);
     }
 
     if (!FinalColorPtr)
     {
-        FinalColorPtr = jRenderTarget::CreateFromTexture(image->TexturePtr);
+        FinalColorPtr = jRenderTarget::CreateFromTexture(InSwapchain->TexturePtr);
     }
 
-    const bool IsUseReverseZShadow = USE_REVERSEZ_PERSPECTIVE_SHADOW;// && (ViewLight.Light->IsUseRevereZPerspective());
-    const jRTClearValue RTClearValue = IsUseReverseZShadow ? jRTClearValue(1.0f, 0) : jRTClearValue(0.0f, 0);
+    if (InLights)
+    {
+        for (int32 i = 0; i < InLights->size(); ++i)
+        {
+            jLight* light = InLights->at(i);
 
-    DirectionalLightShadowMapPtr = jRenderTargetPool::GetRenderTarget(
-        { ETextureType::TEXTURE_2D, ETextureFormat::D16, jDirectionalLight::SM_Width, jDirectionalLight::SM_Height, 1, false, EMSAASamples::COUNT_1, RTClearValue });
+            const bool IsUseReverseZShadow = USE_REVERSEZ_PERSPECTIVE_SHADOW && (light->IsUseRevereZPerspective());
+            const jRTClearValue RTClearValue = IsUseReverseZShadow ? jRTClearValue(0.0f, 0) : jRTClearValue(1.0f, 0);
 
-    CubeShadowMapPtr = jRenderTargetPool::GetRenderTarget(
-        { ETextureType::TEXTURE_CUBE, ETextureFormat::D16, jPointLight::SM_Width, jPointLight::SM_Height, 6, false, EMSAASamples::COUNT_1,RTClearValue });
-
-    SpotLightShadowMapPtr = jRenderTargetPool::GetRenderTarget(
-        { ETextureType::TEXTURE_2D, ETextureFormat::D16, jSpotLight::SM_Width, jSpotLight::SM_Height, 1, false, EMSAASamples::COUNT_1, RTClearValue });
+            // todo ShadowMap 크기나 스펙을 Light 에서 정의할 수 있게 하는건 어떨까?
+            std::shared_ptr<jRenderTarget> ShadowMapPtr;
+            if (light->Type == ELightType::DIRECTIONAL)
+            {
+                ShadowMapPtr = jRenderTargetPool::GetRenderTarget(
+                    { ETextureType::TEXTURE_2D, ETextureFormat::D16, jDirectionalLight::SM_Width, jDirectionalLight::SM_Height, 1, false, EMSAASamples::COUNT_1, RTClearValue });
+            }
+            else if (light->Type == ELightType::POINT)
+            {
+                ShadowMapPtr = jRenderTargetPool::GetRenderTarget(
+                    { ETextureType::TEXTURE_CUBE, ETextureFormat::D16, jPointLight::SM_Width, jPointLight::SM_Height, 6, false, EMSAASamples::COUNT_1,RTClearValue });
+            }
+            else if (light->Type == ELightType::SPOT)
+            {
+                ShadowMapPtr = jRenderTargetPool::GetRenderTarget(
+                    { ETextureType::TEXTURE_2D, ETextureFormat::D16, jSpotLight::SM_Width, jSpotLight::SM_Height, 1, false, EMSAASamples::COUNT_1, RTClearValue });
+            }
+            LightShadowMapPtr.insert(std::make_pair(light, ShadowMapPtr));
+        }
+    }
 
     for (int32 i = 0; i < _countof(GBuffer); ++i)
     {
@@ -81,12 +99,11 @@ void jSceneRenderTarget::Return()
         DepthPtr->Return();
     if (ResolvePtr)
         ResolvePtr->Return();
-    if (DirectionalLightShadowMapPtr)
-        DirectionalLightShadowMapPtr->Return();
-    if (CubeShadowMapPtr)
-        CubeShadowMapPtr->Return();
-    if (SpotLightShadowMapPtr)
-        SpotLightShadowMapPtr->Return();
+    for(auto it : LightShadowMapPtr)
+    {
+        if (it.second)
+            it.second->Return();
+    }
     if (BloomSetup)
         BloomSetup->Return();
     for (int32 i = 0; i < _countof(DownSample); ++i)
@@ -104,6 +121,16 @@ void jSceneRenderTarget::Return()
         if (GBuffer[i])
             GBuffer[i]->Return();
     }
+}
+
+std::shared_ptr<jRenderTarget> jSceneRenderTarget::GetShadowMap(const jLight* InLight) const
+{
+    auto it_find = LightShadowMapPtr.find(InLight);
+    if (LightShadowMapPtr.end() != it_find)
+    {
+        return it_find->second;
+    }
+    return std::shared_ptr<jRenderTarget>();
 }
 
 jShaderBindingInstance* jSceneRenderTarget::PrepareGBufferShaderBindingInstance(bool InUseAsSubpassInput) const

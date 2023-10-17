@@ -66,9 +66,26 @@ void jPointLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* OutDestD
     jShaderBindingInstanceArray CopyShaderBindingInstances = ShaderBindingInstances;
     CopyShaderBindingInstances.Add(InLightView.ShaderBindingInstance);
 
+    //////////////////////////////////////////////////////////////////////////
+    int32 BindingPoint = 0;
+    jShaderBindingArray ShaderBindingArray;
+    jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
+
+    auto PointLightPushConstant = g_rhi->CreateUniformBufferBlock(
+        jNameStatic("jPointLightPushConstant"), jLifeTimeType::OneFrame, sizeof(jPointLightPushConstant));
+    auto PushConstantData = jPointLightPushConstant(InView->Camera->Projection * InView->Camera->View * (*InLightView.Light->GetLightWorldMatrix()));
+    PointLightPushConstant->UpdateBufferData(&PushConstantData, sizeof(jPointLightPushConstant));
+
+    // todo : 인라인 아닌것도 지원해야 됨
+    ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_GRAPHICS
+        , ResourceInlineAllactor.Alloc<jUniformBufferResource>(PointLightPushConstant), true);
+
+    CopyShaderBindingInstances.Add(g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame));
+    //////////////////////////////////////////////////////////////////////////
+
     check(OutDestDrawCommand);
     new (OutDestDrawCommand) jDrawCommand(InRenderFrameContextPtr, &InLightView, PointLightSphere->RenderObjects[0], InRenderPass
-        , Shader, &PipelineStateFixedInfo, PointLightSphere->RenderObjects[0]->MaterialPtr.get(), ShaderBindingInstances, PushConstant, nullptr, InSubpassIndex);
+        , Shader, &PipelineStateFixedInfo, PointLightSphere->RenderObjects[0]->MaterialPtr.get(), CopyShaderBindingInstances, PushConstant, nullptr, InSubpassIndex);
     OutDestDrawCommand->Test = true;
     OutDestDrawCommand->PrepareToDraw(false);
 }

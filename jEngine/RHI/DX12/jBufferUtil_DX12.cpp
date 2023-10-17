@@ -74,7 +74,7 @@ jBuffer_DX12* CreateBuffer(uint64 InSize, uint16 InAlignment, bool InIsCPUAccess
         }
         else
         {
-            ComPtr<ID3D12Resource> StagingBuffer = CreateBufferInternal(InSize, InAlignment, true, InAllowUAV, InInitialState);
+            ComPtr<ID3D12Resource> StagingBuffer = CreateBufferInternal(InSize, InAlignment, true, InAllowUAV, InInitialState, InResourceName);
             check(StagingBuffer);
 
             void* MappedPointer = nullptr;
@@ -149,15 +149,36 @@ ComPtr<ID3D12Resource> CreateImageInternal(uint32 InWidth, uint32 InHeight, uint
 }
 
 jTexture_DX12* CreateImage(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, uint32 InNumOfSample
-    , ETextureType InType, ETextureFormat InFormat, bool InIsRTV, bool InIsUAV, D3D12_RESOURCE_STATES InResourceState, D3D12_CLEAR_VALUE* InClearValue, const wchar_t* InResourceName)
+    , ETextureType InType, ETextureFormat InFormat, bool InIsRTV, bool InIsUAV, D3D12_RESOURCE_STATES InResourceState, const jRTClearValue& InClearValue, const wchar_t* InResourceName)
 {
+    bool HasClearValue = false;
+    D3D12_CLEAR_VALUE ClearValue{};
+    if (InIsRTV)
+    {
+        if (InClearValue.GetType() == ERTClearType::Color)
+        {
+            ClearValue.Color[0] = InClearValue.GetCleraColor()[0];
+            ClearValue.Color[1] = InClearValue.GetCleraColor()[1];
+            ClearValue.Color[2] = InClearValue.GetCleraColor()[2];
+            ClearValue.Color[3] = InClearValue.GetCleraColor()[3];
+            ClearValue.Format = GetDX12TextureFormat(InFormat);
+        }
+        else if (InClearValue.GetType() == ERTClearType::DepthStencil)
+        {
+            ClearValue.DepthStencil.Depth = InClearValue.GetCleraDepth();
+            ClearValue.DepthStencil.Stencil = InClearValue.GetCleraStencil();
+            ClearValue.Format = GetDX12TextureFormat(InFormat);
+        }
+        HasClearValue = InClearValue.GetType() != ERTClearType::None;
+    }
+
     ComPtr<ID3D12Resource> TextureInternal = CreateImageInternal(InWidth, InHeight, InArrayLayers, InMipLevels, InNumOfSample
-        , GetDX12TextureDemension(InType), GetDX12TextureFormat(InFormat), InIsRTV, InIsUAV, InResourceState, InClearValue, InResourceName);
+        , GetDX12TextureDemension(InType), GetDX12TextureFormat(InFormat), InIsRTV, InIsUAV, InResourceState, (HasClearValue ? &ClearValue : nullptr), InResourceName);
     if (!ensure(TextureInternal))
         return nullptr;
 
     jTexture_DX12* Texture = new jTexture_DX12(InType, InFormat, InWidth, InHeight, InArrayLayers
-        , EMSAASamples::COUNT_1, InMipLevels, false, TextureInternal);
+        , EMSAASamples::COUNT_1, InMipLevels, false, InClearValue, TextureInternal);
     check(Texture);
 
     if (IsDepthFormat(InFormat))

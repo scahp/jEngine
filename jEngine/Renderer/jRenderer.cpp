@@ -54,18 +54,7 @@ void jRenderer::Setup()
         {
             if (ViewLight.Light->IsShadowCaster)
             {
-                switch (ViewLight.Light->Type)
-                {
-                case ELightType::DIRECTIONAL:
-                    ViewLight.ShadowMapPtr = RenderFrameContextPtr->SceneRenderTarget->DirectionalLightShadowMapPtr;
-                    break;
-                case ELightType::POINT:
-                    ViewLight.ShadowMapPtr = RenderFrameContextPtr->SceneRenderTarget->CubeShadowMapPtr;
-                    break;
-                case ELightType::SPOT:
-                    ViewLight.ShadowMapPtr = RenderFrameContextPtr->SceneRenderTarget->SpotLightShadowMapPtr;
-                    break;
-                }
+                ViewLight.ShadowMapPtr = RenderFrameContextPtr->SceneRenderTarget->GetShadowMap(ViewLight.Light);
             }
 
             ViewLight.ShaderBindingInstance = ViewLight.Light->PrepareShaderBindingInstance(ViewLight.ShadowMapPtr ? ViewLight.ShadowMapPtr->GetTexture() : nullptr);
@@ -221,8 +210,11 @@ void jRenderer::SetupShadowPass()
                 // todo : Masked material need to set Material for jDrawCommand
                 // iter->MaterialPtr;
 
+                const bool ShouldUseOnePassPointLightShadow = (ViewLight.Light->Type == ELightType::POINT);
+                const jVertexBuffer* OverrideInstanceData = (ShouldUseOnePassPointLightShadow ? jRHI::CubeMapInstanceDataForSixFace : nullptr);
+
                 new (&ShadowPasses.DrawCommands[i]) jDrawCommand(RenderFrameContextPtr, &ShadowPasses.ViewLight, iter, ShadowPasses.ShadowMapRenderPass
-                    , (iter->HasInstancing() ? ShadowInstancingShader : ShadowShader), &ShadpwPipelineStateFixed, Material, {}, nullptr);
+                    , (iter->HasInstancing() ? ShadowInstancingShader : ShadowShader), &ShadpwPipelineStateFixed, Material, {}, nullptr, OverrideInstanceData);
                 ShadowPasses.DrawCommands[i].PrepareToDraw(true);
                 ++i;
             }
@@ -529,7 +521,7 @@ void jRenderer::ShadowPass()
             ShadowPasses.ShadowMapRenderPass->EndRenderPass();
         }
 
-        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_READ_ONLY);
+        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), ShadowMapPtr->GetTexture(), EImageLayout::SHADER_READ_ONLY);
     }
 }
 

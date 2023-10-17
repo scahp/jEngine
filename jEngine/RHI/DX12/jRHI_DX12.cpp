@@ -28,6 +28,7 @@
 #include "jRenderFrameContext_DX12.h"
 #include "jPrimitiveUtil.h"
 #include "Scene/jRenderObject.h"
+#include "Scene/Light/jLight.h"
 
 #define USE_INLINE_DESCRIPTOR 0												// InlineDescriptor 를 쓸것인지? DescriptorTable 를 쓸것인지 여부
 #define USE_ONE_FRAME_BUFFER_AND_DESCRIPTOR (USE_INLINE_DESCRIPTOR && 1)	// 현재 프레임에만 사용하고 버리는 임시 Descriptor 와 Buffer 를 사용할 것인지 여부
@@ -637,6 +638,38 @@ bool jRHI_DX12::InitRHI()
 	D3D12_FEATURE_DATA_D3D12_OPTIONS5 featureSupportData{};
 	if (JFAIL(Device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &featureSupportData, sizeof(featureSupportData))))
 		return false;
+
+    // Create InstanceVertexBuffer for cube map six face
+    // todo : It will be removed, when I have a system that can generate per instance data for visible faces
+    {
+        struct jFaceInstanceData
+        {
+            uint32 LayerIndex = 0;
+        };
+        jFaceInstanceData instanceData[6];
+        for (int32 i = 0; i < _countof(instanceData); ++i)
+        {
+            instanceData[i].LayerIndex = i;
+        }
+
+        auto streamParam = std::make_shared<jStreamParam<jFaceInstanceData>>();
+        streamParam->BufferType = EBufferType::STATIC;
+        streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::UINT32, sizeof(uint32)));
+        streamParam->Stride = sizeof(jFaceInstanceData);
+        //streamParam->Name = jName("LayerIndex");
+        streamParam->Name = jName("BLENDINDICES");
+        streamParam->Data.resize(6);
+        memcpy(&streamParam->Data[0], instanceData, sizeof(instanceData));
+
+        auto VertexStream_InstanceData = std::make_shared<jVertexStreamData>();
+        VertexStream_InstanceData->ElementCount = _countof(instanceData);
+        VertexStream_InstanceData->StartLocation = 1;
+        VertexStream_InstanceData->BindingIndex = 1;
+        VertexStream_InstanceData->VertexInputRate = EVertexInputRate::INSTANCE;
+        VertexStream_InstanceData->Params.push_back(streamParam);
+        CubeMapInstanceDataForSixFace = g_rhi->CreateVertexBuffer(VertexStream_InstanceData);
+    }
+
 	/*
     const int32 slice = 100;
     const int32 verticesCount = ((slice + 1) * (slice / 2) + 2);
@@ -1898,7 +1931,7 @@ std::shared_ptr<jRenderFrameContext> jRHI_DX12::BeginRenderFrame()
     renderFrameContextPtr->UseForwardRenderer = !gOptions.UseDeferredRenderer;
     renderFrameContextPtr->FrameIndex = CurrentFrameIndex;
     renderFrameContextPtr->SceneRenderTarget = new jSceneRenderTarget();
-    renderFrameContextPtr->SceneRenderTarget->Create(Swapchain->GetSwapchainImage(CurrentFrameIndex));
+    renderFrameContextPtr->SceneRenderTarget->Create(Swapchain->GetSwapchainImage(CurrentFrameIndex), &jLight::GetLights());
 
 	return renderFrameContextPtr;
 }
@@ -2090,25 +2123,8 @@ std::shared_ptr<jRenderTarget> jRHI_DX12::CreateRenderTarget(const jRenderTarget
 {
     const uint16 MipLevels = info.IsGenerateMipmap ? static_cast<uint32>(std::floor(std::log2(std::max<int>(info.Width, info.Height)))) + 1 : 1;
     
-    D3D12_CLEAR_VALUE ClearValue{};
-    if (info.RTClearValue.GetType() == ERTClearType::Color)
-    {
-        ClearValue.Color[0] = info.RTClearValue.GetCleraColor()[0];
-        ClearValue.Color[1] = info.RTClearValue.GetCleraColor()[1];
-        ClearValue.Color[2] = info.RTClearValue.GetCleraColor()[2];
-        ClearValue.Color[3] = info.RTClearValue.GetCleraColor()[3];
-        ClearValue.Format = GetDX12TextureFormat(info.Format);
-    }
-    else if (info.RTClearValue.GetType() == ERTClearType::DepthStencil)
-    {
-        ClearValue.DepthStencil.Depth = info.RTClearValue.GetCleraDepth();
-        ClearValue.DepthStencil.Stencil = info.RTClearValue.GetCleraStencil();
-        ClearValue.Format = GetDX12TextureFormat(info.Format);
-    }
-    const bool HasClearValue = info.RTClearValue.GetType() != ERTClearType::None;
-    
     jTexture_DX12* Texture = jBufferUtil_DX12::CreateImage(info.Width, info.Height, info.LayerCount, MipLevels, (uint32)info.SampleCount, info.Type, info.Format
-        , true, false, D3D12_RESOURCE_STATE_COMMON, (HasClearValue ? &ClearValue : nullptr));
+        , true, false, D3D12_RESOURCE_STATE_COMMON, info.RTClearValue);
 
     auto rt = new jRenderTarget();
     check(rt);

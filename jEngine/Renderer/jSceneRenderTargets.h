@@ -11,9 +11,7 @@ struct jSceneRenderTarget
     
     std::shared_ptr<jRenderTarget> GBuffer[3];
 
-    std::shared_ptr<jRenderTarget> DirectionalLightShadowMapPtr;
-    std::shared_ptr<jRenderTarget> CubeShadowMapPtr;
-    std::shared_ptr<jRenderTarget> SpotLightShadowMapPtr;
+    std::map<const jLight*, std::shared_ptr<jRenderTarget>> LightShadowMapPtr;
 
     std::shared_ptr<jRenderTarget> FinalColorPtr;
 
@@ -21,7 +19,8 @@ struct jSceneRenderTarget
     std::shared_ptr<jRenderTarget> DownSample[3];
     std::shared_ptr<jRenderTarget> UpSample[3];
 
-    void Create(const jSwapchainImage* image);
+    void Create(const jSwapchainImage* InSwapchain, const std::vector<jLight*>* InLights = nullptr);
     void Return();
+    std::shared_ptr<jRenderTarget> GetShadowMap(const jLight* InLight) const;
     jShaderBindingInstance* PrepareGBufferShaderBindingInstance(bool InUseAsSubpassInput) const;
 };

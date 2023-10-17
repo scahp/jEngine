@@ -82,7 +82,7 @@ bool jSwapchain_DX12::Create()
         Images[i] = SwapchainImage;        
 
         auto TextureDX12Ptr = std::make_shared<jTexture_DX12>(
-            ETextureType::TEXTURE_2D, Format, Extent.x, Extent.y, 1, EMSAASamples::COUNT_1, 1, false, renderTarget);
+            ETextureType::TEXTURE_2D, Format, Extent.x, Extent.y, 1, EMSAASamples::COUNT_1, 1, false, jRTClearValue::Invalid, renderTarget);
         SwapchainImage->TexturePtr = TextureDX12Ptr;
 
         jBufferUtil_DX12::CreateRenderTargetView((jTexture_DX12*)SwapchainImage->TexturePtr.get());

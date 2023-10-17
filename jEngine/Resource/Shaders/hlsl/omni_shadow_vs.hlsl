@@ -6,14 +6,16 @@ cbuffer RenderObjectParam : register(b1,space0) { RenderObjectUniformBuffer Rend
 struct VSInput
 {
     [[vk::location(0)]] float3 Position : POSITION0;
-    [[vk::location(1)]] min16uint LayerIndex : TEXCOORD0;
+    //[[vk::location(1)]] min16uint LayerIndex : TEXCOORD0;
+    [[vk::location(1)]] uint LayerIndex : BLENDINDICES0;
 };
 
 struct VSOutput
 {
     float4 Pos : SV_POSITION;
     float4 WorldPos : TEXCOORD0;
-    min16uint LayerIndex : SV_RenderTargetArrayIndex;
+    //min16uint LayerIndex : SV_RenderTargetArrayIndex;
+    uint LayerIndex : SV_RenderTargetArrayIndex;
 };
 
 VSOutput main(VSInput input)

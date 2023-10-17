@@ -12,7 +12,9 @@ struct PushConsts
 {
     float4x4 MVP;
 };
-[[vk::push_constant]] PushConsts pushConsts;
+//[[vk::push_constant]] PushConsts pushConsts;
+
+cbuffer PushConsts : register(b2, space0) { PushConsts pushConsts; }
 
 struct VSInput
 {
@@ -21,7 +23,7 @@ struct VSInput
     [[vk::location(0)]] float3 Position : POSITION0;
     [[vk::location(1)]] float4 Color : COLOR0;
     [[vk::location(2)]] float3 Normal : NORMAL0;
-    [[vk::location(3)]] float3 Tangent : NORMAL1;
+    //[[vk::location(3)]] float3 Tangent : NORMAL1;
     [[vk::location(4)]] float2 TexCoord : TEXCOORD0;
 };
 
