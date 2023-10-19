@@ -40,7 +40,7 @@ uint64 jFence_DX12::SignalWithNextFenceValue(ID3D12CommandQueue* InCommandQueue,
     if (JFAIL(InCommandQueue->Signal(Fence.Get(), NewFenceValue)))
         return NewFenceValue;
 
-    ++LastFenceValue;
+    LastFenceValue = NewFenceValue;
     JFAIL(Fence->SetEventOnCompletion(NewFenceValue, FenceEvent));
     if (bWaitUntilExecuteComplete)
     {

@@ -37,7 +37,7 @@ jCamera* jSpotLight::GetLightCamra(int index /*= 0*/) const
     return Camera;
 }
 
-jShaderBindingInstance* jSpotLight::PrepareShaderBindingInstance(jTexture* InShadowMap)
+const std::shared_ptr<jShaderBindingInstance>& jSpotLight::PrepareShaderBindingInstance(jTexture* InShadowMap)
 {
     if (LastUsedShadowMap != InShadowMap)
     {

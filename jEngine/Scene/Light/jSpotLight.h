@@ -54,7 +54,7 @@ public:
     virtual IUniformBufferBlock* GetUniformBufferBlock() const override { return LightDataUniformBlock; }
     virtual jCamera* GetLightCamra(int index = 0) const;
     virtual const Matrix* GetLightWorldMatrix() const override;
-    virtual jShaderBindingInstance* PrepareShaderBindingInstance(jTexture* InShadowMap) override;
+    virtual const std::shared_ptr<jShaderBindingInstance>& PrepareShaderBindingInstance(jTexture* InShadowMap) override;
     virtual bool IsUseRevereZPerspective() const { return true; }
 
     FORCEINLINE const jSpotLightUniformBufferData& GetLightData() const { return LightData; }
@@ -62,7 +62,7 @@ public:
     jCamera* Camera = nullptr;
     Matrix LightWorldMatrix;
 
-    jShaderBindingInstance* ShaderBindingInstance = nullptr;
+    std::shared_ptr<jShaderBindingInstance> ShaderBindingInstance;
     bool IsNeedToUpdateShaderBindingInstance = true;                // 위치가 달라지는 경우도 업데이트 되도록... 업데이트 규칙을 좀 만들어야 함
     jTexture* LastUsedShadowMap = nullptr;
 

@@ -433,7 +433,8 @@ void jRHI_DX12::WaitForGPU()
 	if (Queue && Swapchain)
 	{
 		jSwapchainImage_DX12* CurrentSwapchainImage = (jSwapchainImage_DX12*)Swapchain->GetSwapchainImage(CurrentFrameIndex);
-		Swapchain->Fence->SignalWithNextFenceValue(Queue.Get(), true);
+        if (ensure(Swapchain->Fence))
+		    Swapchain->Fence->SignalWithNextFenceValue(Queue.Get(), true);
 	}
 }
 
@@ -1930,8 +1931,8 @@ std::shared_ptr<jRenderFrameContext> jRHI_DX12::BeginRenderFrame()
     auto renderFrameContextPtr = std::make_shared<jRenderFrameContext_DX12>(commandBuffer);
     renderFrameContextPtr->UseForwardRenderer = !gOptions.UseDeferredRenderer;
     renderFrameContextPtr->FrameIndex = CurrentFrameIndex;
-    renderFrameContextPtr->SceneRenderTarget = new jSceneRenderTarget();
-    renderFrameContextPtr->SceneRenderTarget->Create(Swapchain->GetSwapchainImage(CurrentFrameIndex), &jLight::GetLights());
+    renderFrameContextPtr->SceneRenderTargetPtr = std::make_shared<jSceneRenderTarget>();
+    renderFrameContextPtr->SceneRenderTargetPtr->Create(Swapchain->GetSwapchainImage(CurrentFrameIndex), &jLight::GetLights());
 
 	return renderFrameContextPtr;
 }
@@ -1946,7 +1947,6 @@ void jRHI_DX12::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& rende
     g_rhi->TransitionImageLayout(CommandBuffer, SwapchainImage->TexturePtr.get(), EImageLayout::PRESENT_SRC);
 
 	CommandBufferManager->ExecuteCommandList(CommandBuffer);
-	CommandBufferManager->ReturnCommandBuffer(CommandBuffer);
 
     jSwapchainImage_DX12* CurrentSwapchainImage = (jSwapchainImage_DX12*)Swapchain->GetSwapchainImage(CurrentFrameIndex);
 	CurrentSwapchainImage->CommandBufferFence = CommandBuffer->Fence;
@@ -1963,6 +1963,8 @@ void jRHI_DX12::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& rende
         // 이렇게 하는 것은 렌더링 한 프레임 중 화면에 나오지 못하는 프레임의 cycle을 아끼기 위해서임.
         hr = Swapchain->SwapChain->Present(1, 0);
     }
+
+    ensure(hr == S_OK);
 
 	// CurrentFrameIndex = (CurrentFrameIndex + 1) % Swapchain->Images.size();
     CurrentFrameIndex = Swapchain->GetCurrentBackBufferIndex();
@@ -2041,7 +2043,7 @@ jIndexBuffer* jRHI_DX12::CreateIndexBuffer(const std::shared_ptr<jIndexStreamDat
     return indexBuffer;
 }
 
-jShaderBindingInstance* jRHI_DX12::CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const
+std::shared_ptr<jShaderBindingInstance> jRHI_DX12::CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const
 {
     auto shaderBindingsLayout = CreateShaderBindings(InShaderBindingArray);
     check(shaderBindingsLayout);

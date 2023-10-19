@@ -37,7 +37,7 @@ const jCamera* jDirectionalLight::GetLightCamra(int32 index) const
     return Camera;
 }
 
-jShaderBindingInstance* jDirectionalLight::PrepareShaderBindingInstance(jTexture* InShadowMap)
+const std::shared_ptr<jShaderBindingInstance>& jDirectionalLight::PrepareShaderBindingInstance(jTexture* InShadowMap)
 {
     if (LastUsedShadowMap != InShadowMap)
     {

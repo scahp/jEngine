@@ -30,7 +30,7 @@ struct jShaderBindingsLayout_DX12 : public jShaderBindingsLayout
     virtual ~jShaderBindingsLayout_DX12() {}
 
     virtual bool Initialize(const jShaderBindingArray& InShaderBindingArray) override;
-    virtual jShaderBindingInstance* CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const override;
+    virtual std::shared_ptr<jShaderBindingInstance> CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const override;
 
     //virtual void* GetHandle() const { return RootSignature.Get(); }
     virtual void* GetHandle() const { return nullptr; }

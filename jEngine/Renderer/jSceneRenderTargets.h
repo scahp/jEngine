@@ -22,5 +22,5 @@ struct jSceneRenderTarget
     void Create(const jSwapchainImage* InSwapchain, const std::vector<jLight*>* InLights = nullptr);
     void Return();
     std::shared_ptr<jRenderTarget> GetShadowMap(const jLight* InLight) const;
-    jShaderBindingInstance* PrepareGBufferShaderBindingInstance(bool InUseAsSubpassInput) const;
+    std::shared_ptr<jShaderBindingInstance> PrepareGBufferShaderBindingInstance(bool InUseAsSubpassInput) const;
 };

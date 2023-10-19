@@ -36,7 +36,7 @@ void jPointLight::Initialize(const Vector& InPos, const Vector& InColor, float I
     Camera[5] = jCamera::CreateCamera(InPos, InPos + Vector(0.0f, 0.0f, -1.0f),    InPos + Vector(0.0f, 1.0f, 0.0f), FOV, SM_NearDist, SM_FarDist, SM_Width, SM_Height, true);
 }
 
-jShaderBindingInstance* jPointLight::PrepareShaderBindingInstance(jTexture* InShadowMap)
+const std::shared_ptr<jShaderBindingInstance>& jPointLight::PrepareShaderBindingInstance(jTexture* InShadowMap)
 {
     if (LastUsedShadowMap != InShadowMap)
     {

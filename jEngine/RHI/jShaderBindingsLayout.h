@@ -146,6 +146,8 @@ struct jShaderBindingArray
     template <typename... T>
     void Add(T... args)
     {
+        static_assert(std::is_trivially_copyable<jShaderBinding>::value, "jShaderBinding should be trivially copyable");
+
         check(NumOfInlineData > NumOfData);
         const int32 AddressOffset = (NumOfData) * sizeof(jShaderBinding);
         new (&Data[0] + AddressOffset) jShaderBinding(args...);
@@ -255,6 +257,7 @@ private:
     jShaderBindingInstanceType Type = jShaderBindingInstanceType::SingleFrame;
 };
 
+// todo : MemStack for jShaderBindingInstanceArray to allocate fast memory
 using jShaderBindingInstanceArray = jResourceContainer<const jShaderBindingInstance*>;
 
 struct jShaderBindingsLayout
@@ -262,7 +265,7 @@ struct jShaderBindingsLayout
     virtual ~jShaderBindingsLayout() {}
 
     virtual bool Initialize(const jShaderBindingArray& InShaderBindingArray) { return false; }
-    virtual jShaderBindingInstance* CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const { return nullptr; }
+    virtual std::shared_ptr<jShaderBindingInstance> CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const { return nullptr; }
     virtual size_t GetHash() const;
     virtual const jShaderBindingArray& GetShaderBindingsLayout() const { return ShaderBindingArray; }
     virtual void* GetHandle() const { return nullptr; }

@@ -45,7 +45,7 @@ void jDrawCommand::PrepareToDraw(bool InIsPositionOnly)
         // GetShaderBindings
         if (IsViewLight)
         {
-            ShaderBindingInstanceArray.Add(ViewLight->ShaderBindingInstance);
+            ShaderBindingInstanceArray.Add(ViewLight->ShaderBindingInstance.get());
         }
         else if (View)
         {
@@ -53,12 +53,12 @@ void jDrawCommand::PrepareToDraw(bool InIsPositionOnly)
         }
     
         // GetShaderBindings
-        jShaderBindingInstance* OneRenderObjectUniformBuffer = RenderObject->CreateShaderBindingInstance();
-        ShaderBindingInstanceArray.Add(OneRenderObjectUniformBuffer);
+        OneRenderObjectUniformBuffer = RenderObject->CreateShaderBindingInstance();
+        ShaderBindingInstanceArray.Add(OneRenderObjectUniformBuffer.get());
 
         if (Material)
         {
-            ShaderBindingInstanceArray.Add(Material->CreateShaderBindingInstance());
+            ShaderBindingInstanceArray.Add(Material->CreateShaderBindingInstance().get());
         }
     }
 

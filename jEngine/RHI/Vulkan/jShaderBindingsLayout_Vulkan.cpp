@@ -40,7 +40,7 @@ bool jShaderBindingsLayout_Vulkan::Initialize(const jShaderBindingArray& InShade
     return true;
 }
 
-jShaderBindingInstance* jShaderBindingsLayout_Vulkan::CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const
+std::shared_ptr<jShaderBindingInstance> jShaderBindingsLayout_Vulkan::CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const
 {
     jDescriptorPool_Vulkan* DescriptorPool = nullptr;
     switch (InType)
@@ -66,7 +66,7 @@ jShaderBindingInstance* jShaderBindingsLayout_Vulkan::CreateShaderBindingInstanc
     DescriptorSet->ShaderBindingsLayouts = this;
     DescriptorSet->Initialize(InShaderBindingArray);
     DescriptorSet->SetType(InType);
-    return DescriptorSet;
+    return std::shared_ptr<jShaderBindingInstance>(DescriptorSet);
 }
 
 size_t jShaderBindingsLayout_Vulkan::GetHash() const

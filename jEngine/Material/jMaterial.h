@@ -34,7 +34,7 @@ public:
 
     TextureData TexData[static_cast<int32>(EMaterialTextureType::Max)];
 
-    jShaderBindingInstance* CreateShaderBindingInstance();
-    jShaderBindingInstance* ShaderBindingInstance = nullptr;
+    const std::shared_ptr<jShaderBindingInstance>& CreateShaderBindingInstance();
+    std::shared_ptr<jShaderBindingInstance> ShaderBindingInstance = nullptr;
     mutable bool NeedToUpdateShaderBindingInstance = true;
 };

@@ -2,7 +2,7 @@
 #include "jMaterial.h"
 #include "RHI/jRHI.h"
 
-jShaderBindingInstance* jMaterial::CreateShaderBindingInstance()
+const std::shared_ptr<jShaderBindingInstance>& jMaterial::CreateShaderBindingInstance()
 {
     if (NeedToUpdateShaderBindingInstance)
     {

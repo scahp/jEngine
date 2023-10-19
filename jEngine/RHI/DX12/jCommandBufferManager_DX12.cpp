@@ -3,18 +3,32 @@
 
 bool jCommandBuffer_DX12::Begin() const
 {
+    ensure(OnlineDescriptorHeap && OnlineSamplerDescriptorHeap || (!OnlineDescriptorHeap && !OnlineSamplerDescriptorHeap));
+    if (OnlineDescriptorHeap && OnlineSamplerDescriptorHeap)
+    {
+        ID3D12DescriptorHeap* ppHeaps[] =
+        {
+            OnlineDescriptorHeap->GetHeap(),
+            OnlineSamplerDescriptorHeap->GetHeap()
+        };
+        CommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+    }
+
     return true;
 }
 
 void jCommandBuffer_DX12::Reset() const
 {
-    CommandAllocator->Reset();
-    CommandList->Reset(CommandAllocator.Get(), nullptr);
-    if (OnlineDescriptorHeap)
-        OnlineDescriptorHeap->Reset();
-    if (OnlineSamplerDescriptorHeap)
-        OnlineSamplerDescriptorHeap->Reset();
-    IsClosed = false;
+    if (IsClosed)
+    {
+        CommandAllocator->Reset();
+        CommandList->Reset(CommandAllocator.Get(), nullptr);
+        if (OnlineDescriptorHeap)
+            OnlineDescriptorHeap->Reset();
+        if (OnlineSamplerDescriptorHeap)
+            OnlineSamplerDescriptorHeap->Reset();
+        IsClosed = false;
+    }
 }
 
 void* jCommandBuffer_DX12::GetFenceHandle() const
@@ -83,15 +97,6 @@ jCommandBuffer_DX12* jCommandBufferManager_DX12::GetOrCreateCommandBuffer()
         check(SelectedCmdBuffer);
     }
 
-    if (D3D12_COMMAND_LIST_TYPE_COPY != CommandListType)
-    {
-        ID3D12DescriptorHeap* ppHeaps[] =
-        {
-            SelectedCmdBuffer->OnlineDescriptorHeap->GetHeap(),
-            SelectedCmdBuffer->OnlineSamplerDescriptorHeap->GetHeap()
-        };
-        SelectedCmdBuffer->CommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
-    }
     UsingCommandBuffers.push_back(SelectedCmdBuffer);
 
     return SelectedCmdBuffer;
@@ -139,7 +144,8 @@ void jCommandBufferManager_DX12::ExecuteCommandList(jCommandBuffer_DX12* InComma
 
     ID3D12CommandList* pCommandLists[] = { InCommandList->Get() };
     CommandQueue->ExecuteCommandLists(1, pCommandLists);
-    InCommandList->Fence->SignalWithNextFenceValue(CommandQueue.Get(), bWaitUntilExecuteComplete);
+    if (ensure(InCommandList->Fence))
+        InCommandList->Fence->SignalWithNextFenceValue(CommandQueue.Get(), bWaitUntilExecuteComplete);
 }
 
 jCommandBuffer_DX12* jCommandBufferManager_DX12::CreateCommandList() const

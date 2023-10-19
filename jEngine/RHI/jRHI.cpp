@@ -195,7 +195,7 @@ void jView::PrepareViewUniformBufferShaderBindingInstance()
 
 void jView::GetShaderBindingInstance(jShaderBindingInstanceArray& OutShaderBindingInstanceArray, bool InIsForwardRenderer) const
 {
-	OutShaderBindingInstanceArray.Add(ViewUniformBufferShaderBindingInstance);
+	OutShaderBindingInstanceArray.Add(ViewUniformBufferShaderBindingInstance.get());
 
 	// Get light uniform buffers
 	if (InIsForwardRenderer)
@@ -206,7 +206,7 @@ void jView::GetShaderBindingInstance(jShaderBindingInstanceArray& OutShaderBindi
 			if (ViewLight.Light)
 			{
 				check(ViewLight.ShaderBindingInstance);
-				OutShaderBindingInstanceArray.Add(ViewLight.ShaderBindingInstance);
+				OutShaderBindingInstanceArray.Add(ViewLight.ShaderBindingInstance.get());
 			}
 		}
 	}

@@ -7,7 +7,15 @@ struct jResourceContainer
     jResourceContainer<T, NumOfInlineData>() = default;
     jResourceContainer<T, NumOfInlineData>(const jResourceContainer<T, NumOfInlineData>& InData)
     {
-        memcpy(&Data[0], &InData.Data[0], sizeof(jResourceContainer<T, NumOfInlineData>));
+        if constexpr (std::is_trivially_copyable<T>::value)
+        {
+            memcpy(&Data[0], &InData.Data[0], sizeof(T) * InData.NumOfData);
+        }
+        else
+        {
+            for (int32 i = 0; i < InData.NumOfData; ++i)
+                Data[i] = InData[i];
+        }
         NumOfData = InData.NumOfData;
     }
 
@@ -24,7 +32,15 @@ struct jResourceContainer
         check(NumOfInlineData > (NumOfData + InCount));
         check(InElementAddress);
 
-        memcpy(&Data[NumOfData], InElementAddress, InCount * sizeof(T));
+        if constexpr (std::is_trivially_copyable<T>::value)
+        {
+            memcpy(&Data[NumOfData], InElementAddress, InCount * sizeof(T));
+        }
+        else
+        {
+            for (int32 i = 0; i < InCount; ++i)
+                Data[NumOfData + i] = *((T*)InElementAddress[i]);
+        }
         NumOfData += InCount;
     }
 
@@ -68,10 +84,18 @@ struct jResourceContainer
         NumOfData = 0;
     }
 
-    FORCEINLINE jResourceContainer<T, NumOfInlineData>& operator = (const jResourceContainer<T, NumOfInlineData>& In)
+    FORCEINLINE jResourceContainer<T, NumOfInlineData>& operator = (const jResourceContainer<T, NumOfInlineData>& InData)
     {
-        memcpy(&Data[0], &In.Data[0], sizeof(uint8));
-        NumOfData = In.NumOfData;
+        if constexpr (std::is_trivially_copyable<T>::value)
+        {
+            memcpy(&Data[0], &InData.Data[0], sizeof(T) * InData.NumOfData);
+        }
+        else
+        {
+            for (int32 i = 0; i < InData.NumOfData; ++i)
+                Data[i] = InData[i];
+        }
+        NumOfData = InData.NumOfData;
         return *this;
     }
 

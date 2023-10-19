@@ -182,7 +182,7 @@ const std::vector<float>& jRenderObject::GetVertices() const
 	return s_emtpy;
 }
 
-jShaderBindingInstance* jRenderObject::CreateShaderBindingInstance()
+const std::shared_ptr<jShaderBindingInstance>& jRenderObject::CreateShaderBindingInstance()
 {
     // Special code for PBR test
     if (LastMetallic != gOptions.Metallic || LastRoughness != gOptions.Roughness)

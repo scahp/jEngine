@@ -133,7 +133,7 @@ std::shared_ptr<jRenderTarget> jSceneRenderTarget::GetShadowMap(const jLight* In
     return std::shared_ptr<jRenderTarget>();
 }
 
-jShaderBindingInstance* jSceneRenderTarget::PrepareGBufferShaderBindingInstance(bool InUseAsSubpassInput) const
+std::shared_ptr<jShaderBindingInstance> jSceneRenderTarget::PrepareGBufferShaderBindingInstance(bool InUseAsSubpassInput) const
 {
     int32 BindingPoint = 0;
     jShaderBindingArray ShaderBindingArray;

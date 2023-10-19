@@ -64,24 +64,25 @@ void jPointLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* OutDestD
     Shader.PixelShader = jShaderPointLightPixelShader::CreateShader(ShaderPermutation);
 
     jShaderBindingInstanceArray CopyShaderBindingInstances = ShaderBindingInstances;
-    CopyShaderBindingInstances.Add(InLightView.ShaderBindingInstance);
+    CopyShaderBindingInstances.Add(InLightView.ShaderBindingInstance.get());
 
     //////////////////////////////////////////////////////////////////////////
     int32 BindingPoint = 0;
     jShaderBindingArray ShaderBindingArray;
     jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
 
-    auto PointLightPushConstant = g_rhi->CreateUniformBufferBlock(
-        jNameStatic("jPointLightPushConstant"), jLifeTimeType::OneFrame, sizeof(jPointLightPushConstant));
+    UniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
+        jNameStatic("jPointLightPushConstant"), jLifeTimeType::OneFrame, sizeof(jPointLightPushConstant)));
     auto PushConstantData = jPointLightPushConstant(InView->Camera->Projection * InView->Camera->View * (*InLightView.Light->GetLightWorldMatrix()));
-    PointLightPushConstant->UpdateBufferData(&PushConstantData, sizeof(jPointLightPushConstant));
+    UniformBuffer->UpdateBufferData(&PushConstantData, sizeof(jPointLightPushConstant));
 
     // todo : 인라인 아닌것도 지원해야 됨
     ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_GRAPHICS
-        , ResourceInlineAllactor.Alloc<jUniformBufferResource>(PointLightPushConstant), true);
+        , ResourceInlineAllactor.Alloc<jUniformBufferResource>(UniformBuffer.get()), true);
 
-    CopyShaderBindingInstances.Add(g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame));
-    //////////////////////////////////////////////////////////////////////////
+    ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
+    CopyShaderBindingInstances.Add(ShaderBindingInstance.get());
+    ////////////////////////////////////////////////////////////////////////////
 
     check(OutDestDrawCommand);
     new (OutDestDrawCommand) jDrawCommand(InRenderFrameContextPtr, &InLightView, PointLightSphere->RenderObjects[0], InRenderPass

@@ -166,18 +166,19 @@ public:
 	jScopedProfile_GPU(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jName& name)
 		: RenderFrameContextPtr(InRenderFrameContext)
 	{
-		Profile.Name = jPriorityName(name, s_priority.fetch_add(1));
-        Profile.Indent = ScopedProfilerGPUIndent.fetch_add(1);
-        
-		Profile.Query = jQueryTimePool::GetQueryTime();
-		Profile.Query->BeginQuery(InRenderFrameContext->GetActiveCommandBuffer());
+		// todo : 메모리 소멸위치를 처리 해줘야 함.
+		//Profile.Name = jPriorityName(name, s_priority.fetch_add(1));
+  //      Profile.Indent = ScopedProfilerGPUIndent.fetch_add(1);
+  //      
+		//Profile.Query = jQueryTimePool::GetQueryTime();
+		//Profile.Query->BeginQuery(InRenderFrameContext->GetActiveCommandBuffer());
 	}
 
 	~jScopedProfile_GPU()
 	{
-		Profile.Query->EndQuery(RenderFrameContextPtr.lock()->GetActiveCommandBuffer());
-		jProfile_GPU::WatingResultList[jProfile_GPU::CurrentWatingResultListIndex].emplace_back(Profile);
-		ScopedProfilerGPUIndent.fetch_add(-1);
+		//Profile.Query->EndQuery(RenderFrameContextPtr.lock()->GetActiveCommandBuffer());
+		//jProfile_GPU::WatingResultList[jProfile_GPU::CurrentWatingResultListIndex].emplace_back(Profile);
+		//ScopedProfilerGPUIndent.fetch_add(-1);
 	}
 
 	std::weak_ptr<jRenderFrameContext> RenderFrameContextPtr;

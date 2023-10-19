@@ -60,7 +60,7 @@ void jDirectionalLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* Ou
     Shader.PixelShader = jShaderDirectionalLightPixelShader::CreateShader(ShaderPermutation);
 
     jShaderBindingInstanceArray CopyShaderBindingInstances = ShaderBindingInstances;
-    CopyShaderBindingInstances.Add(InLightView.ShaderBindingInstance);
+    CopyShaderBindingInstances.Add(InLightView.ShaderBindingInstance.get());
 
     check(OutDestDrawCommand);
     new (OutDestDrawCommand) jDrawCommand(InRenderFrameContextPtr, &InLightView, GlobalFullscreenPrimitive->RenderObjects[0], InRenderPass

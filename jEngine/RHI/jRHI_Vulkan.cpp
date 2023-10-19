@@ -1028,7 +1028,7 @@ jShaderBindingsLayout* jRHI_Vulkan::CreateShaderBindings(const jShaderBindingArr
 	}
 }
 
-jShaderBindingInstance* jRHI_Vulkan::CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const
+std::shared_ptr<jShaderBindingInstance> jRHI_Vulkan::CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const
 {
 	auto shaderBindingsLayout = CreateShaderBindings(InShaderBindingArray);
 	check(shaderBindingsLayout);
@@ -1178,8 +1178,8 @@ std::shared_ptr<jRenderFrameContext> jRHI_Vulkan::BeginRenderFrame()
     auto renderFrameContextPtr = std::make_shared<jRenderFrameContext_Vulkan>(commandBuffer);
 	renderFrameContextPtr->UseForwardRenderer = !gOptions.UseDeferredRenderer;
 	renderFrameContextPtr->FrameIndex = CurrentFrameIndex;
-	renderFrameContextPtr->SceneRenderTarget = new jSceneRenderTarget();
-	renderFrameContextPtr->SceneRenderTarget->Create(Swapchain->GetSwapchainImage(CurrentFrameIndex));
+	renderFrameContextPtr->SceneRenderTargetPtr = std::make_shared<jSceneRenderTarget>();
+	renderFrameContextPtr->SceneRenderTargetPtr->Create(Swapchain->GetSwapchainImage(CurrentFrameIndex));
 	renderFrameContextPtr->CurrentWaitSemaphore = Swapchain->Images[CurrentFrameIndex]->Available;
 
 	return renderFrameContextPtr;

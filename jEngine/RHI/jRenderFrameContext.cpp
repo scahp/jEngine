@@ -24,11 +24,10 @@ bool jRenderFrameContext::EndActiveCommandBuffer()
 
 void jRenderFrameContext::Destroy()
 {
-    if (SceneRenderTarget)
+    if (SceneRenderTargetPtr)
     {
-        SceneRenderTarget->Return();
-        delete SceneRenderTarget;
-        SceneRenderTarget = nullptr;
+        SceneRenderTargetPtr->Return();
+        SceneRenderTargetPtr.reset();
     }
 
     if (CommandBuffer)

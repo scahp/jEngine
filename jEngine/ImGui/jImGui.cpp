@@ -461,7 +461,7 @@ void jImGUI_Vulkan::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFra
         const auto& extent = g_rhi_vk->Swapchain->GetExtent();
         const auto& image = g_rhi_vk->Swapchain->GetSwapchainImage(InRenderFrameContextPtr->FrameIndex);
 
-        const auto& FinalColorPtr = InRenderFrameContextPtr->SceneRenderTarget->FinalColorPtr;
+        const auto& FinalColorPtr = InRenderFrameContextPtr->SceneRenderTargetPtr->FinalColorPtr;
 
         jAttachment color = jAttachment(FinalColorPtr, EAttachmentLoadStoreOp::LOAD_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f)
             , FinalColorPtr->GetLayout(), EImageLayout::PRESENT_SRC);

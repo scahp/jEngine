@@ -36,7 +36,9 @@ public:
     jBlendingStateInfo* BlendingState = nullptr;
     jPipelineStateFixedInfo PipelineStateFixedInfo;
 
-    jGraphicsPipelineShader Shader;
     Vector2 ScreenSize;
+    jGraphicsPipelineShader Shader;
+    std::shared_ptr<IUniformBufferBlock> UniformBuffer;
+    std::shared_ptr<jShaderBindingInstance> ShaderBindingInstance;
     const jShaderBindingInstanceArray& ShaderBindingInstances;
 };

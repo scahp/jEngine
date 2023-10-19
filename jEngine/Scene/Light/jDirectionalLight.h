@@ -55,7 +55,7 @@ public:
     virtual void Update(float deltaTime) override;
 	virtual IUniformBufferBlock* GetUniformBufferBlock() const override { return LightDataUniformBlock; }
     virtual const jCamera* GetLightCamra(int32 index = 0) const override;
-    virtual jShaderBindingInstance* PrepareShaderBindingInstance(jTexture* InShadowMap) override;
+    virtual const std::shared_ptr<jShaderBindingInstance>& PrepareShaderBindingInstance(jTexture* InShadowMap) override;
 
     FORCEINLINE const jDirectionalLightUniformBufferData& GetLightData() const { return LightData; }
 
@@ -64,7 +64,7 @@ private:
     jDirectionalLightUniformBufferData LightData;
     IUniformBufferBlock* LightDataUniformBlock = nullptr;
 
-    jShaderBindingInstance* ShaderBindingInstance = nullptr;
+    std::shared_ptr<jShaderBindingInstance> ShaderBindingInstance = nullptr;
     bool IsNeedToUpdateShaderBindingInstance = true;
     jTexture* LastUsedShadowMap = nullptr;
 };

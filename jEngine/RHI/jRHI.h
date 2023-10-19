@@ -258,7 +258,7 @@ public:
     { }
 
     jLight* Light = nullptr;
-    jShaderBindingInstance* ShaderBindingInstance = nullptr;
+    std::shared_ptr<jShaderBindingInstance> ShaderBindingInstance;
     std::shared_ptr<jRenderTarget> ShadowMapPtr;
 };
 
@@ -276,7 +276,7 @@ public:
 	std::vector<jViewLight> Lights;
 	std::vector<jViewLight> ShadowCasterLights;
 	std::shared_ptr<IUniformBufferBlock> ViewUniformBufferPtr;
-	jShaderBindingInstance* ViewUniformBufferShaderBindingInstance = nullptr;
+	std::shared_ptr<jShaderBindingInstance> ViewUniformBufferShaderBindingInstance;
 };
 
 // BindGraphicsShaderBindingInstances 에서 바인딩 할 ShaderBindingInstance 배열을 얻어오는데 사용하는 구조체
@@ -429,7 +429,7 @@ public:
 	virtual jPipelineStateInfo* CreateComputePipelineStateInfo(const jShader* shader, const jShaderBindingsLayoutArray& InShaderBindingArray, const jPushConstant* pushConstant) const { return nullptr; }
 
 	virtual jShaderBindingsLayout* CreateShaderBindings(const jShaderBindingArray& InShaderBindingArray) const { check(0); return nullptr; }
-	virtual jShaderBindingInstance* CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const { check(0); return nullptr; }
+	virtual std::shared_ptr<jShaderBindingInstance> CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const { check(0); return nullptr; }
 
 	virtual void* CreatePipelineLayout(const jShaderBindingsLayoutArray& InShaderBindingLayoutArray, const jPushConstant* pushConstant) const { return nullptr; }
 

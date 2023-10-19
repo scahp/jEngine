@@ -115,7 +115,11 @@ public:
 	const ELightType Type = ELightType::MAX;
 	bool IsShadowCaster = true;
 	jObject* LightDebugObject = nullptr;
-	virtual jShaderBindingInstance* PrepareShaderBindingInstance(jTexture* InShadowMap) { return nullptr; }
+	virtual const std::shared_ptr<jShaderBindingInstance>& PrepareShaderBindingInstance(jTexture* InShadowMap)
+	{ 
+		static std::shared_ptr<jShaderBindingInstance> s_Temp;
+		return s_Temp;
+	}
 };
 
 class jAmbientLight : public jLight

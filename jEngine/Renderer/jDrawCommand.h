@@ -51,6 +51,8 @@ public:
     bool IsPositionOnly = false;
     int32 SubpassIndex = 0;
     bool Test = false;
+
+    std::shared_ptr<jShaderBindingInstance> OneRenderObjectUniformBuffer;
 };
 
 // jDrawCommand generator

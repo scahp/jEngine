@@ -59,7 +59,7 @@ struct jShaderBindingsLayout_Vulkan : public jShaderBindingsLayout
     VkDescriptorSetLayout DescriptorSetLayout = nullptr;
 
     virtual bool Initialize(const jShaderBindingArray& InShaderBindingArray) override;
-    virtual jShaderBindingInstance* CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const override;
+    virtual std::shared_ptr<jShaderBindingInstance> CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const override;
     virtual size_t GetHash() const override;
     void Release();
     virtual void* GetHandle() const override { return DescriptorSetLayout; }

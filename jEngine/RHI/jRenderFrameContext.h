@@ -26,7 +26,7 @@ struct jRenderFrameContext : public std::enable_shared_from_this<jRenderFrameCon
     virtual void SubmitCurrentActiveCommandBuffer(ECurrentRenderPass InCurrentRenderPass) {}
 
 public:
-    jSceneRenderTarget* SceneRenderTarget = nullptr;
+    std::shared_ptr<jSceneRenderTarget> SceneRenderTargetPtr = nullptr;
     uint32 FrameIndex = -1;
     bool UseForwardRenderer = true;
     bool IsBeginActiveCommandbuffer = false;

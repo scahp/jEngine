@@ -36,5 +36,7 @@ public:
     jPipelineStateFixedInfo PipelineStateFixedInfo;
 
     jGraphicsPipelineShader Shader;
+    std::shared_ptr<IUniformBufferBlock> UniformBuffer;
+    std::shared_ptr<jShaderBindingInstance> ShaderBindingInstance;
     const jShaderBindingInstanceArray& ShaderBindingInstances;
 };

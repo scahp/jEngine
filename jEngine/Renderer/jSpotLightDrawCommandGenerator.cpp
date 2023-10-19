@@ -79,23 +79,24 @@ void jSpotLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* OutDestDr
     Shader.PixelShader = jShaderSpotLightPixelShader::CreateShader(ShaderPermutation);
 
     jShaderBindingInstanceArray CopyShaderBindingInstances = ShaderBindingInstances;
-    CopyShaderBindingInstances.Add(InLightView.ShaderBindingInstance);
+    CopyShaderBindingInstances.Add(InLightView.ShaderBindingInstance.get());
 
     //////////////////////////////////////////////////////////////////////////
     int32 BindingPoint = 0;
     jShaderBindingArray ShaderBindingArray;
     jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
 
-    auto SpotLightPushConstant = g_rhi->CreateUniformBufferBlock(
-        jNameStatic("jSpotLightPushConstant"), jLifeTimeType::OneFrame, sizeof(jSpotLightPushConstant));
+    UniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
+        jNameStatic("jSpotLightPushConstant"), jLifeTimeType::OneFrame, sizeof(jSpotLightPushConstant)));
     auto PushConstantData = jSpotLightPushConstant(InView->Camera->Projection * InView->Camera->View * WorldMat);
-    SpotLightPushConstant->UpdateBufferData(&PushConstantData, sizeof(jSpotLightPushConstant));
+    UniformBuffer->UpdateBufferData(&PushConstantData, sizeof(jSpotLightPushConstant));
 
     // todo : 인라인 아닌것도 지원해야 됨
     ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_GRAPHICS
-        , ResourceInlineAllactor.Alloc<jUniformBufferResource>(SpotLightPushConstant), true);
+        , ResourceInlineAllactor.Alloc<jUniformBufferResource>(UniformBuffer.get()), true);
 
-    CopyShaderBindingInstances.Add(g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame));
+    ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
+    CopyShaderBindingInstances.Add(ShaderBindingInstance.get());
     //////////////////////////////////////////////////////////////////////////
 
     check(OutDestDrawCommand);

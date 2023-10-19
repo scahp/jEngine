@@ -87,7 +87,7 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// RenderObjectUniformBuffer
-	virtual jShaderBindingInstance* CreateShaderBindingInstance();
+	virtual const std::shared_ptr<jShaderBindingInstance>& CreateShaderBindingInstance();
 	//////////////////////////////////////////////////////////////////////////
 
     std::shared_ptr<jMaterial> MaterialPtr;
@@ -120,7 +120,7 @@ private:
 
 	bool NeedToUpdateRenderObjectUniformParameters = false;
 	IUniformBufferBlock* RenderObjectUniformParameters = nullptr;
-	jShaderBindingInstance* RenderObjectShaderBindingInstance = nullptr;
+	std::shared_ptr<jShaderBindingInstance> RenderObjectShaderBindingInstance = nullptr;
 
 	// Special code for PBR test
     float LastMetallic = 0.0f;
