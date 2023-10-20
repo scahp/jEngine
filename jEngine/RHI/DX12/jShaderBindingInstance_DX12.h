@@ -33,8 +33,27 @@ struct jShaderBindingInstance_DX12 : public jShaderBindingInstance
         };
     };
 
-    std::vector<std::pair<jInlineRootParamType::Enum, D3D12_GPU_VIRTUAL_ADDRESS>> RootParameterInlines;
+    struct jInlineRootParamData
+    {
+        jInlineRootParamType::Enum Type = jInlineRootParamType::NumOfType;
+        D3D12_GPU_VIRTUAL_ADDRESS GPUVirtualAddress = {};
 
-    std::vector<jDescriptor_DX12> Descriptors;
-    std::vector<jDescriptor_DX12> SamplerDescriptors;
+        // todo : Debug 정보라 런타임에서 제외 되면 좋을 듯 함.
+        jName ResourceName;
+        const jShaderBindableResource* Resource = nullptr;
+    };
+
+    struct jDescriptorData
+    {
+        FORCEINLINE bool IsValid() const { return Descriptor.IsValid(); }
+        jDescriptor_DX12 Descriptor;
+
+        // todo : Debug 정보라 런타임에서 제외 되면 좋을 듯 함.
+        jName ResourceName;
+        const jShaderBindableResource* Resource = nullptr;
+    };
+
+    std::vector<jInlineRootParamData> RootParameterInlines;
+    std::vector<jDescriptorData> Descriptors;
+    std::vector<jDescriptorData> SamplerDescriptors;
 };

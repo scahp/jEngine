@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-struct jTexture
+struct jTexture : public jShaderBindableResource, public std::enable_shared_from_this<jTexture>
 {
     constexpr jTexture() = default;
     constexpr jTexture(ETextureType InType, ETextureFormat InFormat, int32 InWidth, int32 InHeight
@@ -34,5 +34,4 @@ struct jTexture
     int32 Height = 0;
 
     bool sRGB = false;
-    jName ResourceName;     // todo : 디버깅을 위해서 리소스 이름을 지원해야 함. ShaderBindingArray 만 보면 바로 알 수 있도록 하자.
 };

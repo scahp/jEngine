@@ -628,7 +628,16 @@ enum class EImageLayout : uint8
     ATTACHMENT,
 };
 
-struct jBuffer : std::enable_shared_from_this<jBuffer>
+struct jShaderBindableResource
+{
+	jShaderBindableResource() = default;
+	jShaderBindableResource(const jName& InName) : ResourceName(InName) {}
+	virtual ~jShaderBindableResource() {}
+
+    jName ResourceName;
+};
+
+struct jBuffer : public jShaderBindableResource, public std::enable_shared_from_this<jBuffer>
 {
 	virtual ~jBuffer() {}
     virtual void Release() = 0;

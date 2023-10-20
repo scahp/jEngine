@@ -9,23 +9,29 @@
 
 void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::vector<jLight*>* InLights)
 {
-    ColorPtr = jRenderTargetPool::GetRenderTarget(
-        { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f) });
+    jRenderTargetInfo ColorRTInfo = { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f) };
+    ColorRTInfo.ResourceName = TEXT("ColorPtr");
+    ColorPtr = jRenderTargetPool::GetRenderTarget(ColorRTInfo);
 
     {
         int32 Width = SCR_WIDTH / 4;
         int32 Height = SCR_HEIGHT / 4;
 
-        BloomSetup = jRenderTargetPool::GetRenderTarget(
-            { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, Width, Height, 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f) });
+        jRenderTargetInfo BloomSetupRTInfo = { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, Width, Height, 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f) };
+        BloomSetupRTInfo.ResourceName = TEXT("BloomSetup");
+        BloomSetup = jRenderTargetPool::GetRenderTarget(BloomSetupRTInfo);
 
+        wchar_t TempStr[1024];
         for (int32 i = 0; i < _countof(DownSample); ++i)
         {
             Width /= 2;
             Height /= 2;
 
-            DownSample[i] = jRenderTargetPool::GetRenderTarget(
-                { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, Width, Height, 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f) });
+            wsprintf(TempStr, TEXT("DownSample[%d]"), i);
+            jRenderTargetInfo DownSampleRTInfo = { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, Width, Height, 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f) };
+            DownSampleRTInfo.ResourceName = TempStr;
+
+            DownSample[i] = jRenderTargetPool::GetRenderTarget(DownSampleRTInfo);
         }
 
         for (int32 i = 0; i < _countof(UpSample); ++i)
@@ -33,13 +39,17 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
             Width *= 2;
             Height *= 2;
 
-            UpSample[i] = jRenderTargetPool::GetRenderTarget(
-                { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, Width, Height, 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f) });
+            wsprintf(TempStr, TEXT("UpSample[%d]"), i);
+            jRenderTargetInfo UpSampleRTInfo = { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, Width, Height, 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f) };
+            UpSampleRTInfo.ResourceName = TempStr;
+
+            UpSample[i] = jRenderTargetPool::GetRenderTarget(UpSampleRTInfo);
         }
     }
 
-    DepthPtr = jRenderTargetPool::GetRenderTarget(
-        { ETextureType::TEXTURE_2D, ETextureFormat::D24_S8, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(1.0f, 0) });
+    jRenderTargetInfo DepthRTInfo = { ETextureType::TEXTURE_2D, ETextureFormat::D24_S8, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(1.0f, 0) };
+    DepthRTInfo.ResourceName = TEXT("DepthPtr");
+    DepthPtr = jRenderTargetPool::GetRenderTarget(DepthRTInfo);
 
     if ((int32)g_rhi->GetSelectedMSAASamples() > 1)
     {
@@ -65,18 +75,21 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
             std::shared_ptr<jRenderTarget> ShadowMapPtr;
             if (light->Type == ELightType::DIRECTIONAL)
             {
-                ShadowMapPtr = jRenderTargetPool::GetRenderTarget(
-                    { ETextureType::TEXTURE_2D, ETextureFormat::D16, jDirectionalLight::SM_Width, jDirectionalLight::SM_Height, 1, false, EMSAASamples::COUNT_1, RTClearValue });
+                jRenderTargetInfo Info = { ETextureType::TEXTURE_2D, ETextureFormat::D16, jDirectionalLight::SM_Width, jDirectionalLight::SM_Height, 1, false, EMSAASamples::COUNT_1, RTClearValue };
+                Info.ResourceName = TEXT("DirectionalLight_ShadowMap");
+                ShadowMapPtr = jRenderTargetPool::GetRenderTarget(Info);
             }
             else if (light->Type == ELightType::POINT)
             {
-                ShadowMapPtr = jRenderTargetPool::GetRenderTarget(
-                    { ETextureType::TEXTURE_CUBE, ETextureFormat::D16, jPointLight::SM_Width, jPointLight::SM_Height, 6, false, EMSAASamples::COUNT_1,RTClearValue });
+                jRenderTargetInfo Info = { ETextureType::TEXTURE_CUBE, ETextureFormat::D16, jPointLight::SM_Width, jPointLight::SM_Height, 6, false, EMSAASamples::COUNT_1, RTClearValue };
+                Info.ResourceName = TEXT("PointLight_ShadowMap");
+                ShadowMapPtr = jRenderTargetPool::GetRenderTarget(Info);
             }
             else if (light->Type == ELightType::SPOT)
             {
-                ShadowMapPtr = jRenderTargetPool::GetRenderTarget(
-                    { ETextureType::TEXTURE_2D, ETextureFormat::D16, jSpotLight::SM_Width, jSpotLight::SM_Height, 1, false, EMSAASamples::COUNT_1, RTClearValue });
+                jRenderTargetInfo Info = { ETextureType::TEXTURE_2D, ETextureFormat::D16, jSpotLight::SM_Width, jSpotLight::SM_Height, 1, false, EMSAASamples::COUNT_1, RTClearValue };
+                Info.ResourceName = TEXT("SpotLight_ShadowMap");
+                ShadowMapPtr = jRenderTargetPool::GetRenderTarget(Info);
             }
             LightShadowMapPtr.insert(std::make_pair(light, ShadowMapPtr));
         }

@@ -11,7 +11,6 @@ struct jDescriptor_DX12
     class jDescriptorHeap_DX12* DescriptorHeap = nullptr;
 
     void Free();
-
     bool IsValid() const { return (Index != -1); }
 };
 

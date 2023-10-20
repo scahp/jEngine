@@ -57,7 +57,8 @@ public:
     jCamera* Camera[6] = {0,};
     Matrix LightWorldMatrix;
 
-    std::shared_ptr<jShaderBindingInstance> ShaderBindingInstance;
+    std::shared_ptr<jShaderBindingInstance> ShaderBindingInstanceOnlyLightData;
+    std::shared_ptr<jShaderBindingInstance> ShaderBindingInstanceWithShadowMap;
     bool IsNeedToUpdateShaderBindingInstance = true;                // 위치가 달라지는 경우도 업데이트 되도록... 업데이트 규칙을 좀 만들어야 함
     jTexture* LastUsedShadowMap = nullptr;
 

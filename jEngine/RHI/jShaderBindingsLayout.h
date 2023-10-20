@@ -149,8 +149,7 @@ struct jShaderBindingArray
         static_assert(std::is_trivially_copyable<jShaderBinding>::value, "jShaderBinding should be trivially copyable");
 
         check(NumOfInlineData > NumOfData);
-        const int32 AddressOffset = (NumOfData) * sizeof(jShaderBinding);
-        new (&Data[0] + AddressOffset) jShaderBinding(args...);
+        new (&Data[NumOfData]) jShaderBinding(args...);
         ++NumOfData;
     }
 
@@ -175,7 +174,7 @@ struct jShaderBindingArray
     FORCEINLINE const jShaderBinding* operator[] (int32 InIndex) const
     {
         check(InIndex < NumOfData);
-        return (jShaderBinding*)(&Data[InIndex * sizeof(jShaderBinding)]);
+        return (jShaderBinding*)(&Data[InIndex]);
     }
 
     FORCEINLINE void CloneWithoutResource(jShaderBindingArray& OutResult) const
@@ -191,7 +190,7 @@ struct jShaderBindingArray
         OutResult.NumOfData = NumOfData;
     }
 
-    uint8 Data[NumOfInlineData * sizeof(jShaderBinding)];
+    jShaderBinding Data[NumOfInlineData];
     int32 NumOfData = 0;
 };
 

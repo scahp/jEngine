@@ -201,6 +201,9 @@ const std::shared_ptr<jShaderBindingInstance>& jRenderObject::CreateShaderBindin
 
         RenderObjectUniformParameters->UpdateBufferData(&ubo, sizeof(ubo));
 
+        LastMetallic = gOptions.Metallic;
+        LastRoughness = gOptions.Roughness;
+
         int32 BindingPoint = 0;
         jShaderBindingArray ShaderBindingArray;
         jShaderBindingResourceInlineAllocator ResourceInlineAllactor;

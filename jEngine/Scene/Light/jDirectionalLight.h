@@ -64,7 +64,8 @@ private:
     jDirectionalLightUniformBufferData LightData;
     IUniformBufferBlock* LightDataUniformBlock = nullptr;
 
-    std::shared_ptr<jShaderBindingInstance> ShaderBindingInstance = nullptr;
+    std::shared_ptr<jShaderBindingInstance> ShaderBindingInstanceOnlyLightData;
+    std::shared_ptr<jShaderBindingInstance> ShaderBindingInstanceWithShadowMap;
     bool IsNeedToUpdateShaderBindingInstance = true;
     jTexture* LastUsedShadowMap = nullptr;
 };

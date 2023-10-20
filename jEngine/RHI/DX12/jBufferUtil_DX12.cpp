@@ -62,6 +62,17 @@ jBuffer_DX12* CreateBuffer(uint64 InSize, uint16 InAlignment, bool InIsCPUAccess
         return nullptr;
 
     auto Buffer = new jBuffer_DX12(BufferInternal, InSize, InAlignment, InIsCPUAccess, InAllowUAV);
+    if (InResourceName)
+    {
+        // https://learn.microsoft.com/ko-kr/cpp/text/how-to-convert-between-various-string-types?view=msvc-170#example-convert-from-char-
+        char szResourceName[1024];
+        size_t OutLength = 0;
+        size_t origsize = wcslen(InResourceName) + 1;
+        const size_t newsize = origsize * 2;
+        wcstombs_s(&OutLength, szResourceName, newsize, InResourceName, _TRUNCATE);
+
+        Buffer->ResourceName = jName(szResourceName);
+    }
 
     const bool HasInitialData = InData && (InDataSize > 0);
     if (HasInitialData)
@@ -180,6 +191,17 @@ jTexture_DX12* CreateImage(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers
     jTexture_DX12* Texture = new jTexture_DX12(InType, InFormat, InWidth, InHeight, InArrayLayers
         , EMSAASamples::COUNT_1, InMipLevels, false, InClearValue, TextureInternal);
     check(Texture);
+    if (InResourceName)
+    {
+        // https://learn.microsoft.com/ko-kr/cpp/text/how-to-convert-between-various-string-types?view=msvc-170#example-convert-from-char-
+        char szResourceName[1024];
+        size_t OutLength = 0;
+        size_t origsize = wcslen(InResourceName) + 1;
+        const size_t newsize = origsize * 2;
+        wcstombs_s(&OutLength, szResourceName, newsize, InResourceName, _TRUNCATE);
+
+        Texture->ResourceName = jName(szResourceName);
+    }
 
     if (IsDepthFormat(InFormat))
     {

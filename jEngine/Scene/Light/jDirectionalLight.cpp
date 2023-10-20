@@ -39,16 +39,16 @@ const jCamera* jDirectionalLight::GetLightCamra(int32 index) const
 
 const std::shared_ptr<jShaderBindingInstance>& jDirectionalLight::PrepareShaderBindingInstance(jTexture* InShadowMap)
 {
-    if (LastUsedShadowMap != InShadowMap)
+    if (IsNeedToUpdateShaderBindingInstance || (LastUsedShadowMap != InShadowMap))
     {
-        IsNeedToUpdateShaderBindingInstance = true;
-    }
-
-    if (IsNeedToUpdateShaderBindingInstance)        
-    {
-        IsNeedToUpdateShaderBindingInstance = false;
-
-        LightDataUniformBlock->UpdateBufferData(&LightData, sizeof(LightData));
+        if (IsNeedToUpdateShaderBindingInstance)
+        {
+            // todo : 한프레임에 한 번만 호출 될 것으로 기대함.
+            IsNeedToUpdateShaderBindingInstance = false;
+            LightDataUniformBlock->UpdateBufferData(&LightData, sizeof(LightData));
+            ShaderBindingInstanceWithShadowMap.reset();
+            ShaderBindingInstanceOnlyLightData.reset();
+        }
 
         int32 BindingPoint = 0;
         jShaderBindingArray ShaderBindingArray;
@@ -68,12 +68,12 @@ const std::shared_ptr<jShaderBindingInstance>& jDirectionalLight::PrepareShaderB
         }
         LastUsedShadowMap = InShadowMap;
 
-        if (ShaderBindingInstance)
-            ShaderBindingInstance->Free();
-
-        ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::MultiFrame);
+        if (InShadowMap)
+            ShaderBindingInstanceWithShadowMap = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::MultiFrame);
+        else
+            ShaderBindingInstanceOnlyLightData = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::MultiFrame);
     }
-    return ShaderBindingInstance;
+    return InShadowMap ? ShaderBindingInstanceWithShadowMap : ShaderBindingInstanceOnlyLightData;
 }
 
 void jDirectionalLight::Update(float deltaTime)

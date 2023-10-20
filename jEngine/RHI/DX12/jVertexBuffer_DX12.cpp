@@ -37,7 +37,7 @@ bool jVertexBuffer_DX12::Initialize(const std::shared_ptr<jVertexStreamData>& In
         {
             // Create vertex buffer
             stream.BufferPtr = std::shared_ptr<jBuffer_DX12>(jBufferUtil_DX12::CreateBuffer(iter->GetBufferSize(), 0, false, false, D3D12_RESOURCE_STATE_COMMON
-                , iter->GetBufferData(), iter->GetBufferSize(), TEXT("")));
+                , iter->GetBufferData(), iter->GetBufferSize(), TEXT("VertexBuffer")));
 
             BindInfos.Buffers.push_back(stream.BufferPtr->Buffer.Get());
             BindInfos.Offsets.push_back(stream.Offset + stream.BufferPtr->Offset);

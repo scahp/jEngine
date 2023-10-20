@@ -2126,7 +2126,7 @@ std::shared_ptr<jRenderTarget> jRHI_DX12::CreateRenderTarget(const jRenderTarget
     const uint16 MipLevels = info.IsGenerateMipmap ? static_cast<uint32>(std::floor(std::log2(std::max<int>(info.Width, info.Height)))) + 1 : 1;
     
     jTexture_DX12* Texture = jBufferUtil_DX12::CreateImage(info.Width, info.Height, info.LayerCount, MipLevels, (uint32)info.SampleCount, info.Type, info.Format
-        , true, false, D3D12_RESOURCE_STATE_COMMON, info.RTClearValue);
+        , true, false, D3D12_RESOURCE_STATE_COMMON, info.RTClearValue, info.ResourceName);
 
     auto rt = new jRenderTarget();
     check(rt);

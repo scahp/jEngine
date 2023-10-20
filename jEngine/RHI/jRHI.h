@@ -88,15 +88,14 @@ enum class jLifeTimeType : uint8
     MAX
 };
 
-struct IUniformBufferBlock
+struct IUniformBufferBlock : public jShaderBindableResource
 {
 	IUniformBufferBlock() = default;
 	IUniformBufferBlock(const jName& InName, jLifeTimeType InLifeType)
-		: Name(InName), LifeType(InLifeType)
+		: jShaderBindableResource(InName), LifeType(InLifeType)
 	{}
 	virtual ~IUniformBufferBlock() {}
 
-	jName Name;
 	const jLifeTimeType LifeType = jLifeTimeType::MultiFrame;
 
 	virtual bool IsUseRingBuffer() const { return (LifeType == jLifeTimeType::OneFrame); }
@@ -114,7 +113,7 @@ struct IUniformBufferBlock
 	virtual void* GetBufferMemory() const { return nullptr; }
 };
 
-struct IShaderStorageBufferObject
+struct IShaderStorageBufferObject : public jShaderBindableResource
 {
 	IShaderStorageBufferObject() = default;
 	IShaderStorageBufferObject(const jName& InName, jLifeTimeType InLifeType)
@@ -146,7 +145,7 @@ struct IShaderStorageBufferObject
 	}
 };
 
-struct IAtomicCounterBuffer
+struct IAtomicCounterBuffer : public jShaderBindableResource
 {
 	IAtomicCounterBuffer() = default;
 	IAtomicCounterBuffer(const std::string& name, uint32 bindingPoint)
@@ -171,7 +170,7 @@ struct IAtomicCounterBuffer
 	}
 };
 
-struct ITransformFeedbackBuffer
+struct ITransformFeedbackBuffer : public jShaderBindableResource
 {
 	ITransformFeedbackBuffer() = default;
 	ITransformFeedbackBuffer(const std::string& name)
