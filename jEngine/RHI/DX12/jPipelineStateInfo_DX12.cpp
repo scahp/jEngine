@@ -29,6 +29,8 @@ void jSamplerStateInfo_DX12::Initialize()
     check(g_rhi_dx12);
     check(g_rhi_dx12->Device);
     g_rhi_dx12->Device->CreateSampler(&samplerDesc, SamplerSRV.CPUHandle);
+
+    ResourceName = jName(ToString().c_str());
 }
 
 void jRasterizationStateInfo_DX12::Initialize()

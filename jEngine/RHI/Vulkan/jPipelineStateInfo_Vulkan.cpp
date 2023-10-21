@@ -46,6 +46,8 @@ void jSamplerStateInfo_Vulkan::Initialize()
     SamplerStateInfo.pNext = &CustomBorderColor;
 
     ensure(vkCreateSampler(g_rhi_vk->Device, &SamplerStateInfo, nullptr, &SamplerState) == VK_SUCCESS);
+
+    ResourceName = jName(ToString().c_str());
 }
 
 void jSamplerStateInfo_Vulkan::Release()

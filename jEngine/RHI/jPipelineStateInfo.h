@@ -96,6 +96,50 @@ struct jSamplerStateInfo : public jShaderBindableResource
         return Hash;
     }
 
+    std::string ToString() const
+    {
+        std::string Result;
+        Result += EnumToString(Minification);
+        Result += ",";
+        Result += EnumToString(Magnification);
+        Result += ",";
+        Result += EnumToString(AddressU);
+        Result += ",";
+        Result += EnumToString(AddressV);
+        Result += ",";
+        Result += EnumToString(AddressW);
+        Result += std::to_string(MipLODBias);
+        Result += ",";
+        Result += std::to_string(MaxAnisotropy);
+        Result += ",";
+        Result += EnumToString(TextureComparisonMode);
+        Result += ",";
+        Result += std::to_string(IsEnableComparisonMode);
+        Result += ",";
+        Result += EnumToString(ComparisonFunc);
+        Result += ",";
+        Result += std::to_string(MaxAnisotropy);
+        Result += ",";
+
+        Result += "(";
+        Result += std::to_string(BorderColor.x);
+        Result += ",";
+        Result += std::to_string(BorderColor.y);
+        Result += ",";
+        Result += std::to_string(BorderColor.z);
+        Result += ",";
+        Result += std::to_string(BorderColor.w);
+        Result += ")";
+        Result += ",";
+
+        Result += std::to_string(MinLOD);
+        Result += ",";
+        Result += std::to_string(MinLOD);
+        Result += ",";
+
+        return Result;
+    }
+
     mutable size_t Hash = 0;
 
     ETextureFilter Minification = ETextureFilter::NEAREST;

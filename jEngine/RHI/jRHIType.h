@@ -131,10 +131,46 @@ FORCEINLINE auto FunctionName(FunctionName##value_type type) { \
 	GENERATE_STATIC_INVERSECONVERSION_MAP(__VA_ARGS__)\
 }
 
+template <typename EnumType>
+FORCEINLINE std::array<std::string, static_cast<size_t>(EnumType::MAX) + 1> split(const std::string& s, char delim) 
+{
+	std::array<std::string, static_cast<size_t>(EnumType::MAX) + 1> result;
+    std::stringstream ss(s);
+    std::string item;
+
+	int32 Count = 0;
+    while (getline(ss, item, delim)) 
+	{
+		result[Count++] = item;
+    }
+
+    return result;
+}
+
+#define MAKE_ENUM_TO_STRING_CONT(EnumType, N, EnumListString) \
+static std::array<const char*, N> EnumType##Strings = split(EnumListString, ',');
+
+// Enum class 선언과 Enum 에서 string 으로 변환할 수 있는 함수를 생성하는 매크로
+#define DECLARE_ENUM_WITH_CONVERT_TO_STRING(EnumType, UnderlyingType, ...) \
+enum class EnumType : UnderlyingType \
+{ \
+__VA_ARGS__ \
+}; \
+static std::array<std::string, static_cast<size_t>(EnumType::MAX) + 1> EnumType##Strings = split<EnumType>(#__VA_ARGS__, ',');\
+FORCEINLINE const char* EnumToString(EnumType value) { \
+    return EnumType##Strings[static_cast<size_t>(value)].c_str(); \
+}
+//\
+//FORCEINLINE const wchar_t* EnumToWchar(EnumType value) { \
+//    static const std::array<const wchar_t*, static_cast<size_t>(EnumType::MAX) + 1> EnumType##WStrings = { \
+//        L#__VA_ARGS__ \
+//    }; \
+//    return EnumType##WStrings[static_cast<size_t>(value)]; \
+//}
+
 //////////////////////////////////////////////////////////////////////////
 
-enum class EPrimitiveType : uint8
-{
+DECLARE_ENUM_WITH_CONVERT_TO_STRING(EPrimitiveType, uint8,
 	POINTS,
 	LINES,
 	LINES_ADJACENCY,
@@ -144,29 +180,28 @@ enum class EPrimitiveType : uint8
 	TRIANGLES_ADJACENCY,
 	TRIANGLE_STRIP_ADJACENCY,
 	MAX
-};
+);
 
-enum class EVertexInputRate
-{
+DECLARE_ENUM_WITH_CONVERT_TO_STRING(EVertexInputRate, uint8,
 	VERTEX,
-	INSTANCE
-};
+	INSTANCE,
+	MAX
+);
 
-enum class EBufferType : uint8
-{
+DECLARE_ENUM_WITH_CONVERT_TO_STRING(EBufferType, uint8,
 	STATIC,
-	DYNAMIC
-};
+	DYNAMIC,
+	MAX
+);
 
-enum class EBufferElementType : uint8
-{
+DECLARE_ENUM_WITH_CONVERT_TO_STRING(EBufferElementType, uint8,
 	BYTE,
 	BYTE_UNORM,
 	UINT16,
 	UINT32,
 	FLOAT,
 	MAX,
-};
+);
 
 struct IStreamParam : public std::enable_shared_from_this<IStreamParam>
 {
@@ -254,29 +289,26 @@ enum class ETextureFilterTarget : uint8
 	MAX
 };
 
-enum class ETextureFilter : uint8
-{
-	NEAREST = 0,
+DECLARE_ENUM_WITH_CONVERT_TO_STRING(ETextureFilter, uint8,
+	NEAREST,
 	LINEAR,
 	NEAREST_MIPMAP_NEAREST,
 	LINEAR_MIPMAP_NEAREST,
 	NEAREST_MIPMAP_LINEAR,
 	LINEAR_MIPMAP_LINEAR,
 	MAX
-};
+);
 
-enum class ETextureType : uint8
-{
-	TEXTURE_2D = 0,
+DECLARE_ENUM_WITH_CONVERT_TO_STRING(ETextureType, uint8,
+	TEXTURE_2D,
 	TEXTURE_2D_ARRAY,
 	TEXTURE_CUBE,
 	MAX,
-};
+);
 
-enum class ETextureFormat
-{
+DECLARE_ENUM_WITH_CONVERT_TO_STRING(ETextureFormat, uint8,
 	// color
-	RGB8 = 0,
+	RGB8,
 	RGB16F,
 	RGB32F,
 	R11G11B10F,
@@ -308,7 +340,7 @@ enum class ETextureFormat
 	D32_S8,
 
 	MAX,
-};
+);
 
 static bool IsDepthFormat(ETextureFormat format)
 {
@@ -339,20 +371,18 @@ static bool IsDepthOnlyFormat(ETextureFormat format)
     return false;
 }
 
-enum class EFormatType : uint8
-{
-	BYTE = 0,
+DECLARE_ENUM_WITH_CONVERT_TO_STRING(EFormatType, uint8,
+	BYTE,
 	UNSIGNED_BYTE,
 	INT,
 	UNSIGNED_INT,
 	HALF,
 	FLOAT,
 	MAX
-};
+);
 
-enum class EBlendFactor : uint8
-{
-	ZERO = 0,
+DECLARE_ENUM_WITH_CONVERT_TO_STRING(EBlendFactor, uint8,
+	ZERO,
 	ONE,
 	SRC_COLOR,
 	ONE_MINUS_SRC_COLOR,
@@ -368,29 +398,26 @@ enum class EBlendFactor : uint8
 	ONE_MINUS_CONSTANT_ALPHA,
 	SRC_ALPHA_SATURATE,
 	MAX
-};
+);
 
-enum class EBlendOp : uint8
-{
-	ADD = 0,
+DECLARE_ENUM_WITH_CONVERT_TO_STRING(EBlendOp, uint8,
+	ADD,
 	SUBTRACT,
 	REVERSE_SUBTRACT,
 	MIN_VALUE,
 	MAX_VALUE,
 	MAX,
-};
+);
 
-enum class EFace : uint8
-{
-	FRONT = 0,
+DECLARE_ENUM_WITH_CONVERT_TO_STRING(EFace, uint8,
+	FRONT,
 	BACK,
 	FRONT_AND_BACK,
 	MAX,
-};
+);
 
-enum class EStencilOp : uint8
-{
-	KEEP = 0,
+DECLARE_ENUM_WITH_CONVERT_TO_STRING(EStencilOp, uint8,
+	KEEP,
 	ZERO,
 	REPLACE,
 	INCR,
@@ -399,11 +426,10 @@ enum class EStencilOp : uint8
 	DECR_WRAP,
 	INVERT,
 	MAX
-};
+);
 
-enum class ECompareOp : uint8
-{
-	NEVER = 0,
+DECLARE_ENUM_WITH_CONVERT_TO_STRING(ECompareOp, uint8,
+	NEVER,
 	LESS,
 	EQUAL,
 	LEQUAL,
@@ -412,7 +438,7 @@ enum class ECompareOp : uint8
 	GEQUAL,
 	ALWAYS,
 	MAX
-};
+);
 
 enum class ERenderBufferType : uint32
 {
@@ -425,9 +451,8 @@ enum class ERenderBufferType : uint32
 
 DECLARE_ENUM_BIT_OPERATORS(ERenderBufferType)
 
-enum class EDrawBufferType : uint8
-{
-	COLOR_ATTACHMENT0 = 0,
+DECLARE_ENUM_WITH_CONVERT_TO_STRING(EDrawBufferType, uint8,
+	COLOR_ATTACHMENT0,
 	COLOR_ATTACHMENT1,
 	COLOR_ATTACHMENT2,
 	COLOR_ATTACHMENT3,
@@ -436,11 +461,10 @@ enum class EDrawBufferType : uint8
 	COLOR_ATTACHMENT6,
 	COLOR_ATTACHMENT7,
 	MAX
-};
+);
 
-enum class EDepthBufferType : uint8
-{
-	NONE = 0,
+DECLARE_ENUM_WITH_CONVERT_TO_STRING(EDepthBufferType, uint8,
+	NONE,
 	DEPTH16,
 	DEPTH16_STENCIL8,
 	DEPTH24,
@@ -448,57 +472,51 @@ enum class EDepthBufferType : uint8
 	DEPTH32,
 	DEPTH32_STENCIL8,
 	MAX,
-};
+);
 
-enum class ETextureAddressMode : uint8
-{
-	REPEAT = 0,
+DECLARE_ENUM_WITH_CONVERT_TO_STRING(ETextureAddressMode, uint8,
+	REPEAT,
 	MIRRORED_REPEAT,
 	CLAMP_TO_EDGE,
 	CLAMP_TO_BORDER,
 	MIRROR_CLAMP_TO_EDGE,
 	MAX,
-};
+);
 
-enum class ETextureComparisonMode : uint8
-{
-	NONE = 0,
+DECLARE_ENUM_WITH_CONVERT_TO_STRING(ETextureComparisonMode, uint8,
+	NONE,
 	COMPARE_REF_TO_TEXTURE,					// to use PCF filtering by using samplerXXShadow series.
 	MAX,
-};
+);
 
-enum class EPolygonMode : uint8
-{
-	POINT = 0,
+DECLARE_ENUM_WITH_CONVERT_TO_STRING(EPolygonMode, uint8,
+	POINT,
 	LINE,
 	FILL,
 	MAX
-};
+);
 
-enum class EImageTextureAccessType : uint8
-{
-	NONE = 0,
+DECLARE_ENUM_WITH_CONVERT_TO_STRING(EImageTextureAccessType, uint8,
+	NONE,
 	READ_ONLY,
 	WRITE_ONLY,
 	READ_WRITE,
 	MAX,
-};
+);
 
-enum class EFrontFace : uint8
-{
-	CW = 0,
-	CCW = 1,
-	MAX,
-};
+DECLARE_ENUM_WITH_CONVERT_TO_STRING(EFrontFace, uint8,
+	CW,
+	CCW,
+	MAX
+);
 
-enum class ECullMode : uint8
-{
-	NONE = 0,
+DECLARE_ENUM_WITH_CONVERT_TO_STRING(ECullMode, uint8,
+	NONE,
 	BACK,
 	FRONT,
 	FRONT_AND_BACK,
 	MAX
-};
+);
 
 enum class EMSAASamples : uint32
 {
@@ -512,16 +530,15 @@ enum class EMSAASamples : uint32
 };
 DECLARE_ENUM_BIT_OPERATORS(EMSAASamples)
 
-enum class EAttachmentLoadStoreOp : uint8
-{
-    LOAD_STORE = 0,
+DECLARE_ENUM_WITH_CONVERT_TO_STRING(EAttachmentLoadStoreOp, uint8,
+    LOAD_STORE,
 	LOAD_DONTCARE,
     CLEAR_STORE,
 	CLEAR_DONTCARE,
     DONTCARE_STORE,
 	DONTCARE_DONTCARE,
     MAX
-};
+);
 
 enum class EShaderAccessStageFlag : uint32
 {
@@ -538,9 +555,8 @@ DECLARE_ENUM_BIT_OPERATORS(EShaderAccessStageFlag)
 
 // BindingType 별 사용법 문서
 // https://github.com/KhronosGroup/Vulkan-Guide/blob/master/chapters/mapping_data_to_shaders.adoc#storage-texel-buffer
-enum class EShaderBindingType : uint32
-{
-	UNIFORMBUFFER = 0,
+DECLARE_ENUM_WITH_CONVERT_TO_STRING(EShaderBindingType, uint32,
+	UNIFORMBUFFER,
 	UNIFORMBUFFER_DYNAMIC,			// 동적버퍼에 대한 설명 https://github.com/SaschaWillems/Vulkan/blob/master/examples/dynamicuniformbuffer/README.md
 	TEXTURE_SAMPLER_SRV,
 	TEXTURE_SRV,
@@ -553,8 +569,8 @@ enum class EShaderBindingType : uint32
 	BUFFER_TEXEL_SRV,
 	BUFFER_TEXEL_UAV,
 	SUBPASS_INPUT_ATTACHMENT,
-	MAX,
-};
+	MAX
+);
 
 enum class EVulkanBufferBits : uint32
 {
@@ -603,9 +619,8 @@ enum class EColorMask : uint8
 };
 DECLARE_ENUM_BIT_OPERATORS(EColorMask)
 
-enum class EImageLayout : uint8
-{
-    UNDEFINED = 0,
+DECLARE_ENUM_WITH_CONVERT_TO_STRING(EImageLayout, uint8,
+    UNDEFINED,
     GENERAL,
     COLOR_ATTACHMENT,
     DEPTH_STENCIL_ATTACHMENT,
@@ -626,7 +641,8 @@ enum class EImageLayout : uint8
     FRAGMENT_DENSITY_MAP_EXT,
     READ_ONLY,
     ATTACHMENT,
-};
+	MAX
+);
 
 struct jShaderBindableResource
 {
@@ -676,8 +692,7 @@ enum class EPipelineStageMask : uint32
 };
 DECLARE_ENUM_BIT_OPERATORS(EPipelineStageMask)
 
-enum class EPipelineDynamicState : uint8
-{
+DECLARE_ENUM_WITH_CONVERT_TO_STRING(EPipelineDynamicState, uint8,
     VIEWPORT,
     SCISSOR,
     LINE_WIDTH,
@@ -715,23 +730,23 @@ enum class EPipelineDynamicState : uint8
     PATCH_CONTROL_POINTS_EXT,
     LOGIC_OP_EXT,
     COLOR_WRITE_ENABLE_EXT,
-};
+	MAX
+);
 
-enum class EDescriptorHeapTypeDX12
-{
-    CBV_SRV_UAV = 0,
+DECLARE_ENUM_WITH_CONVERT_TO_STRING(EDescriptorHeapTypeDX12, uint8,
+    CBV_SRV_UAV,
     SAMPLER,
     RTV,
     DSV,
     MAX
-};
+);
 
-enum class ERTClearType
-{
-    None = 0,
+DECLARE_ENUM_WITH_CONVERT_TO_STRING(ERTClearType, uint8,
+    None,
     Color,
-    DepthStencil
-};
+    DepthStencil,
+	MAX
+);
 
 struct jDepthStencilClearType
 {
