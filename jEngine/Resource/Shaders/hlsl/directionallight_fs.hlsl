@@ -78,7 +78,10 @@ float4 main(VSOutput input
     DirectionalLightShadowPosition = DirectionalLightShadowPosition / DirectionalLightShadowPosition.w;
     DirectionalLightShadowPosition.y = -DirectionalLightShadowPosition.y;
 
-    //float3 DirectionalLightLit = GetDirectionalLight(DirectionalLight, WorldNormal, ViewWorld);
+#define ENABLE_PBR 0
+#if !ENABLE_PBR
+    float3 DirectionalLightLit = GetDirectionalLight(DirectionalLight, WorldNormal, ViewWorld);
+#endif
     float Lit = 1.0f;
 #if USE_SHADOW_MAP
     if (-1.0 <= DirectionalLightShadowPosition.z && DirectionalLightShadowPosition.z <= 1.0)
@@ -86,17 +89,21 @@ float4 main(VSOutput input
         const float Bias = 0.01f;
         Lit = DirectionalLightShadowMap.SampleCmpLevelZero(
             DirectionalLightShadowMapSampler, (DirectionalLightShadowPosition.xy * 0.5 + 0.5), (DirectionalLightShadowPosition.z - Bias));
-        // DirectionalLightLit *= Shadow;
+#if !ENABLE_PBR
+        DirectionalLightLit *= Lit;
+#endif
     }
 #endif
 
+#if ENABLE_PBR
     float3 L = -DirectionalLight.Direction;
     float3 N = WorldNormal;
     float3 V = ViewWorld;
     color.xyz = PBR(L, N, V, Albedo, DirectionalLight.Color, 100.0f * 0.01f, Metallic, Roughness) * Lit;
     color.w = 1.0f;
     return color;
-    
-    //color = (1.0 / 3.141592653) * float4(Albedo * DirectionalLightLit, 1.0);
-    //return color;
+#else
+    color = (1.0 / 3.141592653) * float4(Albedo * DirectionalLightLit, 1.0);
+    return color;
+#endif
 }

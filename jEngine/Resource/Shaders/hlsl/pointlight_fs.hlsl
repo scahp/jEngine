@@ -63,6 +63,8 @@ float4 main(VSOutput input) : SV_TARGET
     float3 LightDir = normalize(WorldPos.xyz - PointLight.Position);
     float DistanceToLight = length(WorldPos.xyz - PointLight.Position);
 
+#define ENABLE_PBR 0
+
     // Point light shadow map
     float Lit = 1.0f;
 #if USE_SHADOW_MAP
@@ -74,22 +76,26 @@ float4 main(VSOutput input) : SV_TARGET
         Lit = PointLightShadowCubeMap.SampleCmpLevelZero(PointLightShadowMapSampler, LightDir.xyz, NormalizedDistance - Bias);
         if (Lit > 0.0f)
         {
-            // PointLightLit = Shadow * GetPointLight(PointLight, WorldNormal, WorldPos.xyz, ViewWorld);
+             PointLightLit = Lit * GetPointLight(PointLight, WorldNormal, WorldPos.xyz, ViewWorld);
         }
     }
 #else
-    //PointLightLit = GetPointLight(PointLight, WorldNormal, WorldPos.xyz, ViewWorld);
+    #if !ENABLE_PBR
+    PointLightLit = GetPointLight(PointLight, WorldNormal, WorldPos.xyz, ViewWorld);
+    #endif
 #endif
 
+#if ENABLE_PBR
     float PointLightAttenuate = DistanceAttenuation2(DistanceToLight * DistanceToLight, 1.0f / PointLight.MaxDistance);
-    
+
     float3 L = -LightDir;
     float3 N = WorldNormal;
     float3 V = ViewWorld;
     color.xyz = PBR(L, N, V, Albedo, PointLight.Color, DistanceToLight * 0.01f, Metallic, Roughness) * PointLightAttenuate * Lit;
     color.w = 1.0f;
     return color;
-    
-    //color = (1.0 / 3.141592653) * float4(Albedo * PointLightLit, 1.0);
-    //return color;
+#else    
+    color = (1.0 / 3.141592653) * float4(Albedo * PointLightLit, 1.0);
+    return color;
+#endif
 }

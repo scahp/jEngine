@@ -54,7 +54,7 @@ void jGame::ProcessInput()
 void jGame::Setup()
 {
 	srand(static_cast<uint32>(time(NULL)));
-
+/*
 	// Create main camera
     //const Vector mainCameraPos(-111.6f, 17.49f, 3.11f);
     //const Vector mainCameraTarget(282.378632f, 17.6663227f, -1.00448179f);
@@ -71,6 +71,19 @@ void jGame::Setup()
 	//AmbientLight = jLight::CreateAmbientLight(Vector(0.2f, 0.5f, 1.0f), Vector(0.05f));		// sky light color
 	PointLight = jLight::CreatePointLight(Vector(10.0f, 100.0f, 10.0f), Vector4(1.0f, 0.75f, 0.75f, 1.0f), 150.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
 	SpotLight = jLight::CreateSpotLight(Vector(0.0f, 80.0f, 5.0f), Vector(1.0f, -1.0f, 0.4f).GetNormalize(), Vector4(0.2f, 1.0f, 0.2f, 1.0f), 200.0f, 0.35f, 0.5f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
+*/
+	// Create main camera
+    const Vector mainCameraPos(-111.6f, 17.49f, 3.11f);
+    const Vector mainCameraTarget(282.378632f, 17.6663227f, -1.00448179f);
+    MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 10.0f, 1500.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT, true);
+    jCamera::AddCamera(0, MainCamera);
+
+    // Create lights
+    NormalDirectionalLight = jLight::CreateDirectionalLight(Vector(-1.0f, -1.0f, -0.3f) // AppSettings.DirecionalLightDirection
+        , Vector4(0.6f), Vector(1.0f), Vector(1.0f), 64);
+    PointLight = jLight::CreatePointLight(Vector(10.0f, 100.0f, 10.0f), Vector4(1.0f, 0.75f, 0.75f, 1.0f), 150.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
+    SpotLight = jLight::CreateSpotLight(Vector(0.0f, 60.0f, 5.0f), Vector(1.0f, -1.0f, 0.4f).GetNormalize(), Vector4(0.0f, 1.0f, 0.0f, 1.0f), 200.0f, 0.35f, 0.5f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
+
 
 	if (NormalDirectionalLight)
 		jLight::AddLights(NormalDirectionalLight);
@@ -125,15 +138,15 @@ void jGame::Setup()
 	//	jObject::AddUIDebugObject(DirectionalLightShadowMapUIDebug);
 
 	// Select spawning object type
-	SpawnObjects(ESpawnedType::TestPrimitive);
+	//SpawnObjects(ESpawnedType::TestPrimitive);
 	//SpawnObjects(ESpawnedType::InstancingPrimitive);
 	//SpawnObjects(ESpawnedType::IndirectDrawPrimitive);
 
 	//ResourceLoadCompleteEvent = std::async(std::launch::async, [&]()
 	//{
-		//Sponza = jModelLoader::GetInstance().LoadFromFile("Resource/sponza/sponza.dae", "Resource/");
-		//jObject::AddObject(Sponza);
-		//SpawnedObjects.push_back(Sponza);
+		Sponza = jModelLoader::GetInstance().LoadFromFile("Resource/sponza/sponza.dae", "Resource/");
+		jObject::AddObject(Sponza);
+		SpawnedObjects.push_back(Sponza);
 
 		//{
 		//	jScopedLock s(&AsyncLoadLock);

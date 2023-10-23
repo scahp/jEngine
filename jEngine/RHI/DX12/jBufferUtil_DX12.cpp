@@ -144,10 +144,6 @@ ComPtr<ID3D12Resource> CreateImageInternal(uint32 InWidth, uint32 InHeight, uint
     TexDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
     TexDesc.Alignment = 0;
 
-    const D3D12_RESOURCE_ALLOCATION_INFO info = g_rhi_dx12->Device->GetResourceAllocationInfo(0, 1, &TexDesc);
-
-    // ensure(TexDesc.Width == info.SizeInBytes);
-
     ComPtr<ID3D12Resource> Image;
     Image = g_rhi_dx12->CreateResource(&TexDesc, InResourceState, InClearValue);
     if (!ensure(Image))
@@ -190,6 +186,7 @@ jTexture_DX12* CreateImage(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers
 
     jTexture_DX12* Texture = new jTexture_DX12(InType, InFormat, InWidth, InHeight, InArrayLayers
         , EMSAASamples::COUNT_1, InMipLevels, false, InClearValue, TextureInternal);
+    Texture->Layout = GetDX12ImageLayout(InResourceState);
     check(Texture);
     if (InResourceName)
     {

@@ -1690,8 +1690,10 @@ void jRHI_DX12::RenderUI(ID3D12GraphicsCommandList* pCommandList, ID3D12Resource
 jTexture* jRHI_DX12::CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
     , ETextureFormat textureFormat, bool createMipmap) const
 {
+    createMipmap = false;   // todo : keep this until supporting the mipmap for dx12
 	const uint16 MipLevels = createMipmap ? static_cast<uint32>(std::floor(std::log2(std::max<int>(width, height)))) + 1 : 1;
-	jTexture_DX12* Texture = jBufferUtil_DX12::CreateImage(width, height, 1, MipLevels, 1, ETextureType::TEXTURE_2D, textureFormat, false, true);
+    EImageLayout Layout = EImageLayout::GENERAL;
+	jTexture_DX12* Texture = jBufferUtil_DX12::CreateImage(width, height, 1, MipLevels, 1, ETextureType::TEXTURE_2D, textureFormat, false, true, GetDX12ImageLayout(Layout));
 
 	// Copy image data from buffer
 	const auto Desc = Texture->Image->GetDesc();

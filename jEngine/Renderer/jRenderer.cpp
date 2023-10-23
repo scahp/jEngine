@@ -21,6 +21,7 @@
 #include "RHI/DX12/jSwapchain_DX12.h"
 #include "RHI/jRenderFrameContext.h"
 #include "RHI/DX12/jBufferUtil_DX12.h"
+#include "FileLoader/jImageFileLoader.h"
 
 #define ASYNC_WITH_SETUP 0
 #define PARALLELFOR_WITH_PASSSETUP 0
@@ -446,14 +447,14 @@ void jRenderer::SetupBasePass()
         BasePasses[InIndex].PrepareToDraw(false);
     });
 #else
-    BasePasses.resize(jObject::GetStaticObject().size());
+    BasePasses.resize(jObject::GetStaticRenderObject().size());
     int32 i = 0;
-    for (auto iter : jObject::GetStaticObject())
+    for (auto iter : jObject::GetStaticRenderObject())
     {
         jMaterial* Material = nullptr;
-        if (iter->RenderObjects[0]->MaterialPtr)
+        if (iter->MaterialPtr)
         {
-            Material = iter->RenderObjects[0]->MaterialPtr.get();
+            Material = iter->MaterialPtr.get();
         }
         else
         {
@@ -463,8 +464,8 @@ void jRenderer::SetupBasePass()
             }
         }
 
-        new (&BasePasses[i]) jDrawCommand(RenderFrameContextPtr, &View, iter->RenderObjects[0], BaseRenderPass
-            , GetOrCreateShaderFunc(iter->RenderObjects[0]), &BasePassPipelineStateFixed, Material, {}, SimplePushConstant);
+        new (&BasePasses[i]) jDrawCommand(RenderFrameContextPtr, &View, iter, BaseRenderPass
+            , GetOrCreateShaderFunc(iter), &BasePassPipelineStateFixed, Material, {}, SimplePushConstant);
         //new (&BasePasses[i]) jDrawCommand(RenderFrameContextPtr, &View, iter->RenderObject, BaseRenderPass
         //    , (iter->HasInstancing() ? BasePassInstancingShader : BasePassShader), &BasePassPipelineStateFixed, Material, {}, SimplePushConstant);
         BasePasses[i].PrepareToDraw(false);
