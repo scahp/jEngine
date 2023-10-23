@@ -11,7 +11,7 @@ struct jOptions
     bool UseSubpass = false;
     bool UseMemoryless = true;
     bool ShowDebugObject = false;
-    bool BloomEyeAdaptation = false;
+    bool BloomEyeAdaptation = true;
     bool QueueSubmitAfterShadowPass = true;
     bool QueueSubmitAfterBasePass = true;
     Vector CameraPos = Vector::ZeroVector;

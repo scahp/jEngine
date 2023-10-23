@@ -1693,7 +1693,7 @@ jTexture* jRHI_DX12::CreateTextureFromData(void* data, int32 width, int32 height
     createMipmap = false;   // todo : keep this until supporting the mipmap for dx12
 	const uint16 MipLevels = createMipmap ? static_cast<uint32>(std::floor(std::log2(std::max<int>(width, height)))) + 1 : 1;
     EImageLayout Layout = EImageLayout::GENERAL;
-	jTexture_DX12* Texture = jBufferUtil_DX12::CreateImage(width, height, 1, MipLevels, 1, ETextureType::TEXTURE_2D, textureFormat, false, true, GetDX12ImageLayout(Layout));
+	jTexture_DX12* Texture = jBufferUtil_DX12::CreateImage(width, height, 1, MipLevels, 1, ETextureType::TEXTURE_2D, textureFormat, false, true, Layout);
 
 	// Copy image data from buffer
 	const auto Desc = Texture->Image->GetDesc();
@@ -2023,6 +2023,48 @@ void jRHI_DX12::BindGraphicsShaderBindingInstances(const jCommandBuffer* InComma
 	}
 }
 
+void jRHI_DX12::BindComputeShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineStateLayout, const jShaderBindingInstanceCombiner& InShaderBindingInstanceCombiner, uint32 InFirstSet) const
+{
+    // 이 부분은 구조화 하게 되면, 이전에 만들어둔 것을 그대로 사용
+    if (InShaderBindingInstanceCombiner.ShaderBindingInstanceArray)
+    {
+        auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InCommandBuffer;
+        check(CommandBuffer_DX12);
+
+        const jShaderBindingInstanceArray& ShaderBindingInstanceArray = *(InShaderBindingInstanceCombiner.ShaderBindingInstanceArray);
+        CommandBuffer_DX12->CommandList->SetComputeRootSignature(jShaderBindingsLayout_DX12::CreateRootSignature(ShaderBindingInstanceArray));
+
+        int32 RootParameterIndex = 0;
+        bool HasDescriptor = false;
+        bool HasSamplerDescriptor = false;
+
+        const D3D12_GPU_DESCRIPTOR_HANDLE FirstGPUDescriptorHandle
+            = CommandBuffer_DX12->OnlineDescriptorHeap->GetGPUHandle(CommandBuffer_DX12->OnlineDescriptorHeap->GetNumOfAllocated());
+        const D3D12_GPU_DESCRIPTOR_HANDLE FirstGPUSamplerDescriptorHandle
+            = CommandBuffer_DX12->OnlineSamplerDescriptorHeap->GetGPUHandle(CommandBuffer_DX12->OnlineSamplerDescriptorHeap->GetNumOfAllocated());
+
+        for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
+        {
+            jShaderBindingInstance_DX12* Instance = (jShaderBindingInstance_DX12*)ShaderBindingInstanceArray[i];
+            jShaderBindingsLayout_DX12* Layout = (jShaderBindingsLayout_DX12*)(Instance->ShaderBindingsLayouts);
+
+            Instance->CopyToOnlineDescriptorHeap(CommandBuffer_DX12);
+
+            HasDescriptor |= Instance->Descriptors.size() > 0;
+            HasSamplerDescriptor |= Instance->SamplerDescriptors.size() > 0;
+
+            Instance->BindCompute(CommandBuffer_DX12, RootParameterIndex);
+        }
+
+        // DescriptorTable 은 항상 마지막에 바인딩
+        if (HasDescriptor)
+            CommandBuffer_DX12->CommandList->SetComputeRootDescriptorTable(RootParameterIndex++, FirstGPUDescriptorHandle);		// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
+
+        if (HasSamplerDescriptor)
+            CommandBuffer_DX12->CommandList->SetComputeRootDescriptorTable(RootParameterIndex++, FirstGPUSamplerDescriptorHandle);	// SamplerState test
+    }
+}
+
 jVertexBuffer* jRHI_DX12::CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const
 {
     if (!streamData)
@@ -2128,7 +2170,7 @@ std::shared_ptr<jRenderTarget> jRHI_DX12::CreateRenderTarget(const jRenderTarget
     const uint16 MipLevels = info.IsGenerateMipmap ? static_cast<uint32>(std::floor(std::log2(std::max<int>(info.Width, info.Height)))) + 1 : 1;
     
     jTexture_DX12* Texture = jBufferUtil_DX12::CreateImage(info.Width, info.Height, info.LayerCount, MipLevels, (uint32)info.SampleCount, info.Type, info.Format
-        , true, false, D3D12_RESOURCE_STATE_COMMON, info.RTClearValue, info.ResourceName);
+        , true, info.IsUAV, EImageLayout::UNDEFINED, info.RTClearValue, info.ResourceName);
 
     auto rt = new jRenderTarget();
     check(rt);
@@ -2159,14 +2201,19 @@ bool jRHI_DX12::TransitionImageLayout(jCommandBuffer* commandBuffer, jTexture* t
     if (Texture_DX12->Layout == newLayout)
         return true;
 
+    const auto SrcLayout = GetDX12ImageLayout(Texture_DX12->Layout);
+    const auto DstLayout = GetDX12ImageLayout(newLayout);
+    if (SrcLayout == DstLayout)
+        return true;
+
     auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)commandBuffer;
 
     D3D12_RESOURCE_BARRIER barrier = { };
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
     barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
     barrier.Transition.pResource = Texture_DX12->Image.Get();
-    barrier.Transition.StateBefore = GetDX12ImageLayout(Texture_DX12->Layout);
-    barrier.Transition.StateAfter = GetDX12ImageLayout(newLayout);
+    barrier.Transition.StateBefore = SrcLayout;
+    barrier.Transition.StateAfter = DstLayout;
     barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
     CommandBuffer_DX12->CommandList->ResourceBarrier(1, &barrier);
 
@@ -2201,17 +2248,19 @@ bool jRHI_DX12::TransitionImageLayoutImmediate(jTexture* texture, EImageLayout n
 
 void jRHI_DX12::BeginDebugEvent(jCommandBuffer* InCommandBuffer, const char* InName, const Vector4& InColor /*= Vector4::ColorGreen*/) const
 {
-    jCommandBuffer_DX12* commandList = (jCommandBuffer_DX12*)InCommandBuffer;
-    check(commandList);
+    jCommandBuffer_DX12* CommandList = (jCommandBuffer_DX12*)InCommandBuffer;
+    check(CommandList);
+    check(!CommandList->IsClosed);
 
-    PIXBeginEvent(commandList->Get(), PIX_COLOR((BYTE)(255 * InColor.x), (BYTE)(255 * InColor.y), (BYTE)(255 * InColor.z)), InName);
+    PIXBeginEvent(CommandList->Get(), PIX_COLOR((BYTE)(255 * InColor.x), (BYTE)(255 * InColor.y), (BYTE)(255 * InColor.z)), InName);
 }
 
 void jRHI_DX12::EndDebugEvent(jCommandBuffer* InCommandBuffer) const
 {
-    jCommandBuffer_DX12* commandList = (jCommandBuffer_DX12*)InCommandBuffer;
-    check(commandList);
+    jCommandBuffer_DX12* CommandList = (jCommandBuffer_DX12*)InCommandBuffer;
+    check(CommandList);
+    check(!CommandList->IsClosed);
 
-    PIXEndEvent(commandList->Get());
+    PIXEndEvent(CommandList->Get());
 }
 

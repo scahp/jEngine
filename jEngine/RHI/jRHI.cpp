@@ -6,7 +6,7 @@
 #include "Material/jMaterial.h"
 #include "jRHIType.h"
 
-const jRTClearValue jRTClearValue::Invalid(0.0f, 0.0f, 0.0f, 0.0f);
+const jRTClearValue jRTClearValue::Invalid = jRTClearValue();
 
 jTexture* GWhiteTexture = nullptr;
 jTexture* GBlackTexture = nullptr;
@@ -188,7 +188,7 @@ void jView::PrepareViewUniformBufferShaderBindingInstance()
     jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
 
     ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::ALL_GRAPHICS
-        , ResourceInlineAllactor.Alloc<jUniformBufferResource>(ViewUniformBufferPtr.get()));
+        , ResourceInlineAllactor.Alloc<jUniformBufferResource>(ViewUniformBufferPtr.get()), true);
 
 	ViewUniformBufferShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
 }

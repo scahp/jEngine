@@ -18,7 +18,7 @@ struct jShaderBindingInstance_DX12 : public jShaderBindingInstance
     virtual void Free() override {}
 
     void BindGraphics(jCommandBuffer_DX12* InCommandList, int32& InOutStartIndex) const;
-    void BindCompute(jCommandBuffer_DX12* InCommandList);
+    void BindCompute(jCommandBuffer_DX12* InCommandList, int32& InOutStartIndex);
     void CopyToOnlineDescriptorHeap(jCommandBuffer_DX12* InCommandList);
     //ID3D12RootSignature* GetRootSignature() const;
 

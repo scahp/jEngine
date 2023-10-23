@@ -753,11 +753,10 @@ void jRenderer::PostProcess()
         ubo.BufferSizeAndInvSize.z = 1.0f / (float)RTWidth;
         ubo.BufferSizeAndInvSize.w = 1.0f / (float)RTHeight;
 
-        jUniformBufferBlock_Vulkan OneFrameUniformBuffer(jNameStatic("BloomUniformBuffer"), jLifeTimeType::OneFrame);
+        auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(jNameStatic("BloomUniformBuffer"), jLifeTimeType::OneFrame, sizeof(ubo)));
         if (IsBloom)
         {
-            OneFrameUniformBuffer.Init(sizeof(ubo));
-            OneFrameUniformBuffer.UpdateBufferData(&ubo, sizeof(ubo));
+            OneFrameUniformBuffer->UpdateBufferData(&ubo, sizeof(ubo));
         }
 
         std::shared_ptr<jShaderBindingInstance> ShaderBindingInstance;
@@ -765,22 +764,26 @@ void jRenderer::PostProcess()
             if (IsBloom)
             {
                 ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::ALL_GRAPHICS
-                    , ResourceInlineAllactor.Alloc<jUniformBufferResource>(&OneFrameUniformBuffer));
+                    , ResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true);
             }
 
             const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
                 , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
-                , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), true, ECompareOp::LESS>::Create();
+                , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
 
             for (int32 i = 0; i < (int32)InShaderInputs.size(); ++i)
             {
                 ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
                     , ResourceInlineAllactor.Alloc<jTextureResource>(InShaderInputs[i], SamplerState));
+
+                g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), InShaderInputs[i], EImageLayout::SHADER_READ_ONLY);
             }
 
             ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
             ShaderBindingInstanceArray.Add(ShaderBindingInstance.get());
         }
+
+        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), InRenderTargetPtr->GetTexture(), EImageLayout::COLOR_ATTACHMENT);
 
         jGraphicsPipelineShader Shader;
         {
@@ -809,14 +812,12 @@ void jRenderer::PostProcess()
     };
 
     SCOPE_CPU_PROFILE(PostProcess);
-    if (0)
+    if (1)
     {
         SCOPE_GPU_PROFILE(RenderFrameContextPtr, PostProcess);
         DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "PostProcess", Vector4(0.0f, 0.8f, 0.8f, 1.0f));
 
         const uint32 imageIndex = RenderFrameContextPtr->FrameIndex;
-        jCommandBuffer* CommandBuffer = RenderFrameContextPtr->GetActiveCommandBuffer();
-
         char szDebugEventTemp[1024] = { 0, };
 
         jSceneRenderTarget* SceneRT = RenderFrameContextPtr->SceneRenderTargetPtr.get();
@@ -828,13 +829,13 @@ void jRenderer::PostProcess()
             // Todo remove this hardcode
             if (!g_EyeAdaptationARTPtr)
             {
-                jRenderTargetInfo Info = { ETextureType::TEXTURE_2D, ETextureFormat::R16F, 1, 1, 1, false, g_rhi->GetSelectedMSAASamples() };
+                jRenderTargetInfo Info = { ETextureType::TEXTURE_2D, ETextureFormat::R16F, 1, 1, 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue::Invalid, true };
                 Info.ResourceName = TEXT("g_EyeAdaptationARTPtr");
                 g_EyeAdaptationARTPtr = jRenderTargetPool::GetRenderTarget(Info);
             }
             if (!g_EyeAdaptationBRTPtr)
             {
-                jRenderTargetInfo Info = { ETextureType::TEXTURE_2D, ETextureFormat::R16F, 1, 1, 1, false, g_rhi->GetSelectedMSAASamples() };
+                jRenderTargetInfo Info = { ETextureType::TEXTURE_2D, ETextureFormat::R16F, 1, 1, 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue::Invalid, true };
                 Info.ResourceName = TEXT("g_EyeAdaptationBRTPtr");
                 g_EyeAdaptationBRTPtr = jRenderTargetPool::GetRenderTarget(Info);
             }
@@ -845,34 +846,37 @@ void jRenderer::PostProcess()
             jTexture* EyeAdaptationTextureOld = FlipEyeAdaptation ? g_EyeAdaptationARTPtr->GetTexture() : g_EyeAdaptationBRTPtr->GetTexture();
             EyeAdaptationTextureCurrent = FlipEyeAdaptation ? g_EyeAdaptationBRTPtr->GetTexture() : g_EyeAdaptationARTPtr->GetTexture();
 
-            g_rhi->TransitionImageLayout(CommandBuffer, EyeAdaptationTextureOld, EImageLayout::SHADER_READ_ONLY);
-            //////////////////////////////////////////////////////////////////////////
-
-            g_rhi->TransitionImageLayout(CommandBuffer, SceneRT->ColorPtr->GetTexture(), EImageLayout::SHADER_READ_ONLY);
-
-            SourceRT = SceneRT->ColorPtr->GetTexture();
-
-            sprintf_s(szDebugEventTemp, sizeof(szDebugEventTemp), "BloomEyeAdaptationSetup %dx%d", SceneRT->BloomSetup->Info.Width, SceneRT->BloomSetup->Info.Height);
-            AddFullQuadPass(szDebugEventTemp, { SourceRT, EyeAdaptationTextureOld }, SceneRT->BloomSetup
-                , jNameStatic("Resource/Shaders/hlsl/fullscreenquad_vs.hlsl"), jNameStatic("Resource/Shaders/hlsl/bloom_and_eyeadaptation_setup_ps.hlsl"));
-            SourceRT = SceneRT->BloomSetup->GetTexture();
-            g_rhi->TransitionImageLayout(CommandBuffer, SourceRT, EImageLayout::SHADER_READ_ONLY);
-
-            for (int32 i = 0; i < _countof(SceneRT->DownSample); ++i)
+            if (1)
             {
-                const auto& RTInfo = SceneRT->DownSample[i]->Info;
-                sprintf_s(szDebugEventTemp, sizeof(szDebugEventTemp), "BloomDownsample %dx%d", RTInfo.Width, RTInfo.Height);
-                AddFullQuadPass(szDebugEventTemp, { SourceRT }, SceneRT->DownSample[i]
-                    , jNameStatic("Resource/Shaders/hlsl/bloom_down_vs.hlsl"), jNameStatic("Resource/Shaders/hlsl/bloom_down_ps.hlsl"), true);
-                SourceRT = SceneRT->DownSample[i]->GetTexture();
-                g_rhi->TransitionImageLayout(CommandBuffer, SourceRT, EImageLayout::SHADER_READ_ONLY);
-            }
+                jCommandBuffer* CommandBuffer = RenderFrameContextPtr->GetActiveCommandBuffer();
 
-            g_rhi->TransitionImageLayout(CommandBuffer, EyeAdaptationTextureOld, EImageLayout::SHADER_READ_ONLY);
-            g_rhi->TransitionImageLayout(CommandBuffer, EyeAdaptationTextureCurrent, EImageLayout::GENERAL);
+                g_rhi->TransitionImageLayout(CommandBuffer, EyeAdaptationTextureOld, EImageLayout::SHADER_READ_ONLY);
+                //////////////////////////////////////////////////////////////////////////
+
+                g_rhi->TransitionImageLayout(CommandBuffer, SceneRT->ColorPtr->GetTexture(), EImageLayout::SHADER_READ_ONLY);
+
+                SourceRT = SceneRT->ColorPtr->GetTexture();
+
+                sprintf_s(szDebugEventTemp, sizeof(szDebugEventTemp), "BloomEyeAdaptationSetup %dx%d", SceneRT->BloomSetup->Info.Width, SceneRT->BloomSetup->Info.Height);
+                AddFullQuadPass(szDebugEventTemp, { SourceRT, EyeAdaptationTextureOld }, SceneRT->BloomSetup
+                    , jNameStatic("Resource/Shaders/hlsl/fullscreenquad_vs.hlsl"), jNameStatic("Resource/Shaders/hlsl/bloom_and_eyeadaptation_setup_ps.hlsl"));
+                SourceRT = SceneRT->BloomSetup->GetTexture();
+                g_rhi->TransitionImageLayout(CommandBuffer, SourceRT, EImageLayout::SHADER_READ_ONLY);
+
+                for (int32 i = 0; i < _countof(SceneRT->DownSample); ++i)
+                {
+                    const auto& RTInfo = SceneRT->DownSample[i]->Info;
+                    sprintf_s(szDebugEventTemp, sizeof(szDebugEventTemp), "BloomDownsample %dx%d", RTInfo.Width, RTInfo.Height);
+                    AddFullQuadPass(szDebugEventTemp, { SourceRT }, SceneRT->DownSample[i]
+                        , jNameStatic("Resource/Shaders/hlsl/bloom_down_vs.hlsl"), jNameStatic("Resource/Shaders/hlsl/bloom_down_ps.hlsl"), true);
+                    SourceRT = SceneRT->DownSample[i]->GetTexture();
+                    g_rhi->TransitionImageLayout(CommandBuffer, SourceRT, EImageLayout::SHADER_READ_ONLY);
+                }
+            }
 
             // Todo make a function for each postprocess steps
             // 여기서 EyeAdaptation 계산하는 Compute shader 추가
+            if (1)
             {
                 sprintf_s(szDebugEventTemp, sizeof(szDebugEventTemp), "EyeAdaptationCS %dx%d", EyeAdaptationTextureCurrent->Width, EyeAdaptationTextureCurrent->Height);
                 DEBUG_EVENT(RenderFrameContextPtr, szDebugEventTemp);
@@ -924,12 +928,12 @@ void jRenderer::PostProcess()
                 EyeAdaptationUniformBuffer.AdaptationSpeed = 1.0f;
                 EyeAdaptationUniformBuffer.ExposureCompensation = exp2(gOptions.AutoExposureKeyValueScale);
 
-                jUniformBufferBlock_Vulkan OneFrameUniformBuffer(jNameStatic("EyeAdaptationUniformBuffer"), jLifeTimeType::OneFrame);
-                OneFrameUniformBuffer.Init(sizeof(EyeAdaptationUniformBuffer));
-                OneFrameUniformBuffer.UpdateBufferData(&EyeAdaptationUniformBuffer, sizeof(EyeAdaptationUniformBuffer));
+                auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
+                    jNameStatic("EyeAdaptationUniformBuffer"), jLifeTimeType::OneFrame, sizeof(EyeAdaptationUniformBuffer)));
+                OneFrameUniformBuffer->UpdateBufferData(&EyeAdaptationUniformBuffer, sizeof(EyeAdaptationUniformBuffer));
                 {
                     ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
-                        , ResourceInlineAllactor.Alloc<jUniformBufferResource>(&OneFrameUniformBuffer));
+                        , ResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true);
                 }
 
                 CurrentBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
@@ -947,23 +951,47 @@ void jRenderer::PostProcess()
 
                 computePipelineStateInfo->Bind(RenderFrameContextPtr);
 
-                CurrentBindingInstance->BindCompute(RenderFrameContextPtr, (VkPipelineLayout)computePipelineStateInfo->GetPipelineLayoutHandle());
+                //CurrentBindingInstance->BindCompute(RenderFrameContextPtr, (VkPipelineLayout)computePipelineStateInfo->GetPipelineLayoutHandle());
 
-                vkCmdDispatch((VkCommandBuffer)CommandBuffer->GetHandle(), 1, 1, 1);
+                jShaderBindingInstanceArray ShaderBindingInstanceArray;
+                ShaderBindingInstanceArray.Add(CurrentBindingInstance.get());
+
+                jShaderBindingInstanceCombiner ShaderBindingInstanceCombiner;
+                for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
+                {
+                    // Add ShaderBindingInstanceCombiner data : DescriptorSets, DynamicOffsets
+                    ShaderBindingInstanceCombiner.DescriptorSetHandles.Add(ShaderBindingInstanceArray[i]->GetHandle());
+                    const std::vector<uint32>* pDynamicOffsetTest = ShaderBindingInstanceArray[i]->GetDynamicOffsets();
+                    if (pDynamicOffsetTest && pDynamicOffsetTest->size())
+                    {
+                        ShaderBindingInstanceCombiner.DynamicOffsets.Add((void*)pDynamicOffsetTest->data(), (int32)pDynamicOffsetTest->size());
+                    }
+                }
+                ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
+
+                g_rhi->BindComputeShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), computePipelineStateInfo, ShaderBindingInstanceCombiner, 0);
+
+                //vkCmdDispatch((VkCommandBuffer)CommandBuffer->GetHandle(), 1, 1, 1);
+                jCommandBuffer_DX12* CommandBuffer = (jCommandBuffer_DX12*)RenderFrameContextPtr->GetActiveCommandBuffer();
+                CommandBuffer->CommandList->Dispatch(1, 1, 1);
             }
             //////////////////////////////////////////////////////////////////////////
 
-            for (int32 i = 0; i < _countof(SceneRT->UpSample); ++i)
+            if (1)
             {
-                const auto& RTInfo = SceneRT->UpSample[i]->Info;
-                sprintf_s(szDebugEventTemp, sizeof(szDebugEventTemp), "BloomUpsample %dx%d", RTInfo.Width, RTInfo.Height);
-                AddFullQuadPass(szDebugEventTemp, { SourceRT }, SceneRT->UpSample[i]
-                    , jNameStatic("Resource/Shaders/hlsl/bloom_up_vs.hlsl"), jNameStatic("Resource/Shaders/hlsl/bloom_up_ps.hlsl"), true);
-                SourceRT = SceneRT->UpSample[i]->GetTexture();
-                g_rhi->TransitionImageLayout(CommandBuffer, SourceRT, EImageLayout::SHADER_READ_ONLY);
-            }
+                jCommandBuffer_DX12* CommandBuffer = (jCommandBuffer_DX12*)RenderFrameContextPtr->GetActiveCommandBuffer();
+                for (int32 i = 0; i < _countof(SceneRT->UpSample); ++i)
+                {
+                    const auto& RTInfo = SceneRT->UpSample[i]->Info;
+                    sprintf_s(szDebugEventTemp, sizeof(szDebugEventTemp), "BloomUpsample %dx%d", RTInfo.Width, RTInfo.Height);
+                    AddFullQuadPass(szDebugEventTemp, { SourceRT }, SceneRT->UpSample[i]
+                        , jNameStatic("Resource/Shaders/hlsl/bloom_up_vs.hlsl"), jNameStatic("Resource/Shaders/hlsl/bloom_up_ps.hlsl"), true);
+                    SourceRT = SceneRT->UpSample[i]->GetTexture();
+                    g_rhi->TransitionImageLayout(CommandBuffer, SourceRT, EImageLayout::SHADER_READ_ONLY);
+                }
 
-            g_rhi->TransitionImageLayout(CommandBuffer, EyeAdaptationTextureCurrent, EImageLayout::SHADER_READ_ONLY);
+                g_rhi->TransitionImageLayout(CommandBuffer, EyeAdaptationTextureCurrent, EImageLayout::SHADER_READ_ONLY);
+            }
         }
         else
         {
@@ -975,85 +1003,6 @@ void jRenderer::PostProcess()
             , jNameStatic("Resource/Shaders/hlsl/fullscreenquad_vs.hlsl"), jNameStatic("Resource/Shaders/hlsl/tonemap_ps.hlsl"));
 
         return;
-
-        /*
-        //////////////////////////////////////////////////////////////////////////
-        // Compute Pipeline
-        g_rhi->TransitionImageLayout(CommandBuffer, SceneRT->ColorPtr->GetTexture(), EImageLayout::SHADER_READ_ONLY);
-        g_rhi->TransitionImageLayout(CommandBuffer, EyeAdaptationTextureCurrent, EImageLayout::SHADER_READ_ONLY);
-        g_rhi->TransitionImageLayout(CommandBuffer, SceneRT->FinalColorPtr->GetTexture(), EImageLayout::GENERAL);
-
-        jShaderBindingInstance* CurrentBindingInstance = nullptr;
-        int32 BindingPoint = 0;
-        jShaderBindingArray ShaderBindingArray;
-        jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
-
-        // Binding 0 : Source Image
-        if (ensure(SceneRT->ColorPtr))
-        {
-            ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-                , ResourceInlineAllactor.Alloc<jTextureResource>(SceneRT->ColorPtr->GetTexture(), nullptr));
-        }
-
-        // Binding 1 : Source Image
-        if (ensure(EyeAdaptationTextureCurrent))
-        {
-            ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-                , ResourceInlineAllactor.Alloc<jTextureResource>(EyeAdaptationTextureCurrent, nullptr));
-        }
-
-        // Binding 2 : Target Image
-        if (ensure(SceneRT->FinalColorPtr))
-        {
-            ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE
-                , ResourceInlineAllactor.Alloc<jTextureResource>(SceneRT->FinalColorPtr->GetTexture(), nullptr));
-        }
-
-        // Binding 3 : CommonComputeUniformBuffer
-        struct jCommonComputeUniformBuffer
-        {
-            float Width;
-            float Height;
-            float UseWaveIntrinsics;
-            float Padding;
-        };
-        jCommonComputeUniformBuffer CommonComputeUniformBuffer;
-        CommonComputeUniformBuffer.Width = (float)SCR_WIDTH;
-        CommonComputeUniformBuffer.Height = (float)SCR_HEIGHT;
-        CommonComputeUniformBuffer.UseWaveIntrinsics = gOptions.UseWaveIntrinsics;
-
-        jUniformBufferBlock_Vulkan OneFrameUniformBuffer(jNameStatic("CommonComputeUniformBuffer"), jLifeTimeType::OneFrame);
-        OneFrameUniformBuffer.Init(sizeof(CommonComputeUniformBuffer));
-        OneFrameUniformBuffer.UpdateBufferData(&CommonComputeUniformBuffer, sizeof(CommonComputeUniformBuffer));
-        {
-            ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
-                , ResourceInlineAllactor.Alloc<jUniformBufferResource>(&OneFrameUniformBuffer));
-        }
-
-        CurrentBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
-
-        jShaderInfo shaderInfo;
-        shaderInfo.SetName(jNameStatic("tonemap cs"));
-        shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/tonemap_cs.hlsl"));
-        shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
-        static jShader* Shader = g_rhi->CreateShader(shaderInfo);
-
-        jShaderBindingsLayoutArray ShaderBindingLayoutArray;
-        ShaderBindingLayoutArray.Add(CurrentBindingInstance->ShaderBindingsLayouts);
-
-        jPipelineStateInfo* computePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingLayoutArray, {});
-
-        computePipelineStateInfo->Bind(RenderFrameContextPtr);
-
-        CurrentBindingInstance->BindCompute(RenderFrameContextPtr, (VkPipelineLayout)computePipelineStateInfo->GetPipelineLayoutHandle());
-
-        Vector2i SwapchainExtent = g_rhi->GetSwapchain()->GetExtent();
-
-        check(g_rhi->GetSwapchain());
-        vkCmdDispatch((VkCommandBuffer)CommandBuffer->GetHandle()
-            , SwapchainExtent.x / 16 + ((SwapchainExtent.x % 16) ? 1 : 0)
-            , SwapchainExtent.y / 16 + ((SwapchainExtent.y % 16) ? 1 : 0), 1);
-        */
     }
 }
 
@@ -1210,7 +1159,7 @@ void jRenderer::Render()
     if (gOptions.QueueSubmitAfterShadowPass)
     {
         SCOPE_CPU_PROFILE(QueueSubmitAfterShadowPass);
-        RenderFrameContextPtr->GetActiveCommandBuffer()->End();
+        //RenderFrameContextPtr->GetActiveCommandBuffer()->End();
         RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::ShadowPass);
         RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
     }
@@ -1221,13 +1170,16 @@ void jRenderer::Render()
     if (gOptions.QueueSubmitAfterBasePass)
     {
         SCOPE_CPU_PROFILE(QueueSubmitAfterBasePass);
-        RenderFrameContextPtr->GetActiveCommandBuffer()->End();
+        //RenderFrameContextPtr->GetActiveCommandBuffer()->End();
         RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::BasePass);
         RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
     }
 
-    //PostProcess();
+    PostProcess();
     //DebugPasses();
+
+    RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::BasePass);
+    RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
 
 #if USE_VULKAN
     jImGUI_Vulkan::Get().Draw(RenderFrameContextPtr);
@@ -1281,7 +1233,7 @@ void jRenderer::Render()
             // Setup attachment
             jRenderPassInfo renderPassInfo;
             auto BackBuffer = std::make_shared<jRenderTarget>(CurrentSwapchainImage->TexturePtr);
-            jAttachment color = jAttachment(BackBuffer, EAttachmentLoadStoreOp::CLEAR_STORE
+            jAttachment color = jAttachment(BackBuffer, EAttachmentLoadStoreOp::DONTCARE_STORE
                 , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor
                 , EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
             renderPassInfo.Attachments.push_back(color);
@@ -1290,65 +1242,61 @@ void jRenderer::Render()
 
         g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), EImageLayout::SHADER_READ_ONLY);
 
-        // Create Copy DrawCommand
-        static jFullscreenQuadPrimitive* GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
-        std::shared_ptr<jShaderBindingInstance> ShaderBindingInstanceForCopy;
-        jDrawCommand CopyDrawCommand;
+        //// Create Copy DrawCommand
+        //static jFullscreenQuadPrimitive* GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
+        //std::shared_ptr<jShaderBindingInstance> ShaderBindingInstanceForCopy;
+        //jDrawCommand CopyDrawCommand;
+        //{
+        //    jGraphicsPipelineShader Shader;
+
+        //    {
+        //        jShaderInfo shaderInfo;
+        //        shaderInfo.SetName(jNameStatic("CopyVS"));
+        //        shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/fullscreenquad_vs.hlsl"));
+        //        shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
+        //        Shader.VertexShader = g_rhi->CreateShader(shaderInfo);
+        //    }
+        //    {
+        //        jShaderInfo shaderInfo;
+        //        shaderInfo.SetName(jNameStatic("CopyPS"));
+        //        shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/copy_ps.hlsl"));
+        //        shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
+        //        Shader.PixelShader = g_rhi->CreateShader(shaderInfo);
+        //    }
+
+        //    int32 BindingPoint = 0;
+        //    jShaderBindingArray ShaderBindingArray;
+        //    jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
+
+        //    ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
+        //        , ResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), nullptr));
+
+        //    ShaderBindingInstanceForCopy = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
+        //    jShaderBindingInstanceArray ShaderBindingInstanceArray;
+        //    ShaderBindingInstanceArray.Add(ShaderBindingInstanceForCopy.get());
+
+        //    new (&CopyDrawCommand) jDrawCommand(RenderFrameContextPtr, GlobalFullscreenPrimitive->RenderObjects[0], UIRenderPass
+        //        , Shader, &BasePassPipelineStateFixed, nullptr, ShaderBindingInstanceArray, nullptr);
+        //    CopyDrawCommand.Test = true;
+        //    CopyDrawCommand.PrepareToDraw(false);
+        //}
+
         {
-            jGraphicsPipelineShader Shader;
+            DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "ImGUI", Vector4(0.8f, 0.8f, 0.8f, 1.0f));
 
+            if (UIRenderPass && UIRenderPass->BeginRenderPass(RenderFrameContextPtr->GetActiveCommandBuffer()))
             {
-                jShaderInfo shaderInfo;
-                shaderInfo.SetName(jNameStatic("CopyVS"));
-                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/fullscreenquad_vs.hlsl"));
-                shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
-                Shader.VertexShader = g_rhi->CreateShader(shaderInfo);
+                //// Copy ColorRT to BackBuffer
+                //CopyDrawCommand.Draw();
+
+                // Draw UI to BackBuffer Directly
+                const jCommandBuffer_DX12* commandBuffer = (const jCommandBuffer_DX12*)RenderFrameContextPtr->GetActiveCommandBuffer();
+                ID3D12DescriptorHeap* DescriptorHeap = g_rhi_dx12->m_imgui_SrvDescHeap.Get();
+                commandBuffer->CommandList->SetDescriptorHeaps(1, &DescriptorHeap);
+                ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandBuffer->CommandList.Get());
+
+                UIRenderPass->EndRenderPass();
             }
-            {
-                jShaderInfo shaderInfo;
-                shaderInfo.SetName(jNameStatic("CopyPS"));
-                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/copy_ps.hlsl"));
-                shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
-                Shader.PixelShader = g_rhi->CreateShader(shaderInfo);
-            }
-
-            int32 BindingPoint = 0;
-            jShaderBindingArray ShaderBindingArray;
-            jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
-
-            ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
-                , ResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), nullptr));
-
-            ShaderBindingInstanceForCopy = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
-            jShaderBindingInstanceArray ShaderBindingInstanceArray;
-            ShaderBindingInstanceArray.Add(ShaderBindingInstanceForCopy.get());
-
-            new (&CopyDrawCommand) jDrawCommand(RenderFrameContextPtr, GlobalFullscreenPrimitive->RenderObjects[0], UIRenderPass
-                , Shader, &BasePassPipelineStateFixed, nullptr, ShaderBindingInstanceArray, nullptr);
-            CopyDrawCommand.Test = true;
-            CopyDrawCommand.PrepareToDraw(false);
-        }
-
-        RenderFrameContextPtr->GetActiveCommandBuffer()->End();
-        RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::BasePass);
-        RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
-
-        if (UIRenderPass && UIRenderPass->BeginRenderPass(RenderFrameContextPtr->GetActiveCommandBuffer()))
-        {
-            // Copy ColorRT to BackBuffer
-            CopyDrawCommand.Draw();
-
-            // Draw UI to BackBuffer Directly
-            const jCommandBuffer_DX12* commandBuffer = (const jCommandBuffer_DX12*)RenderFrameContextPtr->GetActiveCommandBuffer();
-            ID3D12DescriptorHeap* DescriptorHeap = g_rhi_dx12->m_imgui_SrvDescHeap.Get();
-            commandBuffer->CommandList->SetDescriptorHeaps(1, &DescriptorHeap);
-            ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandBuffer->CommandList.Get());
-
-            UIRenderPass->EndRenderPass();
-
-            RenderFrameContextPtr->GetActiveCommandBuffer()->End();
-            RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::BasePass);
-            RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
         }
     }
 #endif

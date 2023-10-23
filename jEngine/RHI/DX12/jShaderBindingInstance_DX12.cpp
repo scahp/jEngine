@@ -38,7 +38,7 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
         {
             jUniformBufferBlock_DX12* UniformBuffer = (jUniformBufferBlock_DX12*)ShaderBinding->Resource->GetResource();
             check(UniformBuffer->GetBuffer());
-
+            check(!UniformBuffer->IsUseRingBuffer() || (UniformBuffer->IsUseRingBuffer() && ShaderBinding->IsInline));
             if (ShaderBinding->IsInline)
             {
                 RootParameterInlines.push_back({ 
@@ -195,33 +195,30 @@ void jShaderBindingInstance_DX12::BindGraphics(jCommandBuffer_DX12* InCommandLis
     }
 }
 
-void jShaderBindingInstance_DX12::BindCompute(jCommandBuffer_DX12* InCommandList)
+void jShaderBindingInstance_DX12::BindCompute(jCommandBuffer_DX12* InCommandList, int32& InOutStartIndex)
 {
     check(InCommandList);
 
     auto CommandList = InCommandList->Get();
     check(CommandList);
-    CommandList->SetComputeRootSignature((ID3D12RootSignature*)ShaderBindingsLayouts->GetHandle());
 
     int32 index = 0;
-    for (index = 0; index < RootParameterInlines.size(); ++index)
+    for (index = 0; index < RootParameterInlines.size(); ++index, ++InOutStartIndex)
     {
         switch (RootParameterInlines[index].Type)
         {
         case jInlineRootParamType::CBV:
-            CommandList->SetComputeRootConstantBufferView(index, RootParameterInlines[index].GPUVirtualAddress);
+            CommandList->SetComputeRootConstantBufferView(InOutStartIndex, RootParameterInlines[index].GPUVirtualAddress);
             break;
         case jInlineRootParamType::SRV:
-            CommandList->SetComputeRootShaderResourceView(index, RootParameterInlines[index].GPUVirtualAddress);
+            CommandList->SetComputeRootShaderResourceView(InOutStartIndex, RootParameterInlines[index].GPUVirtualAddress);
             break;
         case jInlineRootParamType::UAV:
-            CommandList->SetComputeRootUnorderedAccessView(index, RootParameterInlines[index].GPUVirtualAddress);
+            CommandList->SetComputeRootUnorderedAccessView(InOutStartIndex, RootParameterInlines[index].GPUVirtualAddress);
         default:
             break;
         }
     }
-    CommandList->SetComputeRootDescriptorTable(index++, InCommandList->OnlineDescriptorHeap->GetGPUHandle());		// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
-    CommandList->SetComputeRootDescriptorTable(index++, InCommandList->OnlineSamplerDescriptorHeap->GetGPUHandle());	// SamplerState test
 }
 
 void jShaderBindingInstance_DX12::CopyToOnlineDescriptorHeap(jCommandBuffer_DX12* InCommandList)

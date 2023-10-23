@@ -16,7 +16,7 @@ struct jShaderBindingResource : public std::enable_shared_from_this<jShaderBindi
 struct jUniformBufferResource : public jShaderBindingResource
 {
     jUniformBufferResource() = default;
-    jUniformBufferResource(const IUniformBufferBlock* InUniformBuffer, bool InIsInline = false) : UniformBuffer(InUniformBuffer) {}
+    jUniformBufferResource(const IUniformBufferBlock* InUniformBuffer) : UniformBuffer(InUniformBuffer) {}
     virtual ~jUniformBufferResource() {}
     virtual const void* GetResource() const override { return UniformBuffer; }
 
@@ -26,7 +26,7 @@ struct jUniformBufferResource : public jShaderBindingResource
 struct jBufferResource : public jShaderBindingResource
 {
     jBufferResource() = default;
-    jBufferResource(const jBuffer* InBuffer, bool InIsInline = false) : Buffer(InBuffer) {}
+    jBufferResource(const jBuffer* InBuffer) : Buffer(InBuffer) {}
     virtual ~jBufferResource() {}
     virtual const void* GetResource() const override { return Buffer; }
 
@@ -107,10 +107,8 @@ struct jShaderBinding
         if (Hash)
             return Hash;
 
-        Hash = BindingPoint;
-        Hash = (Hash << 32) | (uint32)BindingType;
-        Hash = (Hash << 32) | (uint32)AccessStageFlags;
-        Hash = (Hash << 32) | (uint32)NumOfDescriptors;
+        Hash = BindingPoint | ((Hash << 32) | (uint32)BindingType);
+        Hash ^= (uint32)AccessStageFlags | ((Hash << 32) | (uint32)NumOfDescriptors);
         Hash ^= (uint32)IsInline;
 
         //Hash = BindingPoint ^ (uint32)BindingType ^ (uint32)AccessStageFlags ^ (int32)NumOfDescriptors ^ (int32)IsInline;

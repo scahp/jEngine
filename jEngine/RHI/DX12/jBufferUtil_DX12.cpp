@@ -109,7 +109,7 @@ jBuffer_DX12* CreateBuffer(uint64 InSize, uint16 InAlignment, bool InIsCPUAccess
 }
 
 ComPtr<ID3D12Resource> CreateImageInternal(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, uint32 InNumOfSample
-    , D3D12_RESOURCE_DIMENSION InType, DXGI_FORMAT InFormat, bool InIsRTV, bool InIsUAV, D3D12_RESOURCE_STATES InResourceState, D3D12_CLEAR_VALUE* InClearValue, const wchar_t* InResourceName)
+    , D3D12_RESOURCE_DIMENSION InType, DXGI_FORMAT InFormat, bool InIsRTV, bool InIsUAV, EImageLayout InImageLayout, D3D12_CLEAR_VALUE* InClearValue, const wchar_t* InResourceName)
 {
     check(g_rhi_dx12);
     check(g_rhi_dx12->Device);
@@ -145,7 +145,7 @@ ComPtr<ID3D12Resource> CreateImageInternal(uint32 InWidth, uint32 InHeight, uint
     TexDesc.Alignment = 0;
 
     ComPtr<ID3D12Resource> Image;
-    Image = g_rhi_dx12->CreateResource(&TexDesc, InResourceState, InClearValue);
+    Image = g_rhi_dx12->CreateResource(&TexDesc, GetDX12ImageLayout(InImageLayout), InClearValue);
     if (!ensure(Image))
         return nullptr;
 
@@ -156,7 +156,7 @@ ComPtr<ID3D12Resource> CreateImageInternal(uint32 InWidth, uint32 InHeight, uint
 }
 
 jTexture_DX12* CreateImage(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, uint32 InNumOfSample
-    , ETextureType InType, ETextureFormat InFormat, bool InIsRTV, bool InIsUAV, D3D12_RESOURCE_STATES InResourceState, const jRTClearValue& InClearValue, const wchar_t* InResourceName)
+    , ETextureType InType, ETextureFormat InFormat, bool InIsRTV, bool InIsUAV, EImageLayout InImageLayout, const jRTClearValue& InClearValue, const wchar_t* InResourceName)
 {
     bool HasClearValue = false;
     D3D12_CLEAR_VALUE ClearValue{};
@@ -180,14 +180,15 @@ jTexture_DX12* CreateImage(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers
     }
 
     ComPtr<ID3D12Resource> TextureInternal = CreateImageInternal(InWidth, InHeight, InArrayLayers, InMipLevels, InNumOfSample
-        , GetDX12TextureDemension(InType), GetDX12TextureFormat(InFormat), InIsRTV, InIsUAV, InResourceState, (HasClearValue ? &ClearValue : nullptr), InResourceName);
+        , GetDX12TextureDemension(InType), GetDX12TextureFormat(InFormat), InIsRTV, InIsUAV, InImageLayout, (HasClearValue ? &ClearValue : nullptr), InResourceName);
     if (!ensure(TextureInternal))
         return nullptr;
 
     jTexture_DX12* Texture = new jTexture_DX12(InType, InFormat, InWidth, InHeight, InArrayLayers
         , EMSAASamples::COUNT_1, InMipLevels, false, InClearValue, TextureInternal);
-    Texture->Layout = GetDX12ImageLayout(InResourceState);
     check(Texture);
+    Texture->Layout = InImageLayout;
+
     if (InResourceName)
     {
         // https://learn.microsoft.com/ko-kr/cpp/text/how-to-convert-between-various-string-types?view=msvc-170#example-convert-from-char-

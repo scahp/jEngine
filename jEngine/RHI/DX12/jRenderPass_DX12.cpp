@@ -112,10 +112,16 @@ bool jRenderPass_DX12::CreateRenderPass()
                 DSVCPUDHandle = TextureDX12->DSV.CPUHandle;
             }
             else
-            {                
+            {
+                if (HasClear)
+                {
+                    RTVClears.push_back(attachment.RTClearValue);
+                }
+                else
+                {
+                    RTVClears.push_back(jRTClearValue::Invalid);
+                }
                 RTVCPUHandles.push_back(TextureDX12->RTV.CPUHandle);
-                RTVClears.push_back(attachment.RTClearValue);
-
                 RTVFormats.push_back(GetDX12TextureFormat(RTInfo.Format));
             }
         }

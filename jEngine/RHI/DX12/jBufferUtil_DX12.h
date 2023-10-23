@@ -524,10 +524,10 @@ jBuffer_DX12* CreateBuffer(uint64 InSize, uint16 InAlignment, bool InIsCPUAccess
     , D3D12_RESOURCE_STATES InInitialState = D3D12_RESOURCE_STATE_COMMON, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr);
 
 ComPtr<ID3D12Resource> CreateImageInternal(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, uint32 InNumOfSample
-    , D3D12_RESOURCE_DIMENSION InType, DXGI_FORMAT InFormat, bool InIsRTV, bool InIsUAV, D3D12_RESOURCE_STATES InResourceState = D3D12_RESOURCE_STATE_COMMON, D3D12_CLEAR_VALUE* InClearValue = nullptr, const wchar_t* InResourceName = nullptr);
+    , D3D12_RESOURCE_DIMENSION InType, DXGI_FORMAT InFormat, bool InIsRTV, bool InIsUAV, EImageLayout InImageLayout = EImageLayout::UNDEFINED, D3D12_CLEAR_VALUE* InClearValue = nullptr, const wchar_t* InResourceName = nullptr);
 
 jTexture_DX12* CreateImage(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, uint32 InNumOfSample
-    , ETextureType InType, ETextureFormat InFormat, bool InIsRTV, bool InIsUAV, D3D12_RESOURCE_STATES InResourceState = D3D12_RESOURCE_STATE_COMMON, const jRTClearValue& InClearValue = jRTClearValue::Invalid, const wchar_t* InResourceName = nullptr);
+    , ETextureType InType, ETextureFormat InFormat, bool InIsRTV, bool InIsUAV, EImageLayout InImageLayout = EImageLayout::UNDEFINED, const jRTClearValue& InClearValue = jRTClearValue::Invalid, const wchar_t* InResourceName = nullptr);
 
 uint64 CopyBufferToImage(ID3D12GraphicsCommandList4* InCommandBuffer, ID3D12Resource* InBuffer, uint64 InBufferOffset, ID3D12Resource* InImage, int32 InImageSubresourceIndex = 0);
 uint64 CopyBufferToImage(ID3D12GraphicsCommandList4* InCommandBuffer, ID3D12Resource* InBuffer, uint64 InBufferOffset, ID3D12Resource* InImage, int32 InNumOfImageSubresource, int32 InStartImageSubresource);

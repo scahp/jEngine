@@ -207,7 +207,23 @@ void* jPipelineStateInfo_DX12::CreateGraphicsPipelineState()
 
 void* jPipelineStateInfo_DX12::CreateComputePipelineState()
 {
-    return nullptr;
+    PipelineState = nullptr;
+
+    D3D12_COMPUTE_PIPELINE_STATE_DESC psoDesc = {};
+    ComPtr<ID3D12RootSignature> RootSignature = jShaderBindingsLayout_DX12::CreateRootSignature(ShaderBindingLayoutArray);
+    psoDesc.pRootSignature = RootSignature.Get();
+    if (ComputeShader)
+    {
+        auto CS_Compiled = (jCompiledShader_DX12*)ComputeShader->GetCompiledShader();
+        check(CS_Compiled);
+        psoDesc.CS = { .pShaderBytecode = CS_Compiled->ShaderBlob->GetBufferPointer(), .BytecodeLength = CS_Compiled->ShaderBlob->GetBufferSize() };
+    }
+    check(g_rhi_dx12);
+    check(g_rhi_dx12->Device);
+    if (JFAIL(g_rhi_dx12->Device->CreateComputePipelineState(&psoDesc, IID_PPV_ARGS(&PipelineState))))
+        return nullptr;
+
+    return PipelineState.Get();
 }
 
 void jPipelineStateInfo_DX12::Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const
