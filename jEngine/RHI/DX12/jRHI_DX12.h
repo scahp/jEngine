@@ -254,6 +254,7 @@ public:
     uint64 PlacedResourceDefaultUploadOffset = 0;
 
     static constexpr uint64 DefaultPlacedResourceHeapSize = 256 * 1024 * 1024;
+	static constexpr uint64 PlacedResourceSizeThreshold = 512 * 512 * 4;
 	static bool IsUsePlacedResource;
 
 	template <typename T>
@@ -262,9 +263,10 @@ public:
 		check(Device);
 
         const D3D12_RESOURCE_ALLOCATION_INFO info = Device->GetResourceAllocationInfo(0, 1, InDesc);
+		const bool IsAvailablePlacedResource = IsUsePlacedResource && (info.SizeInBytes <= PlacedResourceSizeThreshold);
 
 		ComPtr<ID3D12Resource> NewResource;
-		if (IsUsePlacedResource)
+		if (IsAvailablePlacedResource)
 		{
 			check(PlacedResourceDefaultHeap);
 
@@ -287,15 +289,17 @@ public:
     {
         check(Device);
 
+		const D3D12_RESOURCE_ALLOCATION_INFO info = Device->GetResourceAllocationInfo(0, 1, InDesc);
+		const bool IsAvailablePlacedResource = IsUsePlacedResource && (info.SizeInBytes <= PlacedResourceSizeThreshold);
+
         ComPtr<ID3D12Resource> NewResource;
-        if (IsUsePlacedResource)
+        if (IsAvailablePlacedResource)
         {
             check(PlacedResourceUploadHeap);
 
             JFAIL(Device->CreatePlacedResource(PlacedResourceUploadHeap.Get(), PlacedResourceDefaultUploadOffset
                 , std::forward<T>(InDesc), InResourceState, InClearValue, IID_PPV_ARGS(&NewResource)));
 
-            const D3D12_RESOURCE_ALLOCATION_INFO info = Device->GetResourceAllocationInfo(0, 1, InDesc);
 			PlacedResourceDefaultUploadOffset += info.SizeInBytes;
 
             return NewResource;
