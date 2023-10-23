@@ -45,7 +45,12 @@ jModelLoader::~jModelLoader()
 jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materialRootDir)
 {
 	Assimp::Importer importer;
-	const aiScene* scene = importer.ReadFile(filename, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_CalcTangentSpace);
+	const aiScene* scene = importer.ReadFile(filename, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_CalcTangentSpace
+		| aiProcess_MakeLeftHanded
+#if USE_VULKAN
+		| aiProcess_FlipWindingOrder
+#endif
+	);
 
 	if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
 	{
