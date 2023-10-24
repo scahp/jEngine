@@ -970,10 +970,7 @@ void jRenderer::PostProcess()
                 ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
 
                 g_rhi->BindComputeShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), computePipelineStateInfo, ShaderBindingInstanceCombiner, 0);
-
-                //vkCmdDispatch((VkCommandBuffer)CommandBuffer->GetHandle(), 1, 1, 1);
-                jCommandBuffer_DX12* CommandBuffer = (jCommandBuffer_DX12*)RenderFrameContextPtr->GetActiveCommandBuffer();
-                CommandBuffer->CommandList->Dispatch(1, 1, 1);
+                g_rhi->DispatchCompute(RenderFrameContextPtr, 1, 1, 1);
             }
             //////////////////////////////////////////////////////////////////////////
 

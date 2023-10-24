@@ -2165,6 +2165,16 @@ void jRHI_DX12::DrawElementsIndirect(const std::shared_ptr<jRenderFrameContext>&
 	check(0);
 }
 
+void jRHI_DX12::DispatchCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ) const
+{
+    auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
+    check(CommandBuffer_DX12);
+    check(CommandBuffer_DX12->CommandList);
+    check(numGroupsX * numGroupsY * numGroupsZ > 0);
+
+    CommandBuffer_DX12->CommandList->Dispatch(numGroupsX, numGroupsY, numGroupsZ);
+}
+
 std::shared_ptr<jRenderTarget> jRHI_DX12::CreateRenderTarget(const jRenderTargetInfo& info) const
 {
     const uint16 MipLevels = info.IsGenerateMipmap ? static_cast<uint32>(std::floor(std::log2(std::max<int>(info.Width, info.Height)))) + 1 : 1;

@@ -999,6 +999,13 @@ void jRHI_Vulkan::DrawElementsIndirect(const std::shared_ptr<jRenderFrameContext
 		, startIndex * sizeof(VkDrawIndexedIndirectCommand), drawCount, sizeof(VkDrawIndexedIndirectCommand));
 }
 
+void jRHI_Vulkan::DispatchCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ) const
+{
+    check(InRenderFrameContext);
+    check(InRenderFrameContext->GetActiveCommandBuffer());
+	vkCmdDispatch((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), numGroupsX, numGroupsY, numGroupsZ);
+}
+
 jShaderBindingsLayout* jRHI_Vulkan::CreateShaderBindings(const jShaderBindingArray& InShaderBindingArray) const
 {
 	size_t hash = InShaderBindingArray.GetHash();

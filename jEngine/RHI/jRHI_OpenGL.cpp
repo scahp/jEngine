@@ -656,7 +656,7 @@ void jRHI_OpenGL::DrawElementsInstancedBaseVertex(const std::shared_ptr<jRenderF
 	glDrawElementsInstancedBaseVertex(GetPrimitiveType(type), count, elementType, u_offset.offset_pointer, instanceCount, baseVertexIndex);
 }
 
-void jRHI_OpenGL::DispatchCompute(uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ) const
+void jRHI_OpenGL::DispatchCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ) const
 {
 	glDispatchCompute(numGroupsX, numGroupsY, numGroupsZ);
 }
