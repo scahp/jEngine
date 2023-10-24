@@ -141,11 +141,7 @@ public:
     jOfflineDescriptorHeap_DX12 DescriptorHeaps;
     jOfflineDescriptorHeap_DX12 SamplerDescriptorHeaps;
 
-	jOnlineDescriptorHeapBlocks_DX12 OnlineDescriptorHeapBlocks;
-	jOnlineDescriptorHeapBlocks_DX12 OnlineSamplerDescriptorHeapBlocks;
-
-	jOnlineDescriptorHeapBlocks_DX12 OnlineDescriptorHeapBlocks2;			// todo : need to replace with manager of descriptor heap block
-	jOnlineDescriptorHeapBlocks_DX12 OnlineSamplerDescriptorHeapBlocks2;	// todo : need to replace with manager of descriptor heap block
+	jOnlineDescriptorManager OnlineDescriptorHeapManager;
 
     ////////////////////////////////////////////////////////////////////////////
     //// 5. Initialize Camera and lighting

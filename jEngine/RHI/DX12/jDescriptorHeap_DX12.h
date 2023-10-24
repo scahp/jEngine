@@ -91,6 +91,9 @@ struct jDescriptorBlock_DX12
 };
 
 class jOnlineDescriptorHeap_DX12;
+
+// 한개의 Heap 을 여러개의 Block 으로 쪼개서 관리하는 클래스
+// - Block 이름은 jOnlineDescriptorHeap_DX12 임.
 class jOnlineDescriptorHeapBlocks_DX12
 {
 public:
@@ -133,6 +136,8 @@ public:
     mutable jMutexLock DescriptorBlockLock;
 };
 
+// CommandList 당 한개씩 가지게 되는 OnlineDescriptorHeap, jOnlineDescriptorHeapBlocks_DX12 으로 부터 할당 받음.
+// - CommandList 당 Block 을 할당하는 방식으로 여러개의 CommandList 가 OnlineDescriptor 에서 Allocation 경쟁 하는 부분을 피함.
 class jOnlineDescriptorHeap_DX12
 {
 public:
@@ -181,6 +186,73 @@ private:
     int32 NumOfAllocated = 0;
 };
 
+// OnlineDescriptorHeapBlock 을 관리하는 객체, 필요한 경우 추가 DescriptorHeapBlock 을 할당함.
+class jOnlineDescriptorManager
+{
+public:
+    jOnlineDescriptorHeap_DX12* Alloc(EDescriptorHeapTypeDX12 InType)
+    {
+        std::vector<jOnlineDescriptorHeapBlocks_DX12*>& DescriptorHeapBlocks = OnlineDescriptorHeapBlocks[(int32)InType];
+
+        // 기존 HeapBlock 에서 할당 가능한지 확인
+        for (int32 i = 0; i < (int32)DescriptorHeapBlocks.size(); ++i)
+        {
+            check(DescriptorHeapBlocks[i]);
+            jOnlineDescriptorHeap_DX12* AllocatedBlocks = DescriptorHeapBlocks[i]->Alloc();
+            if (AllocatedBlocks)
+            {
+                return AllocatedBlocks;
+            }
+        }
+
+        // 기존 HeapBlock 이 가득 찬 상태라 HeapBlock 추가
+        auto SelectedHeapBlocks = new jOnlineDescriptorHeapBlocks_DX12();
+
+        switch (InType)
+        {
+        case EDescriptorHeapTypeDX12::CBV_SRV_UAV:
+            SelectedHeapBlocks->Initialize(EDescriptorHeapTypeDX12::CBV_SRV_UAV, jDescriptorBlock_DX12::MaxDescriptorsInBlock, 250);
+            break;
+        case EDescriptorHeapTypeDX12::SAMPLER:
+            SelectedHeapBlocks->Initialize(EDescriptorHeapTypeDX12::SAMPLER, 100, 20);
+            break;
+        default:
+            check(0);
+            break;
+        }
+
+        DescriptorHeapBlocks.push_back(SelectedHeapBlocks);
+
+        // 할당 할 수 있는 HeapBlock 이 더 많은 것을 앞쪽에 배치함
+        std::sort(DescriptorHeapBlocks.begin(), DescriptorHeapBlocks.end(), [](jOnlineDescriptorHeapBlocks_DX12* InA, jOnlineDescriptorHeapBlocks_DX12* InB){
+            return InA->FreeLists.size() > InB->FreeLists.size();
+        });
+
+        jOnlineDescriptorHeap_DX12* AllocatedBlocks = SelectedHeapBlocks->Alloc();
+        check(AllocatedBlocks);
+        return AllocatedBlocks;
+    }
+    void Free(jOnlineDescriptorHeap_DX12* InDescriptorHeap)
+    {
+        check(InDescriptorHeap);
+        InDescriptorHeap->Release();
+    }
+
+    void Release()
+    {
+        for(int32 i=0;i<(int32)EDescriptorHeapTypeDX12::MAX;++i)
+        {
+            for(jOnlineDescriptorHeapBlocks_DX12* iter : OnlineDescriptorHeapBlocks[i])
+            {
+                delete iter;
+            }
+            OnlineDescriptorHeapBlocks[i].clear();
+        }
+    }
+
+    std::vector<jOnlineDescriptorHeapBlocks_DX12*> OnlineDescriptorHeapBlocks[(int32)EDescriptorHeapTypeDX12::MAX];
+};
+
 class jOfflineDescriptorHeap_DX12
 {
 public:
@@ -207,6 +279,23 @@ public:
         jDescriptor_DX12 NewDescriptor = CurrentHeap->Alloc();
         if (!NewDescriptor.IsValid())
         {
+            if (Heap.size() > 0)
+            {
+                // 할당 할 수 있는 Heap 이 더 많은 것을 앞쪽에 배치함
+                std::sort(Heap.begin(), Heap.end(), [](jDescriptorHeap_DX12* InA, jDescriptorHeap_DX12* InB) {
+                    return InA->Pools.size() > InB->Pools.size();
+                    });
+
+                if (Heap[0]->Pools.size() > 0)
+                {
+                    CurrentHeap = Heap[0];
+
+                    NewDescriptor = CurrentHeap->Alloc();
+                    check(NewDescriptor.IsValid());
+                    return NewDescriptor;
+                }
+            }
+
             CurrentHeap = CreateDescriptorHeap();
             check(CurrentHeap);
 

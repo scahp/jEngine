@@ -564,12 +564,6 @@ bool jRHI_DX12::InitRHI()
 	DescriptorHeaps.Initialize(EDescriptorHeapTypeDX12::CBV_SRV_UAV);
 	SamplerDescriptorHeaps.Initialize(EDescriptorHeapTypeDX12::SAMPLER);
 
-	OnlineDescriptorHeapBlocks.Initialize(EDescriptorHeapTypeDX12::CBV_SRV_UAV, jDescriptorBlock_DX12::MaxDescriptorsInBlock, 250);
-	OnlineSamplerDescriptorHeapBlocks.Initialize(EDescriptorHeapTypeDX12::SAMPLER, 100, 20);
-    
-    OnlineDescriptorHeapBlocks2.Initialize(EDescriptorHeapTypeDX12::CBV_SRV_UAV, jDescriptorBlock_DX12::MaxDescriptorsInBlock, 250);
-    OnlineSamplerDescriptorHeapBlocks2.Initialize(EDescriptorHeapTypeDX12::SAMPLER, 100, 20);
-
 	// 3. Swapchain
 	Swapchain = new jSwapchain_DX12();
 	Swapchain->Create();
@@ -1136,8 +1130,7 @@ void jRHI_DX12::ReleaseRHI()
 	DescriptorHeaps.Release();
 	SamplerDescriptorHeaps.Release();
 
-	OnlineDescriptorHeapBlocks.Release();
-	OnlineSamplerDescriptorHeapBlocks.Release();
+    OnlineDescriptorHeapManager.Release();
 
 	//////////////////////////////////////////////////////////////////////////
 	// 3. Swapchain

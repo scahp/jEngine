@@ -162,14 +162,8 @@ jCommandBuffer_DX12* jCommandBufferManager_DX12::CreateCommandList() const
     commandBuffer->SetFence(g_rhi_dx12->FenceManager.GetOrCreateFence());
     if (D3D12_COMMAND_LIST_TYPE_COPY != CommandListType)
     {
-        // todo : 반환했다가 다시 받아가는 식으로 하는게 좋은 듯
-        commandBuffer->OnlineDescriptorHeap = g_rhi_dx12->OnlineDescriptorHeapBlocks.Alloc();
-        if (!commandBuffer->OnlineDescriptorHeap)
-            commandBuffer->OnlineDescriptorHeap = g_rhi_dx12->OnlineDescriptorHeapBlocks2.Alloc();
-
-        commandBuffer->OnlineSamplerDescriptorHeap = g_rhi_dx12->OnlineSamplerDescriptorHeapBlocks.Alloc();
-        if (!commandBuffer->OnlineSamplerDescriptorHeap)
-            commandBuffer->OnlineSamplerDescriptorHeap = g_rhi_dx12->OnlineSamplerDescriptorHeapBlocks2.Alloc();
+        commandBuffer->OnlineDescriptorHeap = g_rhi_dx12->OnlineDescriptorHeapManager.Alloc(EDescriptorHeapTypeDX12::CBV_SRV_UAV);
+        commandBuffer->OnlineSamplerDescriptorHeap = g_rhi_dx12->OnlineDescriptorHeapManager.Alloc(EDescriptorHeapTypeDX12::SAMPLER);
 
         check(commandBuffer->OnlineDescriptorHeap);
         check(commandBuffer->OnlineSamplerDescriptorHeap);
