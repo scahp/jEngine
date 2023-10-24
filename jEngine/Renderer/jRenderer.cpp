@@ -1188,6 +1188,7 @@ void jRenderer::Render()
 
         Vector4 clear_color(0.45f, 0.55f, 0.60f, 1.00f);
 
+        if (0)
         {
             ImGui::Begin("Control Pannel");
 
@@ -1199,6 +1200,130 @@ void jRenderer::Render()
             ImGui::SetWindowPos({ 10, 10 }, ImGuiCond_Once);
             ImGui::SetWindowSize({ 350, 100 }, ImGuiCond_Once);
 
+            ImGui::End();
+        }
+        else
+        {
+            ImGui::SetNextWindowSize(ImVec2(200.0f, 200.0f), ImGuiCond_FirstUseEver);
+            ImGui::Begin("Panel");
+
+#if USE_VARIABLE_SHADING_RATE_TIER2
+            ImGui::Checkbox("UseVRS", &gOptions.UseVRS);
+#endif
+            //ImGui::Checkbox("ShowVRSArea", &gOptions.ShowVRSArea);
+            //ImGui::Checkbox("ShowGrid", &gOptions.ShowGrid);
+            //ImGui::Checkbox("UseWaveIntrinsics", &gOptions.UseWaveIntrinsics);
+            {
+                ImGui::BeginDisabled(true);
+                ImGui::Checkbox("[ReadOnly]UseDeferredRenderer", &gOptions.UseDeferredRenderer);
+                ImGui::Checkbox("[ReadOnly]UseSubpass", &gOptions.UseSubpass);
+                ImGui::Checkbox("[ReadOnly]UseMemoryless", &gOptions.UseMemoryless);
+                ImGui::EndDisabled();
+            }
+            {
+                ImGui::BeginDisabled(true);
+                ImGui::Checkbox("ShowDebugObject", &gOptions.ShowDebugObject);
+                ImGui::Checkbox("BloomEyeAdaptation", &gOptions.BloomEyeAdaptation);
+                ImGui::Checkbox("QueueSubmitAfterShadowPass", &gOptions.QueueSubmitAfterShadowPass);
+                ImGui::Checkbox("QueueSubmitAfterBasePass", &gOptions.QueueSubmitAfterBasePass);
+                ImGui::SliderFloat("AutoExposureKeyValueScale", &gOptions.AutoExposureKeyValueScale, -12.0f, 12.0f);
+                ImGui::EndDisabled();
+            }
+            ImGui::Separator();
+            //ImGui::Text("PBR properties");
+            //ImGui::SliderFloat("Metallic", &gOptions.Metallic, 0.0f, 1.0f);
+            //ImGui::SliderFloat("Roughness", &gOptions.Roughness, 0.0f, 1.0f);
+            //ImGui::Separator();
+
+            constexpr float IndentSpace = 10.0f;
+            const std::thread::id CurrentThreadId = std::this_thread::get_id();
+            const ImVec4 OtherThreadColor = { 0.2f, 0.6f, 0.2f, 1.0f };
+            {
+                ImGui::Text("Average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+            }
+            ImGui::Separator();
+            {
+                ImGui::Text("[CPU]");
+                const auto& CPUAvgProfileMap = jPerformanceProfile::GetInstance().GetCPUAvgProfileMap();
+                double TotalPassesMS = 0.0;
+                int32 MostLeastIndent = INT_MAX;
+                for (auto& pair : CPUAvgProfileMap)
+                {
+                    const jPerformanceProfile::jAvgProfile& AvgProfile = pair.second;
+                    const float Indent = IndentSpace * (float)AvgProfile.Indent;
+                    if (Indent > 0)
+                        ImGui::Indent(Indent);
+
+                    if (CurrentThreadId == AvgProfile.ThreadId)
+                        ImGui::Text("%s : %lf ms", pair.first.ToStr(), AvgProfile.AvgElapsedMS);
+                    else
+                        ImGui::TextColored(OtherThreadColor, "%s : %lf ms [0x%p]", pair.first.ToStr(), AvgProfile.AvgElapsedMS, AvgProfile.ThreadId);
+
+                    if (Indent > 0)
+                        ImGui::Unindent(Indent);
+
+                    // 최 상위에 있는 Pass 의 평균 MS 만 더하면 하위에 있는 모든 MS 는 다 포함됨
+                    // 다른 스레드에 한 작업도 렌더링 프레임이 종료 되기 전에 마치기 때문에 추가로 더해줄 필요 없음
+                    if (CurrentThreadId == AvgProfile.ThreadId)
+                    {
+                        if (MostLeastIndent > AvgProfile.Indent)
+                        {
+                            MostLeastIndent = AvgProfile.Indent;
+                            TotalPassesMS = AvgProfile.AvgElapsedMS;
+                        }
+                        else if (MostLeastIndent == AvgProfile.Indent)
+                        {
+                            TotalPassesMS += AvgProfile.AvgElapsedMS;
+                        }
+                    }
+                }
+                ImGui::Text("[CPU]Total Passes : %lf ms", TotalPassesMS);
+            }
+            ImGui::Separator();
+            {
+                ImGui::Text("[GPU]");
+                const auto& GPUAvgProfileMap = jPerformanceProfile::GetInstance().GetGPUAvgProfileMap();
+                double TotalPassesMS = 0.0;
+                int32 MostLeastIndent = INT_MAX;
+                for (auto& pair : GPUAvgProfileMap)
+                {
+                    const jPerformanceProfile::jAvgProfile& AvgProfile = pair.second;
+                    const float Indent = IndentSpace * (float)AvgProfile.Indent;
+                    if (Indent > 0)
+                        ImGui::Indent(Indent);
+
+                    if (CurrentThreadId == AvgProfile.ThreadId)
+                        ImGui::Text("%s : %lf ms", pair.first.ToStr(), AvgProfile.AvgElapsedMS);
+                    else
+                        ImGui::TextColored(OtherThreadColor, "%s : %lf ms [0x%p]", pair.first.ToStr(), AvgProfile.AvgElapsedMS, AvgProfile.ThreadId);
+
+                    if (Indent > 0)
+                        ImGui::Unindent(Indent);
+
+                    // 최 상위에 있는 Pass 의 평균 MS 만 더하면 하위에 있는 모든 MS 는 다 포함됨
+                    // 다른 스레드에 한 작업도 렌더링 프레임이 종료 되기 전에 마치기 때문에 추가로 더해줄 필요 없음
+                    if (CurrentThreadId == AvgProfile.ThreadId)
+                    {
+                        if (MostLeastIndent > AvgProfile.Indent)
+                        {
+                            MostLeastIndent = AvgProfile.Indent;
+                            TotalPassesMS = AvgProfile.AvgElapsedMS;
+                        }
+                        else if (MostLeastIndent == AvgProfile.Indent)
+                        {
+                            TotalPassesMS += AvgProfile.AvgElapsedMS;
+                        }
+                    }
+                }
+                ImGui::Text("[GPU]Total Passes : %lf ms", TotalPassesMS);
+            }
+            ImGui::Separator();
+            //for (auto& pair : CounterMap)
+            //{
+            //    ImGui::Text("%s : %lld", pair.first.ToStr(), pair.second);
+            //}
+            ImGui::Separator();
+            ImGui::Text("CameraPos : %.2f, %.2f, %.2f", gOptions.CameraPos.x, gOptions.CameraPos.y, gOptions.CameraPos.z);
             ImGui::End();
         }
 
@@ -1239,45 +1364,6 @@ void jRenderer::Render()
 
         g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), EImageLayout::SHADER_READ_ONLY);
 
-        //// Create Copy DrawCommand
-        //static jFullscreenQuadPrimitive* GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
-        //std::shared_ptr<jShaderBindingInstance> ShaderBindingInstanceForCopy;
-        //jDrawCommand CopyDrawCommand;
-        //{
-        //    jGraphicsPipelineShader Shader;
-
-        //    {
-        //        jShaderInfo shaderInfo;
-        //        shaderInfo.SetName(jNameStatic("CopyVS"));
-        //        shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/fullscreenquad_vs.hlsl"));
-        //        shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
-        //        Shader.VertexShader = g_rhi->CreateShader(shaderInfo);
-        //    }
-        //    {
-        //        jShaderInfo shaderInfo;
-        //        shaderInfo.SetName(jNameStatic("CopyPS"));
-        //        shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/copy_ps.hlsl"));
-        //        shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
-        //        Shader.PixelShader = g_rhi->CreateShader(shaderInfo);
-        //    }
-
-        //    int32 BindingPoint = 0;
-        //    jShaderBindingArray ShaderBindingArray;
-        //    jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
-
-        //    ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
-        //        , ResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), nullptr));
-
-        //    ShaderBindingInstanceForCopy = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
-        //    jShaderBindingInstanceArray ShaderBindingInstanceArray;
-        //    ShaderBindingInstanceArray.Add(ShaderBindingInstanceForCopy.get());
-
-        //    new (&CopyDrawCommand) jDrawCommand(RenderFrameContextPtr, GlobalFullscreenPrimitive->RenderObjects[0], UIRenderPass
-        //        , Shader, &BasePassPipelineStateFixed, nullptr, ShaderBindingInstanceArray, nullptr);
-        //    CopyDrawCommand.Test = true;
-        //    CopyDrawCommand.PrepareToDraw(false);
-        //}
-
         {
             DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "ImGUI", Vector4(0.8f, 0.8f, 0.8f, 1.0f));
 
@@ -1297,7 +1383,4 @@ void jRenderer::Render()
         }
     }
 #endif
-
-    //ensure(RenderFrameContextPtr->GetActiveCommandBuffer()->End());
-
 }

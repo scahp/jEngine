@@ -164,6 +164,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClInclude Include="RHI\DX12\jFenceManager_DX12.h" />
     <ClInclude Include="RHI\DX12\jIndexBuffer_DX12.h" />
     <ClInclude Include="RHI\DX12\jPipelineStateInfo_DX12.h" />
+    <ClInclude Include="RHI\DX12\jQueryPoolTime_DX12.h" />
     <ClInclude Include="RHI\DX12\jRenderFrameContext_DX12.h" />
     <ClInclude Include="RHI\DX12\jRenderPass_DX12.h" />
     <ClInclude Include="RHI\DX12\jRHIType_DX12.h" />
@@ -358,6 +359,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClCompile Include="RHI\DX12\jFenceManager_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jIndexBuffer_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jPipelineStateInfo_DX12.cpp" />
+    <ClCompile Include="RHI\DX12\jQueryPoolTime_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jRenderFrameContext_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jRenderPass_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jRHI_DX12.cpp" />

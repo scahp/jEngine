@@ -115,6 +115,7 @@ int main()
 
             g_Engine.Update(g_timeDeltaSecond);
             g_Engine.Draw();
+			jPerformanceProfile::GetInstance().Update(g_timeDeltaSecond);
         }
 
         while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))

@@ -53,6 +53,7 @@ struct jBuffer_DX12 : public jBuffer
             return;
 
         Buffer->Unmap(0, nullptr);
+        CPUAddress = nullptr;
     }
     virtual void UpdateBuffer(const void* data, uint64 size) override
     {

@@ -29,6 +29,7 @@
 #include "jPrimitiveUtil.h"
 #include "Scene/jRenderObject.h"
 #include "Scene/Light/jLight.h"
+#include "jQueryPoolTime_DX12.h"
 
 #define USE_INLINE_DESCRIPTOR 0												// InlineDescriptor 를 쓸것인지? DescriptorTable 를 쓸것인지 여부
 #define USE_ONE_FRAME_BUFFER_AND_DESCRIPTOR (USE_INLINE_DESCRIPTOR && 1)	// 현재 프레임에만 사용하고 버리는 임시 Descriptor 와 Buffer 를 사용할 것인지 여부
@@ -1041,7 +1042,12 @@ bool jRHI_DX12::InitRHI()
     MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 10.0f, 1500.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT, true);
 	MainCamera->UpdateCamera();
 	*/
+
+    QueryPoolTime = new jQueryPoolTime_DX12();
+    QueryPoolTime->Create();
+
 	//////////////////////////////////////////////////////////////////////////
+
     InitializeImGui();
 
 	ShowWindow(m_hWnd, SW_SHOW);
@@ -2185,7 +2191,7 @@ std::shared_ptr<jRenderTarget> jRHI_DX12::CreateRenderTarget(const jRenderTarget
 
 jQuery* jRHI_DX12::CreateQueryTime() const
 {
-    auto queryTime = new jQuery();
+    auto queryTime = new jQueryTime_DX12();
     return queryTime;
 }
 

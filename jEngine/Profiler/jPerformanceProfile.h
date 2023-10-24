@@ -126,6 +126,8 @@ struct jProfile_GPU
 		int32 prevIndex = CurrentWatingResultListIndex + 1;
 		prevIndex %= jRHI::MaxWaitingQuerySet;
 
+		check(g_rhi->GetQueryTimePool());
+
 		const bool CanWholeQueryTimeStampResult = g_rhi->GetQueryTimePool()->CanWholeQueryResult();
 
 		// Query 결과를 한번에 다 받아올 수 있는 API 는 그렇게 처리하고, 아니면 개별로 결과를 얻어오도록 함
@@ -166,19 +168,18 @@ public:
 	jScopedProfile_GPU(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jName& name)
 		: RenderFrameContextPtr(InRenderFrameContext)
 	{
-		// todo : 메모리 소멸위치를 처리 해줘야 함.
-		//Profile.Name = jPriorityName(name, s_priority.fetch_add(1));
-  //      Profile.Indent = ScopedProfilerGPUIndent.fetch_add(1);
-  //      
-		//Profile.Query = jQueryTimePool::GetQueryTime();
-		//Profile.Query->BeginQuery(InRenderFrameContext->GetActiveCommandBuffer());
+		Profile.Name = jPriorityName(name, s_priority.fetch_add(1));
+        Profile.Indent = ScopedProfilerGPUIndent.fetch_add(1);
+        
+		Profile.Query = jQueryTimePool::GetQueryTime();
+		Profile.Query->BeginQuery(InRenderFrameContext->GetActiveCommandBuffer());
 	}
 
 	~jScopedProfile_GPU()
 	{
-		//Profile.Query->EndQuery(RenderFrameContextPtr.lock()->GetActiveCommandBuffer());
-		//jProfile_GPU::WatingResultList[jProfile_GPU::CurrentWatingResultListIndex].emplace_back(Profile);
-		//ScopedProfilerGPUIndent.fetch_add(-1);
+		Profile.Query->EndQuery(RenderFrameContextPtr.lock()->GetActiveCommandBuffer());
+		jProfile_GPU::WatingResultList[jProfile_GPU::CurrentWatingResultListIndex].emplace_back(Profile);
+		ScopedProfilerGPUIndent.fetch_add(-1);
 	}
 
 	std::weak_ptr<jRenderFrameContext> RenderFrameContextPtr;

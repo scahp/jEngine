@@ -16,6 +16,7 @@
 #include "jPipelineStateInfo_DX12.h"
 #include "Renderer/jDrawCommand.h"
 #include "jSwapchain_DX12.h"
+#include "jQueryPoolTime_DX12.h"
 
 class jSwapchain_DX12;
 struct jBuffer_DX12;
@@ -412,6 +413,9 @@ public:
 
     virtual void BeginDebugEvent(jCommandBuffer* InCommandBuffer, const char* InName, const Vector4& InColor = Vector4::ColorGreen) const override;
     virtual void EndDebugEvent(jCommandBuffer* InCommandBuffer) const override;
+
+	jQueryPoolTime_DX12* QueryPoolTime = nullptr;
+	virtual jQueryPool* GetQueryTimePool() const override { return QueryPoolTime; }
 };
 
 extern jRHI_DX12* g_rhi_dx12;
