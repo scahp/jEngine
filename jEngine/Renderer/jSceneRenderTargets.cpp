@@ -102,7 +102,7 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
         const bool IsMemoryless = gOptions.UseMemoryless && gOptions.UseSubpass;
 
         jRenderTargetInfo Info = { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, SCR_WIDTH, SCR_HEIGHT
-            , 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f), UseAsSubpassInput, IsMemoryless };
+            , 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f), ETextureCreateFlag::NONE, UseAsSubpassInput, IsMemoryless };
 
         wsprintf(TempStr, TEXT("GBuffer[%d]"), i);
         Info.ResourceName = TempStr;

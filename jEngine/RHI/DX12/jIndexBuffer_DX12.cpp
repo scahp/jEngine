@@ -49,7 +49,7 @@ bool jIndexBuffer_DX12::Initialize(const std::shared_ptr<jIndexStreamData>& InSt
 
     // Create index buffer
     BufferPtr = std::shared_ptr<jBuffer_DX12>(
-        jBufferUtil_DX12::CreateBuffer(bufferSize, 0, false, false, D3D12_RESOURCE_STATE_COMMON, InStreamData->Param->GetBufferData(), bufferSize, TEXT("IndexBuffer")));
+        jBufferUtil_DX12::CreateBuffer(bufferSize, 0, EBufferCreateFlag::NONE, D3D12_RESOURCE_STATE_COMMON, InStreamData->Param->GetBufferData(), bufferSize, TEXT("IndexBuffer")));
 
     //// Create SRV of index buffer
     //auto IndexParam = InStreamData->Param;

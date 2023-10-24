@@ -7,7 +7,7 @@
 namespace jBufferUtil_DX12
 {
 
-ComPtr<ID3D12Resource> CreateBufferInternal(uint64 InSize, uint16 InAlignment, bool InIsCPUAccess, bool InAllowUAV
+ComPtr<ID3D12Resource> CreateBufferInternal(uint64 InSize, uint16 InAlignment, EBufferCreateFlag InBufferCreateFlag
     , D3D12_RESOURCE_STATES InInitialState, const wchar_t* InResourceName)
 {
     InSize = (InAlignment > 0) ? Align(InSize, InAlignment) : InSize;
@@ -19,14 +19,18 @@ ComPtr<ID3D12Resource> CreateBufferInternal(uint64 InSize, uint16 InAlignment, b
     resourceDesc.DepthOrArraySize = 1;
     resourceDesc.MipLevels = 1;
     resourceDesc.Format = DXGI_FORMAT_UNKNOWN;
-    resourceDesc.Flags = InAllowUAV ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : D3D12_RESOURCE_FLAG_NONE;
+    resourceDesc.Flags = !!(InBufferCreateFlag & EBufferCreateFlag::UAV) ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : D3D12_RESOURCE_FLAG_NONE;
     resourceDesc.SampleDesc.Count = 1;
     resourceDesc.SampleDesc.Quality = 0;
     resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
     resourceDesc.Alignment = 0;
 
     D3D12_RESOURCE_STATES resourceState = InInitialState;
-    if (InIsCPUAccess)
+    if (!!(InBufferCreateFlag & EBufferCreateFlag::Readback))
+    {
+        resourceState = D3D12_RESOURCE_STATE_COPY_DEST;
+    }
+    else if (!!(InBufferCreateFlag & EBufferCreateFlag::CPUAccess))
     {
         resourceState = D3D12_RESOURCE_STATE_GENERIC_READ;
     }
@@ -34,7 +38,13 @@ ComPtr<ID3D12Resource> CreateBufferInternal(uint64 InSize, uint16 InAlignment, b
     check(g_rhi_dx12);
 
     ComPtr<ID3D12Resource> Buffer;
-    if (InIsCPUAccess)
+    if (!!(InBufferCreateFlag & EBufferCreateFlag::Readback))
+    {
+        const CD3DX12_HEAP_PROPERTIES& HeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_READBACK);
+        JFAIL(g_rhi_dx12->Device->CreateCommittedResource(&HeapProperties, D3D12_HEAP_FLAG_NONE
+            , &resourceDesc, resourceState, nullptr, IID_PPV_ARGS(&Buffer)));
+    }
+    else if (!!(InBufferCreateFlag & EBufferCreateFlag::CPUAccess))
     {
         Buffer = g_rhi_dx12->CreateUploadResource(&resourceDesc, resourceState);
     }
@@ -54,14 +64,14 @@ ComPtr<ID3D12Resource> CreateBufferInternal(uint64 InSize, uint16 InAlignment, b
     return Buffer;
 }
 
-jBuffer_DX12* CreateBuffer(uint64 InSize, uint16 InAlignment, bool InIsCPUAccess, bool InAllowUAV
-    , D3D12_RESOURCE_STATES InInitialState, const void* InData, uint64 InDataSize, const wchar_t* InResourceName)
+jBuffer_DX12* CreateBuffer(uint64 InSize, uint16 InAlignment, EBufferCreateFlag InBufferCreateFlag
+    , D3D12_RESOURCE_STATES InInitialState /*= D3D12_RESOURCE_STATE_COMMON*/, const void* InData /*= nullptr*/, uint64 InDataSize /*= 0*/, const wchar_t* InResourceName /*= nullptr*/)
 {
-    ComPtr<ID3D12Resource> BufferInternal = CreateBufferInternal(InSize, InAlignment, InIsCPUAccess, InAllowUAV, InInitialState, InResourceName);
+    ComPtr<ID3D12Resource> BufferInternal = CreateBufferInternal(InSize, InAlignment, InBufferCreateFlag, InInitialState, InResourceName);
     if (!BufferInternal)
         return nullptr;
 
-    auto Buffer = new jBuffer_DX12(BufferInternal, InSize, InAlignment, InIsCPUAccess, InAllowUAV);
+    auto Buffer = new jBuffer_DX12(BufferInternal, InSize, InAlignment, InBufferCreateFlag);
     if (InResourceName)
     {
         // https://learn.microsoft.com/ko-kr/cpp/text/how-to-convert-between-various-string-types?view=msvc-170#example-convert-from-char-
@@ -77,7 +87,11 @@ jBuffer_DX12* CreateBuffer(uint64 InSize, uint16 InAlignment, bool InIsCPUAccess
     const bool HasInitialData = InData && (InDataSize > 0);
     if (HasInitialData)
     {
-        if (InIsCPUAccess)
+        if (!!(InBufferCreateFlag & EBufferCreateFlag::Readback))
+        {
+            // nothing todo
+        }
+        else if (!!(InBufferCreateFlag & EBufferCreateFlag::CPUAccess))
         {
             void* CPUAddress = Buffer->Map();
             check(CPUAddress);
@@ -85,7 +99,7 @@ jBuffer_DX12* CreateBuffer(uint64 InSize, uint16 InAlignment, bool InIsCPUAccess
         }
         else
         {
-            ComPtr<ID3D12Resource> StagingBuffer = CreateBufferInternal(InSize, InAlignment, true, InAllowUAV, InInitialState, InResourceName);
+            ComPtr<ID3D12Resource> StagingBuffer = CreateBufferInternal(InSize, InAlignment, EBufferCreateFlag::CPUAccess, InInitialState, InResourceName);
             check(StagingBuffer);
 
             void* MappedPointer = nullptr;
@@ -109,7 +123,7 @@ jBuffer_DX12* CreateBuffer(uint64 InSize, uint16 InAlignment, bool InIsCPUAccess
 }
 
 ComPtr<ID3D12Resource> CreateImageInternal(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, uint32 InNumOfSample
-    , D3D12_RESOURCE_DIMENSION InType, DXGI_FORMAT InFormat, bool InIsRTV, bool InIsUAV, EImageLayout InImageLayout, D3D12_CLEAR_VALUE* InClearValue, const wchar_t* InResourceName)
+    , D3D12_RESOURCE_DIMENSION InType, DXGI_FORMAT InFormat, ETextureCreateFlag InTextureCreateFlag, EImageLayout InImageLayout, D3D12_CLEAR_VALUE* InClearValue, const wchar_t* InResourceName)
 {
     check(g_rhi_dx12);
     check(g_rhi_dx12->Device);
@@ -130,9 +144,9 @@ ComPtr<ID3D12Resource> CreateImageInternal(uint32 InWidth, uint32 InHeight, uint
     TexDesc.Height = InHeight;
     TexDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
-    if (InIsRTV)
+    if (!!(InTextureCreateFlag & ETextureCreateFlag::RTV))
         TexDesc.Flags = IsDepthFormat(GetDX12TextureFormat(InFormat)) ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-    if (InIsUAV)
+    if (!!(InTextureCreateFlag & ETextureCreateFlag::UAV))
         TexDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
     TexDesc.DepthOrArraySize = InArrayLayers;
 
@@ -156,11 +170,11 @@ ComPtr<ID3D12Resource> CreateImageInternal(uint32 InWidth, uint32 InHeight, uint
 }
 
 jTexture_DX12* CreateImage(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, uint32 InNumOfSample
-    , ETextureType InType, ETextureFormat InFormat, bool InIsRTV, bool InIsUAV, EImageLayout InImageLayout, const jRTClearValue& InClearValue, const wchar_t* InResourceName)
+    , ETextureType InType, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag, EImageLayout InImageLayout, const jRTClearValue& InClearValue, const wchar_t* InResourceName)
 {
     bool HasClearValue = false;
     D3D12_CLEAR_VALUE ClearValue{};
-    if (InIsRTV)
+    if (!!(InTextureCreateFlag & ETextureCreateFlag::RTV))
     {
         if (InClearValue.GetType() == ERTClearType::Color)
         {
@@ -180,7 +194,7 @@ jTexture_DX12* CreateImage(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers
     }
 
     ComPtr<ID3D12Resource> TextureInternal = CreateImageInternal(InWidth, InHeight, InArrayLayers, InMipLevels, InNumOfSample
-        , GetDX12TextureDemension(InType), GetDX12TextureFormat(InFormat), InIsRTV, InIsUAV, InImageLayout, (HasClearValue ? &ClearValue : nullptr), InResourceName);
+        , GetDX12TextureDemension(InType), GetDX12TextureFormat(InFormat), InTextureCreateFlag, InImageLayout, (HasClearValue ? &ClearValue : nullptr), InResourceName);
     if (!ensure(TextureInternal))
         return nullptr;
 
@@ -209,9 +223,9 @@ jTexture_DX12* CreateImage(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers
     else
     {
         CreateShaderResourceView(Texture);
-        if (InIsRTV)
+        if (!!(InTextureCreateFlag & ETextureCreateFlag::RTV))
             CreateRenderTargetView(Texture);
-        if (InIsUAV)
+        if (!!(InTextureCreateFlag & ETextureCreateFlag::UAV))
             CreateUnorderedAccessView(Texture);
     }
 

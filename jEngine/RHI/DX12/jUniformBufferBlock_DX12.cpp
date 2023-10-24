@@ -12,7 +12,7 @@ void jUniformBufferBlock_DX12::Init(size_t size)
 
     if (jLifeTimeType::MultiFrame == LifeType)
     {
-        Buffer = jBufferUtil_DX12::CreateBuffer(size, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT, true, false, D3D12_RESOURCE_STATE_COMMON, nullptr, 0, TEXT("UniformBufferBlock"));
+        Buffer = jBufferUtil_DX12::CreateBuffer(size, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT, EBufferCreateFlag::CPUAccess, D3D12_RESOURCE_STATE_COMMON, nullptr, 0, TEXT("UniformBufferBlock"));
         jBufferUtil_DX12::CreateConstantBufferView(Buffer);
     }
 }

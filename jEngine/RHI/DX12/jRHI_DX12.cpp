@@ -189,7 +189,7 @@ ShaderTable::ShaderTable(ID3D12Device* InDevice, uint32 InNumOfShaderRecords, ui
 
 	m_shaderRecordSize = Align(InShaderRecordSize, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
 	const uint32 bufferSize = InNumOfShaderRecords * m_shaderRecordSize;
-	Buffer = jBufferUtil_DX12::CreateBuffer(bufferSize, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT, true, false, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, 0, InResourceName);
+	Buffer = jBufferUtil_DX12::CreateBuffer(bufferSize, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT, EBufferCreateFlag::CPUAccess, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, 0, InResourceName);
 
 #if _DEBUG
 	m_name = InResourceName;
@@ -1545,7 +1545,7 @@ bool jRHI_DX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimi
 	delete RayTacingOutputTexture;
 	RayTacingOutputTexture = nullptr;
     
-    RayTacingOutputTexture = jBufferUtil_DX12::CreateImage(SCR_WIDTH, SCR_HEIGHT, 1, 1, 1, ETextureType::TEXTURE_2D, ETextureFormat::RGBA8, false, true);
+    RayTacingOutputTexture = jBufferUtil_DX12::CreateImage(SCR_WIDTH, SCR_HEIGHT, 1, 1, 1, ETextureType::TEXTURE_2D, ETextureFormat::RGBA8, ETextureCreateFlag::UAV);
     if (!ensure(RayTacingOutputTexture))
         return false;
 
@@ -1692,7 +1692,7 @@ jTexture* jRHI_DX12::CreateTextureFromData(void* data, int32 width, int32 height
     createMipmap = false;   // todo : keep this until supporting the mipmap for dx12
 	const uint16 MipLevels = createMipmap ? static_cast<uint32>(std::floor(std::log2(std::max<int>(width, height)))) + 1 : 1;
     EImageLayout Layout = EImageLayout::GENERAL;
-	jTexture_DX12* Texture = jBufferUtil_DX12::CreateImage(width, height, 1, MipLevels, 1, ETextureType::TEXTURE_2D, textureFormat, false, true, Layout);
+	jTexture_DX12* Texture = jBufferUtil_DX12::CreateImage(width, height, 1, MipLevels, 1, ETextureType::TEXTURE_2D, textureFormat, ETextureCreateFlag::UAV, Layout);
 
 	// Copy image data from buffer
 	const auto Desc = Texture->Image->GetDesc();
@@ -1702,7 +1702,7 @@ jTexture* jRHI_DX12::CreateTextureFromData(void* data, int32 width, int32 height
     const uint64 ImageSize = width * height * GetDX12TexturePixelSize(textureFormat);
 
 	// todo : recycle temp buffer
-	jBuffer_DX12* buffer = jBufferUtil_DX12::CreateBuffer(RequiredSize, 0, true, false, D3D12_RESOURCE_STATE_GENERIC_READ, data, ImageSize);
+	jBuffer_DX12* buffer = jBufferUtil_DX12::CreateBuffer(RequiredSize, 0, EBufferCreateFlag::CPUAccess, D3D12_RESOURCE_STATE_GENERIC_READ, data, ImageSize);
 	check(buffer);
 
 	jCommandBuffer_DX12* commandList = g_rhi_dx12->BeginSingleTimeCopyCommands();
@@ -2179,7 +2179,7 @@ std::shared_ptr<jRenderTarget> jRHI_DX12::CreateRenderTarget(const jRenderTarget
     const uint16 MipLevels = info.IsGenerateMipmap ? static_cast<uint32>(std::floor(std::log2(std::max<int>(info.Width, info.Height)))) + 1 : 1;
     
     jTexture_DX12* Texture = jBufferUtil_DX12::CreateImage(info.Width, info.Height, info.LayerCount, MipLevels, (uint32)info.SampleCount, info.Type, info.Format
-        , true, info.IsUAV, EImageLayout::UNDEFINED, info.RTClearValue, info.ResourceName);
+        , (ETextureCreateFlag::RTV | info.TextureCreateFlag), EImageLayout::UNDEFINED, info.RTClearValue, info.ResourceName);
 
     auto rt = new jRenderTarget();
     check(rt);

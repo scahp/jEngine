@@ -11,34 +11,8 @@
 bool jQueryPoolTime_DX12::Create()
 {
     const uint64 ReadbackBufferSize = MaxQueryTimeCount * jRHI::MaxWaitingQuerySet * sizeof(uint64);
-    //ReadbackBuffer = std::shared_ptr<jBuffer_DX12>(jBufferUtil_DX12::CreateBuffer(ReadbackBufferSize, 0, true, false
-    //    , D3D12_RESOURCE_STATE_COPY_DEST, nullptr, ReadbackBufferSize, TEXT("QueryPoolTime_ReadbackBuffer")));
-    ReadbackBuffer = std::shared_ptr<jBuffer_DX12>(new jBuffer_DX12());
-    ReadbackBuffer->IsCPUAccess = true;
-    D3D12_RESOURCE_DESC resourceDesc = {};
-    resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    resourceDesc.Width = uint32(ReadbackBufferSize);
-    resourceDesc.Height = 1;
-    resourceDesc.DepthOrArraySize = 1;
-    resourceDesc.MipLevels = 1;
-    resourceDesc.Format = DXGI_FORMAT_UNKNOWN;
-    resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-    resourceDesc.SampleDesc.Count = 1;
-    resourceDesc.SampleDesc.Quality = 0;
-    resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-    resourceDesc.Alignment = 0;
-
-    static D3D12_HEAP_PROPERTIES heapProps =
-    {
-        D3D12_HEAP_TYPE_READBACK,
-        D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
-        D3D12_MEMORY_POOL_UNKNOWN,
-        0,
-        0,
-    };
-
-    g_rhi_dx12->Device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &resourceDesc,
-        D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&ReadbackBuffer->Buffer));
+    ReadbackBuffer = std::shared_ptr<jBuffer_DX12>(jBufferUtil_DX12::CreateBuffer(ReadbackBufferSize, 0, EBufferCreateFlag::Readback
+        , D3D12_RESOURCE_STATE_COPY_DEST, nullptr, ReadbackBufferSize, TEXT("QueryPoolTime_ReadbackBuffer")));
 
     D3D12_QUERY_HEAP_DESC heapDesc = { };
     heapDesc.Count = MaxQueryTimeCount * jRHI::MaxWaitingQuerySet;

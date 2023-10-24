@@ -748,6 +748,23 @@ DECLARE_ENUM_WITH_CONVERT_TO_STRING(ERTClearType, uint8,
 	MAX
 );
 
+enum class EBufferCreateFlag : uint32
+{
+    NONE = 0,
+    CPUAccess = 0x00000001,
+    UAV = 0x00000002,
+    Readback = 0x00000004,
+};
+DECLARE_ENUM_BIT_OPERATORS(EBufferCreateFlag)
+
+enum class ETextureCreateFlag : uint32
+{
+    NONE = 0,
+    RTV = 0x00000001,
+    UAV = 0x00000002,
+};
+DECLARE_ENUM_BIT_OPERATORS(ETextureCreateFlag)
+
 struct jDepthStencilClearType
 {
     float Depth;

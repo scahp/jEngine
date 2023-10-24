@@ -5,10 +5,12 @@ struct jRenderTargetInfo
 {
     constexpr jRenderTargetInfo() = default;
     constexpr jRenderTargetInfo(ETextureType textureType, ETextureFormat format, int32 width, int32 height, int32 layerCount = 1
-        , bool isGenerateMipmap = false, EMSAASamples sampleCount = EMSAASamples::COUNT_1, jRTClearValue InRTClearValue = jRTClearValue::Invalid, bool InIsUAV = false
+        , bool isGenerateMipmap = false, EMSAASamples sampleCount = EMSAASamples::COUNT_1, jRTClearValue InRTClearValue = jRTClearValue::Invalid
+        , ETextureCreateFlag InTextureCreateFlag = ETextureCreateFlag::RTV
         , bool InIsUseAsSubpassInput = false, bool InIsMemoryless = false, const wchar_t* InResourceName = nullptr)
         : Type(textureType), Format(format), Width(width), Height(height), LayerCount(layerCount), IsGenerateMipmap(isGenerateMipmap)
-        , SampleCount(sampleCount), RTClearValue(InRTClearValue), IsUAV(InIsUAV), IsUseAsSubpassInput(InIsUseAsSubpassInput), IsMemoryless(InIsMemoryless), ResourceName(InResourceName)
+        , SampleCount(sampleCount), RTClearValue(InRTClearValue), TextureCreateFlag(InTextureCreateFlag), IsUseAsSubpassInput(InIsUseAsSubpassInput)
+        , IsMemoryless(InIsMemoryless), ResourceName(InResourceName)
     {}
 
     size_t GetHash() const
@@ -21,7 +23,7 @@ struct jRenderTargetInfo
         result = CityHash64WithSeed((const char*)&IsGenerateMipmap, sizeof(IsGenerateMipmap), result);
         result = CityHash64WithSeed((const char*)&SampleCount, sizeof(SampleCount), result);
         result = CityHash64WithSeed((const char*)&RTClearValue, sizeof(RTClearValue), result);
-        result = CityHash64WithSeed((const char*)&IsUAV, sizeof(IsUAV), result);
+        result = CityHash64WithSeed((const char*)&TextureCreateFlag, sizeof(TextureCreateFlag), result);
         result = CityHash64WithSeed((const char*)&IsUseAsSubpassInput, sizeof(IsUseAsSubpassInput), result);
         result = CityHash64WithSeed((const char*)&IsMemoryless, sizeof(IsMemoryless), result);
         result = CityHash64WithSeed((const char*)&ResourceName, sizeof(ResourceName), result);
@@ -38,7 +40,7 @@ struct jRenderTargetInfo
     bool IsUseAsSubpassInput = false;
     bool IsMemoryless = false;
     jRTClearValue RTClearValue;
-    bool IsUAV = false;
+    ETextureCreateFlag TextureCreateFlag;
     const wchar_t* ResourceName = nullptr;
 };
 

@@ -5,8 +5,8 @@
 struct jBuffer_DX12 : public jBuffer
 {
     jBuffer_DX12() = default;
-    jBuffer_DX12(ComPtr<ID3D12Resource> InBuffer, uint64 InSize, uint16 InAlignment, bool InIsCPUAccess = false, bool InAllowUAV = false)
-        : Buffer(InBuffer), Size(InSize), Alignment(InAlignment), IsCPUAccess(InIsCPUAccess), AllowUAV(InAllowUAV)
+    jBuffer_DX12(ComPtr<ID3D12Resource> InBuffer, uint64 InSize, uint16 InAlignment, EBufferCreateFlag InBufferCreateFlag = EBufferCreateFlag::NONE)
+        : Buffer(InBuffer), Size(InSize), Alignment(InAlignment), BufferCreateFlag(InBufferCreateFlag)
     { }
     virtual ~jBuffer_DX12() {}
     virtual void Release() override
@@ -17,7 +17,7 @@ struct jBuffer_DX12 : public jBuffer
     {
         check(Buffer);
 
-        if (!IsCPUAccess)
+        if (!(BufferCreateFlag & EBufferCreateFlag::CPUAccess | EBufferCreateFlag::Readback))
             return nullptr;
 
         if (CPUAddress)
@@ -34,7 +34,7 @@ struct jBuffer_DX12 : public jBuffer
     {
         check(Buffer);
 
-        if (!IsCPUAccess)
+        if (!(BufferCreateFlag & (EBufferCreateFlag::CPUAccess | EBufferCreateFlag::Readback)))
             return nullptr;
 
         if (CPUAddress)
@@ -49,7 +49,7 @@ struct jBuffer_DX12 : public jBuffer
     {
         check(Buffer);
 
-        if (!IsCPUAccess)
+        if (!(BufferCreateFlag & EBufferCreateFlag::CPUAccess | EBufferCreateFlag::Readback))
             return;
 
         Buffer->Unmap(0, nullptr);
@@ -70,8 +70,7 @@ struct jBuffer_DX12 : public jBuffer
     virtual uint32 GetAllocatedSize() const override { return (uint32)Size; }
     FORCEINLINE uint64 GetGPUAddress() const { return Buffer->GetGPUVirtualAddress(); }
 
-    bool IsCPUAccess = false;
-    bool AllowUAV = false;
+    EBufferCreateFlag BufferCreateFlag = EBufferCreateFlag::NONE;
     uint64 Size = 0;
     uint16 Alignment = 0;
     uint32 Offset = 0;
