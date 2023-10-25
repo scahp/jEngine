@@ -23,8 +23,8 @@
 #include "RHI/DX12/jBufferUtil_DX12.h"
 #include "FileLoader/jImageFileLoader.h"
 
-#define ASYNC_WITH_SETUP 0
-#define PARALLELFOR_WITH_PASSSETUP 0
+#define ASYNC_WITH_SETUP 1
+#define PARALLELFOR_WITH_PASSSETUP 1
 
 struct jSimplePushConstant
 {
@@ -193,11 +193,16 @@ void jRenderer::SetupShadowPass()
         jParallelFor::ParallelForWithTaskPerThread(MaxPassSetupTaskPerThreadCount, jObject::GetShadowCasterRenderObject()
             , [&](size_t InIndex, jRenderObject* InRenderObject)
             {
+                jMaterial* Material = nullptr;
+
+                // todo : Masked material need to set Material for jDrawCommand
+                // iter->MaterialPtr;
+
                 const bool ShouldUseOnePassPointLightShadow = (ViewLight.Light->Type == ELightType::POINT);
                 const jVertexBuffer* OverrideInstanceData = (ShouldUseOnePassPointLightShadow ? jRHI::CubeMapInstanceDataForSixFace : nullptr);
 
                 new (&ShadowPasses.DrawCommands[InIndex]) jDrawCommand(RenderFrameContextPtr, &ShadowPasses.ViewLight, InRenderObject, ShadowPasses.ShadowMapRenderPass
-                    , (InRenderObject->HasInstancing() ? ShadowInstancingShader : ShadowShader), &ShadpwPipelineStateFixed, nullptr, {}, nullptr, OverrideInstanceData);
+                    , (InRenderObject->HasInstancing() ? ShadowInstancingShader : ShadowShader), &ShadpwPipelineStateFixed, Material, {}, nullptr, OverrideInstanceData);
                 ShadowPasses.DrawCommands[InIndex].PrepareToDraw(true);
             });
 #else
@@ -439,11 +444,21 @@ void jRenderer::SetupBasePass()
     jParallelFor::ParallelForWithTaskPerThread(MaxPassSetupTaskPerThreadCount, jObject::GetStaticRenderObject()
         , [&](size_t InIndex, jRenderObject* InRenderObject)
     {
-        new (&BasePasses[InIndex]) jDrawCommand(RenderFrameContextPtr, &View, InRenderObject, BaseRenderPass
-            , GetOrCreateShaderFunc(InRenderObject), &BasePassPipelineStateFixed, {}, SimplePushConstant);
+        jMaterial* Material = nullptr;
+        if (InRenderObject->MaterialPtr)
+        {
+            Material = InRenderObject->MaterialPtr.get();
+        }
+        else
+        {
+            if (GDefaultMaterial)
+            {
+                Material = GDefaultMaterial;
+            }
+        }
 
-        //new (&BasePasses[InIndex]) jDrawCommand(RenderFrameContextPtr, &View, InRenderObject, BaseRenderPass
-        //    , (InRenderObject->HasInstancing() ? BasePassInstancingShader : BasePassShader), &BasePassPipelineStateFixed, {}, SimplePushConstant);
+        new (&BasePasses[InIndex]) jDrawCommand(RenderFrameContextPtr, &View, InRenderObject, BaseRenderPass
+            , GetOrCreateShaderFunc(InRenderObject), &BasePassPipelineStateFixed, Material, {}, SimplePushConstant);
         BasePasses[InIndex].PrepareToDraw(false);
     });
 #else
@@ -466,8 +481,6 @@ void jRenderer::SetupBasePass()
 
         new (&BasePasses[i]) jDrawCommand(RenderFrameContextPtr, &View, iter, BaseRenderPass
             , GetOrCreateShaderFunc(iter), &BasePassPipelineStateFixed, Material, {}, SimplePushConstant);
-        //new (&BasePasses[i]) jDrawCommand(RenderFrameContextPtr, &View, iter->RenderObject, BaseRenderPass
-        //    , (iter->HasInstancing() ? BasePassInstancingShader : BasePassShader), &BasePassPipelineStateFixed, Material, {}, SimplePushConstant);
         BasePasses[i].PrepareToDraw(false);
         ++i;
     }
@@ -1060,7 +1073,7 @@ void jRenderer::DebugPasses()
     jRenderPassInfo renderPassInfo;
     const int32 LightPassAttachmentIndex = (int32)renderPassInfo.Attachments.size();
 
-    if (UseForwardRenderer || gOptions.UseSubpass)
+    //if (UseForwardRenderer || gOptions.UseSubpass)
     {
         jAttachment color = jAttachment(RenderFrameContextPtr->SceneRenderTargetPtr->FinalColorPtr, EAttachmentLoadStoreOp::LOAD_STORE
             , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor
@@ -1173,10 +1186,7 @@ void jRenderer::Render()
     }
 
     PostProcess();
-    //DebugPasses();
-
-    RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::BasePass);
-    RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
+    DebugPasses();
 
 #if USE_VULKAN
     jImGUI_Vulkan::Get().Draw(RenderFrameContextPtr);
@@ -1221,13 +1231,12 @@ void jRenderer::Render()
                 ImGui::EndDisabled();
             }
             {
-                ImGui::BeginDisabled(true);
                 ImGui::Checkbox("ShowDebugObject", &gOptions.ShowDebugObject);
                 ImGui::Checkbox("BloomEyeAdaptation", &gOptions.BloomEyeAdaptation);
+
                 ImGui::Checkbox("QueueSubmitAfterShadowPass", &gOptions.QueueSubmitAfterShadowPass);
                 ImGui::Checkbox("QueueSubmitAfterBasePass", &gOptions.QueueSubmitAfterBasePass);
                 ImGui::SliderFloat("AutoExposureKeyValueScale", &gOptions.AutoExposureKeyValueScale, -12.0f, 12.0f);
-                ImGui::EndDisabled();
             }
             ImGui::Separator();
             //ImGui::Text("PBR properties");
