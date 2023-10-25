@@ -560,12 +560,12 @@ jRenderObject* CreateQuad_Internal(const Vector& pos, const Vector& size, const 
 	auto offset = Vector::ZeroVector;
 
 	float vertices[] = {
-        offset.x + (halfSize.x),	0.0f,	offset.z + -(-halfSize.z),
-		offset.x + (-halfSize.x),	0.0f,	offset.z + -(-halfSize.z),
-		offset.x + (halfSize.x),	0.0f,	offset.z + -(halfSize.z),
-        offset.x + (-halfSize.x),	0.0f,	offset.z + -(halfSize.z),
-		offset.x + (halfSize.x),	0.0f,	offset.z + -(halfSize.z),
-        offset.x + (-halfSize.x),	0.0f,	offset.z + -(-halfSize.z),
+        offset.x + (-halfSize.x), 0.0f, offset.z + (-halfSize.z),
+        offset.x + (halfSize.x), 0.0f, offset.z + (-halfSize.z),
+        offset.x + (halfSize.x), 0.0f, offset.z + (halfSize.z),
+        offset.x + (halfSize.x), 0.0f, offset.z + (halfSize.z),
+        offset.x + (-halfSize.x), 0.0f, offset.z + (halfSize.z), 
+        offset.x + (-halfSize.x), 0.0f, offset.z + (-halfSize.z),
 	};
 
 	float normals[] = {
@@ -578,12 +578,12 @@ jRenderObject* CreateQuad_Internal(const Vector& pos, const Vector& size, const 
 	};
 
 	Vector2 texcoords[] = {
-		Vector2(1.0f, 1.0f),
-		Vector2(0.0f, 0.0f),
-		Vector2(1.0f, 0.0f),
-		Vector2(0.0f, 0.0f),
-		Vector2(1.0f, 1.0f),
-		Vector2(0.0f, 1.0f),
+        Vector2(0.0f, 0.0f),
+        Vector2(1.0f, 0.0f),
+        Vector2(1.0f, 1.0f),
+        Vector2(1.0f, 1.0f),
+        Vector2(0.0f, 1.0f),
+        Vector2(0.0f, 0.0f),
 	};
 
 	const int32 elementCount = _countof(vertices) / 3;
