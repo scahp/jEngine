@@ -332,6 +332,8 @@ void jGame::Resize(int32 width, int32 height)
 
 void jGame::Release()
 {
+	g_rhi->Flush();
+
 	for (jObject* iter : SpawnedObjects)
 	{
 		delete iter;

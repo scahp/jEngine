@@ -169,7 +169,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// 7. Create sync object
 	jFenceManager_DX12 FenceManager;
-	void WaitForGPU();
+	void WaitForGPU() const;
 
 	//////////////////////////////////////////////////////////////////////////
 	// 11. Create vertex and index buffer
@@ -186,12 +186,14 @@ public:
 
     HWND m_hWnd = 0;
 
-    void RenderUI(ID3D12GraphicsCommandList* pCommandList, ID3D12Resource* pRenderTarget, D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle
-        , ID3D12DescriptorHeap* pDescriptorHeap, D3D12_RESOURCE_STATES beforeResourceState, D3D12_RESOURCE_STATES afterResourceState);
-
     float m_focalDistance = 10.0f;
     float m_lensRadius = 0.2f;
     //////////////////////////////////////////////////////////////////////////
+
+	virtual jName GetRHIName() override
+	{
+		return jNameStatic("DirectX12");
+	}
 
 	virtual bool InitRHI() override;
     bool Run();
@@ -410,6 +412,9 @@ public:
 
 	jQueryPoolTime_DX12* QueryPoolTime = nullptr;
 	virtual jQueryPool* GetQueryTimePool() const override { return QueryPoolTime; }
+
+	virtual void Flush() const override;
+	virtual void Finish() const override;
 };
 
 extern jRHI_DX12* g_rhi_dx12;

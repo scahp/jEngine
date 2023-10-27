@@ -1193,8 +1193,12 @@ void jRenderer::Render()
         {
             Vector4 clear_color(0.45f, 0.55f, 0.60f, 1.00f);
 
-            ImGui::SetNextWindowSize(ImVec2(200.0f, 200.0f), ImGuiCond_FirstUseEver);
-            ImGui::Begin("Panel");
+            char szTitle[128] = { 0, };
+            sprintf_s(szTitle, sizeof(szTitle), "RHI : %s", g_rhi->GetRHIName().ToStr());
+
+            ImGui::SetNextWindowPos(ImVec2(27.0f, 27.0f), ImGuiCond_FirstUseEver);
+            ImGui::SetNextWindowSize(ImVec2(350.0f, 682.0f), ImGuiCond_FirstUseEver);
+            ImGui::Begin(szTitle);
 
 #if USE_VARIABLE_SHADING_RATE_TIER2
             ImGui::Checkbox("UseVRS", &gOptions.UseVRS);

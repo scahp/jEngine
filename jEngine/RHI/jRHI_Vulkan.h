@@ -114,6 +114,11 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 
+    virtual jName GetRHIName() override
+    {
+        return jNameStatic("Vulkan");
+    }
+
 	virtual bool InitRHI() override;
 	virtual void ReleaseRHI() override;
 

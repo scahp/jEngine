@@ -303,6 +303,7 @@ public:
 		return (T*)ShaderPool.GetOrCreate<jShaderInfo, T>(shaderInfo);
 	}
 
+	virtual jName GetRHIName() { return jName::Invalid; }
 	virtual bool InitRHI();
 	virtual void OnInitRHI();
 	virtual void ReleaseRHI();

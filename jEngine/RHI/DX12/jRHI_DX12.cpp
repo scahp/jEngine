@@ -425,7 +425,7 @@ int32 GetHardwareAdapter(IDXGIFactory1* InFactory, IDXGIAdapter1** InAdapter
     return adapterIndex;
 }
 
-void jRHI_DX12::WaitForGPU()
+void jRHI_DX12::WaitForGPU() const
 {
 	check(Swapchain);
 
@@ -2187,5 +2187,15 @@ void jRHI_DX12::EndDebugEvent(jCommandBuffer* InCommandBuffer) const
     check(!CommandList->IsClosed);
 
     PIXEndEvent(CommandList->Get());
+}
+
+void jRHI_DX12::Flush() const
+{
+    WaitForGPU();
+}
+
+void jRHI_DX12::Finish() const
+{
+    WaitForGPU();
 }
 
