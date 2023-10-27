@@ -162,6 +162,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClInclude Include="RHI\DX12\jCommandBufferManager_DX12.h" />
     <ClInclude Include="RHI\DX12\jDescriptorHeap_DX12.h" />
     <ClInclude Include="RHI\DX12\jFenceManager_DX12.h" />
+    <ClInclude Include="RHI\DX12\jImGui_DX12.h" />
     <ClInclude Include="RHI\DX12\jIndexBuffer_DX12.h" />
     <ClInclude Include="RHI\DX12\jPipelineStateInfo_DX12.h" />
     <ClInclude Include="RHI\DX12\jQueryPoolTime_DX12.h" />
@@ -202,6 +203,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClInclude Include="RHI\Vulkan\jCommandBufferManager_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jDescriptorPool_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jFenceManager_Vulkan.h" />
+    <ClInclude Include="RHI\Vulkan\jImGui_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jIndexBuffer_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jMemoryPool_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jPipelineStateInfo_Vulkan.h" />
@@ -357,6 +359,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClCompile Include="RHI\DX12\jCommandBufferManager_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jDescriptorHeap_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jFenceManager_DX12.cpp" />
+    <ClCompile Include="RHI\DX12\jImGui_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jIndexBuffer_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jPipelineStateInfo_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jQueryPoolTime_DX12.cpp" />
@@ -387,6 +390,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClCompile Include="RHI\Vulkan\jCommandBufferManager_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jDescriptorPool_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jFenceManager_Vulkan.cpp" />
+    <ClCompile Include="RHI\Vulkan\jImGui_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jIndexBuffer_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jMemoryPool_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jPipelineStateInfo_Vulkan.cpp" />

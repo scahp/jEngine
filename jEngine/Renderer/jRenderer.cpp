@@ -1188,32 +1188,11 @@ void jRenderer::Render()
     PostProcess();
     DebugPasses();
 
-#if USE_VULKAN
-    jImGUI_Vulkan::Get().Draw(RenderFrameContextPtr);
-#elif USE_DX12
-    {
-        ImGui_ImplDX12_NewFrame();
-        ImGui_ImplWin32_NewFrame();
-        ImGui::NewFrame();
-
-        Vector4 clear_color(0.45f, 0.55f, 0.60f, 1.00f);
-
-        if (0)
+    check(g_ImGUI);
+    g_ImGUI->NewFrame([]()
         {
-            ImGui::Begin("Control Pannel");
+            Vector4 clear_color(0.45f, 0.55f, 0.60f, 1.00f);
 
-            // ImGui::SliderFloat("Focal distance", &m_focalDistance, 3.0f, 40.0f);
-            // ImGui::SliderFloat("Lens radius", &m_lensRadius, 0.0f, 0.2f);
-
-            ImGui::Text("Average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-
-            ImGui::SetWindowPos({ 10, 10 }, ImGuiCond_Once);
-            ImGui::SetWindowSize({ 350, 100 }, ImGuiCond_Once);
-
-            ImGui::End();
-        }
-        else
-        {
             ImGui::SetNextWindowSize(ImVec2(200.0f, 200.0f), ImGuiCond_FirstUseEver);
             ImGui::Begin("Panel");
 
@@ -1334,62 +1313,6 @@ void jRenderer::Render()
             ImGui::Separator();
             ImGui::Text("CameraPos : %.2f, %.2f, %.2f", gOptions.CameraPos.x, gOptions.CameraPos.y, gOptions.CameraPos.z);
             ImGui::End();
-        }
-
-        // Rendering UI
-        ImGui::Render();
-
-        jSwapchainImage_DX12* CurrentSwapchainImage = (jSwapchainImage_DX12*)g_rhi_dx12->GetSwapchainImage(g_rhi->GetCurrentFrameIndex());
-        check(CurrentSwapchainImage);
-        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), CurrentSwapchainImage->TexturePtr.get(), EImageLayout::COLOR_ATTACHMENT);
-        
-        // const float clear_color_with_alpha[4] = { clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w };
-
-        jRenderPass* UIRenderPass = nullptr;
-        //{
-            jRasterizationStateInfo* RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)1, true, 0.2f, false, false>::Create();;
-            auto DepthStencilState = TDepthStencilStateInfo<false, false, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
-            auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
-
-            jPipelineStateFixedInfo BasePassPipelineStateFixed = jPipelineStateFixedInfo(RasterizationState, DepthStencilState, BlendingState
-                , jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT), gOptions.UseVRS);
-
-            auto TranslucentBlendingState = TBlendingStateInfo<true, EBlendFactor::SRC_ALPHA, EBlendFactor::ONE_MINUS_SRC_ALPHA, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
-            jPipelineStateFixedInfo TranslucentPassPipelineStateFixed = jPipelineStateFixedInfo(RasterizationState, DepthStencilState, TranslucentBlendingState
-                , jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT), gOptions.UseVRS);
-
-            const jRTClearValue ClearColor = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f);
-            const jRTClearValue ClearDepth = jRTClearValue(1.0f, 0);
-
-            // Setup attachment
-            jRenderPassInfo renderPassInfo;
-            auto BackBuffer = std::make_shared<jRenderTarget>(CurrentSwapchainImage->TexturePtr);
-            jAttachment color = jAttachment(BackBuffer, EAttachmentLoadStoreOp::DONTCARE_STORE
-                , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor
-                , EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
-            renderPassInfo.Attachments.push_back(color);
-            UIRenderPass = (jRenderPass_Vulkan*)g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
-        //}
-
-        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), EImageLayout::SHADER_READ_ONLY);
-
-        {
-            DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "ImGUI", Vector4(0.8f, 0.8f, 0.8f, 1.0f));
-
-            if (UIRenderPass && UIRenderPass->BeginRenderPass(RenderFrameContextPtr->GetActiveCommandBuffer()))
-            {
-                //// Copy ColorRT to BackBuffer
-                //CopyDrawCommand.Draw();
-
-                // Draw UI to BackBuffer Directly
-                const jCommandBuffer_DX12* commandBuffer = (const jCommandBuffer_DX12*)RenderFrameContextPtr->GetActiveCommandBuffer();
-                ID3D12DescriptorHeap* DescriptorHeap = g_rhi_dx12->m_imgui_SrvDescHeap.Get();
-                commandBuffer->CommandList->SetDescriptorHeaps(1, &DescriptorHeap);
-                ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandBuffer->CommandList.Get());
-
-                UIRenderPass->EndRenderPass();
-            }
-        }
-    }
-#endif
+        });
+    g_ImGUI->Draw(RenderFrameContextPtr);
 }

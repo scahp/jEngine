@@ -186,12 +186,6 @@ public:
 
     HWND m_hWnd = 0;
 
-    //////////////////////////////////////////////////////////////////////////
-    // ImGui
-    ComPtr<ID3D12DescriptorHeap> m_imgui_SrvDescHeap;
-
-    void InitializeImGui();
-    void ReleaseImGui();
     void RenderUI(ID3D12GraphicsCommandList* pCommandList, ID3D12Resource* pRenderTarget, D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle
         , ID3D12DescriptorHeap* pDescriptorHeap, D3D12_RESOURCE_STATES beforeResourceState, D3D12_RESOURCE_STATES afterResourceState);
 

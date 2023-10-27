@@ -454,6 +454,12 @@
     <ClInclude Include="RHI\DX12\jQueryPoolTime_DX12.h">
       <Filter>Code\RHI\DX12</Filter>
     </ClInclude>
+    <ClInclude Include="RHI\Vulkan\jImGui_Vulkan.h">
+      <Filter>Code\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\jImGui_DX12.h">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -781,6 +787,12 @@
       <Filter>Code\RHI\DX12</Filter>
     </ClCompile>
     <ClCompile Include="RHI\DX12\jQueryPoolTime_DX12.cpp">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\jImGui_Vulkan.cpp">
+      <Filter>Code\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\jImGui_DX12.cpp">
       <Filter>Code\RHI\DX12</Filter>
     </ClCompile>
   </ItemGroup>

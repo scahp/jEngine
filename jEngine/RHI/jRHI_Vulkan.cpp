@@ -29,6 +29,7 @@
 #include "Vulkan/jQueryPoolOcclusion_Vulkan.h"
 #include "jOptions.h"
 #include "Vulkan/jRenderFrameContext_Vulkan.h"
+#include "Vulkan/jImGui_Vulkan.h"
 
 jRHI_Vulkan* g_rhi_vk = nullptr;
 robin_hood::unordered_map<size_t, VkPipelineLayout> jRHI_Vulkan::PipelineLayoutPool;
@@ -321,7 +322,8 @@ bool jRHI_Vulkan::InitRHI()
 	DescriptorPools2 = new jDescriptorPool_Vulkan();
 	DescriptorPools2->Create(10000);
 
-    jImGUI_Vulkan::Get().Initialize((float)SCR_WIDTH, (float)SCR_HEIGHT);
+	g_ImGUI = new jImGUI_Vulkan();
+	g_ImGUI->Initialize((float)SCR_WIDTH, (float)SCR_HEIGHT);
 
 	CreateSampleVRSTexture();
 
@@ -366,7 +368,9 @@ void jRHI_Vulkan::ReleaseRHI()
 	SampleVRSTexture = nullptr;
 
 	jImageFileLoader::ReleaseInstance();
-    jImGUI_Vulkan::ReleaseInstance();
+	
+	delete g_ImGUI;
+	g_ImGUI = nullptr;
 
     RenderPassPool.Release();
     SamplerStatePool.Release();
@@ -518,8 +522,8 @@ void jRHI_Vulkan::RecreateSwapChain()
     Swapchain = new jSwapchain_Vulkan();
     verify(Swapchain->Create());
 
-    jImGUI_Vulkan::Get().Release();
-    jImGUI_Vulkan::Get().Initialize((float)SCR_WIDTH, (float)SCR_HEIGHT);
+    g_ImGUI->Release();
+    g_ImGUI->Initialize((float)SCR_WIDTH, (float)SCR_HEIGHT);
 
     CurrentFrameIndex = 0;
 

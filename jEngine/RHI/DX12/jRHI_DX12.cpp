@@ -30,6 +30,7 @@
 #include "Scene/jRenderObject.h"
 #include "Scene/Light/jLight.h"
 #include "jQueryPoolTime_DX12.h"
+#include "jImGui_DX12.h"
 
 #define USE_INLINE_DESCRIPTOR 0												// InlineDescriptor 를 쓸것인지? DescriptorTable 를 쓸것인지 여부
 #define USE_ONE_FRAME_BUFFER_AND_DESCRIPTOR (USE_INLINE_DESCRIPTOR && 1)	// 현재 프레임에만 사용하고 버리는 임시 Descriptor 와 Buffer 를 사용할 것인지 여부
@@ -1046,9 +1047,10 @@ bool jRHI_DX12::InitRHI()
     QueryPoolTime = new jQueryPoolTime_DX12();
     QueryPoolTime->Create();
 
-	//////////////////////////////////////////////////////////////////////////
+    g_ImGUI = new jImGUI_DX12();
+    g_ImGUI->Initialize((float)SCR_WIDTH, (float)SCR_HEIGHT);
 
-    InitializeImGui();
+	//////////////////////////////////////////////////////////////////////////
 
 	ShowWindow(m_hWnd, SW_SHOW);
 
@@ -1085,8 +1087,6 @@ void jRHI_DX12::ReleaseRHI()
 
 	if (CopyCommandBufferManager)
 		CopyCommandBufferManager->Release();
-
-    ReleaseImGui();
 
 	//////////////////////////////////////////////////////////////////////////
 	// 14. Raytracing Output Resouce
@@ -1600,90 +1600,6 @@ void jRHI_DX12::EndSingleTimeCopyCommands(jCommandBuffer_DX12* commandBuffer)
 	check(CopyCommandBufferManager);
 	CopyCommandBufferManager->ExecuteCommandList(commandBuffer, true);
 	CopyCommandBufferManager->ReturnCommandBuffer(commandBuffer);
-}
-
-void jRHI_DX12::InitializeImGui()
-{
-    D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-    desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-    desc.NumDescriptors = 1;
-    desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-    if (JFAIL(Device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_imgui_SrvDescHeap))))
-        return;
-
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
-
-    // Setup Dear ImGui style
-    ImGui::StyleColorsDark();
-
-    // Setup Platform/Renderer backends
-    ImGui_ImplWin32_Init(m_hWnd);
-
-    ImGui_ImplDX12_Init(Device.Get(), MaxFrameCount,
-        DXGI_FORMAT_R8G8B8A8_UNORM, m_imgui_SrvDescHeap.Get(),
-        m_imgui_SrvDescHeap->GetCPUDescriptorHandleForHeapStart(),
-        m_imgui_SrvDescHeap->GetGPUDescriptorHandleForHeapStart());
-}
-
-void jRHI_DX12::ReleaseImGui()
-{
-    // Cleanup
-	if (m_imgui_SrvDescHeap)
-	{
-		ImGui_ImplDX12_Shutdown();
-		ImGui_ImplWin32_Shutdown();
-		ImGui::DestroyContext();
-
-		m_imgui_SrvDescHeap.Reset();
-	}
-}
-
-void jRHI_DX12::RenderUI(ID3D12GraphicsCommandList* pCommandList, ID3D12Resource* pRenderTarget, D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle
-    , ID3D12DescriptorHeap* pDescriptorHeap, D3D12_RESOURCE_STATES beforeResourceState, D3D12_RESOURCE_STATES afterResourceState)
-{
-    ImGui_ImplDX12_NewFrame();
-    ImGui_ImplWin32_NewFrame();
-    ImGui::NewFrame();
-
-    Vector4 clear_color(0.45f, 0.55f, 0.60f, 1.00f);
-
-    {
-        ImGui::Begin("Control Pannel");
-
-        ImGui::SliderFloat("Focal distance", &m_focalDistance, 3.0f, 40.0f);
-        ImGui::SliderFloat("Lens radius", &m_lensRadius, 0.0f, 0.2f);
-
-        ImGui::Text("Average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-
-        ImGui::SetWindowPos({10, 10}, ImGuiCond_Once);
-        ImGui::SetWindowSize({350, 100}, ImGuiCond_Once);
-
-        ImGui::End();
-    }
-
-    // Rendering UI
-    ImGui::Render();
-
-	if (beforeResourceState != D3D12_RESOURCE_STATE_RENDER_TARGET)
-	{
-		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-			pRenderTarget, beforeResourceState, D3D12_RESOURCE_STATE_RENDER_TARGET);
-		pCommandList->ResourceBarrier(1, &barrier);
-	}
-    const float clear_color_with_alpha[4] = { clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w };
-
-    pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, NULL);
-    pCommandList->SetDescriptorHeaps(1, &pDescriptorHeap);
-    ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), pCommandList);
-
-	if (D3D12_RESOURCE_STATE_RENDER_TARGET != afterResourceState)
-	{
-		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-			pRenderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, afterResourceState);
-		pCommandList->ResourceBarrier(1, &barrier);
-	}
 }
 
 jTexture* jRHI_DX12::CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
