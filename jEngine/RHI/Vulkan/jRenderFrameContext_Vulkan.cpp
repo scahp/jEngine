@@ -24,6 +24,8 @@ void jRenderFrameContext_Vulkan::QueueSubmitCurrentActiveCommandBuffer(jSemaphor
 {
     if (CommandBuffer)
     {
+        CommandBuffer->End();
+
         g_rhi->QueueSubmit(shared_from_this(), InSignalSemaphore);
         g_rhi->GetCommandBufferManager()->ReturnCommandBuffer(CommandBuffer);
 

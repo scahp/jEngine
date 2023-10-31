@@ -21,13 +21,20 @@ bool jCommandBuffer_Vulkan::Begin() const
     if (!ensure(vkBeginCommandBuffer(CommandBuffer, &beginInfo) == VK_SUCCESS))
         return false;
 
+    IsEnd = false;
+
     return true;
 }
 
 bool jCommandBuffer_Vulkan::End() const
 {
+    if (IsEnd)
+        return true;
+
     if (!ensure(vkEndCommandBuffer(CommandBuffer) == VK_SUCCESS))
         return false;
+
+    IsEnd = true;
 
     return true;
 }

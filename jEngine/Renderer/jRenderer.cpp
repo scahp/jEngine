@@ -23,8 +23,8 @@
 #include "RHI/DX12/jBufferUtil_DX12.h"
 #include "FileLoader/jImageFileLoader.h"
 
-#define ASYNC_WITH_SETUP 1
-#define PARALLELFOR_WITH_PASSSETUP 1
+#define ASYNC_WITH_SETUP 0
+#define PARALLELFOR_WITH_PASSSETUP 0
 
 struct jSimplePushConstant
 {

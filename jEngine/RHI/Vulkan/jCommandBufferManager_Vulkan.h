@@ -23,6 +23,7 @@ public:
 private:
     jFence* Fence = nullptr;                        // Fence manager 에서 참조하기 때문에 소멸시키지 않음
     VkCommandBuffer CommandBuffer = nullptr;        // CommandBufferManager 에서 CommandBufferPool 을 해제하여 일시에 소멸시키므로 소멸 처리 없음
+    mutable bool IsEnd = false;
 };
 
 class jCommandBufferManager_Vulkan : public jCommandBufferManager

@@ -123,7 +123,7 @@ void jDrawCommand::Draw() const
             for (int32 i = 0; i < pushConstantRanges->NumOfData; ++i)
             {
                 const jPushConstantRange& range = (*pushConstantRanges)[i];
-                vkCmdPushConstants((VkCommandBuffer)RenderFrameContextPtr->GetActiveCommandBuffer()->GetHandle(), CurrentPipelineStateInfo->vkPipelineLayout
+                vkCmdPushConstants((VkCommandBuffer)RenderFrameContextPtr->GetActiveCommandBuffer()->GetHandle(), ((jPipelineStateInfo_Vulkan*)CurrentPipelineStateInfo)->vkPipelineLayout
                     , GetVulkanShaderAccessFlags(range.AccessStageFlag), range.Offset, range.Size, PushConstant->GetConstantData());
             }
         }

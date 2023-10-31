@@ -2,6 +2,7 @@
 
 struct jImageData
 {
+	bool HasMipmap = false;
 	bool sRGB = false;
 	int32 Width = 0;
 	int32 Height = 0;
@@ -9,6 +10,8 @@ struct jImageData
 	std::vector<unsigned char> ImageData;
 	ETextureFormat Format = ETextureFormat::RGBA8;
 	EFormatType FormatType = EFormatType::UNSIGNED_BYTE;
+	//ComPtr<ID3D12Resource> Resource;
+	std::vector<jImageSubResourceData> SubresourceFootprints;
 };
 
 class jImageFileLoader

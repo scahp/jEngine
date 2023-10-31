@@ -287,6 +287,16 @@ struct jShaderBindingInstanceCombiner
     jResourceContainer<uint32> DynamicOffsets;
 };
 
+struct jImageSubResourceData
+{
+    int32 Format = 0;
+    uint32 Width = 0;
+    uint32 Height = 0;
+    uint32 Depth = 0;
+    uint32 RowPitch = 0;
+	uint64 Offset = 0;
+};
+
 class jRHI
 {
 public:
@@ -371,6 +381,8 @@ public:
 		, ETextureFormat textureFormat = ETextureFormat::RGBA8, bool createMipmap = false) const { return nullptr; }
 	virtual jTexture* CreateCubeTextureFromData(std::vector<void*> faces, int32 width, int32 height, bool sRGB
 		, ETextureFormat textureFormat = ETextureFormat::RGBA8, bool createMipmap = false) const { return nullptr; }
+	virtual jTexture* CreateTextureFromData(void* data, int32 InData, int32 width, int32 height, bool InHasMipmap
+		, ETextureFormat textureFormat, const std::vector<jImageSubResourceData>& InSubresourceData) const { return nullptr; }
 	virtual jFrameBuffer* CreateFrameBuffer(const jFrameBufferInfo& info) const { return nullptr; }
 	virtual std::shared_ptr<jRenderTarget> CreateRenderTarget(const jRenderTargetInfo& info) const { return nullptr; }
 	virtual void EnableDepthTest(bool enable) const {}

@@ -7,7 +7,7 @@ struct jTexture_DX12;
 
 namespace
 {
-size_t BitsPerPixel(DXGI_FORMAT fmt)
+size_t BitsPerPixel_(DXGI_FORMAT fmt)
 {
     switch (static_cast<int>(fmt))
     {
@@ -412,7 +412,7 @@ struct jFormattedBuffer
 
     void Initialize()
     {
-        const uint64 Stride = BitsPerPixel(Format) / 8;
+        const uint64 Stride = BitsPerPixel_(Format) / 8;
 
         const D3D12_RESOURCE_STATES InitialResourceState = InitData ? D3D12_RESOURCE_STATE_COMMON : InitialState;
         const uint64 AlignedSize = Align(Stride * NumElements, Stride);
@@ -529,8 +529,11 @@ ComPtr<ID3D12Resource> CreateImageInternal(uint32 InWidth, uint32 InHeight, uint
 jTexture_DX12* CreateImage(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, uint32 InNumOfSample
     , ETextureType InType, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag, EImageLayout InImageLayout = EImageLayout::UNDEFINED, const jRTClearValue& InClearValue = jRTClearValue::Invalid, const wchar_t* InResourceName = nullptr);
 
+jTexture_DX12* CreateImage(ComPtr<ID3D12Resource> InTexture, ETextureCreateFlag InTextureCreateFlag, EImageLayout InImageLayout, const jRTClearValue& InClearValue, const wchar_t* InResourceName);
+
 uint64 CopyBufferToImage(ID3D12GraphicsCommandList4* InCommandBuffer, ID3D12Resource* InBuffer, uint64 InBufferOffset, ID3D12Resource* InImage, int32 InImageSubresourceIndex = 0);
 uint64 CopyBufferToImage(ID3D12GraphicsCommandList4* InCommandBuffer, ID3D12Resource* InBuffer, uint64 InBufferOffset, ID3D12Resource* InImage, int32 InNumOfImageSubresource, int32 InStartImageSubresource);
+void CopyBufferToImage(ID3D12GraphicsCommandList4* InCommandBuffer, ID3D12Resource* InBuffer, ID3D12Resource* InImage, const std::vector<jImageSubResourceData>& InSubresourceData);
 void CopyBuffer(ID3D12GraphicsCommandList4* InCommandBuffer, ID3D12Resource* InSrcBuffer, ID3D12Resource* InDstBuffer, uint64 InSize, uint64 InSrcOffset, uint64 InDstOffset);
 void CopyBuffer(ID3D12Resource* InSrcBuffer, ID3D12Resource* InDstBuffer, uint64 InSize, uint64 InSrcOffset, uint64 InDstOffset);
 

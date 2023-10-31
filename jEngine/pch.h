@@ -5,7 +5,7 @@
 
 #include <windows.h>
 
-#define API_TYPE 3
+#define API_TYPE 1
 
 #if (API_TYPE == 1)
 #define USE_VULKAN 1

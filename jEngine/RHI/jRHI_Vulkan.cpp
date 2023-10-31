@@ -30,6 +30,7 @@
 #include "jOptions.h"
 #include "Vulkan/jRenderFrameContext_Vulkan.h"
 #include "Vulkan/jImGui_Vulkan.h"
+#include "Scene/Light/jLight.h"
 
 jRHI_Vulkan* g_rhi_vk = nullptr;
 robin_hood::unordered_map<size_t, VkPipelineLayout> jRHI_Vulkan::PipelineLayoutPool;
@@ -1190,7 +1191,7 @@ std::shared_ptr<jRenderFrameContext> jRHI_Vulkan::BeginRenderFrame()
 	renderFrameContextPtr->UseForwardRenderer = !gOptions.UseDeferredRenderer;
 	renderFrameContextPtr->FrameIndex = CurrentFrameIndex;
 	renderFrameContextPtr->SceneRenderTargetPtr = std::make_shared<jSceneRenderTarget>();
-	renderFrameContextPtr->SceneRenderTargetPtr->Create(Swapchain->GetSwapchainImage(CurrentFrameIndex));
+	renderFrameContextPtr->SceneRenderTargetPtr->Create(Swapchain->GetSwapchainImage(CurrentFrameIndex), &jLight::GetLights());
 	renderFrameContextPtr->CurrentWaitSemaphore = Swapchain->Images[CurrentFrameIndex]->Available;
 
 	return renderFrameContextPtr;
@@ -1284,6 +1285,9 @@ void jRHI_Vulkan::QueueSubmit(const std::shared_ptr<jRenderFrameContext>& render
 	check(renderFrameContext);
 
     check(renderFrameContext->GetActiveCommandBuffer());
+
+	renderFrameContext->GetActiveCommandBuffer()->End();
+
     VkCommandBuffer vkCommandBuffer = (VkCommandBuffer)renderFrameContext->GetActiveCommandBuffer()->GetHandle();
     VkFence vkFence = (VkFence)renderFrameContext->GetActiveCommandBuffer()->GetFenceHandle();
 	

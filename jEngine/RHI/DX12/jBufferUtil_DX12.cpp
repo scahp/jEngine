@@ -232,6 +232,44 @@ jTexture_DX12* CreateImage(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers
     return Texture;
 }
 
+jTexture_DX12* CreateImage(ComPtr<ID3D12Resource> InTexture, ETextureCreateFlag InTextureCreateFlag, EImageLayout InImageLayout, const jRTClearValue& InClearValue, const wchar_t* InResourceName)
+{
+    const auto desc = InTexture->GetDesc();
+    jTexture_DX12* Texture = new jTexture_DX12(GetDX12TextureDemension(desc.Dimension, desc.DepthOrArraySize > 1), GetDX12TextureFormat(desc.Format), (int32)desc.Width, (int32)desc.Height, (int32)desc.DepthOrArraySize
+        , EMSAASamples::COUNT_1, (int32)desc.MipLevels, false, InClearValue, InTexture);
+
+    check(Texture);
+    Texture->Layout = InImageLayout;
+
+    if (InResourceName)
+    {
+        // https://learn.microsoft.com/ko-kr/cpp/text/how-to-convert-between-various-string-types?view=msvc-170#example-convert-from-char-
+        char szResourceName[1024];
+        size_t OutLength = 0;
+        size_t origsize = wcslen(InResourceName) + 1;
+        const size_t newsize = origsize * 2;
+        wcstombs_s(&OutLength, szResourceName, newsize, InResourceName, _TRUNCATE);
+
+        Texture->ResourceName = jName(szResourceName);
+    }
+
+    if (IsDepthFormat(GetDX12TextureFormat(desc.Format)))
+    {
+        CreateShaderResourceView(Texture);
+        CreateDepthStencilView(Texture);
+    }
+    else
+    {
+        CreateShaderResourceView(Texture);
+        if (!!(InTextureCreateFlag & ETextureCreateFlag::RTV))
+            CreateRenderTargetView(Texture);
+        if (!!(InTextureCreateFlag & ETextureCreateFlag::UAV))
+            CreateUnorderedAccessView(Texture);
+    }
+
+    return Texture;
+}
+
 uint64 CopyBufferToImage(ID3D12GraphicsCommandList4* InCommandBuffer, ID3D12Resource* InBuffer, uint64 InBufferOffset, ID3D12Resource* InImage, int32 InImageSubresourceIndex)
 {
     check(InCommandBuffer);
@@ -268,6 +306,27 @@ uint64 CopyBufferToImage(ID3D12GraphicsCommandList4* InCommandBuffer, ID3D12Reso
         InBufferOffset += CopyBufferToImage(InCommandBuffer, InBuffer, InBufferOffset, InImage, i);
     }
     return InBufferOffset;      // total size of copy data
+}
+
+void CopyBufferToImage(ID3D12GraphicsCommandList4* InCommandBuffer, ID3D12Resource* InBuffer, ID3D12Resource* InImage, const std::vector<jImageSubResourceData>& InSubresourceData)
+{
+    for (uint64 i = 0; i < InSubresourceData.size(); ++i)
+    {
+        D3D12_TEXTURE_COPY_LOCATION dst = { };
+        dst.pResource = InImage;
+        dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+        dst.SubresourceIndex = uint32(i);
+        D3D12_TEXTURE_COPY_LOCATION src = { };
+        src.pResource = InBuffer;
+        src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+        src.PlacedFootprint.Footprint.Format = (DXGI_FORMAT)InSubresourceData[i].Format;
+        src.PlacedFootprint.Footprint.Width = InSubresourceData[i].Width;
+        src.PlacedFootprint.Footprint.Height = InSubresourceData[i].Height;
+        src.PlacedFootprint.Footprint.Depth = InSubresourceData[i].Depth;
+        src.PlacedFootprint.Footprint.RowPitch = InSubresourceData[i].RowPitch;
+        src.PlacedFootprint.Offset = InSubresourceData[i].Offset;
+        InCommandBuffer->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+    }
 }
 
 void CopyBuffer(ID3D12GraphicsCommandList4* InCommandBuffer, ID3D12Resource* InSrcBuffer, ID3D12Resource* InDstBuffer, uint64 InSize, uint64 InSrcOffset, uint64 InDstOffset)

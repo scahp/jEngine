@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 #if _DEBUG
-#define ENABLE_VALIDATION_LAYER 0
+#define ENABLE_VALIDATION_LAYER 1
 #else
 #define ENABLE_VALIDATION_LAYER 0
 #endif
