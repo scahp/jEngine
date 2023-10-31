@@ -522,7 +522,10 @@ void jRenderer::ShadowPass()
 
         const std::shared_ptr<jRenderTarget>& ShadowMapPtr = ShadowPasses.GetShadowMapPtr();
 
-        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), ShadowMapPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_ATTACHMENT);
+        {
+            auto NewLayout = ShadowMapPtr->GetTexture()->IsDepthOnlyFormat() ? EImageLayout::DEPTH_ATTACHMENT : EImageLayout::DEPTH_STENCIL_ATTACHMENT;
+            g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), ShadowMapPtr->GetTexture(), NewLayout);
+        }
 
         if (ShadowPasses.ShadowMapRenderPass && ShadowPasses.ShadowMapRenderPass->BeginRenderPass(RenderFrameContextPtr->GetActiveCommandBuffer()))
         {
@@ -535,7 +538,10 @@ void jRenderer::ShadowPass()
             ShadowPasses.ShadowMapRenderPass->EndRenderPass();
         }
 
-        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), ShadowMapPtr->GetTexture(), EImageLayout::SHADER_READ_ONLY);
+        {
+            auto NewLayout = ShadowMapPtr->GetTexture()->IsDepthOnlyFormat() ? EImageLayout::DEPTH_READ_ONLY : EImageLayout::DEPTH_STENCIL_READ_ONLY;
+            g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), ShadowMapPtr->GetTexture(), NewLayout);
+        }
     }
 }
 
@@ -560,7 +566,11 @@ void jRenderer::BasePass()
                 g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[i]->GetTexture(), EImageLayout::COLOR_ATTACHMENT);
             }
         }
-        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EImageLayout::DEPTH_ATTACHMENT);
+
+        {
+            auto NewLayout = RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture()->IsDepthOnlyFormat() ? EImageLayout::DEPTH_ATTACHMENT : EImageLayout::DEPTH_STENCIL_ATTACHMENT;
+            g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), NewLayout);
+        }
 
         //BasepassOcclusionTest.BeginQuery(RenderFrameContextPtr->GetActiveCommandBuffer());
         if (BaseRenderPass && BaseRenderPass->BeginRenderPass(RenderFrameContextPtr->GetActiveCommandBuffer()))
@@ -895,6 +905,9 @@ void jRenderer::PostProcess()
                 DEBUG_EVENT(RenderFrameContextPtr, szDebugEventTemp);
                 //////////////////////////////////////////////////////////////////////////
                 // Compute Pipeline
+                g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), SourceRT, EImageLayout::SHADER_READ_ONLY);
+                g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), EyeAdaptationTextureCurrent, EImageLayout::GENERAL);
+
                 std::shared_ptr<jShaderBindingInstance> CurrentBindingInstance = nullptr;
                 int32 BindingPoint = 0;
                 jShaderBindingArray ShaderBindingArray;

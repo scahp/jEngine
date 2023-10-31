@@ -1816,11 +1816,7 @@ jUIQuadPrimitive* CreateUIQuad(const Vector2& pos, const Vector2& size, jTexture
 
 jFullscreenQuadPrimitive* CreateFullscreenQuad(jTexture* texture)
 {
-#if VULKAN_NDC_Y_FLIP
-	float vertices[] = { 0.0f, 2.0f, 1.0f };
-#else
 	float vertices[] = { 0.0f, 1.0f, 2.0f };
-#endif
 
 	uint32 elementCount = static_cast<uint32>(_countof(vertices));
 	// attribute 추가

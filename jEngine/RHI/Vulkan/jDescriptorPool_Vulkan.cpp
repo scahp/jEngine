@@ -65,7 +65,7 @@ void jDescriptorPool_Vulkan::Reset()
 #endif
 }
 
-jShaderBindingInstance_Vulkan* jDescriptorPool_Vulkan::AllocateDescriptorSet(VkDescriptorSetLayout InLayout)
+std::shared_ptr<jShaderBindingInstance_Vulkan> jDescriptorPool_Vulkan::AllocateDescriptorSet(VkDescriptorSetLayout InLayout)
 {
     jScopedLock s(&DescriptorPoolLock);
 #if !USE_RESET_DESCRIPTOR_POOL
@@ -73,10 +73,11 @@ jShaderBindingInstance_Vulkan* jDescriptorPool_Vulkan::AllocateDescriptorSet(VkD
     if (it_find != PendingDescriptorSets.end())
     {
         jShaderBindingInstanceVulkanArray& pendingPools = it_find->second;
-        if (pendingPools.NumOfData)
+        if (pendingPools.size())
         {
-            jShaderBindingInstance_Vulkan* descriptorSet = pendingPools.Back();
-            pendingPools.PopBack();
+            std::shared_ptr<jShaderBindingInstance_Vulkan> descriptorSet = *pendingPools.rbegin();
+            //pendingPools.PopBack();
+            pendingPools.resize(pendingPools.size() - 1);
             return descriptorSet;
         }
     }
@@ -92,17 +93,17 @@ jShaderBindingInstance_Vulkan* jDescriptorPool_Vulkan::AllocateDescriptorSet(VkD
     if (!ensure(VK_SUCCESS == vkAllocateDescriptorSets(g_rhi_vk->Device, &DescriptorSetAllocateInfo, &NewDescriptorSet)))
         return nullptr;
 
-    jShaderBindingInstance_Vulkan* NewCachedDescriptorSet = new jShaderBindingInstance_Vulkan();
+    std::shared_ptr<jShaderBindingInstance_Vulkan> NewCachedDescriptorSet = std::make_shared<jShaderBindingInstance_Vulkan>();
     NewCachedDescriptorSet->DescriptorSet = NewDescriptorSet;
 
 #if !USE_RESET_DESCRIPTOR_POOL
-    AllocatedDescriptorSets[InLayout].Add(NewCachedDescriptorSet);
+    AllocatedDescriptorSets[InLayout].push_back(NewCachedDescriptorSet);
 #endif
 
     return NewCachedDescriptorSet;
 }
 
-void jDescriptorPool_Vulkan::Free(jShaderBindingInstance* InShaderBindingInstance)
+void jDescriptorPool_Vulkan::Free(std::shared_ptr<jShaderBindingInstance_Vulkan> InShaderBindingInstance)
 {
     check(InShaderBindingInstance);
     jScopedLock s(&DescriptorPoolLock);
@@ -125,7 +126,7 @@ void jDescriptorPool_Vulkan::Free(jShaderBindingInstance* InShaderBindingInstanc
                     // Return to pending descriptor set
                     check(PendingFreeShaderBindingInstance.ShaderBindingInstance);
                     const VkDescriptorSetLayout DescriptorSetLayout = (VkDescriptorSetLayout)PendingFreeShaderBindingInstance.ShaderBindingInstance->ShaderBindingsLayouts->GetHandle();
-                    PendingDescriptorSets[DescriptorSetLayout].Add((jShaderBindingInstance_Vulkan*)PendingFreeShaderBindingInstance.ShaderBindingInstance);
+                    PendingDescriptorSets[DescriptorSetLayout].push_back(PendingFreeShaderBindingInstance.ShaderBindingInstance);
                 }
                 else
                 {
@@ -138,7 +139,9 @@ void jDescriptorPool_Vulkan::Free(jShaderBindingInstance* InShaderBindingInstanc
                 const size_t RemainingSize = (PendingFree.size() - i);
                 if (RemainingSize > 0)
                 {
-                    memcpy(&PendingFree[0], &PendingFree[i], sizeof(jPendingFreeShaderBindingInstance) * RemainingSize);
+                    for (int32 k = 0; k < RemainingSize; ++k)
+                        PendingFree[k] = PendingFree[i + k];
+                    //memcpy(&PendingFree[0], &PendingFree[i], sizeof(jPendingFreeShaderBindingInstance) * RemainingSize);
                 }
                 PendingFree.resize(RemainingSize);
             }
@@ -159,14 +162,14 @@ void jDescriptorPool_Vulkan::Release()
     {
         jScopedLock s(&DescriptorPoolLock);
 
-        for (auto& iter : AllocatedDescriptorSets)
-        {
-            jShaderBindingInstanceVulkanArray& instances = iter.second;
-            for (int32 i = 0; i < instances.NumOfData; ++i)
-            {
-                delete instances[i];
-            }
-        }
+        //for (auto& iter : AllocatedDescriptorSets)
+        //{
+        //    jShaderBindingInstanceVulkanArray& instances = iter.second;
+        //    for (int32 i = 0; i < instances.size(); ++i)
+        //    {
+        //        delete instances[i];
+        //    }
+        //}
         AllocatedDescriptorSets.clear();
     }
 }

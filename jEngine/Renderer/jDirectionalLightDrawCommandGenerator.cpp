@@ -52,8 +52,6 @@ void jDirectionalLightDrawCommandGenerator::Initialize(int32 InRTWidth, int32 In
 void jDirectionalLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* OutDestDrawCommand, const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr
     , const jView* InView, const jViewLight& InLightView, jRenderPass* InRenderPass, int32 InSubpassIndex)
 {
-    g_rhi->TransitionImageLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InLightView.ShadowMapPtr->GetTexture(), EImageLayout::SHADER_READ_ONLY);
-
     jShaderDirectionalLightPixelShader::ShaderPermutation ShaderPermutation;
     ShaderPermutation.SetIndex<jShaderDirectionalLightPixelShader::USE_SUBPASS>(gOptions.UseSubpass);
     ShaderPermutation.SetIndex<jShaderDirectionalLightPixelShader::USE_SHADOW_MAP>(InLightView.ShadowMapPtr ? 1 : 0);

@@ -69,7 +69,7 @@ void jRasterizationStateInfo_Vulkan::Initialize()
     RasterizationStateInfo.lineWidth = LineWidth;
     RasterizationStateInfo.cullMode = GetVulkanCullMode(CullMode);
 #if VULKAN_NDC_Y_FLIP
-    RasterizationStateInfo.frontFace = GetVulkanFrontFace((EFrontFace::CCW == FrontFace) ? EFrontFace::CW : EFrontFace::CCW);
+    RasterizationStateInfo.frontFace = GetVulkanFrontFace((EFrontFace::CCW == FrontFace) ? EFrontFace::CCW : EFrontFace::CW);
 #else
     RasterizationStateInfo.frontFace = GetVulkanFrontFace(FrontFace);
 #endif

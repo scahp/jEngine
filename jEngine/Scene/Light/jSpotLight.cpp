@@ -39,6 +39,7 @@ jCamera* jSpotLight::GetLightCamra(int index /*= 0*/) const
 
 const std::shared_ptr<jShaderBindingInstance>& jSpotLight::PrepareShaderBindingInstance(jTexture* InShadowMap)
 {
+    std::shared_ptr<jShaderBindingInstance>& SelectedShaderBindingInstance = InShadowMap ? ShaderBindingInstanceWithShadowMap : ShaderBindingInstanceOnlyLightData;
     if (IsNeedToUpdateShaderBindingInstance || (LastUsedShadowMap != InShadowMap))
     {
         if (IsNeedToUpdateShaderBindingInstance)
@@ -46,8 +47,16 @@ const std::shared_ptr<jShaderBindingInstance>& jSpotLight::PrepareShaderBindingI
             // todo : 한프레임에 한 번만 호출 될 것으로 기대함.
             IsNeedToUpdateShaderBindingInstance = false;
             LightDataUniformBlock->UpdateBufferData(&LightData, sizeof(LightData));
-            ShaderBindingInstanceWithShadowMap.reset();
-            ShaderBindingInstanceOnlyLightData.reset();
+            if (ShaderBindingInstanceWithShadowMap)
+            {
+                ShaderBindingInstanceWithShadowMap->Free();
+                ShaderBindingInstanceWithShadowMap.reset();
+            }
+            if (ShaderBindingInstanceOnlyLightData)
+            {
+                ShaderBindingInstanceOnlyLightData->Free();
+                ShaderBindingInstanceOnlyLightData.reset();
+            }
         }
 
         int32 BindingPoint = 0;
@@ -68,12 +77,11 @@ const std::shared_ptr<jShaderBindingInstance>& jSpotLight::PrepareShaderBindingI
         }
         LastUsedShadowMap = InShadowMap;
 
-        if (InShadowMap)
-            ShaderBindingInstanceWithShadowMap = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::MultiFrame);
-        else
-            ShaderBindingInstanceOnlyLightData = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::MultiFrame);
+        if (SelectedShaderBindingInstance)
+            SelectedShaderBindingInstance->Free();
+        SelectedShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::MultiFrame);
     }
-    return InShadowMap ? ShaderBindingInstanceWithShadowMap : ShaderBindingInstanceOnlyLightData;
+    return SelectedShaderBindingInstance;
 }
 
 const Matrix* jSpotLight::GetLightWorldMatrix() const

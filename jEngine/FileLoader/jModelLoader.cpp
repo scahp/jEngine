@@ -48,7 +48,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 	const aiScene* scene = importer.ReadFile(filename, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_CalcTangentSpace
 		| aiProcess_MakeLeftHanded
 #if USE_VULKAN
-		| aiProcess_FlipWindingOrder
+		//| aiProcess_FlipWindingOrder
 #endif
 	);
 

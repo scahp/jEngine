@@ -57,7 +57,7 @@ std::shared_ptr<jShaderBindingInstance> jShaderBindingsLayout_Vulkan::CreateShad
         break;
     }
 
-    jShaderBindingInstance_Vulkan* DescriptorSet = DescriptorPool->AllocateDescriptorSet(DescriptorSetLayout);
+    std::shared_ptr<jShaderBindingInstance_Vulkan> DescriptorSet = DescriptorPool->AllocateDescriptorSet(DescriptorSetLayout);
     if (!ensure(DescriptorSet))
     {
         return nullptr;
@@ -66,7 +66,7 @@ std::shared_ptr<jShaderBindingInstance> jShaderBindingsLayout_Vulkan::CreateShad
     DescriptorSet->ShaderBindingsLayouts = this;
     DescriptorSet->Initialize(InShaderBindingArray);
     DescriptorSet->SetType(InType);
-    return std::shared_ptr<jShaderBindingInstance>(DescriptorSet);
+    return DescriptorSet;
 }
 
 size_t jShaderBindingsLayout_Vulkan::GetHash() const
@@ -202,7 +202,8 @@ void jShaderBindingInstance_Vulkan::BindCompute(const std::shared_ptr<jRenderFra
 
 void jShaderBindingInstance_Vulkan::Free()
 {
-    g_rhi_vk->GetDescriptorPoolMultiFrame()->Free(this);
+    if (GetType() == jShaderBindingInstanceType::MultiFrame)
+        g_rhi_vk->GetDescriptorPoolMultiFrame()->Free(shared_from_this());
 }
 
 void jWriteDescriptorSet::SetWriteDescriptorInfo(int32 InIndex, const jShaderBinding* InShaderBinding)
