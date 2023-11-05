@@ -16,7 +16,7 @@ struct VSInput
 };
 
 cbuffer ViewParam : register(b0, space0) { ViewUniformBuffer ViewParam; }
-cbuffer RenderObjectParam : register(b1, space0) { RenderObjectUniformBuffer RenderObjectParam; }
+cbuffer RenderObjectParam : register(b0, space1) { RenderObjectUniformBuffer RenderObjectParam; }
 
 struct VSOutput
 {

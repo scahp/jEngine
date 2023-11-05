@@ -7,9 +7,9 @@ struct VSOutput
 };
 
 cbuffer ViewParam : register(b0,space0) { ViewUniformBuffer ViewParam; }
-cbuffer RenderObjectParam : register(b1, space0) { RenderObjectUniformBuffer RenderObjectParam; }
-Texture2D DiffuseTexture : register(t0, space0);
-SamplerState DiffuseTextureSampler : register(s0, space0);
+cbuffer RenderObjectParam : register(b0, space1) { RenderObjectUniformBuffer RenderObjectParam; }
+Texture2D DiffuseTexture : register(t0, space2);
+SamplerState DiffuseTextureSampler : register(s0, space2);
 
 float4 main(VSOutput input) : SV_TARGET
 {

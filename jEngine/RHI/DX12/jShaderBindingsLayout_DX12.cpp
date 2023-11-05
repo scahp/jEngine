@@ -10,6 +10,7 @@ void jRootParameterExtractor::Extract(const jShaderBindingArray& InShaderBinding
     // InRootParameters 의 맨 앞쪽에 inline descriptor 를 무조건 먼저 배치함.
 
 #define FORCE_USE_D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND 1
+    int32 BindingIndex = 0;     // // To support both API(Vulkan, DX12) : Vulkna require a unique bindingindex.
 
     for (int32 i = 0; i < InShaderBindingArray.NumOfData; ++i)
     {
@@ -32,7 +33,7 @@ void jRootParameterExtractor::Extract(const jShaderBindingArray& InShaderBinding
                 rootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
                 rootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
                 rootParameter.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
-                rootParameter.Descriptor.ShaderRegister = CBVIndex;
+                rootParameter.Descriptor.ShaderRegister = BindingIndex;
                 rootParameter.Descriptor.RegisterSpace = InRegisterSpace;
                 RootParameters.emplace_back(rootParameter);
             }
@@ -42,7 +43,7 @@ void jRootParameterExtractor::Extract(const jShaderBindingArray& InShaderBinding
                 range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
                 range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE;
                 range.NumDescriptors = ShaderBinding->NumOfDescriptors;
-                range.BaseShaderRegister = CBVIndex;
+                range.BaseShaderRegister = BindingIndex;
                 range.RegisterSpace = InRegisterSpace;
 #if FORCE_USE_D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND
                 range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
@@ -53,7 +54,7 @@ void jRootParameterExtractor::Extract(const jShaderBindingArray& InShaderBinding
                 Descriptors.emplace_back(range);
             }
 
-            CBVIndex += ShaderBinding->NumOfDescriptors;
+            BindingIndex += ShaderBinding->NumOfDescriptors;
             break;
         }
         case EShaderBindingType::TEXTURE_SAMPLER_SRV:
@@ -68,7 +69,7 @@ void jRootParameterExtractor::Extract(const jShaderBindingArray& InShaderBinding
                 rootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
                 rootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
                 rootParameter.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE;
-                rootParameter.Descriptor.ShaderRegister = SRVIndex;
+                rootParameter.Descriptor.ShaderRegister = BindingIndex;
                 rootParameter.Descriptor.RegisterSpace = InRegisterSpace;
                 RootParameters.emplace_back(rootParameter);
             }
@@ -78,7 +79,7 @@ void jRootParameterExtractor::Extract(const jShaderBindingArray& InShaderBinding
                 range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
                 range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE;
                 range.NumDescriptors = ShaderBinding->NumOfDescriptors;
-                range.BaseShaderRegister = SRVIndex;
+                range.BaseShaderRegister = BindingIndex;
                 range.RegisterSpace = InRegisterSpace;
 #if FORCE_USE_D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND
                 range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
@@ -89,8 +90,6 @@ void jRootParameterExtractor::Extract(const jShaderBindingArray& InShaderBinding
                 Descriptors.emplace_back(range);
             }
 
-            SRVIndex += ShaderBinding->NumOfDescriptors;
-
             // todo : Texture Sampler SRV 는 Texture 와 Sampler 를 동시에 정의하기 때문에 여기에 Sampler 를 추가. Vulkan 문법이라 사용하지 않는 것도 고민해봐야 함.
             if (ShaderBinding->BindingType == EShaderBindingType::TEXTURE_SAMPLER_SRV)
             {
@@ -98,7 +97,7 @@ void jRootParameterExtractor::Extract(const jShaderBindingArray& InShaderBinding
                 range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
                 range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE;
                 range.NumDescriptors = ShaderBinding->NumOfDescriptors;
-                range.BaseShaderRegister = SamplerIndex;
+                range.BaseShaderRegister = BindingIndex;
                 range.RegisterSpace = InRegisterSpace;
 #if FORCE_USE_D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND
                 range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
@@ -108,8 +107,10 @@ void jRootParameterExtractor::Extract(const jShaderBindingArray& InShaderBinding
 #endif
                 SamplerDescriptors.emplace_back(range);
 
-                SamplerIndex += ShaderBinding->NumOfDescriptors;
+                //SamplerIndex += ShaderBinding->NumOfDescriptors;
             }
+
+            BindingIndex += ShaderBinding->NumOfDescriptors;
             break;
         }
         case EShaderBindingType::TEXTURE_UAV:
@@ -123,7 +124,7 @@ void jRootParameterExtractor::Extract(const jShaderBindingArray& InShaderBinding
                 rootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_UAV;
                 rootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
                 rootParameter.Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_VOLATILE;
-                rootParameter.Descriptor.ShaderRegister = UAVIndex;
+                rootParameter.Descriptor.ShaderRegister = BindingIndex;
                 rootParameter.Descriptor.RegisterSpace = InRegisterSpace;
                 RootParameters.emplace_back(rootParameter);
             }
@@ -133,7 +134,7 @@ void jRootParameterExtractor::Extract(const jShaderBindingArray& InShaderBinding
                 range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
                 range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
                 range.NumDescriptors = ShaderBinding->NumOfDescriptors;
-                range.BaseShaderRegister = UAVIndex;
+                range.BaseShaderRegister = BindingIndex;
                 range.RegisterSpace = InRegisterSpace;
 #if FORCE_USE_D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND
                 range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
@@ -144,7 +145,7 @@ void jRootParameterExtractor::Extract(const jShaderBindingArray& InShaderBinding
                 Descriptors.emplace_back(range);
             }
 
-            UAVIndex += ShaderBinding->NumOfDescriptors;
+            BindingIndex += ShaderBinding->NumOfDescriptors;
             break;
         }
         case EShaderBindingType::SAMPLER:
@@ -153,7 +154,7 @@ void jRootParameterExtractor::Extract(const jShaderBindingArray& InShaderBinding
             range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
             range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE;
             range.NumDescriptors = ShaderBinding->NumOfDescriptors;
-            range.BaseShaderRegister = SamplerIndex;
+            range.BaseShaderRegister = BindingIndex;
             range.RegisterSpace = InRegisterSpace;
 #if FORCE_USE_D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND
             range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
@@ -163,7 +164,7 @@ void jRootParameterExtractor::Extract(const jShaderBindingArray& InShaderBinding
 #endif
             SamplerDescriptors.emplace_back(range);
 
-            SamplerIndex += ShaderBinding->NumOfDescriptors;
+            BindingIndex += ShaderBinding->NumOfDescriptors;
             break;
         }
         case EShaderBindingType::SUBPASS_INPUT_ATTACHMENT:
@@ -182,7 +183,7 @@ void jRootParameterExtractor::Extract(const jShaderBindingsLayoutArray& InBindin
         jShaderBindingsLayout_DX12* Layout = (jShaderBindingsLayout_DX12*)InBindingLayoutArray[i];
         check(Layout);
 
-        Extract(Layout->GetShaderBindingsLayout(), InRegisterSpace);
+        Extract(Layout->GetShaderBindingsLayout(), i);
     }
 
     NumOfInlineRootParameter = (int32)RootParameters.size();
@@ -219,7 +220,7 @@ void jRootParameterExtractor::Extract(const jShaderBindingInstanceArray& InBindi
 
         jShaderBindingsLayout_DX12* Layout = (jShaderBindingsLayout_DX12*)Instance->ShaderBindingsLayouts;
         check(Layout);
-        Extract(Layout->GetShaderBindingsLayout(), InRegisterSpace);
+        Extract(Layout->GetShaderBindingsLayout(), i);
     }
 
     NumOfInlineRootParameter = (int32)RootParameters.size();

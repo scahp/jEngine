@@ -1,7 +1,7 @@
 #include "common.hlsl"
 
 cbuffer DirectionalLight : register(b0,space0) { jDirectionalLightUniformBuffer DirectionalLight; }
-cbuffer RenderObjectParam : register(b1,space0) { RenderObjectUniformBuffer RenderObjectParam; }
+cbuffer RenderObjectParam : register(b0,space1) { RenderObjectUniformBuffer RenderObjectParam; }
 
 struct VSInput
 {

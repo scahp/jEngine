@@ -55,8 +55,9 @@ void jPointLightDrawCommandGenerator::Initialize(int32 InRTWidth, int32 InRTHeig
 void jPointLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* OutDestDrawCommand, const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr
     , const jView* InView, const jViewLight& InLightView, jRenderPass* InRenderPass, int32 InSubpassIndex)
 {
-    jPushConstant* PushConstant = new(jMemStack::Get()->Alloc<jPushConstant>()) jPushConstant(
-        jPointLightPushConstant(InView->Camera->Projection * InView->Camera->View * (*InLightView.Light->GetLightWorldMatrix())), EShaderAccessStageFlag::ALL);
+    //jPushConstant* PushConstant = new(jMemStack::Get()->Alloc<jPushConstant>()) jPushConstant(
+    //    jPointLightPushConstant(InView->Camera->Projection * InView->Camera->View * (*InLightView.Light->GetLightWorldMatrix())), EShaderAccessStageFlag::ALL);
+    jPushConstant* PushConstant = nullptr;
 
     jShaderPointLightPixelShader::ShaderPermutation ShaderPermutation;
     ShaderPermutation.SetIndex<jShaderPointLightPixelShader::USE_SUBPASS>(gOptions.UseSubpass);

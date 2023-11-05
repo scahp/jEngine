@@ -101,6 +101,8 @@ void jDrawCommand::PrepareToDraw(bool InIsPositionOnly)
 
 void jDrawCommand::Draw() const
 {
+    check(RenderFrameContextPtr);
+
     g_rhi->BindGraphicsShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), CurrentPipelineStateInfo, ShaderBindingInstanceCombiner, 0);
 
     // Bind the image that contains the shading rate patterns

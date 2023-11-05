@@ -15,11 +15,11 @@ struct jEyeAdaptationUniformBuffer
 
 Texture2D SceneColor : register(t0);
 Texture2D EyeAdaptationTexture : register(t1);
-RWTexture2D<float4> RWEyeAdaptationTexture : register(u0);
+RWTexture2D<float4> RWEyeAdaptationTexture : register(u2);
 
 groupshared float2 SubRectTotalValueWeight[TILE_SIZE * TILE_SIZE];
 
-cbuffer EyeAdaptation : register(b0)
+cbuffer EyeAdaptation : register(b3)
 {
     jEyeAdaptationUniformBuffer EyeAdaptation;
 }

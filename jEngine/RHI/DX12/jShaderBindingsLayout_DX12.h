@@ -4,11 +4,6 @@
 struct jRootParameterExtractor
 {
 public:
-    int32 NumOfInlineRootParameter = 0;
-    int32 CBVIndex = 0;
-    int32 SRVIndex = 0;
-    int32 UAVIndex = 0;
-    int32 SamplerIndex = 0;
     std::vector<D3D12_ROOT_PARAMETER1> RootParameters;
     std::vector<D3D12_DESCRIPTOR_RANGE1> Descriptors;
     std::vector<D3D12_DESCRIPTOR_RANGE1> SamplerDescriptors;
@@ -18,11 +13,9 @@ public:
 
 protected:
     void Extract(const jShaderBindingArray& InShaderBindingArray, int32 InRegisterSpace = 0);
-};
 
-struct jRootParameterShaderBindingInstaceExtractor
-{
-
+private:
+    int32 NumOfInlineRootParameter = 0;    
 };
 
 struct jShaderBindingsLayout_DX12 : public jShaderBindingsLayout

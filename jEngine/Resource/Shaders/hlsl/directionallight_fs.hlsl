@@ -32,19 +32,12 @@ Texture2D GBuffer2 : register(t2, space0);
 SamplerState GBuffer2SamplerState : register(s2, space0);
 #endif // USE_SUBPASS
 
-cbuffer ViewParam : register(b0, space0) { ViewUniformBuffer ViewParam; }
+cbuffer ViewParam : register(b0, space1) { ViewUniformBuffer ViewParam; }
 
-cbuffer DirectionalLight : register(b1, space0) { jDirectionalLightUniformBuffer DirectionalLight; }
+cbuffer DirectionalLight : register(b0, space2) { jDirectionalLightUniformBuffer DirectionalLight; }
 #if USE_SHADOW_MAP
-
-#if !USE_SUBPASS
-Texture2D DirectionalLightShadowMap : register(t3, space0);
-#else
-Texture2D DirectionalLightShadowMap : register(t1, space0);
-#endif
-
-SamplerComparisonState DirectionalLightShadowMapSampler : register(s3, space0);
-
+Texture2D DirectionalLightShadowMap : register(t1, space2);
+SamplerComparisonState DirectionalLightShadowMapSampler : register(s1, space2);
 #endif
 
 float4 main(VSOutput input

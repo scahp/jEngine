@@ -17,12 +17,12 @@ struct VSOutput
 };
 
 cbuffer ViewParam : register(b0, space0) { ViewUniformBuffer ViewParam; }
-cbuffer RenderObjectParam : register(b1, space0) { RenderObjectUniformBuffer RenderObjectParam; }
+cbuffer RenderObjectParam : register(b0, space1) { RenderObjectUniformBuffer RenderObjectParam; }
 #if USE_ALBEDO_TEXTURE
-Texture2D DiffuseTexture : register(t0, space0);
-SamplerState DiffuseTextureSampler : register(s0, space0);
-Texture2D NormalTexture : register(t1, space0);
-SamplerState NormalTextureSampler : register(s1, space0);
+Texture2D DiffuseTexture : register(t0, space2);
+SamplerState DiffuseTextureSampler : register(s0, space2);
+Texture2D NormalTexture : register(t1, space2);
+SamplerState NormalTextureSampler : register(s1, space2);
 #endif
 
 struct PushConsts

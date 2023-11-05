@@ -14,8 +14,7 @@ struct PushConsts
 };
 //[[vk::push_constant]] PushConsts pushConsts;
 
-cbuffer PushConsts : register(b2, space0) { PushConsts pushConsts; }
-
+cbuffer PushConsts : register(b0, space3) { PushConsts pushConsts; }
 struct VSInput
 {
     //[[vk::location(0)]] float2 Position : POSITION0;

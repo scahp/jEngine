@@ -28,11 +28,12 @@ Texture2D GBuffer2 : register(t2, space0);
 SamplerState GBuffer2SamplerState : register(s2, space0);
 #endif  // USE_SUBPASS
 
-cbuffer ViewParam : register(b0, space0) { ViewUniformBuffer ViewParam; }
-cbuffer SpotLight : register(b1, space0) { jSpotLightUniformBufferData SpotLight; }
+cbuffer ViewParam : register(b0, space1) { ViewUniformBuffer ViewParam; }
+
+cbuffer SpotLight : register(b0, space2) { jSpotLightUniformBufferData SpotLight; }
 #if USE_SHADOW_MAP
-Texture2D SpotLightShadowMap : register(t3, space0);
-SamplerComparisonState SpotLightShadowMapSampler : register(s3, space0);
+Texture2D SpotLightShadowMap : register(t1, space2);
+SamplerComparisonState SpotLightShadowMapSampler : register(s1, space2);
 #endif
 
 float4 main(VSOutput input) : SV_TARGET

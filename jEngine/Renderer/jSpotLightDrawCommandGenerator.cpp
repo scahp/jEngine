@@ -69,8 +69,9 @@ void jSpotLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* OutDestDr
     const auto umbraRadius = tanf(LightData.UmbraRadian) * LightData.MaxDistance;
     Matrix WorldMat = Matrix::MakeTranslate(spotLightPos) * Matrix::MakeRotate(directionToRot) * Matrix::MakeScale(Vector(umbraRadius, LightData.MaxDistance, umbraRadius));
 
-    jPushConstant* PushConstant = new(jMemStack::Get()->Alloc<jPushConstant>()) jPushConstant(
-        jSpotLightPushConstant(InView->Camera->Projection * InView->Camera->View * WorldMat), EShaderAccessStageFlag::ALL);
+    //jPushConstant* PushConstant = new(jMemStack::Get()->Alloc<jPushConstant>()) jPushConstant(
+    //    jSpotLightPushConstant(InView->Camera->Projection * InView->Camera->View * WorldMat), EShaderAccessStageFlag::ALL);
+    jPushConstant* PushConstant = nullptr;
 
     jShaderSpotLightPixelShader::ShaderPermutation ShaderPermutation;
     ShaderPermutation.SetIndex<jShaderSpotLightPixelShader::USE_SUBPASS>(gOptions.UseSubpass);
