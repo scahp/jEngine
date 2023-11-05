@@ -5,7 +5,7 @@
 
 #include <windows.h>
 
-#define API_TYPE 3
+#define API_TYPE 3			// VULKAN : 1, DX12 : 3 (todo : this will be changed to make easy for switching. ex. start up argments)
 
 #if (API_TYPE == 1)
 #define USE_VULKAN 1
