@@ -140,6 +140,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClInclude Include="FileLoader\jImageFileLoader.h" />
     <ClInclude Include="FileLoader\jModelLoader.h" />
     <ClInclude Include="ImGui\jImGui.h" />
+    <ClInclude Include="jCommandlineArgument.h" />
     <ClInclude Include="jEngine.h" />
     <ClInclude Include="jGame.h" />
     <ClInclude Include="jOptions.h" />
@@ -193,7 +194,6 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClInclude Include="RHI\jMemoryPool.h" />
     <ClInclude Include="RHI\jRHIType.h" />
     <ClInclude Include="RHI\jRHI_DirectX11.h" />
-    <ClInclude Include="RHI\jRHI_OpenGL.h" />
     <ClInclude Include="RHI\jRHI_Vulkan.h" />
     <ClInclude Include="RHI\jSemaphoreManager.h" />
     <ClInclude Include="RHI\jShaderBindingsLayout.h" />
@@ -334,6 +334,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClCompile Include="FileLoader\jImageFileLoader.cpp" />
     <ClCompile Include="FileLoader\jModelLoader.cpp" />
     <ClCompile Include="ImGui\jImGui.cpp" />
+    <ClCompile Include="jCommandlineArgument.cpp" />
     <ClCompile Include="jEngine.cpp" />
     <ClCompile Include="jGame.cpp" />
     <ClCompile Include="jOptions.cpp" />
@@ -383,7 +384,6 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClCompile Include="RHI\jRHI.cpp" />
     <ClCompile Include="RHI\jMemoryPool.cpp" />
     <ClCompile Include="RHI\jRHI_DirectX11.cpp" />
-    <ClCompile Include="RHI\jRHI_OpenGL.cpp" />
     <ClCompile Include="RHI\jRHI_Vulkan.cpp" />
     <ClCompile Include="RHI\jSemaphoreManager.cpp" />
     <ClCompile Include="RHI\Vulkan\jBuffer_Vulkan.cpp" />
@@ -408,6 +408,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClCompile Include="RHI\Vulkan\jVertexBuffer_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jVulkanBufferUtil.cpp" />
     <ClCompile Include="RHI\Vulkan\jVulkanDeviceUtil.cpp" />
+    <ClCompile Include="RHI\Vulkan\jVulkanFeatureSwitch.cpp" />
     <ClCompile Include="Scene\jCamera.cpp" />
     <ClCompile Include="Scene\jMeshObject.cpp" />
     <ClCompile Include="Scene\jObject.cpp" />

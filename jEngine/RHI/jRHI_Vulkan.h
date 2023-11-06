@@ -1,7 +1,5 @@
 ﻿#pragma once
 
-//#if USE_VULKAN
-
 #include "jRHI.h"
 #include "Shader/jShader.h"
 #include "jPipelineStateInfo.h"
@@ -230,4 +228,3 @@ public:
 
 extern jRHI_Vulkan* g_rhi_vk;
 
-//#endif // USE_VULKAN

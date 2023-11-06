@@ -1767,21 +1767,20 @@ jBillboardQuadPrimitive* CreateBillobardQuad(const Vector& pos, const Vector& si
 
 jUIQuadPrimitive* CreateUIQuad(const Vector2& pos, const Vector2& size, jTexture* texture)
 {
-#if VULKAN_NDC_Y_FLIP
-    float vertices[] = {
-        0.0f, 0.0f,
-		0.0f, 1.0f,
-        1.0f, 0.0f,
-		1.0f, 1.0f,
-	};
-#else
 	float vertices[] = {
 		0.0f, 1.0f,
 		0.0f, 0.0f,
 		1.0f, 1.0f,
 		1.0f, 0.0f,
 	};
-#endif
+
+	if (IsUse_VULKAN_NDC_Y_FLIP())
+	{
+		int32 SrcIdx = 1;
+		int32 DstIdx = 2;
+		Swap(vertices[SrcIdx * 2], vertices[DstIdx * 2]);
+		Swap(vertices[SrcIdx * 2 + 1], vertices[DstIdx * 2 + 1]);
+	}
 
 	int32 elementCount = _countof(vertices) / 2;
 

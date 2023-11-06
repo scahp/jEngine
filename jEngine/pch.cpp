@@ -4,8 +4,20 @@ std::map<int, bool> g_KeyState;
 std::map<EMouseButtonType, bool> g_MouseState;
 float g_timeDeltaSecond = 0.0f;
 
-//#if USE_VULKAN
 #pragma comment(lib, "vulkan-1.lib")
+
+EAPIType gAPIType = EAPIType::None;
+
+extern bool IsUseVulkan()
+{
+    return (gAPIType == EAPIType::Vulkan);
+}
+
+extern bool IsUseDX12()
+{
+    return (gAPIType == EAPIType::DX12);
+}
+
 //#endif
 
 int32 SCR_WIDTH = 1280;
@@ -26,3 +38,5 @@ uint32 GetMaxThreadCount()
 #if USE_PIX
 #pragma comment(lib, "WinPixEventRuntime.lib")
 #endif
+
+jEngine* g_Engine = nullptr;

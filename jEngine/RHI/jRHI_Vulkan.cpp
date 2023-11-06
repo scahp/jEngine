@@ -1,6 +1,5 @@
 ﻿#include "pch.h"
 
-//#if USE_VULKAN
 #include "jRHI_Vulkan.h"
 
 #include "FileLoader/jImageFileLoader.h"
@@ -1821,4 +1820,3 @@ void jRHI_Vulkan::EndDebugEvent(jCommandBuffer* InCommandBuffer) const
     }
 }
 
-//#endif // USE_VULKAN

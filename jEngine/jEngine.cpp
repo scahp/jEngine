@@ -4,31 +4,49 @@
 #include "Profiler/jPerformanceProfile.h"
 #include "RHI/jRenderTargetPool.h"
 #include "RHI/jFrameBufferPool.h"
+#include "jCommandlineArgument.h"
 
 jEngine::jEngine()
 {
-}
 
+}
 
 jEngine::~jEngine()
 {
 }
 
+void jEngine::PreInit()
+{
+    if (gCommandLineArgument.HasArgument("-dx12"))
+    {
+        gAPIType = EAPIType::DX12;
+    }
+    else if (gCommandLineArgument.HasArgument("-vulkan"))
+    {
+        gAPIType = EAPIType::Vulkan;
+    }
+    else
+    {
+        gAPIType = EAPIType::DX12;		// Default API is DX12
+    }
+
+    if (IsUseVulkan())
+    {
+        g_rhi = new jRHI_Vulkan();
+    }
+    else if (IsUseDX12())
+    {
+        g_rhi = new jRHI_DX12();
+    }
+    else
+    {
+        check(0);
+    }
+}
+
 void jEngine::Init()
 {
-#if USE_OPENGL
-	jSamplerStatePool::CreateDefaultSamplerState();
-	jShaderInfo::CreateShaders();
-	IPipeline::SetupPipelines();
-
-	g_rhi->EnableSRGB(false);
-
 	Game.Setup();
-
-	jShadowAppSettingProperties::GetInstance().Setup(jAppSettings::GetInstance().Get("MainPannel"));
-#elif USE_VULKAN || USE_DX12
-	Game.Setup();
-#endif
 }
 
 void jEngine::Release()
@@ -64,11 +82,10 @@ void jEngine::Resize(int32 width, int32 height)
 {
     Game.Resize(width, height);
 
-#if USE_OPENGL
-	g_rhi->SetViewport(0, 0, width, height);
-#elif USE_VULKAN
-	g_rhi_vk->FramebufferResized = true;
-#endif
+	if (IsUseVulkan())
+	{
+		g_rhi_vk->FramebufferResized = true;
+	}
 }
 
 void jEngine::OnMouseButton()

@@ -116,21 +116,22 @@ void jDrawCommand::Draw() const
     // Bind Pipeline
     CurrentPipelineStateInfo->Bind(RenderFrameContextPtr);
 
-#if USE_VULKAN
-    if (PushConstant && PushConstant->IsValid())
+    if (IsUseVulkan())
     {
-        const jResourceContainer<jPushConstantRange>* pushConstantRanges = PushConstant->GetPushConstantRanges();
-        if (ensure(pushConstantRanges))
+        if (PushConstant && PushConstant->IsValid())
         {
-            for (int32 i = 0; i < pushConstantRanges->NumOfData; ++i)
+            const jResourceContainer<jPushConstantRange>* pushConstantRanges = PushConstant->GetPushConstantRanges();
+            if (ensure(pushConstantRanges))
             {
-                const jPushConstantRange& range = (*pushConstantRanges)[i];
-                vkCmdPushConstants((VkCommandBuffer)RenderFrameContextPtr->GetActiveCommandBuffer()->GetHandle(), ((jPipelineStateInfo_Vulkan*)CurrentPipelineStateInfo)->vkPipelineLayout
-                    , GetVulkanShaderAccessFlags(range.AccessStageFlag), range.Offset, range.Size, PushConstant->GetConstantData());
+                for (int32 i = 0; i < pushConstantRanges->NumOfData; ++i)
+                {
+                    const jPushConstantRange& range = (*pushConstantRanges)[i];
+                    vkCmdPushConstants((VkCommandBuffer)RenderFrameContextPtr->GetActiveCommandBuffer()->GetHandle(), ((jPipelineStateInfo_Vulkan*)CurrentPipelineStateInfo)->vkPipelineLayout
+                        , GetVulkanShaderAccessFlags(range.AccessStageFlag), range.Offset, range.Size, PushConstant->GetConstantData());
+                }
             }
         }
     }
-#endif
 
     RenderObject->BindBuffers(RenderFrameContextPtr, IsPositionOnly, OverrideInstanceData);
 

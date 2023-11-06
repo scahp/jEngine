@@ -31,6 +31,7 @@
 #include "Scene/Light/jLight.h"
 #include "jQueryPoolTime_DX12.h"
 #include "jImGui_DX12.h"
+#include "jEngine.h"
 
 #define USE_INLINE_DESCRIPTOR 0												// InlineDescriptor 를 쓸것인지? DescriptorTable 를 쓸것인지 여부
 #define USE_ONE_FRAME_BUFFER_AND_DESCRIPTOR (USE_INLINE_DESCRIPTOR && 1)	// 현재 프레임에만 사용하고 버리는 임시 Descriptor 와 Buffer 를 사용할 것인지 여부
@@ -264,15 +265,91 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 		// Save the DXSample* passed in to CreateWindow.
 		LPCREATESTRUCT pCreateStruct = reinterpret_cast<LPCREATESTRUCT>(lParam);
 		SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pCreateStruct->lpCreateParams));
-	}
-	return 0;
-
+        return 0;
+    }
 	case WM_KEYDOWN:
-		return 0;
-
+    {
+        if (!ImGui::IsAnyItemActive())
+            g_KeyState[(int32)wParam] = true;
+        return 0;
+    }
 	case WM_KEYUP:
-		return 0;
+    {
+        g_KeyState[(int32)wParam] = false;
+        return 0;
+    }
+    case WM_LBUTTONDOWN:
+    case WM_RBUTTONDOWN:
+    case WM_MBUTTONDOWN:
+    {
+        EMouseButtonType buttonType;
+        if (WM_RBUTTONDOWN == message)
+            buttonType = EMouseButtonType::RIGHT;
+        else if (WM_LBUTTONDOWN == message)
+            buttonType = EMouseButtonType::LEFT;
+        else if (WM_MBUTTONDOWN == message)
+            buttonType = EMouseButtonType::MIDDLE;
+        else
+            return 0;
 
+        bool buttonDown = false;
+        const bool IsCapturedButtonInputOnUI = ImGui::IsAnyItemHovered() || ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow);
+        if (!IsCapturedButtonInputOnUI)
+        {
+            buttonDown = true;
+        }
+        g_MouseState[buttonType] = buttonDown;
+        g_Engine->OnMouseButton();
+        
+        return 0;
+    }
+    case WM_LBUTTONUP:
+    case WM_RBUTTONUP:
+    case WM_MBUTTONUP:
+    {
+        EMouseButtonType buttonType;
+        if (WM_RBUTTONUP == message)
+            buttonType = EMouseButtonType::RIGHT;
+        else if (WM_LBUTTONUP == message)
+            buttonType = EMouseButtonType::LEFT;
+        else if (WM_MBUTTONUP == message)
+            buttonType = EMouseButtonType::MIDDLE;
+        else
+            return 0;
+
+        g_MouseState[buttonType] = false;
+        g_Engine->OnMouseButton();
+
+        return 0;
+    }
+    case WM_MOUSEMOVE:
+    {
+        const int32 x = ((int)(short)LOWORD(lParam));
+        const int32 y = ((int)(short)HIWORD(lParam));
+
+        static int32 xOld = -1;
+        static int32 yOld = -1;
+
+        if (-1 == xOld)
+            xOld = x;
+
+        if (-1 == yOld)
+            yOld = y;
+
+        g_Engine->OnMouseMove((int32)(x - xOld), (int32)(y - yOld));
+
+        xOld = x;
+        yOld = y;
+
+        return 0;
+    }
+    case WM_KILLFOCUS:
+    {
+        // 포커스를 잃은 경우 입력 상태를 모두 릴리즈 시킴.
+        g_KeyState.clear();
+        g_MouseState.clear();
+        return 0;
+    }
     case WM_SIZE:
     {
         RECT clientRect = {};

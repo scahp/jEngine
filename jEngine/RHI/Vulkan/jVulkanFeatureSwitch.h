@@ -7,5 +7,7 @@
 #endif
 
 #define USE_VARIABLE_SHADING_RATE_TIER2 0
-#define VULKAN_NDC_Y_FLIP (1 && USE_VULKAN)     // Make it NDC space coordinates equal to OpenGL and DirectX which are using Left hand NDC coordinates
 #define USE_REVERSEZ_PERSPECTIVE_SHADOW 1
+
+// Make it NDC space coordinates equal to OpenGL and DirectX which are using Left hand NDC coordinates
+extern bool IsUse_VULKAN_NDC_Y_FLIP();

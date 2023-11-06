@@ -19,13 +19,6 @@ jRHI* g_rhi = nullptr;
 
 jGame::jGame()
 {
-#if USE_OPENGL
-    g_rhi = new jRHI_OpenGL();
-#elif USE_VULKAN
-    g_rhi = new jRHI_Vulkan();
-#elif USE_DX12
-	g_rhi = new jRHI_DX12();
-#endif
 }
 
 jGame::~jGame()

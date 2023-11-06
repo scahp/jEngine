@@ -8,6 +8,7 @@ public:
 	jEngine();
 	~jEngine();
 
+	void PreInit();
 	void Init();
 	void Release();
 	void ProcessInput();

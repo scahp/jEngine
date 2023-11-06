@@ -5,25 +5,6 @@
 
 #include <windows.h>
 
-#define API_TYPE 3			// VULKAN : 1, DX12 : 3 (todo : this will be changed to make easy for switching. ex. start up argments)
-
-#if (API_TYPE == 1)
-#define USE_VULKAN 1
-#elif (API_TYPE == 2)
-#define USE_OPENGL 1
-#elif (API_TYPE == 3)
-#define USE_DX12 1
-#endif
-
-#ifndef USE_VULKAN
-#define USE_VULKAN 0
-#endif
-
-#ifndef USE_OPENGL
-#define USE_OPENGL 0
-#endif
-
-//#define LEFT_HANDED !USE_OPENGL
 #define LEFT_HANDED 1
 #define RIGHT_HANDED !LEFT_HANDED
 
@@ -105,7 +86,7 @@ using tchar = wchar_t;
 #include "RHI/jRHI.h"
 
 //////////////////////////////////////////////////////////////////////////
-// USE_VULKAN 여부에 따라서 불필요한 include 도 제거하도록 해야 함.
+// Vulkan
 #include <vulkan/vulkan.h>
 #include <GLFW/glfw3.h>
 #define GLFW_INCLUDE_VULKAN
@@ -114,15 +95,7 @@ using tchar = wchar_t;
 #include "Shader/Spirv/jSpirvHelper.h"
 #include "RHI/Vulkan/jVulkanFeatureSwitch.h"
 
-#if USE_VULKAN
-
-#elif USE_OPENGL
-#include <GLFW/glfw3.h>
-#include "jRHI_OpenGL.h"
-#include "IMGUI/imgui_impl_opengl3.h"
-#else
-#endif
-
+// DX12
 #include <d3d12.h>
 #include <d3dx12.h>
 #include <wrl.h>
@@ -219,5 +192,18 @@ extern uint32 GetMaxThreadCount();
 #if USE_PIX
 #include "pix3.h"
 #endif
+
+enum class EAPIType : uint8
+{
+	None,
+	Vulkan,
+	DX12
+};
+
+extern EAPIType gAPIType;
+extern bool IsUseVulkan();
+extern bool IsUseDX12();
+
+extern class jEngine* g_Engine;
 
 #endif //PCH_H
