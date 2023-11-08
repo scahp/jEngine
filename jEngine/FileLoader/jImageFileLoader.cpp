@@ -246,7 +246,9 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
 		break;
 	default:
 		if (NewImageDataPatr->SubresourceFootprints.size() <= 0)
+		{
 			check(0);
+		}
 		break;
 	}
 

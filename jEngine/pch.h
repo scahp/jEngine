@@ -72,8 +72,10 @@ using tchar = wchar_t;
 #define ensure(x) (((x) || (assert(!(#x)), false)))
 #else
 #define verify(x) (x)
-#define JOK(a) (a)
-#define JFAIL(a) (a)
+#define JOK(a) (SUCCEEDED(a))
+#define JFAIL(a) (!JOK(a))
+#define JOK_E(a, errorBlob) (SUCCEEDED(a))
+#define JFAIL_E(a, errorBlob) (!JOK_E(a, errorBlob))
 #define JASSERT(a) 
 #define JMESSAGE(a) (a)
 #define check(x) 
