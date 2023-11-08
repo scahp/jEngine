@@ -82,12 +82,11 @@ public:
 
 struct jDescriptorBlock_DX12
 {
-    static constexpr int32 MaxDescriptorsInBlock = 2000;
     class jOnlineDescriptorHeapBlocks_DX12* DescriptorHeapBlocks = nullptr;
     EDescriptorHeapTypeDX12 HeapType = EDescriptorHeapTypeDX12::CBV_SRV_UAV;
     int32 Index = 0;
     int32 AllocatedSize = 0;
-    jDescriptor_DX12 Descriptors[MaxDescriptorsInBlock];
+    std::vector<jDescriptor_DX12> Descriptors;
 };
 
 class jOnlineDescriptorHeap_DX12;
@@ -97,30 +96,36 @@ class jOnlineDescriptorHeap_DX12;
 class jOnlineDescriptorHeapBlocks_DX12
 {
 public:
+    static constexpr int32 DescriptorsInBlock = 2000;
+    static constexpr int32 TotalHeapSize = 500000;
+    static constexpr int32 SamplerDescriptorsInBlock = 100;
+    static constexpr int32 SamplerTotalHeapSize = 2000;
+
     static constexpr int32 NumOfFramesToWaitBeforeReleasing = 3;
 
-    void Initialize(EDescriptorHeapTypeDX12 InHeapType, uint32 InNumOfDescriptorsInBlock = jDescriptorBlock_DX12::MaxDescriptorsInBlock, uint32 InNumOfBlock = 100);
+    struct jFreeData
+    {
+        bool IsValid() const
+        {
+            return Index != -1;
+        }
+        uint32 ReleasedFrame = 0;
+        int32 Index = -1;
+    };
+
+    struct jFreeDataLessReleasedFrameFirstComp
+    {
+        bool operator() (const jFreeData& InA, const jFreeData& InB) const
+        {
+            return ((uint64)InA.ReleasedFrame << 32 | (uint64)InA.Index) < ((uint64)InB.ReleasedFrame << 32 | (uint64)InB.Index);
+        }
+    };
+
+    void Initialize(EDescriptorHeapTypeDX12 InHeapType, uint32 InTotalHeapSize, uint32 InDescriptorsInBlock);
     void Release();
 
-    jOnlineDescriptorHeap_DX12* Alloc()
-    {
-        jScopedLock s(&DescriptorBlockLock);
-
-        if (FreeLists.empty())
-            return nullptr;
-
-        uint32 FreeListIndex = *FreeLists.begin();
-        FreeLists.erase(FreeLists.begin());
-
-        return OnlineDescriptorHeap[FreeListIndex];
-    }
-    void Free(uint32 InIndex)
-    {
-        jScopedLock s(&DescriptorBlockLock);
-
-        check(!FreeLists.contains(InIndex));
-        FreeLists.insert(InIndex);
-    }
+    jOnlineDescriptorHeap_DX12* Alloc();
+    void Free(int32 InIndex);
 
     ComPtr<ID3D12DescriptorHeap> Heap;
     EDescriptorHeapTypeDX12 HeapType = EDescriptorHeapTypeDX12::CBV_SRV_UAV;
@@ -128,7 +133,7 @@ public:
     D3D12_GPU_DESCRIPTOR_HANDLE GPUHandleStart = { };
     uint32 DescriptorSize = 0;
     uint32 NumOfDescriptors = 0;
-    std::set<uint32> FreeLists;
+    std::set<jFreeData, jFreeDataLessReleasedFrameFirstComp> FreeLists;
     
     std::vector<jOnlineDescriptorHeap_DX12*> OnlineDescriptorHeap;
     std::vector<jDescriptorBlock_DX12> DescriptorBlocks;
@@ -157,12 +162,11 @@ public:
         {
             check(DescriptorBlocks->DescriptorHeapBlocks);
             DescriptorBlocks->DescriptorHeapBlocks->Free(DescriptorBlocks->Index);
-            DescriptorBlocks = nullptr;
         }
     }
     jDescriptor_DX12 Alloc()
     {
-        if (NumOfAllocated < jDescriptorBlock_DX12::MaxDescriptorsInBlock)
+        if (NumOfAllocated < DescriptorBlocks->Descriptors.size())
             return DescriptorBlocks->Descriptors[NumOfAllocated++];
 
         return jDescriptor_DX12();
@@ -170,6 +174,10 @@ public:
     void Reset()
     {
         NumOfAllocated = 0;
+    }
+    bool CanAllocate(int32 InSize) const
+    {
+        return (DescriptorBlocks->Descriptors.size() - NumOfAllocated) >= InSize;
     }
     int32 GetNumOfAllocated() const { return NumOfAllocated; }
     D3D12_GPU_DESCRIPTOR_HANDLE GetGPUHandle(size_t InIndex) const { return D3D12_GPU_DESCRIPTOR_HANDLE(GPUHandle.ptr + InIndex * DescriptorBlocks->DescriptorHeapBlocks->DescriptorSize); }
@@ -211,11 +219,17 @@ public:
         switch (InType)
         {
         case EDescriptorHeapTypeDX12::CBV_SRV_UAV:
-            SelectedHeapBlocks->Initialize(EDescriptorHeapTypeDX12::CBV_SRV_UAV, jDescriptorBlock_DX12::MaxDescriptorsInBlock, 250);
+        {
+            SelectedHeapBlocks->Initialize(EDescriptorHeapTypeDX12::CBV_SRV_UAV
+                , jOnlineDescriptorHeapBlocks_DX12::TotalHeapSize, jOnlineDescriptorHeapBlocks_DX12::DescriptorsInBlock);
             break;
+        }
         case EDescriptorHeapTypeDX12::SAMPLER:
-            SelectedHeapBlocks->Initialize(EDescriptorHeapTypeDX12::SAMPLER, 100, 20);
+        {
+            SelectedHeapBlocks->Initialize(EDescriptorHeapTypeDX12::SAMPLER
+                , jOnlineDescriptorHeapBlocks_DX12::SamplerTotalHeapSize, jOnlineDescriptorHeapBlocks_DX12::SamplerDescriptorsInBlock);
             break;
+        }
         default:
             check(0);
             break;

@@ -2009,13 +2009,74 @@ void jRHI_DX12::BindGraphicsShaderBindingInstances(const jCommandBuffer* InComma
 		CommandBuffer_DX12->CommandList->SetGraphicsRootSignature(jShaderBindingsLayout_DX12::CreateRootSignature(ShaderBindingInstanceArray));
 
 		int32 RootParameterIndex = 0;
-		bool HasDescriptor = false;
-		bool HasSamplerDescriptor = false;
+        int32 NumOfDescriptor = 0;
+        int32 NumOfSamplerDescriptor = 0;
 
-		const D3D12_GPU_DESCRIPTOR_HANDLE FirstGPUDescriptorHandle 
-			= CommandBuffer_DX12->OnlineDescriptorHeap->GetGPUHandle(CommandBuffer_DX12->OnlineDescriptorHeap->GetNumOfAllocated());
-		const D3D12_GPU_DESCRIPTOR_HANDLE FirstGPUSamplerDescriptorHandle 
-			= CommandBuffer_DX12->OnlineSamplerDescriptorHeap->GetGPUHandle(CommandBuffer_DX12->OnlineSamplerDescriptorHeap->GetNumOfAllocated());
+        // Check current online descriptor is enough to allocate descriptors, if not, allocate descriptor blocks for current commandlist
+        {
+            for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
+            {
+                jShaderBindingInstance_DX12* Instance = (jShaderBindingInstance_DX12*)ShaderBindingInstanceArray[i];
+                NumOfDescriptor += (int32)Instance->Descriptors.size();
+                NumOfSamplerDescriptor += (int32)Instance->SamplerDescriptors.size();
+            }
+
+            check(g_rhi_dx12);
+            check(g_rhi_dx12->Device);
+
+            // Descriptor 가 충분한지 확인 함. 모자라면 새로 할당함.
+            bool NeedSetDescriptorHeapsAgain = false;            
+            if (!CommandBuffer_DX12->OnlineDescriptorHeap->CanAllocate(NumOfDescriptor))
+            {
+                const ID3D12DescriptorHeap* PrevDescriptorHeap = CommandBuffer_DX12->OnlineDescriptorHeap->GetHeap();
+                
+                CommandBuffer_DX12->OnlineDescriptorHeap->Release();
+                CommandBuffer_DX12->OnlineDescriptorHeap = g_rhi_dx12->OnlineDescriptorHeapManager.Alloc(EDescriptorHeapTypeDX12::CBV_SRV_UAV);
+                check(CommandBuffer_DX12->OnlineDescriptorHeap->CanAllocate(NumOfDescriptor));
+
+                if (PrevDescriptorHeap != CommandBuffer_DX12->OnlineDescriptorHeap->GetHeap())
+                {
+                    NeedSetDescriptorHeapsAgain = true;
+                }
+            }
+
+            // SamplerDescriptor 가 충분한지 확인 함. 모자라면 새로 할당함.
+            const ID3D12DescriptorHeap* PrevOnlineSamplerDescriptorHeap = CommandBuffer_DX12->OnlineDescriptorHeap->GetHeap();
+            if (!CommandBuffer_DX12->OnlineSamplerDescriptorHeap->CanAllocate(NumOfSamplerDescriptor))
+            {
+                const ID3D12DescriptorHeap* PrevDescriptorHeap = CommandBuffer_DX12->OnlineSamplerDescriptorHeap->GetHeap();
+
+                CommandBuffer_DX12->OnlineSamplerDescriptorHeap->Release();
+                CommandBuffer_DX12->OnlineSamplerDescriptorHeap = g_rhi_dx12->OnlineDescriptorHeapManager.Alloc(EDescriptorHeapTypeDX12::SAMPLER);
+                check(CommandBuffer_DX12->OnlineSamplerDescriptorHeap->CanAllocate(NumOfSamplerDescriptor));
+
+                if (PrevDescriptorHeap != CommandBuffer_DX12->OnlineSamplerDescriptorHeap->GetHeap())
+                {
+                    NeedSetDescriptorHeapsAgain = true;
+                }
+            }
+
+            // Descriptor 새로 할당했으면 SetDescriptorHeaps 로 OnlineDescriptorHeap 을 교체해준다.
+            if (NeedSetDescriptorHeapsAgain)
+            {
+                ensure(CommandBuffer_DX12->OnlineDescriptorHeap && CommandBuffer_DX12->OnlineSamplerDescriptorHeap
+                    || (!CommandBuffer_DX12->OnlineDescriptorHeap && !CommandBuffer_DX12->OnlineSamplerDescriptorHeap));
+                if (CommandBuffer_DX12->OnlineDescriptorHeap && CommandBuffer_DX12->OnlineSamplerDescriptorHeap)
+                {
+                    ID3D12DescriptorHeap* ppHeaps[] =
+                    {
+                        CommandBuffer_DX12->OnlineDescriptorHeap->GetHeap(),
+                        CommandBuffer_DX12->OnlineSamplerDescriptorHeap->GetHeap()
+                    };
+                    CommandBuffer_DX12->CommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+                }
+            }
+        }
+
+        const D3D12_GPU_DESCRIPTOR_HANDLE FirstGPUDescriptorHandle
+            = CommandBuffer_DX12->OnlineDescriptorHeap->GetGPUHandle(CommandBuffer_DX12->OnlineDescriptorHeap->GetNumOfAllocated());
+        const D3D12_GPU_DESCRIPTOR_HANDLE FirstGPUSamplerDescriptorHandle
+            = CommandBuffer_DX12->OnlineSamplerDescriptorHeap->GetGPUHandle(CommandBuffer_DX12->OnlineSamplerDescriptorHeap->GetNumOfAllocated());
 
 		for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
 		{
@@ -2023,18 +2084,14 @@ void jRHI_DX12::BindGraphicsShaderBindingInstances(const jCommandBuffer* InComma
 			jShaderBindingsLayout_DX12* Layout = (jShaderBindingsLayout_DX12*)(Instance->ShaderBindingsLayouts);
 
 			Instance->CopyToOnlineDescriptorHeap(CommandBuffer_DX12);
-
-			HasDescriptor |= Instance->Descriptors.size() > 0;
-			HasSamplerDescriptor |= Instance->SamplerDescriptors.size() > 0;
-
 			Instance->BindGraphics(CommandBuffer_DX12, RootParameterIndex);
 		}
 
 		// DescriptorTable 은 항상 마지막에 바인딩
-		if (HasDescriptor)
+		if (NumOfDescriptor > 0)
 			CommandBuffer_DX12->CommandList->SetGraphicsRootDescriptorTable(RootParameterIndex++, FirstGPUDescriptorHandle);		// StructuredBuffer test, I will use descriptor index based on GPU handle start of SRVDescriptorHeap
 
-		if (HasSamplerDescriptor)
+		if (NumOfSamplerDescriptor > 0)
 			CommandBuffer_DX12->CommandList->SetGraphicsRootDescriptorTable(RootParameterIndex++, FirstGPUSamplerDescriptorHandle);	// SamplerState test
 	}
 }

@@ -146,7 +146,7 @@ void jDescriptorHeap_DX12::ProcessPendingDescriptorPoolFree()
 //////////////////////////////////////////////////////////////////////////
 // jOnlineDescriptorHeap_DX12
 //////////////////////////////////////////////////////////////////////////
-void jOnlineDescriptorHeapBlocks_DX12::Initialize(EDescriptorHeapTypeDX12 InHeapType, uint32 InNumOfDescriptorsInBlock, uint32 InNumOfBlock)
+void jOnlineDescriptorHeapBlocks_DX12::Initialize(EDescriptorHeapTypeDX12 InHeapType, uint32 InTotalHeapSize, uint32 InDescriptorsInBlock)
 {
     jScopedLock s(&DescriptorBlockLock);
 
@@ -154,7 +154,7 @@ void jOnlineDescriptorHeapBlocks_DX12::Initialize(EDescriptorHeapTypeDX12 InHeap
 
     const auto HeapTypeDX12 = GetDX12DescriptorHeapType(InHeapType);
 
-    NumOfDescriptors = InNumOfDescriptorsInBlock * InNumOfBlock;
+    NumOfDescriptors = InTotalHeapSize;
 
     D3D12_DESCRIPTOR_HEAP_DESC heapDesc = { };
     heapDesc.NumDescriptors = NumOfDescriptors;
@@ -171,18 +171,24 @@ void jOnlineDescriptorHeapBlocks_DX12::Initialize(EDescriptorHeapTypeDX12 InHeap
 
     DescriptorSize = g_rhi_dx12->Device->GetDescriptorHandleIncrementSize(HeapTypeDX12);
     
+    const uint32 BlockSize = InTotalHeapSize / InDescriptorsInBlock;
 
-    DescriptorBlocks.resize(InNumOfBlock);
-    OnlineDescriptorHeap.resize(InNumOfBlock);
+    DescriptorBlocks.resize(BlockSize);
+    OnlineDescriptorHeap.resize(BlockSize);
 
     int32 Index = 0;
     for(uint32 i=0;i<NumOfDescriptors;++i)
     {
         int32 AllocatedSize = DescriptorBlocks[Index].AllocatedSize;
-        if (AllocatedSize >= (int32)InNumOfDescriptorsInBlock)
+        if (AllocatedSize >= (int32)InDescriptorsInBlock)
         {
             ++Index;
             AllocatedSize = DescriptorBlocks[Index].AllocatedSize;
+        }
+        
+        if (DescriptorBlocks[Index].Descriptors.size() != InDescriptorsInBlock)
+        {
+            DescriptorBlocks[Index].Descriptors.resize(InDescriptorsInBlock);
         }
 
         jDescriptor_DX12& Descriptor = DescriptorBlocks[Index].Descriptors[AllocatedSize];
@@ -205,7 +211,7 @@ void jOnlineDescriptorHeapBlocks_DX12::Initialize(EDescriptorHeapTypeDX12 InHeap
         OnlineDescriptorHeap[i] = new jOnlineDescriptorHeap_DX12();
         OnlineDescriptorHeap[i]->Initialize(&DescriptorBlocks[i]);
 
-        FreeLists.insert(i);
+        FreeLists.insert({ .ReleasedFrame = 0, .Index = i });
     }
 }
 
@@ -228,4 +234,37 @@ void jOnlineDescriptorHeapBlocks_DX12::Release()
         delete OnlineDescriptorHeap[i];
     }
     OnlineDescriptorHeap.clear();
+}
+
+jOnlineDescriptorHeap_DX12* jOnlineDescriptorHeapBlocks_DX12::Alloc()
+{
+    jScopedLock s(&DescriptorBlockLock);
+
+    if (FreeLists.empty())
+        return nullptr;
+
+    for (auto it = FreeLists.begin(); FreeLists.end() != it; ++it)
+    {
+        jFreeData FreeData = *it;
+
+        const bool CanAlloc = (g_rhi_dx12->CurrentFrameNumber - FreeData.ReleasedFrame > NumOfFramesToWaitBeforeReleasing) 
+            || (0 == FreeData.ReleasedFrame);
+        if (CanAlloc)
+        {
+            FreeLists.erase(it);
+            OnlineDescriptorHeap[FreeData.Index]->Reset();
+            return OnlineDescriptorHeap[FreeData.Index];
+        }
+    }
+
+    return nullptr;
+}
+
+void jOnlineDescriptorHeapBlocks_DX12::Free(int32 InIndex)
+{
+    jScopedLock s(&DescriptorBlockLock);
+    
+    jFreeData FreeData = {.ReleasedFrame = g_rhi_dx12->CurrentFrameNumber, .Index = InIndex };
+    check(!FreeLists.contains(FreeData));
+    FreeLists.insert(FreeData);
 }
