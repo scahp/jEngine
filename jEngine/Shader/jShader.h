@@ -252,8 +252,9 @@ struct jShaderGBufferPixelShader : public jShader
     DECLARE_DEFINE(USE_VERTEX_COLOR, 0, 1);
     DECLARE_DEFINE(USE_ALBEDO_TEXTURE, 0, 1);
     DECLARE_DEFINE(USE_VARIABLE_SHADING_RATE, 0, 1);
+    DECLARE_DEFINE(USE_PBR, 0, 1);
     
-    using ShaderPermutation = jPermutation<USE_VERTEX_COLOR, USE_ALBEDO_TEXTURE, USE_VARIABLE_SHADING_RATE>;
+    using ShaderPermutation = jPermutation<USE_VERTEX_COLOR, USE_ALBEDO_TEXTURE, USE_VARIABLE_SHADING_RATE, USE_PBR>;
     ShaderPermutation Permutation;
 
     DECLARE_SHADER_WITH_PERMUTATION(jShaderGBufferPixelShader, Permutation)
@@ -263,8 +264,9 @@ struct jShaderDirectionalLightPixelShader : public jShader
 {
     DECLARE_DEFINE(USE_SUBPASS, 0, 1);
     DECLARE_DEFINE(USE_SHADOW_MAP, 0, 1);
+    DECLARE_DEFINE(USE_PBR, 0, 1);
 
-    using ShaderPermutation = jPermutation<USE_SUBPASS, USE_SHADOW_MAP>;
+    using ShaderPermutation = jPermutation<USE_SUBPASS, USE_SHADOW_MAP, USE_PBR>;
     ShaderPermutation Permutation;
 
     DECLARE_SHADER_WITH_PERMUTATION(jShaderDirectionalLightPixelShader, Permutation)
@@ -274,8 +276,9 @@ struct jShaderPointLightPixelShader : public jShader
 {
     DECLARE_DEFINE(USE_SUBPASS, 0, 1);
     DECLARE_DEFINE(USE_SHADOW_MAP, 0, 1);
+    DECLARE_DEFINE(USE_PBR, 0, 1);
 
-    using ShaderPermutation = jPermutation<USE_SUBPASS, USE_SHADOW_MAP>;
+    using ShaderPermutation = jPermutation<USE_SUBPASS, USE_SHADOW_MAP, USE_PBR>;
     ShaderPermutation Permutation;
 
     DECLARE_SHADER_WITH_PERMUTATION(jShaderPointLightPixelShader, Permutation)
@@ -286,8 +289,9 @@ struct jShaderSpotLightPixelShader : public jShader
     DECLARE_DEFINE(USE_SUBPASS, 0, 1);
     DECLARE_DEFINE(USE_SHADOW_MAP, 0, 1);
     DECLARE_DEFINE(USE_REVERSEZ, 0, 1);
+    DECLARE_DEFINE(USE_PBR, 0, 1);
 
-    using ShaderPermutation = jPermutation<USE_SUBPASS, USE_SHADOW_MAP, USE_REVERSEZ>;
+    using ShaderPermutation = jPermutation<USE_SUBPASS, USE_SHADOW_MAP, USE_REVERSEZ, USE_PBR>;
     ShaderPermutation Permutation;
 
     DECLARE_SHADER_WITH_PERMUTATION(jShaderSpotLightPixelShader, Permutation)

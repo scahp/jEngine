@@ -69,10 +69,6 @@ float4 main(VSOutput input) : SV_TARGET
     SpotLightShadowPosition = SpotLightShadowPosition / SpotLightShadowPosition.w;
     SpotLightShadowPosition.y = -SpotLightShadowPosition.y;
 
-#define ENABLE_PBR 0
-#if !ENABLE_PBR
-    float3 SpotLightLit = 0.0f;
-#endif
     float Lit = 1.0f;
 #if USE_SHADOW_MAP
     if (-1.0 <= SpotLightShadowPosition.z && SpotLightShadowPosition.z <= 1.0)
@@ -83,30 +79,23 @@ float4 main(VSOutput input) : SV_TARGET
         #else
         Lit = SpotLightShadowMap.SampleCmpLevelZero(SpotLightShadowMapSampler, SpotLightShadowPosition.xy * 0.5 + 0.5, SpotLightShadowPosition.z - Bias);
         #endif
-        if (Lit > 0.0f)
-        {
-            SpotLightLit = Lit * GetSpotLight(SpotLight, WorldNormal, WorldPos.xyz, ViewWorld);
-        }
     }
-#else
-    #if !ENABLE_PBR
-    SpotLightLit = GetSpotLight(SpotLight, WorldNormal, WorldPos.xyz, ViewWorld);
-    #endif
-#endif
+#endif // USE_SHADOW_MAP
 
-#if ENABLE_PBR
+#if USE_PBR
     float lightRadian = acos(dot(-LightDir, -SpotLight.Direction));
     float SpotLightAttenuate = DistanceAttenuation2(DistanceToLight * DistanceToLight, 1.0f / SpotLight.MaxDistance)
         * DiretionalFalloff(lightRadian, SpotLight.PenumbraRadian, SpotLight.UmbraRadian);
-    
+
     float3 L = -LightDir;
     float3 N = WorldNormal;
     float3 V = ViewWorld;
     color.xyz = PBR(L, N, V, Albedo, SpotLight.Color, DistanceToLight * 0.01f, Metallic, Roughness) * SpotLightAttenuate * Lit;
     color.w = 1.0f;
-    return color;
-#else    
+#else // USE_PBR
+    float3 SpotLightLit = GetSpotLight(SpotLight, WorldNormal, WorldPos.xyz, ViewWorld) * Lit;
     color = (1.0 / 3.141592653) * float4(Albedo * SpotLightLit, 1.0);
+#endif // USE_PBR
+
     return color;
-#endif
 }

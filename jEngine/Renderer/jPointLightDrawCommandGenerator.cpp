@@ -62,6 +62,7 @@ void jPointLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* OutDestD
     jShaderPointLightPixelShader::ShaderPermutation ShaderPermutation;
     ShaderPermutation.SetIndex<jShaderPointLightPixelShader::USE_SUBPASS>(gOptions.UseSubpass);
     ShaderPermutation.SetIndex<jShaderPointLightPixelShader::USE_SHADOW_MAP>(InLightView.ShadowMapPtr ? 1 : 0);
+    ShaderPermutation.SetIndex<jShaderPointLightPixelShader::USE_PBR>(ENABLE_PBR);
     Shader.PixelShader = jShaderPointLightPixelShader::CreateShader(ShaderPermutation);
 
     jShaderBindingInstanceArray CopyShaderBindingInstances = ShaderBindingInstances;

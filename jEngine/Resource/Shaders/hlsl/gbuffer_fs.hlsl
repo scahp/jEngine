@@ -115,14 +115,13 @@ FSOutput main(VSOutput input
     FSOutput output = (FSOutput)0;
 
     output.GBuffer0.xyz = input.WorldPos.xyz / input.WorldPos.w;
-#define ENABLE_PBR 0
-#if ENABLE_PBR
+#if USE_PBR
     output.GBuffer0.w = RenderObjectParam.Metallic;
 #endif
     
     output.GBuffer1.xyz = WorldNormal;
-#if ENABLE_PBR
-    //output.GBuffer1.w = RenderObjectParam.Roughness;
+#if USE_PBR
+    output.GBuffer1.w = RenderObjectParam.Roughness;
 #endif
     
     output.GBuffer2.xyz = color.xyz;

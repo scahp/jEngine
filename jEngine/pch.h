@@ -208,4 +208,6 @@ extern bool IsUseDX12();
 
 extern class jEngine* g_Engine;
 
+#define ENABLE_PBR 0
+
 #endif //PCH_H

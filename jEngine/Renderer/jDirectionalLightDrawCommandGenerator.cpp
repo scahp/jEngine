@@ -55,6 +55,7 @@ void jDirectionalLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* Ou
     jShaderDirectionalLightPixelShader::ShaderPermutation ShaderPermutation;
     ShaderPermutation.SetIndex<jShaderDirectionalLightPixelShader::USE_SUBPASS>(gOptions.UseSubpass);
     ShaderPermutation.SetIndex<jShaderDirectionalLightPixelShader::USE_SHADOW_MAP>(InLightView.ShadowMapPtr ? 1 : 0);
+    ShaderPermutation.SetIndex<jShaderDirectionalLightPixelShader::USE_PBR>(ENABLE_PBR);
     Shader.PixelShader = jShaderDirectionalLightPixelShader::CreateShader(ShaderPermutation);
 
     jShaderBindingInstanceArray CopyShaderBindingInstances = ShaderBindingInstances;
