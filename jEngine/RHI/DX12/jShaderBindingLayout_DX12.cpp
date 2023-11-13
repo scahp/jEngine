@@ -1,5 +1,5 @@
 ﻿#include "pch.h"
-#include "jShaderBindingsLayout_DX12.h"
+#include "jShaderBindingLayout_DX12.h"
 #include "jShaderBindingInstance_DX12.h"
 
 robin_hood::unordered_map<size_t, ComPtr<ID3D12RootSignature>> jShaderBindingsLayout_DX12::GRootSignaturePool;

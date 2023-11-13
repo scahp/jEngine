@@ -173,7 +173,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClInclude Include="RHI\DX12\jRHI_DX12.h" />
     <ClInclude Include="RHI\DX12\jRingBuffer_DX12.h" />
     <ClInclude Include="RHI\DX12\jShaderBindingInstance_DX12.h" />
-    <ClInclude Include="RHI\DX12\jShaderBindingsLayout_DX12.h" />
+    <ClInclude Include="RHI\DX12\jShaderBindingLayout_DX12.h" />
     <ClInclude Include="RHI\DX12\jShaderCompiler_DX12.h" />
     <ClInclude Include="RHI\DX12\jShader_DX12.h" />
     <ClInclude Include="RHI\DX12\jSwapchain_DX12.h" />
@@ -195,7 +195,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClInclude Include="RHI\jRHIType.h" />
     <ClInclude Include="RHI\jRHI_Vulkan.h" />
     <ClInclude Include="RHI\jSemaphoreManager.h" />
-    <ClInclude Include="RHI\jShaderBindingsLayout.h" />
+    <ClInclude Include="RHI\jShaderBindingLayout.h" />
     <ClInclude Include="RHI\jSwapchain.h" />
     <ClInclude Include="RHI\jTexture.h" />
     <ClInclude Include="RHI\Vulkan\jBuffer_Vulkan.h" />
@@ -212,7 +212,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClInclude Include="RHI\Vulkan\jRenderPass_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jRHIType_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jRingBuffer_Vulkan.h" />
-    <ClInclude Include="RHI\Vulkan\jShaderBindingsLayout_Vulkan.h" />
+    <ClInclude Include="RHI\Vulkan\jShaderBindingLayout_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jShaderStorageBufferObject_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jShader_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jSwapchain_Vulkan.h" />
@@ -368,7 +368,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClCompile Include="RHI\DX12\jRHI_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jRingBuffer_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jShaderBindingInstance_DX12.cpp" />
-    <ClCompile Include="RHI\DX12\jShaderBindingsLayout_DX12.cpp" />
+    <ClCompile Include="RHI\DX12\jShaderBindingLayout_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jShaderCompiler_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jShader_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jSwapchain_DX12.cpp" />
@@ -397,7 +397,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClCompile Include="RHI\Vulkan\jRenderFrameContext_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jRenderPass_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jRingBuffer_Vulkan.cpp" />
-    <ClCompile Include="RHI\Vulkan\jShaderBindingsLayout_Vulkan.cpp" />
+    <ClCompile Include="RHI\Vulkan\jShaderBindingLayout_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jShaderStorageBufferObject_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jShader_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jSwapchain_Vulkan.cpp" />
