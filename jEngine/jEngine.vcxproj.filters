@@ -136,9 +136,6 @@
     <ClInclude Include="pch.h">
       <Filter>Code</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\jRHI_DirectX11.h">
-      <Filter>Code\RHI</Filter>
-    </ClInclude>
     <ClInclude Include="RHI\jRHI_Vulkan.h">
       <Filter>Code\RHI</Filter>
     </ClInclude>
@@ -526,9 +523,6 @@
       <Filter>Code\External\EASTL</Filter>
     </ClCompile>
     <ClCompile Include="RHI\jRHI_Vulkan.cpp">
-      <Filter>Code\RHI</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\jRHI_DirectX11.cpp">
       <Filter>Code\RHI</Filter>
     </ClCompile>
     <ClCompile Include="RHI\jRHI.cpp">
