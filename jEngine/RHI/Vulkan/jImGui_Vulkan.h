@@ -62,7 +62,7 @@ private:
     VkDescriptorPool DescriptorPool;
     VkDescriptorSet DescriptorSet;
     jVertexBuffer* EmptyVertexBuffer = nullptr;
-    jShaderBindingsLayout* EmptyShaderBindingLayout = nullptr;
+    jShaderBindingLayout* EmptyShaderBindingLayout = nullptr;
     std::shared_ptr<jPushConstant> PushConstBlockPtr;
 
     bool IsInitialized = false;

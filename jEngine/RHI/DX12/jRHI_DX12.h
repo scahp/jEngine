@@ -326,7 +326,7 @@ public:
 	ComPtr<ID3D12RootSignature> OneFrameRootSignature[3];
 	jRingBuffer_DX12* GetOneFrameUniformRingBuffer() const { return OneFrameUniformRingBuffers[CurrentFrameIndex]; }
 
-	virtual jShaderBindingsLayout* CreateShaderBindings(const jShaderBindingArray& InShaderBindingArray) const override;
+	virtual jShaderBindingLayout* CreateShaderBindings(const jShaderBindingArray& InShaderBindingArray) const override;
 
 	struct jShaderBindingInstance_DX12* TestShaderBindingInstance = nullptr;
 	struct jShaderBindingInstance_DX12* TestShaderBindingInstance2 = nullptr;
@@ -342,7 +342,7 @@ public:
     virtual uint32 GetCurrentFrameNumber() const override { return CurrentFrameNumber; }
 	virtual uint32 GetCurrentFrameIndex() const { return CurrentFrameIndex; }
 
-	static robin_hood::unordered_map<size_t, jShaderBindingsLayout*> ShaderBindingPool;
+	static robin_hood::unordered_map<size_t, jShaderBindingLayout*> ShaderBindingPool;
 	mutable jMutexRWLock ShaderBindingPoolLock;
 
     static TResourcePool<jSamplerStateInfo_DX12, jMutexRWLock> SamplerStatePool;
@@ -363,8 +363,8 @@ public:
     virtual jRenderPass* GetOrCreateRenderPass(const jRenderPassInfo& renderPassInfo, const Vector2i& offset, const Vector2i& extent) const override;
 
     virtual jPipelineStateInfo* CreatePipelineStateInfo(const jPipelineStateFixedInfo* InPipelineStateFixed, const jGraphicsPipelineShader InShader, const jVertexBufferArray& InVertexBufferArray
-        , const jRenderPass* InRenderPass, const jShaderBindingsLayoutArray& InShaderBindingArray, const jPushConstant* InPushConstant, int32 InSubpassIndex) const override;
-    virtual jPipelineStateInfo* CreateComputePipelineStateInfo(const jShader* shader, const jShaderBindingsLayoutArray& InShaderBindingArray, const jPushConstant* pushConstant) const override;
+        , const jRenderPass* InRenderPass, const jShaderBindingLayoutArray& InShaderBindingArray, const jPushConstant* InPushConstant, int32 InSubpassIndex) const override;
+    virtual jPipelineStateInfo* CreateComputePipelineStateInfo(const jShader* shader, const jShaderBindingLayoutArray& InShaderBindingArray, const jPushConstant* pushConstant) const override;
 
 	virtual std::shared_ptr<jRenderFrameContext> BeginRenderFrame() override;
 	virtual void EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr) override;

@@ -6,17 +6,17 @@
 #include "jDescriptorPool_Vulkan.h"
 
 //////////////////////////////////////////////////////////////////////////
-// jShaderBindings_Vulkan
+// jShaderBinding_Vulkan
 //////////////////////////////////////////////////////////////////////////
-jMutexRWLock jShaderBindingsLayout_Vulkan::PipelineLayoutPoolLock;
-robin_hood::unordered_map<size_t, VkPipelineLayout> jShaderBindingsLayout_Vulkan::PipelineLayoutPool;
+jMutexRWLock jShaderBindingLayout_Vulkan::PipelineLayoutPoolLock;
+robin_hood::unordered_map<size_t, VkPipelineLayout> jShaderBindingLayout_Vulkan::PipelineLayoutPool;
 
-jShaderBindingsLayout_Vulkan::~jShaderBindingsLayout_Vulkan()
+jShaderBindingLayout_Vulkan::~jShaderBindingLayout_Vulkan()
 {
     Release();
 }
 
-bool jShaderBindingsLayout_Vulkan::Initialize(const jShaderBindingArray& InShaderBindingArray)
+bool jShaderBindingLayout_Vulkan::Initialize(const jShaderBindingArray& InShaderBindingArray)
 {
     InShaderBindingArray.CloneWithoutResource(ShaderBindingArray);
     DescriptorSetLayout = CreateDescriptorSetLayout(ShaderBindingArray);
@@ -24,7 +24,7 @@ bool jShaderBindingsLayout_Vulkan::Initialize(const jShaderBindingArray& InShade
     return !!DescriptorSetLayout;
 }
 
-std::shared_ptr<jShaderBindingInstance> jShaderBindingsLayout_Vulkan::CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const
+std::shared_ptr<jShaderBindingInstance> jShaderBindingLayout_Vulkan::CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const
 {
     jDescriptorPool_Vulkan* DescriptorPool = nullptr;
     switch (InType)
@@ -53,7 +53,7 @@ std::shared_ptr<jShaderBindingInstance> jShaderBindingsLayout_Vulkan::CreateShad
     return DescriptorSet;
 }
 
-size_t jShaderBindingsLayout_Vulkan::GetHash() const
+size_t jShaderBindingLayout_Vulkan::GetHash() const
 {
     if (Hash)
         return Hash;
@@ -62,7 +62,7 @@ size_t jShaderBindingsLayout_Vulkan::GetHash() const
     return Hash;
 }
 
-void jShaderBindingsLayout_Vulkan::Release()
+void jShaderBindingLayout_Vulkan::Release()
 {
     if (DescriptorSetLayout)
     {
@@ -71,7 +71,7 @@ void jShaderBindingsLayout_Vulkan::Release()
     }
 }
 
-VkDescriptorSetLayout jShaderBindingsLayout_Vulkan::CreateDescriptorSetLayout(const jShaderBindingArray& InShaderBindingArray)
+VkDescriptorSetLayout jShaderBindingLayout_Vulkan::CreateDescriptorSetLayout(const jShaderBindingArray& InShaderBindingArray)
 {
     std::vector<VkDescriptorSetLayoutBinding> bindings;
     for (int32 i = 0; i < (int32)InShaderBindingArray.NumOfData; ++i)
@@ -96,7 +96,7 @@ VkDescriptorSetLayout jShaderBindingsLayout_Vulkan::CreateDescriptorSetLayout(co
     return DescriptorSetLayout;
 }
 
-VkPipelineLayout jShaderBindingsLayout_Vulkan::CreatePipelineLayout(const jShaderBindingsLayoutArray& InShaderBindingLayoutArray, const jPushConstant* pushConstant)
+VkPipelineLayout jShaderBindingLayout_Vulkan::CreatePipelineLayout(const jShaderBindingLayoutArray& InShaderBindingLayoutArray, const jPushConstant* pushConstant)
 {
     if (InShaderBindingLayoutArray.NumOfData <= 0)
         return 0;
@@ -133,7 +133,7 @@ VkPipelineLayout jShaderBindingsLayout_Vulkan::CreatePipelineLayout(const jShade
         DescriptorSetLayouts.reserve(InShaderBindingLayoutArray.NumOfData);
         for (int32 i = 0; i < InShaderBindingLayoutArray.NumOfData; ++i)
         {
-            const jShaderBindingsLayout_Vulkan* binding_vulkan = (const jShaderBindingsLayout_Vulkan*)InShaderBindingLayoutArray[i];
+            const jShaderBindingLayout_Vulkan* binding_vulkan = (const jShaderBindingLayout_Vulkan*)InShaderBindingLayoutArray[i];
             DescriptorSetLayouts.push_back(binding_vulkan->DescriptorSetLayout);
         }
 
@@ -179,7 +179,7 @@ VkPipelineLayout jShaderBindingsLayout_Vulkan::CreatePipelineLayout(const jShade
     return vkPipelineLayout;
 }
 
-void jShaderBindingsLayout_Vulkan::ClearPipelineLayout()
+void jShaderBindingLayout_Vulkan::ClearPipelineLayout()
 {
     check(g_rhi_vk);
     {

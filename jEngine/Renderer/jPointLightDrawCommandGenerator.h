@@ -1,6 +1,6 @@
 ﻿#pragma once
 #include "jDrawCommand.h"
-#include "RHI/jShaderBindingsLayout.h"
+#include "RHI/jShaderBindingLayout.h"
 #include "RHI/jRHI.h"
 #include "RHI/jPipelineStateInfo.h"
 

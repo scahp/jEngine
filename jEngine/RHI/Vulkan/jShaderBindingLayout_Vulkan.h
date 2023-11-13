@@ -48,11 +48,11 @@ struct jShaderBindingInstance_Vulkan : public jShaderBindingInstance, public std
 };
 
 //////////////////////////////////////////////////////////////////////////
-// jShaderBindings_Vulkan
+// jShaderBinding_Vulkan
 //////////////////////////////////////////////////////////////////////////
-struct jShaderBindingsLayout_Vulkan : public jShaderBindingsLayout
+struct jShaderBindingLayout_Vulkan : public jShaderBindingLayout
 {
-    virtual ~jShaderBindingsLayout_Vulkan();
+    virtual ~jShaderBindingLayout_Vulkan();
 
     VkDescriptorSetLayout DescriptorSetLayout = nullptr;
 
@@ -102,7 +102,7 @@ struct jShaderBindingsLayout_Vulkan : public jShaderBindingsLayout
 
 public:
     static VkDescriptorSetLayout CreateDescriptorSetLayout(const jShaderBindingArray& InShaderBindingArray);
-    static VkPipelineLayout CreatePipelineLayout(const jShaderBindingsLayoutArray& InShaderBindingLayoutArray, const jPushConstant* pushConstant);
+    static VkPipelineLayout CreatePipelineLayout(const jShaderBindingLayoutArray& InShaderBindingLayoutArray, const jPushConstant* pushConstant);
     static void ClearPipelineLayout();
 
     static jMutexRWLock PipelineLayoutPoolLock;

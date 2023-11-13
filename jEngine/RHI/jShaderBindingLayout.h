@@ -238,7 +238,7 @@ struct jShaderBindingInstance
 {
     virtual ~jShaderBindingInstance() {}
 
-    const struct jShaderBindingsLayout* ShaderBindingsLayouts = nullptr;
+    const struct jShaderBindingLayout* ShaderBindingsLayouts = nullptr;
     
     virtual void Initialize(const jShaderBindingArray& InShaderBindingArray) {}
     virtual void UpdateShaderBindings(const jShaderBindingArray& InShaderBindingArray) {}
@@ -255,9 +255,9 @@ private:
 // todo : MemStack for jShaderBindingInstanceArray to allocate fast memory
 using jShaderBindingInstanceArray = jResourceContainer<const jShaderBindingInstance*>;
 
-struct jShaderBindingsLayout
+struct jShaderBindingLayout
 {
-    virtual ~jShaderBindingsLayout() {}
+    virtual ~jShaderBindingLayout() {}
 
     virtual bool Initialize(const jShaderBindingArray& InShaderBindingArray) { return false; }
     virtual std::shared_ptr<jShaderBindingInstance> CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const { return nullptr; }
@@ -271,4 +271,4 @@ protected:
     jShaderBindingArray ShaderBindingArray;     // Resource 정보는 비어있음
 };
 
-using jShaderBindingsLayoutArray = jResourceContainer<const jShaderBindingsLayout*>;
+using jShaderBindingLayoutArray = jResourceContainer<const jShaderBindingLayout*>;

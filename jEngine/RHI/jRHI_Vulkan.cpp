@@ -32,7 +32,7 @@
 #include "Scene/Light/jLight.h"
 
 jRHI_Vulkan* g_rhi_vk = nullptr;
-robin_hood::unordered_map<size_t, jShaderBindingsLayout*> jRHI_Vulkan::ShaderBindingPool;
+robin_hood::unordered_map<size_t, jShaderBindingLayout*> jRHI_Vulkan::ShaderBindingPool;
 TResourcePool<jSamplerStateInfo_Vulkan, jMutexRWLock> jRHI_Vulkan::SamplerStatePool;
 TResourcePool<jRasterizationStateInfo_Vulkan, jMutexRWLock> jRHI_Vulkan::RasterizationStatePool;
 //TResourcePool<jMultisampleStateInfo_Vulkan, jMutexRWLock> jRHI_Vulkan::MultisampleStatePool;
@@ -389,7 +389,7 @@ void jRHI_Vulkan::ReleaseRHI()
 	delete CommandBufferManager;
 	CommandBufferManager = nullptr;
 
-	jShaderBindingsLayout_Vulkan::ClearPipelineLayout();
+	jShaderBindingLayout_Vulkan::ClearPipelineLayout();
 
 	{
 		jScopeWriteLock s(&ShaderBindingPoolLock);
@@ -1004,7 +1004,7 @@ void jRHI_Vulkan::DispatchCompute(const std::shared_ptr<jRenderFrameContext>& In
 	vkCmdDispatch((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), numGroupsX, numGroupsY, numGroupsZ);
 }
 
-jShaderBindingsLayout* jRHI_Vulkan::CreateShaderBindings(const jShaderBindingArray& InShaderBindingArray) const
+jShaderBindingLayout* jRHI_Vulkan::CreateShaderBindings(const jShaderBindingArray& InShaderBindingArray) const
 {
 	size_t hash = InShaderBindingArray.GetHash();
 
@@ -1024,7 +1024,7 @@ jShaderBindingsLayout* jRHI_Vulkan::CreateShaderBindings(const jShaderBindingArr
         if (ShaderBindingPool.end() != it_find)
             return it_find->second;
 
-		auto NewShaderBinding = new jShaderBindingsLayout_Vulkan();
+		auto NewShaderBinding = new jShaderBindingLayout_Vulkan();
 		NewShaderBinding->Initialize(InShaderBindingArray);
 		NewShaderBinding->Hash = hash;
 		ShaderBindingPool[hash] = NewShaderBinding;
@@ -1551,12 +1551,12 @@ bool jRHI_Vulkan::TransitionImageLayoutImmediate(jTexture* texture, EImageLayout
 }
 
 jPipelineStateInfo* jRHI_Vulkan::CreatePipelineStateInfo(const jPipelineStateFixedInfo* InPipelineStateFixed, const jGraphicsPipelineShader InShader, const jVertexBufferArray& InVertexBufferArray
-	, const jRenderPass* InRenderPass, const jShaderBindingsLayoutArray& InShaderBindingArray, const jPushConstant* InPushConstant, int32 InSubpassIndex) const
+	, const jRenderPass* InRenderPass, const jShaderBindingLayoutArray& InShaderBindingArray, const jPushConstant* InPushConstant, int32 InSubpassIndex) const
 {
 	return PipelineStatePool.GetOrCreateMove(std::move(jPipelineStateInfo(InPipelineStateFixed, InShader, InVertexBufferArray, InRenderPass, InShaderBindingArray, InPushConstant, InSubpassIndex)));
 }
 
-jPipelineStateInfo* jRHI_Vulkan::CreateComputePipelineStateInfo(const jShader* shader, const jShaderBindingsLayoutArray& InShaderBindingArray
+jPipelineStateInfo* jRHI_Vulkan::CreateComputePipelineStateInfo(const jShader* shader, const jShaderBindingLayoutArray& InShaderBindingArray
 	, const jPushConstant* pushConstant) const
 {
     return PipelineStatePool.GetOrCreateMove(std::move(jPipelineStateInfo(shader, InShaderBindingArray, pushConstant)));

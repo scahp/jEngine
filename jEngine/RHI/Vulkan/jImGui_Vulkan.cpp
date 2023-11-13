@@ -205,7 +205,7 @@ jPipelineStateInfo* jImGUI_Vulkan::CreatePipelineState(jRenderPass* renderPass, 
     jVertexBufferArray VertexBufferArray;
     VertexBufferArray.Add(EmptyVertexBuffer);
 
-    jShaderBindingsLayoutArray ShaderBindingsLayoutArray;
+    jShaderBindingLayoutArray ShaderBindingsLayoutArray;
     ShaderBindingsLayoutArray.Add(EmptyShaderBindingLayout);
 
     jGraphicsPipelineShader Shader;

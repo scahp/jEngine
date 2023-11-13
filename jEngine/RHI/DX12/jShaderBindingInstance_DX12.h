@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-struct jShaderBindingsLayout_DX12;
+struct jShaderBindingLayout_DX12;
 
 //////////////////////////////////////////////////////////////////////////
 // jShaderBindingInstance_DX12

@@ -1,6 +1,6 @@
 ﻿#include "pch.h"
 #include "jDrawCommand.h"
-#include "RHI/jShaderBindingsLayout.h"
+#include "RHI/jShaderBindingLayout.h"
 #include "Scene/jRenderObject.h"
 #include "RHI/jRHI.h"
 #include "RHI/jRenderPass.h"
@@ -63,7 +63,7 @@ void jDrawCommand::PrepareToDraw(bool InIsPositionOnly)
     }
 
     // Gather ShaderBindings
-    jShaderBindingsLayoutArray ShaderBindingLayoutArray;
+    jShaderBindingLayoutArray ShaderBindingLayoutArray;
     for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
     {
         // Add DescriptorSetLayout data

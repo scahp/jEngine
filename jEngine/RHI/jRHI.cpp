@@ -142,7 +142,7 @@ size_t jRenderPass::GetHash() const
 	return Hash;
 }
 
-size_t jShaderBindingsLayout::GetHash() const
+size_t jShaderBindingLayout::GetHash() const
 {
 	if (Hash)
 		return Hash;
@@ -212,7 +212,7 @@ void jView::GetShaderBindingInstance(jShaderBindingInstanceArray& OutShaderBindi
 	}
 }
 
-void jView::GetShaderBindingLayout(jShaderBindingsLayoutArray& OutShaderBindingsLayoutArray, bool InIsForwardRenderer /*= false*/) const
+void jView::GetShaderBindingLayout(jShaderBindingLayoutArray& OutShaderBindingsLayoutArray, bool InIsForwardRenderer /*= false*/) const
 {
 	OutShaderBindingsLayoutArray.Add(ViewUniformBufferShaderBindingInstance->ShaderBindingsLayouts);
 

@@ -14,7 +14,7 @@
 #include "jRingBuffer_DX12.h"
 #include "jUniformBufferBlock_DX12.h"
 #include "jShaderBindingInstance_DX12.h"
-#include "jShaderBindingsLayout_DX12.h"
+#include "jShaderBindingLayout_DX12.h"
 #include "jVertexBuffer_DX12.h"
 #include "jIndexBuffer_DX12.h"
 #include "jShader_DX12.h"
@@ -46,7 +46,7 @@ struct jSimpleConstantBuffer
 };
 
 jRHI_DX12* g_rhi_dx12 = nullptr;
-robin_hood::unordered_map<size_t, jShaderBindingsLayout*> jRHI_DX12::ShaderBindingPool;
+robin_hood::unordered_map<size_t, jShaderBindingLayout*> jRHI_DX12::ShaderBindingPool;
 TResourcePool<jSamplerStateInfo_DX12, jMutexRWLock> jRHI_DX12::SamplerStatePool;
 TResourcePool<jRasterizationStateInfo_DX12, jMutexRWLock> jRHI_DX12::RasterizationStatePool;
 TResourcePool<jStencilOpStateInfo_DX12, jMutexRWLock> jRHI_DX12::StencilOpStatePool;
@@ -984,7 +984,7 @@ bool jRHI_DX12::InitRHI()
         ShaderBindingArray.Add(-1, 1, EShaderBindingType::SAMPLER, EShaderAccessStageFlag::ALL_GRAPHICS
             , ResourceInlineAllactor.Alloc<jSamplerResource>(SamplerState));
 
-        auto TestShaderBindingLayout = (jShaderBindingsLayout_DX12*)g_rhi->CreateShaderBindings(ShaderBindingArray);
+        auto TestShaderBindingLayout = (jShaderBindingLayout_DX12*)g_rhi->CreateShaderBindings(ShaderBindingArray);
 		TestShaderBindingInstance = (jShaderBindingInstance_DX12*)TestShaderBindingLayout->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::MultiFrame);
     }
 
@@ -1006,7 +1006,7 @@ bool jRHI_DX12::InitRHI()
         ShaderBindingArray.Add(-1, 1, EShaderBindingType::SAMPLER, EShaderAccessStageFlag::ALL_GRAPHICS
             , ResourceInlineAllactor.Alloc<jSamplerResource>(SamplerState));
 
-		auto TestShaderBindingLayout2 = (jShaderBindingsLayout_DX12*)g_rhi->CreateShaderBindings(ShaderBindingArray);
+		auto TestShaderBindingLayout2 = (jShaderBindingLayout_DX12*)g_rhi->CreateShaderBindings(ShaderBindingArray);
 		TestShaderBindingInstance2 = (jShaderBindingInstance_DX12*)TestShaderBindingLayout2->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::MultiFrame);
 	}
     
@@ -1056,7 +1056,7 @@ bool jRHI_DX12::InitRHI()
 
 	}
 
-	jShaderBindingsLayoutArray ShaderBindingsLayoutArray;
+	jShaderBindingLayoutArray ShaderBindingsLayoutArray;
 	ShaderBindingsLayoutArray.Add(TestShaderBindingInstance->ShaderBindingsLayouts);
 	ShaderBindingsLayoutArray.Add(TestShaderBindingInstance2->ShaderBindingsLayouts);
 
@@ -1380,7 +1380,7 @@ void jRHI_DX12::Render()
 //        {
 //			SpawnedObjects[i]->RenderObjects[0]->UpdateWorldMatrix();
 //
-//            jShaderBindingsLayoutArray ShaderBindingsLayoutArray2;
+//            jShaderBindingLayoutArray ShaderBindingsLayoutArray2;
 //            View.GetShaderBindingLayout(ShaderBindingsLayoutArray2);
 //            ShaderBindingsLayoutArray2.Add(SpawnedObjects[i]->RenderObjects[0]->CreateShaderBindingInstance()->ShaderBindingsLayouts);
 //
@@ -1458,7 +1458,7 @@ void jRHI_DX12::Render()
 //			//jShaderBindingInstanceArray ShaderBindingInstanceArray;
 //			//ShaderBindingInstanceArray.Add(TestShaderBindingInstance);
 //			//ShaderBindingInstanceArray.Add(TestShaderBindingInstance2);
-//			//GraphicsCommandList->SetGraphicsRootSignature(jShaderBindingsLayout_DX12::CreateRootSignature(ShaderBindingInstanceArray));
+//			//GraphicsCommandList->SetGraphicsRootSignature(jShaderBindingLayout_DX12::CreateRootSignature(ShaderBindingInstanceArray));
 //
 //			//int32 RootParameterIndex = 0;
 //			//bool HasDescriptor = false;
@@ -1466,7 +1466,7 @@ void jRHI_DX12::Render()
 //			//for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
 //			//{
 //			//	jShaderBindingInstance_DX12* Instance = (jShaderBindingInstance_DX12*)ShaderBindingInstanceArray[i];
-//			//	jShaderBindingsLayout_DX12* Layout = (jShaderBindingsLayout_DX12*)(Instance->ShaderBindingsLayouts);
+//			//	jShaderBindingLayout_DX12* Layout = (jShaderBindingLayout_DX12*)(Instance->ShaderBindingsLayouts);
 //
 //			//	Instance->CopyToOnlineDescriptorHeap(CommandBuffer);
 //			//	HasDescriptor |= Instance->Descriptors.size() > 0;
@@ -1730,7 +1730,7 @@ jTexture* jRHI_DX12::CreateTextureFromData(void* data, int32 InData, int32 width
     return Texture;
 }
 
-jShaderBindingsLayout* jRHI_DX12::CreateShaderBindings(const jShaderBindingArray& InShaderBindingArray) const
+jShaderBindingLayout* jRHI_DX12::CreateShaderBindings(const jShaderBindingArray& InShaderBindingArray) const
 {
     size_t hash = InShaderBindingArray.GetHash();
 
@@ -1750,7 +1750,7 @@ jShaderBindingsLayout* jRHI_DX12::CreateShaderBindings(const jShaderBindingArray
         if (ShaderBindingPool.end() != it_find)
             return it_find->second;
 
-        auto NewShaderBinding = new jShaderBindingsLayout_DX12();
+        auto NewShaderBinding = new jShaderBindingLayout_DX12();
         NewShaderBinding->Initialize(InShaderBindingArray);
         NewShaderBinding->Hash = hash;
         ShaderBindingPool[hash] = NewShaderBinding;
@@ -1919,14 +1919,14 @@ jRenderPass* jRHI_DX12::GetOrCreateRenderPass(const jRenderPassInfo& renderPassI
 }
 
 jPipelineStateInfo* jRHI_DX12::CreatePipelineStateInfo(const jPipelineStateFixedInfo* InPipelineStateFixed, const jGraphicsPipelineShader InShader
-	, const jVertexBufferArray& InVertexBufferArray, const jRenderPass* InRenderPass, const jShaderBindingsLayoutArray& InShaderBindingArray
+	, const jVertexBufferArray& InVertexBufferArray, const jRenderPass* InRenderPass, const jShaderBindingLayoutArray& InShaderBindingArray
 	, const jPushConstant* InPushConstant, int32 InSubpassIndex) const
 {
 	return PipelineStatePool.GetOrCreateMove(std::move(jPipelineStateInfo(InPipelineStateFixed, InShader, InVertexBufferArray
 		, InRenderPass, InShaderBindingArray, InPushConstant, InSubpassIndex)));
 }
 
-jPipelineStateInfo* jRHI_DX12::CreateComputePipelineStateInfo(const jShader* shader, const jShaderBindingsLayoutArray& InShaderBindingArray
+jPipelineStateInfo* jRHI_DX12::CreateComputePipelineStateInfo(const jShader* shader, const jShaderBindingLayoutArray& InShaderBindingArray
 	, const jPushConstant* pushConstant) const
 {
 	return PipelineStatePool.GetOrCreateMove(std::move(jPipelineStateInfo(shader, InShaderBindingArray, pushConstant)));
@@ -2006,7 +2006,7 @@ void jRHI_DX12::BindGraphicsShaderBindingInstances(const jCommandBuffer* InComma
         check(CommandBuffer_DX12);
 
 		const jShaderBindingInstanceArray& ShaderBindingInstanceArray = *(InShaderBindingInstanceCombiner.ShaderBindingInstanceArray);
-		CommandBuffer_DX12->CommandList->SetGraphicsRootSignature(jShaderBindingsLayout_DX12::CreateRootSignature(ShaderBindingInstanceArray));
+		CommandBuffer_DX12->CommandList->SetGraphicsRootSignature(jShaderBindingLayout_DX12::CreateRootSignature(ShaderBindingInstanceArray));
 
 		int32 RootParameterIndex = 0;
         int32 NumOfDescriptor = 0;
@@ -2081,7 +2081,7 @@ void jRHI_DX12::BindGraphicsShaderBindingInstances(const jCommandBuffer* InComma
 		for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
 		{
 			jShaderBindingInstance_DX12* Instance = (jShaderBindingInstance_DX12*)ShaderBindingInstanceArray[i];
-			jShaderBindingsLayout_DX12* Layout = (jShaderBindingsLayout_DX12*)(Instance->ShaderBindingsLayouts);
+			jShaderBindingLayout_DX12* Layout = (jShaderBindingLayout_DX12*)(Instance->ShaderBindingsLayouts);
 
 			Instance->CopyToOnlineDescriptorHeap(CommandBuffer_DX12);
 			Instance->BindGraphics(CommandBuffer_DX12, RootParameterIndex);
@@ -2105,7 +2105,7 @@ void jRHI_DX12::BindComputeShaderBindingInstances(const jCommandBuffer* InComman
         check(CommandBuffer_DX12);
 
         const jShaderBindingInstanceArray& ShaderBindingInstanceArray = *(InShaderBindingInstanceCombiner.ShaderBindingInstanceArray);
-        CommandBuffer_DX12->CommandList->SetComputeRootSignature(jShaderBindingsLayout_DX12::CreateRootSignature(ShaderBindingInstanceArray));
+        CommandBuffer_DX12->CommandList->SetComputeRootSignature(jShaderBindingLayout_DX12::CreateRootSignature(ShaderBindingInstanceArray));
 
         int32 RootParameterIndex = 0;
         bool HasDescriptor = false;
@@ -2119,7 +2119,7 @@ void jRHI_DX12::BindComputeShaderBindingInstances(const jCommandBuffer* InComman
         for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
         {
             jShaderBindingInstance_DX12* Instance = (jShaderBindingInstance_DX12*)ShaderBindingInstanceArray[i];
-            jShaderBindingsLayout_DX12* Layout = (jShaderBindingsLayout_DX12*)(Instance->ShaderBindingsLayouts);
+            jShaderBindingLayout_DX12* Layout = (jShaderBindingLayout_DX12*)(Instance->ShaderBindingsLayouts);
 
             Instance->CopyToOnlineDescriptorHeap(CommandBuffer_DX12);
 

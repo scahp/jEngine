@@ -67,7 +67,7 @@ struct jPipelineStateInfo_DX12 : public jPipelineStateInfo
 {
     jPipelineStateInfo_DX12() = default;
     jPipelineStateInfo_DX12(const jPipelineStateFixedInfo* pipelineStateFixed, const jGraphicsPipelineShader shader, const jVertexBufferArray& InVertexBufferArray
-        , const jRenderPass* renderPass, const jShaderBindingsLayoutArray& InShaderBindingLayoutArray, const jPushConstant* pushConstant)
+        , const jRenderPass* renderPass, const jShaderBindingLayoutArray& InShaderBindingLayoutArray, const jPushConstant* pushConstant)
         : jPipelineStateInfo(pipelineStateFixed, shader, InVertexBufferArray, renderPass, InShaderBindingLayoutArray, pushConstant)
     {}
     jPipelineStateInfo_DX12(const jPipelineStateInfo& pipelineState)

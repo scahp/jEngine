@@ -1,5 +1,5 @@
 ﻿#pragma once
-#include "jShaderBindingsLayout.h"
+#include "jShaderBindingLayout.h"
 #include "jBuffer.h"
 #include "Shader/jShader.h"
 
@@ -548,7 +548,7 @@ struct jPushConstant
 struct jShader;
 struct jGraphicsPipelineShader;
 struct jVertexBuffer;
-struct jShaderBindingsLayout;
+struct jShaderBindingLayout;
 class jRenderPass;
 struct jRenderFrameContext;
 
@@ -559,13 +559,13 @@ struct jPipelineStateInfo
 {
     jPipelineStateInfo() = default;
     jPipelineStateInfo(const jPipelineStateFixedInfo* InPipelineStateFixed, const jGraphicsPipelineShader InShader, const jVertexBufferArray& InVertexBufferArray
-        , const jRenderPass* InRenderPass, const jShaderBindingsLayoutArray& InShaderBindingLayoutArray, const jPushConstant* InPushConstant = nullptr, int32 InSubpassIndex = 0)
+        , const jRenderPass* InRenderPass, const jShaderBindingLayoutArray& InShaderBindingLayoutArray, const jPushConstant* InPushConstant = nullptr, int32 InSubpassIndex = 0)
         : PipelineStateFixed(InPipelineStateFixed), GraphicsShader(InShader), VertexBufferArray(InVertexBufferArray), RenderPass(InRenderPass), ShaderBindingLayoutArray(InShaderBindingLayoutArray)
         , PushConstant(InPushConstant), SubpassIndex(InSubpassIndex)
     {
         IsGraphics = true;
     }
-    jPipelineStateInfo(const jShader* InComputeShader, const jShaderBindingsLayoutArray& InShaderBindingLayoutArray, const jPushConstant* InPushConstant = nullptr, int32 InSubpassIndex = 0)
+    jPipelineStateInfo(const jShader* InComputeShader, const jShaderBindingLayoutArray& InShaderBindingLayoutArray, const jPushConstant* InPushConstant = nullptr, int32 InSubpassIndex = 0)
         : ComputeShader(InComputeShader), ShaderBindingLayoutArray(InShaderBindingLayoutArray), PushConstant(InPushConstant), SubpassIndex(InSubpassIndex)
     {
         IsGraphics = false;
@@ -591,7 +591,7 @@ struct jPipelineStateInfo
     const jShader* ComputeShader = nullptr;
     const jRenderPass* RenderPass = nullptr;
     jVertexBufferArray VertexBufferArray;
-    jShaderBindingsLayoutArray ShaderBindingLayoutArray;
+    jShaderBindingLayoutArray ShaderBindingLayoutArray;
     const jPushConstant* PushConstant;
     const jPipelineStateFixedInfo* PipelineStateFixed = nullptr;
     int32 SubpassIndex = 0;

@@ -2,8 +2,8 @@
 #include "jShaderBindingLayout_DX12.h"
 #include "jShaderBindingInstance_DX12.h"
 
-robin_hood::unordered_map<size_t, ComPtr<ID3D12RootSignature>> jShaderBindingsLayout_DX12::GRootSignaturePool;
-jMutexRWLock jShaderBindingsLayout_DX12::GRootSignatureLock;
+robin_hood::unordered_map<size_t, ComPtr<ID3D12RootSignature>> jShaderBindingLayout_DX12::GRootSignaturePool;
+jMutexRWLock jShaderBindingLayout_DX12::GRootSignatureLock;
 
 void jRootParameterExtractor::Extract(const jShaderBindingArray& InShaderBindingArray, int32 InRegisterSpace)
 {
@@ -176,11 +176,11 @@ void jRootParameterExtractor::Extract(const jShaderBindingArray& InShaderBinding
     }
 }
 
-void jRootParameterExtractor::Extract(const jShaderBindingsLayoutArray& InBindingLayoutArray, int32 InRegisterSpace /*= 0*/)
+void jRootParameterExtractor::Extract(const jShaderBindingLayoutArray& InBindingLayoutArray, int32 InRegisterSpace /*= 0*/)
 {
     for(int32 i=0;i< InBindingLayoutArray.NumOfData;++i)
     {
-        jShaderBindingsLayout_DX12* Layout = (jShaderBindingsLayout_DX12*)InBindingLayoutArray[i];
+        jShaderBindingLayout_DX12* Layout = (jShaderBindingLayout_DX12*)InBindingLayoutArray[i];
         check(Layout);
 
         Extract(Layout->GetShaderBindingsLayout(), i);
@@ -218,7 +218,7 @@ void jRootParameterExtractor::Extract(const jShaderBindingInstanceArray& InBindi
         check(Instance);
         check(Instance->ShaderBindingsLayouts);
 
-        jShaderBindingsLayout_DX12* Layout = (jShaderBindingsLayout_DX12*)Instance->ShaderBindingsLayouts;
+        jShaderBindingLayout_DX12* Layout = (jShaderBindingLayout_DX12*)Instance->ShaderBindingsLayouts;
         check(Layout);
         Extract(Layout->GetShaderBindingsLayout(), i);
     }
@@ -247,14 +247,14 @@ void jRootParameterExtractor::Extract(const jShaderBindingInstanceArray& InBindi
     }
 }
 
-bool jShaderBindingsLayout_DX12::Initialize(const jShaderBindingArray& InShaderBindingArray)
+bool jShaderBindingLayout_DX12::Initialize(const jShaderBindingArray& InShaderBindingArray)
 {
     InShaderBindingArray.CloneWithoutResource(ShaderBindingArray);
 
     return true;
 }
 
-std::shared_ptr<jShaderBindingInstance> jShaderBindingsLayout_DX12::CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const
+std::shared_ptr<jShaderBindingInstance> jShaderBindingLayout_DX12::CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const
 {
     auto ShaderBindingInstance = new jShaderBindingInstance_DX12();
     ShaderBindingInstance->ShaderBindingsLayouts = this;
@@ -264,7 +264,7 @@ std::shared_ptr<jShaderBindingInstance> jShaderBindingsLayout_DX12::CreateShader
     return std::shared_ptr<jShaderBindingInstance>(ShaderBindingInstance);
 }
 
-ID3D12RootSignature* jShaderBindingsLayout_DX12::CreateRootSignatureInternal(size_t InHash, FuncGetRootParameterExtractor InFunc)
+ID3D12RootSignature* jShaderBindingLayout_DX12::CreateRootSignatureInternal(size_t InHash, FuncGetRootParameterExtractor InFunc)
 {
     {
         jScopeReadLock sr(&GRootSignatureLock);
@@ -314,7 +314,7 @@ ID3D12RootSignature* jShaderBindingsLayout_DX12::CreateRootSignatureInternal(siz
     }
 }
 
-ID3D12RootSignature* jShaderBindingsLayout_DX12::CreateRootSignature(const jShaderBindingInstanceArray& InBindingInstanceArray)
+ID3D12RootSignature* jShaderBindingLayout_DX12::CreateRootSignature(const jShaderBindingInstanceArray& InBindingInstanceArray)
 {
     if (InBindingInstanceArray.NumOfData <= 0)
         return nullptr;
@@ -322,7 +322,7 @@ ID3D12RootSignature* jShaderBindingsLayout_DX12::CreateRootSignature(const jShad
     size_t hash = 0;
     for (int32 i = 0; i < InBindingInstanceArray.NumOfData; ++i)
     {
-        jShaderBindingsLayoutArray::GetHash(hash, i, InBindingInstanceArray[i]->ShaderBindingsLayouts);
+        jShaderBindingLayoutArray::GetHash(hash, i, InBindingInstanceArray[i]->ShaderBindingsLayouts);
     }
 
     return CreateRootSignatureInternal(hash, [&InBindingInstanceArray](jRootParameterExtractor& OutRootParameterExtractor)
@@ -331,7 +331,7 @@ ID3D12RootSignature* jShaderBindingsLayout_DX12::CreateRootSignature(const jShad
         });
 }
 
-ID3D12RootSignature* jShaderBindingsLayout_DX12::CreateRootSignature(const jShaderBindingsLayoutArray& InBindingLayoutArray)
+ID3D12RootSignature* jShaderBindingLayout_DX12::CreateRootSignature(const jShaderBindingLayoutArray& InBindingLayoutArray)
 {
     if (InBindingLayoutArray.NumOfData <= 0)
         return nullptr;

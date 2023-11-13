@@ -1,6 +1,6 @@
 ﻿#include "pch.h"
 #include "jShaderBindingInstance_DX12.h"
-#include "jShaderBindingsLayout_DX12.h"
+#include "jShaderBindingLayout_DX12.h"
 #include "jUniformBufferBlock_DX12.h"
 #include "jTexture_DX12.h"
 #include "jBuffer_DX12.h"

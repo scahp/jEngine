@@ -5,7 +5,7 @@
 #include "jPipelineStateInfo.h"
 #include "jFrameBuffer.h"
 #include "jRenderTarget.h"
-#include "jShaderBindingsLayout.h"
+#include "jShaderBindingLayout.h"
 #include "jBuffer.h"
 #include "jCommandBufferManager.h"
 #include "jRenderPass.h"
@@ -269,7 +269,7 @@ public:
 
 	void PrepareViewUniformBufferShaderBindingInstance();
 	void GetShaderBindingInstance(jShaderBindingInstanceArray& OutShaderBindingInstanceArray, bool InIsForwardRenderer = false) const;
-	void GetShaderBindingLayout(jShaderBindingsLayoutArray& OutShaderBindingsLayoutArray, bool InIsForwardRenderer = false) const;
+	void GetShaderBindingLayout(jShaderBindingLayoutArray& OutShaderBindingsLayoutArray, bool InIsForwardRenderer = false) const;
 
 	const jCamera* Camera = nullptr;
 	std::vector<jViewLight> Lights;
@@ -436,11 +436,11 @@ public:
 	virtual jBlendingStateInfo* CreateBlendingState(const jBlendingStateInfo& initializer) const { return nullptr; }
 
 	virtual jPipelineStateInfo* CreatePipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jGraphicsPipelineShader shader
-		, const jVertexBufferArray& InVertexBufferArray, const jRenderPass* renderPass, const jShaderBindingsLayoutArray& InShaderBindingArray, const jPushConstant* InPushConstant, int32 InSubpassIndex) const { return nullptr; }
+		, const jVertexBufferArray& InVertexBufferArray, const jRenderPass* renderPass, const jShaderBindingLayoutArray& InShaderBindingArray, const jPushConstant* InPushConstant, int32 InSubpassIndex) const { return nullptr; }
 
-	virtual jPipelineStateInfo* CreateComputePipelineStateInfo(const jShader* shader, const jShaderBindingsLayoutArray& InShaderBindingArray, const jPushConstant* pushConstant) const { return nullptr; }
+	virtual jPipelineStateInfo* CreateComputePipelineStateInfo(const jShader* shader, const jShaderBindingLayoutArray& InShaderBindingArray, const jPushConstant* pushConstant) const { return nullptr; }
 
-	virtual jShaderBindingsLayout* CreateShaderBindings(const jShaderBindingArray& InShaderBindingArray) const { check(0); return nullptr; }
+	virtual jShaderBindingLayout* CreateShaderBindings(const jShaderBindingArray& InShaderBindingArray) const { check(0); return nullptr; }
 	virtual std::shared_ptr<jShaderBindingInstance> CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const { check(0); return nullptr; }
 
 	virtual jRenderPass* GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const Vector2i& offset, const Vector2i& extent) const { return nullptr; }

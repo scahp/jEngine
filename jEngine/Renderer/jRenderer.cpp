@@ -8,7 +8,7 @@
 #include "Profiler/jPerformanceProfile.h"
 #include "jPrimitiveUtil.h"
 #include "Scene/jRenderObject.h"
-#include "RHI/jShaderBindingsLayout.h"
+#include "RHI/jShaderBindingLayout.h"
 #include "Scene/Light/jPointLight.h"
 #include "Scene/Light/jSpotLight.h"
 #include "jDirectionalLightDrawCommandGenerator.h"
@@ -971,7 +971,7 @@ void jRenderer::PostProcess()
                 shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
                 static jShader* Shader = g_rhi->CreateShader(shaderInfo);
 
-                jShaderBindingsLayoutArray ShaderBindingLayoutArray;
+                jShaderBindingLayoutArray ShaderBindingLayoutArray;
                 ShaderBindingLayoutArray.Add(CurrentBindingInstance->ShaderBindingsLayouts);
 
                 jPipelineStateInfo* computePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingLayoutArray, {});

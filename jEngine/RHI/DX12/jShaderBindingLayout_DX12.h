@@ -1,5 +1,5 @@
 ﻿#pragma once
-#include "../jShaderBindingsLayout.h"
+#include "../jShaderBindingLayout.h"
 
 struct jRootParameterExtractor
 {
@@ -8,7 +8,7 @@ public:
     std::vector<D3D12_DESCRIPTOR_RANGE1> Descriptors;
     std::vector<D3D12_DESCRIPTOR_RANGE1> SamplerDescriptors;
 
-    void Extract(const jShaderBindingsLayoutArray& InBindingLayoutArray, int32 InRegisterSpace = 0);    
+    void Extract(const jShaderBindingLayoutArray& InBindingLayoutArray, int32 InRegisterSpace = 0);    
     void Extract(const jShaderBindingInstanceArray& InBindingLayoutArray, int32 InRegisterSpace = 0);
 
 protected:
@@ -18,9 +18,9 @@ private:
     int32 NumOfInlineRootParameter = 0;    
 };
 
-struct jShaderBindingsLayout_DX12 : public jShaderBindingsLayout
+struct jShaderBindingLayout_DX12 : public jShaderBindingLayout
 {
-    virtual ~jShaderBindingsLayout_DX12() {}
+    virtual ~jShaderBindingLayout_DX12() {}
 
     virtual bool Initialize(const jShaderBindingArray& InShaderBindingArray) override;
     virtual std::shared_ptr<jShaderBindingInstance> CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const override;
@@ -44,6 +44,6 @@ struct jShaderBindingsLayout_DX12 : public jShaderBindingsLayout
 
     static ID3D12RootSignature* CreateRootSignatureInternal(size_t InHash, FuncGetRootParameterExtractor InFunc);
     static ID3D12RootSignature* CreateRootSignature(const jShaderBindingInstanceArray& InBindingInstanceArray);
-    static ID3D12RootSignature* CreateRootSignature(const jShaderBindingsLayoutArray& InBindingLayoutArray);
+    static ID3D12RootSignature* CreateRootSignature(const jShaderBindingLayoutArray& InBindingLayoutArray);
 };
 
