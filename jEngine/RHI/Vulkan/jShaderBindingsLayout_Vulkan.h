@@ -39,8 +39,6 @@ struct jShaderBindingInstance_Vulkan : public jShaderBindingInstance, public std
 
     virtual void Initialize(const jShaderBindingArray& InShaderBindingArray) override;
     virtual void UpdateShaderBindings(const jShaderBindingArray& InShaderBindingArray) override;
-    virtual void BindGraphics(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const override;
-    virtual void BindCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const override;
     virtual void* GetHandle() const override { return DescriptorSet; }
     virtual const std::vector<uint32>* GetDynamicOffsets() const override { return &WriteDescriptorSet.DynamicOffsets; }
     virtual void Free() override;

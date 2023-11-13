@@ -155,15 +155,6 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
 #endif
 }
 
-void jShaderBindingInstance_DX12::BindGraphics(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot /*= 0*/) const
-{
-}
-
-void jShaderBindingInstance_DX12::BindCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot /*= 0*/) const
-{
-
-}
-
 void* jShaderBindingInstance_DX12::GetHandle() const
 {
     return ShaderBindingsLayouts->GetHandle();

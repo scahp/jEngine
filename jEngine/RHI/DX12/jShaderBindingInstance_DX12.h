@@ -11,8 +11,6 @@ struct jShaderBindingInstance_DX12 : public jShaderBindingInstance
 
     virtual void Initialize(const jShaderBindingArray& InShaderBindingArray) override;
     virtual void UpdateShaderBindings(const jShaderBindingArray& InShaderBindingArray) override;
-    virtual void BindGraphics(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const override;
-    virtual void BindCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot = 0) const override;
     virtual void* GetHandle() const override;
     virtual const std::vector<uint32>* GetDynamicOffsets() const override { return 0; }
     virtual void Free() override {}
@@ -20,7 +18,6 @@ struct jShaderBindingInstance_DX12 : public jShaderBindingInstance
     void BindGraphics(jCommandBuffer_DX12* InCommandList, int32& InOutStartIndex) const;
     void BindCompute(jCommandBuffer_DX12* InCommandList, int32& InOutStartIndex);
     void CopyToOnlineDescriptorHeap(jCommandBuffer_DX12* InCommandList);
-    //ID3D12RootSignature* GetRootSignature() const;
 
     struct jInlineRootParamType
     {

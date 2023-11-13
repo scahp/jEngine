@@ -285,24 +285,6 @@ void jShaderBindingInstance_Vulkan::UpdateShaderBindings(const jShaderBindingArr
         , WriteDescriptorSet.DescriptorWrites.data(), 0, nullptr);
 }
 
-void jShaderBindingInstance_Vulkan::BindGraphics(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot /*= 0*/) const
-{
-    check(InRenderFrameContext);
-    check(InRenderFrameContext->GetActiveCommandBuffer());
-    check(pipelineLayout);
-    vkCmdBindDescriptorSets((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, (VkPipelineLayout)(pipelineLayout), InSlot
-        , 1, &DescriptorSet, (uint32)WriteDescriptorSet.DynamicOffsets.size(), WriteDescriptorSet.DynamicOffsets.data());
-}
-
-void jShaderBindingInstance_Vulkan::BindCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, void* pipelineLayout, int32 InSlot) const
-{
-    check(InRenderFrameContext);
-    check(InRenderFrameContext->GetActiveCommandBuffer());
-    check(pipelineLayout);
-    vkCmdBindDescriptorSets((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, (VkPipelineLayout)(pipelineLayout), InSlot
-        , 1, &DescriptorSet, (uint32)WriteDescriptorSet.DynamicOffsets.size(), WriteDescriptorSet.DynamicOffsets.data());
-}
-
 void jShaderBindingInstance_Vulkan::Free()
 {
     if (GetType() == jShaderBindingInstanceType::MultiFrame)
