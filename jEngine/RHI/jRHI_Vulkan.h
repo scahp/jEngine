@@ -23,7 +23,6 @@ struct jDescriptorPool_Vulkan;
 class jRHI_Vulkan : public jRHI
 {
 public:
-    static robin_hood::unordered_map<size_t, VkPipelineLayout> PipelineLayoutPool;
     static robin_hood::unordered_map<size_t, jShaderBindingsLayout*> ShaderBindingPool;
     static TResourcePool<jSamplerStateInfo_Vulkan, jMutexRWLock> SamplerStatePool;
     static TResourcePool<jRasterizationStateInfo_Vulkan, jMutexRWLock> RasterizationStatePool;
@@ -100,7 +99,6 @@ public:
 	jDescriptorPool_Vulkan* DescriptorPools2 = nullptr;
 
 	mutable jMutexRWLock ShaderBindingPoolLock;
-	mutable jMutexRWLock PipelineLayoutPoolLock;
 	//////////////////////////////////////////////////////////////////////////
 
     VkCommandBuffer BeginSingleTimeCommands() const;
@@ -156,7 +154,6 @@ public:
 
 	virtual jShaderBindingsLayout* CreateShaderBindings(const jShaderBindingArray& InShaderBindingArray) const override;
 	virtual std::shared_ptr<jShaderBindingInstance> CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const override;
-	virtual void* CreatePipelineLayout(const jShaderBindingsLayoutArray& InShaderBindingLayoutArray, const jPushConstant* pushConstant) const override;
 
 	virtual IUniformBufferBlock* CreateUniformBufferBlock(jName InName, jLifeTimeType InLifeTimeType, size_t InSize = 0) const override;
 

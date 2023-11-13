@@ -443,20 +443,6 @@ public:
 	virtual jShaderBindingsLayout* CreateShaderBindings(const jShaderBindingArray& InShaderBindingArray) const { check(0); return nullptr; }
 	virtual std::shared_ptr<jShaderBindingInstance> CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const { check(0); return nullptr; }
 
-	virtual void* CreatePipelineLayout(const jShaderBindingsLayoutArray& InShaderBindingLayoutArray, const jPushConstant* pushConstant) const { return nullptr; }
-
-	template <typename T>
-	FORCEINLINE T* CreatePipelineLayout(const std::vector<const jShaderBindingsLayout*>& shaderBindings, const std::vector<const jPushConstant*>& pushConstants)
-	{
-		return (T*)CreatePipelineLayout(shaderBindings, pushConstants);
-	}
-
-	template <typename T>
-	FORCEINLINE T* CreatePipelineLayout(const std::vector<const jShaderBindingInstance*>& shaderBindingInstances, const std::vector<const jPushConstant*>& pushConstants)
-	{
-		return (T*)CreatePipelineLayout(shaderBindingInstances, pushConstants);
-	}
-
 	virtual jRenderPass* GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const Vector2i& offset, const Vector2i& extent) const { return nullptr; }
 	virtual jRenderPass* GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const jAttachment& depthAttachment, const Vector2i& offset, const Vector2i& extent) const { return nullptr; }
 	virtual jRenderPass* GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const jAttachment& depthAttachment, const jAttachment& colorResolveAttachment, const Vector2i& offset, const Vector2i& extent) const { return nullptr; }

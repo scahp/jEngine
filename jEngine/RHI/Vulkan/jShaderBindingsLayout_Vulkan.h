@@ -101,4 +101,12 @@ struct jShaderBindingsLayout_Vulkan : public jShaderBindingsLayout
 
         return std::move(resultArray);
     }
+
+public:
+    static VkDescriptorSetLayout CreateDescriptorSetLayout(const jShaderBindingArray& InShaderBindingArray);
+    static VkPipelineLayout CreatePipelineLayout(const jShaderBindingsLayoutArray& InShaderBindingLayoutArray, const jPushConstant* pushConstant);
+    static void ClearPipelineLayout();
+
+    static jMutexRWLock PipelineLayoutPoolLock;
+    static robin_hood::unordered_map<size_t, VkPipelineLayout> PipelineLayoutPool;
 };

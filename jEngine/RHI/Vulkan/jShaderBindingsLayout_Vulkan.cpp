@@ -8,6 +8,9 @@
 //////////////////////////////////////////////////////////////////////////
 // jShaderBindings_Vulkan
 //////////////////////////////////////////////////////////////////////////
+jMutexRWLock jShaderBindingsLayout_Vulkan::PipelineLayoutPoolLock;
+robin_hood::unordered_map<size_t, VkPipelineLayout> jShaderBindingsLayout_Vulkan::PipelineLayoutPool;
+
 jShaderBindingsLayout_Vulkan::~jShaderBindingsLayout_Vulkan()
 {
     Release();
@@ -15,29 +18,10 @@ jShaderBindingsLayout_Vulkan::~jShaderBindingsLayout_Vulkan()
 
 bool jShaderBindingsLayout_Vulkan::Initialize(const jShaderBindingArray& InShaderBindingArray)
 {
-    std::vector<VkDescriptorSetLayoutBinding> bindings;
-
     InShaderBindingArray.CloneWithoutResource(ShaderBindingArray);
-    for (int32 i = 0; i < (int32)ShaderBindingArray.NumOfData; ++i)
-    {
-        VkDescriptorSetLayoutBinding binding = {};
-        binding.binding = ShaderBindingArray[i]->BindingPoint;
-        binding.descriptorType = GetVulkanShaderBindingType(ShaderBindingArray[i]->BindingType);
-        binding.descriptorCount = ShaderBindingArray[i]->NumOfDescriptors;
-        binding.stageFlags = GetVulkanShaderAccessFlags(ShaderBindingArray[i]->AccessStageFlags);
-        binding.pImmutableSamplers = nullptr;
-        bindings.push_back(binding);
-    }
+    DescriptorSetLayout = CreateDescriptorSetLayout(ShaderBindingArray);
 
-    VkDescriptorSetLayoutCreateInfo layoutInfo = {};
-    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = static_cast<uint32>(bindings.size());
-    layoutInfo.pBindings = bindings.data();
-
-    if (!ensure(vkCreateDescriptorSetLayout(g_rhi_vk->Device, &layoutInfo, nullptr, &DescriptorSetLayout) == VK_SUCCESS))
-        return false;
-
-    return true;
+    return !!DescriptorSetLayout;
 }
 
 std::shared_ptr<jShaderBindingInstance> jShaderBindingsLayout_Vulkan::CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const
@@ -84,6 +68,125 @@ void jShaderBindingsLayout_Vulkan::Release()
     {
         vkDestroyDescriptorSetLayout(g_rhi_vk->Device, DescriptorSetLayout, nullptr);
         DescriptorSetLayout = nullptr;
+    }
+}
+
+VkDescriptorSetLayout jShaderBindingsLayout_Vulkan::CreateDescriptorSetLayout(const jShaderBindingArray& InShaderBindingArray)
+{
+    std::vector<VkDescriptorSetLayoutBinding> bindings;
+    for (int32 i = 0; i < (int32)InShaderBindingArray.NumOfData; ++i)
+    {
+        VkDescriptorSetLayoutBinding binding = {};
+        binding.binding = InShaderBindingArray[i]->BindingPoint;
+        binding.descriptorType = GetVulkanShaderBindingType(InShaderBindingArray[i]->BindingType);
+        binding.descriptorCount = InShaderBindingArray[i]->NumOfDescriptors;
+        binding.stageFlags = GetVulkanShaderAccessFlags(InShaderBindingArray[i]->AccessStageFlags);
+        binding.pImmutableSamplers = nullptr;
+        bindings.push_back(binding);
+    }
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = static_cast<uint32>(bindings.size());
+    layoutInfo.pBindings = bindings.data();
+
+    VkDescriptorSetLayout DescriptorSetLayout = nullptr;
+    if (!ensure(vkCreateDescriptorSetLayout(g_rhi_vk->Device, &layoutInfo, nullptr, &DescriptorSetLayout) == VK_SUCCESS))
+        return nullptr;
+    return DescriptorSetLayout;
+}
+
+VkPipelineLayout jShaderBindingsLayout_Vulkan::CreatePipelineLayout(const jShaderBindingsLayoutArray& InShaderBindingLayoutArray, const jPushConstant* pushConstant)
+{
+    if (InShaderBindingLayoutArray.NumOfData <= 0)
+        return 0;
+
+    VkPipelineLayout vkPipelineLayout = nullptr;
+    size_t hash = InShaderBindingLayoutArray.GetHash();
+
+    if (pushConstant)
+        hash = CityHash64WithSeed(pushConstant->GetHash(), hash);
+    check(hash);
+
+    {
+        jScopeReadLock sr(&PipelineLayoutPoolLock);
+        auto it_find = PipelineLayoutPool.find(hash);
+        if (PipelineLayoutPool.end() != it_find)
+        {
+            vkPipelineLayout = it_find->second;
+            return vkPipelineLayout;
+        }
+    }
+
+    {
+        jScopeWriteLock sw(&PipelineLayoutPoolLock);
+
+        // Try again, to avoid entering creation section simultaneously.
+        auto it_find = PipelineLayoutPool.find(hash);
+        if (PipelineLayoutPool.end() != it_find)
+        {
+            vkPipelineLayout = it_find->second;
+            return vkPipelineLayout;
+        }
+
+        std::vector<VkDescriptorSetLayout> DescriptorSetLayouts;
+        DescriptorSetLayouts.reserve(InShaderBindingLayoutArray.NumOfData);
+        for (int32 i = 0; i < InShaderBindingLayoutArray.NumOfData; ++i)
+        {
+            const jShaderBindingsLayout_Vulkan* binding_vulkan = (const jShaderBindingsLayout_Vulkan*)InShaderBindingLayoutArray[i];
+            DescriptorSetLayouts.push_back(binding_vulkan->DescriptorSetLayout);
+        }
+
+        std::vector<VkPushConstantRange> PushConstantRanges;
+        if (pushConstant)
+        {
+            const jResourceContainer<jPushConstantRange>* pushConstantRanges = pushConstant->GetPushConstantRanges();
+            check(pushConstantRanges);
+            if (pushConstantRanges)
+            {
+                PushConstantRanges.reserve(pushConstantRanges->NumOfData);
+                for (int32 i = 0; i < pushConstantRanges->NumOfData; ++i)
+                {
+                    const jPushConstantRange& range = (*pushConstantRanges)[i];
+
+                    VkPushConstantRange pushConstantRange{};
+                    pushConstantRange.stageFlags = GetVulkanShaderAccessFlags(range.AccessStageFlag);
+                    pushConstantRange.offset = range.Offset;
+                    pushConstantRange.size = range.Size;
+                    PushConstantRanges.emplace_back(pushConstantRange);
+                }
+            }
+        }
+
+        // 쉐이더에 전달된 Uniform 들을 명세하기 위한 오브젝트
+        // 이 오브젝트는 프로그램 실행동안 계속해서 참조되므로 cleanup 에서 제거해줌
+        VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
+        pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        pipelineLayoutInfo.setLayoutCount = (uint32)DescriptorSetLayouts.size();
+        pipelineLayoutInfo.pSetLayouts = &DescriptorSetLayouts[0];
+        if (PushConstantRanges.size() > 0)
+        {
+            pipelineLayoutInfo.pushConstantRangeCount = (int32)PushConstantRanges.size();
+            pipelineLayoutInfo.pPushConstantRanges = PushConstantRanges.data();
+        }
+        check(g_rhi_vk->Device);
+        if (!ensure(vkCreatePipelineLayout(g_rhi_vk->Device, &pipelineLayoutInfo, nullptr, &vkPipelineLayout) == VK_SUCCESS))
+            return nullptr;
+
+        PipelineLayoutPool[hash] = vkPipelineLayout;
+    }
+
+    return vkPipelineLayout;
+}
+
+void jShaderBindingsLayout_Vulkan::ClearPipelineLayout()
+{
+    check(g_rhi_vk);
+    {
+        jScopeWriteLock s(&PipelineLayoutPoolLock);
+        for (auto& iter : PipelineLayoutPool)
+            vkDestroyPipelineLayout(g_rhi_vk->Device, iter.second, nullptr);
+        PipelineLayoutPool.clear();
     }
 }
 

@@ -32,7 +32,6 @@
 #include "Scene/Light/jLight.h"
 
 jRHI_Vulkan* g_rhi_vk = nullptr;
-robin_hood::unordered_map<size_t, VkPipelineLayout> jRHI_Vulkan::PipelineLayoutPool;
 robin_hood::unordered_map<size_t, jShaderBindingsLayout*> jRHI_Vulkan::ShaderBindingPool;
 TResourcePool<jSamplerStateInfo_Vulkan, jMutexRWLock> jRHI_Vulkan::SamplerStatePool;
 TResourcePool<jRasterizationStateInfo_Vulkan, jMutexRWLock> jRHI_Vulkan::RasterizationStatePool;
@@ -390,12 +389,7 @@ void jRHI_Vulkan::ReleaseRHI()
 	delete CommandBufferManager;
 	CommandBufferManager = nullptr;
 
-	{
-		jScopeWriteLock s(&PipelineLayoutPoolLock);
-		for (auto& iter : PipelineLayoutPool)
-			vkDestroyPipelineLayout(Device, iter.second, nullptr);
-		PipelineLayoutPool.clear();
-	}
+	jShaderBindingsLayout_Vulkan::ClearPipelineLayout();
 
 	{
 		jScopeWriteLock s(&ShaderBindingPoolLock);
@@ -1046,88 +1040,6 @@ std::shared_ptr<jShaderBindingInstance> jRHI_Vulkan::CreateShaderBindingInstance
 	return shaderBindingsLayout->CreateShaderBindingInstance(InShaderBindingArray, InType);
 }
 
-void* jRHI_Vulkan::CreatePipelineLayout(const jShaderBindingsLayoutArray& InShaderBindingLayoutArray, const jPushConstant* pushConstant) const
-{
-	if (InShaderBindingLayoutArray.NumOfData <= 0)
-		return 0;
-
-	VkPipelineLayout vkPipelineLayout = nullptr;
-	size_t hash = InShaderBindingLayoutArray.GetHash();
-
-	if (pushConstant)
-		hash = CityHash64WithSeed(pushConstant->GetHash(), hash);
-	check(hash);
-
-	{
-		jScopeReadLock sr(&PipelineLayoutPoolLock);
-		auto it_find = PipelineLayoutPool.find(hash);
-		if (PipelineLayoutPool.end() != it_find)
-		{
-			vkPipelineLayout = it_find->second;
-			return vkPipelineLayout;
-		}
-	}
-
-	{
-		jScopeWriteLock sw(&PipelineLayoutPoolLock);
-
-		// Try again, to avoid entering creation section simultaneously.
-        auto it_find = PipelineLayoutPool.find(hash);
-        if (PipelineLayoutPool.end() != it_find)
-        {
-            vkPipelineLayout = it_find->second;
-            return vkPipelineLayout;
-        }
-
-		std::vector<VkDescriptorSetLayout> DescriptorSetLayouts;
-		DescriptorSetLayouts.reserve(InShaderBindingLayoutArray.NumOfData);
-		for (int32 i = 0; i < InShaderBindingLayoutArray.NumOfData; ++i)
-		{
-			const jShaderBindingsLayout_Vulkan* binding_vulkan = (const jShaderBindingsLayout_Vulkan*)InShaderBindingLayoutArray[i];
-			DescriptorSetLayouts.push_back(binding_vulkan->DescriptorSetLayout);
-		}
-
-		std::vector<VkPushConstantRange> PushConstantRanges;
-		if (pushConstant)
-		{
-			const jResourceContainer<jPushConstantRange>* pushConstantRanges = pushConstant->GetPushConstantRanges();
-			check(pushConstantRanges);
-			if (pushConstantRanges)
-			{
-				PushConstantRanges.reserve(pushConstantRanges->NumOfData);
-				for (int32 i = 0; i < pushConstantRanges->NumOfData; ++i)
-				{
-					const jPushConstantRange& range = (*pushConstantRanges)[i];
-
-					VkPushConstantRange pushConstantRange{};
-					pushConstantRange.stageFlags = GetVulkanShaderAccessFlags(range.AccessStageFlag);
-					pushConstantRange.offset = range.Offset;
-					pushConstantRange.size = range.Size;
-					PushConstantRanges.emplace_back(pushConstantRange);
-				}
-			}
-		}
-
-		// 쉐이더에 전달된 Uniform 들을 명세하기 위한 오브젝트
-		// 이 오브젝트는 프로그램 실행동안 계속해서 참조되므로 cleanup 에서 제거해줌
-		VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
-		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		pipelineLayoutInfo.setLayoutCount = (uint32)DescriptorSetLayouts.size();
-		pipelineLayoutInfo.pSetLayouts = &DescriptorSetLayouts[0];
-		if (PushConstantRanges.size() > 0)
-		{
-			pipelineLayoutInfo.pushConstantRangeCount = (int32)PushConstantRanges.size();
-			pipelineLayoutInfo.pPushConstantRanges = PushConstantRanges.data();
-		}
-		if (!ensure(vkCreatePipelineLayout(Device, &pipelineLayoutInfo, nullptr, &vkPipelineLayout) == VK_SUCCESS))
-			return nullptr;
-
-		PipelineLayoutPool[hash] = vkPipelineLayout;
-	}
-
-	return vkPipelineLayout;
-}
-
 IUniformBufferBlock* jRHI_Vulkan::CreateUniformBufferBlock(jName InName, jLifeTimeType InLifeTimeType, size_t InSize /*= 0*/) const
 {
 	auto uniformBufferBlock = new jUniformBufferBlock_Vulkan(InName, InLifeTimeType);
@@ -1388,7 +1300,7 @@ bool jRHI_Vulkan::TransitionImageLayout(VkCommandBuffer commandBuffer, VkImage i
 	case VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL:
 	case VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL:
 		if (IsDepthOnlyFormat(GetVulkanTextureFormat(format)))
-			check(0);
+			barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;		// VkImageView 가 VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL 를 지원하지 않기 때문에 추가
         else if (IsDepthFormat(GetVulkanTextureFormat(format)))
             barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
         else
@@ -1600,6 +1512,13 @@ bool jRHI_Vulkan::TransitionImageLayout(jCommandBuffer* commandBuffer, jTexture*
 	check(texture);
 
 	auto texture_vk = (jTexture_Vulkan*)texture;
+
+	// VkImageView 가 VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL 를 지원하지 않기 때문에 추가
+	if (texture_vk->IsDepthFormat() && EImageLayout::DEPTH_READ_ONLY == newLayout)
+	{
+		newLayout = EImageLayout::DEPTH_STENCIL_READ_ONLY;
+	}
+
 	if (TransitionImageLayout((VkCommandBuffer)commandBuffer->GetHandle(), texture_vk->Image, GetVulkanTextureFormat(texture_vk->Format)
 		, texture_vk->MipLevel, texture_vk->LayerCount, GetVulkanImageLayout(texture_vk->Layout), GetVulkanImageLayout(newLayout)))
 	{
