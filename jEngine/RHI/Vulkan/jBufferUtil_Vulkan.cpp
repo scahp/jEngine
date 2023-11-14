@@ -1,7 +1,7 @@
 ﻿#include "pch.h"
-#include "jVulkanBufferUtil.h"
+#include "jBufferUtil_Vulkan.h"
 
-namespace jVulkanBufferUtil
+namespace jBufferUtil_Vulkan
 {
 
 VkFormat FindSupportedFormat(VkPhysicalDevice physicalDevice, const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features)
@@ -189,7 +189,7 @@ bool CreateImage2DArray(uint32 width, uint32 height, uint32 arrayLayers, uint32 
     VkMemoryAllocateInfo allocInfo = {};
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = jVulkanBufferUtil::FindMemoryType(g_rhi_vk->PhysicalDevice, memRequirements.memoryTypeBits, properties);
+    allocInfo.memoryTypeIndex = jBufferUtil_Vulkan::FindMemoryType(g_rhi_vk->PhysicalDevice, memRequirements.memoryTypeBits, properties);
     if (!ensure(vkAllocateMemory(g_rhi_vk->Device, &allocInfo, nullptr, &imageMemory) == VK_SUCCESS))
         return false;
 
@@ -220,7 +220,7 @@ size_t CreateBuffer(EVulkanBufferBits InUsage, EVulkanMemoryBits InProperties, u
     VkMemoryAllocateInfo allocInfo = {};
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = jVulkanBufferUtil::FindMemoryType(g_rhi_vk->PhysicalDevice, memRequirements.memoryTypeBits
+    allocInfo.memoryTypeIndex = jBufferUtil_Vulkan::FindMemoryType(g_rhi_vk->PhysicalDevice, memRequirements.memoryTypeBits
         , GetVulkanMemoryPropertyFlagBits(InProperties));
 
     if (!ensure(vkAllocateMemory(g_rhi_vk->Device, &allocInfo, nullptr, &OutBufferMemory) == VK_SUCCESS))

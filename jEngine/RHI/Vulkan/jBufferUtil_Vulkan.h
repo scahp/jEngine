@@ -3,7 +3,7 @@
 #include "jRHIType_Vulkan.h"
 #include "jTexture_Vulkan.h"
 
-namespace jVulkanBufferUtil
+namespace jBufferUtil_Vulkan
 {
 VkFormat FindSupportedFormat(VkPhysicalDevice physicalDevice, const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
 VkFormat FindDepthFormat(VkPhysicalDevice physicalDevice);

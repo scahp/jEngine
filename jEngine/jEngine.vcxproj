@@ -219,7 +219,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClInclude Include="RHI\Vulkan\jTexture_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jUniformBufferBlock_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jVertexBuffer_Vulkan.h" />
-    <ClInclude Include="RHI\Vulkan\jVulkanBufferUtil.h" />
+    <ClInclude Include="RHI\Vulkan\jBufferUtil_Vulkan.h" />
     <ClInclude Include="RHI\Vulkan\jVulkanDeviceUtil.h" />
     <ClInclude Include="RHI\Vulkan\jVulkanFeatureSwitch.h" />
     <ClInclude Include="Scene\jCamera.h" />
@@ -404,7 +404,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClCompile Include="RHI\Vulkan\jTexture_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jUniformBufferBlock_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jVertexBuffer_Vulkan.cpp" />
-    <ClCompile Include="RHI\Vulkan\jVulkanBufferUtil.cpp" />
+    <ClCompile Include="RHI\Vulkan\jBufferUtil_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jVulkanDeviceUtil.cpp" />
     <ClCompile Include="RHI\Vulkan\jVulkanFeatureSwitch.cpp" />
     <ClCompile Include="Scene\jCamera.cpp" />

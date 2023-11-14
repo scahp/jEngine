@@ -18,7 +18,7 @@
 #include "Vulkan/jTexture_Vulkan.h"
 #include "Vulkan/jUniformBufferBlock_Vulkan.h"
 #include "Vulkan/jVulkanDeviceUtil.h"
-#include "Vulkan/jVulkanBufferUtil.h"
+#include "Vulkan/jBufferUtil_Vulkan.h"
 #include "Vulkan/jShader_Vulkan.h"
 #include "Vulkan/jBuffer_Vulkan.h"
 #include "Vulkan/jCommandBufferManager_Vulkan.h"
@@ -551,7 +551,7 @@ jTexture* jRHI_Vulkan::CreateTextureFromData(void* data, int32 width, int32 heig
     const uint32 MipLevels = static_cast<uint32>(std::floor(std::log2(std::max<int>(width, height)))) + 1;
 
 	jBuffer_Vulkan stagingBuffer;
-	jVulkanBufferUtil::AllocateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
+	jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
         , imageSize, stagingBuffer);
 
 	stagingBuffer.UpdateBuffer(data, imageSize);
@@ -560,7 +560,7 @@ jTexture* jRHI_Vulkan::CreateTextureFromData(void* data, int32 width, int32 heig
 
 	VkImage TextureImage;
 	VkDeviceMemory TextureImageMemory;
-    if (!ensure(jVulkanBufferUtil::CreateImage((uint32)width, (uint32)height, MipLevels, VK_SAMPLE_COUNT_1_BIT, vkTextureFormat
+    if (!ensure(jBufferUtil_Vulkan::CreateImage((uint32)width, (uint32)height, MipLevels, VK_SAMPLE_COUNT_1_BIT, vkTextureFormat
         , VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT
         | VK_IMAGE_USAGE_SAMPLED_BIT	// image를 shader 에서 접근가능하게 하고 싶은 경우
         , VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, TextureImage, TextureImageMemory)))
@@ -571,12 +571,12 @@ jTexture* jRHI_Vulkan::CreateTextureFromData(void* data, int32 width, int32 heig
     VkCommandBuffer commandBuffer = BeginSingleTimeCommands();
 	ensure(TransitionImageLayout(commandBuffer, TextureImage, vkTextureFormat, MipLevels, 1, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
 
-	jVulkanBufferUtil::CopyBufferToImage(commandBuffer, stagingBuffer.Buffer, stagingBuffer.Offset, TextureImage, (uint32)width, (uint32)height);
+	jBufferUtil_Vulkan::CopyBufferToImage(commandBuffer, stagingBuffer.Buffer, stagingBuffer.Offset, TextureImage, (uint32)width, (uint32)height);
 
     // 밉맵을 만드는 동안 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL 으로 전환됨.
     if (createMipmap)
     {
-        jVulkanBufferUtil::GenerateMipmaps(commandBuffer, TextureImage, vkTextureFormat, width, height, MipLevels
+        jBufferUtil_Vulkan::GenerateMipmaps(commandBuffer, TextureImage, vkTextureFormat, width, height, MipLevels
 			, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
 	else
@@ -590,7 +590,7 @@ jTexture* jRHI_Vulkan::CreateTextureFromData(void* data, int32 width, int32 heig
 	stagingBuffer.Release();
 
     // Create Texture image view
-    VkImageView textureImageView = jVulkanBufferUtil::CreateImageView(TextureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, MipLevels);
+    VkImageView textureImageView = jBufferUtil_Vulkan::CreateImageView(TextureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, MipLevels);
 
     auto texture = new jTexture_Vulkan();
     texture->sRGB = sRGB;
@@ -806,19 +806,19 @@ jFrameBuffer* jRHI_Vulkan::CreateFrameBuffer(const jFrameBufferInfo& info) const
 	switch (info.TextureType)
 	{
 	case ETextureType::TEXTURE_2D:
-		jVulkanBufferUtil::CreateImage(info.Width, info.Height, mipLevels, (VkSampleCountFlagBits)info.SampleCount
+		jBufferUtil_Vulkan::CreateImage(info.Width, info.Height, mipLevels, (VkSampleCountFlagBits)info.SampleCount
 			, textureFormat, TilingMode, ImageUsageFlagBit, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, image, imageMemory);
-		imageView = jVulkanBufferUtil::CreateImageView(image, textureFormat, ImageAspectFlagBit, mipLevels);
+		imageView = jBufferUtil_Vulkan::CreateImageView(image, textureFormat, ImageAspectFlagBit, mipLevels);
 		break;
 	case ETextureType::TEXTURE_2D_ARRAY:
-		jVulkanBufferUtil::CreateImage2DArray(info.Width, info.Height, info.LayerCount, mipLevels, (VkSampleCountFlagBits)info.SampleCount
+		jBufferUtil_Vulkan::CreateImage2DArray(info.Width, info.Height, info.LayerCount, mipLevels, (VkSampleCountFlagBits)info.SampleCount
 			, textureFormat, TilingMode, ImageUsageFlagBit, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VkImageCreateFlagBits(0), image, imageMemory);
-		imageView = jVulkanBufferUtil::CreateImage2DArrayView(image, info.LayerCount, textureFormat, ImageAspectFlagBit, mipLevels);
+		imageView = jBufferUtil_Vulkan::CreateImage2DArrayView(image, info.LayerCount, textureFormat, ImageAspectFlagBit, mipLevels);
 		break;
 	case ETextureType::TEXTURE_CUBE:
-		jVulkanBufferUtil::CreateImageCube(info.Width, info.Height, mipLevels, (VkSampleCountFlagBits)info.SampleCount
+		jBufferUtil_Vulkan::CreateImageCube(info.Width, info.Height, mipLevels, (VkSampleCountFlagBits)info.SampleCount
 			, textureFormat, TilingMode, ImageUsageFlagBit, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, image, imageMemory);
-		imageView = jVulkanBufferUtil::CreateImageCubeView(image, textureFormat, ImageAspectFlagBit, mipLevels);
+		imageView = jBufferUtil_Vulkan::CreateImageCubeView(image, textureFormat, ImageAspectFlagBit, mipLevels);
 		break;
 	default:
 		JMESSAGE("Unsupported type texture in FramebufferPool");
@@ -873,20 +873,20 @@ std::shared_ptr<jRenderTarget> jRHI_Vulkan::CreateRenderTarget(const jRenderTarg
 	switch (info.Type)
 	{
 	case ETextureType::TEXTURE_2D:
-		jVulkanBufferUtil::CreateImage(info.Width, info.Height, mipLevels, (VkSampleCountFlagBits)info.SampleCount
+		jBufferUtil_Vulkan::CreateImage(info.Width, info.Height, mipLevels, (VkSampleCountFlagBits)info.SampleCount
 			, textureFormat, TilingMode, ImageUsageFlag, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, image, imageMemory);
-		imageView = jVulkanBufferUtil::CreateImageView(image, textureFormat, ImageAspectFlag, mipLevels);
+		imageView = jBufferUtil_Vulkan::CreateImageView(image, textureFormat, ImageAspectFlag, mipLevels);
 		break;
 	case ETextureType::TEXTURE_2D_ARRAY:
-		jVulkanBufferUtil::CreateImage2DArray(info.Width, info.Height, info.LayerCount, mipLevels, (VkSampleCountFlagBits)info.SampleCount
+		jBufferUtil_Vulkan::CreateImage2DArray(info.Width, info.Height, info.LayerCount, mipLevels, (VkSampleCountFlagBits)info.SampleCount
 			, textureFormat, TilingMode, ImageUsageFlag, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VkImageCreateFlagBits(0), image, imageMemory);
-		imageView = jVulkanBufferUtil::CreateImage2DArrayView(image, info.LayerCount, textureFormat, ImageAspectFlag, mipLevels);
+		imageView = jBufferUtil_Vulkan::CreateImage2DArrayView(image, info.LayerCount, textureFormat, ImageAspectFlag, mipLevels);
 		break;
 	case ETextureType::TEXTURE_CUBE:
 		check(info.LayerCount == 6);
-		jVulkanBufferUtil::CreateImageCube(info.Width, info.Height, mipLevels, (VkSampleCountFlagBits)info.SampleCount
+		jBufferUtil_Vulkan::CreateImageCube(info.Width, info.Height, mipLevels, (VkSampleCountFlagBits)info.SampleCount
 			, textureFormat, TilingMode, ImageUsageFlag, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, image, imageMemory);
-		imageView = jVulkanBufferUtil::CreateImageCubeView(image, textureFormat, ImageAspectFlag, mipLevels);
+		imageView = jBufferUtil_Vulkan::CreateImageCubeView(image, textureFormat, ImageAspectFlag, mipLevels);
 		break;
 	default:
 		JMESSAGE("Unsupported type texture in FramebufferPool");
@@ -1628,18 +1628,18 @@ jTexture* jRHI_Vulkan::CreateSampleVRSTexture()
 
 		auto NewVRSTexture = new jTexture_Vulkan();
 
-        jVulkanBufferUtil::CreateImage(imageExtent.width, imageExtent.height, 1, (VkSampleCountFlagBits)1, GetVulkanTextureFormat(ETextureFormat::R8UI), VK_IMAGE_TILING_OPTIMAL
+        jBufferUtil_Vulkan::CreateImage(imageExtent.width, imageExtent.height, 1, (VkSampleCountFlagBits)1, GetVulkanTextureFormat(ETextureFormat::R8UI), VK_IMAGE_TILING_OPTIMAL
             , VK_IMAGE_USAGE_SHADING_RATE_IMAGE_BIT_NV | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, *NewVRSTexture);
 
         VkDeviceSize imageSize = imageExtent.width * imageExtent.height * GetVulkanTexturePixelSize(ETextureFormat::R8UI);
         jBuffer_Vulkan stagingBuffer;
-        jVulkanBufferUtil::AllocateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
+        jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
             , imageSize, stagingBuffer);
 
 		VkCommandBuffer commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
         ensure(g_rhi_vk->TransitionImageLayout(commandBuffer, (VkImage)NewVRSTexture->GetHandle(), GetVulkanTextureFormat(ETextureFormat::R8UI), 1, 1, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
 
-        jVulkanBufferUtil::CopyBufferToImage(commandBuffer, stagingBuffer.Buffer, stagingBuffer.Offset, (VkImage)NewVRSTexture->GetHandle()
+        jBufferUtil_Vulkan::CopyBufferToImage(commandBuffer, stagingBuffer.Buffer, stagingBuffer.Offset, (VkImage)NewVRSTexture->GetHandle()
             , static_cast<uint32>(imageExtent.width), static_cast<uint32>(imageExtent.height));
 
         // Create a circular pattern with decreasing sampling rates outwards (max. range, pattern)
@@ -1681,7 +1681,7 @@ jTexture* jRHI_Vulkan::CreateSampleVRSTexture()
         stagingBuffer.Release();
         delete[]shadingRatePatternData;
 
-		NewVRSTexture->View = jVulkanBufferUtil::CreateImageView((VkImage)NewVRSTexture->GetHandle(), GetVulkanTextureFormat(NewVRSTexture->Format)
+		NewVRSTexture->View = jBufferUtil_Vulkan::CreateImageView((VkImage)NewVRSTexture->GetHandle(), GetVulkanTextureFormat(NewVRSTexture->Format)
             , VK_IMAGE_ASPECT_COLOR_BIT, 1);
 
 		SampleVRSTexture = NewVRSTexture;

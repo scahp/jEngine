@@ -2,7 +2,7 @@
 #include "jImGui_Vulkan.h"
 #include "Profiler/jPerformanceProfile.h"
 #include "RHI/Vulkan/jTexture_Vulkan.h"
-#include "RHI/Vulkan/jVulkanBufferUtil.h"
+#include "RHI/Vulkan/jBufferUtil_Vulkan.h"
 #include "jOptions.h"
 #include "RHI/jRenderFrameContext.h"
 #include "Renderer/jSceneRenderTargets.h"
@@ -89,11 +89,11 @@ void jImGUI_Vulkan::Initialize(float width, float height)
     FontImage = FontImage_vk;
 
     // Create target image for copy
-    verify(jVulkanBufferUtil::CreateImage(texWidth, texHeight, 1, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL
+    verify(jBufferUtil_Vulkan::CreateImage(texWidth, texHeight, 1, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL
         , VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, *FontImage_vk));
 
     // Image view
-    FontImage_vk->View = jVulkanBufferUtil::CreateImageView(FontImage_vk->Image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, 1);
+    FontImage_vk->View = jBufferUtil_Vulkan::CreateImageView(FontImage_vk->Image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, 1);
     check(FontImage_vk->View);
 
     jSamplerStateInfo* samplerStateInfo = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR>::Create();
@@ -118,14 +118,14 @@ void jImGUI_Vulkan::Initialize(float width, float height)
     //////////////////////////////////////////////////////////////////////////
     // Staging buffers for font data upload
     jBuffer_Vulkan stagingBuffer;
-    verify(jVulkanBufferUtil::AllocateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
+    verify(jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
         , uploadSize, stagingBuffer));
 
     stagingBuffer.UpdateBuffer(fontData, uploadSize);
 
     // Copy buffer data to font image
     g_rhi_vk->TransitionImageLayoutImmediate(FontImage, EImageLayout::TRANSFER_DST);
-    jVulkanBufferUtil::CopyBufferToImage(stagingBuffer.Buffer, stagingBuffer.Offset, FontImage_vk->Image, texWidth, texHeight);
+    jBufferUtil_Vulkan::CopyBufferToImage(stagingBuffer.Buffer, stagingBuffer.Offset, FontImage_vk->Image, texWidth, texHeight);
     g_rhi_vk->TransitionImageLayoutImmediate(FontImage, EImageLayout::SHADER_READ_ONLY);
 
     stagingBuffer.Release();
@@ -256,7 +256,7 @@ void jImGUI_Vulkan::UpdateBuffers()
         const uint64 newBufferSize = imDrawData->TotalVtxCount * sizeof(ImDrawVert);
 
         DynamicBuffer.VertexBufferPtr->Release();
-        verify(jVulkanBufferUtil::AllocateBuffer(EVulkanBufferBits::VERTEX_BUFFER, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
+        verify(jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::VERTEX_BUFFER, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
             , newBufferSize, *DynamicBuffer.VertexBufferPtr.get()));
         DynamicBuffer.VertexBufferPtr->Map();
         DynamicBuffer.vertexCount = imDrawData->TotalVtxCount;
@@ -268,7 +268,7 @@ void jImGUI_Vulkan::UpdateBuffers()
         const uint64 newBufferSize = imDrawData->TotalIdxCount * sizeof(ImDrawIdx);
 
         DynamicBuffer.IndexBufferPtr->Release();
-        verify(jVulkanBufferUtil::AllocateBuffer(EVulkanBufferBits::INDEX_BUFFER, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
+        verify(jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::INDEX_BUFFER, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
             , newBufferSize, *DynamicBuffer.IndexBufferPtr.get()));
         DynamicBuffer.IndexBufferPtr->Map();
         DynamicBuffer.indexCount = imDrawData->TotalIdxCount;

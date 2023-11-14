@@ -10,7 +10,7 @@
 #include "Profiler/jPerformanceProfile.h"
 #include "Renderer/jRenderer.h"
 #include "jPrimitiveUtil.h"
-#include "RHI/Vulkan/jVulkanBufferUtil.h"
+#include "RHI/Vulkan/jBufferUtil_Vulkan.h"
 #include "jOptions.h"
 #include "FileLoader/jModelLoader.h"
 #include "Scene/jMeshObject.h"
@@ -655,7 +655,7 @@ void jGame::SpawnIndirectDrawPrimitives()
             const size_t bufferSize = indrectCommands.size() * sizeof(VkDrawIndirectCommand);
 
             jBuffer_Vulkan stagingBuffer;
-            jVulkanBufferUtil::AllocateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
+            jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
                 , bufferSize, stagingBuffer);
 
             stagingBuffer.UpdateBuffer(indrectCommands.data(), bufferSize);
@@ -663,9 +663,9 @@ void jGame::SpawnIndirectDrawPrimitives()
             jBuffer_Vulkan* temp = new jBuffer_Vulkan();
 			check(!GeometryDataPtr->IndirectCommandBuffer);
 			GeometryDataPtr->IndirectCommandBuffer = temp;
-            jVulkanBufferUtil::AllocateBuffer(EVulkanBufferBits::TRANSFER_DST | EVulkanBufferBits::INDIRECT_BUFFER, EVulkanMemoryBits::DEVICE_LOCAL
+            jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::TRANSFER_DST | EVulkanBufferBits::INDIRECT_BUFFER, EVulkanMemoryBits::DEVICE_LOCAL
                 , bufferSize, *temp);
-            jVulkanBufferUtil::CopyBuffer(stagingBuffer.Buffer, (VkBuffer)GeometryDataPtr->IndirectCommandBuffer->GetHandle(), bufferSize
+            jBufferUtil_Vulkan::CopyBuffer(stagingBuffer.Buffer, (VkBuffer)GeometryDataPtr->IndirectCommandBuffer->GetHandle(), bufferSize
 				, stagingBuffer.AllocatedSize, GeometryDataPtr->IndirectCommandBuffer->GetAllocatedSize());
 
             stagingBuffer.Release();

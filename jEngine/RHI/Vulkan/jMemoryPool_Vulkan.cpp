@@ -7,7 +7,7 @@ void jSubMemoryAllocator_Vulkan::Initialize(EVulkanBufferBits InUsage, EVulkanMe
     check(0 == FreeLists.size());
 
     SubMemoryRange.Offset = 0;
-    jVulkanBufferUtil::CreateBuffer(InUsage, InProperties, InSize, Buffer, DeviceMemory, SubMemoryRange.DataSize);
+    jBufferUtil_Vulkan::CreateBuffer(InUsage, InProperties, InSize, Buffer, DeviceMemory, SubMemoryRange.DataSize);
     Usages = InUsage;
     Properties = InProperties;
 

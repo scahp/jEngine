@@ -2,7 +2,7 @@
 
 #include "RHI/jRHIType.h"
 #include "RHI/jMemoryPool.h"
-#include "jVulkanBufferUtil.h"
+#include "jBufferUtil_Vulkan.h"
 
 class jSubMemoryAllocator_Vulkan : public jSubMemoryAllocator
 {

@@ -232,7 +232,7 @@
     <ClInclude Include="RHI\Vulkan\jVulkanDeviceUtil.h">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\Vulkan\jVulkanBufferUtil.h">
+    <ClInclude Include="RHI\Vulkan\jBufferUtil_Vulkan.h">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="RHI\Vulkan\jPipelineStateInfo_Vulkan.h">
@@ -600,7 +600,7 @@
     <ClCompile Include="RHI\Vulkan\jVulkanDeviceUtil.cpp">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\Vulkan\jVulkanBufferUtil.cpp">
+    <ClCompile Include="RHI\Vulkan\jBufferUtil_Vulkan.cpp">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="RHI\Vulkan\jPipelineStateInfo_Vulkan.cpp">

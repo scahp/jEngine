@@ -1,6 +1,6 @@
 ﻿#include "pch.h"
 #include "jShaderStorageBufferObject_Vulkan.h"
-#include "jVulkanBufferUtil.h"
+#include "jBufferUtil_Vulkan.h"
 #include "../jRHI_Vulkan.h"
 #include "jRingBuffer_Vulkan.h"
 
@@ -16,7 +16,7 @@ void jShaderStorageBufferObject_Vulkan::Init(size_t size)
     }
     else
     {
-        jVulkanBufferUtil::AllocateBuffer(EVulkanBufferBits::STORAGE_BUFFER, EVulkanMemoryBits::HOST_VISIBLE
+        jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::STORAGE_BUFFER, EVulkanMemoryBits::HOST_VISIBLE
             | EVulkanMemoryBits::HOST_COHERENT, VkDeviceSize(size), Buffer);
     }
 }

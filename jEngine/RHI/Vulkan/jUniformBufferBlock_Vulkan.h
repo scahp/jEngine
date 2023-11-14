@@ -54,7 +54,6 @@ struct jUniformBufferBlock_Vulkan : public IUniformBufferBlock
     virtual size_t GetBufferOffset() const override { return Buffer.Offset; }
 
     jBuffer_Vulkan Buffer;
-    jMemory Memory;
 
 private:
     jUniformBufferBlock_Vulkan(const jUniformBufferBlock_Vulkan&) = delete;

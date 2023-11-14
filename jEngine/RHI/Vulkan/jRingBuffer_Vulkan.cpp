@@ -1,7 +1,7 @@
 ﻿#include "pch.h"
 #include "jRingBuffer_Vulkan.h"
 #include "../jRHI_Vulkan.h"
-#include "jVulkanBufferUtil.h"
+#include "jBufferUtil_Vulkan.h"
 
 jRingBuffer_Vulkan::~jRingBuffer_Vulkan()
 {
@@ -14,7 +14,7 @@ void jRingBuffer_Vulkan::Create(EVulkanBufferBits bufferBits, uint64 totalSize, 
 
     Release();
 
-    jVulkanBufferUtil::CreateBuffer(bufferBits, EVulkanMemoryBits::HOST_VISIBLE
+    jBufferUtil_Vulkan::CreateBuffer(bufferBits, EVulkanMemoryBits::HOST_VISIBLE
         | EVulkanMemoryBits::HOST_COHERENT, VkDeviceSize(totalSize), Buffer, BufferMemory, RingBufferSize);
     
     RingBufferOffset = 0;

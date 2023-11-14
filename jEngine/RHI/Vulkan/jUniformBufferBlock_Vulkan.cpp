@@ -1,6 +1,6 @@
 ﻿#include "pch.h"
 #include "jUniformBufferBlock_Vulkan.h"
-#include "jVulkanBufferUtil.h"
+#include "jBufferUtil_Vulkan.h"
 #include "../jRHI_Vulkan.h"
 #include "jRingBuffer_Vulkan.h"
 
@@ -18,37 +18,23 @@ void jUniformBufferBlock_Vulkan::Init(size_t size)
     {
         Buffer.HasBufferOwnership = false;          // Prevent destroy the ring buffer
         Buffer.AllocatedSize = size;
-
-        //jVulkanBufferUtil::AllocateBuffer(EVulkanBufferBits::UNIFORM_BUFFER, EVulkanMemoryBits::HOST_VISIBLE
-        //    | EVulkanMemoryBits::HOST_COHERENT, VkDeviceSize(size), Buffer);
     }
 }
 
 void jUniformBufferBlock_Vulkan::AllocBufferFromGlobalMemory(size_t size)
 {
     // If we have allocated memory frame global memory, reallocate it again.
-    if (Memory.IsValid())
-    {
-        g_rhi->GetMemoryPool()->Free(Memory);
-    }
+    Buffer.Release();
 
-    Memory = g_rhi->GetMemoryPool()->Alloc(EVulkanBufferBits::UNIFORM_BUFFER
-        , EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT, VkDeviceSize(size));
+    Buffer.InitializeWithMemory(g_rhi->GetMemoryPool()->Alloc(EVulkanBufferBits::UNIFORM_BUFFER
+        , EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT, VkDeviceSize(size)));
 
-    check(Memory.IsValid());
-
-    Buffer.Buffer = (VkBuffer)Memory.Buffer;
-    Buffer.AllocatedSize = Memory.Range.DataSize;
-    Buffer.Offset = Memory.Range.Offset;
-    Buffer.MappedPointer = Memory.GetMappedPointer();
+    check(Buffer.Memory.IsValid());
 }
 
 void jUniformBufferBlock_Vulkan::Release()
 {
-    if (Memory.IsValid())
-    {
-        g_rhi->GetMemoryPool()->Free(Memory);
-    }
+    Buffer.Release();
 }
 
 void jUniformBufferBlock_Vulkan::UpdateBufferData(const void* InData, size_t InSize)
