@@ -256,7 +256,8 @@ public:
 		check(Device);
 
         const D3D12_RESOURCE_ALLOCATION_INFO info = Device->GetResourceAllocationInfo(0, 1, InDesc);
-		const bool IsAvailablePlacedResource = IsUsePlacedResource && (info.SizeInBytes <= PlacedResourceSizeThreshold);
+		const bool IsAvailablePlacedResource = IsUsePlacedResource && (info.SizeInBytes <= PlacedResourceSizeThreshold) 
+			&& ((PlacedResourceDefaultHeapOffset + info.SizeInBytes) <= DefaultPlacedResourceHeapSize);
 
 		ComPtr<ID3D12Resource> NewResource;
 		if (IsAvailablePlacedResource)
@@ -283,7 +284,8 @@ public:
         check(Device);
 
 		const D3D12_RESOURCE_ALLOCATION_INFO info = Device->GetResourceAllocationInfo(0, 1, InDesc);
-		const bool IsAvailablePlacedResource = IsUsePlacedResource && (info.SizeInBytes <= PlacedResourceSizeThreshold);
+        const bool IsAvailablePlacedResource = IsUsePlacedResource && (info.SizeInBytes <= PlacedResourceSizeThreshold)
+            && ((PlacedResourceDefaultHeapOffset + info.SizeInBytes) <= DefaultPlacedResourceHeapSize);
 
         ComPtr<ID3D12Resource> NewResource;
         if (IsAvailablePlacedResource)
