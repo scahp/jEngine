@@ -28,12 +28,11 @@ void jShader::StartAndRunCheckUpdateShaderThread()
             {
                 std::vector<jShader*> Shaders = g_rhi->GetAllShaders();
 
-                static constexpr int32 MaxChecker = 10;
                 static int32 CurrentIndex = 0;
                 if (Shaders.size() > 0)
                 {
                     jScopedLock s(&Lock);
-                    for (int32 i = 0; i < MaxChecker; ++i, ++CurrentIndex)
+                    for (int32 i = 0; i < GMaxCheckCountForRealTimeShaderUpdate; ++i, ++CurrentIndex)
                     {
                         if (CurrentIndex >= (int32)Shaders.size())
                         {
@@ -49,7 +48,7 @@ void jShader::StartAndRunCheckUpdateShaderThread()
                     if (WaitForUpdateShaders.size() > 0)
                         HasNewWaitForupdateShaders.store(true);
                 }
-                Sleep(100);
+                Sleep(GSleepMSForRealTimeShaderUpdate);
             }
         });
     }

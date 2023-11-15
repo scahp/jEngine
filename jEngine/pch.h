@@ -211,5 +211,7 @@ extern class jEngine* g_Engine;
 #define ENABLE_PBR 0
 
 extern bool GUseRealTimeShaderUpdate;
+extern int32 GMaxCheckCountForRealTimeShaderUpdate;
+extern int32 GSleepMSForRealTimeShaderUpdate;
 
 #endif //PCH_H
