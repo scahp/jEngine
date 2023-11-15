@@ -377,6 +377,17 @@ void* jPipelineStateInfo_Vulkan::CreateGraphicsPipelineState()
         return nullptr;
     }
 
+    size_t hash = GetHash();
+    if (ensure(hash))
+    {
+        if (GraphicsShader.VertexShader)
+            jShader::gConnectedPipelineStateHash[GraphicsShader.VertexShader].push_back(hash);
+        if (GraphicsShader.GeometryShader)
+            jShader::gConnectedPipelineStateHash[GraphicsShader.GeometryShader].push_back(hash);
+        if (GraphicsShader.PixelShader)
+            jShader::gConnectedPipelineStateHash[GraphicsShader.PixelShader].push_back(hash);
+    }
+
     return vkPipeline;
 }
 
@@ -398,6 +409,13 @@ void* jPipelineStateInfo_Vulkan::CreateComputePipelineState()
         , 1, &computePipelineCreateInfo, nullptr, &vkPipeline)))
     {
         return nullptr;
+    }
+
+    size_t hash = GetHash();
+    if (ensure(hash))
+    {
+        if (ComputeShader)
+            jShader::gConnectedPipelineStateHash[ComputeShader].push_back(hash);
     }
 
     return vkPipeline;

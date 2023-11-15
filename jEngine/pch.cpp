@@ -40,3 +40,5 @@ uint32 GetMaxThreadCount()
 #endif
 
 jEngine* g_Engine = nullptr;
+
+bool GUseRealTimeShaderUpdate = true;

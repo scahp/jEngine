@@ -308,9 +308,23 @@ public:
     static jVertexBuffer* CubeMapInstanceDataForSixFace;
 
 	template <typename T = jShader>
-	T* CreateShader(const jShaderInfo& shaderInfo) const
+	T* CreateShader(const jShaderInfo& InShaderInfo) const
 	{
-		return (T*)ShaderPool.GetOrCreate<jShaderInfo, T>(shaderInfo);
+		return (T*)ShaderPool.GetOrCreate<jShaderInfo, T>(InShaderInfo);
+	}
+	void AddShader(const jShaderInfo& InShaderInfo, jShader* InShader)
+	{
+		return ShaderPool.Add(InShaderInfo, InShader);
+	}
+    void ReleaseShader(const jShaderInfo& InShaderInfo)
+    {
+        ShaderPool.Release(InShaderInfo);
+    }
+	std::vector<jShader*> GetAllShaders() 
+	{
+		std::vector<jShader*> Out;
+		ShaderPool.GetAllResource(Out);
+		return Out;
 	}
 
 	virtual jName GetRHIName() { return jName::Invalid; }
@@ -437,8 +451,8 @@ public:
 
 	virtual jPipelineStateInfo* CreatePipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jGraphicsPipelineShader shader
 		, const jVertexBufferArray& InVertexBufferArray, const jRenderPass* renderPass, const jShaderBindingLayoutArray& InShaderBindingArray, const jPushConstant* InPushConstant, int32 InSubpassIndex) const { return nullptr; }
-
 	virtual jPipelineStateInfo* CreateComputePipelineStateInfo(const jShader* shader, const jShaderBindingLayoutArray& InShaderBindingArray, const jPushConstant* pushConstant) const { return nullptr; }
+	virtual void RemovePipelineStateInfo(size_t InHash) {}
 
 	virtual jShaderBindingLayout* CreateShaderBindings(const jShaderBindingArray& InShaderBindingArray) const { check(0); return nullptr; }
 	virtual std::shared_ptr<jShaderBindingInstance> CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const { check(0); return nullptr; }

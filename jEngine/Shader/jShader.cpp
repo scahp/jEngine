@@ -2,17 +2,118 @@
 #include "jShader.h"
 #include "FileLoader/jFile.h"
 
+bool jShader::IsRunningCheckUpdateShaderThread = false;
+std::thread jShader::CheckUpdateShaderThread;
+std::vector<jShader*> jShader::WaitForUpdateShaders;
+std::map<const jShader*, std::vector<size_t>> jShader::gConnectedPipelineStateHash;
+
 jShader::~jShader()
 {
 	delete CompiledShader;
 }
 
-void jShader::UpdateShaders()
+void jShader::StartAndRunCheckUpdateShaderThread()
 {
-	// currentShader->UpdateShader();
+    if (!GUseRealTimeShaderUpdate)
+        return;
+
+    static std::atomic_bool HasNewWaitForupdateShaders(false);
+    static jMutexLock Lock;
+    if (!CheckUpdateShaderThread.joinable())
+    {
+        IsRunningCheckUpdateShaderThread = true;
+        CheckUpdateShaderThread = std::thread([]()
+        {
+            while (IsRunningCheckUpdateShaderThread)
+            {
+                std::vector<jShader*> Shaders = g_rhi->GetAllShaders();
+
+                static constexpr int32 MaxChecker = 10;
+                static int32 CurrentIndex = 0;
+                if (Shaders.size() > 0)
+                {
+                    jScopedLock s(&Lock);
+                    for (int32 i = 0; i < MaxChecker; ++i, ++CurrentIndex)
+                    {
+                        if (CurrentIndex >= (int32)Shaders.size())
+                        {
+                            CurrentIndex = 0;
+                        }
+
+                        if (Shaders[CurrentIndex]->UpdateShader())
+                        {
+                            WaitForUpdateShaders.push_back(Shaders[CurrentIndex]);
+                        }
+                    }
+
+                    if (WaitForUpdateShaders.size() > 0)
+                        HasNewWaitForupdateShaders.store(true);
+                }
+                Sleep(100);
+            }
+        });
+    }
+
+    if (HasNewWaitForupdateShaders.load())
+    {
+        jScopedLock s(&Lock);
+
+        HasNewWaitForupdateShaders.store(false);
+        check(WaitForUpdateShaders.size() > 0);
+
+        g_rhi->Flush();
+
+        for (auto it = WaitForUpdateShaders.begin(); WaitForUpdateShaders.end() != it;)
+        {
+            jShader* Shader = *it;
+
+            // Backup previous data
+            jCompiledShader* PreviousCompiledShader = Shader->CompiledShader;
+            auto PreviousPipelineStateHashes = gConnectedPipelineStateHash[Shader];
+            gConnectedPipelineStateHash[Shader].clear();
+
+            // Reset Shader
+            Shader->CompiledShader = nullptr;
+            g_rhi->ReleaseShader(Shader->ShaderInfo);
+
+            // Try recreate shader
+            if (g_rhi->CreateShaderInternal(Shader, Shader->ShaderInfo))
+            {
+                // Remove Pipeline which is connected with this shader
+                for (auto PipelineStateHash : PreviousPipelineStateHashes)
+                {
+                    g_rhi->RemovePipelineStateInfo(PipelineStateHash);
+                }
+
+                // Release previous compiled shader
+                delete Shader->CompiledShader;
+
+                it = WaitForUpdateShaders.erase(it);
+            }
+            else
+            {
+                // Restore shader data
+                Shader->CompiledShader = PreviousCompiledShader;
+                gConnectedPipelineStateHash[Shader] = PreviousPipelineStateHashes;
+                g_rhi->AddShader(Shader->ShaderInfo, Shader);
+
+                ++it;
+            }
+        }
+    }
 }
 
-void jShader::UpdateShader()
+
+void jShader::ReleaseCheckUpdateShaderThread()
+{
+    if (CheckUpdateShaderThread.joinable())
+    {
+        IsRunningCheckUpdateShaderThread = false;
+        CheckUpdateShaderThread.join();
+    }
+}
+
+bool jShader::UpdateShader()
 {
 	auto checkTimeStampFunc = [this](const char* filename) -> uint64
 	{
@@ -24,19 +125,20 @@ void jShader::UpdateShader()
 	uint64 currentTimeStamp = checkTimeStampFunc(ShaderInfo.GetShaderFilepath().ToStr());
 	
 	if (currentTimeStamp <= 0)
-		return;
+		return false;
 	
 	if (TimeStamp == 0)
 	{
 		TimeStamp = currentTimeStamp;
-		return;
+		return false;
 	}
 
-	if (TimeStamp < currentTimeStamp)
-	{
-		g_rhi->CreateShaderInternal(this, ShaderInfo);
-		TimeStamp = currentTimeStamp;
-	}
+	if (TimeStamp >= currentTimeStamp)
+		return false;
+
+	TimeStamp = currentTimeStamp;
+
+	return true;
 }
 
 void jShader::Initialize()

@@ -710,7 +710,8 @@ bool jRHI_Vulkan::CreateShaderInternal(jShader* OutShader, const jShaderInfo& sh
             const bool isHLSL = !!strstr(shaderInfo.GetShaderFilepath().ToStr(), ".hlsl");
 
             jFile ShaderFile;
-            ShaderFile.OpenFile(shaderInfo.GetShaderFilepath().ToStr(), FileType::TEXT, ReadWriteType::READ);
+			if (!ShaderFile.OpenFile(shaderInfo.GetShaderFilepath().ToStr(), FileType::TEXT, ReadWriteType::READ))
+				return false;
             ShaderFile.ReadFileToBuffer(false);
             std::string ShaderText;
 
@@ -758,7 +759,8 @@ bool jRHI_Vulkan::CreateShaderInternal(jShader* OutShader, const jShaderInfo& sh
 
 				// Load include shader file
                 jFile IncludeShaderFile;
-                IncludeShaderFile.OpenFile(includeFilepath.c_str(), FileType::TEXT, ReadWriteType::READ);
+				if (!IncludeShaderFile.OpenFile(includeFilepath.c_str(), FileType::TEXT, ReadWriteType::READ))
+					return false;
                 IncludeShaderFile.ReadFileToBuffer(false);
 				ShaderText.replace(ReplaceStartPos, ReplaceCount, IncludeShaderFile.GetBuffer());
 				IncludeShaderFile.CloseFile();
@@ -766,12 +768,21 @@ bool jRHI_Vulkan::CreateShaderInternal(jShader* OutShader, const jShaderInfo& sh
 
             std::vector<uint32> SpirvCode;
 			if (isHLSL)
-				jSpirvHelper::HLSLtoSpirv(SpirvCode, ShaderConductorShaderStage, ShaderText.c_str());
+			{
+				if (!jSpirvHelper::HLSLtoSpirv(SpirvCode, ShaderConductorShaderStage, ShaderText.c_str()))
+					return false;
+			}
 			else
-				jSpirvHelper::GLSLtoSpirv(SpirvCode, ShaderLangShaderStage, ShaderText.data());
+			{
+				if (!jSpirvHelper::GLSLtoSpirv(SpirvCode, ShaderLangShaderStage, ShaderText.data()))
+					return false;
+			}
 
 			shaderModule = CreateShaderModule(SpirvCode);
 		}
+
+		if (!shaderModule)
+			return false;
 
 		CurCompiledShader->ShaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 		CurCompiledShader->ShaderStage.stage = ShaderFlagBits;
@@ -1560,6 +1571,11 @@ jPipelineStateInfo* jRHI_Vulkan::CreateComputePipelineStateInfo(const jShader* s
 	, const jPushConstant* pushConstant) const
 {
     return PipelineStatePool.GetOrCreateMove(std::move(jPipelineStateInfo(shader, InShaderBindingArray, pushConstant)));
+}
+
+void jRHI_Vulkan::RemovePipelineStateInfo(size_t InHash)
+{
+    PipelineStatePool.Release(InHash);
 }
 
 jRenderPass* jRHI_Vulkan::GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const Vector2i& offset, const Vector2i& extent) const

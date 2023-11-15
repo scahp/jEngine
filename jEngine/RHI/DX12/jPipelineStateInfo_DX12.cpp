@@ -6,6 +6,7 @@
 #include "dxcapi.h"
 #include "jRenderPass_DX12.h"
 #include "jShaderBindingLayout_DX12.h"
+#include "Shader/jShader.h"
 
 void jSamplerStateInfo_DX12::Initialize()
 {
@@ -202,6 +203,17 @@ void* jPipelineStateInfo_DX12::CreateGraphicsPipelineState()
         Dst.bottom = Src.Offset.y + Src.Extent.y;
     }
 
+    size_t hash = GetHash();
+    if (ensure(hash))
+    {
+        if (GraphicsShader.VertexShader)
+            jShader::gConnectedPipelineStateHash[GraphicsShader.VertexShader].push_back(hash);
+        if (GraphicsShader.GeometryShader)
+            jShader::gConnectedPipelineStateHash[GraphicsShader.GeometryShader].push_back(hash);
+        if (GraphicsShader.PixelShader)
+            jShader::gConnectedPipelineStateHash[GraphicsShader.PixelShader].push_back(hash);
+    }
+
     return PipelineState.Get();
 }
 
@@ -222,6 +234,13 @@ void* jPipelineStateInfo_DX12::CreateComputePipelineState()
     check(g_rhi_dx12->Device);
     if (JFAIL(g_rhi_dx12->Device->CreateComputePipelineState(&psoDesc, IID_PPV_ARGS(&PipelineState))))
         return nullptr;
+
+    size_t hash = GetHash();
+    if (ensure(hash))
+    {
+        if (ComputeShader)
+            jShader::gConnectedPipelineStateHash[ComputeShader].push_back(hash);
+    }
 
     return PipelineState.Get();
 }

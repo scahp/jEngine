@@ -70,7 +70,7 @@ void jEngine::Update(float deltaTime)
 	g_timeDeltaSecond = deltaTime;
 	Game.Update(deltaTime);
 
-	jShader::UpdateShaders();
+	jShader::StartAndRunCheckUpdateShaderThread();
 }
 
 void jEngine::Draw()

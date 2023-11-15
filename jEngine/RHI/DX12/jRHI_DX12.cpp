@@ -1823,7 +1823,8 @@ bool jRHI_DX12::CreateShaderInternal(jShader* OutShader, const jShaderInfo& shad
             const bool isHLSL = !!strstr(shaderInfo.GetShaderFilepath().ToStr(), ".hlsl");
 
             jFile ShaderFile;
-            ShaderFile.OpenFile(shaderInfo.GetShaderFilepath().ToStr(), FileType::TEXT, ReadWriteType::READ);
+            if (!ShaderFile.OpenFile(shaderInfo.GetShaderFilepath().ToStr(), FileType::TEXT, ReadWriteType::READ))
+                return false;
             ShaderFile.ReadFileToBuffer(false);
             std::string ShaderText;
 
@@ -1871,7 +1872,8 @@ bool jRHI_DX12::CreateShaderInternal(jShader* OutShader, const jShaderInfo& shad
 
                 // Load include shader file
                 jFile IncludeShaderFile;
-                IncludeShaderFile.OpenFile(includeFilepath.c_str(), FileType::TEXT, ReadWriteType::READ);
+                if (!IncludeShaderFile.OpenFile(includeFilepath.c_str(), FileType::TEXT, ReadWriteType::READ))
+                    return false;
                 IncludeShaderFile.ReadFileToBuffer(false);
                 ShaderText.replace(ReplaceStartPos, ReplaceCount, IncludeShaderFile.GetBuffer());
                 IncludeShaderFile.CloseFile();
@@ -1889,6 +1891,8 @@ bool jRHI_DX12::CreateShaderInternal(jShader* OutShader, const jShaderInfo& shad
 			
 			CurCompiledShader->ShaderBlob = jShaderCompiler_DX12::Get().Compile(ShaderText.c_str(), (uint32)ShaderText.size()
 				, ShadingModel, EntryPoint);
+            if (!CurCompiledShader->ShaderBlob)
+                return false;
         }
     }
     shader_dx12->ShaderInfo = shaderInfo;
@@ -1930,6 +1934,11 @@ jPipelineStateInfo* jRHI_DX12::CreateComputePipelineStateInfo(const jShader* sha
 	, const jPushConstant* pushConstant) const
 {
 	return PipelineStatePool.GetOrCreateMove(std::move(jPipelineStateInfo(shader, InShaderBindingArray, pushConstant)));
+}
+
+void jRHI_DX12::RemovePipelineStateInfo(size_t InHash)
+{
+    PipelineStatePool.Release(InHash);
 }
 
 std::shared_ptr<jRenderFrameContext> jRHI_DX12::BeginRenderFrame()

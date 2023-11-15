@@ -67,6 +67,8 @@ void jRHI::ReleaseRHI()
 	delete GWhiteTexture;
 	delete GBlackTexture;
 	delete GNormalTexture;
+
+    jShader::ReleaseCheckUpdateShaderThread();
 	ShaderPool.Release();
 }
 

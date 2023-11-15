@@ -210,4 +210,6 @@ extern class jEngine* g_Engine;
 
 #define ENABLE_PBR 0
 
+extern bool GUseRealTimeShaderUpdate;
+
 #endif //PCH_H

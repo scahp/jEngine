@@ -297,7 +297,6 @@ bool jSpirvHelper::HLSLtoSpirv(std::vector<uint32>& OutSpirv, ShaderConductor::S
 	{
 		const char* errorStr = reinterpret_cast<const char*>(resultDesc.errorWarningMsg.Data());
 		OutputDebugStringA(errorStr);
-		check(0);
 		return false;
 	}
 	

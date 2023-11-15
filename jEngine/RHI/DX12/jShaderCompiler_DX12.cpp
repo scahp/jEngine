@@ -168,7 +168,6 @@ ComPtr<IDxcBlob> jShaderCompiler_DX12::Compile(const char* InShaderCode, uint32 
         result->GetErrorBuffer(&error);
         auto tt = reinterpret_cast<const char*>(error->GetBufferPointer());
         OutputDebugStringA(reinterpret_cast<const char*>(error->GetBufferPointer()));
-        JFAIL(resultCode);
         return nullptr;
     }
 

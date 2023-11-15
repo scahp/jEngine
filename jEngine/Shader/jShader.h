@@ -171,6 +171,11 @@ struct jCompiledShader
 
 struct jShader : public std::enable_shared_from_this<jShader>
 {
+    static bool IsRunningCheckUpdateShaderThread;
+    static std::thread CheckUpdateShaderThread;
+    static std::vector<jShader*> WaitForUpdateShaders;
+    static std::map<const jShader*, std::vector<size_t>> gConnectedPipelineStateHash;
+
 	jShader()
 	{}
     jShader(const jShaderInfo& shaderInfo)
@@ -178,9 +183,10 @@ struct jShader : public std::enable_shared_from_this<jShader>
     { }
 	virtual ~jShader();
 
-	static void UpdateShaders();
+	static void StartAndRunCheckUpdateShaderThread();
+    static void ReleaseCheckUpdateShaderThread();
 
-    void UpdateShader();
+    bool UpdateShader();
     virtual void Initialize();
 
 	uint64 TimeStamp = 0;
