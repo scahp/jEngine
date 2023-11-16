@@ -224,12 +224,4 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 void window_focus_callback(GLFWwindow* window, int focused)
 {
 	ImGui_ImplGlfw_WindowFocusCallback(window, focused);
-	//if (focused)
- //   {
-	//	// 윈도우가 Focus 를 얻는 경우 Mouse click callback 이 호출되는데, 
-	//	// 이때 아직 UI는 Mouse Hover 상태 정보를 모르기 때문에 여기서 갱신
-	//	ImGui_ImplGlfw_NewFrame();
-	//	ImGui::NewFrame();
-	//	ImGui::EndFrame();
-	//}
 }

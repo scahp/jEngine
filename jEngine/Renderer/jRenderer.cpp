@@ -1221,11 +1221,22 @@ void jRenderer::Render()
             //ImGui::Checkbox("ShowGrid", &gOptions.ShowGrid);
             //ImGui::Checkbox("UseWaveIntrinsics", &gOptions.UseWaveIntrinsics);
             {
-                ImGui::BeginDisabled(true);
-                ImGui::Checkbox("[ReadOnly]UseDeferredRenderer", &gOptions.UseDeferredRenderer);
-                ImGui::Checkbox("[ReadOnly]UseSubpass", &gOptions.UseSubpass);
-                ImGui::Checkbox("[ReadOnly]UseMemoryless", &gOptions.UseMemoryless);
-                ImGui::EndDisabled();
+                if (IsUseVulkan())
+                {
+                    ImGui::BeginDisabled(true);
+                    ImGui::Checkbox("[ReadOnly]UseDeferredRenderer", &gOptions.UseDeferredRenderer);
+                    ImGui::EndDisabled();
+                    ImGui::Checkbox("UseSubpass", &gOptions.UseSubpass);
+                    ImGui::Checkbox("UseMemoryless", &gOptions.UseMemoryless);
+                }
+                else
+                {
+                    ImGui::BeginDisabled(true);
+                    ImGui::Checkbox("[ReadOnly]UseDeferredRenderer", &gOptions.UseDeferredRenderer);
+                    ImGui::Checkbox("[VulkanOnly]UseSubpass", &gOptions.UseSubpass);
+                    ImGui::Checkbox("[VulkanOnly]UseMemoryless", &gOptions.UseMemoryless);
+                    ImGui::EndDisabled();
+                }
             }
             {
                 ImGui::Checkbox("ShowDebugObject", &gOptions.ShowDebugObject);
