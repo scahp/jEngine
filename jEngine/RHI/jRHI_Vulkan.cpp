@@ -363,6 +363,8 @@ void jRHI_Vulkan::ReleaseRHI()
 {
 	Flush();
 
+	jRHI::ReleaseRHI();
+
     delete SampleVRSTexture;
 	SampleVRSTexture = nullptr;
 

@@ -1159,6 +1159,8 @@ void jRHI_DX12::ReleaseRHI()
 {
 	WaitForGPU();
     
+    jRHI::ReleaseRHI();
+
 	if (CommandBufferManager)
 		CommandBufferManager->Release();
 
