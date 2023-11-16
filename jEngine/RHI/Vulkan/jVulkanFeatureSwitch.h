@@ -5,6 +5,7 @@
 #else
 #define ENABLE_VALIDATION_LAYER 0
 #endif
+extern bool GIsValidationLayerSupport;
 
 #define USE_VARIABLE_SHADING_RATE_TIER2 0
 #define USE_REVERSEZ_PERSPECTIVE_SHADOW 1

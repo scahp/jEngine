@@ -93,18 +93,20 @@ bool jRHI_Vulkan::InitRHI()
 
 #if ENABLE_VALIDATION_LAYER
 	// check validation layer
-	if (!ensure(jVulkanDeviceUtil::CheckValidationLayerSupport()))
-		return false;
+	GIsValidationLayerSupport = jVulkanDeviceUtil::CheckValidationLayerSupport();
 #endif
 
 	// add validation layer
 	VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo = {};
 #if ENABLE_VALIDATION_LAYER
-	createInfo.enabledLayerCount = static_cast<uint32>(jVulkanDeviceUtil::validationLayers.size());
-	createInfo.ppEnabledLayerNames = jVulkanDeviceUtil::validationLayers.data();
+	if (GIsValidationLayerSupport)
+	{
+		createInfo.enabledLayerCount = static_cast<uint32>(jVulkanDeviceUtil::validationLayers.size());
+		createInfo.ppEnabledLayerNames = jVulkanDeviceUtil::validationLayers.data();
 
-	jVulkanDeviceUtil::PopulateDebutMessengerCreateInfo(debugCreateInfo);
-	createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*)&debugCreateInfo;
+		jVulkanDeviceUtil::PopulateDebutMessengerCreateInfo(debugCreateInfo);
+		createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*)&debugCreateInfo;
+	}
 #else
 	createInfo.enabledLayerCount = 0;
 	createInfo.pNext = nullptr;
@@ -118,12 +120,15 @@ bool jRHI_Vulkan::InitRHI()
 	// SetupDebugMessenger
 	{
 #if ENABLE_VALIDATION_LAYER
-		VkDebugUtilsMessengerCreateInfoEXT createInfo = {};
-		jVulkanDeviceUtil::PopulateDebutMessengerCreateInfo(createInfo);
-		createInfo.pUserData = nullptr;	// optional
+		if (GIsValidationLayerSupport)
+		{
+			VkDebugUtilsMessengerCreateInfoEXT createInfo = {};
+			jVulkanDeviceUtil::PopulateDebutMessengerCreateInfo(createInfo);
+			createInfo.pUserData = nullptr;	// optional
 
-		VkResult result = jVulkanDeviceUtil::CreateDebugUtilsMessengerEXT(Instance, &createInfo, nullptr, &DebugMessenger);
-		check(result == VK_SUCCESS);
+			VkResult result = jVulkanDeviceUtil::CreateDebugUtilsMessengerEXT(Instance, &createInfo, nullptr, &DebugMessenger);
+			check(result == VK_SUCCESS);
+		}
 #endif // ENABLE_VALIDATION_LAYER
 	}
 
