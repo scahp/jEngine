@@ -1,6 +1,6 @@
 ﻿#include "pch.h"
 #include "jCommandBufferManager_Vulkan.h"
-#include "../jRHI_Vulkan.h"
+#include "jRHI_Vulkan.h"
 
 //////////////////////////////////////////////////////////////////////////
 // jCommandBuffer_Vulkan

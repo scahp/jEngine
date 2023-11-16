@@ -1,6 +1,6 @@
 ﻿#include "pch.h"
 #include "jRingBuffer_Vulkan.h"
-#include "../jRHI_Vulkan.h"
+#include "jRHI_Vulkan.h"
 #include "jBufferUtil_Vulkan.h"
 
 jRingBuffer_Vulkan::~jRingBuffer_Vulkan()

@@ -1,19 +1,19 @@
 ﻿#pragma once
 
-#include "jRHI.h"
+#include "RHI/jRHI.h"
+#include "RHI/jPipelineStateInfo.h"
+#include "RHI/jSemaphoreManager.h"
 #include "Shader/jShader.h"
-#include "jPipelineStateInfo.h"
-#include "Vulkan/jRenderPass_Vulkan.h"
-#include "Vulkan/jShaderBindingLayout_Vulkan.h"
-#include "Vulkan/jQueryPoolTime_Vulkan.h"
-#include "Vulkan/jPipelineStateInfo_Vulkan.h"
-#include "Vulkan/jCommandBufferManager_Vulkan.h"
-#include "Vulkan/jSwapchain_Vulkan.h"
-#include "Vulkan/jShader_Vulkan.h"
-#include "Vulkan/jQueryPoolOcclusion_Vulkan.h"
-#include "Vulkan/jMemoryPool_Vulkan.h"
-#include "Vulkan/jFenceManager_Vulkan.h"
-#include "jSemaphoreManager.h"
+#include "jRenderPass_Vulkan.h"
+#include "jShaderBindingLayout_Vulkan.h"
+#include "jQueryPoolTime_Vulkan.h"
+#include "jPipelineStateInfo_Vulkan.h"
+#include "jCommandBufferManager_Vulkan.h"
+#include "jSwapchain_Vulkan.h"
+#include "jShader_Vulkan.h"
+#include "jQueryPoolOcclusion_Vulkan.h"
+#include "jMemoryPool_Vulkan.h"
+#include "jFenceManager_Vulkan.h"
 
 struct jRingBuffer_Vulkan;
 struct jDescriptorPool_Vulkan;
@@ -26,7 +26,6 @@ public:
     static robin_hood::unordered_map<size_t, jShaderBindingLayout*> ShaderBindingPool;
     static TResourcePool<jSamplerStateInfo_Vulkan, jMutexRWLock> SamplerStatePool;
     static TResourcePool<jRasterizationStateInfo_Vulkan, jMutexRWLock> RasterizationStatePool;
-    //static TResourcePool<jMultisampleStateInfo_Vulkan, jMutexRWLock> MultisampleStatePool;
     static TResourcePool<jStencilOpStateInfo_Vulkan, jMutexRWLock> StencilOpStatePool;
     static TResourcePool<jDepthStencilStateInfo_Vulkan, jMutexRWLock> DepthStencilStatePool;
     static TResourcePool<jBlendingStateInfo_Vulkan, jMutexRWLock> BlendingStatePool;

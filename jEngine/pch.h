@@ -93,7 +93,7 @@ using tchar = wchar_t;
 #include <GLFW/glfw3.h>
 #define GLFW_INCLUDE_VULKAN
 #include "imgui_impl_vulkan.h"
-#include "RHI/jRHI_Vulkan.h"
+#include "RHI/Vulkan/jRHI_Vulkan.h"
 #include "Shader/Spirv/jSpirvHelper.h"
 #include "RHI/Vulkan/jVulkanFeatureSwitch.h"
 

@@ -1,6 +1,6 @@
 ﻿#include "pch.h"
 #include "jBuffer_Vulkan.h"
-#include "../jRHI_Vulkan.h"
+#include "jRHI_Vulkan.h"
 
 void jBuffer_Vulkan::Release()
 {

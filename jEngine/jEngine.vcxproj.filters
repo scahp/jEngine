@@ -136,9 +136,6 @@
     <ClInclude Include="pch.h">
       <Filter>Code</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\jRHI_Vulkan.h">
-      <Filter>Code\RHI</Filter>
-    </ClInclude>
     <ClInclude Include="RHI\jRHIType.h">
       <Filter>Code\RHI</Filter>
     </ClInclude>
@@ -328,9 +325,6 @@
     <ClInclude Include="External\IMGUI\imstb_truetype.h">
       <Filter>Code\External\IMGUI</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\jSemaphoreManager.h">
-      <Filter>Code\RHI\Vulkan</Filter>
-    </ClInclude>
     <ClInclude Include="RHI\Vulkan\jQueryPoolOcclusion_Vulkan.h">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClInclude>
@@ -457,6 +451,12 @@
     <ClInclude Include="jCommandlineArgument.h">
       <Filter>Code</Filter>
     </ClInclude>
+    <ClInclude Include="RHI\Vulkan\jRHI_Vulkan.h">
+      <Filter>Code\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\jSemaphoreManager.h">
+      <Filter>Code\RHI</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -521,9 +521,6 @@
     </ClCompile>
     <ClCompile Include="External\EASTL\source\thread_support.cpp">
       <Filter>Code\External\EASTL</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\jRHI_Vulkan.cpp">
-      <Filter>Code\RHI</Filter>
     </ClCompile>
     <ClCompile Include="RHI\jRHI.cpp">
       <Filter>Code\RHI</Filter>
@@ -672,9 +669,6 @@
     <ClCompile Include="External\IMGUI\imgui_tables.cpp">
       <Filter>Code\External\IMGUI</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\jSemaphoreManager.cpp">
-      <Filter>Code\RHI\Vulkan</Filter>
-    </ClCompile>
     <ClCompile Include="RHI\Vulkan\jQueryPoolOcclusion_Vulkan.cpp">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClCompile>
@@ -791,6 +785,12 @@
     </ClCompile>
     <ClCompile Include="RHI\Vulkan\jVulkanFeatureSwitch.cpp">
       <Filter>Code\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\jRHI_Vulkan.cpp">
+      <Filter>Code\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\jSemaphoreManager.cpp">
+      <Filter>Code\RHI</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

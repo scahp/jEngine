@@ -12,30 +12,29 @@
 #include "stb_image.h"
 #include "jPrimitiveUtil.h"
 #include "Profiler/jPerformanceProfile.h"
-#include "Vulkan/jVertexBuffer_Vulkan.h"
-#include "Vulkan/jIndexBuffer_Vulkan.h"
-#include "Vulkan/jRHIType_Vulkan.h"
-#include "Vulkan/jTexture_Vulkan.h"
-#include "Vulkan/jUniformBufferBlock_Vulkan.h"
-#include "Vulkan/jVulkanDeviceUtil.h"
-#include "Vulkan/jBufferUtil_Vulkan.h"
-#include "Vulkan/jShader_Vulkan.h"
-#include "Vulkan/jBuffer_Vulkan.h"
-#include "Vulkan/jCommandBufferManager_Vulkan.h"
+#include "jVertexBuffer_Vulkan.h"
+#include "jIndexBuffer_Vulkan.h"
+#include "jRHIType_Vulkan.h"
+#include "jTexture_Vulkan.h"
+#include "jUniformBufferBlock_Vulkan.h"
+#include "jVulkanDeviceUtil.h"
+#include "jBufferUtil_Vulkan.h"
+#include "jShader_Vulkan.h"
+#include "jBuffer_Vulkan.h"
+#include "jCommandBufferManager_Vulkan.h"
 #include "Renderer/jSceneRenderTargets.h"
-#include "Vulkan/jRingBuffer_Vulkan.h"
-#include "Vulkan/jDescriptorPool_Vulkan.h"
-#include "Vulkan/jQueryPoolOcclusion_Vulkan.h"
+#include "jRingBuffer_Vulkan.h"
+#include "jDescriptorPool_Vulkan.h"
+#include "jQueryPoolOcclusion_Vulkan.h"
 #include "jOptions.h"
-#include "Vulkan/jRenderFrameContext_Vulkan.h"
-#include "Vulkan/jImGui_Vulkan.h"
+#include "jRenderFrameContext_Vulkan.h"
+#include "jImGui_Vulkan.h"
 #include "Scene/Light/jLight.h"
 
 jRHI_Vulkan* g_rhi_vk = nullptr;
 robin_hood::unordered_map<size_t, jShaderBindingLayout*> jRHI_Vulkan::ShaderBindingPool;
 TResourcePool<jSamplerStateInfo_Vulkan, jMutexRWLock> jRHI_Vulkan::SamplerStatePool;
 TResourcePool<jRasterizationStateInfo_Vulkan, jMutexRWLock> jRHI_Vulkan::RasterizationStatePool;
-//TResourcePool<jMultisampleStateInfo_Vulkan, jMutexRWLock> jRHI_Vulkan::MultisampleStatePool;
 TResourcePool<jStencilOpStateInfo_Vulkan, jMutexRWLock> jRHI_Vulkan::StencilOpStatePool;
 TResourcePool<jDepthStencilStateInfo_Vulkan, jMutexRWLock> jRHI_Vulkan::DepthStencilStatePool;
 TResourcePool<jBlendingStateInfo_Vulkan, jMutexRWLock> jRHI_Vulkan::BlendingStatePool;

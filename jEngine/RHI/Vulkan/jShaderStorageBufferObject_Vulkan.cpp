@@ -1,7 +1,7 @@
 ﻿#include "pch.h"
 #include "jShaderStorageBufferObject_Vulkan.h"
 #include "jBufferUtil_Vulkan.h"
-#include "../jRHI_Vulkan.h"
+#include "jRHI_Vulkan.h"
 #include "jRingBuffer_Vulkan.h"
 
 void jShaderStorageBufferObject_Vulkan::Init(size_t size)

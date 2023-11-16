@@ -1,6 +1,6 @@
 ﻿#include "pch.h"
 #include "jShader_Vulkan.h"
-#include "../jRHI_Vulkan.h"
+#include "jRHI_Vulkan.h"
 
 jCompiledShader_Vulkan::~jCompiledShader_Vulkan()
 {

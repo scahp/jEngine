@@ -2,7 +2,7 @@
 #include "jShaderBindingLayout_Vulkan.h"
 #include "jRHIType_Vulkan.h"
 #include "jTexture_Vulkan.h"
-#include "../jRHI_Vulkan.h"
+#include "jRHI_Vulkan.h"
 #include "jDescriptorPool_Vulkan.h"
 
 //////////////////////////////////////////////////////////////////////////
