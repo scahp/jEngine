@@ -235,10 +235,10 @@ bool jRenderPass_Vulkan::CreateRenderPass()
             const auto* RT = RenderPassInfo.Attachments[k].RenderTargetPtr.get();
             check(RT);
 
-            const jTexture* texture = RT->GetTexture();
-            check(texture);
+            const jTexture_Vulkan* texture_vk = (const jTexture_Vulkan*)RT->GetTexture();
+            check(texture_vk);
 
-            ImageViews.push_back((VkImageView)texture->GetViewHandle());
+            ImageViews.push_back(texture_vk->View);
         }
 
         VkFramebufferCreateInfo framebufferInfo = {};

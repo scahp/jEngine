@@ -8,9 +8,10 @@ public:
     virtual ~jSwapchainImage() {}
     virtual void Release() = 0;
 
-    virtual void* GetHandle() const = 0;
-    virtual void* GetViewHandle() const = 0;
-    virtual void* GetMemoryHandle() const = 0;
+    virtual void* GetHandle() const
+    {
+        return TexturePtr ? TexturePtr->GetHandle() : nullptr;
+    }
 
     std::shared_ptr<jTexture> TexturePtr;
 };

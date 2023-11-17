@@ -15,8 +15,6 @@ struct jTexture : public jShaderBindableResource, public std::enable_shared_from
     }
 
     virtual void* GetHandle() const { return nullptr; }
-    virtual void* GetViewHandle() const { return nullptr; }
-    virtual void* GetMemoryHandle() const { return nullptr; }
     virtual void* GetSamplerStateHandle() const { return nullptr; }
     virtual void Release() {}
     virtual EImageLayout GetLayout() const { return EImageLayout::UNDEFINED; }

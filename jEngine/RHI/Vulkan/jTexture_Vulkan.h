@@ -20,8 +20,6 @@ struct jTexture_Vulkan : public jTexture
 
     void ReleaseInternal();
     virtual void* GetHandle() const override { return Image; }
-    virtual void* GetViewHandle() const override { return View; }
-    virtual void* GetMemoryHandle() const override { return Memory; }
     virtual void* GetSamplerStateHandle() const override { return SamplerState; }
     virtual void Release() override;
     virtual EImageLayout GetLayout() const override { return Layout; }

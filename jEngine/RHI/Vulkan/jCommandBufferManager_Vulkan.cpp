@@ -78,13 +78,13 @@ void jCommandBufferManager_Vulkan::ReleaseInternal()
     }
     UsingCommandBuffers.clear();
 
-    for (auto& iter : PendingCommandBuffers)
+    for (auto& iter : AvailableCommandBuffers)
     {
         iter->GetFence()->WaitForFence();
         g_rhi->GetFenceManager()->ReturnFence(iter->GetFence());
         delete iter;
     }
-    PendingCommandBuffers.clear();
+    AvailableCommandBuffers.clear();
 
     if (CommandPool)
     {
@@ -95,15 +95,15 @@ void jCommandBufferManager_Vulkan::ReleaseInternal()
 
 jCommandBuffer* jCommandBufferManager_Vulkan::GetOrCreateCommandBuffer()
 {
-    if (PendingCommandBuffers.size() > 0)
+    if (AvailableCommandBuffers.size() > 0)
     {
-        for (int32 i = 0; i < (int32)PendingCommandBuffers.size(); ++i)
+        for (int32 i = 0; i < (int32)AvailableCommandBuffers.size(); ++i)
         {
-            const VkResult Result = vkGetFenceStatus(g_rhi_vk->Device, (VkFence)PendingCommandBuffers[i]->GetFenceHandle());
+            const VkResult Result = vkGetFenceStatus(g_rhi_vk->Device, (VkFence)AvailableCommandBuffers[i]->GetFenceHandle());
             if (Result == VK_SUCCESS)		// VK_SUCCESS 면 Signaled
             {
-                jCommandBuffer_Vulkan* commandBuffer = PendingCommandBuffers[i];
-                PendingCommandBuffers.erase(PendingCommandBuffers.begin() + i);
+                jCommandBuffer_Vulkan* commandBuffer = AvailableCommandBuffers[i];
+                AvailableCommandBuffers.erase(AvailableCommandBuffers.begin() + i);
 
                 UsingCommandBuffers.push_back(commandBuffer);
                 commandBuffer->Reset();
@@ -145,7 +145,7 @@ void jCommandBufferManager_Vulkan::ReturnCommandBuffer(jCommandBuffer* commandBu
         if (UsingCommandBuffers[i]->GetHandle() == commandBuffer->GetHandle())
         {
             UsingCommandBuffers.erase(UsingCommandBuffers.begin() + i);
-            PendingCommandBuffers.push_back((jCommandBuffer_Vulkan*)commandBuffer);
+            AvailableCommandBuffers.push_back((jCommandBuffer_Vulkan*)commandBuffer);
             return;
         }
     }

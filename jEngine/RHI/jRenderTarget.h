@@ -83,7 +83,10 @@ struct jRenderTarget final : public std::enable_shared_from_this<jRenderTarget>
             return Hash;
 
         Hash = Info.GetHash();
-        Hash = CityHash64WithSeed(reinterpret_cast<uint64>(GetViewHandle()), Hash);
+        if (GetTexture())
+        {
+            Hash = CityHash64WithSeed(reinterpret_cast<uint64>(GetTexture()->GetHandle()), Hash);
+        }
         return Hash;
     }
 
@@ -91,7 +94,6 @@ struct jRenderTarget final : public std::enable_shared_from_this<jRenderTarget>
 
     EImageLayout GetLayout() const { return TexturePtr ? TexturePtr->GetLayout() : EImageLayout::UNDEFINED; }
     jTexture* GetTexture() const { return TexturePtr.get(); }
-    const void* GetViewHandle() const { return TexturePtr.get() ? TexturePtr->GetViewHandle() : nullptr; }
 
     jRenderTargetInfo Info;
     std::shared_ptr<jTexture> TexturePtr;

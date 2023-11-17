@@ -20,8 +20,6 @@ struct jTexture_DX12 : public jTexture
     jDescriptor_DX12 DSV;
 
     virtual void* GetHandle() const override { return Image.Get(); }
-    virtual void* GetViewHandle() const override { return Image.Get(); }
-    virtual void* GetMemoryHandle() const override { return Image.Get(); }
     virtual void* GetSamplerStateHandle() const override { return nullptr; }
     virtual void Release() override {}
     virtual EImageLayout GetLayout() const override { return Layout; }

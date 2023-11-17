@@ -1623,7 +1623,7 @@ void jRHI_Vulkan::BindShadingRateImage(jCommandBuffer* commandBuffer, jTexture* 
 {
 	check(commandBuffer);
     g_rhi_vk->vkCmdBindShadingRateImageNV((VkCommandBuffer)commandBuffer->GetHandle()
-        , (vrstexture ? (VkImageView)vrstexture->GetViewHandle() : nullptr), VK_IMAGE_LAYOUT_SHADING_RATE_OPTIMAL_NV);
+        , (vrstexture ? ((jTexture_Vulkan*)vrstexture)->View : nullptr), VK_IMAGE_LAYOUT_SHADING_RATE_OPTIMAL_NV);
 }
 
 void jRHI_Vulkan::NextSubpass(const jCommandBuffer* commandBuffer) const

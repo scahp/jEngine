@@ -14,19 +14,6 @@ public:
     void ReleaseInternal();
     virtual void Release() override;
 
-    virtual void* GetHandle() const override
-    {
-        return TexturePtr ? TexturePtr->GetHandle() : nullptr;
-    }
-    virtual void* GetViewHandle() const override
-    {
-        return TexturePtr ? TexturePtr->GetViewHandle() : nullptr;
-    }
-    virtual void* GetMemoryHandle() const override
-    {
-        return TexturePtr ? TexturePtr->GetMemoryHandle() : nullptr;
-    }
-
     jFence_DX12* CommandBufferFence = nullptr;
 };
 

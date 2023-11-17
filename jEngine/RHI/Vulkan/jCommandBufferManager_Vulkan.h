@@ -46,6 +46,6 @@ public:
 private:
     VkCommandPool CommandPool;		// 커맨드 버퍼를 저장할 메모리 관리자로 커맨드 버퍼를 생성함.
     std::vector<jCommandBuffer_Vulkan*> UsingCommandBuffers;
-    std::vector<jCommandBuffer_Vulkan*> PendingCommandBuffers;
+    std::vector<jCommandBuffer_Vulkan*> AvailableCommandBuffers;
 };
 
