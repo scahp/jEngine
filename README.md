@@ -3,7 +3,7 @@
 Simple toy engine for implementing graphics feature with multiple api
  - Documentation : https://scahp.tistory.com/120
 
-**Commandline argument**
+## Commandline argument
 
  - Select VulkanAPI : "-vulkan"
  - Select DX12 : "-dx12"
@@ -11,13 +11,15 @@ Simple toy engine for implementing graphics feature with multiple api
 ![image](https://github.com/scahp/jEngine/assets/6734453/bfa2b5e8-cc57-4071-883d-057477394c65)
 
 
-**Feature branches**
+## Feature branches
 
 VRS : https://github.com/scahp/jEngine/tree/VariableShadingRate  
 WaveIntrincs : https://github.com/scahp/jEngine/tree/WaveIntrinsics  
 
 
-**Third party libraries**
+<br/><br/>
+
+## Third party libraries
 1. ImGUI : https://github.com/ocornut/imgui
 2. assimp : https://github.com/assimp/assimp
 3. cityhash : https://github.com/google/cityhash
