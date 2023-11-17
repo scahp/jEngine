@@ -66,7 +66,6 @@ struct jBuffer_DX12 : public jBuffer
     }
 
     virtual void* GetHandle() const override { return Buffer.Get(); }
-    virtual void* GetMemoryHandle() const override { return Buffer.Get(); }
     virtual uint32 GetAllocatedSize() const override { return (uint32)Size; }
     FORCEINLINE uint64 GetGPUAddress() const { return Buffer->GetGPUVirtualAddress(); }
 

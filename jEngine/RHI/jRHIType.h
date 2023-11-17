@@ -678,7 +678,6 @@ struct jBuffer : public jShaderBindableResource, public std::enable_shared_from_
     virtual void UpdateBuffer(const void* data, uint64 size) = 0;
 
     virtual void* GetHandle() const = 0;
-    virtual void* GetMemoryHandle() const = 0;
 	virtual uint32 GetAllocatedSize() const = 0;
 };
 

@@ -19,7 +19,6 @@ struct jRingBuffer_Vulkan : public jBuffer
     virtual void UpdateBuffer(const void* data, uint64 size) override;
 
     virtual void* GetHandle() const override { return Buffer; }
-    virtual void* GetMemoryHandle() const override { return BufferMemory; }
     virtual uint32 GetAllocatedSize() const override { return (uint32)RingBufferSize; }
 
     uint64 RingBufferOffset = 0;
