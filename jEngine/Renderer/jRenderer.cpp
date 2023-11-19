@@ -1361,7 +1361,7 @@ void jRenderer::Render()
             ImGui::Text("CameraPos : %.2f, %.2f, %.2f", gOptions.CameraPos.x, gOptions.CameraPos.y, gOptions.CameraPos.z);
             ImGui::End();
 
-#if ENABLE_PBR 1
+#if ENABLE_PBR
             ImGui::SetNextWindowPos(ImVec2(400.0f, 27.0f), ImGuiCond_FirstUseEver);
             ImGui::SetNextWindowSize(ImVec2(200.0f, 80.0f), ImGuiCond_FirstUseEver);
             ImGui::Begin("PBR Pannel");
