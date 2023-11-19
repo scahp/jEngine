@@ -49,7 +49,7 @@ void jGame::Setup()
 {
 	srand(static_cast<uint32>(time(NULL)));
 
-#if ENABLE_PBR 1
+#if ENABLE_PBR
 	// PBR will use light color as a flux,
 	float LightColorScale = 150.0f;
 #else
