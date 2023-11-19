@@ -328,11 +328,15 @@ struct Vector4
 
 	FORCEINLINE Vector4 operator/(float fValue) const
 	{
+#pragma warning( push )
+#pragma warning( disable : 4723 )
 		JASSERT(!IsNearlyZero(fValue));
 		if (IsNearlyZero(fValue))
 			return Vector4(ZeroType);
 
-		return Vector4(x / fValue, y / fValue, z / fValue, w / fValue);
+		const float RScale = 1.0f / fValue;
+		return Vector4(x * RScale, y * RScale, z * RScale, w * RScale);
+#pragma warning( pop )
 	}
 
 	FORCEINLINE Vector4& operator/=(float fValue)
@@ -475,15 +479,25 @@ struct Vector2
 
 	FORCEINLINE Vector2 operator/(float fValue) const
 	{
-		JASSERT(fValue != 0);
-		return Vector2(x / fValue, y / fValue);
+#pragma warning( push )
+#pragma warning( disable : 4723 )
+        JASSERT(!IsNearlyZero(fValue));
+        if (IsNearlyZero(fValue))
+            return Vector2(ZeroType);
+
+		const float RScale = 1.0f / fValue;
+		return Vector2(x * RScale, y * RScale);
+#pragma warning( pop )
 	}
 
 	FORCEINLINE Vector2 operator/(Vector2 const& vector) const
 	{
-		JASSERT(vector.x != 0);
-		JASSERT(vector.y != 0);
-		return Vector2(x / vector.x, y / vector.y);
+        JASSERT(IsNearlyZero(vector.x));
+        JASSERT(IsNearlyZero(vector.y));
+
+		return Vector2(
+			IsNearlyZero(vector.x) ? 0.0f : x / vector.x
+			, IsNearlyZero(vector.y) ? 0.0f : y / vector.y);
 	}
 
 	FORCEINLINE Vector2& operator/=(float fValue)
