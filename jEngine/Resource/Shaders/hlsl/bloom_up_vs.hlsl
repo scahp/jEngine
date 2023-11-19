@@ -19,6 +19,9 @@ float2 Circle(float Start, float Points, float Point)
 struct BloomUniformBuffer
 {
     float4 BufferSizeAndInvSize;
+    float4 TintA;
+    float4 TintB;
+    float BloomIntensity;
 };
 
 cbuffer BloomParam : register(b0, space0) { BloomUniformBuffer BloomParam; }

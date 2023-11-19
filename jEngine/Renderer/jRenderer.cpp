@@ -708,7 +708,7 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
 void jRenderer::PostProcess()
 {
     auto AddFullQuadPass = [&](const char* InDebugName, const std::vector<jTexture*> InShaderInputs, const std::shared_ptr<jRenderTarget>& InRenderTargetPtr
-        , jName VertexShader, jName PixelShader, bool IsBloom = false)
+        , jName VertexShader, jName PixelShader, bool IsBloom = false, Vector InBloomTintA = Vector::ZeroVector, Vector InBloomTintB = Vector::ZeroVector)
     {
         DEBUG_EVENT(RenderFrameContextPtr, InDebugName);
 
@@ -770,12 +770,18 @@ void jRenderer::PostProcess()
         struct jBloomUniformBuffer
         {
             Vector4 BufferSizeAndInvSize;
+            Vector4 TintA;
+            Vector4 TintB;
+            float BloomIntensity;
         };
         jBloomUniformBuffer ubo;
         ubo.BufferSizeAndInvSize.x = (float)RTWidth;
         ubo.BufferSizeAndInvSize.y = (float)RTHeight;
         ubo.BufferSizeAndInvSize.z = 1.0f / (float)RTWidth;
         ubo.BufferSizeAndInvSize.w = 1.0f / (float)RTHeight;
+        ubo.TintA = Vector4(InBloomTintA, 0.0);
+        ubo.TintB = Vector4(InBloomTintB, 0.0);
+        ubo.BloomIntensity = 0.675f;
 
         auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(jNameStatic("BloomUniformBuffer"), jLifeTimeType::OneFrame, sizeof(ubo)));
         if (IsBloom)
@@ -1003,13 +1009,25 @@ void jRenderer::PostProcess()
 
             if (1)
             {
+                Vector UpscaleBloomTintA[3] = {
+                    Vector(0.066f, 0.066f, 0.066f) * 0.675f,
+                    Vector(0.1176f, 0.1176f, 0.1176f) * 0.675f,
+                    Vector(0.138f, 0.138f, 0.138f) * 0.675f * 0.5f
+                };
+
+                Vector UpscaleBloomTintB[3] = {
+                    Vector(0.066f, 0.066f, 0.066f) * 0.675f,
+                    Vector::OneVector,
+                    Vector::OneVector
+                };
+
                 jCommandBuffer_DX12* CommandBuffer = (jCommandBuffer_DX12*)RenderFrameContextPtr->GetActiveCommandBuffer();
                 for (int32 i = 0; i < _countof(SceneRT->UpSample); ++i)
                 {
                     const auto& RTInfo = SceneRT->UpSample[i]->Info;
                     sprintf_s(szDebugEventTemp, sizeof(szDebugEventTemp), "BloomUpsample %dx%d", RTInfo.Width, RTInfo.Height);
                     AddFullQuadPass(szDebugEventTemp, { SourceRT }, SceneRT->UpSample[i]
-                        , jNameStatic("Resource/Shaders/hlsl/bloom_up_vs.hlsl"), jNameStatic("Resource/Shaders/hlsl/bloom_up_ps.hlsl"), true);
+                        , jNameStatic("Resource/Shaders/hlsl/bloom_up_vs.hlsl"), jNameStatic("Resource/Shaders/hlsl/bloom_up_ps.hlsl"), true, UpscaleBloomTintA[i], UpscaleBloomTintB[i]);
                     SourceRT = SceneRT->UpSample[i]->GetTexture();
                     g_rhi->TransitionImageLayout(CommandBuffer, SourceRT, EImageLayout::SHADER_READ_ONLY);
                 }
