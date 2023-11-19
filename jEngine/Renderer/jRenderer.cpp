@@ -1360,6 +1360,15 @@ void jRenderer::Render()
             ImGui::Separator();
             ImGui::Text("CameraPos : %.2f, %.2f, %.2f", gOptions.CameraPos.x, gOptions.CameraPos.y, gOptions.CameraPos.z);
             ImGui::End();
+
+#if ENABLE_PBR 1
+            ImGui::SetNextWindowPos(ImVec2(400.0f, 27.0f), ImGuiCond_FirstUseEver);
+            ImGui::SetNextWindowSize(ImVec2(200.0f, 80.0f), ImGuiCond_FirstUseEver);
+            ImGui::Begin("PBR Pannel");
+            ImGui::SliderFloat("Metallic", &gOptions.Metallic, 0.0f, 1.0f);
+            ImGui::SliderFloat("Roughness", &gOptions.Roughness, 0.0f, 1.0f);
+            ImGui::End();
+#endif
         });
     g_ImGUI->Draw(RenderFrameContextPtr);
 }

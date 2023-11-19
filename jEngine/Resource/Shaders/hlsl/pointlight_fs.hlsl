@@ -81,7 +81,7 @@ float4 main(VSOutput input) : SV_TARGET
     float3 L = -LightDir;
     float3 N = WorldNormal;
     float3 V = ViewWorld;
-    color.xyz = PBR(L, N, V, Albedo, PointLight.Color, DistanceToLight * 0.01f, Metallic, Roughness) * PointLightAttenuate * Lit;
+    color.xyz = PBR(L, N, V, Albedo, PointLight.Color, DistanceToLight, Metallic, Roughness) * PointLightAttenuate * Lit;
     color.w = 1.0f;
 #else // USE_PBR
     float3 PointLightLit = GetPointLight(PointLight, WorldNormal, WorldPos.xyz, ViewWorld) * Lit;

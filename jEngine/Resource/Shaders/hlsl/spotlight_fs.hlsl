@@ -90,7 +90,7 @@ float4 main(VSOutput input) : SV_TARGET
     float3 L = -LightDir;
     float3 N = WorldNormal;
     float3 V = ViewWorld;
-    color.xyz = PBR(L, N, V, Albedo, SpotLight.Color, DistanceToLight * 0.01f, Metallic, Roughness) * SpotLightAttenuate * Lit;
+    color.xyz = PBR(L, N, V, Albedo, SpotLight.Color, DistanceToLight, Metallic, Roughness) * SpotLightAttenuate * Lit;
     color.w = 1.0f;
 #else // USE_PBR
     float3 SpotLightLit = GetSpotLight(SpotLight, WorldNormal, WorldPos.xyz, ViewWorld) * Lit;

@@ -85,7 +85,8 @@ float4 main(VSOutput input
     float3 L = -DirectionalLight.Direction;
     float3 N = WorldNormal;
     float3 V = ViewWorld;
-    color.xyz = PBR(L, N, V, Albedo, DirectionalLight.Color, 100.0f * 0.01f, Metallic, Roughness) * Lit;
+    const float DistanceToLight = 1.0f;     // Directional light from the Sun is not having attenuation by using distance
+    color.xyz = PBR(L, N, V, Albedo, DirectionalLight.Color, DistanceToLight, Metallic, Roughness) * Lit;
     color.w = 1.0f;
     return color;
 #else // USE_PBR
