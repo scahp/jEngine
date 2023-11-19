@@ -14,6 +14,9 @@ public:
         Albedo = 0,
         Normal,
         Opacity,
+        //BaseColor,
+        //Metallic,
+        //Roughness,
         Max
     };
 

@@ -149,7 +149,11 @@ void jGame::Setup()
 	//ResourceLoadCompleteEvent = std::async(std::launch::async, [&]()
 	//{
 #if USE_SPONZA
+		#if USE_SPONZA_PBR		
+		Sponza = jModelLoader::GetInstance().LoadFromFile("Resource/sponza_pbr/sponza.glb", "Resource/sponza_pbr");
+		#else
 		Sponza = jModelLoader::GetInstance().LoadFromFile("Resource/sponza/sponza.dae", "Resource/");
+		#endif
 		jObject::AddObject(Sponza);
 		SpawnedObjects.push_back(Sponza);
 #endif

@@ -124,7 +124,11 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 		std::string name = material->GetName().C_Str();
 
 		auto newMeshMaterial = new jMeshMaterial();
+#if USE_SPONZA_PBR
+		for (uint32 k = aiTextureType_NONE; k <= aiTextureType_UNKNOWN; ++k)
+#else
 		for (uint32 k = aiTextureType_DIFFUSE; k <= aiTextureType_REFLECTION; ++k)
+#endif
 		{
 			auto curTexType = static_cast<aiTextureType>(k);
 			if (0 >= material->GetTextureCount(curTexType))
@@ -137,6 +141,14 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 				Index = (int32)jMaterial::EMaterialTextureType::Normal;
 			else if (k == aiTextureType_OPACITY)
 				Index = (int32)jMaterial::EMaterialTextureType::Opacity;
+#if USE_SPONZA_PBR
+			else if (k == aiTextureType_BASE_COLOR)
+				Index = (int32)jMaterial::EMaterialTextureType::BaseColor;
+			else if (k == aiTextureType_METALNESS)
+				Index = (int32)jMaterial::EMaterialTextureType::Metallic;
+			else if (k == aiTextureType_DIFFUSE_ROUGHNESS)
+				Index = (int32)jMaterial::EMaterialTextureType::Roughness;
+#endif
 			else
 				continue;
 
@@ -146,7 +158,9 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 			aiTextureMapping mapping;
 			aiTextureMapMode mode[2];
 			aiTextureOp op;
-			material->GetTexture(curTexType, 0, &str, &mapping, nullptr, nullptr, &op, &mode[0]);
+			aiReturn ret = material->GetTexture(curTexType, 0, &str, &mapping, nullptr, nullptr, &op, &mode[0]);
+			if (ret != aiReturn_SUCCESS)
+				continue;
 
 			auto FuncTextureAddressMode = [](aiTextureMapMode InMode)
 			{
