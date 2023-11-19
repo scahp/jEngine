@@ -11,7 +11,7 @@ public:
 	void PreInit();
 	void Init();
 	void Release();
-	void ProcessInput();
+	void ProcessInput(float deltaTime);
 	void Update(float deltaTime);
 	void Draw();
 	void Resize(int32 width, int32 height);

@@ -60,15 +60,15 @@ int main()
 		{
 			if (g_rhi_dx12)
 			{
-				g_Engine->ProcessInput();
-
 				static std::chrono::system_clock::time_point lastTime = std::chrono::system_clock::now();
 				std::chrono::system_clock::time_point currentTime = std::chrono::system_clock::now();
 				std::chrono::duration<double> elapsed_seconds = currentTime - lastTime;
 				g_timeDeltaSecond = (float)elapsed_seconds.count();
 				lastTime = currentTime;
 
-                g_rhi->IncrementFrameNumber();
+                g_Engine->ProcessInput(g_timeDeltaSecond);
+                
+				g_rhi->IncrementFrameNumber();
 				g_Engine->Update(g_timeDeltaSecond);
 				g_Engine->Draw();
 				jPerformanceProfile::GetInstance().Update(g_timeDeltaSecond);
@@ -85,19 +85,18 @@ int main()
 	{
 		while (!glfwWindowShouldClose(window))
 		{
-			// input
-			// -----
-			//processInput(window);
-			g_Engine->ProcessInput();
-
-			// render
-			// ------
 			static std::chrono::system_clock::time_point lastTime = std::chrono::system_clock::now();
 			std::chrono::system_clock::time_point currentTime = std::chrono::system_clock::now();
 			std::chrono::duration<double> elapsed_seconds = currentTime - lastTime;
 			g_timeDeltaSecond = (float)elapsed_seconds.count();
 			lastTime = currentTime;
 
+            // input
+            // -----
+            g_Engine->ProcessInput(g_timeDeltaSecond);
+
+            // render
+            // ------
 			g_rhi->IncrementFrameNumber();
 			g_Engine->Update(g_timeDeltaSecond);
 			g_Engine->Draw();

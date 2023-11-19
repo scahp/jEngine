@@ -30,7 +30,7 @@ public:
 	jGame();
 	~jGame();
 
-	void ProcessInput();
+	void ProcessInput(float deltaTime);
 	void Setup();
 
 	enum class ESpawnedType

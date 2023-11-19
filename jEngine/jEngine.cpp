@@ -57,9 +57,9 @@ void jEngine::Release()
 	Game.Release();
 }
 
-void jEngine::ProcessInput()
+void jEngine::ProcessInput(float deltaTime)
 {
-	Game.ProcessInput();
+	Game.ProcessInput(deltaTime);
 }
 
 void jEngine::Update(float deltaTime)

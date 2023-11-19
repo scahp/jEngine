@@ -25,46 +25,32 @@ jGame::~jGame()
 {
 }
 
-void jGame::ProcessInput()
+void jGame::ProcessInput(float deltaTime)
 {
-	static float speed = 0.1f;
+	static float MoveDistancePerSecond = 200.0f;
+	const float CurrentDistance = MoveDistancePerSecond * deltaTime;
 
 	// Process Key Event
-	if (g_KeyState['a'] || g_KeyState['A']) MainCamera->MoveShift(-speed);
-	if (g_KeyState['d'] || g_KeyState['D']) MainCamera->MoveShift(speed);
+	if (g_KeyState['a'] || g_KeyState['A']) MainCamera->MoveShift(-CurrentDistance);
+	if (g_KeyState['d'] || g_KeyState['D']) MainCamera->MoveShift(CurrentDistance);
 	//if (g_KeyState['1']) MainCamera->RotateForwardAxis(-0.1f);
 	//if (g_KeyState['2']) MainCamera->RotateForwardAxis(0.1f);
 	//if (g_KeyState['3']) MainCamera->RotateUpAxis(-0.1f);
 	//if (g_KeyState['4']) MainCamera->RotateUpAxis(0.1f);
 	//if (g_KeyState['5']) MainCamera->RotateRightAxis(-0.1f);
 	//if (g_KeyState['6']) MainCamera->RotateRightAxis(0.1f);
-	if (g_KeyState['w'] || g_KeyState['W']) MainCamera->MoveForward(speed);
-	if (g_KeyState['s'] || g_KeyState['S']) MainCamera->MoveForward(-speed);
-	if (g_KeyState['+']) speed = Max(speed + 0.1f, 0.0f);
-	if (g_KeyState['-']) speed = Max(speed - 0.1f, 0.0f);
+	if (g_KeyState['w'] || g_KeyState['W']) MainCamera->MoveForward(CurrentDistance);
+	if (g_KeyState['s'] || g_KeyState['S']) MainCamera->MoveForward(-CurrentDistance);
+	if (g_KeyState['+']) MoveDistancePerSecond = Max(MoveDistancePerSecond + 10.0f, 0.0f);
+	if (g_KeyState['-']) MoveDistancePerSecond = Max(MoveDistancePerSecond - 10.0f, 0.0f);
 }
 
 void jGame::Setup()
 {
 	srand(static_cast<uint32>(time(NULL)));
-/*
-	// Create main camera
-    //const Vector mainCameraPos(-111.6f, 17.49f, 3.11f);
-    //const Vector mainCameraTarget(282.378632f, 17.6663227f, -1.00448179f);
-    const Vector mainCameraPos(172.66f, 160.0f, -180.63f);
-    const Vector mainCameraTarget(0.0f, 0.0f, 0.0f);
-	MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 10.0f, 1500.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT, true);
-	jCamera::AddCamera(0, MainCamera);
 
-	// Create lights
-	NormalDirectionalLight = jLight::CreateDirectionalLight(Vector(-1.0f, -1.0f, -0.3f) // AppSettings.DirecionalLightDirection
-		, Vector4(0.6f), Vector(1.0f), Vector(1.0f), 64);
-	//CascadeDirectionalLight = jLight::CreateCascadeDirectionalLight(AppSettings.DirecionalLightDirection
-	//	, Vector4(0.6f), Vector(1.0f), Vector(1.0f), 64);
-	//AmbientLight = jLight::CreateAmbientLight(Vector(0.2f, 0.5f, 1.0f), Vector(0.05f));		// sky light color
-	PointLight = jLight::CreatePointLight(Vector(10.0f, 100.0f, 10.0f), Vector4(1.0f, 0.75f, 0.75f, 1.0f), 150.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
-	SpotLight = jLight::CreateSpotLight(Vector(0.0f, 80.0f, 5.0f), Vector(1.0f, -1.0f, 0.4f).GetNormalize(), Vector4(0.2f, 1.0f, 0.2f, 1.0f), 200.0f, 0.35f, 0.5f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
-*/
+#define USE_SPONZA 1
+#if USE_SPONZA
 	// Create main camera
     const Vector mainCameraPos(-111.6f, 17.49f, 3.11f);
     const Vector mainCameraTarget(282.378632f, 17.6663227f, -1.00448179f);
@@ -76,7 +62,24 @@ void jGame::Setup()
         , Vector4(0.6f), Vector(1.0f), Vector(1.0f), 64);
     PointLight = jLight::CreatePointLight(Vector(10.0f, 100.0f, 10.0f), Vector4(1.0f, 0.75f, 0.75f, 1.0f), 150.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
     SpotLight = jLight::CreateSpotLight(Vector(0.0f, 60.0f, 5.0f), Vector(1.0f, -1.0f, 0.4f).GetNormalize(), Vector4(0.0f, 1.0f, 0.0f, 1.0f), 200.0f, 0.35f, 0.5f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
+#else
+	// Create main camera
+	//const Vector mainCameraPos(-111.6f, 17.49f, 3.11f);
+	//const Vector mainCameraTarget(282.378632f, 17.6663227f, -1.00448179f);
+    const Vector mainCameraPos(172.66f, 160.0f, -180.63f);
+    const Vector mainCameraTarget(0.0f, 0.0f, 0.0f);
+    MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 10.0f, 1500.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT, true);
+    jCamera::AddCamera(0, MainCamera);
 
+    // Create lights
+    NormalDirectionalLight = jLight::CreateDirectionalLight(Vector(-1.0f, -1.0f, -0.3f) // AppSettings.DirecionalLightDirection
+        , Vector4(0.6f), Vector(1.0f), Vector(1.0f), 64);
+    //CascadeDirectionalLight = jLight::CreateCascadeDirectionalLight(AppSettings.DirecionalLightDirection
+    //	, Vector4(0.6f), Vector(1.0f), Vector(1.0f), 64);
+    //AmbientLight = jLight::CreateAmbientLight(Vector(0.2f, 0.5f, 1.0f), Vector(0.05f));		// sky light color
+    PointLight = jLight::CreatePointLight(Vector(10.0f, 100.0f, 10.0f), Vector4(1.0f, 0.75f, 0.75f, 1.0f), 150.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
+    SpotLight = jLight::CreateSpotLight(Vector(0.0f, 80.0f, 5.0f), Vector(1.0f, -1.0f, 0.4f).GetNormalize(), Vector4(0.2f, 1.0f, 0.2f, 1.0f), 200.0f, 0.35f, 0.5f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
+#endif
 
 	if (NormalDirectionalLight)
 		jLight::AddLights(NormalDirectionalLight);
@@ -131,16 +134,19 @@ void jGame::Setup()
 	//	jObject::AddUIDebugObject(DirectionalLightShadowMapUIDebug);
 
 	// Select spawning object type
-	//SpawnObjects(ESpawnedType::TestPrimitive);
+#if !USE_SPONZA
+	SpawnObjects(ESpawnedType::TestPrimitive);
+#endif
 	//SpawnObjects(ESpawnedType::InstancingPrimitive);
 	//SpawnObjects(ESpawnedType::IndirectDrawPrimitive);
 
 	//ResourceLoadCompleteEvent = std::async(std::launch::async, [&]()
 	//{
+#if USE_SPONZA
 		Sponza = jModelLoader::GetInstance().LoadFromFile("Resource/sponza/sponza.dae", "Resource/");
 		jObject::AddObject(Sponza);
 		SpawnedObjects.push_back(Sponza);
-
+#endif
 		//{
 		//	jScopedLock s(&AsyncLoadLock);
 		//	CompletedAsyncLoadObjects.push_back(Sponza);
