@@ -12,9 +12,9 @@
 #include "jImageFileLoader.h"
 
 #if defined _DEBUG
-#pragma comment(lib, "assimp-vc142-mtd.lib")
+#pragma comment(lib, "assimp-vc143-mtd.lib")
 #else
-#pragma comment(lib, "assimp-vc142-mt.lib")
+#pragma comment(lib, "assimp-vc143-mt.lib")
 #endif
 
 jModelLoader* jModelLoader::_instance = nullptr;
