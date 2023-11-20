@@ -1788,6 +1788,7 @@ jBlendingStateInfo* jRHI_DX12::CreateBlendingState(const jBlendingStateInfo& ini
 
 bool jRHI_DX12::CreateShaderInternal(jShader* OutShader, const jShaderInfo& shaderInfo) const
 {
+    std::vector<jName> IncludeFilePaths;
     jShader* shader_dx12 = OutShader;
     check(shader_dx12->GetPermutationCount());
     {
@@ -1871,6 +1872,7 @@ bool jRHI_DX12::CreateShaderInternal(jShader* OutShader, const jShaderInfo& shad
 
                 // If already included file, skip it.
                 AlreadyIncludedSets.insert(includeFilepath);
+                IncludeFilePaths.push_back(jName(includeFilepath.c_str()));
 
                 // Load include shader file
                 jFile IncludeShaderFile;
@@ -1898,6 +1900,7 @@ bool jRHI_DX12::CreateShaderInternal(jShader* OutShader, const jShaderInfo& shad
         }
     }
     shader_dx12->ShaderInfo = shaderInfo;
+    shader_dx12->ShaderInfo.SetIncludeShaderFilePaths(IncludeFilePaths);
 
     return true;
 }

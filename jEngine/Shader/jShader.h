@@ -147,6 +147,7 @@ struct jShaderInfo
     const jName& GetEntryPoint() const { return EntryPoint; }
     const EShaderAccessStageFlag GetShaderType() const { return ShaderType; }
     const uint32& GetPermutationId() const { return PermutationId; }
+    const std::vector<jName>& GetIncludeShaderFilePaths() const { return IncludeShaderFilePaths; }
 
     void SetName(const jName& InName) { Name = InName; Hash = 0; }
     void SetShaderFilepath(const jName& InShaderFilepath) { ShaderFilepath = InShaderFilepath; Hash = 0; }
@@ -154,12 +155,14 @@ struct jShaderInfo
     void SetEntryPoint(const jName& InEntryPoint) { EntryPoint = InEntryPoint; Hash = 0; }
     void SetShaderType(const EShaderAccessStageFlag InShaderType) { ShaderType = InShaderType; Hash = 0; }
     void SetPermutationId(const uint32 InPermutationId) { PermutationId = InPermutationId; Hash = 0; }
+    void SetIncludeShaderFilePaths(const std::vector<jName>& InPaths) { IncludeShaderFilePaths = InPaths; }
 
 private:
 	jName Name;
-    jName ShaderFilepath;
     jName PreProcessors;
     jName EntryPoint;
+    jName ShaderFilepath;
+    std::vector<jName> IncludeShaderFilePaths;
     EShaderAccessStageFlag ShaderType = (EShaderAccessStageFlag)0;
     uint32 PermutationId = 0;
 };

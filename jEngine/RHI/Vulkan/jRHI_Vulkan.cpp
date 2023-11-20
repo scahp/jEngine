@@ -661,6 +661,7 @@ bool jRHI_Vulkan::CreateShaderInternal(jShader* OutShader, const jShaderInfo& sh
         return nullptr;
     };
 
+	std::vector<jName> IncludeFilePaths;
 	jShader* shader_vk = OutShader;
 	check(shader_vk->GetPermutationCount());
 	{
@@ -762,6 +763,7 @@ bool jRHI_Vulkan::CreateShaderInternal(jShader* OutShader, const jShaderInfo& sh
 
 				// If already included file, skip it.
 				AlreadyIncludedSets.insert(includeFilepath);
+				IncludeFilePaths.push_back(jName(includeFilepath.c_str()));
 
 				// Load include shader file
                 jFile IncludeShaderFile;
@@ -796,6 +798,7 @@ bool jRHI_Vulkan::CreateShaderInternal(jShader* OutShader, const jShaderInfo& sh
 		CurCompiledShader->ShaderStage.pName = "main";
 	}
 	shader_vk->ShaderInfo = shaderInfo;
+	shader_vk->ShaderInfo.SetIncludeShaderFilePaths(IncludeFilePaths);
 
 	return true;
 }

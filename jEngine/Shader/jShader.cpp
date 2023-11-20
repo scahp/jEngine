@@ -121,7 +121,12 @@ bool jShader::UpdateShader()
 		return 0;
 	};
 
-	uint64 currentTimeStamp = checkTimeStampFunc(ShaderInfo.GetShaderFilepath().ToStr());
+    // Check the state of shader file or any include shader file
+    uint64 currentTimeStamp = checkTimeStampFunc(ShaderInfo.GetShaderFilepath().ToStr());
+    for(auto Name : ShaderInfo.GetIncludeShaderFilePaths())
+    {
+        currentTimeStamp = Max(checkTimeStampFunc(Name.ToStr()), currentTimeStamp);
+    }
 	
 	if (currentTimeStamp <= 0)
 		return false;
