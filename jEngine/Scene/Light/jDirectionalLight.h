@@ -42,10 +42,11 @@ struct jDirectionalLightUniformBufferData
 class jDirectionalLight : public jLight
 {
 public:
-    static constexpr int32 SM_Width = 512;
-    static constexpr int32 SM_Height = 512;
+    static constexpr int32 SM_Width = 512 * 6;
+    static constexpr int32 SM_Height = 512 * 6;
     static constexpr float SM_NearDist = 10.0f;
-    static constexpr float SM_FarDist = 1000.0f;
+    static constexpr float SM_FarDist = 20000.0f;
+    static constexpr float SM_PosDist = 10000.0f;
 
 	jDirectionalLight();
 	virtual ~jDirectionalLight();
@@ -58,6 +59,7 @@ public:
     virtual const std::shared_ptr<jShaderBindingInstance>& PrepareShaderBindingInstance(jTexture* InShadowMap) override;
 
     FORCEINLINE const jDirectionalLightUniformBufferData& GetLightData() const { return LightData; }
+    FORCEINLINE jDirectionalLightUniformBufferData& GetLightData() { return LightData; }
 
 private:
     jCamera* Camera = nullptr;

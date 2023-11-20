@@ -58,16 +58,16 @@ void jGame::Setup()
 
 #if USE_SPONZA
 	// Create main camera
-    const Vector mainCameraPos(-111.6f, 17.49f, 3.11f);
-    const Vector mainCameraTarget(282.378632f, 17.6663227f, -1.00448179f);
-    MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 10.0f, 1500.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT, true);
+    const Vector mainCameraPos(-559.937622f, 116.339653f, 84.3709946f);
+    const Vector mainCameraTarget(-260.303925f, 105.498116f, 94.4834976f);
+    MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 10.0f, 5000.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT, true);
     jCamera::AddCamera(0, MainCamera);
 
     // Create lights
-    NormalDirectionalLight = jLight::CreateDirectionalLight(Vector(-1.0f, -1.0f, -0.3f) // AppSettings.DirecionalLightDirection
-        , Vector4(0.05f), Vector(1.0f), Vector(1.0f), 64);
-    PointLight = jLight::CreatePointLight(Vector(10.0f, 100.0f, 10.0f), Vector4(1.0f, 0.75f, 0.75f, 1.0f) * LightColorScale, 150.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
-    SpotLight = jLight::CreateSpotLight(Vector(0.0f, 60.0f, 5.0f), Vector(1.0f, -1.0f, 0.4f).GetNormalize(), Vector4(0.0f, 1.0f, 0.0f, 1.0f) * LightColorScale, 200.0f, 0.35f, 0.5f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
+    NormalDirectionalLight = jLight::CreateDirectionalLight(Vector(0.1f, -0.5f, 0.1f) // AppSettings.DirecionalLightDirection
+        , Vector4(0.3f), Vector(1.0f), Vector(1.0f), 64);
+    PointLight = jLight::CreatePointLight(Vector(10.0f, 100.0f, 10.0f), Vector4(1.0f, 0.75f, 0.75f, 1.0f) * LightColorScale, 1500.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
+    SpotLight = jLight::CreateSpotLight(Vector(0.0f, 60.0f, 5.0f), Vector(1.0f, -1.0f, 0.4f).GetNormalize(), Vector4(0.0f, 1.0f, 0.0f, 1.0f) * LightColorScale, 2000.0f, 0.35f, 1.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
 #else
 	// Create main camera
 	//const Vector mainCameraPos(-111.6f, 17.49f, 3.11f);
@@ -221,6 +221,11 @@ void jGame::Update(float deltaTime)
 		MainCamera->UpdateCamera();
 
 	gOptions.CameraPos = MainCamera->Pos;
+	if (NormalDirectionalLight)
+	{
+		Vector& SunDir = NormalDirectionalLight->GetLightData().Direction;
+		SunDir = gOptions.SunDir;
+	}
 
 	//// Update lights
 	//const int32 numOfLights = MainCamera->GetNumOfLight();

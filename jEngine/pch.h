@@ -208,9 +208,9 @@ extern bool IsUseDX12();
 
 extern class jEngine* g_Engine;
 
-#define ENABLE_PBR 0
+#define ENABLE_PBR 1
 #define USE_SPONZA 1
-#define USE_SPONZA_PBR 0
+#define USE_SPONZA_PBR 1
 
 extern bool GUseRealTimeShaderUpdate;
 extern int32 GMaxCheckCountForRealTimeShaderUpdate;

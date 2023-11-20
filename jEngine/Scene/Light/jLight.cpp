@@ -14,7 +14,7 @@ namespace jLightUtil
 {
 	void MakeDirectionalLightViewInfo(Vector& outPos, Vector& outTarget, Vector& outUp, const Vector& direction)
 	{
-		outPos = Vector(-200.0f) * direction;
+		outPos = Vector(-jDirectionalLight::SM_PosDist) * direction;
 		outTarget = Vector::ZeroVector;
 		outUp = outPos + Vector(0.0f, 1.0f, 0.0f);
 	}

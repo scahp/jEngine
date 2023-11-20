@@ -23,6 +23,8 @@ Texture2D DiffuseTexture : register(t0, space2);
 SamplerState DiffuseTextureSampler : register(s0, space2);
 Texture2D NormalTexture : register(t1, space2);
 SamplerState NormalTextureSampler : register(s1, space2);
+Texture2D RMTexture : register(t2, space2);     // Metalic, Roughness
+SamplerState RMTextureSampler : register(s2, space2);
 #endif
 
 struct PushConsts
@@ -116,12 +118,22 @@ FSOutput main(VSOutput input
 
     output.GBuffer0.xyz = input.WorldPos.xyz / input.WorldPos.w;
 #if USE_PBR
+#if USE_ALBEDO_TEXTURE
+    float roughness = RMTexture.Sample(RMTextureSampler, input.TexCoord.xy).y;
+    float metallic = RMTexture.Sample(RMTextureSampler, input.TexCoord.xy).z;
+    output.GBuffer0.w = metallic;
+#else
     output.GBuffer0.w = RenderObjectParam.Metallic;
+#endif
 #endif
     
     output.GBuffer1.xyz = WorldNormal;
 #if USE_PBR
+#if USE_ALBEDO_TEXTURE
+    output.GBuffer1.w = roughness;
+#else
     output.GBuffer1.w = RenderObjectParam.Roughness;
+#endif
 #endif
     
     output.GBuffer2.xyz = color.xyz;

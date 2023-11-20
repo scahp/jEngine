@@ -13,16 +13,19 @@ public:
     {
         Albedo = 0,
         Normal,
-        Opacity,
+        //Opacity,
+#if USE_SPONZA_PBR
         //BaseColor,
-        //Metallic,
+        Metallic,
         //Roughness,
+#endif
         Max
     };
 
     struct TextureData
     {
         jName Name;
+        jName FilePath;
         jTexture* Texture = nullptr;
         ETextureAddressMode TextureAddressModeU = ETextureAddressMode::REPEAT;
         ETextureAddressMode TextureAddressModeV = ETextureAddressMode::REPEAT;

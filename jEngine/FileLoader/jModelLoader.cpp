@@ -139,15 +139,15 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 				Index = (int32)jMaterial::EMaterialTextureType::Albedo;
 			else if (k == aiTextureType_NORMALS)
 				Index = (int32)jMaterial::EMaterialTextureType::Normal;
-			else if (k == aiTextureType_OPACITY)
-				Index = (int32)jMaterial::EMaterialTextureType::Opacity;
+			//else if (k == aiTextureType_OPACITY)
+			//	Index = (int32)jMaterial::EMaterialTextureType::Opacity;
 #if USE_SPONZA_PBR
-			else if (k == aiTextureType_BASE_COLOR)
-				Index = (int32)jMaterial::EMaterialTextureType::BaseColor;
+			//else if (k == aiTextureType_BASE_COLOR)
+			//	Index = (int32)jMaterial::EMaterialTextureType::BaseColor;
 			else if (k == aiTextureType_METALNESS)
 				Index = (int32)jMaterial::EMaterialTextureType::Metallic;
-			else if (k == aiTextureType_DIFFUSE_ROUGHNESS)
-				Index = (int32)jMaterial::EMaterialTextureType::Roughness;
+			//else if (k == aiTextureType_DIFFUSE_ROUGHNESS)
+			//	Index = (int32)jMaterial::EMaterialTextureType::Roughness;
 #endif
 			else
 				continue;
@@ -195,6 +195,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 
 			curTexData.Texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName(FilePath), true).lock().get();
 			curTexData.Name = jName(str.C_Str());
+            curTexData.FilePath = jName(FilePath);
 		}
 
 		ai_real Opacity = 1.0f;
