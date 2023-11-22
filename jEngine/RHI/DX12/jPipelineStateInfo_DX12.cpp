@@ -12,7 +12,6 @@ void jSamplerStateInfo_DX12::Initialize()
 {
     D3D12_SAMPLER_DESC samplerDesc = {};
 
-    samplerDesc.Filter = GetDX12TextureFilter(Minification, Magnification, IsEnableComparisonMode);
     samplerDesc.AddressU = GetDX12TextureAddressMode(AddressU);
     samplerDesc.AddressV = GetDX12TextureAddressMode(AddressV);
     samplerDesc.AddressW = GetDX12TextureAddressMode(AddressW);
@@ -20,6 +19,10 @@ void jSamplerStateInfo_DX12::Initialize()
     samplerDesc.MaxLOD = MaxLOD;
     samplerDesc.MipLODBias = MipLODBias;
     samplerDesc.MaxAnisotropy = (uint32)MaxAnisotropy;
+    if (MaxAnisotropy > 1)
+        samplerDesc.Filter = D3D12_FILTER_ANISOTROPIC;
+    else
+        samplerDesc.Filter = GetDX12TextureFilter(Minification, Magnification, IsEnableComparisonMode);
     samplerDesc.ComparisonFunc = GetDX12CompareOp(ComparisonFunc);
 
     check(sizeof(samplerDesc.BorderColor) == sizeof(BorderColor));

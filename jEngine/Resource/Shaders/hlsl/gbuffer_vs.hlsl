@@ -12,7 +12,8 @@ struct VSInput
 #endif
     [[vk::location((1+USE_VERTEX_COLOR))]] float3 Normal : NORMAL0;
     [[vk::location((2+USE_VERTEX_COLOR))]] float3 Tangent : TANGENT0;
-    [[vk::location((3+USE_VERTEX_COLOR))]] float2 TexCoord : TEXCOORD0;
+    [[vk::location((3+USE_VERTEX_COLOR))]] float3 Bitangent : BITANGENT0;
+    [[vk::location((4+USE_VERTEX_COLOR))]] float2 TexCoord : TEXCOORD0;
 };
 
 cbuffer ViewParam : register(b0, space0) { ViewUniformBuffer ViewParam; }
@@ -43,10 +44,9 @@ VSOutput main(VSInput input)
     output.Normal = mul((float3x3)RenderObjectParam.M, input.Normal);
     
 #if USE_ALBEDO_TEXTURE
-    float4 Bitangent = float4(cross(input.Normal, input.Tangent), 0.0);
-    float3 T = normalize(mul(RenderObjectParam.M, float4(input.Tangent, 0.0)).xyz);
-    float3 B = normalize(mul(RenderObjectParam.M, Bitangent).xyz);
-    float3 N = normalize(mul(RenderObjectParam.M, float4(input.Normal, 0.0)).xyz);
+    float3 T = normalize(mul((float3x3)RenderObjectParam.M, input.Tangent).xyz);
+    float3 B = normalize(mul((float3x3)RenderObjectParam.M, input.Bitangent).xyz);
+    float3 N = normalize(mul((float3x3)RenderObjectParam.M, input.Normal).xyz);
     output.TBN = float3x3(T, B, N);
     output.TBN = transpose(output.TBN);
 #endif

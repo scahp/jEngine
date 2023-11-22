@@ -1,7 +1,11 @@
-#include "common.hlsl"
+﻿#include "common.hlsl"
 
 #ifndef USE_VERTEX_COLOR
 #define USE_VERTEX_COLOR 0
+#endif
+
+#ifndef USE_FLIP_NORMALMAP_Y
+#define USE_FLIP_NORMALMAP_Y 1      // todo : normal map 로드시에 적용하면 좋을 것 같다.
 #endif
 
 struct VSOutput
@@ -63,6 +67,9 @@ FSOutput main(VSOutput input
     color.rgb = pow(color.rgb, 2.2);
 
     float3 normal = NormalTexture.Sample(NormalTextureSampler, input.TexCoord.xy).xyz;
+#if USE_FLIP_NORMALMAP_Y
+    normal.y = 1.0 - normal.y;
+#endif
     normal = normal * 2.0f - 1.0f;
     float3 WorldNormal = normalize(mul(input.TBN, normal));
 #else
