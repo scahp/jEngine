@@ -139,13 +139,6 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
 			textureDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 			textureDesc.Alignment = 0;
 
-			static D3D12_HEAP_PROPERTIES DefaultHeapProp{ .Type = D3D12_HEAP_TYPE_DEFAULT, .CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN
-				, .MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN, .CreationNodeMask = 0, .VisibleNodeMask = 0 };
-
-			ComPtr<ID3D12Resource> Resource = nullptr;
-			JFAIL(g_rhi_dx12->Device->CreateCommittedResource(&DefaultHeapProp, D3D12_HEAP_FLAG_NONE, &textureDesc,
-				D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&Resource)));
-
 			const D3D12_SHADER_RESOURCE_VIEW_DESC* srvDescPtr = nullptr;
 			D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = { };
 			if (image.GetMetadata().IsCubemap())
