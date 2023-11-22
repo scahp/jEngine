@@ -44,6 +44,7 @@ public:
 private:
 	std::map<jName, std::shared_ptr<jImageData> > CachedImageDataMap;
 	std::map<jName, std::shared_ptr<jTexture> > CachedTextureMap;
+    jMutexLock CachedImageDataLock;
 
 private:
 	jImageFileLoader();

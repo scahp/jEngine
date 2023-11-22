@@ -41,9 +41,12 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
 	if (strlen(Ext) <= 0)
 		return std::weak_ptr<jImageData>();
 
-	auto it_find = CachedImageDataMap.find(filename);
-	if (CachedImageDataMap.end() != it_find)
-		return it_find->second;
+    {
+		jScopedLock s(&CachedImageDataLock);
+		auto it_find = CachedImageDataMap.find(filename);
+		if (CachedImageDataMap.end() != it_find)
+			return it_find->second;
+	}
 
 	const jName ExtName(Ext);
 	static jName ExtDDS(".dds");
@@ -56,21 +59,36 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
 	int32 width = 0;
 	int32 height = 0;
 	int32 NumOfComponent = -1;
-	if (ExtName == ExtDDS)
+	if (ExtName == ExtDDS || (ExtName == ExtPNG))
 	{
 		if (IsUseVulkan())
 		{
-			uint8* imageData = stbi_dds_load(filename.ToStr(), &width, &height, &NumOfComponent, paddingRGBA ? STBI_rgb_alpha : 0);
-			if (paddingRGBA)
-				NumOfComponent = 4;
+			if (ExtName == ExtPNG)
+			{
+                NewImageDataPatr->Filename = filename;
+                unsigned w, h;
+                LodePNG::decode(NewImageDataPatr->ImageData, w, h, filename.ToStr());
+                NewImageDataPatr->sRGB = sRGB;
+                NewImageDataPatr->FormatType = EFormatType::UNSIGNED_BYTE;
 
-			int32 NumOfBytes = width * height * sizeof(uint8) * NumOfComponent;
-			NewImageDataPatr->ImageData.resize(NumOfBytes);
-			memcpy(&NewImageDataPatr->ImageData[0], imageData, NumOfBytes);
-			NewImageDataPatr->sRGB = sRGB;
-			NewImageDataPatr->FormatType = EFormatType::UNSIGNED_BYTE;
+                width = static_cast<int32>(w);
+                height = static_cast<int32>(h);
+                NumOfComponent = 4;
+			}
+			else
+			{
+				uint8* imageData = stbi_dds_load(filename.ToStr(), &width, &height, &NumOfComponent, paddingRGBA ? STBI_rgb_alpha : 0);
+				if (paddingRGBA)
+					NumOfComponent = 4;
 
-			stbi_image_free(imageData);
+				int32 NumOfBytes = width * height * sizeof(uint8) * NumOfComponent;
+				NewImageDataPatr->ImageData.resize(NumOfBytes);
+				memcpy(&NewImageDataPatr->ImageData[0], imageData, NumOfBytes);
+				NewImageDataPatr->sRGB = sRGB;
+				NewImageDataPatr->FormatType = EFormatType::UNSIGNED_BYTE;
+
+				stbi_image_free(imageData);
+			}
 		}
 		else
 		{
@@ -83,8 +101,20 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
 			FilenameWChar[_countof(FilenameWChar) - 1] = 0;
 
 			DirectX::ScratchImage image;
-			if (JFAIL(DirectX::LoadFromDDSFile(FilenameWChar, DirectX::DDS_FLAGS_NONE, nullptr, image)))
-				return std::weak_ptr<jImageData>();
+			if (ExtName == ExtDDS)
+			{
+                if (JFAIL(DirectX::LoadFromDDSFile(FilenameWChar, DirectX::DDS_FLAGS_NONE, nullptr, image)))
+                    return std::weak_ptr<jImageData>();
+			}
+			else
+			{
+                DirectX::ScratchImage imageOrigin;
+				if (JFAIL(DirectX::LoadFromWICFile(FilenameWChar, DirectX::WIC_FLAGS_FORCE_RGB, nullptr, imageOrigin)))
+					return std::weak_ptr<jImageData>();
+
+				int32 mipLevel = jTexture::GetMipLevels((int32)imageOrigin.GetMetadata().width, (int32)imageOrigin.GetMetadata().height);
+				DirectX::GenerateMipMaps(*imageOrigin.GetImages(), DirectX::TEX_FILTER_BOX | DirectX::TEX_FILTER_SEPARATE_ALPHA, mipLevel, image);
+			}
 
 			check(image.GetMetadata().dimension == TEX_DIMENSION_TEXTURE2D);		// todo : 2D image 만 지원
 
@@ -185,18 +215,6 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
 			NewImageDataPatr->Format = GetDX12TextureFormat(image.GetMetadata().format);
 		}
 	}
-	else if (ExtName == ExtPNG)
-	{
-		NewImageDataPatr->Filename = filename;
-		unsigned w, h;
-		LodePNG::decode(NewImageDataPatr->ImageData, w, h, filename.ToStr());
-		NewImageDataPatr->sRGB = sRGB;
-		NewImageDataPatr->FormatType = EFormatType::UNSIGNED_BYTE;
-
-		width = static_cast<int32>(w);
-		height = static_cast<int32>(h);
-		NumOfComponent = 4;
-	}
 	else if (ExtName == ExtHDR)
 	{
 		float* imageData = stbi_loadf(filename.ToStr(), &width, &height, &NumOfComponent, paddingRGBA ? STBI_rgb_alpha : 0);
@@ -252,7 +270,10 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
 		break;
 	}
 
-	CachedImageDataMap[filename] = NewImageDataPatr;
+    {
+        jScopedLock s(&CachedImageDataLock);
+        CachedImageDataMap[filename] = NewImageDataPatr;
+    }
 	return NewImageDataPatr;
 }
 

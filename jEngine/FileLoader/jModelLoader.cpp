@@ -20,7 +20,8 @@
 jModelLoader* jModelLoader::_instance = nullptr;
 
 jModelLoader::jModelLoader()
-{
+	: ThreadPool(MINIMUM_WORKER_THREAD_COUNT)
+{	
 }
 
 
@@ -117,6 +118,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 		object->SubMeshes.emplace_back(subMesh);
 	}
 
+	std::vector<jMaterial*> Materials;
 	for (uint32 i = 0; i < scene->mNumMaterials; ++i)
 	{
 		aiMaterial* material = scene->mMaterials[i];
@@ -193,9 +195,24 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 			}
 			FilePath += str.C_Str();
 
-			curTexData.Texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName(FilePath), true).lock().get();
+			jName FilePathName = jName(FilePath);
+			//curTexData.Texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName(FilePath), true).lock().get();
 			curTexData.Name = jName(str.C_Str());
-            curTexData.FilePath = jName(FilePath);
+			curTexData.FilePath = FilePathName;
+
+            if (FilePath.length())
+            {
+				Materials.push_back(newMeshMaterial);
+				jTask T;
+				T.pHashFunc = [&FilePathName]()
+				{
+					return (size_t)FilePathName.GetNameHash();
+				};
+				T.pFunc = [FilePath]() {
+					jImageFileLoader::GetInstance().LoadImageDataFromFile(jName(FilePath), true);
+				};
+				ThreadPool.Enqueue(T);
+            }
 		}
 
 		ai_real Opacity = 1.0f;
@@ -233,6 +250,14 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 
 		meshData->Materials.emplace(std::make_pair(i, std::shared_ptr<jMaterial>(newMeshMaterial)));
 	}
+
+    ThreadPool.WaitAll();
+    
+    for (jMaterial* mat : Materials)
+    {
+		for (int32 i = 0; i < _countof(mat->TexData); ++i)
+			mat->TexData[i].Texture = jImageFileLoader::GetInstance().LoadTextureFromFile(mat->TexData[i].FilePath, true).lock().get();
+    }
 
 	JASSERT(scene->mRootNode);
 	if (scene->mRootNode)
@@ -309,19 +334,19 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 		vertexStreamData->Params.push_back(streamParam);
 	}
 
-	//if (!meshData->Bitangents.empty())
-	//{
-	//	JASSERT(meshData->Vertices.size() == meshData->Bitangents.size());
+	if (!meshData->Bitangents.empty())
+	{
+		JASSERT(meshData->Vertices.size() == meshData->Bitangents.size());
 
-	//	auto streamParam = std::make_shared<jStreamParam<float>>();
-	//	streamParam->BufferType = EBufferType::STATIC;
-	//	streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
-	//	streamParam->Name = jName("Bitangent");
-	//	streamParam->Data.resize(elementCount * 3);
-	//	streamParam->Stride = sizeof(float) * 3;
-	//	memcpy(&streamParam->Data[0], &meshData->Bitangents[0], meshData->Bitangents.size() * sizeof(Vector));
-	//	vertexStreamData->Params.push_back(streamParam);
-	//}
+		auto streamParam = std::make_shared<jStreamParam<float>>();
+		streamParam->BufferType = EBufferType::STATIC;
+		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Name = jName("BITANGENT");
+		streamParam->Data.resize(elementCount * 3);
+		streamParam->Stride = sizeof(float) * 3;
+		memcpy(&streamParam->Data[0], &meshData->Bitangents[0], meshData->Bitangents.size() * sizeof(Vector));
+		vertexStreamData->Params.push_back(streamParam);
+	}
 
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
@@ -382,4 +407,74 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 jMeshObject* jModelLoader::LoadFromFile(const char* filename)
 {
 	return LoadFromFile(filename, "Image/");
+}
+
+jThreadPool::jThreadPool(size_t num_threads) : IsStop(false)
+{
+    for (size_t i = 0; i < num_threads; ++i) 
+	{
+        WorkerThreads.emplace_back([this] 
+		{
+            while (true) 
+			{
+				jTask task;
+                {
+                    std::unique_lock<std::mutex> lock(QueueLock);
+
+                    // 대기 중인 파일이 없고, 스레드 풀이 종료되지 않았다면 대기
+                    ConditionVariable.wait(lock, [this] { return IsStop || !TaskQueue.empty(); });
+
+                    if (IsStop && TaskQueue.empty()) 
+					{
+                        return;
+
+                    }
+
+					if (TaskQueue.size() > 0)
+					{
+						task = TaskQueue.front();
+						TaskQueue.pop();
+					}
+                }
+
+				if (task.IsValid())
+				{
+					task.Do();
+					--RemainTask;
+				}
+            }
+        });
+
+    }
+}
+
+jThreadPool::~jThreadPool()
+{
+    {
+        std::unique_lock<std::mutex> lock(QueueLock);
+        IsStop = true;
+    }
+
+    ConditionVariable.notify_all();
+
+    for (std::thread& worker : WorkerThreads) 
+	{
+        worker.join();
+    }
+}
+
+void jThreadPool::Enqueue(const jTask& file_path)
+{
+    std::unique_lock<std::mutex> lock(QueueLock);
+
+    // 중복 확인
+    auto hash = file_path.GetHash();
+    if (ProcessingTaskHashes.find(hash) == ProcessingTaskHashes.end())
+	{
+        // 중복되지 않은 경우에만 파일 큐에 추가
+        TaskQueue.push(file_path);
+        RemainTask++;
+		ProcessingTaskHashes.insert(hash);
+        ConditionVariable.notify_one();
+    }
 }
