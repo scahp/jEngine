@@ -1,11 +1,11 @@
-﻿#include "common.hlsl"
+#include "common.hlsl"
 
 #ifndef USE_VERTEX_COLOR
 #define USE_VERTEX_COLOR 0
 #endif
 
 #ifndef USE_FLIP_NORMALMAP_Y
-#define USE_FLIP_NORMALMAP_Y 1      // todo : normal map 로드시에 적용하면 좋을 것 같다.
+#define USE_FLIP_NORMALMAP_Y 1      // todo : apply it at loading time of the normal map
 #endif
 
 struct VSOutput
