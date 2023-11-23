@@ -1688,12 +1688,26 @@ jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector
 
 	// Dummy
 	{
+		std::vector<Vector2> UV;
+		UV.resize(vertices.size() / 3);
+		for (int32 i = 0; i < vertices.size() / 3; ++i)
+		{
+			const float X = vertices[i * 3 + 0];
+			const float Y = vertices[i * 3 + 1];
+			const float Z = vertices[i * 3 + 2];
+						 
+			float u = 0.5f + atan2(X, Z) / (2 * PI);
+			float v = 0.5f - asin(Y / radius) / PI;
+			UV[i] = Vector2(u, v);
+		}
+
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 2));
 		streamParam->Stride = sizeof(float) * 2;
 		streamParam->Name = jName("TEXCOORD");
-		streamParam->Data.resize(normals.size(), 0.0f);
+		streamParam->Data.resize(UV.size() * (sizeof(Vector2) / sizeof(float)), 0.0f);
+        memcpy(&streamParam->Data[0], &UV[0], UV.size() * sizeof(Vector2));
 		vertexStreamData->Params.push_back(streamParam);
 	}
 
