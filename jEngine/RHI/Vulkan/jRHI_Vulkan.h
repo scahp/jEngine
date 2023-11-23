@@ -129,8 +129,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	virtual jVertexBuffer* CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const override;
 	virtual jIndexBuffer* CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const override;
-	virtual jTexture* CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
-		, ETextureFormat textureFormat = ETextureFormat::RGBA8, bool createMipmap = false) const override;
+	virtual jTexture* CreateTextureFromData(const jImageData* InImageData) const override;
 	virtual bool CreateShaderInternal(jShader* OutShader, const jShaderInfo& shaderInfo) const override;
 	virtual jFrameBuffer* CreateFrameBuffer(const jFrameBufferInfo& info) const override;
 	virtual std::shared_ptr<jRenderTarget> CreateRenderTarget(const jRenderTargetInfo& info) const override;

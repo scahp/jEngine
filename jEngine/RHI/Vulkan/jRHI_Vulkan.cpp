@@ -550,23 +550,22 @@ jVertexBuffer* jRHI_Vulkan::CreateVertexBuffer(const std::shared_ptr<jVertexStre
 	return vertexBuffer;
 }
 
-jTexture* jRHI_Vulkan::CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
-	, ETextureFormat textureFormat, bool createMipmap) const
+jTexture* jRHI_Vulkan::CreateTextureFromData(const jImageData* InImageData) const
 {
-    VkDeviceSize imageSize = width * height * GetVulkanTexturePixelSize(textureFormat);
-    const uint32 MipLevels = static_cast<uint32>(std::floor(std::log2(std::max<int>(width, height)))) + 1;
+    VkDeviceSize imageSize = InImageData->Width * InImageData->Height * GetVulkanTexturePixelSize(InImageData->Format);
+    const uint32 MipLevels = static_cast<uint32>(std::floor(std::log2(std::max<int>(InImageData->Width, InImageData->Height)))) + 1;
 
 	jBuffer_Vulkan stagingBuffer;
 	jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
         , imageSize, stagingBuffer);
 
-	stagingBuffer.UpdateBuffer(data, imageSize);
+	stagingBuffer.UpdateBuffer(&InImageData->ImageData[0], imageSize);
 
-	VkFormat vkTextureFormat = GetVulkanTextureFormat(textureFormat);
+	VkFormat vkTextureFormat = GetVulkanTextureFormat(InImageData->Format);
 
 	VkImage TextureImage;
 	VkDeviceMemory TextureImageMemory;
-    if (!ensure(jBufferUtil_Vulkan::CreateImage((uint32)width, (uint32)height, MipLevels, VK_SAMPLE_COUNT_1_BIT, vkTextureFormat
+    if (!ensure(jBufferUtil_Vulkan::CreateImage((uint32)InImageData->Width, (uint32)InImageData->Height, MipLevels, VK_SAMPLE_COUNT_1_BIT, vkTextureFormat
         , VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT
         | VK_IMAGE_USAGE_SAMPLED_BIT	// image를 shader 에서 접근가능하게 하고 싶은 경우
         , VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, TextureImage, TextureImageMemory)))
@@ -577,12 +576,12 @@ jTexture* jRHI_Vulkan::CreateTextureFromData(void* data, int32 width, int32 heig
     VkCommandBuffer commandBuffer = BeginSingleTimeCommands();
 	ensure(TransitionImageLayout(commandBuffer, TextureImage, vkTextureFormat, MipLevels, 1, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
 
-	jBufferUtil_Vulkan::CopyBufferToImage(commandBuffer, stagingBuffer.Buffer, stagingBuffer.Offset, TextureImage, (uint32)width, (uint32)height);
+	jBufferUtil_Vulkan::CopyBufferToImage(commandBuffer, stagingBuffer.Buffer, stagingBuffer.Offset, TextureImage, (uint32)InImageData->Width, (uint32)InImageData->Height);
 
     // 밉맵을 만드는 동안 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL 으로 전환됨.
-    if (createMipmap)
+    if (InImageData->CreateMipmapIfPossible && !InImageData->HasMipmap)
     {
-        jBufferUtil_Vulkan::GenerateMipmaps(commandBuffer, TextureImage, vkTextureFormat, width, height, MipLevels
+        jBufferUtil_Vulkan::GenerateMipmaps(commandBuffer, TextureImage, vkTextureFormat, InImageData->Width, InImageData->Height, MipLevels
 			, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
 	else
@@ -599,12 +598,12 @@ jTexture* jRHI_Vulkan::CreateTextureFromData(void* data, int32 width, int32 heig
     VkImageView textureImageView = jBufferUtil_Vulkan::CreateImageView(TextureImage, vkTextureFormat, VK_IMAGE_ASPECT_COLOR_BIT, MipLevels);
 
     auto texture = new jTexture_Vulkan();
-    texture->sRGB = sRGB;
-    texture->Format = textureFormat;
+    texture->sRGB = InImageData->sRGB;
+    texture->Format = InImageData->Format;
     texture->Type = ETextureType::TEXTURE_2D;
-    texture->Width = width;
-    texture->Height = height;
-	texture->MipLevel = createMipmap ? jTexture::GetMipLevels(width, height) : 1;
+    texture->Width = InImageData->Width;
+    texture->Height = InImageData->Height;
+	texture->MipLevel = InImageData->HasMipmap ? jTexture::GetMipLevels(InImageData->Width, InImageData->Height) : 1;
 	texture->Image = TextureImage;
 	texture->View = textureImageView;
 	texture->Memory = TextureImageMemory;

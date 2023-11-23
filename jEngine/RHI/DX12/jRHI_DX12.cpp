@@ -1681,57 +1681,36 @@ void jRHI_DX12::EndSingleTimeCopyCommands(jCommandBuffer_DX12* commandBuffer)
 	CopyCommandBufferManager->ReturnCommandBuffer(commandBuffer);
 }
 
-jTexture* jRHI_DX12::CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
-    , ETextureFormat textureFormat, bool createMipmap) const
+jTexture* jRHI_DX12::CreateTextureFromData(const jImageData* InImageData) const
 {
-    createMipmap = false;   // todo : keep this until supporting the mipmap for dx12
-	const uint16 MipLevels = createMipmap ? static_cast<uint32>(std::floor(std::log2(std::max<int>(width, height)))) + 1 : 1;
+    check(InImageData);
+	const uint16 MipLevels = InImageData->HasMipmap ? static_cast<uint32>(std::floor(std::log2(std::max<int>(InImageData->Width, InImageData->Height)))) + 1 : 1;
+
     EImageLayout Layout = EImageLayout::GENERAL;
-	jTexture_DX12* Texture = jBufferUtil_DX12::CreateImage(width, height, 1, MipLevels, 1, ETextureType::TEXTURE_2D, textureFormat, ETextureCreateFlag::UAV, Layout);
-    Texture->sRGB = sRGB;
+	jTexture_DX12* Texture = jBufferUtil_DX12::CreateImage(InImageData->Width, InImageData->Height
+        , 1, MipLevels, 1, ETextureType::TEXTURE_2D, InImageData->Format, ETextureCreateFlag::UAV, Layout);
+    Texture->sRGB = InImageData->sRGB;
 
-	// Copy image data from buffer
-	const auto Desc = Texture->Image->GetDesc();
-	uint64 RequiredSize = 0;
-	Device->GetCopyableFootprints(&Desc, 0, 1, 0, nullptr, nullptr, nullptr, &RequiredSize);
+    const uint64 ImageSize = InImageData->Width * InImageData->Height * GetDX12TexturePixelSize(InImageData->Format);
 
-    const uint64 ImageSize = width * height * GetDX12TexturePixelSize(textureFormat);
-
-	// todo : recycle temp buffer
-	jBuffer_DX12* buffer = jBufferUtil_DX12::CreateBuffer(RequiredSize, 0, EBufferCreateFlag::CPUAccess, D3D12_RESOURCE_STATE_GENERIC_READ, data, ImageSize);
-	check(buffer);
+    // todo : recycle temp buffer
+    jBuffer_DX12* buffer = jBufferUtil_DX12::CreateBuffer(InImageData->ImageData.size(), 0
+        , EBufferCreateFlag::CPUAccess, D3D12_RESOURCE_STATE_GENERIC_READ, &InImageData->ImageData[0], InImageData->ImageData.size());
+    check(buffer);
 
 	jCommandBuffer_DX12* commandList = g_rhi_dx12->BeginSingleTimeCopyCommands();
-	jBufferUtil_DX12::CopyBufferToImage(commandList->Get(), buffer->Buffer.Get(), 0, Texture->Image.Get());
+    if (InImageData->SubresourceFootprints.size() > 0)
+    {
+        jBufferUtil_DX12::CopyBufferToImage(commandList->Get(), buffer->Buffer.Get(), Texture->Image.Get(), InImageData->SubresourceFootprints);
+    }
+    else
+    {
+        jBufferUtil_DX12::CopyBufferToImage(commandList->Get(), buffer->Buffer.Get(), 0, Texture->Image.Get());
+    }
 	g_rhi_dx12->EndSingleTimeCopyCommands(commandList);
 	delete buffer;
 
 	return Texture;
-}
-
-jTexture* jRHI_DX12::CreateTextureFromData(void* data, int32 InData, int32 width, int32 height, bool sRGB, bool InHasMipmap
-    , ETextureFormat textureFormat, const std::vector<jImageSubResourceData>& InSubresourceData) const
-{
-    const uint16 MipLevels = InHasMipmap ? static_cast<uint32>(std::floor(std::log2(std::max<int>(width, height)))) + 1 : 1;
-    EImageLayout Layout = EImageLayout::GENERAL;
-    jTexture_DX12* Texture = jBufferUtil_DX12::CreateImage(width, height, 1, MipLevels, 1, ETextureType::TEXTURE_2D, textureFormat, ETextureCreateFlag::NONE, Layout);
-    Texture->sRGB = sRGB;
-
-    // Copy image data from buffer
-    const auto Desc = Texture->Image->GetDesc();
-    uint64 RequiredSize = 0;
-    Device->GetCopyableFootprints(&Desc, 0, 1, 0, nullptr, nullptr, nullptr, &RequiredSize);
-
-    // todo : recycle temp buffer
-    jBuffer_DX12* buffer = jBufferUtil_DX12::CreateBuffer(InData, 0, EBufferCreateFlag::CPUAccess, D3D12_RESOURCE_STATE_GENERIC_READ, data, InData);
-    check(buffer);
-
-    jCommandBuffer_DX12* commandBuffer = g_rhi_dx12->BeginSingleTimeCopyCommands();
-    jBufferUtil_DX12::CopyBufferToImage(commandBuffer->CommandList.Get(), buffer->Buffer.Get(), Texture->Image.Get(), InSubresourceData);
-    g_rhi_dx12->EndSingleTimeCopyCommands(commandBuffer);
-    delete buffer;
-
-    return Texture;
 }
 
 jShaderBindingLayout* jRHI_DX12::CreateShaderBindings(const jShaderBindingArray& InShaderBindingArray) const

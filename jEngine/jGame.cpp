@@ -167,9 +167,9 @@ void jGame::Setup()
         jObject::AddObject(sphere);
         SpawnedObjects.push_back(sphere);
 
-        auto sphere2 = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f + 130.0f), 1.0, 150, Vector(30.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
-        jObject::AddObject(sphere2);
-        SpawnedObjects.push_back(sphere2);
+        //auto sphere2 = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f + 130.0f), 1.0, 150, Vector(30.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+        //jObject::AddObject(sphere2);
+        //SpawnedObjects.push_back(sphere2);
         //if (sphere2->RenderObjects[0])
         //{
         //    auto MaterialSphere = std::make_shared<jMaterial>();

@@ -3,6 +3,7 @@
 struct jImageData
 {
 	bool HasMipmap = false;
+	bool CreateMipmapIfPossible = true;
 	bool sRGB = false;
 	int32 Width = 0;
 	int32 Height = 0;

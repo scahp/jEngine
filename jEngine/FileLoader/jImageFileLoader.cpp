@@ -297,18 +297,8 @@ std::weak_ptr<jTexture> jImageFileLoader::LoadTextureFromFile(const jName& filen
 	JASSERT(pImageData);
 	if (pImageData)
 	{
-		if (pImageData->SubresourceFootprints.empty())
-		{
-            jTexture* pCreatedTexture = g_rhi->CreateTextureFromData(&pImageData->ImageData[0], pImageData->Width
-                , pImageData->Height, pImageData->sRGB, pImageData->Format, true);
-            NewTexture = std::shared_ptr<jTexture>(pCreatedTexture);
-		}
-		else
-		{
-			jTexture* pCreatedTexture = g_rhi->CreateTextureFromData(&pImageData->ImageData[0], (int32)pImageData->ImageData.size(), pImageData->Width
-				, pImageData->Height, pImageData->sRGB, pImageData->HasMipmap, pImageData->Format, pImageData->SubresourceFootprints);
-			NewTexture = std::shared_ptr<jTexture>(pCreatedTexture);
-		}
+        jTexture* pCreatedTexture = g_rhi->CreateTextureFromData(pImageData);
+        NewTexture = std::shared_ptr<jTexture>(pCreatedTexture);
 	}
 
 	CachedTextureMap[filename] = NewTexture;

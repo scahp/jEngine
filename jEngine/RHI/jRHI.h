@@ -28,6 +28,7 @@ class jSwapchain;
 class jMemoryPool;
 class jFenceManager;
 class jSemaphoreManager;
+struct jImageData;
 
 enum class EUniformType
 {
@@ -391,12 +392,9 @@ public:
 	virtual bool GetUniformbuffer(Vector3i& outResult, const jName& name, const jShader* shader) const { return false; }
 	virtual bool GetUniformbuffer(Vector4i& outResult, const jName& name, const jShader* shader) const { return false; }
 	virtual jTexture* CreateNullTexture() const { return nullptr; }
-	virtual jTexture* CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
-		, ETextureFormat textureFormat = ETextureFormat::RGBA8, bool createMipmap = false) const { return nullptr; }
+	virtual jTexture* CreateTextureFromData(const jImageData* InImageData) const { return nullptr; }
 	virtual jTexture* CreateCubeTextureFromData(std::vector<void*> faces, int32 width, int32 height, bool sRGB
 		, ETextureFormat textureFormat = ETextureFormat::RGBA8, bool createMipmap = false) const { return nullptr; }
-	virtual jTexture* CreateTextureFromData(void* data, int32 InData, int32 width, int32 height, bool sRGB, bool InHasMipmap
-		, ETextureFormat textureFormat, const std::vector<jImageSubResourceData>& InSubresourceData) const { return nullptr; }
 	virtual jFrameBuffer* CreateFrameBuffer(const jFrameBufferInfo& info) const { return nullptr; }
 	virtual std::shared_ptr<jRenderTarget> CreateRenderTarget(const jRenderTargetInfo& info) const { return nullptr; }
 	virtual void EnableDepthTest(bool enable) const {}

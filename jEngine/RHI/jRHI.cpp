@@ -5,6 +5,7 @@
 #include "Scene/jCamera.h"
 #include "Material/jMaterial.h"
 #include "jRHIType.h"
+#include "FileLoader/jImageFileLoader.h"
 
 const jRTClearValue jRTClearValue::Invalid = jRTClearValue();
 
@@ -48,14 +49,22 @@ bool jRHI::InitRHI()
 
 void jRHI::OnInitRHI()
 {
-	uint8 WhiteData[4] = { 255, 255, 255, 255 };
-	GWhiteTexture = CreateTextureFromData(&WhiteData, 1, 1, true, ETextureFormat::RGBA8, false);
+    jImageData image;
+    image.ImageData = { 255, 255, 255, 255 };
+    image.Width = 1;
+    image.Height = 1;
+    image.Format = ETextureFormat::RGBA8;
+    image.FormatType = EFormatType::UNSIGNED_BYTE;
+	image.sRGB = false;
 
-	uint8 BlackData[4] = { 0, 0, 0, 0 };
-	GBlackTexture = CreateTextureFromData(&BlackData, 1, 1, true, ETextureFormat::RGBA8, false);
+	image.ImageData = { 255, 255, 255, 255 };
+	GWhiteTexture = CreateTextureFromData(&image);
 
-    uint8 NormalData[4] = { 0, 0, 255, 0 };
-	GNormalTexture = CreateTextureFromData(&NormalData, 1, 1, true, ETextureFormat::RGBA8, false);
+	image.ImageData = { 0, 0, 0, 0 };
+	GBlackTexture = CreateTextureFromData(&image);
+
+	image.ImageData = { 0, 0, 255, 0 };
+	GNormalTexture = CreateTextureFromData(&image);
 
 	GDefaultMaterial = new jMaterial();
 	for (int32 i = 0; i < _countof(GDefaultMaterial->TexData); ++i)

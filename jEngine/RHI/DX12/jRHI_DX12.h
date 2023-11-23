@@ -317,10 +317,7 @@ public:
 	jCommandBuffer_DX12* BeginSingleTimeCopyCommands();
     void EndSingleTimeCopyCommands(jCommandBuffer_DX12* commandBuffer);
 
-	virtual jTexture* CreateTextureFromData(void* data, int32 width, int32 height, bool sRGB
-		, ETextureFormat textureFormat = ETextureFormat::RGBA8, bool createMipmap = false) const override;
-    virtual jTexture* CreateTextureFromData(void* data, int32 InData, int32 width, int32 height, bool sRGB, bool InHasMipmap
-        , ETextureFormat textureFormat, const std::vector<jImageSubResourceData>& InSubresourceData) const override;
+	virtual jTexture* CreateTextureFromData(const jImageData* InImageData) const override;
 	virtual jFenceManager* GetFenceManager() override { return &FenceManager; }
 
 	std::vector<jRingBuffer_DX12*> OneFrameUniformRingBuffers;
