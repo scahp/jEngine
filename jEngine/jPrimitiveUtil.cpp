@@ -1696,6 +1696,7 @@ jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector
 			const float Y = vertices[i * 3 + 1];
 			const float Z = vertices[i * 3 + 2];
 						 
+			// https://stackoverflow.com/questions/33747876/spherical-mapping-calculation-uv-for-point-given-on-sphere-strange-u-values
 			float u = 0.5f + atan2(X, Z) / (2 * PI);
 			float v = 0.5f - asin(Y / radius) / PI;
 			UV[i] = Vector2(u, v);
