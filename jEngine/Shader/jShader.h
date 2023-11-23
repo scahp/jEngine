@@ -250,8 +250,9 @@ struct jShaderGBufferVertexShader : public jShader
     DECLARE_DEFINE(USE_VERTEX_COLOR, 0, 1);
     DECLARE_DEFINE(USE_VERTEX_BITANGENT, 0, 1);
     DECLARE_DEFINE(USE_ALBEDO_TEXTURE, 0, 1);
+    DECLARE_DEFINE(USE_SPHERICAL_MAP, 0, 1);
 
-    using ShaderPermutation = jPermutation<USE_VERTEX_COLOR, USE_VERTEX_BITANGENT, USE_ALBEDO_TEXTURE>;
+    using ShaderPermutation = jPermutation<USE_VERTEX_COLOR, USE_VERTEX_BITANGENT, USE_ALBEDO_TEXTURE, USE_SPHERICAL_MAP>;
     ShaderPermutation Permutation;
 
     DECLARE_SHADER_WITH_PERMUTATION(jShaderGBufferVertexShader, Permutation)

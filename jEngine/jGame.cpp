@@ -14,6 +14,7 @@
 #include "jOptions.h"
 #include "FileLoader/jModelLoader.h"
 #include "Scene/jMeshObject.h"
+#include "FileLoader/jImageFileLoader.h"
 
 jRHI* g_rhi = nullptr;
 
@@ -157,7 +158,7 @@ void jGame::Setup()
 		jObject::AddObject(Sponza);
 		SpawnedObjects.push_back(Sponza);
 
-        auto sphere = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f), 1.0, 150, Vector(30.0f), Vector4(0.8f, 0.0f, 0.0f, 1.0f));
+        auto sphere = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f), 1.0, 150, Vector(30.0f), Vector4(1.0f, 0.0f, 0.0f, 1.0f));
         sphere->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
         {
             float RotationSpeed = 100.0f;
@@ -165,6 +166,20 @@ void jGame::Setup()
         };
         jObject::AddObject(sphere);
         SpawnedObjects.push_back(sphere);
+
+        auto sphere2 = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f + 130.0f), 1.0, 150, Vector(30.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+        jObject::AddObject(sphere2);
+        SpawnedObjects.push_back(sphere2);
+        //if (sphere2->RenderObjects[0])
+        //{
+        //    auto MaterialSphere = std::make_shared<jMaterial>();
+        //    MaterialSphere->bUseSphericalMap = true;
+        //    jName FilePath = jName("Image/grace_probe.hdr");
+        //    MaterialSphere->TexData[(int32)jMaterial::EMaterialTextureType::Albedo].FilePath = FilePath;
+        //    MaterialSphere->TexData[(int32)jMaterial::EMaterialTextureType::Albedo].Texture
+        //        = jImageFileLoader::GetInstance().LoadTextureFromFile(FilePath, false, true).lock().get();
+        //    sphere2->RenderObjects[0]->MaterialPtr = MaterialSphere;
+        //}
 
 #endif
 		//{

@@ -56,6 +56,7 @@ FSOutput main(VSOutput input
 #if USE_VERTEX_COLOR
     color *= input.Color;
 #endif
+
 #if USE_ALBEDO_TEXTURE
     color *= DiffuseTexture.Sample(DiffuseTextureSampler, input.TexCoord.xy);
     if (color.w < 0.5f)

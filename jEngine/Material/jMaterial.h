@@ -37,8 +37,10 @@ public:
     };
 
     bool HasAlbedoTexture() const { return TexData[(int32)EMaterialTextureType::Albedo].Texture; }
+    bool UseSphericalMap() const { return bUseSphericalMap; }
 
     TextureData TexData[static_cast<int32>(EMaterialTextureType::Max)];
+    bool bUseSphericalMap = false;
 
     const std::shared_ptr<jShaderBindingInstance>& CreateShaderBindingInstance();
     std::shared_ptr<jShaderBindingInstance> ShaderBindingInstance = nullptr;

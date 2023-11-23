@@ -1,5 +1,9 @@
 #include "common.hlsl"
 
+#if USE_SPHERICAL_MAP
+#include "Sphericalmap.hlsl"
+#endif
+
 #ifndef USE_VERTEX_COLOR
 #define USE_VERTEX_COLOR 0
 #endif
@@ -46,7 +50,13 @@ VSOutput main(VSInput input)
 #if USE_VERTEX_COLOR
     output.Color = input.Color;
 #endif
+
+    float2 UV = 0;
+#if USE_SPHERICAL_MAP
+    output.TexCoord = GetSphericalMap_TwoMirrorBall(normalize(input.Position));
+#else
     output.TexCoord = input.TexCoord;
+#endif
     output.Normal = mul((float3x3)RenderObjectParam.M, input.Normal);
     
 #if USE_ALBEDO_TEXTURE

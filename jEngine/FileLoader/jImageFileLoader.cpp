@@ -59,7 +59,7 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
 	int32 width = 0;
 	int32 height = 0;
 	int32 NumOfComponent = -1;
-	if (ExtName == ExtDDS || (ExtName == ExtPNG))
+	if (ExtName == ExtDDS || (ExtName == ExtPNG) || (ExtName == ExtHDR && IsUseDX12()))
 	{
 		if (IsUseVulkan())
 		{
@@ -74,6 +74,21 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
                 width = static_cast<int32>(w);
                 height = static_cast<int32>(h);
                 NumOfComponent = 4;
+			}
+			else if (ExtName == ExtHDR)
+			{
+                float* imageData = stbi_loadf(filename.ToStr(), &width, &height, &NumOfComponent, paddingRGBA ? STBI_rgb_alpha : 0);
+                if (paddingRGBA)
+                    NumOfComponent = 4;
+
+                int32 NumOfBytes = width * height * sizeof(float) * NumOfComponent;
+                NewImageDataPatr->ImageData.resize(NumOfBytes);
+                memcpy(&NewImageDataPatr->ImageData[0], imageData, NumOfBytes);
+                NewImageDataPatr->sRGB = sRGB;
+                NewImageDataPatr->FormatType = EFormatType::FLOAT;
+
+                stbi_image_free(imageData);
+                IsHDR = true;
 			}
 			else
 			{
@@ -104,6 +119,11 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
 			if (ExtName == ExtDDS)
 			{
                 if (JFAIL(DirectX::LoadFromDDSFile(FilenameWChar, DirectX::DDS_FLAGS_NONE, nullptr, image)))
+                    return std::weak_ptr<jImageData>();
+			}
+			else if (ExtName == ExtHDR)
+			{
+                if (JFAIL(DirectX::LoadFromHDRFile(FilenameWChar, nullptr, image)))
                     return std::weak_ptr<jImageData>();
 			}
 			else
@@ -204,24 +224,17 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
 			NewImageDataPatr->Width = width;
 			NewImageDataPatr->Height = height;
 			NewImageDataPatr->sRGB = sRGB;
-			NewImageDataPatr->FormatType = EFormatType::UNSIGNED_BYTE;
+			if (ExtName == ExtHDR)
+			{
+                NewImageDataPatr->FormatType = EFormatType::FLOAT;
+				IsHDR = true;
+			}
+			else
+			{
+				NewImageDataPatr->FormatType = EFormatType::UNSIGNED_BYTE;
+			}
 			NewImageDataPatr->Format = GetDX12TextureFormat(image.GetMetadata().format);
 		}
-	}
-	else if (ExtName == ExtHDR)
-	{
-		float* imageData = stbi_loadf(filename.ToStr(), &width, &height, &NumOfComponent, paddingRGBA ? STBI_rgb_alpha : 0);
-        if (paddingRGBA)
-            NumOfComponent = 4;
-
-		int32 NumOfBytes = width * height * sizeof(float) * NumOfComponent;
-		NewImageDataPatr->ImageData.resize(NumOfBytes);
-		memcpy(&NewImageDataPatr->ImageData[0], imageData, NumOfBytes);
-		NewImageDataPatr->sRGB = sRGB;
-		NewImageDataPatr->FormatType = EFormatType::FLOAT;
-
-		stbi_image_free(imageData);
-		IsHDR = true;
 	}
 	else
 	{

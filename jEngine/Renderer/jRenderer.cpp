@@ -401,6 +401,7 @@ void jRenderer::SetupBasePass()
         }
         else
         {
+            const bool UseSphericalMap = InRenderObject->MaterialPtr && InRenderObject->MaterialPtr->UseSphericalMap();
             const bool HasAlbedoTexture = InRenderObject->MaterialPtr && InRenderObject->MaterialPtr->HasAlbedoTexture();
             const bool HasVertexColor = InRenderObject->GeometryDataPtr && InRenderObject->GeometryDataPtr->HasVertexColor();
             const bool HasVertexBiTangent = InRenderObject->GeometryDataPtr && InRenderObject->GeometryDataPtr->HasVertexBiTangent();
@@ -409,6 +410,7 @@ void jRenderer::SetupBasePass()
             ShaderPermutationVS.SetIndex<jShaderGBufferVertexShader::USE_VERTEX_COLOR>(HasVertexColor);
             ShaderPermutationVS.SetIndex<jShaderGBufferVertexShader::USE_VERTEX_BITANGENT>(HasVertexBiTangent);
             ShaderPermutationVS.SetIndex<jShaderGBufferVertexShader::USE_ALBEDO_TEXTURE>(HasAlbedoTexture);
+            ShaderPermutationVS.SetIndex<jShaderGBufferVertexShader::USE_SPHERICAL_MAP>(UseSphericalMap);
             Shaders.VertexShader = jShaderGBufferVertexShader::CreateShader(ShaderPermutationVS);
 
             jShaderGBufferPixelShader::ShaderPermutation ShaderPermutationPS;
