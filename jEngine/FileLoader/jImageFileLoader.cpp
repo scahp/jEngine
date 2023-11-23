@@ -59,7 +59,7 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
 	int32 width = 0;
 	int32 height = 0;
 	int32 NumOfComponent = -1;
-	if (ExtName == ExtDDS || (ExtName == ExtPNG) || (ExtName == ExtHDR && IsUseDX12()))
+	if (ExtName == ExtDDS || (ExtName == ExtPNG) || (ExtName == ExtHDR))
 	{
 		if (IsUseVulkan())
 		{
