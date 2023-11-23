@@ -64,18 +64,20 @@ FSOutput main(VSOutput input
         discard;
     }
 
+    #if USE_SRGB_ALBEDO_TEXTURE
     // Convert to linear space
     color.rgb = pow(color.rgb, 2.2);
+    #endif // USE_SRGB_ALBEDO_TEXTURE
 
     float3 normal = NormalTexture.Sample(NormalTextureSampler, input.TexCoord.xy).xyz;
-#if USE_FLIP_NORMALMAP_Y
+    #if USE_FLIP_NORMALMAP_Y
     normal.y = 1.0 - normal.y;
-#endif
+    #endif // USE_FLIP_NORMALMAP_Y
     normal = normal * 2.0f - 1.0f;
     float3 WorldNormal = normalize(mul(input.TBN, normal));
-#else
+#else // USE_ALBEDO_TEXTURE
     float3 WorldNormal = normalize(input.Normal);
-#endif
+#endif // USE_ALBEDO_TEXTURE
 
 #if USE_VARIABLE_SHADING_RATE
     if (pushConsts.ShowVRSArea)

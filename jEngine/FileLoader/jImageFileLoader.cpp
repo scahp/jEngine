@@ -223,15 +223,16 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
 
 			NewImageDataPatr->Width = width;
 			NewImageDataPatr->Height = height;
-			NewImageDataPatr->sRGB = sRGB;
 			if (ExtName == ExtHDR)
 			{
                 NewImageDataPatr->FormatType = EFormatType::FLOAT;
-				IsHDR = true;
+				NewImageDataPatr->sRGB = false;
+                IsHDR = true;
 			}
 			else
 			{
 				NewImageDataPatr->FormatType = EFormatType::UNSIGNED_BYTE;
+				NewImageDataPatr->sRGB = sRGB;
 			}
 			NewImageDataPatr->Format = GetDX12TextureFormat(image.GetMetadata().format);
 		}
@@ -305,7 +306,7 @@ std::weak_ptr<jTexture> jImageFileLoader::LoadTextureFromFile(const jName& filen
 		else
 		{
 			jTexture* pCreatedTexture = g_rhi->CreateTextureFromData(&pImageData->ImageData[0], (int32)pImageData->ImageData.size(), pImageData->Width
-				, pImageData->Height, pImageData->HasMipmap, pImageData->Format, pImageData->SubresourceFootprints);
+				, pImageData->Height, pImageData->sRGB, pImageData->HasMipmap, pImageData->Format, pImageData->SubresourceFootprints);
 			NewTexture = std::shared_ptr<jTexture>(pCreatedTexture);
 		}
 	}

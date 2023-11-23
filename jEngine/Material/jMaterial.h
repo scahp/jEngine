@@ -37,7 +37,8 @@ public:
     };
 
     bool HasAlbedoTexture() const { return TexData[(int32)EMaterialTextureType::Albedo].Texture; }
-    bool UseSphericalMap() const { return bUseSphericalMap; }
+    bool IsUseSphericalMap() const { return bUseSphericalMap; }
+    bool IsUseSRGBAlbedoTexture() const { return TexData[(int32)EMaterialTextureType::Albedo].Texture ? TexData[(int32)EMaterialTextureType::Albedo].Texture->sRGB : false; }
 
     TextureData TexData[static_cast<int32>(EMaterialTextureType::Max)];
     bool bUseSphericalMap = false;

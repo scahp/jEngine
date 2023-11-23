@@ -49,13 +49,13 @@ bool jRHI::InitRHI()
 void jRHI::OnInitRHI()
 {
 	uint8 WhiteData[4] = { 255, 255, 255, 255 };
-	GWhiteTexture = CreateTextureFromData(&WhiteData, 1, 1, false, ETextureFormat::RGBA8, false);
+	GWhiteTexture = CreateTextureFromData(&WhiteData, 1, 1, true, ETextureFormat::RGBA8, false);
 
 	uint8 BlackData[4] = { 0, 0, 0, 0 };
-	GBlackTexture = CreateTextureFromData(&BlackData, 1, 1, false, ETextureFormat::RGBA8, false);
+	GBlackTexture = CreateTextureFromData(&BlackData, 1, 1, true, ETextureFormat::RGBA8, false);
 
     uint8 NormalData[4] = { 0, 0, 255, 0 };
-	GNormalTexture = CreateTextureFromData(&NormalData, 1, 1, false, ETextureFormat::RGBA8, false);
+	GNormalTexture = CreateTextureFromData(&NormalData, 1, 1, true, ETextureFormat::RGBA8, false);
 
 	GDefaultMaterial = new jMaterial();
 	for (int32 i = 0; i < _countof(GDefaultMaterial->TexData); ++i)

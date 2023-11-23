@@ -596,7 +596,7 @@ jTexture* jRHI_Vulkan::CreateTextureFromData(void* data, int32 width, int32 heig
 	stagingBuffer.Release();
 
     // Create Texture image view
-    VkImageView textureImageView = jBufferUtil_Vulkan::CreateImageView(TextureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, MipLevels);
+    VkImageView textureImageView = jBufferUtil_Vulkan::CreateImageView(TextureImage, vkTextureFormat, VK_IMAGE_ASPECT_COLOR_BIT, MipLevels);
 
     auto texture = new jTexture_Vulkan();
     texture->sRGB = sRGB;

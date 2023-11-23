@@ -1688,6 +1688,7 @@ jTexture* jRHI_DX12::CreateTextureFromData(void* data, int32 width, int32 height
 	const uint16 MipLevels = createMipmap ? static_cast<uint32>(std::floor(std::log2(std::max<int>(width, height)))) + 1 : 1;
     EImageLayout Layout = EImageLayout::GENERAL;
 	jTexture_DX12* Texture = jBufferUtil_DX12::CreateImage(width, height, 1, MipLevels, 1, ETextureType::TEXTURE_2D, textureFormat, ETextureCreateFlag::UAV, Layout);
+    Texture->sRGB = sRGB;
 
 	// Copy image data from buffer
 	const auto Desc = Texture->Image->GetDesc();
@@ -1708,12 +1709,13 @@ jTexture* jRHI_DX12::CreateTextureFromData(void* data, int32 width, int32 height
 	return Texture;
 }
 
-jTexture* jRHI_DX12::CreateTextureFromData(void* data, int32 InData, int32 width, int32 height, bool InHasMipmap
+jTexture* jRHI_DX12::CreateTextureFromData(void* data, int32 InData, int32 width, int32 height, bool sRGB, bool InHasMipmap
     , ETextureFormat textureFormat, const std::vector<jImageSubResourceData>& InSubresourceData) const
 {
     const uint16 MipLevels = InHasMipmap ? static_cast<uint32>(std::floor(std::log2(std::max<int>(width, height)))) + 1 : 1;
     EImageLayout Layout = EImageLayout::GENERAL;
     jTexture_DX12* Texture = jBufferUtil_DX12::CreateImage(width, height, 1, MipLevels, 1, ETextureType::TEXTURE_2D, textureFormat, ETextureCreateFlag::NONE, Layout);
+    Texture->sRGB = sRGB;
 
     // Copy image data from buffer
     const auto Desc = Texture->Image->GetDesc();
