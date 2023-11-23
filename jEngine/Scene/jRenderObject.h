@@ -16,7 +16,7 @@ public:
 	jRenderObjectGeometryData(const std::shared_ptr<jVertexStreamData>& vertexStream, const std::shared_ptr<jIndexStreamData>& indexStream);
 	~jRenderObjectGeometryData();
 
-	void Create(const std::shared_ptr<jVertexStreamData>& InVertexStream, const std::shared_ptr<jIndexStreamData>& InIndexStream, bool InHasVertexColor = true);
+	void Create(const std::shared_ptr<jVertexStreamData>& InVertexStream, const std::shared_ptr<jIndexStreamData>& InIndexStream, bool InHasVertexColor = true, bool InHasVertexBiTangent = false);
 
     // Vertex buffers
     void UpdateVertexStream(const std::shared_ptr<jVertexStreamData>& vertexStream);
@@ -25,6 +25,7 @@ public:
 	EPrimitiveType GetPrimitiveType() const { return VertexStream ? VertexStream->PrimitiveType : EPrimitiveType::MAX; }
 	FORCEINLINE bool HasInstancing() const { return !!VertexBuffer_InstanceData; }
 	FORCEINLINE bool HasVertexColor() const { return bHasVertexColor; }
+	FORCEINLINE bool HasVertexBiTangent() const { return bHasVertexBiTangent; }
 
     std::shared_ptr<jVertexStreamData> VertexStream;
     std::shared_ptr<jVertexStreamData> VertexStream_InstanceData;
@@ -42,6 +43,7 @@ public:
     jBuffer* IndirectCommandBuffer = nullptr;
 
 	bool bHasVertexColor = true;
+	bool bHasVertexBiTangent = false;
 };
 
 class jRenderObject

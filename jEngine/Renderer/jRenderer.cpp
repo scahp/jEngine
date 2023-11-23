@@ -403,9 +403,11 @@ void jRenderer::SetupBasePass()
         {
             const bool HasAlbedoTexture = InRenderObject->MaterialPtr && InRenderObject->MaterialPtr->HasAlbedoTexture();
             const bool HasVertexColor = InRenderObject->GeometryDataPtr && InRenderObject->GeometryDataPtr->HasVertexColor();
+            const bool HasVertexBiTangent = InRenderObject->GeometryDataPtr && InRenderObject->GeometryDataPtr->HasVertexBiTangent();
 
             jShaderGBufferVertexShader::ShaderPermutation ShaderPermutationVS;
             ShaderPermutationVS.SetIndex<jShaderGBufferVertexShader::USE_VERTEX_COLOR>(HasVertexColor);
+            ShaderPermutationVS.SetIndex<jShaderGBufferVertexShader::USE_VERTEX_BITANGENT>(HasVertexBiTangent);
             ShaderPermutationVS.SetIndex<jShaderGBufferVertexShader::USE_ALBEDO_TEXTURE>(HasAlbedoTexture);
             Shaders.VertexShader = jShaderGBufferVertexShader::CreateShader(ShaderPermutationVS);
 

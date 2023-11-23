@@ -156,6 +156,16 @@ void jGame::Setup()
 		#endif
 		jObject::AddObject(Sponza);
 		SpawnedObjects.push_back(Sponza);
+
+        auto sphere = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f), 1.0, 150, Vector(30.0f), Vector4(0.8f, 0.0f, 0.0f, 1.0f));
+        sphere->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
+        {
+            float RotationSpeed = 100.0f;
+            thisObject->RenderObjects[0]->SetRot(thisObject->RenderObjects[0]->GetRot() + Vector(0.0f, 0.0f, DegreeToRadian(180.0f)) * RotationSpeed * deltaTime);
+        };
+        jObject::AddObject(sphere);
+        SpawnedObjects.push_back(sphere);
+
 #endif
 		//{
 		//	jScopedLock s(&AsyncLoadLock);

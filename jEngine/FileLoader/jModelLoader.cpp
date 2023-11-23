@@ -388,7 +388,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 	}
 
     object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>();
-	object->RenderObjectGeometryDataPtr->Create(vertexStreamData, indexStreamData, false);
+	object->RenderObjectGeometryDataPtr->Create(vertexStreamData, indexStreamData, false, true);
 
 	for (int32 i = 0; i < (int32)object->SubMeshes.size(); ++i)
 	{

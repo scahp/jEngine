@@ -27,7 +27,7 @@ jRenderObjectGeometryData::~jRenderObjectGeometryData()
     VertexStream_PositionOnly.reset();
 }
 
-void jRenderObjectGeometryData::Create(const std::shared_ptr<jVertexStreamData>& InVertexStream, const std::shared_ptr<jIndexStreamData>& InIndexStream, bool InHasVertexColor)
+void jRenderObjectGeometryData::Create(const std::shared_ptr<jVertexStreamData>& InVertexStream, const std::shared_ptr<jIndexStreamData>& InIndexStream, bool InHasVertexColor, bool InHasVertexBiTangent)
 {
     VertexStream = InVertexStream;
     IndexStream = InIndexStream;
@@ -45,6 +45,7 @@ void jRenderObjectGeometryData::Create(const std::shared_ptr<jVertexStreamData>&
     IndexBuffer = g_rhi->CreateIndexBuffer(IndexStream);
 
     bHasVertexColor = InHasVertexColor;
+    bHasVertexBiTangent = InHasVertexBiTangent;
 }
 
 void jRenderObjectGeometryData::UpdateVertexStream(const std::shared_ptr<jVertexStreamData>& vertexStream)
