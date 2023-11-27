@@ -26,6 +26,9 @@
 #define ASYNC_WITH_SETUP 1
 #define PARALLELFOR_WITH_PASSSETUP 1
 
+// 임시로 만든 RT
+static std::shared_ptr<jRenderTarget> IrradianceMap = nullptr;
+
 struct jSimplePushConstant
 {
     Vector4 Color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
@@ -67,6 +70,78 @@ void jRenderer::Setup()
                 View.ShadowCasterLights.push_back(NewViewLight);
             }
         }       
+    }
+
+    // GenIrradianceMap Test
+    if (!IrradianceMap)
+    {
+        DEBUG_EVENT(RenderFrameContextPtr, "GenIrradianceMap");
+        //////////////////////////////////////////////////////////////////////////
+        // Compute Pipeline
+
+        jName FilePath = jName("Image/grace_probe.hdr");
+        static jTexture* TexHDR = jImageFileLoader::GetInstance().LoadTextureFromFile(FilePath, false, true).lock().get();
+
+        static jRenderTargetInfo Info = { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, 1000, 1000
+            , 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f), ETextureCreateFlag::RTV | ETextureCreateFlag::UAV, false, false };
+        Info.ResourceName = L"HDRRT";
+        IrradianceMap = jRenderTargetPool::GetRenderTarget(Info);
+
+        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), TexHDR, EImageLayout::SHADER_READ_ONLY);
+        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), IrradianceMap->GetTexture(), EImageLayout::GENERAL);
+
+        std::shared_ptr<jShaderBindingInstance> CurrentBindingInstance = nullptr;
+        int32 BindingPoint = 0;
+        jShaderBindingArray ShaderBindingArray;
+        jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
+
+        // Binding 0
+        if (ensure(TexHDR))
+        {
+            ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
+                , ResourceInlineAllactor.Alloc<jTextureResource>(TexHDR, nullptr));
+        }
+
+        // Binding 1
+        if (ensure(IrradianceMap && IrradianceMap->GetTexture()))
+        {
+            ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE
+                , ResourceInlineAllactor.Alloc<jTextureResource>(IrradianceMap->GetTexture(), nullptr));
+        }
+
+        CurrentBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
+
+        jShaderInfo shaderInfo;
+        shaderInfo.SetName(jNameStatic("GenIrradianceMap"));
+        shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/genirradiancemap_cs.hlsl"));
+        shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
+        static jShader* Shader = g_rhi->CreateShader(shaderInfo);
+
+        jShaderBindingLayoutArray ShaderBindingLayoutArray;
+        ShaderBindingLayoutArray.Add(CurrentBindingInstance->ShaderBindingsLayouts);
+
+        jPipelineStateInfo* computePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingLayoutArray, {});
+
+        computePipelineStateInfo->Bind(RenderFrameContextPtr);
+
+        jShaderBindingInstanceArray ShaderBindingInstanceArray;
+        ShaderBindingInstanceArray.Add(CurrentBindingInstance.get());
+
+        jShaderBindingInstanceCombiner ShaderBindingInstanceCombiner;
+        for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
+        {
+            // Add ShaderBindingInstanceCombiner data : DescriptorSets, DynamicOffsets
+            ShaderBindingInstanceCombiner.DescriptorSetHandles.Add(ShaderBindingInstanceArray[i]->GetHandle());
+            const std::vector<uint32>* pDynamicOffsetTest = ShaderBindingInstanceArray[i]->GetDynamicOffsets();
+            if (pDynamicOffsetTest && pDynamicOffsetTest->size())
+            {
+                ShaderBindingInstanceCombiner.DynamicOffsets.Add((void*)pDynamicOffsetTest->data(), (int32)pDynamicOffsetTest->size());
+            }
+        }
+        ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
+
+        g_rhi->BindComputeShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), computePipelineStateInfo, ShaderBindingInstanceCombiner, 0);
+        g_rhi->DispatchCompute(RenderFrameContextPtr, 63, 63, 1);
     }
 
 #if ASYNC_WITH_SETUP
@@ -1049,8 +1124,6 @@ void jRenderer::PostProcess()
         sprintf_s(szDebugEventTemp, sizeof(szDebugEventTemp), "Tonemap %dx%d", SceneRT->FinalColorPtr->Info.Width, SceneRT->FinalColorPtr->Info.Height);
         AddFullQuadPass(szDebugEventTemp, { SourceRT, SceneRT->ColorPtr->GetTexture(), EyeAdaptationTextureCurrent }, SceneRT->FinalColorPtr
             , jNameStatic("Resource/Shaders/hlsl/fullscreenquad_vs.hlsl"), jNameStatic("Resource/Shaders/hlsl/tonemap_ps.hlsl"));
-
-        return;
     }
 }
 
