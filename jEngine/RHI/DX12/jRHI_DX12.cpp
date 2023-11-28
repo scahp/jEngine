@@ -964,24 +964,24 @@ bool jRHI_DX12::InitRHI()
         jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
 
         // cbv
-        ShaderBindingArray.Add(-1, 1, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_GRAPHICS
+        ShaderBindingArray.Add(jShaderBinding::APPEND_LAST, 1, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_GRAPHICS
             , ResourceInlineAllactor.Alloc<jUniformBufferResource>(SimpleUniformBuffer), true);
 
         //// structured buffer
-        //ShaderBindingArray.Add(-1, 1, EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
+        //ShaderBindingArray.Add(jShaderBinding::APPEND_LAST, 1, EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
         //    , ResourceInlineAllactor.Alloc<jBufferResource>(SimpleStructuredBuffer), true);
 
         // Descriptor 0 (1 개, BaseRegister, 이전에 들어간것들을 기반으로 자동으로 올려야 함.)
-        ShaderBindingArray.Add(-1, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
+        ShaderBindingArray.Add(jShaderBinding::APPEND_LAST, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
             , ResourceInlineAllactor.Alloc<jTextureResource>(SimpleTextureCube, nullptr));
 
         //// Descriptor 1 (3 개, BaseRegister)
-        //ShaderBindingArray.Add(-1, 3, EShaderBindingType::TEXTURE_ARRAY_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
+        //ShaderBindingArray.Add(jShaderBinding::APPEND_LAST, 3, EShaderBindingType::TEXTURE_ARRAY_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
         //    , ResourceInlineAllactor.Alloc<jTextureArrayResource>((const jTexture**)SimpleTexture, 3));
 
         const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
             , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT>::Create();
-        ShaderBindingArray.Add(-1, 1, EShaderBindingType::SAMPLER, EShaderAccessStageFlag::ALL_GRAPHICS
+        ShaderBindingArray.Add(jShaderBinding::APPEND_LAST, 1, EShaderBindingType::SAMPLER, EShaderAccessStageFlag::ALL_GRAPHICS
             , ResourceInlineAllactor.Alloc<jSamplerResource>(SamplerState));
 
         auto TestShaderBindingLayout = (jShaderBindingLayout_DX12*)g_rhi->CreateShaderBindings(ShaderBindingArray);
@@ -994,16 +994,16 @@ bool jRHI_DX12::InitRHI()
         jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
 
 		// structured buffer
-        ShaderBindingArray.Add(-1, 1, EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
+        ShaderBindingArray.Add(jShaderBinding::APPEND_LAST, 1, EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
             , ResourceInlineAllactor.Alloc<jBufferResource>(SimpleStructuredBuffer), false);
 
         // Descriptor 1 (3 개, BaseRegister)
-        ShaderBindingArray.Add(-1, 3, EShaderBindingType::TEXTURE_ARRAY_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
+        ShaderBindingArray.Add(jShaderBinding::APPEND_LAST, 3, EShaderBindingType::TEXTURE_ARRAY_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
             , ResourceInlineAllactor.Alloc<jTextureArrayResource>((const jTexture**)SimpleTexture, 3));
 
         const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::NEAREST, ETextureFilter::NEAREST
             , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT>::Create();
-        ShaderBindingArray.Add(-1, 1, EShaderBindingType::SAMPLER, EShaderAccessStageFlag::ALL_GRAPHICS
+        ShaderBindingArray.Add(jShaderBinding::APPEND_LAST, 1, EShaderBindingType::SAMPLER, EShaderAccessStageFlag::ALL_GRAPHICS
             , ResourceInlineAllactor.Alloc<jSamplerResource>(SamplerState));
 
 		auto TestShaderBindingLayout2 = (jShaderBindingLayout_DX12*)g_rhi->CreateShaderBindings(ShaderBindingArray);

@@ -1,6 +1,8 @@
 // Reference
 // https://learnopengl.com/PBR/Lighting
 
+#include "Sphericalmap.hlsl"
+
 float DistributionGGX(float3 InN, float3 InH, float InRoughness)
 {
     float a = InRoughness * InRoughness;
@@ -65,4 +67,24 @@ float3 PBR(float3 InL, float3 InN, float3 InV, float3 InAlbedo, float3 InLightCo
     float NdotL = max(dot(InN, InL), 0.0f);
     float3 Lo = (kD * InAlbedo / PI + specular) * radiance * NdotL;
     return Lo;
+}
+
+float3 IBL_DiffusePart(float3 InL, float3 InN, float3 InV, float3 InAlbedo, float InMetallic, float InRoughness, Texture2D InIrradianceMap, SamplerState InIrradianceMapSamplerState)
+{
+    float3 F0 = float3(0.04f, 0.04f, 0.04f);
+    F0 = lerp(F0, InAlbedo, InMetallic);
+
+    float3 H = normalize(InV + InL);
+    float3 F = FresnelSchlick(max(dot(H, InV), 0.0f), F0);
+    float3 kS = F;
+
+    float3 kD = 1.0 - kS;
+    float2 uv = GetSphericalMap_TwoMirrorBall(InN);
+    uv.y = 1.0 - uv.y;
+    float3 irradiance = InIrradianceMap.Sample(InIrradianceMapSamplerState, uv).rgb;
+    float3 diffuse = irradiance * InAlbedo;
+    float ao = 1;
+    float3 ambient = (kD * diffuse) * ao;
+
+    return ambient;
 }

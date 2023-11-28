@@ -26,9 +26,6 @@
 #define ASYNC_WITH_SETUP 1
 #define PARALLELFOR_WITH_PASSSETUP 1
 
-// 임시로 만든 RT
-static std::shared_ptr<jRenderTarget> IrradianceMap = nullptr;
-
 struct jSimplePushConstant
 {
     Vector4 Color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
@@ -73,22 +70,22 @@ void jRenderer::Setup()
     }
 
     // GenIrradianceMap Test
-    if (!IrradianceMap)
+    if (!jSceneRenderTarget::IrradianceMap)
     {
         DEBUG_EVENT(RenderFrameContextPtr, "GenIrradianceMap");
         //////////////////////////////////////////////////////////////////////////
         // Compute Pipeline
 
-        jName FilePath = jName("Image/grace_probe.hdr");
-        static jTexture* TexHDR = jImageFileLoader::GetInstance().LoadTextureFromFile(FilePath, false, true).lock().get();
+        jName FilePath = jName("Resource/stpeters_probe.hdr");
+        jSceneRenderTarget::OriginHDR = jImageFileLoader::GetInstance().LoadTextureFromFile(FilePath, false, true).lock().get();
 
         static jRenderTargetInfo Info = { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, 1000, 1000
             , 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f), ETextureCreateFlag::RTV | ETextureCreateFlag::UAV, false, false };
         Info.ResourceName = L"HDRRT";
-        IrradianceMap = jRenderTargetPool::GetRenderTarget(Info);
+        jSceneRenderTarget::IrradianceMap = jRenderTargetPool::GetRenderTarget(Info);
 
-        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), TexHDR, EImageLayout::SHADER_READ_ONLY);
-        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), IrradianceMap->GetTexture(), EImageLayout::GENERAL);
+        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::OriginHDR, EImageLayout::SHADER_READ_ONLY);
+        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::IrradianceMap->GetTexture(), EImageLayout::GENERAL);
 
         std::shared_ptr<jShaderBindingInstance> CurrentBindingInstance = nullptr;
         int32 BindingPoint = 0;
@@ -96,17 +93,17 @@ void jRenderer::Setup()
         jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
 
         // Binding 0
-        if (ensure(TexHDR))
+        if (ensure(jSceneRenderTarget::OriginHDR))
         {
             ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-                , ResourceInlineAllactor.Alloc<jTextureResource>(TexHDR, nullptr));
+                , ResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::OriginHDR, nullptr));
         }
 
         // Binding 1
-        if (ensure(IrradianceMap && IrradianceMap->GetTexture()))
+        if (ensure(jSceneRenderTarget::IrradianceMap && jSceneRenderTarget::IrradianceMap->GetTexture()))
         {
             ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE
-                , ResourceInlineAllactor.Alloc<jTextureResource>(IrradianceMap->GetTexture(), nullptr));
+                , ResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::IrradianceMap->GetTexture(), nullptr));
         }
 
         CurrentBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
@@ -142,6 +139,8 @@ void jRenderer::Setup()
 
         g_rhi->BindComputeShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), computePipelineStateInfo, ShaderBindingInstanceCombiner, 0);
         g_rhi->DispatchCompute(RenderFrameContextPtr, 63, 63, 1);
+
+        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::IrradianceMap->GetTexture(), EImageLayout::SHADER_READ_ONLY);
     }
 
 #if ASYNC_WITH_SETUP
@@ -1447,6 +1446,7 @@ void jRenderer::Render()
             ImGui::SliderFloat("DirX", &gOptions.SunDir.x, -1.0f, 1.0f);
             ImGui::SliderFloat("DirY", &gOptions.SunDir.y, -1.0f, 1.0f);
             ImGui::SliderFloat("DirZ", &gOptions.SunDir.z, -1.0f, 1.0f);
+            ImGui::Checkbox("ShowOriginHDR", &gOptions.ShowOriginHDR);
             ImGui::End();
 #endif
         });

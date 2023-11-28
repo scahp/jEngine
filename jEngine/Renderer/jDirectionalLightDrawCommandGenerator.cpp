@@ -3,6 +3,7 @@
 #include "jPrimitiveUtil.h"
 #include "jOptions.h"
 #include "Scene/jRenderObject.h"
+#include "jSceneRenderTargets.h"
 
 jObject* jDirectionalLightDrawCommandGenerator::GlobalFullscreenPrimitive = nullptr;
 
@@ -60,6 +61,23 @@ void jDirectionalLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* Ou
 
     jShaderBindingInstanceArray CopyShaderBindingInstances = ShaderBindingInstances;
     CopyShaderBindingInstances.Add(InLightView.ShaderBindingInstance.get());
+
+    // temp
+    jShaderBindingArray ShaderBindingArray;
+    jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
+    if (gOptions.ShowOriginHDR)
+    {
+        ShaderBindingArray.Add(jShaderBinding::APPEND_LAST, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
+            , ResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::OriginHDR, nullptr));
+    }
+    else
+    {
+        ShaderBindingArray.Add(jShaderBinding::APPEND_LAST, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
+            , ResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::IrradianceMap->GetTexture(), nullptr));
+    }
+    temp = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
+    CopyShaderBindingInstances.Add(temp.get());
+    //
 
     check(OutDestDrawCommand);
     new (OutDestDrawCommand) jDrawCommand(InRenderFrameContextPtr, &InLightView, GlobalFullscreenPrimitive->RenderObjects[0], InRenderPass

@@ -31,4 +31,6 @@ public:
 
     jGraphicsPipelineShader Shader;
     const jShaderBindingInstanceArray& ShaderBindingInstances;
+
+    std::shared_ptr<jShaderBindingInstance> temp;
 };

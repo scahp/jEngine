@@ -91,6 +91,8 @@ struct jShaderBindingResourceInlineAllocator
 
 struct jShaderBinding
 {
+    static constexpr int32 APPEND_LAST = -1;        // BindingPoint is appending last
+
     jShaderBinding() = default;
     jShaderBinding(const int32 InBindingPoint, const int32 InNumOfDescriptors, const EShaderBindingType InBindingType
         , const EShaderAccessStageFlag InAccessStageFlags, const jShaderBindingResource* InResource = nullptr, bool InIsInline = false)

@@ -15,6 +15,7 @@
 #include "FileLoader/jModelLoader.h"
 #include "Scene/jMeshObject.h"
 #include "FileLoader/jImageFileLoader.h"
+#include "Renderer/jSceneRenderTargets.h"    // 임시
 
 jRHI* g_rhi = nullptr;
 
@@ -52,7 +53,7 @@ void jGame::Setup()
 
 #if ENABLE_PBR
 	// PBR will use light color as a flux,
-	float LightColorScale = 150.0f;
+	float LightColorScale = 15000.0f;
 #else
 	float LightColorScale = 1.0f;
 #endif
@@ -66,9 +67,9 @@ void jGame::Setup()
 
     // Create lights
     NormalDirectionalLight = jLight::CreateDirectionalLight(Vector(0.1f, -0.5f, 0.1f) // AppSettings.DirecionalLightDirection
-        , Vector4(0.3f), Vector(1.0f), Vector(1.0f), 64);
-    PointLight = jLight::CreatePointLight(Vector(10.0f, 100.0f, 10.0f), Vector4(1.0f, 0.75f, 0.75f, 1.0f) * LightColorScale, 1500.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
-    SpotLight = jLight::CreateSpotLight(Vector(0.0f, 60.0f, 5.0f), Vector(1.0f, -1.0f, 0.4f).GetNormalize(), Vector4(0.0f, 1.0f, 0.0f, 1.0f) * LightColorScale, 2000.0f, 0.35f, 1.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
+        , Vector4(30.0f), Vector(1.0f), Vector(1.0f), 64);
+    //PointLight = jLight::CreatePointLight(Vector(10.0f, 100.0f, 10.0f), Vector4(1.0f, 0.75f, 0.75f, 1.0f) * LightColorScale, 1500.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
+    //SpotLight = jLight::CreateSpotLight(Vector(0.0f, 60.0f, 5.0f), Vector(1.0f, -1.0f, 0.4f).GetNormalize(), Vector4(0.0f, 1.0f, 0.0f, 1.0f) * LightColorScale, 2000.0f, 0.35f, 1.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
 #else
 	// Create main camera
 	//const Vector mainCameraPos(-111.6f, 17.49f, 3.11f);
@@ -158,7 +159,7 @@ void jGame::Setup()
 		jObject::AddObject(Sponza);
 		SpawnedObjects.push_back(Sponza);
 
-        auto sphere = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f), 1.0, 150, Vector(30.0f), Vector4(1.0f, 0.0f, 0.0f, 1.0f));
+        auto sphere = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f), 1.0, 150, Vector(30.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
         sphere->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
         {
             float RotationSpeed = 100.0f;
@@ -391,6 +392,9 @@ void jGame::Release()
     delete PointLightInfo;
     delete SpotLightInfo;
 	delete DirectionalLightShadowMapUIDebug;
+
+	// 임시
+    jSceneRenderTarget::IrradianceMap.reset();
 }
 
 void jGame::SpawnTestPrimitives()

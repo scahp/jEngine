@@ -7,6 +7,9 @@
 #include "Scene/Light/jSpotLight.h"
 #include "jOptions.h"
 
+std::shared_ptr<jRenderTarget> jSceneRenderTarget::IrradianceMap;
+jTexture* jSceneRenderTarget::OriginHDR = nullptr;    // 임시
+
 void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::vector<jLight*>* InLights)
 {
     jRenderTargetInfo ColorRTInfo = { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f) };

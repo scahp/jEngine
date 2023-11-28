@@ -40,6 +40,9 @@ Texture2D DirectionalLightShadowMap : register(t1, space2);
 SamplerComparisonState DirectionalLightShadowMapSampler : register(s1, space2);
 #endif
 
+Texture2D IrradianceMap : register(t0, space3);
+SamplerState IrradianceMapSamplerState : register(s0, space3);
+
 float4 main(VSOutput input
 #if USE_VARIABLE_SHADING_RATE
     , uint shadingRate : SV_ShadingRate
@@ -81,18 +84,21 @@ float4 main(VSOutput input
     }
 #endif // USE_SHADOW_MAP
 
-#if USE_PBR
     float3 L = -DirectionalLight.Direction;
     float3 N = WorldNormal;
     float3 V = ViewWorld;
     const float DistanceToLight = 1.0f;     // Directional light from the Sun is not having attenuation by using distance
+#if USE_PBR
     color.xyz = PBR(L, N, V, Albedo, DirectionalLight.Color, DistanceToLight, Metallic, Roughness) * Lit;
     color.w = 1.0f;
-    return color;
 #else // USE_PBR
     float3 DirectionalLightLit = GetDirectionalLight(DirectionalLight, WorldNormal, ViewWorld) * Lit;
     color = (1.0 / 3.141592653) * float4(Albedo * DirectionalLightLit, 1.0);
 #endif // USE_PBR
+
+    // todo : Need to split shader, because it is possible that ILB without directional light
+    float3 ambient = IBL_DiffusePart(L, N, V, Albedo, Metallic, Roughness, IrradianceMap, IrradianceMapSamplerState);
+    color.xyz += ambient;
 
     return color;
 }

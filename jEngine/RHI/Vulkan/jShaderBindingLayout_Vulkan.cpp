@@ -74,10 +74,19 @@ void jShaderBindingLayout_Vulkan::Release()
 VkDescriptorSetLayout jShaderBindingLayout_Vulkan::CreateDescriptorSetLayout(const jShaderBindingArray& InShaderBindingArray)
 {
     std::vector<VkDescriptorSetLayoutBinding> bindings;
+    int32 LastBindingIndex = 0;
     for (int32 i = 0; i < (int32)InShaderBindingArray.NumOfData; ++i)
     {
         VkDescriptorSetLayoutBinding binding = {};
-        binding.binding = InShaderBindingArray[i]->BindingPoint;
+        if (InShaderBindingArray[i]->BindingPoint != jShaderBinding::APPEND_LAST)
+        {
+            binding.binding = InShaderBindingArray[i]->BindingPoint;
+            LastBindingIndex = InShaderBindingArray[i]->BindingPoint + 1;
+        }
+        else
+        {
+            binding.binding = LastBindingIndex++;
+        }
         binding.descriptorType = GetVulkanShaderBindingType(InShaderBindingArray[i]->BindingType);
         binding.descriptorCount = InShaderBindingArray[i]->NumOfDescriptors;
         binding.stageFlags = GetVulkanShaderAccessFlags(InShaderBindingArray[i]->AccessStageFlags);

@@ -5,6 +5,9 @@ class jSwapchainImage;
 
 struct jSceneRenderTarget
 {
+    static std::shared_ptr<jRenderTarget> IrradianceMap;    // 임시
+    static jTexture* OriginHDR;    // 임시
+
     std::shared_ptr<jRenderTarget> ColorPtr;
     std::shared_ptr<jRenderTarget> DepthPtr;
     std::shared_ptr<jRenderTarget> ResolvePtr;
