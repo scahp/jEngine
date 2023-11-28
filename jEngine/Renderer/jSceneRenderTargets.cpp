@@ -12,7 +12,7 @@ jTexture* jSceneRenderTarget::OriginHDR = nullptr;    // 임시
 
 void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::vector<jLight*>* InLights)
 {
-    jRenderTargetInfo ColorRTInfo = { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f) };
+    jRenderTargetInfo ColorRTInfo = { ETextureType::TEXTURE_2D, ETextureFormat::R11G11B10F, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f) };
     ColorRTInfo.ResourceName = TEXT("ColorPtr");
     ColorPtr = jRenderTargetPool::GetRenderTarget(ColorRTInfo);
 
@@ -99,12 +99,13 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
     }
 
     wchar_t TempStr[256] = { 0, };
+    ETextureFormat GBufferTexFormat[_countof(GBuffer)] = { ETextureFormat::RGBA16F, ETextureFormat::RGBA16F, ETextureFormat::R11G11B10F };
     for (int32 i = 0; i < _countof(GBuffer); ++i)
     {
         const bool UseAsSubpassInput = gOptions.UseSubpass;
         const bool IsMemoryless = gOptions.UseMemoryless && gOptions.UseSubpass;
 
-        jRenderTargetInfo Info = { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, SCR_WIDTH, SCR_HEIGHT
+        jRenderTargetInfo Info = { ETextureType::TEXTURE_2D, GBufferTexFormat[i], SCR_WIDTH, SCR_HEIGHT
             , 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f), ETextureCreateFlag::NONE, UseAsSubpassInput, IsMemoryless };
 
         wsprintf(TempStr, TEXT("GBuffer[%d]"), i);

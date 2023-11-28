@@ -15,7 +15,8 @@ float3 GenerateIrradiance(float3 InNormal)
     float nrSamples = 0.0;
 
     float3 irradiance = float3(0.0, 0.0, 0.0);
-    float sampleDelta = 0.025;
+    // float sampleDelta = 0.005f;
+    float sampleDelta = 0.01f;
     for (float phi = sampleDelta; phi <= 2.0 * PI; phi += sampleDelta)
     {
         for (float theta = sampleDelta; theta <= 0.5 * PI; theta += sampleDelta)
