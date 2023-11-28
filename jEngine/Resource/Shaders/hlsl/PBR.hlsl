@@ -69,18 +69,26 @@ float3 PBR(float3 InL, float3 InN, float3 InV, float3 InAlbedo, float3 InLightCo
     return Lo;
 }
 
-float3 IBL_DiffusePart(float3 InL, float3 InN, float3 InV, float3 InAlbedo, float InMetallic, float InRoughness, Texture2D InIrradianceMap, SamplerState InIrradianceMapSamplerState)
+// https://learnopengl.com/PBR/IBL/Diffuse-irradiance
+// To account for roughness for IBL Diffuse part, because IBL don't have half vector which introduced by roughness.
+float3 FresnelSchlickRoughness(float InCosTheta, float3 InF0, float InRoughness)
+{
+    float3 InvRoughness = float3(1.0f - InRoughness, 1.0f - InRoughness, 1.0f - InRoughness);
+    return InF0 + (max(InvRoughness, InF0) - InF0) * pow(clamp(1.0 - InCosTheta, 0.0, 1.0), 5.0);
+}
+
+float3 IBL_DiffusePart(float3 InN, float3 InV, float3 InAlbedo, float InMetallic, float InRoughness, Texture2D InIrradianceMap, SamplerState InIrradianceMapSamplerState)
 {
     float3 F0 = float3(0.04f, 0.04f, 0.04f);
     F0 = lerp(F0, InAlbedo, InMetallic);
 
-    float3 H = normalize(InV + InL);
-    float3 F = FresnelSchlick(max(dot(H, InV), 0.0f), F0);
+    float3 F = FresnelSchlickRoughness(max(dot(InN, InV), 0.0f), F0, InRoughness);
     float3 kS = F;
 
     float3 kD = 1.0 - kS;
     float2 uv = GetSphericalMap_TwoMirrorBall(InN);
     uv.y = 1.0 - uv.y;
+
     float3 irradiance = InIrradianceMap.Sample(InIrradianceMapSamplerState, uv).rgb;
     float3 diffuse = irradiance * InAlbedo;
     float ao = 1;

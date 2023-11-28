@@ -97,7 +97,7 @@ float4 main(VSOutput input
 #endif // USE_PBR
 
     // todo : Need to split shader, because it is possible that ILB without directional light
-    float3 ambient = IBL_DiffusePart(L, N, V, Albedo, Metallic, Roughness, IrradianceMap, IrradianceMapSamplerState);
+    float3 ambient = IBL_DiffusePart(N, V, Albedo, Metallic, Roughness, IrradianceMap, IrradianceMapSamplerState);
     color.xyz += ambient;
 
     return color;
