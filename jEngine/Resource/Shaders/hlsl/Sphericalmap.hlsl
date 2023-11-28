@@ -58,6 +58,11 @@ float3 GetNormalFromTexCoord_TwoMirrorBall(float2 InTexCoord)
     float v = InTexCoord.y;
 
     float z = cos(sqrt((u - 0.5) * (u - 0.5) + (v - 0.5) * (v - 0.5)) / 0.159154943);
+    if (z == 1)
+    {
+        return float3(0.0f, 0.0f, 1.0f);
+    }
+
     float r = 0.159154943 * acos(z) / sqrt(1.0 - z * z);
     float x = (u - 0.5) / r;
     float y = (v - 0.5) / r;
