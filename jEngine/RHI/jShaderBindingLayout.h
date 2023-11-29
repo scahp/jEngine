@@ -47,12 +47,13 @@ struct jSamplerResource : public jShaderBindingResource
 struct jTextureResource : public jSamplerResource
 {
     jTextureResource() = default;
-    jTextureResource(const jTexture* InTexture, const jSamplerStateInfo* InSamplerState)
-        : jSamplerResource(InSamplerState), Texture(InTexture) {}
+    jTextureResource(const jTexture* InTexture, const jSamplerStateInfo* InSamplerState, int32 InMipLevel = 0)
+        : jSamplerResource(InSamplerState), Texture(InTexture), MipLevel(InMipLevel) {}
     virtual ~jTextureResource() {}
     virtual const void* GetResource() const override { return Texture; }
 
     const jTexture* Texture = nullptr;
+    const int32 MipLevel = 0;
 };
 
 struct jTextureArrayResource : public jShaderBindingResource

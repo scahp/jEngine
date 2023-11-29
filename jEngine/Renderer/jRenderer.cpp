@@ -70,18 +70,18 @@ void jRenderer::Setup()
     }
 
     // GenIrradianceMap Test
+    static jName FilePath = jName("Resource/stpeters_probe.hdr");
     if (!jSceneRenderTarget::IrradianceMap)
     {
         DEBUG_EVENT(RenderFrameContextPtr, "GenIrradianceMap");
         //////////////////////////////////////////////////////////////////////////
         // Compute Pipeline
 
-        jName FilePath = jName("Resource/stpeters_probe.hdr");
         jSceneRenderTarget::OriginHDR = jImageFileLoader::GetInstance().LoadTextureFromFile(FilePath, false, true).lock().get();
 
         static jRenderTargetInfo Info = { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, 1000, 1000
             , 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f), ETextureCreateFlag::RTV | ETextureCreateFlag::UAV, false, false };
-        Info.ResourceName = L"HDRRT";
+        Info.ResourceName = L"IrradianceMap";
         jSceneRenderTarget::IrradianceMap = jRenderTargetPool::GetRenderTarget(Info);
 
         g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::OriginHDR, EImageLayout::SHADER_READ_ONLY);
@@ -141,6 +141,107 @@ void jRenderer::Setup()
         g_rhi->DispatchCompute(RenderFrameContextPtr, 63, 63, 1);
 
         g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::IrradianceMap->GetTexture(), EImageLayout::SHADER_READ_ONLY);
+    }
+
+    // GenFilteredEnvMap Test
+    if (!jSceneRenderTarget::FilteredEnvMap)
+    {
+        DEBUG_EVENT(RenderFrameContextPtr, "GenFilteredEnvMap");
+        //////////////////////////////////////////////////////////////////////////
+        // Compute Pipeline
+
+        if (!jSceneRenderTarget::OriginHDR)
+        {
+            jSceneRenderTarget::OriginHDR = jImageFileLoader::GetInstance().LoadTextureFromFile(FilePath, false, true).lock().get();
+        }
+
+        static jRenderTargetInfo Info = { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, jSceneRenderTarget::OriginHDR->Width, jSceneRenderTarget::OriginHDR->Height
+            , 1, true, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f), ETextureCreateFlag::RTV | ETextureCreateFlag::UAV, false, false };
+        Info.ResourceName = L"FilteredEnvMap";
+        jSceneRenderTarget::FilteredEnvMap = jRenderTargetPool::GetRenderTarget(Info);
+
+        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::OriginHDR, EImageLayout::SHADER_READ_ONLY);
+        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::FilteredEnvMap->GetTexture(), EImageLayout::GENERAL);
+
+        struct jMipUniformBuffer
+        {
+            int32 Width;
+            int32 Height;
+            int32 mip;
+            int32 maxMip;
+        };
+        jMipUniformBuffer MipUBO;
+        MipUBO.maxMip = jTexture::GetMipLevels(jSceneRenderTarget::FilteredEnvMap->Info.Width, jSceneRenderTarget::FilteredEnvMap->Info.Height);
+
+        for (int32 i = 0; i < MipUBO.maxMip; ++i)
+        {
+            MipUBO.Width = jSceneRenderTarget::FilteredEnvMap->Info.Width >> i;
+            MipUBO.Height = jSceneRenderTarget::FilteredEnvMap->Info.Height >> i;
+            MipUBO.mip = i;
+
+            std::shared_ptr<jShaderBindingInstance> CurrentBindingInstance = nullptr;
+            int32 BindingPoint = 0;
+            jShaderBindingArray ShaderBindingArray;
+            jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
+
+            // Binding 0
+            if (ensure(jSceneRenderTarget::OriginHDR))
+            {
+                ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
+                    , ResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::OriginHDR, nullptr));
+            }
+
+            // Binding 1
+            if (ensure(jSceneRenderTarget::FilteredEnvMap && jSceneRenderTarget::FilteredEnvMap->GetTexture()))
+            {
+                ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE
+                    , ResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::FilteredEnvMap->GetTexture(), nullptr, i));
+            }
+
+            // Binding 2
+            auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(jNameStatic("MipUniformBuffer"), jLifeTimeType::OneFrame, sizeof(MipUBO)));
+            OneFrameUniformBuffer->UpdateBufferData(&MipUBO, sizeof(MipUBO));
+            ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
+                , ResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true);
+
+            CurrentBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
+
+            jShaderInfo shaderInfo;
+            shaderInfo.SetName(jNameStatic("GenFilteredEnvMap"));
+            shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/genprefilteredenvmap_cs.hlsl"));
+            shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
+            static jShader* Shader = g_rhi->CreateShader(shaderInfo);
+
+            jShaderBindingLayoutArray ShaderBindingLayoutArray;
+            ShaderBindingLayoutArray.Add(CurrentBindingInstance->ShaderBindingsLayouts);
+
+            jPipelineStateInfo* computePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingLayoutArray, {});
+
+            computePipelineStateInfo->Bind(RenderFrameContextPtr);
+
+            jShaderBindingInstanceArray ShaderBindingInstanceArray;
+            ShaderBindingInstanceArray.Add(CurrentBindingInstance.get());
+
+            jShaderBindingInstanceCombiner ShaderBindingInstanceCombiner;
+            for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
+            {
+                // Add ShaderBindingInstanceCombiner data : DescriptorSets, DynamicOffsets
+                ShaderBindingInstanceCombiner.DescriptorSetHandles.Add(ShaderBindingInstanceArray[i]->GetHandle());
+                const std::vector<uint32>* pDynamicOffsetTest = ShaderBindingInstanceArray[i]->GetDynamicOffsets();
+                if (pDynamicOffsetTest && pDynamicOffsetTest->size())
+                {
+                    ShaderBindingInstanceCombiner.DynamicOffsets.Add((void*)pDynamicOffsetTest->data(), (int32)pDynamicOffsetTest->size());
+                }
+            }
+            ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
+
+            g_rhi->BindComputeShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), computePipelineStateInfo, ShaderBindingInstanceCombiner, 0);
+            g_rhi->DispatchCompute(RenderFrameContextPtr
+                , MipUBO.Width / 16 + ((MipUBO.Width % 16) ? 1 : 0)
+                , MipUBO.Height / 16 + ((MipUBO.Height % 16) ? 1 : 0)
+                , 1);
+        }
+        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::FilteredEnvMap->GetTexture(), EImageLayout::SHADER_READ_ONLY);
     }
 
 #if ASYNC_WITH_SETUP

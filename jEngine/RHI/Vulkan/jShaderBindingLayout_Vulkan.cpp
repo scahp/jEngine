@@ -376,7 +376,25 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(int32 InIndex, const jShaderBin
         {
             VkDescriptorImageInfo& imageInfo = WriteDescriptorInfos[InIndex].ImageInfo;
             imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-            imageInfo.imageView = ((const jTexture_Vulkan*)tbor->Texture)->View;
+
+            const jTexture_Vulkan* Texture = (const jTexture_Vulkan*)tbor->Texture;
+            if (tbor->MipLevel == 0)
+            {
+                imageInfo.imageView = Texture->View;
+            }
+            else
+            {
+                auto it_find = Texture->ViewForMipMap.find(tbor->MipLevel);
+                if (it_find != Texture->ViewForMipMap.end() && it_find->second)
+                {
+                    imageInfo.imageView = it_find->second;
+                }
+                else
+                {
+                    imageInfo.imageView = Texture->View;
+                }
+            }
+
             if (tbor->SamplerState)
                 imageInfo.sampler = (VkSampler)tbor->SamplerState->GetHandle();
             if (!imageInfo.sampler)

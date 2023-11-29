@@ -111,7 +111,19 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
         case EShaderBindingType::TEXTURE_UAV:
         {
             jTexture_DX12* Tex = (jTexture_DX12*)ShaderBinding->Resource->GetResource();
-            Descriptors.push_back({ .Descriptor = Tex->UAV, .ResourceName = Tex->ResourceName, .Resource = Tex });
+            const jTextureResource* tbor = reinterpret_cast<const jTextureResource*>(ShaderBinding->Resource);
+            if (tbor->MipLevel == 0)
+            {
+                Descriptors.push_back({ .Descriptor = Tex->UAV, .ResourceName = Tex->ResourceName, .Resource = Tex });
+            }
+            else
+            {
+                auto it_find = Tex->UAVMipMap.find(tbor->MipLevel);
+                if (it_find != Tex->UAVMipMap.end() && it_find->second.IsValid())
+                    Descriptors.push_back({ .Descriptor = it_find->second, .ResourceName = Tex->ResourceName, .Resource = Tex });
+                else
+                    Descriptors.push_back({ .Descriptor = Tex->UAV, .ResourceName = Tex->ResourceName, .Resource = Tex });
+            }            
             break;
         }
         case EShaderBindingType::BUFFER_UAV:

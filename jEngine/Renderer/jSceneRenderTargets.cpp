@@ -7,8 +7,10 @@
 #include "Scene/Light/jSpotLight.h"
 #include "jOptions.h"
 
+// 임시
 std::shared_ptr<jRenderTarget> jSceneRenderTarget::IrradianceMap;
-jTexture* jSceneRenderTarget::OriginHDR = nullptr;    // 임시
+jTexture* jSceneRenderTarget::OriginHDR = nullptr;
+std::shared_ptr<jRenderTarget> jSceneRenderTarget::FilteredEnvMap;
 
 void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::vector<jLight*>* InLights)
 {

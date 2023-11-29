@@ -888,6 +888,7 @@ std::shared_ptr<jRenderTarget> jRHI_Vulkan::CreateRenderTarget(const jRenderTarg
 	VkImage image = nullptr;
 	VkImageView imageView = nullptr;
 	VkDeviceMemory imageMemory = nullptr;
+	std::map<int32, VkImageView> imageViewForMipMap;
 
 	switch (info.Type)
 	{
@@ -895,17 +896,38 @@ std::shared_ptr<jRenderTarget> jRHI_Vulkan::CreateRenderTarget(const jRenderTarg
 		jBufferUtil_Vulkan::CreateImage(info.Width, info.Height, mipLevels, (VkSampleCountFlagBits)info.SampleCount
 			, textureFormat, TilingMode, ImageUsageFlag, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, image, imageMemory);
 		imageView = jBufferUtil_Vulkan::CreateImageView(image, textureFormat, ImageAspectFlag, mipLevels);
+		imageViewForMipMap[0] = imageView;
+		
+		check(mipLevels > 0);
+		for(int32 i=1;i<mipLevels;++i)
+		{
+			imageViewForMipMap[i] = jBufferUtil_Vulkan::CreateImageViewForSpecificMipMap(image, textureFormat, ImageAspectFlag, i);
+		}
 		break;
 	case ETextureType::TEXTURE_2D_ARRAY:
 		jBufferUtil_Vulkan::CreateImage2DArray(info.Width, info.Height, info.LayerCount, mipLevels, (VkSampleCountFlagBits)info.SampleCount
 			, textureFormat, TilingMode, ImageUsageFlag, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VkImageCreateFlagBits(0), image, imageMemory);
 		imageView = jBufferUtil_Vulkan::CreateImage2DArrayView(image, info.LayerCount, textureFormat, ImageAspectFlag, mipLevels);
+		imageViewForMipMap[0] = imageView;
+
+        check(mipLevels > 0);
+        for (int32 i = 1; i < mipLevels; ++i)
+        {
+            imageViewForMipMap[i] = jBufferUtil_Vulkan::CreateImage2DArrayViewForSpecificMipMap(image, info.LayerCount, textureFormat, ImageAspectFlag, i);
+        }
 		break;
 	case ETextureType::TEXTURE_CUBE:
 		check(info.LayerCount == 6);
 		jBufferUtil_Vulkan::CreateImageCube(info.Width, info.Height, mipLevels, (VkSampleCountFlagBits)info.SampleCount
 			, textureFormat, TilingMode, ImageUsageFlag, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, image, imageMemory);
 		imageView = jBufferUtil_Vulkan::CreateImageCubeView(image, textureFormat, ImageAspectFlag, mipLevels);
+		imageViewForMipMap[0] = imageView;
+
+        check(mipLevels > 0);
+        for (int32 i = 1; i < mipLevels; ++i)
+        {
+            imageViewForMipMap[i] = jBufferUtil_Vulkan::CreateImageCubeViewForSpecificMipMap(image, textureFormat, ImageAspectFlag, i);
+        }
 		break;
 	default:
 		JMESSAGE("Unsupported type texture in FramebufferPool");
@@ -921,6 +943,7 @@ std::shared_ptr<jRenderTarget> jRHI_Vulkan::CreateRenderTarget(const jRenderTarg
 	tex_vk->LayerCount = info.LayerCount;
 	tex_vk->Image = image;
 	tex_vk->View = imageView;
+	tex_vk->ViewForMipMap = imageViewForMipMap;
 	tex_vk->Memory = imageMemory;
 	tex_vk->Layout = EImageLayout::UNDEFINED;
 	tex_vk->MipLevel = mipLevels;

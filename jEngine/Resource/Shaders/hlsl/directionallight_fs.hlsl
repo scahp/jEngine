@@ -43,6 +43,9 @@ SamplerComparisonState DirectionalLightShadowMapSampler : register(s1, space2);
 Texture2D IrradianceMap : register(t0, space3);
 SamplerState IrradianceMapSamplerState : register(s0, space3);
 
+Texture2D PrefilteredEnvMap : register(t1, space3);
+SamplerState PrefilteredEnvSamplerState : register(s1, space3);
+
 float4 main(VSOutput input
 #if USE_VARIABLE_SHADING_RATE
     , uint shadingRate : SV_ShadingRate
@@ -96,9 +99,23 @@ float4 main(VSOutput input
     color = (1.0 / 3.141592653) * float4(Albedo * DirectionalLightLit, 1.0);
 #endif // USE_PBR
 
-    // todo : Need to split shader, because it is possible that ILB without directional light
-    float3 ambient = IBL_DiffusePart(N, V, Albedo, Metallic, Roughness, IrradianceMap, IrradianceMapSamplerState);
-    color.xyz += ambient;
+    // ambient from IBL
+    {
+        // todo : Need to split shader, because it is possible that ILB without directional light
+        float3 DiffusePart = IBL_DiffusePart(N, V, Albedo, Metallic, Roughness, IrradianceMap, IrradianceMapSamplerState);
 
+        float NoV = saturate(dot(N, V));
+        float3 R = 2 * dot(V, N) * N - V;
+
+        float2 uv = GetSphericalMap_TwoMirrorBall(R);
+        uv.y = 1.0 - uv.y;
+        float3 PrefilteredColor = PrefilteredEnvMap.SampleLevel(PrefilteredEnvSamplerState, uv, Roughness * 11).rgb;
+        //float3 PrefilteredColor = PrefilterEnvMap(Roughness, R); 
+        //float2 EnvBRDF = IntegrateBRDF(Roughness, NoV, N);
+        float3 SpecularColor = float3(1, 1, 1);
+
+        float3 SpecularPart = PrefilteredColor * EnvBRDFApprox(SpecularColor, Roughness, NoV);
+        color.xyz += (DiffusePart + SpecularPart);
+    }
     return color;
 }

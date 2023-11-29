@@ -539,38 +539,48 @@ void CreateUnorderedAccessView(jTexture_DX12* InTexture)
         return;
 
     check(!InTexture->UAV.IsValid());
-    //InTexture->UAV = g_rhi_dx12->UAVDescriptorHeap.Alloc();
-    InTexture->UAV = g_rhi_dx12->DescriptorHeaps.Alloc();
-
-    D3D12_UNORDERED_ACCESS_VIEW_DESC Desc = { };
-    Desc.Format = GetDX12TextureFormat(InTexture->Format);
-    switch (InTexture->Type)
+    check(InTexture->MipLevel > 0);
+    for (int32 i = 0; i < InTexture->MipLevel; ++i)
     {
-    case ETextureType::TEXTURE_2D:
-        Desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-        Desc.Texture2D.MipSlice = 0;
-        Desc.Texture2D.PlaneSlice = 0;
-        break;
-    case ETextureType::TEXTURE_2D_ARRAY:
-        Desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
-        Desc.Texture2DArray.ArraySize = InTexture->LayerCount;
-        Desc.Texture2DArray.FirstArraySlice = 0;
-        Desc.Texture2DArray.MipSlice = 0;
-        Desc.Texture2DArray.PlaneSlice = 0;
-        break;
-    case ETextureType::TEXTURE_CUBE:
-        Desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-        Desc.Texture3D.FirstWSlice = 0;
-        Desc.Texture3D.MipSlice = 0;
-        Desc.Texture3D.WSize = InTexture->LayerCount;
-        break;
-    default:
-        check(0);
-        break;
-    }
+        jDescriptor_DX12 UAV = g_rhi_dx12->DescriptorHeaps.Alloc();
 
-    g_rhi_dx12->Device->CreateUnorderedAccessView(InTexture->Image.Get()
-        , nullptr, &Desc, InTexture->UAV.CPUHandle);
+        D3D12_UNORDERED_ACCESS_VIEW_DESC Desc = { };
+        Desc.Format = GetDX12TextureFormat(InTexture->Format);
+        switch (InTexture->Type)
+        {
+        case ETextureType::TEXTURE_2D:
+            Desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+            Desc.Texture2D.MipSlice = i;
+            Desc.Texture2D.PlaneSlice = 0;
+            break;
+        case ETextureType::TEXTURE_2D_ARRAY:
+            Desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
+            Desc.Texture2DArray.ArraySize = InTexture->LayerCount;
+            Desc.Texture2DArray.FirstArraySlice = 0;
+            Desc.Texture2DArray.MipSlice = i;
+            Desc.Texture2DArray.PlaneSlice = 0;
+            break;
+        case ETextureType::TEXTURE_CUBE:
+            Desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+            Desc.Texture3D.FirstWSlice = 0;
+            Desc.Texture3D.MipSlice = i;
+            Desc.Texture3D.WSize = InTexture->LayerCount;
+            break;
+        default:
+            check(0);
+            break;
+        }
+
+        g_rhi_dx12->Device->CreateUnorderedAccessView(InTexture->Image.Get()
+            , nullptr, &Desc, UAV.CPUHandle);
+     
+        if (i == 0)
+        {
+            InTexture->UAV = UAV;
+        }
+
+        InTexture->UAVMipMap[i] = UAV;
+    }
 }
 
 void CreateRenderTargetView(jTexture_DX12* InTexture)

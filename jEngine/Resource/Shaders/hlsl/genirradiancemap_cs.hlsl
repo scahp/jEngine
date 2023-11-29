@@ -48,7 +48,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     float2 Temp = GlobalInvocationID.xy / float2(1000, 1000);
     Temp -= float2(0.5, 0.5);
 
-    if (length(Temp) > 0.5)
+    if (length(Temp) >= 0.5)
         return;
 
     float3 dir = GetNormalFromTexCoord_TwoMirrorBall(GlobalInvocationID.xy / float2(1000, 1000));

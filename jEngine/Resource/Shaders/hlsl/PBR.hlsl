@@ -31,9 +31,17 @@ float GeometrySchlickGGX(float InNdotV, float InRoughness)
 float GeometrySmith(float3 InN, float3 InV, float3 InL, float InRoughness)
 {
     float NdotV = max(dot(InN, InV), 0.0f);
-    float NdotL = max(dot(InN, InV), 0.0f);
+    float NdotL = max(dot(InN, InL), 0.0f);
     float ggx2 = GeometrySchlickGGX(NdotV, InRoughness);
     float ggx1 = GeometrySchlickGGX(NdotL, InRoughness);
+
+    return ggx1 * ggx2;
+}
+
+float GeometrySmith(float InRoughness, float InNdotV, float InNdotN)
+{
+    float ggx2 = GeometrySchlickGGX(InNdotV, InRoughness);
+    float ggx1 = GeometrySchlickGGX(InNdotN, InRoughness);
 
     return ggx1 * ggx2;
 }
@@ -95,4 +103,133 @@ float3 IBL_DiffusePart(float3 InN, float3 InV, float3 InAlbedo, float InMetallic
     float3 ambient = (kD * diffuse) * ao;
 
     return ambient;
+}
+
+float3 ImportanceSampleGGX(float2 Xi, float Roughness, float3 N)
+{
+    float a = Roughness * Roughness;
+    float Phi = 2 * PI * Xi.x;
+    float CosTheta = sqrt((1 - Xi.y) / (1 + (a * a - 1) * Xi.y));
+    float SinTheta = sqrt(1 - CosTheta * CosTheta);
+
+    float3 H;
+    H.x = SinTheta * cos(Phi);
+    H.y = SinTheta * sin(Phi);
+    H.z = CosTheta;
+
+    float3 UpVector = abs(N.z) < 0.999 ? float3(0, 0, 1) : float3(1, 0, 0);
+    float3 TangentX = normalize(cross(UpVector, N));
+    float3 TangentY = cross(N, TangentX);
+
+    // Tangent to world space
+    return TangentX * H.x + TangentY * H.y + N * H.z;
+}
+
+/** Reverses all the 32 bits. */
+uint ReverseBits32(uint bits)
+{
+    //#if SM5_PROFILE || COMPILER_METAL
+    //	return reversebits( bits );
+    //#else
+    bits = (bits << 16) | (bits >> 16);
+    bits = ((bits & 0x00ff00ff) << 8) | ((bits & 0xff00ff00) >> 8);
+    bits = ((bits & 0x0f0f0f0f) << 4) | ((bits & 0xf0f0f0f0) >> 4);
+    bits = ((bits & 0x33333333) << 2) | ((bits & 0xcccccccc) >> 2);
+    bits = ((bits & 0x55555555) << 1) | ((bits & 0xaaaaaaaa) >> 1);
+    return bits;
+    //#endif
+}
+
+float2 Hammersley(uint Index, uint NumSamples, uint2 Random)
+{
+    float E1 = frac((float)Index / NumSamples + float(Random.x & 0xffff) / (1 << 16));
+    float E2 = float(ReverseBits32(Index) ^ Random.y) * 2.3283064365386963e-10;
+    return float2(E1, E2);
+}
+
+float3 PrefilterEnvMap(float Roughness, float3 R, Texture2D EnvMap, SamplerState EnvMapSampler)
+{
+    float3 N = R;
+    float3 V = R;
+    float3 PrefilteredColor = 0;
+    float TotalWeight = 0;
+    const uint NumSamples = 1024;
+
+    for (uint i = 0; i < NumSamples; i++)
+    {
+        float2 Xi = Hammersley(i, NumSamples, 0);
+        float3 H = ImportanceSampleGGX(Xi, Roughness, N);
+        float3 L = 2 * dot(V, H) * H - V;
+        float NoL = saturate(dot(N, L));
+        if (NoL > 0)
+        {
+            float2 uv = GetSphericalMap_TwoMirrorBall(L);
+            PrefilteredColor += EnvMap.SampleLevel(EnvMapSampler, uv, 0).rgb * NoL;
+            TotalWeight += NoL;
+        }
+    }
+    return PrefilteredColor / TotalWeight;
+}
+
+//float G_Smith(float a, float nDotV, float nDotL)
+//{
+//    return GGX(nDotL, a * a) * GGX(nDotV, a * a);
+//}
+
+float2 IntegrateBRDF(float Roughness, float NoV, float3 N) 
+{
+    float3 V; V.x = sqrt(1.0f - NoV * NoV); // sin 
+    V.y = 0; 
+    V.z = NoV; // cos 
+    float A = 0;
+    float B = 0; 
+    
+    const uint NumSamples = 1024; 
+    for(int i = 0; i < NumSamples; i++ ) 
+    { 
+        float2 Xi = Hammersley( i, NumSamples, 0 ); 
+        float3 H = ImportanceSampleGGX( Xi, Roughness, N ); 
+        float3 L = 2 * dot( V, H ) * H - V; 
+        
+        float NoL = saturate( L.z ); 
+        float NoH = saturate( H.z ); 
+        float VoH = saturate(dot( V, H ) ); 
+        
+        if( NoL > 0 ) 
+        { 
+            float G = GeometrySmith( Roughness , NoV, NoL );
+
+            float G_Vis = G * VoH / (NoH * NoV); 
+            float Fc = pow( 1 - VoH, 5 ); 
+            A += (1 - Fc) * G_Vis; 
+            B += Fc * G_Vis; 
+        } 
+    } 
+    
+    return float2( A, B ) / NumSamples; 
+}
+
+// From UnrealEngine 5.3.2
+half2 EnvBRDFApproxLazarov(half Roughness, half NoV)
+{
+    // [ Lazarov 2013, "Getting More Physical in Call of Duty: Black Ops II" ]
+    // Adaptation to fit our G term.
+    const half4 c0 = { -1, -0.0275, -0.572, 0.022 };
+    const half4 c1 = { 1, 0.0425, 1.04, -0.04 };
+    half4 r = Roughness * c0 + c1;
+    half a004 = min(r.x * r.x, exp2(-9.28 * NoV)) * r.x + r.y;
+    half2 AB = half2(-1.04, 1.04) * a004 + r.zw;
+    return AB;
+}
+
+// From UnrealEngine 5.3.2
+half3 EnvBRDFApprox(half3 SpecularColor, half Roughness, half NoV)
+{
+    half2 AB = EnvBRDFApproxLazarov(Roughness, NoV);
+
+    // Anything less than 2% is physically impossible and is instead considered to be shadowing
+    // Note: this is needed for the 'specular' show flag to work, since it uses a SpecularColor of 0
+    float F90 = saturate(50.0 * SpecularColor.g);
+
+    return SpecularColor * AB.x + F90 * AB.y;
 }

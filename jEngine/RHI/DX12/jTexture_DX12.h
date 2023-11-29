@@ -19,6 +19,8 @@ struct jTexture_DX12 : public jTexture
     jDescriptor_DX12 RTV;
     jDescriptor_DX12 DSV;
 
+    std::map<int32, jDescriptor_DX12> UAVMipMap;
+
     virtual void* GetHandle() const override { return Image.Get(); }
     virtual void* GetSamplerStateHandle() const override { return nullptr; }
     virtual void Release() override {}
