@@ -69,8 +69,9 @@ void jRenderer::Setup()
         }       
     }
 
-    // GenIrradianceMap Test
     static jName FilePath = jName("Resource/stpeters_probe.hdr");
+    
+    // GenIrradianceMap Test
     if (!jSceneRenderTarget::IrradianceMap)
     {
         DEBUG_EVENT(RenderFrameContextPtr, "GenIrradianceMap");
@@ -243,6 +244,127 @@ void jRenderer::Setup()
         }
         g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::FilteredEnvMap->GetTexture(), EImageLayout::SHADER_READ_ONLY);
     }
+    
+
+    static bool test = false;
+    if (!test)
+    {
+        test = true;
+
+        DEBUG_EVENT(RenderFrameContextPtr, "DrawCubemap");
+        //////////////////////////////////////////////////////////////////////////
+        // Compute Pipeline
+
+        if (!jSceneRenderTarget::OriginHDR)
+        {
+            jSceneRenderTarget::OriginHDR = jImageFileLoader::GetInstance().LoadTextureFromFile(FilePath, false, true).lock().get();
+        }
+
+        static jRenderTargetInfo Info = { ETextureType::TEXTURE_CUBE, ETextureFormat::RGBA16F, jSceneRenderTarget::OriginHDR->Width, jSceneRenderTarget::OriginHDR->Height
+            , 6, true, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f), ETextureCreateFlag::RTV | ETextureCreateFlag::UAV, false, false };
+        Info.ResourceName = L"FilteredEnvMap";
+        auto CubeMap = jRenderTargetPool::GetRenderTarget(Info);
+        jSceneRenderTarget::CubeEnvMap = CubeMap;
+
+        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::OriginHDR, EImageLayout::SHADER_READ_ONLY);
+        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), CubeMap->GetTexture(), EImageLayout::GENERAL);
+
+        struct jMipUniformBuffer
+        {
+            int32 Width;
+            int32 Height;
+            int32 mip;
+            int32 maxMip;
+        };
+        jMipUniformBuffer MipUBO;
+        MipUBO.maxMip = jTexture::GetMipLevels(CubeMap->Info.Width, CubeMap->Info.Height);
+
+        for (int32 i = 0; i < MipUBO.maxMip; ++i)
+        {
+            MipUBO.Width = CubeMap->Info.Width >> i;
+            MipUBO.Height = CubeMap->Info.Height >> i;
+            MipUBO.mip = i;
+
+            std::shared_ptr<jShaderBindingInstance> CurrentBindingInstance = nullptr;
+            int32 BindingPoint = 0;
+            jShaderBindingArray ShaderBindingArray;
+            jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
+
+            // Binding 0
+            if (ensure(jSceneRenderTarget::OriginHDR))
+            {
+                ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
+                    , ResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::OriginHDR, nullptr));
+            }
+
+            // Binding 1
+            if (ensure(CubeMap && CubeMap->GetTexture()))
+            {
+                ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE
+                    , ResourceInlineAllactor.Alloc<jTextureResource>(CubeMap->GetTexture(), nullptr, i));
+            }
+
+            // Binding 2
+            auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(jNameStatic("MipUniformBuffer"), jLifeTimeType::OneFrame, sizeof(MipUBO)));
+            OneFrameUniformBuffer->UpdateBufferData(&MipUBO, sizeof(MipUBO));
+            ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
+                , ResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true);
+
+            CurrentBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
+
+            jShaderInfo shaderInfo;
+            shaderInfo.SetName(jNameStatic("GenCubemapFromSphericalProbe"));
+            shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/gencubemapfromsphericalprobe_cs.hlsl"));
+            shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
+            static jShader* Shader = g_rhi->CreateShader(shaderInfo);
+
+            jShaderBindingLayoutArray ShaderBindingLayoutArray;
+            ShaderBindingLayoutArray.Add(CurrentBindingInstance->ShaderBindingsLayouts);
+
+            jPipelineStateInfo* computePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingLayoutArray, {});
+
+            computePipelineStateInfo->Bind(RenderFrameContextPtr);
+
+            jShaderBindingInstanceArray ShaderBindingInstanceArray;
+            ShaderBindingInstanceArray.Add(CurrentBindingInstance.get());
+
+            jShaderBindingInstanceCombiner ShaderBindingInstanceCombiner;
+            for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
+            {
+                // Add ShaderBindingInstanceCombiner data : DescriptorSets, DynamicOffsets
+                ShaderBindingInstanceCombiner.DescriptorSetHandles.Add(ShaderBindingInstanceArray[i]->GetHandle());
+                const std::vector<uint32>* pDynamicOffsetTest = ShaderBindingInstanceArray[i]->GetDynamicOffsets();
+                if (pDynamicOffsetTest && pDynamicOffsetTest->size())
+                {
+                    ShaderBindingInstanceCombiner.DynamicOffsets.Add((void*)pDynamicOffsetTest->data(), (int32)pDynamicOffsetTest->size());
+                }
+            }
+            ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
+
+            g_rhi->BindComputeShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), computePipelineStateInfo, ShaderBindingInstanceCombiner, 0);
+            g_rhi->DispatchCompute(RenderFrameContextPtr
+                , MipUBO.Width / 16 + ((MipUBO.Width % 16) ? 1 : 0)
+                , MipUBO.Height / 16 + ((MipUBO.Height % 16) ? 1 : 0)
+                , 1);
+        }
+        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), CubeMap->GetTexture(), EImageLayout::SHADER_READ_ONLY);
+
+        auto cube = jPrimitiveUtil::CreateCube(Vector(65.0f, 85.0f, 10.0f + 130.0f), Vector(1), Vector(100.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+        jObject::AddObject(cube);
+        if (cube->RenderObjects[0])
+        {
+            auto MaterialSphere = std::make_shared<jMaterial>();
+            MaterialSphere->bUseSphericalMap = true;
+            jName FilePath = jName("Image/grace_probe.hdr");
+            MaterialSphere->TexData[(int32)jMaterial::EMaterialTextureType::Env].FilePath = FilePath;
+            MaterialSphere->TexData[(int32)jMaterial::EMaterialTextureType::Env].Texture = CubeMap->GetTexture();
+
+            MaterialSphere->TexData[(int32)jMaterial::EMaterialTextureType::Albedo].FilePath = jName("GBlackTexture");
+            MaterialSphere->TexData[(int32)jMaterial::EMaterialTextureType::Albedo].Texture = GBlackTexture;
+            cube->RenderObjects[0]->MaterialPtr = MaterialSphere;
+        }
+    }
+
 
 #if ASYNC_WITH_SETUP
     ShadowPassSetupCompleteEvent = std::async(std::launch::async, &jRenderer::SetupShadowPass, this);

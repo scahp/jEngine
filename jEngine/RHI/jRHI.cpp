@@ -11,6 +11,7 @@ const jRTClearValue jRTClearValue::Invalid = jRTClearValue();
 
 jTexture* GWhiteTexture = nullptr;
 jTexture* GBlackTexture = nullptr;
+jTexture* GWhiteCubeTexture = nullptr;
 jTexture* GNormalTexture = nullptr;
 jMaterial* GDefaultMaterial = nullptr;
 
@@ -60,11 +61,16 @@ void jRHI::OnInitRHI()
 	image.ImageData = { 255, 255, 255, 255 };
 	GWhiteTexture = CreateTextureFromData(&image);
 
-	image.ImageData = { 0, 0, 0, 0 };
+	image.ImageData = { 0, 0, 0, 255 };
 	GBlackTexture = CreateTextureFromData(&image);
 
 	image.ImageData = { 0, 0, 255, 0 };
 	GNormalTexture = CreateTextureFromData(&image);
+
+	image.TextureType = ETextureType::TEXTURE_CUBE;
+	image.LayerCount = 6;
+    image.ImageData = { 255, 255, 255, 255, 255, 255 };
+    GWhiteCubeTexture = CreateTextureFromData(&image);
 
 	GDefaultMaterial = new jMaterial();
 	for (int32 i = 0; i < _countof(GDefaultMaterial->TexData); ++i)

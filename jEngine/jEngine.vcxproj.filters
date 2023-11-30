@@ -926,5 +926,8 @@
     <None Include="Resource\Shaders\hlsl\genprefilteredenvmap_cs.hlsl">
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
+    <None Include="Resource\Shaders\hlsl\gencubemapfromsphericalprobe_cs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
   </ItemGroup>
 </Project>

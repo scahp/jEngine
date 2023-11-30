@@ -561,10 +561,11 @@ void CreateUnorderedAccessView(jTexture_DX12* InTexture)
             Desc.Texture2DArray.PlaneSlice = 0;
             break;
         case ETextureType::TEXTURE_CUBE:
-            Desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-            Desc.Texture3D.FirstWSlice = 0;
-            Desc.Texture3D.MipSlice = i;
-            Desc.Texture3D.WSize = InTexture->LayerCount;
+            Desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
+            Desc.Texture2DArray.ArraySize = InTexture->LayerCount;
+            Desc.Texture2DArray.FirstArraySlice = 0;
+            Desc.Texture2DArray.MipSlice = i;
+            Desc.Texture2DArray.PlaneSlice = 0;
             break;
         default:
             check(0);
@@ -604,6 +605,14 @@ void CreateRenderTargetView(jTexture_DX12* InTexture)
         Desc.Texture2D.PlaneSlice = 0;
         break;
     case ETextureType::TEXTURE_2D_ARRAY:
+        Desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
+        Desc.Texture2DArray.ArraySize = InTexture->LayerCount;
+        Desc.Texture2DArray.FirstArraySlice = 0;
+        Desc.Texture2DArray.MipSlice = 0;
+        Desc.Texture2DArray.PlaneSlice = 0;
+        break;
+    case ETextureType::TEXTURE_CUBE:
+        check(InTexture->LayerCount == 6);
         Desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
         Desc.Texture2DArray.ArraySize = InTexture->LayerCount;
         Desc.Texture2DArray.FirstArraySlice = 0;

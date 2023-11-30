@@ -7,11 +7,12 @@ struct jImageData
 	bool sRGB = false;
 	int32 Width = 0;
 	int32 Height = 0;
+	int32 LayerCount = 1;
 	jName Filename;
 	std::vector<unsigned char> ImageData;
 	ETextureFormat Format = ETextureFormat::RGBA8;
 	EFormatType FormatType = EFormatType::UNSIGNED_BYTE;
-	//ComPtr<ID3D12Resource> Resource;
+	ETextureType TextureType = ETextureType::TEXTURE_2D;
 	std::vector<jImageSubResourceData> SubresourceFootprints;
 };
 

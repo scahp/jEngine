@@ -256,7 +256,10 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
     for (jMaterial* mat : Materials)
     {
 		for (int32 i = 0; i < _countof(mat->TexData); ++i)
-			mat->TexData[i].Texture = jImageFileLoader::GetInstance().LoadTextureFromFile(mat->TexData[i].FilePath, true).lock().get();
+		{
+			if (mat->TexData[i].FilePath.IsValid())
+				mat->TexData[i].Texture = jImageFileLoader::GetInstance().LoadTextureFromFile(mat->TexData[i].FilePath, true).lock().get();
+		}
     }
 
 	JASSERT(scene->mRootNode);

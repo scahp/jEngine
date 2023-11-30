@@ -21,6 +21,8 @@ const std::shared_ptr<jShaderBindingInstance>& jMaterial::CreateShaderBindingIns
             {
                 if ((int32)EMaterialTextureType::Normal == i)
                     Texture = GNormalTexture;
+                else if ((int32)EMaterialTextureType::Env == i)
+                    Texture = GWhiteCubeTexture;
                 else
                     Texture = GWhiteTexture;
             }

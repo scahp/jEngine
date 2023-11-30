@@ -11,6 +11,7 @@
 struct VSOutput
 {
     float4 Pos : SV_POSITION;
+    float3 LocalPos : POSITION0;
 #if USE_VERTEX_COLOR
     float4 Color : COLOR0;
 #endif
@@ -29,6 +30,8 @@ Texture2D NormalTexture : register(t1, space2);
 SamplerState NormalTextureSampler : register(s1, space2);
 Texture2D RMTexture : register(t2, space2);     // Metalic, Roughness
 SamplerState RMTextureSampler : register(s2, space2);
+TextureCube EnvTexture : register(t3, space2);
+SamplerState EnvextureSampler : register(s3, space2);
 #endif
 
 struct PushConsts
@@ -75,6 +78,9 @@ FSOutput main(VSOutput input
     #endif // USE_FLIP_NORMALMAP_Y
     normal = normal * 2.0f - 1.0f;
     float3 WorldNormal = normalize(mul(input.TBN, normal));
+
+    color += EnvTexture.Sample(EnvextureSampler, normalize(input.LocalPos));
+
 #else // USE_ALBEDO_TEXTURE
     float3 WorldNormal = normalize(input.Normal);
 #endif // USE_ALBEDO_TEXTURE

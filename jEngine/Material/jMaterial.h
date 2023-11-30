@@ -19,6 +19,7 @@ public:
         Metallic,
         //Roughness,
 #endif
+        Env,
         Max
     };
 

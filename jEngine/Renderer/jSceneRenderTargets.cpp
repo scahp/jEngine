@@ -11,6 +11,8 @@
 std::shared_ptr<jRenderTarget> jSceneRenderTarget::IrradianceMap;
 jTexture* jSceneRenderTarget::OriginHDR = nullptr;
 std::shared_ptr<jRenderTarget> jSceneRenderTarget::FilteredEnvMap;
+std::shared_ptr<jRenderTarget> jSceneRenderTarget::CubeEnvMap;
+//////////////////////////////////////////////////////////////////////////
 
 void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::vector<jLight*>* InLights)
 {

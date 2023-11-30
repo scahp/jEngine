@@ -396,6 +396,7 @@ void jGame::Release()
 	// 임시
     jSceneRenderTarget::IrradianceMap.reset();
 	jSceneRenderTarget::FilteredEnvMap.reset();
+	jSceneRenderTarget::CubeEnvMap.reset();
 }
 
 void jGame::SpawnTestPrimitives()

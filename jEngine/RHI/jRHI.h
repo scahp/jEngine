@@ -18,6 +18,7 @@ extern class jRHI* g_rhi;
 
 extern jTexture* GWhiteTexture;
 extern jTexture* GBlackTexture;
+extern jTexture* GWhiteCubeTexture;
 extern jTexture* GNormalTexture;
 extern jMaterial* GDefaultMaterial;
 

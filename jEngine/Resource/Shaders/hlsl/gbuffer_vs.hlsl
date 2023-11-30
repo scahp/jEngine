@@ -32,6 +32,7 @@ cbuffer RenderObjectParam : register(b0, space1) { RenderObjectUniformBuffer Ren
 struct VSOutput
 {
     float4 Pos : SV_POSITION;
+    float3 LocalPos : POSITION0;
 #if USE_VERTEX_COLOR
     float4 Color : COLOR0;
 #endif
@@ -45,6 +46,7 @@ VSOutput main(VSInput input)
 {
     VSOutput output = (VSOutput) 0;
     
+    output.LocalPos = input.Position;
     output.WorldPos = mul(RenderObjectParam.M, float4(input.Position, 1.0));
     output.Pos = mul(ViewParam.VP, output.WorldPos);
 #if USE_VERTEX_COLOR

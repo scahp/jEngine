@@ -70,6 +70,8 @@ float4 main(VSOutput input
     float Roughness = GBufferData1.w;
     float3 Albedo = GBufferData2.xyz;
 
+    return float4(Albedo, 1.0);
+
     float3 ViewWorld = normalize(ViewParam.EyeWorld - WorldPos);
 
     // Directional light shadow map

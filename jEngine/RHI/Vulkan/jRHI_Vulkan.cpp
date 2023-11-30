@@ -565,13 +565,26 @@ jTexture* jRHI_Vulkan::CreateTextureFromData(const jImageData* InImageData) cons
 
 	VkImage TextureImage;
 	VkDeviceMemory TextureImageMemory;
-    if (!ensure(jBufferUtil_Vulkan::CreateImage((uint32)InImageData->Width, (uint32)InImageData->Height, MipLevels, VK_SAMPLE_COUNT_1_BIT, vkTextureFormat
-        , VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT
-        | VK_IMAGE_USAGE_SAMPLED_BIT	// image를 shader 에서 접근가능하게 하고 싶은 경우
-        , VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, TextureImage, TextureImageMemory)))
-    {
-        return nullptr;
-    }
+	if (InImageData->TextureType == ETextureType::TEXTURE_CUBE)
+	{
+        if (!ensure(jBufferUtil_Vulkan::CreateImageCube((uint32)InImageData->Width, (uint32)InImageData->Height, MipLevels, VK_SAMPLE_COUNT_1_BIT, vkTextureFormat
+            , VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT
+            | VK_IMAGE_USAGE_SAMPLED_BIT	// image를 shader 에서 접근가능하게 하고 싶은 경우
+            , VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, TextureImage, TextureImageMemory)))
+        {
+            return nullptr;
+        }
+	}
+	else
+	{
+		if (!ensure(jBufferUtil_Vulkan::CreateImage((uint32)InImageData->Width, (uint32)InImageData->Height, MipLevels, VK_SAMPLE_COUNT_1_BIT, vkTextureFormat
+			, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT
+			| VK_IMAGE_USAGE_SAMPLED_BIT	// image를 shader 에서 접근가능하게 하고 싶은 경우
+			, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, TextureImage, TextureImageMemory)))
+		{
+			return nullptr;
+		}
+	}
 
     VkCommandBuffer commandBuffer = BeginSingleTimeCommands();
 	ensure(TransitionImageLayout(commandBuffer, TextureImage, vkTextureFormat, MipLevels, 1, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
@@ -595,18 +608,23 @@ jTexture* jRHI_Vulkan::CreateTextureFromData(const jImageData* InImageData) cons
 	stagingBuffer.Release();
 
     // Create Texture image view
-    VkImageView textureImageView = jBufferUtil_Vulkan::CreateImageView(TextureImage, vkTextureFormat, VK_IMAGE_ASPECT_COLOR_BIT, MipLevels);
+	VkImageView textureImageView = nullptr;
+	if (InImageData->TextureType == ETextureType::TEXTURE_CUBE)
+		textureImageView = jBufferUtil_Vulkan::CreateImageCubeView(TextureImage, vkTextureFormat, VK_IMAGE_ASPECT_COLOR_BIT, MipLevels);
+	else
+		textureImageView = jBufferUtil_Vulkan::CreateImageView(TextureImage, vkTextureFormat, VK_IMAGE_ASPECT_COLOR_BIT, MipLevels);
 
     auto texture = new jTexture_Vulkan();
     texture->sRGB = InImageData->sRGB;
     texture->Format = InImageData->Format;
-    texture->Type = ETextureType::TEXTURE_2D;
+    texture->Type = InImageData->TextureType;
     texture->Width = InImageData->Width;
     texture->Height = InImageData->Height;
 	texture->MipLevel = InImageData->HasMipmap ? jTexture::GetMipLevels(InImageData->Width, InImageData->Height) : 1;
 	texture->Image = TextureImage;
 	texture->View = textureImageView;
 	texture->Memory = TextureImageMemory;
+	texture->LayerCount = InImageData->LayerCount;
 	texture->Layout = EImageLayout::SHADER_READ_ONLY;
 
 	return texture;

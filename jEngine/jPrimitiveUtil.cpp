@@ -1119,7 +1119,7 @@ jObject* CreateCube(const Vector& pos, const Vector& size, const Vector& scale, 
 		streamParam->Stride = sizeof(float) * 3;
 		streamParam->Name = jName("TANGENT");
 		streamParam->Data.resize(elementCount * 3);
-		memcpy(&streamParam->Data[0], &tangents[0], tangents.size() * sizeof(float));
+		memcpy(&streamParam->Data[0], &tangents[0], tangents.size() * sizeof(Vector));
 		vertexStreamData->Params.push_back(streamParam);
 	}
 

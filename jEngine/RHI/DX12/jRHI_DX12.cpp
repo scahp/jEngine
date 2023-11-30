@@ -1688,7 +1688,7 @@ jTexture* jRHI_DX12::CreateTextureFromData(const jImageData* InImageData) const
 
     EImageLayout Layout = EImageLayout::GENERAL;
 	jTexture_DX12* Texture = jBufferUtil_DX12::CreateImage(InImageData->Width, InImageData->Height
-        , 1, MipLevels, 1, ETextureType::TEXTURE_2D, InImageData->Format, ETextureCreateFlag::UAV, Layout);
+        , InImageData->LayerCount, MipLevels, 1, InImageData->TextureType, InImageData->Format, ETextureCreateFlag::UAV, Layout);
     Texture->sRGB = InImageData->sRGB;
 
     const uint64 ImageSize = InImageData->Width * InImageData->Height * GetDX12TexturePixelSize(InImageData->Format);
