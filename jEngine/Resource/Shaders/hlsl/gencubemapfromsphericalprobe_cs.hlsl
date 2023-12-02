@@ -20,7 +20,7 @@ RWTexture2DArray<float4> Result : register(u1, space0);
 cbuffer MipParam : register(b2, space0) { MipUniformBuffer MipParam; }
 
 [numthreads(16, 16, 1)]
-void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
+void main(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 GroupID : SV_GroupID)
 {
     if (GlobalInvocationID.x >= MipParam.width || GlobalInvocationID.y >= MipParam.height)
         return;
@@ -36,7 +36,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 // from the HDR spheremap from https://www.pauldebevec.com/Probes/ is inverted.
 #define NeedYFlip 1
 
-    for (int i = 0; i < 6; ++i)
+    int i = GroupID.z;
     {
         float3 dir = 0;
         if (i == 0)                             // +x

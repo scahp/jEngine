@@ -40,10 +40,10 @@ Texture2D DirectionalLightShadowMap : register(t1, space2);
 SamplerComparisonState DirectionalLightShadowMapSampler : register(s1, space2);
 #endif
 
-Texture2D IrradianceMap : register(t0, space3);
+TextureCube<float4> IrradianceMap : register(t0, space3);
 SamplerState IrradianceMapSamplerState : register(s0, space3);
 
-Texture2D PrefilteredEnvMap : register(t1, space3);
+TextureCube<float4> PrefilteredEnvMap : register(t1, space3);
 SamplerState PrefilteredEnvSamplerState : register(s1, space3);
 
 float4 main(VSOutput input
@@ -70,7 +70,7 @@ float4 main(VSOutput input
     float Roughness = GBufferData1.w;
     float3 Albedo = GBufferData2.xyz;
 
-    return float4(Albedo, 1.0);
+    //return float4(Albedo, 1.0);
 
     float3 ViewWorld = normalize(ViewParam.EyeWorld - WorldPos);
 
@@ -108,13 +108,10 @@ float4 main(VSOutput input
 
         float NoV = saturate(dot(N, V));
         float3 R = 2 * dot(V, N) * N - V;
-
-        float2 uv = GetSphericalMap_TwoMirrorBall(R);
-        uv.y = 1.0 - uv.y;
-        float3 PrefilteredColor = PrefilteredEnvMap.SampleLevel(PrefilteredEnvSamplerState, uv, Roughness * 11).rgb;
-        //float3 PrefilteredColor = PrefilterEnvMap(Roughness, R); 
-        //float2 EnvBRDF = IntegrateBRDF(Roughness, NoV, N);
-        float3 SpecularColor = float3(1, 1, 1);
+        R = normalize(R);
+        float3 PrefilteredColor = PrefilteredEnvMap.SampleLevel(PrefilteredEnvSamplerState, R, Roughness * (8-1)).rgb;
+        
+        float3 SpecularColor = float3(1, 1, 1);     // todo : it needs to fetch from material
 
         float3 SpecularPart = PrefilteredColor * EnvBRDFApprox(SpecularColor, Roughness, NoV);
         color.xyz += (DiffusePart + SpecularPart);

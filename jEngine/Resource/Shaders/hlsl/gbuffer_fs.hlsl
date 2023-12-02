@@ -79,8 +79,6 @@ FSOutput main(VSOutput input
     normal = normal * 2.0f - 1.0f;
     float3 WorldNormal = normalize(mul(input.TBN, normal));
 
-    color += EnvTexture.Sample(EnvextureSampler, normalize(input.LocalPos));
-
 #else // USE_ALBEDO_TEXTURE
     float3 WorldNormal = normalize(input.Normal);
 #endif // USE_ALBEDO_TEXTURE

@@ -1,8 +1,17 @@
 #include "common.hlsl"
 #include "Sphericalmap.hlsl"
 
-Texture2D TexHDR : register(t0);
-RWTexture2D<float4> HDRRT : register(u1);
+// IrradianceMap Size
+struct RTSizeUniformBuffer
+{
+    int width;
+    int height;
+};
+
+TextureCube<float4> TexHDR : register(t0);
+SamplerState TexHDRSamplerState : register(s0);
+RWTexture2DArray<float4> IrradianceMap : register(u1);
+cbuffer RTSizeParam : register(b2) { RTSizeUniformBuffer RTSizeParam; }
 
 float3 GenerateIrradiance(float3 InNormal)
 {
@@ -15,7 +24,7 @@ float3 GenerateIrradiance(float3 InNormal)
     float nrSamples = 0.0;
 
     float3 irradiance = float3(0.0, 0.0, 0.0);
-    // float sampleDelta = 0.005f;
+    //float sampleDelta = 0.005f;
     float sampleDelta = 0.01f;
     for (float phi = sampleDelta; phi <= 2.0 * PI; phi += sampleDelta)
     {
@@ -29,7 +38,7 @@ float3 GenerateIrradiance(float3 InNormal)
                 tangentSample.z * InNormal;
 
             sampleVec = normalize(sampleVec);
-            float3 curRGB = TexHDR[int2(GetSphericalMap_TwoMirrorBall(sampleVec) * float2(1000, 1000))].xyz;
+            float3 curRGB = TexHDR.SampleLevel(TexHDRSamplerState, sampleVec, 0).xyz;
 
             irradiance += curRGB * cos(theta) * sin(theta);
             nrSamples++;
@@ -40,18 +49,33 @@ float3 GenerateIrradiance(float3 InNormal)
 }
 
 [numthreads(16, 16, 1)]
-void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
+void main(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 GroupID : SV_GroupID)
 {   
-    if (GlobalInvocationID.x >= 1000 || GlobalInvocationID.y >= 1000)
+    if (GlobalInvocationID.x >= RTSizeParam.width || GlobalInvocationID.y >= RTSizeParam.height)
         return;
     
-    float2 Temp = GlobalInvocationID.xy / float2(1000, 1000);
-    Temp -= float2(0.5, 0.5);
+    float3 dir = 0;
+    int i = GroupID.z;
+    //for (int i = 0; i < 1; ++i)
+    {
+        float2 uv = GlobalInvocationID.xy / float2(RTSizeParam.width - 1, RTSizeParam.height - 1);
+        uv = uv * 2 - float2(1, 1);
+        if (i == 0)                             // +x
+            dir = float3(1, uv.y, -uv.x);
+        else if (i == 1)                        // -x
+            dir = float3(-1, uv.y, uv.x);
+        else if (i == 3)                        // +y
+            dir = float3(uv.x, 1, -uv.y);
+        else if (i == 2)                        // -y
+            dir = float3(uv.x, -1, uv.y);
+        else if (i == 4)                        // +z
+            dir = float3(uv.x, uv.y, 1);
+        else if (i == 5)                        // -z
+            dir = float3(-uv.x, uv.y, -1);
+        dir = normalize(dir);
+        dir.y = -dir.y;
 
-    if (length(Temp) >= 0.5)
-        return;
-
-    float3 dir = GetNormalFromTexCoord_TwoMirrorBall(GlobalInvocationID.xy / float2(1000, 1000));
-    float3 Color = GenerateIrradiance(dir);
-    HDRRT[int2(GlobalInvocationID.xy)] = float4(Color, 0.0);
+        float3 Color = GenerateIrradiance(dir);
+        IrradianceMap[int3(GlobalInvocationID.xy, i)] = float4(Color, 0.0);
+    }
 }

@@ -85,7 +85,7 @@ float3 FresnelSchlickRoughness(float InCosTheta, float3 InF0, float InRoughness)
     return InF0 + (max(InvRoughness, InF0) - InF0) * pow(clamp(1.0 - InCosTheta, 0.0, 1.0), 5.0);
 }
 
-float3 IBL_DiffusePart(float3 InN, float3 InV, float3 InAlbedo, float InMetallic, float InRoughness, Texture2D InIrradianceMap, SamplerState InIrradianceMapSamplerState)
+float3 IBL_DiffusePart(float3 InN, float3 InV, float3 InAlbedo, float InMetallic, float InRoughness, TextureCube<float4> InIrradianceMap, SamplerState InIrradianceMapSamplerState)
 {
     float3 F0 = float3(0.04f, 0.04f, 0.04f);
     F0 = lerp(F0, InAlbedo, InMetallic);
@@ -94,10 +94,8 @@ float3 IBL_DiffusePart(float3 InN, float3 InV, float3 InAlbedo, float InMetallic
     float3 kS = F;
 
     float3 kD = 1.0 - kS;
-    float2 uv = GetSphericalMap_TwoMirrorBall(InN);
-    uv.y = 1.0 - uv.y;
 
-    float3 irradiance = InIrradianceMap.Sample(InIrradianceMapSamplerState, uv).rgb;
+    float3 irradiance = InIrradianceMap.SampleLevel(InIrradianceMapSamplerState, InN, 0).rgb;
     float3 diffuse = irradiance * InAlbedo;
     float ao = 1;
     float3 ambient = (kD * diffuse) * ao;
@@ -165,6 +163,29 @@ float3 PrefilterEnvMap(float Roughness, float3 R, Texture2D EnvMap, SamplerState
         {
             float2 uv = GetSphericalMap_TwoMirrorBall(L);
             PrefilteredColor += EnvMap.SampleLevel(EnvMapSampler, uv, 0).rgb * NoL;
+            TotalWeight += NoL;
+        }
+    }
+    return PrefilteredColor / TotalWeight;
+}
+
+float3 PrefilterEnvMap(float Roughness, float3 R, TextureCube<float4> EnvMap, SamplerState EnvMapSampler)
+{
+    float3 N = R;
+    float3 V = R;
+    float3 PrefilteredColor = 0;
+    float TotalWeight = 0;
+    const uint NumSamples = 1024;
+
+    for (uint i = 0; i < NumSamples; i++)
+    {
+        float2 Xi = Hammersley(i, NumSamples, 0);
+        float3 H = ImportanceSampleGGX(Xi, Roughness, N);
+        float3 L = 2 * dot(V, H) * H - V;
+        float NoL = saturate(dot(N, L));
+        if (NoL > 0)
+        {
+            PrefilteredColor += EnvMap.SampleLevel(EnvMapSampler, L, 0).rgb * NoL;
             TotalWeight += NoL;
         }
     }
