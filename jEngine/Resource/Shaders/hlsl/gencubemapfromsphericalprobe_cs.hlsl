@@ -32,8 +32,8 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 GroupID : SV_Gro
     pos.x = GlobalInvocationID.x;
     pos.y = GlobalInvocationID.y;
 
-// If the sphere map Y is inverted, set this to 1.
-// from the HDR spheremap from https://www.pauldebevec.com/Probes/ is inverted.
+// We need to invert UV.v, because DirectX's texture UV.v is growing downside but 3D space is growing upside when Y value is increasing
+// When the UV.v of DirectX's texture coordinate increase, reading texturegrowing up to downside, but in the 3D space 
 #define NeedYFlip 1
 
     int i = GroupID.z;

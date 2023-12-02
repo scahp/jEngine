@@ -21,6 +21,10 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 GroupID : SV_Gro
     if (GlobalInvocationID.x >= MipParam.width || GlobalInvocationID.y >= MipParam.height)
         return;
 
+// We need to invert UV.v, because DirectX's texture UV.v is growing downside but 3D space is growing upside when Y value is increasing
+// When the UV.v of DirectX's texture coordinate increase, reading texturegrowing up to downside, but in the 3D space 
+#define NeedYFlip 1
+
     float3 dir = 0;
     int i = GroupID.z;
     {
@@ -30,16 +34,26 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 GroupID : SV_Gro
             dir = float3(1, uv.y, -uv.x);
         else if (i == 1)                        // -x
             dir = float3(-1, uv.y, uv.x);
+#if NeedYFlip
         else if (i == 3)                        // +y
             dir = float3(uv.x, 1, -uv.y);
         else if (i == 2)                        // -y
             dir = float3(uv.x, -1, uv.y);
+#else
+        else if (i == 2)                        // +y
+            dir = float3(uv.x, 1, -uv.y);
+        else if (i == 3)                        // -y
+            dir = float3(uv.x, -1, uv.y);
+#endif // NeedYFlip
         else if (i == 4)                        // +z
             dir = float3(uv.x, uv.y, 1);
         else if (i == 5)                        // -z
             dir = float3(-uv.x, uv.y, -1);
         dir = normalize(dir);
+
+#if NeedYFlip
         dir.y = -dir.y;
+#endif
 
         float roughness = (float)MipParam.mip / (float)(MipParam.maxMip - 1);
         float3 PrefilteredColor = PrefilterEnvMap(roughness, dir, TexHDR, TexHDRSamplerState);

@@ -187,6 +187,8 @@ void jRenderer::Setup()
         //}
     }
 
+    static int32 PBRMapSize = 256;
+
     // GenIrradianceMap Test
     if (!jSceneRenderTarget::IrradianceMap)
     {
@@ -194,7 +196,7 @@ void jRenderer::Setup()
         //////////////////////////////////////////////////////////////////////////
         // Compute Pipeline
 
-        static jRenderTargetInfo Info = { ETextureType::TEXTURE_CUBE, ETextureFormat::RGBA16F, 256, 256
+        static jRenderTargetInfo Info = { ETextureType::TEXTURE_CUBE, ETextureFormat::RGBA16F, PBRMapSize, PBRMapSize
             , 6, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f), ETextureCreateFlag::RTV | ETextureCreateFlag::UAV, false, false };
         Info.ResourceName = L"IrradianceMap";
         jSceneRenderTarget::IrradianceMap = jRenderTargetPool::GetRenderTarget(Info);
@@ -283,7 +285,7 @@ void jRenderer::Setup()
         //////////////////////////////////////////////////////////////////////////
         // Compute Pipeline
 
-        static jRenderTargetInfo Info = { ETextureType::TEXTURE_CUBE, ETextureFormat::RGBA16F, 256, 256
+        static jRenderTargetInfo Info = { ETextureType::TEXTURE_CUBE, ETextureFormat::RGBA16F, PBRMapSize, PBRMapSize
             , 6, true, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f), ETextureCreateFlag::RTV | ETextureCreateFlag::UAV, false, false };
         Info.ResourceName = L"FilteredEnvMap";
         jSceneRenderTarget::FilteredEnvMap = jRenderTargetPool::GetRenderTarget(Info);

@@ -58,22 +58,37 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 GroupID : SV_Gro
     int i = GroupID.z;
     //for (int i = 0; i < 1; ++i)
     {
+
+// We need to invert UV.v, because DirectX's texture UV.v is growing downside but 3D space is growing upside when Y value is increasing
+// When the UV.v of DirectX's texture coordinate increase, reading texturegrowing up to downside, but in the 3D space 
+#define NeedYFlip 1
+
         float2 uv = GlobalInvocationID.xy / float2(RTSizeParam.width - 1, RTSizeParam.height - 1);
         uv = uv * 2 - float2(1, 1);
         if (i == 0)                             // +x
             dir = float3(1, uv.y, -uv.x);
         else if (i == 1)                        // -x
             dir = float3(-1, uv.y, uv.x);
+#if NeedYFlip
         else if (i == 3)                        // +y
             dir = float3(uv.x, 1, -uv.y);
         else if (i == 2)                        // -y
             dir = float3(uv.x, -1, uv.y);
+#else
+        else if (i == 2)                        // +y
+            dir = float3(uv.x, 1, -uv.y);
+        else if (i == 3)                        // -y
+            dir = float3(uv.x, -1, uv.y);
+#endif // NeedYFlip
         else if (i == 4)                        // +z
             dir = float3(uv.x, uv.y, 1);
         else if (i == 5)                        // -z
             dir = float3(-uv.x, uv.y, -1);
         dir = normalize(dir);
+
+#if NeedYFlip
         dir.y = -dir.y;
+#endif
 
         float3 Color = GenerateIrradiance(dir);
         IrradianceMap[int3(GlobalInvocationID.xy, i)] = float4(Color, 0.0);
