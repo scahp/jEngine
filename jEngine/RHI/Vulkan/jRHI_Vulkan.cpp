@@ -905,8 +905,10 @@ std::shared_ptr<jRenderTarget> jRHI_Vulkan::CreateRenderTarget(const jRenderTarg
 
 	VkImage image = nullptr;
 	VkImageView imageView = nullptr;
+	VkImageView imageViewUAV = nullptr;
 	VkDeviceMemory imageMemory = nullptr;
 	std::map<int32, VkImageView> imageViewForMipMap;
+	std::map<int32, VkImageView> imageViewForMipMapUAV;
 
 	switch (info.Type)
 	{
@@ -938,14 +940,30 @@ std::shared_ptr<jRenderTarget> jRHI_Vulkan::CreateRenderTarget(const jRenderTarg
 		check(info.LayerCount == 6);
 		jBufferUtil_Vulkan::CreateImageCube(info.Width, info.Height, mipLevels, (VkSampleCountFlagBits)info.SampleCount
 			, textureFormat, TilingMode, ImageUsageFlag, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, image, imageMemory);
-		imageView = jBufferUtil_Vulkan::CreateImageCubeView(image, textureFormat, ImageAspectFlag, mipLevels);
-		imageViewForMipMap[0] = imageView;
+		
+		// Create for Shader Resource (TextureCube)
+		{
+			imageView = jBufferUtil_Vulkan::CreateImageCubeView(image, textureFormat, ImageAspectFlag, mipLevels);
+			imageViewForMipMap[0] = imageView;
 
-        check(mipLevels > 0);
-        for (int32 i = 1; i < mipLevels; ++i)
-        {
-            imageViewForMipMap[i] = jBufferUtil_Vulkan::CreateImageCubeViewForSpecificMipMap(image, textureFormat, ImageAspectFlag, i);
-        }
+			check(mipLevels > 0);
+			for (int32 i = 1; i < mipLevels; ++i)
+			{
+				imageViewForMipMap[i] = jBufferUtil_Vulkan::CreateImageCubeViewForSpecificMipMap(image, textureFormat, ImageAspectFlag, i);
+			}
+		}
+
+		// Create for UAV (writing compute shader resource) (Texture2DArray)
+		{
+			imageViewUAV = jBufferUtil_Vulkan::CreateImage2DArrayView(image, info.LayerCount, textureFormat, ImageAspectFlag, mipLevels);
+            imageViewForMipMapUAV[0] = imageViewUAV;
+
+            check(mipLevels > 0);
+            for (int32 i = 1; i < mipLevels; ++i)
+            {
+                imageViewForMipMapUAV[i] = jBufferUtil_Vulkan::CreateImage2DArrayViewForSpecificMipMap(image, info.LayerCount, textureFormat, ImageAspectFlag, i);
+            }
+		}
 		break;
 	default:
 		JMESSAGE("Unsupported type texture in FramebufferPool");
@@ -962,6 +980,8 @@ std::shared_ptr<jRenderTarget> jRHI_Vulkan::CreateRenderTarget(const jRenderTarg
 	tex_vk->Image = image;
 	tex_vk->View = imageView;
 	tex_vk->ViewForMipMap = imageViewForMipMap;
+	tex_vk->ViewUAV = imageViewUAV;
+	tex_vk->ViewUAVForMipMap = imageViewForMipMapUAV;
 	tex_vk->Memory = imageMemory;
 	tex_vk->Layout = EImageLayout::UNDEFINED;
 	tex_vk->MipLevel = mipLevels;

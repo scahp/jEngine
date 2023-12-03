@@ -380,18 +380,22 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(int32 InIndex, const jShaderBin
             const jTexture_Vulkan* Texture = (const jTexture_Vulkan*)tbor->Texture;
             if (tbor->MipLevel == 0)
             {
-                imageInfo.imageView = Texture->View;
+                imageInfo.imageView = Texture->ViewUAV ? Texture->ViewUAV : Texture->View;
+                check(imageInfo.imageView);
             }
             else
             {
-                auto it_find = Texture->ViewForMipMap.find(tbor->MipLevel);
-                if (it_find != Texture->ViewForMipMap.end() && it_find->second)
+                const auto& ViewForMipMap = (Texture->ViewUAVForMipMap.size() > 0) ? Texture->ViewUAVForMipMap : Texture->ViewForMipMap;
+                auto it_find = ViewForMipMap.find(tbor->MipLevel);
+                if (it_find != ViewForMipMap.end() && it_find->second)
                 {
                     imageInfo.imageView = it_find->second;
                 }
-                else
+                
+                if (!imageInfo.imageView)
                 {
-                    imageInfo.imageView = Texture->View;
+                    imageInfo.imageView = Texture->ViewUAV;
+                    check(imageInfo.imageView);
                 }
             }
 

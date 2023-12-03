@@ -13,8 +13,12 @@ struct jTexture_Vulkan : public jTexture
         ReleaseInternal();
     }
     VkImage Image = nullptr;
+
     VkImageView View = nullptr;
     std::map<int32, VkImageView> ViewForMipMap;
+    VkImageView ViewUAV = nullptr;
+    std::map<int32, VkImageView> ViewUAVForMipMap;
+
     VkDeviceMemory Memory = nullptr;
     EImageLayout Layout = EImageLayout::UNDEFINED;
     VkSampler SamplerState = nullptr;
