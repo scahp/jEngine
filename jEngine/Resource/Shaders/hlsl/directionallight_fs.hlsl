@@ -111,7 +111,8 @@ float4 main(VSOutput input
         R = normalize(R);
         float3 PrefilteredColor = PrefilteredEnvMap.SampleLevel(PrefilteredEnvSamplerState, R, Roughness * (8-1)).rgb;
         
-        float3 SpecularColor = float3(1, 1, 1);     // todo : it needs to fetch from material
+        float3 F0 = float3(0.04f, 0.04f, 0.04f);
+        float3 SpecularColor = lerp(F0, Albedo, Metallic);
 
         float3 SpecularPart = PrefilteredColor * EnvBRDFApprox(SpecularColor, Roughness, NoV);
         color.xyz += (DiffusePart + SpecularPart);
