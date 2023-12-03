@@ -909,6 +909,161 @@ void jRenderer::BasePass()
         }
         //BasepassOcclusionTest.EndQuery(RenderFrameContextPtr->GetActiveCommandBuffer());
     }
+
+    if (0)
+    {
+        jDirectionalLight* DirectionalLight = nullptr;
+        for (auto light : jLight::GetLights())
+        {
+            if (light->Type == ELightType::DIRECTIONAL)
+            {
+                DirectionalLight = (jDirectionalLight*)light;
+                break;
+            }
+        }
+        check(DirectionalLight);
+
+        jCamera* MainCamera = jCamera::GetMainCamera();
+        check(MainCamera);
+
+        SCOPE_CPU_PROFILE(AtmosphericShadowing);
+        SCOPE_GPU_PROFILE(RenderFrameContextPtr, AtmosphericShadowing);
+        DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "AtmosphericShadowing", Vector4(0.8f, 0.8f, 0.8f, 1.0f));
+
+        int32 Width = RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[0]->Info.Width;
+        int32 Height = RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[0]->Info.Height;
+
+        static jRenderTargetInfo Info = { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, Width, Height
+            , 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f), ETextureCreateFlag::RTV | ETextureCreateFlag::UAV, false, false };
+        Info.ResourceName = L"AtmosphericShadowing";
+        static auto AtmosphericShadowing = jRenderTargetPool::GetRenderTarget(Info);
+
+        struct jAtmosphericData
+        {
+            Matrix ShadowVP;
+            Matrix VP;
+            Vector CameraPos;
+            float CameraNear;
+            Vector LightDirection;
+            float CameraFar;
+            float AnisoG;
+            float SlopeOfDist;
+            float InScatteringLambda;
+            float Dummy;
+            int TravelCount;
+            int RTWidth;
+            int RTHeight;
+            int UseNoise;  // todo : change to #define USE_NOISE
+        };
+
+        auto LightCamera = DirectionalLight->GetLightCamra();
+
+        auto ShadowVP = LightCamera->Projection* LightCamera->View;
+        auto ShadowVP2 = DirectionalLight->GetLightData().ShadowVP;
+
+        auto LightCameraDirection = LightCamera->GetForwardVector();
+        auto LightCameraDirection2 = DirectionalLight->GetLightData().Direction;
+
+        jAtmosphericData AtmosphericData;
+        AtmosphericData.ShadowVP = ShadowVP;
+        AtmosphericData.VP = MainCamera->GetViewProjectionMatrix();
+        AtmosphericData.CameraPos = MainCamera->Pos;
+        AtmosphericData.LightDirection = LightCameraDirection;
+        AtmosphericData.CameraFar = MainCamera->Far;
+        AtmosphericData.CameraNear = MainCamera->Near;
+        AtmosphericData.AnisoG = 0.0f;
+        AtmosphericData.SlopeOfDist = 0.25f;
+        AtmosphericData.InScatteringLambda = 0.001f;
+        AtmosphericData.TravelCount = 64;
+        AtmosphericData.RTWidth = Width;
+        AtmosphericData.RTHeight = Height;
+        AtmosphericData.UseNoise = true;
+
+        std::shared_ptr<jShaderBindingInstance> CurrentBindingInstance = nullptr;
+        int32 BindingPoint = 0;
+        jShaderBindingArray ShaderBindingArray;
+        jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
+
+        auto ShadowMapTexture = RenderFrameContextPtr->SceneRenderTargetPtr->GetShadowMap(DirectionalLight)->GetTexture();
+        check(ShadowMapTexture);
+
+        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EImageLayout::SHADER_READ_ONLY);
+        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), ShadowMapTexture, EImageLayout::SHADER_READ_ONLY);
+        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), AtmosphericShadowing->GetTexture(), EImageLayout::GENERAL);
+
+        // Binding 0
+        //if (ensure(jSceneRenderTarget::CubeEnvMap))
+        {
+            ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
+                , ResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[0]->GetTexture(), nullptr));
+        }
+
+        // Binding 1
+        //if (ensure(jSceneRenderTarget::IrradianceMap && jSceneRenderTarget::IrradianceMap->GetTexture()))
+        {
+            ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
+                , ResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), nullptr));
+        }
+
+        // Binding 2
+        //if (ensure(jSceneRenderTarget::IrradianceMap && jSceneRenderTarget::IrradianceMap->GetTexture()))
+        {
+            ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
+                , ResourceInlineAllactor.Alloc<jTextureResource>(ShadowMapTexture, nullptr));
+        }
+
+        // Binding 3        
+        auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(jNameStatic("MipUniformBuffer"), jLifeTimeType::OneFrame, sizeof(AtmosphericData)));
+        OneFrameUniformBuffer->UpdateBufferData(&AtmosphericData, sizeof(AtmosphericData));
+        ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
+            , ResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true);
+
+        // Binding 4
+        //if (ensure(jSceneRenderTarget::IrradianceMap && jSceneRenderTarget::IrradianceMap->GetTexture()))
+        {
+            ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE
+                , ResourceInlineAllactor.Alloc<jTextureResource>(AtmosphericShadowing->GetTexture(), nullptr));
+        }
+
+        CurrentBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
+
+        jShaderInfo shaderInfo;
+        shaderInfo.SetName(jNameStatic("GenIrradianceMap"));
+        shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/AtmosphericShadowing_cs.hlsl"));
+        shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
+        static jShader* Shader = g_rhi->CreateShader(shaderInfo);
+
+        jShaderBindingLayoutArray ShaderBindingLayoutArray;
+        ShaderBindingLayoutArray.Add(CurrentBindingInstance->ShaderBindingsLayouts);
+
+        jPipelineStateInfo* computePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingLayoutArray, {});
+
+        computePipelineStateInfo->Bind(RenderFrameContextPtr);
+
+        jShaderBindingInstanceArray ShaderBindingInstanceArray;
+        ShaderBindingInstanceArray.Add(CurrentBindingInstance.get());
+
+        jShaderBindingInstanceCombiner ShaderBindingInstanceCombiner;
+        for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
+        {
+            // Add ShaderBindingInstanceCombiner data : DescriptorSets, DynamicOffsets
+            ShaderBindingInstanceCombiner.DescriptorSetHandles.Add(ShaderBindingInstanceArray[i]->GetHandle());
+            const std::vector<uint32>* pDynamicOffsetTest = ShaderBindingInstanceArray[i]->GetDynamicOffsets();
+            if (pDynamicOffsetTest && pDynamicOffsetTest->size())
+            {
+                ShaderBindingInstanceCombiner.DynamicOffsets.Add((void*)pDynamicOffsetTest->data(), (int32)pDynamicOffsetTest->size());
+            }
+        }
+        ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
+
+        g_rhi->BindComputeShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), computePipelineStateInfo, ShaderBindingInstanceCombiner, 0);
+
+        int32 X = (Info.Width / 16) + ((Info.Width % 16) ? 1 : 0);
+        int32 Y = (Info.Height / 16) + ((Info.Height % 16) ? 1 : 0);
+        g_rhi->DispatchCompute(RenderFrameContextPtr, X, Y, 6);
+
+        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::IrradianceMap->GetTexture(), EImageLayout::SHADER_READ_ONLY);
+    }
 }
 
 void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
@@ -963,8 +1118,8 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
             const jRTClearValue ClearColor = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f);
             const jRTClearValue ClearDepth = jRTClearValue(1.0f, 0);
 
-            jAttachment depth = jAttachment(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr, EAttachmentLoadStoreOp::LOAD_DONTCARE
-                , EAttachmentLoadStoreOp::LOAD_DONTCARE, ClearDepth
+            jAttachment depth = jAttachment(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr, EAttachmentLoadStoreOp::LOAD_STORE
+                , EAttachmentLoadStoreOp::LOAD_STORE, ClearDepth
                 , RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetLayout(), EImageLayout::DEPTH_STENCIL_ATTACHMENT);
 
             // Setup attachment
