@@ -14,7 +14,7 @@ float DistributionGGX(float3 InN, float3 InH, float InRoughness)
     float denom = (NdotH2 * (a2 - 1.0f) + 1.0f);
     denom = PI * denom * denom;
 
-    return num / denom;
+    return num / (denom + 0.000001);        // To avoid divide by zero, added 0.000001 to denom
 }
 
 float GeometrySchlickGGX(float InNdotV, float InRoughness)
