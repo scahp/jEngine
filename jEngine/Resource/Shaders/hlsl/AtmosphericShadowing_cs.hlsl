@@ -8,7 +8,7 @@ struct jAtmosphericData
     float4x4 VP;
     float3 CameraPos;
     float CameraNear;
-    float3 LightDirection;
+    float3 LightCameraDirection;
     float CameraFar;
     float AnisoG;
     float SlopeOfDist;
@@ -37,7 +37,7 @@ float3 TransformShdowMapTextureSpace(float3 InWorldPos)
 {
     float4 temp = mul(AtmosphericParam.ShadowVP, float4(InWorldPos, 1.0));
     temp /= temp.w;
-    temp.xyz = temp.xyz * 0.5 + float3(0.5, 0.5, 0.5);
+    temp.xy = temp.xy * 0.5 + float2(0.5, 0.5);
     temp.y = 1.0 - temp.y;
     return saturate(temp.xyz);
 }
@@ -62,7 +62,7 @@ float AnisotropyIntensity(float3 InFromSurfaceToCamera)
     float3 anisotropyConst = float3(1.0 - g, 1.0 + g * g, 2.0 * g); // (1 - g, 1 + g * g, 2 * g)
 
     float invLength = 1.0;
-    float h = anisotropyConst.x * (1.0 / sqrt(anisotropyConst.y - anisotropyConst.z * dot(InFromSurfaceToCamera, AtmosphericParam.LightDirection)));
+    float h = anisotropyConst.x * (1.0 / sqrt(anisotropyConst.y - anisotropyConst.z * dot(InFromSurfaceToCamera, AtmosphericParam.LightCameraDirection)));
     float intensity = h * h * h * atmosphereBrightness;
 
     return intensity;
@@ -102,8 +102,6 @@ float GetAccumulatedInscatteringValue(float InTravelDist, float3 InToPixelNormal
         // When the z meet Depth on screen, stop raymarching
         if (z > Depth)
             break;
-
-        AccumulatedValue += 1.0;
 
         float3 CurrentPosInShadowMapTS = lerp(p1, p2, u);
         float ShadowMapDepth = ShadowMapTexture.SampleLevel(ShadowMapSamplerState, CurrentPosInShadowMapTS.xy, 0).x;

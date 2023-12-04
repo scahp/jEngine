@@ -1594,7 +1594,7 @@ bool jRHI_Vulkan::TransitionImageLayout(jCommandBuffer* commandBuffer, jTexture*
 	auto texture_vk = (jTexture_Vulkan*)texture;
 
 	// VkImageView 가 VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL 를 지원하지 않기 때문에 추가
-	if (texture_vk->IsDepthFormat() && EImageLayout::DEPTH_READ_ONLY == newLayout)
+	if (texture_vk->IsDepthFormat() && (EImageLayout::DEPTH_READ_ONLY == newLayout || EImageLayout::SHADER_READ_ONLY == newLayout))
 	{
 		newLayout = EImageLayout::DEPTH_STENCIL_READ_ONLY;
 	}

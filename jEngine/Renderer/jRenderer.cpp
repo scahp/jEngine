@@ -910,7 +910,7 @@ void jRenderer::BasePass()
         //BasepassOcclusionTest.EndQuery(RenderFrameContextPtr->GetActiveCommandBuffer());
     }
 
-    if (0)
+    if (1)
     {
         jDirectionalLight* DirectionalLight = nullptr;
         for (auto light : jLight::GetLights())
@@ -930,13 +930,9 @@ void jRenderer::BasePass()
         SCOPE_GPU_PROFILE(RenderFrameContextPtr, AtmosphericShadowing);
         DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "AtmosphericShadowing", Vector4(0.8f, 0.8f, 0.8f, 1.0f));
 
-        int32 Width = RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[0]->Info.Width;
-        int32 Height = RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[0]->Info.Height;
-
-        static jRenderTargetInfo Info = { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, Width, Height
-            , 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f), ETextureCreateFlag::RTV | ETextureCreateFlag::UAV, false, false };
-        Info.ResourceName = L"AtmosphericShadowing";
-        static auto AtmosphericShadowing = jRenderTargetPool::GetRenderTarget(Info);
+        std::shared_ptr<jRenderTarget> AtmosphericShadowing = RenderFrameContextPtr->SceneRenderTargetPtr->AtmosphericShadowing;
+        int32 Width = AtmosphericShadowing->Info.Width;
+        int32 Height = AtmosphericShadowing->Info.Height;
 
         struct jAtmosphericData
         {
@@ -944,7 +940,7 @@ void jRenderer::BasePass()
             Matrix VP;
             Vector CameraPos;
             float CameraNear;
-            Vector LightDirection;
+            Vector LightCameraDirection;
             float CameraFar;
             float AnisoG;
             float SlopeOfDist;
@@ -957,23 +953,19 @@ void jRenderer::BasePass()
         };
 
         auto LightCamera = DirectionalLight->GetLightCamra();
-
-        auto ShadowVP = LightCamera->Projection* LightCamera->View;
-        auto ShadowVP2 = DirectionalLight->GetLightData().ShadowVP;
-
+        auto ShadowVP = DirectionalLight->GetLightData().ShadowVP;
         auto LightCameraDirection = LightCamera->GetForwardVector();
-        auto LightCameraDirection2 = DirectionalLight->GetLightData().Direction;
 
         jAtmosphericData AtmosphericData;
         AtmosphericData.ShadowVP = ShadowVP;
         AtmosphericData.VP = MainCamera->GetViewProjectionMatrix();
         AtmosphericData.CameraPos = MainCamera->Pos;
-        AtmosphericData.LightDirection = LightCameraDirection;
+        AtmosphericData.LightCameraDirection = LightCameraDirection;
         AtmosphericData.CameraFar = MainCamera->Far;
         AtmosphericData.CameraNear = MainCamera->Near;
         AtmosphericData.AnisoG = 0.0f;
         AtmosphericData.SlopeOfDist = 0.25f;
-        AtmosphericData.InScatteringLambda = 0.001f;
+        AtmosphericData.InScatteringLambda = 0.0002f;
         AtmosphericData.TravelCount = 64;
         AtmosphericData.RTWidth = Width;
         AtmosphericData.RTHeight = Height;
@@ -992,34 +984,30 @@ void jRenderer::BasePass()
         g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), AtmosphericShadowing->GetTexture(), EImageLayout::GENERAL);
 
         // Binding 0
-        //if (ensure(jSceneRenderTarget::CubeEnvMap))
         {
             ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
                 , ResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[0]->GetTexture(), nullptr));
         }
 
         // Binding 1
-        //if (ensure(jSceneRenderTarget::IrradianceMap && jSceneRenderTarget::IrradianceMap->GetTexture()))
         {
             ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
                 , ResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), nullptr));
         }
 
         // Binding 2
-        //if (ensure(jSceneRenderTarget::IrradianceMap && jSceneRenderTarget::IrradianceMap->GetTexture()))
         {
             ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
                 , ResourceInlineAllactor.Alloc<jTextureResource>(ShadowMapTexture, nullptr));
         }
 
         // Binding 3        
-        auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(jNameStatic("MipUniformBuffer"), jLifeTimeType::OneFrame, sizeof(AtmosphericData)));
+        auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(jNameStatic("AtmosphericDataUniformBuffer"), jLifeTimeType::OneFrame, sizeof(AtmosphericData)));
         OneFrameUniformBuffer->UpdateBufferData(&AtmosphericData, sizeof(AtmosphericData));
         ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
             , ResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true);
 
         // Binding 4
-        //if (ensure(jSceneRenderTarget::IrradianceMap && jSceneRenderTarget::IrradianceMap->GetTexture()))
         {
             ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE
                 , ResourceInlineAllactor.Alloc<jTextureResource>(AtmosphericShadowing->GetTexture(), nullptr));
@@ -1058,11 +1046,105 @@ void jRenderer::BasePass()
 
         g_rhi->BindComputeShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), computePipelineStateInfo, ShaderBindingInstanceCombiner, 0);
 
-        int32 X = (Info.Width / 16) + ((Info.Width % 16) ? 1 : 0);
-        int32 Y = (Info.Height / 16) + ((Info.Height % 16) ? 1 : 0);
+        int32 X = (Width / 16) + ((Width % 16) ? 1 : 0);
+        int32 Y = (Height / 16) + ((Height % 16) ? 1 : 0);
         g_rhi->DispatchCompute(RenderFrameContextPtr, X, Y, 6);
 
-        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::IrradianceMap->GetTexture(), EImageLayout::SHADER_READ_ONLY);
+        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), AtmosphericShadowing->GetTexture(), EImageLayout::SHADER_READ_ONLY);
+    }
+
+    if (1)
+    {
+        static jFullscreenQuadPrimitive* GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
+        std::shared_ptr<jRenderTarget> AtmosphericShadowing = RenderFrameContextPtr->SceneRenderTargetPtr->AtmosphericShadowing;
+
+        auto RT = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr;
+
+        jRasterizationStateInfo* RasterizationState = nullptr;
+        switch (g_rhi->GetSelectedMSAASamples())
+        {
+        case EMSAASamples::COUNT_1:
+            RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)1, true, 0.2f, false, false>::Create();
+            break;
+        case EMSAASamples::COUNT_2:
+            RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)2, true, 0.2f, false, false>::Create();
+            break;
+        case EMSAASamples::COUNT_4:
+            RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)4, true, 0.2f, false, false>::Create();
+            break;
+        case EMSAASamples::COUNT_8:
+            RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)8, true, 0.2f, false, false>::Create();
+            break;
+        default:
+            check(0);
+            break;
+        }
+        auto DepthStencilState = TDepthStencilStateInfo<false, false, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
+        auto BlendingState = TBlendingStateInfo<true, EBlendFactor::ONE, EBlendFactor::ONE, EBlendOp::ADD, EBlendFactor::ZERO, EBlendFactor::ONE, EBlendOp::ADD, EColorMask::ALL>::Create();
+
+        const int32 RTWidth = RT->Info.Width;
+        const int32 RTHeight = RT->Info.Height;
+
+        // Create fixed pipeline states
+        jPipelineStateFixedInfo PostProcessPassPipelineStateFixed(RasterizationState, DepthStencilState, BlendingState
+            , jViewport(0.0f, 0.0f, (float)RTWidth, (float)RTHeight), jScissor(0, 0, RTWidth, RTHeight), gOptions.UseVRS);
+
+        const jRTClearValue ClearColor = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f);
+        const jRTClearValue ClearDepth = jRTClearValue(1.0f, 0);
+
+        jRenderPassInfo renderPassInfo;
+        jAttachment color = jAttachment(RT, EAttachmentLoadStoreOp::LOAD_STORE
+            , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
+        renderPassInfo.Attachments.push_back(color);
+
+        jSubpass subpass;
+        subpass.Initialize(0, 1, EPipelineStageMask::COLOR_ATTACHMENT_OUTPUT_BIT, EPipelineStageMask::FRAGMENT_SHADER_BIT);
+        subpass.OutputColorAttachments.push_back(0);
+        renderPassInfo.Subpasses.push_back(subpass);
+
+        auto RenderPass = g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
+
+        int32 BindingPoint = 0;
+        jShaderBindingArray ShaderBindingArray;
+        jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
+
+        const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+            , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
+            , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
+
+        ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
+            , ResourceInlineAllactor.Alloc<jTextureResource>(AtmosphericShadowing->GetTexture(), SamplerState));
+
+        std::shared_ptr<jShaderBindingInstance> ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
+        jShaderBindingInstanceArray ShaderBindingInstanceArray;
+        ShaderBindingInstanceArray.Add(ShaderBindingInstance.get());
+
+        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RT->GetTexture(), EImageLayout::COLOR_ATTACHMENT);
+
+        jGraphicsPipelineShader Shader;
+        {
+            jShaderInfo shaderInfo;
+            shaderInfo.SetName(jNameStatic("AtmosphericShadowingApplyVS"));
+            shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/fullscreenquad_vs.hlsl"));
+            shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
+            Shader.VertexShader = g_rhi->CreateShader(shaderInfo);
+
+            shaderInfo.SetName(jNameStatic("AtmosphericShadowingApplyPS"));
+            shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/AtmosphericShadowingApply_ps.hlsl"));
+            shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
+            Shader.PixelShader = g_rhi->CreateShader(shaderInfo);
+        }
+
+        jDrawCommand DrawCommand(RenderFrameContextPtr, GlobalFullscreenPrimitive->RenderObjects[0], RenderPass
+            , Shader, &PostProcessPassPipelineStateFixed, GlobalFullscreenPrimitive->RenderObjects[0]->MaterialPtr.get(), ShaderBindingInstanceArray, nullptr);
+        DrawCommand.Test = true;
+        DrawCommand.PrepareToDraw(false);
+
+        if (RenderPass && RenderPass->BeginRenderPass(RenderFrameContextPtr->GetActiveCommandBuffer()))
+        {
+            DrawCommand.Draw();
+            RenderPass->EndRenderPass();
+        }
     }
 }
 

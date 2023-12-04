@@ -69,6 +69,13 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
         FinalColorPtr = jRenderTarget::CreateFromTexture(InSwapchain->TexturePtr);
     }
 
+    {
+        jRenderTargetInfo Info = { ETextureType::TEXTURE_2D, ETextureFormat::R16F, SCR_WIDTH / 2, SCR_HEIGHT / 2
+                   , 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f), ETextureCreateFlag::RTV | ETextureCreateFlag::UAV, false, false };
+        Info.ResourceName = L"AtmosphericShadowing";
+        AtmosphericShadowing = jRenderTargetPool::GetRenderTarget(Info);
+    }
+
     if (InLights)
     {
         for (int32 i = 0; i < InLights->size(); ++i)
@@ -148,6 +155,7 @@ void jSceneRenderTarget::Return()
         if (GBuffer[i])
             GBuffer[i]->Return();
     }
+    AtmosphericShadowing->Return();
 }
 
 std::shared_ptr<jRenderTarget> jSceneRenderTarget::GetShadowMap(const jLight* InLight) const

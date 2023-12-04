@@ -21,10 +21,11 @@ struct jSceneRenderTarget
     std::map<const jLight*, std::shared_ptr<jRenderTarget>> LightShadowMapPtr;
 
     std::shared_ptr<jRenderTarget> FinalColorPtr;
-
+    std::shared_ptr<jRenderTarget> AtmosphericShadowing;
     std::shared_ptr<jRenderTarget> BloomSetup;
     std::shared_ptr<jRenderTarget> DownSample[3];
     std::shared_ptr<jRenderTarget> UpSample[3];
+
 
     void Create(const jSwapchainImage* InSwapchain, const std::vector<jLight*>* InLights = nullptr);
     void Return();
