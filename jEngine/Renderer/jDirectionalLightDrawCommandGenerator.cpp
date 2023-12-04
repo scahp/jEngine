@@ -65,23 +65,15 @@ void jDirectionalLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* Ou
     // temp
     jShaderBindingArray ShaderBindingArray;
     jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
-    if (gOptions.ShowOriginHDR)
-    {
-        ShaderBindingArray.Add(jShaderBinding::APPEND_LAST, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
-            , ResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::OriginHDR, nullptr));
-    }
-    else
-    {
-        const jSamplerStateInfo* ShadowSamplerStateInfo = TSamplerStateInfo<ETextureFilter::NEAREST_MIPMAP_LINEAR, ETextureFilter::NEAREST_MIPMAP_LINEAR
-            , ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
-            , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
+    const jSamplerStateInfo* ShadowSamplerStateInfo = TSamplerStateInfo<ETextureFilter::NEAREST_MIPMAP_LINEAR, ETextureFilter::NEAREST_MIPMAP_LINEAR
+        , ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
+        , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
 
-        ShaderBindingArray.Add(jShaderBinding::APPEND_LAST, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
-            , ResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::IrradianceMap->GetTexture(), ShadowSamplerStateInfo));
+    ShaderBindingArray.Add(jShaderBinding::APPEND_LAST, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
+        , ResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::IrradianceMap->GetTexture(), ShadowSamplerStateInfo));
 
-        ShaderBindingArray.Add(jShaderBinding::APPEND_LAST, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
-            , ResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::FilteredEnvMap->GetTexture(), ShadowSamplerStateInfo));
-    }
+    ShaderBindingArray.Add(jShaderBinding::APPEND_LAST, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
+        , ResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::FilteredEnvMap->GetTexture(), ShadowSamplerStateInfo));
     temp = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
     CopyShaderBindingInstances.Add(temp.get());
     //

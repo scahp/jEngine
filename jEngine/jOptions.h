@@ -18,8 +18,7 @@ struct jOptions
     float AutoExposureKeyValueScale = -1.0f;
     float Metallic = 0.0f;
     float Roughness = 0.2f;
-    Vector SunDir = Vector(0.1f, -0.5f, 0.1f);
-    bool ShowOriginHDR = false;
+    Vector SunDir = Vector(0.31f, -0.828f, -0.241f);
 };
 
 extern jOptions gOptions;

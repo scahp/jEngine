@@ -1910,11 +1910,10 @@ void jRenderer::Render()
 #if ENABLE_PBR
             ImGui::SetNextWindowPos(ImVec2(400.0f, 27.0f), ImGuiCond_FirstUseEver);
             ImGui::SetNextWindowSize(ImVec2(200.0f, 80.0f), ImGuiCond_FirstUseEver);
-            ImGui::Begin("Directional");
+            ImGui::Begin("Sun");
             ImGui::SliderFloat("DirX", &gOptions.SunDir.x, -1.0f, 1.0f);
             ImGui::SliderFloat("DirY", &gOptions.SunDir.y, -1.0f, 1.0f);
             ImGui::SliderFloat("DirZ", &gOptions.SunDir.z, -1.0f, 1.0f);
-            ImGui::Checkbox("ShowOriginHDR", &gOptions.ShowOriginHDR);
             ImGui::End();
 #endif
         });
