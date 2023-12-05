@@ -170,6 +170,35 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
 				srvDesc.TextureCube.MipLevels = uint32(image.GetMetadata().mipLevels);
 				srvDesc.TextureCube.ResourceMinLODClamp = 0.0f;
 				srvDescPtr = &srvDesc;
+				NewImageDataPatr->TextureType = ETextureType::TEXTURE_CUBE;
+			}
+			else
+			{
+				switch (image.GetMetadata().dimension)
+				{
+				case TEX_DIMENSION_TEXTURE1D:
+					check(image.GetMetadata().arraySize == 1);
+					break;
+				case TEX_DIMENSION_TEXTURE2D:
+					if (image.GetMetadata().arraySize == 1)
+						NewImageDataPatr->TextureType = ETextureType::TEXTURE_2D;
+					else if (image.GetMetadata().arraySize > 1)
+						NewImageDataPatr->TextureType = ETextureType::TEXTURE_2D_ARRAY;
+					else
+						check(0);
+					break;
+				case TEX_DIMENSION_TEXTURE3D:
+                    if (image.GetMetadata().arraySize == 1)
+                        NewImageDataPatr->TextureType = ETextureType::TEXTURE_3D;
+                    else if (image.GetMetadata().arraySize > 1)
+                        NewImageDataPatr->TextureType = ETextureType::TEXTURE_3D_ARRAY;
+                    else
+                        check(0);
+					break;
+				default:
+					check(0);
+					break;
+				}
 			}
 
 			const uint64 numSubResources = image.GetMetadata().mipLevels * image.GetMetadata().arraySize;
@@ -220,21 +249,21 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
 					}
 				}
 			}
-
+			
+			NewImageDataPatr->LayerCount = (int32)image.GetMetadata().arraySize;
 			NewImageDataPatr->Width = width;
 			NewImageDataPatr->Height = height;
+            NewImageDataPatr->Format = GetDX12TextureFormat(image.GetMetadata().format);
+            NewImageDataPatr->FormatType = GetTexturePixelType(NewImageDataPatr->Format);
 			if (ExtName == ExtHDR)
 			{
-                NewImageDataPatr->FormatType = EFormatType::FLOAT;
 				NewImageDataPatr->sRGB = false;
                 IsHDR = true;
 			}
 			else
 			{
-				NewImageDataPatr->FormatType = EFormatType::UNSIGNED_BYTE;
 				NewImageDataPatr->sRGB = sRGB;
 			}
-			NewImageDataPatr->Format = GetDX12TextureFormat(image.GetMetadata().format);
 		}
 	}
 	else
@@ -255,26 +284,29 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
 	NewImageDataPatr->Width = width;
 	NewImageDataPatr->Height = height;
 
-	switch (NumOfComponent)
+	if (IsUseVulkan())
 	{
-	case 1:
-		NewImageDataPatr->Format = IsHDR ? ETextureFormat::R32F : ETextureFormat::R8;
-		break;
-	case 2:
-		NewImageDataPatr->Format = IsHDR ? ETextureFormat::RG32F : ETextureFormat::RG8;
-		break;
-	case 3:
-		NewImageDataPatr->Format = IsHDR ? ETextureFormat::RGB32F : ETextureFormat::RGB8;
-		break;
-	case 4:
-		NewImageDataPatr->Format = IsHDR ? ETextureFormat::RGBA32F : ETextureFormat::RGBA8;
-		break;
-	default:
-		if (NewImageDataPatr->SubresourceFootprints.size() <= 0)
+		switch (NumOfComponent)
 		{
-			check(0);
+		case 1:
+			NewImageDataPatr->Format = IsHDR ? ETextureFormat::R32F : ETextureFormat::R8;
+			break;
+		case 2:
+			NewImageDataPatr->Format = IsHDR ? ETextureFormat::RG32F : ETextureFormat::RG8;
+			break;
+		case 3:
+			NewImageDataPatr->Format = IsHDR ? ETextureFormat::RGB32F : ETextureFormat::RGB8;
+			break;
+		case 4:
+			NewImageDataPatr->Format = IsHDR ? ETextureFormat::RGBA32F : ETextureFormat::RGBA8;
+			break;
+		default:
+			if (NewImageDataPatr->SubresourceFootprints.size() <= 0)
+			{
+				check(0);
+			}
+			break;
 		}
-		break;
 	}
 
     {

@@ -3,7 +3,7 @@
 
 GENERATE_CONVERSION_FUNCTION(GetDX12TextureFormat,
     CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB8, DXGI_FORMAT_R8G8B8A8_UNORM),                      // not support rgb8 -> rgba8
-    CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB32F, DXGI_FORMAT_R32G32B32A32_FLOAT),                // not support rgb32 -> rgba32
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB32F, DXGI_FORMAT_R32G32B32A32_FLOAT),                // not support for UAV rgb32 -> rgba32, check this https://learn.microsoft.com/en-us/windows/win32/direct3d12/typed-unordered-access-view-loads
     CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB16F, DXGI_FORMAT_R16G16B16A16_FLOAT),                // not support rgb16 -> rgba16
     CONVERSION_TYPE_ELEMENT(ETextureFormat::R11G11B10F, DXGI_FORMAT_R11G11B10_FLOAT),
     CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8, DXGI_FORMAT_R8G8B8A8_UNORM),

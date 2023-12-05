@@ -10,6 +10,9 @@ struct jSceneRenderTarget
     static jTexture* OriginHDR;
     static std::shared_ptr<jRenderTarget> FilteredEnvMap;
     static std::shared_ptr<jRenderTarget> CubeEnvMap;
+    static jTexture* IrradianceMap2;
+    static jTexture* FilteredEnvMap2;
+    static jTexture* CubeEnvMap2;
     //////////////////////////////////////////////////////////////////////////
 
     std::shared_ptr<jRenderTarget> ColorPtr;

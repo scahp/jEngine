@@ -22,6 +22,8 @@
 #include "RHI/jRenderFrameContext.h"
 #include "RHI/DX12/jBufferUtil_DX12.h"
 #include "FileLoader/jImageFileLoader.h"
+#include "DirectXTex.h"
+#include "RHI/DX12/jTexture_DX12.h"
 
 #define ASYNC_WITH_SETUP 1
 #define PARALLELFOR_WITH_PASSSETUP 1
@@ -69,11 +71,15 @@ void jRenderer::Setup()
         }       
     }
 
+#if 1
+    jSceneRenderTarget::CubeEnvMap2 = jImageFileLoader::GetInstance().LoadTextureFromFile(jNameStatic("Resource/stpeters_probe_cubemp.dds")).lock().get();
+    jSceneRenderTarget::IrradianceMap2 = jImageFileLoader::GetInstance().LoadTextureFromFile(jNameStatic("Resource/stpeters_probe_irradiancemap.dds")).lock().get();
+    jSceneRenderTarget::FilteredEnvMap2 = jImageFileLoader::GetInstance().LoadTextureFromFile(jNameStatic("Resource/stpeters_probe_filteredenvmap.dds")).lock().get();
+#else
     static jName FilePath = jName("Resource/stpeters_probe.hdr");
-    
     if (!jSceneRenderTarget::CubeEnvMap)
     {
-        DEBUG_EVENT(RenderFrameContextPtr, "DrawCubemap");
+        //DEBUG_EVENT(RenderFrameContextPtr, "DrawCubemap");
         //////////////////////////////////////////////////////////////////////////
         // Compute Pipeline
 
@@ -82,7 +88,7 @@ void jRenderer::Setup()
             jSceneRenderTarget::OriginHDR = jImageFileLoader::GetInstance().LoadTextureFromFile(FilePath, false, true).lock().get();
         }
 
-        static jRenderTargetInfo Info = { ETextureType::TEXTURE_CUBE, ETextureFormat::RGBA16F, jSceneRenderTarget::OriginHDR->Width, jSceneRenderTarget::OriginHDR->Height
+        static jRenderTargetInfo Info = { ETextureType::TEXTURE_CUBE, ETextureFormat::RGBA16F, 512, 512
             , 6, true, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f), ETextureCreateFlag::RTV | ETextureCreateFlag::UAV, false, false };
         Info.ResourceName = L"FilteredEnvMap";
         auto CubeMap = jRenderTargetPool::GetRenderTarget(Info);
@@ -169,7 +175,36 @@ void jRenderer::Setup()
                 , MipUBO.Height / 16 + ((MipUBO.Height % 16) ? 1 : 0)
                 , 6);
         }
+
+        RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::BasePass);
+        RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
+        g_rhi->Flush();
+        DirectX::ScratchImage image;
+        jTexture_DX12* texture_dx12 = (jTexture_DX12*)jSceneRenderTarget::CubeEnvMap->GetTexture();
+        DirectX::CaptureTexture(g_rhi_dx12->CommandBufferManager->GetCommandQueue().Get()
+            , texture_dx12->Image.Get(), true, image, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_RENDER_TARGET);
+
+        DirectX::ScratchImage compressedImage;
+
+        std::function<bool __cdecl(size_t, size_t)> statusCallBack = [](size_t a, size_t b) {
+            char szTemp[256] = { 0 };
+            sprintf_s(szTemp, sizeof(szTemp), "%d / %d\n", a, b);
+            OutputDebugStringA(szTemp);
+            return true;
+        };
+
+        //DirectX::ConvertOptions option{};
+        //option.threshold = TEX_THRESHOLD_DEFAULT;
+        //option.filter = TEX_FILTER_CUBIC;
+
+        //DirectX::ConvertEx(image.GetImages(), image.GetImageCount(), image.GetMetadata()
+        //    , DXGI_FORMAT::DXGI_FORMAT_R32G32B32_FLOAT, option, compressedImage, statusCallBack);
+
+        DirectX::SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::DDS_FLAGS::DDS_FLAGS_NONE, L"D:\\cubemp.dds");
+
         g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), CubeMap->GetTexture(), EImageLayout::SHADER_READ_ONLY);
+
+        jSceneRenderTarget::CubeEnvMap2 = jSceneRenderTarget::CubeEnvMap->GetTexture();
 
         //auto cube = jPrimitiveUtil::CreateCube(Vector(65.0f, 85.0f, 10.0f + 130.0f), Vector(1), Vector(100.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
         //jObject::AddObject(cube);
@@ -192,7 +227,7 @@ void jRenderer::Setup()
     // GenIrradianceMap Test
     if (!jSceneRenderTarget::IrradianceMap)
     {
-        DEBUG_EVENT(RenderFrameContextPtr, "GenIrradianceMap");
+        //DEBUG_EVENT(RenderFrameContextPtr, "GenIrradianceMap");
         //////////////////////////////////////////////////////////////////////////
         // Compute Pipeline
 
@@ -275,13 +310,41 @@ void jRenderer::Setup()
         int32 Y = (Info.Height / 16) + ((Info.Height % 16) ? 1 : 0);
         g_rhi->DispatchCompute(RenderFrameContextPtr, X, Y, 6);
 
+        RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::BasePass);
+        RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
+        g_rhi->Flush();
+        DirectX::ScratchImage image;
+        jTexture_DX12* texture_dx12 = (jTexture_DX12*)jSceneRenderTarget::IrradianceMap->GetTexture();
+        DirectX::CaptureTexture(g_rhi_dx12->CommandBufferManager->GetCommandQueue().Get()
+            , texture_dx12->Image.Get(), true, image, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_RENDER_TARGET);
+
+        DirectX::ScratchImage compressedImage;
+
+        std::function<bool __cdecl(size_t, size_t)> statusCallBack = [](size_t a, size_t b) {
+            char szTemp[256] = { 0 };
+            sprintf_s(szTemp, sizeof(szTemp), "%d / %d\n", a, b);
+            OutputDebugStringA(szTemp);
+            return true;
+        };
+
+        //DirectX::ConvertOptions option{};
+        //option.threshold = TEX_THRESHOLD_DEFAULT;
+        //option.filter = TEX_FILTER_CUBIC;
+
+        //DirectX::ConvertEx(image.GetImages(), image.GetImageCount(), image.GetMetadata()
+        //    , DXGI_FORMAT::DXGI_FORMAT_R32G32B32_FLOAT, option, compressedImage, statusCallBack);
+
+        DirectX::SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::DDS_FLAGS::DDS_FLAGS_NONE, L"D:\\irradiancemap.dds");
+
         g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::IrradianceMap->GetTexture(), EImageLayout::SHADER_READ_ONLY);
+        
+        jSceneRenderTarget::IrradianceMap2 = jSceneRenderTarget::IrradianceMap->GetTexture();
     }
 
     // GenFilteredEnvMap Test
     if (!jSceneRenderTarget::FilteredEnvMap)
     {
-        DEBUG_EVENT(RenderFrameContextPtr, "GenFilteredEnvMap");
+        //DEBUG_EVENT(RenderFrameContextPtr, "GenFilteredEnvMap");
         //////////////////////////////////////////////////////////////////////////
         // Compute Pipeline
 
@@ -371,9 +434,39 @@ void jRenderer::Setup()
             int32 Y = (MipUBO.Height / 16) + ((MipUBO.Height % 16) ? 1 : 0);
             g_rhi->DispatchCompute(RenderFrameContextPtr, X, Y, 6);
         }
+
+        RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::BasePass);
+        RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
+        g_rhi->Flush();
+        DirectX::ScratchImage image;
+        jTexture_DX12* texture_dx12 = (jTexture_DX12*)jSceneRenderTarget::FilteredEnvMap->GetTexture();
+        DirectX::CaptureTexture(g_rhi_dx12->CommandBufferManager->GetCommandQueue().Get()
+            , texture_dx12->Image.Get(), true, image, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_RENDER_TARGET);
+
+        DirectX::ScratchImage compressedImage;
+
+        std::function<bool __cdecl(size_t, size_t)> statusCallBack = [](size_t a, size_t b) {
+            char szTemp[256] = { 0 };
+            sprintf_s(szTemp, sizeof(szTemp), "%d / %d\n", a, b);
+            OutputDebugStringA(szTemp);
+            return true;
+        };
+
+        //DirectX::ConvertOptions option{};
+        //option.threshold = TEX_THRESHOLD_DEFAULT;
+        //option.filter = TEX_FILTER_CUBIC;
+
+        //DirectX::ConvertEx(image.GetImages(), image.GetImageCount(), image.GetMetadata()
+        //    , DXGI_FORMAT::DXGI_FORMAT_R32G32B32_FLOAT, option, compressedImage, statusCallBack);
+
+        DirectX::SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::DDS_FLAGS::DDS_FLAGS_NONE, L"D:\\filteredenvmap.dds");
+
         g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::FilteredEnvMap->GetTexture(), EImageLayout::SHADER_READ_ONLY);
+
+        jSceneRenderTarget::FilteredEnvMap2 = jSceneRenderTarget::FilteredEnvMap->GetTexture();
     }
-    
+#endif
+
 #if ASYNC_WITH_SETUP
     ShadowPassSetupCompleteEvent = std::async(std::launch::async, &jRenderer::SetupShadowPass, this);
 #else
@@ -910,7 +1003,7 @@ void jRenderer::BasePass()
         //BasepassOcclusionTest.EndQuery(RenderFrameContextPtr->GetActiveCommandBuffer());
     }
 
-    if (1)
+    if (0)
     {
         jDirectionalLight* DirectionalLight = nullptr;
         for (auto light : jLight::GetLights())
@@ -1053,7 +1146,7 @@ void jRenderer::BasePass()
         g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), AtmosphericShadowing->GetTexture(), EImageLayout::SHADER_READ_ONLY);
     }
 
-    if (1)
+    if (0)
     {
         static jFullscreenQuadPrimitive* GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
         std::shared_ptr<jRenderTarget> AtmosphericShadowing = RenderFrameContextPtr->SceneRenderTargetPtr->AtmosphericShadowing;

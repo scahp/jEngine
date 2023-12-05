@@ -354,7 +354,6 @@ DECLARE_ENUM_WITH_CONVERT_TO_STRING(ETextureFormat, uint8,
     BC7_UNORM,
 	MAX,
 );
-
 static bool IsDepthFormat(ETextureFormat format)
 {
 	switch (format)
@@ -387,12 +386,53 @@ static bool IsDepthOnlyFormat(ETextureFormat format)
 DECLARE_ENUM_WITH_CONVERT_TO_STRING(EFormatType, uint8,
 	BYTE,
 	UNSIGNED_BYTE,
+	SHORT_INT,
 	INT,
 	UNSIGNED_INT,
 	HALF,
 	FLOAT,
 	MAX
 );
+
+
+
+GENERATE_CONVERSION_FUNCTION(GetTexturePixelType,
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB8, EFormatType::UNSIGNED_BYTE),          // not support rgb8 -> rgba8
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB32F, EFormatType::HALF),                 // not support rgb32 -> rgba32
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB16F, EFormatType::HALF),                 // not support rgb16 -> rgba16
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::R11G11B10F, EFormatType::HALF),
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8, EFormatType::UNSIGNED_BYTE),
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA16F, EFormatType::HALF),
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA32F, EFormatType::FLOAT),
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8SI, EFormatType::INT),
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8UI, EFormatType::INT),
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::BGRA8, EFormatType::UNSIGNED_BYTE),
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::R8, EFormatType::UNSIGNED_BYTE),
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::R16F, EFormatType::HALF),
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::R32F, EFormatType::FLOAT),
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::R8UI, EFormatType::INT),
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::R32UI, EFormatType::INT),
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::RG8, EFormatType::UNSIGNED_BYTE),
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::RG16F, EFormatType::HALF),
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::RG32F, EFormatType::FLOAT),
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::D16, EFormatType::SHORT_INT),
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::D16_S8, EFormatType::INT),                  // not support d16_s8 -> d24_s8
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::D24, EFormatType::INT),
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::D24_S8, EFormatType::INT),
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::D32, EFormatType::FLOAT),
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::D32_S8, EFormatType::FLOAT),
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::BC1_UNORM, EFormatType::UNSIGNED_BYTE),
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::BC2_UNORM, EFormatType::UNSIGNED_BYTE),
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::BC3_UNORM, EFormatType::UNSIGNED_BYTE),
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::BC4_UNORM, EFormatType::UNSIGNED_BYTE),
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::BC4_SNORM, EFormatType::UNSIGNED_BYTE),
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::BC5_UNORM, EFormatType::UNSIGNED_BYTE),
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::BC5_SNORM, EFormatType::UNSIGNED_BYTE),
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::BC6H_UF16, EFormatType::HALF),
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::BC6H_SF16, EFormatType::HALF),
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::BC7_UNORM, EFormatType::HALF)
+)
+
 
 DECLARE_ENUM_WITH_CONVERT_TO_STRING(EBlendFactor, uint8,
 	ZERO,
