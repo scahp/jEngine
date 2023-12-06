@@ -86,6 +86,8 @@ void jShader::StartAndRunCheckUpdateShaderThread()
 
                 // Release previous compiled shader
                 delete PreviousCompiledShader;
+                
+                g_rhi->AddShader(Shader->ShaderInfo, Shader);
 
                 it = WaitForUpdateShaders.erase(it);
             }
