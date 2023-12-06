@@ -415,9 +415,6 @@
     <ClInclude Include="RHI\DX12\jUniformBufferBlock_DX12.h">
       <Filter>Code\RHI\DX12</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX12\jPipelineStateInfo_DX12.h" />
-    <ClInclude Include="RHI\DX12\jShaderBindingInstance_DX12.h" />
-    <ClInclude Include="RHI\DX12\jShaderBindingLayout_DX12.h" />
     <ClInclude Include="RHI\DX12\jVertexBuffer_DX12.h">
       <Filter>Code\RHI\DX12</Filter>
     </ClInclude>
@@ -456,6 +453,15 @@
     </ClInclude>
     <ClInclude Include="RHI\jSemaphoreManager.h">
       <Filter>Code\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\jPipelineStateInfo_DX12.h">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\jShaderBindingInstance_DX12.h">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\jShaderBindingLayout_DX12.h">
+      <Filter>Code\RHI\DX12</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -741,15 +747,6 @@
     <ClCompile Include="RHI\DX12\jUniformBufferBlock_DX12.cpp">
       <Filter>Code\RHI\DX12</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\jPipelineStateInfo_DX12.cpp">
-      <Filter>Code</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\DX12\jShaderBindingInstance_DX12.cpp">
-      <Filter>Code</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\DX12\jShaderBindingLayout_DX12.cpp">
-      <Filter>Code</Filter>
-    </ClCompile>
     <ClCompile Include="RHI\DX12\jVertexBuffer_DX12.cpp">
       <Filter>Code\RHI\DX12</Filter>
     </ClCompile>
@@ -791,6 +788,15 @@
     </ClCompile>
     <ClCompile Include="RHI\jSemaphoreManager.cpp">
       <Filter>Code\RHI</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\jShaderBindingLayout_DX12.cpp">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\jShaderBindingInstance_DX12.cpp">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\jPipelineStateInfo_DX12.cpp">
+      <Filter>Code\RHI\DX12</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
