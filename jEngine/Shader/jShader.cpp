@@ -85,7 +85,7 @@ void jShader::StartAndRunCheckUpdateShaderThread()
                 }
 
                 // Release previous compiled shader
-                delete Shader->CompiledShader;
+                delete PreviousCompiledShader;
 
                 it = WaitForUpdateShaders.erase(it);
             }
