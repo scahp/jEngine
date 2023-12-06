@@ -209,7 +209,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 					return (size_t)FilePathName.GetNameHash();
 				};
 				T.pFunc = [FilePath]() {
-					jImageFileLoader::GetInstance().LoadImageDataFromFile(jName(FilePath), true);
+					jImageFileLoader::GetInstance().LoadImageDataFromFile(jName(FilePath));
 				};
 				ThreadPool.Enqueue(T);
             }
@@ -258,7 +258,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 		for (int32 i = 0; i < _countof(mat->TexData); ++i)
 		{
 			if (mat->TexData[i].FilePath.IsValid())
-				mat->TexData[i].Texture = jImageFileLoader::GetInstance().LoadTextureFromFile(mat->TexData[i].FilePath, true).lock().get();
+				mat->TexData[i].Texture = jImageFileLoader::GetInstance().LoadTextureFromFile(mat->TexData[i].FilePath).lock().get();
 		}
     }
 

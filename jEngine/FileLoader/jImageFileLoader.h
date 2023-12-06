@@ -2,11 +2,11 @@
 
 struct jImageData
 {
-	bool HasMipmap = false;
 	bool CreateMipmapIfPossible = true;
 	bool sRGB = false;
 	int32 Width = 0;
 	int32 Height = 0;
+	int32 MipLevel = 1;
 	int32 LayerCount = 1;
 	jName Filename;
 	std::vector<unsigned char> ImageData;
@@ -40,8 +40,8 @@ public:
 		}
 	}
 
-	std::weak_ptr<jImageData> LoadImageDataFromFile(const jName& filename, bool sRGB = false, bool paddingRGBA = false);
-	std::weak_ptr<jTexture> LoadTextureFromFile(const jName& filename, bool sRGB = false, bool paddingRGBA = false);
+	std::weak_ptr<jImageData> LoadImageDataFromFile(const jName& filename);
+	std::weak_ptr<jTexture> LoadTextureFromFile(const jName& filename);
 
 private:
 	std::map<jName, std::shared_ptr<jImageData> > CachedImageDataMap;

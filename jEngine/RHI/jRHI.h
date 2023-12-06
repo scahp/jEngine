@@ -294,6 +294,7 @@ struct jImageSubResourceData
     int32 Format = 0;
     uint32 Width = 0;
     uint32 Height = 0;
+	uint32 MipLevel = 0;
     uint32 Depth = 0;
     uint32 RowPitch = 0;
 	uint64 Offset = 0;

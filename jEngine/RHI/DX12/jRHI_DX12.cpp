@@ -1684,11 +1684,17 @@ void jRHI_DX12::EndSingleTimeCopyCommands(jCommandBuffer_DX12* commandBuffer)
 jTexture* jRHI_DX12::CreateTextureFromData(const jImageData* InImageData) const
 {
     check(InImageData);
-	const uint16 MipLevels = InImageData->HasMipmap ? static_cast<uint32>(std::floor(std::log2(std::max<int>(InImageData->Width, InImageData->Height)))) + 1 : 1;
+
+    int32 MipLevel = InImageData->MipLevel;
+    // todo : generate miplevel
+    //if ((MipLevel == 1) && (InImageData->CreateMipmapIfPossible))
+    //{
+    //    MipLevel = jTexture::GetMipLevels(InImageData->Width, InImageData->Height);
+    //}
 
     EImageLayout Layout = EImageLayout::GENERAL;
 	jTexture_DX12* Texture = jBufferUtil_DX12::CreateImage(InImageData->Width, InImageData->Height
-        , InImageData->LayerCount, MipLevels, 1, InImageData->TextureType, InImageData->Format, ETextureCreateFlag::UAV, Layout);
+        , InImageData->LayerCount, MipLevel, 1, InImageData->TextureType, InImageData->Format, ETextureCreateFlag::UAV, Layout);
     Texture->sRGB = InImageData->sRGB;
 
     const uint64 ImageSize = InImageData->Width * InImageData->Height * GetDX12TexturePixelSize(InImageData->Format);
@@ -1707,6 +1713,13 @@ jTexture* jRHI_DX12::CreateTextureFromData(const jImageData* InImageData) const
     {
         jBufferUtil_DX12::CopyBufferToImage(commandList->Get(), buffer->Buffer.Get(), 0, Texture->Image.Get());
     }
+
+    // If it needs to generate miplevel do it here.
+    if ((InImageData->MipLevel == 1) && (MipLevel > InImageData->MipLevel))
+    {
+        //check(0); // todo : generate miplevel
+    }
+
 	g_rhi_dx12->EndSingleTimeCopyCommands(commandList);
 	delete buffer;
 

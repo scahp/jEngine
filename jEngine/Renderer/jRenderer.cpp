@@ -1003,7 +1003,7 @@ void jRenderer::BasePass()
         //BasepassOcclusionTest.EndQuery(RenderFrameContextPtr->GetActiveCommandBuffer());
     }
 
-    if (0)
+    if (1)
     {
         jDirectionalLight* DirectionalLight = nullptr;
         for (auto light : jLight::GetLights())
@@ -1058,7 +1058,7 @@ void jRenderer::BasePass()
         AtmosphericData.CameraNear = MainCamera->Near;
         AtmosphericData.AnisoG = 0.0f;
         AtmosphericData.SlopeOfDist = 0.25f;
-        AtmosphericData.InScatteringLambda = 0.0002f;
+        AtmosphericData.InScatteringLambda = 0.001f;
         AtmosphericData.TravelCount = 64;
         AtmosphericData.RTWidth = Width;
         AtmosphericData.RTHeight = Height;
@@ -1146,7 +1146,7 @@ void jRenderer::BasePass()
         g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), AtmosphericShadowing->GetTexture(), EImageLayout::SHADER_READ_ONLY);
     }
 
-    if (0)
+    if (1)
     {
         static jFullscreenQuadPrimitive* GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
         std::shared_ptr<jRenderTarget> AtmosphericShadowing = RenderFrameContextPtr->SceneRenderTargetPtr->AtmosphericShadowing;
