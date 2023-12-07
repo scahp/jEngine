@@ -51,29 +51,23 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
     bool IsHDR = false;
 
     {
-        const int32 filenameLength = MultiByteToWideChar(CP_ACP, 0, filename.ToStr(), -1, NULL, NULL);
-        check(filenameLength < 128);
-
-        wchar_t FilenameWChar[128] = { 0, };
-        MultiByteToWideChar(CP_ACP, 0, filename.ToStr()
-            , (int32)filename.GetStringLength(), FilenameWChar, (int32)(_countof(FilenameWChar) - 1));
-        FilenameWChar[_countof(FilenameWChar) - 1] = 0;
+        const std::wstring FilenameWChar = ConvertToWchar(filename);
 
         DirectX::ScratchImage image;
         if (ExtName == ExtDDS)
         {
-            if (JFAIL(DirectX::LoadFromDDSFile(FilenameWChar, DirectX::DDS_FLAGS_NONE, nullptr, image)))
+            if (JFAIL(DirectX::LoadFromDDSFile(FilenameWChar.c_str(), DirectX::DDS_FLAGS_NONE, nullptr, image)))
                 return std::weak_ptr<jImageData>();
         }
         else if (ExtName == ExtHDR)
         {
-            if (JFAIL(DirectX::LoadFromHDRFile(FilenameWChar, nullptr, image)))
+            if (JFAIL(DirectX::LoadFromHDRFile(FilenameWChar.c_str(), nullptr, image)))
                 return std::weak_ptr<jImageData>();
         }
         else
         {
             DirectX::ScratchImage imageOrigin;
-            if (JFAIL(DirectX::LoadFromWICFile(FilenameWChar, DirectX::WIC_FLAGS_FORCE_RGB, nullptr, imageOrigin)))
+            if (JFAIL(DirectX::LoadFromWICFile(FilenameWChar.c_str(), DirectX::WIC_FLAGS_FORCE_RGB, nullptr, imageOrigin)))
                 return std::weak_ptr<jImageData>();
 
             int32 mipLevel = jTexture::GetMipLevels((int32)imageOrigin.GetMetadata().width, (int32)imageOrigin.GetMetadata().height);

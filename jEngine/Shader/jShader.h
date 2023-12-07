@@ -160,7 +160,7 @@ struct jShaderInfo
 private:
 	jName Name;
     jName PreProcessors;
-    jName EntryPoint;
+    jName EntryPoint = jName("main");
     jName ShaderFilepath;
     std::vector<jName> IncludeShaderFilePaths;
     EShaderAccessStageFlag ShaderType = (EShaderAccessStageFlag)0;

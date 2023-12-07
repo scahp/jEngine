@@ -29,6 +29,26 @@ bool IsSizeMinimize = false;
 #pragma comment(lib,"d3dcompiler.lib")
 #pragma comment(lib,"dxguid.lib")
 
+std::wstring ConvertToWchar(const char* InPath, int32 InLength)
+{
+    check(InPath);
+
+    std::wstring result;
+    if (InLength > 0)
+    {
+        result.resize(InLength + 1);
+        {
+            const int32 ResultFilePathLength = MultiByteToWideChar(CP_ACP, 0, InPath, -1, NULL, NULL);
+            check(ResultFilePathLength < 256);
+
+            MultiByteToWideChar(CP_ACP, 0, InPath
+                , InLength, &result[0], (int32)(result.size() - 1));
+            result[InLength] = 0;
+        }
+    }
+    return result;
+}
+
 uint32 GetMaxThreadCount()
 {
     static uint32 MaxThreadCount = Max((uint32)1, std::thread::hardware_concurrency());

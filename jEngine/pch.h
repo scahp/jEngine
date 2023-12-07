@@ -186,6 +186,14 @@ FORCEINLINE constexpr T Align(T value, uint64 alignment)
     return (T)(((uint64)value + alignment - 1) & ~(alignment - 1));
 }
 
+std::wstring ConvertToWchar(const char* InPath, int32 InLength);
+
+FORCEINLINE std::wstring ConvertToWchar(jName InName)
+{
+	check(InName.IsValid());
+	return ConvertToWchar(InName.ToStr(), (int32)InName.GetStringLength());
+}
+
 #include "Core/jMemStackAllocator.h"
 #include "Core/jParallelFor.h"
 

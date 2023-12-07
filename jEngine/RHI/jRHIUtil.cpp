@@ -137,18 +137,10 @@ std::shared_ptr<jRenderTarget> ConvertToCubeMap(jName InDestFilePath, Vector2i I
     DirectX::CaptureTexture(g_rhi_dx12->CommandBufferManager->GetCommandQueue().Get()
         , texture_dx12->Image.Get(), true, image, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-    wchar_t ResultFilePath[256] = { 0, };
-    {
-        const int32 ResultFilePathLength = MultiByteToWideChar(CP_ACP, 0, InDestFilePath.ToStr(), -1, NULL, NULL);
-        check(ResultFilePathLength < 256);
-
-        MultiByteToWideChar(CP_ACP, 0, InDestFilePath.ToStr()
-            , (int32)InDestFilePath.GetStringLength(), ResultFilePath, (int32)(_countof(ResultFilePath) - 1));
-        ResultFilePath[_countof(ResultFilePath) - 1] = 0;
-    }
+    const std::wstring DestFilePath = ConvertToWchar(InDestFilePath);
 
     // Save image
-    DirectX::SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::DDS_FLAGS::DDS_FLAGS_NONE, ResultFilePath);
+    DirectX::SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::DDS_FLAGS::DDS_FLAGS_NONE, DestFilePath.c_str());
     g_rhi->TransitionImageLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), CubeMap->GetTexture(), EImageLayout::SHADER_READ_ONLY);
 
     return CubeMap;
@@ -260,18 +252,10 @@ std::shared_ptr<jRenderTarget> GenerateIrradianceMap(jName InDestFilePath, Vecto
     DirectX::CaptureTexture(g_rhi_dx12->CommandBufferManager->GetCommandQueue().Get()
         , texture_dx12->Image.Get(), true, image, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-    wchar_t DestFilePath[256] = { 0, };
-    {
-        const int32 DestFilePathLength = MultiByteToWideChar(CP_ACP, 0, InDestFilePath.ToStr(), -1, NULL, NULL);
-        check(DestFilePathLength < 256);
-
-        MultiByteToWideChar(CP_ACP, 0, InDestFilePath.ToStr()
-            , (int32)InDestFilePath.GetStringLength(), DestFilePath, (int32)(_countof(DestFilePath) - 1));
-        DestFilePath[_countof(DestFilePath) - 1] = 0;
-    }
+    const std::wstring DestFilePath = ConvertToWchar(InDestFilePath);
 
     // Save image
-    DirectX::SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::DDS_FLAGS::DDS_FLAGS_NONE, DestFilePath);
+    DirectX::SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::DDS_FLAGS::DDS_FLAGS_NONE, DestFilePath.c_str());
     g_rhi->TransitionImageLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), IrradianceMap->GetTexture(), EImageLayout::SHADER_READ_ONLY);
 
     return IrradianceMap;
@@ -391,18 +375,10 @@ std::shared_ptr<jRenderTarget> GenerateFilteredEnvironmentMap(jName InDestFilePa
     DirectX::CaptureTexture(g_rhi_dx12->CommandBufferManager->GetCommandQueue().Get()
         , texture_dx12->Image.Get(), true, image, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-    wchar_t ResultFilePath[256] = { 0, };
-    {
-        const int32 ResultFilePathLength = MultiByteToWideChar(CP_ACP, 0, InDestFilePath.ToStr(), -1, NULL, NULL);
-        check(ResultFilePathLength < 256);
-
-        MultiByteToWideChar(CP_ACP, 0, InDestFilePath.ToStr()
-            , (int32)InDestFilePath.GetStringLength(), ResultFilePath, (int32)(_countof(ResultFilePath) - 1));
-        ResultFilePath[_countof(ResultFilePath) - 1] = 0;
-    }
+    const std::wstring DestFilePath = ConvertToWchar(InDestFilePath);
 
     // Save image
-    DirectX::SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::DDS_FLAGS::DDS_FLAGS_NONE, ResultFilePath);
+    DirectX::SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::DDS_FLAGS::DDS_FLAGS_NONE, DestFilePath.c_str());
     g_rhi->TransitionImageLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), FilteredEnvMap->GetTexture(), EImageLayout::SHADER_READ_ONLY);
 
     return FilteredEnvMap;

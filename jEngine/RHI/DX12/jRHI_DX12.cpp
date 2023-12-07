@@ -1877,18 +1877,10 @@ bool jRHI_DX12::CreateShaderInternal(jShader* OutShader, const jShaderInfo& shad
                 IncludeShaderFile.CloseFile();
             }
 
-            wchar_t EntryPoint[128] = { 0, };
-			{
-				const int32 EntryPointLength = MultiByteToWideChar(CP_ACP, 0, shaderInfo.GetEntryPoint().ToStr(), -1, NULL, NULL);
-				check(EntryPointLength < 128);
-
-				MultiByteToWideChar(CP_ACP, 0, shaderInfo.GetEntryPoint().ToStr()
-					, (int32)shaderInfo.GetEntryPoint().GetStringLength(), EntryPoint, (int32)(_countof(EntryPoint) - 1));
-				EntryPoint[_countof(EntryPoint) - 1] = 0;
-			}
+            const std::wstring EntryPoint = ConvertToWchar(shaderInfo.GetEntryPoint());
 			
 			CurCompiledShader->ShaderBlob = jShaderCompiler_DX12::Get().Compile(ShaderText.c_str(), (uint32)ShaderText.size()
-				, ShadingModel, EntryPoint);
+				, ShadingModel, EntryPoint.c_str());
             if (!CurCompiledShader->ShaderBlob)
                 return false;
         }
