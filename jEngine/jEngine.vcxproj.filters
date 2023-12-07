@@ -463,6 +463,9 @@
     <ClInclude Include="RHI\DX12\jShaderBindingLayout_DX12.h">
       <Filter>Code\RHI\DX12</Filter>
     </ClInclude>
+    <ClInclude Include="RHI\jRHIUtil.h">
+      <Filter>Code\RHI</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -797,6 +800,9 @@
     </ClCompile>
     <ClCompile Include="RHI\DX12\jPipelineStateInfo_DX12.cpp">
       <Filter>Code\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\jRHIUtil.cpp">
+      <Filter>Code\RHI</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

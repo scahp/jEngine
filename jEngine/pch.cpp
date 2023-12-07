@@ -44,3 +44,10 @@ jEngine* g_Engine = nullptr;
 bool GUseRealTimeShaderUpdate = true;
 int32 GMaxCheckCountForRealTimeShaderUpdate = 10;
 int32 GSleepMSForRealTimeShaderUpdate = 100;
+
+
+#ifdef _DEBUG
+#pragma comment(lib, "Debug/DirectXTex.lib")
+#else
+#pragma comment(lib, "Release/DirectXTex.lib")
+#endif

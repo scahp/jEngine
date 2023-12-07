@@ -193,6 +193,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClInclude Include="RHI\jRHI.h" />
     <ClInclude Include="RHI\jMemoryPool.h" />
     <ClInclude Include="RHI\jRHIType.h" />
+    <ClInclude Include="RHI\jRHIUtil.h" />
     <ClInclude Include="RHI\jSemaphoreManager.h" />
     <ClInclude Include="RHI\jShaderBindingLayout.h" />
     <ClInclude Include="RHI\jSwapchain.h" />
@@ -382,6 +383,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClCompile Include="RHI\jRenderTargetPool.cpp" />
     <ClCompile Include="RHI\jRHI.cpp" />
     <ClCompile Include="RHI\jMemoryPool.cpp" />
+    <ClCompile Include="RHI\jRHIUtil.cpp" />
     <ClCompile Include="RHI\jSemaphoreManager.cpp" />
     <ClCompile Include="RHI\Vulkan\jBuffer_Vulkan.cpp" />
     <ClCompile Include="RHI\Vulkan\jCommandBufferManager_Vulkan.cpp" />

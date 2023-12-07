@@ -7,15 +7,9 @@
 
 #include "SOIL_STBI/stbi_DDS_aug_c.h"
 
-#include "DirectXTex.h"
 #include "RHI/DX12/jBufferUtil_DX12.h"
 #include "RHI/DX12/jTexture_DX12.h"
 
-#ifdef _DEBUG
-#pragma comment(lib, "Debug/DirectXTex.lib")
-#else
-#pragma comment(lib, "Release/DirectXTex.lib")
-#endif
 
 jImageFileLoader* jImageFileLoader::_instance = nullptr;
 

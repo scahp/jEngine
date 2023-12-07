@@ -104,6 +104,7 @@ using tchar = wchar_t;
 #include <dxgi1_6.h>
 #include <d3dcompiler.h>
 #include <DirectXMath.h>
+#include <DirectXTex.h>
 #include "IMGUI/imgui_impl_win32.h"
 #include "IMGUI/imgui_impl_dx12.h"
 #include "RHI/DX12/jRHI_DX12.h"

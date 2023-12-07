@@ -7,6 +7,7 @@ struct jRenderFrameContext : public std::enable_shared_from_this<jRenderFrameCon
 {
     enum ECurrentRenderPass
     {
+        None,
         ShadowPass,
         BasePass,
     };
