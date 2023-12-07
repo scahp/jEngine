@@ -231,44 +231,40 @@ void jShaderBindingInstance_DX12::CopyToOnlineDescriptorHeap(jCommandBuffer_DX12
 
     if (Descriptors.size() > 0)
     {
-        std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> DestDescriptor;
-        DestDescriptor.resize(Descriptors.size());
-
-        std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> SrcDescriptor;
-        SrcDescriptor.resize(Descriptors.size());
+        check(Descriptors.size() <= 20);
+        jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 20> DestDescriptor;
+        jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 20> SrcDescriptor;
 
         for (int32 i = 0; i < Descriptors.size(); ++i)
         {
-            SrcDescriptor[i] = Descriptors[i].Descriptor.CPUHandle;
+            SrcDescriptor.Add(Descriptors[i].Descriptor.CPUHandle);
 
             jDescriptor_DX12 Descriptor = InCommandList->OnlineDescriptorHeap->Alloc();
             check(Descriptor.IsValid());
-            DestDescriptor[i] = Descriptor.CPUHandle;
+            DestDescriptor.Add(Descriptor.CPUHandle);
         }
 
-        g_rhi_dx12->Device->CopyDescriptors((uint32)DestDescriptor.size(), &DestDescriptor[0], nullptr
-            , (uint32)SrcDescriptor.size(), &SrcDescriptor[0], nullptr, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        g_rhi_dx12->Device->CopyDescriptors((uint32)DestDescriptor.NumOfData, &DestDescriptor[0], nullptr
+            , (uint32)SrcDescriptor.NumOfData, &SrcDescriptor[0], nullptr, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
 
     if (SamplerDescriptors.size() > 0)
     {
-        std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> DestSamplerDescriptor;
-        DestSamplerDescriptor.resize(SamplerDescriptors.size());
-
-        std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> SrcSamplerDescriptor;
-        SrcSamplerDescriptor.resize(SamplerDescriptors.size());
+        check(Descriptors.size() <= 20);
+        jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 20> DestSamplerDescriptor;
+        jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 20> SrcSamplerDescriptor;
 
         for (int32 i = 0; i < SamplerDescriptors.size(); ++i)
         {
-            SrcSamplerDescriptor[i] = SamplerDescriptors[i].Descriptor.CPUHandle;
+            SrcSamplerDescriptor.Add(SamplerDescriptors[i].Descriptor.CPUHandle);
 
             jDescriptor_DX12 Descriptor = InCommandList->OnlineSamplerDescriptorHeap->Alloc();
             check(Descriptor.IsValid());
-            DestSamplerDescriptor[i] = Descriptor.CPUHandle;
+            DestSamplerDescriptor.Add(Descriptor.CPUHandle);
         }
 
-        g_rhi_dx12->Device->CopyDescriptors((uint32)DestSamplerDescriptor.size(), &DestSamplerDescriptor[0], nullptr
-            , (uint32)SrcSamplerDescriptor.size(), &SrcSamplerDescriptor[0], nullptr, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+        g_rhi_dx12->Device->CopyDescriptors((uint32)DestSamplerDescriptor.NumOfData, &DestSamplerDescriptor[0], nullptr
+            , (uint32)SrcSamplerDescriptor.NumOfData, &SrcSamplerDescriptor[0], nullptr, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
     }
 }
 
