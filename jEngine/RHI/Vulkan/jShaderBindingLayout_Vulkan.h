@@ -105,6 +105,9 @@ public:
     static VkPipelineLayout CreatePipelineLayout(const jShaderBindingLayoutArray& InShaderBindingLayoutArray, const jPushConstant* pushConstant);
     static void ClearPipelineLayout();
 
+    static jMutexRWLock DescriptorLayoutPoolLock;
+    static robin_hood::unordered_map<size_t, VkDescriptorSetLayout> DescriptorLayoutPool;
+
     static jMutexRWLock PipelineLayoutPoolLock;
     static robin_hood::unordered_map<size_t, VkPipelineLayout> PipelineLayoutPool;
 };

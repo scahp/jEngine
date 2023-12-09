@@ -8,6 +8,9 @@
 //////////////////////////////////////////////////////////////////////////
 // jShaderBinding_Vulkan
 //////////////////////////////////////////////////////////////////////////
+jMutexRWLock jShaderBindingLayout_Vulkan::DescriptorLayoutPoolLock;
+robin_hood::unordered_map<size_t, VkDescriptorSetLayout> jShaderBindingLayout_Vulkan::DescriptorLayoutPool;
+
 jMutexRWLock jShaderBindingLayout_Vulkan::PipelineLayoutPoolLock;
 robin_hood::unordered_map<size_t, VkPipelineLayout> jShaderBindingLayout_Vulkan::PipelineLayoutPool;
 
@@ -44,6 +47,7 @@ std::shared_ptr<jShaderBindingInstance> jShaderBindingLayout_Vulkan::CreateShade
     std::shared_ptr<jShaderBindingInstance_Vulkan> DescriptorSet = DescriptorPool->AllocateDescriptorSet(DescriptorSetLayout);
     if (!ensure(DescriptorSet))
     {
+        DescriptorSet = DescriptorPool->AllocateDescriptorSet(DescriptorSetLayout);
         return nullptr;
     }
 
@@ -73,35 +77,54 @@ void jShaderBindingLayout_Vulkan::Release()
 
 VkDescriptorSetLayout jShaderBindingLayout_Vulkan::CreateDescriptorSetLayout(const jShaderBindingArray& InShaderBindingArray)
 {
-    std::vector<VkDescriptorSetLayoutBinding> bindings;
-    int32 LastBindingIndex = 0;
-    for (int32 i = 0; i < (int32)InShaderBindingArray.NumOfData; ++i)
+    VkDescriptorSetLayout DescriptorSetLayout = nullptr;
+    size_t hash = InShaderBindingArray.GetHash();
+    check(hash);
     {
-        VkDescriptorSetLayoutBinding binding = {};
-        if (InShaderBindingArray[i]->BindingPoint != jShaderBinding::APPEND_LAST)
+        jScopeReadLock sr(&DescriptorLayoutPoolLock);
+        auto it_find = DescriptorLayoutPool.find(hash);
+        if (DescriptorLayoutPool.end() != it_find)
         {
-            binding.binding = InShaderBindingArray[i]->BindingPoint;
-            LastBindingIndex = InShaderBindingArray[i]->BindingPoint + 1;
+            DescriptorSetLayout = it_find->second;
+            return DescriptorSetLayout;
         }
-        else
-        {
-            binding.binding = LastBindingIndex++;
-        }
-        binding.descriptorType = GetVulkanShaderBindingType(InShaderBindingArray[i]->BindingType);
-        binding.descriptorCount = InShaderBindingArray[i]->NumOfDescriptors;
-        binding.stageFlags = GetVulkanShaderAccessFlags(InShaderBindingArray[i]->AccessStageFlags);
-        binding.pImmutableSamplers = nullptr;
-        bindings.push_back(binding);
     }
 
-    VkDescriptorSetLayoutCreateInfo layoutInfo = {};
-    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = static_cast<uint32>(bindings.size());
-    layoutInfo.pBindings = bindings.data();
+    {
+        jScopeWriteLock sw(&DescriptorLayoutPoolLock);
 
-    VkDescriptorSetLayout DescriptorSetLayout = nullptr;
-    if (!ensure(vkCreateDescriptorSetLayout(g_rhi_vk->Device, &layoutInfo, nullptr, &DescriptorSetLayout) == VK_SUCCESS))
-        return nullptr;
+        std::vector<VkDescriptorSetLayoutBinding> bindings;
+        int32 LastBindingIndex = 0;
+        for (int32 i = 0; i < (int32)InShaderBindingArray.NumOfData; ++i)
+        {
+            VkDescriptorSetLayoutBinding binding = {};
+            if (InShaderBindingArray[i]->BindingPoint != jShaderBinding::APPEND_LAST)
+            {
+                binding.binding = InShaderBindingArray[i]->BindingPoint;
+                LastBindingIndex = InShaderBindingArray[i]->BindingPoint + 1;
+            }
+            else
+            {
+                binding.binding = LastBindingIndex++;
+            }
+            binding.descriptorType = GetVulkanShaderBindingType(InShaderBindingArray[i]->BindingType);
+            binding.descriptorCount = InShaderBindingArray[i]->NumOfDescriptors;
+            binding.stageFlags = GetVulkanShaderAccessFlags(InShaderBindingArray[i]->AccessStageFlags);
+            binding.pImmutableSamplers = nullptr;
+            bindings.push_back(binding);
+        }
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = static_cast<uint32>(bindings.size());
+        layoutInfo.pBindings = bindings.data();
+
+        if (!ensure(vkCreateDescriptorSetLayout(g_rhi_vk->Device, &layoutInfo, nullptr, &DescriptorSetLayout) == VK_SUCCESS))
+            return nullptr;
+
+        DescriptorLayoutPool[hash] = DescriptorSetLayout;
+    }
+
     return DescriptorSetLayout;
 }
 

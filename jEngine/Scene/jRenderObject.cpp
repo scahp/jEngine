@@ -216,6 +216,7 @@ const std::shared_ptr<jShaderBindingInstance>& jRenderObject::CreateShaderBindin
             RenderObjectShaderBindingInstance->Free();
 
         RenderObjectShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::MultiFrame);
+        check(RenderObjectShaderBindingInstance.get());
     }
 	
 	//ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::ALL_GRAPHICS

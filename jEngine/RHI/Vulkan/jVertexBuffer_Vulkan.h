@@ -55,8 +55,22 @@ struct jVertexBuffer_Vulkan : public jVertexBuffer
 
         FORCEINLINE size_t GetHash() const
         {
-            size_t result = CityHash64((const char*)InputBindingDescriptions.data(), sizeof(VkVertexInputBindingDescription) * InputBindingDescriptions.size());
-            result = CityHash64WithSeed((const char*)AttributeDescriptions.data(), sizeof(VkVertexInputAttributeDescription) * AttributeDescriptions.size(), result);
+            size_t result = 0;
+            for(int32 i=0;i<(int32)InputBindingDescriptions.size();++i)
+            {
+                result = CityHash64WithSeed((uint64)InputBindingDescriptions[i].binding, result);
+                result = CityHash64WithSeed((uint64)InputBindingDescriptions[i].stride, result);
+                result = CityHash64WithSeed((uint64)InputBindingDescriptions[i].inputRate, result);                
+            }
+
+            for (int32 i = 0; i < (int32)AttributeDescriptions.size(); ++i)
+            {
+                result = CityHash64WithSeed((uint64)AttributeDescriptions[i].location, result);
+                result = CityHash64WithSeed((uint64)AttributeDescriptions[i].binding, result);
+                result = CityHash64WithSeed((uint64)AttributeDescriptions[i].format, result);
+                result = CityHash64WithSeed((uint64)AttributeDescriptions[i].offset, result);
+            }
+
             return result;
         }
     };
@@ -78,7 +92,13 @@ struct jVertexBuffer_Vulkan : public jVertexBuffer
     FORCEINLINE size_t GetInputAssemblyStateHash() const
     {
         VkPipelineInputAssemblyStateCreateInfo state = CreateInputAssemblyState();
-        return CityHash64((const char*)&state, sizeof(VkPipelineInputAssemblyStateCreateInfo));
+        size_t result = 0;
+        result = CityHash64WithSeed((uint64)state.sType, result);
+        result = CityHash64WithSeed((uint64)state.pNext, result);
+        result = CityHash64WithSeed((uint64)state.flags, result);
+        result = CityHash64WithSeed((uint64)state.topology, result);
+        result = CityHash64WithSeed((uint64)state.primitiveRestartEnable, result);
+        return result;
     }
 
     FORCEINLINE VkPipelineVertexInputStateCreateInfo CreateVertexInputState() const

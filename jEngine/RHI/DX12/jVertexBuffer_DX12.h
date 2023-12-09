@@ -47,8 +47,18 @@ struct jVertexBuffer_DX12 : public jVertexBuffer
 
         FORCEINLINE size_t GetHash() const
         {
-            size_t result = CityHash64((const char*)InputElementDescs.data()
-                , sizeof(D3D12_INPUT_ELEMENT_DESC) * InputElementDescs.size());
+            size_t result = 0;
+            for(int32 i=0;i<(int32)InputElementDescs.size();++i)
+            {
+                if (InputElementDescs[i].SemanticName)
+                    result = CityHash64WithSeed(InputElementDescs[i].SemanticName, strlen(InputElementDescs[i].SemanticName), result);
+                result = CityHash64WithSeed((uint64)InputElementDescs[i].SemanticIndex, result);
+                result = CityHash64WithSeed((uint64)InputElementDescs[i].Format, result);
+                result = CityHash64WithSeed((uint64)InputElementDescs[i].InputSlot, result);
+                result = CityHash64WithSeed((uint64)InputElementDescs[i].AlignedByteOffset, result);
+                result = CityHash64WithSeed((uint64)InputElementDescs[i].InputSlotClass, result);
+                result = CityHash64WithSeed((uint64)InputElementDescs[i].InstanceDataStepRate, result);
+            }
             return result;
         }
     };

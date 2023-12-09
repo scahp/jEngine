@@ -883,6 +883,12 @@ public:
 	void ResetToNoneType() { Type = ERTClearType::None; }
 	ERTClearType GetType() const { return Type; }
 
+	size_t GetHash() const
+	{
+		size_t result = CityHash64((uint64)Type);
+		return CityHash64WithSeed((const char*)&ClearValue.Color, sizeof(ClearValue.Color), result);		// safe : Color is 16 byte aligned
+	}
+
 private:
 	ERTClearType Type = ERTClearType::None;
 	jClearValueType ClearValue;

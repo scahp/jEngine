@@ -110,23 +110,11 @@ struct jShaderBinding
         if (Hash)
             return Hash;
 
-        struct jHashTemp
-        {
-            bool IsInline = false;
-            int32 BindingPoint = 0;
-            int32 NumOfDescriptors = 1;
-            EShaderBindingType BindingType = EShaderBindingType::UNIFORMBUFFER;
-            EShaderAccessStageFlag AccessStageFlags = EShaderAccessStageFlag::ALL_GRAPHICS;
-        };
-
-        jHashTemp temp;
-        temp.IsInline = IsInline;
-        temp.BindingPoint = BindingPoint;
-        temp.NumOfDescriptors = NumOfDescriptors;
-        temp.BindingType = BindingType;
-        temp.AccessStageFlags = AccessStageFlags;
-
-        Hash = CityHash64((const char*)&temp, sizeof(temp));
+        Hash = CityHash64((int64)IsInline);
+        Hash = CityHash64WithSeed((int64)BindingPoint, Hash);
+        Hash = CityHash64WithSeed((int64)NumOfDescriptors, Hash);
+        Hash = CityHash64WithSeed((int64)BindingType, Hash);
+        Hash = CityHash64WithSeed((int64)AccessStageFlags, Hash);
 
         return Hash;
     }
