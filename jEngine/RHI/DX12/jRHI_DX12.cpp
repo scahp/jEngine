@@ -511,7 +511,7 @@ void jRHI_DX12::WaitForGPU() const
 
 	if (Queue && Swapchain)
 	{
-		jSwapchainImage_DX12* CurrentSwapchainImage = (jSwapchainImage_DX12*)Swapchain->GetSwapchainImage(CurrentFrameIndex);
+		jSwapchainImage_DX12* CurrentSwapchainImage = (jSwapchainImage_DX12*)Swapchain->GetCurrentSwapchainImage();
         if (ensure(Swapchain->Fence))
 		    Swapchain->Fence->SignalWithNextFenceValue(Queue.Get(), true);
 	}
@@ -1938,7 +1938,7 @@ std::shared_ptr<jRenderFrameContext> jRHI_DX12::BeginRenderFrame()
 
 	//////////////////////////////////////////////////////////////////////////
 	// Acquire new swapchain image
-	jSwapchainImage_DX12* CurrentSwapchainImage = (jSwapchainImage_DX12*)Swapchain->GetSwapchainImage(CurrentFrameIndex);
+	jSwapchainImage_DX12* CurrentSwapchainImage = (jSwapchainImage_DX12*)Swapchain->GetCurrentSwapchainImage();
 	CurrentSwapchainImage->CommandBufferFence->WaitForFence();
 	//////////////////////////////////////////////////////////////////////////
 
@@ -1950,7 +1950,7 @@ std::shared_ptr<jRenderFrameContext> jRHI_DX12::BeginRenderFrame()
     renderFrameContextPtr->UseForwardRenderer = !gOptions.UseDeferredRenderer;
     renderFrameContextPtr->FrameIndex = CurrentFrameIndex;
     renderFrameContextPtr->SceneRenderTargetPtr = std::make_shared<jSceneRenderTarget>();
-    renderFrameContextPtr->SceneRenderTargetPtr->Create(Swapchain->GetSwapchainImage(CurrentFrameIndex), &jLight::GetLights());
+    renderFrameContextPtr->SceneRenderTargetPtr->Create(CurrentSwapchainImage, &jLight::GetLights());
 
 	return renderFrameContextPtr;
 }
@@ -1961,12 +1961,11 @@ void jRHI_DX12::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& rende
 
 	jCommandBuffer_DX12* CommandBuffer = (jCommandBuffer_DX12*)renderFrameContextPtr->GetActiveCommandBuffer();
 
-    jSwapchainImage* SwapchainImage = Swapchain->GetCurrentSwapchainImage();
-    g_rhi->TransitionImageLayout(CommandBuffer, SwapchainImage->TexturePtr.get(), EImageLayout::PRESENT_SRC);
+    jSwapchainImage_DX12* CurrentSwapchainImage = (jSwapchainImage_DX12*)Swapchain->GetCurrentSwapchainImage();
+    g_rhi->TransitionImageLayout(CommandBuffer, CurrentSwapchainImage->TexturePtr.get(), EImageLayout::PRESENT_SRC);
 
 	CommandBufferManager->ExecuteCommandList(CommandBuffer);
 
-    jSwapchainImage_DX12* CurrentSwapchainImage = (jSwapchainImage_DX12*)Swapchain->GetSwapchainImage(CurrentFrameIndex);
 	CurrentSwapchainImage->CommandBufferFence = CommandBuffer->Fence;
     CurrentSwapchainImage->CommandBufferFence->SignalWithNextFenceValue(CommandBufferManager->GetCommandQueue().Get());
 
@@ -2301,13 +2300,6 @@ bool jRHI_DX12::TransitionImageLayout(jCommandBuffer* commandBuffer, jTexture* t
     CommandBuffer_DX12->CommandList->ResourceBarrier(1, &barrier);
 
     Texture_DX12->Layout = newLayout;
-    //auto texture_dx12 = (jTexture_DX12*)texture;
-    //if (TransitionImageLayout((VkCommandBuffer)commandBuffer->GetHandle(), texture_dx12->Image, GetVulkanTextureFormat(texture_dx12->Format)
-    //    , texture_dx12->MipLevel, texture_dx12->LayerCount, GetVulkanImageLayout(texture_dx12->Layout), GetVulkanImageLayout(newLayout)))
-    //{
-    //    ((jTexture_DX12*)texture)->Layout = newLayout;
-    //    return true;
-    //}
     return true;
 }
 
