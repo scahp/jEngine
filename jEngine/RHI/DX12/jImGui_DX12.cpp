@@ -39,6 +39,8 @@ void jImGUI_DX12::Initialize(float width, float height)
         DXGI_FORMAT_R8G8B8A8_UNORM, m_imgui_SrvDescHeap.Get(),
         m_imgui_SrvDescHeap->GetCPUDescriptorHandleForHeapStart(),
         m_imgui_SrvDescHeap->GetGPUDescriptorHandleForHeapStart());
+
+    IsInitialized = true;
 }
 
 void jImGUI_DX12::Release()
@@ -56,6 +58,9 @@ void jImGUI_DX12::Release()
 
 void jImGUI_DX12::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
 {
+    if (!IsInitialized)
+        return;
+
     jRenderPass* UIRenderPass = nullptr;
     jRasterizationStateInfo* RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)1, true, 0.2f, false, false>::Create();;
     auto DepthStencilState = TDepthStencilStateInfo<false, false, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();

@@ -870,6 +870,7 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
     if (!gOptions.UseSubpass)
     {
         g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), EImageLayout::COLOR_ATTACHMENT);
+        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_READ_ONLY);
         for (int32 i = 0; i < _countof(RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer); ++i)
         {
             g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[i]->GetTexture(), EImageLayout::SHADER_READ_ONLY);
@@ -913,15 +914,15 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
             const jRTClearValue ClearColor = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f);
             const jRTClearValue ClearDepth = jRTClearValue(1.0f, 0);
 
-            jAttachment depth = jAttachment(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr, EAttachmentLoadStoreOp::LOAD_STORE
+            jAttachment depth = jAttachment(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr, EAttachmentLoadStoreOp::LOAD_DONTCARE
                 , EAttachmentLoadStoreOp::LOAD_STORE, ClearDepth
-                , RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetLayout(), EImageLayout::DEPTH_STENCIL_ATTACHMENT);
+                , RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetLayout(), EImageLayout::DEPTH_STENCIL_READ_ONLY);
 
             // Setup attachment
             jRenderPassInfo renderPassInfo;
             jAttachment color = jAttachment(RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr, EAttachmentLoadStoreOp::CLEAR_STORE
                 , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor
-                , EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
+                , RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetLayout(), EImageLayout::COLOR_ATTACHMENT);
             renderPassInfo.Attachments.push_back(color);
 
             const int32 DepthAttachmentIndex = (int32)renderPassInfo.Attachments.size();
@@ -1623,11 +1624,13 @@ void jRenderer::Render()
 #if ENABLE_PBR
             ImGui::SetNextWindowPos(ImVec2(400.0f, 27.0f), ImGuiCond_FirstUseEver);
             ImGui::SetNextWindowSize(ImVec2(200.0f, 80.0f), ImGuiCond_FirstUseEver);
-            ImGui::Begin("Sun");
+            ImGui::Begin("Sun", 0, ImGuiWindowFlags_AlwaysAutoResize);
             ImGui::SliderFloat("DirX", &gOptions.SunDir.x, -1.0f, 1.0f);
             ImGui::SliderFloat("DirY", &gOptions.SunDir.y, -1.0f, 1.0f);
             ImGui::SliderFloat("DirZ", &gOptions.SunDir.z, -1.0f, 1.0f);
             ImGui::End();
+
+            ImGui::SetWindowFocus(szTitle);
 #endif
         });
     g_ImGUI->Draw(RenderFrameContextPtr);
