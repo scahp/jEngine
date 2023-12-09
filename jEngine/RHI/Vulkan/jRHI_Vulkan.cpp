@@ -65,6 +65,14 @@ bool jRHI_Vulkan::InitRHI()
 {
     g_rhi = this;
 
+    // Initialize COM library for using DirectTex library
+    HRESULT hr = CoInitializeEx(nullptr, COINITBASE_MULTITHREADED);
+    if (FAILED(hr))
+    {
+		OutputDebugStringA("Failed to initialize COM library, this need to be preinitialized before load image by using DirectTex");
+		check(0);
+    }
+
     glfwInit();
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
