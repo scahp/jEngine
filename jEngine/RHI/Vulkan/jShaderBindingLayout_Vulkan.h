@@ -28,7 +28,7 @@ struct jWriteDescriptorSet
 //////////////////////////////////////////////////////////////////////////
 // jShaderBindingInstance_Vulkan
 //////////////////////////////////////////////////////////////////////////
-struct jShaderBindingInstance_Vulkan : public jShaderBindingInstance, public std::enable_shared_from_this<jShaderBindingInstance_Vulkan>
+struct jShaderBindingInstance_Vulkan : public jShaderBindingInstance
 {
     virtual ~jShaderBindingInstance_Vulkan();
 

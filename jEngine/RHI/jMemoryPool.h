@@ -124,7 +124,7 @@ public:
     virtual jSubMemoryAllocator* CreateSubMemoryAllocator() const = 0;
 
     // 적절한 PoolSize 선택 함수
-    virtual EPoolSizeType GetMemorySize(uint64 InSize) const
+    virtual EPoolSizeType GetPoolSizeType(uint64 InSize) const
     {
         for (int32 i = 0; i < (int32)EPoolSizeType::MAX; ++i)
         {

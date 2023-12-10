@@ -3,13 +3,12 @@
 
 jDirectionalLight::jDirectionalLight() : jLight(ELightType::DIRECTIONAL)
 {
-    LightDataUniformBlock = g_rhi->CreateUniformBufferBlock(jNameStatic("DirectionalLightBlock"), jLifeTimeType::MultiFrame, sizeof(jDirectionalLightUniformBufferData));
 }
 
 jDirectionalLight::~jDirectionalLight()
 {
     delete Camera;
-    delete LightDataUniformBlock;
+    LightDataUniformBlockPtr.reset();
 }
 
 void jDirectionalLight::Initialize(const Vector& InDirection, const Vector& InColor, const Vector& InDiffuseIntensity, const Vector& InSpecularIntensity, float InSpecularPower)
@@ -39,34 +38,33 @@ const jCamera* jDirectionalLight::GetLightCamra(int32 index) const
 
 const std::shared_ptr<jShaderBindingInstance>& jDirectionalLight::PrepareShaderBindingInstance(jTexture* InShadowMap)
 {
-    std::shared_ptr<jShaderBindingInstance>& SelectedShaderBindingInstance = InShadowMap ? ShaderBindingInstanceWithShadowMap : ShaderBindingInstanceOnlyLightData;
-    if (IsNeedToUpdateShaderBindingInstance || (LastUsedShadowMap != InShadowMap))
+    const auto CurrentFrameIndex = g_rhi->GetCurrentFrameIndex();
+    if (NeedToUpdateShaderBindingInstance)
     {
-        if (IsNeedToUpdateShaderBindingInstance)
-        {
-            // todo : 한프레임에 한 번만 호출 될 것으로 기대함.
-            IsNeedToUpdateShaderBindingInstance = false;
-            LightDataUniformBlock->UpdateBufferData(&LightData, sizeof(LightData));
-            if (ShaderBindingInstanceWithShadowMap)
-            {
-                ShaderBindingInstanceWithShadowMap->Free();
-                ShaderBindingInstanceWithShadowMap.reset();
-            }
-            if (ShaderBindingInstanceOnlyLightData)
-            {
-                ShaderBindingInstanceOnlyLightData->Free();
-                ShaderBindingInstanceOnlyLightData.reset();
-            }
-        }
+        NeedToUpdateShaderBindingInstance = false;
+
+        if (LightDataUniformBlockPtr)
+            LightDataUniformBlockPtr->Free();
+
+        LightDataUniformBlockPtr = std::shared_ptr<IUniformBufferBlock>(
+            g_rhi->CreateUniformBufferBlock(jNameStatic("DirectionalLightBlock"), jLifeTimeType::MultiFrame, sizeof(jDirectionalLightUniformBufferData)));
+        LightDataUniformBlockPtr->UpdateBufferData(&LightData, sizeof(LightData));
 
         int32 BindingPoint = 0;
         jShaderBindingArray ShaderBindingArray;
         jShaderBindingResourceInlineAllocator ResourceInlineAllocator;
 
         ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::ALL_GRAPHICS
-            , ResourceInlineAllocator.Alloc<jUniformBufferResource>(LightDataUniformBlock));
+            , ResourceInlineAllocator.Alloc<jUniformBufferResource>(LightDataUniformBlockPtr.get()));
 
-        if (InShadowMap)
+        // Create LightOnlyData (without ShadowMap, for rendering shadowmap)
+        {
+            if (ShaderBindingInstanceOnlyLightData)
+                ShaderBindingInstanceOnlyLightData->Free();
+            ShaderBindingInstanceOnlyLightData = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::MultiFrame);
+        }
+
+        // Create WithShadowMap (for rendering lighting passes)
         {
             const jSamplerStateInfo* ShadowSamplerStateInfo = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
                 , ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
@@ -74,14 +72,15 @@ const std::shared_ptr<jShaderBindingInstance>& jDirectionalLight::PrepareShaderB
 
             ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
                 , ResourceInlineAllocator.Alloc<jTextureResource>(InShadowMap, ShadowSamplerStateInfo));
-        }
-        LastUsedShadowMap = InShadowMap;
 
-        if (SelectedShaderBindingInstance)
-            SelectedShaderBindingInstance->Free();
-        SelectedShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::MultiFrame);
+            if (ShaderBindingInstanceWithShadowMap)
+                ShaderBindingInstanceWithShadowMap->Free();
+
+            ShaderBindingInstanceWithShadowMap = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::MultiFrame);
+        }
     }
-    return SelectedShaderBindingInstance;
+
+    return InShadowMap ? ShaderBindingInstanceWithShadowMap : ShaderBindingInstanceOnlyLightData;
 }
 
 void jDirectionalLight::Update(float deltaTime)
@@ -96,13 +95,13 @@ void jDirectionalLight::Update(float deltaTime)
     if (LightData.ShadowVP != VP)
     {
         LightData.ShadowVP = VP;
-        IsNeedToUpdateShaderBindingInstance = true;
+        NeedToUpdateShaderBindingInstance = true;
     }
     
     if (LightData.ShadowV != Camera->View)
     {
         LightData.ShadowV = Camera->View;
-        IsNeedToUpdateShaderBindingInstance = true;
+        NeedToUpdateShaderBindingInstance = true;
     }
 }
 

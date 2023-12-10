@@ -4,17 +4,16 @@
 jPointLight::jPointLight()
     : jLight(ELightType::POINT)
 {
-    LightDataUniformBlock = g_rhi->CreateUniformBufferBlock(jNameStatic("PointLightBlock"), jLifeTimeType::MultiFrame, sizeof(jPointLightUniformBufferData));
 }
 
 jPointLight::~jPointLight()
 {
-    delete LightDataUniformBlock;
-
     for (int32 i = 0; i < _countof(Camera); ++i)
     {
         delete Camera[i];
     }
+
+    LightDataUniformBlockPtr.reset();
 }
 
 void jPointLight::Initialize(const Vector& InPos, const Vector& InColor, float InMaxDist, const Vector& InDiffuseIntensity, const Vector& InSpecularIntensity, float InSpecularPower)
@@ -38,34 +37,32 @@ void jPointLight::Initialize(const Vector& InPos, const Vector& InColor, float I
 
 const std::shared_ptr<jShaderBindingInstance>& jPointLight::PrepareShaderBindingInstance(jTexture* InShadowMap)
 {
-    std::shared_ptr<jShaderBindingInstance>& SelectedShaderBindingInstance = InShadowMap ? ShaderBindingInstanceWithShadowMap : ShaderBindingInstanceOnlyLightData;
-    if (IsNeedToUpdateShaderBindingInstance || (LastUsedShadowMap != InShadowMap))
+    if (IsNeedToUpdateShaderBindingInstance)
     {
-        if (IsNeedToUpdateShaderBindingInstance)
-        {
-            // todo : 한프레임에 한 번만 호출 될 것으로 기대함.
-            IsNeedToUpdateShaderBindingInstance = false;
-            LightDataUniformBlock->UpdateBufferData(&LightData, sizeof(LightData));
-            if (ShaderBindingInstanceWithShadowMap)
-            {
-                ShaderBindingInstanceWithShadowMap->Free();
-                ShaderBindingInstanceWithShadowMap.reset();
-            }
-            if (ShaderBindingInstanceOnlyLightData)
-            {
-                ShaderBindingInstanceOnlyLightData->Free();
-                ShaderBindingInstanceOnlyLightData.reset();
-            }
-        }
+        IsNeedToUpdateShaderBindingInstance = false;
+
+        if (LightDataUniformBlockPtr)
+            LightDataUniformBlockPtr->Free();
+
+        LightDataUniformBlockPtr = std::shared_ptr<IUniformBufferBlock>(
+            g_rhi->CreateUniformBufferBlock(jNameStatic("PointLightBlock"), jLifeTimeType::MultiFrame, sizeof(jPointLightUniformBufferData)));
+        LightDataUniformBlockPtr->UpdateBufferData(&LightData, sizeof(LightData));
 
         int32 BindingPoint = 0;
         jShaderBindingArray ShaderBindingArray;
         jShaderBindingResourceInlineAllocator ResourceInlineAllocator;
 
         ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::ALL_GRAPHICS
-            , ResourceInlineAllocator.Alloc<jUniformBufferResource>(LightDataUniformBlock));
+            , ResourceInlineAllocator.Alloc<jUniformBufferResource>(LightDataUniformBlockPtr.get()));
 
-        if (InShadowMap)
+        // Create LightOnlyData (without ShadowMap, for rendering shadowmap)
+        {
+            if (ShaderBindingInstanceOnlyLightData)
+                ShaderBindingInstanceOnlyLightData->Free();
+            ShaderBindingInstanceOnlyLightData = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::MultiFrame);
+        }
+
+        // Create WithShadowMap (for rendering lighting passes)
         {
             const jSamplerStateInfo* ShadowSamplerStateInfo = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
                 , ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
@@ -73,14 +70,13 @@ const std::shared_ptr<jShaderBindingInstance>& jPointLight::PrepareShaderBinding
 
             ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
                 , ResourceInlineAllocator.Alloc<jTextureResource>(InShadowMap, ShadowSamplerStateInfo));
-        }
-        LastUsedShadowMap = InShadowMap;
 
-        if (SelectedShaderBindingInstance)
-            SelectedShaderBindingInstance->Free();
-        SelectedShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::MultiFrame);
+            if (ShaderBindingInstanceWithShadowMap)
+                ShaderBindingInstanceWithShadowMap->Free();
+            ShaderBindingInstanceWithShadowMap = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::MultiFrame);
+        }
     }
-    return SelectedShaderBindingInstance;
+    return InShadowMap ? ShaderBindingInstanceWithShadowMap : ShaderBindingInstanceOnlyLightData;
 }
 
 jCamera* jPointLight::GetLightCamra(int index /*= 0*/) const

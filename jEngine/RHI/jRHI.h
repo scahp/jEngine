@@ -90,7 +90,7 @@ enum class jLifeTimeType : uint8
     MAX
 };
 
-struct IUniformBufferBlock : public jShaderBindableResource
+struct IUniformBufferBlock : public jShaderBindableResource, public std::enable_shared_from_this<IUniformBufferBlock>
 {
 	IUniformBufferBlock() = default;
 	IUniformBufferBlock(const jName& InName, jLifeTimeType InLifeType)
@@ -113,6 +113,8 @@ struct IUniformBufferBlock : public jShaderBindableResource
 	
 	virtual void* GetBuffer() const { return nullptr; }
 	virtual void* GetBufferMemory() const { return nullptr; }
+
+	virtual void Free() {}
 };
 
 struct IShaderStorageBufferObject : public jShaderBindableResource

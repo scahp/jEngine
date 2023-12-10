@@ -44,7 +44,7 @@ std::shared_ptr<jShaderBindingInstance> jShaderBindingLayout_Vulkan::CreateShade
         break;
     }
 
-    std::shared_ptr<jShaderBindingInstance_Vulkan> DescriptorSet = DescriptorPool->AllocateDescriptorSet(DescriptorSetLayout);
+    std::shared_ptr<jShaderBindingInstance> DescriptorSet = DescriptorPool->AllocateDescriptorSet(DescriptorSetLayout);
     if (!ensure(DescriptorSet))
     {
         DescriptorSet = DescriptorPool->AllocateDescriptorSet(DescriptorSetLayout);

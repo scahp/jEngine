@@ -16,22 +16,29 @@ const float DefaultPoolSizes[] =
     1 / 8.0	    // VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT
 };
 
-//using jShaderBindingInstanceVulkanArray = jResourceContainer<jShaderBindingInstance_Vulkan*, 2000>;
-using jShaderBindingInstanceVulkanArray = std::vector<std::shared_ptr<jShaderBindingInstance_Vulkan>>;
-
 struct jDescriptorPool_Vulkan
 {
-    std::map<VkDescriptorSetLayout, jShaderBindingInstanceVulkanArray> PendingDescriptorSets;
-    std::map<VkDescriptorSetLayout, jShaderBindingInstanceVulkanArray> AllocatedDescriptorSets;
+    std::map<VkDescriptorSetLayout, jShaderBindingInstancePtrArray> PendingDescriptorSets;
+    std::map<VkDescriptorSetLayout, jShaderBindingInstancePtrArray> AllocatedDescriptorSets;
 
     jDescriptorPool_Vulkan() = default;
     virtual ~jDescriptorPool_Vulkan();
 
     virtual void Create(uint32 InMaxDescriptorSets = 128);
     virtual void Reset();
-    virtual std::shared_ptr<jShaderBindingInstance_Vulkan> AllocateDescriptorSet(VkDescriptorSetLayout InLayout);
-    virtual void Free(std::shared_ptr<jShaderBindingInstance_Vulkan> InShaderBindingInstance);
+    virtual std::shared_ptr<jShaderBindingInstance> AllocateDescriptorSet(VkDescriptorSetLayout InLayout);
+    virtual void Free(std::shared_ptr<jShaderBindingInstance> InShaderBindingInstance);
     void Release();
+
+    // This will be called from 'jDeallocatorMultiFrameShaderBindingInstance'
+    void FreedFromPendingDelegate(std::shared_ptr<jShaderBindingInstance> InShaderBindingInstance)
+    {
+        jShaderBindingInstance_Vulkan* ShaderBindingInstance_Vulkan = (jShaderBindingInstance_Vulkan*)InShaderBindingInstance.get();
+        check(ShaderBindingInstance_Vulkan);
+
+        const VkDescriptorSetLayout DescriptorSetLayout = (VkDescriptorSetLayout)ShaderBindingInstance_Vulkan->ShaderBindingsLayouts->GetHandle();
+        PendingDescriptorSets[DescriptorSetLayout].push_back(InShaderBindingInstance);
+    }
 
     uint32 MaxDescriptorSets = 128;
     uint32 PoolSizes[_countof(DefaultPoolSizes)];
@@ -39,17 +46,7 @@ struct jDescriptorPool_Vulkan
     // mutable jMutexLock DescriptorPoolLock;
     mutable jMutexLock DescriptorPoolLock;
 
-    static constexpr int32 NumOfFramesToWaitBeforeReleasing = 3;
-    struct jPendingFreeShaderBindingInstance
-    {
-        jPendingFreeShaderBindingInstance() = default;
-        jPendingFreeShaderBindingInstance(int32 InFrameIndex, std::shared_ptr<jShaderBindingInstance_Vulkan> InShaderBindingInstance) : FrameIndex(InFrameIndex), ShaderBindingInstance(InShaderBindingInstance) {}
-
-        int32 FrameIndex = 0;
-        std::shared_ptr<jShaderBindingInstance_Vulkan> ShaderBindingInstance = nullptr;
-    };
-    std::vector<jPendingFreeShaderBindingInstance> PendingFree;
-    int32 CanReleasePendingFreeShaderBindingInstanceFrameNumber = 0;
+    jDeallocatorMultiFrameShaderBindingInstance DeallocateMultiframeShaderBindingInstance;
 };
 
 //// The Pool is called by Heap in DX12.

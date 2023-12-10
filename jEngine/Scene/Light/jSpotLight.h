@@ -47,11 +47,9 @@ public:
     void Initialize(const Vector& InPos, const Vector& InDirection, const Vector& InColor, float InMaxDistance
         , float InPenumbraRadian, float InUmbraRadian, const Vector& InDiffuseIntensity, const Vector& InSpecularIntensity, float InSpecularPower);
 
-    IUniformBufferBlock* LightDataUniformBlock = nullptr;
-
     virtual bool IsOmnidirectional() const { return false; }
     virtual void Update(float deltaTime) override;
-    virtual IUniformBufferBlock* GetUniformBufferBlock() const override { return LightDataUniformBlock; }
+    virtual IUniformBufferBlock* GetUniformBufferBlock() const override { return LightDataUniformBlockPtr.get(); }
     virtual jCamera* GetLightCamra(int index = 0) const;
     virtual const Matrix* GetLightWorldMatrix() const override;
     virtual const std::shared_ptr<jShaderBindingInstance>& PrepareShaderBindingInstance(jTexture* InShadowMap) override;
@@ -62,10 +60,10 @@ public:
     jCamera* Camera = nullptr;
     Matrix LightWorldMatrix;
 
+    std::shared_ptr<IUniformBufferBlock> LightDataUniformBlockPtr;
     std::shared_ptr<jShaderBindingInstance> ShaderBindingInstanceOnlyLightData;
     std::shared_ptr<jShaderBindingInstance> ShaderBindingInstanceWithShadowMap;
     bool IsNeedToUpdateShaderBindingInstance = true;                // 위치가 달라지는 경우도 업데이트 되도록... 업데이트 규칙을 좀 만들어야 함
-    jTexture* LastUsedShadowMap = nullptr;
 
     void SetDirection(const Vector& InDirection)
     {

@@ -3,6 +3,8 @@
 
 struct jUniformBufferBlock_DX12 : public IUniformBufferBlock
 {
+    friend struct jPlacedResourcePool;
+
     using IUniformBufferBlock::IUniformBufferBlock;
     using IUniformBufferBlock::UpdateBufferData;
     virtual ~jUniformBufferBlock_DX12()
@@ -23,6 +25,8 @@ struct jUniformBufferBlock_DX12 : public IUniformBufferBlock
 
     const jDescriptor_DX12& GetCBV() const;
     uint64 GetGPUAddress() const;
+
+    virtual void Free() override;
 
 private:
     jUniformBufferBlock_DX12(const jUniformBufferBlock_DX12&) = delete;

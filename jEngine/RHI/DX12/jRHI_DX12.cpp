@@ -600,6 +600,8 @@ bool jRHI_DX12::InitRHI()
         }
 	}
 
+    PlacedResourcePool.Init();
+
     //////////////////////////////////////////////////////////////////////////
     // PlacedResouce test
 	{
@@ -1225,6 +1227,9 @@ void jRHI_DX12::ReleaseRHI()
 	//////////////////////////////////////////////////////////////////////////
 	// 2. Command
 	delete CommandBufferManager;
+
+
+    PlacedResourcePool.Release();
 
 	//////////////////////////////////////////////////////////////////////////
 	// 1. Device
@@ -2349,3 +2354,18 @@ void jRHI_DX12::Finish() const
     WaitForGPU();
 }
 
+void jPlacedResourcePool::Init()
+{
+    // The allocator should be able to allocate memory larger than the PlacedResourceSizeThreshold. 
+    check(g_rhi_dx12->PlacedResourceSizeThreshold <= MemorySize[(int32)EPoolSizeType::MAX - 1]);
+
+    check(g_rhi_dx12);
+    g_rhi_dx12->DeallocatorMultiFrameUniformBufferBlock.FreeDelegate
+        = std::bind(&jPlacedResourcePool::FreedFromPendingDelegate, this, std::placeholders::_1);
+}
+
+void jPlacedResourcePool::Release()
+{
+    check(g_rhi_dx12);
+    g_rhi_dx12->DeallocatorMultiFrameUniformBufferBlock.FreeDelegate = nullptr;
+}

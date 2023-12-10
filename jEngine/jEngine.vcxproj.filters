@@ -804,6 +804,9 @@
     <ClCompile Include="RHI\jRHIUtil.cpp">
       <Filter>Code\RHI</Filter>
     </ClCompile>
+    <ClCompile Include="RHI\jShaderBindingLayout.cpp">
+      <Filter>Code\RHI</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="Resource\Shaders\glsl\shader_vs.glsl">

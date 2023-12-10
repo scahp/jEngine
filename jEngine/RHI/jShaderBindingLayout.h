@@ -238,7 +238,7 @@ enum class jShaderBindingInstanceType : uint8
     Max
 };
 
-struct jShaderBindingInstance
+struct jShaderBindingInstance : public std::enable_shared_from_this<jShaderBindingInstance>
 {
     virtual ~jShaderBindingInstance() {}
 
@@ -258,6 +258,7 @@ private:
 
 // todo : MemStack for jShaderBindingInstanceArray to allocate fast memory
 using jShaderBindingInstanceArray = jResourceContainer<const jShaderBindingInstance*>;
+using jShaderBindingInstancePtrArray = std::vector<std::shared_ptr<jShaderBindingInstance>>;
 
 struct jShaderBindingLayout
 {
@@ -276,3 +277,73 @@ protected:
 };
 
 using jShaderBindingLayoutArray = jResourceContainer<const jShaderBindingLayout*>;
+
+namespace Test
+{
+    uint32 GetCurrentFrameNumber();
+}
+
+// To pending deallocation for MultiFrame GPU Data, Because Avoding deallocation inflighting GPU Data (ex. jShaderBindingInstance, IUniformBufferBlock)
+template <typename T>
+struct jDeallocatorMultiFrameResource
+{
+    static constexpr int32 NumOfFramesToWaitBeforeReleasing = 3;
+    struct jPendingFreeData
+    {
+        jPendingFreeData() = default;
+        jPendingFreeData(int32 InFrameIndex, std::shared_ptr<T> InDataPtr) : FrameIndex(InFrameIndex), DataPtr(InDataPtr) {}
+
+        int32 FrameIndex = 0;
+        std::shared_ptr<T> DataPtr = nullptr;
+    };
+    std::vector<jPendingFreeData> PendingFree;
+    int32 CanReleasePendingFreeDataFrameNumber = 0;
+    std::function<void(std::shared_ptr<T>)> FreeDelegate;
+
+    void Free(std::shared_ptr<T> InDataPtr)
+    {
+        const int32 CurrentFrameNumber = Test::GetCurrentFrameNumber();
+        const int32 OldestFrameToKeep = CurrentFrameNumber - NumOfFramesToWaitBeforeReleasing;
+
+        // ProcessPendingDescriptorPoolFree
+        {
+            // Check it is too early
+            if (CurrentFrameNumber >= CanReleasePendingFreeDataFrameNumber)
+            {
+                // Release pending memory
+                int32 i = 0;
+                for (; i < PendingFree.size(); ++i)
+                {
+                    jPendingFreeData& PendingFreeData = PendingFree[i];
+                    if (PendingFreeData.FrameIndex < OldestFrameToKeep)
+                    {
+                        // Return to pending descriptor set
+                        check(PendingFreeData.DataPtr);
+                        if (FreeDelegate)
+                            FreeDelegate(PendingFreeData.DataPtr);
+                    }
+                    else
+                    {
+                        CanReleasePendingFreeDataFrameNumber = PendingFreeData.FrameIndex + NumOfFramesToWaitBeforeReleasing + 1;
+                        break;
+                    }
+                }
+                if (i > 0)
+                {
+                    const size_t RemainingSize = (PendingFree.size() - i);
+                    if (RemainingSize > 0)
+                    {
+                        for (int32 k = 0; k < RemainingSize; ++k)
+                            PendingFree[k] = PendingFree[i + k];
+                    }
+                    PendingFree.resize(RemainingSize);
+                }
+            }
+        }
+
+        PendingFree.emplace_back(jPendingFreeData(CurrentFrameNumber, InDataPtr));
+    }
+};
+
+using jDeallocatorMultiFrameShaderBindingInstance = jDeallocatorMultiFrameResource<jShaderBindingInstance>;
+using jDeallocatorMultiFrameUniformBufferBlock = jDeallocatorMultiFrameResource<IUniformBufferBlock>;

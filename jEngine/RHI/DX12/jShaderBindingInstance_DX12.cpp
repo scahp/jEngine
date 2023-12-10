@@ -172,6 +172,15 @@ void* jShaderBindingInstance_DX12::GetHandle() const
     return ShaderBindingsLayouts->GetHandle();
 }
 
+void jShaderBindingInstance_DX12::Free()
+{
+    if (GetType() == jShaderBindingInstanceType::MultiFrame)
+    {
+        jScopedLock s(&g_rhi_dx12->MultiFrameShaderBindingInstanceLock);
+        g_rhi_dx12->DeallocatorMultiFrameShaderBindingInstance.Free(shared_from_this());
+    }
+}
+
 void jShaderBindingInstance_DX12::BindGraphics(jCommandBuffer_DX12* InCommandList, int32& InOutStartIndex) const
 {
     check(InCommandList);
@@ -267,8 +276,3 @@ void jShaderBindingInstance_DX12::CopyToOnlineDescriptorHeap(jCommandBuffer_DX12
             , (uint32)SrcSamplerDescriptor.NumOfData, &SrcSamplerDescriptor[0], nullptr, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
     }
 }
-
-//ID3D12RootSignature* jShaderBindingInstance_DX12::GetRootSignature() const
-//{
-//    return ShaderBindingLayout->GetRootSignature();
-//}

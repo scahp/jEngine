@@ -103,6 +103,140 @@ private:
 #endif
 };
 
+struct jPlacedResource
+{
+    bool IsValid() const { return Size > 0 && PlacedSubResource.Get(); }
+    ComPtr<ID3D12Resource> PlacedSubResource;
+    size_t Size = 0;
+	bool IsUploadResource = false;
+};
+
+// Resuse for PlacedResource for DX12
+struct jPlacedResourcePool
+{
+    enum class EPoolSizeType : uint8
+    {
+        E128,
+        E256,
+        E512,
+        E1K,
+        E2K,
+        E4K,
+        E8K,
+        E16K,
+		E1M,
+		E10M,
+		E100M,
+        MAX
+    };
+
+    constexpr static uint64 MemorySize[(int32)EPoolSizeType::MAX] =
+    {
+        128,					// E128
+        256,					// E256
+        512,					// E512
+        1024,					// E1K 
+        2048,					// E2K 
+        4096,					// E4K 
+        8192,					// E8K 
+        16 * 1024,				// E16K
+		1024 * 1024,			// E1M
+		10 * 1024 * 1024,		// E10M
+		100 * 1024 * 1024,      // E100M
+    };
+
+    void Init();
+    void Release();
+
+    const jPlacedResource Alloc(size_t InRequestedSize, bool InIsUploadResource)
+    {
+        jScopedLock s(&Lock);
+
+		auto& PendingList = GetPendingPlacedResources(InIsUploadResource, InRequestedSize);
+        for (int32 i = 0; i < (int32)PendingList.size(); ++i)
+        {
+            if (PendingList[i].Size >= InRequestedSize)
+            {
+                jPlacedResource resource = PendingList[i];
+				PendingList.erase(PendingList.begin() + i);
+				UsingPlacedResources.insert(std::make_pair(resource.PlacedSubResource.Get(), resource));
+                return resource;
+            }
+        }
+
+        return jPlacedResource();
+    }
+
+    void Free(const ComPtr<ID3D12Resource>& InData)
+    {
+        if (!InData)
+            return;
+
+        {
+            jScopedLock s(&Lock);
+
+			auto it_find = UsingPlacedResources.find(InData.Get());
+			if (UsingPlacedResources.end() != it_find)
+			{
+                auto& PendingList = GetPendingPlacedResources(it_find->second.IsUploadResource, it_find->second.Size);
+				PendingList.push_back(it_find->second);
+				UsingPlacedResources.erase(it_find);
+				return;
+			}
+
+            check(0);	// can't reach here.
+        }
+    }
+
+    void AddUsingPlacedResource(const jPlacedResource InPlacedResource)
+    {
+		check(InPlacedResource.IsValid());
+		{
+			jScopedLock s(&Lock);
+			UsingPlacedResources.insert(std::make_pair(InPlacedResource.PlacedSubResource.Get(), InPlacedResource));
+		}
+    }
+
+    // This will be called from 'jDeallocatorMultiFrameUniformBufferBlock'
+    void FreedFromPendingDelegate(std::shared_ptr<IUniformBufferBlock> InData)
+    {
+        jUniformBufferBlock_DX12* UniformBufferBlock_DX12 = (jUniformBufferBlock_DX12*)InData.get();
+        check(UniformBufferBlock_DX12);
+        check(UniformBufferBlock_DX12->LifeType == jLifeTimeType::MultiFrame);
+
+        jBuffer_DX12* Buffer = UniformBufferBlock_DX12->Buffer;
+        check(Buffer);
+        {
+			Free(Buffer->Buffer);
+        }
+    }
+
+	std::vector<jPlacedResource>& GetPendingPlacedResources(bool InIsUploadPlacedResource, size_t InSize)
+	{
+		const int32 Index = (int32)GetPoolSizeType(InSize);
+		check(Index != (int32)EPoolSizeType::MAX);
+		return InIsUploadPlacedResource ? PendingUploadPlacedResources[Index] : PendingPlacedResources[Index];
+	}
+
+    // 적절한 PoolSize 선택 함수
+    EPoolSizeType GetPoolSizeType(uint64 InSize) const
+    {
+        for (int32 i = 0; i < (int32)EPoolSizeType::MAX; ++i)
+        {
+            if (MemorySize[i] > InSize)
+            {
+                return (EPoolSizeType)i;
+            }
+        }
+        return EPoolSizeType::MAX;
+    }
+
+    jMutexLock Lock;
+    std::map<ID3D12Resource*, jPlacedResource> UsingPlacedResources;
+    std::vector<jPlacedResource> PendingPlacedResources[(int32)EPoolSizeType::MAX];
+    std::vector<jPlacedResource> PendingUploadPlacedResources[(int32)EPoolSizeType::MAX];
+};
+
 class jRHI_DX12 : public jRHI
 {
 public:
@@ -250,29 +384,49 @@ public:
 	static constexpr uint64 PlacedResourceSizeThreshold = 512 * 512 * 4;
 	static bool IsUsePlacedResource;
 
+	jPlacedResourcePool PlacedResourcePool;
+
 	template <typename T>
 	ComPtr<ID3D12Resource> CreateResource(T&& InDesc, D3D12_RESOURCE_STATES InResourceState, D3D12_CLEAR_VALUE* InClearValue = nullptr)
 	{
 		check(Device);
 
         const D3D12_RESOURCE_ALLOCATION_INFO info = Device->GetResourceAllocationInfo(0, 1, InDesc);
-		const bool IsAvailablePlacedResource = IsUsePlacedResource && (info.SizeInBytes <= PlacedResourceSizeThreshold) 
-			&& ((PlacedResourceDefaultHeapOffset + info.SizeInBytes) <= DefaultPlacedResourceHeapSize);
-
-		ComPtr<ID3D12Resource> NewResource;
-		if (IsAvailablePlacedResource)
+		if (IsUsePlacedResource)
 		{
-			check(PlacedResourceDefaultHeap);
+			jPlacedResource ReusePlacedResource = PlacedResourcePool.Alloc(info.SizeInBytes, false);
+			if (ReusePlacedResource.IsValid())
+			{
+				return ReusePlacedResource.PlacedSubResource;
+			}
+			else
+			{
+				const bool IsAvailableCreatePlacedResource = IsUsePlacedResource && (info.SizeInBytes <= PlacedResourceSizeThreshold)
+					&& ((PlacedResourceDefaultHeapOffset + info.SizeInBytes) <= DefaultPlacedResourceHeapSize);
 
-			JFAIL(Device->CreatePlacedResource(PlacedResourceDefaultHeap.Get(), PlacedResourceDefaultHeapOffset
-				, std::forward<T>(InDesc), InResourceState, InClearValue, IID_PPV_ARGS(&NewResource)));
+				if (IsAvailableCreatePlacedResource)
+				{
+					check(PlacedResourceDefaultHeap);
 
-			PlacedResourceDefaultHeapOffset += info.SizeInBytes;
+                    ComPtr<ID3D12Resource> NewResource;
+					JFAIL(Device->CreatePlacedResource(PlacedResourceDefaultHeap.Get(), PlacedResourceDefaultHeapOffset
+						, std::forward<T>(InDesc), InResourceState, InClearValue, IID_PPV_ARGS(&NewResource)));
 
-			return NewResource;
+					PlacedResourceDefaultHeapOffset += info.SizeInBytes;
+
+                    jPlacedResource NewPlacedResource;
+                    NewPlacedResource.IsUploadResource = false;
+                    NewPlacedResource.PlacedSubResource = NewResource;
+                    NewPlacedResource.Size = info.SizeInBytes;
+                    PlacedResourcePool.AddUsingPlacedResource(NewPlacedResource);
+
+					return NewResource;
+				}
+			}
 		}
 
 		const CD3DX12_HEAP_PROPERTIES& HeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+        ComPtr<ID3D12Resource> NewResource;
 		JFAIL(Device->CreateCommittedResource(&HeapProperties, D3D12_HEAP_FLAG_NONE
 			, std::forward<T>(InDesc), InResourceState, InClearValue, IID_PPV_ARGS(&NewResource)));
 		return NewResource;
@@ -283,24 +437,42 @@ public:
     {
         check(Device);
 
-		const D3D12_RESOURCE_ALLOCATION_INFO info = Device->GetResourceAllocationInfo(0, 1, InDesc);
-        const bool IsAvailablePlacedResource = IsUsePlacedResource && (info.SizeInBytes <= PlacedResourceSizeThreshold)
-            && ((PlacedResourceDefaultHeapOffset + info.SizeInBytes) <= DefaultPlacedResourceHeapSize);
+        const D3D12_RESOURCE_ALLOCATION_INFO info = Device->GetResourceAllocationInfo(0, 1, InDesc);
+		if (IsUsePlacedResource)
+		{
+			jPlacedResource ReusePlacedUploadResource = PlacedResourcePool.Alloc(info.SizeInBytes, true);
+			if (ReusePlacedUploadResource.IsValid())
+			{
+				return ReusePlacedUploadResource.PlacedSubResource;
+			}
+			else
+			{
+				const bool IsAvailablePlacedResource = IsUsePlacedResource && (info.SizeInBytes <= PlacedResourceSizeThreshold)
+					&& ((PlacedResourceDefaultUploadOffset + info.SizeInBytes) <= DefaultPlacedResourceHeapSize);
 
-        ComPtr<ID3D12Resource> NewResource;
-        if (IsAvailablePlacedResource)
-        {
-            check(PlacedResourceUploadHeap);
+				if (IsAvailablePlacedResource)
+				{
+					check(PlacedResourceUploadHeap);
 
-            JFAIL(Device->CreatePlacedResource(PlacedResourceUploadHeap.Get(), PlacedResourceDefaultUploadOffset
-                , std::forward<T>(InDesc), InResourceState, InClearValue, IID_PPV_ARGS(&NewResource)));
+                    ComPtr<ID3D12Resource> NewResource;
+					JFAIL(Device->CreatePlacedResource(PlacedResourceUploadHeap.Get(), PlacedResourceDefaultUploadOffset
+						, std::forward<T>(InDesc), InResourceState, InClearValue, IID_PPV_ARGS(&NewResource)));
 
-			PlacedResourceDefaultUploadOffset += info.SizeInBytes;
+					PlacedResourceDefaultUploadOffset += info.SizeInBytes;
 
-            return NewResource;
-        }
+					jPlacedResource NewPlacedResource;
+					NewPlacedResource.IsUploadResource = true;
+					NewPlacedResource.PlacedSubResource = NewResource;
+					NewPlacedResource.Size = info.SizeInBytes;
+					PlacedResourcePool.AddUsingPlacedResource(NewPlacedResource);
+
+					return NewResource;
+				}
+			}
+		}
 
         const CD3DX12_HEAP_PROPERTIES& HeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+        ComPtr<ID3D12Resource> NewResource;
         JFAIL(Device->CreateCommittedResource(&HeapProperties, D3D12_HEAP_FLAG_NONE
             , std::forward<T>(InDesc), InResourceState, InClearValue, IID_PPV_ARGS(&NewResource)));
         return NewResource;
@@ -321,8 +493,6 @@ public:
 	virtual jFenceManager* GetFenceManager() override { return &FenceManager; }
 
 	std::vector<jRingBuffer_DX12*> OneFrameUniformRingBuffers;
-
-	ComPtr<ID3D12RootSignature> OneFrameRootSignature[3];
 	jRingBuffer_DX12* GetOneFrameUniformRingBuffer() const { return OneFrameUniformRingBuffers[CurrentFrameIndex]; }
 
 	virtual jShaderBindingLayout* CreateShaderBindings(const jShaderBindingArray& InShaderBindingArray) const override;
@@ -417,6 +587,10 @@ public:
 
 	virtual void Flush() const override;
 	virtual void Finish() const override;
+
+	jMutexLock MultiFrameShaderBindingInstanceLock;
+	jDeallocatorMultiFrameShaderBindingInstance DeallocatorMultiFrameShaderBindingInstance;
+	jDeallocatorMultiFrameUniformBufferBlock DeallocatorMultiFrameUniformBufferBlock;
 };
 
 extern jRHI_DX12* g_rhi_dx12;

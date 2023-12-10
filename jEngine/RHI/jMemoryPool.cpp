@@ -71,7 +71,7 @@ jMemory jSubMemoryAllocator::Alloc(uint64 InRequstedSize)
 jMemory jMemoryPool::Alloc(EVulkanBufferBits InUsages, EVulkanMemoryBits InProperties, uint64 InSize)
 {
     jScopedLock s(&Lock);
-    const EPoolSizeType PoolSizeType = GetMemorySize(InSize);
+    const EPoolSizeType PoolSizeType = GetPoolSizeType(InSize);
 
     std::vector<jSubMemoryAllocator*>& SubMemoryAllocators = MemoryPools[(int32)PoolSizeType];
     for (auto& iter : SubMemoryAllocators)

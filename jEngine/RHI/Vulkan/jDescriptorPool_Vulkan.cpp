@@ -11,6 +11,7 @@ jDescriptorPool_Vulkan::~jDescriptorPool_Vulkan()
         vkDestroyDescriptorPool(g_rhi_vk->Device, DescriptorPool, nullptr);
         DescriptorPool = nullptr;
     }
+    DeallocateMultiframeShaderBindingInstance.FreeDelegate = nullptr;
 }
 
 void jDescriptorPool_Vulkan::Create(uint32 InMaxDescriptorSets)
@@ -53,6 +54,8 @@ void jDescriptorPool_Vulkan::Create(uint32 InMaxDescriptorSets)
     PoolInfo.maxSets = InMaxDescriptorSets;
 
     verify(VK_SUCCESS == vkCreateDescriptorPool(g_rhi_vk->Device, &PoolInfo, nullptr, &DescriptorPool));
+
+    DeallocateMultiframeShaderBindingInstance.FreeDelegate = std::bind(&jDescriptorPool_Vulkan::FreedFromPendingDelegate, this, std::placeholders::_1);
 }
 
 void jDescriptorPool_Vulkan::Reset()
@@ -65,17 +68,17 @@ void jDescriptorPool_Vulkan::Reset()
 #endif
 }
 
-std::shared_ptr<jShaderBindingInstance_Vulkan> jDescriptorPool_Vulkan::AllocateDescriptorSet(VkDescriptorSetLayout InLayout)
+std::shared_ptr<jShaderBindingInstance> jDescriptorPool_Vulkan::AllocateDescriptorSet(VkDescriptorSetLayout InLayout)
 {
     jScopedLock s(&DescriptorPoolLock);
 #if !USE_RESET_DESCRIPTOR_POOL
     const auto it_find = PendingDescriptorSets.find(InLayout);
     if (it_find != PendingDescriptorSets.end())
     {
-        jShaderBindingInstanceVulkanArray& pendingPools = it_find->second;
+        jShaderBindingInstancePtrArray& pendingPools = it_find->second;
         if (pendingPools.size())
         {
-            std::shared_ptr<jShaderBindingInstance_Vulkan> descriptorSet = *pendingPools.rbegin();
+            std::shared_ptr<jShaderBindingInstance> descriptorSet = *pendingPools.rbegin();
             //pendingPools.PopBack();
             pendingPools.resize(pendingPools.size() - 1);
             return descriptorSet;
@@ -93,8 +96,9 @@ std::shared_ptr<jShaderBindingInstance_Vulkan> jDescriptorPool_Vulkan::AllocateD
     if (!ensure(VK_SUCCESS == vkAllocateDescriptorSets(g_rhi_vk->Device, &DescriptorSetAllocateInfo, &NewDescriptorSet)))
         return nullptr;
 
-    std::shared_ptr<jShaderBindingInstance_Vulkan> NewCachedDescriptorSet = std::make_shared<jShaderBindingInstance_Vulkan>();
-    NewCachedDescriptorSet->DescriptorSet = NewDescriptorSet;
+    auto NewShaderBindingInstance_Vulkan = new jShaderBindingInstance_Vulkan();
+    NewShaderBindingInstance_Vulkan->DescriptorSet = NewDescriptorSet;
+    std::shared_ptr<jShaderBindingInstance> NewCachedDescriptorSet = std::shared_ptr<jShaderBindingInstance>(NewShaderBindingInstance_Vulkan);
 
 #if !USE_RESET_DESCRIPTOR_POOL
     AllocatedDescriptorSets[InLayout].push_back(NewCachedDescriptorSet);
@@ -103,52 +107,54 @@ std::shared_ptr<jShaderBindingInstance_Vulkan> jDescriptorPool_Vulkan::AllocateD
     return NewCachedDescriptorSet;
 }
 
-void jDescriptorPool_Vulkan::Free(std::shared_ptr<jShaderBindingInstance_Vulkan> InShaderBindingInstance)
+void jDescriptorPool_Vulkan::Free(std::shared_ptr<jShaderBindingInstance> InShaderBindingInstance)
 {
     check(InShaderBindingInstance);
     jScopedLock s(&DescriptorPoolLock);
+
+    DeallocateMultiframeShaderBindingInstance.Free(InShaderBindingInstance);
     
-    const int32 CurrentFrameNumber = g_rhi->GetCurrentFrameNumber();
-    const int32 OldestFrameToKeep = CurrentFrameNumber - NumOfFramesToWaitBeforeReleasing;
+    //const int32 CurrentFrameNumber = g_rhi->GetCurrentFrameNumber();
+    //const int32 OldestFrameToKeep = CurrentFrameNumber - NumOfFramesToWaitBeforeReleasing;
 
-    // ProcessPendingDescriptorPoolFree
-    {
-        // Check it is too early
-        if (CurrentFrameNumber >= CanReleasePendingFreeShaderBindingInstanceFrameNumber)
-        {
-            // Release pending memory
-            int32 i = 0;
-            for (; i < PendingFree.size(); ++i)
-            {
-                jPendingFreeShaderBindingInstance& PendingFreeShaderBindingInstance = PendingFree[i];
-                if (PendingFreeShaderBindingInstance.FrameIndex < OldestFrameToKeep)
-                {
-                    // Return to pending descriptor set
-                    check(PendingFreeShaderBindingInstance.ShaderBindingInstance);
-                    const VkDescriptorSetLayout DescriptorSetLayout = (VkDescriptorSetLayout)PendingFreeShaderBindingInstance.ShaderBindingInstance->ShaderBindingsLayouts->GetHandle();
-                    PendingDescriptorSets[DescriptorSetLayout].push_back(PendingFreeShaderBindingInstance.ShaderBindingInstance);
-                }
-                else
-                {
-                    CanReleasePendingFreeShaderBindingInstanceFrameNumber = PendingFreeShaderBindingInstance.FrameIndex + NumOfFramesToWaitBeforeReleasing + 1;
-                    break;
-                }
-            }
-            if (i > 0)
-            {
-                const size_t RemainingSize = (PendingFree.size() - i);
-                if (RemainingSize > 0)
-                {
-                    for (int32 k = 0; k < RemainingSize; ++k)
-                        PendingFree[k] = PendingFree[i + k];
-                    //memcpy(&PendingFree[0], &PendingFree[i], sizeof(jPendingFreeShaderBindingInstance) * RemainingSize);
-                }
-                PendingFree.resize(RemainingSize);
-            }
-        }
-    }
+    //// ProcessPendingDescriptorPoolFree
+    //{
+    //    // Check it is too early
+    //    if (CurrentFrameNumber >= CanReleasePendingFreeShaderBindingInstanceFrameNumber)
+    //    {
+    //        // Release pending memory
+    //        int32 i = 0;
+    //        for (; i < PendingFree.size(); ++i)
+    //        {
+    //            jPendingFreeShaderBindingInstance& PendingFreeShaderBindingInstance = PendingFree[i];
+    //            if (PendingFreeShaderBindingInstance.FrameIndex < OldestFrameToKeep)
+    //            {
+    //                // Return to pending descriptor set
+    //                check(PendingFreeShaderBindingInstance.ShaderBindingInstance);
+    //                const VkDescriptorSetLayout DescriptorSetLayout = (VkDescriptorSetLayout)PendingFreeShaderBindingInstance.ShaderBindingInstance->ShaderBindingsLayouts->GetHandle();
+    //                PendingDescriptorSets[DescriptorSetLayout].push_back(PendingFreeShaderBindingInstance.ShaderBindingInstance);
+    //            }
+    //            else
+    //            {
+    //                CanReleasePendingFreeShaderBindingInstanceFrameNumber = PendingFreeShaderBindingInstance.FrameIndex + NumOfFramesToWaitBeforeReleasing + 1;
+    //                break;
+    //            }
+    //        }
+    //        if (i > 0)
+    //        {
+    //            const size_t RemainingSize = (PendingFree.size() - i);
+    //            if (RemainingSize > 0)
+    //            {
+    //                for (int32 k = 0; k < RemainingSize; ++k)
+    //                    PendingFree[k] = PendingFree[i + k];
+    //                //memcpy(&PendingFree[0], &PendingFree[i], sizeof(jPendingFreeShaderBindingInstance) * RemainingSize);
+    //            }
+    //            PendingFree.resize(RemainingSize);
+    //        }
+    //    }
+    //}
 
-    PendingFree.emplace_back(jPendingFreeShaderBindingInstance(CurrentFrameNumber, InShaderBindingInstance));
+    //PendingFree.emplace_back(jPendingFreeShaderBindingInstance(CurrentFrameNumber, InShaderBindingInstance));
 }
 
 void jDescriptorPool_Vulkan::Release()

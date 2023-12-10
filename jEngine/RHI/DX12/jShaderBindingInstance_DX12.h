@@ -13,7 +13,7 @@ struct jShaderBindingInstance_DX12 : public jShaderBindingInstance
     virtual void UpdateShaderBindings(const jShaderBindingArray& InShaderBindingArray) override;
     virtual void* GetHandle() const override;
     virtual const std::vector<uint32>* GetDynamicOffsets() const override { return 0; }
-    virtual void Free() override {}
+    virtual void Free() override;
 
     void BindGraphics(jCommandBuffer_DX12* InCommandList, int32& InOutStartIndex) const;
     void BindCompute(jCommandBuffer_DX12* InCommandList, int32& InOutStartIndex);

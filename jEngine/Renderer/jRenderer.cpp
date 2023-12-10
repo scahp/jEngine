@@ -623,6 +623,7 @@ void jRenderer::BasePass()
     }
 
     static bool EnableAtmosphericShadowing = true;
+    static jFence* AtmosphericShadowingFence = g_rhi->GetFenceManager()->GetOrCreateFence();
     if (EnableAtmosphericShadowing)
     {
         jDirectionalLight* DirectionalLight = nullptr;
@@ -715,7 +716,8 @@ void jRenderer::BasePass()
         }
 
         // Binding 3        
-        auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(jNameStatic("AtmosphericDataUniformBuffer"), jLifeTimeType::OneFrame, sizeof(AtmosphericData)));
+        auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(
+            g_rhi->CreateUniformBufferBlock(jNameStatic("AtmosphericDataUniformBuffer"), jLifeTimeType::OneFrame, sizeof(AtmosphericData)));
         OneFrameUniformBuffer->UpdateBufferData(&AtmosphericData, sizeof(AtmosphericData));
         ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
             , ResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true);
@@ -761,17 +763,26 @@ void jRenderer::BasePass()
 
         int32 X = (Width / 16) + ((Width % 16) ? 1 : 0);
         int32 Y = (Height / 16) + ((Height % 16) ? 1 : 0);
-        g_rhi->DispatchCompute(RenderFrameContextPtr, X, Y, 6);
+        g_rhi->DispatchCompute(RenderFrameContextPtr, X, Y, 1);
 
         g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), AtmosphericShadowing->GetTexture(), EImageLayout::SHADER_READ_ONLY);
     }
 
     if (EnableAtmosphericShadowing)
     {
+        // Wait here for previous compute shader
+        // todo : make interface for this.
+        if (IsUseDX12())
+        {
+            ComPtr<ID3D12CommandQueue> Queue = g_rhi_dx12->CommandBufferManager->GetCommandQueue();
+            ((jFence_DX12*)AtmosphericShadowingFence)->SignalWithNextFenceValue(Queue.Get(), true);
+        }
+
         static jFullscreenQuadPrimitive* GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
         std::shared_ptr<jRenderTarget> AtmosphericShadowing = RenderFrameContextPtr->SceneRenderTargetPtr->AtmosphericShadowing;
 
         auto RT = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr;
+        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RT->GetTexture(), EImageLayout::COLOR_ATTACHMENT);
 
         jRasterizationStateInfo* RasterizationState = nullptr;
         switch (g_rhi->GetSelectedMSAASamples())
@@ -831,8 +842,6 @@ void jRenderer::BasePass()
         std::shared_ptr<jShaderBindingInstance> ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
         jShaderBindingInstanceArray ShaderBindingInstanceArray;
         ShaderBindingInstanceArray.Add(ShaderBindingInstance.get());
-
-        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RT->GetTexture(), EImageLayout::COLOR_ATTACHMENT);
 
         jGraphicsPipelineShader Shader;
         {
@@ -1630,7 +1639,7 @@ void jRenderer::Render()
             ImGui::SliderFloat("DirZ", &gOptions.SunDir.z, -1.0f, 1.0f);
             ImGui::End();
 
-            ImGui::SetWindowFocus(szTitle);
+            //ImGui::SetWindowFocus(szTitle);
 #endif
         });
     g_ImGUI->Draw(RenderFrameContextPtr);

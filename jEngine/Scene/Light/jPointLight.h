@@ -43,11 +43,9 @@ public:
 
     void Initialize(const Vector& InPos, const Vector& InColor, float InMaxDist, const Vector& InDiffuseIntensity, const Vector& InSpecularIntensity, float InSpecularPower);
 
-    IUniformBufferBlock* LightDataUniformBlock = nullptr;
-
     virtual bool IsOmnidirectional() const override { return true; }
     virtual void Update(float deltaTime) override;
-    virtual IUniformBufferBlock* GetUniformBufferBlock() const override { return LightDataUniformBlock; }
+    virtual IUniformBufferBlock* GetUniformBufferBlock() const override { return LightDataUniformBlockPtr.get(); }
     virtual jCamera* GetLightCamra(int index = 0) const;
     virtual const Matrix* GetLightWorldMatrix() const override;
     virtual const std::shared_ptr<jShaderBindingInstance>& PrepareShaderBindingInstance(jTexture* InShadowMap) override;
@@ -56,6 +54,8 @@ public:
 
     jCamera* Camera[6] = {0,};
     Matrix LightWorldMatrix;
+
+    std::shared_ptr<IUniformBufferBlock> LightDataUniformBlockPtr;
 
     std::shared_ptr<jShaderBindingInstance> ShaderBindingInstanceOnlyLightData;
     std::shared_ptr<jShaderBindingInstance> ShaderBindingInstanceWithShadowMap;

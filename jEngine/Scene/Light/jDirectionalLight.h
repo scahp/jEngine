@@ -54,7 +54,8 @@ public:
     void Initialize(const Vector& InDirection, const Vector& InColor, const Vector& InDiffuseIntensity, const Vector& InSpecularIntensity, float InSpecularPower);
 
     virtual void Update(float deltaTime) override;
-	virtual IUniformBufferBlock* GetUniformBufferBlock() const override { return LightDataUniformBlock; }
+    virtual IUniformBufferBlock* GetUniformBufferBlock() const override { return LightDataUniformBlockPtr.get(); }
+
     virtual const jCamera* GetLightCamra(int32 index = 0) const override;
     virtual const std::shared_ptr<jShaderBindingInstance>& PrepareShaderBindingInstance(jTexture* InShadowMap) override;
 
@@ -64,10 +65,9 @@ public:
 private:
     jCamera* Camera = nullptr;
     jDirectionalLightUniformBufferData LightData;
-    IUniformBufferBlock* LightDataUniformBlock = nullptr;
+    std::shared_ptr<IUniformBufferBlock> LightDataUniformBlockPtr;
+    bool NeedToUpdateShaderBindingInstance = true;
 
     std::shared_ptr<jShaderBindingInstance> ShaderBindingInstanceOnlyLightData;
     std::shared_ptr<jShaderBindingInstance> ShaderBindingInstanceWithShadowMap;
-    bool IsNeedToUpdateShaderBindingInstance = true;
-    jTexture* LastUsedShadowMap = nullptr;
 };

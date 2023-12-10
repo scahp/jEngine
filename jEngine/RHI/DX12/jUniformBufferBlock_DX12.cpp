@@ -45,7 +45,7 @@ void jUniformBufferBlock_DX12::UpdateBufferData(const void* InData, size_t InSiz
     else
     {
         RingBuffer = g_rhi_dx12->GetOneFrameUniformRingBuffer();
-        RingBufferAllocatedSize = Align(InSize, 256);
+        RingBufferAllocatedSize = Align(InSize, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
         RingBufferOffset = RingBuffer->Alloc(RingBufferAllocatedSize);
         RingBufferDestAddress = ((uint8*)RingBuffer->GetMappedPointer()) + RingBufferOffset;
         if (InData)
@@ -91,4 +91,12 @@ const jDescriptor_DX12& jUniformBufferBlock_DX12::GetCBV() const
 uint64 jUniformBufferBlock_DX12::GetGPUAddress() const
 {
     return (jLifeTimeType::MultiFrame == LifeType) ? Buffer->GetGPUAddress() : (RingBuffer->GetGPUAddress() + RingBufferOffset);
+}
+
+void jUniformBufferBlock_DX12::Free()
+{
+    if (jLifeTimeType::MultiFrame == LifeType)
+    {
+        g_rhi_dx12->DeallocatorMultiFrameUniformBufferBlock.Free(shared_from_this());
+    }
 }

@@ -71,17 +71,11 @@ void jRenderObjectGeometryData::UpdateVertexStream()
 // jRenderObject
 jRenderObject::jRenderObject()
 {
-    RenderObjectUniformParameters = g_rhi->CreateUniformBufferBlock(
-        jNameStatic("RenderObjectUniformParameters"), jLifeTimeType::MultiFrame, sizeof(jRenderObjectUniformBuffer));
 }
 
 jRenderObject::~jRenderObject()
 {
-    if (RenderObjectUniformParameters)
-    {
-        delete RenderObjectUniformParameters;
-        RenderObjectUniformParameters = nullptr;
-    }
+    RenderObjectUniformParametersPtr.reset();
 }
 
 void jRenderObject::CreateRenderObject(const std::shared_ptr<jRenderObjectGeometryData>& InRenderObjectGeometryData)
@@ -200,7 +194,12 @@ const std::shared_ptr<jShaderBindingInstance>& jRenderObject::CreateShaderBindin
         ubo.Metallic = gOptions.Metallic;
         ubo.Roughness = gOptions.Roughness;
 
-        RenderObjectUniformParameters->UpdateBufferData(&ubo, sizeof(ubo));
+        if (RenderObjectUniformParametersPtr)
+            RenderObjectUniformParametersPtr->Free();
+
+        RenderObjectUniformParametersPtr = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
+            jNameStatic("RenderObjectUniformParameters"), jLifeTimeType::MultiFrame, sizeof(jRenderObjectUniformBuffer)));
+        RenderObjectUniformParametersPtr->UpdateBufferData(&ubo, sizeof(ubo));
 
         LastMetallic = gOptions.Metallic;
         LastRoughness = gOptions.Roughness;
@@ -210,7 +209,7 @@ const std::shared_ptr<jShaderBindingInstance>& jRenderObject::CreateShaderBindin
         jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
 
         ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::ALL_GRAPHICS
-            , ResourceInlineAllactor.Alloc<jUniformBufferResource>(RenderObjectUniformParameters));
+            , ResourceInlineAllactor.Alloc<jUniformBufferResource>(RenderObjectUniformParametersPtr.get()));
 
         if (RenderObjectShaderBindingInstance)
             RenderObjectShaderBindingInstance->Free();

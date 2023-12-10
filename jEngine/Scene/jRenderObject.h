@@ -121,8 +121,8 @@ private:
 	Vector Scale = Vector::OneVector;
 
 	bool NeedToUpdateRenderObjectUniformParameters = false;
-	IUniformBufferBlock* RenderObjectUniformParameters = nullptr;
-	std::shared_ptr<jShaderBindingInstance> RenderObjectShaderBindingInstance = nullptr;
+	std::shared_ptr<IUniformBufferBlock> RenderObjectUniformParametersPtr;
+	std::shared_ptr<jShaderBindingInstance> RenderObjectShaderBindingInstance;
 
 	// Special code for PBR test
     float LastMetallic = 0.0f;
