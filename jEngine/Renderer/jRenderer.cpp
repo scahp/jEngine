@@ -623,7 +623,6 @@ void jRenderer::BasePass()
     }
 
     static bool EnableAtmosphericShadowing = true;
-    static jFence* AtmosphericShadowingFence = g_rhi->GetFenceManager()->GetOrCreateFence();
     if (EnableAtmosphericShadowing)
     {
         jDirectionalLight* DirectionalLight = nullptr;
@@ -770,14 +769,6 @@ void jRenderer::BasePass()
 
     if (EnableAtmosphericShadowing)
     {
-        // Wait here for previous compute shader
-        // todo : make interface for this.
-        if (IsUseDX12())
-        {
-            ComPtr<ID3D12CommandQueue> Queue = g_rhi_dx12->CommandBufferManager->GetCommandQueue();
-            ((jFence_DX12*)AtmosphericShadowingFence)->SignalWithNextFenceValue(Queue.Get(), true);
-        }
-
         static jFullscreenQuadPrimitive* GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
         std::shared_ptr<jRenderTarget> AtmosphericShadowing = RenderFrameContextPtr->SceneRenderTargetPtr->AtmosphericShadowing;
 

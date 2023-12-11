@@ -1660,26 +1660,26 @@ bool jRHI_DX12::OnHandleDeviceRestored()
     return true;
 }
 
-jCommandBuffer_DX12* jRHI_DX12::BeginSingleTimeCommands()
+jCommandBuffer_DX12* jRHI_DX12::BeginSingleTimeCommands() const
 {
     check(CommandBufferManager);
     return CommandBufferManager->GetOrCreateCommandBuffer();
 }
 
-void jRHI_DX12::EndSingleTimeCommands(jCommandBuffer_DX12* commandBuffer)
+void jRHI_DX12::EndSingleTimeCommands(jCommandBuffer_DX12* commandBuffer) const
 {
     check(CommandBufferManager);
     CommandBufferManager->ExecuteCommandList(commandBuffer, true);
     CommandBufferManager->ReturnCommandBuffer(commandBuffer);
 }
 
-jCommandBuffer_DX12* jRHI_DX12::BeginSingleTimeCopyCommands()
+jCommandBuffer_DX12* jRHI_DX12::BeginSingleTimeCopyCommands() const
 {
 	check(CopyCommandBufferManager);
 	return CopyCommandBufferManager->GetOrCreateCommandBuffer();
 }
 
-void jRHI_DX12::EndSingleTimeCopyCommands(jCommandBuffer_DX12* commandBuffer)
+void jRHI_DX12::EndSingleTimeCopyCommands(jCommandBuffer_DX12* commandBuffer) const
 {
 	check(CopyCommandBufferManager);
 	CopyCommandBufferManager->ExecuteCommandList(commandBuffer, true);
@@ -1709,7 +1709,7 @@ jTexture* jRHI_DX12::CreateTextureFromData(const jImageData* InImageData) const
         , EBufferCreateFlag::CPUAccess, D3D12_RESOURCE_STATE_GENERIC_READ, &InImageData->ImageData[0], InImageData->ImageData.size());
     check(buffer);
 
-	jCommandBuffer_DX12* commandList = g_rhi_dx12->BeginSingleTimeCopyCommands();
+	jCommandBuffer_DX12* commandList = BeginSingleTimeCopyCommands();
     if (InImageData->SubresourceFootprints.size() > 0)
     {
         jBufferUtil_DX12::CopyBufferToImage(commandList->Get(), buffer->Buffer.Get(), Texture->Image.Get(), InImageData->SubresourceFootprints);
@@ -1725,7 +1725,7 @@ jTexture* jRHI_DX12::CreateTextureFromData(const jImageData* InImageData) const
         //check(0); // todo : generate miplevel
     }
 
-	g_rhi_dx12->EndSingleTimeCopyCommands(commandList);
+	EndSingleTimeCopyCommands(commandList);
 	delete buffer;
 
 	return Texture;
@@ -1944,12 +1944,13 @@ std::shared_ptr<jRenderFrameContext> jRHI_DX12::BeginRenderFrame()
 	//////////////////////////////////////////////////////////////////////////
 	// Acquire new swapchain image
 	jSwapchainImage_DX12* CurrentSwapchainImage = (jSwapchainImage_DX12*)Swapchain->GetCurrentSwapchainImage();
-	CurrentSwapchainImage->CommandBufferFence->WaitForFence();
+    check(CommandBufferManager);
+    CommandBufferManager->Fence->WaitForFenceValue(CurrentSwapchainImage->FenceValue);
 	//////////////////////////////////////////////////////////////////////////
 
     GetOneFrameUniformRingBuffer()->Reset();
 
-	jCommandBuffer_DX12* commandBuffer = (jCommandBuffer_DX12*)g_rhi_dx12->CommandBufferManager->GetOrCreateCommandBuffer();
+	jCommandBuffer_DX12* commandBuffer = (jCommandBuffer_DX12*)CommandBufferManager->GetOrCreateCommandBuffer();
 
     auto renderFrameContextPtr = std::make_shared<jRenderFrameContext_DX12>(commandBuffer);
     renderFrameContextPtr->UseForwardRenderer = !gOptions.UseDeferredRenderer;
@@ -1971,8 +1972,7 @@ void jRHI_DX12::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& rende
 
 	CommandBufferManager->ExecuteCommandList(CommandBuffer);
 
-	CurrentSwapchainImage->CommandBufferFence = CommandBuffer->Fence;
-    CurrentSwapchainImage->CommandBufferFence->SignalWithNextFenceValue(CommandBufferManager->GetCommandQueue().Get());
+    CurrentSwapchainImage->FenceValue = CommandBuffer->Owner->Fence->SignalWithNextFenceValue(CommandBufferManager->GetCommandQueue().Get());
 
     HRESULT hr = S_OK;
     if (Options & c_AllowTearing)
@@ -2025,8 +2025,7 @@ void jRHI_DX12::BindGraphicsShaderBindingInstances(const jCommandBuffer* InComma
                 NumOfSamplerDescriptor += (int32)Instance->SamplerDescriptors.size();
             }
 
-            check(g_rhi_dx12);
-            check(g_rhi_dx12->Device);
+            check(Device);
 
             // Descriptor 가 충분한지 확인 함. 모자라면 새로 할당함.
             bool NeedSetDescriptorHeapsAgain = false;            
@@ -2035,7 +2034,7 @@ void jRHI_DX12::BindGraphicsShaderBindingInstances(const jCommandBuffer* InComma
                 const ID3D12DescriptorHeap* PrevDescriptorHeap = CommandBuffer_DX12->OnlineDescriptorHeap->GetHeap();
                 
                 CommandBuffer_DX12->OnlineDescriptorHeap->Release();
-                CommandBuffer_DX12->OnlineDescriptorHeap = g_rhi_dx12->OnlineDescriptorHeapManager.Alloc(EDescriptorHeapTypeDX12::CBV_SRV_UAV);
+                CommandBuffer_DX12->OnlineDescriptorHeap = ((jRHI_DX12*)this)->OnlineDescriptorHeapManager.Alloc(EDescriptorHeapTypeDX12::CBV_SRV_UAV);
                 check(CommandBuffer_DX12->OnlineDescriptorHeap->CanAllocate(NumOfDescriptor));
 
                 if (PrevDescriptorHeap != CommandBuffer_DX12->OnlineDescriptorHeap->GetHeap())
@@ -2051,7 +2050,7 @@ void jRHI_DX12::BindGraphicsShaderBindingInstances(const jCommandBuffer* InComma
                 const ID3D12DescriptorHeap* PrevDescriptorHeap = CommandBuffer_DX12->OnlineSamplerDescriptorHeap->GetHeap();
 
                 CommandBuffer_DX12->OnlineSamplerDescriptorHeap->Release();
-                CommandBuffer_DX12->OnlineSamplerDescriptorHeap = g_rhi_dx12->OnlineDescriptorHeapManager.Alloc(EDescriptorHeapTypeDX12::SAMPLER);
+                CommandBuffer_DX12->OnlineSamplerDescriptorHeap = ((jRHI_DX12*)this)->OnlineDescriptorHeapManager.Alloc(EDescriptorHeapTypeDX12::SAMPLER);
                 check(CommandBuffer_DX12->OnlineSamplerDescriptorHeap->CanAllocate(NumOfSamplerDescriptor));
 
                 if (PrevDescriptorHeap != CommandBuffer_DX12->OnlineSamplerDescriptorHeap->GetHeap())

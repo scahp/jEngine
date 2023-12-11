@@ -87,9 +87,6 @@ bool jSwapchain_DX12::Create()
 
         jBufferUtil_DX12::CreateRenderTargetView((jTexture_DX12*)SwapchainImage->TexturePtr.get());
         TextureDX12Ptr->Layout = EImageLayout::PRESENT_SRC;
-
-        if (ensure(g_rhi_dx12->GetFenceManager()))
-            SwapchainImage->CommandBufferFence = (jFence_DX12*)g_rhi_dx12->GetFenceManager()->GetOrCreateFence();
     }
 
     if (ensure(g_rhi_dx12->GetFenceManager()))

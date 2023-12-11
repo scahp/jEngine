@@ -12,12 +12,16 @@ public:
     virtual void WaitForFence(uint64 InTimeoutNanoSec = UINT64_MAX) override;
     virtual bool IsValid() const override { return (Fence && FenceEvent); }
     virtual bool IsComplete() const override;
+    bool IsComplete(uint64 InFenceValue) const;
+    void WaitForFenceValue(uint64 InFenceValue, uint64 InTimeoutNanoSec = UINT64_MAX);
 
     uint64 SignalWithNextFenceValue(ID3D12CommandQueue* InCommandQueue, bool bWaitUntilExecuteComplete = false);
 
     ComPtr<ID3D12Fence> Fence;
     HANDLE FenceEvent = nullptr;
-    uint64 LastFenceValue = InitialFenceValue;
+
+    jMutexLock FenceValueLock;
+    uint64 FenceValue = InitialFenceValue;
 };
 
 class jFenceManager_DX12 : public jFenceManager

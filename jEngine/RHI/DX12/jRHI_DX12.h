@@ -483,11 +483,11 @@ public:
     bool OnHandleDeviceLost();
     bool OnHandleDeviceRestored();
 
-    jCommandBuffer_DX12* BeginSingleTimeCommands();
-    void EndSingleTimeCommands(jCommandBuffer_DX12* commandBuffer);
+    jCommandBuffer_DX12* BeginSingleTimeCommands() const;
+    void EndSingleTimeCommands(jCommandBuffer_DX12* commandBuffer) const;
 
-	jCommandBuffer_DX12* BeginSingleTimeCopyCommands();
-    void EndSingleTimeCopyCommands(jCommandBuffer_DX12* commandBuffer);
+	jCommandBuffer_DX12* BeginSingleTimeCopyCommands() const;
+    void EndSingleTimeCopyCommands(jCommandBuffer_DX12* commandBuffer) const;
 
 	virtual jTexture* CreateTextureFromData(const jImageData* InImageData) const override;
 	virtual jFenceManager* GetFenceManager() override { return &FenceManager; }

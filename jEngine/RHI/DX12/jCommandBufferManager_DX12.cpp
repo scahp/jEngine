@@ -33,17 +33,23 @@ void jCommandBuffer_DX12::Reset() const
 
 void* jCommandBuffer_DX12::GetFenceHandle() const
 {
-    return Fence ? Fence->GetHandle() : nullptr;
+    return Owner->Fence ? Owner->Fence->GetHandle() : nullptr;
 }
 
 void jCommandBuffer_DX12::SetFence(void* InFence)
 {
-    Fence = (jFence_DX12*)InFence;
+    // Fence = (jFence_DX12*)InFence;
+    check(0);
 }
 
 jFence* jCommandBuffer_DX12::GetFence() const
 {
-    return Fence;
+    return Owner->Fence;
+}
+
+bool jCommandBuffer_DX12::IsCompleteForWaitFence()
+{
+    return Owner->Fence->IsComplete(FenceValue);
 }
 
 bool jCommandBuffer_DX12::End() const
@@ -82,7 +88,7 @@ jCommandBuffer_DX12* jCommandBufferManager_DX12::GetOrCreateCommandBuffer()
     jCommandBuffer_DX12* SelectedCmdBuffer = nullptr;
     for (int32 i = 0; i < AvailableCommandLists.size(); ++i)
     {
-        if (AvailableCommandLists[i]->Fence->IsComplete())
+        if (AvailableCommandLists[i]->IsCompleteForWaitFence())
         {
             SelectedCmdBuffer = AvailableCommandLists[i];
             AvailableCommandLists.erase(AvailableCommandLists.begin() + i);
@@ -134,6 +140,8 @@ bool jCommandBufferManager_DX12::Initialize(ComPtr<ID3D12Device> InDevice, D3D12
             return false;
     }
 
+    Fence = (jFence_DX12*)g_rhi_dx12->FenceManager.GetOrCreateFence();
+
     return true;
 }
 
@@ -144,13 +152,17 @@ void jCommandBufferManager_DX12::ExecuteCommandList(jCommandBuffer_DX12* InComma
 
     ID3D12CommandList* pCommandLists[] = { InCommandList->Get() };
     CommandQueue->ExecuteCommandLists(1, pCommandLists);
-    if (ensure(InCommandList->Fence))
-        InCommandList->Fence->SignalWithNextFenceValue(CommandQueue.Get(), bWaitUntilExecuteComplete);
+    if (ensure(InCommandList->Owner->Fence))
+    {
+        InCommandList->FenceValue = InCommandList->Owner->Fence->SignalWithNextFenceValue(InCommandList->Owner->CommandQueue.Get(), bWaitUntilExecuteComplete);
+        //InCommandList->Fence->SignalWithNextFenceValue(CommandQueue.Get(), bWaitUntilExecuteComplete);
+    }
 }
 
 jCommandBuffer_DX12* jCommandBufferManager_DX12::CreateCommandList() const
 {
     jCommandBuffer_DX12* commandBuffer = new jCommandBuffer_DX12();
+    commandBuffer->Owner = this;
     commandBuffer->CommandAllocator = CreateCommandAllocator();
     if (FAILED(Device->CreateCommandList(0, CommandListType
         , commandBuffer->CommandAllocator.Get(), nullptr, IID_PPV_ARGS(&commandBuffer->CommandList))))
@@ -159,7 +171,6 @@ jCommandBuffer_DX12* jCommandBufferManager_DX12::CreateCommandList() const
         return nullptr;
     }
 
-    commandBuffer->SetFence(g_rhi_dx12->FenceManager.GetOrCreateFence());
     if (D3D12_COMMAND_LIST_TYPE_COPY != CommandListType)
     {
         commandBuffer->OnlineDescriptorHeap = g_rhi_dx12->OnlineDescriptorHeapManager.Alloc(EDescriptorHeapTypeDX12::CBV_SRV_UAV);

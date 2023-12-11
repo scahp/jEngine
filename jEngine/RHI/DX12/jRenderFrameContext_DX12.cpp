@@ -16,7 +16,7 @@ void jRenderFrameContext_DX12::QueueSubmitCurrentActiveCommandBuffer()
 
         // get new commandbuffer
         CommandBuffer = CommandBufferManager->GetOrCreateCommandBuffer();
-        g_rhi_dx12->Swapchain->Images[FrameIndex]->CommandBufferFence = (jFence_DX12*)CommandBuffer_DX12->GetFence();
+        g_rhi_dx12->Swapchain->Images[FrameIndex]->FenceValue = CommandBuffer_DX12->Owner->Fence->SignalWithNextFenceValue(CommandBuffer_DX12->Owner->GetCommandQueue().Get());
     }
 }
 
@@ -32,6 +32,6 @@ void jRenderFrameContext_DX12::SubmitCurrentActiveCommandBuffer(ECurrentRenderPa
 
         // get new commandbuffer
         CommandBuffer = CommandBufferManager->GetOrCreateCommandBuffer();
-        g_rhi_dx12->Swapchain->Images[FrameIndex]->CommandBufferFence = (jFence_DX12*)CommandBuffer_DX12->GetFence();
+        g_rhi_dx12->Swapchain->Images[FrameIndex]->FenceValue = CommandBuffer_DX12->Owner->Fence->SignalWithNextFenceValue(CommandBuffer_DX12->Owner->GetCommandQueue().Get());
     }
 }

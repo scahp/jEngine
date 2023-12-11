@@ -18,35 +18,65 @@ void jFence_DX12::Release()
 
 void jFence_DX12::WaitForFence(uint64 InTimeoutNanoSec)
 {
-    if (LastFenceValue == InitialFenceValue)
+    WaitForFenceValue(FenceValue, InTimeoutNanoSec);
+}
+
+void jFence_DX12::WaitForFenceValue(uint64 InFenceValue, uint64 InTimeoutNanoSec)
+{
+    if (InFenceValue == InitialFenceValue)
         return;
 
     check(Fence);
-    if (Fence->GetCompletedValue() >= LastFenceValue)
-        return;
+    if (UINT64_MAX == InTimeoutNanoSec)
+    {
+        while (Fence->GetCompletedValue() < InFenceValue) 
+        {
+            Sleep(0);
+        }
+    }
+    else
+    {
+        std::chrono::system_clock::time_point lastTime = std::chrono::system_clock::now();
 
-    check(FenceEvent);
-    WaitForSingleObjectEx(FenceEvent, (DWORD)(InTimeoutNanoSec / 1000000), false);
+        while (Fence->GetCompletedValue() < InFenceValue)
+        {
+            std::chrono::nanoseconds elapsed_nanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now() - lastTime);
+            if (elapsed_nanoseconds.count() >= (int64)InTimeoutNanoSec)
+                return;
+
+            Sleep(0);
+        }
+    }
 }
 
 bool jFence_DX12::IsComplete() const
 {
-    return (Fence->GetCompletedValue() >= LastFenceValue);
+    return (Fence->GetCompletedValue() >= FenceValue);
+}
+
+bool jFence_DX12::IsComplete(uint64 InFenceValue) const
+{
+    return (Fence->GetCompletedValue() >= InFenceValue);
 }
 
 uint64 jFence_DX12::SignalWithNextFenceValue(ID3D12CommandQueue* InCommandQueue, bool bWaitUntilExecuteComplete)
 {
-    const auto NewFenceValue = LastFenceValue + 1;
-    if (JFAIL(InCommandQueue->Signal(Fence.Get(), NewFenceValue)))
-        return NewFenceValue;
+    {
+        jScopedLock s(&FenceValueLock);
 
-    LastFenceValue = NewFenceValue;
-    JFAIL(Fence->SetEventOnCompletion(NewFenceValue, FenceEvent));
+        const auto NewFenceValue = FenceValue + 1;
+        if (JFAIL(InCommandQueue->Signal(Fence.Get(), NewFenceValue)))
+            return FenceValue;
+
+        FenceValue = NewFenceValue;
+    }
+
+    JFAIL(Fence->SetEventOnCompletion(FenceValue, FenceEvent));
     if (bWaitUntilExecuteComplete)
     {
         WaitForSingleObjectEx(FenceEvent, INFINITE, false);
     }
-    return NewFenceValue;
+    return FenceValue;
 }
 
 jFence* jFenceManager_DX12::GetOrCreateFence()

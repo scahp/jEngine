@@ -14,7 +14,7 @@ public:
     void ReleaseInternal();
     virtual void Release() override;
 
-    jFence_DX12* CommandBufferFence = nullptr;
+    uint64 FenceValue = 0;
 };
 
 // Swapchain
