@@ -10,9 +10,9 @@ void jDescriptor_DX12::Free()
 {
     if (IsValid())
     {
-        check(DescriptorHeap);
-        DescriptorHeap->Free(Index);
-        *this = jDescriptor_DX12::Invalid;
+        if (!DescriptorHeap.expired())
+            DescriptorHeap.lock()->Free(Index);
+        Index = -1;
     }
 }
 

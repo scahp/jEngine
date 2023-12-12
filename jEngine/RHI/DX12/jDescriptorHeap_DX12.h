@@ -10,13 +10,13 @@ struct jDescriptor_DX12
     D3D12_CPU_DESCRIPTOR_HANDLE CPUHandle = {};
     D3D12_GPU_DESCRIPTOR_HANDLE GPUHandle = {};
     uint32 Index = uint32(-1);
-    class jDescriptorHeap_DX12* DescriptorHeap = nullptr;
+    std::weak_ptr<class jDescriptorHeap_DX12> DescriptorHeap;
 
     void Free();
     bool IsValid() const { return (Index != -1); }
 };
 
-class jDescriptorHeap_DX12
+class jDescriptorHeap_DX12 : public std::enable_shared_from_this<jDescriptorHeap_DX12>
 {
 public:
     static constexpr int32 NumOfFramesToWaitBeforeReleasing = 3;    
@@ -46,7 +46,7 @@ public:
         Descriptor.GPUHandle = GPUHandleStart;
         Descriptor.GPUHandle.ptr += Descriptor.Index * DescriptorSize;
 
-        Descriptor.DescriptorHeap = this;
+        Descriptor.DescriptorHeap = shared_from_this();
         return Descriptor;
     }
     jDescriptor_DX12 OneFrameAlloc()
@@ -298,7 +298,7 @@ public:
             if (Heap.size() > 0)
             {
                 // 할당 할 수 있는 Heap 이 더 많은 것을 앞쪽에 배치함
-                std::sort(Heap.begin(), Heap.end(), [](jDescriptorHeap_DX12* InA, jDescriptorHeap_DX12* InB) {
+                std::sort(Heap.begin(), Heap.end(), [](const std::shared_ptr<jDescriptorHeap_DX12>& InA, const std::shared_ptr<jDescriptorHeap_DX12>& InB) {
                     return InA->Pools.size() > InB->Pools.size();
                     });
 
@@ -324,8 +324,8 @@ public:
 
     void Free(const jDescriptor_DX12& InDescriptor)
     {
-        check(InDescriptor.DescriptorHeap);
-        InDescriptor.DescriptorHeap->Free(InDescriptor.Index);
+        if (!InDescriptor.DescriptorHeap.expired())
+            InDescriptor.DescriptorHeap.lock()->Free(InDescriptor.Index);
     }
 
     void Release()
@@ -333,17 +333,13 @@ public:
         if (!IsInitialized)
             return;
 
-        for (int32 i = 0; i < Heap.size(); ++i)
-        {
-            delete Heap[i];
-        }
         Heap.clear();
     }
 
 private:
-    jDescriptorHeap_DX12* CreateDescriptorHeap()
+    std::shared_ptr<jDescriptorHeap_DX12> CreateDescriptorHeap()
     {
-        auto DescriptorHeap = new jDescriptorHeap_DX12();
+        auto DescriptorHeap = std::make_shared<jDescriptorHeap_DX12>();
         check(DescriptorHeap);
 
         DescriptorHeap->Initialize(HeapType, false);
@@ -355,6 +351,6 @@ private:
     bool IsInitialized = false;
     EDescriptorHeapTypeDX12 HeapType = EDescriptorHeapTypeDX12::CBV_SRV_UAV;
 
-    jDescriptorHeap_DX12* CurrentHeap = nullptr;
-    std::vector<jDescriptorHeap_DX12*> Heap;
+    std::shared_ptr<jDescriptorHeap_DX12> CurrentHeap;
+    std::vector<std::shared_ptr<jDescriptorHeap_DX12>> Heap;
 };
