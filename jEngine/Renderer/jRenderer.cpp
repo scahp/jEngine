@@ -25,8 +25,8 @@
 #include "RHI/DX12/jTexture_DX12.h"
 #include "RHI/jRHIUtil.h"
 
-#define ASYNC_WITH_SETUP 1
-#define PARALLELFOR_WITH_PASSSETUP 1
+#define ASYNC_WITH_SETUP 0
+#define PARALLELFOR_WITH_PASSSETUP 0
 
 struct jSimplePushConstant
 {
