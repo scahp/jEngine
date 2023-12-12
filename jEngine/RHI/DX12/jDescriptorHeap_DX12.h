@@ -5,6 +5,8 @@ struct jRingBuffer_DX12;
 
 struct jDescriptor_DX12
 {
+    static const jDescriptor_DX12 Invalid;
+
     D3D12_CPU_DESCRIPTOR_HANDLE CPUHandle = {};
     D3D12_GPU_DESCRIPTOR_HANDLE GPUHandle = {};
     uint32 Index = uint32(-1);

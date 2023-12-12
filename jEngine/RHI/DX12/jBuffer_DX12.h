@@ -9,8 +9,7 @@ struct jBuffer_DX12 : public jBuffer
         : Buffer(InBuffer), Size(InSize), Alignment(InAlignment), BufferCreateFlag(InBufferCreateFlag)
     { }
     virtual ~jBuffer_DX12() {}
-    virtual void Release() override
-    { }
+    virtual void Release() override;
 
     virtual void* GetMappedPointer() const override { return CPUAddress; }
     virtual void* Map(uint64 offset, uint64 size) override

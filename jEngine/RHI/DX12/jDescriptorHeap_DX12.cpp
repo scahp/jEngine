@@ -5,12 +5,14 @@
 //////////////////////////////////////////////////////////////////////////
 // jDescriptor_DX12
 //////////////////////////////////////////////////////////////////////////
+const jDescriptor_DX12 jDescriptor_DX12::Invalid;
 void jDescriptor_DX12::Free()
 {
     if (IsValid())
     {
         check(DescriptorHeap);
         DescriptorHeap->Free(Index);
+        *this = jDescriptor_DX12::Invalid;
     }
 }
 

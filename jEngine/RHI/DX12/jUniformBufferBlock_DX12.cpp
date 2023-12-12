@@ -4,6 +4,11 @@
 #include "jRHI_DX12.h"
 #include "jRingBuffer_DX12.h"
 
+jUniformBufferBlock_DX12::~jUniformBufferBlock_DX12()
+{
+    Release();
+}
+
 void jUniformBufferBlock_DX12::Init(size_t size)
 {
     check(size);

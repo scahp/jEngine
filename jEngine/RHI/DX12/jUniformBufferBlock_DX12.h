@@ -7,8 +7,7 @@ struct jUniformBufferBlock_DX12 : public IUniformBufferBlock
 
     using IUniformBufferBlock::IUniformBufferBlock;
     using IUniformBufferBlock::UpdateBufferData;
-    virtual ~jUniformBufferBlock_DX12()
-    {}
+    virtual ~jUniformBufferBlock_DX12();
 
     virtual void Init(size_t size) override;
 

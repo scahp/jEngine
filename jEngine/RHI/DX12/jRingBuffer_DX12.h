@@ -35,6 +35,7 @@ struct jRingBuffer_DX12 : public jBuffer
     virtual void Release() override
     {
         Buffer = nullptr;
+        CBV.Free();
     }
 
     virtual void* GetMappedPointer() const override { return MappedPointer; }

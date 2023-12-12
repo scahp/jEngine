@@ -9,9 +9,8 @@ struct jTexture_DX12 : public jTexture
         , const ComPtr<ID3D12Resource>& InImage, jDescriptor_DX12 InRTV = {}, jDescriptor_DX12 InDSV = {}, jDescriptor_DX12 InSRV = {}, jDescriptor_DX12 InUAV = {}, EImageLayout InImageLayout = EImageLayout::UNDEFINED)
         : jTexture(InType, InFormat, InWidth, InHeight, InLayerCount, InSampleCount, InMipLevel, InSRGB), Image(InImage), RTV(InRTV), DSV(InDSV), SRV(InSRV), UAV(InUAV), Layout(InImageLayout)
     {}
-    virtual ~jTexture_DX12()
-    {
-    }
+    virtual ~jTexture_DX12();
+
     ComPtr<ID3D12Resource> Image;
     EImageLayout Layout = EImageLayout::UNDEFINED;
     jDescriptor_DX12 SRV;
@@ -23,6 +22,6 @@ struct jTexture_DX12 : public jTexture
 
     virtual void* GetHandle() const override { return Image.Get(); }
     virtual void* GetSamplerStateHandle() const override { return nullptr; }
-    virtual void Release() override {}
+    virtual void Release() override;
     virtual EImageLayout GetLayout() const override { return Layout; }
 };
