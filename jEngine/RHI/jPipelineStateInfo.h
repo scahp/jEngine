@@ -73,7 +73,7 @@ struct jScissor
 struct jSamplerStateInfo : public jShaderBindableResource
 {
     virtual ~jSamplerStateInfo() {}
-    virtual void Initialize() {}
+    virtual void Initialize() { GetHash(); }
     virtual void* GetHandle() const { return nullptr; }
 
     virtual size_t GetHash() const
@@ -165,7 +165,7 @@ struct jSamplerStateInfo : public jShaderBindableResource
 struct jRasterizationStateInfo
 {
     virtual ~jRasterizationStateInfo() {}
-    virtual void Initialize() {}
+    virtual void Initialize() { GetHash(); }
     virtual size_t GetHash() const
     {
         if (Hash)
@@ -215,7 +215,7 @@ struct jRasterizationStateInfo
 struct jStencilOpStateInfo
 {
     virtual ~jStencilOpStateInfo() {}
-    virtual void Initialize() {}
+    virtual void Initialize() { GetHash(); }
     virtual size_t GetHash() const
     {
         if (Hash)
@@ -248,7 +248,7 @@ struct jStencilOpStateInfo
 struct jDepthStencilStateInfo
 {
     virtual ~jDepthStencilStateInfo() {}
-    virtual void Initialize() {}
+    virtual void Initialize() { GetHash(); }
     virtual size_t GetHash() const
     {
         if (Hash)
@@ -289,7 +289,7 @@ struct jDepthStencilStateInfo
 struct jBlendingStateInfo
 {
     virtual ~jBlendingStateInfo() {}
-    virtual void Initialize() {}
+    virtual void Initialize() { GetHash(); }
     virtual size_t GetHash() const
     {
         if (Hash)
@@ -335,17 +335,23 @@ struct jPipelineStateFixedInfo
         , jBlendingStateInfo* blendingState, const std::vector<jViewport>& viewports, const std::vector<jScissor>& scissors, bool isUseVRS)
         : RasterizationState(rasterizationState), DepthStencilState(depthStencilState)
         , BlendingState(blendingState), Viewports(Viewports), Scissors(scissors), IsUseVRS(isUseVRS)
-    {}
+    {
+        CreateHash();
+    }
     jPipelineStateFixedInfo(jRasterizationStateInfo* rasterizationState, jDepthStencilStateInfo* depthStencilState
         , jBlendingStateInfo* blendingState, const jViewport& viewport, const jScissor& scissor, bool isUseVRS)
         : RasterizationState(rasterizationState), DepthStencilState(depthStencilState)
         , BlendingState(blendingState), Viewports({ viewport }), Scissors({ scissor }), IsUseVRS(isUseVRS)
-    {}
+    {
+        CreateHash();
+    }
     jPipelineStateFixedInfo(jRasterizationStateInfo* rasterizationState, jDepthStencilStateInfo* depthStencilState
         , jBlendingStateInfo* blendingState, const std::vector<EPipelineDynamicState>& InDynamicStates, bool isUseVRS)
         : RasterizationState(rasterizationState), DepthStencilState(depthStencilState)
         , BlendingState(blendingState), DynamicStates(InDynamicStates), IsUseVRS(isUseVRS)
-    {}
+    {
+        CreateHash();
+    }
 
     size_t CreateHash() const
     {
@@ -568,7 +574,7 @@ struct jPipelineStateInfo
     const jPipelineStateFixedInfo* PipelineStateFixed = nullptr;
     int32 SubpassIndex = 0;
 
-    virtual void Initialize() {}
+    virtual void Initialize() { GetHash(); }
     virtual void* GetHandle() const { return nullptr; }
     virtual void* GetPipelineLayoutHandle() const { return nullptr; }
     virtual void* CreateGraphicsPipelineState() { return nullptr; }
