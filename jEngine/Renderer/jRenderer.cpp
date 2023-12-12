@@ -694,7 +694,7 @@ void jRenderer::BasePass()
 
         g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EImageLayout::SHADER_READ_ONLY);
         g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), ShadowMapTexture, EImageLayout::SHADER_READ_ONLY);
-        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), AtmosphericShadowing->GetTexture(), EImageLayout::GENERAL);
+        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), AtmosphericShadowing->GetTexture(), EImageLayout::UAV);
 
         // Binding 0
         {
@@ -1175,7 +1175,7 @@ void jRenderer::PostProcess()
                 //////////////////////////////////////////////////////////////////////////
                 // Compute Pipeline
                 g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), SourceRT, EImageLayout::SHADER_READ_ONLY);
-                g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), EyeAdaptationTextureCurrent, EImageLayout::GENERAL);
+                g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), EyeAdaptationTextureCurrent, EImageLayout::UAV);
 
                 std::shared_ptr<jShaderBindingInstance> CurrentBindingInstance = nullptr;
                 int32 BindingPoint = 0;
