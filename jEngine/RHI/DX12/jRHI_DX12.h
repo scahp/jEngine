@@ -376,9 +376,11 @@ public:
 	// PlacedResouce test
 	ComPtr<ID3D12Heap> PlacedResourceDefaultHeap;
 	uint64 PlacedResourceDefaultHeapOffset = 0;
+	jMutexLock PlacedPlacedResourceDefaultHeapOffsetLock;
 
     ComPtr<ID3D12Heap> PlacedResourceUploadHeap;
     uint64 PlacedResourceDefaultUploadOffset = 0;
+	jMutexLock PlacedResourceDefaultUploadOffsetLock;
 
     static constexpr uint64 DefaultPlacedResourceHeapSize = 256 * 1024 * 1024;
 	static constexpr uint64 PlacedResourceSizeThreshold = 512 * 512 * 4;
@@ -401,6 +403,7 @@ public:
 			}
 			else
 			{
+				jScopedLock s(&PlacedPlacedResourceDefaultHeapOffsetLock);
 				const bool IsAvailableCreatePlacedResource = IsUsePlacedResource && (info.SizeInBytes <= PlacedResourceSizeThreshold)
 					&& ((PlacedResourceDefaultHeapOffset + info.SizeInBytes) <= DefaultPlacedResourceHeapSize);
 
@@ -447,6 +450,7 @@ public:
 			}
 			else
 			{
+				jScopedLock s(&PlacedResourceDefaultUploadOffsetLock);
 				const bool IsAvailablePlacedResource = IsUsePlacedResource && (info.SizeInBytes <= PlacedResourceSizeThreshold)
 					&& ((PlacedResourceDefaultUploadOffset + info.SizeInBytes) <= DefaultPlacedResourceHeapSize);
 
