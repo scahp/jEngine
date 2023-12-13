@@ -676,7 +676,7 @@ void jRenderer::BasePass()
         AtmosphericData.LightCameraDirection = LightCameraDirection;
         AtmosphericData.CameraFar = MainCamera->Far;
         AtmosphericData.CameraNear = MainCamera->Near;
-        AtmosphericData.AnisoG = 0.0f;
+        AtmosphericData.AnisoG = gOptions.AnisoG;
         AtmosphericData.SlopeOfDist = 0.25f;
         AtmosphericData.InScatteringLambda = 0.001f;
         AtmosphericData.TravelCount = 64;
@@ -1628,6 +1628,7 @@ void jRenderer::Render()
             ImGui::SliderFloat("DirX", &gOptions.SunDir.x, -1.0f, 1.0f);
             ImGui::SliderFloat("DirY", &gOptions.SunDir.y, -1.0f, 1.0f);
             ImGui::SliderFloat("DirZ", &gOptions.SunDir.z, -1.0f, 1.0f);
+            ImGui::SliderFloat("AnisoG", &gOptions.AnisoG, 0.0f, 1.0f);
             ImGui::End();
 
             //ImGui::SetWindowFocus(szTitle);

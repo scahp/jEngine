@@ -19,6 +19,7 @@ struct jOptions
     float Metallic = 0.0f;
     float Roughness = 0.2f;
     Vector SunDir = Vector(0.31f, -0.828f, -0.241f);
+    float AnisoG = 0.15f;
 };
 
 extern jOptions gOptions;
