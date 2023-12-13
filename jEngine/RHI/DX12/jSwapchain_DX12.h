@@ -34,6 +34,7 @@ public:
     virtual const Vector2i& GetExtent() const override { return Extent; }
     virtual jSwapchainImage* GetSwapchainImage(int32 index) const override { check(Images.size() > index); return Images[index]; }
     virtual int32 GetNumOfSwapchain() const override { return (int32)Images.size(); }
+    bool Resize(int32 InWidth, int32 InHeight);
     uint32 GetCurrentBackBufferIndex() const { return SwapChain->GetCurrentBackBufferIndex(); }
     jSwapchainImage* GetCurrentSwapchainImage() const { return Images[GetCurrentBackBufferIndex()]; }
 

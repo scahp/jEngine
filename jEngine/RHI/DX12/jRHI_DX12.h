@@ -278,45 +278,9 @@ public:
 
 	jOnlineDescriptorManager OnlineDescriptorHeapManager;
 
-    ////////////////////////////////////////////////////////////////////////////
-    //// 5. Initialize Camera and lighting
-    //struct CubeConstantBuffer
-    //{
-    //    XMFLOAT4 albedo;
-    //};
-    //struct SceneConstantBuffer
-    //{
-    //    XMMATRIX projectionToWorld;
-    //    XMVECTOR cameraPosition;
-    //    XMVECTOR lightPosition;
-    //    XMVECTOR lightAmbientColor;
-    //    XMVECTOR lightDiffuseColor;
-    //    XMVECTOR cameraDirection;
-    //    uint32 NumOfStartingRay;
-    //    float focalDistance;
-    //    float lensRadius;
-    //};
-    //SceneConstantBuffer m_sceneCB[MaxFrameCount];
-    //CubeConstantBuffer m_cubeCB;
-    //CubeConstantBuffer m_planeCB;
-
-	//////////////////////////////////////////////////////////////////////////
 	// 7. Create sync object
 	jFenceManager_DX12 FenceManager;
 	void WaitForGPU() const;
-
-	//////////////////////////////////////////////////////////////////////////
-	// 11. Create vertex and index buffer
-	jVertexBuffer_DX12* VertexBuffer = nullptr;
-	jIndexBuffer_DX12* IndexBuffer = nullptr;
-
-	jGraphicsPipelineShader GraphicsPipelineShader;
-	jRenderPass_DX12* RenderPass = nullptr;
-	jPipelineStateInfo_DX12* PipelineStateInfo = nullptr;
-
-	//////////////////////////////////////////////////////////////////////////
-	// 14. Raytracing Output Resouce
-	jTexture_DX12* RayTacingOutputTexture = nullptr;
 
     HWND m_hWnd = 0;
 
@@ -330,7 +294,6 @@ public:
 	}
 
 	virtual bool InitRHI() override;
-    bool Run();
 	virtual void ReleaseRHI() override;
     
     uint32 AdapterID = -1;
@@ -338,39 +301,6 @@ public:
     void CalculateFrameStats();
 
 	HWND CreateMainWindow() const;
-
-	void Update();
-	void Render();
-
-	void OnDeviceLost();
-	void OnDeviceRestored();
-
-	//// Raytracing scene
-	//struct Vertex
-	//{
-	//	XMFLOAT3 position;
-	//	XMFLOAT3 normal;
-	//};
-
-	//XMVECTOR m_eye;
-	//XMVECTOR m_at;
-	//XMVECTOR m_up;
-	//void UpdateCameraMatrices();
-
-	//static_assert(sizeof(SceneConstantBuffer) < D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT, "Checking the size here");
-
-	//union AlignedSceneConstantBuffer
-	//{
-	//	SceneConstantBuffer constants;
-	//	uint8 alignedPadding[D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT];
-	//};
-	//jBuffer_DX12* PerFrameConstantBuffer = nullptr;
-
-	//jUniformBufferBlock_DX12* SimpleUniformBuffer = nullptr;
-	//jBuffer_DX12* SimpleConstantBuffer = nullptr;
-	//jBuffer_DX12* SimpleStructuredBuffer = nullptr;			// StructuredBuffer test
-	//jTexture_DX12* SimpleTexture[3] = { nullptr, nullptr, nullptr };					// Texture test
-	//jTexture_DX12* SimpleTextureCube = nullptr;				// Cube texture test
 
 	//////////////////////////////////////////////////////////////////////////
 	// PlacedResouce test
@@ -484,8 +414,6 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 
 	virtual bool OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimized) override;
-    bool OnHandleDeviceLost();
-    bool OnHandleDeviceRestored();
 
     jCommandBuffer_DX12* BeginSingleTimeCommands() const;
     void EndSingleTimeCommands(jCommandBuffer_DX12* commandBuffer) const;
@@ -500,9 +428,6 @@ public:
 	jRingBuffer_DX12* GetOneFrameUniformRingBuffer() const { return OneFrameUniformRingBuffers[CurrentFrameIndex]; }
 
 	virtual jShaderBindingLayout* CreateShaderBindings(const jShaderBindingArray& InShaderBindingArray) const override;
-
-	struct jShaderBindingInstance_DX12* TestShaderBindingInstance = nullptr;
-	struct jShaderBindingInstance_DX12* TestShaderBindingInstance2 = nullptr;
 
 	virtual jSamplerStateInfo* CreateSamplerState(const jSamplerStateInfo& initializer) const override;
     virtual jRasterizationStateInfo* CreateRasterizationState(const jRasterizationStateInfo& initializer) const override;
@@ -544,12 +469,6 @@ public:
 	virtual void EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr) override;
 	virtual jCommandBufferManager_DX12* GetCommandBufferManager() const override { return CommandBufferManager; }
 	virtual jCommandBufferManager_DX12* GetCopyCommandBufferManager() const { return CopyCommandBufferManager; }
-
-	//jPipelineStateFixedInfo FixedPipelineStateInfo;
-	//class jCamera* MainCamera = nullptr;
-	//jGraphicsPipelineShader GraphicsPipelineShader2;
-	//std::vector<class jObject*> SpawnedObjects;
-	//std::vector<jDrawCommand> DrawCommands;
 
 	virtual IUniformBufferBlock* CreateUniformBufferBlock(jName InName, jLifeTimeType InLifeTimeType, size_t InSize = 0) const override;
     virtual void BindGraphicsShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineStateLayout

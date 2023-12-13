@@ -25,12 +25,8 @@ struct jShaderBindingLayout_DX12 : public jShaderBindingLayout
     virtual bool Initialize(const jShaderBindingArray& InShaderBindingArray) override;
     virtual std::shared_ptr<jShaderBindingInstance> CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const override;
 
-    //virtual void* GetHandle() const { return RootSignature.Get(); }
     virtual void* GetHandle() const { return nullptr; }
 
-    //ID3D12RootSignature* GetRootSignature() const { return RootSignature.Get(); }
-
-    //ComPtr<ID3D12RootSignature> RootSignature;
     std::vector<D3D12_ROOT_PARAMETER1> RootParameters;
     std::vector<D3D12_DESCRIPTOR_RANGE1> Descriptors;
     std::vector<D3D12_DESCRIPTOR_RANGE1> SamplerDescriptors;

@@ -229,5 +229,6 @@ void window_focus_callback(GLFWwindow* window, int focused)
 
 void window_size_callback(GLFWwindow* window, int width, int height)
 {
-	g_Engine->Resize(width, height);
+	if (g_Engine)
+		g_Engine->Resize(width, height);
 }

@@ -97,6 +97,58 @@ void jSwapchain_DX12::Release()
     ReleaseInternal();
 }
 
+bool jSwapchain_DX12::Resize(int32 InWidth, int32 InHeight)
+{
+    if (ensure(SwapChain))
+    {
+        for (int32 i = 0; i < g_rhi_dx12->MaxFrameCount; ++i)
+        {
+            jSwapchainImage* SwapchainImage = Images[i];
+            auto TexDX12 = (jTexture_DX12*)SwapchainImage->TexturePtr.get();
+            TexDX12->Image.Reset();
+        }
+
+        SwapChain->SetFullscreenState(false, nullptr);
+        HRESULT hr = SwapChain->ResizeBuffers(g_rhi_dx12->MaxFrameCount, InWidth, InHeight, DXGI_FORMAT_R8G8B8A8_UNORM
+            , DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH |
+            DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING |
+            DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT);
+
+        if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
+        {
+#ifdef _DEBUG
+            char buff[64] = {};
+            sprintf_s(buff, "Device Lost on ResizeBuffers: Reason code 0x%08X\n"
+                , (hr == DXGI_ERROR_DEVICE_REMOVED) ? g_rhi_dx12->Device->GetDeviceRemovedReason() : hr);
+            OutputDebugStringA(buff);
+#endif
+            return false;
+        }
+        else
+        {
+            JOK(hr);
+        }
+    }
+
+    for (int32 i = 0; i < g_rhi_dx12->MaxFrameCount; ++i)
+    {
+        jSwapchainImage* SwapchainImage = Images[i];
+
+        ComPtr<ID3D12Resource> renderTarget;
+        if (JFAIL(SwapChain->GetBuffer(i, IID_PPV_ARGS(&renderTarget))))
+            return false;
+
+        auto TextureDX12Ptr = std::make_shared<jTexture_DX12>(
+            ETextureType::TEXTURE_2D, GetDX12TextureFormat(DXGI_FORMAT_R8G8B8A8_UNORM), InWidth, InHeight, 1, EMSAASamples::COUNT_1, 1, false, jRTClearValue::Invalid, renderTarget);
+        SwapchainImage->TexturePtr = TextureDX12Ptr;
+
+        jBufferUtil_DX12::CreateRenderTargetView((jTexture_DX12*)SwapchainImage->TexturePtr.get());
+    }
+
+    g_rhi_dx12->RenderPassPool.Release();
+    g_rhi_dx12->PipelineStatePool.Release();
+}
+
 void jSwapchain_DX12::ReleaseInternal()
 {
     for (auto& iter : Images)
@@ -107,7 +159,6 @@ void jSwapchain_DX12::ReleaseInternal()
 
     if (SwapChain)
     {
-        //SwapChain->Release();
         SwapChain = nullptr;
     }
 }

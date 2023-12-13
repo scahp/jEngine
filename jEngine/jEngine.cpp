@@ -80,13 +80,14 @@ void jEngine::Draw()
 
 void jEngine::Resize(int32 width, int32 height)
 {
-    Game.Resize(width, height);
+    if (SCR_WIDTH != width || SCR_HEIGHT != height)
+    {
+        SCR_WIDTH = width;
+        SCR_HEIGHT = height;
 
-	if (IsUseVulkan())
-	{
-        g_rhi_vk->OnHandleResized(width, height, false);
-		//g_rhi_vk->FramebufferResized = true;
-	}
+        Game.Resize(width, height);
+        g_rhi->OnHandleResized(width, height, false);
+    }
 }
 
 void jEngine::OnMouseButton()

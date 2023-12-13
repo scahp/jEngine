@@ -181,7 +181,6 @@ bool jSwapchain_Vulkan::CreateInternal(VkSwapchainKHR InOldSwapchain)
 void jSwapchain_Vulkan::Release()
 {
     ReleaseInternal();
-
 }
 
 void jSwapchain_Vulkan::ReleaseInternal()
