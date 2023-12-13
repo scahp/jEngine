@@ -50,8 +50,8 @@ bool jSwapchain_DX12::Create()
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
     swapChainDesc.SampleDesc.Count = 1;
-    swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH | DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
-        //| DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
+    swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH | DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING
+        | DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
 
     check(g_rhi_dx12);
     check(!!g_rhi_dx12->m_hWnd);
@@ -89,9 +89,6 @@ bool jSwapchain_DX12::Create()
         TextureDX12Ptr->Layout = EImageLayout::PRESENT_SRC;
     }
 
-    if (ensure(g_rhi_dx12->GetFenceManager()))
-        Fence = (jFence_DX12*)g_rhi_dx12->GetFenceManager()->GetOrCreateFence();
-
     return true;
 }
 
@@ -102,15 +99,6 @@ void jSwapchain_DX12::Release()
 
 void jSwapchain_DX12::ReleaseInternal()
 {
-    if (Fence)
-    {
-        Fence->WaitForFence();
-        if (ensure(g_rhi_dx12->GetFenceManager()))
-            g_rhi_dx12->GetFenceManager()->ReturnFence(Fence);
-
-        Fence = nullptr;
-    }
-
     for (auto& iter : Images)
     {
         delete iter;

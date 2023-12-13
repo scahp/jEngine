@@ -13,6 +13,9 @@ void jDescriptor_DX12::Free()
         if (!DescriptorHeap.expired())
             DescriptorHeap.lock()->Free(Index);
         Index = -1;
+        CPUHandle = {};
+        GPUHandle = {};
+        DescriptorHeap.reset();
     }
 }
 

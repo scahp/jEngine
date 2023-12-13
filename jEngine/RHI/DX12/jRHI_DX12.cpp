@@ -366,11 +366,12 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 			IsSizeMinimize = isSizeMininized;
             sSizeChanged = true;
 
-            if (!sIsDraging)
+            if (sIsDraging)
             {
                 sSizeChanged = false;
                 if (g_rhi_dx12)
 					g_rhi_dx12->OnHandleResized(SCR_WIDTH, SCR_HEIGHT, IsSizeMinimize);
+                g_Engine->Resize(SCR_WIDTH, SCR_HEIGHT);
             }
         }
     }
@@ -509,12 +510,8 @@ void jRHI_DX12::WaitForGPU() const
 	auto Queue = CommandBufferManager->GetCommandQueue();
     check(Queue);
 
-	if (Queue && Swapchain)
-	{
-		jSwapchainImage_DX12* CurrentSwapchainImage = (jSwapchainImage_DX12*)Swapchain->GetCurrentSwapchainImage();
-        if (ensure(Swapchain->Fence))
-		    Swapchain->Fence->SignalWithNextFenceValue(Queue.Get(), true);
-	}
+    if (CommandBufferManager && CommandBufferManager->Fence)
+        CommandBufferManager->Fence->SignalWithNextFenceValue(Queue.Get(), true);
 }
 
 bool jRHI_DX12::InitRHI()
@@ -1562,8 +1559,6 @@ void jRHI_DX12::OnDeviceRestored()
 
 bool jRHI_DX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimized)
 {
-	return false;	// todo : need to support RecreateSwapchain
-
     JASSERT(InWidth > 0);
     JASSERT(InHeight > 0);
 
@@ -1577,8 +1572,18 @@ bool jRHI_DX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimi
 
     if (ensure(Swapchain && Swapchain->SwapChain))
     {
-        HRESULT hr = Swapchain->SwapChain->ResizeBuffers(MaxFrameCount, InWidth, InHeight, BackbufferFormat
-            , (Options & c_AllowTearing) ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0);
+        for (int32 i = 0; i < MaxFrameCount; ++i)
+        {
+            jSwapchainImage* SwapchainImage = Swapchain->GetSwapchainImage(i);
+            auto TexDX12 = (jTexture_DX12*)SwapchainImage->TexturePtr.get();
+            TexDX12->Image.Reset();
+        }
+
+        Swapchain->SwapChain->SetFullscreenState(false, nullptr);
+        HRESULT hr = Swapchain->SwapChain->ResizeBuffers(MaxFrameCount, InWidth, InHeight, DXGI_FORMAT_R8G8B8A8_UNORM
+            , DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH |
+            DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING |
+            DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT);
 
         if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
         {
@@ -1596,44 +1601,34 @@ bool jRHI_DX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimi
         }
         else
         {
-            JASSERT(0);
+            JOK(hr);
+            //JASSERT(0);
         }
     }
 
     for (int32 i = 0; i < MaxFrameCount; ++i)
     {
 		jSwapchainImage* SwapchainImage = Swapchain->GetSwapchainImage(i);
-		jTexture_DX12* SwapchainRT = (jTexture_DX12*)SwapchainImage->TexturePtr.get();
-        if (JFAIL(Swapchain->SwapChain->GetBuffer(i, IID_PPV_ARGS(&SwapchainRT->Image))))
+		//jTexture_DX12* SwapchainRT = (jTexture_DX12*)SwapchainImage->TexturePtr.get();
+  //      if (JFAIL(Swapchain->SwapChain->GetBuffer(i, IID_PPV_ARGS(&SwapchainRT->Image))))
+  //          return false;
+
+		//jBufferUtil_DX12::CreateRenderTargetView(SwapchainRT);
+
+  //      jSwapchainImage_DX12* SwapchainImage = new jSwapchainImage_DX12();
+
+        ComPtr<ID3D12Resource> renderTarget;
+        if (JFAIL(Swapchain->SwapChain->GetBuffer(i, IID_PPV_ARGS(&renderTarget))))
             return false;
 
-		jBufferUtil_DX12::CreateRenderTargetView(SwapchainRT);
+        auto TextureDX12Ptr = std::make_shared<jTexture_DX12>(
+            ETextureType::TEXTURE_2D, GetDX12TextureFormat(DXGI_FORMAT_R8G8B8A8_UNORM), InWidth, InHeight, 1, EMSAASamples::COUNT_1, 1, false, jRTClearValue::Invalid, renderTarget);
+        SwapchainImage->TexturePtr = TextureDX12Ptr;
 
-        ////////////////////////////////////////////////////////////////////////////
-        //m_sceneCB[i].cameraPosition = m_eye;
-        //const float m_aspectRatio = SCR_WIDTH / (float)SCR_HEIGHT;
-
-        //const float fovAngleY = 45.0f;
-        //const XMMATRIX view = XMMatrixLookAtLH(m_eye, m_at, m_up);
-        //const XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(fovAngleY), m_aspectRatio, 1.0f, 125.0f);
-        //const XMMATRIX viewProj = view * proj;
-        //m_sceneCB[i].projectionToWorld = XMMatrixInverse(nullptr, viewProj);
-        //m_sceneCB[i].cameraDirection = XMVector3Normalize(m_at - m_eye);
-
-        //m_sceneCB[i].focalDistance = m_focalDistance;
-        //m_sceneCB[i].lensRadius = m_lensRadius;
+        jBufferUtil_DX12::CreateRenderTargetView((jTexture_DX12*)SwapchainImage->TexturePtr.get());
     }
 
     CurrentFrameIndex = Swapchain->GetCurrentBackBufferIndex();
-
-	delete RayTacingOutputTexture;
-	RayTacingOutputTexture = nullptr;
-    
-    RayTacingOutputTexture = jBufferUtil_DX12::CreateImage(SCR_WIDTH, SCR_HEIGHT, 1, 1, 1, ETextureType::TEXTURE_2D, ETextureFormat::RGBA8, ETextureCreateFlag::UAV);
-    if (!ensure(RayTacingOutputTexture))
-        return false;
-
-    jBufferUtil_DX12::CreateUnorderedAccessView(RayTacingOutputTexture);
 
     return true;
 }

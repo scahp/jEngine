@@ -41,8 +41,4 @@ public:
     ETextureFormat Format = ETextureFormat::RGB8;
     Vector2i Extent;
     std::vector<jSwapchainImage_DX12*> Images;
-
-    jFence_DX12* Fence = nullptr;
-    //HANDLE m_fenceEvent = nullptr;
-    //ComPtr<ID3D12Fence> m_fence;
 };
