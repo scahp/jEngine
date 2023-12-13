@@ -16,6 +16,7 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos);
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void window_focus_callback(GLFWwindow* window, int focused);
+void window_size_callback(GLFWwindow* window, int width, int height);
 
 std::vector<jRenderPass*> ImGuiRenderPasses;
 std::vector<VkPipeline> Pipelines;
@@ -41,6 +42,7 @@ int main()
 		glfwSetMouseButtonCallback(window, mouse_button_callback);
 		glfwSetScrollCallback(window, scroll_callback);
 		glfwSetWindowFocusCallback(window, window_focus_callback);
+		glfwSetWindowSizeCallback(window, window_size_callback);
 	}
 
 	//int major, minor, rev;
@@ -223,4 +225,9 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 void window_focus_callback(GLFWwindow* window, int focused)
 {
 	ImGui_ImplGlfw_WindowFocusCallback(window, focused);
+}
+
+void window_size_callback(GLFWwindow* window, int width, int height)
+{
+	g_Engine->Resize(width, height);
 }

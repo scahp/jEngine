@@ -42,6 +42,8 @@ public:
     virtual jSwapchainImage* GetSwapchainImage(int32 index) const override { check(Images.size() > index); return Images[index]; }
     virtual int32 GetNumOfSwapchain() const override { return (int32)Images.size(); }
 
+    bool CreateInternal(VkSwapchainKHR InOldSwapchain);
+
     VkSwapchainKHR Swapchain = nullptr;
     ETextureFormat Format = ETextureFormat::RGB8;
     Vector2i Extent;

@@ -220,6 +220,7 @@ public:
 
 	virtual void BeginDebugEvent(jCommandBuffer* InCommandBuffer, const char* InName, const Vector4& InColor = Vector4::ColorGreen) const override;
 	virtual void EndDebugEvent(jCommandBuffer* InCommandBuffer) const override;
+	virtual bool OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimized) override;
 };
 
 extern jRHI_Vulkan* g_rhi_vk;

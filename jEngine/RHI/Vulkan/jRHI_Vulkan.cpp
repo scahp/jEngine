@@ -1850,3 +1850,26 @@ void jRHI_Vulkan::EndDebugEvent(jCommandBuffer* InCommandBuffer) const
     }
 }
 
+bool jRHI_Vulkan::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimized)
+{
+    JASSERT(InWidth > 0);
+    JASSERT(InHeight > 0);
+
+    {
+        char szTemp[126];
+        sprintf_s(szTemp, sizeof(szTemp), "Called OnHandleResized %d %d\n", InWidth, InHeight);
+        OutputDebugStringA(szTemp);
+    }
+
+	Finish();
+
+	SCR_WIDTH = InWidth;
+	SCR_HEIGHT = InHeight;
+
+    // Swapchain
+	check(Swapchain);
+    verify(Swapchain->CreateInternal(Swapchain->Swapchain));
+
+    return true;
+}
+

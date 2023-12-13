@@ -1609,13 +1609,6 @@ bool jRHI_DX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimi
     for (int32 i = 0; i < MaxFrameCount; ++i)
     {
 		jSwapchainImage* SwapchainImage = Swapchain->GetSwapchainImage(i);
-		//jTexture_DX12* SwapchainRT = (jTexture_DX12*)SwapchainImage->TexturePtr.get();
-  //      if (JFAIL(Swapchain->SwapChain->GetBuffer(i, IID_PPV_ARGS(&SwapchainRT->Image))))
-  //          return false;
-
-		//jBufferUtil_DX12::CreateRenderTargetView(SwapchainRT);
-
-  //      jSwapchainImage_DX12* SwapchainImage = new jSwapchainImage_DX12();
 
         ComPtr<ID3D12Resource> renderTarget;
         if (JFAIL(Swapchain->SwapChain->GetBuffer(i, IID_PPV_ARGS(&renderTarget))))

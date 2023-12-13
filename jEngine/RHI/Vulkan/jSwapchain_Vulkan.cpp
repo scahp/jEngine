@@ -3,6 +3,7 @@
 #include "jVulkanDeviceUtil.h"
 #include "jRHIType_Vulkan.h"
 #include "jBufferUtil_Vulkan.h"
+#include "jDescriptorPool_Vulkan.h"
 
 //////////////////////////////////////////////////////////////////////////
 // jSwapchainImage_Vulkan
@@ -42,6 +43,11 @@ void jSwapchainImage_Vulkan::ReleaseInternal()
 //////////////////////////////////////////////////////////////////////////
 bool jSwapchain_Vulkan::Create()
 {
+    return CreateInternal(nullptr);
+}
+
+bool jSwapchain_Vulkan::CreateInternal(VkSwapchainKHR InOldSwapchain)
+{
     jVulkanDeviceUtil::SwapChainSupportDetails swapChainSupport = jVulkanDeviceUtil::QuerySwapChainSupport(g_rhi_vk->PhysicalDevice, g_rhi_vk->Surface);
 
     VkSurfaceFormatKHR surfaceFormat = jVulkanDeviceUtil::ChooseSwapSurfaceFormat(swapChainSupport.Formats);
@@ -65,10 +71,10 @@ bool jSwapchain_Vulkan::Create()
     createInfo.imageExtent = extent;
     createInfo.imageArrayLayers = 1;			// Stereoscopic 3D application(VR)이 아니면 항상 1
     createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT     // 즉시 스왑체인에 그리기 위해서 이걸로 설정
-                            | VK_IMAGE_USAGE_SAMPLED_BIT
-                            | VK_IMAGE_USAGE_STORAGE_BIT;	
-                                                                    // 포스트 프로세스 같은 처리를 위해 별도의 이미지를 만드는 것이면
-                                                                    // VK_IMAGE_USAGE_TRANSFER_DST_BIT 으로 하면됨.
+        | VK_IMAGE_USAGE_SAMPLED_BIT
+        | VK_IMAGE_USAGE_STORAGE_BIT;
+    // 포스트 프로세스 같은 처리를 위해 별도의 이미지를 만드는 것이면
+    // VK_IMAGE_USAGE_TRANSFER_DST_BIT 으로 하면됨.
 
     jVulkanDeviceUtil::QueueFamilyIndices indices = jVulkanDeviceUtil::FindQueueFamilies(g_rhi_vk->PhysicalDevice, g_rhi_vk->Surface);
     uint32 queueFamilyIndices[] = { indices.GraphicsFamily.value(), indices.PresentFamily.value() };
@@ -93,15 +99,32 @@ bool jSwapchain_Vulkan::Create()
 
     createInfo.preTransform = swapChainSupport.Capabilities.currentTransform;		// 스왑체인에 회전이나 flip 처리 할 수 있음.
     createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;					// 알파채널을 윈도우 시스템의 다른 윈도우와 블랜딩하는데 사용해야하는지 여부
-                                                                                    // VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR 는 알파채널 무시
+    // VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR 는 알파채널 무시
     createInfo.presentMode = presentMode;
     createInfo.clipped = VK_TRUE;			// 다른윈도우에 가려져서 보이지 않는 부분을 그리지 않을지에 대한 여부 VK_TRUE 면 안그림
 
     // 화면 크기 변경등으로 스왑체인이 다시 만들어져야 하는경우 여기에 oldSwapchain을 넘겨준다.
-    createInfo.oldSwapchain = VK_NULL_HANDLE;
+    createInfo.oldSwapchain = InOldSwapchain;
 
     if (!ensure(vkCreateSwapchainKHR(g_rhi_vk->Device, &createInfo, nullptr, &Swapchain) == VK_SUCCESS))
         return false;
+
+    if (InOldSwapchain)
+    {
+        for (int32 i = 0; i < (int32)Images.size(); i++)
+        {
+            jSwapchainImage_Vulkan* SwapchainImage = Images[i];
+            jTexture_Vulkan* Texture_Vulkan = (jTexture_Vulkan*)SwapchainImage->TexturePtr.get();
+            if (Texture_Vulkan->View)
+            {
+                vkDestroyImageView(g_rhi_vk->Device, Texture_Vulkan->View, nullptr);
+                Texture_Vulkan->View = nullptr;
+            }
+            SwapchainImage->TexturePtr.reset();
+            //delete Images[i];
+        }
+        vkDestroySwapchainKHR(g_rhi_vk->Device, InOldSwapchain, nullptr);
+    }
 
     vkGetSwapchainImagesKHR(g_rhi_vk->Device, Swapchain, &imageCount, nullptr);
 
@@ -116,18 +139,40 @@ bool jSwapchain_Vulkan::Create()
     Images.resize(vkImages.size());
     for (int32 i = 0; i < Images.size(); ++i)
     {
-        jSwapchainImage_Vulkan* SwapchainImage = new jSwapchainImage_Vulkan();
-        Images[i] = SwapchainImage;
+        jSwapchainImage_Vulkan* SwapchainImage = nullptr;
+        if (InOldSwapchain)
+        {
+            SwapchainImage = Images[i];
+        }
+        else
+        {
+            SwapchainImage = new jSwapchainImage_Vulkan();
+            SwapchainImage->Available = g_rhi->GetSemaphoreManager()->GetOrCreateSemaphore();
+            SwapchainImage->RenderFinished = g_rhi->GetSemaphoreManager()->GetOrCreateSemaphore();
+            SwapchainImage->RenderFinishedAfterShadow = g_rhi->GetSemaphoreManager()->GetOrCreateSemaphore();
+            SwapchainImage->RenderFinishedAfterBasePass = g_rhi->GetSemaphoreManager()->GetOrCreateSemaphore();
+            SwapchainImage->CommandBufferFence = nullptr;
+
+            Images[i] = SwapchainImage;
+        }
 
         auto ImagetView = jBufferUtil_Vulkan::CreateImageView(vkImages[i], surfaceFormat.format, VK_IMAGE_ASPECT_COLOR_BIT, 1);
         SwapchainImage->TexturePtr = std::shared_ptr<jTexture_Vulkan>(
             new jTexture_Vulkan(ETextureType::TEXTURE_2D, Format, Extent.x, Extent.y, 1, EMSAASamples::COUNT_1, 1, false, vkImages[i], ImagetView));
-        SwapchainImage->CommandBufferFence = nullptr;
+    }
 
-        SwapchainImage->Available = g_rhi->GetSemaphoreManager()->GetOrCreateSemaphore();
-        SwapchainImage->RenderFinished = g_rhi->GetSemaphoreManager()->GetOrCreateSemaphore();
-        SwapchainImage->RenderFinishedAfterShadow = g_rhi->GetSemaphoreManager()->GetOrCreateSemaphore();
-        SwapchainImage->RenderFinishedAfterBasePass = g_rhi->GetSemaphoreManager()->GetOrCreateSemaphore();
+    g_rhi_vk->RenderPassPool.Release();
+    g_rhi_vk->PipelineStatePool.Release();
+
+    for(jDescriptorPool_Vulkan* pool : g_rhi_vk->DescriptorPools)
+    {
+        pool->PendingDescriptorSets.clear();
+        pool->AllocatedDescriptorSets.clear();
+    }
+    if (g_rhi_vk->DescriptorPools2)
+    {
+        g_rhi_vk->DescriptorPools2->PendingDescriptorSets.clear();
+        g_rhi_vk->DescriptorPools2->AllocatedDescriptorSets.clear();
     }
 
     return true;

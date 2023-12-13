@@ -84,7 +84,8 @@ void jEngine::Resize(int32 width, int32 height)
 
 	if (IsUseVulkan())
 	{
-		g_rhi_vk->FramebufferResized = true;
+        g_rhi_vk->OnHandleResized(width, height, false);
+		//g_rhi_vk->FramebufferResized = true;
 	}
 }
 

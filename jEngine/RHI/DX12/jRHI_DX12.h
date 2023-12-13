@@ -483,7 +483,7 @@ public:
     }
 	//////////////////////////////////////////////////////////////////////////
 
-    bool OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimized);
+	virtual bool OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimized) override;
     bool OnHandleDeviceLost();
     bool OnHandleDeviceRestored();
 

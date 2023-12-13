@@ -491,6 +491,7 @@ public:
 	virtual uint32 GetCurrentFrameNumber() const { return 0; }
 	virtual void IncrementFrameNumber() {}
 	virtual bool IsSupportVSync() const { return false; }
+	virtual bool OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimized) { return false; }
 };
 
 // Not thred safe
