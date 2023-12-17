@@ -24,6 +24,15 @@
 #include "FileLoader/jImageFileLoader.h"
 #include "RHI/DX12/jTexture_DX12.h"
 #include "RHI/jRHIUtil.h"
+#include "RHI/DX12/jShader_DX12.h"
+#include "dxcapi.h"
+#include "jGame.h"
+#include "RHI/DX12/jVertexBuffer_DX12.h"
+
+jTexture_DX12* jRenderer::m_raytracingOutput;
+ComPtr<ID3D12RootSignature> jRenderer::m_raytracingGlobalRootSignature;
+ComPtr<ID3D12RootSignature> jRenderer::m_raytracingLocalRootSignature;
+ComPtr<ID3D12RootSignature> jRenderer::m_raytracingEmptyLocalRootSignature;
 
 #define ASYNC_WITH_SETUP 1
 #define PARALLELFOR_WITH_PASSSETUP 1
@@ -1452,6 +1461,392 @@ void jRenderer::Render()
 
         //ShadowpassOcclusionTest.Init();
         //BasepassOcclusionTest.Init();
+    }
+
+    static ComPtr<ID3D12StateObject> m_dxrStateObject;
+    static ComPtr<ID3D12Resource> m_rayGenShaderTable;
+    static ComPtr<ID3D12Resource> m_missShaderTable;
+    static ComPtr<ID3D12Resource> m_hitGroupShaderTable;
+    if (1)
+    {
+        static bool once = false;
+        if (!once)
+        {
+            once = true;
+
+            m_raytracingOutput = jBufferUtil_DX12::CreateImage((uint32)SCR_WIDTH, (uint32)SCR_HEIGHT, (uint32)1, (uint32)1, (uint32)1
+                , ETextureType::TEXTURE_2D, GetDX12TextureFormat(BackbufferFormat), ETextureCreateFlag::UAV, EImageLayout::UAV);
+
+            jShaderInfo shaderInfo;
+            shaderInfo.SetName(jNameStatic("RTShaer"));
+            shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
+            shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING);
+            shaderInfo.SetEntryPoint(jNameStatic(""));
+            auto raytracingShader = g_rhi->CreateShader(shaderInfo);
+
+            std::array<D3D12_STATE_SUBOBJECT, 10> subobjects;
+            uint32 index = 0;
+
+            const wchar_t* c_raygenShaderName = L"MyRaygenShader";
+            const wchar_t* c_closestHitShaderName = L"MyClosestHitShader";
+            const wchar_t* c_missShaderName = L"MyMissShader";
+            const wchar_t* c_triHitGroupName = L"TriHitGroup";
+
+            // 9. CreateRootSignatures
+            {
+                // global root signature는 DispatchRays 함수 호출로 만들어지는 레이트레이싱 쉐이더의 전체에 공유됨.
+                CD3DX12_DESCRIPTOR_RANGE ranges[1];		// 가장 빈번히 사용되는 것을 앞에 둘 수록 최적화에 좋음
+                ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);		// 1 output texture
+
+                CD3DX12_ROOT_PARAMETER rootParameters[3];
+                rootParameters[GlobalRootSignatureParams::OutputViewSlot].InitAsDescriptorTable(1, &ranges[0]);
+                rootParameters[GlobalRootSignatureParams::AccelerationStructureSlot].InitAsShaderResourceView(0);
+                rootParameters[GlobalRootSignatureParams::SceneConstantSlot].InitAsConstantBufferView(0);
+
+                CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc(_countof(rootParameters), rootParameters);
+                ComPtr<ID3DBlob> blob;
+                ComPtr<ID3DBlob> error;
+                if (JFAIL(D3D12SerializeRootSignature(&globalRootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &error)))
+                {
+                    if (error)
+                    {
+                        OutputDebugStringA(reinterpret_cast<const char*>(error->GetBufferPointer()));
+                        error->Release();
+                    }
+                    return;
+                }
+
+                if (JFAIL(g_rhi_dx12->Device->CreateRootSignature(1, blob->GetBufferPointer(), blob->GetBufferSize()
+                    , IID_PPV_ARGS(&m_raytracingGlobalRootSignature))))
+                {
+                    return;
+                }
+            }
+
+            // 1). DXIL 라이브러리 생성
+            D3D12_DXIL_LIBRARY_DESC dxilDesc{};
+            std::vector<D3D12_EXPORT_DESC> exportDesc;
+            std::vector<std::wstring> exportName;
+            {
+                D3D12_STATE_SUBOBJECT subobject{};
+                {
+                    const wchar_t* entryPoint[] = { c_raygenShaderName, c_closestHitShaderName, c_missShaderName };
+                    subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
+                    subobject.pDesc = &dxilDesc;
+
+                    exportDesc.resize(_countof(entryPoint));
+                    exportName.resize(_countof(entryPoint));
+
+                    auto CompiledShaderDX12 = (jCompiledShader_DX12*)raytracingShader->CompiledShader;
+                    dxilDesc.DXILLibrary.pShaderBytecode = CompiledShaderDX12->ShaderBlob->GetBufferPointer();
+                    dxilDesc.DXILLibrary.BytecodeLength = CompiledShaderDX12->ShaderBlob->GetBufferSize();
+                    dxilDesc.NumExports = _countof(entryPoint);
+                    dxilDesc.pExports = exportDesc.data();
+
+                    for (uint32 i = 0; i < _countof(entryPoint); ++i)
+                    {
+                        exportName[i] = entryPoint[i];
+                        exportDesc[i].Name = exportName[i].c_str();
+                        exportDesc[i].Flags = D3D12_EXPORT_FLAG_NONE;
+                        exportDesc[i].ExportToRename = nullptr;
+                    }
+                }
+                subobjects[index++] = subobject;
+            }
+
+            // 2). Triangle and plane hit group
+            // Triangle hit group
+            D3D12_HIT_GROUP_DESC hitgroupDesc{};
+            {
+                hitgroupDesc.AnyHitShaderImport = nullptr;
+                hitgroupDesc.ClosestHitShaderImport = c_closestHitShaderName;
+                hitgroupDesc.HitGroupExport = c_triHitGroupName;
+                hitgroupDesc.Type = D3D12_HIT_GROUP_TYPE_TRIANGLES;
+
+                D3D12_STATE_SUBOBJECT subobject{};
+                subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
+                subobject.pDesc = &hitgroupDesc;
+                subobjects[index++] = subobject;
+            }
+
+            // 3). Shader Config
+            D3D12_RAYTRACING_SHADER_CONFIG shaderConfig;
+            {
+                shaderConfig.MaxAttributeSizeInBytes = 2 * sizeof(float);	// float2 barycentrics
+                shaderConfig.MaxPayloadSizeInBytes = 4 * sizeof(float);		// float4 color
+
+                D3D12_STATE_SUBOBJECT subobject{};
+                subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG;
+                subobject.pDesc = &shaderConfig;
+                subobjects[index++] = subobject;
+            }
+
+            // 5). Global root signature
+            {
+                D3D12_STATE_SUBOBJECT subobject{};
+                subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE;
+                subobject.pDesc = m_raytracingGlobalRootSignature.GetAddressOf();
+                subobjects[index++] = subobject;
+            }
+
+            // 6). Pipeline Config
+            D3D12_RAYTRACING_PIPELINE_CONFIG pipelineConfig;
+            {
+                // pipelineConfig.MaxTraceRecursionDepth = D3D12_RAYTRACING_MAX_DECLARABLE_TRACE_RECURSION_DEPTH;
+                pipelineConfig.MaxTraceRecursionDepth = 2;
+
+                D3D12_STATE_SUBOBJECT subobject{};
+                subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG;
+                subobject.pDesc = &pipelineConfig;
+
+                subobjects[index++] = subobject;
+            }
+
+            // Create pipeline state
+            D3D12_STATE_OBJECT_DESC stateObjectDesc;
+            stateObjectDesc.NumSubobjects = index;
+            stateObjectDesc.pSubobjects = subobjects.data();
+            stateObjectDesc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
+
+            if (JFAIL(g_rhi_dx12->Device->CreateStateObject(&stateObjectDesc, IID_PPV_ARGS(&m_dxrStateObject))))
+                return;
+
+            // 13. ShaderTable
+            const uint16 shaderIdentifierSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+            ComPtr<ID3D12StateObjectProperties> stateObjectProperties;
+            if (JFAIL(m_dxrStateObject.As(&stateObjectProperties)))
+                return;
+
+
+            void* rayGenShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_raygenShaderName);
+            void* misssShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_missShaderName);
+            void* triHitGroupShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_triHitGroupName);
+            //void* planeHitGroupShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_planeHitGroupName);
+
+            // Raygen shader table
+            {
+                const uint16 numShaderRecords = 1;
+                const uint16 shaderRecordSize = shaderIdentifierSize;
+                ShaderTable rayGenShaderTable(g_rhi_dx12->Device.Get(), numShaderRecords, shaderRecordSize, TEXT("RayGenShaderTable"));
+                rayGenShaderTable.push_back(ShaderRecord(rayGenShaderIdentifier, shaderIdentifierSize));
+                m_rayGenShaderTable = rayGenShaderTable.GetResource();
+            }
+
+            // Miss shader table
+            {
+                const uint16 numShaderRecords = 1;
+                const uint16 shaderRecordSize = shaderIdentifierSize;
+                ShaderTable missShaderTable(g_rhi_dx12->Device.Get(), numShaderRecords, shaderRecordSize, TEXT("MissShaderTable"));
+                missShaderTable.push_back(ShaderRecord(misssShaderIdentifier, shaderIdentifierSize));
+                m_missShaderTable = missShaderTable.GetResource();
+            }
+
+            // Hit shader table
+            {
+                const uint16 numShaderRecords = 1;
+                const uint16 shaderRecordSize = shaderIdentifierSize;
+                ShaderTable hitShaderTable(g_rhi_dx12->Device.Get(), numShaderRecords, shaderRecordSize, TEXT("HitShaderTable"));
+                hitShaderTable.push_back(ShaderRecord(triHitGroupShaderIdentifier, shaderIdentifierSize));
+                m_hitGroupShaderTable = hitShaderTable.GetResource();
+            }
+        }
+
+        auto CmdBuffer = RenderFrameContextPtr->GetActiveCommandBuffer();
+        auto CmdBufferDX12 = (jCommandBuffer_DX12*)CmdBuffer;
+
+        if (CmdBufferDX12)
+        {
+            struct SceneConstantBuffer
+            {
+                XMMATRIX projectionToWorld;
+                XMVECTOR cameraPosition;
+                XMVECTOR lightPosition;
+                XMVECTOR lightAmbientColor;
+                XMVECTOR lightDiffuseColor;
+                uint32 NumOfStartingRay;
+                float focalDistance;
+                float lensRadius;
+            };
+
+            SceneConstantBuffer m_sceneCB;
+
+            auto GetScreenAspect = []()
+                {
+                    return static_cast<float>(SCR_WIDTH) / static_cast<float>(SCR_HEIGHT);
+                };
+
+            XMVECTOR m_eye = { 0, 0, -200, 1.0f };
+            XMVECTOR m_at = { 0, 0, 0, 1.0f };
+            XMVECTOR m_up = { 0.0f, 1.0f, 0.0f };
+
+            m_sceneCB.cameraPosition = m_eye;
+            const float fovAngleY = 45.0f;
+            const float m_aspectRatio = GetScreenAspect();
+            const XMMATRIX view = XMMatrixLookAtLH(m_eye, m_at, m_up);
+            const XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(fovAngleY), m_aspectRatio, 0.100, 10000.000);
+            const XMMATRIX viewProj = view * proj;
+
+            m_sceneCB.projectionToWorld = XMMatrixInverse(nullptr, viewProj);
+
+            static auto SceneBuffer = jBufferUtil_DX12::CreateBuffer(sizeof(m_sceneCB), 0, EBufferCreateFlag::UAV, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, &m_sceneCB, sizeof(m_sceneCB));
+            auto cbGpuAddress = SceneBuffer->GetGPUAddress();
+
+            auto RObj = jObject::GetStaticRenderObject()[0];
+
+            // 현재 디스크립터에 복사해야 함.
+            ID3D12DescriptorHeap* ppHeaps[] =
+            {
+                CmdBufferDX12->OnlineDescriptorHeap->GetHeap(),
+                CmdBufferDX12->OnlineSamplerDescriptorHeap->GetHeap()
+            };
+
+            const D3D12_GPU_DESCRIPTOR_HANDLE FirstGPUDescriptorHandle
+                = CmdBufferDX12->OnlineDescriptorHeap->GetGPUHandle(CmdBufferDX12->OnlineDescriptorHeap->GetNumOfAllocated());
+            const D3D12_GPU_DESCRIPTOR_HANDLE FirstGPUSamplerDescriptorHandle
+                = CmdBufferDX12->OnlineSamplerDescriptorHeap->GetGPUHandle(CmdBufferDX12->OnlineSamplerDescriptorHeap->GetNumOfAllocated());
+
+            std::vector<jDescriptor_DX12> Descriptors;
+
+            Descriptors.push_back(m_raytracingOutput->UAV);
+            if (Descriptors.size() > 0)
+            {
+                check(Descriptors.size() <= 20);
+                jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 20> DestDescriptor;
+                jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 20> SrcDescriptor;
+
+                for (int32 i = 0; i < Descriptors.size(); ++i)
+                {
+                    SrcDescriptor.Add(Descriptors[i].CPUHandle);
+
+                    jDescriptor_DX12 Descriptor = CmdBufferDX12->OnlineDescriptorHeap->Alloc();
+                    check(Descriptor.IsValid());
+                    DestDescriptor.Add(Descriptor.CPUHandle);
+                }
+
+                g_rhi_dx12->Device->CopyDescriptors((uint32)DestDescriptor.NumOfData, &DestDescriptor[0], nullptr
+                    , (uint32)SrcDescriptor.NumOfData, &SrcDescriptor[0], nullptr, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+            }
+
+            CmdBufferDX12->CommandList->SetPipelineState1(m_dxrStateObject.Get());
+
+            CmdBufferDX12->CommandList->SetComputeRootSignature(m_raytracingGlobalRootSignature.Get());
+
+            D3D12_DISPATCH_RAYS_DESC dispatchDesc{};
+            CmdBufferDX12->CommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+
+            CmdBufferDX12->CommandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::OutputViewSlot, FirstGPUDescriptorHandle);
+            CmdBufferDX12->CommandList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot, jGame::TopLevelASBuffer->GetGPUAddress());
+            CmdBufferDX12->CommandList->SetComputeRootConstantBufferView(GlobalRootSignatureParams::SceneConstantSlot, cbGpuAddress);
+
+            // 각 Shader table은 단 한개의 shader record를 가지기 때문에 stride가 그 사이즈와 동일함
+            dispatchDesc.HitGroupTable.StartAddress = m_hitGroupShaderTable->GetGPUVirtualAddress();
+            dispatchDesc.HitGroupTable.SizeInBytes = m_hitGroupShaderTable->GetDesc().Width;
+            dispatchDesc.HitGroupTable.StrideInBytes = dispatchDesc.HitGroupTable.SizeInBytes;
+
+            dispatchDesc.MissShaderTable.StartAddress = m_missShaderTable->GetGPUVirtualAddress();
+            dispatchDesc.MissShaderTable.SizeInBytes = m_missShaderTable->GetDesc().Width;
+            dispatchDesc.MissShaderTable.StrideInBytes = dispatchDesc.MissShaderTable.SizeInBytes;
+
+            dispatchDesc.RayGenerationShaderRecord.StartAddress = m_rayGenShaderTable->GetGPUVirtualAddress();
+            dispatchDesc.RayGenerationShaderRecord.SizeInBytes = m_rayGenShaderTable->GetDesc().Width;
+
+            dispatchDesc.Width = SCR_WIDTH;
+            dispatchDesc.Height = SCR_HEIGHT;
+            dispatchDesc.Depth = 1;
+
+            CmdBufferDX12->CommandList->DispatchRays(&dispatchDesc);
+        }
+
+        {
+            static jFullscreenQuadPrimitive* GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
+
+            auto BackBuffer = g_rhi_dx12->GetSwapchainImage(g_rhi_dx12->CurrentFrameIndex)->TexturePtr;
+            auto BackBufferRT = std::make_shared<jRenderTarget>(BackBuffer);
+
+            g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), BackBuffer.get(), EImageLayout::COLOR_ATTACHMENT);
+            g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), m_raytracingOutput, EImageLayout::SHADER_READ_ONLY);
+
+            jRasterizationStateInfo* RasterizationState = nullptr;
+            switch (g_rhi->GetSelectedMSAASamples())
+            {
+            case EMSAASamples::COUNT_1:
+                RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)1, true, 0.2f, false, false>::Create();
+                break;
+            case EMSAASamples::COUNT_2:
+                RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)2, true, 0.2f, false, false>::Create();
+                break;
+            case EMSAASamples::COUNT_4:
+                RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)4, true, 0.2f, false, false>::Create();
+                break;
+            case EMSAASamples::COUNT_8:
+                RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)8, true, 0.2f, false, false>::Create();
+                break;
+            default:
+                check(0);
+                break;
+            }
+            auto DepthStencilState = TDepthStencilStateInfo<false, false, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
+            auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ONE, EBlendOp::ADD, EBlendFactor::ZERO, EBlendFactor::ONE, EBlendOp::ADD, EColorMask::ALL>::Create();
+
+            // Create fixed pipeline states
+            jPipelineStateFixedInfo PostProcessPassPipelineStateFixed(RasterizationState, DepthStencilState, BlendingState
+                , jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT), gOptions.UseVRS);
+
+            const jRTClearValue ClearColor = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f);
+            const jRTClearValue ClearDepth = jRTClearValue(1.0f, 0);
+
+            jRenderPassInfo renderPassInfo;
+            jAttachment color = jAttachment(BackBufferRT, EAttachmentLoadStoreOp::LOAD_STORE
+                , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
+            renderPassInfo.Attachments.push_back(color);
+
+            jSubpass subpass;
+            subpass.Initialize(0, 1, EPipelineStageMask::COLOR_ATTACHMENT_OUTPUT_BIT, EPipelineStageMask::FRAGMENT_SHADER_BIT);
+            subpass.OutputColorAttachments.push_back(0);
+            renderPassInfo.Subpasses.push_back(subpass);
+
+            auto RenderPass = g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
+
+            int32 BindingPoint = 0;
+            jShaderBindingArray ShaderBindingArray;
+            jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
+
+            const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+                , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
+                , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
+
+            ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
+                , ResourceInlineAllactor.Alloc<jTextureResource>(m_raytracingOutput, SamplerState));
+
+            std::shared_ptr<jShaderBindingInstance> ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
+            jShaderBindingInstanceArray ShaderBindingInstanceArray;
+            ShaderBindingInstanceArray.Add(ShaderBindingInstance.get());
+
+            jGraphicsPipelineShader Shader;
+            {
+                jShaderInfo shaderInfo;
+                shaderInfo.SetName(jNameStatic("CopyVS"));
+                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/fullscreenquad_vs.hlsl"));
+                shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
+                Shader.VertexShader = g_rhi->CreateShader(shaderInfo);
+
+                shaderInfo.SetName(jNameStatic("CopyPS"));
+                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/copy_ps.hlsl"));
+                shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
+                Shader.PixelShader = g_rhi->CreateShader(shaderInfo);
+            }
+
+            jDrawCommand DrawCommand(RenderFrameContextPtr, GlobalFullscreenPrimitive->RenderObjects[0], RenderPass
+                , Shader, &PostProcessPassPipelineStateFixed, GlobalFullscreenPrimitive->RenderObjects[0]->MaterialPtr.get(), ShaderBindingInstanceArray, nullptr);
+            DrawCommand.Test = true;
+            DrawCommand.PrepareToDraw(false);
+            if (RenderPass->BeginRenderPass(CmdBufferDX12))
+            {
+                DrawCommand.Draw();
+                RenderPass->EndRenderPass();
+            }
+        }
+        return;
     }
 
     Setup();

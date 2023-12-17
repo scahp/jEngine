@@ -952,6 +952,9 @@ bool jRHI_DX12::CreateShaderInternal(jShader* OutShader, const jShaderInfo& shad
         case EShaderAccessStageFlag::COMPUTE:
 			ShadingModel = TEXT("cs_6_3");
             break;
+        case EShaderAccessStageFlag::RAYTRACING:
+            ShadingModel = TEXT("lib_6_3");
+            break;
         default:
             check(0);
             break;
@@ -1503,4 +1506,26 @@ void jPlacedResourcePool::Release()
 {
     check(g_rhi_dx12);
     g_rhi_dx12->DeallocatorMultiFrameUniformBufferBlock.FreeDelegate = nullptr;
+}
+
+void jPlacedResourcePool::Free(const ComPtr<ID3D12Resource>& InData)
+{
+    if (!InData)
+        return;
+
+    if (g_rhi_dx12->IsUsePlacedResource)
+    {
+        jScopedLock s(&Lock);
+
+        auto it_find = UsingPlacedResources.find(InData.Get());
+        if (UsingPlacedResources.end() != it_find)
+        {
+            auto& PendingList = GetPendingPlacedResources(it_find->second.IsUploadResource, it_find->second.Size);
+            PendingList.push_back(it_find->second);
+            UsingPlacedResources.erase(it_find);
+            return;
+        }
+
+        check(0);	// can't reach here.
+    }
 }

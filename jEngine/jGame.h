@@ -27,6 +27,11 @@ class jSpotLightPrimitive;
 class jGame
 {
 public:
+    static jBuffer_DX12* ScratchASBuffer;
+    static jBuffer_DX12* TopLevelASBuffer;
+    static jBuffer_DX12* InstanceDescUploadBuffer;
+	static jObject* Sphere;
+
 	jGame();
 	~jGame();
 
