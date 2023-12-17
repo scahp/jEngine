@@ -950,5 +950,8 @@
     <None Include="Resource\Shaders\hlsl\AtmosphericShadowingApply_ps.hlsl">
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
+    <None Include="Resource\Shaders\hlsl\RaytracingCubeAndPlane.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
   </ItemGroup>
 </Project>

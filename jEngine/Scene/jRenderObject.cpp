@@ -8,6 +8,9 @@
 #include "RHI/Vulkan/jUniformBufferBlock_Vulkan.h"
 #include "Material/jMaterial.h"
 #include "jOptions.h"
+#include "RHI/DX12/jVertexBuffer_DX12.h"
+#include "RHI/DX12/jIndexBuffer_DX12.h"
+#include "RHI/DX12/jBufferUtil_DX12.h"
 
 // jRenderObjectGeometryData
 jRenderObjectGeometryData::jRenderObjectGeometryData(const std::shared_ptr<jVertexStreamData>& vertexStream, const std::shared_ptr<jIndexStreamData>& indexStream)

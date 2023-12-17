@@ -39,6 +39,9 @@ public:
     jVertexBuffer* VertexBuffer_InstanceData = nullptr;
     jIndexBuffer* IndexBuffer = nullptr;
 
+	jBuffer_DX12* BottomLevelASBuffer = nullptr;
+	jBuffer_DX12* ScratchASBuffer = nullptr;
+
     // IndirectCommand buffer
     jBuffer* IndirectCommandBuffer = nullptr;
 
