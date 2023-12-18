@@ -1621,7 +1621,6 @@ void jRenderer::Render()
             void* rayGenShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_raygenShaderName);
             void* misssShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_missShaderName);
             void* triHitGroupShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_triHitGroupName);
-            //void* planeHitGroupShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_planeHitGroupName);
 
             // Raygen shader table
             {
@@ -1668,25 +1667,46 @@ void jRenderer::Render()
                 float lensRadius;
             };
 
+            //struct SceneConstantBuffer
+            //{
+            //    Matrix projectionToWorld;
+            //    Vector4 cameraPosition;
+            //    Vector4 lightPosition;
+            //    Vector4 lightAmbientColor;
+            //    Vector4 lightDiffuseColor;
+            //    uint32 NumOfStartingRay;
+            //    float focalDistance;
+            //    float lensRadius;
+            //};
+
             SceneConstantBuffer m_sceneCB;
 
             auto GetScreenAspect = []()
-                {
-                    return static_cast<float>(SCR_WIDTH) / static_cast<float>(SCR_HEIGHT);
-                };
+            {
+                return static_cast<float>(SCR_WIDTH) / static_cast<float>(SCR_HEIGHT);
+            };
 
-            XMVECTOR m_eye = { 0, 0, -200, 1.0f };
-            XMVECTOR m_at = { 0, 0, 0, 1.0f };
+            //auto MainCamera = jCamera::GetMainCamera();
+            //m_sceneCB.cameraPosition = Vector4({ 0, 0, -1000 }, 1.0f);
+
+            //auto VP = jCameraUtil::CreateViewMatrix({ 0, 0, -1000 }, { 300, 0, 0 }, { 0, 1, 0 }) *
+            //    jCameraUtil::CreatePerspectiveMatrix(SCR_WIDTH, SCR_HEIGHT, XMConvertToRadians(45), 1.0f, 1250.0f);
+            //m_sceneCB.projectionToWorld = VP.GetInverse().GetTranspose();
+
+            auto v = jCameraUtil::CreateViewMatrix({ 0, 0, -1000 }, { 300, 0, 0 }, { 0, 1, 0 });
+            auto p = jCameraUtil::CreatePerspectiveMatrix(SCR_WIDTH, SCR_HEIGHT, XMConvertToRadians(45), 1.0f, 1250.0f);
+
+            XMVECTOR m_eye = { -559.937622f, 116.339653f, 84.3709946f, 1.0f };
+            XMVECTOR m_at = { -260.303925f, 105.498116f, 94.4834976f, 1.0f };
             XMVECTOR m_up = { 0.0f, 1.0f, 0.0f };
 
             m_sceneCB.cameraPosition = m_eye;
             const float fovAngleY = 45.0f;
             const float m_aspectRatio = GetScreenAspect();
             const XMMATRIX view = XMMatrixLookAtLH(m_eye, m_at, m_up);
-            const XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(fovAngleY), m_aspectRatio, 0.100, 10000.000);
+            const XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(fovAngleY), m_aspectRatio, 1.0f, 1250.0f);
             const XMMATRIX viewProj = view * proj;
-
-            m_sceneCB.projectionToWorld = XMMatrixInverse(nullptr, viewProj);
+            m_sceneCB.projectionToWorld = XMMatrixTranspose(XMMatrixInverse(nullptr, viewProj));
 
             static auto SceneBuffer = jBufferUtil_DX12::CreateBuffer(sizeof(m_sceneCB), 0, EBufferCreateFlag::UAV, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, &m_sceneCB, sizeof(m_sceneCB));
             auto cbGpuAddress = SceneBuffer->GetGPUAddress();

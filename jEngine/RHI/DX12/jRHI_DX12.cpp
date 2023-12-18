@@ -189,9 +189,9 @@ ShaderTable::ShaderTable(ID3D12Device* InDevice, uint32 InNumOfShaderRecords, ui
 {
 	m_shaderRecords.reserve(InNumOfShaderRecords);
 
-	m_shaderRecordSize = Align(InShaderRecordSize, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
+	m_shaderRecordSize = Align(InShaderRecordSize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
 	const uint32 bufferSize = InNumOfShaderRecords * m_shaderRecordSize;
-	Buffer = jBufferUtil_DX12::CreateBuffer(bufferSize, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT, EBufferCreateFlag::CPUAccess, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, 0, InResourceName);
+	Buffer = jBufferUtil_DX12::CreateBuffer(bufferSize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT, EBufferCreateFlag::CPUAccess, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, 0, InResourceName);
 
 #if _DEBUG
 	m_name = InResourceName;
