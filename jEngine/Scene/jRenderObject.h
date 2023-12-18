@@ -39,9 +39,6 @@ public:
     jVertexBuffer* VertexBuffer_InstanceData = nullptr;
     jIndexBuffer* IndexBuffer = nullptr;
 
-	jBuffer_DX12* BottomLevelASBuffer = nullptr;
-	jBuffer_DX12* ScratchASBuffer = nullptr;
-
     // IndirectCommand buffer
     jBuffer* IndirectCommandBuffer = nullptr;
 
@@ -70,6 +67,9 @@ public:
     Matrix World;
 
 	std::shared_ptr<jRenderObjectGeometryData> GeometryDataPtr;
+
+    jBuffer_DX12* BottomLevelASBuffer = nullptr;
+    jBuffer_DX12* ScratchASBuffer = nullptr;
 
 	FORCEINLINE void SetPos(const Vector& InPos) { Pos = InPos; SetDirtyFlags(EDirty::POS); }
 	FORCEINLINE void SetRot(const Vector& InRot) { Rot = InRot; SetDirtyFlags(EDirty::ROT); }

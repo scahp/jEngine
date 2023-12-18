@@ -71,7 +71,9 @@ void jGame::Setup()
 	// Create main camera
     const Vector mainCameraPos(-559.937622f, 116.339653f, 84.3709946f);
     const Vector mainCameraTarget(-260.303925f, 105.498116f, 94.4834976f);
-    MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 10.0f, 5000.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT, true);
+    //const Vector mainCameraPos(0, 0, -1000);
+    //const Vector mainCameraTarget(300, 0, 0);
+    MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 1.0f, 1250.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT, true);
     jCamera::AddCamera(0, MainCamera);
 
     // Create lights
@@ -160,15 +162,15 @@ void jGame::Setup()
 	//ResourceLoadCompleteEvent = std::async(std::launch::async, [&]()
 	//{
 #if USE_SPONZA
-		//#if USE_SPONZA_PBR		
-		//Sponza = jModelLoader::GetInstance().LoadFromFile("Resource/sponza_pbr/sponza.glb", "Resource/sponza_pbr");
-		//#else
-		//Sponza = jModelLoader::GetInstance().LoadFromFile("Resource/sponza/sponza.dae", "Resource/");
-		//#endif
-		//jObject::AddObject(Sponza);
-		//SpawnedObjects.push_back(Sponza);
+		#if USE_SPONZA_PBR		
+		Sponza = jModelLoader::GetInstance().LoadFromFile("Resource/sponza_pbr/sponza.glb", "Resource/sponza_pbr");
+		#else
+		Sponza = jModelLoader::GetInstance().LoadFromFile("Resource/sponza/sponza.dae", "Resource/");
+		#endif
+		jObject::AddObject(Sponza);
+		SpawnedObjects.push_back(Sponza);
 
-        Sphere = jPrimitiveUtil::CreateSphere(Vector(0.0f, 0.0f, 0.0f), 1.0, 150, Vector(30.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+        Sphere = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f), 1.0, 150, Vector(30.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
 		Sphere->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
         {
             float RotationSpeed = 100.0f;
@@ -216,6 +218,15 @@ void jGame::Setup()
         if (GetDX12TextureComponentCount(GetDX12TextureFormat(VertexBufferDX12->BindInfos.InputElementDescs[0].Format)) < 3)
             continue;
 
+		D3D12_GPU_VIRTUAL_ADDRESS VertexStart = VtxBufferDX12->GetGPUVirtualAddress();
+        int32 VertexCount = VertexBufferDX12->GetElementCount();
+        auto ROE = dynamic_cast<jRenderObjectElement*>(RObj);
+		if (ROE)
+		{
+			VertexStart += VertexBufferDX12->Streams[0].Stride * ROE->SubMesh.StartVertex;
+			VertexCount = ROE->SubMesh.EndVertex - ROE->SubMesh.StartVertex + 1;
+		}
+
         RTObjects.push_back(RObj);
 
         if (IndexBuffer)
@@ -224,8 +235,16 @@ void jGame::Setup()
             ComPtr<ID3D12Resource> IdxBufferDX12 = IndexBufferDX12->BufferPtr->Buffer;
             auto& indexStreamData = IndexBufferDX12->IndexStreamData;
 
-            geometryDesc.Triangles.IndexBuffer = IndexBufferDX12->BufferPtr->GetGPUAddress();
-            geometryDesc.Triangles.IndexCount = IndexBuffer->GetElementCount();
+            D3D12_GPU_VIRTUAL_ADDRESS IndexStart = IndexBufferDX12->BufferPtr->GetGPUAddress();
+			int32 IndexCount = IndexBuffer->GetElementCount();
+			if (ROE)
+			{
+				IndexStart += indexStreamData->Param->GetElementSize() * ROE->SubMesh.StartFace;
+				IndexCount = ROE->SubMesh.EndFace - ROE->SubMesh.StartFace + 1;
+			}
+
+            geometryDesc.Triangles.IndexBuffer = IndexStart;
+            geometryDesc.Triangles.IndexCount = IndexCount;
             geometryDesc.Triangles.IndexFormat = indexStreamData->Param->GetElementSize() == 16 ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
         }
         else
@@ -236,8 +255,8 @@ void jGame::Setup()
         }
         geometryDesc.Triangles.Transform3x4 = 0;
         geometryDesc.Triangles.VertexFormat = VertexBufferDX12->BindInfos.InputElementDescs[0].Format;
-        geometryDesc.Triangles.VertexCount = VertexBufferDX12->GetElementCount();
-        geometryDesc.Triangles.VertexBuffer.StartAddress = VtxBufferDX12->GetGPUVirtualAddress();
+        geometryDesc.Triangles.VertexCount = VertexCount;
+        geometryDesc.Triangles.VertexBuffer.StartAddress = VertexStart;
         geometryDesc.Triangles.VertexBuffer.StrideInBytes = VertexBufferDX12->Streams[0].Stride;
 
         // Opaque로 지오메트를 등록하면, 히트 쉐이더에서 더이상 쉐이더를 만들지 않을 것이므로 최적화에 좋다.
@@ -288,7 +307,7 @@ void jGame::Setup()
          // - 앱의 관점에서, acceleration structure에 쓰기/읽기의 동기화는 UAV barriers를 통해서 얻어짐.
 
         D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
-        RObj->GeometryDataPtr->BottomLevelASBuffer = jBufferUtil_DX12::CreateBuffer(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, 0, EBufferCreateFlag::UAV, initialResourceState
+        RObj->BottomLevelASBuffer = jBufferUtil_DX12::CreateBuffer(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, 0, EBufferCreateFlag::UAV, initialResourceState
             , nullptr, 0, TEXT("BottomLevelAccelerationStructure"));
 
         //ComPtr<ID3D12Resource> m_bottomLevelAccelerationStructure;
@@ -297,20 +316,19 @@ void jGame::Setup()
 
         // Bottom level acceleration structure desc
         //ComPtr<ID3D12Resource> scratchResource;
-        RObj->GeometryDataPtr->ScratchASBuffer = jBufferUtil_DX12::CreateBuffer(bottomLevelPrebuildInfo.ScratchDataSizeInBytes, 0, EBufferCreateFlag::UAV, D3D12_RESOURCE_STATE_COMMON
+        RObj->ScratchASBuffer = jBufferUtil_DX12::CreateBuffer(bottomLevelPrebuildInfo.ScratchDataSizeInBytes, 0, EBufferCreateFlag::UAV, D3D12_RESOURCE_STATE_COMMON
             , nullptr, 0, TEXT("ScratchResourceGeometry"));
         //AllocateUAVBuffer(&scratchResource, g_rhi_dx12->Device.Get(), bottomLevelPrebuildInfo.ScratchDataSizeInBytes
         //    , D3D12_RESOURCE_STATE_UNORDERED_ACCESS, L"ScratchResourceGeometry1");
 
         D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc{};
         bottomLevelBuildDesc.Inputs = bottomLevelInputs;
-        bottomLevelBuildDesc.ScratchAccelerationStructureData = RObj->GeometryDataPtr->ScratchASBuffer->GetGPUAddress();
-        bottomLevelBuildDesc.DestAccelerationStructureData = RObj->GeometryDataPtr->BottomLevelASBuffer->GetGPUAddress();
+        bottomLevelBuildDesc.ScratchAccelerationStructureData = RObj->ScratchASBuffer->GetGPUAddress();
+        bottomLevelBuildDesc.DestAccelerationStructureData = RObj->BottomLevelASBuffer->GetGPUAddress();
 
         CmdBuffer->CommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
-        //auto temp = CD3DX12_RESOURCE_BARRIER::UAV(m_bottomLevelAccelerationStructure.Get());
-        //CmdBuffer->CommandList->ResourceBarrier(1, &temp);        
-        //m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(m_bottomLevelAccelerationStructure.Get()));
+        auto temp = CD3DX12_RESOURCE_BARRIER::UAV(RObj->BottomLevelASBuffer->Buffer.Get());
+        CmdBuffer->CommandList->ResourceBarrier(1, &temp);
     }
     {
         D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
@@ -344,7 +362,7 @@ void jGame::Setup()
                 instanceDescs[i].InstanceContributionToHitGroupIndex = 0;
 				memcpy(instanceDescs[i].Transform, &RObj->World.m, sizeof(instanceDescs[i].Transform));
                 instanceDescs[i].InstanceMask = 1;
-                instanceDescs[i].AccelerationStructure = RObj->GeometryDataPtr->BottomLevelASBuffer->GetGPUAddress();
+                instanceDescs[i].AccelerationStructure = RObj->BottomLevelASBuffer->GetGPUAddress();
                 for (int32 k = 0; k < 3; ++k)
                     for (int32 m = 0; m < 4; ++m)
                         instanceDescs[i].Transform[k][m] = RObj->World.m[m][k];
@@ -358,7 +376,9 @@ void jGame::Setup()
             asDesc.DestAccelerationStructureData = TopLevelASBuffer->GetGPUAddress();
             asDesc.ScratchAccelerationStructureData = ScratchASBuffer->GetGPUAddress();
 
-            CmdBuffer->CommandList->BuildRaytracingAccelerationStructure(&asDesc, 0, nullptr);
+			CmdBuffer->CommandList->BuildRaytracingAccelerationStructure(&asDesc, 0, nullptr);
+			auto temp = CD3DX12_RESOURCE_BARRIER::UAV(TopLevelASBuffer->Buffer.Get());
+			CmdBuffer->CommandList->ResourceBarrier(1, &temp);
         }
     }
     g_rhi_dx12->EndSingleTimeCommands(CmdBuffer);
