@@ -1134,12 +1134,31 @@ jObject* CreateCube(const Vector& pos, const Vector& size, const Vector& scale, 
 		vertexStreamData->Params.push_back(streamParam);
 	}
 
+    auto indexStreamData = std::make_shared<jIndexStreamData>();
+	std::vector<uint32> faces;
+	faces.resize(elementCount);
+	for (int32 i = 0; i < elementCount; ++i)
+	{
+		faces[i] = i;
+	}
+    indexStreamData->ElementCount = static_cast<int32>(faces.size());
+    {
+        auto streamParam = new jStreamParam<uint32>();
+        streamParam->BufferType = EBufferType::STATIC;
+        streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::UINT32, sizeof(uint32) * 3));
+        streamParam->Stride = sizeof(uint32) * 3;
+        streamParam->Name = jName("Index");
+        streamParam->Data.resize(faces.size());
+        memcpy(&streamParam->Data[0], &faces[0], faces.size() * sizeof(uint32));
+        indexStreamData->Param = streamParam;
+    }
+
 	vertexStreamData->PrimitiveType = EPrimitiveType::TRIANGLES;
 	vertexStreamData->ElementCount = elementCount;
 
 	auto object = new jObject();
 	auto renderObject = new jRenderObject();
-    object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>(vertexStreamData, nullptr);
+    object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>(vertexStreamData, indexStreamData);
     renderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
     object->RenderObjects.push_back(renderObject);
 	renderObject->SetPos(pos);

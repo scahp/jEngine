@@ -31,6 +31,7 @@ public:
     static jBuffer_DX12* TopLevelASBuffer;
     static jBuffer_DX12* InstanceDescUploadBuffer;
 	static jObject* Sphere;
+	static jBuffer_DX12* VertexIndexStartDataBuffer;
 
 	jGame();
 	~jGame();

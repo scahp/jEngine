@@ -941,19 +941,19 @@ bool jRHI_DX12::CreateShaderInternal(jShader* OutShader, const jShaderInfo& shad
         switch (shaderInfo.GetShaderType())
         {
         case EShaderAccessStageFlag::VERTEX:
-			ShadingModel = TEXT("vs_6_3");
+			ShadingModel = TEXT("vs_6_6");
             break;
         case EShaderAccessStageFlag::GEOMETRY:
-			ShadingModel = TEXT("gs_6_3");
+			ShadingModel = TEXT("gs_6_6");
             break;
         case EShaderAccessStageFlag::FRAGMENT:
-			ShadingModel = TEXT("ps_6_3");
+			ShadingModel = TEXT("ps_6_6");
             break;
         case EShaderAccessStageFlag::COMPUTE:
-			ShadingModel = TEXT("cs_6_3");
+			ShadingModel = TEXT("cs_6_6");
             break;
         case EShaderAccessStageFlag::RAYTRACING:
-            ShadingModel = TEXT("lib_6_3");
+            ShadingModel = TEXT("lib_6_6");
             break;
         default:
             check(0);
