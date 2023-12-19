@@ -28,6 +28,7 @@
 #include "dxcapi.h"
 #include "jGame.h"
 #include "RHI/DX12/jVertexBuffer_DX12.h"
+#include "RHI/DX12/jIndexBuffer_DX12.h"
 
 jTexture_DX12* jRenderer::m_raytracingOutput;
 ComPtr<ID3D12RootSignature> jRenderer::m_raytracingGlobalRootSignature;
@@ -1504,6 +1505,7 @@ void jRenderer::Render()
                 rootParameters[GlobalRootSignatureParams::SceneConstantSlot].InitAsConstantBufferView(0);
 
                 CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc(_countof(rootParameters), rootParameters);
+                globalRootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED;
                 ComPtr<ID3DBlob> blob;
                 ComPtr<ID3DBlob> error;
                 if (JFAIL(D3D12SerializeRootSignature(&globalRootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &error)))
@@ -1728,14 +1730,38 @@ void jRenderer::Render()
             std::vector<jDescriptor_DX12> Descriptors;
 
             Descriptors.push_back(m_raytracingOutput->UAV);
+            Descriptors.push_back(jGame::VertexIndexStartDataBuffer->SRV);
+            for(int32 i=0;i<jObject::GetStaticRenderObject().size();++i)
+            {
+                jRenderObject* RObj = jObject::GetStaticRenderObject()[i];
+                auto Vtx = (jVertexBuffer_DX12*)RObj->GeometryDataPtr->VertexBuffer;
+                auto Idx = (jIndexBuffer_DX12*)RObj->GeometryDataPtr->IndexBuffer;
+
+                for (int32 k = 0; k < Vtx->Streams.size(); ++k)
+                {
+                    if (Vtx->Streams[k].Name == jNameStatic("POSITION"))
+                    {
+                        Descriptors.push_back(Vtx->Streams[k].BufferPtr->SRV);
+                    }
+                    else if (Vtx->Streams[k].Name == jNameStatic("NORMAL"))
+                    {
+                        Descriptors.push_back(Vtx->Streams[k].BufferPtr->SRV);
+                        break;
+                    }
+                }
+
+                Descriptors.push_back(Idx->BufferPtr->SRV);
+            }
             if (Descriptors.size() > 0)
             {
-                check(Descriptors.size() <= 20);
-                jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 20> DestDescriptor;
-                jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 20> SrcDescriptor;
+                check(Descriptors.size() <= 500);
+                jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 500> DestDescriptor;
+                jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 500> SrcDescriptor;
 
                 for (int32 i = 0; i < Descriptors.size(); ++i)
                 {
+                    check(Descriptors[i].IsValid());
+
                     SrcDescriptor.Add(Descriptors[i].CPUHandle);
 
                     jDescriptor_DX12 Descriptor = CmdBufferDX12->OnlineDescriptorHeap->Alloc();

@@ -78,7 +78,10 @@ void MyRaygenShader()
 
     //color.xyz = rayDir;
 
-    RenderTarget[DispatchRaysIndex().xy] = color;
+    // RenderTarget[DispatchRaysIndex().xy] = color;
+
+    RWTexture2D<float4> RenderTargetBindless = ResourceDescriptorHeap[0];
+    RenderTargetBindless[DispatchRaysIndex().xy] = color;
 }
 
 // https://gist.github.com/keijiro/24f9d505fac238c9a2982c0d6911d8e3
@@ -110,8 +113,12 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 {
     float3 hitPosition = HitWorldPosition();
 
-    uint Id = InstanceID();
-    payload.color = float4(ColorVariation(Id), 1.0);
+    Buffer<float3> VertexBindless = ResourceDescriptorHeap[2];
+    Buffer<float3> NormalBindless = ResourceDescriptorHeap[3];
+    Buffer<uint3> IndexBindless = ResourceDescriptorHeap[4];
+
+    //worldNormal = worldNormal * 0.5 + 0.5;
+    payload.color = float4(abs(NormalBindless[1].xyz), 1);
 }
 
 [shader("miss")]
