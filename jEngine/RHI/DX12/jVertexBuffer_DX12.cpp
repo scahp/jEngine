@@ -33,17 +33,6 @@ bool jVertexBuffer_DX12::Initialize(const std::shared_ptr<jVertexStreamData>& In
         stream.Offset = 0;
         stream.InstanceDivisor = iter->InstanceDivisor;
 
-        if (iter->GetBufferSize() > 0)
-        {
-            // Create vertex buffer
-            stream.BufferPtr = std::shared_ptr<jBuffer_DX12>(jBufferUtil_DX12::CreateBuffer(iter->GetBufferSize(), 0, EBufferCreateFlag::NONE, D3D12_RESOURCE_STATE_COMMON
-                , iter->GetBufferData(), iter->GetBufferSize(), TEXT("VertexBuffer")));
-            jBufferUtil_DX12::CreateShaderResourceView(stream.BufferPtr.get());
-
-            BindInfos.Buffers.push_back(stream.BufferPtr->Buffer.Get());
-            BindInfos.Offsets.push_back(stream.Offset + stream.BufferPtr->Offset);
-        }
-
         int32 ElementStride = 0;
         for (IStreamParam::jAttribute& element : iter->Attributes)
         {
@@ -174,6 +163,17 @@ bool jVertexBuffer_DX12::Initialize(const std::shared_ptr<jVertexStreamData>& In
                 break;
             }
             check(AttrFormat != VK_FORMAT_UNDEFINED);
+
+            if (iter->GetBufferSize() > 0)
+            {
+                // Create vertex buffer
+                stream.BufferPtr = std::shared_ptr<jBuffer_DX12>(jBufferUtil_DX12::CreateBuffer(iter->GetBufferSize(), 0, EBufferCreateFlag::NONE, D3D12_RESOURCE_STATE_COMMON
+                    , iter->GetBufferData(), iter->GetBufferSize(), TEXT("VertexBuffer")));
+                jBufferUtil_DX12::CreateShaderResourceView(stream.BufferPtr.get(), iter->Stride, iter->GetBufferSize() / iter->Stride);
+
+                BindInfos.Buffers.push_back(stream.BufferPtr->Buffer.Get());
+                BindInfos.Offsets.push_back(stream.Offset + stream.BufferPtr->Offset);
+            }
         
             D3D12_INPUT_ELEMENT_DESC elem;
             elem.SemanticName = iter->Name.ToStr();

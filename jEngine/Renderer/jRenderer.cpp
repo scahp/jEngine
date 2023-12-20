@@ -1713,8 +1713,6 @@ void jRenderer::Render()
             static auto SceneBuffer = jBufferUtil_DX12::CreateBuffer(sizeof(m_sceneCB), 0, EBufferCreateFlag::UAV, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, &m_sceneCB, sizeof(m_sceneCB));
             auto cbGpuAddress = SceneBuffer->GetGPUAddress();
 
-            auto RObj = jObject::GetStaticRenderObject()[0];
-
             // 현재 디스크립터에 복사해야 함.
             ID3D12DescriptorHeap* ppHeaps[] =
             {
@@ -1730,10 +1728,11 @@ void jRenderer::Render()
             std::vector<jDescriptor_DX12> Descriptors;
 
             Descriptors.push_back(m_raytracingOutput->UAV);
-            Descriptors.push_back(jGame::VertexIndexStartDataBuffer->SRV);
             for(int32 i=0;i<jObject::GetStaticRenderObject().size();++i)
             {
                 jRenderObject* RObj = jObject::GetStaticRenderObject()[i];
+                Descriptors.push_back(RObj->VertexAndIndexStartBuffer->SRV);
+
                 auto Vtx = (jVertexBuffer_DX12*)RObj->GeometryDataPtr->VertexBuffer;
                 auto Idx = (jIndexBuffer_DX12*)RObj->GeometryDataPtr->IndexBuffer;
 
