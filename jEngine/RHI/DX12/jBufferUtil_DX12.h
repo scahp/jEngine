@@ -163,6 +163,11 @@ size_t BitsPerPixel_(DXGI_FORMAT fmt)
     }
 }
 
+size_t BytesPerPixel_(DXGI_FORMAT fmt)
+{
+    return BitsPerPixel_(fmt) / 8;
+}
+
 const D3D12_HEAP_PROPERTIES& GetUploadHeap()
 {
     static D3D12_HEAP_PROPERTIES HeapProp{ .Type = D3D12_HEAP_TYPE_UPLOAD, .CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN
@@ -539,7 +544,8 @@ void CopyBuffer(ID3D12Resource* InSrcBuffer, ID3D12Resource* InDstBuffer, uint64
 
 void CreateConstantBufferView(jBuffer_DX12* InBuffer);
 void CreateShaderResourceView(jBuffer_DX12* InBuffer);
-void CreateShaderResourceView(jBuffer_DX12* InBuffer, uint32 InStride, uint32 InCount, ETextureFormat InFormat = ETextureFormat::MAX);
+void CreateShaderResourceView(jBuffer_DX12* InBuffer, uint32 InStride, uint32 InCount);
+void CreateShaderResourceView(jBuffer_DX12* InBuffer, DXGI_FORMAT InFormat);
 void CreateUnorderedAccessView(jBuffer_DX12* InBuffer);
 void CreateShaderResourceView(jTexture_DX12* InTexture);
 void CreateDepthStencilView(jTexture_DX12* InTexture);

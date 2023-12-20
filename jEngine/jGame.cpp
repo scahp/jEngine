@@ -27,7 +27,6 @@ jBuffer_DX12* jGame::ScratchASBuffer = nullptr;
 jBuffer_DX12* jGame::TopLevelASBuffer = nullptr;
 jBuffer_DX12* jGame::InstanceDescUploadBuffer = nullptr;
 jObject* jGame::Sphere = nullptr;
-jBuffer_DX12* jGame::VertexIndexStartDataBuffer = nullptr;
 
 jGame::jGame()
 {
@@ -171,9 +170,9 @@ void jGame::Setup()
 		//jObject::AddObject(Sponza);
 		//SpawnedObjects.push_back(Sponza);
 
-        //Sphere = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f), 1.0, 60, Vector(30.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
-		Sphere = jPrimitiveUtil::CreateCube(Vector(65.0f, 35.0f, 10.0f), Vector::OneVector, Vector(150), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
-		Sphere->RenderObjects[0]->SetRot(Sphere->RenderObjects[0]->GetRot() + Vector(0.0f, 0.0f, DegreeToRadian(90.0f)));
+        Sphere = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f), 1.0, 60, Vector(30.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+		//Sphere = jPrimitiveUtil::CreateCube(Vector(65.0f, 35.0f, 10.0f), Vector::OneVector, Vector(150), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+		//Sphere->RenderObjects[0]->SetRot(Sphere->RenderObjects[0]->GetRot() + Vector(0.0f, 0.0f, DegreeToRadian(90.0f)));
 		Sphere->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
         {
             float RotationSpeed = 100.0f;
@@ -205,7 +204,6 @@ void jGame::Setup()
 
     auto CmdBuffer = g_rhi_dx12->BeginSingleTimeCommands();
     std::vector<jRenderObject*> RTObjects;
-	std::vector<Vector2i> VertexIndexStarts;
     for(int32 i=0;i<jObject::GetStaticRenderObject().size();++i)
     {
         jRenderObject* RObj = jObject::GetStaticRenderObject()[i];
@@ -225,17 +223,17 @@ void jGame::Setup()
 		D3D12_GPU_VIRTUAL_ADDRESS VertexStart = VtxBufferDX12->GetGPUVirtualAddress();
         int32 VertexCount = VertexBufferDX12->GetElementCount();
         auto ROE = dynamic_cast<jRenderObjectElement*>(RObj);
+		Vector2i VertexIndexStart{};
 		if (ROE)
 		{
 			VertexStart += VertexBufferDX12->Streams[0].Stride * ROE->SubMesh.StartVertex;
 			VertexCount = ROE->SubMesh.EndVertex - ROE->SubMesh.StartVertex + 1;
 
-			VertexIndexStarts.push_back(Vector2i(ROE->SubMesh.StartFace, ROE->SubMesh.StartVertex));
+			VertexIndexStart = Vector2i(ROE->SubMesh.StartVertex, ROE->SubMesh.StartFace);
 		}
-		else
-		{
-			VertexIndexStarts.push_back(Vector2i(0, 0));
-		}
+		RObj->VertexAndIndexStartBuffer = jBufferUtil_DX12::CreateBuffer(sizeof(Vector2i), 0, EBufferCreateFlag::UAV, D3D12_RESOURCE_STATE_COMMON
+            , &VertexIndexStart, sizeof(Vector2i), TEXT("VertexAndIndexStartBuffer"));
+        jBufferUtil_DX12::CreateShaderResourceView(RObj->VertexAndIndexStartBuffer, sizeof(Vector2i), 1);
 
         RTObjects.push_back(RObj);
 
@@ -340,10 +338,6 @@ void jGame::Setup()
         auto temp = CD3DX12_RESOURCE_BARRIER::UAV(RObj->BottomLevelASBuffer->Buffer.Get());
         CmdBuffer->CommandList->ResourceBarrier(1, &temp);
     }
-
-    VertexIndexStartDataBuffer = jBufferUtil_DX12::CreateBuffer(VertexIndexStarts.size() * sizeof(Vector2i), 0, EBufferCreateFlag::UAV, D3D12_RESOURCE_STATE_COMMON
-        , VertexIndexStarts.data(), VertexIndexStarts.size() * sizeof(Vector2i), TEXT("VertexIndexStartDataBuffer"));
-	jBufferUtil_DX12::CreateShaderResourceView(VertexIndexStartDataBuffer);
 
     {
         D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};

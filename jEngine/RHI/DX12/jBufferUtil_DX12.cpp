@@ -370,8 +370,7 @@ void CreateShaderResourceView(jBuffer_DX12* InBuffer)
     CreateShaderResourceView(InBuffer, (uint32)InBuffer->Size, 1);
 }
 
-void CreateShaderResourceView(jBuffer_DX12* InBuffer, uint32 InStride, uint32 InCount
-    , ETextureFormat InFormat)
+void CreateShaderResourceView(jBuffer_DX12* InBuffer, uint32 InStride, uint32 InCount)
 {
     check(g_rhi_dx12);
     check(g_rhi_dx12->Device);
@@ -384,13 +383,37 @@ void CreateShaderResourceView(jBuffer_DX12* InBuffer, uint32 InStride, uint32 In
 
     D3D12_SHADER_RESOURCE_VIEW_DESC Desc = {};
     Desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    Desc.Format = (InFormat == ETextureFormat::MAX) ? DXGI_FORMAT_UNKNOWN : GetDX12TextureFormat(InFormat);
+    Desc.Format = DXGI_FORMAT_UNKNOWN;
+    Desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+
+    Desc.Buffer.FirstElement = 0;
+    Desc.Buffer.Flags = (InStride > 0) ? D3D12_BUFFER_SRV_FLAG_NONE : D3D12_BUFFER_SRV_FLAG_RAW;
+    Desc.Buffer.NumElements = InCount;
+    Desc.Buffer.StructureByteStride = InStride;
+
+    g_rhi_dx12->Device->CreateShaderResourceView(InBuffer->Buffer.Get()
+        , &Desc, InBuffer->SRV.CPUHandle);
+}
+
+void CreateShaderResourceView(jBuffer_DX12* InBuffer, DXGI_FORMAT InFormat)
+{
+    check(g_rhi_dx12);
+    check(g_rhi_dx12->Device);
+
+    if (!ensure(InBuffer))
+        return;
+
+    check(!InBuffer->SRV.IsValid());
+    InBuffer->SRV = g_rhi_dx12->DescriptorHeaps.Alloc();
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC Desc = {};
+    Desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    Desc.Format = InFormat;
     Desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
 
     Desc.Buffer.FirstElement = 0;
     Desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-    Desc.Buffer.NumElements = InCount;
-    Desc.Buffer.StructureByteStride = InStride;
+    Desc.Buffer.NumElements = InBuffer->Size / BytesPerPixel_(InFormat);
 
     g_rhi_dx12->Device->CreateShaderResourceView(InBuffer->Buffer.Get()
         , &Desc, InBuffer->SRV.CPUHandle);
@@ -411,7 +434,7 @@ void CreateUnorderedAccessView(jBuffer_DX12* InBuffer)
     Desc.Format = DXGI_FORMAT_UNKNOWN;
     Desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
     Desc.Buffer.FirstElement = 0;
-    Desc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+    Desc.Buffer.Flags = (InBuffer->Size > 0) ? D3D12_BUFFER_UAV_FLAG_NONE : D3D12_BUFFER_UAV_FLAG_RAW;
     Desc.Buffer.NumElements = 1;
     Desc.Buffer.StructureByteStride = (uint32)InBuffer->Size;
 

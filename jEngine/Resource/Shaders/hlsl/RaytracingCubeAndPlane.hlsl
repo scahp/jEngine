@@ -113,12 +113,33 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 {
     float3 hitPosition = HitWorldPosition();
 
-    Buffer<float3> VertexBindless = ResourceDescriptorHeap[2];
-    Buffer<float3> NormalBindless = ResourceDescriptorHeap[3];
-    Buffer<uint3> IndexBindless = ResourceDescriptorHeap[4];
+    uint InstanceIdx = InstanceIndex();
 
-    //worldNormal = worldNormal * 0.5 + 0.5;
-    payload.color = float4(abs(NormalBindless[1].xyz), 1);
+    uint Stride = 4;
+    StructuredBuffer<uint2> VertexIndexStart = ResourceDescriptorHeap[1 + InstanceIdx * Stride];
+    StructuredBuffer<float3> VertexBindless = ResourceDescriptorHeap[2 + InstanceIdx * Stride];
+    StructuredBuffer<float3> NormalBindless = ResourceDescriptorHeap[3 + InstanceIdx * Stride];
+    StructuredBuffer<uint> IndexBindless = ResourceDescriptorHeap[4 + InstanceIdx * Stride];
+
+    uint VertexStart = VertexIndexStart[0].x;
+    uint IndexStart = VertexIndexStart[0].y;
+
+    uint PrimIdx = PrimitiveIndex();
+    uint3 Indices = uint3(
+        IndexBindless[IndexStart + PrimIdx],
+        IndexBindless[IndexStart + PrimIdx + 1],
+        IndexBindless[IndexStart + PrimIdx + 2]
+        );
+
+    float3 Normals[3] = {
+        NormalBindless[Indices.x],
+        NormalBindless[Indices.y],
+        NormalBindless[Indices.z]
+    };
+
+    float3 normal = HitAttribute(Normals, attr);
+    float3 worldNormal = normalize(mul((float3x3) ObjectToWorld3x4(), normal));
+    payload.color = float4(worldNormal, 1);
 }
 
 [shader("miss")]
