@@ -40,6 +40,8 @@ public:
     bool HasAlbedoTexture() const { return TexData[(int32)EMaterialTextureType::Albedo].Texture; }
     bool IsUseSphericalMap() const { return bUseSphericalMap; }
     bool IsUseSRGBAlbedoTexture() const { return TexData[(int32)EMaterialTextureType::Albedo].Texture ? TexData[(int32)EMaterialTextureType::Albedo].Texture->sRGB : false; }
+    jTexture* GetTexture(EMaterialTextureType InType) const;
+    template <typename T> T* GetTexture(EMaterialTextureType InType) const { return (T*)(GetTexture(InType)); }
 
     TextureData TexData[static_cast<int32>(EMaterialTextureType::Max)];
     bool bUseSphericalMap = false;

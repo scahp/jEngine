@@ -2,6 +2,13 @@
 #include "jMaterial.h"
 #include "RHI/jRHI.h"
 
+jTexture* jMaterial::GetTexture(EMaterialTextureType InType) const
+{
+    check(EMaterialTextureType::Albedo <= InType);
+    check(EMaterialTextureType::Max > InType);
+    return TexData[(int32)InType].Texture;
+}
+
 const std::shared_ptr<jShaderBindingInstance>& jMaterial::CreateShaderBindingInstance()
 {
     if (NeedToUpdateShaderBindingInstance)

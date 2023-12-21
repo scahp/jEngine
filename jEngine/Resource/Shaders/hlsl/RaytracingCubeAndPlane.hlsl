@@ -34,6 +34,12 @@ float3 HitAttribute(float3 vertexAttribute[3], BuiltInTriangleIntersectionAttrib
         attr.barycentrics.y * (vertexAttribute[2] - vertexAttribute[0]);
 }
 
+float2 HitAttribute(float2 vertexAttribute[3], BuiltInTriangleIntersectionAttributes attr)
+{
+    return vertexAttribute[0] +
+        attr.barycentrics.x * (vertexAttribute[1] - vertexAttribute[0]) +
+        attr.barycentrics.y * (vertexAttribute[2] - vertexAttribute[0]);
+}
 
 inline float3 GenerateCameraRay(uint2 index, out float3 origin, out float3 direction)
 {
@@ -115,31 +121,48 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 
     uint InstanceIdx = InstanceIndex();
 
-    uint Stride = 4;
-    StructuredBuffer<uint2> VertexIndexStart = ResourceDescriptorHeap[1 + InstanceIdx * Stride];
-    StructuredBuffer<float3> VertexBindless = ResourceDescriptorHeap[2 + InstanceIdx * Stride];
-    StructuredBuffer<float3> NormalBindless = ResourceDescriptorHeap[3 + InstanceIdx * Stride];
-    StructuredBuffer<uint> IndexBindless = ResourceDescriptorHeap[4 + InstanceIdx * Stride];
+    uint Stride = 5;
 
-    uint VertexStart = VertexIndexStart[0].x;
-    uint IndexStart = VertexIndexStart[0].y;
+    // SRV_UAV DescHeap
+    StructuredBuffer<uint2> VertexIndexOffset = ResourceDescriptorHeap[1 + InstanceIdx * Stride];
+    StructuredBuffer<uint> IndexBindless = ResourceDescriptorHeap[2 + InstanceIdx * Stride];
+    StructuredBuffer<float3> NormalBindless = ResourceDescriptorHeap[3 + InstanceIdx * Stride];
+    StructuredBuffer<float2> TexCoordBindless = ResourceDescriptorHeap[4 + InstanceIdx * Stride];
+    Texture2D<float4> AlbedoTexture = ResourceDescriptorHeap[5 + InstanceIdx * Stride];
+
+    // Sampler DescHeap
+    SamplerState AlbedoTextureSampler = SamplerDescriptorHeap[0];
+
+    uint VertexOffset = VertexIndexOffset[0].x;
+    uint IndexOffset = VertexIndexOffset[0].y;
 
     uint PrimIdx = PrimitiveIndex();
     uint3 Indices = uint3(
-        IndexBindless[IndexStart + PrimIdx],
-        IndexBindless[IndexStart + PrimIdx + 1],
-        IndexBindless[IndexStart + PrimIdx + 2]
+        IndexBindless[IndexOffset + PrimIdx * 3],
+        IndexBindless[IndexOffset + PrimIdx * 3 + 1],
+        IndexBindless[IndexOffset + PrimIdx * 3 + 2]
         );
 
     float3 Normals[3] = {
-        NormalBindless[Indices.x],
-        NormalBindless[Indices.y],
-        NormalBindless[Indices.z]
+        NormalBindless[Indices.x + VertexOffset],
+        NormalBindless[Indices.y + VertexOffset],
+        NormalBindless[Indices.z + VertexOffset]
     };
 
     float3 normal = HitAttribute(Normals, attr);
-    float3 worldNormal = normalize(mul((float3x3) ObjectToWorld3x4(), normal));
-    payload.color = float4(worldNormal, 1);
+    
+    float2 UVs[3] = {
+        TexCoordBindless[Indices.x + VertexOffset],
+        TexCoordBindless[Indices.y + VertexOffset],
+        TexCoordBindless[Indices.z + VertexOffset]
+    };
+
+    float2 uv = HitAttribute(UVs, attr);
+
+    float2 ddx = float2(0, 0);
+    float2 ddy = float2(0, 0);
+    float4 albedo = AlbedoTexture.SampleGrad(AlbedoTextureSampler, uv, ddx, ddy);
+    payload.color = albedo;
 }
 
 [shader("miss")]
