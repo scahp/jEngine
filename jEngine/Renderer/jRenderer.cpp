@@ -1726,36 +1726,60 @@ void jRenderer::Render()
                 = CmdBufferDX12->OnlineSamplerDescriptorHeap->GetGPUHandle(CmdBufferDX12->OnlineSamplerDescriptorHeap->GetNumOfAllocated());
 
             std::vector<jDescriptor_DX12> Descriptors;
+            std::vector<jDescriptor_DX12> SamplerDescriptors;
 
             Descriptors.push_back(m_raytracingOutput->UAV);
             for(int32 i=0;i<jObject::GetStaticRenderObject().size();++i)
             {
                 jRenderObject* RObj = jObject::GetStaticRenderObject()[i];
-                Descriptors.push_back(RObj->VertexAndIndexStartBuffer->SRV);
+                Descriptors.push_back(RObj->VertexAndIndexOffsetBuffer->SRV);
 
                 auto Vtx = (jVertexBuffer_DX12*)RObj->GeometryDataPtr->VertexBuffer;
                 auto Idx = (jIndexBuffer_DX12*)RObj->GeometryDataPtr->IndexBuffer;
+                Descriptors.push_back(Idx->BufferPtr->SRV);
 
                 for (int32 k = 0; k < Vtx->Streams.size(); ++k)
                 {
                     if (Vtx->Streams[k].Name == jNameStatic("POSITION"))
                     {
-                        Descriptors.push_back(Vtx->Streams[k].BufferPtr->SRV);
+                        //Descriptors.push_back(Vtx->Streams[k].BufferPtr->SRV);
                     }
                     else if (Vtx->Streams[k].Name == jNameStatic("NORMAL"))
+                    {
+                        Descriptors.push_back(Vtx->Streams[k].BufferPtr->SRV);
+                    }
+                    else if (Vtx->Streams[k].Name == jNameStatic("TANGENT"))
+                    {
+                        //Descriptors.push_back(Vtx->Streams[k].BufferPtr->SRV);
+                    }
+                    else if (Vtx->Streams[k].Name == jNameStatic("BITANGENT"))
+                    {
+                        //Descriptors.push_back(Vtx->Streams[k].BufferPtr->SRV);
+                    }
+                    else if (Vtx->Streams[k].Name == jNameStatic("TEXCOORD"))
                     {
                         Descriptors.push_back(Vtx->Streams[k].BufferPtr->SRV);
                         break;
                     }
                 }
 
-                Descriptors.push_back(Idx->BufferPtr->SRV);
+                if (RObj->MaterialPtr->HasAlbedoTexture())
+                {
+                    jTexture_DX12* AlbedoTexDX12 = RObj->MaterialPtr->GetTexture<jTexture_DX12>(jMaterial::EMaterialTextureType::Albedo);
+
+                    check(AlbedoTexDX12->SRV.IsValid());
+                    Descriptors.push_back(AlbedoTexDX12->SRV);
+                }
+                else
+                {
+                    Descriptors.push_back(((jTexture_DX12*)GBlackTexture)->SRV);
+                }
             }
             if (Descriptors.size() > 0)
             {
-                check(Descriptors.size() <= 500);
-                jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 500> DestDescriptor;
-                jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 500> SrcDescriptor;
+                check(Descriptors.size() <= 620);
+                jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 620> DestDescriptor;
+                jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 620> SrcDescriptor;
 
                 for (int32 i = 0; i < Descriptors.size(); ++i)
                 {
@@ -1770,6 +1794,32 @@ void jRenderer::Render()
 
                 g_rhi_dx12->Device->CopyDescriptors((uint32)DestDescriptor.NumOfData, &DestDescriptor[0], nullptr
                     , (uint32)SrcDescriptor.NumOfData, &SrcDescriptor[0], nullptr, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+            }
+
+ 
+            const jSamplerStateInfo_DX12* SamplerState = (jSamplerStateInfo_DX12*)TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+                , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT
+                , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
+            SamplerDescriptors.push_back(SamplerState->SamplerSRV);
+            if (SamplerDescriptors.size() > 0)
+            {
+                check(SamplerDescriptors.size() <= 620);
+                jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 620> DestDescriptor;
+                jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 620> SrcDescriptor;
+
+                for (int32 i = 0; i < SamplerDescriptors.size(); ++i)
+                {
+                    check(SamplerDescriptors[i].IsValid());
+
+                    SrcDescriptor.Add(SamplerDescriptors[i].CPUHandle);
+
+                    jDescriptor_DX12 Descriptor = CmdBufferDX12->OnlineSamplerDescriptorHeap->Alloc();
+                    check(Descriptor.IsValid());
+                    DestDescriptor.Add(Descriptor.CPUHandle);
+                }
+
+                g_rhi_dx12->Device->CopyDescriptors((uint32)DestDescriptor.NumOfData, &DestDescriptor[0], nullptr
+                    , (uint32)SrcDescriptor.NumOfData, &SrcDescriptor[0], nullptr, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
             }
 
             CmdBufferDX12->CommandList->SetPipelineState1(m_dxrStateObject.Get());

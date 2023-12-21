@@ -162,24 +162,27 @@ void jGame::Setup()
 	//ResourceLoadCompleteEvent = std::async(std::launch::async, [&]()
 	//{
 #if USE_SPONZA
-		//#if USE_SPONZA_PBR		
-		//Sponza = jModelLoader::GetInstance().LoadFromFile("Resource/sponza_pbr/sponza.glb", "Resource/sponza_pbr");
-		//#else
-		//Sponza = jModelLoader::GetInstance().LoadFromFile("Resource/sponza/sponza.dae", "Resource/");
-		//#endif
-		//jObject::AddObject(Sponza);
-		//SpawnedObjects.push_back(Sponza);
+		#if USE_SPONZA_PBR		
+		Sponza = jModelLoader::GetInstance().LoadFromFile("Resource/sponza_pbr/sponza.glb", "Resource/sponza_pbr");
+		#else
+		Sponza = jModelLoader::GetInstance().LoadFromFile("Resource/sponza/sponza.dae", "Resource/");
+		#endif
+		jObject::AddObject(Sponza);
+		SpawnedObjects.push_back(Sponza);
 
-        Sphere = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f), 1.0, 60, Vector(30.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
-		//Sphere = jPrimitiveUtil::CreateCube(Vector(65.0f, 35.0f, 10.0f), Vector::OneVector, Vector(150), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
-		//Sphere->RenderObjects[0]->SetRot(Sphere->RenderObjects[0]->GetRot() + Vector(0.0f, 0.0f, DegreeToRadian(90.0f)));
-		Sphere->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
-        {
-            float RotationSpeed = 100.0f;
-            thisObject->RenderObjects[0]->SetRot(thisObject->RenderObjects[0]->GetRot() + Vector(0.0f, 0.0f, DegreeToRadian(180.0f)) * RotationSpeed * deltaTime);
-        };
-        jObject::AddObject(Sphere);
-        SpawnedObjects.push_back(Sphere);
+		//for (int32 i = 0; i < 2; ++i)
+		//{
+		//	Sphere = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f + i * 100), 1.0, 60, Vector(30.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+		//	//Sphere = jPrimitiveUtil::CreateCube(Vector(65.0f, 35.0f, 10.0f), Vector::OneVector, Vector(150), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+		//	//Sphere->RenderObjects[0]->SetRot(Sphere->RenderObjects[0]->GetRot() + Vector(0.0f, 0.0f, DegreeToRadian(90.0f)));
+		//	Sphere->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
+		//		{
+		//			float RotationSpeed = 100.0f;
+		//			thisObject->RenderObjects[0]->SetRot(thisObject->RenderObjects[0]->GetRot() + Vector(0.0f, 0.0f, DegreeToRadian(180.0f)) * RotationSpeed * deltaTime);
+		//		};
+		//	jObject::AddObject(Sphere);
+		//	SpawnedObjects.push_back(Sphere);
+		//}
 
         //auto sphere2 = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f + 130.0f), 1.0, 150, Vector(30.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
         //jObject::AddObject(sphere2);
@@ -223,17 +226,17 @@ void jGame::Setup()
 		D3D12_GPU_VIRTUAL_ADDRESS VertexStart = VtxBufferDX12->GetGPUVirtualAddress();
         int32 VertexCount = VertexBufferDX12->GetElementCount();
         auto ROE = dynamic_cast<jRenderObjectElement*>(RObj);
-		Vector2i VertexIndexStart{};
+		Vector2i VertexIndexOffset{};
 		if (ROE)
 		{
 			VertexStart += VertexBufferDX12->Streams[0].Stride * ROE->SubMesh.StartVertex;
 			VertexCount = ROE->SubMesh.EndVertex - ROE->SubMesh.StartVertex + 1;
 
-			VertexIndexStart = Vector2i(ROE->SubMesh.StartVertex, ROE->SubMesh.StartFace);
+			VertexIndexOffset = Vector2i(ROE->SubMesh.StartVertex, ROE->SubMesh.StartFace);
 		}
-		RObj->VertexAndIndexStartBuffer = jBufferUtil_DX12::CreateBuffer(sizeof(Vector2i), 0, EBufferCreateFlag::UAV, D3D12_RESOURCE_STATE_COMMON
-            , &VertexIndexStart, sizeof(Vector2i), TEXT("VertexAndIndexStartBuffer"));
-        jBufferUtil_DX12::CreateShaderResourceView(RObj->VertexAndIndexStartBuffer, sizeof(Vector2i), 1);
+		RObj->VertexAndIndexOffsetBuffer = jBufferUtil_DX12::CreateBuffer(sizeof(Vector2i), 0, EBufferCreateFlag::UAV, D3D12_RESOURCE_STATE_COMMON
+            , &VertexIndexOffset, sizeof(Vector2i), TEXT("VertexAndIndexOffsetBuffer"));
+        jBufferUtil_DX12::CreateShaderResourceView(RObj->VertexAndIndexOffsetBuffer, sizeof(Vector2i), 1);
 
         RTObjects.push_back(RObj);
 
