@@ -204,6 +204,10 @@ const std::shared_ptr<jShaderBindingInstance>& jRenderObject::CreateShaderBindin
             jNameStatic("RenderObjectUniformParameters"), jLifeTimeType::MultiFrame, sizeof(jRenderObjectUniformBuffer)));
         RenderObjectUniformParametersPtr->UpdateBufferData(&ubo, sizeof(ubo));
 
+        TestUniformBuffer = std::shared_ptr<jBuffer_DX12>(jBufferUtil_DX12::CreateBuffer(sizeof(ubo), 0, EBufferCreateFlag::UAV
+            , D3D12_RESOURCE_STATES::D3D12_RESOURCE_STATE_COMMON, &ubo, sizeof(ubo)));
+        jBufferUtil_DX12::CreateShaderResourceView(TestUniformBuffer.get(), sizeof(jRenderObjectUniformBuffer), 1);
+
         LastMetallic = gOptions.Metallic;
         LastRoughness = gOptions.Roughness;
 

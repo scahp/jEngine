@@ -1,3 +1,6 @@
+#include "common.hlsl"
+#include "PBR.hlsl"
+
 #define MAX_RECURSION_DEPTH 10
 
 struct SceneConstantBuffer
@@ -39,6 +42,20 @@ float2 HitAttribute(float2 vertexAttribute[3], BuiltInTriangleIntersectionAttrib
     return vertexAttribute[0] +
         attr.barycentrics.x * (vertexAttribute[1] - vertexAttribute[0]) +
         attr.barycentrics.y * (vertexAttribute[2] - vertexAttribute[0]);
+}
+
+float3 HitAttribute(float3 A, float3 B, float3 C, BuiltInTriangleIntersectionAttributes attr)
+{
+    return A +
+        attr.barycentrics.x * (B - A) +
+        attr.barycentrics.y * (C - A);
+}
+
+float2 HitAttribute(float2 A, float2 B, float2 C, BuiltInTriangleIntersectionAttributes attr)
+{
+    return A +
+        attr.barycentrics.x * (B - A) +
+        attr.barycentrics.y * (C - A);
 }
 
 inline float3 GenerateCameraRay(uint2 index, out float3 origin, out float3 direction)
@@ -119,16 +136,25 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 {
     float3 hitPosition = HitWorldPosition();
 
+    TextureCube<float4> IrradianceMap = ResourceDescriptorHeap[1];
+    TextureCube<float4> PrefilteredEnvMap = ResourceDescriptorHeap[2];
+
     uint InstanceIdx = InstanceIndex();
 
-    uint Stride = 5;
+    uint PerPrimOffset = 3;
+    uint Stride = 10;
 
     // SRV_UAV DescHeap
-    StructuredBuffer<uint2> VertexIndexOffset = ResourceDescriptorHeap[1 + InstanceIdx * Stride];
-    StructuredBuffer<uint> IndexBindless = ResourceDescriptorHeap[2 + InstanceIdx * Stride];
-    StructuredBuffer<float3> NormalBindless = ResourceDescriptorHeap[3 + InstanceIdx * Stride];
-    StructuredBuffer<float2> TexCoordBindless = ResourceDescriptorHeap[4 + InstanceIdx * Stride];
-    Texture2D<float4> AlbedoTexture = ResourceDescriptorHeap[5 + InstanceIdx * Stride];
+    StructuredBuffer<uint2> VertexIndexOffset = ResourceDescriptorHeap[(PerPrimOffset++) + InstanceIdx * Stride];
+    StructuredBuffer<uint> IndexBindless = ResourceDescriptorHeap[(PerPrimOffset++) + InstanceIdx * Stride];
+    StructuredBuffer<RenderObjectUniformBuffer> RenderObjParam = ResourceDescriptorHeap[(PerPrimOffset++) + InstanceIdx * Stride];
+    StructuredBuffer<float3> NormalBindless = ResourceDescriptorHeap[(PerPrimOffset++) + InstanceIdx * Stride];
+    StructuredBuffer<float3> TangentBindless = ResourceDescriptorHeap[(PerPrimOffset++) + InstanceIdx * Stride];
+    StructuredBuffer<float3> BiTangentBindless = ResourceDescriptorHeap[(PerPrimOffset++) + InstanceIdx * Stride];
+    StructuredBuffer<float2> TexCoordBindless = ResourceDescriptorHeap[(PerPrimOffset++) + InstanceIdx * Stride];
+    Texture2D AlbedoTexture = ResourceDescriptorHeap[(PerPrimOffset++) + InstanceIdx * Stride];
+    Texture2D NormalTexture = ResourceDescriptorHeap[(PerPrimOffset++) + InstanceIdx * Stride];
+    Texture2D RMTexture = ResourceDescriptorHeap[(PerPrimOffset++) + InstanceIdx * Stride];
 
     // Sampler DescHeap
     SamplerState AlbedoTextureSampler = SamplerDescriptorHeap[0];
@@ -140,29 +166,70 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
     uint3 Indices = uint3(
         IndexBindless[IndexOffset + PrimIdx * 3],
         IndexBindless[IndexOffset + PrimIdx * 3 + 1],
-        IndexBindless[IndexOffset + PrimIdx * 3 + 2]
-        );
+        IndexBindless[IndexOffset + PrimIdx * 3 + 2]);
 
-    float3 Normals[3] = {
-        NormalBindless[Indices.x + VertexOffset],
-        NormalBindless[Indices.y + VertexOffset],
-        NormalBindless[Indices.z + VertexOffset]
-    };
+    float3 normal = HitAttribute(NormalBindless[Indices.x + VertexOffset]
+        , NormalBindless[Indices.y + VertexOffset]
+        , NormalBindless[Indices.z + VertexOffset], attr);
 
-    float3 normal = HitAttribute(Normals, attr);
-    
-    float2 UVs[3] = {
-        TexCoordBindless[Indices.x + VertexOffset],
-        TexCoordBindless[Indices.y + VertexOffset],
-        TexCoordBindless[Indices.z + VertexOffset]
-    };
+    float3 tangent = HitAttribute(TangentBindless[Indices.x + VertexOffset]
+        , TangentBindless[Indices.y + VertexOffset]
+        , TangentBindless[Indices.z + VertexOffset], attr);
+        
+    float3 bitangent = HitAttribute(NormalBindless[Indices.x + VertexOffset]
+        , BiTangentBindless[Indices.y + VertexOffset]
+        , BiTangentBindless[Indices.z + VertexOffset], attr);
 
-    float2 uv = HitAttribute(UVs, attr);
+    float3x3 TBN = 0;
+    {
+        float3 T = normalize(mul((float3x3)RenderObjParam[0].M, tangent).xyz);
+        float3 B = normalize(mul((float3x3)RenderObjParam[0].M, bitangent).xyz);
+        float3 N = normalize(mul((float3x3)RenderObjParam[0].M, normal).xyz);
+        TBN = transpose(float3x3(T, B, N));
+    }
+
+    float2 uv = HitAttribute(TexCoordBindless[Indices.x + VertexOffset]
+        , TexCoordBindless[Indices.y + VertexOffset]
+        , TexCoordBindless[Indices.z + VertexOffset], attr);
 
     float2 ddx = float2(0, 0);
     float2 ddy = float2(0, 0);
     float4 albedo = AlbedoTexture.SampleGrad(AlbedoTextureSampler, uv, ddx, ddy);
-    payload.color = albedo;
+    //payload.color = albedo;
+
+    float3 TexNormal = NormalTexture.SampleGrad(AlbedoTextureSampler, uv, ddx, ddy).xyz;
+    TexNormal.y = 1.0 - TexNormal.y;
+    TexNormal= TexNormal * 2.0f - 1.0f;
+    float3 WorldNormal = normalize(mul(TBN, TexNormal));
+    //payload.color = float4(WorldNormal, 1.0);
+
+    float roughness = RMTexture.SampleGrad(AlbedoTextureSampler, uv, ddx, ddy).y;
+    float metallic = RMTexture.SampleGrad(AlbedoTextureSampler, uv, ddx, ddy).z;
+
+    float3 L = -float3(0.1f, -0.5f, 0.1f);
+    float3 N = WorldNormal;
+    float3 V = normalize(float3(-559.937622f, 116.339653f, 84.3709946f) - HitWorldPosition());
+    const float DistanceToLight = 1.0f;     // Directional light from the Sun is not having attenuation by using distance
+    payload.color.xyz = PBR(L, N, V, albedo, float3(1, 1, 1), DistanceToLight, metallic, roughness);
+    payload.color.w = 1.0f;
+
+    SamplerState PBRSamplerState = SamplerDescriptorHeap[1];
+    // ambient from IBL
+    {
+        // todo : Need to split shader, because it is possible that ILB without directional light
+        float3 DiffusePart = IBL_DiffusePart(N, V, albedo, metallic, roughness, IrradianceMap, PBRSamplerState);
+
+        float NoV = saturate(dot(N, V));
+        float3 R = 2 * dot(V, N) * N - V;
+        R = normalize(R);
+        float3 PrefilteredColor = PrefilteredEnvMap.SampleLevel(PBRSamplerState, R, roughness * (8-1)).rgb;
+        
+        float3 F0 = float3(0.04f, 0.04f, 0.04f);
+        float3 SpecularColor = lerp(F0, albedo, metallic);
+
+        float3 SpecularPart = PrefilteredColor * EnvBRDFApprox(SpecularColor, roughness, NoV);
+        payload.color.xyz += (DiffusePart + SpecularPart);
+    }
 }
 
 [shader("miss")]
