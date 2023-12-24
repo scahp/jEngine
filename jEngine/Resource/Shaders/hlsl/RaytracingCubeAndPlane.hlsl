@@ -7,12 +7,7 @@ struct SceneConstantBuffer
 {
     float4x4 projectionToWorld;
     float4 cameraPosition;
-    float4 lightPosition;
-    float4 lightAmbientColor;
-    float4 lightDiffuseColor;
-    uint NumOfStartingRay;
-    float focalDistance;
-    float lensRadius;
+    float4 lightDireciton;
 };
 
 RaytracingAccelerationStructure Scene : register(t0, space0);
@@ -77,6 +72,26 @@ inline float3 GenerateCameraRay(uint2 index, out float3 origin, out float3 direc
     return world.xyz;
 }
 
+//////////////////////////////////////////
+// Second ray type which is the shadow
+struct ShadowHitInfo
+{
+    bool isHit;
+};
+
+[shader("closesthit")]
+void ShadowMyClosestHitShader(inout ShadowHitInfo payload, in MyAttributes attr)
+{
+    payload.isHit = true;
+}
+
+[shader("miss")]
+void ShadowMyMissShader(inout ShadowHitInfo payload)
+{
+    payload.isHit = false;
+}
+//////////////////////////////////////////
+
 [shader("raygeneration")]
 void MyRaygenShader()
 {
@@ -95,16 +110,19 @@ void MyRaygenShader()
     // TMin should be kept small to prevent missing geometry at close contact areas.
     ray.TMin = 0.001;
     ray.TMax = 10000.0;
+    
     RayPayload payload = { float4(1.0f, 1.0f, 1.0f, 1.0f) };
-    TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0, ray, payload);
-    color += payload.color;
-
-    // Linear to sRGB
-    //color = float4(sqrt(color.xyz), 1.0f);
-
-    //color.xyz = rayDir;
-
-    // RenderTarget[DispatchRaysIndex().xy] = color;
+    ShadowHitInfo shadowPayload;
+    shadowPayload.isHit = false;
+    
+    TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 0, 0, ray, payload);
+    //color = shadowPayload.isHit ? float4(1, 1, 1, 1) : float4(0, 0, 0, 1);
+    color = payload.color;
+    
+    /*
+    TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 1, 0, 1, ray, shadowPayload);
+    color.xyz = shadowPayload.isHit ? float4(1, 1, 1, 1) : float4(0, 0, 0, 1);
+    */
 
     RWTexture2D<float4> RenderTargetBindless = ResourceDescriptorHeap[0];
     RenderTargetBindless[DispatchRaysIndex().xy] = color;
@@ -276,7 +294,7 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
     float roughness = RMTexture.SampleGrad(AlbedoTextureSampler, uv, ddx, ddy).y;
     float metallic = RMTexture.SampleGrad(AlbedoTextureSampler, uv, ddx, ddy).z;
 
-    float3 L = -float3(0.1f, -0.5f, 0.1f);
+    float3 L = -g_sceneCB.lightDireciton;
     float3 N = WorldNormal;
     float3 V = -WorldRayDirection();
     const float DistanceToLight = 1.0f;     // Directional light from the Sun is not having attenuation by using distance
@@ -299,6 +317,68 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 
         float3 SpecularPart = PrefilteredColor * EnvBRDFApprox(SpecularColor, roughness, NoV);
         payload.color.xyz += (DiffusePart + SpecularPart);
+    }
+
+    if (1)
+    {
+        // Find the world - space hit position
+        float3 worldOrigin = WorldRayOrigin() + RayTCurrent() * WorldRayDirection();
+
+        float3 lightDir = -g_sceneCB.lightDireciton.xyz;
+
+        // Fire a shadow ray. The direction is hard-coded here, but can be fetched
+        // from a constant-buffer
+        RayDesc ray;
+        ray.Origin = worldOrigin;
+        ray.Direction = lightDir;
+        ray.TMin = 0.01;
+        ray.TMax = 100000;
+        bool hit = true;
+
+        // Initialize the ray payload
+        ShadowHitInfo shadowPayload;
+        shadowPayload.isHit = false;
+
+        // Trace the ray
+        TraceRay(
+            // Acceleration structure
+            Scene,
+            // Flags can be used to specify the behavior upon hitting a surface
+            RAY_FLAG_NONE,
+            // Instance inclusion mask, which can be used to mask out some geometry to
+            // this ray by and-ing the mask with a geometry mask. The 0xFF flag then
+            // indicates no geometry will be masked
+            0xFF,
+            // Depending on the type of ray, a given object can have several hit
+            // groups attached (ie. what to do when hitting to compute regular
+            // shading, and what to do when hitting to compute shadows). Those hit
+            // groups are specified sequentially in the SBT, so the value below
+            // indicates which offset (on 4 bits) to apply to the hit groups for this
+            // ray. In this sample we only have one hit group per object, hence an
+            // offset of 0.
+            1,
+            // The offsets in the SBT can be computed from the object ID, its instance
+            // ID, but also simply by the order the objects have been pushed in the
+            // acceleration structure. This allows the application to group shaders in
+            // the SBT in the same order as they are added in the AS, in which case
+            // the value below represents the stride (4 bits representing the number
+            // of hit groups) between two consecutive objects.
+            0,
+            // Index of the miss shader to use in case several consecutive miss
+            // shaders are present in the SBT. This allows to change the behavior of
+            // the program when no geometry have been hit, for example one to return a
+            // sky color for regular rendering, and another returning a full
+            // visibility value for shadow rays. This sample has only one miss shader,
+            // hence an index 0
+            1,
+            // Ray information to trace
+            ray,
+            // Payload associated to the ray, which will be used to communicate
+            // between the hit/miss shaders and the raygen
+            shadowPayload);
+
+        float factor = shadowPayload.isHit ? 0.3 : 1.0;
+        payload.color.xyz *= float3(factor, factor, factor);
     }
 }
 
