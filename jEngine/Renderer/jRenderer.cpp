@@ -1487,13 +1487,17 @@ void jRenderer::Render()
             shaderInfo.SetEntryPoint(jNameStatic(""));
             auto raytracingShader = g_rhi->CreateShader(shaderInfo);
 
-            std::array<D3D12_STATE_SUBOBJECT, 10> subobjects;
+            std::array<D3D12_STATE_SUBOBJECT, 20> subobjects;
             uint32 index = 0;
 
             const wchar_t* c_raygenShaderName = L"MyRaygenShader";
             const wchar_t* c_closestHitShaderName = L"MyClosestHitShader";
             const wchar_t* c_missShaderName = L"MyMissShader";
             const wchar_t* c_triHitGroupName = L"TriHitGroup";
+
+            const wchar_t* c_shadowClosestHitShaderName = L"ShadowMyClosestHitShader";
+            const wchar_t* c_shadowMissShaderName = L"ShadowMyMissShader";
+            const wchar_t* c_shadowTriHitGroupName = L"ShadowTriHitGroup";
 
             // 9. CreateRootSignatures
             {
@@ -1534,7 +1538,9 @@ void jRenderer::Render()
             {
                 D3D12_STATE_SUBOBJECT subobject{};
                 {
-                    const wchar_t* entryPoint[] = { c_raygenShaderName, c_closestHitShaderName, c_missShaderName };
+                    const wchar_t* entryPoint[] = { c_raygenShaderName, c_closestHitShaderName, c_missShaderName
+                        , c_shadowClosestHitShaderName, c_shadowMissShaderName 
+                    };
                     subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
                     subobject.pDesc = &dxilDesc;
 
@@ -1570,6 +1576,20 @@ void jRenderer::Render()
                 D3D12_STATE_SUBOBJECT subobject{};
                 subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
                 subobject.pDesc = &hitgroupDesc;
+                subobjects[index++] = subobject;
+            }
+
+            // Shadow hit group
+            D3D12_HIT_GROUP_DESC shadowHitgroupDesc{};
+            {
+                shadowHitgroupDesc.AnyHitShaderImport = nullptr;
+                shadowHitgroupDesc.ClosestHitShaderImport = c_shadowClosestHitShaderName;
+                shadowHitgroupDesc.HitGroupExport = c_shadowTriHitGroupName;
+                shadowHitgroupDesc.Type = D3D12_HIT_GROUP_TYPE_TRIANGLES;
+
+                D3D12_STATE_SUBOBJECT subobject{};
+                subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
+                subobject.pDesc = &shadowHitgroupDesc;
                 subobjects[index++] = subobject;
             }
 
@@ -1626,6 +1646,9 @@ void jRenderer::Render()
             void* misssShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_missShaderName);
             void* triHitGroupShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_triHitGroupName);
 
+            void* shadowMisssShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_shadowMissShaderName);
+            void* shadowTriHitGroupShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_shadowTriHitGroupName);
+
             // Raygen shader table
             {
                 const uint16 numShaderRecords = 1;
@@ -1637,19 +1660,21 @@ void jRenderer::Render()
 
             // Miss shader table
             {
-                const uint16 numShaderRecords = 1;
+                const uint16 numShaderRecords = 2;
                 const uint16 shaderRecordSize = shaderIdentifierSize;
                 ShaderTable missShaderTable(g_rhi_dx12->Device.Get(), numShaderRecords, shaderRecordSize, TEXT("MissShaderTable"));
                 missShaderTable.push_back(ShaderRecord(misssShaderIdentifier, shaderIdentifierSize));
+                missShaderTable.push_back(ShaderRecord(shadowMisssShaderIdentifier, shaderIdentifierSize));
                 m_missShaderTable = missShaderTable.GetResource();
             }
 
             // Hit shader table
             {
-                const uint16 numShaderRecords = 1;
+                const uint16 numShaderRecords = 2;
                 const uint16 shaderRecordSize = shaderIdentifierSize;
                 ShaderTable hitShaderTable(g_rhi_dx12->Device.Get(), numShaderRecords, shaderRecordSize, TEXT("HitShaderTable"));
                 hitShaderTable.push_back(ShaderRecord(triHitGroupShaderIdentifier, shaderIdentifierSize));
+                hitShaderTable.push_back(ShaderRecord(shadowTriHitGroupShaderIdentifier, shaderIdentifierSize));
                 m_hitGroupShaderTable = hitShaderTable.GetResource();
             }
         }
@@ -1663,25 +1688,8 @@ void jRenderer::Render()
             {
                 XMMATRIX projectionToWorld;
                 XMVECTOR cameraPosition;
-                XMVECTOR lightPosition;
-                XMVECTOR lightAmbientColor;
-                XMVECTOR lightDiffuseColor;
-                uint32 NumOfStartingRay;
-                float focalDistance;
-                float lensRadius;
+                XMVECTOR lightDireciton;
             };
-
-            //struct SceneConstantBuffer
-            //{
-            //    Matrix projectionToWorld;
-            //    Vector4 cameraPosition;
-            //    Vector4 lightPosition;
-            //    Vector4 lightAmbientColor;
-            //    Vector4 lightDiffuseColor;
-            //    uint32 NumOfStartingRay;
-            //    float focalDistance;
-            //    float lensRadius;
-            //};
 
             SceneConstantBuffer m_sceneCB;
 
@@ -1706,6 +1714,18 @@ void jRenderer::Render()
             const XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(fovAngleY), m_aspectRatio, 1.0f, 1250.0f);
             const XMMATRIX viewProj = view * proj;
             m_sceneCB.projectionToWorld = XMMatrixTranspose(XMMatrixInverse(nullptr, viewProj));
+
+            jDirectionalLight* DirectionalLight = nullptr;
+            for (auto light : jLight::GetLights())
+            {
+                if (light->Type == ELightType::DIRECTIONAL)
+                {
+                    DirectionalLight = (jDirectionalLight*)light;
+                    break;
+                }
+            }
+            check(DirectionalLight);
+            m_sceneCB.lightDireciton = { DirectionalLight->GetLightData().Direction.x, DirectionalLight->GetLightData().Direction.y, DirectionalLight->GetLightData().Direction.z };
 
             static auto SceneBuffer = jBufferUtil_DX12::CreateBuffer(sizeof(m_sceneCB), 0, EBufferCreateFlag::UAV, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, &m_sceneCB, sizeof(m_sceneCB));
             static auto TempBuffer = jBufferUtil_DX12::CreateBuffer(sizeof(m_sceneCB), 0, EBufferCreateFlag::CPUAccess, D3D12_RESOURCE_STATE_COMMON, &m_sceneCB, sizeof(m_sceneCB));
@@ -1864,15 +1884,15 @@ void jRenderer::Render()
 
             // 각 Shader table은 단 한개의 shader record를 가지기 때문에 stride가 그 사이즈와 동일함
             dispatchDesc.HitGroupTable.StartAddress = m_hitGroupShaderTable->GetGPUVirtualAddress();
-            dispatchDesc.HitGroupTable.SizeInBytes = m_hitGroupShaderTable->GetDesc().Width;
-            dispatchDesc.HitGroupTable.StrideInBytes = dispatchDesc.HitGroupTable.SizeInBytes;
+            dispatchDesc.HitGroupTable.SizeInBytes = 64;
+            dispatchDesc.HitGroupTable.StrideInBytes = 64;
 
             dispatchDesc.MissShaderTable.StartAddress = m_missShaderTable->GetGPUVirtualAddress();
-            dispatchDesc.MissShaderTable.SizeInBytes = m_missShaderTable->GetDesc().Width;
-            dispatchDesc.MissShaderTable.StrideInBytes = dispatchDesc.MissShaderTable.SizeInBytes;
+            dispatchDesc.MissShaderTable.SizeInBytes = 64;
+            dispatchDesc.MissShaderTable.StrideInBytes = 64;
 
             dispatchDesc.RayGenerationShaderRecord.StartAddress = m_rayGenShaderTable->GetGPUVirtualAddress();
-            dispatchDesc.RayGenerationShaderRecord.SizeInBytes = m_rayGenShaderTable->GetDesc().Width;
+            dispatchDesc.RayGenerationShaderRecord.SizeInBytes = 64;
 
             dispatchDesc.Width = SCR_WIDTH;
             dispatchDesc.Height = SCR_HEIGHT;

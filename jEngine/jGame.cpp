@@ -373,7 +373,7 @@ void jGame::Setup()
                 instanceDescs[i].InstanceID = i;
                 instanceDescs[i].InstanceContributionToHitGroupIndex = 0;
 				memcpy(instanceDescs[i].Transform, &RObj->World.m, sizeof(instanceDescs[i].Transform));
-                instanceDescs[i].InstanceMask = 1;
+                instanceDescs[i].InstanceMask = 0xFF;
                 instanceDescs[i].AccelerationStructure = RObj->BottomLevelASBuffer->GetGPUAddress();
                 for (int32 k = 0; k < 3; ++k)
                     for (int32 m = 0; m < 4; ++m)
