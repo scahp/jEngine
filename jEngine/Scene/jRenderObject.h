@@ -97,6 +97,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 
     std::shared_ptr<jMaterial> MaterialPtr;
+	std::shared_ptr<jBuffer_DX12> TestUniformBuffer;
 
 private:
 	enum EDirty : int8

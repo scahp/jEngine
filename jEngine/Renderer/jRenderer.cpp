@@ -81,21 +81,6 @@ void jRenderer::Setup()
         }       
     }
 
-#if 1
-    jSceneRenderTarget::CubeEnvMap2 = jImageFileLoader::GetInstance().LoadTextureFromFile(jNameStatic("Resource/stpeters_probe_cubemp.dds")).lock().get();
-    jSceneRenderTarget::IrradianceMap2 = jImageFileLoader::GetInstance().LoadTextureFromFile(jNameStatic("Resource/stpeters_probe_irradiancemap.dds")).lock().get();
-    jSceneRenderTarget::FilteredEnvMap2 = jImageFileLoader::GetInstance().LoadTextureFromFile(jNameStatic("Resource/stpeters_probe_filteredenvmap.dds")).lock().get();
-#else
-    static jName FilePath = jName("Resource/stpeters_probe.hdr");
-    static auto Cubemap = jRHIUtil::ConvertToCubeMap(jNameStatic("F:\\Cubemap.dds"), { 512, 512 }, RenderFrameContextPtr, FilePath);
-    static auto IrradianceMap = jRHIUtil::GenerateIrradianceMap(jNameStatic("F:\\IrradianceMap.dds"), { 256, 256 }, RenderFrameContextPtr, Cubemap->GetTexture());
-    static auto EnvironmentCubeMap = jRHIUtil::GenerateFilteredEnvironmentMap(jNameStatic("F:\\FilteredEnvMap.dds"), { 256, 256 }, RenderFrameContextPtr, Cubemap->GetTexture());
-
-    jSceneRenderTarget::CubeEnvMap2 = Cubemap->GetTexture();
-    jSceneRenderTarget::IrradianceMap2 = IrradianceMap->GetTexture();
-    jSceneRenderTarget::FilteredEnvMap2 = EnvironmentCubeMap->GetTexture();
-#endif
-
 #if ASYNC_WITH_SETUP
     ShadowPassSetupCompleteEvent = std::async(std::launch::async, &jRenderer::SetupShadowPass, this);
 #else
@@ -1464,6 +1449,23 @@ void jRenderer::Render()
         //BasepassOcclusionTest.Init();
     }
 
+
+
+#if 1
+    jSceneRenderTarget::CubeEnvMap2 = jImageFileLoader::GetInstance().LoadTextureFromFile(jNameStatic("Resource/stpeters_probe_cubemp.dds")).lock().get();
+    jSceneRenderTarget::IrradianceMap2 = jImageFileLoader::GetInstance().LoadTextureFromFile(jNameStatic("Resource/stpeters_probe_irradiancemap.dds")).lock().get();
+    jSceneRenderTarget::FilteredEnvMap2 = jImageFileLoader::GetInstance().LoadTextureFromFile(jNameStatic("Resource/stpeters_probe_filteredenvmap.dds")).lock().get();
+#else
+    static jName FilePath = jName("Resource/stpeters_probe.hdr");
+    static auto Cubemap = jRHIUtil::ConvertToCubeMap(jNameStatic("F:\\Cubemap.dds"), { 512, 512 }, RenderFrameContextPtr, FilePath);
+    static auto IrradianceMap = jRHIUtil::GenerateIrradianceMap(jNameStatic("F:\\IrradianceMap.dds"), { 256, 256 }, RenderFrameContextPtr, Cubemap->GetTexture());
+    static auto EnvironmentCubeMap = jRHIUtil::GenerateFilteredEnvironmentMap(jNameStatic("F:\\FilteredEnvMap.dds"), { 256, 256 }, RenderFrameContextPtr, Cubemap->GetTexture());
+
+    jSceneRenderTarget::CubeEnvMap2 = Cubemap->GetTexture();
+    jSceneRenderTarget::IrradianceMap2 = IrradianceMap->GetTexture();
+    jSceneRenderTarget::FilteredEnvMap2 = EnvironmentCubeMap->GetTexture();
+#endif
+
     static ComPtr<ID3D12StateObject> m_dxrStateObject;
     static ComPtr<ID3D12Resource> m_rayGenShaderTable;
     static ComPtr<ID3D12Resource> m_missShaderTable;
@@ -1688,18 +1690,13 @@ void jRenderer::Render()
                 return static_cast<float>(SCR_WIDTH) / static_cast<float>(SCR_HEIGHT);
             };
 
-            //auto MainCamera = jCamera::GetMainCamera();
-            //m_sceneCB.cameraPosition = Vector4({ 0, 0, -1000 }, 1.0f);
-
-            //auto VP = jCameraUtil::CreateViewMatrix({ 0, 0, -1000 }, { 300, 0, 0 }, { 0, 1, 0 }) *
-            //    jCameraUtil::CreatePerspectiveMatrix(SCR_WIDTH, SCR_HEIGHT, XMConvertToRadians(45), 1.0f, 1250.0f);
-            //m_sceneCB.projectionToWorld = VP.GetInverse().GetTranspose();
+            auto mainCamera = jCamera::GetMainCamera();
 
             auto v = jCameraUtil::CreateViewMatrix({ 0, 0, -1000 }, { 300, 0, 0 }, { 0, 1, 0 });
-            auto p = jCameraUtil::CreatePerspectiveMatrix(SCR_WIDTH, SCR_HEIGHT, XMConvertToRadians(45), 1.0f, 1250.0f);
+            auto p = jCameraUtil::CreatePerspectiveMatrix((float)SCR_WIDTH, (float)SCR_HEIGHT, XMConvertToRadians(45), 1.0f, 1250.0f);
 
-            XMVECTOR m_eye = { -559.937622f, 116.339653f, 84.3709946f, 1.0f };
-            XMVECTOR m_at = { -260.303925f, 105.498116f, 94.4834976f, 1.0f };
+            XMVECTOR m_eye = { mainCamera->Pos.x, mainCamera->Pos.y, mainCamera->Pos.z, 1.0f };
+            XMVECTOR m_at = { mainCamera->Target.x, mainCamera->Target.y, mainCamera->Target.z, 1.0f };
             XMVECTOR m_up = { 0.0f, 1.0f, 0.0f };
 
             m_sceneCB.cameraPosition = m_eye;
@@ -1711,6 +1708,9 @@ void jRenderer::Render()
             m_sceneCB.projectionToWorld = XMMatrixTranspose(XMMatrixInverse(nullptr, viewProj));
 
             static auto SceneBuffer = jBufferUtil_DX12::CreateBuffer(sizeof(m_sceneCB), 0, EBufferCreateFlag::UAV, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, &m_sceneCB, sizeof(m_sceneCB));
+            static auto TempBuffer = jBufferUtil_DX12::CreateBuffer(sizeof(m_sceneCB), 0, EBufferCreateFlag::CPUAccess, D3D12_RESOURCE_STATE_COMMON, &m_sceneCB, sizeof(m_sceneCB));
+            TempBuffer->UpdateBuffer(&m_sceneCB, sizeof(m_sceneCB));
+            jBufferUtil_DX12::CopyBuffer(CmdBufferDX12->CommandList.Get(), TempBuffer->Buffer.Get(), SceneBuffer->Buffer.Get(), sizeof(m_sceneCB), 0, 0);
             auto cbGpuAddress = SceneBuffer->GetGPUAddress();
 
             // 현재 디스크립터에 복사해야 함.
@@ -1729,6 +1729,8 @@ void jRenderer::Render()
             std::vector<jDescriptor_DX12> SamplerDescriptors;
 
             Descriptors.push_back(m_raytracingOutput->UAV);
+            Descriptors.push_back(((jTexture_DX12*)jSceneRenderTarget::IrradianceMap2)->SRV);
+            Descriptors.push_back(((jTexture_DX12*)jSceneRenderTarget::FilteredEnvMap2)->SRV);
             for(int32 i=0;i<jObject::GetStaticRenderObject().size();++i)
             {
                 jRenderObject* RObj = jObject::GetStaticRenderObject()[i];
@@ -1737,6 +1739,10 @@ void jRenderer::Render()
                 auto Vtx = (jVertexBuffer_DX12*)RObj->GeometryDataPtr->VertexBuffer;
                 auto Idx = (jIndexBuffer_DX12*)RObj->GeometryDataPtr->IndexBuffer;
                 Descriptors.push_back(Idx->BufferPtr->SRV);
+
+                RObj->CreateShaderBindingInstance();
+                auto RObjUni = (jUniformBufferBlock_DX12*)RObj->TestUniformBuffer.get();
+                Descriptors.push_back(RObj->TestUniformBuffer->SRV);
 
                 for (int32 k = 0; k < Vtx->Streams.size(); ++k)
                 {
@@ -1750,11 +1756,11 @@ void jRenderer::Render()
                     }
                     else if (Vtx->Streams[k].Name == jNameStatic("TANGENT"))
                     {
-                        //Descriptors.push_back(Vtx->Streams[k].BufferPtr->SRV);
+                        Descriptors.push_back(Vtx->Streams[k].BufferPtr->SRV);
                     }
                     else if (Vtx->Streams[k].Name == jNameStatic("BITANGENT"))
                     {
-                        //Descriptors.push_back(Vtx->Streams[k].BufferPtr->SRV);
+                        Descriptors.push_back(Vtx->Streams[k].BufferPtr->SRV);
                     }
                     else if (Vtx->Streams[k].Name == jNameStatic("TEXCOORD"))
                     {
@@ -1763,12 +1769,30 @@ void jRenderer::Render()
                     }
                 }
 
-                if (RObj->MaterialPtr->HasAlbedoTexture())
+                if (jTexture_DX12* AlbedoTexDX12 = RObj->MaterialPtr->GetTexture<jTexture_DX12>(jMaterial::EMaterialTextureType::Albedo))
                 {
-                    jTexture_DX12* AlbedoTexDX12 = RObj->MaterialPtr->GetTexture<jTexture_DX12>(jMaterial::EMaterialTextureType::Albedo);
-
                     check(AlbedoTexDX12->SRV.IsValid());
                     Descriptors.push_back(AlbedoTexDX12->SRV);
+                }
+                else
+                {
+                    Descriptors.push_back(((jTexture_DX12*)GBlackTexture)->SRV);
+                }
+
+                if (jTexture_DX12* NormalTexDX12 = RObj->MaterialPtr->GetTexture<jTexture_DX12>(jMaterial::EMaterialTextureType::Normal))
+                {
+                    check(NormalTexDX12->SRV.IsValid());
+                    Descriptors.push_back(NormalTexDX12->SRV);
+                }
+                else
+                {
+                    Descriptors.push_back(((jTexture_DX12*)GNormalTexture)->SRV);
+                }
+
+                if (jTexture_DX12* MetalicTexDX12 = RObj->MaterialPtr->GetTexture<jTexture_DX12>(jMaterial::EMaterialTextureType::Metallic))
+                {
+                    check(MetalicTexDX12->SRV.IsValid());
+                    Descriptors.push_back(MetalicTexDX12->SRV);
                 }
                 else
                 {
@@ -1777,9 +1801,9 @@ void jRenderer::Render()
             }
             if (Descriptors.size() > 0)
             {
-                check(Descriptors.size() <= 620);
-                jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 620> DestDescriptor;
-                jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 620> SrcDescriptor;
+                check(Descriptors.size() <= 1100);
+                jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 1100> DestDescriptor;
+                jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 1100> SrcDescriptor;
 
                 for (int32 i = 0; i < Descriptors.size(); ++i)
                 {
@@ -1801,6 +1825,11 @@ void jRenderer::Render()
                 , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT
                 , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
             SamplerDescriptors.push_back(SamplerState->SamplerSRV);
+
+            const jSamplerStateInfo_DX12* PBRSamplerStateInfoDX12 = (jSamplerStateInfo_DX12*)TSamplerStateInfo<ETextureFilter::NEAREST_MIPMAP_LINEAR, ETextureFilter::NEAREST_MIPMAP_LINEAR
+                , ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
+                , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
+            SamplerDescriptors.push_back(PBRSamplerStateInfoDX12->SamplerSRV);
             if (SamplerDescriptors.size() > 0)
             {
                 check(SamplerDescriptors.size() <= 620);
@@ -1852,13 +1881,15 @@ void jRenderer::Render()
             CmdBufferDX12->CommandList->DispatchRays(&dispatchDesc);
         }
 
+        if (1)
         {
             static jFullscreenQuadPrimitive* GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
 
-            auto BackBuffer = g_rhi_dx12->GetSwapchainImage(g_rhi_dx12->CurrentFrameIndex)->TexturePtr;
-            auto BackBufferRT = std::make_shared<jRenderTarget>(BackBuffer);
+            //auto BackBuffer = g_rhi_dx12->GetSwapchainImage(g_rhi_dx12->CurrentFrameIndex)->TexturePtr;
+            //auto BackBufferRT = std::make_shared<jRenderTarget>(BackBuffer);
+            auto RT = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr;
 
-            g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), BackBuffer.get(), EImageLayout::COLOR_ATTACHMENT);
+            g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RT->TexturePtr.get(), EImageLayout::COLOR_ATTACHMENT);
             g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), m_raytracingOutput, EImageLayout::SHADER_READ_ONLY);
 
             jRasterizationStateInfo* RasterizationState = nullptr;
@@ -1891,7 +1922,7 @@ void jRenderer::Render()
             const jRTClearValue ClearDepth = jRTClearValue(1.0f, 0);
 
             jRenderPassInfo renderPassInfo;
-            jAttachment color = jAttachment(BackBufferRT, EAttachmentLoadStoreOp::LOAD_STORE
+            jAttachment color = jAttachment(RT, EAttachmentLoadStoreOp::LOAD_STORE
                 , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
             renderPassInfo.Attachments.push_back(color);
 
@@ -1941,30 +1972,31 @@ void jRenderer::Render()
                 RenderPass->EndRenderPass();
             }
         }
-        return;
     }
-
-    Setup();
-    ShadowPass();
-
-    // Queue submit to prepare shadowmap for basepass 
-    if (gOptions.QueueSubmitAfterShadowPass)
+    else
     {
-        SCOPE_CPU_PROFILE(QueueSubmitAfterShadowPass);
-        //RenderFrameContextPtr->GetActiveCommandBuffer()->End();
-        RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::ShadowPass);
-        RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
-    }
+        Setup();
+        ShadowPass();
 
-    BasePass();
+        // Queue submit to prepare shadowmap for basepass 
+        if (gOptions.QueueSubmitAfterShadowPass)
+        {
+            SCOPE_CPU_PROFILE(QueueSubmitAfterShadowPass);
+            //RenderFrameContextPtr->GetActiveCommandBuffer()->End();
+            RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::ShadowPass);
+            RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
+        }
 
-    // Queue submit to prepare scenecolor RT for postprocess
-    if (gOptions.QueueSubmitAfterBasePass)
-    {
-        SCOPE_CPU_PROFILE(QueueSubmitAfterBasePass);
-        //RenderFrameContextPtr->GetActiveCommandBuffer()->End();
-        RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::BasePass);
-        RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
+        BasePass();
+
+        // Queue submit to prepare scenecolor RT for postprocess
+        if (gOptions.QueueSubmitAfterBasePass)
+        {
+            SCOPE_CPU_PROFILE(QueueSubmitAfterBasePass);
+            //RenderFrameContextPtr->GetActiveCommandBuffer()->End();
+            RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::BasePass);
+            RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
+        }
     }
 
     PostProcess();
