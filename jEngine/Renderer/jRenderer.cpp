@@ -1748,7 +1748,7 @@ void jRenderer::Render()
                 {
                     if (Vtx->Streams[k].Name == jNameStatic("POSITION"))
                     {
-                        //Descriptors.push_back(Vtx->Streams[k].BufferPtr->SRV);
+                        Descriptors.push_back(Vtx->Streams[k].BufferPtr->SRV);
                     }
                     else if (Vtx->Streams[k].Name == jNameStatic("NORMAL"))
                     {
@@ -1801,9 +1801,9 @@ void jRenderer::Render()
             }
             if (Descriptors.size() > 0)
             {
-                check(Descriptors.size() <= 1100);
-                jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 1100> DestDescriptor;
-                jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 1100> SrcDescriptor;
+                check(Descriptors.size() <= 1150);
+                jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 1150> DestDescriptor;
+                jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 1150> SrcDescriptor;
 
                 for (int32 i = 0; i < Descriptors.size(); ++i)
                 {

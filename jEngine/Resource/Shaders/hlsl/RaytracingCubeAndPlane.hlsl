@@ -58,13 +58,16 @@ float2 HitAttribute(float2 A, float2 B, float2 C, BuiltInTriangleIntersectionAtt
         attr.barycentrics.y * (C - A);
 }
 
+// Generate a ray in world space for a camera pixel corresponding to an index from the dispatched 2D grid.
 inline float3 GenerateCameraRay(uint2 index, out float3 origin, out float3 direction)
 {
-    float2 xy = index + 0.5f;
-    float2 screenPos = xy / DispatchRaysDimensions().xy * 2.0f - 1.0f;
+    float2 xy = index + 0.5f; // center in the middle of the pixel.
+    float2 screenPos = xy / DispatchRaysDimensions().xy * 2.0 - 1.0;
 
+    // Invert Y for DirectX-style coordinates.
     screenPos.y = -screenPos.y;
 
+    // Unproject the pixel coordinate into a ray.
     float4 world = mul(float4(screenPos, 0, 1), g_sceneCB.projectionToWorld);
 
     world.xyz /= world.w;
@@ -131,6 +134,33 @@ float3 ColorVariation(uint In)
     return float3(Random(In), Random(In+100), Random(In+200));
 }
 
+float3 RayPlaneIntersection(float3 planeOrigin, float3 planeNormal, float3 rayOrigin, float3 rayDirection)
+{
+    float t = dot(-planeNormal, rayOrigin - planeOrigin) / dot(planeNormal, rayDirection);
+    return rayOrigin + rayDirection * t;
+}
+
+/*
+    REF: https://gamedev.stackexchange.com/questions/23743/whats-the-most-efficient-way-to-find-barycentric-coordinates
+    From "Real-Time Collision Detection" by Christer Ericson
+*/
+float3 BarycentricCoordinates(float3 pt, float3 v0, float3 v1, float3 v2)
+{
+    float3 e0 = v1 - v0;
+    float3 e1 = v2 - v0;
+    float3 e2 = pt - v0;
+    float d00 = dot(e0, e0);
+    float d01 = dot(e0, e1);
+    float d11 = dot(e1, e1);
+    float d20 = dot(e2, e0);
+    float d21 = dot(e2, e1);
+    float denom = 1.0 / (d00 * d11 - d01 * d01);
+    float v = (d11 * d20 - d01 * d21) * denom;
+    float w = (d00 * d21 - d01 * d20) * denom;
+    float u = 1.0 - v - w;
+    return float3(u, v, w);
+}
+
 [shader("closesthit")]
 void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 {
@@ -142,12 +172,13 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
     uint InstanceIdx = InstanceIndex();
 
     uint PerPrimOffset = 3;
-    uint Stride = 10;
+    uint Stride = 11;
 
     // SRV_UAV DescHeap
     StructuredBuffer<uint2> VertexIndexOffset = ResourceDescriptorHeap[(PerPrimOffset++) + InstanceIdx * Stride];
     StructuredBuffer<uint> IndexBindless = ResourceDescriptorHeap[(PerPrimOffset++) + InstanceIdx * Stride];
     StructuredBuffer<RenderObjectUniformBuffer> RenderObjParam = ResourceDescriptorHeap[(PerPrimOffset++) + InstanceIdx * Stride];
+    StructuredBuffer<float3> PosBindless = ResourceDescriptorHeap[(PerPrimOffset++) + InstanceIdx * Stride];
     StructuredBuffer<float3> NormalBindless = ResourceDescriptorHeap[(PerPrimOffset++) + InstanceIdx * Stride];
     StructuredBuffer<float3> TangentBindless = ResourceDescriptorHeap[(PerPrimOffset++) + InstanceIdx * Stride];
     StructuredBuffer<float3> BiTangentBindless = ResourceDescriptorHeap[(PerPrimOffset++) + InstanceIdx * Stride];
@@ -188,12 +219,51 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
         TBN = transpose(float3x3(T, B, N));
     }
 
-    float2 uv = HitAttribute(TexCoordBindless[Indices.x + VertexOffset]
-        , TexCoordBindless[Indices.y + VertexOffset]
-        , TexCoordBindless[Indices.z + VertexOffset], attr);
+    float2 uv0 = TexCoordBindless[Indices.x + VertexOffset];
+    float2 uv1 = TexCoordBindless[Indices.y + VertexOffset];
+    float2 uv2 = TexCoordBindless[Indices.z + VertexOffset];
 
-    float2 ddx = float2(0, 0);
-    float2 ddy = float2(0, 0);
+    float2 uv = HitAttribute(uv0 , uv1 , uv2, attr);
+
+    //float2 ddx = float2(0, 0);
+    //float2 ddy = float2(0, 0);
+
+    // From D3D12RaytracingMiniEngineSample https://github.com/microsoft/DirectX-Graphics-Samples/blob/master/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingMiniEngineSample/DiffuseHitShaderLib.hlsl
+    //---------------------------------------------------------------------------------------------
+    // Compute partial derivatives of UV coordinates:
+    //
+    //  1) Construct a plane from the hit triangle
+    //  2) Intersect two helper rays with the plane:  one to the right and one down
+    //  3) Compute barycentric coordinates of the two hit points
+    //  4) Reconstruct the UV coordinates at the hit points
+    //  5) Take the difference in UV coordinates as the partial derivatives X and Y
+
+    float3 p0 = PosBindless[Indices.x + VertexOffset];
+    float3 p1 = PosBindless[Indices.y + VertexOffset];
+    float3 p2 = PosBindless[Indices.z + VertexOffset];
+
+    // Normal for plane
+    float3 triangleNormal = normalize(cross(p2 - p0, p1 - p0));
+
+    // Helper rays
+    uint2 threadID = DispatchRaysIndex().xy;
+    float3 ddxOrigin, ddxDir, ddyOrigin, ddyDir;
+    GenerateCameraRay(uint2(threadID.x + 1, threadID.y), ddxOrigin, ddxDir);
+    GenerateCameraRay(uint2(threadID.x, threadID.y + 1), ddyOrigin, ddyDir);
+
+    // Intersect helper rays
+    float3 xOffsetPoint = RayPlaneIntersection(hitPosition, triangleNormal, ddxOrigin, ddxDir);
+    float3 yOffsetPoint = RayPlaneIntersection(hitPosition, triangleNormal, ddyOrigin, ddyDir);
+
+    // Compute barycentrics 
+    float3 baryX = BarycentricCoordinates(xOffsetPoint, p0, p1, p2);
+    float3 baryY = BarycentricCoordinates(yOffsetPoint, p0, p1, p2);
+
+    // Compute UVs and take the difference
+    float3x2 uvMat = float3x2(uv0, uv1, uv2);
+    float2 ddx = mul(baryX, uvMat) - uv;
+    float2 ddy = mul(baryY, uvMat) - uv;
+
     float4 albedo = AlbedoTexture.SampleGrad(AlbedoTextureSampler, uv, ddx, ddy);
     //payload.color = albedo;
 
@@ -208,7 +278,7 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 
     float3 L = -float3(0.1f, -0.5f, 0.1f);
     float3 N = WorldNormal;
-    float3 V = normalize(float3(-559.937622f, 116.339653f, 84.3709946f) - HitWorldPosition());
+    float3 V = -WorldRayDirection();
     const float DistanceToLight = 1.0f;     // Directional light from the Sun is not having attenuation by using distance
     payload.color.xyz = PBR(L, N, V, albedo, float3(1, 1, 1), DistanceToLight, metallic, roughness);
     payload.color.w = 1.0f;
