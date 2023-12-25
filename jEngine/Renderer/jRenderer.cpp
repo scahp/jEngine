@@ -1492,10 +1492,12 @@ void jRenderer::Render()
 
             const wchar_t* c_raygenShaderName = L"MyRaygenShader";
             const wchar_t* c_closestHitShaderName = L"MyClosestHitShader";
+            const wchar_t* c_anyHitShaderName = L"MyAnyHitShader";
             const wchar_t* c_missShaderName = L"MyMissShader";
             const wchar_t* c_triHitGroupName = L"TriHitGroup";
 
             const wchar_t* c_shadowClosestHitShaderName = L"ShadowMyClosestHitShader";
+            const wchar_t* c_shadowAnyHitShaderName = L"ShadowMyAnyHitShader";
             const wchar_t* c_shadowMissShaderName = L"ShadowMyMissShader";
             const wchar_t* c_shadowTriHitGroupName = L"ShadowTriHitGroup";
 
@@ -1538,8 +1540,8 @@ void jRenderer::Render()
             {
                 D3D12_STATE_SUBOBJECT subobject{};
                 {
-                    const wchar_t* entryPoint[] = { c_raygenShaderName, c_closestHitShaderName, c_missShaderName
-                        , c_shadowClosestHitShaderName, c_shadowMissShaderName 
+                    const wchar_t* entryPoint[] = { c_raygenShaderName, c_closestHitShaderName, c_anyHitShaderName, c_missShaderName
+                        , c_shadowClosestHitShaderName, c_shadowAnyHitShaderName, c_shadowMissShaderName
                     };
                     subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
                     subobject.pDesc = &dxilDesc;
@@ -1568,7 +1570,7 @@ void jRenderer::Render()
             // Triangle hit group
             D3D12_HIT_GROUP_DESC hitgroupDesc{};
             {
-                hitgroupDesc.AnyHitShaderImport = nullptr;
+                hitgroupDesc.AnyHitShaderImport = c_anyHitShaderName;
                 hitgroupDesc.ClosestHitShaderImport = c_closestHitShaderName;
                 hitgroupDesc.HitGroupExport = c_triHitGroupName;
                 hitgroupDesc.Type = D3D12_HIT_GROUP_TYPE_TRIANGLES;
@@ -1582,7 +1584,7 @@ void jRenderer::Render()
             // Shadow hit group
             D3D12_HIT_GROUP_DESC shadowHitgroupDesc{};
             {
-                shadowHitgroupDesc.AnyHitShaderImport = nullptr;
+                shadowHitgroupDesc.AnyHitShaderImport = c_shadowAnyHitShaderName;
                 shadowHitgroupDesc.ClosestHitShaderImport = c_shadowClosestHitShaderName;
                 shadowHitgroupDesc.HitGroupExport = c_shadowTriHitGroupName;
                 shadowHitgroupDesc.Type = D3D12_HIT_GROUP_TYPE_TRIANGLES;
