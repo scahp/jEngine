@@ -1472,6 +1472,10 @@ void jRenderer::Render()
     static ComPtr<ID3D12Resource> m_hitGroupShaderTable;
     if (1)
     {
+        SCOPE_CPU_PROFILE(Raytracing);
+        SCOPE_GPU_PROFILE(RenderFrameContextPtr, Raytracing);
+        DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "Raytracing", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
+
         static bool once = false;
         if (!once)
         {
