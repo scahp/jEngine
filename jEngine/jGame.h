@@ -31,6 +31,7 @@ public:
     static jBuffer_DX12* TopLevelASBuffer;
     static jBuffer_DX12* InstanceDescUploadBuffer;
 	static jObject* Sphere;
+	static std::function<void(struct jCommandBuffer_DX12* InCmdBuffer)> UpdateTopLevelAS;
 
 	jGame();
 	~jGame();

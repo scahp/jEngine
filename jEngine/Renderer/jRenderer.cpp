@@ -1470,6 +1470,15 @@ void jRenderer::Render()
     static ComPtr<ID3D12Resource> m_rayGenShaderTable;
     static ComPtr<ID3D12Resource> m_missShaderTable;
     static ComPtr<ID3D12Resource> m_hitGroupShaderTable;
+    {
+        SCOPE_CPU_PROFILE(UpdateTLAS);
+        SCOPE_GPU_PROFILE(RenderFrameContextPtr, UpdateTLAS);
+        DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "UpdateTLAS", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
+
+        auto CmdBuffer = RenderFrameContextPtr->GetActiveCommandBuffer();
+        auto CmdBufferDX12 = (jCommandBuffer_DX12*)CmdBuffer;
+        jGame::UpdateTopLevelAS(CmdBufferDX12);
+    }
     if (1)
     {
         SCOPE_CPU_PROFILE(Raytracing);
@@ -2177,6 +2186,7 @@ void jRenderer::Render()
             ImGui::SliderFloat("DirY", &gOptions.SunDir.y, -1.0f, 1.0f);
             ImGui::SliderFloat("DirZ", &gOptions.SunDir.z, -1.0f, 1.0f);
             ImGui::SliderFloat("AnisoG", &gOptions.AnisoG, 0.0f, 1.0f);
+            ImGui::Checkbox("EarthQuake with TLAS update", &gOptions.EarthQuake);
             ImGui::End();
 
             //ImGui::SetWindowFocus(szTitle);
