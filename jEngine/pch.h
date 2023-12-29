@@ -76,7 +76,7 @@ using tchar = wchar_t;
 #define JFAIL(a) (!JOK(a))
 #define JOK_E(a, errorBlob) (SUCCEEDED(a))
 #define JFAIL_E(a, errorBlob) (!JOK_E(a, errorBlob))
-#define JASSERT(a) 
+#define JASSERT(a) (a)
 #define JMESSAGE(a) (a)
 #define check(x) 
 #define ensure(x) (x)
