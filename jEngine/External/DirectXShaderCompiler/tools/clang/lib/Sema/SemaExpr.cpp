@@ -1,4 +1,4 @@
-//===--- SemaExpr.cpp - Semantic Analysis for Expressions -----------------===//
+﻿//===--- SemaExpr.cpp - Semantic Analysis for Expressions -----------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
