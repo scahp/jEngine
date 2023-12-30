@@ -1,6 +1,14 @@
 #include "common.hlsl"
 #include "PBR.hlsl"
 
+#ifndef USE_HLSL_DYNAMIC_RESOURCE
+#define USE_HLSL_DYNAMIC_RESOURCE 0
+#endif
+
+#ifndef USE_BINDLESS_RESOURCE
+#define USE_BINDLESS_RESOURCE 0
+#endif
+
 #define MAX_RECURSION_DEPTH 10
 
 struct SceneConstantBuffer
@@ -11,8 +19,24 @@ struct SceneConstantBuffer
 };
 
 RaytracingAccelerationStructure Scene : register(t0, space0);
-RWTexture2D<float4> RenderTarget : register(u0);
-ConstantBuffer<SceneConstantBuffer> g_sceneCB : register(b0);
+RWTexture2D<float4> RenderTarget : register(u0, space0);
+ConstantBuffer<SceneConstantBuffer> g_sceneCB : register(b0, space0);
+
+#if USE_BINDLESS_RESOURCE
+TextureCube<float4> IrradianceMapArray[] : register(t0, space100);
+TextureCube<float4> PrefilteredEnvMapArray[] : register(t0, space101);
+StructuredBuffer<uint2> VertexIndexOffsetArray[] : register(t0, space102);
+StructuredBuffer<uint> IndexBindlessArray[] : register(t0, space103);
+StructuredBuffer<RenderObjectUniformBuffer> RenderObjParamArray[] : register(t0, space104);
+StructuredBuffer<float3> PosBindlessArray[] : register(t0, space105);
+StructuredBuffer<float3> NormalBindlessArray[] : register(t0, space106);
+StructuredBuffer<float3> TangentBindlessArray[] : register(t0, space107);
+StructuredBuffer<float3> BiTangentBindlessArray[] : register(t0, space108);
+StructuredBuffer<float2> TexCoordBindlessArray[] : register(t0, space109);
+Texture2D AlbedoTextureArray[] : register(t0, space110);
+Texture2D NormalTextureArray[] : register(t0, space111);
+Texture2D RMTextureArray[] : register(t0, space112);
+#endif // USE_BINDLESS_RESOURCE
 
 typedef BuiltInTriangleIntersectionAttributes MyAttributes;
 struct RayPayload
@@ -90,11 +114,12 @@ void GetShaderBindingResources(
     inout Texture2D RMTexture,
     in uint InstanceIdx)
 {
-    IrradianceMap = ResourceDescriptorHeap[1];
-    PrefilteredEnvMap = ResourceDescriptorHeap[2];
-
     uint PerPrimOffset = 3;
     uint Stride = 11;
+
+#if USE_HLSL_DYNAMIC_RESOURCE
+    IrradianceMap = ResourceDescriptorHeap[1];
+    PrefilteredEnvMap = ResourceDescriptorHeap[2];
 
     VertexIndexOffset = ResourceDescriptorHeap[(PerPrimOffset++) + InstanceIdx * Stride];
     IndexBindless = ResourceDescriptorHeap[(PerPrimOffset++) + InstanceIdx * Stride];
@@ -107,6 +132,22 @@ void GetShaderBindingResources(
     AlbedoTexture = ResourceDescriptorHeap[(PerPrimOffset++) + InstanceIdx * Stride];
     NormalTexture = ResourceDescriptorHeap[(PerPrimOffset++) + InstanceIdx * Stride];
     RMTexture = ResourceDescriptorHeap[(PerPrimOffset++) + InstanceIdx * Stride];
+#elif USE_BINDLESS_RESOURCE
+    IrradianceMap = IrradianceMapArray[1];
+    PrefilteredEnvMap = PrefilteredEnvMapArray[2];
+    
+    VertexIndexOffset = VertexIndexOffsetArray[(PerPrimOffset++) + InstanceIdx * Stride];
+    IndexBindless = IndexBindlessArray[(PerPrimOffset++) + InstanceIdx * Stride];
+    RenderObjParam = RenderObjParamArray[(PerPrimOffset++) + InstanceIdx * Stride];
+    PosBindless = PosBindlessArray[(PerPrimOffset++) + InstanceIdx * Stride];
+    NormalBindless = NormalBindlessArray[(PerPrimOffset++) + InstanceIdx * Stride];
+    TangentBindless = TangentBindlessArray[(PerPrimOffset++) + InstanceIdx * Stride];
+    BiTangentBindless = BiTangentBindlessArray[(PerPrimOffset++) + InstanceIdx * Stride];
+    TexCoordBindless = TexCoordBindlessArray[(PerPrimOffset++) + InstanceIdx * Stride];
+    AlbedoTexture = AlbedoTextureArray[(PerPrimOffset++) + InstanceIdx * Stride];
+    NormalTexture = NormalTextureArray[(PerPrimOffset++) + InstanceIdx * Stride];
+    RMTexture = RMTextureArray[(PerPrimOffset++) + InstanceIdx * Stride];
+#endif // USE_HLSL_DYNAMIC_RESOURCE
 }
 
 float3 RayPlaneIntersection(float3 planeOrigin, float3 planeNormal, float3 rayOrigin, float3 rayDirection)
@@ -315,8 +356,12 @@ void MyRaygenShader()
     color.xyz = shadowPayload.isHit ? float4(1, 1, 1, 1) : float4(0, 0, 0, 1);
     */
 
+#if USE_HLSL_DYNAMIC_RESOURCE
     RWTexture2D<float4> RenderTargetBindless = ResourceDescriptorHeap[0];
     RenderTargetBindless[DispatchRaysIndex().xy] = color;
+#else
+    RenderTarget[DispatchRaysIndex().xy] = color;
+#endif // USE_HLSL_DYNAMIC_RESOURCE
 }
 
 [shader("anyhit")]
