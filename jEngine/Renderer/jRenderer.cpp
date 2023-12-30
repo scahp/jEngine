@@ -1490,6 +1490,8 @@ void jRenderer::Render()
         {
             once = true;
 
+            static const bool IsUseHLSLDynamicResource = false;
+
             m_raytracingOutput = jBufferUtil_DX12::CreateImage((uint32)SCR_WIDTH, (uint32)SCR_HEIGHT, (uint32)1, (uint32)1, (uint32)1
                 , ETextureType::TEXTURE_2D, GetDX12TextureFormat(BackbufferFormat), ETextureCreateFlag::UAV, EImageLayout::UAV);
 
@@ -1497,7 +1499,10 @@ void jRenderer::Render()
             shaderInfo.SetName(jNameStatic("RTShaer"));
             shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
             shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING);
-            shaderInfo.SetEntryPoint(jNameStatic(""));
+            if (IsUseHLSLDynamicResource)
+                shaderInfo.SetPreProcessors(jNameStatic("#define USE_HLSL_DYNAMIC_RESOURCE 1"));
+            else
+                shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
             auto raytracingShader = g_rhi->CreateShader(shaderInfo);
 
             std::array<D3D12_STATE_SUBOBJECT, 20> subobjects;
@@ -1517,19 +1522,42 @@ void jRenderer::Render()
             // 9. CreateRootSignatures
             {
                 // global root signature는 DispatchRays 함수 호출로 만들어지는 레이트레이싱 쉐이더의 전체에 공유됨.
-                CD3DX12_DESCRIPTOR_RANGE ranges[1];		// 가장 빈번히 사용되는 것을 앞에 둘 수록 최적화에 좋음
+                CD3DX12_DESCRIPTOR_RANGE1 ranges[14];		// 가장 빈번히 사용되는 것을 앞에 둘 수록 최적화에 좋음
                 ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);		// 1 output texture
 
-                CD3DX12_ROOT_PARAMETER rootParameters[3];
-                rootParameters[GlobalRootSignatureParams::OutputViewSlot].InitAsDescriptorTable(1, &ranges[0]);
+                int32 NumOfRanges = _countof(ranges);
+
+                // bindless resources
+                if (IsUseHLSLDynamicResource)
+                {
+                    NumOfRanges = 1;
+                }
+                else
+                {
+                    ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 100, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
+                    ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 101, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
+                    ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 102, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
+                    ranges[4].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 103, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
+                    ranges[5].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 104, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
+                    ranges[6].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 105, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
+                    ranges[7].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 106, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
+                    ranges[8].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 107, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
+                    ranges[9].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 108, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
+                    ranges[10].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 109, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
+                    ranges[11].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 110, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
+                    ranges[12].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 111, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
+                    ranges[13].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 112, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
+                }
+
+                CD3DX12_ROOT_PARAMETER1 rootParameters[3];
+                rootParameters[GlobalRootSignatureParams::OutputViewSlot].InitAsDescriptorTable(NumOfRanges, &ranges[0]);
                 rootParameters[GlobalRootSignatureParams::AccelerationStructureSlot].InitAsShaderResourceView(0);
                 rootParameters[GlobalRootSignatureParams::SceneConstantSlot].InitAsConstantBufferView(0);
 
-                CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc(_countof(rootParameters), rootParameters);
-                globalRootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED;
+                CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC globalRootSignatureDesc(_countof(rootParameters), rootParameters, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED);
                 ComPtr<ID3DBlob> blob;
                 ComPtr<ID3DBlob> error;
-                if (JFAIL(D3D12SerializeRootSignature(&globalRootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &error)))
+                if (JFAIL(D3D12SerializeVersionedRootSignature(&globalRootSignatureDesc, &blob, &error)))
                 {
                     if (error)
                     {
@@ -1746,6 +1774,8 @@ void jRenderer::Render()
             static auto TempBuffer = jBufferUtil_DX12::CreateBuffer(sizeof(m_sceneCB), 0, EBufferCreateFlag::CPUAccess, D3D12_RESOURCE_STATE_COMMON, &m_sceneCB, sizeof(m_sceneCB));
             TempBuffer->UpdateBuffer(&m_sceneCB, sizeof(m_sceneCB));
             jBufferUtil_DX12::CopyBuffer(CmdBufferDX12->CommandList.Get(), TempBuffer->Buffer.Get(), SceneBuffer->Buffer.Get(), sizeof(m_sceneCB), 0, 0);
+            auto temp = CD3DX12_RESOURCE_BARRIER::Transition(SceneBuffer->Buffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+            CmdBufferDX12->CommandList->ResourceBarrier(1, &temp);
             auto cbGpuAddress = SceneBuffer->GetGPUAddress();
 
             // 현재 디스크립터에 복사해야 함.
