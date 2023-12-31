@@ -413,7 +413,7 @@ void CreateShaderResourceView(jBuffer_DX12* InBuffer, DXGI_FORMAT InFormat)
 
     Desc.Buffer.FirstElement = 0;
     Desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-    Desc.Buffer.NumElements = InBuffer->Size / BytesPerPixel_(InFormat);
+    Desc.Buffer.NumElements = (uint32)((uint32)InBuffer->Size / BytesPerPixel_(InFormat));
 
     g_rhi_dx12->Device->CreateShaderResourceView(InBuffer->Buffer.Get()
         , &Desc, InBuffer->SRV.CPUHandle);

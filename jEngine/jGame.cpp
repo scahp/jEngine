@@ -206,226 +206,232 @@ void jGame::Setup()
 		//}
 	//});
 
-    auto CmdBuffer = g_rhi_dx12->BeginSingleTimeCommands();
-    std::vector<jRenderObject*> RTObjects;
-    for(int32 i=0;i<jObject::GetStaticRenderObject().size();++i)
-    {
-        jRenderObject* RObj = jObject::GetStaticRenderObject()[i];
-
-        auto VertexBuffer_PositionOnly = RObj->GeometryDataPtr->VertexBuffer_PositionOnly;
-        auto IndexBuffer = RObj->GeometryDataPtr->IndexBuffer;
-
-        D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc{};
-        geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-
-        auto VertexBufferDX12 = (jVertexBuffer_DX12*)VertexBuffer_PositionOnly;
-        ID3D12Resource* VtxBufferDX12 = VertexBufferDX12->BindInfos.Buffers[0];
-
-        if (GetDX12TextureComponentCount(GetDX12TextureFormat(VertexBufferDX12->BindInfos.InputElementDescs[0].Format)) < 3)
-            continue;
-
-		D3D12_GPU_VIRTUAL_ADDRESS VertexStart = VtxBufferDX12->GetGPUVirtualAddress();
-        int32 VertexCount = VertexBufferDX12->GetElementCount();
-        auto ROE = dynamic_cast<jRenderObjectElement*>(RObj);
-		Vector2i VertexIndexOffset{};
-		if (ROE)
+	if (IsUseDX12())
+	{
+		auto CmdBuffer = g_rhi_dx12->BeginSingleTimeCommands();
+		std::vector<jRenderObject*> RTObjects;
+		for (int32 i = 0; i < jObject::GetStaticRenderObject().size(); ++i)
 		{
-			VertexStart += VertexBufferDX12->Streams[0].Stride * ROE->SubMesh.StartVertex;
-			VertexCount = ROE->SubMesh.EndVertex - ROE->SubMesh.StartVertex + 1;
+			jRenderObject* RObj = jObject::GetStaticRenderObject()[i];
 
-			VertexIndexOffset = Vector2i(ROE->SubMesh.StartVertex, ROE->SubMesh.StartFace);
-		}
-		RObj->VertexAndIndexOffsetBuffer = jBufferUtil_DX12::CreateBuffer(sizeof(Vector2i), 0, EBufferCreateFlag::UAV, D3D12_RESOURCE_STATE_COMMON
-            , &VertexIndexOffset, sizeof(Vector2i), TEXT("VertexAndIndexOffsetBuffer"));
-        jBufferUtil_DX12::CreateShaderResourceView(RObj->VertexAndIndexOffsetBuffer, sizeof(Vector2i), 1);
+			auto VertexBuffer_PositionOnly = RObj->GeometryDataPtr->VertexBuffer_PositionOnly;
+			auto IndexBuffer = RObj->GeometryDataPtr->IndexBuffer;
 
-        RTObjects.push_back(RObj);
+			D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc{};
+			geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
 
-        if (IndexBuffer)
-        {
-            auto IndexBufferDX12 = (jIndexBuffer_DX12*)IndexBuffer;
-            ComPtr<ID3D12Resource> IdxBufferDX12 = IndexBufferDX12->BufferPtr->Buffer;
-            auto& indexStreamData = IndexBufferDX12->IndexStreamData;
+			auto VertexBufferDX12 = (jVertexBuffer_DX12*)VertexBuffer_PositionOnly;
+			ID3D12Resource* VtxBufferDX12 = VertexBufferDX12->BindInfos.Buffers[0];
 
-            D3D12_GPU_VIRTUAL_ADDRESS IndexStart = IndexBufferDX12->BufferPtr->GetGPUAddress();
-			int32 IndexCount = IndexBuffer->GetElementCount();
+			if (GetDX12TextureComponentCount(GetDX12TextureFormat(VertexBufferDX12->BindInfos.InputElementDescs[0].Format)) < 3)
+				continue;
+
+			D3D12_GPU_VIRTUAL_ADDRESS VertexStart = VtxBufferDX12->GetGPUVirtualAddress();
+			int32 VertexCount = VertexBufferDX12->GetElementCount();
+			auto ROE = dynamic_cast<jRenderObjectElement*>(RObj);
+			Vector2i VertexIndexOffset{};
 			if (ROE)
 			{
-				IndexStart += indexStreamData->Param->GetElementSize() * ROE->SubMesh.StartFace;
-				IndexCount = ROE->SubMesh.EndFace - ROE->SubMesh.StartFace + 1;
+				VertexStart += VertexBufferDX12->Streams[0].Stride * ROE->SubMesh.StartVertex;
+				VertexCount = ROE->SubMesh.EndVertex - ROE->SubMesh.StartVertex + 1;
+
+				VertexIndexOffset = Vector2i(ROE->SubMesh.StartVertex, ROE->SubMesh.StartFace);
 			}
+			RObj->VertexAndIndexOffsetBuffer = jBufferUtil_DX12::CreateBuffer(sizeof(Vector2i), 0, EBufferCreateFlag::UAV, D3D12_RESOURCE_STATE_COMMON
+				, &VertexIndexOffset, sizeof(Vector2i), TEXT("VertexAndIndexOffsetBuffer"));
+			jBufferUtil_DX12::CreateShaderResourceView(RObj->VertexAndIndexOffsetBuffer, sizeof(Vector2i), 1);
 
-            geometryDesc.Triangles.IndexBuffer = IndexStart;
-            geometryDesc.Triangles.IndexCount = IndexCount;
-            geometryDesc.Triangles.IndexFormat = indexStreamData->Param->GetElementSize() == 16 ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
-        }
-        else
-        {
-            geometryDesc.Triangles.IndexBuffer = {};
-            geometryDesc.Triangles.IndexCount = 0;
-            geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_UNKNOWN;
-        }
-        geometryDesc.Triangles.Transform3x4 = 0;
-        geometryDesc.Triangles.VertexFormat = VertexBufferDX12->BindInfos.InputElementDescs[0].Format;
-        geometryDesc.Triangles.VertexCount = VertexCount;
-        geometryDesc.Triangles.VertexBuffer.StartAddress = VertexStart;
-        geometryDesc.Triangles.VertexBuffer.StrideInBytes = VertexBufferDX12->Streams[0].Stride;
+			RTObjects.push_back(RObj);
 
-        // Opaque로 지오메트를 등록하면, 히트 쉐이더에서 더이상 쉐이더를 만들지 않을 것이므로 최적화에 좋다.
-        //geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
-		geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
-
-        // Acceleration structure 에 필요한 크기를 요청함
-        // 첫번째 지오메트리
-        D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO bottomLevelPrebuildInfo{};
-        D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS bottomLevelInputs{};
-        {
-            D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
-            bottomLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-            bottomLevelInputs.Flags = buildFlags;
-            bottomLevelInputs.pGeometryDescs = &geometryDesc;
-            bottomLevelInputs.NumDescs = 1;
-            bottomLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
-
-
-            g_rhi_dx12->Device->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
-            if (!JASSERT(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0))
-                continue;
-        }
-
-        auto AllocateUAVBuffer = [](ID3D12Resource** OutResource, ID3D12Device* InDevice
-            , uint64 InBufferSize, D3D12_RESOURCE_STATES InInitialResourceState
-            , const wchar_t* InResourceName)
-            {
-                auto uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-                auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(InBufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-                if (JFAIL(InDevice->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE
-                    , &bufferDesc, InInitialResourceState, nullptr, IID_PPV_ARGS(OutResource))))
-                {
-                    return false;
-                }
-
-                if (InResourceName)
-                    (*OutResource)->SetName(InResourceName);
-
-                return true;
-            };
-
-        // Acceleration structure를 위한 리소스를 할당함
-         // Acceleration structure는 default heap에서 생성된 리소스에만 있을 수 있음. (또는 그에 상응하는 heap)
-         // Default heap은 CPU 읽기/쓰기 접근이 필요없기 때문에 괜찮음.
-         // Acceleration structure를 포함하는 리소스는 D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE 상태로 생성해야 함.
-         // 그리고 D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS 플래그를 가져야 함. ALLOW_UNORDERED_ACCESS는 두가지 간단한 정보를 요구함:
-         // - 시스템은 백그라운드에서 Acceleration structure 빌드를 구현할 때 이러한 유형의 액세스를 수행할 것입니다.
-         // - 앱의 관점에서, acceleration structure에 쓰기/읽기의 동기화는 UAV barriers를 통해서 얻어짐.
-
-        D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
-        RObj->BottomLevelASBuffer = jBufferUtil_DX12::CreateBuffer(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, 0, EBufferCreateFlag::UAV, initialResourceState
-            , nullptr, 0, TEXT("BottomLevelAccelerationStructure"));
-
-        //ComPtr<ID3D12Resource> m_bottomLevelAccelerationStructure;
-        //AllocateUAVBuffer(&m_bottomLevelAccelerationStructure, g_rhi_dx12->Device.Get()
-        //    , bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, initialResourceState, TEXT("BottomLevelAccelerationStructure"));
-
-        // Bottom level acceleration structure desc
-        //ComPtr<ID3D12Resource> scratchResource;
-        RObj->ScratchASBuffer = jBufferUtil_DX12::CreateBuffer(bottomLevelPrebuildInfo.ScratchDataSizeInBytes, 0, EBufferCreateFlag::UAV, D3D12_RESOURCE_STATE_COMMON
-            , nullptr, 0, TEXT("ScratchResourceGeometry"));
-        //AllocateUAVBuffer(&scratchResource, g_rhi_dx12->Device.Get(), bottomLevelPrebuildInfo.ScratchDataSizeInBytes
-        //    , D3D12_RESOURCE_STATE_UNORDERED_ACCESS, L"ScratchResourceGeometry1");
-
-        D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc{};
-        bottomLevelBuildDesc.Inputs = bottomLevelInputs;
-        bottomLevelBuildDesc.ScratchAccelerationStructureData = RObj->ScratchASBuffer->GetGPUAddress();
-        bottomLevelBuildDesc.DestAccelerationStructureData = RObj->BottomLevelASBuffer->GetGPUAddress();
-
-        CmdBuffer->CommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
-        auto temp = CD3DX12_RESOURCE_BARRIER::UAV(RObj->BottomLevelASBuffer->Buffer.Get());
-        CmdBuffer->CommandList->ResourceBarrier(1, &temp);
-    }
-
-	jGame::UpdateTopLevelAS = [RTObjects](jCommandBuffer_DX12* InCmdBuffer) {
-		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
-		inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-		inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
-		inputs.NumDescs = (uint32)RTObjects.size();
-		inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
-
-		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO info;
-		g_rhi_dx12->Device->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &info);
-		if (info.ResultDataMaxSizeInBytes)
-		{
-			const bool IsUpdate = !!ScratchASBuffer;
-			if (IsUpdate)
+			if (IndexBuffer)
 			{
-                D3D12_RESOURCE_BARRIER uavBarrier = {};
-                uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-                uavBarrier.UAV.pResource = TopLevelASBuffer->Buffer.Get();
-				InCmdBuffer->CommandList->ResourceBarrier(1, &uavBarrier);
+				auto IndexBufferDX12 = (jIndexBuffer_DX12*)IndexBuffer;
+				ComPtr<ID3D12Resource> IdxBufferDX12 = IndexBufferDX12->BufferPtr->Buffer;
+				auto& indexStreamData = IndexBufferDX12->IndexStreamData;
+
+				D3D12_GPU_VIRTUAL_ADDRESS IndexStart = IndexBufferDX12->BufferPtr->GetGPUAddress();
+				int32 IndexCount = IndexBuffer->GetElementCount();
+				if (ROE)
+				{
+					IndexStart += indexStreamData->Param->GetElementSize() * ROE->SubMesh.StartFace;
+					IndexCount = ROE->SubMesh.EndFace - ROE->SubMesh.StartFace + 1;
+				}
+
+				geometryDesc.Triangles.IndexBuffer = IndexStart;
+				geometryDesc.Triangles.IndexCount = IndexCount;
+				geometryDesc.Triangles.IndexFormat = indexStreamData->Param->GetElementSize() == 16 ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
 			}
 			else
-            {
-                ScratchASBuffer = jBufferUtil_DX12::CreateBuffer(info.ScratchDataSizeInBytes, 0, EBufferCreateFlag::UAV, D3D12_RESOURCE_STATE_UNORDERED_ACCESS
-                    , nullptr, 0, TEXT("TLAS Scratch Buffer"));
-
-                TopLevelASBuffer = jBufferUtil_DX12::CreateBuffer(info.ScratchDataSizeInBytes, 0, EBufferCreateFlag::UAV, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE
-                    , nullptr, 0, TEXT("TLAS Result Buffer"));
-
-                InstanceDescUploadBuffer = jBufferUtil_DX12::CreateBuffer(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * RTObjects.size(), 0
-                    , EBufferCreateFlag::CPUAccess, D3D12_RESOURCE_STATE_GENERIC_READ
-                    , nullptr, 0, TEXT("TLAS Result Buffer"));
-            }
-
-			D3D12_RAYTRACING_INSTANCE_DESC* instanceDescs = (D3D12_RAYTRACING_INSTANCE_DESC*)InstanceDescUploadBuffer->Map();
-
-			for (int32 i = 0; i < RTObjects.size(); ++i)
 			{
-				jRenderObject* RObj = RTObjects[i];
-				RObj->UpdateWorldMatrix();
-
-				instanceDescs[i].InstanceID = i;
-				instanceDescs[i].InstanceContributionToHitGroupIndex = 0;
-				memcpy(instanceDescs[i].Transform, &RObj->World.m, sizeof(instanceDescs[i].Transform));
-				instanceDescs[i].InstanceMask = 0xFF;
-				instanceDescs[i].AccelerationStructure = RObj->BottomLevelASBuffer->GetGPUAddress();
-				for (int32 k = 0; k < 3; ++k)
-				{
-					for (int32 m = 0; m < 4; ++m)
-					{
-						instanceDescs[i].Transform[k][m] = RObj->World.m[m][k];
-					}
-				}
-				if (gOptions.EarthQuake)
-				{
-					instanceDescs[i].Transform[0][3] = sin((float)g_rhi_dx12->CurrentFrameNumber);
-					instanceDescs[i].Transform[1][3] = cos((float)g_rhi_dx12->CurrentFrameNumber);
-					instanceDescs[i].Transform[2][3] = sin((float)g_rhi_dx12->CurrentFrameNumber) * 2;
-				}
-                instanceDescs[i].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_FRONT_COUNTERCLOCKWISE;
+				geometryDesc.Triangles.IndexBuffer = {};
+				geometryDesc.Triangles.IndexCount = 0;
+				geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_UNKNOWN;
 			}
-			InstanceDescUploadBuffer->Unmap();
+			geometryDesc.Triangles.Transform3x4 = 0;
+			geometryDesc.Triangles.VertexFormat = VertexBufferDX12->BindInfos.InputElementDescs[0].Format;
+			geometryDesc.Triangles.VertexCount = VertexCount;
+			geometryDesc.Triangles.VertexBuffer.StartAddress = VertexStart;
+			geometryDesc.Triangles.VertexBuffer.StrideInBytes = VertexBufferDX12->Streams[0].Stride;
 
-			// TLAS 생성
-			D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC asDesc = {};
-			asDesc.Inputs = inputs;
-			asDesc.Inputs.InstanceDescs = InstanceDescUploadBuffer->GetGPUAddress();
-			asDesc.DestAccelerationStructureData = TopLevelASBuffer->GetGPUAddress();
-			asDesc.ScratchAccelerationStructureData = ScratchASBuffer->GetGPUAddress();
+			// Opaque로 지오메트를 등록하면, 히트 쉐이더에서 더이상 쉐이더를 만들지 않을 것이므로 최적화에 좋다.
+			//geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
+			geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
 
-            if (IsUpdate)
-            {
-                asDesc.Inputs.Flags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
-                asDesc.SourceAccelerationStructureData = TopLevelASBuffer->Buffer->GetGPUVirtualAddress();
-            }
+			// Acceleration structure 에 필요한 크기를 요청함
+			// 첫번째 지오메트리
+			D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO bottomLevelPrebuildInfo{};
+			D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS bottomLevelInputs{};
+			{
+				D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+				bottomLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+				bottomLevelInputs.Flags = buildFlags;
+				bottomLevelInputs.pGeometryDescs = &geometryDesc;
+				bottomLevelInputs.NumDescs = 1;
+				bottomLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
 
-			InCmdBuffer->CommandList->BuildRaytracingAccelerationStructure(&asDesc, 0, nullptr);
-			auto temp = CD3DX12_RESOURCE_BARRIER::UAV(TopLevelASBuffer->Buffer.Get());
-			InCmdBuffer->CommandList->ResourceBarrier(1, &temp);
+
+				g_rhi_dx12->Device->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
+				if (!JASSERT(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0))
+					continue;
+			}
+
+			auto AllocateUAVBuffer = [](ID3D12Resource** OutResource, ID3D12Device* InDevice
+				, uint64 InBufferSize, D3D12_RESOURCE_STATES InInitialResourceState
+				, const wchar_t* InResourceName)
+				{
+					auto uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+					auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(InBufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+					if (JFAIL(InDevice->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE
+						, &bufferDesc, InInitialResourceState, nullptr, IID_PPV_ARGS(OutResource))))
+					{
+						return false;
+					}
+
+					if (InResourceName)
+						(*OutResource)->SetName(InResourceName);
+
+					return true;
+				};
+
+			// Acceleration structure를 위한 리소스를 할당함
+				// Acceleration structure는 default heap에서 생성된 리소스에만 있을 수 있음. (또는 그에 상응하는 heap)
+				// Default heap은 CPU 읽기/쓰기 접근이 필요없기 때문에 괜찮음.
+				// Acceleration structure를 포함하는 리소스는 D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE 상태로 생성해야 함.
+				// 그리고 D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS 플래그를 가져야 함. ALLOW_UNORDERED_ACCESS는 두가지 간단한 정보를 요구함:
+				// - 시스템은 백그라운드에서 Acceleration structure 빌드를 구현할 때 이러한 유형의 액세스를 수행할 것입니다.
+				// - 앱의 관점에서, acceleration structure에 쓰기/읽기의 동기화는 UAV barriers를 통해서 얻어짐.
+
+			D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
+			RObj->BottomLevelASBuffer = jBufferUtil_DX12::CreateBuffer(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, 0, EBufferCreateFlag::UAV, initialResourceState
+				, nullptr, 0, TEXT("BottomLevelAccelerationStructure"));
+
+			//ComPtr<ID3D12Resource> m_bottomLevelAccelerationStructure;
+			//AllocateUAVBuffer(&m_bottomLevelAccelerationStructure, g_rhi_dx12->Device.Get()
+			//    , bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, initialResourceState, TEXT("BottomLevelAccelerationStructure"));
+
+			// Bottom level acceleration structure desc
+			//ComPtr<ID3D12Resource> scratchResource;
+			RObj->ScratchASBuffer = jBufferUtil_DX12::CreateBuffer(bottomLevelPrebuildInfo.ScratchDataSizeInBytes, 0, EBufferCreateFlag::UAV, D3D12_RESOURCE_STATE_COMMON
+				, nullptr, 0, TEXT("ScratchResourceGeometry"));
+			//AllocateUAVBuffer(&scratchResource, g_rhi_dx12->Device.Get(), bottomLevelPrebuildInfo.ScratchDataSizeInBytes
+			//    , D3D12_RESOURCE_STATE_UNORDERED_ACCESS, L"ScratchResourceGeometry1");
+
+			D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc{};
+			bottomLevelBuildDesc.Inputs = bottomLevelInputs;
+			bottomLevelBuildDesc.ScratchAccelerationStructureData = RObj->ScratchASBuffer->GetGPUAddress();
+			bottomLevelBuildDesc.DestAccelerationStructureData = RObj->BottomLevelASBuffer->GetGPUAddress();
+
+			CmdBuffer->CommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
+			auto temp = CD3DX12_RESOURCE_BARRIER::UAV(RObj->BottomLevelASBuffer->Buffer.Get());
+			CmdBuffer->CommandList->ResourceBarrier(1, &temp);
 		}
-	};
-	UpdateTopLevelAS(CmdBuffer);
-    g_rhi_dx12->EndSingleTimeCommands(CmdBuffer);
 
+		jGame::UpdateTopLevelAS = [RTObjects](jCommandBuffer_DX12* InCmdBuffer) {
+			D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
+			inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+			inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
+			inputs.NumDescs = (uint32)RTObjects.size();
+			inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
+
+			D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO info;
+			g_rhi_dx12->Device->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &info);
+			if (info.ResultDataMaxSizeInBytes)
+			{
+				const bool IsUpdate = !!ScratchASBuffer;
+				if (IsUpdate)
+				{
+					D3D12_RESOURCE_BARRIER uavBarrier = {};
+					uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+					uavBarrier.UAV.pResource = TopLevelASBuffer->Buffer.Get();
+					InCmdBuffer->CommandList->ResourceBarrier(1, &uavBarrier);
+				}
+				else
+				{
+					ScratchASBuffer = jBufferUtil_DX12::CreateBuffer(info.ScratchDataSizeInBytes, 0, EBufferCreateFlag::UAV, D3D12_RESOURCE_STATE_UNORDERED_ACCESS
+						, nullptr, 0, TEXT("TLAS Scratch Buffer"));
+
+					TopLevelASBuffer = jBufferUtil_DX12::CreateBuffer(info.ScratchDataSizeInBytes, 0, EBufferCreateFlag::UAV, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE
+						, nullptr, 0, TEXT("TLAS Result Buffer"));
+
+					InstanceDescUploadBuffer = jBufferUtil_DX12::CreateBuffer(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * RTObjects.size(), 0
+						, EBufferCreateFlag::CPUAccess, D3D12_RESOURCE_STATE_GENERIC_READ
+						, nullptr, 0, TEXT("TLAS Result Buffer"));
+				}
+
+				D3D12_RAYTRACING_INSTANCE_DESC* instanceDescs = (D3D12_RAYTRACING_INSTANCE_DESC*)InstanceDescUploadBuffer->Map();
+
+				for (int32 i = 0; i < RTObjects.size(); ++i)
+				{
+					jRenderObject* RObj = RTObjects[i];
+					RObj->UpdateWorldMatrix();
+
+					instanceDescs[i].InstanceID = i;
+					instanceDescs[i].InstanceContributionToHitGroupIndex = 0;
+					memcpy(instanceDescs[i].Transform, &RObj->World.m, sizeof(instanceDescs[i].Transform));
+					instanceDescs[i].InstanceMask = 0xFF;
+					instanceDescs[i].AccelerationStructure = RObj->BottomLevelASBuffer->GetGPUAddress();
+					for (int32 k = 0; k < 3; ++k)
+					{
+						for (int32 m = 0; m < 4; ++m)
+						{
+							instanceDescs[i].Transform[k][m] = RObj->World.m[m][k];
+						}
+					}
+					if (gOptions.EarthQuake)
+					{
+						instanceDescs[i].Transform[0][3] = sin((float)g_rhi_dx12->CurrentFrameNumber);
+						instanceDescs[i].Transform[1][3] = cos((float)g_rhi_dx12->CurrentFrameNumber);
+						instanceDescs[i].Transform[2][3] = sin((float)g_rhi_dx12->CurrentFrameNumber) * 2;
+					}
+					instanceDescs[i].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_FRONT_COUNTERCLOCKWISE;
+				}
+				InstanceDescUploadBuffer->Unmap();
+
+				// TLAS 생성
+				D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC asDesc = {};
+				asDesc.Inputs = inputs;
+				asDesc.Inputs.InstanceDescs = InstanceDescUploadBuffer->GetGPUAddress();
+				asDesc.DestAccelerationStructureData = TopLevelASBuffer->GetGPUAddress();
+				asDesc.ScratchAccelerationStructureData = ScratchASBuffer->GetGPUAddress();
+
+				if (IsUpdate)
+				{
+					asDesc.Inputs.Flags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
+					asDesc.SourceAccelerationStructureData = TopLevelASBuffer->Buffer->GetGPUVirtualAddress();
+				}
+
+				InCmdBuffer->CommandList->BuildRaytracingAccelerationStructure(&asDesc, 0, nullptr);
+				auto temp = CD3DX12_RESOURCE_BARRIER::UAV(TopLevelASBuffer->Buffer.Get());
+				InCmdBuffer->CommandList->ResourceBarrier(1, &temp);
+			}
+			};
+		UpdateTopLevelAS(CmdBuffer);
+		g_rhi_dx12->EndSingleTimeCommands(CmdBuffer);
+	}
+	else if (IsUseVulkan())
+	{
+
+	}
 }
 
 void jGame::SpawnObjects(ESpawnedType spawnType)
