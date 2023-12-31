@@ -108,6 +108,7 @@ public:
         jScopeWriteLock sw(&Lock);
         for (auto& iter : Pool)
         {
+            static_assert(sizeof(T) > 0, "the Type T is incomplete, you need to include the class of T.");
             delete iter.second;
         }
         Pool.clear();

@@ -21,7 +21,6 @@
 #include "FileLoader/jFile.h"
 #include "jPipelineStateInfo_DX12.h"
 #include "Renderer/jSceneRenderTargets.h"
-#include "jRenderPass_DX12.h"
 #include "Profiler/jPerformanceProfile.h"
 #include "jOptions.h"
 #include "../jRenderFrameContext.h"
@@ -639,6 +638,12 @@ bool jRHI_DX12::InitRHI()
 	D3D12_FEATURE_DATA_D3D12_OPTIONS5 featureSupportData{};
 	if (JFAIL(Device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &featureSupportData, sizeof(featureSupportData))))
 		return false;
+
+#if SUPPORT_RAYTRACING
+    check(featureSupportData.RaytracingTier > D3D12_RAYTRACING_TIER_NOT_SUPPORTED);
+    if (featureSupportData.RaytracingTier == D3D12_RAYTRACING_TIER_NOT_SUPPORTED)
+        return false;
+#endif
 
     // Create InstanceVertexBuffer for cube map six face
     // todo : It will be removed, when I have a system that can generate per instance data for visible faces
