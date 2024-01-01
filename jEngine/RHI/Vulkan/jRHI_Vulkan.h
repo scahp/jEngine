@@ -82,11 +82,15 @@ public:
 	// 논리 디바이스 생성
 	VkDevice Device;
     VkPipelineCache PipelineCache = nullptr;
-    VkPhysicalDeviceProperties DeviceProperties;
+	VkPhysicalDeviceProperties2 DeviceProperties2{};
+    VkPhysicalDeviceRayTracingPipelinePropertiesKHR  RayTracingPipelineProperties{};
+
+	VkPhysicalDeviceFeatures2 DeviceFeatures2{};
+    VkPhysicalDeviceAccelerationStructureFeaturesKHR AccelerationStructureFeatures{};
 
 	jSwapchain_Vulkan* Swapchain = nullptr;
 	jCommandBufferManager_Vulkan* CommandBufferManager = nullptr;
-    jFenceManager_Vulkan FenceManager;
+    mutable jFenceManager_Vulkan FenceManager;
 	jSemaphoreManager_Vulkan SemaphoreManager;
 	jMemoryPool_Vulkan* MemoryPool = nullptr;
 
@@ -199,6 +203,18 @@ public:
     PFN_vkCmdDebugMarkerBeginEXT vkCmdDebugMarkerBegin = nullptr;
     PFN_vkCmdDebugMarkerEndEXT vkCmdDebugMarkerEnd = nullptr;
     PFN_vkCmdDebugMarkerInsertEXT vkCmdDebugMarkerInsert = nullptr;
+
+    // Raytracing
+    PFN_vkGetBufferDeviceAddressKHR vkGetBufferDeviceAddressKHR;
+    PFN_vkCreateAccelerationStructureKHR vkCreateAccelerationStructureKHR;
+    PFN_vkDestroyAccelerationStructureKHR vkDestroyAccelerationStructureKHR;
+    PFN_vkGetAccelerationStructureBuildSizesKHR vkGetAccelerationStructureBuildSizesKHR;
+    PFN_vkGetAccelerationStructureDeviceAddressKHR vkGetAccelerationStructureDeviceAddressKHR;
+    PFN_vkBuildAccelerationStructuresKHR vkBuildAccelerationStructuresKHR;
+    PFN_vkCmdBuildAccelerationStructuresKHR vkCmdBuildAccelerationStructuresKHR;
+    PFN_vkCmdTraceRaysKHR vkCmdTraceRaysKHR;
+    PFN_vkGetRayTracingShaderGroupHandlesKHR vkGetRayTracingShaderGroupHandlesKHR;
+    PFN_vkCreateRayTracingPipelinesKHR vkCreateRayTracingPipelinesKHR;
 
 	virtual jMemoryPool* GetMemoryPool() const override { return MemoryPool; }
 

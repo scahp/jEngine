@@ -9,7 +9,7 @@ struct jSpirvHelper
 	static bool IsInitialized;
 	static TBuiltInResource Resources;
 
-	static void Init(VkPhysicalDeviceProperties deviceProperties)
+	static void Init(VkPhysicalDeviceProperties2 deviceProperties)
     {
         IsInitialized = glslang::InitializeProcess();
 		InitResources(Resources, deviceProperties);
@@ -23,7 +23,7 @@ struct jSpirvHelper
 
 	//////////////////////////////////////////////////////////////////////////
 	// GLSL to SPV
-	static void InitResources(TBuiltInResource& resources, const VkPhysicalDeviceProperties& props);
+	static void InitResources(TBuiltInResource& resources, const VkPhysicalDeviceProperties2& props);
 	static bool GLSLtoSpirv(std::vector<uint32>& OutSpirv, const EShLanguage stage, const char* pshader);
 
 	[[deprecated("Recommanded to use InitResources function that is based on VkPhysicalDeviceProperties")]]

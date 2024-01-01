@@ -44,6 +44,11 @@ struct jBuffer_Vulkan : public jBuffer
     jMemory Memory;
     VkBuffer Buffer = nullptr;
     VkDeviceMemory BufferMemory = nullptr;
+    
+    // todo : need the description about this properties
+    VkAccelerationStructureKHR AccelerationStructure = nullptr;
+    uint64 DeviceAddress = 0;
+    
     size_t Offset = 0;
     size_t AllocatedSize = 0;
     void* MappedPointer = nullptr;

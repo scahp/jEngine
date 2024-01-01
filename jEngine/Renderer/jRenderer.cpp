@@ -29,8 +29,10 @@
 #include "jGame.h"
 #include "RHI/DX12/jVertexBuffer_DX12.h"
 #include "RHI/DX12/jIndexBuffer_DX12.h"
+#include "RHI/Vulkan/jBuffer_Vulkan.h"
+#include "RHI/Vulkan/jBufferUtil_Vulkan.h"
 
-jTexture_DX12* jRenderer::m_raytracingOutput;
+jTexture* jRenderer::m_raytracingOutput;
 ComPtr<ID3D12RootSignature> jRenderer::m_raytracingGlobalRootSignature;
 ComPtr<ID3D12RootSignature> jRenderer::m_raytracingLocalRootSignature;
 ComPtr<ID3D12RootSignature> jRenderer::m_raytracingEmptyLocalRootSignature;
@@ -1469,12 +1471,12 @@ void jRenderer::Render()
     static bool IsTestingRaytracing = true;
     if (IsTestingRaytracing)
     {
+        SCOPE_CPU_PROFILE(Raytracing);
+        SCOPE_GPU_PROFILE(RenderFrameContextPtr, Raytracing);
+        DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "Raytracing", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
+
         if (IsUseDX12())
         {
-            SCOPE_CPU_PROFILE(Raytracing);
-            SCOPE_GPU_PROFILE(RenderFrameContextPtr, Raytracing);
-            DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "Raytracing", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
-
             static ComPtr<ID3D12StateObject> m_dxrStateObject;
             static ComPtr<ID3D12Resource> m_rayGenShaderTable;
             static ComPtr<ID3D12Resource> m_missShaderTable;
@@ -1500,7 +1502,7 @@ void jRenderer::Render()
                     , ETextureType::TEXTURE_2D, GetDX12TextureFormat(BackbufferFormat), ETextureCreateFlag::UAV, EImageLayout::UAV);
 
                 jShaderInfo shaderInfo;
-                shaderInfo.SetName(jNameStatic("RTShaer"));
+                shaderInfo.SetName(jNameStatic("RTShader"));
                 shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
                 shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING);
                 if (IsUseHLSLDynamicResource)
@@ -1725,6 +1727,7 @@ void jRenderer::Render()
                     m_hitGroupShaderTable = hitShaderTable.GetResource();
                 }
             }
+            auto m_raytracingOutputDX12 = (jTexture_DX12*)m_raytracingOutput;
 
             auto CmdBuffer = RenderFrameContextPtr->GetActiveCommandBuffer();
             auto CmdBufferDX12 = (jCommandBuffer_DX12*)CmdBuffer;
@@ -1797,13 +1800,13 @@ void jRenderer::Render()
                 std::vector<jDescriptor_DX12> Descriptors;
                 std::vector<jDescriptor_DX12> SamplerDescriptors;
 
-                Descriptors.push_back(m_raytracingOutput->UAV);
+                Descriptors.push_back(m_raytracingOutputDX12->UAV);
                 Descriptors.push_back(((jTexture_DX12*)jSceneRenderTarget::IrradianceMap2)->SRV);
                 Descriptors.push_back(((jTexture_DX12*)jSceneRenderTarget::FilteredEnvMap2)->SRV);
                 for (int32 i = 0; i < jObject::GetStaticRenderObject().size(); ++i)
                 {
                     jRenderObject* RObj = jObject::GetStaticRenderObject()[i];
-                    Descriptors.push_back(RObj->VertexAndIndexOffsetBuffer->SRV);
+                    Descriptors.push_back(((jBuffer_DX12*)RObj->VertexAndIndexOffsetBuffer)->SRV);
 
                     auto Vtx = (jVertexBuffer_DX12*)RObj->GeometryDataPtr->VertexBuffer;
                     auto Idx = (jIndexBuffer_DX12*)RObj->GeometryDataPtr->IndexBuffer;
@@ -1959,7 +1962,7 @@ void jRenderer::Render()
                 auto RT = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr;
 
                 g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RT->TexturePtr.get(), EImageLayout::COLOR_ATTACHMENT);
-                g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), m_raytracingOutput, EImageLayout::SHADER_READ_ONLY);
+                g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), m_raytracingOutputDX12, EImageLayout::SHADER_READ_ONLY);
 
                 jRasterizationStateInfo* RasterizationState = nullptr;
                 switch (g_rhi->GetSelectedMSAASamples())
@@ -2011,7 +2014,7 @@ void jRenderer::Render()
                     , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
 
                 ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
-                    , ResourceInlineAllactor.Alloc<jTextureResource>(m_raytracingOutput, SamplerState));
+                    , ResourceInlineAllactor.Alloc<jTextureResource>(m_raytracingOutputDX12, SamplerState));
 
                 std::shared_ptr<jShaderBindingInstance> ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
                 jShaderBindingInstanceArray ShaderBindingInstanceArray;
@@ -2044,7 +2047,457 @@ void jRenderer::Render()
         }
         else if (IsUseVulkan())
         {
+            static VkImageView raytracingOutputView = nullptr;
+            static jUniformBufferBlock_Vulkan* UniformBufferBlockVulkan = nullptr;
+            static VkPipeline raytracingPipeline;
+            static VkPipelineLayout pipelineLayout;
+            static VkDescriptorSet descriptorSet;
+            static VkDescriptorSetLayout descriptorSetLayout;
 
+            static jBuffer_Vulkan* RaygenShaderBindingTable = new jBuffer_Vulkan();
+            static jBuffer_Vulkan* MissShaderBindingTable = new jBuffer_Vulkan();
+            static jBuffer_Vulkan* CloestHitShaderBindingTable = new jBuffer_Vulkan();
+            static VkStridedDeviceAddressRegionKHR RaygenStridedDeviceAddressRegion{};
+            static VkStridedDeviceAddressRegionKHR MissStridedDeviceAddressRegion{};
+            static VkStridedDeviceAddressRegionKHR CloestHitstridedDeviceAddressRegion{};
+
+            if (0)
+            {
+                SCOPE_CPU_PROFILE(UpdateTLAS);
+                SCOPE_GPU_PROFILE(RenderFrameContextPtr, UpdateTLAS);
+                DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "UpdateTLAS", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
+
+                auto CmdBuffer = RenderFrameContextPtr->GetActiveCommandBuffer();
+                auto CmdBufferVulkan = (jCommandBuffer_Vulkan*)CmdBuffer;
+                jGame::UpdateTopLevelAS(CmdBufferVulkan->GetRef());
+            }
+
+            struct SceneConstantBuffer
+            {
+                XMMATRIX projectionToWorld;
+                XMVECTOR cameraPosition;
+                XMVECTOR lightDireciton;
+            };
+            SceneConstantBuffer m_sceneCB;
+
+            auto GetScreenAspect = []()
+                {
+                    return static_cast<float>(SCR_WIDTH) / static_cast<float>(SCR_HEIGHT);
+                };
+
+            auto mainCamera = jCamera::GetMainCamera();
+
+            auto v = jCameraUtil::CreateViewMatrix({ 0, 0, -1000 }, { 300, 0, 0 }, { 0, 1, 0 });
+            auto p = jCameraUtil::CreatePerspectiveMatrix((float)SCR_WIDTH, (float)SCR_HEIGHT, XMConvertToRadians(45), 1.0f, 1250.0f);
+
+            XMVECTOR m_eye = { mainCamera->Pos.x, mainCamera->Pos.y, mainCamera->Pos.z, 1.0f };
+            XMVECTOR m_at = { mainCamera->Target.x, mainCamera->Target.y, mainCamera->Target.z, 1.0f };
+            XMVECTOR m_up = { 0.0f, 1.0f, 0.0f };
+
+            m_sceneCB.cameraPosition = m_eye;
+            const float fovAngleY = 45.0f;
+            const float m_aspectRatio = GetScreenAspect();
+            const XMMATRIX view = XMMatrixLookAtLH(m_eye, m_at, m_up);
+            const XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(fovAngleY), m_aspectRatio, 1.0f, 1250.0f);
+            const XMMATRIX viewProj = view * proj;
+            m_sceneCB.projectionToWorld = XMMatrixTranspose(XMMatrixInverse(nullptr, viewProj));
+
+            jDirectionalLight* DirectionalLight = nullptr;
+            for (auto light : jLight::GetLights())
+            {
+                if (light->Type == ELightType::DIRECTIONAL)
+                {
+                    DirectionalLight = (jDirectionalLight*)light;
+                    break;
+                }
+            }
+            check(DirectionalLight);
+            m_sceneCB.lightDireciton = { DirectionalLight->GetLightData().Direction.x, DirectionalLight->GetLightData().Direction.y, DirectionalLight->GetLightData().Direction.z };
+
+            static bool once = false;
+            if (!once)
+            {
+                once = true;
+
+                UniformBufferBlockVulkan = (jUniformBufferBlock_Vulkan*)g_rhi_vk->CreateUniformBufferBlock(jNameStatic("Test"), jLifeTimeType::MultiFrame, sizeof(m_sceneCB));
+                UniformBufferBlockVulkan->UpdateBufferData(&m_sceneCB, sizeof(m_sceneCB));
+
+                m_raytracingOutput = new jTexture_Vulkan();
+                auto m_raytracingOutputVk = (jTexture_Vulkan*)m_raytracingOutput;
+                jBufferUtil_Vulkan::CreateImage((uint32)SCR_WIDTH, (uint32)SCR_HEIGHT, 1, VkSampleCountFlagBits::VK_SAMPLE_COUNT_1_BIT, GetVulkanTextureFormat(ETextureFormat::RGBA16F)
+                    , VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_ASPECT_COLOR_BIT
+                    , VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, *m_raytracingOutputVk);
+                raytracingOutputView = jBufferUtil_Vulkan::CreateImageView(m_raytracingOutputVk->Image
+                    , GetVulkanTextureFormat(m_raytracingOutputVk->Format), VK_IMAGE_ASPECT_COLOR_BIT, 1);
+                m_raytracingOutputVk->View = raytracingOutputView;
+
+                std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings;
+                setLayoutBindings.resize(3);
+
+                setLayoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+                setLayoutBindings[0].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR;
+                setLayoutBindings[0].binding = 0;
+                setLayoutBindings[0].descriptorCount = 1;
+
+                setLayoutBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+                setLayoutBindings[1].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR;
+                setLayoutBindings[1].binding = 1;
+                setLayoutBindings[1].descriptorCount = 1;
+
+                setLayoutBindings[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                setLayoutBindings[2].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR;
+                setLayoutBindings[2].binding = 2;
+                setLayoutBindings[2].descriptorCount = 1;
+
+                VkDescriptorSetLayoutBindingFlagsCreateInfoEXT setLayoutBindingFlags{};
+                setLayoutBindingFlags.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT;
+                setLayoutBindingFlags.bindingCount = (uint32)setLayoutBindings.size();
+                std::vector<VkDescriptorBindingFlagsEXT> descriptorBindingFlags = {
+                    0,
+                    0,
+                    0,
+                    VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT,
+                };
+                setLayoutBindingFlags.pBindingFlags = descriptorBindingFlags.data();
+
+                VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{};
+                descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+                descriptorSetLayoutCreateInfo.pBindings = setLayoutBindings.data();
+                descriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(setLayoutBindings.size());
+                descriptorSetLayoutCreateInfo.pNext = &setLayoutBindingFlags;
+                check(VK_SUCCESS == vkCreateDescriptorSetLayout(g_rhi_vk->Device, &descriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout));
+
+                VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
+                pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+                pipelineLayoutCreateInfo.setLayoutCount = 1;
+                pipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayout;
+                check(VK_SUCCESS == vkCreatePipelineLayout(g_rhi_vk->Device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+
+                std::vector<VkRayTracingShaderGroupCreateInfoKHR> shaderGroups{};
+                std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
+
+                jShaderInfo shaderInfo;
+                shaderInfo.SetName(jNameStatic("RayGen"));
+                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane2.hlsl"));
+                shaderInfo.SetEntryPoint(jNameStatic("MyRaygenShader"));
+                shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_RAYGEN);
+                auto RayGenShader = g_rhi->CreateShader(shaderInfo);
+                shaderStages.push_back(((jCompiledShader_Vulkan*)RayGenShader->CompiledShader)->ShaderStage);
+
+                VkRayTracingShaderGroupCreateInfoKHR shaderGroup{};
+                shaderGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+                shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+                shaderGroup.generalShader = static_cast<uint32_t>(shaderStages.size()) - 1;
+                shaderGroup.closestHitShader = VK_SHADER_UNUSED_KHR;
+                shaderGroup.anyHitShader = VK_SHADER_UNUSED_KHR;
+                shaderGroup.intersectionShader = VK_SHADER_UNUSED_KHR;
+                shaderGroups.push_back(shaderGroup);
+
+                shaderInfo.SetName(jNameStatic("Miss"));
+                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane2.hlsl"));
+                shaderInfo.SetEntryPoint(jNameStatic("MyMissShader"));
+                shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_MISS);
+                auto MissShader = g_rhi->CreateShader(shaderInfo);
+                shaderStages.push_back(((jCompiledShader_Vulkan*)MissShader->CompiledShader)->ShaderStage);
+                shaderGroup = {};
+                shaderGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+                shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+                shaderGroup.generalShader = static_cast<uint32>(shaderStages.size()) - 1;
+                shaderGroup.closestHitShader = VK_SHADER_UNUSED_KHR;
+                shaderGroup.anyHitShader = VK_SHADER_UNUSED_KHR;
+                shaderGroup.intersectionShader = VK_SHADER_UNUSED_KHR;
+                shaderGroups.push_back(shaderGroup);
+
+                shaderInfo.SetName(jNameStatic("Closest"));
+                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane2.hlsl"));
+                shaderInfo.SetEntryPoint(jNameStatic("MyClosestHitShader"));
+                shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT);
+                auto ClosestHitShader = g_rhi->CreateShader(shaderInfo);
+                shaderStages.push_back(((jCompiledShader_Vulkan*)ClosestHitShader->CompiledShader)->ShaderStage);
+                shaderGroup = {};
+                shaderGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+                shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
+                shaderGroup.generalShader = VK_SHADER_UNUSED_KHR;
+                shaderGroup.closestHitShader = static_cast<uint32>(shaderStages.size()) - 1;
+                shaderGroup.anyHitShader = VK_SHADER_UNUSED_KHR;
+                shaderGroup.intersectionShader = VK_SHADER_UNUSED_KHR;
+                shaderGroups.push_back(shaderGroup);
+
+                VkRayTracingPipelineCreateInfoKHR rayTracingPipelineCI{};
+                rayTracingPipelineCI.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
+                rayTracingPipelineCI.stageCount = static_cast<uint32>(shaderStages.size());
+                rayTracingPipelineCI.pStages = shaderStages.data();
+                rayTracingPipelineCI.groupCount = static_cast<uint32>(shaderGroups.size());
+                rayTracingPipelineCI.pGroups = shaderGroups.data();
+                rayTracingPipelineCI.maxPipelineRayRecursionDepth = 2;
+                rayTracingPipelineCI.layout = pipelineLayout;
+                check(VK_SUCCESS == g_rhi_vk->vkCreateRayTracingPipelinesKHR(g_rhi_vk->Device, VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &rayTracingPipelineCI, nullptr, &raytracingPipeline));
+
+                // ShaderBindingTable
+
+                uint32 handleSize = g_rhi_vk->RayTracingPipelineProperties.shaderGroupHandleSize;
+                const uint32 handleSizeAligned = Align(g_rhi_vk->RayTracingPipelineProperties.shaderGroupHandleSize, g_rhi_vk->RayTracingPipelineProperties.shaderGroupHandleAlignment);
+                const uint32 groupCount = static_cast<uint32>(shaderGroups.size());
+                const uint32 sbtSize = groupCount * handleSizeAligned;
+
+                std::vector<uint8> shaderHandleStorage(sbtSize);
+                check(VK_SUCCESS == g_rhi_vk->vkGetRayTracingShaderGroupHandlesKHR(g_rhi_vk->Device, raytracingPipeline, 0, groupCount, sbtSize, shaderHandleStorage.data()));
+
+                auto getBufferDeviceAddress = [](VkBuffer buffer)
+                    {
+                        VkBufferDeviceAddressInfoKHR bufferDeviceAI{};
+                        bufferDeviceAI.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+                        bufferDeviceAI.buffer = buffer;
+                        return g_rhi_vk->vkGetBufferDeviceAddressKHR(g_rhi_vk->Device, &bufferDeviceAI);
+                    };
+
+                auto getSbtEntryStridedDeviceAddressRegion = [&](VkBuffer buffer, uint32 handleCount)
+                    {
+                        const uint32_t handleSizeAligned = Align(g_rhi_vk->RayTracingPipelineProperties.shaderGroupHandleSize, g_rhi_vk->RayTracingPipelineProperties.shaderGroupHandleAlignment);
+                        VkStridedDeviceAddressRegionKHR stridedDeviceAddressRegionKHR{};
+                        stridedDeviceAddressRegionKHR.deviceAddress = getBufferDeviceAddress(buffer);
+                        stridedDeviceAddressRegionKHR.stride = handleSizeAligned;
+                        stridedDeviceAddressRegionKHR.size = handleCount * handleSizeAligned;
+                        return stridedDeviceAddressRegionKHR;
+                    };
+
+                {
+                    // Create buffer to hold all shader handles for the SBT
+                    int32 handleCount = 1;
+                    jBufferUtil_Vulkan::AllocateBuffer(
+                        EVulkanBufferBits::SHADER_BINDING_TABLE | EVulkanBufferBits::SHADER_DEVICE_ADDRESS,
+                        EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT,
+                        g_rhi_vk->RayTracingPipelineProperties.shaderGroupHandleSize * 1, *RaygenShaderBindingTable);
+                    // Get the strided address to be used when dispatching the rays
+                    RaygenStridedDeviceAddressRegion = getSbtEntryStridedDeviceAddressRegion(RaygenShaderBindingTable->Buffer, handleCount);
+                    // Map persistent
+                    RaygenShaderBindingTable->Map();
+                }
+
+                {
+                    // Create buffer to hold all shader handles for the SBT
+                    int32 handleCount = 1;
+                    jBufferUtil_Vulkan::AllocateBuffer(
+                        EVulkanBufferBits::SHADER_BINDING_TABLE | EVulkanBufferBits::SHADER_DEVICE_ADDRESS,
+                        EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT,
+                        g_rhi_vk->RayTracingPipelineProperties.shaderGroupHandleSize * 1, *MissShaderBindingTable);
+                    // Get the strided address to be used when dispatching the rays
+                    MissStridedDeviceAddressRegion = getSbtEntryStridedDeviceAddressRegion(MissShaderBindingTable->Buffer, handleCount);
+                    // Map persistent
+                    MissShaderBindingTable->Map();
+                }
+
+                {
+                    // Create buffer to hold all shader handles for the SBT
+                    int32 handleCount = 1;
+                    jBufferUtil_Vulkan::AllocateBuffer(
+                        EVulkanBufferBits::SHADER_BINDING_TABLE | EVulkanBufferBits::SHADER_DEVICE_ADDRESS,
+                        EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT,
+                        g_rhi_vk->RayTracingPipelineProperties.shaderGroupHandleSize * 1, *CloestHitShaderBindingTable);
+                    // Get the strided address to be used when dispatching the rays
+                    CloestHitstridedDeviceAddressRegion = getSbtEntryStridedDeviceAddressRegion(CloestHitShaderBindingTable->Buffer, handleCount);
+                    // Map persistent
+                    CloestHitShaderBindingTable->Map();
+                }
+
+                // Copy handles
+                memcpy(RaygenShaderBindingTable->Map(), shaderHandleStorage.data(), handleSize);
+                // We are using two miss shaders, so we need to get two handles for the miss shader binding table
+                memcpy(MissShaderBindingTable->Map(), shaderHandleStorage.data() + handleSizeAligned, handleSize);
+                memcpy(CloestHitShaderBindingTable->Map(), shaderHandleStorage.data() + handleSizeAligned * 2, handleSize);
+
+                // Create DescriptorSets
+
+                std::vector<VkDescriptorPoolSize> poolSizes = {
+                    { VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1 },
+                    { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1 },
+                    { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1 },
+                };
+
+                VkDescriptorPoolCreateInfo descriptorPoolInfo{};
+                descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+                descriptorPoolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+                descriptorPoolInfo.pPoolSizes = poolSizes.data();
+                descriptorPoolInfo.maxSets = 1;
+
+                VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
+                check(VK_SUCCESS == vkCreateDescriptorPool(g_rhi_vk->Device, &descriptorPoolInfo, nullptr, &descriptorPool));
+
+                VkDescriptorSetVariableDescriptorCountAllocateInfoEXT variableDescriptorCountAllocInfo{};
+                uint32_t variableDescCounts[] = { 1 };
+                variableDescriptorCountAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO_EXT;
+                variableDescriptorCountAllocInfo.descriptorSetCount = 1;
+                variableDescriptorCountAllocInfo.pDescriptorCounts = variableDescCounts;
+
+                VkDescriptorSetAllocateInfo descriptorSetAllocateInfo{};
+                descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+                descriptorSetAllocateInfo.descriptorPool = descriptorPool;
+                descriptorSetAllocateInfo.pSetLayouts = &descriptorSetLayout;
+                descriptorSetAllocateInfo.descriptorSetCount = 1;
+                descriptorSetAllocateInfo.pNext = &variableDescriptorCountAllocInfo;
+                check(VK_SUCCESS == vkAllocateDescriptorSets(g_rhi_vk->Device, &descriptorSetAllocateInfo, &descriptorSet));
+
+                VkWriteDescriptorSetAccelerationStructureKHR writeDescriptorSetAccelerationStructureKHR{};
+                writeDescriptorSetAccelerationStructureKHR.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
+                writeDescriptorSetAccelerationStructureKHR.accelerationStructureCount = 1;
+                writeDescriptorSetAccelerationStructureKHR.pAccelerationStructures = &jGame::TLAS_Vulkan->AccelerationStructure;
+
+                VkWriteDescriptorSet accelerationStructureWrite{};
+                accelerationStructureWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                // The specialized acceleration structure descriptor has to be chained
+                accelerationStructureWrite.pNext = &writeDescriptorSetAccelerationStructureKHR;
+                accelerationStructureWrite.dstSet = descriptorSet;
+                accelerationStructureWrite.dstBinding = 0;
+                accelerationStructureWrite.descriptorCount = 1;
+                accelerationStructureWrite.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+
+                VkDescriptorImageInfo storageImageDescriptor{ VK_NULL_HANDLE, raytracingOutputView, VK_IMAGE_LAYOUT_GENERAL };
+
+                VkWriteDescriptorSet writeDescriptorSet{};
+                writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                writeDescriptorSet.dstSet = descriptorSet;
+                writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+                writeDescriptorSet.dstBinding = 1;
+                writeDescriptorSet.pImageInfo = &storageImageDescriptor;
+                writeDescriptorSet.descriptorCount = 1;
+
+                VkDescriptorBufferInfo bufferInfo{};
+                bufferInfo.buffer = (VkBuffer)UniformBufferBlockVulkan->GetBuffer();
+                bufferInfo.offset = UniformBufferBlockVulkan->GetBufferOffset();
+                bufferInfo.range = UniformBufferBlockVulkan->GetBufferSize();		// 전체 사이즈라면 VK_WHOLE_SIZE 이거 가능
+
+                VkWriteDescriptorSet writeDescriptorSet2{};
+                writeDescriptorSet2.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                writeDescriptorSet2.dstSet = descriptorSet;
+                writeDescriptorSet2.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                writeDescriptorSet2.dstBinding = 2;
+                writeDescriptorSet2.pBufferInfo = &bufferInfo;
+                writeDescriptorSet2.descriptorCount = 1;
+
+                std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
+                    // Binding 0: Top level acceleration structure
+                    accelerationStructureWrite,
+                    // Binding 1: Ray tracing result image
+                    writeDescriptorSet,
+                    // Binding 2: Uniform data
+                    writeDescriptorSet2,
+                };
+
+                vkUpdateDescriptorSets(g_rhi_vk->Device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, VK_NULL_HANDLE);
+            }
+            auto m_raytracingOutputVk = (jTexture_Vulkan*)m_raytracingOutput;
+
+            auto CmdBufferVk = (jCommandBuffer_Vulkan*)RenderFrameContextPtr->GetActiveCommandBuffer();
+            
+            g_rhi_vk->TransitionImageLayout(CmdBufferVk, m_raytracingOutputVk, EImageLayout::UAV);
+
+            vkCmdBindPipeline(CmdBufferVk->GetRef(), VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, raytracingPipeline);
+            vkCmdBindDescriptorSets(CmdBufferVk->GetRef(), VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipelineLayout, 0, 1, &descriptorSet, 0, 0);
+
+            VkStridedDeviceAddressRegionKHR emptySbtEntry = {};
+            g_rhi_vk->vkCmdTraceRaysKHR(
+                CmdBufferVk->GetRef(),
+                &RaygenStridedDeviceAddressRegion,
+                &MissStridedDeviceAddressRegion,
+                &CloestHitstridedDeviceAddressRegion,
+                &emptySbtEntry,
+                SCR_WIDTH,
+                SCR_HEIGHT,
+                1);
+
+            //g_rhi_vk->TransitionImageLayout(CmdBufferVk, m_raytracingOutputVk, EImageLayout::SHADER_READ_ONLY);
+
+            if (0)
+            {
+                static jFullscreenQuadPrimitive* GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
+
+                //auto BackBuffer = g_rhi_dx12->GetSwapchainImage(g_rhi_dx12->CurrentFrameIndex)->TexturePtr;
+                //auto BackBufferRT = std::make_shared<jRenderTarget>(BackBuffer);
+                auto RT = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr;
+
+                g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RT->TexturePtr.get(), EImageLayout::COLOR_ATTACHMENT);
+                g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), m_raytracingOutputVk, EImageLayout::SHADER_READ_ONLY);
+
+                jRasterizationStateInfo* RasterizationState = nullptr;
+                switch (g_rhi->GetSelectedMSAASamples())
+                {
+                case EMSAASamples::COUNT_1:
+                    RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)1, true, 0.2f, false, false>::Create();
+                    break;
+                case EMSAASamples::COUNT_2:
+                    RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)2, true, 0.2f, false, false>::Create();
+                    break;
+                case EMSAASamples::COUNT_4:
+                    RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)4, true, 0.2f, false, false>::Create();
+                    break;
+                case EMSAASamples::COUNT_8:
+                    RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)8, true, 0.2f, false, false>::Create();
+                    break;
+                default:
+                    check(0);
+                    break;
+                }
+                auto DepthStencilState = TDepthStencilStateInfo<false, false, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
+                auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ONE, EBlendOp::ADD, EBlendFactor::ZERO, EBlendFactor::ONE, EBlendOp::ADD, EColorMask::ALL>::Create();
+
+                // Create fixed pipeline states
+                jPipelineStateFixedInfo PostProcessPassPipelineStateFixed(RasterizationState, DepthStencilState, BlendingState
+                    , jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT), gOptions.UseVRS);
+
+                const jRTClearValue ClearColor = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f);
+                const jRTClearValue ClearDepth = jRTClearValue(1.0f, 0);
+
+                jRenderPassInfo renderPassInfo;
+                jAttachment color = jAttachment(RT, EAttachmentLoadStoreOp::LOAD_STORE
+                    , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
+                renderPassInfo.Attachments.push_back(color);
+
+                jSubpass subpass;
+                subpass.Initialize(0, 1, EPipelineStageMask::COLOR_ATTACHMENT_OUTPUT_BIT, EPipelineStageMask::FRAGMENT_SHADER_BIT);
+                subpass.OutputColorAttachments.push_back(0);
+                renderPassInfo.Subpasses.push_back(subpass);
+
+                auto RenderPass = g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
+
+                int32 BindingPoint = 0;
+                jShaderBindingArray ShaderBindingArray;
+                jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
+
+                const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+                    , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
+                    , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
+
+                ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
+                    , ResourceInlineAllactor.Alloc<jTextureResource>(m_raytracingOutputVk, SamplerState));
+
+                std::shared_ptr<jShaderBindingInstance> ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
+                jShaderBindingInstanceArray ShaderBindingInstanceArray;
+                ShaderBindingInstanceArray.Add(ShaderBindingInstance.get());
+
+                jGraphicsPipelineShader Shader;
+                {
+                    jShaderInfo shaderInfo;
+                    shaderInfo.SetName(jNameStatic("CopyVS"));
+                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/fullscreenquad_vs.hlsl"));
+                    shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
+                    Shader.VertexShader = g_rhi->CreateShader(shaderInfo);
+
+                    shaderInfo.SetName(jNameStatic("CopyPS"));
+                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/copy_ps.hlsl"));
+                    shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
+                    Shader.PixelShader = g_rhi->CreateShader(shaderInfo);
+                }
+
+                jDrawCommand DrawCommand(RenderFrameContextPtr, GlobalFullscreenPrimitive->RenderObjects[0], RenderPass
+                    , Shader, &PostProcessPassPipelineStateFixed, GlobalFullscreenPrimitive->RenderObjects[0]->MaterialPtr.get(), ShaderBindingInstanceArray, nullptr);
+                DrawCommand.Test = true;
+                DrawCommand.PrepareToDraw(false);
+                if (RenderPass->BeginRenderPass(CmdBufferVk))
+                {
+                    DrawCommand.Draw();
+                    RenderPass->EndRenderPass();
+                }
+            }
         }
     }
     else

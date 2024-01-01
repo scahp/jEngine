@@ -116,7 +116,7 @@ ComPtr<IDxcBlob> jShaderCompiler_DX12::CompileFromFile(const wchar_t* InFilename
 }
 
 ComPtr<IDxcBlob> jShaderCompiler_DX12::Compile(const char* InShaderCode, uint32 InShaderCodeLength, const wchar_t* InShadingModel
-	, const wchar_t* InEntryPoint, bool InRowMajorMatrix) const
+	, const wchar_t* InEntryPoint, bool InRowMajorMatrix, std::vector<const wchar_t*> InCompileOptions) const
 {
     if (!m_dxc.IsEnable())
         return nullptr;
@@ -149,6 +149,7 @@ ComPtr<IDxcBlob> jShaderCompiler_DX12::Compile(const char* InShaderCode, uint32 
 #else
     options.push_back(TEXT("-O3"));				// Optimization Level 3 (Default)
 #endif
+	options.insert(options.end(), InCompileOptions.begin(), InCompileOptions.end());
 
     // Compile
     ComPtr<IDxcOperationResult> result;

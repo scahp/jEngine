@@ -21,13 +21,17 @@
 #include "RHI/DX12/jVertexBuffer_DX12.h"
 #include "RHI/DX12/jIndexBuffer_DX12.h"
 #include "RHI/DX12/jBufferUtil_DX12.h"
+#include "RHI/Vulkan/jVertexBuffer_Vulkan.h"
+#include "RHI/Vulkan/jIndexBuffer_Vulkan.h"
 
 jRHI* g_rhi = nullptr;
 jBuffer_DX12* jGame::ScratchASBuffer = nullptr;
 jBuffer_DX12* jGame::TopLevelASBuffer = nullptr;
 jBuffer_DX12* jGame::InstanceDescUploadBuffer = nullptr;
 jObject* jGame::Sphere = nullptr;
-std::function<void(jCommandBuffer_DX12* InCmdBuffer)> jGame::UpdateTopLevelAS;
+std::function<void(void* InCmdBuffer)> jGame::UpdateTopLevelAS;
+
+jBuffer_Vulkan* jGame::TLAS_Vulkan = nullptr;
 
 jGame::jGame()
 {
@@ -239,7 +243,7 @@ void jGame::Setup()
 			}
 			RObj->VertexAndIndexOffsetBuffer = jBufferUtil_DX12::CreateBuffer(sizeof(Vector2i), 0, EBufferCreateFlag::UAV, D3D12_RESOURCE_STATE_COMMON
 				, &VertexIndexOffset, sizeof(Vector2i), TEXT("VertexAndIndexOffsetBuffer"));
-			jBufferUtil_DX12::CreateShaderResourceView(RObj->VertexAndIndexOffsetBuffer, sizeof(Vector2i), 1);
+			jBufferUtil_DX12::CreateShaderResourceView((jBuffer_DX12*)RObj->VertexAndIndexOffsetBuffer, sizeof(Vector2i), 1);
 
 			RTObjects.push_back(RObj);
 
@@ -338,15 +342,17 @@ void jGame::Setup()
 
 			D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc{};
 			bottomLevelBuildDesc.Inputs = bottomLevelInputs;
-			bottomLevelBuildDesc.ScratchAccelerationStructureData = RObj->ScratchASBuffer->GetGPUAddress();
-			bottomLevelBuildDesc.DestAccelerationStructureData = RObj->BottomLevelASBuffer->GetGPUAddress();
+			bottomLevelBuildDesc.ScratchAccelerationStructureData = ((jBuffer_DX12*)RObj->ScratchASBuffer)->GetGPUAddress();
+			bottomLevelBuildDesc.DestAccelerationStructureData = ((jBuffer_DX12*)RObj->BottomLevelASBuffer)->GetGPUAddress();
 
 			CmdBuffer->CommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
-			auto temp = CD3DX12_RESOURCE_BARRIER::UAV(RObj->BottomLevelASBuffer->Buffer.Get());
+			auto temp = CD3DX12_RESOURCE_BARRIER::UAV(((jBuffer_DX12*)RObj->BottomLevelASBuffer)->Buffer.Get());
 			CmdBuffer->CommandList->ResourceBarrier(1, &temp);
 		}
 
-		jGame::UpdateTopLevelAS = [RTObjects](jCommandBuffer_DX12* InCmdBuffer) {
+		jGame::UpdateTopLevelAS = [RTObjects](void* InCmdBuffer) 
+		{
+			jCommandBuffer_DX12* InCmdBufferDX12 = (jCommandBuffer_DX12*)InCmdBuffer;
 			D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
 			inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
 			inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
@@ -363,7 +369,7 @@ void jGame::Setup()
 					D3D12_RESOURCE_BARRIER uavBarrier = {};
 					uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
 					uavBarrier.UAV.pResource = TopLevelASBuffer->Buffer.Get();
-					InCmdBuffer->CommandList->ResourceBarrier(1, &uavBarrier);
+					InCmdBufferDX12->CommandList->ResourceBarrier(1, &uavBarrier);
 				}
 				else
 				{
@@ -389,7 +395,7 @@ void jGame::Setup()
 					instanceDescs[i].InstanceContributionToHitGroupIndex = 0;
 					memcpy(instanceDescs[i].Transform, &RObj->World.m, sizeof(instanceDescs[i].Transform));
 					instanceDescs[i].InstanceMask = 0xFF;
-					instanceDescs[i].AccelerationStructure = RObj->BottomLevelASBuffer->GetGPUAddress();
+					instanceDescs[i].AccelerationStructure = ((jBuffer_DX12*)RObj->BottomLevelASBuffer)->GetGPUAddress();
 					for (int32 k = 0; k < 3; ++k)
 					{
 						for (int32 m = 0; m < 4; ++m)
@@ -420,17 +426,335 @@ void jGame::Setup()
 					asDesc.SourceAccelerationStructureData = TopLevelASBuffer->Buffer->GetGPUVirtualAddress();
 				}
 
-				InCmdBuffer->CommandList->BuildRaytracingAccelerationStructure(&asDesc, 0, nullptr);
+				InCmdBufferDX12->CommandList->BuildRaytracingAccelerationStructure(&asDesc, 0, nullptr);
 				auto temp = CD3DX12_RESOURCE_BARRIER::UAV(TopLevelASBuffer->Buffer.Get());
-				InCmdBuffer->CommandList->ResourceBarrier(1, &temp);
+				InCmdBufferDX12->CommandList->ResourceBarrier(1, &temp);
 			}
-			};
+		};
 		UpdateTopLevelAS(CmdBuffer);
 		g_rhi_dx12->EndSingleTimeCommands(CmdBuffer);
 	}
 	else if (IsUseVulkan())
-	{
+    {
+        auto getBufferDeviceAddress = [](VkBuffer buffer)
+            {
+                VkBufferDeviceAddressInfoKHR bufferDeviceAI{};
+                bufferDeviceAI.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+                bufferDeviceAI.buffer = buffer;
+                return g_rhi_vk->vkGetBufferDeviceAddressKHR(g_rhi_vk->Device, &bufferDeviceAI);
+            };
 
+        auto BLASTransformBuffer = new jBuffer_Vulkan();
+        {
+            jBufferUtil_Vulkan::AllocateBuffer(
+				EVulkanBufferBits::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY | EVulkanBufferBits::SHADER_DEVICE_ADDRESS,
+                EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
+				, jObject::GetStaticRenderObject().size() * sizeof(VkTransformMatrixKHR), *BLASTransformBuffer);
+
+			VkTransformMatrixKHR transformMatrix = {
+				1.0f, 0.0f, 0.0f, 0.0f,
+				0.0f, 1.0f, 0.0f, 0.0f,
+				0.0f, 0.0f, 1.0f, 0.0f
+			};
+			auto MappedPtr = (VkTransformMatrixKHR*)BLASTransformBuffer->Map();
+			for(int32 i=0;i<jObject::GetStaticRenderObject().size();++i)
+			{
+				MappedPtr[i] = transformMatrix;
+			}
+			BLASTransformBuffer->Unmap();
+        
+			BLASTransformBuffer->DeviceAddress = getBufferDeviceAddress(BLASTransformBuffer->Buffer);
+        }
+
+        std::vector<jRenderObject*> RTObjects;
+        for (int32 i = 0; i < jObject::GetStaticRenderObject().size(); ++i)
+        {
+            jRenderObject* RObj = jObject::GetStaticRenderObject()[i];
+
+            auto VertexBuffer_PositionOnly = RObj->GeometryDataPtr->VertexBuffer_PositionOnly;
+            auto IndexBuffer = RObj->GeometryDataPtr->IndexBuffer;
+
+			VkAccelerationStructureGeometryKHR geometry{};
+            geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
+            geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
+
+            auto VertexBufferVulkan = (jVertexBuffer_Vulkan*)VertexBuffer_PositionOnly;
+			VkBuffer VtxBufferVulkan = VertexBufferVulkan->BindInfos.Buffers[0];
+
+			if (GetVulkanTextureComponentCount(GetVulkanTextureFormat(VertexBufferVulkan->BindInfos.AttributeDescriptions[0].format)) < 3)
+				continue;
+
+            geometry.geometry.triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
+            geometry.geometry.triangles.vertexFormat = VertexBufferVulkan->BindInfos.AttributeDescriptions[0].format;
+
+			VkDeviceOrHostAddressConstKHR vertexBufferDeviceAddress{};
+			vertexBufferDeviceAddress.deviceAddress = getBufferDeviceAddress(VtxBufferVulkan);
+
+			uint64 VertexStart = vertexBufferDeviceAddress.deviceAddress;
+            int32 VertexCount = VertexBufferVulkan->GetElementCount();
+            auto ROE = dynamic_cast<jRenderObjectElement*>(RObj);
+            Vector2i VertexIndexOffset{};
+            if (ROE)
+            {
+                VertexStart += VertexBufferVulkan->Streams[0].Stride * ROE->SubMesh.StartVertex;
+                VertexCount = ROE->SubMesh.EndVertex - ROE->SubMesh.StartVertex + 1;
+
+                VertexIndexOffset = Vector2i(ROE->SubMesh.StartVertex, ROE->SubMesh.StartFace);
+            }
+
+			RObj->VertexAndIndexOffsetBuffer = new jBuffer_Vulkan();
+            jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::TRANSFER_DST | EVulkanBufferBits::VERTEX_BUFFER
+                , EVulkanMemoryBits::DEVICE_LOCAL, sizeof(Vector2i), *(jBuffer_Vulkan*)RObj->VertexAndIndexOffsetBuffer);
+
+            RTObjects.push_back(RObj);
+
+			uint64 IndexStart = 0;
+			uint32 PrimitiveCount = 0;
+            if (IndexBuffer)
+            {
+                auto IndexBufferVulkan = (jIndexBuffer_Vulkan*)IndexBuffer;
+				IndexBufferVulkan->BufferPtr->Buffer;
+                
+                VkDeviceOrHostAddressConstKHR indexBufferDeviceAddress{};
+				indexBufferDeviceAddress.deviceAddress = getBufferDeviceAddress(IndexBufferVulkan->BufferPtr->Buffer);
+
+                auto& indexStreamData = IndexBufferVulkan->IndexStreamData;
+
+				IndexStart = indexBufferDeviceAddress.deviceAddress;
+                int32 IndexCount = IndexBuffer->GetElementCount();
+                if (ROE)
+                {
+                    IndexStart += indexStreamData->Param->GetElementSize() * ROE->SubMesh.StartFace;
+                    IndexCount = ROE->SubMesh.EndFace - ROE->SubMesh.StartFace + 1;
+                }
+
+                geometry.geometry.triangles.indexType = indexStreamData->Param->GetElementSize() == 16 ? VK_INDEX_TYPE_UINT16 : VK_INDEX_TYPE_UINT32;
+                geometry.geometry.triangles.indexData = VkDeviceOrHostAddressConstKHR(IndexStart);
+
+				PrimitiveCount = IndexCount / 3;
+            }
+			else
+			{
+				PrimitiveCount = VertexCount / 3;
+			}
+
+            geometry.geometry.triangles.vertexData = VkDeviceOrHostAddressConstKHR(VertexStart);
+            geometry.geometry.triangles.maxVertex = VertexCount;
+			geometry.geometry.triangles.vertexStride = VertexBufferVulkan->Streams[0].Stride;
+			geometry.geometry.triangles.transformData.deviceAddress = BLASTransformBuffer->DeviceAddress + sizeof(VkTransformMatrixKHR) * i;
+
+			std::vector<VkAccelerationStructureGeometryKHR> geometries{ geometry };
+
+            VkAccelerationStructureBuildGeometryInfoKHR accelerationStructureBuildGeometryInfo{};
+            accelerationStructureBuildGeometryInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
+            accelerationStructureBuildGeometryInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
+            accelerationStructureBuildGeometryInfo.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
+            accelerationStructureBuildGeometryInfo.geometryCount = (uint32)geometries.size();
+            accelerationStructureBuildGeometryInfo.pGeometries = geometries.data();
+
+			std::vector<uint32_t> maxPrimitiveCounts{ PrimitiveCount };
+
+            VkAccelerationStructureBuildSizesInfoKHR accelerationStructureBuildSizesInfo{};
+            accelerationStructureBuildSizesInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR;
+			g_rhi_vk->vkGetAccelerationStructureBuildSizesKHR(
+				g_rhi_vk->Device,
+                VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
+                &accelerationStructureBuildGeometryInfo,
+				maxPrimitiveCounts.data(),
+                &accelerationStructureBuildSizesInfo);
+
+            RObj->BottomLevelASBuffer = new jBuffer_Vulkan();
+			jBuffer_Vulkan* BLAS_Vulkan = (jBuffer_Vulkan*)RObj->BottomLevelASBuffer;
+			{
+				jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::ACCELERATION_STRUCTURE_STORAGE | EVulkanBufferBits::SHADER_DEVICE_ADDRESS,
+					EVulkanMemoryBits::DEVICE_LOCAL, accelerationStructureBuildSizesInfo.accelerationStructureSize, *BLAS_Vulkan);
+
+                VkAccelerationStructureCreateInfoKHR accelerationStructureCreate_info{};
+                accelerationStructureCreate_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
+                accelerationStructureCreate_info.buffer = BLAS_Vulkan->Buffer;
+                accelerationStructureCreate_info.size = accelerationStructureBuildSizesInfo.accelerationStructureSize;
+                accelerationStructureCreate_info.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
+                g_rhi_vk->vkCreateAccelerationStructureKHR(g_rhi_vk->Device, &accelerationStructureCreate_info, nullptr, &BLAS_Vulkan->AccelerationStructure);
+			}
+
+			auto BLASScratch_Vulkan = new jBuffer_Vulkan();
+			{
+				jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::SHADER_DEVICE_ADDRESS | EVulkanBufferBits::STORAGE_BUFFER,
+					EVulkanMemoryBits::DEVICE_LOCAL, accelerationStructureBuildSizesInfo.buildScratchSize, *BLASScratch_Vulkan);
+
+				VkBufferDeviceAddressInfoKHR scratchBufferDeviceAddresInfo{};
+				scratchBufferDeviceAddresInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+				scratchBufferDeviceAddresInfo.buffer = BLASScratch_Vulkan->Buffer;
+				BLASScratch_Vulkan->DeviceAddress = g_rhi_vk->vkGetBufferDeviceAddressKHR(g_rhi_vk->Device, &scratchBufferDeviceAddresInfo);
+			}
+
+			VkAccelerationStructureBuildGeometryInfoKHR accelerationBuildGeometryInfo{};
+			accelerationBuildGeometryInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
+            accelerationBuildGeometryInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
+            accelerationBuildGeometryInfo.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
+            accelerationBuildGeometryInfo.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
+            accelerationBuildGeometryInfo.dstAccelerationStructure = BLAS_Vulkan->AccelerationStructure;
+            accelerationBuildGeometryInfo.geometryCount = (uint32)geometries.size();
+            accelerationBuildGeometryInfo.pGeometries = geometries.data();
+            accelerationBuildGeometryInfo.scratchData.deviceAddress = BLASScratch_Vulkan->DeviceAddress;
+
+            VkAccelerationStructureBuildRangeInfoKHR buildRangeInfo{};
+            buildRangeInfo.firstVertex = 0;
+            buildRangeInfo.primitiveOffset = 0;
+            buildRangeInfo.primitiveCount = PrimitiveCount;
+            buildRangeInfo.transformOffset = 0;
+
+			std::vector<VkAccelerationStructureBuildRangeInfoKHR*> accelerationBuildStructureRangeInfos = { &buildRangeInfo };
+
+            VkCommandBuffer CmdBufferVk = g_rhi_vk->BeginSingleTimeCommands();
+
+            g_rhi_vk->vkCmdBuildAccelerationStructuresKHR(
+                CmdBufferVk,
+                1,
+                &accelerationBuildGeometryInfo,
+                accelerationBuildStructureRangeInfos.data());
+
+			g_rhi_vk->EndSingleTimeCommands(CmdBufferVk);
+
+            VkAccelerationStructureDeviceAddressInfoKHR accelerationDeviceAddressInfo{};
+            accelerationDeviceAddressInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
+            accelerationDeviceAddressInfo.accelerationStructure = BLAS_Vulkan->AccelerationStructure;
+			BLAS_Vulkan->DeviceAddress = g_rhi_vk->vkGetAccelerationStructureDeviceAddressKHR(g_rhi_vk->Device, &accelerationDeviceAddressInfo);
+
+			delete BLASScratch_Vulkan;
+        }
+		g_rhi_vk->Flush();
+
+        jGame::UpdateTopLevelAS = [RTObjects](void* InCmdBuffer)
+        {
+			VkCommandBuffer CmdBufferVk = (VkCommandBuffer)InCmdBuffer;
+			jCommandBuffer_Vulkan* InCmdBufferVulkan = (jCommandBuffer_Vulkan*)InCmdBuffer;
+
+			auto Instance_Vulkan = new jBuffer_Vulkan();
+			Instance_Vulkan = new jBuffer_Vulkan();
+            {
+                jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::SHADER_DEVICE_ADDRESS | EVulkanBufferBits::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY
+					, EVulkanMemoryBits::DEVICE_LOCAL | EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
+					, sizeof(VkAccelerationStructureInstanceKHR) * RTObjects.size(), *Instance_Vulkan);
+            }
+
+            VkBufferDeviceAddressInfoKHR instanceDataDeviceAddress{};
+            instanceDataDeviceAddress.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+            instanceDataDeviceAddress.buffer = Instance_Vulkan->Buffer;
+			Instance_Vulkan->DeviceAddress = g_rhi_vk->vkGetBufferDeviceAddressKHR(g_rhi_vk->Device, &instanceDataDeviceAddress);
+
+			//std::vector<VkAccelerationStructureGeometryKHR> ASGeoInfos;
+
+			VkAccelerationStructureInstanceKHR* MappedPointer = (VkAccelerationStructureInstanceKHR*)Instance_Vulkan->Map();
+            for (int32 i = 0; i < RTObjects.size(); ++i)
+            {
+                jRenderObject* RObj = RTObjects[i];
+                RObj->UpdateWorldMatrix();
+
+				MappedPointer[i].instanceCustomIndex = i;
+				MappedPointer[i].mask = 0xFF;
+				MappedPointer[i].flags = VK_GEOMETRY_INSTANCE_FORCE_OPAQUE_BIT_KHR;
+				MappedPointer[i].accelerationStructureReference = ((jBuffer_Vulkan*)RObj->BottomLevelASBuffer)->DeviceAddress;
+                for (int32 k = 0; k < 3; ++k)
+                {
+                    for (int32 m = 0; m < 4; ++m)
+                    {
+						MappedPointer[i].transform.matrix[k][m] = RObj->World.m[m][k];
+                    }
+                }
+                if (gOptions.EarthQuake)
+                {
+					MappedPointer[i].transform.matrix[0][3] = sin((float)g_rhi_dx12->CurrentFrameNumber);
+					MappedPointer[i].transform.matrix[1][3] = cos((float)g_rhi_dx12->CurrentFrameNumber);
+					MappedPointer[i].transform.matrix[2][3] = sin((float)g_rhi_dx12->CurrentFrameNumber) * 2;
+                }
+
+				//ASGeoInfos.push_back(accelerationStructureGeometry);
+			}
+			Instance_Vulkan->Unmap();
+
+            VkAccelerationStructureGeometryKHR accelerationStructureGeometry{};
+            accelerationStructureGeometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
+            accelerationStructureGeometry.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;
+            accelerationStructureGeometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+            accelerationStructureGeometry.geometry.instances.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR;
+            accelerationStructureGeometry.geometry.instances.arrayOfPointers = VK_FALSE;
+            accelerationStructureGeometry.geometry.instances.data
+                = VkDeviceOrHostAddressConstKHR(Instance_Vulkan->DeviceAddress);
+
+            // Get Size info
+            VkAccelerationStructureBuildGeometryInfoKHR accelerationStructureBuildGeometryInfo{};
+            accelerationStructureBuildGeometryInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
+            accelerationStructureBuildGeometryInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
+            accelerationStructureBuildGeometryInfo.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
+            accelerationStructureBuildGeometryInfo.geometryCount = 1;
+            accelerationStructureBuildGeometryInfo.pGeometries = &accelerationStructureGeometry;
+
+			uint32 primitive_count = (uint32)RTObjects.size();
+
+            VkAccelerationStructureBuildSizesInfoKHR accelerationStructureBuildSizesInfo{};
+            accelerationStructureBuildSizesInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR;
+			g_rhi_vk->vkGetAccelerationStructureBuildSizesKHR(
+                g_rhi_vk->Device,
+                VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
+                &accelerationStructureBuildGeometryInfo,
+                &primitive_count,
+                &accelerationStructureBuildSizesInfo);
+
+            TLAS_Vulkan = new jBuffer_Vulkan();
+            {
+                jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::ACCELERATION_STRUCTURE_STORAGE | EVulkanBufferBits::SHADER_DEVICE_ADDRESS,
+                    EVulkanMemoryBits::DEVICE_LOCAL, accelerationStructureBuildSizesInfo.accelerationStructureSize, *TLAS_Vulkan);
+            }
+            VkAccelerationStructureCreateInfoKHR accelerationStructureCreateInfo{};
+            accelerationStructureCreateInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
+            accelerationStructureCreateInfo.buffer = TLAS_Vulkan->Buffer;
+            accelerationStructureCreateInfo.size = accelerationStructureBuildSizesInfo.accelerationStructureSize;
+            accelerationStructureCreateInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
+            g_rhi_vk->vkCreateAccelerationStructureKHR(g_rhi_vk->Device, &accelerationStructureCreateInfo, nullptr, &TLAS_Vulkan->AccelerationStructure);
+
+            // Create a small scratch buffer used during build of the bottom level acceleration structure
+            auto TLASScratch_Vulkan = new jBuffer_Vulkan();
+            jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::ACCELERATION_STRUCTURE_STORAGE | EVulkanBufferBits::SHADER_DEVICE_ADDRESS | EVulkanBufferBits::STORAGE_BUFFER,
+                EVulkanMemoryBits::DEVICE_LOCAL, accelerationStructureBuildSizesInfo.buildScratchSize, *TLASScratch_Vulkan);
+
+            VkBufferDeviceAddressInfoKHR scratchBufferDeviceAddresInfo{};
+            scratchBufferDeviceAddresInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+            scratchBufferDeviceAddresInfo.buffer = TLASScratch_Vulkan->Buffer;
+			TLASScratch_Vulkan->DeviceAddress = g_rhi_vk->vkGetBufferDeviceAddressKHR(g_rhi_vk->Device, &scratchBufferDeviceAddresInfo);
+
+            VkAccelerationStructureBuildGeometryInfoKHR accelerationBuildGeometryInfo{};
+            accelerationBuildGeometryInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
+            accelerationBuildGeometryInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
+            accelerationBuildGeometryInfo.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
+            accelerationBuildGeometryInfo.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
+            accelerationBuildGeometryInfo.dstAccelerationStructure = TLAS_Vulkan->AccelerationStructure;
+            accelerationBuildGeometryInfo.geometryCount = 1;
+            accelerationBuildGeometryInfo.pGeometries = &accelerationStructureGeometry;
+            accelerationBuildGeometryInfo.scratchData.deviceAddress = TLASScratch_Vulkan->DeviceAddress;
+
+            VkAccelerationStructureBuildRangeInfoKHR accelerationStructureBuildRangeInfo{};
+            accelerationStructureBuildRangeInfo.primitiveCount = primitive_count;
+            accelerationStructureBuildRangeInfo.primitiveOffset = 0;
+            accelerationStructureBuildRangeInfo.firstVertex = 0;
+            accelerationStructureBuildRangeInfo.transformOffset = 0;
+            std::vector<VkAccelerationStructureBuildRangeInfoKHR*> accelerationBuildStructureRangeInfos = { &accelerationStructureBuildRangeInfo };
+
+			g_rhi_vk->vkCmdBuildAccelerationStructuresKHR(
+				CmdBufferVk,
+                1,
+                &accelerationBuildGeometryInfo,
+                accelerationBuildStructureRangeInfos.data());
+
+            VkAccelerationStructureDeviceAddressInfoKHR accelerationDeviceAddressInfo{};
+            accelerationDeviceAddressInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
+            accelerationDeviceAddressInfo.accelerationStructure = TLAS_Vulkan->AccelerationStructure;
+			TLAS_Vulkan->DeviceAddress = g_rhi_vk->vkGetAccelerationStructureDeviceAddressKHR(g_rhi_vk->Device, &accelerationDeviceAddressInfo);
+		};
+        auto CmdBufferVk = g_rhi_vk->BeginSingleTimeCommands();
+		jGame::UpdateTopLevelAS(CmdBufferVk);
+		g_rhi_vk->EndSingleTimeCommands(CmdBufferVk);
+        g_rhi_vk->Flush();
 	}
 }
 

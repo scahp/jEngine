@@ -135,9 +135,9 @@ void jSpirvHelper::InitResources(TBuiltInResource& Resources)
 }
 
 // https://github.com/DragonJoker/Ashes/blob/master/source/util/GlslToSpv.cpp
-void jSpirvHelper::InitResources(TBuiltInResource& resources, const VkPhysicalDeviceProperties& props)
+void jSpirvHelper::InitResources(TBuiltInResource& resources, const VkPhysicalDeviceProperties2& props)
 {
-	auto& limits = props.limits;
+	auto& limits = props.properties.limits;
 
 	resources.limits.doWhileLoops = true;
 	resources.limits.generalAttributeMatrixVectorIndexing = true;

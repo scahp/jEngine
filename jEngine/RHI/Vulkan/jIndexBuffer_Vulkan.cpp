@@ -25,7 +25,8 @@ void jIndexBuffer_Vulkan::Bind(const std::shared_ptr<jRenderFrameContext>& InRen
     }
     check(InRenderFrameContext);
     check(InRenderFrameContext->GetActiveCommandBuffer());
-    vkCmdBindIndexBuffer((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), BufferPtr->Buffer, BufferPtr->Offset, IndexType);
+    vkCmdBindIndexBuffer((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle()
+        , BufferPtr->Buffer, BufferPtr->Offset, IndexType);
 }
 
 bool jIndexBuffer_Vulkan::Initialize(const std::shared_ptr<jIndexStreamData>& InStreamData)
@@ -37,12 +38,17 @@ bool jIndexBuffer_Vulkan::Initialize(const std::shared_ptr<jIndexStreamData>& In
     VkDeviceSize bufferSize = InStreamData->Param->GetBufferSize();
 
     jBuffer_Vulkan stagingBuffer;
-    jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT, bufferSize, stagingBuffer);
+    jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::TRANSFER_SRC
+        , EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT, bufferSize, stagingBuffer);
 
     stagingBuffer.UpdateBuffer(InStreamData->Param->GetBufferData(), bufferSize);
 
     BufferPtr = std::make_shared<jBuffer_Vulkan>();
-    jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::TRANSFER_DST | EVulkanBufferBits::INDEX_BUFFER, EVulkanMemoryBits::DEVICE_LOCAL, bufferSize, *BufferPtr.get());
+    jBufferUtil_Vulkan::AllocateBuffer(
+        EVulkanBufferBits::TRANSFER_DST | EVulkanBufferBits::INDEX_BUFFER
+        | EVulkanBufferBits::SHADER_DEVICE_ADDRESS | EVulkanBufferBits::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY
+        | EVulkanBufferBits::STORAGE_BUFFER
+        , EVulkanMemoryBits::DEVICE_LOCAL, bufferSize, *BufferPtr.get());
     jBufferUtil_Vulkan::CopyBuffer(stagingBuffer, *BufferPtr.get(), bufferSize);
 
     stagingBuffer.Release();
