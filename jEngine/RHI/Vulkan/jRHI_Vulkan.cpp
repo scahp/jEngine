@@ -30,6 +30,7 @@
 #include "jRenderFrameContext_Vulkan.h"
 #include "jImGui_Vulkan.h"
 #include "Scene/Light/jLight.h"
+#include "../DX12/jShaderCompiler_DX12.h"
 
 jRHI_Vulkan* g_rhi_vk = nullptr;
 robin_hood::unordered_map<size_t, jShaderBindingLayout*> jRHI_Vulkan::ShaderBindingPool;
@@ -55,7 +56,6 @@ jRHI_Vulkan::jRHI_Vulkan()
 {
 	g_rhi_vk = this;
 }
-
 
 jRHI_Vulkan::~jRHI_Vulkan()
 {
@@ -168,10 +168,21 @@ bool jRHI_Vulkan::InitRHI()
 		if (!ensure(PhysicalDevice != VK_NULL_HANDLE))
 			return false;
 
-		vkGetPhysicalDeviceProperties(PhysicalDevice, &DeviceProperties);
+		DeviceProperties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+		RayTracingPipelineProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
+		RayTracingPipelineProperties.pNext = (void*)DeviceProperties2.pNext;
+		DeviceProperties2.pNext = &RayTracingPipelineProperties;
+
+		vkGetPhysicalDeviceProperties2(PhysicalDevice, &DeviceProperties2);
+
+		DeviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+        AccelerationStructureFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
+        AccelerationStructureFeatures.pNext = (void*)DeviceProperties2.pNext;
+		DeviceFeatures2.pNext = &AccelerationStructureFeatures;
+		vkGetPhysicalDeviceFeatures2(PhysicalDevice, &DeviceFeatures2);
 	}
 
-	jSpirvHelper::Init(DeviceProperties);
+	jSpirvHelper::Init(DeviceProperties2);
 
 	// Get All device extension properties
     uint32 extensionCount;
@@ -211,6 +222,7 @@ bool jRHI_Vulkan::InitRHI()
 		deviceFeatures.multiDrawIndirect = true;
 		deviceFeatures.geometryShader = true;
 		deviceFeatures.depthClamp = true;
+		deviceFeatures.shaderInt64 = true;				// Buffer device address requires the 64-bit integer feature to be enabled
 
         VkPhysicalDeviceFeatures2 physicalDeviceFeatures2{};
         physicalDeviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
@@ -226,6 +238,39 @@ bool jRHI_Vulkan::InitRHI()
 #else
 		createInfo.pNext = &physicalDeviceFeatures2;		// disable VRS
 #endif
+
+		VkPhysicalDeviceDescriptorIndexingFeaturesEXT physicalDeviceDescriptorIndexingFeatures{};
+        physicalDeviceDescriptorIndexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT;
+        physicalDeviceDescriptorIndexingFeatures.shaderSampledImageArrayNonUniformIndexing = true;
+        physicalDeviceDescriptorIndexingFeatures.runtimeDescriptorArray = true;
+        physicalDeviceDescriptorIndexingFeatures.descriptorBindingVariableDescriptorCount = true;
+		physicalDeviceDescriptorIndexingFeatures.pNext = (void*)createInfo.pNext;
+		createInfo.pNext = &physicalDeviceDescriptorIndexingFeatures;
+
+        // Enable features required for ray tracing using feature chaining via pNext		
+        VkPhysicalDeviceBufferDeviceAddressFeatures enabledBufferDeviceAddresFeatures{};
+        enabledBufferDeviceAddresFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
+        enabledBufferDeviceAddresFeatures.bufferDeviceAddress = true;
+		enabledBufferDeviceAddresFeatures.pNext = (void*)createInfo.pNext;
+		createInfo.pNext = &enabledBufferDeviceAddresFeatures;
+
+        VkPhysicalDeviceRayTracingPipelineFeaturesKHR enabledRayTracingPipelineFeatures{};
+        enabledRayTracingPipelineFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
+        enabledRayTracingPipelineFeatures.rayTracingPipeline = true;
+		enabledRayTracingPipelineFeatures.pNext = (void*)createInfo.pNext;
+        createInfo.pNext = &enabledRayTracingPipelineFeatures;
+
+        VkPhysicalDeviceAccelerationStructureFeaturesKHR enabledAccelerationStructureFeatures{};
+        enabledAccelerationStructureFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
+        enabledAccelerationStructureFeatures.accelerationStructure = true;
+		enabledAccelerationStructureFeatures.pNext = (void*)createInfo.pNext;
+        createInfo.pNext = &enabledAccelerationStructureFeatures;
+
+		VkPhysicalDeviceRayQueryFeaturesKHR enabledRayQueryFeatures{};
+        enabledRayQueryFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR;
+        enabledRayQueryFeatures.rayQuery = true;
+		enabledRayQueryFeatures.pNext = (void*)createInfo.pNext;
+		createInfo.pNext = &enabledRayQueryFeatures;
 
 		// Added CustomBorderColor features
 		VkPhysicalDeviceCustomBorderColorFeaturesEXT enabledCustomBorderColorFeaturesEXT{};
@@ -291,6 +336,19 @@ bool jRHI_Vulkan::InitRHI()
         vkCmdDebugMarkerInsert = (PFN_vkCmdDebugMarkerInsertEXT)vkGetDeviceProcAddr(Device, "vkCmdDebugMarkerInsertEXT");
 	}
 
+#if SUPPORT_RAYTRACING
+    vkGetBufferDeviceAddressKHR = (PFN_vkGetBufferDeviceAddressKHR)vkGetDeviceProcAddr(Device, "vkGetBufferDeviceAddressKHR");
+    vkCmdBuildAccelerationStructuresKHR = (PFN_vkCmdBuildAccelerationStructuresKHR)vkGetDeviceProcAddr(Device, "vkCmdBuildAccelerationStructuresKHR");
+    vkBuildAccelerationStructuresKHR = (PFN_vkBuildAccelerationStructuresKHR)vkGetDeviceProcAddr(Device, "vkBuildAccelerationStructuresKHR");
+    vkCreateAccelerationStructureKHR = (PFN_vkCreateAccelerationStructureKHR)vkGetDeviceProcAddr(Device, "vkCreateAccelerationStructureKHR");
+    vkDestroyAccelerationStructureKHR = (PFN_vkDestroyAccelerationStructureKHR)vkGetDeviceProcAddr(Device, "vkDestroyAccelerationStructureKHR");
+    vkGetAccelerationStructureBuildSizesKHR = (PFN_vkGetAccelerationStructureBuildSizesKHR)vkGetDeviceProcAddr(Device, "vkGetAccelerationStructureBuildSizesKHR");
+    vkGetAccelerationStructureDeviceAddressKHR = (PFN_vkGetAccelerationStructureDeviceAddressKHR)vkGetDeviceProcAddr(Device, "vkGetAccelerationStructureDeviceAddressKHR");
+    vkCmdTraceRaysKHR = (PFN_vkCmdTraceRaysKHR)vkGetDeviceProcAddr(Device, "vkCmdTraceRaysKHR");
+    vkGetRayTracingShaderGroupHandlesKHR = (PFN_vkGetRayTracingShaderGroupHandlesKHR)vkGetDeviceProcAddr(Device, "vkGetRayTracingShaderGroupHandlesKHR");
+    vkCreateRayTracingPipelinesKHR = (PFN_vkCreateRayTracingPipelinesKHR)vkGetDeviceProcAddr(Device, "vkCreateRayTracingPipelinesKHR");
+#endif // SUPPORT_RAYTRACING
+
 	// Swapchain
     Swapchain = new jSwapchain_Vulkan();
 	verify(Swapchain->Create());
@@ -313,14 +371,14 @@ bool jRHI_Vulkan::InitRHI()
 	for (auto& iter : OneFrameUniformRingBuffers)
 	{
         iter = new jRingBuffer_Vulkan();
-		iter->Create(EVulkanBufferBits::UNIFORM_BUFFER, 16 * 1024 * 1024, (uint32)DeviceProperties.limits.minUniformBufferOffsetAlignment);
+		iter->Create(EVulkanBufferBits::UNIFORM_BUFFER, 16 * 1024 * 1024, (uint32)DeviceProperties2.properties.limits.minUniformBufferOffsetAlignment);
 	}
 
     SSBORingBuffers.resize(Swapchain->GetNumOfSwapchain());
     for (auto& iter : SSBORingBuffers)
     {
         iter = new jRingBuffer_Vulkan();
-        iter->Create(EVulkanBufferBits::STORAGE_BUFFER, 16 * 1024 * 1024, (uint32)DeviceProperties.limits.minStorageBufferOffsetAlignment);
+        iter->Create(EVulkanBufferBits::STORAGE_BUFFER, 16 * 1024 * 1024, (uint32)DeviceProperties2.properties.limits.minStorageBufferOffsetAlignment);
     }
 
 	DescriptorPools.resize(Swapchain->GetNumOfSwapchain());
@@ -718,36 +776,6 @@ bool jRHI_Vulkan::CreateShaderInternal(jShader* OutShader, const jShaderInfo& sh
 		std::string PermutationDefines;
 		shader_vk->GetPermutationDefines(PermutationDefines);
 
-		VkShaderStageFlagBits ShaderFlagBits;
-		ShaderConductor::ShaderStage ShaderConductorShaderStage;
-		EShLanguage ShaderLangShaderStage;
-		switch (shaderInfo.GetShaderType())
-		{
-		case EShaderAccessStageFlag::VERTEX:
-			ShaderFlagBits = VK_SHADER_STAGE_VERTEX_BIT;
-			ShaderConductorShaderStage = ShaderConductor::ShaderStage::VertexShader;
-			ShaderLangShaderStage = EShLangVertex;
-			break;
-		case EShaderAccessStageFlag::GEOMETRY:
-			ShaderFlagBits = VK_SHADER_STAGE_GEOMETRY_BIT;
-			ShaderConductorShaderStage = ShaderConductor::ShaderStage::GeometryShader;
-			ShaderLangShaderStage = EShLangGeometry;
-			break;
-		case EShaderAccessStageFlag::FRAGMENT:
-			ShaderFlagBits = VK_SHADER_STAGE_FRAGMENT_BIT;
-			ShaderConductorShaderStage = ShaderConductor::ShaderStage::PixelShader;
-			ShaderLangShaderStage = EShLangFragment;
-			break;
-		case EShaderAccessStageFlag::COMPUTE:
-			ShaderFlagBits = VK_SHADER_STAGE_COMPUTE_BIT;
-			ShaderConductorShaderStage = ShaderConductor::ShaderStage::ComputeShader;
-			ShaderLangShaderStage = EShLangCompute;
-			break;
-		default:
-			check(0);
-			break;
-		}
-
 		VkShaderModule shaderModule{};
 
 		const bool isSpirv = !!strstr(shaderInfo.GetShaderFilepath().ToStr(), ".spv");
@@ -817,28 +845,103 @@ bool jRHI_Vulkan::CreateShaderInternal(jShader* OutShader, const jShaderInfo& sh
 				IncludeShaderFile.CloseFile();
 			}
 
-            std::vector<uint32> SpirvCode;
-			if (isHLSL)
+            const wchar_t* ShadingModel = nullptr;
+            switch (shaderInfo.GetShaderType())
+            {
+            case EShaderAccessStageFlag::VERTEX:
+                ShadingModel = TEXT("vs_6_6");
+                break;
+            case EShaderAccessStageFlag::GEOMETRY:
+                ShadingModel = TEXT("gs_6_6");
+                break;
+            case EShaderAccessStageFlag::FRAGMENT:
+                ShadingModel = TEXT("ps_6_6");
+                break;
+            case EShaderAccessStageFlag::COMPUTE:
+                ShadingModel = TEXT("cs_6_6");
+                break;
+            case EShaderAccessStageFlag::RAYTRACING:
+			case EShaderAccessStageFlag::RAYTRACING_RAYGEN:
+			case EShaderAccessStageFlag::RAYTRACING_MISS:
+			case EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT:
+                ShadingModel = TEXT("lib_6_6");
+                break;
+            default:
+                check(0);
+                break;
+            }
+
+			const std::wstring EntryPoint = ConvertToWchar(shaderInfo.GetEntryPoint());
+			auto ShaderBlob = jShaderCompiler_DX12::Get().Compile(ShaderText.c_str(), ShaderText.length(), ShadingModel, EntryPoint.c_str(), false
+				, {TEXT("-spirv"), TEXT("-fspv-target-env=vulkan1.1spirv1.4"), TEXT("-fvk-use-scalar-layout")
+				, TEXT("-fspv-extension=SPV_EXT_descriptor_indexing"), TEXT("-fspv-extension=SPV_KHR_ray_tracing")
+				, TEXT("-fspv-extension=SPV_KHR_ray_query") });
+
+			std::vector<uint8> SpirvCode;
+			if (ShaderBlob->GetBufferSize() > 0)
 			{
-				if (!jSpirvHelper::HLSLtoSpirv(SpirvCode, ShaderConductorShaderStage, ShaderText.c_str()))
-					return false;
-			}
-			else
-			{
-				if (!jSpirvHelper::GLSLtoSpirv(SpirvCode, ShaderLangShaderStage, ShaderText.data()))
-					return false;
+				SpirvCode.resize(ShaderBlob->GetBufferSize());
+				memcpy(SpirvCode.data(), ShaderBlob->GetBufferPointer(), ShaderBlob->GetBufferSize());
 			}
 
-			shaderModule = CreateShaderModule(SpirvCode);
+			{
+                VkShaderModuleCreateInfo createInfo = {};
+                createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+                createInfo.codeSize = SpirvCode.size();
+
+                // pCode 가 uint32* 형이라서 4 byte aligned 된 메모리를 넘겨줘야 함.
+                // 다행히 std::vector의 default allocator가 가 메모리 할당시 4 byte aligned 을 이미 하고있어서 그대로 씀.
+                createInfo.pCode = reinterpret_cast<const uint32*>(SpirvCode.data());
+
+                ensure(vkCreateShaderModule(Device, &createInfo, nullptr, &shaderModule) == VK_SUCCESS);
+
+                // compiling or linking 과정이 graphics pipeline 이 생성되기 전까지 처리되지 않는다.
+                // 그래픽스 파이프라인이 생성된 후 VkShaderModule은 즉시 소멸 가능.
+                //return shaderModule;
+			}
 		}
 
 		if (!shaderModule)
 			return false;
 
+        VkShaderStageFlagBits ShaderFlagBits;
+        ShaderConductor::ShaderStage ShaderConductorShaderStage;
+        EShLanguage ShaderLangShaderStage;
+        switch (shaderInfo.GetShaderType())
+        {
+        case EShaderAccessStageFlag::VERTEX:
+            ShaderFlagBits = VK_SHADER_STAGE_VERTEX_BIT;
+            break;
+        case EShaderAccessStageFlag::GEOMETRY:
+            ShaderFlagBits = VK_SHADER_STAGE_GEOMETRY_BIT;
+            break;
+        case EShaderAccessStageFlag::FRAGMENT:
+            ShaderFlagBits = VK_SHADER_STAGE_FRAGMENT_BIT;
+            break;
+        case EShaderAccessStageFlag::COMPUTE:
+            ShaderFlagBits = VK_SHADER_STAGE_COMPUTE_BIT;
+            break;
+		case EShaderAccessStageFlag::RAYTRACING:
+			ShaderFlagBits = VK_SHADER_STAGE_ALL;
+			break;
+        case EShaderAccessStageFlag::RAYTRACING_RAYGEN:
+			ShaderFlagBits = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+			break;
+        case EShaderAccessStageFlag::RAYTRACING_MISS:
+			ShaderFlagBits = VK_SHADER_STAGE_MISS_BIT_KHR;
+			break;
+        case EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT:
+			ShaderFlagBits = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+			break;
+        default:
+            check(0);
+            break;
+        }
+
 		CurCompiledShader->ShaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 		CurCompiledShader->ShaderStage.stage = ShaderFlagBits;
 		CurCompiledShader->ShaderStage.module = shaderModule;
-		CurCompiledShader->ShaderStage.pName = "main";
+		CurCompiledShader->ShaderStage.pName = shaderInfo.GetEntryPoint().ToStr();
 	}
 	shader_vk->ShaderInfo = shaderInfo;
 	shader_vk->ShaderInfo.SetIncludeShaderFilePaths(IncludeFilePaths);
@@ -1350,27 +1453,27 @@ VkCommandBuffer jRHI_Vulkan::BeginSingleTimeCommands() const
     allocInfo.commandBufferCount = 1;
 
     VkCommandBuffer commandBuffer;
-    vkAllocateCommandBuffers(Device, &allocInfo, &commandBuffer);
+    check(VK_SUCCESS == vkAllocateCommandBuffers(Device, &allocInfo, &commandBuffer));
 
     VkCommandBufferBeginInfo beginInfo = {};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-    vkBeginCommandBuffer(commandBuffer, &beginInfo);
+	check(VK_SUCCESS == vkBeginCommandBuffer(commandBuffer, &beginInfo));
     return commandBuffer;
 }
 
 void jRHI_Vulkan::EndSingleTimeCommands(VkCommandBuffer commandBuffer) const
 {
-    vkEndCommandBuffer(commandBuffer);
+    check(VK_SUCCESS == vkEndCommandBuffer(commandBuffer));
 
     VkSubmitInfo submitInfo = {};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &commandBuffer;
 
-    vkQueueSubmit(GraphicsQueue.Queue, 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(GraphicsQueue.Queue);
+    check(VK_SUCCESS == vkQueueSubmit(GraphicsQueue.Queue, 1, &submitInfo, VK_NULL_HANDLE));
+	check(VK_SUCCESS == vkQueueWaitIdle(GraphicsQueue.Queue));
 
     // 명령 완료를 기다리기 위해서 2가지 방법이 있는데, Fence를 사용하는 방법(vkWaitForFences)과 Queue가 Idle이 될때(vkQueueWaitIdle)를 기다리는 방법이 있음.
     // fence를 사용하는 방법이 여러개의 전송을 동시에 하고 마치는 것을 기다릴 수 있게 해주기 때문에 그것을 사용함.

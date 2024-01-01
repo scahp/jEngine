@@ -68,9 +68,9 @@ public:
 
 	std::shared_ptr<jRenderObjectGeometryData> GeometryDataPtr;
 
-    jBuffer_DX12* BottomLevelASBuffer = nullptr;
-    jBuffer_DX12* ScratchASBuffer = nullptr;
-	jBuffer_DX12* VertexAndIndexOffsetBuffer = nullptr;
+    jBuffer* BottomLevelASBuffer = nullptr;
+    jBuffer* ScratchASBuffer = nullptr;
+	jBuffer* VertexAndIndexOffsetBuffer = nullptr;
 
 	FORCEINLINE void SetPos(const Vector& InPos) { Pos = InPos; SetDirtyFlags(EDirty::POS); }
 	FORCEINLINE void SetRot(const Vector& InRot) { Rot = InRot; SetDirtyFlags(EDirty::ROT); }

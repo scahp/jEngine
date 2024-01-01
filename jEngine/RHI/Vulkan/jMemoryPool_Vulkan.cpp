@@ -15,7 +15,7 @@ void jSubMemoryAllocator_Vulkan::Initialize(EVulkanBufferBits InUsage, EVulkanMe
     vkGetBufferMemoryRequirements(g_rhi_vk->Device, Buffer, &memRequirements);
     Alignment = memRequirements.alignment;
 
-    if (!(EVulkanBufferBits::TRANSFER_DST & InUsage))
+    if (!!(EVulkanMemoryBits::HOST_VISIBLE & InProperties))
     {
         verify(VK_SUCCESS == vkMapMemory(g_rhi_vk->Device, DeviceMemory, 0, SubMemoryRange.DataSize, 0, &MappedPointer));
     }

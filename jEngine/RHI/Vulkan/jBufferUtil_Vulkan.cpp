@@ -312,6 +312,14 @@ size_t CreateBuffer(EVulkanBufferBits InUsage, EVulkanMemoryBits InProperties, u
     allocInfo.memoryTypeIndex = jBufferUtil_Vulkan::FindMemoryType(g_rhi_vk->PhysicalDevice, memRequirements.memoryTypeBits
         , GetVulkanMemoryPropertyFlagBits(InProperties));
 
+    VkMemoryAllocateFlagsInfoKHR allocFlagsInfo{};
+    if (!!(InUsage & EVulkanBufferBits::SHADER_DEVICE_ADDRESS))
+    {
+        allocFlagsInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO_KHR;
+        allocFlagsInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
+        allocInfo.pNext = &allocFlagsInfo;
+    }
+
     if (!ensure(vkAllocateMemory(g_rhi_vk->Device, &allocInfo, nullptr, &OutBufferMemory) == VK_SUCCESS))
         return 0;
 

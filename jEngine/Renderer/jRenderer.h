@@ -39,7 +39,7 @@ public:
         : RenderFrameContextPtr(InRenderFrameContextPtr), View(InView)
     {}
 
-    static jTexture_DX12* m_raytracingOutput;
+    static jTexture* m_raytracingOutput;
     static ComPtr<ID3D12RootSignature> m_raytracingGlobalRootSignature;
     static ComPtr<ID3D12RootSignature> m_raytracingLocalRootSignature;
     static ComPtr<ID3D12RootSignature> m_raytracingEmptyLocalRootSignature;

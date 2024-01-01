@@ -77,7 +77,7 @@ public:
 	ComPtr<IDxcBlob> CompileFromFile(const wchar_t* InFilename, const wchar_t* InShadingModel
 		, const wchar_t* InEntryPoint = nullptr, bool InRowMajorMatrix = false) const;
 	ComPtr<IDxcBlob> Compile(const char* InShaderCode, uint32 InShaderCodeLength, const wchar_t* InShadingModel
-		, const wchar_t* InEntryPoint = nullptr, bool InRowMajorMatrix = false) const;
+		, const wchar_t* InEntryPoint = nullptr, bool InRowMajorMatrix = false, std::vector<const wchar_t*> InCompileOptions = {}) const;
 
 public:
 	jShaderCompiler_DX12(jShaderCompiler_DX12 const&) = delete;

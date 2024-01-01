@@ -31,7 +31,10 @@ public:
     static jBuffer_DX12* TopLevelASBuffer;
     static jBuffer_DX12* InstanceDescUploadBuffer;
 	static jObject* Sphere;
-	static std::function<void(struct jCommandBuffer_DX12* InCmdBuffer)> UpdateTopLevelAS;
+	static std::function<void(void* InCmdBuffer)> UpdateTopLevelAS;
+
+	static jBuffer_Vulkan* TLAS_Vulkan;
+
 
 	jGame();
 	~jGame();

@@ -7,7 +7,7 @@
 void jShaderStorageBufferObject_Vulkan::Init(size_t size)
 {
     check(size);
-    size = Align<uint64>(size, g_rhi_vk->DeviceProperties.limits.minStorageBufferOffsetAlignment);
+    size = Align<uint64>(size, g_rhi_vk->DeviceProperties2.properties.limits.minStorageBufferOffsetAlignment);
 
     if (IsUseRingBuffer())
     {

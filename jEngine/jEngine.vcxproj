@@ -59,7 +59,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;_ITERATOR_DEBUG_LEVEL=0;_CONTAINER_DEBUG_LEVEL=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>./;./glad/include;./External/assimp/include;./External;./External/vulkan/1.3.216.0/Include;./External/glslang;./External/IMGUI;./External/EASTL/include;./External/EABase/include/Common;./External/glad/include;./External/stb;./External/loadpng;./External/TinyXml2;./External/ShaderConductor/include;./External/DirectX12/include;./External/WinPixEventRuntime/Include;./External/DirectXTex/include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>./;./glad/include;./External/assimp/include;./External;./External/vulkan/1.3.239.0/Include;./External/glslang;./External/IMGUI;./External/EASTL/include;./External/EABase/include/Common;./External/glad/include;./External/stb;./External/loadpng;./External/TinyXml2;./External/ShaderConductor/include;./External/DirectX12/include;./External/WinPixEventRuntime/Include;./External/DirectXTex/include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <DisableSpecificWarnings>
       </DisableSpecificWarnings>
@@ -67,7 +67,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>./;./External/assimp/lib;./External/vulkan/1.3.216.0/lib;./External/glslang/lib;./External/ShaderConductor/Lib;./External/WinPixEventRuntime/lib/x64;./External/DirectXTex/lib</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>./;./External/assimp/lib;./External/vulkan/1.3.239.0/lib;./External/glslang/lib;./External/ShaderConductor/Lib;./External/WinPixEventRuntime/lib/x64;./External/DirectXTex/lib</AdditionalLibraryDirectories>
       <AdditionalDependencies>opengl32.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>
       </IgnoreSpecificDefaultLibraries>
@@ -90,7 +90,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>./;./glad/include;./External/assimp/include;./External;./External/vulkan/1.3.216.0/Include;./External/glslang;./External/IMGUI;./External/EASTL/include;./External/EABase/include/Common;./External/glad/include;./External/stb;./External/loadpng;./External/TinyXml2;./External/ShaderConductor/include;./External/DirectX12/include;./External/WinPixEventRuntime/Include;./External/DirectXTex/include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>./;./glad/include;./External/assimp/include;./External;./External/vulkan/1.3.239.0/Include;./External/glslang;./External/IMGUI;./External/EASTL/include;./External/EABase/include/Common;./External/glad/include;./External/stb;./External/loadpng;./External/TinyXml2;./External/ShaderConductor/include;./External/DirectX12/include;./External/WinPixEventRuntime/Include;./External/DirectXTex/include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <DisableSpecificWarnings>
       </DisableSpecificWarnings>
@@ -101,7 +101,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>opengl32.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>./;./External/assimp/lib;./External/vulkan/1.3.216.0/lib;./External/glslang/lib;./External/ShaderConductor/Lib;./External/WinPixEventRuntime/lib/x64;./External/DirectXTex/lib</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>./;./External/assimp/lib;./External/vulkan/1.3.239.0/lib;./External/glslang/lib;./External/ShaderConductor/Lib;./External/WinPixEventRuntime/lib/x64;./External/DirectXTex/lib</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Command>xcopy /s /y /d  "$(ProjectDir)External\assimp\lib\*.dll" "$(OutDir)"
@@ -625,6 +625,9 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <None Include="Resource\Shaders\hlsl\RaytracingCubeAndPlane.hlsl">
       <FileType>Document</FileType>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="Resource\Shaders\hlsl\RaytracingCubeAndPlane2.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

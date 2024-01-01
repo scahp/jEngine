@@ -954,4 +954,9 @@
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
   </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="Resource\Shaders\hlsl\RaytracingCubeAndPlane2.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </FxCompile>
+  </ItemGroup>
 </Project>

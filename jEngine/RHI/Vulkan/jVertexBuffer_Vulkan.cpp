@@ -58,7 +58,10 @@ bool jVertexBuffer_Vulkan::Initialize(const std::shared_ptr<jVertexStreamData>& 
             // VK_BUFFER_USAGE_TRANSFER_DST_BIT : 이 버퍼가 메모리 전송 연산의 목적지가 될 수 있음.
             // DEVICE LOCAL 메모리에 VertexBuffer를 만들었으므로 이제 vkMapMemory 같은 것은 할 수 없음.
             stream.BufferPtr = std::make_shared<jBuffer_Vulkan>();
-            jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::TRANSFER_DST | EVulkanBufferBits::VERTEX_BUFFER
+            jBufferUtil_Vulkan::AllocateBuffer(
+                EVulkanBufferBits::TRANSFER_DST | EVulkanBufferBits::VERTEX_BUFFER
+                | EVulkanBufferBits::SHADER_DEVICE_ADDRESS | EVulkanBufferBits::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY
+                | EVulkanBufferBits::STORAGE_BUFFER
                 , EVulkanMemoryBits::DEVICE_LOCAL, bufferSize, *stream.BufferPtr.get());
 
             jBufferUtil_Vulkan::CopyBuffer(stagingBuffer, *stream.BufferPtr.get(), bufferSize);
