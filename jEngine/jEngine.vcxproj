@@ -627,7 +627,9 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     </None>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="Resource\Shaders\hlsl\RaytracingCubeAndPlane2.hlsl" />
+    <None Include="Resource\Shaders\hlsl\RaytracingCubeAndPlane2.hlsl">
+      <FileType>Document</FileType>
+    </None>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
