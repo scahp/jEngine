@@ -40,7 +40,7 @@ void* jBuffer_Vulkan::Map(uint64 offset, uint64 size)
 {
     // Ownership 이 있는 경우만 Map
     if (!HasBufferOwnership)
-        return MappedPointer;
+        return ((uint8*)MappedPointer) + Offset;
 
     check(size);
     check(offset + size <= AllocatedSize);
@@ -53,7 +53,7 @@ void* jBuffer_Vulkan::Map()
 {
     // Ownership 이 있는 경우만 Map
     if (!HasBufferOwnership)
-        return MappedPointer;
+        return ((uint8*)MappedPointer) + Offset;
 
     check(AllocatedSize);
     check(!MappedPointer);

@@ -2114,18 +2114,19 @@ void jRenderer::Render()
             check(DirectionalLight);
             m_sceneCB.lightDireciton = { DirectionalLight->GetLightData().Direction.x, DirectionalLight->GetLightData().Direction.y, DirectionalLight->GetLightData().Direction.z };
 
+            UniformBufferBlockVulkan = (jUniformBufferBlock_Vulkan*)g_rhi_vk->CreateUniformBufferBlock(
+                jNameStatic("Test"), jLifeTimeType::OneFrame, sizeof(m_sceneCB));
+            UniformBufferBlockVulkan->UpdateBufferData(&m_sceneCB, sizeof(m_sceneCB));
+
             static bool once = false;
             if (!once)
             {
                 once = true;
 
-                UniformBufferBlockVulkan = (jUniformBufferBlock_Vulkan*)g_rhi_vk->CreateUniformBufferBlock(jNameStatic("Test"), jLifeTimeType::MultiFrame, sizeof(m_sceneCB));
-                UniformBufferBlockVulkan->UpdateBufferData(&m_sceneCB, sizeof(m_sceneCB));
-
                 m_raytracingOutput = new jTexture_Vulkan();
                 auto m_raytracingOutputVk = (jTexture_Vulkan*)m_raytracingOutput;
                 jBufferUtil_Vulkan::CreateImage((uint32)SCR_WIDTH, (uint32)SCR_HEIGHT, 1, VkSampleCountFlagBits::VK_SAMPLE_COUNT_1_BIT, GetVulkanTextureFormat(ETextureFormat::RGBA16F)
-                    , VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_ASPECT_COLOR_BIT
+                    , VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
                     , VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, *m_raytracingOutputVk);
                 raytracingOutputView = jBufferUtil_Vulkan::CreateImageView(m_raytracingOutputVk->Image
                     , GetVulkanTextureFormat(m_raytracingOutputVk->Format), VK_IMAGE_ASPECT_COLOR_BIT, 1);
@@ -2251,25 +2252,27 @@ void jRenderer::Render()
                         return g_rhi_vk->vkGetBufferDeviceAddressKHR(g_rhi_vk->Device, &bufferDeviceAI);
                     };
 
-                auto getSbtEntryStridedDeviceAddressRegion = [&](VkBuffer buffer, uint32 handleCount)
+                auto getSbtEntryStridedDeviceAddressRegion = [&](jBuffer_Vulkan* buffer, uint32 handleCount)
                     {
                         const uint32_t handleSizeAligned = Align(g_rhi_vk->RayTracingPipelineProperties.shaderGroupHandleSize, g_rhi_vk->RayTracingPipelineProperties.shaderGroupHandleAlignment);
                         VkStridedDeviceAddressRegionKHR stridedDeviceAddressRegionKHR{};
-                        stridedDeviceAddressRegionKHR.deviceAddress = getBufferDeviceAddress(buffer);
-                        stridedDeviceAddressRegionKHR.stride = handleSizeAligned;
-                        stridedDeviceAddressRegionKHR.size = handleCount * handleSizeAligned;
+                        stridedDeviceAddressRegionKHR.deviceAddress = getBufferDeviceAddress(buffer->Buffer) + buffer->Offset;
+                        stridedDeviceAddressRegionKHR.stride = Align(handleSizeAligned, g_rhi_vk->RayTracingPipelineProperties.shaderGroupBaseAlignment);
+                        stridedDeviceAddressRegionKHR.size = handleCount * stridedDeviceAddressRegionKHR.stride;
                         return stridedDeviceAddressRegionKHR;
                     };
 
+                const uint64 AlignedBaseGroupHandleSize = Align(g_rhi_vk->RayTracingPipelineProperties.shaderGroupHandleSize
+                    , g_rhi_vk->RayTracingPipelineProperties.shaderGroupBaseAlignment);
                 {
                     // Create buffer to hold all shader handles for the SBT
                     int32 handleCount = 1;
                     jBufferUtil_Vulkan::AllocateBuffer(
                         EVulkanBufferBits::SHADER_BINDING_TABLE | EVulkanBufferBits::SHADER_DEVICE_ADDRESS,
                         EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT,
-                        g_rhi_vk->RayTracingPipelineProperties.shaderGroupHandleSize * 1, *RaygenShaderBindingTable);
+                        AlignedBaseGroupHandleSize * 1, *RaygenShaderBindingTable);
                     // Get the strided address to be used when dispatching the rays
-                    RaygenStridedDeviceAddressRegion = getSbtEntryStridedDeviceAddressRegion(RaygenShaderBindingTable->Buffer, handleCount);
+                    RaygenStridedDeviceAddressRegion = getSbtEntryStridedDeviceAddressRegion(RaygenShaderBindingTable, handleCount);
                     // Map persistent
                     RaygenShaderBindingTable->Map();
                 }
@@ -2280,9 +2283,9 @@ void jRenderer::Render()
                     jBufferUtil_Vulkan::AllocateBuffer(
                         EVulkanBufferBits::SHADER_BINDING_TABLE | EVulkanBufferBits::SHADER_DEVICE_ADDRESS,
                         EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT,
-                        g_rhi_vk->RayTracingPipelineProperties.shaderGroupHandleSize * 1, *MissShaderBindingTable);
+                        AlignedBaseGroupHandleSize * 1, *MissShaderBindingTable);
                     // Get the strided address to be used when dispatching the rays
-                    MissStridedDeviceAddressRegion = getSbtEntryStridedDeviceAddressRegion(MissShaderBindingTable->Buffer, handleCount);
+                    MissStridedDeviceAddressRegion = getSbtEntryStridedDeviceAddressRegion(MissShaderBindingTable, handleCount);
                     // Map persistent
                     MissShaderBindingTable->Map();
                 }
@@ -2293,9 +2296,9 @@ void jRenderer::Render()
                     jBufferUtil_Vulkan::AllocateBuffer(
                         EVulkanBufferBits::SHADER_BINDING_TABLE | EVulkanBufferBits::SHADER_DEVICE_ADDRESS,
                         EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT,
-                        g_rhi_vk->RayTracingPipelineProperties.shaderGroupHandleSize * 1, *CloestHitShaderBindingTable);
+                        AlignedBaseGroupHandleSize * 1, *CloestHitShaderBindingTable);
                     // Get the strided address to be used when dispatching the rays
-                    CloestHitstridedDeviceAddressRegion = getSbtEntryStridedDeviceAddressRegion(CloestHitShaderBindingTable->Buffer, handleCount);
+                    CloestHitstridedDeviceAddressRegion = getSbtEntryStridedDeviceAddressRegion(CloestHitShaderBindingTable, handleCount);
                     // Map persistent
                     CloestHitShaderBindingTable->Map();
                 }
@@ -2405,9 +2408,9 @@ void jRenderer::Render()
                 SCR_HEIGHT,
                 1);
 
-            //g_rhi_vk->TransitionImageLayout(CmdBufferVk, m_raytracingOutputVk, EImageLayout::SHADER_READ_ONLY);
+            g_rhi_vk->TransitionImageLayout(CmdBufferVk, m_raytracingOutputVk, EImageLayout::SHADER_READ_ONLY);
 
-            if (0)
+            if (1)
             {
                 static jFullscreenQuadPrimitive* GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
 

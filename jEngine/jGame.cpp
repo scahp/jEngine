@@ -279,7 +279,7 @@ void jGame::Setup()
 
 			// Opaque로 지오메트를 등록하면, 히트 쉐이더에서 더이상 쉐이더를 만들지 않을 것이므로 최적화에 좋다.
 			//geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
-			geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
+			geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
 
 			// Acceleration structure 에 필요한 크기를 요청함
 			// 첫번째 지오메트리
@@ -444,28 +444,6 @@ void jGame::Setup()
                 return g_rhi_vk->vkGetBufferDeviceAddressKHR(g_rhi_vk->Device, &bufferDeviceAI);
             };
 
-        auto BLASTransformBuffer = new jBuffer_Vulkan();
-        {
-            jBufferUtil_Vulkan::AllocateBuffer(
-				EVulkanBufferBits::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY | EVulkanBufferBits::SHADER_DEVICE_ADDRESS,
-                EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
-				, jObject::GetStaticRenderObject().size() * sizeof(VkTransformMatrixKHR), *BLASTransformBuffer);
-
-			VkTransformMatrixKHR transformMatrix = {
-				1.0f, 0.0f, 0.0f, 0.0f,
-				0.0f, 1.0f, 0.0f, 0.0f,
-				0.0f, 0.0f, 1.0f, 0.0f
-			};
-			auto MappedPtr = (VkTransformMatrixKHR*)BLASTransformBuffer->Map();
-			for(int32 i=0;i<jObject::GetStaticRenderObject().size();++i)
-			{
-				MappedPtr[i] = transformMatrix;
-			}
-			BLASTransformBuffer->Unmap();
-        
-			BLASTransformBuffer->DeviceAddress = getBufferDeviceAddress(BLASTransformBuffer->Buffer);
-        }
-
         std::vector<jRenderObject*> RTObjects;
         for (int32 i = 0; i < jObject::GetStaticRenderObject().size(); ++i)
         {
@@ -476,6 +454,7 @@ void jGame::Setup()
 
 			VkAccelerationStructureGeometryKHR geometry{};
             geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
+			geometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
             geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
 
             auto VertexBufferVulkan = (jVertexBuffer_Vulkan*)VertexBuffer_PositionOnly;
@@ -488,7 +467,7 @@ void jGame::Setup()
             geometry.geometry.triangles.vertexFormat = VertexBufferVulkan->BindInfos.AttributeDescriptions[0].format;
 
 			VkDeviceOrHostAddressConstKHR vertexBufferDeviceAddress{};
-			vertexBufferDeviceAddress.deviceAddress = getBufferDeviceAddress(VtxBufferVulkan);
+			vertexBufferDeviceAddress.deviceAddress = getBufferDeviceAddress(VtxBufferVulkan) + VertexBufferVulkan->BindInfos.Offsets[0];
 
 			uint64 VertexStart = vertexBufferDeviceAddress.deviceAddress;
             int32 VertexCount = VertexBufferVulkan->GetElementCount();
@@ -516,7 +495,7 @@ void jGame::Setup()
 				IndexBufferVulkan->BufferPtr->Buffer;
                 
                 VkDeviceOrHostAddressConstKHR indexBufferDeviceAddress{};
-				indexBufferDeviceAddress.deviceAddress = getBufferDeviceAddress(IndexBufferVulkan->BufferPtr->Buffer);
+				indexBufferDeviceAddress.deviceAddress = getBufferDeviceAddress(IndexBufferVulkan->BufferPtr->Buffer) + IndexBufferVulkan->BufferPtr->Offset;
 
                 auto& indexStreamData = IndexBufferVulkan->IndexStreamData;
 
@@ -528,7 +507,7 @@ void jGame::Setup()
                     IndexCount = ROE->SubMesh.EndFace - ROE->SubMesh.StartFace + 1;
                 }
 
-                geometry.geometry.triangles.indexType = indexStreamData->Param->GetElementSize() == 16 ? VK_INDEX_TYPE_UINT16 : VK_INDEX_TYPE_UINT32;
+                geometry.geometry.triangles.indexType = indexStreamData->Param->GetElementSize() == 2 ? VK_INDEX_TYPE_UINT16 : VK_INDEX_TYPE_UINT32;
                 geometry.geometry.triangles.indexData = VkDeviceOrHostAddressConstKHR(IndexStart);
 
 				PrimitiveCount = IndexCount / 3;
@@ -541,7 +520,7 @@ void jGame::Setup()
             geometry.geometry.triangles.vertexData = VkDeviceOrHostAddressConstKHR(VertexStart);
             geometry.geometry.triangles.maxVertex = VertexCount;
 			geometry.geometry.triangles.vertexStride = VertexBufferVulkan->Streams[0].Stride;
-			geometry.geometry.triangles.transformData.deviceAddress = BLASTransformBuffer->DeviceAddress + sizeof(VkTransformMatrixKHR) * i;
+			geometry.geometry.triangles.transformData.deviceAddress = 0;
 
 			std::vector<VkAccelerationStructureGeometryKHR> geometries{ geometry };
 
@@ -572,6 +551,7 @@ void jGame::Setup()
                 VkAccelerationStructureCreateInfoKHR accelerationStructureCreate_info{};
                 accelerationStructureCreate_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
                 accelerationStructureCreate_info.buffer = BLAS_Vulkan->Buffer;
+				accelerationStructureCreate_info.offset = BLAS_Vulkan->Offset;
                 accelerationStructureCreate_info.size = accelerationStructureBuildSizesInfo.accelerationStructureSize;
                 accelerationStructureCreate_info.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
                 g_rhi_vk->vkCreateAccelerationStructureKHR(g_rhi_vk->Device, &accelerationStructureCreate_info, nullptr, &BLAS_Vulkan->AccelerationStructure);
@@ -585,7 +565,7 @@ void jGame::Setup()
 				VkBufferDeviceAddressInfoKHR scratchBufferDeviceAddresInfo{};
 				scratchBufferDeviceAddresInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
 				scratchBufferDeviceAddresInfo.buffer = BLASScratch_Vulkan->Buffer;
-				BLASScratch_Vulkan->DeviceAddress = g_rhi_vk->vkGetBufferDeviceAddressKHR(g_rhi_vk->Device, &scratchBufferDeviceAddresInfo);
+				BLASScratch_Vulkan->DeviceAddress = g_rhi_vk->vkGetBufferDeviceAddressKHR(g_rhi_vk->Device, &scratchBufferDeviceAddresInfo) + BLASScratch_Vulkan->Offset;
 			}
 
 			VkAccelerationStructureBuildGeometryInfoKHR accelerationBuildGeometryInfo{};
@@ -641,7 +621,7 @@ void jGame::Setup()
             VkBufferDeviceAddressInfoKHR instanceDataDeviceAddress{};
             instanceDataDeviceAddress.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
             instanceDataDeviceAddress.buffer = Instance_Vulkan->Buffer;
-			Instance_Vulkan->DeviceAddress = g_rhi_vk->vkGetBufferDeviceAddressKHR(g_rhi_vk->Device, &instanceDataDeviceAddress);
+			Instance_Vulkan->DeviceAddress = g_rhi_vk->vkGetBufferDeviceAddressKHR(g_rhi_vk->Device, &instanceDataDeviceAddress) + Instance_Vulkan->Offset;
 
 			//std::vector<VkAccelerationStructureGeometryKHR> ASGeoInfos;
 
@@ -653,7 +633,7 @@ void jGame::Setup()
 
 				MappedPointer[i].instanceCustomIndex = i;
 				MappedPointer[i].mask = 0xFF;
-				MappedPointer[i].flags = VK_GEOMETRY_INSTANCE_FORCE_OPAQUE_BIT_KHR;
+				MappedPointer[i].flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
 				MappedPointer[i].accelerationStructureReference = ((jBuffer_Vulkan*)RObj->BottomLevelASBuffer)->DeviceAddress;
                 for (int32 k = 0; k < 3; ++k)
                 {
@@ -709,6 +689,7 @@ void jGame::Setup()
             VkAccelerationStructureCreateInfoKHR accelerationStructureCreateInfo{};
             accelerationStructureCreateInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
             accelerationStructureCreateInfo.buffer = TLAS_Vulkan->Buffer;
+			accelerationStructureCreateInfo.offset = TLAS_Vulkan->Offset;
             accelerationStructureCreateInfo.size = accelerationStructureBuildSizesInfo.accelerationStructureSize;
             accelerationStructureCreateInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
             g_rhi_vk->vkCreateAccelerationStructureKHR(g_rhi_vk->Device, &accelerationStructureCreateInfo, nullptr, &TLAS_Vulkan->AccelerationStructure);
@@ -721,7 +702,7 @@ void jGame::Setup()
             VkBufferDeviceAddressInfoKHR scratchBufferDeviceAddresInfo{};
             scratchBufferDeviceAddresInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
             scratchBufferDeviceAddresInfo.buffer = TLASScratch_Vulkan->Buffer;
-			TLASScratch_Vulkan->DeviceAddress = g_rhi_vk->vkGetBufferDeviceAddressKHR(g_rhi_vk->Device, &scratchBufferDeviceAddresInfo);
+			TLASScratch_Vulkan->DeviceAddress = g_rhi_vk->vkGetBufferDeviceAddressKHR(g_rhi_vk->Device, &scratchBufferDeviceAddresInfo) + TLASScratch_Vulkan->Offset;
 
             VkAccelerationStructureBuildGeometryInfoKHR accelerationBuildGeometryInfo{};
             accelerationBuildGeometryInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
