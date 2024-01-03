@@ -9,7 +9,7 @@ struct SceneConstantBuffer
 
 RaytracingAccelerationStructure Scene : register(t0, space0);
 RWTexture2D<float4> RenderTarget : register(u1);
-ConstantBuffer<SceneConstantBuffer> g_sceneCB : register(b2);
+ConstantBuffer<SceneConstantBuffer> g_sceneCB[] : register(b2);
 
 typedef BuiltInTriangleIntersectionAttributes MyAttributes;
 struct RayPayload
@@ -37,10 +37,10 @@ inline float3 GenerateCameraRay(uint2 index, out float3 origin, out float3 direc
 
     screenPos.y = -screenPos.y;
 
-    float4 world = mul(float4(screenPos, 0, 1), g_sceneCB.projectionToWorld);
+    float4 world = mul(float4(screenPos, 0, 1), g_sceneCB[0].projectionToWorld);
 
     world.xyz /= world.w;
-    origin = g_sceneCB.cameraPosition.xyz;
+    origin = g_sceneCB[0].cameraPosition.xyz;
     direction = normalize(world.xyz - origin);
 
     return world.xyz;
@@ -115,9 +115,9 @@ void MyMissShader(inout RayPayload payload)
      // Make a 't' value that is the factor scaled by using ray hit on background of Y axis.
     float2 xy = HitWorldPosition().xy;
     float2 screenPos = xy / DispatchRaysDimensions().xy * 2.0f - 1.0f;;
-    float4 world = mul(float4(screenPos, 0, 1), g_sceneCB.projectionToWorld);
+    float4 world = mul(float4(screenPos, 0, 1), g_sceneCB[0].projectionToWorld);
     world.xyz /= world.w;
-    float3 origin = g_sceneCB.cameraPosition.xyz;
+    float3 origin = g_sceneCB[0].cameraPosition.xyz;
     float3 direction = normalize(world.xyz - origin);
 
     float t = (direction.y + 1.0f) * 0.5f;
