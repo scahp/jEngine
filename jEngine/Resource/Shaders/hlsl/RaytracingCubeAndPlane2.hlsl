@@ -1,3 +1,6 @@
+#include "common.hlsl"
+#include "PBR.hlsl"
+
 #define MAX_RECURSION_DEPTH 10
 
 struct SceneConstantBuffer
@@ -8,8 +11,22 @@ struct SceneConstantBuffer
 };
 
 RaytracingAccelerationStructure Scene : register(t0, space0);
-RWTexture2D<float4> RenderTarget : register(u1);
-ConstantBuffer<SceneConstantBuffer> g_sceneCB[] : register(b2);
+RWTexture2D<float4> RenderTarget : register(u1, space0);
+ConstantBuffer<SceneConstantBuffer> g_sceneCB[] : register(b2, space0);
+
+TextureCube<float4> IrradianceMapArray[] : register(t0, space100);
+TextureCube<float4> PrefilteredEnvMapArray[] : register(t0, space101);
+StructuredBuffer<uint2> VertexIndexOffsetArray[] : register(t0, space102);
+StructuredBuffer<uint> IndexBindlessArray[] : register(t0, space103);
+StructuredBuffer<RenderObjectUniformBuffer> RenderObjParamArray[] : register(t0, space104);
+StructuredBuffer<float3> PosBindlessArray[] : register(t0, space105);
+StructuredBuffer<float3> NormalBindlessArray[] : register(t0, space106);
+StructuredBuffer<float3> TangentBindlessArray[] : register(t0, space107);
+StructuredBuffer<float3> BiTangentBindlessArray[] : register(t0, space108);
+StructuredBuffer<float2> TexCoordBindlessArray[] : register(t0, space109);
+Texture2D AlbedoTextureArray[] : register(t0, space110);
+Texture2D NormalTextureArray[] : register(t0, space111);
+Texture2D RMTextureArray[] : register(t0, space112);
 
 typedef BuiltInTriangleIntersectionAttributes MyAttributes;
 struct RayPayload
