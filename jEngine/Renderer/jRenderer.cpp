@@ -2118,6 +2118,7 @@ void jRenderer::Render()
                 jNameStatic("Test"), jLifeTimeType::OneFrame, sizeof(m_sceneCB));
             UniformBufferBlockVulkan->UpdateBufferData(&m_sceneCB, sizeof(m_sceneCB));
 
+            static constexpr uint32 MAX_BINDLESS_RESOURCES = 8192;
             static bool once = false;
             if (!once)
             {
@@ -2148,7 +2149,7 @@ void jRenderer::Render()
                 setLayoutBindings[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
                 setLayoutBindings[2].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR;
                 setLayoutBindings[2].binding = 2;
-                setLayoutBindings[2].descriptorCount = 1;
+                setLayoutBindings[2].descriptorCount = MAX_BINDLESS_RESOURCES;
 
                 VkDescriptorSetLayoutBindingFlagsCreateInfoEXT setLayoutBindingFlags{};
                 setLayoutBindingFlags.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT;
@@ -2156,15 +2157,15 @@ void jRenderer::Render()
                 std::vector<VkDescriptorBindingFlagsEXT> descriptorBindingFlags = {
                     0,
                     0,
-                    0,
-                    VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT,
+                    VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
                 };
                 setLayoutBindingFlags.pBindingFlags = descriptorBindingFlags.data();
 
                 VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{};
                 descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
                 descriptorSetLayoutCreateInfo.pBindings = setLayoutBindings.data();
-                descriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(setLayoutBindings.size());
+                descriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32>(setLayoutBindings.size());
+                descriptorSetLayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
                 descriptorSetLayoutCreateInfo.pNext = &setLayoutBindingFlags;
                 check(VK_SUCCESS == vkCreateDescriptorSetLayout(g_rhi_vk->Device, &descriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout));
 
@@ -2182,13 +2183,14 @@ void jRenderer::Render()
                 shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane2.hlsl"));
                 shaderInfo.SetEntryPoint(jNameStatic("MyRaygenShader"));
                 shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_RAYGEN);
+                shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
                 auto RayGenShader = g_rhi->CreateShader(shaderInfo);
                 shaderStages.push_back(((jCompiledShader_Vulkan*)RayGenShader->CompiledShader)->ShaderStage);
 
                 VkRayTracingShaderGroupCreateInfoKHR shaderGroup{};
                 shaderGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
                 shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
-                shaderGroup.generalShader = static_cast<uint32_t>(shaderStages.size()) - 1;
+                shaderGroup.generalShader = static_cast<uint32>(shaderStages.size()) - 1;
                 shaderGroup.closestHitShader = VK_SHADER_UNUSED_KHR;
                 shaderGroup.anyHitShader = VK_SHADER_UNUSED_KHR;
                 shaderGroup.intersectionShader = VK_SHADER_UNUSED_KHR;
@@ -2198,6 +2200,7 @@ void jRenderer::Render()
                 shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane2.hlsl"));
                 shaderInfo.SetEntryPoint(jNameStatic("MyMissShader"));
                 shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_MISS);
+                shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
                 auto MissShader = g_rhi->CreateShader(shaderInfo);
                 shaderStages.push_back(((jCompiledShader_Vulkan*)MissShader->CompiledShader)->ShaderStage);
                 shaderGroup = {};
@@ -2213,6 +2216,7 @@ void jRenderer::Render()
                 shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane2.hlsl"));
                 shaderInfo.SetEntryPoint(jNameStatic("MyClosestHitShader"));
                 shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT);
+                shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
                 auto ClosestHitShader = g_rhi->CreateShader(shaderInfo);
                 shaderStages.push_back(((jCompiledShader_Vulkan*)ClosestHitShader->CompiledShader)->ShaderStage);
                 shaderGroup = {};
@@ -2254,7 +2258,7 @@ void jRenderer::Render()
 
                 auto getSbtEntryStridedDeviceAddressRegion = [&](jBuffer_Vulkan* buffer, uint32 handleCount)
                     {
-                        const uint32_t handleSizeAligned = Align(g_rhi_vk->RayTracingPipelineProperties.shaderGroupHandleSize, g_rhi_vk->RayTracingPipelineProperties.shaderGroupHandleAlignment);
+                        const uint32 handleSizeAligned = Align(g_rhi_vk->RayTracingPipelineProperties.shaderGroupHandleSize, g_rhi_vk->RayTracingPipelineProperties.shaderGroupHandleAlignment);
                         VkStridedDeviceAddressRegionKHR stridedDeviceAddressRegionKHR{};
                         stridedDeviceAddressRegionKHR.deviceAddress = getBufferDeviceAddress(buffer->Buffer) + buffer->Offset;
                         stridedDeviceAddressRegionKHR.stride = Align(handleSizeAligned, g_rhi_vk->RayTracingPipelineProperties.shaderGroupBaseAlignment);
@@ -2312,22 +2316,23 @@ void jRenderer::Render()
                 // Create DescriptorSets
 
                 std::vector<VkDescriptorPoolSize> poolSizes = {
-                    { VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1 },
-                    { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1 },
-                    { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1 },
+                    { VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, MAX_BINDLESS_RESOURCES },
+                    { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, MAX_BINDLESS_RESOURCES },
+                    { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, MAX_BINDLESS_RESOURCES },
                 };
 
                 VkDescriptorPoolCreateInfo descriptorPoolInfo{};
                 descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-                descriptorPoolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+                descriptorPoolInfo.poolSizeCount = static_cast<uint32>(poolSizes.size());
                 descriptorPoolInfo.pPoolSizes = poolSizes.data();
-                descriptorPoolInfo.maxSets = 1;
+                descriptorPoolInfo.maxSets = MAX_BINDLESS_RESOURCES;
+                descriptorPoolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
 
                 VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
                 check(VK_SUCCESS == vkCreateDescriptorPool(g_rhi_vk->Device, &descriptorPoolInfo, nullptr, &descriptorPool));
 
                 VkDescriptorSetVariableDescriptorCountAllocateInfoEXT variableDescriptorCountAllocInfo{};
-                uint32_t variableDescCounts[] = { 1 };
+                uint32 variableDescCounts[] = { 8192 };
                 variableDescriptorCountAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO_EXT;
                 variableDescriptorCountAllocInfo.descriptorSetCount = 1;
                 variableDescriptorCountAllocInfo.pDescriptorCounts = variableDescCounts;
@@ -2369,24 +2374,35 @@ void jRenderer::Render()
                 bufferInfo.offset = UniformBufferBlockVulkan->GetBufferOffset();
                 bufferInfo.range = UniformBufferBlockVulkan->GetBufferSize();		// 전체 사이즈라면 VK_WHOLE_SIZE 이거 가능
 
-                VkWriteDescriptorSet writeDescriptorSet2{};
-                writeDescriptorSet2.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                writeDescriptorSet2.dstSet = descriptorSet;
-                writeDescriptorSet2.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-                writeDescriptorSet2.dstBinding = 2;
-                writeDescriptorSet2.pBufferInfo = &bufferInfo;
-                writeDescriptorSet2.descriptorCount = 1;
+                //VkWriteDescriptorSet writeDescriptorSet2{};
+                //writeDescriptorSet2.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                //writeDescriptorSet2.dstSet = descriptorSet;
+                //writeDescriptorSet2.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                //writeDescriptorSet2.dstBinding = 2;
+                //writeDescriptorSet2.pBufferInfo = &bufferInfo;
+                //writeDescriptorSet2.descriptorCount = 1;
 
                 std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
                     // Binding 0: Top level acceleration structure
                     accelerationStructureWrite,
                     // Binding 1: Ray tracing result image
                     writeDescriptorSet,
-                    // Binding 2: Uniform data
-                    writeDescriptorSet2,
                 };
 
-                vkUpdateDescriptorSets(g_rhi_vk->Device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, VK_NULL_HANDLE);
+                // Binding 2: Uniform data
+                for (int32 m = 0; m < 2; ++m)
+                {
+                    VkWriteDescriptorSet writeDescriptorSet2{};
+                    writeDescriptorSet2.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                    writeDescriptorSet2.dstSet = descriptorSet;
+                    writeDescriptorSet2.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                    writeDescriptorSet2.dstBinding = 2;
+                    writeDescriptorSet2.pBufferInfo = &bufferInfo;
+                    writeDescriptorSet2.dstArrayElement = m;
+                    writeDescriptorSet2.descriptorCount = 1;
+                    writeDescriptorSets.push_back(writeDescriptorSet2);
+                }
+                vkUpdateDescriptorSets(g_rhi_vk->Device, static_cast<uint32>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, VK_NULL_HANDLE);
             }
             auto m_raytracingOutputVk = (jTexture_Vulkan*)m_raytracingOutput;
 

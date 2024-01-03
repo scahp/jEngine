@@ -180,6 +180,14 @@ bool jRHI_Vulkan::InitRHI()
         AccelerationStructureFeatures.pNext = (void*)DeviceProperties2.pNext;
 		DeviceFeatures2.pNext = &AccelerationStructureFeatures;
 		vkGetPhysicalDeviceFeatures2(PhysicalDevice, &DeviceFeatures2);
+
+		// Check if is enabled that the both 'Non-uniform indexing' and 'Update after bind' flags for resources.
+		VkPhysicalDeviceDescriptorIndexingFeatures indexing_features{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT, nullptr };
+		VkPhysicalDeviceFeatures2 device_features{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2, &indexing_features };
+		vkGetPhysicalDeviceFeatures2(PhysicalDevice, &device_features);
+
+		bool bindless_supported = indexing_features.descriptorBindingPartiallyBound && indexing_features.runtimeDescriptorArray;
+		check(bindless_supported);
 	}
 
 	jSpirvHelper::Init(DeviceProperties2);
@@ -244,6 +252,8 @@ bool jRHI_Vulkan::InitRHI()
         physicalDeviceDescriptorIndexingFeatures.shaderSampledImageArrayNonUniformIndexing = true;
         physicalDeviceDescriptorIndexingFeatures.runtimeDescriptorArray = true;
         physicalDeviceDescriptorIndexingFeatures.descriptorBindingVariableDescriptorCount = true;
+        physicalDeviceDescriptorIndexingFeatures.descriptorBindingPartiallyBound = true;
+        physicalDeviceDescriptorIndexingFeatures.descriptorBindingUniformBufferUpdateAfterBind = true;
 		physicalDeviceDescriptorIndexingFeatures.pNext = (void*)createInfo.pNext;
 		createInfo.pNext = &physicalDeviceDescriptorIndexingFeatures;
 
@@ -872,7 +882,7 @@ bool jRHI_Vulkan::CreateShaderInternal(jShader* OutShader, const jShaderInfo& sh
             }
 
 			const std::wstring EntryPoint = ConvertToWchar(shaderInfo.GetEntryPoint());
-			auto ShaderBlob = jShaderCompiler_DX12::Get().Compile(ShaderText.c_str(), ShaderText.length(), ShadingModel, EntryPoint.c_str(), false
+			auto ShaderBlob = jShaderCompiler_DX12::Get().Compile(ShaderText.c_str(), (uint32)ShaderText.length(), ShadingModel, EntryPoint.c_str(), false
 				, {TEXT("-spirv"), TEXT("-fspv-target-env=vulkan1.1spirv1.4"), TEXT("-fvk-use-scalar-layout")
 				, TEXT("-fspv-extension=SPV_EXT_descriptor_indexing"), TEXT("-fspv-extension=SPV_KHR_ray_tracing")
 				, TEXT("-fspv-extension=SPV_KHR_ray_query") });
@@ -905,8 +915,6 @@ bool jRHI_Vulkan::CreateShaderInternal(jShader* OutShader, const jShaderInfo& sh
 			return false;
 
         VkShaderStageFlagBits ShaderFlagBits;
-        ShaderConductor::ShaderStage ShaderConductorShaderStage;
-        EShLanguage ShaderLangShaderStage;
         switch (shaderInfo.GetShaderType())
         {
         case EShaderAccessStageFlag::VERTEX:
