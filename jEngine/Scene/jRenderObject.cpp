@@ -204,9 +204,21 @@ const std::shared_ptr<jShaderBindingInstance>& jRenderObject::CreateShaderBindin
             jNameStatic("RenderObjectUniformParameters"), jLifeTimeType::MultiFrame, sizeof(jRenderObjectUniformBuffer)));
         RenderObjectUniformParametersPtr->UpdateBufferData(&ubo, sizeof(ubo));
 
-        TestUniformBuffer = std::shared_ptr<jBuffer_DX12>(jBufferUtil_DX12::CreateBuffer(sizeof(ubo), 0, EBufferCreateFlag::UAV
-            , D3D12_RESOURCE_STATES::D3D12_RESOURCE_STATE_COMMON, &ubo, sizeof(ubo)));
-        jBufferUtil_DX12::CreateShaderResourceView(TestUniformBuffer.get(), sizeof(jRenderObjectUniformBuffer), 1);
+        if (IsUseDX12())
+        {
+            TestUniformBuffer = std::shared_ptr<jBuffer>(jBufferUtil_DX12::CreateBuffer(sizeof(ubo), 0, EBufferCreateFlag::UAV
+                , D3D12_RESOURCE_STATES::D3D12_RESOURCE_STATE_COMMON, &ubo, sizeof(ubo)));
+            jBufferUtil_DX12::CreateShaderResourceView((jBuffer_DX12*)TestUniformBuffer.get(), sizeof(jRenderObjectUniformBuffer), 1);
+        }
+        else if (IsUseVulkan())
+        {
+            TestUniformBuffer = std::shared_ptr<jBuffer>(new jBuffer_Vulkan());
+            jBufferUtil_Vulkan::AllocateBuffer(
+                EVulkanBufferBits::SHADER_BINDING_TABLE | EVulkanBufferBits::SHADER_DEVICE_ADDRESS,
+                EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT,
+                sizeof(ubo), *(jBuffer_Vulkan*)TestUniformBuffer.get());
+            TestUniformBuffer->UpdateBuffer(&ubo, sizeof(ubo));
+        }
 
         LastMetallic = gOptions.Metallic;
         LastRoughness = gOptions.Roughness;

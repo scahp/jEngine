@@ -249,11 +249,26 @@ bool jRHI_Vulkan::InitRHI()
 
 		VkPhysicalDeviceDescriptorIndexingFeaturesEXT physicalDeviceDescriptorIndexingFeatures{};
         physicalDeviceDescriptorIndexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT;
+        physicalDeviceDescriptorIndexingFeatures.shaderInputAttachmentArrayDynamicIndexing = true;
+        physicalDeviceDescriptorIndexingFeatures.shaderUniformTexelBufferArrayDynamicIndexing = true;
+        physicalDeviceDescriptorIndexingFeatures.shaderStorageTexelBufferArrayDynamicIndexing = true;
+        physicalDeviceDescriptorIndexingFeatures.shaderUniformBufferArrayNonUniformIndexing = true;
         physicalDeviceDescriptorIndexingFeatures.shaderSampledImageArrayNonUniformIndexing = true;
-        physicalDeviceDescriptorIndexingFeatures.runtimeDescriptorArray = true;
-        physicalDeviceDescriptorIndexingFeatures.descriptorBindingVariableDescriptorCount = true;
-        physicalDeviceDescriptorIndexingFeatures.descriptorBindingPartiallyBound = true;
+        physicalDeviceDescriptorIndexingFeatures.shaderStorageBufferArrayNonUniformIndexing = true;
+        physicalDeviceDescriptorIndexingFeatures.shaderStorageImageArrayNonUniformIndexing = true;
+        physicalDeviceDescriptorIndexingFeatures.shaderInputAttachmentArrayNonUniformIndexing = true;
+        physicalDeviceDescriptorIndexingFeatures.shaderUniformTexelBufferArrayNonUniformIndexing = true;
+        physicalDeviceDescriptorIndexingFeatures.shaderStorageTexelBufferArrayNonUniformIndexing = true;
         physicalDeviceDescriptorIndexingFeatures.descriptorBindingUniformBufferUpdateAfterBind = true;
+        physicalDeviceDescriptorIndexingFeatures.descriptorBindingSampledImageUpdateAfterBind = true;
+        physicalDeviceDescriptorIndexingFeatures.descriptorBindingStorageImageUpdateAfterBind = true;
+        physicalDeviceDescriptorIndexingFeatures.descriptorBindingStorageBufferUpdateAfterBind = true;
+        physicalDeviceDescriptorIndexingFeatures.descriptorBindingUniformTexelBufferUpdateAfterBind = true;
+        physicalDeviceDescriptorIndexingFeatures.descriptorBindingStorageTexelBufferUpdateAfterBind = true;
+        physicalDeviceDescriptorIndexingFeatures.descriptorBindingUpdateUnusedWhilePending = true;
+        physicalDeviceDescriptorIndexingFeatures.descriptorBindingPartiallyBound = true;
+        physicalDeviceDescriptorIndexingFeatures.descriptorBindingVariableDescriptorCount = true;
+        physicalDeviceDescriptorIndexingFeatures.runtimeDescriptorArray = true;
 		physicalDeviceDescriptorIndexingFeatures.pNext = (void*)createInfo.pNext;
 		createInfo.pNext = &physicalDeviceDescriptorIndexingFeatures;
 
