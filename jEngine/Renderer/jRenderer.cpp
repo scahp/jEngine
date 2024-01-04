@@ -2059,11 +2059,11 @@ void jRenderer::Render()
 
             static jBuffer_Vulkan* RaygenShaderBindingTable = new jBuffer_Vulkan();
             static jBuffer_Vulkan* MissShaderBindingTable = new jBuffer_Vulkan();
-            static jBuffer_Vulkan* CloestHitShaderBindingTable = new jBuffer_Vulkan();
+            static jBuffer_Vulkan* HitShaderBindingTable = new jBuffer_Vulkan();
             static jBuffer_Vulkan* AnyHitShaderBindingTable = new jBuffer_Vulkan();
             static VkStridedDeviceAddressRegionKHR RaygenStridedDeviceAddressRegion{};
             static VkStridedDeviceAddressRegionKHR MissStridedDeviceAddressRegion{};
-            static VkStridedDeviceAddressRegionKHR CloestHitstridedDeviceAddressRegion{};
+            static VkStridedDeviceAddressRegionKHR HitStridedDeviceAddressRegion{};
 
             if (0)
             {
@@ -2292,37 +2292,33 @@ void jRenderer::Render()
                 shaderGroup.intersectionShader = VK_SHADER_UNUSED_KHR;
                 shaderGroups.push_back(shaderGroup);
 
-                shaderInfo.SetName(jNameStatic("Closest"));
-                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
-                shaderInfo.SetEntryPoint(jNameStatic("MyClosestHitShader"));
-                shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT);
-                shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
-                auto ClosestHitShader = g_rhi->CreateShader(shaderInfo);
-                shaderStages.push_back(((jCompiledShader_Vulkan*)ClosestHitShader->CompiledShader)->ShaderStage);
-                shaderGroup = {};
-                shaderGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
-                shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
-                shaderGroup.generalShader = VK_SHADER_UNUSED_KHR;
-                shaderGroup.closestHitShader = static_cast<uint32>(shaderStages.size()) - 1;
-                shaderGroup.anyHitShader = VK_SHADER_UNUSED_KHR;
-                shaderGroup.intersectionShader = VK_SHADER_UNUSED_KHR;
-                shaderGroups.push_back(shaderGroup);
+                // Hit group
+                {
+                    shaderInfo.SetName(jNameStatic("Closest"));
+                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
+                    shaderInfo.SetEntryPoint(jNameStatic("MyClosestHitShader"));
+                    shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT);
+                    shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
+                    auto ClosestHitShader = g_rhi->CreateShader(shaderInfo);
+                    shaderStages.push_back(((jCompiledShader_Vulkan*)ClosestHitShader->CompiledShader)->ShaderStage);
+                    shaderGroup = {};
+                    shaderGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+                    shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
+                    shaderGroup.generalShader = VK_SHADER_UNUSED_KHR;
+                    shaderGroup.closestHitShader = static_cast<uint32>(shaderStages.size()) - 1;
+                    shaderGroup.anyHitShader = VK_SHADER_UNUSED_KHR;
+                    shaderGroup.intersectionShader = VK_SHADER_UNUSED_KHR;
 
-                //shaderInfo.SetName(jNameStatic("AnyHit"));
-                //shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
-                //shaderInfo.SetEntryPoint(jNameStatic("MyAnyHitShader"));
-                //shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_ANYHIT);
-                //shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
-                //auto AnyHitShader = g_rhi->CreateShader(shaderInfo);
-                //shaderStages.push_back(((jCompiledShader_Vulkan*)AnyHitShader->CompiledShader)->ShaderStage);
-                //shaderGroup = {};
-                //shaderGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
-                //shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
-                //shaderGroup.generalShader = VK_SHADER_UNUSED_KHR;
-                //shaderGroup.closestHitShader = VK_SHADER_UNUSED_KHR;
-                //shaderGroup.anyHitShader = static_cast<uint32>(shaderStages.size()) - 1;
-                //shaderGroup.intersectionShader = VK_SHADER_UNUSED_KHR;
-                //shaderGroups.push_back(shaderGroup);
+                    shaderInfo.SetName(jNameStatic("AnyHit"));
+                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
+                    shaderInfo.SetEntryPoint(jNameStatic("MyAnyHitShader"));
+                    shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_ANYHIT);
+                    shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
+                    auto AnyHitShader = g_rhi->CreateShader(shaderInfo);
+                    shaderStages.push_back(((jCompiledShader_Vulkan*)AnyHitShader->CompiledShader)->ShaderStage);
+                    shaderGroup.anyHitShader = static_cast<uint32>(shaderStages.size()) - 1;
+                    shaderGroups.push_back(shaderGroup);
+                }
 
                 VkRayTracingPipelineCreateInfoKHR rayTracingPipelineCI{};
                 rayTracingPipelineCI.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
@@ -2396,32 +2392,18 @@ void jRenderer::Render()
                     jBufferUtil_Vulkan::AllocateBuffer(
                         EVulkanBufferBits::SHADER_BINDING_TABLE | EVulkanBufferBits::SHADER_DEVICE_ADDRESS,
                         EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT,
-                        AlignedBaseGroupHandleSize * 1, *CloestHitShaderBindingTable);
+                        AlignedBaseGroupHandleSize * 1, *HitShaderBindingTable);
                     // Get the strided address to be used when dispatching the rays
-                    CloestHitstridedDeviceAddressRegion = getSbtEntryStridedDeviceAddressRegion(CloestHitShaderBindingTable, handleCount);
+                    HitStridedDeviceAddressRegion = getSbtEntryStridedDeviceAddressRegion(HitShaderBindingTable, handleCount);
                     // Map persistent
-                    CloestHitShaderBindingTable->Map();
+                    HitShaderBindingTable->Map();
                 };
-
-                //{
-                //    // Create buffer to hold all shader handles for the SBT
-                //    int32 handleCount = 1;
-                //    jBufferUtil_Vulkan::AllocateBuffer(
-                //        EVulkanBufferBits::SHADER_BINDING_TABLE | EVulkanBufferBits::SHADER_DEVICE_ADDRESS,
-                //        EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT,
-                //        AlignedBaseGroupHandleSize * 1, *AnyHitShaderBindingTable);
-                //    // Get the strided address to be used when dispatching the rays
-                //    CloestHitstridedDeviceAddressRegion = getSbtEntryStridedDeviceAddressRegion(AnyHitShaderBindingTable, handleCount);
-                //    // Map persistent
-                //    AnyHitShaderBindingTable->Map();
-                //}
 
                 // Copy handles
                 memcpy(RaygenShaderBindingTable->Map(), shaderHandleStorage.data(), handleSize);
                 // We are using two miss shaders, so we need to get two handles for the miss shader binding table
                 memcpy(MissShaderBindingTable->Map(), shaderHandleStorage.data() + handleSizeAligned, handleSize);
-                memcpy(CloestHitShaderBindingTable->Map(), shaderHandleStorage.data() + handleSizeAligned * 2, handleSize);
-                //memcpy(AnyHitShaderBindingTable->Map(), shaderHandleStorage.data() + handleSizeAligned * 3, handleSize);
+                memcpy(HitShaderBindingTable->Map(), shaderHandleStorage.data() + handleSizeAligned * 2, handleSize);
 
                 // Create DescriptorSets
                 std::vector<VkDescriptorPoolSize> poolSizes = {
@@ -2738,7 +2720,7 @@ void jRenderer::Render()
                 CmdBufferVk->GetRef(),
                 &RaygenStridedDeviceAddressRegion,
                 &MissStridedDeviceAddressRegion,
-                &CloestHitstridedDeviceAddressRegion,
+                &HitStridedDeviceAddressRegion,
                 &emptySbtEntry,
                 SCR_WIDTH,
                 SCR_HEIGHT,
