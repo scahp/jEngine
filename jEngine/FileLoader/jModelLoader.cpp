@@ -73,22 +73,38 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 		meshData->Vertices.resize(meshData->Vertices.size() + assimpMesh->mNumVertices);
 		subMesh.EndVertex = Max(subMesh.StartVertex, static_cast<int32>(meshData->Vertices.size() - 1));
 
-		memcpy(&meshData->Vertices[subMesh.StartVertex], &assimpMesh->mVertices[0], assimpMesh->mNumVertices * sizeof(Vector));
+		for(int32 k=0;k< assimpMesh->mNumVertices;++k)
+		{
+			meshData->Vertices[subMesh.StartVertex + k] = Vector4(assimpMesh->mVertices[k].x, assimpMesh->mVertices[k].y, assimpMesh->mVertices[k].z, 0.0f);
+		}
+		//memcpy(&meshData->Vertices[subMesh.StartVertex], &assimpMesh->mVertices[0], assimpMesh->mNumVertices * sizeof(Vector));
 
 		const bool HasTangentBitangent = assimpMesh->HasTangentsAndBitangents();
 		if (HasTangentBitangent)
 		{
 			meshData->Tangents.resize(meshData->Tangents.size() + assimpMesh->mNumVertices);
-			memcpy(&meshData->Tangents[subMesh.StartVertex], &assimpMesh->mTangents[0], assimpMesh->mNumVertices * sizeof(Vector));
+            for (int32 k = 0; k < assimpMesh->mNumVertices; ++k)
+            {
+                meshData->Tangents[subMesh.StartVertex + k] = Vector4(assimpMesh->mTangents[k].x, assimpMesh->mTangents[k].y, assimpMesh->mTangents[k].z, 0.0f);
+            }
+			//memcpy(&meshData->Tangents[subMesh.StartVertex], &assimpMesh->mTangents[0], assimpMesh->mNumVertices * sizeof(Vector));
 
 			meshData->Bitangents.resize(meshData->Bitangents.size() + assimpMesh->mNumVertices);
-			memcpy(&meshData->Bitangents[subMesh.StartVertex], &assimpMesh->mBitangents[0], assimpMesh->mNumVertices * sizeof(Vector));
+            for (int32 k = 0; k < assimpMesh->mNumVertices; ++k)
+            {
+                meshData->Bitangents[subMesh.StartVertex + k] = Vector4(assimpMesh->mBitangents[k].x, assimpMesh->mBitangents[k].y, assimpMesh->mBitangents[k].z, 0.0f);
+            }
+			//memcpy(&meshData->Bitangents[subMesh.StartVertex], &assimpMesh->mBitangents[0], assimpMesh->mNumVertices * sizeof(Vector));
 		}
 
 		if (assimpMesh->HasNormals())
 		{
 			meshData->Normals.resize(meshData->Normals.size() + assimpMesh->mNumVertices);
-			memcpy(&meshData->Normals[subMesh.StartVertex], &assimpMesh->mNormals[0], assimpMesh->mNumVertices * sizeof(Vector));
+            for (int32 k = 0; k < assimpMesh->mNumVertices; ++k)
+            {
+                meshData->Normals[subMesh.StartVertex + k] = Vector4(assimpMesh->mNormals[k].x, assimpMesh->mNormals[k].y, assimpMesh->mNormals[k].z, 0.0f);
+            }
+			//memcpy(&meshData->Normals[subMesh.StartVertex], &assimpMesh->mNormals[0], assimpMesh->mNumVertices * sizeof(Vector));
 		}
 
 		if (assimpMesh->HasTextureCoords(0))
@@ -301,11 +317,11 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 4));
 		streamParam->Name = jName("POSITION");
-		streamParam->Data.resize(elementCount * 3);
-		streamParam->Stride = sizeof(float) * 3;
-		memcpy(&streamParam->Data[0], &meshData->Vertices[0], meshData->Vertices.size() * sizeof(Vector));
+		streamParam->Data.resize(elementCount * 4);
+		streamParam->Stride = sizeof(float) * 4;
+		memcpy(&streamParam->Data[0], &meshData->Vertices[0], meshData->Vertices.size() * sizeof(Vector4));
 		vertexStreamData->Params.push_back(streamParam);
 	}
 
@@ -315,11 +331,11 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 4));
 		streamParam->Name = jName("NORMAL");
-		streamParam->Data.resize(elementCount * 3);
-		streamParam->Stride = sizeof(float) * 3;
-		memcpy(&streamParam->Data[0], &meshData->Normals[0], meshData->Normals.size() * sizeof(Vector));
+		streamParam->Data.resize(elementCount * 4);
+		streamParam->Stride = sizeof(float) * 4;
+		memcpy(&streamParam->Data[0], &meshData->Normals[0], meshData->Normals.size() * sizeof(Vector4));
 		vertexStreamData->Params.push_back(streamParam);
 	}
 
@@ -329,11 +345,11 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 4));
 		streamParam->Name = jName("TANGENT");
-		streamParam->Data.resize(elementCount * 3);
-		streamParam->Stride = sizeof(float) * 3;
-		memcpy(&streamParam->Data[0], &meshData->Tangents[0], meshData->Tangents.size() * sizeof(Vector));
+		streamParam->Data.resize(elementCount * 4);
+		streamParam->Stride = sizeof(float) * 4;
+		memcpy(&streamParam->Data[0], &meshData->Tangents[0], meshData->Tangents.size() * sizeof(Vector4));
 		vertexStreamData->Params.push_back(streamParam);
 	}
 
@@ -343,11 +359,11 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 4));
 		streamParam->Name = jName("BITANGENT");
-		streamParam->Data.resize(elementCount * 3);
-		streamParam->Stride = sizeof(float) * 3;
-		memcpy(&streamParam->Data[0], &meshData->Bitangents[0], meshData->Bitangents.size() * sizeof(Vector));
+		streamParam->Data.resize(elementCount * 4);
+		streamParam->Stride = sizeof(float) * 4;
+		memcpy(&streamParam->Data[0], &meshData->Bitangents[0], meshData->Bitangents.size() * sizeof(Vector4));
 		vertexStreamData->Params.push_back(streamParam);
 	}
 

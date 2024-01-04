@@ -89,6 +89,8 @@ public:
 		Matrix InvM;
 		float Metallic;
 		float Roughness;
+		float Padding0;
+		float Padding1;
 	};
 
 	//////////////////////////////////////////////////////////////////////////

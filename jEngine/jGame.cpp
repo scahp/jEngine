@@ -454,7 +454,8 @@ void jGame::Setup()
 
 			VkAccelerationStructureGeometryKHR geometry{};
             geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
-			geometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+			//geometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+			geometry.flags = 0;
             geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
 
             auto VertexBufferVulkan = (jVertexBuffer_Vulkan*)VertexBuffer_PositionOnly;
@@ -483,8 +484,10 @@ void jGame::Setup()
 
 			RObj->VertexAndIndexOffsetBuffer = new jBuffer_Vulkan();
             jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::TRANSFER_DST | EVulkanBufferBits::VERTEX_BUFFER
-                , EVulkanMemoryBits::DEVICE_LOCAL, sizeof(Vector2i), *(jBuffer_Vulkan*)RObj->VertexAndIndexOffsetBuffer);
-
+                | EVulkanBufferBits::SHADER_DEVICE_ADDRESS | EVulkanBufferBits::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY
+                | EVulkanBufferBits::STORAGE_BUFFER
+                , EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT, sizeof(Vector2i), *(jBuffer_Vulkan*)RObj->VertexAndIndexOffsetBuffer);
+			RObj->VertexAndIndexOffsetBuffer->UpdateBuffer(&VertexIndexOffset, sizeof(VertexIndexOffset));
             RTObjects.push_back(RObj);
 
 			uint64 IndexStart = 0;
@@ -656,7 +659,8 @@ void jGame::Setup()
             VkAccelerationStructureGeometryKHR accelerationStructureGeometry{};
             accelerationStructureGeometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
             accelerationStructureGeometry.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;
-            accelerationStructureGeometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+            //accelerationStructureGeometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+			accelerationStructureGeometry.flags = 0;
             accelerationStructureGeometry.geometry.instances.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR;
             accelerationStructureGeometry.geometry.instances.arrayOfPointers = VK_FALSE;
             accelerationStructureGeometry.geometry.instances.data

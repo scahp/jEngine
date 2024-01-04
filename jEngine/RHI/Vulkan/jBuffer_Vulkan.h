@@ -51,6 +51,7 @@ struct jBuffer_Vulkan : public jBuffer
     
     size_t Offset = 0;
     size_t AllocatedSize = 0;
+    size_t RealBufferSize = 0;
     void* MappedPointer = nullptr;
 
     bool HasBufferOwnership = true;     // 버퍼를 소멸시킬 권한이 있는 여부. 링버퍼를 사용하는 유니폼 버퍼의 경우 이 값이 false 임.

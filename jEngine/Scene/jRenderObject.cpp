@@ -214,7 +214,7 @@ const std::shared_ptr<jShaderBindingInstance>& jRenderObject::CreateShaderBindin
         {
             TestUniformBuffer = std::shared_ptr<jBuffer>(new jBuffer_Vulkan());
             jBufferUtil_Vulkan::AllocateBuffer(
-                EVulkanBufferBits::SHADER_BINDING_TABLE | EVulkanBufferBits::SHADER_DEVICE_ADDRESS,
+                EVulkanBufferBits::SHADER_BINDING_TABLE | EVulkanBufferBits::SHADER_DEVICE_ADDRESS | EVulkanBufferBits::STORAGE_BUFFER,
                 EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT,
                 sizeof(ubo), *(jBuffer_Vulkan*)TestUniformBuffer.get());
             TestUniformBuffer->UpdateBuffer(&ubo, sizeof(ubo));
