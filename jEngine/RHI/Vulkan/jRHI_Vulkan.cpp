@@ -665,7 +665,7 @@ jTexture* jRHI_Vulkan::CreateTextureFromData(const jImageData* InImageData) cons
 	{
         if (!ensure(jBufferUtil_Vulkan::CreateImageCube((uint32)InImageData->Width, (uint32)InImageData->Height, MipLevel, VK_SAMPLE_COUNT_1_BIT, vkTextureFormat
             , VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT
-            | VK_IMAGE_USAGE_SAMPLED_BIT	// image를 shader 에서 접근가능하게 하고 싶은 경우
+			| VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT	// image를 shader 에서 접근가능하게 하고 싶은 경우
             , VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, TextureImage, TextureImageMemory)))
         {
             return nullptr;
@@ -675,7 +675,7 @@ jTexture* jRHI_Vulkan::CreateTextureFromData(const jImageData* InImageData) cons
 	{
 		if (!ensure(jBufferUtil_Vulkan::CreateImage((uint32)InImageData->Width, (uint32)InImageData->Height, MipLevel, VK_SAMPLE_COUNT_1_BIT, vkTextureFormat
 			, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT
-			| VK_IMAGE_USAGE_SAMPLED_BIT	// image를 shader 에서 접근가능하게 하고 싶은 경우
+			| VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT	// image를 shader 에서 접근가능하게 하고 싶은 경우
 			, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, TextureImage, TextureImageMemory)))
 		{
 			return nullptr;
@@ -889,6 +889,7 @@ bool jRHI_Vulkan::CreateShaderInternal(jShader* OutShader, const jShaderInfo& sh
 			case EShaderAccessStageFlag::RAYTRACING_RAYGEN:
 			case EShaderAccessStageFlag::RAYTRACING_MISS:
 			case EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT:
+			case EShaderAccessStageFlag::RAYTRACING_ANYHIT:
                 ShadingModel = TEXT("lib_6_6");
                 break;
             default:
@@ -956,6 +957,9 @@ bool jRHI_Vulkan::CreateShaderInternal(jShader* OutShader, const jShaderInfo& sh
         case EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT:
 			ShaderFlagBits = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
 			break;
+        case EShaderAccessStageFlag::RAYTRACING_ANYHIT:
+            ShaderFlagBits = VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
+            break;
         default:
             check(0);
             break;

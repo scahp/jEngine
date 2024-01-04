@@ -50,6 +50,7 @@ bool jIndexBuffer_Vulkan::Initialize(const std::shared_ptr<jIndexStreamData>& In
         | EVulkanBufferBits::STORAGE_BUFFER
         , EVulkanMemoryBits::DEVICE_LOCAL, bufferSize, *BufferPtr.get());
     jBufferUtil_Vulkan::CopyBuffer(stagingBuffer, *BufferPtr.get(), bufferSize);
+    BufferPtr->RealBufferSize = bufferSize;
 
     stagingBuffer.Release();
     return true;

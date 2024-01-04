@@ -19,23 +19,25 @@ struct SceneConstantBuffer
 };
 
 RaytracingAccelerationStructure Scene : register(t0, space0);
-RWTexture2D<float4> RenderTarget : register(u0, space0);
-ConstantBuffer<SceneConstantBuffer> g_sceneCB : register(b0, space0);
+RWTexture2D<float4> RenderTarget : register(u1, space0);
+ConstantBuffer<SceneConstantBuffer> g_sceneCB : register(b2, space0);
+SamplerState AlbedoTextureSampler : register(s3, space0);
+SamplerState PBRSamplerState : register(s4, space0);
 
 #if USE_BINDLESS_RESOURCE
-TextureCube<float4> IrradianceMapArray[] : register(t0, space100);
-TextureCube<float4> PrefilteredEnvMapArray[] : register(t0, space101);
-StructuredBuffer<uint2> VertexIndexOffsetArray[] : register(t0, space102);
-StructuredBuffer<uint> IndexBindlessArray[] : register(t0, space103);
-StructuredBuffer<RenderObjectUniformBuffer> RenderObjParamArray[] : register(t0, space104);
-StructuredBuffer<float3> PosBindlessArray[] : register(t0, space105);
-StructuredBuffer<float3> NormalBindlessArray[] : register(t0, space106);
-StructuredBuffer<float3> TangentBindlessArray[] : register(t0, space107);
-StructuredBuffer<float3> BiTangentBindlessArray[] : register(t0, space108);
-StructuredBuffer<float2> TexCoordBindlessArray[] : register(t0, space109);
-Texture2D AlbedoTextureArray[] : register(t0, space110);
-Texture2D NormalTextureArray[] : register(t0, space111);
-Texture2D RMTextureArray[] : register(t0, space112);
+TextureCube<float4> IrradianceMapArray[] : register(t0, space1);
+TextureCube<float4> PrefilteredEnvMapArray[] : register(t0, space2);
+StructuredBuffer<uint2> VertexIndexOffsetArray[] : register(t0, space3);
+StructuredBuffer<uint> IndexBindlessArray[] : register(t0, space4);
+StructuredBuffer<RenderObjectUniformBuffer> RenderObjParamArray[] : register(t0, space5);
+StructuredBuffer<float4> PosBindlessArray[] : register(t0, space6);
+StructuredBuffer<float4> NormalBindlessArray[] : register(t0, space7);
+StructuredBuffer<float4> TangentBindlessArray[] : register(t0, space8);
+StructuredBuffer<float4> BiTangentBindlessArray[] : register(t0, space9);
+StructuredBuffer<float2> TexCoordBindlessArray[] : register(t0, space10);
+Texture2D AlbedoTextureArray[] : register(t0, space11);
+Texture2D NormalTextureArray[] : register(t0, space12);
+Texture2D RMTextureArray[] : register(t0, space13);
 #endif // USE_BINDLESS_RESOURCE
 
 typedef BuiltInTriangleIntersectionAttributes MyAttributes;
@@ -104,10 +106,10 @@ void GetShaderBindingResources(
     inout StructuredBuffer<uint2> VertexIndexOffset,
     inout StructuredBuffer<uint> IndexBindless,
     inout StructuredBuffer<RenderObjectUniformBuffer> RenderObjParam,
-    inout StructuredBuffer<float3> PosBindless,
-    inout StructuredBuffer<float3> NormalBindless,
-    inout StructuredBuffer<float3> TangentBindless,
-    inout StructuredBuffer<float3> BiTangentBindless,
+    inout StructuredBuffer<float4> PosBindless,
+    inout StructuredBuffer<float4> NormalBindless,
+    inout StructuredBuffer<float4> TangentBindless,
+    inout StructuredBuffer<float4> BiTangentBindless,
     inout StructuredBuffer<float2> TexCoordBindless,
     inout Texture2D AlbedoTexture,
     inout Texture2D NormalTexture,
@@ -133,20 +135,20 @@ void GetShaderBindingResources(
     NormalTexture = ResourceDescriptorHeap[(PerPrimOffset++) + InstanceIdx * Stride];
     RMTexture = ResourceDescriptorHeap[(PerPrimOffset++) + InstanceIdx * Stride];
 #elif USE_BINDLESS_RESOURCE
-    IrradianceMap = IrradianceMapArray[1];
-    PrefilteredEnvMap = PrefilteredEnvMapArray[2];
+    IrradianceMap = IrradianceMapArray[0];
+    PrefilteredEnvMap = PrefilteredEnvMapArray[0];
     
-    VertexIndexOffset = VertexIndexOffsetArray[(PerPrimOffset++) + InstanceIdx * Stride];
-    IndexBindless = IndexBindlessArray[(PerPrimOffset++) + InstanceIdx * Stride];
-    RenderObjParam = RenderObjParamArray[(PerPrimOffset++) + InstanceIdx * Stride];
-    PosBindless = PosBindlessArray[(PerPrimOffset++) + InstanceIdx * Stride];
-    NormalBindless = NormalBindlessArray[(PerPrimOffset++) + InstanceIdx * Stride];
-    TangentBindless = TangentBindlessArray[(PerPrimOffset++) + InstanceIdx * Stride];
-    BiTangentBindless = BiTangentBindlessArray[(PerPrimOffset++) + InstanceIdx * Stride];
-    TexCoordBindless = TexCoordBindlessArray[(PerPrimOffset++) + InstanceIdx * Stride];
-    AlbedoTexture = AlbedoTextureArray[(PerPrimOffset++) + InstanceIdx * Stride];
-    NormalTexture = NormalTextureArray[(PerPrimOffset++) + InstanceIdx * Stride];
-    RMTexture = RMTextureArray[(PerPrimOffset++) + InstanceIdx * Stride];
+    VertexIndexOffset = VertexIndexOffsetArray[InstanceIdx];
+    IndexBindless = IndexBindlessArray[InstanceIdx];
+    RenderObjParam = RenderObjParamArray[InstanceIdx];
+    PosBindless = PosBindlessArray[InstanceIdx];
+    NormalBindless = NormalBindlessArray[InstanceIdx];
+    TangentBindless = TangentBindlessArray[InstanceIdx];
+    BiTangentBindless = BiTangentBindlessArray[InstanceIdx];
+    TexCoordBindless = TexCoordBindlessArray[InstanceIdx];
+    AlbedoTexture = AlbedoTextureArray[InstanceIdx];
+    NormalTexture = NormalTextureArray[InstanceIdx];
+    RMTexture = RMTextureArray[InstanceIdx];
 #endif // USE_HLSL_DYNAMIC_RESOURCE
 }
 
@@ -228,10 +230,10 @@ void ShadowMyAnyHitShader(inout ShadowHitInfo payload, in MyAttributes attr)
     StructuredBuffer<uint2> VertexIndexOffset;
     StructuredBuffer<uint> IndexBindless;
     StructuredBuffer<RenderObjectUniformBuffer> RenderObjParam;
-    StructuredBuffer<float3> PosBindless;
-    StructuredBuffer<float3> NormalBindless;
-    StructuredBuffer<float3> TangentBindless;
-    StructuredBuffer<float3> BiTangentBindless;
+    StructuredBuffer<float4> PosBindless;
+    StructuredBuffer<float4> NormalBindless;
+    StructuredBuffer<float4> TangentBindless;
+    StructuredBuffer<float4> BiTangentBindless;
     StructuredBuffer<float2> TexCoordBindless;
     Texture2D AlbedoTexture;
     Texture2D NormalTexture;
@@ -251,9 +253,6 @@ void ShadowMyAnyHitShader(inout ShadowHitInfo payload, in MyAttributes attr)
         NormalTexture,
         RMTexture,
         InstanceIdx);
-
-    // Sampler DescHeap
-    SamplerState AlbedoTextureSampler = SamplerDescriptorHeap[0];
 
     uint VertexOffset = VertexIndexOffset[0].x;
     uint IndexOffset = VertexIndexOffset[0].y;
@@ -344,17 +343,9 @@ void MyRaygenShader()
     ray.TMax = 10000.0;
     
     RayPayload payload = { float4(1.0f, 1.0f, 1.0f, 1.0f) };
-    ShadowHitInfo shadowPayload;
-    shadowPayload.isHit = false;
     
     TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 0, 0, ray, payload);
-    //color = shadowPayload.isHit ? float4(1, 1, 1, 1) : float4(0, 0, 0, 1);
     color = payload.color;
-    
-    /*
-    TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 1, 0, 1, ray, shadowPayload);
-    color.xyz = shadowPayload.isHit ? float4(1, 1, 1, 1) : float4(0, 0, 0, 1);
-    */
 
 #if USE_HLSL_DYNAMIC_RESOURCE
     RWTexture2D<float4> RenderTargetBindless = ResourceDescriptorHeap[0];
@@ -376,10 +367,10 @@ void MyAnyHitShader(inout RayPayload payload, in MyAttributes attr)
     StructuredBuffer<uint2> VertexIndexOffset;
     StructuredBuffer<uint> IndexBindless;
     StructuredBuffer<RenderObjectUniformBuffer> RenderObjParam;
-    StructuredBuffer<float3> PosBindless;
-    StructuredBuffer<float3> NormalBindless;
-    StructuredBuffer<float3> TangentBindless;
-    StructuredBuffer<float3> BiTangentBindless;
+    StructuredBuffer<float4> PosBindless;
+    StructuredBuffer<float4> NormalBindless;
+    StructuredBuffer<float4> TangentBindless;
+    StructuredBuffer<float4> BiTangentBindless;
     StructuredBuffer<float2> TexCoordBindless;
     Texture2D AlbedoTexture;
     Texture2D NormalTexture;
@@ -399,9 +390,6 @@ void MyAnyHitShader(inout RayPayload payload, in MyAttributes attr)
         NormalTexture,
         RMTexture,
         InstanceIdx);
-
-    // Sampler DescHeap
-    SamplerState AlbedoTextureSampler = SamplerDescriptorHeap[0];
 
     uint VertexOffset = VertexIndexOffset[0].x;
     uint IndexOffset = VertexIndexOffset[0].y;
@@ -428,9 +416,9 @@ void MyAnyHitShader(inout RayPayload payload, in MyAttributes attr)
     //  4) Reconstruct the UV coordinates at the hit points
     //  5) Take the difference in UV coordinates as the partial derivatives X and Y
 
-    float3 p0 = PosBindless[Indices.x + VertexOffset];
-    float3 p1 = PosBindless[Indices.y + VertexOffset];
-    float3 p2 = PosBindless[Indices.z + VertexOffset];
+    float3 p0 = PosBindless[Indices.x + VertexOffset].xyz;
+    float3 p1 = PosBindless[Indices.y + VertexOffset].xyz;
+    float3 p2 = PosBindless[Indices.z + VertexOffset].xyz;
 
     // Normal for plane
     float3 triangleNormal = normalize(cross(p2 - p0, p1 - p0));
@@ -473,10 +461,10 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
     StructuredBuffer<uint2> VertexIndexOffset;
     StructuredBuffer<uint> IndexBindless;
     StructuredBuffer<RenderObjectUniformBuffer> RenderObjParam;
-    StructuredBuffer<float3> PosBindless;
-    StructuredBuffer<float3> NormalBindless;
-    StructuredBuffer<float3> TangentBindless;
-    StructuredBuffer<float3> BiTangentBindless;
+    StructuredBuffer<float4> PosBindless;
+    StructuredBuffer<float4> NormalBindless;
+    StructuredBuffer<float4> TangentBindless;
+    StructuredBuffer<float4> BiTangentBindless;
     StructuredBuffer<float2> TexCoordBindless;
     Texture2D AlbedoTexture;
     Texture2D NormalTexture;
@@ -497,9 +485,6 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
         RMTexture,
         InstanceIdx);
 
-    // Sampler DescHeap
-    SamplerState AlbedoTextureSampler = SamplerDescriptorHeap[0];
-
     uint VertexOffset = VertexIndexOffset[0].x;
     uint IndexOffset = VertexIndexOffset[0].y;
 
@@ -509,17 +494,17 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
         IndexBindless[IndexOffset + PrimIdx * 3 + 1],
         IndexBindless[IndexOffset + PrimIdx * 3 + 2]);
 
-    float3 normal = HitAttribute(NormalBindless[Indices.x + VertexOffset]
-        , NormalBindless[Indices.y + VertexOffset]
-        , NormalBindless[Indices.z + VertexOffset], attr);
+    float3 normal = HitAttribute(NormalBindless[Indices.x + VertexOffset].xyz
+        , NormalBindless[Indices.y + VertexOffset].xyz
+        , NormalBindless[Indices.z + VertexOffset].xyz, attr);
 
-    float3 tangent = HitAttribute(TangentBindless[Indices.x + VertexOffset]
-        , TangentBindless[Indices.y + VertexOffset]
-        , TangentBindless[Indices.z + VertexOffset], attr);
+    float3 tangent = HitAttribute(TangentBindless[Indices.x + VertexOffset].xyz
+        , TangentBindless[Indices.y + VertexOffset].xyz
+        , TangentBindless[Indices.z + VertexOffset].xyz, attr);
         
-    float3 bitangent = HitAttribute(NormalBindless[Indices.x + VertexOffset]
-        , BiTangentBindless[Indices.y + VertexOffset]
-        , BiTangentBindless[Indices.z + VertexOffset], attr);
+    float3 bitangent = HitAttribute(BiTangentBindless[Indices.x + VertexOffset].xyz
+        , BiTangentBindless[Indices.y + VertexOffset].xyz
+        , BiTangentBindless[Indices.z + VertexOffset].xyz, attr);
 
     float3x3 TBN = 0;
     {
@@ -534,9 +519,6 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
     float2 uv2 = TexCoordBindless[Indices.z + VertexOffset];
 
     float2 uv = HitAttribute(uv0 , uv1 , uv2, attr);
-
-    //float2 ddx = float2(0, 0);
-    //float2 ddy = float2(0, 0);
 
     // From D3D12RaytracingMiniEngineSample https://github.com/microsoft/DirectX-Graphics-Samples/blob/master/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingMiniEngineSample/DiffuseHitShaderLib.hlsl
     //---------------------------------------------------------------------------------------------
@@ -593,7 +575,6 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
     payload.color.xyz = PBR(L, N, V, albedo, float3(1, 1, 1), DistanceToLight, metallic, roughness);
     payload.color.w = 1.0f;
 
-    SamplerState PBRSamplerState = SamplerDescriptorHeap[1];
     // ambient from IBL
     {
         // todo : Need to split shader, because it is possible that ILB without directional light

@@ -94,6 +94,7 @@ FORCEINLINE size_t AllocateBuffer(EVulkanBufferBits InUsage, EVulkanMemoryBits I
     check(g_rhi->GetMemoryPool());
     const jMemory& Memory = g_rhi->GetMemoryPool()->Alloc(InUsage, InProperties, InSize);
     OutBuffer.InitializeWithMemory(Memory);
+    OutBuffer.RealBufferSize = InSize;
     return OutBuffer.AllocatedSize;
 #else
     return CreateBuffer(InUsage, InProperties, InSize, OutBuffer.Buffer, OutBuffer.BufferMemory, OutBuffer.AllocatedSize);
