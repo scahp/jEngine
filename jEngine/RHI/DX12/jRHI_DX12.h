@@ -39,8 +39,8 @@ struct GlobalRootSignatureParams {
 		OutputViewSlot = 0,
 		AccelerationStructureSlot,
 		SceneConstantSlot,
-		VertexBuffersSlot,
-        PlaneVertexBufferSlot,
+		SamplerState,
+		BindlessIndices,
 		Count
 	};
 };

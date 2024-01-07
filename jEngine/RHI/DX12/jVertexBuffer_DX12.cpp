@@ -33,6 +33,12 @@ bool jVertexBuffer_DX12::Initialize(const std::shared_ptr<jVertexStreamData>& In
         stream.Offset = 0;
         stream.InstanceDivisor = iter->InstanceDivisor;
 
+        // Create vertex buffer
+        stream.BufferPtr = std::shared_ptr<jBuffer_DX12>(jBufferUtil_DX12::CreateBuffer(iter->GetBufferSize(), 0, EBufferCreateFlag::NONE, D3D12_RESOURCE_STATE_COMMON
+            , iter->GetBufferData(), iter->GetBufferSize(), TEXT("VertexBuffer")));
+        //jBufferUtil_DX12::CreateShaderResourceView(stream.BufferPtr.get(), (uint32)iter->Stride, (uint32)(iter->GetBufferSize() / iter->Stride));     // As StructuredBuffer
+        jBufferUtil_DX12::CreateShaderResourceView(stream.BufferPtr.get(), 0, (uint32)(iter->GetBufferSize() / 4));      // As Raw
+
         int32 ElementStride = 0;
         for (IStreamParam::jAttribute& element : iter->Attributes)
         {
@@ -166,17 +172,12 @@ bool jVertexBuffer_DX12::Initialize(const std::shared_ptr<jVertexStreamData>& In
 
             if (iter->GetBufferSize() > 0)
             {
-                // Create vertex buffer
-                stream.BufferPtr = std::shared_ptr<jBuffer_DX12>(jBufferUtil_DX12::CreateBuffer(iter->GetBufferSize(), 0, EBufferCreateFlag::NONE, D3D12_RESOURCE_STATE_COMMON
-                    , iter->GetBufferData(), iter->GetBufferSize(), TEXT("VertexBuffer")));
-                jBufferUtil_DX12::CreateShaderResourceView(stream.BufferPtr.get(), (uint32)iter->Stride, (uint32)(iter->GetBufferSize() / iter->Stride));
-
                 BindInfos.Buffers.push_back(stream.BufferPtr->Buffer.Get());
                 BindInfos.Offsets.push_back(stream.Offset + stream.BufferPtr->Offset);
             }
         
             D3D12_INPUT_ELEMENT_DESC elem;
-            elem.SemanticName = iter->Name.ToStr();
+            elem.SemanticName = element.Name.GetStringLength() ? element.Name.ToStr() : iter->Name.ToStr();     // todo : remove iter-Name.ToStr();
             elem.SemanticIndex = 0;                     // todo
             elem.Format = AttrFormat;
             elem.InputSlot = bindingIndex;

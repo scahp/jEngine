@@ -79,10 +79,10 @@ struct jMeshMaterial : public jMaterial
 
 struct jMeshData
 {
-	std::vector<Vector4> Vertices;
-	std::vector<Vector4> Normals;
-	std::vector<Vector4> Tangents;
-	std::vector<Vector4> Bitangents;
+	std::vector<Vector> Vertices;
+	std::vector<Vector> Normals;
+	std::vector<Vector> Tangents;
+	std::vector<Vector> Bitangents;
 	std::vector<Vector2> TexCoord;
 	std::map<int32, std::shared_ptr<jMaterial>> Materials;
 	std::vector<uint32> Faces;

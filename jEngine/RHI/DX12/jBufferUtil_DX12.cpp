@@ -370,7 +370,7 @@ void CreateShaderResourceView(jBuffer_DX12* InBuffer)
     CreateShaderResourceView(InBuffer, (uint32)InBuffer->Size, 1);
 }
 
-void CreateShaderResourceView(jBuffer_DX12* InBuffer, uint32 InStride, uint32 InCount)
+void CreateShaderResourceView(jBuffer_DX12* InBuffer, uint32 InStride, uint32 InCount = 0)
 {
     check(g_rhi_dx12);
     check(g_rhi_dx12->Device);
@@ -381,13 +381,15 @@ void CreateShaderResourceView(jBuffer_DX12* InBuffer, uint32 InStride, uint32 In
     check(!InBuffer->SRV.IsValid());
     InBuffer->SRV = g_rhi_dx12->DescriptorHeaps.Alloc();
 
+    const bool IsRaw = (InStride <= 0);
+
     D3D12_SHADER_RESOURCE_VIEW_DESC Desc = {};
     Desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    Desc.Format = DXGI_FORMAT_UNKNOWN;
+    Desc.Format = IsRaw ? DXGI_FORMAT_R32_TYPELESS : DXGI_FORMAT_UNKNOWN;
     Desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
 
     Desc.Buffer.FirstElement = 0;
-    Desc.Buffer.Flags = (InStride > 0) ? D3D12_BUFFER_SRV_FLAG_NONE : D3D12_BUFFER_SRV_FLAG_RAW;
+    Desc.Buffer.Flags = IsRaw ? D3D12_BUFFER_SRV_FLAG_RAW : D3D12_BUFFER_SRV_FLAG_NONE;
     Desc.Buffer.NumElements = InCount;
     Desc.Buffer.StructureByteStride = InStride;
 
