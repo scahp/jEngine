@@ -188,6 +188,13 @@ public:
     D3D12_GPU_DESCRIPTOR_HANDLE GetGPUHandle() const { return GPUHandle; }
     ID3D12DescriptorHeap* GetHeap() const { return Heap; }
 
+    uint32 GetDescriptorSize() const 
+    {
+        check(DescriptorBlocks);
+        check(DescriptorBlocks->DescriptorHeapBlocks);
+        return DescriptorBlocks->DescriptorHeapBlocks->DescriptorSize;
+    }
+
 private:
     ID3D12DescriptorHeap* Heap = nullptr;
     jDescriptorBlock_DX12* DescriptorBlocks = nullptr;

@@ -1479,6 +1479,10 @@ void jRenderer::Render()
 
         if (IsUseDX12())
         {
+            SCOPE_CPU_PROFILE(Raytracing);
+            SCOPE_GPU_PROFILE(RenderFrameContextPtr, Raytracing);
+            DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "Raytracing", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
+
             static ComPtr<ID3D12StateObject> m_dxrStateObject;
             static ComPtr<ID3D12Resource> m_rayGenShaderTable;
             static ComPtr<ID3D12Resource> m_missShaderTable;
@@ -1530,8 +1534,8 @@ void jRenderer::Render()
                 // 9. CreateRootSignatures
                 {
                     // global root signature는 DispatchRays 함수 호출로 만들어지는 레이트레이싱 쉐이더의 전체에 공유됨.
-                    CD3DX12_DESCRIPTOR_RANGE1 ranges[14];		// 가장 빈번히 사용되는 것을 앞에 둘 수록 최적화에 좋음
-                    ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);		// 1 output texture
+                    CD3DX12_DESCRIPTOR_RANGE1 ranges[10];		// 가장 빈번히 사용되는 것을 앞에 둘 수록 최적화에 좋음
+                    ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 1);		// 1 output texture
 
                     int32 NumOfRanges = _countof(ranges);
 
@@ -1542,30 +1546,32 @@ void jRenderer::Render()
                     }
                     else
                     {
-                        ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 100, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
-                        ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 101, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
-                        ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 102, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
-                        ranges[4].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 103, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
-                        ranges[5].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 104, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
-                        ranges[6].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 105, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
-                        ranges[7].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 106, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
-                        ranges[8].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 107, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
-                        ranges[9].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 108, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
-                        ranges[10].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 109, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
-                        ranges[11].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 110, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
-                        ranges[12].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 111, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
-                        ranges[13].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 112, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
+                        ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 1, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
+                        ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 2, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
+                        ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 3, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
+                        ranges[4].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 4, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
+                        ranges[5].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 5, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
+                        ranges[6].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 6, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
+                        ranges[7].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 7, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
+                        ranges[8].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 8, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
+                        ranges[9].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 0, 9, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
                     }
 
-                    CD3DX12_ROOT_PARAMETER1 rootParameters[3];
+                    CD3DX12_ROOT_PARAMETER1 rootParameters[5];
                     rootParameters[GlobalRootSignatureParams::OutputViewSlot].InitAsDescriptorTable(NumOfRanges, &ranges[0]);
                     rootParameters[GlobalRootSignatureParams::AccelerationStructureSlot].InitAsShaderResourceView(0);
-                    rootParameters[GlobalRootSignatureParams::SceneConstantSlot].InitAsConstantBufferView(0);
+                    rootParameters[GlobalRootSignatureParams::SceneConstantSlot].InitAsConstantBufferView(2);
+
+                    CD3DX12_DESCRIPTOR_RANGE1 samplerStateRange;
+                    samplerStateRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, 2, 4);
+                    rootParameters[GlobalRootSignatureParams::SamplerState].InitAsDescriptorTable(1, &samplerStateRange);
+
+                    rootParameters[GlobalRootSignatureParams::BindlessIndices].InitAsConstantBufferView(3);
 
                     CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC globalRootSignatureDesc(_countof(rootParameters), rootParameters, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED | D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED);
                     ComPtr<ID3DBlob> blob;
                     ComPtr<ID3DBlob> error;
-                    if (JFAIL(D3D12SerializeVersionedRootSignature(&globalRootSignatureDesc, &blob, &error)))
+                    if (S_OK != (D3D12SerializeVersionedRootSignature(&globalRootSignatureDesc, &blob, &error)))
                     {
                         if (error)
                         {
@@ -1729,7 +1735,6 @@ void jRenderer::Render()
                     m_hitGroupShaderTable = hitShaderTable.GetResource();
                 }
             }
-            auto m_raytracingOutputDX12 = (jTexture_DX12*)m_raytracingOutput;
 
             auto CmdBuffer = RenderFrameContextPtr->GetActiveCommandBuffer();
             auto CmdBufferDX12 = (jCommandBuffer_DX12*)CmdBuffer;
@@ -1787,6 +1792,20 @@ void jRenderer::Render()
                 CmdBufferDX12->CommandList->ResourceBarrier(1, &temp);
                 auto cbGpuAddress = SceneBuffer->GetGPUAddress();
 
+                struct jBindlessIndices
+                {
+                    uint32 IrradianceMap = 0;
+                    uint32 PrefilteredEnvMap = 0;
+                    uint32 VertexIndexOffset = 0;
+                    uint32 Index = 0;
+                    uint32 RenderObj = 0;
+                    uint32 Vertices = 0;
+                    uint32 AlbedoTexture = 0;
+                    uint32 NormalTexture = 0;
+                    uint32 RMTexture = 0;
+                };
+                jBindlessIndices bindlessIndices;
+
                 // 현재 디스크립터에 복사해야 함.
                 ID3D12DescriptorHeap* ppHeaps[] =
                 {
@@ -1802,46 +1821,51 @@ void jRenderer::Render()
                 std::vector<jDescriptor_DX12> Descriptors;
                 std::vector<jDescriptor_DX12> SamplerDescriptors;
 
-                Descriptors.push_back(m_raytracingOutputDX12->UAV);
+                Descriptors.push_back(((jTexture_DX12*)m_raytracingOutput)->UAV);
+
+                bindlessIndices.IrradianceMap = (uint32)Descriptors.size();
                 Descriptors.push_back(((jTexture_DX12*)jSceneRenderTarget::IrradianceMap2)->SRV);
+
+                bindlessIndices.PrefilteredEnvMap = (uint32)Descriptors.size();
                 Descriptors.push_back(((jTexture_DX12*)jSceneRenderTarget::FilteredEnvMap2)->SRV);
+
+                bindlessIndices.VertexIndexOffset = (uint32)Descriptors.size();
                 for (int32 i = 0; i < jObject::GetStaticRenderObject().size(); ++i)
                 {
                     jRenderObject* RObj = jObject::GetStaticRenderObject()[i];
                     Descriptors.push_back(((jBuffer_DX12*)RObj->VertexAndIndexOffsetBuffer)->SRV);
+                }
 
-                    auto Vtx = (jVertexBuffer_DX12*)RObj->GeometryDataPtr->VertexBuffer;
+                bindlessIndices.Index = (uint32)Descriptors.size();
+                for (int32 i = 0; i < jObject::GetStaticRenderObject().size(); ++i)
+                {
+                    jRenderObject* RObj = jObject::GetStaticRenderObject()[i];
                     auto Idx = (jIndexBuffer_DX12*)RObj->GeometryDataPtr->IndexBuffer;
                     Descriptors.push_back(Idx->BufferPtr->SRV);
+                }
 
+                bindlessIndices.RenderObj = (uint32)Descriptors.size();
+                for (int32 i = 0; i < jObject::GetStaticRenderObject().size(); ++i)
+                {
+                    jRenderObject* RObj = jObject::GetStaticRenderObject()[i];
                     RObj->CreateShaderBindingInstance();
+                    auto RObjUni = (jUniformBufferBlock_DX12*)RObj->TestUniformBuffer.get();
                     Descriptors.push_back(((jBuffer_DX12*)RObj->TestUniformBuffer.get())->SRV);
+                }
 
-                    for (int32 k = 0; k < Vtx->Streams.size(); ++k)
-                    {
-                        if (Vtx->Streams[k].Name == jNameStatic("POSITION"))
-                        {
-                            Descriptors.push_back(Vtx->Streams[k].BufferPtr->SRV);
-                        }
-                        else if (Vtx->Streams[k].Name == jNameStatic("NORMAL"))
-                        {
-                            Descriptors.push_back(Vtx->Streams[k].BufferPtr->SRV);
-                        }
-                        else if (Vtx->Streams[k].Name == jNameStatic("TANGENT"))
-                        {
-                            Descriptors.push_back(Vtx->Streams[k].BufferPtr->SRV);
-                        }
-                        else if (Vtx->Streams[k].Name == jNameStatic("BITANGENT"))
-                        {
-                            Descriptors.push_back(Vtx->Streams[k].BufferPtr->SRV);
-                        }
-                        else if (Vtx->Streams[k].Name == jNameStatic("TEXCOORD"))
-                        {
-                            Descriptors.push_back(Vtx->Streams[k].BufferPtr->SRV);
-                            break;
-                        }
-                    }
+                bindlessIndices.Vertices = (uint32)Descriptors.size();
+                for (int32 i = 0; i < jObject::GetStaticRenderObject().size(); ++i)
+                {
+                    jRenderObject* RObj = jObject::GetStaticRenderObject()[i];
+                    auto Vtx = (jVertexBuffer_DX12*)RObj->GeometryDataPtr->VertexBuffer;
+                    check(Vtx->Streams.size() > 0);
+                    Descriptors.push_back(Vtx->Streams[0].BufferPtr->SRV);
+                }
 
+                bindlessIndices.AlbedoTexture = (uint32)Descriptors.size();
+                for (int32 i = 0; i < jObject::GetStaticRenderObject().size(); ++i)
+                {
+                    jRenderObject* RObj = jObject::GetStaticRenderObject()[i];
                     if (jTexture_DX12* AlbedoTexDX12 = RObj->MaterialPtr->GetTexture<jTexture_DX12>(jMaterial::EMaterialTextureType::Albedo))
                     {
                         check(AlbedoTexDX12->SRV.IsValid());
@@ -1851,7 +1875,12 @@ void jRenderer::Render()
                     {
                         Descriptors.push_back(((jTexture_DX12*)GBlackTexture)->SRV);
                     }
+                }
 
+                bindlessIndices.NormalTexture = (uint32)Descriptors.size();
+                for (int32 i = 0; i < jObject::GetStaticRenderObject().size(); ++i)
+                {
+                    jRenderObject* RObj = jObject::GetStaticRenderObject()[i];
                     if (jTexture_DX12* NormalTexDX12 = RObj->MaterialPtr->GetTexture<jTexture_DX12>(jMaterial::EMaterialTextureType::Normal))
                     {
                         check(NormalTexDX12->SRV.IsValid());
@@ -1861,7 +1890,12 @@ void jRenderer::Render()
                     {
                         Descriptors.push_back(((jTexture_DX12*)GNormalTexture)->SRV);
                     }
+                }
 
+                bindlessIndices.RMTexture = (uint32)Descriptors.size();
+                for (int32 i = 0; i < jObject::GetStaticRenderObject().size(); ++i)
+                {
+                    jRenderObject* RObj = jObject::GetStaticRenderObject()[i];
                     if (jTexture_DX12* MetalicTexDX12 = RObj->MaterialPtr->GetTexture<jTexture_DX12>(jMaterial::EMaterialTextureType::Metallic))
                     {
                         check(MetalicTexDX12->SRV.IsValid());
@@ -1893,6 +1927,9 @@ void jRenderer::Render()
                         , (uint32)SrcDescriptor.NumOfData, &SrcDescriptor[0], nullptr, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
                 }
 
+                // Create jBindlessIndices UniformBuffer(ConstantBuffer)
+                auto BindlessUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(jNameStatic("jBindlessIndices"), jLifeTimeType::OneFrame, sizeof(bindlessIndices)));
+                BindlessUniformBuffer->UpdateBufferData(&bindlessIndices, sizeof(bindlessIndices));
 
                 const jSamplerStateInfo_DX12* SamplerState = (jSamplerStateInfo_DX12*)TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
                     , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT
@@ -1934,6 +1971,9 @@ void jRenderer::Render()
                 CmdBufferDX12->CommandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::OutputViewSlot, FirstGPUDescriptorHandle);
                 CmdBufferDX12->CommandList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot, jGame::TopLevelASBuffer->GetGPUAddress());
                 CmdBufferDX12->CommandList->SetComputeRootConstantBufferView(GlobalRootSignatureParams::SceneConstantSlot, cbGpuAddress);
+                CmdBufferDX12->CommandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::SamplerState, FirstGPUSamplerDescriptorHandle);
+                CmdBufferDX12->CommandList->SetComputeRootConstantBufferView(GlobalRootSignatureParams::BindlessIndices, ((jUniformBufferBlock_DX12*)BindlessUniformBuffer.get())->GetGPUAddress());
+                
 
                 // 각 Shader table은 단 한개의 shader record를 가지기 때문에 stride가 그 사이즈와 동일함
                 dispatchDesc.HitGroupTable.StartAddress = m_hitGroupShaderTable->GetGPUVirtualAddress();
@@ -1963,7 +2003,7 @@ void jRenderer::Render()
                 auto RT = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr;
 
                 g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RT->TexturePtr.get(), EImageLayout::COLOR_ATTACHMENT);
-                g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), m_raytracingOutputDX12, EImageLayout::SHADER_READ_ONLY);
+                g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), m_raytracingOutput, EImageLayout::SHADER_READ_ONLY);
 
                 jRasterizationStateInfo* RasterizationState = nullptr;
                 switch (g_rhi->GetSelectedMSAASamples())
@@ -2015,7 +2055,7 @@ void jRenderer::Render()
                     , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
 
                 ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
-                    , ResourceInlineAllactor.Alloc<jTextureResource>(m_raytracingOutputDX12, SamplerState));
+                    , ResourceInlineAllactor.Alloc<jTextureResource>(m_raytracingOutput, SamplerState));
 
                 std::shared_ptr<jShaderBindingInstance> ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
                 jShaderBindingInstanceArray ShaderBindingInstanceArray;
@@ -2052,7 +2092,7 @@ void jRenderer::Render()
             static jUniformBufferBlock_Vulkan* UniformBufferBlockVulkan = nullptr;
             static VkPipeline raytracingPipeline;
             static VkPipelineLayout pipelineLayout;
-            static VkDescriptorSet descriptorSet[14];
+            static VkDescriptorSet descriptorSet[10];
             static VkDescriptorSetLayout descriptorSetLayout;
             static VkDescriptorSetLayout descriptorSetLayoutImage;
             static VkDescriptorSetLayout descriptorSetLayoutBuffer;
@@ -2121,6 +2161,24 @@ void jRenderer::Render()
                 jNameStatic("Test"), jLifeTimeType::OneFrame, sizeof(m_sceneCB));
             UniformBufferBlockVulkan->UpdateBufferData(&m_sceneCB, sizeof(m_sceneCB));
 
+            // Create jBindlessIndices UniformBuffer(ConstantBuffer)
+            struct jBindlessIndices
+            {
+                uint32 IrradianceMap = 0;
+                uint32 PrefilteredEnvMap = 0;
+                uint32 VertexIndexOffset = 0;
+                uint32 Index = 0;
+                uint32 RenderObj = 0;
+                uint32 Vertices = 0;
+                uint32 AlbedoTexture = 0;
+                uint32 NormalTexture = 0;
+                uint32 RMTexture = 0;
+            };
+            jBindlessIndices bindlessIndices;
+
+            auto BindlessUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(jNameStatic("jBindlessIndices"), jLifeTimeType::OneFrame, sizeof(bindlessIndices)));
+            BindlessUniformBuffer->UpdateBufferData(&bindlessIndices, sizeof(bindlessIndices));
+
             static constexpr uint32 MAX_BINDLESS_RESOURCES = 8192;
             static bool once = false;
             if (!once)
@@ -2138,7 +2196,7 @@ void jRenderer::Render()
 
                 {
                     std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings;
-                    setLayoutBindings.resize(5);
+                    setLayoutBindings.resize(6);
 
                     setLayoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
                     setLayoutBindings[0].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
@@ -2155,15 +2213,20 @@ void jRenderer::Render()
                     setLayoutBindings[2].binding = 2;
                     setLayoutBindings[2].descriptorCount = MAX_BINDLESS_RESOURCES;
 
-                    setLayoutBindings[3].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+                    setLayoutBindings[3].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
                     setLayoutBindings[3].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
                     setLayoutBindings[3].binding = 3;
-                    setLayoutBindings[3].descriptorCount = 1;
+                    setLayoutBindings[3].descriptorCount = MAX_BINDLESS_RESOURCES;
 
                     setLayoutBindings[4].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
                     setLayoutBindings[4].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
                     setLayoutBindings[4].binding = 4;
                     setLayoutBindings[4].descriptorCount = 1;
+
+                    setLayoutBindings[5].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+                    setLayoutBindings[5].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
+                    setLayoutBindings[5].binding = 5;
+                    setLayoutBindings[5].descriptorCount = 1;
 
                     VkDescriptorSetLayoutBindingFlagsCreateInfoEXT setLayoutBindingFlags{};
                     setLayoutBindingFlags.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT;
@@ -2172,8 +2235,9 @@ void jRenderer::Render()
                         0,
                         0,
                         VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
+                        VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
                         0,
-                        0
+                        0,
                     };
                     setLayoutBindingFlags.pBindingFlags = descriptorBindingFlags.data();
 
@@ -2242,7 +2306,7 @@ void jRenderer::Render()
                 DescriptorSetLayouts.push_back(descriptorSetLayout);
                 DescriptorSetLayouts.push_back(descriptorSetLayoutImage);
                 DescriptorSetLayouts.push_back(descriptorSetLayoutImage);
-                for (int32 i = 0; i < 8; ++i)
+                for (int32 i = 0; i < 4; ++i)
                     DescriptorSetLayouts.push_back(descriptorSetLayoutBuffer);
                 DescriptorSetLayouts.push_back(descriptorSetLayoutImage);
                 DescriptorSetLayouts.push_back(descriptorSetLayoutImage);
@@ -2469,7 +2533,7 @@ void jRenderer::Render()
 
                 {
                     VkDescriptorSetVariableDescriptorCountAllocateInfoEXT variableDescriptorCountAllocInfo{};
-                    uint32 variableDescCounts[] = { 1, 1, 8192, 1, 1 };
+                    uint32 variableDescCounts[] = { 1, 1, 8192, 1, 1, 1 };
                     variableDescriptorCountAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO_EXT;
                     variableDescriptorCountAllocInfo.descriptorSetCount = 1;
                     variableDescriptorCountAllocInfo.pDescriptorCounts = variableDescCounts;
@@ -2482,6 +2546,7 @@ void jRenderer::Render()
                     descriptorSetAllocateInfo.pNext = &variableDescriptorCountAllocInfo;
                     check(VK_SUCCESS == vkAllocateDescriptorSets(g_rhi_vk->Device, &descriptorSetAllocateInfo, &descriptorSet[0]));
 
+                    // Write descriptorset[0]
                     VkWriteDescriptorSetAccelerationStructureKHR writeDescriptorSetAccelerationStructureKHR{};
                     writeDescriptorSetAccelerationStructureKHR.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
                     writeDescriptorSetAccelerationStructureKHR.accelerationStructureCount = 1;
@@ -2519,7 +2584,6 @@ void jRenderer::Render()
                     };
 
                     // Binding 2: Uniform data
-                    for (int32 m = 0; m < 1; ++m)
                     {
                         VkWriteDescriptorSet writeDescriptorSet2{};
                         writeDescriptorSet2.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -2527,7 +2591,24 @@ void jRenderer::Render()
                         writeDescriptorSet2.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
                         writeDescriptorSet2.dstBinding = 2;
                         writeDescriptorSet2.pBufferInfo = &bufferInfo;
-                        writeDescriptorSet2.dstArrayElement = m;
+                        writeDescriptorSet2.dstArrayElement = 0;
+                        writeDescriptorSet2.descriptorCount = 1;
+                        writeDescriptorSets.push_back(writeDescriptorSet2);
+                    }
+
+                    // Binding 3: Bindless indices (It is only for DX12 so Vulkan is Empty)
+                    VkDescriptorBufferInfo bindlessBufferInfo{};
+                    bindlessBufferInfo.buffer = (VkBuffer)BindlessUniformBuffer->GetBuffer();
+                    bindlessBufferInfo.offset = BindlessUniformBuffer->GetBufferOffset();
+                    bindlessBufferInfo.range = BindlessUniformBuffer->GetBufferSize();		// 전체 사이즈라면 VK_WHOLE_SIZE 이거 가능
+                    {
+                        VkWriteDescriptorSet writeDescriptorSet2{};
+                        writeDescriptorSet2.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                        writeDescriptorSet2.dstSet = descriptorSet[0];
+                        writeDescriptorSet2.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                        writeDescriptorSet2.dstBinding = 3;
+                        writeDescriptorSet2.pBufferInfo = &bindlessBufferInfo;
+                        writeDescriptorSet2.dstArrayElement = 0;
                         writeDescriptorSet2.descriptorCount = 1;
                         writeDescriptorSets.push_back(writeDescriptorSet2);
                     }
@@ -2542,22 +2623,24 @@ void jRenderer::Render()
 
                     VkDescriptorImageInfo SamplerDescriptor1{ SamplerState->SamplerState, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL };
 
+                    // Binding 4: Sampler state
                     VkWriteDescriptorSet writeDescriptorSetSampler1{};
                     writeDescriptorSetSampler1.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
                     writeDescriptorSetSampler1.dstSet = descriptorSet[0];
                     writeDescriptorSetSampler1.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
-                    writeDescriptorSetSampler1.dstBinding = 3;
+                    writeDescriptorSetSampler1.dstBinding = 4;
                     writeDescriptorSetSampler1.pImageInfo = &SamplerDescriptor1;
                     writeDescriptorSetSampler1.descriptorCount = 1;
                     writeDescriptorSets.push_back(writeDescriptorSetSampler1);
 
                     VkDescriptorImageInfo SamplerDescriptor2{ PBRSamplerStateInfo->SamplerState, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL };
 
+                    // Binding 5: Sampler state
                     VkWriteDescriptorSet writeDescriptorSetSampler2{};
                     writeDescriptorSetSampler2.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
                     writeDescriptorSetSampler2.dstSet = descriptorSet[0];
                     writeDescriptorSetSampler2.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
-                    writeDescriptorSetSampler2.dstBinding = 4;
+                    writeDescriptorSetSampler2.dstBinding = 5;
                     writeDescriptorSetSampler2.pImageInfo = &SamplerDescriptor2;
                     writeDescriptorSetSampler2.descriptorCount = 1;
                     writeDescriptorSets.push_back(writeDescriptorSetSampler2);
@@ -2582,7 +2665,7 @@ void jRenderer::Render()
                     descriptorSetAllocateInfo.pNext = &variableDescriptorCountAllocInfo;
                     check(VK_SUCCESS == vkAllocateDescriptorSets(g_rhi_vk->Device, &descriptorSetAllocateInfo, &descriptorSet[index]));
                 }
-                for (int32 i = 0; i < 8; ++i, ++index)
+                for (int32 i = 0; i < 4; ++i, ++index)
                 {
                     VkDescriptorSetVariableDescriptorCountAllocateInfoEXT variableDescriptorCountAllocInfo{};
                     uint32 variableDescCounts[] = { 8192 };
@@ -2692,56 +2775,34 @@ void jRenderer::Render()
                     RObj->CreateShaderBindingInstance();
                     CreateWriteDescriptorSetBuf(writeDescriptorSets, descriptorSet[5], (jBuffer_Vulkan*)RObj->TestUniformBuffer.get(), i);
 
-                    for (int32 k = 0; k < Vtx->Streams.size(); ++k)
-                    {
-                        if (Vtx->Streams[k].Name == jNameStatic("POSITION"))
-                        {
-                            CreateWriteDescriptorSetBuf(writeDescriptorSets, descriptorSet[6], (jBuffer_Vulkan*)Vtx->Streams[k].BufferPtr.get(), i);
-                        }
-                        else if (Vtx->Streams[k].Name == jNameStatic("NORMAL"))
-                        {
-                            CreateWriteDescriptorSetBuf(writeDescriptorSets, descriptorSet[7], (jBuffer_Vulkan*)Vtx->Streams[k].BufferPtr.get(), i);
-                        }
-                        else if (Vtx->Streams[k].Name == jNameStatic("TANGENT"))
-                        {
-                            CreateWriteDescriptorSetBuf(writeDescriptorSets, descriptorSet[8], (jBuffer_Vulkan*)Vtx->Streams[k].BufferPtr.get(), i);
-                        }
-                        else if (Vtx->Streams[k].Name == jNameStatic("BITANGENT"))
-                        {
-                            CreateWriteDescriptorSetBuf(writeDescriptorSets, descriptorSet[9], (jBuffer_Vulkan*)Vtx->Streams[k].BufferPtr.get(), i);
-                        }
-                        else if (Vtx->Streams[k].Name == jNameStatic("TEXCOORD"))
-                        {
-                            CreateWriteDescriptorSetBuf(writeDescriptorSets, descriptorSet[10], (jBuffer_Vulkan*)Vtx->Streams[k].BufferPtr.get(), i);
-                            break;
-                        }
-                    }
+                    check(Vtx->Streams.size() > 0);
+                    CreateWriteDescriptorSetBuf(writeDescriptorSets, descriptorSet[6], (jBuffer_Vulkan*)Vtx->Streams[0].BufferPtr.get(), i);
 
                     if (jTexture_Vulkan* AlbedoTexVulkan = RObj->MaterialPtr->GetTexture<jTexture_Vulkan>(jMaterial::EMaterialTextureType::Albedo))
                     {
-                        CreateWriteDescriptorSet(writeDescriptorSets, descriptorSet[11], AlbedoTexVulkan->View, i);
+                        CreateWriteDescriptorSet(writeDescriptorSets, descriptorSet[7], AlbedoTexVulkan->View, i);
                     }
                     else
                     {
-                        CreateWriteDescriptorSet(writeDescriptorSets, descriptorSet[11], ((jTexture_Vulkan*)GBlackTexture)->View, i);
+                        CreateWriteDescriptorSet(writeDescriptorSets, descriptorSet[7], ((jTexture_Vulkan*)GBlackTexture)->View, i);
                     }
 
                     if (jTexture_Vulkan* NormalTexVulkan = RObj->MaterialPtr->GetTexture<jTexture_Vulkan>(jMaterial::EMaterialTextureType::Normal))
                     {
-                        CreateWriteDescriptorSet(writeDescriptorSets, descriptorSet[12], NormalTexVulkan->View, i);
+                        CreateWriteDescriptorSet(writeDescriptorSets, descriptorSet[8], NormalTexVulkan->View, i);
                     }
                     else
                     {
-                        CreateWriteDescriptorSet(writeDescriptorSets, descriptorSet[12], ((jTexture_Vulkan*)GNormalTexture)->View, i);
+                        CreateWriteDescriptorSet(writeDescriptorSets, descriptorSet[8], ((jTexture_Vulkan*)GNormalTexture)->View, i);
                     }
 
                     if (jTexture_Vulkan* MetalicTexVulkan = RObj->MaterialPtr->GetTexture<jTexture_Vulkan>(jMaterial::EMaterialTextureType::Metallic))
                     {
-                        CreateWriteDescriptorSet(writeDescriptorSets, descriptorSet[13], MetalicTexVulkan->View, i);
+                        CreateWriteDescriptorSet(writeDescriptorSets, descriptorSet[9], MetalicTexVulkan->View, i);
                     }
                     else
                     {
-                        CreateWriteDescriptorSet(writeDescriptorSets, descriptorSet[13], ((jTexture_Vulkan*)GBlackTexture)->View, i);
+                        CreateWriteDescriptorSet(writeDescriptorSets, descriptorSet[9], ((jTexture_Vulkan*)GBlackTexture)->View, i);
                     }
                 }
                 vkUpdateDescriptorSets(g_rhi_vk->Device, static_cast<uint32>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, VK_NULL_HANDLE);
@@ -2754,10 +2815,6 @@ void jRenderer::Render()
 
             vkCmdBindPipeline(CmdBufferVk->GetRef(), VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, raytracingPipeline);
             vkCmdBindDescriptorSets(CmdBufferVk->GetRef(), VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipelineLayout, 0, _countof(descriptorSet), &descriptorSet[0], 0, 0);
-            //for(int32 i=0;i<_countof(descriptorSet);++i)
-            //{
-            //    vkCmdBindDescriptorSets(CmdBufferVk->GetRef(), VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipelineLayout, 100 + i, 1, &descriptorSet[i + 1], 0, 0);
-            //}
 
             VkStridedDeviceAddressRegionKHR emptySbtEntry = {};
             g_rhi_vk->vkCmdTraceRaysKHR(
