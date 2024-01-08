@@ -27,13 +27,11 @@ class jSpotLightPrimitive;
 class jGame
 {
 public:
-    static jBuffer_DX12* ScratchASBuffer;
-    static jBuffer_DX12* TopLevelASBuffer;
-    static jBuffer_DX12* InstanceDescUploadBuffer;
+    static jBuffer* ScratchASBuffer;
+    static jBuffer* TopLevelASBuffer;
+    static jBuffer* InstanceUploadBuffer;
 	static jObject* Sphere;
 	static std::function<void(void* InCmdBuffer)> UpdateTopLevelAS;
-
-	static jBuffer_Vulkan* TLAS_Vulkan;
 
 
 	jGame();
