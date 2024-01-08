@@ -1969,7 +1969,7 @@ void jRenderer::Render()
                 CmdBufferDX12->CommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
                 CmdBufferDX12->CommandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::OutputViewSlot, FirstGPUDescriptorHandle);
-                CmdBufferDX12->CommandList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot, jGame::TopLevelASBuffer->GetGPUAddress());
+                CmdBufferDX12->CommandList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot, ((jBuffer_DX12*)jGame::TopLevelASBuffer)->GetGPUAddress());
                 CmdBufferDX12->CommandList->SetComputeRootConstantBufferView(GlobalRootSignatureParams::SceneConstantSlot, cbGpuAddress);
                 CmdBufferDX12->CommandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::SamplerState, FirstGPUSamplerDescriptorHandle);
                 CmdBufferDX12->CommandList->SetComputeRootConstantBufferView(GlobalRootSignatureParams::BindlessIndices, ((jUniformBufferBlock_DX12*)BindlessUniformBuffer.get())->GetGPUAddress());
@@ -2178,6 +2178,17 @@ void jRenderer::Render()
 
             auto BindlessUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(jNameStatic("jBindlessIndices"), jLifeTimeType::OneFrame, sizeof(bindlessIndices)));
             BindlessUniformBuffer->UpdateBufferData(&bindlessIndices, sizeof(bindlessIndices));
+
+            if (1)
+            {
+                SCOPE_CPU_PROFILE(UpdateTLAS);
+                SCOPE_GPU_PROFILE(RenderFrameContextPtr, UpdateTLAS);
+                DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "UpdateTLAS", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
+
+                auto CmdBuffer = RenderFrameContextPtr->GetActiveCommandBuffer();
+                auto CmdBufferVulkan = (jCommandBuffer_Vulkan*)CmdBuffer;
+                jGame::UpdateTopLevelAS(CmdBufferVulkan->GetRef());
+            }
 
             static constexpr uint32 MAX_BINDLESS_RESOURCES = 8192;
             static bool once = false;
@@ -2550,7 +2561,7 @@ void jRenderer::Render()
                     VkWriteDescriptorSetAccelerationStructureKHR writeDescriptorSetAccelerationStructureKHR{};
                     writeDescriptorSetAccelerationStructureKHR.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
                     writeDescriptorSetAccelerationStructureKHR.accelerationStructureCount = 1;
-                    writeDescriptorSetAccelerationStructureKHR.pAccelerationStructures = &jGame::TLAS_Vulkan->AccelerationStructure;
+                    writeDescriptorSetAccelerationStructureKHR.pAccelerationStructures = &((jBuffer_Vulkan*)jGame::TopLevelASBuffer)->AccelerationStructure;
 
                     VkWriteDescriptorSet accelerationStructureWrite{};
                     accelerationStructureWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
