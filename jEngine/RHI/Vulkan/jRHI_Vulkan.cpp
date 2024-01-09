@@ -31,6 +31,7 @@
 #include "jImGui_Vulkan.h"
 #include "Scene/Light/jLight.h"
 #include "../DX12/jShaderCompiler_DX12.h"
+#include "jRaytracingScene_Vulkan.h"
 
 jRHI_Vulkan* g_rhi_vk = nullptr;
 robin_hood::unordered_map<size_t, jShaderBindingLayout*> jRHI_Vulkan::ShaderBindingPool;
@@ -451,6 +452,8 @@ bool jRHI_Vulkan::InitRHI()
 		CubeMapInstanceDataForSixFace = g_rhi->CreateVertexBuffer(VertexStream_InstanceData);
 	}
 
+    RaytracingScene = CreateRaytracingScene();
+
 	return true;
 }
 
@@ -682,8 +685,8 @@ jTexture* jRHI_Vulkan::CreateTextureFromData(const jImageData* InImageData) cons
 		}
 	}
 
-    VkCommandBuffer commandBuffer = BeginSingleTimeCommands();
-	ensure(TransitionImageLayout(commandBuffer, TextureImage, vkTextureFormat, MipLevel, InImageData->LayerCount, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
+    auto commandBuffer = BeginSingleTimeCommands();
+	ensure(TransitionImageLayout(commandBuffer->GetRef(), TextureImage, vkTextureFormat, MipLevel, InImageData->LayerCount, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
 
 	if (InImageData->SubresourceFootprints.size() > 0)
 	{
@@ -691,24 +694,24 @@ jTexture* jRHI_Vulkan::CreateTextureFromData(const jImageData* InImageData) cons
 		{
 			const jImageSubResourceData SubResourceData = InImageData->SubresourceFootprints[i];
 			
-			jBufferUtil_Vulkan::CopyBufferToImage(commandBuffer, stagingBuffer.Buffer, stagingBuffer.Offset + SubResourceData.Offset, TextureImage
+			jBufferUtil_Vulkan::CopyBufferToImage(commandBuffer->GetRef(), stagingBuffer.Buffer, stagingBuffer.Offset + SubResourceData.Offset, TextureImage
 				, SubResourceData.Width, SubResourceData.Height, SubResourceData.MipLevel, SubResourceData.Depth);
 		}
 	}
 	else
 	{
-		jBufferUtil_Vulkan::CopyBufferToImage(commandBuffer, stagingBuffer.Buffer, stagingBuffer.Offset, TextureImage, (uint32)InImageData->Width, (uint32)InImageData->Height);
+		jBufferUtil_Vulkan::CopyBufferToImage(commandBuffer->GetRef(), stagingBuffer.Buffer, stagingBuffer.Offset, TextureImage, (uint32)InImageData->Width, (uint32)InImageData->Height);
 	}
 
 	// If it needs to generate miplevel do it here.
     if ((InImageData->MipLevel == 1) && (MipLevel > InImageData->MipLevel))
     {
-        jBufferUtil_Vulkan::GenerateMipmaps(commandBuffer, TextureImage, vkTextureFormat, InImageData->Width, InImageData->Height, MipLevel, InImageData->LayerCount
+        jBufferUtil_Vulkan::GenerateMipmaps(commandBuffer->GetRef(), TextureImage, vkTextureFormat, InImageData->Width, InImageData->Height, MipLevel, InImageData->LayerCount
             , VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
     else
     {
-        ensure(TransitionImageLayout(commandBuffer, TextureImage, vkTextureFormat, InImageData->MipLevel, InImageData->LayerCount
+        ensure(TransitionImageLayout(commandBuffer->GetRef(), TextureImage, vkTextureFormat, InImageData->MipLevel, InImageData->LayerCount
             , VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL));
     }
 
@@ -1335,6 +1338,7 @@ std::shared_ptr<jRenderFrameContext> jRHI_Vulkan::BeginRenderFrame()
 	Swapchain->Images[CurrentFrameIndex]->CommandBufferFence = (VkFence)commandBuffer->GetFenceHandle();
 
     auto renderFrameContextPtr = std::make_shared<jRenderFrameContext_Vulkan>(commandBuffer);
+	renderFrameContextPtr->RaytracingScene = g_rhi->RaytracingScene;
 	renderFrameContextPtr->UseForwardRenderer = !gOptions.UseDeferredRenderer;
 	renderFrameContextPtr->FrameIndex = CurrentFrameIndex;
 	renderFrameContextPtr->SceneRenderTargetPtr = std::make_shared<jSceneRenderTarget>();
@@ -1471,40 +1475,32 @@ void jRHI_Vulkan::QueueSubmit(const std::shared_ptr<jRenderFrameContext>& render
     }
 }
 
-VkCommandBuffer jRHI_Vulkan::BeginSingleTimeCommands() const
+jCommandBuffer_Vulkan* jRHI_Vulkan::BeginSingleTimeCommands() const
 {
-    VkCommandBufferAllocateInfo allocInfo = {};
-    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandPool = CommandBufferManager->GetPool();
-    allocInfo.commandBufferCount = 1;
-
-    VkCommandBuffer commandBuffer;
-    check(VK_SUCCESS == vkAllocateCommandBuffers(Device, &allocInfo, &commandBuffer));
-
-    VkCommandBufferBeginInfo beginInfo = {};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-	check(VK_SUCCESS == vkBeginCommandBuffer(commandBuffer, &beginInfo));
-    return commandBuffer;
+	return (jCommandBuffer_Vulkan*)CommandBufferManager->GetOrCreateCommandBuffer();
 }
 
-void jRHI_Vulkan::EndSingleTimeCommands(VkCommandBuffer commandBuffer) const
+void jRHI_Vulkan::EndSingleTimeCommands(jCommandBuffer* commandBuffer) const
 {
-    check(VK_SUCCESS == vkEndCommandBuffer(commandBuffer));
+	auto CommandBuffer_Vulkan = (jCommandBuffer_Vulkan*)commandBuffer;
+
+	CommandBuffer_Vulkan->End();
 
     VkSubmitInfo submitInfo = {};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffer;
+    submitInfo.pCommandBuffers = &CommandBuffer_Vulkan->GetRef();
 
-    check(VK_SUCCESS == vkQueueSubmit(GraphicsQueue.Queue, 1, &submitInfo, VK_NULL_HANDLE));
-	check(VK_SUCCESS == vkQueueWaitIdle(GraphicsQueue.Queue));
+    VkFence vkFence = (VkFence)CommandBuffer_Vulkan->GetFenceHandle();
+	vkResetFences(Device, 1, &vkFence);		// 세마포어와는 다르게 수동으로 펜스를 unsignaled 상태로 재설정 해줘야 함
 
-    // 명령 완료를 기다리기 위해서 2가지 방법이 있는데, Fence를 사용하는 방법(vkWaitForFences)과 Queue가 Idle이 될때(vkQueueWaitIdle)를 기다리는 방법이 있음.
-    // fence를 사용하는 방법이 여러개의 전송을 동시에 하고 마치는 것을 기다릴 수 있게 해주기 때문에 그것을 사용함.
-    vkFreeCommandBuffers(Device, CommandBufferManager->GetPool(), 1, &commandBuffer);
+	auto Result = vkQueueSubmit(GraphicsQueue.Queue, 1, &submitInfo, vkFence);
+	ensure(VK_SUCCESS == Result);
+
+	Result = vkQueueWaitIdle(GraphicsQueue.Queue);
+	ensure(VK_SUCCESS == Result);
+
+    CommandBufferManager->ReturnCommandBuffer(CommandBuffer_Vulkan);
 }
 
 bool jRHI_Vulkan::TransitionImageLayout(VkCommandBuffer commandBuffer, VkImage image, VkFormat format, uint32 mipLevels, uint32 layoutCount, VkImageLayout oldLayout, VkImageLayout newLayout) const
@@ -1766,7 +1762,7 @@ bool jRHI_Vulkan::TransitionImageLayout(jCommandBuffer* commandBuffer, jTexture*
 
 bool jRHI_Vulkan::TransitionImageLayoutImmediate(jTexture* texture, EImageLayout newLayout) const
 {
-    VkCommandBuffer commandBuffer = BeginSingleTimeCommands();
+    auto commandBuffer = BeginSingleTimeCommands();
     check(commandBuffer);
     
 	if (commandBuffer)
@@ -1774,7 +1770,7 @@ bool jRHI_Vulkan::TransitionImageLayoutImmediate(jTexture* texture, EImageLayout
 		check(texture);
 
 		auto texture_vk = (jTexture_Vulkan*)texture;
-		const bool ret = TransitionImageLayout(commandBuffer, texture_vk->Image, GetVulkanTextureFormat(texture_vk->Format)
+		const bool ret = TransitionImageLayout(commandBuffer->GetRef(), texture_vk->Image, GetVulkanTextureFormat(texture_vk->Format)
 			, texture_vk->MipLevel, 1, GetVulkanImageLayout(texture_vk->Layout), GetVulkanImageLayout(newLayout));
 		if (ret)
 			((jTexture_Vulkan*)texture)->Layout = newLayout;
@@ -1877,10 +1873,10 @@ jTexture* jRHI_Vulkan::CreateSampleVRSTexture()
         jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
             , imageSize, stagingBuffer);
 
-		VkCommandBuffer commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
-        ensure(g_rhi_vk->TransitionImageLayout(commandBuffer, (VkImage)NewVRSTexture->GetHandle(), GetVulkanTextureFormat(ETextureFormat::R8UI), 1, 1, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
+		auto commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
+        ensure(g_rhi_vk->TransitionImageLayout(commandBuffer->GetRef(), (VkImage)NewVRSTexture->GetHandle(), GetVulkanTextureFormat(ETextureFormat::R8UI), 1, 1, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
 
-        jBufferUtil_Vulkan::CopyBufferToImage(commandBuffer, stagingBuffer.Buffer, stagingBuffer.Offset, (VkImage)NewVRSTexture->GetHandle()
+        jBufferUtil_Vulkan::CopyBufferToImage(commandBuffer->GetRef(), stagingBuffer.Buffer, stagingBuffer.Offset, (VkImage)NewVRSTexture->GetHandle()
             , static_cast<uint32>(imageExtent.width), static_cast<uint32>(imageExtent.height));
 
         // Create a circular pattern with decreasing sampling rates outwards (max. range, pattern)
@@ -2001,5 +1997,10 @@ bool jRHI_Vulkan::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMini
     verify(Swapchain->CreateInternal(Swapchain->Swapchain));
 
     return true;
+}
+
+jRaytracingScene* jRHI_Vulkan::CreateRaytracingScene() const
+{
+	return new jRaytracingScene_Vulkan();
 }
 

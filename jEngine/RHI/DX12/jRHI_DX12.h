@@ -396,8 +396,8 @@ public:
 
 	virtual bool OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimized) override;
 
-    jCommandBuffer_DX12* BeginSingleTimeCommands() const;
-    void EndSingleTimeCommands(jCommandBuffer_DX12* commandBuffer) const;
+    virtual jCommandBuffer_DX12* BeginSingleTimeCommands() const override;
+    virtual void EndSingleTimeCommands(jCommandBuffer* commandBuffer) const override;
 
 	jCommandBuffer_DX12* BeginSingleTimeCopyCommands() const;
     void EndSingleTimeCopyCommands(jCommandBuffer_DX12* commandBuffer) const;
@@ -495,6 +495,8 @@ public:
 	jMutexLock MultiFrameShaderBindingInstanceLock;
 	jDeallocatorMultiFrameShaderBindingInstance DeallocatorMultiFrameShaderBindingInstance;
 	jDeallocatorMultiFrameUniformBufferBlock DeallocatorMultiFrameUniformBufferBlock;
+
+	virtual jRaytracingScene* CreateRaytracingScene() const;
 };
 
 extern jRHI_DX12* g_rhi_dx12;

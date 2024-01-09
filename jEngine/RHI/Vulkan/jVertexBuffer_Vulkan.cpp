@@ -237,3 +237,8 @@ bool jVertexBuffer_Vulkan::Initialize(const std::shared_ptr<jVertexStreamData>& 
     GetHash();		// GenerateHash
     return true;
 }
+
+bool jVertexBuffer_Vulkan::IsSupportRaytracing() const
+{
+    return GetVulkanTextureComponentCount(GetVulkanTextureFormat(BindInfos.AttributeDescriptions[0].format)) >= 3;
+}

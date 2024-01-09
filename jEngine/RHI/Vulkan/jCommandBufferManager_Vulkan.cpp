@@ -7,6 +7,8 @@
 //////////////////////////////////////////////////////////////////////////
 bool jCommandBuffer_Vulkan::Begin() const
 {
+    check(IsEnd);
+
     VkCommandBufferBeginInfo beginInfo = {};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
@@ -95,6 +97,7 @@ void jCommandBufferManager_Vulkan::ReleaseInternal()
 
 jCommandBuffer* jCommandBufferManager_Vulkan::GetOrCreateCommandBuffer()
 {
+    jCommandBuffer* SelectedCommandBuffer = nullptr;
     if (AvailableCommandBuffers.size() > 0)
     {
         for (int32 i = 0; i < (int32)AvailableCommandBuffers.size(); ++i)
@@ -107,34 +110,38 @@ jCommandBuffer* jCommandBufferManager_Vulkan::GetOrCreateCommandBuffer()
 
                 UsingCommandBuffers.push_back(commandBuffer);
                 commandBuffer->Reset();
-
-                return commandBuffer;
+                SelectedCommandBuffer = commandBuffer;
             }
         }
     }
 
-    VkCommandBufferAllocateInfo allocInfo = {};
-    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.commandPool = GetPool();
-
-    // VK_COMMAND_BUFFER_LEVEL_PRIMARY : 실행을 위해 Queue를 제출할 수 있으면 다른 커맨드버퍼로 부터 호출될 수 없다.
-    // VK_COMMAND_BUFFER_LEVEL_SECONDARY : 직접 제출할 수 없으며, Primary command buffer 로 부터 호출될 수 있다.
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandBufferCount = 1;
-
-    VkCommandBuffer vkCommandBuffer = nullptr;
-    if (!ensure(vkAllocateCommandBuffers(g_rhi_vk->Device, &allocInfo, &vkCommandBuffer) == VK_SUCCESS))
+    if (!SelectedCommandBuffer)
     {
-        return nullptr;
+        VkCommandBufferAllocateInfo allocInfo = {};
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.commandPool = GetPool();
+
+        // VK_COMMAND_BUFFER_LEVEL_PRIMARY : 실행을 위해 Queue를 제출할 수 있으면 다른 커맨드버퍼로 부터 호출될 수 없다.
+        // VK_COMMAND_BUFFER_LEVEL_SECONDARY : 직접 제출할 수 없으며, Primary command buffer 로 부터 호출될 수 있다.
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandBufferCount = 1;
+
+        VkCommandBuffer vkCommandBuffer = nullptr;
+        if (!ensure(vkAllocateCommandBuffers(g_rhi_vk->Device, &allocInfo, &vkCommandBuffer) == VK_SUCCESS))
+        {
+            return nullptr;
+        }
+
+        auto newCommandBuffer = new jCommandBuffer_Vulkan();
+        newCommandBuffer->GetRef() = vkCommandBuffer;
+        newCommandBuffer->SetFence(g_rhi_vk->FenceManager.GetOrCreateFence());
+
+        UsingCommandBuffers.push_back(newCommandBuffer);
+
+        SelectedCommandBuffer = newCommandBuffer;
     }
-
-    auto newCommandBuffer = new jCommandBuffer_Vulkan();
-    newCommandBuffer->GetRef() = vkCommandBuffer;
-    newCommandBuffer->SetFence(g_rhi_vk->FenceManager.GetOrCreateFence());
-
-    UsingCommandBuffers.push_back(newCommandBuffer);
-
-    return newCommandBuffer;
+    SelectedCommandBuffer->Begin();
+    return SelectedCommandBuffer;
 }
 
 void jCommandBufferManager_Vulkan::ReturnCommandBuffer(jCommandBuffer* commandBuffer)

@@ -449,8 +449,8 @@ void CopyBuffer(VkCommandBuffer commandBuffer, const jBuffer_Vulkan& srcBuffer, 
 
 void CopyBufferToImage(VkBuffer buffer, uint64 bufferOffset, VkImage image, uint32 width, uint32 height, int32 miplevel, int32 layerIndex)
 {
-    VkCommandBuffer commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
-    CopyBufferToImage(commandBuffer, buffer, bufferOffset, image, width, height, miplevel, layerIndex);
+    auto commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
+    CopyBufferToImage(commandBuffer->GetRef(), buffer, bufferOffset, image, width, height, miplevel, layerIndex);
     g_rhi_vk->EndSingleTimeCommands(commandBuffer);
 }
 
@@ -462,24 +462,24 @@ void GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int3
     //if (!ensure(formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT))
     //    return false;
 
-    VkCommandBuffer commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
-    GenerateMipmaps(commandBuffer, image, imageFormat, texWidth, texHeight, mipLevels, layerCount, oldLayout, newLayout);
+    auto commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
+    GenerateMipmaps(commandBuffer->GetRef(), image, imageFormat, texWidth, texHeight, mipLevels, layerCount, oldLayout, newLayout);
     g_rhi_vk->EndSingleTimeCommands(commandBuffer);
 }
 
 void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VkDeviceSize srcOffset, VkDeviceSize dstOffset)
 {
      // 임시 커맨드 버퍼를 통해서 메모리를 전송함.
-    VkCommandBuffer commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
-    CopyBuffer(commandBuffer, srcBuffer, dstBuffer, size, srcOffset, dstOffset);
+    auto commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
+    CopyBuffer(commandBuffer->GetRef(), srcBuffer, dstBuffer, size, srcOffset, dstOffset);
     g_rhi_vk->EndSingleTimeCommands(commandBuffer);
 }
 
 void CopyBuffer(const jBuffer_Vulkan& srcBuffer, const jBuffer_Vulkan& dstBuffer, VkDeviceSize size)
 {
     check(srcBuffer.AllocatedSize >= size && dstBuffer.AllocatedSize >= size);
-    VkCommandBuffer commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
-    CopyBuffer(commandBuffer, srcBuffer.Buffer, dstBuffer.Buffer, size, srcBuffer.Offset, dstBuffer.Offset);
+    auto commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
+    CopyBuffer(commandBuffer->GetRef(), srcBuffer.Buffer, dstBuffer.Buffer, size, srcBuffer.Offset, dstBuffer.Offset);
     g_rhi_vk->EndSingleTimeCommands(commandBuffer);
 }
 
