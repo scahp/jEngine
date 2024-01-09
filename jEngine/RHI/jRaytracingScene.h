@@ -1,0 +1,23 @@
+﻿#pragma once
+
+class jCommandBuffer;
+class jRenderObject;
+
+struct jRatracingInitializer
+{
+    std::vector<jRenderObject*> RenderObjects;
+    jCommandBuffer* CommandBuffer = nullptr;
+};
+
+class jRaytracingScene
+{
+public:
+    virtual void CreateOrUpdateBLAS(const jRatracingInitializer& InInitializer) = 0;
+    virtual void CreateOrUpdateTLAS(const jRatracingInitializer& InInitializer) = 0;
+
+    std::vector<jRenderObject*> InstanceList;
+    jBuffer* TLASBuffer = nullptr;
+    jBuffer* ScratchTLASBuffer = nullptr;
+    jBuffer* InstanceUploadBuffer = nullptr;
+};
+

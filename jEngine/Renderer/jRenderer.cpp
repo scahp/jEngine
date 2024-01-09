@@ -33,6 +33,7 @@
 #include "RHI/Vulkan/jBufferUtil_Vulkan.h"
 #include "RHI/Vulkan/jVertexBuffer_Vulkan.h"
 #include "RHI/Vulkan/jIndexBuffer_Vulkan.h"
+#include "RHI/jRaytracingScene.h"
 
 jTexture* jRenderer::m_raytracingOutput;
 ComPtr<ID3D12RootSignature> jRenderer::m_raytracingGlobalRootSignature;
@@ -1439,7 +1440,6 @@ void jRenderer::Render()
     {
         SCOPE_CPU_PROFILE(PoolReset);
         check(RenderFrameContextPtr->GetActiveCommandBuffer());
-        ensure(RenderFrameContextPtr->GetActiveCommandBuffer()->Begin());
         if (g_rhi->GetQueryTimePool())
         {
             g_rhi->GetQueryTimePool()->ResetQueryPool(RenderFrameContextPtr->GetActiveCommandBuffer());
@@ -1494,7 +1494,7 @@ void jRenderer::Render()
 
                 auto CmdBuffer = RenderFrameContextPtr->GetActiveCommandBuffer();
                 auto CmdBufferDX12 = (jCommandBuffer_DX12*)CmdBuffer;
-                jGame::UpdateTopLevelAS(CmdBufferDX12);
+                //jGame::UpdateTopLevelAS(CmdBufferDX12);
             }
 
             static bool once = false;
@@ -1968,8 +1968,9 @@ void jRenderer::Render()
                 D3D12_DISPATCH_RAYS_DESC dispatchDesc{};
                 CmdBufferDX12->CommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
+                check(RenderFrameContextPtr->RaytracingScene);
                 CmdBufferDX12->CommandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::OutputViewSlot, FirstGPUDescriptorHandle);
-                CmdBufferDX12->CommandList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot, ((jBuffer_DX12*)jGame::TopLevelASBuffer)->GetGPUAddress());
+                CmdBufferDX12->CommandList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot, ((jBuffer_DX12*)RenderFrameContextPtr->RaytracingScene->TLASBuffer)->GetGPUAddress());
                 CmdBufferDX12->CommandList->SetComputeRootConstantBufferView(GlobalRootSignatureParams::SceneConstantSlot, cbGpuAddress);
                 CmdBufferDX12->CommandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::SamplerState, FirstGPUSamplerDescriptorHandle);
                 CmdBufferDX12->CommandList->SetComputeRootConstantBufferView(GlobalRootSignatureParams::BindlessIndices, ((jUniformBufferBlock_DX12*)BindlessUniformBuffer.get())->GetGPUAddress());
@@ -2112,7 +2113,7 @@ void jRenderer::Render()
 
                 auto CmdBuffer = RenderFrameContextPtr->GetActiveCommandBuffer();
                 auto CmdBufferVulkan = (jCommandBuffer_Vulkan*)CmdBuffer;
-                jGame::UpdateTopLevelAS(CmdBufferVulkan->GetRef());
+                //jGame::UpdateTopLevelAS(CmdBufferVulkan->GetRef());
             }
 
             struct SceneConstantBuffer
@@ -2187,7 +2188,7 @@ void jRenderer::Render()
 
                 auto CmdBuffer = RenderFrameContextPtr->GetActiveCommandBuffer();
                 auto CmdBufferVulkan = (jCommandBuffer_Vulkan*)CmdBuffer;
-                jGame::UpdateTopLevelAS(CmdBufferVulkan->GetRef());
+                //jGame::UpdateTopLevelAS(CmdBufferVulkan->GetRef());
             }
 
             static constexpr uint32 MAX_BINDLESS_RESOURCES = 8192;
@@ -2561,7 +2562,7 @@ void jRenderer::Render()
                     VkWriteDescriptorSetAccelerationStructureKHR writeDescriptorSetAccelerationStructureKHR{};
                     writeDescriptorSetAccelerationStructureKHR.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
                     writeDescriptorSetAccelerationStructureKHR.accelerationStructureCount = 1;
-                    writeDescriptorSetAccelerationStructureKHR.pAccelerationStructures = &((jBuffer_Vulkan*)jGame::TopLevelASBuffer)->AccelerationStructure;
+                    writeDescriptorSetAccelerationStructureKHR.pAccelerationStructures = &((jBuffer_Vulkan*)RenderFrameContextPtr->RaytracingScene->TLASBuffer)->AccelerationStructure;
 
                     VkWriteDescriptorSet accelerationStructureWrite{};
                     accelerationStructureWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -3111,7 +3112,9 @@ void jRenderer::Render()
             ImGui::SliderFloat("DirY", &gOptions.SunDir.y, -1.0f, 1.0f);
             ImGui::SliderFloat("DirZ", &gOptions.SunDir.z, -1.0f, 1.0f);
             ImGui::SliderFloat("AnisoG", &gOptions.AnisoG, 0.0f, 1.0f);
+            ImGui::BeginDisabled(true);
             ImGui::Checkbox("EarthQuake with TLAS update", &gOptions.EarthQuake);
+            ImGui::EndDisabled();
             ImGui::End();
 
             //ImGui::SetWindowFocus(szTitle);

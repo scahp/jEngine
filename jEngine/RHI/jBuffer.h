@@ -13,6 +13,7 @@ struct jVertexBuffer
     virtual void Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const {}
     virtual int32 GetElementCount() const { return VertexStreamData ? VertexStreamData->ElementCount : 0; }
     virtual bool Initialize(const std::shared_ptr<jVertexStreamData>& InStreamData) { return false; }
+    virtual bool IsSupportRaytracing() const { return false; }
 };
 
 struct jIndexBuffer

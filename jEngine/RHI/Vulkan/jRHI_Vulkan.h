@@ -104,8 +104,8 @@ public:
 	mutable jMutexRWLock ShaderBindingPoolLock;
 	//////////////////////////////////////////////////////////////////////////
 
-    VkCommandBuffer BeginSingleTimeCommands() const;
-    void EndSingleTimeCommands(VkCommandBuffer commandBuffer) const;
+	virtual jCommandBuffer_Vulkan* BeginSingleTimeCommands() const override;
+	virtual void EndSingleTimeCommands(jCommandBuffer* commandBuffer) const override;
 
 	bool TransitionImageLayout(VkCommandBuffer commandBuffer, VkImage image, VkFormat format, uint32 mipLevels, uint32 layoutCount, VkImageLayout oldLayout, VkImageLayout newLayout) const;
 	virtual bool TransitionImageLayout(jCommandBuffer* commandBuffer, jTexture* texture, EImageLayout newLayout) const override;
@@ -237,6 +237,7 @@ public:
 	virtual void BeginDebugEvent(jCommandBuffer* InCommandBuffer, const char* InName, const Vector4& InColor = Vector4::ColorGreen) const override;
 	virtual void EndDebugEvent(jCommandBuffer* InCommandBuffer) const override;
 	virtual bool OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimized) override;
+	virtual jRaytracingScene* CreateRaytracingScene() const;
 };
 
 extern jRHI_Vulkan* g_rhi_vk;

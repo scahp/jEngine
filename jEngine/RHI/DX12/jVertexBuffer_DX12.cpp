@@ -221,3 +221,8 @@ void jVertexBuffer_DX12::Bind(jCommandBuffer_DX12* InCommandList) const
     InCommandList->CommandList->IASetPrimitiveTopology(GetTopology());
     InCommandList->CommandList->IASetVertexBuffers(BindInfos.StartBindingIndex, (uint32)VBView.size(), &VBView[0]);
 }
+
+bool jVertexBuffer_DX12::IsSupportRaytracing() const
+{
+    return GetDX12TextureComponentCount(GetDX12TextureFormat(BindInfos.InputElementDescs[0].Format)) >= 3;
+}

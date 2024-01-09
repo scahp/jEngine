@@ -156,6 +156,17 @@ void jRenderObject::BindBuffers(const std::shared_ptr<jRenderFrameContext>& InRe
         GeometryDataPtr->IndexBuffer->Bind(InRenderFrameContext);
 }
 
+bool jRenderObject::IsSupportRaytracing() const
+{
+    if (!GeometryDataPtr)
+        return false;
+
+    if (!GeometryDataPtr->VertexBuffer_PositionOnly)
+        return false;
+
+    return GeometryDataPtr->VertexBuffer_PositionOnly->IsSupportRaytracing();
+}
+
 void jRenderObject::UpdateWorldMatrix()
 {
     if (static_cast<int32>(DirtyFlags) & static_cast<int32>(EDirty::POS_ROT_SCALE))

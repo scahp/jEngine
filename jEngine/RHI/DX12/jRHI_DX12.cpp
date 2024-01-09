@@ -31,6 +31,7 @@
 #include "jQueryPoolTime_DX12.h"
 #include "jImGui_DX12.h"
 #include "jEngine.h"
+#include "jRaytracingScene_DX12.h"
 
 #define USE_INLINE_DESCRIPTOR 0												// InlineDescriptor 를 쓸것인지? DescriptorTable 를 쓸것인지 여부
 #define USE_ONE_FRAME_BUFFER_AND_DESCRIPTOR (USE_INLINE_DESCRIPTOR && 1)	// 현재 프레임에만 사용하고 버리는 임시 Descriptor 와 Buffer 를 사용할 것인지 여부
@@ -686,6 +687,8 @@ bool jRHI_DX12::InitRHI()
 
 	ShowWindow(m_hWnd, SW_SHOW);
 
+    RaytracingScene = CreateRaytracingScene();
+
     return true;
 }
 
@@ -819,11 +822,13 @@ jCommandBuffer_DX12* jRHI_DX12::BeginSingleTimeCommands() const
     return CommandBufferManager->GetOrCreateCommandBuffer();
 }
 
-void jRHI_DX12::EndSingleTimeCommands(jCommandBuffer_DX12* commandBuffer) const
+void jRHI_DX12::EndSingleTimeCommands(jCommandBuffer* commandBuffer) const
 {
+    auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)commandBuffer;
+
     check(CommandBufferManager);
-    CommandBufferManager->ExecuteCommandList(commandBuffer, true);
-    CommandBufferManager->ReturnCommandBuffer(commandBuffer);
+    CommandBufferManager->ExecuteCommandList(CommandBuffer_DX12, true);
+    CommandBufferManager->ReturnCommandBuffer(CommandBuffer_DX12);
 }
 
 jCommandBuffer_DX12* jRHI_DX12::BeginSingleTimeCopyCommands() const
@@ -1097,6 +1102,7 @@ std::shared_ptr<jRenderFrameContext> jRHI_DX12::BeginRenderFrame()
 	jCommandBuffer_DX12* commandBuffer = (jCommandBuffer_DX12*)CommandBufferManager->GetOrCreateCommandBuffer();
 
     auto renderFrameContextPtr = std::make_shared<jRenderFrameContext_DX12>(commandBuffer);
+    renderFrameContextPtr->RaytracingScene = g_rhi->RaytracingScene;
     renderFrameContextPtr->UseForwardRenderer = !gOptions.UseDeferredRenderer;
     renderFrameContextPtr->FrameIndex = CurrentFrameIndex;
     renderFrameContextPtr->SceneRenderTargetPtr = std::make_shared<jSceneRenderTarget>();
@@ -1495,6 +1501,11 @@ void jRHI_DX12::Flush() const
 void jRHI_DX12::Finish() const
 {
     WaitForGPU();
+}
+
+jRaytracingScene* jRHI_DX12::CreateRaytracingScene() const
+{
+    return new jRaytracingScene_DX12();
 }
 
 void jPlacedResourcePool::Init()

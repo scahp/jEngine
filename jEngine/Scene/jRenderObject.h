@@ -62,6 +62,7 @@ public:
 	virtual void BindBuffers(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, bool InPositionOnly, const jVertexBuffer* InOverrideInstanceData = nullptr) const;
 	const std::vector<float>& GetVertices() const;
 	FORCEINLINE bool HasInstancing() const { return GeometryDataPtr->HasInstancing(); }
+	virtual bool IsSupportRaytracing() const;
 
     void UpdateWorldMatrix();
     Matrix World;
@@ -69,7 +70,6 @@ public:
 	std::shared_ptr<jRenderObjectGeometryData> GeometryDataPtr;
 
     jBuffer* BottomLevelASBuffer = nullptr;
-    jBuffer* ScratchASBuffer = nullptr;
 	jBuffer* VertexAndIndexOffsetBuffer = nullptr;
 
 	FORCEINLINE void SetPos(const Vector& InPos) { Pos = InPos; SetDirtyFlags(EDirty::POS); }

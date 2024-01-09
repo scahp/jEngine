@@ -466,6 +466,15 @@
     <ClInclude Include="RHI\jRHIUtil.h">
       <Filter>Code\RHI</Filter>
     </ClInclude>
+    <ClInclude Include="RHI\jRaytracingScene.h">
+      <Filter>Code\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\jRaytracingScene_DX12.h">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Vulkan\jRaytracingScene_Vulkan.h">
+      <Filter>Code\RHI\Vulkan</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -806,6 +815,12 @@
     </ClCompile>
     <ClCompile Include="RHI\jShaderBindingLayout.cpp">
       <Filter>Code\RHI</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\jRaytracingScene_DX12.cpp">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\jRaytracingScene_Vulkan.cpp">
+      <Filter>Code\RHI\Vulkan</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

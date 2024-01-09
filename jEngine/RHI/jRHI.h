@@ -30,6 +30,7 @@ class jMemoryPool;
 class jFenceManager;
 class jSemaphoreManager;
 struct jImageData;
+class jRaytracingScene;
 
 enum class EUniformType
 {
@@ -492,6 +493,11 @@ public:
 	virtual void IncrementFrameNumber() {}
 	virtual bool IsSupportVSync() const { return false; }
 	virtual bool OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimized) { return false; }
+	virtual jRaytracingScene* CreateRaytracingScene() const { return nullptr; }
+	virtual jCommandBuffer* BeginSingleTimeCommands() const { return nullptr; }
+    virtual void EndSingleTimeCommands(jCommandBuffer* commandBuffer) const { }
+
+    jRaytracingScene* RaytracingScene = nullptr;
 };
 
 // Not thred safe
