@@ -1493,9 +1493,21 @@ void jRenderer::Render()
                 DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "UpdateTLAS", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
 
                 auto CmdBuffer = RenderFrameContextPtr->GetActiveCommandBuffer();
-                auto CmdBufferDX12 = (jCommandBuffer_DX12*)CmdBuffer;
-                //jGame::UpdateTopLevelAS(CmdBufferDX12);
+                jRatracingInitializer InInitializer;
+                InInitializer.CommandBuffer = CmdBuffer;
+                InInitializer.RenderObjects = jObject::GetStaticRenderObject();
+                g_rhi->RaytracingScene->CreateOrUpdateTLAS(InInitializer);
             }
+
+            auto CmdBuffer = RenderFrameContextPtr->GetActiveCommandBuffer();
+            auto CmdBufferDX12 = (jCommandBuffer_DX12*)CmdBuffer;
+
+            const jSamplerStateInfo_DX12* SamplerState = (jSamplerStateInfo_DX12*)TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+                , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT
+                , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
+            const jSamplerStateInfo_DX12* PBRSamplerStateInfoDX12 = (jSamplerStateInfo_DX12*)TSamplerStateInfo<ETextureFilter::NEAREST_MIPMAP_LINEAR, ETextureFilter::NEAREST_MIPMAP_LINEAR
+                , ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
+                , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
 
             static bool once = false;
             if (!once)
@@ -1530,6 +1542,142 @@ void jRenderer::Render()
                 const wchar_t* c_shadowAnyHitShaderName = L"ShadowMyAnyHitShader";
                 const wchar_t* c_shadowMissShaderName = L"ShadowMyMissShader";
                 const wchar_t* c_shadowTriHitGroupName = L"ShadowTriHitGroup";
+
+                struct SceneConstantBuffer
+                {
+                    XMMATRIX projectionToWorld;
+                    XMVECTOR cameraPosition;
+                    XMVECTOR lightDireciton;
+                };
+
+                SceneConstantBuffer m_sceneCB;
+
+                auto GetScreenAspect = []()
+                    {
+                        return static_cast<float>(SCR_WIDTH) / static_cast<float>(SCR_HEIGHT);
+                    };
+
+                auto mainCamera = jCamera::GetMainCamera();
+
+                auto v = jCameraUtil::CreateViewMatrix({ 0, 0, -1000 }, { 300, 0, 0 }, { 0, 1, 0 });
+                auto p = jCameraUtil::CreatePerspectiveMatrix((float)SCR_WIDTH, (float)SCR_HEIGHT, XMConvertToRadians(45), 1.0f, 1250.0f);
+
+                XMVECTOR m_eye = { mainCamera->Pos.x, mainCamera->Pos.y, mainCamera->Pos.z, 1.0f };
+                XMVECTOR m_at = { mainCamera->Target.x, mainCamera->Target.y, mainCamera->Target.z, 1.0f };
+                XMVECTOR m_up = { 0.0f, 1.0f, 0.0f };
+
+                m_sceneCB.cameraPosition = m_eye;
+                const float fovAngleY = 45.0f;
+                const float m_aspectRatio = GetScreenAspect();
+                const XMMATRIX view = XMMatrixLookAtLH(m_eye, m_at, m_up);
+                const XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(fovAngleY), m_aspectRatio, 1.0f, 1250.0f);
+                const XMMATRIX viewProj = view * proj;
+                m_sceneCB.projectionToWorld = XMMatrixTranspose(XMMatrixInverse(nullptr, viewProj));
+
+                jDirectionalLight* DirectionalLight = nullptr;
+                for (auto light : jLight::GetLights())
+                {
+                    if (light->Type == ELightType::DIRECTIONAL)
+                    {
+                        DirectionalLight = (jDirectionalLight*)light;
+                        break;
+                    }
+                }
+                check(DirectionalLight);
+                m_sceneCB.lightDireciton = { DirectionalLight->GetLightData().Direction.x, DirectionalLight->GetLightData().Direction.y, DirectionalLight->GetLightData().Direction.z };
+
+                static auto SceneBuffer = jBufferUtil_DX12::CreateBuffer(sizeof(m_sceneCB), 0, EBufferCreateFlag::UAV, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, &m_sceneCB, sizeof(m_sceneCB));
+                static auto TempBuffer = jBufferUtil_DX12::CreateBuffer(sizeof(m_sceneCB), 0, EBufferCreateFlag::CPUAccess, D3D12_RESOURCE_STATE_COMMON, &m_sceneCB, sizeof(m_sceneCB));
+                TempBuffer->UpdateBuffer(&m_sceneCB, sizeof(m_sceneCB));
+                jBufferUtil_DX12::CopyBuffer(CmdBufferDX12->CommandList.Get(), TempBuffer->Buffer.Get(), SceneBuffer->Buffer.Get(), sizeof(m_sceneCB), 0, 0);
+                auto temp = CD3DX12_RESOURCE_BARRIER::Transition(SceneBuffer->Buffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+                CmdBufferDX12->CommandList->ResourceBarrier(1, &temp);
+                //auto cbGpuAddress = SceneBuffer->GetGPUAddress();
+
+                struct jBindlessIndices
+                {
+                    uint32 IrradianceMap = 0;
+                    uint32 PrefilteredEnvMap = 0;
+                    uint32 VertexIndexOffset = 0;
+                    uint32 Index = 0;
+                    uint32 RenderObj = 0;
+                    uint32 Vertices = 0;
+                    uint32 AlbedoTexture = 0;
+                    uint32 NormalTexture = 0;
+                    uint32 RMTexture = 0;
+                };
+                jBindlessIndices bindlessIndices;
+
+                // Create jBindlessIndices UniformBuffer(ConstantBuffer)
+                auto BindlessUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(jNameStatic("jBindlessIndices"), jLifeTimeType::OneFrame, sizeof(bindlessIndices)));
+                BindlessUniformBuffer->UpdateBufferData(&bindlessIndices, sizeof(bindlessIndices));
+
+                jShaderBindingArray ShaderBindingArray;
+                jShaderBindingResourceInlineAllocator ResourceInlineAllactor;                
+                ShaderBindingArray.Add(jShaderBinding(0, 1, EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
+                    ResourceInlineAllactor.Alloc<jBufferResource>(RenderFrameContextPtr->RaytracingScene->TLASBuffer), true));
+                ShaderBindingArray.Add(jShaderBinding(1, 1, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::ALL_RAYTRACING,
+                    ResourceInlineAllactor.Alloc<jTextureResource>(m_raytracingOutput), false));
+                ShaderBindingArray.Add(jShaderBinding(2, 1, EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
+                    ResourceInlineAllactor.Alloc<jBufferResource>(SceneBuffer), true));
+                ShaderBindingArray.Add(jShaderBinding(3, 1, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_RAYTRACING,
+                    ResourceInlineAllactor.Alloc<jBufferResource>(BindlessUniformBuffer), false));
+                ShaderBindingArray.Add(jShaderBinding(4, 1, EShaderBindingType::SAMPLER, EShaderAccessStageFlag::ALL_RAYTRACING,
+                    ResourceInlineAllactor.Alloc<jSamplerResource>(SamplerState), false));
+                ShaderBindingArray.Add(jShaderBinding(5, 1, EShaderBindingType::SAMPLER, EShaderAccessStageFlag::ALL_RAYTRACING,
+                    ResourceInlineAllactor.Alloc<jSamplerResource>(PBRSamplerStateInfoDX12), false));
+
+                //TextureCube<float4> IrradianceMapArray[] : register(t0, space1);
+                //TextureCube<float4> PrefilteredEnvMapArray[] : register(t0, space2);
+                //StructuredBuffer<uint2> VertexIndexOffsetArray[] : register(t0, space3);
+                //StructuredBuffer<uint> IndexBindlessArray[] : register(t0, space4);
+                //StructuredBuffer<RenderObjectUniformBuffer> RenderObjParamArray[] : register(t0, space5);
+                //ByteAddressBuffer VerticesBindlessArray[] : register(t0, space6);
+                //Texture2D AlbedoTextureArray[] : register(t0, space7);
+                //Texture2D NormalTextureArray[] : register(t0, space8);
+                //Texture2D RMTextureArray[] : register(t0, space9);
+
+                // Bindless
+                jShaderBindingArray BindlessShaderBindingArray[9];
+                BindlessShaderBindingArray[0].Add(jShaderBinding(0, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
+                    ResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::IrradianceMap2), false));
+                BindlessShaderBindingArray[1].Add(jShaderBinding(0, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
+                    ResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::FilteredEnvMap2), false));
+
+                std::vector<const jBuffer*> VertexAndInexOffsetBuffers;
+                std::vector<const jBuffer*> IndexBuffers;
+                std::vector<const jBuffer*> TestUniformBuffers;
+                std::vector<const jBuffer*> VertexBuffers;
+                std::vector<const jTextureResourceBindless::jTextureBindData> AlbedoTextures;
+                std::vector<const jTextureResourceBindless::jTextureBindData> NormalTextures;
+                std::vector<const jTextureResourceBindless::jTextureBindData> MetallicTextures;
+
+                for (int32 i = 0; i < jObject::GetStaticRenderObject().size(); ++i)
+                {
+                    jRenderObject* RObj = jObject::GetStaticRenderObject()[i];
+
+                    VertexAndInexOffsetBuffers.push_back(RObj->VertexAndIndexOffsetBuffer);
+                    IndexBuffers.push_back(RObj->GeometryDataPtr->IndexBuffer->GetBuffer());
+                    TestUniformBuffers.push_back(RObj->TestUniformBuffer.get());
+                    VertexBuffers.push_back(RObj->GeometryDataPtr->VertexBuffer->GetBuffer(0));
+                    AlbedoTextures.push_back(jTextureResourceBindless::jTextureBindData(RObj->MaterialPtr->GetTexture<jTexture_DX12>(jMaterial::EMaterialTextureType::Albedo), nullptr));
+                    NormalTextures.push_back(jTextureResourceBindless::jTextureBindData(RObj->MaterialPtr->GetTexture<jTexture_DX12>(jMaterial::EMaterialTextureType::Normal), nullptr));
+                    MetallicTextures.push_back(jTextureResourceBindless::jTextureBindData(RObj->MaterialPtr->GetTexture<jTexture_DX12>(jMaterial::EMaterialTextureType::Metallic), nullptr));
+                }
+                BindlessShaderBindingArray[2].Add(jShaderBinding(0, 1, EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
+                    ResourceInlineAllactor.Alloc<jBufferResource>(RObj->VertexAndIndexOffsetBuffer), false));
+                BindlessShaderBindingArray[3].Add(jShaderBinding(0, 1, EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
+                    ResourceInlineAllactor.Alloc<jBufferResource>(RObj->GeometryDataPtr->IndexBuffer), false));
+                BindlessShaderBindingArray[4].Add(jShaderBinding(0, 1, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_RAYTRACING,
+                    ResourceInlineAllactor.Alloc<jBufferResource>(RObj->TestUniformBuffer.get()), false));
+                BindlessShaderBindingArray[5].Add(jShaderBinding(0, 1, EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
+                    ResourceInlineAllactor.Alloc<jBufferResource>(RObj->GeometryDataPtr->VertexBuffer), false));
+                BindlessShaderBindingArray[6].Add(jShaderBinding(0, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
+                    ResourceInlineAllactor.Alloc<jTextureResource>(RObj->MaterialPtr->GetTexture<jTexture_DX12>(jMaterial::EMaterialTextureType::Albedo)), false));
+                BindlessShaderBindingArray[7].Add(jShaderBinding(0, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
+                    ResourceInlineAllactor.Alloc<jTextureResource>(RObj->MaterialPtr->GetTexture<jTexture_DX12>(jMaterial::EMaterialTextureType::Normal)), false));
+                BindlessShaderBindingArray[8].Add(jShaderBinding(0, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
+                    ResourceInlineAllactor.Alloc<jTextureResource>(RObj->MaterialPtr->GetTexture<jTexture_DX12>(jMaterial::EMaterialTextureType::Metallic)), false));
 
                 // 9. CreateRootSignatures
                 {
@@ -1698,7 +1846,6 @@ void jRenderer::Render()
                 if (JFAIL(m_dxrStateObject.As(&stateObjectProperties)))
                     return;
 
-
                 void* rayGenShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_raygenShaderName);
                 void* misssShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_missShaderName);
                 void* triHitGroupShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_triHitGroupName);
@@ -1736,76 +1883,8 @@ void jRenderer::Render()
                 }
             }
 
-            auto CmdBuffer = RenderFrameContextPtr->GetActiveCommandBuffer();
-            auto CmdBufferDX12 = (jCommandBuffer_DX12*)CmdBuffer;
-
             if (CmdBufferDX12)
             {
-                struct SceneConstantBuffer
-                {
-                    XMMATRIX projectionToWorld;
-                    XMVECTOR cameraPosition;
-                    XMVECTOR lightDireciton;
-                };
-
-                SceneConstantBuffer m_sceneCB;
-
-                auto GetScreenAspect = []()
-                    {
-                        return static_cast<float>(SCR_WIDTH) / static_cast<float>(SCR_HEIGHT);
-                    };
-
-                auto mainCamera = jCamera::GetMainCamera();
-
-                auto v = jCameraUtil::CreateViewMatrix({ 0, 0, -1000 }, { 300, 0, 0 }, { 0, 1, 0 });
-                auto p = jCameraUtil::CreatePerspectiveMatrix((float)SCR_WIDTH, (float)SCR_HEIGHT, XMConvertToRadians(45), 1.0f, 1250.0f);
-
-                XMVECTOR m_eye = { mainCamera->Pos.x, mainCamera->Pos.y, mainCamera->Pos.z, 1.0f };
-                XMVECTOR m_at = { mainCamera->Target.x, mainCamera->Target.y, mainCamera->Target.z, 1.0f };
-                XMVECTOR m_up = { 0.0f, 1.0f, 0.0f };
-
-                m_sceneCB.cameraPosition = m_eye;
-                const float fovAngleY = 45.0f;
-                const float m_aspectRatio = GetScreenAspect();
-                const XMMATRIX view = XMMatrixLookAtLH(m_eye, m_at, m_up);
-                const XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(fovAngleY), m_aspectRatio, 1.0f, 1250.0f);
-                const XMMATRIX viewProj = view * proj;
-                m_sceneCB.projectionToWorld = XMMatrixTranspose(XMMatrixInverse(nullptr, viewProj));
-
-                jDirectionalLight* DirectionalLight = nullptr;
-                for (auto light : jLight::GetLights())
-                {
-                    if (light->Type == ELightType::DIRECTIONAL)
-                    {
-                        DirectionalLight = (jDirectionalLight*)light;
-                        break;
-                    }
-                }
-                check(DirectionalLight);
-                m_sceneCB.lightDireciton = { DirectionalLight->GetLightData().Direction.x, DirectionalLight->GetLightData().Direction.y, DirectionalLight->GetLightData().Direction.z };
-
-                static auto SceneBuffer = jBufferUtil_DX12::CreateBuffer(sizeof(m_sceneCB), 0, EBufferCreateFlag::UAV, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, &m_sceneCB, sizeof(m_sceneCB));
-                static auto TempBuffer = jBufferUtil_DX12::CreateBuffer(sizeof(m_sceneCB), 0, EBufferCreateFlag::CPUAccess, D3D12_RESOURCE_STATE_COMMON, &m_sceneCB, sizeof(m_sceneCB));
-                TempBuffer->UpdateBuffer(&m_sceneCB, sizeof(m_sceneCB));
-                jBufferUtil_DX12::CopyBuffer(CmdBufferDX12->CommandList.Get(), TempBuffer->Buffer.Get(), SceneBuffer->Buffer.Get(), sizeof(m_sceneCB), 0, 0);
-                auto temp = CD3DX12_RESOURCE_BARRIER::Transition(SceneBuffer->Buffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
-                CmdBufferDX12->CommandList->ResourceBarrier(1, &temp);
-                auto cbGpuAddress = SceneBuffer->GetGPUAddress();
-
-                struct jBindlessIndices
-                {
-                    uint32 IrradianceMap = 0;
-                    uint32 PrefilteredEnvMap = 0;
-                    uint32 VertexIndexOffset = 0;
-                    uint32 Index = 0;
-                    uint32 RenderObj = 0;
-                    uint32 Vertices = 0;
-                    uint32 AlbedoTexture = 0;
-                    uint32 NormalTexture = 0;
-                    uint32 RMTexture = 0;
-                };
-                jBindlessIndices bindlessIndices;
-
                 // 현재 디스크립터에 복사해야 함.
                 ID3D12DescriptorHeap* ppHeaps[] =
                 {
@@ -1927,18 +2006,7 @@ void jRenderer::Render()
                         , (uint32)SrcDescriptor.NumOfData, &SrcDescriptor[0], nullptr, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
                 }
 
-                // Create jBindlessIndices UniformBuffer(ConstantBuffer)
-                auto BindlessUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(jNameStatic("jBindlessIndices"), jLifeTimeType::OneFrame, sizeof(bindlessIndices)));
-                BindlessUniformBuffer->UpdateBufferData(&bindlessIndices, sizeof(bindlessIndices));
-
-                const jSamplerStateInfo_DX12* SamplerState = (jSamplerStateInfo_DX12*)TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
-                    , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT
-                    , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
                 SamplerDescriptors.push_back(SamplerState->SamplerSRV);
-
-                const jSamplerStateInfo_DX12* PBRSamplerStateInfoDX12 = (jSamplerStateInfo_DX12*)TSamplerStateInfo<ETextureFilter::NEAREST_MIPMAP_LINEAR, ETextureFilter::NEAREST_MIPMAP_LINEAR
-                    , ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
-                    , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
                 SamplerDescriptors.push_back(PBRSamplerStateInfoDX12->SamplerSRV);
                 if (SamplerDescriptors.size() > 0)
                 {
@@ -1994,98 +2062,6 @@ void jRenderer::Render()
 
                 CmdBufferDX12->CommandList->DispatchRays(&dispatchDesc);
             }
-
-            if (1)
-            {
-                static jFullscreenQuadPrimitive* GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
-
-                //auto BackBuffer = g_rhi_dx12->GetSwapchainImage(g_rhi_dx12->CurrentFrameIndex)->TexturePtr;
-                //auto BackBufferRT = std::make_shared<jRenderTarget>(BackBuffer);
-                auto RT = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr;
-
-                g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RT->TexturePtr.get(), EImageLayout::COLOR_ATTACHMENT);
-                g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), m_raytracingOutput, EImageLayout::SHADER_READ_ONLY);
-
-                jRasterizationStateInfo* RasterizationState = nullptr;
-                switch (g_rhi->GetSelectedMSAASamples())
-                {
-                case EMSAASamples::COUNT_1:
-                    RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)1, true, 0.2f, false, false>::Create();
-                    break;
-                case EMSAASamples::COUNT_2:
-                    RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)2, true, 0.2f, false, false>::Create();
-                    break;
-                case EMSAASamples::COUNT_4:
-                    RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)4, true, 0.2f, false, false>::Create();
-                    break;
-                case EMSAASamples::COUNT_8:
-                    RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)8, true, 0.2f, false, false>::Create();
-                    break;
-                default:
-                    check(0);
-                    break;
-                }
-                auto DepthStencilState = TDepthStencilStateInfo<false, false, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
-                auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ONE, EBlendOp::ADD, EBlendFactor::ZERO, EBlendFactor::ONE, EBlendOp::ADD, EColorMask::ALL>::Create();
-
-                // Create fixed pipeline states
-                jPipelineStateFixedInfo PostProcessPassPipelineStateFixed(RasterizationState, DepthStencilState, BlendingState
-                    , jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT), gOptions.UseVRS);
-
-                const jRTClearValue ClearColor = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f);
-                const jRTClearValue ClearDepth = jRTClearValue(1.0f, 0);
-
-                jRenderPassInfo renderPassInfo;
-                jAttachment color = jAttachment(RT, EAttachmentLoadStoreOp::LOAD_STORE
-                    , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
-                renderPassInfo.Attachments.push_back(color);
-
-                jSubpass subpass;
-                subpass.Initialize(0, 1, EPipelineStageMask::COLOR_ATTACHMENT_OUTPUT_BIT, EPipelineStageMask::FRAGMENT_SHADER_BIT);
-                subpass.OutputColorAttachments.push_back(0);
-                renderPassInfo.Subpasses.push_back(subpass);
-
-                auto RenderPass = g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
-
-                int32 BindingPoint = 0;
-                jShaderBindingArray ShaderBindingArray;
-                jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
-
-                const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
-                    , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
-                    , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
-
-                ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
-                    , ResourceInlineAllactor.Alloc<jTextureResource>(m_raytracingOutput, SamplerState));
-
-                std::shared_ptr<jShaderBindingInstance> ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
-                jShaderBindingInstanceArray ShaderBindingInstanceArray;
-                ShaderBindingInstanceArray.Add(ShaderBindingInstance.get());
-
-                jGraphicsPipelineShader Shader;
-                {
-                    jShaderInfo shaderInfo;
-                    shaderInfo.SetName(jNameStatic("CopyVS"));
-                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/fullscreenquad_vs.hlsl"));
-                    shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
-                    Shader.VertexShader = g_rhi->CreateShader(shaderInfo);
-
-                    shaderInfo.SetName(jNameStatic("CopyPS"));
-                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/copy_ps.hlsl"));
-                    shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
-                    Shader.PixelShader = g_rhi->CreateShader(shaderInfo);
-                }
-
-                jDrawCommand DrawCommand(RenderFrameContextPtr, GlobalFullscreenPrimitive->RenderObjects[0], RenderPass
-                    , Shader, &PostProcessPassPipelineStateFixed, GlobalFullscreenPrimitive->RenderObjects[0]->MaterialPtr.get(), ShaderBindingInstanceArray, nullptr);
-                DrawCommand.Test = true;
-                DrawCommand.PrepareToDraw(false);
-                if (RenderPass->BeginRenderPass(CmdBufferDX12))
-                {
-                    DrawCommand.Draw();
-                    RenderPass->EndRenderPass();
-                }
-            }
         }
         else if (IsUseVulkan())
         {
@@ -2105,15 +2081,16 @@ void jRenderer::Render()
             static VkStridedDeviceAddressRegionKHR MissStridedDeviceAddressRegion{};
             static VkStridedDeviceAddressRegionKHR HitStridedDeviceAddressRegion{};
 
-            if (0)
             {
                 SCOPE_CPU_PROFILE(UpdateTLAS);
                 SCOPE_GPU_PROFILE(RenderFrameContextPtr, UpdateTLAS);
                 DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "UpdateTLAS", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
 
                 auto CmdBuffer = RenderFrameContextPtr->GetActiveCommandBuffer();
-                auto CmdBufferVulkan = (jCommandBuffer_Vulkan*)CmdBuffer;
-                //jGame::UpdateTopLevelAS(CmdBufferVulkan->GetRef());
+                jRatracingInitializer InInitializer;
+                InInitializer.CommandBuffer = CmdBuffer;
+                InInitializer.RenderObjects = jObject::GetStaticRenderObject();
+                g_rhi->RaytracingScene->CreateOrUpdateTLAS(InInitializer);
             }
 
             struct SceneConstantBuffer
@@ -2179,17 +2156,6 @@ void jRenderer::Render()
 
             auto BindlessUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(jNameStatic("jBindlessIndices"), jLifeTimeType::OneFrame, sizeof(bindlessIndices)));
             BindlessUniformBuffer->UpdateBufferData(&bindlessIndices, sizeof(bindlessIndices));
-
-            if (1)
-            {
-                SCOPE_CPU_PROFILE(UpdateTLAS);
-                SCOPE_GPU_PROFILE(RenderFrameContextPtr, UpdateTLAS);
-                DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "UpdateTLAS", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
-
-                auto CmdBuffer = RenderFrameContextPtr->GetActiveCommandBuffer();
-                auto CmdBufferVulkan = (jCommandBuffer_Vulkan*)CmdBuffer;
-                //jGame::UpdateTopLevelAS(CmdBufferVulkan->GetRef());
-            }
 
             static constexpr uint32 MAX_BINDLESS_RESOURCES = 8192;
             static bool once = false;
@@ -2840,97 +2806,97 @@ void jRenderer::Render()
                 1);
 
             g_rhi_vk->TransitionImageLayout(CmdBufferVk, m_raytracingOutputVk, EImageLayout::SHADER_READ_ONLY);
+        }
 
-            if (1)
+        if (1)
+        {
+            static jFullscreenQuadPrimitive* GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
+
+            //auto BackBuffer = g_rhi_dx12->GetSwapchainImage(g_rhi_dx12->CurrentFrameIndex)->TexturePtr;
+            //auto BackBufferRT = std::make_shared<jRenderTarget>(BackBuffer);
+            auto RT = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr;
+
+            g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RT->TexturePtr.get(), EImageLayout::COLOR_ATTACHMENT);
+            g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), m_raytracingOutput, EImageLayout::SHADER_READ_ONLY);
+
+            jRasterizationStateInfo* RasterizationState = nullptr;
+            switch (g_rhi->GetSelectedMSAASamples())
             {
-                static jFullscreenQuadPrimitive* GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
+            case EMSAASamples::COUNT_1:
+                RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)1, true, 0.2f, false, false>::Create();
+                break;
+            case EMSAASamples::COUNT_2:
+                RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)2, true, 0.2f, false, false>::Create();
+                break;
+            case EMSAASamples::COUNT_4:
+                RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)4, true, 0.2f, false, false>::Create();
+                break;
+            case EMSAASamples::COUNT_8:
+                RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)8, true, 0.2f, false, false>::Create();
+                break;
+            default:
+                check(0);
+                break;
+            }
+            auto DepthStencilState = TDepthStencilStateInfo<false, false, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
+            auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ONE, EBlendOp::ADD, EBlendFactor::ZERO, EBlendFactor::ONE, EBlendOp::ADD, EColorMask::ALL>::Create();
 
-                //auto BackBuffer = g_rhi_dx12->GetSwapchainImage(g_rhi_dx12->CurrentFrameIndex)->TexturePtr;
-                //auto BackBufferRT = std::make_shared<jRenderTarget>(BackBuffer);
-                auto RT = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr;
+            // Create fixed pipeline states
+            jPipelineStateFixedInfo PostProcessPassPipelineStateFixed(RasterizationState, DepthStencilState, BlendingState
+                , jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT), gOptions.UseVRS);
 
-                g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RT->TexturePtr.get(), EImageLayout::COLOR_ATTACHMENT);
-                g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), m_raytracingOutputVk, EImageLayout::SHADER_READ_ONLY);
+            const jRTClearValue ClearColor = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f);
+            const jRTClearValue ClearDepth = jRTClearValue(1.0f, 0);
 
-                jRasterizationStateInfo* RasterizationState = nullptr;
-                switch (g_rhi->GetSelectedMSAASamples())
-                {
-                case EMSAASamples::COUNT_1:
-                    RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)1, true, 0.2f, false, false>::Create();
-                    break;
-                case EMSAASamples::COUNT_2:
-                    RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)2, true, 0.2f, false, false>::Create();
-                    break;
-                case EMSAASamples::COUNT_4:
-                    RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)4, true, 0.2f, false, false>::Create();
-                    break;
-                case EMSAASamples::COUNT_8:
-                    RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)8, true, 0.2f, false, false>::Create();
-                    break;
-                default:
-                    check(0);
-                    break;
-                }
-                auto DepthStencilState = TDepthStencilStateInfo<false, false, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
-                auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ONE, EBlendOp::ADD, EBlendFactor::ZERO, EBlendFactor::ONE, EBlendOp::ADD, EColorMask::ALL>::Create();
+            jRenderPassInfo renderPassInfo;
+            jAttachment color = jAttachment(RT, EAttachmentLoadStoreOp::LOAD_STORE
+                , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
+            renderPassInfo.Attachments.push_back(color);
 
-                // Create fixed pipeline states
-                jPipelineStateFixedInfo PostProcessPassPipelineStateFixed(RasterizationState, DepthStencilState, BlendingState
-                    , jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT), gOptions.UseVRS);
+            jSubpass subpass;
+            subpass.Initialize(0, 1, EPipelineStageMask::COLOR_ATTACHMENT_OUTPUT_BIT, EPipelineStageMask::FRAGMENT_SHADER_BIT);
+            subpass.OutputColorAttachments.push_back(0);
+            renderPassInfo.Subpasses.push_back(subpass);
 
-                const jRTClearValue ClearColor = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f);
-                const jRTClearValue ClearDepth = jRTClearValue(1.0f, 0);
+            auto RenderPass = g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
 
-                jRenderPassInfo renderPassInfo;
-                jAttachment color = jAttachment(RT, EAttachmentLoadStoreOp::LOAD_STORE
-                    , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
-                renderPassInfo.Attachments.push_back(color);
+            int32 BindingPoint = 0;
+            jShaderBindingArray ShaderBindingArray;
+            jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
 
-                jSubpass subpass;
-                subpass.Initialize(0, 1, EPipelineStageMask::COLOR_ATTACHMENT_OUTPUT_BIT, EPipelineStageMask::FRAGMENT_SHADER_BIT);
-                subpass.OutputColorAttachments.push_back(0);
-                renderPassInfo.Subpasses.push_back(subpass);
+            const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+                , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
+                , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
 
-                auto RenderPass = g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
+            ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
+                , ResourceInlineAllactor.Alloc<jTextureResource>(m_raytracingOutput, SamplerState));
 
-                int32 BindingPoint = 0;
-                jShaderBindingArray ShaderBindingArray;
-                jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
+            std::shared_ptr<jShaderBindingInstance> ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
+            jShaderBindingInstanceArray ShaderBindingInstanceArray;
+            ShaderBindingInstanceArray.Add(ShaderBindingInstance.get());
 
-                const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
-                    , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
-                    , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
+            jGraphicsPipelineShader Shader;
+            {
+                jShaderInfo shaderInfo;
+                shaderInfo.SetName(jNameStatic("CopyVS"));
+                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/fullscreenquad_vs.hlsl"));
+                shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
+                Shader.VertexShader = g_rhi->CreateShader(shaderInfo);
 
-                ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
-                    , ResourceInlineAllactor.Alloc<jTextureResource>(m_raytracingOutputVk, SamplerState));
+                shaderInfo.SetName(jNameStatic("CopyPS"));
+                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/copy_ps.hlsl"));
+                shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
+                Shader.PixelShader = g_rhi->CreateShader(shaderInfo);
+            }
 
-                std::shared_ptr<jShaderBindingInstance> ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
-                jShaderBindingInstanceArray ShaderBindingInstanceArray;
-                ShaderBindingInstanceArray.Add(ShaderBindingInstance.get());
-
-                jGraphicsPipelineShader Shader;
-                {
-                    jShaderInfo shaderInfo;
-                    shaderInfo.SetName(jNameStatic("CopyVS"));
-                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/fullscreenquad_vs.hlsl"));
-                    shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
-                    Shader.VertexShader = g_rhi->CreateShader(shaderInfo);
-
-                    shaderInfo.SetName(jNameStatic("CopyPS"));
-                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/copy_ps.hlsl"));
-                    shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
-                    Shader.PixelShader = g_rhi->CreateShader(shaderInfo);
-                }
-
-                jDrawCommand DrawCommand(RenderFrameContextPtr, GlobalFullscreenPrimitive->RenderObjects[0], RenderPass
-                    , Shader, &PostProcessPassPipelineStateFixed, GlobalFullscreenPrimitive->RenderObjects[0]->MaterialPtr.get(), ShaderBindingInstanceArray, nullptr);
-                DrawCommand.Test = true;
-                DrawCommand.PrepareToDraw(false);
-                if (RenderPass->BeginRenderPass(CmdBufferVk))
-                {
-                    DrawCommand.Draw();
-                    RenderPass->EndRenderPass();
-                }
+            jDrawCommand DrawCommand(RenderFrameContextPtr, GlobalFullscreenPrimitive->RenderObjects[0], RenderPass
+                , Shader, &PostProcessPassPipelineStateFixed, GlobalFullscreenPrimitive->RenderObjects[0]->MaterialPtr.get(), ShaderBindingInstanceArray, nullptr);
+            DrawCommand.Test = true;
+            DrawCommand.PrepareToDraw(false);
+            if (RenderPass->BeginRenderPass(RenderFrameContextPtr->GetActiveCommandBuffer()))
+            {
+                DrawCommand.Draw();
+                RenderPass->EndRenderPass();
             }
         }
     }
@@ -3112,9 +3078,7 @@ void jRenderer::Render()
             ImGui::SliderFloat("DirY", &gOptions.SunDir.y, -1.0f, 1.0f);
             ImGui::SliderFloat("DirZ", &gOptions.SunDir.z, -1.0f, 1.0f);
             ImGui::SliderFloat("AnisoG", &gOptions.AnisoG, 0.0f, 1.0f);
-            ImGui::BeginDisabled(true);
             ImGui::Checkbox("EarthQuake with TLAS update", &gOptions.EarthQuake);
-            ImGui::EndDisabled();
             ImGui::End();
 
             //ImGui::SetWindowFocus(szTitle);

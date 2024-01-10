@@ -7,6 +7,7 @@
 #include "jBuffer_Vulkan.h"
 #include "jBufferUtil_Vulkan.h"
 #include "jCommandBufferManager_Vulkan.h"
+#include "jOptions.h"
 
 void jRaytracingScene_Vulkan::CreateOrUpdateBLAS(const jRatracingInitializer& InInitializer)
 {
@@ -229,12 +230,12 @@ void jRaytracingScene_Vulkan::CreateOrUpdateTLAS(const jRatracingInitializer& In
                 MappedPointer[i].transform.matrix[k][m] = RObj->World.m[m][k];
             }
         }
-        //if (gOptions.EarthQuake)
-        //{
-        //    MappedPointer[i].transform.matrix[0][3] = sin((float)g_rhi->GetCurrentFrameNumber());
-        //    MappedPointer[i].transform.matrix[1][3] = cos((float)g_rhi->GetCurrentFrameNumber());
-        //    MappedPointer[i].transform.matrix[2][3] = sin((float)g_rhi->GetCurrentFrameNumber()) * 2;
-        //}
+        if (gOptions.EarthQuake)
+        {
+            MappedPointer[i].transform.matrix[0][3] = sin((float)g_rhi->GetCurrentFrameNumber());
+            MappedPointer[i].transform.matrix[1][3] = cos((float)g_rhi->GetCurrentFrameNumber());
+            MappedPointer[i].transform.matrix[2][3] = sin((float)g_rhi->GetCurrentFrameNumber()) * 2;
+        }
 
         //ASGeoInfos.push_back(accelerationStructureGeometry);
     }

@@ -15,5 +15,7 @@ struct jIndexBuffer_Vulkan : public jIndexBuffer
     {
         return IndexStreamData->ElementCount;
     }
+
+    virtual jBuffer* GetBuffer() const override { return BufferPtr.get(); }
 };
 

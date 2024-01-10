@@ -146,5 +146,6 @@ struct jVertexBuffer_Vulkan : public jVertexBuffer
     virtual void Bind(const jShader* shader) const override {}
     virtual void Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const override;
     virtual bool Initialize(const std::shared_ptr<jVertexStreamData>& InStreamData) override;
-    bool IsSupportRaytracing() const override;
+    virtual bool IsSupportRaytracing() const override;
+    virtual jBuffer* GetBuffer(int32 InStreamIndex) const override;
 };

@@ -6,6 +6,7 @@ struct jRenderFrameContext;
 struct jTexture;
 struct jSamplerStateInfo;
 
+// Single resources
 struct jShaderBindingResource : public std::enable_shared_from_this<jShaderBindingResource>
 {
     virtual ~jShaderBindingResource() {}
@@ -68,6 +69,82 @@ struct jTextureArrayResource : public jShaderBindingResource
     const jTexture** TextureArray = nullptr;
     const int32 NumOfTexure = 1;
 };
+//////////////////////////////////////////////////////////////////////////
+
+// Bindless resources, It contain multiple resources at once.
+struct jUniformBufferResourceBindless : public jShaderBindingResource
+{
+    jUniformBufferResourceBindless() = default;
+    jUniformBufferResourceBindless(const std::vector<const IUniformBufferBlock*>& InUniformBuffers) : UniformBuffers(InUniformBuffers) {}
+    virtual ~jUniformBufferResourceBindless() {}
+    virtual const void* GetResource(int32 InIndex) const override { return UniformBuffers[InIndex]; }
+    virtual int32 GetNumOfResources() const { return (int32)UniformBuffers.size(); }
+
+    std::vector<const IUniformBufferBlock*> UniformBuffers;
+};
+
+struct jBufferResourceBindless : public jShaderBindingResource
+{
+    jBufferResourceBindless() = default;
+    jBufferResourceBindless(const std::vector<const jBuffer*>& InBuffers) : Buffers(InBuffers) {}
+    virtual ~jBufferResourceBindless() {}
+    virtual const void* GetResource(int32 InIndex) const override { return Buffers[InIndex]; }
+
+    std::vector<const jBuffer*> Buffers;
+};
+
+struct jSamplerResourceBindless : public jShaderBindingResource
+{
+    jSamplerResourceBindless() = default;
+    jSamplerResourceBindless(const std::vector<const jSamplerStateInfo*>& InSamplerStates)
+        : SamplerStates(InSamplerStates) {}
+    virtual ~jSamplerResourceBindless() {}
+    virtual const void* GetResource(int32 InIndex) const override { return SamplerStates[InIndex]; }
+
+    std::vector<const jSamplerStateInfo*> SamplerStates;
+};
+
+struct jTextureResourceBindless
+{
+    struct jTextureBindData
+    {
+        jTextureBindData() = default;
+        jTextureBindData(jTexture* InTexture, jSamplerStateInfo* InSamplerState, int32 InMipLevel = 0)
+            : Texture(InTexture), SamplerState(InSamplerState), MipLevel(InMipLevel)
+        {}
+
+        jTexture* Texture = nullptr;
+        jSamplerStateInfo* SamplerState = nullptr;
+        int32 MipLevel = 0;
+    };
+
+    jTextureResourceBindless() = default;
+    jTextureResourceBindless(const std::vector<const jTextureBindData>& InTextureBindData)
+        : TextureBindDatas(InTextureBindData) {}
+    virtual ~jTextureResourceBindless() {}
+    virtual const void* GetResource(int32 InIndex) const override { return &TextureBindDatas[0]; }
+
+    std::vector<const jTextureBindData> TextureBindDatas;
+};
+
+struct jTextureArrayResourceBindless : public jShaderBindingResource
+{
+    struct jTextureArrayBindData
+    {
+        jTexture** Texture = nullptr;
+        int32 InNumOfTexure = 0;
+    };
+
+    jTextureArrayResourceBindless() = default;
+    jTextureArrayResourceBindless(const std::vector<const jTextureArrayBindData>& InTextureArrayBindDatas)
+        : TextureArrayBindDatas(InTextureArrayBindDatas) {}
+    virtual ~jTextureArrayResourceBindless() {}
+    virtual const void* GetResource(int32 InIndex) const override { return &TextureArrayBindDatas[InIndex]; }
+    virtual int32 NumOfResource(int32 InIndex) const override { return TextureArrayBindDatas[InIndex].InNumOfTexure; }
+
+    std::vector<const jTextureArrayBindData> TextureArrayBindDatas;
+};
+//////////////////////////////////////////////////////////////////////////
 
 struct jShaderBindingResourceInlineAllocator
 {

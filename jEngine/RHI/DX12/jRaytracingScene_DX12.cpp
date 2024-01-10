@@ -6,6 +6,7 @@
 #include "jIndexBuffer_DX12.h"
 #include "jVertexBuffer_DX12.h"
 #include "jBufferUtil_DX12.h"
+#include "jOptions.h"
 
 void jRaytracingScene_DX12::CreateOrUpdateBLAS(const jRatracingInitializer& InInitializer)
 {
@@ -182,12 +183,12 @@ void jRaytracingScene_DX12::CreateOrUpdateTLAS(const jRatracingInitializer& InIn
                 instanceDescs[i].Transform[k][m] = RObj->World.m[m][k];
             }
         }
-        //if (gOptions.EarthQuake)
-        //{
-        //    instanceDescs[i].Transform[0][3] = sin((float)g_rhi->GetCurrentFrameNumber());
-        //    instanceDescs[i].Transform[1][3] = cos((float)g_rhi->GetCurrentFrameNumber());
-        //    instanceDescs[i].Transform[2][3] = sin((float)g_rhi->GetCurrentFrameNumber()) * 2;
-        //}
+        if (gOptions.EarthQuake)
+        {
+            instanceDescs[i].Transform[0][3] = sin((float)g_rhi->GetCurrentFrameNumber());
+            instanceDescs[i].Transform[1][3] = cos((float)g_rhi->GetCurrentFrameNumber());
+            instanceDescs[i].Transform[2][3] = sin((float)g_rhi->GetCurrentFrameNumber()) * 2;
+        }
         instanceDescs[i].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_FRONT_COUNTERCLOCKWISE;
     }
     InstanceUploadBuffer->Unmap();
