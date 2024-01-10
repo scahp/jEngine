@@ -76,17 +76,8 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
 
         check(image.GetMetadata().dimension == TEX_DIMENSION_TEXTURE2D);		// todo : 2D image 만 지원
 
-        const D3D12_SHADER_RESOURCE_VIEW_DESC* srvDescPtr = nullptr;
-        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = { };
         if (image.GetMetadata().IsCubemap())
         {
-            check(image.GetMetadata().arraySize == 6);
-            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
-            srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-            srvDesc.TextureCube.MostDetailedMip = 0;
-            srvDesc.TextureCube.MipLevels = uint32(image.GetMetadata().mipLevels);
-            srvDesc.TextureCube.ResourceMinLODClamp = 0.0f;
-            srvDescPtr = &srvDesc;
             NewImageDataPatr->TextureType = ETextureType::TEXTURE_CUBE;
         }
         else
