@@ -242,3 +242,8 @@ bool jVertexBuffer_Vulkan::IsSupportRaytracing() const
 {
     return GetVulkanTextureComponentCount(GetVulkanTextureFormat(BindInfos.AttributeDescriptions[0].format)) >= 3;
 }
+
+jBuffer* jVertexBuffer_Vulkan::GetBuffer(int32 InStreamIndex) const
+{
+    check(Streams.size() > InStreamIndex); return Streams[InStreamIndex].BufferPtr.get();
+}

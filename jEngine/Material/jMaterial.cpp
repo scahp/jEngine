@@ -6,6 +6,14 @@ jTexture* jMaterial::GetTexture(EMaterialTextureType InType) const
 {
     check(EMaterialTextureType::Albedo <= InType);
     check(EMaterialTextureType::Max > InType);
+
+    if (!TexData[(int32)InType].Texture)
+    {
+        if (InType == EMaterialTextureType::Normal)
+            return GNormalTexture;
+        return GBlackTexture;
+    }
+
     return TexData[(int32)InType].Texture;
 }
 

@@ -113,4 +113,5 @@ struct jVertexBuffer_DX12 : public jVertexBuffer
     virtual void Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const override;
     virtual void Bind(jCommandBuffer_DX12* InCommandList) const;
     virtual bool IsSupportRaytracing() const override;
+    virtual jBuffer* GetBuffer(int32 InStreamIndex) const override;
 };

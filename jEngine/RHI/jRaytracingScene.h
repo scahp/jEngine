@@ -2,6 +2,7 @@
 
 class jCommandBuffer;
 class jRenderObject;
+struct jBuffer;
 
 struct jRatracingInitializer
 {

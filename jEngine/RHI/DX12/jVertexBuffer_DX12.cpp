@@ -226,3 +226,8 @@ bool jVertexBuffer_DX12::IsSupportRaytracing() const
 {
     return GetDX12TextureComponentCount(GetDX12TextureFormat(BindInfos.InputElementDescs[0].Format)) >= 3;
 }
+
+jBuffer* jVertexBuffer_DX12::GetBuffer(int32 InStreamIndex) const
+{
+    check(Streams.size() > InStreamIndex); return Streams[InStreamIndex].BufferPtr.get();
+}
