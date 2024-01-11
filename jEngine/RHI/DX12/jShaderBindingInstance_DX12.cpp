@@ -30,123 +30,257 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
         const jShaderBinding* ShaderBinding = InShaderBindingArray[i];
         check(ShaderBinding);
         check(ShaderBinding->Resource);
+        
+        const bool IsBindless = ShaderBinding->Resource->IsBindless();
+        check((IsBindless && !ShaderBinding->IsInline) || !IsBindless);     // Bindless must note be inline
 
         switch (ShaderBinding->BindingType)
         {
         case EShaderBindingType::UNIFORMBUFFER:
         case EShaderBindingType::UNIFORMBUFFER_DYNAMIC:
         {
-            jUniformBufferBlock_DX12* UniformBuffer = (jUniformBufferBlock_DX12*)ShaderBinding->Resource->GetResource();
-            check(UniformBuffer->GetBuffer());
-            check(!UniformBuffer->IsUseRingBuffer() || (UniformBuffer->IsUseRingBuffer() && ShaderBinding->IsInline));
-            if (ShaderBinding->IsInline)
+            if (IsBindless)
             {
-                RootParameterInlines.push_back({ 
-                    .Type = jInlineRootParamType::CBV, .GPUVirtualAddress = UniformBuffer->GetGPUAddress(), .ResourceName = UniformBuffer->ResourceName, .Resource = UniformBuffer });
+                auto UniformResourceBindless = (jUniformBufferResourceBindless*)ShaderBinding->Resource;
+                for(auto Resource : UniformResourceBindless->UniformBuffers)
+                {
+                    check(Resource);
+
+                    jUniformBufferBlock_DX12* UniformBuffer = (jUniformBufferBlock_DX12*)Resource;
+                    Descriptors.push_back({ .Descriptor = UniformBuffer->GetCBV(), .ResourceName = UniformBuffer->ResourceName, .Resource = UniformBuffer });
+                }
             }
             else
             {
-                Descriptors.push_back({ .Descriptor = UniformBuffer->GetCBV(), .ResourceName = UniformBuffer->ResourceName, .Resource = UniformBuffer });
-            }            
+                jUniformBufferBlock_DX12* UniformBuffer = (jUniformBufferBlock_DX12*)ShaderBinding->Resource->GetResource();
+                check(UniformBuffer->GetBuffer());
+                //check(!UniformBuffer->IsUseRingBuffer() || (UniformBuffer->IsUseRingBuffer() && ShaderBinding->IsInline));
+                if (ShaderBinding->IsInline)
+                {
+                    RootParameterInlines.push_back({
+                        .Type = jInlineRootParamType::CBV, .GPUVirtualAddress = UniformBuffer->GetGPUAddress(), .ResourceName = UniformBuffer->ResourceName, .Resource = UniformBuffer });
+                }
+                else
+                {
+                    Descriptors.push_back({ .Descriptor = UniformBuffer->GetCBV(), .ResourceName = UniformBuffer->ResourceName, .Resource = UniformBuffer });
+                }
+            }
             break;
         }
         case EShaderBindingType::TEXTURE_SAMPLER_SRV:
         {
-            const jTextureResource* tbor = reinterpret_cast<const jTextureResource*>(ShaderBinding->Resource);
-            if (ensure(tbor && tbor->Texture))
+            if (IsBindless)
             {
-                jTexture_DX12* TexDX12 = (jTexture_DX12*)tbor->Texture;
-                Descriptors.push_back({ .Descriptor = TexDX12->SRV, .ResourceName = TexDX12->ResourceName, .Resource = TexDX12 });
-
-                if (tbor->SamplerState)
+                auto TextureResourceResourceBindless = (jTextureResourceBindless*)ShaderBinding->Resource;
+                for(auto Resource : TextureResourceResourceBindless->TextureBindDatas)
                 {
-                    jSamplerStateInfo_DX12* SamplerDX12 = (jSamplerStateInfo_DX12*)tbor->SamplerState;
-                    check(SamplerDX12);
-                    SamplerDescriptors.push_back({ .Descriptor = SamplerDX12->SamplerSRV, .ResourceName = SamplerDX12->ResourceName, .Resource = SamplerDX12 });
+                    check(Resource.Texture);
+
+                    jTexture_DX12* TexDX12 = (jTexture_DX12*)Resource.Texture;
+                    Descriptors.push_back({ .Descriptor = TexDX12->SRV, .ResourceName = TexDX12->ResourceName, .Resource = TexDX12 });
+
+                    if (Resource.SamplerState)
+                    {
+                        jSamplerStateInfo_DX12* SamplerDX12 = (jSamplerStateInfo_DX12*)Resource.SamplerState;
+                        check(SamplerDX12);
+                        SamplerDescriptors.push_back({ .Descriptor = SamplerDX12->SamplerSRV, .ResourceName = SamplerDX12->ResourceName, .Resource = SamplerDX12 });
+                    }
+                    else
+                    {
+                        // check(0);   // todo : need to set DefaultSamplerState
+                        const jSamplerStateInfo_DX12* SamplerDX12 = (jSamplerStateInfo_DX12*)TSamplerStateInfo<ETextureFilter::LINEAR_MIPMAP_LINEAR, ETextureFilter::LINEAR_MIPMAP_LINEAR
+                            , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, 0.0f, 16.0f>::Create();
+                        check(SamplerDX12);
+                        SamplerDescriptors.push_back({ .Descriptor = SamplerDX12->SamplerSRV, .ResourceName = SamplerDX12->ResourceName, .Resource = SamplerDX12 });
+                    }
                 }
-                else
+            }
+            else
+            {
+                const jTextureResource* tbor = reinterpret_cast<const jTextureResource*>(ShaderBinding->Resource);
+                if (ensure(tbor && tbor->Texture))
                 {
-                    // check(0);   // todo : need to set DefaultSamplerState
+                    jTexture_DX12* TexDX12 = (jTexture_DX12*)tbor->Texture;
+                    Descriptors.push_back({ .Descriptor = TexDX12->SRV, .ResourceName = TexDX12->ResourceName, .Resource = TexDX12 });
 
-                    const jSamplerStateInfo_DX12* SamplerDX12 = (jSamplerStateInfo_DX12*)TSamplerStateInfo<ETextureFilter::LINEAR_MIPMAP_LINEAR, ETextureFilter::LINEAR_MIPMAP_LINEAR
-                        , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, 0.0f, 16.0f>::Create();
-                    check(SamplerDX12);
-                    SamplerDescriptors.push_back({ .Descriptor = SamplerDX12->SamplerSRV, .ResourceName = SamplerDX12->ResourceName, .Resource = SamplerDX12 });
+                    if (tbor->SamplerState)
+                    {
+                        jSamplerStateInfo_DX12* SamplerDX12 = (jSamplerStateInfo_DX12*)tbor->SamplerState;
+                        check(SamplerDX12);
+                        SamplerDescriptors.push_back({ .Descriptor = SamplerDX12->SamplerSRV, .ResourceName = SamplerDX12->ResourceName, .Resource = SamplerDX12 });
+                    }
+                    else
+                    {
+                        // check(0);   // todo : need to set DefaultSamplerState
+
+                        const jSamplerStateInfo_DX12* SamplerDX12 = (jSamplerStateInfo_DX12*)TSamplerStateInfo<ETextureFilter::LINEAR_MIPMAP_LINEAR, ETextureFilter::LINEAR_MIPMAP_LINEAR
+                            , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, 0.0f, 16.0f>::Create();
+                        check(SamplerDX12);
+                        SamplerDescriptors.push_back({ .Descriptor = SamplerDX12->SamplerSRV, .ResourceName = SamplerDX12->ResourceName, .Resource = SamplerDX12 });
+                    }
                 }
             }
             break;
         }
         case EShaderBindingType::TEXTURE_SRV:
         {
-            jTexture_DX12* Tex = (jTexture_DX12*)ShaderBinding->Resource->GetResource();
-            Descriptors.push_back({ .Descriptor = Tex->SRV, .ResourceName = Tex->ResourceName, .Resource = Tex });
+            if (IsBindless)
+            {
+                auto TextureResourceResourceBindless = (jTextureResourceBindless*)ShaderBinding->Resource;
+                for (auto Resource : TextureResourceResourceBindless->TextureBindDatas)
+                {
+                    jTexture_DX12* Tex = (jTexture_DX12*)Resource.Texture;
+                    Descriptors.push_back({ .Descriptor = Tex->SRV, .ResourceName = Tex->ResourceName, .Resource = Tex });
+                }
+            }
+            else
+            {
+                jTexture_DX12* Tex = (jTexture_DX12*)ShaderBinding->Resource->GetResource();
+                Descriptors.push_back({ .Descriptor = Tex->SRV, .ResourceName = Tex->ResourceName, .Resource = Tex });
+            }
             break;
         }
         case EShaderBindingType::TEXTURE_ARRAY_SRV:
         {
-            jTexture_DX12** Tex = (jTexture_DX12**)ShaderBinding->Resource->GetResource();
-            for(int32 i=0;i< ShaderBinding->Resource->NumOfResource();++i)
+            if (IsBindless)
             {
-                check(Tex[i]);
-                Descriptors.push_back({ .Descriptor = Tex[i]->SRV, .ResourceName = Tex[i]->ResourceName, .Resource = Tex[i] });
+                auto TextureResourceResourceArrayBindless = (jTextureArrayResourceBindless*)ShaderBinding->Resource;
+                for (auto Resource : TextureResourceResourceArrayBindless->TextureArrayBindDatas)
+                {
+                    jTexture_DX12** TexArray = (jTexture_DX12**)Resource.TextureArray;
+                    for (int32 i = 0; i < Resource.InNumOfTexure; ++i)
+                    {
+                        check(TexArray[i]);
+                        Descriptors.push_back({ .Descriptor = TexArray[i]->SRV, .ResourceName = TexArray[i]->ResourceName, .Resource = TexArray[i] });
+                    }
+                }
+            }
+            else
+            {
+                jTexture_DX12** Tex = (jTexture_DX12**)ShaderBinding->Resource->GetResource();
+                for (int32 i = 0; i < ShaderBinding->Resource->NumOfResource(); ++i)
+                {
+                    check(Tex[i]);
+                    Descriptors.push_back({ .Descriptor = Tex[i]->SRV, .ResourceName = Tex[i]->ResourceName, .Resource = Tex[i] });
+                }
             }
             break;
         }
         case EShaderBindingType::BUFFER_SRV:
         case EShaderBindingType::BUFFER_TEXEL_SRV:
         {
-            jBuffer_DX12* Buf = (jBuffer_DX12*)ShaderBinding->Resource->GetResource();
-            check(Buf->Buffer);
-            
-            if (ShaderBinding->IsInline)
+            if (IsBindless)
             {
-                RootParameterInlines.push_back({ .Type = jInlineRootParamType::SRV, .GPUVirtualAddress = Buf->GetGPUAddress(), .ResourceName = Buf->ResourceName, .Resource = Buf });
+                auto BufferResourceBindless = (jBufferResourceBindless*)ShaderBinding->Resource;
+                for (auto Resource : BufferResourceBindless->Buffers)
+                {
+                    jBuffer_DX12* Buf = (jBuffer_DX12*)Resource;
+                    Descriptors.push_back({ .Descriptor = Buf->SRV, .ResourceName = Buf->ResourceName, .Resource = Buf });
+                }
             }
             else
             {
-                Descriptors.push_back({ .Descriptor = Buf->SRV, .ResourceName = Buf->ResourceName, .Resource = Buf });
+                jBuffer_DX12* Buf = (jBuffer_DX12*)ShaderBinding->Resource->GetResource();
+                check(Buf->Buffer);
+
+                if (ShaderBinding->IsInline)
+                {
+                    RootParameterInlines.push_back({ .Type = jInlineRootParamType::SRV, .GPUVirtualAddress = Buf->GetGPUAddress(), .ResourceName = Buf->ResourceName, .Resource = Buf });
+                }
+                else
+                {
+                    Descriptors.push_back({ .Descriptor = Buf->SRV, .ResourceName = Buf->ResourceName, .Resource = Buf });
+                }
             }
             break;
         }
         case EShaderBindingType::TEXTURE_UAV:
         {
-            jTexture_DX12* Tex = (jTexture_DX12*)ShaderBinding->Resource->GetResource();
-            const jTextureResource* tbor = reinterpret_cast<const jTextureResource*>(ShaderBinding->Resource);
-            if (tbor->MipLevel == 0)
+            if (IsBindless)
             {
-                Descriptors.push_back({ .Descriptor = Tex->UAV, .ResourceName = Tex->ResourceName, .Resource = Tex });
+                auto TextureResourceResourceBindless = (jTextureResourceBindless*)ShaderBinding->Resource;
+                for (auto Resource : TextureResourceResourceBindless->TextureBindDatas)
+                {
+                    jTexture_DX12* Tex = (jTexture_DX12*)Resource.Texture;
+                    if (Resource.MipLevel == 0)
+                    {
+                        Descriptors.push_back({ .Descriptor = Tex->UAV, .ResourceName = Tex->ResourceName, .Resource = Tex });
+                    }
+                    else
+                    {
+                        auto it_find = Tex->UAVMipMap.find(Resource.MipLevel);
+                        if (it_find != Tex->UAVMipMap.end() && it_find->second.IsValid())
+                            Descriptors.push_back({ .Descriptor = it_find->second, .ResourceName = Tex->ResourceName, .Resource = Tex });
+                        else
+                            Descriptors.push_back({ .Descriptor = Tex->UAV, .ResourceName = Tex->ResourceName, .Resource = Tex });
+                    }
+                }
             }
             else
             {
-                auto it_find = Tex->UAVMipMap.find(tbor->MipLevel);
-                if (it_find != Tex->UAVMipMap.end() && it_find->second.IsValid())
-                    Descriptors.push_back({ .Descriptor = it_find->second, .ResourceName = Tex->ResourceName, .Resource = Tex });
-                else
+                jTexture_DX12* Tex = (jTexture_DX12*)ShaderBinding->Resource->GetResource();
+                const jTextureResource* tbor = reinterpret_cast<const jTextureResource*>(ShaderBinding->Resource);
+                if (tbor->MipLevel == 0)
+                {
                     Descriptors.push_back({ .Descriptor = Tex->UAV, .ResourceName = Tex->ResourceName, .Resource = Tex });
-            }            
+                }
+                else
+                {
+                    auto it_find = Tex->UAVMipMap.find(tbor->MipLevel);
+                    if (it_find != Tex->UAVMipMap.end() && it_find->second.IsValid())
+                        Descriptors.push_back({ .Descriptor = it_find->second, .ResourceName = Tex->ResourceName, .Resource = Tex });
+                    else
+                        Descriptors.push_back({ .Descriptor = Tex->UAV, .ResourceName = Tex->ResourceName, .Resource = Tex });
+                }
+            }
             break;
         }
         case EShaderBindingType::BUFFER_UAV:
         case EShaderBindingType::BUFFER_UAV_DYNAMIC:
         case EShaderBindingType::BUFFER_TEXEL_UAV:
         {
-            jBuffer_DX12* Buf = (jBuffer_DX12*)ShaderBinding->Resource->GetResource();
-            check(Buf->Buffer);
-            if (ShaderBinding->IsInline)
+            if (IsBindless)
             {
-                RootParameterInlines.push_back({ .Type = jInlineRootParamType::UAV, .GPUVirtualAddress = Buf->GetGPUAddress(), .ResourceName = Buf->ResourceName, .Resource = Buf });
+                auto BufferResourceBindless = (jBufferResourceBindless*)ShaderBinding->Resource;
+                for (auto Resource : BufferResourceBindless->Buffers)
+                {
+                    jBuffer_DX12* Buf = (jBuffer_DX12*)Resource;
+                    Descriptors.push_back({ .Descriptor = Buf->UAV, .ResourceName = Buf->ResourceName, .Resource = Buf });
+                }
             }
             else
             {
-                Descriptors.push_back({ .Descriptor = Buf->UAV, .ResourceName = Buf->ResourceName, .Resource = Buf });
+                jBuffer_DX12* Buf = (jBuffer_DX12*)ShaderBinding->Resource->GetResource();
+                check(Buf->Buffer);
+                if (ShaderBinding->IsInline)
+                {
+                    RootParameterInlines.push_back({ .Type = jInlineRootParamType::UAV, .GPUVirtualAddress = Buf->GetGPUAddress(), .ResourceName = Buf->ResourceName, .Resource = Buf });
+                }
+                else
+                {
+                    Descriptors.push_back({ .Descriptor = Buf->UAV, .ResourceName = Buf->ResourceName, .Resource = Buf });
+                }
             }
             break;
         }
         case EShaderBindingType::SAMPLER:
         {
-            jSamplerStateInfo_DX12* Sampler = (jSamplerStateInfo_DX12*)ShaderBinding->Resource->GetResource();
-            check(Sampler);
-            SamplerDescriptors.push_back({ .Descriptor = Sampler->SamplerSRV, .ResourceName = Sampler->ResourceName, .Resource = Sampler });
+            if (IsBindless)
+            {
+                auto SamplerResourceBindless = (jSamplerResourceBindless*)ShaderBinding->Resource;
+                for(auto Resource : SamplerResourceBindless->SamplerStates)
+                {
+                    jSamplerStateInfo_DX12* Sampler = (jSamplerStateInfo_DX12*)Resource;
+                    check(Sampler);
+                    SamplerDescriptors.push_back({ .Descriptor = Sampler->SamplerSRV, .ResourceName = Sampler->ResourceName, .Resource = Sampler });
+                }
+            }
+            else
+            {
+                jSamplerStateInfo_DX12* Sampler = (jSamplerStateInfo_DX12*)ShaderBinding->Resource->GetResource();
+                check(Sampler);
+                SamplerDescriptors.push_back({ .Descriptor = Sampler->SamplerSRV, .ResourceName = Sampler->ResourceName, .Resource = Sampler });
+            }
             break;
         }
         case EShaderBindingType::SUBPASS_INPUT_ATTACHMENT:
@@ -161,7 +295,6 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
     // validation
     for(int32 i=0;i<(int32)Descriptors.size();++i)
     {
-        const jShaderBinding* ShaderBinding = InShaderBindingArray[i];
         ensure(Descriptors[i].IsValid());
     }
 #endif

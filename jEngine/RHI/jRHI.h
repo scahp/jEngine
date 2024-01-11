@@ -455,6 +455,8 @@ public:
 	virtual jPipelineStateInfo* CreatePipelineStateInfo(const jPipelineStateFixedInfo* pipelineStateFixed, const jGraphicsPipelineShader shader
 		, const jVertexBufferArray& InVertexBufferArray, const jRenderPass* renderPass, const jShaderBindingLayoutArray& InShaderBindingArray, const jPushConstant* InPushConstant, int32 InSubpassIndex) const { return nullptr; }
 	virtual jPipelineStateInfo* CreateComputePipelineStateInfo(const jShader* shader, const jShaderBindingLayoutArray& InShaderBindingArray, const jPushConstant* pushConstant) const { return nullptr; }
+	virtual jPipelineStateInfo* CreateRaytracingPipelineStateInfo(const std::vector<jRaytracingPipelineShader>& InShaders, const jRaytracingPipelineData& InRaytracingData
+		, const jShaderBindingLayoutArray& InShaderBindingArray, const jPushConstant* pushConstant) const { return nullptr; }
 	virtual void RemovePipelineStateInfo(size_t InHash) {}
 
 	virtual jShaderBindingLayout* CreateShaderBindings(const jShaderBindingArray& InShaderBindingArray) const { check(0); return nullptr; }

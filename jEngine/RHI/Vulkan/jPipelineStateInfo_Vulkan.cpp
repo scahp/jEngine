@@ -154,10 +154,14 @@ void jPipelineStateInfo_Vulkan::Release()
 
 void jPipelineStateInfo_Vulkan::Initialize()
 {
-    if (IsGraphics)
+    if (PipelineType == EPipelineType::Graphics)
         CreateGraphicsPipelineState();
-    else
+    else if (PipelineType == EPipelineType::Compute)
         CreateComputePipelineState();
+    else if (PipelineType == EPipelineType::RayTracing)
+        check(0);
+    else
+        check(0);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -299,19 +303,12 @@ void* jPipelineStateInfo_Vulkan::CreateGraphicsPipelineState()
     // Shader stage
     VkPipelineShaderStageCreateInfo ShaderStages[5];
     uint32 ShaderStageIndex = 0;
-    if (IsGraphics)
-    {
-        if (GraphicsShader.VertexShader)
-            ShaderStages[ShaderStageIndex++] = ((jCompiledShader_Vulkan*)GraphicsShader.VertexShader->GetCompiledShader())->ShaderStage;
-        if (GraphicsShader.GeometryShader)
-            ShaderStages[ShaderStageIndex++] = ((jCompiledShader_Vulkan*)GraphicsShader.GeometryShader->GetCompiledShader())->ShaderStage;
-        if (GraphicsShader.PixelShader)
-            ShaderStages[ShaderStageIndex++] = ((jCompiledShader_Vulkan*)GraphicsShader.PixelShader->GetCompiledShader())->ShaderStage;
-    }
-    else
-    {
-        check(0);
-    }
+    if (GraphicsShader.VertexShader)
+        ShaderStages[ShaderStageIndex++] = ((jCompiledShader_Vulkan*)GraphicsShader.VertexShader->GetCompiledShader())->ShaderStage;
+    if (GraphicsShader.GeometryShader)
+        ShaderStages[ShaderStageIndex++] = ((jCompiledShader_Vulkan*)GraphicsShader.GeometryShader->GetCompiledShader())->ShaderStage;
+    if (GraphicsShader.PixelShader)
+        ShaderStages[ShaderStageIndex++] = ((jCompiledShader_Vulkan*)GraphicsShader.PixelShader->GetCompiledShader())->ShaderStage;
 
     check(ShaderStageIndex > 0);
     pipelineInfo.stageCount = ShaderStageIndex;
@@ -424,8 +421,10 @@ void* jPipelineStateInfo_Vulkan::CreateComputePipelineState()
 void jPipelineStateInfo_Vulkan::Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const
 {
     check(vkPipeline);
-    if (IsGraphics)
+    if (PipelineType == EPipelineType::Graphics)
         vkCmdBindPipeline((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipeline);
-    else
+    else if (PipelineType == EPipelineType::Graphics)
         vkCmdBindPipeline((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, vkPipeline);
+    else if (PipelineType == EPipelineType::RayTracing)
+        check(0);
 }

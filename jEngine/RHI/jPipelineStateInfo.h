@@ -535,27 +535,40 @@ struct jRenderFrameContext;
 //////////////////////////////////////////////////////////////////////////
 struct jPipelineStateInfo
 {
+    enum class EPipelineType : uint8
+    {
+        Graphics = 0,
+        Compute,
+        RayTracing
+    };
+
     jPipelineStateInfo() = default;
     jPipelineStateInfo(const jPipelineStateFixedInfo* InPipelineStateFixed, const jGraphicsPipelineShader InShader, const jVertexBufferArray& InVertexBufferArray
         , const jRenderPass* InRenderPass, const jShaderBindingLayoutArray& InShaderBindingLayoutArray, const jPushConstant* InPushConstant = nullptr, int32 InSubpassIndex = 0)
         : PipelineStateFixed(InPipelineStateFixed), GraphicsShader(InShader), VertexBufferArray(InVertexBufferArray), RenderPass(InRenderPass), ShaderBindingLayoutArray(InShaderBindingLayoutArray)
         , PushConstant(InPushConstant), SubpassIndex(InSubpassIndex)
     {
-        IsGraphics = true;
+        PipelineType = EPipelineType::Graphics;
     }
     jPipelineStateInfo(const jShader* InComputeShader, const jShaderBindingLayoutArray& InShaderBindingLayoutArray, const jPushConstant* InPushConstant = nullptr, int32 InSubpassIndex = 0)
         : ComputeShader(InComputeShader), ShaderBindingLayoutArray(InShaderBindingLayoutArray), PushConstant(InPushConstant), SubpassIndex(InSubpassIndex)
     {
-        IsGraphics = false;
+        PipelineType = EPipelineType::Compute;
+    }
+    jPipelineStateInfo(const std::vector<jRaytracingPipelineShader>& InShader, const jRaytracingPipelineData InRaytracingPipelineData
+        , const jShaderBindingLayoutArray& InShaderBindingLayoutArray, const jPushConstant* InPushConstant = nullptr, int32 InSubpassIndex = 0)
+        : RaytracingShaders(InShader), RaytracingPipelineData(InRaytracingPipelineData), ShaderBindingLayoutArray(InShaderBindingLayoutArray), PushConstant(InPushConstant), SubpassIndex(InSubpassIndex)
+    {
+        PipelineType = EPipelineType::RayTracing;
     }
     jPipelineStateInfo(const jPipelineStateInfo& InPipelineState)
-        : PipelineStateFixed(InPipelineState.PipelineStateFixed), GraphicsShader(InPipelineState.GraphicsShader), ComputeShader(InPipelineState.ComputeShader), IsGraphics(InPipelineState.IsGraphics)
-        , VertexBufferArray(InPipelineState.VertexBufferArray), RenderPass(InPipelineState.RenderPass), ShaderBindingLayoutArray(InPipelineState.ShaderBindingLayoutArray)
+        : PipelineStateFixed(InPipelineState.PipelineStateFixed), GraphicsShader(InPipelineState.GraphicsShader), ComputeShader(InPipelineState.ComputeShader), RaytracingShaders(InPipelineState.RaytracingShaders)
+        , PipelineType(InPipelineState.PipelineType), VertexBufferArray(InPipelineState.VertexBufferArray), RenderPass(InPipelineState.RenderPass), ShaderBindingLayoutArray(InPipelineState.ShaderBindingLayoutArray)
         , PushConstant(InPipelineState.PushConstant), Hash(InPipelineState.Hash), SubpassIndex(InPipelineState.SubpassIndex)
     {}
     jPipelineStateInfo(jPipelineStateInfo&& InPipelineState) noexcept
-        : PipelineStateFixed(InPipelineState.PipelineStateFixed), GraphicsShader(InPipelineState.GraphicsShader), ComputeShader(InPipelineState.ComputeShader), IsGraphics(InPipelineState.IsGraphics)
-        , VertexBufferArray(InPipelineState.VertexBufferArray), RenderPass(InPipelineState.RenderPass), ShaderBindingLayoutArray(InPipelineState.ShaderBindingLayoutArray)
+        : PipelineStateFixed(InPipelineState.PipelineStateFixed), GraphicsShader(InPipelineState.GraphicsShader), ComputeShader(InPipelineState.ComputeShader), RaytracingShaders(InPipelineState.RaytracingShaders)
+        , PipelineType(InPipelineState.PipelineType), VertexBufferArray(InPipelineState.VertexBufferArray), RenderPass(InPipelineState.RenderPass), ShaderBindingLayoutArray(InPipelineState.ShaderBindingLayoutArray)
         , PushConstant(InPipelineState.PushConstant), Hash(InPipelineState.Hash), SubpassIndex(InPipelineState.SubpassIndex)
     {}
     virtual ~jPipelineStateInfo() {}
@@ -564,9 +577,11 @@ struct jPipelineStateInfo
 
     mutable size_t Hash = 0;
 
-    bool IsGraphics = true;
+    EPipelineType PipelineType = EPipelineType::Graphics;
     const jGraphicsPipelineShader GraphicsShader;
     const jShader* ComputeShader = nullptr;
+    const std::vector<jRaytracingPipelineShader> RaytracingShaders;
+    const jRaytracingPipelineData RaytracingPipelineData;
     const jRenderPass* RenderPass = nullptr;
     jVertexBufferArray VertexBufferArray;
     jShaderBindingLayoutArray ShaderBindingLayoutArray;
@@ -579,5 +594,6 @@ struct jPipelineStateInfo
     virtual void* GetPipelineLayoutHandle() const { return nullptr; }
     virtual void* CreateGraphicsPipelineState() { return nullptr; }
     virtual void* CreateComputePipelineState() { return nullptr; }
+    virtual void* CreateRaytracingPipelineState() { return nullptr; }
     virtual void Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const { }
 };

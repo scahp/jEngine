@@ -332,3 +332,28 @@ struct jGraphicsPipelineShader
     }
 };
 
+struct jRaytracingPipelineShader
+{
+    jShader* RaygenShader = nullptr;
+    jShader* ClosestHitShader = nullptr;
+    jShader* AnyHitShader = nullptr;
+    jShader* MissShader = nullptr;
+
+    std::wstring RaygenEntryPoint;
+    std::wstring ClosestHitEntryPoint;
+    std::wstring AnyHitEntryPoint;
+    std::wstring MissEntryPoint;
+
+    std::wstring HitGroupName;
+
+    size_t GetHash() const;
+};
+
+struct jRaytracingPipelineData
+{
+    int32 MaxAttributeSize = 2 * sizeof(float);	    // float2 barycentrics
+    int32 MaxPayloadSize = 4 * sizeof(float);		// float4 color
+    int32 MaxTraceRecursionDepth = 1;
+
+    size_t GetHash() const;
+};
