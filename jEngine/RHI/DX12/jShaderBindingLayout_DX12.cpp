@@ -302,8 +302,15 @@ ID3D12RootSignature* jShaderBindingLayout_DX12::CreateRootSignatureInternal(size
 
         ComPtr<ID3DBlob> signature;
         ComPtr<ID3DBlob> error;
-        if (JFAIL_E(D3D12SerializeVersionedRootSignature(&versionedDesc, &signature, &error), error))
+        if (S_OK != D3D12SerializeVersionedRootSignature(&versionedDesc, &signature, &error))
+        {
+            if (error)
+            {
+                OutputDebugStringA(reinterpret_cast<const char*>(error->GetBufferPointer()));
+                error->Release();
+            }
             return nullptr;
+        }
 
         ComPtr<ID3D12RootSignature> RootSignature;
         if (JFAIL(g_rhi_dx12->Device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&RootSignature))))

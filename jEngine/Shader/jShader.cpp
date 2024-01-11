@@ -7,6 +7,38 @@ std::thread jShader::CheckUpdateShaderThread;
 std::vector<jShader*> jShader::WaitForUpdateShaders;
 std::map<const jShader*, std::vector<size_t>> jShader::gConnectedPipelineStateHash;
 
+size_t jRaytracingPipelineShader::GetHash() const
+{
+    size_t hash = 0;
+    if (RaygenShader)
+        hash ^= RaygenShader->ShaderInfo.GetHash();
+
+    if (ClosestHitShader)
+        hash ^= ClosestHitShader->ShaderInfo.GetHash();
+
+    if (AnyHitShader)
+        hash ^= AnyHitShader->ShaderInfo.GetHash();
+
+    if (MissShader)
+        hash ^= MissShader->ShaderInfo.GetHash();
+
+    hash = CityHash64WithSeed((const char*)RaygenEntryPoint.c_str(), RaygenEntryPoint.length() * sizeof(wchar_t), hash);
+    hash = CityHash64WithSeed((const char*)ClosestHitEntryPoint.c_str(), ClosestHitEntryPoint.length() * sizeof(wchar_t), hash);
+    hash = CityHash64WithSeed((const char*)AnyHitEntryPoint.c_str(), AnyHitEntryPoint.length() * sizeof(wchar_t), hash);
+    hash = CityHash64WithSeed((const char*)MissEntryPoint.c_str(), MissEntryPoint.length() * sizeof(wchar_t), hash);
+    hash = CityHash64WithSeed((const char*)HitGroupName.c_str(), HitGroupName.length() * sizeof(wchar_t), hash);
+    return hash;
+}
+
+size_t jRaytracingPipelineData::GetHash() const
+{
+    size_t hash = 0;
+    hash ^= MaxAttributeSize;
+    hash ^= MaxPayloadSize;
+    hash ^= MaxTraceRecursionDepth;
+    return hash;
+}
+
 jShader::~jShader()
 {
 	delete CompiledShader;

@@ -963,6 +963,10 @@ bool jRHI_DX12::CreateShaderInternal(jShader* OutShader, const jShaderInfo& shad
 			ShadingModel = TEXT("cs_6_6");
             break;
         case EShaderAccessStageFlag::RAYTRACING:
+        case EShaderAccessStageFlag::RAYTRACING_RAYGEN:
+        case EShaderAccessStageFlag::RAYTRACING_MISS:
+        case EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT:
+        case EShaderAccessStageFlag::RAYTRACING_ANYHIT:
             ShadingModel = TEXT("lib_6_6");
             break;
         default:
@@ -1079,6 +1083,12 @@ jPipelineStateInfo* jRHI_DX12::CreateComputePipelineStateInfo(const jShader* sha
 	, const jPushConstant* pushConstant) const
 {
 	return PipelineStatePool.GetOrCreateMove(std::move(jPipelineStateInfo(shader, InShaderBindingArray, pushConstant)));
+}
+
+jPipelineStateInfo* jRHI_DX12::CreateRaytracingPipelineStateInfo(const std::vector<jRaytracingPipelineShader>& InShaders, const jRaytracingPipelineData& InRaytracingData
+    , const jShaderBindingLayoutArray& InShaderBindingArray, const jPushConstant* pushConstant) const
+{
+    return PipelineStatePool.GetOrCreateMove(std::move(jPipelineStateInfo(InShaders, InRaytracingData, InShaderBindingArray, pushConstant)));
 }
 
 void jRHI_DX12::RemovePipelineStateInfo(size_t InHash)

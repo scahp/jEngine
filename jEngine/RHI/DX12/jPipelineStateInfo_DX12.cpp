@@ -113,10 +113,14 @@ void jPipelineStateInfo_DX12::Release()
 
 void jPipelineStateInfo_DX12::Initialize()
 {
-    if (IsGraphics)
+    if (PipelineType == EPipelineType::Graphics)
         CreateGraphicsPipelineState();
-    else
+    else if (PipelineType == EPipelineType::Compute)
         CreateComputePipelineState();
+    else if (PipelineType == EPipelineType::RayTracing)
+        CreateRaytracingPipelineState();
+    else
+        check(0);
 }
 
 void* jPipelineStateInfo_DX12::CreateGraphicsPipelineState()
@@ -243,6 +247,126 @@ void* jPipelineStateInfo_DX12::CreateComputePipelineState()
     {
         if (ComputeShader)
             jShader::gConnectedPipelineStateHash[ComputeShader].push_back(hash);
+    }
+
+    return PipelineState.Get();
+}
+
+void* jPipelineStateInfo_DX12::CreateRaytracingPipelineState()
+{
+    PipelineState = nullptr;
+
+    ID3D12RootSignature* RootSignature = jShaderBindingLayout_DX12::CreateRootSignature(ShaderBindingLayoutArray);
+
+    std::vector<D3D12_EXPORT_DESC> exportDescs;
+    exportDescs.reserve(RaytracingShaders.size() * 4);
+
+    std::vector<D3D12_DXIL_LIBRARY_DESC> dxilDescs;
+    dxilDescs.reserve(RaytracingShaders.size() * 4);
+
+    std::vector<D3D12_STATE_SUBOBJECT> subobjects;
+    subobjects.reserve(20);
+    auto AddShaderFunc = [&](jShader* InShader, const wchar_t* InEntryPoint)
+    {
+        D3D12_EXPORT_DESC exportDesc{};
+        exportDesc.Name = InEntryPoint;
+        exportDesc.Flags = D3D12_EXPORT_FLAG_NONE;
+        exportDesc.ExportToRename = nullptr;
+        exportDescs.push_back(exportDesc);
+
+        auto CompiledShaderDX12 = (jCompiledShader_DX12*)InShader->GetCompiledShader();
+
+        D3D12_DXIL_LIBRARY_DESC dxilDesc{};
+        dxilDesc.DXILLibrary.pShaderBytecode = CompiledShaderDX12->ShaderBlob->GetBufferPointer();
+        dxilDesc.DXILLibrary.BytecodeLength = CompiledShaderDX12->ShaderBlob->GetBufferSize();
+        dxilDesc.NumExports = 1;
+        dxilDesc.pExports = &exportDescs[exportDescs.size() - 1];
+        dxilDescs.push_back(dxilDesc);
+
+        D3D12_STATE_SUBOBJECT subobject{};
+        subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
+        subobject.pDesc = &dxilDescs[dxilDescs.size() - 1];
+        subobjects.push_back(subobject);
+    };
+
+    // Add Shader
+    std::vector<D3D12_HIT_GROUP_DESC> hitgroupDescs;
+    hitgroupDescs.reserve(RaytracingShaders.size());
+    for (int32 i = 0; i < RaytracingShaders.size(); ++i)
+    {
+        AddShaderFunc(RaytracingShaders[i].RaygenShader, RaytracingShaders[i].RaygenEntryPoint.c_str());
+        AddShaderFunc(RaytracingShaders[i].ClosestHitShader, RaytracingShaders[i].ClosestHitEntryPoint.c_str());
+        AddShaderFunc(RaytracingShaders[i].AnyHitShader, RaytracingShaders[i].AnyHitEntryPoint.c_str());
+        AddShaderFunc(RaytracingShaders[i].MissShader, RaytracingShaders[i].MissEntryPoint.c_str());
+
+        D3D12_HIT_GROUP_DESC hitGroupDesc{};
+        hitGroupDesc.AnyHitShaderImport = RaytracingShaders[i].AnyHitEntryPoint.c_str();
+        hitGroupDesc.ClosestHitShaderImport = RaytracingShaders[i].ClosestHitEntryPoint.c_str();
+        hitGroupDesc.HitGroupExport = RaytracingShaders[i].HitGroupName.c_str();
+        hitGroupDesc.Type = D3D12_HIT_GROUP_TYPE_TRIANGLES;
+        hitgroupDescs.push_back(hitGroupDesc);
+
+        D3D12_STATE_SUBOBJECT subobject{};
+        subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
+        subobject.pDesc = &hitgroupDescs[hitgroupDescs.size() - 1];
+        subobjects.push_back(subobject);
+    }
+
+    // Shader Config
+    D3D12_RAYTRACING_SHADER_CONFIG shaderConfig;
+    {
+        shaderConfig.MaxAttributeSizeInBytes = RaytracingPipelineData.MaxAttributeSize;
+        shaderConfig.MaxPayloadSizeInBytes = RaytracingPipelineData.MaxPayloadSize;
+
+        D3D12_STATE_SUBOBJECT subobject{};
+        subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG;
+        subobject.pDesc = &shaderConfig;
+        subobjects.push_back(subobject);
+    }
+
+    // Global root signature
+    {
+        D3D12_STATE_SUBOBJECT subobject{};
+        subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE;
+        subobject.pDesc = &RootSignature;
+        subobjects.push_back(subobject);
+    }
+
+    // Pipeline Config
+    D3D12_RAYTRACING_PIPELINE_CONFIG pipelineConfig;
+    {
+        pipelineConfig.MaxTraceRecursionDepth = RaytracingPipelineData.MaxTraceRecursionDepth;
+
+        D3D12_STATE_SUBOBJECT subobject{};
+        subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG;
+        subobject.pDesc = &pipelineConfig;
+        subobjects.push_back(subobject);
+    }
+
+    // Create pipeline state
+    D3D12_STATE_OBJECT_DESC stateObjectDesc;
+    stateObjectDesc.NumSubobjects = (uint32)subobjects.size();
+    stateObjectDesc.pSubobjects = subobjects.data();
+    stateObjectDesc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
+
+    ComPtr<ID3D12StateObject> m_dxrStateObject;
+    if (JFAIL(g_rhi_dx12->Device->CreateStateObject(&stateObjectDesc, IID_PPV_ARGS(&m_dxrStateObject))))
+        return nullptr;
+
+    size_t hash = GetHash();
+    if (ensure(hash))
+    {
+        for (int32 i = 0; i < (int32)RaytracingShaders.size(); ++i)
+        {
+            if (RaytracingShaders[i].RaygenShader)
+                jShader::gConnectedPipelineStateHash[RaytracingShaders[i].RaygenShader].push_back(hash);
+            if (RaytracingShaders[i].ClosestHitShader)
+                jShader::gConnectedPipelineStateHash[RaytracingShaders[i].ClosestHitShader].push_back(hash);
+            if (RaytracingShaders[i].AnyHitShader)
+                jShader::gConnectedPipelineStateHash[RaytracingShaders[i].AnyHitShader].push_back(hash);
+            if (RaytracingShaders[i].MissShader)
+                jShader::gConnectedPipelineStateHash[RaytracingShaders[i].MissShader].push_back(hash);
+        }
     }
 
     return PipelineState.Get();

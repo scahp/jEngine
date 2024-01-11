@@ -444,6 +444,8 @@ public:
     virtual jPipelineStateInfo* CreatePipelineStateInfo(const jPipelineStateFixedInfo* InPipelineStateFixed, const jGraphicsPipelineShader InShader, const jVertexBufferArray& InVertexBufferArray
         , const jRenderPass* InRenderPass, const jShaderBindingLayoutArray& InShaderBindingArray, const jPushConstant* InPushConstant, int32 InSubpassIndex) const override;
     virtual jPipelineStateInfo* CreateComputePipelineStateInfo(const jShader* shader, const jShaderBindingLayoutArray& InShaderBindingArray, const jPushConstant* pushConstant) const override;
+	virtual jPipelineStateInfo* CreateRaytracingPipelineStateInfo(const std::vector<jRaytracingPipelineShader>& InShaders, const jRaytracingPipelineData& InRaytracingData
+		, const jShaderBindingLayoutArray& InShaderBindingArray, const jPushConstant* pushConstant) const override;
 	virtual void RemovePipelineStateInfo(size_t InHash) override;
 
 	virtual std::shared_ptr<jRenderFrameContext> BeginRenderFrame() override;

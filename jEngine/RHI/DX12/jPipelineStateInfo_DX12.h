@@ -88,6 +88,7 @@ struct jPipelineStateInfo_DX12 : public jPipelineStateInfo
     virtual void* GetPipelineLayoutHandle() const override { return nullptr; }
     virtual void* CreateGraphicsPipelineState() override;
     virtual void* CreateComputePipelineState() override;
+    virtual void* CreateRaytracingPipelineState() override;
     virtual void Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const override;
     void Bind(jCommandBuffer_DX12* InCommandList) const;
 
