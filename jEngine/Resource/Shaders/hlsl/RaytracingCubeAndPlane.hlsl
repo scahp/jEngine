@@ -28,25 +28,11 @@ struct jVertex
 	float2 TexCoord;
 };
 
-struct jBindlessIndices
-{
-    uint IrradianceMap;
-    uint PrefilteredEnvMap;
-    uint VertexIndexOffset;
-    uint Index;
-    uint RenderObj;
-    uint Vertices;
-    uint AlbedoTexture;
-    uint NormalTexture;
-    uint RMTexture;
-};
-
 RaytracingAccelerationStructure Scene : register(t0, space0);
 RWTexture2D<float4> RenderTarget : register(u1, space0);
 ConstantBuffer<SceneConstantBuffer> g_sceneCB : register(b2, space0);
-cbuffer BindlessIndices : register(b3, space0) { jBindlessIndices BindlessIndices; }
-SamplerState AlbedoTextureSampler : register(s4, space0);
-SamplerState PBRSamplerState : register(s5, space0);
+SamplerState AlbedoTextureSampler : register(s3, space0);
+SamplerState PBRSamplerState : register(s4, space0);
 
 #if USE_BINDLESS_RESOURCE
 TextureCube<float4> IrradianceMapArray[] : register(t0, space1);
@@ -160,16 +146,16 @@ void GetShaderBindingResources(
     NormalTexture = ResourceDescriptorHeap[(PerPrimOffset++) + InstanceIdx * Stride];
     RMTexture = ResourceDescriptorHeap[(PerPrimOffset++) + InstanceIdx * Stride];
 #elif USE_BINDLESS_RESOURCE
-    IrradianceMap = IrradianceMapArray[BindlessIndices.IrradianceMap + 0];
-    PrefilteredEnvMap = PrefilteredEnvMapArray[BindlessIndices.PrefilteredEnvMap + 0];
+    IrradianceMap = IrradianceMapArray[0];
+    PrefilteredEnvMap = PrefilteredEnvMapArray[0];
 
-    VertexIndexOffset = VertexIndexOffsetArray[BindlessIndices.VertexIndexOffset + InstanceIdx];
-    IndexBindless = IndexBindlessArray[BindlessIndices.Index + InstanceIdx];
-    RenderObjParam = RenderObjParamArray[BindlessIndices.RenderObj + InstanceIdx];
-    VerticesBindless = VerticesBindlessArray[BindlessIndices.Vertices + InstanceIdx];
-    AlbedoTexture = AlbedoTextureArray[BindlessIndices.AlbedoTexture + InstanceIdx];
-    NormalTexture = NormalTextureArray[BindlessIndices.NormalTexture + InstanceIdx];
-    RMTexture = RMTextureArray[BindlessIndices.RMTexture + InstanceIdx];
+    VertexIndexOffset = VertexIndexOffsetArray[InstanceIdx];
+    IndexBindless = IndexBindlessArray[InstanceIdx];
+    RenderObjParam = RenderObjParamArray[InstanceIdx];
+    VerticesBindless = VerticesBindlessArray[InstanceIdx];
+    AlbedoTexture = AlbedoTextureArray[InstanceIdx];
+    NormalTexture = NormalTextureArray[InstanceIdx];
+    RMTexture = RMTextureArray[InstanceIdx];
 #endif // USE_HLSL_DYNAMIC_RESOURCE
 }
 

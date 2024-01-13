@@ -373,9 +373,9 @@ void jShaderBindingInstance_DX12::CopyToOnlineDescriptorHeap(jCommandBuffer_DX12
 
     if (Descriptors.size() > 0)
     {
-        check(Descriptors.size() <= 20);
-        jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 20> DestDescriptor;
-        jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 20> SrcDescriptor;
+        check(Descriptors.size() <= 200);
+        jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 200> DestDescriptor;
+        jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 200> SrcDescriptor;
 
         for (int32 i = 0; i < Descriptors.size(); ++i)
         {
@@ -392,9 +392,9 @@ void jShaderBindingInstance_DX12::CopyToOnlineDescriptorHeap(jCommandBuffer_DX12
 
     if (SamplerDescriptors.size() > 0)
     {
-        check(Descriptors.size() <= 20);
-        jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 20> DestSamplerDescriptor;
-        jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 20> SrcSamplerDescriptor;
+        check(Descriptors.size() <= 200);
+        jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 200> DestSamplerDescriptor;
+        jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 200> SrcSamplerDescriptor;
 
         for (int32 i = 0; i < SamplerDescriptors.size(); ++i)
         {

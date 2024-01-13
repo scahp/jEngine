@@ -1160,7 +1160,7 @@ IUniformBufferBlock* jRHI_DX12::CreateUniformBufferBlock(jName InName, jLifeTime
     return uniformBufferBlock;
 }
 
-void jRHI_DX12::BindGraphicsShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineStateLayout
+void jRHI_DX12::BindGraphicsShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineState
 	, const jShaderBindingInstanceCombiner& InShaderBindingInstanceCombiner, uint32 InFirstSet) const
 {
     // 이 부분은 구조화 하게 되면, 이전에 만들어둔 것을 그대로 사용
@@ -1259,7 +1259,7 @@ void jRHI_DX12::BindGraphicsShaderBindingInstances(const jCommandBuffer* InComma
 	}
 }
 
-void jRHI_DX12::BindComputeShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineStateLayout, const jShaderBindingInstanceCombiner& InShaderBindingInstanceCombiner, uint32 InFirstSet) const
+void jRHI_DX12::BindComputeShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineState, const jShaderBindingInstanceCombiner& InShaderBindingInstanceCombiner, uint32 InFirstSet) const
 {
     // 이 부분은 구조화 하게 되면, 이전에 만들어둔 것을 그대로 사용
     if (InShaderBindingInstanceCombiner.ShaderBindingInstanceArray)
@@ -1299,6 +1299,12 @@ void jRHI_DX12::BindComputeShaderBindingInstances(const jCommandBuffer* InComman
         if (HasSamplerDescriptor)
             CommandBuffer_DX12->CommandList->SetComputeRootDescriptorTable(RootParameterIndex++, FirstGPUSamplerDescriptorHandle);	// SamplerState test
     }
+}
+
+void jRHI_DX12::BindRaytracingShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineState
+    , const jShaderBindingInstanceCombiner& InShaderBindingInstanceCombiner, uint32 InFirstSet) const
+{
+    BindComputeShaderBindingInstances(InCommandBuffer, InPiplineState, InShaderBindingInstanceCombiner, InFirstSet);
 }
 
 jVertexBuffer* jRHI_DX12::CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const
@@ -1409,6 +1415,36 @@ void jRHI_DX12::DispatchCompute(const std::shared_ptr<jRenderFrameContext>& InRe
     check(numGroupsX * numGroupsY * numGroupsZ > 0);
 
     CommandBuffer_DX12->CommandList->Dispatch(numGroupsX, numGroupsY, numGroupsZ);
+}
+
+void jRHI_DX12::DispatchRay(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jRaytracingDispatchData& InDispatchData) const
+{
+    D3D12_DISPATCH_RAYS_DESC dispatchDesc{};
+    
+    auto PipelineState = (jPipelineStateInfo_DX12*)InDispatchData.PipelineState;
+    check(PipelineState);
+
+    check(PipelineState->HitGroupBuffer);
+    dispatchDesc.HitGroupTable.StartAddress = PipelineState->HitGroupBuffer->GetGPUAddress();
+    dispatchDesc.HitGroupTable.SizeInBytes = PipelineState->HitGroupBuffer->Size;
+    dispatchDesc.HitGroupTable.StrideInBytes = D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT;
+
+    check(PipelineState->MissBuffer);
+    dispatchDesc.MissShaderTable.StartAddress = PipelineState->MissBuffer->GetGPUAddress();
+    dispatchDesc.MissShaderTable.SizeInBytes = PipelineState->MissBuffer->Size;
+    dispatchDesc.MissShaderTable.StrideInBytes = D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT;
+
+    check(PipelineState->RaygenBuffer);
+    dispatchDesc.RayGenerationShaderRecord.StartAddress = PipelineState->RaygenBuffer->GetGPUAddress();
+    dispatchDesc.RayGenerationShaderRecord.SizeInBytes = PipelineState->RaygenBuffer->Size;
+
+    dispatchDesc.Width = InDispatchData.Width;
+    dispatchDesc.Height = InDispatchData.Height;
+    dispatchDesc.Depth = InDispatchData.Depth;
+
+    auto CommandBuffer = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
+    check(CommandBuffer);
+    CommandBuffer->CommandList->DispatchRays(&dispatchDesc);
 }
 
 std::shared_ptr<jRenderTarget> jRHI_DX12::CreateRenderTarget(const jRenderTargetInfo& info) const

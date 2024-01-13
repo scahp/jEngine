@@ -12,7 +12,7 @@ public:
     void Extract(const jShaderBindingInstanceArray& InBindingLayoutArray, int32 InRegisterSpace = 0);
 
 protected:
-    void Extract(const jShaderBindingArray& InShaderBindingArray, int32 InRegisterSpace = 0);
+    void Extract(int32& InOutDescriptorOffset, int32& InOutSamplerDescriptorOffset, const jShaderBindingArray& InShaderBindingArray, int32 InRegisterSpace = 0);
 
 private:
     int32 NumOfInlineRootParameter = 0;    

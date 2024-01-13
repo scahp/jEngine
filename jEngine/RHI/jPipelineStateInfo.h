@@ -555,7 +555,7 @@ struct jPipelineStateInfo
     {
         PipelineType = EPipelineType::Compute;
     }
-    jPipelineStateInfo(const std::vector<jRaytracingPipelineShader>& InShader, const jRaytracingPipelineData InRaytracingPipelineData
+    jPipelineStateInfo(const std::vector<jRaytracingPipelineShader>& InShader, const jRaytracingPipelineData& InRaytracingPipelineData
         , const jShaderBindingLayoutArray& InShaderBindingLayoutArray, const jPushConstant* InPushConstant = nullptr, int32 InSubpassIndex = 0)
         : RaytracingShaders(InShader), RaytracingPipelineData(InRaytracingPipelineData), ShaderBindingLayoutArray(InShaderBindingLayoutArray), PushConstant(InPushConstant), SubpassIndex(InSubpassIndex)
     {
@@ -564,12 +564,12 @@ struct jPipelineStateInfo
     jPipelineStateInfo(const jPipelineStateInfo& InPipelineState)
         : PipelineStateFixed(InPipelineState.PipelineStateFixed), GraphicsShader(InPipelineState.GraphicsShader), ComputeShader(InPipelineState.ComputeShader), RaytracingShaders(InPipelineState.RaytracingShaders)
         , PipelineType(InPipelineState.PipelineType), VertexBufferArray(InPipelineState.VertexBufferArray), RenderPass(InPipelineState.RenderPass), ShaderBindingLayoutArray(InPipelineState.ShaderBindingLayoutArray)
-        , PushConstant(InPipelineState.PushConstant), Hash(InPipelineState.Hash), SubpassIndex(InPipelineState.SubpassIndex)
+        , PushConstant(InPipelineState.PushConstant), Hash(InPipelineState.Hash), SubpassIndex(InPipelineState.SubpassIndex), RaytracingPipelineData(InPipelineState.RaytracingPipelineData)
     {}
     jPipelineStateInfo(jPipelineStateInfo&& InPipelineState) noexcept
         : PipelineStateFixed(InPipelineState.PipelineStateFixed), GraphicsShader(InPipelineState.GraphicsShader), ComputeShader(InPipelineState.ComputeShader), RaytracingShaders(InPipelineState.RaytracingShaders)
         , PipelineType(InPipelineState.PipelineType), VertexBufferArray(InPipelineState.VertexBufferArray), RenderPass(InPipelineState.RenderPass), ShaderBindingLayoutArray(InPipelineState.ShaderBindingLayoutArray)
-        , PushConstant(InPipelineState.PushConstant), Hash(InPipelineState.Hash), SubpassIndex(InPipelineState.SubpassIndex)
+        , PushConstant(InPipelineState.PushConstant), Hash(InPipelineState.Hash), SubpassIndex(InPipelineState.SubpassIndex), RaytracingPipelineData(InPipelineState.RaytracingPipelineData)
     {}
     virtual ~jPipelineStateInfo() {}
 
@@ -580,8 +580,8 @@ struct jPipelineStateInfo
     EPipelineType PipelineType = EPipelineType::Graphics;
     const jGraphicsPipelineShader GraphicsShader;
     const jShader* ComputeShader = nullptr;
-    const std::vector<jRaytracingPipelineShader> RaytracingShaders;
-    const jRaytracingPipelineData RaytracingPipelineData;
+    std::vector<jRaytracingPipelineShader> RaytracingShaders;
+    jRaytracingPipelineData RaytracingPipelineData;
     const jRenderPass* RenderPass = nullptr;
     jVertexBufferArray VertexBufferArray;
     jShaderBindingLayoutArray ShaderBindingLayoutArray;

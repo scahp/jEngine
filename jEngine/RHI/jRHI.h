@@ -303,6 +303,14 @@ struct jImageSubResourceData
 	uint64 Offset = 0;
 };
 
+struct jRaytracingDispatchData
+{
+	int32 Width = 0;
+	int32 Height = 0;
+	int32 Depth = 0;
+	jPipelineStateInfo* PipelineState = nullptr;
+};
+
 class jRHI
 {
 public:
@@ -366,6 +374,7 @@ public:
 	virtual void DrawIndirect(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, jBuffer* buffer, int32 startIndex, int32 drawCount) const {}
 	virtual void DrawElementsIndirect(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, jBuffer* buffer, int32 startIndex, int32 drawCount) const {}
 	virtual void DispatchCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ) const {}
+	virtual void DispatchRay(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jRaytracingDispatchData& InDispatchData) const {}
 	virtual void EnableDepthBias(bool enable, EPolygonMode polygonMode = EPolygonMode::FILL) const {}
 	virtual void SetDepthBias(float constant, float slope) const {}
     virtual bool CreateShaderInternal(jShader* OutShader, const jShaderInfo& shaderInfo) const { return false; }
@@ -483,10 +492,12 @@ public:
 	virtual jMemoryPool* GetMemoryPool() const { return nullptr; }
 
 	virtual void NextSubpass(const jCommandBuffer* commandBuffer) const {}
-	virtual void BindGraphicsShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineStateLayout
+	virtual void BindGraphicsShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineState
 		, const jShaderBindingInstanceCombiner& InShaderBindingInstanceCombiner, uint32 InFirstSet) const {}
-	virtual void BindComputeShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineStateLayout
+	virtual void BindComputeShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineState
 		, const jShaderBindingInstanceCombiner& InShaderBindingInstanceCombiner, uint32 InFirstSet) const {}
+    virtual void BindRaytracingShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineState
+        , const jShaderBindingInstanceCombiner& InShaderBindingInstanceCombiner, uint32 InFirstSet) const {}
 
 	virtual jFenceManager* GetFenceManager() { return nullptr; }
 	virtual jSemaphoreManager* GetSemaphoreManager() { return nullptr; }
