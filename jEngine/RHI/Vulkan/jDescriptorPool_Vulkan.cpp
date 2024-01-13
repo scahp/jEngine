@@ -39,11 +39,12 @@ void jDescriptorPool_Vulkan::Create(uint32 InMaxDescriptorSets)
 
     for (uint32 i = 0; i < NumOfPoolSize; ++i)
     {
-        VkDescriptorType DescriptorType = static_cast<VkDescriptorType>(VK_DESCRIPTOR_TYPE_SAMPLER + i);
+        
+        EShaderBindingType DescriptorType = static_cast<EShaderBindingType>(VK_DESCRIPTOR_TYPE_SAMPLER + i);
 
         PoolSizes[i] = (uint32)Max(DefaultPoolSizes[i] * InMaxDescriptorSets, 4.0f);
 
-        Types[i].type = DescriptorType;
+        Types[i].type = GetVulkanShaderBindingType(DescriptorType);
         Types[i].descriptorCount = PoolSizes[i];
     }
 
@@ -52,6 +53,7 @@ void jDescriptorPool_Vulkan::Create(uint32 InMaxDescriptorSets)
     PoolInfo.poolSizeCount = NumOfPoolSize;
     PoolInfo.pPoolSizes = Types;
     PoolInfo.maxSets = InMaxDescriptorSets;
+    PoolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;       // for bindless resources
 
     verify(VK_SUCCESS == vkCreateDescriptorPool(g_rhi_vk->Device, &PoolInfo, nullptr, &DescriptorPool));
 

@@ -629,6 +629,7 @@ DECLARE_ENUM_WITH_CONVERT_TO_STRING(EShaderBindingType, uint32,
 	BUFFER_UAV_DYNAMIC,
 	BUFFER_TEXEL_SRV,
 	BUFFER_TEXEL_UAV,
+	ACCELERATION_STRUCTURE_SRV,
 	SUBPASS_INPUT_ATTACHMENT,
 	MAX
 );
@@ -727,7 +728,9 @@ struct jBuffer : public jShaderBindableResource, public std::enable_shared_from_
     virtual void UpdateBuffer(const void* data, uint64 size) = 0;
 
     virtual void* GetHandle() const = 0;
-	virtual uint32 GetAllocatedSize() const = 0;
+	virtual uint64 GetOffset() const = 0;
+	virtual uint64 GetAllocatedSize() const = 0;				// AllocatedSize from memory pool
+	virtual uint64 GetBufferSize() const = 0;					// RequstedSize
 };
 
 enum class EPipelineStageMask : uint32

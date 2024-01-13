@@ -1243,6 +1243,26 @@ void jRHI_Vulkan::DispatchCompute(const std::shared_ptr<jRenderFrameContext>& In
 	vkCmdDispatch((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), numGroupsX, numGroupsY, numGroupsZ);
 }
 
+void jRHI_Vulkan::DispatchRay(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jRaytracingDispatchData& InDispatchData) const
+{
+    check(InRenderFrameContext);
+    check(InRenderFrameContext->GetActiveCommandBuffer());
+
+	auto PipelineState_Vulkan = (jPipelineStateInfo_Vulkan*)InDispatchData.PipelineState;
+	check(PipelineState_Vulkan);
+
+    VkStridedDeviceAddressRegionKHR emptySbtEntry = {};
+    g_rhi_vk->vkCmdTraceRaysKHR(
+		(VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(),
+        &PipelineState_Vulkan->RaygenStridedDeviceAddressRegion,
+        &PipelineState_Vulkan->MissStridedDeviceAddressRegion,
+        &PipelineState_Vulkan->HitStridedDeviceAddressRegion,
+        &emptySbtEntry,
+		InDispatchData.Width,
+		InDispatchData.Height,
+		InDispatchData.Depth);
+}
+
 jShaderBindingLayout* jRHI_Vulkan::CreateShaderBindings(const jShaderBindingArray& InShaderBindingArray) const
 {
 	size_t hash = InShaderBindingArray.GetHash();
@@ -1794,6 +1814,12 @@ jPipelineStateInfo* jRHI_Vulkan::CreateComputePipelineStateInfo(const jShader* s
     return PipelineStatePool.GetOrCreateMove(std::move(jPipelineStateInfo(shader, InShaderBindingArray, pushConstant)));
 }
 
+jPipelineStateInfo* jRHI_Vulkan::CreateRaytracingPipelineStateInfo(const std::vector<jRaytracingPipelineShader>& InShaders
+	, const jRaytracingPipelineData& InRaytracingData, const jShaderBindingLayoutArray& InShaderBindingArray, const jPushConstant* pushConstant) const
+{
+	return PipelineStatePool.GetOrCreateMove(std::move(jPipelineStateInfo(InShaders, InRaytracingData, InShaderBindingArray, pushConstant)));
+}
+
 void jRHI_Vulkan::RemovePipelineStateInfo(size_t InHash)
 {
     PipelineStatePool.Release(InHash);
@@ -1926,27 +1952,40 @@ jTexture* jRHI_Vulkan::CreateSampleVRSTexture()
 	return SampleVRSTexture;
 }
 
-void jRHI_Vulkan::BindGraphicsShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineStateLayout
+void jRHI_Vulkan::BindGraphicsShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineState
 	, const jShaderBindingInstanceCombiner& InShaderBindingInstanceCombiner, uint32 InFirstSet) const
 {
 	if (InShaderBindingInstanceCombiner.DescriptorSetHandles.NumOfData)
 	{
 		check(InCommandBuffer);
 		vkCmdBindDescriptorSets((VkCommandBuffer)InCommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS
-			, (VkPipelineLayout)InPiplineStateLayout->GetPipelineLayoutHandle(), InFirstSet
+			, (VkPipelineLayout)InPiplineState->GetPipelineLayoutHandle(), InFirstSet
 			, InShaderBindingInstanceCombiner.DescriptorSetHandles.NumOfData, (const VkDescriptorSet*)&InShaderBindingInstanceCombiner.DescriptorSetHandles[0]
 			, InShaderBindingInstanceCombiner.DynamicOffsets.NumOfData, (InShaderBindingInstanceCombiner.DynamicOffsets.NumOfData ? &InShaderBindingInstanceCombiner.DynamicOffsets[0] : nullptr));
 	}	
 }
 
-void jRHI_Vulkan::BindComputeShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineStateLayout
+void jRHI_Vulkan::BindComputeShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineState
 	, const jShaderBindingInstanceCombiner& InShaderBindingInstanceCombiner, uint32 InFirstSet) const
 {
 	if (InShaderBindingInstanceCombiner.DescriptorSetHandles.NumOfData)
 	{
 		check(InCommandBuffer);
 		vkCmdBindDescriptorSets((VkCommandBuffer)InCommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE
-			, (VkPipelineLayout)InPiplineStateLayout->GetPipelineLayoutHandle(), InFirstSet
+			, (VkPipelineLayout)InPiplineState->GetPipelineLayoutHandle(), InFirstSet
+			, InShaderBindingInstanceCombiner.DescriptorSetHandles.NumOfData, (const VkDescriptorSet*)&InShaderBindingInstanceCombiner.DescriptorSetHandles[0]
+			, InShaderBindingInstanceCombiner.DynamicOffsets.NumOfData, (InShaderBindingInstanceCombiner.DynamicOffsets.NumOfData ? &InShaderBindingInstanceCombiner.DynamicOffsets[0] : nullptr));
+	}
+}
+
+void jRHI_Vulkan::BindRaytracingShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineState
+    , const jShaderBindingInstanceCombiner& InShaderBindingInstanceCombiner, uint32 InFirstSet) const
+{
+	if (InShaderBindingInstanceCombiner.DescriptorSetHandles.NumOfData)
+	{
+		check(InCommandBuffer);
+		vkCmdBindDescriptorSets((VkCommandBuffer)InCommandBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR
+			, (VkPipelineLayout)InPiplineState->GetPipelineLayoutHandle(), InFirstSet
 			, InShaderBindingInstanceCombiner.DescriptorSetHandles.NumOfData, (const VkDescriptorSet*)&InShaderBindingInstanceCombiner.DescriptorSetHandles[0]
 			, InShaderBindingInstanceCombiner.DynamicOffsets.NumOfData, (InShaderBindingInstanceCombiner.DynamicOffsets.NumOfData ? &InShaderBindingInstanceCombiner.DynamicOffsets[0] : nullptr));
 	}

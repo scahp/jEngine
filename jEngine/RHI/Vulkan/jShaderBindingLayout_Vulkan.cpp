@@ -94,6 +94,11 @@ VkDescriptorSetLayout jShaderBindingLayout_Vulkan::CreateDescriptorSetLayout(con
         jScopeWriteLock sw(&DescriptorLayoutPoolLock);
 
         std::vector<VkDescriptorSetLayoutBinding> bindings;
+        bindings.reserve(InShaderBindingArray.NumOfData);
+
+        std::vector<VkDescriptorBindingFlagsEXT> bindingFlags;
+        bindingFlags.reserve(InShaderBindingArray.NumOfData);
+
         int32 LastBindingIndex = 0;
         for (int32 i = 0; i < (int32)InShaderBindingArray.NumOfData; ++i)
         {
@@ -112,12 +117,24 @@ VkDescriptorSetLayout jShaderBindingLayout_Vulkan::CreateDescriptorSetLayout(con
             binding.stageFlags = GetVulkanShaderAccessFlags(InShaderBindingArray[i]->AccessStageFlags);
             binding.pImmutableSamplers = nullptr;
             bindings.push_back(binding);
+            bindingFlags.push_back(InShaderBindingArray[i]->Resource->IsBindless() ? (VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT) : 0);
         }
 
         VkDescriptorSetLayoutCreateInfo layoutInfo = {};
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
         layoutInfo.bindingCount = static_cast<uint32>(bindings.size());
         layoutInfo.pBindings = bindings.data();
+        layoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;      // for bindless resources
+
+        // for bindless resources
+        if (bindingFlags.size() > 0)
+        {
+            VkDescriptorSetLayoutBindingFlagsCreateInfoEXT setLayoutBindingFlags{};
+            setLayoutBindingFlags.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT;
+            setLayoutBindingFlags.bindingCount = (uint32)bindingFlags.size();
+            setLayoutBindingFlags.pBindingFlags = bindingFlags.data();
+            layoutInfo.pNext = &setLayoutBindingFlags;
+        }
 
         if (!ensure(vkCreateDescriptorSetLayout(g_rhi_vk->Device, &layoutInfo, nullptr, &DescriptorSetLayout) == VK_SUCCESS))
             return nullptr;
@@ -239,61 +256,75 @@ void jShaderBindingInstance_Vulkan::CreateWriteDescriptorSet(
 
     std::vector<jWriteDescriptorInfo>& descriptors = OutDescriptorWrites.WriteDescriptorInfos;
     std::vector<VkWriteDescriptorSet>& descriptorWrites = OutDescriptorWrites.DescriptorWrites;
-    descriptors.resize(InShaderBindingArray.NumOfData);
-    descriptorWrites.resize(InShaderBindingArray.NumOfData);
+    descriptors.reserve(200);
+    descriptorWrites.reserve(200);
+    //descriptors.resize(InShaderBindingArray.NumOfData);
+    //descriptorWrites.resize(InShaderBindingArray.NumOfData);
     OutDescriptorWrites.DynamicOffsets.clear();
     OutDescriptorWrites.DynamicOffsets.reserve(InShaderBindingArray.NumOfData);
 
+    int32 LastIndex = 0;
     for (int32 i = 0; i < InShaderBindingArray.NumOfData; ++i)
     {
-        OutDescriptorWrites.SetWriteDescriptorInfo(i, InShaderBindingArray[i]);
+        OutDescriptorWrites.SetWriteDescriptorInfo(InShaderBindingArray[i]);
+        descriptorWrites.resize(descriptors.size());
 
-        VkWriteDescriptorSet& CurDescriptorWrite = descriptorWrites[i];
-        CurDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        CurDescriptorWrite.dstSet = InDescriptorSet;
-        CurDescriptorWrite.dstBinding = i;
-        CurDescriptorWrite.dstArrayElement = 0;
-        CurDescriptorWrite.descriptorType = GetVulkanShaderBindingType(InShaderBindingArray[i]->BindingType);
-        CurDescriptorWrite.descriptorCount = 1;
-        if (descriptors[i].BufferInfo.buffer)
+        for (int32 k = LastIndex; k < descriptorWrites.size(); ++k)
         {
-            CurDescriptorWrite.pBufferInfo = &descriptors[i].BufferInfo;		            // 현재는 Buffer 기반 Desriptor 이므로 이것을 사용
+            VkWriteDescriptorSet& CurDescriptorWrite = descriptorWrites[k];
+            CurDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            CurDescriptorWrite.dstSet = InDescriptorSet;
+            CurDescriptorWrite.dstBinding = i;
+            CurDescriptorWrite.dstArrayElement = k - LastIndex;
+            CurDescriptorWrite.descriptorType = GetVulkanShaderBindingType(InShaderBindingArray[i]->BindingType);
+            CurDescriptorWrite.descriptorCount = 1;
+
+            const jWriteDescriptorInfo& WriteDescriptorInfo = descriptors[k];
+            if (WriteDescriptorInfo.BufferInfo.buffer)
+            {
+                CurDescriptorWrite.pBufferInfo = &WriteDescriptorInfo.BufferInfo;		            // 현재는 Buffer 기반 Desriptor 이므로 이것을 사용
+            }
+            else if (WriteDescriptorInfo.ImageInfo.imageView || WriteDescriptorInfo.ImageInfo.sampler)
+            {
+                CurDescriptorWrite.pImageInfo = &WriteDescriptorInfo.ImageInfo;	        			// Optional (Buffer View 기반에 사용)
+            }
+            else if (WriteDescriptorInfo.AccelerationStructureInfo.pAccelerationStructures)
+            {
+                CurDescriptorWrite.pNext = &WriteDescriptorInfo.AccelerationStructureInfo;
+            }
+            else
+            {
+                check(0);
+            }
         }
-        else if (descriptors[i].ImageInfo.imageView || descriptors[i].ImageInfo.sampler)
-        {
-            CurDescriptorWrite.pImageInfo = &descriptors[i].ImageInfo;	        			// Optional (Buffer View 기반에 사용)
-        }
-        else
-        {
-            check(0);
-        }
+        LastIndex = (int32)descriptorWrites.size();
     }
 
     OutDescriptorWrites.IsInitialized = true;
 }
 
-void jShaderBindingInstance_Vulkan::UpdateWriteDescriptorSet(
-    jWriteDescriptorSet& OutDescriptorWrites, const jShaderBindingArray& InShaderBindingArray)
-{
-    check(InShaderBindingArray.NumOfData == OutDescriptorWrites.DescriptorWrites.size());
-    
-    OutDescriptorWrites.DynamicOffsets.clear();
-    for (int32 i = 0; i < InShaderBindingArray.NumOfData; ++i)
-    {
-        OutDescriptorWrites.SetWriteDescriptorInfo(i, InShaderBindingArray[i]);
-    }
-}
+//void jShaderBindingInstance_Vulkan::UpdateWriteDescriptorSet(
+//    jWriteDescriptorSet& OutDescriptorWrites, const jShaderBindingArray& InShaderBindingArray)
+//{
+//    check(InShaderBindingArray.NumOfData == OutDescriptorWrites.DescriptorWrites.size());
+//    
+//    OutDescriptorWrites.DynamicOffsets.clear();
+//    for (int32 i = 0; i < InShaderBindingArray.NumOfData; ++i)
+//    {
+//        OutDescriptorWrites.SetWriteDescriptorInfo(InShaderBindingArray[i]);
+//    }
+//}
 
 void jShaderBindingInstance_Vulkan::Initialize(const jShaderBindingArray& InShaderBindingArray)
 {
-    if (!WriteDescriptorSet.IsInitialized)
+    //if (!WriteDescriptorSet.IsInitialized)
     {
         CreateWriteDescriptorSet(WriteDescriptorSet, DescriptorSet, InShaderBindingArray);
     }
-    else
-    {
-        UpdateWriteDescriptorSet(WriteDescriptorSet, InShaderBindingArray);
-    }
+    //else
+    //{
+    //    UpdateWriteDescriptorSet(WriteDescriptorSet, InShaderBindingArray);
+    //}
 
     vkUpdateDescriptorSets(g_rhi_vk->Device, static_cast<uint32>(WriteDescriptorSet.DescriptorWrites.size())
         , WriteDescriptorSet.DescriptorWrites.data(), 0, nullptr);
@@ -304,14 +335,14 @@ void jShaderBindingInstance_Vulkan::UpdateShaderBindings(const jShaderBindingArr
     check(ShaderBindingsLayouts->GetShaderBindingsLayout().NumOfData == InShaderBindingArray.NumOfData);
     check(InShaderBindingArray.NumOfData);
 
-    if (!WriteDescriptorSet.IsInitialized)
+    //if (!WriteDescriptorSet.IsInitialized)
     {
         CreateWriteDescriptorSet(WriteDescriptorSet, DescriptorSet, InShaderBindingArray);
     }
-    else
-    {
-        UpdateWriteDescriptorSet(WriteDescriptorSet, InShaderBindingArray);
-    }
+    //else
+    //{
+    //    UpdateWriteDescriptorSet(WriteDescriptorSet, InShaderBindingArray);
+    //}
     
     vkUpdateDescriptorSets(g_rhi_vk->Device, static_cast<uint32>(WriteDescriptorSet.DescriptorWrites.size())
         , WriteDescriptorSet.DescriptorWrites.data(), 0, nullptr);
@@ -323,52 +354,123 @@ void jShaderBindingInstance_Vulkan::Free()
         g_rhi_vk->GetDescriptorPoolMultiFrame()->Free(shared_from_this());
 }
 
-void jWriteDescriptorSet::SetWriteDescriptorInfo(int32 InIndex, const jShaderBinding* InShaderBinding)
+void jWriteDescriptorSet::SetWriteDescriptorInfo(const jShaderBinding* InShaderBinding)
 {
+    const bool IsBindless = InShaderBinding->Resource->IsBindless();
+
     switch (InShaderBinding->BindingType)
     {
     case EShaderBindingType::UNIFORMBUFFER:
     {
-        const jUniformBufferResource* ubor = reinterpret_cast<const jUniformBufferResource*>(InShaderBinding->Resource);
-        if (ensure(ubor && ubor->UniformBuffer))
+        if (IsBindless)
         {
-            VkDescriptorBufferInfo& bufferInfo = WriteDescriptorInfos[InIndex].BufferInfo;
-            bufferInfo.buffer = (VkBuffer)ubor->UniformBuffer->GetBuffer();
-            bufferInfo.offset = ubor->UniformBuffer->GetBufferOffset();
-            bufferInfo.range = ubor->UniformBuffer->GetBufferSize();		// 전체 사이즈라면 VK_WHOLE_SIZE 이거 가능
-            check(bufferInfo.buffer);
+            const jUniformBufferResourceBindless* ubor = reinterpret_cast<const jUniformBufferResourceBindless*>(InShaderBinding->Resource);
+            if (ensure(ubor))
+            {
+                for(auto UniformBuffer : ubor->UniformBuffers)
+                {
+                    check(UniformBuffer);
+
+                    VkDescriptorBufferInfo bufferInfo{};
+                    bufferInfo.buffer = (VkBuffer)UniformBuffer->GetBuffer();
+                    bufferInfo.offset = UniformBuffer->GetBufferOffset();
+                    bufferInfo.range = UniformBuffer->GetBufferSize();		// 전체 사이즈라면 VK_WHOLE_SIZE 이거 가능
+                    check(bufferInfo.buffer);
+                    WriteDescriptorInfos.push_back(jWriteDescriptorInfo(bufferInfo));
+                }
+            }
+        }
+        else
+        {
+            const jUniformBufferResource* ubor = reinterpret_cast<const jUniformBufferResource*>(InShaderBinding->Resource);
+            if (ensure(ubor && ubor->UniformBuffer))
+            {
+                VkDescriptorBufferInfo bufferInfo{};
+                bufferInfo.buffer = (VkBuffer)ubor->UniformBuffer->GetBuffer();
+                bufferInfo.offset = ubor->UniformBuffer->GetBufferOffset();
+                bufferInfo.range = ubor->UniformBuffer->GetBufferSize();		// 전체 사이즈라면 VK_WHOLE_SIZE 이거 가능
+                check(bufferInfo.buffer);
+                WriteDescriptorInfos.push_back(jWriteDescriptorInfo(bufferInfo));
+            }
         }
         break;
     }
     case EShaderBindingType::UNIFORMBUFFER_DYNAMIC:
     {
-        const jUniformBufferResource* ubor = reinterpret_cast<const jUniformBufferResource*>(InShaderBinding->Resource);
-        if (ensure(ubor && ubor->UniformBuffer))
+        if (IsBindless)
         {
-            VkDescriptorBufferInfo& bufferInfo = WriteDescriptorInfos[InIndex].BufferInfo;
-            bufferInfo.buffer = (VkBuffer)ubor->UniformBuffer->GetBuffer();
-            bufferInfo.offset = 0;
-            bufferInfo.range = ubor->UniformBuffer->GetBufferSize();		// 전체 사이즈라면 VK_WHOLE_SIZE 이거 가능
-            check(bufferInfo.buffer);
+            const jUniformBufferResourceBindless* ubor = reinterpret_cast<const jUniformBufferResourceBindless*>(InShaderBinding->Resource);
+            if (ensure(ubor))
+            {
+                for (auto UniformBuffer : ubor->UniformBuffers)
+                {
+                    check(UniformBuffer);
 
-            DynamicOffsets.push_back((uint32)ubor->UniformBuffer->GetBufferOffset());
+                    VkDescriptorBufferInfo bufferInfo{};
+                    bufferInfo.buffer = (VkBuffer)UniformBuffer->GetBuffer();
+                    bufferInfo.offset = UniformBuffer->GetBufferOffset();
+                    bufferInfo.range = UniformBuffer->GetBufferSize();		// 전체 사이즈라면 VK_WHOLE_SIZE 이거 가능
+                    check(bufferInfo.buffer);
+                    WriteDescriptorInfos.push_back(jWriteDescriptorInfo(bufferInfo));
+                    DynamicOffsets.push_back((uint32)UniformBuffer->GetBufferOffset());
+                }
+            }
+        }
+        else
+        {
+            const jUniformBufferResource* ubor = reinterpret_cast<const jUniformBufferResource*>(InShaderBinding->Resource);
+            if (ensure(ubor && ubor->UniformBuffer))
+            {
+                VkDescriptorBufferInfo bufferInfo{};
+                bufferInfo.buffer = (VkBuffer)ubor->UniformBuffer->GetBuffer();
+                bufferInfo.offset = ubor->UniformBuffer->GetBufferOffset();
+                bufferInfo.range = ubor->UniformBuffer->GetBufferSize();		// 전체 사이즈라면 VK_WHOLE_SIZE 이거 가능
+                check(bufferInfo.buffer);
+                WriteDescriptorInfos.push_back(jWriteDescriptorInfo(bufferInfo));
+                DynamicOffsets.push_back((uint32)ubor->UniformBuffer->GetBufferOffset());
+            }
         }
         break;
     }
     case EShaderBindingType::TEXTURE_SAMPLER_SRV:
     case EShaderBindingType::TEXTURE_SRV:
     {
-        const jTextureResource* tbor = reinterpret_cast<const jTextureResource*>(InShaderBinding->Resource);
-        if (ensure(tbor && tbor->Texture))
+        if (IsBindless)
         {
-            VkDescriptorImageInfo& imageInfo = WriteDescriptorInfos[InIndex].ImageInfo;
-            imageInfo.imageLayout = tbor->Texture->IsDepthFormat() ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
-                : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            imageInfo.imageView = ((const jTexture_Vulkan*)tbor->Texture)->View;
-            imageInfo.sampler = tbor->SamplerState ? (VkSampler)tbor->SamplerState->GetHandle() : nullptr;
-            if (!imageInfo.sampler)
-                imageInfo.sampler = jTexture_Vulkan::CreateDefaultSamplerState();		// todo 수정 필요, 텍스쳐를 어떻게 바인드 해야할지 고민 필요
-            check(imageInfo.imageView);
+            const jTextureResourceBindless* tbor = reinterpret_cast<const jTextureResourceBindless*>(InShaderBinding->Resource);
+            if (ensure(tbor))
+            {
+                for (auto TextureData : tbor->TextureBindDatas)
+                {
+                    check(TextureData.Texture);
+
+                    VkDescriptorImageInfo imageInfo{};
+                    imageInfo.imageLayout = TextureData.Texture->IsDepthFormat() ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
+                        : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                    imageInfo.imageView = ((const jTexture_Vulkan*)TextureData.Texture)->View;
+                    imageInfo.sampler = TextureData.SamplerState ? (VkSampler)TextureData.SamplerState->GetHandle() : nullptr;
+                    if (!imageInfo.sampler)
+                        imageInfo.sampler = jTexture_Vulkan::CreateDefaultSamplerState();		// todo 수정 필요, 텍스쳐를 어떻게 바인드 해야할지 고민 필요
+                    check(imageInfo.imageView);
+                    WriteDescriptorInfos.push_back(jWriteDescriptorInfo(imageInfo));
+                }
+            }
+        }
+        else
+        {
+            const jTextureResource* tbor = reinterpret_cast<const jTextureResource*>(InShaderBinding->Resource);
+            if (ensure(tbor && tbor->Texture))
+            {
+                VkDescriptorImageInfo imageInfo{};
+                imageInfo.imageLayout = tbor->Texture->IsDepthFormat() ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
+                    : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                imageInfo.imageView = ((const jTexture_Vulkan*)tbor->Texture)->View;
+                imageInfo.sampler = tbor->SamplerState ? (VkSampler)tbor->SamplerState->GetHandle() : nullptr;
+                if (!imageInfo.sampler)
+                    imageInfo.sampler = jTexture_Vulkan::CreateDefaultSamplerState();		// todo 수정 필요, 텍스쳐를 어떻게 바인드 해야할지 고민 필요
+                check(imageInfo.imageView);
+                WriteDescriptorInfos.push_back(jWriteDescriptorInfo(imageInfo));
+            }
         }
         break;
     }
@@ -377,68 +479,162 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(int32 InIndex, const jShaderBin
         const jTextureArrayResource* tbor = reinterpret_cast<const jTextureArrayResource*>(InShaderBinding->Resource);
         if (ensure(tbor && tbor->TextureArray))
         {
+            check(0);   // todo
         }
         break;
     }
     case EShaderBindingType::SUBPASS_INPUT_ATTACHMENT:
     {
-        const jTextureResource* tbor = reinterpret_cast<const jTextureResource*>(InShaderBinding->Resource);
-        if (ensure(tbor && tbor->Texture))
+        if (IsBindless)
         {
-            VkDescriptorImageInfo& imageInfo = WriteDescriptorInfos[InIndex].ImageInfo;
-            imageInfo.imageLayout = (tbor->Texture->IsDepthFormat() ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-            imageInfo.imageView = ((const jTexture_Vulkan*)tbor->Texture)->View;
-            check(imageInfo.imageView);
+            const jTextureResourceBindless* tbor = reinterpret_cast<const jTextureResourceBindless*>(InShaderBinding->Resource);
+            if (ensure(tbor))
+            {
+                for (auto TextureData : tbor->TextureBindDatas)
+                {
+                    check(TextureData.Texture);
+
+                    VkDescriptorImageInfo imageInfo{};
+                    imageInfo.imageLayout = TextureData.Texture->IsDepthFormat() ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
+                        : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                    imageInfo.imageView = ((const jTexture_Vulkan*)TextureData.Texture)->View;
+                    imageInfo.sampler = TextureData.SamplerState ? (VkSampler)TextureData.SamplerState->GetHandle() : nullptr;
+                    if (!imageInfo.sampler)
+                        imageInfo.sampler = jTexture_Vulkan::CreateDefaultSamplerState();		// todo 수정 필요, 텍스쳐를 어떻게 바인드 해야할지 고민 필요
+                    check(imageInfo.imageView);
+                    WriteDescriptorInfos.push_back(jWriteDescriptorInfo(imageInfo));
+                }
+            }
+        }
+        else
+        {
+            const jTextureResource* tbor = reinterpret_cast<const jTextureResource*>(InShaderBinding->Resource);
+            if (ensure(tbor && tbor->Texture))
+            {
+                VkDescriptorImageInfo imageInfo{};
+                imageInfo.imageLayout = (tbor->Texture->IsDepthFormat() ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                imageInfo.imageView = ((const jTexture_Vulkan*)tbor->Texture)->View;
+                check(imageInfo.imageView);
+                WriteDescriptorInfos.push_back(jWriteDescriptorInfo(imageInfo));
+            }
         }
         break;
     }
     case EShaderBindingType::TEXTURE_UAV:
     {
-        const jTextureResource* tbor = reinterpret_cast<const jTextureResource*>(InShaderBinding->Resource);
-        if (ensure(tbor && tbor->Texture))
+        if (IsBindless)
         {
-            VkDescriptorImageInfo& imageInfo = WriteDescriptorInfos[InIndex].ImageInfo;
-            imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+            const jTextureResourceBindless* tbor = reinterpret_cast<const jTextureResourceBindless*>(InShaderBinding->Resource);
+            if (ensure(tbor))
+            {
+                for (auto TextureData : tbor->TextureBindDatas)
+                {
+                    check(TextureData.Texture);
 
-            const jTexture_Vulkan* Texture = (const jTexture_Vulkan*)tbor->Texture;
-            if (tbor->MipLevel == 0)
-            {
-                imageInfo.imageView = Texture->ViewUAV ? Texture->ViewUAV : Texture->View;
-                check(imageInfo.imageView);
-            }
-            else
-            {
-                const auto& ViewForMipMap = (Texture->ViewUAVForMipMap.size() > 0) ? Texture->ViewUAVForMipMap : Texture->ViewForMipMap;
-                auto it_find = ViewForMipMap.find(tbor->MipLevel);
-                if (it_find != ViewForMipMap.end() && it_find->second)
-                {
-                    imageInfo.imageView = it_find->second;
+                    VkDescriptorImageInfo imageInfo{};
+                    imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+                    const jTexture_Vulkan* Texture = (const jTexture_Vulkan*)TextureData.Texture;
+                    if (TextureData.MipLevel == 0)
+                    {
+                        imageInfo.imageView = Texture->ViewUAV ? Texture->ViewUAV : Texture->View;
+                        check(imageInfo.imageView);
+                    }
+                    else
+                    {
+                        const auto& ViewForMipMap = (Texture->ViewUAVForMipMap.size() > 0) ? Texture->ViewUAVForMipMap : Texture->ViewForMipMap;
+                        auto it_find = ViewForMipMap.find(TextureData.MipLevel);
+                        if (it_find != ViewForMipMap.end() && it_find->second)
+                        {
+                            imageInfo.imageView = it_find->second;
+                        }
+
+                        if (!imageInfo.imageView)
+                        {
+                            imageInfo.imageView = Texture->ViewUAV;
+                            check(imageInfo.imageView);
+                        }
+                    }
+
+                    if (TextureData.SamplerState)
+                        imageInfo.sampler = (VkSampler)TextureData.SamplerState->GetHandle();
+                    if (!imageInfo.sampler)
+                        imageInfo.sampler = jTexture_Vulkan::CreateDefaultSamplerState();		// todo 수정 필요, 텍스쳐를 어떻게 바인드 해야할지 고민 필요
+                    check(imageInfo.imageView);
+                    WriteDescriptorInfos.push_back(jWriteDescriptorInfo(imageInfo));
                 }
-                
-                if (!imageInfo.imageView)
+            }
+        }
+        else
+        {
+            const jTextureResource* tbor = reinterpret_cast<const jTextureResource*>(InShaderBinding->Resource);
+            if (ensure(tbor && tbor->Texture))
+            {
+                VkDescriptorImageInfo imageInfo{};
+                imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+                const jTexture_Vulkan* Texture = (const jTexture_Vulkan*)tbor->Texture;
+                if (tbor->MipLevel == 0)
                 {
-                    imageInfo.imageView = Texture->ViewUAV;
+                    imageInfo.imageView = Texture->ViewUAV ? Texture->ViewUAV : Texture->View;
                     check(imageInfo.imageView);
                 }
-            }
+                else
+                {
+                    const auto& ViewForMipMap = (Texture->ViewUAVForMipMap.size() > 0) ? Texture->ViewUAVForMipMap : Texture->ViewForMipMap;
+                    auto it_find = ViewForMipMap.find(tbor->MipLevel);
+                    if (it_find != ViewForMipMap.end() && it_find->second)
+                    {
+                        imageInfo.imageView = it_find->second;
+                    }
 
-            if (tbor->SamplerState)
-                imageInfo.sampler = (VkSampler)tbor->SamplerState->GetHandle();
-            if (!imageInfo.sampler)
-                imageInfo.sampler = jTexture_Vulkan::CreateDefaultSamplerState();		// todo 수정 필요, 텍스쳐를 어떻게 바인드 해야할지 고민 필요
-            check(imageInfo.imageView);
+                    if (!imageInfo.imageView)
+                    {
+                        imageInfo.imageView = Texture->ViewUAV;
+                        check(imageInfo.imageView);
+                    }
+                }
+
+                if (tbor->SamplerState)
+                    imageInfo.sampler = (VkSampler)tbor->SamplerState->GetHandle();
+                if (!imageInfo.sampler)
+                    imageInfo.sampler = jTexture_Vulkan::CreateDefaultSamplerState();		// todo 수정 필요, 텍스쳐를 어떻게 바인드 해야할지 고민 필요
+                check(imageInfo.imageView);
+                WriteDescriptorInfos.push_back(jWriteDescriptorInfo(imageInfo));
+            }
         }
         break;
     }
     case EShaderBindingType::SAMPLER:
     {
-        const jSamplerResource* sr = reinterpret_cast<const jSamplerResource*>(InShaderBinding->Resource);
-        if (ensure(sr && sr->SamplerState))
+        if (IsBindless)
         {
-            VkDescriptorImageInfo& imageInfo = WriteDescriptorInfos[InIndex].ImageInfo;
-            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            imageInfo.sampler = (VkSampler)sr->SamplerState->GetHandle();
-            check(imageInfo.sampler);
+            const jSamplerResourceBindless* sr = reinterpret_cast<const jSamplerResourceBindless*>(InShaderBinding->Resource);
+            if (ensure(sr))
+            {
+                for(auto SamplerState : sr->SamplerStates)
+                {
+                    check(SamplerState);
+
+                    VkDescriptorImageInfo imageInfo{};
+                    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                    imageInfo.sampler = (VkSampler)SamplerState->GetHandle();
+                    check(imageInfo.sampler);
+                    WriteDescriptorInfos.push_back(jWriteDescriptorInfo(imageInfo));
+                }
+            }
+        }
+        else
+        {
+            const jSamplerResource* sr = reinterpret_cast<const jSamplerResource*>(InShaderBinding->Resource);
+            if (ensure(sr && sr->SamplerState))
+            {
+                VkDescriptorImageInfo imageInfo{};
+                imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                imageInfo.sampler = (VkSampler)sr->SamplerState->GetHandle();
+                check(imageInfo.sampler);
+                WriteDescriptorInfos.push_back(jWriteDescriptorInfo(imageInfo));
+            }
         }
         break;
     }
@@ -448,14 +644,65 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(int32 InIndex, const jShaderBin
     case EShaderBindingType::BUFFER_UAV:
     case EShaderBindingType::BUFFER_UAV_DYNAMIC:
     {
-        const jBufferResource* br = reinterpret_cast<const jBufferResource*>(InShaderBinding->Resource);
-        if (ensure(br && br->Buffer))
+        if (IsBindless)
         {
-            VkDescriptorBufferInfo& bufferInfo = WriteDescriptorInfos[InIndex].BufferInfo;
-            bufferInfo.buffer = (VkBuffer)br->Buffer->GetHandle();
-            bufferInfo.offset = 0;
-            bufferInfo.range = br->Buffer->GetAllocatedSize();		// 전체 사이즈라면 VK_WHOLE_SIZE 이거 가능
-            check(bufferInfo.buffer);
+            const jBufferResourceBindless* br = reinterpret_cast<const jBufferResourceBindless*>(InShaderBinding->Resource);
+            for(auto Buffer : br->Buffers)
+            {
+                check(Buffer);
+
+                VkDescriptorBufferInfo bufferInfo{};
+                bufferInfo.buffer = (VkBuffer)Buffer->GetHandle();
+                bufferInfo.offset = Buffer->GetOffset();
+                bufferInfo.range = Buffer->GetBufferSize();		// 전체 사이즈라면 VK_WHOLE_SIZE 이거 가능
+                check(bufferInfo.buffer);
+                WriteDescriptorInfos.push_back(jWriteDescriptorInfo(bufferInfo));
+            }
+        }
+        else
+        {
+            const jBufferResource* br = reinterpret_cast<const jBufferResource*>(InShaderBinding->Resource);
+            if (ensure(br && br->Buffer))
+            {
+                VkDescriptorBufferInfo bufferInfo{};
+                bufferInfo.buffer = (VkBuffer)br->Buffer->GetHandle();
+                bufferInfo.offset = br->Buffer->GetOffset();
+                bufferInfo.range = br->Buffer->GetBufferSize();		// 전체 사이즈라면 VK_WHOLE_SIZE 이거 가능
+                check(bufferInfo.buffer);
+                WriteDescriptorInfos.push_back(jWriteDescriptorInfo(bufferInfo));
+            }
+        }
+        break;
+    }
+    case EShaderBindingType::ACCELERATION_STRUCTURE_SRV:
+    {
+        if (IsBindless)
+        {
+            const jBufferResourceBindless* br = reinterpret_cast<const jBufferResourceBindless*>(InShaderBinding->Resource);
+            for (auto Buffer : br->Buffers)
+            {
+                check(Buffer);
+
+                VkWriteDescriptorSetAccelerationStructureKHR AccelerationStructureKHR{};
+                AccelerationStructureKHR.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
+                AccelerationStructureKHR.accelerationStructureCount = 1;
+                AccelerationStructureKHR.pAccelerationStructures = &((jBuffer_Vulkan*)Buffer)->AccelerationStructure;
+                check(AccelerationStructureKHR.pAccelerationStructures);
+                WriteDescriptorInfos.push_back(jWriteDescriptorInfo(AccelerationStructureKHR));
+            }
+        }
+        else
+        {
+            const jBufferResource* br = reinterpret_cast<const jBufferResource*>(InShaderBinding->Resource);
+            if (ensure(br && br->Buffer))
+            {
+                VkWriteDescriptorSetAccelerationStructureKHR AccelerationStructureKHR{};
+                AccelerationStructureKHR.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
+                AccelerationStructureKHR.accelerationStructureCount = 1;
+                AccelerationStructureKHR.pAccelerationStructures = &((jBuffer_Vulkan*)br->Buffer)->AccelerationStructure;
+                check(AccelerationStructureKHR.pAccelerationStructures);
+                WriteDescriptorInfos.push_back(jWriteDescriptorInfo(AccelerationStructureKHR));
+            }
         }
         break;
     }

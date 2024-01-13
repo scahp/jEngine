@@ -51,6 +51,7 @@ void jImGUI_Vulkan::Initialize(float width, float height)
     descriptorPoolInfo.poolSizeCount = static_cast<uint32>(poolSizes.size());
     descriptorPoolInfo.pPoolSizes = poolSizes.data();
     descriptorPoolInfo.maxSets = 2;
+    descriptorPoolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
     verify(VK_SUCCESS == vkCreateDescriptorPool(g_rhi_vk->Device, &descriptorPoolInfo, nullptr, &DescriptorPool));
 
     // Descriptor set layout

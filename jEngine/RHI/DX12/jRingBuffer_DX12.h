@@ -81,7 +81,9 @@ struct jRingBuffer_DX12 : public jBuffer
     }
 
     virtual void* GetHandle() const override { return Buffer.Get(); }
-    virtual uint32 GetAllocatedSize() const override { return (uint32)RingBufferSize; }
+    virtual uint64 GetAllocatedSize() const override { return RingBufferSize; }
+    virtual uint64 GetBufferSize() const override { return RingBufferSize; }
+    virtual uint64 GetOffset() const override { return RingBufferOffset; }
     FORCEINLINE uint64 GetGPUAddress() const { return Buffer->GetGPUVirtualAddress(); }
 
     uint64 RingBufferOffset = 0;

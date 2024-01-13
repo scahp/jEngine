@@ -159,7 +159,7 @@ void jPipelineStateInfo_Vulkan::Initialize()
     else if (PipelineType == EPipelineType::Compute)
         CreateComputePipelineState();
     else if (PipelineType == EPipelineType::RayTracing)
-        check(0);
+        CreateRaytracingPipelineState();
     else
         check(0);
 }
@@ -418,13 +418,206 @@ void* jPipelineStateInfo_Vulkan::CreateComputePipelineState()
     return vkPipeline;
 }
 
+void* jPipelineStateInfo_Vulkan::CreateRaytracingPipelineState()
+{
+    // 미리 만들어 둔게 있으면 사용
+    if (vkPipeline)
+        return vkPipeline;
+
+    vkPipelineLayout = jShaderBindingLayout_Vulkan::CreatePipelineLayout(ShaderBindingLayoutArray, PushConstant);
+
+    std::vector<VkRayTracingShaderGroupCreateInfoKHR> raygenGroups;
+    raygenGroups.reserve(RaytracingShaders.size() * 4);
+    
+    std::vector<VkRayTracingShaderGroupCreateInfoKHR> hitGroups;
+    hitGroups.reserve(RaytracingShaders.size() * 4);
+    
+    std::vector<VkRayTracingShaderGroupCreateInfoKHR> missGroups;
+    missGroups.reserve(RaytracingShaders.size() * 4);
+    
+    std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
+    shaderStages.reserve(RaytracingShaders.size() * 4);
+
+    for (int32 i = 0; i < RaytracingShaders.size(); ++i)
+    {
+        if (RaytracingShaders[i].RaygenShader)
+        {
+            shaderStages.push_back(((jCompiledShader_Vulkan*)RaytracingShaders[i].RaygenShader->CompiledShader)->ShaderStage);
+
+            VkRayTracingShaderGroupCreateInfoKHR shaderGroup{};
+            shaderGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+            shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+            shaderGroup.generalShader = static_cast<uint32>(shaderStages.size()) - 1;
+            shaderGroup.closestHitShader = VK_SHADER_UNUSED_KHR;
+            shaderGroup.anyHitShader = VK_SHADER_UNUSED_KHR;
+            shaderGroup.intersectionShader = VK_SHADER_UNUSED_KHR;
+            raygenGroups.push_back(shaderGroup);
+        }
+
+        if (RaytracingShaders[i].ClosestHitShader || RaytracingShaders[i].AnyHitShader)
+        {
+            VkRayTracingShaderGroupCreateInfoKHR shaderGroup{};
+            shaderGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+            shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
+            shaderGroup.generalShader = VK_SHADER_UNUSED_KHR;
+            shaderGroup.closestHitShader = VK_SHADER_UNUSED_KHR;
+            shaderGroup.anyHitShader = VK_SHADER_UNUSED_KHR;
+            shaderGroup.intersectionShader = VK_SHADER_UNUSED_KHR;
+
+            if (RaytracingShaders[i].ClosestHitShader)
+            {
+                shaderStages.push_back(((jCompiledShader_Vulkan*)RaytracingShaders[i].ClosestHitShader->CompiledShader)->ShaderStage);
+                shaderGroup.closestHitShader = static_cast<uint32>(shaderStages.size()) - 1;;
+            }
+
+            if (RaytracingShaders[i].AnyHitShader)
+            {
+                shaderStages.push_back(((jCompiledShader_Vulkan*)RaytracingShaders[i].AnyHitShader->CompiledShader)->ShaderStage);
+                shaderGroup.anyHitShader = static_cast<uint32>(shaderStages.size()) - 1;;
+            }
+
+            hitGroups.push_back(shaderGroup);
+        }
+
+        if (RaytracingShaders[i].MissShader)
+        {
+            shaderStages.push_back(((jCompiledShader_Vulkan*)RaytracingShaders[i].MissShader->CompiledShader)->ShaderStage);
+
+            VkRayTracingShaderGroupCreateInfoKHR shaderGroup{};
+            shaderGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+            shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+            shaderGroup.generalShader = static_cast<uint32>(shaderStages.size()) - 1;
+            shaderGroup.closestHitShader = VK_SHADER_UNUSED_KHR;
+            shaderGroup.anyHitShader = VK_SHADER_UNUSED_KHR;
+            shaderGroup.intersectionShader = VK_SHADER_UNUSED_KHR;
+            missGroups.push_back(shaderGroup);
+        }
+    }
+
+    std::vector<VkRayTracingShaderGroupCreateInfoKHR> MergedShaderGroups;
+    MergedShaderGroups.reserve(raygenGroups.size() + missGroups.size() + hitGroups.size());
+    MergedShaderGroups.insert(MergedShaderGroups.end(), raygenGroups.begin(), raygenGroups.end());
+    MergedShaderGroups.insert(MergedShaderGroups.end(), missGroups.begin(), missGroups.end());
+    MergedShaderGroups.insert(MergedShaderGroups.end(), hitGroups.begin(), hitGroups.end());
+
+    VkRayTracingPipelineCreateInfoKHR rayTracingPipelineCI{};
+    rayTracingPipelineCI.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
+    rayTracingPipelineCI.stageCount = static_cast<uint32>(shaderStages.size());
+    rayTracingPipelineCI.pStages = shaderStages.data();
+    rayTracingPipelineCI.groupCount = static_cast<uint32>(MergedShaderGroups.size());
+    rayTracingPipelineCI.pGroups = MergedShaderGroups.data();
+    rayTracingPipelineCI.maxPipelineRayRecursionDepth = RaytracingPipelineData.MaxTraceRecursionDepth;
+    rayTracingPipelineCI.layout = vkPipelineLayout;
+    check(VK_SUCCESS == g_rhi_vk->vkCreateRayTracingPipelinesKHR(g_rhi_vk->Device, VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &rayTracingPipelineCI, nullptr, &vkPipeline));
+
+    // ShaderBindingTable
+    const uint32 handleSize = g_rhi_vk->RayTracingPipelineProperties.shaderGroupHandleSize;
+    const uint32 handleSizeAligned = Align(g_rhi_vk->RayTracingPipelineProperties.shaderGroupHandleSize, g_rhi_vk->RayTracingPipelineProperties.shaderGroupHandleAlignment);
+    const uint32 groupCount = static_cast<uint32>(MergedShaderGroups.size());
+    const uint32 sbtSize = groupCount * handleSizeAligned;
+
+    std::vector<uint8> shaderHandleStorage(sbtSize);
+    check(VK_SUCCESS == g_rhi_vk->vkGetRayTracingShaderGroupHandlesKHR(g_rhi_vk->Device, vkPipeline, 0, groupCount, sbtSize, shaderHandleStorage.data()));
+
+    auto getBufferDeviceAddress = [](VkBuffer buffer)
+    {
+        VkBufferDeviceAddressInfoKHR bufferDeviceAI{};
+        bufferDeviceAI.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+        bufferDeviceAI.buffer = buffer;
+        return g_rhi_vk->vkGetBufferDeviceAddressKHR(g_rhi_vk->Device, &bufferDeviceAI);
+    };
+
+    auto getSbtEntryStridedDeviceAddressRegion = [&](jBuffer_Vulkan* buffer, uint32 handleCount)
+    {
+        const uint32 handleSizeAligned = Align(g_rhi_vk->RayTracingPipelineProperties.shaderGroupHandleSize, g_rhi_vk->RayTracingPipelineProperties.shaderGroupHandleAlignment);
+        VkStridedDeviceAddressRegionKHR stridedDeviceAddressRegionKHR{};
+        stridedDeviceAddressRegionKHR.deviceAddress = getBufferDeviceAddress(buffer->Buffer) + buffer->Offset;
+        stridedDeviceAddressRegionKHR.stride = handleSizeAligned;
+        stridedDeviceAddressRegionKHR.size = handleCount * stridedDeviceAddressRegionKHR.stride;
+        return stridedDeviceAddressRegionKHR;
+    };
+
+    const uint64 AlignedBaseGroupHandleSize = Align(g_rhi_vk->RayTracingPipelineProperties.shaderGroupHandleSize
+        , g_rhi_vk->RayTracingPipelineProperties.shaderGroupBaseAlignment);
+
+    if (RaygenBuffer)
+        delete RaygenBuffer;
+    RaygenBuffer = new jBuffer_Vulkan();
+    {
+        // Create buffer to hold all shader handles for the SBT
+        const uint32 handleCount = (uint32)raygenGroups.size();
+        jBufferUtil_Vulkan::AllocateBuffer(
+            EVulkanBufferBits::SHADER_BINDING_TABLE | EVulkanBufferBits::SHADER_DEVICE_ADDRESS,
+            EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT,
+            AlignedBaseGroupHandleSize * handleCount, *RaygenBuffer);
+        RaygenStridedDeviceAddressRegion = getSbtEntryStridedDeviceAddressRegion(RaygenBuffer, handleCount);
+        RaygenBuffer->Map();
+    }
+
+    if (MissBuffer)
+        delete MissBuffer;
+    MissBuffer = new jBuffer_Vulkan();
+    {
+        // Create buffer to hold all shader handles for the SBT
+        const uint32 handleCount = (uint32)missGroups.size();
+        jBufferUtil_Vulkan::AllocateBuffer(
+            EVulkanBufferBits::SHADER_BINDING_TABLE | EVulkanBufferBits::SHADER_DEVICE_ADDRESS,
+            EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT,
+            AlignedBaseGroupHandleSize * handleCount, *MissBuffer);
+        MissStridedDeviceAddressRegion = getSbtEntryStridedDeviceAddressRegion(MissBuffer, handleCount);
+        MissBuffer->Map();
+    }
+
+    if (HitGroupBuffer)
+        delete HitGroupBuffer;
+    HitGroupBuffer = new jBuffer_Vulkan();
+    {
+        // Create buffer to hold all shader handles for the SBT
+        const uint32 handleCount = (uint32)hitGroups.size();
+        jBufferUtil_Vulkan::AllocateBuffer(
+            EVulkanBufferBits::SHADER_BINDING_TABLE | EVulkanBufferBits::SHADER_DEVICE_ADDRESS,
+            EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT,
+            AlignedBaseGroupHandleSize * handleCount, *HitGroupBuffer);
+        HitStridedDeviceAddressRegion = getSbtEntryStridedDeviceAddressRegion(HitGroupBuffer, handleCount);
+        HitGroupBuffer->Map();
+    };
+
+    memcpy(RaygenBuffer->Map(), shaderHandleStorage.data(), handleSize * raygenGroups.size());
+    memcpy(MissBuffer->Map(), shaderHandleStorage.data() + handleSizeAligned * (raygenGroups.size()), handleSize * missGroups.size());
+    memcpy(HitGroupBuffer->Map(), shaderHandleStorage.data() + handleSizeAligned * (raygenGroups.size() + missGroups.size()), handleSize * hitGroups.size());
+
+    RaygenBuffer->Unmap();
+    MissBuffer->Unmap();
+    HitGroupBuffer->Unmap();
+
+    size_t hash = GetHash();
+    if (ensure(hash))
+    {
+        for (int32 i = 0; i < (int32)RaytracingShaders.size(); ++i)
+        {
+            if (RaytracingShaders[i].RaygenShader)
+                jShader::gConnectedPipelineStateHash[RaytracingShaders[i].RaygenShader].push_back(hash);
+            if (RaytracingShaders[i].ClosestHitShader)
+                jShader::gConnectedPipelineStateHash[RaytracingShaders[i].ClosestHitShader].push_back(hash);
+            if (RaytracingShaders[i].AnyHitShader)
+                jShader::gConnectedPipelineStateHash[RaytracingShaders[i].AnyHitShader].push_back(hash);
+            if (RaytracingShaders[i].MissShader)
+                jShader::gConnectedPipelineStateHash[RaytracingShaders[i].MissShader].push_back(hash);
+        }
+    }
+
+    return vkPipeline;
+}
+
 void jPipelineStateInfo_Vulkan::Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const
 {
     check(vkPipeline);
     if (PipelineType == EPipelineType::Graphics)
         vkCmdBindPipeline((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipeline);
-    else if (PipelineType == EPipelineType::Graphics)
+    else if (PipelineType == EPipelineType::Compute)
         vkCmdBindPipeline((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, vkPipeline);
     else if (PipelineType == EPipelineType::RayTracing)
+        vkCmdBindPipeline((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, vkPipeline);
+    else
         check(0);
 }

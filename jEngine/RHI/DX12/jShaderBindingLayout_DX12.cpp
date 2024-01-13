@@ -15,11 +15,13 @@ void jRootParameterExtractor::Extract(int32& InOutDescriptorOffset, int32& InOut
     for (int32 i = 0; i < InShaderBindingArray.NumOfData; ++i)
     {
         const jShaderBinding* ShaderBinding = InShaderBindingArray[i];
+        const bool IsBindless = ShaderBinding->Resource->IsBindless();
 
         check(!ShaderBinding->IsInline || (ShaderBinding->IsInline &&
             (ShaderBinding->BindingType == EShaderBindingType::UNIFORMBUFFER
                 || ShaderBinding->BindingType == EShaderBindingType::UNIFORMBUFFER_DYNAMIC
                 || ShaderBinding->BindingType == EShaderBindingType::BUFFER_SRV
+                || ShaderBinding->BindingType == EShaderBindingType::ACCELERATION_STRUCTURE_SRV
                 || ShaderBinding->BindingType == EShaderBindingType::BUFFER_UAV)));
 
         switch (ShaderBinding->BindingType)
@@ -44,7 +46,7 @@ void jRootParameterExtractor::Extract(int32& InOutDescriptorOffset, int32& InOut
                 range.NumDescriptors = ShaderBinding->NumOfDescriptors;
                 range.BaseShaderRegister = BindingIndex;
                 range.RegisterSpace = InRegisterSpace;
-                if (ShaderBinding->IsBindless())
+                if (IsBindless)
                 {
                     range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE;
                     range.OffsetInDescriptorsFromTableStart = InOutDescriptorOffset;
@@ -71,8 +73,9 @@ void jRootParameterExtractor::Extract(int32& InOutDescriptorOffset, int32& InOut
         case EShaderBindingType::TEXTURE_ARRAY_SRV:
         case EShaderBindingType::BUFFER_SRV:
         case EShaderBindingType::BUFFER_TEXEL_SRV:
+        case EShaderBindingType::ACCELERATION_STRUCTURE_SRV:
         {
-            if (ShaderBinding->IsInline && (ShaderBinding->BindingType == EShaderBindingType::BUFFER_SRV))
+            if (ShaderBinding->IsInline && (ShaderBinding->BindingType == EShaderBindingType::BUFFER_SRV || ShaderBinding->BindingType == EShaderBindingType::ACCELERATION_STRUCTURE_SRV))
             {
                 D3D12_ROOT_PARAMETER1 rootParameter = {};
                 rootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
@@ -89,7 +92,7 @@ void jRootParameterExtractor::Extract(int32& InOutDescriptorOffset, int32& InOut
                 range.NumDescriptors = ShaderBinding->NumOfDescriptors;
                 range.BaseShaderRegister = BindingIndex;
                 range.RegisterSpace = InRegisterSpace;
-                if (ShaderBinding->IsBindless())
+                if (IsBindless)
                 {
                     range.OffsetInDescriptorsFromTableStart = InOutDescriptorOffset;
                     range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE;
@@ -116,7 +119,7 @@ void jRootParameterExtractor::Extract(int32& InOutDescriptorOffset, int32& InOut
                 range.NumDescriptors = ShaderBinding->NumOfDescriptors;
                 range.BaseShaderRegister = BindingIndex;
                 range.RegisterSpace = InRegisterSpace;
-                if (ShaderBinding->IsBindless())
+                if (IsBindless)
                 {
                     range.OffsetInDescriptorsFromTableStart = InOutSamplerDescriptorOffset;
                     range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE;
@@ -145,7 +148,7 @@ void jRootParameterExtractor::Extract(int32& InOutDescriptorOffset, int32& InOut
         case EShaderBindingType::BUFFER_UAV_DYNAMIC:
         case EShaderBindingType::BUFFER_TEXEL_UAV:
         {
-            if (ShaderBinding->IsInline && (ShaderBinding->BindingType == EShaderBindingType::BUFFER_SRV))
+            if (ShaderBinding->IsInline)
             {
                 D3D12_ROOT_PARAMETER1 rootParameter = {};
                 rootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_UAV;
@@ -162,7 +165,7 @@ void jRootParameterExtractor::Extract(int32& InOutDescriptorOffset, int32& InOut
                 range.NumDescriptors = ShaderBinding->NumOfDescriptors;
                 range.BaseShaderRegister = BindingIndex;
                 range.RegisterSpace = InRegisterSpace;
-                if (ShaderBinding->IsBindless())
+                if (IsBindless)
                 {
                     range.OffsetInDescriptorsFromTableStart = InOutDescriptorOffset;
                     range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE;
@@ -191,7 +194,7 @@ void jRootParameterExtractor::Extract(int32& InOutDescriptorOffset, int32& InOut
             range.NumDescriptors = ShaderBinding->NumOfDescriptors;
             range.BaseShaderRegister = BindingIndex;
             range.RegisterSpace = InRegisterSpace;
-            if (ShaderBinding->IsBindless())
+            if (IsBindless)
             {
                 range.OffsetInDescriptorsFromTableStart = InOutSamplerDescriptorOffset;
                 range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE;

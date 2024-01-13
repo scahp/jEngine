@@ -273,30 +273,30 @@ void* jPipelineStateInfo_DX12::CreateRaytracingPipelineState()
     std::vector<D3D12_DXIL_LIBRARY_DESC> dxilDescs;
     dxilDescs.reserve(RaytracingShaders.size() * 4);
     auto AddShaderFunc = [&](jShader* InShader, const wchar_t* InEntryPoint)
-        {
-            if (!InShader)
-                return;
+    {
+        if (!InShader)
+            return;
 
-            D3D12_EXPORT_DESC exportDesc{};
-            exportDesc.Name = InEntryPoint;
-            exportDesc.Flags = D3D12_EXPORT_FLAG_NONE;
-            exportDesc.ExportToRename = nullptr;
-            exportDescs.push_back(exportDesc);
+        D3D12_EXPORT_DESC exportDesc{};
+        exportDesc.Name = InEntryPoint;
+        exportDesc.Flags = D3D12_EXPORT_FLAG_NONE;
+        exportDesc.ExportToRename = nullptr;
+        exportDescs.push_back(exportDesc);
 
-            auto CompiledShaderDX12 = (jCompiledShader_DX12*)InShader->GetCompiledShader();
+        auto CompiledShaderDX12 = (jCompiledShader_DX12*)InShader->GetCompiledShader();
 
-            D3D12_DXIL_LIBRARY_DESC dxilDesc{};
-            dxilDesc.DXILLibrary.pShaderBytecode = CompiledShaderDX12->ShaderBlob->GetBufferPointer();
-            dxilDesc.DXILLibrary.BytecodeLength = CompiledShaderDX12->ShaderBlob->GetBufferSize();
-            dxilDesc.NumExports = 1;
-            dxilDesc.pExports = &exportDescs[exportDescs.size() - 1];
-            dxilDescs.push_back(dxilDesc);
+        D3D12_DXIL_LIBRARY_DESC dxilDesc{};
+        dxilDesc.DXILLibrary.pShaderBytecode = CompiledShaderDX12->ShaderBlob->GetBufferPointer();
+        dxilDesc.DXILLibrary.BytecodeLength = CompiledShaderDX12->ShaderBlob->GetBufferSize();
+        dxilDesc.NumExports = 1;
+        dxilDesc.pExports = &exportDescs[exportDescs.size() - 1];
+        dxilDescs.push_back(dxilDesc);
 
-            D3D12_STATE_SUBOBJECT subobject{};
-            subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
-            subobject.pDesc = &dxilDescs[dxilDescs.size() - 1];
-            subobjects.push_back(subobject);
-        };
+        D3D12_STATE_SUBOBJECT subobject{};
+        subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
+        subobject.pDesc = &dxilDescs[dxilDescs.size() - 1];
+        subobjects.push_back(subobject);
+    };
 
     std::vector<D3D12_HIT_GROUP_DESC> hitgroupDescs;
     hitgroupDescs.reserve(RaytracingShaders.size());

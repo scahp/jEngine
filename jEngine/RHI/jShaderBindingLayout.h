@@ -212,8 +212,6 @@ struct jShaderBinding
         OutReslut.Hash = Hash;
     }
 
-    bool IsBindless() const { return NumOfDescriptors >= UINT_MAX; }
-
     mutable size_t Hash = 0;
 
     bool IsInline = false;

@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+struct jBuffer_Vulkan;
+
 struct jSamplerStateInfo_Vulkan : public jSamplerStateInfo
 {
     jSamplerStateInfo_Vulkan() = default;
@@ -96,8 +98,18 @@ struct jPipelineStateInfo_Vulkan : public jPipelineStateInfo
     virtual void* GetPipelineLayoutHandle() const override { return vkPipelineLayout; }
     virtual void* CreateGraphicsPipelineState() override;
     virtual void* CreateComputePipelineState() override;
+    virtual void* CreateRaytracingPipelineState() override;
     virtual void Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const override;
 
     VkPipeline vkPipeline = nullptr;
     VkPipelineLayout vkPipelineLayout = nullptr;        // PipelineLayout 은 PipelineLayoutPool 에서 캐싱해둔 거라 소멸시키지 않음
+
+    // Raytracing ShaderTables
+    jBuffer_Vulkan* RaygenBuffer = nullptr;
+    jBuffer_Vulkan* MissBuffer = nullptr;
+    jBuffer_Vulkan* HitGroupBuffer = nullptr;
+
+    VkStridedDeviceAddressRegionKHR RaygenStridedDeviceAddressRegion{};
+    VkStridedDeviceAddressRegionKHR MissStridedDeviceAddressRegion{};
+    VkStridedDeviceAddressRegionKHR HitStridedDeviceAddressRegion{};
 };

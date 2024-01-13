@@ -168,6 +168,7 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
         }
         case EShaderBindingType::BUFFER_SRV:
         case EShaderBindingType::BUFFER_TEXEL_SRV:
+        case EShaderBindingType::ACCELERATION_STRUCTURE_SRV:
         {
             if (IsBindless)
             {
