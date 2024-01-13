@@ -7,6 +7,7 @@
 #include "jRenderPass_DX12.h"
 #include "jShaderBindingLayout_DX12.h"
 #include "Shader/jShader.h"
+#include "jBufferUtil_DX12.h"
 
 void jSamplerStateInfo_DX12::Initialize()
 {
@@ -103,12 +104,21 @@ void jSamplerStateInfo_DX12::Release()
 
 void jPipelineStateInfo_DX12::Release()
 {
-    //if (vkPipeline)
-    //{
-    //    vkDestroyPipeline(g_rhi_vk->Device, vkPipeline, nullptr);
-    //    vkPipeline = nullptr;
-    //}
-    //vkPipelineLayout = nullptr;
+    if (RaygenBuffer)
+    {
+        delete RaygenBuffer;
+        RaygenBuffer = nullptr;
+    }
+    if (MissBuffer)
+    {
+        delete MissBuffer;
+        MissBuffer = nullptr;
+    }
+    if (HitGroupBuffer)
+    {
+        delete HitGroupBuffer;
+        HitGroupBuffer = nullptr;
+    }
 }
 
 void jPipelineStateInfo_DX12::Initialize()
@@ -254,42 +264,40 @@ void* jPipelineStateInfo_DX12::CreateComputePipelineState()
 
 void* jPipelineStateInfo_DX12::CreateRaytracingPipelineState()
 {
-    PipelineState = nullptr;
-
-    ID3D12RootSignature* RootSignature = jShaderBindingLayout_DX12::CreateRootSignature(ShaderBindingLayoutArray);
+    std::vector<D3D12_STATE_SUBOBJECT> subobjects;
+    subobjects.reserve(20);
 
     std::vector<D3D12_EXPORT_DESC> exportDescs;
     exportDescs.reserve(RaytracingShaders.size() * 4);
 
     std::vector<D3D12_DXIL_LIBRARY_DESC> dxilDescs;
     dxilDescs.reserve(RaytracingShaders.size() * 4);
-
-    std::vector<D3D12_STATE_SUBOBJECT> subobjects;
-    subobjects.reserve(20);
     auto AddShaderFunc = [&](jShader* InShader, const wchar_t* InEntryPoint)
-    {
-        D3D12_EXPORT_DESC exportDesc{};
-        exportDesc.Name = InEntryPoint;
-        exportDesc.Flags = D3D12_EXPORT_FLAG_NONE;
-        exportDesc.ExportToRename = nullptr;
-        exportDescs.push_back(exportDesc);
+        {
+            if (!InShader)
+                return;
 
-        auto CompiledShaderDX12 = (jCompiledShader_DX12*)InShader->GetCompiledShader();
+            D3D12_EXPORT_DESC exportDesc{};
+            exportDesc.Name = InEntryPoint;
+            exportDesc.Flags = D3D12_EXPORT_FLAG_NONE;
+            exportDesc.ExportToRename = nullptr;
+            exportDescs.push_back(exportDesc);
 
-        D3D12_DXIL_LIBRARY_DESC dxilDesc{};
-        dxilDesc.DXILLibrary.pShaderBytecode = CompiledShaderDX12->ShaderBlob->GetBufferPointer();
-        dxilDesc.DXILLibrary.BytecodeLength = CompiledShaderDX12->ShaderBlob->GetBufferSize();
-        dxilDesc.NumExports = 1;
-        dxilDesc.pExports = &exportDescs[exportDescs.size() - 1];
-        dxilDescs.push_back(dxilDesc);
+            auto CompiledShaderDX12 = (jCompiledShader_DX12*)InShader->GetCompiledShader();
 
-        D3D12_STATE_SUBOBJECT subobject{};
-        subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
-        subobject.pDesc = &dxilDescs[dxilDescs.size() - 1];
-        subobjects.push_back(subobject);
-    };
+            D3D12_DXIL_LIBRARY_DESC dxilDesc{};
+            dxilDesc.DXILLibrary.pShaderBytecode = CompiledShaderDX12->ShaderBlob->GetBufferPointer();
+            dxilDesc.DXILLibrary.BytecodeLength = CompiledShaderDX12->ShaderBlob->GetBufferSize();
+            dxilDesc.NumExports = 1;
+            dxilDesc.pExports = &exportDescs[exportDescs.size() - 1];
+            dxilDescs.push_back(dxilDesc);
 
-    // Add Shader
+            D3D12_STATE_SUBOBJECT subobject{};
+            subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
+            subobject.pDesc = &dxilDescs[dxilDescs.size() - 1];
+            subobjects.push_back(subobject);
+        };
+
     std::vector<D3D12_HIT_GROUP_DESC> hitgroupDescs;
     hitgroupDescs.reserve(RaytracingShaders.size());
     for (int32 i = 0; i < RaytracingShaders.size(); ++i)
@@ -325,6 +333,7 @@ void* jPipelineStateInfo_DX12::CreateRaytracingPipelineState()
     }
 
     // Global root signature
+    ID3D12RootSignature* RootSignature = jShaderBindingLayout_DX12::CreateRootSignature(ShaderBindingLayoutArray);
     {
         D3D12_STATE_SUBOBJECT subobject{};
         subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE;
@@ -349,9 +358,92 @@ void* jPipelineStateInfo_DX12::CreateRaytracingPipelineState()
     stateObjectDesc.pSubobjects = subobjects.data();
     stateObjectDesc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
 
-    ComPtr<ID3D12StateObject> m_dxrStateObject;
-    if (JFAIL(g_rhi_dx12->Device->CreateStateObject(&stateObjectDesc, IID_PPV_ARGS(&m_dxrStateObject))))
+    if (JFAIL(g_rhi_dx12->Device->CreateStateObject(&stateObjectDesc, IID_PPV_ARGS(&RaytracingStateObject))))
         return nullptr;
+
+    // 13. ShaderTable
+    const uint16 shaderIdentifierSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+    ComPtr<ID3D12StateObjectProperties> stateObjectProperties;
+    if (JFAIL(RaytracingStateObject.As(&stateObjectProperties)))
+        return nullptr;
+
+    std::vector<void*> RaygenShaderIdentifiers;
+    RaygenShaderIdentifiers.reserve(RaytracingShaders.size());
+
+    std::vector<void*> MissShaderIdentifiers;
+    MissShaderIdentifiers.reserve(RaytracingShaders.size());
+
+    std::vector<void*> HitGroupShaderIdentifiers;
+    HitGroupShaderIdentifiers.reserve(RaytracingShaders.size());
+
+    for (int32 i = 0; i < RaytracingShaders.size(); ++i)
+    {
+        if (RaytracingShaders[i].RaygenShader)
+        {
+            check(RaytracingShaders[i].RaygenEntryPoint.length() > 0);
+            if (auto RaygenIdentifier = stateObjectProperties->GetShaderIdentifier(RaytracingShaders[i].RaygenEntryPoint.c_str()))
+                RaygenShaderIdentifiers.push_back(RaygenIdentifier);
+        }
+
+        if (RaytracingShaders[i].MissShader)
+        {
+            check(RaytracingShaders[i].MissEntryPoint.length() > 0);
+            if (auto MissIdentifier = stateObjectProperties->GetShaderIdentifier(RaytracingShaders[i].MissEntryPoint.c_str()))
+                MissShaderIdentifiers.push_back(MissIdentifier);
+        }
+
+        check(RaytracingShaders[i].HitGroupName.length());
+        if (auto HitGroupIdentifier = stateObjectProperties->GetShaderIdentifier(RaytracingShaders[i].HitGroupName.c_str()))
+            HitGroupShaderIdentifiers.push_back(HitGroupIdentifier);
+    }
+
+    const uint32 ShaderIdentifierSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+    const uint32 ShaderRecordSize = D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT;
+
+    if (RaygenShaderIdentifiers.size() > 0)
+    {
+        const uint32 RaygenBufferSize = (uint32)Align(ShaderRecordSize * RaygenShaderIdentifiers.size(), D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
+        RaygenBuffer = jBufferUtil_DX12::CreateBuffer(RaygenBufferSize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT
+            , EBufferCreateFlag::CPUAccess, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, 0, TEXT("RaygenShaderTable"));
+
+        uint8* RaygenMappedPtr = (uint8*)RaygenBuffer->Map();
+        for (int32 i = 0; i < (int32)RaygenShaderIdentifiers.size(); ++i)
+        {
+            memcpy(RaygenMappedPtr, RaygenShaderIdentifiers[i], ShaderIdentifierSize);
+            RaygenMappedPtr += ShaderRecordSize;
+        }
+        RaygenBuffer->Unmap();
+    }
+
+    if (MissShaderIdentifiers.size() > 0)
+    {
+        const uint32 MissBufferSize = (uint32)(ShaderRecordSize * MissShaderIdentifiers.size());
+        MissBuffer = jBufferUtil_DX12::CreateBuffer(MissBufferSize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT
+            , EBufferCreateFlag::CPUAccess, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, 0, TEXT("MissShaderTable"));
+
+        uint8* MissMappedPtr = (uint8*)MissBuffer->Map();
+        for (int32 i = 0; i < (int32)MissShaderIdentifiers.size(); ++i)
+        {
+            memcpy(MissMappedPtr, MissShaderIdentifiers[i], ShaderIdentifierSize);
+            MissMappedPtr += ShaderRecordSize;
+        }
+        MissBuffer->Unmap();
+    }
+
+    if (HitGroupShaderIdentifiers.size() > 0)
+    {
+        const uint32 HitGroupBufferSize = (uint32)(ShaderRecordSize * HitGroupShaderIdentifiers.size());
+        HitGroupBuffer = jBufferUtil_DX12::CreateBuffer(HitGroupBufferSize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT
+            , EBufferCreateFlag::CPUAccess, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, 0, TEXT("HitGroupShaderTable"));
+
+        uint8* HitGroupMappedPtr = (uint8*)HitGroupBuffer->Map();
+        for (int32 i = 0; i < (int32)HitGroupShaderIdentifiers.size(); ++i)
+        {
+            memcpy(HitGroupMappedPtr, HitGroupShaderIdentifiers[i], ShaderIdentifierSize);
+            HitGroupMappedPtr += ShaderRecordSize;
+        }
+        HitGroupBuffer->Unmap();
+    }
 
     size_t hash = GetHash();
     if (ensure(hash))
@@ -369,17 +461,11 @@ void* jPipelineStateInfo_DX12::CreateRaytracingPipelineState()
         }
     }
 
-    return PipelineState.Get();
+    return RaytracingStateObject.Get();
 }
 
 void jPipelineStateInfo_DX12::Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const
 {
-    //check(vkPipeline);
-    //if (IsGraphics)
-    //    vkCmdBindPipeline((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipeline);
-    //else
-    //    vkCmdBindPipeline((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, vkPipeline);
-
     auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
     check(CommandBuffer_DX12);
 
@@ -389,9 +475,22 @@ void jPipelineStateInfo_DX12::Bind(const std::shared_ptr<jRenderFrameContext>& I
 void jPipelineStateInfo_DX12::Bind(jCommandBuffer_DX12* InCommandList) const
 {
     check(InCommandList->CommandList);
-    check(PipelineState);
-    InCommandList->CommandList->SetPipelineState(PipelineState.Get());
+    if (PipelineType == jPipelineStateInfo::EPipelineType::Graphics)
+    {
+        check(PipelineState);
+        InCommandList->CommandList->SetPipelineState(PipelineState.Get());
 
-    InCommandList->CommandList->RSSetViewports((uint32)Viewports.size(), Viewports.data());
-    InCommandList->CommandList->RSSetScissorRects((uint32)Scissors.size(), Scissors.data());
+        InCommandList->CommandList->RSSetViewports((uint32)Viewports.size(), Viewports.data());
+        InCommandList->CommandList->RSSetScissorRects((uint32)Scissors.size(), Scissors.data());
+    }
+    else if (PipelineType == jPipelineStateInfo::EPipelineType::Compute)
+    {
+        check(PipelineState);
+        InCommandList->CommandList->SetPipelineState(PipelineState.Get());
+    }
+    else if (PipelineType == jPipelineStateInfo::EPipelineType::RayTracing)
+    {
+        check(RaytracingStateObject);
+        InCommandList->CommandList->SetPipelineState1(RaytracingStateObject.Get());
+    }
 }

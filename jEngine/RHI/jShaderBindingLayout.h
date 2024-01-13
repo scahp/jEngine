@@ -212,6 +212,8 @@ struct jShaderBinding
         OutReslut.Hash = Hash;
     }
 
+    bool IsBindless() const { return NumOfDescriptors >= UINT_MAX; }
+
     mutable size_t Hash = 0;
 
     bool IsInline = false;
@@ -265,7 +267,7 @@ struct jShaderBindingArray
     FORCEINLINE void CloneWithoutResource(jShaderBindingArray& OutResult) const
     {
         memcpy(&OutResult.Data[0], &Data[0], sizeof(jShaderBinding) * NumOfData);
-                
+
         for (int32 i = 0; i < NumOfData; ++i)
         {
             jShaderBinding* SrcAddress = (jShaderBinding*)&Data[i];
@@ -326,7 +328,7 @@ struct jShaderBindingInstance : public std::enable_shared_from_this<jShaderBindi
     virtual ~jShaderBindingInstance() {}
 
     const struct jShaderBindingLayout* ShaderBindingsLayouts = nullptr;
-    
+
     virtual void Initialize(const jShaderBindingArray& InShaderBindingArray) {}
     virtual void UpdateShaderBindings(const jShaderBindingArray& InShaderBindingArray) {}
     virtual void* GetHandle() const { return nullptr; }

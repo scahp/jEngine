@@ -104,7 +104,7 @@ jCommandBuffer_DX12* jCommandBufferManager_DX12::GetOrCreateCommandBuffer()
     }
 
     UsingCommandBuffers.push_back(SelectedCmdBuffer);
-
+    SelectedCmdBuffer->Begin();
     return SelectedCmdBuffer;
 }
 

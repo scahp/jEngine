@@ -96,6 +96,11 @@ struct jPipelineStateInfo_DX12 : public jPipelineStateInfo
     std::vector<D3D12_VIEWPORT> Viewports;
     std::vector<D3D12_RECT> Scissors;
 
-    // VkPipeline vkPipeline = nullptr;
-    // VkPipelineLayout vkPipelineLayout = nullptr;        // PipelineLayout 은 PipelineLayoutPool 에서 캐싱해둔 거라 소멸시키지 않음
+    // RaytracingStateObject
+    ComPtr<ID3D12StateObject> RaytracingStateObject;
+
+    // Raytracing ShaderTables
+    jBuffer_DX12* RaygenBuffer = nullptr;
+    jBuffer_DX12* MissBuffer = nullptr;
+    jBuffer_DX12* HitGroupBuffer = nullptr;
 };
