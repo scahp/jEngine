@@ -1478,16 +1478,7 @@ void jRenderer::Render()
         SCOPE_GPU_PROFILE(RenderFrameContextPtr, Raytracing);
         DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "Raytracing", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
 
-        if (IsUseDX12())
         {
-            SCOPE_CPU_PROFILE(Raytracing);
-            SCOPE_GPU_PROFILE(RenderFrameContextPtr, Raytracing);
-            DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "Raytracing", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
-
-            static ComPtr<ID3D12StateObject> m_dxrStateObject;
-            static ComPtr<ID3D12Resource> m_rayGenShaderTable;
-            static ComPtr<ID3D12Resource> m_missShaderTable;
-            static ComPtr<ID3D12Resource> m_hitGroupShaderTable;
             {
                 SCOPE_CPU_PROFILE(UpdateTLAS);
                 SCOPE_GPU_PROFILE(RenderFrameContextPtr, UpdateTLAS);
@@ -1503,10 +1494,10 @@ void jRenderer::Render()
             auto CmdBuffer = RenderFrameContextPtr->GetActiveCommandBuffer();
             auto CmdBufferDX12 = (jCommandBuffer_DX12*)CmdBuffer;
 
-            const jSamplerStateInfo_DX12* SamplerState = (jSamplerStateInfo_DX12*)TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+            const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
                 , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT
                 , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
-            const jSamplerStateInfo_DX12* PBRSamplerStateInfoDX12 = (jSamplerStateInfo_DX12*)TSamplerStateInfo<ETextureFilter::NEAREST_MIPMAP_LINEAR, ETextureFilter::NEAREST_MIPMAP_LINEAR
+            const jSamplerStateInfo* PBRSamplerStateInfoDX12 = TSamplerStateInfo<ETextureFilter::NEAREST_MIPMAP_LINEAR, ETextureFilter::NEAREST_MIPMAP_LINEAR
                 , ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
                 , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
 
@@ -1563,15 +1554,29 @@ void jRenderer::Render()
 
                 static const bool IsUseHLSLDynamicResource = false;
 
-                m_raytracingOutput = jBufferUtil_DX12::CreateImage((uint32)SCR_WIDTH, (uint32)SCR_HEIGHT, (uint32)1, (uint32)1, (uint32)1
-                    , ETextureType::TEXTURE_2D, GetDX12TextureFormat(BackbufferFormat), ETextureCreateFlag::UAV, EImageLayout::UAV);
+                if (IsUseDX12())
+                {
+                    m_raytracingOutput = jBufferUtil_DX12::CreateImage((uint32)SCR_WIDTH, (uint32)SCR_HEIGHT, (uint32)1, (uint32)1, (uint32)1
+                        , ETextureType::TEXTURE_2D, GetDX12TextureFormat(BackbufferFormat), ETextureCreateFlag::UAV, EImageLayout::UAV);
+                }
+                else if (IsUseVulkan())
+                {
+                    m_raytracingOutput = new jTexture_Vulkan();
+                    auto m_raytracingOutputVk = (jTexture_Vulkan*)m_raytracingOutput;
+                    jBufferUtil_Vulkan::CreateImage((uint32)SCR_WIDTH, (uint32)SCR_HEIGHT, 1, VkSampleCountFlagBits::VK_SAMPLE_COUNT_1_BIT, GetVulkanTextureFormat(ETextureFormat::RGBA16F)
+                        , VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
+                        , VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, *m_raytracingOutputVk);
+                    auto raytracingOutputView = jBufferUtil_Vulkan::CreateImageView(m_raytracingOutputVk->Image
+                        , GetVulkanTextureFormat(m_raytracingOutputVk->Format), VK_IMAGE_ASPECT_COLOR_BIT, 1);
+                    m_raytracingOutputVk->View = raytracingOutputView;
+                }
             }
 
             // Normal resource
             // Record normal resources
             jShaderBindingArray ShaderBindingArray;
             jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
-            ShaderBindingArray.Add(jShaderBinding(0, 1, EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
+            ShaderBindingArray.Add(jShaderBinding(0, 1, EShaderBindingType::ACCELERATION_STRUCTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
                 ResourceInlineAllactor.Alloc<jBufferResource>(RenderFrameContextPtr->RaytracingScene->TLASBuffer), true));
             ShaderBindingArray.Add(jShaderBinding(1, 1, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::ALL_RAYTRACING,
                 ResourceInlineAllactor.Alloc<jTextureResource>(m_raytracingOutput, nullptr), false));
@@ -1688,7 +1693,7 @@ void jRenderer::Render()
                 shaderInfo.SetName(jNameStatic("AnyHit"));
                 shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
                 shaderInfo.SetEntryPoint(jNameStatic("MyAnyHitShader"));
-                shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT);
+                shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_ANYHIT);
                 shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
                 NewShader.AnyHitShader = g_rhi->CreateShader(shaderInfo);
                 NewShader.AnyHitEntryPoint = TEXT("MyAnyHitShader");
@@ -1719,7 +1724,7 @@ void jRenderer::Render()
                 shaderInfo.SetName(jNameStatic("ShadowAnyHit"));
                 shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
                 shaderInfo.SetEntryPoint(jNameStatic("ShadowMyAnyHitShader"));
-                shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT);
+                shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_ANYHIT);
                 shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
                 NewShader.AnyHitShader = g_rhi->CreateShader(shaderInfo);
                 NewShader.AnyHitEntryPoint = TEXT("ShadowMyAnyHitShader");
@@ -1756,10 +1761,12 @@ void jRenderer::Render()
                 }
             }
             ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
-            g_rhi->BindRaytracingShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), nullptr, ShaderBindingInstanceCombiner, 0);
+            g_rhi->BindRaytracingShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), RaytracingPipelineState, ShaderBindingInstanceCombiner, 0);
             
             // Binding Raytracing Pipeline State
             RaytracingPipelineState->Bind(RenderFrameContextPtr);
+
+            g_rhi->TransitionImageLayout(CmdBuffer, m_raytracingOutput, EImageLayout::UAV);
 
             // Dispatch Rays
             jRaytracingDispatchData TracingData;
@@ -1768,750 +1775,8 @@ void jRenderer::Render()
             TracingData.Depth = 1;
             TracingData.PipelineState = RaytracingPipelineState;
             g_rhi->DispatchRay(RenderFrameContextPtr, TracingData);
-        }
-        else if (IsUseVulkan())
-        {
-            static VkImageView raytracingOutputView = nullptr;
-            static jUniformBufferBlock_Vulkan* UniformBufferBlockVulkan = nullptr;
-            static VkPipeline raytracingPipeline;
-            static VkPipelineLayout pipelineLayout;
-            static VkDescriptorSet descriptorSet[10];
-            static VkDescriptorSetLayout descriptorSetLayout;
-            static VkDescriptorSetLayout descriptorSetLayoutImage;
-            static VkDescriptorSetLayout descriptorSetLayoutBuffer;
 
-            static jBuffer_Vulkan* RaygenShaderBindingTable = new jBuffer_Vulkan();
-            static jBuffer_Vulkan* MissShaderBindingTable = new jBuffer_Vulkan();
-            static jBuffer_Vulkan* HitShaderBindingTable = new jBuffer_Vulkan();
-            static VkStridedDeviceAddressRegionKHR RaygenStridedDeviceAddressRegion{};
-            static VkStridedDeviceAddressRegionKHR MissStridedDeviceAddressRegion{};
-            static VkStridedDeviceAddressRegionKHR HitStridedDeviceAddressRegion{};
-
-            {
-                SCOPE_CPU_PROFILE(UpdateTLAS);
-                SCOPE_GPU_PROFILE(RenderFrameContextPtr, UpdateTLAS);
-                DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "UpdateTLAS", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
-
-                auto CmdBuffer = RenderFrameContextPtr->GetActiveCommandBuffer();
-                jRatracingInitializer InInitializer;
-                InInitializer.CommandBuffer = CmdBuffer;
-                InInitializer.RenderObjects = jObject::GetStaticRenderObject();
-                g_rhi->RaytracingScene->CreateOrUpdateTLAS(InInitializer);
-            }
-
-            struct SceneConstantBuffer
-            {
-                XMMATRIX projectionToWorld;
-                XMVECTOR cameraPosition;
-                XMVECTOR lightDireciton;
-            };
-            SceneConstantBuffer m_sceneCB;
-
-            auto GetScreenAspect = []()
-                {
-                    return static_cast<float>(SCR_WIDTH) / static_cast<float>(SCR_HEIGHT);
-                };
-
-            auto mainCamera = jCamera::GetMainCamera();
-
-            auto v = jCameraUtil::CreateViewMatrix({ 0, 0, -1000 }, { 300, 0, 0 }, { 0, 1, 0 });
-            auto p = jCameraUtil::CreatePerspectiveMatrix((float)SCR_WIDTH, (float)SCR_HEIGHT, XMConvertToRadians(45), 1.0f, 1250.0f);
-
-            XMVECTOR m_eye = { mainCamera->Pos.x, mainCamera->Pos.y, mainCamera->Pos.z, 1.0f };
-            XMVECTOR m_at = { mainCamera->Target.x, mainCamera->Target.y, mainCamera->Target.z, 1.0f };
-            XMVECTOR m_up = { 0.0f, 1.0f, 0.0f };
-
-            m_sceneCB.cameraPosition = m_eye;
-            const float fovAngleY = 45.0f;
-            const float m_aspectRatio = GetScreenAspect();
-            const XMMATRIX view = XMMatrixLookAtLH(m_eye, m_at, m_up);
-            const XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(fovAngleY), m_aspectRatio, 1.0f, 1250.0f);
-            const XMMATRIX viewProj = view * proj;
-            m_sceneCB.projectionToWorld = XMMatrixTranspose(XMMatrixInverse(nullptr, viewProj));
-
-            jDirectionalLight* DirectionalLight = nullptr;
-            for (auto light : jLight::GetLights())
-            {
-                if (light->Type == ELightType::DIRECTIONAL)
-                {
-                    DirectionalLight = (jDirectionalLight*)light;
-                    break;
-                }
-            }
-            check(DirectionalLight);
-            m_sceneCB.lightDireciton = { DirectionalLight->GetLightData().Direction.x, DirectionalLight->GetLightData().Direction.y, DirectionalLight->GetLightData().Direction.z };
-
-            UniformBufferBlockVulkan = (jUniformBufferBlock_Vulkan*)g_rhi_vk->CreateUniformBufferBlock(
-                jNameStatic("Test"), jLifeTimeType::OneFrame, sizeof(m_sceneCB));
-            UniformBufferBlockVulkan->UpdateBufferData(&m_sceneCB, sizeof(m_sceneCB));
-
-            // Create jBindlessIndices UniformBuffer(ConstantBuffer)
-            struct jBindlessIndices
-            {
-                uint32 IrradianceMap = 0;
-                uint32 PrefilteredEnvMap = 0;
-                uint32 VertexIndexOffset = 0;
-                uint32 Index = 0;
-                uint32 RenderObj = 0;
-                uint32 Vertices = 0;
-                uint32 AlbedoTexture = 0;
-                uint32 NormalTexture = 0;
-                uint32 RMTexture = 0;
-            };
-            jBindlessIndices bindlessIndices;
-
-            auto BindlessUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(jNameStatic("jBindlessIndices"), jLifeTimeType::OneFrame, sizeof(bindlessIndices)));
-            BindlessUniformBuffer->UpdateBufferData(&bindlessIndices, sizeof(bindlessIndices));
-
-            static constexpr uint32 MAX_BINDLESS_RESOURCES = 8192;
-            static bool once = false;
-            if (!once)
-            {
-                once = true;
-
-                m_raytracingOutput = new jTexture_Vulkan();
-                auto m_raytracingOutputVk = (jTexture_Vulkan*)m_raytracingOutput;
-                jBufferUtil_Vulkan::CreateImage((uint32)SCR_WIDTH, (uint32)SCR_HEIGHT, 1, VkSampleCountFlagBits::VK_SAMPLE_COUNT_1_BIT, GetVulkanTextureFormat(ETextureFormat::RGBA16F)
-                    , VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
-                    , VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, *m_raytracingOutputVk);
-                raytracingOutputView = jBufferUtil_Vulkan::CreateImageView(m_raytracingOutputVk->Image
-                    , GetVulkanTextureFormat(m_raytracingOutputVk->Format), VK_IMAGE_ASPECT_COLOR_BIT, 1);
-                m_raytracingOutputVk->View = raytracingOutputView;
-
-                {
-                    std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings;
-                    setLayoutBindings.resize(6);
-
-                    setLayoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
-                    setLayoutBindings[0].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
-                    setLayoutBindings[0].binding = 0;
-                    setLayoutBindings[0].descriptorCount = 1;
-
-                    setLayoutBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-                    setLayoutBindings[1].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
-                    setLayoutBindings[1].binding = 1;
-                    setLayoutBindings[1].descriptorCount = 1;
-
-                    setLayoutBindings[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-                    setLayoutBindings[2].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
-                    setLayoutBindings[2].binding = 2;
-                    setLayoutBindings[2].descriptorCount = MAX_BINDLESS_RESOURCES;
-
-                    setLayoutBindings[3].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-                    setLayoutBindings[3].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
-                    setLayoutBindings[3].binding = 3;
-                    setLayoutBindings[3].descriptorCount = MAX_BINDLESS_RESOURCES;
-
-                    setLayoutBindings[4].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
-                    setLayoutBindings[4].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
-                    setLayoutBindings[4].binding = 4;
-                    setLayoutBindings[4].descriptorCount = 1;
-
-                    setLayoutBindings[5].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
-                    setLayoutBindings[5].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
-                    setLayoutBindings[5].binding = 5;
-                    setLayoutBindings[5].descriptorCount = 1;
-
-                    VkDescriptorSetLayoutBindingFlagsCreateInfoEXT setLayoutBindingFlags{};
-                    setLayoutBindingFlags.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT;
-                    setLayoutBindingFlags.bindingCount = (uint32)setLayoutBindings.size();
-                    std::vector<VkDescriptorBindingFlagsEXT> descriptorBindingFlags = {
-                        0,
-                        0,
-                        VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
-                        VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
-                        0,
-                        0,
-                    };
-                    setLayoutBindingFlags.pBindingFlags = descriptorBindingFlags.data();
-
-                    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{};
-                    descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-                    descriptorSetLayoutCreateInfo.pBindings = setLayoutBindings.data();
-                    descriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32>(setLayoutBindings.size());
-                    descriptorSetLayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
-                    descriptorSetLayoutCreateInfo.pNext = &setLayoutBindingFlags;
-                    check(VK_SUCCESS == vkCreateDescriptorSetLayout(g_rhi_vk->Device, &descriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout));
-                }
-
-                {
-                    std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings;
-                    setLayoutBindings.resize(1);
-
-                    setLayoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-                    setLayoutBindings[0].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
-                    setLayoutBindings[0].binding = 0;
-                    setLayoutBindings[0].descriptorCount = MAX_BINDLESS_RESOURCES;
-
-                    VkDescriptorSetLayoutBindingFlagsCreateInfoEXT setLayoutBindingFlags{};
-                    setLayoutBindingFlags.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT;
-                    setLayoutBindingFlags.bindingCount = (uint32)setLayoutBindings.size();
-                    std::vector<VkDescriptorBindingFlagsEXT> descriptorBindingFlags = {
-                        VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
-                    };
-                    setLayoutBindingFlags.pBindingFlags = descriptorBindingFlags.data();
-
-                    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{};
-                    descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-                    descriptorSetLayoutCreateInfo.pBindings = setLayoutBindings.data();
-                    descriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32>(setLayoutBindings.size());
-                    descriptorSetLayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
-                    descriptorSetLayoutCreateInfo.pNext = &setLayoutBindingFlags;
-                    check(VK_SUCCESS == vkCreateDescriptorSetLayout(g_rhi_vk->Device, &descriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayoutImage));
-                }
-
-                {
-                    std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings;
-                    setLayoutBindings.resize(1);
-
-                    setLayoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-                    setLayoutBindings[0].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
-                    setLayoutBindings[0].binding = 0;
-                    setLayoutBindings[0].descriptorCount = MAX_BINDLESS_RESOURCES;
-
-                    VkDescriptorSetLayoutBindingFlagsCreateInfoEXT setLayoutBindingFlags{};
-                    setLayoutBindingFlags.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT;
-                    setLayoutBindingFlags.bindingCount = (uint32)setLayoutBindings.size();
-                    std::vector<VkDescriptorBindingFlagsEXT> descriptorBindingFlags = {
-                        VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
-                    };
-                    setLayoutBindingFlags.pBindingFlags = descriptorBindingFlags.data();
-
-                    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{};
-                    descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-                    descriptorSetLayoutCreateInfo.pBindings = setLayoutBindings.data();
-                    descriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32>(setLayoutBindings.size());
-                    descriptorSetLayoutCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
-                    descriptorSetLayoutCreateInfo.pNext = &setLayoutBindingFlags;
-                    check(VK_SUCCESS == vkCreateDescriptorSetLayout(g_rhi_vk->Device, &descriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayoutBuffer));
-                }
-
-                std::vector<VkDescriptorSetLayout> DescriptorSetLayouts;
-                DescriptorSetLayouts.push_back(descriptorSetLayout);
-                DescriptorSetLayouts.push_back(descriptorSetLayoutImage);
-                DescriptorSetLayouts.push_back(descriptorSetLayoutImage);
-                for (int32 i = 0; i < 4; ++i)
-                    DescriptorSetLayouts.push_back(descriptorSetLayoutBuffer);
-                DescriptorSetLayouts.push_back(descriptorSetLayoutImage);
-                DescriptorSetLayouts.push_back(descriptorSetLayoutImage);
-                DescriptorSetLayouts.push_back(descriptorSetLayoutImage);
-
-                VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
-                pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-                pipelineLayoutCreateInfo.setLayoutCount = (uint32)DescriptorSetLayouts.size();
-                pipelineLayoutCreateInfo.pSetLayouts = DescriptorSetLayouts.data();
-                check(VK_SUCCESS == vkCreatePipelineLayout(g_rhi_vk->Device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
-
-                std::vector<VkRayTracingShaderGroupCreateInfoKHR> shaderGroups{};
-                std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
-
-                jShaderInfo shaderInfo;
-                shaderInfo.SetName(jNameStatic("RayGen"));
-                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
-                shaderInfo.SetEntryPoint(jNameStatic("MyRaygenShader"));
-                shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_RAYGEN);
-                shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
-                auto RayGenShader = g_rhi->CreateShader(shaderInfo);
-                shaderStages.push_back(((jCompiledShader_Vulkan*)RayGenShader->CompiledShader)->ShaderStage);
-
-                VkRayTracingShaderGroupCreateInfoKHR shaderGroup{};
-                shaderGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
-                shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
-                shaderGroup.generalShader = static_cast<uint32>(shaderStages.size()) - 1;
-                shaderGroup.closestHitShader = VK_SHADER_UNUSED_KHR;
-                shaderGroup.anyHitShader = VK_SHADER_UNUSED_KHR;
-                shaderGroup.intersectionShader = VK_SHADER_UNUSED_KHR;
-                shaderGroups.push_back(shaderGroup);
-
-                // Miss group
-                const int32 MissShaderGroupCount = 2;
-                {
-                    // First miss group
-                    shaderInfo.SetName(jNameStatic("Miss"));
-                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
-                    shaderInfo.SetEntryPoint(jNameStatic("MyMissShader"));
-                    shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_MISS);
-                    shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
-                    auto MissShader = g_rhi->CreateShader(shaderInfo);
-                    shaderStages.push_back(((jCompiledShader_Vulkan*)MissShader->CompiledShader)->ShaderStage);
-                    shaderGroup = {};
-                    shaderGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
-                    shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
-                    shaderGroup.generalShader = static_cast<uint32>(shaderStages.size()) - 1;
-                    shaderGroup.closestHitShader = VK_SHADER_UNUSED_KHR;
-                    shaderGroup.anyHitShader = VK_SHADER_UNUSED_KHR;
-                    shaderGroup.intersectionShader = VK_SHADER_UNUSED_KHR;
-                    shaderGroups.push_back(shaderGroup);
-
-                    // Second miss group
-                    shaderInfo.SetName(jNameStatic("ShadowMiss"));
-                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
-                    shaderInfo.SetEntryPoint(jNameStatic("ShadowMyMissShader"));
-                    shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_MISS);
-                    shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
-                    auto ShadowMissShader = g_rhi->CreateShader(shaderInfo);
-                    shaderStages.push_back(((jCompiledShader_Vulkan*)ShadowMissShader->CompiledShader)->ShaderStage);
-                    shaderGroup.generalShader = static_cast<uint32>(shaderStages.size()) - 1;
-                    shaderGroups.push_back(shaderGroup);
-                }
-
-                // Hit group
-                const int32 HitShaderGroupCount = 2;
-                {
-                    // First hit group
-                    shaderInfo.SetName(jNameStatic("ClosestHit"));
-                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
-                    shaderInfo.SetEntryPoint(jNameStatic("MyClosestHitShader"));
-                    shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT);
-                    shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
-                    auto ClosestHitShader = g_rhi->CreateShader(shaderInfo);
-                    shaderStages.push_back(((jCompiledShader_Vulkan*)ClosestHitShader->CompiledShader)->ShaderStage);
-                    shaderGroup = {};
-                    shaderGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
-                    shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
-                    shaderGroup.generalShader = VK_SHADER_UNUSED_KHR;
-                    shaderGroup.closestHitShader = static_cast<uint32>(shaderStages.size()) - 1;
-                    shaderGroup.anyHitShader = VK_SHADER_UNUSED_KHR;
-                    shaderGroup.intersectionShader = VK_SHADER_UNUSED_KHR;
-
-                    shaderInfo.SetName(jNameStatic("AnyHit"));
-                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
-                    shaderInfo.SetEntryPoint(jNameStatic("MyAnyHitShader"));
-                    shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_ANYHIT);
-                    shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
-                    auto AnyHitShader = g_rhi->CreateShader(shaderInfo);
-                    shaderStages.push_back(((jCompiledShader_Vulkan*)AnyHitShader->CompiledShader)->ShaderStage);
-                    shaderGroup.anyHitShader = static_cast<uint32>(shaderStages.size()) - 1;
-                    shaderGroups.push_back(shaderGroup);
-
-                    // Second hit group
-                    shaderGroup = {};
-
-                    shaderInfo.SetName(jNameStatic("ShadowClosestHit"));
-                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
-                    shaderInfo.SetEntryPoint(jNameStatic("ShadowMyClosestHitShader"));
-                    shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT);
-                    shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
-                    auto ShadowClosestHitShader = g_rhi->CreateShader(shaderInfo);
-                    shaderStages.push_back(((jCompiledShader_Vulkan*)ShadowClosestHitShader->CompiledShader)->ShaderStage);
-                    shaderGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
-                    shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
-                    shaderGroup.generalShader = VK_SHADER_UNUSED_KHR;
-                    shaderGroup.closestHitShader = static_cast<uint32>(shaderStages.size()) - 1;
-                    shaderGroup.anyHitShader = VK_SHADER_UNUSED_KHR;
-                    shaderGroup.intersectionShader = VK_SHADER_UNUSED_KHR;
-
-                    shaderInfo.SetName(jNameStatic("ShadowAnyHit"));
-                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
-                    shaderInfo.SetEntryPoint(jNameStatic("ShadowMyAnyHitShader"));
-                    shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_ANYHIT);
-                    shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
-                    auto ShadowAnyHitShader = g_rhi->CreateShader(shaderInfo);
-                    shaderStages.push_back(((jCompiledShader_Vulkan*)ShadowAnyHitShader->CompiledShader)->ShaderStage);
-                    shaderGroup.anyHitShader = static_cast<uint32>(shaderStages.size()) - 1;
-                    shaderGroups.push_back(shaderGroup);
-                }
-
-                VkRayTracingPipelineCreateInfoKHR rayTracingPipelineCI{};
-                rayTracingPipelineCI.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
-                rayTracingPipelineCI.stageCount = static_cast<uint32>(shaderStages.size());
-                rayTracingPipelineCI.pStages = shaderStages.data();
-                rayTracingPipelineCI.groupCount = static_cast<uint32>(shaderGroups.size());
-                rayTracingPipelineCI.pGroups = shaderGroups.data();
-                rayTracingPipelineCI.maxPipelineRayRecursionDepth = 2;
-                rayTracingPipelineCI.layout = pipelineLayout;
-                check(VK_SUCCESS == g_rhi_vk->vkCreateRayTracingPipelinesKHR(g_rhi_vk->Device, VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &rayTracingPipelineCI, nullptr, &raytracingPipeline));
-
-                // ShaderBindingTable
-
-                uint32 handleSize = g_rhi_vk->RayTracingPipelineProperties.shaderGroupHandleSize;
-                const uint32 handleSizeAligned = Align(g_rhi_vk->RayTracingPipelineProperties.shaderGroupHandleSize, g_rhi_vk->RayTracingPipelineProperties.shaderGroupHandleAlignment);
-                const uint32 groupCount = static_cast<uint32>(shaderGroups.size());
-                const uint32 sbtSize = groupCount * handleSizeAligned;
-
-                std::vector<uint8> shaderHandleStorage(sbtSize);
-                check(VK_SUCCESS == g_rhi_vk->vkGetRayTracingShaderGroupHandlesKHR(g_rhi_vk->Device, raytracingPipeline, 0, groupCount, sbtSize, shaderHandleStorage.data()));
-
-                auto getBufferDeviceAddress = [](VkBuffer buffer)
-                    {
-                        VkBufferDeviceAddressInfoKHR bufferDeviceAI{};
-                        bufferDeviceAI.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
-                        bufferDeviceAI.buffer = buffer;
-                        return g_rhi_vk->vkGetBufferDeviceAddressKHR(g_rhi_vk->Device, &bufferDeviceAI);
-                    };
-
-                auto getSbtEntryStridedDeviceAddressRegion = [&](jBuffer_Vulkan* buffer, uint32 handleCount)
-                    {
-                        const uint32 handleSizeAligned = Align(g_rhi_vk->RayTracingPipelineProperties.shaderGroupHandleSize, g_rhi_vk->RayTracingPipelineProperties.shaderGroupHandleAlignment);
-                        VkStridedDeviceAddressRegionKHR stridedDeviceAddressRegionKHR{};
-                        stridedDeviceAddressRegionKHR.deviceAddress = getBufferDeviceAddress(buffer->Buffer) + buffer->Offset;
-                        stridedDeviceAddressRegionKHR.stride = handleSizeAligned;
-                        stridedDeviceAddressRegionKHR.size = handleCount * stridedDeviceAddressRegionKHR.stride;
-                        return stridedDeviceAddressRegionKHR;
-                    };
-
-                const uint64 AlignedBaseGroupHandleSize = Align(g_rhi_vk->RayTracingPipelineProperties.shaderGroupHandleSize
-                    , g_rhi_vk->RayTracingPipelineProperties.shaderGroupBaseAlignment);
-                {
-                    // Create buffer to hold all shader handles for the SBT
-                    int32 handleCount = 1;
-                    jBufferUtil_Vulkan::AllocateBuffer(
-                        EVulkanBufferBits::SHADER_BINDING_TABLE | EVulkanBufferBits::SHADER_DEVICE_ADDRESS,
-                        EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT,
-                        AlignedBaseGroupHandleSize * handleCount, *RaygenShaderBindingTable);
-                    // Get the strided address to be used when dispatching the rays
-                    RaygenStridedDeviceAddressRegion = getSbtEntryStridedDeviceAddressRegion(RaygenShaderBindingTable, handleCount);
-                    // Map persistent
-                    RaygenShaderBindingTable->Map();
-                }
-
-                {
-                    // Create buffer to hold all shader handles for the SBT
-                    int32 handleCount = MissShaderGroupCount;
-                    jBufferUtil_Vulkan::AllocateBuffer(
-                        EVulkanBufferBits::SHADER_BINDING_TABLE | EVulkanBufferBits::SHADER_DEVICE_ADDRESS,
-                        EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT,
-                        AlignedBaseGroupHandleSize * handleCount, *MissShaderBindingTable);
-                    // Get the strided address to be used when dispatching the rays
-                    MissStridedDeviceAddressRegion = getSbtEntryStridedDeviceAddressRegion(MissShaderBindingTable, handleCount);
-                    // Map persistent
-                    MissShaderBindingTable->Map();
-                }
-
-                {
-                    // Create buffer to hold all shader handles for the SBT
-                    int32 handleCount = HitShaderGroupCount;
-                    jBufferUtil_Vulkan::AllocateBuffer(
-                        EVulkanBufferBits::SHADER_BINDING_TABLE | EVulkanBufferBits::SHADER_DEVICE_ADDRESS,
-                        EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT,
-                        AlignedBaseGroupHandleSize * handleCount, *HitShaderBindingTable);
-                    // Get the strided address to be used when dispatching the rays
-                    HitStridedDeviceAddressRegion = getSbtEntryStridedDeviceAddressRegion(HitShaderBindingTable, handleCount);
-                    // Map persistent
-                    HitShaderBindingTable->Map();
-                };
-
-                // Copy handles
-                memcpy(RaygenShaderBindingTable->Map(), shaderHandleStorage.data(), handleSize);
-                // We are using two miss shaders, so we need to get two handles for the miss shader binding table
-                memcpy(MissShaderBindingTable->Map(), shaderHandleStorage.data() + handleSizeAligned, handleSize * MissShaderGroupCount);
-                memcpy(HitShaderBindingTable->Map(), shaderHandleStorage.data() + handleSizeAligned * (1 + MissShaderGroupCount), handleSize * HitShaderGroupCount);
-
-                // Create DescriptorSets
-                std::vector<VkDescriptorPoolSize> poolSizes = {
-                    { VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, MAX_BINDLESS_RESOURCES },
-                    { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, MAX_BINDLESS_RESOURCES },
-                    { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, MAX_BINDLESS_RESOURCES },
-                    { VK_DESCRIPTOR_TYPE_SAMPLER, MAX_BINDLESS_RESOURCES },
-                };
-
-                VkDescriptorPoolCreateInfo descriptorPoolInfo{};
-                descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-                descriptorPoolInfo.poolSizeCount = static_cast<uint32>(poolSizes.size());
-                descriptorPoolInfo.pPoolSizes = poolSizes.data();
-                descriptorPoolInfo.maxSets = MAX_BINDLESS_RESOURCES;
-                descriptorPoolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
-
-                VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
-                check(VK_SUCCESS == vkCreateDescriptorPool(g_rhi_vk->Device, &descriptorPoolInfo, nullptr, &descriptorPool));
-
-                {
-                    VkDescriptorSetVariableDescriptorCountAllocateInfoEXT variableDescriptorCountAllocInfo{};
-                    uint32 variableDescCounts[] = { 1, 1, 8192, 1, 1, 1 };
-                    variableDescriptorCountAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO_EXT;
-                    variableDescriptorCountAllocInfo.descriptorSetCount = 1;
-                    variableDescriptorCountAllocInfo.pDescriptorCounts = variableDescCounts;
-
-                    VkDescriptorSetAllocateInfo descriptorSetAllocateInfo{};
-                    descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-                    descriptorSetAllocateInfo.descriptorPool = descriptorPool;
-                    descriptorSetAllocateInfo.pSetLayouts = &descriptorSetLayout;
-                    descriptorSetAllocateInfo.descriptorSetCount = 1;
-                    descriptorSetAllocateInfo.pNext = &variableDescriptorCountAllocInfo;
-                    check(VK_SUCCESS == vkAllocateDescriptorSets(g_rhi_vk->Device, &descriptorSetAllocateInfo, &descriptorSet[0]));
-
-                    // Write descriptorset[0]
-                    VkWriteDescriptorSetAccelerationStructureKHR writeDescriptorSetAccelerationStructureKHR{};
-                    writeDescriptorSetAccelerationStructureKHR.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
-                    writeDescriptorSetAccelerationStructureKHR.accelerationStructureCount = 1;
-                    writeDescriptorSetAccelerationStructureKHR.pAccelerationStructures = &((jBuffer_Vulkan*)RenderFrameContextPtr->RaytracingScene->TLASBuffer)->AccelerationStructure;
-
-                    VkWriteDescriptorSet accelerationStructureWrite{};
-                    accelerationStructureWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                    // The specialized acceleration structure descriptor has to be chained
-                    accelerationStructureWrite.pNext = &writeDescriptorSetAccelerationStructureKHR;
-                    accelerationStructureWrite.dstSet = descriptorSet[0];
-                    accelerationStructureWrite.dstBinding = 0;
-                    accelerationStructureWrite.descriptorCount = 1;
-                    accelerationStructureWrite.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
-
-                    VkDescriptorImageInfo storageImageDescriptor{ VK_NULL_HANDLE, raytracingOutputView, VK_IMAGE_LAYOUT_GENERAL };
-
-                    VkWriteDescriptorSet writeDescriptorSet{};
-                    writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                    writeDescriptorSet.dstSet = descriptorSet[0];
-                    writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-                    writeDescriptorSet.dstBinding = 1;
-                    writeDescriptorSet.pImageInfo = &storageImageDescriptor;
-                    writeDescriptorSet.descriptorCount = 1;
-
-                    VkDescriptorBufferInfo bufferInfo{};
-                    bufferInfo.buffer = (VkBuffer)UniformBufferBlockVulkan->GetBuffer();
-                    bufferInfo.offset = UniformBufferBlockVulkan->GetBufferOffset();
-                    bufferInfo.range = UniformBufferBlockVulkan->GetBufferSize();		// 전체 사이즈라면 VK_WHOLE_SIZE 이거 가능
-
-                    std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
-                        // Binding 0: Top level acceleration structure
-                        accelerationStructureWrite,
-                        // Binding 1: Ray tracing result image
-                        writeDescriptorSet,
-                    };
-
-                    // Binding 2: Uniform data
-                    {
-                        VkWriteDescriptorSet writeDescriptorSet2{};
-                        writeDescriptorSet2.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                        writeDescriptorSet2.dstSet = descriptorSet[0];
-                        writeDescriptorSet2.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-                        writeDescriptorSet2.dstBinding = 2;
-                        writeDescriptorSet2.pBufferInfo = &bufferInfo;
-                        writeDescriptorSet2.dstArrayElement = 0;
-                        writeDescriptorSet2.descriptorCount = 1;
-                        writeDescriptorSets.push_back(writeDescriptorSet2);
-                    }
-
-                    // Binding 3: Bindless indices (It is only for DX12 so Vulkan is Empty)
-                    VkDescriptorBufferInfo bindlessBufferInfo{};
-                    bindlessBufferInfo.buffer = (VkBuffer)BindlessUniformBuffer->GetBuffer();
-                    bindlessBufferInfo.offset = BindlessUniformBuffer->GetBufferOffset();
-                    bindlessBufferInfo.range = BindlessUniformBuffer->GetBufferSize();		// 전체 사이즈라면 VK_WHOLE_SIZE 이거 가능
-                    {
-                        VkWriteDescriptorSet writeDescriptorSet2{};
-                        writeDescriptorSet2.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                        writeDescriptorSet2.dstSet = descriptorSet[0];
-                        writeDescriptorSet2.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-                        writeDescriptorSet2.dstBinding = 3;
-                        writeDescriptorSet2.pBufferInfo = &bindlessBufferInfo;
-                        writeDescriptorSet2.dstArrayElement = 0;
-                        writeDescriptorSet2.descriptorCount = 1;
-                        writeDescriptorSets.push_back(writeDescriptorSet2);
-                    }
-
-                    const jSamplerStateInfo_Vulkan* SamplerState = (jSamplerStateInfo_Vulkan*)TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
-                        , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT
-                        , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
-
-                    const jSamplerStateInfo_Vulkan* PBRSamplerStateInfo = (jSamplerStateInfo_Vulkan*)TSamplerStateInfo<ETextureFilter::NEAREST_MIPMAP_LINEAR, ETextureFilter::NEAREST_MIPMAP_LINEAR
-                        , ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
-                        , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
-
-                    VkDescriptorImageInfo SamplerDescriptor1{ SamplerState->SamplerState, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL };
-
-                    // Binding 4: Sampler state
-                    VkWriteDescriptorSet writeDescriptorSetSampler1{};
-                    writeDescriptorSetSampler1.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                    writeDescriptorSetSampler1.dstSet = descriptorSet[0];
-                    writeDescriptorSetSampler1.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
-                    writeDescriptorSetSampler1.dstBinding = 4;
-                    writeDescriptorSetSampler1.pImageInfo = &SamplerDescriptor1;
-                    writeDescriptorSetSampler1.descriptorCount = 1;
-                    writeDescriptorSets.push_back(writeDescriptorSetSampler1);
-
-                    VkDescriptorImageInfo SamplerDescriptor2{ PBRSamplerStateInfo->SamplerState, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL };
-
-                    // Binding 5: Sampler state
-                    VkWriteDescriptorSet writeDescriptorSetSampler2{};
-                    writeDescriptorSetSampler2.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                    writeDescriptorSetSampler2.dstSet = descriptorSet[0];
-                    writeDescriptorSetSampler2.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
-                    writeDescriptorSetSampler2.dstBinding = 5;
-                    writeDescriptorSetSampler2.pImageInfo = &SamplerDescriptor2;
-                    writeDescriptorSetSampler2.descriptorCount = 1;
-                    writeDescriptorSets.push_back(writeDescriptorSetSampler2);
-
-                    vkUpdateDescriptorSets(g_rhi_vk->Device, static_cast<uint32>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, VK_NULL_HANDLE);
-                }
-
-                int32 index = 1;
-                for (int32 i = 0; i < 2; ++i, ++index)
-                {
-                    VkDescriptorSetVariableDescriptorCountAllocateInfoEXT variableDescriptorCountAllocInfo{};
-                    uint32 variableDescCounts[] = { 8192 };
-                    variableDescriptorCountAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO_EXT;
-                    variableDescriptorCountAllocInfo.descriptorSetCount = 1;
-                    variableDescriptorCountAllocInfo.pDescriptorCounts = variableDescCounts;
-
-                    VkDescriptorSetAllocateInfo descriptorSetAllocateInfo{};
-                    descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-                    descriptorSetAllocateInfo.descriptorPool = descriptorPool;
-                    descriptorSetAllocateInfo.pSetLayouts = &descriptorSetLayoutImage;
-                    descriptorSetAllocateInfo.descriptorSetCount = 1;
-                    descriptorSetAllocateInfo.pNext = &variableDescriptorCountAllocInfo;
-                    check(VK_SUCCESS == vkAllocateDescriptorSets(g_rhi_vk->Device, &descriptorSetAllocateInfo, &descriptorSet[index]));
-                }
-                for (int32 i = 0; i < 4; ++i, ++index)
-                {
-                    VkDescriptorSetVariableDescriptorCountAllocateInfoEXT variableDescriptorCountAllocInfo{};
-                    uint32 variableDescCounts[] = { 8192 };
-                    variableDescriptorCountAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO_EXT;
-                    variableDescriptorCountAllocInfo.descriptorSetCount = 1;
-                    variableDescriptorCountAllocInfo.pDescriptorCounts = variableDescCounts;
-
-                    VkDescriptorSetAllocateInfo descriptorSetAllocateInfo{};
-                    descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-                    descriptorSetAllocateInfo.descriptorPool = descriptorPool;
-                    descriptorSetAllocateInfo.pSetLayouts = &descriptorSetLayoutBuffer;
-                    descriptorSetAllocateInfo.descriptorSetCount = 1;
-                    descriptorSetAllocateInfo.pNext = &variableDescriptorCountAllocInfo;
-                    check(VK_SUCCESS == vkAllocateDescriptorSets(g_rhi_vk->Device, &descriptorSetAllocateInfo, &descriptorSet[index]));
-                }
-                for (int32 i = 0; i < 3; ++i, ++index)
-                {
-                    VkDescriptorSetVariableDescriptorCountAllocateInfoEXT variableDescriptorCountAllocInfo{};
-                    uint32 variableDescCounts[] = { 8192 };
-                    variableDescriptorCountAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO_EXT;
-                    variableDescriptorCountAllocInfo.descriptorSetCount = 1;
-                    variableDescriptorCountAllocInfo.pDescriptorCounts = variableDescCounts;
-
-                    VkDescriptorSetAllocateInfo descriptorSetAllocateInfo{};
-                    descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-                    descriptorSetAllocateInfo.descriptorPool = descriptorPool;
-                    descriptorSetAllocateInfo.pSetLayouts = &descriptorSetLayoutImage;
-                    descriptorSetAllocateInfo.descriptorSetCount = 1;
-                    descriptorSetAllocateInfo.pNext = &variableDescriptorCountAllocInfo;
-                    check(VK_SUCCESS == vkAllocateDescriptorSets(g_rhi_vk->Device, &descriptorSetAllocateInfo, &descriptorSet[index]));
-                }
-
-                std::vector<VkDescriptorImageInfo> Temp;
-                Temp.reserve(8192);
-                auto CreateWriteDescriptorSet = [&Temp](std::vector<VkWriteDescriptorSet>& OutDescritorSets, VkDescriptorSet DecriptorSet, VkImageView View, int32 index)
-                    {
-                        VkDescriptorImageInfo storageImageDescriptor{ VK_NULL_HANDLE, View, VK_IMAGE_LAYOUT_GENERAL };
-                        Temp.push_back(storageImageDescriptor);
-
-                        VkWriteDescriptorSet writeDescriptorSet{};
-                        writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                        writeDescriptorSet.dstSet = DecriptorSet;
-                        writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-                        writeDescriptorSet.dstBinding = 0;
-                        writeDescriptorSet.dstArrayElement = index;
-                        writeDescriptorSet.pImageInfo = &Temp[Temp.size() - 1];
-                        writeDescriptorSet.descriptorCount = 1;
-                        OutDescritorSets.push_back(writeDescriptorSet);
-                    };
-
-                std::vector<VkDescriptorBufferInfo> Temp2;
-                Temp2.reserve(8192);
-                auto CreateWriteDescriptorSetBuf = [&Temp2](std::vector<VkWriteDescriptorSet>& OutDescritorSets, VkDescriptorSet DecriptorSet, jBuffer_Vulkan* Buf, int32 index)
-                    {
-                        VkDescriptorBufferInfo bufferInfo{};
-                        bufferInfo.buffer = Buf->Buffer;
-                        bufferInfo.offset = Buf->Offset;
-                        bufferInfo.range = Buf->RealBufferSize;
-                        Temp2.push_back(bufferInfo);
-
-                        VkWriteDescriptorSet writeDescriptorSet2{};
-                        writeDescriptorSet2.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                        writeDescriptorSet2.dstSet = DecriptorSet;
-                        writeDescriptorSet2.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-                        writeDescriptorSet2.dstBinding = 0;
-                        writeDescriptorSet2.pBufferInfo = &Temp2[Temp2.size() - 1];
-                        writeDescriptorSet2.dstArrayElement = index;
-                        writeDescriptorSet2.descriptorCount = 1;
-                        OutDescritorSets.push_back(writeDescriptorSet2);
-                    };
-
-                std::vector<VkDescriptorImageInfo> Temp3;
-                Temp3.reserve(8192);
-                auto UpdateDescriptorSetTex = [&Temp3](VkDescriptorSet DecriptorSet, VkImageView View)
-                    {
-                        VkDescriptorImageInfo storageImageDescriptor{ VK_NULL_HANDLE, View, VK_IMAGE_LAYOUT_GENERAL };
-
-                        std::vector<VkWriteDescriptorSet> writeDescriptorSets(1);
-                        Temp3.push_back(storageImageDescriptor);
-
-                        writeDescriptorSets[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                        writeDescriptorSets[0].dstSet = DecriptorSet;
-                        writeDescriptorSets[0].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-                        writeDescriptorSets[0].dstBinding = 0;
-                        writeDescriptorSets[0].dstArrayElement = 0;
-                        writeDescriptorSets[0].pImageInfo = &Temp3[Temp3.size() - 1];
-                        writeDescriptorSets[0].descriptorCount = 1;
-                        vkUpdateDescriptorSets(g_rhi_vk->Device, static_cast<uint32>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, VK_NULL_HANDLE);
-                    };
-
-                UpdateDescriptorSetTex(descriptorSet[1], ((jTexture_Vulkan*)jSceneRenderTarget::IrradianceMap2)->View);
-                UpdateDescriptorSetTex(descriptorSet[2], ((jTexture_Vulkan*)jSceneRenderTarget::FilteredEnvMap2)->View);
-
-                std::vector<VkWriteDescriptorSet> writeDescriptorSets;
-
-                for (int32 i = 0; i < jObject::GetStaticRenderObject().size(); ++i)
-                {
-                    jRenderObject* RObj = jObject::GetStaticRenderObject()[i];
-
-                    // buffer
-                    CreateWriteDescriptorSetBuf(writeDescriptorSets, descriptorSet[3], ((jBuffer_Vulkan*)RObj->VertexAndIndexOffsetBuffer), i);
-
-                    auto Vtx = (jVertexBuffer_Vulkan*)RObj->GeometryDataPtr->VertexBuffer;
-                    auto Idx = (jIndexBuffer_Vulkan*)RObj->GeometryDataPtr->IndexBuffer;
-                    CreateWriteDescriptorSetBuf(writeDescriptorSets, descriptorSet[4], Idx->BufferPtr.get(), i);
-
-                    RObj->CreateShaderBindingInstance();
-                    CreateWriteDescriptorSetBuf(writeDescriptorSets, descriptorSet[5], (jBuffer_Vulkan*)RObj->TestUniformBuffer.get(), i);
-
-                    check(Vtx->Streams.size() > 0);
-                    CreateWriteDescriptorSetBuf(writeDescriptorSets, descriptorSet[6], (jBuffer_Vulkan*)Vtx->Streams[0].BufferPtr.get(), i);
-
-                    if (jTexture_Vulkan* AlbedoTexVulkan = RObj->MaterialPtr->GetTexture<jTexture_Vulkan>(jMaterial::EMaterialTextureType::Albedo))
-                    {
-                        CreateWriteDescriptorSet(writeDescriptorSets, descriptorSet[7], AlbedoTexVulkan->View, i);
-                    }
-                    else
-                    {
-                        CreateWriteDescriptorSet(writeDescriptorSets, descriptorSet[7], ((jTexture_Vulkan*)GBlackTexture)->View, i);
-                    }
-
-                    if (jTexture_Vulkan* NormalTexVulkan = RObj->MaterialPtr->GetTexture<jTexture_Vulkan>(jMaterial::EMaterialTextureType::Normal))
-                    {
-                        CreateWriteDescriptorSet(writeDescriptorSets, descriptorSet[8], NormalTexVulkan->View, i);
-                    }
-                    else
-                    {
-                        CreateWriteDescriptorSet(writeDescriptorSets, descriptorSet[8], ((jTexture_Vulkan*)GNormalTexture)->View, i);
-                    }
-
-                    if (jTexture_Vulkan* MetalicTexVulkan = RObj->MaterialPtr->GetTexture<jTexture_Vulkan>(jMaterial::EMaterialTextureType::Metallic))
-                    {
-                        CreateWriteDescriptorSet(writeDescriptorSets, descriptorSet[9], MetalicTexVulkan->View, i);
-                    }
-                    else
-                    {
-                        CreateWriteDescriptorSet(writeDescriptorSets, descriptorSet[9], ((jTexture_Vulkan*)GBlackTexture)->View, i);
-                    }
-                }
-                vkUpdateDescriptorSets(g_rhi_vk->Device, static_cast<uint32>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, VK_NULL_HANDLE);
-            }
-            auto m_raytracingOutputVk = (jTexture_Vulkan*)m_raytracingOutput;
-
-            auto CmdBufferVk = (jCommandBuffer_Vulkan*)RenderFrameContextPtr->GetActiveCommandBuffer();
-
-            g_rhi_vk->TransitionImageLayout(CmdBufferVk, m_raytracingOutputVk, EImageLayout::UAV);
-
-            vkCmdBindPipeline(CmdBufferVk->GetRef(), VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, raytracingPipeline);
-            vkCmdBindDescriptorSets(CmdBufferVk->GetRef(), VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipelineLayout, 0, _countof(descriptorSet), &descriptorSet[0], 0, 0);
-
-            VkStridedDeviceAddressRegionKHR emptySbtEntry = {};
-            g_rhi_vk->vkCmdTraceRaysKHR(
-                CmdBufferVk->GetRef(),
-                &RaygenStridedDeviceAddressRegion,
-                &MissStridedDeviceAddressRegion,
-                &HitStridedDeviceAddressRegion,
-                &emptySbtEntry,
-                SCR_WIDTH,
-                SCR_HEIGHT,
-                1);
-
-            g_rhi_vk->TransitionImageLayout(CmdBufferVk, m_raytracingOutputVk, EImageLayout::SHADER_READ_ONLY);
+            g_rhi->TransitionImageLayout(CmdBuffer, m_raytracingOutput, EImageLayout::SHADER_READ_ONLY);
         }
 
         if (1)

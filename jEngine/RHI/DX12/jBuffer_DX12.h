@@ -65,13 +65,15 @@ struct jBuffer_DX12 : public jBuffer
     }
 
     virtual void* GetHandle() const override { return Buffer.Get(); }
-    virtual uint32 GetAllocatedSize() const override { return (uint32)Size; }
+    virtual uint64 GetAllocatedSize() const override { return (uint32)Size; }
+    virtual uint64 GetBufferSize() const { return (uint32)Size; }
+    virtual uint64 GetOffset() const { return Offset; }
     FORCEINLINE uint64 GetGPUAddress() const { return Buffer->GetGPUVirtualAddress(); }
 
     EBufferCreateFlag BufferCreateFlag = EBufferCreateFlag::NONE;
     uint64 Size = 0;
     uint16 Alignment = 0;
-    uint32 Offset = 0;
+    uint64 Offset = 0;
     uint8* CPUAddress = nullptr;
     ComPtr<ID3D12Resource> Buffer;
     jDescriptor_DX12 CBV;

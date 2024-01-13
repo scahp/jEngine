@@ -3,8 +3,14 @@
 
 struct jWriteDescriptorInfo
 {
+    jWriteDescriptorInfo() = default;
+    jWriteDescriptorInfo(VkDescriptorBufferInfo InBufferInfo) : BufferInfo(InBufferInfo) {}
+    jWriteDescriptorInfo(VkDescriptorImageInfo InImageInfo) : ImageInfo(InImageInfo) {}
+    jWriteDescriptorInfo(VkWriteDescriptorSetAccelerationStructureKHR InAccelerationStructureInfo) : AccelerationStructureInfo(InAccelerationStructureInfo) {}
+
     VkDescriptorBufferInfo BufferInfo{};
     VkDescriptorImageInfo ImageInfo{};
+    VkWriteDescriptorSetAccelerationStructureKHR AccelerationStructureInfo{};
 };
 
 struct jWriteDescriptorSet
@@ -17,7 +23,7 @@ struct jWriteDescriptorSet
         IsInitialized = false;
     }
 
-    void SetWriteDescriptorInfo(int32 InIndex, const jShaderBinding* InShaderBinding);
+    void SetWriteDescriptorInfo(const jShaderBinding* InShaderBinding);
 
     bool IsInitialized = false;
     std::vector<jWriteDescriptorInfo> WriteDescriptorInfos;
@@ -34,8 +40,8 @@ struct jShaderBindingInstance_Vulkan : public jShaderBindingInstance
 
     static void CreateWriteDescriptorSet(jWriteDescriptorSet& OutWriteDescriptorSet
         , const VkDescriptorSet InDescriptorSet, const jShaderBindingArray& InShaderBindingArray);
-    static void UpdateWriteDescriptorSet(
-        jWriteDescriptorSet& OutDescriptorWrites, const jShaderBindingArray& InShaderBindingArray);
+    //static void UpdateWriteDescriptorSet(
+    //    jWriteDescriptorSet& OutDescriptorWrites, const jShaderBindingArray& InShaderBindingArray);
 
     virtual void Initialize(const jShaderBindingArray& InShaderBindingArray) override;
     virtual void UpdateShaderBindings(const jShaderBindingArray& InShaderBindingArray) override;

@@ -55,7 +55,7 @@ bool jIndexBuffer_DX12::Initialize(const std::shared_ptr<jIndexStreamData>& InSt
 
     // Create Index buffer View
     IBView.BufferLocation = BufferPtr->GetGPUAddress();
-    IBView.SizeInBytes = BufferPtr->GetAllocatedSize();
+    IBView.SizeInBytes = (uint32)BufferPtr->GetAllocatedSize();
     IBView.Format = IndexType;
 
     return true;

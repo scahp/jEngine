@@ -39,7 +39,9 @@ struct jBuffer_Vulkan : public jBuffer
     virtual void UpdateBuffer(const void* data, uint64 size) override;
 
     virtual void* GetHandle() const override { return Buffer; }
-    virtual uint32 GetAllocatedSize() const override { return (uint32)AllocatedSize; }
+    virtual uint64 GetAllocatedSize() const override { return AllocatedSize; }
+    virtual uint64 GetBufferSize() const { return RealBufferSize; }
+    virtual uint64 GetOffset() const { return Offset; }
 
     jMemory Memory;
     VkBuffer Buffer = nullptr;
@@ -49,9 +51,9 @@ struct jBuffer_Vulkan : public jBuffer
     VkAccelerationStructureKHR AccelerationStructure = nullptr;
     uint64 DeviceAddress = 0;
     
-    size_t Offset = 0;
-    size_t AllocatedSize = 0;
-    size_t RealBufferSize = 0;
+    uint64 Offset = 0;
+    uint64 AllocatedSize = 0;
+    uint64 RealBufferSize = 0;
     void* MappedPointer = nullptr;
 
     bool HasBufferOwnership = true;     // 버퍼를 소멸시킬 권한이 있는 여부. 링버퍼를 사용하는 유니폼 버퍼의 경우 이 값이 false 임.
