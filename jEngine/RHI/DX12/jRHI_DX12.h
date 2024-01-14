@@ -19,6 +19,8 @@
 #include "jQueryPoolTime_DX12.h"
 #include "jRenderPass_DX12.h"
 
+using jDeallocatorMultiFrameCreatedResource = jDeallocatorMultiFrameResource<ComPtr<ID3D12Resource>>;
+
 class jSwapchain_DX12;
 struct jBuffer_DX12;
 struct jTexture_DX12;
@@ -33,75 +35,6 @@ using namespace DirectX;
 
 static const uint32 cbvCountPerFrame = 3;
 static constexpr DXGI_FORMAT BackbufferFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
-
-struct GlobalRootSignatureParams {
-	enum Value {
-		OutputViewSlot = 0,
-		AccelerationStructureSlot,
-		SceneConstantSlot,
-		SamplerState,
-		BindlessIndices,
-		Count
-	};
-};
-
-struct LocalRootSignatureParams {
-	enum Value {
-		CubeConstantSlot = 0,
-		Count
-	};
-};
-
-inline UINT Align(UINT size, UINT alignment)
-{
-	return (size + (alignment - 1)) & ~(alignment - 1);
-}
-
-// Shader record = {{Shader ID}, {RootArguments}}
-struct ShaderRecord
-{
-	ShaderRecord(void* InShaderIdentifier, uint32 InShaderIdentifierSize)
-		: m_shaderIdentifier(InShaderIdentifier), m_shaderIdentifierSize(InShaderIdentifierSize)
-	{}
-
-	ShaderRecord(void* InShaderIdentifier, uint32 InShaderIdentifierSize
-		, void* InLocalRootArugments, uint32 InLocalRootArgumentsSize)
-		: m_shaderIdentifier(InShaderIdentifier), m_shaderIdentifierSize(InShaderIdentifierSize)
-		, m_localRootArguments(InLocalRootArugments), m_localRootArgumentsSize(InLocalRootArgumentsSize)
-	{}
-
-	void* m_shaderIdentifier = nullptr;
-	uint32 m_shaderIdentifierSize = 0;
-
-	void* m_localRootArguments = nullptr;
-	uint32 m_localRootArgumentsSize = 0;
-};
-
-// Shader table = {{ ShaderRecord 1}, {ShaderRecord 2}, ...}
-class ShaderTable
-{
-public:
-	ShaderTable() {}
-	ShaderTable(ID3D12Device* InDevice, uint32 InNumOfShaderRecords, uint32 InShaderRecordSize
-		, const wchar_t* InResourceName = nullptr);
-
-	ComPtr<ID3D12Resource> GetResource() const;
-
-	void push_back(const ShaderRecord& InShaderRecord);
-
-	// Pretty-print the shader records.
-	void DebugPrint(robin_hood::unordered_map<void*, std::wstring> shaderIdToStringMap);
-	
-private:
-	uint8* m_mappedShaderRecords = nullptr;
-	uint32 m_shaderRecordSize = 0;
-    jBuffer_DX12* Buffer = nullptr;
-	std::vector<ShaderRecord> m_shaderRecords;
-
-#if _DEBUG
-	std::wstring m_name;
-#endif
-};
 
 struct jPlacedResource
 {
@@ -179,17 +112,9 @@ struct jPlacedResourcePool
     }
 
     // This will be called from 'jDeallocatorMultiFrameUniformBufferBlock'
-    void FreedFromPendingDelegate(std::shared_ptr<IUniformBufferBlock> InData)
+    void FreedFromPendingDelegateForCreatedResource(const ComPtr<ID3D12Resource>& InData)
     {
-        jUniformBufferBlock_DX12* UniformBufferBlock_DX12 = (jUniformBufferBlock_DX12*)InData.get();
-        check(UniformBufferBlock_DX12);
-        check(UniformBufferBlock_DX12->LifeType == jLifeTimeType::MultiFrame);
-
-        jBuffer_DX12* Buffer = UniformBufferBlock_DX12->Buffer;
-        check(Buffer);
-        {
-			Free(Buffer->Buffer);
-        }
+        Free(InData);
     }
 
 	std::vector<jPlacedResource>& GetPendingPlacedResources(bool InIsUploadPlacedResource, size_t InSize)
@@ -300,7 +225,7 @@ public:
 	jPlacedResourcePool PlacedResourcePool;
 
 	template <typename T>
-	ComPtr<ID3D12Resource> CreateResource(T&& InDesc, D3D12_RESOURCE_STATES InResourceState, D3D12_CLEAR_VALUE* InClearValue = nullptr)
+	std::shared_ptr<jCreatedResource> CreateResource(T&& InDesc, D3D12_RESOURCE_STATES InResourceState, D3D12_CLEAR_VALUE* InClearValue = nullptr)
 	{
 		check(Device);
 
@@ -310,7 +235,7 @@ public:
 			jPlacedResource ReusePlacedResource = PlacedResourcePool.Alloc(info.SizeInBytes, false);
 			if (ReusePlacedResource.IsValid())
 			{
-				return ReusePlacedResource.PlacedSubResource;
+				return jCreatedResource::CreatedFromResourcePool(ReusePlacedResource.PlacedSubResource);
 			}
 			else
 			{
@@ -334,7 +259,7 @@ public:
                     NewPlacedResource.Size = info.SizeInBytes;
                     PlacedResourcePool.AddUsingPlacedResource(NewPlacedResource);
 
-					return NewResource;
+					return jCreatedResource::CreatedFromResourcePool(NewPlacedResource.PlacedSubResource);
 				}
 			}
 		}
@@ -343,11 +268,11 @@ public:
         ComPtr<ID3D12Resource> NewResource;
 		JFAIL(Device->CreateCommittedResource(&HeapProperties, D3D12_HEAP_FLAG_NONE
 			, std::forward<T>(InDesc), InResourceState, InClearValue, IID_PPV_ARGS(&NewResource)));
-		return NewResource;
+		return jCreatedResource::CreatedFromStandalone(NewResource);
 	}
 
     template <typename T>
-    ComPtr<ID3D12Resource> CreateUploadResource(T&& InDesc, D3D12_RESOURCE_STATES InResourceState, D3D12_CLEAR_VALUE* InClearValue = nullptr)
+	std::shared_ptr<jCreatedResource> CreateUploadResource(T&& InDesc, D3D12_RESOURCE_STATES InResourceState, D3D12_CLEAR_VALUE* InClearValue = nullptr)
     {
         check(Device);
 
@@ -357,7 +282,7 @@ public:
 			jPlacedResource ReusePlacedUploadResource = PlacedResourcePool.Alloc(info.SizeInBytes, true);
 			if (ReusePlacedUploadResource.IsValid())
 			{
-				return ReusePlacedUploadResource.PlacedSubResource;
+				return jCreatedResource::CreatedFromResourcePool(ReusePlacedUploadResource.PlacedSubResource);
 			}
 			else
 			{
@@ -381,7 +306,7 @@ public:
 					NewPlacedResource.Size = info.SizeInBytes;
 					PlacedResourcePool.AddUsingPlacedResource(NewPlacedResource);
 
-					return NewResource;
+					return jCreatedResource::CreatedFromResourcePool(NewResource);
 				}
 			}
 		}
@@ -390,7 +315,7 @@ public:
         ComPtr<ID3D12Resource> NewResource;
         JFAIL(Device->CreateCommittedResource(&HeapProperties, D3D12_HEAP_FLAG_NONE
             , std::forward<T>(InDesc), InResourceState, InClearValue, IID_PPV_ARGS(&NewResource)));
-        return NewResource;
+		return jCreatedResource::CreatedFromStandalone(NewResource);
     }
 	//////////////////////////////////////////////////////////////////////////
 
@@ -499,7 +424,7 @@ public:
 
 	jMutexLock MultiFrameShaderBindingInstanceLock;
 	jDeallocatorMultiFrameShaderBindingInstance DeallocatorMultiFrameShaderBindingInstance;
-	jDeallocatorMultiFrameUniformBufferBlock DeallocatorMultiFrameUniformBufferBlock;
+	jDeallocatorMultiFrameCreatedResource DeallocatorMultiFrameCreatedResource;
 
 	virtual jRaytracingScene* CreateRaytracingScene() const;
 };

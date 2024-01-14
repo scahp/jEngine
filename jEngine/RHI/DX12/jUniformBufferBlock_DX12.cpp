@@ -97,11 +97,3 @@ uint64 jUniformBufferBlock_DX12::GetGPUAddress() const
 {
     return (jLifeTimeType::MultiFrame == LifeType) ? Buffer->GetGPUAddress() : (RingBuffer->GetGPUAddress() + RingBufferOffset);
 }
-
-void jUniformBufferBlock_DX12::Free()
-{
-    if (jLifeTimeType::MultiFrame == LifeType)
-    {
-        g_rhi_dx12->DeallocatorMultiFrameUniformBufferBlock.Free(shared_from_this());
-    }
-}

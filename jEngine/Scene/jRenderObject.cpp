@@ -208,9 +208,6 @@ const std::shared_ptr<jShaderBindingInstance>& jRenderObject::CreateShaderBindin
         ubo.Metallic = gOptions.Metallic;
         ubo.Roughness = gOptions.Roughness;
 
-        if (RenderObjectUniformParametersPtr)
-            RenderObjectUniformParametersPtr->Free();
-
         RenderObjectUniformParametersPtr = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
             jNameStatic("RenderObjectUniformParameters"), jLifeTimeType::MultiFrame, sizeof(jRenderObjectUniformBuffer)));
         RenderObjectUniformParametersPtr->UpdateBufferData(&ubo, sizeof(ubo));

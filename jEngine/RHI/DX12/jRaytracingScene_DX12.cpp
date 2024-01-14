@@ -20,7 +20,7 @@ void jRaytracingScene_DX12::CreateOrUpdateBLAS(const jRatracingInitializer& InIn
         // Remove Old BLAS
         if (RObj->BottomLevelASBuffer)
         {
-            auto temp = CD3DX12_RESOURCE_BARRIER::UAV(((jBuffer_DX12*)RObj->BottomLevelASBuffer)->Buffer.Get());
+            auto temp = CD3DX12_RESOURCE_BARRIER::UAV(((jBuffer_DX12*)RObj->BottomLevelASBuffer)->Buffer->Get());
             CmdBuffer->CommandList->ResourceBarrier(1, &temp);
 
             delete RObj->BottomLevelASBuffer;
@@ -57,7 +57,7 @@ void jRaytracingScene_DX12::CreateOrUpdateBLAS(const jRatracingInitializer& InIn
         if (IndexBuffer)
         {
             auto IndexBufferDX12 = (jIndexBuffer_DX12*)IndexBuffer;
-            ComPtr<ID3D12Resource> IdxBufferDX12 = IndexBufferDX12->BufferPtr->Buffer;
+            ComPtr<ID3D12Resource> IdxBufferDX12 = IndexBufferDX12->BufferPtr->Buffer->Resource;
             auto& indexStreamData = IndexBufferDX12->IndexStreamData;
 
             D3D12_GPU_VIRTUAL_ADDRESS IndexStart = IndexBufferDX12->BufferPtr->GetGPUAddress();
@@ -117,7 +117,7 @@ void jRaytracingScene_DX12::CreateOrUpdateBLAS(const jRatracingInitializer& InIn
         bottomLevelBuildDesc.DestAccelerationStructureData = ((jBuffer_DX12*)RObj->BottomLevelASBuffer)->GetGPUAddress();
 
         CmdBuffer->CommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
-        auto temp = CD3DX12_RESOURCE_BARRIER::UAV(((jBuffer_DX12*)RObj->BottomLevelASBuffer)->Buffer.Get());
+        auto temp = CD3DX12_RESOURCE_BARRIER::UAV(((jBuffer_DX12*)RObj->BottomLevelASBuffer)->Buffer->Get());
         CmdBuffer->CommandList->ResourceBarrier(1, &temp);
 
         delete ScratchASBuffer;
@@ -148,7 +148,7 @@ void jRaytracingScene_DX12::CreateOrUpdateTLAS(const jRatracingInitializer& InIn
     {
         D3D12_RESOURCE_BARRIER uavBarrier = {};
         uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-        uavBarrier.UAV.pResource = ((jBuffer_DX12*)TLASBuffer)->Buffer.Get();
+        uavBarrier.UAV.pResource = ((jBuffer_DX12*)TLASBuffer)->Buffer->Get();
         CmdBuffer->CommandList->ResourceBarrier(1, &uavBarrier);
     }
     else
@@ -207,6 +207,6 @@ void jRaytracingScene_DX12::CreateOrUpdateTLAS(const jRatracingInitializer& InIn
     }
 
     CmdBuffer->CommandList->BuildRaytracingAccelerationStructure(&asDesc, 0, nullptr);
-    auto temp = CD3DX12_RESOURCE_BARRIER::UAV(((jBuffer_DX12*)TLASBuffer)->Buffer.Get());
+    auto temp = CD3DX12_RESOURCE_BARRIER::UAV(((jBuffer_DX12*)TLASBuffer)->Buffer->Get());
     CmdBuffer->CommandList->ResourceBarrier(1, &temp);
 }

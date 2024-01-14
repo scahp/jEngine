@@ -1654,26 +1654,26 @@ jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector
 	// attribute 추가
 	auto vertexStreamData = std::make_shared<jVertexStreamData>();
 
-	{
-		auto streamParam = std::make_shared<jStreamParam<float>>();
-		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
-		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = jName("POSITION");
-		streamParam->Data.resize(vertices.size());
-		memcpy(&streamParam->Data[0], &vertices[0], vertices.size() * sizeof(float));
-		vertexStreamData->Params.push_back(streamParam);
-	}
+	//{
+	//	auto streamParam = std::make_shared<jStreamParam<float>>();
+	//	streamParam->BufferType = EBufferType::STATIC;
+	//	streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
+	//	streamParam->Stride = sizeof(float) * 3;
+	//	streamParam->Name = jName("POSITION");
+	//	streamParam->Data.resize(vertices.size());
+	//	memcpy(&streamParam->Data[0], &vertices[0], vertices.size() * sizeof(float));
+	//	vertexStreamData->Params.push_back(streamParam);
+	//}
 
-	{
-		auto streamParam = std::make_shared<jStreamParam<float>>();
-		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 4));
-		streamParam->Stride = sizeof(float) * 4;
-		streamParam->Name = jName("COLOR");
-		streamParam->Data = std::move(GenerateColor(color, elementCount));
-		vertexStreamData->Params.push_back(streamParam);
-	}
+    //{
+    //    auto streamParam = std::make_shared<jStreamParam<float>>();
+    //    streamParam->BufferType = EBufferType::STATIC;
+    //    streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 4));
+    //    streamParam->Stride = sizeof(float) * 4;
+    //    streamParam->Name = jName("COLOR");
+    //    streamParam->Data = std::move(GenerateColor(color, elementCount));
+    //    vertexStreamData->Params.push_back(streamParam);
+    //}
 
 	std::vector<float> normals(vertices.size());
 	for (int i = 0; i < normals.size() / 3; ++i)
@@ -1683,30 +1683,30 @@ jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector
 		memcpy(&normals[curIndex], &normal, sizeof(normal));
 	}
 
-	{
-		auto streamParam = std::make_shared<jStreamParam<float>>();
-		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
-		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = jName("NORMAL");
-		streamParam->Data.resize(normals.size());
-		memcpy(&streamParam->Data[0], &normals[0], normals.size() * sizeof(float));
-		vertexStreamData->Params.push_back(streamParam);
-	}
+	//{
+	//	auto streamParam = std::make_shared<jStreamParam<float>>();
+	//	streamParam->BufferType = EBufferType::STATIC;
+	//	streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
+	//	streamParam->Stride = sizeof(float) * 3;
+	//	streamParam->Name = jName("NORMAL");
+	//	streamParam->Data.resize(normals.size());
+	//	memcpy(&streamParam->Data[0], &normals[0], normals.size() * sizeof(float));
+	//	vertexStreamData->Params.push_back(streamParam);
+	//}
+
+	//// Dummy
+	//{
+	//	auto streamParam = std::make_shared<jStreamParam<float>>();
+	//	streamParam->BufferType = EBufferType::STATIC;
+	//	streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
+	//	streamParam->Stride = sizeof(float) * 3;
+	//	streamParam->Name = jName("TANGENT");
+	//	streamParam->Data.resize(normals.size(), 0.0f);
+	//	vertexStreamData->Params.push_back(streamParam);
+	//}
 
 	// Dummy
-	{
-		auto streamParam = std::make_shared<jStreamParam<float>>();
-		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
-		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = jName("TANGENT");
-		streamParam->Data.resize(normals.size(), 0.0f);
-		vertexStreamData->Params.push_back(streamParam);
-	}
-
-	// Dummy
-	{
+	//{
 		std::vector<Vector2> UV;
 		UV.resize(vertices.size() / 3);
 		for (int32 i = 0; i < vertices.size() / 3; ++i)
@@ -1721,15 +1721,46 @@ jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector
 			UV[i] = Vector2(u, v);
 		}
 
-		auto streamParam = std::make_shared<jStreamParam<float>>();
-		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 2));
-		streamParam->Stride = sizeof(float) * 2;
-		streamParam->Name = jName("TEXCOORD");
-		streamParam->Data.resize(UV.size() * (sizeof(Vector2) / sizeof(float)), 0.0f);
-        memcpy(&streamParam->Data[0], &UV[0], UV.size() * sizeof(Vector2));
-		vertexStreamData->Params.push_back(streamParam);
-	}
+	//	auto streamParam = std::make_shared<jStreamParam<float>>();
+	//	streamParam->BufferType = EBufferType::STATIC;
+	//	streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 2));
+	//	streamParam->Stride = sizeof(float) * 2;
+	//	streamParam->Name = jName("TEXCOORD");
+	//	streamParam->Data.resize(UV.size() * (sizeof(Vector2) / sizeof(float)), 0.0f);
+ //       memcpy(&streamParam->Data[0], &UV[0], UV.size() * sizeof(Vector2));
+	//	vertexStreamData->Params.push_back(streamParam);
+	//}
+
+    struct jModelLoaderVertex
+    {
+        Vector Pos;
+        Vector Normal;
+        Vector Tangent;
+        Vector Bitangent;
+        Vector2 TexCoord;
+    };
+    {
+        auto streamParam = std::make_shared<jStreamParam<jModelLoaderVertex>>();
+        streamParam->BufferType = EBufferType::STATIC;
+        streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("POSITION"), EBufferElementType::FLOAT, sizeof(float) * 3));
+        streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("NORMAL"), EBufferElementType::FLOAT, sizeof(float) * 3));
+        streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("TANGENT"), EBufferElementType::FLOAT, sizeof(float) * 3));
+        streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("BITANGENT"), EBufferElementType::FLOAT, sizeof(float) * 3));
+        streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("TEXCOORD"), EBufferElementType::FLOAT, sizeof(float) * 2));
+        streamParam->Name = jName("jModelLoaderVertex");
+        streamParam->Data.resize(elementCount);
+        streamParam->Stride = sizeof(jModelLoaderVertex);
+        jModelLoaderVertex* VerticesData = streamParam->Data.data();
+        for (int32 i = 0; i < elementCount; ++i)
+        {
+            VerticesData[i].Pos = Vector(vertices[i * 3], vertices[i * 3 + 1], vertices[i * 3 + 2]);
+            VerticesData[i].Normal = Vector(normals[i * 3], normals[i * 3 + 1], normals[i * 3 + 2]);
+            VerticesData[i].Tangent = Vector(normals[i * 3], normals[i * 3 + 1], normals[i * 3 + 2]);
+            VerticesData[i].Bitangent = Vector(normals[i * 3], normals[i * 3 + 1], normals[i * 3 + 2]);
+            VerticesData[i].TexCoord = UV[i];
+        }
+        vertexStreamData->Params.push_back(streamParam);
+    }
 
 	vertexStreamData->PrimitiveType = isWireframe ? EPrimitiveType::LINES : EPrimitiveType::TRIANGLES;
 	vertexStreamData->ElementCount = elementCount;
@@ -1783,6 +1814,7 @@ jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector
     object->RenderObjects.push_back(renderObject);
 	renderObject->SetPos(pos);
 	renderObject->SetScale(scale);
+	renderObject->MaterialPtr = GDefaultMaterial;
 	//if (createBoundInfo)
 	//	object->CreateBoundBox();
 	return object;

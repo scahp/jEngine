@@ -401,16 +401,16 @@ struct jDeallocatorMultiFrameResource
     struct jPendingFreeData
     {
         jPendingFreeData() = default;
-        jPendingFreeData(int32 InFrameIndex, std::shared_ptr<T> InDataPtr) : FrameIndex(InFrameIndex), DataPtr(InDataPtr) {}
+        jPendingFreeData(int32 InFrameIndex, T InData) : FrameIndex(InFrameIndex), Data(InData) {}
 
         int32 FrameIndex = 0;
-        std::shared_ptr<T> DataPtr = nullptr;
+        T Data{};
     };
     std::vector<jPendingFreeData> PendingFree;
     int32 CanReleasePendingFreeDataFrameNumber = 0;
-    std::function<void(std::shared_ptr<T>)> FreeDelegate;
+    std::function<void(T)> FreeDelegate;
 
-    void Free(std::shared_ptr<T> InDataPtr)
+    void Free(T InData)
     {
         const int32 CurrentFrameNumber = Test::GetCurrentFrameNumber();
         const int32 OldestFrameToKeep = CurrentFrameNumber - NumOfFramesToWaitBeforeReleasing;
@@ -428,9 +428,8 @@ struct jDeallocatorMultiFrameResource
                     if (PendingFreeData.FrameIndex < OldestFrameToKeep)
                     {
                         // Return to pending descriptor set
-                        check(PendingFreeData.DataPtr);
                         if (FreeDelegate)
-                            FreeDelegate(PendingFreeData.DataPtr);
+                            FreeDelegate(PendingFreeData.Data);
                     }
                     else
                     {
@@ -451,9 +450,8 @@ struct jDeallocatorMultiFrameResource
             }
         }
 
-        PendingFree.emplace_back(jPendingFreeData(CurrentFrameNumber, InDataPtr));
+        PendingFree.emplace_back(jPendingFreeData(CurrentFrameNumber, InData));
     }
 };
 
-using jDeallocatorMultiFrameShaderBindingInstance = jDeallocatorMultiFrameResource<jShaderBindingInstance>;
-using jDeallocatorMultiFrameUniformBufferBlock = jDeallocatorMultiFrameResource<IUniformBufferBlock>;
+using jDeallocatorMultiFrameShaderBindingInstance = jDeallocatorMultiFrameResource< std::shared_ptr<jShaderBindingInstance>>;

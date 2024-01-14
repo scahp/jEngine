@@ -73,182 +73,6 @@ inline float random_double()
     return rand() / (RAND_MAX + 1.0f);
 }
 
-// Pretty-print a state object tree.
-inline void PrintStateObjectDesc(const D3D12_STATE_OBJECT_DESC* desc)
-{
-	std::wstringstream wstr;
-	wstr << L"\n";
-	wstr << L"--------------------------------------------------------------------\n";
-	wstr << L"| D3D12 State Object 0x" << static_cast<const void*>(desc) << L": ";
-	if (desc->Type == D3D12_STATE_OBJECT_TYPE_COLLECTION) wstr << L"Collection\n";
-	if (desc->Type == D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE) wstr << L"Raytracing Pipeline\n";
-
-	auto ExportTree = [](UINT depth, UINT numExports, const D3D12_EXPORT_DESC* exports)
-	{
-		std::wostringstream woss;
-		for (UINT i = 0; i < numExports; i++)
-		{
-			woss << L"|";
-			if (depth > 0)
-			{
-				for (UINT j = 0; j < 2 * depth - 1; j++) woss << L" ";
-			}
-			woss << L" [" << i << L"]: ";
-			if (exports[i].ExportToRename) woss << exports[i].ExportToRename << L" --> ";
-			woss << exports[i].Name << L"\n";
-		}
-		return woss.str();
-	};
-
-	for (UINT i = 0; i < desc->NumSubobjects; i++)
-	{
-		wstr << L"| [" << i << L"]: ";
-		switch (desc->pSubobjects[i].Type)
-		{
-		case D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE:
-			wstr << L"Global Root Signature 0x" << desc->pSubobjects[i].pDesc << L"\n";
-			break;
-		case D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE:
-			wstr << L"Local Root Signature 0x" << desc->pSubobjects[i].pDesc << L"\n";
-			break;
-		case D3D12_STATE_SUBOBJECT_TYPE_NODE_MASK:
-			wstr << L"Node Mask: 0x" << std::hex << std::setfill(L'0') << std::setw(8) << *static_cast<const UINT*>(desc->pSubobjects[i].pDesc) << std::setw(0) << std::dec << L"\n";
-			break;
-		case D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY:
-		{
-			wstr << L"DXIL Library 0x";
-			auto lib = static_cast<const D3D12_DXIL_LIBRARY_DESC*>(desc->pSubobjects[i].pDesc);
-			wstr << lib->DXILLibrary.pShaderBytecode << L", " << lib->DXILLibrary.BytecodeLength << L" bytes\n";
-			wstr << ExportTree(1, lib->NumExports, lib->pExports);
-			break;
-		}
-		case D3D12_STATE_SUBOBJECT_TYPE_EXISTING_COLLECTION:
-		{
-			wstr << L"Existing Library 0x";
-			auto collection = static_cast<const D3D12_EXISTING_COLLECTION_DESC*>(desc->pSubobjects[i].pDesc);
-			wstr << collection->pExistingCollection << L"\n";
-			wstr << ExportTree(1, collection->NumExports, collection->pExports);
-			break;
-		}
-		case D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION:
-		{
-			wstr << L"Subobject to Exports Association (Subobject [";
-			auto association = static_cast<const D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION*>(desc->pSubobjects[i].pDesc);
-			UINT index = static_cast<UINT>(association->pSubobjectToAssociate - desc->pSubobjects);
-			wstr << index << L"])\n";
-			for (UINT j = 0; j < association->NumExports; j++)
-			{
-				wstr << L"|  [" << j << L"]: " << association->pExports[j] << L"\n";
-			}
-			break;
-		}
-		case D3D12_STATE_SUBOBJECT_TYPE_DXIL_SUBOBJECT_TO_EXPORTS_ASSOCIATION:
-		{
-			wstr << L"DXIL Subobjects to Exports Association (";
-			auto association = static_cast<const D3D12_DXIL_SUBOBJECT_TO_EXPORTS_ASSOCIATION*>(desc->pSubobjects[i].pDesc);
-			wstr << association->SubobjectToAssociate << L")\n";
-			for (UINT j = 0; j < association->NumExports; j++)
-			{
-				wstr << L"|  [" << j << L"]: " << association->pExports[j] << L"\n";
-			}
-			break;
-		}
-		case D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG:
-		{
-			wstr << L"Raytracing Shader Config\n";
-			auto config = static_cast<const D3D12_RAYTRACING_SHADER_CONFIG*>(desc->pSubobjects[i].pDesc);
-			wstr << L"|  [0]: Max Payload Size: " << config->MaxPayloadSizeInBytes << L" bytes\n";
-			wstr << L"|  [1]: Max Attribute Size: " << config->MaxAttributeSizeInBytes << L" bytes\n";
-			break;
-		}
-		case D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG:
-		{
-			wstr << L"Raytracing Pipeline Config\n";
-			auto config = static_cast<const D3D12_RAYTRACING_PIPELINE_CONFIG*>(desc->pSubobjects[i].pDesc);
-			wstr << L"|  [0]: Max Recursion Depth: " << config->MaxTraceRecursionDepth << L"\n";
-			break;
-		}
-		case D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP:
-		{
-			wstr << L"Hit Group (";
-			auto hitGroup = static_cast<const D3D12_HIT_GROUP_DESC*>(desc->pSubobjects[i].pDesc);
-			wstr << (hitGroup->HitGroupExport ? hitGroup->HitGroupExport : L"[none]") << L")\n";
-			wstr << L"|  [0]: Any Hit Import: " << (hitGroup->AnyHitShaderImport ? hitGroup->AnyHitShaderImport : L"[none]") << L"\n";
-			wstr << L"|  [1]: Closest Hit Import: " << (hitGroup->ClosestHitShaderImport ? hitGroup->ClosestHitShaderImport : L"[none]") << L"\n";
-			wstr << L"|  [2]: Intersection Import: " << (hitGroup->IntersectionShaderImport ? hitGroup->IntersectionShaderImport : L"[none]") << L"\n";
-			break;
-		}
-		}
-		wstr << L"|--------------------------------------------------------------------\n";
-	}
-	wstr << L"\n";
-	OutputDebugStringW(wstr.str().c_str());
-}
-
-ShaderTable::ShaderTable(ID3D12Device* InDevice, uint32 InNumOfShaderRecords, uint32 InShaderRecordSize, const wchar_t* InResourceName /*= nullptr*/)
-{
-	m_shaderRecords.reserve(InNumOfShaderRecords);
-
-	m_shaderRecordSize = Align(InShaderRecordSize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
-	const uint32 bufferSize = InNumOfShaderRecords * m_shaderRecordSize;
-	Buffer = jBufferUtil_DX12::CreateBuffer(bufferSize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT, EBufferCreateFlag::CPUAccess, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, 0, InResourceName);
-
-#if _DEBUG
-	m_name = InResourceName;
-#endif
-
-	m_mappedShaderRecords = (uint8*)Buffer->Map();
-}
-
-ComPtr<ID3D12Resource> ShaderTable::GetResource() const
-{
-    return Buffer->Buffer;
-}
-
-void ShaderTable::push_back(const ShaderRecord& InShaderRecord)
-{
-    //if (ensure(m_shaderRecords.size() >= m_shaderRecords.capacity()))
-    //    return;
-
-	m_shaderRecords.push_back(InShaderRecord);
-
-    uint32 incrementSize = InShaderRecord.m_shaderIdentifierSize;
-
-	memcpy(m_mappedShaderRecords, InShaderRecord.m_shaderIdentifier
-		, InShaderRecord.m_shaderIdentifierSize);
-
-	if (InShaderRecord.m_localRootArguments)
-	{
-		memcpy(m_mappedShaderRecords + InShaderRecord.m_shaderIdentifierSize
-			, InShaderRecord.m_localRootArguments, InShaderRecord.m_localRootArgumentsSize);
-        incrementSize += InShaderRecord.m_localRootArgumentsSize;
-	}
-
-	//m_mappedShaderRecords += incrementSize;
-    m_mappedShaderRecords += m_shaderRecordSize;
-}
-
-void ShaderTable::DebugPrint(robin_hood::unordered_map<void*, std::wstring> shaderIdToStringMap)
-{
-#if _DEBUG
-	std::wstringstream wstr;
-	wstr << L"|--------------------------------------------------------------------\n";
-	wstr << L"|Shader table - " << m_name.c_str() << L": "
-		<< m_shaderRecordSize << L" | "
-		<< m_shaderRecords.size() * m_shaderRecordSize << L" bytes\n";
-
-	for (UINT i = 0; i < m_shaderRecords.size(); i++)
-	{
-		wstr << L"| [" << i << L"]: ";
-		wstr << shaderIdToStringMap[m_shaderRecords[i].m_shaderIdentifier] << L", ";
-		wstr << m_shaderRecords[i].m_shaderIdentifierSize << L" + " << m_shaderRecords[i].m_localRootArgumentsSize << L" bytes \n";
-	}
-	wstr << L"|--------------------------------------------------------------------\n";
-	wstr << L"\n";
-	OutputDebugStringW(wstr.str().c_str());
-#endif
-}
-
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -866,11 +690,11 @@ jTexture* jRHI_DX12::CreateTextureFromData(const jImageData* InImageData) const
 	jCommandBuffer_DX12* commandList = BeginSingleTimeCopyCommands();
     if (InImageData->SubresourceFootprints.size() > 0)
     {
-        jBufferUtil_DX12::CopyBufferToImage(commandList->Get(), buffer->Buffer.Get(), Texture->Image.Get(), InImageData->SubresourceFootprints);
+        jBufferUtil_DX12::CopyBufferToImage(commandList->Get(), buffer->Buffer->Get(), Texture->Image->Get(), InImageData->SubresourceFootprints);
     }
     else
     {
-        jBufferUtil_DX12::CopyBufferToImage(commandList->Get(), buffer->Buffer.Get(), 0, Texture->Image.Get());
+        jBufferUtil_DX12::CopyBufferToImage(commandList->Get(), buffer->Buffer->Get(), 0, Texture->Image->Get());
     }
 
 	EndSingleTimeCopyCommands(commandList);
@@ -1495,7 +1319,7 @@ bool jRHI_DX12::TransitionImageLayout(jCommandBuffer* commandBuffer, jTexture* t
     D3D12_RESOURCE_BARRIER barrier = { };
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
     barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-    barrier.Transition.pResource = Texture_DX12->Image.Get();
+    barrier.Transition.pResource = Texture_DX12->Image->Get();
     barrier.Transition.StateBefore = SrcLayout;
     barrier.Transition.StateAfter = DstLayout;
     barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
@@ -1562,14 +1386,14 @@ void jPlacedResourcePool::Init()
     check(g_rhi_dx12->PlacedResourceSizeThreshold <= MemorySize[(int32)EPoolSizeType::MAX - 1]);
 
     check(g_rhi_dx12);
-    g_rhi_dx12->DeallocatorMultiFrameUniformBufferBlock.FreeDelegate
-        = std::bind(&jPlacedResourcePool::FreedFromPendingDelegate, this, std::placeholders::_1);
+    g_rhi_dx12->DeallocatorMultiFrameCreatedResource.FreeDelegate
+        = std::bind(&jPlacedResourcePool::FreedFromPendingDelegateForCreatedResource, this, std::placeholders::_1);
 }
 
 void jPlacedResourcePool::Release()
 {
     check(g_rhi_dx12);
-    g_rhi_dx12->DeallocatorMultiFrameUniformBufferBlock.FreeDelegate = nullptr;
+    g_rhi_dx12->DeallocatorMultiFrameCreatedResource.FreeDelegate = nullptr;
 }
 
 void jPlacedResourcePool::Free(const ComPtr<ID3D12Resource>& InData)

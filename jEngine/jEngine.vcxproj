@@ -370,6 +370,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClCompile Include="RHI\DX12\jRaytracingScene_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jRenderFrameContext_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jRenderPass_DX12.cpp" />
+    <ClCompile Include="RHI\DX12\jRHIType_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jRHI_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jRingBuffer_DX12.cpp" />
     <ClCompile Include="RHI\DX12\jShaderBindingInstance_DX12.cpp" />

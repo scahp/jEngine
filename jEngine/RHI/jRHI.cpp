@@ -13,7 +13,7 @@ jTexture* GWhiteTexture = nullptr;
 jTexture* GBlackTexture = nullptr;
 jTexture* GWhiteCubeTexture = nullptr;
 jTexture* GNormalTexture = nullptr;
-jMaterial* GDefaultMaterial = nullptr;
+std::shared_ptr<jMaterial> GDefaultMaterial = nullptr;
 
 //////////////////////////////////////////////////////////////////////////
 void IUniformBuffer::Bind(const jShader* shader) const
@@ -72,7 +72,7 @@ void jRHI::OnInitRHI()
     image.ImageData = { 255, 255, 255, 255, 255, 255 };
     GWhiteCubeTexture = CreateTextureFromData(&image);
 
-	GDefaultMaterial = new jMaterial();
+	GDefaultMaterial = std::make_shared<jMaterial>();
 	for (int32 i = 0; i < _countof(GDefaultMaterial->TexData); ++i)
 		GDefaultMaterial->TexData[i].Texture = GWhiteTexture;
 }

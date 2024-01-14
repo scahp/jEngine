@@ -517,3 +517,38 @@ GENERATE_CONVERSION_FUNCTION(GetDX12ImageLayout,
     CONVERSION_TYPE_ELEMENT(EImageLayout::FRAGMENT_DENSITY_MAP_EXT, D3D12_RESOURCE_STATE_COMMON),
     CONVERSION_TYPE_ELEMENT(EImageLayout::READ_ONLY, D3D12_RESOURCE_STATE_GENERIC_READ),
     CONVERSION_TYPE_ELEMENT(EImageLayout::ATTACHMENT, D3D12_RESOURCE_STATE_RENDER_TARGET))
+
+
+// Generated from CreateResource, CreateUploadResource
+struct jCreatedResource : public std::enable_shared_from_this<jCreatedResource>
+{
+    ~jCreatedResource() { Free(); }
+    enum class EType : uint8
+    {
+        Standalone,			// CommittedResource
+        ResourcePool,		// PlacedResource
+        Swapchain,          // no need release by me.
+    };
+
+    static std::shared_ptr<jCreatedResource> CreatedFromStandalone(const ComPtr<ID3D12Resource>& InResource) { return std::shared_ptr<jCreatedResource>(new jCreatedResource(EType::Standalone, InResource)); }
+    static std::shared_ptr<jCreatedResource> CreatedFromResourcePool(const ComPtr<ID3D12Resource>& InResource) { return std::shared_ptr<jCreatedResource>(new jCreatedResource(EType::ResourcePool, InResource)); }
+    static std::shared_ptr<jCreatedResource> CreatedFromSwapchain(const ComPtr<ID3D12Resource>& InResource) { return std::shared_ptr<jCreatedResource>(new jCreatedResource(EType::Swapchain, InResource)); }
+
+    EType ResourceType = EType::Standalone;
+    ComPtr<ID3D12Resource> Resource;
+
+    bool IsValid() const { return (nullptr != Resource.Get()); }
+    ID3D12Resource* Get() const { return Resource.Get(); }
+    const ComPtr<ID3D12Resource>& GetPtr() const { return Resource; }
+    uint64 GetGPUVirtualAddress() const { return Resource->GetGPUVirtualAddress(); }
+    void Free();
+
+private:
+    // 생성자를 private으로 설정
+    jCreatedResource() {}
+    jCreatedResource(EType InType, const ComPtr<ID3D12Resource>& InResource) : ResourceType(InType), Resource(InResource) {}
+
+    // 복사 생성자 및 할당 연산자를 삭제하여 복사 방지
+    jCreatedResource(const jCreatedResource&) = delete;
+    jCreatedResource& operator=(const jCreatedResource&) = delete;
+};

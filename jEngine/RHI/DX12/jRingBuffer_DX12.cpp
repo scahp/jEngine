@@ -26,7 +26,7 @@ void jRingBuffer_DX12::Create(uint64 totalSize, uint32 alignment /*= 16*/)
 
     check(g_rhi_dx12);
     Buffer = g_rhi_dx12->CreateUploadResource(&desc, D3D12_RESOURCE_STATE_GENERIC_READ);
-    if (!ensure(Buffer))
+    if (!ensure(Buffer->Resource))
         return;
 
     {
@@ -41,7 +41,7 @@ void jRingBuffer_DX12::Create(uint64 totalSize, uint32 alignment /*= 16*/)
     }
 
     D3D12_RANGE readRange = { };
-    if (JFAIL(Buffer->Map(0, &readRange, reinterpret_cast<void**>(&MappedPointer))))
+    if (JFAIL(Buffer->Resource->Map(0, &readRange, reinterpret_cast<void**>(&MappedPointer))))
     {
         return;
     }

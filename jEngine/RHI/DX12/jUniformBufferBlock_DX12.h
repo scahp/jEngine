@@ -25,8 +25,6 @@ struct jUniformBufferBlock_DX12 : public IUniformBufferBlock
     const jDescriptor_DX12& GetCBV() const;
     uint64 GetGPUAddress() const;
 
-    virtual void Free() override;
-
 private:
     jUniformBufferBlock_DX12(const jUniformBufferBlock_DX12&) = delete;
     jUniformBufferBlock_DX12& operator=(const jUniformBufferBlock_DX12&) = delete;
