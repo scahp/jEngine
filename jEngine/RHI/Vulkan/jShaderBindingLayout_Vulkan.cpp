@@ -256,13 +256,8 @@ void jShaderBindingInstance_Vulkan::CreateWriteDescriptorSet(
 
     std::vector<jWriteDescriptorInfo>& descriptors = OutDescriptorWrites.WriteDescriptorInfos;
     std::vector<VkWriteDescriptorSet>& descriptorWrites = OutDescriptorWrites.DescriptorWrites;
-    descriptors.reserve(200);
-    descriptorWrites.reserve(200);
-    //descriptors.resize(InShaderBindingArray.NumOfData);
-    //descriptorWrites.resize(InShaderBindingArray.NumOfData);
-    OutDescriptorWrites.DynamicOffsets.clear();
-    OutDescriptorWrites.DynamicOffsets.reserve(InShaderBindingArray.NumOfData);
-
+    std::vector<uint32>& dynamicOffsets = OutDescriptorWrites.DynamicOffsets;
+    
     int32 LastIndex = 0;
     for (int32 i = 0; i < InShaderBindingArray.NumOfData; ++i)
     {
@@ -278,26 +273,31 @@ void jShaderBindingInstance_Vulkan::CreateWriteDescriptorSet(
             CurDescriptorWrite.dstArrayElement = k - LastIndex;
             CurDescriptorWrite.descriptorType = GetVulkanShaderBindingType(InShaderBindingArray[i]->BindingType);
             CurDescriptorWrite.descriptorCount = 1;
-
-            const jWriteDescriptorInfo& WriteDescriptorInfo = descriptors[k];
-            if (WriteDescriptorInfo.BufferInfo.buffer)
-            {
-                CurDescriptorWrite.pBufferInfo = &WriteDescriptorInfo.BufferInfo;		            // 현재는 Buffer 기반 Desriptor 이므로 이것을 사용
-            }
-            else if (WriteDescriptorInfo.ImageInfo.imageView || WriteDescriptorInfo.ImageInfo.sampler)
-            {
-                CurDescriptorWrite.pImageInfo = &WriteDescriptorInfo.ImageInfo;	        			// Optional (Buffer View 기반에 사용)
-            }
-            else if (WriteDescriptorInfo.AccelerationStructureInfo.pAccelerationStructures)
-            {
-                CurDescriptorWrite.pNext = &WriteDescriptorInfo.AccelerationStructureInfo;
-            }
-            else
-            {
-                check(0);
-            }
         }
         LastIndex = (int32)descriptorWrites.size();
+    }
+
+    check(descriptors.size() == descriptorWrites.size());
+    for(int32 i=0;i<(int32)descriptorWrites.size();++i)
+    {
+        const jWriteDescriptorInfo& WriteDescriptorInfo = descriptors[i];
+        VkWriteDescriptorSet& CurDescriptorWrite = descriptorWrites[i];
+        if (WriteDescriptorInfo.BufferInfo.buffer)
+        {
+            CurDescriptorWrite.pBufferInfo = &WriteDescriptorInfo.BufferInfo;		            // Buffer should be bound in pBufferInfo
+        }
+        else if (WriteDescriptorInfo.ImageInfo.imageView || WriteDescriptorInfo.ImageInfo.sampler)
+        {
+            CurDescriptorWrite.pImageInfo = &WriteDescriptorInfo.ImageInfo;	        			// Image should be bound in pImageInfo
+        }
+        else if (WriteDescriptorInfo.AccelerationStructureInfo.pAccelerationStructures)         // AS structure should be bound in pNext
+        {
+            CurDescriptorWrite.pNext = &WriteDescriptorInfo.AccelerationStructureInfo;
+        }
+        else
+        {
+            check(0);
+        }
     }
 
     OutDescriptorWrites.IsInitialized = true;
@@ -356,6 +356,8 @@ void jShaderBindingInstance_Vulkan::Free()
 
 void jWriteDescriptorSet::SetWriteDescriptorInfo(const jShaderBinding* InShaderBinding)
 {
+    check(InShaderBinding);
+    check(InShaderBinding->Resource);
     const bool IsBindless = InShaderBinding->Resource->IsBindless();
 
     switch (InShaderBinding->BindingType)
@@ -408,7 +410,7 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(const jShaderBinding* InShaderB
 
                     VkDescriptorBufferInfo bufferInfo{};
                     bufferInfo.buffer = (VkBuffer)UniformBuffer->GetBuffer();
-                    bufferInfo.offset = UniformBuffer->GetBufferOffset();
+                    bufferInfo.offset = 0;      // Use DynamicOffset instead
                     bufferInfo.range = UniformBuffer->GetBufferSize();		// 전체 사이즈라면 VK_WHOLE_SIZE 이거 가능
                     check(bufferInfo.buffer);
                     WriteDescriptorInfos.push_back(jWriteDescriptorInfo(bufferInfo));
@@ -423,7 +425,7 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(const jShaderBinding* InShaderB
             {
                 VkDescriptorBufferInfo bufferInfo{};
                 bufferInfo.buffer = (VkBuffer)ubor->UniformBuffer->GetBuffer();
-                bufferInfo.offset = ubor->UniformBuffer->GetBufferOffset();
+                bufferInfo.offset = 0;      // Use DynamicOffset instead
                 bufferInfo.range = ubor->UniformBuffer->GetBufferSize();		// 전체 사이즈라면 VK_WHOLE_SIZE 이거 가능
                 check(bufferInfo.buffer);
                 WriteDescriptorInfos.push_back(jWriteDescriptorInfo(bufferInfo));
