@@ -5,11 +5,13 @@
 robin_hood::unordered_map<size_t, ComPtr<ID3D12RootSignature>> jShaderBindingLayout_DX12::GRootSignaturePool;
 jMutexRWLock jShaderBindingLayout_DX12::GRootSignatureLock;
 
+// Below option will be work like switch
+#define FORCE_USE_DESCRIPTOR_OFFSET_BY_USING_AUTO_CALCULATION_FOR_BINDLESS 1
+#define FORCE_USE_D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND (1 && !FORCE_USE_DESCRIPTOR_OFFSET_BY_USING_AUTO_CALCULATION_FOR_BINDLESS)
+
 void jRootParameterExtractor::Extract(int32& InOutDescriptorOffset, int32& InOutSamplerDescriptorOffset, const jShaderBindingArray& InShaderBindingArray, int32 InRegisterSpace)
 {
     // InRootParameters 의 맨 앞쪽에 inline descriptor 를 무조건 먼저 배치함.
-
-#define FORCE_USE_D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND 1
     int32 BindingIndex = 0;     // // To support both API(Vulkan, DX12) : Vulkna require a unique bindingindex.
 
     for (int32 i = 0; i < InShaderBindingArray.NumOfData; ++i)
@@ -53,8 +55,10 @@ void jRootParameterExtractor::Extract(int32& InOutDescriptorOffset, int32& InOut
                 }
                 else
                 {
-#if FORCE_USE_D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND
+#if FORCE_USE_DESCRIPTOR_OFFSET_BY_USING_AUTO_CALCULATION_FOR_BINDLESS
                     range.OffsetInDescriptorsFromTableStart = InOutDescriptorOffset;
+#elif FORCE_USE_D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND
+                    range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 #else
                     range.OffsetInDescriptorsFromTableStart = (ShaderBinding->BindingPoint == -1)
                         ? D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND : ShaderBinding->BindingPoint;
@@ -99,8 +103,10 @@ void jRootParameterExtractor::Extract(int32& InOutDescriptorOffset, int32& InOut
                 }
                 else
                 {
-#if FORCE_USE_D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND
+#if FORCE_USE_DESCRIPTOR_OFFSET_BY_USING_AUTO_CALCULATION_FOR_BINDLESS
                     range.OffsetInDescriptorsFromTableStart = InOutDescriptorOffset;
+#elif FORCE_USE_D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND
+                    range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 #else
                     range.OffsetInDescriptorsFromTableStart = (ShaderBinding->BindingPoint == -1)
                         ? D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND : ShaderBinding->BindingPoint;
@@ -126,8 +132,10 @@ void jRootParameterExtractor::Extract(int32& InOutDescriptorOffset, int32& InOut
                 }
                 else
                 {
-#if FORCE_USE_D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND
+#if FORCE_USE_DESCRIPTOR_OFFSET_BY_USING_AUTO_CALCULATION_FOR_BINDLESS
                     range.OffsetInDescriptorsFromTableStart = InOutSamplerDescriptorOffset;
+#elif FORCE_USE_D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND
+                    range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 #else
                     range.OffsetInDescriptorsFromTableStart = (ShaderBinding->BindingPoint == -1)
                         ? D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND : ShaderBinding->BindingPoint;
@@ -172,8 +180,10 @@ void jRootParameterExtractor::Extract(int32& InOutDescriptorOffset, int32& InOut
                 }
                 else
                 {
-#if FORCE_USE_D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND
+#if FORCE_USE_DESCRIPTOR_OFFSET_BY_USING_AUTO_CALCULATION_FOR_BINDLESS
                     range.OffsetInDescriptorsFromTableStart = InOutDescriptorOffset;
+#elif FORCE_USE_D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND
+                    range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 #else
                     range.OffsetInDescriptorsFromTableStart = (ShaderBinding->BindingPoint == -1)
                         ? D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND : ShaderBinding->BindingPoint;
@@ -201,8 +211,10 @@ void jRootParameterExtractor::Extract(int32& InOutDescriptorOffset, int32& InOut
             }
             else
             {
-#if FORCE_USE_D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND
+#if FORCE_USE_DESCRIPTOR_OFFSET_BY_USING_AUTO_CALCULATION_FOR_BINDLESS
                 range.OffsetInDescriptorsFromTableStart = InOutSamplerDescriptorOffset;
+#elif FORCE_USE_D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND
+                range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 #else
                 range.OffsetInDescriptorsFromTableStart = (ShaderBinding->BindingPoint == -1)
                     ? D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND : ShaderBinding->BindingPoint;
