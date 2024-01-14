@@ -15,7 +15,7 @@ void jRootParameterExtractor::Extract(int32& InOutDescriptorOffset, int32& InOut
     for (int32 i = 0; i < InShaderBindingArray.NumOfData; ++i)
     {
         const jShaderBinding* ShaderBinding = InShaderBindingArray[i];
-        const bool IsBindless = ShaderBinding->Resource->IsBindless();
+        const bool IsBindless = ShaderBinding->IsBindless;
 
         check(!ShaderBinding->IsInline || (ShaderBinding->IsInline &&
             (ShaderBinding->BindingType == EShaderBindingType::UNIFORMBUFFER

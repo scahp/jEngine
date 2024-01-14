@@ -177,13 +177,29 @@ struct jShaderBinding
 {
     static constexpr int32 APPEND_LAST = -1;        // BindingPoint is appending last
 
-    jShaderBinding() = default;
-    jShaderBinding(const int32 InBindingPoint, const int32 InNumOfDescriptors, const EShaderBindingType InBindingType
+    FORCEINLINE static jShaderBinding Create(const int32 InBindingPoint, const int32 InNumOfDescriptors, const EShaderBindingType InBindingType
         , const EShaderAccessStageFlag InAccessStageFlags, const jShaderBindingResource* InResource = nullptr, bool InIsInline = false)
-        : BindingPoint(InBindingPoint), NumOfDescriptors(InNumOfDescriptors), BindingType(InBindingType)
+    {
+        return jShaderBinding(InBindingPoint, InNumOfDescriptors, InBindingType, false, InAccessStageFlags, InResource, InIsInline);
+    }
+
+    FORCEINLINE static jShaderBinding CreateBindless(const int32 InBindingPoint, const int32 InNumOfDescriptors, const EShaderBindingType InBindingType
+        , const EShaderAccessStageFlag InAccessStageFlags, const jShaderBindingResource* InResource = nullptr, bool InIsInline = false)
+    {
+        return jShaderBinding(InBindingPoint, InNumOfDescriptors, InBindingType, true, InAccessStageFlags, InResource, InIsInline);
+    }
+
+    jShaderBinding() = default;
+    jShaderBinding(const int32 InBindingPoint, const int32 InNumOfDescriptors, const EShaderBindingType InBindingType, const bool InIsBindless
+        , const EShaderAccessStageFlag InAccessStageFlags, const jShaderBindingResource* InResource = nullptr, bool InIsInline = false)
+        : BindingPoint(InBindingPoint), NumOfDescriptors(InNumOfDescriptors), BindingType(InBindingType), IsBindless(InIsBindless)
         , AccessStageFlags(InAccessStageFlags), Resource(InResource), IsInline(InIsInline)
     {
         check(EShaderBindingType::SUBPASS_INPUT_ATTACHMENT != InBindingType || InAccessStageFlags == EShaderAccessStageFlag::FRAGMENT);        // SubpassInputAttachment must have the stageflag 0.
+        if (InResource)
+        {
+            check(InResource->IsBindless() == InIsBindless);
+        }
 
         GetHash();
     }
@@ -198,6 +214,7 @@ struct jShaderBinding
         Hash = CityHash64WithSeed((int64)NumOfDescriptors, Hash);
         Hash = CityHash64WithSeed((int64)BindingType, Hash);
         Hash = CityHash64WithSeed((int64)AccessStageFlags, Hash);
+        Hash = CityHash64WithSeed((int64)IsBindless, Hash);
 
         return Hash;
     }
@@ -209,18 +226,19 @@ struct jShaderBinding
         OutReslut.NumOfDescriptors = NumOfDescriptors;
         OutReslut.BindingType = BindingType;
         OutReslut.AccessStageFlags = AccessStageFlags;
+        OutReslut.IsBindless = IsBindless;
         OutReslut.Hash = Hash;
     }
 
     mutable size_t Hash = 0;
 
     bool IsInline = false;
+    bool IsBindless = false;
     int32 BindingPoint = 0;
     int32 NumOfDescriptors = 1;
     EShaderBindingType BindingType = EShaderBindingType::UNIFORMBUFFER;
     EShaderAccessStageFlag AccessStageFlags = EShaderAccessStageFlag::ALL_GRAPHICS;
 
-    // std::shared_ptr<jShaderBindingResource> ResourcePtr;
     const jShaderBindingResource* Resource = nullptr;
 };
 
@@ -235,6 +253,15 @@ struct jShaderBindingArray
 
         check(NumOfInlineData > NumOfData);
         new (&Data[NumOfData]) jShaderBinding(args...);
+        ++NumOfData;
+    }
+
+    void Add(const jShaderBinding& args)
+    {
+        static_assert(std::is_trivially_copyable<jShaderBinding>::value, "jShaderBinding should be trivially copyable");
+
+        check(NumOfInlineData > NumOfData);
+        Data[NumOfData] = args;
         ++NumOfData;
     }
 

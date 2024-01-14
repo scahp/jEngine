@@ -42,8 +42,8 @@ const std::shared_ptr<jShaderBindingInstance>& jMaterial::CreateShaderBindingIns
                     Texture = GWhiteTexture;
             }
 
-            ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
-                , ResourceInlineAllactor.Alloc<jTextureResource>(Texture, nullptr));
+            ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
+                , ResourceInlineAllactor.Alloc<jTextureResource>(Texture, nullptr)));
         }
 
         if (ShaderBindingInstance)

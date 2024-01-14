@@ -7,7 +7,8 @@
 //////////////////////////////////////////////////////////////////////////
 bool jCommandBuffer_Vulkan::Begin() const
 {
-    check(IsEnd);
+    if (!IsEnd)
+        return true;
 
     VkCommandBufferBeginInfo beginInfo = {};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;

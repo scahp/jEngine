@@ -94,8 +94,8 @@ void jSpotLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* OutDestDr
     UniformBuffer->UpdateBufferData(&PushConstantData, sizeof(jSpotLightPushConstant));
 
     // todo : 인라인 아닌것도 지원해야 됨
-    ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_GRAPHICS
-        , ResourceInlineAllactor.Alloc<jUniformBufferResource>(UniformBuffer.get()), true);
+    ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_GRAPHICS
+        , ResourceInlineAllactor.Alloc<jUniformBufferResource>(UniformBuffer.get()), true));
 
     ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
     CopyShaderBindingInstances.Add(ShaderBindingInstance.get());

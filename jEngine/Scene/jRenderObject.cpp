@@ -238,8 +238,8 @@ const std::shared_ptr<jShaderBindingInstance>& jRenderObject::CreateShaderBindin
         jShaderBindingArray ShaderBindingArray;
         jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
 
-        ShaderBindingArray.Add(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::ALL_GRAPHICS
-            , ResourceInlineAllactor.Alloc<jUniformBufferResource>(RenderObjectUniformParametersPtr.get()));
+        ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::ALL_GRAPHICS
+            , ResourceInlineAllactor.Alloc<jUniformBufferResource>(RenderObjectUniformParametersPtr.get())));
 
         if (RenderObjectShaderBindingInstance)
             RenderObjectShaderBindingInstance->Free();
