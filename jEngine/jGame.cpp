@@ -73,7 +73,7 @@ void jGame::Setup()
     const Vector mainCameraTarget(-260.303925f, 105.498116f, 94.4834976f);
     //const Vector mainCameraPos(0, 0, -1000);
     //const Vector mainCameraTarget(300, 0, 0);
-    MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 1.0f, 1250.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT, true);
+    MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 10.0f, 5000.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT, true);
     jCamera::AddCamera(0, MainCamera);
 
     // Create lights
@@ -205,6 +205,7 @@ void jGame::Setup()
 		//}
 	//});
 
+#if SUPPORT_RAYTRACING
     jRatracingInitializer Initializer;
     Initializer.CommandBuffer = g_rhi->BeginSingleTimeCommands();
     Initializer.RenderObjects = jObject::GetStaticRenderObject();
@@ -216,6 +217,7 @@ void jGame::Setup()
     g_rhi->RaytracingScene->CreateOrUpdateTLAS(Initializer);
 	g_rhi->EndSingleTimeCommands(Initializer.CommandBuffer);
     g_rhi->Finish(); // todo : Instead of this, it needs UAV barrier here
+#endif // SUPPORT_RAYTRACING
 }
 
 void jGame::SpawnObjects(ESpawnedType spawnType)
