@@ -905,3 +905,4 @@ private:
 	ERTClearType Type = ERTClearType::None;
 	jClearValueType ClearValue;
 };
+

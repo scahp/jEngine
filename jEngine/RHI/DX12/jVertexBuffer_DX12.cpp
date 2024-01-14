@@ -172,7 +172,7 @@ bool jVertexBuffer_DX12::Initialize(const std::shared_ptr<jVertexStreamData>& In
 
             if (iter->GetBufferSize() > 0)
             {
-                BindInfos.Buffers.push_back(stream.BufferPtr->Buffer.Get());
+                BindInfos.Buffers.push_back(stream.BufferPtr->Buffer->Get());
                 BindInfos.Offsets.push_back(stream.Offset + stream.BufferPtr->Offset);
             }
         

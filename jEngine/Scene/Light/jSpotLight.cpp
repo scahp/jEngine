@@ -42,9 +42,6 @@ const std::shared_ptr<jShaderBindingInstance>& jSpotLight::PrepareShaderBindingI
     {
         IsNeedToUpdateShaderBindingInstance = false;
 
-        if (LightDataUniformBlockPtr)
-            LightDataUniformBlockPtr->Free();
-
         LightDataUniformBlockPtr = std::shared_ptr<IUniformBufferBlock>(
             g_rhi->CreateUniformBufferBlock(jNameStatic("SpotLightBlock"), jLifeTimeType::MultiFrame, sizeof(jSpotLightUniformBufferData)));
         LightDataUniformBlockPtr->UpdateBufferData(&LightData, sizeof(LightData));

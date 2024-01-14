@@ -100,7 +100,7 @@ void jQueryTime_DX12::EndQuery(const jCommandBuffer* commandBuffer) const
     commandBuffer_DX12->CommandList->EndQuery(g_rhi_dx12->QueryPoolTime->QueryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, QueryId + 1);
 
     commandBuffer_DX12->CommandList->ResolveQueryData(g_rhi_dx12->QueryPoolTime->QueryHeap.Get()
-        , D3D12_QUERY_TYPE_TIMESTAMP, QueryId, 2, g_rhi_dx12->QueryPoolTime->ReadbackBuffer->Buffer.Get(), QueryId * sizeof(uint64));
+        , D3D12_QUERY_TYPE_TIMESTAMP, QueryId, 2, g_rhi_dx12->QueryPoolTime->ReadbackBuffer->Buffer->Get(), QueryId * sizeof(uint64));
 }
 
 bool jQueryTime_DX12::IsQueryTimeStampResult(bool isWaitUntilAvailable) const

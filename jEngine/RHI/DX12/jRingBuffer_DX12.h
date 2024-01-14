@@ -34,7 +34,6 @@ struct jRingBuffer_DX12 : public jBuffer
 
     virtual void Release() override
     {
-        Buffer = nullptr;
         CBV.Free();
     }
 
@@ -46,7 +45,7 @@ struct jRingBuffer_DX12 : public jBuffer
         check(!MappedPointer);
 
         const D3D12_RANGE readRange = { .Begin = offset, .End = offset + size };
-        if (JFAIL(Buffer->Map(0, &readRange, reinterpret_cast<void**>(&MappedPointer))))
+        if (JFAIL(Buffer->Resource->Map(0, &readRange, reinterpret_cast<void**>(&MappedPointer))))
         {
             return nullptr;
         }
@@ -57,7 +56,7 @@ struct jRingBuffer_DX12 : public jBuffer
         check(RingBufferSize);
         check(!MappedPointer);
         D3D12_RANGE readRange = { };
-        if (JFAIL(Buffer->Map(0, &readRange, reinterpret_cast<void**>(&MappedPointer))))
+        if (JFAIL(Buffer->Resource->Map(0, &readRange, reinterpret_cast<void**>(&MappedPointer))))
         {
             return nullptr;
         }
@@ -66,7 +65,7 @@ struct jRingBuffer_DX12 : public jBuffer
     virtual void Unmap() override
     {
         check(MappedPointer);
-        Buffer->Unmap(0, nullptr);
+        Buffer->Resource->Unmap(0, nullptr);
         MappedPointer = nullptr;
     }
     virtual void UpdateBuffer(const void* data, uint64 size) override
@@ -80,7 +79,7 @@ struct jRingBuffer_DX12 : public jBuffer
         }
     }
 
-    virtual void* GetHandle() const override { return Buffer.Get(); }
+    virtual void* GetHandle() const override { return Buffer->Get(); }
     virtual uint64 GetAllocatedSize() const override { return RingBufferSize; }
     virtual uint64 GetBufferSize() const override { return RingBufferSize; }
     virtual uint64 GetOffset() const override { return RingBufferOffset; }
@@ -88,7 +87,7 @@ struct jRingBuffer_DX12 : public jBuffer
 
     uint64 RingBufferOffset = 0;
     uint32 Alignment = 16;
-    ComPtr<ID3D12Resource> Buffer;
+    std::shared_ptr<jCreatedResource> Buffer;
     uint64 RingBufferSize = 0;
     void* MappedPointer = nullptr;
 

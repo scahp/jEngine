@@ -75,14 +75,16 @@ bool jSwapchain_DX12::Create()
     {
         jSwapchainImage_DX12* SwapchainImage = new jSwapchainImage_DX12();
 
-        ComPtr<ID3D12Resource> renderTarget;
-        if (JFAIL(SwapChain->GetBuffer(i, IID_PPV_ARGS(&renderTarget))))
+        ComPtr<ID3D12Resource> NewResource;
+        if (JFAIL(SwapChain->GetBuffer(i, IID_PPV_ARGS(&NewResource))))
             return false;
+
+        std::shared_ptr<jCreatedResource> RenderTargetResource = jCreatedResource::CreatedFromSwapchain(NewResource);
 
         Images[i] = SwapchainImage;        
 
         auto TextureDX12Ptr = std::make_shared<jTexture_DX12>(
-            ETextureType::TEXTURE_2D, Format, Extent.x, Extent.y, 1, EMSAASamples::COUNT_1, 1, false, jRTClearValue::Invalid, renderTarget);
+            ETextureType::TEXTURE_2D, Format, Extent.x, Extent.y, 1, EMSAASamples::COUNT_1, 1, false, jRTClearValue::Invalid, RenderTargetResource);
         SwapchainImage->TexturePtr = TextureDX12Ptr;
 
         jBufferUtil_DX12::CreateRenderTargetView((jTexture_DX12*)SwapchainImage->TexturePtr.get());
@@ -105,7 +107,7 @@ bool jSwapchain_DX12::Resize(int32 InWidth, int32 InHeight)
         {
             jSwapchainImage* SwapchainImage = Images[i];
             auto TexDX12 = (jTexture_DX12*)SwapchainImage->TexturePtr.get();
-            TexDX12->Image.Reset();
+            TexDX12->Image->Resource.Reset();
         }
 
         SwapChain->SetFullscreenState(false, nullptr);
@@ -134,12 +136,14 @@ bool jSwapchain_DX12::Resize(int32 InWidth, int32 InHeight)
     {
         jSwapchainImage* SwapchainImage = Images[i];
 
-        ComPtr<ID3D12Resource> renderTarget;
-        if (JFAIL(SwapChain->GetBuffer(i, IID_PPV_ARGS(&renderTarget))))
+        ComPtr<ID3D12Resource> NewResource;
+        if (JFAIL(SwapChain->GetBuffer(i, IID_PPV_ARGS(&NewResource))))
             return false;
 
+        std::shared_ptr<jCreatedResource> RenderTargetResource = jCreatedResource::CreatedFromSwapchain(NewResource);
+
         auto TextureDX12Ptr = std::make_shared<jTexture_DX12>(
-            ETextureType::TEXTURE_2D, GetDX12TextureFormat(DXGI_FORMAT_R8G8B8A8_UNORM), InWidth, InHeight, 1, EMSAASamples::COUNT_1, 1, false, jRTClearValue::Invalid, renderTarget);
+            ETextureType::TEXTURE_2D, GetDX12TextureFormat(DXGI_FORMAT_R8G8B8A8_UNORM), InWidth, InHeight, 1, EMSAASamples::COUNT_1, 1, false, jRTClearValue::Invalid, RenderTargetResource);
         SwapchainImage->TexturePtr = TextureDX12Ptr;
 
         jBufferUtil_DX12::CreateRenderTargetView((jTexture_DX12*)SwapchainImage->TexturePtr.get());

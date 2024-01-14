@@ -470,7 +470,7 @@ void jRenderer::SetupBasePass()
             {
                 if (GDefaultMaterial)
                 {
-                    Material = GDefaultMaterial;
+                    Material = GDefaultMaterial.get();
                 }
             }
 
@@ -1616,6 +1616,8 @@ void jRenderer::Render()
                 IndexBuffers.push_back(RObj->GeometryDataPtr->IndexBuffer->GetBuffer());
                 TestUniformBuffers.push_back(RObj->TestUniformBuffer.get());
                 VertexBuffers.push_back(RObj->GeometryDataPtr->VertexBuffer->GetBuffer(0));
+
+                check(RObj->MaterialPtr);
                 AlbedoTextures.push_back(jTextureResourceBindless::jTextureBindData(RObj->MaterialPtr->GetTexture<jTexture_DX12>(jMaterial::EMaterialTextureType::Albedo), nullptr));
                 NormalTextures.push_back(jTextureResourceBindless::jTextureBindData(RObj->MaterialPtr->GetTexture<jTexture_DX12>(jMaterial::EMaterialTextureType::Normal), nullptr));
                 MetallicTextures.push_back(jTextureResourceBindless::jTextureBindData(RObj->MaterialPtr->GetTexture<jTexture_DX12>(jMaterial::EMaterialTextureType::Metallic), nullptr));

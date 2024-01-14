@@ -43,9 +43,6 @@ const std::shared_ptr<jShaderBindingInstance>& jDirectionalLight::PrepareShaderB
     {
         NeedToUpdateShaderBindingInstance = false;
 
-        if (LightDataUniformBlockPtr)
-            LightDataUniformBlockPtr->Free();
-
         LightDataUniformBlockPtr = std::shared_ptr<IUniformBufferBlock>(
             g_rhi->CreateUniformBufferBlock(jNameStatic("DirectionalLightBlock"), jLifeTimeType::MultiFrame, sizeof(jDirectionalLightUniformBufferData)));
         LightDataUniformBlockPtr->UpdateBufferData(&LightData, sizeof(LightData));

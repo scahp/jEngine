@@ -41,9 +41,6 @@ const std::shared_ptr<jShaderBindingInstance>& jPointLight::PrepareShaderBinding
     {
         IsNeedToUpdateShaderBindingInstance = false;
 
-        if (LightDataUniformBlockPtr)
-            LightDataUniformBlockPtr->Free();
-
         LightDataUniformBlockPtr = std::shared_ptr<IUniformBufferBlock>(
             g_rhi->CreateUniformBufferBlock(jNameStatic("PointLightBlock"), jLifeTimeType::MultiFrame, sizeof(jPointLightUniformBufferData)));
         LightDataUniformBlockPtr->UpdateBufferData(&LightData, sizeof(LightData));

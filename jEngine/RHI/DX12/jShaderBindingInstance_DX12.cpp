@@ -183,7 +183,7 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
             else
             {
                 jBuffer_DX12* Buf = (jBuffer_DX12*)ShaderBinding->Resource->GetResource();
-                check(Buf->Buffer);
+                check(Buf->Buffer->Resource);
 
                 if (ShaderBinding->IsInline)
                 {
@@ -253,7 +253,7 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
             else
             {
                 jBuffer_DX12* Buf = (jBuffer_DX12*)ShaderBinding->Resource->GetResource();
-                check(Buf->Buffer);
+                check(Buf->Buffer->Resource);
                 if (ShaderBinding->IsInline)
                 {
                     RootParameterInlines.push_back({ .Type = jInlineRootParamType::UAV, .GPUVirtualAddress = Buf->GetGPUAddress(), .ResourceName = Buf->ResourceName, .Resource = Buf });

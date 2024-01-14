@@ -20,7 +20,7 @@ extern jTexture* GWhiteTexture;
 extern jTexture* GBlackTexture;
 extern jTexture* GWhiteCubeTexture;
 extern jTexture* GNormalTexture;
-extern jMaterial* GDefaultMaterial;
+extern std::shared_ptr<jMaterial> GDefaultMaterial;
 
 struct jShader;
 struct jShaderInfo;
@@ -114,8 +114,6 @@ struct IUniformBufferBlock : public jShaderBindableResource, public std::enable_
 	
 	virtual void* GetBuffer() const { return nullptr; }
 	virtual void* GetBufferMemory() const { return nullptr; }
-
-	virtual void Free() {}
 };
 
 struct IShaderStorageBufferObject : public jShaderBindableResource
