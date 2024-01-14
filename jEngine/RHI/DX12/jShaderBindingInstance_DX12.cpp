@@ -30,8 +30,9 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
         const jShaderBinding* ShaderBinding = InShaderBindingArray[i];
         check(ShaderBinding);
         check(ShaderBinding->Resource);
-        
-        const bool IsBindless = ShaderBinding->Resource->IsBindless();
+        check(ShaderBinding->IsBindless == ShaderBinding->Resource->IsBindless());
+
+        const bool IsBindless = ShaderBinding->IsBindless;
         check((IsBindless && !ShaderBinding->IsInline) || !IsBindless);     // Bindless must note be inline
 
         switch (ShaderBinding->BindingType)

@@ -69,11 +69,11 @@ void jDirectionalLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* Ou
         , ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
         , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
 
-    ShaderBindingArray.Add(jShaderBinding::APPEND_LAST, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
-        , ResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::IrradianceMap2, ShadowSamplerStateInfo));
+    ShaderBindingArray.Add(jShaderBinding::Create(jShaderBinding::APPEND_LAST, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
+        , ResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::IrradianceMap2, ShadowSamplerStateInfo)));
 
-    ShaderBindingArray.Add(jShaderBinding::APPEND_LAST, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
-        , ResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::FilteredEnvMap2, ShadowSamplerStateInfo));
+    ShaderBindingArray.Add(jShaderBinding::Create(jShaderBinding::APPEND_LAST, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
+        , ResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::FilteredEnvMap2, ShadowSamplerStateInfo)));
     temp = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
     CopyShaderBindingInstances.Add(temp.get());
     //
