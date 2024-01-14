@@ -904,7 +904,7 @@ bool jRHI_Vulkan::CreateShaderInternal(jShader* OutShader, const jShaderInfo& sh
 			auto ShaderBlob = jShaderCompiler_DX12::Get().Compile(ShaderText.c_str(), (uint32)ShaderText.length(), ShadingModel, EntryPoint.c_str(), false
 				, {TEXT("-spirv"), TEXT("-fspv-target-env=vulkan1.1spirv1.4"), TEXT("-fvk-use-scalar-layout")
 				, TEXT("-fspv-extension=SPV_EXT_descriptor_indexing"), TEXT("-fspv-extension=SPV_KHR_ray_tracing")
-				, TEXT("-fspv-extension=SPV_KHR_ray_query") });
+				, TEXT("-fspv-extension=SPV_KHR_ray_query"), TEXT("-fspv-extension=SPV_EXT_shader_viewport_index_layer") });
 
 			std::vector<uint8> SpirvCode;
 			if (ShaderBlob->GetBufferSize() > 0)
