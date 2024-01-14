@@ -10,19 +10,12 @@
 #include "Profiler/jPerformanceProfile.h"
 #include "Renderer/jRenderer.h"
 #include "jPrimitiveUtil.h"
-#include "RHI/Vulkan/jBufferUtil_Vulkan.h"
 #include "jOptions.h"
 #include "FileLoader/jModelLoader.h"
 #include "Scene/jMeshObject.h"
 #include "FileLoader/jImageFileLoader.h"
 #include "Renderer/jSceneRenderTargets.h"    // 임시
-#include "RHI/DX12/jShader_DX12.h"
 #include "dxcapi.h"
-#include "RHI/DX12/jVertexBuffer_DX12.h"
-#include "RHI/DX12/jIndexBuffer_DX12.h"
-#include "RHI/DX12/jBufferUtil_DX12.h"
-#include "RHI/Vulkan/jVertexBuffer_Vulkan.h"
-#include "RHI/Vulkan/jIndexBuffer_Vulkan.h"
 #include "RHI/jRaytracingScene.h"
 
 jRHI* g_rhi = nullptr;
