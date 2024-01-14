@@ -20,6 +20,7 @@ extern jTexture* GWhiteTexture;
 extern jTexture* GBlackTexture;
 extern jTexture* GWhiteCubeTexture;
 extern jTexture* GNormalTexture;
+extern jTexture* GRoughnessMetalicTexture;
 extern std::shared_ptr<jMaterial> GDefaultMaterial;
 
 struct jShader;
