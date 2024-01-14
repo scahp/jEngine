@@ -687,7 +687,9 @@ bool jRHI_DX12::InitRHI()
 
 	ShowWindow(m_hWnd, SW_SHOW);
 
+#if SUPPORT_RAYTRACING
     RaytracingScene = CreateRaytracingScene();
+#endif // SUPPORT_RAYTRACING
 
     return true;
 }
