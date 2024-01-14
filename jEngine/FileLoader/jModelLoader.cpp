@@ -71,7 +71,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 
 		subMesh.StartVertex = static_cast<int32>(meshData->Vertices.size());
 		meshData->Vertices.resize(meshData->Vertices.size() + assimpMesh->mNumVertices);
-		subMesh.EndVertex = Max(subMesh.StartVertex, static_cast<int32>(meshData->Vertices.size() - 1));
+		subMesh.EndVertex = static_cast<int32>(meshData->Vertices.size());
 
 		memcpy(&meshData->Vertices[subMesh.StartVertex], &assimpMesh->mVertices[0], assimpMesh->mNumVertices * sizeof(Vector));
 
@@ -107,7 +107,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 		{
 			subMesh.StartFace = static_cast<int32>(meshData->Faces.size());
 			meshData->Faces.resize(meshData->Faces.size() + assimpMesh->mNumFaces * 3);
-			subMesh.EndFace = Max(subMesh.StartFace, static_cast<int32>(meshData->Faces.size() - 1));
+			subMesh.EndFace = static_cast<int32>(meshData->Faces.size());
 			for (unsigned int k = 0; k < assimpMesh->mNumFaces; ++k)
 			{
 				aiFace& face = assimpMesh->mFaces[k];
