@@ -1549,7 +1549,7 @@ void jRenderer::Render()
                 if (IsUseDX12())
                 {
                     m_raytracingOutput = jBufferUtil_DX12::CreateImage((uint32)SCR_WIDTH, (uint32)SCR_HEIGHT, (uint32)1, (uint32)1, (uint32)1
-                        , ETextureType::TEXTURE_2D, GetDX12TextureFormat(BackbufferFormat), ETextureCreateFlag::UAV, EImageLayout::UAV);
+                        , ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, ETextureCreateFlag::UAV, EImageLayout::UAV);
                 }
                 else if (IsUseVulkan())
                 {

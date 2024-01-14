@@ -1766,7 +1766,7 @@ jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector
 	vertexStreamData->ElementCount = elementCount;
 
 	// IndexStream 추가
-	std::vector<uint32> faces;
+	std::vector<uint32> indices;
 	int32 iCount = 0;
 	int32 toNextSlice = slice + 1;
 	int32 temp = 6;
@@ -1774,36 +1774,36 @@ jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector
 	{
 		for (int32 i = 0; i < slice; ++i, iCount += 1)
 		{
-			faces.push_back(iCount + 1); faces.push_back(iCount); faces.push_back(iCount + toNextSlice);
-			faces.push_back(iCount + 1); faces.push_back(iCount + toNextSlice); faces.push_back(iCount + toNextSlice + 1);
+			indices.push_back(iCount + 1); indices.push_back(iCount); indices.push_back(iCount + toNextSlice);
+			indices.push_back(iCount + 1); indices.push_back(iCount + toNextSlice); indices.push_back(iCount + toNextSlice + 1);
 		}
 	}
 
 	for (int32 i = 0; i < slice; ++i, iCount += 1)
 	{
-		faces.push_back(iCount + 1);
-		faces.push_back(iCount);
-		faces.push_back(elementCount - 1);
+		indices.push_back(iCount + 1);
+		indices.push_back(iCount);
+		indices.push_back(elementCount - 1);
 	}
 
 	iCount = 0;
 	for (int32 i = 0; i < slice; ++i, iCount += 1)
 	{
-		faces.push_back(elementCount - 2);
-		faces.push_back(iCount);
-		faces.push_back(iCount + 1);
+		indices.push_back(elementCount - 2);
+		indices.push_back(iCount);
+		indices.push_back(iCount + 1);
 	}
 
 	auto indexStreamData = std::make_shared<jIndexStreamData>();
-	indexStreamData->ElementCount = static_cast<int32>(faces.size());
+	indexStreamData->ElementCount = static_cast<int32>(indices.size());
 	{
 		auto streamParam = new jStreamParam<uint32>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::UINT32, sizeof(uint32) * 3));
+		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::UINT32, sizeof(int32) * 3));
 		streamParam->Stride = sizeof(uint32) * 3;
 		streamParam->Name = jName("Index");
-		streamParam->Data.resize(faces.size());
-		memcpy(&streamParam->Data[0], &faces[0], faces.size() * sizeof(uint32));
+		streamParam->Data.resize(indices.size());
+		memcpy(&streamParam->Data[0], &indices[0], indices.size() * sizeof(uint32));
 		indexStreamData->Param = streamParam;
 	}
 
@@ -1815,8 +1815,6 @@ jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector
 	renderObject->SetPos(pos);
 	renderObject->SetScale(scale);
 	renderObject->MaterialPtr = GDefaultMaterial;
-	//if (createBoundInfo)
-	//	object->CreateBoundBox();
 	return object;
 }
 

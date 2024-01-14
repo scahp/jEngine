@@ -163,19 +163,19 @@ void jGame::Setup()
 		jObject::AddObject(Sponza);
 		SpawnedObjects.push_back(Sponza);
 
-		//for (int32 i = 0; i < 2; ++i)
-		//{
-		//	Sphere = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f + i * 100), 1.0, 60, Vector(30.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
-		//	//Sphere = jPrimitiveUtil::CreateCube(Vector(65.0f, 35.0f, 10.0f), Vector::OneVector, Vector(150), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
-		//	//Sphere->RenderObjects[0]->SetRot(Sphere->RenderObjects[0]->GetRot() + Vector(0.0f, 0.0f, DegreeToRadian(90.0f)));
-		//	Sphere->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
-		//		{
-		//			float RotationSpeed = 100.0f;
-		//			thisObject->RenderObjects[0]->SetRot(thisObject->RenderObjects[0]->GetRot() + Vector(0.0f, 0.0f, DegreeToRadian(180.0f)) * RotationSpeed * deltaTime);
-		//		};
-		//	jObject::AddObject(Sphere);
-		//	SpawnedObjects.push_back(Sphere);
-		//}
+		for (int32 i = 0; i < 2; ++i)
+		{
+			Sphere = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f + i * 100), 1.0, 60, Vector(30.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+			//Sphere = jPrimitiveUtil::CreateCube(Vector(65.0f, 35.0f, 10.0f), Vector::OneVector, Vector(150), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+			//Sphere->RenderObjects[0]->SetRot(Sphere->RenderObjects[0]->GetRot() + Vector(0.0f, 0.0f, DegreeToRadian(90.0f)));
+			Sphere->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
+				{
+					//float RotationSpeed = 100.0f;
+					//thisObject->RenderObjects[0]->SetRot(thisObject->RenderObjects[0]->GetRot() + Vector(0.0f, 0.0f, DegreeToRadian(180.0f)) * RotationSpeed * deltaTime);
+				};
+			jObject::AddObject(Sphere);
+			SpawnedObjects.push_back(Sphere);
+		}
 
         //auto sphere2 = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f + 130.0f), 1.0, 150, Vector(30.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
         //jObject::AddObject(sphere2);

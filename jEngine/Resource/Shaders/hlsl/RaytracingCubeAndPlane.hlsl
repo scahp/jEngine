@@ -560,13 +560,10 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
     float2 ddy = mul(baryY, uvMat) - uv;
 
     float4 albedo = AlbedoTexture.SampleGrad(AlbedoTextureSampler, uv, ddx, ddy);
-    //payload.color = albedo;
-
     float3 TexNormal = NormalTexture.SampleGrad(AlbedoTextureSampler, uv, ddx, ddy).xyz;
     TexNormal.y = 1.0 - TexNormal.y;
     TexNormal= TexNormal * 2.0f - 1.0f;
     float3 WorldNormal = normalize(mul(TBN, TexNormal));
-    //payload.color = float4(WorldNormal, 1.0);
 
     float roughness = RMTexture.SampleGrad(AlbedoTextureSampler, uv, ddx, ddy).y;
     float metallic = RMTexture.SampleGrad(AlbedoTextureSampler, uv, ddx, ddy).z;

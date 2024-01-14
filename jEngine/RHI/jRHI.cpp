@@ -13,6 +13,7 @@ jTexture* GWhiteTexture = nullptr;
 jTexture* GBlackTexture = nullptr;
 jTexture* GWhiteCubeTexture = nullptr;
 jTexture* GNormalTexture = nullptr;
+jTexture* GRoughnessMetalicTexture = nullptr;
 std::shared_ptr<jMaterial> GDefaultMaterial = nullptr;
 
 //////////////////////////////////////////////////////////////////////////
@@ -67,14 +68,18 @@ void jRHI::OnInitRHI()
 	image.ImageData = { 0, 0, 255, 0 };
 	GNormalTexture = CreateTextureFromData(&image);
 
+	image.ImageData = { 0, 25, 25, 0 };
+	GRoughnessMetalicTexture = CreateTextureFromData(&image);
+
 	image.TextureType = ETextureType::TEXTURE_CUBE;
 	image.LayerCount = 6;
-    image.ImageData = { 255, 255, 255, 255, 255, 255 };
+    image.ImageData = { 255, 255, 255, 200, 255, 255 };
     GWhiteCubeTexture = CreateTextureFromData(&image);
 
 	GDefaultMaterial = std::make_shared<jMaterial>();
-	for (int32 i = 0; i < _countof(GDefaultMaterial->TexData); ++i)
-		GDefaultMaterial->TexData[i].Texture = GWhiteTexture;
+	GDefaultMaterial->TexData[(int32)jMaterial::EMaterialTextureType::Albedo].Texture = GWhiteCubeTexture;
+	GDefaultMaterial->TexData[(int32)jMaterial::EMaterialTextureType::Normal].Texture = GNormalTexture;
+	GDefaultMaterial->TexData[(int32)jMaterial::EMaterialTextureType::Metallic].Texture = GRoughnessMetalicTexture;
 }
 
 void jRHI::ReleaseRHI()
