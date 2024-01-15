@@ -14,9 +14,12 @@ class jRenderObjectGeometryData
 public:
 	jRenderObjectGeometryData() = default;
 	jRenderObjectGeometryData(const std::shared_ptr<jVertexStreamData>& vertexStream, const std::shared_ptr<jIndexStreamData>& indexStream);
+	jRenderObjectGeometryData(const std::shared_ptr<jVertexStreamData>& vertexStream, const std::shared_ptr<jVertexStreamData>& positionOnlyVertexStream, const std::shared_ptr<jIndexStreamData>& indexStream);
 	~jRenderObjectGeometryData();
 
 	void Create(const std::shared_ptr<jVertexStreamData>& InVertexStream, const std::shared_ptr<jIndexStreamData>& InIndexStream, bool InHasVertexColor = true, bool InHasVertexBiTangent = false);
+    void CreateNew_ForRaytracing(const std::shared_ptr<jVertexStreamData>& InVertexStream, const std::shared_ptr<jVertexStreamData>& InVertexStream_PositionOnly
+        , const std::shared_ptr<jIndexStreamData>& InIndexStream, bool InHasVertexColor = true, bool InHasVertexBiTangent = false);
 
     // Vertex buffers
     void UpdateVertexStream(const std::shared_ptr<jVertexStreamData>& vertexStream);
@@ -70,6 +73,7 @@ public:
 	std::shared_ptr<jRenderObjectGeometryData> GeometryDataPtr;
 
     jBuffer* BottomLevelASBuffer = nullptr;
+	jBuffer* ScratchASBuffer = nullptr;
 	jBuffer* VertexAndIndexOffsetBuffer = nullptr;
 
 	FORCEINLINE void SetPos(const Vector& InPos) { Pos = InPos; SetDirtyFlags(EDirty::POS); }

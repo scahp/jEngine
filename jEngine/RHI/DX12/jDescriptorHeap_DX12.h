@@ -98,7 +98,7 @@ class jOnlineDescriptorHeap_DX12;
 class jOnlineDescriptorHeapBlocks_DX12
 {
 public:
-    static constexpr int32 DescriptorsInBlock = 2000;
+    static constexpr int32 DescriptorsInBlock = 5000;
     static constexpr int32 TotalHeapSize = 500000;
     static constexpr int32 SamplerDescriptorsInBlock = 100;
     static constexpr int32 SamplerTotalHeapSize = 2000;

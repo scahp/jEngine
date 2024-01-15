@@ -18,6 +18,11 @@ jRenderObjectGeometryData::jRenderObjectGeometryData(const std::shared_ptr<jVert
     Create(vertexStream, indexStream);
 }
 
+jRenderObjectGeometryData::jRenderObjectGeometryData(const std::shared_ptr<jVertexStreamData>& vertexStream, const std::shared_ptr<jVertexStreamData>& positionOnlyVertexStream, const std::shared_ptr<jIndexStreamData>& indexStream)
+{
+    CreateNew_ForRaytracing(vertexStream, positionOnlyVertexStream, indexStream);
+}
+
 jRenderObjectGeometryData::~jRenderObjectGeometryData()
 {
     delete VertexBuffer;
@@ -42,6 +47,21 @@ void jRenderObjectGeometryData::Create(const std::shared_ptr<jVertexStreamData>&
         VertexStream_PositionOnly->PrimitiveType = VertexStream->PrimitiveType;
         VertexStream_PositionOnly->ElementCount = VertexStream->ElementCount;
     }
+
+    VertexBuffer = g_rhi->CreateVertexBuffer(VertexStream);
+    VertexBuffer_PositionOnly = g_rhi->CreateVertexBuffer(VertexStream_PositionOnly);
+    IndexBuffer = g_rhi->CreateIndexBuffer(IndexStream);
+
+    bHasVertexColor = InHasVertexColor;
+    bHasVertexBiTangent = InHasVertexBiTangent;
+}
+
+void jRenderObjectGeometryData::CreateNew_ForRaytracing(const std::shared_ptr<jVertexStreamData>& InVertexStream, const std::shared_ptr<jVertexStreamData>& InVertexStream_PositionOnly
+    , const std::shared_ptr<jIndexStreamData>& InIndexStream, bool InHasVertexColor, bool InHasVertexBiTangent)
+{
+    VertexStream = InVertexStream;
+    VertexStream_PositionOnly = InVertexStream_PositionOnly;
+    IndexStream = InIndexStream;
 
     VertexBuffer = g_rhi->CreateVertexBuffer(VertexStream);
     VertexBuffer_PositionOnly = g_rhi->CreateVertexBuffer(VertexStream_PositionOnly);

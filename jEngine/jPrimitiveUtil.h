@@ -242,7 +242,7 @@ namespace jPrimitiveUtil
 	jObject* CreateCapsule(const Vector& pos, float height, float radius, int32 slice, const Vector& scale, const Vector4& color);
 	jConePrimitive* CreateCone(const Vector& pos, float height, float radius, int32 slice, const Vector& scale, const Vector4& color, bool isWireframe = false, bool createBoundInfo = true);
 	jObject* CreateCylinder(const Vector& pos, float height, float radius, int32 slice, const Vector& scale, const Vector4& color);
-	jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector& scale, const Vector4& color, bool isWireframe = false, bool createBoundInfo = true);
+	jObject* CreateSphere(const Vector& pos, float radius, uint32 slices, uint32 stacks, const Vector& scale, const Vector4& color, bool isWireframe = false, bool createBoundInfo = true);
 	jBillboardQuadPrimitive* CreateBillobardQuad(const Vector& pos, const Vector& size, const Vector& scale, const Vector4& color, jCamera* camera);
 	jUIQuadPrimitive* CreateUIQuad(const Vector2& pos, const Vector2& size, jTexture* texture);
 	jFullscreenQuadPrimitive* CreateFullscreenQuad(jTexture* texture);

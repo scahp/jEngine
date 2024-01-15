@@ -1456,366 +1456,314 @@ jConePrimitive* CreateCone(const Vector& pos, float height, float radius, int32 
 	return object;
 }
 
-jObject* CreateCylinder(const Vector& pos, float height, float radius, int32 slice, const Vector& scale, const Vector4& color)
+jObject* CreateCylinder(const Vector& pos, float height, float radius, int32 slices, const Vector& scale, const Vector4& color)
 {
 	const auto halfHeight = height / 2.0f;
 	const Vector topVert(0.0f, halfHeight, 0.0f);
 	const Vector bottomVert(0.0f, -halfHeight, 0.0f);
 
-	if (slice % 2)
-		++slice;
+	if (slices % 2)
+		++slices;
 
-	std::vector<float> vertices(slice * 36);
+	std::vector<jBaseVertex> vertices(slices * 12);
+	std::vector<uint32> indices;
 
-	const float stepRadian = DegreeToRadian(360.0f / slice);
-	for (int32 i = 0; i < slice; ++i)
+	const float stepRadian = DegreeToRadian(360.0f / slices);
+	for (int32 i = 0; i < slices; ++i)
 	{
 		float rad = i * stepRadian;
 		float prevRad = rad - stepRadian;
 
-		Vector* currentPos = (Vector*)&vertices[i * 36];
+		jBaseVertex* CurrentBaseVertex = (jBaseVertex*)&vertices[i * 12];
 
 		// Top
-		*currentPos = Vector(topVert); ++currentPos;
-		*currentPos = Vector(cosf(prevRad) * radius,	topVert.y,		sinf(prevRad) * radius);	++currentPos;
-		*currentPos = Vector(cosf(rad) * radius,		topVert.y,		sinf(rad) * radius);		++currentPos;
+		CurrentBaseVertex->Pos = Vector(topVert);
+        CurrentBaseVertex->Normal = Vector(0.0f, 1.0f, 0.0f);
+        CurrentBaseVertex->Tangent = Vector(1.0f, 0.0f, 0.0f);
+        CurrentBaseVertex->Bitangent = Vector::CrossProduct(CurrentBaseVertex->Normal, CurrentBaseVertex->Tangent);
+		++CurrentBaseVertex;
+
+		CurrentBaseVertex->Pos = Vector(cosf(prevRad) * radius,	topVert.y,		sinf(prevRad) * radius);	
+        CurrentBaseVertex->Normal = Vector(0.0f, 1.0f, 0.0f);
+        CurrentBaseVertex->Tangent = Vector(1.0f, 0.0f, 0.0f);
+        CurrentBaseVertex->Bitangent = Vector::CrossProduct(CurrentBaseVertex->Normal, CurrentBaseVertex->Tangent);
+		++CurrentBaseVertex;
+
+		CurrentBaseVertex->Pos = Vector(cosf(rad) * radius,		topVert.y,		sinf(rad) * radius);		
+        CurrentBaseVertex->Normal = Vector(0.0f, 1.0f, 0.0f);
+        CurrentBaseVertex->Tangent = Vector(1.0f, 0.0f, 0.0f);
+        CurrentBaseVertex->Bitangent = Vector::CrossProduct(CurrentBaseVertex->Normal, CurrentBaseVertex->Tangent);
+		++CurrentBaseVertex;
 
 		// Mid
-		*currentPos = Vector(cosf(prevRad) * radius,	topVert.y,		sinf(prevRad) * radius);	++currentPos;
-		*currentPos = Vector(cosf(prevRad) * radius,	bottomVert.y,	sinf(prevRad) * radius);	++currentPos;
-		*currentPos = Vector(cosf(rad) * radius,		topVert.y,		sinf(rad) * radius);		++currentPos;
+		CurrentBaseVertex->Pos = Vector(cosf(prevRad) * radius,	topVert.y,		sinf(prevRad) * radius);
+        CurrentBaseVertex->Normal = Vector(cosf(prevRad), 0.0f, sinf(prevRad));
+        CurrentBaseVertex->Tangent = Vector(0.0f, 1.0f, 0.0f);
+        CurrentBaseVertex->Bitangent = Vector::CrossProduct(CurrentBaseVertex->Normal, CurrentBaseVertex->Tangent);
+		++CurrentBaseVertex;
 
-		*currentPos = Vector(cosf(prevRad) * radius,	bottomVert.y,	sinf(prevRad) * radius);	++currentPos;
-		*currentPos = Vector(cosf(rad) * radius,		bottomVert.y,	sinf(rad) * radius);		++currentPos;
-		*currentPos = Vector(cosf(rad) * radius,		topVert.y,		sinf(rad) * radius);		++currentPos;
+		CurrentBaseVertex->Pos = Vector(cosf(prevRad) * radius,	bottomVert.y,	sinf(prevRad) * radius);	
+        CurrentBaseVertex->Normal = Vector(cosf(prevRad), 0.0f, sinf(prevRad));
+        CurrentBaseVertex->Tangent = Vector(0.0f, 1.0f, 0.0f);
+        CurrentBaseVertex->Bitangent = Vector::CrossProduct(CurrentBaseVertex->Normal, CurrentBaseVertex->Tangent);
+		++CurrentBaseVertex;
+
+		CurrentBaseVertex->Pos = Vector(cosf(rad) * radius,		topVert.y,		sinf(rad) * radius);		
+        CurrentBaseVertex->Normal = Vector(cosf(rad), 0.0f, sinf(rad));
+        CurrentBaseVertex->Tangent = Vector(0.0f, 1.0f, 0.0f);
+        CurrentBaseVertex->Bitangent = Vector::CrossProduct(CurrentBaseVertex->Normal, CurrentBaseVertex->Tangent);
+		++CurrentBaseVertex;
+
+		CurrentBaseVertex->Pos = Vector(cosf(prevRad) * radius,	bottomVert.y,	sinf(prevRad) * radius);
+        CurrentBaseVertex->Normal = Vector(cosf(prevRad), 0.0f, sinf(prevRad));
+        CurrentBaseVertex->Tangent = Vector(0.0f, -1.0f, 0.0f);
+        CurrentBaseVertex->Bitangent = Vector::CrossProduct(CurrentBaseVertex->Normal, CurrentBaseVertex->Tangent);
+		++CurrentBaseVertex;
+
+		CurrentBaseVertex->Pos = Vector(cosf(rad) * radius,		bottomVert.y,	sinf(rad) * radius);
+        CurrentBaseVertex->Normal = Vector(cosf(rad), 0.0f, sinf(rad));
+        CurrentBaseVertex->Tangent = Vector(0.0f, -1.0f, 0.0f);
+        CurrentBaseVertex->Bitangent = Vector::CrossProduct(CurrentBaseVertex->Normal, CurrentBaseVertex->Tangent);
+		++CurrentBaseVertex;
+
+		CurrentBaseVertex->Pos = Vector(cosf(rad) * radius,		topVert.y,		sinf(rad) * radius);
+        CurrentBaseVertex->Normal = Vector(cosf(rad), 0.0f, sinf(rad));
+        CurrentBaseVertex->Tangent = Vector(0.0f, -1.0f, 0.0f);
+        CurrentBaseVertex->Bitangent = Vector::CrossProduct(CurrentBaseVertex->Normal, CurrentBaseVertex->Tangent);
+		++CurrentBaseVertex;
 
 		// Bottom
-		*currentPos = Vector(bottomVert.x,				bottomVert.y,	bottomVert.z);				++currentPos;
-		*currentPos = Vector(cosf(rad) * radius,		bottomVert.y,	sinf(rad) * radius);		++currentPos;
-		*currentPos = Vector(cosf(prevRad) * radius,	bottomVert.y,	sinf(prevRad) * radius);	++currentPos;
+		CurrentBaseVertex->Pos = Vector(bottomVert.x,				bottomVert.y,	bottomVert.z);
+        CurrentBaseVertex->Normal = Vector(0.0f, -1.0f, 0.0f);
+        CurrentBaseVertex->Tangent = Vector(-1.0f, 0.0f, 0.0f);
+        CurrentBaseVertex->Bitangent = Vector::CrossProduct(CurrentBaseVertex->Normal, CurrentBaseVertex->Tangent);
+		++CurrentBaseVertex;
+
+		CurrentBaseVertex->Pos = Vector(cosf(rad) * radius,		bottomVert.y,	sinf(rad) * radius);
+        CurrentBaseVertex->Normal = Vector(0.0f, -1.0f, 0.0f);
+        CurrentBaseVertex->Tangent = Vector(-1.0f, 0.0f, 0.0f);
+        CurrentBaseVertex->Bitangent = Vector::CrossProduct(CurrentBaseVertex->Normal, CurrentBaseVertex->Tangent);
+		++CurrentBaseVertex;
+
+		CurrentBaseVertex->Pos = Vector(cosf(prevRad) * radius,	bottomVert.y,	sinf(prevRad) * radius);
+        CurrentBaseVertex->Normal = Vector(0.0f, -1.0f, 0.0f);
+        CurrentBaseVertex->Tangent = Vector(-1.0f, 0.0f, 0.0f);
+        CurrentBaseVertex->Bitangent = Vector::CrossProduct(CurrentBaseVertex->Normal, CurrentBaseVertex->Tangent);
+		++CurrentBaseVertex;
 	}
 
-	int32 elementCount = static_cast<int32>(vertices.size() / 3);
-
-	std::vector<float> normals(slice * 36);
-
-	// https://stackoverflow.com/questions/51015286/how-can-i-calculate-the-normal-of-a-cone-face-in-opengl-4-5
-	// lenght of the flank of the cone
-	const float flank_len = sqrtf(radius * radius + height * height);
-
-	// unit vector along the flank of the cone
-	const float cone_x = radius / flank_len;
-	const float cone_y = -height / flank_len;
-
-	// Cone Top Normal
-	for (int32 i = 0; i < slice; ++i)
+	indices.reserve(vertices.size());
+	for(uint32 i=0;i<vertices.size();++i)
 	{
-		const float rad = i * stepRadian;
-		const float prevRad = rad - stepRadian;
-
-		Vector* currentPos = (Vector*)&normals[i * 36];
-
-		// Top
-		const Vector temp(0.0f, 1.0f, 0.0f);
-		*currentPos = Vector(temp); ++currentPos;
-		*currentPos = Vector(temp); ++currentPos;
-		*currentPos = Vector(temp); ++currentPos;
-
-		// Mid
-		*currentPos = Vector(cosf(prevRad),		0.0f,		sinf(prevRad));			++currentPos;
-		*currentPos = Vector(cosf(prevRad),		0.0f,		sinf(prevRad));			++currentPos;
-		*currentPos = Vector(cosf(rad),			0.0f,		sinf(rad));				++currentPos;
-
-		*currentPos = Vector(cosf(prevRad),		0.0f,		sinf(prevRad));			++currentPos;
-		*currentPos = Vector(cosf(rad),			0.0f,		sinf(rad));				++currentPos;
-		*currentPos = Vector(cosf(rad),			0.0f,		sinf(rad));				++currentPos;
-
-		// Bottom
-		const Vector temp2(0.0f, -1.0f, 0.0f);
-        *currentPos = Vector(temp2); ++currentPos;
-        *currentPos = Vector(temp2); ++currentPos;
-        *currentPos = Vector(temp2); ++currentPos;
+		indices.push_back(i);
 	}
 	/////////////////////////////////////////////////////
 
-	// attribute 추가
-	auto vertexStreamData = std::make_shared<jVertexStreamData>();
-
+	// PositionOnly VertexStream 추가
+    std::vector<jPositionOnlyVertex> verticesPositionOnly(vertices.size());
+    for (int32 i = 0; i < (int32)vertices.size();++i)
 	{
-		auto streamParam = std::make_shared<jStreamParam<float>>();
-		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
-		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = jName("POSITION");
-		streamParam->Data.resize(vertices.size());
-		memcpy(&streamParam->Data[0], &vertices[0], vertices.size() * sizeof(float));
-		vertexStreamData->Params.push_back(streamParam);
+		verticesPositionOnly[i].Pos = vertices[i].Pos;
 	}
 
+    const int32 NumOfVertices = (int32)vertices.size();
+    auto positionOnlyVertexStreamData = std::make_shared<jVertexStreamData>();
 	{
-		auto streamParam = std::make_shared<jStreamParam<float>>();
+		auto streamParam = std::make_shared<jStreamParam<jPositionOnlyVertex>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 4));
-		streamParam->Stride = sizeof(float) * 4;
-		streamParam->Name = jName("COLOR");
-		streamParam->Data = std::move(GenerateColor(color, elementCount));
-		vertexStreamData->Params.push_back(streamParam);
+		streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("POSITION"), EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Name = jName("jPositionOnlyVertex");
+		streamParam->Stride = sizeof(jPositionOnlyVertex);
+		streamParam->Data.swap(verticesPositionOnly);
+		positionOnlyVertexStreamData->Params.push_back(streamParam);
+
+		positionOnlyVertexStreamData->PrimitiveType = EPrimitiveType::TRIANGLES;
+		positionOnlyVertexStreamData->ElementCount = NumOfVertices;
 	}
 
+    // Base VertexStream 추가
+    auto vertexStreamData = std::make_shared<jVertexStreamData>();
 	{
-		auto streamParam = std::make_shared<jStreamParam<float>>();
+		auto streamParam = std::make_shared<jStreamParam<jBaseVertex>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
-		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = jName("NORMAL");
-		streamParam->Data.resize(normals.size());
-		memcpy(&streamParam->Data[0], &normals[0], normals.size() * sizeof(float));
+		streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("POSITION"), EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("NORMAL"), EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("TANGENT"), EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("BITANGENT"), EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("TEXCOORD"), EBufferElementType::FLOAT, sizeof(float) * 2));
+		streamParam->Name = jName("jBaseVertex");
+		streamParam->Stride = sizeof(jBaseVertex);
+		streamParam->Data.swap(vertices);
 		vertexStreamData->Params.push_back(streamParam);
+
+		vertexStreamData->PrimitiveType = EPrimitiveType::TRIANGLES;
+		vertexStreamData->ElementCount = NumOfVertices;
 	}
 
-	// Dummy
-	{
-		auto streamParam = std::make_shared<jStreamParam<float>>();
-		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
-		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = jName("TANGENT");
-		streamParam->Data.resize(normals.size(), 0.0f);
-		vertexStreamData->Params.push_back(streamParam);
-	}
+    auto indexStreamData = std::make_shared<jIndexStreamData>();
+    indexStreamData->ElementCount = static_cast<int32>(indices.size());
+    {
+        auto streamParam = new jStreamParam<uint32>();
+        streamParam->BufferType = EBufferType::STATIC;
+        streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::UINT32, sizeof(int32) * 3));
+        streamParam->Stride = sizeof(uint32) * 3;
+        streamParam->Name = jName("Index");
+        streamParam->Data.resize(indices.size());
+        memcpy(&streamParam->Data[0], &indices[0], indices.size() * sizeof(uint32));
+        indexStreamData->Param = streamParam;
+    }
 
-	// Dummy
-	{
-		auto streamParam = std::make_shared<jStreamParam<float>>();
-		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 2));
-		streamParam->Stride = sizeof(float) * 2;
-		streamParam->Name = jName("TEXCOORD");
-		streamParam->Data.resize(normals.size(), 0.0f);
-		vertexStreamData->Params.push_back(streamParam);
-	}
-
-	vertexStreamData->PrimitiveType = EPrimitiveType::TRIANGLES;
-	vertexStreamData->ElementCount = elementCount;
-
-	auto object = new jCylinderPrimitive();
-	auto renderObject = new jRenderObject();
-    object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>(vertexStreamData, nullptr);
+    auto object = new jObject();
+    auto renderObject = new jRenderObject();
+    object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>(vertexStreamData, positionOnlyVertexStreamData, indexStreamData);
     renderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
     object->RenderObjects.push_back(renderObject);
-	renderObject->SetPos(pos);
-	renderObject->SetScale(scale);
-	object->Height = height;
-	object->Radius = radius;
-	object->Color = color;
-	// object->CreateBoundBox();
+    renderObject->SetPos(pos);
+    renderObject->SetScale(scale);
+    renderObject->MaterialPtr = GDefaultMaterial;
 	return object;
 }
 
-jObject* CreateSphere(const Vector& pos, float radius, int32 slice, const Vector& scale, const Vector4& color, bool isWireframe /*= false*/, bool createBoundInfo/* = true*/)
+jObject* CreateSphere(const Vector& pos, float radius, uint32 slices, uint32 stacks, const Vector& scale, const Vector4& color, bool isWireframe /*= false*/, bool createBoundInfo /*= true*/)
 {
-	const auto offset = Vector::ZeroVector;
+    const auto offset = Vector::ZeroVector;
 
-	if (slice < 6)
-		slice = 6;
-	else if (slice % 2)
-		++slice;
+    if (slices < 6)
+        slices = 6;
+    else if (slices % 2)
+        ++slices;
 
-	const float stepRadian = DegreeToRadian(360.0f / slice);
+	if (stacks < 6)
+		stacks = 6;
+	else if (stacks % 2)
+		++stacks;
 
-	std::vector<float> vertices;
-	int j = 0;
+	//////////////////////////////////////////////////////////////////////////
+	// Create from ChatGPT4
+    std::vector<jBaseVertex> vertices;
+    const float sectorStep = 2 * PI / slices;
+    const float stackStep = PI / stacks;
 
-	for (int32 j = 0; j < slice / 2; ++j)
-	{
-		for (int32 i = 0; i <= slice; ++i)
-		{
-			const Vector temp(offset.x + cosf(stepRadian * i) * radius * sinf(stepRadian * (j + 1))
-							, offset.z + cosf(stepRadian * (j + 1)) * radius
-							, offset.y + sinf(stepRadian * i) * radius * sinf(stepRadian * (j + 1)));
-			vertices.push_back(temp.x);
-			vertices.push_back(temp.y);
-			vertices.push_back(temp.z);
-		}
-	}
-
-	// top
-	vertices.push_back(0.0f);
-	vertices.push_back(radius);
-	vertices.push_back(0.0f);
-
-	// down
-	vertices.push_back(0.0f);
-	vertices.push_back(-radius);
-	vertices.push_back(0.0f);
-
-	int32 elementCount = static_cast<int32>(vertices.size() / 3);
-
-	// attribute 추가
-	auto vertexStreamData = std::make_shared<jVertexStreamData>();
-
-	//{
-	//	auto streamParam = std::make_shared<jStreamParam<float>>();
-	//	streamParam->BufferType = EBufferType::STATIC;
-	//	streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
-	//	streamParam->Stride = sizeof(float) * 3;
-	//	streamParam->Name = jName("POSITION");
-	//	streamParam->Data.resize(vertices.size());
-	//	memcpy(&streamParam->Data[0], &vertices[0], vertices.size() * sizeof(float));
-	//	vertexStreamData->Params.push_back(streamParam);
-	//}
-
-    //{
-    //    auto streamParam = std::make_shared<jStreamParam<float>>();
-    //    streamParam->BufferType = EBufferType::STATIC;
-    //    streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 4));
-    //    streamParam->Stride = sizeof(float) * 4;
-    //    streamParam->Name = jName("COLOR");
-    //    streamParam->Data = std::move(GenerateColor(color, elementCount));
-    //    vertexStreamData->Params.push_back(streamParam);
-    //}
-
-	std::vector<float> normals(vertices.size());
-	for (int i = 0; i < normals.size() / 3; ++i)
-	{
-		const int32 curIndex = i * 3;
-		const Vector normal = Vector(vertices[curIndex], vertices[curIndex + 1], vertices[curIndex + 2]).GetNormalize();
-		memcpy(&normals[curIndex], &normal, sizeof(normal));
-	}
-
-	//{
-	//	auto streamParam = std::make_shared<jStreamParam<float>>();
-	//	streamParam->BufferType = EBufferType::STATIC;
-	//	streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
-	//	streamParam->Stride = sizeof(float) * 3;
-	//	streamParam->Name = jName("NORMAL");
-	//	streamParam->Data.resize(normals.size());
-	//	memcpy(&streamParam->Data[0], &normals[0], normals.size() * sizeof(float));
-	//	vertexStreamData->Params.push_back(streamParam);
-	//}
-
-	//// Dummy
-	//{
-	//	auto streamParam = std::make_shared<jStreamParam<float>>();
-	//	streamParam->BufferType = EBufferType::STATIC;
-	//	streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
-	//	streamParam->Stride = sizeof(float) * 3;
-	//	streamParam->Name = jName("TANGENT");
-	//	streamParam->Data.resize(normals.size(), 0.0f);
-	//	vertexStreamData->Params.push_back(streamParam);
-	//}
-
-	// Dummy
-	//{
-		std::vector<Vector2> UV;
-		UV.resize(vertices.size() / 3);
-		for (int32 i = 0; i < vertices.size() / 3; ++i)
-		{
-			const float X = vertices[i * 3 + 0];
-			const float Y = vertices[i * 3 + 1];
-			const float Z = vertices[i * 3 + 2];
-						 
-			// https://stackoverflow.com/questions/33747876/spherical-mapping-calculation-uv-for-point-given-on-sphere-strange-u-values
-			float u = 0.5f + atan2(X, Z) / (2 * PI);
-			float v = 0.5f - asin(Y / radius) / PI;
-			UV[i] = Vector2(u, v);
-		}
-
-	//	auto streamParam = std::make_shared<jStreamParam<float>>();
-	//	streamParam->BufferType = EBufferType::STATIC;
-	//	streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 2));
-	//	streamParam->Stride = sizeof(float) * 2;
-	//	streamParam->Name = jName("TEXCOORD");
-	//	streamParam->Data.resize(UV.size() * (sizeof(Vector2) / sizeof(float)), 0.0f);
- //       memcpy(&streamParam->Data[0], &UV[0], UV.size() * sizeof(Vector2));
-	//	vertexStreamData->Params.push_back(streamParam);
-	//}
-
-    struct jModelLoaderVertex
+    for (uint32 i = 0; i <= stacks; ++i)
     {
-        Vector Pos;
-        Vector Normal;
-        Vector Tangent;
-        Vector Bitangent;
-        Vector2 TexCoord;
-    };
+        const float stackAngle = PI / 2 - i * stackStep; // stack angle in the range [-π/2, π/2]
+        const float xy = radius * cosf(stackAngle);
+        const float z = radius * sinf(stackAngle);
+
+        for (uint32 j = 0; j <= slices; ++j)
+        {
+            float sectorAngle = j * sectorStep; // sector angle in the range [0, 2π]
+
+            // Vertex position
+            const float x = xy * cosf(sectorAngle);
+            const float y = xy * sinf(sectorAngle);
+            const Vector pos(x, z, y);					// swap z, y, because z is up vector.
+
+            // Normalized vertex normal
+			const Vector normal = pos.GetNormalize();
+
+            // Tangent and bitangent
+            const Vector tangent(-sinf(sectorAngle), cosf(sectorAngle), 0);
+            const Vector bitangent = Vector::CrossProduct(normal, tangent);
+
+            // UV coordinates
+            const float u = (float)j / slices;
+            const float v = (float)i / stacks;
+            const Vector2 uv(u, v);
+
+            vertices.push_back({ pos, normal, tangent, bitangent, uv });
+        }
+    }
+
+    // Indices
+    std::vector<uint32> indices;
+    int k1, k2;
+    for (uint32 i = 0; i < stacks; ++i) 
+	{
+        k1 = i * (slices + 1);
+        k2 = k1 + slices + 1;
+
+        for (uint32 j = 0; j < slices; ++j, ++k1, ++k2) 
+		{
+            if (i != 0) 
+			{
+                indices.push_back(k1);
+                indices.push_back(k2);
+                indices.push_back(k1 + 1);
+            }
+            if (i != (stacks - 1)) 
+			{
+                indices.push_back(k1 + 1);
+                indices.push_back(k2);
+                indices.push_back(k2 + 1);
+            }
+        }
+    }
+    //////////////////////////////////////////////////////////////////////////
+
+    // PositionOnly VertexStream 추가
+    std::vector<jPositionOnlyVertex> verticesPositionOnly(vertices.size());
+    for (int32 i = 0; i < (int32)vertices.size(); ++i)
     {
-        auto streamParam = std::make_shared<jStreamParam<jModelLoaderVertex>>();
+        verticesPositionOnly[i].Pos = vertices[i].Pos;
+    }
+
+    const int32 NumOfVertices = (int32)vertices.size();
+    auto positionOnlyVertexStreamData = std::make_shared<jVertexStreamData>();
+    {
+        auto streamParam = std::make_shared<jStreamParam<jPositionOnlyVertex>>();
+        streamParam->BufferType = EBufferType::STATIC;
+        streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("POSITION"), EBufferElementType::FLOAT, sizeof(float) * 3));
+        streamParam->Name = jName("jPositionOnlyVertex");
+        streamParam->Stride = sizeof(jPositionOnlyVertex);
+        streamParam->Data.swap(verticesPositionOnly);
+        positionOnlyVertexStreamData->Params.push_back(streamParam);
+
+        positionOnlyVertexStreamData->PrimitiveType = isWireframe ? EPrimitiveType::LINES : EPrimitiveType::TRIANGLES;
+        positionOnlyVertexStreamData->ElementCount = NumOfVertices;
+    }
+
+    // Base VertexStream 추가
+    auto vertexStreamData = std::make_shared<jVertexStreamData>();
+    {
+        auto streamParam = std::make_shared<jStreamParam<jBaseVertex>>();
         streamParam->BufferType = EBufferType::STATIC;
         streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("POSITION"), EBufferElementType::FLOAT, sizeof(float) * 3));
         streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("NORMAL"), EBufferElementType::FLOAT, sizeof(float) * 3));
         streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("TANGENT"), EBufferElementType::FLOAT, sizeof(float) * 3));
         streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("BITANGENT"), EBufferElementType::FLOAT, sizeof(float) * 3));
         streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("TEXCOORD"), EBufferElementType::FLOAT, sizeof(float) * 2));
-        streamParam->Name = jName("jModelLoaderVertex");
-        streamParam->Data.resize(elementCount);
-        streamParam->Stride = sizeof(jModelLoaderVertex);
-        jModelLoaderVertex* VerticesData = streamParam->Data.data();
-        for (int32 i = 0; i < elementCount; ++i)
-        {
-            VerticesData[i].Pos = Vector(vertices[i * 3], vertices[i * 3 + 1], vertices[i * 3 + 2]);
-            VerticesData[i].Normal = Vector(normals[i * 3], normals[i * 3 + 1], normals[i * 3 + 2]);
-            VerticesData[i].Tangent = Vector(normals[i * 3], normals[i * 3 + 1], normals[i * 3 + 2]);
-            VerticesData[i].Bitangent = Vector(normals[i * 3], normals[i * 3 + 1], normals[i * 3 + 2]);
-            VerticesData[i].TexCoord = UV[i];
-        }
+        streamParam->Name = jName("jBaseVertex");
+        streamParam->Stride = sizeof(jBaseVertex);
+        streamParam->Data.swap(vertices);
         vertexStreamData->Params.push_back(streamParam);
+
+        vertexStreamData->PrimitiveType = isWireframe ? EPrimitiveType::LINES : EPrimitiveType::TRIANGLES;
+        vertexStreamData->ElementCount = NumOfVertices;
     }
 
-	vertexStreamData->PrimitiveType = isWireframe ? EPrimitiveType::LINES : EPrimitiveType::TRIANGLES;
-	vertexStreamData->ElementCount = elementCount;
+    auto indexStreamData = std::make_shared<jIndexStreamData>();
+    indexStreamData->ElementCount = static_cast<int32>(indices.size());
+    {
+        auto streamParam = new jStreamParam<uint32>();
+        streamParam->BufferType = EBufferType::STATIC;
+        streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::UINT32, sizeof(int32) * 3));
+        streamParam->Stride = sizeof(uint32) * 3;
+        streamParam->Name = jName("Index");
+        streamParam->Data.resize(indices.size());
+        memcpy(&streamParam->Data[0], &indices[0], indices.size() * sizeof(uint32));
+        indexStreamData->Param = streamParam;
+    }
 
-	// IndexStream 추가
-	std::vector<uint32> indices;
-	int32 iCount = 0;
-	int32 toNextSlice = slice + 1;
-	int32 temp = 6;
-	for (int32 i = 0; i < (slice) / 2 - 2; ++i, iCount += 1)
-	{
-		for (int32 i = 0; i < slice; ++i, iCount += 1)
-		{
-			indices.push_back(iCount + 1); indices.push_back(iCount); indices.push_back(iCount + toNextSlice);
-			indices.push_back(iCount + 1); indices.push_back(iCount + toNextSlice); indices.push_back(iCount + toNextSlice + 1);
-		}
-	}
-
-	for (int32 i = 0; i < slice; ++i, iCount += 1)
-	{
-		indices.push_back(iCount + 1);
-		indices.push_back(iCount);
-		indices.push_back(elementCount - 1);
-	}
-
-	iCount = 0;
-	for (int32 i = 0; i < slice; ++i, iCount += 1)
-	{
-		indices.push_back(elementCount - 2);
-		indices.push_back(iCount);
-		indices.push_back(iCount + 1);
-	}
-
-	auto indexStreamData = std::make_shared<jIndexStreamData>();
-	indexStreamData->ElementCount = static_cast<int32>(indices.size());
-	{
-		auto streamParam = new jStreamParam<uint32>();
-		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::UINT32, sizeof(int32) * 3));
-		streamParam->Stride = sizeof(uint32) * 3;
-		streamParam->Name = jName("Index");
-		streamParam->Data.resize(indices.size());
-		memcpy(&streamParam->Data[0], &indices[0], indices.size() * sizeof(uint32));
-		indexStreamData->Param = streamParam;
-	}
-
-	auto object = new jObject();
-	auto renderObject = new jRenderObject();
-    object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>(vertexStreamData, indexStreamData);
+    auto object = new jObject();
+    auto renderObject = new jRenderObject();
+    object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>(vertexStreamData, positionOnlyVertexStreamData, indexStreamData);
     renderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
     object->RenderObjects.push_back(renderObject);
-	renderObject->SetPos(pos);
-	renderObject->SetScale(scale);
-	renderObject->MaterialPtr = GDefaultMaterial;
-	return object;
+    renderObject->SetPos(pos);
+    renderObject->SetScale(scale);
+    renderObject->MaterialPtr = GDefaultMaterial;
+    return object;
 }
 
 jBillboardQuadPrimitive* CreateBillobardQuad(const Vector& pos, const Vector& size, const Vector& scale, const Vector4& color, jCamera* camera)
@@ -2035,7 +1983,7 @@ jPointLightPrimitive* CreatePointLightDebug(const Vector& scale, jCamera* target
         object->BillboardObject->RenderObjects[0]->MaterialPtr->TexData[static_cast<int32>(jMaterial::EMaterialTextureType::Albedo)].Texture = texture;
 		object->BillboardObject->RenderObjects[0]->IsHiddenBoundBox = true;
 	}
-	object->SphereObject = CreateSphere(LightData.Position, LightData.MaxDistance, 20, Vector::OneVector, Vector4(LightData.Color, 1.0f), true, false);
+	object->SphereObject = CreateSphere(LightData.Position, LightData.MaxDistance, 20, 10, Vector::OneVector, Vector4(LightData.Color, 1.0f), true, false);
 	object->SphereObject->RenderObjects[0]->IsHiddenBoundBox = true;
 	object->Light = light;
 	object->PostUpdateFunc = [](jObject* thisObject, float deltaTime)

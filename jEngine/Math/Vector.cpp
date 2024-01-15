@@ -78,6 +78,9 @@ void Vector4::operator=(struct Vector const& vector)
 
 
 // Vector2
+const Vector2 Vector2::OneVector(1.0f);
+const Vector2 Vector2::ZeroVector(0.0f);
+
 Vector2::Vector2(const Vector& InVector)
 	: x(InVector.x), y(InVector.y)
 {

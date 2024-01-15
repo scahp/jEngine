@@ -906,3 +906,16 @@ private:
 	jClearValueType ClearValue;
 };
 
+struct jBaseVertex
+{
+    Vector Pos = Vector::ZeroVector;
+    Vector Normal = Vector::ZeroVector;
+    Vector Tangent = Vector::ZeroVector;
+    Vector Bitangent = Vector::ZeroVector;
+    Vector2 TexCoord = Vector2::ZeroVector;
+};
+
+struct jPositionOnlyVertex
+{
+    Vector Pos = Vector::ZeroVector;
+};

@@ -308,8 +308,12 @@ void* jPipelineStateInfo_DX12::CreateRaytracingPipelineState()
         AddShaderFunc(RaytracingShaders[i].MissShader, RaytracingShaders[i].MissEntryPoint.c_str());
 
         D3D12_HIT_GROUP_DESC hitGroupDesc{};
-        hitGroupDesc.AnyHitShaderImport = RaytracingShaders[i].AnyHitEntryPoint.c_str();
-        hitGroupDesc.ClosestHitShaderImport = RaytracingShaders[i].ClosestHitEntryPoint.c_str();
+        if (RaytracingShaders[i].AnyHitShader)
+            hitGroupDesc.AnyHitShaderImport = RaytracingShaders[i].AnyHitEntryPoint.c_str();
+        
+        if (RaytracingShaders[i].ClosestHitShader)
+            hitGroupDesc.ClosestHitShaderImport = RaytracingShaders[i].ClosestHitEntryPoint.c_str();
+        
         hitGroupDesc.HitGroupExport = RaytracingShaders[i].HitGroupName.c_str();
         hitGroupDesc.Type = D3D12_HIT_GROUP_TYPE_TRIANGLES;
         hitgroupDescs.push_back(hitGroupDesc);
@@ -321,7 +325,7 @@ void* jPipelineStateInfo_DX12::CreateRaytracingPipelineState()
     }
 
     // Shader Config
-    D3D12_RAYTRACING_SHADER_CONFIG shaderConfig;
+    D3D12_RAYTRACING_SHADER_CONFIG shaderConfig{};
     {
         shaderConfig.MaxAttributeSizeInBytes = RaytracingPipelineData.MaxAttributeSize;
         shaderConfig.MaxPayloadSizeInBytes = RaytracingPipelineData.MaxPayloadSize;
@@ -334,15 +338,17 @@ void* jPipelineStateInfo_DX12::CreateRaytracingPipelineState()
 
     // Global root signature
     ID3D12RootSignature* RootSignature = jShaderBindingLayout_DX12::CreateRootSignature(ShaderBindingLayoutArray);
+    D3D12_GLOBAL_ROOT_SIGNATURE globalRSDesc = { };
+    globalRSDesc.pGlobalRootSignature = RootSignature;
     {
         D3D12_STATE_SUBOBJECT subobject{};
         subobject.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE;
-        subobject.pDesc = &RootSignature;
+        subobject.pDesc = &globalRSDesc;
         subobjects.push_back(subobject);
     }
 
     // Pipeline Config
-    D3D12_RAYTRACING_PIPELINE_CONFIG pipelineConfig;
+    D3D12_RAYTRACING_PIPELINE_CONFIG pipelineConfig{};
     {
         pipelineConfig.MaxTraceRecursionDepth = RaytracingPipelineData.MaxTraceRecursionDepth;
 
@@ -353,10 +359,10 @@ void* jPipelineStateInfo_DX12::CreateRaytracingPipelineState()
     }
 
     // Create pipeline state
-    D3D12_STATE_OBJECT_DESC stateObjectDesc;
+    D3D12_STATE_OBJECT_DESC stateObjectDesc{};
+    stateObjectDesc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
     stateObjectDesc.NumSubobjects = (uint32)subobjects.size();
     stateObjectDesc.pSubobjects = subobjects.data();
-    stateObjectDesc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
 
     if (JFAIL(g_rhi_dx12->Device->CreateStateObject(&stateObjectDesc, IID_PPV_ARGS(&RaytracingStateObject))))
         return nullptr;

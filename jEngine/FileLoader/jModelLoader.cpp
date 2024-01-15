@@ -295,31 +295,43 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 
 	const int32 elementCount = static_cast<int32>(meshData->Vertices.size());
 
-	// attribute 추가
+    // PositionOnly VertexStream 추가
+    std::vector<jPositionOnlyVertex> verticesPositionOnly(meshData->Vertices.size());
+    for (int32 i = 0; i < (int32)meshData->Vertices.size(); ++i)
+    {
+        verticesPositionOnly[i].Pos = meshData->Vertices[i];
+    }
+
+    const int32 NumOfVertices = (int32)meshData->Vertices.size();
+    auto positionOnlyVertexStreamData = std::make_shared<jVertexStreamData>();
+    {
+        auto streamParam = std::make_shared<jStreamParam<jPositionOnlyVertex>>();
+        streamParam->BufferType = EBufferType::STATIC;
+        streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("POSITION"), EBufferElementType::FLOAT, sizeof(float) * 3));
+        streamParam->Name = jName("jPositionOnlyVertex");
+        streamParam->Stride = sizeof(jPositionOnlyVertex);
+        streamParam->Data.swap(verticesPositionOnly);
+        positionOnlyVertexStreamData->Params.push_back(streamParam);
+
+        positionOnlyVertexStreamData->PrimitiveType = EPrimitiveType::TRIANGLES;
+        positionOnlyVertexStreamData->ElementCount = NumOfVertices;
+    }
+
+	// Base VertexStream 추가
 	auto vertexStreamData = std::make_shared<jVertexStreamData>();
-
-	struct jModelLoaderVertex
 	{
-		Vector Pos;
-		Vector Normal;
-		Vector Tangent;
-		Vector Bitangent;
-		Vector2 TexCoord;
-	};
-
-	{
-		auto streamParam = std::make_shared<jStreamParam<jModelLoaderVertex>>();
+		auto streamParam = std::make_shared<jStreamParam<jBaseVertex>>();
 		streamParam->BufferType = EBufferType::STATIC;
 		streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("POSITION"), EBufferElementType::FLOAT, sizeof(float) * 3));
 		streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("NORMAL"), EBufferElementType::FLOAT, sizeof(float) * 3));
 		streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("TANGENT"), EBufferElementType::FLOAT, sizeof(float) * 3));
 		streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("BITANGENT"), EBufferElementType::FLOAT, sizeof(float) * 3));
 		streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("TEXCOORD"), EBufferElementType::FLOAT, sizeof(float) * 2));
-		streamParam->Name = jName("jModelLoaderVertex");
+		streamParam->Name = jName("jBaseVertex");
 		streamParam->Data.resize(elementCount);
-		streamParam->Stride = sizeof(jModelLoaderVertex);
-		jModelLoaderVertex* VerticesData = streamParam->Data.data();
-		for(int32 i=0;i<elementCount;++i)
+		streamParam->Stride = sizeof(jBaseVertex);
+		jBaseVertex* VerticesData = streamParam->Data.data();
+		for (int32 i = 0; i < elementCount; ++i)
 		{
 			VerticesData[i].Pos = meshData->Vertices[i];
 			VerticesData[i].Normal = meshData->Normals[i];
@@ -328,10 +340,10 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 			VerticesData[i].TexCoord = meshData->TexCoord[i];
 		}
 		vertexStreamData->Params.push_back(streamParam);
-    }
 
-	vertexStreamData->PrimitiveType = EPrimitiveType::TRIANGLES;
-	vertexStreamData->ElementCount = elementCount;
+		vertexStreamData->PrimitiveType = EPrimitiveType::TRIANGLES;
+		vertexStreamData->ElementCount = elementCount;
+	}
 
 	auto indexStreamData = std::make_shared<jIndexStreamData>();
 	indexStreamData->ElementCount = static_cast<int32>(meshData->Faces.size());
@@ -359,7 +371,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 	}
 
     object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>();
-	object->RenderObjectGeometryDataPtr->Create(vertexStreamData, indexStreamData, false, true);
+	object->RenderObjectGeometryDataPtr->CreateNew_ForRaytracing(vertexStreamData, positionOnlyVertexStreamData, indexStreamData, false, true);
 
 	for (int32 i = 0; i < (int32)object->SubMeshes.size(); ++i)
 	{

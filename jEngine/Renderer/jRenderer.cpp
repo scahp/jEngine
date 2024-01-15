@@ -33,8 +33,8 @@ ComPtr<ID3D12RootSignature> jRenderer::m_raytracingGlobalRootSignature;
 ComPtr<ID3D12RootSignature> jRenderer::m_raytracingLocalRootSignature;
 ComPtr<ID3D12RootSignature> jRenderer::m_raytracingEmptyLocalRootSignature;
 
-#define ASYNC_WITH_SETUP 1
-#define PARALLELFOR_WITH_PASSSETUP 1
+#define ASYNC_WITH_SETUP 0
+#define PARALLELFOR_WITH_PASSSETUP 0
 
 struct jSimplePushConstant
 {
@@ -492,7 +492,7 @@ void jRenderer::SetupBasePass()
         {
             if (GDefaultMaterial)
             {
-                Material = GDefaultMaterial;
+                Material = GDefaultMaterial.get();
             }
         }
 
@@ -1466,402 +1466,433 @@ void jRenderer::Render()
     static bool IsTestingRaytracing = true;
     if (IsTestingRaytracing)
     {
-        SCOPE_CPU_PROFILE(Raytracing);
-        SCOPE_GPU_PROFILE(RenderFrameContextPtr, Raytracing);
-        DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "Raytracing", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
-
+        if (RenderFrameContextPtr->RaytracingScene->IsValid())
         {
+            SCOPE_CPU_PROFILE(Raytracing);
+            SCOPE_GPU_PROFILE(RenderFrameContextPtr, Raytracing);
+            DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "Raytracing", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
+
             {
-                SCOPE_CPU_PROFILE(UpdateTLAS);
-                SCOPE_GPU_PROFILE(RenderFrameContextPtr, UpdateTLAS);
-                DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "UpdateTLAS", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
+                if (0)
+                {
+                    SCOPE_CPU_PROFILE(UpdateTLAS);
+                    SCOPE_GPU_PROFILE(RenderFrameContextPtr, UpdateTLAS);
+                    DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "UpdateTLAS", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
+
+                    auto CmdBuffer = RenderFrameContextPtr->GetActiveCommandBuffer();
+                    jRatracingInitializer InInitializer;
+                    InInitializer.CommandBuffer = CmdBuffer;
+                    InInitializer.RenderObjects = jObject::GetStaticRenderObject();
+                    g_rhi->RaytracingScene->CreateOrUpdateTLAS(InInitializer);
+                }
 
                 auto CmdBuffer = RenderFrameContextPtr->GetActiveCommandBuffer();
-                jRatracingInitializer InInitializer;
-                InInitializer.CommandBuffer = CmdBuffer;
-                InInitializer.RenderObjects = jObject::GetStaticRenderObject();
-                g_rhi->RaytracingScene->CreateOrUpdateTLAS(InInitializer);
-            }
+                auto CmdBufferDX12 = (jCommandBuffer_DX12*)CmdBuffer;
 
-            auto CmdBuffer = RenderFrameContextPtr->GetActiveCommandBuffer();
-            auto CmdBufferDX12 = (jCommandBuffer_DX12*)CmdBuffer;
+                const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+                    , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT
+                    , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
+                const jSamplerStateInfo* PBRSamplerStateInfoDX12 = TSamplerStateInfo<ETextureFilter::NEAREST_MIPMAP_LINEAR, ETextureFilter::NEAREST_MIPMAP_LINEAR
+                    , ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
+                    , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
 
-            const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
-                , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT
-                , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
-            const jSamplerStateInfo* PBRSamplerStateInfoDX12 = TSamplerStateInfo<ETextureFilter::NEAREST_MIPMAP_LINEAR, ETextureFilter::NEAREST_MIPMAP_LINEAR
-                , ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
-                , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
-
-            struct SceneConstantBuffer
-            {
-                XMMATRIX projectionToWorld;
-                XMVECTOR cameraPosition;
-                XMVECTOR lightDireciton;
-            };
-
-            SceneConstantBuffer m_sceneCB;
-
-            auto GetScreenAspect = []()
+                struct SceneConstantBuffer
                 {
-                    return static_cast<float>(SCR_WIDTH) / static_cast<float>(SCR_HEIGHT);
+                    XMMATRIX projectionToWorld;
+                    XMVECTOR cameraPosition;
+                    XMVECTOR lightDireciton;
                 };
 
-            auto mainCamera = jCamera::GetMainCamera();
+                SceneConstantBuffer m_sceneCB;
 
-            auto v = jCameraUtil::CreateViewMatrix({ 0, 0, -1000 }, { 300, 0, 0 }, { 0, 1, 0 });
-            auto p = jCameraUtil::CreatePerspectiveMatrix((float)SCR_WIDTH, (float)SCR_HEIGHT, XMConvertToRadians(45), 1.0f, 1250.0f);
+                auto GetScreenAspect = []()
+                    {
+                        return static_cast<float>(SCR_WIDTH) / static_cast<float>(SCR_HEIGHT);
+                    };
 
-            XMVECTOR m_eye = { mainCamera->Pos.x, mainCamera->Pos.y, mainCamera->Pos.z, 1.0f };
-            XMVECTOR m_at = { mainCamera->Target.x, mainCamera->Target.y, mainCamera->Target.z, 1.0f };
-            XMVECTOR m_up = { 0.0f, 1.0f, 0.0f };
+                auto mainCamera = jCamera::GetMainCamera();
 
-            m_sceneCB.cameraPosition = m_eye;
-            const float fovAngleY = 45.0f;
-            const float m_aspectRatio = GetScreenAspect();
-            const XMMATRIX view = XMMatrixLookAtLH(m_eye, m_at, m_up);
-            const XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(fovAngleY), m_aspectRatio, 1.0f, 1250.0f);
-            const XMMATRIX viewProj = view * proj;
-            m_sceneCB.projectionToWorld = XMMatrixTranspose(XMMatrixInverse(nullptr, viewProj));
+                auto v = jCameraUtil::CreateViewMatrix({ 0, 0, -1000 }, { 300, 0, 0 }, { 0, 1, 0 });
+                auto p = jCameraUtil::CreatePerspectiveMatrix((float)SCR_WIDTH, (float)SCR_HEIGHT, XMConvertToRadians(45), 1.0f, 1250.0f);
 
-            jDirectionalLight* DirectionalLight = nullptr;
-            for (auto light : jLight::GetLights())
-            {
-                if (light->Type == ELightType::DIRECTIONAL)
+                XMVECTOR m_eye = { mainCamera->Pos.x, mainCamera->Pos.y, mainCamera->Pos.z, 1.0f };
+                XMVECTOR m_at = { mainCamera->Target.x, mainCamera->Target.y, mainCamera->Target.z, 1.0f };
+                XMVECTOR m_up = { 0.0f, 1.0f, 0.0f };
+
+                m_sceneCB.cameraPosition = m_eye;
+                const float fovAngleY = 45.0f;
+                const float m_aspectRatio = GetScreenAspect();
+                const XMMATRIX view = XMMatrixLookAtLH(m_eye, m_at, m_up);
+                const XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(fovAngleY), m_aspectRatio, 1.0f, 1250.0f);
+                const XMMATRIX viewProj = view * proj;
+                m_sceneCB.projectionToWorld = XMMatrixTranspose(XMMatrixInverse(nullptr, viewProj));
+
+                jDirectionalLight* DirectionalLight = nullptr;
+                for (auto light : jLight::GetLights())
                 {
-                    DirectionalLight = (jDirectionalLight*)light;
+                    if (light->Type == ELightType::DIRECTIONAL)
+                    {
+                        DirectionalLight = (jDirectionalLight*)light;
+                        break;
+                    }
+                }
+                check(DirectionalLight);
+                m_sceneCB.lightDireciton = { DirectionalLight->GetLightData().Direction.x, DirectionalLight->GetLightData().Direction.y, DirectionalLight->GetLightData().Direction.z };
+
+                static auto SceneBuffer = g_rhi->CreateUniformBufferBlock(jNameStatic("SceneData"), jLifeTimeType::MultiFrame, sizeof(m_sceneCB));
+                SceneBuffer->UpdateBufferData(&m_sceneCB, sizeof(m_sceneCB));
+
+                static bool once = false;
+                if (!once)
+                {
+                    once = true;
+
+                    static const bool IsUseHLSLDynamicResource = false;
+
+                    if (IsUseDX12())
+                    {
+                        m_raytracingOutput = jBufferUtil_DX12::CreateImage((uint32)SCR_WIDTH, (uint32)SCR_HEIGHT, (uint32)1, (uint32)1, (uint32)1
+                            , ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, ETextureCreateFlag::UAV, EImageLayout::UAV);
+                    }
+                    else if (IsUseVulkan())
+                    {
+                        m_raytracingOutput = new jTexture_Vulkan();
+                        auto m_raytracingOutputVk = (jTexture_Vulkan*)m_raytracingOutput;
+                        jBufferUtil_Vulkan::CreateImage((uint32)SCR_WIDTH, (uint32)SCR_HEIGHT, 1, VkSampleCountFlagBits::VK_SAMPLE_COUNT_1_BIT, GetVulkanTextureFormat(ETextureFormat::RGBA16F)
+                            , VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
+                            , VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, *m_raytracingOutputVk);
+                        auto raytracingOutputView = jBufferUtil_Vulkan::CreateImageView(m_raytracingOutputVk->Image
+                            , GetVulkanTextureFormat(m_raytracingOutputVk->Format), VK_IMAGE_ASPECT_COLOR_BIT, 1);
+                        m_raytracingOutputVk->View = raytracingOutputView;
+                    }
+                }
+
+                // Normal resource
+                // Record normal resources
+                jShaderBindingArray ShaderBindingArray;
+                jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
+                ShaderBindingArray.Add(jShaderBinding::Create(0, 1, EShaderBindingType::ACCELERATION_STRUCTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
+                    ResourceInlineAllactor.Alloc<jBufferResource>(RenderFrameContextPtr->RaytracingScene->TLASBuffer), true));
+                ShaderBindingArray.Add(jShaderBinding::Create(1, 1, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::ALL_RAYTRACING,
+                    ResourceInlineAllactor.Alloc<jTextureResource>(m_raytracingOutput, nullptr), false));
+                ShaderBindingArray.Add(jShaderBinding::Create(2, 1, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_RAYTRACING,
+                    ResourceInlineAllactor.Alloc<jUniformBufferResource>(SceneBuffer), true));
+                ShaderBindingArray.Add(jShaderBinding::Create(3, 1, EShaderBindingType::SAMPLER, EShaderAccessStageFlag::ALL_RAYTRACING,
+                    ResourceInlineAllactor.Alloc<jSamplerResource>(SamplerState), false));
+                ShaderBindingArray.Add(jShaderBinding::Create(4, 1, EShaderBindingType::SAMPLER, EShaderAccessStageFlag::ALL_RAYTRACING,
+                    ResourceInlineAllactor.Alloc<jSamplerResource>(PBRSamplerStateInfoDX12), false));
+
+#define TURN_ON_BINDLESS 1
+#define TURN_ON_SHADOW 1
+
+#if TURN_ON_BINDLESS
+                // Bindless resources
+                // Record bindless resources
+                jShaderBindingArray BindlessShaderBindingArray[9];
+
+                std::vector<jTextureResourceBindless::jTextureBindData> IrradianceMapTextures;
+                jTextureResourceBindless::jTextureBindData IrradianceTextureBindData;
+                IrradianceTextureBindData.Texture = jSceneRenderTarget::IrradianceMap2;
+                IrradianceMapTextures.push_back(IrradianceTextureBindData);
+
+                std::vector<jTextureResourceBindless::jTextureBindData> FilteredEnvMapTextures;
+                jTextureResourceBindless::jTextureBindData FilteredEnvMapBindData;
+                FilteredEnvMapBindData.Texture = jSceneRenderTarget::FilteredEnvMap2;
+                FilteredEnvMapTextures.push_back(FilteredEnvMapBindData);
+
+                // Below Two textures have only 1 texture each, but this is just test code for bindless resouces so I will remove this from bindless resource range.
+                BindlessShaderBindingArray[0].Add(jShaderBinding::CreateBindless(0, (uint32)IrradianceMapTextures.size(), EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
+                    ResourceInlineAllactor.Alloc<jTextureResourceBindless>(IrradianceMapTextures), false));
+                BindlessShaderBindingArray[1].Add(jShaderBinding::CreateBindless(0, (uint32)FilteredEnvMapTextures.size(), EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
+                    ResourceInlineAllactor.Alloc<jTextureResourceBindless>(FilteredEnvMapTextures), false));
+
+                std::vector<const jBuffer*> VertexAndInexOffsetBuffers;
+                std::vector<const jBuffer*> IndexBuffers;
+                std::vector<const jBuffer*> TestUniformBuffers;
+                std::vector<const jBuffer*> VertexBuffers;
+                std::vector<jTextureResourceBindless::jTextureBindData> AlbedoTextures;
+                std::vector<jTextureResourceBindless::jTextureBindData> NormalTextures;
+                std::vector<jTextureResourceBindless::jTextureBindData> MetallicTextures;
+
+                for (int32 i = 0; i < jObject::GetStaticRenderObject().size(); ++i)
+                {
+                    jRenderObject* RObj = jObject::GetStaticRenderObject()[i];
+                    RObj->CreateShaderBindingInstance();
+
+                    VertexAndInexOffsetBuffers.push_back(RObj->VertexAndIndexOffsetBuffer);
+                    IndexBuffers.push_back(RObj->GeometryDataPtr->IndexBuffer->GetBuffer());
+                    TestUniformBuffers.push_back(RObj->TestUniformBuffer.get());
+                    VertexBuffers.push_back(RObj->GeometryDataPtr->VertexBuffer->GetBuffer(0));
+
+                    check(RObj->MaterialPtr);
+                    AlbedoTextures.push_back(jTextureResourceBindless::jTextureBindData(RObj->MaterialPtr->GetTexture<jTexture_DX12>(jMaterial::EMaterialTextureType::Albedo), nullptr));
+                    NormalTextures.push_back(jTextureResourceBindless::jTextureBindData(RObj->MaterialPtr->GetTexture<jTexture_DX12>(jMaterial::EMaterialTextureType::Normal), nullptr));
+                    MetallicTextures.push_back(jTextureResourceBindless::jTextureBindData(RObj->MaterialPtr->GetTexture<jTexture_DX12>(jMaterial::EMaterialTextureType::Metallic), nullptr));
+                }
+                BindlessShaderBindingArray[2].Add(jShaderBinding::CreateBindless(0, (uint32)VertexAndInexOffsetBuffers.size(), EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
+                    ResourceInlineAllactor.Alloc<jBufferResourceBindless>(VertexAndInexOffsetBuffers), false));
+                BindlessShaderBindingArray[3].Add(jShaderBinding::CreateBindless(0, (uint32)IndexBuffers.size(), EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
+                    ResourceInlineAllactor.Alloc<jBufferResourceBindless>(IndexBuffers), false));
+                BindlessShaderBindingArray[4].Add(jShaderBinding::CreateBindless(0, (uint32)TestUniformBuffers.size(), EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
+                    ResourceInlineAllactor.Alloc<jBufferResourceBindless>(TestUniformBuffers), false));
+                BindlessShaderBindingArray[5].Add(jShaderBinding::CreateBindless(0, (uint32)VertexBuffers.size(), EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
+                    ResourceInlineAllactor.Alloc<jBufferResourceBindless>(VertexBuffers), false));
+                BindlessShaderBindingArray[6].Add(jShaderBinding::CreateBindless(0, (uint32)AlbedoTextures.size(), EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
+                    ResourceInlineAllactor.Alloc<jTextureResourceBindless>(AlbedoTextures)));
+                BindlessShaderBindingArray[7].Add(jShaderBinding::CreateBindless(0, (uint32)NormalTextures.size(), EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
+                    ResourceInlineAllactor.Alloc<jTextureResourceBindless>(NormalTextures)));
+                BindlessShaderBindingArray[8].Add(jShaderBinding::CreateBindless(0, (uint32)MetallicTextures.size(), EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
+                    ResourceInlineAllactor.Alloc<jTextureResourceBindless>(MetallicTextures)));
+#endif // TURN_ON_BINDLESS
+
+                // Create ShaderBindingLayout and ShaderBindingInstance Instance for this draw call
+                std::shared_ptr<jShaderBindingInstance> GlobalShaderBindingInstance;
+                GlobalShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
+#if TURN_ON_BINDLESS
+                std::shared_ptr<jShaderBindingInstance> GlobalShaderBindingInstanceBindless[9];
+                for (int32 i = 0; i < 9; ++i)
+                {
+                    GlobalShaderBindingInstanceBindless[i] = g_rhi->CreateShaderBindingInstance(BindlessShaderBindingArray[i], jShaderBindingInstanceType::SingleFrame);
+                }
+#endif // TURN_ON_BINDLESS
+
+                jShaderBindingLayoutArray GlobalShaderBindingLayoutArray;
+                GlobalShaderBindingLayoutArray.Add(GlobalShaderBindingInstance->ShaderBindingsLayouts);
+#if TURN_ON_BINDLESS
+                for (int32 i = 0; i < 9; ++i)
+                {
+                    GlobalShaderBindingLayoutArray.Add(GlobalShaderBindingInstanceBindless[i]->ShaderBindingsLayouts);
+                }
+#endif // TURN_ON_BINDLESS
+
+                // Create RaytracingShaders
+                std::vector<jRaytracingPipelineShader> RaytracingShaders;
+                {
+                    jRaytracingPipelineShader NewShader;
+                    jShaderInfo shaderInfo;
+
+                    // First hit gorup
+                    shaderInfo.SetName(jNameStatic("Miss"));
+                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
+                    shaderInfo.SetEntryPoint(jNameStatic("MyMissShader"));
+                    shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_MISS);
+#if TURN_ON_BINDLESS
+                    shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
+#endif // TURN_ON_BINDLESS
+                    NewShader.MissShader = g_rhi->CreateShader(shaderInfo);
+                    NewShader.MissEntryPoint = TEXT("MyMissShader");
+
+                    shaderInfo.SetName(jNameStatic("Raygen"));
+                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
+                    shaderInfo.SetEntryPoint(jNameStatic("MyRaygenShader"));
+                    shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_RAYGEN);
+#if TURN_ON_BINDLESS
+                    shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
+#endif
+                    NewShader.RaygenShader = g_rhi->CreateShader(shaderInfo);
+                    NewShader.RaygenEntryPoint = TEXT("MyRaygenShader");
+
+                    shaderInfo.SetName(jNameStatic("ClosestHit"));
+                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
+                    shaderInfo.SetEntryPoint(jNameStatic("MyClosestHitShader"));
+                    shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT);
+#if TURN_ON_BINDLESS
+                    shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
+#endif // TURN_ON_BINDLESS
+                    NewShader.ClosestHitShader = g_rhi->CreateShader(shaderInfo);
+                    NewShader.ClosestHitEntryPoint = TEXT("MyClosestHitShader");
+
+                    shaderInfo.SetName(jNameStatic("AnyHit"));
+                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
+                    shaderInfo.SetEntryPoint(jNameStatic("MyAnyHitShader"));
+                    shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_ANYHIT);
+#if TURN_ON_BINDLESS
+                    shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
+#endif // TURN_ON_BINDLESS
+                    NewShader.AnyHitShader = g_rhi->CreateShader(shaderInfo);
+                    NewShader.AnyHitEntryPoint = TEXT("MyAnyHitShader");
+
+                    NewShader.HitGroupName = TEXT("DefaultHit");
+
+                    RaytracingShaders.push_back(NewShader);
+
+                    // Second hit group
+#if TURN_ON_SHADOW
+                    NewShader = {};
+
+                    shaderInfo.SetName(jNameStatic("ShadowMiss"));
+                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
+                    shaderInfo.SetEntryPoint(jNameStatic("ShadowMyMissShader"));
+                    shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_MISS);
+#if TURN_ON_BINDLESS
+                    shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
+#endif // TURN_ON_BINDLESS
+                    NewShader.MissShader = g_rhi->CreateShader(shaderInfo);
+                    NewShader.MissEntryPoint = TEXT("ShadowMyMissShader");
+
+                    shaderInfo.SetName(jNameStatic("ShadowClosestHit"));
+                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
+                    shaderInfo.SetEntryPoint(jNameStatic("ShadowMyClosestHitShader"));
+                    shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT);
+#if TURN_ON_BINDLESS
+                    shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
+#endif // TURN_ON_BINDLESS
+                    NewShader.ClosestHitShader = g_rhi->CreateShader(shaderInfo);
+                    NewShader.ClosestHitEntryPoint = TEXT("ShadowMyClosestHitShader");
+
+                    shaderInfo.SetName(jNameStatic("ShadowAnyHit"));
+                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
+                    shaderInfo.SetEntryPoint(jNameStatic("ShadowMyAnyHitShader"));
+                    shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_ANYHIT);
+#if TURN_ON_BINDLESS
+                    shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
+#endif // TURN_ON_BINDLESS
+                    NewShader.AnyHitShader = g_rhi->CreateShader(shaderInfo);
+                    NewShader.AnyHitEntryPoint = TEXT("ShadowMyAnyHitShader");
+
+                    NewShader.HitGroupName = TEXT("ShadowHit");
+
+                    RaytracingShaders.push_back(NewShader);
+#endif // TURN_ON_SHADOW
+                }
+
+                // Create RaytracingPipelineState
+                jRaytracingPipelineData RaytracingPipelineData;
+                RaytracingPipelineData.MaxAttributeSize = 2 * sizeof(float);	    // float2 barycentrics
+                RaytracingPipelineData.MaxPayloadSize = 4 * sizeof(float);		// float4 color
+                RaytracingPipelineData.MaxTraceRecursionDepth = 2;
+                auto RaytracingPipelineState = (jPipelineStateInfo_DX12*)g_rhi->CreateRaytracingPipelineStateInfo(RaytracingShaders, RaytracingPipelineData
+                    , GlobalShaderBindingLayoutArray, nullptr);
+
+                // Binding RaytracingShader resources
+                jShaderBindingInstanceArray ShaderBindingInstanceArray;
+                ShaderBindingInstanceArray.Add(GlobalShaderBindingInstance.get());
+#if TURN_ON_BINDLESS
+                for (int32 i = 0; i < _countof(GlobalShaderBindingInstanceBindless); ++i)
+                {
+                    ShaderBindingInstanceArray.Add(GlobalShaderBindingInstanceBindless[i].get());
+                }
+#endif // TURN_ON_BINDLESS
+
+                jShaderBindingInstanceCombiner ShaderBindingInstanceCombiner;
+                for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
+                {
+                    ShaderBindingInstanceCombiner.DescriptorSetHandles.Add(ShaderBindingInstanceArray[i]->GetHandle());
+                    const std::vector<uint32>* pDynamicOffsetTest = ShaderBindingInstanceArray[i]->GetDynamicOffsets();
+                    if (pDynamicOffsetTest && pDynamicOffsetTest->size())
+                    {
+                        ShaderBindingInstanceCombiner.DynamicOffsets.Add((void*)pDynamicOffsetTest->data(), (int32)pDynamicOffsetTest->size());
+                    }
+                }
+                ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
+                g_rhi->BindRaytracingShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), RaytracingPipelineState, ShaderBindingInstanceCombiner, 0);
+
+                // Binding Raytracing Pipeline State
+                RaytracingPipelineState->Bind(RenderFrameContextPtr);
+
+                g_rhi->TransitionImageLayout(CmdBuffer, m_raytracingOutput, EImageLayout::UAV);
+
+                // Dispatch Rays
+                jRaytracingDispatchData TracingData;
+                TracingData.Width = SCR_WIDTH;
+                TracingData.Height = SCR_HEIGHT;
+                TracingData.Depth = 1;
+                TracingData.PipelineState = RaytracingPipelineState;
+                g_rhi->DispatchRay(RenderFrameContextPtr, TracingData);
+
+                g_rhi->TransitionImageLayout(CmdBuffer, m_raytracingOutput, EImageLayout::SHADER_READ_ONLY);
+            }
+
+            if (1)
+            {
+                static jFullscreenQuadPrimitive* GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
+
+                //auto BackBuffer = g_rhi_dx12->GetSwapchainImage(g_rhi_dx12->CurrentFrameIndex)->TexturePtr;
+                //auto BackBufferRT = std::make_shared<jRenderTarget>(BackBuffer);
+                auto RT = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr;
+
+                g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RT->TexturePtr.get(), EImageLayout::COLOR_ATTACHMENT);
+                g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), m_raytracingOutput, EImageLayout::SHADER_READ_ONLY);
+
+                jRasterizationStateInfo* RasterizationState = nullptr;
+                switch (g_rhi->GetSelectedMSAASamples())
+                {
+                case EMSAASamples::COUNT_1:
+                    RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)1, true, 0.2f, false, false>::Create();
+                    break;
+                case EMSAASamples::COUNT_2:
+                    RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)2, true, 0.2f, false, false>::Create();
+                    break;
+                case EMSAASamples::COUNT_4:
+                    RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)4, true, 0.2f, false, false>::Create();
+                    break;
+                case EMSAASamples::COUNT_8:
+                    RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)8, true, 0.2f, false, false>::Create();
+                    break;
+                default:
+                    check(0);
                     break;
                 }
-            }
-            check(DirectionalLight);
-            m_sceneCB.lightDireciton = { DirectionalLight->GetLightData().Direction.x, DirectionalLight->GetLightData().Direction.y, DirectionalLight->GetLightData().Direction.z };
+                auto DepthStencilState = TDepthStencilStateInfo<false, false, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
+                auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ONE, EBlendOp::ADD, EBlendFactor::ZERO, EBlendFactor::ONE, EBlendOp::ADD, EColorMask::ALL>::Create();
 
-            static auto SceneBuffer = g_rhi->CreateUniformBufferBlock(jNameStatic("SceneData"), jLifeTimeType::MultiFrame, sizeof(m_sceneCB));
-            SceneBuffer->UpdateBufferData(&m_sceneCB, sizeof(m_sceneCB));
+                // Create fixed pipeline states
+                jPipelineStateFixedInfo PostProcessPassPipelineStateFixed(RasterizationState, DepthStencilState, BlendingState
+                    , jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT), gOptions.UseVRS);
 
-            static bool once = false;
-            if (!once)
-            {
-                once = true;
+                const jRTClearValue ClearColor = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f);
+                const jRTClearValue ClearDepth = jRTClearValue(1.0f, 0);
 
-                static const bool IsUseHLSLDynamicResource = false;
+                jRenderPassInfo renderPassInfo;
+                jAttachment color = jAttachment(RT, EAttachmentLoadStoreOp::LOAD_STORE
+                    , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
+                renderPassInfo.Attachments.push_back(color);
 
-                if (IsUseDX12())
+                jSubpass subpass;
+                subpass.Initialize(0, 1, EPipelineStageMask::COLOR_ATTACHMENT_OUTPUT_BIT, EPipelineStageMask::FRAGMENT_SHADER_BIT);
+                subpass.OutputColorAttachments.push_back(0);
+                renderPassInfo.Subpasses.push_back(subpass);
+
+                auto RenderPass = g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
+
+                int32 BindingPoint = 0;
+                jShaderBindingArray ShaderBindingArray;
+                jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
+
+                const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+                    , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
+                    , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
+
+                ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
+                    , ResourceInlineAllactor.Alloc<jTextureResource>(m_raytracingOutput, SamplerState)));
+
+                std::shared_ptr<jShaderBindingInstance> ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
+                jShaderBindingInstanceArray ShaderBindingInstanceArray;
+                ShaderBindingInstanceArray.Add(ShaderBindingInstance.get());
+
+                jGraphicsPipelineShader Shader;
                 {
-                    m_raytracingOutput = jBufferUtil_DX12::CreateImage((uint32)SCR_WIDTH, (uint32)SCR_HEIGHT, (uint32)1, (uint32)1, (uint32)1
-                        , ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, ETextureCreateFlag::UAV, EImageLayout::UAV);
+                    jShaderInfo shaderInfo;
+                    shaderInfo.SetName(jNameStatic("CopyVS"));
+                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/fullscreenquad_vs.hlsl"));
+                    shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
+                    Shader.VertexShader = g_rhi->CreateShader(shaderInfo);
+
+                    shaderInfo.SetName(jNameStatic("CopyPS"));
+                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/copy_ps.hlsl"));
+                    shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
+                    Shader.PixelShader = g_rhi->CreateShader(shaderInfo);
                 }
-                else if (IsUseVulkan())
+
+                jDrawCommand DrawCommand(RenderFrameContextPtr, GlobalFullscreenPrimitive->RenderObjects[0], RenderPass
+                    , Shader, &PostProcessPassPipelineStateFixed, GlobalFullscreenPrimitive->RenderObjects[0]->MaterialPtr.get(), ShaderBindingInstanceArray, nullptr);
+                DrawCommand.Test = true;
+                DrawCommand.PrepareToDraw(false);
+                if (RenderPass->BeginRenderPass(RenderFrameContextPtr->GetActiveCommandBuffer()))
                 {
-                    m_raytracingOutput = new jTexture_Vulkan();
-                    auto m_raytracingOutputVk = (jTexture_Vulkan*)m_raytracingOutput;
-                    jBufferUtil_Vulkan::CreateImage((uint32)SCR_WIDTH, (uint32)SCR_HEIGHT, 1, VkSampleCountFlagBits::VK_SAMPLE_COUNT_1_BIT, GetVulkanTextureFormat(ETextureFormat::RGBA16F)
-                        , VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
-                        , VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, *m_raytracingOutputVk);
-                    auto raytracingOutputView = jBufferUtil_Vulkan::CreateImageView(m_raytracingOutputVk->Image
-                        , GetVulkanTextureFormat(m_raytracingOutputVk->Format), VK_IMAGE_ASPECT_COLOR_BIT, 1);
-                    m_raytracingOutputVk->View = raytracingOutputView;
+                    DrawCommand.Draw();
+                    RenderPass->EndRenderPass();
                 }
-            }
-
-            // Normal resource
-            // Record normal resources
-            jShaderBindingArray ShaderBindingArray;
-            jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
-            ShaderBindingArray.Add(jShaderBinding::Create(0, 1, EShaderBindingType::ACCELERATION_STRUCTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
-                ResourceInlineAllactor.Alloc<jBufferResource>(RenderFrameContextPtr->RaytracingScene->TLASBuffer), true));
-            ShaderBindingArray.Add(jShaderBinding::Create(1, 1, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::ALL_RAYTRACING,
-                ResourceInlineAllactor.Alloc<jTextureResource>(m_raytracingOutput, nullptr), false));
-            ShaderBindingArray.Add(jShaderBinding::Create(2, 1, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_RAYTRACING,
-                ResourceInlineAllactor.Alloc<jUniformBufferResource>(SceneBuffer), true));
-            ShaderBindingArray.Add(jShaderBinding::Create(3, 1, EShaderBindingType::SAMPLER, EShaderAccessStageFlag::ALL_RAYTRACING,
-                ResourceInlineAllactor.Alloc<jSamplerResource>(SamplerState), false));
-            ShaderBindingArray.Add(jShaderBinding::Create(4, 1, EShaderBindingType::SAMPLER, EShaderAccessStageFlag::ALL_RAYTRACING,
-                ResourceInlineAllactor.Alloc<jSamplerResource>(PBRSamplerStateInfoDX12), false));
-
-            // Bindless resources
-            // Record bindless resources
-            jShaderBindingArray BindlessShaderBindingArray[9];
-
-            std::vector<jTextureResourceBindless::jTextureBindData> IrradianceMapTextures;
-            jTextureResourceBindless::jTextureBindData IrradianceTextureBindData;
-            IrradianceTextureBindData.Texture = jSceneRenderTarget::IrradianceMap2;
-            IrradianceMapTextures.push_back(IrradianceTextureBindData);
-
-            std::vector<jTextureResourceBindless::jTextureBindData> FilteredEnvMapTextures;
-            jTextureResourceBindless::jTextureBindData FilteredEnvMapBindData;
-            FilteredEnvMapBindData.Texture = jSceneRenderTarget::FilteredEnvMap2;
-            FilteredEnvMapTextures.push_back(FilteredEnvMapBindData);
-
-            // Below Two textures have only 1 texture each, but this is just test code for bindless resouces so I will remove this from bindless resource range.
-            BindlessShaderBindingArray[0].Add(jShaderBinding::CreateBindless(0, (uint32)IrradianceMapTextures.size(), EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
-                ResourceInlineAllactor.Alloc<jTextureResourceBindless>(IrradianceMapTextures), false));
-            BindlessShaderBindingArray[1].Add(jShaderBinding::CreateBindless(0, (uint32)FilteredEnvMapTextures.size(), EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
-                ResourceInlineAllactor.Alloc<jTextureResourceBindless>(FilteredEnvMapTextures), false));
-
-            std::vector<const jBuffer*> VertexAndInexOffsetBuffers;
-            std::vector<const jBuffer*> IndexBuffers;
-            std::vector<const jBuffer*> TestUniformBuffers;
-            std::vector<const jBuffer*> VertexBuffers;
-            std::vector<jTextureResourceBindless::jTextureBindData> AlbedoTextures;
-            std::vector<jTextureResourceBindless::jTextureBindData> NormalTextures;
-            std::vector<jTextureResourceBindless::jTextureBindData> MetallicTextures;
-
-            for (int32 i = 0; i < jObject::GetStaticRenderObject().size(); ++i)
-            {
-                jRenderObject* RObj = jObject::GetStaticRenderObject()[i];
-                RObj->CreateShaderBindingInstance();
-
-                VertexAndInexOffsetBuffers.push_back(RObj->VertexAndIndexOffsetBuffer);
-                IndexBuffers.push_back(RObj->GeometryDataPtr->IndexBuffer->GetBuffer());
-                TestUniformBuffers.push_back(RObj->TestUniformBuffer.get());
-                VertexBuffers.push_back(RObj->GeometryDataPtr->VertexBuffer->GetBuffer(0));
-
-                check(RObj->MaterialPtr);
-                AlbedoTextures.push_back(jTextureResourceBindless::jTextureBindData(RObj->MaterialPtr->GetTexture<jTexture_DX12>(jMaterial::EMaterialTextureType::Albedo), nullptr));
-                NormalTextures.push_back(jTextureResourceBindless::jTextureBindData(RObj->MaterialPtr->GetTexture<jTexture_DX12>(jMaterial::EMaterialTextureType::Normal), nullptr));
-                MetallicTextures.push_back(jTextureResourceBindless::jTextureBindData(RObj->MaterialPtr->GetTexture<jTexture_DX12>(jMaterial::EMaterialTextureType::Metallic), nullptr));
-            }
-            BindlessShaderBindingArray[2].Add(jShaderBinding::CreateBindless(0, (uint32)VertexAndInexOffsetBuffers.size(), EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
-                ResourceInlineAllactor.Alloc<jBufferResourceBindless>(VertexAndInexOffsetBuffers), false));
-            BindlessShaderBindingArray[3].Add(jShaderBinding::CreateBindless(0, (uint32)IndexBuffers.size(), EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
-                ResourceInlineAllactor.Alloc<jBufferResourceBindless>(IndexBuffers), false));
-            BindlessShaderBindingArray[4].Add(jShaderBinding::CreateBindless(0, (uint32)TestUniformBuffers.size(), EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
-                ResourceInlineAllactor.Alloc<jBufferResourceBindless>(TestUniformBuffers), false));
-            BindlessShaderBindingArray[5].Add(jShaderBinding::CreateBindless(0, (uint32)VertexBuffers.size(), EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
-                ResourceInlineAllactor.Alloc<jBufferResourceBindless>(VertexBuffers), false));
-            BindlessShaderBindingArray[6].Add(jShaderBinding::CreateBindless(0, (uint32)AlbedoTextures.size(), EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
-                ResourceInlineAllactor.Alloc<jTextureResourceBindless>(AlbedoTextures)));
-            BindlessShaderBindingArray[7].Add(jShaderBinding::CreateBindless(0, (uint32)NormalTextures.size(), EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
-                ResourceInlineAllactor.Alloc<jTextureResourceBindless>(NormalTextures)));
-            BindlessShaderBindingArray[8].Add(jShaderBinding::CreateBindless(0, (uint32)MetallicTextures.size(), EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
-                ResourceInlineAllactor.Alloc<jTextureResourceBindless>(MetallicTextures)));
-
-            // Create ShaderBindingLayout and ShaderBindingInstance Instance for this draw call
-            std::shared_ptr<jShaderBindingInstance> GlobalShaderBindingInstance;
-            std::shared_ptr<jShaderBindingInstance> GlobalShaderBindingInstanceBindless[9];
-            GlobalShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
-            for (int32 i = 0; i < 9; ++i)
-            {
-                GlobalShaderBindingInstanceBindless[i] = g_rhi->CreateShaderBindingInstance(BindlessShaderBindingArray[i], jShaderBindingInstanceType::SingleFrame);
-            }
-
-            jShaderBindingLayoutArray GlobalShaderBindingLayoutArray;
-            GlobalShaderBindingLayoutArray.Add(GlobalShaderBindingInstance->ShaderBindingsLayouts);
-            for (int32 i = 0; i < 9; ++i)
-            {
-                GlobalShaderBindingLayoutArray.Add(GlobalShaderBindingInstanceBindless[i]->ShaderBindingsLayouts);
-            }
-
-            // Create RaytracingShaders
-            std::vector<jRaytracingPipelineShader> RaytracingShaders;
-            {
-                jRaytracingPipelineShader NewShader;
-                jShaderInfo shaderInfo;
-
-                // First hit gorup
-                shaderInfo.SetName(jNameStatic("Miss"));
-                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
-                shaderInfo.SetEntryPoint(jNameStatic("MyMissShader"));
-                shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_MISS);
-                shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
-                NewShader.MissShader = g_rhi->CreateShader(shaderInfo);
-                NewShader.MissEntryPoint = TEXT("MyMissShader");
-
-                shaderInfo.SetName(jNameStatic("Raygen"));
-                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
-                shaderInfo.SetEntryPoint(jNameStatic("MyRaygenShader"));
-                shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_RAYGEN);
-                shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
-                NewShader.RaygenShader = g_rhi->CreateShader(shaderInfo);
-                NewShader.RaygenEntryPoint = TEXT("MyRaygenShader");
-
-                shaderInfo.SetName(jNameStatic("ClosestHit"));
-                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
-                shaderInfo.SetEntryPoint(jNameStatic("MyClosestHitShader"));
-                shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT);
-                shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
-                NewShader.ClosestHitShader = g_rhi->CreateShader(shaderInfo);
-                NewShader.ClosestHitEntryPoint = TEXT("MyClosestHitShader");
-
-                shaderInfo.SetName(jNameStatic("AnyHit"));
-                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
-                shaderInfo.SetEntryPoint(jNameStatic("MyAnyHitShader"));
-                shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_ANYHIT);
-                shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
-                NewShader.AnyHitShader = g_rhi->CreateShader(shaderInfo);
-                NewShader.AnyHitEntryPoint = TEXT("MyAnyHitShader");
-
-                NewShader.HitGroupName = TEXT("DefaultHit");
-
-                RaytracingShaders.push_back(NewShader);
-
-                // Second hit group
-                NewShader = {};
-
-                shaderInfo.SetName(jNameStatic("ShadowMiss"));
-                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
-                shaderInfo.SetEntryPoint(jNameStatic("ShadowMyMissShader"));
-                shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_MISS);
-                shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
-                NewShader.MissShader = g_rhi->CreateShader(shaderInfo);
-                NewShader.MissEntryPoint = TEXT("ShadowMyMissShader");
-
-                shaderInfo.SetName(jNameStatic("ShadowClosestHit"));
-                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
-                shaderInfo.SetEntryPoint(jNameStatic("ShadowMyClosestHitShader"));
-                shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT);
-                shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
-                NewShader.ClosestHitShader = g_rhi->CreateShader(shaderInfo);
-                NewShader.ClosestHitEntryPoint = TEXT("ShadowMyClosestHitShader");
-
-                shaderInfo.SetName(jNameStatic("ShadowAnyHit"));
-                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
-                shaderInfo.SetEntryPoint(jNameStatic("ShadowMyAnyHitShader"));
-                shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_ANYHIT);
-                shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
-                NewShader.AnyHitShader = g_rhi->CreateShader(shaderInfo);
-                NewShader.AnyHitEntryPoint = TEXT("ShadowMyAnyHitShader");
-
-                NewShader.HitGroupName = TEXT("ShadowHit");
-
-                RaytracingShaders.push_back(NewShader);
-            }
-
-            // Create RaytracingPipelineState
-            jRaytracingPipelineData RaytracingPipelineData;
-            RaytracingPipelineData.MaxAttributeSize = 2 * sizeof(float);	    // float2 barycentrics
-            RaytracingPipelineData.MaxPayloadSize = 4 * sizeof(float);		// float4 color
-            RaytracingPipelineData.MaxTraceRecursionDepth = 2;
-            auto RaytracingPipelineState = (jPipelineStateInfo_DX12*)g_rhi->CreateRaytracingPipelineStateInfo(RaytracingShaders, RaytracingPipelineData
-                , GlobalShaderBindingLayoutArray, nullptr);
-
-            // Binding RaytracingShader resources
-            jShaderBindingInstanceArray ShaderBindingInstanceArray;
-            ShaderBindingInstanceArray.Add(GlobalShaderBindingInstance.get());
-            for(int32 i=0;i<_countof(GlobalShaderBindingInstanceBindless);++i)
-            {
-                ShaderBindingInstanceArray.Add(GlobalShaderBindingInstanceBindless[i].get());
-            }
-
-            jShaderBindingInstanceCombiner ShaderBindingInstanceCombiner;
-            for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
-            {
-                ShaderBindingInstanceCombiner.DescriptorSetHandles.Add(ShaderBindingInstanceArray[i]->GetHandle());
-                const std::vector<uint32>* pDynamicOffsetTest = ShaderBindingInstanceArray[i]->GetDynamicOffsets();
-                if (pDynamicOffsetTest && pDynamicOffsetTest->size())
-                {
-                    ShaderBindingInstanceCombiner.DynamicOffsets.Add((void*)pDynamicOffsetTest->data(), (int32)pDynamicOffsetTest->size());
-                }
-            }
-            ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
-            g_rhi->BindRaytracingShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), RaytracingPipelineState, ShaderBindingInstanceCombiner, 0);
-            
-            // Binding Raytracing Pipeline State
-            RaytracingPipelineState->Bind(RenderFrameContextPtr);
-
-            g_rhi->TransitionImageLayout(CmdBuffer, m_raytracingOutput, EImageLayout::UAV);
-
-            // Dispatch Rays
-            jRaytracingDispatchData TracingData;
-            TracingData.Width = SCR_WIDTH;
-            TracingData.Height = SCR_HEIGHT;
-            TracingData.Depth = 1;
-            TracingData.PipelineState = RaytracingPipelineState;
-            g_rhi->DispatchRay(RenderFrameContextPtr, TracingData);
-
-            g_rhi->TransitionImageLayout(CmdBuffer, m_raytracingOutput, EImageLayout::SHADER_READ_ONLY);
-        }
-
-        if (1)
-        {
-            static jFullscreenQuadPrimitive* GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
-
-            //auto BackBuffer = g_rhi_dx12->GetSwapchainImage(g_rhi_dx12->CurrentFrameIndex)->TexturePtr;
-            //auto BackBufferRT = std::make_shared<jRenderTarget>(BackBuffer);
-            auto RT = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr;
-
-            g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RT->TexturePtr.get(), EImageLayout::COLOR_ATTACHMENT);
-            g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), m_raytracingOutput, EImageLayout::SHADER_READ_ONLY);
-
-            jRasterizationStateInfo* RasterizationState = nullptr;
-            switch (g_rhi->GetSelectedMSAASamples())
-            {
-            case EMSAASamples::COUNT_1:
-                RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)1, true, 0.2f, false, false>::Create();
-                break;
-            case EMSAASamples::COUNT_2:
-                RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)2, true, 0.2f, false, false>::Create();
-                break;
-            case EMSAASamples::COUNT_4:
-                RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)4, true, 0.2f, false, false>::Create();
-                break;
-            case EMSAASamples::COUNT_8:
-                RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)8, true, 0.2f, false, false>::Create();
-                break;
-            default:
-                check(0);
-                break;
-            }
-            auto DepthStencilState = TDepthStencilStateInfo<false, false, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
-            auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ONE, EBlendOp::ADD, EBlendFactor::ZERO, EBlendFactor::ONE, EBlendOp::ADD, EColorMask::ALL>::Create();
-
-            // Create fixed pipeline states
-            jPipelineStateFixedInfo PostProcessPassPipelineStateFixed(RasterizationState, DepthStencilState, BlendingState
-                , jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT), gOptions.UseVRS);
-
-            const jRTClearValue ClearColor = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f);
-            const jRTClearValue ClearDepth = jRTClearValue(1.0f, 0);
-
-            jRenderPassInfo renderPassInfo;
-            jAttachment color = jAttachment(RT, EAttachmentLoadStoreOp::LOAD_STORE
-                , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
-            renderPassInfo.Attachments.push_back(color);
-
-            jSubpass subpass;
-            subpass.Initialize(0, 1, EPipelineStageMask::COLOR_ATTACHMENT_OUTPUT_BIT, EPipelineStageMask::FRAGMENT_SHADER_BIT);
-            subpass.OutputColorAttachments.push_back(0);
-            renderPassInfo.Subpasses.push_back(subpass);
-
-            auto RenderPass = g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
-
-            int32 BindingPoint = 0;
-            jShaderBindingArray ShaderBindingArray;
-            jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
-
-            const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
-                , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
-                , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
-
-            ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
-                , ResourceInlineAllactor.Alloc<jTextureResource>(m_raytracingOutput, SamplerState)));
-
-            std::shared_ptr<jShaderBindingInstance> ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
-            jShaderBindingInstanceArray ShaderBindingInstanceArray;
-            ShaderBindingInstanceArray.Add(ShaderBindingInstance.get());
-
-            jGraphicsPipelineShader Shader;
-            {
-                jShaderInfo shaderInfo;
-                shaderInfo.SetName(jNameStatic("CopyVS"));
-                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/fullscreenquad_vs.hlsl"));
-                shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
-                Shader.VertexShader = g_rhi->CreateShader(shaderInfo);
-
-                shaderInfo.SetName(jNameStatic("CopyPS"));
-                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/copy_ps.hlsl"));
-                shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
-                Shader.PixelShader = g_rhi->CreateShader(shaderInfo);
-            }
-
-            jDrawCommand DrawCommand(RenderFrameContextPtr, GlobalFullscreenPrimitive->RenderObjects[0], RenderPass
-                , Shader, &PostProcessPassPipelineStateFixed, GlobalFullscreenPrimitive->RenderObjects[0]->MaterialPtr.get(), ShaderBindingInstanceArray, nullptr);
-            DrawCommand.Test = true;
-            DrawCommand.PrepareToDraw(false);
-            if (RenderPass->BeginRenderPass(RenderFrameContextPtr->GetActiveCommandBuffer()))
-            {
-                DrawCommand.Draw();
-                RenderPass->EndRenderPass();
             }
         }
     }
