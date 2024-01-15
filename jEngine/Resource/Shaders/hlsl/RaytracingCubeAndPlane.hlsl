@@ -369,6 +369,9 @@ void MyRaygenShader()
 [shader("anyhit")]
 void MyAnyHitShader(inout RayPayload payload, in MyAttributes attr)
 {
+//payload.color *= float4(0, 1, 0, 0);
+//return;
+
     float3 hitPosition = HitWorldPosition();
     uint InstanceIdx = InstanceIndex();
 
@@ -459,6 +462,9 @@ void MyAnyHitShader(inout RayPayload payload, in MyAttributes attr)
 [shader("closesthit")]
 void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 {
+//payload.color = float4(1, 0, 0, 0);
+//return;
+
     float3 hitPosition = HitWorldPosition();
     uint InstanceIdx = InstanceIndex();
 
@@ -592,7 +598,7 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
         payload.color.xyz += (DiffusePart + SpecularPart);
     }
 
-    bool TraceRayForShadow = true;
+    bool TraceRayForShadow = false;
     if (TraceRayForShadow)
     {
         // Find the world - space hit position
@@ -659,6 +665,8 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 [shader("miss")]
 void MyMissShader(inout RayPayload payload)
 {
+//payload.color = float4(0, 0, 1, 0);
+//return;
      // Make a 't' value that is the factor scaled by using ray hit on background of Y axis.
     float2 xy = HitWorldPosition().xy;
     float2 screenPos = xy / DispatchRaysDimensions().xy * 2.0f - 1.0f;;

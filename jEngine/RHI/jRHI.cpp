@@ -57,29 +57,31 @@ void jRHI::OnInitRHI()
     image.Height = 1;
     image.Format = ETextureFormat::RGBA8;
     image.FormatType = EFormatType::UNSIGNED_BYTE;
-	image.sRGB = false;
+    image.sRGB = false;
 
-	image.ImageData = { 255, 255, 255, 255 };
-	GWhiteTexture = CreateTextureFromData(&image);
+    image.ImageData = { 255, 255, 255, 255 };
+    GWhiteTexture = CreateTextureFromData(&image);
 
-	image.ImageData = { 0, 0, 0, 255 };
-	GBlackTexture = CreateTextureFromData(&image);
+    image.ImageData = { 0, 0, 0, 255 };
+    GBlackTexture = CreateTextureFromData(&image);
 
-	image.ImageData = { 0, 0, 255, 0 };
-	GNormalTexture = CreateTextureFromData(&image);
+    image.ImageData = { 255 / 2, 255 / 2, 255, 0 };
+    GNormalTexture = CreateTextureFromData(&image);
 
-	image.ImageData = { 0, 25, 25, 0 };
-	GRoughnessMetalicTexture = CreateTextureFromData(&image);
+    const float roughness = 0.2f;
+    const float metalic = 0.0f;
+    image.ImageData = { 0, (uint8)(255.0f * roughness), (uint8)(255.0f * metalic), 0 };
+    GRoughnessMetalicTexture = CreateTextureFromData(&image);
 
-	image.TextureType = ETextureType::TEXTURE_CUBE;
-	image.LayerCount = 6;
+    image.TextureType = ETextureType::TEXTURE_CUBE;
+    image.LayerCount = 6;
     image.ImageData = { 255, 255, 255, 200, 255, 255 };
     GWhiteCubeTexture = CreateTextureFromData(&image);
 
-	GDefaultMaterial = std::make_shared<jMaterial>();
-	GDefaultMaterial->TexData[(int32)jMaterial::EMaterialTextureType::Albedo].Texture = GWhiteCubeTexture;
-	GDefaultMaterial->TexData[(int32)jMaterial::EMaterialTextureType::Normal].Texture = GNormalTexture;
-	GDefaultMaterial->TexData[(int32)jMaterial::EMaterialTextureType::Metallic].Texture = GRoughnessMetalicTexture;
+    GDefaultMaterial = std::make_shared<jMaterial>();
+    GDefaultMaterial->TexData[(int32)jMaterial::EMaterialTextureType::Albedo].Texture = GWhiteTexture;
+    GDefaultMaterial->TexData[(int32)jMaterial::EMaterialTextureType::Normal].Texture = GNormalTexture;
+    GDefaultMaterial->TexData[(int32)jMaterial::EMaterialTextureType::Metallic].Texture = GRoughnessMetalicTexture;
 }
 
 void jRHI::ReleaseRHI()
@@ -202,7 +204,7 @@ void jView::PrepareViewUniformBufferShaderBindingInstance()
     ubo.VP = Camera->Projection * Camera->View;
 	ubo.EyeWorld = Camera->Pos;
 
-	ViewUniformBufferPtr = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(jNameStatic("ViewUniformParameters"), jLifeTimeType::OneFrame, sizeof(ubo)));
+    ViewUniformBufferPtr = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(jNameStatic("ViewUniformParameters"), jLifeTimeType::OneFrame, sizeof(ubo)));
     ViewUniformBufferPtr->UpdateBufferData(&ubo, sizeof(ubo));
 
     int32 BindingPoint = 0;

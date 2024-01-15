@@ -61,7 +61,7 @@ const wchar_t* jRHI_DX12::c_missShaderName = L"MyMissShader";
 const wchar_t* jRHI_DX12::c_triHitGroupName = L"TriHitGroup";
 const wchar_t* jRHI_DX12::c_planeHitGroupName = L"PlaneHitGroup";
 const wchar_t* jRHI_DX12::c_planeclosestHitShaderName = L"MyPlaneClosestHitShader";
-bool jRHI_DX12::IsUsePlacedResource = true;			// PlacedResouce test
+bool jRHI_DX12::IsUsePlacedResource = false;			// PlacedResouce test
 
 constexpr uint32 c_AllowTearing = 0x1;
 constexpr uint32 c_RequireTearingSupport = 0x2;

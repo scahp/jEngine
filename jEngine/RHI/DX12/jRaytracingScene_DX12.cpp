@@ -28,6 +28,9 @@ void jRaytracingScene_DX12::CreateOrUpdateBLAS(const jRatracingInitializer& InIn
         }
 
         auto VertexBuffer_PositionOnly = RObj->GeometryDataPtr->VertexBuffer_PositionOnly;
+        check(VertexBuffer_PositionOnly->VertexStreamData->Params.size() == 1);
+        check(VertexBuffer_PositionOnly->VertexStreamData->Params[0]->Stride == 4 * 3);
+
         auto VertexBufferDX12 = (jVertexBuffer_DX12*)VertexBuffer_PositionOnly;
 
         // Create VertexAndIndexOffsetBuffer
@@ -107,20 +110,19 @@ void jRaytracingScene_DX12::CreateOrUpdateBLAS(const jRatracingInitializer& InIn
         RObj->BottomLevelASBuffer = jBufferUtil_DX12::CreateBuffer(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, 0, EBufferCreateFlag::UAV, initialResourceState
             , nullptr, 0, TEXT("BottomLevelAccelerationStructure"));
 
-        auto ScratchASBuffer = jBufferUtil_DX12::CreateBuffer(bottomLevelPrebuildInfo.ScratchDataSizeInBytes, 0, EBufferCreateFlag::UAV, D3D12_RESOURCE_STATE_COMMON
+        delete RObj->ScratchASBuffer;
+        RObj->ScratchASBuffer = jBufferUtil_DX12::CreateBuffer(bottomLevelPrebuildInfo.ScratchDataSizeInBytes, 0, EBufferCreateFlag::UAV, D3D12_RESOURCE_STATE_COMMON
             , nullptr, 0, TEXT("ScratchResourceGeometry"));
 
         // Create BLAS
         D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc{};
         bottomLevelBuildDesc.Inputs = bottomLevelInputs;
-        bottomLevelBuildDesc.ScratchAccelerationStructureData = ((jBuffer_DX12*)ScratchASBuffer)->GetGPUAddress();
+        bottomLevelBuildDesc.ScratchAccelerationStructureData = ((jBuffer_DX12*)RObj->ScratchASBuffer)->GetGPUAddress();
         bottomLevelBuildDesc.DestAccelerationStructureData = ((jBuffer_DX12*)RObj->BottomLevelASBuffer)->GetGPUAddress();
 
         CmdBuffer->CommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
         auto temp = CD3DX12_RESOURCE_BARRIER::UAV(((jBuffer_DX12*)RObj->BottomLevelASBuffer)->Buffer->Get());
         CmdBuffer->CommandList->ResourceBarrier(1, &temp);
-
-        delete ScratchASBuffer;
 
         InstanceList.push_back(RObj);
     }
@@ -135,7 +137,8 @@ void jRaytracingScene_DX12::CreateOrUpdateTLAS(const jRatracingInitializer& InIn
 
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
     inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-    inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
+    //inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
+    inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
     inputs.NumDescs = (uint32)InstanceList.size();
     inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
 
@@ -153,7 +156,7 @@ void jRaytracingScene_DX12::CreateOrUpdateTLAS(const jRatracingInitializer& InIn
     }
     else
     {
-        ScratchTLASBuffer = jBufferUtil_DX12::CreateBuffer(info.ScratchDataSizeInBytes, 0, EBufferCreateFlag::UAV, D3D12_RESOURCE_STATE_UNORDERED_ACCESS
+        ScratchTLASBuffer = jBufferUtil_DX12::CreateBuffer(info.ScratchDataSizeInBytes, 0, EBufferCreateFlag::UAV, D3D12_RESOURCE_STATE_COMMON
             , nullptr, 0, TEXT("TLAS Scratch Buffer"));
 
         TLASBuffer = jBufferUtil_DX12::CreateBuffer(info.ScratchDataSizeInBytes, 0, EBufferCreateFlag::UAV, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE
@@ -164,34 +167,40 @@ void jRaytracingScene_DX12::CreateOrUpdateTLAS(const jRatracingInitializer& InIn
             , nullptr, 0, TEXT("TLAS Result Buffer"));
     }
 
-    D3D12_RAYTRACING_INSTANCE_DESC* instanceDescs = (D3D12_RAYTRACING_INSTANCE_DESC*)InstanceUploadBuffer->Map();
-
-    for (int32 i = 0; i < (int32)InstanceList.size(); ++i)
+    if (D3D12_RAYTRACING_INSTANCE_DESC* instanceDescs = (D3D12_RAYTRACING_INSTANCE_DESC*)InstanceUploadBuffer->Map())
     {
-        jRenderObject* RObj = InstanceList[i];
-        RObj->UpdateWorldMatrix();
+        for (int32 i = 0; i < (int32)InstanceList.size(); ++i)
+        {
+            jRenderObject* RObj = InstanceList[i];
+            RObj->UpdateWorldMatrix();
 
-        instanceDescs[i].InstanceID = i;
-        instanceDescs[i].InstanceContributionToHitGroupIndex = 0;
-        memcpy(instanceDescs[i].Transform, &RObj->World.m, sizeof(instanceDescs[i].Transform));
-        instanceDescs[i].InstanceMask = 0xFF;
-        instanceDescs[i].AccelerationStructure = ((jBuffer_DX12*)RObj->BottomLevelASBuffer)->GetGPUAddress();
-        for (int32 k = 0; k < 3; ++k)
-        {
-            for (int32 m = 0; m < 4; ++m)
+            instanceDescs[i].InstanceID = i;
+            instanceDescs[i].InstanceContributionToHitGroupIndex = 0;
+            instanceDescs[i].InstanceMask = 0xFF;
+            instanceDescs[i].AccelerationStructure = ((jBuffer_DX12*)RObj->BottomLevelASBuffer)->GetGPUAddress();
+            for (int32 k = 0; k < 3; ++k)
             {
-                instanceDescs[i].Transform[k][m] = RObj->World.m[m][k];
+                for (int32 m = 0; m < 4; ++m)
+                {
+                    instanceDescs[i].Transform[k][m] = RObj->World.m[m][k];
+                }
             }
+            if (gOptions.EarthQuake)
+            {
+                instanceDescs[i].Transform[0][3] = sin((float)g_rhi->GetCurrentFrameNumber());
+                instanceDescs[i].Transform[1][3] = cos((float)g_rhi->GetCurrentFrameNumber());
+                instanceDescs[i].Transform[2][3] = sin((float)g_rhi->GetCurrentFrameNumber()) * 2;
+            }
+            instanceDescs[i].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_FRONT_COUNTERCLOCKWISE;
         }
-        if (gOptions.EarthQuake)
-        {
-            instanceDescs[i].Transform[0][3] = sin((float)g_rhi->GetCurrentFrameNumber());
-            instanceDescs[i].Transform[1][3] = cos((float)g_rhi->GetCurrentFrameNumber());
-            instanceDescs[i].Transform[2][3] = sin((float)g_rhi->GetCurrentFrameNumber()) * 2;
-        }
-        instanceDescs[i].Flags = D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_FRONT_COUNTERCLOCKWISE;
+        InstanceUploadBuffer->Unmap();
     }
-    InstanceUploadBuffer->Unmap();
+    else
+    {
+        int32 i = 0;
+        ++i;
+        return;
+    }
 
     // TLAS 생성
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC asDesc = {};

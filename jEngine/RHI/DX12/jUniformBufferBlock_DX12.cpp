@@ -45,6 +45,7 @@ void jUniformBufferBlock_DX12::UpdateBufferData(const void* InData, size_t InSiz
                 memcpy(startAddr, InData, InSize);
             else
                 memset(startAddr, 0, InSize);
+            Buffer->Unmap();
         }
     }
     else

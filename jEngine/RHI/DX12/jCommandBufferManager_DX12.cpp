@@ -3,6 +3,8 @@
 
 bool jCommandBuffer_DX12::Begin() const
 {
+    Reset();
+
     ensure(OnlineDescriptorHeap && OnlineSamplerDescriptorHeap || (!OnlineDescriptorHeap && !OnlineSamplerDescriptorHeap));
     if (OnlineDescriptorHeap && OnlineSamplerDescriptorHeap)
     {
@@ -92,7 +94,6 @@ jCommandBuffer_DX12* jCommandBufferManager_DX12::GetOrCreateCommandBuffer()
         {
             SelectedCmdBuffer = AvailableCommandLists[i];
             AvailableCommandLists.erase(AvailableCommandLists.begin() + i);
-            SelectedCmdBuffer->Reset();
             break;
         }
     }

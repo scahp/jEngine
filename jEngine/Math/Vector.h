@@ -435,6 +435,9 @@ struct Vector4
 
 struct Vector2
 {
+    static const Vector2 OneVector;
+    static const Vector2 ZeroVector;
+
 	constexpr Vector2() { }
 	constexpr Vector2(zero_type /*ZeroType*/) { x = 0.0f; y = 0.0f; }
 	constexpr Vector2(float fValue) : x(fValue), y(fValue) { }
