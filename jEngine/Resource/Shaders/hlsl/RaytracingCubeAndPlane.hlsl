@@ -15,7 +15,13 @@ struct SceneConstantBuffer
 {
     float4x4 projectionToWorld;
     float4 cameraPosition;
-    float4 lightDireciton;
+    float4 lightPosition;
+    float4 lightAmbientColor;
+    float4 lightDiffuseColor;
+    float4 cameraDirection;
+    uint NumOfStartingRay;
+    float focalDistance;
+    float lensRadius;
 };
 
 #define VERTEX_STRID 56
