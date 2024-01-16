@@ -1473,7 +1473,7 @@ void jRenderer::Render()
             DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "Raytracing", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
 
             {
-                if (0)
+                if (1)
                 {
                     SCOPE_CPU_PROFILE(UpdateTLAS);
                     SCOPE_GPU_PROFILE(RenderFrameContextPtr, UpdateTLAS);
