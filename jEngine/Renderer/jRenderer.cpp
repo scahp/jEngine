@@ -1500,7 +1500,13 @@ void jRenderer::Render()
                 {
                     XMMATRIX projectionToWorld;
                     XMVECTOR cameraPosition;
-                    XMVECTOR lightDireciton;
+                    XMVECTOR lightPosition;
+                    XMVECTOR lightAmbientColor;
+                    XMVECTOR lightDiffuseColor;
+                    XMVECTOR cameraDirection;
+                    uint32 NumOfStartingRay;
+                    float focalDistance;
+                    float lensRadius;
                 };
 
                 SceneConstantBuffer m_sceneCB;
@@ -1536,8 +1542,22 @@ void jRenderer::Render()
                         break;
                     }
                 }
-                check(DirectionalLight);
-                m_sceneCB.lightDireciton = { DirectionalLight->GetLightData().Direction.x, DirectionalLight->GetLightData().Direction.y, DirectionalLight->GetLightData().Direction.z };
+                //check(DirectionalLight);
+                //m_sceneCB.lightDireciton = { DirectionalLight->GetLightData().Direction.x, DirectionalLight->GetLightData().Direction.y, DirectionalLight->GetLightData().Direction.z };
+
+                auto lightPosition = XMFLOAT4(0.0f, 1.8f, -3.0f, 0.0f);
+                m_sceneCB.lightPosition = XMLoadFloat4(&lightPosition);
+
+                auto lightAmbientColor = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
+                m_sceneCB.lightAmbientColor = XMLoadFloat4(&lightAmbientColor);
+
+                auto lightDiffuseColor = XMFLOAT4(0.5f, 0.3f, 0.3f, 1.0f);
+                m_sceneCB.lightDiffuseColor = XMLoadFloat4(&lightDiffuseColor);
+                
+                m_sceneCB.cameraDirection = XMVector3Normalize(m_at - m_eye);
+                m_sceneCB.focalDistance = gOptions.FocalDistance;
+                m_sceneCB.lensRadius = gOptions.LensRadius;
+                m_sceneCB.NumOfStartingRay = 20;
 
                 static auto SceneBuffer = g_rhi->CreateUniformBufferBlock(jNameStatic("SceneData"), jLifeTimeType::MultiFrame, sizeof(m_sceneCB));
                 SceneBuffer->UpdateBufferData(&m_sceneCB, sizeof(m_sceneCB));
@@ -1583,7 +1603,7 @@ void jRenderer::Render()
                     ResourceInlineAllactor.Alloc<jSamplerResource>(PBRSamplerStateInfoDX12), false));
 
 #define TURN_ON_BINDLESS 1
-#define TURN_ON_SHADOW 1
+#define TURN_ON_SHADOW 0
 
 #if TURN_ON_BINDLESS
                 // Bindless resources
@@ -1673,7 +1693,7 @@ void jRenderer::Render()
 
                     // First hit gorup
                     shaderInfo.SetName(jNameStatic("Miss"));
-                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
+                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingOneWeekend.hlsl"));
                     shaderInfo.SetEntryPoint(jNameStatic("MyMissShader"));
                     shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_MISS);
 #if TURN_ON_BINDLESS
@@ -1683,7 +1703,7 @@ void jRenderer::Render()
                     NewShader.MissEntryPoint = TEXT("MyMissShader");
 
                     shaderInfo.SetName(jNameStatic("Raygen"));
-                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
+                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingOneWeekend.hlsl"));
                     shaderInfo.SetEntryPoint(jNameStatic("MyRaygenShader"));
                     shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_RAYGEN);
 #if TURN_ON_BINDLESS
@@ -1693,7 +1713,7 @@ void jRenderer::Render()
                     NewShader.RaygenEntryPoint = TEXT("MyRaygenShader");
 
                     shaderInfo.SetName(jNameStatic("ClosestHit"));
-                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
+                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingOneWeekend.hlsl"));
                     shaderInfo.SetEntryPoint(jNameStatic("MyClosestHitShader"));
                     shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT);
 #if TURN_ON_BINDLESS
@@ -1702,15 +1722,15 @@ void jRenderer::Render()
                     NewShader.ClosestHitShader = g_rhi->CreateShader(shaderInfo);
                     NewShader.ClosestHitEntryPoint = TEXT("MyClosestHitShader");
 
-                    shaderInfo.SetName(jNameStatic("AnyHit"));
-                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
-                    shaderInfo.SetEntryPoint(jNameStatic("MyAnyHitShader"));
-                    shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_ANYHIT);
-#if TURN_ON_BINDLESS
-                    shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
-#endif // TURN_ON_BINDLESS
-                    NewShader.AnyHitShader = g_rhi->CreateShader(shaderInfo);
-                    NewShader.AnyHitEntryPoint = TEXT("MyAnyHitShader");
+//                    shaderInfo.SetName(jNameStatic("AnyHit"));
+//                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingOneWeekend.hlsl"));
+//                    shaderInfo.SetEntryPoint(jNameStatic("MyAnyHitShader"));
+//                    shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_ANYHIT);
+//#if TURN_ON_BINDLESS
+//                    shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
+//#endif // TURN_ON_BINDLESS
+//                    NewShader.AnyHitShader = g_rhi->CreateShader(shaderInfo);
+//                    NewShader.AnyHitEntryPoint = TEXT("MyAnyHitShader");
 
                     NewShader.HitGroupName = TEXT("DefaultHit");
 
@@ -1721,7 +1741,7 @@ void jRenderer::Render()
                     NewShader = {};
 
                     shaderInfo.SetName(jNameStatic("ShadowMiss"));
-                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
+                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingOneWeekend.hlsl"));
                     shaderInfo.SetEntryPoint(jNameStatic("ShadowMyMissShader"));
                     shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_MISS);
 #if TURN_ON_BINDLESS
@@ -1731,7 +1751,7 @@ void jRenderer::Render()
                     NewShader.MissEntryPoint = TEXT("ShadowMyMissShader");
 
                     shaderInfo.SetName(jNameStatic("ShadowClosestHit"));
-                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
+                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingOneWeekend.hlsl"));
                     shaderInfo.SetEntryPoint(jNameStatic("ShadowMyClosestHitShader"));
                     shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT);
 #if TURN_ON_BINDLESS
@@ -1741,7 +1761,7 @@ void jRenderer::Render()
                     NewShader.ClosestHitEntryPoint = TEXT("ShadowMyClosestHitShader");
 
                     shaderInfo.SetName(jNameStatic("ShadowAnyHit"));
-                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingCubeAndPlane.hlsl"));
+                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RaytracingOneWeekend.hlsl"));
                     shaderInfo.SetEntryPoint(jNameStatic("ShadowMyAnyHitShader"));
                     shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_ANYHIT);
 #if TURN_ON_BINDLESS
@@ -1758,9 +1778,9 @@ void jRenderer::Render()
 
                 // Create RaytracingPipelineState
                 jRaytracingPipelineData RaytracingPipelineData;
-                RaytracingPipelineData.MaxAttributeSize = 2 * sizeof(float);	    // float2 barycentrics
-                RaytracingPipelineData.MaxPayloadSize = 4 * sizeof(float);		// float4 color
-                RaytracingPipelineData.MaxTraceRecursionDepth = 2;
+                RaytracingPipelineData.MaxAttributeSize = 2 * sizeof(float);	                // float2 barycentrics
+                RaytracingPipelineData.MaxPayloadSize = 4 * sizeof(float) + sizeof(int32);		// float4 color
+                RaytracingPipelineData.MaxTraceRecursionDepth = 10;
                 auto RaytracingPipelineState = (jPipelineStateInfo_DX12*)g_rhi->CreateRaytracingPipelineStateInfo(RaytracingShaders, RaytracingPipelineData
                     , GlobalShaderBindingLayoutArray, nullptr);
 
@@ -2069,12 +2089,14 @@ void jRenderer::Render()
 #if ENABLE_PBR
             ImGui::SetNextWindowPos(ImVec2(400.0f, 27.0f), ImGuiCond_FirstUseEver);
             ImGui::SetNextWindowSize(ImVec2(200.0f, 80.0f), ImGuiCond_FirstUseEver);
-            ImGui::Begin("Sun", 0, ImGuiWindowFlags_AlwaysAutoResize);
-            ImGui::SliderFloat("DirX", &gOptions.SunDir.x, -1.0f, 1.0f);
-            ImGui::SliderFloat("DirY", &gOptions.SunDir.y, -1.0f, 1.0f);
-            ImGui::SliderFloat("DirZ", &gOptions.SunDir.z, -1.0f, 1.0f);
-            ImGui::SliderFloat("AnisoG", &gOptions.AnisoG, 0.0f, 1.0f);
-            ImGui::Checkbox("EarthQuake with TLAS update", &gOptions.EarthQuake);
+            ImGui::Begin("Camera Options", 0, ImGuiWindowFlags_AlwaysAutoResize);
+            //ImGui::SliderFloat("DirX", &gOptions.SunDir.x, -1.0f, 1.0f);
+            //ImGui::SliderFloat("DirY", &gOptions.SunDir.y, -1.0f, 1.0f);
+            //ImGui::SliderFloat("DirZ", &gOptions.SunDir.z, -1.0f, 1.0f);
+            //ImGui::SliderFloat("AnisoG", &gOptions.AnisoG, 0.0f, 1.0f);
+            //ImGui::Checkbox("EarthQuake with TLAS update", &gOptions.EarthQuake);
+            ImGui::SliderFloat("Focal distance", &gOptions.FocalDistance, 3.0f, 40.0f);
+            ImGui::SliderFloat("Lens radius", &gOptions.LensRadius, 0.0f, 0.2f);
             ImGui::End();
 
             //ImGui::SetWindowFocus(szTitle);

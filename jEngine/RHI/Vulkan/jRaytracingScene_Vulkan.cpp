@@ -64,8 +64,8 @@ void jRaytracingScene_Vulkan::CreateOrUpdateBLAS(const jRatracingInitializer& In
         // Set GeometryDesc
         VkAccelerationStructureGeometryKHR geometry{};
         geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
-        //geometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
-        geometry.flags = 0;
+        geometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+        //geometry.flags = 0;
         geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
         geometry.geometry.triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
         geometry.geometry.triangles.vertexFormat = VertexBufferVulkan->BindInfos.AttributeDescriptions[0].format;
@@ -221,7 +221,7 @@ void jRaytracingScene_Vulkan::CreateOrUpdateTLAS(const jRatracingInitializer& In
 
         MappedPointer[i].instanceCustomIndex = i;
         MappedPointer[i].mask = 0xFF;
-        MappedPointer[i].flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
+        MappedPointer[i].flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FRONT_COUNTERCLOCKWISE_BIT_KHR;
         MappedPointer[i].accelerationStructureReference = ((jBuffer_Vulkan*)RObj->BottomLevelASBuffer)->DeviceAddress;
         for (int32 k = 0; k < 3; ++k)
         {
@@ -244,8 +244,8 @@ void jRaytracingScene_Vulkan::CreateOrUpdateTLAS(const jRatracingInitializer& In
     VkAccelerationStructureGeometryKHR accelerationStructureGeometry{};
     accelerationStructureGeometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
     accelerationStructureGeometry.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;
-    //accelerationStructureGeometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
-    accelerationStructureGeometry.flags = 0;
+    accelerationStructureGeometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+    //accelerationStructureGeometry.flags = 0;
     accelerationStructureGeometry.geometry.instances.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR;
     accelerationStructureGeometry.geometry.instances.arrayOfPointers = VK_FALSE;
     accelerationStructureGeometry.geometry.instances.data

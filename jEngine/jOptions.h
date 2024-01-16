@@ -21,6 +21,8 @@ struct jOptions
     Vector SunDir = Vector(0.31f, -0.828f, -0.241f);
     float AnisoG = 0.15f;
     bool EarthQuake = false;
+    float FocalDistance = 10.0f;
+    float LensRadius = 0.2f;
 };
 
 extern jOptions gOptions;
