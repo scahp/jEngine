@@ -173,6 +173,8 @@ void jGame::Setup()
 		int32 cnt = 0;
 
 		srand(123);
+
+		// Small Sphere
 		const float radius = 0.3f;
         int32 w = 11, h = 11;
         int32 totalCount = (w * 2 * h * 2) + 3 + 1;     // small balls, big balls, plane
@@ -192,6 +194,7 @@ void jGame::Setup()
 			}
 		}
 
+		// Big Sphere
         for (int32 i = 0; i < 3; ++i)
         {
             auto s = XMMatrixScaling(1.0f, 1.0f, 1.0f);
@@ -201,6 +204,13 @@ void jGame::Setup()
 			jObject::AddObject(NewPrimitive);
 			SpawnedObjects.push_back(NewPrimitive);
         }
+
+		// Plane
+		{
+			auto NewPrimitive = jPrimitiveUtil::CreateQuad(Vector(0.0f, -1.0f, 0.0f), Vector(1.0f), Vector(200.0f), Vector4::ColorWhite);
+			jObject::AddObject(NewPrimitive);
+			SpawnedObjects.push_back(NewPrimitive);
+		}
 
 		//for (int32 i = 0; i < 2; ++i)
 		//{

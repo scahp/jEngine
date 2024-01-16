@@ -559,118 +559,110 @@ jRenderObject* CreateQuad_Internal(const Vector& pos, const Vector& size, const 
 	auto halfSize = size / 2.0;
 	auto offset = Vector::ZeroVector;
 
-	float vertices[] = {
-        offset.x + (-halfSize.x), 0.0f, offset.z + (-halfSize.z),
-        offset.x + (halfSize.x), 0.0f, offset.z + (-halfSize.z),
-        offset.x + (halfSize.x), 0.0f, offset.z + (halfSize.z),
-        offset.x + (halfSize.x), 0.0f, offset.z + (halfSize.z),
-        offset.x + (-halfSize.x), 0.0f, offset.z + (halfSize.z), 
-        offset.x + (-halfSize.x), 0.0f, offset.z + (-halfSize.z),
-	};
+	std::vector<jBaseVertex> vertices(6);
+	{
+		vertices[0].Pos = Vector(offset.x + (-halfSize.x), 0.0f, offset.z + (-halfSize.z));
+		vertices[0].Normal = Vector(0.0f, 1.0f, 0.0f);
+		vertices[0].Tangent = Vector(1.0f, 0.0f, 0.0f);
+		vertices[0].Bitangent = Vector(0.0f, 0.0f, 1.0f);
+		vertices[0].TexCoord = Vector2(0.0f, 0.0f);
+	
+		vertices[1].Pos = Vector(offset.x + (halfSize.x), 0.0f, offset.z + (-halfSize.z));
+		vertices[0].Normal = Vector(0.0f, 1.0f, 0.0f);
+		vertices[0].Tangent = Vector(1.0f, 0.0f, 0.0f);
+		vertices[0].Bitangent = Vector(0.0f, 0.0f, 1.0f);
+		vertices[0].TexCoord = Vector2(1.0f, 0.0f);
+	
+		vertices[2].Pos = Vector(offset.x + (halfSize.x), 0.0f, offset.z + (halfSize.z));
+		vertices[2].Normal = Vector(0.0f, 1.0f, 0.0f);
+		vertices[2].Tangent = Vector(1.0f, 0.0f, 0.0f);
+		vertices[2].Bitangent = Vector(0.0f, 0.0f, 1.0f);
+		vertices[2].TexCoord = Vector2(1.0f, 1.0f);
+	
+		vertices[3].Pos = Vector(offset.x + (halfSize.x), 0.0f, offset.z + (halfSize.z));
+		vertices[3].Normal = Vector(0.0f, 1.0f, 0.0f);
+		vertices[3].Tangent = Vector(1.0f, 0.0f, 0.0f);
+		vertices[3].Bitangent = Vector(0.0f, 0.0f, 1.0f);
+		vertices[3].TexCoord = Vector2(1.0f, 1.0f);
+	
+		vertices[4].Pos = Vector(offset.x + (-halfSize.x), 0.0f, offset.z + (halfSize.z));
+		vertices[4].Normal = Vector(0.0f, 1.0f, 0.0f);
+		vertices[4].Tangent = Vector(1.0f, 0.0f, 0.0f);
+		vertices[4].Bitangent = Vector(0.0f, 0.0f, 1.0f);
+		vertices[4].TexCoord = Vector2(0.0f, 1.0f);
+	
+		vertices[5].Pos = Vector(offset.x + (-halfSize.x), 0.0f, offset.z + (-halfSize.z));
+		vertices[5].Normal = Vector(0.0f, 1.0f, 0.0f);
+		vertices[5].Tangent = Vector(1.0f, 0.0f, 0.0f);
+		vertices[5].Bitangent = Vector(0.0f, 0.0f, 1.0f);
+		vertices[5].TexCoord = Vector2(0.0f, 0.0f);
+	}
+	
+	std::vector<uint32> indices;
+	indices.reserve(6);
+	for (int32 i = 0; i < 6; ++i)
+	{
+		indices.push_back(i);
+	}
+	
+	// PositionOnly VertexStream 추가
+	std::vector<jPositionOnlyVertex> verticesPositionOnly(vertices.size());
+	for (int32 i = 0; i < (int32)vertices.size(); ++i)
+	{
+		verticesPositionOnly[i].Pos = vertices[i].Pos;
+	}
+	
+	const int32 NumOfVertices = (int32)vertices.size();
+	auto positionOnlyVertexStreamData = std::make_shared<jVertexStreamData>();
+	{
+		auto streamParam = std::make_shared<jStreamParam<jPositionOnlyVertex>>();
+		streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("POSITION"), EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Name = jName("jPositionOnlyVertex");
+		streamParam->Stride = sizeof(jPositionOnlyVertex);
+		streamParam->Data.swap(verticesPositionOnly);
+		positionOnlyVertexStreamData->Params.push_back(streamParam);
+	
+		positionOnlyVertexStreamData->PrimitiveType = EPrimitiveType::TRIANGLES;
+		positionOnlyVertexStreamData->ElementCount = NumOfVertices;
+	}
 
-	float normals[] = {
-        0.0f, 1.0f, 0.0f,
-        0.0f, 1.0f, 0.0f,
-        0.0f, 1.0f, 0.0f,
-        0.0f, 1.0f, 0.0f,
-        0.0f, 1.0f, 0.0f,
-        0.0f, 1.0f, 0.0f,
-	};
-
-	Vector2 texcoords[] = {
-        Vector2(0.0f, 0.0f),
-        Vector2(1.0f, 0.0f),
-        Vector2(1.0f, 1.0f),
-        Vector2(1.0f, 1.0f),
-        Vector2(0.0f, 1.0f),
-        Vector2(0.0f, 0.0f),
-	};
-
-	const int32 elementCount = _countof(vertices) / 3;
-
-	// attribute 추가
+	// Base VertexStream 추가
 	auto vertexStreamData = std::make_shared<jVertexStreamData>();
-
 	{
-		auto streamParam = std::make_shared<jStreamParam<float>>();
-		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
-		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = jName("POSITION");
-		streamParam->Data.resize(elementCount * 3);
-		memcpy(&streamParam->Data[0], &vertices[0], sizeof(vertices));
+		auto streamParam = std::make_shared<jStreamParam<jBaseVertex>>();
+		streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("POSITION"), EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("NORMAL"), EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("TANGENT"), EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("BITANGENT"), EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("TEXCOORD"), EBufferElementType::FLOAT, sizeof(float) * 2));
+		streamParam->Name = jName("jBaseVertex");
+		streamParam->Stride = sizeof(jBaseVertex);
+		streamParam->Data.swap(vertices);
 		vertexStreamData->Params.push_back(streamParam);
+	
+		vertexStreamData->PrimitiveType = EPrimitiveType::TRIANGLES;
+		vertexStreamData->ElementCount = NumOfVertices;
 	}
-
+	
+	auto indexStreamData = std::make_shared<jIndexStreamData>();
+	indexStreamData->ElementCount = static_cast<int32>(indices.size());
 	{
-		auto streamParam = std::make_shared<jStreamParam<float>>();
+		auto streamParam = new jStreamParam<uint32>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 4));
-		streamParam->Stride = sizeof(float) * 4;
-		streamParam->Name = jName("COLOR");
-		streamParam->Data = std::move(GenerateColor(color, elementCount));
-		vertexStreamData->Params.push_back(streamParam);
+		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::UINT32, sizeof(int32) * 3));
+		streamParam->Stride = sizeof(uint32) * 3;
+		streamParam->Name = jName("Index");
+		streamParam->Data.resize(indices.size());
+		memcpy(&streamParam->Data[0], &indices[0], indices.size() * sizeof(uint32));
+		indexStreamData->Param = streamParam;
 	}
-
-	{
-		auto streamParam = std::make_shared<jStreamParam<float>>();
-		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
-		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = jName("NORMAL");
-		streamParam->Data.resize(elementCount * 3);
-		memcpy(&streamParam->Data[0], normals, sizeof(normals));
-		vertexStreamData->Params.push_back(streamParam);
-	}
-
-	{
-		// Create tangent
-		const int32 TotalNumOfTriangles = elementCount / 3;
-		std::vector<Triangle> TriangleArray;
-		for (int32 i = 0; i < TotalNumOfTriangles; ++i)
-		{
-			TriangleArray.push_back(Triangle{ i * 3, i * 3 + 1, i * 3 + 2 });
-		}
-
-		constexpr int32 veticesElement = sizeof(vertices) / sizeof(float);
-		Vector4 TangentArray[elementCount];
-		CalculateTangents(&TangentArray[0], (int32)TriangleArray.size(), &TriangleArray[0], elementCount
-			, (const Vector*)(vertices), (const Vector*)&normals[0], &texcoords[0]);
-
-		std::vector<Vector> tangents;
-		for (int32 i = 0; i < elementCount; ++i)
-		{
-			tangents.push_back(Vector(TangentArray[i].x, TangentArray[i].y, TangentArray[i].z));
-		}
-
-		auto streamParam = std::make_shared<jStreamParam<float>>();
-		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
-		streamParam->Stride = sizeof(float) * 3;
-		streamParam->Name = jName("TANGENT");
-		streamParam->Data.resize(elementCount * 3);
-		memcpy(&streamParam->Data[0], &tangents[0], tangents.size() * sizeof(float));
-		vertexStreamData->Params.push_back(streamParam);
-	}
-
-	{
-		auto streamParam = std::make_shared<jStreamParam<float>>();
-		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 2));
-		streamParam->Stride = sizeof(float) * 2;
-		streamParam->Name = jName("TEXCOORD");
-		streamParam->Data.resize(elementCount * 2);
-		memcpy(&streamParam->Data[0], texcoords, sizeof(texcoords));
-		vertexStreamData->Params.push_back(streamParam);
-	}
-
-	vertexStreamData->PrimitiveType = EPrimitiveType::TRIANGLES;
-	vertexStreamData->ElementCount = elementCount;
 
 	auto renderObject = new jRenderObject();
-    renderObject->CreateRenderObject(std::make_shared<jRenderObjectGeometryData>(vertexStreamData, nullptr));
+	auto RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>(vertexStreamData, positionOnlyVertexStreamData, indexStreamData);
+	renderObject->CreateRenderObject(RenderObjectGeometryDataPtr);
 	renderObject->SetPos(pos);
 	renderObject->SetScale(scale);
+	renderObject->MaterialPtr = GDefaultMaterial;
 	return renderObject;
 }
 
