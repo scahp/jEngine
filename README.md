@@ -24,7 +24,7 @@ Simple toy engine for implementing graphics feature with multiple api
 <img src="https://github.com/scahp/jEngine/assets/6734453/e080e1f0-38be-4d4b-8690-3ef17dc42a31" width="90%"></img> 
 
 4. RaytracingOneWeekend : https://github.com/scahp/jEngine/tree/Raytracing \
-<img src="https://github.com/scahp/jEngine/assets/6734453/3fc415eb-3504-40f5-a7a2-f806e21b8343" width="90%"></img> 
+<img src="https://github.com/scahp/jEngine/assets/6734453/5e56e051-89bb-43b4-84db-dc9ee18160f2" width="90%"></img> 
 
 
 <br/><br/>
