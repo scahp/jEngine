@@ -15,14 +15,14 @@ struct jOptions
     bool QueueSubmitAfterShadowPass = true;
     bool QueueSubmitAfterBasePass = true;
     Vector CameraPos = Vector::ZeroVector;
-    float AutoExposureKeyValueScale = 0.1f;
+    float AutoExposureKeyValueScale = 1.6f;
     float Metallic = 0.0f;
     float Roughness = 0.2f;
     Vector SunDir = Vector(0.31f, -0.828f, -0.241f);
     float AnisoG = 0.15f;
     bool EarthQuake = false;
     float FocalDistance = 5.0f;
-    float LensRadius = 0.2f;
+    float LensRadius = 0.05f;
 };
 
 extern jOptions gOptions;

@@ -372,50 +372,59 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
         // 반직선 추적
         RayDesc ray;
         ray.Origin = hitPosition;
-        uint selectedIndex = InstanceID() % 5;
-        switch (selectedIndex)
+        bool IsPlane = InstanceID() == 0;       // this is kind of trick for easy implementation. I placed plane instance at 0.
+        if (IsPlane)
         {
-        // Refraction
-        case 0:
-        {
-            //newPayload.color = payload.color * g_localRootSigCB.albedo;
-            newPayload.color = payload.color * float4(1, 1, 1, 1);
-
-            // 5. Refraction corrected
-            float cos_theta = min(dot(-WorldRayDirection(), triangleNormal), 1.0);
-            float sin_theta = sqrt(1.0 - cos_theta * cos_theta);
-
-            float ir = 1.5f;
-            bool IsFrontFace = true;
-            float refraction_ratio = IsFrontFace ? (1.0 / ir) : ir;
-            bool cannot_refract = refraction_ratio * sin_theta > 1.0;
-
-            if (cannot_refract || Schlick(cos_theta, refraction_ratio) > (random_in_unit_sphere().x * 0.5f + 1.0f))
-                ray.Direction = MakeMirrorReflection(triangleNormal);
-            else
-                ray.Direction = MakeRefract(WorldRayDirection(), triangleNormal, refraction_ratio);
+            newPayload.color = payload.color * float4(0.5f, 0.5f, 0.5f, 1.0f);
+            ray.Direction = MakeLambertianReflection(triangleNormal);
         }
-        break;
+        else
+        {
+            uint selectedIndex = (InstanceID() - 1) % 5;
+            switch (selectedIndex)
+            {
+            // Refraction
+            case 0:
+            {
+                //newPayload.color = payload.color * g_localRootSigCB.albedo;
+                newPayload.color = payload.color * float4(1, 1, 1, 1);
 
-        // Mirror Reflection
-        case 1:
-            ray.Direction = MakeMirrorReflection(triangleNormal, 0.0f);
-            newPayload.color = payload.color * float4(1, 1, 1, 1);
+                // 5. Refraction corrected
+                float cos_theta = min(dot(-WorldRayDirection(), triangleNormal), 1.0);
+                float sin_theta = sqrt(1.0 - cos_theta * cos_theta);
+
+                float ir = 1.5f;
+                bool IsFrontFace = true;
+                float refraction_ratio = IsFrontFace ? (1.0 / ir) : ir;
+                bool cannot_refract = refraction_ratio * sin_theta > 1.0;
+
+                if (cannot_refract || Schlick(cos_theta, refraction_ratio) > (random_in_unit_sphere().x * 0.5f + 1.0f))
+                    ray.Direction = MakeMirrorReflection(triangleNormal);
+                else
+                    ray.Direction = MakeRefract(WorldRayDirection(), triangleNormal, refraction_ratio);
+            }
             break;
 
-        // Lambertian Reflection            
-        case 2:
-            newPayload.color = payload.color * float4(0.8f, 0.2f, 0.2f, 1.0f);
-            ray.Direction = MakeLambertianReflection(triangleNormal);
-            break;
-        case 3:
-            newPayload.color = payload.color * float4(0.2f, 0.8f, 0.2f, 1.0f);
-            ray.Direction = MakeLambertianReflection(triangleNormal);
-            break;
-        case 4:
-            newPayload.color = payload.color * float4(0.2f, 0.2f, 0.8f, 1.0f);
-            ray.Direction = MakeLambertianReflection(triangleNormal);
-            break;
+            // Mirror Reflection
+            case 1:
+                ray.Direction = MakeMirrorReflection(triangleNormal, 0.0f);
+                newPayload.color = payload.color * float4(1, 1, 1, 1);
+                break;
+
+            // Lambertian Reflection            
+            case 2:
+                newPayload.color = payload.color * float4(0.8f, 0.2f, 0.2f, 1.0f);
+                ray.Direction = MakeLambertianReflection(triangleNormal);
+                break;
+            case 3:
+                newPayload.color = payload.color * float4(0.2f, 0.8f, 0.2f, 1.0f);
+                ray.Direction = MakeLambertianReflection(triangleNormal);
+                break;
+            case 4:
+                newPayload.color = payload.color * float4(0.2f, 0.2f, 0.8f, 1.0f);
+                ray.Direction = MakeLambertianReflection(triangleNormal);
+                break;
+            }
         }
 
         // TMin을 0이 아닌 작은 값으로 설정하여 앨리어싱 이슈를 피함. - floating point 에러

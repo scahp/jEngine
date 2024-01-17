@@ -174,6 +174,13 @@ void jGame::Setup()
 
 		srand(123);
 
+        // Plane
+        {
+            auto NewPrimitive = jPrimitiveUtil::CreateQuad(Vector(0.0f, -1.0f, 0.0f), Vector(1.0f), Vector(200.0f), Vector4::ColorWhite);
+            jObject::AddObject(NewPrimitive);
+            SpawnedObjects.push_back(NewPrimitive);
+        }
+
 		// Small Sphere
 		const float radius = 0.3f;
         int32 w = 11, h = 11;
@@ -204,13 +211,6 @@ void jGame::Setup()
 			jObject::AddObject(NewPrimitive);
 			SpawnedObjects.push_back(NewPrimitive);
         }
-
-		// Plane
-		{
-			auto NewPrimitive = jPrimitiveUtil::CreateQuad(Vector(0.0f, -1.0f, 0.0f), Vector(1.0f), Vector(200.0f), Vector4::ColorWhite);
-			jObject::AddObject(NewPrimitive);
-			SpawnedObjects.push_back(NewPrimitive);
-		}
 
 		//for (int32 i = 0; i < 2; ++i)
 		//{
