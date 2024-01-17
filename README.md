@@ -23,8 +23,8 @@ Simple toy engine for implementing graphics feature with multiple api
 3. PBR IBL : https://github.com/scahp/jEngine/tree/PBR_IBL \
 <img src="https://github.com/scahp/jEngine/assets/6734453/e080e1f0-38be-4d4b-8690-3ef17dc42a31" width="90%"></img> 
 
-4. RaytracingOneWeekend with DXR, VkRaytracing : https://github.com/scahp/jEngine/tree/Raytracing \
-<img src="https://github.com/scahp/jEngine/assets/6734453/748344b5-c935-4ebc-b79a-9ff2a09f55ff" width="90%"></img> 
+4. RaytracingOneWeekend with DXR, VkRaytracing : https://github.com/scahp/jEngine/tree/RaytracingOneWeekend \
+<img src="https://github.com/scahp/jEngine/assets/6734453/e7b4ef1a-2da5-4d2a-8b9b-cc9a451e1695" width="90%"></img> 
 
 <br/><br/>
 
