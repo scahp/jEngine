@@ -14,14 +14,16 @@
 struct SceneConstantBuffer
 {
     float4x4 projectionToWorld;
-    float4 cameraPosition;
-    float4 lightPosition;
-    float4 lightAmbientColor;
-    float4 lightDiffuseColor;
-    float4 cameraDirection;
-    uint NumOfStartingRay;
+    float3 cameraPosition;
     float focalDistance;
+    float3 lightPosition;
     float lensRadius;
+    float3 lightAmbientColor;
+    uint NumOfStartingRay;
+    float3 lightDiffuseColor;
+    float Padding0;                 // for 16 byte align
+    float3 cameraDirection;
+    float Padding1;                 // for 16 byte align
 };
 
 #define VERTEX_STRID 56
@@ -233,7 +235,7 @@ float4 CalculationDiffuseLighting(float3 hitPosition, float3 normal)
     // Diffuse 기여
     float fNDotL = max(0.0f, dot(pixelToLight, normal));
     //return g_localRootSigCB.albedo * g_sceneCB.lightDiffuseColor * fNDotL;
-    return float4(1, 1, 1, 1) * g_sceneCB.lightDiffuseColor * fNDotL;
+    return float4((float3(1, 1, 1) * g_sceneCB.lightDiffuseColor * fNDotL), 1.0f);
 }
 
 float Schlick(float cosine, float ref_idx)
@@ -310,9 +312,6 @@ void MyRaygenShader()
     }
 
     color /= samples;
-
-    // Linear to sRGB
-    color = float4(sqrt(color.xyz), 1.0f);
 
     // 출력 텍스쳐에 반직선 추적된 색상을 기록함
     RenderTarget[DispatchRaysIndex().xy] = color;
