@@ -63,10 +63,8 @@ void jGame::Setup()
 
 #if USE_SPONZA
 	// Create main camera
-    //const Vector mainCameraPos(-559.937622f, 116.339653f, 84.3709946f);
-    //const Vector mainCameraTarget(-260.303925f, 105.498116f, 94.4834976f);
-	Vector mainCameraPos{ 9.0f, 1.0f, 5.0f };
-	const Vector mainCameraTarget{ 0.0f, 0.0f, 0.0f };
+    const Vector mainCameraPos(-559.937622f, 116.339653f, 84.3709946f);
+    const Vector mainCameraTarget(-260.303925f, 105.498116f, 94.4834976f);
     MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 10.0f, 5000.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT, true);
     jCamera::AddCamera(0, MainCamera);
 
@@ -156,75 +154,68 @@ void jGame::Setup()
 	//ResourceLoadCompleteEvent = std::async(std::launch::async, [&]()
 	//{
 #if USE_SPONZA
-		//#if USE_SPONZA_PBR		
-		//Sponza = jModelLoader::GetInstance().LoadFromFile("Resource/sponza_pbr/sponza.glb", "Resource/sponza_pbr");
-		//#else
-		//Sponza = jModelLoader::GetInstance().LoadFromFile("Resource/sponza/sponza.dae", "Resource/");
-		//#endif
-		//jObject::AddObject(Sponza);
-		//SpawnedObjects.push_back(Sponza);
+		#if USE_SPONZA_PBR		
+		Sponza = jModelLoader::GetInstance().LoadFromFile("Resource/sponza_pbr/sponza.glb", "Resource/sponza_pbr");
+		#else
+		Sponza = jModelLoader::GetInstance().LoadFromFile("Resource/sponza/sponza.dae", "Resource/");
+		#endif
+		jObject::AddObject(Sponza);
+		SpawnedObjects.push_back(Sponza);
 
-		auto random_double = []() -> float
-		{
-			// Returns a random real in [0,1).
-			return rand() / (RAND_MAX + 1.0f);
-		};
-
-		int32 cnt = 0;
-
-		srand(123);
-
-        // Plane
+        for (int32 i = 0; i < 1; ++i)
         {
-            auto NewPrimitive = jPrimitiveUtil::CreateQuad(Vector(0.0f, -1.0f, 0.0f), Vector(1.0f), Vector(200.0f), Vector4::ColorWhite);
-            jObject::AddObject(NewPrimitive);
-            SpawnedObjects.push_back(NewPrimitive);
+            Sphere = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f + i * 100), 1.0, 60, 30, Vector(30.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+            jObject::AddObject(Sphere);
+            SpawnedObjects.push_back(Sphere);
         }
 
-		// Small Sphere
-		const float radius = 0.3f;
-        int32 w = 11, h = 11;
-        int32 totalCount = (w * 2 * h * 2) + 3 + 1;     // small balls, big balls, plane
-		for (int32 i = -w; i < w; ++i)
-		{
-			for (int32 j = -h; j < h; ++j, ++cnt)
-			{
-				float r = radius;
-				auto t = Vector(
-					(float)(i * radius * 5.0f) + (radius * 4.0f * random_double())
-					, -0.7f
-					, (float)(j * radius * 5.0f) + (radius * 4.0f * random_double()));
-
-				auto NewPrimitive = jPrimitiveUtil::CreateSphere(t, 1.0, 38, 16, Vector(r), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
-                jObject::AddObject(NewPrimitive);
-                SpawnedObjects.push_back(NewPrimitive);
-			}
-		}
-
-		// Big Sphere
-        for (int32 i = 0; i < 3; ++i)
-        {
-            auto s = XMMatrixScaling(1.0f, 1.0f, 1.0f);
-            auto t = Vector(0.0f + i * 2, 0.0f, 0.0f + i * 2);
-            
-			auto NewPrimitive = jPrimitiveUtil::CreateSphere(t, 1.0, 38, 16, Vector(1.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
-			jObject::AddObject(NewPrimitive);
-			SpawnedObjects.push_back(NewPrimitive);
-        }
-
-		//for (int32 i = 0; i < 2; ++i)
+		//auto random_double = []() -> float
 		//{
-		//	Sphere = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f + i * 100), 1.0, 60, 30, Vector(30.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
-		//	//Sphere = jPrimitiveUtil::CreateCube(Vector(65.0f, 35.0f, 10.0f), Vector::OneVector, Vector(150), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
-		//	//Sphere->RenderObjects[0]->SetRot(Sphere->RenderObjects[0]->GetRot() + Vector(0.0f, 0.0f, DegreeToRadian(90.0f)));
-		//	Sphere->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
-		//		{
-		//			//float RotationSpeed = 100.0f;
-		//			//thisObject->RenderObjects[0]->SetRot(thisObject->RenderObjects[0]->GetRot() + Vector(0.0f, 0.0f, DegreeToRadian(180.0f)) * RotationSpeed * deltaTime);
-		//		};
-		//	jObject::AddObject(Sphere);
-		//	SpawnedObjects.push_back(Sphere);
+		//	// Returns a random real in [0,1).
+		//	return rand() / (RAND_MAX + 1.0f);
+		//};
+
+		//int32 cnt = 0;
+
+		//srand(123);
+
+  //      // Plane
+  //      {
+  //          auto NewPrimitive = jPrimitiveUtil::CreateQuad(Vector(0.0f, -1.0f, 0.0f), Vector(1.0f), Vector(200.0f), Vector4::ColorWhite);
+  //          jObject::AddObject(NewPrimitive);
+  //          SpawnedObjects.push_back(NewPrimitive);
+  //      }
+
+		//// Small Sphere
+		//const float radius = 0.3f;
+  //      int32 w = 11, h = 11;
+  //      int32 totalCount = (w * 2 * h * 2) + 3 + 1;     // small balls, big balls, plane
+		//for (int32 i = -w; i < w; ++i)
+		//{
+		//	for (int32 j = -h; j < h; ++j, ++cnt)
+		//	{
+		//		float r = radius;
+		//		auto t = Vector(
+		//			(float)(i * radius * 5.0f) + (radius * 4.0f * random_double())
+		//			, -0.7f
+		//			, (float)(j * radius * 5.0f) + (radius * 4.0f * random_double()));
+
+		//		auto NewPrimitive = jPrimitiveUtil::CreateSphere(t, 1.0, 38, 16, Vector(r), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+  //              jObject::AddObject(NewPrimitive);
+  //              SpawnedObjects.push_back(NewPrimitive);
+		//	}
 		//}
+
+		//// Big Sphere
+  //      for (int32 i = 0; i < 3; ++i)
+  //      {
+  //          auto s = XMMatrixScaling(1.0f, 1.0f, 1.0f);
+  //          auto t = Vector(0.0f + i * 2, 0.0f, 0.0f + i * 2);
+  //          
+		//	auto NewPrimitive = jPrimitiveUtil::CreateSphere(t, 1.0, 38, 16, Vector(1.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+		//	jObject::AddObject(NewPrimitive);
+		//	SpawnedObjects.push_back(NewPrimitive);
+  //      }
 
         //auto sphere2 = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f + 130.0f), 1.0, 150, Vector(30.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
         //jObject::AddObject(sphere2);
