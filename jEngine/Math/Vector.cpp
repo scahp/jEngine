@@ -34,6 +34,16 @@ void Vector::operator=(struct Vector4 const& vector)
 	z = vector.y;
 }
 
+Vector::Vector(Vector4 const& vector) : x(vector.x), y(vector.y), z(vector.z)
+{
+
+}
+
+Vector::Vector(Vector2 const& vector, float fZ) : x(vector.x), y(vector.y), z(fZ)
+{
+
+}
+
 //////////////////////////////////////////////////////////////////////////
 
 // Vector4
