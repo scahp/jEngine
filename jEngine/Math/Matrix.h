@@ -71,20 +71,20 @@ struct Matrix
 
 	FORCEINLINE float GetDeterminant() const
 	{
-		// Upper 2 rows's 2x2 Det
-		float const A = m11 * m00 - m01 * m10;
-		float const B = m12 * m00 - m01 * m20;
-		float const C = m13 * m00 - m01 * m30;
-		float const D = m12 * m10 - m11 * m20;
-		float const E = m13 * m10 - m11 * m30;
-		float const F = m13 * m20 - m21 * m30;
-		// Lower 2 row's 2x2 Det
-		float const G = m13 * m02 - m03 * m12;
-		float const H = m23 * m02 - m03 * m22;
-		float const I = m33 * m02 - m03 * m32;
-		float const J = m23 * m12 - m13 * m22;
-		float const K = m33 * m12 - m13 * m32;
-		float const L = m33 * m22 - m23 * m32;
+        // Upper 2 rows's 2x2 Det
+        float const A = m11 * m00 - m10 * m01;
+        float const B = m12 * m00 - m10 * m02;
+        float const C = m13 * m00 - m10 * m03;
+        float const D = m12 * m01 - m11 * m02;
+        float const E = m13 * m01 - m11 * m03;
+        float const F = m13 * m02 - m12 * m03;
+        // Lower 2 row's 2x2 Det
+        float const G = m31 * m20 - m30 * m21;
+        float const H = m32 * m20 - m30 * m22;
+        float const I = m33 * m20 - m30 * m23;
+        float const J = m32 * m21 - m31 * m22;
+        float const K = m33 * m21 - m31 * m23;
+        float const L = m33 * m22 - m32 * m23;
 
         // 행렬식 계산량 최적화
         // Det calculate optimize
@@ -101,20 +101,20 @@ struct Matrix
 
 	FORCEINLINE Matrix GetInverse() const
 	{
-		// Upper 2 rows's 2x2 Det
-		float const A = m11 * m00 - m01 * m10;
-		float const B = m21 * m00 - m01 * m20;
-		float const C = m31 * m00 - m01 * m30;
-		float const D = m21 * m10 - m11 * m20;
-		float const E = m31 * m10 - m11 * m30;
-		float const F = m31 * m20 - m21 * m30;
-		// Lower 2 row's 2x2 Det
-		float const G = m13 * m02 - m03 * m12;
-		float const H = m23 * m02 - m03 * m22;
-		float const I = m33 * m02 - m03 * m32;
-		float const J = m23 * m12 - m13 * m22;
-		float const K = m33 * m12 - m13 * m32;
-		float const L = m33 * m22 - m23 * m32;
+        // Upper 2 rows's 2x2 Det
+        float const A = m11 * m00 - m10 * m01;
+        float const B = m12 * m00 - m10 * m02;
+        float const C = m13 * m00 - m10 * m03;
+        float const D = m12 * m01 - m11 * m02;
+        float const E = m13 * m01 - m11 * m03;
+        float const F = m13 * m02 - m12 * m03;
+        // Lower 2 row's 2x2 Det
+        float const G = m31 * m20 - m30 * m21;
+        float const H = m32 * m20 - m30 * m22;
+        float const I = m33 * m20 - m30 * m23;
+        float const J = m32 * m21 - m31 * m22;
+        float const K = m33 * m21 - m31 * m23;
+        float const L = m33 * m22 - m32 * m23;
 
 		// 행렬식 계산량 최적화
 		// Det calculate optimize
