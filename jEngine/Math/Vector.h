@@ -29,8 +29,8 @@ struct Vector
 	FORCEINLINE constexpr Vector(zero_type /*ZeroType*/) { x = 0.0f; y = 0.0f; z = 0.0f; }
 	FORCEINLINE constexpr explicit Vector(float fValue) : x(fValue), y(fValue), z(fValue) { }
 	FORCEINLINE constexpr Vector(float fX, float fY, float fZ) : x(fX), y(fY), z(fZ) { }
-	FORCEINLINE Vector(Vector4 const& vector);
-	FORCEINLINE Vector(Vector2 const& vector, float fZ);
+	Vector(Vector4 const& vector);
+	Vector(Vector2 const& vector, float fZ);
 
 	FORCEINLINE Vector operator*(float fValue) const
 	{
@@ -142,8 +142,8 @@ struct Vector
 		return !(*this == vector);
 	}
 
-	FORCEINLINE void operator=(struct Vector2 const& vector);
-	FORCEINLINE void operator=(struct Vector4 const& vector);
+	void operator=(struct Vector2 const& vector);
+	void operator=(struct Vector4 const& vector);
 
 	FORCEINLINE float DotProduct(Vector const& vector) const
 	{
@@ -251,7 +251,7 @@ struct Vector4
 	FORCEINLINE constexpr Vector4(zero_type /*ZeroType*/) { x = 0.0f; y = 0.0f; z = 0.0f; w = 0.0f; }
 	FORCEINLINE constexpr explicit Vector4(float fValue) : x(fValue), y(fValue), z(fValue), w(fValue) { }
 	FORCEINLINE constexpr Vector4(float fX, float fY, float fZ, float fW) : x(fX), y(fY), z(fZ), w(fW) { }
-	FORCEINLINE Vector4(const Vector& InVector);
+	Vector4(const Vector& InVector);
 	Vector4(const Vector2& InA, const Vector2& InB);
 	FORCEINLINE Vector4(Vector vector, float fW) : x(vector.x), y(vector.y), z(vector.z), w(fW) { }
 
@@ -364,8 +364,8 @@ struct Vector4
 		return !(*this == Vector4);
 	}
 
-	FORCEINLINE void operator=(struct Vector2 const& vector);
-	FORCEINLINE void operator=(struct Vector const& vector);
+	void operator=(struct Vector2 const& vector);
+	void operator=(struct Vector const& vector);
 
 	FORCEINLINE float Length() const
 	{
@@ -528,8 +528,8 @@ struct Vector2
 		return !(*this == vector);
 	}
 
-	FORCEINLINE void operator=(struct Vector const& vector);
-	FORCEINLINE void operator=(struct Vector4 const& vector);
+	void operator=(struct Vector const& vector);
+	void operator=(struct Vector4 const& vector);
 
 	FORCEINLINE float DotProduct(Vector2 const& vector) const
 	{
@@ -612,17 +612,6 @@ struct Vector2
 		float v[2];
 	};
 };
-
-Vector::Vector(Vector4 const& vector)
-	: x(vector.x), y(vector.y), z(vector.z)
-{
-
-}
-
-Vector::Vector(Vector2 const& vector, float fZ)
-	: x(vector.x), y(vector.y), z(fZ)
-{
-}
 
 template <typename T>
 FORCEINLINE Vector operator/(T value, Vector const& vector)
