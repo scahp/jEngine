@@ -31,8 +31,8 @@ jGame::~jGame()
 
 void jGame::ProcessInput(float deltaTime)
 {
-	//static float MoveDistancePerSecond = 200.0f;
-	static float MoveDistancePerSecond = 10.0f;
+	static float MoveDistancePerSecond = 200.0f;
+	//static float MoveDistancePerSecond = 10.0f;
 	const float CurrentDistance = MoveDistancePerSecond * deltaTime;
 
 	// Process Key Event

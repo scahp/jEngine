@@ -9,19 +9,21 @@
 #define USE_BINDLESS_RESOURCE 0
 #endif
 
-#define MAX_RECURSION_DEPTH 10
-
 struct SceneConstantBuffer
 {
     float4x4 projectionToWorld;
-    float4 cameraPosition;
-    float4 lightPosition;
-    float4 lightAmbientColor;
-    float4 lightDiffuseColor;
-    float4 cameraDirection;
-    uint NumOfStartingRay;
+    float3 cameraPosition;
     float focalDistance;
+    float3 lightPosition;
     float lensRadius;
+    float3 lightAmbientColor;
+    uint NumOfStartingRay;
+    float3 lightDiffuseColor;
+    float Padding0;                 // for 16 byte align
+    float3 cameraDirection;
+    float Padding1;                 // for 16 byte align
+    float3 lightDirection;
+    float Padding2;                 // for 16 byte align
 };
 
 #define VERTEX_STRID 56
@@ -375,9 +377,6 @@ void MyRaygenShader()
 [shader("anyhit")]
 void MyAnyHitShader(inout RayPayload payload, in MyAttributes attr)
 {
-//payload.color *= float4(0, 1, 0, 0);
-//return;
-
     float3 hitPosition = HitWorldPosition();
     uint InstanceIdx = InstanceIndex();
 
@@ -468,9 +467,6 @@ void MyAnyHitShader(inout RayPayload payload, in MyAttributes attr)
 [shader("closesthit")]
 void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 {
-//payload.color = float4(1, 0, 0, 0);
-//return;
-
     float3 hitPosition = HitWorldPosition();
     uint InstanceIdx = InstanceIndex();
 
@@ -580,7 +576,7 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
     float roughness = RMTexture.SampleGrad(AlbedoTextureSampler, uv, ddx, ddy).y;
     float metallic = RMTexture.SampleGrad(AlbedoTextureSampler, uv, ddx, ddy).z;
 
-    float3 L = -g_sceneCB.lightDireciton;
+    float3 L = -g_sceneCB.lightDirection;
     float3 N = WorldNormal;
     float3 V = -WorldRayDirection();
     const float DistanceToLight = 1.0f;     // Directional light from the Sun is not having attenuation by using distance
@@ -604,13 +600,13 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
         payload.color.xyz += (DiffusePart + SpecularPart);
     }
 
-    bool TraceRayForShadow = false;
+    bool TraceRayForShadow = true;
     if (TraceRayForShadow)
     {
         // Find the world - space hit position
         float3 worldOrigin = WorldRayOrigin() + RayTCurrent() * WorldRayDirection();
 
-        float3 lightDir = -g_sceneCB.lightDireciton.xyz;
+        float3 lightDir = -g_sceneCB.lightDirection.xyz;
 
         // Fire a shadow ray. The direction is hard-coded here, but can be fetched
         // from a constant-buffer
@@ -671,8 +667,6 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 [shader("miss")]
 void MyMissShader(inout RayPayload payload)
 {
-//payload.color = float4(0, 0, 1, 0);
-//return;
      // Make a 't' value that is the factor scaled by using ray hit on background of Y axis.
     float2 xy = HitWorldPosition().xy;
     float2 screenPos = xy / DispatchRaysDimensions().xy * 2.0f - 1.0f;;

@@ -628,12 +628,12 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     </None>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Resource\Shaders\hlsl\RaytracingCubeAndPlane.hlsl">
+    <None Include="Resource\Shaders\hlsl\RaytracingOneWeekend.hlsl">
       <FileType>Document</FileType>
     </None>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Resource\Shaders\hlsl\RaytracingOneWeekend.hlsl">
+    <None Include="Resource\Shaders\hlsl\RaytracingPBR.hlsl">
       <FileType>Document</FileType>
     </None>
   </ItemGroup>
