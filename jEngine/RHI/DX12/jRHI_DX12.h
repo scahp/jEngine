@@ -17,6 +17,7 @@
 #include "Renderer/jDrawCommand.h"
 #include "jSwapchain_DX12.h"
 #include "jQueryPoolTime_DX12.h"
+#include "jRenderPass_DX12.h"
 
 class jSwapchain_DX12;
 struct jBuffer_DX12;
@@ -25,7 +26,6 @@ struct jBuffer_DX12;
 struct jRingBuffer_DX12;
 struct jVertexBuffer_DX12;
 struct jIndexBuffer_DX12;
-class jRenderPass_DX12;
 struct jPipelineStateInfo_DX12;
 
 using Microsoft::WRL::ComPtr;

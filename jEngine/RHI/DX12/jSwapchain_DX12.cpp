@@ -147,6 +147,7 @@ bool jSwapchain_DX12::Resize(int32 InWidth, int32 InHeight)
 
     g_rhi_dx12->RenderPassPool.Release();
     g_rhi_dx12->PipelineStatePool.Release();
+    return true;
 }
 
 void jSwapchain_DX12::ReleaseInternal()
