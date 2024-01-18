@@ -124,7 +124,7 @@ struct jPlacedResourcePool
 		return InIsUploadPlacedResource ? PendingUploadPlacedResources[Index] : PendingPlacedResources[Index];
 	}
 
-    // ÀûÀýÇÑ PoolSize ¼±ÅÃ ÇÔ¼ö
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ PoolSize ï¿½ï¿½ï¿½ï¿½ ï¿½Ô¼ï¿½
     EPoolSizeType GetPoolSizeType(uint64 InSize) const
     {
         for (int32 i = 0; i < (int32)EPoolSizeType::MAX; ++i)
