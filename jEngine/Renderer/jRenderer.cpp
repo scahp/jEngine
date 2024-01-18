@@ -1498,63 +1498,28 @@ void jRenderer::Render()
 
                 struct SceneConstantBuffer
                 {
-                    XMMATRIX projectionToWorld;
-                    XMVECTOR cameraPosition;
-                    XMVECTOR lightPosition;
-                    XMVECTOR lightAmbientColor;
-                    XMVECTOR lightDiffuseColor;
-                    XMVECTOR cameraDirection;
-                    uint32 NumOfStartingRay;
+                    Matrix projectionToWorld;
+                    Vector cameraPosition;
                     float focalDistance;
+                    Vector lightPosition;
                     float lensRadius;
+                    Vector lightAmbientColor;
+                    uint32 NumOfStartingRay;
+                    Vector lightDiffuseColor;
+                    float Padding0;                 // for 16 byte align
+                    Vector cameraDirection;
+                    float Padding1;                 // for 16 byte align
                 };
 
                 SceneConstantBuffer m_sceneCB;
 
-                auto GetScreenAspect = []()
-                    {
-                        return static_cast<float>(SCR_WIDTH) / static_cast<float>(SCR_HEIGHT);
-                    };
-
                 auto mainCamera = jCamera::GetMainCamera();
-
-                auto v = jCameraUtil::CreateViewMatrix({ 0, 0, -1000 }, { 300, 0, 0 }, { 0, 1, 0 });
-                auto p = jCameraUtil::CreatePerspectiveMatrix((float)SCR_WIDTH, (float)SCR_HEIGHT, XMConvertToRadians(45), 1.0f, 1250.0f);
-
-                XMVECTOR m_eye = { mainCamera->Pos.x, mainCamera->Pos.y, mainCamera->Pos.z, 1.0f };
-                XMVECTOR m_at = { mainCamera->Target.x, mainCamera->Target.y, mainCamera->Target.z, 1.0f };
-                XMVECTOR m_up = { 0.0f, 1.0f, 0.0f };
-
-                m_sceneCB.cameraPosition = m_eye;
-                const float fovAngleY = 45.0f;
-                const float m_aspectRatio = GetScreenAspect();
-                const XMMATRIX view = XMMatrixLookAtLH(m_eye, m_at, m_up);
-                const XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(fovAngleY), m_aspectRatio, 1.0f, 1250.0f);
-                const XMMATRIX viewProj = view * proj;
-                m_sceneCB.projectionToWorld = XMMatrixTranspose(XMMatrixInverse(nullptr, viewProj));
-
-                jDirectionalLight* DirectionalLight = nullptr;
-                for (auto light : jLight::GetLights())
-                {
-                    if (light->Type == ELightType::DIRECTIONAL)
-                    {
-                        DirectionalLight = (jDirectionalLight*)light;
-                        break;
-                    }
-                }
-                //check(DirectionalLight);
-                //m_sceneCB.lightDireciton = { DirectionalLight->GetLightData().Direction.x, DirectionalLight->GetLightData().Direction.y, DirectionalLight->GetLightData().Direction.z };
-
-                auto lightPosition = XMFLOAT4(0.0f, 1.8f, -3.0f, 0.0f);
-                m_sceneCB.lightPosition = XMLoadFloat4(&lightPosition);
-
-                auto lightAmbientColor = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
-                m_sceneCB.lightAmbientColor = XMLoadFloat4(&lightAmbientColor);
-
-                auto lightDiffuseColor = XMFLOAT4(0.5f, 0.3f, 0.3f, 1.0f);
-                m_sceneCB.lightDiffuseColor = XMLoadFloat4(&lightDiffuseColor);
-                
-                m_sceneCB.cameraDirection = XMVector3Normalize(m_at - m_eye);
+                m_sceneCB.cameraPosition = mainCamera->Pos;
+                m_sceneCB.projectionToWorld = mainCamera->GetViewProjectionMatrix().GetInverse();
+                m_sceneCB.lightPosition = Vector(0.0f, 1.8f, -3.0f);
+                m_sceneCB.lightAmbientColor = Vector(0.5f, 0.5f, 0.5f);
+                m_sceneCB.lightDiffuseColor = Vector(0.5f, 0.3f, 0.3f);
+                m_sceneCB.cameraDirection = (mainCamera->Target - mainCamera->Pos).GetNormalize();
                 m_sceneCB.focalDistance = gOptions.FocalDistance;
                 m_sceneCB.lensRadius = gOptions.LensRadius;
                 m_sceneCB.NumOfStartingRay = 20;
