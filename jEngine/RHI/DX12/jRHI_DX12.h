@@ -424,7 +424,8 @@ public:
 
 	jMutexLock MultiFrameShaderBindingInstanceLock;
 	jDeallocatorMultiFrameShaderBindingInstance DeallocatorMultiFrameShaderBindingInstance;
-	jDeallocatorMultiFrameCreatedResource DeallocatorMultiFrameCreatedResource;
+	jDeallocatorMultiFrameCreatedResource DeallocatorMultiFramePlacedResource;
+	jDeallocatorMultiFrameCreatedResource DeallocatorMultiFrameStandaloneResource;
 
 	virtual jRaytracingScene* CreateRaytracingScene() const;
 };

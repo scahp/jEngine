@@ -399,6 +399,10 @@ bool jRHI_DX12::InitRHI()
 	}
 
     PlacedResourcePool.Init();
+    DeallocatorMultiFrameStandaloneResource.FreeDelegate = [](ComPtr<ID3D12Resource> InData)
+    {
+        InData.Reset();
+    };
 
     //////////////////////////////////////////////////////////////////////////
     // PlacedResouce test
@@ -1386,14 +1390,14 @@ void jPlacedResourcePool::Init()
     check(g_rhi_dx12->PlacedResourceSizeThreshold <= MemorySize[(int32)EPoolSizeType::MAX - 1]);
 
     check(g_rhi_dx12);
-    g_rhi_dx12->DeallocatorMultiFrameCreatedResource.FreeDelegate
+    g_rhi_dx12->DeallocatorMultiFramePlacedResource.FreeDelegate
         = std::bind(&jPlacedResourcePool::FreedFromPendingDelegateForCreatedResource, this, std::placeholders::_1);
 }
 
 void jPlacedResourcePool::Release()
 {
     check(g_rhi_dx12);
-    g_rhi_dx12->DeallocatorMultiFrameCreatedResource.FreeDelegate = nullptr;
+    g_rhi_dx12->DeallocatorMultiFramePlacedResource.FreeDelegate = nullptr;
 }
 
 void jPlacedResourcePool::Free(const ComPtr<ID3D12Resource>& InData)

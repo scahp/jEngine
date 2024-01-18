@@ -19,7 +19,7 @@ public:
 
 	void Create(const std::shared_ptr<jVertexStreamData>& InVertexStream, const std::shared_ptr<jIndexStreamData>& InIndexStream, bool InHasVertexColor = true, bool InHasVertexBiTangent = false);
     void CreateNew_ForRaytracing(const std::shared_ptr<jVertexStreamData>& InVertexStream, const std::shared_ptr<jVertexStreamData>& InVertexStream_PositionOnly
-        , const std::shared_ptr<jIndexStreamData>& InIndexStream, bool InHasVertexColor = true, bool InHasVertexBiTangent = false);
+        , const std::shared_ptr<jIndexStreamData>& InIndexStream, bool InHasVertexColor = false, bool InHasVertexBiTangent = true);
 
     // Vertex buffers
     void UpdateVertexStream(const std::shared_ptr<jVertexStreamData>& vertexStream);

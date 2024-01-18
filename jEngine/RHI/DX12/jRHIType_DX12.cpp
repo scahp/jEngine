@@ -7,12 +7,13 @@ void jCreatedResource::Free()
     {
         if (ResourceType == jCreatedResource::EType::Standalone)
         {
-            Resource.Reset();
+            if (g_rhi_dx12)
+                g_rhi_dx12->DeallocatorMultiFrameStandaloneResource.Free(Resource);
         }
         else if (ResourceType == jCreatedResource::EType::ResourcePool)
         {
             if (g_rhi_dx12)
-                g_rhi_dx12->DeallocatorMultiFrameCreatedResource.Free(Resource);
+                g_rhi_dx12->DeallocatorMultiFramePlacedResource.Free(Resource);
         }
         else if (ResourceType == jCreatedResource::EType::Swapchain)
         {

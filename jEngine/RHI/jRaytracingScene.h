@@ -16,6 +16,7 @@ public:
     virtual void CreateOrUpdateBLAS(const jRatracingInitializer& InInitializer) = 0;
     virtual void CreateOrUpdateTLAS(const jRatracingInitializer& InInitializer) = 0;
     virtual bool IsValid() const { return TLASBuffer != nullptr; }
+    virtual bool ShouldUpdate() const { return false; }
 
     std::vector<jRenderObject*> InstanceList;
     jBuffer* TLASBuffer = nullptr;
