@@ -28,38 +28,29 @@ void jRaytracingScene_Vulkan::CreateOrUpdateBLAS(const jRatracingInitializer& In
         check(RObj->IsSupportRaytracing());
 
         // Remove Old BLAS
-        {
-            delete RObj->BottomLevelASBuffer;
-            RObj->BottomLevelASBuffer = nullptr;
-        }
+        RObj->BottomLevelASBuffer.reset();
 
-        auto VertexBufferVulkan = (jVertexBuffer_Vulkan*)RObj->GeometryDataPtr->VertexBuffer_PositionOnly;
-        VkBuffer VtxBufferVulkan = VertexBufferVulkan->BindInfos.Buffers[0];
+        auto VertexBufferVulkanPtr = (jVertexBuffer_Vulkan*)RObj->GeometryDataPtr->VertexBuffer_PositionOnlyPtr.get();
+        VkBuffer VtxBufferVulkan = VertexBufferVulkanPtr->BindInfos.Buffers[0];
 
         // Create VertexAndIndexOffsetBuffer
         VkDeviceOrHostAddressConstKHR vertexBufferDeviceAddress{};
-        vertexBufferDeviceAddress.deviceAddress = getBufferDeviceAddress(VtxBufferVulkan) + VertexBufferVulkan->BindInfos.Offsets[0];
+        vertexBufferDeviceAddress.deviceAddress = getBufferDeviceAddress(VtxBufferVulkan) + VertexBufferVulkanPtr->BindInfos.Offsets[0];
 
         uint64 VertexStart = vertexBufferDeviceAddress.deviceAddress;
-        int32 VertexCount = VertexBufferVulkan->GetElementCount();
+        int32 VertexCount = VertexBufferVulkanPtr->GetElementCount();
         auto ROE = dynamic_cast<jRenderObjectElement*>(RObj);
         Vector2i VertexIndexOffset{};
         if (ROE)
         {
-            VertexStart += VertexBufferVulkan->Streams[0].Stride * ROE->SubMesh.StartVertex;
+            VertexStart += VertexBufferVulkanPtr->Streams[0].Stride * ROE->SubMesh.StartVertex;
             VertexCount = ROE->SubMesh.EndVertex - ROE->SubMesh.StartVertex + 1;
 
             VertexIndexOffset = Vector2i(ROE->SubMesh.StartVertex, ROE->SubMesh.StartFace);
         }
 
-        if (RObj->VertexAndIndexOffsetBuffer)
-            delete RObj->VertexAndIndexOffsetBuffer;
-        RObj->VertexAndIndexOffsetBuffer = new jBuffer_Vulkan();
-        jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::TRANSFER_DST | EVulkanBufferBits::VERTEX_BUFFER
-            | EVulkanBufferBits::SHADER_DEVICE_ADDRESS | EVulkanBufferBits::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY
-            | EVulkanBufferBits::STORAGE_BUFFER
-            , EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT, sizeof(Vector2i), *(jBuffer_Vulkan*)RObj->VertexAndIndexOffsetBuffer);
-        RObj->VertexAndIndexOffsetBuffer->UpdateBuffer(&VertexIndexOffset, sizeof(VertexIndexOffset));
+        RObj->VertexAndIndexOffsetBuffer = g_rhi->CreateStructuredBuffer(sizeof(Vector2i), 0, sizeof(Vector2i), EBufferCreateFlag::UAV | EBufferCreateFlag::CPUAccess
+            , EImageLayout::GENERAL, &VertexIndexOffset, sizeof(Vector2i), TEXT("VertexAndIndexOffsetBuffer"));
 
         // Set GeometryDesc
         VkAccelerationStructureGeometryKHR geometry{};
@@ -68,23 +59,20 @@ void jRaytracingScene_Vulkan::CreateOrUpdateBLAS(const jRatracingInitializer& In
         //geometry.flags = 0;
         geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
         geometry.geometry.triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
-        geometry.geometry.triangles.vertexFormat = VertexBufferVulkan->BindInfos.AttributeDescriptions[0].format;
+        geometry.geometry.triangles.vertexFormat = VertexBufferVulkanPtr->BindInfos.AttributeDescriptions[0].format;
 
         uint64 IndexStart = 0;
         uint32 PrimitiveCount = 0;
-        auto IndexBuffer = RObj->GeometryDataPtr->IndexBuffer;
-        if (IndexBuffer)
+        auto IndexBufferVulkan = (jIndexBuffer_Vulkan*)RObj->GeometryDataPtr->IndexBufferPtr.get();
+        if (IndexBufferVulkan)
         {
-            auto IndexBufferVulkan = (jIndexBuffer_Vulkan*)IndexBuffer;
-            IndexBufferVulkan->BufferPtr->Buffer;
-
             VkDeviceOrHostAddressConstKHR indexBufferDeviceAddress{};
-            indexBufferDeviceAddress.deviceAddress = getBufferDeviceAddress(IndexBufferVulkan->BufferPtr->Buffer) + IndexBufferVulkan->BufferPtr->Offset;
+            indexBufferDeviceAddress.deviceAddress = getBufferDeviceAddress(IndexBufferVulkan->GetBuffer()->Buffer) + IndexBufferVulkan->GetBuffer()->Offset;
 
             auto& indexStreamData = IndexBufferVulkan->IndexStreamData;
 
             IndexStart = indexBufferDeviceAddress.deviceAddress;
-            int32 IndexCount = IndexBuffer->GetElementCount();
+            int32 IndexCount = IndexBufferVulkan->GetElementCount();
             if (ROE)
             {
                 IndexStart += indexStreamData->Param->GetElementSize() * ROE->SubMesh.StartFace;
@@ -103,7 +91,7 @@ void jRaytracingScene_Vulkan::CreateOrUpdateBLAS(const jRatracingInitializer& In
 
         geometry.geometry.triangles.vertexData = VkDeviceOrHostAddressConstKHR(VertexStart);
         geometry.geometry.triangles.maxVertex = VertexCount;
-        geometry.geometry.triangles.vertexStride = VertexBufferVulkan->Streams[0].Stride;
+        geometry.geometry.triangles.vertexStride = VertexBufferVulkanPtr->Streams[0].Stride;
         geometry.geometry.triangles.transformData.deviceAddress = 0;
 
         std::vector<VkAccelerationStructureGeometryKHR> geometries{ geometry };
@@ -127,14 +115,11 @@ void jRaytracingScene_Vulkan::CreateOrUpdateBLAS(const jRatracingInitializer& In
             maxPrimitiveCounts.data(),
             &accelerationStructureBuildSizesInfo);
 
-        if (RObj->BottomLevelASBuffer)
-            delete RObj->BottomLevelASBuffer;
-
-        RObj->BottomLevelASBuffer = new jBuffer_Vulkan();
-        jBuffer_Vulkan* BLAS_Vulkan = (jBuffer_Vulkan*)RObj->BottomLevelASBuffer;
+        jBuffer_Vulkan* BLAS_Vulkan = nullptr;
         {
-            jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::ACCELERATION_STRUCTURE_STORAGE | EVulkanBufferBits::SHADER_DEVICE_ADDRESS,
-                EVulkanMemoryBits::DEVICE_LOCAL, accelerationStructureBuildSizesInfo.accelerationStructureSize, *BLAS_Vulkan);
+            RObj->BottomLevelASBuffer = g_rhi->CreateRawBuffer<jBuffer_Vulkan>(accelerationStructureBuildSizesInfo.accelerationStructureSize
+                , 0, EBufferCreateFlag::AccelerationStructure, EImageLayout::UAV);
+            BLAS_Vulkan = RObj->GetBottomLevelASBuffer<jBuffer_Vulkan>();
 
             VkAccelerationStructureCreateInfoKHR accelerationStructureCreate_info{};
             accelerationStructureCreate_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
@@ -145,10 +130,11 @@ void jRaytracingScene_Vulkan::CreateOrUpdateBLAS(const jRatracingInitializer& In
             g_rhi_vk->vkCreateAccelerationStructureKHR(g_rhi_vk->Device, &accelerationStructureCreate_info, nullptr, &BLAS_Vulkan->AccelerationStructure);
         }
 
-        auto BLASScratch_Vulkan = new jBuffer_Vulkan();
+        jBuffer_Vulkan* BLASScratch_Vulkan = nullptr;
         {
-            jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::SHADER_DEVICE_ADDRESS | EVulkanBufferBits::STORAGE_BUFFER,
-                EVulkanMemoryBits::DEVICE_LOCAL, accelerationStructureBuildSizesInfo.buildScratchSize, *BLASScratch_Vulkan);
+            RObj->ScratchASBuffer = g_rhi->CreateRawBuffer<jBuffer_Vulkan>(accelerationStructureBuildSizesInfo.buildScratchSize, 0
+                , EBufferCreateFlag::AccelerationStructureBuildInput | EBufferCreateFlag::UAV, EImageLayout::TRANSFER_SRC);
+            BLASScratch_Vulkan = RObj->GetScratchASBuffer<jBuffer_Vulkan>();
 
             VkBufferDeviceAddressInfoKHR scratchBufferDeviceAddresInfo{};
             scratchBufferDeviceAddresInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
@@ -186,8 +172,6 @@ void jRaytracingScene_Vulkan::CreateOrUpdateBLAS(const jRatracingInitializer& In
         accelerationDeviceAddressInfo.accelerationStructure = BLAS_Vulkan->AccelerationStructure;
         BLAS_Vulkan->DeviceAddress = g_rhi_vk->vkGetAccelerationStructureDeviceAddressKHR(g_rhi_vk->Device, &accelerationDeviceAddressInfo);
 
-        delete BLASScratch_Vulkan;
-
         InstanceList.push_back(RObj);
     }
 }
@@ -196,16 +180,15 @@ void jRaytracingScene_Vulkan::CreateOrUpdateTLAS(const jRatracingInitializer& In
 {
     auto CmdBuffer = (jCommandBuffer_Vulkan*)InInitializer.CommandBuffer;
 
-    const bool IsUpdate = !!ScratchTLASBuffer;
+    const bool IsUpdate = !!ScratchTLASBufferPtr;
 
     if (!IsUpdate)
     {
-        InstanceUploadBuffer = new jBuffer_Vulkan();
-        jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::SHADER_DEVICE_ADDRESS | EVulkanBufferBits::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY
-            , EVulkanMemoryBits::DEVICE_LOCAL | EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
-            , sizeof(VkAccelerationStructureInstanceKHR) * InstanceList.size(), *(jBuffer_Vulkan*)InstanceUploadBuffer);
+        InstanceUploadBufferPtr = g_rhi->CreateStructuredBuffer(sizeof(VkAccelerationStructureInstanceKHR) * InstanceList.size()
+            , sizeof(VkAccelerationStructureInstanceKHR), sizeof(VkAccelerationStructureInstanceKHR)
+            , EBufferCreateFlag::CPUAccess | EBufferCreateFlag::AccelerationStructureBuildInput, EImageLayout::UAV);
     }
-    auto InstanceUploadBufferVulkan = ((jBuffer_Vulkan*)InstanceUploadBuffer);
+    auto InstanceUploadBufferVulkan = GetInstanceUploadBuffer<jBuffer_Vulkan>();
 
     VkBufferDeviceAddressInfoKHR instanceDataDeviceAddress{};
     instanceDataDeviceAddress.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
@@ -222,7 +205,7 @@ void jRaytracingScene_Vulkan::CreateOrUpdateTLAS(const jRatracingInitializer& In
         MappedPointer[i].instanceCustomIndex = i;
         MappedPointer[i].mask = 0xFF;
         MappedPointer[i].flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FRONT_COUNTERCLOCKWISE_BIT_KHR;
-        MappedPointer[i].accelerationStructureReference = ((jBuffer_Vulkan*)RObj->BottomLevelASBuffer)->DeviceAddress;
+        MappedPointer[i].accelerationStructureReference = RObj->GetBottomLevelASBuffer<jBuffer_Vulkan>()->DeviceAddress;
         for (int32 k = 0; k < 3; ++k)
         {
             for (int32 m = 0; m < 4; ++m)
@@ -272,13 +255,9 @@ void jRaytracingScene_Vulkan::CreateOrUpdateTLAS(const jRatracingInitializer& In
 
     if (!IsUpdate)
     {
-        TLASBuffer = new jBuffer_Vulkan();
-        {
-            jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::ACCELERATION_STRUCTURE_STORAGE | EVulkanBufferBits::SHADER_DEVICE_ADDRESS,
-                EVulkanMemoryBits::DEVICE_LOCAL, accelerationStructureBuildSizesInfo.accelerationStructureSize, *(jBuffer_Vulkan*)TLASBuffer);
-        }
+        TLASBufferPtr = g_rhi->CreateRawBuffer(accelerationStructureBuildSizesInfo.accelerationStructureSize, 0, EBufferCreateFlag::AccelerationStructure, EImageLayout::UAV);
     }
-    auto TLASBufferVulkan = (jBuffer_Vulkan*)TLASBuffer;
+    auto TLASBufferVulkan = (jBuffer_Vulkan*)TLASBufferPtr.get();
 
     if (!TLASBufferVulkan->AccelerationStructure)
     {
@@ -294,11 +273,9 @@ void jRaytracingScene_Vulkan::CreateOrUpdateTLAS(const jRatracingInitializer& In
     // Create a small scratch buffer used during build of the bottom level acceleration structure
     if (!IsUpdate)
     {
-        ScratchTLASBuffer = new jBuffer_Vulkan();
-        jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::ACCELERATION_STRUCTURE_STORAGE | EVulkanBufferBits::SHADER_DEVICE_ADDRESS | EVulkanBufferBits::STORAGE_BUFFER,
-            EVulkanMemoryBits::DEVICE_LOCAL, accelerationStructureBuildSizesInfo.buildScratchSize, *(jBuffer_Vulkan*)ScratchTLASBuffer);
+        ScratchTLASBufferPtr = g_rhi->CreateRawBuffer(accelerationStructureBuildSizesInfo.buildScratchSize, 0, EBufferCreateFlag::UAV | EBufferCreateFlag::AccelerationStructureBuildInput, EImageLayout::UAV);
     }
-    auto ScratchASBufferVulkan = (jBuffer_Vulkan*)ScratchTLASBuffer;
+    auto ScratchASBufferVulkan = (jBuffer_Vulkan*)ScratchTLASBufferPtr.get();
 
     VkBufferDeviceAddressInfoKHR scratchBufferDeviceAddresInfo{};
     scratchBufferDeviceAddresInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;

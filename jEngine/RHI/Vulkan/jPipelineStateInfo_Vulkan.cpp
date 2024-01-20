@@ -540,45 +540,27 @@ void* jPipelineStateInfo_Vulkan::CreateRaytracingPipelineState()
     const uint64 AlignedBaseGroupHandleSize = Align(g_rhi_vk->RayTracingPipelineProperties.shaderGroupHandleSize
         , g_rhi_vk->RayTracingPipelineProperties.shaderGroupBaseAlignment);
 
-    if (RaygenBuffer)
-        delete RaygenBuffer;
-    RaygenBuffer = new jBuffer_Vulkan();
     {
         // Create buffer to hold all shader handles for the SBT
         const uint32 handleCount = (uint32)raygenGroups.size();
-        jBufferUtil_Vulkan::AllocateBuffer(
-            EVulkanBufferBits::SHADER_BINDING_TABLE | EVulkanBufferBits::SHADER_DEVICE_ADDRESS,
-            EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT,
-            AlignedBaseGroupHandleSize * handleCount, *RaygenBuffer);
-        RaygenStridedDeviceAddressRegion = getSbtEntryStridedDeviceAddressRegion(RaygenBuffer, handleCount);
+        RaygenBuffer = g_rhi->CreateRawBuffer<jBuffer_Vulkan>(AlignedBaseGroupHandleSize* handleCount, 0, EBufferCreateFlag::CPUAccess | EBufferCreateFlag::ShaderBindingTable, EImageLayout::GENERAL);
+        RaygenStridedDeviceAddressRegion = getSbtEntryStridedDeviceAddressRegion(RaygenBuffer.get(), handleCount);
         RaygenBuffer->Map();
     }
 
-    if (MissBuffer)
-        delete MissBuffer;
-    MissBuffer = new jBuffer_Vulkan();
     {
         // Create buffer to hold all shader handles for the SBT
         const uint32 handleCount = (uint32)missGroups.size();
-        jBufferUtil_Vulkan::AllocateBuffer(
-            EVulkanBufferBits::SHADER_BINDING_TABLE | EVulkanBufferBits::SHADER_DEVICE_ADDRESS,
-            EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT,
-            AlignedBaseGroupHandleSize * handleCount, *MissBuffer);
-        MissStridedDeviceAddressRegion = getSbtEntryStridedDeviceAddressRegion(MissBuffer, handleCount);
+        MissBuffer = g_rhi->CreateRawBuffer<jBuffer_Vulkan>(AlignedBaseGroupHandleSize * handleCount, 0, EBufferCreateFlag::CPUAccess | EBufferCreateFlag::ShaderBindingTable, EImageLayout::GENERAL);
+        MissStridedDeviceAddressRegion = getSbtEntryStridedDeviceAddressRegion(MissBuffer.get(), handleCount);
         MissBuffer->Map();
     }
 
-    if (HitGroupBuffer)
-        delete HitGroupBuffer;
-    HitGroupBuffer = new jBuffer_Vulkan();
     {
         // Create buffer to hold all shader handles for the SBT
         const uint32 handleCount = (uint32)hitGroups.size();
-        jBufferUtil_Vulkan::AllocateBuffer(
-            EVulkanBufferBits::SHADER_BINDING_TABLE | EVulkanBufferBits::SHADER_DEVICE_ADDRESS,
-            EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT,
-            AlignedBaseGroupHandleSize * handleCount, *HitGroupBuffer);
-        HitStridedDeviceAddressRegion = getSbtEntryStridedDeviceAddressRegion(HitGroupBuffer, handleCount);
+        HitGroupBuffer = g_rhi->CreateRawBuffer<jBuffer_Vulkan>(AlignedBaseGroupHandleSize * handleCount, 0, EBufferCreateFlag::CPUAccess | EBufferCreateFlag::ShaderBindingTable, EImageLayout::GENERAL);
+        HitStridedDeviceAddressRegion = getSbtEntryStridedDeviceAddressRegion(HitGroupBuffer.get(), handleCount);
         HitGroupBuffer->Map();
     };
 

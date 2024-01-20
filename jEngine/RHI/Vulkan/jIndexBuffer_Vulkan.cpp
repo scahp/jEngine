@@ -5,8 +5,18 @@
 void jIndexBuffer_Vulkan::Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const
 {
     check(IndexStreamData->Param->Attributes.size());
-    VkIndexType IndexType = VK_INDEX_TYPE_UINT16;
-    switch (IndexStreamData->Param->Attributes[0].UnderlyingType)
+
+    check(InRenderFrameContext);
+    check(InRenderFrameContext->GetActiveCommandBuffer());
+    const VkIndexType IndexType = GetVulkanIndexFormat(IndexStreamData->Param->Attributes[0].UnderlyingType);
+    vkCmdBindIndexBuffer((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle()
+        , GetBuffer()->Buffer, GetBuffer()->Offset, IndexType);
+}
+
+VkIndexType jIndexBuffer_Vulkan::GetVulkanIndexFormat(EBufferElementType InType) const
+{
+    VkIndexType IndexType = VK_INDEX_TYPE_UINT32;
+    switch (InType)
     {
     case EBufferElementType::BYTE:
         IndexType = VK_INDEX_TYPE_UINT8_EXT;
@@ -23,10 +33,27 @@ void jIndexBuffer_Vulkan::Bind(const std::shared_ptr<jRenderFrameContext>& InRen
     default:
         break;
     }
-    check(InRenderFrameContext);
-    check(InRenderFrameContext->GetActiveCommandBuffer());
-    vkCmdBindIndexBuffer((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle()
-        , BufferPtr->Buffer, BufferPtr->Offset, IndexType);
+    return IndexType;
+}
+
+uint32 jIndexBuffer_Vulkan::GetVulkanIndexStride(EBufferElementType InType) const
+{
+    switch (InType)
+    {
+    case EBufferElementType::BYTE:
+        return 1;
+    case EBufferElementType::UINT16:
+        return 2;
+    case EBufferElementType::UINT32:
+        return 4;
+    case EBufferElementType::FLOAT:
+        check(0);
+        break;
+    default:
+        break;
+    }
+    check(0);
+    return 4;
 }
 
 bool jIndexBuffer_Vulkan::Initialize(const std::shared_ptr<jIndexStreamData>& InStreamData)
@@ -37,21 +64,9 @@ bool jIndexBuffer_Vulkan::Initialize(const std::shared_ptr<jIndexStreamData>& In
     IndexStreamData = InStreamData;
     VkDeviceSize bufferSize = InStreamData->Param->GetBufferSize();
 
-    jBuffer_Vulkan stagingBuffer;
-    jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::TRANSFER_SRC
-        , EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT, bufferSize, stagingBuffer);
+    const EBufferCreateFlag BufferCreateFlag = EBufferCreateFlag::IndexBuffer | EBufferCreateFlag::UAV | EBufferCreateFlag::AccelerationStructureBuildInput;
+    BufferPtr = g_rhi->CreateStructuredBuffer<jBuffer_Vulkan>(bufferSize, 0, GetVulkanIndexStride(IndexStreamData->Param->Attributes[0].UnderlyingType)
+        , BufferCreateFlag, EImageLayout::TRANSFER_DST, InStreamData->Param->GetBufferData(), bufferSize, TEXT("IndexBuffer"));
 
-    stagingBuffer.UpdateBuffer(InStreamData->Param->GetBufferData(), bufferSize);
-
-    BufferPtr = std::make_shared<jBuffer_Vulkan>();
-    jBufferUtil_Vulkan::AllocateBuffer(
-        EVulkanBufferBits::TRANSFER_DST | EVulkanBufferBits::INDEX_BUFFER
-        | EVulkanBufferBits::SHADER_DEVICE_ADDRESS | EVulkanBufferBits::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY
-        | EVulkanBufferBits::STORAGE_BUFFER
-        , EVulkanMemoryBits::DEVICE_LOCAL, bufferSize, *BufferPtr.get());
-    jBufferUtil_Vulkan::CopyBuffer(stagingBuffer, *BufferPtr.get(), bufferSize);
-    BufferPtr->RealBufferSize = bufferSize;
-
-    stagingBuffer.Release();
     return true;
 }

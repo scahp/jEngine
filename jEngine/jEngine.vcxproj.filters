@@ -289,9 +289,6 @@
     <ClInclude Include="RHI\Vulkan\jDescriptorPool_Vulkan.h">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\Vulkan\jShaderStorageBufferObject_Vulkan.h">
-      <Filter>Code\RHI\Vulkan</Filter>
-    </ClInclude>
     <ClInclude Include="Core\jLock.h">
       <Filter>Code\Core</Filter>
     </ClInclude>
@@ -654,9 +651,6 @@
     <ClCompile Include="RHI\Vulkan\jDescriptorPool_Vulkan.cpp">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\Vulkan\jShaderStorageBufferObject_Vulkan.cpp">
-      <Filter>Code\RHI\Vulkan</Filter>
-    </ClCompile>
     <ClCompile Include="External\IMGUI\imgui.cpp">
       <Filter>Code\External\IMGUI</Filter>
     </ClCompile>
@@ -968,11 +962,9 @@
     <None Include="Resource\Shaders\hlsl\AtmosphericShadowingApply_ps.hlsl">
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
-    <None Include="Resource\Shaders\hlsl\RaytracingCubeAndPlane.hlsl">
-      <Filter>Resource\Shaders\hlsl</Filter>
-    </None>
     <None Include="Resource\Shaders\hlsl\RaytracingOneWeekend.hlsl">
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
+    <None Include="Resource\Shaders\hlsl\RaytracingPBR.hlsl" />
   </ItemGroup>
 </Project>

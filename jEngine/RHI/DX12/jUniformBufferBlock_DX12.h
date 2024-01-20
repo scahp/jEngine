@@ -16,8 +16,8 @@ struct jUniformBufferBlock_DX12 : public IUniformBufferBlock
 
     virtual void ClearBuffer(int32 clearValue) override;
 
-    virtual void* GetBuffer() const override;
-    virtual void* GetBufferMemory() const override;
+    virtual void* GetLowLevelResource() const override;
+    virtual void* GetLowLevelMemory() const override;
 
     virtual size_t GetBufferSize() const override;
     virtual size_t GetBufferOffset() const override { return 0; }
@@ -29,7 +29,7 @@ private:
     jUniformBufferBlock_DX12(const jUniformBufferBlock_DX12&) = delete;
     jUniformBufferBlock_DX12& operator=(const jUniformBufferBlock_DX12&) = delete;
 
-    jBuffer_DX12* Buffer = nullptr;
+    std::shared_ptr<jBuffer_DX12> BufferPtr;
 
     jRingBuffer_DX12* RingBuffer = nullptr;
     int64 RingBufferOffset = 0;

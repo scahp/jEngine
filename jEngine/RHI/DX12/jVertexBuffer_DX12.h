@@ -15,6 +15,9 @@ struct jVertexStream_DX12
     size_t Offset = 0;
     int32 InstanceDivisor = 0;
 
+    template <typename T>
+    T* GetBuffer() const { return (T*)BufferPtr.get(); }
+
     std::shared_ptr<jBuffer_DX12> BufferPtr;
 };
 

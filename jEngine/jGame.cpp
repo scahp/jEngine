@@ -675,13 +675,13 @@ void jGame::SpawnInstancingPrimitives()
 
 		auto& GeometryDataPtr = obj->RenderObjects[0]->GeometryDataPtr;
 
-        GeometryDataPtr->VertexStream_InstanceData = std::make_shared<jVertexStreamData>();
-        GeometryDataPtr->VertexStream_InstanceData->ElementCount = _countof(instanceData);
-        GeometryDataPtr->VertexStream_InstanceData->StartLocation = (int32)GeometryDataPtr->VertexStream->GetEndLocation();
-        GeometryDataPtr->VertexStream_InstanceData->BindingIndex = (int32)GeometryDataPtr->VertexStream->Params.size();
-        GeometryDataPtr->VertexStream_InstanceData->VertexInputRate = EVertexInputRate::INSTANCE;
-        GeometryDataPtr->VertexStream_InstanceData->Params.push_back(streamParam);
-        GeometryDataPtr->VertexBuffer_InstanceData = g_rhi->CreateVertexBuffer(GeometryDataPtr->VertexStream_InstanceData);
+        GeometryDataPtr->VertexStream_InstanceDataPtr = std::make_shared<jVertexStreamData>();
+        GeometryDataPtr->VertexStream_InstanceDataPtr->ElementCount = _countof(instanceData);
+        GeometryDataPtr->VertexStream_InstanceDataPtr->StartLocation = (int32)GeometryDataPtr->VertexStreamPtr->GetEndLocation();
+        GeometryDataPtr->VertexStream_InstanceDataPtr->BindingIndex = (int32)GeometryDataPtr->VertexStreamPtr->Params.size();
+        GeometryDataPtr->VertexStream_InstanceDataPtr->VertexInputRate = EVertexInputRate::INSTANCE;
+        GeometryDataPtr->VertexStream_InstanceDataPtr->Params.push_back(streamParam);
+        GeometryDataPtr->VertexBuffer_InstanceDataPtr = g_rhi->CreateVertexBuffer(GeometryDataPtr->VertexStream_InstanceDataPtr);
 
         jObject::AddObject(obj);
         SpawnedObjects.push_back(obj);
@@ -727,22 +727,22 @@ void jGame::SpawnIndirectDrawPrimitives()
         memcpy(&streamParam->Data[0], instanceData, sizeof(instanceData));
 
 		auto& GeometryDataPtr = obj->RenderObjects[0]->GeometryDataPtr;
-        GeometryDataPtr->VertexStream_InstanceData = std::make_shared<jVertexStreamData>();
-        GeometryDataPtr->VertexStream_InstanceData->ElementCount = _countof(instanceData);
-        GeometryDataPtr->VertexStream_InstanceData->StartLocation = (int32)GeometryDataPtr->VertexStream->GetEndLocation();
-        GeometryDataPtr->VertexStream_InstanceData->BindingIndex = (int32)GeometryDataPtr->VertexStream->Params.size();
-        GeometryDataPtr->VertexStream_InstanceData->VertexInputRate = EVertexInputRate::INSTANCE;
-        GeometryDataPtr->VertexStream_InstanceData->Params.push_back(streamParam);
-        GeometryDataPtr->VertexBuffer_InstanceData = g_rhi->CreateVertexBuffer(GeometryDataPtr->VertexStream_InstanceData);
+        GeometryDataPtr->VertexStream_InstanceDataPtr = std::make_shared<jVertexStreamData>();
+        GeometryDataPtr->VertexStream_InstanceDataPtr->ElementCount = _countof(instanceData);
+        GeometryDataPtr->VertexStream_InstanceDataPtr->StartLocation = (int32)GeometryDataPtr->VertexStreamPtr->GetEndLocation();
+        GeometryDataPtr->VertexStream_InstanceDataPtr->BindingIndex = (int32)GeometryDataPtr->VertexStreamPtr->Params.size();
+        GeometryDataPtr->VertexStream_InstanceDataPtr->VertexInputRate = EVertexInputRate::INSTANCE;
+        GeometryDataPtr->VertexStream_InstanceDataPtr->Params.push_back(streamParam);
+        GeometryDataPtr->VertexBuffer_InstanceDataPtr = g_rhi->CreateVertexBuffer(GeometryDataPtr->VertexStream_InstanceDataPtr);
 
         // Create indirect draw buffer
         {
-            check(GeometryDataPtr->VertexStream_InstanceData);
+            check(GeometryDataPtr->VertexStream_InstanceDataPtr);
 
             std::vector<VkDrawIndirectCommand> indrectCommands;
 
-            const int32 instanceCount = GeometryDataPtr->VertexStream_InstanceData->ElementCount;
-            const int32 vertexCount = GeometryDataPtr->VertexStream->ElementCount;
+            const int32 instanceCount = GeometryDataPtr->VertexStream_InstanceDataPtr->ElementCount;
+            const int32 vertexCount = GeometryDataPtr->VertexStreamPtr->ElementCount;
             for (int32 i = 0; i < instanceCount; ++i)
             {
                 VkDrawIndirectCommand command;
@@ -755,21 +755,9 @@ void jGame::SpawnIndirectDrawPrimitives()
 
             const size_t bufferSize = indrectCommands.size() * sizeof(VkDrawIndirectCommand);
 
-            jBuffer_Vulkan stagingBuffer;
-            jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
-                , bufferSize, stagingBuffer);
-
-            stagingBuffer.UpdateBuffer(indrectCommands.data(), bufferSize);
-
-            jBuffer_Vulkan* temp = new jBuffer_Vulkan();
-			check(!GeometryDataPtr->IndirectCommandBuffer);
-			GeometryDataPtr->IndirectCommandBuffer = temp;
-            jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::TRANSFER_DST | EVulkanBufferBits::INDIRECT_BUFFER, EVulkanMemoryBits::DEVICE_LOCAL
-                , bufferSize, *temp);
-            jBufferUtil_Vulkan::CopyBuffer(stagingBuffer.Buffer, (VkBuffer)GeometryDataPtr->IndirectCommandBuffer->GetHandle(), bufferSize
-				, stagingBuffer.AllocatedSize, GeometryDataPtr->IndirectCommandBuffer->GetAllocatedSize());
-
-            stagingBuffer.Release();
+			check(!GeometryDataPtr->IndirectCommandBufferPtr);
+			GeometryDataPtr->IndirectCommandBufferPtr = g_rhi->CreateStructuredBuffer(bufferSize, 0, sizeof(VkDrawIndirectCommand), EBufferCreateFlag::IndirectCommand, EImageLayout::TRANSFER_DST
+				, indrectCommands.data(), bufferSize, TEXT("IndirectBuffer"));
         }
 
         jObject::AddObject(obj);

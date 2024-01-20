@@ -11,7 +11,6 @@ class jPointLight;
 class jSpotLight;
 class jRenderer;
 struct jFrameBuffer;
-struct IShaderStorageBufferObject;
 struct IAtomicCounterBuffer;
 struct jTexture;
 struct jFrameBuffer;

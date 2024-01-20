@@ -374,7 +374,7 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(const jShaderBinding* InShaderB
                     check(UniformBuffer);
 
                     VkDescriptorBufferInfo bufferInfo{};
-                    bufferInfo.buffer = (VkBuffer)UniformBuffer->GetBuffer();
+                    bufferInfo.buffer = (VkBuffer)UniformBuffer->GetLowLevelResource();
                     bufferInfo.offset = UniformBuffer->GetBufferOffset();
                     bufferInfo.range = UniformBuffer->GetBufferSize();		// 전체 사이즈라면 VK_WHOLE_SIZE 이거 가능
                     check(bufferInfo.buffer);
@@ -388,7 +388,7 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(const jShaderBinding* InShaderB
             if (ensure(ubor && ubor->UniformBuffer))
             {
                 VkDescriptorBufferInfo bufferInfo{};
-                bufferInfo.buffer = (VkBuffer)ubor->UniformBuffer->GetBuffer();
+                bufferInfo.buffer = (VkBuffer)ubor->UniformBuffer->GetLowLevelResource();
                 bufferInfo.offset = ubor->UniformBuffer->GetBufferOffset();
                 bufferInfo.range = ubor->UniformBuffer->GetBufferSize();		// 전체 사이즈라면 VK_WHOLE_SIZE 이거 가능
                 check(bufferInfo.buffer);
@@ -409,7 +409,7 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(const jShaderBinding* InShaderB
                     check(UniformBuffer);
 
                     VkDescriptorBufferInfo bufferInfo{};
-                    bufferInfo.buffer = (VkBuffer)UniformBuffer->GetBuffer();
+                    bufferInfo.buffer = (VkBuffer)UniformBuffer->GetLowLevelResource();
                     bufferInfo.offset = 0;      // Use DynamicOffset instead
                     bufferInfo.range = UniformBuffer->GetBufferSize();		// 전체 사이즈라면 VK_WHOLE_SIZE 이거 가능
                     check(bufferInfo.buffer);
@@ -424,7 +424,7 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(const jShaderBinding* InShaderB
             if (ensure(ubor && ubor->UniformBuffer))
             {
                 VkDescriptorBufferInfo bufferInfo{};
-                bufferInfo.buffer = (VkBuffer)ubor->UniformBuffer->GetBuffer();
+                bufferInfo.buffer = (VkBuffer)ubor->UniformBuffer->GetLowLevelResource();
                 bufferInfo.offset = 0;      // Use DynamicOffset instead
                 bufferInfo.range = ubor->UniformBuffer->GetBufferSize();		// 전체 사이즈라면 VK_WHOLE_SIZE 이거 가능
                 check(bufferInfo.buffer);

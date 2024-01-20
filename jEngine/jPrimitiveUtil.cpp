@@ -209,12 +209,10 @@ void jBoundBoxObject::UpdateBoundBox()
 	};
 
 	const int32 elementCount = static_cast<int32>(_countof(vertices) / 3);
-	JASSERT(RenderObjectGeometryDataPtr->VertexStream->ElementCount == elementCount);
+	JASSERT(RenderObjectGeometryDataPtr->VertexStreamPtr->ElementCount == elementCount);
 
-	jStreamParam<float>* PositionParam = static_cast<jStreamParam<float>*>(RenderObjectGeometryDataPtr->VertexStream->Params[0].get());
+	jStreamParam<float>* PositionParam = static_cast<jStreamParam<float>*>(RenderObjectGeometryDataPtr->VertexStreamPtr->Params[0].get());
 	memcpy(&PositionParam->Data[0], vertices, sizeof(vertices));
-
-	RenderObjectGeometryDataPtr->UpdateVertexStream();
 }
 
 void jBoundSphereObject::SetUniformBuffer(const jShader* shader)
@@ -2122,14 +2120,14 @@ void jDirectionalLightPrimitive::Update(float deltaTime)
 
 void jSegmentPrimitive::UpdateSegment()
 {
-	if (RenderObjectGeometryDataPtr->VertexStream->Params.size() < 2)
+	if (RenderObjectGeometryDataPtr->VertexStreamPtr->Params.size() < 2)
 	{
 		JASSERT(0);
 		return;
 	}
 
-	RenderObjectGeometryDataPtr->VertexStream->Params[0].reset();
-	RenderObjectGeometryDataPtr->VertexStream->Params[1].reset();
+	RenderObjectGeometryDataPtr->VertexStreamPtr->Params[0].reset();
+	RenderObjectGeometryDataPtr->VertexStreamPtr->Params[1].reset();
 	const auto currentEnd = GetCurrentEnd();
 
 	const float vertices[] = {
@@ -2145,7 +2143,7 @@ void jSegmentPrimitive::UpdateSegment()
 		streamParam->Name = jName("POSITION");
 		streamParam->Data.resize(_countof(vertices));
 		memcpy(&streamParam->Data[0], &vertices[0], sizeof(vertices));
-		RenderObjectGeometryDataPtr->VertexStream->Params[0] = streamParam;
+		RenderObjectGeometryDataPtr->VertexStreamPtr->Params[0] = streamParam;
 	}
 
 	{
@@ -2155,9 +2153,8 @@ void jSegmentPrimitive::UpdateSegment()
 		streamParam->Stride = sizeof(float) * 4;
 		streamParam->Name = jName("COLOR");
 		streamParam->Data = std::move(jPrimitiveUtil::GenerateColor(Color, 2));
-		RenderObjectGeometryDataPtr->VertexStream->Params[1] = streamParam;
+		RenderObjectGeometryDataPtr->VertexStreamPtr->Params[1] = streamParam;
 	}
-	g_rhi->UpdateVertexBuffer(RenderObjectGeometryDataPtr->VertexBuffer, RenderObjectGeometryDataPtr->VertexStream);
 }
 
 void jSegmentPrimitive::UpdateSegment(const Vector& start, const Vector& end, const Vector4& color, float time)
@@ -2493,10 +2490,10 @@ void jGraph2D::UpdateBuffer()
 				tr = (tr * Matrix::MakeScale(lineLength, 1.0f, 1.0f));
 			}
 
-			if (RenderObjectGeometryDataPtr->VertexStream)
+			if (RenderObjectGeometryDataPtr->VertexStreamPtr)
 			{
 				static jName TransformName("Transform");
-				for (auto& iter : RenderObjectGeometryDataPtr->VertexStream->Params)
+				for (auto& iter : RenderObjectGeometryDataPtr->VertexStreamPtr->Params)
 				{
 					if (iter->Name == TransformName)
 					{
@@ -2506,7 +2503,6 @@ void jGraph2D::UpdateBuffer()
 						break;
 					}
 				}
-				RenderObjectGeometryDataPtr->UpdateVertexStream();
 			}
 		}
 		else

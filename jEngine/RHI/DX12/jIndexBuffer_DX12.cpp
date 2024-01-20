@@ -48,10 +48,7 @@ bool jIndexBuffer_DX12::Initialize(const std::shared_ptr<jIndexStreamData>& InSt
     }
 
     // Create index buffer
-    BufferPtr = std::shared_ptr<jBuffer_DX12>(
-        jBufferUtil_DX12::CreateBuffer(bufferSize, 0, EBufferCreateFlag::NONE, D3D12_RESOURCE_STATE_COMMON, InStreamData->Param->GetBufferData(), bufferSize, TEXT("IndexBuffer")));
-    //jBufferUtil_DX12::CreateShaderResourceView(BufferPtr.get(), IndexStreamData->Param->Attributes[0].Stride, bufferSize / IndexStreamData->Param->Attributes[0].Stride);
-    jBufferUtil_DX12::CreateShaderResourceView(BufferPtr.get(), IndexType);
+    BufferPtr = g_rhi->CreateFormattedBuffer<jBuffer_DX12>(bufferSize, 0, GetDX12TextureFormat(IndexType), EBufferCreateFlag::NONE, EImageLayout::GENERAL, InStreamData->Param->GetBufferData(), bufferSize, TEXT("IndexBuffer"));
 
     // Create Index buffer View
     IBView.BufferLocation = BufferPtr->GetGPUAddress();

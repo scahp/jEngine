@@ -25,32 +25,26 @@ jRenderObjectGeometryData::jRenderObjectGeometryData(const std::shared_ptr<jVert
 
 jRenderObjectGeometryData::~jRenderObjectGeometryData()
 {
-    delete VertexBuffer;
-    delete VertexBuffer_PositionOnly;
-    delete VertexBuffer_InstanceData;
-    delete IndexBuffer;
-    delete IndirectCommandBuffer;
-
-    VertexStream.reset();
-    VertexStream_PositionOnly.reset();
+    VertexStreamPtr.reset();
+    VertexStream_PositionOnlyPtr.reset();
 }
 
 void jRenderObjectGeometryData::Create(const std::shared_ptr<jVertexStreamData>& InVertexStream, const std::shared_ptr<jIndexStreamData>& InIndexStream, bool InHasVertexColor, bool InHasVertexBiTangent)
 {
-    VertexStream = InVertexStream;
-    IndexStream = InIndexStream;
+    VertexStreamPtr = InVertexStream;
+    IndexStreamPtr = InIndexStream;
 
-    if (VertexStream && ensure(VertexStream->Params.size()))
+    if (VertexStreamPtr && ensure(VertexStreamPtr->Params.size()))
     {
-        VertexStream_PositionOnly = std::make_shared<jVertexStreamData>();
-        VertexStream_PositionOnly->Params.push_back(VertexStream->Params[0]);
-        VertexStream_PositionOnly->PrimitiveType = VertexStream->PrimitiveType;
-        VertexStream_PositionOnly->ElementCount = VertexStream->ElementCount;
+        VertexStream_PositionOnlyPtr = std::make_shared<jVertexStreamData>();
+        VertexStream_PositionOnlyPtr->Params.push_back(VertexStreamPtr->Params[0]);
+        VertexStream_PositionOnlyPtr->PrimitiveType = VertexStreamPtr->PrimitiveType;
+        VertexStream_PositionOnlyPtr->ElementCount = VertexStreamPtr->ElementCount;
     }
 
-    VertexBuffer = g_rhi->CreateVertexBuffer(VertexStream);
-    VertexBuffer_PositionOnly = g_rhi->CreateVertexBuffer(VertexStream_PositionOnly);
-    IndexBuffer = g_rhi->CreateIndexBuffer(IndexStream);
+    VertexBufferPtr = g_rhi->CreateVertexBuffer(VertexStreamPtr);
+    VertexBuffer_PositionOnlyPtr = g_rhi->CreateVertexBuffer(VertexStream_PositionOnlyPtr);
+    IndexBufferPtr = g_rhi->CreateIndexBuffer(IndexStreamPtr);
 
     bHasVertexColor = InHasVertexColor;
     bHasVertexBiTangent = InHasVertexBiTangent;
@@ -59,13 +53,13 @@ void jRenderObjectGeometryData::Create(const std::shared_ptr<jVertexStreamData>&
 void jRenderObjectGeometryData::CreateNew_ForRaytracing(const std::shared_ptr<jVertexStreamData>& InVertexStream, const std::shared_ptr<jVertexStreamData>& InVertexStream_PositionOnly
     , const std::shared_ptr<jIndexStreamData>& InIndexStream, bool InHasVertexColor, bool InHasVertexBiTangent)
 {
-    VertexStream = InVertexStream;
-    VertexStream_PositionOnly = InVertexStream_PositionOnly;
-    IndexStream = InIndexStream;
+    VertexStreamPtr = InVertexStream;
+    VertexStream_PositionOnlyPtr = InVertexStream_PositionOnly;
+    IndexStreamPtr = InIndexStream;
 
-    VertexBuffer = g_rhi->CreateVertexBuffer(VertexStream);
-    VertexBuffer_PositionOnly = g_rhi->CreateVertexBuffer(VertexStream_PositionOnly);
-    IndexBuffer = g_rhi->CreateIndexBuffer(IndexStream);
+    VertexBufferPtr = g_rhi->CreateVertexBuffer(VertexStreamPtr);
+    VertexBuffer_PositionOnlyPtr = g_rhi->CreateVertexBuffer(VertexStream_PositionOnlyPtr);
+    IndexBufferPtr = g_rhi->CreateIndexBuffer(IndexStreamPtr);
 
     bHasVertexColor = InHasVertexColor;
     bHasVertexBiTangent = InHasVertexBiTangent;
@@ -73,22 +67,15 @@ void jRenderObjectGeometryData::CreateNew_ForRaytracing(const std::shared_ptr<jV
 
 void jRenderObjectGeometryData::UpdateVertexStream(const std::shared_ptr<jVertexStreamData>& vertexStream)
 {
-    VertexStream = vertexStream;
-    g_rhi->UpdateVertexBuffer(VertexBuffer, VertexStream);
+    VertexStreamPtr = vertexStream;
 
-    if (VertexStream && ensure(VertexStream->Params.size()))
+    if (VertexStreamPtr && ensure(VertexStreamPtr->Params.size()))
     {
-        VertexStream_PositionOnly = std::make_shared<jVertexStreamData>();
-        VertexStream_PositionOnly->Params.push_back(VertexStream->Params[0]);
-        VertexStream_PositionOnly->PrimitiveType = VertexStream->PrimitiveType;
-        VertexStream_PositionOnly->ElementCount = VertexStream->ElementCount;
+        VertexStream_PositionOnlyPtr = std::make_shared<jVertexStreamData>();
+        VertexStream_PositionOnlyPtr->Params.push_back(VertexStreamPtr->Params[0]);
+        VertexStream_PositionOnlyPtr->PrimitiveType = VertexStreamPtr->PrimitiveType;
+        VertexStream_PositionOnlyPtr->ElementCount = VertexStreamPtr->ElementCount;
     }
-}
-
-void jRenderObjectGeometryData::UpdateVertexStream()
-{
-    g_rhi->UpdateVertexBuffer(VertexBuffer, VertexStream);
-    g_rhi->UpdateVertexBuffer(VertexBuffer_PositionOnly, VertexStream_PositionOnly);
 }
 
 // jRenderObject
@@ -98,7 +85,6 @@ jRenderObject::jRenderObject()
 
 jRenderObject::~jRenderObject()
 {
-    RenderObjectUniformParametersPtr.reset();
 }
 
 void jRenderObject::CreateRenderObject(const std::shared_ptr<jRenderObjectGeometryData>& InRenderObjectGeometryData)
@@ -116,15 +102,15 @@ void jRenderObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFra
 	startIndex = startIndex != -1 ? startIndex : 0;
 
 	const EPrimitiveType primitiveType = GetPrimitiveType();
-	if (GeometryDataPtr->IndexBuffer)
+	if (GeometryDataPtr->IndexBufferPtr)
 	{
-        if (GeometryDataPtr->IndirectCommandBuffer)
+        if (GeometryDataPtr->IndirectCommandBufferPtr)
         {
-            g_rhi->DrawElementsIndirect(InRenderFrameContext, primitiveType, GeometryDataPtr->IndirectCommandBuffer, startIndex, instanceCount);
+            g_rhi->DrawElementsIndirect(InRenderFrameContext, primitiveType, GeometryDataPtr->IndirectCommandBufferPtr.get(), startIndex, instanceCount);
         }
 		else
 		{
-			auto& indexStreamData = GeometryDataPtr->IndexBuffer->IndexStreamData;
+			auto& indexStreamData = GeometryDataPtr->IndexBufferPtr->IndexStreamData;
 			indexCount = indexCount != -1 ? indexCount : indexStreamData->ElementCount;
 			if (instanceCount <= 0)
 				g_rhi->DrawElementsBaseVertex(InRenderFrameContext, primitiveType, static_cast<int32>(indexStreamData->Param->GetElementSize()), startIndex, indexCount, startVertex);
@@ -134,13 +120,13 @@ void jRenderObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFra
 	}
 	else
 	{
-		if (GeometryDataPtr->IndirectCommandBuffer)
+		if (GeometryDataPtr->IndirectCommandBufferPtr)
 		{
-			g_rhi->DrawIndirect(InRenderFrameContext, primitiveType, GeometryDataPtr->IndirectCommandBuffer, startVertex, instanceCount);
+			g_rhi->DrawIndirect(InRenderFrameContext, primitiveType, GeometryDataPtr->IndirectCommandBufferPtr.get(), startVertex, instanceCount);
 		}
 		else
 		{
-			vertexCount = vertexCount != -1 ? vertexCount : GeometryDataPtr->VertexStream->ElementCount;
+			vertexCount = vertexCount != -1 ? vertexCount : GeometryDataPtr->VertexStreamPtr->ElementCount;
 			if (instanceCount <= 0)
 				g_rhi->DrawArrays(InRenderFrameContext, primitiveType, startVertex, vertexCount);
 			else
@@ -158,22 +144,22 @@ void jRenderObject::BindBuffers(const std::shared_ptr<jRenderFrameContext>& InRe
 {
     if (InPositionOnly)
     {
-        if (GeometryDataPtr->VertexBuffer_PositionOnly)
-            GeometryDataPtr->VertexBuffer_PositionOnly->Bind(InRenderFrameContext);
+        if (GeometryDataPtr->VertexBuffer_PositionOnlyPtr)
+            GeometryDataPtr->VertexBuffer_PositionOnlyPtr->Bind(InRenderFrameContext);
     }
     else
     {
-        if (GeometryDataPtr->VertexBuffer)
-            GeometryDataPtr->VertexBuffer->Bind(InRenderFrameContext);
+        if (GeometryDataPtr->VertexBufferPtr)
+            GeometryDataPtr->VertexBufferPtr->Bind(InRenderFrameContext);
     }
     
     if (InOverrideInstanceData)
         InOverrideInstanceData->Bind(InRenderFrameContext);
-    else if (GeometryDataPtr->VertexBuffer_InstanceData)
-        GeometryDataPtr->VertexBuffer_InstanceData->Bind(InRenderFrameContext);
+    else if (GeometryDataPtr->VertexBuffer_InstanceDataPtr)
+        GeometryDataPtr->VertexBuffer_InstanceDataPtr->Bind(InRenderFrameContext);
 
-    if (GeometryDataPtr->IndexBuffer)
-        GeometryDataPtr->IndexBuffer->Bind(InRenderFrameContext);
+    if (GeometryDataPtr->IndexBufferPtr)
+        GeometryDataPtr->IndexBufferPtr->Bind(InRenderFrameContext);
 }
 
 bool jRenderObject::IsSupportRaytracing() const
@@ -181,10 +167,10 @@ bool jRenderObject::IsSupportRaytracing() const
     if (!GeometryDataPtr)
         return false;
 
-    if (!GeometryDataPtr->VertexBuffer_PositionOnly)
+    if (!GeometryDataPtr->VertexBuffer_PositionOnlyPtr)
         return false;
 
-    return GeometryDataPtr->VertexBuffer_PositionOnly->IsSupportRaytracing();
+    return GeometryDataPtr->VertexBuffer_PositionOnlyPtr->IsSupportRaytracing();
 }
 
 void jRenderObject::UpdateWorldMatrix()
@@ -204,8 +190,8 @@ void jRenderObject::UpdateWorldMatrix()
 
 const std::vector<float>& jRenderObject::GetVertices() const
 {
-    if (GeometryDataPtr->VertexStream && !GeometryDataPtr->VertexStream->Params.empty())
-		return static_cast<jStreamParam<float>*>(GeometryDataPtr->VertexStream->Params[0].get())->Data;
+    if (GeometryDataPtr->VertexStreamPtr && !GeometryDataPtr->VertexStreamPtr->Params.empty())
+		return static_cast<jStreamParam<float>*>(GeometryDataPtr->VertexStreamPtr->Params[0].get())->Data;
 
 	static const std::vector<float> s_emtpy;
 	return s_emtpy;
@@ -232,21 +218,8 @@ const std::shared_ptr<jShaderBindingInstance>& jRenderObject::CreateShaderBindin
             jNameStatic("RenderObjectUniformParameters"), jLifeTimeType::MultiFrame, sizeof(jRenderObjectUniformBuffer)));
         RenderObjectUniformParametersPtr->UpdateBufferData(&ubo, sizeof(ubo));
 
-        if (IsUseDX12())
-        {
-            TestUniformBuffer = std::shared_ptr<jBuffer>(jBufferUtil_DX12::CreateBuffer(sizeof(ubo), 0, EBufferCreateFlag::UAV
-                , D3D12_RESOURCE_STATES::D3D12_RESOURCE_STATE_COMMON, &ubo, sizeof(ubo)));
-            jBufferUtil_DX12::CreateShaderResourceView((jBuffer_DX12*)TestUniformBuffer.get(), sizeof(jRenderObjectUniformBuffer), 1);
-        }
-        else if (IsUseVulkan())
-        {
-            TestUniformBuffer = std::shared_ptr<jBuffer>(new jBuffer_Vulkan());
-            jBufferUtil_Vulkan::AllocateBuffer(
-                EVulkanBufferBits::SHADER_BINDING_TABLE | EVulkanBufferBits::SHADER_DEVICE_ADDRESS | EVulkanBufferBits::STORAGE_BUFFER,
-                EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT,
-                sizeof(ubo), *(jBuffer_Vulkan*)TestUniformBuffer.get());
-            TestUniformBuffer->UpdateBuffer(&ubo, sizeof(ubo));
-        }
+        TestUniformBuffer = g_rhi->CreateStructuredBuffer(sizeof(ubo), 0, sizeof(ubo), EBufferCreateFlag::UAV | EBufferCreateFlag::ShaderBindingTable
+            , EImageLayout::GENERAL, &ubo, sizeof(ubo));
 
         LastMetallic = gOptions.Metallic;
         LastRoughness = gOptions.Roughness;

@@ -544,25 +544,19 @@ void jRHI_Vulkan::ReleaseRHI()
 		Instance = nullptr;
 	}
 
-	if (CubeMapInstanceDataForSixFace)
-	{
-		delete CubeMapInstanceDataForSixFace;
-		CubeMapInstanceDataForSixFace = nullptr;
-	}
-
     jSpirvHelper::Finalize();
 }
 
-jIndexBuffer* jRHI_Vulkan::CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const
+std::shared_ptr<jIndexBuffer> jRHI_Vulkan::CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const
 {
 	if (!streamData)
 		return nullptr;
 
 	check(streamData);
 	check(streamData->Param);
-	jIndexBuffer_Vulkan* indexBuffer = new jIndexBuffer_Vulkan();
-	indexBuffer->Initialize(streamData);
-	return indexBuffer;
+	auto indexBufferPtr = std::make_shared<jIndexBuffer_Vulkan>();
+	indexBufferPtr->Initialize(streamData);
+	return indexBufferPtr;
 }
 
 void jRHI_Vulkan::CleanupSwapChain()
@@ -634,14 +628,14 @@ uint32 jRHI_Vulkan::GetMaxSwapchainCount() const
 	return (uint32)Swapchain->Images.size();
 }
 
-jVertexBuffer* jRHI_Vulkan::CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const
+std::shared_ptr<jVertexBuffer> jRHI_Vulkan::CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const
 {
 	if (!streamData)
 		return nullptr;
 
-	jVertexBuffer_Vulkan* vertexBuffer = new jVertexBuffer_Vulkan();
-	vertexBuffer->Initialize(streamData);
-	return vertexBuffer;
+	auto vertexBufferPtr = std::make_shared<jVertexBuffer_Vulkan>();
+	vertexBufferPtr->Initialize(streamData);
+	return vertexBufferPtr;
 }
 
 jTexture* jRHI_Vulkan::CreateTextureFromData(const jImageData* InImageData) const
@@ -654,11 +648,10 @@ jTexture* jRHI_Vulkan::CreateTextureFromData(const jImageData* InImageData) cons
         MipLevel = jTexture::GetMipLevels(InImageData->Width, InImageData->Height);
     }
 
-	jBuffer_Vulkan stagingBuffer;
-	jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
-        , InImageData->ImageData.size(), stagingBuffer);
+	auto stagingBufferPtr = jBufferUtil_Vulkan::CreateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
+        , InImageData->ImageData.size());
 
-	stagingBuffer.UpdateBuffer(&InImageData->ImageData[0], InImageData->ImageData.size());
+	stagingBufferPtr->UpdateBuffer(&InImageData->ImageData[0], InImageData->ImageData.size());
 
 	VkFormat vkTextureFormat = GetVulkanTextureFormat(InImageData->Format);
 
@@ -694,13 +687,13 @@ jTexture* jRHI_Vulkan::CreateTextureFromData(const jImageData* InImageData) cons
 		{
 			const jImageSubResourceData SubResourceData = InImageData->SubresourceFootprints[i];
 			
-			jBufferUtil_Vulkan::CopyBufferToImage(commandBuffer->GetRef(), stagingBuffer.Buffer, stagingBuffer.Offset + SubResourceData.Offset, TextureImage
+			jBufferUtil_Vulkan::CopyBufferToImage(commandBuffer->GetRef(), stagingBufferPtr->Buffer, stagingBufferPtr->Offset + SubResourceData.Offset, TextureImage
 				, SubResourceData.Width, SubResourceData.Height, SubResourceData.MipLevel, SubResourceData.Depth);
 		}
 	}
 	else
 	{
-		jBufferUtil_Vulkan::CopyBufferToImage(commandBuffer->GetRef(), stagingBuffer.Buffer, stagingBuffer.Offset, TextureImage, (uint32)InImageData->Width, (uint32)InImageData->Height);
+		jBufferUtil_Vulkan::CopyBufferToImage(commandBuffer->GetRef(), stagingBufferPtr->Buffer, stagingBufferPtr->Offset, TextureImage, (uint32)InImageData->Width, (uint32)InImageData->Height);
 	}
 
 	// If it needs to generate miplevel do it here.
@@ -716,8 +709,6 @@ jTexture* jRHI_Vulkan::CreateTextureFromData(const jImageData* InImageData) cons
     }
 
 	EndSingleTimeCommands(commandBuffer);
-
-	stagingBuffer.Release();
 
     // Create Texture image view
 	VkImageView textureImageView = nullptr;
@@ -1299,11 +1290,11 @@ std::shared_ptr<jShaderBindingInstance> jRHI_Vulkan::CreateShaderBindingInstance
 	return shaderBindingsLayout->CreateShaderBindingInstance(InShaderBindingArray, InType);
 }
 
-IUniformBufferBlock* jRHI_Vulkan::CreateUniformBufferBlock(jName InName, jLifeTimeType InLifeTimeType, size_t InSize /*= 0*/) const
+std::shared_ptr<IUniformBufferBlock> jRHI_Vulkan::CreateUniformBufferBlock(jName InName, jLifeTimeType InLifeTimeType, size_t InSize /*= 0*/) const
 {
-	auto uniformBufferBlock = new jUniformBufferBlock_Vulkan(InName, InLifeTimeType);
-	uniformBufferBlock->Init(InSize);
-	return uniformBufferBlock;
+	auto uniformBufferBlockPtr = std::make_shared<jUniformBufferBlock_Vulkan>(InName, InLifeTimeType);
+	uniformBufferBlockPtr->Init(InSize);
+	return uniformBufferBlockPtr;
 }
 
 jQuery* jRHI_Vulkan::CreateQueryTime() const
@@ -1895,14 +1886,12 @@ jTexture* jRHI_Vulkan::CreateSampleVRSTexture()
             , VK_IMAGE_USAGE_SHADING_RATE_IMAGE_BIT_NV | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, *NewVRSTexture);
 
         VkDeviceSize imageSize = imageExtent.width * imageExtent.height * GetVulkanTexturePixelSize(ETextureFormat::R8UI);
-        jBuffer_Vulkan stagingBuffer;
-        jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
-            , imageSize, stagingBuffer);
+		auto stagingBufferPtr = jBufferUtil_Vulkan::CreateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT, imageSize);
 
 		auto commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
         ensure(g_rhi_vk->TransitionImageLayout(commandBuffer->GetRef(), (VkImage)NewVRSTexture->GetHandle(), GetVulkanTextureFormat(ETextureFormat::R8UI), 1, 1, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
 
-        jBufferUtil_Vulkan::CopyBufferToImage(commandBuffer->GetRef(), stagingBuffer.Buffer, stagingBuffer.Offset, (VkImage)NewVRSTexture->GetHandle()
+        jBufferUtil_Vulkan::CopyBufferToImage(commandBuffer->GetRef(), stagingBufferPtr->Buffer, stagingBufferPtr->Offset, (VkImage)NewVRSTexture->GetHandle()
             , static_cast<uint32>(imageExtent.width), static_cast<uint32>(imageExtent.height));
 
         // Create a circular pattern with decreasing sampling rates outwards (max. range, pattern)
@@ -1937,11 +1926,10 @@ jTexture* jRHI_Vulkan::CreateSampleVRSTexture()
 
         check(imageSize == bufferSize);
 
-        stagingBuffer.UpdateBuffer(shadingRatePatternData, bufferSize);
+        stagingBufferPtr->UpdateBuffer(shadingRatePatternData, bufferSize);
 
         g_rhi_vk->EndSingleTimeCommands(commandBuffer);
 
-        stagingBuffer.Release();
         delete[]shadingRatePatternData;
 
 		NewVRSTexture->View = jBufferUtil_Vulkan::CreateImageView((VkImage)NewVRSTexture->GetHandle(), GetVulkanTextureFormat(NewVRSTexture->Format)
@@ -2041,5 +2029,104 @@ bool jRHI_Vulkan::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMini
 jRaytracingScene* jRHI_Vulkan::CreateRaytracingScene() const
 {
 	return new jRaytracingScene_Vulkan();
+}
+
+std::shared_ptr<jBuffer> jRHI_Vulkan::CreateBufferInternal(uint64 InSize, uint64 InAlignment, EBufferCreateFlag InBufferCreateFlag, EImageLayout InInitialState
+	, const void* InData, uint64 InDataSize, const wchar_t* InResourceName) const
+{
+	if (InAlignment > 0)
+		InSize = Align(InSize, InAlignment);
+
+    EVulkanBufferBits BufferBits = EVulkanBufferBits::SHADER_DEVICE_ADDRESS;
+    if (!!(EBufferCreateFlag::UAV & InBufferCreateFlag))
+    {
+        BufferBits = BufferBits | EVulkanBufferBits::STORAGE_BUFFER;
+    }
+
+    if (!!(EBufferCreateFlag::AccelerationStructureBuildInput & InBufferCreateFlag))
+    {
+        BufferBits = BufferBits | EVulkanBufferBits::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY;
+    }
+
+    if (!!(EBufferCreateFlag::AccelerationStructure& InBufferCreateFlag))
+    {
+        BufferBits = BufferBits | EVulkanBufferBits::ACCELERATION_STRUCTURE_STORAGE;
+    }
+
+    if (!!(EBufferCreateFlag::VertexBuffer & InBufferCreateFlag))
+    {
+        BufferBits = BufferBits | EVulkanBufferBits::VERTEX_BUFFER;
+    }
+    
+	if (!!(EBufferCreateFlag::IndexBuffer & InBufferCreateFlag))
+    {
+        BufferBits = BufferBits | EVulkanBufferBits::INDEX_BUFFER;
+    }
+
+	if (!!(EBufferCreateFlag::IndirectCommand & InBufferCreateFlag))
+	{
+		BufferBits = BufferBits | EVulkanBufferBits::INDIRECT_BUFFER;
+	}
+
+	if (!!(EBufferCreateFlag::ShaderBindingTable & InBufferCreateFlag))
+	{
+		BufferBits = BufferBits | EVulkanBufferBits::SHADER_BINDING_TABLE;
+	}
+
+    if (InInitialState == EImageLayout::TRANSFER_DST)
+    {
+        BufferBits = BufferBits | EVulkanBufferBits::TRANSFER_DST;
+    }
+
+    if (InInitialState == EImageLayout::TRANSFER_SRC)
+    {
+        BufferBits = BufferBits | EVulkanBufferBits::TRANSFER_SRC;
+    }
+
+    EVulkanMemoryBits MemoryBits = EVulkanMemoryBits::DEVICE_LOCAL;
+    if (!!(EBufferCreateFlag::CPUAccess & InBufferCreateFlag))
+    {
+		// EBufferCreateFlag::CPUAccess 사용시 고민해볼 점
+        // Map -> Unmap 했다가 메모리에 데이터가 즉시 반영되는게 아님, 바로 사용하려면 아래 2가지 방법이 있음.
+		// 1. VK_MEMORY_PROPERTY_HOST_COHERENT_BIT 사용 (항상 반영, 약간 느릴 수도)
+		// 2. 쓰기 이후 vkFlushMappedMemoryRanges 호출, 읽기 이후 vkInvalidateMappedMemoryRanges 호출
+		// 위의 2가지 방법을 사용해도 이 데이터가 GPU에 바로 보인다고 보장할 수는 없지만 다음 vkQueueSubmit 호출 전에는 완료될 것을 보장함.
+		
+		// 현재 코드는 모든 CPUAccess 는 HOST_COHERENT 로 사용.
+        MemoryBits |= EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT;
+    }
+
+	auto Buffer_Vulkan = jBufferUtil_Vulkan::CreateBuffer(BufferBits, MemoryBits, InSize);
+    if (InData && InDataSize > 0)
+    {
+		if (!!(EBufferCreateFlag::CPUAccess & InBufferCreateFlag))
+		{
+			Buffer_Vulkan->UpdateBuffer(InData, InDataSize);
+		}
+		else
+		{
+			auto stagingBufferPtr = g_rhi->CreateRawBuffer<jBuffer_Vulkan>(InDataSize, InAlignment, EBufferCreateFlag::CPUAccess, EImageLayout::TRANSFER_SRC, InData, InDataSize, TEXT("StagingBuffer"));
+			jBufferUtil_Vulkan::CopyBuffer(*stagingBufferPtr, *Buffer_Vulkan, InDataSize);
+		}
+    }
+	return std::shared_ptr<jBuffer>(Buffer_Vulkan);
+}
+
+std::shared_ptr<jBuffer> jRHI_Vulkan::CreateStructuredBuffer(uint64 InSize, uint64 InAlignment, uint64 InStride
+	, EBufferCreateFlag InBufferCreateFlag, EImageLayout InInitialState, const void* InData, uint64 InDataSize , const wchar_t* InResourceName) const
+{
+	return CreateBufferInternal(InSize, InAlignment, InBufferCreateFlag, InInitialState, InData, InDataSize, InResourceName);
+}
+
+std::shared_ptr<jBuffer> jRHI_Vulkan::CreateRawBuffer(uint64 InSize, uint64 InAlignment, EBufferCreateFlag InBufferCreateFlag
+	, EImageLayout InInitialState, const void* InData, uint64 InDataSize , const wchar_t* InResourceName) const
+{
+	return CreateBufferInternal(InSize, InAlignment, InBufferCreateFlag, InInitialState, InData, InDataSize, InResourceName);
+}
+
+std::shared_ptr<jBuffer> jRHI_Vulkan::CreateFormattedBuffer(uint64 InSize, uint64 InAlignment, ETextureFormat InFormat
+	, EBufferCreateFlag InBufferCreateFlag, EImageLayout InInitialState, const void* InData, uint64 InDataSize , const wchar_t* InResourceName) const
+{
+	return CreateBufferInternal(InSize, InAlignment, InBufferCreateFlag, InInitialState, InData, InDataSize, InResourceName);
 }
 

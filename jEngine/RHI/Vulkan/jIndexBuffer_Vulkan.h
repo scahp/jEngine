@@ -9,6 +9,10 @@ struct jIndexBuffer_Vulkan : public jIndexBuffer
 
     virtual void Bind(const jShader* shader) const override {}
     virtual void Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const override;
+
+    VkIndexType GetVulkanIndexFormat(EBufferElementType IndexType) const;
+    uint32 GetVulkanIndexStride(EBufferElementType IndexType) const;
+
     virtual bool Initialize(const std::shared_ptr<jIndexStreamData>& InStreamData) override;
 
     FORCEINLINE uint32 GetIndexCount() const
@@ -16,6 +20,6 @@ struct jIndexBuffer_Vulkan : public jIndexBuffer
         return IndexStreamData->ElementCount;
     }
 
-    virtual jBuffer* GetBuffer() const override { return BufferPtr.get(); }
+    virtual jBuffer_Vulkan* GetBuffer() const override { return BufferPtr.get(); }
 };
 

@@ -86,20 +86,8 @@ FORCEINLINE bool CreateImageCube(uint32 width, uint32 height, uint32 mipLevels, 
     }
     return false;
 }
-
-size_t CreateBuffer(EVulkanBufferBits InUsage, EVulkanMemoryBits InProperties, uint64 InSize, VkBuffer& OutBuffer, VkDeviceMemory& OutBufferMemory, uint64& OutAllocatedSize);
-FORCEINLINE size_t AllocateBuffer(EVulkanBufferBits InUsage, EVulkanMemoryBits InProperties, uint64 InSize, jBuffer_Vulkan& OutBuffer)
-{
-#if USE_VK_MEMORY_POOL
-    check(g_rhi->GetMemoryPool());
-    const jMemory& Memory = g_rhi->GetMemoryPool()->Alloc(InUsage, InProperties, InSize);
-    OutBuffer.InitializeWithMemory(Memory);
-    OutBuffer.RealBufferSize = InSize;
-    return OutBuffer.AllocatedSize;
-#else
-    return CreateBuffer(InUsage, InProperties, InSize, OutBuffer.Buffer, OutBuffer.BufferMemory, OutBuffer.AllocatedSize);
-#endif
-}
+size_t CreateBuffer_LowLevel(EVulkanBufferBits InUsage, EVulkanMemoryBits InProperties, uint64 InSize, VkBuffer& OutBuffer, VkDeviceMemory& OutBufferMemory, uint64& OutAllocatedSize);
+std::shared_ptr<jBuffer_Vulkan> CreateBuffer(EVulkanBufferBits InUsage, EVulkanMemoryBits InProperties, uint64 InSize);
 
 void CopyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer buffer, uint64 bufferOffset, VkImage image, uint32 width, uint32 height, int32 miplevel = 0, int32 layerIndex = 0);
 void GenerateMipmaps(VkCommandBuffer commandBuffer, VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32 mipLevels, uint32 layerCount

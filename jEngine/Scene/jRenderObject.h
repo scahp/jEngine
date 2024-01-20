@@ -23,27 +23,26 @@ public:
 
     // Vertex buffers
     void UpdateVertexStream(const std::shared_ptr<jVertexStreamData>& vertexStream);
-    void UpdateVertexStream();
 
-	EPrimitiveType GetPrimitiveType() const { return VertexStream ? VertexStream->PrimitiveType : EPrimitiveType::MAX; }
-	FORCEINLINE bool HasInstancing() const { return !!VertexBuffer_InstanceData; }
+	EPrimitiveType GetPrimitiveType() const { return VertexStreamPtr ? VertexStreamPtr->PrimitiveType : EPrimitiveType::MAX; }
+	FORCEINLINE bool HasInstancing() const { return !!VertexBuffer_InstanceDataPtr; }
 	FORCEINLINE bool HasVertexColor() const { return bHasVertexColor; }
 	FORCEINLINE bool HasVertexBiTangent() const { return bHasVertexBiTangent; }
 
-    std::shared_ptr<jVertexStreamData> VertexStream;
-    std::shared_ptr<jVertexStreamData> VertexStream_InstanceData;
-    std::shared_ptr<jVertexStreamData> VertexStream_PositionOnly;
+    std::shared_ptr<jVertexStreamData> VertexStreamPtr;
+    std::shared_ptr<jVertexStreamData> VertexStream_InstanceDataPtr;
+    std::shared_ptr<jVertexStreamData> VertexStream_PositionOnlyPtr;
 
     // Index buffer
-    std::shared_ptr<jIndexStreamData> IndexStream;
+    std::shared_ptr<jIndexStreamData> IndexStreamPtr;
 
-    jVertexBuffer* VertexBuffer = nullptr;
-    jVertexBuffer* VertexBuffer_PositionOnly = nullptr;
-    jVertexBuffer* VertexBuffer_InstanceData = nullptr;
-    jIndexBuffer* IndexBuffer = nullptr;
+    std::shared_ptr<jVertexBuffer> VertexBufferPtr;
+    std::shared_ptr<jVertexBuffer> VertexBuffer_PositionOnlyPtr;
+    std::shared_ptr<jVertexBuffer> VertexBuffer_InstanceDataPtr;
+    std::shared_ptr<jIndexBuffer> IndexBufferPtr;
 
     // IndirectCommand buffer
-    jBuffer* IndirectCommandBuffer = nullptr;
+    std::shared_ptr<jBuffer> IndirectCommandBufferPtr;
 
 	bool bHasVertexColor = true;
 	bool bHasVertexBiTangent = false;
@@ -72,9 +71,13 @@ public:
 
 	std::shared_ptr<jRenderObjectGeometryData> GeometryDataPtr;
 
-    jBuffer* BottomLevelASBuffer = nullptr;
-	jBuffer* ScratchASBuffer = nullptr;
-	jBuffer* VertexAndIndexOffsetBuffer = nullptr;
+    std::shared_ptr<jBuffer> BottomLevelASBuffer;
+	std::shared_ptr<jBuffer> ScratchASBuffer;
+	std::shared_ptr<jBuffer> VertexAndIndexOffsetBuffer;
+
+	template <typename T> T* GetBottomLevelASBuffer() const { return (T*)BottomLevelASBuffer.get(); }
+	template <typename T> T* GetScratchASBuffer() const { return (T*)ScratchASBuffer.get(); }
+	template <typename T> T* GetVertexAndIndexOffsetBuffer() const { return (T*)VertexAndIndexOffsetBuffer.get(); }
 
 	FORCEINLINE void SetPos(const Vector& InPos) { Pos = InPos; SetDirtyFlags(EDirty::POS); }
 	FORCEINLINE void SetRot(const Vector& InRot) { Rot = InRot; SetDirtyFlags(EDirty::ROT); }

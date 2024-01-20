@@ -32,26 +32,25 @@ namespace jLightUtil
 	{
 		jShadowMapArrayData()
 		{
-			UniformBlock = g_rhi->CreateUniformBufferBlock(jNameStatic("ShadowMapBlock"), jLifeTimeType::MultiFrame);
+			UniformBlockPtr = g_rhi->CreateUniformBufferBlock(jNameStatic("ShadowMapBlock"), jLifeTimeType::MultiFrame);
 		}
 
 		jShadowMapArrayData(const char* prefix)
 		{
 			if (prefix)
-				UniformBlock = g_rhi->CreateUniformBufferBlock(jNameStatic(std::string(prefix) + "ShadowMapBlock"), jLifeTimeType::MultiFrame);
+				UniformBlockPtr = g_rhi->CreateUniformBufferBlock(jNameStatic(std::string(prefix) + "ShadowMapBlock"), jLifeTimeType::MultiFrame);
 			else
-				UniformBlock = g_rhi->CreateUniformBufferBlock(jNameStatic("ShadowMapBlock"), jLifeTimeType::MultiFrame);
+				UniformBlockPtr = g_rhi->CreateUniformBufferBlock(jNameStatic("ShadowMapBlock"), jLifeTimeType::MultiFrame);
 		}
 
 		~jShadowMapArrayData()
 		{
-			delete UniformBlock;
 		}
 
 		FORCEINLINE bool IsValid() const { return (ShadowMapCamera[0] && ShadowMapCamera[1] && ShadowMapCamera[2] && ShadowMapCamera[3] && ShadowMapCamera[4] && ShadowMapCamera[5]); }
 
 		jCamera* ShadowMapCamera[6] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
-		IUniformBufferBlock* UniformBlock = nullptr;
+		std::shared_ptr<IUniformBufferBlock> UniformBlockPtr;
 	};
 
 	static jShadowMapArrayData* CreateShadowMapArray(const Vector& pos);
