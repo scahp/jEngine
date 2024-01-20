@@ -24,7 +24,7 @@ void IUniformBuffer::Bind(const jShader* shader) const
 
 //////////////////////////////////////////////////////////////////////////
 TResourcePool<jShader, jMutexRWLock> jRHI::ShaderPool;
-jVertexBuffer* jRHI::CubeMapInstanceDataForSixFace = nullptr;
+std::shared_ptr<jVertexBuffer> jRHI::CubeMapInstanceDataForSixFace;
 
 // jGPUDebugEvent
 jGPUDebugEvent::jGPUDebugEvent(jCommandBuffer* InCommandBuffer, const char* InName)

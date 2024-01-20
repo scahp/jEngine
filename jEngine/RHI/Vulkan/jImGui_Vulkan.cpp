@@ -118,18 +118,13 @@ void jImGUI_Vulkan::Initialize(float width, float height)
     // 
     //////////////////////////////////////////////////////////////////////////
     // Staging buffers for font data upload
-    jBuffer_Vulkan stagingBuffer;
-    verify(jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
-        , uploadSize, stagingBuffer));
-
-    stagingBuffer.UpdateBuffer(fontData, uploadSize);
+    std::shared_ptr<jBuffer_Vulkan> stagingBuffer = jBufferUtil_Vulkan::CreateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT, uploadSize);
+    stagingBuffer->UpdateBuffer(fontData, uploadSize);
 
     // Copy buffer data to font image
     g_rhi_vk->TransitionImageLayoutImmediate(FontImage, EImageLayout::TRANSFER_DST);
-    jBufferUtil_Vulkan::CopyBufferToImage(stagingBuffer.Buffer, stagingBuffer.Offset, FontImage_vk->Image, texWidth, texHeight);
+    jBufferUtil_Vulkan::CopyBufferToImage(stagingBuffer->Buffer, stagingBuffer->Offset, FontImage_vk->Image, texWidth, texHeight);
     g_rhi_vk->TransitionImageLayoutImmediate(FontImage, EImageLayout::SHADER_READ_ONLY);
-
-    stagingBuffer.Release();
     //////////////////////////////////////////////////////////////////////////
 
     DynamicBufferData.resize(g_rhi_vk->Swapchain->GetNumOfSwapchain());
@@ -155,7 +150,7 @@ void jImGUI_Vulkan::Initialize(float width, float height)
         vertexStreamData->PrimitiveType = EPrimitiveType::TRIANGLES;
         vertexStreamData->ElementCount = 0;
 
-        EmptyVertexBuffer = g_rhi->CreateVertexBuffer(vertexStreamData);
+        EmptyVertexBufferPtr = g_rhi->CreateVertexBuffer(vertexStreamData);
     }
 
     IsInitialized = true;
@@ -176,9 +171,6 @@ void jImGUI_Vulkan::Release()
     }
  
     PushConstBlockPtr.reset();
-
-    delete EmptyVertexBuffer;
-    EmptyVertexBuffer = nullptr;
 }
 
 jPipelineStateInfo* jImGUI_Vulkan::CreatePipelineState(jRenderPass* renderPass, VkQueue copyQueue)
@@ -204,7 +196,7 @@ jPipelineStateInfo* jImGUI_Vulkan::CreatePipelineState(jRenderPass* renderPass, 
     jPipelineStateFixedInfo PipelineStateFixed(rasterizationInfo, depthStencilInfo, blendStateInfo, PipelineDynamicStates, false);
 
     jVertexBufferArray VertexBufferArray;
-    VertexBufferArray.Add(EmptyVertexBuffer);
+    VertexBufferArray.Add(EmptyVertexBufferPtr.get());
 
     jShaderBindingLayoutArray ShaderBindingsLayoutArray;
     ShaderBindingsLayoutArray.Add(EmptyShaderBindingLayout);
@@ -252,25 +244,22 @@ void jImGUI_Vulkan::UpdateBuffers()
     // Update buffers only if vertex or index count has been changed compared to current buffer size
 
     // Vertex buffer
-    if ((DynamicBuffer.VertexBufferPtr->Buffer == VK_NULL_HANDLE) || (DynamicBuffer.vertexCount != imDrawData->TotalVtxCount))
+    if (!DynamicBuffer.VertexBufferPtr || (DynamicBuffer.VertexBufferPtr->Buffer == VK_NULL_HANDLE) || (DynamicBuffer.vertexCount != imDrawData->TotalVtxCount))
     {
         const uint64 newBufferSize = imDrawData->TotalVtxCount * sizeof(ImDrawVert);
-
-        DynamicBuffer.VertexBufferPtr->Release();
-        verify(jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::VERTEX_BUFFER, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
-            , newBufferSize, *DynamicBuffer.VertexBufferPtr.get()));
+        DynamicBuffer.VertexBufferPtr = g_rhi->CreateRawBuffer<jBuffer_Vulkan>(newBufferSize, 0
+            , EBufferCreateFlag::VertexBuffer | EBufferCreateFlag::CPUAccess, EImageLayout::GENERAL);
         DynamicBuffer.VertexBufferPtr->Map();
         DynamicBuffer.vertexCount = imDrawData->TotalVtxCount;
     }
 
     // Index buffer
-    if ((DynamicBuffer.IndexBufferPtr->Buffer == VK_NULL_HANDLE) || (DynamicBuffer.indexCount < imDrawData->TotalIdxCount))
+    if (!DynamicBuffer.IndexBufferPtr || (DynamicBuffer.IndexBufferPtr->Buffer == VK_NULL_HANDLE) || (DynamicBuffer.indexCount < imDrawData->TotalIdxCount))
     {
         const uint64 newBufferSize = imDrawData->TotalIdxCount * sizeof(ImDrawIdx);
 
-        DynamicBuffer.IndexBufferPtr->Release();
-        verify(jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::INDEX_BUFFER, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
-            , newBufferSize, *DynamicBuffer.IndexBufferPtr.get()));
+        DynamicBuffer.IndexBufferPtr = g_rhi->CreateRawBuffer<jBuffer_Vulkan>(newBufferSize, 0
+            , EBufferCreateFlag::IndexBuffer | EBufferCreateFlag::CPUAccess, EImageLayout::GENERAL);
         DynamicBuffer.IndexBufferPtr->Map();
         DynamicBuffer.indexCount = imDrawData->TotalIdxCount;
     }

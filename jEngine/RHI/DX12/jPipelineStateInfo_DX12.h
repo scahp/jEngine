@@ -100,7 +100,7 @@ struct jPipelineStateInfo_DX12 : public jPipelineStateInfo
     ComPtr<ID3D12StateObject> RaytracingStateObject;
 
     // Raytracing ShaderTables
-    jBuffer_DX12* RaygenBuffer = nullptr;
-    jBuffer_DX12* MissBuffer = nullptr;
-    jBuffer_DX12* HitGroupBuffer = nullptr;
+    std::shared_ptr<jBuffer_DX12> RaygenBuffer;
+    std::shared_ptr<jBuffer_DX12> MissBuffer;
+    std::shared_ptr<jBuffer_DX12> HitGroupBuffer;
 };

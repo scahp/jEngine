@@ -148,13 +148,6 @@ class jRHI_DX12 : public jRHI
 public:
     static constexpr UINT MaxFrameCount = 3;
 
-	static const wchar_t* c_raygenShaderName;
-	static const wchar_t* c_closestHitShaderName;
-	static const wchar_t* c_missShaderName;
-    static const wchar_t* c_triHitGroupName;
-    static const wchar_t* c_planeHitGroupName;
-    static const wchar_t* c_planeclosestHitShaderName;
-
 	jRHI_DX12();
 	virtual ~jRHI_DX12();
 
@@ -218,9 +211,9 @@ public:
     uint64 PlacedResourceDefaultUploadOffset = 0;
 	jMutexLock PlacedResourceDefaultUploadOffsetLock;
 
-    static constexpr uint64 DefaultPlacedResourceHeapSize = 256 * 1024 * 1024;
-	static constexpr uint64 PlacedResourceSizeThreshold = 512 * 512 * 4;
-	static bool IsUsePlacedResource;
+    static constexpr uint64 GDefaultPlacedResourceHeapSize = 256 * 1024 * 1024;
+	static constexpr uint64 GPlacedResourceSizeThreshold = 512 * 512 * 4;
+	static bool GIsUsePlacedResource;
 
 	jPlacedResourcePool PlacedResourcePool;
 
@@ -230,7 +223,7 @@ public:
 		check(Device);
 
         const D3D12_RESOURCE_ALLOCATION_INFO info = Device->GetResourceAllocationInfo(0, 1, InDesc);
-		if (IsUsePlacedResource)
+		if (GIsUsePlacedResource)
 		{
 			jPlacedResource ReusePlacedResource = PlacedResourcePool.Alloc(info.SizeInBytes, false);
 			if (ReusePlacedResource.IsValid())
@@ -240,8 +233,8 @@ public:
 			else
 			{
 				jScopedLock s(&PlacedPlacedResourceDefaultHeapOffsetLock);
-				const bool IsAvailableCreatePlacedResource = IsUsePlacedResource && (info.SizeInBytes <= PlacedResourceSizeThreshold)
-					&& ((PlacedResourceDefaultHeapOffset + info.SizeInBytes) <= DefaultPlacedResourceHeapSize);
+				const bool IsAvailableCreatePlacedResource = GIsUsePlacedResource && (info.SizeInBytes <= GPlacedResourceSizeThreshold)
+					&& ((PlacedResourceDefaultHeapOffset + info.SizeInBytes) <= GDefaultPlacedResourceHeapSize);
 
 				if (IsAvailableCreatePlacedResource)
 				{
@@ -277,7 +270,7 @@ public:
         check(Device);
 
         const D3D12_RESOURCE_ALLOCATION_INFO info = Device->GetResourceAllocationInfo(0, 1, InDesc);
-		if (IsUsePlacedResource)
+		if (GIsUsePlacedResource)
 		{
 			jPlacedResource ReusePlacedUploadResource = PlacedResourcePool.Alloc(info.SizeInBytes, true);
 			if (ReusePlacedUploadResource.IsValid())
@@ -287,8 +280,8 @@ public:
 			else
 			{
 				jScopedLock s(&PlacedResourceDefaultUploadOffsetLock);
-				const bool IsAvailablePlacedResource = IsUsePlacedResource && (info.SizeInBytes <= PlacedResourceSizeThreshold)
-					&& ((PlacedResourceDefaultUploadOffset + info.SizeInBytes) <= DefaultPlacedResourceHeapSize);
+				const bool IsAvailablePlacedResource = GIsUsePlacedResource && (info.SizeInBytes <= GPlacedResourceSizeThreshold)
+					&& ((PlacedResourceDefaultUploadOffset + info.SizeInBytes) <= GDefaultPlacedResourceHeapSize);
 
 				if (IsAvailablePlacedResource)
 				{
@@ -378,7 +371,6 @@ public:
 	virtual jCommandBufferManager_DX12* GetCommandBufferManager() const override { return CommandBufferManager; }
 	virtual jCommandBufferManager_DX12* GetCopyCommandBufferManager() const { return CopyCommandBufferManager; }
 
-	virtual IUniformBufferBlock* CreateUniformBufferBlock(jName InName, jLifeTimeType InLifeTimeType, size_t InSize = 0) const override;
     virtual void BindGraphicsShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineState
         , const jShaderBindingInstanceCombiner& InShaderBindingInstanceCombiner, uint32 InFirstSet) const override;
 	virtual void BindComputeShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineState
@@ -386,8 +378,6 @@ public:
 	virtual void BindRaytracingShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineState
 		, const jShaderBindingInstanceCombiner& InShaderBindingInstanceCombiner, uint32 InFirstSet) const override;
 
-	virtual jVertexBuffer* CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const override;
-	virtual jIndexBuffer* CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const override;
 	virtual std::shared_ptr<jShaderBindingInstance> CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const override;
 
 	virtual void DrawArrays(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 vertStartIndex, int32 vertCount) const override;
@@ -428,6 +418,16 @@ public:
 	jDeallocatorMultiFrameCreatedResource DeallocatorMultiFrameStandaloneResource;
 
 	virtual jRaytracingScene* CreateRaytracingScene() const;
+
+    virtual std::shared_ptr<jBuffer> CreateStructuredBuffer(uint64 InSize, uint64 InAlignment, uint64 InStride, EBufferCreateFlag InBufferCreateFlag
+        , EImageLayout InInitialState, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr) const override;
+	virtual std::shared_ptr<jBuffer> CreateRawBuffer(uint64 InSize, uint64 InAlignment, EBufferCreateFlag InBufferCreateFlag
+		, EImageLayout InInitialState, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr) const override;
+	virtual std::shared_ptr<jBuffer> CreateFormattedBuffer(uint64 InSize, uint64 InAlignment, ETextureFormat InFormat, EBufferCreateFlag InBufferCreateFlag
+		, EImageLayout InInitialState, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr) const override;
+    virtual std::shared_ptr<IUniformBufferBlock> CreateUniformBufferBlock(jName InName, jLifeTimeType InLifeTimeType, size_t InSize = 0) const override;
+    virtual std::shared_ptr<jVertexBuffer> CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const override;
+    virtual std::shared_ptr<jIndexBuffer> CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const override;
 };
 
 extern jRHI_DX12* g_rhi_dx12;

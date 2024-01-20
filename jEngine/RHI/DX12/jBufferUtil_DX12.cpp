@@ -7,7 +7,7 @@
 namespace jBufferUtil_DX12
 {
 
-std::shared_ptr<jCreatedResource> CreateBufferInternal(uint64 InSize, uint16 InAlignment, EBufferCreateFlag InBufferCreateFlag
+std::shared_ptr<jCreatedResource> CreateBufferInternal(uint64 InSize, uint64 InAlignment, EBufferCreateFlag InBufferCreateFlag
     , D3D12_RESOURCE_STATES InInitialState, const wchar_t* InResourceName)
 {
     InSize = (InAlignment > 0) ? Align(InSize, InAlignment) : InSize;
@@ -40,6 +40,8 @@ std::shared_ptr<jCreatedResource> CreateBufferInternal(uint64 InSize, uint16 InA
     std::shared_ptr<jCreatedResource> CreatedResource;
     if (!!(InBufferCreateFlag & EBufferCreateFlag::Readback))
     {
+        check(EBufferCreateFlag::NONE == (InBufferCreateFlag & EBufferCreateFlag::UAV));        // Not allowed Readback with UAV
+
         ComPtr<ID3D12Resource> NewResource;
         const CD3DX12_HEAP_PROPERTIES& HeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_READBACK);
         JFAIL(g_rhi_dx12->Device->CreateCommittedResource(&HeapProperties, D3D12_HEAP_FLAG_NONE
@@ -49,6 +51,7 @@ std::shared_ptr<jCreatedResource> CreateBufferInternal(uint64 InSize, uint16 InA
     }
     else if (!!(InBufferCreateFlag & EBufferCreateFlag::CPUAccess))
     {
+        check(EBufferCreateFlag::NONE == (InBufferCreateFlag & EBufferCreateFlag::UAV));        // Not allowed Readback with UAV
         CreatedResource = g_rhi_dx12->CreateUploadResource(&resourceDesc, resourceState);
     }
     else
@@ -64,14 +67,14 @@ std::shared_ptr<jCreatedResource> CreateBufferInternal(uint64 InSize, uint16 InA
     return CreatedResource;
 }
 
-jBuffer_DX12* CreateBuffer(uint64 InSize, uint16 InAlignment, EBufferCreateFlag InBufferCreateFlag
+std::shared_ptr<jBuffer_DX12> CreateBuffer(uint64 InSize, uint64 InAlignment, EBufferCreateFlag InBufferCreateFlag
     , D3D12_RESOURCE_STATES InInitialState /*= D3D12_RESOURCE_STATE_COMMON*/, const void* InData /*= nullptr*/, uint64 InDataSize /*= 0*/, const wchar_t* InResourceName /*= nullptr*/)
 {
     std::shared_ptr<jCreatedResource> BufferInternal = CreateBufferInternal(InSize, InAlignment, InBufferCreateFlag, InInitialState, InResourceName);
     if (!BufferInternal->Resource)
         return nullptr;
 
-    auto Buffer = new jBuffer_DX12(BufferInternal, InSize, InAlignment, InBufferCreateFlag);
+    auto BufferPtr = std::make_shared<jBuffer_DX12>(BufferInternal, InSize, InAlignment, InBufferCreateFlag);
     if (InResourceName)
     {
         // https://learn.microsoft.com/ko-kr/cpp/text/how-to-convert-between-various-string-types?view=msvc-170#example-convert-from-char-
@@ -81,7 +84,7 @@ jBuffer_DX12* CreateBuffer(uint64 InSize, uint16 InAlignment, EBufferCreateFlag 
         const size_t newsize = origsize * 2;
         wcstombs_s(&OutLength, szResourceName, newsize, InResourceName, _TRUNCATE);
 
-        Buffer->ResourceName = jName(szResourceName);
+        BufferPtr->ResourceName = jName(szResourceName);
     }
 
     const bool HasInitialData = InData && (InDataSize > 0);
@@ -93,7 +96,7 @@ jBuffer_DX12* CreateBuffer(uint64 InSize, uint16 InAlignment, EBufferCreateFlag 
         }
         else if (!!(InBufferCreateFlag & EBufferCreateFlag::CPUAccess))
         {
-            void* CPUAddress = Buffer->Map();
+            void* CPUAddress = BufferPtr->Map();
             check(CPUAddress);
             memcpy(CPUAddress, InData, InDataSize);
         }
@@ -114,12 +117,12 @@ jBuffer_DX12* CreateBuffer(uint64 InSize, uint16 InAlignment, EBufferCreateFlag 
             jCommandBuffer_DX12* commandBuffer = g_rhi_dx12->BeginSingleTimeCopyCommands();
             check(commandBuffer->IsValid());
 
-            commandBuffer->Get()->CopyBufferRegion((ID3D12Resource*)Buffer->GetHandle(), 0, StagingBuffer->Get(), 0, InSize);
+            commandBuffer->Get()->CopyBufferRegion((ID3D12Resource*)BufferPtr->GetHandle(), 0, StagingBuffer->Get(), 0, InSize);
             g_rhi_dx12->EndSingleTimeCopyCommands(commandBuffer);
         }
     }
 
-    return Buffer;
+    return BufferPtr;
 }
 
 std::shared_ptr<jCreatedResource> CreateImageInternal(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, uint32 InNumOfSample
@@ -362,12 +365,7 @@ void CreateConstantBufferView(jBuffer_DX12* InBuffer)
     g_rhi_dx12->Device->CreateConstantBufferView(&Desc, InBuffer->CBV.CPUHandle);
 }
 
-void CreateShaderResourceView(jBuffer_DX12* InBuffer)
-{
-    CreateShaderResourceView(InBuffer, (uint32)InBuffer->Size, 1);
-}
-
-void CreateShaderResourceView(jBuffer_DX12* InBuffer, uint32 InStride, uint32 InCount = 0)
+void CreateShaderResourceView_StructuredBuffer(jBuffer_DX12* InBuffer, uint32 InStride, uint32 InCount)
 {
     check(g_rhi_dx12);
     check(g_rhi_dx12->Device);
@@ -378,47 +376,62 @@ void CreateShaderResourceView(jBuffer_DX12* InBuffer, uint32 InStride, uint32 In
     check(!InBuffer->SRV.IsValid());
     InBuffer->SRV = g_rhi_dx12->DescriptorHeaps.Alloc();
 
-    const bool IsRaw = (InStride <= 0);
-
-    D3D12_SHADER_RESOURCE_VIEW_DESC Desc = {};
-    Desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    Desc.Format = IsRaw ? DXGI_FORMAT_R32_TYPELESS : DXGI_FORMAT_UNKNOWN;
+    D3D12_SHADER_RESOURCE_VIEW_DESC Desc{};
+    Desc.Format = DXGI_FORMAT_UNKNOWN;
     Desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-
-    Desc.Buffer.FirstElement = 0;
-    Desc.Buffer.Flags = IsRaw ? D3D12_BUFFER_SRV_FLAG_RAW : D3D12_BUFFER_SRV_FLAG_NONE;
-    Desc.Buffer.NumElements = InCount;
-    Desc.Buffer.StructureByteStride = InStride;
-
-    g_rhi_dx12->Device->CreateShaderResourceView(InBuffer->Buffer->Get()
-        , &Desc, InBuffer->SRV.CPUHandle);
-}
-
-void CreateShaderResourceView(jBuffer_DX12* InBuffer, DXGI_FORMAT InFormat)
-{
-    check(g_rhi_dx12);
-    check(g_rhi_dx12->Device);
-
-    if (!ensure(InBuffer))
-        return;
-
-    check(!InBuffer->SRV.IsValid());
-    InBuffer->SRV = g_rhi_dx12->DescriptorHeaps.Alloc();
-
-    D3D12_SHADER_RESOURCE_VIEW_DESC Desc = {};
     Desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    Desc.Format = InFormat;
-    Desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-
     Desc.Buffer.FirstElement = 0;
     Desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-    Desc.Buffer.NumElements = (uint32)((uint32)InBuffer->Size / BytesPerPixel_(InFormat));
-
-    g_rhi_dx12->Device->CreateShaderResourceView(InBuffer->Buffer->Get()
-        , &Desc, InBuffer->SRV.CPUHandle);
+    Desc.Buffer.NumElements = InCount;
+    Desc.Buffer.StructureByteStride = InStride;
+    g_rhi_dx12->Device->CreateShaderResourceView(InBuffer->Buffer->Get(), &Desc, InBuffer->SRV.CPUHandle);
 }
 
-void CreateUnorderedAccessView(jBuffer_DX12* InBuffer)
+void CreateShaderResourceView_Raw(jBuffer_DX12* InBuffer, uint32 InBufferSize)
+{
+    check(g_rhi_dx12);
+    check(g_rhi_dx12->Device);
+
+    if (!ensure(InBuffer))
+        return;
+
+    check(!InBuffer->SRV.IsValid());
+    InBuffer->SRV = g_rhi_dx12->DescriptorHeaps.Alloc();
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC Desc{};
+    Desc.Format = DXGI_FORMAT_R32_TYPELESS;
+    Desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+    Desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    Desc.Buffer.FirstElement = 0;
+    Desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
+    Desc.Buffer.NumElements = InBufferSize / 4;     // DXGI_FORMAT_R32_TYPELESS size is 4
+    g_rhi_dx12->Device->CreateShaderResourceView(InBuffer->Buffer->Get(), &Desc, InBuffer->SRV.CPUHandle);
+}
+
+void CreateShaderResourceView_Formatted(jBuffer_DX12* InBuffer, ETextureFormat InFormat, uint32 InBufferSize)
+{
+    check(g_rhi_dx12);
+    check(g_rhi_dx12->Device);
+
+    if (!ensure(InBuffer))
+        return;
+
+    check(!InBuffer->SRV.IsValid());
+    InBuffer->SRV = g_rhi_dx12->DescriptorHeaps.Alloc();
+
+    const uint32 Stride = GetDX12TextureComponentCount(InFormat) * GetDX12TexturePixelSize(InFormat);
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC Desc{};
+    Desc.Format = GetDX12TextureFormat(InFormat);
+    Desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+    Desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    Desc.Buffer.FirstElement = 0;
+    Desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+    Desc.Buffer.NumElements = InBufferSize / Stride;
+    g_rhi_dx12->Device->CreateShaderResourceView(InBuffer->Buffer->Get(), &Desc, InBuffer->SRV.CPUHandle);
+}
+
+void CreateUnorderedAccessView_StructuredBuffer(jBuffer_DX12* InBuffer, uint32 InStride, uint32 InCount)
 {
     check(g_rhi_dx12);
     check(g_rhi_dx12->Device);
@@ -429,16 +442,56 @@ void CreateUnorderedAccessView(jBuffer_DX12* InBuffer)
     check(!InBuffer->UAV.IsValid());
     InBuffer->UAV = g_rhi_dx12->DescriptorHeaps.Alloc();
 
-    D3D12_UNORDERED_ACCESS_VIEW_DESC Desc = { };
+    D3D12_UNORDERED_ACCESS_VIEW_DESC Desc{ };
     Desc.Format = DXGI_FORMAT_UNKNOWN;
     Desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
     Desc.Buffer.FirstElement = 0;
-    Desc.Buffer.Flags = (InBuffer->Size > 0) ? D3D12_BUFFER_UAV_FLAG_NONE : D3D12_BUFFER_UAV_FLAG_RAW;
-    Desc.Buffer.NumElements = 1;
-    Desc.Buffer.StructureByteStride = (uint32)InBuffer->Size;
+    Desc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+    Desc.Buffer.NumElements = InCount;
+    Desc.Buffer.StructureByteStride = InStride;
+    g_rhi_dx12->Device->CreateUnorderedAccessView(InBuffer->Buffer->Get(), nullptr, &Desc, InBuffer->UAV.CPUHandle);
+}
 
-    g_rhi_dx12->Device->CreateUnorderedAccessView(InBuffer->Buffer->Get(), nullptr
-        , &Desc, InBuffer->UAV.CPUHandle);
+void CreateUnorderedAccessView_Raw(jBuffer_DX12* InBuffer, uint32 InBufferSize)
+{
+    check(g_rhi_dx12);
+    check(g_rhi_dx12->Device);
+
+    if (!ensure(InBuffer))
+        return;
+
+    check(!InBuffer->UAV.IsValid());
+    InBuffer->UAV = g_rhi_dx12->DescriptorHeaps.Alloc();
+
+    D3D12_UNORDERED_ACCESS_VIEW_DESC Desc{ };
+    Desc.Format = DXGI_FORMAT_R32_TYPELESS;
+    Desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+    Desc.Buffer.FirstElement = 0;
+    Desc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_RAW;
+    Desc.Buffer.NumElements = InBufferSize / 4;     // DXGI_FORMAT_R32_TYPELESS size is 4
+    g_rhi_dx12->Device->CreateUnorderedAccessView(InBuffer->Buffer->Get(), nullptr, &Desc, InBuffer->UAV.CPUHandle);
+}
+
+void CreateUnorderedAccessView_Formatted(jBuffer_DX12* InBuffer, ETextureFormat InFormat, uint32 InBufferSize)
+{
+    check(g_rhi_dx12);
+    check(g_rhi_dx12->Device);
+
+    if (!ensure(InBuffer))
+        return;
+
+    check(!InBuffer->UAV.IsValid());
+    InBuffer->UAV = g_rhi_dx12->DescriptorHeaps.Alloc();
+
+    const uint32 Stride = GetDX12TextureComponentCount(InFormat) * GetDX12TexturePixelSize(InFormat);
+
+    D3D12_UNORDERED_ACCESS_VIEW_DESC Desc{ };
+    Desc.Format = GetDX12TextureFormat(InFormat);
+    Desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+    Desc.Buffer.FirstElement = 0;
+    Desc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+    Desc.Buffer.NumElements = InBufferSize / Stride;
+    g_rhi_dx12->Device->CreateUnorderedAccessView(InBuffer->Buffer->Get(), nullptr, &Desc, InBuffer->UAV.CPUHandle);
 }
 
 void CreateShaderResourceView(jTexture_DX12* InTexture)

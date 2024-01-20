@@ -43,11 +43,7 @@ private:
     // Vulkan resources for rendering the UI
     struct jDynamicBufferData
     {
-        void Initialize()
-        {
-            VertexBufferPtr = std::make_shared<jBuffer_Vulkan>();
-            IndexBufferPtr = std::make_shared<jBuffer_Vulkan>();
-        }
+        void Initialize(){}
 
         std::shared_ptr<jBuffer_Vulkan> VertexBufferPtr;
         std::shared_ptr<jBuffer_Vulkan> IndexBufferPtr;
@@ -61,7 +57,7 @@ private:
     // VkPipelineLayout PipelineLayout;
     VkDescriptorPool DescriptorPool;
     VkDescriptorSet DescriptorSet;
-    jVertexBuffer* EmptyVertexBuffer = nullptr;
+    std::shared_ptr<jVertexBuffer> EmptyVertexBufferPtr;
     jShaderBindingLayout* EmptyShaderBindingLayout = nullptr;
     std::shared_ptr<jPushConstant> PushConstBlockPtr;
 

@@ -14,7 +14,7 @@ void jRingBuffer_Vulkan::Create(EVulkanBufferBits bufferBits, uint64 totalSize, 
 
     Release();
 
-    jBufferUtil_Vulkan::CreateBuffer(bufferBits, EVulkanMemoryBits::HOST_VISIBLE
+    jBufferUtil_Vulkan::CreateBuffer_LowLevel(bufferBits, EVulkanMemoryBits::HOST_VISIBLE
         | EVulkanMemoryBits::HOST_COHERENT, VkDeviceSize(totalSize), Buffer, BufferMemory, RingBufferSize);
     
     RingBufferOffset = 0;

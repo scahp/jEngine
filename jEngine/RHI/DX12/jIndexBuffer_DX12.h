@@ -19,6 +19,6 @@ struct jIndexBuffer_DX12 : public jIndexBuffer
         return IndexStreamData->ElementCount;
     }
 
-    virtual jBuffer* GetBuffer() const override { return BufferPtr.get(); }
+    virtual jBuffer_DX12* GetBuffer() const override { return BufferPtr.get(); }
 };
 

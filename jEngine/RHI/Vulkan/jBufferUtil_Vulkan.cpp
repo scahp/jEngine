@@ -287,7 +287,7 @@ bool CreateImage2DArray(uint32 width, uint32 height, uint32 arrayLayers, uint32 
     return true;
 }
 
-size_t CreateBuffer(EVulkanBufferBits InUsage, EVulkanMemoryBits InProperties, uint64 InSize, VkBuffer& OutBuffer, VkDeviceMemory& OutBufferMemory, uint64& OutAllocatedSize)
+size_t CreateBuffer_LowLevel(EVulkanBufferBits InUsage, EVulkanMemoryBits InProperties, uint64 InSize, VkBuffer& OutBuffer, VkDeviceMemory& OutBufferMemory, uint64& OutAllocatedSize)
 {
     check(InSize);
     VkBufferCreateInfo bufferInfo = {};
@@ -330,6 +330,20 @@ size_t CreateBuffer(EVulkanBufferBits InUsage, EVulkanMemoryBits InProperties, u
     verify(VK_SUCCESS == vkBindBufferMemory(g_rhi_vk->Device, OutBuffer, OutBufferMemory, 0));
 
     return memRequirements.size;
+}
+
+std::shared_ptr<jBuffer_Vulkan> CreateBuffer(EVulkanBufferBits InUsage, EVulkanMemoryBits InProperties, uint64 InSize)
+{
+    auto BufferPtr = std::make_shared<jBuffer_Vulkan>();
+    BufferPtr->RealBufferSize = InSize;
+#if USE_VK_MEMORY_POOL
+    check(g_rhi->GetMemoryPool());
+    const jMemory& Memory = g_rhi->GetMemoryPool()->Alloc(InUsage, InProperties, InSize);
+    BufferPtr->InitializeWithMemory(Memory);
+#else
+    CreateBuffer_LowLevel(InUsage, InProperties, InSize, BufferPtr->Buffer, BufferPtr->BufferMemory, BufferPtr->AllocatedSize);
+#endif
+    return BufferPtr;
 }
 
 void CopyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer buffer, uint64 bufferOffset, VkImage image, uint32 width, uint32 height, int32 miplevel, int32 layerIndex)

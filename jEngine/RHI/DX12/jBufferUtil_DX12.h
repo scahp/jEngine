@@ -522,10 +522,10 @@ struct jRawBufferInit
 namespace jBufferUtil_DX12
 {
 
-std::shared_ptr<jCreatedResource> CreateBufferInternal(uint64 InSize, uint16 InAlignment, EBufferCreateFlag InBufferCreateFlag
+std::shared_ptr<jCreatedResource> CreateBufferInternal(uint64 InSize, uint64 InAlignment, EBufferCreateFlag InBufferCreateFlag
     , D3D12_RESOURCE_STATES InInitialState = D3D12_RESOURCE_STATE_COMMON, const wchar_t* InResourceName = nullptr);
 
-jBuffer_DX12* CreateBuffer(uint64 InSize, uint16 InAlignment, EBufferCreateFlag InBufferCreateFlag
+std::shared_ptr<jBuffer_DX12> CreateBuffer(uint64 InSize, uint64 InAlignment, EBufferCreateFlag InBufferCreateFlag
     , D3D12_RESOURCE_STATES InInitialState = D3D12_RESOURCE_STATE_COMMON, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr);
 
 std::shared_ptr<jCreatedResource> CreateImageInternal(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, uint32 InNumOfSample
@@ -542,14 +542,26 @@ void CopyBufferToImage(ID3D12GraphicsCommandList4* InCommandBuffer, ID3D12Resour
 void CopyBuffer(ID3D12GraphicsCommandList4* InCommandBuffer, ID3D12Resource* InSrcBuffer, ID3D12Resource* InDstBuffer, uint64 InSize, uint64 InSrcOffset, uint64 InDstOffset);
 void CopyBuffer(ID3D12Resource* InSrcBuffer, ID3D12Resource* InDstBuffer, uint64 InSize, uint64 InSrcOffset, uint64 InDstOffset);
 
+// Create CBV
 void CreateConstantBufferView(jBuffer_DX12* InBuffer);
-void CreateShaderResourceView(jBuffer_DX12* InBuffer);
-void CreateShaderResourceView(jBuffer_DX12* InBuffer, uint32 InStride, uint32 InCount);
-void CreateShaderResourceView(jBuffer_DX12* InBuffer, DXGI_FORMAT InFormat);
-void CreateUnorderedAccessView(jBuffer_DX12* InBuffer);
+
+// Create SRV for Buffer
+void CreateShaderResourceView_StructuredBuffer(jBuffer_DX12* InBuffer, uint32 InStride, uint32 InCount);
+void CreateShaderResourceView_Raw(jBuffer_DX12* InBuffer, uint32 InBufferSize);
+void CreateShaderResourceView_Formatted(jBuffer_DX12* InBuffer, ETextureFormat InFormat, uint32 InBufferSize);
+
+// Create UAV for Buffer
+void CreateUnorderedAccessView_StructuredBuffer(jBuffer_DX12* InBuffer, uint32 InStride, uint32 InCount);
+void CreateUnorderedAccessView_Raw(jBuffer_DX12* InBuffer, uint32 InBufferSize);
+void CreateUnorderedAccessView_Formatted(jBuffer_DX12* InBuffer, ETextureFormat InFormat, uint32 InBufferSize);
+
+// Create SRV for Texture
 void CreateShaderResourceView(jTexture_DX12* InTexture);
-void CreateDepthStencilView(jTexture_DX12* InTexture);
+
+// Create UAV for Texture
 void CreateUnorderedAccessView(jTexture_DX12* InTexture);
+
+void CreateDepthStencilView(jTexture_DX12* InTexture);
 void CreateRenderTargetView(jTexture_DX12* InTexture);
 
 }

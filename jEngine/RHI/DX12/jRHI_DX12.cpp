@@ -55,13 +55,7 @@ TResourcePool<jBlendingStateInfo_DX12, jMutexRWLock> jRHI_DX12::BlendingStatePoo
 TResourcePool<jPipelineStateInfo_DX12, jMutexRWLock> jRHI_DX12::PipelineStatePool;
 TResourcePool<jRenderPass_DX12, jMutexRWLock> jRHI_DX12::RenderPassPool;
 
-const wchar_t* jRHI_DX12::c_raygenShaderName = L"MyRaygenShader";
-const wchar_t* jRHI_DX12::c_closestHitShaderName = L"MyClosestHitShader";
-const wchar_t* jRHI_DX12::c_missShaderName = L"MyMissShader";
-const wchar_t* jRHI_DX12::c_triHitGroupName = L"TriHitGroup";
-const wchar_t* jRHI_DX12::c_planeHitGroupName = L"PlaneHitGroup";
-const wchar_t* jRHI_DX12::c_planeclosestHitShaderName = L"MyPlaneClosestHitShader";
-bool jRHI_DX12::IsUsePlacedResource = false;			// PlacedResouce test
+bool jRHI_DX12::GIsUsePlacedResource = false;			// PlacedResouce test
 
 constexpr uint32 c_AllowTearing = 0x1;
 constexpr uint32 c_RequireTearingSupport = 0x2;
@@ -408,7 +402,7 @@ bool jRHI_DX12::InitRHI()
     // PlacedResouce test
 	{
 		D3D12_HEAP_DESC heapDesc;
-		heapDesc.SizeInBytes = DefaultPlacedResourceHeapSize;
+		heapDesc.SizeInBytes = GDefaultPlacedResourceHeapSize;
 		heapDesc.Properties.Type = D3D12_HEAP_TYPE_DEFAULT;
 		heapDesc.Properties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
 		heapDesc.Properties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
@@ -422,7 +416,7 @@ bool jRHI_DX12::InitRHI()
 
 	{
         D3D12_HEAP_DESC heapDesc;
-        heapDesc.SizeInBytes = DefaultPlacedResourceHeapSize;
+        heapDesc.SizeInBytes = GDefaultPlacedResourceHeapSize;
         heapDesc.Properties.Type = D3D12_HEAP_TYPE_UPLOAD;
         heapDesc.Properties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
         heapDesc.Properties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
@@ -619,7 +613,7 @@ void jRHI_DX12::CalculateFrameStats()
                 swprintf_s(usageString, L"%I64d B", memoryInfo.CurrentUsage);
             }
 
-			windowText << L" - " << (IsUsePlacedResource ? L"[Placed]" : L"[Committed]") << L" Memory Used : " << usageString;
+			windowText << L" - " << (GIsUsePlacedResource ? L"[Placed]" : L"[Committed]") << L" Memory Used : " << usageString;
 		}
 		//////////////////////////////////////////////////////////////////////////
 
@@ -687,22 +681,21 @@ jTexture* jRHI_DX12::CreateTextureFromData(const jImageData* InImageData) const
     const uint64 ImageSize = InImageData->Width * InImageData->Height * GetDX12TexturePixelSize(InImageData->Format);
 
     // todo : recycle temp buffer
-    jBuffer_DX12* buffer = jBufferUtil_DX12::CreateBuffer(InImageData->ImageData.size(), 0
+    auto BufferPtr = jBufferUtil_DX12::CreateBuffer(InImageData->ImageData.size(), 0
         , EBufferCreateFlag::CPUAccess, D3D12_RESOURCE_STATE_GENERIC_READ, &InImageData->ImageData[0], InImageData->ImageData.size());
-    check(buffer);
+    check(BufferPtr);
 
 	jCommandBuffer_DX12* commandList = BeginSingleTimeCopyCommands();
     if (InImageData->SubresourceFootprints.size() > 0)
     {
-        jBufferUtil_DX12::CopyBufferToImage(commandList->Get(), buffer->Buffer->Get(), Texture->Image->Get(), InImageData->SubresourceFootprints);
+        jBufferUtil_DX12::CopyBufferToImage(commandList->Get(), BufferPtr->Buffer->Get(), Texture->Image->Get(), InImageData->SubresourceFootprints);
     }
     else
     {
-        jBufferUtil_DX12::CopyBufferToImage(commandList->Get(), buffer->Buffer->Get(), 0, Texture->Image->Get());
+        jBufferUtil_DX12::CopyBufferToImage(commandList->Get(), BufferPtr->Buffer->Get(), 0, Texture->Image->Get());
     }
 
 	EndSingleTimeCopyCommands(commandList);
-	delete buffer;
 
 	return Texture;
 }
@@ -983,11 +976,11 @@ void jRHI_DX12::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& rende
 	renderFrameContextPtr->Destroy();
 }
 
-IUniformBufferBlock* jRHI_DX12::CreateUniformBufferBlock(jName InName, jLifeTimeType InLifeTimeType, size_t InSize /*= 0*/) const
+std::shared_ptr<IUniformBufferBlock> jRHI_DX12::CreateUniformBufferBlock(jName InName, jLifeTimeType InLifeTimeType, size_t InSize /*= 0*/) const
 {
-    auto uniformBufferBlock = new jUniformBufferBlock_DX12(InName, InLifeTimeType);
-    uniformBufferBlock->Init(InSize);
-    return uniformBufferBlock;
+    auto uniformBufferBlockPtr = std::make_shared<jUniformBufferBlock_DX12>(InName, InLifeTimeType);
+    uniformBufferBlockPtr->Init(InSize);
+    return uniformBufferBlockPtr;
 }
 
 void jRHI_DX12::BindGraphicsShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineState
@@ -1137,26 +1130,27 @@ void jRHI_DX12::BindRaytracingShaderBindingInstances(const jCommandBuffer* InCom
     BindComputeShaderBindingInstances(InCommandBuffer, InPiplineState, InShaderBindingInstanceCombiner, InFirstSet);
 }
 
-jVertexBuffer* jRHI_DX12::CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const
+std::shared_ptr<jVertexBuffer> jRHI_DX12::CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const
 {
     if (!streamData)
         return nullptr;
 
-	jVertexBuffer_DX12* vertexBuffer = new jVertexBuffer_DX12();
-    vertexBuffer->Initialize(streamData);
-    return vertexBuffer;
+	auto vertexBufferPtr = std::make_shared<jVertexBuffer_DX12>();
+    vertexBufferPtr->Initialize(streamData);
+    return vertexBufferPtr;
 }
 
-jIndexBuffer* jRHI_DX12::CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const
+std::shared_ptr<jIndexBuffer> jRHI_DX12::CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const
 {
     if (!streamData)
         return nullptr;
 
     check(streamData);
     check(streamData->Param);
-    jIndexBuffer_DX12* indexBuffer = new jIndexBuffer_DX12();
-    indexBuffer->Initialize(streamData);
-    return indexBuffer;
+
+    auto indexBufferPtr = std::make_shared<jIndexBuffer_DX12>();
+    indexBufferPtr->Initialize(streamData);
+    return indexBufferPtr;
 }
 
 std::shared_ptr<jShaderBindingInstance> jRHI_DX12::CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const
@@ -1384,10 +1378,58 @@ jRaytracingScene* jRHI_DX12::CreateRaytracingScene() const
     return new jRaytracingScene_DX12();
 }
 
+std::shared_ptr<jBuffer> jRHI_DX12::CreateStructuredBuffer(uint64 InSize, uint64 InAlignment, uint64 InStride, EBufferCreateFlag InBufferCreateFlag
+    , EImageLayout InInitialState, const void* InData, uint64 InDataSize, const wchar_t* InResourceName) const
+{
+    auto BufferPtr = jBufferUtil_DX12::CreateBuffer(InSize, InStride, InBufferCreateFlag, GetDX12ImageLayout(InInitialState)
+        , InData, InDataSize, InResourceName);
+
+    jBufferUtil_DX12::CreateShaderResourceView_StructuredBuffer(BufferPtr.get(), (uint32)InStride, (uint32)(InSize / InStride));
+
+    if (!!(EBufferCreateFlag::UAV & InBufferCreateFlag))
+    {
+        jBufferUtil_DX12::CreateUnorderedAccessView_StructuredBuffer(BufferPtr.get(), (uint32)InStride, (uint32)(InSize / InStride));
+    }
+
+    return std::shared_ptr<jBuffer>(BufferPtr);
+}
+
+std::shared_ptr<jBuffer> jRHI_DX12::CreateRawBuffer(uint64 InSize, uint64 InAlignment, EBufferCreateFlag InBufferCreateFlag
+    , EImageLayout InInitialState, const void* InData, uint64 InDataSize, const wchar_t* InResourceName) const
+{
+    auto BufferPtr = jBufferUtil_DX12::CreateBuffer(InSize, InAlignment, InBufferCreateFlag, GetDX12ImageLayout(InInitialState)
+        , InData, InDataSize, InResourceName);
+
+    jBufferUtil_DX12::CreateShaderResourceView_Raw(BufferPtr.get(), (uint32)InSize);
+
+    if (!!(EBufferCreateFlag::UAV & InBufferCreateFlag))
+    {
+        jBufferUtil_DX12::CreateUnorderedAccessView_Raw(BufferPtr.get(), (uint32)InSize);
+    }
+
+    return BufferPtr;
+}
+
+std::shared_ptr<jBuffer> jRHI_DX12::CreateFormattedBuffer(uint64 InSize, uint64 InAlignment, ETextureFormat InFormat, EBufferCreateFlag InBufferCreateFlag
+    , EImageLayout InInitialState, const void* InData, uint64 InDataSize, const wchar_t* InResourceName) const
+{
+    auto BufferPtr = jBufferUtil_DX12::CreateBuffer(InSize, InAlignment, InBufferCreateFlag, GetDX12ImageLayout(InInitialState)
+        , InData, InDataSize, InResourceName);
+
+    jBufferUtil_DX12::CreateShaderResourceView_Formatted(BufferPtr.get(), InFormat, (uint32)InSize);
+
+    if (!!(EBufferCreateFlag::UAV & InBufferCreateFlag))
+    {
+        jBufferUtil_DX12::CreateUnorderedAccessView_Formatted(BufferPtr.get(), InFormat, (uint32)InSize);
+    }
+
+    return BufferPtr;
+}
+
 void jPlacedResourcePool::Init()
 {
     // The allocator should be able to allocate memory larger than the PlacedResourceSizeThreshold. 
-    check(g_rhi_dx12->PlacedResourceSizeThreshold <= MemorySize[(int32)EPoolSizeType::MAX - 1]);
+    check(g_rhi_dx12->GPlacedResourceSizeThreshold <= MemorySize[(int32)EPoolSizeType::MAX - 1]);
 
     check(g_rhi_dx12);
     g_rhi_dx12->DeallocatorMultiFramePlacedResource.FreeDelegate
@@ -1405,7 +1447,7 @@ void jPlacedResourcePool::Free(const ComPtr<ID3D12Resource>& InData)
     if (!InData)
         return;
 
-    if (g_rhi_dx12->IsUsePlacedResource)
+    if (g_rhi_dx12->GIsUsePlacedResource)
     {
         jScopedLock s(&Lock);
 

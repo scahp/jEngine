@@ -227,7 +227,7 @@ void jRenderer::SetupShadowPass()
                 // iter->MaterialPtr;
 
                 const bool ShouldUseOnePassPointLightShadow = (ViewLight.Light->Type == ELightType::POINT);
-                const jVertexBuffer* OverrideInstanceData = (ShouldUseOnePassPointLightShadow ? jRHI::CubeMapInstanceDataForSixFace : nullptr);
+                const jVertexBuffer* OverrideInstanceData = (ShouldUseOnePassPointLightShadow ? jRHI::CubeMapInstanceDataForSixFace.get() : nullptr);
 
                 new (&ShadowPasses.DrawCommands[i]) jDrawCommand(RenderFrameContextPtr, &ShadowPasses.ViewLight, iter, ShadowPasses.ShadowMapRenderPass
                     , (iter->HasInstancing() ? ShadowInstancingShader : ShadowShader), &ShadpwPipelineStateFixed, Material, {}, nullptr, OverrideInstanceData);
@@ -1533,8 +1533,8 @@ void jRenderer::Render()
             check(DirectionalLight);
             m_sceneCB.lightDirection = { DirectionalLight->GetLightData().Direction.x, DirectionalLight->GetLightData().Direction.y, DirectionalLight->GetLightData().Direction.z };
 
-            static auto SceneBuffer = g_rhi->CreateUniformBufferBlock(jNameStatic("SceneData"), jLifeTimeType::MultiFrame, sizeof(m_sceneCB));
-            SceneBuffer->UpdateBufferData(&m_sceneCB, sizeof(m_sceneCB));
+            static auto SceneUniformBufferPtr = g_rhi->CreateUniformBufferBlock(jNameStatic("SceneData"), jLifeTimeType::MultiFrame, sizeof(m_sceneCB));
+            SceneUniformBufferPtr->UpdateBufferData(&m_sceneCB, sizeof(m_sceneCB));
 
             static bool once = false;
             if (!once)
@@ -1566,11 +1566,11 @@ void jRenderer::Render()
             jShaderBindingArray ShaderBindingArray;
             jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
             ShaderBindingArray.Add(jShaderBinding::Create(0, 1, EShaderBindingType::ACCELERATION_STRUCTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
-                ResourceInlineAllactor.Alloc<jBufferResource>(RenderFrameContextPtr->RaytracingScene->TLASBuffer), true));
+                ResourceInlineAllactor.Alloc<jBufferResource>(RenderFrameContextPtr->RaytracingScene->TLASBufferPtr.get()), true));
             ShaderBindingArray.Add(jShaderBinding::Create(1, 1, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::ALL_RAYTRACING,
                 ResourceInlineAllactor.Alloc<jTextureResource>(m_raytracingOutput, nullptr), false));
             ShaderBindingArray.Add(jShaderBinding::Create(2, 1, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_RAYTRACING,
-                ResourceInlineAllactor.Alloc<jUniformBufferResource>(SceneBuffer), true));
+                ResourceInlineAllactor.Alloc<jUniformBufferResource>(SceneUniformBufferPtr.get()), true));
             ShaderBindingArray.Add(jShaderBinding::Create(3, 1, EShaderBindingType::SAMPLER, EShaderAccessStageFlag::ALL_RAYTRACING,
                 ResourceInlineAllactor.Alloc<jSamplerResource>(SamplerState), false));
             ShaderBindingArray.Add(jShaderBinding::Create(4, 1, EShaderBindingType::SAMPLER, EShaderAccessStageFlag::ALL_RAYTRACING,
@@ -1613,10 +1613,10 @@ void jRenderer::Render()
                 jRenderObject* RObj = jObject::GetStaticRenderObject()[i];
                 RObj->CreateShaderBindingInstance();
 
-                VertexAndInexOffsetBuffers.push_back(RObj->VertexAndIndexOffsetBuffer);
-                IndexBuffers.push_back(RObj->GeometryDataPtr->IndexBuffer->GetBuffer());
+                VertexAndInexOffsetBuffers.push_back(RObj->VertexAndIndexOffsetBuffer.get());
+                IndexBuffers.push_back(RObj->GeometryDataPtr->IndexBufferPtr->GetBuffer());
                 TestUniformBuffers.push_back(RObj->TestUniformBuffer.get());
-                VertexBuffers.push_back(RObj->GeometryDataPtr->VertexBuffer->GetBuffer(0));
+                VertexBuffers.push_back(RObj->GeometryDataPtr->VertexBufferPtr->GetBuffer(0));
 
                 check(RObj->MaterialPtr);
                 AlbedoTextures.push_back(jTextureResourceBindless::jTextureBindData(RObj->MaterialPtr->GetTexture<jTexture_DX12>(jMaterial::EMaterialTextureType::Albedo), nullptr));

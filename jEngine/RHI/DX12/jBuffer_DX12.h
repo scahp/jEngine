@@ -5,10 +5,10 @@
 struct jBuffer_DX12 : public jBuffer
 {
     jBuffer_DX12() = default;
-    jBuffer_DX12(std::shared_ptr<jCreatedResource> InBuffer, uint64 InSize, uint16 InAlignment, EBufferCreateFlag InBufferCreateFlag = EBufferCreateFlag::NONE)
+    jBuffer_DX12(std::shared_ptr<jCreatedResource> InBuffer, uint64 InSize, uint64 InAlignment, EBufferCreateFlag InBufferCreateFlag = EBufferCreateFlag::NONE)
         : Buffer(InBuffer), Size(InSize), Alignment(InAlignment), BufferCreateFlag(InBufferCreateFlag)
     { }
-    virtual ~jBuffer_DX12() {}
+    virtual ~jBuffer_DX12() { Release(); }
     virtual void Release() override;
 
     virtual void* GetMappedPointer() const override { return CPUAddress; }
@@ -72,7 +72,7 @@ struct jBuffer_DX12 : public jBuffer
 
     EBufferCreateFlag BufferCreateFlag = EBufferCreateFlag::NONE;
     uint64 Size = 0;
-    uint16 Alignment = 0;
+    uint64 Alignment = 0;
     uint64 Offset = 0;
     uint8* CPUAddress = nullptr;
     std::shared_ptr<jCreatedResource> Buffer;

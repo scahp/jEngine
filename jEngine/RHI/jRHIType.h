@@ -231,6 +231,8 @@ struct IStreamParam : public std::enable_shared_from_this<IStreamParam>
 	virtual const void* GetBufferData() const = 0;
 	virtual size_t GetBufferSize() const { return 0; }
 	virtual size_t GetElementSize() const { return 0; }
+    virtual size_t GetStride() const { return 0; }
+    virtual size_t GetNumOfElement() const { return 0; }
 };
 
 template <typename T>
@@ -243,6 +245,8 @@ struct jStreamParam : public IStreamParam
 	virtual const void* GetBufferData() const override { return &Data[0]; }
 	virtual size_t GetBufferSize() const override { return Data.size() * ElementSize; }
 	virtual size_t GetElementSize() const override { return ElementSize; }
+	virtual size_t GetStride() const override { return ElementSize; }
+	virtual size_t GetNumOfElement() const override { return Data.size(); }
 };
 
 struct jVertexStreamData : public std::enable_shared_from_this<jVertexStreamData>
@@ -704,6 +708,7 @@ DECLARE_ENUM_WITH_CONVERT_TO_STRING(EImageLayout, uint8,
     FRAGMENT_DENSITY_MAP_EXT,
     READ_ONLY,
     ATTACHMENT,
+	ACCELERATION_STRUCTURE,
 	MAX
 );
 
@@ -818,6 +823,12 @@ enum class EBufferCreateFlag : uint32
     CPUAccess = 0x00000001,
     UAV = 0x00000002,
     Readback = 0x00000004,
+	AccelerationStructureBuildInput = 0x00000008,
+	VertexBuffer = 0x00000010,
+	IndexBuffer = 0x00000020,
+	IndirectCommand = 0x00000040,
+	ShaderBindingTable = 0x00000080,
+	AccelerationStructure = 0x00000100,
 };
 DECLARE_ENUM_BIT_OPERATORS(EBufferCreateFlag)
 

@@ -17,35 +17,30 @@ void jUniformBufferBlock_DX12::Init(size_t size)
 
     if (jLifeTimeType::MultiFrame == LifeType)
     {
-        Buffer = jBufferUtil_DX12::CreateBuffer(size, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT, EBufferCreateFlag::CPUAccess, D3D12_RESOURCE_STATE_COMMON, nullptr, 0, TEXT("UniformBufferBlock"));
-        jBufferUtil_DX12::CreateConstantBufferView(Buffer);
+        BufferPtr = jBufferUtil_DX12::CreateBuffer(size, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT, EBufferCreateFlag::CPUAccess, D3D12_RESOURCE_STATE_COMMON, nullptr, 0, TEXT("UniformBufferBlock"));
+        jBufferUtil_DX12::CreateConstantBufferView(BufferPtr.get());
     }
 }
 
 void jUniformBufferBlock_DX12::Release()
 {
-    if (Buffer)
-    {
-        Buffer->Release();
-        delete Buffer;
-    }
 }
 
 void jUniformBufferBlock_DX12::UpdateBufferData(const void* InData, size_t InSize)
 {
     if (jLifeTimeType::MultiFrame == LifeType)
     {
-        check(Buffer);
-        check(Buffer->GetAllocatedSize() >= InSize);
+        check(BufferPtr);
+        check(BufferPtr->GetAllocatedSize() >= InSize);
 
-        if (ensure(Buffer->Map()))
+        if (ensure(BufferPtr->Map()))
         {
-            uint8* startAddr = ((uint8*)Buffer->GetMappedPointer());
+            uint8* startAddr = ((uint8*)BufferPtr->GetMappedPointer());
             if (InData)
                 memcpy(startAddr, InData, InSize);
             else
                 memset(startAddr, 0, InSize);
-            Buffer->Unmap();
+            BufferPtr->Unmap();
         }
     }
     else
@@ -63,32 +58,32 @@ void jUniformBufferBlock_DX12::UpdateBufferData(const void* InData, size_t InSiz
 
 void jUniformBufferBlock_DX12::ClearBuffer(int32 clearValue)
 {
-    check(Buffer);
-    UpdateBufferData(nullptr, Buffer->GetAllocatedSize());
+    check(BufferPtr);
+    UpdateBufferData(nullptr, BufferPtr->GetAllocatedSize());
 }
 
-void* jUniformBufferBlock_DX12::GetBuffer() const
+void* jUniformBufferBlock_DX12::GetLowLevelResource() const
 {
     return (jLifeTimeType::MultiFrame == LifeType)
-        ? Buffer->GetHandle() : RingBuffer->GetHandle();
+        ? BufferPtr->GetHandle() : RingBuffer->GetHandle();
 }
 
-void* jUniformBufferBlock_DX12::GetBufferMemory() const
+void* jUniformBufferBlock_DX12::GetLowLevelMemory() const
 {
     return (jLifeTimeType::MultiFrame == LifeType)
-        ? Buffer->CPUAddress : RingBufferDestAddress;
+        ? BufferPtr->CPUAddress : RingBufferDestAddress;
 }
 
 size_t jUniformBufferBlock_DX12::GetBufferSize() const
 {
-    return (jLifeTimeType::MultiFrame == LifeType) ? Buffer->Size : RingBufferAllocatedSize;
+    return (jLifeTimeType::MultiFrame == LifeType) ? BufferPtr->Size : RingBufferAllocatedSize;
 }
 
 const jDescriptor_DX12& jUniformBufferBlock_DX12::GetCBV() const
 {
     if (jLifeTimeType::MultiFrame == LifeType)
     {
-        return Buffer->CBV;
+        return BufferPtr->CBV;
     }
 
     return RingBuffer->CBV;
@@ -96,5 +91,5 @@ const jDescriptor_DX12& jUniformBufferBlock_DX12::GetCBV() const
 
 uint64 jUniformBufferBlock_DX12::GetGPUAddress() const
 {
-    return (jLifeTimeType::MultiFrame == LifeType) ? Buffer->GetGPUAddress() : (RingBuffer->GetGPUAddress() + RingBufferOffset);
+    return (jLifeTimeType::MultiFrame == LifeType) ? BufferPtr->GetGPUAddress() : (RingBuffer->GetGPUAddress() + RingBufferOffset);
 }

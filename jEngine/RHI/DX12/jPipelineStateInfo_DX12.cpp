@@ -104,21 +104,6 @@ void jSamplerStateInfo_DX12::Release()
 
 void jPipelineStateInfo_DX12::Release()
 {
-    if (RaygenBuffer)
-    {
-        delete RaygenBuffer;
-        RaygenBuffer = nullptr;
-    }
-    if (MissBuffer)
-    {
-        delete MissBuffer;
-        MissBuffer = nullptr;
-    }
-    if (HitGroupBuffer)
-    {
-        delete HitGroupBuffer;
-        HitGroupBuffer = nullptr;
-    }
 }
 
 void jPipelineStateInfo_DX12::Initialize()

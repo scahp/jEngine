@@ -37,36 +37,9 @@ bool jVertexBuffer_Vulkan::Initialize(const std::shared_ptr<jVertexStreamData>& 
         if (iter->GetBufferSize() > 0)
         {
             VkDeviceSize bufferSize = iter->GetBufferSize();
-            jBuffer_Vulkan stagingBuffer;
-
-            // VK_BUFFER_USAGE_TRANSFER_SRC_BIT : 이 버퍼가 메모리 전송 연산의 소스가 될 수 있음.
-            jBufferUtil_Vulkan::AllocateBuffer(EVulkanBufferBits::TRANSFER_SRC
-                , EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT, bufferSize, stagingBuffer);
-
-            //// 마지막 파라메터 0은 메모리 영역의 offset 임.
-            //// 이 값이 0이 아니면 memRequirements.alignment 로 나눠야 함. (align 되어있다는 의미)
-            //vkBindBufferMemory(device, vertexBuffer, vertexBufferMemory, 0);
-
-            stagingBuffer.UpdateBuffer(iter->GetBufferData(), bufferSize);
-
-            // Map -> Unmap 했다가 메모리에 데이터가 즉시 반영되는게 아님
-            // 바로 사용하려면 아래 2가지 방법이 있음.
-            // 1. VK_MEMORY_PROPERTY_HOST_COHERENT_BIT 사용 (항상 반영, 약간 느릴 수도)
-            // 2. 쓰기 이후 vkFlushMappedMemoryRanges 호출, 읽기 이후 vkInvalidateMappedMemoryRanges 호출
-            // 위의 2가지 방법을 사용해도 이 데이터가 GPU에 바로 보인다고 보장할 수는 없지만 다음 vkQueueSubmit 호출 전에는 완료될 것을 보장함.
-
-            // VK_BUFFER_USAGE_TRANSFER_DST_BIT : 이 버퍼가 메모리 전송 연산의 목적지가 될 수 있음.
-            // DEVICE LOCAL 메모리에 VertexBuffer를 만들었으므로 이제 vkMapMemory 같은 것은 할 수 없음.
-            stream.BufferPtr = std::make_shared<jBuffer_Vulkan>();
-            jBufferUtil_Vulkan::AllocateBuffer(
-                EVulkanBufferBits::TRANSFER_DST | EVulkanBufferBits::VERTEX_BUFFER
-                | EVulkanBufferBits::SHADER_DEVICE_ADDRESS | EVulkanBufferBits::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY
-                | EVulkanBufferBits::STORAGE_BUFFER
-                , EVulkanMemoryBits::DEVICE_LOCAL, bufferSize, *stream.BufferPtr.get());
-
-            jBufferUtil_Vulkan::CopyBuffer(stagingBuffer, *stream.BufferPtr.get(), bufferSize);
-
-            stagingBuffer.Release();
+            stream.BufferPtr = g_rhi->CreateStructuredBuffer<jBuffer_Vulkan>(bufferSize, stream.Stride, stream.Stride
+                , EBufferCreateFlag::VertexBuffer | EBufferCreateFlag::AccelerationStructureBuildInput | EBufferCreateFlag::UAV
+                , EImageLayout::TRANSFER_DST, iter->GetBufferData(), bufferSize);
 
             BindInfos.Buffers.push_back(stream.BufferPtr->Buffer);
             BindInfos.Offsets.push_back(stream.Offset + stream.BufferPtr->Offset);

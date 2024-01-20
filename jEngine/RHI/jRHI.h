@@ -113,40 +113,8 @@ struct IUniformBufferBlock : public jShaderBindableResource, public std::enable_
 	virtual void UpdateBufferData(const void* newData, size_t size) = 0;
 	virtual void ClearBuffer(int32 clearValue = 0) = 0;
 	
-	virtual void* GetBuffer() const { return nullptr; }
-	virtual void* GetBufferMemory() const { return nullptr; }
-};
-
-struct IShaderStorageBufferObject : public jShaderBindableResource
-{
-	IShaderStorageBufferObject() = default;
-	IShaderStorageBufferObject(const jName& InName, jLifeTimeType InLifeType)
-		: Name(InName)
-	{}
-	virtual ~IShaderStorageBufferObject() {}
-
-	jName Name;
-	const jLifeTimeType LifeType = jLifeTimeType::MultiFrame;
-
-	virtual bool IsUseRingBuffer() const { return (LifeType == jLifeTimeType::OneFrame); }
-
-    virtual size_t GetBufferSize() const { return 0; }
-    virtual size_t GetBufferOffset() const { return 0; }
-
-	virtual void Init(size_t size) = 0;
-	virtual void Bind(const jShader* shader) const {}
-	virtual void UpdateBufferData(const void* newData, size_t size) = 0;
-	virtual void GetBufferData(const void* newData, size_t size) = 0;
-	virtual void ClearBuffer(int32 clearValue) = 0;
-
-    virtual void* GetBuffer() const { return nullptr; }
-    virtual void* GetBufferMemory() const { return nullptr; }
-
-	template <typename T>
-	void GetBufferData(typename std::remove_reference<T>::type& out)
-	{
-		GetBufferData(&out, sizeof(T));
-	}
+	virtual void* GetLowLevelResource() const { return nullptr; }
+	virtual void* GetLowLevelMemory() const { return nullptr; }		// Vulkan only
 };
 
 struct IAtomicCounterBuffer : public jShaderBindableResource
@@ -318,7 +286,7 @@ public:
 
     static TResourcePool<jShader, jMutexRWLock> ShaderPool;
     static constexpr int32 MaxWaitingQuerySet = 4;
-    static jVertexBuffer* CubeMapInstanceDataForSixFace;
+    static std::shared_ptr<jVertexBuffer> CubeMapInstanceDataForSixFace;
 
 	template <typename T = jShader>
 	T* CreateShader(const jShaderInfo& InShaderInfo) const
@@ -355,12 +323,6 @@ public:
 	virtual void SetClearBuffer(ERenderBufferType typeBit, const int32* value, int32 bufferIndex) const {}
 	virtual void SetFrameBuffer(const jFrameBuffer* rt, int32 index = 0, bool mrt = false) const {}
 	virtual void SetDrawBuffers(const std::initializer_list<EDrawBufferType>& list) const {}
-	virtual jVertexBuffer* CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const { return nullptr; }
-	virtual jIndexBuffer* CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const { return nullptr; }
-	virtual void UpdateVertexBuffer(jVertexBuffer* vb, const std::shared_ptr<jVertexStreamData>& streamData) const {}
-	virtual void UpdateVertexBuffer(jVertexBuffer* vb, IStreamParam* streamParam, int32 streamParamIndex) const {}
-	virtual void BindVertexBuffer(const jVertexBuffer* vb, const jShader* shader) const {}
-	virtual void BindIndexBuffer(const jIndexBuffer* ib, const jShader* shader) const {}
 	virtual void SetTextureFilter(ETextureType type, int32 sampleCount, ETextureFilterTarget target, ETextureFilter filter) const {}
 	virtual void SetTextureWrap(int flag) const {}
 	virtual void SetTexture(int32 index, const jTexture* texture) const {}
@@ -423,10 +385,6 @@ public:
 	virtual void SetDepthFunc(ECompareOp func) const {}
 	virtual void SetDepthMask(bool enable) const {}
 	virtual void SetColorMask(bool r, bool g, bool b, bool a) const {}
-	virtual IUniformBufferBlock* CreateUniformBufferBlock(jName InName, jLifeTimeType InLifeTimeType, size_t InSize = 0) const { return nullptr; }
-	virtual IShaderStorageBufferObject* CreateShaderStorageBufferObject(const char* blockname) const { return nullptr; }
-	virtual IAtomicCounterBuffer* CreateAtomicCounterBuffer(const char* name, int32 bindingPoint) const { return nullptr; }
-	virtual ITransformFeedbackBuffer* CreateTransformFeedbackBuffer(const char* name) const { return nullptr; }
 	virtual void EnableSRGB(bool enable) const {  }
 	virtual void EnableDepthClip(bool enable) const {  }
 	virtual void BeginDebugEvent(const char* name) const {}
@@ -508,6 +466,51 @@ public:
 	virtual jRaytracingScene* CreateRaytracingScene() const { return nullptr; }
 	virtual jCommandBuffer* BeginSingleTimeCommands() const { return nullptr; }
     virtual void EndSingleTimeCommands(jCommandBuffer* commandBuffer) const { }
+
+	virtual std::shared_ptr<jBuffer> CreateStructuredBuffer(uint64 InSize, uint64 InAlignment, uint64 InStride, EBufferCreateFlag InBufferCreateFlag
+		, EImageLayout InInitialState, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr) const { return nullptr; }
+	virtual std::shared_ptr<jBuffer> CreateRawBuffer(uint64 InSize, uint64 InAlignment, EBufferCreateFlag InBufferCreateFlag
+		, EImageLayout InInitialState, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr) const { return nullptr; }
+	virtual std::shared_ptr<jBuffer> CreateFormattedBuffer(uint64 InSize, uint64 InAlignment, ETextureFormat InFormat, EBufferCreateFlag InBufferCreateFlag
+		, EImageLayout InInitialState, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr) const { return nullptr; }
+    virtual std::shared_ptr<IUniformBufferBlock> CreateUniformBufferBlock(jName InName, jLifeTimeType InLifeTimeType, size_t InSize = 0) const { return nullptr; }
+
+	virtual IAtomicCounterBuffer* CreateAtomicCounterBuffer(const char* name, int32 bindingPoint) const { return nullptr; }
+    virtual ITransformFeedbackBuffer* CreateTransformFeedbackBuffer(const char* name) const { return nullptr; }
+    virtual std::shared_ptr<jVertexBuffer> CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const { return nullptr; }
+    virtual std::shared_ptr<jIndexBuffer> CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const { return nullptr; }
+
+
+	template <typename T = jBuffer>
+	FORCEINLINE std::shared_ptr<T> CreateStructuredBuffer(uint64 InSize, uint64 InAlignment, uint64 InStride, EBufferCreateFlag InBufferCreateFlag
+		, EImageLayout InInitialState, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr) const 
+	{
+		return std::static_pointer_cast<T>(CreateStructuredBuffer(InSize, InAlignment, InStride, InBufferCreateFlag
+			, InInitialState, InData, InDataSize, InResourceName));
+	}
+
+	template <typename T = jBuffer>
+    FORCEINLINE std::shared_ptr<T> CreateRawBuffer(uint64 InSize, uint64 InAlignment, EBufferCreateFlag InBufferCreateFlag
+        , EImageLayout InInitialState, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr) const 
+	{
+		return std::static_pointer_cast<T>(CreateRawBuffer(InSize, InAlignment, InBufferCreateFlag
+			, InInitialState, InData, InDataSize, InResourceName));
+    }
+
+	template <typename T = jBuffer>
+    FORCEINLINE std::shared_ptr<T> CreateFormattedBuffer(uint64 InSize, uint64 InAlignment, ETextureFormat InFormat, EBufferCreateFlag InBufferCreateFlag
+        , EImageLayout InInitialState, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr) const 
+	{
+		return std::static_pointer_cast<T>(CreateFormattedBuffer(InSize, InAlignment, InFormat, InBufferCreateFlag
+			, InInitialState, InData, InDataSize, InResourceName));
+    }
+
+    template <typename T = IUniformBufferBlock>
+    FORCEINLINE std::shared_ptr<T> CreateUniformBufferBlock(jName InName, jLifeTimeType InLifeTimeType, size_t InSize = 0) const
+    {
+        return std::static_pointer_cast<T>(CreateUniformBufferBlock(InName, InLifeTimeType, InSize));
+    }
+
 
     jRaytracingScene* RaytracingScene = nullptr;
 };

@@ -105,9 +105,9 @@ struct jPipelineStateInfo_Vulkan : public jPipelineStateInfo
     VkPipelineLayout vkPipelineLayout = nullptr;        // PipelineLayout 은 PipelineLayoutPool 에서 캐싱해둔 거라 소멸시키지 않음
 
     // Raytracing ShaderTables
-    jBuffer_Vulkan* RaygenBuffer = nullptr;
-    jBuffer_Vulkan* MissBuffer = nullptr;
-    jBuffer_Vulkan* HitGroupBuffer = nullptr;
+    std::shared_ptr<jBuffer_Vulkan> RaygenBuffer;
+    std::shared_ptr<jBuffer_Vulkan> MissBuffer;
+    std::shared_ptr<jBuffer_Vulkan> HitGroupBuffer;
 
     VkStridedDeviceAddressRegionKHR RaygenStridedDeviceAddressRegion{};
     VkStridedDeviceAddressRegionKHR MissStridedDeviceAddressRegion{};

@@ -34,10 +34,10 @@ bool jVertexBuffer_DX12::Initialize(const std::shared_ptr<jVertexStreamData>& In
         stream.InstanceDivisor = iter->InstanceDivisor;
 
         // Create vertex buffer
-        stream.BufferPtr = std::shared_ptr<jBuffer_DX12>(jBufferUtil_DX12::CreateBuffer(iter->GetBufferSize(), 0, EBufferCreateFlag::NONE, D3D12_RESOURCE_STATE_COMMON
-            , iter->GetBufferData(), iter->GetBufferSize(), TEXT("VertexBuffer")));
-        //jBufferUtil_DX12::CreateShaderResourceView(stream.BufferPtr.get(), (uint32)iter->Stride, (uint32)(iter->GetBufferSize() / iter->Stride));     // As StructuredBuffer
-        jBufferUtil_DX12::CreateShaderResourceView(stream.BufferPtr.get(), 0, (uint32)(iter->GetBufferSize() / 4));      // As Raw
+        stream.BufferPtr = g_rhi->CreateRawBuffer<jBuffer_DX12>(iter->GetBufferSize(), 0, EBufferCreateFlag::NONE, EImageLayout::GENERAL
+            , iter->GetBufferData(), iter->GetBufferSize(), TEXT("VertexBuffer"));
+
+        jBuffer_DX12* Buffer_DX12 = stream.GetBuffer<jBuffer_DX12>();
 
         int32 ElementStride = 0;
         for (IStreamParam::jAttribute& element : iter->Attributes)
@@ -172,8 +172,8 @@ bool jVertexBuffer_DX12::Initialize(const std::shared_ptr<jVertexStreamData>& In
 
             if (iter->GetBufferSize() > 0)
             {
-                BindInfos.Buffers.push_back(stream.BufferPtr->Buffer->Get());
-                BindInfos.Offsets.push_back(stream.Offset + stream.BufferPtr->Offset);
+                BindInfos.Buffers.push_back(Buffer_DX12->Buffer->Get());
+                BindInfos.Offsets.push_back(stream.Offset + Buffer_DX12->Offset);
             }
         
             D3D12_INPUT_ELEMENT_DESC elem;
@@ -194,8 +194,8 @@ bool jVertexBuffer_DX12::Initialize(const std::shared_ptr<jVertexStreamData>& In
         Streams.emplace_back(stream);
         
         D3D12_VERTEX_BUFFER_VIEW view;
-        view.BufferLocation = stream.BufferPtr->GetGPUAddress();
-        view.SizeInBytes = (uint32)stream.BufferPtr->Size;
+        view.BufferLocation = Buffer_DX12->GetGPUAddress();
+        view.SizeInBytes = (uint32)Buffer_DX12->Size;
         view.StrideInBytes = stream.Stride;
         VBView.emplace_back(view);
 

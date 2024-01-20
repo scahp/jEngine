@@ -54,7 +54,7 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
             else
             {
                 jUniformBufferBlock_DX12* UniformBuffer = (jUniformBufferBlock_DX12*)ShaderBinding->Resource->GetResource();
-                check(UniformBuffer->GetBuffer());
+                check(UniformBuffer->GetLowLevelResource());
                 //check(!UniformBuffer->IsUseRingBuffer() || (UniformBuffer->IsUseRingBuffer() && ShaderBinding->IsInline));
                 if (ShaderBinding->IsInline)
                 {
