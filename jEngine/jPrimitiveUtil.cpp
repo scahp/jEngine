@@ -1933,10 +1933,9 @@ jDirectionalLightPrimitive* CreateDirectionalLightDebug(const Vector& pos, const
 
     std::weak_ptr<jImageData> data = jImageFileLoader::GetInstance().LoadImageDataFromFile(jName(textureFilename));
     object->BillboardObject = jPrimitiveUtil::CreateBillobardQuad(pos, Vector::OneVector, scale, Vector4(1.0f), targetCamera);
-    if (data.lock()->ImageData.size() > 0)
+    if (data.lock()->ImageBulkData.ImageData.size() > 0)
     {
         jTexture* texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName(textureFilename)).lock().get();
-		//object->BillboardObject->RenderObject->TextureSamplers.push_back({ .Texture = texture, .SamplerState = nullptr });
 		object->BillboardObject->RenderObjects[0]->MaterialPtr = std::make_shared<jMaterial>();
 		object->BillboardObject->RenderObjects[0]->MaterialPtr->TexData[static_cast<int32>(jMaterial::EMaterialTextureType::Albedo)].Texture = texture;
         object->BillboardObject->RenderObjects[0]->IsHiddenBoundBox = true;
@@ -1966,7 +1965,7 @@ jPointLightPrimitive* CreatePointLightDebug(const Vector& scale, jCamera* target
 	std::weak_ptr<jImageData> data = jImageFileLoader::GetInstance().LoadImageDataFromFile(jName(textureFilename));
 	const jPointLightUniformBufferData& LightData = light->GetLightData();
 	object->BillboardObject = jPrimitiveUtil::CreateBillobardQuad(LightData.Position, Vector::OneVector, scale, Vector4(1.0f), targetCamera);
-	if (data.lock()->ImageData.size() > 0)
+	if (data.lock()->ImageBulkData.ImageData.size() > 0)
 	{
 		auto texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName(textureFilename)).lock().get();
         object->BillboardObject->RenderObjects[0]->MaterialPtr = std::make_shared<jMaterial>();
@@ -1997,7 +1996,7 @@ jSpotLightPrimitive* CreateSpotLightDebug(const Vector& scale, jCamera* targetCa
 	std::weak_ptr<jImageData> data = jImageFileLoader::GetInstance().LoadImageDataFromFile(jName(textureFilename));
 	const jSpotLightUniformBufferData& LightData = light->GetLightData();
 	object->BillboardObject = jPrimitiveUtil::CreateBillobardQuad(LightData.Position, Vector::OneVector, scale, Vector4(1.0f), targetCamera);
-	if (data.lock()->ImageData.size() > 0)
+	if (data.lock()->ImageBulkData.ImageData.size() > 0)
 	{
 		auto texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName(textureFilename)).lock().get();
         object->BillboardObject->RenderObjects[0]->MaterialPtr = std::make_shared<jMaterial>();

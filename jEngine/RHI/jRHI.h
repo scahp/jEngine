@@ -16,11 +16,11 @@ class jMaterial;
 
 extern class jRHI* g_rhi;
 
-extern jTexture* GWhiteTexture;
-extern jTexture* GBlackTexture;
-extern jTexture* GWhiteCubeTexture;
-extern jTexture* GNormalTexture;
-extern jTexture* GRoughnessMetalicTexture;
+extern std::shared_ptr<jTexture> GWhiteTexture;
+extern std::shared_ptr<jTexture> GBlackTexture;
+extern std::shared_ptr<jTexture> GWhiteCubeTexture;
+extern std::shared_ptr<jTexture> GNormalTexture;
+extern std::shared_ptr<jTexture> GRoughnessMetalicTexture;
 extern std::shared_ptr<jMaterial> GDefaultMaterial;
 
 struct jShader;
@@ -270,6 +270,12 @@ struct jImageSubResourceData
 	uint64 Offset = 0;
 };
 
+struct jImageBulkData
+{
+    std::vector<unsigned char> ImageData;
+    std::vector<jImageSubResourceData> SubresourceFootprints;
+};
+
 struct jRaytracingDispatchData
 {
 	int32 Width = 0;
@@ -367,7 +373,7 @@ public:
 	virtual bool GetUniformbuffer(Vector3i& outResult, const jName& name, const jShader* shader) const { return false; }
 	virtual bool GetUniformbuffer(Vector4i& outResult, const jName& name, const jShader* shader) const { return false; }
 	virtual jTexture* CreateNullTexture() const { return nullptr; }
-	virtual jTexture* CreateTextureFromData(const jImageData* InImageData) const { return nullptr; }
+	virtual std::shared_ptr<jTexture> CreateTextureFromData(const jImageData* InImageData) const { return nullptr; }
 	virtual jTexture* CreateCubeTextureFromData(std::vector<void*> faces, int32 width, int32 height, bool sRGB
 		, ETextureFormat textureFormat = ETextureFormat::RGBA8, bool createMipmap = false) const { return nullptr; }
 	virtual jFrameBuffer* CreateFrameBuffer(const jFrameBufferInfo& info) const { return nullptr; }
@@ -467,6 +473,9 @@ public:
 	virtual jCommandBuffer* BeginSingleTimeCommands() const { return nullptr; }
     virtual void EndSingleTimeCommands(jCommandBuffer* commandBuffer) const { }
 
+	jRaytracingScene* RaytracingScene = nullptr;
+
+	// CreateBuffers
 	virtual std::shared_ptr<jBuffer> CreateStructuredBuffer(uint64 InSize, uint64 InAlignment, uint64 InStride, EBufferCreateFlag InBufferCreateFlag
 		, EImageLayout InInitialState, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr) const { return nullptr; }
 	virtual std::shared_ptr<jBuffer> CreateRawBuffer(uint64 InSize, uint64 InAlignment, EBufferCreateFlag InBufferCreateFlag
@@ -479,7 +488,6 @@ public:
     virtual ITransformFeedbackBuffer* CreateTransformFeedbackBuffer(const char* name) const { return nullptr; }
     virtual std::shared_ptr<jVertexBuffer> CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const { return nullptr; }
     virtual std::shared_ptr<jIndexBuffer> CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const { return nullptr; }
-
 
 	template <typename T = jBuffer>
 	FORCEINLINE std::shared_ptr<T> CreateStructuredBuffer(uint64 InSize, uint64 InAlignment, uint64 InStride, EBufferCreateFlag InBufferCreateFlag
@@ -510,9 +518,29 @@ public:
     {
         return std::static_pointer_cast<T>(CreateUniformBufferBlock(InName, InLifeTimeType, InSize));
     }
+	//////////////////////////////////////////////////////////////////////////
 
+	// Create Images
+    virtual std::shared_ptr<jTexture> Create2DTexture(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag
+		, EImageLayout InImageLayout = EImageLayout::UNDEFINED, const jImageBulkData& InImageBulkData = {}, const jRTClearValue& InClearValue = jRTClearValue::Invalid, const wchar_t* InResourceName = nullptr) const { return nullptr; }
 
-    jRaytracingScene* RaytracingScene = nullptr;
+	virtual std::shared_ptr<jTexture> CreateCubeTexture(uint32 InWidth, uint32 InHeight, uint32 InMipLevels, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag
+		, EImageLayout InImageLayout = EImageLayout::UNDEFINED, const jImageBulkData& InImageBulkData = {}, const jRTClearValue& InClearValue = jRTClearValue::Invalid, const wchar_t* InResourceName = nullptr) const { return nullptr; }
+
+	template <typename T>
+    std::shared_ptr<T> Create2DTexture(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag
+		, EImageLayout InImageLayout = EImageLayout::UNDEFINED, const jImageBulkData& InImageCopyData = {}, const jRTClearValue& InClearValue = jRTClearValue::Invalid, const wchar_t* InResourceName = nullptr) const
+	{
+		return std::static_pointer_cast<T>(Create2DTexture(InWidth, InHeight, InArrayLayers, InMipLevels, InFormat, InTextureCreateFlag, InImageLayout, InImageCopyData, InClearValue, InResourceName));
+    }
+
+	template <typename T>
+    std::shared_ptr<T> CreateCubeTexture(uint32 InWidth, uint32 InHeight, uint32 InMipLevels, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag
+		, EImageLayout InImageLayout = EImageLayout::UNDEFINED, const jImageBulkData& InImageCopyData = {}, const jRTClearValue& InClearValue = jRTClearValue::Invalid, const wchar_t* InResourceName = nullptr) const
+	{
+		return std::static_pointer_cast<T>(CreateCubeTexture(InWidth, InHeight, InMipLevels, InFormat, InTextureCreateFlag, InImageLayout, InImageCopyData, InClearValue, InResourceName));
+    }
+	//////////////////////////////////////////////////////////////////////////
 };
 
 // Not thred safe

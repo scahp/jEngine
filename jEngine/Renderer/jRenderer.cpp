@@ -28,7 +28,6 @@
 #include "RHI/Vulkan/jTexture_Vulkan.h"
 #include "RHI/DX12/jTexture_DX12.h"
 
-jTexture* jRenderer::m_raytracingOutput;
 ComPtr<ID3D12RootSignature> jRenderer::m_raytracingGlobalRootSignature;
 ComPtr<ID3D12RootSignature> jRenderer::m_raytracingLocalRootSignature;
 ComPtr<ID3D12RootSignature> jRenderer::m_raytracingEmptyLocalRootSignature;
@@ -1292,8 +1291,8 @@ void jRenderer::PostProcess()
         }
         else
         {
-            SourceRT = GBlackTexture;
-            EyeAdaptationTextureCurrent = GWhiteTexture;
+            SourceRT = GBlackTexture.get();
+            EyeAdaptationTextureCurrent = GWhiteTexture.get();
         }
         sprintf_s(szDebugEventTemp, sizeof(szDebugEventTemp), "Tonemap %dx%d", SceneRT->FinalColorPtr->Info.Width, SceneRT->FinalColorPtr->Info.Height);
         AddFullQuadPass(szDebugEventTemp, { SourceRT, SceneRT->ColorPtr->GetTexture(), EyeAdaptationTextureCurrent }, SceneRT->FinalColorPtr
@@ -1543,22 +1542,8 @@ void jRenderer::Render()
 
                 static const bool IsUseHLSLDynamicResource = false;
 
-                if (IsUseDX12())
-                {
-                    m_raytracingOutput = jBufferUtil_DX12::CreateImage((uint32)SCR_WIDTH, (uint32)SCR_HEIGHT, (uint32)1, (uint32)1, (uint32)1
-                        , ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, ETextureCreateFlag::UAV, EImageLayout::UAV);
-                }
-                else if (IsUseVulkan())
-                {
-                    m_raytracingOutput = new jTexture_Vulkan();
-                    auto m_raytracingOutputVk = (jTexture_Vulkan*)m_raytracingOutput;
-                    jBufferUtil_Vulkan::CreateImage((uint32)SCR_WIDTH, (uint32)SCR_HEIGHT, 1, VkSampleCountFlagBits::VK_SAMPLE_COUNT_1_BIT, GetVulkanTextureFormat(ETextureFormat::RGBA16F)
-                        , VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
-                        , VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, *m_raytracingOutputVk);
-                    auto raytracingOutputView = jBufferUtil_Vulkan::CreateImageView(m_raytracingOutputVk->Image
-                        , GetVulkanTextureFormat(m_raytracingOutputVk->Format), VK_IMAGE_ASPECT_COLOR_BIT, 1);
-                    m_raytracingOutputVk->View = raytracingOutputView;
-                }
+                RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr = g_rhi->Create2DTexture((uint32)SCR_WIDTH, (uint32)SCR_HEIGHT, (uint32)1, (uint32)1
+                    , ETextureFormat::RGBA16F, ETextureCreateFlag::UAV, EImageLayout::UAV);
             }
 
             // Normal resource
@@ -1568,7 +1553,7 @@ void jRenderer::Render()
             ShaderBindingArray.Add(jShaderBinding::Create(0, 1, EShaderBindingType::ACCELERATION_STRUCTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
                 ResourceInlineAllactor.Alloc<jBufferResource>(RenderFrameContextPtr->RaytracingScene->TLASBufferPtr.get()), true));
             ShaderBindingArray.Add(jShaderBinding::Create(1, 1, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::ALL_RAYTRACING,
-                ResourceInlineAllactor.Alloc<jTextureResource>(m_raytracingOutput, nullptr), false));
+                ResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr.get(), nullptr), false));
             ShaderBindingArray.Add(jShaderBinding::Create(2, 1, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_RAYTRACING,
                 ResourceInlineAllactor.Alloc<jUniformBufferResource>(SceneUniformBufferPtr.get()), true));
             ShaderBindingArray.Add(jShaderBinding::Create(3, 1, EShaderBindingType::SAMPLER, EShaderAccessStageFlag::ALL_RAYTRACING,
@@ -1784,7 +1769,7 @@ void jRenderer::Render()
             // Binding Raytracing Pipeline State
             RaytracingPipelineState->Bind(RenderFrameContextPtr);
 
-            g_rhi->TransitionImageLayout(CmdBuffer, m_raytracingOutput, EImageLayout::UAV);
+            g_rhi->TransitionImageLayout(CmdBuffer, RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr.get(), EImageLayout::UAV);
 
             // Dispatch Rays
             jRaytracingDispatchData TracingData;
@@ -1794,7 +1779,7 @@ void jRenderer::Render()
             TracingData.PipelineState = RaytracingPipelineState;
             g_rhi->DispatchRay(RenderFrameContextPtr, TracingData);
 
-            g_rhi->TransitionImageLayout(CmdBuffer, m_raytracingOutput, EImageLayout::SHADER_READ_ONLY);
+            g_rhi->TransitionImageLayout(CmdBuffer, RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr.get(), EImageLayout::SHADER_READ_ONLY);
         }
 
         if (1)
@@ -1806,7 +1791,7 @@ void jRenderer::Render()
             auto RT = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr;
 
             g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RT->TexturePtr.get(), EImageLayout::COLOR_ATTACHMENT);
-            g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), m_raytracingOutput, EImageLayout::SHADER_READ_ONLY);
+            g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr.get(), EImageLayout::SHADER_READ_ONLY);
 
             jRasterizationStateInfo* RasterizationState = nullptr;
             switch (g_rhi->GetSelectedMSAASamples())
@@ -1858,7 +1843,7 @@ void jRenderer::Render()
                 , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
 
             ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
-                , ResourceInlineAllactor.Alloc<jTextureResource>(m_raytracingOutput, SamplerState)));
+                , ResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr.get(), SamplerState)));
 
             std::shared_ptr<jShaderBindingInstance> ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
             jShaderBindingInstanceArray ShaderBindingInstanceArray;

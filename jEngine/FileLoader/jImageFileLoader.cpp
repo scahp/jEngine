@@ -119,18 +119,18 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
         }
 
         const uint64 numSubResources = image.GetMetadata().mipLevels * image.GetMetadata().arraySize;
-        NewImageDataPatr->SubresourceFootprints.resize(numSubResources);
+        NewImageDataPatr->ImageBulkData.SubresourceFootprints.resize(numSubResources);
         if (IsUseVulkan())
         {
             for (int32 i = 0; i < numSubResources; ++i)
             {
                 const Image& subImage = image.GetImages()[i];
-                NewImageDataPatr->SubresourceFootprints[i].Depth = 0;
-                NewImageDataPatr->SubresourceFootprints[i].Width = (uint32)subImage.width;
-                NewImageDataPatr->SubresourceFootprints[i].Height = (uint32)subImage.height;
-                NewImageDataPatr->SubresourceFootprints[i].RowPitch = (uint32)subImage.rowPitch;
-                NewImageDataPatr->SubresourceFootprints[i].Format = image.GetMetadata().format;
-                NewImageDataPatr->SubresourceFootprints[i].Offset = 0;
+                NewImageDataPatr->ImageBulkData.SubresourceFootprints[i].Depth = 0;
+                NewImageDataPatr->ImageBulkData.SubresourceFootprints[i].Width = (uint32)subImage.width;
+                NewImageDataPatr->ImageBulkData.SubresourceFootprints[i].Height = (uint32)subImage.height;
+                NewImageDataPatr->ImageBulkData.SubresourceFootprints[i].RowPitch = (uint32)subImage.rowPitch;
+                NewImageDataPatr->ImageBulkData.SubresourceFootprints[i].Format = image.GetMetadata().format;
+                NewImageDataPatr->ImageBulkData.SubresourceFootprints[i].Offset = 0;
             }
 
             size_t SizeInBytes = 0;
@@ -147,7 +147,7 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
                 }
             }
 
-            NewImageDataPatr->ImageData.resize(SizeInBytes);
+            NewImageDataPatr->ImageBulkData.ImageData.resize(SizeInBytes);
             size_t Offset = 0;
             for (uint64 arrayIdx = 0; arrayIdx < image.GetMetadata().arraySize; ++arrayIdx)
             {
@@ -156,12 +156,12 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
                     const uint64 subResourceIdx = mipIdx + (arrayIdx * image.GetMetadata().mipLevels);
                     const Image& subImage = image.GetImages()[subResourceIdx];
 
-                    NewImageDataPatr->SubresourceFootprints[subResourceIdx].MipLevel = (uint32)mipIdx;
-                    NewImageDataPatr->SubresourceFootprints[subResourceIdx].Depth = (uint32)arrayIdx;
-                    NewImageDataPatr->SubresourceFootprints[subResourceIdx].Offset = Offset;
+                    NewImageDataPatr->ImageBulkData.SubresourceFootprints[subResourceIdx].MipLevel = (uint32)mipIdx;
+                    NewImageDataPatr->ImageBulkData.SubresourceFootprints[subResourceIdx].Depth = (uint32)arrayIdx;
+                    NewImageDataPatr->ImageBulkData.SubresourceFootprints[subResourceIdx].Offset = Offset;
 
                     size_t LocalSizeInByte = subImage.width * subImage.height * (DirectX::BitsPerPixel(image.GetMetadata().format) / 8);
-                    memcpy(&NewImageDataPatr->ImageData[Offset], subImage.pixels, LocalSizeInByte);
+                    memcpy(&NewImageDataPatr->ImageBulkData.ImageData[Offset], subImage.pixels, LocalSizeInByte);
                     LocalSizeInByte = Align(LocalSizeInByte, subImage.slicePitch);
                     LocalSizeInByte = Align(LocalSizeInByte, subImage.rowPitch);
                     Offset += LocalSizeInByte;
@@ -193,22 +193,22 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
 
             for (int32 i = 0; i < numSubResources; ++i)
             {
-                NewImageDataPatr->SubresourceFootprints[i].Depth = layouts[i].Footprint.Depth;
-                NewImageDataPatr->SubresourceFootprints[i].Width = layouts[i].Footprint.Width;
-                NewImageDataPatr->SubresourceFootprints[i].Height = layouts[i].Footprint.Height;
-                NewImageDataPatr->SubresourceFootprints[i].RowPitch = layouts[i].Footprint.RowPitch;
-                NewImageDataPatr->SubresourceFootprints[i].Format = layouts[i].Footprint.Format;
-                NewImageDataPatr->SubresourceFootprints[i].Offset = layouts[i].Offset;
+                NewImageDataPatr->ImageBulkData.SubresourceFootprints[i].Depth = layouts[i].Footprint.Depth;
+                NewImageDataPatr->ImageBulkData.SubresourceFootprints[i].Width = layouts[i].Footprint.Width;
+                NewImageDataPatr->ImageBulkData.SubresourceFootprints[i].Height = layouts[i].Footprint.Height;
+                NewImageDataPatr->ImageBulkData.SubresourceFootprints[i].RowPitch = layouts[i].Footprint.RowPitch;
+                NewImageDataPatr->ImageBulkData.SubresourceFootprints[i].Format = layouts[i].Footprint.Format;
+                NewImageDataPatr->ImageBulkData.SubresourceFootprints[i].Offset = layouts[i].Offset;
             }
 
-            NewImageDataPatr->ImageData.resize(textureMemSize);
-            uint8* uploadMem = &NewImageDataPatr->ImageData[0];
+            NewImageDataPatr->ImageBulkData.ImageData.resize(textureMemSize);
+            uint8* uploadMem = &NewImageDataPatr->ImageBulkData.ImageData[0];
             for (uint64 arrayIdx = 0; arrayIdx < image.GetMetadata().arraySize; ++arrayIdx)
             {
                 for (uint64 mipIdx = 0; mipIdx < image.GetMetadata().mipLevels; ++mipIdx)
                 {
                     const uint64 subResourceIdx = mipIdx + (arrayIdx * image.GetMetadata().mipLevels);
-                    NewImageDataPatr->SubresourceFootprints[subResourceIdx].MipLevel = (uint32)mipIdx;
+                    NewImageDataPatr->ImageBulkData.SubresourceFootprints[subResourceIdx].MipLevel = (uint32)mipIdx;
 
                     const D3D12_PLACED_SUBRESOURCE_FOOTPRINT& subResourceLayout = layouts[subResourceIdx];
                     const uint64 subResourceHeight = numRows[subResourceIdx];
@@ -266,8 +266,7 @@ std::weak_ptr<jTexture> jImageFileLoader::LoadTextureFromFile(const jName& filen
     JASSERT(pImageData);
     if (pImageData)
     {
-        jTexture* pCreatedTexture = g_rhi->CreateTextureFromData(pImageData);
-        NewTexture = std::shared_ptr<jTexture>(pCreatedTexture);
+        NewTexture = g_rhi->CreateTextureFromData(pImageData);
     }
 
     CachedTextureMap[filename] = NewTexture;

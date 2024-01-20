@@ -52,7 +52,7 @@ private:
         int32_t indexCount = 0;
     };
     std::vector<jDynamicBufferData> DynamicBufferData;
-    jTexture* FontImage = nullptr;
+    std::shared_ptr<jTexture_Vulkan> FontImagePtr;
 
     // VkPipelineLayout PipelineLayout;
     VkDescriptorPool DescriptorPool;

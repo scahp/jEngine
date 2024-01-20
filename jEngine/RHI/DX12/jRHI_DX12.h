@@ -320,7 +320,7 @@ public:
 	jCommandBuffer_DX12* BeginSingleTimeCopyCommands() const;
     void EndSingleTimeCopyCommands(jCommandBuffer_DX12* commandBuffer) const;
 
-	virtual jTexture* CreateTextureFromData(const jImageData* InImageData) const override;
+	virtual std::shared_ptr<jTexture> CreateTextureFromData(const jImageData* InImageData) const override;
 	virtual jFenceManager* GetFenceManager() override { return &FenceManager; }
 
 	std::vector<jRingBuffer_DX12*> OneFrameUniformRingBuffers;
@@ -419,6 +419,7 @@ public:
 
 	virtual jRaytracingScene* CreateRaytracingScene() const;
 
+	// Create Buffers
     virtual std::shared_ptr<jBuffer> CreateStructuredBuffer(uint64 InSize, uint64 InAlignment, uint64 InStride, EBufferCreateFlag InBufferCreateFlag
         , EImageLayout InInitialState, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr) const override;
 	virtual std::shared_ptr<jBuffer> CreateRawBuffer(uint64 InSize, uint64 InAlignment, EBufferCreateFlag InBufferCreateFlag
@@ -428,6 +429,15 @@ public:
     virtual std::shared_ptr<IUniformBufferBlock> CreateUniformBufferBlock(jName InName, jLifeTimeType InLifeTimeType, size_t InSize = 0) const override;
     virtual std::shared_ptr<jVertexBuffer> CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const override;
     virtual std::shared_ptr<jIndexBuffer> CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const override;
+	//////////////////////////////////////////////////////////////////////////
+
+	// Create Images
+	virtual std::shared_ptr<jTexture> Create2DTexture(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag
+		, EImageLayout InImageLayout = EImageLayout::UNDEFINED, const jImageBulkData& InImageBulkData = {}, const jRTClearValue& InClearValue = jRTClearValue::Invalid, const wchar_t* InResourceName = nullptr) const override;
+
+    virtual std::shared_ptr<jTexture> CreateCubeTexture(uint32 InWidth, uint32 InHeight, uint32 InMipLevels, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag
+		, EImageLayout InImageLayout = EImageLayout::UNDEFINED, const jImageBulkData& InImageBulkData = {}, const jRTClearValue& InClearValue = jRTClearValue::Invalid, const wchar_t* InResourceName = nullptr) const override;
+	//////////////////////////////////////////////////////////////////////////
 };
 
 extern jRHI_DX12* g_rhi_dx12;

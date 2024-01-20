@@ -10,8 +10,8 @@ jTexture* jMaterial::GetTexture(EMaterialTextureType InType) const
     if (!TexData[(int32)InType].Texture)
     {
         if (InType == EMaterialTextureType::Normal)
-            return GNormalTexture;
-        return GBlackTexture;
+            return GNormalTexture.get();
+        return GBlackTexture.get();
     }
 
     return TexData[(int32)InType].Texture;
@@ -35,11 +35,11 @@ const std::shared_ptr<jShaderBindingInstance>& jMaterial::CreateShaderBindingIns
             if (!Texture)
             {
                 if ((int32)EMaterialTextureType::Normal == i)
-                    Texture = GNormalTexture;
+                    Texture = GNormalTexture.get();
                 else if ((int32)EMaterialTextureType::Env == i)
-                    Texture = GWhiteCubeTexture;
+                    Texture = GWhiteCubeTexture.get();
                 else
-                    Texture = GWhiteTexture;
+                    Texture = GWhiteTexture.get();
             }
 
             ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
