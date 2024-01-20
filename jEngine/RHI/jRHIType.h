@@ -837,6 +837,13 @@ enum class ETextureCreateFlag : uint32
     NONE = 0,
     RTV = 0x00000001,
     UAV = 0x00000002,
+    CPUAccess = 0x00000004,
+	TransferDst = 0x00000008,
+	TransferSrc = 0x00000010,
+	ShadingRate = 0x00000020,
+	DSV = 0x00000040,
+	SubpassInput = 0x00000040,
+	Memoryless = 0x00000080,
 };
 DECLARE_ENUM_BIT_OPERATORS(ETextureCreateFlag)
 

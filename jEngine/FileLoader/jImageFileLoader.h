@@ -9,11 +9,10 @@ struct jImageData
 	int32 MipLevel = 1;
 	int32 LayerCount = 1;
 	jName Filename;
-	std::vector<unsigned char> ImageData;
 	ETextureFormat Format = ETextureFormat::RGBA8;
 	EFormatType FormatType = EFormatType::UNSIGNED_BYTE;
 	ETextureType TextureType = ETextureType::TEXTURE_2D;
-	std::vector<jImageSubResourceData> SubresourceFootprints;
+	jImageBulkData ImageBulkData;
 };
 
 class jImageFileLoader

@@ -125,7 +125,7 @@ std::shared_ptr<jBuffer_DX12> CreateBuffer(uint64 InSize, uint64 InAlignment, EB
     return BufferPtr;
 }
 
-std::shared_ptr<jCreatedResource> CreateImageInternal(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, uint32 InNumOfSample
+std::shared_ptr<jCreatedResource> CreateTexturenternal(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, uint32 InNumOfSample
     , D3D12_RESOURCE_DIMENSION InType, DXGI_FORMAT InFormat, ETextureCreateFlag InTextureCreateFlag, EImageLayout InImageLayout, D3D12_CLEAR_VALUE* InClearValue, const wchar_t* InResourceName)
 {
     check(g_rhi_dx12);
@@ -170,7 +170,7 @@ std::shared_ptr<jCreatedResource> CreateImageInternal(uint32 InWidth, uint32 InH
     return ImageResource;
 }
 
-jTexture_DX12* CreateImage(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, uint32 InNumOfSample
+std::shared_ptr<jTexture_DX12> CreateTexture(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, uint32 InNumOfSample
     , ETextureType InType, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag, EImageLayout InImageLayout, const jRTClearValue& InClearValue, const wchar_t* InResourceName)
 {
     bool HasClearValue = false;
@@ -194,14 +194,14 @@ jTexture_DX12* CreateImage(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers
         HasClearValue = InClearValue.GetType() != ERTClearType::None;
     }
 
-    std::shared_ptr<jCreatedResource> TextureInternal = CreateImageInternal(InWidth, InHeight, InArrayLayers, InMipLevels, InNumOfSample
+    std::shared_ptr<jCreatedResource> TextureInternal = CreateTexturenternal(InWidth, InHeight, InArrayLayers, InMipLevels, InNumOfSample
         , GetDX12TextureDemension(InType), GetDX12TextureFormat(InFormat), InTextureCreateFlag, InImageLayout, (HasClearValue ? &ClearValue : nullptr), InResourceName);
     ensure(TextureInternal->IsValid());
 
-    jTexture_DX12* Texture = new jTexture_DX12(InType, InFormat, InWidth, InHeight, InArrayLayers
+    auto TexturePtr = std::make_shared<jTexture_DX12>(InType, InFormat, InWidth, InHeight, InArrayLayers
         , EMSAASamples::COUNT_1, InMipLevels, false, InClearValue, TextureInternal);
-    check(Texture);
-    Texture->Layout = InImageLayout;
+    check(TexturePtr);
+    TexturePtr->Layout = InImageLayout;
 
     if (InResourceName)
     {
@@ -212,34 +212,34 @@ jTexture_DX12* CreateImage(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers
         const size_t newsize = origsize * 2;
         wcstombs_s(&OutLength, szResourceName, newsize, InResourceName, _TRUNCATE);
 
-        Texture->ResourceName = jName(szResourceName);
+        TexturePtr->ResourceName = jName(szResourceName);
     }
 
     if (IsDepthFormat(InFormat))
     {
-        CreateShaderResourceView(Texture);
-        CreateDepthStencilView(Texture);
+        CreateShaderResourceView(TexturePtr.get());
+        CreateDepthStencilView(TexturePtr.get());
     }
     else
     {
-        CreateShaderResourceView(Texture);
+        CreateShaderResourceView(TexturePtr.get());
         if (!!(InTextureCreateFlag & ETextureCreateFlag::RTV))
-            CreateRenderTargetView(Texture);
+            CreateRenderTargetView(TexturePtr.get());
         if (!!(InTextureCreateFlag & ETextureCreateFlag::UAV))
-            CreateUnorderedAccessView(Texture);
+            CreateUnorderedAccessView(TexturePtr.get());
     }
 
-    return Texture;
+    return TexturePtr;
 }
 
-jTexture_DX12* CreateImage(const std::shared_ptr<jCreatedResource>& InTexture, ETextureCreateFlag InTextureCreateFlag, EImageLayout InImageLayout, const jRTClearValue& InClearValue, const wchar_t* InResourceName)
+std::shared_ptr<jTexture_DX12> CreateTexture(const std::shared_ptr<jCreatedResource>& InTexture, ETextureCreateFlag InTextureCreateFlag, EImageLayout InImageLayout, const jRTClearValue& InClearValue, const wchar_t* InResourceName)
 {
     const auto desc = InTexture->Resource->GetDesc();
-    jTexture_DX12* Texture = new jTexture_DX12(GetDX12TextureDemension(desc.Dimension, desc.DepthOrArraySize > 1), GetDX12TextureFormat(desc.Format), (int32)desc.Width, (int32)desc.Height, (int32)desc.DepthOrArraySize
+    auto TexturePtr = std::make_shared<jTexture_DX12>(GetDX12TextureDemension(desc.Dimension, desc.DepthOrArraySize > 1), GetDX12TextureFormat(desc.Format), (int32)desc.Width, (int32)desc.Height, (int32)desc.DepthOrArraySize
         , EMSAASamples::COUNT_1, (int32)desc.MipLevels, false, InClearValue, InTexture);
 
-    check(Texture);
-    Texture->Layout = InImageLayout;
+    check(TexturePtr);
+    TexturePtr->Layout = InImageLayout;
 
     if (InResourceName)
     {
@@ -250,27 +250,27 @@ jTexture_DX12* CreateImage(const std::shared_ptr<jCreatedResource>& InTexture, E
         const size_t newsize = origsize * 2;
         wcstombs_s(&OutLength, szResourceName, newsize, InResourceName, _TRUNCATE);
 
-        Texture->ResourceName = jName(szResourceName);
+        TexturePtr->ResourceName = jName(szResourceName);
     }
 
     if (IsDepthFormat(GetDX12TextureFormat(desc.Format)))
     {
-        CreateShaderResourceView(Texture);
-        CreateDepthStencilView(Texture);
+        CreateShaderResourceView(TexturePtr.get());
+        CreateDepthStencilView(TexturePtr.get());
     }
     else
     {
-        CreateShaderResourceView(Texture);
+        CreateShaderResourceView(TexturePtr.get());
         if (!!(InTextureCreateFlag & ETextureCreateFlag::RTV))
-            CreateRenderTargetView(Texture);
+            CreateRenderTargetView(TexturePtr.get());
         if (!!(InTextureCreateFlag & ETextureCreateFlag::UAV))
-            CreateUnorderedAccessView(Texture);
+            CreateUnorderedAccessView(TexturePtr.get());
     }
 
-    return Texture;
+    return TexturePtr;
 }
 
-uint64 CopyBufferToImage(ID3D12GraphicsCommandList4* InCommandBuffer, ID3D12Resource* InBuffer, uint64 InBufferOffset, ID3D12Resource* InImage, int32 InImageSubresourceIndex)
+uint64 CopyBufferToTexture(ID3D12GraphicsCommandList4* InCommandBuffer, ID3D12Resource* InBuffer, uint64 InBufferOffset, ID3D12Resource* InImage, int32 InImageSubresourceIndex)
 {
     check(InCommandBuffer);
 
@@ -298,17 +298,17 @@ uint64 CopyBufferToImage(ID3D12GraphicsCommandList4* InCommandBuffer, ID3D12Reso
     return textureMemorySize;
 }
 
-uint64 CopyBufferToImage(ID3D12GraphicsCommandList4* InCommandBuffer, ID3D12Resource* InBuffer, uint64 InBufferOffset, ID3D12Resource* InImage
+uint64 CopyBufferToTexture(ID3D12GraphicsCommandList4* InCommandBuffer, ID3D12Resource* InBuffer, uint64 InBufferOffset, ID3D12Resource* InImage
     , int32 InNumOfImageSubresource, int32 InStartImageSubresource)
 {
     for (int32 i = 0; i < InNumOfImageSubresource; ++i)
     {
-        InBufferOffset += CopyBufferToImage(InCommandBuffer, InBuffer, InBufferOffset, InImage, i);
+        InBufferOffset += CopyBufferToTexture(InCommandBuffer, InBuffer, InBufferOffset, InImage, i);
     }
     return InBufferOffset;      // total size of copy data
 }
 
-void CopyBufferToImage(ID3D12GraphicsCommandList4* InCommandBuffer, ID3D12Resource* InBuffer, ID3D12Resource* InImage, const std::vector<jImageSubResourceData>& InSubresourceData)
+void CopyBufferToTexture(ID3D12GraphicsCommandList4* InCommandBuffer, ID3D12Resource* InBuffer, ID3D12Resource* InImage, const std::vector<jImageSubResourceData>& InSubresourceData)
 {
     for (uint64 i = 0; i < InSubresourceData.size(); ++i)
     {

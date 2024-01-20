@@ -9,11 +9,11 @@
 
 const jRTClearValue jRTClearValue::Invalid = jRTClearValue();
 
-jTexture* GWhiteTexture = nullptr;
-jTexture* GBlackTexture = nullptr;
-jTexture* GWhiteCubeTexture = nullptr;
-jTexture* GNormalTexture = nullptr;
-jTexture* GRoughnessMetalicTexture = nullptr;
+std::shared_ptr<jTexture> GWhiteTexture;
+std::shared_ptr<jTexture> GBlackTexture;
+std::shared_ptr<jTexture> GWhiteCubeTexture;
+std::shared_ptr<jTexture> GNormalTexture;
+std::shared_ptr<jTexture> GRoughnessMetalicTexture;
 std::shared_ptr<jMaterial> GDefaultMaterial = nullptr;
 
 //////////////////////////////////////////////////////////////////////////
@@ -52,43 +52,46 @@ bool jRHI::InitRHI()
 void jRHI::OnInitRHI()
 {
     jImageData image;
-    image.ImageData = { 255, 255, 255, 255 };
+    image.ImageBulkData.ImageData = { 255, 255, 255, 255 };
     image.Width = 1;
     image.Height = 1;
     image.Format = ETextureFormat::RGBA8;
     image.FormatType = EFormatType::UNSIGNED_BYTE;
     image.sRGB = false;
 
-    image.ImageData = { 255, 255, 255, 255 };
+    image.ImageBulkData.ImageData = { 255, 255, 255, 255 };
     GWhiteTexture = CreateTextureFromData(&image);
 
-    image.ImageData = { 0, 0, 0, 255 };
+    image.ImageBulkData.ImageData = { 0, 0, 0, 255 };
     GBlackTexture = CreateTextureFromData(&image);
 
-    image.ImageData = { 255 / 2, 255 / 2, 255, 0 };
+    image.ImageBulkData.ImageData = { 255 / 2, 255 / 2, 255, 0 };
     GNormalTexture = CreateTextureFromData(&image);
 
     const float roughness = 0.2f;
     const float metalic = 0.0f;
-    image.ImageData = { 0, (uint8)(255.0f * roughness), (uint8)(255.0f * metalic), 0 };
+    image.ImageBulkData.ImageData = { 0, (uint8)(255.0f * roughness), (uint8)(255.0f * metalic), 0 };
     GRoughnessMetalicTexture = CreateTextureFromData(&image);
 
     image.TextureType = ETextureType::TEXTURE_CUBE;
     image.LayerCount = 6;
-    image.ImageData = { 255, 255, 255, 200, 255, 255 };
+    image.ImageBulkData.ImageData = { 255, 255, 255, 200, 255, 255 };
     GWhiteCubeTexture = CreateTextureFromData(&image);
 
     GDefaultMaterial = std::make_shared<jMaterial>();
-    GDefaultMaterial->TexData[(int32)jMaterial::EMaterialTextureType::Albedo].Texture = GWhiteTexture;
-    GDefaultMaterial->TexData[(int32)jMaterial::EMaterialTextureType::Normal].Texture = GNormalTexture;
-    GDefaultMaterial->TexData[(int32)jMaterial::EMaterialTextureType::Metallic].Texture = GRoughnessMetalicTexture;
+    GDefaultMaterial->TexData[(int32)jMaterial::EMaterialTextureType::Albedo].Texture = GWhiteTexture.get();
+    GDefaultMaterial->TexData[(int32)jMaterial::EMaterialTextureType::Normal].Texture = GNormalTexture.get();
+    GDefaultMaterial->TexData[(int32)jMaterial::EMaterialTextureType::Metallic].Texture = GRoughnessMetalicTexture.get();
 }
 
 void jRHI::ReleaseRHI()
 {
-	delete GWhiteTexture;
-	delete GBlackTexture;
-	delete GNormalTexture;
+    GWhiteTexture.reset();
+    GBlackTexture.reset();
+    GWhiteCubeTexture.reset();
+    GNormalTexture.reset();
+    GRoughnessMetalicTexture.reset();
+    GDefaultMaterial.reset();
 
     jShader::ReleaseCheckUpdateShaderThread();
 	ShaderPool.Release();

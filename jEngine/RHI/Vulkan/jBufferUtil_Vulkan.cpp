@@ -53,7 +53,7 @@ bool HasStencilComponent(VkFormat format)
     return ((format == VK_FORMAT_D32_SFLOAT_S8_UINT) || (format == VK_FORMAT_D24_UNORM_S8_UINT));
 }
 
-VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectMask, uint32 mipLevels)
+VkImageView CreateTextureView(VkImage image, VkFormat format, VkImageAspectFlags aspectMask, uint32 mipLevels)
 {
     VkImageViewCreateInfo viewInfo = {};
 
@@ -83,7 +83,7 @@ VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags a
     return imageView;
 }
 
-VkImageView CreateImage2DArrayView(VkImage image, uint32 layerCount, VkFormat format, VkImageAspectFlags aspectMask, uint32 mipLevels)
+VkImageView CreateTexture2DArrayView(VkImage image, uint32 layerCount, VkFormat format, VkImageAspectFlags aspectMask, uint32 mipLevels)
 {
     VkImageViewCreateInfo viewInfo = {};
 
@@ -113,7 +113,7 @@ VkImageView CreateImage2DArrayView(VkImage image, uint32 layerCount, VkFormat fo
     return imageView;
 }
 
-VkImageView CreateImageCubeView(VkImage image, VkFormat format, VkImageAspectFlags aspectMask, uint32 mipLevels)
+VkImageView CreateTextureCubeView(VkImage image, VkFormat format, VkImageAspectFlags aspectMask, uint32 mipLevels)
 {
     VkImageViewCreateInfo viewInfo = {};
 
@@ -143,7 +143,7 @@ VkImageView CreateImageCubeView(VkImage image, VkFormat format, VkImageAspectFla
     return imageView;
 }
 
-VkImageView CreateImageViewForSpecificMipMap(VkImage image, VkFormat format, VkImageAspectFlags aspectMask, uint32 mipLevelIndex)
+VkImageView CreateTextureViewForSpecificMipMap(VkImage image, VkFormat format, VkImageAspectFlags aspectMask, uint32 mipLevelIndex)
 {
     VkImageViewCreateInfo viewInfo = {};
 
@@ -173,7 +173,7 @@ VkImageView CreateImageViewForSpecificMipMap(VkImage image, VkFormat format, VkI
     return imageView;
 }
 
-VkImageView CreateImage2DArrayViewForSpecificMipMap(VkImage image, uint32 layerCount, VkFormat format, VkImageAspectFlags aspectMask, uint32 mipLevelIndex)
+VkImageView CreateTexture2DArrayViewForSpecificMipMap(VkImage image, uint32 layerCount, VkFormat format, VkImageAspectFlags aspectMask, uint32 mipLevelIndex)
 {
     VkImageViewCreateInfo viewInfo = {};
 
@@ -203,7 +203,7 @@ VkImageView CreateImage2DArrayViewForSpecificMipMap(VkImage image, uint32 layerC
     return imageView;
 }
 
-VkImageView CreateImageCubeViewForSpecificMipMap(VkImage image, VkFormat format, VkImageAspectFlags aspectMask, uint32 mipLevelIndex)
+VkImageView CreateTextureCubeViewForSpecificMipMap(VkImage image, VkFormat format, VkImageAspectFlags aspectMask, uint32 mipLevelIndex)
 {
     VkImageViewCreateInfo viewInfo = {};
 
@@ -233,7 +233,7 @@ VkImageView CreateImageCubeViewForSpecificMipMap(VkImage image, VkFormat format,
     return imageView;
 }
 
-bool CreateImage2DArray(uint32 width, uint32 height, uint32 arrayLayers, uint32 mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage
+bool CreateTexture2DArray_LowLevel(uint32 width, uint32 height, uint32 arrayLayers, uint32 mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage
     , VkMemoryPropertyFlags properties, VkImageLayout imageLayout, VkImageCreateFlagBits imageCreateFlagBits, VkImage& image, VkDeviceMemory& imageMemory)
 {
     VkImageCreateInfo imageInfo = {};
@@ -346,7 +346,7 @@ std::shared_ptr<jBuffer_Vulkan> CreateBuffer(EVulkanBufferBits InUsage, EVulkanM
     return BufferPtr;
 }
 
-void CopyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer buffer, uint64 bufferOffset, VkImage image, uint32 width, uint32 height, int32 miplevel, int32 layerIndex)
+void CopyBufferToTexture(VkCommandBuffer commandBuffer, VkBuffer buffer, uint64 bufferOffset, VkImage image, uint32 width, uint32 height, int32 miplevel, int32 layerIndex)
 {
     VkBufferImageCopy region = {};
     region.bufferOffset = bufferOffset;
@@ -461,10 +461,10 @@ void CopyBuffer(VkCommandBuffer commandBuffer, const jBuffer_Vulkan& srcBuffer, 
     CopyBuffer(commandBuffer, srcBuffer.Buffer, dstBuffer.Buffer, size, srcBuffer.Offset, dstBuffer.Offset);
 }
 
-void CopyBufferToImage(VkBuffer buffer, uint64 bufferOffset, VkImage image, uint32 width, uint32 height, int32 miplevel, int32 layerIndex)
+void CopyBufferToTexture(VkBuffer buffer, uint64 bufferOffset, VkImage image, uint32 width, uint32 height, int32 miplevel, int32 layerIndex)
 {
     auto commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
-    CopyBufferToImage(commandBuffer->GetRef(), buffer, bufferOffset, image, width, height, miplevel, layerIndex);
+    CopyBufferToTexture(commandBuffer->GetRef(), buffer, bufferOffset, image, width, height, miplevel, layerIndex);
     g_rhi_vk->EndSingleTimeCommands(commandBuffer);
 }
 

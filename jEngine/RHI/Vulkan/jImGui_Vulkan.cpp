@@ -86,23 +86,16 @@ void jImGUI_Vulkan::Initialize(float width, float height)
     io.Fonts->GetTexDataAsRGBA32(&fontData, &texWidth, &texHeight);
     VkDeviceSize uploadSize = texWidth * texHeight * 4 * sizeof(char);
 
-    jTexture_Vulkan* FontImage_vk = new jTexture_Vulkan();
-    FontImage = FontImage_vk;
-
     // Create target image for copy
-    verify(jBufferUtil_Vulkan::CreateImage(texWidth, texHeight, 1, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL
-        , VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, *FontImage_vk));
-
-    // Image view
-    FontImage_vk->View = jBufferUtil_Vulkan::CreateImageView(FontImage_vk->Image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, 1);
-    check(FontImage_vk->View);
+    FontImagePtr = g_rhi->Create2DTexture<jTexture_Vulkan>(texWidth, texHeight, 1, 1, ETextureFormat::RGBA8, ETextureCreateFlag::TransferDst);
+    check(FontImagePtr);
 
     jSamplerStateInfo* samplerStateInfo = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR>::Create();
     check(samplerStateInfo);
 
     VkDescriptorImageInfo fontDescriptor{};
     fontDescriptor.sampler = ((jSamplerStateInfo_Vulkan*)samplerStateInfo)->SamplerState;
-    fontDescriptor.imageView = FontImage_vk->View;
+    fontDescriptor.imageView = FontImagePtr->View;
     fontDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
     std::vector<VkWriteDescriptorSet> writeDescriptorSets;
@@ -122,9 +115,9 @@ void jImGUI_Vulkan::Initialize(float width, float height)
     stagingBuffer->UpdateBuffer(fontData, uploadSize);
 
     // Copy buffer data to font image
-    g_rhi_vk->TransitionImageLayoutImmediate(FontImage, EImageLayout::TRANSFER_DST);
-    jBufferUtil_Vulkan::CopyBufferToImage(stagingBuffer->Buffer, stagingBuffer->Offset, FontImage_vk->Image, texWidth, texHeight);
-    g_rhi_vk->TransitionImageLayoutImmediate(FontImage, EImageLayout::SHADER_READ_ONLY);
+    g_rhi_vk->TransitionImageLayoutImmediate(FontImagePtr.get(), EImageLayout::TRANSFER_DST);
+    jBufferUtil_Vulkan::CopyBufferToTexture(stagingBuffer->Buffer, stagingBuffer->Offset, FontImagePtr->Image, texWidth, texHeight);
+    g_rhi_vk->TransitionImageLayoutImmediate(FontImagePtr.get(), EImageLayout::SHADER_READ_ONLY);
     //////////////////////////////////////////////////////////////////////////
 
     DynamicBufferData.resize(g_rhi_vk->Swapchain->GetNumOfSwapchain());
@@ -158,9 +151,6 @@ void jImGUI_Vulkan::Initialize(float width, float height)
 
 void jImGUI_Vulkan::Release()
 {
-    delete FontImage;
-    FontImage = nullptr;
-
     DynamicBufferData.clear();
 
     DescriptorSet = nullptr;        // DescriptorPool 을 해제 하면되므로 따로 소멸시키지 않음

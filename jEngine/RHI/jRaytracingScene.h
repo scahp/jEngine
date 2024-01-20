@@ -26,5 +26,6 @@ public:
     std::shared_ptr<jBuffer> TLASBufferPtr;
     std::shared_ptr<jBuffer> ScratchTLASBufferPtr;
     std::shared_ptr<jBuffer> InstanceUploadBufferPtr;
+    std::shared_ptr<jTexture> RaytracingOutputPtr;
 };
 

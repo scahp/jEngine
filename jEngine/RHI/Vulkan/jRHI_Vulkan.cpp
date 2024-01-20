@@ -463,9 +463,6 @@ void jRHI_Vulkan::ReleaseRHI()
 
 	jRHI::ReleaseRHI();
 
-    delete SampleVRSTexture;
-	SampleVRSTexture = nullptr;
-
 	jImageFileLoader::ReleaseInstance();
 	
 	delete g_ImGUI;
@@ -561,25 +558,7 @@ std::shared_ptr<jIndexBuffer> jRHI_Vulkan::CreateIndexBuffer(const std::shared_p
 
 void jRHI_Vulkan::CleanupSwapChain()
 {
-	// ImageViews and RenderPass 가 소멸되기전에 호출되어야 함
-	//for (auto framebuffer : swapChainFramebuffers)
-	//	vkDestroyFramebuffer(device, framebuffer, nullptr);
-	//for (int32 i = 0; i < RenderPasses.size(); ++i)
-	//{
-	//	RenderPasses[i]->Release();
-	//	delete RenderPasses[i];
-	//}
-	//RenderPasses.clear();
-
 	delete Swapchain;
-
-	//for (size_t i = 0; i < swapChainImages.size(); ++i)
-	//{
-	//	vkDestroyBuffer(device, uniformBuffers[i], nullptr);
-	//	vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
-	//}
-
-	//vkDestroyDescriptorPool(device, descriptorPool, nullptr);
 }
 
 void jRHI_Vulkan::RecreateSwapChain()
@@ -615,8 +594,6 @@ void jRHI_Vulkan::RecreateSwapChain()
 
     CurrentFrameIndex = 0;
 
-	delete SampleVRSTexture;
-	SampleVRSTexture = nullptr;
 	CreateSampleVRSTexture();
 
 	Flush();
@@ -638,7 +615,7 @@ std::shared_ptr<jVertexBuffer> jRHI_Vulkan::CreateVertexBuffer(const std::shared
 	return vertexBufferPtr;
 }
 
-jTexture* jRHI_Vulkan::CreateTextureFromData(const jImageData* InImageData) const
+std::shared_ptr<jTexture> jRHI_Vulkan::CreateTextureFromData(const jImageData* InImageData) const
 {
 	check(InImageData);
 
@@ -649,88 +626,31 @@ jTexture* jRHI_Vulkan::CreateTextureFromData(const jImageData* InImageData) cons
     }
 
 	auto stagingBufferPtr = jBufferUtil_Vulkan::CreateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
-        , InImageData->ImageData.size());
+        , InImageData->ImageBulkData.ImageData.size());
 
-	stagingBufferPtr->UpdateBuffer(&InImageData->ImageData[0], InImageData->ImageData.size());
+	stagingBufferPtr->UpdateBuffer(&InImageData->ImageBulkData.ImageData[0], InImageData->ImageBulkData.ImageData.size());
 
-	VkFormat vkTextureFormat = GetVulkanTextureFormat(InImageData->Format);
-
-	VkImage TextureImage;
-	VkDeviceMemory TextureImageMemory;
+	std::shared_ptr<jTexture_Vulkan> TexturePtr;
 	if (InImageData->TextureType == ETextureType::TEXTURE_CUBE)
 	{
-        if (!ensure(jBufferUtil_Vulkan::CreateImageCube((uint32)InImageData->Width, (uint32)InImageData->Height, MipLevel, VK_SAMPLE_COUNT_1_BIT, vkTextureFormat
-            , VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT
-			| VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT	// image를 shader 에서 접근가능하게 하고 싶은 경우
-            , VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, TextureImage, TextureImageMemory)))
+		TexturePtr = g_rhi->CreateCubeTexture<jTexture_Vulkan>((uint32)InImageData->Width, (uint32)InImageData->Height, MipLevel, InImageData->Format
+			, ETextureCreateFlag::TransferSrc | ETextureCreateFlag::TransferDst | ETextureCreateFlag::UAV, EImageLayout::GENERAL, InImageData->ImageBulkData);
+        if (!ensure(TexturePtr))
         {
             return nullptr;
         }
 	}
 	else
 	{
-		if (!ensure(jBufferUtil_Vulkan::CreateImage((uint32)InImageData->Width, (uint32)InImageData->Height, MipLevel, VK_SAMPLE_COUNT_1_BIT, vkTextureFormat
-			, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT
-			| VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT	// image를 shader 에서 접근가능하게 하고 싶은 경우
-			, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, TextureImage, TextureImageMemory)))
+		TexturePtr = g_rhi->Create2DTexture<jTexture_Vulkan>((uint32)InImageData->Width, (uint32)InImageData->Height, (uint32)InImageData->LayerCount, MipLevel, InImageData->Format
+			, ETextureCreateFlag::TransferSrc | ETextureCreateFlag::TransferDst | ETextureCreateFlag::UAV, EImageLayout::GENERAL, InImageData->ImageBulkData);
+		if (!ensure(TexturePtr))
 		{
 			return nullptr;
 		}
 	}
 
-    auto commandBuffer = BeginSingleTimeCommands();
-	ensure(TransitionImageLayout(commandBuffer->GetRef(), TextureImage, vkTextureFormat, MipLevel, InImageData->LayerCount, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
-
-	if (InImageData->SubresourceFootprints.size() > 0)
-	{
-		for (int32 i = 0; i < (int32)InImageData->SubresourceFootprints.size(); ++i)
-		{
-			const jImageSubResourceData SubResourceData = InImageData->SubresourceFootprints[i];
-			
-			jBufferUtil_Vulkan::CopyBufferToImage(commandBuffer->GetRef(), stagingBufferPtr->Buffer, stagingBufferPtr->Offset + SubResourceData.Offset, TextureImage
-				, SubResourceData.Width, SubResourceData.Height, SubResourceData.MipLevel, SubResourceData.Depth);
-		}
-	}
-	else
-	{
-		jBufferUtil_Vulkan::CopyBufferToImage(commandBuffer->GetRef(), stagingBufferPtr->Buffer, stagingBufferPtr->Offset, TextureImage, (uint32)InImageData->Width, (uint32)InImageData->Height);
-	}
-
-	// If it needs to generate miplevel do it here.
-    if ((InImageData->MipLevel == 1) && (MipLevel > InImageData->MipLevel))
-    {
-        jBufferUtil_Vulkan::GenerateMipmaps(commandBuffer->GetRef(), TextureImage, vkTextureFormat, InImageData->Width, InImageData->Height, MipLevel, InImageData->LayerCount
-            , VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    }
-    else
-    {
-        ensure(TransitionImageLayout(commandBuffer->GetRef(), TextureImage, vkTextureFormat, InImageData->MipLevel, InImageData->LayerCount
-            , VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL));
-    }
-
-	EndSingleTimeCommands(commandBuffer);
-
-    // Create Texture image view
-	VkImageView textureImageView = nullptr;
-	if (InImageData->TextureType == ETextureType::TEXTURE_CUBE)
-		textureImageView = jBufferUtil_Vulkan::CreateImageCubeView(TextureImage, vkTextureFormat, VK_IMAGE_ASPECT_COLOR_BIT, InImageData->MipLevel);
-	else
-		textureImageView = jBufferUtil_Vulkan::CreateImageView(TextureImage, vkTextureFormat, VK_IMAGE_ASPECT_COLOR_BIT, InImageData->MipLevel);
-
-    auto texture = new jTexture_Vulkan();
-    texture->sRGB = InImageData->sRGB;
-    texture->Format = InImageData->Format;
-    texture->Type = InImageData->TextureType;
-    texture->Width = InImageData->Width;
-    texture->Height = InImageData->Height;
-	texture->MipLevel = InImageData->MipLevel;
-	texture->Image = TextureImage;
-	texture->View = textureImageView;
-	texture->Memory = TextureImageMemory;
-	texture->LayerCount = InImageData->LayerCount;
-	texture->Layout = EImageLayout::SHADER_READ_ONLY;
-
-	return texture;
+	return TexturePtr;
 }
 
 bool jRHI_Vulkan::CreateShaderInternal(jShader* OutShader, const jShaderInfo& shaderInfo) const
@@ -986,47 +906,30 @@ jFrameBuffer* jRHI_Vulkan::CreateFrameBuffer(const jFrameBufferInfo& info) const
 
 	JASSERT(info.SampleCount >= 1);
 
-	VkImage image = nullptr;
-	VkImageView imageView = nullptr;
-	VkDeviceMemory imageMemory = nullptr;
-
+	std::shared_ptr<jTexture_Vulkan> TexturePtr;
 	switch (info.TextureType)
 	{
 	case ETextureType::TEXTURE_2D:
-		jBufferUtil_Vulkan::CreateImage(info.Width, info.Height, mipLevels, (VkSampleCountFlagBits)info.SampleCount
-			, textureFormat, TilingMode, ImageUsageFlagBit, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, image, imageMemory);
-		imageView = jBufferUtil_Vulkan::CreateImageView(image, textureFormat, ImageAspectFlagBit, mipLevels);
+		TexturePtr = jBufferUtil_Vulkan::Create2DTexture(info.Width, info.Height, mipLevels, (VkSampleCountFlagBits)info.SampleCount
+			, textureFormat, TilingMode, ImageUsageFlagBit, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VkImageCreateFlagBits(), VK_IMAGE_LAYOUT_UNDEFINED);
 		break;
 	case ETextureType::TEXTURE_2D_ARRAY:
-		jBufferUtil_Vulkan::CreateImage2DArray(info.Width, info.Height, info.LayerCount, mipLevels, (VkSampleCountFlagBits)info.SampleCount
-			, textureFormat, TilingMode, ImageUsageFlagBit, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VkImageCreateFlagBits(0), image, imageMemory);
-		imageView = jBufferUtil_Vulkan::CreateImage2DArrayView(image, info.LayerCount, textureFormat, ImageAspectFlagBit, mipLevels);
+		TexturePtr = jBufferUtil_Vulkan::CreateTexture2DArray(info.Width, info.Height, info.LayerCount, mipLevels, (VkSampleCountFlagBits)info.SampleCount
+			, textureFormat, TilingMode, ImageUsageFlagBit, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VkImageCreateFlagBits(), VK_IMAGE_LAYOUT_UNDEFINED);
 		break;
 	case ETextureType::TEXTURE_CUBE:
-		jBufferUtil_Vulkan::CreateImageCube(info.Width, info.Height, mipLevels, (VkSampleCountFlagBits)info.SampleCount
-			, textureFormat, TilingMode, ImageUsageFlagBit, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, image, imageMemory);
-		imageView = jBufferUtil_Vulkan::CreateImageCubeView(image, textureFormat, ImageAspectFlagBit, mipLevels);
+		TexturePtr = jBufferUtil_Vulkan::CreateCubeTexture(info.Width, info.Height, mipLevels, (VkSampleCountFlagBits)info.SampleCount
+			, textureFormat, TilingMode, ImageUsageFlagBit, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VkImageCreateFlagBits(), VK_IMAGE_LAYOUT_UNDEFINED);
 		break;
 	default:
 		JMESSAGE("Unsupported type texture in FramebufferPool");
 		return nullptr;
 	}
 
-	auto tex_vk = new jTexture_Vulkan();
-	tex_vk->Type = info.TextureType;
-	tex_vk->Format = info.Format;
-	tex_vk->Width = info.Width;
-	tex_vk->Height = info.Height;
-	tex_vk->Image = image;
-	tex_vk->View = imageView;
-	tex_vk->Memory = imageMemory;
-	tex_vk->MipLevel = mipLevels;
-	auto texturePtr = std::shared_ptr<jTexture>(tex_vk);
-
 	auto fb_vk = new jFrameBuffer_Vulkan();
 	fb_vk->Info = info;
-	fb_vk->Textures.push_back(texturePtr);
-	fb_vk->AllTextures.push_back(texturePtr);
+	fb_vk->Textures.push_back(TexturePtr);
+	fb_vk->AllTextures.push_back(TexturePtr);
 
 	return fb_vk;
 }
@@ -1035,83 +938,74 @@ std::shared_ptr<jRenderTarget> jRHI_Vulkan::CreateRenderTarget(const jRenderTarg
 {
 	const VkFormat textureFormat = GetVulkanTextureFormat(info.Format);
 	const bool hasDepthAttachment = IsDepthFormat(info.Format);
-	const VkImageUsageFlags AllowingUsageFlag = info.IsMemoryless
-		? (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)
-		: VK_IMAGE_USAGE_FLAG_BITS_MAX_ENUM;
-
-	const VkImageUsageFlags ImageUsageFlag = AllowingUsageFlag & 
-		((hasDepthAttachment ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT)
-		| VK_IMAGE_USAGE_SAMPLED_BIT 
-		| (info.IsUseAsSubpassInput ? VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT : 0)
-		| (info.IsMemoryless ? VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT : 0));
-	const VkImageAspectFlags ImageAspectFlag = hasDepthAttachment ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
-
-	// VK_IMAGE_TILING_LINEAR 설정시 크래시 나서 VK_IMAGE_TILING_OPTIMAL 로 함.
-	//const VkImageTiling TilingMode = IsMobile ? VkImageTiling::VK_IMAGE_TILING_OPTIMAL : VkImageTiling::VK_IMAGE_TILING_LINEAR;
-	const VkImageTiling TilingMode = VkImageTiling::VK_IMAGE_TILING_OPTIMAL;
-
 	const int32 mipLevels = (info.SampleCount > EMSAASamples::COUNT_1 || !info.IsGenerateMipmap) ? 1 : jTexture::GetMipLevels(info.Width, info.Height);		// MipLevel 은 SampleCount 1인 경우만 가능
 	JASSERT((int32)info.SampleCount >= 1);
 
-	VkImage image = nullptr;
-	VkImageView imageView = nullptr;
 	VkImageView imageViewUAV = nullptr;
-	VkDeviceMemory imageMemory = nullptr;
 	std::map<int32, VkImageView> imageViewForMipMap;
 	std::map<int32, VkImageView> imageViewForMipMapUAV;
+	std::shared_ptr<jTexture_Vulkan> TexturePtr;
+
+	ETextureCreateFlag TextureCreateFlag{};
+	if (hasDepthAttachment)
+		TextureCreateFlag |= ETextureCreateFlag::DSV;
+	else
+		TextureCreateFlag |= ETextureCreateFlag::RTV | ETextureCreateFlag::UAV;
+	
+	if (info.IsUseAsSubpassInput)
+		TextureCreateFlag |= ETextureCreateFlag::SubpassInput;
+
+	if (info.IsMemoryless)
+		TextureCreateFlag |= ETextureCreateFlag::Memoryless;
+
+	const VkImageAspectFlags ImageAspectFlag = hasDepthAttachment ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
 
 	switch (info.Type)
 	{
 	case ETextureType::TEXTURE_2D:
-		jBufferUtil_Vulkan::CreateImage(info.Width, info.Height, mipLevels, (VkSampleCountFlagBits)info.SampleCount
-			, textureFormat, TilingMode, ImageUsageFlag, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, image, imageMemory);
-		imageView = jBufferUtil_Vulkan::CreateImageView(image, textureFormat, ImageAspectFlag, mipLevels);
-		imageViewForMipMap[0] = imageView;
+		TexturePtr = g_rhi->Create2DTexture<jTexture_Vulkan>(info.Width, info.Height, 1, mipLevels, info.Format, TextureCreateFlag, EImageLayout::GENERAL);
+		imageViewForMipMap[0] = TexturePtr->View;
 		
 		check(mipLevels > 0);
 		for(int32 i=1;i<mipLevels;++i)
 		{
-			imageViewForMipMap[i] = jBufferUtil_Vulkan::CreateImageViewForSpecificMipMap(image, textureFormat, ImageAspectFlag, i);
+			imageViewForMipMap[i] = jBufferUtil_Vulkan::CreateTextureViewForSpecificMipMap(TexturePtr->Image, textureFormat, ImageAspectFlag, i);
 		}
 		break;
 	case ETextureType::TEXTURE_2D_ARRAY:
-		jBufferUtil_Vulkan::CreateImage2DArray(info.Width, info.Height, info.LayerCount, mipLevels, (VkSampleCountFlagBits)info.SampleCount
-			, textureFormat, TilingMode, ImageUsageFlag, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VkImageCreateFlagBits(0), image, imageMemory);
-		imageView = jBufferUtil_Vulkan::CreateImage2DArrayView(image, info.LayerCount, textureFormat, ImageAspectFlag, mipLevels);
-		imageViewForMipMap[0] = imageView;
+        TexturePtr = g_rhi->Create2DTexture<jTexture_Vulkan>(info.Width, info.Height, info.LayerCount, mipLevels, info.Format, TextureCreateFlag, EImageLayout::GENERAL);
+        imageViewForMipMap[0] = TexturePtr->View;
 
         check(mipLevels > 0);
         for (int32 i = 1; i < mipLevels; ++i)
         {
-            imageViewForMipMap[i] = jBufferUtil_Vulkan::CreateImage2DArrayViewForSpecificMipMap(image, info.LayerCount, textureFormat, ImageAspectFlag, i);
+            imageViewForMipMap[i] = jBufferUtil_Vulkan::CreateTexture2DArrayViewForSpecificMipMap(TexturePtr->Image, info.LayerCount, textureFormat, ImageAspectFlag, i);
         }
 		break;
 	case ETextureType::TEXTURE_CUBE:
 		check(info.LayerCount == 6);
-		jBufferUtil_Vulkan::CreateImageCube(info.Width, info.Height, mipLevels, (VkSampleCountFlagBits)info.SampleCount
-			, textureFormat, TilingMode, ImageUsageFlag, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, image, imageMemory);
-		
+		TexturePtr = g_rhi->CreateCubeTexture<jTexture_Vulkan>(info.Width, info.Height, mipLevels, info.Format, TextureCreateFlag, EImageLayout::GENERAL);
+
 		// Create for Shader Resource (TextureCube)
 		{
-			imageView = jBufferUtil_Vulkan::CreateImageCubeView(image, textureFormat, ImageAspectFlag, mipLevels);
-			imageViewForMipMap[0] = imageView;
+			imageViewForMipMap[0] = TexturePtr->View;
 
 			check(mipLevels > 0);
 			for (int32 i = 1; i < mipLevels; ++i)
 			{
-				imageViewForMipMap[i] = jBufferUtil_Vulkan::CreateImageCubeViewForSpecificMipMap(image, textureFormat, ImageAspectFlag, i);
+				imageViewForMipMap[i] = jBufferUtil_Vulkan::CreateTextureCubeViewForSpecificMipMap(TexturePtr->Image, textureFormat, ImageAspectFlag, i);
 			}
 		}
 
 		// Create for UAV (writing compute shader resource) (Texture2DArray)
 		{
-			imageViewUAV = jBufferUtil_Vulkan::CreateImage2DArrayView(image, info.LayerCount, textureFormat, ImageAspectFlag, mipLevels);
-            imageViewForMipMapUAV[0] = imageViewUAV;
+			imageViewUAV = TexturePtr->View;
+            imageViewForMipMapUAV[0] = TexturePtr->View;
 
             check(mipLevels > 0);
             for (int32 i = 1; i < mipLevels; ++i)
             {
-                imageViewForMipMapUAV[i] = jBufferUtil_Vulkan::CreateImage2DArrayViewForSpecificMipMap(image, info.LayerCount, textureFormat, ImageAspectFlag, i);
+                imageViewForMipMapUAV[i] = jBufferUtil_Vulkan::CreateTexture2DArrayViewForSpecificMipMap(TexturePtr->Image, info.LayerCount, textureFormat, ImageAspectFlag, i);
             }
 		}
 		break;
@@ -1120,27 +1014,15 @@ std::shared_ptr<jRenderTarget> jRHI_Vulkan::CreateRenderTarget(const jRenderTarg
 		return nullptr;
 	}
 
-	auto tex_vk = new jTexture_Vulkan();
-	tex_vk->Type = info.Type;
-	tex_vk->Format = info.Format;
-	tex_vk->Width = info.Width;
-	tex_vk->Height = info.Height;
-	tex_vk->SampleCount = info.SampleCount;
-	tex_vk->LayerCount = info.LayerCount;
-	tex_vk->Image = image;
-	tex_vk->View = imageView;
-	tex_vk->ViewForMipMap = imageViewForMipMap;
-	tex_vk->ViewUAV = imageViewUAV;
-	tex_vk->ViewUAVForMipMap = imageViewForMipMapUAV;
-	tex_vk->Memory = imageMemory;
-	tex_vk->Layout = EImageLayout::UNDEFINED;
-	tex_vk->MipLevel = mipLevels;
+	TexturePtr->ViewForMipMap = imageViewForMipMap;
+	TexturePtr->ViewUAV = imageViewUAV;
+	TexturePtr->ViewUAVForMipMap = imageViewForMipMapUAV;
 
-	auto rt_vk = new jRenderTarget();
-	rt_vk->Info = info;
-	rt_vk->TexturePtr = std::shared_ptr<jTexture>(tex_vk);
+	auto RenderTargetPtr = std::make_shared<jRenderTarget>();
+	RenderTargetPtr->Info = info;
+	RenderTargetPtr->TexturePtr = TexturePtr;
 
-	return std::shared_ptr<jRenderTarget>(rt_vk);
+	return RenderTargetPtr;
 }
 
 jSamplerStateInfo* jRHI_Vulkan::CreateSamplerState(const jSamplerStateInfo& initializer) const
@@ -1295,6 +1177,137 @@ std::shared_ptr<IUniformBufferBlock> jRHI_Vulkan::CreateUniformBufferBlock(jName
 	auto uniformBufferBlockPtr = std::make_shared<jUniformBufferBlock_Vulkan>(InName, InLifeTimeType);
 	uniformBufferBlockPtr->Init(InSize);
 	return uniformBufferBlockPtr;
+}
+
+VkImageUsageFlags jRHI_Vulkan::GetImageUsageFlags(ETextureCreateFlag InTextureCreateFlag) const
+{
+    VkImageUsageFlags UsageFlag = VK_IMAGE_USAGE_SAMPLED_BIT;
+    if (!!(InTextureCreateFlag & ETextureCreateFlag::RTV))
+        UsageFlag |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+    if (!!(InTextureCreateFlag & ETextureCreateFlag::DSV))
+        UsageFlag |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+
+    if (!!(InTextureCreateFlag & ETextureCreateFlag::UAV))
+        UsageFlag |= VK_IMAGE_USAGE_STORAGE_BIT;
+
+    if (!!(InTextureCreateFlag & ETextureCreateFlag::TransferSrc))
+        UsageFlag |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+
+    if (!!(InTextureCreateFlag & ETextureCreateFlag::TransferDst))
+        UsageFlag |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+
+    if (!!(InTextureCreateFlag & ETextureCreateFlag::ShadingRate))
+        UsageFlag |= VK_IMAGE_USAGE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR;
+
+    if (!!(InTextureCreateFlag & ETextureCreateFlag::SubpassInput))
+        UsageFlag |= VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
+
+    // This should be placed last, because Memoryless has only Color, Depth, Input attachment usages.
+    if (!!(InTextureCreateFlag & ETextureCreateFlag::Memoryless))
+        UsageFlag &= ~(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT);
+
+	return UsageFlag;
+}
+
+VkMemoryPropertyFlagBits jRHI_Vulkan::GetMemoryPropertyFlagBits(ETextureCreateFlag InTextureCreateFlag) const
+{
+    VkMemoryPropertyFlagBits PropertyFlagBits{};
+    if (!!(InTextureCreateFlag & ETextureCreateFlag::CPUAccess))
+    {
+        PropertyFlagBits = (VkMemoryPropertyFlagBits)(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    }
+	return PropertyFlagBits;
+}
+
+std::shared_ptr<jTexture> jRHI_Vulkan::Create2DTexture(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag
+    , EImageLayout InImageLayout, const jImageBulkData& InImageBulkData, const jRTClearValue& InClearValue, const wchar_t* InResourceName) const
+{
+	VkImageCreateFlagBits ImageCreateFlags{};
+	const VkMemoryPropertyFlagBits PropertyFlagBits = GetMemoryPropertyFlagBits(InTextureCreateFlag);
+	const VkImageUsageFlags UsageFlag = GetImageUsageFlags(InTextureCreateFlag);
+	check(!IsDepthFormat(InFormat) || (IsDepthFormat(InFormat) && (UsageFlag & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)));
+
+	auto TexturePtr = jBufferUtil_Vulkan::Create2DTexture(InWidth, InHeight, InMipLevels, VK_SAMPLE_COUNT_1_BIT, GetVulkanTextureFormat(InFormat), VK_IMAGE_TILING_OPTIMAL
+		, UsageFlag, PropertyFlagBits, ImageCreateFlags, VK_IMAGE_LAYOUT_UNDEFINED);
+
+	if (InImageBulkData.ImageData.size() > 0)
+	{
+		// todo : recycle temp buffer
+        auto stagingBufferPtr = jBufferUtil_Vulkan::CreateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
+            , InImageBulkData.ImageData.size());
+
+        stagingBufferPtr->UpdateBuffer(&InImageBulkData.ImageData[0], InImageBulkData.ImageData.size());
+
+        auto commandBuffer = BeginSingleTimeCommands();
+        ensure(TransitionImageLayout(commandBuffer, TexturePtr.get(), EImageLayout::TRANSFER_DST));
+
+        if (InImageBulkData.SubresourceFootprints.size() > 0)
+        {
+            for (int32 i = 0; i < (int32)InImageBulkData.SubresourceFootprints.size(); ++i)
+            {
+                const jImageSubResourceData SubResourceData = InImageBulkData.SubresourceFootprints[i];
+
+                jBufferUtil_Vulkan::CopyBufferToTexture(commandBuffer->GetRef(), stagingBufferPtr->Buffer, stagingBufferPtr->Offset + SubResourceData.Offset, TexturePtr->Image
+                    , SubResourceData.Width, SubResourceData.Height, SubResourceData.MipLevel, SubResourceData.Depth);
+            }
+        }
+        else
+        {
+            jBufferUtil_Vulkan::CopyBufferToTexture(commandBuffer->GetRef(), stagingBufferPtr->Buffer, stagingBufferPtr->Offset, TexturePtr->Image, InWidth, InHeight);
+        }
+
+        ensure(TransitionImageLayout(commandBuffer, TexturePtr.get(), InImageLayout));
+
+        EndSingleTimeCommands(commandBuffer);
+	}
+
+	return TexturePtr;
+}
+
+std::shared_ptr<jTexture> jRHI_Vulkan::CreateCubeTexture(uint32 InWidth, uint32 InHeight, uint32 InMipLevels, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag
+    , EImageLayout InImageLayout, const jImageBulkData& InImageBulkData, const jRTClearValue& InClearValue, const wchar_t* InResourceName) const
+{
+	VkImageCreateFlagBits ImageCreateFlags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+    const VkMemoryPropertyFlagBits PropertyFlagBits = GetMemoryPropertyFlagBits(InTextureCreateFlag);
+    const VkImageUsageFlags UsageFlag = GetImageUsageFlags(InTextureCreateFlag);
+    check(!IsDepthFormat(InFormat) || (IsDepthFormat(InFormat) && (UsageFlag & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)));
+
+	auto TexturePtr = jBufferUtil_Vulkan::CreateCubeTexture(InWidth, InHeight, InMipLevels, VK_SAMPLE_COUNT_1_BIT, GetVulkanTextureFormat(InFormat), VK_IMAGE_TILING_OPTIMAL
+		, UsageFlag, PropertyFlagBits, ImageCreateFlags, VK_IMAGE_LAYOUT_UNDEFINED);
+
+    if (InImageBulkData.ImageData.size() > 0)
+    {
+        // todo : recycle temp buffer
+        auto stagingBufferPtr = jBufferUtil_Vulkan::CreateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
+            , InImageBulkData.ImageData.size());
+
+        stagingBufferPtr->UpdateBuffer(&InImageBulkData.ImageData[0], InImageBulkData.ImageData.size());
+
+        auto commandBuffer = BeginSingleTimeCommands();
+        ensure(TransitionImageLayout(commandBuffer, TexturePtr.get(), EImageLayout::TRANSFER_DST));
+
+        if (InImageBulkData.SubresourceFootprints.size() > 0)
+        {
+            for (int32 i = 0; i < (int32)InImageBulkData.SubresourceFootprints.size(); ++i)
+            {
+                const jImageSubResourceData SubResourceData = InImageBulkData.SubresourceFootprints[i];
+
+                jBufferUtil_Vulkan::CopyBufferToTexture(commandBuffer->GetRef(), stagingBufferPtr->Buffer, stagingBufferPtr->Offset + SubResourceData.Offset, TexturePtr->Image
+                    , SubResourceData.Width, SubResourceData.Height, SubResourceData.MipLevel, SubResourceData.Depth);
+            }
+        }
+        else
+        {
+            jBufferUtil_Vulkan::CopyBufferToTexture(commandBuffer->GetRef(), stagingBufferPtr->Buffer, stagingBufferPtr->Offset, TexturePtr->Image, InWidth, InHeight);
+        }
+
+        ensure(TransitionImageLayout(commandBuffer, TexturePtr.get(), InImageLayout));
+
+        EndSingleTimeCommands(commandBuffer);
+    }
+
+	return TexturePtr;
 }
 
 jQuery* jRHI_Vulkan::CreateQueryTime() const
@@ -1866,7 +1879,7 @@ void jRHI_Vulkan::NextSubpass(const jCommandBuffer* commandBuffer) const
 
 jTexture* jRHI_Vulkan::CreateSampleVRSTexture()
 {
-    if (ensure(!SampleVRSTexture))
+    if (ensure(!SampleVRSTexturePtr))
     {
         VkPhysicalDeviceShadingRateImagePropertiesNV physicalDeviceShadingRateImagePropertiesNV{};
         physicalDeviceShadingRateImagePropertiesNV.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADING_RATE_IMAGE_PROPERTIES_NV;
@@ -1880,18 +1893,16 @@ jTexture* jRHI_Vulkan::CreateSampleVRSTexture()
         imageExtent.height = static_cast<uint32_t>(ceil(SCR_HEIGHT / (float)physicalDeviceShadingRateImagePropertiesNV.shadingRateTexelSize.height));
         imageExtent.depth = 1;
 
-		auto NewVRSTexture = new jTexture_Vulkan();
-
-        jBufferUtil_Vulkan::CreateImage(imageExtent.width, imageExtent.height, 1, (VkSampleCountFlagBits)1, GetVulkanTextureFormat(ETextureFormat::R8UI), VK_IMAGE_TILING_OPTIMAL
-            , VK_IMAGE_USAGE_SHADING_RATE_IMAGE_BIT_NV | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_LAYOUT_UNDEFINED, *NewVRSTexture);
+		SampleVRSTexturePtr = jBufferUtil_Vulkan::Create2DTexture(imageExtent.width, imageExtent.height, 1, (VkSampleCountFlagBits)1, GetVulkanTextureFormat(ETextureFormat::R8UI), VK_IMAGE_TILING_OPTIMAL
+            , VK_IMAGE_USAGE_SHADING_RATE_IMAGE_BIT_NV | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VkImageCreateFlagBits(), VK_IMAGE_LAYOUT_UNDEFINED);
 
         VkDeviceSize imageSize = imageExtent.width * imageExtent.height * GetVulkanTexturePixelSize(ETextureFormat::R8UI);
 		auto stagingBufferPtr = jBufferUtil_Vulkan::CreateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT, imageSize);
 
 		auto commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
-        ensure(g_rhi_vk->TransitionImageLayout(commandBuffer->GetRef(), (VkImage)NewVRSTexture->GetHandle(), GetVulkanTextureFormat(ETextureFormat::R8UI), 1, 1, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
+        ensure(g_rhi_vk->TransitionImageLayout(commandBuffer->GetRef(), (VkImage)SampleVRSTexturePtr->GetHandle(), GetVulkanTextureFormat(ETextureFormat::R8UI), 1, 1, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
 
-        jBufferUtil_Vulkan::CopyBufferToImage(commandBuffer->GetRef(), stagingBufferPtr->Buffer, stagingBufferPtr->Offset, (VkImage)NewVRSTexture->GetHandle()
+        jBufferUtil_Vulkan::CopyBufferToTexture(commandBuffer->GetRef(), stagingBufferPtr->Buffer, stagingBufferPtr->Offset, (VkImage)SampleVRSTexturePtr->GetHandle()
             , static_cast<uint32>(imageExtent.width), static_cast<uint32>(imageExtent.height));
 
         // Create a circular pattern with decreasing sampling rates outwards (max. range, pattern)
@@ -1931,13 +1942,8 @@ jTexture* jRHI_Vulkan::CreateSampleVRSTexture()
         g_rhi_vk->EndSingleTimeCommands(commandBuffer);
 
         delete[]shadingRatePatternData;
-
-		NewVRSTexture->View = jBufferUtil_Vulkan::CreateImageView((VkImage)NewVRSTexture->GetHandle(), GetVulkanTextureFormat(NewVRSTexture->Format)
-            , VK_IMAGE_ASPECT_COLOR_BIT, 1);
-
-		SampleVRSTexture = NewVRSTexture;
     }
-	return SampleVRSTexture;
+	return SampleVRSTexturePtr.get();
 }
 
 void jRHI_Vulkan::BindGraphicsShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineState
@@ -2037,7 +2043,7 @@ std::shared_ptr<jBuffer> jRHI_Vulkan::CreateBufferInternal(uint64 InSize, uint64
 	if (InAlignment > 0)
 		InSize = Align(InSize, InAlignment);
 
-    EVulkanBufferBits BufferBits = EVulkanBufferBits::SHADER_DEVICE_ADDRESS;
+    EVulkanBufferBits BufferBits = EVulkanBufferBits::SHADER_DEVICE_ADDRESS | EVulkanBufferBits::TRANSFER_DST | EVulkanBufferBits::TRANSFER_SRC;
     if (!!(EBufferCreateFlag::UAV & InBufferCreateFlag))
     {
         BufferBits = BufferBits | EVulkanBufferBits::STORAGE_BUFFER;
@@ -2072,16 +2078,6 @@ std::shared_ptr<jBuffer> jRHI_Vulkan::CreateBufferInternal(uint64 InSize, uint64
 	{
 		BufferBits = BufferBits | EVulkanBufferBits::SHADER_BINDING_TABLE;
 	}
-
-    if (InInitialState == EImageLayout::TRANSFER_DST)
-    {
-        BufferBits = BufferBits | EVulkanBufferBits::TRANSFER_DST;
-    }
-
-    if (InInitialState == EImageLayout::TRANSFER_SRC)
-    {
-        BufferBits = BufferBits | EVulkanBufferBits::TRANSFER_SRC;
-    }
 
     EVulkanMemoryBits MemoryBits = EVulkanMemoryBits::DEVICE_LOCAL;
     if (!!(EBufferCreateFlag::CPUAccess & InBufferCreateFlag))

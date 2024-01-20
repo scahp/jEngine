@@ -133,7 +133,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	virtual std::shared_ptr<jVertexBuffer> CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const override;
 	virtual std::shared_ptr<jIndexBuffer> CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const override;
-	virtual jTexture* CreateTextureFromData(const jImageData* InImageData) const override;
+	virtual std::shared_ptr<jTexture> CreateTextureFromData(const jImageData* InImageData) const override;
 	virtual bool CreateShaderInternal(jShader* OutShader, const jShaderInfo& shaderInfo) const override;
 	virtual jFrameBuffer* CreateFrameBuffer(const jFrameBufferInfo& info) const override;
 	virtual std::shared_ptr<jRenderTarget> CreateRenderTarget(const jRenderTargetInfo& info) const override;
@@ -223,8 +223,8 @@ public:
 
 	// Temporary VRS Texture
 	jTexture* CreateSampleVRSTexture();
-	FORCEINLINE jTexture* GetSampleVRSTexture() const { return SampleVRSTexture; }
-	jTexture* SampleVRSTexture = nullptr;
+	FORCEINLINE jTexture* GetSampleVRSTexture() const { return SampleVRSTexturePtr.get(); }
+	std::shared_ptr<jTexture_Vulkan> SampleVRSTexturePtr;
 
 	virtual void BindGraphicsShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineState
 		, const jShaderBindingInstanceCombiner& InShaderBindingInstanceCombiner, uint32 InFirstSet) const override;
@@ -242,6 +242,7 @@ public:
 	virtual bool OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimized) override;
 	virtual jRaytracingScene* CreateRaytracingScene() const;
 
+	// Create Buffers
 	std::shared_ptr<jBuffer> CreateBufferInternal(uint64 InSize, uint64 InAlignment, EBufferCreateFlag InBufferCreateFlag
 		, EImageLayout InInitialState, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr) const;
     virtual std::shared_ptr<jBuffer> CreateStructuredBuffer(uint64 InSize, uint64 InAlignment, uint64 InStride, EBufferCreateFlag InBufferCreateFlag
@@ -251,6 +252,17 @@ public:
     virtual std::shared_ptr<jBuffer> CreateFormattedBuffer(uint64 InSize, uint64 InAlignment, ETextureFormat InFormat, EBufferCreateFlag InBufferCreateFlag
         , EImageLayout InInitialState, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr) const override;
     virtual std::shared_ptr<IUniformBufferBlock> CreateUniformBufferBlock(jName InName, jLifeTimeType InLifeTimeType, size_t InSize = 0) const override;
+
+    // Create Images
+	VkImageUsageFlags GetImageUsageFlags(ETextureCreateFlag InTextureCreateFlag) const;
+	VkMemoryPropertyFlagBits GetMemoryPropertyFlagBits(ETextureCreateFlag InTextureCreateFlag) const;
+
+    virtual std::shared_ptr<jTexture> Create2DTexture(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag
+        , EImageLayout InImageLayout = EImageLayout::UNDEFINED, const jImageBulkData& InImageBulkData = {}, const jRTClearValue& InClearValue = jRTClearValue::Invalid, const wchar_t* InResourceName = nullptr) const override;
+
+    virtual std::shared_ptr<jTexture> CreateCubeTexture(uint32 InWidth, uint32 InHeight, uint32 InMipLevels, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag
+        , EImageLayout InImageLayout = EImageLayout::UNDEFINED, const jImageBulkData& InImageBulkData = {}, const jRTClearValue& InClearValue = jRTClearValue::Invalid, const wchar_t* InResourceName = nullptr) const override;
+    //////////////////////////////////////////////////////////////////////////
 };
 
 extern jRHI_Vulkan* g_rhi_vk;

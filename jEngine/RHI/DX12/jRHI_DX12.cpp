@@ -668,36 +668,24 @@ void jRHI_DX12::EndSingleTimeCopyCommands(jCommandBuffer_DX12* commandBuffer) co
 	CopyCommandBufferManager->ReturnCommandBuffer(commandBuffer);
 }
 
-jTexture* jRHI_DX12::CreateTextureFromData(const jImageData* InImageData) const
+std::shared_ptr<jTexture> jRHI_DX12::CreateTextureFromData(const jImageData* InImageData) const
 {
     check(InImageData);
 
     const int32 MipLevel = InImageData->MipLevel;
-    EImageLayout Layout = EImageLayout::GENERAL;
-	jTexture_DX12* Texture = jBufferUtil_DX12::CreateImage(InImageData->Width, InImageData->Height
-        , InImageData->LayerCount, MipLevel, 1, InImageData->TextureType, InImageData->Format, ETextureCreateFlag::UAV, Layout);
-    Texture->sRGB = InImageData->sRGB;
-
-    const uint64 ImageSize = InImageData->Width * InImageData->Height * GetDX12TexturePixelSize(InImageData->Format);
-
-    // todo : recycle temp buffer
-    auto BufferPtr = jBufferUtil_DX12::CreateBuffer(InImageData->ImageData.size(), 0
-        , EBufferCreateFlag::CPUAccess, D3D12_RESOURCE_STATE_GENERIC_READ, &InImageData->ImageData[0], InImageData->ImageData.size());
-    check(BufferPtr);
-
-	jCommandBuffer_DX12* commandList = BeginSingleTimeCopyCommands();
-    if (InImageData->SubresourceFootprints.size() > 0)
+    const EImageLayout Layout = EImageLayout::GENERAL;
+    
+    std::shared_ptr<jTexture_DX12> TexturePtr;
+    if (InImageData->TextureType == ETextureType::TEXTURE_CUBE)
     {
-        jBufferUtil_DX12::CopyBufferToImage(commandList->Get(), BufferPtr->Buffer->Get(), Texture->Image->Get(), InImageData->SubresourceFootprints);
+        TexturePtr = g_rhi->CreateCubeTexture<jTexture_DX12>(InImageData->Width, InImageData->Height, MipLevel, InImageData->Format, ETextureCreateFlag::UAV, Layout, InImageData->ImageBulkData);
     }
     else
     {
-        jBufferUtil_DX12::CopyBufferToImage(commandList->Get(), BufferPtr->Buffer->Get(), 0, Texture->Image->Get());
+        TexturePtr = g_rhi->Create2DTexture<jTexture_DX12>(InImageData->Width, InImageData->Height, InImageData->LayerCount, MipLevel, InImageData->Format, ETextureCreateFlag::UAV, Layout, InImageData->ImageBulkData);
     }
-
-	EndSingleTimeCopyCommands(commandList);
-
-	return Texture;
+    TexturePtr->sRGB = InImageData->sRGB;
+	return TexturePtr;
 }
 
 jShaderBindingLayout* jRHI_DX12::CreateShaderBindings(const jShaderBindingArray& InShaderBindingArray) const
@@ -1153,6 +1141,58 @@ std::shared_ptr<jIndexBuffer> jRHI_DX12::CreateIndexBuffer(const std::shared_ptr
     return indexBufferPtr;
 }
 
+std::shared_ptr<jTexture> jRHI_DX12::Create2DTexture(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag
+    , EImageLayout InImageLayout, const jImageBulkData& InImageBulkData, const jRTClearValue& InClearValue, const wchar_t* InResourceName) const
+{
+    auto TexturePtr = jBufferUtil_DX12::CreateTexture(InWidth, InHeight, InArrayLayers, InMipLevels, 1, ETextureType::TEXTURE_2D, InFormat, InTextureCreateFlag, InImageLayout, InClearValue, InResourceName);
+    if (InImageBulkData.ImageData.size() > 0)
+    {
+        // todo : recycle temp buffer
+        auto BufferPtr = jBufferUtil_DX12::CreateBuffer(InImageBulkData.ImageData.size(), 0
+            , EBufferCreateFlag::CPUAccess, D3D12_RESOURCE_STATE_GENERIC_READ, &InImageBulkData.ImageData[0], InImageBulkData.ImageData.size());
+        check(BufferPtr);
+
+        jCommandBuffer_DX12* commandList = BeginSingleTimeCopyCommands();
+        if (InImageBulkData.SubresourceFootprints.size() > 0)
+        {
+            jBufferUtil_DX12::CopyBufferToTexture(commandList->Get(), BufferPtr->Buffer->Get(), TexturePtr->Image->Get(), InImageBulkData.SubresourceFootprints);
+        }
+        else
+        {
+            jBufferUtil_DX12::CopyBufferToTexture(commandList->Get(), BufferPtr->Buffer->Get(), 0, TexturePtr->Image->Get());
+        }
+
+        EndSingleTimeCopyCommands(commandList);
+    }
+    return TexturePtr;
+}
+
+std::shared_ptr<jTexture> jRHI_DX12::CreateCubeTexture(uint32 InWidth, uint32 InHeight, uint32 InMipLevels, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag
+    , EImageLayout InImageLayout, const jImageBulkData& InImageBulkData, const jRTClearValue& InClearValue, const wchar_t* InResourceName) const
+{
+    auto TexturePtr = jBufferUtil_DX12::CreateTexture(InWidth, InHeight, 6, InMipLevels, 1, ETextureType::TEXTURE_CUBE, InFormat, InTextureCreateFlag, InImageLayout, InClearValue, InResourceName);
+    if (InImageBulkData.ImageData.size() > 0)
+    {
+        // todo : recycle temp buffer
+        auto BufferPtr = jBufferUtil_DX12::CreateBuffer(InImageBulkData.ImageData.size(), 0
+            , EBufferCreateFlag::CPUAccess, D3D12_RESOURCE_STATE_GENERIC_READ, &InImageBulkData.ImageData[0], InImageBulkData.ImageData.size());
+        check(BufferPtr);
+
+        jCommandBuffer_DX12* commandList = BeginSingleTimeCopyCommands();
+        if (InImageBulkData.SubresourceFootprints.size() > 0)
+        {
+            jBufferUtil_DX12::CopyBufferToTexture(commandList->Get(), BufferPtr->Buffer->Get(), TexturePtr->Image->Get(), InImageBulkData.SubresourceFootprints);
+        }
+        else
+        {
+            jBufferUtil_DX12::CopyBufferToTexture(commandList->Get(), BufferPtr->Buffer->Get(), 0, TexturePtr->Image->Get());
+        }
+
+        EndSingleTimeCopyCommands(commandList);
+    }
+    return TexturePtr;
+}
+
 std::shared_ptr<jShaderBindingInstance> jRHI_DX12::CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const
 {
     auto shaderBindingsLayout = CreateShaderBindings(InShaderBindingArray);
@@ -1275,15 +1315,15 @@ std::shared_ptr<jRenderTarget> jRHI_DX12::CreateRenderTarget(const jRenderTarget
 {
     const uint16 MipLevels = info.IsGenerateMipmap ? static_cast<uint32>(std::floor(std::log2(std::max<int>(info.Width, info.Height)))) + 1 : 1;
     
-    jTexture_DX12* Texture = jBufferUtil_DX12::CreateImage(info.Width, info.Height, info.LayerCount, MipLevels, (uint32)info.SampleCount, info.Type, info.Format
+    auto TexturePtr = jBufferUtil_DX12::CreateTexture(info.Width, info.Height, info.LayerCount, MipLevels, (uint32)info.SampleCount, info.Type, info.Format
         , (ETextureCreateFlag::RTV | info.TextureCreateFlag), EImageLayout::UNDEFINED, info.RTClearValue, info.ResourceName);
 
-    auto rt = new jRenderTarget();
-    check(rt);
-    rt->Info = info;
-    rt->TexturePtr = std::shared_ptr<jTexture>(Texture);
+    auto RenderTargetPtr = std::make_shared<jRenderTarget>();
+    check(RenderTargetPtr);
+    RenderTargetPtr->Info = info;
+    RenderTargetPtr->TexturePtr = TexturePtr;
 
-    return std::shared_ptr<jRenderTarget>(rt);
+    return RenderTargetPtr;
 }
 
 jQuery* jRHI_DX12::CreateQueryTime() const
