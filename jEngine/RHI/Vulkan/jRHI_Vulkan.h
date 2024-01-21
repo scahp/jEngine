@@ -108,6 +108,7 @@ public:
 	virtual void EndSingleTimeCommands(jCommandBuffer* commandBuffer) const override;
 
 	bool TransitionLayout(VkCommandBuffer commandBuffer, VkImage image, VkFormat format, uint32 mipLevels, uint32 layoutCount, VkImageLayout oldLayout, VkImageLayout newLayout) const;
+	bool TransitionLayout(VkCommandBuffer commandBuffer, VkBuffer buffer, uint64 offset, uint64 size, VkImageLayout oldLayout, VkImageLayout newLayout) const;
 	virtual bool TransitionLayout(jCommandBuffer* commandBuffer, jTexture* texture, EResourceLayout newLayout) const override;
     virtual bool TransitionLayoutImmediate(jTexture* texture, EResourceLayout newLayout) const override;
     virtual bool TransitionLayout(jCommandBuffer* commandBuffer, jBuffer* buffer, EResourceLayout newLayout) const override;

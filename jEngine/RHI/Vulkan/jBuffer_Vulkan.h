@@ -42,6 +42,7 @@ struct jBuffer_Vulkan : public jBuffer
     virtual uint64 GetAllocatedSize() const override { return AllocatedSize; }
     virtual uint64 GetBufferSize() const { return RealBufferSize; }
     virtual uint64 GetOffset() const { return Offset; }
+    virtual EResourceLayout GetLayout() const override { return Layout; }
 
     jMemory Memory;
     VkBuffer Buffer = nullptr;
@@ -57,4 +58,5 @@ struct jBuffer_Vulkan : public jBuffer
     void* MappedPointer = nullptr;
 
     bool HasBufferOwnership = true;     // 버퍼를 소멸시킬 권한이 있는 여부. 링버퍼를 사용하는 유니폼 버퍼의 경우 이 값이 false 임.
+    EResourceLayout Layout = EResourceLayout::UNDEFINED;
 };

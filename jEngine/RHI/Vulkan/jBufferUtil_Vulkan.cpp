@@ -332,7 +332,7 @@ size_t CreateBuffer_LowLevel(EVulkanBufferBits InUsage, EVulkanMemoryBits InProp
     return memRequirements.size;
 }
 
-std::shared_ptr<jBuffer_Vulkan> CreateBuffer(EVulkanBufferBits InUsage, EVulkanMemoryBits InProperties, uint64 InSize)
+std::shared_ptr<jBuffer_Vulkan> CreateBuffer(EVulkanBufferBits InUsage, EVulkanMemoryBits InProperties, uint64 InSize, EResourceLayout InResourceLayout)
 {
     auto BufferPtr = std::make_shared<jBuffer_Vulkan>();
     BufferPtr->RealBufferSize = InSize;
@@ -343,6 +343,12 @@ std::shared_ptr<jBuffer_Vulkan> CreateBuffer(EVulkanBufferBits InUsage, EVulkanM
 #else
     CreateBuffer_LowLevel(InUsage, InProperties, InSize, BufferPtr->Buffer, BufferPtr->BufferMemory, BufferPtr->AllocatedSize);
 #endif
+
+    if (BufferPtr->Layout != InResourceLayout)
+    {
+        g_rhi->TransitionLayoutImmediate(BufferPtr.get(), InResourceLayout);
+    }
+
     return BufferPtr;
 }
 

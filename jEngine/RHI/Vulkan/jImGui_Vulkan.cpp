@@ -111,7 +111,7 @@ void jImGUI_Vulkan::Initialize(float width, float height)
     // 
     //////////////////////////////////////////////////////////////////////////
     // Staging buffers for font data upload
-    std::shared_ptr<jBuffer_Vulkan> stagingBuffer = jBufferUtil_Vulkan::CreateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT, uploadSize);
+    std::shared_ptr<jBuffer_Vulkan> stagingBuffer = jBufferUtil_Vulkan::CreateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT, uploadSize, EResourceLayout::TRANSFER_SRC);
     stagingBuffer->UpdateBuffer(fontData, uploadSize);
 
     // Copy buffer data to font image
