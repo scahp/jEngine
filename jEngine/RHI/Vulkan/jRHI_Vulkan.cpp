@@ -626,7 +626,7 @@ std::shared_ptr<jTexture> jRHI_Vulkan::CreateTextureFromData(const jImageData* I
     }
 
 	auto stagingBufferPtr = jBufferUtil_Vulkan::CreateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
-        , InImageData->ImageBulkData.ImageData.size());
+        , InImageData->ImageBulkData.ImageData.size(), EResourceLayout::TRANSFER_SRC);
 
 	stagingBufferPtr->UpdateBuffer(&InImageData->ImageBulkData.ImageData[0], InImageData->ImageBulkData.ImageData.size());
 
@@ -1235,7 +1235,7 @@ std::shared_ptr<jTexture> jRHI_Vulkan::Create2DTexture(uint32 InWidth, uint32 In
 	{
 		// todo : recycle temp buffer
         auto stagingBufferPtr = jBufferUtil_Vulkan::CreateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
-            , InImageBulkData.ImageData.size());
+            , InImageBulkData.ImageData.size(), EResourceLayout::TRANSFER_SRC);
 
         stagingBufferPtr->UpdateBuffer(&InImageBulkData.ImageData[0], InImageBulkData.ImageData.size());
 
@@ -1280,7 +1280,7 @@ std::shared_ptr<jTexture> jRHI_Vulkan::CreateCubeTexture(uint32 InWidth, uint32 
     {
         // todo : recycle temp buffer
         auto stagingBufferPtr = jBufferUtil_Vulkan::CreateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
-            , InImageBulkData.ImageData.size());
+            , InImageBulkData.ImageData.size(), EResourceLayout::TRANSFER_SRC);
 
         stagingBufferPtr->UpdateBuffer(&InImageBulkData.ImageData[0], InImageBulkData.ImageData.size());
 
@@ -1542,7 +1542,7 @@ bool jRHI_Vulkan::TransitionLayout(VkCommandBuffer commandBuffer, VkImage image,
 	barrier.newLayout = newLayout;
 
 	// 아래 두필드는 Barrier를 사용해 Queue family ownership을 전달하는 경우에 사용됨.
-	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;		// todo : need to control this when the pipeline stage control is not All stage bits
 	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 
 	barrier.image = image;
@@ -1595,9 +1595,9 @@ bool jRHI_Vulkan::TransitionLayout(VkCommandBuffer commandBuffer, VkImage image,
 	barrier.srcAccessMask = 0;	// TODO
 	barrier.dstAccessMask = 0;	// TODO
 
+	// todo : need to control pipeline stage
 	VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
 	VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-
 
 	//  // Barrier 는 동기화를 목적으로 사용하므로, 이 리소스와 연관되는 어떤 종류의 명령이 이전에 일어나야 하는지와
 	//  // 어떤 종류의 명령이 Barrier를 기다려야 하는지를 명시해야만 한다. vkQueueWaitIdle 을 사용하지만 그래도 수동으로 해줘야 함.
@@ -1767,6 +1767,9 @@ bool jRHI_Vulkan::TransitionLayout(jCommandBuffer* commandBuffer, jTexture* text
 	check(commandBuffer);
 	check(texture);
 
+	if (texture->GetLayout() == newLayout)
+		return true;
+
 	auto texture_vk = (jTexture_Vulkan*)texture;
 
 	// VkImageView 가 VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL 를 지원하지 않기 때문에 추가
@@ -1781,38 +1784,169 @@ bool jRHI_Vulkan::TransitionLayout(jCommandBuffer* commandBuffer, jTexture* text
 		((jTexture_Vulkan*)texture)->Layout = newLayout;
 		return true;
 	}
-	return false;
+	return true;
+}
+
+bool jRHI_Vulkan::TransitionLayout(VkCommandBuffer commandBuffer, VkBuffer buffer, uint64 offset, uint64 size, VkImageLayout oldLayout, VkImageLayout newLayout) const
+{
+    if (oldLayout == newLayout)
+        return true;
+
+	auto GetAccessFlagBits = [](VkImageLayout InLayout) -> VkAccessFlagBits
+	{
+		VkAccessFlagBits AccessFlagBits{};
+		switch (InLayout)
+		{
+		case VK_IMAGE_LAYOUT_UNDEFINED:
+		case VK_IMAGE_LAYOUT_GENERAL:
+			AccessFlagBits = (VkAccessFlagBits)(VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+			break;
+		case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+			AccessFlagBits = VK_ACCESS_TRANSFER_READ_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+			AccessFlagBits = VK_ACCESS_TRANSFER_WRITE_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_PREINITIALIZED:
+			AccessFlagBits = VK_ACCESS_HOST_WRITE_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+		case VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL:
+			AccessFlagBits = VK_ACCESS_SHADER_READ_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL:
+		case VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL:
+		case VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL:
+		case VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL:
+		case VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL:
+		case VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL:
+		case VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL:
+		case VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL:
+		case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
+		case VK_IMAGE_LAYOUT_VIDEO_DECODE_DST_KHR:
+		case VK_IMAGE_LAYOUT_VIDEO_DECODE_SRC_KHR:
+		case VK_IMAGE_LAYOUT_VIDEO_DECODE_DPB_KHR:
+		case VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR:
+		case VK_IMAGE_LAYOUT_FRAGMENT_SHADING_RATE_ATTACHMENT_OPTIMAL_KHR:
+		case VK_IMAGE_LAYOUT_FRAGMENT_DENSITY_MAP_OPTIMAL_EXT:
+			check(0);	// this is only for image
+			break;
+		}
+		return AccessFlagBits;
+	};
+
+    VkBufferMemoryBarrier barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;		// todo : need to control this when the pipeline stage control is not All stage bits
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.buffer = buffer;
+    barrier.offset = offset;
+    barrier.size = size;
+	barrier.srcAccessMask = GetAccessFlagBits(oldLayout);
+    barrier.dstAccessMask = GetAccessFlagBits(newLayout);
+
+    // Image is read by a shader
+	// Make sure any shader reads from the image have been finished
+	if (!!(barrier.dstAccessMask & VK_ACCESS_SHADER_READ_BIT))
+	{
+		if (barrier.srcAccessMask == 0)
+		{
+			barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+		}
+	}
+
+	// todo : need to control pipeline stage
+    VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+    VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+
+    // 현재 싱글 커맨드버퍼 서브미션은 암시적으로 VK_ACCESS_HOST_WRITE_BIT 동기화를 함.
+
+    // 모든 종류의 Pipeline barrier 가 같은 함수로 submit 함.
+    vkCmdPipelineBarrier(commandBuffer
+        , sourceStage		// 	- 이 barrier 를 기다릴 pipeline stage. 
+        //		만약 barrier 이후 uniform 을 읽을 경우 VK_ACCESS_UNIFORM_READ_BIT 과 
+        //		파이프라인 스테이지에서 유니폼 버퍼를 읽을 가장 빠른 쉐이더 지정
+        //		(예를들면, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT - 이 barrier가 uniform을 수정했고, Fragment shader에서 uniform을 처음 읽는거라면)
+        , destinationStage	// 	- 0 or VK_DEPENDENCY_BY_REGION_BIT(지금까지 쓰여진 리소스 부분을 읽기 시작할 수 있도록 함)
+        , 0
+        // 아래 3가지 부분은 이번에 사용할 memory, buffer, image  barrier 의 개수가 배열을 중 하나를 명시
+        , 0, nullptr
+        , 1, &barrier
+        , 0, nullptr
+    );
+
+    return true;
 }
 
 bool jRHI_Vulkan::TransitionLayoutImmediate(jTexture* texture, EResourceLayout newLayout) const
 {
-    auto commandBuffer = BeginSingleTimeCommands();
-    check(commandBuffer);
-    
-	if (commandBuffer)
+    check(texture);
+	VkImageLayout SrcLayout = GetVulkanImageLayout(texture->GetLayout());
+	VkImageLayout DstLayout = GetVulkanImageLayout(newLayout);
+
+	if (SrcLayout != DstLayout)
 	{
-		check(texture);
+		auto commandBuffer = BeginSingleTimeCommands();
+		check(commandBuffer);
 
-		auto texture_vk = (jTexture_Vulkan*)texture;
-		const bool ret = TransitionLayout(commandBuffer->GetRef(), texture_vk->Image, GetVulkanTextureFormat(texture_vk->Format)
-			, texture_vk->MipLevel, 1, GetVulkanImageLayout(texture_vk->Layout), GetVulkanImageLayout(newLayout));
-		if (ret)
-			((jTexture_Vulkan*)texture)->Layout = newLayout;
+		if (commandBuffer)
+		{
+            auto texture_vk = (jTexture_Vulkan*)texture;
+			const bool ret = TransitionLayout(commandBuffer->GetRef(), texture_vk->Image, GetVulkanTextureFormat(texture_vk->Format)
+				, texture_vk->MipLevel, 1, SrcLayout, DstLayout);
+			texture_vk->Layout = newLayout;
 
-		EndSingleTimeCommands(commandBuffer);
-		return ret;
+			EndSingleTimeCommands(commandBuffer);
+			return ret;
+		}
 	}
 
-	return false;
+	return true;
 }
 
 bool jRHI_Vulkan::TransitionLayout(jCommandBuffer* commandBuffer, jBuffer* buffer, EResourceLayout newLayout) const
 {
-	return true;
+    check(commandBuffer);
+    check(buffer);
+
+    VkImageLayout SrcLayout = GetVulkanImageLayout(buffer->GetLayout());
+    VkImageLayout DstLayout = GetVulkanImageLayout(newLayout);
+
+    if (SrcLayout == DstLayout)
+        return true;
+
+    auto buffer_vk = (jBuffer_Vulkan*)buffer;
+    if (TransitionLayout((VkCommandBuffer)commandBuffer->GetHandle(), buffer_vk->Buffer, buffer_vk->Offset, buffer_vk->AllocatedSize, SrcLayout, DstLayout))
+    {
+		buffer_vk->Layout = newLayout;
+        return true;
+    }
+    return true;
 }
 
 bool jRHI_Vulkan::TransitionLayoutImmediate(jBuffer* buffer, EResourceLayout newLayout) const
 {
+    check(buffer);
+    VkImageLayout SrcLayout = GetVulkanImageLayout(buffer->GetLayout());
+    VkImageLayout DstLayout = GetVulkanImageLayout(newLayout);
+
+    if (SrcLayout != DstLayout)
+    {
+        auto commandBuffer = BeginSingleTimeCommands();
+        check(commandBuffer);
+
+        if (commandBuffer)
+        {
+            auto buffer_vk = (jBuffer_Vulkan*)buffer;
+            const bool ret = TransitionLayout(commandBuffer->GetRef(), buffer_vk->Buffer, buffer_vk->Offset, buffer_vk->AllocatedSize, SrcLayout, DstLayout);
+
+            EndSingleTimeCommands(commandBuffer);
+            return ret;
+        }
+    }
+
 	return true;
 }
 
@@ -1907,7 +2041,7 @@ jTexture* jRHI_Vulkan::CreateSampleVRSTexture()
             , VK_IMAGE_USAGE_SHADING_RATE_IMAGE_BIT_NV | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VkImageCreateFlagBits(), VK_IMAGE_LAYOUT_UNDEFINED);
 
         VkDeviceSize imageSize = imageExtent.width * imageExtent.height * GetVulkanTexturePixelSize(ETextureFormat::R8UI);
-		auto stagingBufferPtr = jBufferUtil_Vulkan::CreateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT, imageSize);
+		auto stagingBufferPtr = jBufferUtil_Vulkan::CreateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT, imageSize, EResourceLayout::TRANSFER_SRC);
 
 		auto commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
         ensure(g_rhi_vk->TransitionLayout(commandBuffer->GetRef(), (VkImage)SampleVRSTexturePtr->GetHandle(), GetVulkanTextureFormat(ETextureFormat::R8UI), 1, 1, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
@@ -2102,7 +2236,7 @@ std::shared_ptr<jBuffer> jRHI_Vulkan::CreateBufferInternal(uint64 InSize, uint64
         MemoryBits |= EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT;
     }
 
-	auto Buffer_Vulkan = jBufferUtil_Vulkan::CreateBuffer(BufferBits, MemoryBits, InSize);
+	auto Buffer_Vulkan = jBufferUtil_Vulkan::CreateBuffer(BufferBits, MemoryBits, InSize, InInitialState);
     if (InData && InDataSize > 0)
     {
 		if (!!(EBufferCreateFlag::CPUAccess & InBufferCreateFlag))
