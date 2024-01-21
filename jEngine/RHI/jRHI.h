@@ -442,8 +442,11 @@ public:
 	virtual jCommandBufferManager* GetCommandBufferManager() const { return nullptr; }
 	virtual EMSAASamples GetSelectedMSAASamples() const { return EMSAASamples::COUNT_1; }
 
-	virtual bool TransitionImageLayout(jCommandBuffer* commandBuffer, jTexture* texture, EImageLayout newLayout) const { return true; }
-	virtual bool TransitionImageLayoutImmediate(jTexture* texture, EImageLayout newLayout) const { return true; }
+	virtual bool TransitionLayout(jCommandBuffer* commandBuffer, jTexture* texture, EResourceLayout newLayout) const { return true; }
+	virtual bool TransitionLayoutImmediate(jTexture* texture, EResourceLayout newLayout) const { return true; }
+    virtual bool TransitionLayout(jCommandBuffer* commandBuffer, jBuffer* buffer, EResourceLayout newLayout) const { return true; }
+	virtual bool TransitionLayoutImmediate(jBuffer* buffer, EResourceLayout newLayout) const { return true; }
+
 	virtual jQueryPool* GetQueryTimePool() const { return nullptr; }
 	virtual jSwapchain* GetSwapchain() const { return nullptr; }
 	virtual class jSwapchainImage* GetSwapchainImage(int32 InIndex) const { return nullptr; }
@@ -477,11 +480,11 @@ public:
 
 	// CreateBuffers
 	virtual std::shared_ptr<jBuffer> CreateStructuredBuffer(uint64 InSize, uint64 InAlignment, uint64 InStride, EBufferCreateFlag InBufferCreateFlag
-		, EImageLayout InInitialState, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr) const { return nullptr; }
+		, EResourceLayout InInitialState, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr) const { return nullptr; }
 	virtual std::shared_ptr<jBuffer> CreateRawBuffer(uint64 InSize, uint64 InAlignment, EBufferCreateFlag InBufferCreateFlag
-		, EImageLayout InInitialState, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr) const { return nullptr; }
+		, EResourceLayout InInitialState, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr) const { return nullptr; }
 	virtual std::shared_ptr<jBuffer> CreateFormattedBuffer(uint64 InSize, uint64 InAlignment, ETextureFormat InFormat, EBufferCreateFlag InBufferCreateFlag
-		, EImageLayout InInitialState, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr) const { return nullptr; }
+		, EResourceLayout InInitialState, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr) const { return nullptr; }
     virtual std::shared_ptr<IUniformBufferBlock> CreateUniformBufferBlock(jName InName, jLifeTimeType InLifeTimeType, size_t InSize = 0) const { return nullptr; }
 
 	virtual IAtomicCounterBuffer* CreateAtomicCounterBuffer(const char* name, int32 bindingPoint) const { return nullptr; }
@@ -491,7 +494,7 @@ public:
 
 	template <typename T = jBuffer>
 	FORCEINLINE std::shared_ptr<T> CreateStructuredBuffer(uint64 InSize, uint64 InAlignment, uint64 InStride, EBufferCreateFlag InBufferCreateFlag
-		, EImageLayout InInitialState, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr) const 
+		, EResourceLayout InInitialState, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr) const 
 	{
 		return std::static_pointer_cast<T>(CreateStructuredBuffer(InSize, InAlignment, InStride, InBufferCreateFlag
 			, InInitialState, InData, InDataSize, InResourceName));
@@ -499,7 +502,7 @@ public:
 
 	template <typename T = jBuffer>
     FORCEINLINE std::shared_ptr<T> CreateRawBuffer(uint64 InSize, uint64 InAlignment, EBufferCreateFlag InBufferCreateFlag
-        , EImageLayout InInitialState, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr) const 
+        , EResourceLayout InInitialState, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr) const 
 	{
 		return std::static_pointer_cast<T>(CreateRawBuffer(InSize, InAlignment, InBufferCreateFlag
 			, InInitialState, InData, InDataSize, InResourceName));
@@ -507,7 +510,7 @@ public:
 
 	template <typename T = jBuffer>
     FORCEINLINE std::shared_ptr<T> CreateFormattedBuffer(uint64 InSize, uint64 InAlignment, ETextureFormat InFormat, EBufferCreateFlag InBufferCreateFlag
-        , EImageLayout InInitialState, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr) const 
+        , EResourceLayout InInitialState, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr) const 
 	{
 		return std::static_pointer_cast<T>(CreateFormattedBuffer(InSize, InAlignment, InFormat, InBufferCreateFlag
 			, InInitialState, InData, InDataSize, InResourceName));
@@ -522,21 +525,21 @@ public:
 
 	// Create Images
     virtual std::shared_ptr<jTexture> Create2DTexture(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag
-		, EImageLayout InImageLayout = EImageLayout::UNDEFINED, const jImageBulkData& InImageBulkData = {}, const jRTClearValue& InClearValue = jRTClearValue::Invalid, const wchar_t* InResourceName = nullptr) const { return nullptr; }
+		, EResourceLayout InImageLayout = EResourceLayout::UNDEFINED, const jImageBulkData& InImageBulkData = {}, const jRTClearValue& InClearValue = jRTClearValue::Invalid, const wchar_t* InResourceName = nullptr) const { return nullptr; }
 
 	virtual std::shared_ptr<jTexture> CreateCubeTexture(uint32 InWidth, uint32 InHeight, uint32 InMipLevels, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag
-		, EImageLayout InImageLayout = EImageLayout::UNDEFINED, const jImageBulkData& InImageBulkData = {}, const jRTClearValue& InClearValue = jRTClearValue::Invalid, const wchar_t* InResourceName = nullptr) const { return nullptr; }
+		, EResourceLayout InImageLayout = EResourceLayout::UNDEFINED, const jImageBulkData& InImageBulkData = {}, const jRTClearValue& InClearValue = jRTClearValue::Invalid, const wchar_t* InResourceName = nullptr) const { return nullptr; }
 
 	template <typename T>
     std::shared_ptr<T> Create2DTexture(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag
-		, EImageLayout InImageLayout = EImageLayout::UNDEFINED, const jImageBulkData& InImageCopyData = {}, const jRTClearValue& InClearValue = jRTClearValue::Invalid, const wchar_t* InResourceName = nullptr) const
+		, EResourceLayout InImageLayout = EResourceLayout::UNDEFINED, const jImageBulkData& InImageCopyData = {}, const jRTClearValue& InClearValue = jRTClearValue::Invalid, const wchar_t* InResourceName = nullptr) const
 	{
 		return std::static_pointer_cast<T>(Create2DTexture(InWidth, InHeight, InArrayLayers, InMipLevels, InFormat, InTextureCreateFlag, InImageLayout, InImageCopyData, InClearValue, InResourceName));
     }
 
 	template <typename T>
     std::shared_ptr<T> CreateCubeTexture(uint32 InWidth, uint32 InHeight, uint32 InMipLevels, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag
-		, EImageLayout InImageLayout = EImageLayout::UNDEFINED, const jImageBulkData& InImageCopyData = {}, const jRTClearValue& InClearValue = jRTClearValue::Invalid, const wchar_t* InResourceName = nullptr) const
+		, EResourceLayout InImageLayout = EResourceLayout::UNDEFINED, const jImageBulkData& InImageCopyData = {}, const jRTClearValue& InClearValue = jRTClearValue::Invalid, const wchar_t* InResourceName = nullptr) const
 	{
 		return std::static_pointer_cast<T>(CreateCubeTexture(InWidth, InHeight, InMipLevels, InFormat, InTextureCreateFlag, InImageLayout, InImageCopyData, InClearValue, InResourceName));
     }

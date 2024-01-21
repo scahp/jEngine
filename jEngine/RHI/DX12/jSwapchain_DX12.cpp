@@ -88,7 +88,7 @@ bool jSwapchain_DX12::Create()
         SwapchainImage->TexturePtr = TextureDX12Ptr;
 
         jBufferUtil_DX12::CreateRenderTargetView((jTexture_DX12*)SwapchainImage->TexturePtr.get());
-        TextureDX12Ptr->Layout = EImageLayout::PRESENT_SRC;
+        TextureDX12Ptr->Layout = EResourceLayout::PRESENT_SRC;
     }
 
     return true;

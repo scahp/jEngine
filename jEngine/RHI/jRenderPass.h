@@ -7,8 +7,8 @@ struct jAttachment
         , EAttachmentLoadStoreOp InLoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE
         , EAttachmentLoadStoreOp InStencilLoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE
         , jRTClearValue RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f)
-        , EImageLayout InInitialLayout = EImageLayout::UNDEFINED
-        , EImageLayout InFinalLayout = EImageLayout::SHADER_READ_ONLY
+        , EResourceLayout InInitialLayout = EResourceLayout::UNDEFINED
+        , EResourceLayout InFinalLayout = EResourceLayout::SHADER_READ_ONLY
         , bool InIsResolveAttachment = false
     )
         : RenderTargetPtr(InRTPtr), LoadStoreOp(InLoadStoreOp), StencilLoadStoreOp(InStencilLoadStoreOp)
@@ -31,8 +31,8 @@ struct jAttachment
 
     jRTClearValue RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f);
 
-    EImageLayout InitialLayout = EImageLayout::UNDEFINED;
-    EImageLayout FinalLayout = EImageLayout::SHADER_READ_ONLY;
+    EResourceLayout InitialLayout = EResourceLayout::UNDEFINED;
+    EResourceLayout FinalLayout = EResourceLayout::SHADER_READ_ONLY;
 
     bool bResolveAttachment = false;
 

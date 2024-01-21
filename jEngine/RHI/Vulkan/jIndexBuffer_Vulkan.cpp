@@ -66,7 +66,7 @@ bool jIndexBuffer_Vulkan::Initialize(const std::shared_ptr<jIndexStreamData>& In
 
     const EBufferCreateFlag BufferCreateFlag = EBufferCreateFlag::IndexBuffer | EBufferCreateFlag::UAV | EBufferCreateFlag::AccelerationStructureBuildInput;
     BufferPtr = g_rhi->CreateStructuredBuffer<jBuffer_Vulkan>(bufferSize, 0, GetVulkanIndexStride(IndexStreamData->Param->Attributes[0].UnderlyingType)
-        , BufferCreateFlag, EImageLayout::TRANSFER_DST, InStreamData->Param->GetBufferData(), bufferSize, TEXT("IndexBuffer"));
+        , BufferCreateFlag, EResourceLayout::TRANSFER_DST, InStreamData->Param->GetBufferData(), bufferSize, TEXT("IndexBuffer"));
 
     return true;
 }

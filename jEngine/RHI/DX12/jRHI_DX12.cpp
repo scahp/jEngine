@@ -673,7 +673,7 @@ std::shared_ptr<jTexture> jRHI_DX12::CreateTextureFromData(const jImageData* InI
     check(InImageData);
 
     const int32 MipLevel = InImageData->MipLevel;
-    const EImageLayout Layout = EImageLayout::GENERAL;
+    const EResourceLayout Layout = EResourceLayout::GENERAL;
     
     std::shared_ptr<jTexture_DX12> TexturePtr;
     if (InImageData->TextureType == ETextureType::TEXTURE_CUBE)
@@ -939,7 +939,7 @@ void jRHI_DX12::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& rende
 	jCommandBuffer_DX12* CommandBuffer = (jCommandBuffer_DX12*)renderFrameContextPtr->GetActiveCommandBuffer();
 
     jSwapchainImage_DX12* CurrentSwapchainImage = (jSwapchainImage_DX12*)Swapchain->GetCurrentSwapchainImage();
-    g_rhi->TransitionImageLayout(CommandBuffer, CurrentSwapchainImage->TexturePtr.get(), EImageLayout::PRESENT_SRC);
+    g_rhi->TransitionLayout(CommandBuffer, CurrentSwapchainImage->TexturePtr.get(), EResourceLayout::PRESENT_SRC);
 
 	CommandBufferManager->ExecuteCommandList(CommandBuffer);
 
@@ -1142,14 +1142,14 @@ std::shared_ptr<jIndexBuffer> jRHI_DX12::CreateIndexBuffer(const std::shared_ptr
 }
 
 std::shared_ptr<jTexture> jRHI_DX12::Create2DTexture(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag
-    , EImageLayout InImageLayout, const jImageBulkData& InImageBulkData, const jRTClearValue& InClearValue, const wchar_t* InResourceName) const
+    , EResourceLayout InImageLayout, const jImageBulkData& InImageBulkData, const jRTClearValue& InClearValue, const wchar_t* InResourceName) const
 {
     auto TexturePtr = jBufferUtil_DX12::CreateTexture(InWidth, InHeight, InArrayLayers, InMipLevels, 1, ETextureType::TEXTURE_2D, InFormat, InTextureCreateFlag, InImageLayout, InClearValue, InResourceName);
     if (InImageBulkData.ImageData.size() > 0)
     {
         // todo : recycle temp buffer
         auto BufferPtr = jBufferUtil_DX12::CreateBuffer(InImageBulkData.ImageData.size(), 0
-            , EBufferCreateFlag::CPUAccess, D3D12_RESOURCE_STATE_GENERIC_READ, &InImageBulkData.ImageData[0], InImageBulkData.ImageData.size());
+            , EBufferCreateFlag::CPUAccess, EResourceLayout::READ_ONLY, &InImageBulkData.ImageData[0], InImageBulkData.ImageData.size());
         check(BufferPtr);
 
         jCommandBuffer_DX12* commandList = BeginSingleTimeCopyCommands();
@@ -1168,14 +1168,14 @@ std::shared_ptr<jTexture> jRHI_DX12::Create2DTexture(uint32 InWidth, uint32 InHe
 }
 
 std::shared_ptr<jTexture> jRHI_DX12::CreateCubeTexture(uint32 InWidth, uint32 InHeight, uint32 InMipLevels, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag
-    , EImageLayout InImageLayout, const jImageBulkData& InImageBulkData, const jRTClearValue& InClearValue, const wchar_t* InResourceName) const
+    , EResourceLayout InImageLayout, const jImageBulkData& InImageBulkData, const jRTClearValue& InClearValue, const wchar_t* InResourceName) const
 {
     auto TexturePtr = jBufferUtil_DX12::CreateTexture(InWidth, InHeight, 6, InMipLevels, 1, ETextureType::TEXTURE_CUBE, InFormat, InTextureCreateFlag, InImageLayout, InClearValue, InResourceName);
     if (InImageBulkData.ImageData.size() > 0)
     {
         // todo : recycle temp buffer
         auto BufferPtr = jBufferUtil_DX12::CreateBuffer(InImageBulkData.ImageData.size(), 0
-            , EBufferCreateFlag::CPUAccess, D3D12_RESOURCE_STATE_GENERIC_READ, &InImageBulkData.ImageData[0], InImageBulkData.ImageData.size());
+            , EBufferCreateFlag::CPUAccess, EResourceLayout::READ_ONLY, &InImageBulkData.ImageData[0], InImageBulkData.ImageData.size());
         check(BufferPtr);
 
         jCommandBuffer_DX12* commandList = BeginSingleTimeCopyCommands();
@@ -1316,7 +1316,7 @@ std::shared_ptr<jRenderTarget> jRHI_DX12::CreateRenderTarget(const jRenderTarget
     const uint16 MipLevels = info.IsGenerateMipmap ? static_cast<uint32>(std::floor(std::log2(std::max<int>(info.Width, info.Height)))) + 1 : 1;
     
     auto TexturePtr = jBufferUtil_DX12::CreateTexture(info.Width, info.Height, info.LayerCount, MipLevels, (uint32)info.SampleCount, info.Type, info.Format
-        , (ETextureCreateFlag::RTV | info.TextureCreateFlag), EImageLayout::UNDEFINED, info.RTClearValue, info.ResourceName);
+        , (ETextureCreateFlag::RTV | info.TextureCreateFlag), EResourceLayout::UNDEFINED, info.RTClearValue, info.ResourceName);
 
     auto RenderTargetPtr = std::make_shared<jRenderTarget>();
     check(RenderTargetPtr);
@@ -1338,18 +1338,12 @@ void jRHI_DX12::ReleaseQueryTime(jQuery* queryTime) const
     delete queryTime_gl;
 }
 
-bool jRHI_DX12::TransitionImageLayout(jCommandBuffer* commandBuffer, jTexture* texture, EImageLayout newLayout) const
+bool jRHI_DX12::TransitionLayout_Internal(jCommandBuffer* commandBuffer, ID3D12Resource* resource, D3D12_RESOURCE_STATES srcLayout, D3D12_RESOURCE_STATES dstLayout) const
 {
     check(commandBuffer);
-    check(texture);
-
-    auto Texture_DX12 = (jTexture_DX12*)texture;
-    if (Texture_DX12->Layout == newLayout)
-        return true;
-
-    const auto SrcLayout = GetDX12ImageLayout(Texture_DX12->Layout);
-    const auto DstLayout = GetDX12ImageLayout(newLayout);
-    if (SrcLayout == DstLayout)
+    check(resource);
+    
+    if (srcLayout == dstLayout)
         return true;
 
     auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)commandBuffer;
@@ -1357,29 +1351,95 @@ bool jRHI_DX12::TransitionImageLayout(jCommandBuffer* commandBuffer, jTexture* t
     D3D12_RESOURCE_BARRIER barrier = { };
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
     barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-    barrier.Transition.pResource = Texture_DX12->Image->Get();
-    barrier.Transition.StateBefore = SrcLayout;
-    barrier.Transition.StateAfter = DstLayout;
-    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    barrier.Transition.pResource = resource;
+    barrier.Transition.StateBefore = srcLayout;
+    barrier.Transition.StateAfter = dstLayout;
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;       // todo : each subresource control
     CommandBuffer_DX12->CommandList->ResourceBarrier(1, &barrier);
 
-    Texture_DX12->Layout = newLayout;
     return true;
 }
 
-bool jRHI_DX12::TransitionImageLayoutImmediate(jTexture* texture, EImageLayout newLayout) const
+bool jRHI_DX12::TransitionLayout(jCommandBuffer* commandBuffer, jTexture* texture, EResourceLayout newLayout) const
 {
+    check(commandBuffer);
     check(texture);
 
-    jCommandBuffer_DX12* commandBuffer = const_cast<jRHI_DX12*>(this)->BeginSingleTimeCommands();
-    check(commandBuffer);
+    auto Texture_DX12 = (jTexture_DX12*)texture;
+    const auto SrcLayout = GetDX12ResourceLayout(Texture_DX12->Layout);
+    const auto DstLayout = GetDX12ResourceLayout(newLayout);
+    if (SrcLayout == DstLayout)
+        return true;
 
-    if (commandBuffer)
+    Texture_DX12->Layout = newLayout;
+    return TransitionLayout_Internal(commandBuffer, Texture_DX12->Image->Get(), SrcLayout, DstLayout);
+}
+
+bool jRHI_DX12::TransitionLayoutImmediate(jTexture* texture, EResourceLayout newLayout) const
+{
+    check(texture);
+    if (texture->GetLayout() != newLayout)
     {
-        auto ret = TransitionImageLayout(commandBuffer, texture, newLayout);
+        auto Texture_DX12 = (jTexture_DX12*)texture;
+        const auto SrcLayout = GetDX12ResourceLayout(Texture_DX12->Layout);
+        const auto DstLayout = GetDX12ResourceLayout(newLayout);
+        if (SrcLayout == DstLayout)
+            return true;
 
-        const_cast<jRHI_DX12*>(this)->EndSingleTimeCommands(commandBuffer);
-        return ret;
+        jCommandBuffer_DX12* commandBuffer = const_cast<jRHI_DX12*>(this)->BeginSingleTimeCommands();
+        check(commandBuffer);
+
+        if (commandBuffer)
+        {
+            const bool ret = TransitionLayout_Internal(commandBuffer, Texture_DX12->Image->Get(), SrcLayout, DstLayout);
+            Texture_DX12->Layout = newLayout;
+
+            const_cast<jRHI_DX12*>(this)->EndSingleTimeCommands(commandBuffer);
+            return ret;
+        }
+    }
+
+    return false;
+}
+
+bool jRHI_DX12::TransitionLayout(jCommandBuffer* commandBuffer, jBuffer* buffer, EResourceLayout newLayout) const
+{
+    check(commandBuffer);
+    check(buffer);
+    check(buffer->GetLayout() != newLayout);
+
+    auto Buffer_DX12 = (jBuffer_DX12*)buffer;
+    const auto SrcLayout = GetDX12ResourceLayout(Buffer_DX12->Layout);
+    const auto DstLayout = GetDX12ResourceLayout(newLayout);
+    if (SrcLayout == DstLayout)
+        return true;
+
+    Buffer_DX12->Layout = newLayout;
+    return TransitionLayout_Internal(commandBuffer, Buffer_DX12->Buffer->Get(), SrcLayout, DstLayout);
+}
+
+bool jRHI_DX12::TransitionLayoutImmediate(jBuffer* buffer, EResourceLayout newLayout) const
+{
+    check(buffer);
+    if (buffer->GetLayout() != newLayout)
+    {
+        auto Buffer_DX12 = (jBuffer_DX12*)buffer;
+        const auto SrcLayout = GetDX12ResourceLayout(Buffer_DX12->Layout);
+        const auto DstLayout = GetDX12ResourceLayout(newLayout);
+        if (SrcLayout == DstLayout)
+            return true;
+
+        jCommandBuffer_DX12* commandBuffer = const_cast<jRHI_DX12*>(this)->BeginSingleTimeCommands();
+        check(commandBuffer);
+
+        if (commandBuffer)
+        {
+            const bool ret = TransitionLayout_Internal(commandBuffer, Buffer_DX12->Buffer->Get(), SrcLayout, DstLayout);
+            Buffer_DX12->Layout = newLayout;
+
+            const_cast<jRHI_DX12*>(this)->EndSingleTimeCommands(commandBuffer);
+            return ret;
+        }
     }
 
     return false;
@@ -1419,9 +1479,9 @@ jRaytracingScene* jRHI_DX12::CreateRaytracingScene() const
 }
 
 std::shared_ptr<jBuffer> jRHI_DX12::CreateStructuredBuffer(uint64 InSize, uint64 InAlignment, uint64 InStride, EBufferCreateFlag InBufferCreateFlag
-    , EImageLayout InInitialState, const void* InData, uint64 InDataSize, const wchar_t* InResourceName) const
+    , EResourceLayout InInitialState, const void* InData, uint64 InDataSize, const wchar_t* InResourceName) const
 {
-    auto BufferPtr = jBufferUtil_DX12::CreateBuffer(InSize, InStride, InBufferCreateFlag, GetDX12ImageLayout(InInitialState)
+    auto BufferPtr = jBufferUtil_DX12::CreateBuffer(InSize, InStride, InBufferCreateFlag, InInitialState
         , InData, InDataSize, InResourceName);
 
     jBufferUtil_DX12::CreateShaderResourceView_StructuredBuffer(BufferPtr.get(), (uint32)InStride, (uint32)(InSize / InStride));
@@ -1435,9 +1495,9 @@ std::shared_ptr<jBuffer> jRHI_DX12::CreateStructuredBuffer(uint64 InSize, uint64
 }
 
 std::shared_ptr<jBuffer> jRHI_DX12::CreateRawBuffer(uint64 InSize, uint64 InAlignment, EBufferCreateFlag InBufferCreateFlag
-    , EImageLayout InInitialState, const void* InData, uint64 InDataSize, const wchar_t* InResourceName) const
+    , EResourceLayout InInitialState, const void* InData, uint64 InDataSize, const wchar_t* InResourceName) const
 {
-    auto BufferPtr = jBufferUtil_DX12::CreateBuffer(InSize, InAlignment, InBufferCreateFlag, GetDX12ImageLayout(InInitialState)
+    auto BufferPtr = jBufferUtil_DX12::CreateBuffer(InSize, InAlignment, InBufferCreateFlag, InInitialState
         , InData, InDataSize, InResourceName);
 
     jBufferUtil_DX12::CreateShaderResourceView_Raw(BufferPtr.get(), (uint32)InSize);
@@ -1451,9 +1511,9 @@ std::shared_ptr<jBuffer> jRHI_DX12::CreateRawBuffer(uint64 InSize, uint64 InAlig
 }
 
 std::shared_ptr<jBuffer> jRHI_DX12::CreateFormattedBuffer(uint64 InSize, uint64 InAlignment, ETextureFormat InFormat, EBufferCreateFlag InBufferCreateFlag
-    , EImageLayout InInitialState, const void* InData, uint64 InDataSize, const wchar_t* InResourceName) const
+    , EResourceLayout InInitialState, const void* InData, uint64 InDataSize, const wchar_t* InResourceName) const
 {
-    auto BufferPtr = jBufferUtil_DX12::CreateBuffer(InSize, InAlignment, InBufferCreateFlag, GetDX12ImageLayout(InInitialState)
+    auto BufferPtr = jBufferUtil_DX12::CreateBuffer(InSize, InAlignment, InBufferCreateFlag, InInitialState
         , InData, InDataSize, InResourceName);
 
     jBufferUtil_DX12::CreateShaderResourceView_Formatted(BufferPtr.get(), InFormat, (uint32)InSize);

@@ -685,7 +685,7 @@ enum class EColorMask : uint8
 };
 DECLARE_ENUM_BIT_OPERATORS(EColorMask)
 
-DECLARE_ENUM_WITH_CONVERT_TO_STRING(EImageLayout, uint8,
+DECLARE_ENUM_WITH_CONVERT_TO_STRING(EResourceLayout, uint8,
     UNDEFINED,
     GENERAL,
 	UAV,
@@ -736,6 +736,8 @@ struct jBuffer : public jShaderBindableResource, public std::enable_shared_from_
 	virtual uint64 GetOffset() const = 0;
 	virtual uint64 GetAllocatedSize() const = 0;				// AllocatedSize from memory pool
 	virtual uint64 GetBufferSize() const = 0;					// RequstedSize
+
+	virtual EResourceLayout GetLayout() const { return EResourceLayout::UNDEFINED; }
 };
 
 enum class EPipelineStageMask : uint32

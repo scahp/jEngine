@@ -17,7 +17,7 @@ struct jTexture : public jShaderBindableResource, public std::enable_shared_from
     virtual void* GetHandle() const { return nullptr; }
     virtual void* GetSamplerStateHandle() const { return nullptr; }
     virtual void Release() {}
-    virtual EImageLayout GetLayout() const { return EImageLayout::UNDEFINED; }
+    virtual EResourceLayout GetLayout() const { return EResourceLayout::UNDEFINED; }
 
     FORCEINLINE bool IsDepthFormat() const { return ::IsDepthFormat(Format); }
     FORCEINLINE bool IsDepthOnlyFormat() const { return ::IsDepthOnlyFormat(Format); }

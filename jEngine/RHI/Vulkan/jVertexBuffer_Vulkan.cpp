@@ -39,7 +39,7 @@ bool jVertexBuffer_Vulkan::Initialize(const std::shared_ptr<jVertexStreamData>& 
             VkDeviceSize bufferSize = iter->GetBufferSize();
             stream.BufferPtr = g_rhi->CreateStructuredBuffer<jBuffer_Vulkan>(bufferSize, stream.Stride, stream.Stride
                 , EBufferCreateFlag::VertexBuffer | EBufferCreateFlag::AccelerationStructureBuildInput | EBufferCreateFlag::UAV
-                , EImageLayout::TRANSFER_DST, iter->GetBufferData(), bufferSize);
+                , EResourceLayout::TRANSFER_DST, iter->GetBufferData(), bufferSize);
 
             BindInfos.Buffers.push_back(stream.BufferPtr->Buffer);
             BindInfos.Offsets.push_back(stream.Offset + stream.BufferPtr->Offset);

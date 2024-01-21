@@ -41,12 +41,12 @@ void jRaytracingScene_DX12::CreateOrUpdateBLAS(const jRatracingInitializer& InIn
         if (ROE)
         {
             VertexStart += VertexBufferDX12->Streams[0].Stride * ROE->SubMesh.StartVertex;
-            VertexCount = ROE->SubMesh.EndVertex - ROE->SubMesh.StartVertex + 1;
+            VertexCount = ROE->SubMesh.EndVertex - ROE->SubMesh.StartVertex;
 
             VertexIndexOffset = Vector2i(ROE->SubMesh.StartVertex, ROE->SubMesh.StartFace);
         }
         RObj->VertexAndIndexOffsetBuffer = g_rhi->CreateStructuredBuffer<jBuffer_DX12>(sizeof(Vector2i), 0, sizeof(Vector2i), EBufferCreateFlag::UAV
-            , EImageLayout::GENERAL, &VertexIndexOffset, sizeof(Vector2i), TEXT("VertexAndIndexOffsetBuffer"));
+            , EResourceLayout::GENERAL, &VertexIndexOffset, sizeof(Vector2i), TEXT("VertexAndIndexOffsetBuffer"));
 
         // Set GeometryDesc
         D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc{};
@@ -63,7 +63,7 @@ void jRaytracingScene_DX12::CreateOrUpdateBLAS(const jRatracingInitializer& InIn
             if (ROE)
             {
                 IndexStart += indexStreamData->Param->GetElementSize() * ROE->SubMesh.StartFace;
-                IndexCount = ROE->SubMesh.EndFace - ROE->SubMesh.StartFace + 1;
+                IndexCount = ROE->SubMesh.EndFace - ROE->SubMesh.StartFace;
             }
 
             geometryDesc.Triangles.IndexBuffer = IndexStart;
@@ -101,10 +101,10 @@ void jRaytracingScene_DX12::CreateOrUpdateBLAS(const jRatracingInitializer& InIn
             continue;
 
         RObj->BottomLevelASBuffer = g_rhi->CreateRawBuffer<jBuffer_DX12>(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, 0
-            , EBufferCreateFlag::UAV | EBufferCreateFlag::AccelerationStructure, EImageLayout::ACCELERATION_STRUCTURE, nullptr, 0, TEXT("BottomLevelAccelerationStructure"));
+            , EBufferCreateFlag::UAV | EBufferCreateFlag::AccelerationStructure, EResourceLayout::ACCELERATION_STRUCTURE, nullptr, 0, TEXT("BottomLevelAccelerationStructure"));
 
         RObj->ScratchASBuffer = g_rhi->CreateRawBuffer<jBuffer_DX12>(bottomLevelPrebuildInfo.ScratchDataSizeInBytes, 0
-            , EBufferCreateFlag::UAV | EBufferCreateFlag::AccelerationStructureBuildInput, EImageLayout::GENERAL, nullptr, 0, TEXT("ScratchResourceGeometry"));
+            , EBufferCreateFlag::UAV | EBufferCreateFlag::AccelerationStructureBuildInput, EResourceLayout::GENERAL, nullptr, 0, TEXT("ScratchResourceGeometry"));
 
         // Create BLAS
         D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc{};
@@ -148,15 +148,14 @@ void jRaytracingScene_DX12::CreateOrUpdateTLAS(const jRatracingInitializer& InIn
     }
     else
     {
-        ScratchTLASBufferPtr = std::shared_ptr<jBuffer>(jBufferUtil_DX12::CreateBuffer(info.ScratchDataSizeInBytes, 0, EBufferCreateFlag::UAV, D3D12_RESOURCE_STATE_COMMON
+        ScratchTLASBufferPtr = std::shared_ptr<jBuffer>(jBufferUtil_DX12::CreateBuffer(info.ScratchDataSizeInBytes, 0, EBufferCreateFlag::UAV, EResourceLayout::UNDEFINED
             , nullptr, 0, TEXT("TLAS Scratch Buffer")));
 
-        TLASBufferPtr = std::shared_ptr<jBuffer>(jBufferUtil_DX12::CreateBuffer(info.ResultDataMaxSizeInBytes, 0, EBufferCreateFlag::UAV, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE
+        TLASBufferPtr = std::shared_ptr<jBuffer>(jBufferUtil_DX12::CreateBuffer(info.ResultDataMaxSizeInBytes, 0, EBufferCreateFlag::UAV | EBufferCreateFlag::AccelerationStructure, EResourceLayout::ACCELERATION_STRUCTURE
             , nullptr, 0, TEXT("TLAS Result Buffer")));
 
         InstanceUploadBufferPtr = std::shared_ptr<jBuffer>(jBufferUtil_DX12::CreateBuffer(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * InstanceList.size(), 0
-            , EBufferCreateFlag::CPUAccess, D3D12_RESOURCE_STATE_GENERIC_READ
-            , nullptr, 0, TEXT("TLAS Result Buffer")));
+            , EBufferCreateFlag::CPUAccess, EResourceLayout::READ_ONLY, nullptr, 0, TEXT("TLAS Result Buffer")));
     }
 
     if (D3D12_RAYTRACING_INSTANCE_DESC* instanceDescs = (D3D12_RAYTRACING_INSTANCE_DESC*)InstanceUploadBufferPtr->Map())
