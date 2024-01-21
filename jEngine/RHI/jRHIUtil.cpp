@@ -135,7 +135,7 @@ std::shared_ptr<jRenderTarget> ConvertToCubeMap(jName InDestFilePath, Vector2i I
     DirectX::ScratchImage image;
     jTexture_DX12* texture_dx12 = (jTexture_DX12*)CubeMap->GetTexture();
     DirectX::CaptureTexture(g_rhi_dx12->CommandBufferManager->GetCommandQueue().Get()
-        , texture_dx12->Image->Get(), true, image, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_RENDER_TARGET);
+        , texture_dx12->Texture->Get(), true, image, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
     const std::wstring DestFilePath = ConvertToWchar(InDestFilePath);
 
@@ -250,7 +250,7 @@ std::shared_ptr<jRenderTarget> GenerateIrradianceMap(jName InDestFilePath, Vecto
     DirectX::ScratchImage image;
     jTexture_DX12* texture_dx12 = (jTexture_DX12*)IrradianceMap->GetTexture();
     DirectX::CaptureTexture(g_rhi_dx12->CommandBufferManager->GetCommandQueue().Get()
-        , texture_dx12->Image->Get(), true, image, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_RENDER_TARGET);
+        , texture_dx12->Texture->Get(), true, image, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
     const std::wstring DestFilePath = ConvertToWchar(InDestFilePath);
 
@@ -373,7 +373,7 @@ std::shared_ptr<jRenderTarget> GenerateFilteredEnvironmentMap(jName InDestFilePa
     DirectX::ScratchImage image;
     jTexture_DX12* texture_dx12 = (jTexture_DX12*)FilteredEnvMap->GetTexture();
     DirectX::CaptureTexture(g_rhi_dx12->CommandBufferManager->GetCommandQueue().Get()
-        , texture_dx12->Image->Get(), true, image, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_RENDER_TARGET);
+        , texture_dx12->Texture->Get(), true, image, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
     const std::wstring DestFilePath = ConvertToWchar(InDestFilePath);
 

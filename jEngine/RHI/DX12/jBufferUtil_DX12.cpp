@@ -583,7 +583,7 @@ void CreateShaderResourceView(jTexture_DX12* InTexture)
         break;
     }
 
-    g_rhi_dx12->Device->CreateShaderResourceView(InTexture->Image->Get()
+    g_rhi_dx12->Device->CreateShaderResourceView(InTexture->Texture->Get()
         , &Desc, InTexture->SRV.CPUHandle);
 }
 
@@ -635,7 +635,7 @@ void CreateDepthStencilView(jTexture_DX12* InTexture)
     //    Desc.Flags |= D3D12_DSV_FLAG_READ_ONLY_STENCIL;
     Desc.Flags = D3D12_DSV_FLAG_NONE;
 
-    g_rhi_dx12->Device->CreateDepthStencilView(InTexture->Image->Get()
+    g_rhi_dx12->Device->CreateDepthStencilView(InTexture->Texture->Get()
         , &Desc, InTexture->DSV.CPUHandle);
 }
 
@@ -681,7 +681,7 @@ void CreateUnorderedAccessView(jTexture_DX12* InTexture)
             break;
         }
 
-        g_rhi_dx12->Device->CreateUnorderedAccessView(InTexture->Image->Get()
+        g_rhi_dx12->Device->CreateUnorderedAccessView(InTexture->Texture->Get()
             , nullptr, &Desc, UAV.CPUHandle);
      
         if (i == 0)
@@ -733,7 +733,7 @@ void CreateRenderTargetView(jTexture_DX12* InTexture)
         break;
     }
 
-    g_rhi_dx12->Device->CreateRenderTargetView(InTexture->Image->Get(), &Desc, InTexture->RTV.CPUHandle);
+    g_rhi_dx12->Device->CreateRenderTargetView(InTexture->Texture->Get(), &Desc, InTexture->RTV.CPUHandle);
 }
 
 

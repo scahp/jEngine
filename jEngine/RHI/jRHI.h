@@ -442,10 +442,17 @@ public:
 	virtual jCommandBufferManager* GetCommandBufferManager() const { return nullptr; }
 	virtual EMSAASamples GetSelectedMSAASamples() const { return EMSAASamples::COUNT_1; }
 
+	// ResourceBarrier
 	virtual bool TransitionLayout(jCommandBuffer* commandBuffer, jTexture* texture, EResourceLayout newLayout) const { return true; }
 	virtual bool TransitionLayoutImmediate(jTexture* texture, EResourceLayout newLayout) const { return true; }
     virtual bool TransitionLayout(jCommandBuffer* commandBuffer, jBuffer* buffer, EResourceLayout newLayout) const { return true; }
 	virtual bool TransitionLayoutImmediate(jBuffer* buffer, EResourceLayout newLayout) const { return true; }
+	
+	virtual void UAVBarrier(jCommandBuffer* commandBuffer, jTexture* texture) const { }
+	virtual void UAVBarrierImmediate(jTexture* texture) const { }
+	virtual void UAVBarrier(jCommandBuffer* commandBuffer, jBuffer* buffer) const { }
+    virtual void UAVBarrierImmediate(jBuffer* buffer) const { }
+	//////////////////////////////////////////////////////////////////////////
 
 	virtual jQueryPool* GetQueryTimePool() const { return nullptr; }
 	virtual jSwapchain* GetSwapchain() const { return nullptr; }

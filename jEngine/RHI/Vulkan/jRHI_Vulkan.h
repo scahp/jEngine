@@ -107,12 +107,20 @@ public:
 	virtual jCommandBuffer_Vulkan* BeginSingleTimeCommands() const override;
 	virtual void EndSingleTimeCommands(jCommandBuffer* commandBuffer) const override;
 
+	// Resource Barrier
 	bool TransitionLayout(VkCommandBuffer commandBuffer, VkImage image, VkFormat format, uint32 mipLevels, uint32 layoutCount, VkImageLayout oldLayout, VkImageLayout newLayout) const;
 	bool TransitionLayout(VkCommandBuffer commandBuffer, VkBuffer buffer, uint64 offset, uint64 size, VkImageLayout oldLayout, VkImageLayout newLayout) const;
 	virtual bool TransitionLayout(jCommandBuffer* commandBuffer, jTexture* texture, EResourceLayout newLayout) const override;
     virtual bool TransitionLayoutImmediate(jTexture* texture, EResourceLayout newLayout) const override;
     virtual bool TransitionLayout(jCommandBuffer* commandBuffer, jBuffer* buffer, EResourceLayout newLayout) const override;
     virtual bool TransitionLayoutImmediate(jBuffer* buffer, EResourceLayout newLayout) const override;
+
+	// Vulkan UAVBarrier doesn't need to resource, because it works with pipeline stage.
+	// - https://github.com/KhronosGroup/Vulkan-Docs/wiki/Synchronization-Examples-(Legacy-synchronization-APIs)
+    virtual void UAVBarrier(jCommandBuffer* commandBuffer, jTexture* /*texture*/) const override;
+    virtual void UAVBarrierImmediate(jTexture* /*texture*/) const override;
+    virtual void UAVBarrier(jCommandBuffer* commandBuffer, jBuffer* /*buffer*/) const override;
+    virtual void UAVBarrierImmediate(jBuffer* /*buffer*/) const override;
 	//////////////////////////////////////////////////////////////////////////
 
     virtual jName GetRHIName() override
