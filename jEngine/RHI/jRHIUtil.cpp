@@ -42,8 +42,8 @@ std::shared_ptr<jRenderTarget> ConvertToCubeMap(jName InDestFilePath, Vector2i I
     {
         DEBUG_EVENT(InRenderFrameContextPtr, "DrawCubemap");
 
-        g_rhi->TransitionImageLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InTwoMirrorBallSphereMap, EImageLayout::SHADER_READ_ONLY);
-        g_rhi->TransitionImageLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), CubeMap->GetTexture(), EImageLayout::UAV);
+        g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InTwoMirrorBallSphereMap, EResourceLayout::SHADER_READ_ONLY);
+        g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), CubeMap->GetTexture(), EResourceLayout::UAV);
 
         struct jMipUniformBuffer
         {
@@ -141,7 +141,7 @@ std::shared_ptr<jRenderTarget> ConvertToCubeMap(jName InDestFilePath, Vector2i I
 
     // Save image
     DirectX::SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::DDS_FLAGS::DDS_FLAGS_NONE, DestFilePath.c_str());
-    g_rhi->TransitionImageLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), CubeMap->GetTexture(), EImageLayout::SHADER_READ_ONLY);
+    g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), CubeMap->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
 
     return CubeMap;
 }
@@ -166,8 +166,8 @@ std::shared_ptr<jRenderTarget> GenerateIrradianceMap(jName InDestFilePath, Vecto
     {
         DEBUG_EVENT(InRenderFrameContextPtr, "GenIrradianceMap");
 
-        g_rhi->TransitionImageLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InCubemap, EImageLayout::SHADER_READ_ONLY);
-        g_rhi->TransitionImageLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), IrradianceMap->GetTexture(), EImageLayout::UAV);
+        g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InCubemap, EResourceLayout::SHADER_READ_ONLY);
+        g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), IrradianceMap->GetTexture(), EResourceLayout::UAV);
 
         struct jRTSizeUniformBuffer
         {
@@ -256,7 +256,7 @@ std::shared_ptr<jRenderTarget> GenerateIrradianceMap(jName InDestFilePath, Vecto
 
     // Save image
     DirectX::SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::DDS_FLAGS::DDS_FLAGS_NONE, DestFilePath.c_str());
-    g_rhi->TransitionImageLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), IrradianceMap->GetTexture(), EImageLayout::SHADER_READ_ONLY);
+    g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), IrradianceMap->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
 
     return IrradianceMap;
 }
@@ -281,8 +281,8 @@ std::shared_ptr<jRenderTarget> GenerateFilteredEnvironmentMap(jName InDestFilePa
     {
         DEBUG_EVENT(InRenderFrameContextPtr, "GenFilteredEnvMap");
 
-        g_rhi->TransitionImageLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InCubemap, EImageLayout::SHADER_READ_ONLY);
-        g_rhi->TransitionImageLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), FilteredEnvMap->GetTexture(), EImageLayout::UAV);
+        g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InCubemap, EResourceLayout::SHADER_READ_ONLY);
+        g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), FilteredEnvMap->GetTexture(), EResourceLayout::UAV);
 
         struct jMipUniformBuffer
         {
@@ -379,7 +379,7 @@ std::shared_ptr<jRenderTarget> GenerateFilteredEnvironmentMap(jName InDestFilePa
 
     // Save image
     DirectX::SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::DDS_FLAGS::DDS_FLAGS_NONE, DestFilePath.c_str());
-    g_rhi->TransitionImageLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), FilteredEnvMap->GetTexture(), EImageLayout::SHADER_READ_ONLY);
+    g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), FilteredEnvMap->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
 
     return FilteredEnvMap;
 }

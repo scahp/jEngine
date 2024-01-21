@@ -219,7 +219,7 @@ const std::shared_ptr<jShaderBindingInstance>& jRenderObject::CreateShaderBindin
         RenderObjectUniformParametersPtr->UpdateBufferData(&ubo, sizeof(ubo));
 
         TestUniformBuffer = g_rhi->CreateStructuredBuffer(sizeof(ubo), 0, sizeof(ubo), EBufferCreateFlag::UAV | EBufferCreateFlag::ShaderBindingTable
-            , EImageLayout::GENERAL, &ubo, sizeof(ubo));
+            , EResourceLayout::GENERAL, &ubo, sizeof(ubo));
 
         LastMetallic = gOptions.Metallic;
         LastRoughness = gOptions.Roughness;

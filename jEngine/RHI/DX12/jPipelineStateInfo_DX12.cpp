@@ -395,7 +395,7 @@ void* jPipelineStateInfo_DX12::CreateRaytracingPipelineState()
     {
         const uint32 RaygenBufferSize = (uint32)Align(ShaderRecordSize * RaygenShaderIdentifiers.size(), D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
         RaygenBuffer = jBufferUtil_DX12::CreateBuffer(RaygenBufferSize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT
-            , EBufferCreateFlag::CPUAccess, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, 0, TEXT("RaygenShaderTable"));
+            , EBufferCreateFlag::CPUAccess, EResourceLayout::READ_ONLY, nullptr, 0, TEXT("RaygenShaderTable"));
 
         uint8* RaygenMappedPtr = (uint8*)RaygenBuffer->Map();
         for (int32 i = 0; i < (int32)RaygenShaderIdentifiers.size(); ++i)
@@ -410,7 +410,7 @@ void* jPipelineStateInfo_DX12::CreateRaytracingPipelineState()
     {
         const uint32 MissBufferSize = (uint32)(ShaderRecordSize * MissShaderIdentifiers.size());
         MissBuffer = jBufferUtil_DX12::CreateBuffer(MissBufferSize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT
-            , EBufferCreateFlag::CPUAccess, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, 0, TEXT("MissShaderTable"));
+            , EBufferCreateFlag::CPUAccess, EResourceLayout::READ_ONLY, nullptr, 0, TEXT("MissShaderTable"));
 
         uint8* MissMappedPtr = (uint8*)MissBuffer->Map();
         for (int32 i = 0; i < (int32)MissShaderIdentifiers.size(); ++i)
@@ -425,7 +425,7 @@ void* jPipelineStateInfo_DX12::CreateRaytracingPipelineState()
     {
         const uint32 HitGroupBufferSize = (uint32)(ShaderRecordSize * HitGroupShaderIdentifiers.size());
         HitGroupBuffer = jBufferUtil_DX12::CreateBuffer(HitGroupBufferSize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT
-            , EBufferCreateFlag::CPUAccess, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, 0, TEXT("HitGroupShaderTable"));
+            , EBufferCreateFlag::CPUAccess, EResourceLayout::READ_ONLY, nullptr, 0, TEXT("HitGroupShaderTable"));
 
         uint8* HitGroupMappedPtr = (uint8*)HitGroupBuffer->Map();
         for (int32 i = 0; i < (int32)HitGroupShaderIdentifiers.size(); ++i)

@@ -34,7 +34,7 @@ bool jVertexBuffer_DX12::Initialize(const std::shared_ptr<jVertexStreamData>& In
         stream.InstanceDivisor = iter->InstanceDivisor;
 
         // Create vertex buffer
-        stream.BufferPtr = g_rhi->CreateRawBuffer<jBuffer_DX12>(iter->GetBufferSize(), 0, EBufferCreateFlag::NONE, EImageLayout::GENERAL
+        stream.BufferPtr = g_rhi->CreateRawBuffer<jBuffer_DX12>(iter->GetBufferSize(), 0, EBufferCreateFlag::NONE, EResourceLayout::GENERAL
             , iter->GetBufferData(), iter->GetBufferSize(), TEXT("VertexBuffer"));
 
         jBuffer_DX12* Buffer_DX12 = stream.GetBuffer<jBuffer_DX12>();

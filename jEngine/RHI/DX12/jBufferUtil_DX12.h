@@ -305,18 +305,18 @@ namespace jBufferUtil_DX12
 {
 
 std::shared_ptr<jCreatedResource> CreateBufferInternal(uint64 InSize, uint64 InAlignment, EBufferCreateFlag InBufferCreateFlag
-    , D3D12_RESOURCE_STATES InInitialState = D3D12_RESOURCE_STATE_COMMON, const wchar_t* InResourceName = nullptr);
+    , D3D12_RESOURCE_STATES InInitialResourceState, const wchar_t* InResourceName = nullptr);
 
 std::shared_ptr<jBuffer_DX12> CreateBuffer(uint64 InSize, uint64 InAlignment, EBufferCreateFlag InBufferCreateFlag
-    , D3D12_RESOURCE_STATES InInitialState = D3D12_RESOURCE_STATE_COMMON, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr);
+    , EResourceLayout InLayout, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr);
 
 std::shared_ptr<jCreatedResource> CreateTexturenternal(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, uint32 InNumOfSample
-    , D3D12_RESOURCE_DIMENSION InType, DXGI_FORMAT InFormat, ETextureCreateFlag InTextureCreateFlag, EImageLayout InImageLayout = EImageLayout::UNDEFINED, D3D12_CLEAR_VALUE* InClearValue = nullptr, const wchar_t* InResourceName = nullptr);
+    , D3D12_RESOURCE_DIMENSION InType, DXGI_FORMAT InFormat, ETextureCreateFlag InTextureCreateFlag, EResourceLayout InImageLayout = EResourceLayout::UNDEFINED, D3D12_CLEAR_VALUE* InClearValue = nullptr, const wchar_t* InResourceName = nullptr);
 
 std::shared_ptr<jTexture_DX12> CreateTexture(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, uint32 InNumOfSample
-    , ETextureType InType, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag, EImageLayout InImageLayout = EImageLayout::UNDEFINED, const jRTClearValue& InClearValue = jRTClearValue::Invalid, const wchar_t* InResourceName = nullptr);
+    , ETextureType InType, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag, EResourceLayout InImageLayout = EResourceLayout::UNDEFINED, const jRTClearValue& InClearValue = jRTClearValue::Invalid, const wchar_t* InResourceName = nullptr);
 
-std::shared_ptr<jTexture_DX12> CreateTexture(const std::shared_ptr<jCreatedResource>& InTexture, ETextureCreateFlag InTextureCreateFlag, EImageLayout InImageLayout, const jRTClearValue& InClearValue, const wchar_t* InResourceName);
+std::shared_ptr<jTexture_DX12> CreateTexture(const std::shared_ptr<jCreatedResource>& InTexture, ETextureCreateFlag InTextureCreateFlag, EResourceLayout InImageLayout, const jRTClearValue& InClearValue, const wchar_t* InResourceName);
 
 uint64 CopyBufferToTexture(ID3D12GraphicsCommandList4* InCommandBuffer, ID3D12Resource* InBuffer, uint64 InBufferOffset, ID3D12Resource* InImage, int32 InImageSubresourceIndex = 0);
 uint64 CopyBufferToTexture(ID3D12GraphicsCommandList4* InCommandBuffer, ID3D12Resource* InBuffer, uint64 InBufferOffset, ID3D12Resource* InImage, int32 InNumOfImageSubresource, int32 InStartImageSubresource);

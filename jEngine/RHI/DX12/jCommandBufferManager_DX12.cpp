@@ -59,10 +59,10 @@ bool jCommandBuffer_DX12::End() const
     if (IsClosed)
         return true;
 
-    if (FAILED(CommandList->Close()))
+    IsClosed = true;
+    if (JFAIL(CommandList->Close()))
         return false;
 
-    IsClosed = true;
     return true;
 }
 

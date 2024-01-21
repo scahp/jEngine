@@ -121,7 +121,7 @@ void jRenderer::SetupShadowPass()
             const jRTClearValue ClearDepth = IsUseReverseZShadow ? jRTClearValue(0.0f, 0) : jRTClearValue(1.0f, 0);
 
             jAttachment depth = jAttachment(ViewLight.ShadowMapPtr, EAttachmentLoadStoreOp::CLEAR_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE
-                , ClearDepth, EImageLayout::UNDEFINED, EImageLayout::DEPTH_STENCIL_ATTACHMENT);
+                , ClearDepth, EResourceLayout::UNDEFINED, EResourceLayout::DEPTH_STENCIL_ATTACHMENT);
 
             // Setup attachment
             jRenderPassInfo renderPassInfo;
@@ -277,7 +277,7 @@ void jRenderer::SetupBasePass()
 
     jAttachment depth = jAttachment(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr, EAttachmentLoadStoreOp::CLEAR_STORE
         , EAttachmentLoadStoreOp::CLEAR_STORE, ClearDepth
-        , EImageLayout::UNDEFINED, EImageLayout::DEPTH_STENCIL_ATTACHMENT);
+        , EResourceLayout::UNDEFINED, EResourceLayout::DEPTH_STENCIL_ATTACHMENT);
     jAttachment resolve;
 
     if (UseForwardRenderer)
@@ -286,7 +286,7 @@ void jRenderer::SetupBasePass()
         {
             resolve = jAttachment(RenderFrameContextPtr->SceneRenderTargetPtr->ResolvePtr, EAttachmentLoadStoreOp::DONTCARE_STORE
                 , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor
-                , EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT, true);
+                , EResourceLayout::UNDEFINED, EResourceLayout::COLOR_ATTACHMENT, true);
         }
     }
 
@@ -298,7 +298,7 @@ void jRenderer::SetupBasePass()
         {
             jAttachment color = jAttachment(RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[i], EAttachmentLoadStoreOp::CLEAR_STORE
                 , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor
-                , EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
+                , EResourceLayout::UNDEFINED, EResourceLayout::COLOR_ATTACHMENT);
             renderPassInfo.Attachments.push_back(color);
         }
     }
@@ -309,7 +309,7 @@ void jRenderer::SetupBasePass()
     {
         jAttachment color = jAttachment(RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr, EAttachmentLoadStoreOp::CLEAR_STORE
             , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor
-            , EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
+            , EResourceLayout::UNDEFINED, EResourceLayout::COLOR_ATTACHMENT);
         renderPassInfo.Attachments.push_back(color);
     }
 
@@ -539,8 +539,8 @@ void jRenderer::ShadowPass()
         const std::shared_ptr<jRenderTarget>& ShadowMapPtr = ShadowPasses.GetShadowMapPtr();
 
         {
-            auto NewLayout = ShadowMapPtr->GetTexture()->IsDepthOnlyFormat() ? EImageLayout::DEPTH_ATTACHMENT : EImageLayout::DEPTH_STENCIL_ATTACHMENT;
-            g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), ShadowMapPtr->GetTexture(), NewLayout);
+            auto NewLayout = ShadowMapPtr->GetTexture()->IsDepthOnlyFormat() ? EResourceLayout::DEPTH_ATTACHMENT : EResourceLayout::DEPTH_STENCIL_ATTACHMENT;
+            g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), ShadowMapPtr->GetTexture(), NewLayout);
         }
 
         if (ShadowPasses.ShadowMapRenderPass && ShadowPasses.ShadowMapRenderPass->BeginRenderPass(RenderFrameContextPtr->GetActiveCommandBuffer()))
@@ -555,8 +555,8 @@ void jRenderer::ShadowPass()
         }
 
         {
-            auto NewLayout = ShadowMapPtr->GetTexture()->IsDepthOnlyFormat() ? EImageLayout::DEPTH_READ_ONLY : EImageLayout::DEPTH_STENCIL_READ_ONLY;
-            g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), ShadowMapPtr->GetTexture(), NewLayout);
+            auto NewLayout = ShadowMapPtr->GetTexture()->IsDepthOnlyFormat() ? EResourceLayout::DEPTH_READ_ONLY : EResourceLayout::DEPTH_STENCIL_READ_ONLY;
+            g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), ShadowMapPtr->GetTexture(), NewLayout);
         }
     }
 }
@@ -573,19 +573,19 @@ void jRenderer::BasePass()
 
         if (UseForwardRenderer)
         {
-            g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), EImageLayout::COLOR_ATTACHMENT);
+            g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
         }
         else
         {
             for (int32 i = 0; i < _countof(RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer); ++i)
             {
-                g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[i]->GetTexture(), EImageLayout::COLOR_ATTACHMENT);
+                g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[i]->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
             }
         }
 
         {
-            auto NewLayout = RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture()->IsDepthOnlyFormat() ? EImageLayout::DEPTH_ATTACHMENT : EImageLayout::DEPTH_STENCIL_ATTACHMENT;
-            g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), NewLayout);
+            auto NewLayout = RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture()->IsDepthOnlyFormat() ? EResourceLayout::DEPTH_ATTACHMENT : EResourceLayout::DEPTH_STENCIL_ATTACHMENT;
+            g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), NewLayout);
         }
 
         //BasepassOcclusionTest.BeginQuery(RenderFrameContextPtr->GetActiveCommandBuffer());
@@ -684,9 +684,9 @@ void jRenderer::BasePass()
         auto ShadowMapTexture = RenderFrameContextPtr->SceneRenderTargetPtr->GetShadowMap(DirectionalLight)->GetTexture();
         check(ShadowMapTexture);
 
-        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EImageLayout::SHADER_READ_ONLY);
-        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), ShadowMapTexture, EImageLayout::SHADER_READ_ONLY);
-        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), AtmosphericShadowing->GetTexture(), EImageLayout::UAV);
+        g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+        g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), ShadowMapTexture, EResourceLayout::SHADER_READ_ONLY);
+        g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), AtmosphericShadowing->GetTexture(), EResourceLayout::UAV);
 
         // Binding 0
         {
@@ -756,7 +756,7 @@ void jRenderer::BasePass()
         int32 Y = (Height / 16) + ((Height % 16) ? 1 : 0);
         g_rhi->DispatchCompute(RenderFrameContextPtr, X, Y, 1);
 
-        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), AtmosphericShadowing->GetTexture(), EImageLayout::SHADER_READ_ONLY);
+        g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), AtmosphericShadowing->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
     }
 
     if (EnableAtmosphericShadowing)
@@ -765,7 +765,7 @@ void jRenderer::BasePass()
         std::shared_ptr<jRenderTarget> AtmosphericShadowing = RenderFrameContextPtr->SceneRenderTargetPtr->AtmosphericShadowing;
 
         auto RT = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr;
-        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RT->GetTexture(), EImageLayout::COLOR_ATTACHMENT);
+        g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RT->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
 
         jRasterizationStateInfo* RasterizationState = nullptr;
         switch (g_rhi->GetSelectedMSAASamples())
@@ -801,7 +801,7 @@ void jRenderer::BasePass()
 
         jRenderPassInfo renderPassInfo;
         jAttachment color = jAttachment(RT, EAttachmentLoadStoreOp::LOAD_STORE
-            , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
+            , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, EResourceLayout::UNDEFINED, EResourceLayout::COLOR_ATTACHMENT);
         renderPassInfo.Attachments.push_back(color);
 
         jSubpass subpass;
@@ -861,11 +861,11 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
 
     if (!gOptions.UseSubpass)
     {
-        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), EImageLayout::COLOR_ATTACHMENT);
-        g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EImageLayout::DEPTH_STENCIL_READ_ONLY);
+        g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
+        g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::DEPTH_STENCIL_READ_ONLY);
         for (int32 i = 0; i < _countof(RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer); ++i)
         {
-            g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[i]->GetTexture(), EImageLayout::SHADER_READ_ONLY);
+            g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[i]->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
         }
     }
 
@@ -908,13 +908,13 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
 
             jAttachment depth = jAttachment(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr, EAttachmentLoadStoreOp::LOAD_DONTCARE
                 , EAttachmentLoadStoreOp::LOAD_STORE, ClearDepth
-                , RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetLayout(), EImageLayout::DEPTH_STENCIL_READ_ONLY);
+                , RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetLayout(), EResourceLayout::DEPTH_STENCIL_READ_ONLY);
 
             // Setup attachment
             jRenderPassInfo renderPassInfo;
             jAttachment color = jAttachment(RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr, EAttachmentLoadStoreOp::CLEAR_STORE
                 , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor
-                , RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetLayout(), EImageLayout::COLOR_ATTACHMENT);
+                , RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetLayout(), EResourceLayout::COLOR_ATTACHMENT);
             renderPassInfo.Attachments.push_back(color);
 
             const int32 DepthAttachmentIndex = (int32)renderPassInfo.Attachments.size();
@@ -1002,7 +1002,7 @@ void jRenderer::PostProcess()
 
             jRenderPassInfo renderPassInfo;
             jAttachment color = jAttachment(InRenderTargetPtr, EAttachmentLoadStoreOp::DONTCARE_STORE
-                , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
+                , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, EResourceLayout::UNDEFINED, EResourceLayout::COLOR_ATTACHMENT);
             renderPassInfo.Attachments.push_back(color);
 
             // Setup subpass of LightingPass
@@ -1060,14 +1060,14 @@ void jRenderer::PostProcess()
                     ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
                         , ResourceInlineAllactor.Alloc<jTextureResource>(InShaderInputs[i], SamplerState)));
 
-                    g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), InShaderInputs[i], EImageLayout::SHADER_READ_ONLY);
+                    g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), InShaderInputs[i], EResourceLayout::SHADER_READ_ONLY);
                 }
 
                 ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
                 ShaderBindingInstanceArray.Add(ShaderBindingInstance.get());
             }
 
-            g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), InRenderTargetPtr->GetTexture(), EImageLayout::COLOR_ATTACHMENT);
+            g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), InRenderTargetPtr->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
 
             jGraphicsPipelineShader Shader;
             {
@@ -1134,10 +1134,10 @@ void jRenderer::PostProcess()
             {
                 jCommandBuffer* CommandBuffer = RenderFrameContextPtr->GetActiveCommandBuffer();
 
-                g_rhi->TransitionImageLayout(CommandBuffer, EyeAdaptationTextureOld, EImageLayout::SHADER_READ_ONLY);
+                g_rhi->TransitionLayout(CommandBuffer, EyeAdaptationTextureOld, EResourceLayout::SHADER_READ_ONLY);
                 //////////////////////////////////////////////////////////////////////////
 
-                g_rhi->TransitionImageLayout(CommandBuffer, SceneRT->ColorPtr->GetTexture(), EImageLayout::SHADER_READ_ONLY);
+                g_rhi->TransitionLayout(CommandBuffer, SceneRT->ColorPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
 
                 SourceRT = SceneRT->ColorPtr->GetTexture();
 
@@ -1145,7 +1145,7 @@ void jRenderer::PostProcess()
                 AddFullQuadPass(szDebugEventTemp, { SourceRT, EyeAdaptationTextureOld }, SceneRT->BloomSetup
                     , jNameStatic("Resource/Shaders/hlsl/fullscreenquad_vs.hlsl"), jNameStatic("Resource/Shaders/hlsl/bloom_and_eyeadaptation_setup_ps.hlsl"));
                 SourceRT = SceneRT->BloomSetup->GetTexture();
-                g_rhi->TransitionImageLayout(CommandBuffer, SourceRT, EImageLayout::SHADER_READ_ONLY);
+                g_rhi->TransitionLayout(CommandBuffer, SourceRT, EResourceLayout::SHADER_READ_ONLY);
 
                 for (int32 i = 0; i < _countof(SceneRT->DownSample); ++i)
                 {
@@ -1154,7 +1154,7 @@ void jRenderer::PostProcess()
                     AddFullQuadPass(szDebugEventTemp, { SourceRT }, SceneRT->DownSample[i]
                         , jNameStatic("Resource/Shaders/hlsl/bloom_down_vs.hlsl"), jNameStatic("Resource/Shaders/hlsl/bloom_down_ps.hlsl"), true);
                     SourceRT = SceneRT->DownSample[i]->GetTexture();
-                    g_rhi->TransitionImageLayout(CommandBuffer, SourceRT, EImageLayout::SHADER_READ_ONLY);
+                    g_rhi->TransitionLayout(CommandBuffer, SourceRT, EResourceLayout::SHADER_READ_ONLY);
                 }
             }
 
@@ -1166,8 +1166,8 @@ void jRenderer::PostProcess()
                 DEBUG_EVENT(RenderFrameContextPtr, szDebugEventTemp);
                 //////////////////////////////////////////////////////////////////////////
                 // Compute Pipeline
-                g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), SourceRT, EImageLayout::SHADER_READ_ONLY);
-                g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), EyeAdaptationTextureCurrent, EImageLayout::UAV);
+                g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), SourceRT, EResourceLayout::SHADER_READ_ONLY);
+                g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), EyeAdaptationTextureCurrent, EResourceLayout::UAV);
 
                 std::shared_ptr<jShaderBindingInstance> CurrentBindingInstance = nullptr;
                 int32 BindingPoint = 0;
@@ -1283,10 +1283,10 @@ void jRenderer::PostProcess()
                     AddFullQuadPass(szDebugEventTemp, { SourceRT }, SceneRT->UpSample[i]
                         , jNameStatic("Resource/Shaders/hlsl/bloom_up_vs.hlsl"), jNameStatic("Resource/Shaders/hlsl/bloom_up_ps.hlsl"), true, UpscaleBloomTintA[i], UpscaleBloomTintB[i]);
                     SourceRT = SceneRT->UpSample[i]->GetTexture();
-                    g_rhi->TransitionImageLayout(CommandBuffer, SourceRT, EImageLayout::SHADER_READ_ONLY);
+                    g_rhi->TransitionLayout(CommandBuffer, SourceRT, EResourceLayout::SHADER_READ_ONLY);
                 }
 
-                g_rhi->TransitionImageLayout(CommandBuffer, EyeAdaptationTextureCurrent, EImageLayout::SHADER_READ_ONLY);
+                g_rhi->TransitionLayout(CommandBuffer, EyeAdaptationTextureCurrent, EResourceLayout::SHADER_READ_ONLY);
             }
         }
         else
@@ -1340,7 +1340,7 @@ void jRenderer::DebugPasses()
 
     jAttachment depth = jAttachment(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr, EAttachmentLoadStoreOp::LOAD_DONTCARE
         , EAttachmentLoadStoreOp::LOAD_DONTCARE, ClearDepth
-        , RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetLayout(), EImageLayout::DEPTH_STENCIL_ATTACHMENT);
+        , RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetLayout(), EResourceLayout::DEPTH_STENCIL_ATTACHMENT);
     jAttachment resolve;
 
     if (UseForwardRenderer)
@@ -1349,7 +1349,7 @@ void jRenderer::DebugPasses()
         {
             resolve = jAttachment(RenderFrameContextPtr->SceneRenderTargetPtr->ResolvePtr, EAttachmentLoadStoreOp::DONTCARE_STORE
                 , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor
-                , EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT, true);
+                , EResourceLayout::UNDEFINED, EResourceLayout::COLOR_ATTACHMENT, true);
         }
     }
 
@@ -1361,7 +1361,7 @@ void jRenderer::DebugPasses()
     {
         jAttachment color = jAttachment(RenderFrameContextPtr->SceneRenderTargetPtr->FinalColorPtr, EAttachmentLoadStoreOp::LOAD_STORE
             , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor
-            , RenderFrameContextPtr->SceneRenderTargetPtr->FinalColorPtr->GetLayout(), EImageLayout::COLOR_ATTACHMENT);
+            , RenderFrameContextPtr->SceneRenderTargetPtr->FinalColorPtr->GetLayout(), EResourceLayout::COLOR_ATTACHMENT);
         renderPassInfo.Attachments.push_back(color);
     }
 
@@ -1543,7 +1543,7 @@ void jRenderer::Render()
                 static const bool IsUseHLSLDynamicResource = false;
 
                 RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr = g_rhi->Create2DTexture((uint32)SCR_WIDTH, (uint32)SCR_HEIGHT, (uint32)1, (uint32)1
-                    , ETextureFormat::RGBA16F, ETextureCreateFlag::UAV, EImageLayout::UAV);
+                    , ETextureFormat::RGBA16F, ETextureCreateFlag::UAV, EResourceLayout::UAV);
             }
 
             // Normal resource
@@ -1769,7 +1769,7 @@ void jRenderer::Render()
             // Binding Raytracing Pipeline State
             RaytracingPipelineState->Bind(RenderFrameContextPtr);
 
-            g_rhi->TransitionImageLayout(CmdBuffer, RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr.get(), EImageLayout::UAV);
+            g_rhi->TransitionLayout(CmdBuffer, RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr.get(), EResourceLayout::UAV);
 
             // Dispatch Rays
             jRaytracingDispatchData TracingData;
@@ -1779,7 +1779,7 @@ void jRenderer::Render()
             TracingData.PipelineState = RaytracingPipelineState;
             g_rhi->DispatchRay(RenderFrameContextPtr, TracingData);
 
-            g_rhi->TransitionImageLayout(CmdBuffer, RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr.get(), EImageLayout::SHADER_READ_ONLY);
+            g_rhi->TransitionLayout(CmdBuffer, RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr.get(), EResourceLayout::SHADER_READ_ONLY);
         }
 
         if (1)
@@ -1790,8 +1790,8 @@ void jRenderer::Render()
             //auto BackBufferRT = std::make_shared<jRenderTarget>(BackBuffer);
             auto RT = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr;
 
-            g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RT->TexturePtr.get(), EImageLayout::COLOR_ATTACHMENT);
-            g_rhi->TransitionImageLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr.get(), EImageLayout::SHADER_READ_ONLY);
+            g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RT->TexturePtr.get(), EResourceLayout::COLOR_ATTACHMENT);
+            g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr.get(), EResourceLayout::SHADER_READ_ONLY);
 
             jRasterizationStateInfo* RasterizationState = nullptr;
             switch (g_rhi->GetSelectedMSAASamples())
@@ -1824,7 +1824,7 @@ void jRenderer::Render()
 
             jRenderPassInfo renderPassInfo;
             jAttachment color = jAttachment(RT, EAttachmentLoadStoreOp::LOAD_STORE
-                , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, EImageLayout::UNDEFINED, EImageLayout::COLOR_ATTACHMENT);
+                , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, EResourceLayout::UNDEFINED, EResourceLayout::COLOR_ATTACHMENT);
             renderPassInfo.Attachments.push_back(color);
 
             jSubpass subpass;

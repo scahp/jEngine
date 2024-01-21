@@ -634,7 +634,7 @@ std::shared_ptr<jTexture> jRHI_Vulkan::CreateTextureFromData(const jImageData* I
 	if (InImageData->TextureType == ETextureType::TEXTURE_CUBE)
 	{
 		TexturePtr = g_rhi->CreateCubeTexture<jTexture_Vulkan>((uint32)InImageData->Width, (uint32)InImageData->Height, MipLevel, InImageData->Format
-			, ETextureCreateFlag::TransferSrc | ETextureCreateFlag::TransferDst | ETextureCreateFlag::UAV, EImageLayout::GENERAL, InImageData->ImageBulkData);
+			, ETextureCreateFlag::TransferSrc | ETextureCreateFlag::TransferDst | ETextureCreateFlag::UAV, EResourceLayout::GENERAL, InImageData->ImageBulkData);
         if (!ensure(TexturePtr))
         {
             return nullptr;
@@ -643,7 +643,7 @@ std::shared_ptr<jTexture> jRHI_Vulkan::CreateTextureFromData(const jImageData* I
 	else
 	{
 		TexturePtr = g_rhi->Create2DTexture<jTexture_Vulkan>((uint32)InImageData->Width, (uint32)InImageData->Height, (uint32)InImageData->LayerCount, MipLevel, InImageData->Format
-			, ETextureCreateFlag::TransferSrc | ETextureCreateFlag::TransferDst | ETextureCreateFlag::UAV, EImageLayout::GENERAL, InImageData->ImageBulkData);
+			, ETextureCreateFlag::TransferSrc | ETextureCreateFlag::TransferDst | ETextureCreateFlag::UAV, EResourceLayout::GENERAL, InImageData->ImageBulkData);
 		if (!ensure(TexturePtr))
 		{
 			return nullptr;
@@ -963,7 +963,7 @@ std::shared_ptr<jRenderTarget> jRHI_Vulkan::CreateRenderTarget(const jRenderTarg
 	switch (info.Type)
 	{
 	case ETextureType::TEXTURE_2D:
-		TexturePtr = g_rhi->Create2DTexture<jTexture_Vulkan>(info.Width, info.Height, 1, mipLevels, info.Format, TextureCreateFlag, EImageLayout::GENERAL);
+		TexturePtr = g_rhi->Create2DTexture<jTexture_Vulkan>(info.Width, info.Height, 1, mipLevels, info.Format, TextureCreateFlag, EResourceLayout::GENERAL);
 		imageViewForMipMap[0] = TexturePtr->View;
 		
 		check(mipLevels > 0);
@@ -973,7 +973,7 @@ std::shared_ptr<jRenderTarget> jRHI_Vulkan::CreateRenderTarget(const jRenderTarg
 		}
 		break;
 	case ETextureType::TEXTURE_2D_ARRAY:
-        TexturePtr = g_rhi->Create2DTexture<jTexture_Vulkan>(info.Width, info.Height, info.LayerCount, mipLevels, info.Format, TextureCreateFlag, EImageLayout::GENERAL);
+        TexturePtr = g_rhi->Create2DTexture<jTexture_Vulkan>(info.Width, info.Height, info.LayerCount, mipLevels, info.Format, TextureCreateFlag, EResourceLayout::GENERAL);
         imageViewForMipMap[0] = TexturePtr->View;
 
         check(mipLevels > 0);
@@ -984,7 +984,7 @@ std::shared_ptr<jRenderTarget> jRHI_Vulkan::CreateRenderTarget(const jRenderTarg
 		break;
 	case ETextureType::TEXTURE_CUBE:
 		check(info.LayerCount == 6);
-		TexturePtr = g_rhi->CreateCubeTexture<jTexture_Vulkan>(info.Width, info.Height, mipLevels, info.Format, TextureCreateFlag, EImageLayout::GENERAL);
+		TexturePtr = g_rhi->CreateCubeTexture<jTexture_Vulkan>(info.Width, info.Height, mipLevels, info.Format, TextureCreateFlag, EResourceLayout::GENERAL);
 
 		// Create for Shader Resource (TextureCube)
 		{
@@ -1221,7 +1221,7 @@ VkMemoryPropertyFlagBits jRHI_Vulkan::GetMemoryPropertyFlagBits(ETextureCreateFl
 }
 
 std::shared_ptr<jTexture> jRHI_Vulkan::Create2DTexture(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag
-    , EImageLayout InImageLayout, const jImageBulkData& InImageBulkData, const jRTClearValue& InClearValue, const wchar_t* InResourceName) const
+    , EResourceLayout InImageLayout, const jImageBulkData& InImageBulkData, const jRTClearValue& InClearValue, const wchar_t* InResourceName) const
 {
 	VkImageCreateFlagBits ImageCreateFlags{};
 	const VkMemoryPropertyFlagBits PropertyFlagBits = GetMemoryPropertyFlagBits(InTextureCreateFlag);
@@ -1240,7 +1240,7 @@ std::shared_ptr<jTexture> jRHI_Vulkan::Create2DTexture(uint32 InWidth, uint32 In
         stagingBufferPtr->UpdateBuffer(&InImageBulkData.ImageData[0], InImageBulkData.ImageData.size());
 
         auto commandBuffer = BeginSingleTimeCommands();
-        ensure(TransitionImageLayout(commandBuffer, TexturePtr.get(), EImageLayout::TRANSFER_DST));
+        ensure(TransitionLayout(commandBuffer, TexturePtr.get(), EResourceLayout::TRANSFER_DST));
 
         if (InImageBulkData.SubresourceFootprints.size() > 0)
         {
@@ -1257,7 +1257,7 @@ std::shared_ptr<jTexture> jRHI_Vulkan::Create2DTexture(uint32 InWidth, uint32 In
             jBufferUtil_Vulkan::CopyBufferToTexture(commandBuffer->GetRef(), stagingBufferPtr->Buffer, stagingBufferPtr->Offset, TexturePtr->Image, InWidth, InHeight);
         }
 
-        ensure(TransitionImageLayout(commandBuffer, TexturePtr.get(), InImageLayout));
+        ensure(TransitionLayout(commandBuffer, TexturePtr.get(), InImageLayout));
 
         EndSingleTimeCommands(commandBuffer);
 	}
@@ -1266,7 +1266,7 @@ std::shared_ptr<jTexture> jRHI_Vulkan::Create2DTexture(uint32 InWidth, uint32 In
 }
 
 std::shared_ptr<jTexture> jRHI_Vulkan::CreateCubeTexture(uint32 InWidth, uint32 InHeight, uint32 InMipLevels, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag
-    , EImageLayout InImageLayout, const jImageBulkData& InImageBulkData, const jRTClearValue& InClearValue, const wchar_t* InResourceName) const
+    , EResourceLayout InImageLayout, const jImageBulkData& InImageBulkData, const jRTClearValue& InClearValue, const wchar_t* InResourceName) const
 {
 	VkImageCreateFlagBits ImageCreateFlags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
     const VkMemoryPropertyFlagBits PropertyFlagBits = GetMemoryPropertyFlagBits(InTextureCreateFlag);
@@ -1285,7 +1285,7 @@ std::shared_ptr<jTexture> jRHI_Vulkan::CreateCubeTexture(uint32 InWidth, uint32 
         stagingBufferPtr->UpdateBuffer(&InImageBulkData.ImageData[0], InImageBulkData.ImageData.size());
 
         auto commandBuffer = BeginSingleTimeCommands();
-        ensure(TransitionImageLayout(commandBuffer, TexturePtr.get(), EImageLayout::TRANSFER_DST));
+        ensure(TransitionLayout(commandBuffer, TexturePtr.get(), EResourceLayout::TRANSFER_DST));
 
         if (InImageBulkData.SubresourceFootprints.size() > 0)
         {
@@ -1302,7 +1302,7 @@ std::shared_ptr<jTexture> jRHI_Vulkan::CreateCubeTexture(uint32 InWidth, uint32 
             jBufferUtil_Vulkan::CopyBufferToTexture(commandBuffer->GetRef(), stagingBufferPtr->Buffer, stagingBufferPtr->Offset, TexturePtr->Image, InWidth, InHeight);
         }
 
-        ensure(TransitionImageLayout(commandBuffer, TexturePtr.get(), InImageLayout));
+        ensure(TransitionLayout(commandBuffer, TexturePtr.get(), InImageLayout));
 
         EndSingleTimeCommands(commandBuffer);
     }
@@ -1527,7 +1527,7 @@ void jRHI_Vulkan::EndSingleTimeCommands(jCommandBuffer* commandBuffer) const
     CommandBufferManager->ReturnCommandBuffer(CommandBuffer_Vulkan);
 }
 
-bool jRHI_Vulkan::TransitionImageLayout(VkCommandBuffer commandBuffer, VkImage image, VkFormat format, uint32 mipLevels, uint32 layoutCount, VkImageLayout oldLayout, VkImageLayout newLayout) const
+bool jRHI_Vulkan::TransitionLayout(VkCommandBuffer commandBuffer, VkImage image, VkFormat format, uint32 mipLevels, uint32 layoutCount, VkImageLayout oldLayout, VkImageLayout newLayout) const
 {
 	if (oldLayout == newLayout)
 		return true;
@@ -1762,7 +1762,7 @@ bool jRHI_Vulkan::TransitionImageLayout(VkCommandBuffer commandBuffer, VkImage i
 	return true;
 }
 
-bool jRHI_Vulkan::TransitionImageLayout(jCommandBuffer* commandBuffer, jTexture* texture, EImageLayout newLayout) const
+bool jRHI_Vulkan::TransitionLayout(jCommandBuffer* commandBuffer, jTexture* texture, EResourceLayout newLayout) const
 {
 	check(commandBuffer);
 	check(texture);
@@ -1770,12 +1770,12 @@ bool jRHI_Vulkan::TransitionImageLayout(jCommandBuffer* commandBuffer, jTexture*
 	auto texture_vk = (jTexture_Vulkan*)texture;
 
 	// VkImageView 가 VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL 를 지원하지 않기 때문에 추가
-	if (texture_vk->IsDepthFormat() && (EImageLayout::DEPTH_READ_ONLY == newLayout || EImageLayout::SHADER_READ_ONLY == newLayout))
+	if (texture_vk->IsDepthFormat() && (EResourceLayout::DEPTH_READ_ONLY == newLayout || EResourceLayout::SHADER_READ_ONLY == newLayout))
 	{
-		newLayout = EImageLayout::DEPTH_STENCIL_READ_ONLY;
+		newLayout = EResourceLayout::DEPTH_STENCIL_READ_ONLY;
 	}
 
-	if (TransitionImageLayout((VkCommandBuffer)commandBuffer->GetHandle(), texture_vk->Image, GetVulkanTextureFormat(texture_vk->Format)
+	if (TransitionLayout((VkCommandBuffer)commandBuffer->GetHandle(), texture_vk->Image, GetVulkanTextureFormat(texture_vk->Format)
 		, texture_vk->MipLevel, texture_vk->LayerCount, GetVulkanImageLayout(texture_vk->Layout), GetVulkanImageLayout(newLayout)))
 	{
 		((jTexture_Vulkan*)texture)->Layout = newLayout;
@@ -1784,7 +1784,7 @@ bool jRHI_Vulkan::TransitionImageLayout(jCommandBuffer* commandBuffer, jTexture*
 	return false;
 }
 
-bool jRHI_Vulkan::TransitionImageLayoutImmediate(jTexture* texture, EImageLayout newLayout) const
+bool jRHI_Vulkan::TransitionLayoutImmediate(jTexture* texture, EResourceLayout newLayout) const
 {
     auto commandBuffer = BeginSingleTimeCommands();
     check(commandBuffer);
@@ -1794,7 +1794,7 @@ bool jRHI_Vulkan::TransitionImageLayoutImmediate(jTexture* texture, EImageLayout
 		check(texture);
 
 		auto texture_vk = (jTexture_Vulkan*)texture;
-		const bool ret = TransitionImageLayout(commandBuffer->GetRef(), texture_vk->Image, GetVulkanTextureFormat(texture_vk->Format)
+		const bool ret = TransitionLayout(commandBuffer->GetRef(), texture_vk->Image, GetVulkanTextureFormat(texture_vk->Format)
 			, texture_vk->MipLevel, 1, GetVulkanImageLayout(texture_vk->Layout), GetVulkanImageLayout(newLayout));
 		if (ret)
 			((jTexture_Vulkan*)texture)->Layout = newLayout;
@@ -1804,6 +1804,16 @@ bool jRHI_Vulkan::TransitionImageLayoutImmediate(jTexture* texture, EImageLayout
 	}
 
 	return false;
+}
+
+bool jRHI_Vulkan::TransitionLayout(jCommandBuffer* commandBuffer, jBuffer* buffer, EResourceLayout newLayout) const
+{
+	return true;
+}
+
+bool jRHI_Vulkan::TransitionLayoutImmediate(jBuffer* buffer, EResourceLayout newLayout) const
+{
+	return true;
 }
 
 jPipelineStateInfo* jRHI_Vulkan::CreatePipelineStateInfo(const jPipelineStateFixedInfo* InPipelineStateFixed, const jGraphicsPipelineShader InShader, const jVertexBufferArray& InVertexBufferArray
@@ -1900,7 +1910,7 @@ jTexture* jRHI_Vulkan::CreateSampleVRSTexture()
 		auto stagingBufferPtr = jBufferUtil_Vulkan::CreateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT, imageSize);
 
 		auto commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
-        ensure(g_rhi_vk->TransitionImageLayout(commandBuffer->GetRef(), (VkImage)SampleVRSTexturePtr->GetHandle(), GetVulkanTextureFormat(ETextureFormat::R8UI), 1, 1, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
+        ensure(g_rhi_vk->TransitionLayout(commandBuffer->GetRef(), (VkImage)SampleVRSTexturePtr->GetHandle(), GetVulkanTextureFormat(ETextureFormat::R8UI), 1, 1, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
 
         jBufferUtil_Vulkan::CopyBufferToTexture(commandBuffer->GetRef(), stagingBufferPtr->Buffer, stagingBufferPtr->Offset, (VkImage)SampleVRSTexturePtr->GetHandle()
             , static_cast<uint32>(imageExtent.width), static_cast<uint32>(imageExtent.height));
@@ -2037,7 +2047,7 @@ jRaytracingScene* jRHI_Vulkan::CreateRaytracingScene() const
 	return new jRaytracingScene_Vulkan();
 }
 
-std::shared_ptr<jBuffer> jRHI_Vulkan::CreateBufferInternal(uint64 InSize, uint64 InAlignment, EBufferCreateFlag InBufferCreateFlag, EImageLayout InInitialState
+std::shared_ptr<jBuffer> jRHI_Vulkan::CreateBufferInternal(uint64 InSize, uint64 InAlignment, EBufferCreateFlag InBufferCreateFlag, EResourceLayout InInitialState
 	, const void* InData, uint64 InDataSize, const wchar_t* InResourceName) const
 {
 	if (InAlignment > 0)
@@ -2101,7 +2111,7 @@ std::shared_ptr<jBuffer> jRHI_Vulkan::CreateBufferInternal(uint64 InSize, uint64
 		}
 		else
 		{
-			auto stagingBufferPtr = g_rhi->CreateRawBuffer<jBuffer_Vulkan>(InDataSize, InAlignment, EBufferCreateFlag::CPUAccess, EImageLayout::TRANSFER_SRC, InData, InDataSize, TEXT("StagingBuffer"));
+			auto stagingBufferPtr = g_rhi->CreateRawBuffer<jBuffer_Vulkan>(InDataSize, InAlignment, EBufferCreateFlag::CPUAccess, EResourceLayout::TRANSFER_SRC, InData, InDataSize, TEXT("StagingBuffer"));
 			jBufferUtil_Vulkan::CopyBuffer(*stagingBufferPtr, *Buffer_Vulkan, InDataSize);
 		}
     }
@@ -2109,19 +2119,19 @@ std::shared_ptr<jBuffer> jRHI_Vulkan::CreateBufferInternal(uint64 InSize, uint64
 }
 
 std::shared_ptr<jBuffer> jRHI_Vulkan::CreateStructuredBuffer(uint64 InSize, uint64 InAlignment, uint64 InStride
-	, EBufferCreateFlag InBufferCreateFlag, EImageLayout InInitialState, const void* InData, uint64 InDataSize , const wchar_t* InResourceName) const
+	, EBufferCreateFlag InBufferCreateFlag, EResourceLayout InInitialState, const void* InData, uint64 InDataSize , const wchar_t* InResourceName) const
 {
 	return CreateBufferInternal(InSize, InAlignment, InBufferCreateFlag, InInitialState, InData, InDataSize, InResourceName);
 }
 
 std::shared_ptr<jBuffer> jRHI_Vulkan::CreateRawBuffer(uint64 InSize, uint64 InAlignment, EBufferCreateFlag InBufferCreateFlag
-	, EImageLayout InInitialState, const void* InData, uint64 InDataSize , const wchar_t* InResourceName) const
+	, EResourceLayout InInitialState, const void* InData, uint64 InDataSize , const wchar_t* InResourceName) const
 {
 	return CreateBufferInternal(InSize, InAlignment, InBufferCreateFlag, InInitialState, InData, InDataSize, InResourceName);
 }
 
 std::shared_ptr<jBuffer> jRHI_Vulkan::CreateFormattedBuffer(uint64 InSize, uint64 InAlignment, ETextureFormat InFormat
-	, EBufferCreateFlag InBufferCreateFlag, EImageLayout InInitialState, const void* InData, uint64 InDataSize , const wchar_t* InResourceName) const
+	, EBufferCreateFlag InBufferCreateFlag, EResourceLayout InInitialState, const void* InData, uint64 InDataSize , const wchar_t* InResourceName) const
 {
 	return CreateBufferInternal(InSize, InAlignment, InBufferCreateFlag, InInitialState, InData, InDataSize, InResourceName);
 }

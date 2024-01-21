@@ -543,7 +543,7 @@ void* jPipelineStateInfo_Vulkan::CreateRaytracingPipelineState()
     {
         // Create buffer to hold all shader handles for the SBT
         const uint32 handleCount = (uint32)raygenGroups.size();
-        RaygenBuffer = g_rhi->CreateRawBuffer<jBuffer_Vulkan>(AlignedBaseGroupHandleSize* handleCount, 0, EBufferCreateFlag::CPUAccess | EBufferCreateFlag::ShaderBindingTable, EImageLayout::GENERAL);
+        RaygenBuffer = g_rhi->CreateRawBuffer<jBuffer_Vulkan>(AlignedBaseGroupHandleSize* handleCount, 0, EBufferCreateFlag::CPUAccess | EBufferCreateFlag::ShaderBindingTable, EResourceLayout::GENERAL);
         RaygenStridedDeviceAddressRegion = getSbtEntryStridedDeviceAddressRegion(RaygenBuffer.get(), handleCount);
         RaygenBuffer->Map();
     }
@@ -551,7 +551,7 @@ void* jPipelineStateInfo_Vulkan::CreateRaytracingPipelineState()
     {
         // Create buffer to hold all shader handles for the SBT
         const uint32 handleCount = (uint32)missGroups.size();
-        MissBuffer = g_rhi->CreateRawBuffer<jBuffer_Vulkan>(AlignedBaseGroupHandleSize * handleCount, 0, EBufferCreateFlag::CPUAccess | EBufferCreateFlag::ShaderBindingTable, EImageLayout::GENERAL);
+        MissBuffer = g_rhi->CreateRawBuffer<jBuffer_Vulkan>(AlignedBaseGroupHandleSize * handleCount, 0, EBufferCreateFlag::CPUAccess | EBufferCreateFlag::ShaderBindingTable, EResourceLayout::GENERAL);
         MissStridedDeviceAddressRegion = getSbtEntryStridedDeviceAddressRegion(MissBuffer.get(), handleCount);
         MissBuffer->Map();
     }
@@ -559,7 +559,7 @@ void* jPipelineStateInfo_Vulkan::CreateRaytracingPipelineState()
     {
         // Create buffer to hold all shader handles for the SBT
         const uint32 handleCount = (uint32)hitGroups.size();
-        HitGroupBuffer = g_rhi->CreateRawBuffer<jBuffer_Vulkan>(AlignedBaseGroupHandleSize * handleCount, 0, EBufferCreateFlag::CPUAccess | EBufferCreateFlag::ShaderBindingTable, EImageLayout::GENERAL);
+        HitGroupBuffer = g_rhi->CreateRawBuffer<jBuffer_Vulkan>(AlignedBaseGroupHandleSize * handleCount, 0, EBufferCreateFlag::CPUAccess | EBufferCreateFlag::ShaderBindingTable, EResourceLayout::GENERAL);
         HitStridedDeviceAddressRegion = getSbtEntryStridedDeviceAddressRegion(HitGroupBuffer.get(), handleCount);
         HitGroupBuffer->Map();
     };

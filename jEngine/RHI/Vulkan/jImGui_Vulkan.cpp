@@ -115,9 +115,9 @@ void jImGUI_Vulkan::Initialize(float width, float height)
     stagingBuffer->UpdateBuffer(fontData, uploadSize);
 
     // Copy buffer data to font image
-    g_rhi_vk->TransitionImageLayoutImmediate(FontImagePtr.get(), EImageLayout::TRANSFER_DST);
+    g_rhi_vk->TransitionLayoutImmediate(FontImagePtr.get(), EResourceLayout::TRANSFER_DST);
     jBufferUtil_Vulkan::CopyBufferToTexture(stagingBuffer->Buffer, stagingBuffer->Offset, FontImagePtr->Image, texWidth, texHeight);
-    g_rhi_vk->TransitionImageLayoutImmediate(FontImagePtr.get(), EImageLayout::SHADER_READ_ONLY);
+    g_rhi_vk->TransitionLayoutImmediate(FontImagePtr.get(), EResourceLayout::SHADER_READ_ONLY);
     //////////////////////////////////////////////////////////////////////////
 
     DynamicBufferData.resize(g_rhi_vk->Swapchain->GetNumOfSwapchain());
@@ -238,7 +238,7 @@ void jImGUI_Vulkan::UpdateBuffers()
     {
         const uint64 newBufferSize = imDrawData->TotalVtxCount * sizeof(ImDrawVert);
         DynamicBuffer.VertexBufferPtr = g_rhi->CreateRawBuffer<jBuffer_Vulkan>(newBufferSize, 0
-            , EBufferCreateFlag::VertexBuffer | EBufferCreateFlag::CPUAccess, EImageLayout::GENERAL);
+            , EBufferCreateFlag::VertexBuffer | EBufferCreateFlag::CPUAccess, EResourceLayout::GENERAL);
         DynamicBuffer.VertexBufferPtr->Map();
         DynamicBuffer.vertexCount = imDrawData->TotalVtxCount;
     }
@@ -249,7 +249,7 @@ void jImGUI_Vulkan::UpdateBuffers()
         const uint64 newBufferSize = imDrawData->TotalIdxCount * sizeof(ImDrawIdx);
 
         DynamicBuffer.IndexBufferPtr = g_rhi->CreateRawBuffer<jBuffer_Vulkan>(newBufferSize, 0
-            , EBufferCreateFlag::IndexBuffer | EBufferCreateFlag::CPUAccess, EImageLayout::GENERAL);
+            , EBufferCreateFlag::IndexBuffer | EBufferCreateFlag::CPUAccess, EResourceLayout::GENERAL);
         DynamicBuffer.IndexBufferPtr->Map();
         DynamicBuffer.indexCount = imDrawData->TotalIdxCount;
     }
@@ -286,10 +286,10 @@ void jImGUI_Vulkan::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFra
         const auto& image = g_rhi_vk->Swapchain->GetSwapchainImage(InRenderFrameContextPtr->FrameIndex);
 
         const auto& FinalColorPtr = InRenderFrameContextPtr->SceneRenderTargetPtr->FinalColorPtr;
-        g_rhi->TransitionImageLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), FinalColorPtr->GetTexture(), EImageLayout::COLOR_ATTACHMENT);
+        g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), FinalColorPtr->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
 
         jAttachment color = jAttachment(FinalColorPtr, EAttachmentLoadStoreOp::LOAD_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f)
-            , FinalColorPtr->GetLayout(), EImageLayout::PRESENT_SRC);
+            , FinalColorPtr->GetLayout(), EResourceLayout::PRESENT_SRC);
 
         RenderPass = g_rhi_vk->GetOrCreateRenderPass({ color }, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
         PiplineStateInfo = (jPipelineStateInfo_Vulkan*)CreatePipelineState(RenderPass, g_rhi_vk->GraphicsQueue.Queue);
