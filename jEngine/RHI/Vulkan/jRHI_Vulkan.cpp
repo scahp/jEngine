@@ -634,7 +634,7 @@ std::shared_ptr<jTexture> jRHI_Vulkan::CreateTextureFromData(const jImageData* I
 	if (InImageData->TextureType == ETextureType::TEXTURE_CUBE)
 	{
 		TexturePtr = g_rhi->CreateCubeTexture<jTexture_Vulkan>((uint32)InImageData->Width, (uint32)InImageData->Height, MipLevel, InImageData->Format
-			, ETextureCreateFlag::TransferSrc | ETextureCreateFlag::TransferDst | ETextureCreateFlag::UAV, EResourceLayout::GENERAL, InImageData->ImageBulkData);
+			, ETextureCreateFlag::TransferSrc | ETextureCreateFlag::TransferDst | ETextureCreateFlag::UAV, EResourceLayout::SHADER_READ_ONLY, InImageData->ImageBulkData);
         if (!ensure(TexturePtr))
         {
             return nullptr;
@@ -643,7 +643,7 @@ std::shared_ptr<jTexture> jRHI_Vulkan::CreateTextureFromData(const jImageData* I
 	else
 	{
 		TexturePtr = g_rhi->Create2DTexture<jTexture_Vulkan>((uint32)InImageData->Width, (uint32)InImageData->Height, (uint32)InImageData->LayerCount, MipLevel, InImageData->Format
-			, ETextureCreateFlag::TransferSrc | ETextureCreateFlag::TransferDst | ETextureCreateFlag::UAV, EResourceLayout::GENERAL, InImageData->ImageBulkData);
+			, ETextureCreateFlag::TransferSrc | ETextureCreateFlag::TransferDst | ETextureCreateFlag::UAV, EResourceLayout::SHADER_READ_ONLY, InImageData->ImageBulkData);
 		if (!ensure(TexturePtr))
 		{
 			return nullptr;
