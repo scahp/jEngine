@@ -1155,11 +1155,11 @@ std::shared_ptr<jTexture> jRHI_DX12::Create2DTexture(uint32 InWidth, uint32 InHe
         jCommandBuffer_DX12* commandList = BeginSingleTimeCopyCommands();
         if (InImageBulkData.SubresourceFootprints.size() > 0)
         {
-            jBufferUtil_DX12::CopyBufferToTexture(commandList->Get(), BufferPtr->Buffer->Get(), TexturePtr->Image->Get(), InImageBulkData.SubresourceFootprints);
+            jBufferUtil_DX12::CopyBufferToTexture(commandList->Get(), BufferPtr->Buffer->Get(), TexturePtr->Texture->Get(), InImageBulkData.SubresourceFootprints);
         }
         else
         {
-            jBufferUtil_DX12::CopyBufferToTexture(commandList->Get(), BufferPtr->Buffer->Get(), 0, TexturePtr->Image->Get());
+            jBufferUtil_DX12::CopyBufferToTexture(commandList->Get(), BufferPtr->Buffer->Get(), 0, TexturePtr->Texture->Get());
         }
 
         EndSingleTimeCopyCommands(commandList);
@@ -1181,11 +1181,11 @@ std::shared_ptr<jTexture> jRHI_DX12::CreateCubeTexture(uint32 InWidth, uint32 In
         jCommandBuffer_DX12* commandList = BeginSingleTimeCopyCommands();
         if (InImageBulkData.SubresourceFootprints.size() > 0)
         {
-            jBufferUtil_DX12::CopyBufferToTexture(commandList->Get(), BufferPtr->Buffer->Get(), TexturePtr->Image->Get(), InImageBulkData.SubresourceFootprints);
+            jBufferUtil_DX12::CopyBufferToTexture(commandList->Get(), BufferPtr->Buffer->Get(), TexturePtr->Texture->Get(), InImageBulkData.SubresourceFootprints);
         }
         else
         {
-            jBufferUtil_DX12::CopyBufferToTexture(commandList->Get(), BufferPtr->Buffer->Get(), 0, TexturePtr->Image->Get());
+            jBufferUtil_DX12::CopyBufferToTexture(commandList->Get(), BufferPtr->Buffer->Get(), 0, TexturePtr->Texture->Get());
         }
 
         EndSingleTimeCopyCommands(commandList);
@@ -1372,7 +1372,7 @@ bool jRHI_DX12::TransitionLayout(jCommandBuffer* commandBuffer, jTexture* textur
         return true;
 
     Texture_DX12->Layout = newLayout;
-    return TransitionLayout_Internal(commandBuffer, Texture_DX12->Image->Get(), SrcLayout, DstLayout);
+    return TransitionLayout_Internal(commandBuffer, Texture_DX12->Texture->Get(), SrcLayout, DstLayout);
 }
 
 bool jRHI_DX12::TransitionLayoutImmediate(jTexture* texture, EResourceLayout newLayout) const
@@ -1386,20 +1386,72 @@ bool jRHI_DX12::TransitionLayoutImmediate(jTexture* texture, EResourceLayout new
         if (SrcLayout == DstLayout)
             return true;
 
-        jCommandBuffer_DX12* commandBuffer = const_cast<jRHI_DX12*>(this)->BeginSingleTimeCommands();
+        jCommandBuffer_DX12* commandBuffer = BeginSingleTimeCommands();
         check(commandBuffer);
 
         if (commandBuffer)
         {
-            const bool ret = TransitionLayout_Internal(commandBuffer, Texture_DX12->Image->Get(), SrcLayout, DstLayout);
+            const bool ret = TransitionLayout_Internal(commandBuffer, Texture_DX12->Texture->Get(), SrcLayout, DstLayout);
             Texture_DX12->Layout = newLayout;
 
-            const_cast<jRHI_DX12*>(this)->EndSingleTimeCommands(commandBuffer);
+            EndSingleTimeCommands(commandBuffer);
             return ret;
         }
     }
 
     return false;
+}
+
+void jRHI_DX12::UAVBarrier(jCommandBuffer* commandBuffer, jTexture* texture) const
+{
+    check(commandBuffer);
+    auto commandBuffer_DX12 = (jCommandBuffer_DX12*)commandBuffer;
+    auto texture_dx12 = (jTexture_DX12*)texture;
+    check(texture_dx12->Texture);
+
+    D3D12_RESOURCE_BARRIER uavBarrier = {};
+    uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+    uavBarrier.UAV.pResource = texture_dx12->Texture->Get();
+    check(uavBarrier.UAV.pResource);
+    commandBuffer_DX12->CommandList->ResourceBarrier(1, &uavBarrier);
+}
+
+void jRHI_DX12::UAVBarrier(jCommandBuffer* commandBuffer, jBuffer* buffer) const
+{
+    check(commandBuffer);
+    auto commandBuffer_DX12 = (jCommandBuffer_DX12*)commandBuffer;
+    auto buffer_dx12 = (jBuffer_DX12*)buffer;
+    check(buffer_dx12->Buffer);
+
+    D3D12_RESOURCE_BARRIER uavBarrier = {};
+    uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+    uavBarrier.UAV.pResource = buffer_dx12->Buffer->Get();
+    check(uavBarrier.UAV.pResource);
+    commandBuffer_DX12->CommandList->ResourceBarrier(1, &uavBarrier);
+}
+
+void jRHI_DX12::UAVBarrierImmediate(jTexture* texture) const
+{
+    jCommandBuffer_DX12* commandBuffer = BeginSingleTimeCommands();
+    check(commandBuffer);
+
+    if (commandBuffer)
+    {
+        UAVBarrier(commandBuffer, texture);
+        EndSingleTimeCommands(commandBuffer);
+    }
+}
+
+void jRHI_DX12::UAVBarrierImmediate(jBuffer* buffer) const
+{
+    jCommandBuffer_DX12* commandBuffer = BeginSingleTimeCommands();
+    check(commandBuffer);
+
+    if (commandBuffer)
+    {
+        UAVBarrier(commandBuffer, buffer);
+        EndSingleTimeCommands(commandBuffer);
+    }
 }
 
 bool jRHI_DX12::TransitionLayout(jCommandBuffer* commandBuffer, jBuffer* buffer, EResourceLayout newLayout) const
@@ -1429,7 +1481,7 @@ bool jRHI_DX12::TransitionLayoutImmediate(jBuffer* buffer, EResourceLayout newLa
         if (SrcLayout == DstLayout)
             return true;
 
-        jCommandBuffer_DX12* commandBuffer = const_cast<jRHI_DX12*>(this)->BeginSingleTimeCommands();
+        jCommandBuffer_DX12* commandBuffer = BeginSingleTimeCommands();
         check(commandBuffer);
 
         if (commandBuffer)
@@ -1437,7 +1489,7 @@ bool jRHI_DX12::TransitionLayoutImmediate(jBuffer* buffer, EResourceLayout newLa
             const bool ret = TransitionLayout_Internal(commandBuffer, Buffer_DX12->Buffer->Get(), SrcLayout, DstLayout);
             Buffer_DX12->Layout = newLayout;
 
-            const_cast<jRHI_DX12*>(this)->EndSingleTimeCommands(commandBuffer);
+            EndSingleTimeCommands(commandBuffer);
             return ret;
         }
     }

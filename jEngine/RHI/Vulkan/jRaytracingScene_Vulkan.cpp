@@ -182,7 +182,11 @@ void jRaytracingScene_Vulkan::CreateOrUpdateTLAS(const jRatracingInitializer& In
 
     const bool IsUpdate = !!ScratchTLASBufferPtr;
 
-    if (!IsUpdate)
+    if (IsUpdate)
+    {
+        g_rhi->UAVBarrier(CmdBuffer, GetTLASBuffer<jBuffer_Vulkan>());
+    }
+    else
     {
         InstanceUploadBufferPtr = g_rhi->CreateStructuredBuffer(sizeof(VkAccelerationStructureInstanceKHR) * InstanceList.size()
             , sizeof(VkAccelerationStructureInstanceKHR), sizeof(VkAccelerationStructureInstanceKHR)

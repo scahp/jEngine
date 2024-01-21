@@ -141,10 +141,7 @@ void jRaytracingScene_DX12::CreateOrUpdateTLAS(const jRatracingInitializer& InIn
     const bool IsUpdate = !!ScratchTLASBufferPtr;
     if (IsUpdate)
     {
-        D3D12_RESOURCE_BARRIER uavBarrier = {};
-        uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-        uavBarrier.UAV.pResource = GetTLASBuffer<jBuffer_DX12>()->Buffer->Get();
-        CmdBuffer->CommandList->ResourceBarrier(1, &uavBarrier);
+        g_rhi->UAVBarrier(CmdBuffer, GetTLASBuffer<jBuffer_DX12>());
     }
     else
     {

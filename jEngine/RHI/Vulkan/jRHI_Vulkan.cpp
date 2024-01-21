@@ -1906,6 +1906,70 @@ bool jRHI_Vulkan::TransitionLayoutImmediate(jTexture* texture, EResourceLayout n
 	return true;
 }
 
+void jRHI_Vulkan::UAVBarrier(jCommandBuffer* commandBuffer, jTexture* /*texture*/) const
+{
+	auto commandbuffer_vk = (jCommandBuffer_Vulkan*)commandBuffer;
+
+	VkMemoryBarrier barrier{};
+	barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+	barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+	barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+    vkCmdPipelineBarrier(commandbuffer_vk->GetRef()
+        , VK_ACCESS_SHADER_WRITE_BIT
+        , VK_ACCESS_SHADER_WRITE_BIT
+        , 0
+        // 아래 3가지 부분은 이번에 사용할 memory, buffer, image  barrier 의 개수가 배열을 중 하나를 명시
+        , 1, &barrier
+        , 0, nullptr
+        , 0, nullptr
+    );
+}
+
+void jRHI_Vulkan::UAVBarrier(jCommandBuffer* commandBuffer, jBuffer* /*buffer*/) const
+{
+    auto commandbuffer_vk = (jCommandBuffer_Vulkan*)commandBuffer;
+
+    VkMemoryBarrier barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+    barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+    vkCmdPipelineBarrier(commandbuffer_vk->GetRef()
+        , VK_ACCESS_SHADER_WRITE_BIT
+        , VK_ACCESS_SHADER_WRITE_BIT
+        , 0
+        // 아래 3가지 부분은 이번에 사용할 memory, buffer, image  barrier 의 개수가 배열을 중 하나를 명시
+        , 1, &barrier
+        , 0, nullptr
+        , 0, nullptr
+    );
+}
+
+void jRHI_Vulkan::UAVBarrierImmediate(jTexture* texture) const
+{
+    auto commandBuffer = BeginSingleTimeCommands();
+    check(commandBuffer);
+
+    if (commandBuffer)
+    {
+        UAVBarrier(commandBuffer, texture);
+        EndSingleTimeCommands(commandBuffer);
+    }
+}
+
+void jRHI_Vulkan::UAVBarrierImmediate(jBuffer* buffer) const
+{
+    auto commandBuffer = BeginSingleTimeCommands();
+    check(commandBuffer);
+
+    if (commandBuffer)
+    {
+        UAVBarrier(commandBuffer, buffer);
+        EndSingleTimeCommands(commandBuffer);
+    }
+}
+
 bool jRHI_Vulkan::TransitionLayout(jCommandBuffer* commandBuffer, jBuffer* buffer, EResourceLayout newLayout) const
 {
     check(commandBuffer);
@@ -1918,7 +1982,7 @@ bool jRHI_Vulkan::TransitionLayout(jCommandBuffer* commandBuffer, jBuffer* buffe
         return true;
 
     auto buffer_vk = (jBuffer_Vulkan*)buffer;
-    if (TransitionLayout((VkCommandBuffer)commandBuffer->GetHandle(), buffer_vk->Buffer, buffer_vk->Offset, buffer_vk->AllocatedSize, SrcLayout, DstLayout))
+    if (TransitionLayout((VkCommandBuffer)commandBuffer->GetHandle(), buffer_vk->Buffer, buffer_vk->Offset, buffer_vk->RealBufferSize, SrcLayout, DstLayout))
     {
 		buffer_vk->Layout = newLayout;
         return true;
@@ -1940,7 +2004,7 @@ bool jRHI_Vulkan::TransitionLayoutImmediate(jBuffer* buffer, EResourceLayout new
         if (commandBuffer)
         {
             auto buffer_vk = (jBuffer_Vulkan*)buffer;
-            const bool ret = TransitionLayout(commandBuffer->GetRef(), buffer_vk->Buffer, buffer_vk->Offset, buffer_vk->AllocatedSize, SrcLayout, DstLayout);
+            const bool ret = TransitionLayout(commandBuffer->GetRef(), buffer_vk->Buffer, buffer_vk->Offset, buffer_vk->RealBufferSize, SrcLayout, DstLayout);
 
             EndSingleTimeCommands(commandBuffer);
             return ret;
