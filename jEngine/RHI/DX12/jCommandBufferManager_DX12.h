@@ -76,6 +76,7 @@ private:
 
     jCommandBuffer_DX12* CreateCommandList() const;
 
+    jMutexLock CommandListLock;
     std::vector<jCommandBuffer_DX12*> AvailableCommandLists;
     mutable std::vector<jCommandBuffer_DX12*> UsingCommandBuffers;
 

@@ -22,16 +22,6 @@
 #include "jSceneRenderTargets.h"
 #include "jSpotLightDrawCommandGenerator.h"
 
-// todo : Remove this platform specific headers
-#include "RHI/DX12/jBufferUtil_DX12.h"
-#include "RHI/Vulkan/jBufferUtil_Vulkan.h"
-#include "RHI/Vulkan/jTexture_Vulkan.h"
-#include "RHI/DX12/jTexture_DX12.h"
-
-ComPtr<ID3D12RootSignature> jRenderer::m_raytracingGlobalRootSignature;
-ComPtr<ID3D12RootSignature> jRenderer::m_raytracingLocalRootSignature;
-ComPtr<ID3D12RootSignature> jRenderer::m_raytracingEmptyLocalRootSignature;
-
 #define ASYNC_WITH_SETUP 0
 #define PARALLELFOR_WITH_PASSSETUP 0
 
@@ -208,7 +198,7 @@ void jRenderer::SetupShadowPass()
                 // iter->MaterialPtr;
 
                 const bool ShouldUseOnePassPointLightShadow = (ViewLight.Light->Type == ELightType::POINT);
-                const jVertexBuffer* OverrideInstanceData = (ShouldUseOnePassPointLightShadow ? jRHI::CubeMapInstanceDataForSixFace : nullptr);
+                const jVertexBuffer* OverrideInstanceData = (ShouldUseOnePassPointLightShadow ? jRHI::CubeMapInstanceDataForSixFace.get() : nullptr);
 
                 new (&ShadowPasses.DrawCommands[InIndex]) jDrawCommand(RenderFrameContextPtr, &ShadowPasses.ViewLight, InRenderObject, ShadowPasses.ShadowMapRenderPass
                     , (InRenderObject->HasInstancing() ? ShadowInstancingShader : ShadowShader), &ShadpwPipelineStateFixed, Material, {}, nullptr, OverrideInstanceData);
@@ -1275,7 +1265,7 @@ void jRenderer::PostProcess()
                     Vector::OneVector
                 };
 
-                jCommandBuffer_DX12* CommandBuffer = (jCommandBuffer_DX12*)RenderFrameContextPtr->GetActiveCommandBuffer();
+                auto CommandBuffer = (jCommandBuffer*)RenderFrameContextPtr->GetActiveCommandBuffer();
                 for (int32 i = 0; i < _countof(SceneRT->UpSample); ++i)
                 {
                     const auto& RTInfo = SceneRT->UpSample[i]->Info;
@@ -1481,12 +1471,11 @@ void jRenderer::Render()
 
         {
             auto CmdBuffer = RenderFrameContextPtr->GetActiveCommandBuffer();
-            auto CmdBufferDX12 = (jCommandBuffer_DX12*)CmdBuffer;
 
             const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
                 , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT
                 , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
-            const jSamplerStateInfo* PBRSamplerStateInfoDX12 = TSamplerStateInfo<ETextureFilter::NEAREST_MIPMAP_LINEAR, ETextureFilter::NEAREST_MIPMAP_LINEAR
+            const jSamplerStateInfo* PBRSamplerStateInfo = TSamplerStateInfo<ETextureFilter::NEAREST_MIPMAP_LINEAR, ETextureFilter::NEAREST_MIPMAP_LINEAR
                 , ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
                 , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
 
@@ -1559,7 +1548,7 @@ void jRenderer::Render()
             ShaderBindingArray.Add(jShaderBinding::Create(3, 1, EShaderBindingType::SAMPLER, EShaderAccessStageFlag::ALL_RAYTRACING,
                 ResourceInlineAllactor.Alloc<jSamplerResource>(SamplerState), false));
             ShaderBindingArray.Add(jShaderBinding::Create(4, 1, EShaderBindingType::SAMPLER, EShaderAccessStageFlag::ALL_RAYTRACING,
-                ResourceInlineAllactor.Alloc<jSamplerResource>(PBRSamplerStateInfoDX12), false));
+                ResourceInlineAllactor.Alloc<jSamplerResource>(PBRSamplerStateInfo), false));
 
 #define TURN_ON_BINDLESS 1
 #define TURN_ON_SHADOW 1
@@ -1604,9 +1593,9 @@ void jRenderer::Render()
                 VertexBuffers.push_back(RObj->GeometryDataPtr->VertexBufferPtr->GetBuffer(0));
 
                 check(RObj->MaterialPtr);
-                AlbedoTextures.push_back(jTextureResourceBindless::jTextureBindData(RObj->MaterialPtr->GetTexture<jTexture_DX12>(jMaterial::EMaterialTextureType::Albedo), nullptr));
-                NormalTextures.push_back(jTextureResourceBindless::jTextureBindData(RObj->MaterialPtr->GetTexture<jTexture_DX12>(jMaterial::EMaterialTextureType::Normal), nullptr));
-                MetallicTextures.push_back(jTextureResourceBindless::jTextureBindData(RObj->MaterialPtr->GetTexture<jTexture_DX12>(jMaterial::EMaterialTextureType::Metallic), nullptr));
+                AlbedoTextures.push_back(jTextureResourceBindless::jTextureBindData(RObj->MaterialPtr->GetTexture<jTexture>(jMaterial::EMaterialTextureType::Albedo), nullptr));
+                NormalTextures.push_back(jTextureResourceBindless::jTextureBindData(RObj->MaterialPtr->GetTexture<jTexture>(jMaterial::EMaterialTextureType::Normal), nullptr));
+                MetallicTextures.push_back(jTextureResourceBindless::jTextureBindData(RObj->MaterialPtr->GetTexture<jTexture>(jMaterial::EMaterialTextureType::Metallic), nullptr));
             }
             BindlessShaderBindingArray[2].Add(jShaderBinding::CreateBindless(0, (uint32)VertexAndInexOffsetBuffers.size(), EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
                 ResourceInlineAllactor.Alloc<jBufferResourceBindless>(VertexAndInexOffsetBuffers), false));
@@ -1740,7 +1729,7 @@ void jRenderer::Render()
             RaytracingPipelineData.MaxAttributeSize = 2 * sizeof(float);	                // float2 barycentrics
             RaytracingPipelineData.MaxPayloadSize = 4 * sizeof(float) + sizeof(int32);		// float4 color
             RaytracingPipelineData.MaxTraceRecursionDepth = 10;
-            auto RaytracingPipelineState = (jPipelineStateInfo_DX12*)g_rhi->CreateRaytracingPipelineStateInfo(RaytracingShaders, RaytracingPipelineData
+            auto RaytracingPipelineState = g_rhi->CreateRaytracingPipelineStateInfo(RaytracingShaders, RaytracingPipelineData
                 , GlobalShaderBindingLayoutArray, nullptr);
 
             // Binding RaytracingShader resources
@@ -1786,8 +1775,6 @@ void jRenderer::Render()
         {
             static jFullscreenQuadPrimitive* GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
 
-            //auto BackBuffer = g_rhi_dx12->GetSwapchainImage(g_rhi_dx12->CurrentFrameIndex)->TexturePtr;
-            //auto BackBufferRT = std::make_shared<jRenderTarget>(BackBuffer);
             auto RT = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr;
 
             g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RT->TexturePtr.get(), EResourceLayout::COLOR_ATTACHMENT);

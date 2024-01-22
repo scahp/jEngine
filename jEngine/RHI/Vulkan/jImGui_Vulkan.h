@@ -60,6 +60,7 @@ private:
     std::shared_ptr<jVertexBuffer> EmptyVertexBufferPtr;
     jShaderBindingLayout* EmptyShaderBindingLayout = nullptr;
     std::shared_ptr<jPushConstant> PushConstBlockPtr;
+	float MonitorDPIScale = 1.0f;       // Vulkan ImGUI doesn't support DPI correctly, so I handle this here.
 
     bool IsInitialized = false;
 };

@@ -70,6 +70,8 @@ void jCommandBufferManager_Vulkan::Release()
 
 void jCommandBufferManager_Vulkan::ReleaseInternal()
 {
+    jScopedLock s(&CommandListLock);
+
     //// Command buffer pool 을 다시 만들기 보다 있는 커맨드 버퍼 풀을 cleanup 하고 재사용 함.
     //vkFreeCommandBuffers(device, CommandBufferManager.GetPool(), static_cast<uint32>(commandBuffers.size()), commandBuffers.data());
 
@@ -98,6 +100,8 @@ void jCommandBufferManager_Vulkan::ReleaseInternal()
 
 jCommandBuffer* jCommandBufferManager_Vulkan::GetOrCreateCommandBuffer()
 {
+    jScopedLock s(&CommandListLock);
+
     jCommandBuffer* SelectedCommandBuffer = nullptr;
     if (AvailableCommandBuffers.size() > 0)
     {
@@ -147,6 +151,8 @@ jCommandBuffer* jCommandBufferManager_Vulkan::GetOrCreateCommandBuffer()
 
 void jCommandBufferManager_Vulkan::ReturnCommandBuffer(jCommandBuffer* commandBuffer)
 {
+    jScopedLock s(&CommandListLock);
+
     check(commandBuffer);
     for (int32 i = 0; i < UsingCommandBuffers.size(); ++i)
     {

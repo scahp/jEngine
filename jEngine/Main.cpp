@@ -24,6 +24,7 @@ std::vector<VkPipeline> Pipelines;
 int main()
 {
     gCommandLineArgument.Init(GetCommandLineA());
+	GMainThreadID = std::this_thread::get_id();
 
 	g_Engine = new jEngine();
 	g_Engine->PreInit();

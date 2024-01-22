@@ -28,6 +28,10 @@ std::shared_ptr<jCreatedResource> CreateBufferInternal(uint64 InSize, uint64 InA
     }
 
     InSize = (InAlignment > 0) ? Align(InSize, InAlignment) : InSize;
+    if (jRHI_DX12::GIsUsePlacedResource)
+    {
+        InSize = Align(InSize, D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT);
+    }
 
     D3D12_RESOURCE_DESC resourceDesc = { };
     resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
@@ -379,8 +383,6 @@ void CopyBuffer(ID3D12Resource* InSrcBuffer, ID3D12Resource* InDstBuffer, uint64
     g_rhi_dx12->EndSingleTimeCopyCommands(commandBuffer);
 }
 
-const uint64 ConstantBufferAlignment = D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT;
-
 void CreateConstantBufferView(jBuffer_DX12* InBuffer)
 {
     check(g_rhi_dx12);
@@ -392,9 +394,9 @@ void CreateConstantBufferView(jBuffer_DX12* InBuffer)
     check(!InBuffer->CBV.IsValid());
     InBuffer->CBV = g_rhi_dx12->DescriptorHeaps.Alloc();
 
-    D3D12_CONSTANT_BUFFER_VIEW_DESC Desc;
+    D3D12_CONSTANT_BUFFER_VIEW_DESC Desc{};
     Desc.BufferLocation = InBuffer->GetGPUAddress();
-    Desc.SizeInBytes = (uint32)((ConstantBufferAlignment > 0) ? Align(InBuffer->Size, ConstantBufferAlignment) : InBuffer->Size);
+    Desc.SizeInBytes = (uint32)InBuffer->GetAllocatedSize();
 
     g_rhi_dx12->Device->CreateConstantBufferView(&Desc, InBuffer->CBV.CPUHandle);
 }

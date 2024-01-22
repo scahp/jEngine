@@ -55,12 +55,6 @@ TResourcePool<jBlendingStateInfo_DX12, jMutexRWLock> jRHI_DX12::BlendingStatePoo
 TResourcePool<jPipelineStateInfo_DX12, jMutexRWLock> jRHI_DX12::PipelineStatePool;
 TResourcePool<jRenderPass_DX12, jMutexRWLock> jRHI_DX12::RenderPassPool;
 
-bool jRHI_DX12::GIsUsePlacedResource = false;			// PlacedResouce test
-
-constexpr uint32 c_AllowTearing = 0x1;
-constexpr uint32 c_RequireTearingSupport = 0x2;
-constexpr uint32 g_MaxRecursionDepth = 10;
-
 inline float random_double() 
 {
     // Returns a random real in [0,1).
@@ -346,15 +340,11 @@ bool jRHI_DX12::InitRHI()
         if (FAILED(hr) || !allowTearing)
         {
             OutputDebugStringA("WARNING: Variable refresh rate displays are not supported.\n");
-            if (Options & c_RequireTearingSupport)
-            {
-                JASSERT(!L"Error: Sample must be run on an OS with tearing support.\n");
-            }
-            Options &= ~c_AllowTearing;
+            GRHISupportVsync = false;
         }
         else
         {
-            Options |= c_AllowTearing;
+            GRHISupportVsync = true;
         }
     }
 
@@ -946,16 +936,16 @@ void jRHI_DX12::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& rende
     CurrentSwapchainImage->FenceValue = CommandBuffer->Owner->Fence->SignalWithNextFenceValue(CommandBufferManager->GetCommandQueue().Get());
 
     HRESULT hr = S_OK;
-    if (Options & c_AllowTearing)
-    {
-        hr = Swapchain->SwapChain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
-    }
-    else
+    if (g_rhi->IsSupportVSync())
     {
         // 첫번째 아규먼트는 VSync가 될때까지 기다림, 어플리케이션은 다음 VSync까지 잠재운다.
         // 이렇게 하는 것은 렌더링 한 프레임 중 화면에 나오지 못하는 프레임의 cycle을 아끼기 위해서임.
         hr = Swapchain->SwapChain->Present(1, 0);
     }
+    else
+	{
+		hr = Swapchain->SwapChain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
+	}
 
     ensure(hr == S_OK);
 
@@ -1578,6 +1568,13 @@ std::shared_ptr<jBuffer> jRHI_DX12::CreateFormattedBuffer(uint64 InSize, uint64 
     return BufferPtr;
 }
 
+bool jRHI_DX12::IsSupportVSync() const
+{
+    return GRHISupportVsync && GUseVsync;
+}
+
+//////////////////////////////////////////////////////////////////////////
+// jPlacedResourcePool
 void jPlacedResourcePool::Init()
 {
     // The allocator should be able to allocate memory larger than the PlacedResourceSizeThreshold. 

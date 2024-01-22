@@ -40,6 +40,7 @@ struct jPlacedResource
 {
     bool IsValid() const { return Size > 0 && PlacedSubResource.Get(); }
     ComPtr<ID3D12Resource> PlacedSubResource;
+	size_t Offset = 0;
     size_t Size = 0;
 	bool IsUploadResource = false;
 };
@@ -213,7 +214,7 @@ public:
 
     static constexpr uint64 GDefaultPlacedResourceHeapSize = 256 * 1024 * 1024;
 	static constexpr uint64 GPlacedResourceSizeThreshold = 512 * 512 * 4;
-	static bool GIsUsePlacedResource;
+	static constexpr bool GIsUsePlacedResource = true;
 
 	jPlacedResourcePool PlacedResourcePool;
 
@@ -222,9 +223,10 @@ public:
 	{
 		check(Device);
 
-        const D3D12_RESOURCE_ALLOCATION_INFO info = Device->GetResourceAllocationInfo(0, 1, InDesc);
 		if (GIsUsePlacedResource)
 		{
+			const D3D12_RESOURCE_ALLOCATION_INFO info = Device->GetResourceAllocationInfo(0, 1, InDesc);
+
 			jPlacedResource ReusePlacedResource = PlacedResourcePool.Alloc(info.SizeInBytes, false);
 			if (ReusePlacedResource.IsValid())
 			{
@@ -269,9 +271,10 @@ public:
     {
         check(Device);
 
-        const D3D12_RESOURCE_ALLOCATION_INFO info = Device->GetResourceAllocationInfo(0, 1, InDesc);
 		if (GIsUsePlacedResource)
 		{
+			const D3D12_RESOURCE_ALLOCATION_INFO info = Device->GetResourceAllocationInfo(0, 1, InDesc);
+
 			jPlacedResource ReusePlacedUploadResource = PlacedResourcePool.Alloc(info.SizeInBytes, true);
 			if (ReusePlacedUploadResource.IsValid())
 			{
@@ -448,6 +451,8 @@ public:
     virtual std::shared_ptr<jTexture> CreateCubeTexture(uint32 InWidth, uint32 InHeight, uint32 InMipLevels, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag
 		, EResourceLayout InImageLayout = EResourceLayout::UNDEFINED, const jImageBulkData& InImageBulkData = {}, const jRTClearValue& InClearValue = jRTClearValue::Invalid, const wchar_t* InResourceName = nullptr) const override;
 	//////////////////////////////////////////////////////////////////////////
+
+	virtual bool IsSupportVSync() const override;
 };
 
 extern jRHI_DX12* g_rhi_dx12;

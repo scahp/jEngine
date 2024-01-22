@@ -64,7 +64,15 @@ jEngine* g_Engine = nullptr;
 bool GUseRealTimeShaderUpdate = true;
 int32 GMaxCheckCountForRealTimeShaderUpdate = 10;
 int32 GSleepMSForRealTimeShaderUpdate = 100;
+std::thread::id GMainThreadID;
 
+bool IsMainThread()
+{
+    return GMainThreadID == std::this_thread::get_id();
+}
+
+extern bool GRHISupportVsync = false;
+extern bool GUseVsync = false;
 
 #ifdef _DEBUG
 #pragma comment(lib, "Debug/DirectXTex.lib")
