@@ -78,6 +78,7 @@ bool jRHI_Vulkan::InitRHI()
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+	glfwWindowHint(GLFW_SCALE_TO_MONITOR, TRUE);
 
     Window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Vulkan", nullptr, nullptr);
     glfwSetWindowUserPointer(Window, this);
@@ -345,6 +346,22 @@ bool jRHI_Vulkan::InitRHI()
 		vkGetDeviceQueue(Device, GraphicsQueue.QueueIndex, 0, &GraphicsQueue.Queue);
 		vkGetDeviceQueue(Device, ComputeQueue.QueueIndex, 0, &ComputeQueue.Queue);
 		vkGetDeviceQueue(Device, PresentQueue.QueueIndex, 0, &PresentQueue.Queue);
+	}
+
+	// Check if the Vsync support
+	{
+		check(PhysicalDevice);
+		check(Surface);
+		jVulkanDeviceUtil::SwapChainSupportDetails swapChainSupport = jVulkanDeviceUtil::QuerySwapChainSupport(PhysicalDevice, Surface);
+
+		for (auto it : swapChainSupport.PresentModes)
+		{
+			if (it == VK_PRESENT_MODE_IMMEDIATE_KHR)
+			{
+				GRHISupportVsync = true;
+				break;
+			}
+		}
 	}
 
 	MemoryPool = new jMemoryPool_Vulkan();
@@ -1308,6 +1325,11 @@ std::shared_ptr<jTexture> jRHI_Vulkan::CreateCubeTexture(uint32 InWidth, uint32 
     }
 
 	return TexturePtr;
+}
+
+bool jRHI_Vulkan::IsSupportVSync() const
+{
+	return GRHISupportVsync && GUseVsync;
 }
 
 jQuery* jRHI_Vulkan::CreateQueryTime() const

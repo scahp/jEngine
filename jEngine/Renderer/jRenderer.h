@@ -1,7 +1,6 @@
 ﻿#pragma once
 
 #include "jDrawCommand.h"
-#include "RHI/Vulkan/jQueryPoolOcclusion_Vulkan.h"
 
 class jView;
 struct jSceneRenderTarget;
@@ -38,10 +37,6 @@ public:
     jRenderer(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, const jView& InView)
         : RenderFrameContextPtr(InRenderFrameContextPtr), View(InView)
     {}
-
-    static ComPtr<ID3D12RootSignature> m_raytracingGlobalRootSignature;
-    static ComPtr<ID3D12RootSignature> m_raytracingLocalRootSignature;
-    static ComPtr<ID3D12RootSignature> m_raytracingEmptyLocalRootSignature;
 
     virtual ~jRenderer() {}
 

@@ -226,4 +226,10 @@ extern bool GUseRealTimeShaderUpdate;
 extern int32 GMaxCheckCountForRealTimeShaderUpdate;
 extern int32 GSleepMSForRealTimeShaderUpdate;
 
+extern std::thread::id GMainThreadID;
+extern bool IsMainThread();
+
+extern bool GRHISupportVsync;
+extern bool GUseVsync;
+
 #endif //PCH_H

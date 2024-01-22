@@ -68,6 +68,8 @@ bool jCommandBuffer_DX12::End() const
 
 void jCommandBufferManager_DX12::Release()
 {
+    jScopedLock s(&CommandListLock);
+
     for (auto& iter : UsingCommandBuffers)
     {
         iter->GetFence()->WaitForFence();
@@ -87,6 +89,8 @@ void jCommandBufferManager_DX12::Release()
 
 jCommandBuffer_DX12* jCommandBufferManager_DX12::GetOrCreateCommandBuffer()
 {
+    jScopedLock s(&CommandListLock);
+
     jCommandBuffer_DX12* SelectedCmdBuffer = nullptr;
     for (int32 i = 0; i < AvailableCommandLists.size(); ++i)
     {
@@ -111,6 +115,8 @@ jCommandBuffer_DX12* jCommandBufferManager_DX12::GetOrCreateCommandBuffer()
 
 void jCommandBufferManager_DX12::ReturnCommandBuffer(jCommandBuffer* commandBuffer)
 {
+    jScopedLock s(&CommandListLock);
+
     for (int32 i = 0; i < UsingCommandBuffers.size(); ++i)
     {
         if (UsingCommandBuffers[i]->GetHandle() == commandBuffer->GetHandle())
@@ -156,7 +162,6 @@ void jCommandBufferManager_DX12::ExecuteCommandList(jCommandBuffer_DX12* InComma
     if (ensure(InCommandList->Owner->Fence))
     {
         InCommandList->FenceValue = InCommandList->Owner->Fence->SignalWithNextFenceValue(InCommandList->Owner->CommandQueue.Get(), bWaitUntilExecuteComplete);
-        //InCommandList->Fence->SignalWithNextFenceValue(CommandQueue.Get(), bWaitUntilExecuteComplete);
     }
 }
 

@@ -56,10 +56,10 @@ public:
 	// VkInstance를 만들고 바로 Surface를 만들어야 한다. 물리 디바이스 선택에 영향을 미치기 때문
 	// Window에 렌더링할 필요 없으면 그냥 만들지 않고 Offscreen rendering만 해도 됨. (OpenGL은 보이지 않는 창을 만들어야만 함)
 	// 플랫폼 독립적인 구조이지만 Window의 Surface와 연결하려면 HWND or HMODULE 등을 사용해야 하므로 VK_KHR_win32_surface Extension을 사용해서 처리함.
-	VkSurfaceKHR Surface;
+	VkSurfaceKHR Surface = nullptr;
 
 	// 물리 디바이스 - 물리 그래픽 카드를 선택
-	VkPhysicalDevice PhysicalDevice = VK_NULL_HANDLE;
+	VkPhysicalDevice PhysicalDevice = nullptr;
 
 	EMSAASamples SelectedMSAASamples = EMSAASamples::COUNT_1;
 
@@ -273,6 +273,8 @@ public:
     virtual std::shared_ptr<jTexture> CreateCubeTexture(uint32 InWidth, uint32 InHeight, uint32 InMipLevels, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag
         , EResourceLayout InImageLayout = EResourceLayout::UNDEFINED, const jImageBulkData& InImageBulkData = {}, const jRTClearValue& InClearValue = jRTClearValue::Invalid, const wchar_t* InResourceName = nullptr) const override;
     //////////////////////////////////////////////////////////////////////////
+
+	virtual bool IsSupportVSync() const override;
 };
 
 extern jRHI_Vulkan* g_rhi_vk;

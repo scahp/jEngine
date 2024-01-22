@@ -68,7 +68,7 @@ struct jBuffer_DX12 : public jBuffer
     virtual uint64 GetAllocatedSize() const override { return (uint32)Size; }
     virtual uint64 GetBufferSize() const { return (uint32)Size; }
     virtual uint64 GetOffset() const { return Offset; }
-    FORCEINLINE uint64 GetGPUAddress() const { return Buffer->GetGPUVirtualAddress(); }
+    FORCEINLINE uint64 GetGPUAddress() const { return Buffer->GetGPUVirtualAddress() + Offset; }
     virtual EResourceLayout GetLayout() const { return Layout; }
 
     EBufferCreateFlag BufferCreateFlag = EBufferCreateFlag::NONE;

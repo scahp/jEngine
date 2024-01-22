@@ -27,6 +27,17 @@ jImGUI_Vulkan::~jImGUI_Vulkan()
 
 void jImGUI_Vulkan::Initialize(float width, float height)
 {
+	// Handle Monitor DPI
+	float MonitorDPIScaleX = 0;
+	float MonitorDPIScaleY = 0;
+	GLFWmonitor* PrimaryMonitor = glfwGetPrimaryMonitor();
+	glfwGetMonitorContentScale(PrimaryMonitor, &MonitorDPIScaleX, &MonitorDPIScaleY);
+	MonitorDPIScale = Max(MonitorDPIScaleX, MonitorDPIScaleY);
+
+	ImGui::GetStyle().ScaleAllSizes(MonitorDPIScale);
+	ImGui::GetIO().FontGlobalScale = MonitorDPIScale;
+	//////////////////////////////////////////////////////////////////////////
+
     // Color scheme
     ImGuiStyle& style = ImGui::GetStyle();
     style.Colors[ImGuiCol_TitleBg] = ImVec4(1.0f, 0.0f, 0.0f, 0.6f);
@@ -38,7 +49,7 @@ void jImGUI_Vulkan::Initialize(float width, float height)
     ImGuiIO& io = ImGui::GetIO();
     io.DisplaySize = ImVec2(width, height);
     io.DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
-
+    
     //////////////////////////////////////////////////////////////////////////
     // Descriptor pool
     std::vector<VkDescriptorPoolSize> poolSizes;
@@ -291,7 +302,7 @@ void jImGUI_Vulkan::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFra
         jAttachment color = jAttachment(FinalColorPtr, EAttachmentLoadStoreOp::LOAD_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f)
             , FinalColorPtr->GetLayout(), EResourceLayout::PRESENT_SRC);
 
-        RenderPass = g_rhi_vk->GetOrCreateRenderPass({ color }, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
+        RenderPass = g_rhi_vk->GetOrCreateRenderPass({ color }, { 0, 0 }, { (int32)(SCR_WIDTH * MonitorDPIScale), (int32)(SCR_HEIGHT * MonitorDPIScale) });
         PiplineStateInfo = (jPipelineStateInfo_Vulkan*)CreatePipelineState(RenderPass, g_rhi_vk->GraphicsQueue.Queue);
     }
     check(RenderPass);

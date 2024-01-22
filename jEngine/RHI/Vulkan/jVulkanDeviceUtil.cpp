@@ -202,7 +202,7 @@ VkPresentModeKHR ChooseSwapPresentMode(const std::vector<VkPresentModeKHR>& avai
         }
         else
         {
-            if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR)
+            if (availablePresentMode == VK_PRESENT_MODE_IMMEDIATE_KHR)
                 return availablePresentMode;
         }
     }
