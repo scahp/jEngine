@@ -43,6 +43,8 @@ public:
     virtual void Setup();
     virtual void ShadowPass();
     virtual void BasePass();
+    
+    virtual void AOPass();
 
     void DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass);
 
