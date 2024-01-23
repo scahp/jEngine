@@ -5,6 +5,7 @@
 class jImGUI
 {
 public:
+    virtual ~jImGUI() {}
     // Initialize styles, keys, etc.
     virtual void Initialize(float width, float height) {}
     virtual void Release() {}

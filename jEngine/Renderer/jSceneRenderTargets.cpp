@@ -15,6 +15,10 @@ std::shared_ptr<jRenderTarget> jSceneRenderTarget::CubeEnvMap;
 jTexture* jSceneRenderTarget::IrradianceMap2 = nullptr;
 jTexture* jSceneRenderTarget::FilteredEnvMap2 = nullptr;
 jTexture* jSceneRenderTarget::CubeEnvMap2 = nullptr;
+
+// todo : remove this.
+#include "jPrimitiveUtil.h"
+jFullscreenQuadPrimitive* jSceneRenderTarget::GlobalFullscreenPrimitive = nullptr;
 //////////////////////////////////////////////////////////////////////////
 
 void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::vector<jLight*>* InLights)

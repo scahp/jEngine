@@ -17,6 +17,9 @@
 #include "Renderer/jSceneRenderTargets.h"    // 임시
 #include "dxcapi.h"
 #include "RHI/jRaytracingScene.h"
+#include "Renderer/jDirectionalLightDrawCommandGenerator.h"
+#include "Renderer/jPointLightDrawCommandGenerator.h"
+#include "Renderer/jSpotLightDrawCommandGenerator.h"
 
 jRHI* g_rhi = nullptr;
 jObject* jGame::Sphere = nullptr;
@@ -308,15 +311,16 @@ void jGame::Update(float deltaTime)
 
 	// Update main camera
 	if (MainCamera)
+	{
 		MainCamera->UpdateCamera();
 
-	gOptions.CameraPos = MainCamera->Pos;
-	if (NormalDirectionalLight)
-	{
-		Vector& SunDir = NormalDirectionalLight->GetLightData().Direction;
-		SunDir = gOptions.SunDir;
+		gOptions.CameraPos = MainCamera->Pos;
+		if (NormalDirectionalLight)
+		{
+			Vector& SunDir = NormalDirectionalLight->GetLightData().Direction;
+			SunDir = gOptions.SunDir;
+		}
 	}
-
 	//// Update lights
 	//const int32 numOfLights = MainCamera->GetNumOfLight();
 	//for (int32 i = 0; i < numOfLights; ++i)
@@ -423,24 +427,43 @@ void jGame::Release()
 {
 	g_rhi->Flush();
 
-	for (jObject* iter : SpawnedObjects)
-	{
-		delete iter;
-	}
+	delete jDirectionalLightDrawCommandGenerator::GlobalFullscreenPrimitive;
+	jDirectionalLightDrawCommandGenerator::GlobalFullscreenPrimitive = nullptr;
+	
+	delete jPointLightDrawCommandGenerator::PointLightSphere;
+	jPointLightDrawCommandGenerator::PointLightSphere = nullptr;
+	
+	delete jSpotLightDrawCommandGenerator::SpotLightCone;
+	jSpotLightDrawCommandGenerator::SpotLightCone = nullptr;
+
+	delete jSceneRenderTarget::GlobalFullscreenPrimitive;
+	jSceneRenderTarget::GlobalFullscreenPrimitive = nullptr;
+
 	SpawnedObjects.clear();
+	for(auto it : jObject::s_StaticObjects)
+	{
+		delete it;
+	}
+	for(auto it : jLight::s_Lights)
+	{
+		delete it;
+	}
 
     DirectionalLight = nullptr;		// 현재 사용중인 Directional light 의 레퍼런스이므로 그냥 nullptr 설정
-	delete NormalDirectionalLight;
-	//delete CascadeDirectionalLight;
-	delete PointLight;
-	delete SpotLight;
-	delete AmbientLight;
+    DirectionalLight = nullptr;
+    NormalDirectionalLight = nullptr;
+    CascadeDirectionalLight = nullptr;
+    PointLight = nullptr;
+    SpotLight = nullptr;
+    AmbientLight = nullptr;
+	
 	delete MainCamera;
+    MainCamera = nullptr;
 
-    delete DirectionalLightInfo;
-    delete PointLightInfo;
-    delete SpotLightInfo;
-	delete DirectionalLightShadowMapUIDebug;
+    DirectionalLightInfo = nullptr;
+    PointLightInfo = nullptr;
+    SpotLightInfo = nullptr;
+	DirectionalLightShadowMapUIDebug = nullptr;
 
 	// 임시
     jSceneRenderTarget::IrradianceMap.reset();

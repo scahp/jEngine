@@ -819,6 +819,9 @@
     <ClCompile Include="RHI\DX12\jRHIType_DX12.cpp">
       <Filter>Code\RHI\DX12</Filter>
     </ClCompile>
+    <ClCompile Include="RHI\jRaytracingScene.cpp">
+      <Filter>Code\RHI</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="Resource\Shaders\glsl\shader_vs.glsl">

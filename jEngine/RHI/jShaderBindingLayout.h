@@ -452,6 +452,24 @@ struct jDeallocatorMultiFrameResource
 
         PendingFree.emplace_back(jPendingFreeData(CurrentFrameNumber, InData));
     }
+
+    void FlushAll()
+    {
+        if (!FreeDelegate)
+            return;
+        
+        for (jPendingFreeData& PendingFreeData : PendingFree)
+        {
+            FreeDelegate(PendingFreeData.Data);
+        }
+        PendingFree.clear();
+    }
+
+    void Release()
+    {
+        FlushAll();
+        FreeDelegate = nullptr;
+    }
 };
 
 using jDeallocatorMultiFrameShaderBindingInstance = jDeallocatorMultiFrameResource< std::shared_ptr<jShaderBindingInstance>>;

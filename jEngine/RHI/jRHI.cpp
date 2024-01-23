@@ -81,11 +81,13 @@ void jRHI::OnInitRHI()
     GDefaultMaterial = std::make_shared<jMaterial>();
     GDefaultMaterial->TexData[(int32)jMaterial::EMaterialTextureType::Albedo].Texture = GWhiteTexture.get();
     GDefaultMaterial->TexData[(int32)jMaterial::EMaterialTextureType::Normal].Texture = GNormalTexture.get();
-    GDefaultMaterial->TexData[(int32)jMaterial::EMaterialTextureType::Metallic].Texture = GRoughnessMetalicTexture.get();
+    GDefaultMaterial->TexData[(int32)jMaterial::EMaterialTextureType::Metallic].Texture = GRoughnessMetalicTexture.get();    
 }
 
 void jRHI::ReleaseRHI()
 {
+    jImageFileLoader::ReleaseInstance();
+
     GWhiteTexture.reset();
     GBlackTexture.reset();
     GWhiteCubeTexture.reset();
@@ -95,6 +97,7 @@ void jRHI::ReleaseRHI()
 
     jShader::ReleaseCheckUpdateShaderThread();
 	ShaderPool.Release();
+
 }
 
 jRHI::jRHI()

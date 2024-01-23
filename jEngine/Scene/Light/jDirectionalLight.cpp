@@ -9,6 +9,8 @@ jDirectionalLight::~jDirectionalLight()
 {
     delete Camera;
     LightDataUniformBlockPtr.reset();
+    ShaderBindingInstanceOnlyLightData.reset();
+    ShaderBindingInstanceWithShadowMap.reset();
 }
 
 void jDirectionalLight::Initialize(const Vector& InDirection, const Vector& InColor, const Vector& InDiffuseIntensity, const Vector& InSpecularIntensity, float InSpecularPower)

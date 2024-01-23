@@ -85,6 +85,8 @@ void jCommandBufferManager_DX12::Release()
         delete iter;
     }
     AvailableCommandLists.clear();
+
+    CommandQueue.Reset();
 }
 
 jCommandBuffer_DX12* jCommandBufferManager_DX12::GetOrCreateCommandBuffer()

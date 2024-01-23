@@ -5,8 +5,7 @@ void jFence_DX12::Release()
 {
     if (Fence)
     {
-        Fence->Release();
-        Fence = nullptr;
+        Fence.Reset();
     }
 
     if (FenceEvent)

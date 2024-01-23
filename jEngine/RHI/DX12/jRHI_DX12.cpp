@@ -327,9 +327,9 @@ bool jRHI_DX12::InitRHI()
 	}
 #endif
 
-	ComPtr<IDXGIFactory4> factory;
-	if (JFAIL(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory))))
-		return false;
+    ComPtr<IDXGIFactory4> factory;
+    if (JFAIL(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory))))
+        return false;
 
     HRESULT hr = factory.As(&Factory);
     if (SUCCEEDED(hr))
@@ -440,7 +440,6 @@ bool jRHI_DX12::InitRHI()
 	for(jRingBuffer_DX12*& iter : OneFrameUniformRingBuffers)
 	{
 		iter = new jRingBuffer_DX12();
-		// iter->Create(16 * 1024 * 1024);
 		iter->Create(65536);
 	}
 
@@ -512,14 +511,62 @@ void jRHI_DX12::ReleaseRHI()
     
     jRHI::ReleaseRHI();
 
-	if (CommandBufferManager)
-		CommandBufferManager->Release();
+#if SUPPORT_RAYTRACING
+    delete RaytracingScene;
+    RaytracingScene = nullptr;
+#endif // SUPPORT_RAYTRACING
 
-	if (CopyCommandBufferManager)
-		CopyCommandBufferManager->Release();
+    for(auto it : ShaderBindingPool)
+    {
+        delete it.second;
+    }
+    ShaderBindingPool.clear();
 
+    SamplerStatePool.Release();
+    RasterizationStatePool.Release();
+    StencilOpStatePool.Release();
+    DepthStencilStatePool.Release();
+    BlendingStatePool.Release();
+    PipelineStatePool.Release();
+    RenderPassPool.Release();
+
+    for (jRingBuffer_DX12* iter : OneFrameUniformRingBuffers)
+    {
+        delete iter;
+    }
+    OneFrameUniformRingBuffers.clear();
+
+    CubeMapInstanceDataForSixFace.reset();
+
+    delete g_ImGUI;
+    g_ImGUI = nullptr;
+    
+    delete QueryPoolTime;
+    QueryPoolTime = nullptr;
+
+    if (CommandBufferManager)
+    {
+        CommandBufferManager->Release();
+        delete CommandBufferManager;
+        CommandBufferManager = nullptr;
+    }
+
+    if (CopyCommandBufferManager)
+    {
+        CopyCommandBufferManager->Release();
+        delete CopyCommandBufferManager;
+        CopyCommandBufferManager = nullptr;
+    }
+    FenceManager.Release();
 	SamplerStatePool.Release();
     
+    DeallocatorMultiFrameStandaloneResource.Release();
+    DeallocatorMultiFramePlacedResource.Release();
+    DeallocatorMultiFrameShaderBindingInstance.Release();
+    PlacedResourceDefaultHeap.Reset();
+    PlacedResourceUploadHeap.Reset();
+    PlacedResourcePool.Release();
+
 	{
         jScopeWriteLock s(&ShaderBindingPoolLock);
         for (auto& iter : ShaderBindingPool)
@@ -527,13 +574,6 @@ void jRHI_DX12::ReleaseRHI()
         ShaderBindingPool.clear();
     }
 
-
-	//////////////////////////////////////////////////////////////////////////
-	// 8. Raytracing device and commandlist
-	Device.Reset();
-
-	//////////////////////////////////////////////////////////////////////////
-	// 4. Heap
 	RTVDescriptorHeaps.Release();
 	DSVDescriptorHeaps.Release();
 	DescriptorHeaps.Release();
@@ -541,22 +581,13 @@ void jRHI_DX12::ReleaseRHI()
 
     OnlineDescriptorHeapManager.Release();
 
-	//////////////////////////////////////////////////////////////////////////
-	// 3. Swapchain
     Swapchain->Release();
     delete Swapchain;
+    Swapchain = nullptr;
 
-	//////////////////////////////////////////////////////////////////////////
-	// 2. Command
-	delete CommandBufferManager;
-
-
-    PlacedResourcePool.Release();
-
-	//////////////////////////////////////////////////////////////////////////
-	// 1. Device
-	Device.Reset();
-
+    Adapter.Reset();
+    Factory.Reset();
+    Device.Reset();
 }
 
 void jRHI_DX12::CalculateFrameStats()
@@ -1589,6 +1620,12 @@ void jPlacedResourcePool::Release()
 {
     check(g_rhi_dx12);
     g_rhi_dx12->DeallocatorMultiFramePlacedResource.FreeDelegate = nullptr;
+
+    for (int32 i = 0; i < (int32)EPoolSizeType::MAX; ++i)
+    {
+        PendingPlacedResources[i].clear();
+        PendingUploadPlacedResources[i].clear();
+    }
 }
 
 void jPlacedResourcePool::Free(const ComPtr<ID3D12Resource>& InData)

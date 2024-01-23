@@ -72,6 +72,11 @@ namespace jLightUtil
 
 }
 
+jLight::~jLight()
+{
+	delete LightDebugObject;
+}
+
 jLight* jLight::CreateAmbientLight(const Vector& color, const Vector& intensity)
 {
 	auto ambientLight = new jAmbientLight();

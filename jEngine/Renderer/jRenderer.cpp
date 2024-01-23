@@ -751,7 +751,6 @@ void jRenderer::BasePass()
 
     if (EnableAtmosphericShadowing)
     {
-        static jFullscreenQuadPrimitive* GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
         std::shared_ptr<jRenderTarget> AtmosphericShadowing = RenderFrameContextPtr->SceneRenderTargetPtr->AtmosphericShadowing;
 
         auto RT = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr;
@@ -830,8 +829,10 @@ void jRenderer::BasePass()
             Shader.PixelShader = g_rhi->CreateShader(shaderInfo);
         }
 
-        jDrawCommand DrawCommand(RenderFrameContextPtr, GlobalFullscreenPrimitive->RenderObjects[0], RenderPass
-            , Shader, &PostProcessPassPipelineStateFixed, GlobalFullscreenPrimitive->RenderObjects[0]->MaterialPtr.get(), ShaderBindingInstanceArray, nullptr);
+        if (!jSceneRenderTarget::GlobalFullscreenPrimitive)
+            jSceneRenderTarget::GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
+        jDrawCommand DrawCommand(RenderFrameContextPtr, jSceneRenderTarget::GlobalFullscreenPrimitive->RenderObjects[0], RenderPass
+            , Shader, &PostProcessPassPipelineStateFixed, jSceneRenderTarget::GlobalFullscreenPrimitive->RenderObjects[0]->MaterialPtr.get(), ShaderBindingInstanceArray, nullptr);
         DrawCommand.Test = true;
         DrawCommand.PrepareToDraw(false);
 
@@ -956,7 +957,8 @@ void jRenderer::PostProcess()
         {
             DEBUG_EVENT(RenderFrameContextPtr, InDebugName);
 
-            static jFullscreenQuadPrimitive* GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
+            if (!jSceneRenderTarget::GlobalFullscreenPrimitive)
+                jSceneRenderTarget::GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
 
             jRasterizationStateInfo* RasterizationState = nullptr;
             switch (g_rhi->GetSelectedMSAASamples())
@@ -1073,8 +1075,8 @@ void jRenderer::PostProcess()
                 Shader.PixelShader = g_rhi->CreateShader(shaderInfo);
             }
 
-            jDrawCommand DrawCommand(RenderFrameContextPtr, GlobalFullscreenPrimitive->RenderObjects[0], RenderPass
-                , Shader, &PostProcessPassPipelineStateFixed, GlobalFullscreenPrimitive->RenderObjects[0]->MaterialPtr.get(), ShaderBindingInstanceArray, nullptr);
+            jDrawCommand DrawCommand(RenderFrameContextPtr, jSceneRenderTarget::GlobalFullscreenPrimitive->RenderObjects[0], RenderPass
+                , Shader, &PostProcessPassPipelineStateFixed, jSceneRenderTarget::GlobalFullscreenPrimitive->RenderObjects[0]->MaterialPtr.get(), ShaderBindingInstanceArray, nullptr);
             DrawCommand.Test = true;
             DrawCommand.PrepareToDraw(false);
 
@@ -1521,7 +1523,7 @@ void jRenderer::Render()
             check(DirectionalLight);
             m_sceneCB.lightDirection = { DirectionalLight->GetLightData().Direction.x, DirectionalLight->GetLightData().Direction.y, DirectionalLight->GetLightData().Direction.z };
 
-            static auto SceneUniformBufferPtr = g_rhi->CreateUniformBufferBlock(jNameStatic("SceneData"), jLifeTimeType::MultiFrame, sizeof(m_sceneCB));
+            auto SceneUniformBufferPtr = g_rhi->CreateUniformBufferBlock(jNameStatic("SceneData"), jLifeTimeType::OneFrame, sizeof(m_sceneCB));
             SceneUniformBufferPtr->UpdateBufferData(&m_sceneCB, sizeof(m_sceneCB));
 
             static bool once = false;
@@ -1773,8 +1775,6 @@ void jRenderer::Render()
 
         if (1)
         {
-            static jFullscreenQuadPrimitive* GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
-
             auto RT = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr;
 
             g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RT->TexturePtr.get(), EResourceLayout::COLOR_ATTACHMENT);
@@ -1850,8 +1850,11 @@ void jRenderer::Render()
                 Shader.PixelShader = g_rhi->CreateShader(shaderInfo);
             }
 
-            jDrawCommand DrawCommand(RenderFrameContextPtr, GlobalFullscreenPrimitive->RenderObjects[0], RenderPass
-                , Shader, &PostProcessPassPipelineStateFixed, GlobalFullscreenPrimitive->RenderObjects[0]->MaterialPtr.get(), ShaderBindingInstanceArray, nullptr);
+            if (!jSceneRenderTarget::GlobalFullscreenPrimitive)
+                jSceneRenderTarget::GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
+
+            jDrawCommand DrawCommand(RenderFrameContextPtr, jSceneRenderTarget::GlobalFullscreenPrimitive->RenderObjects[0], RenderPass
+                , Shader, &PostProcessPassPipelineStateFixed, jSceneRenderTarget::GlobalFullscreenPrimitive->RenderObjects[0]->MaterialPtr.get(), ShaderBindingInstanceArray, nullptr);
             DrawCommand.Test = true;
             DrawCommand.PrepareToDraw(false);
             if (RenderPass->BeginRenderPass(RenderFrameContextPtr->GetActiveCommandBuffer()))

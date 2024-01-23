@@ -13,7 +13,6 @@ jImGUI_DX12::jImGUI_DX12()
 jImGUI_DX12::~jImGUI_DX12()
 {
     Release();
-    ImGui::DestroyContext();
 }
 
 void jImGUI_DX12::Initialize(float width, float height)

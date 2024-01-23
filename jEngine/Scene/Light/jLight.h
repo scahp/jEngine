@@ -98,7 +98,7 @@ public:
 
 	jLight() = default;
 	jLight(ELightType type) :Type(type) {}
-	virtual ~jLight() {}
+	virtual ~jLight();
 
 	virtual bool IsOmnidirectional() const { return false; }
 	virtual void Update(float deltaTime) { }

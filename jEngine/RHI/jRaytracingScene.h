@@ -13,6 +13,7 @@ struct jRatracingInitializer
 class jRaytracingScene
 {
 public:
+    virtual ~jRaytracingScene();
     virtual void CreateOrUpdateBLAS(const jRatracingInitializer& InInitializer) = 0;
     virtual void CreateOrUpdateTLAS(const jRatracingInitializer& InInitializer) = 0;
     virtual bool IsValid() const { return TLASBufferPtr != nullptr; }

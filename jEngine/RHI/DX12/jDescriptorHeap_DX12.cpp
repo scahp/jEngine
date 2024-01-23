@@ -60,7 +60,7 @@ void jDescriptorHeap_DX12::Release()
 {
     jScopedLock s(&DescriptorLock);
 
-    Heap->Release();
+    Heap.Reset();
     CPUHandleStart = { };
     GPUHandleStart = { };
     DescriptorSize = 0;

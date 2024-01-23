@@ -382,6 +382,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClCompile Include="RHI\DX12\jVertexBuffer_DX12.cpp" />
     <ClCompile Include="RHI\jFrameBufferPool.cpp" />
     <ClCompile Include="RHI\jPipelineStateInfo.cpp" />
+    <ClCompile Include="RHI\jRaytracingScene.cpp" />
     <ClCompile Include="RHI\jRenderFrameContext.cpp" />
     <ClCompile Include="RHI\jRenderTarget.cpp" />
     <ClCompile Include="RHI\jRenderTargetPool.cpp" />

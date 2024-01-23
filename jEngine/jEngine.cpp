@@ -55,6 +55,7 @@ void jEngine::Release()
 		g_rhi_vk->Flush();
 
 	Game.Release();
+    jRenderTargetPool::Release();
 }
 
 void jEngine::ProcessInput(float deltaTime)

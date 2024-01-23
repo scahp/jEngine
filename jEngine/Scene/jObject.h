@@ -80,7 +80,7 @@ public:
 	jBoundBox BoundBox;
 	jBoundSphere BoundSphere;
 
-private:
+//private:
 	static std::vector<jObject*> s_ShadowCasterObject;
 	static std::vector<jRenderObject*> s_ShadowCasterRenderObject;
 	static std::vector<jObject*> s_StaticObjects;

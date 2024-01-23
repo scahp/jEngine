@@ -341,6 +341,7 @@ public:
             return;
 
         Heap.clear();
+        CurrentHeap.reset();
     }
 
 private:
