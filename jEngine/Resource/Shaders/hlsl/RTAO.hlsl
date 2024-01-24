@@ -128,7 +128,30 @@ inline float3 GenerateCameraRay(uint2 index, out float3 origin, out float3 direc
     return world.xyz;
 }
 
+float3 random_in_unit_sphere()
+{
+    //float rand = RayTCurrent();
+    float rand = 2.0f;
+    float2 uv = DispatchRaysIndex().xy + float2(rand, rand * 2.0f);
+    float noiseX = (frac(sin(dot(uv, float2(12.9898, 78.233))) * 43758.5453));
+    float noiseY = (frac(sin(dot(uv, float2(12.9898, 78.233) * rand * 2.0f)) * 43758.5453));
+    float noiseZ = (frac(sin(dot(uv, float2(12.9898, 78.233) * rand)) * 43758.5453));
 
+    float3 randomUniSphere = float3(noiseX, noiseY, noiseZ) * 2.0f - 0.5f;
+    if (length(randomUniSphere) <= 1.0f)
+        return randomUniSphere;
+
+    return normalize(randomUniSphere);
+}
+
+float3 random_in_hemisphere(float3 normal)
+{
+    float3 in_unit_sphere = random_in_unit_sphere();
+    if (dot(in_unit_sphere, normal) > 0.0)  // 노멀 기준으로 같은 반구 방향인지?
+        return in_unit_sphere;
+
+    return -in_unit_sphere;
+}
 
 void GetShaderBindingResources(
     inout TextureCube<float4> IrradianceMap,
@@ -227,43 +250,38 @@ float3 BarycentricCoordinates(float3 pt, float3 v0, float3 v1, float3 v2)
 void MyRaygenShader()
 {
     float2 UV = DispatchRaysIndex().xy / g_sceneCB.ViewRect.zw;
-
-    Texture2D GBuffer0_Pos : register(t2, space0);
-    Texture2D GBuffer1_Normal : register(t3, space0);
-
     float3 WorldPos = GBuffer0_Pos.SampleLevel(AlbedoTextureSampler, UV, 0).xyz;
-    //float3 WorldNormal = GBuffer1_Normal.SampleLevel(AlbedoTextureSampler, UV, 0).xyz;
+    float3 WorldNormal = GBuffer1_Normal.SampleLevel(AlbedoTextureSampler, UV, 0).xyz;
 
-    //RayDesc ray;
-    //ray.Origin = WorldPos;
-    //ray.Direction = WorldNormal;
+    RayDesc ray;
+    ray.Origin = WorldPos;
+    ray.Direction = random_in_hemisphere(WorldNormal);
 
-    //ray.TMin = 0.001;
-    //ray.TMax = 1.0;
+    // Set TMin to a non-zero small value to avoid aliasing issues due to floating - point errors.
+    // TMin should be kept small to prevent missing geometry at close contact areas.
+    ray.TMin = 0.001;
+    ray.TMax = 50.0;
+    
+    RayPayload payload = { float4(1.0f, 1.0f, 1.0f, 1.0f) };
+    TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 0, 0, ray, payload);
 
-    //RayPayload payload;
-    //payload.Lit = 1.0f;
-    //TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 0, 0, ray, payload);
-
-    float z = payload.Lit;
-    z = 1.0f;
-    RenderTarget[DispatchRaysIndex().xy] = float4(WorldPos, 1);
+    RenderTarget[DispatchRaysIndex().xy] = float4(payload.color.xyz, 1.0f);
 }
 
 [shader("anyhit")]
 void MyAnyHitShader(inout RayPayload payload, in MyAttributes attr)
 {
-
+    payload.color = float4(0, 0, 0, 1);
 }
 
 [shader("closesthit")]
 void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 {
-
+    payload.color = float4(0, 0, 0, 1);
 }
 
 [shader("miss")]
 void MyMissShader(inout RayPayload payload)
 {
-    payload.Lit = 1.0f;
+    payload.color = float4(1, 1, 1, 1);
 }

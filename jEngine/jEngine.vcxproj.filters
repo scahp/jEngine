@@ -969,5 +969,8 @@
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
     <None Include="Resource\Shaders\hlsl\RaytracingPBR.hlsl" />
+    <None Include="Resource\Shaders\hlsl\RTAO.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
   </ItemGroup>
 </Project>

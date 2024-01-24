@@ -77,4 +77,6 @@ public:
 
     // Thread per task for PassSetup
     const int32 MaxPassSetupTaskPerThreadCount = 100;
+
+    std::vector<jTexture*> DebugRTs;
 };
