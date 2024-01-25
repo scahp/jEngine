@@ -25,6 +25,7 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
 {
     jRenderTargetInfo ColorRTInfo = { ETextureType::TEXTURE_2D, ETextureFormat::R11G11B10F, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f) };
     ColorRTInfo.ResourceName = TEXT("ColorPtr");
+    ColorRTInfo.TextureCreateFlag = ETextureCreateFlag::UAV;
     ColorPtr = jRenderTargetPool::GetRenderTarget(ColorRTInfo);
 
     {

@@ -20,11 +20,15 @@ struct SceneConstantBuffer
     float3 lightAmbientColor;
     uint NumOfStartingRay;
     float3 lightDiffuseColor;
-    float Padding0;                 // for 16 byte align
+    float FrameTime;
     float3 cameraDirection;
-    float Padding1;                 // for 16 byte align
+    float AORadius;
     float3 lightDirection;
-    float Padding2;                 // for 16 byte align
+    uint SamplePerPixel;
+    int Clear;
+    float AOIntensity;
+    int AOAccumulateCount;
+    float Padding;            // for 16 byte align
 };
 
 #define VERTEX_STRID 56
@@ -128,14 +132,16 @@ inline float3 GenerateCameraRay(uint2 index, out float3 origin, out float3 direc
     return world.xyz;
 }
 
-float3 random_in_unit_sphere()
+float Random_0_1(float co) { return frac(sin(co*(91.3458)) * 47453.5453); }
+
+float3 random_in_unit_sphere(int seed)
 {
     //float rand = RayTCurrent();
-    float rand = 2.0f;
-    float2 uv = DispatchRaysIndex().xy + float2(rand, rand * 2.0f);
+    float r = Random_0_1(seed) + 0.01f;        // To avoid 0 value for random variable
+    float2 uv = DispatchRaysIndex().xy + float2(r, r * 2.0f);
     float noiseX = (frac(sin(dot(uv, float2(12.9898, 78.233))) * 43758.5453));
-    float noiseY = (frac(sin(dot(uv, float2(12.9898, 78.233) * rand * 2.0f)) * 43758.5453));
-    float noiseZ = (frac(sin(dot(uv, float2(12.9898, 78.233) * rand)) * 43758.5453));
+    float noiseY = (frac(sin(dot(uv, float2(12.9898, 78.233) * r * 2.0f)) * 43758.5453));
+    float noiseZ = (frac(sin(dot(uv, float2(12.9898, 78.233) * r)) * 43758.5453));
 
     float3 randomUniSphere = float3(noiseX, noiseY, noiseZ) * 2.0f - 0.5f;
     if (length(randomUniSphere) <= 1.0f)
@@ -144,9 +150,9 @@ float3 random_in_unit_sphere()
     return normalize(randomUniSphere);
 }
 
-float3 random_in_hemisphere(float3 normal)
+float3 random_in_hemisphere(float3 normal, int seed)
 {
-    float3 in_unit_sphere = random_in_unit_sphere();
+    float3 in_unit_sphere = random_in_unit_sphere(seed);
     if (dot(in_unit_sphere, normal) > 0.0)  // 노멀 기준으로 같은 반구 방향인지?
         return in_unit_sphere;
 
@@ -253,19 +259,34 @@ void MyRaygenShader()
     float3 WorldPos = GBuffer0_Pos.SampleLevel(AlbedoTextureSampler, UV, 0).xyz;
     float3 WorldNormal = GBuffer1_Normal.SampleLevel(AlbedoTextureSampler, UV, 0).xyz;
 
-    RayDesc ray;
-    ray.Origin = WorldPos;
-    ray.Direction = random_in_hemisphere(WorldNormal);
+    float3 FinalAO = float4(1, 1, 1, 1);
+    if (!g_sceneCB.Clear)
+    {
+        FinalAO = RenderTarget[DispatchRaysIndex().xy];
+    }
 
-    // Set TMin to a non-zero small value to avoid aliasing issues due to floating - point errors.
-    // TMin should be kept small to prevent missing geometry at close contact areas.
-    ray.TMin = 0.001;
-    ray.TMax = 50.0;
+    float AccumulateCount = g_sceneCB.AOAccumulateCount;
+
+    for(int i=0;i<g_sceneCB.SamplePerPixel;++i)
+    {
+        RayDesc ray;
+        ray.Origin = WorldPos;
+        ray.Direction = random_in_hemisphere(WorldNormal, g_sceneCB.FrameTime + i*10);
+
+        // Set TMin to a non-zero small value to avoid aliasing issues due to floating - point errors.
+        // TMin should be kept small to prevent missing geometry at close contact areas.
+        ray.TMin = 0.001;
+        ray.TMax = g_sceneCB.AORadius;
     
-    RayPayload payload = { float4(1.0f, 1.0f, 1.0f, 1.0f) };
-    TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 0, 0, ray, payload);
+        RayPayload payload = { float4(1.0f, 1.0f, 1.0f, 1.0f) };
+        TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 0, 0, ray, payload);
 
-    RenderTarget[DispatchRaysIndex().xy] = float4(payload.color.xyz, 1.0f);
+        ++AccumulateCount;
+
+        // Incremental Average : https://blog.demofox.org/2016/08/23/incremental-averaging/
+        FinalAO = lerp(FinalAO.xyz, payload.color.xyz, 1.0 / AccumulateCount);
+    }
+    RenderTarget[DispatchRaysIndex().xy] = float4(FinalAO, 1.0f);
 }
 
 [shader("anyhit")]

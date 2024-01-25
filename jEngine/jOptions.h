@@ -23,6 +23,11 @@ struct jOptions
     bool EarthQuake = false;
     float FocalDistance = 5.0f;
     float LensRadius = 0.05f;
+    float AORadius = 20.0f;
+    float AOIntensity = 1.0f;
+    int32 SamplePerPixel = 1;
+    bool UseRTAO = true;
+    bool ShowDebugRT = true;
 };
 
 extern jOptions gOptions;

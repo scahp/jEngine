@@ -978,7 +978,7 @@ void jRHI_DX12::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& rende
 		hr = Swapchain->SwapChain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
 	}
 
-    ensure(hr == S_OK);
+    ensure(hr == S_OK || hr == DXGI_STATUS_OCCLUDED || hr == DXGI_STATUS_CLIPPED);
 
 	// CurrentFrameIndex = (CurrentFrameIndex + 1) % Swapchain->Images.size();
     CurrentFrameIndex = Swapchain->GetCurrentBackBufferIndex();
