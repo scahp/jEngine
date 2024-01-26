@@ -15,8 +15,10 @@ struct ViewUniformBuffer
     float4x4 V;
     float4x4 P;
     float4x4 VP;
+    float4x4 PrevVP;
     float3 EyeWorld;
     float padding0;
+    float4 ScreenRect;
 };
 
 struct jDirectionalLightUniformBuffer

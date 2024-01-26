@@ -20,7 +20,7 @@ struct jSceneRenderTarget
     std::shared_ptr<jRenderTarget> DepthPtr;
     std::shared_ptr<jRenderTarget> ResolvePtr;
     
-    std::shared_ptr<jRenderTarget> GBuffer[3];
+    std::shared_ptr<jRenderTarget> GBuffer[4];
 
     std::map<const jLight*, std::shared_ptr<jRenderTarget>> LightShadowMapPtr;
 

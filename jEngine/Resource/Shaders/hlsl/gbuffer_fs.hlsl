@@ -11,7 +11,8 @@
 struct VSOutput
 {
     float4 Pos : SV_POSITION;
-    float3 LocalPos : POSITION0;
+    float4 PrevPos : POSITION0;
+    float3 LocalPos : POSITION1;
 #if USE_VERTEX_COLOR
     float4 Color : COLOR0;
 #endif
@@ -47,6 +48,7 @@ struct FSOutput
     float4 GBuffer0 : SV_TARGET0;       // Position.xyz
     float4 GBuffer1 : SV_TARGET1;       // Normal.xyz
     float4 GBuffer2 : SV_TARGET2;       // Albedo.xyz
+    float4 GBuffer3 : SV_TARGET3;       // Velocity.xyz
 };
 
 FSOutput main(VSOutput input
@@ -151,6 +153,13 @@ FSOutput main(VSOutput input
 #endif
     
     output.GBuffer2.xyz = color.xyz;
+    
+    float2 PrevScreenPos = (input.PrevPos.xy / input.PrevPos.w);
+    PrevScreenPos.y = -PrevScreenPos.y;
+    PrevScreenPos = PrevScreenPos * float2(0.5, 0.5) + float2(0.5, 0.5);
+    
+    PrevScreenPos = PrevScreenPos * ViewParam.ScreenRect.zw;
+    output.GBuffer3 = float4(input.Pos.xy - PrevScreenPos, 0, 0);
 
     return output;
 }

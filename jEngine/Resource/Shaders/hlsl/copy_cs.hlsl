@@ -3,8 +3,8 @@ RWTexture2D<float4> resultImage : register(u1);
 
 struct CommonComputeUniformBuffer
 {
-    float Width;
-    float Height;
+    int Width;
+    int Height;
     float UseWaveIntrinsics;
     float Padding;
 };

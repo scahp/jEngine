@@ -200,15 +200,19 @@ void jView::PrepareViewUniformBufferShaderBindingInstance()
         Matrix V;
         Matrix P;
         Matrix VP;
+        Matrix PrevVP;
 		Vector EyeWorld;
 		float padding0;
+        Vector4 ScreenRect;
     };
 
     jViewUniformBuffer ubo;
     ubo.P = Camera->Projection;
     ubo.V = Camera->View;
-    ubo.VP = Camera->Projection * Camera->View;
+    ubo.VP = Camera->ViewProjection;
+    ubo.PrevVP = Camera->PrevViewProjection;
 	ubo.EyeWorld = Camera->Pos;
+    ubo.ScreenRect = Vector4(0.0f, 0.0f, Camera->Width, Camera->Height);
 
     ViewUniformBufferPtr = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(jNameStatic("ViewUniformParameters"), jLifeTimeType::OneFrame, sizeof(ubo)));
     ViewUniformBufferPtr->UpdateBufferData(&ubo, sizeof(ubo));

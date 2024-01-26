@@ -300,6 +300,8 @@ public:
 	
 	Matrix View;
 	Matrix Projection;
+	Matrix ViewProjection;
+	Matrix PrevViewProjection;
 	Matrix ReverseZProjection;
 	bool IsPerspectiveProjection = true;
 	bool IsInfinityFar = false;

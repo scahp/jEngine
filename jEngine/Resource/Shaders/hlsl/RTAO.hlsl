@@ -247,8 +247,7 @@ float3 BarycentricCoordinates(float3 pt, float3 v0, float3 v1, float3 v2)
     float d21 = dot(e2, e1);
     float denom = 1.0 / (d00 * d11 - d01 * d01);
     float v = (d11 * d20 - d01 * d21) * denom;
-    float w = (d00 * d21 - d01 * d20) * denom;
-    float u = 1.0 - v - w;
+    float w = (d00 * d21 - d01 * d20) * denom;    float u = 1.0 - v - w;
     return float3(u, v, w);
 }
 
@@ -259,13 +258,15 @@ void MyRaygenShader()
     float3 WorldPos = GBuffer0_Pos.SampleLevel(AlbedoTextureSampler, UV, 0).xyz;
     float3 WorldNormal = GBuffer1_Normal.SampleLevel(AlbedoTextureSampler, UV, 0).xyz;
 
-    float3 FinalAO = float4(1, 1, 1, 1);
+    float3 FinalAO = float3(1, 1, 1);
     if (!g_sceneCB.Clear)
     {
-        FinalAO = RenderTarget[DispatchRaysIndex().xy];
+        FinalAO = RenderTarget[DispatchRaysIndex().xy].xyz;
     }
 
-    float AccumulateCount = g_sceneCB.AOAccumulateCount;
+    //float AccumulateCount = g_sceneCB.AOAccumulateCount;
+    //float AccumulateCount = RenderTarget[DispatchRaysIndex().xy].w;
+    //float AccumulateCount = 0;
 
     for(int i=0;i<g_sceneCB.SamplePerPixel;++i)
     {
@@ -281,10 +282,11 @@ void MyRaygenShader()
         RayPayload payload = { float4(1.0f, 1.0f, 1.0f, 1.0f) };
         TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 0, 0, ray, payload);
 
-        ++AccumulateCount;
+        //++AccumulateCount;
 
         // Incremental Average : https://blog.demofox.org/2016/08/23/incremental-averaging/
-        FinalAO = lerp(FinalAO.xyz, payload.color.xyz, 1.0 / AccumulateCount);
+        //FinalAO = lerp(FinalAO.xyz, payload.color.xyz, 1.0 / AccumulateCount);
+        FinalAO = payload.color.xyz;
     }
     RenderTarget[DispatchRaysIndex().xy] = float4(FinalAO, 1.0f);
 }

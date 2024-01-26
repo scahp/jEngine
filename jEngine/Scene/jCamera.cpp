@@ -85,8 +85,11 @@ void jCamera::UpdateCameraFrustum()
 
 void jCamera::UpdateCamera()
 {
+    PrevViewProjection = Projection * View;
+
     View = CreateView();
     Projection = CreateProjection();
+    ViewProjection = Projection * View;
     if (IsPerspectiveProjection)
     {
         #if USE_REVERSEZ_PERSPECTIVE_SHADOW

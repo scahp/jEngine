@@ -27,6 +27,7 @@ struct jOptions
     float AOIntensity = 1.0f;
     int32 SamplePerPixel = 1;
     bool UseRTAO = true;
+    bool UseAOReprojection = true;
     bool ShowDebugRT = true;
 };
 
