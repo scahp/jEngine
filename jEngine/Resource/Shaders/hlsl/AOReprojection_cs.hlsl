@@ -19,7 +19,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         return;
 
     int2 PixelPos = int2(GlobalInvocationID.xy);
-    int2 ScreenOffsetToPrevPos = VelocityBuffer[PixelPos].xy;
+    int2 ScreenOffsetToPrevPos = round(VelocityBuffer[PixelPos].xy);
     int2 OldPixelPos = PixelPos - ScreenOffsetToPrevPos;
 
     if (OldPixelPos.x >= ComputeCommon.Width-2 || OldPixelPos.y >= ComputeCommon.Height-2 || OldPixelPos.x < 0 || OldPixelPos.y < 0)

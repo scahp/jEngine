@@ -972,5 +972,11 @@
     <None Include="Resource\Shaders\hlsl\RTAO.hlsl">
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
+    <None Include="Resource\Shaders\hlsl\AOApply_cs.hlsl" />
+    <None Include="Resource\Shaders\hlsl\gaussianblur_cs.hlsl" />
+    <None Include="Resource\Shaders\hlsl\AOReprojection_cs.hlsl" />
+    <None Include="Resource\Shaders\hlsl\bilateralfiltering_cs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
   </ItemGroup>
 </Project>

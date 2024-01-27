@@ -1,6 +1,8 @@
 ﻿#pragma once
 #include "Math/Vector.h"
 
+extern const char* GDenoisers[4];
+
 struct jOptions
 {
     bool UseVRS = false;
@@ -28,10 +30,16 @@ struct jOptions
     int32 SamplePerPixel = 1;
     bool UseRTAO = true;
     bool UseAOReprojection = true;
-    bool UseDenoiseGaussian = true;
-    int32 GaussianKernelSize = 5;
-    int32 GaussianKernelVar = 5;
+    const char* Denoiser = GDenoisers[2];       // Select Bilateral
+    float BilateralIntensityScale = 10.0f;
+    int32 GaussianKernelSize = 9;
+    float GaussianKernelSigma = 10.0f;
+    bool ShowAOOnly = false;
     bool ShowDebugRT = true;
+
+    bool IsDenoiserGuassian() const { return GDenoisers[0] == Denoiser; }
+    bool IsDenoiserGuassianSeparable() const { return GDenoisers[1] == Denoiser; }
+    bool IsDenoiserGuassianBilateral() const { return GDenoisers[2] == Denoiser; }
 };
 
 extern jOptions gOptions;

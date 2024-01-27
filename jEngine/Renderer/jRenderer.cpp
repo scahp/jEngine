@@ -730,7 +730,7 @@ void jRenderer::BasePass()
         shaderInfo.SetName(jNameStatic("GenIrradianceMap"));
         shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/AtmosphericShadowing_cs.hlsl"));
         shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
-        static jShader* Shader = g_rhi->CreateShader(shaderInfo);
+        jShader* Shader = g_rhi->CreateShader(shaderInfo);
 
         jShaderBindingLayoutArray ShaderBindingLayoutArray;
         ShaderBindingLayoutArray.Add(CurrentBindingInstance->ShaderBindingsLayouts);
@@ -857,9 +857,6 @@ void jRenderer::BasePass()
             RenderPass->EndRenderPass();
         }
     }
-
-	//if (gOptions.ShowDebugRT)
-	//	DebugRTs.push_back(RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[3]->GetTexture());
 }
 
 void jRenderer::AOPass()
@@ -964,7 +961,9 @@ void jRenderer::AOPass()
             auto SceneUniformBufferPtr = g_rhi->CreateUniformBufferBlock(jNameStatic("SceneData"), jLifeTimeType::OneFrame, sizeof(m_sceneCB));
             SceneUniformBufferPtr->UpdateBufferData(&m_sceneCB, sizeof(m_sceneCB));
 
-            if (!RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr)
+            if (!RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr 
+                || RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr->Width != (int32)SCR_WIDTH
+                || RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr->Height != (int32)SCR_HEIGHT)
             {
                 RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr = g_rhi->Create2DTexture((uint32)SCR_WIDTH, (uint32)SCR_HEIGHT, (uint32)1, (uint32)1
                     , ETextureFormat::RGBA16F, ETextureCreateFlag::UAV, EResourceLayout::UAV);
@@ -1172,26 +1171,22 @@ void jRenderer::AOPass()
 
             g_rhi->TransitionLayout(CmdBuffer, RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr.get(), EResourceLayout::SHADER_READ_ONLY);
         }
-
-		//if (gOptions.ShowDebugRT)
-		//	DebugRTs.push_back(RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr.get());
     }
 
-    auto GaussianV = g_rhi->Create2DTexture((uint32)SCR_WIDTH, (uint32)SCR_HEIGHT, (uint32)1, (uint32)1
+    static auto GaussianV = g_rhi->Create2DTexture((uint32)SCR_WIDTH, (uint32)SCR_HEIGHT, (uint32)1, (uint32)1
 	    , ETextureFormat::RGBA16F, ETextureCreateFlag::UAV, EResourceLayout::UAV);
-    auto GaussianH = g_rhi->Create2DTexture((uint32)SCR_WIDTH, (uint32)SCR_HEIGHT, (uint32)1, (uint32)1
+    static auto GaussianH = g_rhi->Create2DTexture((uint32)SCR_WIDTH, (uint32)SCR_HEIGHT, (uint32)1, (uint32)1
         , ETextureFormat::RGBA16F, ETextureCreateFlag::UAV, EResourceLayout::UAV);
 
-    static std::shared_ptr<jTexture> HistoryBuffer;
-    if (!HistoryBuffer)
+    if (!jSceneRenderTarget::HistoryBuffer || jSceneRenderTarget::HistoryBuffer->Width != (int32)SCR_WIDTH || jSceneRenderTarget::HistoryBuffer->Height != (int32)SCR_HEIGHT)
     {
-        HistoryBuffer = g_rhi->Create2DTexture((uint32)SCR_WIDTH, (uint32)SCR_HEIGHT, (uint32)1, (uint32)1
+        jSceneRenderTarget::HistoryBuffer = g_rhi->Create2DTexture((uint32)SCR_WIDTH, (uint32)SCR_HEIGHT, (uint32)1, (uint32)1
             , ETextureFormat::RGBA16F, ETextureCreateFlag::UAV, EResourceLayout::UAV);
     }
 
-    if (gOptions.UseDenoiseGaussian)
+    if (gOptions.IsDenoiserGuassianSeparable())
     {
-        DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "Gaussian", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
+        DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "GaussianSeparable", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
 
 		auto createGaussianKernel = [](int32 kernelSize, float sigma) -> std::vector<float> 
         {
@@ -1215,7 +1210,7 @@ void jRenderer::AOPass()
 			return kernel;
 		};
 
-        std::vector<float> kernal = createGaussianKernel(gOptions.GaussianKernelSize, gOptions.GaussianKernelVar);
+        std::vector<float> kernel = createGaussianKernel(gOptions.GaussianKernelSize, gOptions.GaussianKernelSigma);
 		//auto applyGaussianFilter = [](const std::vector<float>& input, const std::vector<float>& kernel) -> std::vector<float> 
   //      {
 		//	int kernelSize = kernel.size();
@@ -1253,13 +1248,13 @@ void jRenderer::AOPass()
 			    float Width;
 			    float Height;
 			    float UseWaveIntrinsics;
-			    int KernalSize;
+			    int32 KernelSize;
 		    };
 		    CommonComputeUniformBuffer CommonComputeData;
 		    CommonComputeData.Width = (float)Width;
 		    CommonComputeData.Height = (float)Height;
 		    CommonComputeData.UseWaveIntrinsics = false;
-		    CommonComputeData.KernalSize = kernal.size();
+		    CommonComputeData.KernelSize = (int32)kernel.size();
 
 		    std::shared_ptr<jShaderBindingInstance> CurrentBindingInstance = nullptr;
 		    int32 BindingPoint = 0;
@@ -1289,8 +1284,8 @@ void jRenderer::AOPass()
 			    Vector4 Width[20];
 		    };
             jGaussianBlurKernel KernelData;
-            check(sizeof(KernelData.Width) >= kernal.size() * sizeof(float));
-            memcpy(KernelData.Width, kernal.data(), kernal.size() * sizeof(float));
+            check(sizeof(KernelData.Width) >= kernel.size() * sizeof(float));
+            memcpy(KernelData.Width, kernel.data(), kernel.size() * sizeof(float));
 
 		    auto OneFrameGaussianKernelUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
 			    jNameStatic("GaussianKernel"), jLifeTimeType::OneFrame, sizeof(KernelData)));
@@ -1355,13 +1350,13 @@ void jRenderer::AOPass()
 				float Width;
 				float Height;
 				float UseWaveIntrinsics;
-				int KernalSize;
+				int KernelSize;
 			};
 			CommonComputeUniformBuffer CommonComputeData;
 			CommonComputeData.Width = (float)Width;
 			CommonComputeData.Height = (float)Height;
 			CommonComputeData.UseWaveIntrinsics = false;
-			CommonComputeData.KernalSize = 5;
+			CommonComputeData.KernelSize = 5;
 
 			std::shared_ptr<jShaderBindingInstance> CurrentBindingInstance = nullptr;
 			int32 BindingPoint = 0;
@@ -1391,8 +1386,8 @@ void jRenderer::AOPass()
 				Vector4 Width[10];
 			};
 			jGaussianBlurKernel KernelData;
-			check(sizeof(KernelData.Width) >= kernal.size() * sizeof(float));
-			memcpy(KernelData.Width, kernal.data(), kernal.size() * sizeof(float));
+			check(sizeof(KernelData.Width) >= kernel.size() * sizeof(float));
+			memcpy(KernelData.Width, kernel.data(), kernel.size() * sizeof(float));
 
 			auto OneFrameGaussianKernelUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
 				jNameStatic("GaussianKernel"), jLifeTimeType::OneFrame, sizeof(KernelData)));
@@ -1441,6 +1436,94 @@ void jRenderer::AOPass()
 			g_rhi->DispatchCompute(RenderFrameContextPtr, X, Y, 1);
         }
     }
+    else if (gOptions.IsDenoiserGuassian() || gOptions.IsDenoiserGuassianBilateral())
+    {
+        DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, gOptions.IsDenoiserGuassianBilateral() ? "Bilateral" : "Gaussian", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
+        g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr.get());
+        {
+            g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GaussianH.get(), EResourceLayout::UAV);
+            g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr.get(), EResourceLayout::SHADER_READ_ONLY);
+
+            int32 Width = SCR_WIDTH;
+            int32 Height = SCR_HEIGHT;
+
+            struct CommonComputeUniformBuffer
+            {
+                float Width;
+                float Height;
+                float Sigma;
+                int KernelSize;
+                float BilateralIntensityScale;
+                Vector Padding0;
+            };
+            CommonComputeUniformBuffer CommonComputeData;
+            CommonComputeData.Width = (float)Width;
+            CommonComputeData.Height = (float)Height;
+            CommonComputeData.Sigma = gOptions.GaussianKernelSigma;
+            CommonComputeData.KernelSize = gOptions.GaussianKernelSize;
+            CommonComputeData.BilateralIntensityScale = gOptions.BilateralIntensityScale;
+
+            std::shared_ptr<jShaderBindingInstance> CurrentBindingInstance = nullptr;
+            int32 BindingPoint = 0;
+            jShaderBindingArray ShaderBindingArray;
+            jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
+
+            {
+                ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
+                    , ResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr.get(), nullptr)));
+            }
+
+            {
+                ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE
+                    , ResourceInlineAllactor.Alloc<jTextureResource>(GaussianH.get(), nullptr)));
+            }
+
+            auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
+                jNameStatic("CommonComputeUniformBuffer"), jLifeTimeType::OneFrame, sizeof(CommonComputeData)));
+            OneFrameUniformBuffer->UpdateBufferData(&CommonComputeData, sizeof(CommonComputeData));
+            {
+                ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
+                    , ResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
+            }
+
+            CurrentBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
+
+            jShaderBilateralComputeShader::ShaderPermutation ShaderPermutation;
+            ShaderPermutation.SetIndex<jShaderBilateralComputeShader::USE_GAUSSIAN_INSTEAD>(gOptions.IsDenoiserGuassian());
+            jShader* Shader = jShaderBilateralComputeShader::CreateShader(ShaderPermutation);
+
+            jShaderBindingLayoutArray ShaderBindingLayoutArray;
+            ShaderBindingLayoutArray.Add(CurrentBindingInstance->ShaderBindingsLayouts);
+
+            jPipelineStateInfo* computePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingLayoutArray, {});
+
+            computePipelineStateInfo->Bind(RenderFrameContextPtr);
+
+            jShaderBindingInstanceArray ShaderBindingInstanceArray;
+            ShaderBindingInstanceArray.Add(CurrentBindingInstance.get());
+
+            jShaderBindingInstanceCombiner ShaderBindingInstanceCombiner;
+            for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
+            {
+                // Add ShaderBindingInstanceCombiner data : DescriptorSets, DynamicOffsets
+                ShaderBindingInstanceCombiner.DescriptorSetHandles.Add(ShaderBindingInstanceArray[i]->GetHandle());
+                const std::vector<uint32>* pDynamicOffsetTest = ShaderBindingInstanceArray[i]->GetDynamicOffsets();
+                if (pDynamicOffsetTest && pDynamicOffsetTest->size())
+                {
+                    ShaderBindingInstanceCombiner.DynamicOffsets.Add((void*)pDynamicOffsetTest->data(), (int32)pDynamicOffsetTest->size());
+                }
+            }
+            ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
+
+            g_rhi->BindComputeShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), computePipelineStateInfo, ShaderBindingInstanceCombiner, 0);
+
+            int32 X = (Width / 16) + ((Width % 16) ? 1 : 0);
+            int32 Y = (Height / 16) + ((Height % 16) ? 1 : 0);
+            g_rhi->DispatchCompute(RenderFrameContextPtr, X, Y, 1);
+        }
+
+        g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), GaussianH.get());
+    }
     else
     {
         GaussianH = RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr;
@@ -1456,7 +1539,7 @@ void jRenderer::AOPass()
             DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "Reprojection AO", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
 
             jTexture* OutTexture = GaussianH.get();
-            jTexture* InTexture = HistoryBuffer.get();
+            jTexture* InTexture = jSceneRenderTarget::HistoryBuffer.get();
 
             int32 Width = OutTexture->Width;
             int32 Height = OutTexture->Height;
@@ -1542,7 +1625,7 @@ void jRenderer::AOPass()
         {
             DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "Copy HistoryBuffer", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
 
-            jTexture* OutTexture = HistoryBuffer.get();
+            jTexture* OutTexture = jSceneRenderTarget::HistoryBuffer.get();
             jTexture* InTexture = GaussianH.get();
 
             int32 Width = OutTexture->Width;
@@ -1672,7 +1755,9 @@ void jRenderer::AOPass()
 		shaderInfo.SetName(jNameStatic("AOApply"));
 		shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/AOApply_cs.hlsl"));
 		shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
-		static jShader* Shader = g_rhi->CreateShader(shaderInfo);
+        if (gOptions.ShowAOOnly)
+            shaderInfo.SetPreProcessors(jNameStatic("#define SHOW_AO_ONLY 1"));
+		jShader* Shader = g_rhi->CreateShader(shaderInfo);
 
 		jShaderBindingLayoutArray ShaderBindingLayoutArray;
 		ShaderBindingLayoutArray.Add(CurrentBindingInstance->ShaderBindingsLayouts);
@@ -1707,7 +1792,8 @@ void jRenderer::AOPass()
 	}
 	if (gOptions.ShowDebugRT)
 	{
-		DebugRTs.push_back(HistoryBuffer);
+        DebugRTs.push_back(GaussianH);
+		//DebugRTs.push_back(HistoryBuffer);
 	}
 #else // SUPPORT_RAYTRACING
 // SSAO
@@ -1969,7 +2055,7 @@ void jRenderer::PostProcess()
         jSceneRenderTarget* SceneRT = RenderFrameContextPtr->SceneRenderTargetPtr.get();
         jTexture* SourceRT = nullptr;
         jTexture* EyeAdaptationTextureCurrent = nullptr;
-        if (gOptions.BloomEyeAdaptation)
+        if (gOptions.BloomEyeAdaptation && !gOptions.ShowAOOnly)
         {
             //////////////////////////////////////////////////////////////////////////
             // Todo remove this hardcode
@@ -2384,11 +2470,12 @@ void jRenderer::DebugPasses()
 
         if (DebugRTs.size() > 0)
         {
-            float Y = 500.0f;
+            Vector2i Size(SCR_WIDTH / 4, SCR_HEIGHT / 4);
+            Vector2i Padding(10, 10);
             for(int32 i=0;i<(int32)DebugRTs.size();++i)
             {
-                DrawFullQuad(RenderFrameContextPtr, RenderFrameContextPtr->SceneRenderTargetPtr->FinalColorPtr, DebugRTs[i].get(), Vector4i(800, Y, SCR_WIDTH / 4, SCR_HEIGHT / 4));
-                Y += SCR_HEIGHT / 4;
+                DrawFullQuad(RenderFrameContextPtr, RenderFrameContextPtr->SceneRenderTargetPtr->FinalColorPtr, DebugRTs[i].get()
+                    , Vector4i(SCR_WIDTH - Size.x - Padding.x, SCR_HEIGHT - Size.y * (i + 1) - Padding.y, Size.x, Size.y));
             }
         }
     }
@@ -2608,22 +2695,37 @@ void jRenderer::Render()
             ImGui::SetNextWindowPos(ImVec2(400.0f, 27.0f), ImGuiCond_FirstUseEver);
             ImGui::SetNextWindowSize(ImVec2(200.0f, 80.0f), ImGuiCond_FirstUseEver);
             ImGui::Begin("RTAO Options", 0, ImGuiWindowFlags_AlwaysAutoResize);
-            //ImGui::SliderFloat("DirX", &gOptions.SunDir.x, -1.0f, 1.0f);
-            //ImGui::SliderFloat("DirY", &gOptions.SunDir.y, -1.0f, 1.0f);
-            //ImGui::SliderFloat("DirZ", &gOptions.SunDir.z, -1.0f, 1.0f);
-            //ImGui::SliderFloat("AnisoG", &gOptions.AnisoG, 0.0f, 1.0f);
-            //ImGui::Checkbox("EarthQuake with TLAS update", &gOptions.EarthQuake);
-            //ImGui::SliderFloat("Focal distance", &gOptions.FocalDistance, 3.0f, 40.0f);
-            //ImGui::SliderFloat("Lens radius", &gOptions.LensRadius, 0.0f, 0.2f);
+
+            ImGui::Checkbox("UseRTAO", &gOptions.UseRTAO);
+            ImGui::Checkbox("UseAOReprojection", &gOptions.UseAOReprojection);
+            ImGui::Checkbox("ShowDebugRT", &gOptions.ShowDebugRT);
+            ImGui::Checkbox("ShowAOOnly", &gOptions.ShowAOOnly);
             ImGui::SliderFloat("RTAO Radius", &gOptions.AORadius, 0.0f, 100.0f);
             ImGui::SliderFloat("RTAO Intensity", &gOptions.AOIntensity, 0.0f, 1.0f);
             ImGui::SliderInt("RTAO SamplePerPixel", &gOptions.SamplePerPixel, 1, 100);
-            ImGui::Checkbox("ShowDebugRT", &gOptions.ShowDebugRT);
-            ImGui::Checkbox("UseRTAO", &gOptions.UseRTAO);
-            ImGui::Checkbox("UseAOReprojection", &gOptions.UseAOReprojection);
-            ImGui::Checkbox("UseDenoiseGaussian", &gOptions.UseDenoiseGaussian);
+            if (ImGui::BeginCombo("Denoiser", gOptions.Denoiser, ImGuiComboFlags_None))
+            {
+                for (int32 i = 0; i < _countof(GDenoisers); ++i)
+                {
+                    const bool is_selected = (gOptions.Denoiser == GDenoisers[i]);
+                    if (ImGui::Selectable(GDenoisers[i], is_selected))
+                        gOptions.Denoiser = GDenoisers[i];
+                    if (is_selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+            if (gOptions.IsDenoiserGuassianBilateral())
+            {
+                ImGui::SliderFloat("BilateralIntensityScale", &gOptions.BilateralIntensityScale, 1.0f, 100.0f);
+            }
+
+            // The kernel size must be an odd number
             ImGui::SliderInt("GaussianKernelSize", &gOptions.GaussianKernelSize, 1, 20);
-            ImGui::SliderInt("GaussianKernelVar", &gOptions.GaussianKernelVar, 1, 20);
+            if ((gOptions.GaussianKernelSize % 2) == 0)
+                gOptions.GaussianKernelSize++;
+
+            ImGui::SliderFloat("GaussianKernelSigma", &gOptions.GaussianKernelSigma, 1.0f, 20.0f);
             ImGui::End();
 
             //ImGui::SetWindowFocus(szTitle);

@@ -1933,7 +1933,7 @@ void jRHI_Vulkan::UAVBarrier(jCommandBuffer* commandBuffer, jTexture* /*texture*
 	auto commandbuffer_vk = (jCommandBuffer_Vulkan*)commandBuffer;
 
 	VkMemoryBarrier barrier{};
-	barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+	barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
 	barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
 	barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
@@ -1953,7 +1953,7 @@ void jRHI_Vulkan::UAVBarrier(jCommandBuffer* commandBuffer, jBuffer* /*buffer*/)
     auto commandbuffer_vk = (jCommandBuffer_Vulkan*)commandBuffer;
 
     VkMemoryBarrier barrier{};
-    barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+    barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
     barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 

@@ -309,6 +309,16 @@ struct jShaderSpotLightPixelShader : public jShader
     DECLARE_SHADER_WITH_PERMUTATION(jShaderSpotLightPixelShader, Permutation)
 };
 
+struct jShaderBilateralComputeShader : public jShader
+{
+    DECLARE_DEFINE(USE_GAUSSIAN_INSTEAD, 0, 1);
+
+    using ShaderPermutation = jPermutation<USE_GAUSSIAN_INSTEAD>;
+    ShaderPermutation Permutation;
+
+    DECLARE_SHADER_WITH_PERMUTATION(jShaderBilateralComputeShader, Permutation)
+};
+
 
 struct jGraphicsPipelineShader
 {

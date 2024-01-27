@@ -14,6 +14,7 @@ struct jSceneRenderTarget
     static jTexture* FilteredEnvMap2;
     static jTexture* CubeEnvMap2;
     static class jFullscreenQuadPrimitive* GlobalFullscreenPrimitive;
+    static std::shared_ptr<jTexture> HistoryBuffer;
     //////////////////////////////////////////////////////////////////////////
 
     std::shared_ptr<jRenderTarget> ColorPtr;

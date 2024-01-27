@@ -212,7 +212,7 @@ void jView::PrepareViewUniformBufferShaderBindingInstance()
     ubo.VP = Camera->ViewProjection;
     ubo.PrevVP = Camera->PrevViewProjection;
 	ubo.EyeWorld = Camera->Pos;
-    ubo.ScreenRect = Vector4(0.0f, 0.0f, Camera->Width, Camera->Height);
+    ubo.ScreenRect = Vector4(0.0f, 0.0f, (float)Camera->Width, (float)Camera->Height);
 
     ViewUniformBufferPtr = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(jNameStatic("ViewUniformParameters"), jLifeTimeType::OneFrame, sizeof(ubo)));
     ViewUniformBufferPtr->UpdateBufferData(&ubo, sizeof(ubo));

@@ -15,6 +15,7 @@ std::shared_ptr<jRenderTarget> jSceneRenderTarget::CubeEnvMap;
 jTexture* jSceneRenderTarget::IrradianceMap2 = nullptr;
 jTexture* jSceneRenderTarget::FilteredEnvMap2 = nullptr;
 jTexture* jSceneRenderTarget::CubeEnvMap2 = nullptr;
+std::shared_ptr<jTexture> jSceneRenderTarget::HistoryBuffer;
 
 // todo : remove this.
 #include "jPrimitiveUtil.h"

@@ -259,20 +259,24 @@ void MyRaygenShader()
     float3 WorldNormal = GBuffer1_Normal.SampleLevel(AlbedoTextureSampler, UV, 0).xyz;
 
     float3 FinalAO = 0;//float3(1, 1, 1);
-    if (!g_sceneCB.Clear)
+    if (g_sceneCB.Clear)
     {
-        //FinalAO = RenderTarget[DispatchRaysIndex().xy].xyz;
+        RenderTarget[DispatchRaysIndex().xy].w = 0;
+    }
+    else
+    {
+        FinalAO = RenderTarget[DispatchRaysIndex().xy].xyz;
     }
 
-    //float AccumulateCount = g_sceneCB.AOAccumulateCount;
-    //float AccumulateCount = RenderTarget[DispatchRaysIndex().xy].w;
-    //float AccumulateCount = 0;
+    float AccumulateCount = RenderTarget[DispatchRaysIndex().xy].w;
+    if (AccumulateCount > 500)
+        return;
 
     for(int i=0;i<g_sceneCB.SamplePerPixel;++i)
     {
         RayDesc ray;
         ray.Origin = WorldPos;
-        ray.Direction = random_in_hemisphere(WorldNormal, g_sceneCB.FrameTime + i*10);
+        ray.Direction = random_in_hemisphere(WorldNormal, g_sceneCB.FrameTime + i);
 
         // Set TMin to a non-zero small value to avoid aliasing issues due to floating - point errors.
         // TMin should be kept small to prevent missing geometry at close contact areas.
@@ -282,14 +286,12 @@ void MyRaygenShader()
         RayPayload payload = { float4(1.0f, 1.0f, 1.0f, 1.0f) };
         TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 0, 0, ray, payload);
 
-        //++AccumulateCount;
+        ++AccumulateCount;
 
         // Incremental Average : https://blog.demofox.org/2016/08/23/incremental-averaging/
-        //FinalAO = lerp(FinalAO.xyz, payload.color.xyz, 1.0 / AccumulateCount);
-        FinalAO += payload.color.xyz;
+        FinalAO = lerp(FinalAO.xyz, payload.color.xyz, 1.0 / AccumulateCount);
     }
-    FinalAO /= g_sceneCB.SamplePerPixel;
-    RenderTarget[DispatchRaysIndex().xy] = float4(FinalAO, g_sceneCB.SamplePerPixel);
+    RenderTarget[DispatchRaysIndex().xy] = float4(FinalAO, AccumulateCount);
 }
 
 [shader("anyhit")]

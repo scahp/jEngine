@@ -469,6 +469,7 @@ void jGame::Release()
     jSceneRenderTarget::IrradianceMap.reset();
 	jSceneRenderTarget::FilteredEnvMap.reset();
 	jSceneRenderTarget::CubeEnvMap.reset();
+	jSceneRenderTarget::HistoryBuffer.reset();
 }
 
 void jGame::SpawnTestPrimitives()

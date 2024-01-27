@@ -230,3 +230,11 @@ IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderSpotLightPixelShader
     , ""
 	, "main"
     , EShaderAccessStageFlag::FRAGMENT)
+
+//////////////////////////////////////////////////////////////////////////
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderBilateralComputeShader
+    , "BilateralCS"
+    , "Resource/Shaders/hlsl/bilateralfiltering_cs.hlsl"
+    , ""
+	, "Bilateral"
+    , EShaderAccessStageFlag::COMPUTE)
