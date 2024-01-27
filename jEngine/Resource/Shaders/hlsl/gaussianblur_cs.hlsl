@@ -16,7 +16,7 @@ cbuffer ComputeCommon : register(b2)
 
 struct jKernel
 {
-    float4 Data[10];
+    float4 Data[20];
 };
 cbuffer KernelBuffer : register(b3) { jKernel Kernal; }
 

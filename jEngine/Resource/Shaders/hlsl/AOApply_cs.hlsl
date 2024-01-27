@@ -17,6 +17,6 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     if (GlobalInvocationID.x >= ComputeCommon.Width || GlobalInvocationID.y >= ComputeCommon.Height)
         return;
     
-    //resultImage[int2(GlobalInvocationID.xy)].xyz *= lerp(float3(1.0f, 1.0f, 1.0f), inputImage[uint2(GlobalInvocationID.xy)].xyz, ComputeCommon.AOIntensity);
-    resultImage[int2(GlobalInvocationID.xy)].xyz = lerp(float3(1.0f, 1.0f, 1.0f), inputImage[uint2(GlobalInvocationID.xy)].xyz, ComputeCommon.AOIntensity);
+    resultImage[int2(GlobalInvocationID.xy)].xyz *= lerp(float3(1.0f, 1.0f, 1.0f), inputImage[uint2(GlobalInvocationID.xy)].xyz, ComputeCommon.AOIntensity);
+    //resultImage[int2(GlobalInvocationID.xy)].xyz = lerp(float3(1.0f, 1.0f, 1.0f), inputImage[uint2(GlobalInvocationID.xy)].xyz, ComputeCommon.AOIntensity);
 }

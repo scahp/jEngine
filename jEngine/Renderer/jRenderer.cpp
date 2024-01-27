@@ -1189,6 +1189,7 @@ void jRenderer::AOPass()
             , ETextureFormat::RGBA16F, ETextureCreateFlag::UAV, EResourceLayout::UAV);
     }
 
+    if (gOptions.UseDenoiseGaussian)
     {
         DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "Gaussian", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
 
@@ -1214,7 +1215,7 @@ void jRenderer::AOPass()
 			return kernel;
 		};
 
-        std::vector<float> kernal = createGaussianKernel(5, 5);
+        std::vector<float> kernal = createGaussianKernel(gOptions.GaussianKernelSize, gOptions.GaussianKernelVar);
 		//auto applyGaussianFilter = [](const std::vector<float>& input, const std::vector<float>& kernel) -> std::vector<float> 
   //      {
 		//	int kernelSize = kernel.size();
@@ -1258,7 +1259,7 @@ void jRenderer::AOPass()
 		    CommonComputeData.Width = (float)Width;
 		    CommonComputeData.Height = (float)Height;
 		    CommonComputeData.UseWaveIntrinsics = false;
-		    CommonComputeData.KernalSize = 5;
+		    CommonComputeData.KernalSize = kernal.size();
 
 		    std::shared_ptr<jShaderBindingInstance> CurrentBindingInstance = nullptr;
 		    int32 BindingPoint = 0;
@@ -1285,7 +1286,7 @@ void jRenderer::AOPass()
 
 		    struct jGaussianBlurKernel
 		    {
-			    Vector4 Width[10];
+			    Vector4 Width[20];
 		    };
             jGaussianBlurKernel KernelData;
             check(sizeof(KernelData.Width) >= kernal.size() * sizeof(float));
@@ -1440,6 +1441,10 @@ void jRenderer::AOPass()
 			g_rhi->DispatchCompute(RenderFrameContextPtr, X, Y, 1);
         }
     }
+    else
+    {
+        GaussianH = RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr;
+    }
 
     g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), GaussianH.get());
 
@@ -1486,7 +1491,7 @@ void jRenderer::AOPass()
             CommonComputeData.Height = Height;
 
             auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
-                jNameStatic("EyeAdaptationUniformBuffer"), jLifeTimeType::OneFrame, sizeof(CommonComputeData)));
+                jNameStatic("ReprojectionAOUniformBuffer"), jLifeTimeType::OneFrame, sizeof(CommonComputeData)));
             OneFrameUniformBuffer->UpdateBufferData(&CommonComputeData, sizeof(CommonComputeData));
             {
                 ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
@@ -2602,11 +2607,11 @@ void jRenderer::Render()
 #if ENABLE_PBR
             ImGui::SetNextWindowPos(ImVec2(400.0f, 27.0f), ImGuiCond_FirstUseEver);
             ImGui::SetNextWindowSize(ImVec2(200.0f, 80.0f), ImGuiCond_FirstUseEver);
-            ImGui::Begin("Camera Options", 0, ImGuiWindowFlags_AlwaysAutoResize);
-            ImGui::SliderFloat("DirX", &gOptions.SunDir.x, -1.0f, 1.0f);
-            ImGui::SliderFloat("DirY", &gOptions.SunDir.y, -1.0f, 1.0f);
-            ImGui::SliderFloat("DirZ", &gOptions.SunDir.z, -1.0f, 1.0f);
-            ImGui::SliderFloat("AnisoG", &gOptions.AnisoG, 0.0f, 1.0f);
+            ImGui::Begin("RTAO Options", 0, ImGuiWindowFlags_AlwaysAutoResize);
+            //ImGui::SliderFloat("DirX", &gOptions.SunDir.x, -1.0f, 1.0f);
+            //ImGui::SliderFloat("DirY", &gOptions.SunDir.y, -1.0f, 1.0f);
+            //ImGui::SliderFloat("DirZ", &gOptions.SunDir.z, -1.0f, 1.0f);
+            //ImGui::SliderFloat("AnisoG", &gOptions.AnisoG, 0.0f, 1.0f);
             //ImGui::Checkbox("EarthQuake with TLAS update", &gOptions.EarthQuake);
             //ImGui::SliderFloat("Focal distance", &gOptions.FocalDistance, 3.0f, 40.0f);
             //ImGui::SliderFloat("Lens radius", &gOptions.LensRadius, 0.0f, 0.2f);
@@ -2616,6 +2621,9 @@ void jRenderer::Render()
             ImGui::Checkbox("ShowDebugRT", &gOptions.ShowDebugRT);
             ImGui::Checkbox("UseRTAO", &gOptions.UseRTAO);
             ImGui::Checkbox("UseAOReprojection", &gOptions.UseAOReprojection);
+            ImGui::Checkbox("UseDenoiseGaussian", &gOptions.UseDenoiseGaussian);
+            ImGui::SliderInt("GaussianKernelSize", &gOptions.GaussianKernelSize, 1, 20);
+            ImGui::SliderInt("GaussianKernelVar", &gOptions.GaussianKernelVar, 1, 20);
             ImGui::End();
 
             //ImGui::SetWindowFocus(szTitle);

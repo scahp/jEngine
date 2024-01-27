@@ -143,7 +143,7 @@ float3 random_in_unit_sphere(int seed)
     float noiseY = (frac(sin(dot(uv, float2(12.9898, 78.233) * r * 2.0f)) * 43758.5453));
     float noiseZ = (frac(sin(dot(uv, float2(12.9898, 78.233) * r)) * 43758.5453));
 
-    float3 randomUniSphere = float3(noiseX, noiseY, noiseZ) * 2.0f - 0.5f;
+    float3 randomUniSphere = float3(noiseX, noiseY, noiseZ) * 2.0f - 1.0f;
     if (length(randomUniSphere) <= 1.0f)
         return randomUniSphere;
 
@@ -258,10 +258,10 @@ void MyRaygenShader()
     float3 WorldPos = GBuffer0_Pos.SampleLevel(AlbedoTextureSampler, UV, 0).xyz;
     float3 WorldNormal = GBuffer1_Normal.SampleLevel(AlbedoTextureSampler, UV, 0).xyz;
 
-    float3 FinalAO = float3(1, 1, 1);
+    float3 FinalAO = 0;//float3(1, 1, 1);
     if (!g_sceneCB.Clear)
     {
-        FinalAO = RenderTarget[DispatchRaysIndex().xy].xyz;
+        //FinalAO = RenderTarget[DispatchRaysIndex().xy].xyz;
     }
 
     //float AccumulateCount = g_sceneCB.AOAccumulateCount;
@@ -286,9 +286,10 @@ void MyRaygenShader()
 
         // Incremental Average : https://blog.demofox.org/2016/08/23/incremental-averaging/
         //FinalAO = lerp(FinalAO.xyz, payload.color.xyz, 1.0 / AccumulateCount);
-        FinalAO = payload.color.xyz;
+        FinalAO += payload.color.xyz;
     }
-    RenderTarget[DispatchRaysIndex().xy] = float4(FinalAO, 1.0f);
+    FinalAO /= g_sceneCB.SamplePerPixel;
+    RenderTarget[DispatchRaysIndex().xy] = float4(FinalAO, g_sceneCB.SamplePerPixel);
 }
 
 [shader("anyhit")]
