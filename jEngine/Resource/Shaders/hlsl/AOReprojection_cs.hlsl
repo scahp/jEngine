@@ -1,6 +1,13 @@
+
+#ifndef USE_DISCONTINUITY_WEIGHT
+#define USE_DISCONTINUITY_WEIGHT 0
+#endif // USE_DISCONTINUITY_WEIGHT
+
 RWTexture2D<float4> resultImage : register(u0);
-Texture2D inputImage : register(t1);
+Texture2D HistoryBuffer : register(t1);
 Texture2D VelocityBuffer : register(t2);
+Texture2D DepthBuffer : register(t3);
+RWTexture2D<float> HistoryDepthBuffer : register(u4);
 
 struct CommonComputeUniformBuffer
 {
@@ -10,7 +17,7 @@ struct CommonComputeUniformBuffer
     float Padding0;
 };
 
-cbuffer ComputeCommon : register(b3) { CommonComputeUniformBuffer ComputeCommon; }
+cbuffer ComputeCommon : register(b5) { CommonComputeUniformBuffer ComputeCommon; }
 
 [numthreads(16, 16, 1)]
 void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
@@ -26,7 +33,14 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         return;
 
     float3 currentColor = resultImage[PixelPos].xyz;
-    float3 historyColor = inputImage[OldPixelPos];
-
-    resultImage[PixelPos].xyz = lerp(resultImage[PixelPos].xyz, historyColor, 0.9);
+    float3 historyColor = HistoryBuffer[OldPixelPos].xyz;
+    
+    float ReprojectionWeight = 0.9;
+    #if USE_DISCONTINUITY_WEIGHT
+    float DiscontinuityWeight = abs(DepthBuffer[PixelPos].x - HistoryDepthBuffer[PixelPos].x) < 0.01;
+    ReprojectionWeight *= DiscontinuityWeight;
+    HistoryDepthBuffer[PixelPos].x = DepthBuffer[PixelPos].x;
+    #endif
+    
+    resultImage[PixelPos].xyz = lerp(resultImage[PixelPos].xyz, historyColor, ReprojectionWeight);
 }

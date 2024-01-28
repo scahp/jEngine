@@ -188,8 +188,10 @@ public:
 
 #if ENABLE_PROFILE_GPU
 #define SCOPE_GPU_PROFILE(RenderFrameContextPtr, Name) jScopedProfile_GPU Name##ScopedProfileGPU(RenderFrameContextPtr, jNameStatic(#Name));
+#define SCOPE_GPU_PROFILE_NAME(RenderFrameContextPtr, Name) jScopedProfile_GPU Name##ScopedProfileGPU(RenderFrameContextPtr, Name);
 #else
 #define SCOPE_GPU_PROFILE(RenderFrameContextPtr, Name)
+#define SCOPE_GPU_PROFILE_NAME(RenderFrameContextPtr, Name) 
 #endif
 
 //////////////////////////////////////////////////////////////////////////

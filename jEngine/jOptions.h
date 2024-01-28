@@ -32,15 +32,16 @@ struct jOptions
     bool UseAOReprojection = true;
     const char* Denoiser = GDenoisers[2];       // Select Bilateral
     float BilateralIntensityScale = 10.0f;
-    int32 GaussianKernelSize = 9;
+    int32 GaussianKernelSize = 5;
     float GaussianKernelSigma = 10.0f;
     bool ShowAOOnly = false;
     bool ShowDebugRT = true;
-    bool UseAccumultateRay = true;
+    bool UseAccumulateRay = true;
+    bool UseDiscontinuityWeight = true;
 
     bool IsDenoiserGuassian() const { return GDenoisers[0] == Denoiser; }
     bool IsDenoiserGuassianSeparable() const { return GDenoisers[1] == Denoiser; }
-    bool IsDenoiserGuassianBilateral() const { return GDenoisers[2] == Denoiser; }
+    bool IsDenoiserBilateral() const { return GDenoisers[2] == Denoiser; }
 };
 
 extern jOptions gOptions;

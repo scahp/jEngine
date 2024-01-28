@@ -928,7 +928,7 @@ void jRenderer::AOPass()
         
         static auto OldMatrix = m_sceneCB.projectionToWorld;
         static int32 AOAccumulate = 1;
-        if (OldMatrix != m_sceneCB.projectionToWorld || !gOptions.UseAccumultateRay)
+        if (OldMatrix != m_sceneCB.projectionToWorld || !gOptions.UseAccumulateRay)
         {
             OldMatrix = m_sceneCB.projectionToWorld;
             AOAccumulate = 1;
@@ -1181,12 +1181,22 @@ void jRenderer::AOPass()
     if (!jSceneRenderTarget::HistoryBuffer || jSceneRenderTarget::HistoryBuffer->Width != (int32)SCR_WIDTH || jSceneRenderTarget::HistoryBuffer->Height != (int32)SCR_HEIGHT)
     {
         jSceneRenderTarget::HistoryBuffer = g_rhi->Create2DTexture((uint32)SCR_WIDTH, (uint32)SCR_HEIGHT, (uint32)1, (uint32)1
-            , ETextureFormat::RGBA16F, ETextureCreateFlag::UAV, EResourceLayout::UAV);
+            , ETextureFormat::RGB16F, ETextureCreateFlag::UAV, EResourceLayout::UAV);
+    }
+
+    if (RenderFrameContextPtr->SceneRenderTargetPtr && RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr)
+    {
+        if (!jSceneRenderTarget::HistoryDepthBuffer || jSceneRenderTarget::HistoryDepthBuffer->Width != (int32)SCR_WIDTH || jSceneRenderTarget::HistoryDepthBuffer->Height != (int32)SCR_HEIGHT)
+        {            
+            jSceneRenderTarget::HistoryDepthBuffer = g_rhi->Create2DTexture((uint32)SCR_WIDTH, (uint32)SCR_HEIGHT, (uint32)1, (uint32)1
+                , ETextureFormat::R8, ETextureCreateFlag::UAV, EResourceLayout::UAV);
+        }
     }
 
     if (gOptions.IsDenoiserGuassianSeparable())
     {
         DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "GaussianSeparable", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
+        SCOPE_GPU_PROFILE(RenderFrameContextPtr, GaussianSeparable);
 
 		auto createGaussianKernel = [](int32 kernelSize, float sigma) -> std::vector<float> 
         {
@@ -1211,31 +1221,11 @@ void jRenderer::AOPass()
 		};
 
         std::vector<float> kernel = createGaussianKernel(gOptions.GaussianKernelSize, gOptions.GaussianKernelSigma);
-		//auto applyGaussianFilter = [](const std::vector<float>& input, const std::vector<float>& kernel) -> std::vector<float> 
-  //      {
-		//	int kernelSize = kernel.size();
-		//	int center = kernelSize / 2;
-		//	int dataSize = input.size();
-		//	std::vector<float> output(dataSize, 0.0);
-
-		//	for (int32 i = 0; i < dataSize; ++i)
-  //          {
-		//		for (int32 j = 0; j < kernelSize; ++j)
-  //              {
-		//			int32 dataIndex = i + j - center;
-		//			if (dataIndex >= 0 && dataIndex < dataSize) 
-  //                  {
-		//				output[i] += input[dataIndex] * kernel[j];
-		//			}
-		//		}
-		//	}
-
-		//	return output;
-		//};
 
         g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr.get());
         {
             DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "Vertical", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
+            SCOPE_GPU_PROFILE(RenderFrameContextPtr, Vertical);
 
             g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GaussianV.get(), EResourceLayout::UAV);
             g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr.get(), EResourceLayout::SHADER_READ_ONLY);
@@ -1338,6 +1328,7 @@ void jRenderer::AOPass()
 
         {
             DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "Horizon", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
+            SCOPE_GPU_PROFILE(RenderFrameContextPtr, Horizon);
 			
             g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GaussianH.get(), EResourceLayout::UAV);
             g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GaussianV.get(), EResourceLayout::SHADER_READ_ONLY);
@@ -1436,9 +1427,12 @@ void jRenderer::AOPass()
 			g_rhi->DispatchCompute(RenderFrameContextPtr, X, Y, 1);
         }
     }
-    else if (gOptions.IsDenoiserGuassian() || gOptions.IsDenoiserGuassianBilateral())
+    else if (gOptions.IsDenoiserGuassian() || gOptions.IsDenoiserBilateral())
     {
-        DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, gOptions.IsDenoiserGuassianBilateral() ? "Bilateral" : "Gaussian", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
+        DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, gOptions.IsDenoiserBilateral() ? "Bilateral" : "Gaussian", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
+        
+        jName ProfileTitle = gOptions.IsDenoiserBilateral() ? jNameStatic("Bilateral") : jNameStatic("Gaussian");
+        SCOPE_GPU_PROFILE_NAME(RenderFrameContextPtr, ProfileTitle);
         g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr.get());
         {
             g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GaussianH.get(), EResourceLayout::UAV);
@@ -1537,6 +1531,7 @@ void jRenderer::AOPass()
         if (1)
         {
             DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "Reprojection AO", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
+            SCOPE_GPU_PROFILE(RenderFrameContextPtr, ReprojectionAO);
 
             jTexture* OutTexture = GaussianH.get();
             jTexture* InTexture = jSceneRenderTarget::HistoryBuffer.get();
@@ -1561,6 +1556,12 @@ void jRenderer::AOPass()
 
             ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::COMPUTE
                 , ResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[3]->GetTexture(), nullptr)));
+
+            ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::COMPUTE
+                , ResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), nullptr)));
+
+            ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE
+                , ResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->HistoryDepthBuffer.get(), nullptr)));
 
             struct CommonComputeUniformBuffer
             {
@@ -1587,7 +1588,11 @@ void jRenderer::AOPass()
             shaderInfo.SetName(jNameStatic("ReprojectionAO"));
             shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/AOReprojection_cs.hlsl"));
             shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
-            static jShader* Shader = g_rhi->CreateShader(shaderInfo);
+            if (gOptions.UseDiscontinuityWeight)
+            {
+                shaderInfo.SetPreProcessors(jNameStatic("#define USE_DISCONTINUITY_WEIGHT 1"));
+            }
+            jShader* Shader = g_rhi->CreateShader(shaderInfo);
 
             jShaderBindingLayoutArray ShaderBindingLayoutArray;
             ShaderBindingLayoutArray.Add(CurrentBindingInstance->ShaderBindingsLayouts);
@@ -1624,6 +1629,7 @@ void jRenderer::AOPass()
         if (1)
         {
             DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "Copy HistoryBuffer", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
+            SCOPE_GPU_PROFILE(RenderFrameContextPtr, CopyHistoryBuffer);
 
             jTexture* OutTexture = jSceneRenderTarget::HistoryBuffer.get();
             jTexture* InTexture = GaussianH.get();
@@ -1706,6 +1712,7 @@ void jRenderer::AOPass()
 	// Apply AO to Final color 
 	{
         DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "Apply AO", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
+        SCOPE_GPU_PROFILE(RenderFrameContextPtr, ApplyAO);
 
 		jTexture* OutTexture = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture();
 		jTexture* InTexture = GaussianH.get();
@@ -2698,9 +2705,15 @@ void jRenderer::Render()
 
             ImGui::Checkbox("UseRTAO", &gOptions.UseRTAO);
             ImGui::Checkbox("UseAOReprojection", &gOptions.UseAOReprojection);
+            if (!gOptions.UseAOReprojection)
+                ImGui::BeginDisabled();
+            ImGui::Checkbox("UseDiscontinuityWeight", &gOptions.UseDiscontinuityWeight);
+            if (!gOptions.UseAOReprojection)
+                ImGui::EndDisabled();
+
             ImGui::Checkbox("ShowDebugRT", &gOptions.ShowDebugRT);
             ImGui::Checkbox("ShowAOOnly", &gOptions.ShowAOOnly);
-            ImGui::Checkbox("UseAccumultateRay", &gOptions.UseAccumultateRay);
+            ImGui::Checkbox("UseAccumulateRay", &gOptions.UseAccumulateRay);
             ImGui::SliderFloat("RTAO Radius", &gOptions.AORadius, 0.0f, 100.0f);
             ImGui::SliderFloat("RTAO Intensity", &gOptions.AOIntensity, 0.0f, 1.0f);
             ImGui::SliderInt("RTAO SamplePerPixel", &gOptions.SamplePerPixel, 1, 100);
@@ -2716,7 +2729,7 @@ void jRenderer::Render()
                 }
                 ImGui::EndCombo();
             }
-            if (gOptions.IsDenoiserGuassianBilateral())
+            if (gOptions.IsDenoiserBilateral())
             {
                 ImGui::SliderFloat("BilateralIntensityScale", &gOptions.BilateralIntensityScale, 1.0f, 100.0f);
             }
