@@ -20,7 +20,7 @@ struct SceneConstantBuffer
     float3 lightAmbientColor;
     uint NumOfStartingRay;
     float3 lightDiffuseColor;
-    float FrameTime;
+    int FrameNumber;
     float3 cameraDirection;
     float AORadius;
     float3 lightDirection;
@@ -276,8 +276,8 @@ void MyRaygenShader()
     {
         RayDesc ray;
         ray.Origin = WorldPos;
-        ray.Direction = random_in_hemisphere(WorldNormal, g_sceneCB.FrameTime + i);
-
+        ray.Direction = random_in_hemisphere(WorldNormal, g_sceneCB.FrameNumber + i);
+        
         // Set TMin to a non-zero small value to avoid aliasing issues due to floating - point errors.
         // TMin should be kept small to prevent missing geometry at close contact areas.
         ray.TMin = 0.001;

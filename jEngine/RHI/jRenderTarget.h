@@ -94,6 +94,7 @@ struct jRenderTarget final : public std::enable_shared_from_this<jRenderTarget>
 
     EResourceLayout GetLayout() const { return TexturePtr ? TexturePtr->GetLayout() : EResourceLayout::UNDEFINED; }
     jTexture* GetTexture() const { return TexturePtr.get(); }
+    const std::shared_ptr<jTexture>& GetTexturePtr() const { return TexturePtr; }
 
     jRenderTargetInfo Info;
     std::shared_ptr<jTexture> TexturePtr;

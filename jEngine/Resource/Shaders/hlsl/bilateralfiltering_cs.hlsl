@@ -12,8 +12,6 @@ struct CommonComputeUniformBuffer
     float Height;
     float Sigma;
     int KernalSize;
-    float BilateralIntensityScale;
-    float3 Padding0;
 };
 
 cbuffer ComputeCommon : register(b2)
@@ -56,7 +54,7 @@ void Bilateral(uint3 GlobalInvocationID : SV_DispatchThreadID)
             float2 CurPixelPos = clamp(PixelPos + float2(x, y), float2(0, 0), float2(ComputeCommon.Width, ComputeCommon.Height));
             float3 CurrentPixel = inputImage[CurPixelPos].xyz;
             
-            float PixelIntensityDifference = (GetIntensity(CurrentPixel) - CenterPixelLuminance) * ComputeCommon.BilateralIntensityScale;
+            float PixelIntensityDifference = saturate(GetIntensity(CurrentPixel) - CenterPixelLuminance) * center;
             float Gi = Gaussian(PixelIntensityDifference * PixelIntensityDifference, ComputeCommon.Sigma);
             
             #if USE_GAUSSIAN_INSTEAD

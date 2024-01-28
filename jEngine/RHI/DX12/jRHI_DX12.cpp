@@ -815,6 +815,8 @@ bool jRHI_DX12::CreateShaderInternal(jShader* OutShader, const jShaderInfo& shad
             ShaderFile.ReadFileToBuffer(false);
             std::string ShaderText;
 
+            shaderInfo.GetShaderTypeDefines(ShaderText, shaderInfo.GetShaderType());
+
             if (shaderInfo.GetPreProcessors().GetStringLength() > 0)
             {
                 ShaderText += shaderInfo.GetPreProcessors().ToStr();

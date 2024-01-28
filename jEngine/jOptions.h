@@ -30,9 +30,8 @@ struct jOptions
     int32 SamplePerPixel = 1;
     bool UseRTAO = true;
     bool UseAOReprojection = true;
-    const char* Denoiser = GDenoisers[2];       // Select Bilateral
-    float BilateralIntensityScale = 10.0f;
-    int32 GaussianKernelSize = 5;
+    const char* Denoiser = GDenoisers[1];       // Select GaussianSeparable
+    int32 GaussianKernelSize = 9;
     float GaussianKernelSigma = 10.0f;
     bool ShowAOOnly = false;
     bool ShowDebugRT = true;

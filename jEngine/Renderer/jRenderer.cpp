@@ -897,7 +897,7 @@ void jRenderer::AOPass()
             Vector lightAmbientColor;
             uint32 NumOfStartingRay;
             Vector lightDiffuseColor;
-            float FrameTime;
+            int32 FrameNumber;
             Vector cameraDirection;
             float AORadius;
             Vector lightDirection;
@@ -921,7 +921,7 @@ void jRenderer::AOPass()
         m_sceneCB.lensRadius = gOptions.LensRadius;
         m_sceneCB.NumOfStartingRay = 20;
         m_sceneCB.ViewRect = Vector4(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT);
-        m_sceneCB.FrameTime = (float)g_rhi->GetCurrentFrameNumber();
+        m_sceneCB.FrameNumber = (int32)g_rhi->GetCurrentFrameNumber();
         m_sceneCB.AORadius = gOptions.AORadius;
         m_sceneCB.AOIntensity = gOptions.AOIntensity;
         m_sceneCB.SamplePerPixel = (uint32)Max(gOptions.SamplePerPixel, 0);
@@ -1173,10 +1173,12 @@ void jRenderer::AOPass()
         }
     }
 
-    static auto GaussianV = g_rhi->Create2DTexture((uint32)SCR_WIDTH, (uint32)SCR_HEIGHT, (uint32)1, (uint32)1
+    auto GaussianV = g_rhi->Create2DTexture((uint32)SCR_WIDTH, (uint32)SCR_HEIGHT, (uint32)1, (uint32)1
 	    , ETextureFormat::RGBA16F, ETextureCreateFlag::UAV, EResourceLayout::UAV);
-    static auto GaussianH = g_rhi->Create2DTexture((uint32)SCR_WIDTH, (uint32)SCR_HEIGHT, (uint32)1, (uint32)1
+    auto GaussianH = g_rhi->Create2DTexture((uint32)SCR_WIDTH, (uint32)SCR_HEIGHT, (uint32)1, (uint32)1
         , ETextureFormat::RGBA16F, ETextureCreateFlag::UAV, EResourceLayout::UAV);
+    static auto GaussianH2 = g_rhi->CreateRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f), ETextureCreateFlag::UAV });
+    jTexture* ResultProjection = nullptr;
 
     if (!jSceneRenderTarget::HistoryBuffer || jSceneRenderTarget::HistoryBuffer->Width != (int32)SCR_WIDTH || jSceneRenderTarget::HistoryBuffer->Height != (int32)SCR_HEIGHT)
     {
@@ -1447,15 +1449,12 @@ void jRenderer::AOPass()
                 float Height;
                 float Sigma;
                 int KernelSize;
-                float BilateralIntensityScale;
-                Vector Padding0;
             };
             CommonComputeUniformBuffer CommonComputeData;
             CommonComputeData.Width = (float)Width;
             CommonComputeData.Height = (float)Height;
             CommonComputeData.Sigma = gOptions.GaussianKernelSigma;
             CommonComputeData.KernelSize = gOptions.GaussianKernelSize;
-            CommonComputeData.BilateralIntensityScale = gOptions.BilateralIntensityScale;
 
             std::shared_ptr<jShaderBindingInstance> CurrentBindingInstance = nullptr;
             int32 BindingPoint = 0;
@@ -1520,15 +1519,18 @@ void jRenderer::AOPass()
     }
     else
     {
-        GaussianH = RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr;
+        //GaussianH = RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr;
     }
 
     g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), GaussianH.get());
 
+    std::shared_ptr<jTexture> AfterProjection;
+
     if (gOptions.UseAOReprojection)
     {
         // Temporal Previous Frame AO Reprojection
-        if (1)
+        bool IsCompute = false;
+        if (IsCompute)
         {
             DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "Reprojection AO", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
             SCOPE_GPU_PROFILE(RenderFrameContextPtr, ReprojectionAO);
@@ -1568,11 +1570,12 @@ void jRenderer::AOPass()
                 int32 Width;
                 int32 Height;
                 int32 UseWaveIntrinsics;
-                float Padding0;
+                int32 FrameNumber;
             };
             CommonComputeUniformBuffer CommonComputeData;
             CommonComputeData.Width = Width;
             CommonComputeData.Height = Height;
+            CommonComputeData.FrameNumber = g_rhi->GetCurrentFrameNumber();
 
             auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
                 jNameStatic("ReprojectionAOUniformBuffer"), jLifeTimeType::OneFrame, sizeof(CommonComputeData)));
@@ -1621,10 +1624,244 @@ void jRenderer::AOPass()
             int32 X = (Width / 16) + ((Width % 16) ? 1 : 0);
             int32 Y = (Height / 16) + ((Height % 16) ? 1 : 0);
             g_rhi->DispatchCompute(RenderFrameContextPtr, X, Y, 1);
+
+            g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), GaussianH.get());
+
+            AfterProjection = GaussianH;
+        }
+        else
+        {
+            DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "Reprojection AO", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
+            SCOPE_GPU_PROFILE(RenderFrameContextPtr, ReprojectionAO); 
+
+            std::shared_ptr<jRenderTarget> OutTexture = GaussianH2;
+            jTexture* InTexture = jSceneRenderTarget::HistoryBuffer.get();
+
+            int32 Width = OutTexture->Info.Width;
+            int32 Height = OutTexture->Info.Height;
+
+            // Compute Pipeline
+            g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), InTexture, EResourceLayout::SHADER_READ_ONLY);
+            g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GaussianH.get(), EResourceLayout::SHADER_READ_ONLY);
+            g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[3]->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+            g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::HistoryDepthBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
+            g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+            g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), OutTexture->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
+
+            jRasterizationStateInfo* RasterizationState = nullptr;
+            switch (g_rhi->GetSelectedMSAASamples())
+            {
+            case EMSAASamples::COUNT_1:
+                RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)1, true, 0.2f, false, false>::Create();
+                break;
+            case EMSAASamples::COUNT_2:
+                RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)2, true, 0.2f, false, false>::Create();
+                break;
+            case EMSAASamples::COUNT_4:
+                RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)4, true, 0.2f, false, false>::Create();
+                break;
+            case EMSAASamples::COUNT_8:
+                RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)8, true, 0.2f, false, false>::Create();
+                break;
+            default:
+                check(0);
+                break;
+            }
+            auto DepthStencilState = TDepthStencilStateInfo<false, false, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
+            auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ZERO, EBlendFactor::ONE, EBlendOp::ADD, EColorMask::ALL>::Create();
+
+            const int32 RTWidth = Width;
+            const int32 RTHeight = Height;
+
+            // Create fixed pipeline states
+            jPipelineStateFixedInfo PostProcessPassPipelineStateFixed(RasterizationState, DepthStencilState, BlendingState
+                , jViewport((float)0, (float)0, (float)RTWidth, (float)RTHeight), jScissor(0, 0, RTWidth, RTHeight), gOptions.UseVRS);
+
+            const jRTClearValue ClearColor = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f);
+            const jRTClearValue ClearDepth = jRTClearValue(1.0f, 0);
+
+            jRenderPassInfo renderPassInfo;
+            jAttachment color = jAttachment(OutTexture, EAttachmentLoadStoreOp::LOAD_STORE
+                , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, EResourceLayout::UNDEFINED, EResourceLayout::COLOR_ATTACHMENT);
+            renderPassInfo.Attachments.push_back(color);
+
+            jSubpass subpass;
+            subpass.Initialize(0, 1, EPipelineStageMask::COLOR_ATTACHMENT_OUTPUT_BIT, EPipelineStageMask::FRAGMENT_SHADER_BIT);
+            subpass.OutputColorAttachments.push_back(0);
+            renderPassInfo.Subpasses.push_back(subpass);
+
+            auto RenderPass = g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
+
+            std::shared_ptr<jShaderBindingInstance> CurrentBindingInstance = nullptr;
+            int32 BindingPoint = 0;
+            jShaderBindingArray ShaderBindingArray;
+            jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
+
+            const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+                , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
+                , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
+
+            ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
+                , ResourceInlineAllactor.Alloc<jTextureResource>(GaussianH.get(), SamplerState)));
+
+            ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
+                , ResourceInlineAllactor.Alloc<jTextureResource>(InTexture, SamplerState)));
+
+            ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::FRAGMENT
+                , ResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[3]->GetTexture(), nullptr)));
+
+            ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::FRAGMENT
+                , ResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), nullptr)));
+
+            ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::FRAGMENT
+                , ResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::HistoryDepthBuffer.get(), nullptr)));
+
+            struct CommonComputeUniformBuffer
+            {
+                int32 Width;
+                int32 Height;
+                int32 UseWaveIntrinsics;
+                int32 FrameNumber;
+            };
+            CommonComputeUniformBuffer CommonComputeData;
+            CommonComputeData.Width = Width;
+            CommonComputeData.Height = Height;
+            CommonComputeData.FrameNumber = g_rhi->GetCurrentFrameNumber();
+
+            auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
+                jNameStatic("ReprojectionAOUniformBuffer"), jLifeTimeType::OneFrame, sizeof(CommonComputeData)));
+            OneFrameUniformBuffer->UpdateBufferData(&CommonComputeData, sizeof(CommonComputeData));
+            {
+                ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::FRAGMENT
+                    , ResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
+            }
+
+            std::shared_ptr<jShaderBindingInstance> ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
+            jShaderBindingInstanceArray ShaderBindingInstanceArray;
+            ShaderBindingInstanceArray.Add(ShaderBindingInstance.get());
+
+            jGraphicsPipelineShader Shader;
+            {
+                jShaderInfo shaderInfo;
+                shaderInfo.SetName(jNameStatic("DrawQuadVS"));
+                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/fullscreenquad_vs.hlsl"));
+                shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
+                Shader.VertexShader = g_rhi->CreateShader(shaderInfo);
+
+                shaderInfo.SetName(jNameStatic("DrawQuadPS"));
+                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/AOReprojection_cs.hlsl"));
+                shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
+                shaderInfo.SetEntryPoint(jNameStatic("AOReprojectionPS"));
+                if (gOptions.UseDiscontinuityWeight)
+                {
+                    shaderInfo.SetPreProcessors(jNameStatic("#define USE_DISCONTINUITY_WEIGHT 1"));
+                }
+                Shader.PixelShader = g_rhi->CreateShader(shaderInfo);
+            }
+
+            if (!jSceneRenderTarget::GlobalFullscreenPrimitive)
+                jSceneRenderTarget::GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
+            jDrawCommand DrawCommand(RenderFrameContextPtr, jSceneRenderTarget::GlobalFullscreenPrimitive->RenderObjects[0], RenderPass
+                , Shader, &PostProcessPassPipelineStateFixed, jSceneRenderTarget::GlobalFullscreenPrimitive->RenderObjects[0]->MaterialPtr.get(), ShaderBindingInstanceArray, nullptr);
+            DrawCommand.Test = true;
+            DrawCommand.PrepareToDraw(false);
+            if (RenderPass && RenderPass->BeginRenderPass(RenderFrameContextPtr->GetActiveCommandBuffer()))
+            {
+                DrawCommand.Draw();
+                RenderPass->EndRenderPass();
+            }
+
+            {
+                DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "CopyDepthBuffer", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
+                SCOPE_GPU_PROFILE(RenderFrameContextPtr, CopyDepthBuffer);
+
+                jTexture* OutTexture = jSceneRenderTarget::HistoryDepthBuffer.get();
+                jTexture* InTexture = RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture();
+
+                int32 Width = OutTexture->Width;
+                int32 Height = OutTexture->Height;
+
+                // Compute Pipeline
+                g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), InTexture, EResourceLayout::SHADER_READ_ONLY);
+                g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), OutTexture, EResourceLayout::UAV);
+
+                std::shared_ptr<jShaderBindingInstance> CurrentBindingInstance = nullptr;
+                int32 BindingPoint = 0;
+                jShaderBindingArray ShaderBindingArray;
+                jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
+
+                ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::COMPUTE
+                    , ResourceInlineAllactor.Alloc<jTextureResource>(InTexture, nullptr)));
+
+                ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE
+                    , ResourceInlineAllactor.Alloc<jTextureResource>(OutTexture, nullptr)));
+
+                struct CommonComputeUniformBuffer
+                {
+                    int32 Width;
+                    int32 Height;
+                    int32 UseWaveIntrinsics;
+                    float Padding0;
+                };
+                CommonComputeUniformBuffer CommonComputeData;
+                CommonComputeData.Width = Width;
+                CommonComputeData.Height = Height;
+
+                auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
+                    jNameStatic("CopyCSOneFrameUniformBuffer"), jLifeTimeType::OneFrame, sizeof(CommonComputeData)));
+                OneFrameUniformBuffer->UpdateBufferData(&CommonComputeData, sizeof(CommonComputeData));
+                {
+                    ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
+                        , ResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
+                }
+
+                CurrentBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
+
+                jShaderInfo shaderInfo;
+                shaderInfo.SetName(jNameStatic("CopyCS"));
+                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/copy_cs.hlsl"));
+                shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
+                static jShader* Shader = g_rhi->CreateShader(shaderInfo);
+
+                jShaderBindingLayoutArray ShaderBindingLayoutArray;
+                ShaderBindingLayoutArray.Add(CurrentBindingInstance->ShaderBindingsLayouts);
+
+                jPipelineStateInfo* computePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingLayoutArray, {});
+
+                computePipelineStateInfo->Bind(RenderFrameContextPtr);
+
+                jShaderBindingInstanceArray ShaderBindingInstanceArray;
+                ShaderBindingInstanceArray.Add(CurrentBindingInstance.get());
+
+                jShaderBindingInstanceCombiner ShaderBindingInstanceCombiner;
+                for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
+                {
+                    ShaderBindingInstanceCombiner.DescriptorSetHandles.Add(ShaderBindingInstanceArray[i]->GetHandle());
+                    const std::vector<uint32>* pDynamicOffsetTest = ShaderBindingInstanceArray[i]->GetDynamicOffsets();
+                    if (pDynamicOffsetTest && pDynamicOffsetTest->size())
+                    {
+                        ShaderBindingInstanceCombiner.DynamicOffsets.Add((void*)pDynamicOffsetTest->data(), (int32)pDynamicOffsetTest->size());
+                    }
+                }
+                ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
+
+                g_rhi->BindComputeShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), computePipelineStateInfo, ShaderBindingInstanceCombiner, 0);
+
+                int32 X = (Width / 16) + ((Width % 16) ? 1 : 0);
+                int32 Y = (Height / 16) + ((Height % 16) ? 1 : 0);
+                g_rhi->DispatchCompute(RenderFrameContextPtr, X, Y, 1);
+            }
+            AfterProjection = GaussianH2->GetTexturePtr();
         }
 
-        g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), GaussianH.get());
+    }
+    else
+    {
+        AfterProjection = GaussianH;
+    }
 
+
+    {
         // Copy HistoryBuffer
         if (1)
         {
@@ -1632,7 +1869,7 @@ void jRenderer::AOPass()
             SCOPE_GPU_PROFILE(RenderFrameContextPtr, CopyHistoryBuffer);
 
             jTexture* OutTexture = jSceneRenderTarget::HistoryBuffer.get();
-            jTexture* InTexture = GaussianH.get();
+            jTexture* InTexture = AfterProjection.get();
 
             int32 Width = OutTexture->Width;
             int32 Height = OutTexture->Height;
@@ -1715,7 +1952,7 @@ void jRenderer::AOPass()
         SCOPE_GPU_PROFILE(RenderFrameContextPtr, ApplyAO);
 
 		jTexture* OutTexture = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture();
-		jTexture* InTexture = GaussianH.get();
+		jTexture* InTexture = AfterProjection.get();
 
 		int32 Width = OutTexture->Width;
 		int32 Height = OutTexture->Height;
@@ -1800,7 +2037,6 @@ void jRenderer::AOPass()
 	if (gOptions.ShowDebugRT)
 	{
         DebugRTs.push_back(GaussianH);
-		//DebugRTs.push_back(HistoryBuffer);
 	}
 #else // SUPPORT_RAYTRACING
 // SSAO
@@ -2728,10 +2964,6 @@ void jRenderer::Render()
                         ImGui::SetItemDefaultFocus();
                 }
                 ImGui::EndCombo();
-            }
-            if (gOptions.IsDenoiserBilateral())
-            {
-                ImGui::SliderFloat("BilateralIntensityScale", &gOptions.BilateralIntensityScale, 1.0f, 100.0f);
             }
 
             // The kernel size must be an odd number

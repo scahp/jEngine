@@ -113,6 +113,8 @@ public:
 
 struct jShaderInfo
 {
+    static void GetShaderTypeDefines(std::string& OutResult, EShaderAccessStageFlag InShaderType);
+
     jShaderInfo() = default;
     jShaderInfo(jName InName, jName InShaderFilepath, jName InPreProcessors, jName InEntryPoint, EShaderAccessStageFlag InShaderType)
         : Name(InName), ShaderFilepath(InShaderFilepath), PreProcessors(InPreProcessors), EntryPoint(InEntryPoint), ShaderType(InShaderType)

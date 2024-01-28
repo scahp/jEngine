@@ -111,7 +111,7 @@ void jRootParameterExtractor::Extract(int32& InOutDescriptorOffset, int32& InOut
                     range.OffsetInDescriptorsFromTableStart = (ShaderBinding->BindingPoint == -1)
                         ? D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND : ShaderBinding->BindingPoint;
 #endif
-                    range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE;
+                    range.Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE;
                 }
                 InOutDescriptorOffset += ShaderBinding->NumOfDescriptors;
                 Descriptors.emplace_back(range);

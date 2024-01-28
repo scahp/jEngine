@@ -7,6 +7,46 @@ std::thread jShader::CheckUpdateShaderThread;
 std::vector<jShader*> jShader::WaitForUpdateShaders;
 std::map<const jShader*, std::vector<size_t>> jShader::gConnectedPipelineStateHash;
 
+// jShaderInfo
+void jShaderInfo::GetShaderTypeDefines(std::string& OutResult, EShaderAccessStageFlag InShaderType)
+{
+    static std::map<EShaderAccessStageFlag, std::string> DefineName;
+    if (DefineName.size() == 0)
+    {
+        DefineName[EShaderAccessStageFlag::VERTEX] = "#define VERTEX_SHADER %d\r\n";
+        DefineName[EShaderAccessStageFlag::TESSELLATION_CONTROL] = "#define TESSELLATION_CONTROL_SHADER %d\r\n";
+        DefineName[EShaderAccessStageFlag::TESSELLATION_EVALUATION] = "#define TESSELLATION_EVALUATION_SHADER %d\r\n";
+        DefineName[EShaderAccessStageFlag::GEOMETRY] = "#define GEOMETRY_SHADER %d\r\n";
+        DefineName[EShaderAccessStageFlag::FRAGMENT] = "#define FRAGMENT_SHADER %d\r\n#define PIXEL_SHADER FRAGMENT_SHADER\r\n";
+        DefineName[EShaderAccessStageFlag::COMPUTE] = "#define COMPUTE_SHADER %d\r\n";
+        DefineName[EShaderAccessStageFlag::RAYTRACING_RAYGEN] = "#define RAYTRACING_RAYGEN_SHADER %d\r\n";
+        DefineName[EShaderAccessStageFlag::RAYTRACING_MISS] = "#define RAYTRACING_MISS_SHADER %d\r\n";
+        DefineName[EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT] = "#define RAYTRACING_CLOSESTHIT_SHADER %d\r\n";
+        DefineName[EShaderAccessStageFlag::RAYTRACING_ANYHIT] = "#define RAYTRACING_ANYHIT_SHADER %d\r\n";
+    }
+
+    // This type is not supported.
+    switch (InShaderType)
+    {
+    case EShaderAccessStageFlag::RAYTRACING:
+    case EShaderAccessStageFlag::ALL_RAYTRACING:
+    case EShaderAccessStageFlag::ALL_GRAPHICS:
+    case EShaderAccessStageFlag::ALL:
+        check(0);
+    default:
+        break;
+    }
+
+    char szTemp[128] = { 0, };
+    for (auto it : DefineName)
+    {
+        const int32 IsEnable = !!(it.first & InShaderType);
+        sprintf_s(szTemp, sizeof(szTemp), it.second.c_str(), IsEnable);
+        OutResult += szTemp;
+    }
+}
+
+// jRaytracingPipelineShader
 size_t jRaytracingPipelineShader::GetHash() const
 {
     size_t hash = 0;
@@ -39,6 +79,7 @@ size_t jRaytracingPipelineData::GetHash() const
     return hash;
 }
 
+// jShader
 jShader::~jShader()
 {
 	delete CompiledShader;
