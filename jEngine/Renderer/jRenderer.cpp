@@ -928,7 +928,7 @@ void jRenderer::AOPass()
         
         static auto OldMatrix = m_sceneCB.projectionToWorld;
         static int32 AOAccumulate = 1;
-        if (OldMatrix != m_sceneCB.projectionToWorld)
+        if (OldMatrix != m_sceneCB.projectionToWorld || !gOptions.UseAccumultateRay)
         {
             OldMatrix = m_sceneCB.projectionToWorld;
             AOAccumulate = 1;
@@ -2700,6 +2700,7 @@ void jRenderer::Render()
             ImGui::Checkbox("UseAOReprojection", &gOptions.UseAOReprojection);
             ImGui::Checkbox("ShowDebugRT", &gOptions.ShowDebugRT);
             ImGui::Checkbox("ShowAOOnly", &gOptions.ShowAOOnly);
+            ImGui::Checkbox("UseAccumultateRay", &gOptions.UseAccumultateRay);
             ImGui::SliderFloat("RTAO Radius", &gOptions.AORadius, 0.0f, 100.0f);
             ImGui::SliderFloat("RTAO Intensity", &gOptions.AOIntensity, 0.0f, 1.0f);
             ImGui::SliderInt("RTAO SamplePerPixel", &gOptions.SamplePerPixel, 1, 100);

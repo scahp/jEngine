@@ -36,6 +36,7 @@ struct jOptions
     float GaussianKernelSigma = 10.0f;
     bool ShowAOOnly = false;
     bool ShowDebugRT = true;
+    bool UseAccumultateRay = true;
 
     bool IsDenoiserGuassian() const { return GDenoisers[0] == Denoiser; }
     bool IsDenoiserGuassianSeparable() const { return GDenoisers[1] == Denoiser; }
