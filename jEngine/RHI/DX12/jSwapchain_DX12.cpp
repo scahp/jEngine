@@ -149,8 +149,8 @@ bool jSwapchain_DX12::Resize(int32 InWidth, int32 InHeight)
         jBufferUtil_DX12::CreateRenderTargetView((jTexture_DX12*)SwapchainImage->TexturePtr.get());
     }
 
-    g_rhi_dx12->RenderPassPool.Release();
-    g_rhi_dx12->PipelineStatePool.Release();
+    g_rhi_dx12->RenderPassPool.ReleaseAll();
+    g_rhi_dx12->PipelineStatePool.ReleaseAll();
     return true;
 }
 

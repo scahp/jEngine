@@ -95,10 +95,10 @@ bool jRenderPass_DX12::CreateRenderPass()
             const jAttachment& attachment = RenderPassInfo.Attachments[i];
             check(attachment.IsValid());
 
-            const auto& RTInfo = attachment.RenderTargetPtr->Info;
+            const auto& RTInfo = attachment.RenderTargetPtr.lock()->Info;
             const bool HasClear = (attachment.LoadStoreOp == EAttachmentLoadStoreOp::CLEAR_STORE ||
                 attachment.LoadStoreOp == EAttachmentLoadStoreOp::CLEAR_DONTCARE);
-            jTexture_DX12* TextureDX12 = (jTexture_DX12*)attachment.RenderTargetPtr->GetTexture();
+            jTexture_DX12* TextureDX12 = (jTexture_DX12*)attachment.RenderTargetPtr.lock()->GetTexture();
 
             if (attachment.IsDepthAttachment())
             {

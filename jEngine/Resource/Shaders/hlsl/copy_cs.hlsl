@@ -1,12 +1,12 @@
-Texture2D inputImage : register(t0);
-RWTexture2D<float4> resultImage : register(u1);
+RWTexture2D<float4> resultImage : register(u0);
+Texture2D inputImage : register(t1);
 
 struct CommonComputeUniformBuffer
 {
     int Width;
     int Height;
-    float UseWaveIntrinsics;
-    float Padding;
+    int Padding0;
+    float Padding1;
 };
 
 cbuffer ComputeCommon : register(b2)

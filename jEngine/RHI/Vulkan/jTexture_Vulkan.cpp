@@ -15,14 +15,40 @@ void jTexture_Vulkan::ReleaseInternal()
     // View 의 경우 직접 생성한 것이므로 소멸 필요
     if (Memory)
     {
-        if (Image)
-            vkDestroyImage(g_rhi_vk->Device, Image, nullptr);
+        std::set<VkImageView> ViewSets;
 
-        vkFreeMemory(g_rhi_vk->Device, Memory, nullptr);
+        // View, ViewUAV is included in ViewForMipMap, ViewUAVForMipMap, if containers are not empty.
+        if (ViewForMipMap.empty())
+        {
+            if (View)
+                ViewSets.insert(View);
+        }
+        else
+        {
+            for(auto it : ViewForMipMap)
+                ViewSets.insert(it.second);
+        }
+
+        if (ViewUAVForMipMap.empty())
+        {
+			if (ViewUAV)
+                ViewSets.insert(ViewUAV);
+        }
+        else
+        {
+		    for (auto it : ViewUAVForMipMap)
+                ViewSets.insert(it.second);
+        }
+
+        jStandaloneResourceVulkan::ReleaseImageResource(Image, Memory, std::vector<VkImageView>(ViewSets.begin(), ViewSets.end()));
     }
+    Image = nullptr;
+    Memory = nullptr;
+    View = nullptr;
+    ViewUAV = nullptr;
+    ViewForMipMap.clear();
+    ViewUAVForMipMap.clear();
 
-    if (View)
-        vkDestroyImageView(g_rhi_vk->Device, View, nullptr);
 }
 
 static VkSampler g_defaultSampler = nullptr;

@@ -145,7 +145,7 @@ VkDescriptorSetLayout jShaderBindingLayout_Vulkan::CreateDescriptorSetLayout(con
     return DescriptorSetLayout;
 }
 
-VkPipelineLayout jShaderBindingLayout_Vulkan::CreatePipelineLayout(const jShaderBindingLayoutArray& InShaderBindingLayoutArray, const jPushConstant* pushConstant)
+VkPipelineLayout jShaderBindingLayout_Vulkan::CreatePipelineLayout(const jShaderBindingLayoutArray& InShaderBindingLayoutArray, const jPushConstant* InPushConstant, EShaderAccessStageFlag InShaderAccessStageFlag)
 {
     if (InShaderBindingLayoutArray.NumOfData <= 0)
         return 0;
@@ -153,8 +153,8 @@ VkPipelineLayout jShaderBindingLayout_Vulkan::CreatePipelineLayout(const jShader
     VkPipelineLayout vkPipelineLayout = nullptr;
     size_t hash = InShaderBindingLayoutArray.GetHash();
 
-    if (pushConstant)
-        hash = CityHash64WithSeed(pushConstant->GetHash(), hash);
+    if (InPushConstant)
+        hash = CityHash64WithSeed(InPushConstant->GetHash(), hash);
     check(hash);
 
     {
@@ -183,13 +183,22 @@ VkPipelineLayout jShaderBindingLayout_Vulkan::CreatePipelineLayout(const jShader
         for (int32 i = 0; i < InShaderBindingLayoutArray.NumOfData; ++i)
         {
             const jShaderBindingLayout_Vulkan* binding_vulkan = (const jShaderBindingLayout_Vulkan*)InShaderBindingLayoutArray[i];
+            
+#if _DEBUG
+            const auto& ShaderBindingArray = binding_vulkan->GetShaderBindingsLayout();
+            for(int32 k = 0;k< ShaderBindingArray.NumOfData;++k)
+            {
+                check(!!(ShaderBindingArray[k]->AccessStageFlags & InShaderAccessStageFlag));
+            }
+#endif // _DEBUG
+            
             DescriptorSetLayouts.push_back(binding_vulkan->DescriptorSetLayout);
         }
 
         std::vector<VkPushConstantRange> PushConstantRanges;
-        if (pushConstant)
+        if (InPushConstant)
         {
-            const jResourceContainer<jPushConstantRange>* pushConstantRanges = pushConstant->GetPushConstantRanges();
+            const jResourceContainer<jPushConstantRange>* pushConstantRanges = InPushConstant->GetPushConstantRanges();
             check(pushConstantRanges);
             if (pushConstantRanges)
             {
@@ -199,6 +208,7 @@ VkPipelineLayout jShaderBindingLayout_Vulkan::CreatePipelineLayout(const jShader
                     const jPushConstantRange& range = (*pushConstantRanges)[i];
 
                     VkPushConstantRange pushConstantRange{};
+                    check(!!(InShaderAccessStageFlag & range.AccessStageFlag));
                     pushConstantRange.stageFlags = GetVulkanShaderAccessFlags(range.AccessStageFlag);
                     pushConstantRange.offset = range.Offset;
                     pushConstantRange.size = range.Size;

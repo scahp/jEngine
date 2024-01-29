@@ -33,6 +33,8 @@
 #include "jEngine.h"
 #include "jRaytracingScene_DX12.h"
 
+#define DX12_ENABLE_DEBUG_LAYER 0
+
 #define USE_INLINE_DESCRIPTOR 0												// InlineDescriptor 를 쓸것인지? DescriptorTable 를 쓸것인지 여부
 #define USE_ONE_FRAME_BUFFER_AND_DESCRIPTOR (USE_INLINE_DESCRIPTOR && 1)	// 현재 프레임에만 사용하고 버리는 임시 Descriptor 와 Buffer 를 사용할 것인지 여부
 
@@ -315,6 +317,7 @@ bool jRHI_DX12::InitRHI()
 #if defined(_DEBUG)
 	// 디버그 레이어 켬 ("optional feature" 그래픽 툴을 요구함)
 	// 주의 : 디버그 레이어를 device 생성 후에 하면 활성화된 device를 무효화 됨.
+    if (DX12_ENABLE_DEBUG_LAYER)
 	{
 		ComPtr<ID3D12Debug> debugController;
 		if (JOK(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
@@ -522,13 +525,13 @@ void jRHI_DX12::ReleaseRHI()
     }
     ShaderBindingPool.clear();
 
-    SamplerStatePool.Release();
-    RasterizationStatePool.Release();
-    StencilOpStatePool.Release();
-    DepthStencilStatePool.Release();
-    BlendingStatePool.Release();
-    PipelineStatePool.Release();
-    RenderPassPool.Release();
+    SamplerStatePool.ReleaseAll();
+    RasterizationStatePool.ReleaseAll();
+    StencilOpStatePool.ReleaseAll();
+    DepthStencilStatePool.ReleaseAll();
+    BlendingStatePool.ReleaseAll();
+    PipelineStatePool.ReleaseAll();
+    RenderPassPool.ReleaseAll();
 
     for (jRingBuffer_DX12* iter : OneFrameUniformRingBuffers)
     {
@@ -558,7 +561,7 @@ void jRHI_DX12::ReleaseRHI()
         CopyCommandBufferManager = nullptr;
     }
     FenceManager.Release();
-	SamplerStatePool.Release();
+	SamplerStatePool.ReleaseAll();
     
     DeallocatorMultiFrameStandaloneResource.Release();
     DeallocatorMultiFramePlacedResource.Release();
@@ -1004,7 +1007,7 @@ void jRHI_DX12::BindGraphicsShaderBindingInstances(const jCommandBuffer* InComma
         check(CommandBuffer_DX12);
 
 		const jShaderBindingInstanceArray& ShaderBindingInstanceArray = *(InShaderBindingInstanceCombiner.ShaderBindingInstanceArray);
-		CommandBuffer_DX12->CommandList->SetGraphicsRootSignature(jShaderBindingLayout_DX12::CreateRootSignature(ShaderBindingInstanceArray));
+		CommandBuffer_DX12->CommandList->SetGraphicsRootSignature(jShaderBindingLayout_DX12::CreateRootSignature(ShaderBindingInstanceArray, EShaderAccessStageFlag::ALL_GRAPHICS));
 
 		int32 RootParameterIndex = 0;
         int32 NumOfDescriptor = 0;
@@ -1102,7 +1105,7 @@ void jRHI_DX12::BindComputeShaderBindingInstances(const jCommandBuffer* InComman
         check(CommandBuffer_DX12);
 
         const jShaderBindingInstanceArray& ShaderBindingInstanceArray = *(InShaderBindingInstanceCombiner.ShaderBindingInstanceArray);
-        CommandBuffer_DX12->CommandList->SetComputeRootSignature(jShaderBindingLayout_DX12::CreateRootSignature(ShaderBindingInstanceArray));
+        CommandBuffer_DX12->CommandList->SetComputeRootSignature(jShaderBindingLayout_DX12::CreateRootSignature(ShaderBindingInstanceArray, EShaderAccessStageFlag::COMPUTE | EShaderAccessStageFlag::ALL_RAYTRACING));
 
         int32 RootParameterIndex = 0;
         bool HasDescriptor = false;

@@ -51,17 +51,9 @@ void jRingBuffer_Vulkan::Release()
 {
     check(g_rhi_vk->Device);
 
-    if (Buffer)
-    {
-        vkDestroyBuffer(g_rhi_vk->Device, Buffer, nullptr);
-        Buffer = nullptr;
-    }
-
-    if (BufferMemory)
-    {
-        vkFreeMemory(g_rhi_vk->Device, BufferMemory, nullptr);
-        BufferMemory = nullptr;
-    }
+    jStandaloneResourceVulkan::ReleaseBufferResource(Buffer, BufferMemory);
+    Buffer = nullptr;
+    BufferMemory = nullptr;
 
     RingBufferSize = 0;
     MappedPointer = nullptr;

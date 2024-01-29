@@ -18,6 +18,16 @@ void jRenderPass_Vulkan::Release()
     }
 }
 
+bool jRenderPass_Vulkan::IsValidRenderTargets() const
+{
+    for (const jAttachment& iter : RenderPassInfo.Attachments)
+    {
+        if (iter.RenderTargetPtr.expired())
+            return false;
+    }
+	return true;
+}
+
 void jRenderPass_Vulkan::EndRenderPass()
 {
     ensure(CommandBuffer);
@@ -37,8 +47,8 @@ void jRenderPass_Vulkan::EndRenderPass()
 
 void jRenderPass_Vulkan::SetFinalLayoutToAttachment(const jAttachment& attachment) const
 {
-    check(attachment.RenderTargetPtr);
-    jTexture_Vulkan* texture_vk = (jTexture_Vulkan*)attachment.RenderTargetPtr->GetTexture();
+    check(!attachment.RenderTargetPtr.expired());
+    jTexture_Vulkan* texture_vk = (jTexture_Vulkan*)attachment.RenderTargetPtr.lock()->GetTexture();
     texture_vk->Layout = attachment.FinalLayout;
 }
 
@@ -61,7 +71,7 @@ bool jRenderPass_Vulkan::CreateRenderPass()
             const jAttachment& attachment = RenderPassInfo.Attachments[i];
             check(attachment.IsValid());
 
-            const auto& RTInfo = attachment.RenderTargetPtr->Info;
+            const auto& RTInfo = attachment.RenderTargetPtr.lock()->Info;
 
             VkAttachmentDescription& attachmentDesc = AttachmentDescs[i];
             attachmentDesc.format = GetVulkanTextureFormat(RTInfo.Format);
@@ -88,6 +98,9 @@ bool jRenderPass_Vulkan::CreateRenderPass()
             else
                 clearValue.color = { RTClearColor[0], RTClearColor[1], RTClearColor[2], RTClearColor[3] };
             ClearValues.push_back(clearValue);
+
+            check(Hash != 0);
+            attachment.RenderTargetPtr.lock()->RelatedRenderPassHashes.push_back(Hash);
         }
 
         struct jSubpassAttachmentRefs
@@ -232,7 +245,7 @@ bool jRenderPass_Vulkan::CreateRenderPass()
         {
             check(RenderPassInfo.Attachments[k].IsValid());
 
-            const auto* RT = RenderPassInfo.Attachments[k].RenderTargetPtr.get();
+            const auto* RT = RenderPassInfo.Attachments[k].RenderTargetPtr.lock().get();
             check(RT);
 
             const jTexture_Vulkan* texture_vk = (const jTexture_Vulkan*)RT->GetTexture();

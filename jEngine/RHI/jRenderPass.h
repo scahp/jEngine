@@ -3,7 +3,7 @@
 struct jAttachment
 {
     jAttachment() = default;
-    jAttachment(const std::shared_ptr<jRenderTarget>& InRTPtr
+    jAttachment(const std::weak_ptr<jRenderTarget>& InRTPtr
         , EAttachmentLoadStoreOp InLoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE
         , EAttachmentLoadStoreOp InStencilLoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE
         , jRTClearValue RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f)
@@ -16,7 +16,7 @@ struct jAttachment
         , bResolveAttachment(InIsResolveAttachment)
     {}
 
-    std::shared_ptr<jRenderTarget> RenderTargetPtr;
+    std::weak_ptr<jRenderTarget> RenderTargetPtr;
 
     // 아래 2가지 옵션은 렌더링 전, 후에 attachment에 있는 데이터에 무엇을 할지 결정하는 부분.
     // 1). loadOp
@@ -38,7 +38,7 @@ struct jAttachment
 
     FORCEINLINE bool IsValid() const
     {
-        if (RenderTargetPtr)
+        if (!RenderTargetPtr.expired())
             return true;
         return false;
     }
@@ -48,10 +48,11 @@ struct jAttachment
         if (Hash)
             return Hash;
 
-        if (!RenderTargetPtr)
+        if (RenderTargetPtr.expired())
             return 0;
 
-        Hash = RenderTargetPtr->GetHash();
+        if (!RenderTargetPtr.expired())
+            Hash = RenderTargetPtr.lock()->GetHash();
         Hash = CityHash64WithSeed((const char*)&LoadStoreOp, sizeof(LoadStoreOp), Hash);
         Hash = CityHash64WithSeed((const char*)&StencilLoadStoreOp, sizeof(StencilLoadStoreOp), Hash);
         Hash = CityHash64WithSeed((const char*)&RTClearValue, sizeof(RTClearValue), Hash);
@@ -62,8 +63,8 @@ struct jAttachment
 
     FORCEINLINE bool IsDepthAttachment() const
     {
-        check(RenderTargetPtr);
-        return IsDepthFormat(RenderTargetPtr->Info.Format);
+        check(!RenderTargetPtr.expired());
+        return IsDepthFormat(RenderTargetPtr.lock()->Info.Format);
     }
 
     FORCEINLINE bool IsResolveAttachment() const
@@ -303,6 +304,8 @@ public:
 
     virtual void* GetRenderPass() const { return nullptr; }
     virtual void* GetFrameBuffer() const { return nullptr; }
+    virtual bool IsInvalidated() const { return false; }
+    virtual bool IsValidRenderTargets() const { return true; }
 
     jRenderPassInfo RenderPassInfo;
     

@@ -25,6 +25,11 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
     SamplerDescriptors.clear();
     RootParameterInlines.clear();
 
+    // todo : pre calculate size
+    Descriptors.reserve(200);
+    RootParameterInlines.reserve(200);
+    SamplerDescriptors.reserve(200);
+
     for (int32 i = 0; i < InShaderBindingArray.NumOfData; ++i)
     {
         const jShaderBinding* ShaderBinding = InShaderBindingArray[i];

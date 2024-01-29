@@ -7,7 +7,7 @@
 void jUniformBufferBlock_Vulkan::Init(size_t size)
 {
     check(size);
-    size = Align<uint64>(size, g_rhi_vk->DeviceProperties2.properties.limits.minUniformBufferOffsetAlignment);
+    size = Align<uint64>(size, g_rhi_vk->GetDevicePropertyLimits().minUniformBufferOffsetAlignment);
 
     if (IsUseRingBuffer())
     {

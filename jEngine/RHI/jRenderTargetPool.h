@@ -12,10 +12,16 @@ public:
 	static std::shared_ptr<jRenderTarget> GetRenderTarget(const jRenderTargetInfo& info);
 	static void ReturnRenderTarget(jRenderTarget* renderTarget);
 
+	static bool PreventReturnRenderTarget;
+
 	static void ReleaseForRecreateSwapchain()
 	{
+		PreventReturnRenderTarget = true;
+
         RenderTargetResourceMap.clear();
         RenderTargetHashVariableMap.clear();
+
+		PreventReturnRenderTarget = false;
 	}
 
 	static void Release()
@@ -31,8 +37,12 @@ public:
 			g_EyeAdaptationBRTPtr.reset();
 		}
 
+		PreventReturnRenderTarget = true;
+
 		RenderTargetResourceMap.clear();
 		RenderTargetHashVariableMap.clear();
+
+		PreventReturnRenderTarget = false;
 	}
 
 	struct jRenderTargetPoolResource

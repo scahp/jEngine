@@ -96,7 +96,7 @@ void jRHI::ReleaseRHI()
     GDefaultMaterial.reset();
 
     jShader::ReleaseCheckUpdateShaderThread();
-	ShaderPool.Release();
+	ShaderPool.ReleaseAll();
 
 }
 

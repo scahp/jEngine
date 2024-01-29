@@ -74,6 +74,7 @@ struct jSamplerStateInfo : public jShaderBindableResource
 {
     virtual ~jSamplerStateInfo() {}
     virtual void Initialize() { GetHash(); }
+    virtual bool IsInvalidated() const { return false; }
     virtual void* GetHandle() const { return nullptr; }
 
     virtual size_t GetHash() const
@@ -166,6 +167,7 @@ struct jRasterizationStateInfo
 {
     virtual ~jRasterizationStateInfo() {}
     virtual void Initialize() { GetHash(); }
+    virtual bool IsInvalidated() const { return false; }
     virtual size_t GetHash() const
     {
         if (Hash)
@@ -216,6 +218,7 @@ struct jStencilOpStateInfo
 {
     virtual ~jStencilOpStateInfo() {}
     virtual void Initialize() { GetHash(); }
+    virtual bool IsInvalidated() const { return false; }
     virtual size_t GetHash() const
     {
         if (Hash)
@@ -249,6 +252,7 @@ struct jDepthStencilStateInfo
 {
     virtual ~jDepthStencilStateInfo() {}
     virtual void Initialize() { GetHash(); }
+    virtual bool IsInvalidated() const { return false; }
     virtual size_t GetHash() const
     {
         if (Hash)
@@ -290,6 +294,7 @@ struct jBlendingStateInfo
 {
     virtual ~jBlendingStateInfo() {}
     virtual void Initialize() { GetHash(); }
+    virtual bool IsInvalidated() const { return false; }
     virtual size_t GetHash() const
     {
         if (Hash)
@@ -590,6 +595,7 @@ struct jPipelineStateInfo
     int32 SubpassIndex = 0;
 
     virtual void Initialize() { GetHash(); }
+    virtual bool IsInvalidated() const { return false; }
     virtual void* GetHandle() const { return nullptr; }
     virtual void* GetPipelineLayoutHandle() const { return nullptr; }
     virtual void* CreateGraphicsPipelineState() { return nullptr; }

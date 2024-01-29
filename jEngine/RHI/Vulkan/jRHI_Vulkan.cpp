@@ -43,6 +43,29 @@ TResourcePool<jBlendingStateInfo_Vulkan, jMutexRWLock> jRHI_Vulkan::BlendingStat
 TResourcePool<jPipelineStateInfo_Vulkan, jMutexRWLock> jRHI_Vulkan::PipelineStatePool;
 TResourcePool<jRenderPass_Vulkan, jMutexRWLock> jRHI_Vulkan::RenderPassPool;
 
+void jStandaloneResourceVulkan::ReleaseBufferResource(VkBuffer InBuffer, VkDeviceMemory InMemory, const VkAllocationCallbacks* InAllocatorCallback)
+{
+	check(g_rhi_vk);
+
+	auto StandaloneResourcePtr = std::make_shared<jStandaloneResourceVulkan>();
+	StandaloneResourcePtr->Buffer = InBuffer;
+	StandaloneResourcePtr->Memory = InMemory;
+	StandaloneResourcePtr->AllocatorCallback = InAllocatorCallback;
+	g_rhi_vk->DeallocatorMultiFrameStandaloneResource.Free(StandaloneResourcePtr);
+}
+
+void jStandaloneResourceVulkan::ReleaseImageResource(VkImage InImage, VkDeviceMemory InMemory, const std::vector<VkImageView>& InViews, const VkAllocationCallbacks* InAllocatorCallback)
+{
+	check(g_rhi_vk);
+
+	auto StandaloneResourcePtr = std::make_shared<jStandaloneResourceVulkan>();
+	StandaloneResourcePtr->Image = InImage;
+	StandaloneResourcePtr->Memory = InMemory;
+	StandaloneResourcePtr->Views = InViews;
+	StandaloneResourcePtr->AllocatorCallback = InAllocatorCallback;
+	g_rhi_vk->DeallocatorMultiFrameStandaloneResource.Free(StandaloneResourcePtr);
+}
+
 // jFrameBuffer_Vulkan
 struct jFrameBuffer_Vulkan : public jFrameBuffer
 {
@@ -167,32 +190,39 @@ bool jRHI_Vulkan::InitRHI()
 			}
 		}
 
-		if (!ensure(PhysicalDevice != VK_NULL_HANDLE))
+		if (!ensure(PhysicalDevice))
 			return false;
-
-		DeviceProperties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-		RayTracingPipelineProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
-		RayTracingPipelineProperties.pNext = (void*)DeviceProperties2.pNext;
-		DeviceProperties2.pNext = &RayTracingPipelineProperties;
-
-		vkGetPhysicalDeviceProperties2(PhysicalDevice, &DeviceProperties2);
-
-		DeviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-        AccelerationStructureFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
-        AccelerationStructureFeatures.pNext = (void*)DeviceProperties2.pNext;
-		DeviceFeatures2.pNext = &AccelerationStructureFeatures;
-		vkGetPhysicalDeviceFeatures2(PhysicalDevice, &DeviceFeatures2);
 
 		// Check if is enabled that the both 'Non-uniform indexing' and 'Update after bind' flags for resources.
 		VkPhysicalDeviceDescriptorIndexingFeatures indexing_features{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT, nullptr };
-		VkPhysicalDeviceFeatures2 device_features{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2, &indexing_features };
-		vkGetPhysicalDeviceFeatures2(PhysicalDevice, &device_features);
+
+		DeviceProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+		DeviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+#if SUPPORT_RAYTRACING
+		RayTracingPipelineProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
+		RayTracingPipelineProperties.pNext = (void*)DeviceProperties.pNext;
+		DeviceProperties.pNext = &RayTracingPipelineProperties;
+		vkGetPhysicalDeviceProperties2(PhysicalDevice, &DeviceProperties);
+
+		AccelerationStructureFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
+		AccelerationStructureFeatures.pNext = (void*)DeviceProperties.pNext;
+		DeviceFeatures2.pNext = &AccelerationStructureFeatures;
+		
+		indexing_features.pNext = (void*)DeviceProperties.pNext;
+		DeviceFeatures2.pNext = &indexing_features;
+		vkGetPhysicalDeviceFeatures2(PhysicalDevice, &DeviceFeatures2);
+#else
+		vkGetPhysicalDeviceProperties2(PhysicalDevice, &DeviceProperties);
+
+		DeviceFeatures2.pNext = &indexing_features;
+		vkGetPhysicalDeviceFeatures2(PhysicalDevice, &DeviceFeatures2);
+#endif // SUPPORT_RAYTRACING
 
 		bool bindless_supported = indexing_features.descriptorBindingPartiallyBound && indexing_features.runtimeDescriptorArray;
 		check(bindless_supported);
 	}
 
-	jSpirvHelper::Init(DeviceProperties2);
+	jSpirvHelper::Init(DeviceProperties);
 
 	// Get All device extension properties
     uint32 extensionCount;
@@ -396,6 +426,43 @@ bool jRHI_Vulkan::InitRHI()
     Swapchain = new jSwapchain_Vulkan();
 	verify(Swapchain->Create());
 
+	DeallocatorMultiFrameStandaloneResource.FreeDelegate = [](const std::shared_ptr<jStandaloneResourceVulkan>& InStandaloneResourcePtr)
+	{
+		check(g_rhi_vk);
+		check(g_rhi_vk->Device);
+
+        if (InStandaloneResourcePtr->Memory)
+            vkFreeMemory(g_rhi_vk->Device, InStandaloneResourcePtr->Memory, nullptr);
+
+		std::set<VkImageView> t;
+        for (VkImageView View : InStandaloneResourcePtr->Views)
+        {
+            check(View);
+			check(t.count(View) == 0);
+			t.insert(View);
+            //vkDestroyImageView(g_rhi_vk->Device, View, nullptr);
+        }
+
+		if (InStandaloneResourcePtr->Buffer)
+		{
+			// Either Image or Buffer resource at one.
+			check(!InStandaloneResourcePtr->Image);
+			check(InStandaloneResourcePtr->Views.size() == 0);
+
+			vkDestroyBuffer(g_rhi_vk->Device, InStandaloneResourcePtr->Buffer, nullptr);
+		}
+		else if (InStandaloneResourcePtr->Image)
+		{
+			vkDestroyImage(g_rhi_vk->Device, InStandaloneResourcePtr->Image, nullptr);
+		}
+	};
+
+	DeallocatorMultiFrameRenderPass.FreeDelegate = [](jRenderPass_Vulkan* InRenderPass)
+	{
+		check(InRenderPass);
+		delete InRenderPass;
+	};
+
 	CommandBufferManager = new jCommandBufferManager_Vulkan();
 	CommandBufferManager->CreatePool(GraphicsQueue.QueueIndex);
 
@@ -414,14 +481,14 @@ bool jRHI_Vulkan::InitRHI()
 	for (auto& iter : OneFrameUniformRingBuffers)
 	{
         iter = new jRingBuffer_Vulkan();
-		iter->Create(EVulkanBufferBits::UNIFORM_BUFFER, 16 * 1024 * 1024, (uint32)DeviceProperties2.properties.limits.minUniformBufferOffsetAlignment);
+		iter->Create(EVulkanBufferBits::UNIFORM_BUFFER, 16 * 1024 * 1024, (uint32)GetDevicePropertyLimits().minUniformBufferOffsetAlignment);
 	}
 
     SSBORingBuffers.resize(Swapchain->GetNumOfSwapchain());
     for (auto& iter : SSBORingBuffers)
     {
         iter = new jRingBuffer_Vulkan();
-        iter->Create(EVulkanBufferBits::STORAGE_BUFFER, 16 * 1024 * 1024, (uint32)DeviceProperties2.properties.limits.minStorageBufferOffsetAlignment);
+        iter->Create(EVulkanBufferBits::STORAGE_BUFFER, 16 * 1024 * 1024, (uint32)GetDevicePropertyLimits().minStorageBufferOffsetAlignment);
     }
 
 	DescriptorPools.resize(Swapchain->GetNumOfSwapchain());
@@ -485,23 +552,23 @@ void jRHI_Vulkan::ReleaseRHI()
 	delete g_ImGUI;
 	g_ImGUI = nullptr;
 
-    RenderPassPool.Release();
-    SamplerStatePool.Release();
-    RasterizationStatePool.Release();
-    StencilOpStatePool.Release();
-    DepthStencilStatePool.Release();
-    BlendingStatePool.Release();
-    PipelineStatePool.Release();
+    RenderPassPool.ReleaseAll();
+    SamplerStatePool.ReleaseAll();
+    RasterizationStatePool.ReleaseAll();
+    StencilOpStatePool.ReleaseAll();
+    DepthStencilStatePool.ReleaseAll();
+    BlendingStatePool.ReleaseAll();
+    PipelineStatePool.ReleaseAll();
 
     jTexture_Vulkan::DestroyDefaultSamplerState();
     jFrameBufferPool::Release();
     jRenderTargetPool::Release();
 
-	delete Swapchain;
-	Swapchain = nullptr;
+    delete Swapchain;
+    Swapchain = nullptr;
 
-	delete CommandBufferManager;
-	CommandBufferManager = nullptr;
+    delete CommandBufferManager;
+    CommandBufferManager = nullptr;
 
 	jShaderBindingLayout_Vulkan::ClearPipelineLayout();
 
@@ -529,6 +596,9 @@ void jRHI_Vulkan::ReleaseRHI()
 	for (auto& iter : DescriptorPools)
 		delete iter;
 	DescriptorPools.clear();
+
+	DeallocatorMultiFrameStandaloneResource.Release();
+	DeallocatorMultiFrameRenderPass.Release();
 
 	vkDestroyPipelineCache(Device, PipelineCache, nullptr);
 	FenceManager.Release();
@@ -599,8 +669,8 @@ void jRHI_Vulkan::RecreateSwapChain()
 
     jFrameBufferPool::Release();
     jRenderTargetPool::ReleaseForRecreateSwapchain();
-	PipelineStatePool.Release();
-    RenderPassPool.Release();
+	PipelineStatePool.ReleaseAll();
+    RenderPassPool.ReleaseAll();
 
     delete Swapchain;
     Swapchain = new jSwapchain_Vulkan();
@@ -729,8 +799,9 @@ bool jRHI_Vulkan::CreateShaderInternal(jShader* OutShader, const jShaderInfo& sh
 		// PermutationId 를 설정하여 컴파일을 준비함
         shader_vk->SetPermutationId(shaderInfo.GetPermutationId());
 
-		std::string PermutationDefines;
-		shader_vk->GetPermutationDefines(PermutationDefines);
+		std::string Defines;
+		shaderInfo.GetShaderTypeDefines(Defines, shaderInfo.GetShaderType());
+		shader_vk->GetPermutationDefines(Defines);
 
 		VkShaderModule shaderModule{};
 
@@ -754,7 +825,7 @@ bool jRHI_Vulkan::CreateShaderInternal(jShader* OutShader, const jShaderInfo& sh
                 ShaderText += shaderInfo.GetPreProcessors().ToStr();
                 ShaderText += "\r\n";
             }
-            ShaderText += PermutationDefines;
+            ShaderText += Defines;
             ShaderText += "\r\n";
 
             ShaderText += ShaderFile.GetBuffer();
@@ -1245,8 +1316,9 @@ std::shared_ptr<jTexture> jRHI_Vulkan::Create2DTexture(uint32 InWidth, uint32 In
 	const VkImageUsageFlags UsageFlag = GetImageUsageFlags(InTextureCreateFlag);
 	check(!IsDepthFormat(InFormat) || (IsDepthFormat(InFormat) && (UsageFlag & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)));
 
+	// If there is Image or Depth bit, it should be initialized VK_IMAGE_LAYOUT_PREINITIALIZED, if not, VK_IMAGE_LAYOUT_UNDEFINED
 	auto TexturePtr = jBufferUtil_Vulkan::Create2DTexture(InWidth, InHeight, InMipLevels, VK_SAMPLE_COUNT_1_BIT, GetVulkanTextureFormat(InFormat), VK_IMAGE_TILING_OPTIMAL
-		, UsageFlag, PropertyFlagBits, ImageCreateFlags, VK_IMAGE_LAYOUT_UNDEFINED);
+		, UsageFlag, PropertyFlagBits, ImageCreateFlags, VK_IMAGE_LAYOUT_PREINITIALIZED); 
 
 	if (InImageBulkData.ImageData.size() > 0)
 	{
@@ -1290,8 +1362,9 @@ std::shared_ptr<jTexture> jRHI_Vulkan::CreateCubeTexture(uint32 InWidth, uint32 
     const VkImageUsageFlags UsageFlag = GetImageUsageFlags(InTextureCreateFlag);
     check(!IsDepthFormat(InFormat) || (IsDepthFormat(InFormat) && (UsageFlag & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)));
 
+	// If there is Image or Depth bit, it should be initialized VK_IMAGE_LAYOUT_PREINITIALIZED, if not, VK_IMAGE_LAYOUT_UNDEFINED
 	auto TexturePtr = jBufferUtil_Vulkan::CreateCubeTexture(InWidth, InHeight, InMipLevels, VK_SAMPLE_COUNT_1_BIT, GetVulkanTextureFormat(InFormat), VK_IMAGE_TILING_OPTIMAL
-		, UsageFlag, PropertyFlagBits, ImageCreateFlags, VK_IMAGE_LAYOUT_UNDEFINED);
+		, UsageFlag, PropertyFlagBits, ImageCreateFlags, VK_IMAGE_LAYOUT_PREINITIALIZED);
 
     if (InImageBulkData.ImageData.size() > 0)
     {
@@ -1330,6 +1403,16 @@ std::shared_ptr<jTexture> jRHI_Vulkan::CreateCubeTexture(uint32 InWidth, uint32 
 bool jRHI_Vulkan::IsSupportVSync() const
 {
 	return GRHISupportVsync && GUseVsync;
+}
+
+void jRHI_Vulkan::RemoveRenderPassByHash(const std::vector<uint64>& InRelatedRenderPassHashes)
+{
+	for (auto Hash : InRelatedRenderPassHashes)
+	{
+		jRenderPass_Vulkan* ToReleaseRP = g_rhi_vk->RenderPassPool.Release(Hash);
+		if (ToReleaseRP)
+			g_rhi_vk->DeallocatorMultiFrameRenderPass.Free(ToReleaseRP);
+	}
 }
 
 jQuery* jRHI_Vulkan::CreateQueryTime() const
@@ -2355,4 +2438,3 @@ std::shared_ptr<jBuffer> jRHI_Vulkan::CreateFormattedBuffer(uint64 InSize, uint6
 {
 	return CreateBufferInternal(InSize, InAlignment, InBufferCreateFlag, InInitialState, InData, InDataSize, InResourceName);
 }
-

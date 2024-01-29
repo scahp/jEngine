@@ -3,13 +3,13 @@
 #define USE_GAUSSIAN_INSTEAD 0
 #endif // USE_GAUSSIAN_INSTEAD
 
-Texture2D inputImage : register(t0);
-RWTexture2D<float4> resultImage : register(u1);
+RWTexture2D<float4> resultImage : register(u0);
+Texture2D inputImage : register(t1);
 
 struct CommonComputeUniformBuffer
 {
-    float Width;
-    float Height;
+    int Width;
+    int Height;
     float Sigma;
     int KernalSize;
 };

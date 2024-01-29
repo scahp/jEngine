@@ -63,8 +63,10 @@ public:
 
 #if ENABLE_PROFILE_CPU
 #define SCOPE_CPU_PROFILE(Name) jScopedProfile_CPU Name##ScopedProfileCPU(jNameStatic(#Name));
+#define SCOPE_CPU_PROFILE_NAME(Name) jScopedProfile_CPU Name##ScopedProfileCPU(Name);
 #else
 #define SCOPE_CPU_PROFILE(Name)
+#define SCOPE_CPU_PROFILE_NAME(Name) 
 #endif
 
 //////////////////////////////////////////////////////////////////////////

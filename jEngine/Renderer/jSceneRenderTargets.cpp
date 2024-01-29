@@ -17,6 +17,9 @@ jTexture* jSceneRenderTarget::FilteredEnvMap2 = nullptr;
 jTexture* jSceneRenderTarget::CubeEnvMap2 = nullptr;
 std::shared_ptr<jTexture> jSceneRenderTarget::HistoryBuffer;
 std::shared_ptr<jTexture> jSceneRenderTarget::HistoryDepthBuffer;
+std::shared_ptr<jTexture> jSceneRenderTarget::GaussianV;
+std::shared_ptr<jTexture> jSceneRenderTarget::GaussianH;
+std::shared_ptr<jRenderTarget> jSceneRenderTarget::AOProjection;
 
 // todo : remove this.
 #include "jPrimitiveUtil.h"
@@ -165,7 +168,8 @@ void jSceneRenderTarget::Return()
         if (GBuffer[i])
             GBuffer[i]->Return();
     }
-    AtmosphericShadowing->Return();
+    if (AtmosphericShadowing)
+        AtmosphericShadowing->Return();
 }
 
 std::shared_ptr<jRenderTarget> jSceneRenderTarget::GetShadowMap(const jLight* InLight) const

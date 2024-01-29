@@ -161,8 +161,8 @@ bool jSwapchain_Vulkan::CreateInternal(VkSwapchainKHR InOldSwapchain)
             new jTexture_Vulkan(ETextureType::TEXTURE_2D, Format, Extent.x, Extent.y, 1, EMSAASamples::COUNT_1, 1, false, vkImages[i], ImagetView));
     }
 
-    g_rhi_vk->RenderPassPool.Release();
-    g_rhi_vk->PipelineStatePool.Release();
+    g_rhi_vk->RenderPassPool.ReleaseAll();
+    g_rhi_vk->PipelineStatePool.ReleaseAll();
 
     for(jDescriptorPool_Vulkan* pool : g_rhi_vk->DescriptorPools)
     {

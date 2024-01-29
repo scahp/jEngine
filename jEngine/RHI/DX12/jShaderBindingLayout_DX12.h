@@ -4,6 +4,9 @@
 struct jRootParameterExtractor
 {
 public:
+    jRootParameterExtractor() = default;
+    jRootParameterExtractor(EShaderAccessStageFlag InShaderAccessStageFlags) : ShaderAccessStageFlags(InShaderAccessStageFlags) {}
+
     std::vector<D3D12_ROOT_PARAMETER1> RootParameters;
     std::vector<D3D12_DESCRIPTOR_RANGE1> Descriptors;
     std::vector<D3D12_DESCRIPTOR_RANGE1> SamplerDescriptors;
@@ -16,6 +19,7 @@ protected:
 
 private:
     int32 NumOfInlineRootParameter = 0;    
+    EShaderAccessStageFlag ShaderAccessStageFlags = EShaderAccessStageFlag::ALL;
 };
 
 struct jShaderBindingLayout_DX12 : public jShaderBindingLayout
@@ -38,8 +42,8 @@ struct jShaderBindingLayout_DX12 : public jShaderBindingLayout
     // RootSignature extractor utility
     using FuncGetRootParameterExtractor = std::function<void(jRootParameterExtractor&)>;
 
-    static ID3D12RootSignature* CreateRootSignatureInternal(size_t InHash, FuncGetRootParameterExtractor InFunc);
-    static ID3D12RootSignature* CreateRootSignature(const jShaderBindingInstanceArray& InBindingInstanceArray);
-    static ID3D12RootSignature* CreateRootSignature(const jShaderBindingLayoutArray& InBindingLayoutArray);
+    static ID3D12RootSignature* CreateRootSignatureInternal(size_t InHash, FuncGetRootParameterExtractor InFunc, EShaderAccessStageFlag InShaderAccessStageFlag);
+    static ID3D12RootSignature* CreateRootSignature(const jShaderBindingInstanceArray& InBindingInstanceArray, EShaderAccessStageFlag InShaderAccessStageFlag);
+    static ID3D12RootSignature* CreateRootSignature(const jShaderBindingLayoutArray& InBindingLayoutArray, EShaderAccessStageFlag InShaderAccessStageFlag);
 };
 

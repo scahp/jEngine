@@ -16,6 +16,9 @@ struct jSceneRenderTarget
     static class jFullscreenQuadPrimitive* GlobalFullscreenPrimitive;
     static std::shared_ptr<jTexture> HistoryBuffer;
     static std::shared_ptr<jTexture> HistoryDepthBuffer;
+    static std::shared_ptr<jTexture> GaussianV;
+    static std::shared_ptr<jTexture> GaussianH;
+    static std::shared_ptr<jRenderTarget> AOProjection;
     //////////////////////////////////////////////////////////////////////////
 
     std::shared_ptr<jRenderTarget> ColorPtr;

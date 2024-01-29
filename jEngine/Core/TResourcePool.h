@@ -88,22 +88,25 @@ public:
     }
 
     template <typename TInitializer>
-    void Release(const TInitializer& initializer)
+    T* Release(const TInitializer& initializer)
     {
-        Release(initializer.GetHash());
+        return Release(initializer.GetHash());
     }
 
-    void Release(size_t InHash)
+    T* Release(size_t InHash)
     {
         jScopeReadLock sr(&Lock);
         auto it_find = Pool.find(InHash);
         if (Pool.end() != it_find)
         {
+            T* ToRelease = it_find->second;
             Pool.erase(it_find);
+            return ToRelease;
         }
+        return nullptr;
     }
 
-    void Release()
+    void ReleaseAll()
     {
         jScopeWriteLock sw(&Lock);
         for (auto& iter : Pool)

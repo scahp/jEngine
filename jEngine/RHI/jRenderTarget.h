@@ -75,7 +75,7 @@ struct jRenderTarget final : public std::enable_shared_from_this<jRenderTarget>
         }
     }
 
-    ~jRenderTarget() {}
+    virtual ~jRenderTarget();
 
     size_t GetHash() const
     {
@@ -101,4 +101,8 @@ struct jRenderTarget final : public std::enable_shared_from_this<jRenderTarget>
 
     mutable size_t Hash = 0;
     bool bCreatedFromRenderTargetPool = false;
+
+    // Vulkan only
+    // To remove renderpasses, if relative RenderTarget is released or returned to pool.
+    std::vector<uint64> RelatedRenderPassHashes;
 };

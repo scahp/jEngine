@@ -18,6 +18,8 @@ public:
     virtual void* GetRenderPass() const override { return RenderPass; }
     FORCEINLINE const VkRenderPass& GetRenderPassRaw() const { return RenderPass; }
     virtual void* GetFrameBuffer() const override { return FrameBuffer; }
+	virtual bool IsInvalidated() const override { return !IsValidRenderTargets(); }
+    virtual bool IsValidRenderTargets() const override;
 
     virtual bool BeginRenderPass(const jCommandBuffer* commandBuffer) override
     {

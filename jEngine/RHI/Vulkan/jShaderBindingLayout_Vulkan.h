@@ -108,7 +108,7 @@ struct jShaderBindingLayout_Vulkan : public jShaderBindingLayout
 
 public:
     static VkDescriptorSetLayout CreateDescriptorSetLayout(const jShaderBindingArray& InShaderBindingArray);
-    static VkPipelineLayout CreatePipelineLayout(const jShaderBindingLayoutArray& InShaderBindingLayoutArray, const jPushConstant* pushConstant);
+    static VkPipelineLayout CreatePipelineLayout(const jShaderBindingLayoutArray& InShaderBindingLayoutArray, const jPushConstant* InPushConstant, EShaderAccessStageFlag InShaderAccessStageFlag);
     static void ClearPipelineLayout();
 
     static jMutexRWLock DescriptorLayoutPoolLock;

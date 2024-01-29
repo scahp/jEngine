@@ -551,6 +551,9 @@ public:
 		return std::static_pointer_cast<T>(CreateCubeTexture(InWidth, InHeight, InMipLevels, InFormat, InTextureCreateFlag, InImageLayout, InImageCopyData, InClearValue, InResourceName));
     }
 	//////////////////////////////////////////////////////////////////////////
+
+	// To release renderpasses that have relation with rendertarget which will be released.
+	virtual void RemoveRenderPassByHash(const std::vector<uint64>& InRelatedRenderPassHashes) {}
 };
 
 // Not thred safe

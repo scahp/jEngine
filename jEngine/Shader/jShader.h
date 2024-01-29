@@ -193,6 +193,7 @@ struct jShader : public std::enable_shared_from_this<jShader>
 
     bool UpdateShader();
     virtual void Initialize();
+    virtual bool IsInvalidated() const { return false; }
 
 	uint64 TimeStamp = 0;
 	jShaderInfo ShaderInfo;

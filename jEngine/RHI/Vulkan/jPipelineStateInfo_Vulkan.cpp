@@ -189,7 +189,7 @@ void* jPipelineStateInfo_Vulkan::CreateGraphicsPipelineState()
 
     // 4. Viewports and scissors
     // SwapChain의 이미지 사이즈가 이 클래스에 정의된 상수 WIDTH, HEIGHT와 다를 수 있다는 것을 기억 해야함.
-    // 그리고 Viewports 사이즈는 SwapChain 크기 이하로 마추면 됨.
+    // 그리고 Viewports 사이즈는 SwapChain 크기 이하로 맞추면 됨.
     // [minDepth ~ maxDepth] 는 [0.0 ~ 1.0] 이며 특별한 경우가 아니면 이 범위로 사용하면 된다.
     // Scissor Rect 영역을 설정해주면 영역내에 있는 Pixel만 레스터라이저를 통과할 수 있으며 나머지는 버려(Discard)진다.
     const auto& Viewports = PipelineStateFixed->Viewports;
@@ -202,7 +202,7 @@ void* jPipelineStateInfo_Vulkan::CreateGraphicsPipelineState()
         
         if (IsUse_VULKAN_NDC_Y_FLIP())
         {
-            vkViewports[i].y = Viewports[i].Height - Viewports[i].Y;
+            vkViewports[i].y = Viewports[i].Height + Viewports[i].Y;
             vkViewports[i].height = -Viewports[i].Height;
         }
         else
@@ -295,7 +295,7 @@ void* jPipelineStateInfo_Vulkan::CreateGraphicsPipelineState()
     }
 
     // 10. Pipeline layout
-    vkPipelineLayout = jShaderBindingLayout_Vulkan::CreatePipelineLayout(ShaderBindingLayoutArray, PushConstant);
+    vkPipelineLayout = jShaderBindingLayout_Vulkan::CreatePipelineLayout(ShaderBindingLayoutArray, PushConstant, EShaderAccessStageFlag::ALL_GRAPHICS);
 
     VkGraphicsPipelineCreateInfo pipelineInfo = {};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -394,7 +394,7 @@ void* jPipelineStateInfo_Vulkan::CreateComputePipelineState()
     if (vkPipeline)
         return vkPipeline;
 
-    vkPipelineLayout = jShaderBindingLayout_Vulkan::CreatePipelineLayout(ShaderBindingLayoutArray, PushConstant);
+    vkPipelineLayout = jShaderBindingLayout_Vulkan::CreatePipelineLayout(ShaderBindingLayoutArray, PushConstant, EShaderAccessStageFlag::COMPUTE);
 
     VkComputePipelineCreateInfo computePipelineCreateInfo{};
     computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
@@ -420,11 +420,12 @@ void* jPipelineStateInfo_Vulkan::CreateComputePipelineState()
 
 void* jPipelineStateInfo_Vulkan::CreateRaytracingPipelineState()
 {
+#if SUPPORT_RAYTRACING
     // 미리 만들어 둔게 있으면 사용
     if (vkPipeline)
         return vkPipeline;
 
-    vkPipelineLayout = jShaderBindingLayout_Vulkan::CreatePipelineLayout(ShaderBindingLayoutArray, PushConstant);
+    vkPipelineLayout = jShaderBindingLayout_Vulkan::CreatePipelineLayout(ShaderBindingLayoutArray, PushConstant, EShaderAccessStageFlag::ALL_RAYTRACING);
 
     std::vector<VkRayTracingShaderGroupCreateInfoKHR> raygenGroups;
     raygenGroups.reserve(RaytracingShaders.size() * 4);
@@ -589,6 +590,10 @@ void* jPipelineStateInfo_Vulkan::CreateRaytracingPipelineState()
     }
 
     return vkPipeline;
+#else
+    check(0);
+    return nullptr;
+#endif // SUPPORT_RAYTRACING
 }
 
 void jPipelineStateInfo_Vulkan::Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const

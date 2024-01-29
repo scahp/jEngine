@@ -131,8 +131,8 @@ void* jPipelineStateInfo_DX12::CreateGraphicsPipelineState()
     psoDesc.InputLayout.pInputElementDescs = OutInputElementDescs.data();
     psoDesc.InputLayout.NumElements = (uint32)OutInputElementDescs.size();
 
-    // DX12 에서는 한개만 사용할 수 있도록 되어있는데, 변경 예정. 1개로 할지, 여러개로 할지 협의 봐야 함.
-    ComPtr<ID3D12RootSignature> RootSignature = jShaderBindingLayout_DX12::CreateRootSignature(ShaderBindingLayoutArray);
+    // Create RootSignature
+    ComPtr<ID3D12RootSignature> RootSignature = jShaderBindingLayout_DX12::CreateRootSignature(ShaderBindingLayoutArray, EShaderAccessStageFlag::ALL_GRAPHICS);
     psoDesc.pRootSignature = RootSignature.Get();
 
     if (GraphicsShader.VertexShader)
@@ -224,7 +224,7 @@ void* jPipelineStateInfo_DX12::CreateComputePipelineState()
     PipelineState = nullptr;
 
     D3D12_COMPUTE_PIPELINE_STATE_DESC psoDesc = {};
-    ComPtr<ID3D12RootSignature> RootSignature = jShaderBindingLayout_DX12::CreateRootSignature(ShaderBindingLayoutArray);
+    ComPtr<ID3D12RootSignature> RootSignature = jShaderBindingLayout_DX12::CreateRootSignature(ShaderBindingLayoutArray, EShaderAccessStageFlag::COMPUTE);
     psoDesc.pRootSignature = RootSignature.Get();
     if (ComputeShader)
     {
@@ -322,7 +322,7 @@ void* jPipelineStateInfo_DX12::CreateRaytracingPipelineState()
     }
 
     // Global root signature
-    ID3D12RootSignature* RootSignature = jShaderBindingLayout_DX12::CreateRootSignature(ShaderBindingLayoutArray);
+    ID3D12RootSignature* RootSignature = jShaderBindingLayout_DX12::CreateRootSignature(ShaderBindingLayoutArray, EShaderAccessStageFlag::ALL_RAYTRACING);
     D3D12_GLOBAL_ROOT_SIGNATURE globalRSDesc = { };
     globalRSDesc.pGlobalRootSignature = RootSignature;
     {

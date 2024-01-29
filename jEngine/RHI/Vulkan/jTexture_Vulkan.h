@@ -23,6 +23,8 @@ struct jTexture_Vulkan : public jTexture
     EResourceLayout Layout = EResourceLayout::UNDEFINED;
     VkSampler SamplerState = nullptr;
 
+    bool IsSwapchain = false;
+
     void ReleaseInternal();
     virtual void* GetHandle() const override { return Image; }
     virtual void* GetSamplerStateHandle() const override { return SamplerState; }

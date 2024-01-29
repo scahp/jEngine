@@ -7,6 +7,7 @@ std::shared_ptr<jRenderTarget> g_EyeAdaptationBRTPtr;
 
 std::map<size_t, std::list<jRenderTargetPool::jRenderTargetPoolResource> > jRenderTargetPool::RenderTargetResourceMap;
 std::map<jRenderTarget*, size_t> jRenderTargetPool::RenderTargetHashVariableMap;
+bool jRenderTargetPool::PreventReturnRenderTarget = false;
 
 struct jTexture* jRenderTargetPool::GetNullTexture(ETextureType type)
 {
@@ -54,9 +55,15 @@ std::shared_ptr<jRenderTarget> jRenderTargetPool::GetRenderTarget(const jRenderT
 
 void jRenderTargetPool::ReturnRenderTarget(jRenderTarget* renderTarget)
 {
+	if (PreventReturnRenderTarget)
+		return;
+
 	auto it_find = RenderTargetHashVariableMap.find(renderTarget);
 	if (RenderTargetHashVariableMap.end() == it_find)
+	{
+		check(0);
 		return;
+	}
 
 	const size_t hash = it_find->second;
 	for (auto& iter : RenderTargetResourceMap[hash])
@@ -64,7 +71,8 @@ void jRenderTargetPool::ReturnRenderTarget(jRenderTarget* renderTarget)
 		if (renderTarget == iter.RenderTargetPtr.get())
 		{
 			iter.IsUsing = false;
-			break;
+			return;
 		}
 	}
+	check(0);
 }

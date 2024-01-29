@@ -20,6 +20,23 @@ struct jDescriptorPool_Vulkan;
 
 #define VALIDATION_LAYER_VERBOSE 0
 
+// For delaying destroy for standalone resource
+struct jStandaloneResourceVulkan
+{
+	static void ReleaseBufferResource(VkBuffer InBuffer, VkDeviceMemory InMemory, const VkAllocationCallbacks* InAllocatorCallback = nullptr);
+	static void ReleaseImageResource(VkImage InImage, VkDeviceMemory InMemory, const std::vector<VkImageView>& InViews, const VkAllocationCallbacks* InAllocatorCallback = nullptr);
+
+	VkBuffer Buffer = nullptr;
+	VkDeviceMemory Memory = nullptr;
+
+	VkImage Image = nullptr;
+	std::vector<VkImageView> Views;
+
+	const VkAllocationCallbacks* AllocatorCallback = nullptr;
+};
+using jDeallocatorMultiFrameStandalonResource = jDeallocatorMultiFrameResource<std::shared_ptr<jStandaloneResourceVulkan>>;
+using jDeallocatorMultiFrameRenderPass = jDeallocatorMultiFrameResource<jRenderPass_Vulkan*>;
+
 class jRHI_Vulkan : public jRHI
 {
 public:
@@ -82,11 +99,14 @@ public:
 	// 논리 디바이스 생성
 	VkDevice Device;
     VkPipelineCache PipelineCache = nullptr;
-	VkPhysicalDeviceProperties2 DeviceProperties2{};
-    VkPhysicalDeviceRayTracingPipelinePropertiesKHR  RayTracingPipelineProperties{};
-
+	VkPhysicalDeviceProperties2 DeviceProperties{};
+	const VkPhysicalDeviceLimits& GetDevicePropertyLimits() const { return DeviceProperties.properties.limits; }
 	VkPhysicalDeviceFeatures2 DeviceFeatures2{};
-    VkPhysicalDeviceAccelerationStructureFeaturesKHR AccelerationStructureFeatures{};
+	
+	// Raytracing Features
+	VkPhysicalDeviceAccelerationStructureFeaturesKHR AccelerationStructureFeatures{};
+	VkPhysicalDeviceRayTracingPipelinePropertiesKHR  RayTracingPipelineProperties{};
+	//////////////////////////////////////////////////////////////////////////
 
 	jSwapchain_Vulkan* Swapchain = nullptr;
 	jCommandBufferManager_Vulkan* CommandBufferManager = nullptr;
@@ -275,6 +295,12 @@ public:
     //////////////////////////////////////////////////////////////////////////
 
 	virtual bool IsSupportVSync() const override;
+
+	jDeallocatorMultiFrameStandalonResource DeallocatorMultiFrameStandaloneResource;
+	jDeallocatorMultiFrameRenderPass DeallocatorMultiFrameRenderPass;
+
+	// To release renderpasses that have relation with rendertarget which will be released.
+	virtual void RemoveRenderPassByHash(const std::vector<uint64>& InRelatedRenderPassHashes) override;
 };
 
 extern jRHI_Vulkan* g_rhi_vk;

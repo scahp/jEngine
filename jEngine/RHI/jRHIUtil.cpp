@@ -3,6 +3,10 @@
 #include "FileLoader/jImageFileLoader.h"
 #include "jRenderTargetPool.h"
 #include "DX12/jTexture_DX12.h"
+#include "Renderer/jSceneRenderTargets.h"
+#include "jPrimitiveUtil.h"
+#include "jOptions.h"
+#include "Scene/jRenderObject.h"
 
 namespace jRHIUtil
 {
@@ -384,5 +388,138 @@ std::shared_ptr<jRenderTarget> GenerateFilteredEnvironmentMap(jName InDestFilePa
     return FilteredEnvMap;
 }
 
+void CreateDefaultFixedPipelineStates(jRasterizationStateInfo*& OutRasterState, jBlendingStateInfo*& OutBlendState, jDepthStencilStateInfo*& OutDepthStencilState)
+{
+    OutRasterState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)1, true, 0.2f, false, false>::Create();
+    OutDepthStencilState = TDepthStencilStateInfo<false, false, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
+    OutBlendState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ZERO, EBlendFactor::ONE, EBlendOp::ADD, EColorMask::ALL>::Create();
+}
+
+void DispatchCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jTexture* RenderTarget, FuncBindingShaderResources InFuncBindingShaderResources, FuncCreateShaders InFuncCreateShaders)
+{
+	check(RenderTarget);
+	const int32 Width = RenderTarget->Width;
+	const int32 Height = RenderTarget->Height;
+
+	std::shared_ptr<jShaderBindingInstance> CurrentBindingInstance = nullptr;
+	jShaderBindingArray ShaderBindingArray;
+	jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
+
+	g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), RenderTarget, EResourceLayout::UAV);
+
+	ShaderBindingArray.Add(jShaderBinding::Create(ShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE
+		, ResourceInlineAllactor.Alloc<jTextureResource>(RenderTarget, nullptr)));
+
+	InFuncBindingShaderResources(InRenderFrameContextPtr, ShaderBindingArray, ResourceInlineAllactor);
+
+	CurrentBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
+
+	jShaderBindingLayoutArray ShaderBindingLayoutArray;
+	ShaderBindingLayoutArray.Add(CurrentBindingInstance->ShaderBindingsLayouts);
+
+	jShader* Shader = InFuncCreateShaders(InRenderFrameContextPtr);
+	jPipelineStateInfo* computePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingLayoutArray, {});
+
+	computePipelineStateInfo->Bind(InRenderFrameContextPtr);
+
+	jShaderBindingInstanceArray ShaderBindingInstanceArray;
+	ShaderBindingInstanceArray.Add(CurrentBindingInstance.get());
+
+	jShaderBindingInstanceCombiner ShaderBindingInstanceCombiner;
+	for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
+	{
+		// Add ShaderBindingInstanceCombiner data : DescriptorSets, DynamicOffsets
+		ShaderBindingInstanceCombiner.DescriptorSetHandles.Add(ShaderBindingInstanceArray[i]->GetHandle());
+		const std::vector<uint32>* pDynamicOffsetTest = ShaderBindingInstanceArray[i]->GetDynamicOffsets();
+		if (pDynamicOffsetTest && pDynamicOffsetTest->size())
+		{
+			ShaderBindingInstanceCombiner.DynamicOffsets.Add((void*)pDynamicOffsetTest->data(), (int32)pDynamicOffsetTest->size());
+		}
+	}
+	ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
+
+	g_rhi->BindComputeShaderBindingInstances(InRenderFrameContextPtr->GetActiveCommandBuffer(), computePipelineStateInfo, ShaderBindingInstanceCombiner, 0);
+
+	const int32 X = (Width / 16) + ((Width % 16) ? 1 : 0);
+	const int32 Y = (Height / 16) + ((Height % 16) ? 1 : 0);
+	g_rhi->DispatchCompute(InRenderFrameContextPtr, X, Y, 1);
+}
+
+void DrawFullScreen(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, std::shared_ptr<jRenderTarget> InRenderTargetPtr
+                    , FuncBindingShaderResources InFuncBindingShaderResources, FuncCreateShaders InFuncCreateShaders, FuncCreateFixedPipelineStates InFuncCreateFixedPipelineStates)
+{
+    check(InRenderTargetPtr);
+	const int32 RTWidth = InRenderTargetPtr->Info.Width;
+	const int32 RTHeight = InRenderTargetPtr->Info.Height;
+	DrawQuad(InRenderFrameContextPtr, InRenderTargetPtr, Vector4i(0, 0, RTWidth, RTHeight), InFuncBindingShaderResources, InFuncCreateShaders, InFuncCreateFixedPipelineStates);
+}
+
+void DrawQuad(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, std::shared_ptr<jRenderTarget> InRenderTargetPtr, Vector4i InRect
+    , FuncBindingShaderResources InFuncBindingShaderResources, FuncCreateShaders InFuncCreateShaders, FuncCreateFixedPipelineStates InFuncCreateFixedPipelineStates)
+{
+	check(InRenderTargetPtr);
+	const int32 Width = InRenderTargetPtr->Info.Width;
+	const int32 Height = InRenderTargetPtr->Info.Height;
+
+	g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InRenderTargetPtr->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
+
+	jRasterizationStateInfo* RasterizationState = nullptr;
+	jBlendingStateInfo* BlendingState = nullptr;
+	jDepthStencilStateInfo* DepthStencilState = nullptr;
+	InFuncCreateFixedPipelineStates(RasterizationState, BlendingState, DepthStencilState);
+
+	// Create fixed pipeline states
+	jPipelineStateFixedInfo PostProcessPassPipelineStateFixed(RasterizationState, DepthStencilState, BlendingState
+		, jViewport(InRect.x, InRect.y, InRect.z, InRect.w), jScissor(InRect.x, InRect.y, InRect.z, InRect.w), gOptions.UseVRS);
+
+	const jRTClearValue ClearColor = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f);
+	const jRTClearValue ClearDepth = jRTClearValue(1.0f, 0);
+
+	jRenderPassInfo renderPassInfo;
+	jAttachment color = jAttachment(InRenderTargetPtr, EAttachmentLoadStoreOp::LOAD_STORE
+		, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, InRenderTargetPtr->GetLayout(), EResourceLayout::COLOR_ATTACHMENT);
+	renderPassInfo.Attachments.push_back(color);
+
+	jSubpass subpass;
+	subpass.Initialize(0, 1, EPipelineStageMask::COLOR_ATTACHMENT_OUTPUT_BIT, EPipelineStageMask::FRAGMENT_SHADER_BIT);
+	subpass.OutputColorAttachments.push_back(0);
+	renderPassInfo.Subpasses.push_back(subpass);
+
+	auto RenderPass = g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { Width, Height });
+
+	std::shared_ptr<jShaderBindingInstance> CurrentBindingInstance = nullptr;
+	int32 BindingPoint = 0;
+	jShaderBindingArray ShaderBindingArray;
+	jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
+
+	InFuncBindingShaderResources(InRenderFrameContextPtr, ShaderBindingArray, ResourceInlineAllactor);
+
+	std::shared_ptr<jShaderBindingInstance> ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
+	jShaderBindingInstanceArray ShaderBindingInstanceArray;
+	ShaderBindingInstanceArray.Add(ShaderBindingInstance.get());
+
+	jGraphicsPipelineShader Shader;
+	{
+		jShaderInfo shaderInfo;
+		shaderInfo.SetName(jNameStatic("DrawQuadVS"));
+		shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/fullscreenquad_vs.hlsl"));
+		shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
+		Shader.VertexShader = g_rhi->CreateShader(shaderInfo);
+
+		Shader.PixelShader = InFuncCreateShaders(InRenderFrameContextPtr);
+	}
+
+	if (!jSceneRenderTarget::GlobalFullscreenPrimitive)
+		jSceneRenderTarget::GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
+	jDrawCommand DrawCommand(InRenderFrameContextPtr, jSceneRenderTarget::GlobalFullscreenPrimitive->RenderObjects[0], RenderPass
+		, Shader, &PostProcessPassPipelineStateFixed, jSceneRenderTarget::GlobalFullscreenPrimitive->RenderObjects[0]->MaterialPtr.get(), ShaderBindingInstanceArray, nullptr);
+	DrawCommand.Test = true;
+	DrawCommand.PrepareToDraw(false);
+	if (RenderPass && RenderPass->BeginRenderPass(InRenderFrameContextPtr->GetActiveCommandBuffer()))
+	{
+		DrawCommand.Draw();
+		RenderPass->EndRenderPass();
+	}
+}
 
 }

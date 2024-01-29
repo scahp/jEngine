@@ -390,8 +390,8 @@ void jGame::Draw()
 		jView View(MainCamera, jLight::GetLights());
 		View.PrepareViewUniformBufferShaderBindingInstance();
 
-		jRenderer renderer(renderFrameContext, View);
-		renderer.Render();
+        jRenderer renderer(renderFrameContext, View);
+        renderer.Render();
 
 		g_rhi->EndRenderFrame(renderFrameContext);
 	}
@@ -471,6 +471,9 @@ void jGame::Release()
 	jSceneRenderTarget::CubeEnvMap.reset();
 	jSceneRenderTarget::HistoryBuffer.reset();
 	jSceneRenderTarget::HistoryDepthBuffer.reset();
+    jSceneRenderTarget::GaussianV.reset();
+    jSceneRenderTarget::GaussianH.reset();
+    jSceneRenderTarget::AOProjection.reset();
 }
 
 void jGame::SpawnTestPrimitives()

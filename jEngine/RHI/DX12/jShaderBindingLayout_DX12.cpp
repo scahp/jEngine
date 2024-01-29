@@ -19,6 +19,8 @@ void jRootParameterExtractor::Extract(int32& InOutDescriptorOffset, int32& InOut
         const jShaderBinding* ShaderBinding = InShaderBindingArray[i];
         const bool IsBindless = ShaderBinding->IsBindless;
 
+        check(!!(ShaderBinding->AccessStageFlags & ShaderAccessStageFlags));
+
         check(!ShaderBinding->IsInline || (ShaderBinding->IsInline &&
             (ShaderBinding->BindingType == EShaderBindingType::UNIFORMBUFFER
                 || ShaderBinding->BindingType == EShaderBindingType::UNIFORMBUFFER_DYNAMIC
@@ -328,7 +330,7 @@ std::shared_ptr<jShaderBindingInstance> jShaderBindingLayout_DX12::CreateShaderB
     return std::shared_ptr<jShaderBindingInstance>(ShaderBindingInstance);
 }
 
-ID3D12RootSignature* jShaderBindingLayout_DX12::CreateRootSignatureInternal(size_t InHash, FuncGetRootParameterExtractor InFunc)
+ID3D12RootSignature* jShaderBindingLayout_DX12::CreateRootSignatureInternal(size_t InHash, FuncGetRootParameterExtractor InFunc, EShaderAccessStageFlag InShaderAccessStageFlag)
 {
     {
         jScopeReadLock sr(&GRootSignatureLock);
@@ -349,7 +351,7 @@ ID3D12RootSignature* jShaderBindingLayout_DX12::CreateRootSignatureInternal(size
             return it_find->second.Get();
         }
 
-        jRootParameterExtractor DescriptorExtractor;
+        jRootParameterExtractor DescriptorExtractor(InShaderAccessStageFlag);
         InFunc(DescriptorExtractor);
 
         // RootSignature 생성
@@ -381,7 +383,7 @@ ID3D12RootSignature* jShaderBindingLayout_DX12::CreateRootSignatureInternal(size
     }
 }
 
-ID3D12RootSignature* jShaderBindingLayout_DX12::CreateRootSignature(const jShaderBindingInstanceArray& InBindingInstanceArray)
+ID3D12RootSignature* jShaderBindingLayout_DX12::CreateRootSignature(const jShaderBindingInstanceArray& InBindingInstanceArray, EShaderAccessStageFlag InShaderAccessStageFlag)
 {
     if (InBindingInstanceArray.NumOfData <= 0)
         return nullptr;
@@ -395,10 +397,10 @@ ID3D12RootSignature* jShaderBindingLayout_DX12::CreateRootSignature(const jShade
     return CreateRootSignatureInternal(hash, [&InBindingInstanceArray](jRootParameterExtractor& OutRootParameterExtractor)
         {
             OutRootParameterExtractor.Extract(InBindingInstanceArray);
-        });
+        }, InShaderAccessStageFlag);
 }
 
-ID3D12RootSignature* jShaderBindingLayout_DX12::CreateRootSignature(const jShaderBindingLayoutArray& InBindingLayoutArray)
+ID3D12RootSignature* jShaderBindingLayout_DX12::CreateRootSignature(const jShaderBindingLayoutArray& InBindingLayoutArray, EShaderAccessStageFlag InShaderAccessStageFlag)
 {
     if (InBindingLayoutArray.NumOfData <= 0)
         return nullptr;
@@ -408,5 +410,5 @@ ID3D12RootSignature* jShaderBindingLayout_DX12::CreateRootSignature(const jShade
     return CreateRootSignatureInternal(hash, [&InBindingLayoutArray](jRootParameterExtractor& OutRootParameterExtractor)
         {
             OutRootParameterExtractor.Extract(InBindingLayoutArray);
-        });
+        }, InShaderAccessStageFlag);
 }

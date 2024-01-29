@@ -20,16 +20,8 @@ void jBuffer_Vulkan::ReleaseInternal()
 
     check(g_rhi_vk->Device);
 
-    if (Buffer)
-    {
-        vkDestroyBuffer(g_rhi_vk->Device, Buffer, nullptr);
-    }
+    jStandaloneResourceVulkan::ReleaseBufferResource(Buffer, BufferMemory);
     Buffer = nullptr;
-
-    if (BufferMemory)
-    {
-        vkFreeMemory(g_rhi_vk->Device, BufferMemory, nullptr);
-    }
     BufferMemory = nullptr;
 
     AllocatedSize = 0;
