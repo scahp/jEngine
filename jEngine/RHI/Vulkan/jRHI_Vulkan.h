@@ -300,7 +300,9 @@ public:
 	jDeallocatorMultiFrameRenderPass DeallocatorMultiFrameRenderPass;
 
 	// To release renderpasses that have relation with rendertarget which will be released.
-	virtual void RemoveRenderPassByHash(const std::vector<uint64>& InRelatedRenderPassHashes) override;
+	virtual void RemoveRenderPassByHash(const std::vector<uint64>& InRelatedRenderPassHashes) const override;
+
+	virtual float GetCurrentMonitorDPIScale() const override;
 };
 
 extern jRHI_Vulkan* g_rhi_vk;

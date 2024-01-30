@@ -302,7 +302,7 @@ void jImGUI_Vulkan::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFra
         jAttachment color = jAttachment(FinalColorPtr, EAttachmentLoadStoreOp::LOAD_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f)
             , FinalColorPtr->GetLayout(), EResourceLayout::PRESENT_SRC);
 
-        RenderPass = g_rhi_vk->GetOrCreateRenderPass({ color }, { 0, 0 }, { (int32)(SCR_WIDTH * MonitorDPIScale), (int32)(SCR_HEIGHT * MonitorDPIScale) });
+        RenderPass = g_rhi_vk->GetOrCreateRenderPass({ color }, { 0, 0 }, { FinalColorPtr->Info.Width, FinalColorPtr->Info.Height });
         PiplineStateInfo = (jPipelineStateInfo_Vulkan*)CreatePipelineState(RenderPass, g_rhi_vk->GraphicsQueue.Queue);
     }
     check(RenderPass);
@@ -320,15 +320,18 @@ void jImGUI_Vulkan::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFra
         vkCmdBindDescriptorSets(commandbuffer_vk, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &DescriptorSet, 0, nullptr);
         vkCmdBindPipeline(commandbuffer_vk, VK_PIPELINE_BIND_POINT_GRAPHICS, PiplineStateInfo->vkPipeline);
 
+        const float DisplayWidth = io.DisplaySize.x;
+        const float DisplayHeight = io.DisplaySize.y;
+
         VkViewport viewport = {};
-        viewport.width = ImGui::GetIO().DisplaySize.x;
-        viewport.height = ImGui::GetIO().DisplaySize.y;
+        viewport.width = DisplayWidth;
+        viewport.height = DisplayHeight;
         viewport.minDepth = 0.0f;
         viewport.maxDepth = 1.0f;
         vkCmdSetViewport(commandbuffer_vk, 0, 1, &viewport);
 
         // UI scale and translate via push constants
-        pushConstBlock.scale = Vector2(2.0f / io.DisplaySize.x, 2.0f / io.DisplaySize.y);
+        pushConstBlock.scale = Vector2(2.0f / DisplayWidth, 2.0f / DisplayHeight);
         pushConstBlock.translate = Vector2(-1.0f);
         vkCmdPushConstants(commandbuffer_vk, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstBlock), &pushConstBlock);
 

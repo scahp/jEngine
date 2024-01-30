@@ -22,6 +22,8 @@ public:
         ImGui::Render();
     }
 
+    virtual float GetCurrentMonitorDPIScale() const { return 1.0f; }
+
 protected:
     virtual void NewFrameInternal() {}
 };

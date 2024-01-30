@@ -495,8 +495,8 @@ struct Vector2
 
 	FORCEINLINE Vector2 operator/(Vector2 const& vector) const
 	{
-        JASSERT(IsNearlyZero(vector.x));
-        JASSERT(IsNearlyZero(vector.y));
+        JASSERT(!IsNearlyZero(vector.x));
+        JASSERT(!IsNearlyZero(vector.y));
 
 		return Vector2(
 			IsNearlyZero(vector.x) ? 0.0f : x / vector.x
@@ -616,9 +616,9 @@ struct Vector2
 template <typename T>
 FORCEINLINE Vector operator/(T value, Vector const& vector)
 {
-	JASSERT(IsNearlyZero(vector.x));
-	JASSERT(IsNearlyZero(vector.y));
-	JASSERT(IsNearlyZero(vector.z));
+	JASSERT(!IsNearlyZero(vector.x));
+	JASSERT(!IsNearlyZero(vector.y));
+	JASSERT(!IsNearlyZero(vector.z));
 
 	return Vector(
 		IsNearlyZero(vector.x) ? 0.0f : value / vector.x

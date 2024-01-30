@@ -355,6 +355,10 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClCompile Include="Renderer\jDrawCommand.cpp" />
     <ClCompile Include="Renderer\jPointLightDrawCommandGenerator.cpp" />
     <ClCompile Include="Renderer\jRenderer.cpp" />
+    <ClCompile Include="Renderer\jRenderer_AOPass.cpp" />
+    <ClCompile Include="Renderer\jRenderer_AtmosphericShadowPass.cpp" />
+    <ClCompile Include="Renderer\jRenderer_PostProcessPass.cpp" />
+    <ClCompile Include="Renderer\jRenderer_UIPass.cpp" />
     <ClCompile Include="Renderer\jSceneRenderTargets.cpp" />
     <ClCompile Include="Renderer\jSpotLightDrawCommandGenerator.cpp" />
     <ClCompile Include="RHI\DX12\jBufferUtil_DX12.cpp" />

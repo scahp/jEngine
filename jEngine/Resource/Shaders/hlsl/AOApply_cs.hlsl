@@ -46,7 +46,7 @@ struct VSOutput
 float4 AOApplyPS(VSOutput input) : SV_TARGET
 {
     float AO = AOTexture.Sample(AOSampler, input.TexCoord).x;
-    //AO = lerp(1.0, AO, ComputeCommon.AOIntensity);
+    AO = lerp(1.0, AO, ComputeCommon.AOIntensity);
     return float4(float3(1, 1, 1), AO);
 }
 #endif // PIXEL_SHADER

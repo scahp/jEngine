@@ -27,8 +27,10 @@ struct SceneConstantBuffer
     uint SamplePerPixel;
     int Clear;
     float AOIntensity;
-    int AOAccumulateCount;
-    float Padding;            // for 16 byte align
+    int Padding2;
+    float Padding0;            // for 16 byte align
+    float2 HaltonJitter;
+    float2 Padding1;           // for 16 byte align
 };
 
 #define VERTEX_STRID 56
@@ -159,6 +161,32 @@ float3 random_in_hemisphere(float3 normal, int seed)
     return -in_unit_sphere;
 }
 
+float3 random_in_unit_sphere(float3 seed)
+{
+    float r = Random_0_1(seed.x) + 0.01f; // To avoid 0 value for random variable
+    float g = Random_0_1(seed.y) + 0.01f; // To avoid 0 value for random variable
+    float b = Random_0_1(seed.z) + 0.01f; // To avoid 0 value for random variable
+    float2 uv = float2(DispatchRaysIndex().x * 2 + r, DispatchRaysIndex().y + r * 2.0f);
+    float noiseX = (frac(sin(dot(uv, float2(12.9898, 78.233))) * 43758.5453));
+    float noiseY = (frac(sin(dot(uv, float2(12.9898, 78.233) * g * 2.0f)) * 43758.5453));
+    float noiseZ = (frac(sin(dot(uv, float2(12.9898, 78.233) * b)) * 43758.5453));
+
+    float3 randomUniSphere = float3(noiseX, noiseY, noiseZ) * 2.0f - 1.0f;
+    if (length(randomUniSphere) <= 1.0f)
+        return randomUniSphere;
+
+    return normalize(randomUniSphere);
+}
+
+float3 random_in_hemisphere(float3 normal, float3 seed)
+{
+    float3 in_unit_sphere = random_in_unit_sphere(seed);
+    if (dot(in_unit_sphere, normal) > 0.0)  // 노멀 기준으로 같은 반구 방향인지?
+        return in_unit_sphere;
+
+    return -in_unit_sphere;
+}
+
 void GetShaderBindingResources(
     inout TextureCube<float4> IrradianceMap,
     inout TextureCube<float4> PrefilteredEnvMap,
@@ -255,6 +283,7 @@ float3 BarycentricCoordinates(float3 pt, float3 v0, float3 v1, float3 v2)
 void MyRaygenShader()
 {
     float2 UV = DispatchRaysIndex().xy / g_sceneCB.ViewRect.zw;
+    UV += g_sceneCB.HaltonJitter.xy;
     float3 WorldPos = GBuffer0_Pos.SampleLevel(AlbedoTextureSampler, UV, 0).xyz;
     float3 WorldNormal = GBuffer1_Normal.SampleLevel(AlbedoTextureSampler, UV, 0).xyz;
 
@@ -276,7 +305,8 @@ void MyRaygenShader()
     {
         RayDesc ray;
         ray.Origin = WorldPos;
-        ray.Direction = random_in_hemisphere(WorldNormal, g_sceneCB.FrameNumber + i);
+        //ray.Direction = random_in_hemisphere(WorldNormal, g_sceneCB.FrameNumber + i);
+        ray.Direction = random_in_hemisphere(WorldNormal, WorldPos);
         
         // Set TMin to a non-zero small value to avoid aliasing issues due to floating - point errors.
         // TMin should be kept small to prevent missing geometry at close contact areas.

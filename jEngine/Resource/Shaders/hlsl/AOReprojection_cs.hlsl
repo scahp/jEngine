@@ -3,20 +3,20 @@
 #define USE_DISCONTINUITY_WEIGHT 0
 #endif // USE_DISCONTINUITY_WEIGHT
 
+struct CommonComputeUniformBuffer
+{
+    int Width;
+    int Height;
+    int FrameNumber;
+    float InvScaleToOriginBuffer;
+};
+
 #if COMPUTE_SHADER
 RWTexture2D<float4> resultImage : register(u0);
 Texture2D HistoryBuffer : register(t1);
 Texture2D VelocityBuffer : register(t2);
 Texture2D DepthBuffer : register(t3);
 RWTexture2D<float> HistoryDepthBuffer : register(u4);
-
-struct CommonComputeUniformBuffer
-{
-    int Width;
-    int Height;
-    int UseWaveIntrinsics;
-    int FrameNumber;
-};
 
 cbuffer ComputeCommon : register(b5)
 {
@@ -79,14 +79,6 @@ Texture2D VelocityBuffer : register(t2);
 Texture2D DepthBuffer : register(t3);
 Texture2D HistoryDepthBuffer : register(t4);
 
-struct CommonComputeUniformBuffer
-{
-    int Width;
-    int Height;
-    int UseWaveIntrinsics;
-    int FrameNumber;
-};
-
 cbuffer ComputeCommon : register(b5)
 {
     CommonComputeUniformBuffer ComputeCommon;
@@ -95,7 +87,7 @@ cbuffer ComputeCommon : register(b5)
 float4 AOReprojectionPS(VSOutput input) : SV_TARGET
 {
     float4 Velocity = VelocityBuffer.Sample(TextureSampler, input.TexCoord);
-    float2 OldUV = input.TexCoord - (Velocity.xy / float2(ComputeCommon.Width, ComputeCommon.Height));
+    float2 OldUV = input.TexCoord - (Velocity.xy / float2(ComputeCommon.Width * ComputeCommon.InvScaleToOriginBuffer, ComputeCommon.Height * ComputeCommon.InvScaleToOriginBuffer));
     
     float3 currentColor = CurrentTexture.Sample(TextureSampler, input.TexCoord).xyz;
     float3 historyColor = HistoryBuffer.Sample(TextureSampler, OldUV).xyz;

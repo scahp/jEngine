@@ -27,6 +27,8 @@ public:
     // Draw current imGui frame into a command buffer
     virtual void Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr);
 
+    virtual float GetCurrentMonitorDPIScale() const { return MonitorDPIScale; }
+
     // Todo : remove this for generalization of ui datas
     robin_hood::unordered_map<jName, uint64, jNameHashFunc> CounterMap;
 

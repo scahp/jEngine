@@ -2,41 +2,51 @@
 #include "Math/Vector.h"
 
 extern const char* GDenoisers[4];
+extern const char* GAOResolution[3];
 
 struct jOptions
 {
-    bool UseVRS = false;
-    bool ShowVRSArea = false;
-    bool ShowGrid = false;
-    bool UseWaveIntrinsics = false;
-    bool UseDeferredRenderer = true;
-    bool UseSubpass = false;
-    bool UseMemoryless = true;
-    bool ShowDebugObject = false;
-    bool BloomEyeAdaptation = true;
-    bool QueueSubmitAfterShadowPass = true;
-    bool QueueSubmitAfterBasePass = true;
-    Vector CameraPos = Vector::ZeroVector;
-    float AutoExposureKeyValueScale = -0.2f;
-    float Metallic = 0.0f;
-    float Roughness = 0.2f;
-    Vector SunDir = Vector(0.31f, -0.828f, -0.241f);
-    float AnisoG = 0.15f;
-    bool EarthQuake = false;
-    float FocalDistance = 5.0f;
-    float LensRadius = 0.05f;
-    float AORadius = 30.0f;
-    float AOIntensity = 1.0f;
-    int32 SamplePerPixel = 1;
-    bool UseRTAO = true;
-    bool UseAOReprojection = true;
-    const char* Denoiser = GDenoisers[1];       // Select GaussianSeparable
-    int32 GaussianKernelSize = 9;
-    float GaussianKernelSigma = 10.0f;
-    bool ShowAOOnly = false;
-    bool ShowDebugRT = true;
-    bool UseAccumulateRay = true;
-    bool UseDiscontinuityWeight = true;
+    jOptions();
+
+    // RHI options
+    const bool EnableDebuggerLayer;
+
+    // Graphics options
+    bool UseVRS;
+    bool ShowVRSArea;
+    bool ShowGrid;
+    bool UseWaveIntrinsics;
+    bool UseDeferredRenderer;
+    bool UseSubpass;
+    bool UseMemoryless;
+    bool ShowDebugObject;
+    bool BloomEyeAdaptation;
+    bool QueueSubmitAfterShadowPass;
+    bool QueueSubmitAfterBasePass;
+    Vector CameraPos;
+    float AutoExposureKeyValueScale;
+    float Metallic;
+    float Roughness;
+    Vector SunDir;
+    float AnisoG;
+    bool EarthQuake;
+    float FocalDistance;
+    float LensRadius;
+    float AORadius;
+    float AOIntensity;
+    int32 SamplePerPixel;
+    bool UseRTAO;
+    bool UseAOReprojection;
+    const char* Denoiser;
+    int32 GaussianKernelSize;
+    float GaussianKernelSigma;
+    float BilateralKernelSigma;
+    bool ShowAOOnly;
+    bool ShowDebugRT;
+    bool UseAccumulateRay;
+    bool UseDiscontinuityWeight;
+    bool UseHaltonJitter;
+    const char* UseResolution;
 
     bool IsDenoiserGuassian() const { return GDenoisers[0] == Denoiser; }
     bool IsDenoiserGuassianSeparable() const { return GDenoisers[1] == Denoiser; }

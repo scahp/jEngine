@@ -317,7 +317,7 @@ bool jRHI_DX12::InitRHI()
 #if defined(_DEBUG)
 	// 디버그 레이어 켬 ("optional feature" 그래픽 툴을 요구함)
 	// 주의 : 디버그 레이어를 device 생성 후에 하면 활성화된 device를 무효화 됨.
-    if (DX12_ENABLE_DEBUG_LAYER)
+    if (gOptions.EnableDebuggerLayer)
 	{
 		ComPtr<ID3D12Debug> debugController;
 		if (JOK(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))

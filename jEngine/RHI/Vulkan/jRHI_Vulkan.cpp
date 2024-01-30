@@ -114,6 +114,11 @@ bool jRHI_Vulkan::InitRHI()
 	appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
 	appInfo.apiVersion = VK_API_VERSION_1_3;
 
+#if ENABLE_VALIDATION_LAYER
+	// check validation layer
+	GIsValidationLayerSupport = jVulkanDeviceUtil::CheckValidationLayerSupport();
+#endif
+
 	// Must
 	VkInstanceCreateInfo createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -124,15 +129,10 @@ bool jRHI_Vulkan::InitRHI()
 	createInfo.enabledExtensionCount = static_cast<uint32>(extensions.size());
 	createInfo.ppEnabledExtensionNames = extensions.data();
 
-#if ENABLE_VALIDATION_LAYER
-	// check validation layer
-	GIsValidationLayerSupport = jVulkanDeviceUtil::CheckValidationLayerSupport();
-#endif
-
 	// add validation layer
 	VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo = {};
 #if ENABLE_VALIDATION_LAYER
-	if (GIsValidationLayerSupport)
+	if (GIsValidationLayerSupport && gOptions.EnableDebuggerLayer)
 	{
 		createInfo.enabledLayerCount = static_cast<uint32>(jVulkanDeviceUtil::validationLayers.size());
 		createInfo.ppEnabledLayerNames = jVulkanDeviceUtil::validationLayers.data();
@@ -153,7 +153,7 @@ bool jRHI_Vulkan::InitRHI()
 	// SetupDebugMessenger
 	{
 #if ENABLE_VALIDATION_LAYER
-		if (GIsValidationLayerSupport)
+		if (GIsValidationLayerSupport && gOptions.EnableDebuggerLayer)
 		{
 			VkDebugUtilsMessengerCreateInfoEXT createInfo = {};
 			jVulkanDeviceUtil::PopulateDebutMessengerCreateInfo(createInfo);
@@ -359,9 +359,12 @@ bool jRHI_Vulkan::InitRHI()
 		createInfo.ppEnabledExtensionNames = DeviceExtensions.data();
 
 #if ENABLE_VALIDATION_LAYER
-		// 최신 버젼에서는 validation layer는 무시되지만, 오래된 버젼을 호환을 위해 vkInstance와 맞춰줌
-		createInfo.enabledLayerCount = static_cast<uint32>(jVulkanDeviceUtil::validationLayers.size());
-		createInfo.ppEnabledLayerNames = jVulkanDeviceUtil::validationLayers.data();
+		if (GIsValidationLayerSupport && gOptions.EnableDebuggerLayer)
+		{
+			// 최신 버젼에서는 validation layer는 무시되지만, 오래된 버젼을 호환을 위해 vkInstance와 맞춰줌
+			createInfo.enabledLayerCount = static_cast<uint32>(jVulkanDeviceUtil::validationLayers.size());
+			createInfo.ppEnabledLayerNames = jVulkanDeviceUtil::validationLayers.data();
+		}
 #else
 		createInfo.enabledLayerCount = 0;
 #endif // ENABLE_VALIDATION_LAYER
@@ -1405,7 +1408,7 @@ bool jRHI_Vulkan::IsSupportVSync() const
 	return GRHISupportVsync && GUseVsync;
 }
 
-void jRHI_Vulkan::RemoveRenderPassByHash(const std::vector<uint64>& InRelatedRenderPassHashes)
+void jRHI_Vulkan::RemoveRenderPassByHash(const std::vector<uint64>& InRelatedRenderPassHashes) const
 {
 	for (auto Hash : InRelatedRenderPassHashes)
 	{
@@ -1413,6 +1416,14 @@ void jRHI_Vulkan::RemoveRenderPassByHash(const std::vector<uint64>& InRelatedRen
 		if (ToReleaseRP)
 			g_rhi_vk->DeallocatorMultiFrameRenderPass.Free(ToReleaseRP);
 	}
+}
+
+float jRHI_Vulkan::GetCurrentMonitorDPIScale() const
+{
+	if (g_ImGUI)
+		return g_ImGUI->GetCurrentMonitorDPIScale();
+
+	return 1.0f;
 }
 
 jQuery* jRHI_Vulkan::CreateQueryTime() const

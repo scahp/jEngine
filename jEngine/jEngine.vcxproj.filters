@@ -822,6 +822,18 @@
     <ClCompile Include="RHI\jRaytracingScene.cpp">
       <Filter>Code\RHI</Filter>
     </ClCompile>
+    <ClCompile Include="Renderer\jRenderer_AOPass.cpp">
+      <Filter>Code\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\jRenderer_AtmosphericShadowPass.cpp">
+      <Filter>Code\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\jRenderer_PostProcessPass.cpp">
+      <Filter>Code\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\jRenderer_UIPass.cpp">
+      <Filter>Code\Renderer</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="Resource\Shaders\glsl\shader_vs.glsl">

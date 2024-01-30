@@ -106,8 +106,7 @@ bool jSwapchain_DX12::Resize(int32 InWidth, int32 InHeight)
         for (int32 i = 0; i < g_rhi_dx12->MaxFrameCount; ++i)
         {
             jSwapchainImage* SwapchainImage = Images[i];
-            auto TexDX12 = (jTexture_DX12*)SwapchainImage->TexturePtr.get();
-            TexDX12->Texture->Resource.Reset();
+            SwapchainImage->TexturePtr.reset();
         }
 
         SwapChain->SetFullscreenState(false, nullptr);

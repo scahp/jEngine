@@ -553,7 +553,9 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 
 	// To release renderpasses that have relation with rendertarget which will be released.
-	virtual void RemoveRenderPassByHash(const std::vector<uint64>& InRelatedRenderPassHashes) {}
+	virtual void RemoveRenderPassByHash(const std::vector<uint64>& InRelatedRenderPassHashes) const {}
+	
+	virtual float GetCurrentMonitorDPIScale() const { return 1.0f; }
 };
 
 // Not thred safe
