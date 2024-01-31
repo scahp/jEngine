@@ -177,7 +177,7 @@ void jRenderer::UIPass()
 				ImGui::TextColored(ImVec4(1, 1, 0, 1), "RTAO ray options");
 				ImGui::SliderFloat("Radius", &gOptions.AORadius, 0.0f, 150.0f);
 				ImGui::SliderFloat("Intensity", &gOptions.AOIntensity, 0.0f, 1.0f);
-				ImGui::SliderInt("SamplePerPixel", &gOptions.SamplePerPixel, 1, 100);
+				ImGui::SliderInt("RayPerPixel", &gOptions.RayPerPixel, 1, 100);
 			
 				ImGui::Separator();
 				ImGui::TextColored(ImVec4(1, 1, 0, 1), "Temporal denosing");

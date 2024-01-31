@@ -34,7 +34,7 @@ jOptions::jOptions()
 	LensRadius = 0.05f;
 	AORadius = 50.0f;
 	AOIntensity = 1.0f;
-	SamplePerPixel = 1;
+	RayPerPixel = 1;
 	UseRTAO = true;
 	UseAOReprojection = true;
 	Denoiser = GDenoisers[2];       // Select Bilateral Filter

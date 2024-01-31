@@ -507,7 +507,7 @@ void jRenderer::AOPass()
             Vector cameraDirection;
             float AORadius;
             Vector lightDirection;
-            uint32 SamplePerPixel;
+            uint32 RayPerPixel;
             int32 Clear;
             float AOIntensity;
             int32 Padding2;
@@ -531,7 +531,7 @@ void jRenderer::AOPass()
         m_sceneCB.FrameNumber = (int32)g_rhi->GetCurrentFrameNumber();
         m_sceneCB.AORadius = gOptions.AORadius;
         m_sceneCB.AOIntensity = gOptions.AOIntensity;
-        m_sceneCB.SamplePerPixel = (uint32)Max(gOptions.SamplePerPixel, 0);
+        m_sceneCB.RayPerPixel = (uint32)Max(gOptions.RayPerPixel, 0);
         
         static Vector2 HaltonJitter[]={
             Vector2(0.0f,      -0.333334f) / Vector2((float)RayRTWidth, (float)RayRTHeight),

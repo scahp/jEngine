@@ -36,7 +36,7 @@ struct jOptions
     float LensRadius;
     float AORadius;
     float AOIntensity;
-    int32 SamplePerPixel;
+    int32 RayPerPixel;
     bool UseRTAO;
     bool UseAOReprojection;
     const char* Denoiser;

@@ -24,7 +24,7 @@ struct SceneConstantBuffer
     float3 cameraDirection;
     float AORadius;
     float3 lightDirection;
-    uint SamplePerPixel;
+    uint RayPerPixel;
     int Clear;
     float AOIntensity;
     int Padding2;
@@ -299,7 +299,7 @@ void MyRaygenShader()
     if (AccumulateCount > 500)
         return;
 
-    for(int i=0;i<g_sceneCB.SamplePerPixel;++i)
+    for(int i=0;i<g_sceneCB.RayPerPixel;++i)
     {
         RayDesc ray;
         ray.Origin = WorldPos;
