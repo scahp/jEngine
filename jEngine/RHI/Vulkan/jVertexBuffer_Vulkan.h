@@ -92,13 +92,7 @@ struct jVertexBuffer_Vulkan : public jVertexBuffer
     FORCEINLINE size_t GetInputAssemblyStateHash() const
     {
         VkPipelineInputAssemblyStateCreateInfo state = CreateInputAssemblyState();
-        size_t result = 0;
-        result = CityHash64WithSeed((uint64)state.sType, result);
-        result = CityHash64WithSeed((uint64)state.pNext, result);
-        result = CityHash64WithSeed((uint64)state.flags, result);
-        result = CityHash64WithSeed((uint64)state.topology, result);
-        result = CityHash64WithSeed((uint64)state.primitiveRestartEnable, result);
-        return result;
+        return GETHASH_FROM_INSTANT_STRUCT(state);
     }
 
     FORCEINLINE VkPipelineVertexInputStateCreateInfo CreateVertexInputState() const

@@ -18,9 +18,6 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void window_focus_callback(GLFWwindow* window, int focused);
 void window_size_callback(GLFWwindow* window, int width, int height);
 
-std::vector<jRenderPass*> ImGuiRenderPasses;
-std::vector<VkPipeline> Pipelines;
-
 int main()
 {
     gCommandLineArgument.Init(GetCommandLineA());

@@ -30,12 +30,7 @@ struct jViewport
         if (Hash)
             return Hash;
 
-        Hash = CityHash64((uint64)X);
-        Hash = CityHash64WithSeed((uint64)Y, Hash);
-        Hash = CityHash64WithSeed((uint64)Width, Hash);
-        Hash = CityHash64WithSeed((uint64)Height, Hash);
-        Hash = CityHash64WithSeed((uint64)MinDepth, Hash);
-        Hash = CityHash64WithSeed((uint64)MaxDepth, Hash);
+        Hash = GETHASH_FROM_INSTANT_STRUCT(X, Y, Width, Height, MinDepth, MaxDepth);
         return Hash;
     }
 };
@@ -59,10 +54,7 @@ struct jScissor
         if (Hash)
             return Hash;
 
-        Hash = CityHash64((uint64)Offset.x);
-        Hash = CityHash64WithSeed((uint64)Offset.y, Hash);
-        Hash = CityHash64WithSeed((uint64)Extent.x, Hash);
-        Hash = CityHash64WithSeed((uint64)Extent.y, Hash);
+        Hash = GETHASH_FROM_INSTANT_STRUCT(Offset, Extent);
         return Hash;
     }
 };
@@ -82,20 +74,8 @@ struct jSamplerStateInfo : public jShaderBindableResource
         if (Hash)
             return Hash;
 
-        Hash = CityHash64((uint64)Minification);
-        Hash = CityHash64WithSeed((uint64)Magnification, Hash);
-        Hash = CityHash64WithSeed((uint64)AddressU, Hash);
-        Hash = CityHash64WithSeed((uint64)AddressV, Hash);
-        Hash = CityHash64WithSeed((uint64)AddressW, Hash);
-        Hash = CityHash64WithSeed((uint64)MipLODBias, Hash);
-        Hash = CityHash64WithSeed((uint64)MaxAnisotropy, Hash);
-        Hash = CityHash64WithSeed((uint64)TextureComparisonMode, Hash);
-        Hash = CityHash64WithSeed((uint64)IsEnableComparisonMode, Hash);
-        Hash = CityHash64WithSeed((uint64)ComparisonFunc, Hash);
-        Hash = CityHash64WithSeed((uint64)ComparisonFunc, Hash);
-        Hash = CityHash64WithSeed((const char*)&BorderColor, sizeof(BorderColor), Hash);    // safe : BorderColor is 16 byte align data
-        Hash = CityHash64WithSeed((uint64)MinLOD, Hash);
-        Hash = CityHash64WithSeed((uint64)MaxLOD, Hash);
+        Hash = GETHASH_FROM_INSTANT_STRUCT(Minification, Magnification, AddressU, AddressV, AddressW
+            , MipLODBias, MaxAnisotropy, TextureComparisonMode, IsEnableComparisonMode, ComparisonFunc, BorderColor, MinLOD, MaxLOD);
         return Hash;
     }
 
@@ -173,21 +153,9 @@ struct jRasterizationStateInfo
         if (Hash)
             return Hash;
 
-        Hash = CityHash64((uint64)PolygonMode);
-        Hash = CityHash64WithSeed((uint64)CullMode, Hash);
-        Hash = CityHash64WithSeed((uint64)FrontFace, Hash);
-        Hash = CityHash64WithSeed((uint64)DepthBiasEnable, Hash);
-        Hash = CityHash64WithSeed((uint64)DepthBiasConstantFactor, Hash);
-        Hash = CityHash64WithSeed((uint64)DepthBiasClamp, Hash);
-        Hash = CityHash64WithSeed((uint64)DepthBiasSlopeFactor, Hash);
-        Hash = CityHash64WithSeed((uint64)LineWidth, Hash);
-        Hash = CityHash64WithSeed((uint64)DepthClampEnable, Hash);
-        Hash = CityHash64WithSeed((uint64)RasterizerDiscardEnable, Hash);
-        Hash = CityHash64WithSeed((uint64)SampleCount, Hash);
-        Hash = CityHash64WithSeed((uint64)SampleShadingEnable, Hash);
-        Hash = CityHash64WithSeed((uint64)MinSampleShading, Hash);
-        Hash = CityHash64WithSeed((uint64)AlphaToCoverageEnable, Hash);
-        Hash = CityHash64WithSeed((uint64)AlphaToOneEnable, Hash);
+        Hash = GETHASH_FROM_INSTANT_STRUCT(PolygonMode, CullMode, FrontFace, DepthBiasEnable, DepthBiasConstantFactor
+            , DepthBiasClamp, DepthBiasSlopeFactor, LineWidth, DepthClampEnable, RasterizerDiscardEnable, SampleCount
+            , SampleShadingEnable, MinSampleShading, AlphaToCoverageEnable, AlphaToOneEnable);
         return Hash;
     }
 
@@ -224,13 +192,7 @@ struct jStencilOpStateInfo
         if (Hash)
             return Hash;
 
-        Hash = CityHash64((uint64)FailOp);
-        Hash = CityHash64WithSeed((uint64)PassOp, Hash);
-        Hash = CityHash64WithSeed((uint64)DepthFailOp, Hash);
-        Hash = CityHash64WithSeed((uint64)CompareOp, Hash);
-        Hash = CityHash64WithSeed((uint64)CompareMask, Hash);
-        Hash = CityHash64WithSeed((uint64)WriteMask, Hash);
-        Hash = CityHash64WithSeed((uint64)Reference, Hash);
+        Hash = GETHASH_FROM_INSTANT_STRUCT(FailOp, PassOp, DepthFailOp, CompareOp, CompareMask, WriteMask, Reference);
         return Hash;
     }
 
@@ -258,17 +220,8 @@ struct jDepthStencilStateInfo
         if (Hash)
             return Hash;
 
-        Hash = CityHash64((uint64)DepthTestEnable);
-        Hash = CityHash64WithSeed((uint64)DepthWriteEnable, Hash);
-        Hash = CityHash64WithSeed((uint64)DepthCompareOp, Hash);
-        Hash = CityHash64WithSeed((uint64)DepthBoundsTestEnable, Hash);
-        Hash = CityHash64WithSeed((uint64)StencilTestEnable, Hash);
-        if (Front)
-            Hash = CityHash64WithSeed(Front->GetHash(), Hash);
-        if (Back)
-            Hash = CityHash64WithSeed(Back->GetHash(), Hash);
-        Hash = CityHash64WithSeed((uint64)MinDepthBounds, Hash);
-        Hash = CityHash64WithSeed((uint64)MaxDepthBounds, Hash);
+        Hash = GETHASH_FROM_INSTANT_STRUCT(DepthTestEnable, DepthWriteEnable, DepthCompareOp, DepthBoundsTestEnable
+            , StencilTestEnable, (Front ? Front->GetHash() : 0), (Back ? Back->GetHash() : 0), MinDepthBounds, MaxDepthBounds);
         return Hash;
     }
 
@@ -300,14 +253,7 @@ struct jBlendingStateInfo
         if (Hash)
             return Hash;
 
-        Hash = CityHash64((uint64)BlendEnable);
-        Hash = CityHash64WithSeed((uint64)Src, Hash);
-        Hash = CityHash64WithSeed((uint64)Dest, Hash);
-        Hash = CityHash64WithSeed((uint64)BlendOp, Hash);
-        Hash = CityHash64WithSeed((uint64)SrcAlpha, Hash);
-        Hash = CityHash64WithSeed((uint64)DestAlpha, Hash);
-        Hash = CityHash64WithSeed((uint64)AlphaBlendOp, Hash);
-        Hash = CityHash64WithSeed((uint64)ColorWriteMask, Hash);
+        Hash = GETHASH_FROM_INSTANT_STRUCT(BlendEnable, Src, Dest, BlendOp, SrcAlpha, DestAlpha, AlphaBlendOp, ColorWriteMask);
         return Hash;
     }
 

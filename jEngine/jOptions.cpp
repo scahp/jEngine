@@ -42,9 +42,16 @@ jOptions::jOptions()
 	GaussianKernelSigma = 3.0f;
 	BilateralKernelSigma = 0.015f;
 	ShowAOOnly = false;
-	ShowDebugRT = true;
-	UseAccumulateRay = false;
+	ShowDebugRT = false;
+	UseAccumulateRay = true;
 	UseDiscontinuityWeight = true;
 	UseHaltonJitter = true;
 	UseResolution = GAOResolution[0];
+}
+
+bool jOptions::operator==(struct jOptions const& RHS) const
+{
+	static_assert(std::is_trivially_copyable<jOptions>::value, "jOptions should be trivially copyable!");
+
+	return 0 == memcmp(this, &RHS, sizeof(jOptions));
 }

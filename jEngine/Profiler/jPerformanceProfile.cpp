@@ -132,6 +132,12 @@ void jPerformanceProfile::CalcAvg()
 			iter.second.AvgElapsedMS = (iter.second.TotalElapsedTick / static_cast<double>(iter.second.TotalSampleCount)) * 0.000001;	// ns -> ms
 			GPUAvgProfileMap[iter.first] = iter.second;
 		}
+
+		GPUAvgProfiles.clear();
+		for (auto& iter : GPUAvgProfileMap)
+		{
+			GPUAvgProfiles.push_back(std::make_pair(iter.first, iter.second));
+		}
 	}
 }
 

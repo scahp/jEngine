@@ -71,7 +71,6 @@ void Bilateral(uint3 GlobalInvocationID : SV_DispatchThreadID)
         {
             int x = (i - center);
             int y = (j - center);
-            //float Gs = Gaussian2D(x * x + y * y, ComputeCommon.Sigma);
             float Gs = GetGaussian2DKernel(i, j);
             
             float2 CurPixelPos = clamp(PixelPos + float2(x, y), float2(0, 0), float2(ComputeCommon.Width, ComputeCommon.Height));

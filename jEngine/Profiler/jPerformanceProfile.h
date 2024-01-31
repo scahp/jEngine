@@ -219,6 +219,7 @@ public:
     const AvgProfileMapType& GetCPUAvgProfileMap() const { return CPUAvgProfileMap; }
     const AvgProfileMapType& GetGPUAvgProfileMap() const { return GPUAvgProfileMap; }
 
+	std::vector<std::pair<jPriorityName, jAvgProfile>> GPUAvgProfiles;
 private:
     AvgProfileMapType CPUAvgProfileMap;		// ms
     AvgProfileMapType GPUAvgProfileMap;		// ms

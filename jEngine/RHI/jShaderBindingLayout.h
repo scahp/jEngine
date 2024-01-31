@@ -209,13 +209,7 @@ struct jShaderBinding
         if (Hash)
             return Hash;
 
-        Hash = CityHash64((int64)IsInline);
-        Hash = CityHash64WithSeed((int64)BindingPoint, Hash);
-        Hash = CityHash64WithSeed((int64)NumOfDescriptors, Hash);
-        Hash = CityHash64WithSeed((int64)BindingType, Hash);
-        Hash = CityHash64WithSeed((int64)AccessStageFlags, Hash);
-        Hash = CityHash64WithSeed((int64)IsBindless, Hash);
-
+        Hash = GETHASH_FROM_INSTANT_STRUCT(IsInline, BindingPoint, NumOfDescriptors, BindingType, AccessStageFlags, IsBindless);
         return Hash;
     }
 

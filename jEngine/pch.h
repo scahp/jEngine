@@ -171,6 +171,7 @@ extern float g_timeDeltaSecond;
 
 #include "Core/jLock.h"
 #include "Core/jName.h"
+#include "Core/TInstantStruct.h"
 
 // string type city hash generator
 #define STATIC_NAME_CITY_HASH(str) []() -> size_t { \

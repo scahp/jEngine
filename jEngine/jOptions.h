@@ -7,6 +7,8 @@ extern const char* GAOResolution[3];
 struct jOptions
 {
     jOptions();
+    
+    bool operator==(struct jOptions const& RHS) const;
 
     // RHI options
     const bool EnableDebuggerLayer;

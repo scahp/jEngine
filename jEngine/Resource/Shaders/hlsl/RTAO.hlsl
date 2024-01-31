@@ -283,21 +283,19 @@ float3 BarycentricCoordinates(float3 pt, float3 v0, float3 v1, float3 v2)
 void MyRaygenShader()
 {
     float2 UV = DispatchRaysIndex().xy / g_sceneCB.ViewRect.zw;
-    UV += g_sceneCB.HaltonJitter.xy;
+    UV += g_sceneCB.HaltonJitter.xy; // Apply Jittering from Halton Sequence
+
     float3 WorldPos = GBuffer0_Pos.SampleLevel(AlbedoTextureSampler, UV, 0).xyz;
     float3 WorldNormal = GBuffer1_Normal.SampleLevel(AlbedoTextureSampler, UV, 0).xyz;
 
-    float3 FinalAO = 0;//float3(1, 1, 1);
-    if (g_sceneCB.Clear)
-    {
-        RenderTarget[DispatchRaysIndex().xy].w = 0;
-    }
-    else
+    float3 FinalAO = 0;
+    float AccumulateCount = 0.0f;
+    if (!g_sceneCB.Clear)
     {
         FinalAO = RenderTarget[DispatchRaysIndex().xy].xyz;
+        AccumulateCount = RenderTarget[DispatchRaysIndex().xy].w;
     }
 
-    float AccumulateCount = RenderTarget[DispatchRaysIndex().xy].w;
     if (AccumulateCount > 500)
         return;
 
@@ -305,12 +303,8 @@ void MyRaygenShader()
     {
         RayDesc ray;
         ray.Origin = WorldPos;
-        //ray.Direction = random_in_hemisphere(WorldNormal, g_sceneCB.FrameNumber + i);
-        ray.Direction = random_in_hemisphere(WorldNormal, WorldPos);
-        
-        // Set TMin to a non-zero small value to avoid aliasing issues due to floating - point errors.
-        // TMin should be kept small to prevent missing geometry at close contact areas.
-        ray.TMin = 0.001;
+        ray.Direction = random_in_hemisphere(WorldNormal, WorldPos + random_in_hemisphere(WorldNormal, g_sceneCB.FrameNumber % 1000) * (i + 1));
+        ray.TMin = 0.001; // Small epsilon to avoid self intersection.
         ray.TMax = g_sceneCB.AORadius;
     
         RayPayload payload = { float4(1.0f, 1.0f, 1.0f, 1.0f) };

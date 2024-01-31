@@ -166,9 +166,7 @@ size_t jRenderPass::GetHash() const
 	if (Hash)
 		return Hash;
 
-	Hash = RenderPassInfo.GetHash();
-	Hash = CityHash64WithSeed((const char*)&RenderOffset, sizeof(RenderOffset), Hash);
-	Hash = CityHash64WithSeed((const char*)&RenderExtent, sizeof(RenderExtent), Hash);
+    Hash = GETHASH_FROM_INSTANT_STRUCT(RenderPassInfo.GetHash(), RenderOffset, RenderExtent);
 	return Hash;
 }
 

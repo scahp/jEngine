@@ -15,19 +15,8 @@ struct jRenderTargetInfo
 
     size_t GetHash() const
     {
-        size_t result = CityHash64((uint64)Type);
-        result = CityHash64WithSeed((uint64)Format, result);
-        result = CityHash64WithSeed((uint64)Width, result);
-        result = CityHash64WithSeed((uint64)Height, result);
-        result = CityHash64WithSeed((uint64)LayerCount, result);
-        result = CityHash64WithSeed((uint64)IsGenerateMipmap, result);
-        result = CityHash64WithSeed((uint64)SampleCount, result);
-        result = CityHash64WithSeed((uint64)RTClearValue.GetHash(), result);
-        result = CityHash64WithSeed((uint64)TextureCreateFlag, result);
-        result = CityHash64WithSeed((uint64)IsUseAsSubpassInput, result);
-        result = CityHash64WithSeed((uint64)IsMemoryless, result);
-        result = CityHash64WithSeed((uint64)ResourceName, result);
-        return result;
+        return GETHASH_FROM_INSTANT_STRUCT(Type, Format, Width, Height, LayerCount, IsGenerateMipmap
+            , SampleCount, RTClearValue, TextureCreateFlag, IsUseAsSubpassInput, IsMemoryless);         // without ResourceName
     }
 
     ETextureType Type = ETextureType::TEXTURE_2D;

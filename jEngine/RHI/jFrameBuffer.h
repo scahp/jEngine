@@ -12,14 +12,7 @@ struct jFrameBufferInfo
 
     size_t GetHash() const
     {
-        size_t result = CityHash64((uint64)TextureType);
-        result = CityHash64WithSeed((uint64)Format, result);
-        result = CityHash64WithSeed((uint64)Width, result);
-        result = CityHash64WithSeed((uint64)Height, result);
-        result = CityHash64WithSeed((uint64)LayerCount, result);
-        result = CityHash64WithSeed((uint64)IsGenerateMipmap, result);
-        result = CityHash64WithSeed((uint64)SampleCount, result);
-        return result;
+		return GETHASH_FROM_INSTANT_STRUCT(TextureType, Format, Width, Height, LayerCount, IsGenerateMipmap, SampleCount);
     }
 
     ETextureType TextureType = ETextureType::TEXTURE_2D;

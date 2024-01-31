@@ -646,7 +646,7 @@ FORCEINLINE Vector operator+(T value, Vector const& vector)
 
 struct Vector2i
 {
-	constexpr Vector2i() = default;
+	constexpr Vector2i() : x(0), y(0) {}
 	constexpr Vector2i(int32 fX, int32 fY) : x(fX), y(fY) {}
 	union
 	{
@@ -657,7 +657,7 @@ struct Vector2i
 
 struct Vector3i
 {
-	constexpr Vector3i() = default;
+	constexpr Vector3i() : x(0), y(0), z(0) {};
 	constexpr Vector3i(int32 fX, int32 fY, int32 fZ) : x(fX), y(fY), z(fZ) {}
 	union
 	{
@@ -668,7 +668,7 @@ struct Vector3i
 
 struct Vector4i
 {
-	constexpr Vector4i() = default;
+	constexpr Vector4i() : x(0), y(0), z(0), w(0) {}
 	constexpr Vector4i(int32 fX, int32 fY, int32 fZ, int32 fW) : x(fX), y(fY), z(fZ), w(fW) {}
 	union
 	{

@@ -116,6 +116,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClInclude Include="Core\jName.h" />
     <ClInclude Include="Core\jParallelFor.h" />
     <ClInclude Include="Core\jResourceContainer.h" />
+    <ClInclude Include="Core\TInstantStruct.h" />
     <ClInclude Include="Core\TResourcePool.h" />
     <ClInclude Include="External\cityhash\city.h" />
     <ClInclude Include="External\cityhash\citycrc.h" />

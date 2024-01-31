@@ -51,13 +51,8 @@ struct jAttachment
         if (RenderTargetPtr.expired())
             return 0;
 
-        if (!RenderTargetPtr.expired())
-            Hash = RenderTargetPtr.lock()->GetHash();
-        Hash = CityHash64WithSeed((const char*)&LoadStoreOp, sizeof(LoadStoreOp), Hash);
-        Hash = CityHash64WithSeed((const char*)&StencilLoadStoreOp, sizeof(StencilLoadStoreOp), Hash);
-        Hash = CityHash64WithSeed((const char*)&RTClearValue, sizeof(RTClearValue), Hash);
-        Hash = CityHash64WithSeed((const char*)&InitialLayout, sizeof(InitialLayout), Hash);
-        Hash = CityHash64WithSeed((const char*)&FinalLayout, sizeof(FinalLayout), Hash);
+        Hash = GETHASH_FROM_INSTANT_STRUCT((RenderTargetPtr.expired() ? 0 : RenderTargetPtr.lock()->GetHash())
+            , LoadStoreOp, StencilLoadStoreOp, RTClearValue, InitialLayout, FinalLayout);
         return Hash;
     }
 

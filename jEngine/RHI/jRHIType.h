@@ -3,6 +3,7 @@
 #include <type_traits>
 #include "Core/jName.h"
 #include "Math/Vector.h"
+#include "Core/TInstantStruct.h"
 
 #define DECLARE_ENUM_BIT_OPERATORS(ENUM_TYPE)\
 FORCEINLINE constexpr ENUM_TYPE operator | (ENUM_TYPE lhs, ENUM_TYPE rhs)\
@@ -917,8 +918,7 @@ public:
 
 	size_t GetHash() const
 	{
-		size_t result = CityHash64((uint64)Type);
-		return CityHash64WithSeed((const char*)&ClearValue.Color, sizeof(ClearValue.Color), result);		// safe : Color is 16 byte aligned
+		return GETHASH_FROM_INSTANT_STRUCT(Type, ClearValue);
 	}
 
 private:

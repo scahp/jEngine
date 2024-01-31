@@ -563,12 +563,12 @@ void jRenderer::AOPass()
             m_sceneCB.HaltonJitter = Vector2::ZeroVector;
         }
 
+        static jOptions OldOptions = gOptions;
         static auto OldMatrix = m_sceneCB.projectionToWorld;
-        static auto UseHaltonJitter = gOptions.UseHaltonJitter;
-        if (OldMatrix != m_sceneCB.projectionToWorld || !gOptions.UseAccumulateRay || gOptions.UseHaltonJitter != UseHaltonJitter)
+        if (!gOptions.UseAccumulateRay || OldMatrix != m_sceneCB.projectionToWorld || OldOptions != gOptions)
         {
             OldMatrix = m_sceneCB.projectionToWorld;
-            UseHaltonJitter = gOptions.UseHaltonJitter;
+            memcpy(&OldOptions, &gOptions, sizeof(gOptions));
             m_sceneCB.Clear = true;
         }
         else
@@ -806,11 +806,17 @@ void jRenderer::AOPass()
     }
 
     // 2. Reprojection AO
-    std::shared_ptr<jTexture> AfterProjection = ReprojectionAO(RenderFrameContextPtr, RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr);
+    std::shared_ptr<jTexture> AfterReprojection = ReprojectionAO(RenderFrameContextPtr, RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr);
     
+    if (gOptions.ShowDebugRT)
+        DebugRTs.push_back(AfterReprojection);
+
     // 3. Denosing
-    std::shared_ptr<jTexture> AfterDenoising = DenoisingAO(RenderFrameContextPtr, AfterProjection);
+    std::shared_ptr<jTexture> AfterDenoising = DenoisingAO(RenderFrameContextPtr, AfterReprojection);
     g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), AfterDenoising.get());
+
+    if (gOptions.ShowDebugRT)
+        DebugRTs.push_back(AfterDenoising);
 
     // 4. UpdateHistoryBuffer
     std::shared_ptr<jTexture> AfterUpdateHistoryBuffer = UpdateHistoryBuffer(RenderFrameContextPtr, AfterDenoising);

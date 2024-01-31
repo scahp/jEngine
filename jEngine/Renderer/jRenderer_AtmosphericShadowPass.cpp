@@ -12,6 +12,9 @@
 
 void jRenderer::AtmosphericShadow()
 {
+	if (gOptions.ShowAOOnly)
+		return;
+
 	static bool EnableAtmosphericShadowing = true;
 	if (EnableAtmosphericShadowing)
 	{

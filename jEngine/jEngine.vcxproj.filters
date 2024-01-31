@@ -472,6 +472,9 @@
     <ClInclude Include="RHI\Vulkan\jRaytracingScene_Vulkan.h">
       <Filter>Code\RHI\Vulkan</Filter>
     </ClInclude>
+    <ClInclude Include="Core\TInstantStruct.h">
+      <Filter>Code\Core</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">

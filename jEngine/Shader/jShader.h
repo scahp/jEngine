@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include "Core/jName.h"
+#include "Core/TInstantStruct.h"
 
 // Shader Permutation Define
 #define DECLARE_DEFINE(Name, ...) \
@@ -127,18 +128,8 @@ struct jShaderInfo
         if (Hash)
             return Hash;
 
-		{
-			if (Name.IsValid())
-				Hash = CityHash64WithSeed(Name, Hash);
-            if (ShaderFilepath.IsValid())
-                Hash = CityHash64WithSeed(ShaderFilepath, Hash);
-            if (PreProcessors.IsValid())
-                Hash = CityHash64WithSeed(PreProcessors, Hash);
-            if (EntryPoint.IsValid())
-                Hash = CityHash64WithSeed(EntryPoint, Hash);
-            Hash = CityHash64WithSeed((uint64)ShaderType, Hash);
-            Hash = CityHash64WithSeed((uint64)PermutationId, Hash);
-		}
+		Hash = GETHASH_FROM_INSTANT_STRUCT(Name.GetNameHash(), ShaderFilepath.GetNameHash()
+			, PreProcessors.GetNameHash(), EntryPoint.GetNameHash(), ShaderType, PermutationId);
 		return Hash;
 	}
     mutable size_t Hash = 0;
