@@ -786,23 +786,43 @@ bool jRHI_DX12::CreateShaderInternal(jShader* OutShader, const jShaderInfo& shad
         switch (shaderInfo.GetShaderType())
         {
         case EShaderAccessStageFlag::VERTEX:
-			ShadingModel = TEXT("vs_6_6");
+#if SUPPORT_RAYTRACING
+            ShadingModel = TEXT("vs_6_6");
+#else
+			ShadingModel = TEXT("vs_6_5");
+#endif
             break;
         case EShaderAccessStageFlag::GEOMETRY:
-			ShadingModel = TEXT("gs_6_6");
+#if SUPPORT_RAYTRACING
+            ShadingModel = TEXT("gs_6_6");
+#else
+            ShadingModel = TEXT("gs_6_5");
+#endif
             break;
         case EShaderAccessStageFlag::FRAGMENT:
-			ShadingModel = TEXT("ps_6_6");
+#if SUPPORT_RAYTRACING
+            ShadingModel = TEXT("ps_6_6");
+#else
+            ShadingModel = TEXT("ps_6_5");
+#endif
             break;
         case EShaderAccessStageFlag::COMPUTE:
-			ShadingModel = TEXT("cs_6_6");
+#if SUPPORT_RAYTRACING
+            ShadingModel = TEXT("cs_6_6");
+#else
+            ShadingModel = TEXT("cs_6_5");
+#endif
             break;
         case EShaderAccessStageFlag::RAYTRACING:
         case EShaderAccessStageFlag::RAYTRACING_RAYGEN:
         case EShaderAccessStageFlag::RAYTRACING_MISS:
         case EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT:
         case EShaderAccessStageFlag::RAYTRACING_ANYHIT:
+#if SUPPORT_RAYTRACING
             ShadingModel = TEXT("lib_6_6");
+#else
+            ShadingModel = TEXT("lib_6_5");
+#endif
             break;
         default:
             check(0);

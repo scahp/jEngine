@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "Math/Vector.h"
+#include "Profiler/jPerformanceProfile.h"
 
 class jImGUI
 {
@@ -23,6 +24,9 @@ public:
     }
 
     virtual float GetCurrentMonitorDPIScale() const { return 1.0f; }
+
+    // UI Generator Utility
+    static void CreateTreeForProfiling(const char* InTreeTitle, const jPerformanceProfile::AvgProfileMapType& InProfileData, double InTotalProfileMS, float InTabSpacing = 10.0f);
 
 protected:
     virtual void NewFrameInternal() {}

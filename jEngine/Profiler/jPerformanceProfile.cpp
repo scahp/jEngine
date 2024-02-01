@@ -80,8 +80,26 @@ void jPerformanceProfile::Update(float deltaTime)
 
 void jPerformanceProfile::CalcAvg()
 {
+	auto AccumulateTotalMS = [](double& OutTotalCPUPassesMS, int32& InOutMostLeastIndent, const jAvgProfile& InProfile)
 	{
-        robin_hood::unordered_map<jPriorityName, jAvgProfile, jPriorityNameHashFunc> SumOfScopedProfileCPUMap;
+		// 최 상위에 있는 Pass 의 평균 MS 만 더하면 하위에 있는 모든 MS 는 다 포함됨
+		// 다른 스레드에 한 작업도 렌더링 프레임이 종료 되기 전에 마치기 때문에 추가로 더해줄 필요 없음
+		if (IsMainThread(InProfile.ThreadId))
+		{
+			if (InOutMostLeastIndent > InProfile.Indent)
+			{
+				InOutMostLeastIndent = InProfile.Indent;
+				OutTotalCPUPassesMS = InProfile.AvgElapsedMS;
+			}
+			else if (InOutMostLeastIndent == InProfile.Indent)
+			{
+				OutTotalCPUPassesMS += InProfile.AvgElapsedMS;
+			}
+		}
+	};
+	
+	{
+        std::map<jPriorityName, jAvgProfile, jPriorityNameComapreFunc> SumOfScopedProfileCPUMap;
 		{
 			jScopeReadLock s(&ScopedCPULock);
 			for (int32 i = 0; i < MaxProfileFrame; ++i)
@@ -93,22 +111,29 @@ void jPerformanceProfile::CalcAvg()
 					avgProfile.TotalElapsedTick += iter.second.ElapsedTick;
 					avgProfile.Indent = iter.second.Indent;
 					avgProfile.ThreadId = iter.second.ThreadId;
+					avgProfile.Name = iter.first;
 					++avgProfile.TotalSampleCount;
 				}
 			}
 		}
 
-		CPUAvgProfileMap.clear();
+		AvgCPUProfiles.clear();
+		AvgCPUProfiles.reserve(SumOfScopedProfileCPUMap.size());
+		int32 MostLeastIndent = INT_MAX;
+		TotalAvgCPUPassesMS = 0.0;
 		for (auto& iter : SumOfScopedProfileCPUMap)
 		{
 			JASSERT(iter.second.TotalSampleCount > 0);
 			iter.second.AvgElapsedMS = (iter.second.TotalElapsedTick / static_cast<double>(iter.second.TotalSampleCount)) * 0.000001;	// ns -> ms
-			CPUAvgProfileMap[iter.first] = iter.second;
+			AvgCPUProfiles.push_back(iter.second);
+
+			// Accumulate Total CPU time
+			AccumulateTotalMS(TotalAvgCPUPassesMS, MostLeastIndent, iter.second);
 		}
 	}
 
 	{
-		robin_hood::unordered_map<jPriorityName, jAvgProfile, jPriorityNameHashFunc> SumOfScopedProfileGPUMap;
+		std::map<jPriorityName, jAvgProfile, jPriorityNameComapreFunc> SumOfScopedProfileGPUMap;
 		{
 			jScopeReadLock s(&ScopedGPULock);
 			for (int32 i = 0; i < MaxProfileFrame; ++i)
@@ -120,23 +145,26 @@ void jPerformanceProfile::CalcAvg()
 					avgProfile.TotalElapsedTick += iter.second.ElapsedTick;
 					avgProfile.Indent = iter.second.Indent;
 					avgProfile.ThreadId = iter.second.ThreadId;
+					avgProfile.Name = iter.first;
 					++avgProfile.TotalSampleCount;
 				}
 			}
 		}
 
-        GPUAvgProfileMap.clear();
+        AvgGPUProfiles.clear();
+		AvgGPUProfiles.reserve(SumOfScopedProfileGPUMap.size());
+		
+		int32 MostLeastIndent = INT_MAX;
+		TotalAvgGPUPassesMS = 0.0;
+
 		for (auto& iter : SumOfScopedProfileGPUMap)
 		{
 			JASSERT(iter.second.TotalSampleCount > 0);
 			iter.second.AvgElapsedMS = (iter.second.TotalElapsedTick / static_cast<double>(iter.second.TotalSampleCount)) * 0.000001;	// ns -> ms
-			GPUAvgProfileMap[iter.first] = iter.second;
-		}
+			AvgGPUProfiles.push_back(iter.second);
 
-		GPUAvgProfiles.clear();
-		for (auto& iter : GPUAvgProfileMap)
-		{
-			GPUAvgProfiles.push_back(std::make_pair(iter.first, iter.second));
+			// Accumulate Total GPU time
+			AccumulateTotalMS(TotalAvgGPUPassesMS, MostLeastIndent, iter.second);
 		}
 	}
 }
@@ -145,23 +173,23 @@ void jPerformanceProfile::PrintOutputDebugString()
 {
 	std::string result;
 	char szTemp[128] = { 0, };
-	if (!CPUAvgProfileMap.empty())
+	if (!AvgCPUProfiles.empty())
 	{
 		result += "-----CPU---PerformanceProfile----------\n";
-		for (auto& iter : CPUAvgProfileMap)
+		for (auto& iter : AvgCPUProfiles)
 		{
-			sprintf_s(szTemp, sizeof(szTemp), "%s : \t\t\t\t%lf ms", iter.first.ToStr(), iter.second.AvgElapsedMS);
+			sprintf_s(szTemp, sizeof(szTemp), "%s : \t\t\t\t%lf ms", iter.Name.ToStr(), iter.AvgElapsedMS);
 			result += szTemp;
 			result += "\n";
 		}
 	}
 
-	if (!GPUAvgProfileMap.empty())
+	if (!AvgGPUProfiles.empty())
 	{
 		result += "-----GPU---PerformanceProfile----------\n";
-		for (auto& iter : GPUAvgProfileMap)
+		for (auto& iter : AvgGPUProfiles)
 		{
-			sprintf_s(szTemp, sizeof(szTemp), "%s : \t\t\t\t%lf ms", iter.first.ToStr(), iter.second.AvgElapsedMS);
+			sprintf_s(szTemp, sizeof(szTemp), "%s : \t\t\t\t%lf ms", iter.Name.ToStr(), iter.AvgElapsedMS);
 			result += szTemp;
 			result += "\n";
 		}

@@ -203,6 +203,7 @@ class jPerformanceProfile
 public:
 	struct jAvgProfile
 	{
+		jPriorityName Name;
 		uint64 TotalElapsedTick = 0;
 		double AvgElapsedMS = 0;
 		int32 TotalSampleCount = 0;
@@ -210,19 +211,25 @@ public:
 		std::thread::id ThreadId;
 	};
 
-	using AvgProfileMapType = std::map<jPriorityName, jAvgProfile, jPriorityNameComapreFunc>;
+	// jPriorityNameComapreFunc
+	using AvgProfileMapType = std::vector<jAvgProfile>;
 
 	void Update(float deltaTime);
 	void CalcAvg();
 	void PrintOutputDebugString();
 
-    const AvgProfileMapType& GetCPUAvgProfileMap() const { return CPUAvgProfileMap; }
-    const AvgProfileMapType& GetGPUAvgProfileMap() const { return GPUAvgProfileMap; }
+    const AvgProfileMapType& GetAvgCPUProfiles() const { return AvgCPUProfiles; }
+    const AvgProfileMapType& GetAvgGPUProfiles() const { return AvgGPUProfiles; }
 
-	std::vector<std::pair<jPriorityName, jAvgProfile>> GPUAvgProfiles;
+	double GetTotalAvgCPUPassesMS() const { return TotalAvgCPUPassesMS; }
+	double GetTotalAvgGPUPassesMS() const { return TotalAvgGPUPassesMS; }
+
 private:
-    AvgProfileMapType CPUAvgProfileMap;		// ms
-    AvgProfileMapType GPUAvgProfileMap;		// ms
+	double TotalAvgCPUPassesMS = 0.0;
+	double TotalAvgGPUPassesMS = 0.0;
+
+    AvgProfileMapType AvgCPUProfiles;		// ms
+    AvgProfileMapType AvgGPUProfiles;		// ms
 
 public:
 	static jPerformanceProfile& GetInstance()

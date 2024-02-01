@@ -71,6 +71,11 @@ bool IsMainThread()
     return GMainThreadID == std::this_thread::get_id();
 }
 
+bool IsMainThread(const std::thread::id& InThreadId)
+{
+    return GMainThreadID == InThreadId;
+}
+
 extern bool GRHISupportVsync = false;
 extern bool GUseVsync = false;
 

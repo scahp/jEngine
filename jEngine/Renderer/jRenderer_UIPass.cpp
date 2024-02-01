@@ -66,90 +66,15 @@ void jRenderer::UIPass()
 				{
 					ImGui::Text("Average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 				}
+
 				ImGui::Separator();
-				{
-					ImGui::Text("[CPU]");
-					const auto& CPUAvgProfileMap = jPerformanceProfile::GetInstance().GetCPUAvgProfileMap();
-					double TotalPassesMS = 0.0;
-					int32 MostLeastIndent = INT_MAX;
-					for (auto& pair : CPUAvgProfileMap)
-					{
-						const jPerformanceProfile::jAvgProfile& AvgProfile = pair.second;
-						const float Indent = IndentSpace * (float)AvgProfile.Indent;
-						if (Indent > 0)
-							ImGui::Indent(Indent);
-
-						if (CurrentThreadId == AvgProfile.ThreadId)
-							ImGui::Text("%s : %lf ms", pair.first.ToStr(), AvgProfile.AvgElapsedMS);
-						else
-							ImGui::TextColored(OtherThreadColor, "%s : %lf ms [0x%p]", pair.first.ToStr(), AvgProfile.AvgElapsedMS, AvgProfile.ThreadId);
-
-						if (Indent > 0)
-							ImGui::Unindent(Indent);
-
-						// 최 상위에 있는 Pass 의 평균 MS 만 더하면 하위에 있는 모든 MS 는 다 포함됨
-						// 다른 스레드에 한 작업도 렌더링 프레임이 종료 되기 전에 마치기 때문에 추가로 더해줄 필요 없음
-						if (CurrentThreadId == AvgProfile.ThreadId)
-						{
-							if (MostLeastIndent > AvgProfile.Indent)
-							{
-								MostLeastIndent = AvgProfile.Indent;
-								TotalPassesMS = AvgProfile.AvgElapsedMS;
-							}
-							else if (MostLeastIndent == AvgProfile.Indent)
-							{
-								TotalPassesMS += AvgProfile.AvgElapsedMS;
-							}
-						}
-					}
-					ImGui::Text("[CPU]Total Passes : %lf ms", TotalPassesMS);
-				}
+				jImGUI::CreateTreeForProfiling("[CPU]Total Passes", jPerformanceProfile::GetInstance().GetAvgCPUProfiles(), jPerformanceProfile::GetInstance().GetTotalAvgCPUPassesMS());
+				
 				ImGui::Separator();
-				{
-					ImGui::Text("[GPU]");
-					const auto& GPUAvgProfileMap = jPerformanceProfile::GetInstance().GetGPUAvgProfileMap();
-					double TotalPassesMS = 0.0;
-					int32 MostLeastIndent = INT_MAX;
-					for (auto& pair : GPUAvgProfileMap)
-					{
-						const jPerformanceProfile::jAvgProfile& AvgProfile = pair.second;
-						const float Indent = IndentSpace * (float)AvgProfile.Indent;
-						if (Indent > 0)
-							ImGui::Indent(Indent);
+				jImGUI::CreateTreeForProfiling("[GPU]Total Passes", jPerformanceProfile::GetInstance().GetAvgGPUProfiles(), jPerformanceProfile::GetInstance().GetTotalAvgGPUPassesMS());
 
-						if (CurrentThreadId == AvgProfile.ThreadId)
-							ImGui::Text("%s : %lf ms", pair.first.ToStr(), AvgProfile.AvgElapsedMS);
-						else
-							ImGui::TextColored(OtherThreadColor, "%s : %lf ms [0x%p]", pair.first.ToStr(), AvgProfile.AvgElapsedMS, AvgProfile.ThreadId);
-
-						if (Indent > 0)
-							ImGui::Unindent(Indent);
-
-						// 최 상위에 있는 Pass 의 평균 MS 만 더하면 하위에 있는 모든 MS 는 다 포함됨
-						// 다른 스레드에 한 작업도 렌더링 프레임이 종료 되기 전에 마치기 때문에 추가로 더해줄 필요 없음
-						if (CurrentThreadId == AvgProfile.ThreadId)
-						{
-							if (MostLeastIndent > AvgProfile.Indent)
-							{
-								MostLeastIndent = AvgProfile.Indent;
-								TotalPassesMS = AvgProfile.AvgElapsedMS;
-							}
-							else if (MostLeastIndent == AvgProfile.Indent)
-							{
-								TotalPassesMS += AvgProfile.AvgElapsedMS;
-							}
-						}
-					}
-					ImGui::Text("[GPU]Total Passes : %lf ms", TotalPassesMS);
-				}
-				ImGui::Separator();
-				//for (auto& pair : CounterMap)
-				//{
-				//    ImGui::Text("%s : %lld", pair.first.ToStr(), pair.second);
-				//}
 				ImGui::Separator();
 				ImGui::Text("CameraPos : %.2f, %.2f, %.2f", gOptions.CameraPos.x, gOptions.CameraPos.y, gOptions.CameraPos.z);
-				//ImGui::End();
 
 				ImGui::EndTabItem();
 			}
@@ -213,7 +138,6 @@ void jRenderer::UIPass()
 
 				ImGui::EndTabItem();
 			}
-			//ImGui::SetWindowFocus(szTitle);
 #endif // SUPPORT_RAYTRACING
 			ImGui::EndTabBar();
 		}

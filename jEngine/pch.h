@@ -229,6 +229,7 @@ extern int32 GSleepMSForRealTimeShaderUpdate;
 
 extern std::thread::id GMainThreadID;
 extern bool IsMainThread();
+extern bool IsMainThread(const std::thread::id& InThreadId);
 
 extern bool GRHISupportVsync;
 extern bool GUseVsync;
