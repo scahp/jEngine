@@ -60,6 +60,15 @@ using tchar = wchar_t;
 #include "External/cityhash/city.h"
 #include "External/robin-hood-hashing/robin_hood.h"
 
+#include "External/xxHash/xxhash.h"
+template <typename T>
+FORCEINLINE uint64 XXH64(const T& InData, uint64 InSeed = 0)
+{
+	static_assert(std::is_trivially_copyable<T>::value, "Custom XXH64 function Should be trivially copyable.");
+	static_assert(!std::is_pointer<T>::value, "Custom XXH64 function is Not allowed pointer type.");
+	return XXH64(&InData, sizeof(T), InSeed);
+}
+
 #if _DEBUG
 #define verify(x) JASSERT(x)
 #define JOK(a) (SUCCEEDED(a) ? true : (assert(!(#a)), false))
@@ -173,13 +182,6 @@ extern float g_timeDeltaSecond;
 #include "Core/jName.h"
 #include "Core/TInstantStruct.h"
 
-// string type city hash generator
-#define STATIC_NAME_CITY_HASH(str) []() -> size_t { \
-			static size_t StrLen = strlen(str); \
-			static size_t hash = CityHash64(str, StrLen); \
-			return hash;\
-		}()
-
 template <typename T>
 FORCEINLINE constexpr T Align(T value, uint64 alignment)
 {
@@ -221,7 +223,7 @@ extern class jEngine* g_Engine;
 #define ENABLE_PBR 1
 #define USE_SPONZA 1
 #define USE_SPONZA_PBR 1
-#define SUPPORT_RAYTRACING 1
+#define SUPPORT_RAYTRACING 0
 
 extern bool GUseRealTimeShaderUpdate;
 extern int32 GMaxCheckCountForRealTimeShaderUpdate;

@@ -54,13 +54,13 @@ struct jVertexBuffer_DX12 : public jVertexBuffer
             for(int32 i=0;i<(int32)InputElementDescs.size();++i)
             {
                 if (InputElementDescs[i].SemanticName)
-                    result = CityHash64WithSeed(InputElementDescs[i].SemanticName, strlen(InputElementDescs[i].SemanticName), result);
-                result = CityHash64WithSeed((uint64)InputElementDescs[i].SemanticIndex, result);
-                result = CityHash64WithSeed((uint64)InputElementDescs[i].Format, result);
-                result = CityHash64WithSeed((uint64)InputElementDescs[i].InputSlot, result);
-                result = CityHash64WithSeed((uint64)InputElementDescs[i].AlignedByteOffset, result);
-                result = CityHash64WithSeed((uint64)InputElementDescs[i].InputSlotClass, result);
-                result = CityHash64WithSeed((uint64)InputElementDescs[i].InstanceDataStepRate, result);
+                    result = XXH64(InputElementDescs[i].SemanticName, strlen(InputElementDescs[i].SemanticName), result);
+                result = XXH64(InputElementDescs[i].SemanticIndex, result);
+                result = XXH64(InputElementDescs[i].Format, result);
+                result = XXH64(InputElementDescs[i].InputSlot, result);
+                result = XXH64(InputElementDescs[i].AlignedByteOffset, result);
+                result = XXH64(InputElementDescs[i].InputSlotClass, result);
+                result = XXH64(InputElementDescs[i].InstanceDataStepRate, result);
             }
             return result;
         }

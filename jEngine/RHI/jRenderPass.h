@@ -111,17 +111,17 @@ struct jSubpass
     {
         size_t Hash = 0;
         if (InputAttachments.size() > 0)
-            Hash = CityHash64WithSeed((const char*)InputAttachments.data(), InputAttachments.size() * sizeof(int32), Hash);
+            Hash = XXH64(InputAttachments.data(), InputAttachments.size() * sizeof(int32), Hash);
         if (OutputColorAttachments.size() > 0)
-            Hash = CityHash64WithSeed((const char*)OutputColorAttachments.data(), OutputColorAttachments.size() * sizeof(int32), Hash);
+            Hash = XXH64(OutputColorAttachments.data(), OutputColorAttachments.size() * sizeof(int32), Hash);
         if (OutputDepthAttachment)
-            Hash = CityHash64WithSeed((const char*)&OutputDepthAttachment.value(), sizeof(int32), Hash);
+            Hash = XXH64(&OutputDepthAttachment.value(), sizeof(int32), Hash);
         if (OutputResolveAttachment)
-            Hash = CityHash64WithSeed((const char*)&OutputResolveAttachment.value(), sizeof(int32), Hash);
-        Hash = CityHash64WithSeed((const char*)&SourceSubpassIndex, sizeof(int32), Hash);
-        Hash = CityHash64WithSeed((const char*)&DestSubpassIndex, sizeof(int32), Hash);
-        Hash = CityHash64WithSeed((const char*)&AttachmentProducePipelineBit, sizeof(EPipelineStageMask), Hash);
-        Hash = CityHash64WithSeed((const char*)&AttachmentComsumePipelineBit, sizeof(EPipelineStageMask), Hash);
+            Hash = XXH64(&OutputResolveAttachment.value(), sizeof(int32), Hash);
+        Hash = XXH64(&SourceSubpassIndex, sizeof(int32), Hash);
+        Hash = XXH64(&DestSubpassIndex, sizeof(int32), Hash);
+        Hash = XXH64(&AttachmentProducePipelineBit, sizeof(EPipelineStageMask), Hash);
+        Hash = XXH64(&AttachmentComsumePipelineBit, sizeof(EPipelineStageMask), Hash);
         return Hash;
     }
 };
@@ -143,11 +143,11 @@ struct jRenderPassInfo
         int64 Hash = 0;
         for(const auto& iter : Attachments)
         {
-            Hash = CityHash64WithSeed(iter.GetHash(), Hash);
+            Hash = XXH64(iter.GetHash(), Hash);
         }
         for (const auto& iter : Subpasses)
         {
-            Hash = CityHash64WithSeed(iter.GetHash(), Hash);
+            Hash = XXH64(iter.GetHash(), Hash);
         }
         return Hash;
     }

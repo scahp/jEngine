@@ -16,7 +16,22 @@ struct jRenderTargetInfo
     size_t GetHash() const
     {
         return GETHASH_FROM_INSTANT_STRUCT(Type, Format, Width, Height, LayerCount, IsGenerateMipmap
-            , SampleCount, RTClearValue, TextureCreateFlag, IsUseAsSubpassInput, IsMemoryless);         // without ResourceName
+            , SampleCount, RTClearValue.GetHash(), TextureCreateFlag, IsUseAsSubpassInput, IsMemoryless);         // without ResourceName
+    }
+
+    bool operator==(const jRenderTargetInfo& InRHS) const
+    {
+        return Type == InRHS.Type 
+            && Format == InRHS.Format
+            && Width == InRHS.Width
+            && Height == InRHS.Height
+            && LayerCount == InRHS.LayerCount
+            && IsGenerateMipmap == InRHS.IsGenerateMipmap
+            && SampleCount == InRHS.SampleCount
+            && IsUseAsSubpassInput == InRHS.IsUseAsSubpassInput
+            && IsMemoryless == InRHS.IsMemoryless
+            && RTClearValue == InRHS.RTClearValue
+            && TextureCreateFlag == InRHS.TextureCreateFlag;
     }
 
     ETextureType Type = ETextureType::TEXTURE_2D;
@@ -74,7 +89,7 @@ struct jRenderTarget final : public std::enable_shared_from_this<jRenderTarget>
         Hash = Info.GetHash();
         if (GetTexture())
         {
-            Hash = CityHash64WithSeed(reinterpret_cast<uint64>(GetTexture()->GetHandle()), Hash);
+            Hash = XXH64(reinterpret_cast<uint64>(GetTexture()->GetHandle()), Hash);
         }
         return Hash;
     }

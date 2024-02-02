@@ -918,7 +918,24 @@ public:
 
 	size_t GetHash() const
 	{
-		return GETHASH_FROM_INSTANT_STRUCT(Type, ClearValue);
+		if (Type == ERTClearType::Color)
+			return GETHASH_FROM_INSTANT_STRUCT(Type, ClearValue.Color[0], ClearValue.Color[1], ClearValue.Color[2], ClearValue.Color[3]);
+
+        return GETHASH_FROM_INSTANT_STRUCT(Type, ClearValue.DepthStencil.Depth, ClearValue.DepthStencil.Stencil);
+	}
+
+	bool operator==(const jRTClearValue& InRHS) const
+	{
+		if (Type == ERTClearType::Color)
+		{
+			return ClearValue.Color[0] == InRHS.ClearValue.Color[0]
+				&& ClearValue.Color[1] == InRHS.ClearValue.Color[1]
+				&& ClearValue.Color[2] == InRHS.ClearValue.Color[2]
+				&& ClearValue.Color[3] == InRHS.ClearValue.Color[3];
+		}
+
+		return ClearValue.DepthStencil.Depth == InRHS.ClearValue.DepthStencil.Depth
+			&& ClearValue.DepthStencil.Stencil == InRHS.ClearValue.DepthStencil.Stencil;
 	}
 
 private:

@@ -127,9 +127,9 @@ VkDescriptorSetLayout jShaderBindingLayout_Vulkan::CreateDescriptorSetLayout(con
         layoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;      // for bindless resources
 
         // for bindless resources
+        VkDescriptorSetLayoutBindingFlagsCreateInfoEXT setLayoutBindingFlags{};
         if (bindingFlags.size() > 0)
         {
-            VkDescriptorSetLayoutBindingFlagsCreateInfoEXT setLayoutBindingFlags{};
             setLayoutBindingFlags.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT;
             setLayoutBindingFlags.bindingCount = (uint32)bindingFlags.size();
             setLayoutBindingFlags.pBindingFlags = bindingFlags.data();
@@ -154,7 +154,7 @@ VkPipelineLayout jShaderBindingLayout_Vulkan::CreatePipelineLayout(const jShader
     size_t hash = InShaderBindingLayoutArray.GetHash();
 
     if (InPushConstant)
-        hash = CityHash64WithSeed(InPushConstant->GetHash(), hash);
+        hash = XXH64(InPushConstant->GetHash(), hash);
     check(hash);
 
     {

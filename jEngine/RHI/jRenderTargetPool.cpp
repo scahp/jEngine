@@ -23,6 +23,7 @@ jRenderTargetPool::jRenderTargetPool()
 jRenderTargetPool::~jRenderTargetPool()
 {
 }
+#pragma optimize("", off)
 
 std::shared_ptr<jRenderTarget> jRenderTargetPool::GetRenderTarget(const jRenderTargetInfo& info)
 {
@@ -52,6 +53,7 @@ std::shared_ptr<jRenderTarget> jRenderTargetPool::GetRenderTarget(const jRenderT
 	
 	return renderTargetPtr;
 }
+#pragma optimize("", on)
 
 void jRenderTargetPool::ReturnRenderTarget(jRenderTarget* renderTarget)
 {

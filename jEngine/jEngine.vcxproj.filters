@@ -98,6 +98,9 @@
     <Filter Include="Code\RHI\DX12">
       <UniqueIdentifier>{bbc6b4a7-6e2b-42a4-aa04-8cfcfd9a78ae}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Code\External\xxHash">
+      <UniqueIdentifier>{2bada837-8b35-4821-bf59-f7435743a42f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Math\MathUtility.h">
@@ -475,6 +478,9 @@
     <ClInclude Include="Core\TInstantStruct.h">
       <Filter>Code\Core</Filter>
     </ClInclude>
+    <ClInclude Include="External\xxHash\xxhash.h">
+      <Filter>Code\External\xxHash</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -836,6 +842,9 @@
     </ClCompile>
     <ClCompile Include="Renderer\jRenderer_UIPass.cpp">
       <Filter>Code\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="External\xxHash\xxhash.c">
+      <Filter>Code\External\xxHash</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

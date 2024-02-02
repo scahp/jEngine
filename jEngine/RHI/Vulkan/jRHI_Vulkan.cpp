@@ -311,6 +311,7 @@ bool jRHI_Vulkan::InitRHI()
 		enabledBufferDeviceAddresFeatures.pNext = (void*)createInfo.pNext;
 		createInfo.pNext = &enabledBufferDeviceAddresFeatures;
 
+#if SUPPORT_RAYTRACING
         VkPhysicalDeviceRayTracingPipelineFeaturesKHR enabledRayTracingPipelineFeatures{};
         enabledRayTracingPipelineFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
         enabledRayTracingPipelineFeatures.rayTracingPipeline = true;
@@ -328,6 +329,7 @@ bool jRHI_Vulkan::InitRHI()
         enabledRayQueryFeatures.rayQuery = true;
 		enabledRayQueryFeatures.pNext = (void*)createInfo.pNext;
 		createInfo.pNext = &enabledRayQueryFeatures;
+#endif // SUPPORT_RAYTRACING
 
 		// Added CustomBorderColor features
 		VkPhysicalDeviceCustomBorderColorFeaturesEXT enabledCustomBorderColorFeaturesEXT{};

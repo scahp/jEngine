@@ -59,7 +59,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;_ITERATOR_DEBUG_LEVEL=0;_CONTAINER_DEBUG_LEVEL=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>./;./glad/include;./External/assimp/include;./External;./External/vulkan/1.3.239.0/Include;./External/glslang;./External/IMGUI;./External/EASTL/include;./External/EABase/include/Common;./External/glad/include;./External/stb;./External/loadpng;./External/TinyXml2;./External/ShaderConductor/include;./External/DirectX12/include;./External/WinPixEventRuntime/Include;./External/DirectXTex/include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>./;./glad/include;./External/assimp/include;./External;./External/vulkan/1.3.239.0/Include;./External/glslang;./External/IMGUI;./External/EASTL/include;./External/EABase/include/Common;./External/glad/include;./External/stb;./External/loadpng;./External/TinyXml2;./External/ShaderConductor/include;./External/DirectX12/include;./External/WinPixEventRuntime/Include;./External/DirectXTex/include;./External/xxHash</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <DisableSpecificWarnings>
       </DisableSpecificWarnings>
@@ -90,7 +90,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>./;./glad/include;./External/assimp/include;./External;./External/vulkan/1.3.239.0/Include;./External/glslang;./External/IMGUI;./External/EASTL/include;./External/EABase/include/Common;./External/glad/include;./External/stb;./External/loadpng;./External/TinyXml2;./External/ShaderConductor/include;./External/DirectX12/include;./External/WinPixEventRuntime/Include;./External/DirectXTex/include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>./;./glad/include;./External/assimp/include;./External;./External/vulkan/1.3.239.0/Include;./External/glslang;./External/IMGUI;./External/EASTL/include;./External/EABase/include/Common;./External/glad/include;./External/stb;./External/loadpng;./External/TinyXml2;./External/ShaderConductor/include;./External/DirectX12/include;./External/WinPixEventRuntime/Include;./External/DirectXTex/include;./External/xxHash</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <DisableSpecificWarnings>
       </DisableSpecificWarnings>
@@ -137,6 +137,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClInclude Include="External\ShaderConductor\Include\ShaderConductor\ShaderConductor.hpp" />
     <ClInclude Include="External\stb\stb_image.h" />
     <ClInclude Include="External\TinyXml2\tinyxml2.h" />
+    <ClInclude Include="External\xxHash\xxhash.h" />
     <ClInclude Include="FileLoader\jFile.h" />
     <ClInclude Include="FileLoader\jImageFileLoader.h" />
     <ClInclude Include="FileLoader\jModelLoader.h" />
@@ -330,6 +331,10 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     </ClCompile>
     <ClCompile Include="External\loadpng\loadpng.cpp" />
     <ClCompile Include="External\TinyXml2\tinyxml2.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="External\xxHash\xxhash.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>

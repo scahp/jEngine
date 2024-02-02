@@ -62,11 +62,11 @@ size_t jRaytracingPipelineShader::GetHash() const
     if (MissShader)
         hash ^= MissShader->ShaderInfo.GetHash();
 
-    hash = CityHash64WithSeed((const char*)RaygenEntryPoint.c_str(), RaygenEntryPoint.length() * sizeof(wchar_t), hash);
-    hash = CityHash64WithSeed((const char*)ClosestHitEntryPoint.c_str(), ClosestHitEntryPoint.length() * sizeof(wchar_t), hash);
-    hash = CityHash64WithSeed((const char*)AnyHitEntryPoint.c_str(), AnyHitEntryPoint.length() * sizeof(wchar_t), hash);
-    hash = CityHash64WithSeed((const char*)MissEntryPoint.c_str(), MissEntryPoint.length() * sizeof(wchar_t), hash);
-    hash = CityHash64WithSeed((const char*)HitGroupName.c_str(), HitGroupName.length() * sizeof(wchar_t), hash);
+    hash = XXH64(RaygenEntryPoint.c_str(), RaygenEntryPoint.length() * sizeof(wchar_t), hash);
+    hash = XXH64(ClosestHitEntryPoint.c_str(), ClosestHitEntryPoint.length() * sizeof(wchar_t), hash);
+    hash = XXH64(AnyHitEntryPoint.c_str(), AnyHitEntryPoint.length() * sizeof(wchar_t), hash);
+    hash = XXH64(MissEntryPoint.c_str(), MissEntryPoint.length() * sizeof(wchar_t), hash);
+    hash = XXH64(HitGroupName.c_str(), HitGroupName.length() * sizeof(wchar_t), hash);
     return hash;
 }
 

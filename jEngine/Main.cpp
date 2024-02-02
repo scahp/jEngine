@@ -26,7 +26,9 @@ int main()
 	g_Engine = new jEngine();
 	g_Engine->PreInit();
 
-	g_rhi->InitRHI();
+	if (!g_rhi->InitRHI())
+		return false;
+
 	g_rhi->OnInitRHI();
 
 	GLFWwindow* window = nullptr;

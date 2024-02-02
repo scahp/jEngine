@@ -317,7 +317,7 @@ struct jPipelineStateFixedInfo
             Hash ^= (Scissors[i].GetHash() ^ (i + 1));
 
         if (DynamicStates.size() > 0)
-            Hash = CityHash64WithSeed((const char*)&DynamicStates[0], sizeof(EPipelineDynamicState) * DynamicStates.size(), Hash);
+            Hash = XXH64(&DynamicStates[0], sizeof(EPipelineDynamicState) * DynamicStates.size(), Hash);
 
         // 아래 내용들도 해시를 만들 수 있어야 함, todo
         Hash ^= RasterizationState->GetHash();
@@ -459,8 +459,9 @@ struct jPushConstant
         if (Hash)
             return Hash;
 
+        Hash = 0;
         if (PushConstantRanges.NumOfData > 0)
-            CityHash64WithSeed((const char*)&PushConstantRanges[0], sizeof(jPushConstantRange) * PushConstantRanges.NumOfData, Hash);
+            Hash = XXH64(&PushConstantRanges[0], sizeof(jPushConstantRange) * PushConstantRanges.NumOfData, Hash);
 
         return Hash;
     }
