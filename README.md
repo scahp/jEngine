@@ -44,4 +44,5 @@ Simple toy engine for implementing graphics feature with multiple api
 10. DXC : https://github.com/microsoft/DirectXShaderCompiler
 11. stb : https://github.com/nothings/stb
 12. WinPixEventRuntime : https://devblogs.microsoft.com/pix/winpixeventruntime/
+13. xxHash : https://github.com/Cyan4973/xxHash
 
