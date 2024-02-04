@@ -76,36 +76,36 @@ struct jTextureArrayResource : public jShaderBindingResource
 struct jUniformBufferResourceBindless : public jShaderBindingResource
 {
     jUniformBufferResourceBindless() = default;
-    jUniformBufferResourceBindless(const std::vector<const IUniformBufferBlock*>& InUniformBuffers) : UniformBuffers(InUniformBuffers) {}
+    jUniformBufferResourceBindless(const std::vector<const IUniformBufferBlock*>& InUniformBuffers) : UniformBuffers(&InUniformBuffers) {}
     virtual ~jUniformBufferResourceBindless() {}
-    virtual const void* GetResource(int32 InIndex) const { return UniformBuffers[InIndex]; }
-    virtual int32 GetNumOfResources() const { return (int32)UniformBuffers.size(); }
+    virtual const void* GetResource(int32 InIndex) const { return (*UniformBuffers)[InIndex]; }
+    virtual int32 GetNumOfResources() const { return (int32)(*UniformBuffers).size(); }
     virtual bool IsBindless() const { return true; }
 
-    std::vector<const IUniformBufferBlock*> UniformBuffers;
+    const std::vector<const IUniformBufferBlock*>* UniformBuffers = nullptr;
 };
 
 struct jBufferResourceBindless : public jShaderBindingResource
 {
     jBufferResourceBindless() = default;
-    jBufferResourceBindless(const std::vector<const jBuffer*>& InBuffers) : Buffers(InBuffers) {}
+    jBufferResourceBindless(std::vector<const jBuffer*>& InBuffers) : Buffers(&InBuffers) {}
     virtual ~jBufferResourceBindless() {}
-    virtual const void* GetResource(int32 InIndex) const { return Buffers[InIndex]; }
+    virtual const void* GetResource(int32 InIndex) const { return (*Buffers)[InIndex]; }
     virtual bool IsBindless() const { return true; }
 
-    std::vector<const jBuffer*> Buffers;
+    std::vector<const jBuffer*>* Buffers;
 };
 
 struct jSamplerResourceBindless : public jShaderBindingResource
 {
     jSamplerResourceBindless() = default;
     jSamplerResourceBindless(const std::vector<const jSamplerStateInfo*>& InSamplerStates)
-        : SamplerStates(InSamplerStates) {}
+        : SamplerStates(&InSamplerStates) {}
     virtual ~jSamplerResourceBindless() {}
-    virtual const void* GetResource(int32 InIndex) const { return SamplerStates[InIndex]; }
+    virtual const void* GetResource(int32 InIndex) const { return (*SamplerStates)[InIndex]; }
     virtual bool IsBindless() const { return true; }
 
-    std::vector<const jSamplerStateInfo*> SamplerStates;
+    const std::vector<const jSamplerStateInfo*>* SamplerStates = nullptr;
 };
 
 struct jTextureResourceBindless : public jShaderBindingResource
@@ -124,12 +124,12 @@ struct jTextureResourceBindless : public jShaderBindingResource
 
     jTextureResourceBindless() = default;
     jTextureResourceBindless(const std::vector<jTextureBindData>& InTextureBindData)
-        : TextureBindDatas(InTextureBindData) {}
+        : TextureBindDatas(&InTextureBindData) {}
     virtual ~jTextureResourceBindless() {}
-    virtual const void* GetResource(int32 InIndex) const { return &TextureBindDatas[0]; }
+    virtual const void* GetResource(int32 InIndex) const { return &(*TextureBindDatas)[0]; }
     virtual bool IsBindless() const { return true; }
 
-    std::vector<jTextureBindData> TextureBindDatas;
+    const std::vector<jTextureBindData>* TextureBindDatas = nullptr;
 };
 
 struct jTextureArrayResourceBindless : public jShaderBindingResource
@@ -142,13 +142,13 @@ struct jTextureArrayResourceBindless : public jShaderBindingResource
 
     jTextureArrayResourceBindless() = default;
     jTextureArrayResourceBindless(const std::vector<jTextureArrayBindData>& InTextureArrayBindDatas)
-        : TextureArrayBindDatas(InTextureArrayBindDatas) {}
+        : TextureArrayBindDatas(&InTextureArrayBindDatas) {}
     virtual ~jTextureArrayResourceBindless() {}
-    virtual const void* GetResource(int32 InIndex) const { return &TextureArrayBindDatas[InIndex]; }
-    virtual int32 NumOfResource(int32 InIndex) const { return TextureArrayBindDatas[InIndex].InNumOfTexure; }
+    virtual const void* GetResource(int32 InIndex) const { return &(*TextureArrayBindDatas)[InIndex]; }
+    virtual int32 NumOfResource(int32 InIndex) const { return (*TextureArrayBindDatas)[InIndex].InNumOfTexure; }
     virtual bool IsBindless() const { return true; }
 
-    std::vector<jTextureArrayBindData> TextureArrayBindDatas;
+    const std::vector<jTextureArrayBindData>* TextureArrayBindDatas = nullptr;
 };
 //////////////////////////////////////////////////////////////////////////
 

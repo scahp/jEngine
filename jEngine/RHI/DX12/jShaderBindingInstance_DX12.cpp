@@ -48,7 +48,8 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
             if (IsBindless)
             {
                 auto UniformResourceBindless = (jUniformBufferResourceBindless*)ShaderBinding->Resource;
-                for(auto Resource : UniformResourceBindless->UniformBuffers)
+                check(UniformResourceBindless->UniformBuffers);
+                for(const auto& Resource : *UniformResourceBindless->UniformBuffers)
                 {
                     check(Resource);
 
@@ -78,7 +79,8 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
             if (IsBindless)
             {
                 auto TextureResourceResourceBindless = (jTextureResourceBindless*)ShaderBinding->Resource;
-                for(auto Resource : TextureResourceResourceBindless->TextureBindDatas)
+                check(TextureResourceResourceBindless->TextureBindDatas);
+                for(const auto& Resource : *TextureResourceResourceBindless->TextureBindDatas)
                 {
                     check(Resource.Texture);
 
@@ -133,7 +135,8 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
             if (IsBindless)
             {
                 auto TextureResourceResourceBindless = (jTextureResourceBindless*)ShaderBinding->Resource;
-                for (auto Resource : TextureResourceResourceBindless->TextureBindDatas)
+                check(TextureResourceResourceBindless->TextureBindDatas);
+                for (const auto& Resource : *TextureResourceResourceBindless->TextureBindDatas)
                 {
                     jTexture_DX12* Tex = (jTexture_DX12*)Resource.Texture;
                     Descriptors.push_back({ .Descriptor = Tex->SRV, .ResourceName = Tex->ResourceName, .Resource = Tex });
@@ -151,7 +154,8 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
             if (IsBindless)
             {
                 auto TextureResourceResourceArrayBindless = (jTextureArrayResourceBindless*)ShaderBinding->Resource;
-                for (auto Resource : TextureResourceResourceArrayBindless->TextureArrayBindDatas)
+                check(TextureResourceResourceArrayBindless->TextureArrayBindDatas);
+                for (const auto& Resource : *TextureResourceResourceArrayBindless->TextureArrayBindDatas)
                 {
                     jTexture_DX12** TexArray = (jTexture_DX12**)Resource.TextureArray;
                     for (int32 i = 0; i < Resource.InNumOfTexure; ++i)
@@ -179,7 +183,8 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
             if (IsBindless)
             {
                 auto BufferResourceBindless = (jBufferResourceBindless*)ShaderBinding->Resource;
-                for (auto Resource : BufferResourceBindless->Buffers)
+                check(BufferResourceBindless->Buffers);
+                for (const auto& Resource : *BufferResourceBindless->Buffers)
                 {
                     jBuffer_DX12* Buf = (jBuffer_DX12*)Resource;
                     Descriptors.push_back({ .Descriptor = Buf->SRV, .ResourceName = Buf->ResourceName, .Resource = Buf });
@@ -206,7 +211,8 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
             if (IsBindless)
             {
                 auto TextureResourceResourceBindless = (jTextureResourceBindless*)ShaderBinding->Resource;
-                for (auto Resource : TextureResourceResourceBindless->TextureBindDatas)
+                check(TextureResourceResourceBindless->TextureBindDatas);
+                for (const auto& Resource : *TextureResourceResourceBindless->TextureBindDatas)
                 {
                     jTexture_DX12* Tex = (jTexture_DX12*)Resource.Texture;
                     if (Resource.MipLevel == 0)
@@ -249,7 +255,8 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
             if (IsBindless)
             {
                 auto BufferResourceBindless = (jBufferResourceBindless*)ShaderBinding->Resource;
-                for (auto Resource : BufferResourceBindless->Buffers)
+                check(BufferResourceBindless->Buffers);
+                for (const auto& Resource : *BufferResourceBindless->Buffers)
                 {
                     jBuffer_DX12* Buf = (jBuffer_DX12*)Resource;
                     Descriptors.push_back({ .Descriptor = Buf->UAV, .ResourceName = Buf->ResourceName, .Resource = Buf });
@@ -275,7 +282,8 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
             if (IsBindless)
             {
                 auto SamplerResourceBindless = (jSamplerResourceBindless*)ShaderBinding->Resource;
-                for(auto Resource : SamplerResourceBindless->SamplerStates)
+                check(SamplerResourceBindless->SamplerStates);
+                for(const auto& Resource : *SamplerResourceBindless->SamplerStates)
                 {
                     jSamplerStateInfo_DX12* Sampler = (jSamplerStateInfo_DX12*)Resource;
                     check(Sampler);
