@@ -379,7 +379,7 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(const jShaderBinding* InShaderB
             const jUniformBufferResourceBindless* ubor = reinterpret_cast<const jUniformBufferResourceBindless*>(InShaderBinding->Resource);
             if (ensure(ubor))
             {
-                for(auto UniformBuffer : ubor->UniformBuffers)
+                for(const auto& UniformBuffer : *ubor->UniformBuffers)
                 {
                     check(UniformBuffer);
 
@@ -414,7 +414,7 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(const jShaderBinding* InShaderB
             const jUniformBufferResourceBindless* ubor = reinterpret_cast<const jUniformBufferResourceBindless*>(InShaderBinding->Resource);
             if (ensure(ubor))
             {
-                for (auto UniformBuffer : ubor->UniformBuffers)
+                for (const auto& UniformBuffer : *ubor->UniformBuffers)
                 {
                     check(UniformBuffer);
 
@@ -452,7 +452,7 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(const jShaderBinding* InShaderB
             const jTextureResourceBindless* tbor = reinterpret_cast<const jTextureResourceBindless*>(InShaderBinding->Resource);
             if (ensure(tbor))
             {
-                for (auto TextureData : tbor->TextureBindDatas)
+                for (const auto& TextureData : *tbor->TextureBindDatas)
                 {
                     check(TextureData.Texture);
 
@@ -502,7 +502,7 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(const jShaderBinding* InShaderB
             const jTextureResourceBindless* tbor = reinterpret_cast<const jTextureResourceBindless*>(InShaderBinding->Resource);
             if (ensure(tbor))
             {
-                for (auto TextureData : tbor->TextureBindDatas)
+                for (const auto& TextureData : *tbor->TextureBindDatas)
                 {
                     check(TextureData.Texture);
 
@@ -539,7 +539,7 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(const jShaderBinding* InShaderB
             const jTextureResourceBindless* tbor = reinterpret_cast<const jTextureResourceBindless*>(InShaderBinding->Resource);
             if (ensure(tbor))
             {
-                for (auto TextureData : tbor->TextureBindDatas)
+                for (const auto& TextureData : *tbor->TextureBindDatas)
                 {
                     check(TextureData.Texture);
 
@@ -624,7 +624,7 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(const jShaderBinding* InShaderB
             const jSamplerResourceBindless* sr = reinterpret_cast<const jSamplerResourceBindless*>(InShaderBinding->Resource);
             if (ensure(sr))
             {
-                for(auto SamplerState : sr->SamplerStates)
+                for(const auto& SamplerState : *sr->SamplerStates)
                 {
                     check(SamplerState);
 
@@ -659,7 +659,7 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(const jShaderBinding* InShaderB
         if (IsBindless)
         {
             const jBufferResourceBindless* br = reinterpret_cast<const jBufferResourceBindless*>(InShaderBinding->Resource);
-            for(auto Buffer : br->Buffers)
+            for(const auto& Buffer : *br->Buffers)
             {
                 check(Buffer);
 
@@ -691,7 +691,7 @@ void jWriteDescriptorSet::SetWriteDescriptorInfo(const jShaderBinding* InShaderB
         if (IsBindless)
         {
             const jBufferResourceBindless* br = reinterpret_cast<const jBufferResourceBindless*>(InShaderBinding->Resource);
-            for (auto Buffer : br->Buffers)
+            for (const auto& Buffer : *br->Buffers)
             {
                 check(Buffer);
 
