@@ -116,6 +116,7 @@ jCommandBuffer* jCommandBufferManager_Vulkan::GetOrCreateCommandBuffer()
                 UsingCommandBuffers.push_back(commandBuffer);
                 commandBuffer->Reset();
                 SelectedCommandBuffer = commandBuffer;
+                break;
             }
         }
     }
