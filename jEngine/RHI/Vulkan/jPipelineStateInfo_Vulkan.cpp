@@ -509,7 +509,7 @@ void* jPipelineStateInfo_Vulkan::CreateRaytracingPipelineState()
     rayTracingPipelineCI.pGroups = MergedShaderGroups.data();
     rayTracingPipelineCI.maxPipelineRayRecursionDepth = RaytracingPipelineData.MaxTraceRecursionDepth;
     rayTracingPipelineCI.layout = vkPipelineLayout;
-    check(VK_SUCCESS == g_rhi_vk->vkCreateRayTracingPipelinesKHR(g_rhi_vk->Device, VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &rayTracingPipelineCI, nullptr, &vkPipeline));
+    verify(VK_SUCCESS == g_rhi_vk->vkCreateRayTracingPipelinesKHR(g_rhi_vk->Device, VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &rayTracingPipelineCI, nullptr, &vkPipeline));
 
     // ShaderBindingTable
     const uint32 handleSize = g_rhi_vk->RayTracingPipelineProperties.shaderGroupHandleSize;
@@ -518,7 +518,7 @@ void* jPipelineStateInfo_Vulkan::CreateRaytracingPipelineState()
     const uint32 sbtSize = groupCount * handleSizeAligned;
 
     std::vector<uint8> shaderHandleStorage(sbtSize);
-    check(VK_SUCCESS == g_rhi_vk->vkGetRayTracingShaderGroupHandlesKHR(g_rhi_vk->Device, vkPipeline, 0, groupCount, sbtSize, shaderHandleStorage.data()));
+    verify(VK_SUCCESS == g_rhi_vk->vkGetRayTracingShaderGroupHandlesKHR(g_rhi_vk->Device, vkPipeline, 0, groupCount, sbtSize, shaderHandleStorage.data()));
 
     auto getBufferDeviceAddress = [](VkBuffer buffer)
     {
