@@ -481,6 +481,15 @@
     <ClInclude Include="External\xxHash\xxhash.h">
       <Filter>Code\External\xxHash</Filter>
     </ClInclude>
+    <ClInclude Include="RHI\jResourceBarrierBatcher.h">
+      <Filter>Code\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Vulkan\jResourceBarrierBatcher_Vulkan.h">
+      <Filter>Code\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\jResourceBarrierBatcher_DX12.h">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -846,6 +855,12 @@
     <ClCompile Include="External\xxHash\xxhash.c">
       <Filter>Code\External\xxHash</Filter>
     </ClCompile>
+    <ClCompile Include="RHI\Vulkan\jResourceBarrierBatcher_Vulkan.cpp">
+      <Filter>Code\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\DX12\jResourceBarrierBatcher_DX12.cpp">
+      <Filter>Code\RHI\DX12</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="Resource\Shaders\glsl\shader_vs.glsl">
@@ -992,14 +1007,22 @@
     <None Include="Resource\Shaders\hlsl\RaytracingOneWeekend.hlsl">
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
-    <None Include="Resource\Shaders\hlsl\RaytracingPBR.hlsl" />
     <None Include="Resource\Shaders\hlsl\RTAO.hlsl">
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
-    <None Include="Resource\Shaders\hlsl\AOApply_cs.hlsl" />
-    <None Include="Resource\Shaders\hlsl\gaussianblur_cs.hlsl" />
-    <None Include="Resource\Shaders\hlsl\AOReprojection_cs.hlsl" />
     <None Include="Resource\Shaders\hlsl\bilateralfiltering_cs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\RaytracingPBR.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\AOApply_cs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\AOReprojection_cs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\gaussianblur_cs.hlsl">
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
   </ItemGroup>
