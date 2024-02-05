@@ -70,9 +70,9 @@ uint64 jFence_DX12::SignalWithNextFenceValue(ID3D12CommandQueue* InCommandQueue,
         FenceValue = NewFenceValue;
     }
 
-    JFAIL(Fence->SetEventOnCompletion(FenceValue, FenceEvent));
-    if (bWaitUntilExecuteComplete)
+    if (bWaitUntilExecuteComplete && Fence->GetCompletedValue() < FenceValue)
     {
+        JFAIL(Fence->SetEventOnCompletion(FenceValue, FenceEvent));
         WaitForSingleObjectEx(FenceEvent, INFINITE, false);
     }
     return FenceValue;
