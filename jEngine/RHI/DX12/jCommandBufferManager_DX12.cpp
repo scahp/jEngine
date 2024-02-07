@@ -59,6 +59,10 @@ bool jCommandBuffer_DX12::End() const
     if (IsClosed)
         return true;
 
+#if USE_RESOURCE_BARRIER_BATCHER
+    FlushBarrierBatch();
+#endif // USE_RESOURCE_BARRIER_BATCHER
+
     IsClosed = true;
     if (JFAIL(CommandList->Close()))
         return false;

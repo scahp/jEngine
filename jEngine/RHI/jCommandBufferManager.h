@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 class jFence;
+class jResourceBarrierBatcher;
 
 class jCommandBuffer
 {
@@ -14,6 +15,9 @@ public:
     virtual bool End() const { return false; }
     virtual void Reset() const {}
     virtual jFence* GetFence() const { return nullptr; }
+    virtual bool IsEnd() const { return false; }
+    virtual jResourceBarrierBatcher* GetBarrierBatcher() const { return nullptr; }
+    virtual void FlushBarrierBatch() const {}
 };
 
 class jCommandBufferManager

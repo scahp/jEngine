@@ -22,7 +22,7 @@ public:
     virtual void AddTransition(jBuffer* InBuffer, EResourceLayout InNewLayout) override;
     virtual void AddTransition(jTexture* InTexture, EResourceLayout InNewLayout) override;
     FORCEINLINE void AddTransition_Internal(ID3D12Resource* InResource, D3D12_RESOURCE_STATES InBefore
-        , D3D12_RESOURCE_STATES InAfter, uint32 InSubresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES)
+        , D3D12_RESOURCE_STATES InAfter, uint32 InSubresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES)           // todo : each subresource control
     {
         check(InResource);
 
@@ -32,12 +32,12 @@ public:
         barrier.Transition.pResource = InResource;
         barrier.Transition.StateBefore = InBefore;
         barrier.Transition.StateAfter = InAfter;
-        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;       // todo : each subresource control
+        barrier.Transition.Subresource = InSubresource;
 
         Barriers.emplace_back(barrier);
     }
 
-    virtual void Flush(jCommandBuffer* InCommandBuffer) override;
+    virtual void Flush(const jCommandBuffer* InCommandBuffer) override;
 
 private:
     std::vector<D3D12_RESOURCE_BARRIER> Barriers;

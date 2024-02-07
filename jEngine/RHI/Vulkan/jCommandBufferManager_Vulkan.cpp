@@ -7,7 +7,7 @@
 //////////////////////////////////////////////////////////////////////////
 bool jCommandBuffer_Vulkan::Begin() const
 {
-    if (!IsEnd)
+    if (!IsClosed)
         return true;
 
     VkCommandBufferBeginInfo beginInfo = {};
@@ -24,20 +24,24 @@ bool jCommandBuffer_Vulkan::Begin() const
     if (!ensure(vkBeginCommandBuffer(CommandBuffer, &beginInfo) == VK_SUCCESS))
         return false;
 
-    IsEnd = false;
+    IsClosed = false;
 
     return true;
 }
 
 bool jCommandBuffer_Vulkan::End() const
 {
-    if (IsEnd)
+    if (IsClosed)
         return true;
+
+#if USE_RESOURCE_BARRIER_BATCHER
+    FlushBarrierBatch();
+#endif // USE_RESOURCE_BARRIER_BATCHER
 
     if (!ensure(vkEndCommandBuffer(CommandBuffer) == VK_SUCCESS))
         return false;
 
-    IsEnd = true;
+    IsClosed = true;
 
     return true;
 }

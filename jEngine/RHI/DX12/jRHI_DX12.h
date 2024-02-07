@@ -370,7 +370,7 @@ public:
 	virtual void RemovePipelineStateInfo(size_t InHash) override;
 
 	virtual std::shared_ptr<jRenderFrameContext> BeginRenderFrame() override;
-	virtual void EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr) override;
+	virtual void EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr) override;
 	virtual jCommandBufferManager_DX12* GetCommandBufferManager() const override { return CommandBufferManager; }
 	virtual jCommandBufferManager_DX12* GetCopyCommandBufferManager() const { return CopyCommandBufferManager; }
 
@@ -453,6 +453,9 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 
 	virtual bool IsSupportVSync() const override;
+
+	jResourceBarrierBatcher_DX12* BarrierBatcher = nullptr;
+	virtual jResourceBarrierBatcher* GetGlobalBarrierBatcher() const override { return BarrierBatcher; }
 };
 
 extern jRHI_DX12* g_rhi_dx12;

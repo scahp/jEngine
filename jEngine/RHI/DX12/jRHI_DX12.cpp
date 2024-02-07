@@ -32,6 +32,7 @@
 #include "jImGui_DX12.h"
 #include "jEngine.h"
 #include "jRaytracingScene_DX12.h"
+#include "jResourceBarrierBatcher_DX12.h"
 
 #define DX12_ENABLE_DEBUG_LAYER 0
 
@@ -422,6 +423,8 @@ bool jRHI_DX12::InitRHI()
 	}
 	//////////////////////////////////////////////////////////////////////////
 
+    BarrierBatcher = new jResourceBarrierBatcher_DX12();
+
 	// 2. Command
 	CommandBufferManager = new jCommandBufferManager_DX12();
 	CommandBufferManager->Initialize(Device, D3D12_COMMAND_LIST_TYPE_DIRECT);
@@ -587,6 +590,8 @@ void jRHI_DX12::ReleaseRHI()
     Swapchain->Release();
     delete Swapchain;
     Swapchain = nullptr;
+
+    delete BarrierBatcher;
 
     Adapter.Reset();
     Factory.Reset();
@@ -978,14 +983,19 @@ std::shared_ptr<jRenderFrameContext> jRHI_DX12::BeginRenderFrame()
 	return renderFrameContextPtr;
 }
 
-void jRHI_DX12::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr)
+void jRHI_DX12::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
 {
 	SCOPE_CPU_PROFILE(EndRenderFrame);
 
-	jCommandBuffer_DX12* CommandBuffer = (jCommandBuffer_DX12*)renderFrameContextPtr->GetActiveCommandBuffer();
+	jCommandBuffer_DX12* CommandBuffer = (jCommandBuffer_DX12*)InRenderFrameContextPtr->GetActiveCommandBuffer();
 
     jSwapchainImage_DX12* CurrentSwapchainImage = (jSwapchainImage_DX12*)Swapchain->GetCurrentSwapchainImage();
+
+#if USE_RESOURCE_BARRIER_BATCHER
+    InRenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(CurrentSwapchainImage->TexturePtr.get(), EResourceLayout::PRESENT_SRC);
+#else
     g_rhi->TransitionLayout(CommandBuffer, CurrentSwapchainImage->TexturePtr.get(), EResourceLayout::PRESENT_SRC);
+#endif // USE_RESOURCE_BARRIER_BATCHER
 
 	CommandBufferManager->ExecuteCommandList(CommandBuffer);
 
@@ -1007,7 +1017,7 @@ void jRHI_DX12::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& rende
 
 	// CurrentFrameIndex = (CurrentFrameIndex + 1) % Swapchain->Images.size();
     CurrentFrameIndex = Swapchain->GetCurrentBackBufferIndex();
-	renderFrameContextPtr->Destroy();
+	InRenderFrameContextPtr->Destroy();
 }
 
 std::shared_ptr<IUniformBufferBlock> jRHI_DX12::CreateUniformBufferBlock(jName InName, jLifeTimeType InLifeTimeType, size_t InSize /*= 0*/) const
@@ -1251,6 +1261,11 @@ void jRHI_DX12::DrawArrays(const std::shared_ptr<jRenderFrameContext>& InRenderF
     auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
     check(CommandBuffer_DX12);
 
+#if USE_RESOURCE_BARRIER_BATCHER
+    BarrierBatcher->Flush(InRenderFrameContext->GetActiveCommandBuffer());
+    CommandBuffer_DX12->FlushBarrierBatch();
+#endif // USE_RESOURCE_BARRIER_BATCHER
+
 	CommandBuffer_DX12->CommandList->DrawInstanced(vertCount, 1, vertStartIndex, 0);
 }
 
@@ -1260,6 +1275,11 @@ void jRHI_DX12::DrawArraysInstanced(const std::shared_ptr<jRenderFrameContext>& 
     auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
     check(CommandBuffer_DX12);
 
+#if USE_RESOURCE_BARRIER_BATCHER
+    BarrierBatcher->Flush(InRenderFrameContext->GetActiveCommandBuffer());
+    CommandBuffer_DX12->FlushBarrierBatch();
+#endif // USE_RESOURCE_BARRIER_BATCHER
+
 	CommandBuffer_DX12->CommandList->DrawInstanced(vertCount, instanceCount, vertStartIndex, 0);
 }
 
@@ -1268,7 +1288,12 @@ void jRHI_DX12::DrawElements(const std::shared_ptr<jRenderFrameContext>& InRende
 {
     auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
     check(CommandBuffer_DX12);
-	
+
+#if USE_RESOURCE_BARRIER_BATCHER
+    BarrierBatcher->Flush(InRenderFrameContext->GetActiveCommandBuffer());
+    CommandBuffer_DX12->FlushBarrierBatch();
+#endif // USE_RESOURCE_BARRIER_BATCHER
+
 	CommandBuffer_DX12->CommandList->DrawIndexedInstanced(indexCount, 1, startIndex, 0, 0);
 }
 
@@ -1277,6 +1302,11 @@ void jRHI_DX12::DrawElementsInstanced(const std::shared_ptr<jRenderFrameContext>
 {
     auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
     check(CommandBuffer_DX12);
+
+#if USE_RESOURCE_BARRIER_BATCHER
+    BarrierBatcher->Flush(InRenderFrameContext->GetActiveCommandBuffer());
+    CommandBuffer_DX12->FlushBarrierBatch();
+#endif // USE_RESOURCE_BARRIER_BATCHER
 
     CommandBuffer_DX12->CommandList->DrawIndexedInstanced(indexCount, instanceCount, startIndex, 0, 0);
 }
@@ -1287,6 +1317,11 @@ void jRHI_DX12::DrawElementsBaseVertex(const std::shared_ptr<jRenderFrameContext
     auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
     check(CommandBuffer_DX12);
 
+#if USE_RESOURCE_BARRIER_BATCHER
+    BarrierBatcher->Flush(InRenderFrameContext->GetActiveCommandBuffer());
+    CommandBuffer_DX12->FlushBarrierBatch();
+#endif // USE_RESOURCE_BARRIER_BATCHER
+
     CommandBuffer_DX12->CommandList->DrawIndexedInstanced(indexCount, 1, startIndex, baseVertexIndex, 0);
 }
 
@@ -1295,6 +1330,11 @@ void jRHI_DX12::DrawElementsInstancedBaseVertex(const std::shared_ptr<jRenderFra
 {
     auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
     check(CommandBuffer_DX12);
+
+#if USE_RESOURCE_BARRIER_BATCHER
+    BarrierBatcher->Flush(InRenderFrameContext->GetActiveCommandBuffer());
+    CommandBuffer_DX12->FlushBarrierBatch();
+#endif // USE_RESOURCE_BARRIER_BATCHER
 
     CommandBuffer_DX12->CommandList->DrawIndexedInstanced(indexCount, instanceCount, startIndex, baseVertexIndex, 0);
 }
@@ -1305,6 +1345,11 @@ void jRHI_DX12::DrawIndirect(const std::shared_ptr<jRenderFrameContext>& InRende
     auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
     check(CommandBuffer_DX12);
 
+#if USE_RESOURCE_BARRIER_BATCHER
+    BarrierBatcher->Flush(InRenderFrameContext->GetActiveCommandBuffer());
+    CommandBuffer_DX12->FlushBarrierBatch();
+#endif // USE_RESOURCE_BARRIER_BATCHER
+
 	check(0);
 }
 
@@ -1313,6 +1358,11 @@ void jRHI_DX12::DrawElementsIndirect(const std::shared_ptr<jRenderFrameContext>&
 {
     auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
     check(CommandBuffer_DX12);
+
+#if USE_RESOURCE_BARRIER_BATCHER
+    BarrierBatcher->Flush(InRenderFrameContext->GetActiveCommandBuffer());
+    CommandBuffer_DX12->FlushBarrierBatch();
+#endif // USE_RESOURCE_BARRIER_BATCHER
 
 	check(0);
 }
@@ -1324,11 +1374,24 @@ void jRHI_DX12::DispatchCompute(const std::shared_ptr<jRenderFrameContext>& InRe
     check(CommandBuffer_DX12->CommandList);
     check(numGroupsX * numGroupsY * numGroupsZ > 0);
 
+#if USE_RESOURCE_BARRIER_BATCHER
+    BarrierBatcher->Flush(InRenderFrameContext->GetActiveCommandBuffer());
+    CommandBuffer_DX12->FlushBarrierBatch();
+#endif // USE_RESOURCE_BARRIER_BATCHER
+
     CommandBuffer_DX12->CommandList->Dispatch(numGroupsX, numGroupsY, numGroupsZ);
 }
 
 void jRHI_DX12::DispatchRay(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jRaytracingDispatchData& InDispatchData) const
 {
+    auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
+    check(CommandBuffer_DX12);
+
+#if USE_RESOURCE_BARRIER_BATCHER
+    BarrierBatcher->Flush(InRenderFrameContext->GetActiveCommandBuffer());
+    CommandBuffer_DX12->FlushBarrierBatch();
+#endif // USE_RESOURCE_BARRIER_BATCHER
+
     D3D12_DISPATCH_RAYS_DESC dispatchDesc{};
     
     auto PipelineState = (jPipelineStateInfo_DX12*)InDispatchData.PipelineState;
@@ -1352,9 +1415,7 @@ void jRHI_DX12::DispatchRay(const std::shared_ptr<jRenderFrameContext>& InRender
     dispatchDesc.Height = InDispatchData.Height;
     dispatchDesc.Depth = InDispatchData.Depth;
 
-    auto CommandBuffer = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
-    check(CommandBuffer);
-    CommandBuffer->CommandList->DispatchRays(&dispatchDesc);
+    CommandBuffer_DX12->CommandList->DispatchRays(&dispatchDesc);
 }
 
 std::shared_ptr<jRenderTarget> jRHI_DX12::CreateRenderTarget(const jRenderTargetInfo& info) const

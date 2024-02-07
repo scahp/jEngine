@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "../jCommandBufferManager.h"
+#include "jResourceBarrierBatcher_DX12.h"
 
 class jFence_DX12;
 
@@ -9,14 +10,7 @@ using namespace DirectX;
 
 struct jCommandBuffer_DX12 : public jCommandBuffer
 {
-    ComPtr<ID3D12CommandAllocator> CommandAllocator;
-    ComPtr<ID3D12GraphicsCommandList4> CommandList;
-    mutable bool IsClosed = false;
-
-    class jOnlineDescriptorHeap_DX12* OnlineDescriptorHeap = nullptr;
-    class jOnlineDescriptorHeap_DX12* OnlineSamplerDescriptorHeap = nullptr;
-
-    ID3D12GraphicsCommandList4* Get()
+    ID3D12GraphicsCommandList4* Get() const
     {
         return CommandList.Get();
     }
@@ -34,10 +28,23 @@ struct jCommandBuffer_DX12 : public jCommandBuffer
     virtual void* GetFenceHandle() const override;
     virtual void SetFence(void* InFence) override;
     virtual jFence* GetFence() const override;
+    virtual bool IsEnd() const override { return IsClosed; }
+    virtual jResourceBarrierBatcher* GetBarrierBatcher() const override { return &BarrierBatcher; }
+    virtual void FlushBarrierBatch() const override { BarrierBatcher.Flush(this); }
 
     const class jCommandBufferManager_DX12* Owner = nullptr;
-    uint64 FenceValue = 0;
     bool IsCompleteForWaitFence();
+
+//private:
+    uint64 FenceValue = 0;
+    ComPtr<ID3D12CommandAllocator> CommandAllocator;
+    ComPtr<ID3D12GraphicsCommandList4> CommandList;
+
+    class jOnlineDescriptorHeap_DX12* OnlineDescriptorHeap = nullptr;
+    class jOnlineDescriptorHeap_DX12* OnlineSamplerDescriptorHeap = nullptr;
+
+    mutable bool IsClosed = false;
+    mutable jResourceBarrierBatcher_DX12 BarrierBatcher;
 };
 
 class jCommandBufferManager_DX12 : public jCommandBufferManager

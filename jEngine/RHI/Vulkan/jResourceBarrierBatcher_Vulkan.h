@@ -30,7 +30,7 @@ public:
     virtual void AddTransition(jBuffer* InBuffer, EResourceLayout InNewLayout) override;
     virtual void AddTransition(jTexture* InTexture, EResourceLayout InNewLayout) override;
 
-    virtual void Flush(jCommandBuffer* InCommandBuffer) override;
+    virtual void Flush(const jCommandBuffer* InCommandBuffer) override;
 
 private:
     std::vector<jBarrier_Vulkan> Barriers;

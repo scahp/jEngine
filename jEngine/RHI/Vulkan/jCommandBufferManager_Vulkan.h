@@ -1,10 +1,12 @@
 ﻿#pragma once
 #include "../jCommandBufferManager.h"
 #include "../jFenceManager.h"
+#include "jResourceBarrierBatcher_Vulkan.h"
 
 class jCommandBuffer_Vulkan : public jCommandBuffer
 {
 public:
+    FORCEINLINE const VkCommandBuffer& GetRef() const { return CommandBuffer; }
     FORCEINLINE VkCommandBuffer& GetRef() { return CommandBuffer; }
     virtual void* GetHandle() const override { return CommandBuffer; }
     virtual void* GetFenceHandle() const override { return Fence ? Fence->GetHandle() : nullptr; }
@@ -19,11 +21,15 @@ public:
     {
         vkResetCommandBuffer(CommandBuffer, 0);
     }
+    virtual bool IsEnd() const override { return IsClosed; }
+    virtual jResourceBarrierBatcher* GetBarrierBatcher() const override { return &BarrierBatcher; }
+    virtual void FlushBarrierBatch() const override { BarrierBatcher.Flush(this); }
 
 private:
     jFence* Fence = nullptr;                        // Fence manager 에서 참조하기 때문에 소멸시키지 않음
     VkCommandBuffer CommandBuffer = nullptr;        // CommandBufferManager 에서 CommandBufferPool 을 해제하여 일시에 소멸시키므로 소멸 처리 없음
-    mutable bool IsEnd = true;
+    mutable bool IsClosed = true;
+    mutable jResourceBarrierBatcher_Vulkan BarrierBatcher;
 };
 
 class jCommandBufferManager_Vulkan : public jCommandBufferManager

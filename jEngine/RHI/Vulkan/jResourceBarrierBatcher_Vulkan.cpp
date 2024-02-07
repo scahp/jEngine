@@ -45,6 +45,8 @@ void jResourceBarrierBatcher_Vulkan::AddTransition(jBuffer* InBuffer, EResourceL
     if (SrcLayout == DstLayout)
         return;
 
+    buffer_vk->Layout = InNewLayout;
+
     auto GetAccessFlagBits = [](VkImageLayout InLayout) -> VkAccessFlagBits
         {
             VkAccessFlagBits AccessFlagBits{};
@@ -123,11 +125,20 @@ void jResourceBarrierBatcher_Vulkan::AddTransition(jBuffer* InBuffer, EResourceL
 void jResourceBarrierBatcher_Vulkan::AddTransition(jTexture* InTexture, EResourceLayout InNewLayout)
 {
     auto texture_vk = (jTexture_Vulkan*)InTexture;
+
+    // VkImageView 가 VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL 를 지원하지 않기 때문에 추가
+    if (texture_vk->IsDepthFormat() && (EResourceLayout::DEPTH_READ_ONLY == InNewLayout || EResourceLayout::SHADER_READ_ONLY == InNewLayout))
+    {
+        InNewLayout = EResourceLayout::DEPTH_STENCIL_READ_ONLY;
+    }
+
     VkImageLayout SrcLayout = GetVulkanImageLayout(InTexture->GetLayout());
     VkImageLayout DstLayout = GetVulkanImageLayout(InNewLayout);
 
     if (SrcLayout == DstLayout)
         return;
+
+    texture_vk->Layout = InNewLayout;
 
     // Layout Transition 에는 image memory barrier 사용
     // Pipeline barrier는 리소스들 간의 synchronize 를 맞추기 위해 사용 (버퍼를 읽기전에 쓰기가 완료되는 것을 보장받기 위해)
@@ -347,7 +358,84 @@ void jResourceBarrierBatcher_Vulkan::AddTransition(jTexture* InTexture, EResourc
     Barriers.emplace_back(BarrierVulkan);
 }
 
-void jResourceBarrierBatcher_Vulkan::Flush(jCommandBuffer* InCommandBuffer)
+void jResourceBarrierBatcher_Vulkan::Flush(const jCommandBuffer* InCommandBuffer)
 {
+#if USE_RESOURCE_BARRIER_BATCHER
+	if (Barriers.empty())
+		return;
 
+    check(InCommandBuffer);
+    check(!InCommandBuffer->IsEnd());
+    auto commandbuffer_vk = (const jCommandBuffer_Vulkan*)InCommandBuffer;
+
+	std::vector<VkBufferMemoryBarrier> BufferBarriers;
+	std::vector<VkImageMemoryBarrier> ImageBarriers;
+	std::vector<VkMemoryBarrier> MemroyBarriers;
+
+    BufferBarriers.reserve(Barriers.size());
+    ImageBarriers.reserve(Barriers.size());
+    MemroyBarriers.reserve(Barriers.size());
+
+    VkPipelineStageFlags SrcStageMask = Barriers[0].SrcStage;
+    VkPipelineStageFlags DstStageMask = Barriers[0].DstStage;
+    for (const auto& Iter : Barriers)
+    {
+        if (Iter.IsBufferBarrier())
+        {
+            BufferBarriers.push_back(Iter.Barrier.BufferBarrier);
+        }
+        else if (Iter.IsImageBarrier())
+        {
+            ImageBarriers.push_back(Iter.Barrier.ImageBarrier);
+        }
+        else if (Iter.IsMemoryBarrier())
+        {
+            MemroyBarriers.push_back(Iter.Barrier.MemroyBarrier);
+        }
+        else
+        {
+            check(0);
+        }
+
+        if (SrcStageMask != Iter.SrcStage && DstStageMask != Iter.DstStage)
+        {
+			vkCmdPipelineBarrier(commandbuffer_vk->GetRef()
+				, SrcStageMask
+				, DstStageMask
+				, 0
+				, (uint32)MemroyBarriers.size(), MemroyBarriers.data()
+				, (uint32)BufferBarriers.size(), BufferBarriers.data()
+				, (uint32)ImageBarriers.size(), ImageBarriers.data()
+			);
+
+			BufferBarriers.clear();
+			ImageBarriers.clear();
+			MemroyBarriers.clear();
+
+            SrcStageMask = Iter.SrcStage;
+            DstStageMask = Iter.DstStage;
+        }
+        else
+        {
+            check(Iter.SrcStage != 0 && Iter.DstStage != 0);
+			SrcStageMask = Iter.SrcStage;
+			DstStageMask = Iter.DstStage;
+        }
+    }
+
+    if (BufferBarriers.size() > 0 || ImageBarriers.size() > 0 || MemroyBarriers.size() > 0)
+    {
+		vkCmdPipelineBarrier(commandbuffer_vk->GetRef()
+			, SrcStageMask
+			, DstStageMask
+			, 0
+			, (uint32)MemroyBarriers.size(), MemroyBarriers.data()
+			, (uint32)BufferBarriers.size(), BufferBarriers.data()
+			, (uint32)ImageBarriers.size(), ImageBarriers.data()
+		);
+    }
+    Barriers.clear();
+#else
+    check(Barriers.size() == 0);
+#endif // USE_RESOURCE_BARRIER_BATCHER
 }

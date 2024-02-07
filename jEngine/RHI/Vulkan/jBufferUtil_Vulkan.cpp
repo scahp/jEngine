@@ -346,14 +346,23 @@ std::shared_ptr<jBuffer_Vulkan> CreateBuffer(EVulkanBufferBits InUsage, EVulkanM
 
     if (BufferPtr->Layout != InResourceLayout)
     {
+#if USE_RESOURCE_BARRIER_BATCHER
+		g_rhi->GetGlobalBarrierBatcher()->AddTransition(BufferPtr.get(), InResourceLayout);
+#else
         g_rhi->TransitionLayoutImmediate(BufferPtr.get(), InResourceLayout);
+#endif // USE_RESOURCE_BARRIER_BATCHER
     }
 
     return BufferPtr;
 }
 
-void CopyBufferToTexture(VkCommandBuffer commandBuffer, VkBuffer buffer, uint64 bufferOffset, VkImage image, uint32 width, uint32 height, int32 miplevel, int32 layerIndex)
+void CopyBufferToTexture(jCommandBuffer_Vulkan* commandBuffer_vk, VkBuffer buffer, uint64 bufferOffset, VkImage image, uint32 width, uint32 height, int32 miplevel, int32 layerIndex)
 {
+    check(commandBuffer_vk);
+#if USE_RESOURCE_BARRIER_BATCHER
+    commandBuffer_vk->FlushBarrierBatch();
+#endif // USE_RESOURCE_BARRIER_BATCHER
+
     VkBufferImageCopy region = {};
     region.bufferOffset = bufferOffset;
 
@@ -369,14 +378,20 @@ void CopyBufferToTexture(VkCommandBuffer commandBuffer, VkBuffer buffer, uint64 
     region.imageOffset = { 0, 0, 0 };
     region.imageExtent = { width, height, 1 };
 
-    vkCmdCopyBufferToImage(commandBuffer, buffer, image
+    vkCmdCopyBufferToImage(commandBuffer_vk->GetRef(), buffer, image
         , VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL		// image가 현재 어떤 레이아웃으로 사용되는지 명세
         , 1, &region);
 }
 
-void GenerateMipmaps(VkCommandBuffer commandBuffer, VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32 mipLevels, uint32 layerCount
+void GenerateMipmaps(jCommandBuffer_Vulkan* commandBuffer_vk, VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32 mipLevels, uint32 layerCount
     , VkImageLayout oldLayout, VkImageLayout newLayout)
 {
+    check(commandBuffer_vk);
+#if USE_RESOURCE_BARRIER_BATCHER
+    commandBuffer_vk->FlushBarrierBatch();
+#endif // USE_RESOURCE_BARRIER_BATCHER
+
+
     for (uint32 k = 0; k < layerCount; ++k)
     {
         VkImageMemoryBarrier barrier = { };
@@ -399,7 +414,7 @@ void GenerateMipmaps(VkCommandBuffer commandBuffer, VkImage image, VkFormat imag
             barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
             barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
 
-            vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0
+            vkCmdPipelineBarrier(commandBuffer_vk->GetRef(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0
                 , 0, nullptr
                 , 0, nullptr
                 , 1, &barrier);
@@ -420,14 +435,14 @@ void GenerateMipmaps(VkCommandBuffer commandBuffer, VkImage image, VkFormat imag
 
             // 멀티샘플된 source or dest image는 사용할 수 없으며, 그러려면 vkCmdResolveImage를 사용해야함.
             // 만약 VK_FILTER_LINEAR를 사용한다면, vkCmdBlitImage를 사용하기 위해서 VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT 를 srcImage가 포함해야함.
-            vkCmdBlitImage(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
+            vkCmdBlitImage(commandBuffer_vk->GetRef(), image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
                 , image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
 
             barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
             barrier.newLayout = newLayout;
             barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
             barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-            vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0
+            vkCmdPipelineBarrier(commandBuffer_vk->GetRef(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0
                 , 0, nullptr
                 , 0, nullptr
                 , 1, &barrier);
@@ -443,34 +458,39 @@ void GenerateMipmaps(VkCommandBuffer commandBuffer, VkImage image, VkFormat imag
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-        vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0
+        vkCmdPipelineBarrier(commandBuffer_vk->GetRef(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0
             , 0, nullptr
             , 0, nullptr
             , 1, &barrier);
     }
 }
 
-void CopyBuffer(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VkDeviceSize srcOffset, VkDeviceSize dstOffset)
+void CopyBuffer(jCommandBuffer_Vulkan* commandBuffer_vk, VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VkDeviceSize srcOffset, VkDeviceSize dstOffset)
 {
+    check(commandBuffer_vk);
+#if USE_RESOURCE_BARRIER_BATCHER
+    commandBuffer_vk->FlushBarrierBatch();
+#endif // USE_RESOURCE_BARRIER_BATCHER
+
     // VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT : 커맨드버퍼를 1번만 쓰고, 복사가 다 될때까지 기다리기 위해서 사용
 
     VkBufferCopy copyRegion = {};
     copyRegion.srcOffset = srcOffset;		// Optional
     copyRegion.dstOffset = dstOffset;		// Optional
     copyRegion.size = size;			// 여기서는 VK_WHOLE_SIZE 사용 불가
-    vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+    vkCmdCopyBuffer(commandBuffer_vk->GetRef(), srcBuffer, dstBuffer, 1, &copyRegion);
 }
 
-void CopyBuffer(VkCommandBuffer commandBuffer, const jBuffer_Vulkan& srcBuffer, const jBuffer_Vulkan& dstBuffer, VkDeviceSize size)
+void CopyBuffer(jCommandBuffer_Vulkan* commandBuffer_vk, const jBuffer_Vulkan& srcBuffer, const jBuffer_Vulkan& dstBuffer, VkDeviceSize size)
 {
     check(srcBuffer.AllocatedSize >= size && dstBuffer.AllocatedSize >= size);
-    CopyBuffer(commandBuffer, srcBuffer.Buffer, dstBuffer.Buffer, size, srcBuffer.Offset, dstBuffer.Offset);
+    CopyBuffer(commandBuffer_vk, srcBuffer.Buffer, dstBuffer.Buffer, size, srcBuffer.Offset, dstBuffer.Offset);
 }
 
 void CopyBufferToTexture(VkBuffer buffer, uint64 bufferOffset, VkImage image, uint32 width, uint32 height, int32 miplevel, int32 layerIndex)
 {
     auto commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
-    CopyBufferToTexture(commandBuffer->GetRef(), buffer, bufferOffset, image, width, height, miplevel, layerIndex);
+    CopyBufferToTexture(commandBuffer, buffer, bufferOffset, image, width, height, miplevel, layerIndex);
     g_rhi_vk->EndSingleTimeCommands(commandBuffer);
 }
 
@@ -483,7 +503,7 @@ void GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int3
     //    return false;
 
     auto commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
-    GenerateMipmaps(commandBuffer->GetRef(), image, imageFormat, texWidth, texHeight, mipLevels, layerCount, oldLayout, newLayout);
+    GenerateMipmaps(commandBuffer, image, imageFormat, texWidth, texHeight, mipLevels, layerCount, oldLayout, newLayout);
     g_rhi_vk->EndSingleTimeCommands(commandBuffer);
 }
 
@@ -491,7 +511,7 @@ void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VkDev
 {
      // 임시 커맨드 버퍼를 통해서 메모리를 전송함.
     auto commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
-    CopyBuffer(commandBuffer->GetRef(), srcBuffer, dstBuffer, size, srcOffset, dstOffset);
+    CopyBuffer(commandBuffer, srcBuffer, dstBuffer, size, srcOffset, dstOffset);
     g_rhi_vk->EndSingleTimeCommands(commandBuffer);
 }
 
@@ -499,7 +519,7 @@ void CopyBuffer(const jBuffer_Vulkan& srcBuffer, const jBuffer_Vulkan& dstBuffer
 {
     check(srcBuffer.AllocatedSize >= size && dstBuffer.AllocatedSize >= size);
     auto commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
-    CopyBuffer(commandBuffer->GetRef(), srcBuffer.Buffer, dstBuffer.Buffer, size, srcBuffer.Offset, dstBuffer.Offset);
+    CopyBuffer(commandBuffer, srcBuffer.Buffer, dstBuffer.Buffer, size, srcBuffer.Offset, dstBuffer.Offset);
     g_rhi_vk->EndSingleTimeCommands(commandBuffer);
 }
 

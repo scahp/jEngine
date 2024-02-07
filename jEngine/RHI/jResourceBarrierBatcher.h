@@ -16,5 +16,5 @@ public:
     virtual void AddTransition(jBuffer* InBuffer, EResourceLayout InNewLayout) = 0;
     virtual void AddTransition(jTexture* InTexture, EResourceLayout InNewLayout) = 0;
 
-    virtual void Flush(jCommandBuffer* InCommandBuffer) = 0;
+    virtual void Flush(const jCommandBuffer* InCommandBuffer) = 0;
 };

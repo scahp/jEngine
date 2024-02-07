@@ -38,6 +38,8 @@ void jResourceBarrierBatcher_DX12::AddTransition(jBuffer* InBuffer, EResourceLay
     if (SrcLayout == DstLayout)
         return;
 
+    Buffer_DX12->Layout = InNewLayout;
+
     AddTransition_Internal(Buffer_DX12->Buffer->Get(), SrcLayout, DstLayout);
 }
 
@@ -54,10 +56,24 @@ void jResourceBarrierBatcher_DX12::AddTransition(jTexture* InTexture, EResourceL
     if (SrcLayout == DstLayout)
         return;
 
+    Texture_DX12->Layout = InNewLayout;
+
     AddTransition_Internal(Texture_DX12->Texture->Get(), SrcLayout, DstLayout);
 }
 
-void jResourceBarrierBatcher_DX12::Flush(jCommandBuffer* InCommandBuffer)
+void jResourceBarrierBatcher_DX12::Flush(const jCommandBuffer* InCommandBuffer)
 {
+#if USE_RESOURCE_BARRIER_BATCHER
+    if (Barriers.empty())
+        return;
 
+    check(InCommandBuffer);
+    check(!InCommandBuffer->IsEnd());
+    
+    auto CommandBuffer_DX12 = (const jCommandBuffer_DX12*)InCommandBuffer;
+    CommandBuffer_DX12->CommandList->ResourceBarrier((uint32)Barriers.size(), Barriers.data());
+    Barriers.clear();
+#else
+    check(Barriers.size() == 0);
+#endif // USE_RESOURCE_BARRIER_BATCHER
 }

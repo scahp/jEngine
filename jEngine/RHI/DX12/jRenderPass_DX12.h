@@ -33,14 +33,14 @@ public:
         //commandBuffer->CommandList->ClearRenderTargetView(InTempRTV, clearColor, 0, nullptr);
         //return true;
 
-        commandBuffer->CommandList->OMSetRenderTargets((uint32)RTVCPUHandles.size(), &RTVCPUHandles[0], false, &DSVCPUDHandle);
+        commandBuffer->Get()->OMSetRenderTargets((uint32)RTVCPUHandles.size(), &RTVCPUHandles[0], false, &DSVCPUDHandle);
 
         for (int32 i = 0; i < RTVClears.size(); ++i)
         {
             if (RTVClears[i].GetType() != ERTClearType::Color)
                 continue;
 
-            commandBuffer->CommandList->ClearRenderTargetView(RTVCPUHandles[i], RTVClears[i].GetCleraColor(), 0, nullptr);
+            commandBuffer->Get()->ClearRenderTargetView(RTVCPUHandles[i], RTVClears[i].GetCleraColor(), 0, nullptr);
         }
 
         
@@ -55,7 +55,7 @@ public:
                 if (DSVStencilClear)
                     DSVClearFlags |= D3D12_CLEAR_FLAG_STENCIL;
 
-                commandBuffer->CommandList->ClearDepthStencilView(DSVCPUDHandle, DSVClearFlags, DSVClear.GetCleraDepth(), (uint8)DSVClear.GetCleraStencil(), 0, nullptr);
+                commandBuffer->Get()->ClearDepthStencilView(DSVCPUDHandle, DSVClearFlags, DSVClear.GetCleraDepth(), (uint8)DSVClear.GetCleraStencil(), 0, nullptr);
             }
         }
 

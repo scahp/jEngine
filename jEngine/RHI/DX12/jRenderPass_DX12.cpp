@@ -23,6 +23,11 @@ bool jRenderPass_DX12::BeginRenderPass(const jCommandBuffer* commandBuffer)
     if (!ensure(commandBuffer))
         return false;
 
+#if USE_RESOURCE_BARRIER_BATCHER
+    g_rhi->GetGlobalBarrierBatcher()->Flush(commandBuffer);
+    commandBuffer->FlushBarrierBatch();
+#endif // USE_RESOURCE_BARRIER_BATCHER
+
     CommandBuffer = (const jCommandBuffer_DX12*)commandBuffer;
 
     if (RTVCPUHandles.size() > 0)

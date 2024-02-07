@@ -416,7 +416,7 @@ public:
 	virtual void Flush() const {}
 	virtual void Finish() const {}
 	virtual std::shared_ptr<jRenderFrameContext> BeginRenderFrame() { return nullptr; }
-    virtual void EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr) {}
+    virtual void EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr) {}
 	virtual void QueueSubmit(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr, class jSemaphore* InSignalSemaphore) {}
 
 	virtual jRasterizationStateInfo* CreateRasterizationState(const jRasterizationStateInfo& initializer) const { return nullptr; }
@@ -556,6 +556,8 @@ public:
 	virtual void RemoveRenderPassByHash(const std::vector<uint64>& InRelatedRenderPassHashes) const {}
 	
 	virtual float GetCurrentMonitorDPIScale() const { return 1.0f; }
+
+	virtual jResourceBarrierBatcher* GetGlobalBarrierBatcher() const { return nullptr; }
 };
 
 // Not thred safe

@@ -157,7 +157,11 @@ std::shared_ptr<jBuffer_DX12> CreateBuffer(uint64 InSize, uint64 InAlignment, EB
 
     if (BufferPtr->Layout != InLayout)
     {
+#if USE_RESOURCE_BARRIER_BATCHER
+        g_rhi->GetGlobalBarrierBatcher()->AddTransition(BufferPtr.get(), InLayout);
+#else
         g_rhi->TransitionLayoutImmediate(BufferPtr.get(), InLayout);
+#endif // USE_RESOURCE_BARRIER_BATCHER
     }
 
     return BufferPtr;

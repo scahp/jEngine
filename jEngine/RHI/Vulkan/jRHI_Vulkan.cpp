@@ -32,6 +32,8 @@
 #include "Scene/Light/jLight.h"
 #include "../DX12/jShaderCompiler_DX12.h"
 #include "jRaytracingScene_Vulkan.h"
+#include "jResourceBarrierBatcher_Vulkan.h"
+#include "../jResourceBarrierBatcher.h"
 
 jRHI_Vulkan* g_rhi_vk = nullptr;
 robin_hood::unordered_map<size_t, jShaderBindingLayout*> jRHI_Vulkan::ShaderBindingPool;
@@ -401,6 +403,8 @@ bool jRHI_Vulkan::InitRHI()
 
 	MemoryPool = new jMemoryPool_Vulkan();
 
+	BarrierBatcher = new jResourceBarrierBatcher_Vulkan();
+
 	// Get vkCmdBindShadingRateImageNV function pointer for VRS
 	vkCmdBindShadingRateImageNV = reinterpret_cast<PFN_vkCmdBindShadingRateImageNV>(vkGetDeviceProcAddr(Device, "vkCmdBindShadingRateImageNV"));
 
@@ -608,6 +612,8 @@ void jRHI_Vulkan::ReleaseRHI()
 	vkDestroyPipelineCache(Device, PipelineCache, nullptr);
 	FenceManager.Release();
 	SemaphoreManager.Release();
+
+	delete BarrierBatcher;
 
 	if (Device)
 	{
@@ -1145,36 +1151,66 @@ jBlendingStateInfo* jRHI_Vulkan::CreateBlendingState(const jBlendingStateInfo& i
 
 void jRHI_Vulkan::DrawArrays(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 vertStartIndex, int32 vertCount) const
 {
-    check(InRenderFrameContext);
+	check(InRenderFrameContext);
     check(InRenderFrameContext->GetActiveCommandBuffer());
+
+#if USE_RESOURCE_BARRIER_BATCHER
+    BarrierBatcher->Flush(InRenderFrameContext->GetActiveCommandBuffer());
+	InRenderFrameContext->GetActiveCommandBuffer()->FlushBarrierBatch();
+#endif // USE_RESOURCE_BARRIER_BATCHER
+
 	vkCmdDraw((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), vertCount, 1, vertStartIndex, 0);
 }
 
 void jRHI_Vulkan::DrawArraysInstanced(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 vertStartIndex, int32 vertCount, int32 instanceCount) const
 {
-    check(InRenderFrameContext);
+	check(InRenderFrameContext);
     check(InRenderFrameContext->GetActiveCommandBuffer());
+
+#if USE_RESOURCE_BARRIER_BATCHER
+    BarrierBatcher->Flush(InRenderFrameContext->GetActiveCommandBuffer());
+    InRenderFrameContext->GetActiveCommandBuffer()->FlushBarrierBatch();
+#endif // USE_RESOURCE_BARRIER_BATCHER
+
 	vkCmdDraw((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), vertCount, instanceCount, vertStartIndex, 0);
 }
 
 void jRHI_Vulkan::DrawElements(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 indexCount) const
 {
-    check(InRenderFrameContext);
+	check(InRenderFrameContext);
     check(InRenderFrameContext->GetActiveCommandBuffer());
+
+#if USE_RESOURCE_BARRIER_BATCHER
+    BarrierBatcher->Flush(InRenderFrameContext->GetActiveCommandBuffer());
+    InRenderFrameContext->GetActiveCommandBuffer()->FlushBarrierBatch();
+#endif // USE_RESOURCE_BARRIER_BATCHER
+
 	vkCmdDrawIndexed((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), indexCount, 1, startIndex, 0, 0);
 }
 
 void jRHI_Vulkan::DrawElementsInstanced(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 indexCount, int32 instanceCount) const
 {
-    check(InRenderFrameContext);
+	check(InRenderFrameContext);
     check(InRenderFrameContext->GetActiveCommandBuffer());
+
+#if USE_RESOURCE_BARRIER_BATCHER
+    BarrierBatcher->Flush(InRenderFrameContext->GetActiveCommandBuffer());
+    InRenderFrameContext->GetActiveCommandBuffer()->FlushBarrierBatch();
+#endif // USE_RESOURCE_BARRIER_BATCHER
+
 	vkCmdDrawIndexed((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), indexCount, instanceCount, startIndex, 0, 0);
 }
 
 void jRHI_Vulkan::DrawElementsBaseVertex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 indexCount, int32 baseVertexIndex) const
 {
-    check(InRenderFrameContext);
+	check(InRenderFrameContext);
     check(InRenderFrameContext->GetActiveCommandBuffer());
+
+#if USE_RESOURCE_BARRIER_BATCHER
+    BarrierBatcher->Flush(InRenderFrameContext->GetActiveCommandBuffer());
+    InRenderFrameContext->GetActiveCommandBuffer()->FlushBarrierBatch();
+#endif // USE_RESOURCE_BARRIER_BATCHER
+
 	vkCmdDrawIndexed((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), indexCount, 1, startIndex, baseVertexIndex, 0);
 }
 
@@ -1182,14 +1218,26 @@ void jRHI_Vulkan::DrawElementsInstancedBaseVertex(const std::shared_ptr<jRenderF
 {
 	check(InRenderFrameContext);
 	check(InRenderFrameContext->GetActiveCommandBuffer());
+
+#if USE_RESOURCE_BARRIER_BATCHER
+    BarrierBatcher->Flush(InRenderFrameContext->GetActiveCommandBuffer());
+    InRenderFrameContext->GetActiveCommandBuffer()->FlushBarrierBatch();
+#endif // USE_RESOURCE_BARRIER_BATCHER
+
 	vkCmdDrawIndexed((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), indexCount, instanceCount, startIndex, baseVertexIndex, 0);
 }
 
 void jRHI_Vulkan::DrawIndirect(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, jBuffer* buffer, int32 startIndex, int32 drawCount) const
 {
-    check(InRenderFrameContext);
+	check(InRenderFrameContext);
     check(InRenderFrameContext->GetActiveCommandBuffer());
-    vkCmdDrawIndirect((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), (VkBuffer)buffer->GetHandle()
+
+#if USE_RESOURCE_BARRIER_BATCHER
+    BarrierBatcher->Flush(InRenderFrameContext->GetActiveCommandBuffer());
+    InRenderFrameContext->GetActiveCommandBuffer()->FlushBarrierBatch();
+#endif // USE_RESOURCE_BARRIER_BATCHER
+	
+	vkCmdDrawIndirect((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), (VkBuffer)buffer->GetHandle()
         , startIndex * sizeof(VkDrawIndirectCommand), drawCount, sizeof(VkDrawIndirectCommand));
 }
 
@@ -1198,6 +1246,12 @@ void jRHI_Vulkan::DrawElementsIndirect(const std::shared_ptr<jRenderFrameContext
 {
     check(InRenderFrameContext);
     check(InRenderFrameContext->GetActiveCommandBuffer());
+
+#if USE_RESOURCE_BARRIER_BATCHER
+    BarrierBatcher->Flush(InRenderFrameContext->GetActiveCommandBuffer());
+    InRenderFrameContext->GetActiveCommandBuffer()->FlushBarrierBatch();
+#endif // USE_RESOURCE_BARRIER_BATCHER
+
 	vkCmdDrawIndexedIndirect((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), (VkBuffer)buffer->GetHandle()
 		, startIndex * sizeof(VkDrawIndexedIndirectCommand), drawCount, sizeof(VkDrawIndexedIndirectCommand));
 }
@@ -1206,6 +1260,12 @@ void jRHI_Vulkan::DispatchCompute(const std::shared_ptr<jRenderFrameContext>& In
 {
     check(InRenderFrameContext);
     check(InRenderFrameContext->GetActiveCommandBuffer());
+
+#if USE_RESOURCE_BARRIER_BATCHER
+    BarrierBatcher->Flush(InRenderFrameContext->GetActiveCommandBuffer());
+    InRenderFrameContext->GetActiveCommandBuffer()->FlushBarrierBatch();
+#endif // USE_RESOURCE_BARRIER_BATCHER
+
 	vkCmdDispatch((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), numGroupsX, numGroupsY, numGroupsZ);
 }
 
@@ -1213,6 +1273,11 @@ void jRHI_Vulkan::DispatchRay(const std::shared_ptr<jRenderFrameContext>& InRend
 {
     check(InRenderFrameContext);
     check(InRenderFrameContext->GetActiveCommandBuffer());
+
+#if USE_RESOURCE_BARRIER_BATCHER
+    BarrierBatcher->Flush(InRenderFrameContext->GetActiveCommandBuffer());
+    InRenderFrameContext->GetActiveCommandBuffer()->FlushBarrierBatch();
+#endif // USE_RESOURCE_BARRIER_BATCHER
 
 	auto PipelineState_Vulkan = (jPipelineStateInfo_Vulkan*)InDispatchData.PipelineState;
 	check(PipelineState_Vulkan);
@@ -1319,11 +1384,13 @@ std::shared_ptr<jTexture> jRHI_Vulkan::Create2DTexture(uint32 InWidth, uint32 In
 	VkImageCreateFlagBits ImageCreateFlags{};
 	const VkMemoryPropertyFlagBits PropertyFlagBits = GetMemoryPropertyFlagBits(InTextureCreateFlag);
 	const VkImageUsageFlags UsageFlag = GetImageUsageFlags(InTextureCreateFlag);
+	const VkImageLayout InitialImageLayout = (InImageBulkData.ImageData.size() > 0) ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_PREINITIALIZED;
 	check(!IsDepthFormat(InFormat) || (IsDepthFormat(InFormat) && (UsageFlag & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)));
+
 
 	// If there is Image or Depth bit, it should be initialized VK_IMAGE_LAYOUT_PREINITIALIZED, if not, VK_IMAGE_LAYOUT_UNDEFINED
 	auto TexturePtr = jBufferUtil_Vulkan::Create2DTexture(InWidth, InHeight, InMipLevels, VK_SAMPLE_COUNT_1_BIT, GetVulkanTextureFormat(InFormat), VK_IMAGE_TILING_OPTIMAL
-		, UsageFlag, PropertyFlagBits, ImageCreateFlags, VK_IMAGE_LAYOUT_PREINITIALIZED); 
+		, UsageFlag, PropertyFlagBits, ImageCreateFlags, InitialImageLayout);
 
 	if (InImageBulkData.ImageData.size() > 0)
 	{
@@ -1334,7 +1401,11 @@ std::shared_ptr<jTexture> jRHI_Vulkan::Create2DTexture(uint32 InWidth, uint32 In
         stagingBufferPtr->UpdateBuffer(&InImageBulkData.ImageData[0], InImageBulkData.ImageData.size());
 
         auto commandBuffer = BeginSingleTimeCommands();
+#if USE_RESOURCE_BARRIER_BATCHER
+		commandBuffer->GetBarrierBatcher()->AddTransition(TexturePtr.get(), EResourceLayout::TRANSFER_DST);
+#else
         ensure(TransitionLayout(commandBuffer, TexturePtr.get(), EResourceLayout::TRANSFER_DST));
+#endif // USE_RESOURCE_BARRIER_BATCHER
 
         if (InImageBulkData.SubresourceFootprints.size() > 0)
         {
@@ -1342,16 +1413,20 @@ std::shared_ptr<jTexture> jRHI_Vulkan::Create2DTexture(uint32 InWidth, uint32 In
             {
                 const jImageSubResourceData SubResourceData = InImageBulkData.SubresourceFootprints[i];
 
-                jBufferUtil_Vulkan::CopyBufferToTexture(commandBuffer->GetRef(), stagingBufferPtr->Buffer, stagingBufferPtr->Offset + SubResourceData.Offset, TexturePtr->Image
+                jBufferUtil_Vulkan::CopyBufferToTexture(commandBuffer, stagingBufferPtr->Buffer, stagingBufferPtr->Offset + SubResourceData.Offset, TexturePtr->Image
                     , SubResourceData.Width, SubResourceData.Height, SubResourceData.MipLevel, SubResourceData.Depth);
             }
         }
         else
         {
-            jBufferUtil_Vulkan::CopyBufferToTexture(commandBuffer->GetRef(), stagingBufferPtr->Buffer, stagingBufferPtr->Offset, TexturePtr->Image, InWidth, InHeight);
+            jBufferUtil_Vulkan::CopyBufferToTexture(commandBuffer, stagingBufferPtr->Buffer, stagingBufferPtr->Offset, TexturePtr->Image, InWidth, InHeight);
         }
 
+#if USE_RESOURCE_BARRIER_BATCHER
+		commandBuffer->GetBarrierBatcher()->AddTransition(TexturePtr.get(), InImageLayout);
+#else
         ensure(TransitionLayout(commandBuffer, TexturePtr.get(), InImageLayout));
+#endif // USE_RESOURCE_BARRIER_BATCHER
 
         EndSingleTimeCommands(commandBuffer);
 	}
@@ -1365,11 +1440,12 @@ std::shared_ptr<jTexture> jRHI_Vulkan::CreateCubeTexture(uint32 InWidth, uint32 
 	VkImageCreateFlagBits ImageCreateFlags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
     const VkMemoryPropertyFlagBits PropertyFlagBits = GetMemoryPropertyFlagBits(InTextureCreateFlag);
     const VkImageUsageFlags UsageFlag = GetImageUsageFlags(InTextureCreateFlag);
+	const VkImageLayout InitialImageLayout = (InImageBulkData.ImageData.size() > 0) ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_PREINITIALIZED;
     check(!IsDepthFormat(InFormat) || (IsDepthFormat(InFormat) && (UsageFlag & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)));
 
 	// If there is Image or Depth bit, it should be initialized VK_IMAGE_LAYOUT_PREINITIALIZED, if not, VK_IMAGE_LAYOUT_UNDEFINED
 	auto TexturePtr = jBufferUtil_Vulkan::CreateCubeTexture(InWidth, InHeight, InMipLevels, VK_SAMPLE_COUNT_1_BIT, GetVulkanTextureFormat(InFormat), VK_IMAGE_TILING_OPTIMAL
-		, UsageFlag, PropertyFlagBits, ImageCreateFlags, VK_IMAGE_LAYOUT_PREINITIALIZED);
+		, UsageFlag, PropertyFlagBits, ImageCreateFlags, InitialImageLayout);
 
     if (InImageBulkData.ImageData.size() > 0)
     {
@@ -1380,7 +1456,11 @@ std::shared_ptr<jTexture> jRHI_Vulkan::CreateCubeTexture(uint32 InWidth, uint32 
         stagingBufferPtr->UpdateBuffer(&InImageBulkData.ImageData[0], InImageBulkData.ImageData.size());
 
         auto commandBuffer = BeginSingleTimeCommands();
+#if USE_RESOURCE_BARRIER_BATCHER
+		commandBuffer->GetBarrierBatcher()->AddTransition(TexturePtr.get(), EResourceLayout::TRANSFER_DST);
+#else
         ensure(TransitionLayout(commandBuffer, TexturePtr.get(), EResourceLayout::TRANSFER_DST));
+#endif // USE_RESOURCE_BARRIER_BATCHER
 
         if (InImageBulkData.SubresourceFootprints.size() > 0)
         {
@@ -1388,16 +1468,20 @@ std::shared_ptr<jTexture> jRHI_Vulkan::CreateCubeTexture(uint32 InWidth, uint32 
             {
                 const jImageSubResourceData SubResourceData = InImageBulkData.SubresourceFootprints[i];
 
-                jBufferUtil_Vulkan::CopyBufferToTexture(commandBuffer->GetRef(), stagingBufferPtr->Buffer, stagingBufferPtr->Offset + SubResourceData.Offset, TexturePtr->Image
+                jBufferUtil_Vulkan::CopyBufferToTexture(commandBuffer, stagingBufferPtr->Buffer, stagingBufferPtr->Offset + SubResourceData.Offset, TexturePtr->Image
                     , SubResourceData.Width, SubResourceData.Height, SubResourceData.MipLevel, SubResourceData.Depth);
             }
         }
         else
         {
-            jBufferUtil_Vulkan::CopyBufferToTexture(commandBuffer->GetRef(), stagingBufferPtr->Buffer, stagingBufferPtr->Offset, TexturePtr->Image, InWidth, InHeight);
+            jBufferUtil_Vulkan::CopyBufferToTexture(commandBuffer, stagingBufferPtr->Buffer, stagingBufferPtr->Offset, TexturePtr->Image, InWidth, InHeight);
         }
 
+#if USE_RESOURCE_BARRIER_BATCHER
+		commandBuffer->GetBarrierBatcher()->AddTransition(TexturePtr.get(), InImageLayout);
+#else
         ensure(TransitionLayout(commandBuffer, TexturePtr.get(), InImageLayout));
+#endif // USE_RESOURCE_BARRIER_BATCHER
 
         EndSingleTimeCommands(commandBuffer);
     }
@@ -2226,9 +2310,13 @@ jTexture* jRHI_Vulkan::CreateSampleVRSTexture()
 		auto stagingBufferPtr = jBufferUtil_Vulkan::CreateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT, imageSize, EResourceLayout::TRANSFER_SRC);
 
 		auto commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
+#if USE_RESOURCE_BARRIER_BATCHER
+		commandBuffer->GetBarrierBatcher()->AddTransition(SampleVRSTexturePtr.get(), EResourceLayout::TRANSFER_DST);
+#else
         ensure(g_rhi_vk->TransitionLayout(commandBuffer->GetRef(), (VkImage)SampleVRSTexturePtr->GetHandle(), GetVulkanTextureFormat(ETextureFormat::R8UI), 1, 1, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
+#endif // USE_RESOURCE_BARRIER_BATCHER
 
-        jBufferUtil_Vulkan::CopyBufferToTexture(commandBuffer->GetRef(), stagingBufferPtr->Buffer, stagingBufferPtr->Offset, (VkImage)SampleVRSTexturePtr->GetHandle()
+        jBufferUtil_Vulkan::CopyBufferToTexture(commandBuffer, stagingBufferPtr->Buffer, stagingBufferPtr->Offset, (VkImage)SampleVRSTexturePtr->GetHandle()
             , static_cast<uint32>(imageExtent.width), static_cast<uint32>(imageExtent.height));
 
         // Create a circular pattern with decreasing sampling rates outwards (max. range, pattern)

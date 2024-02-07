@@ -85,9 +85,16 @@ void jRenderer::AtmosphericShadow()
 		auto ShadowMapTexture = RenderFrameContextPtr->SceneRenderTargetPtr->GetShadowMap(DirectionalLight)->GetTexture();
 		check(ShadowMapTexture);
 
+#if USE_RESOURCE_BARRIER_BATCHER
+		RenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+		RenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(ShadowMapTexture, EResourceLayout::SHADER_READ_ONLY);
+		RenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(AtmosphericShadowing->GetTexture(), EResourceLayout::UAV);
+
+#else
 		g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
 		g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), ShadowMapTexture, EResourceLayout::SHADER_READ_ONLY);
 		g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), AtmosphericShadowing->GetTexture(), EResourceLayout::UAV);
+#endif // USE_RESOURCE_BARRIER_BATCHER
 
 		// Binding 0
 		{
@@ -157,7 +164,11 @@ void jRenderer::AtmosphericShadow()
 		int32 Y = (Height / 16) + ((Height % 16) ? 1 : 0);
 		g_rhi->DispatchCompute(RenderFrameContextPtr, X, Y, 1);
 
+#if USE_RESOURCE_BARRIER_BATCHER
+        RenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(AtmosphericShadowing->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+#else
 		g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), AtmosphericShadowing->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+#endif // USE_RESOURCE_BARRIER_BATCHER
 	}
 
 	if (EnableAtmosphericShadowing)
@@ -165,7 +176,11 @@ void jRenderer::AtmosphericShadow()
 		std::shared_ptr<jRenderTarget> AtmosphericShadowing = RenderFrameContextPtr->SceneRenderTargetPtr->AtmosphericShadowing;
 
 		auto RT = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr;
+#if USE_RESOURCE_BARRIER_BATCHER
+        RenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(RT->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
+#else
 		g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RT->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
+#endif // USE_RESOURCE_BARRIER_BATCHER
 
 		jRasterizationStateInfo* RasterizationState = nullptr;
 		switch (g_rhi->GetSelectedMSAASamples())
@@ -222,6 +237,7 @@ void jRenderer::AtmosphericShadow()
 		ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
 			, ResourceInlineAllactor.Alloc<jTextureResource>(AtmosphericShadowing->GetTexture(), SamplerState)));
 
+		RenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->Flush(RenderFrameContextPtr->GetActiveCommandBuffer());
 		std::shared_ptr<jShaderBindingInstance> ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
 		jShaderBindingInstanceArray ShaderBindingInstanceArray;
 		ShaderBindingInstanceArray.Add(ShaderBindingInstance.get());

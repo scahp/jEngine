@@ -303,6 +303,9 @@ public:
 	virtual void RemoveRenderPassByHash(const std::vector<uint64>& InRelatedRenderPassHashes) const override;
 
 	virtual float GetCurrentMonitorDPIScale() const override;
+
+	jResourceBarrierBatcher_Vulkan* BarrierBatcher = nullptr;
+	virtual jResourceBarrierBatcher* GetGlobalBarrierBatcher() const override { return BarrierBatcher; }
 };
 
 extern jRHI_Vulkan* g_rhi_vk;

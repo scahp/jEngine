@@ -53,11 +53,19 @@ std::shared_ptr<jTexture> ReprojectionAO(const std::shared_ptr<jRenderFrameConte
                         , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
                         , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
 
+#if USE_RESOURCE_BARRIER_BATCHER
+                    InRenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(jSceneRenderTarget::HistoryBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
+                    InRenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(InTexture.get(), EResourceLayout::SHADER_READ_ONLY);
+                    InRenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(InRenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[3]->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+                    InRenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(jSceneRenderTarget::HistoryDepthBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
+                    InRenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(InRenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+#else
                     g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::HistoryBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
                     g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InTexture.get(), EResourceLayout::SHADER_READ_ONLY);
                     g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InRenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[3]->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
                     g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::HistoryDepthBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
                     g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InRenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+#endif // USE_RESOURCE_BARRIER_BATCHER
 
                     InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
                         , InOutResourceInlineAllactor.Alloc<jTextureResource>(InTexture.get(), SamplerState)));
@@ -116,7 +124,11 @@ std::shared_ptr<jTexture> ReprojectionAO(const std::shared_ptr<jRenderFrameConte
                 {
                     jTexture* InTexture = InRenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture();
 
+#if USE_RESOURCE_BARRIER_BATCHER
+                    InRenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(InTexture, EResourceLayout::SHADER_READ_ONLY);
+#else
                     g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InTexture, EResourceLayout::SHADER_READ_ONLY);
+#endif // USE_RESOURCE_BARRIER_BATCHER
 
                     InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::COMPUTE
                         , InOutResourceInlineAllactor.Alloc<jTextureResource>(InTexture, nullptr)));
@@ -212,7 +224,11 @@ std::shared_ptr<jTexture> DenoisingAO(const std::shared_ptr<jRenderFrameContext>
             jRHIUtil::DispatchCompute(InRenderFrameContextPtr, jSceneRenderTarget::GaussianV.get()
                 , [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
                 {
+#if USE_RESOURCE_BARRIER_BATCHER
+                    InRenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(InTexture.get(), EResourceLayout::SHADER_READ_ONLY);
+#else
                     g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InTexture.get(), EResourceLayout::SHADER_READ_ONLY);
+#endif // USE_RESOURCE_BARRIER_BATCHER
 
                     InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
                         , InOutResourceInlineAllactor.Alloc<jTextureResource>(InTexture.get(), nullptr)));
@@ -252,7 +268,11 @@ std::shared_ptr<jTexture> DenoisingAO(const std::shared_ptr<jRenderFrameContext>
                 {
                     jTexture* InGaussianVTexture = jSceneRenderTarget::GaussianV.get();
 
+#if USE_RESOURCE_BARRIER_BATCHER
+                    InRenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(InGaussianVTexture, EResourceLayout::SHADER_READ_ONLY);
+#else
                     g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InGaussianVTexture, EResourceLayout::SHADER_READ_ONLY);
+#endif // USE_RESOURCE_BARRIER_BATCHER
 
                     InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
                         , InOutResourceInlineAllactor.Alloc<jTextureResource>(InGaussianVTexture, nullptr)));
@@ -352,8 +372,13 @@ std::shared_ptr<jTexture> DenoisingAO(const std::shared_ptr<jRenderFrameContext>
             jRHIUtil::DispatchCompute(InRenderFrameContextPtr, jSceneRenderTarget::GaussianH.get()
                 , [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
                 {
+#if USE_RESOURCE_BARRIER_BATCHER
+                    InRenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(InTexture.get(), EResourceLayout::SHADER_READ_ONLY);
+                    InRenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(InRenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+#else
                     g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InTexture.get(), EResourceLayout::SHADER_READ_ONLY);
                     g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InRenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+#endif // USE_RESOURCE_BARRIER_BATCHER
 
                     const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
                         , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT
@@ -413,7 +438,11 @@ std::shared_ptr<jTexture> UpdateHistoryBuffer(const std::shared_ptr<jRenderFrame
     jRHIUtil::DispatchCompute(InRenderFrameContextPtr, jSceneRenderTarget::HistoryBuffer.get()
         , [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
         {
+#if USE_RESOURCE_BARRIER_BATCHER
+            InRenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(InTexture.get(), EResourceLayout::SHADER_READ_ONLY);
+#else
             g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InTexture.get(), EResourceLayout::SHADER_READ_ONLY);
+#endif // USE_RESOURCE_BARRIER_BATCHER
 
             InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::COMPUTE
                 , InOutResourceInlineAllactor.Alloc<jTextureResource>(InTexture.get(), nullptr)));
@@ -789,9 +818,15 @@ void jRenderer::AOPass()
             // Binding Raytracing Pipeline State
             RaytracingPipelineState->Bind(RenderFrameContextPtr);
 
+#if USE_RESOURCE_BARRIER_BATCHER
+            RenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr.get(), EResourceLayout::UAV);
+            RenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[0]->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+            RenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[1]->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+#else
             g_rhi->TransitionLayout(CmdBuffer, RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr.get(), EResourceLayout::UAV);
             g_rhi->TransitionLayout(CmdBuffer, RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[0]->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
             g_rhi->TransitionLayout(CmdBuffer, RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[1]->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+#endif // USE_RESOURCE_BARRIER_BATCHER
 
             // Dispatch Rays
             jRaytracingDispatchData TracingData;
@@ -801,7 +836,11 @@ void jRenderer::AOPass()
             TracingData.PipelineState = RaytracingPipelineState;
             g_rhi->DispatchRay(RenderFrameContextPtr, TracingData);
 
+#if USE_RESOURCE_BARRIER_BATCHER
+            RenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr.get(), EResourceLayout::SHADER_READ_ONLY);
+#else
             g_rhi->TransitionLayout(CmdBuffer, RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr.get(), EResourceLayout::SHADER_READ_ONLY);
+#endif // USE_RESOURCE_BARRIER_BATCHER
         }
     }
 
@@ -849,7 +888,11 @@ void jRenderer::AOPass()
             jRHIUtil::DispatchCompute(RenderFrameContextPtr, RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture()
 			    , [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
 			    {
+#if USE_RESOURCE_BARRIER_BATCHER
+                    InRenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(AfterUpdateHistoryBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
+#else
 				    g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), AfterUpdateHistoryBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
+#endif // USE_RESOURCE_BARRIER_BATCHER
 
 				    InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::COMPUTE
 					    , InOutResourceInlineAllactor.Alloc<jTextureResource>(AfterUpdateHistoryBuffer.get(), nullptr)));
@@ -880,7 +923,11 @@ void jRenderer::AOPass()
                     , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
                     , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
 
+#if USE_RESOURCE_BARRIER_BATCHER
+                InRenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(AfterUpdateHistoryBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
+#else
                 g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), AfterUpdateHistoryBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
+#endif // USE_RESOURCE_BARRIER_BATCHER
 
                 InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
                     , InOutResourceInlineAllactor.Alloc<jTextureResource>(AfterUpdateHistoryBuffer.get(), SamplerState)));

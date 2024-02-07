@@ -46,8 +46,13 @@ std::shared_ptr<jRenderTarget> ConvertToCubeMap(jName InDestFilePath, Vector2i I
     {
         DEBUG_EVENT(InRenderFrameContextPtr, "DrawCubemap");
 
+#if USE_RESOURCE_BARRIER_BATCHER
+        InRenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(InTwoMirrorBallSphereMap, EResourceLayout::SHADER_READ_ONLY);
+        InRenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(CubeMap->GetTexture(), EResourceLayout::UAV);
+#else
         g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InTwoMirrorBallSphereMap, EResourceLayout::SHADER_READ_ONLY);
         g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), CubeMap->GetTexture(), EResourceLayout::UAV);
+#endif // USE_RESOURCE_BARRIER_BATCHER
 
         struct jMipUniformBuffer
         {
@@ -145,7 +150,12 @@ std::shared_ptr<jRenderTarget> ConvertToCubeMap(jName InDestFilePath, Vector2i I
 
     // Save image
     DirectX::SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::DDS_FLAGS::DDS_FLAGS_NONE, DestFilePath.c_str());
+
+#if USE_RESOURCE_BARRIER_BATCHER
+    InRenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(CubeMap->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+#else
     g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), CubeMap->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+#endif // USE_RESOURCE_BARRIER_BATCHER
 
     return CubeMap;
 }
@@ -170,8 +180,13 @@ std::shared_ptr<jRenderTarget> GenerateIrradianceMap(jName InDestFilePath, Vecto
     {
         DEBUG_EVENT(InRenderFrameContextPtr, "GenIrradianceMap");
 
+#if USE_RESOURCE_BARRIER_BATCHER
+        InRenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(InCubemap, EResourceLayout::SHADER_READ_ONLY);
+        InRenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(IrradianceMap->GetTexture(), EResourceLayout::UAV);
+#else
         g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InCubemap, EResourceLayout::SHADER_READ_ONLY);
         g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), IrradianceMap->GetTexture(), EResourceLayout::UAV);
+#endif // USE_RESOURCE_BARRIER_BATCHER
 
         struct jRTSizeUniformBuffer
         {
@@ -260,7 +275,12 @@ std::shared_ptr<jRenderTarget> GenerateIrradianceMap(jName InDestFilePath, Vecto
 
     // Save image
     DirectX::SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::DDS_FLAGS::DDS_FLAGS_NONE, DestFilePath.c_str());
+
+#if USE_RESOURCE_BARRIER_BATCHER
+    InRenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(IrradianceMap->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+#else
     g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), IrradianceMap->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+#endif // USE_RESOURCE_BARRIER_BATCHER
 
     return IrradianceMap;
 }
@@ -285,8 +305,13 @@ std::shared_ptr<jRenderTarget> GenerateFilteredEnvironmentMap(jName InDestFilePa
     {
         DEBUG_EVENT(InRenderFrameContextPtr, "GenFilteredEnvMap");
 
+#if USE_RESOURCE_BARRIER_BATCHER
+        InRenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(InCubemap, EResourceLayout::SHADER_READ_ONLY);
+        InRenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(FilteredEnvMap->GetTexture(), EResourceLayout::UAV);
+#else
         g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InCubemap, EResourceLayout::SHADER_READ_ONLY);
         g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), FilteredEnvMap->GetTexture(), EResourceLayout::UAV);
+#endif // USE_RESOURCE_BARRIER_BATCHER
 
         struct jMipUniformBuffer
         {
@@ -383,7 +408,12 @@ std::shared_ptr<jRenderTarget> GenerateFilteredEnvironmentMap(jName InDestFilePa
 
     // Save image
     DirectX::SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::DDS_FLAGS::DDS_FLAGS_NONE, DestFilePath.c_str());
+
+#if USE_RESOURCE_BARRIER_BATCHER
+    InRenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(FilteredEnvMap->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+#else
     g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), FilteredEnvMap->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+#endif // USE_RESOURCE_BARRIER_BATCHER
 
     return FilteredEnvMap;
 }
@@ -405,7 +435,11 @@ void DispatchCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameCo
 	jShaderBindingArray ShaderBindingArray;
 	jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
 
+#if USE_RESOURCE_BARRIER_BATCHER
+    InRenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(RenderTarget, EResourceLayout::UAV);
+#else
 	g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), RenderTarget, EResourceLayout::UAV);
+#endif // USE_RESOURCE_BARRIER_BATCHER
 
 	ShaderBindingArray.Add(jShaderBinding::Create(ShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE
 		, ResourceInlineAllactor.Alloc<jTextureResource>(RenderTarget, nullptr)));
@@ -461,7 +495,11 @@ void DrawQuad(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPt
 	const int32 Width = InRenderTargetPtr->Info.Width;
 	const int32 Height = InRenderTargetPtr->Info.Height;
 
+#if USE_RESOURCE_BARRIER_BATCHER
+    InRenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(InRenderTargetPtr->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
+#else
 	g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InRenderTargetPtr->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
+#endif // USE_RESOURCE_BARRIER_BATCHER
 
 	jRasterizationStateInfo* RasterizationState = nullptr;
 	jBlendingStateInfo* BlendingState = nullptr;
