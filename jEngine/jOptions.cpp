@@ -8,7 +8,7 @@ jOptions gOptions;
 
 jOptions::jOptions()
 	// RHI options
-	: EnableDebuggerLayer(false)
+	: EnableDebuggerLayer(true)
 {
 
 	// Graphics options

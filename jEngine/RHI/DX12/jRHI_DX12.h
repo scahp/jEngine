@@ -162,6 +162,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// 2. Command
 	jCommandBufferManager_DX12* CommandBufferManager = nullptr;
+	jCommandBufferManager_DX12* ComputeCommandBufferManager = nullptr;
 	jCommandBufferManager_DX12* CopyCommandBufferManager = nullptr;
 
 	//////////////////////////////////////////////////////////////////////////
@@ -319,6 +320,9 @@ public:
 
     virtual jCommandBuffer_DX12* BeginSingleTimeCommands() const override;
     virtual void EndSingleTimeCommands(jCommandBuffer* commandBuffer) const override;
+
+    jCommandBuffer_DX12* BeginSingleTimeComputeCommands() const;
+    void EndSingleTimeComputeCommands(jCommandBuffer* commandBuffer) const;
 
 	jCommandBuffer_DX12* BeginSingleTimeCopyCommands() const;
     void EndSingleTimeCopyCommands(jCommandBuffer_DX12* commandBuffer) const;

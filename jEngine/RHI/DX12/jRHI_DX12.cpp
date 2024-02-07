@@ -428,7 +428,9 @@ bool jRHI_DX12::InitRHI()
 	// 2. Command
 	CommandBufferManager = new jCommandBufferManager_DX12();
 	CommandBufferManager->Initialize(Device, D3D12_COMMAND_LIST_TYPE_DIRECT);
-	CopyCommandBufferManager = new jCommandBufferManager_DX12();
+    ComputeCommandBufferManager = new jCommandBufferManager_DX12();
+    ComputeCommandBufferManager->Initialize(Device, D3D12_COMMAND_LIST_TYPE_COMPUTE);
+    CopyCommandBufferManager = new jCommandBufferManager_DX12();
 	CopyCommandBufferManager->Initialize(Device, D3D12_COMMAND_LIST_TYPE_COPY);
 
     // 4. Heap	
@@ -557,6 +559,13 @@ void jRHI_DX12::ReleaseRHI()
         CommandBufferManager = nullptr;
     }
 
+    if (ComputeCommandBufferManager)
+    {
+        ComputeCommandBufferManager->Release();
+        delete ComputeCommandBufferManager;
+        ComputeCommandBufferManager = nullptr;
+    }
+
     if (CopyCommandBufferManager)
     {
         CopyCommandBufferManager->Release();
@@ -682,6 +691,21 @@ void jRHI_DX12::EndSingleTimeCommands(jCommandBuffer* commandBuffer) const
     check(CommandBufferManager);
     CommandBufferManager->ExecuteCommandList(CommandBuffer_DX12, true);
     CommandBufferManager->ReturnCommandBuffer(CommandBuffer_DX12);
+}
+
+jCommandBuffer_DX12* jRHI_DX12::BeginSingleTimeComputeCommands() const
+{
+    check(ComputeCommandBufferManager);
+    return ComputeCommandBufferManager->GetOrCreateCommandBuffer();
+}
+
+void jRHI_DX12::EndSingleTimeComputeCommands(jCommandBuffer* commandBuffer) const
+{
+    auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)commandBuffer;
+
+    check(ComputeCommandBufferManager);
+    ComputeCommandBufferManager->ExecuteCommandList(CommandBuffer_DX12, true);
+    ComputeCommandBufferManager->ReturnCommandBuffer(CommandBuffer_DX12);
 }
 
 jCommandBuffer_DX12* jRHI_DX12::BeginSingleTimeCopyCommands() const
