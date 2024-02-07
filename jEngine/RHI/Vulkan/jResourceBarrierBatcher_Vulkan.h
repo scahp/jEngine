@@ -24,6 +24,8 @@ class jResourceBarrierBatcher_Vulkan : public jResourceBarrierBatcher
 public:
     virtual ~jResourceBarrierBatcher_Vulkan() {}
 
+    // Vulkan UAVBarrier doesn't need to resource, because it works with pipeline stage.
+    // - https://github.com/KhronosGroup/Vulkan-Docs/wiki/Synchronization-Examples-(Legacy-synchronization-APIs)
     virtual void AddUAV(jBuffer* InBuffer) override;
     virtual void AddUAV(jTexture* InTexture) override;
 

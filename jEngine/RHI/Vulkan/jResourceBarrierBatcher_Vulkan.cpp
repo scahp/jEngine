@@ -360,7 +360,6 @@ void jResourceBarrierBatcher_Vulkan::AddTransition(jTexture* InTexture, EResourc
 
 void jResourceBarrierBatcher_Vulkan::Flush(const jCommandBuffer* InCommandBuffer)
 {
-#if USE_RESOURCE_BARRIER_BATCHER
 	if (Barriers.empty())
 		return;
 
@@ -435,7 +434,4 @@ void jResourceBarrierBatcher_Vulkan::Flush(const jCommandBuffer* InCommandBuffer
 		);
     }
     Barriers.clear();
-#else
-    check(Barriers.size() == 0);
-#endif // USE_RESOURCE_BARRIER_BATCHER
 }

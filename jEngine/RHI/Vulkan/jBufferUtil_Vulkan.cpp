@@ -346,11 +346,7 @@ std::shared_ptr<jBuffer_Vulkan> CreateBuffer(EVulkanBufferBits InUsage, EVulkanM
 
     if (BufferPtr->Layout != InResourceLayout)
     {
-#if USE_RESOURCE_BARRIER_BATCHER
-		g_rhi->GetGlobalBarrierBatcher()->AddTransition(BufferPtr.get(), InResourceLayout);
-#else
-        g_rhi->TransitionLayoutImmediate(BufferPtr.get(), InResourceLayout);
-#endif // USE_RESOURCE_BARRIER_BATCHER
+        g_rhi->TransitionLayout(BufferPtr.get(), InResourceLayout);
     }
 
     return BufferPtr;
@@ -360,6 +356,7 @@ void CopyBufferToTexture(jCommandBuffer_Vulkan* commandBuffer_vk, VkBuffer buffe
 {
     check(commandBuffer_vk);
 #if USE_RESOURCE_BARRIER_BATCHER
+    g_rhi->GetGlobalBarrierBatcher()->Flush(commandBuffer_vk);
     commandBuffer_vk->FlushBarrierBatch();
 #endif // USE_RESOURCE_BARRIER_BATCHER
 

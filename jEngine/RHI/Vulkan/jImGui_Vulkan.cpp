@@ -126,9 +126,9 @@ void jImGUI_Vulkan::Initialize(float width, float height)
     stagingBuffer->UpdateBuffer(fontData, uploadSize);
 
     // Copy buffer data to font image
-    g_rhi_vk->TransitionLayoutImmediate(FontImagePtr.get(), EResourceLayout::TRANSFER_DST);
+    g_rhi_vk->TransitionLayout(FontImagePtr.get(), EResourceLayout::TRANSFER_DST);
     jBufferUtil_Vulkan::CopyBufferToTexture(stagingBuffer->Buffer, stagingBuffer->Offset, FontImagePtr->Image, texWidth, texHeight);
-    g_rhi_vk->TransitionLayoutImmediate(FontImagePtr.get(), EResourceLayout::SHADER_READ_ONLY);
+    g_rhi_vk->TransitionLayout(FontImagePtr.get(), EResourceLayout::SHADER_READ_ONLY);
     //////////////////////////////////////////////////////////////////////////
 
     DynamicBufferData.resize(g_rhi_vk->Swapchain->GetNumOfSwapchain());
@@ -297,11 +297,7 @@ void jImGUI_Vulkan::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFra
         const auto& image = g_rhi_vk->Swapchain->GetSwapchainImage(InRenderFrameContextPtr->FrameIndex);
 
         const auto& FinalColorPtr = InRenderFrameContextPtr->SceneRenderTargetPtr->FinalColorPtr;
-#if USE_RESOURCE_BARRIER_BATCHER
-        InRenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(FinalColorPtr->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
-#else
         g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), FinalColorPtr->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
-#endif // USE_RESOURCE_BARRIER_BATCHER
 
         jAttachment color = jAttachment(FinalColorPtr, EAttachmentLoadStoreOp::LOAD_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f)
             , FinalColorPtr->GetLayout(), EResourceLayout::PRESENT_SRC);

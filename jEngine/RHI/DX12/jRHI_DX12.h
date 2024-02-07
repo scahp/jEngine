@@ -401,16 +401,15 @@ public:
 	virtual void ReleaseQueryTime(jQuery* queryTime) const override;
 
 	// Resource Barrier
-	bool TransitionLayout_Internal(jCommandBuffer* commandBuffer, ID3D12Resource* resource, D3D12_RESOURCE_STATES srcLayout, D3D12_RESOURCE_STATES dstLayout) const;
-	virtual bool TransitionLayout(jCommandBuffer* commandBuffer, jTexture* texture, EResourceLayout newLayout) const override;
-	virtual bool TransitionLayoutImmediate(jTexture* texture, EResourceLayout newLayout) const override;
-    virtual bool TransitionLayout(jCommandBuffer* commandBuffer, jBuffer* buffer, EResourceLayout newLayout) const override;
-    virtual bool TransitionLayoutImmediate(jBuffer* buffer, EResourceLayout newLayout) const override;
+	virtual void TransitionLayout(jCommandBuffer* commandBuffer, jTexture* texture, EResourceLayout newLayout) const override;
+    virtual void TransitionLayout(jCommandBuffer* commandBuffer, jBuffer* buffer, EResourceLayout newLayout) const override;
+    virtual void UAVBarrier(jCommandBuffer* commandBuffer, jTexture* texture) const override;
+    virtual void UAVBarrier(jCommandBuffer* commandBuffer, jBuffer* buffer) const override;
 
-	virtual void UAVBarrier(jCommandBuffer* commandBuffer, jTexture* texture) const override;
-	virtual void UAVBarrierImmediate(jTexture* texture) const override;
-	virtual void UAVBarrier(jCommandBuffer* commandBuffer, jBuffer* buffer) const override;
-	virtual void UAVBarrierImmediate(jBuffer* buffer) const override;
+	virtual void TransitionLayout(jTexture* texture, EResourceLayout newLayout) const override;
+    virtual void TransitionLayout(jBuffer* buffer, EResourceLayout newLayout) const override;
+	virtual void UAVBarrier(jTexture* texture) const override;
+	virtual void UAVBarrier(jBuffer* buffer) const override;
 	//////////////////////////////////////////////////////////////////////////
 
     virtual jSwapchain* GetSwapchain() const override { return Swapchain; }

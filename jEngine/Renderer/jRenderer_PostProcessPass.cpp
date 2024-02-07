@@ -21,11 +21,7 @@ void jRenderer::PostProcess()
 			if (!jSceneRenderTarget::GlobalFullscreenPrimitive)
 				jSceneRenderTarget::GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
 
-#if USE_RESOURCE_BARRIER_BATCHER
-            RenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(InRenderTargetPtr->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
-#else
 			g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), InRenderTargetPtr->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
-#endif // USE_RESOURCE_BARRIER_BATCHER
 
 			jRasterizationStateInfo* RasterizationState = nullptr;
 			switch (g_rhi->GetSelectedMSAASamples())
@@ -119,11 +115,7 @@ void jRenderer::PostProcess()
 					ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
 						, ResourceInlineAllactor.Alloc<jTextureResource>(InShaderInputs[i], SamplerState)));
 
-#if USE_RESOURCE_BARRIER_BATCHER
-                    RenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(InShaderInputs[i], EResourceLayout::SHADER_READ_ONLY);
-#else
 					g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), InShaderInputs[i], EResourceLayout::SHADER_READ_ONLY);
-#endif // USE_RESOURCE_BARRIER_BATCHER
 				}
 
 				ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
@@ -195,13 +187,8 @@ void jRenderer::PostProcess()
 			{
 				jCommandBuffer* CommandBuffer = RenderFrameContextPtr->GetActiveCommandBuffer();
 
-#if USE_RESOURCE_BARRIER_BATCHER
-                RenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(EyeAdaptationTextureOld, EResourceLayout::SHADER_READ_ONLY);
-				RenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(SceneRT->ColorPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
-#else
 				g_rhi->TransitionLayout(CommandBuffer, EyeAdaptationTextureOld, EResourceLayout::SHADER_READ_ONLY);
 				g_rhi->TransitionLayout(CommandBuffer, SceneRT->ColorPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
-#endif // USE_RESOURCE_BARRIER_BATCHER
 
 				SourceRT = SceneRT->ColorPtr->GetTexture();
 
@@ -210,11 +197,7 @@ void jRenderer::PostProcess()
 					, jNameStatic("Resource/Shaders/hlsl/fullscreenquad_vs.hlsl"), jNameStatic("Resource/Shaders/hlsl/bloom_and_eyeadaptation_setup_ps.hlsl"));
 				SourceRT = SceneRT->BloomSetup->GetTexture();
 
-#if USE_RESOURCE_BARRIER_BATCHER
-                RenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(SourceRT, EResourceLayout::SHADER_READ_ONLY);
-#else
 				g_rhi->TransitionLayout(CommandBuffer, SourceRT, EResourceLayout::SHADER_READ_ONLY);
-#endif // USE_RESOURCE_BARRIER_BATCHER
 
 				for (int32 i = 0; i < _countof(SceneRT->DownSample); ++i)
 				{
@@ -224,11 +207,7 @@ void jRenderer::PostProcess()
 						, jNameStatic("Resource/Shaders/hlsl/bloom_down_vs.hlsl"), jNameStatic("Resource/Shaders/hlsl/bloom_down_ps.hlsl"), true);
 					SourceRT = SceneRT->DownSample[i]->GetTexture();
 
-#if USE_RESOURCE_BARRIER_BATCHER
-                    RenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(SourceRT, EResourceLayout::SHADER_READ_ONLY);
-#else
 					g_rhi->TransitionLayout(CommandBuffer, SourceRT, EResourceLayout::SHADER_READ_ONLY);
-#endif // USE_RESOURCE_BARRIER_BATCHER
 				}
 			}
 
@@ -241,13 +220,8 @@ void jRenderer::PostProcess()
 				//////////////////////////////////////////////////////////////////////////
 				// Compute Pipeline
 
-#if USE_RESOURCE_BARRIER_BATCHER
-                RenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(SourceRT, EResourceLayout::SHADER_READ_ONLY);
-				RenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(EyeAdaptationTextureCurrent, EResourceLayout::UAV);
-#else
 				g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), SourceRT, EResourceLayout::SHADER_READ_ONLY);
 				g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), EyeAdaptationTextureCurrent, EResourceLayout::UAV);
-#endif // USE_RESOURCE_BARRIER_BATCHER
 
 				std::shared_ptr<jShaderBindingInstance> CurrentBindingInstance = nullptr;
 				int32 BindingPoint = 0;
@@ -364,18 +338,10 @@ void jRenderer::PostProcess()
 						, jNameStatic("Resource/Shaders/hlsl/bloom_up_vs.hlsl"), jNameStatic("Resource/Shaders/hlsl/bloom_up_ps.hlsl"), true, UpscaleBloomTintA[i], UpscaleBloomTintB[i]);
 					SourceRT = SceneRT->UpSample[i]->GetTexture();
 
-#if USE_RESOURCE_BARRIER_BATCHER
-                    RenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(SourceRT, EResourceLayout::SHADER_READ_ONLY);
-#else
 					g_rhi->TransitionLayout(CommandBuffer, SourceRT, EResourceLayout::SHADER_READ_ONLY);
-#endif // USE_RESOURCE_BARRIER_BATCHER
 				}
 
-#if USE_RESOURCE_BARRIER_BATCHER
-                RenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(EyeAdaptationTextureCurrent, EResourceLayout::SHADER_READ_ONLY);
-#else
 				g_rhi->TransitionLayout(CommandBuffer, EyeAdaptationTextureCurrent, EResourceLayout::SHADER_READ_ONLY);
-#endif // USE_RESOURCE_BARRIER_BATCHER
 			}
 		}
 		else

@@ -988,15 +988,9 @@ void jRHI_DX12::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& InRen
 	SCOPE_CPU_PROFILE(EndRenderFrame);
 
 	jCommandBuffer_DX12* CommandBuffer = (jCommandBuffer_DX12*)InRenderFrameContextPtr->GetActiveCommandBuffer();
-
     jSwapchainImage_DX12* CurrentSwapchainImage = (jSwapchainImage_DX12*)Swapchain->GetCurrentSwapchainImage();
 
-#if USE_RESOURCE_BARRIER_BATCHER
-    InRenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(CurrentSwapchainImage->TexturePtr.get(), EResourceLayout::PRESENT_SRC);
-#else
     g_rhi->TransitionLayout(CommandBuffer, CurrentSwapchainImage->TexturePtr.get(), EResourceLayout::PRESENT_SRC);
-#endif // USE_RESOURCE_BARRIER_BATCHER
-
 	CommandBufferManager->ExecuteCommandList(CommandBuffer);
 
     CurrentSwapchainImage->FenceValue = CommandBuffer->Owner->Fence->SignalWithNextFenceValue(CommandBufferManager->GetCommandQueue().Get());
@@ -1445,163 +1439,112 @@ void jRHI_DX12::ReleaseQueryTime(jQuery* queryTime) const
     delete queryTime_gl;
 }
 
-bool jRHI_DX12::TransitionLayout_Internal(jCommandBuffer* commandBuffer, ID3D12Resource* resource, D3D12_RESOURCE_STATES srcLayout, D3D12_RESOURCE_STATES dstLayout) const
+void jRHI_DX12::TransitionLayout(jCommandBuffer* commandBuffer, jTexture* texture, EResourceLayout newLayout) const
 {
     check(commandBuffer);
-    check(resource);
-    
-    if (srcLayout == dstLayout)
-        return true;
+    check(commandBuffer->GetBarrierBatcher());
+    commandBuffer->GetBarrierBatcher()->AddTransition(texture, newLayout);
 
-    auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)commandBuffer;
-
-    D3D12_RESOURCE_BARRIER barrier = { };
-    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-    barrier.Transition.pResource = resource;
-    barrier.Transition.StateBefore = srcLayout;
-    barrier.Transition.StateAfter = dstLayout;
-    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;       // todo : each subresource control
-    CommandBuffer_DX12->CommandList->ResourceBarrier(1, &barrier);
-
-    return true;
-}
-
-bool jRHI_DX12::TransitionLayout(jCommandBuffer* commandBuffer, jTexture* texture, EResourceLayout newLayout) const
-{
-    check(commandBuffer);
-    check(texture);
-
-    auto Texture_DX12 = (jTexture_DX12*)texture;
-    const auto SrcLayout = GetDX12ResourceLayout(Texture_DX12->Layout);
-    const auto DstLayout = GetDX12ResourceLayout(newLayout);
-    if (SrcLayout == DstLayout)
-        return true;
-
-    Texture_DX12->Layout = newLayout;
-    return TransitionLayout_Internal(commandBuffer, Texture_DX12->Texture->Get(), SrcLayout, DstLayout);
-}
-
-bool jRHI_DX12::TransitionLayoutImmediate(jTexture* texture, EResourceLayout newLayout) const
-{
-    check(texture);
-    if (texture->GetLayout() != newLayout)
+#if !USE_RESOURCE_BARRIER_BATCHER
     {
-        auto Texture_DX12 = (jTexture_DX12*)texture;
-        const auto SrcLayout = GetDX12ResourceLayout(Texture_DX12->Layout);
-        const auto DstLayout = GetDX12ResourceLayout(newLayout);
-        if (SrcLayout == DstLayout)
-            return true;
-
-        jCommandBuffer_DX12* commandBuffer = BeginSingleTimeCommands();
-        check(commandBuffer);
-
-        if (commandBuffer)
-        {
-            const bool ret = TransitionLayout_Internal(commandBuffer, Texture_DX12->Texture->Get(), SrcLayout, DstLayout);
-            Texture_DX12->Layout = newLayout;
-
-            EndSingleTimeCommands(commandBuffer);
-            return ret;
-        }
+        commandBuffer->FlushBarrierBatch();
     }
+#endif // USE_RESOURCE_BARRIER_BATCHER
+}
 
-    return false;
+void jRHI_DX12::TransitionLayout(jTexture* texture, EResourceLayout newLayout) const
+{
+    check(BarrierBatcher);
+    BarrierBatcher->AddTransition(texture, newLayout);
+
+#if !USE_RESOURCE_BARRIER_BATCHER
+    {
+        auto CommandBuffer = BeginSingleTimeCommands();
+        BarrierBatcher->Flush(CommandBuffer);
+        EndSingleTimeCommands(CommandBuffer);
+    }
+#endif // USE_RESOURCE_BARRIER_BATCHER
 }
 
 void jRHI_DX12::UAVBarrier(jCommandBuffer* commandBuffer, jTexture* texture) const
 {
     check(commandBuffer);
-    auto commandBuffer_DX12 = (jCommandBuffer_DX12*)commandBuffer;
-    auto texture_dx12 = (jTexture_DX12*)texture;
-    check(texture_dx12->Texture);
+    check(commandBuffer->GetBarrierBatcher());
+    commandBuffer->GetBarrierBatcher()->AddUAV(texture);
 
-    D3D12_RESOURCE_BARRIER uavBarrier = {};
-    uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-    uavBarrier.UAV.pResource = texture_dx12->Texture->Get();
-    check(uavBarrier.UAV.pResource);
-    commandBuffer_DX12->CommandList->ResourceBarrier(1, &uavBarrier);
+#if !USE_RESOURCE_BARRIER_BATCHER
+    {
+        commandBuffer->FlushBarrierBatch();
+    }
+#endif // USE_RESOURCE_BARRIER_BATCHER
 }
 
 void jRHI_DX12::UAVBarrier(jCommandBuffer* commandBuffer, jBuffer* buffer) const
 {
     check(commandBuffer);
-    auto commandBuffer_DX12 = (jCommandBuffer_DX12*)commandBuffer;
-    auto buffer_dx12 = (jBuffer_DX12*)buffer;
-    check(buffer_dx12->Buffer);
+    check(commandBuffer->GetBarrierBatcher());
+    commandBuffer->GetBarrierBatcher()->AddUAV(buffer);
 
-    D3D12_RESOURCE_BARRIER uavBarrier = {};
-    uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-    uavBarrier.UAV.pResource = buffer_dx12->Buffer->Get();
-    check(uavBarrier.UAV.pResource);
-    commandBuffer_DX12->CommandList->ResourceBarrier(1, &uavBarrier);
-}
-
-void jRHI_DX12::UAVBarrierImmediate(jTexture* texture) const
-{
-    jCommandBuffer_DX12* commandBuffer = BeginSingleTimeCommands();
-    check(commandBuffer);
-
-    if (commandBuffer)
+#if !USE_RESOURCE_BARRIER_BATCHER
     {
-        UAVBarrier(commandBuffer, texture);
-        EndSingleTimeCommands(commandBuffer);
+        commandBuffer->FlushBarrierBatch();
     }
+#endif // USE_RESOURCE_BARRIER_BATCHER
 }
 
-void jRHI_DX12::UAVBarrierImmediate(jBuffer* buffer) const
+void jRHI_DX12::UAVBarrier(jTexture* texture) const
 {
-    jCommandBuffer_DX12* commandBuffer = BeginSingleTimeCommands();
-    check(commandBuffer);
+    check(BarrierBatcher);
+    BarrierBatcher->AddUAV(texture);
 
-    if (commandBuffer)
+#if !USE_RESOURCE_BARRIER_BATCHER
     {
-        UAVBarrier(commandBuffer, buffer);
-        EndSingleTimeCommands(commandBuffer);
-    }
+        auto CommandBuffer = BeginSingleTimeCommands();
+        BarrierBatcher->Flush(CommandBuffer);
+        EndSingleTimeCommands(CommandBuffer);
+}
+#endif // USE_RESOURCE_BARRIER_BATCHER
 }
 
-bool jRHI_DX12::TransitionLayout(jCommandBuffer* commandBuffer, jBuffer* buffer, EResourceLayout newLayout) const
+void jRHI_DX12::UAVBarrier(jBuffer* buffer) const
+{
+    check(BarrierBatcher);
+    BarrierBatcher->AddUAV(buffer);
+
+#if !USE_RESOURCE_BARRIER_BATCHER
+    {
+        auto CommandBuffer = BeginSingleTimeCommands();
+        BarrierBatcher->Flush(CommandBuffer);
+        EndSingleTimeCommands(CommandBuffer);
+    }
+#endif // USE_RESOURCE_BARRIER_BATCHER
+}
+
+void jRHI_DX12::TransitionLayout(jCommandBuffer* commandBuffer, jBuffer* buffer, EResourceLayout newLayout) const
 {
     check(commandBuffer);
-    check(buffer);
-    check(buffer->GetLayout() != newLayout);
+    check(commandBuffer->GetBarrierBatcher());
+    commandBuffer->GetBarrierBatcher()->AddTransition(buffer, newLayout);
 
-    auto Buffer_DX12 = (jBuffer_DX12*)buffer;
-    const auto SrcLayout = GetDX12ResourceLayout(Buffer_DX12->Layout);
-    const auto DstLayout = GetDX12ResourceLayout(newLayout);
-    if (SrcLayout == DstLayout)
-        return true;
-
-    Buffer_DX12->Layout = newLayout;
-    return TransitionLayout_Internal(commandBuffer, Buffer_DX12->Buffer->Get(), SrcLayout, DstLayout);
+#if !USE_RESOURCE_BARRIER_BATCHER
+    {
+        commandBuffer->FlushBarrierBatch();
+    }
+#endif // USE_RESOURCE_BARRIER_BATCHER
 }
 
-bool jRHI_DX12::TransitionLayoutImmediate(jBuffer* buffer, EResourceLayout newLayout) const
+void jRHI_DX12::TransitionLayout(jBuffer* buffer, EResourceLayout newLayout) const
 {
-    check(buffer);
-    if (buffer->GetLayout() != newLayout)
+    check(BarrierBatcher);
+    BarrierBatcher->AddTransition(buffer, newLayout);
+
+#if !USE_RESOURCE_BARRIER_BATCHER
     {
-        auto Buffer_DX12 = (jBuffer_DX12*)buffer;
-        const auto SrcLayout = GetDX12ResourceLayout(Buffer_DX12->Layout);
-        const auto DstLayout = GetDX12ResourceLayout(newLayout);
-        if (SrcLayout == DstLayout)
-            return true;
-
-        jCommandBuffer_DX12* commandBuffer = BeginSingleTimeCommands();
-        check(commandBuffer);
-
-        if (commandBuffer)
-        {
-            const bool ret = TransitionLayout_Internal(commandBuffer, Buffer_DX12->Buffer->Get(), SrcLayout, DstLayout);
-            Buffer_DX12->Layout = newLayout;
-
-            EndSingleTimeCommands(commandBuffer);
-            return ret;
-        }
+        auto CommandBuffer = BeginSingleTimeCommands();
+        BarrierBatcher->Flush(CommandBuffer);
+        EndSingleTimeCommands(CommandBuffer);
     }
-
-    return false;
+#endif // USE_RESOURCE_BARRIER_BATCHER
 }
 
 void jRHI_DX12::BeginDebugEvent(jCommandBuffer* InCommandBuffer, const char* InName, const Vector4& InColor /*= Vector4::ColorGreen*/) const

@@ -545,11 +545,7 @@ void jRenderer::ShadowPass()
 
         {
             auto NewLayout = ShadowMapPtr->GetTexture()->IsDepthOnlyFormat() ? EResourceLayout::DEPTH_ATTACHMENT : EResourceLayout::DEPTH_STENCIL_ATTACHMENT;
-#if USE_RESOURCE_BARRIER_BATCHER
-            RenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(ShadowMapPtr->GetTexture(), NewLayout);
-#else
             g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), ShadowMapPtr->GetTexture(), NewLayout);
-#endif // USE_RESOURCE_BARRIER_BATCHER
         }
 
         if (ShadowPasses.ShadowMapRenderPass && ShadowPasses.ShadowMapRenderPass->BeginRenderPass(RenderFrameContextPtr->GetActiveCommandBuffer()))
@@ -565,11 +561,7 @@ void jRenderer::ShadowPass()
 
         {
             auto NewLayout = ShadowMapPtr->GetTexture()->IsDepthOnlyFormat() ? EResourceLayout::DEPTH_READ_ONLY : EResourceLayout::DEPTH_STENCIL_READ_ONLY;
-#if USE_RESOURCE_BARRIER_BATCHER
-            RenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(ShadowMapPtr->GetTexture(), NewLayout);
-#else
             g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), ShadowMapPtr->GetTexture(), NewLayout);
-#endif // USE_RESOURCE_BARRIER_BATCHER
         }
     }
 }
@@ -586,31 +578,19 @@ void jRenderer::BasePass()
 
         if (UseForwardRenderer)
         {
-#if USE_RESOURCE_BARRIER_BATCHER
-            RenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
-#else
             g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
-#endif // USE_RESOURCE_BARRIER_BATCHER
         }
         else
         {
             for (int32 i = 0; i < _countof(RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer); ++i)
             {
-#if USE_RESOURCE_BARRIER_BATCHER
-                RenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[i]->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
-#else
                 g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[i]->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
-#endif // USE_RESOURCE_BARRIER_BATCHER
             }
         }
 
         {
             auto NewLayout = RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture()->IsDepthOnlyFormat() ? EResourceLayout::DEPTH_ATTACHMENT : EResourceLayout::DEPTH_STENCIL_ATTACHMENT;
-#if USE_RESOURCE_BARRIER_BATCHER
-            RenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), NewLayout);
-#else
             g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), NewLayout);
-#endif // USE_RESOURCE_BARRIER_BATCHER
         }
 
         //BasepassOcclusionTest.BeginQuery(RenderFrameContextPtr->GetActiveCommandBuffer());
@@ -648,21 +628,12 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
 
     if (!gOptions.UseSubpass)
     {
-#if USE_RESOURCE_BARRIER_BATCHER
-        RenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
-        RenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::DEPTH_STENCIL_READ_ONLY);
-        for (int32 i = 0; i < _countof(RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer); ++i)
-        {
-            RenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[i]->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
-        }
-#else
         g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
         g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::DEPTH_STENCIL_READ_ONLY);
         for (int32 i = 0; i < _countof(RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer); ++i)
         {
             g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[i]->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
         }
-#endif // USE_RESOURCE_BARRIER_BATCHER
     }
 
     //////////////////////////////////////////////////////////////////////////
@@ -898,17 +869,11 @@ void jRenderer::DebugPasses()
                     , [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
                     {
                         jTexture* InTexture = DebugRTs[i].get();
-
-#if USE_RESOURCE_BARRIER_BATCHER
-                        RenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->AddTransition(InTexture, EResourceLayout::SHADER_READ_ONLY);
-#else
 						g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InTexture, EResourceLayout::SHADER_READ_ONLY);
-#endif // USE_RESOURCE_BARRIER_BATCHER
 
 						const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
 							, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
 							, 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
-
 
 						InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
 							, InOutResourceInlineAllactor.Alloc<jTextureResource>(InTexture, SamplerState)));
