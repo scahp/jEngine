@@ -402,7 +402,7 @@ public:
 	virtual void* GetWindow() const override { return m_hWnd; }
 	virtual std::shared_ptr<jRenderTarget> CreateRenderTarget(const jRenderTargetInfo& info) const override;
 
-	virtual jQuery* CreateQueryTime() const override;
+	virtual jQuery* CreateQueryTime(ECommandBufferType InCmdBufferType) const override;
 	virtual void ReleaseQueryTime(jQuery* queryTime) const override;
 
 	// Resource Barrier
@@ -423,8 +423,8 @@ public:
     virtual void BeginDebugEvent(jCommandBuffer* InCommandBuffer, const char* InName, const Vector4& InColor = Vector4::ColorGreen) const override;
     virtual void EndDebugEvent(jCommandBuffer* InCommandBuffer) const override;
 
-	jQueryPoolTime_DX12* QueryPoolTime = nullptr;
-	virtual jQueryPool* GetQueryTimePool() const override { return QueryPoolTime; }
+	jQueryPoolTime_DX12* QueryPoolTime[(int32)ECommandBufferType::MAX] = { nullptr, };
+	virtual jQueryPool* GetQueryTimePool(ECommandBufferType InType) const override { return QueryPoolTime[(int32)InType]; }
 
 	virtual void Flush() const override;
 	virtual void Finish() const override;

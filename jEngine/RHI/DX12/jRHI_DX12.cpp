@@ -426,12 +426,12 @@ bool jRHI_DX12::InitRHI()
     BarrierBatcher = new jResourceBarrierBatcher_DX12();
 
 	// 2. Command
-	CommandBufferManager = new jCommandBufferManager_DX12();
-	CommandBufferManager->Initialize(Device, D3D12_COMMAND_LIST_TYPE_DIRECT);
-    ComputeCommandBufferManager = new jCommandBufferManager_DX12();
-    ComputeCommandBufferManager->Initialize(Device, D3D12_COMMAND_LIST_TYPE_COMPUTE);
-    CopyCommandBufferManager = new jCommandBufferManager_DX12();
-	CopyCommandBufferManager->Initialize(Device, D3D12_COMMAND_LIST_TYPE_COPY);
+	CommandBufferManager = new jCommandBufferManager_DX12(ECommandBufferType::GRAPHICS);
+	CommandBufferManager->Initialize(Device);
+    ComputeCommandBufferManager = new jCommandBufferManager_DX12(ECommandBufferType::COMPUTE);
+    ComputeCommandBufferManager->Initialize(Device);
+    CopyCommandBufferManager = new jCommandBufferManager_DX12(ECommandBufferType::COPY);
+	CopyCommandBufferManager->Initialize(Device);
 
     // 4. Heap	
 	RTVDescriptorHeaps.Initialize(EDescriptorHeapTypeDX12::RTV);
@@ -496,8 +496,11 @@ bool jRHI_DX12::InitRHI()
         CubeMapInstanceDataForSixFace = g_rhi->CreateVertexBuffer(VertexStream_InstanceData);
     }
 
-    QueryPoolTime = new jQueryPoolTime_DX12();
-    QueryPoolTime->Create();
+    for (int32 i = 0; i < _countof(QueryPoolTime); ++i)
+    {
+        QueryPoolTime[i] = new jQueryPoolTime_DX12((ECommandBufferType)i);
+        QueryPoolTime[i]->Create();
+    }
 
     g_ImGUI = new jImGUI_DX12();
     g_ImGUI->Initialize((float)SCR_WIDTH, (float)SCR_HEIGHT);
@@ -549,8 +552,11 @@ void jRHI_DX12::ReleaseRHI()
     delete g_ImGUI;
     g_ImGUI = nullptr;
     
-    delete QueryPoolTime;
-    QueryPoolTime = nullptr;
+    for (int32 i = 0; i < (int32)ECommandBufferType::MAX; ++i)
+    {
+        delete QueryPoolTime[i];
+        QueryPoolTime[i] = nullptr;
+    }
 
     if (CommandBufferManager)
     {
@@ -1451,9 +1457,9 @@ std::shared_ptr<jRenderTarget> jRHI_DX12::CreateRenderTarget(const jRenderTarget
     return RenderTargetPtr;
 }
 
-jQuery* jRHI_DX12::CreateQueryTime() const
+jQuery* jRHI_DX12::CreateQueryTime(ECommandBufferType InCmdBufferType) const
 {
-    auto queryTime = new jQueryTime_DX12();
+    auto queryTime = new jQueryTime_DX12(InCmdBufferType);
     return queryTime;
 }
 

@@ -3,20 +3,27 @@
 #include "Renderer/jSceneRenderTargets.h"
 #include "../jCommandBufferManager.h"
 
+std::shared_ptr<jRenderFrameContext> jRenderFrameContext_Vulkan::CreateRenderFrameContextAsync(const std::vector<jFence*>& InPrerequisites) const
+{
+    auto NewRenderFrameContext = std::make_shared<jRenderFrameContext_Vulkan>();
+    *NewRenderFrameContext = *this;
+
+    auto ComputeCommandBufferManager = g_rhi->GetComputeCommandBufferManager();
+    NewRenderFrameContext->CommandBuffer = ComputeCommandBufferManager->GetOrCreateCommandBuffer();
+
+    return NewRenderFrameContext;
+}
+
 void jRenderFrameContext_Vulkan::SubmitCurrentActiveCommandBuffer(ECurrentRenderPass InCurrentRenderPass, bool bWaitUntilExecuteComplete)
 {
     jSwapchainImage_Vulkan* SwapchainImage_Vulkan = (jSwapchainImage_Vulkan*)g_rhi->GetSwapchainImage(FrameIndex);
-
-    switch(InCurrentRenderPass)
+    if (CommandBuffer->Type == ECommandBufferType::GRAPHICS)
     {
-    case jRenderFrameContext::ShadowPass:
-        QueueSubmitCurrentActiveCommandBuffer(SwapchainImage_Vulkan->RenderFinishedAfterShadow, bWaitUntilExecuteComplete);
-        break;
-    case jRenderFrameContext::BasePass:
-        QueueSubmitCurrentActiveCommandBuffer(SwapchainImage_Vulkan->RenderFinishedAfterBasePass, bWaitUntilExecuteComplete);
-        break;
-    default:
-        break;
+        QueueSubmitCurrentActiveCommandBuffer(SwapchainImage_Vulkan->GraphicQueueSubmitSemaphore, bWaitUntilExecuteComplete);
+    }
+    else
+    {
+        QueueSubmitCurrentActiveCommandBuffer(SwapchainImage_Vulkan->ComputeQueueSubmitSemaphore, bWaitUntilExecuteComplete);
     }
 }
 
@@ -26,11 +33,13 @@ void jRenderFrameContext_Vulkan::QueueSubmitCurrentActiveCommandBuffer(jSemaphor
     {
         CommandBuffer->End();
 
+        jCommandBufferManager_Vulkan* CommandBufferManager = (jCommandBufferManager_Vulkan*)g_rhi->GetCommandBufferManager2(CommandBuffer->Type);
+
         g_rhi->QueueSubmit(shared_from_this(), InSignalSemaphore);
-        g_rhi->GetCommandBufferManager()->ReturnCommandBuffer(CommandBuffer);
+        CommandBufferManager->ReturnCommandBuffer(CommandBuffer);
 
         // get new commandbuffer
-        CommandBuffer = g_rhi_vk->CommandBufferManager->GetOrCreateCommandBuffer();
+        CommandBuffer = CommandBufferManager->GetOrCreateCommandBuffer();
         g_rhi_vk->Swapchain->Images[FrameIndex]->CommandBufferFence = (VkFence)CommandBuffer->GetFenceHandle();
     }
 }

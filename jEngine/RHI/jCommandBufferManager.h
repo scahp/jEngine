@@ -3,6 +3,7 @@
 
 class jFence;
 class jResourceBarrierBatcher;
+struct jQueryPool;
 
 class jCommandBuffer
 {
@@ -33,4 +34,6 @@ public:
 
     virtual jCommandBuffer* GetOrCreateCommandBuffer() = 0;
     virtual void ReturnCommandBuffer(jCommandBuffer* commandBuffer) = 0;
+
+    virtual jQueryPool* GetQueryTimePool() const { return nullptr; }
 };

@@ -26,22 +26,7 @@ void jRenderFrameContext::Destroy()
 {
     if (CommandBuffer)
     {
-        jCommandBufferManager* CommandBufferManager = nullptr;
-        switch (CommandBuffer->Type)
-        {
-        case ECommandBufferType::GRAPHICS:
-            CommandBufferManager = g_rhi_dx12->GetCommandBufferManager();
-            break;
-        case ECommandBufferType::COMPUTE:
-            CommandBufferManager = g_rhi_dx12->GetComputeCommandBufferManager();
-            break;
-        case ECommandBufferType::COPY:
-            CommandBufferManager = g_rhi_dx12->GetCopyCommandBufferManager();
-            break;
-        default:
-            check(0);
-            break;
-        }
+        jCommandBufferManager* CommandBufferManager = g_rhi->GetCommandBufferManager2(CommandBuffer->Type);
 
         check(CommandBufferManager);
         CommandBufferManager->ReturnCommandBuffer(CommandBuffer);

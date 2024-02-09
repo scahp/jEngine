@@ -10,10 +10,11 @@ namespace jVulkanDeviceUtil
     std::optional<uint32> GraphicsFamily;
     std::optional<uint32> ComputeFamily;
     std::optional<uint32> PresentFamily;
+    std::optional<uint32> CopyFamily;
 
     bool IsComplete() const
     {
-        return GraphicsFamily.has_value() && ComputeFamily.has_value() && PresentFamily.has_value();
+        return GraphicsFamily.has_value() && ComputeFamily.has_value() && PresentFamily.has_value() && CopyFamily.has_value();
     }
 };
 

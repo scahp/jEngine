@@ -4,6 +4,7 @@
 #include "jResourceBarrierBatcher_DX12.h"
 
 class jFence_DX12;
+struct jQueryPoolTime_DX12;
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -53,9 +54,7 @@ struct jCommandBuffer_DX12 : public jCommandBuffer
 class jCommandBufferManager_DX12 : public jCommandBufferManager
 {
 public:
-    jCommandBufferManager_DX12()
-        : CommandListType(D3D12_COMMAND_LIST_TYPE_DIRECT)
-    { }
+    jCommandBufferManager_DX12(ECommandBufferType InType);
 
     virtual ~jCommandBufferManager_DX12() {}
 
@@ -64,12 +63,14 @@ public:
     virtual jCommandBuffer_DX12* GetOrCreateCommandBuffer() override;
     virtual void ReturnCommandBuffer(jCommandBuffer* commandBuffer) override;
 
-    bool Initialize(ComPtr<ID3D12Device> InDevice, D3D12_COMMAND_LIST_TYPE InType = D3D12_COMMAND_LIST_TYPE_DIRECT);
+    bool Initialize(ComPtr<ID3D12Device> InDevice);
 
     FORCEINLINE ComPtr<ID3D12CommandQueue> GetCommandQueue() const { return CommandQueue; }
 
     // CommandList
     void ExecuteCommandList(jCommandBuffer_DX12* InCommandList, bool bWaitUntilExecuteComplete = false);
+
+    virtual jQueryPool* GetQueryTimePool() const override;
 
     jFence_DX12* Fence = nullptr;                        // Fence manager 에서 참조하기 때문에 소멸시키지 않음
 
@@ -89,7 +90,10 @@ private:
     std::vector<jCommandBuffer_DX12*> AvailableCommandLists;
     mutable std::vector<jCommandBuffer_DX12*> UsingCommandBuffers;
 
+    ECommandBufferType CommandBufferType = ECommandBufferType::GRAPHICS;
     D3D12_COMMAND_LIST_TYPE CommandListType = D3D12_COMMAND_LIST_TYPE_DIRECT;
+
     ComPtr<ID3D12Device> Device;
     ComPtr<ID3D12CommandQueue> CommandQueue;
+    jQueryPoolTime_DX12* QueryPoolTime = nullptr;
 };

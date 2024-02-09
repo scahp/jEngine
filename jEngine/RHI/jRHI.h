@@ -201,6 +201,7 @@ struct jQuery
 	virtual void GetQueryResultFromQueryArray(int32 InWatingResultIndex, const std::vector<uint64>& wholeQueryArray) const {}
 
 	virtual uint64 GetElpasedTime() const { return 0; }
+	virtual ECommandBufferType GetCommandBufferType() const { return ECommandBufferType::GRAPHICS; }
 };
 
 struct jQueryPrimitiveGenerated
@@ -398,7 +399,7 @@ public:
     virtual void BeginDebugEvent(jCommandBuffer* InCommandBuffer, const char* InName, const Vector4& InColor = Vector4::ColorGreen) const {}
     virtual void EndDebugEvent(jCommandBuffer* InCommandBuffer) const {}
 	virtual void GenerateMips(const jTexture* texture) const {}
-	virtual jQuery* CreateQueryTime() const { return nullptr;  }
+	virtual jQuery* CreateQueryTime(ECommandBufferType InCmdBufferType) const { return nullptr;  }
 	virtual void ReleaseQueryTime(jQuery* queryTime) const {}
 	virtual void EnableWireframe(bool enable) const {}
 	virtual void SetImageTexture(int32 index, const jTexture* texture, EImageTextureAccessType type) const {}
@@ -439,6 +440,18 @@ public:
 	virtual jRenderPass* GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const jAttachment& depthAttachment, const jAttachment& colorResolveAttachment, const Vector2i& offset, const Vector2i& extent) const { return nullptr; }
     virtual jRenderPass* GetOrCreateRenderPass(const jRenderPassInfo& renderPassInfo, const Vector2i& offset, const Vector2i& extent) const { return nullptr; }
 
+	FORCEINLINE virtual jCommandBufferManager* GetCommandBufferManager2(ECommandBufferType InType) const
+	{ 
+		switch(InType)
+		{
+		case ECommandBufferType::GRAPHICS:	return GetCommandBufferManager();
+		case ECommandBufferType::COMPUTE:	return GetComputeCommandBufferManager();
+		case ECommandBufferType::COPY:		return GetCopyCommandBufferManager();
+		default:
+			break;
+		}
+		return nullptr; 
+	}
 	virtual jCommandBufferManager* GetCommandBufferManager() const { return nullptr; }
 	virtual jCommandBufferManager* GetComputeCommandBufferManager() const { return nullptr; }
 	virtual jCommandBufferManager* GetCopyCommandBufferManager() const { return nullptr; }
@@ -456,7 +469,7 @@ public:
     virtual void UAVBarrier(jBuffer* buffer) const { }
 	//////////////////////////////////////////////////////////////////////////
 
-	virtual jQueryPool* GetQueryTimePool() const { return nullptr; }
+	virtual jQueryPool* GetQueryTimePool(ECommandBufferType InType) const { return nullptr; }
 	virtual jSwapchain* GetSwapchain() const { return nullptr; }
 	virtual class jSwapchainImage* GetSwapchainImage(int32 InIndex) const { return nullptr; }
 	virtual void RecreateSwapChain() {}

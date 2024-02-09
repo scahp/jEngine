@@ -40,7 +40,8 @@ void jRenderer::AtmosphericShadow()
 		check(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture()->GetLayout() == EResourceLayout::SHADER_READ_ONLY
 			|| RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture()->GetLayout() == EResourceLayout::DEPTH_STENCIL_READ_ONLY);
 		check(ShadowMapTexture->GetLayout() == EResourceLayout::SHADER_READ_ONLY
-			|| ShadowMapTexture->GetLayout() == EResourceLayout::DEPTH_READ_ONLY);
+			|| ShadowMapTexture->GetLayout() == EResourceLayout::DEPTH_READ_ONLY
+			|| ShadowMapTexture->GetLayout() == EResourceLayout::DEPTH_STENCIL_READ_ONLY);
 		//check(AtmosphericShadowing->GetLayout() == EResourceLayout::UAV);
         //auto CommandBuffer = g_rhi_dx12->BeginSingleTimeCommands();
         //g_rhi->TransitionLayout(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
@@ -184,6 +185,7 @@ void jRenderer::AtmosphericShadow()
 
 		auto RT = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr;
 		g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RT->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
+		g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), AtmosphericShadowing->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
 
 		jRasterizationStateInfo* RasterizationState = nullptr;
 		switch (g_rhi->GetSelectedMSAASamples())

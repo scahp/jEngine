@@ -9,8 +9,8 @@ robin_hood::unordered_map<jPriorityName, jScopedProfileData, jPriorityNameHashFu
 robin_hood::unordered_map<jPriorityName, jScopedProfileData, jPriorityNameHashFunc> ScopedProfileGPUMap[MaxProfileFrame];
 static int32 PerformanceFrame = 0;
 
-robin_hood::unordered_set<jQuery*> jQueryTimePool::s_running;
-robin_hood::unordered_set<jQuery*> jQueryTimePool::s_resting;
+robin_hood::unordered_set<jQuery*> jQueryTimePool::s_running[(uint32)ECommandBufferType::MAX];
+robin_hood::unordered_set<jQuery*> jQueryTimePool::s_pending[(uint32)ECommandBufferType::MAX];
 
 std::atomic<int32> jScopedProfile_CPU::s_priority = 0;
 std::atomic<int32> jScopedProfile_GPU::s_priority = 0;

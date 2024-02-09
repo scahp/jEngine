@@ -89,10 +89,13 @@ jVulkanDeviceUtil::QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device,
                 indices.GraphicsFamily = i;
             }
         }
-        
-        if (queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT)
+        else if (queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT)
         {
             indices.ComputeFamily = i;
+        }
+        else if (queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT)
+        {
+            indices.CopyFamily = i;
         }
         
         if (indices.IsComplete())

@@ -8,6 +8,7 @@ extern const uint32 MaxQueryTimeCount;
 //////////////////////////////////////////////////////////////////////////
 struct jQueryPoolTime_DX12 : public jQueryPool
 {
+    jQueryPoolTime_DX12(ECommandBufferType InType) : CommandBufferType(InType) {}
     virtual ~jQueryPoolTime_DX12() 
     {
         ReleaseInstance();
@@ -25,6 +26,7 @@ struct jQueryPoolTime_DX12 : public jQueryPool
 
     void ReleaseInstance();
 
+    ECommandBufferType CommandBufferType = ECommandBufferType::GRAPHICS;
     std::shared_ptr<jBuffer_DX12> ReadbackBuffer;
     ComPtr<ID3D12QueryHeap> QueryHeap = nullptr;
     int32 QueryIndex[jRHI::MaxWaitingQuerySet] = { 0, };
@@ -35,6 +37,7 @@ struct jQueryPoolTime_DX12 : public jQueryPool
 //////////////////////////////////////////////////////////////////////////
 struct jQueryTime_DX12 : public jQuery
 {
+    jQueryTime_DX12(ECommandBufferType InCmdBufferType) : CmdBufferType(InCmdBufferType) {}
     virtual ~jQueryTime_DX12() {}
     virtual void Init() override;
     
@@ -46,7 +49,9 @@ struct jQueryTime_DX12 : public jQuery
     virtual void GetQueryResultFromQueryArray(int32 InWatingResultIndex, const std::vector<uint64>& wholeQueryArray) const override;
 
     virtual uint64 GetElpasedTime() const override { return TimeStampStartEnd[1] - TimeStampStartEnd[0]; }
+    virtual ECommandBufferType GetCommandBufferType() const { return CmdBufferType; }
 
     mutable uint64 TimeStampStartEnd[2] = { 0, 0 };
     uint32 QueryId = 0;
+    ECommandBufferType CmdBufferType = ECommandBufferType::GRAPHICS;
 };

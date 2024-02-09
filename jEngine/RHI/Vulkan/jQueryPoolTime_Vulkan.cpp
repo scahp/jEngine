@@ -67,41 +67,50 @@ void jQueryPoolTime_Vulkan::ReleaseInstance()
 //////////////////////////////////////////////////////////////////////////
 void jQueryTime_Vulkan::Init()
 {
-    QueryId = g_rhi_vk->QueryPoolTime->QueryIndex[jProfile_GPU::CurrentWatingResultListIndex];
-    g_rhi_vk->QueryPoolTime->QueryIndex[jProfile_GPU::CurrentWatingResultListIndex] += 2;		// Need 2 Queries for Starting, Ending timestamp
+    auto QueryPoolTime = (jQueryPoolTime_Vulkan*)g_rhi->GetQueryTimePool(GetCommandBufferType());
+
+    QueryId = QueryPoolTime->QueryIndex[jProfile_GPU::CurrentWatingResultListIndex];
+    QueryPoolTime->QueryIndex[jProfile_GPU::CurrentWatingResultListIndex] += 2;		// Need 2 Queries for Starting, Ending timestamp
 }
 
 void jQueryTime_Vulkan::BeginQuery(const jCommandBuffer* commandBuffer) const
 {
+    auto QueryPoolTime = (jQueryPoolTime_Vulkan*)g_rhi->GetQueryTimePool(GetCommandBufferType());
+
     check(commandBuffer);
-    vkCmdWriteTimestamp((VkCommandBuffer)commandBuffer->GetHandle(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, g_rhi_vk->QueryPoolTime->QueryPool, QueryId);
+    vkCmdWriteTimestamp((VkCommandBuffer)commandBuffer->GetHandle(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, QueryPoolTime->QueryPool, QueryId);
 }
 
 void jQueryTime_Vulkan::EndQuery(const jCommandBuffer* commandBuffer) const
 {
+    auto QueryPoolTime = (jQueryPoolTime_Vulkan*)g_rhi->GetQueryTimePool(GetCommandBufferType());
+
     check(commandBuffer);
-    vkCmdWriteTimestamp((VkCommandBuffer)commandBuffer->GetHandle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, g_rhi_vk->QueryPoolTime->QueryPool, QueryId + 1);
+    vkCmdWriteTimestamp((VkCommandBuffer)commandBuffer->GetHandle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, QueryPoolTime->QueryPool, QueryId + 1);
 }
 
 bool jQueryTime_Vulkan::IsQueryTimeStampResult(bool isWaitUntilAvailable) const
 {
+    auto QueryPoolTime = (jQueryPoolTime_Vulkan*)g_rhi->GetQueryTimePool(GetCommandBufferType());
+
     uint64 time[2] = { 0, 0 };
     VkResult result = VK_RESULT_MAX_ENUM;
     if (isWaitUntilAvailable)
     {
         while (result == VK_SUCCESS)
         {
-            result = (vkGetQueryPoolResults(g_rhi_vk->Device, g_rhi_vk->QueryPoolTime->QueryPool, QueryId, 2, sizeof(uint64) * 2, time, sizeof(uint64), VK_QUERY_RESULT_WITH_AVAILABILITY_BIT));
+            result = (vkGetQueryPoolResults(g_rhi_vk->Device, QueryPoolTime->QueryPool, QueryId, 2, sizeof(uint64) * 2, time, sizeof(uint64), VK_QUERY_RESULT_WITH_AVAILABILITY_BIT));
         }
     }
 
-    result = (vkGetQueryPoolResults(g_rhi_vk->Device, g_rhi_vk->QueryPoolTime->QueryPool, QueryId, 2, sizeof(uint64) * 2, time, sizeof(uint64), VK_QUERY_RESULT_WITH_AVAILABILITY_BIT));
+    result = (vkGetQueryPoolResults(g_rhi_vk->Device, QueryPoolTime->QueryPool, QueryId, 2, sizeof(uint64) * 2, time, sizeof(uint64), VK_QUERY_RESULT_WITH_AVAILABILITY_BIT));
     return (result == VK_SUCCESS);
 }
 
 void jQueryTime_Vulkan::GetQueryResult() const
 {
-    vkGetQueryPoolResults(g_rhi_vk->Device, g_rhi_vk->QueryPoolTime->QueryPool, QueryId, 2, sizeof(uint64) * 2, TimeStampStartEnd, sizeof(uint64), VK_QUERY_RESULT_64_BIT);
+    auto QueryPoolTime = (jQueryPoolTime_Vulkan*)g_rhi->GetQueryTimePool(GetCommandBufferType());
+    vkGetQueryPoolResults(g_rhi_vk->Device, QueryPoolTime->QueryPool, QueryId, 2, sizeof(uint64) * 2, TimeStampStartEnd, sizeof(uint64), VK_QUERY_RESULT_64_BIT);
 }
 
 void jQueryTime_Vulkan::GetQueryResultFromQueryArray(int32 InWatingResultIndex, const std::vector<uint64>& wholeQueryArray) const

@@ -91,6 +91,7 @@ public:
 	};
 	jQueue_Vulkan GraphicsQueue;
 	jQueue_Vulkan ComputeQueue;
+	jQueue_Vulkan CopyQueue;
 	jQueue_Vulkan PresentQueue;
 
     uint32 CurrentFrameIndex = 0;		// FrameIndex is swapchain number that is currently used.
@@ -110,11 +111,13 @@ public:
 
 	jSwapchain_Vulkan* Swapchain = nullptr;
 	jCommandBufferManager_Vulkan* CommandBufferManager = nullptr;
+	jCommandBufferManager_Vulkan* ComputeCommandBufferManager = nullptr;
+	jCommandBufferManager_Vulkan* CopyCommandBufferManager = nullptr;
     mutable jFenceManager_Vulkan FenceManager;
 	jSemaphoreManager_Vulkan SemaphoreManager;
 	jMemoryPool_Vulkan* MemoryPool = nullptr;
 
-    jQueryPoolTime_Vulkan* QueryPoolTime = nullptr;
+    jQueryPoolTime_Vulkan* QueryPoolTime[(int32)ECommandBufferType::MAX] = { nullptr, };
 	jQueryPoolOcclusion_Vulkan* QueryPoolOcclusion = nullptr;
 	std::vector<jRingBuffer_Vulkan*> OneFrameUniformRingBuffers;
 	std::vector<jRingBuffer_Vulkan*> SSBORingBuffers;
@@ -184,7 +187,7 @@ public:
 	virtual jShaderBindingLayout* CreateShaderBindings(const jShaderBindingArray& InShaderBindingArray) const override;
 	virtual std::shared_ptr<jShaderBindingInstance> CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const override;
 
-    virtual jQuery* CreateQueryTime() const override;
+    virtual jQuery* CreateQueryTime(ECommandBufferType InCmdBufferType) const override;
     virtual void ReleaseQueryTime(jQuery* queryTime) const override;
 	virtual std::shared_ptr<jRenderFrameContext> BeginRenderFrame() override;
 	virtual void EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr) override;
@@ -203,9 +206,26 @@ public:
 		, const jAttachment& colorResolveAttachment, const Vector2i& offset, const Vector2i& extent) const override;
 	virtual jRenderPass* GetOrCreateRenderPass(const jRenderPassInfo& renderPassInfo, const Vector2i& offset, const Vector2i& extent) const override;
 
-	virtual jCommandBufferManager* GetCommandBufferManager() const override { return CommandBufferManager; }
+	virtual jCommandBufferManager_Vulkan* GetCommandBufferManager() const override { return CommandBufferManager; }
+    virtual jCommandBufferManager_Vulkan* GetComputeCommandBufferManager() const override { return ComputeCommandBufferManager; }
+    virtual jCommandBufferManager_Vulkan* GetCopyCommandBufferManager() const override { return CopyCommandBufferManager; }
+	FORCEINLINE const jQueue_Vulkan& GetQueue(ECommandBufferType InType) const
+	{
+		switch(InType)
+		{
+		case ECommandBufferType::GRAPHICS:	return GraphicsQueue;
+		case ECommandBufferType::COMPUTE:	return ComputeQueue;
+		case ECommandBufferType::COPY:		return CopyQueue;
+		default:
+			check(0);
+			break;
+		}
+		static jQueue_Vulkan Empty;
+		return Empty;
+	}
+
 	virtual EMSAASamples GetSelectedMSAASamples() const override { return SelectedMSAASamples; }
-	virtual jQueryPool* GetQueryTimePool() const override { return QueryPoolTime; }
+	virtual jQueryPool* GetQueryTimePool(ECommandBufferType InType) const override { return QueryPoolTime[(int32)InType]; }
 	virtual jQueryPool* GetQueryOcclusionPool() const override { return QueryPoolOcclusion; }
 	virtual jSwapchain* GetSwapchain() const override { return Swapchain; }
 	virtual uint32 GetCurrentFrameIndex() const override { return CurrentFrameIndex; }

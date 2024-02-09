@@ -1,5 +1,6 @@
 ﻿#include "pch.h"
 #include "jCommandBufferManager_DX12.h"
+#include "jQueryPoolTime_DX12.h"
 
 bool jCommandBuffer_DX12::Begin() const
 {
@@ -70,6 +71,12 @@ bool jCommandBuffer_DX12::End() const
     return true;
 }
 
+jCommandBufferManager_DX12::jCommandBufferManager_DX12(ECommandBufferType InType)
+    : CommandBufferType(InType), CommandListType(GetDX12CommandBufferType(InType))
+{
+
+}
+
 void jCommandBufferManager_DX12::Release()
 {
     jScopedLock s(&CommandListLock);
@@ -134,12 +141,10 @@ void jCommandBufferManager_DX12::ReturnCommandBuffer(jCommandBuffer* commandBuff
     }
 }
 
-bool jCommandBufferManager_DX12::Initialize(ComPtr<ID3D12Device> InDevice, D3D12_COMMAND_LIST_TYPE InType)
+bool jCommandBufferManager_DX12::Initialize(ComPtr<ID3D12Device> InDevice)
 {
     JASSERT(InDevice);
     Device = InDevice;
-
-    CommandListType = InType;
 
     if (CommandListType != D3D12_COMMAND_LIST_TYPE_BUNDLE)
     {
@@ -169,6 +174,11 @@ void jCommandBufferManager_DX12::ExecuteCommandList(jCommandBuffer_DX12* InComma
     {
         InCommandList->FenceValue = InCommandList->Owner->Fence->SignalWithNextFenceValue(InCommandList->Owner->CommandQueue.Get(), bWaitUntilExecuteComplete);
     }
+}
+
+jQueryPool* jCommandBufferManager_DX12::GetQueryTimePool() const
+{
+    return QueryPoolTime;
 }
 
 jCommandBuffer_DX12* jCommandBufferManager_DX12::CreateCommandList() const

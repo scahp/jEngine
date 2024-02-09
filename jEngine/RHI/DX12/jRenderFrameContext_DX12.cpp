@@ -9,7 +9,7 @@ std::shared_ptr<jRenderFrameContext> jRenderFrameContext_DX12::CreateRenderFrame
     auto NewRenderFrameContext = std::make_shared<jRenderFrameContext_DX12>();
     *NewRenderFrameContext = *this;
 
-    auto ComputeCommandBufferManager = g_rhi_dx12->GetComputeCommandBufferManager();
+    auto ComputeCommandBufferManager = g_rhi->GetComputeCommandBufferManager();
     NewRenderFrameContext->CommandBuffer = ComputeCommandBufferManager->GetOrCreateCommandBuffer();
 
     return NewRenderFrameContext;
@@ -36,23 +36,7 @@ void jRenderFrameContext_DX12::SubmitCurrentActiveCommandBuffer(ECurrentRenderPa
     if (CommandBuffer)
     {
         jCommandBuffer_DX12* CommandBuffer_DX12 = (jCommandBuffer_DX12*)CommandBuffer;
-
-        jCommandBufferManager_DX12* CommandBufferManager = nullptr;
-        switch(CommandBuffer_DX12->Type)
-        {
-        case ECommandBufferType::GRAPHICS:
-            CommandBufferManager = g_rhi_dx12->GetCommandBufferManager();
-            break;
-        case ECommandBufferType::COMPUTE:
-            CommandBufferManager = g_rhi_dx12->GetComputeCommandBufferManager();
-            break;
-        case ECommandBufferType::COPY:
-            CommandBufferManager = g_rhi_dx12->GetCopyCommandBufferManager();
-            break;
-        default:
-            check(0);
-            break;
-        }
+        jCommandBufferManager_DX12* CommandBufferManager = (jCommandBufferManager_DX12*)g_rhi->GetCommandBufferManager2(CommandBuffer->Type);
 
         CommandBufferManager->ExecuteCommandList(CommandBuffer_DX12);
         CommandBufferManager->ReturnCommandBuffer(CommandBuffer_DX12);

@@ -17,7 +17,7 @@ bool jQueryPoolTime_DX12::Create()
     D3D12_QUERY_HEAP_DESC heapDesc = { };
     heapDesc.Count = MaxQueryTimeCount * jRHI::MaxWaitingQuerySet;
     heapDesc.NodeMask = 0;
-    heapDesc.Type = D3D12_QUERY_HEAP_TYPE_TIMESTAMP;
+    heapDesc.Type = (CommandBufferType == ECommandBufferType::COPY) ? D3D12_QUERY_HEAP_TYPE_COPY_QUEUE_TIMESTAMP : D3D12_QUERY_HEAP_TYPE_TIMESTAMP;
     return JOK(g_rhi_dx12->Device->CreateQueryHeap(&heapDesc, IID_PPV_ARGS(&QueryHeap)));
 }
 
@@ -78,29 +78,35 @@ void jQueryPoolTime_DX12::ReleaseInstance()
 //////////////////////////////////////////////////////////////////////////
 void jQueryTime_DX12::Init()
 {
-    QueryId = g_rhi_dx12->QueryPoolTime->QueryIndex[jProfile_GPU::CurrentWatingResultListIndex];
-    g_rhi_dx12->QueryPoolTime->QueryIndex[jProfile_GPU::CurrentWatingResultListIndex] += 2;		// Need 2 Queries for Starting, Ending timestamp
+    auto QueryPoolTime = (jQueryPoolTime_DX12*)g_rhi->GetQueryTimePool(GetCommandBufferType());
+    QueryId = QueryPoolTime->QueryIndex[jProfile_GPU::CurrentWatingResultListIndex];
+    QueryPoolTime->QueryIndex[jProfile_GPU::CurrentWatingResultListIndex] += 2;		// Need 2 Queries for Starting, Ending timestamp
 }
 
 void jQueryTime_DX12::BeginQuery(const jCommandBuffer* commandBuffer) const
 {
+    check(commandBuffer->Type == GetCommandBufferType());
+
     auto commandBuffer_DX12 = (jCommandBuffer_DX12*)commandBuffer;
     check(commandBuffer_DX12);
     check(commandBuffer_DX12->CommandList);
 
-    commandBuffer_DX12->CommandList->EndQuery(g_rhi_dx12->QueryPoolTime->QueryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, QueryId);
+    auto QueryPoolTime = (jQueryPoolTime_DX12*)g_rhi->GetQueryTimePool(GetCommandBufferType());
+    commandBuffer_DX12->CommandList->EndQuery(QueryPoolTime->QueryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, QueryId);
 }
 
 void jQueryTime_DX12::EndQuery(const jCommandBuffer* commandBuffer) const
 {
+    check(commandBuffer->Type == GetCommandBufferType());
+
     auto commandBuffer_DX12 = (jCommandBuffer_DX12*)commandBuffer;
     check(commandBuffer_DX12);
     check(commandBuffer_DX12->CommandList);
 
-    commandBuffer_DX12->CommandList->EndQuery(g_rhi_dx12->QueryPoolTime->QueryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, QueryId + 1);
-
-    commandBuffer_DX12->CommandList->ResolveQueryData(g_rhi_dx12->QueryPoolTime->QueryHeap.Get()
-        , D3D12_QUERY_TYPE_TIMESTAMP, QueryId, 2, g_rhi_dx12->QueryPoolTime->ReadbackBuffer->Buffer->Get(), QueryId * sizeof(uint64));
+    auto QueryPoolTime = (jQueryPoolTime_DX12*)g_rhi->GetQueryTimePool(GetCommandBufferType());
+    commandBuffer_DX12->CommandList->EndQuery(QueryPoolTime->QueryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, QueryId + 1);
+    commandBuffer_DX12->CommandList->ResolveQueryData(QueryPoolTime->QueryHeap.Get()
+        , D3D12_QUERY_TYPE_TIMESTAMP, QueryId, 2, QueryPoolTime->ReadbackBuffer->Buffer->Get(), QueryId * sizeof(uint64));
 }
 
 bool jQueryTime_DX12::IsQueryTimeStampResult(bool isWaitUntilAvailable) const

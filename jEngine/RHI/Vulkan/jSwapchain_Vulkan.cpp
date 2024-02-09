@@ -26,15 +26,15 @@ void jSwapchainImage_Vulkan::ReleaseInternal()
         g_rhi->GetSemaphoreManager()->ReturnSemaphore(RenderFinished);
         RenderFinished = nullptr;
     }
-    if (RenderFinishedAfterShadow)
+    if (GraphicQueueSubmitSemaphore)
     {
-        g_rhi->GetSemaphoreManager()->ReturnSemaphore(RenderFinishedAfterShadow);
-        RenderFinishedAfterShadow = nullptr;
+        g_rhi->GetSemaphoreManager()->ReturnSemaphore(GraphicQueueSubmitSemaphore);
+        GraphicQueueSubmitSemaphore = nullptr;
     }
-    if (RenderFinishedAfterBasePass)
+    if (ComputeQueueSubmitSemaphore)
     {
-        g_rhi->GetSemaphoreManager()->ReturnSemaphore(RenderFinishedAfterBasePass);
-        RenderFinishedAfterBasePass = nullptr;
+        g_rhi->GetSemaphoreManager()->ReturnSemaphore(ComputeQueueSubmitSemaphore);
+        ComputeQueueSubmitSemaphore = nullptr;
     }
 }
 
@@ -147,10 +147,10 @@ bool jSwapchain_Vulkan::CreateInternal(VkSwapchainKHR InOldSwapchain)
         else
         {
             SwapchainImage = new jSwapchainImage_Vulkan();
-            SwapchainImage->Available = g_rhi->GetSemaphoreManager()->GetOrCreateSemaphore();
-            SwapchainImage->RenderFinished = g_rhi->GetSemaphoreManager()->GetOrCreateSemaphore();
-            SwapchainImage->RenderFinishedAfterShadow = g_rhi->GetSemaphoreManager()->GetOrCreateSemaphore();
-            SwapchainImage->RenderFinishedAfterBasePass = g_rhi->GetSemaphoreManager()->GetOrCreateSemaphore();
+            SwapchainImage->Available = g_rhi->GetSemaphoreManager()->GetOrCreateSemaphore(ESemaphoreType::BINARY);
+            SwapchainImage->RenderFinished = g_rhi->GetSemaphoreManager()->GetOrCreateSemaphore(ESemaphoreType::BINARY);
+            SwapchainImage->GraphicQueueSubmitSemaphore = g_rhi->GetSemaphoreManager()->GetOrCreateSemaphore(ESemaphoreType::TIMELINE);
+            SwapchainImage->ComputeQueueSubmitSemaphore = g_rhi->GetSemaphoreManager()->GetOrCreateSemaphore(ESemaphoreType::TIMELINE);
             SwapchainImage->CommandBufferFence = nullptr;
 
             Images[i] = SwapchainImage;

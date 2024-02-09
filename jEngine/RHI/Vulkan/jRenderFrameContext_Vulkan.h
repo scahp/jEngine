@@ -13,10 +13,13 @@ struct jRenderFrameContext_Vulkan : public jRenderFrameContext
     {}
     virtual ~jRenderFrameContext_Vulkan() {}
 
+    virtual std::shared_ptr<jRenderFrameContext> CreateRenderFrameContextAsync(const std::vector<jFence*>& InPrerequisites = std::vector<jFence*>()) const override;
     virtual void SubmitCurrentActiveCommandBuffer(ECurrentRenderPass InCurrentRenderPass, bool bWaitUntilExecuteComplete = true) override;
 
-    virtual void QueueSubmitCurrentActiveCommandBuffer(jSemaphore* InSignalSemaphore, bool bWaitUntilExecuteComplete = true);
 
 public:
     jSemaphore* CurrentWaitSemaphore = nullptr;
+
+private:
+    virtual void QueueSubmitCurrentActiveCommandBuffer(jSemaphore* InSignalSemaphore, bool bWaitUntilExecuteComplete = true);
 };

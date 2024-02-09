@@ -832,6 +832,7 @@ enum class EBufferCreateFlag : uint32
 	IndirectCommand = 0x00000040,
 	ShaderBindingTable = 0x00000080,
 	AccelerationStructure = 0x00000100,
+	SimultaneousQueueAcess = 0x00000200,
 };
 DECLARE_ENUM_BIT_OPERATORS(EBufferCreateFlag)
 

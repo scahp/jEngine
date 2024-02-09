@@ -8,6 +8,7 @@ extern const uint32 MaxQueryTimeCount;
 //////////////////////////////////////////////////////////////////////////
 struct jQueryPoolTime_Vulkan : public jQueryPool
 {
+    jQueryPoolTime_Vulkan(ECommandBufferType InType) : CommandBufferType(InType) {}
     virtual ~jQueryPoolTime_Vulkan() 
     {
         ReleaseInstance();
@@ -25,6 +26,7 @@ struct jQueryPoolTime_Vulkan : public jQueryPool
 
     void ReleaseInstance();
 
+    ECommandBufferType CommandBufferType = ECommandBufferType::GRAPHICS;
     VkQueryPool QueryPool = nullptr;
     int32 QueryIndex[jRHI::MaxWaitingQuerySet] = { 0, };
 };
@@ -34,6 +36,7 @@ struct jQueryPoolTime_Vulkan : public jQueryPool
 //////////////////////////////////////////////////////////////////////////
 struct jQueryTime_Vulkan : public jQuery
 {
+    jQueryTime_Vulkan(ECommandBufferType InCmdBufferType) : CmdBufferType(InCmdBufferType) {}
     virtual ~jQueryTime_Vulkan() {}
     virtual void Init() override;
     
@@ -48,4 +51,5 @@ struct jQueryTime_Vulkan : public jQuery
 
     mutable uint64 TimeStampStartEnd[2] = { 0, 0 };
     uint32 QueryId = 0;
+    ECommandBufferType CmdBufferType = ECommandBufferType::GRAPHICS;
 };

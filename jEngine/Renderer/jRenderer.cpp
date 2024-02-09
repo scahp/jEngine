@@ -898,14 +898,21 @@ void jRenderer::Render()
     {
         SCOPE_CPU_PROFILE(PoolReset);
         check(RenderFrameContextPtr->GetActiveCommandBuffer());
-        if (g_rhi->GetQueryTimePool())
+        for (int32 i = 0; i < (int32)ECommandBufferType::MAX; ++i)
         {
-            g_rhi->GetQueryTimePool()->ResetQueryPool(RenderFrameContextPtr->GetActiveCommandBuffer());
+            if (g_rhi->GetQueryTimePool((ECommandBufferType)i))
+            {
+                g_rhi->GetQueryTimePool((ECommandBufferType)i)->ResetQueryPool(RenderFrameContextPtr->GetActiveCommandBuffer());
+            }
         }
         if (g_rhi->GetQueryOcclusionPool())
         {
             g_rhi->GetQueryOcclusionPool()->ResetQueryPool(RenderFrameContextPtr->GetActiveCommandBuffer());
         }
+
+        // Vulkan need to queue submmit to reset query pool, and replace CurrentSemaphore with GraphicQueueSubmitSemaphore
+        RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None);
+        RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
 
         //ShadowpassOcclusionTest.Init();
         //BasepassOcclusionTest.Init();

@@ -74,43 +74,51 @@ public:
 struct jQueryTimePool
 {
 public:
-	static jQuery* GetQueryTime()
+	static jQuery* GetQueryTime(ECommandBufferType InCmdBufferType)
 	{
 		jQuery* queryTime = nullptr;
-		if (s_resting.empty())
+
+		auto& CurPending = s_pending[(int32)InCmdBufferType];
+		auto& CurRunning = s_running[(int32)InCmdBufferType];
+
+		if (CurPending.empty())
 		{
-			queryTime = g_rhi->CreateQueryTime();
+			queryTime = g_rhi->CreateQueryTime(InCmdBufferType);
 		}
 		else
 		{
-			auto iter = s_resting.begin();
+			auto iter = CurPending.begin();
 			queryTime = *iter;
-			s_resting.erase(iter);
+			CurPending.erase(iter);
 		}
         JASSERT(queryTime);
 		queryTime->Init();
-		s_running.insert(queryTime);
+		CurRunning.insert(queryTime);
 		return queryTime;
 	}
 	static void ReturnQueryTime(jQuery* queryTime)
 	{
-		s_running.erase(queryTime);
-		s_resting.insert(queryTime);
+		auto CommandBufferType = queryTime->GetCommandBufferType();
+		s_running[(int32)CommandBufferType].erase(queryTime);
+		s_pending[(int32)CommandBufferType].insert(queryTime);
 	}
 	static void DeleteAllQueryTime()
 	{
-		JASSERT(s_running.empty());
-		for (auto& iter : s_resting)
+		for (int32 i = 0; i < (int32)ECommandBufferType::MAX; ++i)
 		{
-			g_rhi->ReleaseQueryTime(iter);
-			delete iter;
+			JASSERT(s_running[i].empty());
+			for (auto& iter : s_pending[i])
+			{
+				g_rhi->ReleaseQueryTime(iter);
+				delete iter;
+			}
+			s_pending[i].clear();
 		}
-		s_resting.clear();
 	}
 
 private:
-	static robin_hood::unordered_set<jQuery*> s_running;
-	static robin_hood::unordered_set<jQuery*> s_resting;
+	static robin_hood::unordered_set<jQuery*> s_running[(uint32)ECommandBufferType::MAX];
+	static robin_hood::unordered_set<jQuery*> s_pending[(uint32)ECommandBufferType::MAX];
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -128,24 +136,31 @@ struct jProfile_GPU
 		int32 prevIndex = CurrentWatingResultListIndex + 1;
 		prevIndex %= jRHI::MaxWaitingQuerySet;
 
-		check(g_rhi->GetQueryTimePool());
+        // Query 결과를 한번에 다 받아올 수 있는 API 는 그렇게 처리하고, 아니면 개별로 결과를 얻어오도록 함
+		bool CanWholeQueryTimeStampResult[(int32)ECommandBufferType::MAX] = { false, };
+        std::vector<uint64> WholeQueryTimeStampArray[(int32)ECommandBufferType::MAX];
 
-		const bool CanWholeQueryTimeStampResult = g_rhi->GetQueryTimePool()->CanWholeQueryResult();
-
-		// Query 결과를 한번에 다 받아올 수 있는 API 는 그렇게 처리하고, 아니면 개별로 결과를 얻어오도록 함
-        std::vector<uint64> WholeQueryTimeStampArray;
-		if (CanWholeQueryTimeStampResult)
+		for (int32 i = 0; i < (int32)ECommandBufferType::MAX; ++i)
 		{
-			WholeQueryTimeStampArray = g_rhi->GetQueryTimePool()->GetWholeQueryResult(prevIndex);
+			check(g_rhi->GetQueryTimePool((ECommandBufferType)i));
+
+			CanWholeQueryTimeStampResult[i] = g_rhi->GetQueryTimePool((ECommandBufferType)i)->CanWholeQueryResult();
+
+			if (CanWholeQueryTimeStampResult[i])
+			{
+				WholeQueryTimeStampArray[i] = g_rhi->GetQueryTimePool((ECommandBufferType)i)->GetWholeQueryResult(prevIndex);
+			}
 		}
 
 		auto& prevList = WatingResultList[prevIndex];
 		for (auto it = prevList.begin(); prevList.end() != it;++it)
 		{
 			const auto& iter = *it;
-			if (CanWholeQueryTimeStampResult)
+			ECommandBufferType CurrentCommandBufferType = iter.Query->GetCommandBufferType();
+
+			if (CanWholeQueryTimeStampResult[(int32)CurrentCommandBufferType])
 			{
-				iter.Query->GetQueryResultFromQueryArray(prevIndex, WholeQueryTimeStampArray);
+				iter.Query->GetQueryResultFromQueryArray(prevIndex, WholeQueryTimeStampArray[(int32)CurrentCommandBufferType]);
 			}
 			else
 			{
@@ -173,7 +188,7 @@ public:
 		Profile.Name = jPriorityName(name, s_priority.fetch_add(1));
         Profile.Indent = ScopedProfilerGPUIndent.fetch_add(1);
         
-		Profile.Query = jQueryTimePool::GetQueryTime();
+		Profile.Query = jQueryTimePool::GetQueryTime(InRenderFrameContext->GetActiveCommandBuffer()->Type);
 		Profile.Query->BeginQuery(InRenderFrameContext->GetActiveCommandBuffer());
 	}
 

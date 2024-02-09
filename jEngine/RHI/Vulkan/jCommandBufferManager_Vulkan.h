@@ -38,6 +38,7 @@ private:
 class jCommandBufferManager_Vulkan : public jCommandBufferManager
 {
 public:
+    jCommandBufferManager_Vulkan(ECommandBufferType InType) : CommandBufferType(InType) {}
     virtual ~jCommandBufferManager_Vulkan()
     {
         ReleaseInternal();
@@ -53,6 +54,7 @@ public:
     void ReturnCommandBuffer(jCommandBuffer* commandBuffer) override;
 
 private:
+    ECommandBufferType CommandBufferType = ECommandBufferType::GRAPHICS;
     VkCommandPool CommandPool;		// 커맨드 버퍼를 저장할 메모리 관리자로 커맨드 버퍼를 생성함.
 
     jMutexLock CommandListLock;

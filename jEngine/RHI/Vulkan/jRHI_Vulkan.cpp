@@ -239,7 +239,7 @@ bool jRHI_Vulkan::InitRHI()
 		jVulkanDeviceUtil::QueueFamilyIndices indices = jVulkanDeviceUtil::FindQueueFamilies(PhysicalDevice, Surface);
 
 		std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-		std::set<uint32> uniqueQueueFamilies = { indices.GraphicsFamily.value(), indices.PresentFamily.value() };
+		std::set<uint32> uniqueQueueFamilies = { indices.GraphicsFamily.value(), indices.ComputeFamily.value(), indices.CopyFamily.value(), indices.PresentFamily.value() };
 
 		float queuePriority = 1.0f;			// [0.0 ~ 1.0]
 		for (uint32 queueFamily : uniqueQueueFamilies)
@@ -341,6 +341,13 @@ bool jRHI_Vulkan::InitRHI()
 		enabledCustomBorderColorFeaturesEXT.pNext = (void*)createInfo.pNext;
         createInfo.pNext = &enabledCustomBorderColorFeaturesEXT;
 
+		// Added Timeline Semaphore features
+        VkPhysicalDeviceTimelineSemaphoreFeatures timelineSemaphoreFeatures{};
+        timelineSemaphoreFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
+        timelineSemaphoreFeatures.timelineSemaphore = true;
+		timelineSemaphoreFeatures.pNext = (void*)createInfo.pNext;
+		createInfo.pNext = &timelineSemaphoreFeatures;
+
 		// createInfo.pEnabledFeatures = &deviceFeatures;
 		createInfo.pEnabledFeatures = nullptr;
 
@@ -379,9 +386,11 @@ bool jRHI_Vulkan::InitRHI()
 		// 현재는 Queue가 1개 뿐이므로 QueueIndex를 0
 		GraphicsQueue.QueueIndex = indices.GraphicsFamily.value();
 		ComputeQueue.QueueIndex = indices.ComputeFamily.value();
+		CopyQueue.QueueIndex = indices.CopyFamily.value();
 		PresentQueue.QueueIndex = indices.PresentFamily.value();
 		vkGetDeviceQueue(Device, GraphicsQueue.QueueIndex, 0, &GraphicsQueue.Queue);
 		vkGetDeviceQueue(Device, ComputeQueue.QueueIndex, 0, &ComputeQueue.Queue);
+		vkGetDeviceQueue(Device, CopyQueue.QueueIndex, 0, &CopyQueue.Queue);
 		vkGetDeviceQueue(Device, PresentQueue.QueueIndex, 0, &PresentQueue.Queue);
 	}
 
@@ -472,16 +481,23 @@ bool jRHI_Vulkan::InitRHI()
 		delete InRenderPass;
 	};
 
-	CommandBufferManager = new jCommandBufferManager_Vulkan();
+	CommandBufferManager = new jCommandBufferManager_Vulkan(ECommandBufferType::GRAPHICS);
 	CommandBufferManager->CreatePool(GraphicsQueue.QueueIndex);
+	ComputeCommandBufferManager = new jCommandBufferManager_Vulkan(ECommandBufferType::COMPUTE);
+	ComputeCommandBufferManager->CreatePool(ComputeQueue.QueueIndex);
+	CopyCommandBufferManager = new jCommandBufferManager_Vulkan(ECommandBufferType::COPY);
+	CopyCommandBufferManager->CreatePool(CopyQueue.QueueIndex);
 
     // Pipeline cache
     VkPipelineCacheCreateInfo pipelineCacheCreateInfo = {};
     pipelineCacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
 	verify(VK_SUCCESS == vkCreatePipelineCache(Device, &pipelineCacheCreateInfo, nullptr, &PipelineCache));
 
-	QueryPoolTime = new jQueryPoolTime_Vulkan();
-	QueryPoolTime->Create();
+    for (int32 i = 0; i < _countof(QueryPoolTime); ++i)
+    {
+        QueryPoolTime[i] = new jQueryPoolTime_Vulkan((ECommandBufferType)i);
+        QueryPoolTime[i]->Create();
+    }
 
 	QueryPoolOcclusion = new jQueryPoolOcclusion_Vulkan();
 	QueryPoolOcclusion->Create();
@@ -579,6 +595,12 @@ void jRHI_Vulkan::ReleaseRHI()
     delete CommandBufferManager;
     CommandBufferManager = nullptr;
 
+    delete ComputeCommandBufferManager;
+	ComputeCommandBufferManager = nullptr;
+
+    delete CopyCommandBufferManager;
+	CopyCommandBufferManager = nullptr;
+
 	jShaderBindingLayout_Vulkan::ClearPipelineLayout();
 
 	{
@@ -588,8 +610,11 @@ void jRHI_Vulkan::ReleaseRHI()
 		ShaderBindingPool.clear();
 	}
 
-	delete QueryPoolTime;
-	QueryPoolTime = nullptr;
+    for (int32 i = 0; i < (int32)ECommandBufferType::MAX; ++i)
+    {
+        delete QueryPoolTime[i];
+        QueryPoolTime[i] = nullptr;
+    }
 
 	delete QueryPoolOcclusion;
 	QueryPoolOcclusion = nullptr;
@@ -675,8 +700,16 @@ void jRHI_Vulkan::RecreateSwapChain()
 	SCR_HEIGHT = height;
 
     delete CommandBufferManager;
-	CommandBufferManager = new jCommandBufferManager_Vulkan();
+	CommandBufferManager = new jCommandBufferManager_Vulkan(ECommandBufferType::GRAPHICS);
 	verify(CommandBufferManager->CreatePool(GraphicsQueue.QueueIndex));
+
+    delete ComputeCommandBufferManager;
+	ComputeCommandBufferManager = new jCommandBufferManager_Vulkan(ECommandBufferType::COMPUTE);
+    verify(ComputeCommandBufferManager->CreatePool(ComputeQueue.QueueIndex));
+
+    delete CopyCommandBufferManager;
+	CopyCommandBufferManager = new jCommandBufferManager_Vulkan(ECommandBufferType::COPY);
+    verify(CopyCommandBufferManager->CreatePool(CopyQueue.QueueIndex));
 
     jFrameBufferPool::Release();
     jRenderTargetPool::ReleaseForRecreateSwapchain();
@@ -1494,9 +1527,9 @@ float jRHI_Vulkan::GetCurrentMonitorDPIScale() const
 	return 1.0f;
 }
 
-jQuery* jRHI_Vulkan::CreateQueryTime() const
+jQuery* jRHI_Vulkan::CreateQueryTime(ECommandBufferType InCmdBufferType) const
 {
-	auto queryTime = new jQueryTime_Vulkan();
+	auto queryTime = new jQueryTime_Vulkan(InCmdBufferType);
 	return queryTime;
 }
 
@@ -1512,7 +1545,7 @@ std::shared_ptr<jRenderFrameContext> jRHI_Vulkan::BeginRenderFrame()
 
     // timeout 은 nanoseconds. UINT64_MAX 는 타임아웃 없음
     VkResult acquireNextImageResult = vkAcquireNextImageKHR(Device, (VkSwapchainKHR)Swapchain->GetHandle(), UINT64_MAX
-		, (VkSemaphore)Swapchain->Images[CurrentFrameIndex]->Available->GetHandle(), VK_NULL_HANDLE, &CurrentFrameIndex);
+		, (VkSemaphore)Swapchain->Images[CurrentFrameIndex]->Available->GetHandle(), nullptr, &CurrentFrameIndex);
 
     VkFence lastCommandBufferFence = Swapchain->Images[CurrentFrameIndex]->CommandBufferFence;
 
@@ -1599,8 +1632,8 @@ void jRHI_Vulkan::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& ren
 
 	VkSemaphore signalSemaphore[] = { (VkSemaphore)Swapchain->Images[CurrentFrameIndex]->RenderFinished->GetHandle() };
 	QueueSubmit(renderFrameContextPtr, Swapchain->Images[CurrentFrameIndex]->RenderFinished);
-
-    VkPresentInfoKHR presentInfo = {};
+    
+	VkPresentInfoKHR presentInfo = {};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     presentInfo.waitSemaphoreCount = 1;
     presentInfo.pWaitSemaphores = signalSemaphore;
@@ -1643,36 +1676,79 @@ void jRHI_Vulkan::QueueSubmit(const std::shared_ptr<jRenderFrameContext>& render
 	auto renderFrameContext = (jRenderFrameContext_Vulkan*)renderFrameContextPtr.get();
 	check(renderFrameContext);
 
-    check(renderFrameContext->GetActiveCommandBuffer());
+	auto CommandBuffer = renderFrameContext->GetActiveCommandBuffer();
+    check(CommandBuffer);
 
-	renderFrameContext->GetActiveCommandBuffer()->End();
+	CommandBuffer->End();
 
-    VkCommandBuffer vkCommandBuffer = (VkCommandBuffer)renderFrameContext->GetActiveCommandBuffer()->GetHandle();
-    VkFence vkFence = (VkFence)renderFrameContext->GetActiveCommandBuffer()->GetFenceHandle();
+    VkCommandBuffer vkCommandBuffer = (VkCommandBuffer)CommandBuffer->GetHandle();
+    VkFence vkFence = (VkFence)CommandBuffer->GetFenceHandle();
 	
     // Submitting the command buffer
     VkSubmitInfo submitInfo = {};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-    VkSemaphore waitsemaphores[] = { (VkSemaphore)renderFrameContext->CurrentWaitSemaphore->GetHandle() };
-    VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-    submitInfo.waitSemaphoreCount = 1;
+    VkSemaphore waitsemaphores[] = { 
+		renderFrameContext->CurrentWaitSemaphore ? (VkSemaphore)renderFrameContext->CurrentWaitSemaphore->GetHandle() : nullptr };
+
+	VkPipelineStageFlags WaitStage;
+	switch(CommandBuffer->Type)
+	{
+	case ECommandBufferType::GRAPHICS:	WaitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT; break;
+	case ECommandBufferType::COMPUTE:	WaitStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT; break;
+	case ECommandBufferType::COPY:		WaitStage = VK_PIPELINE_STAGE_TRANSFER_BIT; break;
+	default:
+		check(0);
+		break;
+	}
+
+	uint64 waitValue = 0;
+	uint64 signalValue = 0;
+
+	const bool UseWaitTimeline = renderFrameContext->CurrentWaitSemaphore&& renderFrameContext->CurrentWaitSemaphore->GetType() == ESemaphoreType::TIMELINE;
+	const bool UseSignalTimeline = InSignalSemaphore && InSignalSemaphore->GetType() == ESemaphoreType::TIMELINE;
+
+	if (UseWaitTimeline || UseSignalTimeline)
+	{
+		VkTimelineSemaphoreSubmitInfo timelineSemaphoreSubmitInfo = {};
+		timelineSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+		if (UseWaitTimeline)
+		{
+			waitValue = renderFrameContext->CurrentWaitSemaphore->GetValue();
+
+			timelineSemaphoreSubmitInfo.waitSemaphoreValueCount = 1;
+			timelineSemaphoreSubmitInfo.pWaitSemaphoreValues = &waitValue;
+		}
+		if (UseSignalTimeline)
+		{
+			signalValue = InSignalSemaphore->IncrementValue();
+
+			timelineSemaphoreSubmitInfo.signalSemaphoreValueCount = 1;
+			timelineSemaphoreSubmitInfo.pSignalSemaphoreValues = &signalValue;
+		}
+		submitInfo.pNext = &timelineSemaphoreSubmitInfo;
+	}
+
+    VkPipelineStageFlags waitStages[] = { WaitStage };
     submitInfo.pWaitSemaphores = waitsemaphores;
+    submitInfo.waitSemaphoreCount = renderFrameContext->CurrentWaitSemaphore ? 1 : 0;
     submitInfo.pWaitDstStageMask = waitStages;
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &vkCommandBuffer;
 
 	renderFrameContext->CurrentWaitSemaphore = InSignalSemaphore;
 
-    VkSemaphore signalSemaphores[] = { (VkSemaphore)InSignalSemaphore->GetHandle() };
-    submitInfo.signalSemaphoreCount = 1;
+    VkSemaphore signalSemaphores[] = { (InSignalSemaphore ? (VkSemaphore)InSignalSemaphore->GetHandle() : nullptr) };
+    submitInfo.signalSemaphoreCount = InSignalSemaphore ? 1 : 0;
     submitInfo.pSignalSemaphores = signalSemaphores;
 
     // SubmitInfo를 동시에 할수도 있음.
     vkResetFences(Device, 1, &vkFence);		// 세마포어와는 다르게 수동으로 펜스를 unsignaled 상태로 재설정 해줘야 함
 
-    // 마지막에 Fences 파라메터는 커맨드 버퍼가 모두 실행되고나면 Signaled 될 Fences.
-    auto queueSubmitResult = vkQueueSubmit(GraphicsQueue.Queue, 1, &submitInfo, vkFence);
+	const jQueue_Vulkan& CurrentQueue = GetQueue(CommandBuffer->Type);
+
+	// 마지막에 Fences 파라메터는 커맨드 버퍼가 모두 실행되고나면 Signaled 될 Fences.
+    auto queueSubmitResult = vkQueueSubmit(CurrentQueue.Queue, 1, &submitInfo, vkFence);
     if ((queueSubmitResult == VK_ERROR_OUT_OF_DATE_KHR) || (queueSubmitResult == VK_SUBOPTIMAL_KHR))
     {
         RecreateSwapChain();
@@ -1702,10 +1778,12 @@ void jRHI_Vulkan::EndSingleTimeCommands(jCommandBuffer* commandBuffer) const
     VkFence vkFence = (VkFence)CommandBuffer_Vulkan->GetFenceHandle();
 	vkResetFences(Device, 1, &vkFence);		// 세마포어와는 다르게 수동으로 펜스를 unsignaled 상태로 재설정 해줘야 함
 
-	auto Result = vkQueueSubmit(GraphicsQueue.Queue, 1, &submitInfo, vkFence);
+	const jQueue_Vulkan& CurrentQueue = GetQueue(CommandBuffer_Vulkan->Type);
+
+	auto Result = vkQueueSubmit(CurrentQueue.Queue, 1, &submitInfo, vkFence);
 	ensure(VK_SUCCESS == Result);
 
-	Result = vkQueueWaitIdle(GraphicsQueue.Queue);
+	Result = vkQueueWaitIdle(CurrentQueue.Queue);
 	ensure(VK_SUCCESS == Result);
 
     CommandBufferManager->ReturnCommandBuffer(CommandBuffer_Vulkan);
@@ -1867,6 +1945,7 @@ void jRHI_Vulkan::Flush() const
 {
 	vkQueueWaitIdle(GraphicsQueue.Queue);
 	vkQueueWaitIdle(ComputeQueue.Queue);
+	vkQueueWaitIdle(CopyQueue.Queue);
 	vkQueueWaitIdle(PresentQueue.Queue);
 }
 
@@ -1874,6 +1953,7 @@ void jRHI_Vulkan::Finish() const
 {
     vkQueueWaitIdle(GraphicsQueue.Queue);
     vkQueueWaitIdle(ComputeQueue.Queue);
+	vkQueueWaitIdle(CopyQueue.Queue);
     vkQueueWaitIdle(PresentQueue.Queue);
 }
 

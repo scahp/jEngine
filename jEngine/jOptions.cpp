@@ -21,8 +21,8 @@ jOptions::jOptions()
 	UseMemoryless = true;
 	ShowDebugObject = false;
 	BloomEyeAdaptation = true;
-	QueueSubmitAfterShadowPass = true;
-	QueueSubmitAfterBasePass = true;
+	QueueSubmitAfterShadowPass = false;
+	QueueSubmitAfterBasePass = false;
 	CameraPos = Vector::ZeroVector;
 	AutoExposureKeyValueScale = -0.2f;
 	Metallic = 0.0f;
