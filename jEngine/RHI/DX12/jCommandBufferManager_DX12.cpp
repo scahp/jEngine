@@ -173,7 +173,7 @@ void jCommandBufferManager_DX12::ExecuteCommandList(jCommandBuffer_DX12* InComma
 
 jCommandBuffer_DX12* jCommandBufferManager_DX12::CreateCommandList() const
 {
-    jCommandBuffer_DX12* commandBuffer = new jCommandBuffer_DX12();
+    jCommandBuffer_DX12* commandBuffer = new jCommandBuffer_DX12(GetDX12CommandBufferType(CommandListType));
     commandBuffer->Owner = this;
     commandBuffer->CommandAllocator = CreateCommandAllocator();
     if (FAILED(Device->CreateCommandList(0, CommandListType

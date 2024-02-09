@@ -10,6 +10,9 @@ using namespace DirectX;
 
 struct jCommandBuffer_DX12 : public jCommandBuffer
 {
+    jCommandBuffer_DX12(ECommandBufferType InType) : jCommandBuffer(InType) {}
+    virtual ~jCommandBuffer_DX12() {}
+
     ID3D12GraphicsCommandList4* Get() const
     {
         return CommandList.Get();
@@ -52,7 +55,6 @@ class jCommandBufferManager_DX12 : public jCommandBufferManager
 public:
     jCommandBufferManager_DX12()
         : CommandListType(D3D12_COMMAND_LIST_TYPE_DIRECT)
-        //, FenceValue(0)
     { }
 
     virtual ~jCommandBufferManager_DX12() {}

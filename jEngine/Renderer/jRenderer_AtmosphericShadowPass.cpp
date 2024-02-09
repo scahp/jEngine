@@ -16,6 +16,7 @@ void jRenderer::AtmosphericShadow()
 		return;
 
 	static bool EnableAtmosphericShadowing = true;
+    std::shared_ptr<jRenderFrameContext> RenderFrameContextAsyncPtr = RenderFrameContextPtr->CreateRenderFrameContextAsync();
 	if (EnableAtmosphericShadowing)
 	{
 		jDirectionalLight* DirectionalLight = nullptr;
@@ -33,10 +34,10 @@ void jRenderer::AtmosphericShadow()
 		check(MainCamera);
 
 		SCOPE_CPU_PROFILE(AtmosphericShadowing);
-		SCOPE_GPU_PROFILE(RenderFrameContextPtr, AtmosphericShadowing);
-		DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "AtmosphericShadowing", Vector4(0.8f, 0.8f, 0.8f, 1.0f));
+		SCOPE_GPU_PROFILE(RenderFrameContextAsyncPtr, AtmosphericShadowing);
+		DEBUG_EVENT_WITH_COLOR(RenderFrameContextAsyncPtr, "AtmosphericShadowing", Vector4(0.8f, 0.8f, 0.8f, 1.0f));
 
-		std::shared_ptr<jRenderTarget> AtmosphericShadowing = RenderFrameContextPtr->SceneRenderTargetPtr->AtmosphericShadowing;
+		std::shared_ptr<jRenderTarget> AtmosphericShadowing = RenderFrameContextAsyncPtr->SceneRenderTargetPtr->AtmosphericShadowing;
 		int32 Width = AtmosphericShadowing->Info.Width;
 		int32 Height = AtmosphericShadowing->Info.Height;
 
@@ -82,17 +83,17 @@ void jRenderer::AtmosphericShadow()
 		jShaderBindingArray ShaderBindingArray;
 		jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
 
-		auto ShadowMapTexture = RenderFrameContextPtr->SceneRenderTargetPtr->GetShadowMap(DirectionalLight)->GetTexture();
+		auto ShadowMapTexture = RenderFrameContextAsyncPtr->SceneRenderTargetPtr->GetShadowMap(DirectionalLight)->GetTexture();
 		check(ShadowMapTexture);
 
 		// https://www.gamedev.net/forums/topic/673079-error-using-resource-barrier-from-multiple-commandlists-for-same-resource/
-		//g_rhi->TransitionLayout(CommandBuffer_Async, RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+		//g_rhi->TransitionLayout(CommandBuffer_Async, RenderFrameContextAsyncPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
 		//g_rhi->TransitionLayout(CommandBuffer_Async, ShadowMapTexture, EResourceLayout::SHADER_READ_ONLY);
 		//g_rhi->TransitionLayout(CommandBuffer_Async, AtmosphericShadowing->GetTexture(), EResourceLayout::UAV);
         
 		{
 			auto CommandBuffer = g_rhi_dx12->BeginSingleTimeCommands();
-			g_rhi->TransitionLayout(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+			g_rhi->TransitionLayout(RenderFrameContextAsyncPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
 			g_rhi->TransitionLayout(ShadowMapTexture, EResourceLayout::SHADER_READ_ONLY);
 			g_rhi->TransitionLayout(AtmosphericShadowing->GetTexture(), EResourceLayout::UAV);
 			g_rhi->GetGlobalBarrierBatcher()->Flush(CommandBuffer);
@@ -101,18 +102,19 @@ void jRenderer::AtmosphericShadow()
 			g_rhi_dx12->WaitForGPU();
 		}
 
-        auto CommandBuffer_Async = g_rhi_dx12->BeginSingleTimeComputeCommands();
+        //auto CommandBuffer = g_rhi_dx12->BeginSingleTimeComputeCommands();
+		auto CommandBuffer = RenderFrameContextAsyncPtr->GetActiveCommandBuffer();
 
 		// Binding 0
 		{
 			ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-				, ResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[0]->GetTexture(), nullptr)));
+				, ResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextAsyncPtr->SceneRenderTargetPtr->GBuffer[0]->GetTexture(), nullptr)));
 		}
 
 		// Binding 1
 		{
 			ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-				, ResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), nullptr)));
+				, ResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextAsyncPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), nullptr)));
 		}
 
 		// Binding 2
@@ -147,10 +149,10 @@ void jRenderer::AtmosphericShadow()
 
 		jPipelineStateInfo* computePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingLayoutArray, {});
 
-		//computePipelineStateInfo->Bind(RenderFrameContextPtr);
-        {
-			((jPipelineStateInfo_DX12*)computePipelineStateInfo)->Bind(CommandBuffer_Async);
-        }
+		computePipelineStateInfo->Bind(RenderFrameContextAsyncPtr);
+   //     {
+			//((jPipelineStateInfo_DX12*)computePipelineStateInfo)->Bind(CommandBuffer);
+   //     }
 
 		jShaderBindingInstanceArray ShaderBindingInstanceArray;
 		ShaderBindingInstanceArray.Add(CurrentBindingInstance.get());
@@ -168,36 +170,37 @@ void jRenderer::AtmosphericShadow()
 		}
 		ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
 
-		g_rhi->BindComputeShaderBindingInstances(CommandBuffer_Async, computePipelineStateInfo, ShaderBindingInstanceCombiner, 0);
+		g_rhi->BindComputeShaderBindingInstances(CommandBuffer, computePipelineStateInfo, ShaderBindingInstanceCombiner, 0);
 
 		int32 X = (Width / 16) + ((Width % 16) ? 1 : 0);
 		int32 Y = (Height / 16) + ((Height % 16) ? 1 : 0);
-		//g_rhi->DispatchCompute(RenderFrameContextPtr, X, Y, 1);
-        {
-            check(CommandBuffer_Async);
-            check(CommandBuffer_Async->CommandList);
-            check(X * Y * 1 > 0);
-
-#if USE_RESOURCE_BARRIER_BATCHER
-            g_rhi->GetGlobalBarrierBatcher()->Flush(CommandBuffer_Async);
-			CommandBuffer_Async->FlushBarrierBatch();
-#endif // USE_RESOURCE_BARRIER_BATCHER
-
-			CommandBuffer_Async->CommandList->Dispatch(X, Y, 1);
-		}
+		g_rhi->DispatchCompute(RenderFrameContextAsyncPtr, X, Y, 1);
+//        {
+//            check(CommandBuffer);
+//            check(CommandBuffer->CommandList);
+//            check(X * Y * 1 > 0);
+//
+//#if USE_RESOURCE_BARRIER_BATCHER
+//            g_rhi->GetGlobalBarrierBatcher()->Flush(CommandBuffer);
+//			CommandBuffer->FlushBarrierBatch();
+//#endif // USE_RESOURCE_BARRIER_BATCHER
+//
+//			CommandBuffer->CommandList->Dispatch(X, Y, 1);
+//		}
 
 		//g_rhi->TransitionLayout(CommandBuffer_Async, AtmosphericShadowing->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
 
-		g_rhi_dx12->EndSingleTimeComputeCommands(CommandBuffer_Async);
+		//g_rhi_dx12->EndSingleTimeComputeCommands(CommandBuffer);
 
-		{
-			auto Queue = g_rhi_dx12->ComputeCommandBufferManager->GetCommandQueue();
-			check(Queue);
+		//{
+		//	auto Queue = g_rhi_dx12->ComputeCommandBufferManager->GetCommandQueue();
+		//	check(Queue);
 
-			if (g_rhi_dx12->ComputeCommandBufferManager && g_rhi_dx12->ComputeCommandBufferManager->Fence)
-				g_rhi_dx12->ComputeCommandBufferManager->Fence->SignalWithNextFenceValue(Queue.Get(), true);
-		}
-	}
+		//	if (g_rhi_dx12->ComputeCommandBufferManager && g_rhi_dx12->ComputeCommandBufferManager->Fence)
+		//		g_rhi_dx12->ComputeCommandBufferManager->Fence->SignalWithNextFenceValue(Queue.Get(), true);
+		//}
+			}
+	RenderFrameContextAsyncPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None);
 
 	if (EnableAtmosphericShadowing)
 	{

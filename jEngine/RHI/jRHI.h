@@ -440,6 +440,8 @@ public:
     virtual jRenderPass* GetOrCreateRenderPass(const jRenderPassInfo& renderPassInfo, const Vector2i& offset, const Vector2i& extent) const { return nullptr; }
 
 	virtual jCommandBufferManager* GetCommandBufferManager() const { return nullptr; }
+	virtual jCommandBufferManager* GetComputeCommandBufferManager() const { return nullptr; }
+	virtual jCommandBufferManager* GetCopyCommandBufferManager() const { return nullptr; }
 	virtual EMSAASamples GetSelectedMSAASamples() const { return EMSAASamples::COUNT_1; }
 
 	// ResourceBarrier

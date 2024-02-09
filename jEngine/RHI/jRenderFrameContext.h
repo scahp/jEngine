@@ -27,6 +27,8 @@ struct jRenderFrameContext : public std::enable_shared_from_this<jRenderFrameCon
 
     virtual void SubmitCurrentActiveCommandBuffer(ECurrentRenderPass InCurrentRenderPass) {}
 
+    virtual std::shared_ptr<jRenderFrameContext> CreateRenderFrameContextAsync() const { return nullptr; }
+
 public:
     jRaytracingScene* RaytracingScene = nullptr;
     std::shared_ptr<jSceneRenderTarget> SceneRenderTargetPtr = nullptr;

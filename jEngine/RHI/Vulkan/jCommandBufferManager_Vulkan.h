@@ -6,6 +6,9 @@
 class jCommandBuffer_Vulkan : public jCommandBuffer
 {
 public:
+    jCommandBuffer_Vulkan(ECommandBufferType InType) : jCommandBuffer(InType) {}
+    virtual ~jCommandBuffer_Vulkan() {}
+
     FORCEINLINE const VkCommandBuffer& GetRef() const { return CommandBuffer; }
     FORCEINLINE VkCommandBuffer& GetRef() { return CommandBuffer; }
     virtual void* GetHandle() const override { return CommandBuffer; }

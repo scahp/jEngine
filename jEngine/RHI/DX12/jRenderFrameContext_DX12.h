@@ -12,6 +12,7 @@ struct jRenderFrameContext_DX12 : public jRenderFrameContext
     {}
     virtual ~jRenderFrameContext_DX12() {}
 
+    virtual std::shared_ptr<jRenderFrameContext> CreateRenderFrameContextAsync() const override;
     virtual void QueueSubmitCurrentActiveCommandBuffer();
     virtual void SubmitCurrentActiveCommandBuffer(ECurrentRenderPass InCurrentRenderPass) override;
 };

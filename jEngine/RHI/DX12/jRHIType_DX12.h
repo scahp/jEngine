@@ -553,3 +553,8 @@ private:
     jCreatedResource(const jCreatedResource&) = delete;
     jCreatedResource& operator=(const jCreatedResource&) = delete;
 };
+
+GENERATE_CONVERSION_FUNCTION(GetDX12CommandBufferType,
+    CONVERSION_TYPE_ELEMENT(ECommandBufferType::GRAPHICS, D3D12_COMMAND_LIST_TYPE_DIRECT),
+    CONVERSION_TYPE_ELEMENT(ECommandBufferType::COMPUTE, D3D12_COMMAND_LIST_TYPE_COMPUTE),
+    CONVERSION_TYPE_ELEMENT(ECommandBufferType::COPY, D3D12_COMMAND_LIST_TYPE_COPY))

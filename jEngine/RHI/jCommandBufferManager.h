@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include "jRHIType.h"
 
 class jFence;
 class jResourceBarrierBatcher;
@@ -6,6 +7,9 @@ class jResourceBarrierBatcher;
 class jCommandBuffer
 {
 public:
+    const ECommandBufferType Type = ECommandBufferType::GRAPHICS;
+
+    jCommandBuffer(ECommandBufferType InType) : Type(InType) {}
     virtual ~jCommandBuffer() {}
 
     virtual void* GetHandle() const { return nullptr; }

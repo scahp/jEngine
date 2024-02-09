@@ -142,7 +142,7 @@ jCommandBuffer* jCommandBufferManager_Vulkan::GetOrCreateCommandBuffer()
             return nullptr;
         }
 
-        auto newCommandBuffer = new jCommandBuffer_Vulkan();
+        auto newCommandBuffer = new jCommandBuffer_Vulkan(ECommandBufferType::GRAPHICS);
         newCommandBuffer->GetRef() = vkCommandBuffer;
         newCommandBuffer->SetFence(g_rhi_vk->FenceManager.GetOrCreateFence());
 

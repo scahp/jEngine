@@ -24,16 +24,27 @@ bool jRenderFrameContext::EndActiveCommandBuffer()
 
 void jRenderFrameContext::Destroy()
 {
-    if (SceneRenderTargetPtr)
-    {
-        SceneRenderTargetPtr->Return();
-        SceneRenderTargetPtr.reset();
-    }
-
     if (CommandBuffer)
     {
-        check(g_rhi->GetCommandBufferManager());
-        g_rhi->GetCommandBufferManager()->ReturnCommandBuffer(CommandBuffer);
+        jCommandBufferManager* CommandBufferManager = nullptr;
+        switch (CommandBuffer->Type)
+        {
+        case ECommandBufferType::GRAPHICS:
+            CommandBufferManager = g_rhi_dx12->GetCommandBufferManager();
+            break;
+        case ECommandBufferType::COMPUTE:
+            CommandBufferManager = g_rhi_dx12->GetComputeCommandBufferManager();
+            break;
+        case ECommandBufferType::COPY:
+            CommandBufferManager = g_rhi_dx12->GetCopyCommandBufferManager();
+            break;
+        default:
+            check(0);
+            break;
+        }
+
+        check(CommandBufferManager);
+        CommandBufferManager->ReturnCommandBuffer(CommandBuffer);
         CommandBuffer = nullptr;
     }
 

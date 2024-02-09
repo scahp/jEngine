@@ -956,3 +956,12 @@ struct jPositionOnlyVertex
 {
     Vector Pos = Vector::ZeroVector;
 };
+
+enum class ECommandBufferType : uint8
+{
+    GRAPHICS = 0,
+    COMPUTE,
+    COPY,
+    MAX
+};
+

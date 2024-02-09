@@ -3,8 +3,13 @@
 struct jRenderTarget;
 class jSwapchainImage;
 
-struct jSceneRenderTarget
+struct jSceneRenderTarget : public std::enable_shared_from_this<jSceneRenderTarget>
 {
+    virtual ~jSceneRenderTarget()
+    {
+        Return();
+    }
+
     // 임시
     static std::shared_ptr<jRenderTarget> IrradianceMap;
     static jTexture* OriginHDR;

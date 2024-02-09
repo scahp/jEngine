@@ -376,7 +376,8 @@ public:
 	virtual std::shared_ptr<jRenderFrameContext> BeginRenderFrame() override;
 	virtual void EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr) override;
 	virtual jCommandBufferManager_DX12* GetCommandBufferManager() const override { return CommandBufferManager; }
-	virtual jCommandBufferManager_DX12* GetCopyCommandBufferManager() const { return CopyCommandBufferManager; }
+	virtual jCommandBufferManager_DX12* GetComputeCommandBufferManager() const override { return ComputeCommandBufferManager; }
+	virtual jCommandBufferManager_DX12* GetCopyCommandBufferManager() const override { return CopyCommandBufferManager; }
 
     virtual void BindGraphicsShaderBindingInstances(const jCommandBuffer* InCommandBuffer, const jPipelineStateInfo* InPiplineState
         , const jShaderBindingInstanceCombiner& InShaderBindingInstanceCombiner, uint32 InFirstSet) const override;
