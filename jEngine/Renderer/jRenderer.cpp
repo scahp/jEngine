@@ -948,7 +948,7 @@ void jRenderer::Render()
         {
             SCOPE_CPU_PROFILE(QueueSubmitAfterBasePass);
             //RenderFrameContextPtr->GetActiveCommandBuffer()->End();
-            RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::BasePass);
+            RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::BasePass, false);
             RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
         }
     }

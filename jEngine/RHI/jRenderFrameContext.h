@@ -25,9 +25,10 @@ struct jRenderFrameContext : public std::enable_shared_from_this<jRenderFrameCon
     virtual bool BeginActiveCommandBuffer();
     virtual bool EndActiveCommandBuffer();
 
-    virtual void SubmitCurrentActiveCommandBuffer(ECurrentRenderPass InCurrentRenderPass) {}
+    virtual void SubmitCurrentActiveCommandBuffer(ECurrentRenderPass InCurrentRenderPass, bool IsWaitUntilFinish = true) {}
 
-    virtual std::shared_ptr<jRenderFrameContext> CreateRenderFrameContextAsync() const { return nullptr; }
+    virtual std::shared_ptr<jRenderFrameContext> CreateRenderFrameContextAsync(const std::vector<jFence*>& InPrerequisites = std::vector<jFence*>()) const { return nullptr; }
+    ECommandBufferType GetCommandBufferType() const { check(CommandBuffer); return CommandBuffer->Type; }
 
 public:
     jRaytracingScene* RaytracingScene = nullptr;

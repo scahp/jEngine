@@ -3,24 +3,24 @@
 #include "Renderer/jSceneRenderTargets.h"
 #include "../jCommandBufferManager.h"
 
-void jRenderFrameContext_Vulkan::SubmitCurrentActiveCommandBuffer(ECurrentRenderPass InCurrentRenderPass)
+void jRenderFrameContext_Vulkan::SubmitCurrentActiveCommandBuffer(ECurrentRenderPass InCurrentRenderPass, bool bWaitUntilExecuteComplete)
 {
     jSwapchainImage_Vulkan* SwapchainImage_Vulkan = (jSwapchainImage_Vulkan*)g_rhi->GetSwapchainImage(FrameIndex);
 
     switch(InCurrentRenderPass)
     {
     case jRenderFrameContext::ShadowPass:
-        QueueSubmitCurrentActiveCommandBuffer(SwapchainImage_Vulkan->RenderFinishedAfterShadow);
+        QueueSubmitCurrentActiveCommandBuffer(SwapchainImage_Vulkan->RenderFinishedAfterShadow, bWaitUntilExecuteComplete);
         break;
     case jRenderFrameContext::BasePass:
-        QueueSubmitCurrentActiveCommandBuffer(SwapchainImage_Vulkan->RenderFinishedAfterBasePass);
+        QueueSubmitCurrentActiveCommandBuffer(SwapchainImage_Vulkan->RenderFinishedAfterBasePass, bWaitUntilExecuteComplete);
         break;
     default:
         break;
     }
 }
 
-void jRenderFrameContext_Vulkan::QueueSubmitCurrentActiveCommandBuffer(jSemaphore* InSignalSemaphore)
+void jRenderFrameContext_Vulkan::QueueSubmitCurrentActiveCommandBuffer(jSemaphore* InSignalSemaphore, bool bWaitUntilExecuteComplete)
 {
     if (CommandBuffer)
     {

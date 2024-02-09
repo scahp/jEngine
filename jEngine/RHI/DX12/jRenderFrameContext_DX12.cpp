@@ -4,14 +4,13 @@
 #include "../jCommandBufferManager.h"
 #include "jSwapchain_DX12.h"
 
-std::shared_ptr<jRenderFrameContext> jRenderFrameContext_DX12::CreateRenderFrameContextAsync() const
+std::shared_ptr<jRenderFrameContext> jRenderFrameContext_DX12::CreateRenderFrameContextAsync(const std::vector<jFence*>& InPrerequisites) const
 {
     auto NewRenderFrameContext = std::make_shared<jRenderFrameContext_DX12>();
     *NewRenderFrameContext = *this;
 
     auto ComputeCommandBufferManager = g_rhi_dx12->GetComputeCommandBufferManager();
     NewRenderFrameContext->CommandBuffer = ComputeCommandBufferManager->GetOrCreateCommandBuffer();
-    NewRenderFrameContext->CommandBuffer->Begin();
 
     return NewRenderFrameContext;
 }
@@ -32,7 +31,7 @@ void jRenderFrameContext_DX12::QueueSubmitCurrentActiveCommandBuffer()
     }
 }
 
-void jRenderFrameContext_DX12::SubmitCurrentActiveCommandBuffer(ECurrentRenderPass InCurrentRenderPass)
+void jRenderFrameContext_DX12::SubmitCurrentActiveCommandBuffer(ECurrentRenderPass InCurrentRenderPass, bool bWaitUntilExecuteComplete)
 {
     if (CommandBuffer)
     {
@@ -60,6 +59,6 @@ void jRenderFrameContext_DX12::SubmitCurrentActiveCommandBuffer(ECurrentRenderPa
 
         // get new commandbuffer
         CommandBuffer = CommandBufferManager->GetOrCreateCommandBuffer();
-        g_rhi_dx12->Swapchain->Images[FrameIndex]->FenceValue = CommandBuffer_DX12->Owner->Fence->SignalWithNextFenceValue(CommandBuffer_DX12->Owner->GetCommandQueue().Get());
+        g_rhi_dx12->Swapchain->Images[FrameIndex]->FenceValue = CommandBuffer_DX12->Owner->Fence->SignalWithNextFenceValue(CommandBuffer_DX12->Owner->GetCommandQueue().Get(), bWaitUntilExecuteComplete);
     }
 }

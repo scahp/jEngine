@@ -189,6 +189,8 @@ std::shared_ptr<jCreatedResource> CreateTexturenternal(uint32 InWidth, uint32 In
         TexDesc.Flags = IsDepthFormat(GetDX12TextureFormat(InFormat)) ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
     if (!!(InTextureCreateFlag & ETextureCreateFlag::UAV))
         TexDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+    if (!!(InTextureCreateFlag & ETextureCreateFlag::SimultaneousQueueAcess))
+        TexDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_SIMULTANEOUS_ACCESS;
     TexDesc.DepthOrArraySize = InArrayLayers;
 
     const uint32 StandardMSAAPattern = 0xFFFFFFFF;

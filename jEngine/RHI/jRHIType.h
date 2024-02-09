@@ -847,6 +847,7 @@ enum class ETextureCreateFlag : uint32
 	DSV = 0x00000040,
 	SubpassInput = 0x00000040,
 	Memoryless = 0x00000080,
+    SimultaneousQueueAcess = 0x00000100,
 };
 DECLARE_ENUM_BIT_OPERATORS(ETextureCreateFlag)
 

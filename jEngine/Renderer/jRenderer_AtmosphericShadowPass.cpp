@@ -15,21 +15,46 @@ void jRenderer::AtmosphericShadow()
 	if (gOptions.ShowAOOnly)
 		return;
 
-	static bool EnableAtmosphericShadowing = true;
-    std::shared_ptr<jRenderFrameContext> RenderFrameContextAsyncPtr = RenderFrameContextPtr->CreateRenderFrameContextAsync();
-	if (EnableAtmosphericShadowing)
-	{
-		jDirectionalLight* DirectionalLight = nullptr;
-		for (auto light : jLight::GetLights())
-		{
-			if (light->Type == ELightType::DIRECTIONAL)
-			{
-				DirectionalLight = (jDirectionalLight*)light;
-				break;
-			}
-		}
-		check(DirectionalLight);
+    jDirectionalLight* DirectionalLight = nullptr;
+    for (auto light : jLight::GetLights())
+    {
+        if (light->Type == ELightType::DIRECTIONAL)
+        {
+            DirectionalLight = (jDirectionalLight*)light;
+            break;
+        }
+    }
+    check(DirectionalLight);
 
+    std::shared_ptr<jRenderFrameContext> RenderFrameContextAsyncPtr = RenderFrameContextPtr->CreateRenderFrameContextAsync();
+    RenderFrameContextAsyncPtr->GetActiveCommandBuffer()->Begin();
+
+    auto ShadowMapTexture = RenderFrameContextPtr->SceneRenderTargetPtr->GetShadowMap(DirectionalLight)->GetTexture();
+    check(ShadowMapTexture);
+
+    std::shared_ptr<jRenderTarget> AtmosphericShadowing = RenderFrameContextPtr->SceneRenderTargetPtr->AtmosphericShadowing;
+
+    // https://www.gamedev.net/forums/topic/673079-error-using-resource-barrier-from-multiple-commandlists-for-same-resource/
+	// AsyncComputeQueue doesn't have any ability for transition to SHADER_READ_ONLY.
+	{
+		check(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture()->GetLayout() == EResourceLayout::SHADER_READ_ONLY
+			|| RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture()->GetLayout() == EResourceLayout::DEPTH_STENCIL_READ_ONLY);
+		check(ShadowMapTexture->GetLayout() == EResourceLayout::SHADER_READ_ONLY
+			|| ShadowMapTexture->GetLayout() == EResourceLayout::DEPTH_READ_ONLY);
+		//check(AtmosphericShadowing->GetLayout() == EResourceLayout::UAV);
+        //auto CommandBuffer = g_rhi_dx12->BeginSingleTimeCommands();
+        //g_rhi->TransitionLayout(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+        //g_rhi->TransitionLayout(ShadowMapTexture, EResourceLayout::SHADER_READ_ONLY);
+        //g_rhi->TransitionLayout(AtmosphericShadowing->GetTexture(), EResourceLayout::UAV);
+        //g_rhi->GetGlobalBarrierBatcher()->Flush(CommandBuffer);
+        //g_rhi_dx12->EndSingleTimeCommands(CommandBuffer);
+
+        //g_rhi_dx12->WaitForGPU();
+
+		g_rhi->TransitionLayout(RenderFrameContextAsyncPtr->GetActiveCommandBuffer(), AtmosphericShadowing->GetTexture(), EResourceLayout::UAV);
+    }
+
+	{
 		jCamera* MainCamera = jCamera::GetMainCamera();
 		check(MainCamera);
 
@@ -37,7 +62,6 @@ void jRenderer::AtmosphericShadow()
 		SCOPE_GPU_PROFILE(RenderFrameContextAsyncPtr, AtmosphericShadowing);
 		DEBUG_EVENT_WITH_COLOR(RenderFrameContextAsyncPtr, "AtmosphericShadowing", Vector4(0.8f, 0.8f, 0.8f, 1.0f));
 
-		std::shared_ptr<jRenderTarget> AtmosphericShadowing = RenderFrameContextAsyncPtr->SceneRenderTargetPtr->AtmosphericShadowing;
 		int32 Width = AtmosphericShadowing->Info.Width;
 		int32 Height = AtmosphericShadowing->Info.Height;
 
@@ -83,27 +107,7 @@ void jRenderer::AtmosphericShadow()
 		jShaderBindingArray ShaderBindingArray;
 		jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
 
-		auto ShadowMapTexture = RenderFrameContextAsyncPtr->SceneRenderTargetPtr->GetShadowMap(DirectionalLight)->GetTexture();
-		check(ShadowMapTexture);
-
-		// https://www.gamedev.net/forums/topic/673079-error-using-resource-barrier-from-multiple-commandlists-for-same-resource/
-		//g_rhi->TransitionLayout(CommandBuffer_Async, RenderFrameContextAsyncPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
-		//g_rhi->TransitionLayout(CommandBuffer_Async, ShadowMapTexture, EResourceLayout::SHADER_READ_ONLY);
-		//g_rhi->TransitionLayout(CommandBuffer_Async, AtmosphericShadowing->GetTexture(), EResourceLayout::UAV);
-        
-		{
-			auto CommandBuffer = g_rhi_dx12->BeginSingleTimeCommands();
-			g_rhi->TransitionLayout(RenderFrameContextAsyncPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
-			g_rhi->TransitionLayout(ShadowMapTexture, EResourceLayout::SHADER_READ_ONLY);
-			g_rhi->TransitionLayout(AtmosphericShadowing->GetTexture(), EResourceLayout::UAV);
-			g_rhi->GetGlobalBarrierBatcher()->Flush(CommandBuffer);
-			g_rhi_dx12->EndSingleTimeCommands(CommandBuffer);
-
-			g_rhi_dx12->WaitForGPU();
-		}
-
-        //auto CommandBuffer = g_rhi_dx12->BeginSingleTimeComputeCommands();
-		auto CommandBuffer = RenderFrameContextAsyncPtr->GetActiveCommandBuffer();
+        auto CommandBuffer = RenderFrameContextAsyncPtr->GetActiveCommandBuffer();
 
 		// Binding 0
 		{
@@ -150,9 +154,6 @@ void jRenderer::AtmosphericShadow()
 		jPipelineStateInfo* computePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingLayoutArray, {});
 
 		computePipelineStateInfo->Bind(RenderFrameContextAsyncPtr);
-   //     {
-			//((jPipelineStateInfo_DX12*)computePipelineStateInfo)->Bind(CommandBuffer);
-   //     }
 
 		jShaderBindingInstanceArray ShaderBindingInstanceArray;
 		ShaderBindingInstanceArray.Add(CurrentBindingInstance.get());
@@ -175,34 +176,9 @@ void jRenderer::AtmosphericShadow()
 		int32 X = (Width / 16) + ((Width % 16) ? 1 : 0);
 		int32 Y = (Height / 16) + ((Height % 16) ? 1 : 0);
 		g_rhi->DispatchCompute(RenderFrameContextAsyncPtr, X, Y, 1);
-//        {
-//            check(CommandBuffer);
-//            check(CommandBuffer->CommandList);
-//            check(X * Y * 1 > 0);
-//
-//#if USE_RESOURCE_BARRIER_BATCHER
-//            g_rhi->GetGlobalBarrierBatcher()->Flush(CommandBuffer);
-//			CommandBuffer->FlushBarrierBatch();
-//#endif // USE_RESOURCE_BARRIER_BATCHER
-//
-//			CommandBuffer->CommandList->Dispatch(X, Y, 1);
-//		}
+	}
+    RenderFrameContextAsyncPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None);
 
-		//g_rhi->TransitionLayout(CommandBuffer_Async, AtmosphericShadowing->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
-
-		//g_rhi_dx12->EndSingleTimeComputeCommands(CommandBuffer);
-
-		//{
-		//	auto Queue = g_rhi_dx12->ComputeCommandBufferManager->GetCommandQueue();
-		//	check(Queue);
-
-		//	if (g_rhi_dx12->ComputeCommandBufferManager && g_rhi_dx12->ComputeCommandBufferManager->Fence)
-		//		g_rhi_dx12->ComputeCommandBufferManager->Fence->SignalWithNextFenceValue(Queue.Get(), true);
-		//}
-			}
-	RenderFrameContextAsyncPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None);
-
-	if (EnableAtmosphericShadowing)
 	{
 		std::shared_ptr<jRenderTarget> AtmosphericShadowing = RenderFrameContextPtr->SceneRenderTargetPtr->AtmosphericShadowing;
 
