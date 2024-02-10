@@ -3,7 +3,7 @@
 #include "Renderer/jSceneRenderTargets.h"
 #include "../jCommandBufferManager.h"
 
-std::shared_ptr<jRenderFrameContext> jRenderFrameContext_Vulkan::CreateRenderFrameContextAsync(const std::vector<jFence*>& InPrerequisites) const
+std::shared_ptr<jRenderFrameContext> jRenderFrameContext_Vulkan::CreateRenderFrameContextAsync(const std::shared_ptr<jCommandQueueAcrossSyncObject>& InSync) const
 {
     auto NewRenderFrameContext = std::make_shared<jRenderFrameContext_Vulkan>();
     *NewRenderFrameContext = *this;
@@ -14,8 +14,10 @@ std::shared_ptr<jRenderFrameContext> jRenderFrameContext_Vulkan::CreateRenderFra
     return NewRenderFrameContext;
 }
 
-void jRenderFrameContext_Vulkan::SubmitCurrentActiveCommandBuffer(ECurrentRenderPass InCurrentRenderPass, bool bWaitUntilExecuteComplete)
+std::shared_ptr<jCommandQueueAcrossSyncObject> jRenderFrameContext_Vulkan::SubmitCurrentActiveCommandBuffer(ECurrentRenderPass InCurrentRenderPass, bool bWaitUntilExecuteComplete)
 {
+    std::shared_ptr<jCommandQueueAcrossSyncObject_DX12> CommandQueueSyncObjectPtr;
+
     jSwapchainImage_Vulkan* SwapchainImage_Vulkan = (jSwapchainImage_Vulkan*)g_rhi->GetSwapchainImage(FrameIndex);
     if (CommandBuffer->Type == ECommandBufferType::GRAPHICS)
     {
@@ -25,6 +27,7 @@ void jRenderFrameContext_Vulkan::SubmitCurrentActiveCommandBuffer(ECurrentRender
     {
         QueueSubmitCurrentActiveCommandBuffer(SwapchainImage_Vulkan->ComputeQueueSubmitSemaphore, bWaitUntilExecuteComplete);
     }
+    return CommandQueueSyncObjectPtr;
 }
 
 void jRenderFrameContext_Vulkan::QueueSubmitCurrentActiveCommandBuffer(jSemaphore* InSignalSemaphore, bool bWaitUntilExecuteComplete)

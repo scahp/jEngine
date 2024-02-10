@@ -5,6 +5,14 @@ class jFence;
 class jResourceBarrierBatcher;
 struct jQueryPool;
 
+// Make a syncronization between CommandQueues(Graphics, Compute, Copy)
+struct jCommandQueueAcrossSyncObject : std::enable_shared_from_this<jCommandQueueAcrossSyncObject>
+{
+    virtual ~jCommandQueueAcrossSyncObject() {}
+
+    virtual void WaitCommandQueueAcrossSync(ECommandBufferType InWaitCommandQueueType) {};
+};
+
 class jCommandBuffer
 {
 public:
@@ -34,6 +42,7 @@ public:
 
     virtual jCommandBuffer* GetOrCreateCommandBuffer() = 0;
     virtual void ReturnCommandBuffer(jCommandBuffer* commandBuffer) = 0;
-
+    
+    virtual void WaitCommandQueueAcrossSync(const std::shared_ptr<jCommandQueueAcrossSyncObject>& InSync) {}
     virtual jQueryPool* GetQueryTimePool() const { return nullptr; }
 };

@@ -1,8 +1,9 @@
 ﻿#pragma once
 
 class jCommandBuffer;
-struct jSceneRenderTarget;
 class jRaytracingScene;
+struct jSceneRenderTarget;
+struct jCommandQueueAcrossSyncObject;
 
 struct jRenderFrameContext : public std::enable_shared_from_this<jRenderFrameContext>
 {
@@ -25,9 +26,9 @@ struct jRenderFrameContext : public std::enable_shared_from_this<jRenderFrameCon
     virtual bool BeginActiveCommandBuffer();
     virtual bool EndActiveCommandBuffer();
 
-    virtual void SubmitCurrentActiveCommandBuffer(ECurrentRenderPass InCurrentRenderPass, bool IsWaitUntilFinish = true) {}
+    virtual std::shared_ptr<jCommandQueueAcrossSyncObject> SubmitCurrentActiveCommandBuffer(ECurrentRenderPass InCurrentRenderPass, bool IsWaitUntilFinish = true) { return std::shared_ptr<jCommandQueueAcrossSyncObject>(); }
 
-    virtual std::shared_ptr<jRenderFrameContext> CreateRenderFrameContextAsync(const std::vector<jFence*>& InPrerequisites = std::vector<jFence*>()) const { return nullptr; }
+    virtual std::shared_ptr<jRenderFrameContext> CreateRenderFrameContextAsync(const std::shared_ptr<jCommandQueueAcrossSyncObject>& InSync = nullptr) const { return nullptr; }
     ECommandBufferType GetCommandBufferType() const { check(CommandBuffer); return CommandBuffer->Type; }
 
 public:

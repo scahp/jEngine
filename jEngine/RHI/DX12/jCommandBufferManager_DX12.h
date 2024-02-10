@@ -9,6 +9,19 @@ struct jQueryPoolTime_DX12;
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
 
+// DX12 is using Fence for sync between CommandQueues
+struct jCommandQueueAcrossSyncObject_DX12 : public jCommandQueueAcrossSyncObject
+{
+    jCommandQueueAcrossSyncObject_DX12(ECommandBufferType InType, jFence_DX12* InFence, uint64 InFenceValue = -1);
+    virtual ~jCommandQueueAcrossSyncObject_DX12() {}
+  
+    virtual void WaitCommandQueueAcrossSync(ECommandBufferType InWaitCommandQueueType) override;
+
+    ECommandBufferType Type = ECommandBufferType::MAX;
+    jFence_DX12* Fence = nullptr;
+    uint64 FenceValue = 0;
+};
+
 struct jCommandBuffer_DX12 : public jCommandBuffer
 {
     jCommandBuffer_DX12(ECommandBufferType InType) : jCommandBuffer(InType) {}
@@ -68,7 +81,8 @@ public:
     FORCEINLINE ComPtr<ID3D12CommandQueue> GetCommandQueue() const { return CommandQueue; }
 
     // CommandList
-    void ExecuteCommandList(jCommandBuffer_DX12* InCommandList, bool bWaitUntilExecuteComplete = false);
+    std::shared_ptr<jCommandQueueAcrossSyncObject_DX12> ExecuteCommandList(jCommandBuffer_DX12* InCommandList, bool bWaitUntilExecuteComplete = false);
+    virtual void WaitCommandQueueAcrossSync(const std::shared_ptr<jCommandQueueAcrossSyncObject>& InSync) override;
 
     virtual jQueryPool* GetQueryTimePool() const override;
 

@@ -12,7 +12,7 @@ struct jRenderFrameContext_DX12 : public jRenderFrameContext
     {}
     virtual ~jRenderFrameContext_DX12() {}
 
-    virtual std::shared_ptr<jRenderFrameContext> CreateRenderFrameContextAsync(const std::vector<jFence*>& InPrerequisites = std::vector<jFence*>()) const override;
-    virtual void QueueSubmitCurrentActiveCommandBuffer();
-    virtual void SubmitCurrentActiveCommandBuffer(ECurrentRenderPass InCurrentRenderPass, bool bWaitUntilExecuteComplete = true) override;
+    virtual std::shared_ptr<jRenderFrameContext> CreateRenderFrameContextAsync(const std::shared_ptr<jCommandQueueAcrossSyncObject>& InSync = nullptr) const override;
+    virtual std::shared_ptr<jCommandQueueAcrossSyncObject_DX12> QueueSubmitCurrentActiveCommandBuffer();
+    virtual std::shared_ptr<jCommandQueueAcrossSyncObject> SubmitCurrentActiveCommandBuffer(ECurrentRenderPass InCurrentRenderPass, bool bWaitUntilExecuteComplete = true) override;
 };

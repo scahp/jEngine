@@ -1,6 +1,28 @@
 ﻿#include "pch.h"
 #include "jCommandBufferManager_DX12.h"
 #include "jQueryPoolTime_DX12.h"
+#include "jFenceManager_DX12.h"
+
+jCommandQueueAcrossSyncObject_DX12::jCommandQueueAcrossSyncObject_DX12(ECommandBufferType InType, jFence_DX12* InFence, uint64 InFenceValue)
+    : Type(InType), Fence(InFence), FenceValue(InFenceValue)
+{
+    check(InFence);
+    if (InFenceValue == -1)
+    {
+        FenceValue = InFence->FenceValue;
+    }
+}
+
+void jCommandQueueAcrossSyncObject_DX12::WaitCommandQueueAcrossSync(ECommandBufferType InWaitCommandQueueType)
+{
+    if (!ensure(InWaitCommandQueueType != Type))
+        return;
+
+    auto CommandBufferManager = g_rhi->GetCommandBufferManager2(InWaitCommandQueueType);
+    check(CommandBufferManager);
+
+    CommandBufferManager->WaitCommandQueueAcrossSync(shared_from_this());
+}
 
 bool jCommandBuffer_DX12::Begin() const
 {
@@ -163,17 +185,31 @@ bool jCommandBufferManager_DX12::Initialize(ComPtr<ID3D12Device> InDevice)
     return true;
 }
 
-void jCommandBufferManager_DX12::ExecuteCommandList(jCommandBuffer_DX12* InCommandList, bool bWaitUntilExecuteComplete)
+std::shared_ptr<jCommandQueueAcrossSyncObject_DX12> jCommandBufferManager_DX12::ExecuteCommandList(jCommandBuffer_DX12* InCommandList, bool bWaitUntilExecuteComplete)
 {
-    if (!InCommandList->End())
-        return;
-
-    ID3D12CommandList* pCommandLists[] = { InCommandList->Get() };
-    CommandQueue->ExecuteCommandLists(1, pCommandLists);
-    if (ensure(InCommandList->Owner->Fence))
+    std::shared_ptr< jCommandQueueAcrossSyncObject_DX12> CommandQueueSyncObjectPtr;
+    if (InCommandList->End())
     {
-        InCommandList->FenceValue = InCommandList->Owner->Fence->SignalWithNextFenceValue(InCommandList->Owner->CommandQueue.Get(), bWaitUntilExecuteComplete);
+        ID3D12CommandList* pCommandLists[] = { InCommandList->Get() };
+        CommandQueue->ExecuteCommandLists(1, pCommandLists);
+
+        if (ensure(InCommandList->Owner->Fence))
+        {
+            InCommandList->FenceValue = InCommandList->Owner->Fence->SignalWithNextFenceValue(InCommandList->Owner->CommandQueue.Get(), bWaitUntilExecuteComplete);
+            CommandQueueSyncObjectPtr = std::make_shared<jCommandQueueAcrossSyncObject_DX12>(InCommandList->Type, InCommandList->Owner->Fence);
+        }
     }
+    return CommandQueueSyncObjectPtr;
+}
+
+void jCommandBufferManager_DX12::WaitCommandQueueAcrossSync(const std::shared_ptr<jCommandQueueAcrossSyncObject>& InSync)
+{
+    check(CommandQueue);
+    check(InSync);
+
+    auto Sync_DX12 = (jCommandQueueAcrossSyncObject_DX12*)InSync.get();
+    check(Sync_DX12->Fence);
+    CommandQueue->Wait(Sync_DX12->Fence->Fence.Get(), Sync_DX12->FenceValue);
 }
 
 jQueryPool* jCommandBufferManager_DX12::GetQueryTimePool() const

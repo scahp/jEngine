@@ -26,7 +26,10 @@ void jRenderer::AtmosphericShadow()
     }
     check(DirectionalLight);
 
-    std::shared_ptr<jRenderFrameContext> RenderFrameContextAsyncPtr = RenderFrameContextPtr->CreateRenderFrameContextAsync();
+	auto CommandQueueAcrossSyncObjectPtr = RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None, false);
+
+    std::shared_ptr<jRenderFrameContext> RenderFrameContextAsyncPtr = RenderFrameContextPtr->CreateRenderFrameContextAsync(CommandQueueAcrossSyncObjectPtr);
+
     RenderFrameContextAsyncPtr->GetActiveCommandBuffer()->Begin();
 
     auto ShadowMapTexture = RenderFrameContextPtr->SceneRenderTargetPtr->GetShadowMap(DirectionalLight)->GetTexture();
@@ -52,7 +55,7 @@ void jRenderer::AtmosphericShadow()
 
         //g_rhi_dx12->WaitForGPU();
 
-		g_rhi->TransitionLayout(RenderFrameContextAsyncPtr->GetActiveCommandBuffer(), AtmosphericShadowing->GetTexture(), EResourceLayout::UAV);
+		//g_rhi->TransitionLayout(RenderFrameContextAsyncPtr->GetActiveCommandBuffer(), AtmosphericShadowing->GetTexture(), EResourceLayout::UAV);
     }
 
 	{
@@ -178,8 +181,10 @@ void jRenderer::AtmosphericShadow()
 		int32 Y = (Height / 16) + ((Height % 16) ? 1 : 0);
 		g_rhi->DispatchCompute(RenderFrameContextAsyncPtr, X, Y, 1);
 	}
-    RenderFrameContextAsyncPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None);
+    auto ComputeCommandQueueAcrossSyncObject = RenderFrameContextAsyncPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None, false);
+	ComputeCommandQueueAcrossSyncObject->WaitCommandQueueAcrossSync(ECommandBufferType::GRAPHICS);
 
+	if (1)
 	{
 		std::shared_ptr<jRenderTarget> AtmosphericShadowing = RenderFrameContextPtr->SceneRenderTargetPtr->AtmosphericShadowing;
 

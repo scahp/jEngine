@@ -1023,7 +1023,7 @@ void jRHI_DX12::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& InRen
     g_rhi->TransitionLayout(CommandBuffer, CurrentSwapchainImage->TexturePtr.get(), EResourceLayout::PRESENT_SRC);
 	CommandBufferManager->ExecuteCommandList(CommandBuffer);
 
-    CurrentSwapchainImage->FenceValue = CommandBuffer->Owner->Fence->SignalWithNextFenceValue(CommandBufferManager->GetCommandQueue().Get());
+     CurrentSwapchainImage->FenceValue = CommandBuffer->FenceValue;
 
     HRESULT hr = S_OK;
     if (g_rhi->IsSupportVSync())
