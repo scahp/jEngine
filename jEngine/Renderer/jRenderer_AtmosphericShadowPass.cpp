@@ -28,7 +28,7 @@ void jRenderer::AtmosphericShadow()
     check(DirectionalLight);
 
 	// Compute Test 용
-    static bool UseCompute = true;
+    static bool UseCompute = false;
 	if (UseCompute)
 		g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), EResourceLayout::UAV);
 
@@ -185,18 +185,20 @@ void jRenderer::AtmosphericShadow()
 		g_rhi->DispatchCompute(RenderFrameContextAsyncPtr, X, Y, 1);
 	}
 
-	static bool ComputeApply = true;
-    if (ComputeApply)
+    if (UseCompute)
     {
-        if (UseCompute)
+		static bool UseAsyncComputeQueue = true;
+        if (UseCompute && !UseAsyncComputeQueue)
         {
             auto ComputeSyncAcrossCommandQueuePtr = RenderFrameContextAsyncPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None, false);
             ComputeSyncAcrossCommandQueuePtr->WaitSyncAcrossCommandQueue(ECommandBufferType::GRAPHICS);
         }
 
-        auto RT = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr;
+		auto CurrentRenderFrameContextPtr = UseAsyncComputeQueue ? RenderFrameContextAsyncPtr : RenderFrameContextPtr;
+
+        auto RT = CurrentRenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr;
 		auto AtmosphericTexture = AtmosphericShadowing->GetTexture();
-		//auto AtmosphericTexture = RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[2]->GetTexture();
+		//auto AtmosphericTexture = CurrentRenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[2]->GetTexture();
         const int32 Width = RT->Info.Width;
         const int32 Height = RT->Info.Height;
 
@@ -215,7 +217,7 @@ void jRenderer::AtmosphericShadow()
             jNameStatic("AtmosphericShadowingApplyOneFrameUniformBuffer"), jLifeTimeType::OneFrame, sizeof(CommonComputeData)));
         OneFrameUniformBuffer->UpdateBufferData(&CommonComputeData, sizeof(CommonComputeData));
 
-        jRHIUtil::DispatchCompute(RenderFrameContextPtr, RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture()
+        jRHIUtil::DispatchCompute(CurrentRenderFrameContextPtr, CurrentRenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture()
             , [&](const std::shared_ptr<jRenderFrameContext>& RenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
             {
 				if (UseCompute)
@@ -248,6 +250,12 @@ void jRenderer::AtmosphericShadow()
                     return Shader;
                 }
             );
+
+        if (UseCompute && UseAsyncComputeQueue)
+        {
+            auto ComputeSyncAcrossCommandQueuePtr = RenderFrameContextAsyncPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None, false);
+            ComputeSyncAcrossCommandQueuePtr->WaitSyncAcrossCommandQueue(ECommandBufferType::GRAPHICS);
+        }
     }
     else
 	{
