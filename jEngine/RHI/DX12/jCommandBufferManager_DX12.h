@@ -10,12 +10,12 @@ using Microsoft::WRL::ComPtr;
 using namespace DirectX;
 
 // DX12 is using Fence for sync between CommandQueues
-struct jCommandQueueAcrossSyncObject_DX12 : public jCommandQueueAcrossSyncObject
+struct jSyncAcrossCommandQueue_DX12 : public jSyncAcrossCommandQueue
 {
-    jCommandQueueAcrossSyncObject_DX12(ECommandBufferType InType, jFence_DX12* InFence, uint64 InFenceValue = -1);
-    virtual ~jCommandQueueAcrossSyncObject_DX12() {}
+    jSyncAcrossCommandQueue_DX12(ECommandBufferType InType, jFence_DX12* InFence, uint64 InFenceValue = -1);
+    virtual ~jSyncAcrossCommandQueue_DX12() {}
   
-    virtual void WaitCommandQueueAcrossSync(ECommandBufferType InWaitCommandQueueType) override;
+    virtual void WaitSyncAcrossCommandQueue(ECommandBufferType InWaitCommandQueueType) override;
 
     ECommandBufferType Type = ECommandBufferType::MAX;
     jFence_DX12* Fence = nullptr;
@@ -81,8 +81,8 @@ public:
     FORCEINLINE ComPtr<ID3D12CommandQueue> GetCommandQueue() const { return CommandQueue; }
 
     // CommandList
-    std::shared_ptr<jCommandQueueAcrossSyncObject_DX12> ExecuteCommandList(jCommandBuffer_DX12* InCommandList, bool bWaitUntilExecuteComplete = false);
-    virtual void WaitCommandQueueAcrossSync(const std::shared_ptr<jCommandQueueAcrossSyncObject>& InSync) override;
+    std::shared_ptr<jSyncAcrossCommandQueue_DX12> ExecuteCommandList(jCommandBuffer_DX12* InCommandList, bool bWaitUntilExecuteComplete = false);
+    virtual void WaitCommandQueueAcrossSync(const std::shared_ptr<jSyncAcrossCommandQueue>& InSync) override;
 
     virtual jQueryPool* GetQueryTimePool() const override;
 

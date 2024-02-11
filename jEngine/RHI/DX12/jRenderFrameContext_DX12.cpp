@@ -4,10 +4,10 @@
 #include "../jCommandBufferManager.h"
 #include "jSwapchain_DX12.h"
 
-std::shared_ptr<jRenderFrameContext> jRenderFrameContext_DX12::CreateRenderFrameContextAsync(const std::shared_ptr<jCommandQueueAcrossSyncObject>& InSync) const
+std::shared_ptr<jRenderFrameContext> jRenderFrameContext_DX12::CreateRenderFrameContextAsync(const std::shared_ptr<jSyncAcrossCommandQueue>& InSync) const
 {
     if (InSync)
-        InSync->WaitCommandQueueAcrossSync(ECommandBufferType::COMPUTE);
+        InSync->WaitSyncAcrossCommandQueue(ECommandBufferType::COMPUTE);
 
     auto NewRenderFrameContext = std::make_shared<jRenderFrameContext_DX12>();
     *NewRenderFrameContext = *this;
@@ -18,9 +18,9 @@ std::shared_ptr<jRenderFrameContext> jRenderFrameContext_DX12::CreateRenderFrame
     return NewRenderFrameContext;
 }
 
-std::shared_ptr<jCommandQueueAcrossSyncObject_DX12> jRenderFrameContext_DX12::QueueSubmitCurrentActiveCommandBuffer()
+std::shared_ptr<jSyncAcrossCommandQueue_DX12> jRenderFrameContext_DX12::QueueSubmitCurrentActiveCommandBuffer()
 {
-    std::shared_ptr<jCommandQueueAcrossSyncObject_DX12> CommandQueueSyncObjectPtr;
+    std::shared_ptr<jSyncAcrossCommandQueue_DX12> CommandQueueSyncObjectPtr;
     if (CommandBuffer)
     {
         jCommandBuffer_DX12* CommandBuffer_DX12 = (jCommandBuffer_DX12*)CommandBuffer;
@@ -38,9 +38,9 @@ std::shared_ptr<jCommandQueueAcrossSyncObject_DX12> jRenderFrameContext_DX12::Qu
     return CommandQueueSyncObjectPtr;
 }
 
-std::shared_ptr<jCommandQueueAcrossSyncObject> jRenderFrameContext_DX12::SubmitCurrentActiveCommandBuffer(ECurrentRenderPass InCurrentRenderPass, bool bWaitUntilExecuteComplete)
+std::shared_ptr<jSyncAcrossCommandQueue> jRenderFrameContext_DX12::SubmitCurrentActiveCommandBuffer(ECurrentRenderPass InCurrentRenderPass, bool bWaitUntilExecuteComplete)
 {
-    std::shared_ptr<jCommandQueueAcrossSyncObject_DX12> CommandQueueSyncObjectPtr;
+    std::shared_ptr<jSyncAcrossCommandQueue_DX12> CommandQueueSyncObjectPtr;
     if (CommandBuffer)
     {
         jCommandBuffer_DX12* CommandBuffer_DX12 = (jCommandBuffer_DX12*)CommandBuffer;

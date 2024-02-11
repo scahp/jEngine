@@ -26,9 +26,9 @@ void jRenderer::AtmosphericShadow()
     }
     check(DirectionalLight);
 
-	auto CommandQueueAcrossSyncObjectPtr = RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None, false);
+	auto SyncAcrossCommandQueuePtr = RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None, false);
 
-    std::shared_ptr<jRenderFrameContext> RenderFrameContextAsyncPtr = RenderFrameContextPtr->CreateRenderFrameContextAsync(CommandQueueAcrossSyncObjectPtr);
+    std::shared_ptr<jRenderFrameContext> RenderFrameContextAsyncPtr = RenderFrameContextPtr->CreateRenderFrameContextAsync(SyncAcrossCommandQueuePtr);
 
     RenderFrameContextAsyncPtr->GetActiveCommandBuffer()->Begin();
 
@@ -181,8 +181,8 @@ void jRenderer::AtmosphericShadow()
 		int32 Y = (Height / 16) + ((Height % 16) ? 1 : 0);
 		g_rhi->DispatchCompute(RenderFrameContextAsyncPtr, X, Y, 1);
 	}
-    auto ComputeCommandQueueAcrossSyncObject = RenderFrameContextAsyncPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None, false);
-	ComputeCommandQueueAcrossSyncObject->WaitCommandQueueAcrossSync(ECommandBufferType::GRAPHICS);
+    auto ComputeSyncAcrossCommandQueuePtr = RenderFrameContextAsyncPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None, false);
+	ComputeSyncAcrossCommandQueuePtr->WaitSyncAcrossCommandQueue(ECommandBufferType::GRAPHICS);
 
 	if (1)
 	{

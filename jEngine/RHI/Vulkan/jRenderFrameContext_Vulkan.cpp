@@ -3,7 +3,7 @@
 #include "Renderer/jSceneRenderTargets.h"
 #include "../jCommandBufferManager.h"
 
-std::shared_ptr<jRenderFrameContext> jRenderFrameContext_Vulkan::CreateRenderFrameContextAsync(const std::shared_ptr<jCommandQueueAcrossSyncObject>& InSync) const
+std::shared_ptr<jRenderFrameContext> jRenderFrameContext_Vulkan::CreateRenderFrameContextAsync(const std::shared_ptr<jSyncAcrossCommandQueue>& InSync) const
 {
     auto NewRenderFrameContext = std::make_shared<jRenderFrameContext_Vulkan>();
     *NewRenderFrameContext = *this;
@@ -14,9 +14,9 @@ std::shared_ptr<jRenderFrameContext> jRenderFrameContext_Vulkan::CreateRenderFra
     return NewRenderFrameContext;
 }
 
-std::shared_ptr<jCommandQueueAcrossSyncObject> jRenderFrameContext_Vulkan::SubmitCurrentActiveCommandBuffer(ECurrentRenderPass InCurrentRenderPass, bool bWaitUntilExecuteComplete)
+std::shared_ptr<jSyncAcrossCommandQueue> jRenderFrameContext_Vulkan::SubmitCurrentActiveCommandBuffer(ECurrentRenderPass InCurrentRenderPass, bool bWaitUntilExecuteComplete)
 {
-    std::shared_ptr<jCommandQueueAcrossSyncObject_DX12> CommandQueueSyncObjectPtr;
+    std::shared_ptr<jSyncAcrossCommandQueue_DX12> CommandQueueSyncObjectPtr;
 
     jSwapchainImage_Vulkan* SwapchainImage_Vulkan = (jSwapchainImage_Vulkan*)g_rhi->GetSwapchainImage(FrameIndex);
     if (CommandBuffer->Type == ECommandBufferType::GRAPHICS)
