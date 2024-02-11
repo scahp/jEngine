@@ -25,7 +25,7 @@ struct jSyncAcrossCommandQueue_DX12 : public jSyncAcrossCommandQueue
 struct jCommandBuffer_DX12 : public jCommandBuffer
 {
     jCommandBuffer_DX12(ECommandBufferType InType) : jCommandBuffer(InType) {}
-    virtual ~jCommandBuffer_DX12() {}
+    virtual ~jCommandBuffer_DX12();
 
     ID3D12GraphicsCommandList4* Get() const
     {

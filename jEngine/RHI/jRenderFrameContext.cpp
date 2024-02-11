@@ -26,7 +26,12 @@ void jRenderFrameContext::Destroy()
 {
     if (CommandBuffer)
     {
-        jCommandBufferManager* CommandBufferManager = g_rhi->GetCommandBufferManager2(CommandBuffer->Type);
+        auto CommandBufferManager = (jCommandBufferManager_DX12*)g_rhi->GetCommandBufferManager2(CommandBuffer->Type);
+        
+        if (!CommandBuffer->IsEnd())
+        {
+            CommandBufferManager->ExecuteCommandList((jCommandBuffer_DX12*)CommandBuffer);
+        }
 
         check(CommandBufferManager);
         CommandBufferManager->ReturnCommandBuffer(CommandBuffer);

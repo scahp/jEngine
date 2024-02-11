@@ -24,6 +24,11 @@ void jSyncAcrossCommandQueue_DX12::WaitSyncAcrossCommandQueue(ECommandBufferType
     CommandBufferManager->WaitCommandQueueAcrossSync(shared_from_this());
 }
 
+jCommandBuffer_DX12::~jCommandBuffer_DX12()
+{
+    check(IsClosed);
+}
+
 bool jCommandBuffer_DX12::Begin() const
 {
     Reset();

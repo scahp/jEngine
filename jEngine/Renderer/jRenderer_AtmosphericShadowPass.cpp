@@ -9,6 +9,7 @@
 #include "Scene/Light/jDirectionalLight.h"
 #include "jOptions.h"
 #include "Scene/jRenderObject.h"
+#include "RHI/jRHIUtil.h"
 
 void jRenderer::AtmosphericShadow()
 {
@@ -26,11 +27,13 @@ void jRenderer::AtmosphericShadow()
     }
     check(DirectionalLight);
 
-	auto SyncAcrossCommandQueuePtr = RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None, false);
+	// Compute Test 용
+    static bool UseCompute = true;
+	if (UseCompute)
+		g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), EResourceLayout::UAV);
 
-    std::shared_ptr<jRenderFrameContext> RenderFrameContextAsyncPtr = RenderFrameContextPtr->CreateRenderFrameContextAsync(SyncAcrossCommandQueuePtr);
-
-    RenderFrameContextAsyncPtr->GetActiveCommandBuffer()->Begin();
+	std::shared_ptr<jSyncAcrossCommandQueue> SyncAcrossCommandQueuePtr = RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None, false);
+    std::shared_ptr<jRenderFrameContext> RenderFrameContextAsyncPtr = UseCompute ? RenderFrameContextPtr->CreateRenderFrameContextAsync(SyncAcrossCommandQueuePtr) : RenderFrameContextPtr;
 
     auto ShadowMapTexture = RenderFrameContextPtr->SceneRenderTargetPtr->GetShadowMap(DirectionalLight)->GetTexture();
     check(ShadowMapTexture);
@@ -62,9 +65,9 @@ void jRenderer::AtmosphericShadow()
 		jCamera* MainCamera = jCamera::GetMainCamera();
 		check(MainCamera);
 
-		SCOPE_CPU_PROFILE(AtmosphericShadowing);
-		SCOPE_GPU_PROFILE(RenderFrameContextAsyncPtr, AtmosphericShadowing);
-		DEBUG_EVENT_WITH_COLOR(RenderFrameContextAsyncPtr, "AtmosphericShadowing", Vector4(0.8f, 0.8f, 0.8f, 1.0f));
+		//SCOPE_CPU_PROFILE(AtmosphericShadowing);
+		//SCOPE_GPU_PROFILE(RenderFrameContextAsyncPtr, AtmosphericShadowing);
+		//DEBUG_EVENT_WITH_COLOR(RenderFrameContextAsyncPtr, "AtmosphericShadowing", Vector4(0.8f, 0.8f, 0.8f, 1.0f));
 
 		int32 Width = AtmosphericShadowing->Info.Width;
 		int32 Height = AtmosphericShadowing->Info.Height;
@@ -181,11 +184,79 @@ void jRenderer::AtmosphericShadow()
 		int32 Y = (Height / 16) + ((Height % 16) ? 1 : 0);
 		g_rhi->DispatchCompute(RenderFrameContextAsyncPtr, X, Y, 1);
 	}
-    auto ComputeSyncAcrossCommandQueuePtr = RenderFrameContextAsyncPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None, false);
-	ComputeSyncAcrossCommandQueuePtr->WaitSyncAcrossCommandQueue(ECommandBufferType::GRAPHICS);
 
-	if (1)
+	static bool ComputeApply = true;
+    if (ComputeApply)
+    {
+        if (UseCompute)
+        {
+            auto ComputeSyncAcrossCommandQueuePtr = RenderFrameContextAsyncPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None, false);
+            ComputeSyncAcrossCommandQueuePtr->WaitSyncAcrossCommandQueue(ECommandBufferType::GRAPHICS);
+        }
+
+        auto RT = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr;
+		auto AtmosphericTexture = AtmosphericShadowing->GetTexture();
+		//auto AtmosphericTexture = RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[2]->GetTexture();
+        const int32 Width = RT->Info.Width;
+        const int32 Height = RT->Info.Height;
+
+        struct CommonComputeUniformBuffer
+        {
+            int32 Width;
+            int32 Height;
+            int32 Paading0;
+            int32 Padding1;
+        };
+        CommonComputeUniformBuffer CommonComputeData;
+        CommonComputeData.Width = Width;
+        CommonComputeData.Height = Height;
+
+        auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
+            jNameStatic("AtmosphericShadowingApplyOneFrameUniformBuffer"), jLifeTimeType::OneFrame, sizeof(CommonComputeData)));
+        OneFrameUniformBuffer->UpdateBufferData(&CommonComputeData, sizeof(CommonComputeData));
+
+        jRHIUtil::DispatchCompute(RenderFrameContextPtr, RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture()
+            , [&](const std::shared_ptr<jRenderFrameContext>& RenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
+            {
+				if (UseCompute)
+				{
+				}
+				else
+				{
+					// Todo : Invalid flag for async compute qeue
+					g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RT->GetTexture(), EResourceLayout::UAV);
+					g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), AtmosphericTexture, EResourceLayout::SHADER_READ_ONLY);
+				}
+
+                const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+                    , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
+                    , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
+
+                InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
+                    , InOutResourceInlineAllactor.Alloc<jTextureResource>(AtmosphericTexture, SamplerState)));
+
+                InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
+                    , InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
+            }
+            , [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
+                {
+                    jShaderInfo shaderInfo;
+                    shaderInfo.SetName(jNameStatic("AtmosphericShadowingApplyCS"));
+                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/AtmosphericShadowingApply_cs.hlsl"));
+                    shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
+                    jShader* Shader = g_rhi->CreateShader(shaderInfo);
+                    return Shader;
+                }
+            );
+    }
+    else
 	{
+        if (UseCompute)
+        {
+            auto ComputeSyncAcrossCommandQueuePtr = RenderFrameContextAsyncPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None, false);
+            ComputeSyncAcrossCommandQueuePtr->WaitSyncAcrossCommandQueue(ECommandBufferType::GRAPHICS);
+        }
+
 		std::shared_ptr<jRenderTarget> AtmosphericShadowing = RenderFrameContextPtr->SceneRenderTargetPtr->AtmosphericShadowing;
 
 		auto RT = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr;
