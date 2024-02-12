@@ -726,6 +726,131 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
     }
 }
 
+void jRenderer::AsyncComputeTest(std::shared_ptr<jSyncAcrossCommandQueue> SyncAcrossCommandQueuePtr)
+{
+    std::shared_ptr<jRenderFrameContext> RenderFrameContextAsyncPtr = RenderFrameContextPtr->CreateRenderFrameContextAsync(SyncAcrossCommandQueuePtr);
+
+    static std::shared_ptr<jRenderTarget> AsyncComputeTestPtr;
+    if (!AsyncComputeTestPtr)
+    {
+        jRenderTargetInfo AsyncComputeTestRTInfo = { ETextureType::TEXTURE_2D, ETextureFormat::R11G11B10F, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f) };
+        AsyncComputeTestRTInfo.ResourceName = TEXT("AsyncComputeTestRT");
+        AsyncComputeTestRTInfo.TextureCreateFlag = ETextureCreateFlag::UAV;
+        AsyncComputeTestPtr = jRenderTargetPool::GetRenderTarget(AsyncComputeTestRTInfo);
+    }
+
+    //DebugRTs.push_back(AsyncComputeTestPtr->GetTexturePtr());
+
+    {
+        static bool UseAsyncComputeQueue = true;
+        static bool WaitSubsequentGraphicsQueueTask = true;
+
+        auto CurrentRenderFrameContextPtr = UseAsyncComputeQueue ? RenderFrameContextAsyncPtr : RenderFrameContextPtr;
+
+        int32 Width = AsyncComputeTestPtr->Info.Width;
+        int32 Height = AsyncComputeTestPtr->Info.Height;
+
+        struct CommonComputeUniformBuffer
+        {
+            int32 Width;
+            int32 Height;
+            int32 Paading0;
+            int32 Padding1;
+        };
+        CommonComputeUniformBuffer CommonComputeData;
+        CommonComputeData.Width = Width;
+        CommonComputeData.Height = Height;
+
+        auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
+            jNameStatic("AsyncComputeTestOneFrameUniformBuffer"), jLifeTimeType::OneFrame, sizeof(CommonComputeData)));
+        OneFrameUniformBuffer->UpdateBufferData(&CommonComputeData, sizeof(CommonComputeData));
+
+        {
+            SCOPE_CPU_PROFILE(AsyncComputeTest_A);
+            SCOPE_GPU_PROFILE(CurrentRenderFrameContextPtr, AsyncComputeTest_A);
+            DEBUG_EVENT_WITH_COLOR(CurrentRenderFrameContextPtr, "AsyncComputeTest_A", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
+
+            jRHIUtil::DispatchCompute(CurrentRenderFrameContextPtr, AsyncComputeTestPtr->GetTexture()
+                , [&](const std::shared_ptr<jRenderFrameContext>& RenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
+            {
+                InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
+                    , InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
+            }
+            , [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
+                {
+                    jShaderInfo shaderInfo;
+                    shaderInfo.SetName(jNameStatic("AyncComputeTestCS"));
+                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/AyncComputeTest_cs.hlsl"));
+                    shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
+                    shaderInfo.SetEntryPoint(jNameStatic("AsyncComputeTest_A"));
+                    jShader* Shader = g_rhi->CreateShader(shaderInfo);
+                    return Shader;
+                }
+            );
+        }
+
+        g_rhi->UAVBarrier(CurrentRenderFrameContextPtr->GetActiveCommandBuffer(), AsyncComputeTestPtr->GetTexture());
+
+        {
+            SCOPE_CPU_PROFILE(AsyncComputeTest_B);
+            SCOPE_GPU_PROFILE(CurrentRenderFrameContextPtr, AsyncComputeTest_B);
+            DEBUG_EVENT_WITH_COLOR(CurrentRenderFrameContextPtr, "AsyncComputeTest_B", Vector4(0.0f, 0.8f, 0.0f, 1.0f));
+
+            jRHIUtil::DispatchCompute(CurrentRenderFrameContextPtr, AsyncComputeTestPtr->GetTexture()
+                , [&](const std::shared_ptr<jRenderFrameContext>& RenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
+            {
+                InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
+                    , InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
+            }
+            , [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
+                {
+                    jShaderInfo shaderInfo;
+                    shaderInfo.SetName(jNameStatic("AyncComputeTestCS"));
+                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/AyncComputeTest_cs.hlsl"));
+                    shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
+                    shaderInfo.SetEntryPoint(jNameStatic("AsyncComputeTest_B"));
+                    jShader* Shader = g_rhi->CreateShader(shaderInfo);
+                    return Shader;
+                }
+            );
+        }
+
+        g_rhi->UAVBarrier(CurrentRenderFrameContextPtr->GetActiveCommandBuffer(), AsyncComputeTestPtr->GetTexture());
+
+        {
+            SCOPE_CPU_PROFILE(AsyncComputeTest_C);
+            SCOPE_GPU_PROFILE(CurrentRenderFrameContextPtr, AsyncComputeTest_C);
+            DEBUG_EVENT_WITH_COLOR(CurrentRenderFrameContextPtr, "AsyncComputeTest_C", Vector4(0.0f, 0.0f, 0.8f, 1.0f));
+
+            jRHIUtil::DispatchCompute(CurrentRenderFrameContextPtr, AsyncComputeTestPtr->GetTexture()
+                , [&](const std::shared_ptr<jRenderFrameContext>& RenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
+                {
+                    InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
+                        , InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
+                }
+                , [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
+                    {
+                        jShaderInfo shaderInfo;
+                        shaderInfo.SetName(jNameStatic("AyncComputeTestCS"));
+                        shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/AyncComputeTest_cs.hlsl"));
+                        shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
+                        shaderInfo.SetEntryPoint(jNameStatic("AsyncComputeTest_C"));
+                        jShader* Shader = g_rhi->CreateShader(shaderInfo);
+                        return Shader;
+                    }
+                );
+        }
+
+        if (UseAsyncComputeQueue)
+        {
+            auto SyncPtr = CurrentRenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None, false);
+
+            if (WaitSubsequentGraphicsQueueTask)
+                SyncPtr->WaitSyncAcrossCommandQueue(ECommandBufferType::GRAPHICS);
+        }
+    }
+}
+
 void jRenderer::DebugPasses()
 {
     SCOPE_CPU_PROFILE(DebugPasses);
@@ -935,6 +1060,9 @@ void jRenderer::Render()
     jSceneRenderTarget::FilteredEnvMap2 = EnvironmentCubeMap->GetTexture();
 #endif
 
+    std::shared_ptr<jSyncAcrossCommandQueue> Sync_ShadowPass;
+    std::shared_ptr<jSyncAcrossCommandQueue> Sync_BasePass;
+    std::shared_ptr<jSyncAcrossCommandQueue> Sync_AtmosphericShadowing;
     {
         Setup();
         ShadowPass();
@@ -944,7 +1072,7 @@ void jRenderer::Render()
         {
             SCOPE_CPU_PROFILE(QueueSubmitAfterShadowPass);
             //RenderFrameContextPtr->GetActiveCommandBuffer()->End();
-            RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::ShadowPass);
+            Sync_ShadowPass = RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::ShadowPass);
             RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
         }
 
@@ -955,14 +1083,19 @@ void jRenderer::Render()
         {
             SCOPE_CPU_PROFILE(QueueSubmitAfterBasePass);
             //RenderFrameContextPtr->GetActiveCommandBuffer()->End();
-            RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::BasePass, false);
+            Sync_BasePass = RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::BasePass, false);
             RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
         }
     }
 
     {
         AOPass();
-		AtmosphericShadow();
+        {
+            AtmosphericShadow();
+            Sync_AtmosphericShadowing = RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::BasePass, false);
+            RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
+        }
+        AsyncComputeTest(Sync_BasePass);
     }
 
     PostProcess();

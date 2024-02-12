@@ -43,11 +43,12 @@ public:
     virtual void Setup();
     virtual void ShadowPass();
     virtual void BasePass();
+    void DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass);
 
     virtual void AtmosphericShadow();
     virtual void AOPass();
-
-    void DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass);
+    
+    void AsyncComputeTest(std::shared_ptr<jSyncAcrossCommandQueue> SyncAcrossCommandQueuePtr);
 
     virtual void PostProcess();
     virtual void DebugPasses();

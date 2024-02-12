@@ -32,8 +32,8 @@ void jRenderer::AtmosphericShadow()
     check(ShadowMapTexture);
 
 	// Compute Test 용
-    static bool UseCompute = true;
-	if (UseCompute)
+    static bool UseAsyncCompute = false;
+	if (UseAsyncCompute)
 	{
 		// Todo : Invalid flag for async compute queue
 		g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), EResourceLayout::UAV);
@@ -41,7 +41,7 @@ void jRenderer::AtmosphericShadow()
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), AtmosphericShadowing->GetTexture(), EResourceLayout::UAV);
 
 	std::shared_ptr<jSyncAcrossCommandQueue> SyncAcrossCommandQueuePtr = RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None, false);
-    std::shared_ptr<jRenderFrameContext> RenderFrameContextAsyncPtr = UseCompute ? RenderFrameContextPtr->CreateRenderFrameContextAsync(SyncAcrossCommandQueuePtr) : RenderFrameContextPtr;
+    std::shared_ptr<jRenderFrameContext> RenderFrameContextAsyncPtr = UseAsyncCompute ? RenderFrameContextPtr->CreateRenderFrameContextAsync(SyncAcrossCommandQueuePtr) : RenderFrameContextPtr;
 
     // https://www.gamedev.net/forums/topic/673079-error-using-resource-barrier-from-multiple-commandlists-for-same-resource/
 	// AsyncComputeQueue doesn't have any ability for transition to SHADER_READ_ONLY.
@@ -66,9 +66,9 @@ void jRenderer::AtmosphericShadow()
 		jCamera* MainCamera = jCamera::GetMainCamera();
 		check(MainCamera);
 
-		//SCOPE_CPU_PROFILE(AtmosphericShadowing);
-		//SCOPE_GPU_PROFILE(RenderFrameContextAsyncPtr, AtmosphericShadowing);
-		//DEBUG_EVENT_WITH_COLOR(RenderFrameContextAsyncPtr, "AtmosphericShadowing", Vector4(0.8f, 0.8f, 0.8f, 1.0f));
+		SCOPE_CPU_PROFILE(AtmosphericShadowing);
+		SCOPE_GPU_PROFILE(RenderFrameContextAsyncPtr, AtmosphericShadowing);
+		DEBUG_EVENT_WITH_COLOR(RenderFrameContextAsyncPtr, "AtmosphericShadowing", Vector4(0.8f, 0.8f, 0.8f, 1.0f));
 
 		int32 Width = AtmosphericShadowing->Info.Width;
 		int32 Height = AtmosphericShadowing->Info.Height;
@@ -186,10 +186,10 @@ void jRenderer::AtmosphericShadow()
 		g_rhi->DispatchCompute(RenderFrameContextAsyncPtr, X, Y, 1);
 	}
 
-    if (UseCompute)
+    if (UseAsyncCompute)
     {
-		static bool UseAsyncComputeQueue = true;
-        if (UseCompute && !UseAsyncComputeQueue)
+		static bool UseAsyncComputeQueue = false;
+        if (UseAsyncCompute && !UseAsyncComputeQueue)
         {
             auto ComputeSyncAcrossCommandQueuePtr = RenderFrameContextAsyncPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None, false);
             ComputeSyncAcrossCommandQueuePtr->WaitSyncAcrossCommandQueue(ECommandBufferType::GRAPHICS);
@@ -220,7 +220,7 @@ void jRenderer::AtmosphericShadow()
         jRHIUtil::DispatchCompute(CurrentRenderFrameContextPtr, CurrentRenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture()
             , [&](const std::shared_ptr<jRenderFrameContext>& RenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
             {
-				if (UseCompute)
+				if (UseAsyncCompute)
 				{
 					if (IsUseVulkan())
 					{
@@ -256,7 +256,7 @@ void jRenderer::AtmosphericShadow()
                 }
             );
 
-        if (UseCompute && UseAsyncComputeQueue)
+        if (UseAsyncCompute && UseAsyncComputeQueue)
         {
             auto ComputeSyncAcrossCommandQueuePtr = RenderFrameContextAsyncPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None, false);
             ComputeSyncAcrossCommandQueuePtr->WaitSyncAcrossCommandQueue(ECommandBufferType::GRAPHICS);
@@ -264,7 +264,7 @@ void jRenderer::AtmosphericShadow()
     }
     else
 	{
-        if (UseCompute)
+        if (UseAsyncCompute)
         {
             auto ComputeSyncAcrossCommandQueuePtr = RenderFrameContextAsyncPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None, false);
             ComputeSyncAcrossCommandQueuePtr->WaitSyncAcrossCommandQueue(ECommandBufferType::GRAPHICS);
@@ -363,5 +363,7 @@ void jRenderer::AtmosphericShadow()
 			RenderPass->EndRenderPass();
 		}
 	}
+
+	RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None, false);
 }
 

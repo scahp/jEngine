@@ -37,12 +37,10 @@ public:
 			g_EyeAdaptationBRTPtr.reset();
 		}
 
-		PreventReturnRenderTarget = true;
+        jRenderTargetPool::PreventReturnRenderTarget = true;	// After Released, RT can't be returned.
 
 		RenderTargetResourceMap.clear();
 		RenderTargetHashVariableMap.clear();
-
-		PreventReturnRenderTarget = false;
 	}
 
 	struct jRenderTargetPoolResource
