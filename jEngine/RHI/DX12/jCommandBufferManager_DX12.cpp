@@ -18,7 +18,7 @@ void jSyncAcrossCommandQueue_DX12::WaitSyncAcrossCommandQueue(ECommandBufferType
     if (!ensure(InWaitCommandQueueType != Type))
         return;
 
-    auto CommandBufferManager = g_rhi->GetCommandBufferManager2(InWaitCommandQueueType);
+    auto CommandBufferManager = g_rhi->GetCommandBufferManager(InWaitCommandQueueType);
     check(CommandBufferManager);
 
     CommandBufferManager->WaitCommandQueueAcrossSync(shared_from_this());

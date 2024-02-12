@@ -161,7 +161,7 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// 2. Command
-	jCommandBufferManager_DX12* CommandBufferManager = nullptr;
+	jCommandBufferManager_DX12* GraphicsCommandBufferManager = nullptr;
 	jCommandBufferManager_DX12* ComputeCommandBufferManager = nullptr;
 	jCommandBufferManager_DX12* CopyCommandBufferManager = nullptr;
 
@@ -375,7 +375,7 @@ public:
 
 	virtual std::shared_ptr<jRenderFrameContext> BeginRenderFrame() override;
 	virtual void EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr) override;
-	virtual jCommandBufferManager_DX12* GetCommandBufferManager() const override { return CommandBufferManager; }
+	virtual jCommandBufferManager_DX12* GetGraphicsCommandBufferManager() const override { return GraphicsCommandBufferManager; }
 	virtual jCommandBufferManager_DX12* GetComputeCommandBufferManager() const override { return ComputeCommandBufferManager; }
 	virtual jCommandBufferManager_DX12* GetCopyCommandBufferManager() const override { return CopyCommandBufferManager; }
 

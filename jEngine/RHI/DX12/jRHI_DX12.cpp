@@ -299,11 +299,11 @@ void jRHI_DX12::WaitForGPU() const
 {
 	check(Swapchain);
 
-	auto Queue = CommandBufferManager->GetCommandQueue();
+	auto Queue = GraphicsCommandBufferManager->GetCommandQueue();
     check(Queue);
 
-    if (CommandBufferManager && CommandBufferManager->Fence)
-        CommandBufferManager->Fence->SignalWithNextFenceValue(Queue.Get(), true);
+    if (GraphicsCommandBufferManager && GraphicsCommandBufferManager->Fence)
+        GraphicsCommandBufferManager->Fence->SignalWithNextFenceValue(Queue.Get(), true);
 }
 
 bool jRHI_DX12::InitRHI()
@@ -426,8 +426,8 @@ bool jRHI_DX12::InitRHI()
     BarrierBatcher = new jResourceBarrierBatcher_DX12();
 
 	// 2. Command
-	CommandBufferManager = new jCommandBufferManager_DX12(ECommandBufferType::GRAPHICS);
-	CommandBufferManager->Initialize(Device);
+	GraphicsCommandBufferManager = new jCommandBufferManager_DX12(ECommandBufferType::GRAPHICS);
+	GraphicsCommandBufferManager->Initialize(Device);
     ComputeCommandBufferManager = new jCommandBufferManager_DX12(ECommandBufferType::COMPUTE);
     ComputeCommandBufferManager->Initialize(Device);
     CopyCommandBufferManager = new jCommandBufferManager_DX12(ECommandBufferType::COPY);
@@ -558,11 +558,11 @@ void jRHI_DX12::ReleaseRHI()
         QueryPoolTime[i] = nullptr;
     }
 
-    if (CommandBufferManager)
+    if (GraphicsCommandBufferManager)
     {
-        CommandBufferManager->Release();
-        delete CommandBufferManager;
-        CommandBufferManager = nullptr;
+        GraphicsCommandBufferManager->Release();
+        delete GraphicsCommandBufferManager;
+        GraphicsCommandBufferManager = nullptr;
     }
 
     if (ComputeCommandBufferManager)
@@ -686,17 +686,17 @@ bool jRHI_DX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimi
 
 jCommandBuffer_DX12* jRHI_DX12::BeginSingleTimeCommands() const
 {
-    check(CommandBufferManager);
-    return CommandBufferManager->GetOrCreateCommandBuffer();
+    check(GraphicsCommandBufferManager);
+    return GraphicsCommandBufferManager->GetOrCreateCommandBuffer();
 }
 
 void jRHI_DX12::EndSingleTimeCommands(jCommandBuffer* commandBuffer) const
 {
     auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)commandBuffer;
 
-    check(CommandBufferManager);
-    CommandBufferManager->ExecuteCommandList(CommandBuffer_DX12, true);
-    CommandBufferManager->ReturnCommandBuffer(CommandBuffer_DX12);
+    check(GraphicsCommandBufferManager);
+    GraphicsCommandBufferManager->ExecuteCommandList(CommandBuffer_DX12, true);
+    GraphicsCommandBufferManager->ReturnCommandBuffer(CommandBuffer_DX12);
 }
 
 jCommandBuffer_DX12* jRHI_DX12::BeginSingleTimeComputeCommands() const
@@ -995,13 +995,13 @@ std::shared_ptr<jRenderFrameContext> jRHI_DX12::BeginRenderFrame()
 	//////////////////////////////////////////////////////////////////////////
 	// Acquire new swapchain image
 	jSwapchainImage_DX12* CurrentSwapchainImage = (jSwapchainImage_DX12*)Swapchain->GetCurrentSwapchainImage();
-    check(CommandBufferManager);
-    CommandBufferManager->Fence->WaitForFenceValue(CurrentSwapchainImage->FenceValue);
+    check(GraphicsCommandBufferManager);
+    GraphicsCommandBufferManager->Fence->WaitForFenceValue(CurrentSwapchainImage->FenceValue);
 	//////////////////////////////////////////////////////////////////////////
 
     GetOneFrameUniformRingBuffer()->Reset();
 
-	jCommandBuffer_DX12* commandBuffer = (jCommandBuffer_DX12*)CommandBufferManager->GetOrCreateCommandBuffer();
+	jCommandBuffer_DX12* commandBuffer = (jCommandBuffer_DX12*)GraphicsCommandBufferManager->GetOrCreateCommandBuffer();
 
     auto renderFrameContextPtr = std::make_shared<jRenderFrameContext_DX12>(commandBuffer);
     renderFrameContextPtr->RaytracingScene = g_rhi->RaytracingScene;
@@ -1021,7 +1021,7 @@ void jRHI_DX12::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& InRen
     jSwapchainImage_DX12* CurrentSwapchainImage = (jSwapchainImage_DX12*)Swapchain->GetCurrentSwapchainImage();
 
     g_rhi->TransitionLayout(CommandBuffer, CurrentSwapchainImage->TexturePtr.get(), EResourceLayout::PRESENT_SRC);
-	CommandBufferManager->ExecuteCommandList(CommandBuffer);
+	GraphicsCommandBufferManager->ExecuteCommandList(CommandBuffer);
 
      CurrentSwapchainImage->FenceValue = CommandBuffer->FenceValue;
 

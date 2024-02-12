@@ -5,7 +5,6 @@
 
 jRenderFrameContext::~jRenderFrameContext()
 {
-    Destroy();
 }
 
 bool jRenderFrameContext::BeginActiveCommandBuffer()
@@ -26,12 +25,7 @@ void jRenderFrameContext::Destroy()
 {
     if (CommandBuffer)
     {
-        auto CommandBufferManager = (jCommandBufferManager_DX12*)g_rhi->GetCommandBufferManager2(CommandBuffer->Type);
-        
-        if (!CommandBuffer->IsEnd())
-        {
-            CommandBufferManager->ExecuteCommandList((jCommandBuffer_DX12*)CommandBuffer);
-        }
+        auto CommandBufferManager = g_rhi->GetCommandBufferManager(CommandBuffer->Type);
 
         check(CommandBufferManager);
         CommandBufferManager->ReturnCommandBuffer(CommandBuffer);

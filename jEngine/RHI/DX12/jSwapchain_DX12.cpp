@@ -56,10 +56,10 @@ bool jSwapchain_DX12::Create()
     check(g_rhi_dx12);
     check(!!g_rhi_dx12->m_hWnd);
     check(g_rhi_dx12->Factory);
-    check(g_rhi_dx12->CommandBufferManager);
+    check(g_rhi_dx12->GraphicsCommandBufferManager);
     
     ComPtr<IDXGISwapChain1> swapChainTemp;
-    if (JFAIL(g_rhi_dx12->Factory->CreateSwapChainForHwnd(g_rhi_dx12->CommandBufferManager->GetCommandQueue().Get(), g_rhi_dx12->m_hWnd
+    if (JFAIL(g_rhi_dx12->Factory->CreateSwapChainForHwnd(g_rhi_dx12->GraphicsCommandBufferManager->GetCommandQueue().Get(), g_rhi_dx12->m_hWnd
         , &swapChainDesc, nullptr, nullptr, &swapChainTemp)))
     {
         return false;

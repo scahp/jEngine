@@ -27,18 +27,21 @@ void jRenderer::AtmosphericShadow()
     }
     check(DirectionalLight);
 
-	// Compute Test 용
-    static bool UseCompute = false;
-	if (UseCompute)
-		g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), EResourceLayout::UAV);
-
-	std::shared_ptr<jSyncAcrossCommandQueue> SyncAcrossCommandQueuePtr = RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None, false);
-    std::shared_ptr<jRenderFrameContext> RenderFrameContextAsyncPtr = UseCompute ? RenderFrameContextPtr->CreateRenderFrameContextAsync(SyncAcrossCommandQueuePtr) : RenderFrameContextPtr;
-
+    std::shared_ptr<jRenderTarget> AtmosphericShadowing = RenderFrameContextPtr->SceneRenderTargetPtr->AtmosphericShadowing;
     auto ShadowMapTexture = RenderFrameContextPtr->SceneRenderTargetPtr->GetShadowMap(DirectionalLight)->GetTexture();
     check(ShadowMapTexture);
 
-    std::shared_ptr<jRenderTarget> AtmosphericShadowing = RenderFrameContextPtr->SceneRenderTargetPtr->AtmosphericShadowing;
+	// Compute Test 용
+    static bool UseCompute = true;
+	if (UseCompute)
+	{
+		// Todo : Invalid flag for async compute queue
+		g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), EResourceLayout::UAV);
+	}
+    g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), AtmosphericShadowing->GetTexture(), EResourceLayout::UAV);
+
+	std::shared_ptr<jSyncAcrossCommandQueue> SyncAcrossCommandQueuePtr = RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None, false);
+    std::shared_ptr<jRenderFrameContext> RenderFrameContextAsyncPtr = UseCompute ? RenderFrameContextPtr->CreateRenderFrameContextAsync(SyncAcrossCommandQueuePtr) : RenderFrameContextPtr;
 
     // https://www.gamedev.net/forums/topic/673079-error-using-resource-barrier-from-multiple-commandlists-for-same-resource/
 	// AsyncComputeQueue doesn't have any ability for transition to SHADER_READ_ONLY.
@@ -57,8 +60,6 @@ void jRenderer::AtmosphericShadow()
         //g_rhi_dx12->EndSingleTimeCommands(CommandBuffer);
 
         //g_rhi_dx12->WaitForGPU();
-
-		//g_rhi->TransitionLayout(RenderFrameContextAsyncPtr->GetActiveCommandBuffer(), AtmosphericShadowing->GetTexture(), EResourceLayout::UAV);
     }
 
 	{
@@ -198,7 +199,6 @@ void jRenderer::AtmosphericShadow()
 
         auto RT = CurrentRenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr;
 		auto AtmosphericTexture = AtmosphericShadowing->GetTexture();
-		//auto AtmosphericTexture = CurrentRenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[2]->GetTexture();
         const int32 Width = RT->Info.Width;
         const int32 Height = RT->Info.Height;
 
@@ -222,10 +222,15 @@ void jRenderer::AtmosphericShadow()
             {
 				if (UseCompute)
 				{
+					if (IsUseVulkan())
+					{
+						g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RT->GetTexture(), EResourceLayout::UAV);
+						g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), AtmosphericTexture, EResourceLayout::SHADER_READ_ONLY);
+					}
 				}
 				else
 				{
-					// Todo : Invalid flag for async compute qeue
+					// Todo : Invalid flag for async compute queue
 					g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RT->GetTexture(), EResourceLayout::UAV);
 					g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), AtmosphericTexture, EResourceLayout::SHADER_READ_ONLY);
 				}

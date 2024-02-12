@@ -481,8 +481,8 @@ bool jRHI_Vulkan::InitRHI()
 		delete InRenderPass;
 	};
 
-	CommandBufferManager = new jCommandBufferManager_Vulkan(ECommandBufferType::GRAPHICS);
-	CommandBufferManager->CreatePool(GraphicsQueue.QueueIndex);
+	GraphicsCommandBufferManager = new jCommandBufferManager_Vulkan(ECommandBufferType::GRAPHICS);
+	GraphicsCommandBufferManager->CreatePool(GraphicsQueue.QueueIndex);
 	ComputeCommandBufferManager = new jCommandBufferManager_Vulkan(ECommandBufferType::COMPUTE);
 	ComputeCommandBufferManager->CreatePool(ComputeQueue.QueueIndex);
 	CopyCommandBufferManager = new jCommandBufferManager_Vulkan(ECommandBufferType::COPY);
@@ -592,8 +592,8 @@ void jRHI_Vulkan::ReleaseRHI()
     delete Swapchain;
     Swapchain = nullptr;
 
-    delete CommandBufferManager;
-    CommandBufferManager = nullptr;
+    delete GraphicsCommandBufferManager;
+    GraphicsCommandBufferManager = nullptr;
 
     delete ComputeCommandBufferManager;
 	ComputeCommandBufferManager = nullptr;
@@ -699,9 +699,9 @@ void jRHI_Vulkan::RecreateSwapChain()
 	SCR_WIDTH = width;
 	SCR_HEIGHT = height;
 
-    delete CommandBufferManager;
-	CommandBufferManager = new jCommandBufferManager_Vulkan(ECommandBufferType::GRAPHICS);
-	verify(CommandBufferManager->CreatePool(GraphicsQueue.QueueIndex));
+    delete GraphicsCommandBufferManager;
+	GraphicsCommandBufferManager = new jCommandBufferManager_Vulkan(ECommandBufferType::GRAPHICS);
+	verify(GraphicsCommandBufferManager->CreatePool(GraphicsQueue.QueueIndex));
 
     delete ComputeCommandBufferManager;
 	ComputeCommandBufferManager = new jCommandBufferManager_Vulkan(ECommandBufferType::COMPUTE);
@@ -1566,7 +1566,7 @@ std::shared_ptr<jRenderFrameContext> jRHI_Vulkan::BeginRenderFrame()
 		return nullptr;
 	}
 
-	jCommandBuffer_Vulkan* commandBuffer = (jCommandBuffer_Vulkan*)g_rhi_vk->CommandBufferManager->GetOrCreateCommandBuffer();
+	jCommandBuffer_Vulkan* commandBuffer = (jCommandBuffer_Vulkan*)g_rhi_vk->GraphicsCommandBufferManager->GetOrCreateCommandBuffer();
 
     // 이전 프레임에서 현재 사용하려는 이미지를 사용중에 있나? (그렇다면 펜스를 기다려라)
     if (lastCommandBufferFence != VK_NULL_HANDLE)
@@ -1669,99 +1669,29 @@ void jRHI_Vulkan::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& ren
     }
 }
 
-void jRHI_Vulkan::QueueSubmit(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr, jSemaphore* InSignalSemaphore)
+std::shared_ptr<jSyncAcrossCommandQueue_Vulkan> jRHI_Vulkan::QueueSubmit(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr, jSemaphore* InSignalSemaphore)
 {
     SCOPE_CPU_PROFILE(QueueSubmit);
 
 	auto renderFrameContext = (jRenderFrameContext_Vulkan*)renderFrameContextPtr.get();
 	check(renderFrameContext);
 
-	auto CommandBuffer = renderFrameContext->GetActiveCommandBuffer();
-    check(CommandBuffer);
+	auto CurrentWaitSemaphore = renderFrameContext->CurrentWaitSemaphore;
 
-	CommandBuffer->End();
-
-    VkCommandBuffer vkCommandBuffer = (VkCommandBuffer)CommandBuffer->GetHandle();
-    VkFence vkFence = (VkFence)CommandBuffer->GetFenceHandle();
+	check(renderFrameContext->GetActiveCommandBuffer());
+	auto CommandBufferManager = (jCommandBufferManager_Vulkan*)g_rhi_vk->GetCommandBufferManager(renderFrameContext->GetActiveCommandBuffer()->Type);
 	
-    // Submitting the command buffer
-    VkSubmitInfo submitInfo = {};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	std::shared_ptr<jSyncAcrossCommandQueue_Vulkan> Sync_Vulkan 
+		= CommandBufferManager->QueueSubmit((jCommandBuffer_Vulkan*)renderFrameContext->GetActiveCommandBuffer(), renderFrameContext->CurrentWaitSemaphore, InSignalSemaphore);
 
-    VkSemaphore waitsemaphores[] = { 
-		renderFrameContext->CurrentWaitSemaphore ? (VkSemaphore)renderFrameContext->CurrentWaitSemaphore->GetHandle() : nullptr };
+	renderFrameContext->CurrentWaitSemaphore = InSignalSemaphore;		// Update Next Wait Semaphore
 
-	VkPipelineStageFlags WaitStage;
-	switch(CommandBuffer->Type)
-	{
-	case ECommandBufferType::GRAPHICS:	WaitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT; break;
-	case ECommandBufferType::COMPUTE:	WaitStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT; break;
-	case ECommandBufferType::COPY:		WaitStage = VK_PIPELINE_STAGE_TRANSFER_BIT; break;
-	default:
-		check(0);
-		break;
-	}
-
-	uint64 waitValue = 0;
-	uint64 signalValue = 0;
-
-	const bool UseWaitTimeline = renderFrameContext->CurrentWaitSemaphore&& renderFrameContext->CurrentWaitSemaphore->GetType() == ESemaphoreType::TIMELINE;
-	const bool UseSignalTimeline = InSignalSemaphore && InSignalSemaphore->GetType() == ESemaphoreType::TIMELINE;
-
-	if (UseWaitTimeline || UseSignalTimeline)
-	{
-		VkTimelineSemaphoreSubmitInfo timelineSemaphoreSubmitInfo = {};
-		timelineSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
-		if (UseWaitTimeline)
-		{
-			waitValue = renderFrameContext->CurrentWaitSemaphore->GetValue();
-
-			timelineSemaphoreSubmitInfo.waitSemaphoreValueCount = 1;
-			timelineSemaphoreSubmitInfo.pWaitSemaphoreValues = &waitValue;
-		}
-		if (UseSignalTimeline)
-		{
-			signalValue = InSignalSemaphore->IncrementValue();
-
-			timelineSemaphoreSubmitInfo.signalSemaphoreValueCount = 1;
-			timelineSemaphoreSubmitInfo.pSignalSemaphoreValues = &signalValue;
-		}
-		submitInfo.pNext = &timelineSemaphoreSubmitInfo;
-	}
-
-    VkPipelineStageFlags waitStages[] = { WaitStage };
-    submitInfo.pWaitSemaphores = waitsemaphores;
-    submitInfo.waitSemaphoreCount = renderFrameContext->CurrentWaitSemaphore ? 1 : 0;
-    submitInfo.pWaitDstStageMask = waitStages;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &vkCommandBuffer;
-
-	renderFrameContext->CurrentWaitSemaphore = InSignalSemaphore;
-
-    VkSemaphore signalSemaphores[] = { (InSignalSemaphore ? (VkSemaphore)InSignalSemaphore->GetHandle() : nullptr) };
-    submitInfo.signalSemaphoreCount = InSignalSemaphore ? 1 : 0;
-    submitInfo.pSignalSemaphores = signalSemaphores;
-
-    // SubmitInfo를 동시에 할수도 있음.
-    vkResetFences(Device, 1, &vkFence);		// 세마포어와는 다르게 수동으로 펜스를 unsignaled 상태로 재설정 해줘야 함
-
-	const jQueue_Vulkan& CurrentQueue = GetQueue(CommandBuffer->Type);
-
-	// 마지막에 Fences 파라메터는 커맨드 버퍼가 모두 실행되고나면 Signaled 될 Fences.
-    auto queueSubmitResult = vkQueueSubmit(CurrentQueue.Queue, 1, &submitInfo, vkFence);
-    if ((queueSubmitResult == VK_ERROR_OUT_OF_DATE_KHR) || (queueSubmitResult == VK_SUBOPTIMAL_KHR))
-    {
-        RecreateSwapChain();
-    }
-    else if (queueSubmitResult != VK_SUCCESS)
-    {
-        check(0);
-    }
+	return Sync_Vulkan;
 }
 
 jCommandBuffer_Vulkan* jRHI_Vulkan::BeginSingleTimeCommands() const
 {
-	return (jCommandBuffer_Vulkan*)CommandBufferManager->GetOrCreateCommandBuffer();
+	return (jCommandBuffer_Vulkan*)GraphicsCommandBufferManager->GetOrCreateCommandBuffer();
 }
 
 void jRHI_Vulkan::EndSingleTimeCommands(jCommandBuffer* commandBuffer) const
@@ -1786,7 +1716,7 @@ void jRHI_Vulkan::EndSingleTimeCommands(jCommandBuffer* commandBuffer) const
 	Result = vkQueueWaitIdle(CurrentQueue.Queue);
 	ensure(VK_SUCCESS == Result);
 
-    CommandBufferManager->ReturnCommandBuffer(CommandBuffer_Vulkan);
+    GraphicsCommandBufferManager->ReturnCommandBuffer(CommandBuffer_Vulkan);
 }
 
 void jRHI_Vulkan::TransitionLayout(jCommandBuffer* commandBuffer, jTexture* texture, EResourceLayout newLayout) const

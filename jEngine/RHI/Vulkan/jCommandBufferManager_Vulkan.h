@@ -3,6 +3,21 @@
 #include "../jFenceManager.h"
 #include "jResourceBarrierBatcher_Vulkan.h"
 
+class jSemaphore_Vulkan;
+
+// Vulkan is using Semaphore for sync between CommandQueues
+struct jSyncAcrossCommandQueue_Vulkan : public jSyncAcrossCommandQueue
+{
+    jSyncAcrossCommandQueue_Vulkan(ECommandBufferType InType, jSemaphore_Vulkan* InWaitSemaphore, uint64 InSemaphoreValue = -1);
+    virtual ~jSyncAcrossCommandQueue_Vulkan() {}
+
+    virtual void WaitSyncAcrossCommandQueue(ECommandBufferType InWaitCommandQueueType) override;
+
+    ECommandBufferType Type = ECommandBufferType::MAX;
+    jSemaphore_Vulkan* WaitSemaphore = nullptr;
+    uint64 SemaphoreValue = 0;      // for timeline semaphore
+};
+
 class jCommandBuffer_Vulkan : public jCommandBuffer
 {
 public:
@@ -53,6 +68,16 @@ public:
     virtual jCommandBuffer* GetOrCreateCommandBuffer() override;
     void ReturnCommandBuffer(jCommandBuffer* commandBuffer) override;
 
+    virtual void WaitCommandQueueAcrossSync(const std::shared_ptr<jSyncAcrossCommandQueue>& InSync) override;
+    
+    void GetWaitSemaphoreAndValueThenClear(std::vector<VkSemaphore>& InOutSemaphore, std::vector<uint64>& InOutSemaphoreValue);
+    const std::vector<std::shared_ptr<jSyncAcrossCommandQueue>>& GetWaitSemaphoreAcrossQueues() const { return WaitSemaphoreAcrossQueues; }
+    void ClearWaitSemaphoreAcrossQueues() { WaitSemaphoreAcrossQueues.clear(); }
+
+    std::shared_ptr<jSyncAcrossCommandQueue_Vulkan> QueueSubmit(jCommandBuffer_Vulkan* InCommandBuffer, jSemaphore* InWaitSemaphore, jSemaphore* InSignalSemaphore);
+
+    jSemaphore_Vulkan* GetQueueSubmitSemaphore() const { return QueueSubmitSemaphore; }
+
 private:
     ECommandBufferType CommandBufferType = ECommandBufferType::GRAPHICS;
     VkCommandPool CommandPool;		// 커맨드 버퍼를 저장할 메모리 관리자로 커맨드 버퍼를 생성함.
@@ -60,5 +85,9 @@ private:
     jMutexLock CommandListLock;
     std::vector<jCommandBuffer_Vulkan*> UsingCommandBuffers;
     std::vector<jCommandBuffer_Vulkan*> AvailableCommandBuffers;
+
+    jSemaphore_Vulkan* QueueSubmitSemaphore = nullptr; // QueueSubmit timeline semaphore, This is equivalent to DX12 fence
+
+    std::vector<std::shared_ptr<jSyncAcrossCommandQueue>> WaitSemaphoreAcrossQueues;
 };
 

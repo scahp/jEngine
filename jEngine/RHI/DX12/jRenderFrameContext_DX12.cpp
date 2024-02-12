@@ -4,6 +4,20 @@
 #include "../jCommandBufferManager.h"
 #include "jSwapchain_DX12.h"
 
+void jRenderFrameContext_DX12::Destroy()
+{
+    if (CommandBuffer)
+    {
+        if (!CommandBuffer->IsEnd())
+        {
+           auto CommandBufferManager = (jCommandBufferManager_DX12*)g_rhi->GetCommandBufferManager(CommandBuffer->Type);
+            CommandBufferManager->ExecuteCommandList((jCommandBuffer_DX12*)CommandBuffer);
+        }
+    }
+
+    __super::Destroy();
+}
+
 std::shared_ptr<jRenderFrameContext> jRenderFrameContext_DX12::CreateRenderFrameContextAsync(const std::shared_ptr<jSyncAcrossCommandQueue>& InSync) const
 {
     if (InSync)
@@ -25,7 +39,7 @@ std::shared_ptr<jSyncAcrossCommandQueue_DX12> jRenderFrameContext_DX12::QueueSub
     {
         jCommandBuffer_DX12* CommandBuffer_DX12 = (jCommandBuffer_DX12*)CommandBuffer;
 
-        auto CommandBufferManager = g_rhi_dx12->GetCommandBufferManager();
+        auto CommandBufferManager = g_rhi_dx12->GetGraphicsCommandBufferManager();
         CommandQueueSyncObjectPtr = CommandBufferManager->ExecuteCommandList(CommandBuffer_DX12);
         CommandBufferManager->ReturnCommandBuffer(CommandBuffer_DX12);
 
@@ -44,7 +58,7 @@ std::shared_ptr<jSyncAcrossCommandQueue> jRenderFrameContext_DX12::SubmitCurrent
     if (CommandBuffer)
     {
         jCommandBuffer_DX12* CommandBuffer_DX12 = (jCommandBuffer_DX12*)CommandBuffer;
-        jCommandBufferManager_DX12* CommandBufferManager = (jCommandBufferManager_DX12*)g_rhi->GetCommandBufferManager2(CommandBuffer->Type);
+        jCommandBufferManager_DX12* CommandBufferManager = (jCommandBufferManager_DX12*)g_rhi->GetCommandBufferManager(CommandBuffer->Type);
 
         CommandQueueSyncObjectPtr = CommandBufferManager->ExecuteCommandList(CommandBuffer_DX12, bWaitUntilExecuteComplete);
         CommandBufferManager->ReturnCommandBuffer(CommandBuffer_DX12);

@@ -418,7 +418,6 @@ public:
 	virtual void Finish() const {}
 	virtual std::shared_ptr<jRenderFrameContext> BeginRenderFrame() { return nullptr; }
     virtual void EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr) {}
-	virtual void QueueSubmit(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr, class jSemaphore* InSignalSemaphore) {}
 
 	virtual jRasterizationStateInfo* CreateRasterizationState(const jRasterizationStateInfo& initializer) const { return nullptr; }
 	virtual jStencilOpStateInfo* CreateStencilOpStateInfo(const jStencilOpStateInfo& initializer) const { return nullptr; }
@@ -440,11 +439,11 @@ public:
 	virtual jRenderPass* GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const jAttachment& depthAttachment, const jAttachment& colorResolveAttachment, const Vector2i& offset, const Vector2i& extent) const { return nullptr; }
     virtual jRenderPass* GetOrCreateRenderPass(const jRenderPassInfo& renderPassInfo, const Vector2i& offset, const Vector2i& extent) const { return nullptr; }
 
-	FORCEINLINE virtual jCommandBufferManager* GetCommandBufferManager2(ECommandBufferType InType) const
+	FORCEINLINE virtual jCommandBufferManager* GetCommandBufferManager(ECommandBufferType InType) const
 	{ 
 		switch(InType)
 		{
-		case ECommandBufferType::GRAPHICS:	return GetCommandBufferManager();
+		case ECommandBufferType::GRAPHICS:	return GetGraphicsCommandBufferManager();
 		case ECommandBufferType::COMPUTE:	return GetComputeCommandBufferManager();
 		case ECommandBufferType::COPY:		return GetCopyCommandBufferManager();
 		default:
@@ -452,7 +451,7 @@ public:
 		}
 		return nullptr; 
 	}
-	virtual jCommandBufferManager* GetCommandBufferManager() const { return nullptr; }
+	virtual jCommandBufferManager* GetGraphicsCommandBufferManager() const { return nullptr; }
 	virtual jCommandBufferManager* GetComputeCommandBufferManager() const { return nullptr; }
 	virtual jCommandBufferManager* GetCopyCommandBufferManager() const { return nullptr; }
 	virtual EMSAASamples GetSelectedMSAASamples() const { return EMSAASamples::COUNT_1; }

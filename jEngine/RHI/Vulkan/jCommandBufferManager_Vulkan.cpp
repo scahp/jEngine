@@ -3,6 +3,153 @@
 #include "jRHI_Vulkan.h"
 
 //////////////////////////////////////////////////////////////////////////
+// jSyncAcrossCommandQueue_Vulkan
+//////////////////////////////////////////////////////////////////////////
+jSyncAcrossCommandQueue_Vulkan::jSyncAcrossCommandQueue_Vulkan(ECommandBufferType InType, jSemaphore_Vulkan* InWaitSemaphore, uint64 InSemaphoreValue)
+    : Type(InType), WaitSemaphore(InWaitSemaphore), SemaphoreValue(InSemaphoreValue)
+{
+    check(WaitSemaphore);
+    if (SemaphoreValue == -1)
+    {
+        SemaphoreValue = WaitSemaphore->GetValue();
+    }
+}
+
+void jCommandBufferManager_Vulkan::WaitCommandQueueAcrossSync(const std::shared_ptr<jSyncAcrossCommandQueue>& InSync)
+{
+    check(CommandPool);
+    check(InSync);
+
+    WaitSemaphoreAcrossQueues.push_back(InSync);
+}
+
+void jCommandBufferManager_Vulkan::GetWaitSemaphoreAndValueThenClear(std::vector<VkSemaphore>& InOutSemaphore, std::vector<uint64>& InOutSemaphoreValue)
+{
+    if (WaitSemaphoreAcrossQueues.empty())
+        return;
+
+    check(InOutSemaphore.size() == InOutSemaphoreValue.size());
+
+    InOutSemaphore.reserve(InOutSemaphore.size() + WaitSemaphoreAcrossQueues.size());
+    InOutSemaphoreValue.reserve(InOutSemaphoreValue.size() + WaitSemaphoreAcrossQueues.size());
+
+    for(int32 i=0;i< WaitSemaphoreAcrossQueues.size();++i)
+    {
+        auto Sync_Vulkan = (jSyncAcrossCommandQueue_Vulkan*)WaitSemaphoreAcrossQueues[i].get();
+        check(Sync_Vulkan);
+
+        InOutSemaphore.push_back(Sync_Vulkan->WaitSemaphore->Semaphore);
+        InOutSemaphoreValue.push_back(Sync_Vulkan->SemaphoreValue);
+    }
+    WaitSemaphoreAcrossQueues.clear();
+}
+
+std::shared_ptr<jSyncAcrossCommandQueue_Vulkan> jCommandBufferManager_Vulkan::QueueSubmit(jCommandBuffer_Vulkan* InCommandBuffer, jSemaphore* InWaitSemaphore, jSemaphore* InSignalSemaphore)
+{
+    check(InCommandBuffer);
+
+    InCommandBuffer->End();
+
+    auto vkInCommandBuffer = (VkCommandBuffer)InCommandBuffer->GetHandle();
+    VkFence vkFence = (VkFence)InCommandBuffer->GetFenceHandle();
+
+    // Submitting the command buffer
+    VkSubmitInfo submitInfo = {};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+    auto CurrentInCommandBufferManager = (jCommandBufferManager_Vulkan*)g_rhi_vk->GetCommandBufferManager(InCommandBuffer->Type);
+    check(CurrentInCommandBufferManager);
+
+    std::vector<VkSemaphore> WaitSemaphores;
+    std::vector<uint64> WaitSemaphoreValues;
+    CurrentInCommandBufferManager->GetWaitSemaphoreAndValueThenClear(WaitSemaphores, WaitSemaphoreValues);
+
+    if (InWaitSemaphore)
+    {
+        WaitSemaphores.push_back((VkSemaphore)InWaitSemaphore->GetHandle());
+        WaitSemaphoreValues.push_back(InWaitSemaphore->GetValue());
+    }
+
+    VkPipelineStageFlags WaitStage;
+    switch (InCommandBuffer->Type)
+    {
+    case ECommandBufferType::GRAPHICS:	WaitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT; break;
+    case ECommandBufferType::COMPUTE:	WaitStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT; break;
+    case ECommandBufferType::COPY:		WaitStage = VK_PIPELINE_STAGE_TRANSFER_BIT; break;
+    default:
+        check(0);
+        break;
+    }
+
+    uint64 waitValue = 0;
+    uint64 signalValue = 0;
+
+    const bool UseWaitTimeline = InWaitSemaphore && InWaitSemaphore->GetType() == ESemaphoreType::TIMELINE;
+    const bool UseSignalTimeline = InSignalSemaphore && InSignalSemaphore->GetType() == ESemaphoreType::TIMELINE;
+
+    if (UseWaitTimeline || UseSignalTimeline)
+    {
+        VkTimelineSemaphoreSubmitInfo timelineSemaphoreSubmitInfo = {};
+        timelineSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+        if (UseWaitTimeline)
+        {
+            waitValue = InWaitSemaphore->GetValue();
+
+            timelineSemaphoreSubmitInfo.waitSemaphoreValueCount = (uint32)WaitSemaphoreValues.size();
+            timelineSemaphoreSubmitInfo.pWaitSemaphoreValues = WaitSemaphoreValues.data();
+        }
+        if (UseSignalTimeline)
+        {
+            signalValue = InSignalSemaphore->IncrementValue();
+
+            timelineSemaphoreSubmitInfo.signalSemaphoreValueCount = 1;
+            timelineSemaphoreSubmitInfo.pSignalSemaphoreValues = &signalValue;
+        }
+        submitInfo.pNext = &timelineSemaphoreSubmitInfo;
+    }
+
+    std::vector<VkPipelineStageFlags> WaitStages(WaitSemaphores.size(), WaitStage);
+    submitInfo.pWaitSemaphores = WaitSemaphores.data();
+    submitInfo.waitSemaphoreCount = (uint32)WaitSemaphores.size();
+    submitInfo.pWaitDstStageMask = WaitStages.data();
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &vkInCommandBuffer;
+
+    VkSemaphore signalSemaphores[] = { (InSignalSemaphore ? (VkSemaphore)InSignalSemaphore->GetHandle() : nullptr) };
+    submitInfo.signalSemaphoreCount = InSignalSemaphore ? 1 : 0;
+    submitInfo.pSignalSemaphores = signalSemaphores;
+
+    // SubmitInfo를 동시에 할수도 있음.
+    vkResetFences(g_rhi_vk->Device, 1, &vkFence);		// 세마포어와는 다르게 수동으로 펜스를 unsignaled 상태로 재설정 해줘야 함
+
+    const jRHI_Vulkan::jQueue_Vulkan& CurrentQueue = g_rhi_vk->GetQueue(InCommandBuffer->Type);
+
+    // 마지막에 Fences 파라메터는 커맨드 버퍼가 모두 실행되고나면 Signaled 될 Fences.
+    auto queueSubmitResult = vkQueueSubmit(CurrentQueue.Queue, 1, &submitInfo, vkFence);
+    if ((queueSubmitResult == VK_ERROR_OUT_OF_DATE_KHR) || (queueSubmitResult == VK_SUBOPTIMAL_KHR))
+    {
+        g_rhi_vk->RecreateSwapChain();
+    }
+    else if (queueSubmitResult != VK_SUCCESS)
+    {
+        check(0);
+    }
+
+    return std::make_shared<jSyncAcrossCommandQueue_Vulkan>(InCommandBuffer->Type, (jSemaphore_Vulkan*)InSignalSemaphore);
+}
+
+void jSyncAcrossCommandQueue_Vulkan::WaitSyncAcrossCommandQueue(ECommandBufferType InWaitCommandQueueType)
+{
+    if (!ensure(InWaitCommandQueueType != Type))
+        return;
+
+    auto CommandBufferManager = g_rhi->GetCommandBufferManager(InWaitCommandQueueType);
+    check(CommandBufferManager);
+
+    CommandBufferManager->WaitCommandQueueAcrossSync(shared_from_this());
+}
+
+//////////////////////////////////////////////////////////////////////////
 // jCommandBuffer_Vulkan
 //////////////////////////////////////////////////////////////////////////
 bool jCommandBuffer_Vulkan::Begin() const
@@ -64,6 +211,8 @@ bool jCommandBufferManager_Vulkan::CreatePool(uint32 QueueIndex)
     if (!ensure(vkCreateCommandPool(g_rhi_vk->Device, &poolInfo, nullptr, &CommandPool) == VK_SUCCESS))
         return false;
 
+    QueueSubmitSemaphore = (jSemaphore_Vulkan*)g_rhi->GetSemaphoreManager()->GetOrCreateSemaphore(ESemaphoreType::TIMELINE);
+
     return true;
 }
 
@@ -99,6 +248,12 @@ void jCommandBufferManager_Vulkan::ReleaseInternal()
     {
         vkDestroyCommandPool(g_rhi_vk->Device, CommandPool, nullptr);
         CommandPool = nullptr;
+    }
+
+    if (QueueSubmitSemaphore)
+    {
+        g_rhi->GetSemaphoreManager()->ReturnSemaphore(QueueSubmitSemaphore);
+        QueueSubmitSemaphore = nullptr;
     }
 }
 

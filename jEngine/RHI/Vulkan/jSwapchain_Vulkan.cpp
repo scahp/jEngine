@@ -26,16 +26,6 @@ void jSwapchainImage_Vulkan::ReleaseInternal()
         g_rhi->GetSemaphoreManager()->ReturnSemaphore(RenderFinished);
         RenderFinished = nullptr;
     }
-    if (GraphicQueueSubmitSemaphore)
-    {
-        g_rhi->GetSemaphoreManager()->ReturnSemaphore(GraphicQueueSubmitSemaphore);
-        GraphicQueueSubmitSemaphore = nullptr;
-    }
-    if (ComputeQueueSubmitSemaphore)
-    {
-        g_rhi->GetSemaphoreManager()->ReturnSemaphore(ComputeQueueSubmitSemaphore);
-        ComputeQueueSubmitSemaphore = nullptr;
-    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -149,8 +139,6 @@ bool jSwapchain_Vulkan::CreateInternal(VkSwapchainKHR InOldSwapchain)
             SwapchainImage = new jSwapchainImage_Vulkan();
             SwapchainImage->Available = g_rhi->GetSemaphoreManager()->GetOrCreateSemaphore(ESemaphoreType::BINARY);
             SwapchainImage->RenderFinished = g_rhi->GetSemaphoreManager()->GetOrCreateSemaphore(ESemaphoreType::BINARY);
-            SwapchainImage->GraphicQueueSubmitSemaphore = g_rhi->GetSemaphoreManager()->GetOrCreateSemaphore(ESemaphoreType::TIMELINE);
-            SwapchainImage->ComputeQueueSubmitSemaphore = g_rhi->GetSemaphoreManager()->GetOrCreateSemaphore(ESemaphoreType::TIMELINE);
             SwapchainImage->CommandBufferFence = nullptr;
 
             Images[i] = SwapchainImage;

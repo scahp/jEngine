@@ -110,7 +110,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 
 	jSwapchain_Vulkan* Swapchain = nullptr;
-	jCommandBufferManager_Vulkan* CommandBufferManager = nullptr;
+	jCommandBufferManager_Vulkan* GraphicsCommandBufferManager = nullptr;
 	jCommandBufferManager_Vulkan* ComputeCommandBufferManager = nullptr;
 	jCommandBufferManager_Vulkan* CopyCommandBufferManager = nullptr;
     mutable jFenceManager_Vulkan FenceManager;
@@ -191,7 +191,7 @@ public:
     virtual void ReleaseQueryTime(jQuery* queryTime) const override;
 	virtual std::shared_ptr<jRenderFrameContext> BeginRenderFrame() override;
 	virtual void EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr) override;
-    virtual void QueueSubmit(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr, jSemaphore* InSignalSemaphore) override;
+	std::shared_ptr<jSyncAcrossCommandQueue_Vulkan> QueueSubmit(const std::shared_ptr<jRenderFrameContext>& renderFrameContextPtr, jSemaphore* InSignalSemaphore);
 	jPipelineStateInfo* CreatePipelineStateInfo(const jPipelineStateFixedInfo* InPipelineStateFixed, const jGraphicsPipelineShader InShader, const jVertexBufferArray& InVertexBufferArray
 		, const jRenderPass* InRenderPass, const jShaderBindingLayoutArray& InShaderBindingArray, const jPushConstant* InPushConstant, int32 InSubpassIndex) const override;
 	virtual jPipelineStateInfo* CreateComputePipelineStateInfo(const jShader* shader, const jShaderBindingLayoutArray& InShaderBindingArray, const jPushConstant* pushConstant) const override;
@@ -206,7 +206,7 @@ public:
 		, const jAttachment& colorResolveAttachment, const Vector2i& offset, const Vector2i& extent) const override;
 	virtual jRenderPass* GetOrCreateRenderPass(const jRenderPassInfo& renderPassInfo, const Vector2i& offset, const Vector2i& extent) const override;
 
-	virtual jCommandBufferManager_Vulkan* GetCommandBufferManager() const override { return CommandBufferManager; }
+	virtual jCommandBufferManager_Vulkan* GetGraphicsCommandBufferManager() const override { return GraphicsCommandBufferManager; }
     virtual jCommandBufferManager_Vulkan* GetComputeCommandBufferManager() const override { return ComputeCommandBufferManager; }
     virtual jCommandBufferManager_Vulkan* GetCopyCommandBufferManager() const override { return CopyCommandBufferManager; }
 	FORCEINLINE const jQueue_Vulkan& GetQueue(ECommandBufferType InType) const

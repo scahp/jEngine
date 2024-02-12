@@ -11,7 +11,8 @@ struct jRenderFrameContext_Vulkan : public jRenderFrameContext
     jRenderFrameContext_Vulkan(jCommandBuffer* InCommandBuffer)
         : jRenderFrameContext(InCommandBuffer)
     {}
-    virtual ~jRenderFrameContext_Vulkan() {}
+    virtual ~jRenderFrameContext_Vulkan() { Destroy(); }
+    virtual void Destroy() override;
 
     virtual std::shared_ptr<jRenderFrameContext> CreateRenderFrameContextAsync(const std::shared_ptr<jSyncAcrossCommandQueue>& InSync = nullptr) const override;
     virtual std::shared_ptr<jSyncAcrossCommandQueue> SubmitCurrentActiveCommandBuffer(ECurrentRenderPass InCurrentRenderPass, bool bWaitUntilExecuteComplete = true) override;
@@ -21,5 +22,5 @@ public:
     jSemaphore* CurrentWaitSemaphore = nullptr;
 
 private:
-    virtual void QueueSubmitCurrentActiveCommandBuffer(jSemaphore* InSignalSemaphore, bool bWaitUntilExecuteComplete = true);
+    std::shared_ptr<jSyncAcrossCommandQueue_Vulkan> QueueSubmitCurrentActiveCommandBuffer(jSemaphore* InSignalSemaphore, bool bWaitUntilExecuteComplete = true);
 };
