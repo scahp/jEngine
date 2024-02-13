@@ -21,9 +21,9 @@ void AsyncComputeTest_A(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 Gr
         return;
     
     float t = 0.0f;
-    for (int i = 0; i < 10000; ++i)
+    for (int i = 0; i < 1500; ++i)
     {
-        t += 0.0001f;
+        t += ResultImage[int2(GlobalInvocationID.xy)].x * 0.0001f;
     }
     
     ResultImage[int2(GlobalInvocationID.xy)] = float4(t, 0, 0, 1);
@@ -36,9 +36,9 @@ void AsyncComputeTest_B(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 Gr
         return;
     
     float t = 0.0f;
-    for (int i = 0; i < 10000; ++i)
+    for (int i = 0; i < 1500; ++i)
     {
-        t += 0.0001f;
+        t += ResultImage[int2(GlobalInvocationID.xy)].x * 0.0001f;
     }
     
     float x = ResultImage[int2(GlobalInvocationID.xy)].x;
@@ -53,9 +53,9 @@ void AsyncComputeTest_C(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 Gr
         return;
     
     float t = 0.0f;
-    for (int i = 0; i < 10000; ++i)
+    for (int i = 0; i < 1500; ++i)
     {
-        t += 0.0001f;
+        t += ResultImage[int2(GlobalInvocationID.xy)].x * 0.0001f;
     }
     
     float2 xy = ResultImage[int2(GlobalInvocationID.xy)].xy;

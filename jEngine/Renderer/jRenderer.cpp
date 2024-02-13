@@ -737,8 +737,6 @@ void jRenderer::AsyncComputeTest(std::shared_ptr<jSyncAcrossCommandQueue> SyncAc
         AsyncComputeTestPtr = jRenderTargetPool::GetRenderTarget(AsyncComputeTestRTInfo).get();
     }
 
-    //DebugRTs.push_back(AsyncComputeTestPtr->GetTexturePtr());
-
     {
 		std::shared_ptr<jRenderFrameContext> CurrentRenderFrameContextPtr = gOptions.UseAsyncComputeQueue ? RenderFrameContextPtr->CreateRenderFrameContextAsync(SyncAcrossCommandQueuePtr) : RenderFrameContextPtr;
 
@@ -774,8 +772,8 @@ void jRenderer::AsyncComputeTest(std::shared_ptr<jSyncAcrossCommandQueue> SyncAc
             , [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
                 {
                     jShaderInfo shaderInfo;
-                    shaderInfo.SetName(jNameStatic("AyncComputeTestCS"));
-                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/AyncComputeTest_cs.hlsl"));
+                    shaderInfo.SetName(jNameStatic("AsyncComputeTestCS"));
+                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/AsyncComputeTest_cs.hlsl"));
                     shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
                     shaderInfo.SetEntryPoint(jNameStatic("AsyncComputeTest_A"));
                     jShader* Shader = g_rhi->CreateShader(shaderInfo);
@@ -800,8 +798,8 @@ void jRenderer::AsyncComputeTest(std::shared_ptr<jSyncAcrossCommandQueue> SyncAc
             , [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
                 {
                     jShaderInfo shaderInfo;
-                    shaderInfo.SetName(jNameStatic("AyncComputeTestCS"));
-                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/AyncComputeTest_cs.hlsl"));
+                    shaderInfo.SetName(jNameStatic("AsyncComputeTestCS"));
+                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/AsyncComputeTest_cs.hlsl"));
                     shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
                     shaderInfo.SetEntryPoint(jNameStatic("AsyncComputeTest_B"));
                     jShader* Shader = g_rhi->CreateShader(shaderInfo);
@@ -826,8 +824,8 @@ void jRenderer::AsyncComputeTest(std::shared_ptr<jSyncAcrossCommandQueue> SyncAc
                 , [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
                     {
                         jShaderInfo shaderInfo;
-                        shaderInfo.SetName(jNameStatic("AyncComputeTestCS"));
-                        shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/AyncComputeTest_cs.hlsl"));
+                        shaderInfo.SetName(jNameStatic("AsyncComputeTestCS"));
+                        shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/AsyncComputeTest_cs.hlsl"));
                         shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
                         shaderInfo.SetEntryPoint(jNameStatic("AsyncComputeTest_C"));
                         jShader* Shader = g_rhi->CreateShader(shaderInfo);
