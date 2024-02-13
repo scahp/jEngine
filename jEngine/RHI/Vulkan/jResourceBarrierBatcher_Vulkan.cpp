@@ -5,35 +5,27 @@
 void jResourceBarrierBatcher_Vulkan::AddUAV(jBuffer* InBuffer)
 {
     VkMemoryBarrier barrier{};
-    barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;       // Global memroy invalidation
     barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-    jBarrier_Vulkan BarrierVulkan{};
-
-    // todo : need to control pipeline stage
-    BarrierVulkan.SrcStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-    BarrierVulkan.DstStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-
-    BarrierVulkan.Barrier.MemroyBarrier = barrier;
-    Barriers.emplace_back(BarrierVulkan);
+	// todo : need to control pipeline stage
+	const auto SrcStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+	const auto DstStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+	AddBarrier(SrcStage, DstStage, barrier);
 }
 
 void jResourceBarrierBatcher_Vulkan::AddUAV(jTexture* InTexture)
 {
     VkMemoryBarrier barrier{};
-    barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;       // Global memroy invalidation
     barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-    jBarrier_Vulkan BarrierVulkan{};
-
-    // todo : need to control pipeline stage
-    BarrierVulkan.SrcStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-    BarrierVulkan.DstStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-
-    BarrierVulkan.Barrier.MemroyBarrier = barrier;
-    Barriers.emplace_back(BarrierVulkan);
+	// todo : need to control pipeline stage
+	const auto SrcStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+	const auto DstStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+	AddBarrier(SrcStage, DstStage, barrier);
 }
 
 void jResourceBarrierBatcher_Vulkan::AddTransition(jBuffer* InBuffer, EResourceLayout InNewLayout)
@@ -94,8 +86,11 @@ void jResourceBarrierBatcher_Vulkan::AddTransition(jBuffer* InBuffer, EResourceL
 
     VkBufferMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;		// todo : need to control this when the pipeline stage control is not All stage bits
+    
+    // todo : Need to control this if I use VK_SHARING_MODE_EXCLUSIVE(VkSharingMode).
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
     barrier.buffer = buffer_vk->Buffer;
     barrier.offset = buffer_vk->Offset;
     barrier.size = buffer_vk->RealBufferSize;
@@ -112,14 +107,10 @@ void jResourceBarrierBatcher_Vulkan::AddTransition(jBuffer* InBuffer, EResourceL
         }
     }
 
-    jBarrier_Vulkan BarrierVulkan{};
-    
-    // todo : need to control pipeline stage
-    BarrierVulkan.SrcStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-    BarrierVulkan.DstStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-
-    BarrierVulkan.Barrier.BufferBarrier = barrier;
-    Barriers.emplace_back(BarrierVulkan);
+	// todo : need to control pipeline stage
+	const auto SrcStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+	const auto DstStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+	AddBarrier(SrcStage, DstStage, barrier);
 }
 
 void jResourceBarrierBatcher_Vulkan::AddTransition(jTexture* InTexture, EResourceLayout InNewLayout)
@@ -149,8 +140,8 @@ void jResourceBarrierBatcher_Vulkan::AddTransition(jTexture* InTexture, EResourc
     barrier.oldLayout = SrcLayout;		// 현재 image 내용이 존재하던말던 상관없다면 VK_IMAGE_LAYOUT_UNDEFINED 로 하면 됨
     barrier.newLayout = DstLayout;
 
-    // 아래 두필드는 Barrier를 사용해 Queue family ownership을 전달하는 경우에 사용됨.
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;		// todo : need to control this when the pipeline stage control is not All stage bits
+    // todo : Need to control this if I use VK_SHARING_MODE_EXCLUSIVE(VkSharingMode).
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 
     barrier.image = texture_vk->Image;
@@ -186,16 +177,7 @@ void jResourceBarrierBatcher_Vulkan::AddTransition(jTexture* InTexture, EResourc
             barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         break;
     }
-    //if (newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
-    //{
-    //    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    //    if (jVulkanBufferUtil::HasStencilComponent(format))
-    //        barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
-    //}
-    //else
-    //{
-    //    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    //}
+
     barrier.subresourceRange.baseMipLevel = 0;
     barrier.subresourceRange.levelCount = texture_vk->MipLevel;
     barrier.subresourceRange.baseArrayLayer = 0;
@@ -203,59 +185,9 @@ void jResourceBarrierBatcher_Vulkan::AddTransition(jTexture* InTexture, EResourc
     barrier.srcAccessMask = 0;	// TODO
     barrier.dstAccessMask = 0;	// TODO
 
-
-    //  // Barrier 는 동기화를 목적으로 사용하므로, 이 리소스와 연관되는 어떤 종류의 명령이 이전에 일어나야 하는지와
-    //  // 어떤 종류의 명령이 Barrier를 기다려야 하는지를 명시해야만 한다. vkQueueWaitIdle 을 사용하지만 그래도 수동으로 해줘야 함.
-
-    //  // Undefined -> transfer destination : 이 경우 기다릴 필요없이 바로 쓰면됨. Undefined 라 다른 곳에서 딱히 쓰거나 하는것이 없음.
-    //  // Transfer destination -> frag shader reading : frag 쉐이더에서 읽기 전에 transfer destination 에서 쓰기가 완료 됨이 보장되어야 함. 그래서 shader 에서 읽기 가능.
-    //  VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-    //  VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-    //  if ((oldLayout == VK_IMAGE_LAYOUT_UNDEFINED) && (newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL))
-    //  {
-    //      // 이전 작업을 기다릴 필요가 없어서 srcAccessMask에 0, sourceStage 에 가능한 pipeline stage의 가장 빠른 VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
-    //      barrier.srcAccessMask = 0;
-    //      barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;	// VK_ACCESS_TRANSFER_WRITE_BIT 는 Graphics 나 Compute stage에 실제 stage가 아닌 pseudo-stage 임.
-
-    //      sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-    //      destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-    //  }
-    //  else if ((oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) && (newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL))
-    //  {
-    //      barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    //      barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-    //      sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-    //      destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    //  }
-    //  else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
-    //  {
-    //      barrier.srcAccessMask = 0;
-    //      barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-
-    //      sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-
-    //      // 둘중 가장 빠른 stage 인 VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT 를 선택
-    //      // VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT 에서 depth read 가 일어날 수 있음.
-    //      // VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT 에서 depth write 가 일어날 수 있음.
-    //      destinationStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    //  }
-    //  else
-    //  {
-          //if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED)
-          //{
-          //	barrier.srcAccessMask = 0;
-          //}
-          //else
-          //{
-          //	check(!"Unsupported layout transition!");
-          //	return false;
-          //}
-    //  }
-
-      // Source layouts (old)
-      // Source access mask controls actions that have to be finished on the old layout
-      // before it will be transitioned to the new layout
+    // Source layouts (old)
+    // Source access mask controls actions that have to be finished on the old layout
+    // before it will be transitioned to the new layout
     switch (SrcLayout)
     {
     case VK_IMAGE_LAYOUT_UNDEFINED:
@@ -348,90 +280,38 @@ void jResourceBarrierBatcher_Vulkan::AddTransition(jTexture* InTexture, EResourc
         break;
     }
 
-    jBarrier_Vulkan BarrierVulkan{};
-
-    // todo : need to control pipeline stage
-    BarrierVulkan.SrcStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-    BarrierVulkan.DstStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-
-    BarrierVulkan.Barrier.ImageBarrier = barrier;
-    Barriers.emplace_back(BarrierVulkan);
+	// todo : need to control pipeline stage
+	const auto SrcStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+	const auto DstStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+	AddBarrier(SrcStage, DstStage, barrier);
 }
 
 void jResourceBarrierBatcher_Vulkan::Flush(const jCommandBuffer* InCommandBuffer)
 {
-	if (Barriers.empty())
+	if (BarriersList.empty())
 		return;
 
     check(InCommandBuffer);
     check(!InCommandBuffer->IsEnd());
     auto commandbuffer_vk = (const jCommandBuffer_Vulkan*)InCommandBuffer;
 
-	std::vector<VkBufferMemoryBarrier> BufferBarriers;
-	std::vector<VkImageMemoryBarrier> ImageBarriers;
-	std::vector<VkMemoryBarrier> MemroyBarriers;
-
-    BufferBarriers.reserve(Barriers.size());
-    ImageBarriers.reserve(Barriers.size());
-    MemroyBarriers.reserve(Barriers.size());
-
-    VkPipelineStageFlags SrcStageMask = Barriers[0].SrcStage;
-    VkPipelineStageFlags DstStageMask = Barriers[0].DstStage;
-    for (const auto& Iter : Barriers)
-    {
-        if (Iter.IsBufferBarrier())
-        {
-            BufferBarriers.push_back(Iter.Barrier.BufferBarrier);
-        }
-        else if (Iter.IsImageBarrier())
-        {
-            ImageBarriers.push_back(Iter.Barrier.ImageBarrier);
-        }
-        else if (Iter.IsMemoryBarrier())
-        {
-            MemroyBarriers.push_back(Iter.Barrier.MemroyBarrier);
-        }
-        else
-        {
-            check(0);
-        }
-
-        if (SrcStageMask != Iter.SrcStage && DstStageMask != Iter.DstStage)
-        {
-			vkCmdPipelineBarrier(commandbuffer_vk->GetRef()
-				, SrcStageMask
-				, DstStageMask
-				, 0
-				, (uint32)MemroyBarriers.size(), MemroyBarriers.data()
-				, (uint32)BufferBarriers.size(), BufferBarriers.data()
-				, (uint32)ImageBarriers.size(), ImageBarriers.data()
-			);
-
-			BufferBarriers.clear();
-			ImageBarriers.clear();
-			MemroyBarriers.clear();
-
-            SrcStageMask = Iter.SrcStage;
-            DstStageMask = Iter.DstStage;
-        }
-        else
-        {
-            check(Iter.SrcStage != 0 && Iter.DstStage != 0);
-			SrcStageMask = Iter.SrcStage;
-			DstStageMask = Iter.DstStage;
-        }
-    }
-
-    if (BufferBarriers.size() > 0 || ImageBarriers.size() > 0 || MemroyBarriers.size() > 0)
+    for (const jBarrier_Vulkan& iter : BarriersList)
     {
 		vkCmdPipelineBarrier(commandbuffer_vk->GetRef()
-			, SrcStageMask
-			, DstStageMask
+			, iter.SrcStage
+			, iter.DstStage
 			, 0
-			, (uint32)MemroyBarriers.size(), MemroyBarriers.data()
-			, (uint32)BufferBarriers.size(), BufferBarriers.data()
-			, (uint32)ImageBarriers.size(), ImageBarriers.data()
+			, (uint32)iter.MemroyBarriers.size(), iter.MemroyBarriers.data()
+			, (uint32)iter.BufferBarriers.size(), iter.BufferBarriers.data()
+			, (uint32)iter.ImageBarriers.size(), iter.ImageBarriers.data()
 		);
     }
-    Barriers.clear();
+
+    ClearBarriers();
+}
+
+void jResourceBarrierBatcher_Vulkan::ClearBarriers()
+{
+    CurrentBarriers = nullptr;
+    BarriersList.clear();
 }

@@ -161,8 +161,5 @@ void jSwapchain_DX12::ReleaseInternal()
     }
     Images.clear();
 
-    if (SwapChain)
-    {
-        SwapChain = nullptr;
-    }
+    SwapChain.Reset();
 }

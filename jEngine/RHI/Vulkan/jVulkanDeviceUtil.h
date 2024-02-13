@@ -53,7 +53,7 @@ const std::vector<const char*> DeviceExtensions = {
 #endif // SUPPORT_RAYTRACING
 
     // VK_KHR_spirv_1_4
-    VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME,    
+    VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME,
 };
 
 VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(

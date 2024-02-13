@@ -14,17 +14,47 @@ struct jScopedProfileData
 	std::thread::id ThreadId;
 };
 
+//////////////////////////////////////////////////////////////////////////
+// jGPUPriorityName, for jProfile_GPU
+//////////////////////////////////////////////////////////////////////////
+struct jGPUPriorityName : public jPriorityName
+{
+	jGPUPriorityName() = default;
+
+	FORCEINLINE explicit jGPUPriorityName(uint32 InNameHash, uint32 InPriority, ECommandBufferType InCommandBufferType)
+		: jPriorityName(InNameHash, InPriority), CommandBufferType(InCommandBufferType)
+	{}
+
+	FORCEINLINE explicit jGPUPriorityName(const char* pName, uint32 InPriority, ECommandBufferType InCommandBufferType)
+		: jPriorityName(pName, InPriority), CommandBufferType(InCommandBufferType)
+	{}
+
+	FORCEINLINE explicit jGPUPriorityName(const char* pName, size_t size, uint32 InPriority, ECommandBufferType InCommandBufferType)
+		: jPriorityName(pName, size, InPriority), CommandBufferType(InCommandBufferType)
+	{}
+
+	FORCEINLINE explicit jGPUPriorityName(const std::string& name, uint32 InPriority, ECommandBufferType InCommandBufferType)
+		: jPriorityName(name, InPriority), CommandBufferType(InCommandBufferType)
+	{}
+
+	FORCEINLINE explicit jGPUPriorityName(const jName& name, uint32 InPriority, ECommandBufferType InCommandBufferType)
+		: jPriorityName(name, InPriority), CommandBufferType(InCommandBufferType)
+	{}
+
+	ECommandBufferType CommandBufferType = ECommandBufferType::GRAPHICS;
+};
+
 extern jMutexRWLock ScopedCPULock;
 extern jMutexRWLock ScopedGPULock;
 extern robin_hood::unordered_map<jPriorityName, jScopedProfileData, jPriorityNameHashFunc> ScopedProfileCPUMap[MaxProfileFrame];
-extern robin_hood::unordered_map<jPriorityName, jScopedProfileData, jPriorityNameHashFunc> ScopedProfileGPUMap[MaxProfileFrame];
+extern robin_hood::unordered_map<jGPUPriorityName, jScopedProfileData, jPriorityNameHashFunc> ScopedProfileGPUMap[MaxProfileFrame];
 struct jQuery;
 
 void ClearScopedProfileCPU();
 void AddScopedProfileCPU(const jPriorityName& name, uint64 elapsedTick, int32 Indent = 0);
 
 void ClearScopedProfileGPU();
-void AddScopedProfileGPU(const jPriorityName& name, uint64 elapsedTick, int32 Indent = 0);
+void AddScopedProfileGPU(const jGPUPriorityName& name, uint64 elapsedTick, int32 Indent = 0);
 
 extern thread_local std::atomic<int32> ScopedProfilerCPUIndent;
 extern thread_local std::atomic<int32> ScopedProfilerGPUIndent;
@@ -125,7 +155,7 @@ private:
 // jProfile_GPU
 struct jProfile_GPU
 {
-	jPriorityName Name;
+	jGPUPriorityName Name;
 	jQuery* Query = nullptr;
 	int32 Indent = 0;
 
@@ -185,7 +215,7 @@ public:
 	jScopedProfile_GPU(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jName& name)
 		: RenderFrameContextPtr(InRenderFrameContext)
 	{
-		Profile.Name = jPriorityName(name, s_priority.fetch_add(1));
+		Profile.Name = jGPUPriorityName(name, s_priority.fetch_add(1), InRenderFrameContext->GetActiveCommandBuffer()->Type);
         Profile.Indent = ScopedProfilerGPUIndent.fetch_add(1);
         
 		Profile.Query = jQueryTimePool::GetQueryTime(InRenderFrameContext->GetActiveCommandBuffer()->Type);
@@ -224,6 +254,7 @@ public:
 		int32 TotalSampleCount = 0;
 		int32 Indent = 0;
 		std::thread::id ThreadId;
+		ECommandBufferType GPUCommandBufferType = ECommandBufferType::MAX;
 	};
 
 	// jPriorityNameComapreFunc

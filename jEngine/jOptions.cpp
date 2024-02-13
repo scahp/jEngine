@@ -3,12 +3,13 @@
 
 const char* GDenoisers[4] = { "Gaussian", "GaussianSeparable", "Bilateral", "None" };
 const char* GAOResolution[3] = { "100", "75", "50" };
+const char* GWaitPrerequsiteGraphicsQueueTask[4] = { "None", "ShadowPass", "BasePass", "AtmosphericPass" };
 
 jOptions gOptions;
 
 jOptions::jOptions()
 	// RHI options
-	: EnableDebuggerLayer(true)
+	: EnableDebuggerLayer(false)
 {
 
 	// Graphics options
@@ -47,6 +48,9 @@ jOptions::jOptions()
 	UseDiscontinuityWeight = true;
 	UseHaltonJitter = true;
 	UseResolution = GAOResolution[0];
+	UseAsyncComputeQueue = true;
+	WaitPrerequsiteGraphicsQueueTask = GWaitPrerequsiteGraphicsQueueTask[2];	// Default is BasePass
+	WaitSubsequentGraphicsQueueTask = true;
 }
 
 bool jOptions::operator==(struct jOptions const& RHS) const

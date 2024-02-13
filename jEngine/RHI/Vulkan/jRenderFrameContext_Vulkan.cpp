@@ -19,8 +19,14 @@ void jRenderFrameContext_Vulkan::Destroy()
 
 std::shared_ptr<jRenderFrameContext> jRenderFrameContext_Vulkan::CreateRenderFrameContextAsync(const std::shared_ptr<jSyncAcrossCommandQueue>& InSync) const
 {
+	if (InSync)
+		InSync->WaitSyncAcrossCommandQueue(ECommandBufferType::COMPUTE);
+
     auto NewRenderFrameContext = std::make_shared<jRenderFrameContext_Vulkan>();
     *NewRenderFrameContext = *this;
+
+    // Need to clear wait semaphore for other queue. because we also make dependency between queues by using jSyncAcrossCommandQueue.
+    NewRenderFrameContext->CurrentWaitSemaphore = nullptr;
 
     auto ComputeCommandBufferManager = g_rhi->GetComputeCommandBufferManager();
     NewRenderFrameContext->CommandBuffer = ComputeCommandBufferManager->GetOrCreateCommandBuffer();

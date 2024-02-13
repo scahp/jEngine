@@ -3,20 +3,30 @@
 
 struct jBarrier_Vulkan
 {
+    FORCEINLINE jBarrier_Vulkan(VkPipelineStageFlags InSrcStage, VkPipelineStageFlags InDstStage)
+        : SrcStage(InSrcStage), DstStage(InDstStage) {}
+    FORCEINLINE jBarrier_Vulkan(VkPipelineStageFlags InSrcStage, VkPipelineStageFlags InDstStage, const VkBufferMemoryBarrier& InBarrier)
+        : SrcStage(InSrcStage), DstStage(InDstStage), BufferBarriers{InBarrier} {}
+    FORCEINLINE jBarrier_Vulkan(VkPipelineStageFlags InSrcStage, VkPipelineStageFlags InDstStage, const VkImageMemoryBarrier& InBarrier)
+        : SrcStage(InSrcStage), DstStage(InDstStage), ImageBarriers{InBarrier} {}
+    FORCEINLINE jBarrier_Vulkan(VkPipelineStageFlags InSrcStage, VkPipelineStageFlags InDstStage, const VkMemoryBarrier& InBarrier)
+        : SrcStage(InSrcStage), DstStage(InDstStage), MemroyBarriers{ InBarrier } {}
+
+    FORCEINLINE bool CanMerge(VkPipelineStageFlags InSrcStage, VkPipelineStageFlags InDstStage) const
+    {
+        return SrcStage == InSrcStage && DstStage == InDstStage;
+    }
+
+    FORCEINLINE void AddBarrier(const VkBufferMemoryBarrier& InBarrier) { BufferBarriers.push_back(InBarrier); }
+    FORCEINLINE void AddBarrier(const VkImageMemoryBarrier& InBarrier) { ImageBarriers.push_back(InBarrier); }
+    FORCEINLINE void AddBarrier(const VkMemoryBarrier& InBarrier) { MemroyBarriers.push_back(InBarrier); }
+
     VkPipelineStageFlags SrcStage = 0;
     VkPipelineStageFlags DstStage = 0;
 
-    union
-    {
-        VkBufferMemoryBarrier BufferBarrier;
-        VkImageMemoryBarrier ImageBarrier;
-        VkMemoryBarrier MemroyBarrier;
-    } Barrier;
-
-    // This functions rely on first element of the Barriers would be VkStructureType
-    FORCEINLINE bool IsBufferBarrier() const { return Barrier.BufferBarrier.sType == VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER; }
-    FORCEINLINE bool IsImageBarrier() const { return Barrier.BufferBarrier.sType == VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER; }
-    FORCEINLINE bool IsMemoryBarrier() const { return Barrier.BufferBarrier.sType == VK_STRUCTURE_TYPE_MEMORY_BARRIER; }
+    std::vector<VkBufferMemoryBarrier> BufferBarriers;
+    std::vector<VkImageMemoryBarrier> ImageBarriers;
+	std::vector<VkMemoryBarrier> MemroyBarriers;
 };
 
 class jResourceBarrierBatcher_Vulkan : public jResourceBarrierBatcher
@@ -34,6 +44,37 @@ public:
 
     virtual void Flush(const jCommandBuffer* InCommandBuffer) override;
 
-private:
-    std::vector<jBarrier_Vulkan> Barriers;
+    template <typename T>
+    void AddBarrier(VkPipelineStageFlags InSrcStage, VkPipelineStageFlags InDstStage, const T& InBarrier)
+    {
+		// Function to alloc NewBarriers
+		auto AllocateNewBarriers = [&](VkPipelineStageFlags InSrcStage, VkPipelineStageFlags InDstStage, const T & InNewBarrier)
+		{
+			BarriersList.push_back(jBarrier_Vulkan(InSrcStage, InDstStage, InNewBarrier));
+			CurrentBarriers = &(*BarriersList.rbegin());
+		};
+
+		if (BarriersList.empty())
+		{
+			AllocateNewBarriers(InSrcStage, InDstStage, InBarrier);
+			return;
+		}
+		check(CurrentBarriers);
+
+		// Check the new barrier could be merged with CurrentBarries, if not split the barrieres array.
+		if (CurrentBarriers->CanMerge(InSrcStage, InDstStage))
+		{
+			CurrentBarriers->AddBarrier(InBarrier);
+		}
+		else
+		{
+			AllocateNewBarriers(InSrcStage, InDstStage, InBarrier);
+		}
+    }
+
+    void ClearBarriers();
+
+private:    
+    jBarrier_Vulkan* CurrentBarriers = nullptr;
+    std::list<jBarrier_Vulkan> BarriersList;
 };

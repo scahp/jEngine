@@ -6,7 +6,7 @@ jPerformanceProfile* jPerformanceProfile::_instance = nullptr;
 jMutexRWLock ScopedCPULock;
 jMutexRWLock ScopedGPULock;
 robin_hood::unordered_map<jPriorityName, jScopedProfileData, jPriorityNameHashFunc> ScopedProfileCPUMap[MaxProfileFrame];
-robin_hood::unordered_map<jPriorityName, jScopedProfileData, jPriorityNameHashFunc> ScopedProfileGPUMap[MaxProfileFrame];
+robin_hood::unordered_map<jGPUPriorityName, jScopedProfileData, jPriorityNameHashFunc> ScopedProfileGPUMap[MaxProfileFrame];
 static int32 PerformanceFrame = 0;
 
 robin_hood::unordered_set<jQuery*> jQueryTimePool::s_running[(uint32)ECommandBufferType::MAX];
@@ -61,7 +61,7 @@ void ClearScopedProfileGPU()
 		ScopedProfileGPUMap[i].clear();
 }
 
-void AddScopedProfileGPU(const jPriorityName& name, uint64 elapsedTick, int32 Indent)
+void AddScopedProfileGPU(const jGPUPriorityName& name, uint64 elapsedTick, int32 Indent)
 {
 	jScopeWriteLock s(&ScopedGPULock);
 	ScopedProfileGPUMap[PerformanceFrame][name] = jScopedProfileData(elapsedTick, Indent, std::this_thread::get_id());
@@ -146,6 +146,7 @@ void jPerformanceProfile::CalcAvg()
 					avgProfile.Indent = iter.second.Indent;
 					avgProfile.ThreadId = iter.second.ThreadId;
 					avgProfile.Name = iter.first;
+					avgProfile.GPUCommandBufferType = iter.first.CommandBufferType;
 					++avgProfile.TotalSampleCount;
 				}
 			}

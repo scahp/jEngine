@@ -728,24 +728,19 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
 
 void jRenderer::AsyncComputeTest(std::shared_ptr<jSyncAcrossCommandQueue> SyncAcrossCommandQueuePtr)
 {
-    std::shared_ptr<jRenderFrameContext> RenderFrameContextAsyncPtr = RenderFrameContextPtr->CreateRenderFrameContextAsync(SyncAcrossCommandQueuePtr);
-
-    static std::shared_ptr<jRenderTarget> AsyncComputeTestPtr;
+    static jRenderTarget* AsyncComputeTestPtr = nullptr;
     if (!AsyncComputeTestPtr)
     {
         jRenderTargetInfo AsyncComputeTestRTInfo = { ETextureType::TEXTURE_2D, ETextureFormat::R11G11B10F, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f) };
         AsyncComputeTestRTInfo.ResourceName = TEXT("AsyncComputeTestRT");
         AsyncComputeTestRTInfo.TextureCreateFlag = ETextureCreateFlag::UAV;
-        AsyncComputeTestPtr = jRenderTargetPool::GetRenderTarget(AsyncComputeTestRTInfo);
+        AsyncComputeTestPtr = jRenderTargetPool::GetRenderTarget(AsyncComputeTestRTInfo).get();
     }
 
     //DebugRTs.push_back(AsyncComputeTestPtr->GetTexturePtr());
 
     {
-        static bool UseAsyncComputeQueue = true;
-        static bool WaitSubsequentGraphicsQueueTask = true;
-
-        auto CurrentRenderFrameContextPtr = UseAsyncComputeQueue ? RenderFrameContextAsyncPtr : RenderFrameContextPtr;
+		std::shared_ptr<jRenderFrameContext> CurrentRenderFrameContextPtr = gOptions.UseAsyncComputeQueue ? RenderFrameContextPtr->CreateRenderFrameContextAsync(SyncAcrossCommandQueuePtr) : RenderFrameContextPtr;
 
         int32 Width = AsyncComputeTestPtr->Info.Width;
         int32 Height = AsyncComputeTestPtr->Info.Height;
@@ -841,11 +836,11 @@ void jRenderer::AsyncComputeTest(std::shared_ptr<jSyncAcrossCommandQueue> SyncAc
                 );
         }
 
-        if (UseAsyncComputeQueue)
+        if (gOptions.UseAsyncComputeQueue)
         {
             auto SyncPtr = CurrentRenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None, false);
 
-            if (WaitSubsequentGraphicsQueueTask)
+            if (gOptions.WaitSubsequentGraphicsQueueTask)
                 SyncPtr->WaitSyncAcrossCommandQueue(ECommandBufferType::GRAPHICS);
         }
     }
@@ -1095,7 +1090,15 @@ void jRenderer::Render()
             Sync_AtmosphericShadowing = RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::BasePass, false);
             RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
         }
-        AsyncComputeTest(Sync_BasePass);
+
+        std::shared_ptr<jSyncAcrossCommandQueue> SelectedSyncPass;
+        if (gOptions.IsPrerequsiteShadowPass())
+            SelectedSyncPass = Sync_ShadowPass;
+        else if (gOptions.IsPrerequsiteBasePass())
+            SelectedSyncPass = Sync_BasePass;
+        else if (gOptions.IsPrerequsiteShadowAtmosphericPass())
+            SelectedSyncPass = Sync_AtmosphericShadowing;
+        AsyncComputeTest(SelectedSyncPass);
     }
 
     PostProcess();

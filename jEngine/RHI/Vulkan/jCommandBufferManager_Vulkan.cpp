@@ -70,6 +70,8 @@ std::shared_ptr<jSyncAcrossCommandQueue_Vulkan> jCommandBufferManager_Vulkan::Qu
         WaitSemaphoreValues.push_back(InWaitSemaphore->GetValue());
     }
 
+    check(WaitSemaphoreValues.size() == WaitSemaphores.size());
+
     VkPipelineStageFlags WaitStage;
     switch (InCommandBuffer->Type)
     {
@@ -81,30 +83,21 @@ std::shared_ptr<jSyncAcrossCommandQueue_Vulkan> jCommandBufferManager_Vulkan::Qu
         break;
     }
 
-    uint64 waitValue = 0;
     uint64 signalValue = 0;
 
     const bool UseWaitTimeline = InWaitSemaphore && InWaitSemaphore->GetType() == ESemaphoreType::TIMELINE;
     const bool UseSignalTimeline = InSignalSemaphore && InSignalSemaphore->GetType() == ESemaphoreType::TIMELINE;
 
+    VkTimelineSemaphoreSubmitInfo timelineSemaphoreSubmitInfo = {};
     if (UseWaitTimeline || UseSignalTimeline)
     {
-        VkTimelineSemaphoreSubmitInfo timelineSemaphoreSubmitInfo = {};
         timelineSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
-        if (UseWaitTimeline)
-        {
-            waitValue = InWaitSemaphore->GetValue();
-
-            timelineSemaphoreSubmitInfo.waitSemaphoreValueCount = (uint32)WaitSemaphoreValues.size();
-            timelineSemaphoreSubmitInfo.pWaitSemaphoreValues = WaitSemaphoreValues.data();
-        }
-        if (UseSignalTimeline)
-        {
-            signalValue = InSignalSemaphore->IncrementValue();
-
-            timelineSemaphoreSubmitInfo.signalSemaphoreValueCount = 1;
-            timelineSemaphoreSubmitInfo.pSignalSemaphoreValues = &signalValue;
-        }
+        timelineSemaphoreSubmitInfo.waitSemaphoreValueCount = (uint32)WaitSemaphoreValues.size();
+        timelineSemaphoreSubmitInfo.pWaitSemaphoreValues = WaitSemaphoreValues.data();
+        
+        signalValue = InSignalSemaphore->IncrementValue();
+        timelineSemaphoreSubmitInfo.signalSemaphoreValueCount = 1;
+        timelineSemaphoreSubmitInfo.pSignalSemaphoreValues = &signalValue;
         submitInfo.pNext = &timelineSemaphoreSubmitInfo;
     }
 

@@ -139,6 +139,35 @@ void jRenderer::UIPass()
 				ImGui::EndTabItem();
 			}
 #endif // SUPPORT_RAYTRACING
+			const float DPI = g_ImGUI->GetCurrentMonitorDPIScale();
+			ImGui::SetNextWindowPos(ImVec2(370.0f * DPI, 25.0f * DPI), ImGuiCond_Once);
+			ImGui::SetNextWindowSize(ImVec2(778.0f * DPI, 106.0f * DPI), ImGuiCond_Once);
+			ImGui::Begin("AsyncCompute");
+			
+			ImGui::Checkbox("UseAsyncComputeQueue", &gOptions.UseAsyncComputeQueue);
+
+			if (!gOptions.UseAsyncComputeQueue)
+				ImGui::BeginDisabled();
+
+			if (ImGui::BeginCombo("WaitPrerequsiteGraphicsQueueTask", gOptions.WaitPrerequsiteGraphicsQueueTask, ImGuiComboFlags_None))
+			{
+				for (int32 i = 0; i < _countof(GWaitPrerequsiteGraphicsQueueTask); ++i)
+				{
+					const bool is_selected = (gOptions.WaitPrerequsiteGraphicsQueueTask == GWaitPrerequsiteGraphicsQueueTask[i]);
+					if (ImGui::Selectable(GWaitPrerequsiteGraphicsQueueTask[i], is_selected))
+						gOptions.WaitPrerequsiteGraphicsQueueTask = GWaitPrerequsiteGraphicsQueueTask[i];
+					if (is_selected)
+						ImGui::SetItemDefaultFocus();
+				}
+				ImGui::EndCombo();
+			}
+			ImGui::Checkbox("WaitSubsequentGraphicsQueueTask", &gOptions.WaitSubsequentGraphicsQueueTask);
+
+			if (!gOptions.UseAsyncComputeQueue)
+				ImGui::EndDisabled();
+
+			ImGui::End();
+
 			ImGui::EndTabBar();
 		}
 		ImGui::End();
