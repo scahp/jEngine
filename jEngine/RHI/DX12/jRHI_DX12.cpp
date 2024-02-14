@@ -460,7 +460,6 @@ bool jRHI_DX12::InitRHI()
         return false;
 
 #if USE_RAYTRACING
-    check(featureSupportData.RaytracingTier > D3D12_RAYTRACING_TIER_NOT_SUPPORTED);
     GSupportRaytracing = featureSupportData.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED;
 #else // USE_RAYTRACING
     GSupportRaytracing = false;
