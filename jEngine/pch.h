@@ -223,10 +223,11 @@ extern class jEngine* g_Engine;
 #define ENABLE_PBR 1
 #define USE_SPONZA 1
 #define USE_SPONZA_PBR 1
-#define SUPPORT_RAYTRACING 0
+#define USE_RAYTRACING 1
 #define USE_RESOURCE_BARRIER_BATCHER 1
 
 extern bool GUseRealTimeShaderUpdate;
+extern bool GSupportRaytracing;
 extern int32 GMaxCheckCountForRealTimeShaderUpdate;
 extern int32 GSleepMSForRealTimeShaderUpdate;
 

@@ -75,7 +75,6 @@ void jRenderer::Setup()
     jRenderer::SetupBasePass();
 #endif
 
-#if SUPPORT_RAYTRACING
     if (g_rhi->RaytracingScene && g_rhi->RaytracingScene->ShouldUpdate())
     {
         SCOPE_CPU_PROFILE(UpdateTLAS);
@@ -88,7 +87,6 @@ void jRenderer::Setup()
         InInitializer.RenderObjects = jObject::GetStaticRenderObject();
         g_rhi->RaytracingScene->CreateOrUpdateTLAS(InInitializer);
     }
-#endif // SUPPORT_RAYTRACING
 }
 
 void jRenderer::SetupShadowPass()

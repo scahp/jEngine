@@ -420,7 +420,9 @@ void* jPipelineStateInfo_Vulkan::CreateComputePipelineState()
 
 void* jPipelineStateInfo_Vulkan::CreateRaytracingPipelineState()
 {
-#if SUPPORT_RAYTRACING
+    if (!GSupportRaytracing)
+        return nullptr;
+
     // 미리 만들어 둔게 있으면 사용
     if (vkPipeline)
         return vkPipeline;
@@ -590,10 +592,6 @@ void* jPipelineStateInfo_Vulkan::CreateRaytracingPipelineState()
     }
 
     return vkPipeline;
-#else
-    check(0);
-    return nullptr;
-#endif // SUPPORT_RAYTRACING
 }
 
 void jPipelineStateInfo_Vulkan::Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const

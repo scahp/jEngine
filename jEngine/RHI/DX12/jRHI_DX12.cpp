@@ -308,27 +308,27 @@ void jRHI_DX12::WaitForGPU() const
 
 bool jRHI_DX12::InitRHI()
 {
-	g_rhi = this;
+    g_rhi = this;
 
     m_hWnd = CreateMainWindow();
 
-	// 1. Device
-	uint32 dxgiFactoryFlags = 0;
+    // 1. Device
+    uint32 dxgiFactoryFlags = 0;
 
 #if defined(_DEBUG)
-	// 디버그 레이어 켬 ("optional feature" 그래픽 툴을 요구함)
-	// 주의 : 디버그 레이어를 device 생성 후에 하면 활성화된 device를 무효화 됨.
+    // 디버그 레이어 켬 ("optional feature" 그래픽 툴을 요구함)
+    // 주의 : 디버그 레이어를 device 생성 후에 하면 활성화된 device를 무효화 됨.
     if (gOptions.EnableDebuggerLayer)
-	{
-		ComPtr<ID3D12Debug> debugController;
-		if (JOK(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
-		{
-			debugController->EnableDebugLayer();
+    {
+        ComPtr<ID3D12Debug> debugController;
+        if (JOK(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
+        {
+            debugController->EnableDebugLayer();
 
-			// 디버그 레이어를 추가적으로 켬
-			dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
-		}
-	}
+            // 디버그 레이어를 추가적으로 켬
+            dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
+        }
+    }
 #endif
 
     ComPtr<IDXGIFactory4> factory;
@@ -352,20 +352,20 @@ bool jRHI_DX12::InitRHI()
         }
     }
 
-	bool UseWarpDevice = false;		// Software rasterizer 사용 여부
-	if (UseWarpDevice)
-	{
-		if (JFAIL(factory->EnumWarpAdapter(IID_PPV_ARGS(&Adapter))))
-			return false;
+    bool UseWarpDevice = false;		// Software rasterizer 사용 여부
+    if (UseWarpDevice)
+    {
+        if (JFAIL(factory->EnumWarpAdapter(IID_PPV_ARGS(&Adapter))))
+            return false;
 
-		if (JFAIL((D3D12CreateDevice(Adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&Device)))))
-			return false;
-	}
-	else
-	{
-		ComPtr<IDXGIAdapter1> hardwareAdapter;
-		const int32 ResultAdapterID = GetHardwareAdapter(factory.Get(), &hardwareAdapter);
-		hardwareAdapter.As(&Adapter);
+        if (JFAIL((D3D12CreateDevice(Adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&Device)))))
+            return false;
+    }
+    else
+    {
+        ComPtr<IDXGIAdapter1> hardwareAdapter;
+        const int32 ResultAdapterID = GetHardwareAdapter(factory.Get(), &hardwareAdapter);
+        hardwareAdapter.As(&Adapter);
 
         if (JFAIL(D3D12CreateDevice(Adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&Device))))
         {
@@ -374,7 +374,7 @@ bool jRHI_DX12::InitRHI()
         else
         {
             DXGI_ADAPTER_DESC desc;
-			Adapter->GetDesc(&desc);
+            Adapter->GetDesc(&desc);
             AdapterID = ResultAdapterID;
             AdapterName = desc.Description;
 
@@ -384,31 +384,31 @@ bool jRHI_DX12::InitRHI()
             OutputDebugStringW(buff);
 #endif
         }
-	}
+    }
 
     PlacedResourcePool.Init();
     DeallocatorMultiFrameStandaloneResource.FreeDelegate = [](ComPtr<ID3D12Resource> InData)
-    {
-        InData.Reset();
-    };
+        {
+            InData.Reset();
+        };
 
     //////////////////////////////////////////////////////////////////////////
     // PlacedResouce test
-	{
-		D3D12_HEAP_DESC heapDesc;
-		heapDesc.SizeInBytes = GDefaultPlacedResourceHeapSize;
-		heapDesc.Properties.Type = D3D12_HEAP_TYPE_DEFAULT;
-		heapDesc.Properties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-		heapDesc.Properties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-		heapDesc.Properties.CreationNodeMask = 1;
-		heapDesc.Properties.VisibleNodeMask = 1;
-		heapDesc.Alignment = 0;
-		heapDesc.Flags = D3D12_HEAP_FLAG_NONE;
-		if (JFAIL(Device->CreateHeap(&heapDesc, IID_PPV_ARGS(&PlacedResourceDefaultHeap))))
-			return false;
-	}
+    {
+        D3D12_HEAP_DESC heapDesc;
+        heapDesc.SizeInBytes = GDefaultPlacedResourceHeapSize;
+        heapDesc.Properties.Type = D3D12_HEAP_TYPE_DEFAULT;
+        heapDesc.Properties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        heapDesc.Properties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        heapDesc.Properties.CreationNodeMask = 1;
+        heapDesc.Properties.VisibleNodeMask = 1;
+        heapDesc.Alignment = 0;
+        heapDesc.Flags = D3D12_HEAP_FLAG_NONE;
+        if (JFAIL(Device->CreateHeap(&heapDesc, IID_PPV_ARGS(&PlacedResourceDefaultHeap))))
+            return false;
+    }
 
-	{
+    {
         D3D12_HEAP_DESC heapDesc;
         heapDesc.SizeInBytes = GDefaultPlacedResourceHeapSize;
         heapDesc.Properties.Type = D3D12_HEAP_TYPE_UPLOAD;
@@ -420,50 +420,51 @@ bool jRHI_DX12::InitRHI()
         heapDesc.Flags = D3D12_HEAP_FLAG_NONE;
         if (JFAIL(Device->CreateHeap(&heapDesc, IID_PPV_ARGS(&PlacedResourceUploadHeap))))
             return false;
-	}
-	//////////////////////////////////////////////////////////////////////////
+    }
+    //////////////////////////////////////////////////////////////////////////
 
     BarrierBatcher = new jResourceBarrierBatcher_DX12();
 
-	// 2. Command
-	GraphicsCommandBufferManager = new jCommandBufferManager_DX12(ECommandBufferType::GRAPHICS);
-	GraphicsCommandBufferManager->Initialize(Device);
+    // 2. Command
+    GraphicsCommandBufferManager = new jCommandBufferManager_DX12(ECommandBufferType::GRAPHICS);
+    GraphicsCommandBufferManager->Initialize(Device);
     ComputeCommandBufferManager = new jCommandBufferManager_DX12(ECommandBufferType::COMPUTE);
     ComputeCommandBufferManager->Initialize(Device);
     CopyCommandBufferManager = new jCommandBufferManager_DX12(ECommandBufferType::COPY);
-	CopyCommandBufferManager->Initialize(Device);
+    CopyCommandBufferManager->Initialize(Device);
 
     // 4. Heap	
-	RTVDescriptorHeaps.Initialize(EDescriptorHeapTypeDX12::RTV);
-	DSVDescriptorHeaps.Initialize(EDescriptorHeapTypeDX12::DSV);
-	DescriptorHeaps.Initialize(EDescriptorHeapTypeDX12::CBV_SRV_UAV);
-	SamplerDescriptorHeaps.Initialize(EDescriptorHeapTypeDX12::SAMPLER);
+    RTVDescriptorHeaps.Initialize(EDescriptorHeapTypeDX12::RTV);
+    DSVDescriptorHeaps.Initialize(EDescriptorHeapTypeDX12::DSV);
+    DescriptorHeaps.Initialize(EDescriptorHeapTypeDX12::CBV_SRV_UAV);
+    SamplerDescriptorHeaps.Initialize(EDescriptorHeapTypeDX12::SAMPLER);
 
-	// 3. Swapchain
-	Swapchain = new jSwapchain_DX12();
-	Swapchain->Create();
+    // 3. Swapchain
+    Swapchain = new jSwapchain_DX12();
+    Swapchain->Create();
     CurrentFrameIndex = Swapchain->GetCurrentBackBufferIndex();
 
-	OneFrameUniformRingBuffers.resize(Swapchain->GetNumOfSwapchain());
-	for(jRingBuffer_DX12*& iter : OneFrameUniformRingBuffers)
-	{
-		iter = new jRingBuffer_DX12();
-		iter->Create(65536);
-	}
+    OneFrameUniformRingBuffers.resize(Swapchain->GetNumOfSwapchain());
+    for (jRingBuffer_DX12*& iter : OneFrameUniformRingBuffers)
+    {
+        iter = new jRingBuffer_DX12();
+        iter->Create(65536);
+    }
 
-	// 7. Create sync object
-	WaitForGPU();
+    // 7. Create sync object
+    WaitForGPU();
 
-	// 8. Raytracing device and commandlist
-	D3D12_FEATURE_DATA_D3D12_OPTIONS5 featureSupportData{};
-	if (JFAIL(Device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &featureSupportData, sizeof(featureSupportData))))
-		return false;
-
-#if SUPPORT_RAYTRACING
-    check(featureSupportData.RaytracingTier > D3D12_RAYTRACING_TIER_NOT_SUPPORTED);
-    if (featureSupportData.RaytracingTier == D3D12_RAYTRACING_TIER_NOT_SUPPORTED)
+    // 8. Raytracing device and commandlist
+    D3D12_FEATURE_DATA_D3D12_OPTIONS5 featureSupportData{};
+    if (JFAIL(Device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &featureSupportData, sizeof(featureSupportData))))
         return false;
-#endif
+
+#if USE_RAYTRACING
+    check(featureSupportData.RaytracingTier > D3D12_RAYTRACING_TIER_NOT_SUPPORTED);
+    GSupportRaytracing = featureSupportData.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED;
+#else // USE_RAYTRACING
+    GSupportRaytracing = false;
+#endif // USE_RAYTRACING
 
     // Create InstanceVertexBuffer for cube map six face
     // todo : It will be removed, when I have a system that can generate per instance data for visible faces
@@ -509,9 +510,8 @@ bool jRHI_DX12::InitRHI()
 
 	ShowWindow(m_hWnd, SW_SHOW);
 
-#if SUPPORT_RAYTRACING
-    RaytracingScene = CreateRaytracingScene();
-#endif // SUPPORT_RAYTRACING
+    if (GSupportRaytracing)
+        RaytracingScene = CreateRaytracingScene();
 
     return true;
 }
@@ -522,10 +522,11 @@ void jRHI_DX12::ReleaseRHI()
     
     jRHI::ReleaseRHI();
 
-#if SUPPORT_RAYTRACING
-    delete RaytracingScene;
-    RaytracingScene = nullptr;
-#endif // SUPPORT_RAYTRACING
+    if (RaytracingScene)
+    {
+        delete RaytracingScene;
+        RaytracingScene = nullptr;
+    }
 
     for(auto it : ShaderBindingPool)
     {
@@ -821,43 +822,23 @@ bool jRHI_DX12::CreateShaderInternal(jShader* OutShader, const jShaderInfo& shad
         switch (shaderInfo.GetShaderType())
         {
         case EShaderAccessStageFlag::VERTEX:
-#if SUPPORT_RAYTRACING
-            ShadingModel = TEXT("vs_6_6");
-#else
-			ShadingModel = TEXT("vs_6_5");
-#endif
+            ShadingModel = GSupportRaytracing ? TEXT("vs_6_6") : TEXT("vs_6_5");
             break;
         case EShaderAccessStageFlag::GEOMETRY:
-#if SUPPORT_RAYTRACING
-            ShadingModel = TEXT("gs_6_6");
-#else
-            ShadingModel = TEXT("gs_6_5");
-#endif
+            ShadingModel = GSupportRaytracing ? TEXT("gs_6_6") : TEXT("gs_6_5");
             break;
         case EShaderAccessStageFlag::FRAGMENT:
-#if SUPPORT_RAYTRACING
-            ShadingModel = TEXT("ps_6_6");
-#else
-            ShadingModel = TEXT("ps_6_5");
-#endif
+            ShadingModel = GSupportRaytracing ? TEXT("ps_6_6") : TEXT("ps_6_5");
             break;
         case EShaderAccessStageFlag::COMPUTE:
-#if SUPPORT_RAYTRACING
-            ShadingModel = TEXT("cs_6_6");
-#else
-            ShadingModel = TEXT("cs_6_5");
-#endif
+            ShadingModel = GSupportRaytracing ? TEXT("cs_6_6") : TEXT("cs_6_5");
             break;
         case EShaderAccessStageFlag::RAYTRACING:
         case EShaderAccessStageFlag::RAYTRACING_RAYGEN:
         case EShaderAccessStageFlag::RAYTRACING_MISS:
         case EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT:
         case EShaderAccessStageFlag::RAYTRACING_ANYHIT:
-#if SUPPORT_RAYTRACING
-            ShadingModel = TEXT("lib_6_6");
-#else
-            ShadingModel = TEXT("lib_6_5");
-#endif
+            ShadingModel = GSupportRaytracing ? TEXT("lib_6_6") : TEXT("lib_6_5");
             break;
         default:
             check(0);

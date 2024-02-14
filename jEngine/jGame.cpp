@@ -241,20 +241,21 @@ void jGame::Setup()
 		//}
 	//});
 	
+	g_rhi->Finish(); // todo : Instead of this, it needs UAV barrier here
+	if (GSupportRaytracing)
+	{
+		jRatracingInitializer Initializer;
+		Initializer.CommandBuffer = g_rhi->BeginSingleTimeCommands();
+		Initializer.RenderObjects = jObject::GetStaticRenderObject();
+		g_rhi->RaytracingScene->CreateOrUpdateBLAS(Initializer);
+		g_rhi->EndSingleTimeCommands(Initializer.CommandBuffer);
 		g_rhi->Finish(); // todo : Instead of this, it needs UAV barrier here
-#if SUPPORT_RAYTRACING
-    jRatracingInitializer Initializer;
-    Initializer.CommandBuffer = g_rhi->BeginSingleTimeCommands();
-    Initializer.RenderObjects = jObject::GetStaticRenderObject();
-    g_rhi->RaytracingScene->CreateOrUpdateBLAS(Initializer);
-    g_rhi->EndSingleTimeCommands(Initializer.CommandBuffer);
-    g_rhi->Finish(); // todo : Instead of this, it needs UAV barrier here
 
-	Initializer.CommandBuffer = g_rhi->BeginSingleTimeCommands();
-    g_rhi->RaytracingScene->CreateOrUpdateTLAS(Initializer);
-	g_rhi->EndSingleTimeCommands(Initializer.CommandBuffer);
-    g_rhi->Finish(); // todo : Instead of this, it needs UAV barrier here
-#endif // SUPPORT_RAYTRACING
+		Initializer.CommandBuffer = g_rhi->BeginSingleTimeCommands();
+		g_rhi->RaytracingScene->CreateOrUpdateTLAS(Initializer);
+		g_rhi->EndSingleTimeCommands(Initializer.CommandBuffer);
+		g_rhi->Finish(); // todo : Instead of this, it needs UAV barrier here
+	}
 }
 
 void jGame::SpawnObjects(ESpawnedType spawnType)

@@ -303,4 +303,30 @@ bool CheckValidationLayerSupport()
     return true;
 }
 
+bool IsSupportRaytracing(const std::vector<VkExtensionProperties>& InAvailableExtensions)
+{
+    if (InAvailableExtensions.empty())
+        return false;
+
+    for (auto& raytracingExtension : jVulkanDeviceUtil::RaytracingDeviceExtensions)
+    {
+        bool found = false;
+        for (auto& extension : InAvailableExtensions)
+        {
+            if (!strcmp(extension.extensionName, raytracingExtension))
+            {
+                found = true;
+                break;
+            }
+        }
+
+        if (!found)
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 }

@@ -171,6 +171,9 @@ bool jRHI_Vulkan::InitRHI()
 		ensure(VK_SUCCESS == glfwCreateWindowSurface(Instance, Window, nullptr, &Surface));
 	}
 
+	// AvailableExtension from PhysicalDevice
+	std::vector<VkExtensionProperties> availableExtensions;
+
 	// Physical device
 	{
 		uint32 deviceCount = 0;
@@ -195,42 +198,51 @@ bool jRHI_Vulkan::InitRHI()
 		if (!ensure(PhysicalDevice))
 			return false;
 
+        // Get All device extension properties
+        uint32 extensionCount;
+        vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &extensionCount, nullptr);
+		
+		availableExtensions.resize(extensionCount);
+        vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &extensionCount, availableExtensions.data());
+
+#if USE_RAYTRACING
+		GSupportRaytracing = jVulkanDeviceUtil::IsSupportRaytracing(availableExtensions);
+#else // USE_RAYTRACING
+		GSupportRaytracing = false;
+#endif // USE_RAYTRACING
+
 		// Check if is enabled that the both 'Non-uniform indexing' and 'Update after bind' flags for resources.
 		VkPhysicalDeviceDescriptorIndexingFeatures indexing_features{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT, nullptr };
 
 		DeviceProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
 		DeviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-#if SUPPORT_RAYTRACING
-		RayTracingPipelineProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
-		RayTracingPipelineProperties.pNext = (void*)DeviceProperties.pNext;
-		DeviceProperties.pNext = &RayTracingPipelineProperties;
-		vkGetPhysicalDeviceProperties2(PhysicalDevice, &DeviceProperties);
+		if (GSupportRaytracing)
+		{
+			RayTracingPipelineProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
+			RayTracingPipelineProperties.pNext = (void*)DeviceProperties.pNext;
+			DeviceProperties.pNext = &RayTracingPipelineProperties;
+			vkGetPhysicalDeviceProperties2(PhysicalDevice, &DeviceProperties);
 
-		AccelerationStructureFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
-		AccelerationStructureFeatures.pNext = (void*)DeviceProperties.pNext;
-		DeviceFeatures2.pNext = &AccelerationStructureFeatures;
-		
-		indexing_features.pNext = (void*)DeviceProperties.pNext;
-		DeviceFeatures2.pNext = &indexing_features;
-		vkGetPhysicalDeviceFeatures2(PhysicalDevice, &DeviceFeatures2);
-#else
-		vkGetPhysicalDeviceProperties2(PhysicalDevice, &DeviceProperties);
+			AccelerationStructureFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
+			AccelerationStructureFeatures.pNext = (void*)DeviceProperties.pNext;
+			DeviceFeatures2.pNext = &AccelerationStructureFeatures;
 
-		DeviceFeatures2.pNext = &indexing_features;
-		vkGetPhysicalDeviceFeatures2(PhysicalDevice, &DeviceFeatures2);
-#endif // SUPPORT_RAYTRACING
+			indexing_features.pNext = (void*)DeviceProperties.pNext;
+			DeviceFeatures2.pNext = &indexing_features;
+			vkGetPhysicalDeviceFeatures2(PhysicalDevice, &DeviceFeatures2);
+		}
+		else
+		{
+			vkGetPhysicalDeviceProperties2(PhysicalDevice, &DeviceProperties);
 
+			DeviceFeatures2.pNext = &indexing_features;
+			vkGetPhysicalDeviceFeatures2(PhysicalDevice, &DeviceFeatures2);
+		}
 		bool bindless_supported = indexing_features.descriptorBindingPartiallyBound && indexing_features.runtimeDescriptorArray;
 		check(bindless_supported);
 	}
 
 	jSpirvHelper::Init(DeviceProperties);
-
-	// Get All device extension properties
-    uint32 extensionCount;
-    vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &extensionCount, nullptr);
-    std::vector<VkExtensionProperties> availableExtensions(extensionCount);
-    vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &extensionCount, availableExtensions.data());
 
 	bool IsSupportDebugMarker = false;
 
@@ -313,25 +325,26 @@ bool jRHI_Vulkan::InitRHI()
 		enabledBufferDeviceAddresFeatures.pNext = (void*)createInfo.pNext;
 		createInfo.pNext = &enabledBufferDeviceAddresFeatures;
 
-#if SUPPORT_RAYTRACING
-        VkPhysicalDeviceRayTracingPipelineFeaturesKHR enabledRayTracingPipelineFeatures{};
-        enabledRayTracingPipelineFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
-        enabledRayTracingPipelineFeatures.rayTracingPipeline = true;
-		enabledRayTracingPipelineFeatures.pNext = (void*)createInfo.pNext;
-        createInfo.pNext = &enabledRayTracingPipelineFeatures;
+		if (GSupportRaytracing)
+		{
+			VkPhysicalDeviceRayTracingPipelineFeaturesKHR enabledRayTracingPipelineFeatures{};
+			enabledRayTracingPipelineFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
+			enabledRayTracingPipelineFeatures.rayTracingPipeline = true;
+			enabledRayTracingPipelineFeatures.pNext = (void*)createInfo.pNext;
+			createInfo.pNext = &enabledRayTracingPipelineFeatures;
 
-        VkPhysicalDeviceAccelerationStructureFeaturesKHR enabledAccelerationStructureFeatures{};
-        enabledAccelerationStructureFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
-        enabledAccelerationStructureFeatures.accelerationStructure = true;
-		enabledAccelerationStructureFeatures.pNext = (void*)createInfo.pNext;
-        createInfo.pNext = &enabledAccelerationStructureFeatures;
+			VkPhysicalDeviceAccelerationStructureFeaturesKHR enabledAccelerationStructureFeatures{};
+			enabledAccelerationStructureFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
+			enabledAccelerationStructureFeatures.accelerationStructure = true;
+			enabledAccelerationStructureFeatures.pNext = (void*)createInfo.pNext;
+			createInfo.pNext = &enabledAccelerationStructureFeatures;
 
-		VkPhysicalDeviceRayQueryFeaturesKHR enabledRayQueryFeatures{};
-        enabledRayQueryFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR;
-        enabledRayQueryFeatures.rayQuery = true;
-		enabledRayQueryFeatures.pNext = (void*)createInfo.pNext;
-		createInfo.pNext = &enabledRayQueryFeatures;
-#endif // SUPPORT_RAYTRACING
+			VkPhysicalDeviceRayQueryFeaturesKHR enabledRayQueryFeatures{};
+			enabledRayQueryFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR;
+			enabledRayQueryFeatures.rayQuery = true;
+			enabledRayQueryFeatures.pNext = (void*)createInfo.pNext;
+			createInfo.pNext = &enabledRayQueryFeatures;
+		}
 
 		// Added CustomBorderColor features
 		VkPhysicalDeviceCustomBorderColorFeaturesEXT enabledCustomBorderColorFeaturesEXT{};
@@ -354,6 +367,11 @@ bool jRHI_Vulkan::InitRHI()
 		// extension
 		// Prepare extensions
 		std::vector<const char*> DeviceExtensions(jVulkanDeviceUtil::DeviceExtensions);
+
+		if (GSupportRaytracing)
+		{
+			DeviceExtensions.insert(DeviceExtensions.end(), jVulkanDeviceUtil::RaytracingDeviceExtensions.begin(), jVulkanDeviceUtil::RaytracingDeviceExtensions.end());
+		}
 
 		// Add debug marker extension when it can be enabled
 		for (auto& extension : availableExtensions)
@@ -427,18 +445,19 @@ bool jRHI_Vulkan::InitRHI()
         vkCmdDebugMarkerInsert = (PFN_vkCmdDebugMarkerInsertEXT)vkGetDeviceProcAddr(Device, "vkCmdDebugMarkerInsertEXT");
 	}
 
-#if SUPPORT_RAYTRACING
-    vkGetBufferDeviceAddressKHR = (PFN_vkGetBufferDeviceAddressKHR)vkGetDeviceProcAddr(Device, "vkGetBufferDeviceAddressKHR");
-    vkCmdBuildAccelerationStructuresKHR = (PFN_vkCmdBuildAccelerationStructuresKHR)vkGetDeviceProcAddr(Device, "vkCmdBuildAccelerationStructuresKHR");
-    vkBuildAccelerationStructuresKHR = (PFN_vkBuildAccelerationStructuresKHR)vkGetDeviceProcAddr(Device, "vkBuildAccelerationStructuresKHR");
-    vkCreateAccelerationStructureKHR = (PFN_vkCreateAccelerationStructureKHR)vkGetDeviceProcAddr(Device, "vkCreateAccelerationStructureKHR");
-    vkDestroyAccelerationStructureKHR = (PFN_vkDestroyAccelerationStructureKHR)vkGetDeviceProcAddr(Device, "vkDestroyAccelerationStructureKHR");
-    vkGetAccelerationStructureBuildSizesKHR = (PFN_vkGetAccelerationStructureBuildSizesKHR)vkGetDeviceProcAddr(Device, "vkGetAccelerationStructureBuildSizesKHR");
-    vkGetAccelerationStructureDeviceAddressKHR = (PFN_vkGetAccelerationStructureDeviceAddressKHR)vkGetDeviceProcAddr(Device, "vkGetAccelerationStructureDeviceAddressKHR");
-    vkCmdTraceRaysKHR = (PFN_vkCmdTraceRaysKHR)vkGetDeviceProcAddr(Device, "vkCmdTraceRaysKHR");
-    vkGetRayTracingShaderGroupHandlesKHR = (PFN_vkGetRayTracingShaderGroupHandlesKHR)vkGetDeviceProcAddr(Device, "vkGetRayTracingShaderGroupHandlesKHR");
-    vkCreateRayTracingPipelinesKHR = (PFN_vkCreateRayTracingPipelinesKHR)vkGetDeviceProcAddr(Device, "vkCreateRayTracingPipelinesKHR");
-#endif // SUPPORT_RAYTRACING
+	if (GSupportRaytracing)
+	{
+		vkGetBufferDeviceAddressKHR = (PFN_vkGetBufferDeviceAddressKHR)vkGetDeviceProcAddr(Device, "vkGetBufferDeviceAddressKHR");
+		vkCmdBuildAccelerationStructuresKHR = (PFN_vkCmdBuildAccelerationStructuresKHR)vkGetDeviceProcAddr(Device, "vkCmdBuildAccelerationStructuresKHR");
+		vkBuildAccelerationStructuresKHR = (PFN_vkBuildAccelerationStructuresKHR)vkGetDeviceProcAddr(Device, "vkBuildAccelerationStructuresKHR");
+		vkCreateAccelerationStructureKHR = (PFN_vkCreateAccelerationStructureKHR)vkGetDeviceProcAddr(Device, "vkCreateAccelerationStructureKHR");
+		vkDestroyAccelerationStructureKHR = (PFN_vkDestroyAccelerationStructureKHR)vkGetDeviceProcAddr(Device, "vkDestroyAccelerationStructureKHR");
+		vkGetAccelerationStructureBuildSizesKHR = (PFN_vkGetAccelerationStructureBuildSizesKHR)vkGetDeviceProcAddr(Device, "vkGetAccelerationStructureBuildSizesKHR");
+		vkGetAccelerationStructureDeviceAddressKHR = (PFN_vkGetAccelerationStructureDeviceAddressKHR)vkGetDeviceProcAddr(Device, "vkGetAccelerationStructureDeviceAddressKHR");
+		vkCmdTraceRaysKHR = (PFN_vkCmdTraceRaysKHR)vkGetDeviceProcAddr(Device, "vkCmdTraceRaysKHR");
+		vkGetRayTracingShaderGroupHandlesKHR = (PFN_vkGetRayTracingShaderGroupHandlesKHR)vkGetDeviceProcAddr(Device, "vkGetRayTracingShaderGroupHandlesKHR");
+		vkCreateRayTracingPipelinesKHR = (PFN_vkCreateRayTracingPipelinesKHR)vkGetDeviceProcAddr(Device, "vkCreateRayTracingPipelinesKHR");
+	}
 
 	// Swapchain
     Swapchain = new jSwapchain_Vulkan();
@@ -561,7 +580,8 @@ bool jRHI_Vulkan::InitRHI()
 		CubeMapInstanceDataForSixFace = g_rhi->CreateVertexBuffer(VertexStream_InstanceData);
 	}
 
-    RaytracingScene = CreateRaytracingScene();
+	if (GSupportRaytracing)
+		RaytracingScene = CreateRaytracingScene();
 
 	return true;
 }

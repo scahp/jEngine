@@ -46,7 +46,7 @@ jOptions::jOptions()
 	UseAccumulateRay = true;
 	UseDiscontinuityWeight = true;
 	UseHaltonJitter = true;
-	UseResolution = GAOResolution[0];
+	UseResolution = GAOResolution[2];	// Default to 1/4 size of the screen
 }
 
 bool jOptions::operator==(struct jOptions const& RHS) const

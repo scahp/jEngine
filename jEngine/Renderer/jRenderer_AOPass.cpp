@@ -438,7 +438,9 @@ void jRenderer::AOPass()
     if (!gOptions.UseRTAO)
         return;
 
-#if SUPPORT_RAYTRACING
+    if (!GSupportRaytracing)
+        return;
+
     SCOPE_CPU_PROFILE(RaytracingAO);
     SCOPE_GPU_PROFILE(RenderFrameContextPtr, RaytracingAO);
     DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "RaytracingAO", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
@@ -911,7 +913,4 @@ void jRenderer::AOPass()
 
         }
     }
-#else // SUPPORT_RAYTRACING
-// SSAO
-#endif // SUPPORT_RAYTRACING
 }

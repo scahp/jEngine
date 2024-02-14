@@ -62,6 +62,7 @@ uint32 GetMaxThreadCount()
 jEngine* g_Engine = nullptr;
 
 bool GUseRealTimeShaderUpdate = true;
+bool GSupportRaytracing = false;
 int32 GMaxCheckCountForRealTimeShaderUpdate = 10;
 int32 GSleepMSForRealTimeShaderUpdate = 100;
 std::thread::id GMainThreadID;

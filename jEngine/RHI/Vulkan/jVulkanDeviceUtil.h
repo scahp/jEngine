@@ -5,7 +5,7 @@
 namespace jVulkanDeviceUtil
 {
 
-    struct QueueFamilyIndices
+struct QueueFamilyIndices
 {
     std::optional<uint32> GraphicsFamily;
     std::optional<uint32> ComputeFamily;
@@ -39,8 +39,12 @@ const std::vector<const char*> DeviceExtensions = {
     VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME,
     VK_EXT_SHADER_VIEWPORT_INDEX_LAYER_EXTENSION_NAME,
     VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME,
-    
-#if SUPPORT_RAYTRACING
+
+    // VK_KHR_spirv_1_4
+    VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME,
+};
+
+const std::vector<const char*> RaytracingDeviceExtensions = {
     // VK_KHR_acceleration_structure
     VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
     VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
@@ -50,10 +54,6 @@ const std::vector<const char*> DeviceExtensions = {
     VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
     VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
     VK_KHR_RAY_QUERY_EXTENSION_NAME,
-#endif // SUPPORT_RAYTRACING
-
-    // VK_KHR_spirv_1_4
-    VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME,
 };
 
 VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
@@ -75,5 +75,6 @@ VkExtent2D ChooseSwapExtent(GLFWwindow* window, const VkSurfaceCapabilitiesKHR& 
 SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface);
 std::vector<const char*> GetRequiredInstanceExtensions();
 bool CheckValidationLayerSupport();
+bool IsSupportRaytracing(const std::vector<VkExtensionProperties>& InAvailableExtensions);
 
 }
