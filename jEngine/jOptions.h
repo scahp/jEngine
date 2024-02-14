@@ -51,16 +51,6 @@ struct jOptions
     bool UseHaltonJitter;
     const char* UseResolution;
 
-    // Begin AsyncComputeOption
-    bool UseAsyncComputeQueue;
-    const char* WaitPrerequsiteGraphicsQueueTask;
-    bool WaitSubsequentGraphicsQueueTask;
-    bool IsPrerequsiteNone() const { return GWaitPrerequsiteGraphicsQueueTask[0] == WaitPrerequsiteGraphicsQueueTask; }
-    bool IsPrerequsiteShadowPass() const { return GWaitPrerequsiteGraphicsQueueTask[1] == WaitPrerequsiteGraphicsQueueTask; }
-    bool IsPrerequsiteBasePass() const { return GWaitPrerequsiteGraphicsQueueTask[2] == WaitPrerequsiteGraphicsQueueTask; }
-    bool IsPrerequsiteShadowAtmosphericPass() const { return GWaitPrerequsiteGraphicsQueueTask[3] == WaitPrerequsiteGraphicsQueueTask; }
-    // End AsyncComputeOption
-
     bool IsDenoiserGuassian() const { return GDenoisers[0] == Denoiser; }
     bool IsDenoiserGuassianSeparable() const { return GDenoisers[1] == Denoiser; }
     bool IsDenoiserBilateral() const { return GDenoisers[2] == Denoiser; }

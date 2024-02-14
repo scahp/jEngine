@@ -48,8 +48,6 @@ public:
     virtual void AtmosphericShadow();
     virtual void AOPass();
     
-    void AsyncComputeTest(std::shared_ptr<jSyncAcrossCommandQueue> SyncAcrossCommandQueuePtr);
-
     virtual void PostProcess();
     virtual void DebugPasses();
     virtual void UIPass();
