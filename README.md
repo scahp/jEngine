@@ -1,4 +1,4 @@
-# jEngine
+![image](https://github.com/scahp/jEngine/assets/6734453/7bac532e-4fbc-4fb3-aa75-a70f09222265)# jEngine
 
 Simple toy engine for implementing graphics feature with multiple api
  - Documentation : https://scahp.tistory.com/120
@@ -28,6 +28,10 @@ Simple toy engine for implementing graphics feature with multiple api
 
 5. RTAO(Raytraced Ambient Occlusion) : https://github.com/scahp/jEngine/tree/RTAO \
 <img src="https://github.com/scahp/jEngine/assets/6734453/bac6820a-782e-4925-9e23-9f7e3ed1e37b" width="90%"></img>
+
+5. AsyncCompute : https://github.com/scahp/jEngine/tree/AsyncCompute \
+<img src="https://github.com/scahp/jEngine/assets/6734453/f52d103b-cc2d-4673-9baf-354606ec9a36" width="90%"></img>
+
 
 <br/><br/>
 
