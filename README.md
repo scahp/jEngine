@@ -1,4 +1,4 @@
-![image](https://github.com/scahp/jEngine/assets/6734453/7bac532e-4fbc-4fb3-aa75-a70f09222265)# jEngine
+# jEngine
 
 Simple toy engine for implementing graphics feature with multiple api
  - Documentation : https://scahp.tistory.com/120
