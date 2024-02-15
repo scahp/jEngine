@@ -8,8 +8,8 @@ class Name \
 { \
 public: \
     static constexpr char DefineName[] = #Name; \
-    static constexpr int Value[] = { __VA_ARGS__ }; \
-    static constexpr int Count = _countof(Value); \
+    static constexpr int32 Value[] = { __VA_ARGS__ }; \
+    static constexpr int32 Count = _countof(Value); \
 };
 
 // Shader Permutation. by using Shader Permutation Define, generate permutation of defines and convert it to permutation id.
@@ -17,23 +17,31 @@ template <typename ... T>
 class jPermutation
 {
 public:
-    static int GetPermutationCount() { return 1; }
+	template <typename K>
+	using TFindClass = jPermutation;
+
+    static constexpr int32 MaxPermutationCount = 1;
 
     template <typename K>
-    static int GetDefineCount() { return 1; }
+    constexpr int32 GetDefineCount() { return 1; }
 
     template <typename K>
-    int Get() const { return int(); }
+    int32 Get() const { return int32(); }
 
     template <typename K>
-    int GetIndex() const { return int(); }
+    int32 GetIndex() const { return int32(); }
 
     template <typename K>
-    void SetIndex(int) { }
+    void SetIndex(int32) { }
 
-    int GetPermutationId() const { return 0; }
-    void SetFromPermutationId(int) {}
+    constexpr int32 GetPermutationId() const { return 0; }
+    void SetFromPermutationId(int32) {}
     void GetPermutationDefines(std::string&) const {}
+
+    constexpr int32 GetLocalPermutationId() const { return 0; }
+	constexpr int32 GetValueIndex() const { return 0; }
+	constexpr void SetLocalPermutationId(int32) { }
+	constexpr void SetValueIndex(int32) { }
 };
 
 template <typename T, typename ... T1>
@@ -42,59 +50,56 @@ class jPermutation<T, T1...> : public jPermutation<T1...>
 public:
     using Type = T;
     using Super = jPermutation<T1...>;
+    using ThisClass = jPermutation<T, T1...>;
+    
+    // Find jPermutation class which have K as a Type.
+    template <typename K> using TFindClass = typename std::conditional_t<std::is_same<T, K>::value, ThisClass, typename Super::template TFindClass<K>>;
 
-    static int GetPermutationCount()
+    static constexpr int32 MaxPermutationCount = T::Count * Super::MaxPermutationCount;
+
+    template <typename K>
+    constexpr int32 GetDefineCount()
     {
-        return T::Count * Super::GetPermutationCount();
+		using TFoundType = decltype(TFindClass<K>);
+        return TFoundType::Count;
     }
 
     template <typename K>
-    static int GetDefineCount()
+    int32 Get() const
     {
-        if (std::is_same<T, K>::value)
-            return T::Count;
+		using TFoundType = decltype(TFindClass<K>);
+		const TFoundType& FoundClass = *this;
 
-        return Super::template GetDefineCount<K>();
+		return T::Value[FoundClass.GetValueIndex()];
     }
 
     template <typename K>
-    int Get() const
+    int32 GetIndex() const
     {
-        if (std::is_same<T, K>::value)
-            return T::Value[ValueIndex];
+		using TFoundType = decltype(TFindClass<K>);
+		const TFoundType& FoundClass = *this;
 
-        return Super::template Get<K>();
+        return FoundClass.GetValueIndex();
     }
 
     template <typename K>
-    int GetIndex() const
+    void SetIndex(int32 value)
     {
-        if (std::is_same<T, K>::value)
-            return ValueIndex;
+		using TFoundType = decltype(TFindClass<K>);
+        TFoundType& FoundClass = *this;
 
-        return Super::template GetIndex<K>();
+		FoundClass.SetValueIndex(value);
+		FoundClass.SetLocalPermutationId(value * TFoundType::Super::MaxPermutationCount);
     }
 
-    template <typename K>
-    void SetIndex(int value)
+    constexpr int32 GetPermutationId() const
     {
-        if (std::is_same<T, K>::value)
-        {
-            ValueIndex = value;
-            return;
-        }
-
-        return jPermutation<T1...>::template SetIndex<K>(value);
+        return LocalPermutationId + Super::GetPermutationId();
     }
 
-    int GetPermutationId() const
+    void SetFromPermutationId(int32 permutationId)
     {
-        return ValueIndex * Super::GetPermutationCount() + Super::GetPermutationId();
-    }
-
-    void SetFromPermutationId(int permutationId)
-    {
-        ValueIndex = (permutationId / Super::GetPermutationCount()) % T::Count;
+        ValueIndex = (permutationId / Super::MaxPermutationCount) % T::Count;
         Super::SetFromPermutationId(permutationId);
     }
 
@@ -109,7 +114,13 @@ public:
         Super::GetPermutationDefines(OutDefines);
     }
 
-    int ValueIndex = 0;
+	int32 GetLocalPermutationId() const { return LocalPermutationId; }
+	int32 GetValueIndex() const { return ValueIndex; }
+	void SetLocalPermutationId(int32 InValue) { LocalPermutationId = InValue; }
+	void SetValueIndex(int32 InValue) { ValueIndex = InValue; }
+
+	int32 LocalPermutationId = 0;
+	int32 ValueIndex = 0;
 };
 
 struct jShaderInfo
@@ -153,7 +164,7 @@ struct jShaderInfo
 private:
 	jName Name;
     jName PreProcessors;
-    jName EntryPoint = jName("main");
+    jName EntryPoint = jNameStatic("main");
     jName ShaderFilepath;
     std::vector<jName> IncludeShaderFilePaths;
     EShaderAccessStageFlag ShaderType = (EShaderAccessStageFlag)0;
@@ -203,15 +214,17 @@ struct jShader : public std::enable_shared_from_this<jShader>
 
 #define DECLARE_SHADER_WITH_PERMUTATION(ShaderClass, PermutationVariable) \
 public: \
+    static ShaderClass* Shaders[ShaderClass::ShaderPermutation::MaxPermutationCount]; \
     static jShaderInfo GShaderInfo; \
     static ShaderClass* CreateShader(const ShaderClass::ShaderPermutation& InPermutation); \
     using jShader::jShader; \
     virtual void SetPermutationId(int32 InPermutaitonId) override { PermutationVariable.SetFromPermutationId(InPermutaitonId); } \
     virtual int32 GetPermutationId() const override { return PermutationVariable.GetPermutationId(); } \
-    virtual int32 GetPermutationCount() const override { return PermutationVariable.GetPermutationCount(); } \
+    virtual int32 GetPermutationCount() const override { return ShaderClass::ShaderPermutation::MaxPermutationCount; } \
     virtual void GetPermutationDefines(std::string& OutResult) const { PermutationVariable.GetPermutationDefines(OutResult); }
 
 #define IMPLEMENT_SHADER_WITH_PERMUTATION(ShaderClass, Name, Filepath, Preprocessor, EntryName, ShaderAccesssStageFlag) \
+ShaderClass* ShaderClass::Shaders[ShaderClass::ShaderPermutation::MaxPermutationCount] = { nullptr, }; \
 jShaderInfo ShaderClass::GShaderInfo( \
     jNameStatic(Name), \
     jNameStatic(Filepath), \
@@ -221,11 +234,15 @@ jShaderInfo ShaderClass::GShaderInfo( \
 ); \
 ShaderClass* ShaderClass::CreateShader(const ShaderClass::ShaderPermutation& InPermutation) \
 { \
+    const auto PermutationId = InPermutation.GetPermutationId(); \
+    if (Shaders[PermutationId]) \
+        return Shaders[PermutationId]; \
     jShaderInfo TempShaderInfo = GShaderInfo; \
-    TempShaderInfo.SetPermutationId(InPermutation.GetPermutationId()); \
-    ShaderClass* Shader = g_rhi->CreateShader<ShaderClass>(TempShaderInfo); \
-    Shader->Permutation = InPermutation; \
-    return Shader; \
+    TempShaderInfo.SetPermutationId(PermutationId); \
+    auto NewShader = g_rhi->CreateShader<ShaderClass>(TempShaderInfo); /* Don't need to care about thread-safe because CreateShader will care about this. */ \
+    NewShader->Permutation = InPermutation; \
+    Shaders[PermutationId] = NewShader; \
+    return Shaders[PermutationId]; \
 }
 
 struct jShaderForwardPixelShader : public jShader
@@ -338,6 +355,8 @@ struct jGraphicsPipelineShader
 
 struct jRaytracingPipelineShader
 {
+    static constexpr int32 MaxNumOfShaders = 4;
+
     jShader* RaygenShader = nullptr;
     jShader* ClosestHitShader = nullptr;
     jShader* AnyHitShader = nullptr;
