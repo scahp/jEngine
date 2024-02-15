@@ -78,7 +78,7 @@ float GetAccumulatedInscatteringValue(float InTravelDist, float3 InToPixelNormal
     float t = dt;
     if (AtmosphericParam.UseNoise != 0)
     {
-        float seed = InScreenPixelPos.x* InScreenPixelPos.y / AtmosphericParam.CameraFar;
+        float seed = InScreenPixelPos.x * InScreenPixelPos.y / AtmosphericParam.CameraFar;
         t += dt * rand(float2(seed, seed)) * 3.0;
     }
     float tmax = t + 1.0;
