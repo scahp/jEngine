@@ -53,7 +53,7 @@ void jImGUI::CreateTreeForProfiling(const char* InTreeTitle, const jPerformanceP
 			if (IsTopLevel || CurIndentLevel >= CurProfile.Indent)
 			{
 				// Check whether this node has leaf node or not
-				bool IsLeaf = InProfileData.size() > (i + 1) ? CurProfile.Indent >= InProfileData[i + 1].Indent : true;
+				bool IsLeaf = InProfileData.size() > (i + 1) ? (CurProfile.Indent >= InProfileData[i + 1].Indent || CurProfile.ThreadId != InProfileData[i + 1].ThreadId) : true;
 				if (IsMainThread(CurProfile.ThreadId))
 				{
 					ImGui::PushStyleColor(ImGuiCol_Text, GetTextColorByQueueType(CurProfile.GPUCommandBufferType));
