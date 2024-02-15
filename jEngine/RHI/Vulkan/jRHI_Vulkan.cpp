@@ -1739,6 +1739,69 @@ void jRHI_Vulkan::EndSingleTimeCommands(jCommandBuffer* commandBuffer) const
     GraphicsCommandBufferManager->ReturnCommandBuffer(CommandBuffer_Vulkan);
 }
 
+jCommandBuffer_Vulkan* jRHI_Vulkan::BeginSingleTimeComputeCommands() const
+{
+	return (jCommandBuffer_Vulkan*)ComputeCommandBufferManager->GetOrCreateCommandBuffer();
+}
+
+void jRHI_Vulkan::EndSingleTimeComputeCommands(jCommandBuffer* commandBuffer) const
+{
+    auto CommandBuffer_Vulkan = (jCommandBuffer_Vulkan*)commandBuffer;
+
+    CommandBuffer_Vulkan->End();
+
+    VkSubmitInfo submitInfo = {};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &CommandBuffer_Vulkan->GetRef();
+
+    VkFence vkFence = (VkFence)CommandBuffer_Vulkan->GetFenceHandle();
+    vkResetFences(Device, 1, &vkFence);		// 세마포어와는 다르게 수동으로 펜스를 unsignaled 상태로 재설정 해줘야 함
+
+    const jQueue_Vulkan& CurrentQueue = GetQueue(CommandBuffer_Vulkan->Type);
+
+    auto Result = vkQueueSubmit(CurrentQueue.Queue, 1, &submitInfo, vkFence);
+    ensure(VK_SUCCESS == Result);
+
+    Result = vkQueueWaitIdle(CurrentQueue.Queue);
+    ensure(VK_SUCCESS == Result);
+
+	ComputeCommandBufferManager->ReturnCommandBuffer(CommandBuffer_Vulkan);
+}
+
+jCommandBuffer_Vulkan* jRHI_Vulkan::BeginSingleTimeCopyCommands() const
+{
+	return (jCommandBuffer_Vulkan*)CopyCommandBufferManager->GetOrCreateCommandBuffer();
+}
+
+void jRHI_Vulkan::EndSingleTimeCopyCommands(jCommandBuffer_Vulkan* commandBuffer, bool bWaitUntilExecuteComplete) const
+{
+    auto CommandBuffer_Vulkan = (jCommandBuffer_Vulkan*)commandBuffer;
+
+    CommandBuffer_Vulkan->End();
+
+    VkSubmitInfo submitInfo = {};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &CommandBuffer_Vulkan->GetRef();
+
+    VkFence vkFence = (VkFence)CommandBuffer_Vulkan->GetFenceHandle();
+    vkResetFences(Device, 1, &vkFence);		// 세마포어와는 다르게 수동으로 펜스를 unsignaled 상태로 재설정 해줘야 함
+
+    const jQueue_Vulkan& CurrentQueue = GetQueue(CommandBuffer_Vulkan->Type);
+
+    auto Result = vkQueueSubmit(CurrentQueue.Queue, 1, &submitInfo, vkFence);
+    ensure(VK_SUCCESS == Result);
+
+	if (bWaitUntilExecuteComplete)
+	{
+		Result = vkQueueWaitIdle(CurrentQueue.Queue);
+		ensure(VK_SUCCESS == Result);
+	}
+
+	CopyCommandBufferManager->ReturnCommandBuffer(CommandBuffer_Vulkan);
+}
+
 void jRHI_Vulkan::TransitionLayout(jCommandBuffer* commandBuffer, jTexture* texture, EResourceLayout newLayout) const
 {
     check(commandBuffer);

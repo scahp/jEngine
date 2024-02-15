@@ -129,6 +129,10 @@ public:
 
 	virtual jCommandBuffer_Vulkan* BeginSingleTimeCommands() const override;
 	virtual void EndSingleTimeCommands(jCommandBuffer* commandBuffer) const override;
+	jCommandBuffer_Vulkan* BeginSingleTimeComputeCommands() const;
+    void EndSingleTimeComputeCommands(jCommandBuffer* commandBuffer) const;
+	jCommandBuffer_Vulkan* BeginSingleTimeCopyCommands() const;
+    void EndSingleTimeCopyCommands(jCommandBuffer_Vulkan* commandBuffer, bool bWaitUntilExecuteComplete = false) const;
 
 	// Resource Barrier
 	virtual void TransitionLayout(jCommandBuffer* commandBuffer, jTexture* texture, EResourceLayout newLayout) const override;

@@ -325,7 +325,7 @@ public:
     void EndSingleTimeComputeCommands(jCommandBuffer* commandBuffer) const;
 
 	jCommandBuffer_DX12* BeginSingleTimeCopyCommands() const;
-    void EndSingleTimeCopyCommands(jCommandBuffer_DX12* commandBuffer) const;
+    void EndSingleTimeCopyCommands(jCommandBuffer_DX12* commandBuffer, bool bWaitUntilExecuteComplete = false) const;
 
 	virtual std::shared_ptr<jTexture> CreateTextureFromData(const jImageData* InImageData) const override;
 	virtual jFenceManager* GetFenceManager() override { return &FenceManager; }

@@ -720,10 +720,10 @@ jCommandBuffer_DX12* jRHI_DX12::BeginSingleTimeCopyCommands() const
 	return CopyCommandBufferManager->GetOrCreateCommandBuffer();
 }
 
-void jRHI_DX12::EndSingleTimeCopyCommands(jCommandBuffer_DX12* commandBuffer) const
+void jRHI_DX12::EndSingleTimeCopyCommands(jCommandBuffer_DX12* commandBuffer, bool bWaitUntilExecuteComplete) const
 {
 	check(CopyCommandBufferManager);
-	CopyCommandBufferManager->ExecuteCommandList(commandBuffer, true);
+	CopyCommandBufferManager->ExecuteCommandList(commandBuffer, bWaitUntilExecuteComplete);
 	CopyCommandBufferManager->ReturnCommandBuffer(commandBuffer);
 }
 

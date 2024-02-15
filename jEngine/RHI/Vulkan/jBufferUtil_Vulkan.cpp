@@ -486,9 +486,9 @@ void CopyBuffer(jCommandBuffer_Vulkan* commandBuffer_vk, const jBuffer_Vulkan& s
 
 void CopyBufferToTexture(VkBuffer buffer, uint64 bufferOffset, VkImage image, uint32 width, uint32 height, int32 miplevel, int32 layerIndex)
 {
-    auto commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
+    auto commandBuffer = g_rhi_vk->BeginSingleTimeCopyCommands();
     CopyBufferToTexture(commandBuffer, buffer, bufferOffset, image, width, height, miplevel, layerIndex);
-    g_rhi_vk->EndSingleTimeCommands(commandBuffer);
+    g_rhi_vk->EndSingleTimeCopyCommands(commandBuffer);
 }
 
 void GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32 mipLevels, uint32 layerCount
@@ -507,17 +507,17 @@ void GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int3
 void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VkDeviceSize srcOffset, VkDeviceSize dstOffset)
 {
      // 임시 커맨드 버퍼를 통해서 메모리를 전송함.
-    auto commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
+    auto commandBuffer = g_rhi_vk->BeginSingleTimeCopyCommands();
     CopyBuffer(commandBuffer, srcBuffer, dstBuffer, size, srcOffset, dstOffset);
-    g_rhi_vk->EndSingleTimeCommands(commandBuffer);
+    g_rhi_vk->EndSingleTimeCopyCommands(commandBuffer);
 }
 
 void CopyBuffer(const jBuffer_Vulkan& srcBuffer, const jBuffer_Vulkan& dstBuffer, VkDeviceSize size)
 {
     check(srcBuffer.AllocatedSize >= size && dstBuffer.AllocatedSize >= size);
-    auto commandBuffer = g_rhi_vk->BeginSingleTimeCommands();
+    auto commandBuffer = g_rhi_vk->BeginSingleTimeCopyCommands();
     CopyBuffer(commandBuffer, srcBuffer.Buffer, dstBuffer.Buffer, size, srcBuffer.Offset, dstBuffer.Offset);
-    g_rhi_vk->EndSingleTimeCommands(commandBuffer);
+    g_rhi_vk->EndSingleTimeCopyCommands(commandBuffer);
 }
 
 }
