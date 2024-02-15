@@ -566,10 +566,10 @@ jRenderObject* CreateQuad_Internal(const Vector& pos, const Vector& size, const 
 		vertices[0].TexCoord = Vector2(0.0f, 0.0f);
 	
 		vertices[1].Pos = Vector(offset.x + (halfSize.x), 0.0f, offset.z + (-halfSize.z));
-		vertices[0].Normal = Vector(0.0f, 1.0f, 0.0f);
-		vertices[0].Tangent = Vector(1.0f, 0.0f, 0.0f);
-		vertices[0].Bitangent = Vector(0.0f, 0.0f, 1.0f);
-		vertices[0].TexCoord = Vector2(1.0f, 0.0f);
+        vertices[1].Normal = Vector(0.0f, 1.0f, 0.0f);
+        vertices[1].Tangent = Vector(1.0f, 0.0f, 0.0f);
+        vertices[1].Bitangent = Vector(0.0f, 0.0f, 1.0f);
+        vertices[1].TexCoord = Vector2(1.0f, 0.0f);
 	
 		vertices[2].Pos = Vector(offset.x + (halfSize.x), 0.0f, offset.z + (halfSize.z));
 		vertices[2].Normal = Vector(0.0f, 1.0f, 0.0f);

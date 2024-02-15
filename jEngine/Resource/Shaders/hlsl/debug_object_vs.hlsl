@@ -2,11 +2,11 @@
 
 struct VSInput
 {
-    [[vk::location(0)]] float3 Position : POSITION0;
-    [[vk::location(1)]] float4 Color : COLOR0;
-    [[vk::location(2)]] float3 Normal : NORMAL0;
-    //[[vk::location(3)]] float3 Tangent : NORMAL1;
-    [[vk::location(4)]] float2 TexCoord : TEXCOORD0;
+    [[vk::location((0))]] float3 Position : POSITION0;
+    [[vk::location((1))]] float3 Normal : NORMAL0;
+    [[vk::location((2))]] float3 Tangent : TANGENT0;
+    [[vk::location((3))]] float3 Bitangent : BITANGENT0;
+    [[vk::location((4))]] float2 TexCoord : TEXCOORD0;
 };
 
 cbuffer ViewParam : register(b0, space0) { ViewUniformBuffer ViewParam; }

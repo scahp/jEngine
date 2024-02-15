@@ -734,6 +734,8 @@ void jRenderer::DebugPasses()
     {
         DEBUG_EVENT(RenderFrameContextPtr, "DebugObject");
 
+        g_rhi->TransitionLayout(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::DEPTH_STENCIL_ATTACHMENT);
+
         // Prepare basepass pipeline
         jRasterizationStateInfo* RasterizationState = nullptr;
         switch (g_rhi->GetSelectedMSAASamples())
