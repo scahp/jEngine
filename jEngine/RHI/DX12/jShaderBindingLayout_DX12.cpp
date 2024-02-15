@@ -322,12 +322,11 @@ bool jShaderBindingLayout_DX12::Initialize(const jShaderBindingArray& InShaderBi
 
 std::shared_ptr<jShaderBindingInstance> jShaderBindingLayout_DX12::CreateShaderBindingInstance(const jShaderBindingArray& InShaderBindingArray, const jShaderBindingInstanceType InType) const
 {
-    auto ShaderBindingInstance = new jShaderBindingInstance_DX12();
-    ShaderBindingInstance->ShaderBindingsLayouts = this;
-    ShaderBindingInstance->Initialize(InShaderBindingArray);
-    ShaderBindingInstance->SetType(InType);
-
-    return std::shared_ptr<jShaderBindingInstance>(ShaderBindingInstance);
+    auto ShaderBindingInstance_DX12 = std::make_shared<jShaderBindingInstance_DX12>();
+    ShaderBindingInstance_DX12->ShaderBindingsLayouts = this;
+    ShaderBindingInstance_DX12->Initialize(InShaderBindingArray);
+    ShaderBindingInstance_DX12->SetType(InType);
+    return ShaderBindingInstance_DX12;
 }
 
 ID3D12RootSignature* jShaderBindingLayout_DX12::CreateRootSignatureInternal(size_t InHash, FuncGetRootParameterExtractor InFunc, EShaderAccessStageFlag InShaderAccessStageFlag)

@@ -652,7 +652,16 @@ void jRenderer::AOPass()
             std::vector<jTextureResourceBindless::jTextureBindData> NormalTextures;
             std::vector<jTextureResourceBindless::jTextureBindData> MetallicTextures;
 
-            for (int32 i = 0; i < jObject::GetStaticRenderObject().size(); ++i)
+            const int32 NumOfStaticRenderObjects = (int32)jObject::GetStaticRenderObject().size();
+			VertexAndInexOffsetBuffers.reserve(NumOfStaticRenderObjects);
+			IndexBuffers.reserve(NumOfStaticRenderObjects);
+			TestUniformBuffers.reserve(NumOfStaticRenderObjects);
+			VertexBuffers.reserve(NumOfStaticRenderObjects);
+			AlbedoTextures.reserve(NumOfStaticRenderObjects);
+			NormalTextures.reserve(NumOfStaticRenderObjects);
+			MetallicTextures.reserve(NumOfStaticRenderObjects);
+
+            for (int32 i = 0; i < NumOfStaticRenderObjects; ++i)
             {
                 jRenderObject* RObj = jObject::GetStaticRenderObject()[i];
                 RObj->CreateShaderBindingInstance();

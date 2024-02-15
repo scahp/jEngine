@@ -253,10 +253,10 @@ void* jPipelineStateInfo_DX12::CreateRaytracingPipelineState()
     subobjects.reserve(20);
 
     std::vector<D3D12_EXPORT_DESC> exportDescs;
-    exportDescs.reserve(RaytracingShaders.size() * 4);
+    exportDescs.reserve(RaytracingShaders.size() * jRaytracingPipelineShader::MaxNumOfShaders);
 
     std::vector<D3D12_DXIL_LIBRARY_DESC> dxilDescs;
-    dxilDescs.reserve(RaytracingShaders.size() * 4);
+    dxilDescs.reserve(RaytracingShaders.size() * jRaytracingPipelineShader::MaxNumOfShaders);
     auto AddShaderFunc = [&](jShader* InShader, const wchar_t* InEntryPoint)
     {
         if (!InShader)

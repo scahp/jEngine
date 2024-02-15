@@ -923,24 +923,24 @@ bool jRHI_DX12::CreateShaderInternal(jShader* OutShader, const jShaderInfo& shad
 
 jRenderPass* jRHI_DX12::GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const Vector2i& offset, const Vector2i& extent) const
 {
-	return RenderPassPool.GetOrCreate(jRenderPass_DX12(colorAttachments, offset, extent));
+	return RenderPassPool.GetOrCreateMove(jRenderPass_DX12(colorAttachments, offset, extent));
 }
 
 jRenderPass* jRHI_DX12::GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const jAttachment& depthAttachment
 	, const Vector2i& offset, const Vector2i& extent) const
 {
-	return RenderPassPool.GetOrCreate(jRenderPass_DX12(colorAttachments, depthAttachment, offset, extent));
+	return RenderPassPool.GetOrCreateMove(jRenderPass_DX12(colorAttachments, depthAttachment, offset, extent));
 }
 
 jRenderPass* jRHI_DX12::GetOrCreateRenderPass(const std::vector<jAttachment>& colorAttachments, const jAttachment& depthAttachment
 	, const jAttachment& colorResolveAttachment, const Vector2i& offset, const Vector2i& extent) const
 {
-	return RenderPassPool.GetOrCreate(jRenderPass_DX12(colorAttachments, depthAttachment, colorResolveAttachment, offset, extent));
+	return RenderPassPool.GetOrCreateMove(jRenderPass_DX12(colorAttachments, depthAttachment, colorResolveAttachment, offset, extent));
 }
 
 jRenderPass* jRHI_DX12::GetOrCreateRenderPass(const jRenderPassInfo& renderPassInfo, const Vector2i& offset, const Vector2i& extent) const
 {
-	return RenderPassPool.GetOrCreate(jRenderPass_DX12(renderPassInfo, offset, extent));
+	return RenderPassPool.GetOrCreateMove(jRenderPass_DX12(renderPassInfo, offset, extent));
 }
 
 jPipelineStateInfo* jRHI_DX12::CreatePipelineStateInfo(const jPipelineStateFixedInfo* InPipelineStateFixed, const jGraphicsPipelineShader InShader

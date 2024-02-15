@@ -89,6 +89,10 @@ struct jDescriptorBlock_DX12
     int32 Index = 0;
     int32 AllocatedSize = 0;
     std::vector<jDescriptor_DX12> Descriptors;
+
+    // Helper container for fast preparing parameter of CopyDescriptors.
+    // This should be same size with 'Descriptors' container.
+    std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> DescriptorsOnlyCPU;
 };
 
 class jOnlineDescriptorHeap_DX12;
@@ -172,6 +176,17 @@ public:
             return DescriptorBlocks->Descriptors[NumOfAllocated++];
 
         return jDescriptor_DX12();
+    }
+    template <int32 NumOfInlineData>
+    bool AllocToResourceContainer(jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, NumOfInlineData>& OutResourceContainer, int32 InNumOfNewAlloctor)
+    {
+        if (NumOfAllocated + InNumOfNewAlloctor <= DescriptorBlocks->Descriptors.size())
+        {
+            OutResourceContainer.Add(&DescriptorBlocks->DescriptorsOnlyCPU[NumOfAllocated], InNumOfNewAlloctor);
+            NumOfAllocated += InNumOfNewAlloctor;
+            return true;
+        }
+        return false;
     }
     void Reset()
     {

@@ -24,11 +24,15 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
     Descriptors.clear();
     SamplerDescriptors.clear();
     RootParameterInlines.clear();
+    DesriptorsOnlyCPU.clear();
+    SamplerDescriptorsOnlyCPU.clear();
 
     // todo : pre calculate size
     Descriptors.reserve(200);
     RootParameterInlines.reserve(200);
     SamplerDescriptors.reserve(200);
+	DesriptorsOnlyCPU.reserve(200);
+	SamplerDescriptorsOnlyCPU.reserve(200);
 
     for (int32 i = 0; i < InShaderBindingArray.NumOfData; ++i)
     {
@@ -55,6 +59,7 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
 
                     jUniformBufferBlock_DX12* UniformBuffer = (jUniformBufferBlock_DX12*)Resource;
                     Descriptors.push_back({ .Descriptor = UniformBuffer->GetCBV(), .ResourceName = UniformBuffer->ResourceName, .Resource = UniformBuffer });
+                    DesriptorsOnlyCPU.push_back(UniformBuffer->GetCBV().CPUHandle);
                 }
             }
             else
@@ -70,6 +75,7 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
                 else
                 {
                     Descriptors.push_back({ .Descriptor = UniformBuffer->GetCBV(), .ResourceName = UniformBuffer->ResourceName, .Resource = UniformBuffer });
+                    DesriptorsOnlyCPU.push_back(UniformBuffer->GetCBV().CPUHandle);
                 }
             }
             break;
@@ -86,12 +92,14 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
 
                     jTexture_DX12* TexDX12 = (jTexture_DX12*)Resource.Texture;
                     Descriptors.push_back({ .Descriptor = TexDX12->SRV, .ResourceName = TexDX12->ResourceName, .Resource = TexDX12 });
+                    DesriptorsOnlyCPU.push_back(TexDX12->SRV.CPUHandle);
 
                     if (Resource.SamplerState)
                     {
                         jSamplerStateInfo_DX12* SamplerDX12 = (jSamplerStateInfo_DX12*)Resource.SamplerState;
                         check(SamplerDX12);
                         SamplerDescriptors.push_back({ .Descriptor = SamplerDX12->SamplerSRV, .ResourceName = SamplerDX12->ResourceName, .Resource = SamplerDX12 });
+                        SamplerDescriptorsOnlyCPU.push_back(SamplerDX12->SamplerSRV.CPUHandle);
                     }
                     else
                     {
@@ -100,6 +108,7 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
                             , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, 0.0f, 16.0f>::Create();
                         check(SamplerDX12);
                         SamplerDescriptors.push_back({ .Descriptor = SamplerDX12->SamplerSRV, .ResourceName = SamplerDX12->ResourceName, .Resource = SamplerDX12 });
+                        SamplerDescriptorsOnlyCPU.push_back(SamplerDX12->SamplerSRV.CPUHandle);
                     }
                 }
             }
@@ -110,12 +119,14 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
                 {
                     jTexture_DX12* TexDX12 = (jTexture_DX12*)tbor->Texture;
                     Descriptors.push_back({ .Descriptor = TexDX12->SRV, .ResourceName = TexDX12->ResourceName, .Resource = TexDX12 });
+                    DesriptorsOnlyCPU.push_back(TexDX12->SRV.CPUHandle);
 
                     if (tbor->SamplerState)
                     {
                         jSamplerStateInfo_DX12* SamplerDX12 = (jSamplerStateInfo_DX12*)tbor->SamplerState;
                         check(SamplerDX12);
                         SamplerDescriptors.push_back({ .Descriptor = SamplerDX12->SamplerSRV, .ResourceName = SamplerDX12->ResourceName, .Resource = SamplerDX12 });
+                        SamplerDescriptorsOnlyCPU.push_back(SamplerDX12->SamplerSRV.CPUHandle);
                     }
                     else
                     {
@@ -125,6 +136,7 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
                             , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, 0.0f, 16.0f>::Create();
                         check(SamplerDX12);
                         SamplerDescriptors.push_back({ .Descriptor = SamplerDX12->SamplerSRV, .ResourceName = SamplerDX12->ResourceName, .Resource = SamplerDX12 });
+                        SamplerDescriptorsOnlyCPU.push_back(SamplerDX12->SamplerSRV.CPUHandle);
                     }
                 }
             }
@@ -140,12 +152,14 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
                 {
                     jTexture_DX12* Tex = (jTexture_DX12*)Resource.Texture;
                     Descriptors.push_back({ .Descriptor = Tex->SRV, .ResourceName = Tex->ResourceName, .Resource = Tex });
+                    DesriptorsOnlyCPU.push_back(Tex->SRV.CPUHandle);
                 }
             }
             else
             {
                 jTexture_DX12* Tex = (jTexture_DX12*)ShaderBinding->Resource->GetResource();
                 Descriptors.push_back({ .Descriptor = Tex->SRV, .ResourceName = Tex->ResourceName, .Resource = Tex });
+                DesriptorsOnlyCPU.push_back(Tex->SRV.CPUHandle);
             }
             break;
         }
@@ -162,6 +176,7 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
                     {
                         check(TexArray[i]);
                         Descriptors.push_back({ .Descriptor = TexArray[i]->SRV, .ResourceName = TexArray[i]->ResourceName, .Resource = TexArray[i] });
+                        DesriptorsOnlyCPU.push_back(TexArray[i]->SRV.CPUHandle);
                     }
                 }
             }
@@ -172,6 +187,7 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
                 {
                     check(Tex[i]);
                     Descriptors.push_back({ .Descriptor = Tex[i]->SRV, .ResourceName = Tex[i]->ResourceName, .Resource = Tex[i] });
+                    DesriptorsOnlyCPU.push_back(Tex[i]->SRV.CPUHandle);
                 }
             }
             break;
@@ -188,6 +204,7 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
                 {
                     jBuffer_DX12* Buf = (jBuffer_DX12*)Resource;
                     Descriptors.push_back({ .Descriptor = Buf->SRV, .ResourceName = Buf->ResourceName, .Resource = Buf });
+                    DesriptorsOnlyCPU.push_back(Buf->SRV.CPUHandle);
                 }
             }
             else
@@ -202,6 +219,7 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
                 else
                 {
                     Descriptors.push_back({ .Descriptor = Buf->SRV, .ResourceName = Buf->ResourceName, .Resource = Buf });
+                    DesriptorsOnlyCPU.push_back(Buf->SRV.CPUHandle);
                 }
             }
             break;
@@ -218,6 +236,7 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
                     if (Resource.MipLevel == 0)
                     {
                         Descriptors.push_back({ .Descriptor = Tex->UAV, .ResourceName = Tex->ResourceName, .Resource = Tex });
+                        DesriptorsOnlyCPU.push_back(Tex->UAV.CPUHandle);
                     }
                     else
                     {
@@ -226,6 +245,8 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
                             Descriptors.push_back({ .Descriptor = it_find->second, .ResourceName = Tex->ResourceName, .Resource = Tex });
                         else
                             Descriptors.push_back({ .Descriptor = Tex->UAV, .ResourceName = Tex->ResourceName, .Resource = Tex });
+
+                        DesriptorsOnlyCPU.push_back(Descriptors[Descriptors.size() - 1].Descriptor.CPUHandle);
                     }
                 }
             }
@@ -236,6 +257,7 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
                 if (tbor->MipLevel == 0)
                 {
                     Descriptors.push_back({ .Descriptor = Tex->UAV, .ResourceName = Tex->ResourceName, .Resource = Tex });
+                    DesriptorsOnlyCPU.push_back(Tex->UAV.CPUHandle);
                 }
                 else
                 {
@@ -244,6 +266,8 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
                         Descriptors.push_back({ .Descriptor = it_find->second, .ResourceName = Tex->ResourceName, .Resource = Tex });
                     else
                         Descriptors.push_back({ .Descriptor = Tex->UAV, .ResourceName = Tex->ResourceName, .Resource = Tex });
+                    
+                    DesriptorsOnlyCPU.push_back(Descriptors[Descriptors.size() - 1].Descriptor.CPUHandle);
                 }
             }
             break;
@@ -260,6 +284,7 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
                 {
                     jBuffer_DX12* Buf = (jBuffer_DX12*)Resource;
                     Descriptors.push_back({ .Descriptor = Buf->UAV, .ResourceName = Buf->ResourceName, .Resource = Buf });
+                    DesriptorsOnlyCPU.push_back(Buf->UAV.CPUHandle);
                 }
             }
             else
@@ -273,6 +298,7 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
                 else
                 {
                     Descriptors.push_back({ .Descriptor = Buf->UAV, .ResourceName = Buf->ResourceName, .Resource = Buf });
+                    DesriptorsOnlyCPU.push_back(Buf->UAV.CPUHandle);
                 }
             }
             break;
@@ -288,6 +314,7 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
                     jSamplerStateInfo_DX12* Sampler = (jSamplerStateInfo_DX12*)Resource;
                     check(Sampler);
                     SamplerDescriptors.push_back({ .Descriptor = Sampler->SamplerSRV, .ResourceName = Sampler->ResourceName, .Resource = Sampler });
+                    SamplerDescriptorsOnlyCPU.push_back(Sampler->SamplerSRV.CPUHandle);
                 }
             }
             else
@@ -295,6 +322,7 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
                 jSamplerStateInfo_DX12* Sampler = (jSamplerStateInfo_DX12*)ShaderBinding->Resource->GetResource();
                 check(Sampler);
                 SamplerDescriptors.push_back({ .Descriptor = Sampler->SamplerSRV, .ResourceName = Sampler->ResourceName, .Resource = Sampler });
+                SamplerDescriptorsOnlyCPU.push_back(Sampler->SamplerSRV.CPUHandle);
             }
             break;
         }
@@ -390,37 +418,19 @@ void jShaderBindingInstance_DX12::CopyToOnlineDescriptorHeap(jCommandBuffer_DX12
     {
         check(Descriptors.size() <= 1000);
         jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 1000> DestDescriptor;
-        jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 1000> SrcDescriptor;
-
-        for (int32 i = 0; i < Descriptors.size(); ++i)
-        {
-            SrcDescriptor.Add(Descriptors[i].Descriptor.CPUHandle);
-
-            jDescriptor_DX12 Descriptor = InCommandList->OnlineDescriptorHeap->Alloc();
-            check(Descriptor.IsValid());
-            DestDescriptor.Add(Descriptor.CPUHandle);
-        }
+        InCommandList->OnlineDescriptorHeap->AllocToResourceContainer(DestDescriptor, (int32)Descriptors.size());
 
         g_rhi_dx12->Device->CopyDescriptors((uint32)DestDescriptor.NumOfData, &DestDescriptor[0], nullptr
-            , (uint32)SrcDescriptor.NumOfData, &SrcDescriptor[0], nullptr, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+            , (uint32)DesriptorsOnlyCPU.size(), &DesriptorsOnlyCPU[0], nullptr, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
 
     if (SamplerDescriptors.size() > 0)
     {
         check(Descriptors.size() <= 200);
-        jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 1000> DestSamplerDescriptor;
-        jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 1000> SrcSamplerDescriptor;
-
-        for (int32 i = 0; i < SamplerDescriptors.size(); ++i)
-        {
-            SrcSamplerDescriptor.Add(SamplerDescriptors[i].Descriptor.CPUHandle);
-
-            jDescriptor_DX12 Descriptor = InCommandList->OnlineSamplerDescriptorHeap->Alloc();
-            check(Descriptor.IsValid());
-            DestSamplerDescriptor.Add(Descriptor.CPUHandle);
-        }
+        jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 200> DestSamplerDescriptor;
+        InCommandList->OnlineSamplerDescriptorHeap->AllocToResourceContainer(DestSamplerDescriptor, (int32)SamplerDescriptors.size());
 
         g_rhi_dx12->Device->CopyDescriptors((uint32)DestSamplerDescriptor.NumOfData, &DestSamplerDescriptor[0], nullptr
-            , (uint32)SrcSamplerDescriptor.NumOfData, &SrcSamplerDescriptor[0], nullptr, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+            , (uint32)SamplerDescriptorsOnlyCPU.size(), &SamplerDescriptorsOnlyCPU[0], nullptr, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
     }
 }

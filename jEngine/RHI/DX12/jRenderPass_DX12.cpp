@@ -5,17 +5,6 @@
 
 void jRenderPass_DX12::Release()
 {
-    //if (FrameBuffer)
-    //{
-    //    vkDestroyFramebuffer(g_rhi_vk->Device, FrameBuffer, nullptr);
-    //    FrameBuffer = nullptr;
-    //}
-
-    //if (RenderPass)
-    //{
-    //    vkDestroyRenderPass(g_rhi_vk->Device, RenderPass, nullptr);
-    //    RenderPass = nullptr;
-    //}
 }
 
 bool jRenderPass_DX12::BeginRenderPass(const jCommandBuffer* commandBuffer)
@@ -64,26 +53,10 @@ bool jRenderPass_DX12::BeginRenderPass(const jCommandBuffer* commandBuffer)
 
 void jRenderPass_DX12::EndRenderPass()
 {
-    //ensure(CommandBuffer);
-
-    //// Finishing up
-    //vkCmdEndRenderPass((VkCommandBuffer)CommandBuffer->GetHandle());
-
-    //// Apply layout to attachments
-    //for(jAttachment& iter : RenderPassInfo.Attachments)
-    //{
-    //    check(iter.IsValid());
-    //    SetFinalLayoutToAttachment(iter);
-    //}
-
-    //CommandBuffer = nullptr;
 }
 
 void jRenderPass_DX12::SetFinalLayoutToAttachment(const jAttachment& attachment) const
 {
-    //check(attachment.RenderTargetPtr);
-    //jTexture_DX12* texture_vk = (jTexture_DX12*)attachment.RenderTargetPtr->GetTexture();
-    //texture_vk->Layout = attachment.FinalLayout;
 }
 
 void jRenderPass_DX12::Initialize()

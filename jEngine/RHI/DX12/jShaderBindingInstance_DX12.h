@@ -53,4 +53,7 @@ struct jShaderBindingInstance_DX12 : public jShaderBindingInstance
     std::vector<jInlineRootParamData> RootParameterInlines;
     std::vector<jDescriptorData> Descriptors;
     std::vector<jDescriptorData> SamplerDescriptors;
+
+    std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> DesriptorsOnlyCPU;
+    std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> SamplerDescriptorsOnlyCPU;
 };

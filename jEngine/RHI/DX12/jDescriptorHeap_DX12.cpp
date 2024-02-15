@@ -194,6 +194,7 @@ void jOnlineDescriptorHeapBlocks_DX12::Initialize(EDescriptorHeapTypeDX12 InHeap
         if (DescriptorBlocks[Index].Descriptors.size() != InDescriptorsInBlock)
         {
             DescriptorBlocks[Index].Descriptors.resize(InDescriptorsInBlock);
+            DescriptorBlocks[Index].DescriptorsOnlyCPU.resize(InDescriptorsInBlock);
         }
 
         jDescriptor_DX12& Descriptor = DescriptorBlocks[Index].Descriptors[AllocatedSize];
@@ -203,6 +204,8 @@ void jOnlineDescriptorHeapBlocks_DX12::Initialize(EDescriptorHeapTypeDX12 InHeap
 
         Descriptor.GPUHandle = GPUHandleStart;
         Descriptor.GPUHandle.ptr += Descriptor.Index * DescriptorSize;
+
+        DescriptorBlocks[Index].DescriptorsOnlyCPU[AllocatedSize] = Descriptor.CPUHandle;
 
         ++DescriptorBlocks[Index].AllocatedSize;
     }
