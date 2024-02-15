@@ -325,21 +325,21 @@ bool jRHI_Vulkan::InitRHI()
 		enabledBufferDeviceAddresFeatures.pNext = (void*)createInfo.pNext;
 		createInfo.pNext = &enabledBufferDeviceAddresFeatures;
 
+		VkPhysicalDeviceRayTracingPipelineFeaturesKHR enabledRayTracingPipelineFeatures{};
+		VkPhysicalDeviceAccelerationStructureFeaturesKHR enabledAccelerationStructureFeatures{};
+		VkPhysicalDeviceRayQueryFeaturesKHR enabledRayQueryFeatures{};
 		if (GSupportRaytracing)
 		{
-			VkPhysicalDeviceRayTracingPipelineFeaturesKHR enabledRayTracingPipelineFeatures{};
 			enabledRayTracingPipelineFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
 			enabledRayTracingPipelineFeatures.rayTracingPipeline = true;
 			enabledRayTracingPipelineFeatures.pNext = (void*)createInfo.pNext;
 			createInfo.pNext = &enabledRayTracingPipelineFeatures;
 
-			VkPhysicalDeviceAccelerationStructureFeaturesKHR enabledAccelerationStructureFeatures{};
 			enabledAccelerationStructureFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
 			enabledAccelerationStructureFeatures.accelerationStructure = true;
 			enabledAccelerationStructureFeatures.pNext = (void*)createInfo.pNext;
 			createInfo.pNext = &enabledAccelerationStructureFeatures;
 
-			VkPhysicalDeviceRayQueryFeaturesKHR enabledRayQueryFeatures{};
 			enabledRayQueryFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR;
 			enabledRayQueryFeatures.rayQuery = true;
 			enabledRayQueryFeatures.pNext = (void*)createInfo.pNext;

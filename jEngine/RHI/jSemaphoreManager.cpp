@@ -44,9 +44,9 @@ jSemaphore* jSemaphoreManager_Vulkan::GetOrCreateSemaphore(ESemaphoreType InType
     VkSemaphoreCreateInfo semaphoreInfo = {};
     semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
+    VkSemaphoreTypeCreateInfo createTypeInfo{};
     if (InType == ESemaphoreType::TIMELINE)
     {
-        VkSemaphoreTypeCreateInfo createTypeInfo{};
         createTypeInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
         createTypeInfo.pNext = nullptr;
         createTypeInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
