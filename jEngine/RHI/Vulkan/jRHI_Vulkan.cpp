@@ -1416,7 +1416,7 @@ VkImageUsageFlags jRHI_Vulkan::GetImageUsageFlags(ETextureCreateFlag InTextureCr
 
     // This should be placed last, because Memoryless has only Color, Depth, Input attachment usages.
     if (!!(InTextureCreateFlag & ETextureCreateFlag::Memoryless))
-        UsageFlag &= ~(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT);
+        UsageFlag &= (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
 
 	return UsageFlag;
 }

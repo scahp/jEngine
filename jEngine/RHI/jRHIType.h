@@ -822,33 +822,33 @@ DECLARE_ENUM_WITH_CONVERT_TO_STRING(ERTClearType, uint8,
 
 enum class EBufferCreateFlag : uint32
 {
-    NONE = 0,
-    CPUAccess = 0x00000001,
-    UAV = 0x00000002,
-    Readback = 0x00000004,
-	AccelerationStructureBuildInput = 0x00000008,
-	VertexBuffer = 0x00000010,
-	IndexBuffer = 0x00000020,
-	IndirectCommand = 0x00000040,
-	ShaderBindingTable = 0x00000080,
-	AccelerationStructure = 0x00000100,
-	SimultaneousQueueAcess = 0x00000200,
+    NONE =								0,
+    CPUAccess =							1,
+    UAV =								1 << 1,
+    Readback =							1 << 2,
+	AccelerationStructureBuildInput =	1 << 3,
+	VertexBuffer =						1 << 4,
+	IndexBuffer =						1 << 5,
+	IndirectCommand =					1 << 6,
+	ShaderBindingTable =				1 << 7,
+	AccelerationStructure =				1 << 8,
+	SimultaneousQueueAcess =			1 << 9,
 };
 DECLARE_ENUM_BIT_OPERATORS(EBufferCreateFlag)
 
 enum class ETextureCreateFlag : uint32
 {
-    NONE = 0,
-    RTV = 0x00000001,
-    UAV = 0x00000002,
-    CPUAccess = 0x00000004,
-	TransferDst = 0x00000008,
-	TransferSrc = 0x00000010,
-	ShadingRate = 0x00000020,
-	DSV = 0x00000040,
-	SubpassInput = 0x00000040,
-	Memoryless = 0x00000080,
-    SimultaneousQueueAcess = 0x00000100,
+    NONE =								0,
+    RTV =								1,
+    UAV =								1 << 1,
+    CPUAccess =							1 << 2,
+	TransferDst =						1 << 3,
+	TransferSrc =						1 << 4,
+	ShadingRate =						1 << 5,
+	DSV =								1 << 6,
+	SubpassInput =						1 << 7,
+	Memoryless =						1 << 8,
+    SimultaneousQueueAcess =			1 << 9,
 };
 DECLARE_ENUM_BIT_OPERATORS(ETextureCreateFlag)
 
