@@ -60,36 +60,30 @@ public:
     template <typename K>
     constexpr int32 GetDefineCount()
     {
-		using TFoundType = decltype(TFindClass<K>);
-        return TFoundType::Count;
+        return TFindClass<K>::Count;
     }
 
     template <typename K>
     int32 Get() const
     {
-		using TFoundType = decltype(TFindClass<K>);
-		const TFoundType& FoundClass = *this;
-
+		const TFindClass<K>& FoundClass = *this;
 		return T::Value[FoundClass.GetValueIndex()];
     }
 
     template <typename K>
     int32 GetIndex() const
     {
-		using TFoundType = decltype(TFindClass<K>);
-		const TFoundType& FoundClass = *this;
-
+		const TFindClass<K>& FoundClass = *this;
         return FoundClass.GetValueIndex();
     }
 
     template <typename K>
     void SetIndex(int32 value)
     {
-		using TFoundType = decltype(TFindClass<K>);
-        TFoundType& FoundClass = *this;
+        TFindClass<K>& FoundClass = *this;
 
 		FoundClass.SetValueIndex(value);
-		FoundClass.SetLocalPermutationId(value * TFoundType::Super::MaxPermutationCount);
+		FoundClass.SetLocalPermutationId(value * TFindClass<K>::Super::MaxPermutationCount);
     }
 
     constexpr int32 GetPermutationId() const
