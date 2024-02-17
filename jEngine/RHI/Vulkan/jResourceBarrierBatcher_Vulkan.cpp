@@ -267,6 +267,8 @@ void jResourceBarrierBatcher_Vulkan::AddTransition(jTexture* InTexture, EResourc
         break;
 
     case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+    case VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL:
+    case VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL:
         // Image will be read in a shader (sampler, input attachment)
         // Make sure any writes to the image have been finished
         if (barrier.srcAccessMask == 0)

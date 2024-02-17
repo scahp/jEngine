@@ -105,7 +105,7 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
                     {
                         // check(0);   // todo : need to set DefaultSamplerState
                         const jSamplerStateInfo_DX12* SamplerDX12 = (jSamplerStateInfo_DX12*)TSamplerStateInfo<ETextureFilter::LINEAR_MIPMAP_LINEAR, ETextureFilter::LINEAR_MIPMAP_LINEAR
-                            , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, 0.0f, 16.0f>::Create();
+                            , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, 0.0f, 1.0f>::Create();
                         check(SamplerDX12);
                         SamplerDescriptors.push_back({ .Descriptor = SamplerDX12->SamplerSRV, .ResourceName = SamplerDX12->ResourceName, .Resource = SamplerDX12 });
                         SamplerDescriptorsOnlyCPU.push_back(SamplerDX12->SamplerSRV.CPUHandle);
@@ -133,7 +133,7 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
                         // check(0);   // todo : need to set DefaultSamplerState
 
                         const jSamplerStateInfo_DX12* SamplerDX12 = (jSamplerStateInfo_DX12*)TSamplerStateInfo<ETextureFilter::LINEAR_MIPMAP_LINEAR, ETextureFilter::LINEAR_MIPMAP_LINEAR
-                            , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, 0.0f, 16.0f>::Create();
+                            , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, 0.0f, 1.0f>::Create();
                         check(SamplerDX12);
                         SamplerDescriptors.push_back({ .Descriptor = SamplerDX12->SamplerSRV, .ResourceName = SamplerDX12->ResourceName, .Resource = SamplerDX12 });
                         SamplerDescriptorsOnlyCPU.push_back(SamplerDX12->SamplerSRV.CPUHandle);

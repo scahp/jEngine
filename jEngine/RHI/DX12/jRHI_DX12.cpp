@@ -737,11 +737,11 @@ std::shared_ptr<jTexture> jRHI_DX12::CreateTextureFromData(const jImageData* InI
     std::shared_ptr<jTexture_DX12> TexturePtr;
     if (InImageData->TextureType == ETextureType::TEXTURE_CUBE)
     {
-        TexturePtr = g_rhi->CreateCubeTexture<jTexture_DX12>(InImageData->Width, InImageData->Height, MipLevel, InImageData->Format, ETextureCreateFlag::UAV, Layout, InImageData->ImageBulkData);
+        TexturePtr = g_rhi->CreateCubeTexture<jTexture_DX12>(InImageData->Width, InImageData->Height, MipLevel, InImageData->Format, ETextureCreateFlag::NONE, Layout, InImageData->ImageBulkData);
     }
     else
     {
-        TexturePtr = g_rhi->Create2DTexture<jTexture_DX12>(InImageData->Width, InImageData->Height, InImageData->LayerCount, MipLevel, InImageData->Format, ETextureCreateFlag::UAV, Layout, InImageData->ImageBulkData);
+        TexturePtr = g_rhi->Create2DTexture<jTexture_DX12>(InImageData->Width, InImageData->Height, InImageData->LayerCount, MipLevel, InImageData->Format, ETextureCreateFlag::NONE, Layout, InImageData->ImageBulkData);
     }
     TexturePtr->sRGB = InImageData->sRGB;
 	return TexturePtr;

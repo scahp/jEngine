@@ -39,7 +39,7 @@ struct jVertex
 
 RaytracingAccelerationStructure Scene : register(t0, space0);
 RWTexture2D<float4> RenderTarget : register(u1, space0);
-Texture2D GBuffer0_Pos : register(t2, space0);
+Texture2D DepthTexture : register(t2, space0);
 Texture2D GBuffer1_Normal : register(t3, space0);
 ConstantBuffer<SceneConstantBuffer> g_sceneCB : register(b4, space0);
 SamplerState AlbedoTextureSampler : register(s5, space0);
@@ -228,10 +228,7 @@ void MyRaygenShader()
 {
     float2 UV = DispatchRaysIndex().xy / g_sceneCB.ViewRect.zw;
 
-    Texture2D GBuffer0_Pos : register(t2, space0);
-    Texture2D GBuffer1_Normal : register(t3, space0);
-
-    float3 WorldPos = GBuffer0_Pos.SampleLevel(AlbedoTextureSampler, UV, 0).xyz;
+    float3 WorldPos = CalcWorldPositionFromDepth(DepthTexture, AlbedoTextureSampler, UV, g_sceneCB.projectionToWorld);
     //float3 WorldNormal = GBuffer1_Normal.SampleLevel(AlbedoTextureSampler, UV, 0).xyz;
 
     //RayDesc ray;

@@ -29,7 +29,7 @@ Texture2D DiffuseTexture : register(t0, space2);
 SamplerState DiffuseTextureSampler : register(s0, space2);
 Texture2D NormalTexture : register(t1, space2);
 SamplerState NormalTextureSampler : register(s1, space2);
-Texture2D RMTexture : register(t2, space2);     // Metalic, Roughness
+Texture2D RMTexture : register(t2, space2);     // Metallic, Roughness
 SamplerState RMTextureSampler : register(s2, space2);
 TextureCube EnvTexture : register(t3, space2);
 SamplerState EnvextureSampler : register(s3, space2);
@@ -45,10 +45,9 @@ struct PushConsts
 
 struct FSOutput
 {
-    float4 GBuffer0 : SV_TARGET0;       // Position.xyz
-    float4 GBuffer1 : SV_TARGET1;       // Normal.xyz
-    float4 GBuffer2 : SV_TARGET2;       // Albedo.xyz
-    float4 GBuffer3 : SV_TARGET3;       // Velocity.xyz
+    float4 GBuffer0 : SV_TARGET0;       // Normal.xyz, Roughness
+    float4 GBuffer1 : SV_TARGET1;       // Albedo.xyz, Metallic
+    float4 GBuffer2 : SV_TARGET2;       // Velocity.xy
 };
 
 FSOutput main(VSOutput input
@@ -132,34 +131,33 @@ FSOutput main(VSOutput input
 
     FSOutput output = (FSOutput)0;
 
-    output.GBuffer0.xyz = input.WorldPos.xyz / input.WorldPos.w;
 #if USE_PBR
 #if USE_ALBEDO_TEXTURE
     float roughness = RMTexture.Sample(RMTextureSampler, input.TexCoord.xy).y;
     float metallic = RMTexture.Sample(RMTextureSampler, input.TexCoord.xy).z;
-    output.GBuffer0.w = metallic;
+    output.GBuffer1.w = metallic;
 #else
-    output.GBuffer0.w = RenderObjectParam.Metallic;
+    output.GBuffer1.w = RenderObjectParam.Metallic;
 #endif
 #endif
     
-    output.GBuffer1.xyz = WorldNormal;
+    output.GBuffer0.xyz = WorldNormal;
 #if USE_PBR
 #if USE_ALBEDO_TEXTURE
-    output.GBuffer1.w = roughness;
+    output.GBuffer0.w = roughness;
 #else
-    output.GBuffer1.w = RenderObjectParam.Roughness;
+    output.GBuffer0.w = RenderObjectParam.Roughness;
 #endif
 #endif
     
-    output.GBuffer2.xyz = color.xyz;
+    output.GBuffer1.xyz = color.xyz;
     
     float2 PrevScreenPos = (input.PrevPos.xy / input.PrevPos.w);
     PrevScreenPos.y = -PrevScreenPos.y;
     PrevScreenPos = PrevScreenPos * float2(0.5, 0.5) + float2(0.5, 0.5);
     
     PrevScreenPos = PrevScreenPos * ViewParam.ScreenRect.zw;
-    output.GBuffer3 = float4(input.Pos.xy - PrevScreenPos, 0, 0);
+    output.GBuffer2 = float4(input.Pos.xy - PrevScreenPos, 0, 0);
 
     return output;
 }

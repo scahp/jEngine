@@ -86,6 +86,7 @@ bool jRenderPass_Vulkan::CreateRenderPass()
 
     // Create RenderPass
     {
+        int32 DepthAttachmentIndex = -1;
         std::vector<VkAttachmentDescription> AttachmentDescs;
         AttachmentDescs.resize(RenderPassInfo.Attachments.size());
         for (int32 i = 0; i < (int32)RenderPassInfo.Attachments.size(); ++i)
@@ -177,12 +178,14 @@ bool jRenderPass_Vulkan::CreateRenderPass()
             }
             if (subPass.OutputDepthAttachment)
             {
-                const VkAttachmentReference attchmentRef = { (uint32)subPass.OutputDepthAttachment.value(), VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
+                // If you need to Read-only shader resource and read-only depth attachment for the same depth texture. VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL will be used.
+                const VkAttachmentReference attchmentRef = { (uint32)subPass.OutputDepthAttachment.value()
+                    , subPass.DepthAttachmentReadOnly ? VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
                 OutputDepthAttachmentRef = attchmentRef;
             }
             if (subPass.OutputResolveAttachment)
             {
-                const VkAttachmentReference attchmentRef = { (uint32)subPass.OutputDepthAttachment.value(), VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
+                const VkAttachmentReference attchmentRef = { (uint32)subPass.OutputDepthAttachment.value(), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
                 OutputResolveAttachmentRef = attchmentRef;
             }
 

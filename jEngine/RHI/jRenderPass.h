@@ -84,6 +84,8 @@ struct jSubpass
 
     std::vector<int32> OutputColorAttachments;
     std::optional<int32> OutputDepthAttachment;
+    bool DepthAttachmentReadOnly = false;           // If you need to Read-only shader resource and read-only depth attachment for the same depth texture. Set this true.
+
     std::optional<int32> OutputResolveAttachment;
 
     // If both SourceSubpass and DstSubpass of all subpasses are -1, subpasses will be executed in order

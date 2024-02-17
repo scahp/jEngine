@@ -785,7 +785,7 @@ std::shared_ptr<jTexture> jRHI_Vulkan::CreateTextureFromData(const jImageData* I
 	if (InImageData->TextureType == ETextureType::TEXTURE_CUBE)
 	{
 		TexturePtr = g_rhi->CreateCubeTexture<jTexture_Vulkan>((uint32)InImageData->Width, (uint32)InImageData->Height, MipLevel, InImageData->Format
-			, ETextureCreateFlag::TransferSrc | ETextureCreateFlag::TransferDst | ETextureCreateFlag::UAV, EResourceLayout::SHADER_READ_ONLY, InImageData->ImageBulkData);
+			, ETextureCreateFlag::TransferSrc | ETextureCreateFlag::TransferDst, EResourceLayout::SHADER_READ_ONLY, InImageData->ImageBulkData);
         if (!ensure(TexturePtr))
         {
             return nullptr;
@@ -794,7 +794,7 @@ std::shared_ptr<jTexture> jRHI_Vulkan::CreateTextureFromData(const jImageData* I
 	else
 	{
 		TexturePtr = g_rhi->Create2DTexture<jTexture_Vulkan>((uint32)InImageData->Width, (uint32)InImageData->Height, (uint32)InImageData->LayerCount, MipLevel, InImageData->Format
-			, ETextureCreateFlag::TransferSrc | ETextureCreateFlag::TransferDst | ETextureCreateFlag::UAV, EResourceLayout::SHADER_READ_ONLY, InImageData->ImageBulkData);
+			, ETextureCreateFlag::TransferSrc | ETextureCreateFlag::TransferDst, EResourceLayout::SHADER_READ_ONLY, InImageData->ImageBulkData);
 		if (!ensure(TexturePtr))
 		{
 			return nullptr;
@@ -1463,12 +1463,12 @@ std::shared_ptr<jTexture> jRHI_Vulkan::Create2DTexture(uint32 InWidth, uint32 In
                 const jImageSubResourceData SubResourceData = InImageBulkData.SubresourceFootprints[i];
 
                 jBufferUtil_Vulkan::CopyBufferToTexture(commandBuffer, stagingBufferPtr->Buffer, stagingBufferPtr->Offset + SubResourceData.Offset, TexturePtr->Image
-                    , SubResourceData.Width, SubResourceData.Height, SubResourceData.MipLevel, SubResourceData.Depth);
+                    , SubResourceData.Width, SubResourceData.Height, GetVulkanTextureFormat(TexturePtr->Format), SubResourceData.MipLevel, SubResourceData.Depth);
             }
         }
         else
         {
-            jBufferUtil_Vulkan::CopyBufferToTexture(commandBuffer, stagingBufferPtr->Buffer, stagingBufferPtr->Offset, TexturePtr->Image, InWidth, InHeight);
+            jBufferUtil_Vulkan::CopyBufferToTexture(commandBuffer, stagingBufferPtr->Buffer, stagingBufferPtr->Offset, TexturePtr->Image, InWidth, InHeight, GetVulkanTextureFormat(TexturePtr->Format));
         }
 
         TransitionLayout(commandBuffer, TexturePtr.get(), InImageLayout);
@@ -1509,12 +1509,12 @@ std::shared_ptr<jTexture> jRHI_Vulkan::CreateCubeTexture(uint32 InWidth, uint32 
                 const jImageSubResourceData SubResourceData = InImageBulkData.SubresourceFootprints[i];
 
                 jBufferUtil_Vulkan::CopyBufferToTexture(commandBuffer, stagingBufferPtr->Buffer, stagingBufferPtr->Offset + SubResourceData.Offset, TexturePtr->Image
-                    , SubResourceData.Width, SubResourceData.Height, SubResourceData.MipLevel, SubResourceData.Depth);
+                    , SubResourceData.Width, SubResourceData.Height, GetVulkanTextureFormat(TexturePtr->Format), SubResourceData.MipLevel, SubResourceData.Depth);
             }
         }
         else
         {
-            jBufferUtil_Vulkan::CopyBufferToTexture(commandBuffer, stagingBufferPtr->Buffer, stagingBufferPtr->Offset, TexturePtr->Image, InWidth, InHeight);
+            jBufferUtil_Vulkan::CopyBufferToTexture(commandBuffer, stagingBufferPtr->Buffer, stagingBufferPtr->Offset, TexturePtr->Image, InWidth, InHeight, GetVulkanTextureFormat(TexturePtr->Format));
         }
 
         TransitionLayout(commandBuffer, TexturePtr.get(), InImageLayout);
@@ -2009,7 +2009,7 @@ jTexture* jRHI_Vulkan::CreateSampleVRSTexture()
 		g_rhi->TransitionLayout(commandBuffer, SampleVRSTexturePtr.get(), EResourceLayout::TRANSFER_DST);
 
         jBufferUtil_Vulkan::CopyBufferToTexture(commandBuffer, stagingBufferPtr->Buffer, stagingBufferPtr->Offset, (VkImage)SampleVRSTexturePtr->GetHandle()
-            , static_cast<uint32>(imageExtent.width), static_cast<uint32>(imageExtent.height));
+            , static_cast<uint32>(imageExtent.width), static_cast<uint32>(imageExtent.height), GetVulkanTextureFormat(SampleVRSTexturePtr->Format));
 
         // Create a circular pattern with decreasing sampling rates outwards (max. range, pattern)
         std::map<float, VkShadingRatePaletteEntryNV> patternLookup = {

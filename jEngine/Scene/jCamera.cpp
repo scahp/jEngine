@@ -90,6 +90,7 @@ void jCamera::UpdateCamera()
     View = CreateView();
     Projection = CreateProjection();
     ViewProjection = Projection * View;
+    InvViewProjection = ViewProjection.GetInverse();
     if (IsPerspectiveProjection)
     {
         #if USE_REVERSEZ_PERSPECTIVE_SHADOW

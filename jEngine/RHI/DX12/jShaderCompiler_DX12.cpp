@@ -142,7 +142,7 @@ ComPtr<IDxcBlob> jShaderCompiler_DX12::Compile(const char* InShaderCode, uint32 
     if (InRowMajorMatrix)
         options.push_back(TEXT("-Zpr"));			// Pack matrices in row-major order.
 
-#ifdef _DEBUG
+#if 1 // def _DEBUG
     options.push_back(TEXT("-Zi"));				// Debug info.
     options.push_back(TEXT("-Qembed_debug"));	// Embed PDB in shader container
     options.push_back(TEXT("-Od"));				// Disable optimization

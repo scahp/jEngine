@@ -3,6 +3,14 @@
 struct jRenderTarget;
 class jSwapchainImage;
 
+enum class EGBufferType : uint8
+{
+    NORMAL = 0,
+    ALBEDO = 1,
+    VELOCITY = 2,
+    MAX,
+};
+
 struct jSceneRenderTarget : public std::enable_shared_from_this<jSceneRenderTarget>
 {
     virtual ~jSceneRenderTarget()
@@ -30,7 +38,13 @@ struct jSceneRenderTarget : public std::enable_shared_from_this<jSceneRenderTarg
     std::shared_ptr<jRenderTarget> DepthPtr;
     std::shared_ptr<jRenderTarget> ResolvePtr;
     
-    std::shared_ptr<jRenderTarget> GBuffer[4];
+    std::shared_ptr<jRenderTarget> GBuffer[3];
+
+    const std::shared_ptr<jRenderTarget>& GetGBuffer(EGBufferType InType)
+    {
+        check((int32)InType < _countof(GBuffer));
+        return GBuffer[(int32)InType];
+    }
 
     std::map<const jLight*, std::shared_ptr<jRenderTarget>> LightShadowMapPtr;
 

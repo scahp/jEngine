@@ -62,6 +62,9 @@ std::shared_ptr<jSyncAcrossCommandQueue_Vulkan> jRenderFrameContext_Vulkan::Queu
         
         if (CommandBuffer->Type == ECommandBufferType::GRAPHICS)
             g_rhi_vk->Swapchain->Images[FrameIndex]->CommandBufferFence = (VkFence)CommandBuffer->GetFenceHandle();
+
+        if (bWaitUntilExecuteComplete && CommandBuffer->GetFence())
+            CommandBuffer->GetFence()->WaitForFence();
     }
     return CommandQueueSyncObjectPtr;
 }

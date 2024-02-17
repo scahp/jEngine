@@ -44,6 +44,7 @@ void jRenderer::AtmosphericShadow()
         {
             Matrix ShadowVP;
             Matrix VP;
+            Matrix InvVP;
             Vector CameraPos;
             float CameraNear;
             Vector LightCameraDirection;
@@ -65,6 +66,7 @@ void jRenderer::AtmosphericShadow()
         jAtmosphericData AtmosphericData;
         AtmosphericData.ShadowVP = ShadowVP;
         AtmosphericData.VP = MainCamera->GetViewProjectionMatrix();
+        AtmosphericData.InvVP = MainCamera->GetInverseViewProjectionMatrix();
         AtmosphericData.CameraPos = MainCamera->Pos;
         AtmosphericData.LightCameraDirection = LightCameraDirection;
         AtmosphericData.CameraFar = MainCamera->Far;
@@ -96,29 +98,23 @@ void jRenderer::AtmosphericShadow()
         // Binding 0
         {
             ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-                , ResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[0]->GetTexture(), SamplerState)));
+                , ResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), SamplerState)));
         }
 
         // Binding 1
         {
             ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-                , ResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), SamplerState)));
-        }
-
-        // Binding 2
-        {
-            ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
                 , ResourceInlineAllactor.Alloc<jTextureResource>(ShadowMapTexture, SamplerState)));
         }
 
-        // Binding 3        
+        // Binding 2
         auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(
             g_rhi->CreateUniformBufferBlock(jNameStatic("AtmosphericDataUniformBuffer"), jLifeTimeType::OneFrame, sizeof(AtmosphericData)));
         OneFrameUniformBuffer->UpdateBufferData(&AtmosphericData, sizeof(AtmosphericData));
         ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
             , ResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
 
-        // Binding 4
+        // Binding 3
         {
             ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE
                 , ResourceInlineAllactor.Alloc<jTextureResource>(AtmosphericShadowing->GetTexture(), nullptr)));

@@ -13,8 +13,6 @@ jObject* jSpotLightDrawCommandGenerator::SpotLightCone = nullptr;
 jSpotLightDrawCommandGenerator::jSpotLightDrawCommandGenerator(const jShaderBindingInstanceArray& InShaderBindingInstances)
     : ShaderBindingInstances(InShaderBindingInstances)
 {
-    if (!SpotLightCone)
-        SpotLightCone = jPrimitiveUtil::CreateCone(Vector::ZeroVector, 1.0, 1.0, 20, Vector::OneVector, Vector4::OneVector, false, false);
 }
 
 void jSpotLightDrawCommandGenerator::Initialize(int32 InRTWidth, int32 InRTHeight)

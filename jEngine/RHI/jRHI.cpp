@@ -198,6 +198,7 @@ void jView::PrepareViewUniformBufferShaderBindingInstance()
         Matrix V;
         Matrix P;
         Matrix VP;
+        Matrix InvVP;
         Matrix PrevVP;
 		Vector EyeWorld;
 		float padding0;
@@ -208,6 +209,7 @@ void jView::PrepareViewUniformBufferShaderBindingInstance()
     ubo.P = Camera->Projection;
     ubo.V = Camera->View;
     ubo.VP = Camera->ViewProjection;
+    ubo.InvVP = Camera->InvViewProjection;
     ubo.PrevVP = Camera->PrevViewProjection;
 	ubo.EyeWorld = Camera->Pos;
     ubo.ScreenRect = Vector4(0.0f, 0.0f, (float)Camera->Width, (float)Camera->Height);

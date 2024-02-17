@@ -69,6 +69,8 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
 
     jRenderTargetInfo DepthRTInfo = { ETextureType::TEXTURE_2D, ETextureFormat::D24_S8, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(1.0f, 0) };
     DepthRTInfo.ResourceName = TEXT("DepthPtr");
+    DepthRTInfo.IsUseAsSubpassInput = gOptions.UseSubpass;
+    DepthRTInfo.IsMemoryless = gOptions.UseMemoryless;
     DepthPtr = jRenderTargetPool::GetRenderTarget(DepthRTInfo);
 
     if ((int32)g_rhi->GetSelectedMSAASamples() > 1)
@@ -123,7 +125,7 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
     }
 
     wchar_t TempStr[256] = { 0, };
-    ETextureFormat GBufferTexFormat[_countof(GBuffer)] = { ETextureFormat::RGBA16F, ETextureFormat::RGBA16F, ETextureFormat::R11G11B10F, ETextureFormat::RGBA16F };
+    ETextureFormat GBufferTexFormat[_countof(GBuffer)] = { ETextureFormat::RGBA16F, ETextureFormat::RGBA8, ETextureFormat::RG16F };
     for (int32 i = 0; i < _countof(GBuffer); ++i)
     {
         const bool UseAsSubpassInput = gOptions.UseSubpass;
@@ -204,6 +206,21 @@ std::shared_ptr<jShaderBindingInstance> jSceneRenderTarget::PrepareGBufferShader
             ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
                 , ResourceInlineAllocator.Alloc<jTextureResource>(GBuffer[i]->GetTexture(), ShadowSamplerStateInfo)));
         }
+    }
+
+    if (InUseAsSubpassInput)
+    {
+        ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::SUBPASS_INPUT_ATTACHMENT, EShaderAccessStageFlag::FRAGMENT
+            , ResourceInlineAllocator.Alloc<jTextureResource>(DepthPtr->GetTexture(), nullptr)));
+    }
+    else
+    {
+        const jSamplerStateInfo* ShadowSamplerStateInfo = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+            , ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
+            , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
+
+        ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
+            , ResourceInlineAllocator.Alloc<jTextureResource>(DepthPtr->GetTexture(), ShadowSamplerStateInfo)));
     }
 
     return g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);

@@ -127,7 +127,7 @@ void jImGUI_Vulkan::Initialize(float width, float height)
 
     // Copy buffer data to font image
     g_rhi_vk->TransitionLayout(FontImagePtr.get(), EResourceLayout::TRANSFER_DST);
-    jBufferUtil_Vulkan::CopyBufferToTexture(stagingBuffer->Buffer, stagingBuffer->Offset, FontImagePtr->Image, texWidth, texHeight);
+    jBufferUtil_Vulkan::CopyBufferToTexture(stagingBuffer->Buffer, stagingBuffer->Offset, FontImagePtr->Image, texWidth, texHeight, GetVulkanTextureFormat(FontImagePtr->Format));
     g_rhi_vk->TransitionLayout(FontImagePtr.get(), EResourceLayout::SHADER_READ_ONLY);
     //////////////////////////////////////////////////////////////////////////
 

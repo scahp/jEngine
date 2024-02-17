@@ -256,6 +256,18 @@ void jGame::Setup()
 		g_rhi->EndSingleTimeCommands(Initializer.CommandBuffer);
 		g_rhi->Finish(); // todo : Instead of this, it needs UAV barrier here
 	}
+
+	// todo : Need to move
+	{
+		if (!jDirectionalLightDrawCommandGenerator::GlobalFullscreenPrimitive)
+			jDirectionalLightDrawCommandGenerator::GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
+
+		if (!jPointLightDrawCommandGenerator::PointLightSphere)
+			jPointLightDrawCommandGenerator::PointLightSphere = jPrimitiveUtil::CreateSphere(Vector::ZeroVector, 1.0, 16, 8, Vector(1.0f), Vector4::OneVector);
+
+		if (!jSpotLightDrawCommandGenerator::SpotLightCone)
+			jSpotLightDrawCommandGenerator::SpotLightCone = jPrimitiveUtil::CreateCone(Vector::ZeroVector, 1.0, 1.0, 20, Vector::OneVector, Vector4::OneVector, false, false);
+	}
 }
 
 void jGame::SpawnObjects(ESpawnedType spawnType)

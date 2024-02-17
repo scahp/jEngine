@@ -10,8 +10,6 @@ jObject* jDirectionalLightDrawCommandGenerator::GlobalFullscreenPrimitive = null
 jDirectionalLightDrawCommandGenerator::jDirectionalLightDrawCommandGenerator(const jShaderBindingInstanceArray& InShaderBindingInstances)
     : ShaderBindingInstances(InShaderBindingInstances)
 {
-    if (!GlobalFullscreenPrimitive)
-        GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
 }
 
 void jDirectionalLightDrawCommandGenerator::Initialize(int32 InRTWidth, int32 InRTHeight)

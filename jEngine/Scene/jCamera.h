@@ -215,8 +215,13 @@ public:
 
 	FORCEINLINE Matrix GetViewProjectionMatrix() const
 	{
-		return Projection * View;
+		return ViewProjection;
 	}
+
+    FORCEINLINE Matrix GetInverseViewProjectionMatrix() const
+    {
+        return InvViewProjection;
+    }
 
 	FORCEINLINE bool IsInFrustum(const Vector& pos, float radius)
 	{
@@ -301,6 +306,7 @@ public:
 	Matrix View;
 	Matrix Projection;
 	Matrix ViewProjection;
+	Matrix InvViewProjection;
 	Matrix PrevViewProjection;
 	Matrix ReverseZProjection;
 	bool IsPerspectiveProjection = true;

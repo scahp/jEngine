@@ -20,6 +20,9 @@ class jImageFileLoader
 public:
 	~jImageFileLoader();
 
+	// Apply BC3 Block compression to Windows Imaging Component (WIC), it helps gpu to increase VRAM bandwidth for reading.
+	constexpr static bool UseBlockCompressionForWIC = true;
+
 	static jImageFileLoader& GetInstance()
 	{
 		if (!_instance)

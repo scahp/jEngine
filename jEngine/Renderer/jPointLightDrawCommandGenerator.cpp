@@ -11,8 +11,6 @@ jObject* jPointLightDrawCommandGenerator::PointLightSphere = nullptr;
 jPointLightDrawCommandGenerator::jPointLightDrawCommandGenerator(const jShaderBindingInstanceArray& InShaderBindingInstances)
     : ShaderBindingInstances(InShaderBindingInstances)
 {
-    if (!PointLightSphere)
-        PointLightSphere = jPrimitiveUtil::CreateSphere(Vector::ZeroVector, 1.0, 16, 8, Vector(1.0f), Vector4::OneVector);
 }
 
 void jPointLightDrawCommandGenerator::Initialize(int32 InRTWidth, int32 InRTHeight)

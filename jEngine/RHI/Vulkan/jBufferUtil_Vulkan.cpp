@@ -4,6 +4,123 @@
 namespace jBufferUtil_Vulkan
 {
 
+// https://github.com/KhronosGroup/Vulkan-LoaderAndValidationLayers/blob/master/layers/vk_format_utils.cpp
+VkExtent3D FormatCompressedTexelBlockExtent(VkFormat format) 
+{
+    VkExtent3D block_size = { 1, 1, 1 };
+    switch (format) {
+    case VK_FORMAT_BC1_RGB_UNORM_BLOCK:
+    case VK_FORMAT_BC1_RGB_SRGB_BLOCK:
+    case VK_FORMAT_BC1_RGBA_UNORM_BLOCK:
+    case VK_FORMAT_BC1_RGBA_SRGB_BLOCK:
+    case VK_FORMAT_BC2_UNORM_BLOCK:
+    case VK_FORMAT_BC2_SRGB_BLOCK:
+    case VK_FORMAT_BC3_UNORM_BLOCK:
+    case VK_FORMAT_BC3_SRGB_BLOCK:
+    case VK_FORMAT_BC4_UNORM_BLOCK:
+    case VK_FORMAT_BC4_SNORM_BLOCK:
+    case VK_FORMAT_BC5_UNORM_BLOCK:
+    case VK_FORMAT_BC5_SNORM_BLOCK:
+    case VK_FORMAT_BC6H_UFLOAT_BLOCK:
+    case VK_FORMAT_BC6H_SFLOAT_BLOCK:
+    case VK_FORMAT_BC7_UNORM_BLOCK:
+    case VK_FORMAT_BC7_SRGB_BLOCK:
+    case VK_FORMAT_ETC2_R8G8B8_UNORM_BLOCK:
+    case VK_FORMAT_ETC2_R8G8B8_SRGB_BLOCK:
+    case VK_FORMAT_ETC2_R8G8B8A1_UNORM_BLOCK:
+    case VK_FORMAT_ETC2_R8G8B8A1_SRGB_BLOCK:
+    case VK_FORMAT_ETC2_R8G8B8A8_UNORM_BLOCK:
+    case VK_FORMAT_ETC2_R8G8B8A8_SRGB_BLOCK:
+    case VK_FORMAT_EAC_R11_UNORM_BLOCK:
+    case VK_FORMAT_EAC_R11_SNORM_BLOCK:
+    case VK_FORMAT_EAC_R11G11_UNORM_BLOCK:
+    case VK_FORMAT_EAC_R11G11_SNORM_BLOCK:
+    case VK_FORMAT_ASTC_4x4_UNORM_BLOCK:
+    case VK_FORMAT_ASTC_4x4_SRGB_BLOCK:
+        block_size = { 4, 4, 1 };
+        break;
+    case VK_FORMAT_ASTC_5x4_UNORM_BLOCK:
+    case VK_FORMAT_ASTC_5x4_SRGB_BLOCK:
+        block_size = { 5, 4, 1 };
+        break;
+    case VK_FORMAT_ASTC_5x5_UNORM_BLOCK:
+    case VK_FORMAT_ASTC_5x5_SRGB_BLOCK:
+        block_size = { 5, 5, 1 };
+        break;
+    case VK_FORMAT_ASTC_6x5_UNORM_BLOCK:
+    case VK_FORMAT_ASTC_6x5_SRGB_BLOCK:
+        block_size = { 6, 5, 1 };
+        break;
+    case VK_FORMAT_ASTC_6x6_UNORM_BLOCK:
+    case VK_FORMAT_ASTC_6x6_SRGB_BLOCK:
+        block_size = { 6, 6, 1 };
+        break;
+    case VK_FORMAT_ASTC_8x5_UNORM_BLOCK:
+    case VK_FORMAT_ASTC_8x5_SRGB_BLOCK:
+        block_size = { 8, 5, 1 };
+        break;
+    case VK_FORMAT_ASTC_8x6_UNORM_BLOCK:
+    case VK_FORMAT_ASTC_8x6_SRGB_BLOCK:
+        block_size = { 8, 6, 1 };
+        break;
+    case VK_FORMAT_ASTC_8x8_UNORM_BLOCK:
+    case VK_FORMAT_ASTC_8x8_SRGB_BLOCK:
+        block_size = { 8, 8, 1 };
+        break;
+    case VK_FORMAT_ASTC_10x5_UNORM_BLOCK:
+    case VK_FORMAT_ASTC_10x5_SRGB_BLOCK:
+        block_size = { 10, 5, 1 };
+        break;
+    case VK_FORMAT_ASTC_10x6_UNORM_BLOCK:
+    case VK_FORMAT_ASTC_10x6_SRGB_BLOCK:
+        block_size = { 10, 6, 1 };
+        break;
+    case VK_FORMAT_ASTC_10x8_UNORM_BLOCK:
+    case VK_FORMAT_ASTC_10x8_SRGB_BLOCK:
+        block_size = { 10, 8, 1 };
+        break;
+    case VK_FORMAT_ASTC_10x10_UNORM_BLOCK:
+    case VK_FORMAT_ASTC_10x10_SRGB_BLOCK:
+        block_size = { 10, 10, 1 };
+        break;
+    case VK_FORMAT_ASTC_12x10_UNORM_BLOCK:
+    case VK_FORMAT_ASTC_12x10_SRGB_BLOCK:
+        block_size = { 12, 10, 1 };
+        break;
+    case VK_FORMAT_ASTC_12x12_UNORM_BLOCK:
+    case VK_FORMAT_ASTC_12x12_SRGB_BLOCK:
+        block_size = { 12, 12, 1 };
+        break;
+    case VK_FORMAT_PVRTC1_2BPP_UNORM_BLOCK_IMG:
+    case VK_FORMAT_PVRTC2_2BPP_UNORM_BLOCK_IMG:
+    case VK_FORMAT_PVRTC1_2BPP_SRGB_BLOCK_IMG:
+    case VK_FORMAT_PVRTC2_2BPP_SRGB_BLOCK_IMG:
+        block_size = { 8, 4, 1 };
+        break;
+    case VK_FORMAT_PVRTC1_4BPP_UNORM_BLOCK_IMG:
+    case VK_FORMAT_PVRTC2_4BPP_UNORM_BLOCK_IMG:
+    case VK_FORMAT_PVRTC1_4BPP_SRGB_BLOCK_IMG:
+    case VK_FORMAT_PVRTC2_4BPP_SRGB_BLOCK_IMG:
+        block_size = { 4, 4, 1 };
+        break;
+        // With KHR_sampler_ycbcr_conversion, these formats are treated as 2x1 compressed (for copies)
+    case VK_FORMAT_G8B8G8R8_422_UNORM_KHR:
+    case VK_FORMAT_B8G8R8G8_422_UNORM_KHR:
+    case VK_FORMAT_G10X6B10X6G10X6R10X6_422_UNORM_4PACK16_KHR:
+    case VK_FORMAT_B10X6G10X6R10X6G10X6_422_UNORM_4PACK16_KHR:
+    case VK_FORMAT_G12X4B12X4G12X4R12X4_422_UNORM_4PACK16_KHR:
+    case VK_FORMAT_B12X4G12X4R12X4G12X4_422_UNORM_4PACK16_KHR:
+    case VK_FORMAT_G16B16G16R16_422_UNORM_KHR:
+    case VK_FORMAT_B16G16R16G16_422_UNORM_KHR:
+        block_size = { 2, 1, 1 };
+        break;
+
+    default:
+        break;
+    }
+    return block_size;
+}
+
 VkFormat FindSupportedFormat(VkPhysicalDevice physicalDevice, const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features)
 {
     for (VkFormat format : candidates)
@@ -352,7 +469,7 @@ std::shared_ptr<jBuffer_Vulkan> CreateBuffer(EVulkanBufferBits InUsage, EVulkanM
     return BufferPtr;
 }
 
-void CopyBufferToTexture(jCommandBuffer_Vulkan* commandBuffer_vk, VkBuffer buffer, uint64 bufferOffset, VkImage image, uint32 width, uint32 height, int32 miplevel, int32 layerIndex)
+void CopyBufferToTexture(jCommandBuffer_Vulkan* commandBuffer_vk, VkBuffer buffer, uint64 bufferOffset, VkImage image, uint32 width, uint32 height, VkFormat InFormat, int32 miplevel, int32 layerIndex)
 {
     check(commandBuffer_vk);
 #if USE_RESOURCE_BARRIER_BATCHER
@@ -363,9 +480,11 @@ void CopyBufferToTexture(jCommandBuffer_Vulkan* commandBuffer_vk, VkBuffer buffe
     VkBufferImageCopy region = {};
     region.bufferOffset = bufferOffset;
 
+    VkExtent3D BlockSize = FormatCompressedTexelBlockExtent(InFormat);
+
     // 아래 2가지는 얼마나 많은 pixel이 들어있는지 설명, 둘다 0, 0이면 전체
-    region.bufferRowLength = width;
-    region.bufferImageHeight = height;
+    region.bufferRowLength = Align(width, BlockSize.width);
+    region.bufferImageHeight = Align(height, BlockSize.height);
 
     // 아래 부분은 이미지의 어떤 부분의 픽셀을 복사할지 명세
     region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -484,10 +603,10 @@ void CopyBuffer(jCommandBuffer_Vulkan* commandBuffer_vk, const jBuffer_Vulkan& s
     CopyBuffer(commandBuffer_vk, srcBuffer.Buffer, dstBuffer.Buffer, size, srcBuffer.Offset, dstBuffer.Offset);
 }
 
-void CopyBufferToTexture(VkBuffer buffer, uint64 bufferOffset, VkImage image, uint32 width, uint32 height, int32 miplevel, int32 layerIndex)
+void CopyBufferToTexture(VkBuffer buffer, uint64 bufferOffset, VkImage image, uint32 width, uint32 height, VkFormat InFormat, int32 miplevel, int32 layerIndex)
 {
     auto commandBuffer = g_rhi_vk->BeginSingleTimeCopyCommands();
-    CopyBufferToTexture(commandBuffer, buffer, bufferOffset, image, width, height, miplevel, layerIndex);
+    CopyBufferToTexture(commandBuffer, buffer, bufferOffset, image, width, height, InFormat, miplevel, layerIndex);
     g_rhi_vk->EndSingleTimeCopyCommands(commandBuffer);
 }
 

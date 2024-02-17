@@ -6,6 +6,7 @@ struct jAtmosphericData
 {
     float4x4 ShadowVP;
     float4x4 VP;
+    float4x4 InvVP;
     float3 CameraPos;
     float CameraNear;
     float3 LightCameraDirection;
@@ -20,18 +21,15 @@ struct jAtmosphericData
     int UseNoise;  // todo : change to #define USE_NOISE
 };
 
-Texture2D GBuffer0 : register(t0, space0);
-SamplerState GBuffer0SamplerState : register(s0, space0);
+Texture2D DepthTexture : register(t0, space0);
+SamplerState DepthTextureSamplerState : register(s0, space0);
 
-Texture2D DepthTexture : register(t1, space0);
-SamplerState DepthTextureSamplerState : register(s1, space0);
+Texture2D ShadowMapTexture : register(t1, space0);
+SamplerState ShadowMapSamplerState : register(s1, space0);
 
-Texture2D ShadowMapTexture : register(t2, space0);
-SamplerState ShadowMapSamplerState : register(s2, space0);
+cbuffer AtmosphericParam : register(b2, space0) { jAtmosphericData AtmosphericParam; }
 
-cbuffer AtmosphericParam : register(b3, space0) { jAtmosphericData AtmosphericParam; }
-
-RWTexture2D<float4> Result : register(u4, space0);
+RWTexture2D<float4> Result : register(u3, space0);
 
 float3 TransformShdowMapTextureSpace(float3 InWorldPos)
 {
@@ -121,8 +119,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 GroupID : SV_Gro
         return;
 
     float2 uv = GlobalInvocationID.xy / float2(AtmosphericParam.RTWidth - 1, AtmosphericParam.RTHeight - 1);
-
-    float3 WorldPos = GBuffer0.SampleLevel(GBuffer0SamplerState, uv, 0).xyz;
+    float3 WorldPos = CalcWorldPositionFromDepth(DepthTexture, DepthTextureSamplerState, uv, AtmosphericParam.InvVP);
 
     float3 ToPixel = (WorldPos - AtmosphericParam.CameraPos);
     float TravelDist = sqrt(dot(ToPixel, ToPixel));

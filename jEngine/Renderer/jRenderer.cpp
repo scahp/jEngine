@@ -365,9 +365,11 @@ void jRenderer::SetupBasePass()
         {
             subpass.InputAttachments.push_back(i);
         }
+        subpass.InputAttachments.push_back(DepthAttachmentIndex);
 
         subpass.OutputColorAttachments.push_back(LightPassAttachmentIndex);
         subpass.OutputDepthAttachment = DepthAttachmentIndex;
+        subpass.DepthAttachmentReadOnly = true;
 
         if ((int32)g_rhi->GetSelectedMSAASamples() > 1)
             subpass.OutputResolveAttachment = ResolveAttachemntIndex;
@@ -377,7 +379,7 @@ void jRenderer::SetupBasePass()
     //////////////////////////////////////////////////////////////////////////
     BaseRenderPass = (jRenderPass_Vulkan*)g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
 
-    auto GetOrCreateShaderFunc = [UseForwardRenderer = this->UseForwardRenderer](const jRenderObject* InRenderObject)
+    auto GetOrCreateShaderFunc = [UseForwardRenderer = this->UseForwardRenderer](const jRenderObject* InRenderObject, const jMaterial* InOverrideMaterial = nullptr)
         {
             jGraphicsPipelineShader Shaders;
             jShaderInfo shaderInfo;
@@ -413,9 +415,10 @@ void jRenderer::SetupBasePass()
             }
             else
             {
-                const bool IsUseSphericalMap = InRenderObject->MaterialPtr && InRenderObject->MaterialPtr->IsUseSphericalMap();
-                const bool HasAlbedoTexture = InRenderObject->MaterialPtr && InRenderObject->MaterialPtr->HasAlbedoTexture();
-                const bool IsUseSRGBAlbedoTexture = InRenderObject->MaterialPtr && InRenderObject->MaterialPtr->IsUseSRGBAlbedoTexture();
+                const jMaterial* Material = InOverrideMaterial ? InOverrideMaterial : InRenderObject->MaterialPtr.get();
+                const bool IsUseSphericalMap = Material && Material->IsUseSphericalMap();
+                const bool HasAlbedoTexture = Material && Material->HasAlbedoTexture();
+                const bool IsUseSRGBAlbedoTexture = Material && Material->IsUseSRGBAlbedoTexture();
                 const bool HasVertexColor = InRenderObject->GeometryDataPtr && InRenderObject->GeometryDataPtr->HasVertexColor();
                 const bool HasVertexBiTangent = InRenderObject->GeometryDataPtr && InRenderObject->GeometryDataPtr->HasVertexBiTangent();
 
@@ -477,7 +480,7 @@ void jRenderer::SetupBasePass()
             }
 
             new (&BasePasses[InIndex]) jDrawCommand(RenderFrameContextPtr, &View, InRenderObject, BaseRenderPass
-                , GetOrCreateShaderFunc(InRenderObject), &BasePassPipelineStateFixed, Material, {}, SimplePushConstant);
+                , GetOrCreateShaderFunc(InRenderObject, Material), &BasePassPipelineStateFixed, Material, {}, SimplePushConstant);
             BasePasses[InIndex].PrepareToDraw(false);
         });
 #else
@@ -498,8 +501,10 @@ void jRenderer::SetupBasePass()
             }
         }
 
+        //Material = GDefaultMaterial.get();
+
         new (&BasePasses[i]) jDrawCommand(RenderFrameContextPtr, &View, iter, BaseRenderPass
-            , GetOrCreateShaderFunc(iter), &BasePassPipelineStateFixed, Material, {}, SimplePushConstant);
+            , GetOrCreateShaderFunc(iter, Material), &BasePassPipelineStateFixed, Material, {}, SimplePushConstant);
         BasePasses[i].PrepareToDraw(false);
         ++i;
     }
@@ -672,7 +677,7 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
             const jRTClearValue ClearDepth = jRTClearValue(1.0f, 0);
 
             jAttachment depth = jAttachment(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr, EAttachmentLoadStoreOp::LOAD_DONTCARE
-                , EAttachmentLoadStoreOp::LOAD_STORE, ClearDepth
+                , EAttachmentLoadStoreOp::LOAD_DONTCARE, ClearDepth
                 , RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetLayout(), EResourceLayout::DEPTH_STENCIL_READ_ONLY);
 
             // Setup attachment
@@ -696,6 +701,8 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
             }
 
             subpass.OutputDepthAttachment = DepthAttachmentIndex;
+            subpass.DepthAttachmentReadOnly = true;
+
             subpass.AttachmentProducePipelineBit = EPipelineStageMask::COLOR_ATTACHMENT_OUTPUT_BIT;
             renderPassInfo.Subpasses.push_back(subpass);
 
@@ -911,7 +918,7 @@ void jRenderer::Render()
         }
 
         // Vulkan need to queue submmit to reset query pool, and replace CurrentSemaphore with GraphicQueueSubmitSemaphore
-        RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None);
+        RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None, false);
         RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
 
         //ShadowpassOcclusionTest.Init();
@@ -943,7 +950,7 @@ void jRenderer::Render()
         if (gOptions.QueueSubmitAfterShadowPass)
         {
             SCOPE_CPU_PROFILE(QueueSubmitAfterShadowPass);
-            RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::ShadowPass);
+            RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::ShadowPass, false);
             RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
         }
 

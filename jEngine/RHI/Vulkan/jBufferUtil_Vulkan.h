@@ -101,13 +101,13 @@ FORCEINLINE std::shared_ptr<jTexture_Vulkan> CreateCubeTexture(uint32 width, uin
 size_t CreateBuffer_LowLevel(EVulkanBufferBits InUsage, EVulkanMemoryBits InProperties, uint64 InSize, VkBuffer& OutBuffer, VkDeviceMemory& OutBufferMemory, uint64& OutAllocatedSize);
 std::shared_ptr<jBuffer_Vulkan> CreateBuffer(EVulkanBufferBits InUsage, EVulkanMemoryBits InProperties, uint64 InSize, EResourceLayout InResourceLayout);
 
-void CopyBufferToTexture(jCommandBuffer_Vulkan* commandBuffer_vk, VkBuffer buffer, uint64 bufferOffset, VkImage image, uint32 width, uint32 height, int32 miplevel = 0, int32 layerIndex = 0);
+void CopyBufferToTexture(jCommandBuffer_Vulkan* commandBuffer_vk, VkBuffer buffer, uint64 bufferOffset, VkImage image, uint32 width, uint32 height, VkFormat InFormat, int32 miplevel = 0, int32 layerIndex = 0);
 void GenerateMipmaps(jCommandBuffer_Vulkan* commandBuffer_vk, VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32 mipLevels, uint32 layerCount
     , VkImageLayout oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VkImageLayout newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 void CopyBuffer(jCommandBuffer_Vulkan* commandBuffer_vk, VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VkDeviceSize srcOffset, VkDeviceSize dstOffset);
 void CopyBuffer(jCommandBuffer_Vulkan* commandBuffer_vk, const jBuffer_Vulkan& srcBuffer, const jBuffer_Vulkan& dstBuffer, VkDeviceSize size);
 
-void CopyBufferToTexture(VkBuffer buffer, uint64 bufferOffset, VkImage image, uint32 width, uint32 height, int32 miplevel = 0, int32 layerIndex = 0);
+void CopyBufferToTexture(VkBuffer buffer, uint64 bufferOffset, VkImage image, uint32 width, uint32 height, VkFormat InFormat, int32 miplevel = 0, int32 layerIndex = 0);
 void GenerateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32 mipLevels, uint32 layerCount
     , VkImageLayout oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VkImageLayout newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VkDeviceSize srcOffset, VkDeviceSize dstOffset);
