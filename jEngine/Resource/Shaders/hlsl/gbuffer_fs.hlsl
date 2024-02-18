@@ -45,9 +45,9 @@ struct PushConsts
 
 struct FSOutput
 {
-    float4 GBuffer0 : SV_TARGET0;       // Normal.xyz, Roughness
-    float4 GBuffer1 : SV_TARGET1;       // Albedo.xyz, Metallic
-    float4 GBuffer2 : SV_TARGET2;       // Velocity.xy
+    float2 GBuffer0 : SV_TARGET0;       // OctaNormal.xy
+    float3 GBuffer1 : SV_TARGET1;       // Albedo.xyz
+    float4 GBuffer2 : SV_TARGET2;       // Velocity.xy, Metallic, Roughness
 };
 
 FSOutput main(VSOutput input

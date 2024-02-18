@@ -59,13 +59,13 @@ float4 main(VSOutput input
     float4 color = 0;
 
 #if USE_SUBPASS
-    float4 GBufferData0 = GBuffer0.SubpassLoad();
-    float4 GBufferData1 = GBuffer1.SubpassLoad();
+    float2 GBufferData0 = GBuffer0.SubpassLoad();
+    float3 GBufferData1 = GBuffer1.SubpassLoad();
     float4 GBufferData2 = GBuffer2.SubpassLoad();
     float DepthValue = DepthTexture.SubpassLoad();
 #else   // USE_SUBPASS
-    float4 GBufferData0 = GBuffer0.Sample(GBuffer0SamplerState, input.TexCoord);
-    float4 GBufferData1 = GBuffer1.Sample(GBuffer1SamplerState, input.TexCoord);
+    float2 GBufferData0 = GBuffer0.Sample(GBuffer0SamplerState, input.TexCoord);
+    float3 GBufferData1 = GBuffer1.Sample(GBuffer1SamplerState, input.TexCoord);
     float4 GBufferData2 = GBuffer2.Sample(GBuffer2SamplerState, input.TexCoord);
     float DepthValue = DepthTexture.Sample(DepthTextureSamplerState, input.TexCoord).x;
 #endif  // USE_SUBPASS
