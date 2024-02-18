@@ -76,15 +76,15 @@ VkSampler jTexture_Vulkan::CreateDefaultSamplerState()
     samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
     samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
 
-    samplerInfo.anisotropyEnable = VK_TRUE;
-    samplerInfo.maxAnisotropy = 16;
+    samplerInfo.anisotropyEnable = false;
+    samplerInfo.maxAnisotropy = 1;
 
     // 이게 true 이면 UV 좌표가 [0, texWidth], [0, texHeight] 가 됨. false 이면 [0, 1] 범위
-    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.unnormalizedCoordinates = false;
 
     // compareEnable이 ture 이면, 텍셀을 특정 값과 비교한 뒤 그 결과를 필터링 연산에 사용한다.
     // Percentage-closer filtering(PCF) 에 주로 사용됨.
-    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.compareEnable = false;
     samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
 
     const uint32 MipLevels = static_cast<uint32>(std::floor(std::log2(std::max<int>(SCR_WIDTH, SCR_HEIGHT)))) + 1;		// 이것도 수정 필요. SamplerState 는 텍스쳐에 바인딩 해야 할듯 
