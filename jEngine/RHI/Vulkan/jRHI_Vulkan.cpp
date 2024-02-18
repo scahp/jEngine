@@ -1428,6 +1428,10 @@ VkMemoryPropertyFlagBits jRHI_Vulkan::GetMemoryPropertyFlagBits(ETextureCreateFl
     {
         PropertyFlagBits = (VkMemoryPropertyFlagBits)(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     }
+	else
+	{
+		PropertyFlagBits = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+	}
 	return PropertyFlagBits;
 }
 
