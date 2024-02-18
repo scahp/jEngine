@@ -131,33 +131,31 @@ FSOutput main(VSOutput input
 
     FSOutput output = (FSOutput)0;
 
+    float Metallic = 0;
+    float Roughness = 0;
+    
 #if USE_PBR
 #if USE_ALBEDO_TEXTURE
     float roughness = RMTexture.Sample(RMTextureSampler, input.TexCoord.xy).y;
     float metallic = RMTexture.Sample(RMTextureSampler, input.TexCoord.xy).z;
-    output.GBuffer1.w = metallic;
+    Metallic = metallic;
+    Roughness = roughness;
 #else
-    output.GBuffer1.w = RenderObjectParam.Metallic;
+    Metallic = RenderObjectParam.Metallic;
+    Roughness = RenderObjectParam.Roughness;
 #endif
 #endif
     
-    output.GBuffer0.xyz = WorldNormal;
-#if USE_PBR
-#if USE_ALBEDO_TEXTURE
-    output.GBuffer0.w = roughness;
-#else
-    output.GBuffer0.w = RenderObjectParam.Roughness;
-#endif
-#endif
-    
+    output.GBuffer0.xy = EncodeOctNormal(WorldNormal);
     output.GBuffer1.xyz = color.xyz;
     
     float2 PrevScreenPos = (input.PrevPos.xy / input.PrevPos.w);
     PrevScreenPos.y = -PrevScreenPos.y;
     PrevScreenPos = PrevScreenPos * float2(0.5, 0.5) + float2(0.5, 0.5);
     
-    PrevScreenPos = PrevScreenPos * ViewParam.ScreenRect.zw;
-    output.GBuffer2 = float4(input.Pos.xy - PrevScreenPos, 0, 0);
+    // Velcoity.xy : [0, 1]
+    // Metallic, Roughness : [0, 1]
+    output.GBuffer2 = float4(float2(input.Pos.xy / ViewParam.ScreenRect.zw - PrevScreenPos), Metallic, Roughness);
 
     return output;
 }

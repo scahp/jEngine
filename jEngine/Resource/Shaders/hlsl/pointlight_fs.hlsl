@@ -57,7 +57,7 @@ float4 main(VSOutput input) : SV_TARGET
 #endif  // USE_SUBPASS
 
     float3 WorldPos = CalcWorldPositionFromDepth(DepthValue, UV, ViewParam.InvVP);
-    float3 WorldNormal = normalize(GBufferData0.xyz);       // Need to normalize again to avoid noise of specular light, even though it is stored normalized normal at GBuffer.
+    float3 WorldNormal = normalize(DecodeOctNormal(GBufferData0.xy)); // Need to normalize again to avoid noise of specular light, even though it is stored normalized normal at GBuffer.
     float3 Albedo = GBufferData1.xyz;
     float Metallic = GBufferData1.w;
     float Roughness = GBufferData0.w;

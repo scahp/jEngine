@@ -46,7 +46,7 @@ struct jVertex
 RaytracingAccelerationStructure Scene : register(t0, space0);
 RWTexture2D<float4> RenderTarget : register(u1, space0);
 Texture2D DepthTexture : register(t2, space0);
-Texture2D GBuffer1_Normal : register(t3, space0);
+Texture2D GBuffer0_Normal : register(t3, space0);
 ConstantBuffer<SceneConstantBuffer> g_sceneCB : register(b4, space0);
 SamplerState AlbedoTextureSampler : register(s5, space0);
 SamplerState PBRSamplerState : register(s6, space0);
@@ -286,7 +286,8 @@ void MyRaygenShader()
     UV += g_sceneCB.HaltonJitter.xy; // Apply Jittering from Halton Sequence
 
     float3 WorldPos = CalcWorldPositionFromDepth(DepthTexture, AlbedoTextureSampler, UV, g_sceneCB.projectionToWorld);
-    float3 WorldNormal = GBuffer1_Normal.SampleLevel(AlbedoTextureSampler, UV, 0).xyz;
+    float2 OctNormal = GBuffer0_Normal.SampleLevel(AlbedoTextureSampler, UV, 0);
+    float3 WorldNormal = normalize(DecodeOctNormal(OctNormal));
 
     float3 FinalAO = 0;
     float AccumulateCount = 0.0f;
