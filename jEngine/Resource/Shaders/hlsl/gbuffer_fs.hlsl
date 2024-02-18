@@ -31,8 +31,6 @@ Texture2D NormalTexture : register(t1, space2);
 SamplerState NormalTextureSampler : register(s1, space2);
 Texture2D RMTexture : register(t2, space2);     // Metallic, Roughness
 SamplerState RMTextureSampler : register(s2, space2);
-TextureCube EnvTexture : register(t3, space2);
-SamplerState EnvextureSampler : register(s3, space2);
 #endif
 
 struct PushConsts
