@@ -43,7 +43,7 @@ struct PushConsts
 
 struct FSOutput
 {
-    float2 GBuffer0 : SV_TARGET0;       // OctaNormal.xy
+    float3 GBuffer0 : SV_TARGET0;       // OctaNormal.xy
     float3 GBuffer1 : SV_TARGET1;       // Albedo.xyz
     float4 GBuffer2 : SV_TARGET2;       // Velocity.xy, Metallic, Roughness
 };
@@ -144,7 +144,8 @@ FSOutput main(VSOutput input
 #endif
 #endif
     
-    output.GBuffer0.xy = EncodeOctNormal(WorldNormal);
+    //output.GBuffer0.xy = EncodeOctNormal(WorldNormal * 0.5 + 0.5);
+    output.GBuffer0.xyz = WorldNormal * 0.5 + 0.5;
     output.GBuffer1.xyz = color.xyz;
     
     float2 PrevScreenPos = (input.PrevPos.xy / input.PrevPos.w);

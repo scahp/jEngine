@@ -1031,5 +1031,8 @@
     <None Include="Resource\Shaders\hlsl\AsyncComputeTest_cs.hlsl">
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
+    <None Include="Resource\Shaders\hlsl\SSAO_cs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
   </ItemGroup>
 </Project>

@@ -52,7 +52,6 @@ bool jRHI::InitRHI()
 void jRHI::OnInitRHI()
 {
     jImageData image;
-    image.ImageBulkData.ImageData = { 255, 255, 255, 255 };
     image.Width = 1;
     image.Height = 1;
     image.Format = ETextureFormat::RGBA8;

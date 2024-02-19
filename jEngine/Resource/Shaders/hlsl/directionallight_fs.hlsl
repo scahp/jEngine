@@ -64,14 +64,15 @@ float4 main(VSOutput input
     float4 GBufferData2 = GBuffer2.SubpassLoad();
     float DepthValue = DepthTexture.SubpassLoad();
 #else   // USE_SUBPASS
-    float2 GBufferData0 = GBuffer0.Sample(GBuffer0SamplerState, input.TexCoord);
+    float3 GBufferData0 = GBuffer0.Sample(GBuffer0SamplerState, input.TexCoord);
     float3 GBufferData1 = GBuffer1.Sample(GBuffer1SamplerState, input.TexCoord);
     float4 GBufferData2 = GBuffer2.Sample(GBuffer2SamplerState, input.TexCoord);
     float DepthValue = DepthTexture.Sample(DepthTextureSamplerState, input.TexCoord).x;
 #endif  // USE_SUBPASS
 
     float3 WorldPos = CalcWorldPositionFromDepth(DepthValue, input.TexCoord, ViewParam.InvVP);
-    float3 WorldNormal = normalize(DecodeOctNormal(GBufferData0.xy)); // Need to normalize again to avoid noise of specular light, even though it is stored normalized normal at GBuffer.
+    //float3 WorldNormal = normalize(DecodeOctNormal(GBufferData0.xy)); // Need to normalize again to avoid noise of specular light, even though it is stored normalized normal at GBuffer.
+    float3 WorldNormal = GBufferData0.xyz * 2 - 1;
     float3 Albedo = GBufferData1.xyz;
     float Metallic = GBufferData2.z;
     float Roughness = GBufferData2.w;

@@ -1207,18 +1207,39 @@ std::shared_ptr<jTexture> jRHI_DX12::Create2DTexture(uint32 InWidth, uint32 InHe
     auto TexturePtr = jBufferUtil_DX12::CreateTexture(InWidth, InHeight, InArrayLayers, InMipLevels, 1, ETextureType::TEXTURE_2D, InFormat, InTextureCreateFlag, InImageLayout, InClearValue, InResourceName);
     if (InImageBulkData.ImageData.size() > 0)
     {
-        // todo : recycle temp buffer
-        auto BufferPtr = jBufferUtil_DX12::CreateBuffer(InImageBulkData.ImageData.size(), 0
-            , EBufferCreateFlag::CPUAccess, EResourceLayout::READ_ONLY, &InImageBulkData.ImageData[0], InImageBulkData.ImageData.size());
-        check(BufferPtr);
-
-        jCommandBuffer_DX12* commandList = BeginSingleTimeCopyCommands();
+         jCommandBuffer_DX12* commandList = BeginSingleTimeCopyCommands();
         if (InImageBulkData.SubresourceFootprints.size() > 0)
         {
+            // todo : recycle temp buffer
+            auto BufferPtr = jBufferUtil_DX12::CreateBuffer(InImageBulkData.ImageData.size(), 0
+                , EBufferCreateFlag::CPUAccess, EResourceLayout::READ_ONLY, &InImageBulkData.ImageData[0], InImageBulkData.ImageData.size());
+            check(BufferPtr);
+            
             jBufferUtil_DX12::CopyBufferToTexture(commandList->Get(), BufferPtr->Buffer->Get(), TexturePtr->Texture->Get(), InImageBulkData.SubresourceFootprints);
         }
         else
         {
+            auto ImageDesc = TexturePtr->Texture->Get()->GetDesc();
+            D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint;
+            UINT num_rows;
+            UINT64 row_size_in_bytes, total_bytes;
+            g_rhi_dx12->Device->GetCopyableFootprints(&ImageDesc, 0, 1, 0, &footprint, &num_rows, &row_size_in_bytes, &total_bytes);
+
+            // todo : recycle temp buffer
+            auto BufferPtr = jBufferUtil_DX12::CreateBuffer(InImageBulkData.ImageData.size(), 0
+                , EBufferCreateFlag::CPUAccess, EResourceLayout::READ_ONLY, nullptr, total_bytes);
+            check(BufferPtr);
+
+            auto MappedData = BufferPtr->Map();
+            for (UINT y = 0; y < num_rows; ++y) 
+            {
+                memcpy(
+                    static_cast<BYTE*>(MappedData) + footprint.Offset + y * footprint.Footprint.RowPitch,
+                    static_cast<const BYTE*>(InImageBulkData.ImageData.data()) + y * row_size_in_bytes,
+                    row_size_in_bytes); // row_size_in_bytes는 실제 데이터의 한 행의 바이트 크기
+            }
+            BufferPtr->Unmap();
+
             jBufferUtil_DX12::CopyBufferToTexture(commandList->Get(), BufferPtr->Buffer->Get(), 0, TexturePtr->Texture->Get());
         }
 

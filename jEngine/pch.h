@@ -56,6 +56,7 @@ using tchar = wchar_t;
 #include <execution>
 #include <ppl.h>
 #include <filesystem>
+#include <random>
 
 #include "External/cityhash/city.h"
 #include "External/robin-hood-hashing/robin_hood.h"

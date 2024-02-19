@@ -47,7 +47,8 @@ public:
 
     virtual void AtmosphericShadow();
     virtual void AOPass();
-    
+	void SSAO();
+
     virtual void PostProcess();
     virtual void DebugPasses();
     virtual void UIPass();

@@ -286,8 +286,9 @@ void MyRaygenShader()
     UV += g_sceneCB.HaltonJitter.xy; // Apply Jittering from Halton Sequence
 
     float3 WorldPos = CalcWorldPositionFromDepth(DepthTexture, AlbedoTextureSampler, UV, g_sceneCB.projectionToWorld);
-    float2 OctNormal = GBuffer0_Normal.SampleLevel(AlbedoTextureSampler, UV, 0);
-    float3 WorldNormal = normalize(DecodeOctNormal(OctNormal));
+    //float2 OctNormal = GBuffer0_Normal.SampleLevel(AlbedoTextureSampler, UV, 0);
+    //float3 WorldNormal = normalize(DecodeOctNormal(OctNormal));
+    float3 WorldNormal = GBuffer0_Normal.SampleLevel(AlbedoTextureSampler, UV, 0).xyz * 2 - 1;
 
     float3 FinalAO = 0;
     float AccumulateCount = 0.0f;
