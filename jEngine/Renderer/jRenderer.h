@@ -46,8 +46,10 @@ public:
     void DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass);
 
     virtual void AtmosphericShadow();
+    
     virtual void AOPass();
-	void SSAO();
+    virtual std::shared_ptr<jTexture> SSAO();
+    virtual std::shared_ptr<jTexture> RTAO();
 
     virtual void PostProcess();
     virtual void DebugPasses();

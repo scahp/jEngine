@@ -105,6 +105,7 @@ struct jRenderTarget final : public std::enable_shared_from_this<jRenderTarget>
 
     mutable size_t Hash = 0;
     bool bCreatedFromRenderTargetPool = false;
+    bool bOneFrameRenderTarget = false;         // It should be 'bCreatedFromRenderTargetPool == true'.
 
     // Vulkan only
     // To remove renderpasses, if relative RenderTarget is released or returned to pool.

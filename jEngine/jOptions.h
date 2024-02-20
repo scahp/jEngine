@@ -4,6 +4,7 @@
 extern const char* GDenoisers[4];
 extern const char* GAOResolution[3];
 extern const char* GWaitPrerequsiteGraphicsQueueTask[4];
+extern const char* GAOType[3];
 
 struct jOptions
 {
@@ -36,9 +37,10 @@ struct jOptions
     float FocalDistance;
     float LensRadius;
     float AORadius;
+    float SSAOBias;
     float AOIntensity;
     int32 RayPerPixel;
-    bool UseRTAO;
+    int32 AOType;
     bool UseAOReprojection;
     const char* Denoiser;
     int32 GaussianKernelSize;
@@ -54,6 +56,10 @@ struct jOptions
     bool IsDenoiserGuassian() const { return GDenoisers[0] == Denoiser; }
     bool IsDenoiserGuassianSeparable() const { return GDenoisers[1] == Denoiser; }
     bool IsDenoiserBilateral() const { return GDenoisers[2] == Denoiser; }
+
+    int32 GetRTAOIndex() const { return 1; }
+    bool IsRTAO() const;
+    bool IsSSAO() const;
 };
 
 extern jOptions gOptions;

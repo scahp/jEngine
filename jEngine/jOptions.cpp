@@ -3,6 +3,7 @@
 
 const char* GDenoisers[4] = { "Gaussian", "GaussianSeparable", "Bilateral", "None" };
 const char* GAOResolution[3] = { "100", "75", "50" };
+extern const char* GAOType[3] = { "NoAO", "RTAO", "SSAO" };
 
 jOptions gOptions;
 
@@ -33,9 +34,10 @@ jOptions::jOptions()
 	FocalDistance = 5.0f;
 	LensRadius = 0.05f;
 	AORadius = 50.0f;
+	SSAOBias = AORadius / 20.0f;
 	AOIntensity = 1.0f;
 	RayPerPixel = 1;
-	UseRTAO = true;
+	AOType = 1;						// Select RTAO default
 	UseAOReprojection = true;
 	Denoiser = GDenoisers[2];       // Select Bilateral Filter
 	GaussianKernelSize = 5;
@@ -47,6 +49,16 @@ jOptions::jOptions()
 	UseDiscontinuityWeight = true;
 	UseHaltonJitter = true;
 	UseResolution = GAOResolution[2];	// Default to 1/4 size of the screen
+}
+
+bool jOptions::IsRTAO() const
+{
+    return 1 == AOType && GSupportRaytracing;
+}
+
+bool jOptions::IsSSAO() const
+{
+    return 2 == AOType;
 }
 
 bool jOptions::operator==(struct jOptions const& RHS) const

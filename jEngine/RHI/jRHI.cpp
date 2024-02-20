@@ -14,6 +14,7 @@ std::shared_ptr<jTexture> GBlackTexture;
 std::shared_ptr<jTexture> GWhiteCubeTexture;
 std::shared_ptr<jTexture> GNormalTexture;
 std::shared_ptr<jTexture> GRoughnessMetalicTexture;
+std::shared_ptr<jTexture> GNoiseTexture;
 std::shared_ptr<jMaterial> GDefaultMaterial = nullptr;
 
 //////////////////////////////////////////////////////////////////////////
@@ -72,6 +73,30 @@ void jRHI::OnInitRHI()
     image.ImageBulkData.ImageData = { 0, (uint8)(255.0f * roughness), (uint8)(255.0f * metalic), 0 };
     GRoughnessMetalicTexture = CreateTextureFromData(&image);
 
+	// Create noise texture for SSAO
+    {
+#define NOISE_DIM 4
+
+		std::default_random_engine rndEngine(0);
+		std::uniform_real_distribution<float> rndDist(0.0f, 1.0f);
+
+		std::vector<Vector4> Noise(NOISE_DIM * NOISE_DIM);
+		for (uint32_t i = 0; i < static_cast<uint32_t>(Noise.size()); i++)
+		{
+			Noise[i] = Vector4(rndDist(rndEngine) * 2.0f - 1.0f, rndDist(rndEngine) * 2.0f - 1.0f, 0.0f, 0.0f);
+		}
+
+		jImageData image;
+		image.ImageBulkData.ImageData.resize(sizeof(Vector4) * Noise.size());
+		memcpy(image.ImageBulkData.ImageData.data(), Noise.data(), image.ImageBulkData.ImageData.size());
+		image.Width = NOISE_DIM;
+		image.Height = NOISE_DIM;
+		image.Format = ETextureFormat::RGBA32F;
+		image.FormatType = EFormatType::FLOAT;
+		image.sRGB = false;
+		GNoiseTexture = g_rhi->CreateTextureFromData(&image);
+    }
+
     image.TextureType = ETextureType::TEXTURE_CUBE;
     image.LayerCount = 6;
     image.ImageBulkData.ImageData = { 255, 255, 255, 200, 255, 255 };
@@ -80,7 +105,7 @@ void jRHI::OnInitRHI()
     GDefaultMaterial = std::make_shared<jMaterial>();
     GDefaultMaterial->TexData[(int32)jMaterial::EMaterialTextureType::Albedo].Texture = GWhiteTexture.get();
     GDefaultMaterial->TexData[(int32)jMaterial::EMaterialTextureType::Normal].Texture = GNormalTexture.get();
-    GDefaultMaterial->TexData[(int32)jMaterial::EMaterialTextureType::Metallic].Texture = GRoughnessMetalicTexture.get();    
+    GDefaultMaterial->TexData[(int32)jMaterial::EMaterialTextureType::Metallic].Texture = GRoughnessMetalicTexture.get();
 }
 
 void jRHI::ReleaseRHI()
@@ -92,6 +117,7 @@ void jRHI::ReleaseRHI()
     GWhiteCubeTexture.reset();
     GNormalTexture.reset();
     GRoughnessMetalicTexture.reset();
+	GNoiseTexture.reset();
     GDefaultMaterial.reset();
 
     jShader::ReleaseCheckUpdateShaderThread();

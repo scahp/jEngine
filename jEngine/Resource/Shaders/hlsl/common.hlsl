@@ -153,3 +153,14 @@ float3 CalcWorldPositionFromDepth(
 
     return CalcWorldPositionFromDepth(DepthValue, InUV, InInvViewProj);
 }
+
+float3 CalcViewPositionFromDepth(float InDepth, float2 InUV, float4x4 InInvViewProj)
+{
+    return CalcWorldPositionFromDepth(InDepth, InUV, InInvViewProj);
+}
+
+float3 CalcViewPositionFromDepth(
+    Texture2D InDepthTexture, SamplerState InDepthSamplerState, float2 InUV, float4x4 InInvViewProj)
+{
+    return CalcWorldPositionFromDepth(InDepthTexture, InDepthSamplerState, InUV, InInvViewProj);
+}

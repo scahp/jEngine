@@ -21,6 +21,7 @@ extern std::shared_ptr<jTexture> GBlackTexture;
 extern std::shared_ptr<jTexture> GWhiteCubeTexture;
 extern std::shared_ptr<jTexture> GNormalTexture;
 extern std::shared_ptr<jTexture> GRoughnessMetalicTexture;
+extern std::shared_ptr<jTexture> GNoiseTexture;
 extern std::shared_ptr<jMaterial> GDefaultMaterial;
 
 struct jShader;

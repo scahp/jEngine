@@ -102,3 +102,9 @@ void jEngine::OnMouseMove(int32 xOffset, int32 yOffset)
 {
 	Game.OnMouseMove(xOffset, yOffset);
 }
+
+void jEngine::EndOfFrame()
+{
+	jPerformanceProfile::GetInstance().Update(g_timeDeltaSecond);
+	jRenderTargetPool::ReturnAllOneFrameRTs();
+}
