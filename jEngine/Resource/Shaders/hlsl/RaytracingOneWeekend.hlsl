@@ -122,7 +122,7 @@ inline float3 GenerateCameraRay(uint2 index, out float3 origin, out float3 direc
     screenPos.y = -screenPos.y;
 
     // Unproject the pixel coordinate into a ray.
-    float4 world = mul(float4(screenPos, 0, 1), g_sceneCB.projectionToWorld);
+    float4 world = mul(g_sceneCB.projectionToWorld, float4(screenPos, 0, 1));
 
     world.xyz /= world.w;
     origin = g_sceneCB.cameraPosition.xyz;
@@ -202,7 +202,7 @@ float3 random_in_unit_sphere()
 float3 random_in_hemisphere(float3 normal)
 {
     float3 in_unit_sphere = random_in_unit_sphere();
-    if (dot(in_unit_sphere, normal) > 0.0)  // 노멀 기준으로 같은 반구 방향인지?
+    if (dot(in_unit_sphere, normal) > 0.0)  // Check it random vector is same side of the hemisphere which centered normal vector
         return in_unit_sphere;
 
     return -in_unit_sphere;
@@ -210,20 +210,20 @@ float3 random_in_hemisphere(float3 normal)
 
 inline void ApplyDepthOfField(inout float3 origin, inout float3 direction, int randomIndex)
 {
-    float ft = g_sceneCB.focalDistance / length(direction);     // Focal Plane 과 교차하는 파라메터 ft 구함
+    float ft = g_sceneCB.focalDistance / length(direction);     // Find ft that can intersect with the focal plane
     
-    // 월드 공간 카메라 방향 축을 기준으로, uv 를 구함.
+    // Make a uv based on world-space camera direction
     float3 u = normalize(cross(g_sceneCB.cameraDirection.xyz, float3(0, 1, 0)));
     float3 v = normalize(cross(g_sceneCB.cameraDirection.xyz, u));
     
-    // uv 방향으로 랜덤하게 이동(최대 lensRadius) 시킴.
+    // Move this random of uv direction(Max lensRadius)
     float2 lensRandom = random_in_unit_sphere2(randomIndex).xy * g_sceneCB.lensRadius;
     float3 offsetOnLens = lensRandom.x * u + lensRandom.y * v;
     offsetOnLens = random_in_unit_sphere2(randomIndex).xyz * g_sceneCB.lensRadius;
     
     float3 pFocus = origin + ft * direction;
 
-    origin.xyz += offsetOnLens; // 렌즈에서 랜덤으로 선택한 위치로 origin 설정
+    origin.xyz += offsetOnLens; // Set the origin as a random location in lens
     direction = normalize(pFocus - origin);
 }
 
@@ -232,7 +232,7 @@ float4 CalculationDiffuseLighting(float3 hitPosition, float3 normal)
 {
     float3 pixelToLight = normalize(g_sceneCB.lightPosition.xyz - hitPosition);
 
-    // Diffuse 기여
+    // Diffuse 占썩여
     float fNDotL = max(0.0f, dot(pixelToLight, normal));
     //return g_localRootSigCB.albedo * g_sceneCB.lightDiffuseColor * fNDotL;
     return float4((float3(1, 1, 1) * g_sceneCB.lightDiffuseColor * fNDotL), 1.0f);
@@ -299,8 +299,8 @@ void MyRaygenShader()
         ray.Origin = origin;
         ray.Direction = rayDir + float3(random_in_unit_sphere2(i).xy / DispatchRaysDimensions().xy, 0.0f);
 
-        // TMin을 0이 아닌 작은 값으로 설정하여 앨리어싱 이슈를 피함. - floating point 에러
-        // TMin을 작은 값으로 유지해서 접촉하고 있는 영역에서 지오메트리 missing을 예방
+        // Avoid aliasing issues by setting TMin to a small nonzero value. - floating point error
+        // Keep TMin small to prevent geometry missing in contact areas
         ray.TMin = 0.001;
         ray.TMax = 10000.0;
 
@@ -313,7 +313,7 @@ void MyRaygenShader()
 
     color /= samples;
 
-    // 출력 텍스쳐에 반직선 추적된 색상을 기록함
+    // Record ray tracked colors in the output texture
     RenderTarget[DispatchRaysIndex().xy] = color;
 }
 
@@ -368,7 +368,7 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
         RayPayload newPayload;        
         newPayload.currentRecursionDepth = payload.currentRecursionDepth + 1;
 
-        // 반직선 추적
+        // Tracing ray
         RayDesc ray;
         ray.Origin = hitPosition;
         bool IsPlane = InstanceID() == 0;       // this is kind of trick for easy implementation. I placed plane instance at 0.
@@ -426,8 +426,8 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
             }
         }
 
-        // TMin을 0이 아닌 작은 값으로 설정하여 앨리어싱 이슈를 피함. - floating point 에러
-        // TMin을 작은 값으로 유지해서 접촉하고 있는 영역에서 지오메트리 missing을 예방
+        // Avoid aliasing issues by setting TMin to a small nonzero value. - floating point error
+        // Keep TMin small to prevent geometry missing in contact areas
         ray.TMin = 0.01;
         ray.TMax = 10000.0;
 
@@ -443,7 +443,7 @@ void MyMissShader(inout RayPayload payload)
      // Make a 't' value that is the factor scaled by using ray hit on background of Y axis.
     float2 xy = HitWorldPosition().xy;
     float2 screenPos = xy / DispatchRaysDimensions().xy * 2.0f - 1.0f;;
-    float4 world = mul(float4(screenPos, 0, 1), g_sceneCB.projectionToWorld);
+    float4 world = mul(g_sceneCB.projectionToWorld, float4(screenPos, 0, 1));
     world.xyz /= world.w;
     float3 origin = g_sceneCB.cameraPosition.xyz;
     float3 direction = normalize(world.xyz - origin);

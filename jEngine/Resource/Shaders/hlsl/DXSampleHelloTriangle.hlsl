@@ -40,7 +40,7 @@ PSInput VSMain(float3 position : POSITION, float3 normal : NORMAL)
 {
     PSInput result;
 
-    result.position = mul(float4(position, 1.0f), TransformParam.World);
+    result.position = mul(TransformParam.World, float4(position, 1.0f));
     //result.position = float4(position + TransformParam.World._41_42_43, 1.0);
     //result.position = float4(position, 1.0f);
     result.uv = result.position.xy / result.position.w;

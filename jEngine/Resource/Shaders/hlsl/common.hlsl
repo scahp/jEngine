@@ -136,7 +136,7 @@ float3 CalcWorldPositionFromDepth(float InDepth, float2 InUV, float4x4 InInvView
     screenSpacePos.w = 1.0;
 
     // To world space
-    float4 worldPos = mul(screenSpacePos, InInvViewProj);
+    float4 worldPos = mul(InInvViewProj, screenSpacePos);
     worldPos.xyz /= worldPos.w;
 
     return worldPos.xyz;

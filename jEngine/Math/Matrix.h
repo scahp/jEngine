@@ -138,20 +138,20 @@ struct Matrix
 		// Adjoint matrix. Make a matrix (-1)^(i+j) * M[i][j] and then transpose the matrix.
 		Matrix inverseMatrix;
         inverseMatrix.m[0][0] = (m11 * L - m12 * K + m13 * J) * InverseDet;
-		inverseMatrix.m[0][1] = -(m10 * L - m12 * I + m13 * H) * InverseDet;
-		inverseMatrix.m[0][2] = (m10 * K - m11 * I + m13 * G) * InverseDet;
-		inverseMatrix.m[0][3] = -(m10 * J - m11 * H + m12 * G) * InverseDet;
-		inverseMatrix.m[1][0] = -(m01 * L - m02 * K + m03 * J) * InverseDet;
+		inverseMatrix.m[1][0] = -(m10 * L - m12 * I + m13 * H) * InverseDet;
+		inverseMatrix.m[2][0] = (m10 * K - m11 * I + m13 * G) * InverseDet;
+		inverseMatrix.m[3][0] = -(m10 * J - m11 * H + m12 * G) * InverseDet;
+		inverseMatrix.m[0][1] = -(m01 * L - m02 * K + m03 * J) * InverseDet;
 		inverseMatrix.m[1][1] = (m00 * L - m02 * I + m03 * H) * InverseDet;
-		inverseMatrix.m[1][2] = -(m00 * K - m01 * I + m03 * G) * InverseDet;
-		inverseMatrix.m[1][3] = (m00 * J - m01 * H + m02 * G) * InverseDet;
-		inverseMatrix.m[2][0] = (m31 * F - m32 * E + m33 * D) * InverseDet;
-		inverseMatrix.m[2][1] = -(m30 * F - m32 * C + m33 * B) * InverseDet;
+		inverseMatrix.m[2][1] = -(m00 * K - m01 * I + m03 * G) * InverseDet;
+		inverseMatrix.m[3][1] = (m00 * J - m01 * H + m02 * G) * InverseDet;
+		inverseMatrix.m[0][2] = (m31 * F - m32 * E + m33 * D) * InverseDet;
+		inverseMatrix.m[1][2] = -(m30 * F - m32 * C + m33 * B) * InverseDet;
 		inverseMatrix.m[2][2] = (m30 * E - m31 * C + m33 * A) * InverseDet;
-		inverseMatrix.m[2][3] = -(m30 * D - m31 * B + m32 * A) * InverseDet;
-		inverseMatrix.m[3][0] = -(m21 * F - m22 * E + m23 * D) * InverseDet;
-		inverseMatrix.m[3][1] = (m20 * F - m22 * C + m23 * B) * InverseDet;
-		inverseMatrix.m[3][2] = -(m20 * E - m21 * C + m23 * A) * InverseDet;
+		inverseMatrix.m[3][2] = -(m30 * D - m31 * B + m32 * A) * InverseDet;
+		inverseMatrix.m[0][3] = -(m21 * F - m22 * E + m23 * D) * InverseDet;
+		inverseMatrix.m[1][3] = (m20 * F - m22 * C + m23 * B) * InverseDet;
+		inverseMatrix.m[2][3] = -(m20 * E - m21 * C + m23 * A) * InverseDet;
 		inverseMatrix.m[3][3] = (m20 * D - m21 * B + m22 * A) * InverseDet;
 
 		return std::move(inverseMatrix);
