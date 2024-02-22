@@ -20,6 +20,9 @@
 #include "Renderer/jDirectionalLightDrawCommandGenerator.h"
 #include "Renderer/jPointLightDrawCommandGenerator.h"
 #include "Renderer/jSpotLightDrawCommandGenerator.h"
+#include "PathTracingDataLoader/jPathTracingData.h"
+#include "PathTracingDataLoader/PathTracingDataLoader.h"
+#include "PathTracingDataLoader/GLTFLoader.h"
 
 jRHI* g_rhi = nullptr;
 jObject* jGame::Sphere = nullptr;
@@ -268,6 +271,44 @@ void jGame::Setup()
 		if (!jSpotLightDrawCommandGenerator::SpotLightCone)
 			jSpotLightDrawCommandGenerator::SpotLightCone = jPrimitiveUtil::CreateCone(Vector::ZeroVector, 1.0, 1.0, 20, Vector::OneVector, Vector4::OneVector, false, false);
 	}
+
+    static bool LoadPathTracing = false;
+    if (LoadPathTracing)
+    {
+        auto scene = new GLSLPT::jPathTracingLoadData();
+
+        std::string sceneName = "Resource/PathTracing/cornell_box/cornell_box_orig.scene";
+        std::string ext = sceneName.substr(sceneName.find_last_of(".") + 1);
+
+        bool success = false;
+        Matrix xform;
+
+        GLSLPT::jRenderOptions renderOptions;
+
+        if (ext == "scene")
+            success = GLSLPT::LoadSceneFromFile(sceneName, scene, renderOptions);
+        else if (ext == "gltf")
+            success = GLSLPT::LoadGLTF(sceneName, scene, renderOptions, xform, false);
+        else if (ext == "glb")
+            success = GLSLPT::LoadGLTF(sceneName, scene, renderOptions, xform, true);
+
+        if (!success)
+        {
+            check(0);
+        }
+
+        //selectedInstance = 0;
+
+        //// Add a default HDR if there are no lights in the scene
+        //if (!scene->envMap && !envMaps.empty())
+        //{
+        //    scene->AddEnvMap(envMaps[envMapIdx]);
+        //    renderOptions.enableEnvMap = scene->lights.empty() ? true : false;
+        //    renderOptions.envMapIntensity = 1.5f;
+        //}
+
+        scene->renderOptions = renderOptions;
+    }
 }
 
 void jGame::SpawnObjects(ESpawnedType spawnType)

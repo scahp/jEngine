@@ -101,6 +101,9 @@
     <Filter Include="Code\External\xxHash">
       <UniqueIdentifier>{2bada837-8b35-4821-bf59-f7435743a42f}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Code\External\PathTracingDataLoader">
+      <UniqueIdentifier>{cd557efd-c6cc-475b-ab30-75cca04cec58}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Math\MathUtility.h">
@@ -490,6 +493,24 @@
     <ClInclude Include="RHI\DX12\jResourceBarrierBatcher_DX12.h">
       <Filter>Code\RHI\DX12</Filter>
     </ClInclude>
+    <ClInclude Include="External\PathTracingDataLoader\GLTFLoader.h">
+      <Filter>Code\External\PathTracingDataLoader</Filter>
+    </ClInclude>
+    <ClInclude Include="External\PathTracingDataLoader\PathTracingDataLoader.h">
+      <Filter>Code\External\PathTracingDataLoader</Filter>
+    </ClInclude>
+    <ClInclude Include="External\PathTracingDataLoader\jPathTracingData.h">
+      <Filter>Code\External\PathTracingDataLoader</Filter>
+    </ClInclude>
+    <ClInclude Include="External\PathTracingDataLoader\tiny_gltf.h">
+      <Filter>Code\External\PathTracingDataLoader</Filter>
+    </ClInclude>
+    <ClInclude Include="External\PathTracingDataLoader\tiny_obj_loader.h">
+      <Filter>Code\External\PathTracingDataLoader</Filter>
+    </ClInclude>
+    <ClInclude Include="External\PathTracingDataLoader\json.hpp">
+      <Filter>Code\External\PathTracingDataLoader</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -860,6 +881,12 @@
     </ClCompile>
     <ClCompile Include="RHI\DX12\jResourceBarrierBatcher_DX12.cpp">
       <Filter>Code\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="External\PathTracingDataLoader\GLTFLoader.cpp">
+      <Filter>Code\External\PathTracingDataLoader</Filter>
+    </ClCompile>
+    <ClCompile Include="External\PathTracingDataLoader\PathTracingDataLoader.cpp">
+      <Filter>Code\External\PathTracingDataLoader</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
