@@ -224,19 +224,19 @@ public:
 class jPathTracingLoadData
 {
 public:
-    jPathTracingLoadData() : initialized(false), dirty(true) {
-        //sceneBvh = new RadeonRays::Bvh(10.0f, 64, false);
-    }
+    jPathTracingLoadData() : initialized(false), dirty(true) {}
     ~jPathTracingLoadData() {}
 
-    // todo 
-    int32 AddMesh(const std::string& filename) { return 0; }
-    int32 AddTexture(const std::string& filename) { return 0; }
-    int32 AddMaterial(const Material& material) { return 0; }
-    int32 AddMeshInstance(const MeshInstance& meshInstance) { return 0; }
-    int32 AddLight(const Light& light) { return 0; }
-    void AddCamera(Vector eye, Vector lookat, float fov) {}
-    void AddEnvMap(const std::string& filename) {}
+    // Create path tracing scene for jEngine
+    void CreateSceneFor_jEngine();
+
+    int32 AddMesh(const std::string& filename);
+    int32 AddTexture(const std::string& filename);
+    int32 AddMaterial(const Material& material);
+    int32 AddMeshInstance(const MeshInstance& meshInstance);
+    int32 AddLight(const Light& light);
+    void AddCamera(const Vector& InPos, const Vector& InTarget, const Vector& InUp, float InFov, float InNear = 0.1f, float InFar = 5000.0f);
+    void AddEnvMap(const std::string& filename);
 
     // Options
     jRenderOptions renderOptions;

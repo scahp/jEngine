@@ -3,7 +3,19 @@
 #include "pch.h"
 #include "jPathTracingData.h"
 
-bool GLSLPT::Mesh::LoadFromFile(const std::string& filename)
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "tiny_obj_loader.h"
+#include "FileLoader/jImageFileLoader.h"
+
+namespace GLSLPT
+{
+
+void jPathTracingLoadData::CreateSceneFor_jEngine()
+{
+
+}
+
+bool Mesh::LoadFromFile(const std::string& filename)
 {
     name = filename;
     tinyobj::attrib_t attrib;
@@ -43,7 +55,7 @@ bool GLSLPT::Mesh::LoadFromFile(const std::string& filename)
                 if (!attrib.texcoords.empty())
                 {
                     tx = attrib.texcoords[2 * idx.texcoord_index + 0];
-                    ty = 1.0 - attrib.texcoords[2 * idx.texcoord_index + 1];
+                    ty = (tinyobj::real_t)(1.0 - attrib.texcoords[2 * idx.texcoord_index + 1]);
                 }
                 else
                 {
@@ -64,4 +76,99 @@ bool GLSLPT::Mesh::LoadFromFile(const std::string& filename)
     }
 
     return true;
+}
+
+int32 jPathTracingLoadData::AddMesh(const std::string& filename)
+{
+    int32 id = -1;
+    // Check if mesh was already loaded
+    for (int32 i = 0; i < meshes.size(); i++)
+        if (meshes[i]->name == filename)
+            return i;
+
+    id = (int32)meshes.size();
+    Mesh* mesh = new Mesh;
+
+    printf("Loading model %s\n", filename.c_str());
+    if (mesh->LoadFromFile(filename))
+        meshes.push_back(mesh);
+    else
+    {
+        printf("Unable to load model %s\n", filename.c_str());
+        delete mesh;
+        id = -1;
+    }
+    return id;
+}
+
+int32 jPathTracingLoadData::AddTexture(const std::string& filename)
+{
+    int32 id = -1;
+    // Check if texture was already loaded
+    for (int32 i = 0; i < textures.size(); i++)
+        if (textures[i]->ResourceName.ToStr() == filename)
+            return i;
+
+    id = (int32)textures.size();
+
+    printf("Loading texture %s\n", filename.c_str());
+    jTexture* texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName(filename.c_str())).lock().get();
+
+    if (texture)
+    {
+        textures.push_back(texture);
+    }
+    else
+    {
+        printf("Unable to load texture %s\n", filename.c_str());
+        id = -1;
+    }
+
+    return id;
+}
+
+int32 jPathTracingLoadData::AddMaterial(const Material& material)
+{
+    int32 id = (int32)materials.size();
+    materials.push_back(material);
+    return id;
+}
+
+int32 jPathTracingLoadData::AddMeshInstance(const MeshInstance& meshInstance)
+{
+    int32 id = (int32)meshInstances.size();
+    meshInstances.push_back(meshInstance);
+    return id;
+}
+
+int32 jPathTracingLoadData::AddLight(const Light& light)
+{
+    int32 id = (int32)lights.size();
+    lights.push_back(light);
+    return id;
+}
+
+void jPathTracingLoadData::AddCamera(const Vector& InPos, const Vector& InTarget, const Vector& InUp, float InFov, float InNear, float InFar)
+{
+    jCamera::SetCamera(&Camera, InPos, InTarget, InUp, InFov, InNear, InFar, (float)SCR_WIDTH, (float)SCR_HEIGHT, true);
+}
+
+void jPathTracingLoadData::AddEnvMap(const std::string& filename)
+{
+    //if (envMap)
+    //    delete envMap;
+
+    //envMap = new EnvironmentMap;
+    //if (envMap->LoadMap(filename.c_str()))
+    //    printf("HDR %s loaded\n", filename.c_str());
+    //else
+    //{
+    //    printf("Unable to load HDR\n");
+    //    delete envMap;
+    //    envMap = nullptr;
+    //}
+    //envMapModified = true;
+    //dirty = true;
+}
+
 }

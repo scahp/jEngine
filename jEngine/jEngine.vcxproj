@@ -341,6 +341,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     </ClCompile>
     <ClCompile Include="External\loadpng\loadpng.cpp" />
     <ClCompile Include="External\PathTracingDataLoader\GLTFLoader.cpp" />
+    <ClCompile Include="External\PathTracingDataLoader\jPathTracingData.cpp" />
     <ClCompile Include="External\PathTracingDataLoader\PathTracingDataLoader.cpp" />
     <ClCompile Include="External\TinyXml2\tinyxml2.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>

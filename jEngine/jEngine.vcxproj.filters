@@ -894,6 +894,9 @@
     <ClCompile Include="Math\Quaternion.cpp">
       <Filter>Code\Math</Filter>
     </ClCompile>
+    <ClCompile Include="External\PathTracingDataLoader\jPathTracingData.cpp">
+      <Filter>Code\External\PathTracingDataLoader</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="Resource\Shaders\glsl\shader_vs.glsl">

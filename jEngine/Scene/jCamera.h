@@ -329,6 +329,10 @@ public:
 	bool IsEnableCullMode = false;
 	float PCF_SIZE_DIRECTIONAL = 2.0f;
 	float PCF_SIZE_OMNIDIRECTIONAL = 8.0f;
+
+	// todo 현재는 레이 트레이싱의 DOF 구현에만 사용됨.
+	float Aperture = 0.0f;
+	float FocalDist = 0.0f;
 };
 
 class jOrthographicCamera : public jCamera 

@@ -34,6 +34,8 @@
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "tiny_gltf.h"
+#include "Math/Quaternion.h"
+#include "FileLoader/jImageFileLoader.h"
 
 namespace GLSLPT
 {
@@ -228,8 +230,10 @@ namespace GLSLPT
             std::string texName = gltfTex.name;
             if (strcmp(gltfTex.name.c_str(), "") == 0)
                 texName = image.uri;
-            // todo
-            //Texture* texture = new Texture(texName, image.image.data(), image.width, image.height, image.component);
+
+            jTexture* texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName(texName.c_str())).lock().get();
+            check(texture);
+            scene->textures.push_back(texture);
         }
     }
 
@@ -333,8 +337,8 @@ namespace GLSLPT
 
             if (gltfNode.rotation.size() > 0)
             {
-                // todo
-                //rot = Mat4::QuatToMatrix(gltfNode.rotation[0], gltfNode.rotation[1], gltfNode.rotation[2], gltfNode.rotation[3]);
+                rot = Quaternion((float)gltfNode.rotation[0], (float)gltfNode.rotation[1]
+                    , (float)gltfNode.rotation[2], (float)gltfNode.rotation[3]).GetMatrix();
             }
 
             if (gltfNode.scale.size() > 0)

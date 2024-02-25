@@ -29,6 +29,8 @@ freely, subject to the following restrictions:
 #include <cstring>
 #include "PathTracingDataLoader.h"
 #include "GLTFLoader.h"
+#include "Math/Quaternion.h"
+#include "jPathTracingData.h"
 
 namespace GLSLPT
 {
@@ -213,7 +215,7 @@ namespace GLSLPT
                 Matrix xform;
                 Vector position;
                 Vector lookAt;
-                float fov;
+                float fov = 0.0f;
                 float aperture = 0, focalDist = 1;
                 bool matrixProvided = false;
 
@@ -245,11 +247,14 @@ namespace GLSLPT
                     lookAt = position + forward;
                 }
 
+                const auto zAxis = (lookAt - position).GetNormalize();
+                auto yAxis = (Vector::UpVector - position).GetNormalize();
+                const auto xAxis = yAxis.CrossProduct(zAxis).GetNormalize();
+                yAxis = zAxis.CrossProduct(xAxis).GetNormalize();
 
-                // todo
-                scene->AddCamera(position, lookAt, fov);
-                //scene->camera->aperture = aperture;
-                //scene->camera->focalDist = focalDist;
+                scene->AddCamera(position, lookAt, yAxis, fov);
+                scene->Camera.Aperture = aperture;
+                scene->Camera.FocalDist = focalDist;
             }
 
             //--------------------------------------------
@@ -378,7 +383,7 @@ namespace GLSLPT
             if (strstr(line, "mesh"))
             {
                 std::string filename;
-                Vector4 rotQuat;        // todo : need to add jQuat
+                Quaternion rotQuat;
                 Matrix xform, translate, rot, scale;
                 int material_id = 0; // Default Material ID
                 char meshName[200] = "none";
@@ -419,8 +424,7 @@ namespace GLSLPT
                     sscanf_s(line, " scale %f %f %f", &scale.m[0][0], &scale.m[1][1], &scale.m[2][2]);
                     if (sscanf_s(line, " rotation %f %f %f %f", &rotQuat.x, &rotQuat.y, &rotQuat.z, &rotQuat.w) != 0)
                     {
-                        // todo
-                        //rot = Matrix::QuatToMatrix(rotQuat.x, rotQuat.y, rotQuat.z, rotQuat.w);
+                        rot = rotQuat.GetMatrix();
                     }
                 }
 
@@ -458,7 +462,7 @@ namespace GLSLPT
             if (strstr(line, "gltf"))
             {
                 std::string filename;
-                Vector4 rotQuat;
+                Quaternion rotQuat;
                 Matrix xform, translate, rot, scale;
                 bool matrixProvided = false;
 
@@ -485,8 +489,7 @@ namespace GLSLPT
                     sscanf_s(line, " scale %f %f %f", &scale.m[0][0], &scale.m[1][1], &scale.m[2][2]);
                     if (sscanf_s(line, " rotation %f %f %f %f", &rotQuat.x, &rotQuat.y, &rotQuat.z, &rotQuat.w) != 0)
                     {
-                        // Todo
-                        //rot = Mat4::QuatToMatrix(rotQuat.x, rotQuat.y, rotQuat.z, rotQuat.w);
+                        rot = rotQuat.GetMatrix();
                     }
                 }
 
