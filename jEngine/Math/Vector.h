@@ -105,8 +105,8 @@ struct Vector
 
 	FORCEINLINE Vector operator/(float fValue) const
 	{
-		JASSERT(!IsNearlyZero(fValue));
-		if (IsNearlyZero(fValue))
+		JASSERT(!::IsNearlyZero(fValue));
+		if (::IsNearlyZero(fValue))
 			return Vector(ZeroType);
 
 		return Vector(x / fValue, y / fValue, z / fValue);
@@ -114,8 +114,8 @@ struct Vector
 
 	FORCEINLINE Vector& operator/=(float fValue)
 	{
-		JASSERT(!IsNearlyZero(fValue));
-		if (IsNearlyZero(fValue))
+		JASSERT(!::IsNearlyZero(fValue));
+		if (::IsNearlyZero(fValue))
 			x = 0.0f, y = 0.0f, z = 0.0f;
 		else
 			x /= fValue, y /= fValue, z /= fValue;
@@ -136,6 +136,11 @@ struct Vector
 	{
 		return ::IsNearlyEqual(x, vector.x, fTolerance) && ::IsNearlyEqual(y, vector.y, fTolerance) && ::IsNearlyEqual(z, vector.z, fTolerance);
 	}
+
+    FORCEINLINE friend bool IsNearlyEqual(Vector const& A, Vector const& B, float fTolerance = FLOAT_TOLERANCE)
+    {
+		return A.IsNearlyEqual(B, fTolerance);
+    }
 
 	FORCEINLINE bool operator!=(Vector const& vector) const
 	{
@@ -186,14 +191,19 @@ struct Vector
 		return (A - B).LengthSQ();
 	}
 
-	FORCEINLINE bool IsZero() const
+	FORCEINLINE bool IsNearlyZero(float fTolerance = FLOAT_TOLERANCE) const
 	{
-		return IsNearlyZero(x) && IsNearlyZero(y) && IsNearlyZero(z);
+		return ::IsNearlyZero(x, fTolerance) && ::IsNearlyZero(y, fTolerance) && ::IsNearlyZero(z, fTolerance);
 	}
+
+    FORCEINLINE friend bool IsNearlyZero(Vector const& vector, float fTolerance = FLOAT_TOLERANCE)
+    {
+		return vector.IsNearlyZero(fTolerance);
+    }
 
 	FORCEINLINE Vector& SetNormalize()
 	{
-		if (IsZero())
+		if (IsNearlyZero())
 		{
 			JASSERT("Vector length is zero.");
 		}
@@ -356,8 +366,19 @@ struct Vector4
 
 	FORCEINLINE bool operator==(Vector4 const& vector) const
 	{
-		return IsNearlyEqual(x, vector.x) && IsNearlyEqual(y, vector.y) && IsNearlyEqual(z, vector.z) && IsNearlyEqual(w, vector.w);
+		return (x == vector.x) && (y == vector.y) && (z == vector.z) && (w == vector.w);
 	}
+
+    FORCEINLINE bool IsNearlyEqual(Vector4 const& vector, float fTolerance = FLOAT_TOLERANCE) const
+    {
+        return ::IsNearlyEqual(x, vector.x, fTolerance) && ::IsNearlyEqual(y, vector.y, fTolerance) 
+			&& ::IsNearlyEqual(z, vector.z, fTolerance) && ::IsNearlyEqual(w, vector.w, fTolerance);
+    }
+
+    FORCEINLINE friend bool IsNearlyEqual(Vector4 const& A, Vector4 const& B, float fTolerance = FLOAT_TOLERANCE)
+    {
+		return A.IsNearlyEqual(B, fTolerance);
+    }
 
 	FORCEINLINE bool operator!=(Vector4 const& Vector4) const
 	{
@@ -387,14 +408,19 @@ struct Vector4
 		return (A - B).LengthSQ();
 	}
 
-	FORCEINLINE bool IsZero() const
+	FORCEINLINE bool IsNearlyZero(float fTolerance = FLOAT_TOLERANCE) const
 	{
-		return IsNearlyZero(x) && IsNearlyZero(y) && IsNearlyZero(z) && IsNearlyZero(w);
+		return ::IsNearlyZero(x, fTolerance) && ::IsNearlyZero(y, fTolerance) && ::IsNearlyZero(z, fTolerance) && ::IsNearlyZero(w, fTolerance);
+	}
+
+	FORCEINLINE friend bool IsNearlyZero(Vector4 const& vector, float fTolerance = FLOAT_TOLERANCE)
+	{
+		return vector.IsNearlyZero(fTolerance);
 	}
 
 	FORCEINLINE Vector4& SetNormalize()
 	{
-		if (IsZero())
+		if (IsNearlyZero())
 		{
 			JASSERT("Vector4 length is zero.");
 		}
@@ -520,8 +546,18 @@ struct Vector2
 
 	FORCEINLINE bool operator==(Vector2 const& vector) const
 	{
-		return IsNearlyEqual(x, vector.x) && IsNearlyEqual(y, vector.y);
+		return (x == vector.x) && (y == vector.y);
 	}
+
+    FORCEINLINE bool IsNearlyEqual(Vector2 const& vector, float fTolerance = FLOAT_TOLERANCE) const
+    {
+        return ::IsNearlyEqual(x, vector.x, fTolerance) && ::IsNearlyEqual(y, vector.y, fTolerance);
+    }
+
+    FORCEINLINE friend bool IsNearlyEqual(Vector2 const& A, Vector2 const& B, float fTolerance = FLOAT_TOLERANCE)
+    {
+		return A.IsNearlyEqual(B, fTolerance);
+    }
 
 	FORCEINLINE bool operator!=(Vector2 const& vector) const
 	{
@@ -580,14 +616,19 @@ struct Vector2
 		return (A - B).LengthSQ();
 	}
 
-	FORCEINLINE bool IsZero() const
+	FORCEINLINE bool IsNearlyZero(float fTolerance = FLOAT_TOLERANCE) const
 	{
-		return IsNearlyZero(x) && IsNearlyZero(y);
+		return ::IsNearlyZero(x, fTolerance) && ::IsNearlyZero(y, fTolerance);
+	}
+
+	FORCEINLINE friend bool IsNearlyZero(Vector2 const& vector, float fTolerance = FLOAT_TOLERANCE)
+	{
+		return vector.IsNearlyZero(fTolerance);
 	}
 
 	FORCEINLINE Vector2& SetNormalize()
 	{
-		if (IsZero())
+		if (IsNearlyZero())
 		{
 			JASSERT("Vector2 length is zero.");
 		}

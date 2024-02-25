@@ -511,6 +511,9 @@
     <ClInclude Include="External\PathTracingDataLoader\json.hpp">
       <Filter>Code\External\PathTracingDataLoader</Filter>
     </ClInclude>
+    <ClInclude Include="Math\Quaternion.h">
+      <Filter>Code\Math</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -887,6 +890,9 @@
     </ClCompile>
     <ClCompile Include="External\PathTracingDataLoader\PathTracingDataLoader.cpp">
       <Filter>Code\External\PathTracingDataLoader</Filter>
+    </ClCompile>
+    <ClCompile Include="Math\Quaternion.cpp">
+      <Filter>Code\Math</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

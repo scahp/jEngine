@@ -18,6 +18,10 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void window_focus_callback(GLFWwindow* window, int focused);
 void window_size_callback(GLFWwindow* window, int width, int height);
 
+#include "Math/Quaternion.h"
+#include "Math/Matrix.h"
+#include "Math/Vector.h"
+
 int main()
 {
     gCommandLineArgument.Init(GetCommandLineA());
