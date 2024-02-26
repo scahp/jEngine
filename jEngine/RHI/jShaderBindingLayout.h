@@ -155,11 +155,11 @@ struct jTextureArrayResourceBindless : public jShaderBindingResource
 struct jShaderBindingResourceInlineAllocator
 {
     template <typename T, typename... T1>
-    T* Alloc(T1... args)
+    T* Alloc(T1&&... args)
     {
         check((Offset + sizeof(T)) < sizeof(Data));
 
-        T* AllocatedAddress = new (&Data[0] + Offset) T(args...);
+        T* AllocatedAddress = new (&Data[0] + Offset) T(std::forward<T1>(args)...);
         Offset += sizeof(T);
         return AllocatedAddress;
     }

@@ -326,6 +326,7 @@ void CopyBuffer(ID3D12Resource* InSrcBuffer, ID3D12Resource* InDstBuffer, uint64
 
 // Create CBV
 void CreateConstantBufferView(jBuffer_DX12* InBuffer);
+jDescriptor_DX12 CreateConstantBufferView(D3D12_GPU_VIRTUAL_ADDRESS InAddress, uint32 InSize);
 
 // Create SRV for Buffer
 void CreateShaderResourceView_StructuredBuffer(jBuffer_DX12* InBuffer, uint32 InStride, uint32 InCount);

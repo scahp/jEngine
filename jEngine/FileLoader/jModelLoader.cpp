@@ -196,7 +196,6 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 			FilePath += str.C_Str();
 
 			jName FilePathName = jName(FilePath);
-			//curTexData.Texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName(FilePath), true).lock().get();
 			curTexData.Name = jName(str.C_Str());
 			curTexData.FilePath = FilePathName;
 

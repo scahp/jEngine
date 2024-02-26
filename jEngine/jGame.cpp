@@ -23,6 +23,7 @@
 #include "PathTracingDataLoader/jPathTracingData.h"
 #include "PathTracingDataLoader/PathTracingDataLoader.h"
 #include "PathTracingDataLoader/GLTFLoader.h"
+#include "Renderer/jRenderer_PathTracing.h"
 
 jRHI* g_rhi = nullptr;
 jObject* jGame::Sphere = nullptr;
@@ -37,8 +38,8 @@ jGame::~jGame()
 
 void jGame::ProcessInput(float deltaTime)
 {
-	static float MoveDistancePerSecond = 200.0f;
-	//static float MoveDistancePerSecond = 10.0f;
+	//static float MoveDistancePerSecond = 200.0f;
+	static float MoveDistancePerSecond = 1.0f;
 	const float CurrentDistance = MoveDistancePerSecond * deltaTime;
 
 	// Process Key Event
@@ -67,6 +68,8 @@ void jGame::Setup()
 	float LightColorScale = 1.0f;
 #endif
 
+	static bool LoadPathTracing = true;
+
 #if USE_SPONZA
 	// Create main camera
     const Vector mainCameraPos(-559.937622f, 116.339653f, 84.3709946f);
@@ -75,10 +78,13 @@ void jGame::Setup()
     jCamera::AddCamera(0, MainCamera);
 
     // Create lights
-    NormalDirectionalLight = jLight::CreateDirectionalLight(Vector(0.1f, -0.5f, 0.1f) // AppSettings.DirecionalLightDirection
-        , Vector4(30.0f), Vector(1.0f), Vector(1.0f), 64);
-    PointLight = jLight::CreatePointLight(Vector(10.0f, 100.0f, 10.0f), Vector4(1.0f, 0.75f, 0.75f, 1.0f) * LightColorScale, 1500.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
-    SpotLight = jLight::CreateSpotLight(Vector(0.0f, 60.0f, 5.0f), Vector(1.0f, -1.0f, 0.4f).GetNormalize(), Vector4(0.0f, 1.0f, 0.0f, 1.0f) * LightColorScale, 2000.0f, 0.35f, 1.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
+	if (!LoadPathTracing)
+	{
+		NormalDirectionalLight = jLight::CreateDirectionalLight(Vector(0.1f, -0.5f, 0.1f) // AppSettings.DirecionalLightDirection
+			, Vector4(30.0f), Vector(1.0f), Vector(1.0f), 64);
+		PointLight = jLight::CreatePointLight(Vector(10.0f, 100.0f, 10.0f), Vector4(1.0f, 0.75f, 0.75f, 1.0f) * LightColorScale, 1500.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
+		SpotLight = jLight::CreateSpotLight(Vector(0.0f, 60.0f, 5.0f), Vector(1.0f, -1.0f, 0.4f).GetNormalize(), Vector4(0.0f, 1.0f, 0.0f, 1.0f) * LightColorScale, 2000.0f, 0.35f, 1.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
+	}
 #else
 	// Create main camera
 	//const Vector mainCameraPos(-111.6f, 17.49f, 3.11f);
@@ -160,20 +166,23 @@ void jGame::Setup()
 	//ResourceLoadCompleteEvent = std::async(std::launch::async, [&]()
 	//{
 #if USE_SPONZA
-		#if USE_SPONZA_PBR		
-		Sponza = jModelLoader::GetInstance().LoadFromFile("Resource/sponza_pbr/sponza.glb", "Resource/sponza_pbr");
-		#else
-		Sponza = jModelLoader::GetInstance().LoadFromFile("Resource/sponza/sponza.dae", "Resource/");
-		#endif
-		jObject::AddObject(Sponza);
-		SpawnedObjects.push_back(Sponza);
+	if (!LoadPathTracing)
+	{
+	#if USE_SPONZA_PBR		
+	Sponza = jModelLoader::GetInstance().LoadFromFile("Resource/sponza_pbr/sponza.glb", "Resource/sponza_pbr");
+	#else
+	Sponza = jModelLoader::GetInstance().LoadFromFile("Resource/sponza/sponza.dae", "Resource/");
+	#endif
+	jObject::AddObject(Sponza);
+	SpawnedObjects.push_back(Sponza);
 
-        for (int32 i = 0; i < 1; ++i)
-        {
-            Sphere = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f + i * 100), 1.0, 60, 30, Vector(30.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
-            jObject::AddObject(Sphere);
-            SpawnedObjects.push_back(Sphere);
-        }
+    for (int32 i = 0; i < 1; ++i)
+    {
+        Sphere = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f + i * 100), 1.0, 60, 30, Vector(30.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+        jObject::AddObject(Sphere);
+        SpawnedObjects.push_back(Sphere);
+    }
+	}
 
 		//auto random_double = []() -> float
 		//{
@@ -244,6 +253,14 @@ void jGame::Setup()
 		//}
 	//});
 	
+	jPathTracingLoadData* LoadedPathTracingData = nullptr;
+	if (LoadPathTracing)
+	{
+		std::string sceneName = "Resource/PathTracing/cornell_box/cornell_box_orig.scene";
+		LoadedPathTracingData = jPathTracingLoadData::LoadPathTracingData(sceneName);
+		LoadedPathTracingData->CreateSceneFor_jEngine(this);
+	}
+
 	g_rhi->Finish(); // todo : Instead of this, it needs UAV barrier here
 	if (GSupportRaytracing)
 	{
@@ -271,44 +288,6 @@ void jGame::Setup()
 		if (!jSpotLightDrawCommandGenerator::SpotLightCone)
 			jSpotLightDrawCommandGenerator::SpotLightCone = jPrimitiveUtil::CreateCone(Vector::ZeroVector, 1.0, 1.0, 20, Vector::OneVector, Vector4::OneVector, false, false);
 	}
-
-    static bool LoadPathTracing = false;
-    if (LoadPathTracing)
-    {
-        auto scene = new GLSLPT::jPathTracingLoadData();
-
-        std::string sceneName = "Resource/PathTracing/cornell_box/cornell_box_orig.scene";
-        std::string ext = sceneName.substr(sceneName.find_last_of(".") + 1);
-
-        bool success = false;
-        Matrix xform;
-
-        GLSLPT::jRenderOptions renderOptions;
-
-        if (ext == "scene")
-            success = GLSLPT::LoadSceneFromFile(sceneName, scene, renderOptions);
-        else if (ext == "gltf")
-            success = GLSLPT::LoadGLTF(sceneName, scene, renderOptions, xform, false);
-        else if (ext == "glb")
-            success = GLSLPT::LoadGLTF(sceneName, scene, renderOptions, xform, true);
-
-        if (!success)
-        {
-            check(0);
-        }
-
-        //selectedInstance = 0;
-
-        //// Add a default HDR if there are no lights in the scene
-        //if (!scene->envMap && !envMaps.empty())
-        //{
-        //    scene->AddEnvMap(envMaps[envMapIdx]);
-        //    renderOptions.enableEnvMap = scene->lights.empty() ? true : false;
-        //    renderOptions.envMapIntensity = 1.5f;
-        //}
-
-        scene->renderOptions = renderOptions;
-    }
 }
 
 void jGame::SpawnObjects(ESpawnedType spawnType)
@@ -444,8 +423,10 @@ void jGame::Draw()
 		jView View(MainCamera, jLight::GetLights());
 		View.PrepareViewUniformBufferShaderBindingInstance();
 
-        jRenderer renderer(renderFrameContext, View);
-        renderer.Render();
+        //jRenderer renderer(renderFrameContext, View);
+        //renderer.Render();
+		jRenderer_PathTracing renderer(renderFrameContext, View);
+		renderer.Render();
 
 		g_rhi->EndRenderFrame(renderFrameContext);
 	}

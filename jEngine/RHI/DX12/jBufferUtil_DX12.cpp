@@ -403,6 +403,22 @@ void CreateConstantBufferView(jBuffer_DX12* InBuffer)
     g_rhi_dx12->Device->CreateConstantBufferView(&Desc, InBuffer->CBV.CPUHandle);
 }
 
+jDescriptor_DX12 CreateConstantBufferView(D3D12_GPU_VIRTUAL_ADDRESS InAddress, uint32 InSize)
+{
+    check(g_rhi_dx12);
+    check(g_rhi_dx12->Device);
+    check(InSize > 0);
+
+    jDescriptor_DX12 NewCBV = g_rhi_dx12->DescriptorHeaps.Alloc();
+
+    D3D12_CONSTANT_BUFFER_VIEW_DESC Desc{};
+    Desc.BufferLocation = InAddress;
+    Desc.SizeInBytes = InSize;
+
+    g_rhi_dx12->Device->CreateConstantBufferView(&Desc, NewCBV.CPUHandle);
+    return NewCBV;
+}
+
 void CreateShaderResourceView_StructuredBuffer(jBuffer_DX12* InBuffer, uint32 InStride, uint32 InCount)
 {
     check(g_rhi_dx12);

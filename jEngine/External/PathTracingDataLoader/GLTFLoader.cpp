@@ -348,7 +348,7 @@ namespace GLSLPT
                 scale.m[2][2] = (float)gltfNode.scale[2];
             }
 
-            localMat = scale * rot * translate;
+            localMat = translate * rot * scale;
         }
 
         Matrix xform = localMat * parentMat;

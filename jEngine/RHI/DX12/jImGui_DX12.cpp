@@ -78,6 +78,8 @@ void jImGUI_DX12::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrame
     // Setup attachment
     jRenderPassInfo renderPassInfo;
     const jSwapchainImage* image = g_rhi_dx12->Swapchain->GetCurrentSwapchainImage();
+	g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), image->TexturePtr.get(), EResourceLayout::COLOR_ATTACHMENT);
+
     auto BackBuffer = std::make_shared<jRenderTarget>(image->TexturePtr);
     jAttachment color = jAttachment(BackBuffer, EAttachmentLoadStoreOp::LOAD_STORE
         , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor

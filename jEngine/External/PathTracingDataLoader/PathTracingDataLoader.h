@@ -31,9 +31,8 @@ freely, subject to the following restrictions:
 
 #include "jPathTracingData.h"
 
+class jPathTracingLoadData;
 namespace GLSLPT
 {
-    class jPathTracingLoadData;
-
     bool LoadSceneFromFile(const std::string& filename, jPathTracingLoadData* scene, jRenderOptions& renderOptions);
 }

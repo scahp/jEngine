@@ -31,9 +31,8 @@
 
 #include "jPathTracingData.h"
 
+class jPathTracingLoadData;
 namespace GLSLPT
 {
-    class jPathTracingLoadData;
-
     bool LoadGLTF(const std::string& filename, jPathTracingLoadData* scene, jRenderOptions& renderOptions, Matrix xform, bool binary);
 }

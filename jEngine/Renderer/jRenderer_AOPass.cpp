@@ -603,40 +603,21 @@ std::shared_ptr<jTexture> jRenderer::RTAO()
 			Matrix projectionToWorld;
 			Vector4 ViewRect;
 			Vector cameraPosition;
-			float focalDistance;
-			Vector lightPosition;
-			float lensRadius;
-			Vector lightAmbientColor;
-			uint32 NumOfStartingRay;
-			Vector lightDiffuseColor;
-			int32 FrameNumber;
-			Vector cameraDirection;
 			float AORadius;
-			Vector lightDirection;
-			uint32 RayPerPixel;
 			int32 Clear;
-			float AOIntensity;
-			int32 Padding2;
-			float Padding0;            // for 16 byte align
+			uint32 RayPerPixel;
 			Vector2 HaltonJitter;
-			Vector2 Padding1;          // for 16 byte align
+			int32 FrameNumber;
+			Vector Padding0;			// for 16 byte align
 		};
 
 		SceneConstantBuffer m_sceneCB;
 		auto mainCamera = jCamera::GetMainCamera();
 		m_sceneCB.cameraPosition = mainCamera->Pos;
 		m_sceneCB.projectionToWorld = mainCamera->GetInverseViewProjectionMatrix();
-		m_sceneCB.lightPosition = Vector(0.0f, 1.8f, -3.0f);
-		m_sceneCB.lightAmbientColor = Vector(0.5f, 0.5f, 0.5f);
-		m_sceneCB.lightDiffuseColor = Vector(0.5f, 0.3f, 0.3f);
-		m_sceneCB.cameraDirection = (mainCamera->Target - mainCamera->Pos).GetNormalize();
-		m_sceneCB.focalDistance = gOptions.FocalDistance;
-		m_sceneCB.lensRadius = gOptions.LensRadius;
-		m_sceneCB.NumOfStartingRay = 20;
 		m_sceneCB.ViewRect = Vector4(0.0f, 0.0f, (float)RayRTWidth, (float)RayRTHeight);
 		m_sceneCB.FrameNumber = (int32)g_rhi->GetCurrentFrameNumber();
 		m_sceneCB.AORadius = gOptions.AORadius;
-		m_sceneCB.AOIntensity = gOptions.AOIntensity;
 		m_sceneCB.RayPerPixel = (uint32)Max(gOptions.RayPerPixel, 0);
 
 		static Vector2 HaltonJitter[] = {
@@ -682,31 +663,20 @@ std::shared_ptr<jTexture> jRenderer::RTAO()
 			m_sceneCB.Clear = false;
 		}
 
+		if (!RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr
+			|| RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr->Width != (int32)RayRTWidth
+			|| RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr->Height != (int32)RayRTHeight)
+		{
+			RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr = g_rhi->Create2DTexture((uint32)RayRTWidth, (uint32)RayRTHeight, (uint32)1, (uint32)1
+				, ETextureFormat::RG16F, ETextureCreateFlag::UAV, EResourceLayout::UAV);
+		}
+
+		if (jObject::GetStaticRenderObject().size() > 0)
 		{
 			DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "DispatchRayAO", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
 
-			jDirectionalLight* DirectionalLight = nullptr;
-			for (auto light : jLight::GetLights())
-			{
-				if (light->Type == ELightType::DIRECTIONAL)
-				{
-					DirectionalLight = (jDirectionalLight*)light;
-					break;
-				}
-			}
-			check(DirectionalLight);
-			m_sceneCB.lightDirection = { DirectionalLight->GetLightData().Direction.x, DirectionalLight->GetLightData().Direction.y, DirectionalLight->GetLightData().Direction.z };
-
 			auto SceneUniformBufferPtr = g_rhi->CreateUniformBufferBlock(jNameStatic("SceneData"), jLifeTimeType::OneFrame, sizeof(m_sceneCB));
 			SceneUniformBufferPtr->UpdateBufferData(&m_sceneCB, sizeof(m_sceneCB));
-
-			if (!RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr
-				|| RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr->Width != (int32)RayRTWidth
-				|| RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr->Height != (int32)RayRTHeight)
-			{
-				RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr = g_rhi->Create2DTexture((uint32)RayRTWidth, (uint32)RayRTHeight, (uint32)1, (uint32)1
-					, ETextureFormat::RG16F, ETextureCreateFlag::UAV, EResourceLayout::UAV);
-			}
 
 			// Normal resource
 			// Record normal resources
@@ -777,10 +747,11 @@ std::shared_ptr<jTexture> jRenderer::RTAO()
 				TestUniformBuffers.push_back(RObj->TestUniformBuffer.get());
 				VertexBuffers.push_back(RObj->GeometryDataPtr->VertexBufferPtr->GetBuffer(0));
 
-				check(RObj->MaterialPtr);
-				AlbedoTextures.push_back(jTextureResourceBindless::jTextureBindData(RObj->MaterialPtr->GetTexture<jTexture>(jMaterial::EMaterialTextureType::Albedo), nullptr));
-				NormalTextures.push_back(jTextureResourceBindless::jTextureBindData(RObj->MaterialPtr->GetTexture<jTexture>(jMaterial::EMaterialTextureType::Normal), nullptr));
-				MetallicTextures.push_back(jTextureResourceBindless::jTextureBindData(RObj->MaterialPtr->GetTexture<jTexture>(jMaterial::EMaterialTextureType::Metallic), nullptr));
+				auto Material = RObj->MaterialPtr ? RObj->MaterialPtr : GDefaultMaterial;
+				check(Material);
+				AlbedoTextures.push_back(jTextureResourceBindless::jTextureBindData(Material->GetTexture<jTexture>(jMaterial::EMaterialTextureType::Albedo), nullptr));
+				NormalTextures.push_back(jTextureResourceBindless::jTextureBindData(Material->GetTexture<jTexture>(jMaterial::EMaterialTextureType::Normal), nullptr));
+				MetallicTextures.push_back(jTextureResourceBindless::jTextureBindData(Material->GetTexture<jTexture>(jMaterial::EMaterialTextureType::Metallic), nullptr));
 			}
 			BindlessShaderBindingArray[2].Add(jShaderBinding::CreateBindless(0, (uint32)VertexAndInexOffsetBuffers.size(), EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
 				ResourceInlineAllactor.Alloc<jBufferResourceBindless>(VertexAndInexOffsetBuffers), false));
@@ -832,42 +803,42 @@ std::shared_ptr<jTexture> jRenderer::RTAO()
 #if TURN_ON_BINDLESS
 				shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
 #endif // TURN_ON_BINDLESS
-NewShader.MissShader = g_rhi->CreateShader(shaderInfo);
-NewShader.MissEntryPoint = TEXT("MyMissShader");
+				NewShader.MissShader = g_rhi->CreateShader(shaderInfo);
+				NewShader.MissEntryPoint = TEXT("MyMissShader");
 
-shaderInfo.SetName(jNameStatic("Raygen"));
-shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RTAO.hlsl"));
-shaderInfo.SetEntryPoint(jNameStatic("MyRaygenShader"));
-shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_RAYGEN);
+				shaderInfo.SetName(jNameStatic("Raygen"));
+				shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RTAO.hlsl"));
+				shaderInfo.SetEntryPoint(jNameStatic("MyRaygenShader"));
+				shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_RAYGEN);
 #if TURN_ON_BINDLESS
-shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
+				shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
 #endif
-NewShader.RaygenShader = g_rhi->CreateShader(shaderInfo);
-NewShader.RaygenEntryPoint = TEXT("MyRaygenShader");
+				NewShader.RaygenShader = g_rhi->CreateShader(shaderInfo);
+				NewShader.RaygenEntryPoint = TEXT("MyRaygenShader");
 
-shaderInfo.SetName(jNameStatic("ClosestHit"));
-shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RTAO.hlsl"));
-shaderInfo.SetEntryPoint(jNameStatic("MyClosestHitShader"));
-shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT);
+				shaderInfo.SetName(jNameStatic("ClosestHit"));
+				shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RTAO.hlsl"));
+				shaderInfo.SetEntryPoint(jNameStatic("MyClosestHitShader"));
+				shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT);
 #if TURN_ON_BINDLESS
-shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
+				shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
 #endif // TURN_ON_BINDLESS
-NewShader.ClosestHitShader = g_rhi->CreateShader(shaderInfo);
-NewShader.ClosestHitEntryPoint = TEXT("MyClosestHitShader");
+				NewShader.ClosestHitShader = g_rhi->CreateShader(shaderInfo);
+				NewShader.ClosestHitEntryPoint = TEXT("MyClosestHitShader");
 
-shaderInfo.SetName(jNameStatic("AnyHit"));
-shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RTAO.hlsl"));
-shaderInfo.SetEntryPoint(jNameStatic("MyAnyHitShader"));
-shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_ANYHIT);
+				shaderInfo.SetName(jNameStatic("AnyHit"));
+				shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RTAO.hlsl"));
+				shaderInfo.SetEntryPoint(jNameStatic("MyAnyHitShader"));
+				shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_ANYHIT);
 #if TURN_ON_BINDLESS
-shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
+				shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
 #endif // TURN_ON_BINDLESS
-NewShader.AnyHitShader = g_rhi->CreateShader(shaderInfo);
-NewShader.AnyHitEntryPoint = TEXT("MyAnyHitShader");
+				NewShader.AnyHitShader = g_rhi->CreateShader(shaderInfo);
+				NewShader.AnyHitEntryPoint = TEXT("MyAnyHitShader");
 
-NewShader.HitGroupName = TEXT("DefaultHit");
+				NewShader.HitGroupName = TEXT("DefaultHit");
 
-RaytracingShaders.push_back(NewShader);
+				RaytracingShaders.push_back(NewShader);
 			}
 
 			// Create RaytracingPipelineState

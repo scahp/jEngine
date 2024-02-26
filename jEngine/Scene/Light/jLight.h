@@ -8,6 +8,7 @@ enum class ELightType
 	DIRECTIONAL,
 	POINT,
 	SPOT,
+	PATH_TRACING,		// Specific type of light is defined in jPathTracingLight
 	MAX
 };
 
@@ -21,6 +22,8 @@ class jPointLight;
 class jSpotLight;
 class jObject;
 class jLight;
+class jPathTracingLight;
+struct jPathTracingLightUniformBufferData;
 
 namespace jLightUtil
 {
@@ -76,6 +79,7 @@ class jLight
 public:
 	// Create light
 	static jLight* CreateAmbientLight(const Vector& color, const Vector& intensity);
+	static jPathTracingLight* CreatePathTracingLight(const jPathTracingLightUniformBufferData& InData);
 	static jDirectionalLight* CreateDirectionalLight(const Vector& direction, const Vector& color, const Vector& diffuseIntensity
 		, const Vector& specularIntensity, float specularPower);
 	static jCascadeDirectionalLight* CreateCascadeDirectionalLight(const Vector& direction, const Vector& color, const Vector& diffuseIntensity
@@ -134,25 +138,3 @@ public:
 
 	LightData Data;
 };
-
-//class jCascadeDirectionalLight : public jDirectionalLight
-//{
-//public:
-//	jCascadeDirectionalLight()
-//	{
-//		char szTemp[128] = { 0 };
-//		for (int32 i = 0; i < NUM_CASCADES; ++i)
-//		{
-//			sprintf_s(szTemp, sizeof(szTemp), "CascadeLightVP[%d]", i);
-//			CascadeLightVP[i].Name = jName(szTemp);
-//			sprintf_s(szTemp, sizeof(szTemp), "CascadeEndsW[%d]", i);
-//			CascadeEndsW[i].Name = jName(szTemp);
-//		}
-//	}
-//	virtual void Update(float deltaTime) override;
-//
-//	jUniformBuffer<Matrix> CascadeLightVP[NUM_CASCADES];
-//	jUniformBuffer<float> CascadeEndsW[NUM_CASCADES];
-//};
-
-

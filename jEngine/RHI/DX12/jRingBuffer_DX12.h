@@ -10,12 +10,7 @@ struct jRingBuffer_DX12 : public jBuffer
     }
 
     virtual void Create(uint64 totalSize, uint32 alignment = 16);
-    virtual void Reset()
-    {
-        jScopedLock s(&Lock);
-
-        RingBufferOffset = 0;
-    }
+    virtual void Reset();
     virtual uint64 Alloc(uint64 allocSize)
     {
         jScopedLock s(&Lock);
@@ -31,6 +26,8 @@ struct jRingBuffer_DX12 : public jBuffer
 
         return 0;
     }
+
+    virtual uint64 AllocWithCBV(uint64 allocSize, jDescriptor_DX12& OutCBV);
 
     virtual void Release() override
     {
@@ -90,6 +87,7 @@ struct jRingBuffer_DX12 : public jBuffer
     std::shared_ptr<jCreatedResource> Buffer;
     uint64 RingBufferSize = 0;
     void* MappedPointer = nullptr;
+    std::vector<jDescriptor_DX12> AllocatedCBVs;
 
     jDescriptor_DX12 CBV;
 

@@ -30,17 +30,36 @@ struct jShadowDrawInfo
     std::vector<jDrawCommand> DrawCommands;
 };
 
-class jRenderer
+class IRenderer
+{
+public:
+    IRenderer(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, const jView& InView)
+		: RenderFrameContextPtr(InRenderFrameContextPtr), View(InView)
+	{}
+
+    virtual ~IRenderer() {}
+
+    virtual void Setup() {}
+    virtual void Render() {}
+    virtual void DebugPasses();
+    virtual void UIPass();
+
+	std::shared_ptr<jRenderFrameContext> RenderFrameContextPtr;
+	jView View;
+	std::vector<std::shared_ptr<jTexture>> DebugRTs;
+};
+
+class jRenderer : public IRenderer
 {
 public:
     jRenderer() = default;
-    jRenderer(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, const jView& InView)
-        : RenderFrameContextPtr(InRenderFrameContextPtr), View(InView)
-    {}
+    using IRenderer::IRenderer;
 
     virtual ~jRenderer() {}
 
-    virtual void Setup();
+	virtual void Setup() override;
+	virtual void Render() override;
+
     virtual void ShadowPass();
     virtual void BasePass();
     void DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass);
@@ -52,18 +71,9 @@ public:
     virtual std::shared_ptr<jTexture> RTAO();
 
     virtual void PostProcess();
-    virtual void DebugPasses();
-    virtual void UIPass();
 
     void SetupShadowPass();
     void SetupBasePass();
-
-    virtual void Render();
-
-    bool UseForwardRenderer = false;
-
-    std::shared_ptr<jRenderFrameContext> RenderFrameContextPtr;
-    jView View;
 
     std::future<void> ShadowPassSetupCompleteEvent;
     std::future<void> BasePassSetupCompleteEvent;
@@ -81,6 +91,4 @@ public:
 
     // Thread per task for PassSetup
     const int32 MaxPassSetupTaskPerThreadCount = 100;
-
-    std::vector<std::shared_ptr<jTexture>> DebugRTs;
 };

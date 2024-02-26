@@ -4,6 +4,14 @@
 struct jTexture;
 struct jShaderBindingInstance;
 
+struct jMaterialData
+{
+    void* GetData() const { return (void*)Data.data(); }
+    uint32 GetDataSizeInBytes() const { return (uint32)Data.size(); }
+
+    std::vector<uint8> Data;
+};
+
 class jMaterial
 {
 public:
@@ -44,6 +52,11 @@ public:
     template <typename T> T* GetTexture(EMaterialTextureType InType) const { return (T*)(GetTexture(InType)); }
 
     TextureData TexData[static_cast<int32>(EMaterialTextureType::Max)];
+    
+    // Material specific uniform buffer data which is depend on material what data was set.
+    std::shared_ptr<jMaterialData> MaterialDataPtr;
+    std::shared_ptr<IUniformBufferBlock> MaterialDataUniformBufferPtr;
+
     bool bUseSphericalMap = false;
 
     const std::shared_ptr<jShaderBindingInstance>& CreateShaderBindingInstance();

@@ -5,14 +5,207 @@
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
+
 #include "FileLoader/jImageFileLoader.h"
+#include "PathTracingDataLoader.h"
+#include "GLTFLoader.h"
+#include "Scene/jRenderObject.h"
+#include "Scene/jObject.h"
+#include "jGame.h"
+#include "Material/jMaterial.h"
+#include "Scene/Light/jPathTracingLight.h"
 
-namespace GLSLPT
+jPathTracingLoadData* jPathTracingLoadData::LoadPathTracingData(std::string InFilename)
 {
+    jPathTracingLoadData* NewData = new jPathTracingLoadData();
 
-void jPathTracingLoadData::CreateSceneFor_jEngine()
+	std::string ext = InFilename.substr(InFilename.find_last_of(".") + 1);
+
+	bool success = false;
+	Matrix xform;
+
+	jRenderOptions renderOptions;
+
+	if (ext == "scene")
+		success = GLSLPT::LoadSceneFromFile(InFilename, NewData, renderOptions);
+	else if (ext == "gltf")
+		success = GLSLPT::LoadGLTF(InFilename, NewData, renderOptions, xform, false);
+	else if (ext == "glb")
+		success = GLSLPT::LoadGLTF(InFilename, NewData, renderOptions, xform, true);
+
+	if (!success)
+	{
+		check(0);
+	}
+
+	//selectedInstance = 0;
+
+	//// Add a default HDR if there are no lights in the scene
+	//if (!scene->envMap && !envMaps.empty())
+	//{
+	//    scene->AddEnvMap(envMaps[envMapIdx]);
+	//    renderOptions.enableEnvMap = scene->lights.empty() ? true : false;
+	//    renderOptions.envMapIntensity = 1.5f;
+	//}
+
+    NewData->renderOptions = renderOptions;
+
+    return NewData;
+}
+
+void jPathTracingLoadData::CreateSceneFor_jEngine(jGame* InGame)
 {
+    // Create mesh for jObject
+    for (const MeshInstance& MeshInst : meshInstances)
+    {
+		auto object = new jObject();
+		auto renderObject = new jRenderObject();
+		object->RenderObjects.push_back(renderObject);
+		jObject::AddObject(object);
 
+        // Create Gemoetry
+        Mesh* mesh = meshes[MeshInst.meshID];
+
+        const int32 elementCount = (int32)mesh->verticesUVX.size();
+		auto positionOnlyVertexStreamData = std::make_shared<jVertexStreamData>();
+		{
+			auto streamParam = std::make_shared<jStreamParam<jPositionOnlyVertex>>();
+			streamParam->BufferType = EBufferType::STATIC;
+			streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("POSITION"), EBufferElementType::FLOAT, sizeof(float) * 3));
+			streamParam->Name = jName("jPositionOnlyVertex");
+			streamParam->Stride = sizeof(jPositionOnlyVertex);
+            streamParam->Data.resize(elementCount);
+            jPositionOnlyVertex* VerticesData = streamParam->Data.data();
+            for (int32 i = 0; i < elementCount; ++i)
+            {
+                Vector4 Pos_U = mesh->verticesUVX[i];
+                VerticesData[i].Pos = Vector(Pos_U);
+            }
+            positionOnlyVertexStreamData->Params.push_back(streamParam);
+            positionOnlyVertexStreamData->PrimitiveType = EPrimitiveType::TRIANGLES;
+            positionOnlyVertexStreamData->ElementCount = elementCount;
+        }
+
+        // Base VertexStream �߰�
+        auto vertexStreamData = std::make_shared<jVertexStreamData>();
+        {
+            auto streamParam = std::make_shared<jStreamParam<jBaseVertex>>();
+            streamParam->BufferType = EBufferType::STATIC;
+            streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("POSITION"), EBufferElementType::FLOAT, sizeof(float) * 3));
+            streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("NORMAL"), EBufferElementType::FLOAT, sizeof(float) * 3));
+            streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("TANGENT"), EBufferElementType::FLOAT, sizeof(float) * 3));
+            streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("BITANGENT"), EBufferElementType::FLOAT, sizeof(float) * 3));
+            streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("TEXCOORD"), EBufferElementType::FLOAT, sizeof(float) * 2));
+            streamParam->Name = jName("jBaseVertex");
+            streamParam->Data.resize(elementCount);
+            streamParam->Stride = sizeof(jBaseVertex);
+            jBaseVertex* VerticesData = streamParam->Data.data();
+            for (int32 i = 0; i < elementCount; ++i)
+            {
+                Vector4 Pos_U = mesh->verticesUVX[i];
+                Vector4 Normal_V = mesh->normalsUVY[i];
+
+                VerticesData[i].Pos = Vector(Pos_U);
+                VerticesData[i].Normal = Vector(Normal_V);
+                //VerticesData[i].Tangent = meshData->Tangents[i];
+                //VerticesData[i].Bitangent = meshData->Bitangents[i];
+                VerticesData[i].TexCoord = Vector2(Pos_U.w, Normal_V.w);
+            }
+            vertexStreamData->Params.push_back(streamParam);
+
+            vertexStreamData->PrimitiveType = EPrimitiveType::TRIANGLES;
+            vertexStreamData->ElementCount = elementCount;
+        }
+
+        auto indexStreamData = std::make_shared<jIndexStreamData>();
+        indexStreamData->ElementCount = static_cast<int32>(elementCount);
+        if (indexStreamData->ElementCount > 65535)
+        {
+            std::vector<uint32> indices(elementCount);
+            for (int32 i = 0; i < elementCount; ++i)
+            {
+                indices[i] = i;
+            }
+
+            auto streamParam = new jStreamParam<uint32>();
+            streamParam->BufferType = EBufferType::STATIC;
+            streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::UINT32, sizeof(int32) * 3));
+            streamParam->Name = jName("Index");
+            streamParam->Data.resize(indices.size());
+            streamParam->Stride = sizeof(uint32) * 3;
+			for (int32 i = 0; i < indices.size(); i += 3)
+			{
+				streamParam->Data[i + 0] = indices[i + 0];
+
+                // Convert from CW to CCW
+				streamParam->Data[i + 1] = indices[i + 2];
+				streamParam->Data[i + 2] = indices[i + 1];
+			}
+            indexStreamData->Param = streamParam;
+        }
+        else
+        {
+            std::vector<uint16> indices(elementCount);
+            for (int32 i = 0; i < elementCount; ++i)
+            {
+                indices[i] = i;
+            }
+
+            auto streamParam = new jStreamParam<uint16>();
+            streamParam->BufferType = EBufferType::STATIC;
+            streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::UINT16, sizeof(uint16) * 3));
+            streamParam->Name = jName("Index");
+            streamParam->Data.resize(indices.size());
+            streamParam->Stride = sizeof(uint16) * 3;
+            for (int32 i = 0; i < indices.size(); i += 3)
+            {
+                streamParam->Data[i + 0] = indices[i + 0];
+
+                // Convert from CW to CCW
+                streamParam->Data[i + 1] = indices[i + 2];
+                streamParam->Data[i + 2] = indices[i + 1];
+            }
+            indexStreamData->Param = streamParam;
+        }
+
+        object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>();
+        object->RenderObjectGeometryDataPtr->CreateNew_ForRaytracing(vertexStreamData, positionOnlyVertexStreamData, indexStreamData, false, true);
+        renderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
+
+        auto transform = MeshInst.transform;
+
+        renderObject->SetPos(transform.GetTranslateVector());
+        renderObject->SetScale(transform.GetScaleVector());
+        renderObject->SetRot(transform.GetRotateVector());
+
+        // Create Material
+        const Material& material = materials[MeshInst.materialID];
+
+        std::shared_ptr<jMaterial> materialPtr = std::make_shared<jMaterial>();
+        materialPtr->MaterialDataPtr = std::make_shared<jMaterialData>();
+        materialPtr->MaterialDataPtr->Data.resize(sizeof(material));
+        memcpy(materialPtr->MaterialDataPtr->Data.data(), &material, sizeof(material));
+
+        renderObject->MaterialPtr = materialPtr;
+    }
+
+    // Create Light
+	for (const Light& L : lights)
+	{
+        jPathTracingLightUniformBufferData Data;
+        Data.position = L.position;
+        Data.emission = L.emission;
+        Data.u = L.u;
+        Data.v = L.v;
+        Data.radius = L.radius;
+        Data.area = L.area;
+        Data.type = L.type;
+
+        jLight::AddLights(jLight::CreatePathTracingLight(Data));
+    }
+
+    // Set MainCamera
+    *InGame->MainCamera = Camera;
 }
 
 bool Mesh::LoadFromFile(const std::string& filename)
@@ -169,6 +362,4 @@ void jPathTracingLoadData::AddEnvMap(const std::string& filename)
     //}
     //envMapModified = true;
     //dirty = true;
-}
-
 }

@@ -233,6 +233,7 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
                 for (const auto& Resource : *TextureResourceResourceBindless->TextureBindDatas)
                 {
                     jTexture_DX12* Tex = (jTexture_DX12*)Resource.Texture;
+                    check(Tex->UAV.IsValid());
                     if (Resource.MipLevel == 0)
                     {
                         Descriptors.push_back({ .Descriptor = Tex->UAV, .ResourceName = Tex->ResourceName, .Resource = Tex });
@@ -254,6 +255,7 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
             {
                 jTexture_DX12* Tex = (jTexture_DX12*)ShaderBinding->Resource->GetResource();
                 const jTextureResource* tbor = reinterpret_cast<const jTextureResource*>(ShaderBinding->Resource);
+                check(Tex->UAV.IsValid());
                 if (tbor->MipLevel == 0)
                 {
                     Descriptors.push_back({ .Descriptor = Tex->UAV, .ResourceName = Tex->ResourceName, .Resource = Tex });
@@ -297,6 +299,7 @@ void jShaderBindingInstance_DX12::UpdateShaderBindings(const jShaderBindingArray
                 }
                 else
                 {
+					check(Buf->UAV.IsValid());
                     Descriptors.push_back({ .Descriptor = Buf->UAV, .ResourceName = Buf->ResourceName, .Resource = Buf });
                     DesriptorsOnlyCPU.push_back(Buf->UAV.CPUHandle);
                 }

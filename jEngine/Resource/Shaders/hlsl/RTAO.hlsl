@@ -14,23 +14,12 @@ struct SceneConstantBuffer
     float4x4 projectionToWorld;
     float4 ViewRect;
     float3 cameraPosition;
-    float focalDistance;
-    float3 lightPosition;
-    float lensRadius;
-    float3 lightAmbientColor;
-    uint NumOfStartingRay;
-    float3 lightDiffuseColor;
-    int FrameNumber;
-    float3 cameraDirection;
     float AORadius;
-    float3 lightDirection;
-    uint RayPerPixel;
     int Clear;
-    float AOIntensity;
-    int Padding2;
-    float Padding0;            // for 16 byte align
+    uint RayPerPixel;
     float2 HaltonJitter;
-    float2 Padding1;           // for 16 byte align
+    int FrameNumber;
+    float3 Padding0;        // for 16 byte align
 };
 
 #define VERTEX_STRID 56

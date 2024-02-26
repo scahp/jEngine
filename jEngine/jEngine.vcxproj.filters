@@ -514,6 +514,12 @@
     <ClInclude Include="Math\Quaternion.h">
       <Filter>Code\Math</Filter>
     </ClInclude>
+    <ClInclude Include="Scene\Light\jPathTracingLight.h">
+      <Filter>Code\Scene\Light</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer\jRenderer_PathTracing.h">
+      <Filter>Code\Renderer</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -897,6 +903,12 @@
     <ClCompile Include="External\PathTracingDataLoader\jPathTracingData.cpp">
       <Filter>Code\External\PathTracingDataLoader</Filter>
     </ClCompile>
+    <ClCompile Include="Scene\Light\jPathTracingLight.cpp">
+      <Filter>Code\Scene\Light</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\jRenderer_PathTracing.cpp">
+      <Filter>Code\Renderer</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="Resource\Shaders\glsl\shader_vs.glsl">
@@ -1068,6 +1080,9 @@
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
     <None Include="Resource\Shaders\hlsl\SSAO_cs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\PathTracing.hlsl">
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
   </ItemGroup>

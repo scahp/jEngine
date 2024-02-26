@@ -7,6 +7,7 @@
 #include "jDirectionalLight.h"
 #include "jPointLight.h"
 #include "jSpotLight.h"
+#include "jPathTracingLight.h"
 
 std::vector<jLight*> jLight::s_Lights;
 
@@ -86,6 +87,14 @@ jLight* jLight::CreateAmbientLight(const Vector& color, const Vector& intensity)
 	ambientLight->Data.Intensity = intensity;
 
 	return ambientLight;
+}
+
+jPathTracingLight* jLight::CreatePathTracingLight(const jPathTracingLightUniformBufferData& InData)
+{
+	auto pathTracingLight = new jPathTracingLight();
+	JASSERT(pathTracingLight);
+	pathTracingLight->Initialize(InData);
+	return pathTracingLight;
 }
 
 //////////////////////////////////////////////////////////////////////////

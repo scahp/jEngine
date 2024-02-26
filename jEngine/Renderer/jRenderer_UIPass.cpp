@@ -4,7 +4,7 @@
 #include "Profiler/jPerformanceProfile.h"
 #include "jOptions.h"
 
-void jRenderer::UIPass()
+void IRenderer::UIPass()
 {
 	check(g_ImGUI);
 	g_ImGUI->NewFrame([]()

@@ -36,13 +36,180 @@ struct jSimplePushConstant
     bool Padding2[3];
 };
 
+// IRenderer
+void IRenderer::DebugPasses()
+{
+	SCOPE_CPU_PROFILE(DebugPasses);
+	SCOPE_GPU_PROFILE(RenderFrameContextPtr, DebugPasses);
+	DEBUG_EVENT(RenderFrameContextPtr, "DebugPasses");
+
+	if (gOptions.ShowDebugObject)
+	{
+		DEBUG_EVENT(RenderFrameContextPtr, "DebugObject");
+
+		g_rhi->TransitionLayout(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::DEPTH_STENCIL_ATTACHMENT);
+
+		// Prepare basepass pipeline
+		jRasterizationStateInfo* RasterizationState = nullptr;
+		switch (g_rhi->GetSelectedMSAASamples())
+		{
+		case EMSAASamples::COUNT_1:
+			RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)1, true, 0.2f, false, false>::Create();
+			break;
+		case EMSAASamples::COUNT_2:
+			RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)2, true, 0.2f, false, false>::Create();
+			break;
+		case EMSAASamples::COUNT_4:
+			RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)4, true, 0.2f, false, false>::Create();
+			break;
+		case EMSAASamples::COUNT_8:
+			RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)8, true, 0.2f, false, false>::Create();
+			break;
+		default:
+			check(0);
+			break;
+		}
+		auto DepthStencilState = TDepthStencilStateInfo<false, false, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
+		auto BlendingState = TBlendingStateInfo<true, EBlendFactor::ONE, EBlendFactor::ONE_MINUS_SRC_ALPHA, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
+
+		jPipelineStateFixedInfo DebugPassPipelineStateFixed = jPipelineStateFixedInfo(RasterizationState, DepthStencilState, BlendingState
+			, jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT), gOptions.UseVRS);
+
+		const jRTClearValue ClearColor = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f);
+		const jRTClearValue ClearDepth = jRTClearValue(1.0f, 0);
+
+		jAttachment depth = jAttachment(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr, EAttachmentLoadStoreOp::LOAD_DONTCARE
+			, EAttachmentLoadStoreOp::LOAD_DONTCARE, ClearDepth
+			, RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetLayout(), EResourceLayout::DEPTH_STENCIL_ATTACHMENT);
+		jAttachment resolve;
+
+		if (RenderFrameContextPtr->UseForwardRenderer)
+		{
+			if ((int32)g_rhi->GetSelectedMSAASamples() > 1)
+			{
+				resolve = jAttachment(RenderFrameContextPtr->SceneRenderTargetPtr->ResolvePtr, EAttachmentLoadStoreOp::DONTCARE_STORE
+					, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor
+					, EResourceLayout::UNDEFINED, EResourceLayout::COLOR_ATTACHMENT, true);
+			}
+		}
+
+		// Setup attachment
+		jRenderPassInfo renderPassInfo;
+		const int32 LightPassAttachmentIndex = (int32)renderPassInfo.Attachments.size();
+
+		//if (UseForwardRenderer || gOptions.UseSubpass)
+		{
+			jAttachment color = jAttachment(RenderFrameContextPtr->SceneRenderTargetPtr->FinalColorPtr, EAttachmentLoadStoreOp::LOAD_STORE
+				, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor
+				, RenderFrameContextPtr->SceneRenderTargetPtr->FinalColorPtr->GetLayout(), EResourceLayout::COLOR_ATTACHMENT);
+			renderPassInfo.Attachments.push_back(color);
+		}
+
+		const int32 DepthAttachmentIndex = (int32)renderPassInfo.Attachments.size();
+		renderPassInfo.Attachments.push_back(depth);
+
+		const int32 ResolveAttachemntIndex = (int32)renderPassInfo.Attachments.size();
+		if (RenderFrameContextPtr->UseForwardRenderer)
+		{
+			if ((int32)g_rhi->GetSelectedMSAASamples() > 1)
+				renderPassInfo.Attachments.push_back(resolve);
+		}
+
+		//////////////////////////////////////////////////////////////////////////
+		// Setup subpass of BasePass
+		{
+			jSubpass subpass;
+			subpass.Initialize(0, 1, EPipelineStageMask::COLOR_ATTACHMENT_OUTPUT_BIT, EPipelineStageMask::FRAGMENT_SHADER_BIT);
+			subpass.OutputColorAttachments.push_back(0);
+			subpass.OutputDepthAttachment = DepthAttachmentIndex;
+			if (RenderFrameContextPtr->UseForwardRenderer)
+			{
+				if ((int32)g_rhi->GetSelectedMSAASamples() > 1)
+					subpass.OutputResolveAttachment = ResolveAttachemntIndex;
+			}
+			renderPassInfo.Subpasses.push_back(subpass);
+		}
+		jRenderPass* DebugRenderPass = (jRenderPass_Vulkan*)g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
+
+		jGraphicsPipelineShader DebugObjectShader;
+		{
+			jShaderInfo shaderInfo;
+			shaderInfo.SetName(jNameStatic("default_debug_objectVS"));
+			shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/debug_object_vs.hlsl"));
+			shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
+			DebugObjectShader.VertexShader = g_rhi->CreateShader(shaderInfo);
+
+			shaderInfo.SetName(jNameStatic("default_debug_objectPS"));
+			shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/debug_object_fs.hlsl"));
+			shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
+			DebugObjectShader.PixelShader = g_rhi->CreateShader(shaderInfo);
+		}
+
+		std::vector<jDrawCommand> DebugDrawCommand;
+		auto& DebugObjects = jObject::GetDebugObject();
+		DebugDrawCommand.resize(DebugObjects.size());
+		for (int32 i = 0; i < (int32)DebugObjects.size(); ++i)
+		{
+			new (&DebugDrawCommand[i]) jDrawCommand(RenderFrameContextPtr, &View, DebugObjects[i]->RenderObjects[0], DebugRenderPass
+				, DebugObjectShader, &DebugPassPipelineStateFixed, DebugObjects[i]->RenderObjects[0]->MaterialPtr.get(), {}, nullptr);
+			DebugDrawCommand[i].PrepareToDraw(false);
+		}
+
+		if (DebugRenderPass && DebugRenderPass->BeginRenderPass(RenderFrameContextPtr->GetActiveCommandBuffer()))
+		{
+			for (auto& command : DebugDrawCommand)
+			{
+				command.Draw();
+			}
+			DebugRenderPass->EndRenderPass();
+		}
+	}
+
+	{
+		DEBUG_EVENT(RenderFrameContextPtr, "DebugRenderTarget");
+
+		if (DebugRTs.size() > 0)
+		{
+			const int32 RTWidth = RenderFrameContextPtr->SceneRenderTargetPtr->FinalColorPtr->Info.Width;
+			const int32 RTHeight = RenderFrameContextPtr->SceneRenderTargetPtr->FinalColorPtr->Info.Height;
+
+			Vector2i Size(RTWidth / 4, RTHeight / 4);
+			Vector2i Padding(10, 10);
+			for (int32 i = 0; i < (int32)DebugRTs.size(); ++i)
+			{
+				const Vector4i DrawRect = Vector4i(RTWidth - Size.x - Padding.x, RTHeight - Size.y * (i + 1) - Padding.y, Size.x, Size.y);
+				jRHIUtil::DrawQuad(RenderFrameContextPtr, RenderFrameContextPtr->SceneRenderTargetPtr->FinalColorPtr, DrawRect
+					, [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
+					{
+						jTexture* InTexture = DebugRTs[i].get();
+						g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InTexture, EResourceLayout::SHADER_READ_ONLY);
+
+						const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+							, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
+							, 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
+
+						InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
+							, InOutResourceInlineAllactor.Alloc<jTextureResource>(InTexture, SamplerState)));
+					}
+					, [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
+						{
+							jShaderInfo shaderInfo;
+							shaderInfo.SetName(jNameStatic("CopyPS"));
+							shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/copy_ps.hlsl"));
+							shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
+							return g_rhi->CreateShader(shaderInfo);
+						});
+			}
+		}
+	}
+}
+
+// jRenderer
 void jRenderer::Setup()
 {
     SCOPE_CPU_PROFILE(Setup);
 
     FrameIndex = g_rhi->GetCurrentFrameIndex();
-    UseForwardRenderer = RenderFrameContextPtr->UseForwardRenderer;
-
     View.ShadowCasterLights.reserve(View.Lights.size());
 
     // View 별로 저장 할 수 있어야 함
@@ -283,7 +450,7 @@ void jRenderer::SetupBasePass()
         , EResourceLayout::UNDEFINED, EResourceLayout::DEPTH_STENCIL_ATTACHMENT);
     jAttachment resolve;
 
-    if (UseForwardRenderer)
+    if (RenderFrameContextPtr->UseForwardRenderer)
     {
         if ((int32)g_rhi->GetSelectedMSAASamples() > 1)
         {
@@ -295,7 +462,7 @@ void jRenderer::SetupBasePass()
 
     // Setup attachment
     jRenderPassInfo renderPassInfo;
-    if (!UseForwardRenderer)
+    if (!RenderFrameContextPtr->UseForwardRenderer)
     {
         for (int32 i = 0; i < _countof(RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer); ++i)
         {
@@ -308,7 +475,7 @@ void jRenderer::SetupBasePass()
 
     const int32 LightPassAttachmentIndex = (int32)renderPassInfo.Attachments.size();
 
-    if (UseForwardRenderer || gOptions.UseSubpass)
+    if (RenderFrameContextPtr->UseForwardRenderer || gOptions.UseSubpass)
     {
         jAttachment color = jAttachment(RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr, EAttachmentLoadStoreOp::CLEAR_STORE
             , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor
@@ -320,7 +487,7 @@ void jRenderer::SetupBasePass()
     renderPassInfo.Attachments.push_back(depth);
 
     const int32 ResolveAttachemntIndex = (int32)renderPassInfo.Attachments.size();
-    if (UseForwardRenderer)
+    if (RenderFrameContextPtr->UseForwardRenderer)
     {
         if ((int32)g_rhi->GetSelectedMSAASamples() > 1)
             renderPassInfo.Attachments.push_back(resolve);
@@ -333,7 +500,7 @@ void jRenderer::SetupBasePass()
         jSubpass subpass;
         subpass.Initialize(0, 1, EPipelineStageMask::COLOR_ATTACHMENT_OUTPUT_BIT, EPipelineStageMask::FRAGMENT_SHADER_BIT);
 
-        if (UseForwardRenderer)
+        if (RenderFrameContextPtr->UseForwardRenderer)
         {
             subpass.OutputColorAttachments.push_back(0);
         }
@@ -347,14 +514,14 @@ void jRenderer::SetupBasePass()
         }
 
         subpass.OutputDepthAttachment = DepthAttachmentIndex;
-        if (UseForwardRenderer)
+        if (RenderFrameContextPtr->UseForwardRenderer)
         {
             if ((int32)g_rhi->GetSelectedMSAASamples() > 1)
                 subpass.OutputResolveAttachment = ResolveAttachemntIndex;
         }
         renderPassInfo.Subpasses.push_back(subpass);
     }
-    if (!UseForwardRenderer && gOptions.UseSubpass)
+    if (!RenderFrameContextPtr->UseForwardRenderer && gOptions.UseSubpass)
     {
         // Second subpass, Lighting pass
         jSubpass subpass;
@@ -379,7 +546,7 @@ void jRenderer::SetupBasePass()
     //////////////////////////////////////////////////////////////////////////
     BaseRenderPass = (jRenderPass_Vulkan*)g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
 
-    auto GetOrCreateShaderFunc = [UseForwardRenderer = this->UseForwardRenderer](const jRenderObject* InRenderObject, const jMaterial* InOverrideMaterial = nullptr)
+    auto GetOrCreateShaderFunc = [UseForwardRenderer = RenderFrameContextPtr->UseForwardRenderer](const jRenderObject* InRenderObject, const jMaterial* InOverrideMaterial = nullptr)
         {
             jGraphicsPipelineShader Shaders;
             jShaderInfo shaderInfo;
@@ -579,7 +746,7 @@ void jRenderer::BasePass()
         SCOPE_GPU_PROFILE(RenderFrameContextPtr, BasePass);
         DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "BasePass", Vector4(0.8f, 0.8f, 0.0f, 1.0f));
 
-        if (UseForwardRenderer)
+        if (RenderFrameContextPtr->UseForwardRenderer)
         {
             g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
         }
@@ -606,7 +773,7 @@ void jRenderer::BasePass()
             }
 
             // Draw Light : subpass 1
-            if (!UseForwardRenderer && gOptions.UseSubpass)
+            if (!RenderFrameContextPtr->UseForwardRenderer && gOptions.UseSubpass)
             {
                 g_rhi->NextSubpass(RenderFrameContextPtr->GetActiveCommandBuffer());
                 DeferredLightPass_TodoRefactoring(BaseRenderPass);
@@ -615,7 +782,7 @@ void jRenderer::BasePass()
             BaseRenderPass->EndRenderPass();
         }
 
-        if (!UseForwardRenderer && !gOptions.UseSubpass)
+        if (!RenderFrameContextPtr->UseForwardRenderer && !gOptions.UseSubpass)
         {
             DeferredLightPass_TodoRefactoring(BaseRenderPass);
         }
@@ -669,7 +836,7 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
     LightDrawCommandGenerator[(int32)ELightType::SPOT] = &SpotLightPass;
 
     {
-        const int32 SubpassIndex = (!UseForwardRenderer && gOptions.UseSubpass) ? 1 : 0;
+        const int32 SubpassIndex = (!RenderFrameContextPtr->UseForwardRenderer && gOptions.UseSubpass) ? 1 : 0;
 
         if (!gOptions.UseSubpass)
         {
@@ -727,173 +894,6 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
         {
             check(InRenderPass);
             InRenderPass->EndRenderPass();
-        }
-    }
-}
-
-void jRenderer::DebugPasses()
-{
-    SCOPE_CPU_PROFILE(DebugPasses);
-    SCOPE_GPU_PROFILE(RenderFrameContextPtr, DebugPasses);
-    DEBUG_EVENT(RenderFrameContextPtr, "DebugPasses");
-
-    if (gOptions.ShowDebugObject)
-    {
-        DEBUG_EVENT(RenderFrameContextPtr, "DebugObject");
-
-        g_rhi->TransitionLayout(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::DEPTH_STENCIL_ATTACHMENT);
-
-        // Prepare basepass pipeline
-        jRasterizationStateInfo* RasterizationState = nullptr;
-        switch (g_rhi->GetSelectedMSAASamples())
-        {
-        case EMSAASamples::COUNT_1:
-            RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)1, true, 0.2f, false, false>::Create();
-            break;
-        case EMSAASamples::COUNT_2:
-            RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)2, true, 0.2f, false, false>::Create();
-            break;
-        case EMSAASamples::COUNT_4:
-            RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)4, true, 0.2f, false, false>::Create();
-            break;
-        case EMSAASamples::COUNT_8:
-            RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)8, true, 0.2f, false, false>::Create();
-            break;
-        default:
-            check(0);
-            break;
-        }
-        auto DepthStencilState = TDepthStencilStateInfo<false, false, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
-        auto BlendingState = TBlendingStateInfo<true, EBlendFactor::ONE, EBlendFactor::ONE_MINUS_SRC_ALPHA, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
-
-        jPipelineStateFixedInfo DebugPassPipelineStateFixed = jPipelineStateFixedInfo(RasterizationState, DepthStencilState, BlendingState
-            , jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT), gOptions.UseVRS);
-
-        const jRTClearValue ClearColor = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f);
-        const jRTClearValue ClearDepth = jRTClearValue(1.0f, 0);
-
-        jAttachment depth = jAttachment(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr, EAttachmentLoadStoreOp::LOAD_DONTCARE
-            , EAttachmentLoadStoreOp::LOAD_DONTCARE, ClearDepth
-            , RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetLayout(), EResourceLayout::DEPTH_STENCIL_ATTACHMENT);
-        jAttachment resolve;
-
-        if (UseForwardRenderer)
-        {
-            if ((int32)g_rhi->GetSelectedMSAASamples() > 1)
-            {
-                resolve = jAttachment(RenderFrameContextPtr->SceneRenderTargetPtr->ResolvePtr, EAttachmentLoadStoreOp::DONTCARE_STORE
-                    , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor
-                    , EResourceLayout::UNDEFINED, EResourceLayout::COLOR_ATTACHMENT, true);
-            }
-        }
-
-        // Setup attachment
-        jRenderPassInfo renderPassInfo;
-        const int32 LightPassAttachmentIndex = (int32)renderPassInfo.Attachments.size();
-
-        //if (UseForwardRenderer || gOptions.UseSubpass)
-        {
-            jAttachment color = jAttachment(RenderFrameContextPtr->SceneRenderTargetPtr->FinalColorPtr, EAttachmentLoadStoreOp::LOAD_STORE
-                , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor
-                , RenderFrameContextPtr->SceneRenderTargetPtr->FinalColorPtr->GetLayout(), EResourceLayout::COLOR_ATTACHMENT);
-            renderPassInfo.Attachments.push_back(color);
-        }
-
-        const int32 DepthAttachmentIndex = (int32)renderPassInfo.Attachments.size();
-        renderPassInfo.Attachments.push_back(depth);
-
-        const int32 ResolveAttachemntIndex = (int32)renderPassInfo.Attachments.size();
-        if (UseForwardRenderer)
-        {
-            if ((int32)g_rhi->GetSelectedMSAASamples() > 1)
-                renderPassInfo.Attachments.push_back(resolve);
-        }
-
-        //////////////////////////////////////////////////////////////////////////
-        // Setup subpass of BasePass
-        {
-            jSubpass subpass;
-            subpass.Initialize(0, 1, EPipelineStageMask::COLOR_ATTACHMENT_OUTPUT_BIT, EPipelineStageMask::FRAGMENT_SHADER_BIT);
-            subpass.OutputColorAttachments.push_back(0);
-            subpass.OutputDepthAttachment = DepthAttachmentIndex;
-            if (UseForwardRenderer)
-            {
-                if ((int32)g_rhi->GetSelectedMSAASamples() > 1)
-                    subpass.OutputResolveAttachment = ResolveAttachemntIndex;
-            }
-            renderPassInfo.Subpasses.push_back(subpass);
-        }
-        jRenderPass* DebugRenderPass = (jRenderPass_Vulkan*)g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
-
-        jGraphicsPipelineShader DebugObjectShader;
-        {
-            jShaderInfo shaderInfo;
-            shaderInfo.SetName(jNameStatic("default_debug_objectVS"));
-            shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/debug_object_vs.hlsl"));
-            shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
-            DebugObjectShader.VertexShader = g_rhi->CreateShader(shaderInfo);
-
-            shaderInfo.SetName(jNameStatic("default_debug_objectPS"));
-            shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/debug_object_fs.hlsl"));
-            shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
-            DebugObjectShader.PixelShader = g_rhi->CreateShader(shaderInfo);
-        }
-
-        std::vector<jDrawCommand> DebugDrawCommand;
-        auto& DebugObjects = jObject::GetDebugObject();
-        DebugDrawCommand.resize(DebugObjects.size());
-        for (int32 i = 0; i < (int32)DebugObjects.size(); ++i)
-        {
-            new (&DebugDrawCommand[i]) jDrawCommand(RenderFrameContextPtr, &View, DebugObjects[i]->RenderObjects[0], DebugRenderPass
-                , DebugObjectShader, &DebugPassPipelineStateFixed, DebugObjects[i]->RenderObjects[0]->MaterialPtr.get(), {}, nullptr);
-            DebugDrawCommand[i].PrepareToDraw(false);
-        }
-
-        if (DebugRenderPass && DebugRenderPass->BeginRenderPass(RenderFrameContextPtr->GetActiveCommandBuffer()))
-        {
-            for (auto& command : DebugDrawCommand)
-            {
-                command.Draw();
-            }
-            DebugRenderPass->EndRenderPass();
-        }
-    }
-
-    {
-        DEBUG_EVENT(RenderFrameContextPtr, "DebugRenderTarget");
-
-        if (DebugRTs.size() > 0)
-        {
-            const int32 RTWidth = RenderFrameContextPtr->SceneRenderTargetPtr->FinalColorPtr->Info.Width;
-            const int32 RTHeight = RenderFrameContextPtr->SceneRenderTargetPtr->FinalColorPtr->Info.Height;
-
-            Vector2i Size(RTWidth / 4, RTHeight / 4);
-            Vector2i Padding(10, 10);
-            for(int32 i=0;i<(int32)DebugRTs.size();++i)
-            {
-                const Vector4i DrawRect = Vector4i(RTWidth - Size.x - Padding.x, RTHeight - Size.y * (i + 1) - Padding.y, Size.x, Size.y);
-                jRHIUtil::DrawQuad(RenderFrameContextPtr, RenderFrameContextPtr->SceneRenderTargetPtr->FinalColorPtr, DrawRect
-                    , [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
-                    {
-                        jTexture* InTexture = DebugRTs[i].get();
-						g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InTexture, EResourceLayout::SHADER_READ_ONLY);
-
-						const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
-							, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
-							, 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
-
-						InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
-							, InOutResourceInlineAllactor.Alloc<jTextureResource>(InTexture, SamplerState)));
-                    }
-                    , [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
-					{
-                        jShaderInfo shaderInfo;
-						shaderInfo.SetName(jNameStatic("CopyPS"));
-						shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/copy_ps.hlsl"));
-						shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
-						return g_rhi->CreateShader(shaderInfo);
-                    });
-            }
         }
     }
 }

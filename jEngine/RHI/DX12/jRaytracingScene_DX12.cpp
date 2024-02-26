@@ -68,7 +68,7 @@ void jRaytracingScene_DX12::CreateOrUpdateBLAS(const jRatracingInitializer& InIn
 
             geometryDesc.Triangles.IndexBuffer = IndexStart;
             geometryDesc.Triangles.IndexCount = IndexCount;
-            geometryDesc.Triangles.IndexFormat = indexStreamData->Param->GetElementSize() == 16 ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
+            geometryDesc.Triangles.IndexFormat = indexStreamData->Param->GetElementSize() == 2 ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
         }
         else
         {

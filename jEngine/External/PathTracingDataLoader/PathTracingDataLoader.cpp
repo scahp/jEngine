@@ -212,7 +212,7 @@ namespace GLSLPT
 
             if (strstr(line, "camera"))
             {
-                Matrix xform;
+                Matrix xform{IdentityType};
                 Vector position;
                 Vector lookAt;
                 float fov = 0.0f;
@@ -247,12 +247,7 @@ namespace GLSLPT
                     lookAt = position + forward;
                 }
 
-                const auto zAxis = (lookAt - position).GetNormalize();
-                auto yAxis = (Vector::UpVector - position).GetNormalize();
-                const auto xAxis = yAxis.CrossProduct(zAxis).GetNormalize();
-                yAxis = zAxis.CrossProduct(xAxis).GetNormalize();
-
-                scene->AddCamera(position, lookAt, yAxis, fov);
+                scene->AddCamera(position, lookAt, position + Vector::UpVector, DegreeToRadian(fov));
                 scene->Camera.Aperture = aperture;
                 scene->Camera.FocalDist = focalDist;
             }
@@ -384,7 +379,7 @@ namespace GLSLPT
             {
                 std::string filename;
                 Quaternion rotQuat;
-                Matrix xform, translate, rot, scale;
+                Matrix xform{IdentityType}, translate{IdentityType}, rot{IdentityType}, scale{IdentityType};
                 int material_id = 0; // Default Material ID
                 char meshName[200] = "none";
                 bool matrixProvided = false;
@@ -443,12 +438,12 @@ namespace GLSLPT
                             instanceName = filename.substr(pos + 1);
                         }
 
-                        Matrix transformMat;
+                        Matrix transformMat{IdentityType};
 
                         if (matrixProvided)
                             transformMat = xform;
                         else
-                            transformMat = scale * rot * translate;
+                            transformMat = translate * rot * scale;
 
                         MeshInstance instance(instanceName, mesh_id, transformMat, material_id);
                         scene->AddMeshInstance(instance);
@@ -463,7 +458,7 @@ namespace GLSLPT
             {
                 std::string filename;
                 Quaternion rotQuat;
-                Matrix xform, translate, rot, scale;
+                Matrix xform{IdentityType}, translate{IdentityType}, rot{IdentityType}, scale{IdentityType};
                 bool matrixProvided = false;
 
                 while (fgets(line, kMaxLineLength, file))
@@ -498,12 +493,12 @@ namespace GLSLPT
                     std::string ext = filename.substr(filename.find_last_of(".") + 1);
 
                     bool success = false;
-                    Matrix transformMat;
+                    Matrix transformMat{IdentityType};
 
                     if (matrixProvided)
                         transformMat = xform;
                     else
-                        transformMat = scale * rot * translate;
+                        transformMat = translate * rot * scale;
 
                     // TODO: Add support for instancing.
                     // If the same gltf is loaded multiple times then mesh data gets duplicated

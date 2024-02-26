@@ -35,4 +35,5 @@ private:
     int64 RingBufferOffset = 0;
     uint8* RingBufferDestAddress = nullptr;
     size_t RingBufferAllocatedSize = 0;
+    jDescriptor_DX12 RingBufferSubAlloc_CBV;
 };

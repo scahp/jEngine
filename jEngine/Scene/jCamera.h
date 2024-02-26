@@ -137,7 +137,7 @@ public:
 
 	FORCEINLINE void SetEulerAngle(const Vector& InEulerAngle)
 	{
-		if (EulerAngle.IsNearlyEqual(InEulerAngle))
+		if (!EulerAngle.IsNearlyEqual(InEulerAngle))
 		{
 			EulerAngle = InEulerAngle;
 			UpdateCameraParameters();

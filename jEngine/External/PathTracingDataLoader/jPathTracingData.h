@@ -5,8 +5,6 @@
 #include "RHI/jTexture.h"
 #include "Scene/jCamera.h"
 
-namespace GLSLPT
-{
 struct jRenderOptions
 {
     jRenderOptions()
@@ -87,7 +85,7 @@ struct Light
     Vector v;
     float radius;
     float area;
-    float type;
+    uint32 type;
 };
 
 struct Indices
@@ -105,7 +103,7 @@ public:
 
     bool LoadFromFile(const std::string& filename);
 
-    std::vector<Vector> verticesUVX; // Vertex + texture Coord (u/s)
+    std::vector<Vector4> verticesUVX; // Vertex + texture Coord (u/s)
     std::vector<Vector> normalsUVY;  // Normal + texture Coord (v/t)
 
     std::string name;
@@ -227,8 +225,10 @@ public:
     jPathTracingLoadData() : initialized(false), dirty(true) {}
     ~jPathTracingLoadData() {}
 
+    static jPathTracingLoadData* LoadPathTracingData(std::string InFilename);
+
     // Create path tracing scene for jEngine
-    void CreateSceneFor_jEngine();
+    void CreateSceneFor_jEngine(class jGame* InGame);
 
     int32 AddMesh(const std::string& filename);
     int32 AddTexture(const std::string& filename);
@@ -274,4 +274,3 @@ public:
     bool instancesModified = false;
     bool envMapModified = false;
 };
-}

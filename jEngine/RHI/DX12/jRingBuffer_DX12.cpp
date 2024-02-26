@@ -1,5 +1,6 @@
 ﻿#include "pch.h"
 #include "jRingBuffer_DX12.h"
+#include "jBufferUtil_DX12.h"
 
 void jRingBuffer_DX12::Create(uint64 totalSize, uint32 alignment /*= 16*/)
 {
@@ -45,4 +46,42 @@ void jRingBuffer_DX12::Create(uint64 totalSize, uint32 alignment /*= 16*/)
     {
         return;
     }
+}
+
+void jRingBuffer_DX12::Reset()
+{
+    jScopedLock s(&Lock);
+    RingBufferOffset = 0;
+
+    if (!AllocatedCBVs.empty())
+    {
+        for (jDescriptor_DX12& CBV : AllocatedCBVs)
+        {
+            if (ensure(CBV.IsValid()))
+                CBV.Free();
+        }
+        AllocatedCBVs.clear();
+    }
+}
+
+uint64 jRingBuffer_DX12::AllocWithCBV(uint64 allocSize, jDescriptor_DX12& OutCBV)
+{
+    jScopedLock s(&Lock);
+
+    const uint64 allocOffset = Align<uint64>(RingBufferOffset, Alignment);
+    if (allocOffset + allocSize <= RingBufferSize)
+    {
+        RingBufferOffset = allocOffset + allocSize;
+
+        // Create CBV
+        {
+            OutCBV = jBufferUtil_DX12::CreateConstantBufferView(GetGPUAddress() + allocOffset, allocSize);
+            AllocatedCBVs.push_back(OutCBV);
+        }
+        return allocOffset;
+    }
+
+    check(0);
+
+    return 0;
 }

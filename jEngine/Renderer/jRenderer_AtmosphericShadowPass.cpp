@@ -27,7 +27,8 @@ void jRenderer::AtmosphericShadow()
                 break;
             }
         }
-        check(DirectionalLight);
+        if (!DirectionalLight)
+            return;
 
         jCamera* MainCamera = jCamera::GetMainCamera();
         check(MainCamera);

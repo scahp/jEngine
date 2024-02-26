@@ -165,6 +165,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClInclude Include="Renderer\jDrawCommand.h" />
     <ClInclude Include="Renderer\jPointLightDrawCommandGenerator.h" />
     <ClInclude Include="Renderer\jRenderer.h" />
+    <ClInclude Include="Renderer\jRenderer_PathTracing.h" />
     <ClInclude Include="Renderer\jSceneRenderTargets.h" />
     <ClInclude Include="Renderer\jSpotLightDrawCommandGenerator.h" />
     <ClInclude Include="RHI\DX12\jBufferUtil_DX12.h" />
@@ -243,6 +244,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClInclude Include="Scene\jRenderObject.h" />
     <ClInclude Include="Scene\Light\jDirectionalLight.h" />
     <ClInclude Include="Scene\Light\jLight.h" />
+    <ClInclude Include="Scene\Light\jPathTracingLight.h" />
     <ClInclude Include="Scene\Light\jPointLight.h" />
     <ClInclude Include="Scene\Light\jSpotLight.h" />
     <ClInclude Include="Shader\jShader.h" />
@@ -377,6 +379,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClCompile Include="Renderer\jRenderer.cpp" />
     <ClCompile Include="Renderer\jRenderer_AOPass.cpp" />
     <ClCompile Include="Renderer\jRenderer_AtmosphericShadowPass.cpp" />
+    <ClCompile Include="Renderer\jRenderer_PathTracing.cpp" />
     <ClCompile Include="Renderer\jRenderer_PostProcessPass.cpp" />
     <ClCompile Include="Renderer\jRenderer_UIPass.cpp" />
     <ClCompile Include="Renderer\jSceneRenderTargets.cpp" />
@@ -447,6 +450,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClCompile Include="Scene\jRenderObject.cpp" />
     <ClCompile Include="Scene\Light\jDirectionalLight.cpp" />
     <ClCompile Include="Scene\Light\jLight.cpp" />
+    <ClCompile Include="Scene\Light\jPathTracingLight.cpp" />
     <ClCompile Include="Scene\Light\jPointLight.cpp" />
     <ClCompile Include="Scene\Light\jSpotLight.cpp" />
     <ClCompile Include="Shader\jShader.cpp" />
@@ -695,6 +699,11 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
   </ItemGroup>
   <ItemGroup>
     <None Include="Resource\Shaders\hlsl\SSAO_cs.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resource\Shaders\hlsl\PathTracing.hlsl">
       <FileType>Document</FileType>
     </None>
   </ItemGroup>

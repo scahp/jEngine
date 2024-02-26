@@ -46,6 +46,14 @@ const std::shared_ptr<jShaderBindingInstance>& jMaterial::CreateShaderBindingIns
                 , ResourceInlineAllactor.Alloc<jTextureResource>(Texture, nullptr)));
         }
 
+        if (MaterialDataPtr && MaterialDataPtr->GetData() && MaterialDataPtr->GetDataSizeInBytes() > 0)
+        {
+            MaterialDataUniformBufferPtr = g_rhi->CreateUniformBufferBlock(jNameStatic("MaterialDataUniformBuffer"), jLifeTimeType::MultiFrame, MaterialDataPtr->GetDataSizeInBytes());
+            MaterialDataUniformBufferPtr->UpdateBufferData(MaterialDataPtr->GetData(), MaterialDataPtr->GetDataSizeInBytes());
+			ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_GRAPHICS
+				, ResourceInlineAllactor.Alloc<jUniformBufferResource>(MaterialDataUniformBufferPtr.get())));
+        }
+
         if (ShaderBindingInstance)
             ShaderBindingInstance->Free();
 
