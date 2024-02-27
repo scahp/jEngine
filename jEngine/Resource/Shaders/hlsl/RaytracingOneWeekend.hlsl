@@ -26,16 +26,6 @@ struct SceneConstantBuffer
     float Padding1;                 // for 16 byte align
 };
 
-#define VERTEX_STRID 56
-struct jVertex
-{
-	float3 Pos;
-	float3 Normal;
-	float3 Tangent;
-	float3 Bitangent;
-	float2 TexCoord;
-};
-
 RaytracingAccelerationStructure Scene : register(t0, space0);
 RWTexture2D<float4> RenderTarget : register(u1, space0);
 ConstantBuffer<SceneConstantBuffer> g_sceneCB : register(b2, space0);

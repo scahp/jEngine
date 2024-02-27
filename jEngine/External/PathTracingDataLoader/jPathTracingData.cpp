@@ -14,6 +14,7 @@
 #include "jGame.h"
 #include "Material/jMaterial.h"
 #include "Scene/Light/jPathTracingLight.h"
+#include "jPrimitiveUtil.h"
 
 jPathTracingLoadData* jPathTracingLoadData::LoadPathTracingData(std::string InFilename)
 {
@@ -55,6 +56,9 @@ jPathTracingLoadData* jPathTracingLoadData::LoadPathTracingData(std::string InFi
 
 void jPathTracingLoadData::CreateSceneFor_jEngine(jGame* InGame)
 {
+#define OBJECT_HIT_GROUP_INDEX 0
+#define LIGHT_HIT_GROUP_INDEX 1
+
     // Create mesh for jObject
     for (const MeshInstance& MeshInst : meshInstances)
     {
@@ -119,7 +123,8 @@ void jPathTracingLoadData::CreateSceneFor_jEngine(jGame* InGame)
 
         auto indexStreamData = std::make_shared<jIndexStreamData>();
         indexStreamData->ElementCount = static_cast<int32>(elementCount);
-        if (indexStreamData->ElementCount > 65535)
+        //if (indexStreamData->ElementCount > 65535)
+        if (1)  // todo support load 16 bit index for shader
         {
             std::vector<uint32> indices(elementCount);
             for (int32 i = 0; i < elementCount; ++i)
@@ -187,11 +192,14 @@ void jPathTracingLoadData::CreateSceneFor_jEngine(jGame* InGame)
         memcpy(materialPtr->MaterialDataPtr->Data.data(), &material, sizeof(material));
 
         renderObject->MaterialPtr = materialPtr;
+        renderObject->RayTracingHitGroupIndex = OBJECT_HIT_GROUP_INDEX;
     }
 
     // Create Light
-	for (const Light& L : lights)
+    for(int32 i=0;i<(int32)lights.size();++i)
 	{
+        const Light& L = lights[i];
+
         jPathTracingLightUniformBufferData Data;
         Data.position = L.position;
         Data.emission = L.emission;
@@ -202,6 +210,61 @@ void jPathTracingLoadData::CreateSceneFor_jEngine(jGame* InGame)
         Data.type = L.type;
 
         jLight::AddLights(jLight::CreatePathTracingLight(Data));
+
+        switch (L.type)
+        {
+		case RectLight:
+		{
+            Vector Size(L.v.Length(), 0.001f, L.u.Length());
+            jQuadPrimitive* quad = jPrimitiveUtil::CreateQuad(Data.position - (Size * 0.5f), Size, Vector(1.0f), Vector4::ColorWhite);
+            jObject::AddObject(quad);
+
+            check(quad->RenderObjects.size() > 0);
+            const Vector Normal = L.u.CrossProduct(L.v).GetNormalize();
+            const Vector EulerAngle = Vector::GetEulerAngleFrom(Normal);
+			quad->RenderObjects[0]->SetRot(EulerAngle);
+
+            quad->RenderObjects[0]->RayTracingHitGroupIndex = 1;
+
+            // todo : need to replace it as a light data
+            // todo : I need additional data structure for lights. ex). hit group and so on.
+            Material material{};
+            material.lightId = i;
+
+			std::shared_ptr<jMaterial> materialPtr = std::make_shared<jMaterial>();
+			materialPtr->MaterialDataPtr = std::make_shared<jMaterialData>();
+			materialPtr->MaterialDataPtr->Data.resize(sizeof(material));
+			memcpy(materialPtr->MaterialDataPtr->Data.data(), &material, sizeof(material));
+            quad->RenderObjects[0]->MaterialPtr = materialPtr;
+            quad->RenderObjects[0]->RayTracingHitGroupIndex = LIGHT_HIT_GROUP_INDEX;
+
+			break;
+		}
+		case SphereLight:
+		{
+            jObject* sphere = jPrimitiveUtil::CreateSphere(Data.position, Data.radius, 60, 60, Vector(1.0f), Vector4::ColorWhite);
+            jObject::AddObject(sphere);
+
+			// todo : need to replace it as a light data
+            // todo : I need additional data structure for lights. ex). hit group and so on.
+			Material material{};
+            material.lightId = i;
+
+			std::shared_ptr<jMaterial> materialPtr = std::make_shared<jMaterial>();
+			materialPtr->MaterialDataPtr = std::make_shared<jMaterialData>();
+			materialPtr->MaterialDataPtr->Data.resize(sizeof(material));
+			memcpy(materialPtr->MaterialDataPtr->Data.data(), &material, sizeof(material));
+            sphere->RenderObjects[0]->MaterialPtr = materialPtr;
+            sphere->RenderObjects[0]->RayTracingHitGroupIndex = LIGHT_HIT_GROUP_INDEX;
+
+			break;
+		}
+		case DistantLight:
+		{
+            check(0);       // todo
+			break;
+		}
+        }
     }
 
     // Set MainCamera

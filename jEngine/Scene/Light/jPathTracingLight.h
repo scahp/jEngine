@@ -3,13 +3,20 @@
 
 struct jPathTracingLightUniformBufferData
 {
+	enum ELightType
+	{
+		Rect,
+		Sphere,
+		DistantLight
+	};
+
 	Vector position;
-	Vector emission;
-	Vector u;
-	Vector v;
 	float radius;
+	Vector emission;
 	float area;
-	uint32 type;
+	Vector u;
+	int32 type;
+	Vector v;
 
 	bool operator == (const jPathTracingLightUniformBufferData& rhs) const
 	{

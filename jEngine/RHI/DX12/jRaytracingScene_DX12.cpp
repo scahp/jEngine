@@ -163,7 +163,7 @@ void jRaytracingScene_DX12::CreateOrUpdateTLAS(const jRatracingInitializer& InIn
             RObj->UpdateWorldMatrix();
 
             instanceDescs[i].InstanceID = i;
-            instanceDescs[i].InstanceContributionToHitGroupIndex = 0;
+            instanceDescs[i].InstanceContributionToHitGroupIndex = RObj->RayTracingHitGroupIndex;
             instanceDescs[i].InstanceMask = 0xFF;
             instanceDescs[i].AccelerationStructure = RObj->GetBottomLevelASBuffer<jBuffer_DX12>()->GetGPUAddress();
             for (int32 k = 0; k < 3; ++k)

@@ -74,6 +74,7 @@ public:
     std::shared_ptr<jBuffer> BottomLevelASBuffer;
 	std::shared_ptr<jBuffer> ScratchASBuffer;
 	std::shared_ptr<jBuffer> VertexAndIndexOffsetBuffer;
+	uint32 RayTracingHitGroupIndex = 0;
 
 	template <typename T> T* GetBottomLevelASBuffer() const { return (T*)BottomLevelASBuffer.get(); }
 	template <typename T> T* GetScratchASBuffer() const { return (T*)ScratchASBuffer.get(); }

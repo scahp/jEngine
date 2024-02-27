@@ -206,6 +206,7 @@ void jRaytracingScene_Vulkan::CreateOrUpdateTLAS(const jRatracingInitializer& In
         jRenderObject* RObj = InstanceList[i];
         RObj->UpdateWorldMatrix();
 
+        MappedPointer[i].instanceShaderBindingTableRecordOffset = RObj->RayTracingHitGroupIndex;
         MappedPointer[i].instanceCustomIndex = i;
         MappedPointer[i].mask = 0xFF;
         MappedPointer[i].flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FRONT_COUNTERCLOCKWISE_BIT_KHR;

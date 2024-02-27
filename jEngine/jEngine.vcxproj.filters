@@ -1085,5 +1085,8 @@
     <None Include="Resource\Shaders\hlsl\PathTracing.hlsl">
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
+    <None Include="Resource\Shaders\hlsl\SimpleTonemap_ps.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
   </ItemGroup>
 </Project>

@@ -153,7 +153,7 @@ public:
         anisotropic = 0.0f;
 
         emission = Vector(0.0f, 0.0f, 0.0f);
-        // padding1
+        lightId = -1;
 
         metallic = 0.0f;
         roughness = 0.5f;
@@ -188,7 +188,7 @@ public:
     float anisotropic;
 
     Vector emission;
-    float padding1;
+    int32 lightId;
 
     float metallic;
     float roughness;
