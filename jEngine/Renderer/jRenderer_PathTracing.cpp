@@ -115,26 +115,12 @@ void jRenderer_PathTracing::PathTracing()
 				jShaderInfo shaderInfo;
 
 				// Second hit gorup for light
-				shaderInfo.SetName(jNameStatic("Miss"));
-				shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/PathTracing.hlsl"));
-				shaderInfo.SetEntryPoint(jNameStatic("LightMissShader"));
-				shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_MISS);
-				NewShader.MissShader = g_rhi->CreateShader(shaderInfo);
-				NewShader.MissEntryPoint = TEXT("LightMissShader");
-
 				shaderInfo.SetName(jNameStatic("ClosestHit"));
 				shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/PathTracing.hlsl"));
 				shaderInfo.SetEntryPoint(jNameStatic("LightClosestHitShader"));
 				shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT);
 				NewShader.ClosestHitShader = g_rhi->CreateShader(shaderInfo);
 				NewShader.ClosestHitEntryPoint = TEXT("LightClosestHitShader");
-
-				shaderInfo.SetName(jNameStatic("AnyHit"));
-				shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/PathTracing.hlsl"));
-				shaderInfo.SetEntryPoint(jNameStatic("LightAnyHitShader"));
-				shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_ANYHIT);
-				NewShader.AnyHitShader = g_rhi->CreateShader(shaderInfo);
-				NewShader.AnyHitEntryPoint = TEXT("LightAnyHitShader");
 
 				NewShader.HitGroupName = TEXT("LightHit");
 
@@ -304,7 +290,7 @@ void jRenderer_PathTracing::PathTracing()
 		jRaytracingPipelineData RaytracingPipelineData;
 		RaytracingPipelineData.MaxAttributeSize = 2 * sizeof(float);	                // float2 barycentrics
 
-		RaytracingPipelineData.MaxPayloadSize = sizeof(Vector) * 4 + sizeof(uint32) * 2;
+		RaytracingPipelineData.MaxPayloadSize = sizeof(Vector) * 4 + sizeof(uint32) * 3;
 		RaytracingPipelineData.MaxTraceRecursionDepth = 31;
 		auto RaytracingPipelineState = g_rhi->CreateRaytracingPipelineStateInfo(RaytracingShaders, RaytracingPipelineData
 			, GlobalShaderBindingLayoutArray, nullptr);

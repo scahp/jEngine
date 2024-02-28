@@ -59,6 +59,8 @@ void jPathTracingLoadData::CreateSceneFor_jEngine(jGame* InGame)
 #define OBJECT_HIT_GROUP_INDEX 0
 #define LIGHT_HIT_GROUP_INDEX 1
 
+#define CONVER_TO_LEFT_HAND_COORDINATE 1
+
     // Create mesh for jObject
     for (const MeshInstance& MeshInst : meshInstances)
     {
@@ -142,9 +144,14 @@ void jPathTracingLoadData::CreateSceneFor_jEngine(jGame* InGame)
 			{
 				streamParam->Data[i + 0] = indices[i + 0];
 
+                #if CONVER_TO_LEFT_HAND_COORDINATE
                 // Convert from CW to CCW
 				streamParam->Data[i + 1] = indices[i + 2];
 				streamParam->Data[i + 2] = indices[i + 1];
+                #else
+				streamParam->Data[i + 1] = indices[i + 1];
+				streamParam->Data[i + 2] = indices[i + 2];
+                #endif // CONVER_TO_LEFT_HAND_COORDINATE
 			}
             indexStreamData->Param = streamParam;
         }

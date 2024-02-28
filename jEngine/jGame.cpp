@@ -256,7 +256,7 @@ void jGame::Setup()
 	jPathTracingLoadData* LoadedPathTracingData = nullptr;
 	if (LoadPathTracing)
 	{
-		std::string sceneName = "Resource/PathTracing/cornell_box/cornell_box_orig.scene";
+		std::string sceneName = "Resource/PathTracing/cornell_box/cornell_box_sphere.scene";
 		LoadedPathTracingData = jPathTracingLoadData::LoadPathTracingData(sceneName);
 		LoadedPathTracingData->CreateSceneFor_jEngine(this);
 	}

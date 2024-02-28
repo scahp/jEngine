@@ -1088,5 +1088,8 @@
     <None Include="Resource\Shaders\hlsl\SimpleTonemap_ps.hlsl">
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
+    <None Include="Resource\Shaders\hlsl\BRDF.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
   </ItemGroup>
 </Project>

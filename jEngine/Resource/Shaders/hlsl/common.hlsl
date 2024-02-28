@@ -1,4 +1,6 @@
-#define PI 3.1415926535897932384626433832795028841971693993751058209749
+#define PI 3.1415926535897932384626433832795
+#define TWO_PI 6.283185307179586476925286766559
+#define INV_PI 0.31830988618379067153776752674503
 
 struct RenderObjectUniformBuffer
 {
@@ -265,7 +267,7 @@ float3 CosWeightedSampleHemisphere(inout uint RandomSeed)
     
     // Sampling on disk
     float r = sqrt(rand1); // for cosine weight. - check out the grpah of sqrt(x)
-    float phi = 2.0f * PI * rand2;
+    float phi = TWO_PI * rand2;
     SampleDir.x = r * cos(phi);
     SampleDir.y = r * sin(phi);
     
@@ -283,7 +285,7 @@ float3 UniformSampleHemisphere(inout uint RandomSeed)
     
     // Sampling on disk
     float r = rand1;
-    float phi = 2.0f * PI * rand2;
+    float phi = TWO_PI * rand2;
     SampleDir.x = r * cos(phi);
     SampleDir.y = r * sin(phi);
     
