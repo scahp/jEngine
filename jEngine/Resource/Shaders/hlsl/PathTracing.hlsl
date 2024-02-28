@@ -251,6 +251,7 @@ void SamplingBRDF(out float3 SampleDir, out float SamplePDF, out float3 BRDF_Cos
         }
     }
 
+    /*
     if (glassPart > 0.0f)
     {
         // Cook torrance brdf from https://cdn2.unrealengine.com/Resources/files/2013SiggraphPresentationsNotes-26915738.pdf
@@ -283,17 +284,18 @@ void SamplingBRDF(out float3 SampleDir, out float SamplePDF, out float3 BRDF_Cos
             payload.TransmittingInstanceIndex = InstanceIndex();
         }
     }
-
+    */
 }
+
+// todo : set from shader
+#define MAX_RECURSION_DEPTH 10
+#define MAX_PIXEL_PER_RAY 10
 
 [shader("raygeneration")]
 void RaygenShader()
 {
     uint seed = InitRandomSeed(DispatchRaysIndex().xy, DispatchRaysDimensions().xy, g_sceneCB.AccumulateNumber);
 
-    // todo : set from shader
-    #define MAX_RECURSION_DEPTH 10
-    #define MAX_PIXEL_PER_RAY 10
     float3 TotalRadiance = 0.0f;
     
     for (int i = 0; i < MAX_PIXEL_PER_RAY; ++i)
@@ -322,8 +324,8 @@ void RaygenShader()
 
         while (payload.RecursionDepth < MAX_RECURSION_DEPTH)
         {
-            TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 0, 0, ray, payload);
-            //TraceRay(Scene, RAY_FLAG_NONE, ~0, 0, 0, 0, ray, payload);
+            //TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 0, 0, ray, payload);
+            TraceRay(Scene, RAY_FLAG_NONE, ~0, 0, 0, 0, ray, payload);
             /*
             if (payload.TransmittingInstanceIndex == -1)
                 TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 0, 0, ray, payload);
@@ -387,27 +389,98 @@ void MeshClosestHitShader(inout RayPayload payload, in MyAttributes attr)
     jVertex Vertex1 = GetVertex(VerticesBindless, Indices.y + VertexOffset);
     jVertex Vertex2 = GetVertex(VerticesBindless, Indices.z + VertexOffset);
 
+    float3 FaceNormal = normalize(cross(Vertex2.Pos - Vertex0.Pos, Vertex1.Pos - Vertex0.Pos));
+    
     // Make triangle normal
-    float3 FaceNormal = HitAttribute(Vertex0.Normal
+    float3 normal = HitAttribute(Vertex0.Normal
         , Vertex1.Normal
         , Vertex2.Normal, attr);
-    FaceNormal = normalize(FaceNormal);
+    normal = normalize(normal);
     
     float3 WorldNormal = 0;
+    float3 WorldFaceNormal = 0;
 
     const bool IsUsingWorldNormal = true;
     if (IsUsingWorldNormal)
     {
-        WorldNormal = FaceNormal;
+        WorldNormal = normal;
     }
     else
     {
-        WorldNormal = mul((float3x3)RenderObjParam[0].M, FaceNormal);
+        WorldNormal = mul((float3x3) RenderObjParam[0].M, normal);
     }
-
+    WorldFaceNormal = mul((float3x3) RenderObjParam[0].M, FaceNormal);
+    //WorldFaceNormal = FaceNormal;
+    
     // Set hit point to payload
     payload.HitPos = HitWorldPosition();
 
+    if (MaterialBindless.specTrans > 0)
+    {
+        payload.Radiance = 0.0f;
+        payload.Attenuation = 1.0f;
+        
+        float3 SurfaceToView = -WorldRayDirection();
+     
+        float EN = dot(SurfaceToView, WorldNormal);
+        float EfN = dot(SurfaceToView, WorldFaceNormal);
+        
+        // Check Weather Inside the transmittance object or not. This could be slow need to improve it.
+        if (EN * EfN < 0)
+        {
+            payload.HitReflectDir = WorldRayDirection();
+            --payload.RecursionDepth;
+            return;
+        }
+        
+        float SamplePDF;
+        float Fresnel;
+        float3 BRDF_Cos = 0;
+        float3 SampleDir = 0;
+
+        {
+            // Cook torrance brdf from https://cdn2.unrealengine.com/Resources/files/2013SiggraphPresentationsNotes-26915738.pdf
+            float3 F0 = MaterialBindless.baseColor;
+
+            float r1 = Random_0_1(payload.seed);
+            float r2 = Random_0_1(payload.seed);
+            float3 WorldHalf = normalize(ImportanceSampleGGX(float2(r1, r2), MaterialBindless.roughness, WorldNormal));
+
+            bool IntoMedium = EN > 0.0f;
+            float eta = IntoMedium ? (1.0 / MaterialBindless.ior) : MaterialBindless.ior;
+            
+            if (EN <= 0)
+            {
+                WorldHalf *= -1.0f;
+            }
+            
+            float F = DielectricFresnel(dot(SurfaceToView, WorldHalf), eta);
+
+            if (Random_0_1(payload.seed) < F && EN > 0)
+            {
+                SamplePDF = 1;
+                SampleDir = reflect(-SurfaceToView, WorldHalf);
+            }
+            else
+            {
+                SamplePDF = 1;
+                SampleDir = refract(-SurfaceToView, WorldHalf, eta);
+            }
+            if (EN > 0)
+            {
+                payload.RecursionDepth--;
+                payload.TransmittingInstanceIndex = 1;
+            }
+            else
+            {
+                payload.TransmittingInstanceIndex = -1;
+            }
+            payload.Attenuation = SamplePDF;
+            payload.HitReflectDir = SampleDir;
+            return;
+        }
+    }
+    
     if (dot(WorldNormal, -WorldRayDirection()) <= 0.0f)
     {
         payload.Attenuation = 1;
@@ -416,14 +489,13 @@ void MeshClosestHitShader(inout RayPayload payload, in MyAttributes attr)
         return;
     }
 
+    float SamplePDF;
+    float3 BRDF_Cos = 0;
+    float3 SampleDir = 0;
     if (any(MaterialBindless.emission))
     {
         payload.Radiance += MaterialBindless.emission;
     }
-
-    float3 SampleDir;
-    float SamplePDF;
-    float3 BRDF_Cos;
     SamplingBRDF(SampleDir, SamplePDF, BRDF_Cos, WorldNormal, -WorldRayDirection(), MaterialBindless, payload);
 
     //if(dot(SampleDir, WorldNormal) <= 0)

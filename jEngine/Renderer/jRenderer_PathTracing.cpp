@@ -99,12 +99,12 @@ void jRenderer_PathTracing::PathTracing()
 				NewShader.ClosestHitShader = g_rhi->CreateShader(shaderInfo);
 				NewShader.ClosestHitEntryPoint = TEXT("MeshClosestHitShader");
 
-				shaderInfo.SetName(jNameStatic("AnyHit"));
-				shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/PathTracing.hlsl"));
-				shaderInfo.SetEntryPoint(jNameStatic("MeshAnyHitShader"));
-				shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_ANYHIT);
-				NewShader.AnyHitShader = g_rhi->CreateShader(shaderInfo);
-				NewShader.AnyHitEntryPoint = TEXT("MeshAnyHitShader");
+				//shaderInfo.SetName(jNameStatic("AnyHit"));
+				//shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/PathTracing.hlsl"));
+				//shaderInfo.SetEntryPoint(jNameStatic("MeshAnyHitShader"));
+				//shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_ANYHIT);
+				//NewShader.AnyHitShader = g_rhi->CreateShader(shaderInfo);
+				//NewShader.AnyHitEntryPoint = TEXT("MeshAnyHitShader");
 
 				NewShader.HitGroupName = TEXT("DefaultHit");
 
