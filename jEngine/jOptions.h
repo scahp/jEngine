@@ -63,3 +63,8 @@ struct jOptions
 };
 
 extern jOptions gOptions;
+
+extern std::vector<std::string> gPathTracingScenes;
+extern std::vector<std::string> gPathTracingScenesNameOnly;
+extern const char* gSelectedScene;
+extern int32 gSelectedSceneIndex;

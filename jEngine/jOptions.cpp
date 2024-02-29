@@ -1,6 +1,11 @@
 ﻿#include "pch.h"
 #include "jOptions.h"
 
+std::vector<std::string> gPathTracingScenes;
+std::vector<std::string> gPathTracingScenesNameOnly;
+const char* gSelectedScene = nullptr;
+int32 gSelectedSceneIndex = 0;
+
 const char* GDenoisers[4] = { "Gaussian", "GaussianSeparable", "Bilateral", "None" };
 const char* GAOResolution[3] = { "100", "75", "50" };
 extern const char* GAOType[3] = { "NoAO", "RTAO", "SSAO" };

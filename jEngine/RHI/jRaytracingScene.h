@@ -18,6 +18,14 @@ public:
     virtual void CreateOrUpdateTLAS(const jRatracingInitializer& InInitializer) = 0;
     virtual bool IsValid() const { return TLASBufferPtr != nullptr; }
     virtual bool ShouldUpdate() const { return false; }
+    virtual void Clear()
+    {
+        InstanceList.clear();
+        TLASBufferPtr.reset();
+        ScratchTLASBufferPtr.reset();
+        InstanceUploadBufferPtr.reset();
+        RaytracingOutputPtr.reset();
+    }
 
     template <typename T> T* GetTLASBuffer() const { return (T*)TLASBufferPtr.get(); }
     template <typename T> T* GetScratchTLASBuffer() const { return (T*)ScratchTLASBufferPtr.get(); }

@@ -299,11 +299,29 @@ void jRHI_DX12::WaitForGPU() const
 {
 	check(Swapchain);
 
-	auto Queue = GraphicsCommandBufferManager->GetCommandQueue();
-    check(Queue);
+    {
+        auto Queue = GraphicsCommandBufferManager->GetCommandQueue();
+        check(Queue);
 
-    if (GraphicsCommandBufferManager && GraphicsCommandBufferManager->Fence)
-        GraphicsCommandBufferManager->Fence->SignalWithNextFenceValue(Queue.Get(), true);
+        if (GraphicsCommandBufferManager && GraphicsCommandBufferManager->Fence)
+            GraphicsCommandBufferManager->Fence->SignalWithNextFenceValue(Queue.Get(), true);
+    }
+
+    {
+        auto Queue = ComputeCommandBufferManager->GetCommandQueue();
+        check(Queue);
+
+        if (ComputeCommandBufferManager && ComputeCommandBufferManager->Fence)
+            ComputeCommandBufferManager->Fence->SignalWithNextFenceValue(Queue.Get(), true);
+    }
+
+    {
+        auto Queue = CopyCommandBufferManager->GetCommandQueue();
+        check(Queue);
+
+        if (CopyCommandBufferManager && CopyCommandBufferManager->Fence)
+            CopyCommandBufferManager->Fence->SignalWithNextFenceValue(Queue.Get(), true);
+    }
 }
 
 bool jRHI_DX12::InitRHI()
