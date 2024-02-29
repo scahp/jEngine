@@ -206,8 +206,13 @@ namespace GLSLPT
                     Vector nrm = normals[indices[v]];
                     Vector2 uv = uvs[indices[v]];
 
+                    #if PATH_TRACING_DATA_LEFT_HAND
+					mesh->verticesUVX.push_back(Vector4(-pos.x, pos.y, pos.z, uv.x));
+					mesh->normalsUVY.push_back(Vector4(-nrm.x, nrm.y, nrm.z, uv.y));
+                    #else
                     mesh->verticesUVX.push_back(Vector4(pos.x, pos.y, pos.z, uv.x));
                     mesh->normalsUVY.push_back(Vector4(nrm.x, nrm.y, nrm.z, uv.y));
+                    #endif // PATH_TRACING_DATA_LEFT_HAND
                 }
 
                 mesh->name = gltfMesh.name;
@@ -252,7 +257,7 @@ namespace GLSLPT
             // Albedo
             material.baseColor = Vector((float)pbr.baseColorFactor[0], (float)pbr.baseColorFactor[1], (float)pbr.baseColorFactor[2]);
             if (pbr.baseColorTexture.index > -1)
-                material.baseColorTexId = (float)(pbr.baseColorTexture.index + sceneTexIdx);
+                material.baseColorTexId = (pbr.baseColorTexture.index + sceneTexIdx);
 
             // Opacity
             material.opacity = (float)pbr.baseColorFactor[3];
@@ -267,15 +272,15 @@ namespace GLSLPT
             material.roughness = sqrtf((float)pbr.roughnessFactor); // Repo's disney material doesn't use squared roughness
             material.metallic = (float)pbr.metallicFactor;
             if (pbr.metallicRoughnessTexture.index > -1)
-                material.metallicRoughnessTexID = (float)(pbr.metallicRoughnessTexture.index + sceneTexIdx);
+                material.metallicRoughnessTexID = (pbr.metallicRoughnessTexture.index + sceneTexIdx);
 
             // Normal Map
-            material.normalmapTexID = (float)(gltfMaterial.normalTexture.index + sceneTexIdx);
+            material.normalmapTexID = (gltfMaterial.normalTexture.index + sceneTexIdx);
 
             // Emission
             material.emission = Vector((float)gltfMaterial.emissiveFactor[0], (float)gltfMaterial.emissiveFactor[1], (float)gltfMaterial.emissiveFactor[2]);
             if (gltfMaterial.emissiveTexture.index > -1)
-                material.emissionmapTexID = (float)(gltfMaterial.emissiveTexture.index + sceneTexIdx);
+                material.emissionmapTexID = (gltfMaterial.emissiveTexture.index + sceneTexIdx);
 
             // KHR_materials_transmission
             if (gltfMaterial.extensions.find("KHR_materials_transmission") != gltfMaterial.extensions.end())
@@ -333,6 +338,9 @@ namespace GLSLPT
                 translate.m[3][0] = (float)gltfNode.translation[0];
                 translate.m[3][1] = (float)gltfNode.translation[1];
                 translate.m[3][2] = (float)gltfNode.translation[2];
+                #if PATH_TRACING_DATA_LEFT_HAND
+                translate.m[3][0] *= -1.0f;
+                #endif // PATH_TRACING_DATA_LEFT_HAND
             }
 
             if (gltfNode.rotation.size() > 0)

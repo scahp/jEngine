@@ -16,6 +16,8 @@
 #include "Scene/Light/jPathTracingLight.h"
 #include "jPrimitiveUtil.h"
 
+jPathTracingLoadData* gPathTracingScene = nullptr;
+
 jPathTracingLoadData* jPathTracingLoadData::LoadPathTracingData(std::string InFilename)
 {
     jPathTracingLoadData* NewData = new jPathTracingLoadData();
@@ -59,8 +61,6 @@ void jPathTracingLoadData::CreateSceneFor_jEngine(jGame* InGame)
 #define OBJECT_HIT_GROUP_INDEX 0
 #define LIGHT_HIT_GROUP_INDEX 1
 
-#define CONVER_TO_LEFT_HAND_COORDINATE 1
-
     // Create mesh for jObject
     for (const MeshInstance& MeshInst : meshInstances)
     {
@@ -92,7 +92,7 @@ void jPathTracingLoadData::CreateSceneFor_jEngine(jGame* InGame)
             positionOnlyVertexStreamData->ElementCount = elementCount;
         }
 
-        // Base VertexStream �߰�
+        // Create Base VertexStream
         auto vertexStreamData = std::make_shared<jVertexStreamData>();
         {
             auto streamParam = std::make_shared<jStreamParam<jBaseVertex>>();
@@ -143,15 +143,8 @@ void jPathTracingLoadData::CreateSceneFor_jEngine(jGame* InGame)
 			for (int32 i = 0; i < indices.size(); i += 3)
 			{
 				streamParam->Data[i + 0] = indices[i + 0];
-
-                #if CONVER_TO_LEFT_HAND_COORDINATE
-                // Convert from CW to CCW
-				streamParam->Data[i + 1] = indices[i + 2];
-				streamParam->Data[i + 2] = indices[i + 1];
-                #else
 				streamParam->Data[i + 1] = indices[i + 1];
 				streamParam->Data[i + 2] = indices[i + 2];
-                #endif // CONVER_TO_LEFT_HAND_COORDINATE
 			}
             indexStreamData->Param = streamParam;
         }
@@ -200,6 +193,8 @@ void jPathTracingLoadData::CreateSceneFor_jEngine(jGame* InGame)
 
         renderObject->MaterialPtr = materialPtr;
         renderObject->RayTracingHitGroupIndex = OBJECT_HIT_GROUP_INDEX;
+
+        SpawnObjects.push_back(object);
     }
 
     // Create Light
@@ -216,21 +211,24 @@ void jPathTracingLoadData::CreateSceneFor_jEngine(jGame* InGame)
         Data.area = L.area;
         Data.type = L.type;
 
-        jLight::AddLights(jLight::CreatePathTracingLight(Data));
+        jLight* NewLight = jLight::CreatePathTracingLight(Data);
+        jLight::AddLights(NewLight);
+        SpawnLights.push_back(NewLight);
 
         switch (L.type)
         {
 		case RectLight:
 		{
-            Vector Size(L.v.Length(), 0.001f, L.u.Length());
-            jQuadPrimitive* quad = jPrimitiveUtil::CreateQuad(Data.position - (Size * 0.5f), Size, Vector(1.0f), Vector4::ColorWhite);
+            Vector Size = Abs(L.u) + Abs(L.v);
+            Size.y = Max(0.001f, Size.y);
+            jQuadPrimitive* quad = jPrimitiveUtil::CreateQuad(Data.position + (L.u + L.v) * 0.5f, Size, Vector(1.0f), Vector4::ColorWhite);
             jObject::AddObject(quad);
+            SpawnObjects.push_back(quad);
 
             check(quad->RenderObjects.size() > 0);
-            const Vector Normal = L.u.CrossProduct(L.v).GetNormalize();
-            const Vector EulerAngle = Vector::GetEulerAngleFrom(Normal);
+            const Vector Normal = L.v.CrossProduct(L.u).GetNormalize();
+            Vector EulerAngle = Vector::GetEulerAngleFrom(Normal);
 			quad->RenderObjects[0]->SetRot(EulerAngle);
-
             quad->RenderObjects[0]->RayTracingHitGroupIndex = 1;
 
             // todo : need to replace it as a light data
@@ -251,6 +249,7 @@ void jPathTracingLoadData::CreateSceneFor_jEngine(jGame* InGame)
 		{
             jObject* sphere = jPrimitiveUtil::CreateSphere(Data.position, Data.radius, 60, 60, Vector(1.0f), Vector4::ColorWhite);
             jObject::AddObject(sphere);
+            SpawnObjects.push_back(sphere);
 
 			// todo : need to replace it as a light data
             // todo : I need additional data structure for lights. ex). hit group and so on.
@@ -272,10 +271,26 @@ void jPathTracingLoadData::CreateSceneFor_jEngine(jGame* InGame)
 			break;
 		}
         }
+
     }
 
     // Set MainCamera
     *InGame->MainCamera = Camera;
+}
+
+void jPathTracingLoadData::ClearSceneFor_jEngine(class jGame* InGame)
+{
+    for (jObject* obj : SpawnObjects)
+    {
+        jObject::RemoveObject(obj);
+    }
+    SpawnObjects.clear();
+
+	for (jLight* light : SpawnLights)
+	{
+		jLight::RemoveLights(light);
+	}
+    SpawnLights.clear();
 }
 
 bool Mesh::LoadFromFile(const std::string& filename)
@@ -310,8 +325,13 @@ bool Mesh::LoadFromFile(const std::string& filename)
                 tinyobj::real_t vy = attrib.vertices[3 * idx.vertex_index + 1];
                 tinyobj::real_t vz = attrib.vertices[3 * idx.vertex_index + 2];
                 tinyobj::real_t nx = attrib.normals[3 * idx.normal_index + 0];
-                tinyobj::real_t ny = attrib.normals[3 * idx.normal_index + 1];
-                tinyobj::real_t nz = attrib.normals[3 * idx.normal_index + 2];
+				tinyobj::real_t ny = attrib.normals[3 * idx.normal_index + 1];
+				tinyobj::real_t nz = attrib.normals[3 * idx.normal_index + 2];
+
+#if PATH_TRACING_DATA_LEFT_HAND
+                vx *= -1.0f;
+                nx *= -1.0f;
+#endif // PATH_TRACING_DATA_LEFT_HAND
 
                 tinyobj::real_t tx, ty;
 

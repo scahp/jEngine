@@ -39,10 +39,10 @@ struct MaterialUniformBuffer
     float3 mediumColor;
     float mediumAnisotropy;
 
-    float baseColorTexId;
-    float metallicRoughnessTexID;
-    float normalmapTexID;
-    float emissionmapTexID;
+    int baseColorTexId;
+    int metallicRoughnessTexID;
+    int normalmapTexID;
+    int emissionmapTexID;
 
     float opacity;
     float alphaMode;
@@ -64,6 +64,7 @@ struct LightUniformBuffer
 RaytracingAccelerationStructure Scene : register(t0, space0);
 RWTexture2D<float4> RenderTarget : register(u1, space0);
 ConstantBuffer<SceneConstantBuffer> g_sceneCB : register(b2, space0);
+SamplerState DefaultSamplerState : register(s3, space0);
 
 StructuredBuffer<uint2> VertexIndexOffsetArray[] : register(t0, space1);
 StructuredBuffer<uint> IndexBindlessArray[] : register(t0, space2);
@@ -71,6 +72,50 @@ StructuredBuffer<RenderObjectUniformBuffer> RenderObjParamArray[] : register(t0,
 ByteAddressBuffer VerticesBindlessArray[] : register(t0, space4);
 ConstantBuffer<MaterialUniformBuffer> MaterialBindlessArray[] : register(b0, space5);
 ConstantBuffer<LightUniformBuffer> LightBindlessArray[] : register(b0, space6);
+Texture2D TextureBindlessArray[] : register(t0, space7);
+
+MaterialUniformBuffer GetMaterial(inout float3 InOutWorldNormal, in ConstantBuffer<MaterialUniformBuffer> InMaterial, float2 InUV)
+{
+    MaterialUniformBuffer mat;
+    mat = InMaterial;
+
+    // Base Color Map
+    if (mat.baseColorTexId >= 0)
+    {
+        float4 col = TextureBindlessArray[mat.baseColorTexId].SampleLevel(DefaultSamplerState, InUV, 0);
+        mat.baseColor.rgb *= pow(col.rgb, 2.2);
+        mat.opacity *= col.a;
+    }
+
+    // Metallic Roughness Map
+    if (mat.metallicRoughnessTexID >= 0)
+    {
+        float4 matRgh = TextureBindlessArray[mat.metallicRoughnessTexID].SampleLevel(DefaultSamplerState, InUV, 0);
+        mat.metallic = matRgh.x;
+        mat.roughness = max(matRgh.y * matRgh.y, 0.001);
+    }
+
+    // Normal Map
+    if (mat.normalmapTexID >= 0)
+    {
+        float3 texNormal = TextureBindlessArray[mat.normalmapTexID].SampleLevel(DefaultSamplerState, InUV, 0).xyz;
+        texNormal.y = 1.0 - texNormal.y;
+        texNormal = normalize(texNormal * 2.0 - 1.0);
+        
+
+        float3 origNormal = InOutWorldNormal;
+        float3 T, B;
+        MakeTB_From_N(InOutWorldNormal, T, B);
+        InOutWorldNormal = normalize(T * texNormal.x + B * texNormal.y + origNormal * texNormal.z);
+        //state.ffnormal = dot(origNormal, r.direction) <= 0.0 ? origNormal : -state.normal;
+    }
+
+    // Emission Map
+    if (mat.emissionmapTexID >= 0)
+        mat.emission = pow(TextureBindlessArray[mat.emissionmapTexID].SampleLevel(DefaultSamplerState, InUV, 0).xyz, 2.2);
+
+    return mat;
+}
 
 // Generate a ray in world space for a camera pixel corresponding to an index from the dispatched 2D grid.
 inline float3 GenerateCameraRay(uint2 index, out float3 origin, out float3 direction)
@@ -127,7 +172,11 @@ struct RayPayload
     float3 Radiance;
     uint seed;
     uint RecursionDepth;
-    int TransmittingInstanceIndex;
+    int PenetratingInstanceIndex;
+
+    bool IsRayPenetratingInstance() { return PenetratingInstanceIndex != -1; }
+    void SetPenetratingInstnaceIndex(uint InstanceIndex) { PenetratingInstanceIndex = InstanceIndex; }
+    void ResetPenetratingInstanceIndex() { PenetratingInstanceIndex = -1; }
 };
 
 float DielectricFresnel(float cosThetaI, float eta)
@@ -159,32 +208,72 @@ bool Refract(in float3 wi, in float3 n, float eta, out float3 wt)
     return true;
 }
 
-float3 SampleGGXVNDF(float3 V, float ax, float ay, float r1, float r2)
+// https://github.com/knightcrawler25/GLSL-PathTracer/blob/master/src/shaders/common/sampling.glsl
+float SchlickWeight(float u)
 {
-    float3 Vh = normalize(float3(ax * V.x, ay * V.y, V.z));
-
-    float lensq = Vh.x * Vh.x + Vh.y * Vh.y;
-    float3 T1 = lensq > 0 ? float3(-Vh.y, Vh.x, 0) * (1.0f / sqrt(lensq)) : float3(1, 0, 0);
-    float3 T2 = cross(Vh, T1);
-
-    float r = sqrt(r1);
-    float phi = 2.0 * PI * r2;
-    float t1 = r * cos(phi);
-    float t2 = r * sin(phi);
-    float s = 0.5 * (1.0 + Vh.z);
-    t2 = (1.0 - s) * sqrt(1.0 - t1 * t1) + s * t2;
-
-    float3 Nh = t1 * T1 + t2 * T2 + sqrt(max(0.0, 1.0 - t1 * t1 - t2 * t2)) * Vh;
-
-    return normalize(float3(ax * Nh.x, ay * Nh.y, max(0.0, Nh.z)));
+    float m = clamp(1.0 - u, 0.0, 1.0);
+    float m2 = m * m;
+    return m2 * m2 * m;
 }
 
 void SamplingBRDF(out float3 SampleDir, out float SamplePDF, out float3 BRDF_Cos
-    , in float3 WorldNormal, in float3 SurfaceToView, in ConstantBuffer<MaterialUniformBuffer> mat, inout RayPayload payload)
+    , in float3 WorldNormal, in float3 SurfaceToView, in MaterialUniformBuffer mat, inout RayPayload payload)
 {
     float diffusePart = (1.0f - mat.metallic) * (1.0f - mat.specTrans);
     float specularPart = mat.metallic * (1.0f - mat.specTrans);
+
     float glassPart = (1.0 - mat.metallic) * mat.specTrans;
+    float clearcoatPart = 0.25 * mat.clearcoat;
+
+    //diffusePart = 0;  // test disable
+    //specularPart = 0;  // test disable
+    glassPart = 0;  // test disable
+    clearcoatPart = 0;  // test disable
+
+    float totalWeight = 1.0f / (diffusePart + specularPart + glassPart + clearcoatPart);
+    float diffuseWeight = diffusePart * totalWeight;
+    float specularWeight = specularPart * totalWeight;
+    float clearcoatWeight = clearcoatPart * totalWeight;
+
+    // CDF of the sampling probabilities
+    float cdf[2];
+    cdf[0] = diffusePart;
+    cdf[1] = cdf[0] + specularPart;
+    //cdf[2] = cdf[1] + clearcoatPart;
+
+    float3 WorldHalf = 0;
+    float cosine_theta = 0;
+
+    float r3 = Random_0_1(payload.seed);
+    if (r3 < cdf[0]) // diffusePart
+    {
+        // Lambertian surface
+        SampleDir = CosWeightedSampleHemisphere(payload.seed);
+        cosine_theta = SampleDir.z;
+        SampleDir = ToWorld(WorldNormal, SampleDir);
+    }
+    else if (r3 < cdf[1]) // specularPart
+    {
+        // Cook torrance brdf from https://cdn2.unrealengine.com/Resources/files/2013SiggraphPresentationsNotes-26915738.pdf
+        float r1 = Random_0_1(payload.seed);
+        float r2 = Random_0_1(payload.seed);
+        WorldHalf = normalize(ImportanceSampleGGX(float2(r1, r2), mat.roughness, WorldNormal));
+        SampleDir = reflect(-SurfaceToView, WorldHalf);
+        cosine_theta = saturate(dot(WorldNormal, SampleDir));
+    }
+/*
+    else if (r3 < cdf[2]) // clearcoatPart
+    {
+        // https://github.com/knightcrawler25/GLSL-PathTracer/blob/master/src/shaders/common/sampling.glsl
+        float clearcoatRoughness = lerp(0.1, 0.001, mat.clearcoatGloss);
+
+        float r1 = Random_0_1(payload.seed);
+        float r2 = Random_0_1(payload.seed);
+        WorldHalf = normalize(ImportanceSampleGGX(float2(r1, r2), clearcoatRoughness, WorldNormal));
+        SampleDir = reflect(-SurfaceToView, WorldHalf);
+    }
+*/
+
 
     SamplePDF = 0;
     BRDF_Cos = 0;
@@ -192,7 +281,7 @@ void SamplingBRDF(out float3 SampleDir, out float SamplePDF, out float3 BRDF_Cos
 // In, out intersection check within any hit for glass sphere
 #define TRANSMITTANCE_TEST 0
 #if TRANSMITTANCE_TEST
-    if (payload.TransmittingInstanceIndex != -1)
+    if (payload.IsRayPenetratingInstance())
     {
         payload.Radiance = float3(10, 0, 0);
         payload.Attenuation = 1;
@@ -200,38 +289,52 @@ void SamplingBRDF(out float3 SampleDir, out float SamplePDF, out float3 BRDF_Cos
     }
 #endif // TRANSMITTANCE_TEST
 
-    //payload.TransmittingInstanceIndex = -1;
-
     if (diffusePart > 0.0f)
     {
-        // Lambertian surface
-        SampleDir = CosWeightedSampleHemisphere(payload.seed);
-        float cosine_theta = SampleDir.z;
-        SampleDir = ToWorld(WorldNormal, SampleDir);
-    
-
-        float3 BRDF = INV_PI * mat.baseColor;
-        BRDF_Cos += BRDF * cosine_theta * diffusePart;
-        SamplePDF += (INV_PI * cosine_theta) * diffusePart;
+        if (cosine_theta < 0)
+        {
+            // Underneath skip.
+        }
+        else
+        {
+            float3 BRDF = INV_PI * mat.baseColor;
+            BRDF_Cos += BRDF * cosine_theta * diffusePart;
+            SamplePDF += (INV_PI * cosine_theta) * diffuseWeight;
+        }
     }
 
-    if (mat.metallic > 0.0f)
+    if (specularPart > 0.0f)
     {
-        // Cook torrance brdf from https://cdn2.unrealengine.com/Resources/files/2013SiggraphPresentationsNotes-26915738.pdf
-        float3 F0 = mat.baseColor;
-
-        float r1 = Random_0_1(payload.seed);
-        float r2 = Random_0_1(payload.seed);
-        float3 WorldHalf = normalize(ImportanceSampleGGX(float2(r1, r2), mat.roughness, WorldNormal));
-
-        //SampleDir = 2.0f * dot(SurfaceToView, WorldHalf) * WorldHalf - SurfaceToView;
-        SampleDir = reflect(-SurfaceToView, WorldHalf);
-
         float NoV = saturate(dot(WorldNormal, SurfaceToView));
         float NoL = saturate(dot(WorldNormal, SampleDir));
         float NoH = saturate(dot(WorldNormal, WorldHalf));
         float VoH = saturate(dot(SurfaceToView, WorldHalf));
 
+        if (cosine_theta < 0)
+        {
+            // Underneath skip.
+        }
+        else
+        {
+            float3 F0 = mat.baseColor;
+
+            float D = DistributionGGX(WorldNormal, WorldHalf, mat.roughness);
+            float G = GeometrySmith(mat.roughness, NoV, NoL);
+            float3 F = FresnelSchlick(cosine_theta, F0);
+            float3 BRDF = F * (D * G / (4 * NoL * NoV));
+            
+            BRDF_Cos += (BRDF * cosine_theta) * specularPart;
+            SamplePDF += (D * NoH / (4 * VoH)) * specularWeight;
+        }
+    }
+
+/*
+    if (clearcoatPart > 0.0f)
+    {
+        float NoV = saturate(dot(WorldNormal, SurfaceToView));
+        float NoL = saturate(dot(WorldNormal, SampleDir));
+        float NoH = saturate(dot(WorldNormal, WorldHalf));
+        float VoH = saturate(dot(SurfaceToView, WorldHalf));
         float cosine_theta = NoL;
         if (cosine_theta < 0)
         {
@@ -241,55 +344,24 @@ void SamplingBRDF(out float3 SampleDir, out float SamplePDF, out float3 BRDF_Cos
         }
         else
         {
-            float D = DistributionGGX(WorldNormal, WorldHalf, mat.roughness);
-            float G = GeometrySmith(mat.roughness, NoV, NoL);
-            float3 F = FresnelSchlick(cosine_theta, F0);
-            float3 BRDF = F * (D * G / (4 * NoL * NoV));
-            
-            SamplePDF += (D * NoH / (4 * VoH)) * mat.metallic;
-            BRDF_Cos += (BRDF * cosine_theta) * mat.metallic;
+            // https://github.com/knightcrawler25/GLSL-PathTracer/blob/master/src/shaders/common/sampling.glsl
+            float clearcoatRoughness = lerp(0.1, 0.001, mat.clearcoatGloss);
+
+            float F = lerp(0.04, 1.0, SchlickWeight(VoH));
+            float D = DistributionGGX(WorldNormal, WorldHalf, clearcoatRoughness);
+            float G = GeometrySmith(0.25f, NoV, NoL);
+            float jacobian = 1.0 / (4.0 * VoH);
+
+            SamplePDF += D * NoH * jacobian * clearcoatPart;
+            BRDF_Cos += float3(F, F, F) * D * G * cosine_theta * (0.25 * mat.clearcoat);
         }
     }
-
-    /*
-    if (glassPart > 0.0f)
-    {
-        // Cook torrance brdf from https://cdn2.unrealengine.com/Resources/files/2013SiggraphPresentationsNotes-26915738.pdf
-        float3 F0 = mat.baseColor;
-
-        float r1 = Random_0_1(payload.seed);
-        float r2 = Random_0_1(payload.seed);
-        float3 WorldHalf = normalize(ImportanceSampleGGX(float2(r1, r2), mat.roughness, WorldNormal));
-
-        bool IntoMedium = dot(SurfaceToView, WorldHalf) > 0.0f;
-        float ior = mat.ior;
-        float eta = IntoMedium ? (1.0 / ior) : ior;
-        float F = DielectricFresnel(abs(dot(SurfaceToView, WorldHalf)), eta);
-
-        if (Random_0_1(payload.seed) < F)
-        {
-            SampleDir = reflect(-SurfaceToView, WorldHalf);
-            float cosine_theta = dot(SampleDir, WorldHalf);
-
-            BRDF_Cos = F;
-            SamplePDF = F;
-        }
-        else
-        {
-            SampleDir = refract(-SurfaceToView, WorldHalf, eta);
-            float cosine_theta = dot(SampleDir, WorldNormal);
-            
-            BRDF_Cos = 1.0-F;
-            SamplePDF = 1.0-F;
-            payload.TransmittingInstanceIndex = InstanceIndex();
-        }
-    }
-    */
+*/
 }
 
 // todo : set from shader
-#define MAX_RECURSION_DEPTH 10
-#define MAX_PIXEL_PER_RAY 10
+#define MAX_RECURSION_DEPTH 6
+#define MAX_PIXEL_PER_RAY 5
 
 [shader("raygeneration")]
 void RaygenShader()
@@ -317,21 +389,23 @@ void RaygenShader()
         payload.HitReflectDir = float3(0, 0, 0);
         payload.Radiance = float3(0, 0, 0);
         payload.Attenuation = float3(1, 1, 1);
-        payload.TransmittingInstanceIndex = -1;
+        payload.ResetPenetratingInstanceIndex();
 
         float3 radiance = 0.0f;
         float3 attenuation = 1.0f;
 
         while (payload.RecursionDepth < MAX_RECURSION_DEPTH)
         {
-            //TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 0, 0, ray, payload);
+#define FORCE_TWO_SIDE 0
+#if FORCE_TWO_SIDE
             TraceRay(Scene, RAY_FLAG_NONE, ~0, 0, 0, 0, ray, payload);
-            /*
-            if (payload.TransmittingInstanceIndex == -1)
-                TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 0, 0, ray, payload);
-            else
+#else
+            if (payload.IsRayPenetratingInstance())
                 TraceRay(Scene, RAY_FLAG_CULL_FRONT_FACING_TRIANGLES, ~0, 0, 0, 0, ray, payload);
-            */
+            else
+                TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 0, 0, ray, payload);
+#endif // FORCE_TWO_SIDE
+            
             radiance += attenuation * payload.Radiance;
             attenuation = max(0, attenuation * payload.Attenuation);
 
@@ -410,12 +484,16 @@ void MeshClosestHitShader(inout RayPayload payload, in MyAttributes attr)
         WorldNormal = mul((float3x3) RenderObjParam[0].M, normal);
     }
     WorldFaceNormal = mul((float3x3) RenderObjParam[0].M, FaceNormal);
-    //WorldFaceNormal = FaceNormal;
+
+    float2 uv = HitAttribute(Vertex0.TexCoord
+        , Vertex1.TexCoord
+        , Vertex2.TexCoord, attr);
+    MaterialUniformBuffer material = GetMaterial(WorldNormal, MaterialBindless, uv);
     
     // Set hit point to payload
     payload.HitPos = HitWorldPosition();
 
-    if (MaterialBindless.specTrans > 0)
+    if (material.specTrans > 0)
     {
         payload.Radiance = 0.0f;
         payload.Attenuation = 1.0f;
@@ -424,15 +502,7 @@ void MeshClosestHitShader(inout RayPayload payload, in MyAttributes attr)
      
         float EN = dot(SurfaceToView, WorldNormal);
         float EfN = dot(SurfaceToView, WorldFaceNormal);
-        
-        // Check Weather Inside the transmittance object or not. This could be slow need to improve it.
-        if (EN * EfN < 0)
-        {
-            payload.HitReflectDir = WorldRayDirection();
-            --payload.RecursionDepth;
-            return;
-        }
-        
+
         float SamplePDF;
         float Fresnel;
         float3 BRDF_Cos = 0;
@@ -440,14 +510,14 @@ void MeshClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 
         {
             // Cook torrance brdf from https://cdn2.unrealengine.com/Resources/files/2013SiggraphPresentationsNotes-26915738.pdf
-            float3 F0 = MaterialBindless.baseColor;
+            float3 F0 = material.baseColor;
 
             float r1 = Random_0_1(payload.seed);
             float r2 = Random_0_1(payload.seed);
-            float3 WorldHalf = normalize(ImportanceSampleGGX(float2(r1, r2), MaterialBindless.roughness, WorldNormal));
+            float3 WorldHalf = normalize(ImportanceSampleGGX(float2(r1, r2), material.roughness, WorldNormal));
 
             bool IntoMedium = EN > 0.0f;
-            float eta = IntoMedium ? (1.0 / MaterialBindless.ior) : MaterialBindless.ior;
+            float eta = IntoMedium ? (1.0 / material.ior) : material.ior;
             
             if (EN <= 0)
             {
@@ -465,15 +535,15 @@ void MeshClosestHitShader(inout RayPayload payload, in MyAttributes attr)
             {
                 SamplePDF = 1;
                 SampleDir = refract(-SurfaceToView, WorldHalf, eta);
-            }
-            if (EN > 0)
-            {
-                payload.RecursionDepth--;
-                payload.TransmittingInstanceIndex = 1;
-            }
-            else
-            {
-                payload.TransmittingInstanceIndex = -1;
+
+                if (EN > 0)
+                {
+                    payload.SetPenetratingInstnaceIndex(InstanceIndex());
+                }
+                else
+                {
+                    payload.ResetPenetratingInstanceIndex();
+                }
             }
             payload.Attenuation = SamplePDF;
             payload.HitReflectDir = SampleDir;
@@ -492,11 +562,11 @@ void MeshClosestHitShader(inout RayPayload payload, in MyAttributes attr)
     float SamplePDF;
     float3 BRDF_Cos = 0;
     float3 SampleDir = 0;
-    if (any(MaterialBindless.emission))
+    if (any(material.emission))
     {
-        payload.Radiance += MaterialBindless.emission;
+        payload.Radiance += material.emission;
     }
-    SamplingBRDF(SampleDir, SamplePDF, BRDF_Cos, WorldNormal, -WorldRayDirection(), MaterialBindless, payload);
+    SamplingBRDF(SampleDir, SamplePDF, BRDF_Cos, WorldNormal, -WorldRayDirection(), material, payload);
 
     //if(dot(SampleDir, WorldNormal) <= 0)
     {
@@ -508,98 +578,6 @@ void MeshClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 
     payload.Attenuation = BRDF_Cos / SamplePDF;
     payload.HitReflectDir = SampleDir;
-}
-
-[shader("anyhit")]
-void MeshAnyHitShader(inout RayPayload payload, in MyAttributes attr)
-{
-    // SRV_UAV DescHeap
-    StructuredBuffer<uint2> VertexIndexOffset;
-    StructuredBuffer<uint> IndexBindless;
-    StructuredBuffer<RenderObjectUniformBuffer> RenderObjParam;
-    ByteAddressBuffer VerticesBindless;
-    ConstantBuffer<MaterialUniformBuffer> MaterialBindless;
-
-    uint InstanceIdx = InstanceIndex();
-    GetShaderBindingResources( 
-        VertexIndexOffset,
-        IndexBindless,
-        RenderObjParam,
-        VerticesBindless,
-        MaterialBindless,
-        InstanceIdx);
-/*
-    if (MaterialBindless.specTrans > 0)
-    {
-        if (payload.TransmittingInstanceIndex == InstanceIndex())
-        {
-            
-            uint VertexOffset = VertexIndexOffset[0].x;
-            uint IndexOffset = VertexIndexOffset[0].y;
-
-            uint PrimIdx = PrimitiveIndex();
-            uint3 Indices = uint3(
-                IndexBindless[IndexOffset + PrimIdx * 3],
-                IndexBindless[IndexOffset + PrimIdx * 3 + 1],
-                IndexBindless[IndexOffset + PrimIdx * 3 + 2]);
-
-            jVertex Vertex0 = GetVertex(VerticesBindless, Indices.x + VertexOffset);
-            jVertex Vertex1 = GetVertex(VerticesBindless, Indices.y + VertexOffset);
-            jVertex Vertex2 = GetVertex(VerticesBindless, Indices.z + VertexOffset);
-
-            // Make triangle normal
-            float3 FaceNormal = HitAttribute(Vertex0.Normal
-                , Vertex1.Normal
-                , Vertex2.Normal, attr);
-            FaceNormal = normalize(FaceNormal);
-    
-            float3 WorldNormal = 0;
-
-            const bool IsUsingWorldNormal = true;
-            if (IsUsingWorldNormal)
-            {
-                WorldNormal = FaceNormal;
-            }
-            else
-            {
-                WorldNormal = mul((float3x3)RenderObjParam[0].M, FaceNormal);
-            }
-
-            bool IsOutMedium = dot(WorldRayDirection(), WorldNormal) >= 0.0;
-            float eta =  !IsOutMedium ? (1.0 / MaterialBindless.ior) : MaterialBindless.ior;
-            payload.HitPos = HitWorldPosition();
-            //eta = 1.0f;
-            //payload.HitReflectDir = refract(WorldRayDirection(), WorldNormal, 1.0 / eta);
-            
-            float F = DielectricFresnel(abs(dot(-WorldRayDirection(), WorldNormal)), eta);
-
-            if (Random_0_1(payload.seed) < F)
-            {
-                payload.HitReflectDir = reflect(WorldRayDirection(), WorldNormal);
-            }
-            else
-            {
-                payload.HitReflectDir = refract(WorldRayDirection(), WorldNormal, eta);
-                payload.TransmittingInstanceIndex = -1;
-            }
-            
-            
-            IgnoreHit();
-            return;
-        }
-    }
-*/
-/*
-    if (payload.TransmittingInstanceIndex != -1)
-    {
-        if (0 < payload.TransmittingInstanceIndex)
-        {
-            IgnoreHit();
-            return;
-        }
-    }
-*/
-    AcceptHitAndEndSearch();
 }
 
 [shader("miss")]

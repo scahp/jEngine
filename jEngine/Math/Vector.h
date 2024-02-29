@@ -142,6 +142,14 @@ struct Vector
 		return A.IsNearlyEqual(B, fTolerance);
     }
 
+	FORCEINLINE friend Vector Abs(Vector A)
+	{
+		A.x = fabs(A.x);
+		A.y = fabs(A.y);
+		A.z = fabs(A.z);
+		return A;
+	}
+
 	FORCEINLINE bool operator!=(Vector const& vector) const
 	{
 		return !(*this == vector);
@@ -380,6 +388,15 @@ struct Vector4
 		return A.IsNearlyEqual(B, fTolerance);
     }
 
+	FORCEINLINE friend Vector4 Abs(Vector4 A)
+	{
+		A.x = fabs(A.x);
+		A.y = fabs(A.y);
+		A.z = fabs(A.z);
+		A.w = fabs(A.w);
+		return A;
+	}
+
 	FORCEINLINE bool operator!=(Vector4 const& Vector4) const
 	{
 		return !(*this == Vector4);
@@ -558,6 +575,13 @@ struct Vector2
     {
 		return A.IsNearlyEqual(B, fTolerance);
     }
+
+	FORCEINLINE friend Vector2 Abs(Vector2 A)
+	{
+		A.x = fabs(A.x);
+		A.y = fabs(A.y);
+		return A;
+	}
 
 	FORCEINLINE bool operator!=(Vector2 const& vector) const
 	{

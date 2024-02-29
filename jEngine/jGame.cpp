@@ -39,7 +39,8 @@ jGame::~jGame()
 void jGame::ProcessInput(float deltaTime)
 {
 	//static float MoveDistancePerSecond = 200.0f;
-	static float MoveDistancePerSecond = 1.0f;
+	//static float MoveDistancePerSecond = 1.0f;
+	static float MoveDistancePerSecond = 10.0f;
 	const float CurrentDistance = MoveDistancePerSecond * deltaTime;
 
 	// Process Key Event
@@ -253,12 +254,14 @@ void jGame::Setup()
 		//}
 	//});
 	
-	jPathTracingLoadData* LoadedPathTracingData = nullptr;
-	if (LoadPathTracing)
+	if (!gPathTracingScene)
 	{
-		std::string sceneName = "Resource/PathTracing/cornell_box/cornell_box_sphere.scene";
-		LoadedPathTracingData = jPathTracingLoadData::LoadPathTracingData(sceneName);
-		LoadedPathTracingData->CreateSceneFor_jEngine(this);
+		std::string sceneName = "Resource/PathTracing/cornell_box/cornell_box_orig.scene";
+		//std::string sceneName = "Resource/PathTracing/cornell_box/cornell_box_sphere.scene";
+		//std::string sceneName = "Resource/PathTracing/hyperion/hyperion_rect_lights.scene";
+		//std::string sceneName = "Resource/PathTracing/hyperion/hyperion_sphere_light.scene";		
+		gPathTracingScene = jPathTracingLoadData::LoadPathTracingData(sceneName);
+		gPathTracingScene->CreateSceneFor_jEngine(this);
 	}
 
 	g_rhi->Finish(); // todo : Instead of this, it needs UAV barrier here

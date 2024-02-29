@@ -11,6 +11,7 @@
 #include "Scene/Light/jLight.h"
 #include "Scene/Light/jPathTracingLight.h"
 #include "jOptions.h"
+#include "PathTracingDataLoader/jPathTracingData.h"
 
 void jRenderer_PathTracing::Setup()
 {
@@ -60,8 +61,8 @@ void jRenderer_PathTracing::PathTracing()
 			, ETextureFormat::RGBA32F, ETextureCreateFlag::UAV, EResourceLayout::UAV);
 	}
 
-	jTexture* RayTracingOutput = RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr.get();
-	check(RayTracingOutput);
+	jTexture* PathTracingOutput = RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr.get();
+	check(PathTracingOutput);
 
 	{
         DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "PathTracing", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
@@ -130,10 +131,14 @@ void jRenderer_PathTracing::PathTracing()
 
 		jShaderBindingArray ShaderBindingArray;
 		jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
+
+		// Bind TLAS
 		ShaderBindingArray.Add(jShaderBinding::Create(0, 1, EShaderBindingType::ACCELERATION_STRUCTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
 			ResourceInlineAllactor.Alloc<jBufferResource>(RenderFrameContextPtr->RaytracingScene->TLASBufferPtr.get()), true));
+
+		// Bind PathTracingOutput
 		ShaderBindingArray.Add(jShaderBinding::Create(1, 1, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::ALL_RAYTRACING,
-			ResourceInlineAllactor.Alloc<jTextureResource>(RayTracingOutput, nullptr), false));
+			ResourceInlineAllactor.Alloc<jTextureResource>(PathTracingOutput, nullptr), false));
 
 		struct SceneConstantBuffer
 		{
@@ -194,8 +199,16 @@ void jRenderer_PathTracing::PathTracing()
 		auto SceneUniformBufferPtr = g_rhi->CreateUniformBufferBlock(jNameStatic("SceneData"), jLifeTimeType::OneFrame, sizeof(sceneCB));
 		SceneUniformBufferPtr->UpdateBufferData(&sceneCB, sizeof(sceneCB));
 
-		ShaderBindingArray.Add(jShaderBinding::Create(4, 1, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_RAYTRACING,
+		// Bind SceneUniformBuffer
+		ShaderBindingArray.Add(jShaderBinding::Create(2, 1, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_RAYTRACING,
 			ResourceInlineAllactor.Alloc<jUniformBufferResource>(SceneUniformBufferPtr.get()), true));
+
+		// Bind DefaultSampler
+		const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+			, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
+			, 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
+		ShaderBindingArray.Add(jShaderBinding::Create(3, 1, EShaderBindingType::SAMPLER, EShaderAccessStageFlag::ALL_RAYTRACING,
+			ResourceInlineAllactor.Alloc<jSamplerResource>(SamplerState)));
 
 		// Create ShaderBindingLayout and ShaderBindingInstance Instance for this draw call
 		std::shared_ptr<jShaderBindingInstance> GlobalShaderBindingInstance;
@@ -205,13 +218,14 @@ void jRenderer_PathTracing::PathTracing()
 		GlobalShaderBindingLayoutArray.Add(GlobalShaderBindingInstance->ShaderBindingsLayouts);
 
 		// Bindless
-		jShaderBindingArray BindlessShaderBindingArray[6];
+		jShaderBindingArray BindlessShaderBindingArray[7];
 		std::vector<const jBuffer*> VertexAndInexOffsetBuffers;
 		std::vector<const jBuffer*> IndexBuffers;
 		std::vector<const jBuffer*> TestUniformBuffers;
 		std::vector<const jBuffer*> VertexBuffers;
 		std::vector<const IUniformBufferBlock*> MaterialBuffers;
 		std::vector<const IUniformBufferBlock*> LightBuffers;
+		std::vector<jTextureResourceBindless::jTextureBindData> Textures;
 		std::vector<std::shared_ptr<IUniformBufferBlock>> RefCountMaintainer;
 
 		{
@@ -261,6 +275,21 @@ void jRenderer_PathTracing::PathTracing()
 				RefCountMaintainer.push_back(LightUniformParametersPtr);
 			}
 
+			check(gPathTracingScene);
+			if (gPathTracingScene->textures.empty())
+			{
+				Textures.resize(1);
+				Textures[0].Texture = GWhiteTexture.get();
+			}
+			else
+			{
+				Textures.resize(gPathTracingScene->textures.size());
+				for (int32 i = 0; i < (int32)gPathTracingScene->textures.size(); ++i)
+				{
+					Textures[i].Texture = gPathTracingScene->textures[i];
+				}
+			}
+
 			BindlessShaderBindingArray[0].Add(jShaderBinding::CreateBindless(0, (uint32)VertexAndInexOffsetBuffers.size(), EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
 				ResourceInlineAllactor.Alloc<jBufferResourceBindless>(VertexAndInexOffsetBuffers), false));
 			BindlessShaderBindingArray[1].Add(jShaderBinding::CreateBindless(0, (uint32)IndexBuffers.size(), EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
@@ -273,6 +302,8 @@ void jRenderer_PathTracing::PathTracing()
 				ResourceInlineAllactor.Alloc<jUniformBufferResourceBindless>(MaterialBuffers)));
 			BindlessShaderBindingArray[5].Add(jShaderBinding::CreateBindless(0, (uint32)LightBuffers.size(), EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_RAYTRACING,
 				ResourceInlineAllactor.Alloc<jUniformBufferResourceBindless>(LightBuffers)));
+			BindlessShaderBindingArray[6].Add(jShaderBinding::CreateBindless(0, (uint32)Textures.size(), EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
+				ResourceInlineAllactor.Alloc<jTextureResourceBindless>(Textures)));
 		}
 
 		std::shared_ptr<jShaderBindingInstance> GlobalShaderBindingInstanceBindless[_countof(BindlessShaderBindingArray)];
@@ -319,7 +350,7 @@ void jRenderer_PathTracing::PathTracing()
 		// Binding Raytracing Pipeline State
 		RaytracingPipelineState->Bind(RenderFrameContextPtr);
 
-		g_rhi->TransitionLayout(CmdBuffer, RayTracingOutput, EResourceLayout::UAV);
+		g_rhi->TransitionLayout(CmdBuffer, PathTracingOutput, EResourceLayout::UAV);
 
 		// Dispatch Rays
 		jRaytracingDispatchData TracingData;
@@ -329,7 +360,7 @@ void jRenderer_PathTracing::PathTracing()
 		TracingData.PipelineState = RaytracingPipelineState;
 		g_rhi->DispatchRay(RenderFrameContextPtr, TracingData);
 
-		g_rhi->TransitionLayout(CmdBuffer, RayTracingOutput, EResourceLayout::SHADER_READ_ONLY);
+		g_rhi->TransitionLayout(CmdBuffer, PathTracingOutput, EResourceLayout::SHADER_READ_ONLY);
 	}
 
 	{
@@ -343,7 +374,7 @@ void jRenderer_PathTracing::PathTracing()
 		jRHIUtil::DrawQuad(RenderFrameContextPtr, RenderFrameContextPtr->SceneRenderTargetPtr->FinalColorPtr, DrawRect
 			, [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
 			{
-				jTexture* InTexture = RayTracingOutput;
+				jTexture* InTexture = PathTracingOutput;
 				g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InTexture, EResourceLayout::SHADER_READ_ONLY);
 
 				const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR

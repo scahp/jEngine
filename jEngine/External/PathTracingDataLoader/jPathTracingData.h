@@ -5,6 +5,8 @@
 #include "RHI/jTexture.h"
 #include "Scene/jCamera.h"
 
+#define PATH_TRACING_DATA_LEFT_HAND 1
+
 struct jRenderOptions
 {
     jRenderOptions()
@@ -173,10 +175,10 @@ public:
         mediumColor = Vector(1.0f, 1.0f, 1.0f);
         mediumAnisotropy = 0.0f;
 
-        baseColorTexId = -1.0f;
-        metallicRoughnessTexID = -1.0f;
-        normalmapTexID = -1.0f;
-        emissionmapTexID = -1.0f;
+        baseColorTexId = -1;
+        metallicRoughnessTexID = -1;
+        normalmapTexID = -1;
+        emissionmapTexID = -1;
 
         opacity = 1.0f;
         alphaMode = 0.0f;
@@ -208,10 +210,10 @@ public:
     Vector mediumColor;
     float mediumAnisotropy;
 
-    float baseColorTexId;
-    float metallicRoughnessTexID;
-    float normalmapTexID;
-    float emissionmapTexID;
+    int32 baseColorTexId;
+    int32 metallicRoughnessTexID;
+    int32 normalmapTexID;
+    int32 emissionmapTexID;
 
     float opacity;
     float alphaMode;
@@ -229,6 +231,9 @@ public:
 
     // Create path tracing scene for jEngine
     void CreateSceneFor_jEngine(class jGame* InGame);
+    void ClearSceneFor_jEngine(class jGame* InGame);
+    std::vector<class jObject*> SpawnObjects; 
+    std::vector<class jLight*> SpawnLights;
 
     int32 AddMesh(const std::string& filename);
     int32 AddTexture(const std::string& filename);
@@ -274,3 +279,5 @@ public:
     bool instancesModified = false;
     bool envMapModified = false;
 };
+
+extern jPathTracingLoadData* gPathTracingScene;

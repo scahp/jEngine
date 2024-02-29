@@ -124,19 +124,19 @@ namespace GLSLPT
 
                 // Albedo Texture
                 if (strcmp(albedoTexName, "none") != 0)
-                    material.baseColorTexId = (float)scene->AddTexture(path + albedoTexName);
+                    material.baseColorTexId = scene->AddTexture(path + albedoTexName);
 
                 // MetallicRoughness Texture
                 if (strcmp(metallicRoughnessTexName, "none") != 0)
-                    material.metallicRoughnessTexID = (float)scene->AddTexture(path + metallicRoughnessTexName);
+                    material.metallicRoughnessTexID = scene->AddTexture(path + metallicRoughnessTexName);
 
                 // Normal Map Texture
                 if (strcmp(normalTexName, "none") != 0)
-                    material.normalmapTexID = (float)scene->AddTexture(path + normalTexName);
+                    material.normalmapTexID = scene->AddTexture(path + normalTexName);
 
                 // Emission Map Texture
                 if (strcmp(emissionTexName, "none") != 0)
-                    material.emissionmapTexID = (float)scene->AddTexture(path + emissionTexName);
+                    material.emissionmapTexID = scene->AddTexture(path + emissionTexName);
 
                 // AlphaMode
                 if (strcmp(alphaMode, "opaque") == 0)
@@ -204,6 +204,12 @@ namespace GLSLPT
                     light.area = 0.0f;
                 }
 
+#if PATH_TRACING_DATA_LEFT_HAND
+				light.position.x *= -1.0f;
+				light.u.x *= -1.0f;
+				light.v.x *= -1.0f;
+#endif // PATH_TRACING_DATA_LEFT_HAND
+
                 scene->AddLight(light);
             }
 
@@ -246,6 +252,11 @@ namespace GLSLPT
                     position = Vector(xform.m[3][0], xform.m[3][1], xform.m[3][2]);
                     lookAt = position + forward;
                 }
+
+#if PATH_TRACING_DATA_LEFT_HAND
+				position.x *= -1.0f;
+				lookAt.x *= -1.0f;
+#endif // PATH_TRACING_DATA_LEFT_HAND
 
                 scene->AddCamera(position, lookAt, position + Vector::UpVector, DegreeToRadian(fov));
                 scene->Camera.Aperture = aperture;
@@ -440,6 +451,10 @@ namespace GLSLPT
 
                         Matrix transformMat{IdentityType};
 
+#if PATH_TRACING_DATA_LEFT_HAND
+						translate.m[3][0] *= -1;
+#endif // PATH_TRACING_DATA_LEFT_HAND
+
                         if (matrixProvided)
                             transformMat = xform;
                         else
@@ -487,6 +502,10 @@ namespace GLSLPT
                         rot = rotQuat.GetMatrix();
                     }
                 }
+
+#if PATH_TRACING_DATA_LEFT_HAND
+                translate.m[3][0] *= -1.0f;
+#endif // PATH_TRACING_DATA_LEFT_HAND
 
                 if (!filename.empty())
                 {
