@@ -256,10 +256,10 @@ void jGame::Setup()
 	
 	if (!gPathTracingScene)
 	{
-		std::string sceneName = "Resource/PathTracing/cornell_box/cornell_box_orig.scene";
+		//std::string sceneName = "Resource/PathTracing/cornell_box/cornell_box_orig.scene";
 		//std::string sceneName = "Resource/PathTracing/cornell_box/cornell_box_sphere.scene";
 		//std::string sceneName = "Resource/PathTracing/hyperion/hyperion_rect_lights.scene";
-		//std::string sceneName = "Resource/PathTracing/hyperion/hyperion_sphere_light.scene";		
+		std::string sceneName = "Resource/PathTracing/hyperion/hyperion_sphere_light.scene";		
 		gPathTracingScene = jPathTracingLoadData::LoadPathTracingData(sceneName);
 		gPathTracingScene->CreateSceneFor_jEngine(this);
 	}
@@ -330,6 +330,33 @@ void jGame::RemoveSpawnedObjects()
 void jGame::Update(float deltaTime)
 {
 	SCOPE_DEBUG_EVENT(g_rhi, "Game::Update");
+
+	static int32 LastSelectedIndex = gSelectedSceneIndex;
+	if (gSelectedSceneIndex != LastSelectedIndex)
+	{
+		// todo : abstraction
+		((jRHI_DX12*)g_rhi)->WaitForGPU();
+
+		gPathTracingScene->ClearSceneFor_jEngine(this);
+        gPathTracingScene = jPathTracingLoadData::LoadPathTracingData(gPathTracingScenes[gSelectedSceneIndex].c_str());
+        gPathTracingScene->CreateSceneFor_jEngine(this);
+
+		g_rhi->RaytracingScene->Clear();
+
+        jRatracingInitializer Initializer;
+        Initializer.CommandBuffer = g_rhi->BeginSingleTimeCommands();
+        Initializer.RenderObjects = jObject::GetStaticRenderObject();
+        g_rhi->RaytracingScene->CreateOrUpdateBLAS(Initializer);
+        g_rhi->EndSingleTimeCommands(Initializer.CommandBuffer);
+        g_rhi->Finish(); // todo : Instead of this, it needs UAV barrier here
+
+        Initializer.CommandBuffer = g_rhi->BeginSingleTimeCommands();
+        g_rhi->RaytracingScene->CreateOrUpdateTLAS(Initializer);
+        g_rhi->EndSingleTimeCommands(Initializer.CommandBuffer);
+        g_rhi->Finish(); // todo : Instead of this, it needs UAV barrier here
+
+		LastSelectedIndex = gSelectedSceneIndex;
+	}
 
 	//if (CompletedAsyncLoadObjects.size() > 0)
 	//{

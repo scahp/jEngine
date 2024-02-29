@@ -145,35 +145,34 @@ void IRenderer::UIPass()
 			{
 				ImGui::SetNextWindowPos(ImVec2(400.0f, 27.0f), ImGuiCond_FirstUseEver);
 				ImGui::SetNextWindowSize(ImVec2(200.0f, 80.0f), ImGuiCond_FirstUseEver);
-				if (ImGui::Begin("Camera Options", 0, ImGuiWindowFlags_AlwaysAutoResize))
+				if (ImGui::Begin("PathTracing Options", 0, ImGuiWindowFlags_AlwaysAutoResize))
 				{
-					static std::vector<std::string> sPathTracingScenes;
-					static std::vector<std::string> sPathTracingScenesNameOnly;
-					static const char* sSelectedScene = nullptr;
-
 					static bool initialized = false;
 					if (!initialized)
 					{
 						initialized = true;
 
-						SearchFilesRecursive(sPathTracingScenes, "Resource/PathTracing", {".scene"});
-						sPathTracingScenesNameOnly.resize(sPathTracingScenes.size());
-						for (int32 i = 0; i < sPathTracingScenes.size(); ++i)
+						SearchFilesRecursive(gPathTracingScenes, "Resource/PathTracing", {".scene"});
+						gPathTracingScenesNameOnly.resize(gPathTracingScenes.size());
+						for (int32 i = 0; i < gPathTracingScenes.size(); ++i)
 						{
-							sPathTracingScenesNameOnly[i] = ExtractFileName(sPathTracingScenes[i]);
+							gPathTracingScenesNameOnly[i] = ExtractFileName(gPathTracingScenes[i]);
 						}
 						
-						if (sPathTracingScenesNameOnly.size() > 0)
-							sSelectedScene = sPathTracingScenesNameOnly[0].c_str();
+						if (gPathTracingScenesNameOnly.size() > 0)
+							gSelectedScene = gPathTracingScenesNameOnly[0].c_str();
 					}
 
-					if (ImGui::BeginCombo("PathTracingScene(%)", sSelectedScene, ImGuiComboFlags_None))
+					if (ImGui::BeginCombo("PathTracingScene", gSelectedScene, ImGuiComboFlags_None))
 					{
-						for (int32 i = 0; i < (int32)sPathTracingScenesNameOnly.size(); ++i)
+						for (int32 i = 0; i < (int32)gPathTracingScenesNameOnly.size(); ++i)
 						{
-							const bool is_selected = (sSelectedScene == sPathTracingScenesNameOnly[i].c_str());
-							if (ImGui::Selectable(sPathTracingScenesNameOnly[i].c_str(), is_selected))
-								sSelectedScene = sPathTracingScenesNameOnly[i].c_str();
+							const bool is_selected = (gSelectedScene == gPathTracingScenesNameOnly[i].c_str());
+							if (ImGui::Selectable(gPathTracingScenesNameOnly[i].c_str(), is_selected))
+							{
+								gSelectedScene = gPathTracingScenesNameOnly[i].c_str();
+								gSelectedSceneIndex = i;
+							}
 							if (is_selected)
 								ImGui::SetItemDefaultFocus();
 						}

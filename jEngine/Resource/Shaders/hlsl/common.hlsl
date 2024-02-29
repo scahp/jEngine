@@ -240,9 +240,10 @@ uint InitRandomSeed(uint2 InPixelPos, uint2 InResolution, uint InFrameNumber)
     return (InPixelPos.y * InResolution.x + InPixelPos.x) + (InFrameNumber * InResolution.x * InResolution.y);
 }
 
-void Random(inout uint seed)
+uint Random(inout uint seed)
 {
     RandomHash(seed);
+    return seed;
 }
 
 float Random_0_1(inout uint seed)

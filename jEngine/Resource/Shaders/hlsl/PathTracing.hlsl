@@ -219,16 +219,19 @@ float SchlickWeight(float u)
 void SamplingBRDF(out float3 SampleDir, out float SamplePDF, out float3 BRDF_Cos
     , in float3 WorldNormal, in float3 SurfaceToView, in MaterialUniformBuffer mat, inout RayPayload payload)
 {
+    SamplePDF = 0;
+    BRDF_Cos = 0;
+    
     float diffusePart = (1.0f - mat.metallic) * (1.0f - mat.specTrans);
     float specularPart = mat.metallic * (1.0f - mat.specTrans);
 
     float glassPart = (1.0 - mat.metallic) * mat.specTrans;
     float clearcoatPart = 0.25 * mat.clearcoat;
 
-    //diffusePart = 0;  // test disable
-    //specularPart = 0;  // test disable
+    //diffusePart = 1.0;  // test disable
+    //specularPart = 0.0;  // test disable
+    //clearcoatPart = 1.0;  // test disable
     glassPart = 0;  // test disable
-    clearcoatPart = 0;  // test disable
 
     float totalWeight = 1.0f / (diffusePart + specularPart + glassPart + clearcoatPart);
     float diffuseWeight = diffusePart * totalWeight;
@@ -236,10 +239,10 @@ void SamplingBRDF(out float3 SampleDir, out float SamplePDF, out float3 BRDF_Cos
     float clearcoatWeight = clearcoatPart * totalWeight;
 
     // CDF of the sampling probabilities
-    float cdf[2];
-    cdf[0] = diffusePart;
-    cdf[1] = cdf[0] + specularPart;
-    //cdf[2] = cdf[1] + clearcoatPart;
+    float cdf[3];
+    cdf[0] = diffuseWeight;
+    cdf[1] = cdf[0] + specularWeight;
+    cdf[2] = cdf[1] + clearcoatWeight;
 
     float3 WorldHalf = 0;
     float cosine_theta = 0;
@@ -251,6 +254,20 @@ void SamplingBRDF(out float3 SampleDir, out float SamplePDF, out float3 BRDF_Cos
         SampleDir = CosWeightedSampleHemisphere(payload.seed);
         cosine_theta = SampleDir.z;
         SampleDir = ToWorld(WorldNormal, SampleDir);
+        
+        if (diffusePart > 0.0f)
+        {
+            if (cosine_theta < 0)
+            {
+            // Underneath skip.
+            }
+            else
+            {
+                float3 BRDF = INV_PI * mat.baseColor;
+                BRDF_Cos += BRDF * diffusePart;
+                SamplePDF += (INV_PI * cosine_theta) * diffuseWeight;
+            }
+        }
     }
     else if (r3 < cdf[1]) // specularPart
     {
@@ -260,8 +277,32 @@ void SamplingBRDF(out float3 SampleDir, out float SamplePDF, out float3 BRDF_Cos
         WorldHalf = normalize(ImportanceSampleGGX(float2(r1, r2), mat.roughness, WorldNormal));
         SampleDir = reflect(-SurfaceToView, WorldHalf);
         cosine_theta = saturate(dot(WorldNormal, SampleDir));
+        
+        if (specularPart > 0.0f)
+        {
+            float NoV = saturate(dot(WorldNormal, SurfaceToView));
+            float NoL = saturate(dot(WorldNormal, SampleDir));
+            float NoH = saturate(dot(WorldNormal, WorldHalf));
+            float VoH = saturate(dot(SurfaceToView, WorldHalf));
+
+            if (cosine_theta < 0)
+            {
+            // Underneath skip.
+            }
+            else
+            {
+                float3 F0 = mat.baseColor;
+
+                float D = DistributionGGX(WorldNormal, WorldHalf, mat.roughness);
+                float G = GeometrySmith(mat.roughness, NoV, NoL);
+                float3 F = FresnelSchlick(cosine_theta, F0);
+                float3 BRDF = F * (D * G / (4 * NoL * NoV));
+            
+                BRDF_Cos += BRDF * specularPart;
+                SamplePDF += (D * NoH / (4 * VoH)) * specularWeight;
+            }
+        }
     }
-/*
     else if (r3 < cdf[2]) // clearcoatPart
     {
         // https://github.com/knightcrawler25/GLSL-PathTracer/blob/master/src/shaders/common/sampling.glsl
@@ -271,12 +312,33 @@ void SamplingBRDF(out float3 SampleDir, out float SamplePDF, out float3 BRDF_Cos
         float r2 = Random_0_1(payload.seed);
         WorldHalf = normalize(ImportanceSampleGGX(float2(r1, r2), clearcoatRoughness, WorldNormal));
         SampleDir = reflect(-SurfaceToView, WorldHalf);
+        cosine_theta = saturate(dot(WorldNormal, SampleDir));
+        
+        if (clearcoatPart > 0.0f)
+        {
+            // https://github.com/knightcrawler25/GLSL-PathTracer/blob/master/src/shaders/common/sampling.glsl
+            float clearcoatRoughness = lerp(0.1, 0.001, mat.clearcoatGloss);
+        
+            float NoV = saturate(dot(WorldNormal, SurfaceToView));
+            float NoL = saturate(dot(WorldNormal, SampleDir));
+            float NoH = saturate(dot(WorldNormal, WorldHalf));
+            float VoH = saturate(dot(SurfaceToView, WorldHalf));
+            if (cosine_theta < 0)
+            {
+                // Underneath skip.
+            }
+            else
+            {
+                float D = DistributionGGX(WorldNormal, WorldHalf, clearcoatRoughness);
+                float G = GeometrySmith(clearcoatRoughness, NoV, NoL);
+                float3 BRDF = (D * G / (4 * NoL * NoV));
+            
+                BRDF_Cos += BRDF * clearcoatPart;
+                SamplePDF += (D * NoH / (4 * VoH)) * clearcoatWeight;
+            }
+        }
     }
-*/
 
-
-    SamplePDF = 0;
-    BRDF_Cos = 0;
 
 // In, out intersection check within any hit for glass sphere
 #define TRANSMITTANCE_TEST 0
@@ -289,74 +351,13 @@ void SamplingBRDF(out float3 SampleDir, out float SamplePDF, out float3 BRDF_Cos
     }
 #endif // TRANSMITTANCE_TEST
 
-    if (diffusePart > 0.0f)
-    {
-        if (cosine_theta < 0)
-        {
-            // Underneath skip.
-        }
-        else
-        {
-            float3 BRDF = INV_PI * mat.baseColor;
-            BRDF_Cos += BRDF * cosine_theta * diffusePart;
-            SamplePDF += (INV_PI * cosine_theta) * diffuseWeight;
-        }
-    }
 
-    if (specularPart > 0.0f)
-    {
-        float NoV = saturate(dot(WorldNormal, SurfaceToView));
-        float NoL = saturate(dot(WorldNormal, SampleDir));
-        float NoH = saturate(dot(WorldNormal, WorldHalf));
-        float VoH = saturate(dot(SurfaceToView, WorldHalf));
 
-        if (cosine_theta < 0)
-        {
-            // Underneath skip.
-        }
-        else
-        {
-            float3 F0 = mat.baseColor;
 
-            float D = DistributionGGX(WorldNormal, WorldHalf, mat.roughness);
-            float G = GeometrySmith(mat.roughness, NoV, NoL);
-            float3 F = FresnelSchlick(cosine_theta, F0);
-            float3 BRDF = F * (D * G / (4 * NoL * NoV));
-            
-            BRDF_Cos += (BRDF * cosine_theta) * specularPart;
-            SamplePDF += (D * NoH / (4 * VoH)) * specularWeight;
-        }
-    }
+    
+   
+    BRDF_Cos *= cosine_theta;
 
-/*
-    if (clearcoatPart > 0.0f)
-    {
-        float NoV = saturate(dot(WorldNormal, SurfaceToView));
-        float NoL = saturate(dot(WorldNormal, SampleDir));
-        float NoH = saturate(dot(WorldNormal, WorldHalf));
-        float VoH = saturate(dot(SurfaceToView, WorldHalf));
-        float cosine_theta = NoL;
-        if (cosine_theta < 0)
-        {
-            // Underneath skip.
-            BRDF_Cos = 0;
-            SamplePDF = 0;
-        }
-        else
-        {
-            // https://github.com/knightcrawler25/GLSL-PathTracer/blob/master/src/shaders/common/sampling.glsl
-            float clearcoatRoughness = lerp(0.1, 0.001, mat.clearcoatGloss);
-
-            float F = lerp(0.04, 1.0, SchlickWeight(VoH));
-            float D = DistributionGGX(WorldNormal, WorldHalf, clearcoatRoughness);
-            float G = GeometrySmith(0.25f, NoV, NoL);
-            float jacobian = 1.0 / (4.0 * VoH);
-
-            SamplePDF += D * NoH * jacobian * clearcoatPart;
-            BRDF_Cos += float3(F, F, F) * D * G * cosine_theta * (0.25 * mat.clearcoat);
-        }
-    }
-*/
 }
 
 // todo : set from shader
