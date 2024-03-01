@@ -48,7 +48,7 @@ bool jIndexBuffer_DX12::Initialize(const std::shared_ptr<jIndexStreamData>& InSt
     }
 
     // Create index buffer
-    BufferPtr = g_rhi->CreateFormattedBuffer<jBuffer_DX12>(bufferSize, 0, GetDX12TextureFormat(IndexType), EBufferCreateFlag::NONE
+    BufferPtr = g_rhi->CreateFormattedBuffer<jBuffer_DX12>(bufferSize, 0, GetDX12TextureFormat(IndexType), EBufferCreateFlag::UAV
         , EResourceLayout::GENERAL, InStreamData->Param->GetBufferData(), bufferSize, TEXT("IndexBuffer"));
 
     // Create Index buffer View

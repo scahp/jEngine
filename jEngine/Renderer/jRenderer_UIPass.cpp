@@ -4,67 +4,6 @@
 #include "Profiler/jPerformanceProfile.h"
 #include "jOptions.h"
 
-void SearchFilesRecursive(std::vector<std::string>& OutFiles, const std::string& InTargetDirectory, const std::vector<std::string>& extensions) 
-{
-	WIN32_FIND_DATAA findFileData;
-	HANDLE hFind = INVALID_HANDLE_VALUE;
-
-	// 첫 번째 파일 검색
-	hFind = FindFirstFileA((InTargetDirectory + "\\*").c_str(), &findFileData);
-
-	if (hFind == INVALID_HANDLE_VALUE) 
-	{
-		return;
-	}
-
-	do 
-	{
-		if (findFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) 
-		{
-			// 현재 항목이 디렉토리인 경우 (현재 디렉토리와 상위 디렉토리 제외)
-			if (strcmp(findFileData.cFileName, ".") != 0 && strcmp(findFileData.cFileName, "..") != 0) 
-			{
-				SearchFilesRecursive(OutFiles, InTargetDirectory + "\\" + findFileData.cFileName, extensions); // 재귀 호출
-			}
-		}
-		else {
-			// 파일 확장자 확인
-			std::string fileName = findFileData.cFileName;
-			auto it = fileName.rfind('.');
-			if (it != std::string::npos) 
-			{
-				std::string ext = fileName.substr(it);
-				// 지정된 확장자 중 하나와 일치하는지 확인
-				for (const auto& allowedExt : extensions) 
-				{
-					if (ext == allowedExt) 
-					{
-						OutFiles.push_back(InTargetDirectory + "\\" + fileName); // 조건에 맞는 파일 경로를 vector에 추가
-						break;
-					}
-				}
-			}
-		}
-	} while (FindNextFileA(hFind, &findFileData) != 0);
-
-	FindClose(hFind); // 핸들 닫기
-}
-
-std::string ExtractFileName(const std::string& path) 
-{
-	// Windows와 POSIX 시스템의 경로 구분자 위치 찾기
-	size_t lastSlashPos = path.find_last_of("/\\");
-
-	if (lastSlashPos != std::string::npos) {
-		// 경로 구분자 이후의 문자열(파일 이름) 반환
-		return path.substr(lastSlashPos + 1);
-	}
-	else {
-		// 경로 구분자가 없는 경우, 전체 문자열이 파일 이름임
-		return path;
-	}
-}
-
 void IRenderer::UIPass()
 {
 	check(g_ImGUI);
@@ -147,22 +86,6 @@ void IRenderer::UIPass()
 				ImGui::SetNextWindowSize(ImVec2(200.0f, 80.0f), ImGuiCond_FirstUseEver);
 				if (ImGui::Begin("PathTracing Options", 0, ImGuiWindowFlags_AlwaysAutoResize))
 				{
-					static bool initialized = false;
-					if (!initialized)
-					{
-						initialized = true;
-
-						SearchFilesRecursive(gPathTracingScenes, "Resource/PathTracing", {".scene"});
-						gPathTracingScenesNameOnly.resize(gPathTracingScenes.size());
-						for (int32 i = 0; i < gPathTracingScenes.size(); ++i)
-						{
-							gPathTracingScenesNameOnly[i] = ExtractFileName(gPathTracingScenes[i]);
-						}
-						
-						if (gPathTracingScenesNameOnly.size() > 0)
-							gSelectedScene = gPathTracingScenesNameOnly[0].c_str();
-					}
-
 					if (ImGui::BeginCombo("PathTracingScene", gSelectedScene, ImGuiComboFlags_None))
 					{
 						for (int32 i = 0; i < (int32)gPathTracingScenesNameOnly.size(); ++i)

@@ -147,11 +147,20 @@ std::shared_ptr<jBuffer_DX12> CreateBuffer(uint64 InSize, uint64 InAlignment, EB
                 StagingBuffer->Resource->Unmap(0, nullptr);
             }
 
-            jCommandBuffer_DX12* commandBuffer = g_rhi_dx12->BeginSingleTimeCopyCommands();
+            jCommandBuffer_DX12* commandBuffer = g_rhi_dx12->BeginSingleTimeCommands();
             check(commandBuffer->IsValid());
-
+            
+            // Transit to TRANSFER_DST layout
+            g_rhi->TransitionLayout(commandBuffer, BufferPtr.get(), EResourceLayout::TRANSFER_DST);
+            commandBuffer->FlushBarrierBatch();
+            
+            // Copy initial data
             commandBuffer->Get()->CopyBufferRegion((ID3D12Resource*)BufferPtr->GetHandle(), 0, StagingBuffer->Get(), 0, InSize);
-            g_rhi_dx12->EndSingleTimeCopyCommands(commandBuffer);
+            
+            g_rhi->TransitionLayout(BufferPtr.get(), InLayout);
+            commandBuffer->FlushBarrierBatch();
+
+            g_rhi_dx12->EndSingleTimeCommands(commandBuffer);
         }
     }
 

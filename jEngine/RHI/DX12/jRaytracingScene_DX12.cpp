@@ -20,8 +20,9 @@ void jRaytracingScene_DX12::CreateOrUpdateBLAS(const jRatracingInitializer& InIn
         // Remove Old BLAS
         if (RObj->BottomLevelASBuffer)
         {
-            auto temp = CD3DX12_RESOURCE_BARRIER::UAV(((jBuffer_DX12*)RObj->BottomLevelASBuffer.get())->Buffer->Get());
-            CmdBuffer->CommandList->ResourceBarrier(1, &temp);
+            // UAV barrier for completion of previous command which are using BottomLevelASBuffer
+            g_rhi->UAVBarrier(CmdBuffer, RObj->BottomLevelASBuffer.get());
+            CmdBuffer->FlushBarrierBatch();
 
             RObj->BottomLevelASBuffer.reset();
         }
@@ -106,6 +107,15 @@ void jRaytracingScene_DX12::CreateOrUpdateBLAS(const jRatracingInitializer& InIn
         RObj->ScratchASBuffer = g_rhi->CreateRawBuffer<jBuffer_DX12>(bottomLevelPrebuildInfo.ScratchDataSizeInBytes, 0
             , EBufferCreateFlag::UAV | EBufferCreateFlag::AccelerationStructureBuildInput, EResourceLayout::GENERAL, nullptr, 0, TEXT("ScratchResourceGeometry"));
 
+        // Transit Vertex & Index Buffer to SHADER_READ_ONLY layout for BuildRaytracingAccelerationStructure
+        for (const auto& VertexStream : VertexBufferDX12->Streams)
+        {
+            g_rhi->TransitionLayout(CmdBuffer, VertexStream.BufferPtr.get(), EResourceLayout::SHADER_READ_ONLY);
+        }
+        if (IndexBuffer)
+            g_rhi->TransitionLayout(CmdBuffer, IndexBuffer->GetBuffer(), EResourceLayout::SHADER_READ_ONLY);
+        CmdBuffer->FlushBarrierBatch();
+
         // Create BLAS
         D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc{};
         bottomLevelBuildDesc.Inputs = bottomLevelInputs;
@@ -113,8 +123,10 @@ void jRaytracingScene_DX12::CreateOrUpdateBLAS(const jRatracingInitializer& InIn
         bottomLevelBuildDesc.DestAccelerationStructureData = RObj->GetBottomLevelASBuffer<jBuffer_DX12>()->GetGPUAddress();
 
         CmdBuffer->CommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
-        auto temp = CD3DX12_RESOURCE_BARRIER::UAV(RObj->GetBottomLevelASBuffer<jBuffer_DX12>()->Buffer->Get());
-        CmdBuffer->CommandList->ResourceBarrier(1, &temp);
+
+        // UAV barrier for completion of BuildRaytracingAccelerationStructure
+        g_rhi->UAVBarrier(CmdBuffer, RObj->BottomLevelASBuffer.get());
+        CmdBuffer->FlushBarrierBatch();
 
         InstanceList.push_back(RObj);
     }
@@ -141,7 +153,9 @@ void jRaytracingScene_DX12::CreateOrUpdateTLAS(const jRatracingInitializer& InIn
     const bool IsUpdate = !!ScratchTLASBufferPtr;
     if (IsUpdate)
     {
+        // UAV barrier for completion of previous command which are using TLASBufferPtr
         g_rhi->UAVBarrier(CmdBuffer, GetTLASBuffer<jBuffer_DX12>());
+        CmdBuffer->FlushBarrierBatch();
     }
     else
     {
@@ -204,6 +218,8 @@ void jRaytracingScene_DX12::CreateOrUpdateTLAS(const jRatracingInitializer& InIn
     }
 
     CmdBuffer->CommandList->BuildRaytracingAccelerationStructure(&asDesc, 0, nullptr);
-    auto temp = CD3DX12_RESOURCE_BARRIER::UAV(GetTLASBuffer<jBuffer_DX12>()->Buffer->Get());
-    CmdBuffer->CommandList->ResourceBarrier(1, &temp);
+
+    // UAV barrier for completion of BuildRaytracingAccelerationStructure
+    g_rhi->UAVBarrier(CmdBuffer, GetTLASBuffer<jBuffer_DX12>());
+    CmdBuffer->FlushBarrierBatch();
 }

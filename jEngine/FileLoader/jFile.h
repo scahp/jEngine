@@ -30,6 +30,8 @@ public:
 	typedef std::vector<ELEMENT_TYPE> FILE_BUFFER;
 
 	static uint64 GetFileTimeStamp(const char* filename);
+    static void SearchFilesRecursive(std::vector<std::string>& OutFiles, const std::string& InTargetDirectory, const std::vector<std::string>& extensions);
+    static std::string ExtractFileName(const std::string& path);
 
 	jFile() : m_fp(nullptr) {}
 	~jFile();

@@ -24,6 +24,7 @@
 #include "PathTracingDataLoader/PathTracingDataLoader.h"
 #include "PathTracingDataLoader/GLTFLoader.h"
 #include "Renderer/jRenderer_PathTracing.h"
+#include "FileLoader/jFile.h"
 
 jRHI* g_rhi = nullptr;
 jObject* jGame::Sphere = nullptr;
@@ -254,13 +255,27 @@ void jGame::Setup()
 		//}
 	//});
 	
+    static bool initialized = false;
+    if (!initialized)
+    {
+        initialized = true;
+
+		jFile::SearchFilesRecursive(gPathTracingScenes, "Resource/PathTracing", { ".scene" });
+        gPathTracingScenesNameOnly.resize(gPathTracingScenes.size());
+        for (int32 i = 0; i < gPathTracingScenes.size(); ++i)
+        {
+            gPathTracingScenesNameOnly[i] = jFile::ExtractFileName(gPathTracingScenes[i]);
+        }
+
+        if (gPathTracingScenesNameOnly.size() > 0)
+            gSelectedScene = gPathTracingScenesNameOnly[0].c_str();
+
+		gSelectedSceneIndex = 0;
+    }
+
 	if (!gPathTracingScene)
 	{
-		//std::string sceneName = "Resource/PathTracing/cornell_box/cornell_box_orig.scene";
-		//std::string sceneName = "Resource/PathTracing/cornell_box/cornell_box_sphere.scene";
-		//std::string sceneName = "Resource/PathTracing/hyperion/hyperion_rect_lights.scene";
-		std::string sceneName = "Resource/PathTracing/hyperion/hyperion_sphere_light.scene";		
-		gPathTracingScene = jPathTracingLoadData::LoadPathTracingData(sceneName);
+		gPathTracingScene = jPathTracingLoadData::LoadPathTracingData(gPathTracingScenes[gSelectedSceneIndex]);
 		gPathTracingScene->CreateSceneFor_jEngine(this);
 	}
 

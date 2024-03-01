@@ -163,8 +163,13 @@ void jRenderer_PathTracing::PathTracing()
 		static jOptions OldOptions = gOptions;
 		static auto OldMatrix = sceneCB.projectionToWorld;
 		static uint32 AccumulateNumber = 0;
-		if (!gOptions.UseAccumulateRay || OldMatrix != sceneCB.projectionToWorld || OldOptions != gOptions)
+        static int32 LastSelectedIndex = gSelectedSceneIndex;
+		if (!gOptions.UseAccumulateRay 
+			|| OldMatrix != sceneCB.projectionToWorld 
+			|| OldOptions != gOptions 
+			|| gSelectedSceneIndex != LastSelectedIndex)
 		{
+			LastSelectedIndex = gSelectedSceneIndex;
 			OldMatrix = sceneCB.projectionToWorld;
 			memcpy(&OldOptions, &gOptions, sizeof(gOptions));
 			AccumulateNumber = 0;

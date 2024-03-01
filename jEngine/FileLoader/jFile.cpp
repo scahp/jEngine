@@ -10,6 +10,59 @@ uint64 jFile::GetFileTimeStamp(const char* filename)
 	return attributes.ftLastWriteTime.dwLowDateTime | static_cast<uint64>(attributes.ftLastWriteTime.dwHighDateTime) << 32;
 }
 
+void jFile::SearchFilesRecursive(std::vector<std::string>& OutFiles, const std::string& InTargetDirectory, const std::vector<std::string>& extensions)
+{
+    WIN32_FIND_DATAA findFileData;
+    HANDLE hFind = INVALID_HANDLE_VALUE;
+
+    // Find first file
+    hFind = FindFirstFileA((InTargetDirectory + "\\*").c_str(), &findFileData);
+    if (hFind == INVALID_HANDLE_VALUE)
+        return;
+
+    do
+    {
+        if (findFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+        {
+			// Remove Current and Parent directory
+            if (strcmp(findFileData.cFileName, ".") != 0 && strcmp(findFileData.cFileName, "..") != 0)
+            {
+                SearchFilesRecursive(OutFiles, InTargetDirectory + "\\" + findFileData.cFileName, extensions); // ¿Á±Õ »£√‚
+            }
+        }
+        else 
+		{
+            // Find Ext
+            std::string fileName = findFileData.cFileName;
+            auto it = fileName.rfind('.');
+            if (it != std::string::npos)
+            {
+                std::string ext = fileName.substr(it);
+                for (const auto& allowedExt : extensions)
+                {
+                    if (ext == allowedExt)
+                    {
+                        OutFiles.push_back(InTargetDirectory + "\\" + fileName); // Added file path to container which meet matching ext condition.
+                        break;
+                    }
+                }
+            }
+        }
+    } while (FindNextFileA(hFind, &findFileData) != 0);
+    FindClose(hFind);
+}
+
+std::string jFile::ExtractFileName(const std::string& path)
+{
+    // Find path splitter(Windows, POSIX system)
+    size_t lastSlashPos = path.find_last_of("/\\");
+
+    if (lastSlashPos != std::string::npos)
+        return path.substr(lastSlashPos + 1);	// Return the string after path splitter
+    
+	return path;
+}
+
 jFile::~jFile()
 {
 	CloseFile();
