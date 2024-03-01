@@ -74,7 +74,7 @@ ConstantBuffer<MaterialUniformBuffer> MaterialBindlessArray[] : register(b0, spa
 ConstantBuffer<LightUniformBuffer> LightBindlessArray[] : register(b0, space6);
 Texture2D TextureBindlessArray[] : register(t0, space7);
 
-MaterialUniformBuffer GetMaterial(inout float3 InOutWorldNormal, in ConstantBuffer<MaterialUniformBuffer> InMaterial, float2 InUV)
+MaterialUniformBuffer GetMaterial(inout float3 InOutWorldNormal, in MaterialUniformBuffer InMaterial, float2 InUV)
 {
     MaterialUniformBuffer mat;
     mat = InMaterial;
@@ -148,7 +148,7 @@ void GetShaderBindingResources(
     inout StructuredBuffer<uint> IndexBuffer,
     inout StructuredBuffer<RenderObjectUniformBuffer> RenderObjParam,
     inout ByteAddressBuffer VerticesBuffer,
-    inout ConstantBuffer<MaterialUniformBuffer> MaterialBuffer,
+    inout MaterialUniformBuffer MaterialBuffer,
     in uint InstanceIdx)
 {
     VertexIndexOffsetBuffer = VertexIndexOffsetArray[InstanceIdx];
@@ -158,7 +158,7 @@ void GetShaderBindingResources(
     MaterialBuffer = MaterialBindlessArray[InstanceIdx];
 }
 
-void GetLightShaderBindingResource(inout ConstantBuffer<LightUniformBuffer> LightBuffer, int LightId)
+void GetLightShaderBindingResource(inout LightUniformBuffer LightBuffer, int LightId)
 {
     LightBuffer = LightBindlessArray[LightId];
 }
@@ -482,7 +482,7 @@ void MeshClosestHitShader(inout RayPayload payload, in MyAttributes attr)
     StructuredBuffer<uint> IndexBindless;
     StructuredBuffer<RenderObjectUniformBuffer> RenderObjParam;
     ByteAddressBuffer VerticesBindless;
-    ConstantBuffer<MaterialUniformBuffer> MaterialBindless;
+    MaterialUniformBuffer MaterialBindless;
 
     uint InstanceIdx = InstanceIndex();
     GetShaderBindingResources( 
@@ -566,7 +566,7 @@ void LightClosestHitShader(inout RayPayload payload, in MyAttributes attr)
     StructuredBuffer<uint> IndexBindless;
     StructuredBuffer<RenderObjectUniformBuffer> RenderObjParam;
     ByteAddressBuffer VerticesBindless;
-    ConstantBuffer<MaterialUniformBuffer> MaterialBindless;
+    MaterialUniformBuffer MaterialBindless;
 
     uint InstanceIdx = InstanceIndex();
     GetShaderBindingResources( 
@@ -582,7 +582,7 @@ void LightClosestHitShader(inout RayPayload payload, in MyAttributes attr)
         return;
     }
 
-    ConstantBuffer<LightUniformBuffer> LightBuffer;
+    LightUniformBuffer LightBuffer;
     GetLightShaderBindingResource(LightBuffer, MaterialBindless.lightId);
 
     // Set hit point to payload

@@ -349,8 +349,7 @@ void jGame::Update(float deltaTime)
 	static int32 LastSelectedIndex = gSelectedSceneIndex;
 	if (gSelectedSceneIndex != LastSelectedIndex)
 	{
-		// todo : abstraction
-		((jRHI_DX12*)g_rhi)->WaitForGPU();
+		g_rhi->Flush();
 
 		gPathTracingScene->ClearSceneFor_jEngine(this);
         gPathTracingScene = jPathTracingLoadData::LoadPathTracingData(gPathTracingScenes[gSelectedSceneIndex].c_str());
