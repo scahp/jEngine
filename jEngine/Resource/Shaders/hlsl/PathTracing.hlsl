@@ -217,32 +217,51 @@ float SchlickWeight(float u)
 }
 
 void SamplingBRDF(out float3 SampleDir, out float SamplePDF, out float3 BRDF_Cos
-    , in float3 WorldNormal, in float3 SurfaceToView, in MaterialUniformBuffer mat, inout RayPayload payload)
+    , in float3 WorldNormal, in float3 WorldFaceNormal, in float3 SurfaceToView, in MaterialUniformBuffer mat, inout RayPayload payload)
 {
     SamplePDF = 0;
     BRDF_Cos = 0;
     
     float diffusePart = (1.0f - mat.metallic) * (1.0f - mat.specTrans);
     float specularPart = mat.metallic * (1.0f - mat.specTrans);
-
     float glassPart = (1.0 - mat.metallic) * mat.specTrans;
     float clearcoatPart = 0.25 * mat.clearcoat;
 
+#define TRANSMITTANCE_TEST 0    // Debugging code : In, out intersection check within any hit for glass sphere
+#if TRANSMITTANCE_TEST
+    if (payload.IsRayPenetratingInstance() && glassPart <= 0)       // If intersection material is not glassPart, it's always not Penetrating.
+    {
+        payload.Radiance = float3(10, 0, 0);
+        payload.Attenuation = 1;
+        return;
+    }
+#endif // TRANSMITTANCE_TEST
+    
+    // If penetrating instance(glass type), it is always intersecting glass part.
+    if (payload.IsRayPenetratingInstance())
+    {
+        diffusePart = 0.0;
+        specularPart = 0.0;
+        clearcoatPart = 0.0;
+    }    
+    
     //diffusePart = 1.0;  // test disable
     //specularPart = 0.0;  // test disable
     //clearcoatPart = 1.0;  // test disable
-    glassPart = 0;  // test disable
+    //glassPart = 0;  // test disable
 
     float totalWeight = 1.0f / (diffusePart + specularPart + glassPart + clearcoatPart);
     float diffuseWeight = diffusePart * totalWeight;
     float specularWeight = specularPart * totalWeight;
     float clearcoatWeight = clearcoatPart * totalWeight;
+    float glassWeight = glassPart * totalWeight;
 
     // CDF of the sampling probabilities
-    float cdf[3];
+    float cdf[4];
     cdf[0] = diffuseWeight;
     cdf[1] = cdf[0] + specularWeight;
     cdf[2] = cdf[1] + clearcoatWeight;
+    cdf[3] = cdf[2] + glassWeight;
 
     float3 WorldHalf = 0;
     float cosine_theta = 0;
@@ -306,7 +325,7 @@ void SamplingBRDF(out float3 SampleDir, out float SamplePDF, out float3 BRDF_Cos
     else if (r3 < cdf[2]) // clearcoatPart
     {
         // https://github.com/knightcrawler25/GLSL-PathTracer/blob/master/src/shaders/common/sampling.glsl
-        float clearcoatRoughness = lerp(0.1, 0.001, mat.clearcoatGloss);
+        float clearcoatRoughness = lerp(0.25, 0.1, mat.clearcoatGloss);
 
         float r1 = Random_0_1(payload.seed);
         float r2 = Random_0_1(payload.seed);
@@ -316,9 +335,6 @@ void SamplingBRDF(out float3 SampleDir, out float SamplePDF, out float3 BRDF_Cos
         
         if (clearcoatPart > 0.0f)
         {
-            // https://github.com/knightcrawler25/GLSL-PathTracer/blob/master/src/shaders/common/sampling.glsl
-            float clearcoatRoughness = lerp(0.1, 0.001, mat.clearcoatGloss);
-        
             float NoV = saturate(dot(WorldNormal, SurfaceToView));
             float NoL = saturate(dot(WorldNormal, SampleDir));
             float NoH = saturate(dot(WorldNormal, WorldHalf));
@@ -330,34 +346,60 @@ void SamplingBRDF(out float3 SampleDir, out float SamplePDF, out float3 BRDF_Cos
             else
             {
                 float D = DistributionGGX(WorldNormal, WorldHalf, clearcoatRoughness);
-                float G = GeometrySmith(clearcoatRoughness, NoV, NoL);
-                float3 BRDF = (D * G / (4 * NoL * NoV));
+                float G = GeometrySmith(0.25, NoV, NoL);
+                float3 F = FresnelSchlick(cosine_theta, float3(1, 1, 1));
+                float3 BRDF = F * (D * G / (4 * NoL * NoV));
             
                 BRDF_Cos += BRDF * clearcoatPart;
                 SamplePDF += (D * NoH / (4 * VoH)) * clearcoatWeight;
             }
         }
     }
-
-
-// In, out intersection check within any hit for glass sphere
-#define TRANSMITTANCE_TEST 0
-#if TRANSMITTANCE_TEST
-    if (payload.IsRayPenetratingInstance())
+    else if (r3 < cdf[3]) // glassPart
     {
-        payload.Radiance = float3(10, 0, 0);
-        payload.Attenuation = 1;
-        return;
+        float NoV = dot(SurfaceToView, WorldNormal);
+        float fNoV = dot(SurfaceToView, WorldFaceNormal);
+        
+        // Cook torrance brdf from https://cdn2.unrealengine.com/Resources/files/2013SiggraphPresentationsNotes-26915738.pdf
+        float3 F0 = mat.baseColor;
+
+        float r1 = Random_0_1(payload.seed);
+        float r2 = Random_0_1(payload.seed);
+        float3 WorldHalf = normalize(ImportanceSampleGGX(float2(r1, r2), mat.roughness, WorldNormal));
+
+        bool IntoMedium = NoV > 0.0f;
+        float eta = IntoMedium ? (1.0 / mat.ior) : mat.ior;
+            
+        if (NoV <= 0)
+            WorldHalf *= -1.0f;
+            
+        float F = DielectricFresnel(dot(SurfaceToView, WorldHalf), eta);
+
+        if (Random_0_1(payload.seed) < F && NoV > 0)
+        {
+            SamplePDF = 1;
+            BRDF_Cos = 1;
+            SampleDir = reflect(-SurfaceToView, WorldHalf);
+        }
+        else
+        {
+            SamplePDF = 1;
+            BRDF_Cos = 1;
+            SampleDir = refract(-SurfaceToView, WorldHalf, eta);
+
+            if (NoV > 0)
+            {
+                payload.SetPenetratingInstnaceIndex(InstanceIndex());
+            }
+            else
+            {
+                payload.ResetPenetratingInstanceIndex();
+            }
+        }
+        cosine_theta = 1.0f;
     }
-#endif // TRANSMITTANCE_TEST
 
-
-
-
-    
-   
     BRDF_Cos *= cosine_theta;
-
 }
 
 // todo : set from shader
@@ -486,80 +528,12 @@ void MeshClosestHitShader(inout RayPayload payload, in MyAttributes attr)
     }
     WorldFaceNormal = mul((float3x3) RenderObjParam[0].M, FaceNormal);
 
-    float2 uv = HitAttribute(Vertex0.TexCoord
-        , Vertex1.TexCoord
-        , Vertex2.TexCoord, attr);
+    float2 uv = HitAttribute(Vertex0.TexCoord, Vertex1.TexCoord, Vertex2.TexCoord, attr);
     MaterialUniformBuffer material = GetMaterial(WorldNormal, MaterialBindless, uv);
     
     // Set hit point to payload
     payload.HitPos = HitWorldPosition();
-
-    if (material.specTrans > 0)
-    {
-        payload.Radiance = 0.0f;
-        payload.Attenuation = 1.0f;
-        
-        float3 SurfaceToView = -WorldRayDirection();
-     
-        float EN = dot(SurfaceToView, WorldNormal);
-        float EfN = dot(SurfaceToView, WorldFaceNormal);
-
-        float SamplePDF;
-        float Fresnel;
-        float3 BRDF_Cos = 0;
-        float3 SampleDir = 0;
-
-        {
-            // Cook torrance brdf from https://cdn2.unrealengine.com/Resources/files/2013SiggraphPresentationsNotes-26915738.pdf
-            float3 F0 = material.baseColor;
-
-            float r1 = Random_0_1(payload.seed);
-            float r2 = Random_0_1(payload.seed);
-            float3 WorldHalf = normalize(ImportanceSampleGGX(float2(r1, r2), material.roughness, WorldNormal));
-
-            bool IntoMedium = EN > 0.0f;
-            float eta = IntoMedium ? (1.0 / material.ior) : material.ior;
-            
-            if (EN <= 0)
-            {
-                WorldHalf *= -1.0f;
-            }
-            
-            float F = DielectricFresnel(dot(SurfaceToView, WorldHalf), eta);
-
-            if (Random_0_1(payload.seed) < F && EN > 0)
-            {
-                SamplePDF = 1;
-                SampleDir = reflect(-SurfaceToView, WorldHalf);
-            }
-            else
-            {
-                SamplePDF = 1;
-                SampleDir = refract(-SurfaceToView, WorldHalf, eta);
-
-                if (EN > 0)
-                {
-                    payload.SetPenetratingInstnaceIndex(InstanceIndex());
-                }
-                else
-                {
-                    payload.ResetPenetratingInstanceIndex();
-                }
-            }
-            payload.Attenuation = SamplePDF;
-            payload.HitReflectDir = SampleDir;
-            return;
-        }
-    }
     
-    if (dot(WorldNormal, -WorldRayDirection()) <= 0.0f)
-    {
-        payload.Attenuation = 1;
-        payload.Radiance = 0;
-        payload.RecursionDepth = MAX_RECURSION_DEPTH;
-        return;
-    }
-
     float SamplePDF;
     float3 BRDF_Cos = 0;
     float3 SampleDir = 0;
@@ -567,15 +541,7 @@ void MeshClosestHitShader(inout RayPayload payload, in MyAttributes attr)
     {
         payload.Radiance += material.emission;
     }
-    SamplingBRDF(SampleDir, SamplePDF, BRDF_Cos, WorldNormal, -WorldRayDirection(), material, payload);
-
-    //if(dot(SampleDir, WorldNormal) <= 0)
-    {
-        //payload.Attenuation = 1;
-        //payload.Radiance = 0;
-		//payload.RecursionDepth = MAX_RECURSION_DEPTH;
-        //return;
-    }
+    SamplingBRDF(SampleDir, SamplePDF, BRDF_Cos, WorldNormal, WorldFaceNormal, -WorldRayDirection(), material, payload);
 
     payload.Attenuation = BRDF_Cos / SamplePDF;
     payload.HitReflectDir = SampleDir;
