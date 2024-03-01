@@ -75,7 +75,7 @@ uint64 jRingBuffer_DX12::AllocWithCBV(uint64 allocSize, jDescriptor_DX12& OutCBV
 
         // Create CBV
         {
-            OutCBV = jBufferUtil_DX12::CreateConstantBufferView(GetGPUAddress() + allocOffset, allocSize);
+            OutCBV = jBufferUtil_DX12::CreateConstantBufferView(GetGPUAddress() + allocOffset, (uint32)allocSize);
             AllocatedCBVs.push_back(OutCBV);
         }
         return allocOffset;

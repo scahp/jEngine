@@ -150,6 +150,7 @@ struct jShaderInfo
     void SetName(const jName& InName) { Name = InName; Hash = 0; }
     void SetShaderFilepath(const jName& InShaderFilepath) { ShaderFilepath = InShaderFilepath; Hash = 0; }
     void SetPreProcessors(const jName& InPreProcessors) { PreProcessors = InPreProcessors; Hash = 0; }
+    void AddPreProcessor(const char* InDefine, const char* InValue);
     void SetEntryPoint(const jName& InEntryPoint) { EntryPoint = InEntryPoint; Hash = 0; }
     void SetShaderType(const EShaderAccessStageFlag InShaderType) { ShaderType = InShaderType; Hash = 0; }
     void SetPermutationId(const uint32 InPermutationId) { PermutationId = InPermutationId; Hash = 0; }

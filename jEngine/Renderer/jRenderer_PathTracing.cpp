@@ -77,6 +77,8 @@ void jRenderer_PathTracing::PathTracing()
 			{
 				jRaytracingPipelineShader NewShader;
 				jShaderInfo shaderInfo;
+				shaderInfo.AddPreProcessor("MAX_RECURSION_DEPTH", std::to_string(gOptions.MaxRecursionDepthForPathTracing).c_str());
+				shaderInfo.AddPreProcessor("MAX_RAY_PER_PIXEL", std::to_string(gOptions.RayPerPixelForPathTracing).c_str());
 
 				// First hit group for mesh
 				shaderInfo.SetName(jNameStatic("Miss"));
@@ -100,13 +102,6 @@ void jRenderer_PathTracing::PathTracing()
 				NewShader.ClosestHitShader = g_rhi->CreateShader(shaderInfo);
 				NewShader.ClosestHitEntryPoint = TEXT("MeshClosestHitShader");
 
-				//shaderInfo.SetName(jNameStatic("AnyHit"));
-				//shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/PathTracing.hlsl"));
-				//shaderInfo.SetEntryPoint(jNameStatic("MeshAnyHitShader"));
-				//shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_ANYHIT);
-				//NewShader.AnyHitShader = g_rhi->CreateShader(shaderInfo);
-				//NewShader.AnyHitEntryPoint = TEXT("MeshAnyHitShader");
-
 				NewShader.HitGroupName = TEXT("DefaultHit");
 
 				RaytracingShaders.push_back(NewShader);
@@ -114,6 +109,8 @@ void jRenderer_PathTracing::PathTracing()
 			{
 				jRaytracingPipelineShader NewShader;
 				jShaderInfo shaderInfo;
+                shaderInfo.AddPreProcessor("MAX_RECURSION_DEPTH", std::to_string(gOptions.MaxRecursionDepthForPathTracing).c_str());
+				shaderInfo.AddPreProcessor("MAX_RAY_PER_PIXEL", std::to_string(gOptions.RayPerPixelForPathTracing).c_str());
 
 				// Second hit gorup for light
 				shaderInfo.SetName(jNameStatic("ClosestHit"));

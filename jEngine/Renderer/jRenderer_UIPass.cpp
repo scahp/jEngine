@@ -102,6 +102,9 @@ void IRenderer::UIPass()
 						ImGui::EndCombo();
 					}
 
+					ImGui::SliderInt("MaxRecursionDepth", &gOptions.MaxRecursionDepthForPathTracing, 1, 100);
+					ImGui::SliderInt("RayPerPixel", &gOptions.RayPerPixelForPathTracing, 1, 100);
+
 					ImGui::End();
 				}
 			}

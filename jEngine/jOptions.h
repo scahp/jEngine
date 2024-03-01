@@ -52,6 +52,9 @@ struct jOptions
     bool UseDiscontinuityWeight;
     bool UseHaltonJitter;
     const char* UseResolution;
+    
+    int32 MaxRecursionDepthForPathTracing;
+    int32 RayPerPixelForPathTracing;
 
     bool IsDenoiserGuassian() const { return GDenoisers[0] == Denoiser; }
     bool IsDenoiserGuassianSeparable() const { return GDenoisers[1] == Denoiser; }

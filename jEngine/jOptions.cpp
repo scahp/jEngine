@@ -54,6 +54,8 @@ jOptions::jOptions()
 	UseDiscontinuityWeight = true;
 	UseHaltonJitter = true;
 	UseResolution = GAOResolution[2];	// Default to 1/4 size of the screen
+    MaxRecursionDepthForPathTracing = 6;
+    RayPerPixelForPathTracing = 5;
 }
 
 bool jOptions::IsRTAO() const

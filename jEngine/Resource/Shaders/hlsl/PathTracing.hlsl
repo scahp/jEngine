@@ -1,6 +1,14 @@
 #include "common.hlsl"
 #include "BRDF.hlsl"
 
+#ifndef MAX_RECURSION_DEPTH
+#error MAX_RECURSION_DEPTH should be defined.
+#endif // MAX_RECURSION_DEPTH
+
+#ifndef MAX_RAY_PER_PIXEL
+#error MAX_RAY_PER_PIXEL should be defined.
+#endif // MAX_RAY_PER_PIXEL
+
 struct SceneConstantBuffer
 {
     float4x4 projectionToWorld;
@@ -402,10 +410,6 @@ void SamplingBRDF(out float3 SampleDir, out float SamplePDF, out float3 BRDF_Cos
     BRDF_Cos *= cosine_theta;
 }
 
-// todo : set from shader
-#define MAX_RECURSION_DEPTH 6
-#define MAX_PIXEL_PER_RAY 5
-
 [shader("raygeneration")]
 void RaygenShader()
 {
@@ -413,7 +417,7 @@ void RaygenShader()
 
     float3 TotalRadiance = 0.0f;
     
-    for (int i = 0; i < MAX_PIXEL_PER_RAY; ++i)
+    for (int i = 0; i < MAX_RAY_PER_PIXEL; ++i)
     {
         float3 origin = 0;
         float3 rayDir = 0;
@@ -461,7 +465,7 @@ void RaygenShader()
         
         seed = payload.seed;
     }
-    TotalRadiance /= MAX_PIXEL_PER_RAY;
+    TotalRadiance /= MAX_RAY_PER_PIXEL;
 
     if (g_sceneCB.AccumulateNumber == 0)
     {

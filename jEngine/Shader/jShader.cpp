@@ -46,6 +46,18 @@ void jShaderInfo::GetShaderTypeDefines(std::string& OutResult, EShaderAccessStag
     }
 }
 
+void jShaderInfo::AddPreProcessor(const char* InDefine, const char* InValue)
+{
+    check(InDefine);
+    check(InValue);
+    std::string NewPreProcessor = PreProcessors.ToStr() ? PreProcessors.ToStr() : "";
+    NewPreProcessor += "\r\n#define ";
+    NewPreProcessor += InDefine;
+    NewPreProcessor += " ";
+    NewPreProcessor += InValue;
+    PreProcessors = jName(NewPreProcessor.c_str());
+}
+
 // jRaytracingPipelineShader
 size_t jRaytracingPipelineShader::GetHash() const
 {
