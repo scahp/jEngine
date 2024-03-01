@@ -271,6 +271,7 @@ void jGame::Setup()
             gSelectedScene = gPathTracingScenesNameOnly[0].c_str();
 
 		gSelectedSceneIndex = 3;
+		gSelectedScene = gPathTracingScenesNameOnly[gSelectedSceneIndex].c_str();
     }
 
 	if (!gPathTracingScene)

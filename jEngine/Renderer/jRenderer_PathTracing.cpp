@@ -12,6 +12,7 @@
 #include "Scene/Light/jPathTracingLight.h"
 #include "jOptions.h"
 #include "PathTracingDataLoader/jPathTracingData.h"
+#include "FileLoader/jImageFileLoader.h"
 
 void jRenderer_PathTracing::Setup()
 {
@@ -211,6 +212,10 @@ void jRenderer_PathTracing::PathTracing()
 			, 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
 		ShaderBindingArray.Add(jShaderBinding::Create(3, 1, EShaderBindingType::SAMPLER, EShaderAccessStageFlag::ALL_RAYTRACING,
 			ResourceInlineAllactor.Alloc<jSamplerResource>(SamplerState)));
+
+		jSceneRenderTarget::CubeEnvMap2 = jImageFileLoader::GetInstance().LoadTextureFromFile(jNameStatic("Resource/stpeters_probe_cubemp.dds")).lock().get();
+        ShaderBindingArray.Add(jShaderBinding::Create(3, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
+            ResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::CubeEnvMap2, nullptr)));
 
 		// Create ShaderBindingLayout and ShaderBindingInstance Instance for this draw call
 		std::shared_ptr<jShaderBindingInstance> GlobalShaderBindingInstance;

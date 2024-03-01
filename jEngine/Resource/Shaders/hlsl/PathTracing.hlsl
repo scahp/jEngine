@@ -73,6 +73,7 @@ RaytracingAccelerationStructure Scene : register(t0, space0);
 RWTexture2D<float4> RenderTarget : register(u1, space0);
 ConstantBuffer<SceneConstantBuffer> g_sceneCB : register(b2, space0);
 SamplerState DefaultSamplerState : register(s3, space0);
+TextureCube EnvTexture : register(s4, space0);
 
 StructuredBuffer<uint2> VertexIndexOffsetArray[] : register(t0, space1);
 StructuredBuffer<uint> IndexBindlessArray[] : register(t0, space2);
@@ -224,7 +225,7 @@ float SchlickWeight(float u)
     return m2 * m2 * m;
 }
 
-void SamplingBRDF(out float3 SampleDir, out float SamplePDF, out float3 BRDF_Cos
+void SamplingBSDF(out float3 SampleDir, out float SamplePDF, out float3 BRDF_Cos
     , in float3 WorldNormal, in float3 WorldFaceNormal, in float3 SurfaceToView, in MaterialUniformBuffer mat, inout RayPayload payload)
 {
     SamplePDF = 0;
@@ -545,7 +546,7 @@ void MeshClosestHitShader(inout RayPayload payload, in MyAttributes attr)
     {
         payload.Radiance += material.emission;
     }
-    SamplingBRDF(SampleDir, SamplePDF, BRDF_Cos, WorldNormal, WorldFaceNormal, -WorldRayDirection(), material, payload);
+    SamplingBSDF(SampleDir, SamplePDF, BRDF_Cos, WorldNormal, WorldFaceNormal, -WorldRayDirection(), material, payload);
 
     payload.Attenuation = BRDF_Cos / SamplePDF;
     payload.HitReflectDir = SampleDir;
