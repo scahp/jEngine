@@ -79,8 +79,90 @@ void IRenderer::UIPass()
 				ImGui::EndTabItem();
 			}
 
-			static bool IsUsePathTracing = true;
-			if (IsUsePathTracing)
+			if (GSupportRaytracing)
+			{
+				if (ImGui::BeginTabItem("AO Options"))
+				{
+					for(int32 i=0;i<_countof(GAOType);++i)
+					{
+						if (!GSupportRaytracing && i == gOptions.GetRTAOIndex())
+							continue;
+
+						ImGui::RadioButton(GAOType[i], &gOptions.AOType, i);
+					}
+
+					if (gOptions.AOType == 0 && !GSupportRaytracing)
+						gOptions.AOType = 1;
+
+					ImGui::Checkbox("ShowDebugRT", &gOptions.ShowDebugRT);
+					ImGui::Checkbox("ShowAOOnly", &gOptions.ShowAOOnly);
+					if (ImGui::BeginCombo("AO RT Res(%)", gOptions.UseResolution, ImGuiComboFlags_None))
+					{
+						for (int32 i = 0; i < _countof(GAOResolution); ++i)
+						{
+							const bool is_selected = (gOptions.UseResolution == GAOResolution[i]);
+							if (ImGui::Selectable(GAOResolution[i], is_selected))
+								gOptions.UseResolution = GAOResolution[i];
+							if (is_selected)
+								ImGui::SetItemDefaultFocus();
+						}
+						ImGui::EndCombo();
+					}
+
+					if (gOptions.IsRTAO())
+					{
+						ImGui::Separator();
+						ImGui::TextColored(ImVec4(1, 1, 0, 1), "RTAO ray options");
+						ImGui::SliderFloat("Radius", &gOptions.AORadius, 0.0f, 150.0f);
+						ImGui::SliderFloat("Intensity", &gOptions.AOIntensity, 0.0f, 1.0f);
+						ImGui::SliderInt("RayPerPixel", &gOptions.RayPerPixel, 1, 100);
+
+						ImGui::Separator();
+						ImGui::TextColored(ImVec4(1, 1, 0, 1), "Temporal denosing");
+						ImGui::Checkbox("UseAOReprojection", &gOptions.UseAOReprojection);
+						if (!gOptions.UseAOReprojection)
+							ImGui::BeginDisabled();
+						ImGui::Checkbox("UseDiscontinuityWeight", &gOptions.UseDiscontinuityWeight);
+						if (!gOptions.UseAOReprojection)
+							ImGui::EndDisabled();
+						ImGui::Checkbox("UseHaltonJitter", &gOptions.UseHaltonJitter);
+						ImGui::Checkbox("UseAccumulateRay", &gOptions.UseAccumulateRay);
+					}
+					else if (gOptions.IsSSAO())
+					{
+						ImGui::Separator();
+						ImGui::TextColored(ImVec4(1, 1, 0, 1), "SSAO ray options");
+						ImGui::SliderFloat("Radius", &gOptions.AORadius, 0.0f, 150.0f);
+						ImGui::SliderFloat("Bias(avoid banding)", &gOptions.SSAOBias, 0.0f, 150.0f);
+						ImGui::SliderFloat("Intensity", &gOptions.AOIntensity, 0.0f, 1.0f);
+					}
+
+					ImGui::Separator();
+					ImGui::TextColored(ImVec4(1, 1, 0, 1), "Spatial denosing");
+					if (ImGui::BeginCombo("Denoiser", gOptions.Denoiser, ImGuiComboFlags_None))
+					{
+						for (int32 i = 0; i < _countof(GDenoisers); ++i)
+						{
+							const bool is_selected = (gOptions.Denoiser == GDenoisers[i]);
+							if (ImGui::Selectable(GDenoisers[i], is_selected))
+								gOptions.Denoiser = GDenoisers[i];
+							if (is_selected)
+								ImGui::SetItemDefaultFocus();
+						}
+						ImGui::EndCombo();
+					}
+					// The kernel size must be an odd number
+					ImGui::SliderInt("KernelSize", &gOptions.GaussianKernelSize, 1, 20);
+					if ((gOptions.GaussianKernelSize % 2) == 0)
+						gOptions.GaussianKernelSize++;
+					ImGui::SliderFloat("KernelSigma", &gOptions.GaussianKernelSigma, 0.1f, 30.0f);
+					ImGui::SliderFloat("BilateralSigma", &gOptions.BilateralKernelSigma, 0.001f, 0.1f);
+
+					ImGui::EndTabItem();
+				}
+			}
+
+#if USE_PATH_TRACING
 			{
 				ImGui::SetNextWindowPos(ImVec2(400.0f, 27.0f), ImGuiCond_FirstUseEver);
 				ImGui::SetNextWindowSize(ImVec2(200.0f, 80.0f), ImGuiCond_FirstUseEver);
@@ -108,6 +190,7 @@ void IRenderer::UIPass()
 					ImGui::End();
 				}
 			}
+#endif // USE_PATH_TRACING
 			ImGui::EndTabBar();
 		}
 		ImGui::End();

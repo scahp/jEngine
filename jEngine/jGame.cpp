@@ -39,9 +39,9 @@ jGame::~jGame()
 
 void jGame::ProcessInput(float deltaTime)
 {
-	//static float MoveDistancePerSecond = 200.0f;
+	static float MoveDistancePerSecond = 200.0f;
 	//static float MoveDistancePerSecond = 1.0f;
-	static float MoveDistancePerSecond = 10.0f;
+	//static float MoveDistancePerSecond = 10.0f;
 	const float CurrentDistance = MoveDistancePerSecond * deltaTime;
 
 	// Process Key Event
@@ -70,8 +70,6 @@ void jGame::Setup()
 	float LightColorScale = 1.0f;
 #endif
 
-	static bool LoadPathTracing = true;
-
 #if USE_SPONZA
 	// Create main camera
     const Vector mainCameraPos(-559.937622f, 116.339653f, 84.3709946f);
@@ -79,14 +77,15 @@ void jGame::Setup()
     MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 10.0f, 5000.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT, true);
     jCamera::AddCamera(0, MainCamera);
 
+	#if !USE_PATH_TRACING		// todo : this hard code should be removed.
     // Create lights
-	if (!LoadPathTracing)
 	{
 		NormalDirectionalLight = jLight::CreateDirectionalLight(Vector(0.1f, -0.5f, 0.1f) // AppSettings.DirecionalLightDirection
 			, Vector4(30.0f), Vector(1.0f), Vector(1.0f), 64);
 		PointLight = jLight::CreatePointLight(Vector(10.0f, 100.0f, 10.0f), Vector4(1.0f, 0.75f, 0.75f, 1.0f) * LightColorScale, 1500.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
 		SpotLight = jLight::CreateSpotLight(Vector(0.0f, 60.0f, 5.0f), Vector(1.0f, -1.0f, 0.4f).GetNormalize(), Vector4(0.0f, 1.0f, 0.0f, 1.0f) * LightColorScale, 2000.0f, 0.35f, 1.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
 	}
+	#endif // !USE_PATH_TRACING
 #else
 	// Create main camera
 	//const Vector mainCameraPos(-111.6f, 17.49f, 3.11f);
@@ -168,23 +167,24 @@ void jGame::Setup()
 	//ResourceLoadCompleteEvent = std::async(std::launch::async, [&]()
 	//{
 #if USE_SPONZA
-	if (!LoadPathTracing)
+	#if !USE_PATH_TRACING		// todo : this hard code should be removed.
 	{
-	#if USE_SPONZA_PBR		
-	Sponza = jModelLoader::GetInstance().LoadFromFile("Resource/sponza_pbr/sponza.glb", "Resource/sponza_pbr");
-	#else
-	Sponza = jModelLoader::GetInstance().LoadFromFile("Resource/sponza/sponza.dae", "Resource/");
-	#endif
-	jObject::AddObject(Sponza);
-	SpawnedObjects.push_back(Sponza);
+#if USE_SPONZA_PBR		
+        Sponza = jModelLoader::GetInstance().LoadFromFile("Resource/sponza_pbr/sponza.glb", "Resource/sponza_pbr");
+#else
+        Sponza = jModelLoader::GetInstance().LoadFromFile("Resource/sponza/sponza.dae", "Resource/");
+#endif
+        jObject::AddObject(Sponza);
+        SpawnedObjects.push_back(Sponza);
 
-    for (int32 i = 0; i < 1; ++i)
-    {
-        Sphere = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f + i * 100), 1.0, 60, 30, Vector(30.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
-        jObject::AddObject(Sphere);
-        SpawnedObjects.push_back(Sphere);
-    }
+        for (int32 i = 0; i < 1; ++i)
+        {
+            Sphere = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f + i * 100), 1.0, 60, 30, Vector(30.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+            jObject::AddObject(Sphere);
+            SpawnedObjects.push_back(Sphere);
+        }
 	}
+	#endif // !USE_PATH_TRACING
 
 		//auto random_double = []() -> float
 		//{
@@ -255,6 +255,7 @@ void jGame::Setup()
 		//}
 	//});
 	
+#if USE_PATH_TRACING
     static bool initialized = false;
     if (!initialized)
     {
@@ -279,6 +280,7 @@ void jGame::Setup()
 		gPathTracingScene = jPathTracingLoadData::LoadPathTracingData(gPathTracingScenes[gSelectedSceneIndex]);
 		gPathTracingScene->CreateSceneFor_jEngine(this);
 	}
+#endif // USE_PATH_TRACING
 
 	g_rhi->Finish(); // todo : Instead of this, it needs UAV barrier here
 	if (GSupportRaytracing)
@@ -347,6 +349,7 @@ void jGame::Update(float deltaTime)
 {
 	SCOPE_DEBUG_EVENT(g_rhi, "Game::Update");
 
+#if USE_PATH_TRACING
 	static int32 LastSelectedIndex = gSelectedSceneIndex;
 	if (gSelectedSceneIndex != LastSelectedIndex)
 	{
@@ -372,6 +375,7 @@ void jGame::Update(float deltaTime)
 
 		LastSelectedIndex = gSelectedSceneIndex;
 	}
+#endif // USE_PATH_TRACING
 
 	//if (CompletedAsyncLoadObjects.size() > 0)
 	//{
@@ -468,10 +472,13 @@ void jGame::Draw()
 		jView View(MainCamera, jLight::GetLights());
 		View.PrepareViewUniformBufferShaderBindingInstance();
 
-        //jRenderer renderer(renderFrameContext, View);
-        //renderer.Render();
-		jRenderer_PathTracing renderer(renderFrameContext, View);
-		renderer.Render();
+#if USE_PATH_TRACING
+        jRenderer_PathTracing renderer(renderFrameContext, View);
+        renderer.Render();
+#else
+        jRenderer renderer(renderFrameContext, View);
+        renderer.Render();
+#endif // USE_PATH_TRACING
 
 		g_rhi->EndRenderFrame(renderFrameContext);
 	}

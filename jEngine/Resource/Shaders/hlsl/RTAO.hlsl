@@ -22,16 +22,6 @@ struct SceneConstantBuffer
     float3 Padding0;        // for 16 byte align
 };
 
-#define VERTEX_STRID 56
-struct jVertex
-{
-	float3 Pos;
-	float3 Normal;
-	float3 Tangent;
-	float3 Bitangent;
-	float2 TexCoord;
-};
-
 RaytracingAccelerationStructure Scene : register(t0, space0);
 RWTexture2D<float4> RenderTarget : register(u1, space0);
 Texture2D DepthTexture : register(t2, space0);
@@ -52,19 +42,6 @@ Texture2D NormalTextureArray[] : register(t0, space8);
 Texture2D RMTextureArray[] : register(t0, space9);
 #endif // USE_BINDLESS_RESOURCE
 
-jVertex GetVertex(in ByteAddressBuffer buffer, uint index)
-{
-    uint address = index * VERTEX_STRID;
-    
-    jVertex r;
-    r.Pos = asfloat(buffer.Load3(address));
-    r.Normal = asfloat(buffer.Load3(address + 12));
-    r.Tangent = asfloat(buffer.Load3(address + 24));
-    r.Bitangent = asfloat(buffer.Load3(address + 36));
-    r.TexCoord = asfloat(buffer.Load2(address + 48));
-    return r;
-}
-
 typedef BuiltInTriangleIntersectionAttributes MyAttributes;
 struct RayPayload
 {
@@ -74,34 +51,6 @@ struct RayPayload
 float3 HitWorldPosition()
 {
     return WorldRayOrigin() + RayTCurrent() * WorldRayDirection();
-}
-
-float3 HitAttribute(float3 vertexAttribute[3], BuiltInTriangleIntersectionAttributes attr)
-{
-    return vertexAttribute[0] +
-        attr.barycentrics.x * (vertexAttribute[1] - vertexAttribute[0]) +
-        attr.barycentrics.y * (vertexAttribute[2] - vertexAttribute[0]);
-}
-
-float2 HitAttribute(float2 vertexAttribute[3], BuiltInTriangleIntersectionAttributes attr)
-{
-    return vertexAttribute[0] +
-        attr.barycentrics.x * (vertexAttribute[1] - vertexAttribute[0]) +
-        attr.barycentrics.y * (vertexAttribute[2] - vertexAttribute[0]);
-}
-
-float3 HitAttribute(float3 A, float3 B, float3 C, BuiltInTriangleIntersectionAttributes attr)
-{
-    return A +
-        attr.barycentrics.x * (B - A) +
-        attr.barycentrics.y * (C - A);
-}
-
-float2 HitAttribute(float2 A, float2 B, float2 C, BuiltInTriangleIntersectionAttributes attr)
-{
-    return A +
-        attr.barycentrics.x * (B - A) +
-        attr.barycentrics.y * (C - A);
 }
 
 // Generate a ray in world space for a camera pixel corresponding to an index from the dispatched 2D grid.
@@ -123,9 +72,7 @@ inline float3 GenerateCameraRay(uint2 index, out float3 origin, out float3 direc
     return world.xyz;
 }
 
-float Random_0_1(float co) { return frac(sin(co*(91.3458)) * 47453.5453); }
-
-float3 random_in_unit_sphere(int seed)
+float3 random_in_unit_sphere(inout uint seed)
 {
     //float rand = RayTCurrent();
     float r = Random_0_1(seed) + 0.01f;        // To avoid 0 value for random variable
@@ -141,7 +88,7 @@ float3 random_in_unit_sphere(int seed)
     return normalize(randomUniSphere);
 }
 
-float3 random_in_hemisphere(float3 normal, int seed)
+float3 random_in_hemisphere(float3 normal, inout uint seed)
 {
     float3 in_unit_sphere = random_in_unit_sphere(seed);
     if (dot(in_unit_sphere, normal) > 0.0)  // 노멀 기준으로 같은 반구 방향인지?
@@ -222,32 +169,6 @@ float3 RayPlaneIntersection(float3 planeOrigin, float3 planeNormal, float3 rayOr
     return rayOrigin + rayDirection * t;
 }
 
-
-
-// https://gist.github.com/keijiro/24f9d505fac238c9a2982c0d6911d8e3
-// Hash function from H. Schechter & R. Bridson, goo.gl/RXiKaH
-uint Hash(uint s)
-{
-    s ^= 2747636419u;
-    s *= 2654435769u;
-    s ^= s >> 16;
-    s *= 2654435769u;
-    s ^= s >> 16;
-    s *= 2654435769u;
-    return s;
-}
-
-float Random(uint seed)
-{
-    return float(Hash(seed)) / 4294967295.0; // 2^32-1
-}
-//////
-
-float3 ColorVariation(uint In)
-{
-    return float3(Random(In), Random(In+100), Random(In+200));
-}
-
 /*
     REF: https://gamedev.stackexchange.com/questions/23743/whats-the-most-efficient-way-to-find-barycentric-coordinates
     From "Real-Time Collision Detection" by Christer Ericson
@@ -290,11 +211,13 @@ void MyRaygenShader()
     if (AccumulateCount > 500)
         return;
 
+    uint seed = InitRandomSeed(DispatchRaysIndex().xy, DispatchRaysDimensions().xy, g_sceneCB.FrameNumber);
+    
     for(int i=0;i<g_sceneCB.RayPerPixel;++i)
     {
         RayDesc ray;
         ray.Origin = WorldPos;
-        ray.Direction = random_in_hemisphere(WorldNormal, WorldPos + random_in_hemisphere(WorldNormal, g_sceneCB.FrameNumber % 1000) * (i + 1));
+        ray.Direction = random_in_hemisphere(WorldNormal, seed);
         ray.TMin = 0.001; // Small epsilon to avoid self intersection.
         ray.TMax = g_sceneCB.AORadius;
     
