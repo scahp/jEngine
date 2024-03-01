@@ -32,6 +32,8 @@ Simple toy engine for implementing graphics feature with multiple api
 5. AsyncCompute : https://github.com/scahp/jEngine/tree/AsyncCompute \
 <img src="https://github.com/scahp/jEngine/assets/6734453/f52d103b-cc2d-4673-9baf-354606ec9a36" width="90%"></img>
 
+6. PathTracing Basis : https://github.com/scahp/jEngine/tree/PathTracingBasis \
+<img src="https://github.com/scahp/jEngine/assets/6734453/0490c447-f8fe-475d-8ffc-d6b92ddac619" width="90%"></img>
 
 <br/><br/>
 
