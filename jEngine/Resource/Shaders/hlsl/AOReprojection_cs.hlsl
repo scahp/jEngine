@@ -48,12 +48,9 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     if (OldPixelPos.x >= ComputeCommon.Width - 2 || OldPixelPos.y >= ComputeCommon.Height - 2 || OldPixelPos.x < 0 || OldPixelPos.y < 0)
         return;
 
-    float3 currentColor = resultImage[PixelPos].xyz;
-    float3 historyColor = HistoryBuffer[OldPixelPos].xyz;
+    float currentColor = resultImage[PixelPos].x;
+    float historyColor = HistoryBuffer[OldPixelPos].x;
    
-    //float3 currentColor = GetTexture(resultImage, PixelPos);
-    //float3 historyColor = GetTexture(HistoryBuffer, PixelPos);
-    
     float ReprojectionWeight = 0.9;
 #if USE_DISCONTINUITY_WEIGHT
     float DiscontinuityWeight = abs(DepthBuffer[PixelPos].x - HistoryDepthBuffer[PixelPos].x) < 0.01;
@@ -61,7 +58,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     HistoryDepthBuffer[PixelPos].x = DepthBuffer[PixelPos].x;
 #endif
     
-    resultImage[PixelPos].xyz = lerp(currentColor, historyColor, ReprojectionWeight);
+    resultImage[PixelPos].x = lerp(currentColor, historyColor, ReprojectionWeight);
 }
 #endif // COMPUTE_SHADER
 
@@ -84,13 +81,13 @@ cbuffer ComputeCommon : register(b5)
     CommonComputeUniformBuffer ComputeCommon;
 }
 
-float4 AOReprojectionPS(VSOutput input) : SV_TARGET
+float AOReprojectionPS(VSOutput input) : SV_TARGET
 {
     float2 Velocity = VelocityBuffer.Sample(TextureSampler, input.TexCoord).xy;
     float2 OldUV = input.TexCoord - Velocity;
     
-    float3 currentColor = CurrentTexture.Sample(TextureSampler, input.TexCoord).xyz;
-    float3 historyColor = HistoryBuffer.Sample(TextureSampler, OldUV).xyz;
+    float currentColor = CurrentTexture.Sample(TextureSampler, input.TexCoord).x;
+    float historyColor = HistoryBuffer.Sample(TextureSampler, OldUV).x;
     
     float ReprojectionWeight = 0.9;
 #if USE_DISCONTINUITY_WEIGHT
@@ -98,6 +95,6 @@ float4 AOReprojectionPS(VSOutput input) : SV_TARGET
     ReprojectionWeight *= DiscontinuityWeight;
 #endif // USE_DISCONTINUITY_WEIGHT
     
-    return float4(lerp(currentColor, historyColor, ReprojectionWeight), 1.0);
+    return lerp(currentColor, historyColor, ReprojectionWeight);
 }
 #endif // PIXEL_SHADER

@@ -23,7 +23,7 @@ struct SceneConstantBuffer
 };
 
 RaytracingAccelerationStructure Scene : register(t0, space0);
-RWTexture2D<float4> RenderTarget : register(u1, space0);
+RWTexture2D<float2> RenderTarget : register(u1, space0);
 Texture2D DepthTexture : register(t2, space0);
 Texture2D GBuffer0_Normal : register(t3, space0);
 ConstantBuffer<SceneConstantBuffer> g_sceneCB : register(b4, space0);
@@ -45,7 +45,7 @@ Texture2D RMTextureArray[] : register(t0, space9);
 typedef BuiltInTriangleIntersectionAttributes MyAttributes;
 struct RayPayload
 {
-    float4 color;
+    float AO;
 };
 
 float3 HitWorldPosition()
@@ -200,12 +200,12 @@ void MyRaygenShader()
     //float3 WorldNormal = normalize(DecodeOctNormal(OctNormal));
     float3 WorldNormal = GBuffer0_Normal.SampleLevel(AlbedoTextureSampler, UV, 0).xyz * 2 - 1;
 
-    float3 FinalAO = 0;
+    float FinalAO = 0.0f;
     float AccumulateCount = 0.0f;
     if (!g_sceneCB.Clear)
     {
-        FinalAO = RenderTarget[DispatchRaysIndex().xy].xyz;
-        AccumulateCount = RenderTarget[DispatchRaysIndex().xy].w;
+        FinalAO = RenderTarget[DispatchRaysIndex().xy].x;
+        AccumulateCount = RenderTarget[DispatchRaysIndex().xy].y;
     }
 
     if (AccumulateCount > 500)
@@ -221,31 +221,31 @@ void MyRaygenShader()
         ray.TMin = 0.001; // Small epsilon to avoid self intersection.
         ray.TMax = g_sceneCB.AORadius;
     
-        RayPayload payload = { float4(1.0f, 1.0f, 1.0f, 1.0f) };
+        RayPayload payload = { 1.0f };
         TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 0, 0, ray, payload);
 
         ++AccumulateCount;
 
         // Incremental Average : https://blog.demofox.org/2016/08/23/incremental-averaging/
-        FinalAO = lerp(FinalAO.xyz, payload.color.xyz, 1.0 / AccumulateCount);
+        FinalAO = lerp(FinalAO, payload.AO, 1.0 / AccumulateCount);
     }
-    RenderTarget[DispatchRaysIndex().xy] = float4(FinalAO, AccumulateCount);
+    RenderTarget[DispatchRaysIndex().xy] = float2(FinalAO, AccumulateCount);
 }
 
 [shader("anyhit")]
 void MyAnyHitShader(inout RayPayload payload, in MyAttributes attr)
 {
-    payload.color = float4(0, 0, 0, 1);
+    payload.AO = 0.0f;
 }
 
 [shader("closesthit")]
 void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 {
-    payload.color = float4(0, 0, 0, 1);
+    payload.AO = 0.0f;
 }
 
 [shader("miss")]
 void MyMissShader(inout RayPayload payload)
 {
-    payload.color = float4(1, 1, 1, 1);
+    payload.AO = 1.0f;
 }

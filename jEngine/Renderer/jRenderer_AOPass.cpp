@@ -568,13 +568,13 @@ std::shared_ptr<jTexture> jRenderer::RTAO()
 	// Create Persistent Resources
 	if (!jSceneRenderTarget::AOProjection || jSceneRenderTarget::AOProjection->Info.Width != (int32)RayRTWidth || jSceneRenderTarget::AOProjection->Info.Height != (int32)RayRTHeight)
 	{
-		jSceneRenderTarget::AOProjection = g_rhi->CreateRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, RayRTWidth, RayRTHeight, 1, false, g_rhi->GetSelectedMSAASamples()
+		jSceneRenderTarget::AOProjection = g_rhi->CreateRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::R16F, RayRTWidth, RayRTHeight, 1, false, g_rhi->GetSelectedMSAASamples()
 			, jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f), ETextureCreateFlag::UAV });
 	}
 	if (!jSceneRenderTarget::HistoryBuffer || jSceneRenderTarget::HistoryBuffer->Width != (int32)RayRTWidth || jSceneRenderTarget::HistoryBuffer->Height != (int32)RayRTHeight)
 	{
 		jSceneRenderTarget::HistoryBuffer = g_rhi->Create2DTexture((uint32)RayRTWidth, (uint32)RayRTHeight, (uint32)1, (uint32)1
-			, ETextureFormat::RGBA16F, ETextureCreateFlag::UAV, EResourceLayout::UAV);
+			, ETextureFormat::R16F, ETextureCreateFlag::UAV, EResourceLayout::UAV);
 	}
 	if (RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr)
 	{
