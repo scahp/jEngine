@@ -5,6 +5,7 @@ std::vector<std::string> gPathTracingScenes;
 std::vector<std::string> gPathTracingScenesNameOnly;
 const char* gSelectedScene = nullptr;
 int32 gSelectedSceneIndex = 0;
+uint32 gPathTracingFrameCount = 1;
 
 const char* GDenoisers[4] = { "Gaussian", "GaussianSeparable", "Bilateral", "None" };
 const char* GAOResolution[3] = { "100", "75", "50" };
@@ -56,6 +57,8 @@ jOptions::jOptions()
 	UseResolution = GAOResolution[2];	// Default to 1/4 size of the screen
     MaxRecursionDepthForPathTracing = 6;
     RayPerPixelForPathTracing = 5;
+	UseRussianRoulette = true;
+	RussianRouletteDepth = 3;
 }
 
 bool jOptions::IsRTAO() const

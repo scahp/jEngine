@@ -187,6 +187,15 @@ void IRenderer::UIPass()
 					ImGui::SliderInt("MaxRecursionDepth", &gOptions.MaxRecursionDepthForPathTracing, 1, 100);
 					ImGui::SliderInt("RayPerPixel", &gOptions.RayPerPixelForPathTracing, 1, 100);
 
+					ImGui::Checkbox("UseRussianRoulette", &gOptions.UseRussianRoulette);
+					if (!gOptions.UseRussianRoulette)
+						ImGui::BeginDisabled();
+					ImGui::SliderInt("RussianRouletteDepth", &gOptions.RussianRouletteDepth, 1, gOptions.MaxRecursionDepthForPathTracing);
+					if (!gOptions.UseRussianRoulette)
+						ImGui::EndDisabled();
+
+					ImGui::Text("Advanced FrameCount : %d", gPathTracingFrameCount);
+
 					ImGui::End();
 				}
 			}

@@ -55,6 +55,8 @@ struct jOptions
     
     int32 MaxRecursionDepthForPathTracing;
     int32 RayPerPixelForPathTracing;
+    bool UseRussianRoulette;
+    int32 RussianRouletteDepth;
 
     bool IsDenoiserGuassian() const { return GDenoisers[0] == Denoiser; }
     bool IsDenoiserGuassianSeparable() const { return GDenoisers[1] == Denoiser; }
@@ -71,3 +73,4 @@ extern std::vector<std::string> gPathTracingScenes;
 extern std::vector<std::string> gPathTracingScenesNameOnly;
 extern const char* gSelectedScene;
 extern int32 gSelectedSceneIndex;
+extern uint32 gPathTracingFrameCount;

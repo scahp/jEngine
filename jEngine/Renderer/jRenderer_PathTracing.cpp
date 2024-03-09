@@ -141,13 +141,19 @@ void jRenderer_PathTracing::PathTracing()
 		struct SceneConstantBuffer
 		{
 			Matrix projectionToWorld;
+			
 			Vector cameraPosition;
 			float focalDistance;
+			
 			Vector cameraDirection;
 			float lensRadius;
+			
 			uint32 FrameNumber;
 			uint32 AccumulateNumber;
 			Vector2 HaltonJitter;
+			
+			int32 RussianRouletteDepth;
+			Vector3i Padding0;
 		};
 
 		SceneConstantBuffer sceneCB;
@@ -158,9 +164,13 @@ void jRenderer_PathTracing::PathTracing()
 		sceneCB.lensRadius = mainCamera->Aperture;
 		sceneCB.FrameNumber = g_rhi->GetCurrentFrameNumber();
 
+		if (gOptions.UseRussianRoulette)
+			sceneCB.RussianRouletteDepth = gOptions.RussianRouletteDepth;
+		else
+			sceneCB.RussianRouletteDepth = -1;
+
 		static jOptions OldOptions = gOptions;
 		static auto OldMatrix = sceneCB.projectionToWorld;
-		static uint32 AccumulateNumber = 0;
         static int32 LastSelectedIndex = gSelectedSceneIndex;
 		if (!gOptions.UseAccumulateRay 
 			|| OldMatrix != sceneCB.projectionToWorld 
@@ -170,13 +180,13 @@ void jRenderer_PathTracing::PathTracing()
 			LastSelectedIndex = gSelectedSceneIndex;
 			OldMatrix = sceneCB.projectionToWorld;
 			memcpy(&OldOptions, &gOptions, sizeof(gOptions));
-			AccumulateNumber = 0;
+			gPathTracingFrameCount = 1;
 		}
 		else
 		{
-			++AccumulateNumber;
+			++gPathTracingFrameCount;
 		}
-		sceneCB.AccumulateNumber = AccumulateNumber;
+		sceneCB.AccumulateNumber = gPathTracingFrameCount;
 
 		static Vector2 HaltonJitter[] = {
 			Vector2(0.0f,      -0.333334f) / Vector2((float)SCR_WIDTH, (float)SCR_HEIGHT),

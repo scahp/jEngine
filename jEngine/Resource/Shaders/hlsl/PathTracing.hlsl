@@ -12,13 +12,19 @@
 struct SceneConstantBuffer
 {
     float4x4 projectionToWorld;
+    
     float3 cameraPosition;
     float focalDistance;
-    float3 cameraDirection;
+    
+    float3 cameraDirection;    
     float lensRadius;
-    uint FrameNumber;
+    
+    uint FrameNumber;    
     uint AccumulateNumber;
     float2 HaltonJitter;
+    
+    int RussianRouletteDepth;
+    int3 Padding0;
 };
 
 struct MaterialUniformBuffer
@@ -457,6 +463,19 @@ void RaygenShader()
             radiance += attenuation * payload.Radiance;
             attenuation = max(0, attenuation * payload.Attenuation);
 
+            // Russian Roulette
+            if (g_sceneCB.RussianRouletteDepth > 0)
+            {
+                if (payload.RecursionDepth >= g_sceneCB.RussianRouletteDepth)
+                {
+                    float q = min(max(payload.Attenuation.x, max(payload.Attenuation.y, payload.Attenuation.z)), 0.95);
+                    if (Random_0_1(payload.seed) > q)
+                        break;
+                    
+                    payload.Attenuation /= q;
+                }
+            }
+            
             ray.Origin = payload.HitPos;
             ray.Direction = payload.HitReflectDir;
             ++payload.RecursionDepth;
