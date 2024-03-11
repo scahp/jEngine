@@ -291,10 +291,21 @@ void EvalBSDF(out float3 BRDF_Cos, out float pdf, in MaterialUniformBuffer mat, 
     L = ToLocal(N, L);
     N = float3(0, 0, 1);
     
-    float3 H = normalize(L + V);
-    
-    if (H.z < 0.0)
-        H = -H;
+    float3 H = 0;
+    if (L.z > 0.0)
+    {
+        H = normalize(L + V);
+    }
+    else
+    {
+        // Refractive half vector is defined as :
+        // - (no * wo + ni * wi) / || (no * wo + ni * wi) ||
+        //
+        // http://graphics.berkeley.edu/papers/Rousiers-RTR-2012-02/Rousiers-RTR-2012-02.pdf 2. Related work : equation (3)
+        
+        float eta = 1.0 / mat.ior;
+        H = -normalize(L + V * eta);
+    }
     
     bool isReflect = V.z * L.z > 0;     // Is the both V and L in same side.
 
