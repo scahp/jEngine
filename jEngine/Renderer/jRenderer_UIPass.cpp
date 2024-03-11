@@ -161,48 +161,47 @@ void IRenderer::UIPass()
 					ImGui::EndTabItem();
 				}
 			}
-
-#if USE_PATH_TRACING
-			{
-				ImGui::SetNextWindowPos(ImVec2(400.0f, 27.0f), ImGuiCond_FirstUseEver);
-				ImGui::SetNextWindowSize(ImVec2(200.0f, 80.0f), ImGuiCond_FirstUseEver);
-				if (ImGui::Begin("PathTracing Options", 0, ImGuiWindowFlags_AlwaysAutoResize))
-				{
-					if (ImGui::BeginCombo("PathTracingScene", gSelectedScene, ImGuiComboFlags_None))
-					{
-						for (int32 i = 0; i < (int32)gPathTracingScenesNameOnly.size(); ++i)
-						{
-							const bool is_selected = (gSelectedScene == gPathTracingScenesNameOnly[i].c_str());
-							if (ImGui::Selectable(gPathTracingScenesNameOnly[i].c_str(), is_selected))
-							{
-								gSelectedScene = gPathTracingScenesNameOnly[i].c_str();
-								gSelectedSceneIndex = i;
-							}
-							if (is_selected)
-								ImGui::SetItemDefaultFocus();
-						}
-						ImGui::EndCombo();
-					}
-
-					ImGui::SliderInt("MaxRecursionDepth", &gOptions.MaxRecursionDepthForPathTracing, 1, 100);
-					ImGui::SliderInt("RayPerPixel", &gOptions.RayPerPixelForPathTracing, 1, 100);
-
-					ImGui::Checkbox("UseRussianRoulette", &gOptions.UseRussianRoulette);
-					if (!gOptions.UseRussianRoulette)
-						ImGui::BeginDisabled();
-					ImGui::SliderInt("RussianRouletteDepth", &gOptions.RussianRouletteDepth, 1, gOptions.MaxRecursionDepthForPathTracing);
-					if (!gOptions.UseRussianRoulette)
-						ImGui::EndDisabled();
-
-					ImGui::Text("Advanced FrameCount : %d", gPathTracingFrameCount);
-
-					ImGui::End();
-				}
-			}
-#endif // USE_PATH_TRACING
 			ImGui::EndTabBar();
 		}
 		ImGui::End();
+
+#if USE_PATH_TRACING
+        {
+            ImGui::SetNextWindowPos(ImVec2(400.0f, 27.0f), ImGuiCond_FirstUseEver);
+            ImGui::SetNextWindowSize(ImVec2(200.0f, 80.0f), ImGuiCond_FirstUseEver);
+			ImGui::Begin("PathTracing Options", 0, ImGuiWindowFlags_AlwaysAutoResize);
+            {
+                if (ImGui::BeginCombo("PathTracingScene", gSelectedScene, ImGuiComboFlags_None))
+                {
+                    for (int32 i = 0; i < (int32)gPathTracingScenesNameOnly.size(); ++i)
+                    {
+                        const bool is_selected = (gSelectedScene == gPathTracingScenesNameOnly[i].c_str());
+                        if (ImGui::Selectable(gPathTracingScenesNameOnly[i].c_str(), is_selected))
+                        {
+                            gSelectedScene = gPathTracingScenesNameOnly[i].c_str();
+                            gSelectedSceneIndex = i;
+                        }
+                        if (is_selected)
+                            ImGui::SetItemDefaultFocus();
+                    }
+                    ImGui::EndCombo();
+                }
+
+                ImGui::SliderInt("MaxRecursionDepth", &gOptions.MaxRecursionDepthForPathTracing, 1, 100);
+                ImGui::SliderInt("RayPerPixel", &gOptions.RayPerPixelForPathTracing, 1, 100);
+
+                ImGui::Checkbox("UseRussianRoulette", &gOptions.UseRussianRoulette);
+                if (!gOptions.UseRussianRoulette)
+                    ImGui::BeginDisabled();
+                ImGui::SliderInt("RussianRouletteDepth", &gOptions.RussianRouletteDepth, 1, gOptions.MaxRecursionDepthForPathTracing);
+                if (!gOptions.UseRussianRoulette)
+                    ImGui::EndDisabled();
+
+                ImGui::Text("Advanced FrameCount : %d", gPathTracingFrameCount);
+            }
+            ImGui::End();
+        }
+#endif // USE_PATH_TRACING
 	});
 	g_ImGUI->Draw(RenderFrameContextPtr);
 }
