@@ -303,7 +303,10 @@ void EvalBSDF(out float3 BRDF_Cos, out float pdf, in MaterialUniformBuffer mat, 
         //
         // http://graphics.berkeley.edu/papers/Rousiers-RTR-2012-02/Rousiers-RTR-2012-02.pdf 2. Related work : equation (3)
         
-        float eta = 1.0 / mat.ior;
+        // ior is ni/no
+        // - ni : light speed in medium before ray penetrates the surface.
+        // - no : light speed in medium after ray penetrates the surface.
+        float eta = mat.ior;
         H = -normalize(L + V * eta);
     }
     
