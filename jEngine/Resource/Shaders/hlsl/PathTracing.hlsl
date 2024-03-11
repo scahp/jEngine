@@ -231,6 +231,144 @@ float SchlickWeight(float u)
     return m2 * m2 * m;
 }
 
+// V, N, L are local space vector.
+void EvalLambertianDiffuse(out float3 BRDF, out float pdf, in MaterialUniformBuffer mat, in float3 V, in float3 N, in float3 L)
+{
+    float cosine_theta = abs(L.z);
+    BRDF = INV_PI * mat.baseColor;
+    pdf = (INV_PI * cosine_theta);
+}
+
+// V, N, L, H are local space vector.
+void EvalMicrofacetReflection(out float3 BRDF, out float pdf, in MaterialUniformBuffer mat, in float3 V, in float3 N, in float3 L, in float3 H)
+{
+    float3 F0 = mat.baseColor;
+    float cosine_theta = abs(L.z);
+
+    float NoV = saturate(dot(N, V));
+    float NoL = saturate(dot(N, L));
+    float VoH = saturate(dot(V, H)) + 0.001;
+    float NoH = saturate(dot(N, H));
+    
+    float D = DistributionGGX(N, H, mat.roughness);
+    float G = GeometrySmith(mat.roughness, NoV, NoL);
+    float3 F = FresnelSchlick(cosine_theta, F0);
+    BRDF = F * (D * G / (4 * NoL * NoV));
+    pdf = (D * NoH / (4 * VoH));
+}
+
+// V, N, L, H are local space vector.
+void EvalMicrofacetRefraction(out float3 BRDF, out float pdf, in MaterialUniformBuffer mat, in float3 V, in float3 N, in float3 L, in float3 H)
+{
+}
+
+// V, N, L, H are local space vector.
+void EvalClearCoat(out float3 BRDF, out float pdf, in MaterialUniformBuffer mat, in float3 V, in float3 N, in float3 L, in float3 H)
+{
+    // https://github.com/knightcrawler25/GLSL-PathTracer/blob/master/src/shaders/common/sampling.glsl
+    float clearcoatRoughness = lerp(0.25, 0.1, mat.clearcoatGloss);
+    float cosine_theta = abs(L.z);
+    
+    float NoV = saturate(dot(N, V));
+    float NoL = saturate(dot(N, L));
+    float VoH = saturate(dot(V, H)) + 0.001;
+    float NoH = saturate(dot(N, H));
+    
+    float D = DistributionGGX(N, H, clearcoatRoughness);
+    float G = GeometrySmith(0.25, NoV, NoL);
+    float F = FresnelSchlick(cosine_theta, float3(1, 1, 1));
+    BRDF = F * (D * G / (4 * NoL * NoV));
+    pdf = (D * NoH / (4 * VoH));
+}
+
+// Input vector V, N, L is world space vector.
+void EvalBSDF(out float3 BRDF_Cos, out float pdf, in MaterialUniformBuffer mat, in float3 V, in float3 N, in float3 L)
+{
+    BRDF_Cos = float3(0, 0, 0);
+    pdf = 0;
+    
+    V = ToLocal(N, V);
+    L = ToLocal(N, L);
+    N = float3(0, 0, 1);
+    
+    float3 H = normalize(L + V);
+    
+    if (H.z < 0.0)
+        H = -H;
+    
+    bool isReflect = V.z * L.z > 0;     // Is the both V and L in same side.
+
+    float diffusePart = (1.0f - mat.metallic) * (1.0f - mat.specTrans);
+    float metalicPart = mat.metallic;
+    float glassPart = (1.0 - mat.metallic) * mat.specTrans;
+    float clearcoatPart = 0.25 * mat.clearcoat;
+    
+    float totalWeight = 1.0f / (diffusePart + metalicPart + glassPart + clearcoatPart);
+    float diffuseWeight = diffusePart * totalWeight;
+    float metalicWeight = metalicPart * totalWeight;
+    float clearcoatWeight = clearcoatPart * totalWeight;
+    float glassWeight = glassPart * totalWeight;
+    
+        // 2. Compute BRDF and PDF
+    float NoV = saturate(dot(N, V));
+    float NoL = saturate(dot(N, L));
+    float NoH = saturate(dot(N, H));
+    float VoH = saturate(dot(V, H)) + 0.001;
+    float cosine_theta = abs(L.z);
+    
+    if (diffuseWeight > 0.0f && isReflect)
+    {
+        float3 LocalBRDF = 0;
+        float LocalPDF = 0;
+        EvalLambertianDiffuse(LocalBRDF, LocalPDF, mat, V, N, L);
+        
+        BRDF_Cos += LocalBRDF * diffusePart;
+        pdf += LocalPDF * diffuseWeight;
+    }
+
+    if (metalicWeight > 0.0f && isReflect)
+    {
+        float3 LocalBRDF = 0;
+        float LocalPDF = 0;
+        EvalMicrofacetReflection(LocalBRDF, LocalPDF, mat, V, N, L, H);
+        
+        BRDF_Cos += LocalBRDF * metalicPart;
+        pdf += LocalPDF * metalicWeight;
+    }
+
+    if (clearcoatWeight > 0.0f && isReflect)
+    {
+        float3 LocalBRDF = 0;
+        float LocalPDF = 0;
+        EvalClearCoat(LocalBRDF, LocalPDF, mat, V, N, L, H);
+            
+        BRDF_Cos += LocalBRDF * clearcoatPart;
+        pdf += LocalPDF * clearcoatWeight;
+    }
+
+    if (glassWeight > 0.0f)
+    {
+        pdf = 1;
+        BRDF_Cos = 1;
+        
+        //float3 LocalBRDF = 0;
+        //float LocalPDF = 0;
+        //if (isReflect)
+        //{
+        //    EvalMicrofacetReflection(LocalBRDF, LocalPDF, mat, V, N, L, H);
+        //}
+        //else
+        //{
+        //    EvalMicrofacetRefraction(LocalBRDF, LocalPDF, mat, V, N, L, H);
+        //}
+        //BRDF_Cos += LocalBRDF * glassPart;
+        //pdf += LocalPDF * glassWeight;
+    }
+    
+    BRDF_Cos *= cosine_theta;
+
+}
+
 void SamplingBSDF(out float3 SampleDir, out float SamplePDF, out float3 BRDF_Cos
     , in float3 WorldNormal, in float3 WorldFaceNormal, in float3 SurfaceToView, in MaterialUniformBuffer mat, inout RayPayload payload)
 {
@@ -350,73 +488,7 @@ void SamplingBSDF(out float3 SampleDir, out float SamplePDF, out float3 BRDF_Cos
     }
 
     // 2. Compute BRDF and PDF
-    float NoV = saturate(dot(WorldNormal, SurfaceToView));
-    float NoL = saturate(dot(WorldNormal, SampleDir));
-    float NoH = saturate(dot(WorldNormal, WorldHalf));
-    float VoH = saturate(dot(SurfaceToView, WorldHalf)) + 0.001;
-
-    if (diffuseWeight > 0.0f)
-    {
-        if (cosine_theta < 0)
-        {
-            // Underneath skip.
-        }
-        else
-        {
-            float3 BRDF = INV_PI * mat.baseColor;
-            BRDF_Cos += BRDF * diffusePart;
-            SamplePDF += (INV_PI * cosine_theta) * diffuseWeight;
-        }
-    }
-
-    if (metalicWeight > 0.0f)
-    {
-        if (cosine_theta < 0)
-        {
-            // Underneath skip.
-        }
-        else
-        {
-            float3 F0 = mat.baseColor;
-            
-            float D = DistributionGGX(WorldNormal, WorldHalf, mat.roughness);
-            float G = GeometrySmith(0.25, NoV, NoL);
-            float3 F = FresnelSchlick(cosine_theta, F0);
-            float3 BRDF = F * (D * G / (4 * NoL * NoV));
-            
-            BRDF_Cos += BRDF * metalicPart;
-            SamplePDF += (D * NoH / (4 * VoH)) * metalicWeight;
-        }
-    }
-
-    if (clearcoatWeight > 0.0f)
-    {
-        if (cosine_theta < 0)
-        {
-            // Underneath skip.
-        }
-        else
-        {
-            // https://github.com/knightcrawler25/GLSL-PathTracer/blob/master/src/shaders/common/sampling.glsl
-            float clearcoatRoughness = lerp(0.25, 0.1, mat.clearcoatGloss);
-
-            float D = DistributionGGX(WorldNormal, WorldHalf, clearcoatRoughness);
-            float G = GeometrySmith(0.25, NoV, NoL);
-            float F = FresnelSchlick(cosine_theta, float3(1, 1, 1));
-            float3 BRDF = F * (D * G / (4 * NoL * NoV));
-            
-            BRDF_Cos += BRDF * clearcoatPart;
-            SamplePDF += (D * NoH / (4 * VoH)) * clearcoatWeight;
-        }
-    }
-
-    if (glassWeight > 0.0f)
-    {
-        SamplePDF = 1;
-        BRDF_Cos = 1;
-    }
-
-    BRDF_Cos *= cosine_theta;
+    EvalBSDF(BRDF_Cos, SamplePDF, mat, SurfaceToView, WorldNormal, SampleDir);
 }
 
 [shader("raygeneration")]

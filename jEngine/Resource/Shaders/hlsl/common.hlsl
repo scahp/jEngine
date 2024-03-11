@@ -316,17 +316,17 @@ void MakeTB_From_N(in float3 N, inout float3 T, inout float3 B)
 }
 
 // Transfrom from world to shading space
-float3 ToLocal(in float3 WorldN)
+float3 ToLocal(in float3 WorldN, in float3 InWorldDir)
 {
     float3 T, B;
     MakeTB_From_N(WorldN, T, B);
-    return ToLocal(T, B, WorldN, WorldN);
+    return ToLocal(T, B, WorldN, InWorldDir);
 }
 
 // Transform from shading to world space
-float3 ToWorld(in float3 WorldN, in float3 LocalN)
+float3 ToWorld(in float3 WorldN, in float3 InLocalDir)
 {
     float3 T, B;
     MakeTB_From_N(WorldN, T, B);
-    return ToWorld(T, B, WorldN, LocalN);
+    return ToWorld(T, B, WorldN, InLocalDir);
 }
