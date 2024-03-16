@@ -210,6 +210,25 @@ float DielectricFresnel(float cosThetaI, float eta)
     return 0.5f * (rs * rs + rp * rp);
 }
 
+float DielectricFresnel_PBRT(float cosThetaI, float eta)
+{
+    cosThetaI = clamp(cosThetaI, -1, 1);
+    if (cosThetaI < 0)
+    {
+        eta = 1 / eta;
+        cosThetaI = -cosThetaI;
+    }
+    
+    float sin2ThetaI = 1 - cosThetaI * cosThetaI;
+    float sin2ThetaT = sin2ThetaI / eta * eta;
+    if (sin2ThetaT >= 1)
+        return 1.f;
+    float cosThetaT = sqrt(1 - sin2ThetaT);
+    float r_parl = (eta * cosThetaI - cosThetaT) / (eta * cosThetaI + cosThetaT);
+    float r_perp = (cosThetaI - eta * cosThetaT) / (cosThetaI + eta * cosThetaT);
+    return (r_parl * r_parl + r_perp * r_perp) / 2;
+}
+
 bool Refract(in float3 wi, in float3 n, float eta, out float3 wt) 
 {
     float cosThetaI = dot(n, wi);
@@ -239,6 +258,22 @@ void EvalLambertianDiffuse(out float3 BRDF, out float pdf, in MaterialUniformBuf
     pdf = (INV_PI * cosine_theta);
 }
 
+float GTR2Aniso(float NDotH, float HDotX, float HDotY, float ax, float ay)
+{
+    float a = HDotX / ax;
+    float b = HDotY / ay;
+    float c = a * a + b * b + NDotH * NDotH;
+    return 1.0 / (PI * ax * ay * c * c);
+}
+
+float SmithGAniso(float NDotV, float VDotX, float VDotY, float ax, float ay)
+{
+    float a = VDotX * ax;
+    float b = VDotY * ay;
+    float c = NDotV;
+    return (2.0 * NDotV) / (NDotV + sqrt(a * a + b * b + c * c));
+}
+
 // V, N, L, H are local space vector.
 void EvalMicrofacetReflection(out float3 BRDF, out float pdf, in MaterialUniformBuffer mat, in float3 V, in float3 N, in float3 L, in float3 H)
 {
@@ -258,8 +293,46 @@ void EvalMicrofacetReflection(out float3 BRDF, out float pdf, in MaterialUniform
 }
 
 // V, N, L, H are local space vector.
-void EvalMicrofacetRefraction(out float3 BRDF, out float pdf, in MaterialUniformBuffer mat, in float3 V, in float3 N, in float3 L, in float3 H)
+void EvalMicrofacetReflection(out float3 BRDF, out float pdf, in MaterialUniformBuffer mat, in float3 V, in float3 N, in float3 L, in float3 H, in float F)
 {
+    float NoV = saturate(dot(N, V));
+    float NoL = saturate(dot(N, L));
+    float VoH = saturate(dot(V, H)) + 0.001;
+    float NoH = saturate(dot(N, H));
+    
+    float aspect = sqrt(1.0 - mat.anisotropic * 0.9);
+    float ax = max(0.001, mat.roughness / aspect);
+    float ay = max(0.001, mat.roughness * aspect);
+    
+    //float D = DistributionGGX(N, H, mat.roughness);
+    float D = GTR2Aniso(H.z, H.x, H.y, ax, ay);
+    
+    float G = GeometrySmith(mat.roughness, NoV, NoL);
+    BRDF = F * (D * G / (4 * NoL * NoV));
+    pdf = (D * NoH / (4 * VoH));
+}
+
+
+// V, N, L, H are local space vector.
+void EvalMicrofacetRefraction(out float3 BRDF, out float pdf, in MaterialUniformBuffer mat, in float3 V, in float3 N, in float3 L, in float3 H, in float F, in float eta)
+{
+    float LDotH = dot(L, H);
+    float VDotH = dot(V, H);
+    
+    float aspect = sqrt(1.0 - mat.anisotropic * 0.9);
+    float ax = max(0.001, mat.roughness / aspect);
+    float ay = max(0.001, mat.roughness * aspect);
+
+    float D = GTR2Aniso(H.z, H.x, H.y, ax, ay);
+    float G1 = SmithGAniso(abs(V.z), V.x, V.y, ax, ay);
+    float G2 = G1 * SmithGAniso(abs(L.z), L.x, L.y, ax, ay);
+    float denom = LDotH + VDotH * eta;
+    denom *= denom;
+    float eta2 = eta * eta;
+    float jacobian = abs(LDotH) / denom;
+
+    BRDF = (1.0 - F) * D * G2 * abs(VDotH) * jacobian * eta2 / abs(L.z * V.z);
+    pdf = G1 * max(0.0, abs(VDotH)) * D * jacobian / abs(V.z);
 }
 
 // V, N, L, H are local space vector.
@@ -282,7 +355,7 @@ void EvalClearCoat(out float3 BRDF, out float pdf, in MaterialUniformBuffer mat,
 }
 
 // Input vector V, N, L is world space vector.
-void EvalBSDF(out float3 BRDF_Cos, out float pdf, in MaterialUniformBuffer mat, in float3 V, in float3 N, in float3 L)
+void EvalBSDF(out float3 BRDF_Cos, out float pdf, in MaterialUniformBuffer mat, in float3 V, in float3 N, in float3 L, in float eta)
 {
     BRDF_Cos = float3(0, 0, 0);
     pdf = 0;
@@ -323,11 +396,7 @@ void EvalBSDF(out float3 BRDF_Cos, out float pdf, in MaterialUniformBuffer mat, 
     float clearcoatWeight = clearcoatPart * totalWeight;
     float glassWeight = glassPart * totalWeight;
     
-        // 2. Compute BRDF and PDF
-    float NoV = saturate(dot(N, V));
-    float NoL = saturate(dot(N, L));
-    float NoH = saturate(dot(N, H));
-    float VoH = saturate(dot(V, H)) + 0.001;
+    // 2. Compute BRDF and PDF
     float cosine_theta = abs(L.z);
     
     if (diffuseWeight > 0.0f && isReflect)
@@ -362,21 +431,26 @@ void EvalBSDF(out float3 BRDF_Cos, out float pdf, in MaterialUniformBuffer mat, 
 
     if (glassWeight > 0.0f)
     {
-        pdf = 1;
-        BRDF_Cos = 1;
-        
-        //float3 LocalBRDF = 0;
-        //float LocalPDF = 0;
-        //if (isReflect)
-        //{
-        //    EvalMicrofacetReflection(LocalBRDF, LocalPDF, mat, V, N, L, H);
-        //}
-        //else
-        //{
-        //    EvalMicrofacetRefraction(LocalBRDF, LocalPDF, mat, V, N, L, H);
-        //}
-        //BRDF_Cos += LocalBRDF * glassPart;
-        //pdf += LocalPDF * glassWeight;
+        float F = DielectricFresnel_PBRT(dot(V, H), eta);
+
+        float3 LocalBRDF = 0;
+        float LocalPDF = 1;
+        if (isReflect)
+        {
+            EvalMicrofacetReflection(LocalBRDF, LocalPDF, mat, V, N, L, H, F);
+            LocalPDF = LocalPDF * F;
+        }
+        else
+        {
+            EvalMicrofacetRefraction(LocalBRDF, LocalPDF, mat, V, N, L, H, F, eta);
+            LocalPDF = LocalPDF * (1.0 - F);
+        }
+
+        BRDF_Cos += LocalBRDF * glassPart;
+        pdf += LocalPDF * glassWeight;
+
+        //BRDF_Cos = 1;
+        //pdf = 1;
     }
     
     BRDF_Cos *= cosine_theta;
@@ -389,6 +463,11 @@ void SamplingBSDF(out float3 SampleDir, out float SamplePDF, out float3 BRDF_Cos
     SamplePDF = 0;
     BRDF_Cos = 0;
     
+    float NoV = dot(SurfaceToView, WorldNormal);
+    bool IntoMedium = NoV > 0.0f;
+    float eta = IntoMedium ? (1.0 / mat.ior) : mat.ior;
+
+    //float eta = dot(payload.HitReflectDir, WorldNormal) < 0.0 ? mat.ior : (1.0 / mat.ior);
     float diffusePart = (1.0f - mat.metallic) * (1.0f - mat.specTrans);
     float metalicPart = mat.metallic;
     float glassPart = (1.0 - mat.metallic) * mat.specTrans;
@@ -431,7 +510,6 @@ void SamplingBSDF(out float3 SampleDir, out float SamplePDF, out float3 BRDF_Cos
     cdf[3] = cdf[2] + glassWeight;
 
     float3 WorldHalf = 0;
-    float cosine_theta = 0;
 
     // 1. Getting SampleDir
     float r3 = Random_0_1(payload.seed);
@@ -439,7 +517,6 @@ void SamplingBSDF(out float3 SampleDir, out float SamplePDF, out float3 BRDF_Cos
     {
         // Lambertian surface
         SampleDir = CosWeightedSampleHemisphere(payload.seed);
-        cosine_theta = SampleDir.z;
         SampleDir = ToWorld(WorldNormal, SampleDir);
     }
     else if (r3 < cdf[1]) // metalicPart
@@ -448,7 +525,6 @@ void SamplingBSDF(out float3 SampleDir, out float SamplePDF, out float3 BRDF_Cos
         float r2 = Random_0_1(payload.seed);
         WorldHalf = normalize(ImportanceSampleGGX(float2(r1, r2), mat.roughness, WorldNormal));
         SampleDir = reflect(-SurfaceToView, WorldHalf);
-        cosine_theta = saturate(dot(WorldNormal, SampleDir));
     }
     else if (r3 < cdf[2]) // clearcoatPart
     {
@@ -459,35 +535,30 @@ void SamplingBSDF(out float3 SampleDir, out float SamplePDF, out float3 BRDF_Cos
         float r2 = Random_0_1(payload.seed);
         WorldHalf = normalize(ImportanceSampleGGX(float2(r1, r2), clearcoatRoughness, WorldNormal));
         SampleDir = reflect(-SurfaceToView, WorldHalf);
-        cosine_theta = saturate(dot(WorldNormal, SampleDir));
     }
     else if (r3 < cdf[3]) // glassPart
     {
         float NoV = dot(SurfaceToView, WorldNormal);
         float fNoV = dot(SurfaceToView, WorldFaceNormal);
         
-        // Cook torrance brdf from https://cdn2.unrealengine.com/Resources/files/2013SiggraphPresentationsNotes-26915738.pdf
-        float3 F0 = mat.baseColor;
-
         float r1 = Random_0_1(payload.seed);
         float r2 = Random_0_1(payload.seed);
-        float3 WorldHalf = normalize(ImportanceSampleGGX(float2(r1, r2), mat.roughness, WorldNormal));
 
-        bool IntoMedium = NoV > 0.0f;
-        float eta = IntoMedium ? (1.0 / mat.ior) : mat.ior;
-            
+        float3 WorldHalf = normalize(ImportanceSampleGGX(float2(r1, r2), mat.roughness, WorldNormal));
+        float F = DielectricFresnel_PBRT(dot(SurfaceToView, WorldHalf), eta);
+
         if (NoV <= 0)
             WorldHalf *= -1.0f;
-            
-        float F = DielectricFresnel(dot(SurfaceToView, WorldHalf), eta);
 
-        if (Random_0_1(payload.seed) < F && NoV > 0)
+        if (Random_0_1(payload.seed) < F
+            //&& NoV > 0
+            )
         {
-            SampleDir = reflect(-SurfaceToView, WorldHalf);
+            SampleDir = normalize(reflect(-SurfaceToView, WorldHalf));
         }
         else
         {
-            SampleDir = refract(-SurfaceToView, WorldHalf, eta);
+            SampleDir = normalize(refract(-SurfaceToView, WorldHalf, eta));
 
             if (NoV > 0)
             {
@@ -498,11 +569,10 @@ void SamplingBSDF(out float3 SampleDir, out float SamplePDF, out float3 BRDF_Cos
                 payload.ResetPenetratingInstanceIndex();
             }
         }
-        cosine_theta = 1.0f;
     }
 
     // 2. Compute BRDF and PDF
-    EvalBSDF(BRDF_Cos, SamplePDF, mat, SurfaceToView, WorldNormal, SampleDir);
+    EvalBSDF(BRDF_Cos, SamplePDF, mat, SurfaceToView, WorldNormal, SampleDir, eta);
 }
 
 [shader("raygeneration")]
@@ -575,7 +645,7 @@ void RaygenShader()
     }
     TotalRadiance /= MAX_RAY_PER_PIXEL;
 
-    if (g_sceneCB.AccumulateNumber == 0)
+    if (g_sceneCB.AccumulateNumber == 1)
     {
         RenderTarget[DispatchRaysIndex().xy].xyz = TotalRadiance;
     }
