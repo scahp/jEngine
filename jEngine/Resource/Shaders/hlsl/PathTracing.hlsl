@@ -304,9 +304,7 @@ void EvalMicrofacetReflection(out float3 BRDF, out float pdf, in MaterialUniform
     float ax = max(0.001, mat.roughness / aspect);
     float ay = max(0.001, mat.roughness * aspect);
     
-    //float D = DistributionGGX(N, H, mat.roughness);
-    float D = GTR2Aniso(H.z, H.x, H.y, ax, ay);
-    
+    float D = DistributionGGX(N, H, mat.roughness);
     float G = GeometrySmith(mat.roughness, NoV, NoL);
     BRDF = F * (D * G / (4 * NoL * NoV));
     pdf = (D * NoH / (4 * VoH));
@@ -316,23 +314,21 @@ void EvalMicrofacetReflection(out float3 BRDF, out float pdf, in MaterialUniform
 // V, N, L, H are local space vector.
 void EvalMicrofacetRefraction(out float3 BRDF, out float pdf, in MaterialUniformBuffer mat, in float3 V, in float3 N, in float3 L, in float3 H, in float F, in float eta)
 {
-    float LDotH = dot(L, H);
-    float VDotH = dot(V, H);
+    float LoH = dot(L, H);
+    float VoH = dot(V, H);
+    float NoV = dot(N, V);
+    float NoL = dot(N, L);
     
-    float aspect = sqrt(1.0 - mat.anisotropic * 0.9);
-    float ax = max(0.001, mat.roughness / aspect);
-    float ay = max(0.001, mat.roughness * aspect);
+    float D = DistributionGGX(N, H, mat.roughness);
+    float G = GeometrySmith(mat.roughness, NoV, NoL);
 
-    float D = GTR2Aniso(H.z, H.x, H.y, ax, ay);
-    float G1 = SmithGAniso(abs(V.z), V.x, V.y, ax, ay);
-    float G2 = G1 * SmithGAniso(abs(L.z), L.x, L.y, ax, ay);
-    float denom = LDotH + VDotH * eta;
+    float denom = LoH + VoH * eta;
     denom *= denom;
     float eta2 = eta * eta;
-    float jacobian = abs(LDotH) / denom;
+    float jacobian = abs(LoH) / denom;
 
-    BRDF = (1.0 - F) * D * G2 * abs(VDotH) * jacobian * eta2 / abs(L.z * V.z);
-    pdf = G1 * max(0.0, abs(VDotH)) * D * jacobian / abs(V.z);
+    BRDF = (1.0 - F) * D * G * abs(VoH) * jacobian * eta2 / abs(L.z * V.z);
+    pdf = G * max(0.0, abs(VoH)) * D * jacobian / abs(V.z);
 }
 
 // V, N, L, H are local space vector.
