@@ -183,7 +183,7 @@ struct RayPayload
 {
     float3 HitPos;
     float3 HitReflectDir;
-    float3 Attenuation;
+    float3 Thoughput;
     float3 Radiance;
     uint seed;
     uint RecursionDepth;
@@ -299,10 +299,6 @@ void EvalMicrofacetReflection(out float3 BRDF, out float pdf, in MaterialUniform
     float NoL = saturate(dot(N, L));
     float VoH = saturate(dot(V, H)) + 0.001;
     float NoH = saturate(dot(N, H));
-    
-    float aspect = sqrt(1.0 - mat.anisotropic * 0.9);
-    float ax = max(0.001, mat.roughness / aspect);
-    float ay = max(0.001, mat.roughness * aspect);
     
     float D = DistributionGGX(N, H, mat.roughness);
     float G = GeometrySmith(mat.roughness, NoV, NoL);
@@ -474,7 +470,7 @@ void SamplingBSDF(out float3 SampleDir, out float SamplePDF, out float3 BRDF_Cos
     if (payload.IsRayPenetratingInstance() && glassPart <= 0)       // If intersection material is not glassPart, it's always not Penetrating.
     {
         payload.Radiance = float3(10, 0, 0);
-        payload.Attenuation = 1;
+        payload.Thoughput = 1;
         return;
     }
 #endif // TRANSMITTANCE_TEST
@@ -543,27 +539,25 @@ void SamplingBSDF(out float3 SampleDir, out float SamplePDF, out float3 BRDF_Cos
         float3 WorldHalf = normalize(ImportanceSampleGGX(float2(r1, r2), mat.roughness, WorldNormal));
         float F = DielectricFresnel_PBRT(dot(SurfaceToView, WorldHalf), eta);
 
-        if (NoV <= 0)
-            WorldHalf *= -1.0f;
-
-        if (Random_0_1(payload.seed) < F
-            //&& NoV > 0
-            )
+        bool IsIntoMediumDirection = dot(SurfaceToView, WorldHalf) >= 0;
+        
+        if (Random_0_1(payload.seed) < F)
         {
             SampleDir = normalize(reflect(-SurfaceToView, WorldHalf));
         }
         else
         {
-            SampleDir = normalize(refract(-SurfaceToView, WorldHalf, eta));
-
-            if (NoV > 0)
+            if (IsIntoMediumDirection)
             {
                 payload.SetPenetratingInstnaceIndex(InstanceIndex());
             }
             else
             {
+                WorldHalf *= -1.0f;
                 payload.ResetPenetratingInstanceIndex();
             }
+
+            SampleDir = normalize(refract(-SurfaceToView, WorldHalf, eta));
         }
     }
 
@@ -596,11 +590,11 @@ void RaygenShader()
         payload.HitPos = float3(0, 0, 0);
         payload.HitReflectDir = float3(0, 0, 0);
         payload.Radiance = float3(0, 0, 0);
-        payload.Attenuation = float3(1, 1, 1);
+        payload.Thoughput = float3(1, 1, 1);
         payload.ResetPenetratingInstanceIndex();
 
         float3 radiance = 0.0f;
-        float3 attenuation = 1.0f;
+        float3 Thoughput = 1.0f;
 
         while (payload.RecursionDepth < MAX_RECURSION_DEPTH)
         {
@@ -614,19 +608,19 @@ void RaygenShader()
                 TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 0, 0, ray, payload);
 #endif // FORCE_TWO_SIDE
             
-            radiance += attenuation * payload.Radiance;
-            attenuation = max(0, attenuation * payload.Attenuation);
+            radiance += Thoughput * payload.Radiance;
+            Thoughput = max(0, Thoughput * payload.Thoughput);
 
             // Russian Roulette
             if (g_sceneCB.RussianRouletteDepth > 0)
             {
                 if (payload.RecursionDepth >= g_sceneCB.RussianRouletteDepth)
                 {
-                    float q = min(max(payload.Attenuation.x, max(payload.Attenuation.y, payload.Attenuation.z)), 0.95);
+                    float q = min(max(payload.Thoughput.x, max(payload.Thoughput.y, payload.Thoughput.z)), 0.95);
                     if (Random_0_1(payload.seed) > q)
                         break;
                     
-                    payload.Attenuation /= q;
+                    payload.Thoughput /= q;
                 }
             }
             
@@ -721,7 +715,7 @@ void MeshClosestHitShader(inout RayPayload payload, in MyAttributes attr)
     }
     SamplingBSDF(SampleDir, SamplePDF, BRDF_Cos, WorldNormal, WorldFaceNormal, -WorldRayDirection(), material, payload);
 
-    payload.Attenuation = BRDF_Cos / SamplePDF;
+    payload.Thoughput = BRDF_Cos / SamplePDF;
     payload.HitReflectDir = SampleDir;
 }
 
@@ -730,7 +724,7 @@ void MeshMissShader(inout RayPayload payload)
 {
     //payload.Radiance = float3(1, 0, 0);
     payload.Radiance = 0;
-    payload.Attenuation = 1;
+    payload.Thoughput = 1;
     payload.RecursionDepth = MAX_RECURSION_DEPTH;
 }
 
