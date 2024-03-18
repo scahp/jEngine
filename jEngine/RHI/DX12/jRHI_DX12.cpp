@@ -483,6 +483,55 @@ bool jRHI_DX12::InitRHI()
     GSupportRaytracing = false;
 #endif // USE_RAYTRACING
 
+    auto IsSupportHeapDirectlyIndexed = [&]() {
+        D3D12_FEATURE_DATA_D3D12_OPTIONS D3D12Options{};
+        check(JOK(Device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &D3D12Options, sizeof(D3D12Options))));
+
+        const D3D_SHADER_MODEL ShaderModels[] =
+        {
+            D3D_SHADER_MODEL_6_7,
+            D3D_SHADER_MODEL_6_6,
+            D3D_SHADER_MODEL_6_5,
+            D3D_SHADER_MODEL_6_4,
+            D3D_SHADER_MODEL_6_3,
+            D3D_SHADER_MODEL_6_2,
+            D3D_SHADER_MODEL_6_1,
+            D3D_SHADER_MODEL_6_0,
+        };
+
+        D3D_SHADER_MODEL HighestShaderModel = D3D_SHADER_MODEL_5_1;
+        for (const D3D_SHADER_MODEL CurShaderModel : ShaderModels)
+        {
+            D3D12_FEATURE_DATA_SHADER_MODEL ShaderModelData{};
+            ShaderModelData.HighestShaderModel = CurShaderModel;
+            if (JOK(Device->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &ShaderModelData, sizeof(ShaderModelData))))
+            {
+                HighestShaderModel = ShaderModelData.HighestShaderModel;
+                break;
+            }
+        }
+
+        const D3D_FEATURE_LEVEL FeatureLevels[] =
+        {
+            D3D_FEATURE_LEVEL_12_2,
+            D3D_FEATURE_LEVEL_12_1,
+            D3D_FEATURE_LEVEL_12_0,
+            D3D_FEATURE_LEVEL_11_1,
+            D3D_FEATURE_LEVEL_11_0
+        };
+        D3D12_FEATURE_DATA_FEATURE_LEVELS FeatureLevelOptions{};
+        FeatureLevelOptions.pFeatureLevelsRequested = FeatureLevels;
+        FeatureLevelOptions.NumFeatureLevels = _countof(FeatureLevels);
+
+        D3D_FEATURE_LEVEL MaxFeatureLevel{};
+        if (JOK(Device->CheckFeatureSupport(D3D12_FEATURE_FEATURE_LEVELS, &FeatureLevelOptions, sizeof(FeatureLevelOptions))))
+            MaxFeatureLevel = FeatureLevelOptions.MaxSupportedFeatureLevel;
+
+        return MaxFeatureLevel >= D3D_FEATURE_LEVEL_12_0 && HighestShaderModel >= D3D_SHADER_MODEL_6_6 && D3D12Options.ResourceBindingTier >= D3D12_RESOURCE_BINDING_TIER_3;
+    };
+
+    check(IsSupportHeapDirectlyIndexed());
+
     // Create InstanceVertexBuffer for cube map six face
     // todo : It will be removed, when I have a system that can generate per instance data for visible faces
     {
