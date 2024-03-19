@@ -125,7 +125,7 @@ namespace GLSLPT
                 // To avoid perfect mirror reflection. (DistributionGGX is always 0 or I need to another function for handling mirror reflection)
                 material.roughness = material.roughness < 0.001f ? 0.001f : material.roughness;
 
-                material.mediumAnisotropy = material.mediumAnisotropy < -0.9f ? -0.9 : (material.mediumAnisotropy > 0.9 ? 0.9 : material.mediumAnisotropy);
+                material.mediumAnisotropy = material.mediumAnisotropy < -0.9f ? -0.9f : (material.mediumAnisotropy > 0.9f ? 0.9f : material.mediumAnisotropy);
 
                 // Albedo Texture
                 if (strcmp(albedoTexName, "none") != 0)
