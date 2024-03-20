@@ -81,8 +81,6 @@ void jEngine::Draw()
 
 void jEngine::Resize(int32 width, int32 height)
 {
-    width = (int32)(width / g_rhi->GetCurrentMonitorDPIScale());
-    height = (int32)(height / g_rhi->GetCurrentMonitorDPIScale());
     if (SCR_WIDTH != width || SCR_HEIGHT != height)
     {
         SCR_WIDTH = width;

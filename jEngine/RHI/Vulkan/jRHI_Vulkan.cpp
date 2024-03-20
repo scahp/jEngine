@@ -108,6 +108,9 @@ bool jRHI_Vulkan::InitRHI()
     Window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Vulkan", nullptr, nullptr);
     glfwSetWindowUserPointer(Window, this);
 
+    // Fitting screen resolution to monitor
+    glfwGetWindowSize(Window, &SCR_WIDTH, &SCR_HEIGHT);
+
 	VkApplicationInfo appInfo{};
 	appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 	appInfo.pApplicationName = "Vulkan";
