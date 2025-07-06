@@ -26,15 +26,15 @@ struct jParallelFor
             return;
 
         const size_t TaskPerThread = (InContainer.size() / InMaxThreadCount);
+        const size_t RemainingTasks = InContainer.size() % InMaxThreadCount;
         if (TaskPerThread > 0)
         {
             concurrency::parallel_for(size_t(0), InMaxThreadCount, [&](size_t InIndex)
             {
-                const size_t StartIndex = TaskPerThread * InIndex;
+                // 남은 작업이 있는 경우, 각 스레드에 하나씩 추가로 할당
+                const size_t StartIndex = InIndex * TaskPerThread + min(InIndex, RemainingTasks);
+                const size_t EndIndex = StartIndex + TaskPerThread + (InIndex < RemainingTasks ? 1 : 0);
 
-                // 마지막 스레드가 남은 작업들을 모두 처리하도록 함.
-                const bool IsLastThread = ((InMaxThreadCount - 1) == InIndex);
-                const size_t EndIndex = IsLastThread ? InContainer.size() : Min(StartIndex + TaskPerThread, InContainer.size());
                 for (size_t k = StartIndex; k < EndIndex; ++k)
                 {
                     Lambda(k, InContainer[k]);
