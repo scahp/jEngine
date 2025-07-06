@@ -20,6 +20,9 @@ std::shared_ptr<jTexture> jSceneRenderTarget::HistoryDepthBuffer;
 std::shared_ptr<jTexture> jSceneRenderTarget::GaussianV;
 std::shared_ptr<jTexture> jSceneRenderTarget::GaussianH;
 std::shared_ptr<jRenderTarget> jSceneRenderTarget::AOProjection;
+std::shared_ptr<jRenderTarget> jSceneRenderTarget::GIProjection;
+std::shared_ptr<jRenderTarget> jSceneRenderTarget::SSGI_RT;
+std::shared_ptr<jRenderTarget> jSceneRenderTarget::SSGI_Accum_RT[3];
 
 // todo : remove this.
 #include "jPrimitiveUtil.h"
@@ -172,6 +175,10 @@ void jSceneRenderTarget::Return()
     }
     if (AtmosphericShadowing)
         AtmosphericShadowing->Return();
+    if (GIProjection)
+        GIProjection->Return();
+    if (SSGI_RT)
+        SSGI_RT->Return();
 }
 
 std::shared_ptr<jRenderTarget> jSceneRenderTarget::GetShadowMap(const jLight* InLight) const

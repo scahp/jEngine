@@ -32,7 +32,12 @@ struct jSceneRenderTarget : public std::enable_shared_from_this<jSceneRenderTarg
     static std::shared_ptr<jTexture> GaussianV;
     static std::shared_ptr<jTexture> GaussianH;
     static std::shared_ptr<jRenderTarget> AOProjection;
-    //////////////////////////////////////////////////////////////////////////
+    static std::shared_ptr<jRenderTarget> GIProjection;
+    static std::shared_ptr<jRenderTarget> SSGI_RT;
+    static std::shared_ptr<jRenderTarget> SSGI_Accum_RT[3];
+
+    static std::shared_ptr<jRenderTarget> AtmosphericShadow_RT;
+    static std::shared_ptr<jRenderTarget> VBuffer_RT;
 
     std::shared_ptr<jRenderTarget> ColorPtr;
     std::shared_ptr<jRenderTarget> DepthPtr;

@@ -142,13 +142,13 @@ std::shared_ptr<jTexture> ReprojectionAO(const std::shared_ptr<jRenderFrameConte
 	return InTexture;
 }
 
-std::shared_ptr<jTexture> DenoisingAO(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, const std::shared_ptr<jTexture>& InTexture)
+std::shared_ptr<jTexture> jRenderer::Denoise(const std::shared_ptr<jTexture>& InTexture, const char* InDenoiser, int32 InKernelSize, float InKernelSigma, float InBilateralSigma)
 {
-	if (gOptions.IsDenoiserGuassianSeparable())
+    if (gOptions.IsDenoiserGuassianSeparable())
 	{
-		DEBUG_EVENT_WITH_COLOR(InRenderFrameContextPtr, "GaussianSeparable", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
+		DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "GaussianSeparable", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
 		SCOPE_CPU_PROFILE(GaussianSeparable);
-		SCOPE_GPU_PROFILE(InRenderFrameContextPtr, GaussianSeparable);
+		SCOPE_GPU_PROFILE(RenderFrameContextPtr, GaussianSeparable);
 
 		auto createGaussianKernel = [](int32 kernelSize, float sigma) -> std::vector<float>
 			{
@@ -172,7 +172,7 @@ std::shared_ptr<jTexture> DenoisingAO(const std::shared_ptr<jRenderFrameContext>
 				return kernel;
 			};
 
-		std::vector<float> GaussianKernel = createGaussianKernel(gOptions.GaussianKernelSize, gOptions.GaussianKernelSigma);
+		std::vector<float> GaussianKernel = createGaussianKernel(InKernelSize, InKernelSigma);
 
 		// Create GaussianBlurKernel uniformbuffer
 		struct jGaussianBlurKernel
@@ -204,13 +204,13 @@ std::shared_ptr<jTexture> DenoisingAO(const std::shared_ptr<jRenderFrameContext>
 			jNameStatic("CommonComputeUniformBuffer"), jLifeTimeType::OneFrame, sizeof(CommonComputeData)));
 		OneFrameUniformBuffer->UpdateBufferData(&CommonComputeData, sizeof(CommonComputeData));
 
-		g_rhi->UAVBarrier(InRenderFrameContextPtr->GetActiveCommandBuffer(), InTexture.get());
+		g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), InTexture.get());
 		{
-			DEBUG_EVENT_WITH_COLOR(InRenderFrameContextPtr, "Vertical", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
+			DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "Vertical", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
 			SCOPE_CPU_PROFILE(Vertical);
-			SCOPE_GPU_PROFILE(InRenderFrameContextPtr, Vertical);
+			SCOPE_GPU_PROFILE(RenderFrameContextPtr, Vertical);
 
-			jRHIUtil::DispatchCompute(InRenderFrameContextPtr, jSceneRenderTarget::GaussianV.get()
+			jRHIUtil::DispatchCompute(RenderFrameContextPtr, jSceneRenderTarget::GaussianV.get()
 				, [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
 				{
 					g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InTexture.get(), EResourceLayout::SHADER_READ_ONLY);
@@ -237,18 +237,18 @@ std::shared_ptr<jTexture> DenoisingAO(const std::shared_ptr<jRenderFrameContext>
 				);
 		}
 
-		g_rhi->UAVBarrier(InRenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::GaussianV.get());
+		g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::GaussianV.get());
 
 		{
-			DEBUG_EVENT_WITH_COLOR(InRenderFrameContextPtr, "Horizon", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
+			DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "Horizon", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
 			SCOPE_CPU_PROFILE(Horizon);
-			SCOPE_GPU_PROFILE(InRenderFrameContextPtr, Horizon);
+			SCOPE_GPU_PROFILE(RenderFrameContextPtr, Horizon);
 
 			auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
 				jNameStatic("CommonComputeUniformBuffer"), jLifeTimeType::OneFrame, sizeof(CommonComputeData)));
 			OneFrameUniformBuffer->UpdateBufferData(&CommonComputeData, sizeof(CommonComputeData));
 
-			jRHIUtil::DispatchCompute(InRenderFrameContextPtr, jSceneRenderTarget::GaussianH.get()
+			jRHIUtil::DispatchCompute(RenderFrameContextPtr, jSceneRenderTarget::GaussianH.get()
 				, [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
 				{
 					jTexture* InGaussianVTexture = jSceneRenderTarget::GaussianV.get();
@@ -279,7 +279,7 @@ std::shared_ptr<jTexture> DenoisingAO(const std::shared_ptr<jRenderFrameContext>
 	}
 	else if (gOptions.IsDenoiserGuassian() || gOptions.IsDenoiserBilateral())
 	{
-		DEBUG_EVENT_WITH_COLOR(InRenderFrameContextPtr, gOptions.IsDenoiserBilateral() ? "Bilateral" : "Gaussian", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
+		DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, gOptions.IsDenoiserBilateral() ? "Bilateral" : "Gaussian", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
 
 		auto createGaussian2DKernel = [](int32 kernelSize, float sigma) -> std::vector<float>
 			{
@@ -309,12 +309,12 @@ std::shared_ptr<jTexture> DenoisingAO(const std::shared_ptr<jRenderFrameContext>
 				return kernel;
 			};
 
-		std::vector<float> GaussianKernel = createGaussian2DKernel(gOptions.GaussianKernelSize, gOptions.GaussianKernelSigma);
+		std::vector<float> GaussianKernel = createGaussian2DKernel(InKernelSize, InKernelSigma);
 
 		jName ProfileTitle = gOptions.IsDenoiserBilateral() ? jNameStatic("Bilateral") : jNameStatic("Gaussian");
 		SCOPE_CPU_PROFILE(ProfileTitle);
-		SCOPE_GPU_PROFILE_NAME(InRenderFrameContextPtr, ProfileTitle);
-		g_rhi->UAVBarrier(InRenderFrameContextPtr->GetActiveCommandBuffer(), InTexture.get());
+		SCOPE_GPU_PROFILE_NAME(RenderFrameContextPtr, ProfileTitle);
+		g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), InTexture.get());
 		{
 			struct CommonComputeUniformBuffer
 			{
@@ -328,9 +328,9 @@ std::shared_ptr<jTexture> DenoisingAO(const std::shared_ptr<jRenderFrameContext>
 			CommonComputeUniformBuffer CommonComputeData;
 			CommonComputeData.Width = jSceneRenderTarget::GaussianH->Width;
 			CommonComputeData.Height = jSceneRenderTarget::GaussianH->Height;
-			CommonComputeData.Sigma = gOptions.GaussianKernelSigma;
-			CommonComputeData.KernelSize = gOptions.GaussianKernelSize;
-			CommonComputeData.SigmaForBilateral = gOptions.BilateralKernelSigma;
+			CommonComputeData.Sigma = InKernelSigma;
+			CommonComputeData.KernelSize = InKernelSize;
+			CommonComputeData.SigmaForBilateral = InBilateralSigma;
 
 			auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
 				jNameStatic("CommonComputeUniformBuffer"), jLifeTimeType::OneFrame, sizeof(CommonComputeData)));
@@ -349,7 +349,7 @@ std::shared_ptr<jTexture> DenoisingAO(const std::shared_ptr<jRenderFrameContext>
 				jNameStatic("GaussianKernel"), jLifeTimeType::OneFrame, sizeof(KernelData)));
 			OneFrameGaussianKernelUniformBuffer->UpdateBufferData(&KernelData, sizeof(KernelData));
 
-			jRHIUtil::DispatchCompute(InRenderFrameContextPtr, jSceneRenderTarget::GaussianH.get()
+			jRHIUtil::DispatchCompute(RenderFrameContextPtr, jSceneRenderTarget::GaussianH.get()
 				, [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
 				{
 					g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InTexture.get(), EResourceLayout::SHADER_READ_ONLY);
@@ -381,7 +381,7 @@ std::shared_ptr<jTexture> DenoisingAO(const std::shared_ptr<jRenderFrameContext>
 				);
 		}
 
-		g_rhi->UAVBarrier(InRenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::GaussianH.get());
+		g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::GaussianH.get());
 		return jSceneRenderTarget::GaussianH;
 	}
 
@@ -556,7 +556,7 @@ std::shared_ptr<jTexture> jRenderer::SSAO()
     g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), SSAO_RT->GetTexture());
 
 	// 2. Denosing
-	return DenoisingAO(RenderFrameContextPtr, SSAO_RT->GetTexturePtr());
+	return Denoise(SSAO_RT->GetTexturePtr(), gOptions.Denoiser, gOptions.GaussianKernelSize, gOptions.GaussianKernelSigma, gOptions.BilateralKernelSigma);
 }
 
 std::shared_ptr<jTexture> jRenderer::RTAO()
@@ -895,7 +895,7 @@ std::shared_ptr<jTexture> jRenderer::RTAO()
 	std::shared_ptr<jTexture> AfterReprojection = ReprojectionAO(RenderFrameContextPtr, RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr);
 
 	// 3. Denosing
-	std::shared_ptr<jTexture> AfterDenoising = DenoisingAO(RenderFrameContextPtr, AfterReprojection);
+	std::shared_ptr<jTexture> AfterDenoising = Denoise(AfterReprojection, gOptions.Denoiser, gOptions.GaussianKernelSize, gOptions.GaussianKernelSigma, gOptions.BilateralKernelSigma);
 	g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), AfterDenoising.get());
 
 	// 4. UpdateHistoryBuffer
@@ -1033,5 +1033,187 @@ void jRenderer::AOPass()
 		DebugRTs.push_back(AOResult);
 
 	ApplyAOToFinalColor(RenderFrameContextPtr, AOResult);
+}
+
+void jRenderer::SSGIPass()
+{
+    if (!gOptions.UseSSGI)
+        return;
+
+    SCOPE_CPU_PROFILE(SSGIPass);
+    SCOPE_GPU_PROFILE(RenderFrameContextPtr, SSGIPass);
+    DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "SSGIPass", Vector4(0.0f, 0.8f, 0.5f, 1.0f));
+
+    g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+    g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::NORMAL)->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+    g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::ALBEDO)->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+
+    const float RTScale = 1.0f; // Use full resolution for now
+    const int32 RayRTWidth = (int32)(SCR_WIDTH * RTScale);
+    const int32 RayRTHeight = (int32)(SCR_HEIGHT * RTScale);
+
+    auto SSGI_RT = jRenderTargetPool::GetRenderTargetForOneFrame({ ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, RayRTWidth, RayRTHeight, 1, false, EMSAASamples::COUNT_1
+            , jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f), ETextureCreateFlag::UAV });
+	jSceneRenderTarget::SSGI_RT = SSGI_RT;
+    
+    if (!jSceneRenderTarget::GIProjection || jSceneRenderTarget::GIProjection->Info.Width != RayRTWidth || jSceneRenderTarget::GIProjection->Info.Height != RayRTHeight)
+    {
+        jSceneRenderTarget::GIProjection = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, RayRTWidth, RayRTHeight, 1, false, EMSAASamples::COUNT_1
+            , jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f), ETextureCreateFlag::UAV });
+    }
+
+    struct CommonComputeUniformBuffer
+    {
+        Matrix InvP;
+        Matrix V;
+        Matrix P;
+        float Radius;
+        float Bias;
+        Vector2 NoiseUVScale;
+        int32 Width;
+        int32 Height;
+        int32 FrameNumber;
+        int32 Padding0;
+        Vector CameraPos;
+        float Padding1;
+    };
+    CommonComputeUniformBuffer CommonComputeData;
+
+    auto mainCamera = jCamera::GetMainCamera();
+    CommonComputeData.InvP = mainCamera->Projection.GetInverse();
+    CommonComputeData.V = mainCamera->View;
+    CommonComputeData.P = mainCamera->Projection;
+    CommonComputeData.Radius = 50.0f; // temp
+    CommonComputeData.Bias = 0.01f; // temp
+    CommonComputeData.NoiseUVScale.x = (float)RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->Info.Width / (float)GNoiseTexture->Width;
+    CommonComputeData.NoiseUVScale.y = (float)RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->Info.Height / (float)GNoiseTexture->Height;
+    CommonComputeData.Width = SSGI_RT->Info.Width;
+    CommonComputeData.Height = SSGI_RT->Info.Height;
+    CommonComputeData.FrameNumber = (int32)g_rhi->GetCurrentFrameNumber();
+    CommonComputeData.CameraPos = Vector4(mainCamera->Pos, 0.0f);
+
+    auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
+        jNameStatic("SSGI_OnFrameUniformBuffer"), jLifeTimeType::OneFrame, sizeof(CommonComputeData)));
+    OneFrameUniformBuffer->UpdateBufferData(&CommonComputeData, sizeof(CommonComputeData));
+
+    jRHIUtil::DispatchCompute(RenderFrameContextPtr, SSGI_RT->GetTexture()
+        , [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
+        {
+            g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InRenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+
+            const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+                , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::REPEAT
+                , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
+
+            const jSamplerStateInfo* RepeatSamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+                , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT
+                , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
+
+            InOutShaderBindingArray.Add(jShaderBinding::Create(1, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
+                , InOutResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), SamplerState)));
+
+            InOutShaderBindingArray.Add(jShaderBinding::Create(2, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
+                , InOutResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::NORMAL)->GetTexture(), SamplerState)));
+
+            InOutShaderBindingArray.Add(jShaderBinding::Create(3, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
+                , InOutResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), SamplerState)));
+
+            InOutShaderBindingArray.Add(jShaderBinding::Create(4, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
+                , InOutResourceInlineAllactor.Alloc<jTextureResource>(GNoiseTexture.get(), RepeatSamplerState)));
+
+            InOutShaderBindingArray.Add(jShaderBinding::Create(5, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
+                , InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
+        }
+        , [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
+            {
+                jShaderInfo shaderInfo;
+                shaderInfo.SetName(jNameStatic("SSGI_CS"));
+                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/SSGI_cs.hlsl"));
+                shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
+                shaderInfo.SetEntryPoint(jNameStatic("main"));
+                return g_rhi->CreateShader(shaderInfo);
+            }
+        );
+
+    g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), SSGI_RT->GetTexture());
+}
+
+void jRenderer::SSGIAccumulatePass()
+{
+    if (!gOptions.UseSSGI || !gOptions.UseSSGITemporalAccumulation)
+        return;
+
+    SCOPE_CPU_PROFILE(SSGIAccumulatePass);
+    SCOPE_GPU_PROFILE(RenderFrameContextPtr, SSGIAccumulatePass);
+    DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "SSGIAccumulatePass", Vector4(0.0f, 0.8f, 0.5f, 1.0f));
+
+    const int32 RayRTWidth = (int32)(SCR_WIDTH);
+    const int32 RayRTHeight = (int32)(SCR_HEIGHT);
+
+    if (!jSceneRenderTarget::SSGI_Accum_RT[0] || jSceneRenderTarget::SSGI_Accum_RT[0]->Info.Width != RayRTWidth || jSceneRenderTarget::SSGI_Accum_RT[0]->Info.Height != RayRTHeight)
+    {
+        jRenderTargetInfo Info = { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, RayRTWidth, RayRTHeight, 1, false, EMSAASamples::COUNT_1, jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f), ETextureCreateFlag::UAV };
+        Info.ResourceName = L"SSGI_Accum_0";
+        jSceneRenderTarget::SSGI_Accum_RT[0] = g_rhi->CreateRenderTarget(Info);
+        Info.ResourceName = L"SSGI_Accum_1";
+        jSceneRenderTarget::SSGI_Accum_RT[1] = g_rhi->CreateRenderTarget(Info);
+        Info.ResourceName = L"SSGI_Accum_2";
+        jSceneRenderTarget::SSGI_Accum_RT[2] = g_rhi->CreateRenderTarget(Info);
+    }
+
+    const int32 RTIndex = RenderFrameContextPtr->FrameIndex % 3;
+    const int32 PrevRTIndex = (RenderFrameContextPtr->FrameIndex + 2) % 3;
+
+    auto SSGI_Accum_RT_Dest = jSceneRenderTarget::SSGI_Accum_RT[RTIndex];
+    auto SSGI_Accum_RT_Prev = jSceneRenderTarget::SSGI_Accum_RT[PrevRTIndex];
+
+    struct CommonComputeUniformBuffer
+    {
+        int32 Width;
+        int32 Height;
+        float BlendFactor;
+        int32 Padding;
+    };
+
+    CommonComputeUniformBuffer CommonComputeData;
+    CommonComputeData.Width = SSGI_Accum_RT_Dest->Info.Width;
+    CommonComputeData.Height = SSGI_Accum_RT_Dest->Info.Height;
+    CommonComputeData.BlendFactor = gOptions.SSGIAccumBlendFactor;
+
+    auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
+        jNameStatic("SSGIAccum_OnFrameUniformBuffer"), jLifeTimeType::OneFrame, sizeof(CommonComputeData)));
+    OneFrameUniformBuffer->UpdateBufferData(&CommonComputeData, sizeof(CommonComputeData));
+
+    jRHIUtil::DispatchCompute(RenderFrameContextPtr, SSGI_Accum_RT_Dest->GetTexture()
+        , [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
+        {
+            const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+                , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
+                , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
+
+            g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::SSGI_RT->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+            g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), SSGI_Accum_RT_Prev->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+
+            InOutShaderBindingArray.Add(jShaderBinding::Create(1, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
+                , InOutResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::SSGI_RT->GetTexture(), SamplerState)));
+
+            InOutShaderBindingArray.Add(jShaderBinding::Create(2, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
+                , InOutResourceInlineAllactor.Alloc<jTextureResource>(SSGI_Accum_RT_Prev->GetTexture(), SamplerState)));
+
+            InOutShaderBindingArray.Add(jShaderBinding::Create(3, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
+                , InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
+        }
+        , [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
+        {
+            jShaderInfo shaderInfo;
+            shaderInfo.SetName(jNameStatic("SSGI_Accumulate_CS"));
+            shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/SSGI_Accumulate_cs.hlsl"));
+            shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
+            shaderInfo.SetEntryPoint(jNameStatic("main"));
+            return g_rhi->CreateShader(shaderInfo);
+        }
+    );
+
+    g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), SSGI_Accum_RT_Dest->GetTexture());
 }
 

@@ -967,10 +967,86 @@ void jRenderer::Render()
 
     {
         AOPass();
+        SSGIPass();
+        SSGIAccumulatePass();
         AtmosphericShadow();
     }
 
+    // Apply SSGI
+    if (gOptions.UseSSGI && jSceneRenderTarget::SSGI_RT)
+    {
+        DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "ApplySSGI", Vector4(0.0f, 0.5f, 0.8f, 1.0f));
+
+        // Select the source SSGI texture
+        std::shared_ptr<jTexture> ssgiTexture = gOptions.UseSSGITemporalAccumulation
+            ? jSceneRenderTarget::SSGI_Accum_RT[RenderFrameContextPtr->FrameIndex % 3]->GetTexturePtr()
+            : jSceneRenderTarget::SSGI_RT->GetTexturePtr();
+
+        // Denoise the SSGI texture if enabled
+        if (gOptions.UseSSGIDenoising)
+        {
+            ssgiTexture = Denoise(ssgiTexture, gOptions.SSGIDenoiser, gOptions.SSGIDenoiserKernelSize, gOptions.SSGIDenoiserKernelSigma, gOptions.SSGIDenoiserBilateralKernelSigma);
+        }
+
+        // To avoid read/write hazard on ColorPtr, copy it to a temp texture.
+        auto TempColorRT = jRenderTargetPool::GetRenderTargetForOneFrame(RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->Info);
+        jRHIUtil::DrawQuad(RenderFrameContextPtr, TempColorRT, {0, 0, SCR_WIDTH, SCR_HEIGHT},
+            [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
+            {
+                jTexture* InTexture = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture();
+                g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InTexture, EResourceLayout::SHADER_READ_ONLY);
+
+                const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+                    , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
+                    , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
+
+                InOutShaderBindingArray.Add(jShaderBinding::Create(0, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
+                    , InOutResourceInlineAllactor.Alloc<jTextureResource>(InTexture, SamplerState)));
+            },
+            [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
+            {
+                jShaderInfo shaderInfo;
+                shaderInfo.SetName(jNameStatic("CopyPS"));
+                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/copy_ps.hlsl"));
+                shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
+                return g_rhi->CreateShader(shaderInfo);
+            }
+        );
+
+        struct jApplySSGIUniformBuffer
+        {
+            float SSGIIntensity;
+            Vector Padding;
+        };
+        jApplySSGIUniformBuffer UniformData;
+        UniformData.SSGIIntensity = gOptions.SSGIIntensity;
+        
+        auto UniformBuffer = g_rhi->CreateUniformBufferBlock(jNameStatic("ApplySSGIUniformBuffer"), jLifeTimeType::OneFrame, sizeof(UniformData));
+        UniformBuffer->UpdateBufferData(&UniformData, sizeof(UniformData));
+
+        jRHIUtil::DispatchCompute(RenderFrameContextPtr, RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(),
+            [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
+            {
+                g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), TempColorRT->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+                g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), ssgiTexture.get(), EResourceLayout::SHADER_READ_ONLY);
+
+                InOutShaderBindingArray.Add(jShaderBinding::Create(0, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::COMPUTE, InOutResourceInlineAllactor.Alloc<jTextureResource>(TempColorRT->GetTexture(), nullptr)));
+                InOutShaderBindingArray.Add(jShaderBinding::Create(1, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::COMPUTE, InOutResourceInlineAllactor.Alloc<jTextureResource>(ssgiTexture.get(), nullptr)));
+                InOutShaderBindingArray.Add(jShaderBinding::Create(0, 1, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::COMPUTE, InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(UniformBuffer.get())));
+            },
+            [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
+            {
+                jShaderInfo shaderInfo;
+                shaderInfo.SetName(jNameStatic("ApplySSGI_CS"));
+                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/ApplySSGI_cs.hlsl"));
+                shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
+                return g_rhi->CreateShader(shaderInfo);
+            }
+        );
+    }
+
     PostProcess();
+
     DebugPasses();
     UIPass();
 }

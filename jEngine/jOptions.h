@@ -39,30 +39,47 @@ struct jOptions
     float AORadius;
     float SSAOBias;
     float AOIntensity;
-    int32 RayPerPixel;
-    int32 AOType;
-    bool UseAOReprojection;
+    bool UseSSGI;
+    bool UseSSGITemporalAccumulation;
+    float SSGIAccumBlendFactor;
+    float SSGIIntensity;
+
+    // SSGI Denoising
+    bool UseSSGIDenoising;
+    const char* SSGIDenoiser;
+    int32 SSGIDenoiserKernelSize;
+    float SSGIDenoiserKernelSigma;
+    float SSGIDenoiserBilateralKernelSigma;
+
+    // AO
     const char* Denoiser;
+    int32 AOType;
+    const char* UseResolution;
+    bool ShowDebugRT;
+    bool ShowAOOnly;
+    bool UseAOReprojection;
+    bool UseDiscontinuityWeight;
+    bool UseHaltonJitter;
+    bool UseAccumulateRay;
     int32 GaussianKernelSize;
     float GaussianKernelSigma;
     float BilateralKernelSigma;
-    bool ShowAOOnly;
-    bool ShowDebugRT;
-    bool UseAccumulateRay;
-    bool UseDiscontinuityWeight;
-    bool UseHaltonJitter;
-    const char* UseResolution;
-    
+    int32 RayPerPixel;
+
+    // Path Tracing
     int32 MaxRecursionDepthForPathTracing;
     int32 RayPerPixelForPathTracing;
+
+    // Raytracing
+    bool UseRaytracing;
 
     bool IsDenoiserGuassian() const { return GDenoisers[0] == Denoiser; }
     bool IsDenoiserGuassianSeparable() const { return GDenoisers[1] == Denoiser; }
     bool IsDenoiserBilateral() const { return GDenoisers[2] == Denoiser; }
 
     int32 GetRTAOIndex() const { return 1; }
-    bool IsRTAO() const;
-    bool IsSSAO() const;
+    bool IsRTAO() const { return AOType == GetRTAOIndex(); }
+    bool IsSSAO() const { return AOType == 2; }
 };
 
 extern jOptions gOptions;

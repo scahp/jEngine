@@ -41,31 +41,39 @@ jOptions::jOptions()
 	AORadius = 50.0f;
 	SSAOBias = AORadius / 20.0f;
 	AOIntensity = 1.0f;
-	RayPerPixel = 1;
-	AOType = 1;						// Select RTAO default
-	UseAOReprojection = true;
-	Denoiser = GDenoisers[2];       // Select Bilateral Filter
-	GaussianKernelSize = 5;
-	GaussianKernelSigma = 3.0f;
-	BilateralKernelSigma = 0.015f;
-	ShowAOOnly = false;
-	ShowDebugRT = false;
-	UseAccumulateRay = true;
-	UseDiscontinuityWeight = true;
-	UseHaltonJitter = true;
-	UseResolution = GAOResolution[2];	// Default to 1/4 size of the screen
-    MaxRecursionDepthForPathTracing = 6;
-    RayPerPixelForPathTracing = 5;
-}
+	UseSSGI = true;
+	UseSSGITemporalAccumulation = true;
+	SSGIAccumBlendFactor = 0.9f;
+    SSGIIntensity = 1.0f;
 
-bool jOptions::IsRTAO() const
-{
-    return 1 == AOType && GSupportRaytracing;
-}
+    // SSGI Denoising
+    UseSSGIDenoising = true;
+    SSGIDenoiser = GDenoisers[0];
+    SSGIDenoiserKernelSize = 9;
+    SSGIDenoiserKernelSigma = 2.5f;
+    SSGIDenoiserBilateralKernelSigma = 0.01f;
 
-bool jOptions::IsSSAO() const
-{
-    return 2 == AOType;
+    // AO
+    Denoiser = GDenoisers[0];
+    AOType = GetRTAOIndex();
+    UseResolution = GAOResolution[0];
+    ShowDebugRT = false;
+    ShowAOOnly = false;
+    UseAOReprojection = true;
+    UseDiscontinuityWeight = true;
+    UseHaltonJitter = true;
+    UseAccumulateRay = true;
+    GaussianKernelSize = 9;
+    GaussianKernelSigma = 2.5f;
+    BilateralKernelSigma = 0.01f;
+    RayPerPixel = 1;
+
+    // Path Tracing
+    MaxRecursionDepthForPathTracing = 1;
+    RayPerPixelForPathTracing = 1;
+
+	// Raytracing
+	UseRaytracing = true;
 }
 
 bool jOptions::operator==(struct jOptions const& RHS) const
