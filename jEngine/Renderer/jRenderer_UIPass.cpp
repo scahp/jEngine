@@ -96,20 +96,6 @@ void IRenderer::UIPass()
 
 					ImGui::Checkbox("ShowDebugRT", &gOptions.ShowDebugRT);
 					ImGui::Checkbox("ShowAOOnly", &gOptions.ShowAOOnly);
-                    ImGui::Checkbox("UseSSGI", &gOptions.UseSSGI);
-                    if (gOptions.UseSSGI)
-                    {
-                        ImGui::Indent();
-                        ImGui::Checkbox("Temporal Accumulation", &gOptions.UseSSGITemporalAccumulation);
-                        if (gOptions.UseSSGITemporalAccumulation)
-                        {
-                            ImGui::Indent();
-                            ImGui::SliderFloat("Blend Factor", &gOptions.SSGIAccumBlendFactor, 0.0f, 1.0f);
-                            ImGui::Unindent();
-                        }
-                        ImGui::SliderFloat("Intensity", &gOptions.SSGIIntensity, 0.0f, 5.0f);
-                        ImGui::Unindent();
-                    }
 					if (ImGui::BeginCombo("AO RT Res(%)", gOptions.UseResolution, ImGuiComboFlags_None))
 					{
 						for (int32 i = 0; i < _countof(GAOResolution); ++i)
@@ -171,6 +157,25 @@ void IRenderer::UIPass()
 						gOptions.GaussianKernelSize++;
 					ImGui::SliderFloat("KernelSigma", &gOptions.GaussianKernelSigma, 0.1f, 30.0f);
 					ImGui::SliderFloat("BilateralSigma", &gOptions.BilateralKernelSigma, 0.001f, 0.1f);
+					ImGui::EndTabItem();
+				}
+
+				if (ImGui::BeginTabItem("SSGI Options"))
+				{
+                    ImGui::Checkbox("UseSSGI", &gOptions.UseSSGI);
+                    if (gOptions.UseSSGI)
+                    {
+                        ImGui::Indent();
+                        ImGui::Checkbox("Temporal Accumulation", &gOptions.UseSSGITemporalAccumulation);
+                        if (gOptions.UseSSGITemporalAccumulation)
+                        {
+                            ImGui::Indent();
+                            ImGui::SliderFloat("Blend Factor", &gOptions.SSGIAccumBlendFactor, 0.0f, 1.0f);
+                            ImGui::Unindent();
+                        }
+                        ImGui::SliderFloat("Intensity", &gOptions.SSGIIntensity, 0.0f, 5.0f);
+                        ImGui::Unindent();
+                    }
 
                     ImGui::Separator();
                     ImGui::TextColored(ImVec4(1, 1, 0, 1), "SSGI denosing");
@@ -195,9 +200,9 @@ void IRenderer::UIPass()
                             gOptions.SSGIDenoiserKernelSize++;
                         ImGui::SliderFloat("SSGIDenoiserKernelSigma", &gOptions.SSGIDenoiserKernelSigma, 0.1f, 30.0f);
                         ImGui::SliderFloat("SSGIDenoiserBilateralSigma", &gOptions.SSGIDenoiserBilateralKernelSigma, 0.001f, 0.1f);
+                        ImGui::SliderInt("SSGI_BlurQuality", &gOptions.SSGI_BlurQuality, 1, 5);
                         ImGui::Unindent();
                     }
-
 					ImGui::EndTabItem();
 				}
 			}

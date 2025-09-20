@@ -978,14 +978,15 @@ void jRenderer::Render()
         DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "ApplySSGI", Vector4(0.0f, 0.5f, 0.8f, 1.0f));
 
         // Select the source SSGI texture
-        std::shared_ptr<jTexture> ssgiTexture = gOptions.UseSSGITemporalAccumulation
-            ? jSceneRenderTarget::SSGI_Accum_RT[RenderFrameContextPtr->FrameIndex % 3]->GetTexturePtr()
-            : jSceneRenderTarget::SSGI_RT->GetTexturePtr();
+        auto ssgiRenderTarget = gOptions.UseSSGITemporalAccumulation
+            ? jSceneRenderTarget::SSGI_Accum_RT[RenderFrameContextPtr->FrameIndex % 3]
+            : jSceneRenderTarget::SSGI_RT;
+        auto ssgiTexture = ssgiRenderTarget->GetTexturePtr();
 
         // Denoise the SSGI texture if enabled
         if (gOptions.UseSSGIDenoising)
         {
-            ssgiTexture = Denoise(ssgiTexture, gOptions.SSGIDenoiser, gOptions.SSGIDenoiserKernelSize, gOptions.SSGIDenoiserKernelSigma, gOptions.SSGIDenoiserBilateralKernelSigma);
+            ssgiTexture = BlurSSGI(ssgiRenderTarget);
         }
 
         // To avoid read/write hazard on ColorPtr, copy it to a temp texture.

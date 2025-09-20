@@ -50,6 +50,7 @@ struct jOptions
     int32 SSGIDenoiserKernelSize;
     float SSGIDenoiserKernelSigma;
     float SSGIDenoiserBilateralKernelSigma;
+    int32 SSGI_BlurQuality;
 
     // AO
     const char* Denoiser;

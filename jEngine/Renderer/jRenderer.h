@@ -72,6 +72,7 @@ public:
     virtual std::shared_ptr<jTexture> SSAO();
     virtual std::shared_ptr<jTexture> RTAO();
     virtual std::shared_ptr<jTexture> Denoise(const std::shared_ptr<jTexture>& InTexture, const char* InDenoiser, int32 InKernelSize, float InKernelSigma, float InBilateralSigma);
+    virtual std::shared_ptr<jTexture> BlurSSGI(const std::shared_ptr<jRenderTarget>& InRenderTarget);
 
     virtual void PostProcess();
 

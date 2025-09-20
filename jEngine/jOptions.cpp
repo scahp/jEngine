@@ -52,6 +52,7 @@ jOptions::jOptions()
     SSGIDenoiserKernelSize = 9;
     SSGIDenoiserKernelSigma = 2.5f;
     SSGIDenoiserBilateralKernelSigma = 0.01f;
+    SSGI_BlurQuality = 3;
 
     // AO
     Denoiser = GDenoisers[0];

@@ -1091,5 +1091,11 @@
     <None Include="Resource\Shaders\hlsl\BRDF.hlsl">
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
+    <None Include="Resource\Shaders\hlsl\ApplySSGI_cs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\SSGI_cs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
   </ItemGroup>
 </Project>
