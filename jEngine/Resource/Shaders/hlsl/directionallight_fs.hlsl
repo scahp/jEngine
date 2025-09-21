@@ -109,14 +109,16 @@ float4 main(VSOutput input
 #endif // USE_PBR
 
     // ambient from IBL
+    // if (Lit > 0)
+    if (0)
     {
-        // todo : Need to split shader, because it is possible that ILB without directional light
+        // todo : Need to split shader, because it is possible that IBL without directional light
         float3 DiffusePart = IBL_DiffusePart(N, V, Albedo, Metallic, Roughness, IrradianceMap, IrradianceMapSamplerState);
 
         float NoV = saturate(dot(N, V));
         float3 R = 2 * dot(V, N) * N - V;
         R = normalize(R);
-        float3 PrefilteredColor = PrefilteredEnvMap.SampleLevel(PrefilteredEnvSamplerState, R, Roughness * (8-1)).rgb;
+        float3 PrefilteredColor = PrefilteredEnvMap.SampleLevel(PrefilteredEnvSamplerState, R, Roughness * (8 - 1)).rgb;
         
         float3 F0 = float3(0.04f, 0.04f, 0.04f);
         float3 SpecularColor = lerp(F0, Albedo, Metallic);

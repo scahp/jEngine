@@ -15,7 +15,7 @@ void jRenderer::AtmosphericShadow()
     if (gOptions.ShowAOOnly)
         return;
 
-    static bool EnableAtmosphericShadowing = true;
+    static bool EnableAtmosphericShadowing = false;
     if (EnableAtmosphericShadowing)
     {
         jDirectionalLight* DirectionalLight = nullptr;

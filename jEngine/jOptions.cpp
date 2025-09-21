@@ -26,7 +26,7 @@ jOptions::jOptions()
 	UseSubpass = false;
 	UseMemoryless = true;
 	ShowDebugObject = false;
-	BloomEyeAdaptation = true;
+	BloomEyeAdaptation = false;
 	QueueSubmitAfterShadowPass = true;
 	QueueSubmitAfterBasePass = true;
 	CameraPos = Vector::ZeroVector;
@@ -47,7 +47,7 @@ jOptions::jOptions()
     SSGIIntensity = 1.0f;
 
     // SSGI Denoising
-    UseSSGIDenoising = true;
+    UseSSGIDenoising = false;
     SSGIDenoiser = GDenoisers[0];
     SSGIDenoiserKernelSize = 9;
     SSGIDenoiserKernelSigma = 2.5f;

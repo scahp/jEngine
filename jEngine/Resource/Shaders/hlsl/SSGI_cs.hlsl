@@ -71,71 +71,82 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 GroupID : SV_Gro
     float3 worldNormal = normalize(GBuffer0.SampleLevel(GBuffer0SamplerState, uv, 0).xyz * 2.0 - 1.0);
     float3 viewNormal = normalize(mul((float3x3)ComputeCommon.V, worldNormal));
 
-    // Use a combination of screen position and frame number for a time-varying seed
-    float2 randomSeed = GlobalInvocationID.xy + float2(GlobalInvocationID.x * ComputeCommon.FrameNumber % 256, GlobalInvocationID.y * ComputeCommon.FrameNumber % 14);
-    float2 randomValues = rand(randomSeed);
-
     // Create a TBN matrix oriented to the normal vector
     float3 tangent = (abs(viewNormal.y) < 0.999) ? normalize(cross(viewNormal, float3(0, 1, 0))) : float3(1, 0, 0);
     float3 bitangent = cross(viewNormal, tangent);
     float3x3 tbn = float3x3(tangent, bitangent, viewNormal);
+    tbn = transpose(tbn);
 
-    // Generate a cosine-weighted random vector in the hemisphere
-    float r1 = 2.0 * PI * randomValues.x;
-    float r2 = randomValues.y;
-    float r2s = sqrt(r2);
-    float3 sampleDir = mul(tbn, float3(cos(r1) * r2s, sin(r1) * r2s, sqrt(1.0 - r2)));
-
-    float3 indirectLight = float3(0.0, 0.0, 0.0);
-    
     // Screen-space ray marching
     // Use noise texture for jittering the starting position of the ray to reduce banding
     float2 noiseUV = ComputeCommon.NoiseUVScale * uv;
     float rayJitter = Noise.SampleLevel(NoiseSamplerState, noiseUV, 0).r;
-
-    viewPos += sampleDir * 50;
-
-    float stepSize = SSGI_MAX_DISTANCE / SSGI_MAX_STEPS;
-    for (int i = 0; i < SSGI_MAX_STEPS; ++i)
+    
+    uint seed = InitRandomSeed(GlobalInvocationID.xy, float2(ComputeCommon.Width, ComputeCommon.Height), ComputeCommon.FrameNumber);
+    
+    float3 indirectLight = float3(0.0, 0.0, 0.0);
+    float count = 0.0f;
+    for (int k = 0; k < 10;++k)
     {
-        // March along the reflection vector in view space
-        float3 rayPos = viewPos + sampleDir * stepSize * (float(i) + rayJitter);
+        // Use a combination of screen position and frame number for a time-varying seed
+        float2 randomValues = float2(Random_0_1(seed), Random_0_1(seed));
 
-        // Project ray position to screen space
-        float4 projectedPos = mul(ComputeCommon.P, float4(rayPos, 1.0));
-        projectedPos.xyz /= projectedPos.w;
-        float2 rayUV = projectedPos.xy * 0.5 + 0.5;
-        rayUV.y = 1.0 - rayUV.y;
+        // Generate a cosine-weighted random vector in the hemisphere
+        float r1 = 2.0 * PI * randomValues.x;
+        float r2 = randomValues.y;
+        float r2s = sqrt(r2);
+        float3 sampleDir = mul(tbn, float3(cos(r1) * r2s, sin(r1) * r2s, sqrt(1.0 - r2)));
 
-        // Check if the ray is within the screen bounds
-        if (rayUV.x < 0.0 || rayUV.x > 1.0 || rayUV.y < 0.0 || rayUV.y > 1.0)
+        viewPos += sampleDir * 50;
+
+        float stepSize = SSGI_MAX_DISTANCE / SSGI_MAX_STEPS;
+        for (int i = 0; i < SSGI_MAX_STEPS; ++i)
         {
-            break;
-        }
+            // March along the reflection vector in view space
+            float3 rayPos = viewPos + sampleDir * stepSize * (float(i) + rayJitter);
 
-        // Get depth at the ray's screen position
-        float sceneDepth = CalcViewPositionFromDepth(DepthTexture, DepthTextureSamplerState, rayUV, ComputeCommon.InvP).z;
+            // Project ray position to screen space
+            float4 projectedPos = mul(ComputeCommon.P, float4(rayPos, 1.0));
+            projectedPos.xyz /= projectedPos.w;
+            float2 rayUV = projectedPos.xy * 0.5 + 0.5;
+            rayUV.y = 1.0 - rayUV.y;
 
-        // Check for intersection
-        if (sceneDepth < rayPos.z && (rayPos.z - sceneDepth) < SSGI_THICKNESS)
-        {
-            // Intersection found, get color from ColorPtr
-            float3 hitColor = ColorTexture.SampleLevel(ColorTextureSamplerState, rayUV, 0).rgb;
+            // Check if the ray is within the screen bounds
+            if (rayUV.x < 0.0 || rayUV.x > 1.0 || rayUV.y < 0.0 || rayUV.y > 1.0)
+            {
+                break;
+            }
+
+            // Get depth at the ray's screen position
+            float sceneDepth = CalcViewPositionFromDepth(DepthTexture, DepthTextureSamplerState, rayUV, ComputeCommon.InvP).z;
+
+            // Check for intersection
+            if (sceneDepth < rayPos.z && (rayPos.z - sceneDepth) < SSGI_THICKNESS)
+            {
+                // Intersection found, get color from ColorPtr
+                float3 hitColor = ColorTexture.SampleLevel(ColorTextureSamplerState, rayUV, 0).rgb;
             
-            // Get normal at hit point
-            float3 hitWorldNormal = normalize(GBuffer0.SampleLevel(GBuffer0SamplerState, rayUV, 0).xyz * 2.0 - 1.0);
-            float3 hitViewNormal = normalize(mul((float3x3)ComputeCommon.V, hitWorldNormal));
+                // Get normal at hit point
+                float3 hitWorldNormal = normalize(GBuffer0.SampleLevel(GBuffer0SamplerState, rayUV, 0).xyz * 2.0 - 1.0);
+                float3 hitViewNormal = normalize(mul((float3x3) ComputeCommon.V, hitWorldNormal));
 
-            // Cosine falloff
-            float cosFalloff = saturate(dot(normalize(viewPos - rayPos), hitViewNormal));
+                // Cosine falloff
+                float cosFalloff = saturate(dot(normalize(viewPos - rayPos), hitViewNormal));
 
-            // Attenuate light by distance
-            float distFalloff = 1.0 - smoothstep(0.0, SSGI_MAX_DISTANCE, length(rayPos - viewPos));
+                // Attenuate light by distance
+                float distFalloff = 1.0 - smoothstep(0.0, SSGI_MAX_DISTANCE, length(rayPos - viewPos));
             
-            // indirectLight = hitColor * cosFalloff * distFalloff;
-            indirectLight = hitColor * 10.0f;
-            break;
+                indirectLight += hitColor * cosFalloff * distFalloff;
+                count += 1.0f;
+                //indirectLight = hitColor * 10.0f;
+                break;
+            }
         }
+    }
+    
+    if (count > 0)
+    {
+        indirectLight /= count;
     }
 
     Result[GlobalInvocationID.xy] = float4(indirectLight, 1.0);
