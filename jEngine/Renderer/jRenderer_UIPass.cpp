@@ -173,6 +173,12 @@ void IRenderer::UIPass()
                             ImGui::SliderFloat("Blend Factor", &gOptions.SSGIAccumBlendFactor, 0.0f, 1.0f);
                             ImGui::Unindent();
                         }
+                        ImGui::Checkbox("UseSSGIReprojection", &gOptions.UseSSGIReprojection);
+                        if (!gOptions.UseSSGIReprojection)
+                            ImGui::BeginDisabled();
+                        ImGui::Checkbox("UseDiscontinuityWeightForSSGI", &gOptions.UseDiscontinuityWeightForSSGI);
+                        if (!gOptions.UseSSGIReprojection)
+                            ImGui::EndDisabled();
                         ImGui::SliderFloat("Intensity", &gOptions.SSGIIntensity, 0.0f, 5.0f);
                         ImGui::Unindent();
                     }

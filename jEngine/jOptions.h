@@ -44,6 +44,10 @@ struct jOptions
     float SSGIAccumBlendFactor;
     float SSGIIntensity;
 
+    // SSGI Reprojection
+    bool UseSSGIReprojection;
+    bool UseDiscontinuityWeightForSSGI;
+
     // SSGI Denoising
     bool UseSSGIDenoising;
     const char* SSGIDenoiser;

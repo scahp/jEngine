@@ -1097,5 +1097,8 @@
     <None Include="Resource\Shaders\hlsl\SSGI_cs.hlsl">
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
+    <None Include="Resource\Shaders\hlsl\SSGIReprojection_cs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
   </ItemGroup>
 </Project>

@@ -46,6 +46,10 @@ jOptions::jOptions()
 	SSGIAccumBlendFactor = 0.9f;
     SSGIIntensity = 1.0f;
 
+    // SSGI Reprojection
+    UseSSGIReprojection = true;
+    UseDiscontinuityWeightForSSGI = true;
+
     // SSGI Denoising
     UseSSGIDenoising = false;
     SSGIDenoiser = GDenoisers[0];
