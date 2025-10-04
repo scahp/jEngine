@@ -128,7 +128,7 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
     }
 
     wchar_t TempStr[256] = { 0, };
-    ETextureFormat GBufferTexFormat[_countof(GBuffer)] = { ETextureFormat::R11G11B10F, ETextureFormat::R11G11B10F, ETextureFormat::RGBA8 };
+    ETextureFormat GBufferTexFormat[_countof(GBuffer)] = { ETextureFormat::R11G11B10F, ETextureFormat::R11G11B10F, ETextureFormat::RGBA16F };
     for (int32 i = 0; i < _countof(GBuffer); ++i)
     {
         const bool UseAsSubpassInput = gOptions.UseSubpass;

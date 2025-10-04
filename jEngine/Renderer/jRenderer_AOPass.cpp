@@ -585,7 +585,7 @@ std::shared_ptr<jTexture> jRenderer::RTAO()
 		if (!jSceneRenderTarget::HistoryDepthBuffer || jSceneRenderTarget::HistoryDepthBuffer->Width != DepthWidth || jSceneRenderTarget::HistoryDepthBuffer->Height != DepthHeight)
 		{
 			jSceneRenderTarget::HistoryDepthBuffer = g_rhi->Create2DTexture((uint32)DepthWidth, (uint32)DepthHeight, (uint32)1, (uint32)1
-				, ETextureFormat::R8, ETextureCreateFlag::UAV, EResourceLayout::UAV);
+				, ETextureFormat::R16F, ETextureCreateFlag::UAV, EResourceLayout::UAV);
 		}
 	}
 

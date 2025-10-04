@@ -13,6 +13,7 @@ struct VSOutput
     float4 Pos : SV_POSITION;
     float4 PrevPos : POSITION0;
     float3 LocalPos : POSITION1;
+    float4 TestPos : POSITION2;
 #if USE_VERTEX_COLOR
     float4 Color : COLOR0;
 #endif
@@ -148,13 +149,20 @@ FSOutput main(VSOutput input
     output.GBuffer0.xyz = WorldNormal * 0.5 + 0.5;
     output.GBuffer1.xyz = color.xyz;
     
-    float2 PrevScreenPos = (input.PrevPos.xy / input.PrevPos.w);
-    PrevScreenPos.y = -PrevScreenPos.y;
-    PrevScreenPos = PrevScreenPos * float2(0.5, 0.5) + float2(0.5, 0.5);
+    float2 PrevScreenPosUV = (input.PrevPos.xy / input.PrevPos.w);
+    PrevScreenPosUV.y = -PrevScreenPosUV.y;
+    PrevScreenPosUV = PrevScreenPosUV * float2(0.5, 0.5) + float2(0.5, 0.5);
+    
+    float2 ScreenPosUV = (input.TestPos.xy / input.TestPos.w);
+    ScreenPosUV.y = -ScreenPosUV.y;
+    ScreenPosUV = ScreenPosUV * float2(0.5, 0.5) + float2(0.5, 0.5);
+    
+    //float2 ScreenPosUV = (input.Pos.xy / ViewParam.ScreenRect.zw);
+    float2 Velocity = float2(ScreenPosUV - PrevScreenPosUV) * float2(0.5, 0.5) + float2(0.5, 0.5);
     
     // Velcoity.xy : [0, 1]
     // Metallic, Roughness : [0, 1]
-    output.GBuffer2 = float4(float2(input.Pos.xy / ViewParam.ScreenRect.zw - PrevScreenPos), Metallic, Roughness);
+    output.GBuffer2 = float4(Velocity, Metallic, Roughness);
 
     return output;
 }

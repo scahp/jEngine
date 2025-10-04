@@ -34,6 +34,7 @@ struct VSOutput
     float4 Pos : SV_POSITION;
     float4 PrevPos : POSITION0;
     float3 LocalPos : POSITION1;
+    float4 TestPos : POSITION2;
 #if USE_VERTEX_COLOR
     float4 Color : COLOR0;
 #endif
@@ -50,6 +51,7 @@ VSOutput main(VSInput input)
     output.LocalPos = input.Position;
     output.WorldPos = mul(RenderObjectParam.M, float4(input.Position, 1.0));
     output.Pos = mul(ViewParam.VP, output.WorldPos);
+    output.TestPos = mul(ViewParam.VP, output.WorldPos);
     output.PrevPos = mul(ViewParam.PrevVP, output.WorldPos);
 #if USE_VERTEX_COLOR
     output.Color = input.Color;

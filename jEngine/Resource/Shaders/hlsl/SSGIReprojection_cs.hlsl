@@ -42,8 +42,9 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         return;
 
     int2 PixelPos = int2(GlobalInvocationID.xy);
-    int2 ScreenOffsetToPrevPos = round(VelocityBuffer[PixelPos].xy);
-    int2 OldPixelPos = PixelPos - ScreenOffsetToPrevPos;
+    float2 ScreenOffsetToPrevPos = (VelocityBuffer[PixelPos].xy * float2(2.0, 2.0) - float2(1.0, 1.0)) * float2(ComputeCommon.Width, ComputeCommon.Height);
+    //int2 ScreenOffsetToPrevPos = round(VelocityBuffer[PixelPos].xy);
+    int2 OldPixelPos = PixelPos - round(ScreenOffsetToPrevPos);
 
     if (OldPixelPos.x >= ComputeCommon.Width - 2 || OldPixelPos.y >= ComputeCommon.Height - 2 || OldPixelPos.x < 0 || OldPixelPos.y < 0)
         return;
@@ -83,8 +84,8 @@ cbuffer ComputeCommon : register(b5)
 
 float4 SSGIReprojectionPS(VSOutput input) : SV_TARGET
 {
-    float2 Velocity = VelocityBuffer.Sample(TextureSampler, input.TexCoord).xy;
-    float2 OldUV = input.TexCoord - Velocity;
+    float2 ScreenOffsetToPrevUV = (VelocityBuffer.Sample(TextureSampler, input.TexCoord).xy * float2(2.0, 2.0) - float2(1.0, 1.0));
+    float2 OldUV = input.TexCoord - ScreenOffsetToPrevUV;
     
     float4 currentColor = CurrentTexture.Sample(TextureSampler, input.TexCoord);
     float4 historyColor = HistoryBuffer.Sample(TextureSampler, OldUV);

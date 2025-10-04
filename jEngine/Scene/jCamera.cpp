@@ -85,7 +85,7 @@ void jCamera::UpdateCameraFrustum()
 
 void jCamera::UpdateCamera()
 {
-    PrevViewProjection = Projection * View;
+    PrevViewProjection = ViewProjection;
 
     View = CreateView();
     Projection = CreateProjection();
