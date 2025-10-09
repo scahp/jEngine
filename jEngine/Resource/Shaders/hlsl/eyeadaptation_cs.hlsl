@@ -1,6 +1,6 @@
 // This code is based on UE5 EyeAdaptation Basic Method
 
-#define TILE_SIZE 16
+#define TILE_SIZE 8
 
 struct jEyeAdaptationUniformBuffer
 {

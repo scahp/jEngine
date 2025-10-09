@@ -6,15 +6,17 @@ std::vector<std::string> gPathTracingScenesNameOnly;
 const char* gSelectedScene = nullptr;
 int32 gSelectedSceneIndex = 0;
 
-const char* GDenoisers[4] = { "Gaussian", "GaussianSeparable", "Bilateral", "None" };
+const char* GDenoisers[(int32)EDenoiser::MAX] = { "None", "Gaussian", "GaussianSeparable", "Bilateral", "BilateralPS", "A-Trous" };
 const char* GAOResolution[3] = { "100", "75", "50" };
 extern const char* GAOType[3] = { "NoAO", "RTAO", "SSAO" };
+
+static_assert(_countof(GDenoisers) == (int32)EDenoiser::MAX, "EDenoiser count mismatch");
 
 jOptions gOptions;
 
 jOptions::jOptions()
 	// RHI options
-	: EnableDebuggerLayer(false)
+	: EnableDebuggerLayer(true)
 {
 
 	// Graphics options
@@ -51,15 +53,19 @@ jOptions::jOptions()
     UseDiscontinuityWeightForSSGI = true;
 
     // SSGI Denoising
-    UseSSGIDenoising = false;
-    SSGIDenoiser = GDenoisers[0];
+    SSGIDenoiser = EDenoiser::A_TROUS;
     SSGIDenoiserKernelSize = 9;
     SSGIDenoiserKernelSigma = 2.5f;
     SSGIDenoiserBilateralKernelSigma = 0.01f;
-    SSGI_BlurQuality = 3;
+    SSGI_BlurQuality = 5;
+
+    // SSGI A-Trous Denoising
+    SSGI_A_Trous_Sigma_Color = 1.0f;
+    SSGI_A_Trous_Sigma_Normal = 0.5f;
+    SSGI_A_Trous_Sigma_Depth = 5.0f;
 
     // AO
-    Denoiser = GDenoisers[0];
+    Denoiser = EDenoiser::GAUSSIAN;
     AOType = GetRTAOIndex();
     UseResolution = GAOResolution[0];
     ShowDebugRT = false;
@@ -79,6 +85,17 @@ jOptions::jOptions()
 
 	// Raytracing
 	UseRaytracing = true;
+}
+
+
+const char* jOptions::GetDenoiseName(EDenoiser InDenoiser) const
+{
+    for (int32 i = 0; i < (int32)EDenoiser::MAX; ++i)
+    {
+        if ((int32)InDenoiser == i)
+            return GDenoisers[i];
+    }
+    return GDenoisers[0];
 }
 
 bool jOptions::operator==(struct jOptions const& RHS) const

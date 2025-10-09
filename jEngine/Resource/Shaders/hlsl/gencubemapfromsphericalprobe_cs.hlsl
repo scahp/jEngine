@@ -19,7 +19,7 @@ SamplerState EnvMapSampler : register(s0, space0);
 RWTexture2DArray<float4> Result : register(u1, space0);
 cbuffer MipParam : register(b2, space0) { MipUniformBuffer MipParam; }
 
-[numthreads(16, 16, 1)]
+[numthreads(8, 8, 1)]
 void main(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 GroupID : SV_GroupID)
 {
     if (GlobalInvocationID.x >= MipParam.width || GlobalInvocationID.y >= MipParam.height)

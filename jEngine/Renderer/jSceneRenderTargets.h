@@ -41,6 +41,7 @@ struct jSceneRenderTarget : public std::enable_shared_from_this<jSceneRenderTarg
 
     std::shared_ptr<jRenderTarget> ColorPtr;
     std::shared_ptr<jRenderTarget> DepthPtr;
+    std::shared_ptr<jRenderTarget> LinearDepthPtr;
     std::shared_ptr<jRenderTarget> ResolvePtr;
     
     std::shared_ptr<jRenderTarget> GBuffer[3];

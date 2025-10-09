@@ -9,7 +9,7 @@ cbuffer ApplySSGIUniformBuffer : register(b3)
 };
 RWTexture2D<float4> OutColorTexture : register(u0);
 
-[numthreads(16, 16, 1)]
+[numthreads(8, 8, 1)]
 void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 {
     uint2 p = dispatchThreadId.xy;

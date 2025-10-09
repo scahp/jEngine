@@ -956,6 +956,46 @@ void jRenderer::Render()
 
         BasePass();
 
+        // Calculate linear depth
+        {
+            DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "CalcLinearDepth", Vector4(0.0f, 0.5f, 0.8f, 1.0f));
+            SCOPE_CPU_PROFILE(CalcLinearDepth);
+            SCOPE_GPU_PROFILE(RenderFrameContextPtr, CalcLinearDepth);
+
+            struct jLinearDepthUniformBuffer
+            {
+                Matrix InvP;
+                Vector2 ScreenSize;
+                Vector2 Padding;
+            };
+
+            jLinearDepthUniformBuffer UniformData;
+            UniformData.InvP = jCamera::GetMainCamera()->Projection.GetInverse();
+            UniformData.ScreenSize.x = (float)SCR_WIDTH;
+            UniformData.ScreenSize.y = (float)SCR_HEIGHT;
+
+            auto UniformBuffer = g_rhi->CreateUniformBufferBlock(jNameStatic("LinearDepthUniformBuffer"), jLifeTimeType::OneFrame, sizeof(UniformData));
+            UniformBuffer->UpdateBufferData(&UniformData, sizeof(UniformData));
+
+            jRHIUtil::DispatchCompute(RenderFrameContextPtr, RenderFrameContextPtr->SceneRenderTargetPtr->LinearDepthPtr->GetTexture(),
+                [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
+                {
+                    g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InRenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+
+                    InOutShaderBindingArray.Add(jShaderBinding::Create(0, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::COMPUTE, InOutResourceInlineAllactor.Alloc<jTextureResource>(InRenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), nullptr)));
+                    InOutShaderBindingArray.Add(jShaderBinding::Create(1, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE, InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(UniformBuffer.get()), true));
+                },
+                [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
+                {
+                    jShaderInfo shaderInfo;
+                    shaderInfo.SetName(jNameStatic("CalcLinearDepth_CS"));
+                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/CalcLinearDepth_cs.hlsl"));
+                    shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
+                    return g_rhi->CreateShader(shaderInfo);
+                }
+            );
+        }
+
         // Queue submit to prepare scenecolor RT for postprocess
         if (gOptions.QueueSubmitAfterBasePass)
         {
@@ -984,7 +1024,7 @@ void jRenderer::Render()
         auto ssgiTexture = ssgiRenderTarget->GetTexturePtr();
 
         // Denoise the SSGI texture if enabled
-        if (gOptions.UseSSGIDenoising)
+        if (gOptions.SSGIDenoiser != EDenoiser::NONE)     // GDenoisers[3] is "None"
         {
             ssgiTexture = BlurSSGI(ssgiRenderTarget);
         }

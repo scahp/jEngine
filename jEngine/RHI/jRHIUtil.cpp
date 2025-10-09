@@ -440,8 +440,8 @@ void DispatchCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameCo
 
 	g_rhi->BindComputeShaderBindingInstances(InRenderFrameContextPtr->GetActiveCommandBuffer(), computePipelineStateInfo, ShaderBindingInstanceCombiner, 0);
 
-	const int32 X = (Width / 16) + ((Width % 16) ? 1 : 0);
-	const int32 Y = (Height / 16) + ((Height % 16) ? 1 : 0);
+	const int32 X = (Width / 8) + ((Width % 8) ? 1 : 0);
+	const int32 Y = (Height / 8) + ((Height % 8) ? 1 : 0);
 	g_rhi->DispatchCompute(InRenderFrameContextPtr, X, Y, 1);
 }
 

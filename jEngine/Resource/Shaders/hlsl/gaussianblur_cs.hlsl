@@ -20,7 +20,7 @@ struct jKernel
 };
 cbuffer KernelBuffer : register(b3) { jKernel Kernal; }
 
-[numthreads(16, 16, 1)]
+[numthreads(8, 8, 1)]
 void Vertical(uint3 GlobalInvocationID : SV_DispatchThreadID)
 {   
     if (GlobalInvocationID.x >= ComputeCommon.Width || GlobalInvocationID.y >= ComputeCommon.Height)
@@ -47,7 +47,7 @@ void Vertical(uint3 GlobalInvocationID : SV_DispatchThreadID)
     resultImage[int2(GlobalInvocationID.xy)] = Color;
 }
 
-[numthreads(16, 16, 1)]
+[numthreads(8, 8, 1)]
 void Horizon(uint3 GlobalInvocationID : SV_DispatchThreadID)
 {   
     if (GlobalInvocationID.x >= ComputeCommon.Width || GlobalInvocationID.y >= ComputeCommon.Height)

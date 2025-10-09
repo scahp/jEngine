@@ -139,13 +139,13 @@ void IRenderer::UIPass()
 
 					ImGui::Separator();
 					ImGui::TextColored(ImVec4(1, 1, 0, 1), "Spatial denosing");
-					if (ImGui::BeginCombo("Denoiser", gOptions.Denoiser, ImGuiComboFlags_None))
+					if (ImGui::BeginCombo("Denoiser", gOptions.GetDenoiseName(gOptions.Denoiser), ImGuiComboFlags_None))
 					{
 						for (int32 i = 0; i < _countof(GDenoisers); ++i)
 						{
-							const bool is_selected = (gOptions.Denoiser == GDenoisers[i]);
+							const bool is_selected = (gOptions.Denoiser == (EDenoiser)i);
 							if (ImGui::Selectable(GDenoisers[i], is_selected))
-								gOptions.Denoiser = GDenoisers[i];
+								gOptions.Denoiser = (EDenoiser)i;
 							if (is_selected)
 								ImGui::SetItemDefaultFocus();
 						}
@@ -185,30 +185,38 @@ void IRenderer::UIPass()
 
                     ImGui::Separator();
                     ImGui::TextColored(ImVec4(1, 1, 0, 1), "SSGI denosing");
-                    ImGui::Checkbox("UseSSGIDenoising", &gOptions.UseSSGIDenoising);
-                    if (gOptions.UseSSGIDenoising)
+                    if (ImGui::BeginCombo("SSGIDenoiser", gOptions.GetDenoiseName(gOptions.SSGIDenoiser), ImGuiComboFlags_None))
+                    {
+                        for (int32 i = 0; i < _countof(GDenoisers); ++i)
+                        {
+                            const bool is_selected = (gOptions.SSGIDenoiser == (EDenoiser)i);
+                            if (ImGui::Selectable(GDenoisers[i], is_selected))
+                                gOptions.SSGIDenoiser = (EDenoiser)i;
+                            if (is_selected)
+                                ImGui::SetItemDefaultFocus();
+                        }
+                        ImGui::EndCombo();
+                    }
+
+                    if (gOptions.SSGIDenoiser != EDenoiser::NONE)
                     {
                         ImGui::Indent();
-                        if (ImGui::BeginCombo("SSGIDenoiser", gOptions.SSGIDenoiser, ImGuiComboFlags_None))
-                        {
-                            for (int32 i = 0; i < _countof(GDenoisers); ++i)
-                            {
-                                const bool is_selected = (gOptions.SSGIDenoiser == GDenoisers[i]);
-                                if (ImGui::Selectable(GDenoisers[i], is_selected))
-                                    gOptions.SSGIDenoiser = GDenoisers[i];
-                                if (is_selected)
-                                    ImGui::SetItemDefaultFocus();
-                            }
-                            ImGui::EndCombo();
-                        }
-                        ImGui::SliderInt("SSGIDenoiserKernelSize", &gOptions.SSGIDenoiserKernelSize, 1, 20);
+                        ImGui::SliderInt("KernelSize", &gOptions.SSGIDenoiserKernelSize, 1, 20);
                         if ((gOptions.SSGIDenoiserKernelSize % 2) == 0)
                             gOptions.SSGIDenoiserKernelSize++;
-                        ImGui::SliderFloat("SSGIDenoiserKernelSigma", &gOptions.SSGIDenoiserKernelSigma, 0.1f, 30.0f);
-                        ImGui::SliderFloat("SSGIDenoiserBilateralSigma", &gOptions.SSGIDenoiserBilateralKernelSigma, 0.001f, 0.1f);
-                        ImGui::SliderInt("SSGI_BlurQuality", &gOptions.SSGI_BlurQuality, 1, 5);
+                        ImGui::SliderFloat("KernelSigma", &gOptions.SSGIDenoiserKernelSigma, 0.1f, 30.0f);
+                        ImGui::SliderFloat("BilateralSigma", &gOptions.SSGIDenoiserBilateralKernelSigma, 0.001f, 0.1f);
+                        ImGui::SliderInt("BlurQuality", &gOptions.SSGI_BlurQuality, 1, 5);
                         ImGui::Unindent();
                     }
+					if (gOptions.SSGIDenoiser == EDenoiser::A_TROUS)
+					{
+                        ImGui::Indent();
+                        ImGui::SliderFloat("Sigma_Color", &gOptions.SSGI_A_Trous_Sigma_Color, 0.0f, 10.0f);
+                        ImGui::SliderFloat("Sigma_Normal", &gOptions.SSGI_A_Trous_Sigma_Normal, 0.0f, 1.0f);
+						ImGui::SliderFloat("Sigma_Depth", &gOptions.SSGI_A_Trous_Sigma_Depth, 0.0f, 1000.0f);
+                        ImGui::Unindent();
+					}
 					ImGui::EndTabItem();
 				}
 			}

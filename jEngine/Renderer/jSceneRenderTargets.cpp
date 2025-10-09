@@ -76,6 +76,11 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
     DepthRTInfo.IsMemoryless = gOptions.UseMemoryless;
     DepthPtr = jRenderTargetPool::GetRenderTarget(DepthRTInfo);
 
+    jRenderTargetInfo LinearDepthRTInfo = { ETextureType::TEXTURE_2D, ETextureFormat::R32F, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0) };
+    LinearDepthRTInfo.ResourceName = TEXT("LinearDepthPtr");
+    LinearDepthRTInfo.TextureCreateFlag = ETextureCreateFlag::UAV;
+    LinearDepthPtr = jRenderTargetPool::GetRenderTarget(LinearDepthRTInfo);
+
     if ((int32)g_rhi->GetSelectedMSAASamples() > 1)
     {
         check(InSwapchain);
@@ -149,6 +154,8 @@ void jSceneRenderTarget::Return()
         ColorPtr->Return();
     if (DepthPtr)
         DepthPtr->Return();
+    if (LinearDepthPtr)
+        LinearDepthPtr->Return();
     if (ResolvePtr)
         ResolvePtr->Return();
     for(auto it : LightShadowMapPtr)

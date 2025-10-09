@@ -72,7 +72,7 @@ float3 random_in_hemisphere(float3 InNormal, float2 InUV, int InSeed)
     return -in_unit_sphere;
 }
 
-[numthreads(16, 16, 1)]
+[numthreads(8, 8, 1)]
 void main(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 GroupID : SV_GroupID)
 {
     if (GlobalInvocationID.x >= ComputeCommon.Width || GlobalInvocationID.y >= ComputeCommon.Height)

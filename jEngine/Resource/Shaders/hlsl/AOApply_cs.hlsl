@@ -17,7 +17,7 @@ Texture2D inputImage : register(t1);
 
 cbuffer ComputeCommon : register(b2) { CommonComputeUniformBuffer ComputeCommon; }
 
-[numthreads(16, 16, 1)]
+[numthreads(8, 8, 1)]
 void AOApplyCS(uint3 GlobalInvocationID : SV_DispatchThreadID)
 {   
     if (GlobalInvocationID.x >= ComputeCommon.Width || GlobalInvocationID.y >= ComputeCommon.Height)

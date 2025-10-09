@@ -14,7 +14,7 @@ cbuffer ComputeCommon : register(b2)
     CommonComputeUniformBuffer ComputeCommon;
 }
 
-[numthreads(16, 16, 1)]
+[numthreads(8, 8, 1)]
 void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 {   
     if (GlobalInvocationID.x >= ComputeCommon.Width || GlobalInvocationID.y >= ComputeCommon.Height)

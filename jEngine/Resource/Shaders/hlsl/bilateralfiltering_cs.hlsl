@@ -51,7 +51,7 @@ float GetGaussian2DKernel(int x, int y)
     return Kernal.Data[LinearIndex / 4][LinearIndex % 4];
 }
 
-[numthreads(16, 16, 1)]
+[numthreads(8, 8, 1)]
 void Bilateral(uint3 GlobalInvocationID : SV_DispatchThreadID)
 {
     if (GlobalInvocationID.x >= ComputeCommon.Width || GlobalInvocationID.y >= ComputeCommon.Height)

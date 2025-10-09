@@ -57,7 +57,7 @@ float GetExposureScale()
     return EyeAdaptationImage.Load(int3(0, 0, 0)).x;
 }
 
-[numthreads(16, 16, 1)]
+[numthreads(8, 8, 1)]
 void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 {   
     if (GlobalInvocationID.x >= ComputeCommon.Width || GlobalInvocationID.y >= ComputeCommon.Height)

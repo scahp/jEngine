@@ -14,7 +14,7 @@ cbuffer ComputeCommon : register(b1)
     CommonComputeUniformBuffer ComputeCommon;
 }
 
-[numthreads(16, 16, 1)]
+[numthreads(8, 8, 1)]
 void AsyncComputeTest_A(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 GroupID : SV_GroupID)
 {
     if (GlobalInvocationID.x >= ComputeCommon.Width || GlobalInvocationID.y >= ComputeCommon.Height)
@@ -29,7 +29,7 @@ void AsyncComputeTest_A(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 Gr
     ResultImage[int2(GlobalInvocationID.xy)] = float4(t, 0, 0, 1);
 }
 
-[numthreads(16, 16, 1)]
+[numthreads(8, 8, 1)]
 void AsyncComputeTest_B(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 GroupID : SV_GroupID)
 {
     if (GlobalInvocationID.x >= ComputeCommon.Width || GlobalInvocationID.y >= ComputeCommon.Height)
@@ -46,7 +46,7 @@ void AsyncComputeTest_B(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 Gr
     ResultImage[int2(GlobalInvocationID.xy)] = float4(x, x + t, 0, 1);
 }
 
-[numthreads(16, 16, 1)]
+[numthreads(8, 8, 1)]
 void AsyncComputeTest_C(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 GroupID : SV_GroupID)
 {
     if (GlobalInvocationID.x >= ComputeCommon.Width || GlobalInvocationID.y >= ComputeCommon.Height)

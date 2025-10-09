@@ -48,7 +48,7 @@ float3 GenerateIrradiance(float3 InNormal)
     return irradiance;
 }
 
-[numthreads(16, 16, 1)]
+[numthreads(8, 8, 1)]
 void main(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 GroupID : SV_GroupID)
 {   
     if (GlobalInvocationID.x >= RTSizeParam.width || GlobalInvocationID.y >= RTSizeParam.height)

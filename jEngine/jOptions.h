@@ -1,7 +1,18 @@
 ﻿#pragma once
 #include "Math/Vector.h"
 
-extern const char* GDenoisers[4];
+enum class EDenoiser : int32
+{
+    NONE = 0,
+    GAUSSIAN,
+    GAUSSIAN_SEPARABLE,
+    BILATERAL,
+    BILATERAL_PS,
+    A_TROUS,
+    MAX
+};
+
+extern const char* GDenoisers[(int32)EDenoiser::MAX];
 extern const char* GAOResolution[3];
 extern const char* GWaitPrerequsiteGraphicsQueueTask[4];
 extern const char* GAOType[3];
@@ -49,15 +60,19 @@ struct jOptions
     bool UseDiscontinuityWeightForSSGI;
 
     // SSGI Denoising
-    bool UseSSGIDenoising;
-    const char* SSGIDenoiser;
+    EDenoiser SSGIDenoiser;
     int32 SSGIDenoiserKernelSize;
     float SSGIDenoiserKernelSigma;
     float SSGIDenoiserBilateralKernelSigma;
     int32 SSGI_BlurQuality;
 
+    // SSGI A-Trous Denoising
+    float SSGI_A_Trous_Sigma_Color;
+    float SSGI_A_Trous_Sigma_Normal;
+    float SSGI_A_Trous_Sigma_Depth;
+
     // AO
-    const char* Denoiser;
+    EDenoiser Denoiser;
     int32 AOType;
     const char* UseResolution;
     bool ShowDebugRT;
@@ -78,9 +93,17 @@ struct jOptions
     // Raytracing
     bool UseRaytracing;
 
-    bool IsDenoiserGuassian() const { return GDenoisers[0] == Denoiser; }
-    bool IsDenoiserGuassianSeparable() const { return GDenoisers[1] == Denoiser; }
-    bool IsDenoiserBilateral() const { return GDenoisers[2] == Denoiser; }
+    bool IsDenoiserGuassian() const { return Denoiser == EDenoiser::GAUSSIAN; }
+    bool IsDenoiserGuassianSeparable() const { return Denoiser == EDenoiser::GAUSSIAN_SEPARABLE; }
+    bool IsDenoiserBilateral() const { return Denoiser == EDenoiser::BILATERAL; }
+
+    bool IsSSGIDenoiserGuassian() const { return SSGIDenoiser == EDenoiser::GAUSSIAN; }
+    bool IsSSGIDenoiserGuassianSeparable() const { return SSGIDenoiser == EDenoiser::GAUSSIAN_SEPARABLE; }
+    bool IsSSGIDenoiserBilateral() const { return SSGIDenoiser == EDenoiser::BILATERAL; }
+    bool IsSSGIDenoiserBilateralPS() const { return SSGIDenoiser == EDenoiser::BILATERAL_PS; }
+    bool IsSSGIDenoise_A_Trous() const { return SSGIDenoiser == EDenoiser::A_TROUS; }
+
+    const char* GetDenoiseName(EDenoiser InDenoiser) const;
 
     int32 GetRTAOIndex() const { return 1; }
     bool IsRTAO() const { return AOType == GetRTAOIndex(); }

@@ -35,7 +35,7 @@ float3 GetTexture(Texture2D Tex, int2 Pos)
     return Tex[Pos].xyz;
 }
 
-[numthreads(16, 16, 1)]
+[numthreads(8, 8, 1)]
 void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 {
     if (GlobalInvocationID.x >= ComputeCommon.Width || GlobalInvocationID.y >= ComputeCommon.Height)
