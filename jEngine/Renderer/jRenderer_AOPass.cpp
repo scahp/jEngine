@@ -1049,6 +1049,7 @@ void jRenderer::SSGIPass()
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::NORMAL)->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::ALBEDO)->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+    g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::VELOCITY)->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
 
     const float RTScale = 1.0f; // Use full resolution for now
     const int32 RayRTWidth = (int32)(SCR_WIDTH * RTScale);
@@ -1069,15 +1070,20 @@ void jRenderer::SSGIPass()
         Matrix InvP;
         Matrix V;
         Matrix P;
+        Matrix InvV;
         float Radius;
         float Bias;
         Vector2 NoiseUVScale;
         int32 Width;
         int32 Height;
         int32 FrameNumber;
-        int32 Padding0;
+        int32 SSGI_MaxSteps;
         Vector CameraPos;
-        float Padding1;
+        float SSGI_MaxDistance;
+        int32 SSGI_RayCount;
+        int32 Padding0;
+        int32 Padding1;
+        int32 Padding2;
     };
     CommonComputeUniformBuffer CommonComputeData;
 
@@ -1085,6 +1091,7 @@ void jRenderer::SSGIPass()
     CommonComputeData.InvP = mainCamera->Projection.GetInverse();
     CommonComputeData.V = mainCamera->View;
     CommonComputeData.P = mainCamera->Projection;
+    CommonComputeData.InvV = mainCamera->View.GetInverse();
     CommonComputeData.Radius = 50.0f; // temp
     CommonComputeData.Bias = 0.01f; // temp
     CommonComputeData.NoiseUVScale.x = (float)RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->Info.Width / (float)GNoiseTexture->Width;
@@ -1092,7 +1099,13 @@ void jRenderer::SSGIPass()
     CommonComputeData.Width = SSGI_RT->Info.Width;
     CommonComputeData.Height = SSGI_RT->Info.Height;
     CommonComputeData.FrameNumber = (int32)g_rhi->GetCurrentFrameNumber();
+    CommonComputeData.SSGI_MaxSteps = gOptions.SSGI_MAX_STEPS;
     CommonComputeData.CameraPos = Vector4(mainCamera->Pos, 0.0f);
+    CommonComputeData.SSGI_MaxDistance = gOptions.SSGI_MAX_DISTANCE;
+    CommonComputeData.SSGI_RayCount = gOptions.SSGI_RAY_COUNT;
+    CommonComputeData.Padding0 = 0;
+    CommonComputeData.Padding1 = 0;
+    CommonComputeData.Padding2 = 0;
 
     auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
         jNameStatic("SSGI_OnFrameUniformBuffer"), jLifeTimeType::OneFrame, sizeof(CommonComputeData)));
@@ -1118,12 +1131,18 @@ void jRenderer::SSGIPass()
                 , InOutResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::NORMAL)->GetTexture(), SamplerState)));
 
             InOutShaderBindingArray.Add(jShaderBinding::Create(3, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-                , InOutResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), SamplerState)));
+                , InOutResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::ALBEDO)->GetTexture(), SamplerState)));
 
             InOutShaderBindingArray.Add(jShaderBinding::Create(4, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
+                , InOutResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::VELOCITY)->GetTexture(), SamplerState)));
+
+            InOutShaderBindingArray.Add(jShaderBinding::Create(5, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
+                , InOutResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), SamplerState)));
+
+            InOutShaderBindingArray.Add(jShaderBinding::Create(6, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
                 , InOutResourceInlineAllactor.Alloc<jTextureResource>(GNoiseTexture.get(), RepeatSamplerState)));
 
-            InOutShaderBindingArray.Add(jShaderBinding::Create(5, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
+            InOutShaderBindingArray.Add(jShaderBinding::Create(7, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
                 , InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
         }
         , [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)

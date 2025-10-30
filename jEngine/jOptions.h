@@ -43,6 +43,8 @@ struct jOptions
     float Metallic;
     float Roughness;
     Vector SunDir;
+    Vector DirectionalLightColor;
+    float DirectionalLightIntensity;
     float AnisoG;
     bool EarthQuake;
     float FocalDistance;
@@ -54,6 +56,9 @@ struct jOptions
     bool UseSSGITemporalAccumulation;
     float SSGIAccumBlendFactor;
     float SSGIIntensity;
+    int32 SSGI_MAX_STEPS;
+    float SSGI_MAX_DISTANCE;
+    int32 SSGI_RAY_COUNT;
 
     // SSGI Reprojection
     bool UseSSGIReprojection;

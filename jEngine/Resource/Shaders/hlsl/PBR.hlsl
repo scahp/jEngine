@@ -30,6 +30,32 @@ float3 PBR(float3 InL, float3 InN, float3 InV, float3 InAlbedo, float3 InLightCo
     return Lo;
 }
 
+float3 PBR2(float3 InL, float3 InN, float3 InV, float3 InAlbedo, float3 InLightColor, float InDistToLight, float InMetallic, float InRoughness)
+{
+    float3 F0 = float3(0.04f, 0.04f, 0.04f);
+    F0 = lerp(F0, InAlbedo, InMetallic);
+    
+    float3 H = normalize(InV + InL);
+    float attenuation = 1.0f / (InDistToLight * InDistToLight);
+    float3 radiance = attenuation * InLightColor;
+    
+    float NDF = DistributionGGX(InN, H, InRoughness);
+    float G = GeometrySmith(InN, InV, InL, InRoughness);
+    float3 F = FresnelSchlick(max(dot(H, InV), 0.0f), F0);
+    
+    float3 kS = F;
+    float3 kD = float3(1.0f, 1.0f, 1.0f) - kS;
+    kD *= (1.0f - InMetallic);
+    
+    float3 numerator = G * F;
+    float denominator = 4.0f * max(dot(InN, InV), 0.0f) * max(dot(InN, InL), 0.0f) + 0.0001f;
+    float3 specular = numerator / denominator;
+    
+    float NdotL = max(dot(InN, InL), 0.0f);
+    float3 Lo = (kD * InAlbedo + specular) * radiance * NdotL;
+    return Lo;
+}
+
 // https://learnopengl.com/PBR/IBL/Diffuse-irradiance
 // To account for roughness for IBL Diffuse part, because IBL don't have half vector which introduced by roughness.
 float3 FresnelSchlickRoughness(float InCosTheta, float3 InF0, float InRoughness)

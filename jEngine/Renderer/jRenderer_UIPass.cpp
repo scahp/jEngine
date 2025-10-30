@@ -3,6 +3,8 @@
 #include "ImGui/jImGui.h"
 #include "Profiler/jPerformanceProfile.h"
 #include "jOptions.h"
+#include "Scene/Light/jLight.h"
+#include "Scene/Light/jDirectionalLight.h"
 
 void IRenderer::UIPass()
 {
@@ -75,6 +77,58 @@ void IRenderer::UIPass()
 
 				ImGui::Separator();
 				ImGui::Text("CameraPos : %.2f, %.2f, %.2f", gOptions.CameraPos.x, gOptions.CameraPos.y, gOptions.CameraPos.z);
+
+				ImGui::Separator();
+				ImGui::TextColored(ImVec4(1, 1, 0, 1), "Directional Light");
+				if (ImGui::SliderFloat3("Light Direction", &gOptions.SunDir.x, -1.0f, 1.0f))
+				{
+					// Normalize the direction vector
+					gOptions.SunDir = gOptions.SunDir.GetNormalize();
+
+					// Update directional light direction when UI changes
+					const auto& lights = jLight::GetLights();
+					for (auto light : lights)
+					{
+						if (light->GetLightType() == ELightType::DIRECTIONAL)
+						{
+							jDirectionalLight* dirLight = static_cast<jDirectionalLight*>(light);
+							dirLight->SetDirection(gOptions.SunDir);
+							break;
+						}
+					}
+				}
+				if (ImGui::ColorEdit3("Light Color", &gOptions.DirectionalLightColor.x, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR))
+				{
+					// Update directional light color when UI changes
+					const auto& lights = jLight::GetLights();
+					for (auto light : lights)
+					{
+						if (light->GetLightType() == ELightType::DIRECTIONAL)
+						{
+							jDirectionalLight* dirLight = static_cast<jDirectionalLight*>(light);
+							Vector finalColor = gOptions.DirectionalLightColor * gOptions.DirectionalLightIntensity;
+							Vector color = Vector4(finalColor.x, finalColor.y, finalColor.z, 1.0f);
+							dirLight->SetColor(color);
+							break;
+						}
+					}
+				}
+				if (ImGui::SliderFloat("Light Intensity", &gOptions.DirectionalLightIntensity, 0.0f, 100.0f))
+				{
+					// Update directional light intensity when UI changes
+					const auto& lights = jLight::GetLights();
+					for (auto light : lights)
+					{
+						if (light->GetLightType() == ELightType::DIRECTIONAL)
+						{
+							jDirectionalLight* dirLight = static_cast<jDirectionalLight*>(light);
+							Vector finalColor = gOptions.DirectionalLightColor * gOptions.DirectionalLightIntensity;
+							Vector color = Vector4(finalColor.x, finalColor.y, finalColor.z, 1.0f);
+							dirLight->SetColor(color);
+							break;
+						}
+					}
+				}
 
 				ImGui::EndTabItem();
 			}
@@ -179,7 +233,10 @@ void IRenderer::UIPass()
                         ImGui::Checkbox("UseDiscontinuityWeightForSSGI", &gOptions.UseDiscontinuityWeightForSSGI);
                         if (!gOptions.UseSSGIReprojection)
                             ImGui::EndDisabled();
-                        ImGui::SliderFloat("Intensity", &gOptions.SSGIIntensity, 0.0f, 5.0f);
+                        ImGui::SliderFloat("Intensity", &gOptions.SSGIIntensity, 0.0f, 10.0f);
+                        ImGui::SliderInt("Ray Count", &gOptions.SSGI_RAY_COUNT, 1, 20);
+                        ImGui::SliderInt("Max Steps", &gOptions.SSGI_MAX_STEPS, 1, 64);
+                        ImGui::SliderFloat("Max Distance", &gOptions.SSGI_MAX_DISTANCE, 1.0f, 1000.0f);
                         ImGui::Unindent();
                     }
 
@@ -214,7 +271,7 @@ void IRenderer::UIPass()
                         ImGui::Indent();
                         ImGui::SliderFloat("Sigma_Color", &gOptions.SSGI_A_Trous_Sigma_Color, 0.0f, 10.0f);
                         ImGui::SliderFloat("Sigma_Normal", &gOptions.SSGI_A_Trous_Sigma_Normal, 0.0f, 1.0f);
-						ImGui::SliderFloat("Sigma_Depth", &gOptions.SSGI_A_Trous_Sigma_Depth, 0.0f, 1000.0f);
+						ImGui::SliderFloat("Sigma_Depth", &gOptions.SSGI_A_Trous_Sigma_Depth, 0.0f, 10.0f);
                         ImGui::Unindent();
 					}
 					ImGui::EndTabItem();

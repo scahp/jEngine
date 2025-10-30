@@ -35,7 +35,10 @@ jOptions::jOptions()
 	AutoExposureKeyValueScale = -0.2f;
 	Metallic = 0.0f;
 	Roughness = 0.2f;
-	SunDir = Vector(0.31f, -0.828f, -0.241f);
+	//SunDir = Vector(0.31f, -0.828f, -0.241f);
+    SunDir = Vector(0.051f, -0.999f, -0.014f);
+	DirectionalLightColor = Vector(0.074f, 0.059f, 0.028f);
+	DirectionalLightIntensity = 30.0f;
 	AnisoG = 0.15f;
 	EarthQuake = false;
 	FocalDistance = 5.0f;
@@ -46,7 +49,10 @@ jOptions::jOptions()
 	UseSSGI = true;
 	UseSSGITemporalAccumulation = true;
 	SSGIAccumBlendFactor = 0.9f;
-    SSGIIntensity = 1.0f;
+    SSGIIntensity = 3.0f;
+    SSGI_MAX_STEPS = 32;
+    SSGI_MAX_DISTANCE = 100.0f;
+    SSGI_RAY_COUNT = 10;
 
     // SSGI Reprojection
     UseSSGIReprojection = true;

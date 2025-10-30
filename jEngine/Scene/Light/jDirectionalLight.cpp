@@ -96,10 +96,38 @@ void jDirectionalLight::Update(float deltaTime)
         LightData.ShadowVP = VP;
         NeedToUpdateShaderBindingInstance = true;
     }
-    
+
     if (LightData.ShadowV != Camera->View)
     {
         LightData.ShadowV = Camera->View;
+        NeedToUpdateShaderBindingInstance = true;
+    }
+}
+
+void jDirectionalLight::SetDirection(const Vector& InDirection)
+{
+    if (LightData.Direction != InDirection)
+    {
+        LightData.Direction = InDirection;
+        NeedToUpdateShaderBindingInstance = true;
+    }
+}
+
+void jDirectionalLight::SetColor(const Vector& InColor)
+{
+    if (LightData.Color != InColor)
+    {
+        LightData.Color = InColor;
+        NeedToUpdateShaderBindingInstance = true;
+    }
+}
+
+void jDirectionalLight::SetIntensity(float InIntensity)
+{
+    Vector newColor = Vector4(InIntensity);
+    if (LightData.Color != newColor)
+    {
+        LightData.Color = newColor;
         NeedToUpdateShaderBindingInstance = true;
     }
 }

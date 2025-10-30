@@ -115,6 +115,8 @@ public:
 	// Light world matrix by using light's Position and MaxDistance
 	virtual const Matrix* GetLightWorldMatrix() const { return nullptr; }
 
+	FORCEINLINE ELightType GetLightType() const { return Type; }
+
 	const ELightType Type = ELightType::MAX;
 	bool IsShadowCaster = true;
 	jObject* LightDebugObject = nullptr;

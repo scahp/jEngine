@@ -1,7 +1,8 @@
 #include "common.hlsl"
+#include "PBR.hlsl"
 
 #ifndef SSGI_MAX_STEPS
-#define SSGI_MAX_STEPS 64
+#define SSGI_MAX_STEPS 32
 #endif
 
 #ifndef SSGI_MAX_DISTANCE
@@ -17,15 +18,20 @@ struct CommonComputeUniformBuffer
     float4x4 InvP;
     float4x4 V;
     float4x4 P;
+    float4x4 InvV;
     float Radius;
     float Bias;
     float2 NoiseUVScale;
     int Width;
     int Height;
     int FrameNumber;
-    int Padding0;
+    int SSGI_MaxSteps;
     float3 CameraPos;
-    float Padding1;
+    float SSGI_MaxDistance;
+    int SSGI_RayCount;
+    int Padding0;
+    int Padding1;
+    int Padding2;
 };
 
 RWTexture2D<float4> Result : register(u0, space0);
@@ -33,18 +39,26 @@ RWTexture2D<float4> Result : register(u0, space0);
 Texture2D DepthTexture : register(t1, space0);
 SamplerState DepthTextureSamplerState : register(s1, space0);
 
-// GBuffer0: Normal(xyz), Metallic(w)
+// GBuffer0: Normal(xyz)
 Texture2D GBuffer0 : register(t2, space0);
 SamplerState GBuffer0SamplerState : register(s2, space0);
 
+// GBuffer1: Albedo(xyz)
+Texture2D GBuffer1 : register(t3, space0);
+SamplerState GBuffer1SamplerState : register(s3, space0);
+
+// GBuffer2: Metallic(z), Roughness(w)
+Texture2D GBuffer2 : register(t4, space0);
+SamplerState GBuffer2SamplerState : register(s4, space0);
+
 // ColorPtr
-Texture2D ColorTexture : register(t3, space0);
-SamplerState ColorTextureSamplerState : register(s3, space0);
+Texture2D ColorTexture : register(t5, space0);
+SamplerState ColorTextureSamplerState : register(s5, space0);
 
-Texture2D Noise : register(t4, space0);
-SamplerState NoiseSamplerState : register(s4, space0);
+Texture2D Noise : register(t6, space0);
+SamplerState NoiseSamplerState : register(s6, space0);
 
-cbuffer ComputeCommon : register(b5, space0)
+cbuffer ComputeCommon : register(b7, space0)
 {
     CommonComputeUniformBuffer ComputeCommon;
 }
@@ -68,8 +82,18 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 GroupID : SV_Gro
 
     // Get view-space position and normal
     float3 viewPos = CalcViewPositionFromDepth(DepthTexture, DepthTextureSamplerState, uv, ComputeCommon.InvP);
+    float3 worldPos = mul(ComputeCommon.InvV, float4(viewPos, 1.0)).xyz;
     float3 worldNormal = normalize(GBuffer0.SampleLevel(GBuffer0SamplerState, uv, 0).xyz * 2.0 - 1.0);
     float3 viewNormal = normalize(mul((float3x3)ComputeCommon.V, worldNormal));
+
+    // Get material properties at current position
+    float3 albedo = GBuffer1.SampleLevel(GBuffer1SamplerState, uv, 0).xyz;
+    float4 gbuffer2 = GBuffer2.SampleLevel(GBuffer2SamplerState, uv, 0);
+    float metallic = gbuffer2.z;
+    float roughness = gbuffer2.w;
+
+    // View direction for PBR
+    float3 V = normalize(ComputeCommon.CameraPos - worldPos);
 
     // Create a TBN matrix oriented to the normal vector
     float3 tangent = (abs(viewNormal.y) < 0.999) ? normalize(cross(viewNormal, float3(0, 1, 0))) : float3(1, 0, 0);
@@ -86,7 +110,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 GroupID : SV_Gro
     
     float3 indirectLight = float3(0.0, 0.0, 0.0);
     float count = 0.0f;
-    for (int k = 0; k < 10;++k)
+    for (int k = 0; k < ComputeCommon.SSGI_RayCount; ++k)
     {
         // Use a combination of screen position and frame number for a time-varying seed
         float2 randomValues = float2(Random_0_1(seed), Random_0_1(seed));
@@ -99,8 +123,8 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 GroupID : SV_Gro
 
         viewPos += sampleDir * 50;
 
-        float stepSize = SSGI_MAX_DISTANCE / SSGI_MAX_STEPS;
-        for (int i = 0; i < SSGI_MAX_STEPS; ++i)
+        float stepSize = ComputeCommon.SSGI_MaxDistance / ComputeCommon.SSGI_MaxSteps;
+        for (int i = 0; i < ComputeCommon.SSGI_MaxSteps; ++i)
         {
             // March along the reflection vector in view space
             float3 rayPos = viewPos + sampleDir * stepSize * (float(i) + rayJitter);
@@ -123,22 +147,36 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 GroupID : SV_Gro
             // Check for intersection
             if (sceneDepth < rayPos.z && (rayPos.z - sceneDepth) < SSGI_THICKNESS)
             {
-                // Intersection found, get color from ColorPtr
+                // Intersection found, get incoming radiance from hit surface
                 float3 hitColor = ColorTexture.SampleLevel(ColorTextureSamplerState, rayUV, 0).rgb;
-            
-                // Get normal at hit point
+
+                // Get hit position in world space
+                float3 hitViewPos = CalcViewPositionFromDepth(DepthTexture, DepthTextureSamplerState, rayUV, ComputeCommon.InvP);
+                float3 hitWorldPos = mul(ComputeCommon.InvV, float4(hitViewPos, 1.0)).xyz;
+
+                // Get normal at hit point for visibility test
                 float3 hitWorldNormal = normalize(GBuffer0.SampleLevel(GBuffer0SamplerState, rayUV, 0).xyz * 2.0 - 1.0);
-                float3 hitViewNormal = normalize(mul((float3x3) ComputeCommon.V, hitWorldNormal));
+                //float3 hitViewNormal = normalize(mul((float3x3) ComputeCommon.V, hitWorldNormal));
 
-                // Cosine falloff
-                float cosFalloff = saturate(dot(normalize(viewPos - rayPos), hitViewNormal));
+                // Visibility: check if hit surface faces toward receiver
+                float3 hitToReceiver = normalize(worldPos - hitWorldPos);
+                float visibility = saturate(dot(hitWorldNormal, hitToReceiver));
 
-                // Attenuate light by distance
-                float distFalloff = 1.0 - smoothstep(0.0, SSGI_MAX_DISTANCE, length(rayPos - viewPos));
-            
-                indirectLight += hitColor * cosFalloff * distFalloff;
+                // Distance attenuation
+                float distToHit = length(hitWorldPos - worldPos);
+                float distFalloff = 1.0 - smoothstep(0.0, ComputeCommon.SSGI_MaxDistance, distToHit * 0.1);
+                // Apply PBR at receiver surface
+                // L: direction from receiver to light source (hit surface acts as area light)
+                float3 L = -hitToReceiver;
+                float3 N = worldNormal;
+                // V is already calculated above
+
+                // Use PBR function for physically accurate BRDF
+                //float3 contribution = PBR2(L, N, V, albedo, hitColor, distToHit * 0.01, metallic, roughness);
+
+                // indirectLight += contribution;
+                indirectLight += hitColor * visibility * distFalloff;
                 count += 1.0f;
-                //indirectLight = hitColor * 10.0f;
                 break;
             }
         }

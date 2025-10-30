@@ -62,6 +62,10 @@ public:
     FORCEINLINE const jDirectionalLightUniformBufferData& GetLightData() const { return LightData; }
     FORCEINLINE jDirectionalLightUniformBufferData& GetLightData() { return LightData; }
 
+    void SetDirection(const Vector& InDirection);
+    void SetColor(const Vector& InColor);
+    void SetIntensity(float InIntensity);
+
 private:
     jCamera* Camera = nullptr;
     jDirectionalLightUniformBufferData LightData;

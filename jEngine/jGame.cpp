@@ -80,8 +80,9 @@ void jGame::Setup()
 	#if !USE_PATH_TRACING		// todo : this hard code should be removed.
     // Create lights
 	{
-		NormalDirectionalLight = jLight::CreateDirectionalLight(Vector(0.1f, -0.5f, 0.1f) // AppSettings.DirecionalLightDirection
-			, Vector4(30.0f), Vector(1.0f), Vector(1.0f), 64);
+		Vector lightColor = gOptions.DirectionalLightColor * gOptions.DirectionalLightIntensity;
+		NormalDirectionalLight = jLight::CreateDirectionalLight(gOptions.SunDir
+			, Vector4(lightColor.x, lightColor.y, lightColor.z, 1.0f), Vector(1.0f), Vector(1.0f), 64);
 		PointLight = jLight::CreatePointLight(Vector(10.0f, 100.0f, 10.0f), Vector4(1.0f, 0.75f, 0.75f, 1.0f) * LightColorScale, 1500.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
 		SpotLight = jLight::CreateSpotLight(Vector(0.0f, 60.0f, 5.0f), Vector(1.0f, -1.0f, 0.4f).GetNormalize(), Vector4(0.0f, 1.0f, 0.0f, 1.0f) * LightColorScale, 2000.0f, 0.35f, 1.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
 	}
@@ -96,8 +97,9 @@ void jGame::Setup()
     jCamera::AddCamera(0, MainCamera);
 
     // Create lights
-    NormalDirectionalLight = jLight::CreateDirectionalLight(Vector(-1.0f, -1.0f, -0.3f) // AppSettings.DirecionalLightDirection
-        , Vector4(0.05f), Vector(1.0f), Vector(1.0f), 64);
+    Vector lightColor = gOptions.DirectionalLightColor * gOptions.DirectionalLightIntensity;
+    NormalDirectionalLight = jLight::CreateDirectionalLight(gOptions.SunDir
+        , Vector4(lightColor.x, lightColor.y, lightColor.z, 1.0f), Vector(1.0f), Vector(1.0f), 64);
     //CascadeDirectionalLight = jLight::CreateCascadeDirectionalLight(AppSettings.DirecionalLightDirection
     //	, Vector4(0.6f), Vector(1.0f), Vector(1.0f), 64);
     //AmbientLight = jLight::CreateAmbientLight(Vector(0.2f, 0.5f, 1.0f), Vector(0.05f));		// sky light color
