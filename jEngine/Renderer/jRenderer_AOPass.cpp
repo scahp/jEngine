@@ -1044,16 +1044,19 @@ void jRenderer::SSGIPass()
 
     SCOPE_CPU_PROFILE(SSGIPass);
     SCOPE_GPU_PROFILE(RenderFrameContextPtr, SSGIPass);
-    DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "SSGIPass", Vector4(0.0f, 0.8f, 0.5f, 1.0f));
+
+    const float RTScale = gOptions.SSGIResolutionScale;
+    const int32 RayRTWidth = (int32)(SCR_WIDTH * RTScale);
+    const int32 RayRTHeight = (int32)(SCR_HEIGHT * RTScale);
+
+    char eventName[128];
+    sprintf_s(eventName, "SSGIPass (Res:%.0f%%, RPP:%d)", RTScale * 100.0f, gOptions.SSGI_RAY_COUNT);
+    DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, eventName, Vector4(0.0f, 0.8f, 0.5f, 1.0f));
 
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::NORMAL)->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::ALBEDO)->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::VELOCITY)->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
-
-    const float RTScale = 1.0f; // Use full resolution for now
-    const int32 RayRTWidth = (int32)(SCR_WIDTH * RTScale);
-    const int32 RayRTHeight = (int32)(SCR_HEIGHT * RTScale);
 
     auto SSGI_RT = jRenderTargetPool::GetRenderTargetForOneFrame({ ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, RayRTWidth, RayRTHeight, 1, false, EMSAASamples::COUNT_1
             , jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f), ETextureCreateFlag::UAV });
@@ -1168,8 +1171,9 @@ void jRenderer::SSGIAccumulatePass()
     SCOPE_GPU_PROFILE(RenderFrameContextPtr, SSGIAccumulatePass);
     DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "SSGIAccumulatePass", Vector4(0.0f, 0.8f, 0.5f, 1.0f));
 
-    const int32 RayRTWidth = (int32)(SCR_WIDTH);
-    const int32 RayRTHeight = (int32)(SCR_HEIGHT);
+    const float RTScale = gOptions.SSGIResolutionScale;
+    const int32 RayRTWidth = (int32)(SCR_WIDTH * RTScale);
+    const int32 RayRTHeight = (int32)(SCR_HEIGHT * RTScale);
 
     if (!jSceneRenderTarget::SSGI_Accum_RT[0] || jSceneRenderTarget::SSGI_Accum_RT[0]->Info.Width != RayRTWidth || jSceneRenderTarget::SSGI_Accum_RT[0]->Info.Height != RayRTHeight)
     {
@@ -1201,7 +1205,7 @@ void jRenderer::SSGIAccumulatePass()
         CommonComputeData.Width = SSGI_Accum_RT_Dest->Info.Width;
         CommonComputeData.Height = SSGI_Accum_RT_Dest->Info.Height;
         CommonComputeData.FrameNumber = g_rhi->GetCurrentFrameNumber();
-        CommonComputeData.InvScaleToOriginBuffer = 1.0f;
+        CommonComputeData.InvScaleToOriginBuffer = 1.0f / RTScale;
 
         auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
             jNameStatic("ReprojectionSSGIUniformBuffer"), jLifeTimeType::OneFrame, sizeof(CommonComputeData)));
@@ -1662,14 +1666,18 @@ std::shared_ptr<jTexture> jRenderer::BlurSSGI(const std::shared_ptr<jRenderTarge
                     g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InRenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::NORMAL)->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
                     g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InRenderFrameContextPtr->SceneRenderTargetPtr->LinearDepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
 
+                    const jSamplerStateInfo* LinearSamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+                        , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
+                        , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
+
                     InOutShaderBindingArray.Add(jShaderBinding::Create(0, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::COMPUTE
                         , InOutResourceInlineAllactor.Alloc<jTextureResource>(CurrentInput.get(), nullptr)));
 
-                    InOutShaderBindingArray.Add(jShaderBinding::Create(1, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::COMPUTE
-                        , InOutResourceInlineAllactor.Alloc<jTextureResource>(InRenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::NORMAL)->GetTexture(), nullptr)));
+                    InOutShaderBindingArray.Add(jShaderBinding::Create(1, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
+                        , InOutResourceInlineAllactor.Alloc<jTextureResource>(InRenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::NORMAL)->GetTexture(), LinearSamplerState)));
 
-                    InOutShaderBindingArray.Add(jShaderBinding::Create(2, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::COMPUTE
-                        , InOutResourceInlineAllactor.Alloc<jTextureResource>(InRenderFrameContextPtr->SceneRenderTargetPtr->LinearDepthPtr->GetTexture(), nullptr)));
+                    InOutShaderBindingArray.Add(jShaderBinding::Create(2, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
+                        , InOutResourceInlineAllactor.Alloc<jTextureResource>(InRenderFrameContextPtr->SceneRenderTargetPtr->LinearDepthPtr->GetTexture(), LinearSamplerState)));
 
                     InOutShaderBindingArray.Add(jShaderBinding::Create(4, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
                         , InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(UniformBuffer.get()), true));

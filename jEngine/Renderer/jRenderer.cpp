@@ -1057,11 +1057,16 @@ void jRenderer::Render()
         struct jApplySSGIUniformBuffer
         {
             float SSGIIntensity;
-            Vector Padding;
+            int32 SceneWidth;
+            int32 SceneHeight;
+            int32 ShowSSGIOnly;
         };
         jApplySSGIUniformBuffer UniformData;
         UniformData.SSGIIntensity = gOptions.SSGIIntensity;
-        
+        UniformData.SceneWidth = SCR_WIDTH;
+        UniformData.SceneHeight = SCR_HEIGHT;
+        UniformData.ShowSSGIOnly = gOptions.ShowSSGIOnly ? 1 : 0;
+
         auto UniformBuffer = g_rhi->CreateUniformBufferBlock(jNameStatic("ApplySSGIUniformBuffer"), jLifeTimeType::OneFrame, sizeof(UniformData));
         UniformBuffer->UpdateBufferData(&UniformData, sizeof(UniformData));
 
@@ -1071,8 +1076,12 @@ void jRenderer::Render()
                 g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), TempColorRT->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
                 g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), ssgiTexture.get(), EResourceLayout::SHADER_READ_ONLY);
 
+                const jSamplerStateInfo* SSGISamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+                    , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
+                    , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
+
                 InOutShaderBindingArray.Add(jShaderBinding::Create(0, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::COMPUTE, InOutResourceInlineAllactor.Alloc<jTextureResource>(TempColorRT->GetTexture(), nullptr)));
-                InOutShaderBindingArray.Add(jShaderBinding::Create(1, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::COMPUTE, InOutResourceInlineAllactor.Alloc<jTextureResource>(ssgiTexture.get(), nullptr)));
+                InOutShaderBindingArray.Add(jShaderBinding::Create(1, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE, InOutResourceInlineAllactor.Alloc<jTextureResource>(ssgiTexture.get(), SSGISamplerState)));
                 InOutShaderBindingArray.Add(jShaderBinding::Create(0, 1, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::COMPUTE, InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(UniformBuffer.get())));
             },
             [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)

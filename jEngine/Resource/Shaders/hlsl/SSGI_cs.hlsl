@@ -158,7 +158,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 GroupID : SV_Gro
                 float3 hitWorldNormal = normalize(GBuffer0.SampleLevel(GBuffer0SamplerState, rayUV, 0).xyz * 2.0 - 1.0);
                 //float3 hitViewNormal = normalize(mul((float3x3) ComputeCommon.V, hitWorldNormal));
 
-                // Visibility: check if hit surface faces toward receiver
+                // Visibility: check if hit surface faces toward receiver 
                 float3 hitToReceiver = normalize(worldPos - hitWorldPos);
                 float visibility = saturate(dot(hitWorldNormal, hitToReceiver));
 
@@ -175,7 +175,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 GroupID : SV_Gro
                 //float3 contribution = PBR2(L, N, V, albedo, hitColor, distToHit * 0.01, metallic, roughness);
 
                 // indirectLight += contribution;
-                indirectLight += hitColor * visibility * distFalloff;
+                indirectLight += hitColor * visibility;
                 count += 1.0f;
                 break;
             }

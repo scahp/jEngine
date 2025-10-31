@@ -54,11 +54,13 @@ struct jOptions
     float AOIntensity;
     bool UseSSGI;
     bool UseSSGITemporalAccumulation;
+    bool ShowSSGIOnly;
     float SSGIAccumBlendFactor;
     float SSGIIntensity;
     int32 SSGI_MAX_STEPS;
     float SSGI_MAX_DISTANCE;
     int32 SSGI_RAY_COUNT;
+    float SSGIResolutionScale;
 
     // SSGI Reprojection
     bool UseSSGIReprojection;

@@ -220,6 +220,7 @@ void IRenderer::UIPass()
                     if (gOptions.UseSSGI)
                     {
                         ImGui::Indent();
+                        ImGui::Checkbox("Show SSGI Only", &gOptions.ShowSSGIOnly);
                         ImGui::Checkbox("Temporal Accumulation", &gOptions.UseSSGITemporalAccumulation);
                         if (gOptions.UseSSGITemporalAccumulation)
                         {
@@ -234,6 +235,7 @@ void IRenderer::UIPass()
                         if (!gOptions.UseSSGIReprojection)
                             ImGui::EndDisabled();
                         ImGui::SliderFloat("Intensity", &gOptions.SSGIIntensity, 0.0f, 10.0f);
+                        ImGui::SliderFloat("Resolution Scale", &gOptions.SSGIResolutionScale, 0.25f, 1.0f);
                         ImGui::SliderInt("Ray Count", &gOptions.SSGI_RAY_COUNT, 1, 20);
                         ImGui::SliderInt("Max Steps", &gOptions.SSGI_MAX_STEPS, 1, 64);
                         ImGui::SliderFloat("Max Distance", &gOptions.SSGI_MAX_DISTANCE, 1.0f, 1000.0f);

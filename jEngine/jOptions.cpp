@@ -38,7 +38,7 @@ jOptions::jOptions()
 	//SunDir = Vector(0.31f, -0.828f, -0.241f);
     SunDir = Vector(0.051f, -0.999f, -0.014f);
 	DirectionalLightColor = Vector(0.074f, 0.059f, 0.028f);
-	DirectionalLightIntensity = 30.0f;
+	DirectionalLightIntensity = 10.0f;
 	AnisoG = 0.15f;
 	EarthQuake = false;
 	FocalDistance = 5.0f;
@@ -48,11 +48,13 @@ jOptions::jOptions()
 	AOIntensity = 1.0f;
 	UseSSGI = true;
 	UseSSGITemporalAccumulation = true;
-	SSGIAccumBlendFactor = 0.9f;
+	ShowSSGIOnly = false;
+	SSGIAccumBlendFactor = 0.95f;  // Higher blend factor for more temporal smoothing
     SSGIIntensity = 3.0f;
-    SSGI_MAX_STEPS = 32;
+    SSGI_MAX_STEPS = 16;
     SSGI_MAX_DISTANCE = 100.0f;
-    SSGI_RAY_COUNT = 10;
+    SSGI_RAY_COUNT = 16;
+    SSGIResolutionScale = 0.5f;
 
     // SSGI Reprojection
     UseSSGIReprojection = true;
@@ -63,10 +65,10 @@ jOptions::jOptions()
     SSGIDenoiserKernelSize = 9;
     SSGIDenoiserKernelSigma = 2.5f;
     SSGIDenoiserBilateralKernelSigma = 0.01f;
-    SSGI_BlurQuality = 5;
+    SSGI_BlurQuality = 4;  // Reduced from 5 to balance noise vs edge preservation
 
     // SSGI A-Trous Denoising
-    SSGI_A_Trous_Sigma_Color = 1.0f;
+    SSGI_A_Trous_Sigma_Color = 2.0f;
     SSGI_A_Trous_Sigma_Normal = 0.5f;
     SSGI_A_Trous_Sigma_Depth = 5.0f;
 
