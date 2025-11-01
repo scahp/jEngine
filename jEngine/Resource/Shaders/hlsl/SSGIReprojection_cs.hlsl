@@ -8,7 +8,7 @@ struct CommonComputeUniformBuffer
     int Width;
     int Height;
     int FrameNumber;
-    float InvScaleToOriginBuffer;
+    float BlendFactor;
 };
 
 #if COMPUTE_SHADER
@@ -88,9 +88,16 @@ float4 SSGIReprojectionPS(VSOutput input) : SV_TARGET
     float2 OldUV = input.TexCoord - ScreenOffsetToPrevUV;
     
     float4 currentColor = CurrentTexture.Sample(TextureSampler, input.TexCoord);
+
+    // Avoid ghosting from outside to inside pixels
+    if (OldUV.x < 0 || OldUV.x > 1.0f || OldUV.y < 0 || OldUV.y > 1.0f)
+    {
+        return currentColor;
+    }
+
     float4 historyColor = HistoryBuffer.Sample(TextureSampler, OldUV);
     
-    float ReprojectionWeight = 0.9;
+    float ReprojectionWeight = ComputeCommon.BlendFactor;
 #if USE_DISCONTINUITY_WEIGHT
     float DiscontinuityWeight = abs(DepthBuffer.Sample(TextureSampler, input.TexCoord).x - HistoryDepthBuffer.Sample(TextureSampler, input.TexCoord).x) < 0.01;
     ReprojectionWeight *= DiscontinuityWeight;

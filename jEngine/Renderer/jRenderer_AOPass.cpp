@@ -1199,13 +1199,13 @@ void jRenderer::SSGIAccumulatePass()
             int32 Width;
             int32 Height;
             int32 FrameNumber;
-            float InvScaleToOriginBuffer;           // InvScale for HistoryBuffer, it will be always 1.0 when no scaling options(RTScale == 1).
+            float BlendFactor;
         };
         CommonComputeUniformBuffer CommonComputeData;
         CommonComputeData.Width = SSGI_Accum_RT_Dest->Info.Width;
         CommonComputeData.Height = SSGI_Accum_RT_Dest->Info.Height;
         CommonComputeData.FrameNumber = g_rhi->GetCurrentFrameNumber();
-        CommonComputeData.InvScaleToOriginBuffer = 1.0f / RTScale;
+        CommonComputeData.BlendFactor = gOptions.SSGIAccumBlendFactor;
 
         auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
             jNameStatic("ReprojectionSSGIUniformBuffer"), jLifeTimeType::OneFrame, sizeof(CommonComputeData)));
