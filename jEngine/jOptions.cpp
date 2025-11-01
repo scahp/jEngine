@@ -49,10 +49,10 @@ jOptions::jOptions()
 	UseSSGI = true;
 	UseSSGITemporalAccumulation = true;
 	ShowSSGIOnly = false;
-	SSGIAccumBlendFactor = 0.95f;  // Higher blend factor for more temporal smoothing
+	SSGIAccumBlendFactor = 0.98f;  // Higher blend factor for more temporal smoothing
     SSGIIntensity = 3.0f;
     SSGI_MAX_STEPS = 16;
-    SSGI_MAX_DISTANCE = 100.0f;
+    SSGI_MAX_DISTANCE = 50.0f;
     SSGI_RAY_COUNT = 16;
     SSGIResolutionScale = 0.5f;
 
@@ -65,12 +65,12 @@ jOptions::jOptions()
     SSGIDenoiserKernelSize = 9;
     SSGIDenoiserKernelSigma = 2.5f;
     SSGIDenoiserBilateralKernelSigma = 0.01f;
-    SSGI_BlurQuality = 4;  // Reduced from 5 to balance noise vs edge preservation
+    SSGI_BlurQuality = 3;  // Reduced from 5 to balance noise vs edge preservation
 
     // SSGI A-Trous Denoising
     SSGI_A_Trous_Sigma_Color = 2.0f;
     SSGI_A_Trous_Sigma_Normal = 0.5f;
-    SSGI_A_Trous_Sigma_Depth = 5.0f;
+    SSGI_A_Trous_Sigma_Depth = 2.5f;
 
     // AO
     Denoiser = EDenoiser::GAUSSIAN;
