@@ -77,6 +77,12 @@ void IRenderer::UIPass()
 
 				ImGui::Separator();
 				ImGui::Text("CameraPos : %.2f, %.2f, %.2f", gOptions.CameraPos.x, gOptions.CameraPos.y, gOptions.CameraPos.z);
+			auto mainCamera = jCamera::GetMainCamera();
+			if (mainCamera)
+			{
+				Vector cameraDir = mainCamera->GetForwardVector();
+				ImGui::Text("CameraDir : %.2f, %.2f, %.2f", cameraDir.x, cameraDir.y, cameraDir.z);
+			}
 
 				ImGui::Separator();
 				ImGui::TextColored(ImVec4(1, 1, 0, 1), "Directional Light");
@@ -236,9 +242,9 @@ void IRenderer::UIPass()
                             ImGui::EndDisabled();
                         ImGui::SliderFloat("Intensity", &gOptions.SSGIIntensity, 0.0f, 10.0f);
                         ImGui::SliderFloat("Resolution Scale", &gOptions.SSGIResolutionScale, 0.25f, 1.0f);
-                        ImGui::SliderInt("Ray Count", &gOptions.SSGI_RAY_COUNT, 1, 20);
-                        ImGui::SliderInt("Max Steps", &gOptions.SSGI_MAX_STEPS, 1, 64);
-                        ImGui::SliderFloat("Max Distance", &gOptions.SSGI_MAX_DISTANCE, 1.0f, 1000.0f);
+                        ImGui::SliderInt("Ray Count", &gOptions.SSGIRayCount, 1, 20);
+                        ImGui::SliderInt("Max Steps", &gOptions.SSGIMaxSteps, 1, 64);
+                        ImGui::SliderFloat("Max Distance", &gOptions.SSGIMaxDistance, 1.0f, 1000.0f);
                         ImGui::Unindent();
                     }
 
@@ -265,15 +271,15 @@ void IRenderer::UIPass()
                             gOptions.SSGIDenoiserKernelSize++;
                         ImGui::SliderFloat("KernelSigma", &gOptions.SSGIDenoiserKernelSigma, 0.1f, 30.0f);
                         ImGui::SliderFloat("BilateralSigma", &gOptions.SSGIDenoiserBilateralKernelSigma, 0.001f, 0.1f);
-                        ImGui::SliderInt("BlurQuality", &gOptions.SSGI_BlurQuality, 1, 5);
+                        ImGui::SliderInt("BlurQuality", &gOptions.SSGIBlurQuality, 1, 5);
                         ImGui::Unindent();
                     }
 					if (gOptions.SSGIDenoiser == EDenoiser::A_TROUS)
 					{
                         ImGui::Indent();
-                        ImGui::SliderFloat("Sigma_Color", &gOptions.SSGI_A_Trous_Sigma_Color, 0.0f, 10.0f);
-                        ImGui::SliderFloat("Sigma_Normal", &gOptions.SSGI_A_Trous_Sigma_Normal, 0.0f, 1.0f);
-						ImGui::SliderFloat("Sigma_Depth", &gOptions.SSGI_A_Trous_Sigma_Depth, 0.0f, 10.0f);
+                        ImGui::SliderFloat("Sigma_Color", &gOptions.SSGIATrousSigmaColor, 0.0f, 10.0f);
+                        ImGui::SliderFloat("Sigma_Normal", &gOptions.SSGIATrousSigmaNormal, 0.0f, 1.0f);
+						ImGui::SliderFloat("Sigma_Depth", &gOptions.SSGIATrousSigmaDepth, 0.0f, 10.0f);
                         ImGui::Unindent();
 					}
 					ImGui::EndTabItem();

@@ -170,9 +170,6 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 GroupID : SV_Gro
                 float3 L = -hitToReceiver;
                 float3 N = worldNormal;
 
-                // Use PBR function for physically accurate BRDF
-                //float3 contribution = PBR2(L, N, V, albedo, hitColor, distToHit * 0.01, metallic, roughness);
-
                 indirectLight += hitColor * visibility * distFalloff;
                 count += 1.0f;
                 break;

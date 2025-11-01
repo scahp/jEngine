@@ -57,9 +57,9 @@ struct jOptions
     bool ShowSSGIOnly;
     float SSGIAccumBlendFactor;
     float SSGIIntensity;
-    int32 SSGI_MAX_STEPS;
-    float SSGI_MAX_DISTANCE;
-    int32 SSGI_RAY_COUNT;
+    int32 SSGIMaxSteps;
+    float SSGIMaxDistance;
+    int32 SSGIRayCount;
     float SSGIResolutionScale;
 
     // SSGI Reprojection
@@ -71,12 +71,12 @@ struct jOptions
     int32 SSGIDenoiserKernelSize;
     float SSGIDenoiserKernelSigma;
     float SSGIDenoiserBilateralKernelSigma;
-    int32 SSGI_BlurQuality;
+    int32 SSGIBlurQuality;
 
     // SSGI A-Trous Denoising
-    float SSGI_A_Trous_Sigma_Color;
-    float SSGI_A_Trous_Sigma_Normal;
-    float SSGI_A_Trous_Sigma_Depth;
+    float SSGIATrousSigmaColor;
+    float SSGIATrousSigmaNormal;
+    float SSGIATrousSigmaDepth;
 
     // AO
     EDenoiser Denoiser;

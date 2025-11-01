@@ -1050,7 +1050,7 @@ void jRenderer::SSGIPass()
     const int32 RayRTHeight = (int32)(SCR_HEIGHT * RTScale);
 
     char eventName[128];
-    sprintf_s(eventName, "SSGIPass (Res:%.0f%%, RPP:%d)", RTScale * 100.0f, gOptions.SSGI_RAY_COUNT);
+    sprintf_s(eventName, "SSGIPass (Res:%.0f%%, RPP:%d)", RTScale * 100.0f, gOptions.SSGIRayCount);
     DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, eventName, Vector4(0.0f, 0.8f, 0.5f, 1.0f));
 
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
@@ -1102,10 +1102,10 @@ void jRenderer::SSGIPass()
     CommonComputeData.Width = SSGI_RT->Info.Width;
     CommonComputeData.Height = SSGI_RT->Info.Height;
     CommonComputeData.FrameNumber = (int32)g_rhi->GetCurrentFrameNumber();
-    CommonComputeData.SSGI_MaxSteps = gOptions.SSGI_MAX_STEPS;
+    CommonComputeData.SSGI_MaxSteps = gOptions.SSGIMaxSteps;
     CommonComputeData.CameraPos = Vector4(mainCamera->Pos, 0.0f);
-    CommonComputeData.SSGI_MaxDistance = gOptions.SSGI_MAX_DISTANCE;
-    CommonComputeData.SSGI_RayCount = gOptions.SSGI_RAY_COUNT;
+    CommonComputeData.SSGI_MaxDistance = gOptions.SSGIMaxDistance;
+    CommonComputeData.SSGI_RayCount = gOptions.SSGIRayCount;
     CommonComputeData.Padding0 = 0;
     CommonComputeData.Padding1 = 0;
     CommonComputeData.Padding2 = 0;
@@ -1645,15 +1645,15 @@ std::shared_ptr<jTexture> jRenderer::BlurSSGI(const std::shared_ptr<jRenderTarge
             Vector padding;
         };
 
-        for (int32 i = 0; i < gOptions.SSGI_BlurQuality; ++i)
+        for (int32 i = 0; i < gOptions.SSGIBlurQuality; ++i)
         {
             g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), CurrentInput.get());
 
             jATrousUniformBuffer UniformData;
             UniformData.g_StepSize = 1 << i;
-            UniformData.g_Sigma_Color = gOptions.SSGI_A_Trous_Sigma_Color;
-            UniformData.g_Sigma_Normal = gOptions.SSGI_A_Trous_Sigma_Normal;
-            UniformData.g_Sigma_Depth = gOptions.SSGI_A_Trous_Sigma_Depth;
+            UniformData.g_Sigma_Color = gOptions.SSGIATrousSigmaColor;
+            UniformData.g_Sigma_Normal = gOptions.SSGIATrousSigmaNormal;
+            UniformData.g_Sigma_Depth = gOptions.SSGIATrousSigmaDepth;
             UniformData.g_KernelSize = gOptions.SSGIDenoiserKernelSize;
 
             auto UniformBuffer = g_rhi->CreateUniformBufferBlock(jNameStatic("A_TrousUniformBuffer"), jLifeTimeType::OneFrame, sizeof(UniformData));
@@ -1700,7 +1700,7 @@ std::shared_ptr<jTexture> jRenderer::BlurSSGI(const std::shared_ptr<jRenderTarge
     }
     else if (gOptions.IsSSGIDenoiserGuassianSeparable())
     {
-        if (gOptions.SSGI_BlurQuality <= 0)
+        if (gOptions.SSGIBlurQuality <= 0)
             return InRenderTarget->GetTexturePtr();
 
         DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "BlurSSGI", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
@@ -1743,7 +1743,7 @@ std::shared_ptr<jTexture> jRenderer::BlurSSGI(const std::shared_ptr<jRenderTarge
 
         // Downsample
         std::shared_ptr<jRenderTarget> LastRT = BlurredResultRT;
-        for (int32 i = 0; i < gOptions.SSGI_BlurQuality; ++i)
+        for (int32 i = 0; i < gOptions.SSGIBlurQuality; ++i)
         {
             DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "SSGI Downsample", Vector4(0.8f, 0.5f, 0.0f, 1.0f));
             Vector2i NextSize(LastRT->Info.Width / 2, LastRT->Info.Height / 2);

@@ -72,8 +72,8 @@ void jGame::Setup()
 
 #if USE_SPONZA
 	// Create main camera
-    const Vector mainCameraPos(-559.937622f, 116.339653f, 84.3709946f);
-    const Vector mainCameraTarget(-260.303925f, 105.498116f, 94.4834976f);
+    const Vector mainCameraPos(1273.57f, 204.1f, 89.56f);
+    const Vector mainCameraTarget(Vector(1273.57f, 204.1f, 89.56f) + Vector(-0.96f, -0.01f, -0.26f));
     MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 10.0f, 5000.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT, true);
     jCamera::AddCamera(0, MainCamera);
 
