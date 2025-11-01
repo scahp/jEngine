@@ -83,7 +83,8 @@ cbuffer ComputeCommon : register(b5)
 
 float AOReprojectionPS(VSOutput input) : SV_TARGET
 {
-    float2 ScreenOffsetToPrevUV = (VelocityBuffer.Sample(TextureSampler, input.TexCoord).xy * float2(2.0, 2.0) - float2(1.0, 1.0));
+    //float2 ScreenOffsetToPrevUV = (VelocityBuffer.Sample(TextureSampler, input.TexCoord).xy * float2(2.0, 2.0) - float2(1.0, 1.0));
+    float2 ScreenOffsetToPrevUV = VelocityBuffer.Sample(TextureSampler, input.TexCoord).xy;
     float2 OldUV = input.TexCoord - ScreenOffsetToPrevUV;
     
     float currentColor = CurrentTexture.Sample(TextureSampler, input.TexCoord).x;

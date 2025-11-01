@@ -158,7 +158,8 @@ FSOutput main(VSOutput input
     ScreenPosUV = ScreenPosUV * float2(0.5, 0.5) + float2(0.5, 0.5);
     
     //float2 ScreenPosUV = (input.Pos.xy / ViewParam.ScreenRect.zw);
-    float2 Velocity = float2(ScreenPosUV - PrevScreenPosUV) * float2(0.5, 0.5) + float2(0.5, 0.5);
+    // float2 Velocity = float2(ScreenPosUV - PrevScreenPosUV) * float2(0.5, 0.5) + float2(0.5, 0.5);
+    float2 Velocity = float2(ScreenPosUV - PrevScreenPosUV);
     
     // Velcoity.xy : [0, 1]
     // Metallic, Roughness : [0, 1]
