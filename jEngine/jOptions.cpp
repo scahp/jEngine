@@ -50,7 +50,7 @@ jOptions::jOptions()
 	UseSSGITemporalAccumulation = true;
 	ShowSSGIOnly = false;
 	SSGIAccumBlendFactor = 0.98f;  // Higher blend factor for more temporal smoothing
-    SSGIIntensity = 3.0f;
+    SSGIIntensity = 15.0f;
     SSGIMaxSteps = 16;
     SSGIMaxDistance = 50.0f;
     SSGIRayCount = 16;
