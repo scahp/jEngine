@@ -36,7 +36,7 @@ Simple toy engine for implementing graphics feature with multiple api
 <img src="https://github.com/scahp/jEngine/assets/6734453/0490c447-f8fe-475d-8ffc-d6b92ddac619" width="90%"></img>
 
 8. SSGI : https://github.com/scahp/jEngine/tree/SSGI \
-<img src="https://github.com/user-attachments/assets/7273861a-1d26-458e-9b19-29b1982c93da" width="90%"></img>
+<img src="https://github.com/user-attachments/assets/2d338852-4f73-4d53-a524-a81860a562bd" width="90%"></img>
 
 
 <br/><br/>
