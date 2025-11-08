@@ -29,7 +29,7 @@ struct CommonComputeUniformBuffer
     float3 CameraPos;
     float SSGI_MaxDistance;
     int SSGI_RayCount;
-    int Padding0;
+    int UseAttenuation;
     int Padding1;
     int Padding2;
 };
@@ -165,12 +165,9 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 GroupID : SV_Gro
                 // Distance attenuation
                 float distToHit = length(hitWorldPos - worldPos);
                 float distFalloff = 1.0 - smoothstep(0.0, ComputeCommon.SSGI_MaxDistance, distToHit * 0.09);
-                // Apply PBR at receiver surface
-                // L: direction from receiver to light source (hit surface acts as area light)
-                float3 L = -hitToReceiver;
-                float3 N = worldNormal;
 
-                indirectLight += hitColor * visibility * distFalloff;
+                float attenuation = ComputeCommon.UseAttenuation ? (visibility * distFalloff) : 1.0;
+                indirectLight += hitColor * attenuation;
                 count += 1.0f;
                 break;
             }

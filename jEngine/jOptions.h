@@ -55,6 +55,7 @@ struct jOptions
     bool UseSSGI;
     bool UseSSGITemporalAccumulation;
     bool ShowSSGIOnly;
+    bool UseSSGIAttenuation;
     float SSGIAccumBlendFactor;
     float SSGIIntensity;
     int32 SSGIMaxSteps;
