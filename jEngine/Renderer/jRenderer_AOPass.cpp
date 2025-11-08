@@ -1084,7 +1084,7 @@ void jRenderer::SSGIPass()
         Vector CameraPos;
         float SSGI_MaxDistance;
         int32 SSGI_RayCount;
-        int32 Padding0;
+        int32 UseAttenuation;
         int32 Padding1;
         int32 Padding2;
     };
@@ -1106,7 +1106,7 @@ void jRenderer::SSGIPass()
     CommonComputeData.CameraPos = Vector4(mainCamera->Pos, 0.0f);
     CommonComputeData.SSGI_MaxDistance = gOptions.SSGIMaxDistance;
     CommonComputeData.SSGI_RayCount = gOptions.SSGIRayCount;
-    CommonComputeData.Padding0 = 0;
+    CommonComputeData.UseAttenuation = gOptions.UseSSGIAttenuation ? 1 : 0;
     CommonComputeData.Padding1 = 0;
     CommonComputeData.Padding2 = 0;
 

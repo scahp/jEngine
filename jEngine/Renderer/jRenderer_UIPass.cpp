@@ -479,6 +479,7 @@ void IRenderer::UIPass()
 						ImGui::Checkbox("UseDiscontinuityWeightForSSGI", &gOptions.UseDiscontinuityWeightForSSGI);
 						if (!gOptions.UseSSGIReprojection)
 							ImGui::EndDisabled();
+						ImGui::Checkbox("Apply attenuation", &gOptions.UseSSGIAttenuation);
 						ImGui::SliderFloat("Intensity", &gOptions.SSGIIntensity, 0.0f, 30.0f);
 						AddCopyPasteContextMenu("SSGIIntensityContext", gOptions.SSGIIntensity);
 						ImGui::SliderFloat("Resolution Scale", &gOptions.SSGIResolutionScale, 0.25f, 1.0f);
