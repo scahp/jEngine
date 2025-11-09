@@ -12,7 +12,15 @@ enum class EDenoiser : int32
     MAX
 };
 
+enum class EGIType : int32
+{
+    SSGI = 0,
+    IRRADIANCE_PROBES,
+    MAX
+};
+
 extern const char* GDenoisers[(int32)EDenoiser::MAX];
+extern const char* GGITypes[(int32)EGIType::MAX];
 extern const char* GAOResolution[3];
 extern const char* GWaitPrerequsiteGraphicsQueueTask[4];
 extern const char* GAOType[3];
@@ -52,6 +60,7 @@ struct jOptions
     float AORadius;
     float SSAOBias;
     float AOIntensity;
+    EGIType GIType;
     bool UseSSGI;
     bool UseSSGITemporalAccumulation;
     bool ShowSSGIOnly;

@@ -1007,13 +1007,16 @@ void jRenderer::Render()
 
     {
         AOPass();
-        SSGIPass();
-        SSGIAccumulatePass();
+        if (gOptions.GIType == EGIType::SSGI)
+        {
+            SSGIPass();
+            SSGIAccumulatePass();
+        }
         AtmosphericShadow();
     }
 
     // Apply SSGI
-    if (gOptions.UseSSGI && jSceneRenderTarget::SSGI_RT)
+    if (gOptions.GIType == EGIType::SSGI && gOptions.UseSSGI && jSceneRenderTarget::SSGI_RT)
     {
         DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "ApplySSGI", Vector4(0.0f, 0.5f, 0.8f, 1.0f));
 

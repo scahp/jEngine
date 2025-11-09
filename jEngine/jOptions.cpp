@@ -7,10 +7,12 @@ const char* gSelectedScene = nullptr;
 int32 gSelectedSceneIndex = 0;
 
 const char* GDenoisers[(int32)EDenoiser::MAX] = { "None", "Gaussian", "GaussianSeparable", "Bilateral", "BilateralPS", "A-Trous" };
+const char* GGITypes[(int32)EGIType::MAX] = { "SSGI", "Irradiance Probes" };
 const char* GAOResolution[3] = { "100", "75", "50" };
 extern const char* GAOType[3] = { "NoAO", "RTAO", "SSAO" };
 
 static_assert(_countof(GDenoisers) == (int32)EDenoiser::MAX, "EDenoiser count mismatch");
+static_assert(_countof(GGITypes) == (int32)EGIType::MAX, "EGIType count mismatch");
 
 jOptions gOptions;
 
@@ -46,6 +48,7 @@ jOptions::jOptions()
 	AORadius = 50.0f;
 	SSAOBias = AORadius / 20.0f;
 	AOIntensity = 1.0f;
+	GIType = EGIType::IRRADIANCE_PROBES;
 	UseSSGI = true;
 	UseSSGITemporalAccumulation = true;
 	ShowSSGIOnly = false;

@@ -458,81 +458,108 @@ void IRenderer::UIPass()
 					ImGui::EndTabItem();
 				}
 
-				if (ImGui::BeginTabItem("SSGI Options"))
+				if (ImGui::BeginTabItem("GI Options"))
 				{
-					ImGui::Checkbox("UseSSGI", &gOptions.UseSSGI);
-					if (gOptions.UseSSGI)
+					// GI Type selection
+					if (ImGui::BeginCombo("GI Type", GGITypes[(int32)gOptions.GIType], ImGuiComboFlags_None))
 					{
-						ImGui::Indent();
-						ImGui::Checkbox("Show SSGI Only", &gOptions.ShowSSGIOnly);
-						ImGui::Checkbox("Temporal Accumulation", &gOptions.UseSSGITemporalAccumulation);
-						if (gOptions.UseSSGITemporalAccumulation)
+						for (int32 i = 0; i < (int32)EGIType::MAX; ++i)
 						{
-							ImGui::Indent();
-							ImGui::SliderFloat("Blend Factor", &gOptions.SSGIAccumBlendFactor, 0.0f, 1.0f);
-							AddCopyPasteContextMenu("SSGIBlendFactorContext", gOptions.SSGIAccumBlendFactor);
-							ImGui::Unindent();
-						}
-						ImGui::Checkbox("UseSSGIReprojection", &gOptions.UseSSGIReprojection);
-						if (!gOptions.UseSSGIReprojection)
-							ImGui::BeginDisabled();
-						ImGui::Checkbox("UseDiscontinuityWeightForSSGI", &gOptions.UseDiscontinuityWeightForSSGI);
-						if (!gOptions.UseSSGIReprojection)
-							ImGui::EndDisabled();
-						ImGui::Checkbox("Apply attenuation", &gOptions.UseSSGIAttenuation);
-						ImGui::SliderFloat("Intensity", &gOptions.SSGIIntensity, 0.0f, 30.0f);
-						AddCopyPasteContextMenu("SSGIIntensityContext", gOptions.SSGIIntensity);
-						ImGui::SliderFloat("Resolution Scale", &gOptions.SSGIResolutionScale, 0.25f, 1.0f);
-						AddCopyPasteContextMenu("SSGIResolutionScaleContext", gOptions.SSGIResolutionScale);
-						ImGui::SliderInt("Ray Count", &gOptions.SSGIRayCount, 1, 20);
-						ImGui::SliderInt("Max Steps", &gOptions.SSGIMaxSteps, 1, 64);
-						ImGui::SliderFloat("Max Distance", &gOptions.SSGIMaxDistance, 1.0f, 1000.0f);
-						AddCopyPasteContextMenu("SSGIMaxDistanceContext", gOptions.SSGIMaxDistance);
-						ImGui::Unindent();
-					}
-
-					ImGui::Separator();
-					ImGui::TextColored(ImVec4(1, 1, 0, 1), "SSGI denosing");
-					if (ImGui::BeginCombo("SSGIDenoiser", gOptions.GetDenoiseName(gOptions.SSGIDenoiser), ImGuiComboFlags_None))
-					{
-						for (int32 i = 0; i < _countof(GDenoisers); ++i)
-						{
-							const bool is_selected = (gOptions.SSGIDenoiser == (EDenoiser)i);
-							if (ImGui::Selectable(GDenoisers[i], is_selected))
-								gOptions.SSGIDenoiser = (EDenoiser)i;
+							const bool is_selected = (gOptions.GIType == (EGIType)i);
+							if (ImGui::Selectable(GGITypes[i], is_selected))
+								gOptions.GIType = (EGIType)i;
 							if (is_selected)
 								ImGui::SetItemDefaultFocus();
 						}
 						ImGui::EndCombo();
 					}
 
-					if (gOptions.SSGIDenoiser != EDenoiser::NONE)
+					ImGui::Separator();
+
+					// SSGI Options
+					if (gOptions.GIType == EGIType::SSGI)
 					{
-						ImGui::Indent();
-						ImGui::SliderInt("KernelSize", &gOptions.SSGIDenoiserKernelSize, 1, 20);
-						if ((gOptions.SSGIDenoiserKernelSize % 2) == 0)
-							gOptions.SSGIDenoiserKernelSize++;
-						ImGui::SliderFloat("KernelSigma", &gOptions.SSGIDenoiserKernelSigma, 0.1f, 30.0f);
-						AddCopyPasteContextMenu("SSGIKernelSigmaContext", gOptions.SSGIDenoiserKernelSigma);
-						ImGui::SliderFloat("BilateralSigma", &gOptions.SSGIDenoiserBilateralKernelSigma, 0.001f, 0.1f);
-						AddCopyPasteContextMenu("SSGIBilateralSigmaContext", gOptions.SSGIDenoiserBilateralKernelSigma);
-						ImGui::SliderInt("BlurQuality", &gOptions.SSGIBlurQuality, 1, 5);
-						ImGui::Unindent();
+						ImGui::Checkbox("UseSSGI", &gOptions.UseSSGI);
+						if (gOptions.UseSSGI)
+						{
+							ImGui::Indent();
+							ImGui::Checkbox("Show SSGI Only", &gOptions.ShowSSGIOnly);
+							ImGui::Checkbox("Temporal Accumulation", &gOptions.UseSSGITemporalAccumulation);
+							if (gOptions.UseSSGITemporalAccumulation)
+							{
+								ImGui::Indent();
+								ImGui::SliderFloat("Blend Factor", &gOptions.SSGIAccumBlendFactor, 0.0f, 1.0f);
+								AddCopyPasteContextMenu("SSGIBlendFactorContext", gOptions.SSGIAccumBlendFactor);
+								ImGui::Unindent();
+							}
+							ImGui::Checkbox("UseSSGIReprojection", &gOptions.UseSSGIReprojection);
+							if (!gOptions.UseSSGIReprojection)
+								ImGui::BeginDisabled();
+							ImGui::Checkbox("UseDiscontinuityWeightForSSGI", &gOptions.UseDiscontinuityWeightForSSGI);
+							if (!gOptions.UseSSGIReprojection)
+								ImGui::EndDisabled();
+							ImGui::Checkbox("Apply attenuation", &gOptions.UseSSGIAttenuation);
+							ImGui::SliderFloat("Intensity", &gOptions.SSGIIntensity, 0.0f, 30.0f);
+							AddCopyPasteContextMenu("SSGIIntensityContext", gOptions.SSGIIntensity);
+							ImGui::SliderFloat("Resolution Scale", &gOptions.SSGIResolutionScale, 0.25f, 1.0f);
+							AddCopyPasteContextMenu("SSGIResolutionScaleContext", gOptions.SSGIResolutionScale);
+							ImGui::SliderInt("Ray Count", &gOptions.SSGIRayCount, 1, 20);
+							ImGui::SliderInt("Max Steps", &gOptions.SSGIMaxSteps, 1, 64);
+							ImGui::SliderFloat("Max Distance", &gOptions.SSGIMaxDistance, 1.0f, 1000.0f);
+							AddCopyPasteContextMenu("SSGIMaxDistanceContext", gOptions.SSGIMaxDistance);
+							ImGui::Unindent();
+						}
+
+						ImGui::Separator();
+						ImGui::TextColored(ImVec4(1, 1, 0, 1), "SSGI denosing");
+						if (ImGui::BeginCombo("SSGIDenoiser", gOptions.GetDenoiseName(gOptions.SSGIDenoiser), ImGuiComboFlags_None))
+						{
+							for (int32 i = 0; i < _countof(GDenoisers); ++i)
+							{
+								const bool is_selected = (gOptions.SSGIDenoiser == (EDenoiser)i);
+								if (ImGui::Selectable(GDenoisers[i], is_selected))
+									gOptions.SSGIDenoiser = (EDenoiser)i;
+								if (is_selected)
+									ImGui::SetItemDefaultFocus();
+							}
+							ImGui::EndCombo();
+						}
+
+						if (gOptions.SSGIDenoiser != EDenoiser::NONE)
+						{
+							ImGui::Indent();
+							ImGui::SliderInt("KernelSize", &gOptions.SSGIDenoiserKernelSize, 1, 20);
+							if ((gOptions.SSGIDenoiserKernelSize % 2) == 0)
+								gOptions.SSGIDenoiserKernelSize++;
+							ImGui::SliderFloat("KernelSigma", &gOptions.SSGIDenoiserKernelSigma, 0.1f, 30.0f);
+							AddCopyPasteContextMenu("SSGIKernelSigmaContext", gOptions.SSGIDenoiserKernelSigma);
+							ImGui::SliderFloat("BilateralSigma", &gOptions.SSGIDenoiserBilateralKernelSigma, 0.001f, 0.1f);
+							AddCopyPasteContextMenu("SSGIBilateralSigmaContext", gOptions.SSGIDenoiserBilateralKernelSigma);
+							ImGui::SliderInt("BlurQuality", &gOptions.SSGIBlurQuality, 1, 5);
+							ImGui::Unindent();
+						}
+						if (gOptions.SSGIDenoiser == EDenoiser::A_TROUS)
+						{
+							ImGui::Indent();
+							ImGui::SliderFloat("Sigma_Color", &gOptions.SSGIATrousSigmaColor, 0.0f, 10.0f);
+
+							AddCopyPasteContextMenu("SSGISigmaColorContext", gOptions.SSGIATrousSigmaColor);
+							ImGui::SliderFloat("Sigma_Normal", &gOptions.SSGIATrousSigmaNormal, 0.0f, 1.0f);
+
+							AddCopyPasteContextMenu("SSGISigmaNormalContext", gOptions.SSGIATrousSigmaNormal);
+							ImGui::SliderFloat("Sigma_Depth", &gOptions.SSGIATrousSigmaDepth, 0.0f, 10.0f);
+
+							AddCopyPasteContextMenu("SSGISigmaDepthContext", gOptions.SSGIATrousSigmaDepth);
+							ImGui::Unindent();
+						}
 					}
-					if (gOptions.SSGIDenoiser == EDenoiser::A_TROUS)
+					// Irradiance Probes Options
+					else if (gOptions.GIType == EGIType::IRRADIANCE_PROBES)
 					{
-						ImGui::Indent();
-						ImGui::SliderFloat("Sigma_Color", &gOptions.SSGIATrousSigmaColor, 0.0f, 10.0f);
-
-						AddCopyPasteContextMenu("SSGISigmaColorContext", gOptions.SSGIATrousSigmaColor);
-						ImGui::SliderFloat("Sigma_Normal", &gOptions.SSGIATrousSigmaNormal, 0.0f, 1.0f);
-
-						AddCopyPasteContextMenu("SSGISigmaNormalContext", gOptions.SSGIATrousSigmaNormal);
-						ImGui::SliderFloat("Sigma_Depth", &gOptions.SSGIATrousSigmaDepth, 0.0f, 10.0f);
-
-						AddCopyPasteContextMenu("SSGISigmaDepthContext", gOptions.SSGIATrousSigmaDepth);
-						ImGui::Unindent();
+						ImGui::TextColored(ImVec4(1, 1, 0, 1), "Irradiance Probes (Coming Soon)");
+						ImGui::Text("Irradiance Probes implementation is in progress.");
 					}
+
 					ImGui::EndTabItem();
 				}
 			}
