@@ -5,6 +5,8 @@
 #include "Math/Vector.h"
 #include "Core/TInstantStruct.h"
 
+template<typename E> constexpr int32 GetEnumMax(E) { return static_cast<int32>(E::MAX); }
+
 #define DECLARE_ENUM_BIT_OPERATORS(ENUM_TYPE)\
 FORCEINLINE constexpr ENUM_TYPE operator | (ENUM_TYPE lhs, ENUM_TYPE rhs)\
 {\
@@ -64,10 +66,13 @@ constexpr auto GenerateConversionTypeArray(T1... args)
 {
 	// std::pair 로 구성된 Parameter packs 의 첫번째 타입의 second_tpype 을 얻음
     using value_type = typename PacksType<T1...>::second_type;
+	using key_type = typename PacksType<T1...>::first_type;
+	constexpr int32 MaxEnum = GetEnumMax(key_type());
     
-	std::array<value_type, sizeof...(args)> newArray;
+	std::array<value_type, MaxEnum> newArray;
     auto AddElementFunc = [&newArray](const auto& arg)
     {
+		check(newArray.size() > (uint64)arg.first);
         newArray[(int64)arg.first] = arg.second;
     };
 
@@ -407,9 +412,10 @@ DECLARE_ENUM_WITH_CONVERT_TO_STRING(EFormatType, uint8,
 
 GENERATE_CONVERSION_FUNCTION(GetTexturePixelType,
     CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB8, EFormatType::UNSIGNED_BYTE),          // not support rgb8 -> rgba8
-    CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB32F, EFormatType::HALF),                 // not support rgb32 -> rgba32
     CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB16F, EFormatType::HALF),                 // not support rgb16 -> rgba16
+    CONVERSION_TYPE_ELEMENT(ETextureFormat::RGB32F, EFormatType::HALF),                 // not support rgb32 -> rgba32
     CONVERSION_TYPE_ELEMENT(ETextureFormat::R11G11B10F, EFormatType::HALF),
+	CONVERSION_TYPE_ELEMENT(ETextureFormat::R10G10B10A2, EFormatType::HALF),
     CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA8, EFormatType::UNSIGNED_BYTE),
     CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA16F, EFormatType::HALF),
     CONVERSION_TYPE_ELEMENT(ETextureFormat::RGBA32F, EFormatType::FLOAT),
@@ -420,6 +426,7 @@ GENERATE_CONVERSION_FUNCTION(GetTexturePixelType,
     CONVERSION_TYPE_ELEMENT(ETextureFormat::R16F, EFormatType::HALF),
     CONVERSION_TYPE_ELEMENT(ETextureFormat::R32F, EFormatType::FLOAT),
     CONVERSION_TYPE_ELEMENT(ETextureFormat::R8UI, EFormatType::INT),
+	CONVERSION_TYPE_ELEMENT(ETextureFormat::R16UI, EFormatType::INT),
     CONVERSION_TYPE_ELEMENT(ETextureFormat::R32UI, EFormatType::INT),
     CONVERSION_TYPE_ELEMENT(ETextureFormat::RG8, EFormatType::UNSIGNED_BYTE),
     CONVERSION_TYPE_ELEMENT(ETextureFormat::RG16F, EFormatType::HALF),

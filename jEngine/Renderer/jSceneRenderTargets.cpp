@@ -76,6 +76,17 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
     DepthRTInfo.IsMemoryless = gOptions.UseMemoryless;
     DepthPtr = jRenderTargetPool::GetRenderTarget(DepthRTInfo);
 
+    if (DepthPtr)
+    {
+        const int32 DepthWidth = DepthPtr->Info.Width;
+        const int32 DepthHeight = DepthPtr->Info.Height;
+        if (!jSceneRenderTarget::HistoryDepthBuffer || jSceneRenderTarget::HistoryDepthBuffer->Width != DepthWidth || jSceneRenderTarget::HistoryDepthBuffer->Height != DepthHeight)
+        {
+            jSceneRenderTarget::HistoryDepthBuffer = g_rhi->Create2DTexture((uint32)DepthWidth, (uint32)DepthHeight, (uint32)1, (uint32)1
+                , ETextureFormat::R16F, ETextureCreateFlag::UAV, EResourceLayout::UAV);
+        }
+    }
+
     jRenderTargetInfo LinearDepthRTInfo = { ETextureType::TEXTURE_2D, ETextureFormat::R32F, SCR_WIDTH, SCR_HEIGHT, 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0) };
     LinearDepthRTInfo.ResourceName = TEXT("LinearDepthPtr");
     LinearDepthRTInfo.TextureCreateFlag = ETextureCreateFlag::UAV;
