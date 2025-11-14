@@ -678,6 +678,54 @@ void jRenderer::SetupBasePass()
 #endif
 }
 
+void jRenderer::PrepareHistoryDepth()
+{
+    if (gOptions.HasAnyReprojection())
+    {
+        DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "CopyDepthBuffer", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
+        SCOPE_CPU_PROFILE(CopyDepthBuffer);
+        SCOPE_GPU_PROFILE(RenderFrameContextPtr, CopyDepthBuffer);
+
+        struct CommonComputeUniformBuffer
+        {
+            int32 Width;
+            int32 Height;
+            int32 Paading0;
+            float Padding1;
+        };
+        CommonComputeUniformBuffer CommonComputeData;
+        CommonComputeData.Width = jSceneRenderTarget::HistoryDepthBuffer->Width;
+        CommonComputeData.Height = jSceneRenderTarget::HistoryDepthBuffer->Height;
+
+        auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
+            jNameStatic("CopyCSOneFrameUniformBuffer"), jLifeTimeType::OneFrame, sizeof(CommonComputeData)));
+        OneFrameUniformBuffer->UpdateBufferData(&CommonComputeData, sizeof(CommonComputeData));
+
+        jRHIUtil::DispatchCompute(RenderFrameContextPtr, jSceneRenderTarget::HistoryDepthBuffer.get()
+        , [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
+        {
+            jTexture* InTexture = InRenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture();
+            g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InTexture, EResourceLayout::SHADER_READ_ONLY);
+
+            InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::COMPUTE
+                , InOutResourceInlineAllactor.Alloc<jTextureResource>(InTexture, nullptr)));
+
+            InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
+                , InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
+        }
+        , [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
+        {
+            jShaderInfo shaderInfo;
+            shaderInfo.SetName(jNameStatic("CopyCS"));
+            shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/copy_cs.hlsl"));
+            shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
+            jShader* Shader = g_rhi->CreateShader(shaderInfo);
+            return Shader;
+        }
+        );
+    }
+}
+
 void jRenderer::ShadowPass()
 {
 #if ASYNC_WITH_SETUP
@@ -1006,6 +1054,8 @@ void jRenderer::Render()
     }
 
     {
+        PrepareHistoryDepth();
+
         AOPass();
         SSGIPass();
         SSGIAccumulatePass();

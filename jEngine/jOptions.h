@@ -101,21 +101,22 @@ struct jOptions
     // Raytracing
     bool UseRaytracing;
 
-    bool IsDenoiserGuassian() const { return Denoiser == EDenoiser::GAUSSIAN; }
-    bool IsDenoiserGuassianSeparable() const { return Denoiser == EDenoiser::GAUSSIAN_SEPARABLE; }
-    bool IsDenoiserBilateral() const { return Denoiser == EDenoiser::BILATERAL; }
+    FORCEINLINE bool IsDenoiserGuassian() const { return Denoiser == EDenoiser::GAUSSIAN; }
+    FORCEINLINE bool IsDenoiserGuassianSeparable() const { return Denoiser == EDenoiser::GAUSSIAN_SEPARABLE; }
+    FORCEINLINE bool IsDenoiserBilateral() const { return Denoiser == EDenoiser::BILATERAL; }
 
-    bool IsSSGIDenoiserGuassian() const { return SSGIDenoiser == EDenoiser::GAUSSIAN; }
-    bool IsSSGIDenoiserGuassianSeparable() const { return SSGIDenoiser == EDenoiser::GAUSSIAN_SEPARABLE; }
-    bool IsSSGIDenoiserBilateral() const { return SSGIDenoiser == EDenoiser::BILATERAL; }
-    bool IsSSGIDenoiserBilateralPS() const { return SSGIDenoiser == EDenoiser::BILATERAL_PS; }
-    bool IsSSGIDenoise_A_Trous() const { return SSGIDenoiser == EDenoiser::A_TROUS; }
+    FORCEINLINE bool IsSSGIDenoiserGuassian() const { return SSGIDenoiser == EDenoiser::GAUSSIAN; }
+    FORCEINLINE bool IsSSGIDenoiserGuassianSeparable() const { return SSGIDenoiser == EDenoiser::GAUSSIAN_SEPARABLE; }
+    FORCEINLINE bool IsSSGIDenoiserBilateral() const { return SSGIDenoiser == EDenoiser::BILATERAL; }
+    FORCEINLINE bool IsSSGIDenoiserBilateralPS() const { return SSGIDenoiser == EDenoiser::BILATERAL_PS; }
+    FORCEINLINE bool IsSSGIDenoise_A_Trous() const { return SSGIDenoiser == EDenoiser::A_TROUS; }
+    FORCEINLINE bool HasAnyReprojection() const { return UseAOReprojection || UseSSGIReprojection; }
 
     const char* GetDenoiseName(EDenoiser InDenoiser) const;
 
-    int32 GetRTAOIndex() const { return 1; }
-    bool IsRTAO() const { return AOType == GetRTAOIndex(); }
-    bool IsSSAO() const { return AOType == 2; }
+    FORCEINLINE int32 GetRTAOIndex() const { return 1; }
+    FORCEINLINE bool IsRTAO() const { return AOType == GetRTAOIndex(); }
+    FORCEINLINE bool IsSSAO() const { return AOType == 2; }
 };
 
 extern jOptions gOptions;

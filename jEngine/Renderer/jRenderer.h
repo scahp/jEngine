@@ -78,6 +78,7 @@ public:
 
     void SetupShadowPass();
     void SetupBasePass();
+    void PrepareHistoryDepth();
 
     std::future<void> ShadowPassSetupCompleteEvent;
     std::future<void> BasePassSetupCompleteEvent;
