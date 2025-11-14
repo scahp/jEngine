@@ -93,49 +93,6 @@ std::shared_ptr<jTexture> ReprojectionAO(const std::shared_ptr<jRenderFrameConte
 						return g_rhi->CreateShader(shaderInfo);
 					});
 		}
-		{
-			DEBUG_EVENT_WITH_COLOR(InRenderFrameContextPtr, "CopyDepthBuffer", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
-			SCOPE_CPU_PROFILE(CopyDepthBuffer);
-			SCOPE_GPU_PROFILE(InRenderFrameContextPtr, CopyDepthBuffer);
-
-			struct CommonComputeUniformBuffer
-			{
-				int32 Width;
-				int32 Height;
-				int32 Paading0;
-				float Padding1;
-			};
-			CommonComputeUniformBuffer CommonComputeData;
-			CommonComputeData.Width = jSceneRenderTarget::HistoryDepthBuffer->Width;
-			CommonComputeData.Height = jSceneRenderTarget::HistoryDepthBuffer->Height;
-
-			auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
-				jNameStatic("CopyCSOneFrameUniformBuffer"), jLifeTimeType::OneFrame, sizeof(CommonComputeData)));
-			OneFrameUniformBuffer->UpdateBufferData(&CommonComputeData, sizeof(CommonComputeData));
-
-			jRHIUtil::DispatchCompute(InRenderFrameContextPtr, jSceneRenderTarget::HistoryDepthBuffer.get()
-				, [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
-				{
-					jTexture* InTexture = InRenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture();
-					g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InTexture, EResourceLayout::SHADER_READ_ONLY);
-
-					InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::COMPUTE
-						, InOutResourceInlineAllactor.Alloc<jTextureResource>(InTexture, nullptr)));
-
-					InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
-						, InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
-				}
-				, [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
-					{
-						jShaderInfo shaderInfo;
-						shaderInfo.SetName(jNameStatic("CopyCS"));
-						shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/copy_cs.hlsl"));
-						shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
-						jShader* Shader = g_rhi->CreateShader(shaderInfo);
-						return Shader;
-					}
-				);
-		}
 		return jSceneRenderTarget::AOProjection->GetTexturePtr();
 	}
 
@@ -577,16 +534,6 @@ std::shared_ptr<jTexture> jRenderer::RTAO()
 	{
 		jSceneRenderTarget::HistoryBuffer = g_rhi->Create2DTexture((uint32)RayRTWidth, (uint32)RayRTHeight, (uint32)1, (uint32)1
 			, ETextureFormat::R16F, ETextureCreateFlag::UAV, EResourceLayout::UAV);
-	}
-	if (RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr)
-	{
-		const int32 DepthWidth = RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->Info.Width;
-		const int32 DepthHeight = RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->Info.Height;
-		if (!jSceneRenderTarget::HistoryDepthBuffer || jSceneRenderTarget::HistoryDepthBuffer->Width != DepthWidth || jSceneRenderTarget::HistoryDepthBuffer->Height != DepthHeight)
-		{
-			jSceneRenderTarget::HistoryDepthBuffer = g_rhi->Create2DTexture((uint32)DepthWidth, (uint32)DepthHeight, (uint32)1, (uint32)1
-				, ETextureFormat::R16F, ETextureCreateFlag::UAV, EResourceLayout::UAV);
-		}
 	}
 
 	// 1. RTAO ray shoot
