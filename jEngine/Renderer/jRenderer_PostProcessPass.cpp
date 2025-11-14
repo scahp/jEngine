@@ -166,14 +166,34 @@ void jRenderer::PostProcess()
 			// Todo remove this hardcode
 			if (!g_EyeAdaptationARTPtr)
 			{
-				jRenderTargetInfo Info = { ETextureType::TEXTURE_2D, ETextureFormat::R16F, 1, 1, 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue::Invalid, (ETextureCreateFlag::RTV | ETextureCreateFlag::UAV) };
-				Info.ResourceName = TEXT("g_EyeAdaptationARTPtr");
+				jRenderTargetInfo Info = {
+					.Type = ETextureType::TEXTURE_2D,
+					.Format = ETextureFormat::R16F,
+					.Width = 1,
+					.Height = 1,
+					.LayerCount = 1,
+					.IsGenerateMipmap = false,
+					.SampleCount = g_rhi->GetSelectedMSAASamples(),
+					.RTClearValue = jRTClearValue::Invalid,
+					.TextureCreateFlag = (ETextureCreateFlag::RTV | ETextureCreateFlag::UAV),
+					.ResourceName = TEXT("g_EyeAdaptationARTPtr")
+				};
 				g_EyeAdaptationARTPtr = jRenderTargetPool::GetRenderTarget(Info);
 			}
 			if (!g_EyeAdaptationBRTPtr)
 			{
-				jRenderTargetInfo Info = { ETextureType::TEXTURE_2D, ETextureFormat::R16F, 1, 1, 1, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue::Invalid, (ETextureCreateFlag::RTV | ETextureCreateFlag::UAV) };
-				Info.ResourceName = TEXT("g_EyeAdaptationBRTPtr");
+				jRenderTargetInfo Info = {
+					.Type = ETextureType::TEXTURE_2D,
+					.Format = ETextureFormat::R16F,
+					.Width = 1,
+					.Height = 1,
+					.LayerCount = 1,
+					.IsGenerateMipmap = false,
+					.SampleCount = g_rhi->GetSelectedMSAASamples(),
+					.RTClearValue = jRTClearValue::Invalid,
+					.TextureCreateFlag = (ETextureCreateFlag::RTV | ETextureCreateFlag::UAV),
+					.ResourceName = TEXT("g_EyeAdaptationBRTPtr")
+				};
 				g_EyeAdaptationBRTPtr = jRenderTargetPool::GetRenderTarget(Info);
 			}
 

@@ -39,9 +39,20 @@ std::shared_ptr<jRenderTarget> ConvertToCubeMap(jName InDestFilePath, Vector2i I
     if (InDestTextureSize.y == 0)
         InDestTextureSize.y = InTwoMirrorBallSphereMap->Height;
 
-    static jRenderTargetInfo Info = { ETextureType::TEXTURE_CUBE, ETextureFormat::RGBA16F, InDestTextureSize.x, InDestTextureSize.y
-        , 6, true, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f), ETextureCreateFlag::RTV | ETextureCreateFlag::UAV, false, false };
-    Info.ResourceName = L"Cubemap";
+    static jRenderTargetInfo Info = {
+        .Type = ETextureType::TEXTURE_CUBE,
+        .Format = ETextureFormat::RGBA16F,
+        .Width = InDestTextureSize.x,
+        .Height = InDestTextureSize.y,
+        .LayerCount = 6,
+        .IsGenerateMipmap = true,
+        .SampleCount = g_rhi->GetSelectedMSAASamples(),
+        .IsUseAsSubpassInput = false,
+        .IsMemoryless = false,
+        .RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
+        .TextureCreateFlag = ETextureCreateFlag::RTV | ETextureCreateFlag::UAV,
+        .ResourceName = L"Cubemap"
+    };
     auto CubeMap = jRenderTargetPool::GetRenderTarget(Info);
     {
         DEBUG_EVENT(InRenderFrameContextPtr, "DrawCubemap");
@@ -163,9 +174,20 @@ std::shared_ptr<jRenderTarget> GenerateIrradianceMap(jName InDestFilePath, Vecto
     if (InDestTextureSize.y == 0)
         InDestTextureSize.y = InCubemap->Height;
 
-    static jRenderTargetInfo Info = { ETextureType::TEXTURE_CUBE, ETextureFormat::RGBA16F, InDestTextureSize.x, InDestTextureSize.y
-        , 6, false, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f), ETextureCreateFlag::RTV | ETextureCreateFlag::UAV, false, false };
-    Info.ResourceName = L"IrradianceMap";
+    static jRenderTargetInfo Info = {
+        .Type = ETextureType::TEXTURE_CUBE,
+        .Format = ETextureFormat::RGBA16F,
+        .Width = InDestTextureSize.x,
+        .Height = InDestTextureSize.y,
+        .LayerCount = 6,
+        .IsGenerateMipmap = false,
+        .SampleCount = g_rhi->GetSelectedMSAASamples(),
+        .IsUseAsSubpassInput = false,
+        .IsMemoryless = false,
+        .RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
+        .TextureCreateFlag = ETextureCreateFlag::RTV | ETextureCreateFlag::UAV,
+        .ResourceName = L"IrradianceMap"
+    };
     auto IrradianceMap = jRenderTargetPool::GetRenderTarget(Info);
     {
         DEBUG_EVENT(InRenderFrameContextPtr, "GenIrradianceMap");
@@ -278,9 +300,20 @@ std::shared_ptr<jRenderTarget> GenerateFilteredEnvironmentMap(jName InDestFilePa
     if (InDestTextureSize.y == 0)
         InDestTextureSize.y = InCubemap->Height;
 
-    static jRenderTargetInfo Info = { ETextureType::TEXTURE_CUBE, ETextureFormat::RGBA16F, InDestTextureSize.x, InDestTextureSize.y
-        , 6, true, g_rhi->GetSelectedMSAASamples(), jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f), ETextureCreateFlag::RTV | ETextureCreateFlag::UAV, false, false };
-    Info.ResourceName = L"FilteredEnvMap";
+    static jRenderTargetInfo Info = {
+        .Type = ETextureType::TEXTURE_CUBE,
+        .Format = ETextureFormat::RGBA16F,
+        .Width = InDestTextureSize.x,
+        .Height = InDestTextureSize.y,
+        .LayerCount = 6,
+        .IsGenerateMipmap = true,
+        .SampleCount = g_rhi->GetSelectedMSAASamples(),
+        .IsUseAsSubpassInput = false,
+        .IsMemoryless = false,
+        .RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
+        .TextureCreateFlag = ETextureCreateFlag::RTV | ETextureCreateFlag::UAV,
+        .ResourceName = L"FilteredEnvMap"
+    };
     auto FilteredEnvMap = jRenderTargetPool::GetRenderTarget(Info);
     {
         DEBUG_EVENT(InRenderFrameContextPtr, "GenFilteredEnvMap");

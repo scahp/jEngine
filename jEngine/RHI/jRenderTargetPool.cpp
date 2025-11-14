@@ -12,7 +12,13 @@ bool jRenderTargetPool::PreventReturnRenderTarget = false;
 
 struct jTexture* jRenderTargetPool::GetNullTexture(ETextureType type)
 {
-	static std::shared_ptr<jRenderTarget> RTPtr = jRenderTargetPool::GetRenderTarget({ type, ETextureFormat::RGBA8, 2, 2, 1 });
+	static std::shared_ptr<jRenderTarget> RTPtr = jRenderTargetPool::GetRenderTarget({
+		.Type = type,
+		.Format = ETextureFormat::RGBA8,
+		.Width = 2,
+		.Height = 2,
+		.LayerCount = 1
+	});
 	return RTPtr->GetTexture();
 }
 

@@ -400,8 +400,17 @@ std::shared_ptr<jTexture> jRenderer::SSAO()
     SCOPE_GPU_PROFILE(RenderFrameContextPtr, SSAO);
     DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "SSAO", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
 
-	auto SSAO_RT = jRenderTargetPool::GetRenderTargetForOneFrame({ ETextureType::TEXTURE_2D, ETextureFormat::R16F, RayRTWidth, RayRTHeight, 1, false, EMSAASamples::COUNT_1
-			, jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f), ETextureCreateFlag::UAV });
+	auto SSAO_RT = jRenderTargetPool::GetRenderTargetForOneFrame({
+		.Type = ETextureType::TEXTURE_2D,
+		.Format = ETextureFormat::R16F,
+		.Width = RayRTWidth,
+		.Height = RayRTHeight,
+		.LayerCount = 1,
+		.IsGenerateMipmap = false,
+		.SampleCount = EMSAASamples::COUNT_1,
+		.RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
+		.TextureCreateFlag = ETextureCreateFlag::UAV
+	});
 
 	// 1. SSAO
     struct CommonComputeUniformBuffer
@@ -527,8 +536,17 @@ std::shared_ptr<jTexture> jRenderer::RTAO()
 	// Create Persistent Resources
 	if (!jSceneRenderTarget::AOProjection || jSceneRenderTarget::AOProjection->Info.Width != (int32)RayRTWidth || jSceneRenderTarget::AOProjection->Info.Height != (int32)RayRTHeight)
 	{
-		jSceneRenderTarget::AOProjection = g_rhi->CreateRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::R16F, RayRTWidth, RayRTHeight, 1, false, g_rhi->GetSelectedMSAASamples()
-			, jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f), ETextureCreateFlag::UAV });
+		jSceneRenderTarget::AOProjection = g_rhi->CreateRenderTarget({
+			.Type = ETextureType::TEXTURE_2D,
+			.Format = ETextureFormat::R16F,
+			.Width = RayRTWidth,
+			.Height = RayRTHeight,
+			.LayerCount = 1,
+			.IsGenerateMipmap = false,
+			.SampleCount = g_rhi->GetSelectedMSAASamples(),
+			.RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
+			.TextureCreateFlag = ETextureCreateFlag::UAV
+		});
 	}
 	if (!jSceneRenderTarget::HistoryBuffer || jSceneRenderTarget::HistoryBuffer->Width != (int32)RayRTWidth || jSceneRenderTarget::HistoryBuffer->Height != (int32)RayRTHeight)
 	{
@@ -1005,14 +1023,32 @@ void jRenderer::SSGIPass()
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::ALBEDO)->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::VELOCITY)->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
 
-    auto SSGI_RT = jRenderTargetPool::GetRenderTargetForOneFrame({ ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, RayRTWidth, RayRTHeight, 1, false, EMSAASamples::COUNT_1
-            , jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f), ETextureCreateFlag::UAV });
+    auto SSGI_RT = jRenderTargetPool::GetRenderTargetForOneFrame({
+		.Type = ETextureType::TEXTURE_2D,
+		.Format = ETextureFormat::RGBA16F,
+		.Width = RayRTWidth,
+		.Height = RayRTHeight,
+		.LayerCount = 1,
+		.IsGenerateMipmap = false,
+		.SampleCount = EMSAASamples::COUNT_1,
+		.RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
+		.TextureCreateFlag = ETextureCreateFlag::UAV
+	});
 	jSceneRenderTarget::SSGI_RT = SSGI_RT;
     
     if (!jSceneRenderTarget::GIProjection || jSceneRenderTarget::GIProjection->Info.Width != RayRTWidth || jSceneRenderTarget::GIProjection->Info.Height != RayRTHeight)
     {
-        jSceneRenderTarget::GIProjection = jRenderTargetPool::GetRenderTarget({ ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, RayRTWidth, RayRTHeight, 1, false, EMSAASamples::COUNT_1
-            , jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f), ETextureCreateFlag::UAV });
+        jSceneRenderTarget::GIProjection = jRenderTargetPool::GetRenderTarget({
+			.Type = ETextureType::TEXTURE_2D,
+			.Format = ETextureFormat::RGBA16F,
+			.Width = RayRTWidth,
+			.Height = RayRTHeight,
+			.LayerCount = 1,
+			.IsGenerateMipmap = false,
+			.SampleCount = EMSAASamples::COUNT_1,
+			.RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
+			.TextureCreateFlag = ETextureCreateFlag::UAV
+		});
     }
 
     struct CommonComputeUniformBuffer
@@ -1124,8 +1160,18 @@ void jRenderer::SSGIAccumulatePass()
 
     if (!jSceneRenderTarget::SSGI_Accum_RT[0] || jSceneRenderTarget::SSGI_Accum_RT[0]->Info.Width != RayRTWidth || jSceneRenderTarget::SSGI_Accum_RT[0]->Info.Height != RayRTHeight)
     {
-        jRenderTargetInfo Info = { ETextureType::TEXTURE_2D, ETextureFormat::RGBA16F, RayRTWidth, RayRTHeight, 1, false, EMSAASamples::COUNT_1, jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f), ETextureCreateFlag::UAV };
-        Info.ResourceName = L"SSGI_Accum_0";
+        jRenderTargetInfo Info = {
+            .Type = ETextureType::TEXTURE_2D,
+            .Format = ETextureFormat::RGBA16F,
+            .Width = RayRTWidth,
+            .Height = RayRTHeight,
+            .LayerCount = 1,
+            .IsGenerateMipmap = false,
+            .SampleCount = EMSAASamples::COUNT_1,
+            .RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
+            .TextureCreateFlag = ETextureCreateFlag::UAV,
+            .ResourceName = L"SSGI_Accum_0"
+        };
         jSceneRenderTarget::SSGI_Accum_RT[0] = g_rhi->CreateRenderTarget(Info);
         Info.ResourceName = L"SSGI_Accum_1";
         jSceneRenderTarget::SSGI_Accum_RT[1] = g_rhi->CreateRenderTarget(Info);
@@ -1317,10 +1363,28 @@ std::shared_ptr<jRenderTarget> SeparableGaussianBlur(const std::shared_ptr<jRend
         jNameStatic("CommonComputeUniformBuffer"), jLifeTimeType::OneFrame, sizeof(CommonComputeData)));
     OneFrameUniformBuffer->UpdateBufferData(&CommonComputeData, sizeof(CommonComputeData));
 
-    auto GaussianV = jRenderTargetPool::GetRenderTargetForOneFrame({ ETextureType::TEXTURE_2D, InTexture->Format, InTexture->Width, InTexture->Height, 1, false, EMSAASamples::COUNT_1
-            , jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f), ETextureCreateFlag::UAV });
-    auto GaussianH = jRenderTargetPool::GetRenderTargetForOneFrame({ ETextureType::TEXTURE_2D, InTexture->Format, InTexture->Width, InTexture->Height, 1, false, EMSAASamples::COUNT_1
-            , jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f), ETextureCreateFlag::UAV });
+    auto GaussianV = jRenderTargetPool::GetRenderTargetForOneFrame({
+		.Type = ETextureType::TEXTURE_2D,
+		.Format = InTexture->Format,
+		.Width = InTexture->Width,
+		.Height = InTexture->Height,
+		.LayerCount = 1,
+		.IsGenerateMipmap = false,
+		.SampleCount = EMSAASamples::COUNT_1,
+		.RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
+		.TextureCreateFlag = ETextureCreateFlag::UAV
+	});
+    auto GaussianH = jRenderTargetPool::GetRenderTargetForOneFrame({
+		.Type = ETextureType::TEXTURE_2D,
+		.Format = InTexture->Format,
+		.Width = InTexture->Width,
+		.Height = InTexture->Height,
+		.LayerCount = 1,
+		.IsGenerateMipmap = false,
+		.SampleCount = EMSAASamples::COUNT_1,
+		.RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
+		.TextureCreateFlag = ETextureCreateFlag::UAV
+	});
 
     g_rhi->UAVBarrier(InRenderFrameContextPtr->GetActiveCommandBuffer(), InTexture.get());
     {
@@ -1656,8 +1720,17 @@ std::shared_ptr<jTexture> jRenderer::BlurSSGI(const std::shared_ptr<jRenderTarge
 
         auto Downsample = [&](std::shared_ptr<jRenderTarget> InRT, const Vector2i& InSize) -> std::shared_ptr<jRenderTarget>
         {
-            auto DownsampleRT = jRenderTargetPool::GetRenderTargetForOneFrame({ ETextureType::TEXTURE_2D, InRT->Info.Format, InSize.x, InSize.y, 1, false, EMSAASamples::COUNT_1
-                , jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f), ETextureCreateFlag::UAV });
+            auto DownsampleRT = jRenderTargetPool::GetRenderTargetForOneFrame({
+				.Type = ETextureType::TEXTURE_2D,
+				.Format = InRT->Info.Format,
+				.Width = InSize.x,
+				.Height = InSize.y,
+				.LayerCount = 1,
+				.IsGenerateMipmap = false,
+				.SampleCount = EMSAASamples::COUNT_1,
+				.RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
+				.TextureCreateFlag = ETextureCreateFlag::UAV
+			});
             jRHIUtil::DrawQuad(RenderFrameContextPtr, DownsampleRT, { 0, 0, InSize.x, InSize.y },
                 [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
                 {
