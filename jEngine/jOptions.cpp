@@ -51,10 +51,10 @@ jOptions::jOptions()
 	ShowSSGIOnly = false;
 	UseSSGIAttenuation = false;
 	SSGIAccumBlendFactor = 0.98f;  // Higher blend factor for more temporal smoothing
-    SSGIIntensity = 5.0f;
-    SSGIMaxSteps = 16;
+    SSGIIntensity = 25.0f;
+    SSGIMaxSteps = 4;
     SSGIMaxDistance = 50.0f;
-    SSGIRayCount = 16;
+    SSGIRayCount = 4;
     SSGIResolutionScale = 0.5f;
 
     // SSGI Reprojection
