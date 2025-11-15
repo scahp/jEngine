@@ -3,6 +3,9 @@
 #include "jDrawCommand.h"
 
 class jView;
+class jLightTree;
+class jLightcutSelector;
+class jLightcutEvaluator;
 struct jSceneRenderTarget;
 struct jRenderFrameContext;
 
@@ -90,4 +93,26 @@ public:
 
     // Thread per task for PassSetup
     const int32 MaxPassSetupTaskPerThreadCount = 100;
+
+    //////////////////////////////////////////////////////////////////////////
+    // Lightcuts
+    //////////////////////////////////////////////////////////////////////////
+
+    // Light tree for Lightcuts (built once per frame or when lights change)
+    jLightTree* LightTree = nullptr;
+
+    // Lightcut selector (computes adaptive cuts)
+    jLightcutSelector* LightcutSelector = nullptr;
+
+    // Lightcut evaluator (evaluates lighting from cuts)
+    jLightcutEvaluator* LightcutEvaluator = nullptr;
+
+    // Helper: Setup Lightcuts system (called once)
+    void SetupLightcuts();
+
+    // Helper: Build light tree from current lights
+    void BuildLightTree();
+
+    // Helper: Deferred light pass using Lightcuts
+    void DeferredLightPass_Lightcuts(jRenderPass* InRenderPass);
 };

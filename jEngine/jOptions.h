@@ -101,6 +101,14 @@ struct jOptions
     // Raytracing
     bool UseRaytracing;
 
+    // Lightcuts
+    bool UseLightcuts;
+    float LightcutErrorRatio;
+    int32 LightcutMaxCutSize;
+    bool LightcutTraceShadows;
+    bool LightcutShowDebug;
+    int32 LightcutDebugMode;
+
     FORCEINLINE bool IsDenoiserGuassian() const { return Denoiser == EDenoiser::GAUSSIAN; }
     FORCEINLINE bool IsDenoiserGuassianSeparable() const { return Denoiser == EDenoiser::GAUSSIAN_SEPARABLE; }
     FORCEINLINE bool IsDenoiserBilateral() const { return Denoiser == EDenoiser::BILATERAL; }

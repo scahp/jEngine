@@ -166,6 +166,13 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClInclude Include="Renderer\jPointLightDrawCommandGenerator.h" />
     <ClInclude Include="Renderer\jRenderer.h" />
     <ClInclude Include="Renderer\jRenderer_PathTracing.h" />
+    <ClInclude Include="Renderer\Lightcuts\jLightcutTypes.h" />
+    <ClInclude Include="Renderer\Lightcuts\jLightTreeNode.h" />
+    <ClInclude Include="Renderer\Lightcuts\jLightTree.h" />
+    <ClInclude Include="Renderer\Lightcuts\jErrorBound.h" />
+    <ClInclude Include="Renderer\Lightcuts\jLightcut.h" />
+    <ClInclude Include="Renderer\Lightcuts\jLightcutSelector.h" />
+    <ClInclude Include="Renderer\Lightcuts\jLightcutEvaluator.h" />
     <ClInclude Include="Renderer\jSceneRenderTargets.h" />
     <ClInclude Include="Renderer\jSpotLightDrawCommandGenerator.h" />
     <ClInclude Include="RHI\DX12\jBufferUtil_DX12.h" />
@@ -382,6 +389,12 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClCompile Include="Renderer\jRenderer_PathTracing.cpp" />
     <ClCompile Include="Renderer\jRenderer_PostProcessPass.cpp" />
     <ClCompile Include="Renderer\jRenderer_UIPass.cpp" />
+    <ClCompile Include="Renderer\Lightcuts\jLightcutTypes.cpp" />
+    <ClCompile Include="Renderer\Lightcuts\jLightTreeNode.cpp" />
+    <ClCompile Include="Renderer\Lightcuts\jLightTree.cpp" />
+    <ClCompile Include="Renderer\Lightcuts\jErrorBound.cpp" />
+    <ClCompile Include="Renderer\Lightcuts\jLightcutSelector.cpp" />
+    <ClCompile Include="Renderer\Lightcuts\jLightcutEvaluator.cpp" />
     <ClCompile Include="Renderer\jSceneRenderTargets.cpp" />
     <ClCompile Include="Renderer\jSpotLightDrawCommandGenerator.cpp" />
     <ClCompile Include="RHI\DX12\jBufferUtil_DX12.cpp" />

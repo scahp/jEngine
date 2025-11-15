@@ -94,6 +94,14 @@ jOptions::jOptions()
 
 	// Raytracing
 	UseRaytracing = true;
+
+	// Lightcuts
+	UseLightcuts = false;                     // Default: off (enable when ready)
+	LightcutErrorRatio = 0.02f;               // 2% error (from paper)
+	LightcutMaxCutSize = 1000;                // Max 1000 nodes per cut
+	LightcutTraceShadows = false;             // Phase 4: shadow rays
+	LightcutShowDebug = false;                // Debug visualization off
+	LightcutDebugMode = 0;                    // ELightcutDebugMode::None
 }
 
 

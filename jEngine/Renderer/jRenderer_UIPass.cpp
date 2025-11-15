@@ -448,6 +448,53 @@ void IRenderer::UIPass()
                 ImGui::EndTabItem();
             }
 
+			// Lightcuts Tab
+			if (ImGui::BeginTabItem("Lightcuts"))
+			{
+				ImGui::Checkbox("Enable Lightcuts", &gOptions.UseLightcuts);
+
+				if (gOptions.UseLightcuts)
+				{
+					ImGui::Indent();
+
+					// Error ratio slider
+					ImGui::SliderFloat("Error Ratio", &gOptions.LightcutErrorRatio, 0.001f, 0.1f, "%.3f");
+					AddCopyPasteContextMenu("LightcutErrorRatioContext", gOptions.LightcutErrorRatio);
+					ImGui::Text("2%% = 0.02 (paper default)");
+
+					// Max cut size slider
+					ImGui::SliderInt("Max Cut Size", &gOptions.LightcutMaxCutSize, 100, 2000);
+					ImGui::Text("Maximum nodes per lightcut");
+
+					// Shadow rays checkbox
+					ImGui::Checkbox("Trace Shadows", &gOptions.LightcutTraceShadows);
+					ImGui::Text("Enable shadow ray tracing (Phase 5)");
+
+					// Debug visualization
+					ImGui::Separator();
+					ImGui::Checkbox("Show Debug Info", &gOptions.LightcutShowDebug);
+
+					if (gOptions.LightcutShowDebug)
+					{
+						ImGui::Indent();
+						const char* debugModes[] = {
+							"None",
+							"Cut Size",
+							"Error Bound",
+							"Shadow Rays",
+							"Tree Depth",
+							"Cluster Bounds"
+						};
+						ImGui::Combo("Debug Mode", &gOptions.LightcutDebugMode, debugModes, IM_ARRAYSIZE(debugModes));
+						ImGui::Unindent();
+					}
+
+					ImGui::Unindent();
+				}
+
+				ImGui::EndTabItem();
+			}
+
 			if (GSupportRaytracing)
 			{
 				if (ImGui::BeginTabItem("AO Options"))

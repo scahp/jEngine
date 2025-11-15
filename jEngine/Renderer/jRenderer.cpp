@@ -21,6 +21,9 @@
 #include "jRenderer.h"
 #include "jSceneRenderTargets.h"
 #include "jSpotLightDrawCommandGenerator.h"
+#include "Lightcuts/jLightTree.h"
+#include "Lightcuts/jLightcutSelector.h"
+#include "Lightcuts/jLightcutEvaluator.h"
 
 #define ASYNC_WITH_SETUP 0
 #define PARALLELFOR_WITH_PASSSETUP 0
@@ -257,6 +260,12 @@ void jRenderer::Setup()
     jRenderer::SetupShadowPass();
     jRenderer::SetupBasePass();
 #endif
+
+    // Setup Lightcuts if enabled
+    if (gOptions.UseLightcuts)
+    {
+        jRenderer::SetupLightcuts();
+    }
 
     if (g_rhi->RaytracingScene && g_rhi->RaytracingScene->ShouldUpdate())
     {
@@ -887,6 +896,28 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
     SCOPE_GPU_PROFILE(RenderFrameContextPtr, LightingPass);
     DEBUG_EVENT(RenderFrameContextPtr, "LightingPass");
 
+    // Use Lightcuts path if enabled
+    if (gOptions.UseLightcuts && LightTree && LightTree->IsBuilt())
+    {
+        // Setup render targets for Lightcuts
+        if (!gOptions.UseSubpass)
+        {
+            g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
+            g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::DEPTH_STENCIL_READ_ONLY);
+            for (int32 i = 0; i < _countof(RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer); ++i)
+            {
+                g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[i]->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+            }
+        }
+
+        // Lightcuts rendering path
+        DeferredLightPass_Lightcuts(InRenderPass);
+
+        // Note: For Phase 4, Lightcuts is placeholder
+        // Fall through to naive rendering for now
+    }
+
+    // Naive rendering path (original code)
     if (!gOptions.UseSubpass)
     {
         g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
@@ -1202,4 +1233,97 @@ void jRenderer::Render()
 
     DebugPasses();
     UIPass();
+}
+
+//////////////////////////////////////////////////////////////////////////
+// Lightcuts Implementation
+//////////////////////////////////////////////////////////////////////////
+
+void jRenderer::SetupLightcuts()
+{
+	SCOPE_CPU_PROFILE(SetupLightcuts);
+
+	// Create Lightcuts components if needed
+	if (!LightTree)
+	{
+		LightTree = new jLightTree();
+	}
+	if (!LightcutSelector)
+	{
+		LightcutSelector = new jLightcutSelector();
+	}
+	if (!LightcutEvaluator)
+	{
+		LightcutEvaluator = new jLightcutEvaluator();
+	}
+
+	// Build light tree from current lights
+	BuildLightTree();
+}
+
+void jRenderer::BuildLightTree()
+{
+	SCOPE_CPU_PROFILE(BuildLightTree);
+	DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "BuildLightTree", Vector4(0.5f, 0.8f, 0.0f, 1.0f));
+
+	if (!LightTree || View.Lights.empty())
+		return;
+
+	// Extract jLight pointers from View.Lights
+	std::vector<jLight*> lights;
+	lights.reserve(View.Lights.size());
+	for (const auto& viewLight : View.Lights)
+	{
+		if (viewLight.Light)
+		{
+			lights.push_back(viewLight.Light);
+		}
+	}
+
+	if (lights.empty())
+		return;
+
+	// Build tree with default options
+	jLightTreeBuildOptions buildOptions;
+	buildOptions.SpatialDirectionalScale = 100.0f;  // Scene scale dependent
+	buildOptions.RandomizeRepresentative = true;
+
+	LightTree->Build(lights, buildOptions);
+
+	// JLOG("Lightcuts: Built tree with %d lights", LightTree->GetNumLights());
+}
+
+void jRenderer::DeferredLightPass_Lightcuts(jRenderPass* InRenderPass)
+{
+	SCOPE_CPU_PROFILE(LightingPass_Lightcuts);
+	SCOPE_GPU_PROFILE(RenderFrameContextPtr, LightingPass_Lightcuts);
+	DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "LightingPass_Lightcuts", Vector4(0.0f, 0.8f, 0.5f, 1.0f));
+
+	if (!LightTree || !LightTree->IsBuilt())
+	{
+		// JLOG("Lightcuts: Tree not built, fallback to naive");
+		return;
+	}
+
+	if (!LightcutSelector || !LightcutEvaluator)
+	{
+		// JLOG("Lightcuts: Components not initialized");
+		return;
+	}
+
+	// TODO: Implement GPU-based Lightcuts evaluation
+	// For Phase 4, we'll use a compute shader approach
+	// For now, log a placeholder message
+
+	// JLOG("Lightcuts: Rendering with %d lights via adaptive cuts", LightTree->GetNumLights());
+
+	// Phase 4 placeholder:
+	// In Phase 5-6, we'll implement:
+	// 1. Compute shader that reads GBuffer
+	// 2. For each pixel, compute lightcut using jLightcutSelector
+	// 3. Evaluate lightcut using jLightcutEvaluator
+	// 4. Write result to ColorPtr
+
+	// For now, fall back to naive rendering
+	// This ensures the system works even with Lightcuts enabled
 }
