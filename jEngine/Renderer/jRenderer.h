@@ -107,6 +107,9 @@ public:
     // Lightcut evaluator (evaluates lighting from cuts)
     jLightcutEvaluator* LightcutEvaluator = nullptr;
 
+    // Statistics tracking
+    struct jLightcutStats* LightcutStats = nullptr;
+
     // Helper: Setup Lightcuts system (called once)
     void SetupLightcuts();
 

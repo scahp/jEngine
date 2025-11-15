@@ -24,6 +24,7 @@
 #include "Lightcuts/jLightTree.h"
 #include "Lightcuts/jLightcutSelector.h"
 #include "Lightcuts/jLightcutEvaluator.h"
+#include "Lightcuts/jLightcutTypes.h"
 
 #define ASYNC_WITH_SETUP 0
 #define PARALLELFOR_WITH_PASSSETUP 0
@@ -1256,6 +1257,11 @@ void jRenderer::SetupLightcuts()
 	{
 		LightcutEvaluator = new jLightcutEvaluator();
 	}
+	if (!LightcutStats)
+	{
+		LightcutStats = new jLightcutStats();
+		LightcutStats->Reset();
+	}
 
 	// Build light tree from current lights
 	BuildLightTree();
@@ -1329,21 +1335,19 @@ void jRenderer::DeferredLightPass_Lightcuts(jRenderPass* InRenderPass)
 		gOptions.LightcutMaxCutSize
 	);
 
-	// Log cut size periodically for statistics
-	static int frameCount = 0;
-	if ((frameCount++ % 60) == 0)  // Every 60 frames
+	// Update statistics
+	if (LightcutStats)
 	{
-		int cutSize = static_cast<int>(lightcut.Nodes.size());
-		int totalLights = LightTree->GetNumLights();
-		float reduction = (totalLights > 0) ? 100.0f * (1.0f - (float)cutSize / (float)totalLights) : 0.0f;
-		(void)cutSize;
-		(void)totalLights;
-		(void)reduction;
-		// Stats: cutSize nodes / totalLights lights (reduction% reduction)
+		LightcutStats->TotalLights = LightTree->GetNumLights();
+		LightcutStats->UpdateCutSize(static_cast<int32>(lightcut.Nodes.size()));
+		LightcutStats->LightTreeMemoryBytes = LightTree->GetMemoryUsage();
+
+		// Update shadow rays (currently 0 since we don't trace shadows in Phase 5)
+		LightcutStats->UpdateShadowRays(0);
 	}
 
-	// Phase 5 Note:
-	// This demonstrates that Lightcuts algorithm works correctly
-	// For production rendering, this logic would be in GPU shader
-	// See Lightcuts_cs.hlsl for GPU implementation outline
+	// Phase 5-6 Note:
+	// - Phase 5: CPU-based lightcut computation for validation
+	// - Phase 6: Statistics collection and display
+	// - Future: GPU compute shader implementation (see Lightcuts_cs.hlsl)
 }

@@ -5,6 +5,10 @@
 #include "jOptions.h"
 #include "Scene/Light/jLight.h"
 #include "Scene/Light/jDirectionalLight.h"
+#include "Lightcuts/jLightcutTypes.h"
+
+// Global pointer for accessing renderer stats in UI lambda
+static jRenderer* g_RendererForUI = nullptr;
 
 // Helper functions for Copy/Paste context menus
 namespace
@@ -158,6 +162,10 @@ namespace
 void IRenderer::UIPass()
 {
 	check(g_ImGUI);
+
+	// Store renderer pointer for UI access
+	g_RendererForUI = dynamic_cast<jRenderer*>(this);
+
 	g_ImGUI->NewFrame([]()
 	{
 		Vector4 clear_color(0.45f, 0.55f, 0.60f, 1.00f);
@@ -469,6 +477,36 @@ void IRenderer::UIPass()
 					// Shadow rays checkbox
 					ImGui::Checkbox("Trace Shadows", &gOptions.LightcutTraceShadows);
 					ImGui::Text("Enable shadow ray tracing (Phase 5)");
+
+					// Statistics display
+					ImGui::Separator();
+					ImGui::Text("Statistics:");
+					ImGui::Indent();
+
+					// Get stats from global renderer pointer
+					if (g_RendererForUI && g_RendererForUI->LightcutStats)
+					{
+						const auto& stats = *g_RendererForUI->LightcutStats;
+
+						ImGui::Text("Total Lights: %d", stats.TotalLights);
+						ImGui::Text("Avg Cut Size: %.1f", stats.AvgCutSize);
+						ImGui::Text("Min/Max Cut: %d / %d", stats.MinCutSize, stats.MaxCutSize);
+
+						if (stats.TotalLights > 0)
+						{
+							float reduction = 100.0f * (1.0f - stats.AvgCutSize / (float)stats.TotalLights);
+							ImGui::Text("Reduction: %.1f%%", reduction);
+						}
+
+						ImGui::Text("Tree Memory: %.2f KB", stats.LightTreeMemoryBytes / 1024.0f);
+						ImGui::Text("Shadow Rays/Pixel: %.1f", stats.AvgShadowRaysPerPixel);
+					}
+					else
+					{
+						ImGui::TextDisabled("(Statistics not available)");
+					}
+
+					ImGui::Unindent();
 
 					// Debug visualization
 					ImGui::Separator();
