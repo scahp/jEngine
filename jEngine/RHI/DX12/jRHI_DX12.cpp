@@ -498,7 +498,7 @@ bool jRHI_DX12::InitRHI()
 
         auto streamParam = std::make_shared<jStreamParam<jFaceInstanceData>>();
         streamParam->BufferType = EBufferType::STATIC;
-        streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::UINT32, sizeof(uint32)));
+        streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::UINT32, .Stride=sizeof(uint32)});
         streamParam->Stride = sizeof(jFaceInstanceData);
         //streamParam->Name = jName("LayerIndex");
         streamParam->Name = jName("BLENDINDICES");

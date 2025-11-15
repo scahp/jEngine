@@ -81,9 +81,14 @@ void jImGUI_DX12::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrame
 	g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), image->TexturePtr.get(), EResourceLayout::COLOR_ATTACHMENT);
 
     auto BackBuffer = std::make_shared<jRenderTarget>(image->TexturePtr);
-    jAttachment color = jAttachment(BackBuffer, EAttachmentLoadStoreOp::LOAD_STORE
-        , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor
-        , BackBuffer->GetLayout(), EResourceLayout::COLOR_ATTACHMENT);
+    jAttachment color = {
+        .RenderTargetPtr = BackBuffer,
+        .LoadStoreOp = EAttachmentLoadStoreOp::LOAD_STORE,
+        .StencilLoadStoreOp = EAttachmentLoadStoreOp::DONTCARE_DONTCARE,
+        .RTClearValue = ClearColor,
+        .InitialLayout = BackBuffer->GetLayout(),
+        .FinalLayout = EResourceLayout::COLOR_ATTACHMENT
+    };
     renderPassInfo.Attachments.push_back(color);
     UIRenderPass = (jRenderPass_Vulkan*)g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
 

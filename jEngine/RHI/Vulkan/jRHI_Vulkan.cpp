@@ -568,7 +568,7 @@ bool jRHI_Vulkan::InitRHI()
 
         auto streamParam = std::make_shared<jStreamParam<jFaceInstanceData>>();
         streamParam->BufferType = EBufferType::STATIC;
-        streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::UINT16, sizeof(uint16)));
+        streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::UINT16, .Stride=sizeof(uint16)});
         streamParam->Stride = sizeof(jFaceInstanceData);
         streamParam->Name = jName("InstanceData");
         streamParam->Data.resize(6);

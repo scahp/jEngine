@@ -9,12 +9,6 @@ struct jRenderFrameContext;
 // Light 별로 렌더링할 정보들을 갖고 있는 객체
 struct jShadowDrawInfo
 {
-    jShadowDrawInfo() = default;
-    jShadowDrawInfo(const jViewLight& InViewLight)
-    {
-        ViewLight = InViewLight;
-    }
-
     const jViewLight& GetViewLight() const
     {
         return ViewLight;

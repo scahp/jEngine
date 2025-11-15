@@ -201,8 +201,14 @@ void jRenderer::AtmosphericShadow()
         const jRTClearValue ClearDepth = jRTClearValue(1.0f, 0);
 
         jRenderPassInfo renderPassInfo;
-        jAttachment color = jAttachment(RT, EAttachmentLoadStoreOp::LOAD_STORE
-            , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, RT->GetLayout(), EResourceLayout::COLOR_ATTACHMENT);
+        jAttachment color = {
+            .RenderTargetPtr = RT,
+            .LoadStoreOp = EAttachmentLoadStoreOp::LOAD_STORE,
+            .StencilLoadStoreOp = EAttachmentLoadStoreOp::DONTCARE_DONTCARE,
+            .RTClearValue = ClearColor,
+            .InitialLayout = RT->GetLayout(),
+            .FinalLayout = EResourceLayout::COLOR_ATTACHMENT
+        };
         renderPassInfo.Attachments.push_back(color);
 
         jSubpass subpass;

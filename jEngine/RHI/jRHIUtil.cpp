@@ -509,8 +509,14 @@ void DrawQuad(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPt
 	const jRTClearValue ClearDepth = jRTClearValue(1.0f, 0);
 
 	jRenderPassInfo renderPassInfo;
-	jAttachment color = jAttachment(InRenderTargetPtr, EAttachmentLoadStoreOp::LOAD_STORE
-		, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, InRenderTargetPtr->GetLayout(), EResourceLayout::COLOR_ATTACHMENT);
+	jAttachment color = {
+		.RenderTargetPtr = InRenderTargetPtr,
+		.LoadStoreOp = EAttachmentLoadStoreOp::LOAD_STORE,
+		.StencilLoadStoreOp = EAttachmentLoadStoreOp::DONTCARE_DONTCARE,
+		.RTClearValue = ClearColor,
+		.InitialLayout = InRenderTargetPtr->GetLayout(),
+		.FinalLayout = EResourceLayout::COLOR_ATTACHMENT
+	};
 	renderPassInfo.Attachments.push_back(color);
 
 	jSubpass subpass;

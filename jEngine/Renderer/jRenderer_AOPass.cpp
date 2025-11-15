@@ -716,9 +716,9 @@ std::shared_ptr<jTexture> jRenderer::RTAO()
 
 				auto Material = RObj->MaterialPtr ? RObj->MaterialPtr : GDefaultMaterial;
 				check(Material);
-				AlbedoTextures.push_back(jTextureResourceBindless::jTextureBindData(Material->GetTexture<jTexture>(jMaterial::EMaterialTextureType::Albedo), nullptr));
-				NormalTextures.push_back(jTextureResourceBindless::jTextureBindData(Material->GetTexture<jTexture>(jMaterial::EMaterialTextureType::Normal), nullptr));
-				MetallicTextures.push_back(jTextureResourceBindless::jTextureBindData(Material->GetTexture<jTexture>(jMaterial::EMaterialTextureType::Metallic), nullptr));
+                AlbedoTextures.push_back({.Texture = Material->GetTexture<jTexture>(jMaterial::EMaterialTextureType::Albedo), .SamplerState = nullptr});
+                NormalTextures.push_back({.Texture = Material->GetTexture<jTexture>(jMaterial::EMaterialTextureType::Normal), .SamplerState = nullptr});
+				MetallicTextures.push_back({.Texture = Material->GetTexture<jTexture>(jMaterial::EMaterialTextureType::Metallic), .SamplerState = nullptr});
 			}
 			BindlessShaderBindingArray[2].Add(jShaderBinding::CreateBindless(0, (uint32)VertexAndInexOffsetBuffers.size(), EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
 				ResourceInlineAllactor.Alloc<jBufferResourceBindless>(VertexAndInexOffsetBuffers), false));

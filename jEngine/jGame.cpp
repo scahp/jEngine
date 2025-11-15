@@ -783,8 +783,8 @@ void jGame::SpawnInstancingPrimitives()
 
         auto streamParam = std::make_shared<jStreamParam<jInstanceData>>();
         streamParam->BufferType = EBufferType::STATIC;
-        streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(Vector4)));
-        streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(Vector)));
+        streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(Vector4)});
+        streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(Vector)});
         streamParam->Stride = sizeof(jInstanceData);
         streamParam->Name = jName("InstanceData");
         streamParam->Data.resize(100);
@@ -836,8 +836,8 @@ void jGame::SpawnIndirectDrawPrimitives()
 
         auto streamParam = std::make_shared<jStreamParam<jInstanceData>>();
         streamParam->BufferType = EBufferType::STATIC;
-        streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(Vector4)));
-        streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(Vector)));
+        streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(Vector4)});
+        streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(Vector)});
         streamParam->Stride = sizeof(jInstanceData);
         streamParam->Name = jName("InstanceData");
         streamParam->Data.resize(100);

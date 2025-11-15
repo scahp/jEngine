@@ -3,13 +3,6 @@
 
 struct jFrameBufferInfo
 {
-    jFrameBufferInfo() = default;
-    jFrameBufferInfo(ETextureType textureType, ETextureFormat format, int32 width, int32 height, int32 layerCount = 1
-        , bool isGenerateMipmap = false, int32 sampleCount = 1)
-        : TextureType(textureType), Format(format), Width(width), Height(height), LayerCount(layerCount)
-        , IsGenerateMipmap(isGenerateMipmap), SampleCount(sampleCount)
-    {}
-
     size_t GetHash() const
     {
 		return GETHASH_FROM_INSTANT_STRUCT(TextureType, Format, Width, Height, LayerCount, IsGenerateMipmap, SampleCount);

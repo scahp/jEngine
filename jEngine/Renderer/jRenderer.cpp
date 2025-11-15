@@ -78,18 +78,29 @@ void IRenderer::DebugPasses()
 		const jRTClearValue ClearColor = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f);
 		const jRTClearValue ClearDepth = jRTClearValue(1.0f, 0);
 
-		jAttachment depth = jAttachment(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr, EAttachmentLoadStoreOp::LOAD_DONTCARE
-			, EAttachmentLoadStoreOp::LOAD_DONTCARE, ClearDepth
-			, RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetLayout(), EResourceLayout::DEPTH_STENCIL_ATTACHMENT);
+		jAttachment depth = {
+			.RenderTargetPtr = RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr,
+			.LoadStoreOp = EAttachmentLoadStoreOp::LOAD_DONTCARE,
+			.StencilLoadStoreOp = EAttachmentLoadStoreOp::LOAD_DONTCARE,
+			.RTClearValue = ClearDepth,
+			.InitialLayout = RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetLayout(),
+			.FinalLayout = EResourceLayout::DEPTH_STENCIL_ATTACHMENT
+		};
 		jAttachment resolve;
 
 		if (RenderFrameContextPtr->UseForwardRenderer)
 		{
 			if ((int32)g_rhi->GetSelectedMSAASamples() > 1)
 			{
-				resolve = jAttachment(RenderFrameContextPtr->SceneRenderTargetPtr->ResolvePtr, EAttachmentLoadStoreOp::DONTCARE_STORE
-					, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor
-					, EResourceLayout::UNDEFINED, EResourceLayout::COLOR_ATTACHMENT, true);
+				resolve = {
+					.RenderTargetPtr = RenderFrameContextPtr->SceneRenderTargetPtr->ResolvePtr,
+					.LoadStoreOp = EAttachmentLoadStoreOp::DONTCARE_STORE,
+					.StencilLoadStoreOp = EAttachmentLoadStoreOp::DONTCARE_DONTCARE,
+					.RTClearValue = ClearColor,
+					.InitialLayout = EResourceLayout::UNDEFINED,
+					.FinalLayout = EResourceLayout::COLOR_ATTACHMENT,
+					.bResolveAttachment = true
+				};
 			}
 		}
 
@@ -99,9 +110,14 @@ void IRenderer::DebugPasses()
 
 		//if (UseForwardRenderer || gOptions.UseSubpass)
 		{
-			jAttachment color = jAttachment(RenderFrameContextPtr->SceneRenderTargetPtr->FinalColorPtr, EAttachmentLoadStoreOp::LOAD_STORE
-				, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor
-				, RenderFrameContextPtr->SceneRenderTargetPtr->FinalColorPtr->GetLayout(), EResourceLayout::COLOR_ATTACHMENT);
+			jAttachment color = {
+				.RenderTargetPtr = RenderFrameContextPtr->SceneRenderTargetPtr->FinalColorPtr,
+				.LoadStoreOp = EAttachmentLoadStoreOp::LOAD_STORE,
+				.StencilLoadStoreOp = EAttachmentLoadStoreOp::DONTCARE_DONTCARE,
+				.RTClearValue = ClearColor,
+				.InitialLayout = RenderFrameContextPtr->SceneRenderTargetPtr->FinalColorPtr->GetLayout(),
+				.FinalLayout = EResourceLayout::COLOR_ATTACHMENT
+			};
 			renderPassInfo.Attachments.push_back(color);
 		}
 
@@ -290,8 +306,14 @@ void jRenderer::SetupShadowPass()
         {
             const jRTClearValue ClearDepth = IsUseReverseZShadow ? jRTClearValue(0.0f, 0) : jRTClearValue(1.0f, 0);
 
-            jAttachment depth = jAttachment(ViewLight.ShadowMapPtr, EAttachmentLoadStoreOp::CLEAR_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE
-                , ClearDepth, EResourceLayout::UNDEFINED, EResourceLayout::DEPTH_STENCIL_ATTACHMENT);
+            jAttachment depth = {
+                .RenderTargetPtr = ViewLight.ShadowMapPtr,
+                .LoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE,
+                .StencilLoadStoreOp = EAttachmentLoadStoreOp::DONTCARE_DONTCARE,
+                .RTClearValue = ClearDepth,
+                .InitialLayout = EResourceLayout::UNDEFINED,
+                .FinalLayout = EResourceLayout::DEPTH_STENCIL_ATTACHMENT
+            };
 
             // Setup attachment
             jRenderPassInfo renderPassInfo;
@@ -445,18 +467,29 @@ void jRenderer::SetupBasePass()
     const jRTClearValue ClearColor = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f);
     const jRTClearValue ClearDepth = jRTClearValue(1.0f, 0);
 
-    jAttachment depth = jAttachment(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr, EAttachmentLoadStoreOp::CLEAR_STORE
-        , EAttachmentLoadStoreOp::CLEAR_STORE, ClearDepth
-        , EResourceLayout::UNDEFINED, EResourceLayout::DEPTH_STENCIL_ATTACHMENT);
+    jAttachment depth = {
+        .RenderTargetPtr = RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr,
+        .LoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE,
+        .StencilLoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE,
+        .RTClearValue = ClearDepth,
+        .InitialLayout = EResourceLayout::UNDEFINED,
+        .FinalLayout = EResourceLayout::DEPTH_STENCIL_ATTACHMENT
+    };
     jAttachment resolve;
 
     if (RenderFrameContextPtr->UseForwardRenderer)
     {
         if ((int32)g_rhi->GetSelectedMSAASamples() > 1)
         {
-            resolve = jAttachment(RenderFrameContextPtr->SceneRenderTargetPtr->ResolvePtr, EAttachmentLoadStoreOp::DONTCARE_STORE
-                , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor
-                , EResourceLayout::UNDEFINED, EResourceLayout::COLOR_ATTACHMENT, true);
+            resolve = {
+                .RenderTargetPtr = RenderFrameContextPtr->SceneRenderTargetPtr->ResolvePtr,
+                .LoadStoreOp = EAttachmentLoadStoreOp::DONTCARE_STORE,
+                .StencilLoadStoreOp = EAttachmentLoadStoreOp::DONTCARE_DONTCARE,
+                .RTClearValue = ClearColor,
+                .InitialLayout = EResourceLayout::UNDEFINED,
+                .FinalLayout = EResourceLayout::COLOR_ATTACHMENT,
+                .bResolveAttachment = true
+            };
         }
     }
 
@@ -466,9 +499,14 @@ void jRenderer::SetupBasePass()
     {
         for (int32 i = 0; i < _countof(RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer); ++i)
         {
-            jAttachment color = jAttachment(RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[i], EAttachmentLoadStoreOp::CLEAR_STORE
-                , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor
-                , EResourceLayout::UNDEFINED, EResourceLayout::COLOR_ATTACHMENT);
+            jAttachment color = {
+                .RenderTargetPtr = RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[i],
+                .LoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE,
+                .StencilLoadStoreOp = EAttachmentLoadStoreOp::DONTCARE_DONTCARE,
+                .RTClearValue = ClearColor,
+                .InitialLayout = EResourceLayout::UNDEFINED,
+                .FinalLayout = EResourceLayout::COLOR_ATTACHMENT
+            };
             renderPassInfo.Attachments.push_back(color);
         }
     }
@@ -477,9 +515,14 @@ void jRenderer::SetupBasePass()
 
     if (RenderFrameContextPtr->UseForwardRenderer || gOptions.UseSubpass)
     {
-        jAttachment color = jAttachment(RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr, EAttachmentLoadStoreOp::CLEAR_STORE
-            , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor
-            , RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetLayout(), EResourceLayout::COLOR_ATTACHMENT);
+        jAttachment color = {
+            .RenderTargetPtr = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr,
+            .LoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE,
+            .StencilLoadStoreOp = EAttachmentLoadStoreOp::DONTCARE_DONTCARE,
+            .RTClearValue = ClearColor,
+            .InitialLayout = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetLayout(),
+            .FinalLayout = EResourceLayout::COLOR_ATTACHMENT
+        };
         renderPassInfo.Attachments.push_back(color);
     }
 
@@ -891,15 +934,25 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
             const jRTClearValue ClearColor = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f);
             const jRTClearValue ClearDepth = jRTClearValue(1.0f, 0);
 
-            jAttachment depth = jAttachment(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr, EAttachmentLoadStoreOp::LOAD_STORE
-                , EAttachmentLoadStoreOp::LOAD_DONTCARE, ClearDepth
-                , RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetLayout(), EResourceLayout::DEPTH_STENCIL_READ_ONLY);
+            jAttachment depth = {
+                .RenderTargetPtr = RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr,
+                .LoadStoreOp = EAttachmentLoadStoreOp::LOAD_STORE,
+                .StencilLoadStoreOp = EAttachmentLoadStoreOp::LOAD_DONTCARE,
+                .RTClearValue = ClearDepth,
+                .InitialLayout = RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetLayout(),
+                .FinalLayout = EResourceLayout::DEPTH_STENCIL_READ_ONLY
+            };
 
             // Setup attachment
             jRenderPassInfo renderPassInfo;
-            jAttachment color = jAttachment(RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr, EAttachmentLoadStoreOp::CLEAR_STORE
-                , EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor
-                , RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetLayout(), EResourceLayout::COLOR_ATTACHMENT);
+            jAttachment color = {
+                .RenderTargetPtr = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr,
+                .LoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE,
+                .StencilLoadStoreOp = EAttachmentLoadStoreOp::DONTCARE_DONTCARE,
+                .RTClearValue = ClearColor,
+                .InitialLayout = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetLayout(),
+                .FinalLayout = EResourceLayout::COLOR_ATTACHMENT
+            };
             renderPassInfo.Attachments.push_back(color);
 
             const int32 DepthAttachmentIndex = (int32)renderPassInfo.Attachments.size();

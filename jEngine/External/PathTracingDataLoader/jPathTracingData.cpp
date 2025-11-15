@@ -136,7 +136,7 @@ void jPathTracingLoadData::CreateSceneFor_jEngine(jGame* InGame)
 
             auto streamParam = new jStreamParam<uint32>();
             streamParam->BufferType = EBufferType::STATIC;
-            streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::UINT32, sizeof(int32) * 3));
+            streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::UINT32, .Stride=sizeof(int32) * 3});
             streamParam->Name = jName("Index");
             streamParam->Data.resize(indices.size());
             streamParam->Stride = sizeof(uint32) * 3;
@@ -158,7 +158,7 @@ void jPathTracingLoadData::CreateSceneFor_jEngine(jGame* InGame)
 
             auto streamParam = new jStreamParam<uint16>();
             streamParam->BufferType = EBufferType::STATIC;
-            streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::UINT16, sizeof(uint16) * 3));
+            streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::UINT16, .Stride=sizeof(uint16) * 3});
             streamParam->Name = jName("Index");
             streamParam->Data.resize(indices.size());
             streamParam->Stride = sizeof(uint16) * 3;

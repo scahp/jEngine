@@ -384,7 +384,7 @@ jBoundBoxObject* CreateBoundBox(jBoundBox boundBox, jObject* ownerObject, const 
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 3});
 		streamParam->Stride = sizeof(float) * 3;
 		streamParam->Name = jName("POSITION");
 		streamParam->Data.resize(elementCount * 3);
@@ -467,7 +467,7 @@ jBoundSphereObject* CreateBoundSphere(jBoundSphere boundSphere, jObject* ownerOb
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 3});
 		streamParam->Stride = sizeof(float) * 3;
 		streamParam->Name = jName("POSITION");
 		streamParam->Data.resize(vertices.size());
@@ -512,7 +512,7 @@ jBoundSphereObject* CreateBoundSphere(jBoundSphere boundSphere, jObject* ownerOb
 	{
 		auto streamParam = new jStreamParam<uint32>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::UINT32, sizeof(uint32) * 3));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::UINT32, .Stride=sizeof(uint32) * 3});
 		streamParam->Stride = sizeof(uint32) * 3;
 		streamParam->Name = jName("Index");
 		streamParam->Data.resize(faces.size());
@@ -614,7 +614,7 @@ jRenderObject* CreateQuad_Internal(const Vector& pos, const Vector& size, const 
 	auto positionOnlyVertexStreamData = std::make_shared<jVertexStreamData>();
 	{
 		auto streamParam = std::make_shared<jStreamParam<jPositionOnlyVertex>>();
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("POSITION"), EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Attributes.push_back({.Name = jNameStatic("POSITION"), .UnderlyingType = EBufferElementType::FLOAT, .Stride = sizeof(float) * 3});
 		streamParam->Name = jName("jPositionOnlyVertex");
 		streamParam->Stride = sizeof(jPositionOnlyVertex);
 		streamParam->Data.swap(verticesPositionOnly);
@@ -628,11 +628,11 @@ jRenderObject* CreateQuad_Internal(const Vector& pos, const Vector& size, const 
 	auto vertexStreamData = std::make_shared<jVertexStreamData>();
 	{
 		auto streamParam = std::make_shared<jStreamParam<jBaseVertex>>();
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("POSITION"), EBufferElementType::FLOAT, sizeof(float) * 3));
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("NORMAL"), EBufferElementType::FLOAT, sizeof(float) * 3));
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("TANGENT"), EBufferElementType::FLOAT, sizeof(float) * 3));
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("BITANGENT"), EBufferElementType::FLOAT, sizeof(float) * 3));
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("TEXCOORD"), EBufferElementType::FLOAT, sizeof(float) * 2));
+		streamParam->Attributes.push_back({.Name = jNameStatic("POSITION"), .UnderlyingType = EBufferElementType::FLOAT, .Stride = sizeof(float) * 3});
+		streamParam->Attributes.push_back({.Name = jNameStatic("NORMAL"), .UnderlyingType = EBufferElementType::FLOAT, .Stride = sizeof(float) * 3});
+		streamParam->Attributes.push_back({.Name = jNameStatic("TANGENT"), .UnderlyingType = EBufferElementType::FLOAT, .Stride = sizeof(float) * 3});
+		streamParam->Attributes.push_back({.Name = jNameStatic("BITANGENT"), .UnderlyingType = EBufferElementType::FLOAT, .Stride = sizeof(float) * 3});
+		streamParam->Attributes.push_back({.Name = jNameStatic("TEXCOORD"), .UnderlyingType = EBufferElementType::FLOAT, .Stride = sizeof(float) * 2});
 		streamParam->Name = jName("jBaseVertex");
 		streamParam->Stride = sizeof(jBaseVertex);
 		streamParam->Data.swap(vertices);
@@ -647,7 +647,7 @@ jRenderObject* CreateQuad_Internal(const Vector& pos, const Vector& size, const 
 	{
 		auto streamParam = new jStreamParam<uint32>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::UINT32, sizeof(int32) * 3));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::UINT32, .Stride=sizeof(int32) * 3});
 		streamParam->Stride = sizeof(uint32) * 3;
 		streamParam->Name = jName("Index");
 		streamParam->Data.resize(indices.size());
@@ -732,7 +732,7 @@ jObject* CreateGizmo(const Vector& pos, const Vector& rot, const Vector& scale)
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 3});
 		streamParam->Stride = sizeof(float) * 3;
 		streamParam->Name = jName("POSITION");
 		streamParam->Data.resize(elementCount * 3);
@@ -743,7 +743,7 @@ jObject* CreateGizmo(const Vector& pos, const Vector& rot, const Vector& scale)
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 4));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 4});
 		streamParam->Stride = sizeof(float) * 4;
 		streamParam->Name = jName("COLOR");
 		streamParam->Data.resize(elementCount * 4);
@@ -754,7 +754,7 @@ jObject* CreateGizmo(const Vector& pos, const Vector& rot, const Vector& scale)
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 3});
 		streamParam->Stride = sizeof(float) * 3;
 		streamParam->Name = jName("NORMAL");
 		streamParam->Data.resize(elementCount * 3);
@@ -770,7 +770,7 @@ jObject* CreateGizmo(const Vector& pos, const Vector& rot, const Vector& scale)
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 3});
 		streamParam->Stride = sizeof(float) * 3;
 		streamParam->Name = jName("TANGENT");
 		streamParam->Data.resize(elementCount * 3);
@@ -786,7 +786,7 @@ jObject* CreateGizmo(const Vector& pos, const Vector& rot, const Vector& scale)
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 2));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 2});
 		streamParam->Stride = sizeof(float) * 2;
 		streamParam->Name = jName("TEXCOORD");
 		streamParam->Data.resize(elementCount * 2, 0.0f);
@@ -832,7 +832,7 @@ jObject* CreateTriangle(const Vector& pos, const Vector& size, const Vector& sca
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 3});
 		streamParam->Stride = sizeof(float) * 3;
 		streamParam->Name = jName("POSITION");
 		streamParam->Data.resize(elementCount * 3);
@@ -843,7 +843,7 @@ jObject* CreateTriangle(const Vector& pos, const Vector& size, const Vector& sca
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 4));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 4});
 		streamParam->Stride = sizeof(float) * 4;
 		streamParam->Name = jName("COLOR");
 		streamParam->Data = std::move(GenerateColor(color, elementCount));
@@ -853,7 +853,7 @@ jObject* CreateTriangle(const Vector& pos, const Vector& size, const Vector& sca
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 3});
 		streamParam->Stride = sizeof(float) * 3;
 		streamParam->Name = jName("NORMAL");
 		streamParam->Data.resize(elementCount * 3);
@@ -869,7 +869,7 @@ jObject* CreateTriangle(const Vector& pos, const Vector& size, const Vector& sca
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 3});
 		streamParam->Stride = sizeof(float) * 3;
 		streamParam->Name = jName("TANGENT");
 		streamParam->Data.resize(elementCount * 3);
@@ -885,7 +885,7 @@ jObject* CreateTriangle(const Vector& pos, const Vector& size, const Vector& sca
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 2));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 2});
 		streamParam->Stride = sizeof(float) * 2;
 		streamParam->Name = jName("TEXCOORD");
 		streamParam->Data.resize(elementCount * 2);
@@ -1054,7 +1054,7 @@ jObject* CreateCube(const Vector& pos, const Vector& size, const Vector& scale, 
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 3});
 		streamParam->Stride = sizeof(float) * 3;
 		streamParam->Name = jName("POSITION");
 		streamParam->Data.resize(elementCount * 3);
@@ -1065,7 +1065,7 @@ jObject* CreateCube(const Vector& pos, const Vector& size, const Vector& scale, 
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 4));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 4});
 		streamParam->Stride = sizeof(float) * 4;
 		streamParam->Name = jName("COLOR");
 		streamParam->Data = std::move(GenerateColor(color, elementCount));
@@ -1075,7 +1075,7 @@ jObject* CreateCube(const Vector& pos, const Vector& size, const Vector& scale, 
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 3});
 		streamParam->Stride = sizeof(float) * 3;
 		streamParam->Name = jName("NORMAL");
 		streamParam->Data.resize(elementCount * 3);
@@ -1105,7 +1105,7 @@ jObject* CreateCube(const Vector& pos, const Vector& size, const Vector& scale, 
 
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 3});
 		streamParam->Stride = sizeof(float) * 3;
 		streamParam->Name = jName("TANGENT");
 		streamParam->Data.resize(elementCount * 3);
@@ -1116,7 +1116,7 @@ jObject* CreateCube(const Vector& pos, const Vector& size, const Vector& scale, 
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 2));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 2});
 		streamParam->Stride = sizeof(float) * 2;
 		streamParam->Name = jName("TEXCOORD");
 		streamParam->Data.resize(elementCount * 2);
@@ -1135,7 +1135,7 @@ jObject* CreateCube(const Vector& pos, const Vector& size, const Vector& scale, 
     {
         auto streamParam = new jStreamParam<uint32>();
         streamParam->BufferType = EBufferType::STATIC;
-        streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::UINT32, sizeof(uint32) * 3));
+        streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::UINT32, .Stride=sizeof(uint32) * 3});
         streamParam->Stride = sizeof(uint32) * 3;
         streamParam->Name = jName("Index");
         streamParam->Data.resize(faces.size());
@@ -1217,7 +1217,7 @@ jObject* CreateCapsule(const Vector& pos, float height, float radius, int32 slic
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 3});
 		streamParam->Stride = sizeof(float) * 3;
 		streamParam->Name = jName("POSITION");
 		streamParam->Data.resize(vertices.size());
@@ -1228,7 +1228,7 @@ jObject* CreateCapsule(const Vector& pos, float height, float radius, int32 slic
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 4));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 4});
 		streamParam->Stride = sizeof(float) * 4;
 		streamParam->Name = jName("COLOR");
 		streamParam->Data = std::move(GenerateColor(color, elementCount));
@@ -1238,7 +1238,7 @@ jObject* CreateCapsule(const Vector& pos, float height, float radius, int32 slic
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 3});
 		streamParam->Stride = sizeof(float) * 3;
 		streamParam->Name = jName("NORMAL");
 		streamParam->Data.resize(normals.size());
@@ -1250,7 +1250,7 @@ jObject* CreateCapsule(const Vector& pos, float height, float radius, int32 slic
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 3});
 		streamParam->Stride = sizeof(float) * 3;
 		streamParam->Name = jName("TANGENT");
 		streamParam->Data.resize(normals.size(), 0.0f);
@@ -1261,7 +1261,7 @@ jObject* CreateCapsule(const Vector& pos, float height, float radius, int32 slic
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 2));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 2});
 		streamParam->Stride = sizeof(float) * 2;
 		streamParam->Name = jName("TEXCOORD");
 		streamParam->Data.resize(normals.size(), 0.0f);
@@ -1291,7 +1291,7 @@ jObject* CreateCapsule(const Vector& pos, float height, float radius, int32 slic
 	{
 		auto streamParam = new jStreamParam<uint32>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::UINT32, sizeof(uint32) * 3));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::UINT32, .Stride=sizeof(uint32) * 3});
 		streamParam->Stride = sizeof(uint32) * 3;
 		streamParam->Name = jName("Index");
 		streamParam->Data.resize(faces.size());
@@ -1377,7 +1377,7 @@ jConePrimitive* CreateCone(const Vector& pos, float height, float radius, int32 
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 3});
 		streamParam->Stride = sizeof(float) * 3;
 		streamParam->Name = jName("POSITION");
 		streamParam->Data.resize(vertices.size());
@@ -1388,7 +1388,7 @@ jConePrimitive* CreateCone(const Vector& pos, float height, float radius, int32 
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 4));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 4});
 		streamParam->Stride = sizeof(float) * 4;
 		streamParam->Name = jName("COLOR");
 		streamParam->Data = std::move(GenerateColor(color, elementCount));
@@ -1398,7 +1398,7 @@ jConePrimitive* CreateCone(const Vector& pos, float height, float radius, int32 
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 3});
 		streamParam->Stride = sizeof(float) * 3;
 		streamParam->Name = jName("NORMAL");
 		streamParam->Data.resize(normals.size());
@@ -1410,7 +1410,7 @@ jConePrimitive* CreateCone(const Vector& pos, float height, float radius, int32 
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 3});
 		streamParam->Stride = sizeof(float) * 3;
 		streamParam->Name = jName("TANGENT");
 		streamParam->Data.resize(normals.size(), 0.0f);
@@ -1421,7 +1421,7 @@ jConePrimitive* CreateCone(const Vector& pos, float height, float radius, int32 
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 2));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 2});
 		streamParam->Stride = sizeof(float) * 2;
 		streamParam->Name = jName("TEXCOORD");
 		streamParam->Data.resize(normals.size(), 0.0f);
@@ -1561,7 +1561,7 @@ jObject* CreateCylinder(const Vector& pos, float height, float radius, int32 sli
 	{
 		auto streamParam = std::make_shared<jStreamParam<jPositionOnlyVertex>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("POSITION"), EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Attributes.push_back({.Name = jNameStatic("POSITION"), .UnderlyingType = EBufferElementType::FLOAT, .Stride = sizeof(float) * 3});
 		streamParam->Name = jName("jPositionOnlyVertex");
 		streamParam->Stride = sizeof(jPositionOnlyVertex);
 		streamParam->Data.swap(verticesPositionOnly);
@@ -1576,11 +1576,11 @@ jObject* CreateCylinder(const Vector& pos, float height, float radius, int32 sli
 	{
 		auto streamParam = std::make_shared<jStreamParam<jBaseVertex>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("POSITION"), EBufferElementType::FLOAT, sizeof(float) * 3));
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("NORMAL"), EBufferElementType::FLOAT, sizeof(float) * 3));
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("TANGENT"), EBufferElementType::FLOAT, sizeof(float) * 3));
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("BITANGENT"), EBufferElementType::FLOAT, sizeof(float) * 3));
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("TEXCOORD"), EBufferElementType::FLOAT, sizeof(float) * 2));
+		streamParam->Attributes.push_back({.Name = jNameStatic("POSITION"), .UnderlyingType = EBufferElementType::FLOAT, .Stride = sizeof(float) * 3});
+		streamParam->Attributes.push_back({.Name = jNameStatic("NORMAL"), .UnderlyingType = EBufferElementType::FLOAT, .Stride = sizeof(float) * 3});
+		streamParam->Attributes.push_back({.Name = jNameStatic("TANGENT"), .UnderlyingType = EBufferElementType::FLOAT, .Stride = sizeof(float) * 3});
+		streamParam->Attributes.push_back({.Name = jNameStatic("BITANGENT"), .UnderlyingType = EBufferElementType::FLOAT, .Stride = sizeof(float) * 3});
+		streamParam->Attributes.push_back({.Name = jNameStatic("TEXCOORD"), .UnderlyingType = EBufferElementType::FLOAT, .Stride = sizeof(float) * 2});
 		streamParam->Name = jName("jBaseVertex");
 		streamParam->Stride = sizeof(jBaseVertex);
 		streamParam->Data.swap(vertices);
@@ -1595,7 +1595,7 @@ jObject* CreateCylinder(const Vector& pos, float height, float radius, int32 sli
     {
         auto streamParam = new jStreamParam<uint32>();
         streamParam->BufferType = EBufferType::STATIC;
-        streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::UINT32, sizeof(int32) * 3));
+        streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::UINT32, .Stride=sizeof(int32) * 3});
         streamParam->Stride = sizeof(uint32) * 3;
         streamParam->Name = jName("Index");
         streamParam->Data.resize(indices.size());
@@ -1703,7 +1703,7 @@ jObject* CreateSphere(const Vector& pos, float radius, uint32 slices, uint32 sta
     {
         auto streamParam = std::make_shared<jStreamParam<jPositionOnlyVertex>>();
         streamParam->BufferType = EBufferType::STATIC;
-        streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("POSITION"), EBufferElementType::FLOAT, sizeof(float) * 3));
+        streamParam->Attributes.push_back({.Name = jNameStatic("POSITION"), .UnderlyingType = EBufferElementType::FLOAT, .Stride = sizeof(float) * 3});
         streamParam->Name = jName("jPositionOnlyVertex");
         streamParam->Stride = sizeof(jPositionOnlyVertex);
         streamParam->Data.swap(verticesPositionOnly);
@@ -1718,11 +1718,11 @@ jObject* CreateSphere(const Vector& pos, float radius, uint32 slices, uint32 sta
     {
         auto streamParam = std::make_shared<jStreamParam<jBaseVertex>>();
         streamParam->BufferType = EBufferType::STATIC;
-        streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("POSITION"), EBufferElementType::FLOAT, sizeof(float) * 3));
-        streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("NORMAL"), EBufferElementType::FLOAT, sizeof(float) * 3));
-        streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("TANGENT"), EBufferElementType::FLOAT, sizeof(float) * 3));
-        streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("BITANGENT"), EBufferElementType::FLOAT, sizeof(float) * 3));
-        streamParam->Attributes.push_back(IStreamParam::jAttribute(jNameStatic("TEXCOORD"), EBufferElementType::FLOAT, sizeof(float) * 2));
+        streamParam->Attributes.push_back({.Name = jNameStatic("POSITION"), .UnderlyingType = EBufferElementType::FLOAT, .Stride = sizeof(float) * 3});
+        streamParam->Attributes.push_back({.Name = jNameStatic("NORMAL"), .UnderlyingType = EBufferElementType::FLOAT, .Stride = sizeof(float) * 3});
+        streamParam->Attributes.push_back({.Name = jNameStatic("TANGENT"), .UnderlyingType = EBufferElementType::FLOAT, .Stride = sizeof(float) * 3});
+        streamParam->Attributes.push_back({.Name = jNameStatic("BITANGENT"), .UnderlyingType = EBufferElementType::FLOAT, .Stride = sizeof(float) * 3});
+        streamParam->Attributes.push_back({.Name = jNameStatic("TEXCOORD"), .UnderlyingType = EBufferElementType::FLOAT, .Stride = sizeof(float) * 2});
         streamParam->Name = jName("jBaseVertex");
         streamParam->Stride = sizeof(jBaseVertex);
         streamParam->Data.swap(vertices);
@@ -1737,7 +1737,7 @@ jObject* CreateSphere(const Vector& pos, float radius, uint32 slices, uint32 sta
     {
         auto streamParam = new jStreamParam<uint32>();
         streamParam->BufferType = EBufferType::STATIC;
-        streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::UINT32, sizeof(int32) * 3));
+        streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::UINT32, .Stride=sizeof(int32) * 3});
         streamParam->Stride = sizeof(uint32) * 3;
         streamParam->Name = jName("Index");
         streamParam->Data.resize(indices.size());
@@ -1792,7 +1792,7 @@ jUIQuadPrimitive* CreateUIQuad(const Vector2& pos, const Vector2& size, jTexture
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 2));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 2});
 		streamParam->Stride = sizeof(float) * 2;
 		streamParam->Name = jName("VertPos");
 		streamParam->Data.resize(_countof(vertices));
@@ -1826,7 +1826,7 @@ jFullscreenQuadPrimitive* CreateFullscreenQuad(jTexture* texture)
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float)));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float)});
 		streamParam->Stride = sizeof(float);
 		streamParam->Name = jName("POSITION");
 		streamParam->Data.resize(_countof(vertices));
@@ -1871,7 +1871,7 @@ jSegmentPrimitive* CreateSegment(const Vector& start, const Vector& end, float t
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::DYNAMIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 3});
 		streamParam->Stride = sizeof(float) * 3;
 		streamParam->Name = jName("POSITION");
 		streamParam->Data.resize(_countof(vertices));
@@ -1882,7 +1882,7 @@ jSegmentPrimitive* CreateSegment(const Vector& start, const Vector& end, float t
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 4));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 4});
 		streamParam->Stride = sizeof(float) * 4;
 		streamParam->Name = jName("COLOR");
 		streamParam->Data = std::move(GenerateColor(color, elementCount));
@@ -2060,7 +2060,7 @@ jGraph2D* CreateGraph2D(const Vector2& pos, const Vector2& size, const std::vect
 	{
 		auto streamParam = std::make_shared<jStreamParam<Vector2>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(Vector2)));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(Vector2)});
 		streamParam->Stride = sizeof(Vector2);
 		streamParam->Name = jName("POSITION");
 		streamParam->Data.resize(_countof(point));
@@ -2071,7 +2071,7 @@ jGraph2D* CreateGraph2D(const Vector2& pos, const Vector2& size, const std::vect
 	{
 		auto streamParam = std::make_shared<jStreamParam<Matrix>>();
 		streamParam->BufferType = EBufferType::DYNAMIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(Matrix)));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(Matrix)});
 		streamParam->Stride = sizeof(Matrix);
 		streamParam->Name = jName("Transform");
 		streamParam->Data.clear();
@@ -2137,7 +2137,7 @@ void jSegmentPrimitive::UpdateSegment()
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::DYNAMIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 3});
 		streamParam->Stride = sizeof(float) * 3;
 		streamParam->Name = jName("POSITION");
 		streamParam->Data.resize(_countof(vertices));
@@ -2148,7 +2148,7 @@ void jSegmentPrimitive::UpdateSegment()
 	{
 		auto streamParam = std::make_shared<jStreamParam<float>>();
 		streamParam->BufferType = EBufferType::STATIC;
-		streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 4));
+		streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 4});
 		streamParam->Stride = sizeof(float) * 4;
 		streamParam->Name = jName("COLOR");
 		streamParam->Data = std::move(jPrimitiveUtil::GenerateColor(Color, 2));
@@ -2328,7 +2328,7 @@ void jFrustumPrimitive::Update(float deltaTime)
 		{
 			auto streamParam = std::make_shared<jStreamParam<float>>();
 			streamParam->BufferType = EBufferType::STATIC;
-			streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
+			streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 3});
 			streamParam->Stride = sizeof(float) * 3;
 			streamParam->Name = jName("POSITION");
 			streamParam->Data.resize(elementCount * 3);
@@ -2339,7 +2339,7 @@ void jFrustumPrimitive::Update(float deltaTime)
 		{
 			auto streamParam = std::make_shared<jStreamParam<float>>();
 			streamParam->BufferType = EBufferType::STATIC;
-			streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 4));
+			streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 4});
 			streamParam->Stride = sizeof(float) * 4;
 			streamParam->Name = jName("COLOR");
 			streamParam->Data = std::move(jPrimitiveUtil::GenerateColor(color, elementCount));
@@ -2357,7 +2357,7 @@ void jFrustumPrimitive::Update(float deltaTime)
 		{
 			auto streamParam = std::make_shared<jStreamParam<float>>();
 			streamParam->BufferType = EBufferType::STATIC;
-			streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 3));
+			streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 3});
 			streamParam->Stride = sizeof(float) * 3;
 			streamParam->Name = jName("NORMAL");
 			streamParam->Data.resize(elementCount * 3);

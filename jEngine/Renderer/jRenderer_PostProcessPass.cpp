@@ -56,8 +56,14 @@ void jRenderer::PostProcess()
 			const jRTClearValue ClearDepth = jRTClearValue(1.0f, 0);
 
 			jRenderPassInfo renderPassInfo;
-			jAttachment color = jAttachment(InRenderTargetPtr, EAttachmentLoadStoreOp::DONTCARE_STORE
-				, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, ClearColor, InRenderTargetPtr->GetLayout(), EResourceLayout::COLOR_ATTACHMENT);
+			jAttachment color = {
+				.RenderTargetPtr = InRenderTargetPtr,
+				.LoadStoreOp = EAttachmentLoadStoreOp::DONTCARE_STORE,
+				.StencilLoadStoreOp = EAttachmentLoadStoreOp::DONTCARE_DONTCARE,
+				.RTClearValue = ClearColor,
+				.InitialLayout = InRenderTargetPtr->GetLayout(),
+				.FinalLayout = EResourceLayout::COLOR_ATTACHMENT
+			};
 			renderPassInfo.Attachments.push_back(color);
 
 			// Setup subpass of LightingPass

@@ -112,11 +112,6 @@ struct jTextureResourceBindless : public jShaderBindingResource
 {
     struct jTextureBindData
     {
-        jTextureBindData() = default;
-        jTextureBindData(jTexture* InTexture, jSamplerStateInfo* InSamplerState, int32 InMipLevel = 0)
-            : Texture(InTexture), SamplerState(InSamplerState), MipLevel(InMipLevel)
-        {}
-
         jTexture* Texture = nullptr;
         jSamplerStateInfo* SamplerState = nullptr;
         int32 MipLevel = 0;

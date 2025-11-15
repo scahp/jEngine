@@ -213,10 +213,6 @@ struct IStreamParam : public std::enable_shared_from_this<IStreamParam>
 {
     struct jAttribute
     {
-		jAttribute() = default;
-		jAttribute(EBufferElementType InElementType, int32 InStride) : UnderlyingType(InElementType), Stride(InStride) {}
-		jAttribute(jName InName, EBufferElementType InElementType, int32 InStride) : Name(InName), UnderlyingType(InElementType), Stride(InStride) {}
-
 		jName Name;
         EBufferElementType UnderlyingType = EBufferElementType::BYTE;
 		int32 Stride = 0;

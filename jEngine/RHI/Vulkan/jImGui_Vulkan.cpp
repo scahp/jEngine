@@ -143,9 +143,9 @@ void jImGUI_Vulkan::Initialize(float width, float height)
         {
             auto streamParam = std::make_shared<jStreamParam<float>>();
             streamParam->BufferType = EBufferType::STATIC;
-            streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 2));
-            streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::FLOAT, sizeof(float) * 2));
-            streamParam->Attributes.push_back(IStreamParam::jAttribute(EBufferElementType::BYTE_UNORM, sizeof(unsigned char) * 4));
+            streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 2});
+            streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 2});
+            streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::BYTE_UNORM, .Stride=sizeof(unsigned char) * 4});
             streamParam->Stride = (sizeof(float) * 2) + (sizeof(float) * 2) + (sizeof(unsigned char) * 4);
             streamParam->Name = jName("Position_UV_Color");
             vertexStreamData->Params.push_back(streamParam);
@@ -164,7 +164,7 @@ void jImGUI_Vulkan::Release()
 {
     DynamicBufferData.clear();
 
-    DescriptorSet = nullptr;        // DescriptorPool À» ÇØÁ¦ ÇÏ¸éµÇ¹Ç·Î µû·Î ¼Ò¸ê½ÃÅ°Áö ¾ÊÀ½
+    DescriptorSet = nullptr;        // DescriptorPool ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ï¸ï¿½Ç¹Ç·ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ò¸ï¿½ï¿½Å°ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     if (DescriptorPool)
     {
         vkDestroyDescriptorPool(g_rhi_vk->Device, DescriptorPool, nullptr);
@@ -299,8 +299,14 @@ void jImGUI_Vulkan::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFra
         const auto& FinalColorPtr = InRenderFrameContextPtr->SceneRenderTargetPtr->FinalColorPtr;
         g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), FinalColorPtr->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
 
-        jAttachment color = jAttachment(FinalColorPtr, EAttachmentLoadStoreOp::LOAD_STORE, EAttachmentLoadStoreOp::DONTCARE_DONTCARE, jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f)
-            , FinalColorPtr->GetLayout(), EResourceLayout::PRESENT_SRC);
+        jAttachment color = {
+            .RenderTargetPtr = FinalColorPtr,
+            .LoadStoreOp = EAttachmentLoadStoreOp::LOAD_STORE,
+            .StencilLoadStoreOp = EAttachmentLoadStoreOp::DONTCARE_DONTCARE,
+            .RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
+            .InitialLayout = FinalColorPtr->GetLayout(),
+            .FinalLayout = EResourceLayout::PRESENT_SRC
+        };
 
         RenderPass = g_rhi_vk->GetOrCreateRenderPass({ color }, { 0, 0 }, { FinalColorPtr->Info.Width, FinalColorPtr->Info.Height });
         PiplineStateInfo = (jPipelineStateInfo_Vulkan*)CreatePipelineState(RenderPass, g_rhi_vk->GraphicsQueue.Queue);

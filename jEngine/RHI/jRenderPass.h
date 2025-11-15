@@ -2,20 +2,6 @@
 
 struct jAttachment
 {
-    jAttachment() = default;
-    jAttachment(const std::weak_ptr<jRenderTarget>& InRTPtr
-        , EAttachmentLoadStoreOp InLoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE
-        , EAttachmentLoadStoreOp InStencilLoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE
-        , jRTClearValue RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f)
-        , EResourceLayout InInitialLayout = EResourceLayout::UNDEFINED
-        , EResourceLayout InFinalLayout = EResourceLayout::SHADER_READ_ONLY
-        , bool InIsResolveAttachment = false
-    )
-        : RenderTargetPtr(InRTPtr), LoadStoreOp(InLoadStoreOp), StencilLoadStoreOp(InStencilLoadStoreOp)
-        , RTClearValue(RTClearValue), InitialLayout(InInitialLayout), FinalLayout(InFinalLayout)
-        , bResolveAttachment(InIsResolveAttachment)
-    {}
-
     std::weak_ptr<jRenderTarget> RenderTargetPtr;
 
     // 아래 2가지 옵션은 렌더링 전, 후에 attachment에 있는 데이터에 무엇을 할지 결정하는 부분.

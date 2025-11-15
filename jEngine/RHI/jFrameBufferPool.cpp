@@ -11,17 +11,17 @@ struct jTexture* jFrameBufferPool::GetNullTexture(ETextureType type)
 	{
 	case ETextureType::TEXTURE_2D:
 	{
-		static auto temp = jFrameBufferPool::GetFrameBuffer({ ETextureType::TEXTURE_2D, ETextureFormat::RGBA8, 2, 2, 1 });
+		static auto temp = jFrameBufferPool::GetFrameBuffer({ .TextureType=ETextureType::TEXTURE_2D, .Format=ETextureFormat::RGBA8, .Width=2, .Height=2, .LayerCount=1 });
 		return temp->GetTexture();
 	}
 	case ETextureType::TEXTURE_2D_ARRAY:
 	{
-		static auto temp = jFrameBufferPool::GetFrameBuffer({ ETextureType::TEXTURE_2D_ARRAY, ETextureFormat::RGBA8, 2, 2, 1 });
+		static auto temp = jFrameBufferPool::GetFrameBuffer({ .TextureType=ETextureType::TEXTURE_2D_ARRAY, .Format=ETextureFormat::RGBA8, .Width=2, .Height=2, .LayerCount=1 });
 		return temp->GetTexture();
 	}
 	case ETextureType::TEXTURE_CUBE:
 	{
-		static auto temp = jFrameBufferPool::GetFrameBuffer({ ETextureType::TEXTURE_CUBE, ETextureFormat::RGBA8, 2, 2, 1 });
+		static auto temp = jFrameBufferPool::GetFrameBuffer({ .TextureType=ETextureType::TEXTURE_CUBE, .Format=ETextureFormat::RGBA8, .Width=2, .Height=2, .LayerCount=1 });
 		return temp->GetTexture();
 	}
 	default:
