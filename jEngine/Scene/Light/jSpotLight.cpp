@@ -84,6 +84,8 @@ const Matrix* jSpotLight::GetLightWorldMatrix() const
 
 void jSpotLight::Update(float deltaTime)
 {
+    __super::Update(deltaTime);
+
     check(Camera);
     Camera->SetEulerAngle(Vector::GetEulerAngleFrom(LightData.Direction));
     Camera->UpdateCamera();

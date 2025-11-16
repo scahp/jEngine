@@ -94,6 +94,15 @@ jOptions::jOptions()
 
 	// Raytracing
 	UseRaytracing = true;
+
+	// Light Placement Tool
+	EnableLightPlacementMode = false;
+	SelectedPlacedLightIndex = -1;
+
+#if ENABLE_PBR
+    // PBR will use light color as a flux,
+    LightColorScale = 20000.0f;
+#endif
 }
 
 

@@ -5,6 +5,10 @@
 #include "jOptions.h"
 #include "Scene/Light/jLight.h"
 #include "Scene/Light/jDirectionalLight.h"
+#include "Scene/Light/jPointLight.h"
+#include "Scene/Light/jSpotLight.h"
+#include "Scene/jObject.h"
+#include "jEngine.h"
 
 // Helper functions for Copy/Paste context menus
 namespace
@@ -366,6 +370,188 @@ void IRenderer::UIPass()
 						}
 					}
 				});
+
+				// Light Placement Tool
+				ImGui::Separator();
+				ImGui::TextColored(ImVec4(0, 1, 1, 1), "Light Placement Tool");
+
+				ImGui::Checkbox("Enable Light Placement Mode", &gOptions.EnableLightPlacementMode);
+
+				if (gOptions.EnableLightPlacementMode)
+				{
+					ImGui::Indent();
+					ImGui::TextColored(ImVec4(1, 1, 0, 1), "Hotkeys:");
+					ImGui::Text("  L - Create Point Light (White)");
+					ImGui::Text("  K - Create Spot Light (Yellow)");
+					ImGui::Text("  J - Create Directional Light (Orange)");
+					ImGui::Text("  DELETE - Remove selected light");
+					ImGui::Separator();
+
+					// Access jGame instance to get placed lights
+					if (g_Engine && !g_Engine->Game.PlacedLights.empty())
+					{
+						ImGui::TextColored(ImVec4(1, 1, 0, 1), "Placed Lights: %d", (int)g_Engine->Game.PlacedLights.size());
+
+						ImGui::BeginChild("LightListRegion", ImVec2(0, 150), true);
+						for (int i = 0; i < (int)g_Engine->Game.PlacedLights.size(); ++i)
+						{
+							jLight* light = g_Engine->Game.PlacedLights[i];
+							const char* lightTypeName = "Unknown";
+							if (light->GetLightType() == ELightType::POINT)
+								lightTypeName = "Point";
+							else if (light->GetLightType() == ELightType::SPOT)
+								lightTypeName = "Spot";
+							else if (light->GetLightType() == ELightType::DIRECTIONAL)
+								lightTypeName = "Directional";
+
+							char labelBuf[128];
+							sprintf_s(labelBuf, "[%d] %s Light", i, lightTypeName);
+
+							if (ImGui::Selectable(labelBuf, gOptions.SelectedPlacedLightIndex == i))
+							{
+								gOptions.SelectedPlacedLightIndex = i;
+							}
+						}
+						ImGui::EndChild();
+
+						// Edit selected light
+						if (gOptions.SelectedPlacedLightIndex >= 0 &&
+							gOptions.SelectedPlacedLightIndex < (int)g_Engine->Game.PlacedLights.size())
+						{
+							jLight* selectedLight = g_Engine->Game.PlacedLights[gOptions.SelectedPlacedLightIndex];
+
+							ImGui::Separator();
+							ImGui::TextColored(ImVec4(0, 1, 0, 1), "Selected Light Properties:");
+
+							// Position (for point and spot lights)
+							if (selectedLight->GetLightType() == ELightType::POINT)
+							{
+								jPointLight* pointLight = static_cast<jPointLight*>(selectedLight);
+								jPointLightUniformBufferData& data = const_cast<jPointLightUniformBufferData&>(pointLight->GetLightData());
+								Vector pos = data.Position;
+								if (ImGui::SliderFloat3("Position", &pos.x, -500.0f, 500.0f))
+								{
+									data.Position = pos;
+									pointLight->IsNeedToUpdateShaderBindingInstance = true;
+								}
+								AddCopyPasteContextMenu("PlacedLightPosContext", pos, [pointLight](float x, float y, float z) {
+									Vector newPos(x, y, z);
+									jPointLightUniformBufferData& data = const_cast<jPointLightUniformBufferData&>(pointLight->GetLightData());
+									data.Position = newPos;
+									pointLight->IsNeedToUpdateShaderBindingInstance = true;
+								});
+							}
+							else if (selectedLight->GetLightType() == ELightType::SPOT)
+							{
+								jSpotLight* spotLight = static_cast<jSpotLight*>(selectedLight);
+								jSpotLightUniformBufferData& data = const_cast<jSpotLightUniformBufferData&>(spotLight->GetLightData());
+								Vector pos = data.Position;
+								if (ImGui::SliderFloat3("Position", &pos.x, -500.0f, 500.0f))
+								{
+									data.Position = pos;
+									spotLight->IsNeedToUpdateShaderBindingInstance = true;
+								}
+								AddCopyPasteContextMenu("PlacedLightPosContext", pos, [spotLight](float x, float y, float z) {
+									Vector newPos(x, y, z);
+									jSpotLightUniformBufferData& data = const_cast<jSpotLightUniformBufferData&>(spotLight->GetLightData());
+									data.Position = newPos;
+									spotLight->IsNeedToUpdateShaderBindingInstance = true;
+								});
+
+								Vector dir = data.Direction;
+								if (ImGui::SliderFloat3("Direction", &dir.x, -1.0f, 1.0f))
+								{
+									dir = dir.GetNormalize();
+									spotLight->SetDirection(dir);
+								}
+								AddCopyPasteContextMenu("PlacedLightDirContext", dir, [spotLight](float x, float y, float z) {
+									Vector newDir(x, y, z);
+									newDir = newDir.GetNormalize();
+									spotLight->SetDirection(newDir);
+								});
+							}
+							else if (selectedLight->GetLightType() == ELightType::DIRECTIONAL)
+							{
+								jDirectionalLight* dirLight = static_cast<jDirectionalLight*>(selectedLight);
+								jDirectionalLightUniformBufferData& data = const_cast<jDirectionalLightUniformBufferData&>(dirLight->GetLightData());
+								Vector dir = data.Direction;
+								if (ImGui::SliderFloat3("Direction", &dir.x, -1.0f, 1.0f))
+								{
+									dir = dir.GetNormalize();
+									dirLight->SetDirection(dir);
+								}
+								AddCopyPasteContextMenu("PlacedLightDirContext", dir, [dirLight](float x, float y, float z) {
+									Vector newDir(x, y, z);
+									newDir = newDir.GetNormalize();
+									dirLight->SetDirection(newDir);
+								});
+							}
+
+							// Color
+							Vector colorRGB;
+							if (selectedLight->GetLightType() == ELightType::POINT)
+							{
+								jPointLight* pointLight = static_cast<jPointLight*>(selectedLight);
+								jPointLightUniformBufferData& data = const_cast<jPointLightUniformBufferData&>(pointLight->GetLightData());
+								colorRGB = data.Color;
+								if (ImGui::ColorEdit3("Color", &colorRGB.x, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR))
+								{
+									data.Color = colorRGB;
+									pointLight->IsNeedToUpdateShaderBindingInstance = true;
+								}
+								AddCopyPasteContextMenu("PlacedLightColorContext", colorRGB, [pointLight](float x, float y, float z) {
+									jPointLightUniformBufferData& data = const_cast<jPointLightUniformBufferData&>(pointLight->GetLightData());
+									data.Color = Vector(x, y, z);
+									pointLight->IsNeedToUpdateShaderBindingInstance = true;
+								});
+							}
+							else if (selectedLight->GetLightType() == ELightType::SPOT)
+							{
+								jSpotLight* spotLight = static_cast<jSpotLight*>(selectedLight);
+								jSpotLightUniformBufferData& data = const_cast<jSpotLightUniformBufferData&>(spotLight->GetLightData());
+								colorRGB = data.Color;
+								if (ImGui::ColorEdit3("Color", &colorRGB.x, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR))
+								{
+									data.Color = colorRGB;
+									spotLight->IsNeedToUpdateShaderBindingInstance = true;
+								}
+								AddCopyPasteContextMenu("PlacedLightColorContext", colorRGB, [spotLight](float x, float y, float z) {
+									jSpotLightUniformBufferData& data = const_cast<jSpotLightUniformBufferData&>(spotLight->GetLightData());
+									data.Color = Vector(x, y, z);
+									spotLight->IsNeedToUpdateShaderBindingInstance = true;
+								});
+							}
+							else if (selectedLight->GetLightType() == ELightType::DIRECTIONAL)
+							{
+								jDirectionalLight* dirLight = static_cast<jDirectionalLight*>(selectedLight);
+								jDirectionalLightUniformBufferData& data = const_cast<jDirectionalLightUniformBufferData&>(dirLight->GetLightData());
+								colorRGB = data.Color;
+								if (ImGui::ColorEdit3("Color", &colorRGB.x, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR))
+								{
+									dirLight->SetColor(colorRGB);
+								}
+								AddCopyPasteContextMenu("PlacedLightColorContext", colorRGB, [dirLight](float x, float y, float z) {
+									dirLight->SetColor(Vector(x, y, z));
+								});
+							}
+
+							// Delete button
+							ImGui::Separator();
+							if (ImGui::Button("Delete Selected Light"))
+							{
+								// Directly call delete function
+								g_Engine->Game.DeletePlacedLight(gOptions.SelectedPlacedLightIndex);
+							}
+						}
+					}
+					else
+					{
+						ImGui::Text("No lights placed yet.");
+						ImGui::Text("Press L, K, or J to create lights!");
+					}
+
+					ImGui::Unindent();
+				}
 
 				ImGui::EndTabItem();
 			}

@@ -912,19 +912,37 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
 
     const int32 RTWidth = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->Info.Width;
     const int32 RTHeight = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->Info.Height;
-    jDirectionalLightDrawCommandGenerator DirectionalLightPass(DefaultLightPassShaderBindingInstances);
-    DirectionalLightPass.Initialize(RTWidth, RTHeight);
 
-    jPointLightDrawCommandGenerator PointLightPass(DefaultLightPassShaderBindingInstances);
-    PointLightPass.Initialize(RTWidth, RTHeight);
+    // Create a separate DrawCommandGenerator for each light
+    std::vector<std::unique_ptr<jDrawCommandGenerator>> LightDrawCommandGenerators;
+    LightDrawCommandGenerators.reserve(View.Lights.size());
 
-    jSpotLightDrawCommandGenerator SpotLightPass(DefaultLightPassShaderBindingInstances);
-    SpotLightPass.Initialize(RTWidth, RTHeight);
+    for (int32 i = 0; i < (int32)View.Lights.size(); ++i)
+    {
+        const auto& viewLight = View.Lights[i];
+        std::unique_ptr<jDrawCommandGenerator> generator;
 
-    jDrawCommandGenerator* LightDrawCommandGenerator[(int32)ELightType::MAX] = { 0, };
-    LightDrawCommandGenerator[(int32)ELightType::DIRECTIONAL] = &DirectionalLightPass;
-    LightDrawCommandGenerator[(int32)ELightType::POINT] = &PointLightPass;
-    LightDrawCommandGenerator[(int32)ELightType::SPOT] = &SpotLightPass;
+        switch (viewLight.Light->Type)
+        {
+        case ELightType::DIRECTIONAL:
+            generator = std::make_unique<jDirectionalLightDrawCommandGenerator>(DefaultLightPassShaderBindingInstances);
+            break;
+        case ELightType::POINT:
+            generator = std::make_unique<jPointLightDrawCommandGenerator>(DefaultLightPassShaderBindingInstances);
+            break;
+        case ELightType::SPOT:
+            generator = std::make_unique<jSpotLightDrawCommandGenerator>(DefaultLightPassShaderBindingInstances);
+            break;
+        default:
+            continue;
+        }
+
+        if (generator)
+        {
+            generator->Initialize(RTWidth, RTHeight);
+            LightDrawCommandGenerators.push_back(std::move(generator));
+        }
+    }
 
     {
         const int32 SubpassIndex = (!RenderFrameContextPtr->UseForwardRenderer && gOptions.UseSubpass) ? 1 : 0;
@@ -981,9 +999,10 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
         }
 
         check(View.Lights.size() == LightPasses.size());
+        check(LightDrawCommandGenerators.size() == LightPasses.size());
         for (int32 i = 0; i < (int32)LightPasses.size(); ++i)
         {
-            LightDrawCommandGenerator[(int32)View.Lights[i].Light->Type]->GenerateDrawCommand(&LightPasses[i], RenderFrameContextPtr, &View, View.Lights[i], InRenderPass, SubpassIndex);
+            LightDrawCommandGenerators[i]->GenerateDrawCommand(&LightPasses[i], RenderFrameContextPtr, &View, View.Lights[i], InRenderPass, SubpassIndex);
         }
 
         for (int32 i = 0; i < (int32)LightPasses.size(); ++i)

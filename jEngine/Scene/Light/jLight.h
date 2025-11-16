@@ -74,6 +74,8 @@ namespace jLightUtil
 	//static jShadowMapData* CreateCascadeShadowMap(const Vector& direction, const Vector& pos);
 }
 
+using PRE_UPDATE_LAMBDA = void (*)(class jLight*, float);
+
 class jLight
 {
 public:
@@ -93,10 +95,10 @@ public:
 	static const void AddLights(jLight* InLight) { return s_Lights.push_back(InLight); }
 	static const void RemoveLights(jLight* InLight) 
 	{
-		s_Lights.erase(std::remove_if(s_Lights.begin(), s_Lights.end(), [&InLight](jLight* param)
+		std::erase_if(s_Lights, [&InLight](jLight* param)
             {
                 return (param == InLight);
-            }));
+            });
 	}
 	static std::vector<jLight*> s_Lights;
 
@@ -105,7 +107,10 @@ public:
 	virtual ~jLight();
 
 	virtual bool IsOmnidirectional() const { return false; }
-	virtual void Update(float deltaTime) { }
+	virtual void Update(float deltaTime)
+	{
+		if (PreUpdateLambda) PreUpdateLambda(this, deltaTime);
+	}
 	virtual IUniformBufferBlock* GetUniformBufferBlock() const { return nullptr; }
 
 	virtual const jCamera* GetLightCamra(int32 index = 0) const { return nullptr; }
@@ -125,6 +130,8 @@ public:
 		static std::shared_ptr<jShaderBindingInstance> s_Temp;
 		return s_Temp;
 	}
+
+	PRE_UPDATE_LAMBDA PreUpdateLambda = nullptr;
 };
 
 class jAmbientLight : public jLight

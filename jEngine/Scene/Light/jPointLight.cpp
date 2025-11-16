@@ -89,6 +89,8 @@ const Matrix* jPointLight::GetLightWorldMatrix() const
 
 void jPointLight::Update(float deltaTime)
 {
+    __super::Update(deltaTime);
+
     // Prepare light data for uniform buffer
     for (int32 i = 0; i < _countof(Camera); ++i)
     {

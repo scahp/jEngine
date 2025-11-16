@@ -64,12 +64,6 @@ public:
 	void Resize(int32 width, int32 height);
 	void Release();
 
-	jDirectionalLight* DirectionalLight = nullptr;
-	jDirectionalLight* NormalDirectionalLight = nullptr;
-	jCascadeDirectionalLight* CascadeDirectionalLight = nullptr;
-	jPointLight* PointLight = nullptr;
-	jSpotLight* SpotLight = nullptr;
-	jLight* AmbientLight = nullptr;
 	jCamera* MainCamera = nullptr;
 
 	jDirectionalLightPrimitive* DirectionalLightInfo = nullptr;
@@ -79,6 +73,11 @@ public:
 	jMeshObject* Sponza = nullptr;
 
 	std::vector<jObject*> SpawnedObjects;
+
+	// Light Placement Tool
+	std::vector<jLight*> PlacedLights;
+	std::vector<jObject*> PlacedLightDebugObjects;
+	void DeletePlacedLight(int32 index);
 
 	std::future<void> ResourceLoadCompleteEvent;
 	std::vector<jObject*> CompletedAsyncLoadObjects;

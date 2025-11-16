@@ -57,6 +57,148 @@ void jGame::ProcessInput(float deltaTime)
 	if (g_KeyState['s'] || g_KeyState['S']) MainCamera->MoveForward(-CurrentDistance);
 	if (g_KeyState['+']) MoveDistancePerSecond = Max(MoveDistancePerSecond + 10.0f, 0.0f);
 	if (g_KeyState['-']) MoveDistancePerSecond = Max(MoveDistancePerSecond - 10.0f, 0.0f);
+
+	// Light Placement Tool - Hotkeys
+	static bool wasLPressed = false;
+	static bool wasKPressed = false;
+	static bool wasJPressed = false;
+	static bool wasDeletePressed = false;
+
+	if (gOptions.EnableLightPlacementMode)
+	{
+		// L: Create Point Light at camera position
+		if (g_KeyState['l'] || g_KeyState['L'])
+		{
+			if (!wasLPressed)
+			{
+				Vector cameraPos = MainCamera->Pos;
+				Vector lightColor = Vector(1.0f, 1.0f, 1.0f);  // White
+				auto* newLight = jLight::CreatePointLight(
+					cameraPos,
+					lightColor * gOptions.LightColorScale,
+					1500.0f,  // maxDistance
+					Vector(1.0f, 1.0f, 1.0f),  // diffuseIntensity
+					Vector(1.0f, 1.0f, 1.0f),  // specularIntensity
+					64.0f  // specularPower
+				);
+
+				jLight::AddLights(newLight);  // Register light to engine
+				PlacedLights.push_back(newLight);
+
+				// Create debug visualization
+				Vector scale(1.0f, 1.0f, 1.0f);
+				auto* debugObj = jPrimitiveUtil::CreatePointLightDebug(scale, MainCamera, static_cast<jPointLight*>(newLight), "Image/bulb.png");
+				PlacedLightDebugObjects.push_back(debugObj);
+			}
+			wasLPressed = true;
+		}
+		else
+		{
+			wasLPressed = false;
+		}
+
+		// K: Create Spot Light at camera position
+		if (g_KeyState['k'] || g_KeyState['K'])
+		{
+			if (!wasKPressed)
+			{
+				Vector cameraPos = MainCamera->Pos;
+				Vector cameraDir = MainCamera->GetForwardVector();
+				Vector lightColor = Vector(1.0f, 1.0f, 0.0f);  // Yellow
+				auto* newLight = jLight::CreateSpotLight(
+					cameraPos, 
+					cameraDir, 
+					lightColor * gOptions.LightColorScale, 
+					2000.0f, 
+					0.35f, 
+					1.0f, 
+					Vector(1.0f, 1.0f, 1.0f), 
+					Vector(1.0f), 
+					64.0f
+				);
+
+				jLight::AddLights(newLight);  // Register light to engine
+				PlacedLights.push_back(newLight);
+
+				// Create debug visualization
+				Vector scale(1.0f, 1.0f, 1.0f);
+				auto* debugObj = jPrimitiveUtil::CreateSpotLightDebug(scale, MainCamera, static_cast<jSpotLight*>(newLight), "Image/spot.png");
+				PlacedLightDebugObjects.push_back(debugObj);
+			}
+			wasKPressed = true;
+		}
+		else
+		{
+			wasKPressed = false;
+		}
+
+		// J: Create Directional Light pointing in camera direction
+		if (g_KeyState['j'] || g_KeyState['J'])
+		{
+			if (!wasJPressed)
+			{
+				Vector lightColor = gOptions.DirectionalLightColor * gOptions.DirectionalLightIntensity;
+				auto* newLight = jLight::CreateDirectionalLight(
+					gOptions.SunDir,
+					lightColor,
+					Vector(1.0f, 1.0f, 1.0f),  // diffuseIntensity
+					Vector(1.0f, 1.0f, 1.0f),  // specularIntensity
+					64.0f  // specularPower
+				);
+
+				jLight::AddLights(newLight);  // Register light to engine
+				PlacedLights.push_back(newLight);
+
+				// Create debug visualization (at camera position for visibility)
+				Vector scale(1.0f, 1.0f, 1.0f);
+				float length = 50.0f;
+				auto* debugObj = jPrimitiveUtil::CreateDirectionalLightDebug(MainCamera->Pos, scale, length, MainCamera, static_cast<jDirectionalLight*>(newLight), "Image/sun.png");
+				PlacedLightDebugObjects.push_back(debugObj);
+			}
+			wasJPressed = true;
+		}
+		else
+		{
+			wasJPressed = false;
+		}
+
+		// Delete: Remove selected light
+		if (g_KeyState[VK_DELETE])
+		{
+			if (!wasDeletePressed && gOptions.SelectedPlacedLightIndex >= 0 &&
+				gOptions.SelectedPlacedLightIndex < static_cast<int32>(PlacedLights.size()))
+			{
+				DeletePlacedLight(gOptions.SelectedPlacedLightIndex);
+			}
+			wasDeletePressed = true;
+		}
+		else
+		{
+			wasDeletePressed = false;
+		}
+	}
+}
+
+void jGame::DeletePlacedLight(int32 index)
+{
+	if (index < 0 || index >= static_cast<int32>(PlacedLights.size()))
+		return;
+
+	// Remove debug object
+	if (index < static_cast<int32>(PlacedLightDebugObjects.size()))
+	{
+		auto* debugObj = PlacedLightDebugObjects[index];
+		jObject::RemoveObject(debugObj);
+		PlacedLightDebugObjects.erase(PlacedLightDebugObjects.begin() + index);
+	}
+
+	// Remove light
+	auto* light = PlacedLights[index];
+	jLight::RemoveLights(light);
+	PlacedLights.erase(PlacedLights.begin() + index);
+
+	// Reset selection
+	gOptions.SelectedPlacedLightIndex = -1;
 }
 
 void jGame::Setup()
@@ -72,19 +214,42 @@ void jGame::Setup()
 
 #if USE_SPONZA
 	// Create main camera
-    const Vector mainCameraPos(1124.351929, 31.903732, 18.574120);
-    const Vector mainCameraTarget(Vector(1124.351929, 31.903732, 18.574120) + Vector(-0.927020, 0.264276, -0.266068));
+    const Vector mainCameraPos(1124.351929f, 31.903732f, 18.574120f);
+    const Vector mainCameraTarget(Vector(1124.351929f, 31.903732f, 18.574120f) + Vector(-0.927020f, 0.264276f, -0.266068f));
     MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 10.0f, 5000.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT, true);
     jCamera::AddCamera(0, MainCamera);
 
+	jDirectionalLight* DirectionalLight = nullptr;
+	jPointLight* PointLight = nullptr;
+	jSpotLight* SpotLight = nullptr;
 	#if !USE_PATH_TRACING		// todo : this hard code should be removed.
     // Create lights
 	{
 		Vector lightColor = gOptions.DirectionalLightColor * gOptions.DirectionalLightIntensity;
-		NormalDirectionalLight = jLight::CreateDirectionalLight(gOptions.SunDir
+		DirectionalLight = jLight::CreateDirectionalLight(gOptions.SunDir
 			, Vector4(lightColor.x, lightColor.y, lightColor.z, 1.0f), Vector(1.0f), Vector(1.0f), 64);
+		if (DirectionalLight)
+		{
+			DirectionalLight->PreUpdateLambda = [](jLight* light, float InDeltaTime)
+			{
+				auto DirectionalLight = (jDirectionalLight*)(light);
+				check(DirectionalLight);
+                Vector& SunDir = DirectionalLight->GetLightData().Direction;
+                SunDir = gOptions.SunDir;
+			};
+		}
+
 		PointLight = jLight::CreatePointLight(Vector(10.0f, 100.0f, 10.0f), Vector4(1.0f, 0.75f, 0.75f, 1.0f) * LightColorScale, 1500.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
 		SpotLight = jLight::CreateSpotLight(Vector(0.0f, 60.0f, 5.0f), Vector(1.0f, -1.0f, 0.4f).GetNormalize(), Vector4(0.0f, 1.0f, 0.0f, 1.0f) * LightColorScale, 2000.0f, 0.35f, 1.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
+        if (SpotLight)
+        {
+			SpotLight->PreUpdateLambda = [](jLight* light, float InDeltaTime)
+            {
+                auto SpotLight = (jSpotLight*)(light);
+                check(SpotLight);
+                SpotLight->SetDirection(Matrix::MakeRotateY(1.0f * InDeltaTime).TransformDirection(SpotLight->GetLightData().Direction));
+            };
+        }
 	}
 	#endif // !USE_PATH_TRACING
 #else
@@ -98,7 +263,7 @@ void jGame::Setup()
 
     // Create lights
     Vector lightColor = gOptions.DirectionalLightColor * gOptions.DirectionalLightIntensity;
-    NormalDirectionalLight = jLight::CreateDirectionalLight(gOptions.SunDir
+    DirectionalLight = jLight::CreateDirectionalLight(gOptions.SunDir
         , Vector4(lightColor.x, lightColor.y, lightColor.z, 1.0f), Vector(1.0f), Vector(1.0f), 64);
     //CascadeDirectionalLight = jLight::CreateCascadeDirectionalLight(AppSettings.DirecionalLightDirection
     //	, Vector4(0.6f), Vector(1.0f), Vector(1.0f), 64);
@@ -107,8 +272,8 @@ void jGame::Setup()
     SpotLight = jLight::CreateSpotLight(Vector(0.0f, 80.0f, 5.0f), Vector(1.0f, -1.0f, 0.4f).GetNormalize(), Vector4(0.2f, 1.0f, 0.2f, 1.0f) * LightColorScale, 200.0f, 0.35f, 0.5f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
 #endif
 
-	if (NormalDirectionalLight)
-		jLight::AddLights(NormalDirectionalLight);
+	if (DirectionalLight)
+		jLight::AddLights(DirectionalLight);
 	if (PointLight)
 		jLight::AddLights(PointLight);
 	if (SpotLight)
@@ -121,9 +286,6 @@ void jGame::Setup()
     //jObject::AddObject(cube);
     //SpawnedObjects.push_back(cube);
 
-	// Select one of directional light
-	DirectionalLight = NormalDirectionalLight;
-
 	// Create light info for debugging light infomation
     if (DirectionalLight)
     {
@@ -131,18 +293,30 @@ void jGame::Setup()
         // jObject::AddDebugObject(DirectionalLightInfo);
 		jObject::AddDebugObject(DirectionalLightInfo->BillboardObject);
 		// jObject::AddDebugObject(DirectionalLightInfo->ArrowSegementObject);
+
+		// Add to Light Placement Tool
+		PlacedLights.push_back(DirectionalLight);
+		PlacedLightDebugObjects.push_back(DirectionalLightInfo->BillboardObject);
     }
 
     if (PointLight)
     {
         PointLightInfo = jPrimitiveUtil::CreatePointLightDebug(Vector(10.0f), MainCamera, PointLight, "Image/bulb.png");
         jObject::AddDebugObject(PointLightInfo->BillboardObject);
+
+		// Add to Light Placement Tool
+		PlacedLights.push_back(PointLight);
+		PlacedLightDebugObjects.push_back(PointLightInfo->BillboardObject);
     }
 
     if (SpotLight)
     {
         SpotLightInfo = jPrimitiveUtil::CreateSpotLightDebug(Vector(10.0f), MainCamera, SpotLight, "Image/spot.png");
         jObject::AddDebugObject(SpotLightInfo->BillboardObject);
+
+		// Add to Light Placement Tool
+		PlacedLights.push_back(SpotLight);
+		PlacedLightDebugObjects.push_back(SpotLightInfo->BillboardObject);
     }
 
 	//// Main camera is linked with lights which will be used.
@@ -399,11 +573,6 @@ void jGame::Update(float deltaTime)
 		MainCamera->UpdateCamera();
 
 		gOptions.CameraPos = MainCamera->Pos;
-		if (NormalDirectionalLight)
-		{
-			Vector& SunDir = NormalDirectionalLight->GetLightData().Direction;
-			SunDir = gOptions.SunDir;
-		}
 	}
 	//// Update lights
 	//const int32 numOfLights = MainCamera->GetNumOfLight();
@@ -448,17 +617,10 @@ void jGame::Update(float deltaTime)
             RenderObject->UpdateWorldMatrix();
 	}
 
-    // 정리해야함
-	if (DirectionalLight)
-		DirectionalLight->Update(deltaTime);
-	if (PointLight)
-		PointLight->Update(deltaTime);
-	if (SpotLight)
+	for (auto light : jLight::GetLights())
 	{
-		SpotLight->SetDirection(Matrix::MakeRotateY(1.0f * deltaTime).TransformDirection(SpotLight->GetLightData().Direction));
-		SpotLight->Update(deltaTime);
-    } 
-
+		light->Update(deltaTime);
+	}
 }
 
 void jGame::Draw()
@@ -537,14 +699,6 @@ void jGame::Release()
 	{
 		delete it;
 	}
-
-    DirectionalLight = nullptr;		// 현재 사용중인 Directional light 의 레퍼런스이므로 그냥 nullptr 설정
-    DirectionalLight = nullptr;
-    NormalDirectionalLight = nullptr;
-    CascadeDirectionalLight = nullptr;
-    PointLight = nullptr;
-    SpotLight = nullptr;
-    AmbientLight = nullptr;
 	
 	delete MainCamera;
     MainCamera = nullptr;

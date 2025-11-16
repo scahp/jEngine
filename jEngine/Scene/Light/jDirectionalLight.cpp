@@ -84,6 +84,8 @@ const std::shared_ptr<jShaderBindingInstance>& jDirectionalLight::PrepareShaderB
 
 void jDirectionalLight::Update(float deltaTime)
 {
+    __super::Update(deltaTime);
+
     check(Camera);
     Camera->SetEulerAngle(Vector::GetEulerAngleFrom(LightData.Direction));
     Camera->UpdateCamera();

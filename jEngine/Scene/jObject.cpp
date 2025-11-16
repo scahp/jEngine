@@ -47,27 +47,27 @@ void jObject::RemoveObject(jObject* object)
 {
 	if (!object)
 		return;
-	s_ShadowCasterObject.erase(std::remove_if(s_ShadowCasterObject.begin(), s_ShadowCasterObject.end(), [&object](jObject* param)
+	std::erase_if(s_ShadowCasterObject, [&object](jObject* param)
 	{
 		return (param == object);
-	}));
-	s_StaticObjects.erase(std::remove_if(s_StaticObjects.begin(), s_StaticObjects.end(), [&object](jObject* param)
+	});
+	std::erase_if(s_StaticObjects, [&object](jObject* param)
 	{
 		return (param == object);
-	}));
+	});
 
 	{
 		for (auto& RenderObject : object->RenderObjects)
 		{
-			s_ShadowCasterRenderObject.erase(std::remove_if(s_ShadowCasterRenderObject.begin(), s_ShadowCasterRenderObject.end(), [&RenderObject](jRenderObject* param)
+			std::erase_if(s_ShadowCasterRenderObject, [&RenderObject](jRenderObject* param)
 			{
 				return (param == RenderObject);
-			}));
+			});
 
-			s_StaticRenderObjects.erase(std::remove_if(s_StaticRenderObjects.begin(), s_StaticRenderObjects.end(), [&RenderObject](jRenderObject* param)
+			std::erase_if(s_StaticRenderObjects, [&RenderObject](jRenderObject* param)
 			{
 				return (param == RenderObject);
-			}));
+			});
 		}
 	}
 }
@@ -105,10 +105,10 @@ void jObject::RemoveBoundBoxObject(jObject* object)
 {
 	if (!object)
 		return;
-	s_BoundBoxObjects.erase(std::remove_if(s_BoundBoxObjects.begin(), s_BoundBoxObjects.end(), [&object](jObject* param)
+	std::erase_if(s_BoundBoxObjects, [&object](jObject* param)
 	{
 		return (param == object);
-	}));
+	});
 }
 
 void jObject::AddBoundSphereObject(jObject* object)
@@ -122,10 +122,10 @@ void jObject::RemoveBoundSphereObject(jObject* object)
 {
 	if (!object)
 		return;
-	s_BoundSphereObjects.erase(std::remove_if(s_BoundSphereObjects.begin(), s_BoundSphereObjects.end(), [&object](jObject* param)
+	std::erase_if(s_BoundSphereObjects, [&object](jObject* param)
 	{
 		return (param == object);
-	}));
+	});
 }
 
 void jObject::AddDebugObject(jObject* object)
@@ -139,10 +139,10 @@ void jObject::RemoveDebugObject(jObject* object)
 {
 	if (!object)
 		return;
-	s_DebugObjects.erase(std::remove_if(s_DebugObjects.begin(), s_DebugObjects.end(), [&object](jObject* param)
+	std::erase_if(s_DebugObjects, [&object](jObject* param)
 	{
 		return (param == object);
-	}));
+	});
 }
 
 void jObject::AddUIObject(jObject* object)
@@ -156,10 +156,10 @@ void jObject::RemoveUIObject(jObject* object)
 {
 	if (!object)
 		return;
-	s_UIObjects.erase(std::remove_if(s_UIObjects.begin(), s_UIObjects.end(), [&object](jObject* param)
+	std::erase_if(s_UIObjects, [&object](jObject* param)
 	{
 		return (param == object);
-	}));
+	});
 }
 
 void jObject::AddUIDebugObject(jObject* object)
@@ -173,10 +173,10 @@ void jObject::RemoveUIDebugObject(jObject* object)
 {
 	if (!object)
 		return;
-	s_UIDebugObjects.erase(std::remove_if(s_UIDebugObjects.begin(), s_UIDebugObjects.end(), [&object](jObject* param)
+	std::erase_if(s_UIDebugObjects, [&object](jObject* param)
 	{
 		return (param == object);
-	}));
+	});
 }
 //////////////////////////////////////////////////////////////////////////
 jObject::jObject()
