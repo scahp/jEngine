@@ -25,3 +25,20 @@ void jCreatedResource::Free()
         }
     }
 }
+
+bool IsDX12CompareEnabled(D3D12_COMPARISON_FUNC InFilter)
+{
+    switch (InFilter)
+    {
+    case D3D12_COMPARISON_FUNC_LESS:
+    case D3D12_COMPARISON_FUNC_EQUAL:
+    case D3D12_COMPARISON_FUNC_LESS_EQUAL:
+    case D3D12_COMPARISON_FUNC_GREATER:
+    case D3D12_COMPARISON_FUNC_NOT_EQUAL:
+    case D3D12_COMPARISON_FUNC_GREATER_EQUAL:
+        return true;
+
+    default:
+        return false; // NEVER, ALWAYS
+    }
+}

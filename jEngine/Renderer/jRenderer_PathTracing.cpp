@@ -209,7 +209,7 @@ void jRenderer_PathTracing::PathTracing()
 		// Bind DefaultSampler
 		const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
 			, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
-			, 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
+			, 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
 		ShaderBindingArray.Add(jShaderBinding::Create(3, 1, EShaderBindingType::SAMPLER, EShaderAccessStageFlag::ALL_RAYTRACING,
 			ResourceInlineAllactor.Alloc<jSamplerResource>(SamplerState)));
 
@@ -386,7 +386,7 @@ void jRenderer_PathTracing::PathTracing()
 
 				const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
 					, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
-					, 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
+					, 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
 
 				InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
 					, InOutResourceInlineAllactor.Alloc<jTextureResource>(InTexture, SamplerState)));

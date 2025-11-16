@@ -1059,7 +1059,6 @@ void jRHI_DX12::BindGraphicsShaderBindingInstances(const jCommandBuffer* InComma
         check(CommandBuffer_DX12);
 
 		const jShaderBindingInstanceArray& ShaderBindingInstanceArray = *(InShaderBindingInstanceCombiner.ShaderBindingInstanceArray);
-		CommandBuffer_DX12->CommandList->SetGraphicsRootSignature(jShaderBindingLayout_DX12::CreateRootSignature(ShaderBindingInstanceArray, EShaderAccessStageFlag::ALL_GRAPHICS));
 
 		int32 RootParameterIndex = 0;
         int32 NumOfDescriptor = 0;
@@ -1124,6 +1123,9 @@ void jRHI_DX12::BindGraphicsShaderBindingInstances(const jCommandBuffer* InComma
                 }
             }
         }
+
+        // SetGraphicsRootSignature should be called after SetDescriptorHeaps to avoid D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED exception
+        CommandBuffer_DX12->CommandList->SetGraphicsRootSignature(jShaderBindingLayout_DX12::CreateRootSignature(ShaderBindingInstanceArray, EShaderAccessStageFlag::ALL_GRAPHICS));
 
         const D3D12_GPU_DESCRIPTOR_HANDLE FirstGPUDescriptorHandle
             = CommandBuffer_DX12->OnlineDescriptorHeap->GetGPUHandle(CommandBuffer_DX12->OnlineDescriptorHeap->GetNumOfAllocated());

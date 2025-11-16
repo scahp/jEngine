@@ -65,7 +65,7 @@ void jDirectionalLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* Ou
     jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
     const jSamplerStateInfo* ShadowSamplerStateInfo = TSamplerStateInfo<ETextureFilter::NEAREST_MIPMAP_LINEAR, ETextureFilter::NEAREST_MIPMAP_LINEAR
         , ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
-        , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), false, ECompareOp::LESS>::Create();
+        , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
 
     ShaderBindingArray.Add(jShaderBinding::Create(jShaderBinding::APPEND_LAST, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
         , ResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::IrradianceMap2, ShadowSamplerStateInfo)));

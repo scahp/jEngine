@@ -641,7 +641,7 @@ jName GetCommonTextureSRGBName(int32 index);
 
 template <ETextureFilter TMinification = ETextureFilter::NEAREST, ETextureFilter TMagnification = ETextureFilter::NEAREST, ETextureAddressMode TAddressU = ETextureAddressMode::CLAMP_TO_EDGE
     , ETextureAddressMode TAddressV = ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode TAddressW = ETextureAddressMode::CLAMP_TO_EDGE, float TMipLODBias = 0.0f
-    , float TMaxAnisotropy = 1.0f, Vector4 TBorderColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f), bool TIsEnableComparisonMode = false, ECompareOp TComparisonFunc = ECompareOp::LESS, float TMinLOD = -FLT_MAX, float TMaxLOD = FLT_MAX,
+    , float TMaxAnisotropy = 1.0f, Vector4 TBorderColor = Vector4(0.0f, 0.0f, 0.0f, 1.0f), bool TIsEnableComparisonMode = false, ECompareOp TComparisonFunc = ECompareOp::NEVER, float TMinLOD = -FLT_MAX, float TMaxLOD = FLT_MAX,
     ETextureComparisonMode TTextureComparisonMode = ETextureComparisonMode::NONE>
 struct TSamplerStateInfo
 {
