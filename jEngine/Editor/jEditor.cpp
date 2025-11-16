@@ -137,7 +137,7 @@ void jEditor::PlacementTool::ProcessInput(float deltaTime, jCamera* mainCamera, 
 			// Create debug visualization
 			Vector scale(1.0f, 1.0f, 1.0f);
 			auto* debugObj = jPrimitiveUtil::CreatePointLightDebug(scale, mainCamera, static_cast<jPointLight*>(newLight), "Image/bulb.png");
-			PlacedLightDebugObjects.push_back(debugObj);
+			PlacedLightDebugObjects.push_back(debugObj->BillboardObject);
 		}
 		wasLPressed = true;
 	}
@@ -172,7 +172,7 @@ void jEditor::PlacementTool::ProcessInput(float deltaTime, jCamera* mainCamera, 
 			// Create debug visualization
 			Vector scale(1.0f, 1.0f, 1.0f);
 			auto* debugObj = jPrimitiveUtil::CreateSpotLightDebug(scale, mainCamera, static_cast<jSpotLight*>(newLight), "Image/spot.png");
-			PlacedLightDebugObjects.push_back(debugObj);
+			PlacedLightDebugObjects.push_back(debugObj->BillboardObject);
 		}
 		wasKPressed = true;
 	}
@@ -202,7 +202,7 @@ void jEditor::PlacementTool::ProcessInput(float deltaTime, jCamera* mainCamera, 
 			Vector scale(1.0f, 1.0f, 1.0f);
 			float length = 50.0f;
 			auto* debugObj = jPrimitiveUtil::CreateDirectionalLightDebug(mainCamera->Pos, scale, length, mainCamera, static_cast<jDirectionalLight*>(newLight), "Image/sun.png");
-			PlacedLightDebugObjects.push_back(debugObj);
+			PlacedLightDebugObjects.push_back(debugObj->BillboardObject);
 		}
 		wasJPressed = true;
 	}
@@ -380,11 +380,60 @@ void jEditor::PlacementTool::RenderUI(jCamera* mainCamera)
 					{
 						jDirectionalLight* dirLight = static_cast<jDirectionalLight*>(selectedLight);
 						lightDir = const_cast<jDirectionalLightUniformBufferData&>(dirLight->GetLightData()).Direction;
-						lightPos = mainCamera->Pos + lightDir * -100.0f;  // Position for visualization
+
+						// Use debug object (BillboardObject) position if available
+						if (SelectedPlacedLightIndex < (int)PlacedLightDebugObjects.size())
+						{
+							auto* debugObj = PlacedLightDebugObjects[SelectedPlacedLightIndex];
+							if (debugObj && !debugObj->RenderObjects.empty())
+							{
+								lightPos = debugObj->RenderObjects[0]->GetPos();
+							}
+							else
+							{
+								lightPos = mainCamera->Pos + lightDir * -100.0f;  // Fallback
+							}
+						}
+						else
+						{
+							lightPos = mainCamera->Pos + lightDir * -100.0f;  // Fallback
+						}
 					}
 
-					// Create translation matrix
-					lightTransform = Matrix::MakeTranslate(lightPos);
+					// Create transform matrix (translation + rotation for directional lights)
+					if (selectedLight->GetLightType() == ELightType::DIRECTIONAL)
+					{
+						// Build rotation matrix from direction vector
+						Vector forward = lightDir.GetNormalize();
+						Vector up = Vector(0, 1, 0);
+
+						// Handle case where forward is parallel to up
+						if (fabsf(forward.DotProduct(up)) > 0.999f)
+							up = Vector(0, 0, 1);
+
+						Vector right = up.CrossProduct(forward).GetNormalize();
+						up = forward.CrossProduct(right).GetNormalize();
+
+						// Build rotation matrix from basis vectors
+						Matrix rotationMatrix = Matrix(IdentityType);
+						rotationMatrix.m[0][0] = right.x;
+						rotationMatrix.m[0][1] = right.y;
+						rotationMatrix.m[0][2] = right.z;
+						rotationMatrix.m[1][0] = up.x;
+						rotationMatrix.m[1][1] = up.y;
+						rotationMatrix.m[1][2] = up.z;
+						rotationMatrix.m[2][0] = forward.x;
+						rotationMatrix.m[2][1] = forward.y;
+						rotationMatrix.m[2][2] = forward.z;
+
+						// Combine translation and rotation
+						Matrix translationMatrix = Matrix::MakeTranslate(lightPos);
+						lightTransform = translationMatrix * rotationMatrix;
+					}
+					else
+					{
+						lightTransform = Matrix::MakeTranslate(lightPos);
+					}
 
 					// Apply Gizmo manipulation
 					float* matrixPtr = &lightTransform.m[0][0];
@@ -436,17 +485,28 @@ void jEditor::PlacementTool::RenderUI(jCamera* mainCamera)
 						else if (selectedLight->GetLightType() == ELightType::DIRECTIONAL)
 						{
 							jDirectionalLight* dirLight = static_cast<jDirectionalLight*>(selectedLight);
-							// For directional lights, position change represents direction change
-							Vector newDir = (newPos - mainCamera->Pos).GetNormalize();
-							dirLight->SetDirection(newDir);
 
-							// Update debug object position
-							if (SelectedPlacedLightIndex < (int)PlacedLightDebugObjects.size())
+							// For rotation: extract new direction from rotation matrix
+							if (GizmoOperation == ImGuizmo::ROTATE)
 							{
-								auto* debugObj = PlacedLightDebugObjects[SelectedPlacedLightIndex];
-								if (debugObj && !debugObj->RenderObjects.empty())
+								// Extract rotation matrix and get forward vector (Z-axis)
+								Vector newForward(lightTransform.m[2][0], lightTransform.m[2][1], lightTransform.m[2][2]);
+								newForward = newForward.GetNormalize();
+								dirLight->SetDirection(newForward);
+
+								// Debug object position stays at gizmo position (newPos)
+								// Don't recalculate based on camera, just keep it where user placed it
+							}
+							else // Translation: move debug object
+							{
+								// Update debug object (BillboardObject) position
+								if (SelectedPlacedLightIndex < (int)PlacedLightDebugObjects.size())
 								{
-									debugObj->RenderObjects[0]->SetPos(newPos);
+									auto* debugObj = PlacedLightDebugObjects[SelectedPlacedLightIndex];
+									if (debugObj && !debugObj->RenderObjects.empty())
+									{
+										debugObj->RenderObjects[0]->SetPos(newPos);
+									}
 								}
 							}
 						}
@@ -540,7 +600,7 @@ void jEditor::PlacementTool::RenderUI(jCamera* mainCamera)
 						dir = dir.GetNormalize();
 						dirLight->SetDirection(dir);
 					}
-					AddCopyPasteContextMenu("PlacedLightDirContext", dir, [dirLight](float x, float y, float z) {
+					AddCopyPasteContextMenu("PlacedLightDirContext", dir, [this, dirLight](float x, float y, float z) {
 						Vector newDir(x, y, z);
 						newDir = newDir.GetNormalize();
 						dirLight->SetDirection(newDir);
