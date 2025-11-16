@@ -114,6 +114,7 @@ void jEditor::PlacementTool::ProcessInput(float deltaTime, jCamera* mainCamera, 
 	static bool wasKPressed = false;
 	static bool wasJPressed = false;
 	static bool wasDeletePressed = false;
+	constexpr float DebugIconScale = 10.0f;
 
 	// L: Create Point Light at camera position
 	if (g_KeyState['l'] || g_KeyState['L'])
@@ -135,8 +136,8 @@ void jEditor::PlacementTool::ProcessInput(float deltaTime, jCamera* mainCamera, 
 			PlacedLights.push_back(newLight);
 
 			// Create debug visualization
-			Vector scale(1.0f, 1.0f, 1.0f);
-			auto* debugObj = jPrimitiveUtil::CreatePointLightDebug(scale, mainCamera, static_cast<jPointLight*>(newLight), "Image/bulb.png");
+			auto* debugObj = jPrimitiveUtil::CreatePointLightDebug(Vector(DebugIconScale), mainCamera, static_cast<jPointLight*>(newLight), "Image/bulb.png");
+			jObject::AddDebugObject(debugObj->BillboardObject);
 			PlacedLightDebugObjects.push_back(debugObj->BillboardObject);
 		}
 		wasLPressed = true;
@@ -170,8 +171,8 @@ void jEditor::PlacementTool::ProcessInput(float deltaTime, jCamera* mainCamera, 
 			PlacedLights.push_back(newLight);
 
 			// Create debug visualization
-			Vector scale(1.0f, 1.0f, 1.0f);
-			auto* debugObj = jPrimitiveUtil::CreateSpotLightDebug(scale, mainCamera, static_cast<jSpotLight*>(newLight), "Image/spot.png");
+			auto* debugObj = jPrimitiveUtil::CreateSpotLightDebug(Vector(DebugIconScale), mainCamera, static_cast<jSpotLight*>(newLight), "Image/spot.png");
+			jObject::AddDebugObject(debugObj->BillboardObject);
 			PlacedLightDebugObjects.push_back(debugObj->BillboardObject);
 		}
 		wasKPressed = true;
@@ -199,9 +200,9 @@ void jEditor::PlacementTool::ProcessInput(float deltaTime, jCamera* mainCamera, 
 			PlacedLights.push_back(newLight);
 
 			// Create debug visualization (at camera position for visibility)
-			Vector scale(1.0f, 1.0f, 1.0f);
 			float length = 50.0f;
-			auto* debugObj = jPrimitiveUtil::CreateDirectionalLightDebug(mainCamera->Pos, scale, length, mainCamera, static_cast<jDirectionalLight*>(newLight), "Image/sun.png");
+			auto* debugObj = jPrimitiveUtil::CreateDirectionalLightDebug(mainCamera->Pos, Vector(DebugIconScale), length, mainCamera, static_cast<jDirectionalLight*>(newLight), "Image/sun.png");
+            jObject::AddDebugObject(debugObj->BillboardObject);
 			PlacedLightDebugObjects.push_back(debugObj->BillboardObject);
 		}
 		wasJPressed = true;
