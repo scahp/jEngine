@@ -5,6 +5,10 @@
 
 #include <windows.h>
 
+// Editor Features
+// Uncomment to enable editor-specific features like Placement Tool
+#define ENABLE_EDITOR_FEATURES
+
 #define LEFT_HANDED 1
 #define RIGHT_HANDED !LEFT_HANDED
 

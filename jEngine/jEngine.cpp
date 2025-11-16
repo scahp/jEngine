@@ -6,6 +6,10 @@
 #include "RHI/jFrameBufferPool.h"
 #include "jCommandlineArgument.h"
 
+#ifdef ENABLE_EDITOR_FEATURES
+#include "Editor/jEditor.h"
+#endif
+
 jEngine::jEngine()
 {
 
@@ -46,6 +50,11 @@ void jEngine::PreInit()
 
 void jEngine::Init()
 {
+#ifdef ENABLE_EDITOR_FEATURES
+	// Initialize editor features
+	g_Editor = new jEditor();
+#endif
+
 	Game.Setup();
 }
 
@@ -56,6 +65,15 @@ void jEngine::Release()
 
 	Game.Release();
     jRenderTargetPool::Release();
+
+#ifdef ENABLE_EDITOR_FEATURES
+	// Cleanup editor features
+	if (g_Editor)
+	{
+		delete g_Editor;
+		g_Editor = nullptr;
+	}
+#endif
 }
 
 void jEngine::ProcessInput(float deltaTime)

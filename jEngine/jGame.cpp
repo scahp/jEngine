@@ -26,6 +26,10 @@
 #include "Renderer/jRenderer_PathTracing.h"
 #include "FileLoader/jFile.h"
 
+#ifdef ENABLE_EDITOR_FEATURES
+#include "Editor/jEditor.h"
+#endif
+
 jRHI* g_rhi = nullptr;
 jObject* jGame::Sphere = nullptr;
 
@@ -58,147 +62,13 @@ void jGame::ProcessInput(float deltaTime)
 	if (g_KeyState['+']) MoveDistancePerSecond = Max(MoveDistancePerSecond + 10.0f, 0.0f);
 	if (g_KeyState['-']) MoveDistancePerSecond = Max(MoveDistancePerSecond - 10.0f, 0.0f);
 
-	// Light Placement Tool - Hotkeys
-	static bool wasLPressed = false;
-	static bool wasKPressed = false;
-	static bool wasJPressed = false;
-	static bool wasDeletePressed = false;
-
-	if (gOptions.EnableLightPlacementMode)
+#ifdef ENABLE_EDITOR_FEATURES
+	// Editor-specific input handling (e.g., Placement Tool)
+	if (g_Editor)
 	{
-		// L: Create Point Light at camera position
-		if (g_KeyState['l'] || g_KeyState['L'])
-		{
-			if (!wasLPressed)
-			{
-				Vector cameraPos = MainCamera->Pos;
-				Vector lightColor = Vector(1.0f, 1.0f, 1.0f);  // White
-				auto* newLight = jLight::CreatePointLight(
-					cameraPos,
-					lightColor * gOptions.LightColorScale,
-					1500.0f,  // maxDistance
-					Vector(1.0f, 1.0f, 1.0f),  // diffuseIntensity
-					Vector(1.0f, 1.0f, 1.0f),  // specularIntensity
-					64.0f  // specularPower
-				);
-
-				jLight::AddLights(newLight);  // Register light to engine
-				PlacedLights.push_back(newLight);
-
-				// Create debug visualization
-				Vector scale(1.0f, 1.0f, 1.0f);
-				auto* debugObj = jPrimitiveUtil::CreatePointLightDebug(scale, MainCamera, static_cast<jPointLight*>(newLight), "Image/bulb.png");
-				PlacedLightDebugObjects.push_back(debugObj);
-			}
-			wasLPressed = true;
-		}
-		else
-		{
-			wasLPressed = false;
-		}
-
-		// K: Create Spot Light at camera position
-		if (g_KeyState['k'] || g_KeyState['K'])
-		{
-			if (!wasKPressed)
-			{
-				Vector cameraPos = MainCamera->Pos;
-				Vector cameraDir = MainCamera->GetForwardVector();
-				Vector lightColor = Vector(1.0f, 1.0f, 0.0f);  // Yellow
-				auto* newLight = jLight::CreateSpotLight(
-					cameraPos, 
-					cameraDir, 
-					lightColor * gOptions.LightColorScale, 
-					2000.0f, 
-					0.35f, 
-					1.0f, 
-					Vector(1.0f, 1.0f, 1.0f), 
-					Vector(1.0f), 
-					64.0f
-				);
-
-				jLight::AddLights(newLight);  // Register light to engine
-				PlacedLights.push_back(newLight);
-
-				// Create debug visualization
-				Vector scale(1.0f, 1.0f, 1.0f);
-				auto* debugObj = jPrimitiveUtil::CreateSpotLightDebug(scale, MainCamera, static_cast<jSpotLight*>(newLight), "Image/spot.png");
-				PlacedLightDebugObjects.push_back(debugObj);
-			}
-			wasKPressed = true;
-		}
-		else
-		{
-			wasKPressed = false;
-		}
-
-		// J: Create Directional Light pointing in camera direction
-		if (g_KeyState['j'] || g_KeyState['J'])
-		{
-			if (!wasJPressed)
-			{
-				Vector lightColor = gOptions.DirectionalLightColor * gOptions.DirectionalLightIntensity;
-				auto* newLight = jLight::CreateDirectionalLight(
-					gOptions.SunDir,
-					lightColor,
-					Vector(1.0f, 1.0f, 1.0f),  // diffuseIntensity
-					Vector(1.0f, 1.0f, 1.0f),  // specularIntensity
-					64.0f  // specularPower
-				);
-
-				jLight::AddLights(newLight);  // Register light to engine
-				PlacedLights.push_back(newLight);
-
-				// Create debug visualization (at camera position for visibility)
-				Vector scale(1.0f, 1.0f, 1.0f);
-				float length = 50.0f;
-				auto* debugObj = jPrimitiveUtil::CreateDirectionalLightDebug(MainCamera->Pos, scale, length, MainCamera, static_cast<jDirectionalLight*>(newLight), "Image/sun.png");
-				PlacedLightDebugObjects.push_back(debugObj);
-			}
-			wasJPressed = true;
-		}
-		else
-		{
-			wasJPressed = false;
-		}
-
-		// Delete: Remove selected light
-		if (g_KeyState[VK_DELETE])
-		{
-			if (!wasDeletePressed && gOptions.SelectedPlacedLightIndex >= 0 &&
-				gOptions.SelectedPlacedLightIndex < static_cast<int32>(PlacedLights.size()))
-			{
-				DeletePlacedLight(gOptions.SelectedPlacedLightIndex);
-			}
-			wasDeletePressed = true;
-		}
-		else
-		{
-			wasDeletePressed = false;
-		}
+		g_Editor->Placement.ProcessInput(deltaTime, MainCamera, gOptions.LightColorScale);
 	}
-}
-
-void jGame::DeletePlacedLight(int32 index)
-{
-	if (index < 0 || index >= static_cast<int32>(PlacedLights.size()))
-		return;
-
-	// Remove debug object
-	if (index < static_cast<int32>(PlacedLightDebugObjects.size()))
-	{
-		auto* debugObj = PlacedLightDebugObjects[index];
-		jObject::RemoveObject(debugObj);
-		PlacedLightDebugObjects.erase(PlacedLightDebugObjects.begin() + index);
-	}
-
-	// Remove light
-	auto* light = PlacedLights[index];
-	jLight::RemoveLights(light);
-	PlacedLights.erase(PlacedLights.begin() + index);
-
-	// Reset selection
-	gOptions.SelectedPlacedLightIndex = -1;
+#endif
 }
 
 void jGame::Setup()
@@ -294,9 +164,14 @@ void jGame::Setup()
 		jObject::AddDebugObject(DirectionalLightInfo->BillboardObject);
 		// jObject::AddDebugObject(DirectionalLightInfo->ArrowSegementObject);
 
-		// Add to Light Placement Tool
-		PlacedLights.push_back(DirectionalLight);
-		PlacedLightDebugObjects.push_back(DirectionalLightInfo->BillboardObject);
+#ifdef ENABLE_EDITOR_FEATURES
+		// Add to Placement Tool
+		if (g_Editor)
+		{
+			g_Editor->Placement.PlacedLights.push_back(DirectionalLight);
+			g_Editor->Placement.PlacedLightDebugObjects.push_back(DirectionalLightInfo->BillboardObject);
+		}
+#endif
     }
 
     if (PointLight)
@@ -304,9 +179,14 @@ void jGame::Setup()
         PointLightInfo = jPrimitiveUtil::CreatePointLightDebug(Vector(10.0f), MainCamera, PointLight, "Image/bulb.png");
         jObject::AddDebugObject(PointLightInfo->BillboardObject);
 
-		// Add to Light Placement Tool
-		PlacedLights.push_back(PointLight);
-		PlacedLightDebugObjects.push_back(PointLightInfo->BillboardObject);
+#ifdef ENABLE_EDITOR_FEATURES
+		// Add to Placement Tool
+		if (g_Editor)
+		{
+			g_Editor->Placement.PlacedLights.push_back(PointLight);
+			g_Editor->Placement.PlacedLightDebugObjects.push_back(PointLightInfo->BillboardObject);
+		}
+#endif
     }
 
     if (SpotLight)
@@ -314,9 +194,14 @@ void jGame::Setup()
         SpotLightInfo = jPrimitiveUtil::CreateSpotLightDebug(Vector(10.0f), MainCamera, SpotLight, "Image/spot.png");
         jObject::AddDebugObject(SpotLightInfo->BillboardObject);
 
-		// Add to Light Placement Tool
-		PlacedLights.push_back(SpotLight);
-		PlacedLightDebugObjects.push_back(SpotLightInfo->BillboardObject);
+#ifdef ENABLE_EDITOR_FEATURES
+		// Add to Placement Tool
+		if (g_Editor)
+		{
+			g_Editor->Placement.PlacedLights.push_back(SpotLight);
+			g_Editor->Placement.PlacedLightDebugObjects.push_back(SpotLightInfo->BillboardObject);
+		}
+#endif
     }
 
 	//// Main camera is linked with lights which will be used.

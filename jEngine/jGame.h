@@ -74,11 +74,6 @@ public:
 
 	std::vector<jObject*> SpawnedObjects;
 
-	// Light Placement Tool
-	std::vector<jLight*> PlacedLights;
-	std::vector<jObject*> PlacedLightDebugObjects;
-	void DeletePlacedLight(int32 index);
-
 	std::future<void> ResourceLoadCompleteEvent;
 	std::vector<jObject*> CompletedAsyncLoadObjects;
 	jMutexLock AsyncLoadLock;

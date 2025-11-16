@@ -101,10 +101,6 @@ struct jOptions
     // Raytracing
     bool UseRaytracing;
 
-    // Light Placement Tool
-    bool EnableLightPlacementMode;
-    int32 SelectedPlacedLightIndex;
-
     float LightColorScale = 1.0f;
 
     FORCEINLINE bool IsDenoiserGuassian() const { return Denoiser == EDenoiser::GAUSSIAN; }
