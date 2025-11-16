@@ -5,6 +5,8 @@
 
 #ifdef ENABLE_EDITOR_FEATURES
 
+#include "External/ImGuizmo/ImGuizmo.h"
+
 class jLight;
 class jObject;
 class jCamera;
@@ -23,6 +25,14 @@ public:
 
 		std::vector<jLight*> PlacedLights;
 		std::vector<jObject*> PlacedLightDebugObjects;
+
+		// Gizmo settings
+		ImGuizmo::OPERATION GizmoOperation = ImGuizmo::TRANSLATE;
+		ImGuizmo::MODE GizmoMode = ImGuizmo::WORLD;
+		bool UseSnap = false;
+		float TranslationSnap[3] = {1.0f, 1.0f, 1.0f};
+		float RotationSnap = 15.0f;  // degrees
+		float ScaleSnap[3] = {0.1f, 0.1f, 0.1f};
 
 		void ProcessInput(float deltaTime, jCamera* mainCamera, float lightColorScale);
 		void DeletePlacedLight(int32 index);

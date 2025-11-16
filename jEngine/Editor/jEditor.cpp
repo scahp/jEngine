@@ -9,6 +9,7 @@
 #include "Scene/Light/jPointLight.h"
 #include "Scene/Light/jSpotLight.h"
 #include "Scene/jObject.h"
+#include "Scene/jRenderObject.h"
 #include "jPrimitiveUtil.h"
 #include "jOptions.h"
 #include "ImGui/jImGui.h"
@@ -28,7 +29,87 @@ void jEditor::PlacementTool::ProcessInput(float deltaTime, jCamera* mainCamera, 
 	if (!EnablePlacementMode || !mainCamera)
 		return;
 
-	// Hotkey states
+	// Gizmo mode switching hotkeys (when not in ImGui window)
+	if (!ImGui::GetIO().WantCaptureKeyboard)
+	{
+		static bool wasWPressed = false;
+		static bool wasEPressed = false;
+		static bool wasRPressed = false;
+		static bool wasQPressed = false;
+		static bool wasCtrlPressed = false;
+
+		// W: Translate mode
+		if (g_KeyState['w'] || g_KeyState['W'])
+		{
+			if (!wasWPressed && g_KeyState[VK_SHIFT])  // Shift+W
+			{
+				GizmoOperation = ImGuizmo::TRANSLATE;
+			}
+			wasWPressed = true;
+		}
+		else
+		{
+			wasWPressed = false;
+		}
+
+		// E: Rotate mode
+		if (g_KeyState['e'] || g_KeyState['E'])
+		{
+			if (!wasEPressed && g_KeyState[VK_SHIFT])  // Shift+E
+			{
+				GizmoOperation = ImGuizmo::ROTATE;
+			}
+			wasEPressed = true;
+		}
+		else
+		{
+			wasEPressed = false;
+		}
+
+		// R: Scale mode
+		if (g_KeyState['r'] || g_KeyState['R'])
+		{
+			if (!wasRPressed && g_KeyState[VK_SHIFT])  // Shift+R
+			{
+				GizmoOperation = ImGuizmo::SCALE;
+			}
+			wasRPressed = true;
+		}
+		else
+		{
+			wasRPressed = false;
+		}
+
+		// Q: Toggle Local/World space
+		if (g_KeyState['q'] || g_KeyState['Q'])
+		{
+			if (!wasQPressed)
+			{
+				GizmoMode = (GizmoMode == ImGuizmo::LOCAL) ? ImGuizmo::WORLD : ImGuizmo::LOCAL;
+			}
+			wasQPressed = true;
+		}
+		else
+		{
+			wasQPressed = false;
+		}
+
+		// Ctrl: Toggle snap
+		if (g_KeyState[VK_CONTROL])
+		{
+			if (!wasCtrlPressed)
+			{
+				UseSnap = !UseSnap;
+			}
+			wasCtrlPressed = true;
+		}
+		else
+		{
+			wasCtrlPressed = false;
+		}
+	}
+
+	// Hotkey states for light creation
 	static bool wasLPressed = false;
 	static bool wasKPressed = false;
 	static bool wasJPressed = false;
@@ -107,7 +188,7 @@ void jEditor::PlacementTool::ProcessInput(float deltaTime, jCamera* mainCamera, 
 		{
 			Vector lightColor = gOptions.DirectionalLightColor * gOptions.DirectionalLightIntensity;
 			auto* newLight = jLight::CreateDirectionalLight(
-				gOptions.SunDir,
+				gOptions.DefaultSunDir,
 				lightColor,
 				Vector(1.0f, 1.0f, 1.0f),  // diffuseIntensity
 				Vector(1.0f, 1.0f, 1.0f),  // specularIntensity
@@ -170,6 +251,9 @@ void jEditor::PlacementTool::DeletePlacedLight(int32 index)
 
 void jEditor::PlacementTool::RenderUI(jCamera* mainCamera)
 {
+	// Initialize ImGuizmo for this frame
+	ImGuizmo::BeginFrame();
+
 	ImGui::Separator();
 	ImGui::TextColored(ImVec4(0, 1, 1, 1), "Placement Tool");
 
@@ -183,6 +267,50 @@ void jEditor::PlacementTool::RenderUI(jCamera* mainCamera)
 		ImGui::Text("  K - Create Spot Light (Yellow)");
 		ImGui::Text("  J - Create Directional Light (Orange)");
 		ImGui::Text("  DELETE - Remove selected light");
+		ImGui::Separator();
+
+		// Gizmo Controls
+		ImGui::TextColored(ImVec4(0, 1, 1, 1), "Gizmo Controls:");
+		ImGui::Text("Operation Mode:");
+		ImGui::Indent();
+		if (ImGui::RadioButton("Translate (Shift+W)", GizmoOperation == ImGuizmo::TRANSLATE))
+			GizmoOperation = ImGuizmo::TRANSLATE;
+		if (ImGui::RadioButton("Rotate (Shift+E)", GizmoOperation == ImGuizmo::ROTATE))
+			GizmoOperation = ImGuizmo::ROTATE;
+		if (ImGui::RadioButton("Scale (Shift+R)", GizmoOperation == ImGuizmo::SCALE))
+			GizmoOperation = ImGuizmo::SCALE;
+		ImGui::Unindent();
+
+		ImGui::Spacing();
+		ImGui::Text("Coordinate Space:");
+		ImGui::Indent();
+		if (ImGui::RadioButton("Local", GizmoMode == ImGuizmo::LOCAL))
+			GizmoMode = ImGuizmo::LOCAL;
+		ImGui::SameLine();
+		if (ImGui::RadioButton("World (Q)", GizmoMode == ImGuizmo::WORLD))
+			GizmoMode = ImGuizmo::WORLD;
+		ImGui::Unindent();
+
+		ImGui::Spacing();
+		ImGui::Checkbox("Enable Snap (Ctrl)", &UseSnap);
+
+		if (UseSnap)
+		{
+			ImGui::Indent();
+			if (GizmoOperation == ImGuizmo::TRANSLATE)
+			{
+				ImGui::DragFloat3("Translation Snap", TranslationSnap, 0.1f, 0.1f, 100.0f);
+			}
+			else if (GizmoOperation == ImGuizmo::ROTATE)
+			{
+				ImGui::DragFloat("Rotation Snap (deg)", &RotationSnap, 1.0f, 1.0f, 90.0f);
+			}
+			else if (GizmoOperation == ImGuizmo::SCALE)
+			{
+				ImGui::DragFloat3("Scale Snap", ScaleSnap, 0.01f, 0.01f, 1.0f);
+			}
+			ImGui::Unindent();
+		}
 		ImGui::Separator();
 
 		if (!PlacedLights.empty())
@@ -216,6 +344,114 @@ void jEditor::PlacementTool::RenderUI(jCamera* mainCamera)
 				SelectedPlacedLightIndex < (int)PlacedLights.size())
 			{
 				jLight* selectedLight = PlacedLights[SelectedPlacedLightIndex];
+
+				// Render 3D Gizmo in viewport
+				if (mainCamera)
+				{
+					// Setup viewport for Gizmo rendering
+					ImGuizmo::Enable(true);
+					ImGuizmo::SetOrthographic(false);
+					ImGuizmo::SetDrawlist(ImGui::GetForegroundDrawList());
+					ImGuizmo::SetRect(0, 0, (float)SCR_WIDTH, (float)SCR_HEIGHT);
+
+					// Get camera matrices
+					float* viewMatrix = &mainCamera->View.m[0][0];
+					float* projMatrix = &mainCamera->Projection.m[0][0];
+
+					// Build transform matrix for selected light
+					Matrix lightTransform = Matrix(IdentityType);
+					Vector lightPos = Vector::ZeroVector;
+					Vector lightDir = Vector(0, -1, 0);
+
+					// Get position and direction based on light type
+					if (selectedLight->GetLightType() == ELightType::POINT)
+					{
+						jPointLight* pointLight = static_cast<jPointLight*>(selectedLight);
+						lightPos = const_cast<jPointLightUniformBufferData&>(pointLight->GetLightData()).Position;
+					}
+					else if (selectedLight->GetLightType() == ELightType::SPOT)
+					{
+						jSpotLight* spotLight = static_cast<jSpotLight*>(selectedLight);
+						auto& data = const_cast<jSpotLightUniformBufferData&>(spotLight->GetLightData());
+						lightPos = data.Position;
+						lightDir = data.Direction;
+					}
+					else if (selectedLight->GetLightType() == ELightType::DIRECTIONAL)
+					{
+						jDirectionalLight* dirLight = static_cast<jDirectionalLight*>(selectedLight);
+						lightDir = const_cast<jDirectionalLightUniformBufferData&>(dirLight->GetLightData()).Direction;
+						lightPos = mainCamera->Pos + lightDir * -100.0f;  // Position for visualization
+					}
+
+					// Create translation matrix
+					lightTransform = Matrix::MakeTranslate(lightPos);
+
+					// Apply Gizmo manipulation
+					float* matrixPtr = &lightTransform.m[0][0];
+					float* snapPtr = UseSnap ? (GizmoOperation == ImGuizmo::TRANSLATE ? TranslationSnap :
+												GizmoOperation == ImGuizmo::ROTATE ? &RotationSnap :
+												ScaleSnap) : nullptr;
+
+					if (ImGuizmo::Manipulate(viewMatrix, projMatrix, GizmoOperation, GizmoMode,
+											  matrixPtr, nullptr, snapPtr))
+					{
+						// Extract new position from matrix
+						Vector newPos(lightTransform.m[3][0], lightTransform.m[3][1], lightTransform.m[3][2]);
+
+						// Apply to light based on type
+						if (selectedLight->GetLightType() == ELightType::POINT)
+						{
+							jPointLight* pointLight = static_cast<jPointLight*>(selectedLight);
+							auto& data = const_cast<jPointLightUniformBufferData&>(pointLight->GetLightData());
+							data.Position = newPos;
+							pointLight->IsNeedToUpdateShaderBindingInstance = true;
+
+							// Update debug object position
+							if (SelectedPlacedLightIndex < (int)PlacedLightDebugObjects.size())
+							{
+								auto* debugObj = PlacedLightDebugObjects[SelectedPlacedLightIndex];
+								if (debugObj && !debugObj->RenderObjects.empty())
+								{
+									debugObj->RenderObjects[0]->SetPos(newPos);
+								}
+							}
+						}
+						else if (selectedLight->GetLightType() == ELightType::SPOT)
+						{
+							jSpotLight* spotLight = static_cast<jSpotLight*>(selectedLight);
+							auto& data = const_cast<jSpotLightUniformBufferData&>(spotLight->GetLightData());
+							data.Position = newPos;
+							spotLight->IsNeedToUpdateShaderBindingInstance = true;
+
+							// Update debug object position
+							if (SelectedPlacedLightIndex < (int)PlacedLightDebugObjects.size())
+							{
+								auto* debugObj = PlacedLightDebugObjects[SelectedPlacedLightIndex];
+								if (debugObj && !debugObj->RenderObjects.empty())
+								{
+									debugObj->RenderObjects[0]->SetPos(newPos);
+								}
+							}
+						}
+						else if (selectedLight->GetLightType() == ELightType::DIRECTIONAL)
+						{
+							jDirectionalLight* dirLight = static_cast<jDirectionalLight*>(selectedLight);
+							// For directional lights, position change represents direction change
+							Vector newDir = (newPos - mainCamera->Pos).GetNormalize();
+							dirLight->SetDirection(newDir);
+
+							// Update debug object position
+							if (SelectedPlacedLightIndex < (int)PlacedLightDebugObjects.size())
+							{
+								auto* debugObj = PlacedLightDebugObjects[SelectedPlacedLightIndex];
+								if (debugObj && !debugObj->RenderObjects.empty())
+								{
+									debugObj->RenderObjects[0]->SetPos(newPos);
+								}
+							}
+						}
+					}
+				}
 
 				ImGui::Separator();
 				ImGui::TextColored(ImVec4(0, 1, 0, 1), "Selected Light Properties:");

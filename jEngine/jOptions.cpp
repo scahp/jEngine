@@ -36,7 +36,7 @@ jOptions::jOptions()
 	Metallic = 0.0f;
 	Roughness = 0.2f;
 	//SunDir = Vector(0.31f, -0.828f, -0.241f);
-    SunDir = Vector(0.049f, -0.953f, -0.263f);
+    DefaultSunDir = Vector(0.049f, -0.953f, -0.263f);
 	DirectionalLightColor = Vector(0.074f, 0.059f, 0.028f);
 	DirectionalLightIntensity = 30.0f;
 	AnisoG = 0.15f;

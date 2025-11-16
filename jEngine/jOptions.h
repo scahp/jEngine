@@ -42,7 +42,7 @@ struct jOptions
     float AutoExposureKeyValueScale;
     float Metallic;
     float Roughness;
-    Vector SunDir;
+    Vector DefaultSunDir;
     Vector DirectionalLightColor;
     float DirectionalLightIntensity;
     float AnisoG;

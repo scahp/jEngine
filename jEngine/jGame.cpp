@@ -96,18 +96,8 @@ void jGame::Setup()
     // Create lights
 	{
 		Vector lightColor = gOptions.DirectionalLightColor * gOptions.DirectionalLightIntensity;
-		DirectionalLight = jLight::CreateDirectionalLight(gOptions.SunDir
+		DirectionalLight = jLight::CreateDirectionalLight(gOptions.DefaultSunDir
 			, Vector4(lightColor.x, lightColor.y, lightColor.z, 1.0f), Vector(1.0f), Vector(1.0f), 64);
-		if (DirectionalLight)
-		{
-			DirectionalLight->PreUpdateLambda = [](jLight* light, float InDeltaTime)
-			{
-				auto DirectionalLight = (jDirectionalLight*)(light);
-				check(DirectionalLight);
-                Vector& SunDir = DirectionalLight->GetLightData().Direction;
-                SunDir = gOptions.SunDir;
-			};
-		}
 
 		PointLight = jLight::CreatePointLight(Vector(10.0f, 100.0f, 10.0f), Vector4(1.0f, 0.75f, 0.75f, 1.0f) * LightColorScale, 1500.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
 		SpotLight = jLight::CreateSpotLight(Vector(0.0f, 60.0f, 5.0f), Vector(1.0f, -1.0f, 0.4f).GetNormalize(), Vector4(0.0f, 1.0f, 0.0f, 1.0f) * LightColorScale, 2000.0f, 0.35f, 1.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
@@ -133,7 +123,7 @@ void jGame::Setup()
 
     // Create lights
     Vector lightColor = gOptions.DirectionalLightColor * gOptions.DirectionalLightIntensity;
-    DirectionalLight = jLight::CreateDirectionalLight(gOptions.SunDir
+    DirectionalLight = jLight::CreateDirectionalLight(gOptions.DefaultSunDir
         , Vector4(lightColor.x, lightColor.y, lightColor.z, 1.0f), Vector(1.0f), Vector(1.0f), 64);
     //CascadeDirectionalLight = jLight::CreateCascadeDirectionalLight(AppSettings.DirecionalLightDirection
     //	, Vector4(0.6f), Vector(1.0f), Vector(1.0f), 64);
@@ -543,6 +533,12 @@ void jGame::OnMouseMove(int32 xOffset, int32 yOffset)
 {
 	if (g_MouseState[EMouseButtonType::LEFT])
 	{
+#ifdef ENABLE_EDITOR_FEATURES
+		// Don't rotate camera when manipulating Gizmo
+		if (ImGuizmo::IsUsing() || ImGuizmo::IsOver())
+			return;
+#endif
+
 		constexpr float PitchScale = 0.0025f;
 		constexpr float YawScale = 0.0025f;
 		if (MainCamera)

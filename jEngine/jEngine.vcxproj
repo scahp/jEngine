@@ -147,6 +147,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClInclude Include="FileLoader\jFile.h" />
     <ClInclude Include="FileLoader\jImageFileLoader.h" />
     <ClInclude Include="FileLoader\jModelLoader.h" />
+    <ClInclude Include="External\ImGuizmo\ImGuizmo.h" />
     <ClInclude Include="ImGui\jImGui.h" />
     <ClInclude Include="Editor\jEditor.h" />
     <ClInclude Include="jCommandlineArgument.h" />
@@ -357,6 +358,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClCompile Include="FileLoader\jFile.cpp" />
     <ClCompile Include="FileLoader\jImageFileLoader.cpp" />
     <ClCompile Include="FileLoader\jModelLoader.cpp" />
+    <ClCompile Include="External\ImGuizmo\ImGuizmo.cpp" />
     <ClCompile Include="ImGui\jImGui.cpp" />
     <ClCompile Include="Editor\jEditor.cpp" />
     <ClCompile Include="jCommandlineArgument.cpp" />
