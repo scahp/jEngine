@@ -151,6 +151,8 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClInclude Include="ImGui\jImGui.h" />
     <ClInclude Include="Editor\jEditor.h" />
     <ClInclude Include="Editor\jPlacementTool.h" />
+    <ClInclude Include="Console\jConsole.h" />
+    <ClInclude Include="Console\jConsoleVariable.h" />
     <ClInclude Include="jCommandlineArgument.h" />
     <ClInclude Include="jEngine.h" />
     <ClInclude Include="jGame.h" />
@@ -363,6 +365,8 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClCompile Include="ImGui\jImGui.cpp" />
     <ClCompile Include="Editor\jEditor.cpp" />
     <ClCompile Include="Editor\jPlacementTool.cpp" />
+    <ClCompile Include="Console\jConsole.cpp" />
+    <ClCompile Include="Console\jConsoleVariable.cpp" />
     <ClCompile Include="jCommandlineArgument.cpp" />
     <ClCompile Include="jEngine.cpp" />
     <ClCompile Include="jGame.cpp" />

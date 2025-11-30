@@ -9,6 +9,7 @@
 #include "Scene/Light/jSpotLight.h"
 #include "Scene/jObject.h"
 #include "jEngine.h"
+#include "Console/jConsole.h"
 
 #ifdef ENABLE_EDITOR_FEATURES
 #include "Editor/jEditor.h"
@@ -481,6 +482,9 @@ void IRenderer::UIPass()
 			ImGui::EndTabBar();
 		}
 		ImGui::End();
+
+		// Console overlay (rendered on top of everything)
+		jConsole::Get().Render();
 	});
 	g_ImGUI->Draw(RenderFrameContextPtr);
 }

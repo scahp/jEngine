@@ -18,6 +18,8 @@
 #include "dxcapi.h"
 #include "RHI/jRaytracingScene.h"
 #include "Renderer/jDirectionalLightDrawCommandGenerator.h"
+#include "Console/jConsole.h"
+#include "Console/jConsoleVariable.h"
 #include "Renderer/jPointLightDrawCommandGenerator.h"
 #include "Renderer/jSpotLightDrawCommandGenerator.h"
 #include "PathTracingDataLoader/jPathTracingData.h"
@@ -43,6 +45,16 @@ jGame::~jGame()
 
 void jGame::ProcessInput(float deltaTime)
 {
+	// If console is visible, don't process game input
+	// All console keys (ESC, `, ') are handled by ImGui in RenderInputField
+	if (jConsole::Get().IsVisible())
+	{
+		return;
+	}
+
+	// Note: ` and ' keys are handled in ImGui (jConsole.cpp RenderInputField)
+	// to avoid double-triggering issues between Win32 and ImGui input systems
+
 	static float MoveDistancePerSecond = 200.0f;
 	//static float MoveDistancePerSecond = 1.0f;
 	//static float MoveDistancePerSecond = 10.0f;
@@ -74,6 +86,23 @@ void jGame::ProcessInput(float deltaTime)
 void jGame::Setup()
 {
  	srand(static_cast<uint32>(time(NULL)));
+
+	// Register test console variables
+	{
+		// External variable examples (connected to gOptions)
+		static jConsoleVariableBool* cvar_UseVRS = new jConsoleVariableBool("r.vrs", &gOptions.UseVRS, "Enable Variable Rate Shading");
+		static jConsoleVariableBool* cvar_UseSSGI = new jConsoleVariableBool("r.ssgi.enable", &gOptions.UseSSGI, "Enable Screen Space Global Illumination");
+		static jConsoleVariableInt* cvar_SSGIRayCount = new jConsoleVariableInt("r.ssgi.raycount", &gOptions.SSGIRayCount, "SSGI ray count per pixel");
+		static jConsoleVariableFloat* cvar_SSGIIntensity = new jConsoleVariableFloat("r.ssgi.intensity", &gOptions.SSGIIntensity, "SSGI intensity multiplier");
+
+		// Internal variable examples (standalone test variables)
+		static jConsoleVariableBool* cvar_DebugDraw = new jConsoleVariableBool("debug.draw", false, "Enable debug drawing");
+		static jConsoleVariableInt* cvar_DebugLevel = new jConsoleVariableInt("debug.level", 0, "Debug verbosity level (0-3)");
+		static jConsoleVariableFloat* cvar_TimeScale = new jConsoleVariableFloat("game.timescale", 1.0f, "Game time scale multiplier");
+		static jConsoleVariableString* cvar_PlayerName = new jConsoleVariableString("player.name", "Player", "Player name");
+
+		jConsole::Get().Log("Test console variables registered.");
+	}
 
 #if ENABLE_PBR
 	// PBR will use light color as a flux,
