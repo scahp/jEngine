@@ -94,10 +94,12 @@ private:
 	// Input
 	char InputBuffer[512] = {};
 	bool bNeedFocusInput = false;
+	bool bNeedMoveCursorToEnd = false;
 
 	// Autocomplete suggestions
 	std::vector<std::string> CurrentSuggestions;
 	int32 SelectedSuggestionIndex = -1;
+	std::string LastInputForSuggestions;  // Track last input to avoid resetting selection
 
 	// History
 	std::vector<std::string> History;

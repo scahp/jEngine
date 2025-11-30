@@ -5,7 +5,7 @@
 
 #ifdef ENABLE_EDITOR_FEATURES
 
-#include "jPlacementTool.h"
+#include "PlacementTool/jPlacementTool.h"
 
 class jEditor
 {

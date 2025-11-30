@@ -7,7 +7,7 @@
 #include "jCommandlineArgument.h"
 
 #ifdef ENABLE_EDITOR_FEATURES
-#include "Editor/jEditor.h"
+#include "Code/Engine/jEditor.h"
 #endif
 
 jEngine::jEngine()

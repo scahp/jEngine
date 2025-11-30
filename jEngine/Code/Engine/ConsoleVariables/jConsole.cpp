@@ -2,6 +2,7 @@
 #include "jConsole.h"
 #include "jConsoleVariable.h"
 #include "External/ImGui/imgui.h"
+#include "External/ImGui/imgui_internal.h"
 #include <sstream>
 #include <algorithm>
 
@@ -207,22 +208,32 @@ void jConsole::ApplyAutocomplete(const std::string& suggestion)
 	// Copy suggestion to input buffer
 	strncpy_s(InputBuffer, sizeof(InputBuffer), suggestion.c_str(), sizeof(InputBuffer) - 1);
 	InputBuffer[sizeof(InputBuffer) - 1] = '\0';
+
+	// Set flag to move cursor to end on next frame
+	bNeedMoveCursorToEnd = true;
 }
 
 void jConsole::UpdateSuggestions(const std::string& input)
 {
-	CurrentSuggestions.clear();
-	SelectedSuggestionIndex = -1;
+	// Only reset selection if input actually changed
+	bool inputChanged = (input != LastInputForSuggestions);
 
-	if (input.empty())
-		return;
+	if (inputChanged)
+	{
+		CurrentSuggestions.clear();
+		SelectedSuggestionIndex = -1;
+		LastInputForSuggestions = input;
 
-	// Get suggestions that start with input
-	CurrentSuggestions = GetAutocompleteSuggestions(input);
+		if (input.empty())
+			return;
 
-	// Limit to 10 suggestions for UI
-	if (CurrentSuggestions.size() > 10)
-		CurrentSuggestions.resize(10);
+		// Get suggestions that start with input
+		CurrentSuggestions = GetAutocompleteSuggestions(input);
+
+		// Limit to 10 suggestions for UI
+		if (CurrentSuggestions.size() > 10)
+			CurrentSuggestions.resize(10);
+	}
 }
 
 void jConsole::RenderSuggestions()
@@ -230,26 +241,96 @@ void jConsole::RenderSuggestions()
 	if (CurrentSuggestions.empty())
 		return;
 
-	// Render suggestions above the input field
-	ImGui::Separator();
-	ImGui::TextColored(ImVec4(0.5f, 1.0f, 0.5f, 1.0f), "Suggestions:");
+	ImGuiViewport* viewport = ImGui::GetMainViewport();
 
-	for (size_t i = 0; i < CurrentSuggestions.size(); ++i)
+	// Calculate popup size based on number of suggestions
+	const float itemHeight = ImGui::GetTextLineHeightWithSpacing();
+	const float headerHeight = ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().ItemSpacing.y;
+	const float separatorHeight = ImGui::GetStyle().ItemSpacing.y;
+	const float popupHeight = headerHeight + separatorHeight + (itemHeight * CurrentSuggestions.size()) + ImGui::GetStyle().WindowPadding.y * 2;
+	const float popupWidth = 400.0f;  // Fixed width for suggestions popup
+
+	// Determine popup position based on display mode
+	ImVec2 popupPos;
+	if (DisplayMode == EConsoleDisplayMode::Small)
 	{
-		bool isSelected = (i == SelectedSuggestionIndex);
+		// Small mode: Show popup above the console window (above input field)
+		ImVec2 consolePos = ImGui::GetWindowPos();
+		float consoleHeight = ImGui::GetWindowHeight();
+		float consoleY = consolePos.y;
 
-		ImVec4 color = isSelected ? ImVec4(1.0f, 1.0f, 0.0f, 1.0f) : ImVec4(0.8f, 0.8f, 0.8f, 1.0f);
+		// Position popup just above the console window
+		popupPos = ImVec2(consolePos.x + 10.0f, consoleY - popupHeight - 5.0f);
+	}
+	else  // Large mode
+	{
+		// Large mode: Show popup below the console window (below input field)
+		ImVec2 consolePos = ImGui::GetWindowPos();
+		float consoleHeight = ImGui::GetWindowHeight();
 
-		if (isSelected)
+		// Position popup just below the console window
+		popupPos = ImVec2(consolePos.x + 10.0f, consolePos.y + consoleHeight + 5.0f);
+	}
+
+	// Ensure popup stays within viewport bounds
+	if (popupPos.y < viewport->Pos.y)
+		popupPos.y = viewport->Pos.y;
+	if (popupPos.y + popupHeight > viewport->Pos.y + viewport->Size.y)
+		popupPos.y = viewport->Pos.y + viewport->Size.y - popupHeight;
+	if (popupPos.x + popupWidth > viewport->Pos.x + viewport->Size.x)
+		popupPos.x = viewport->Pos.x + viewport->Size.x - popupWidth;
+
+	// Render popup window
+	ImGui::SetNextWindowPos(popupPos);
+	ImGui::SetNextWindowSize(ImVec2(popupWidth, popupHeight));
+	ImGui::SetNextWindowBgAlpha(0.95f);
+
+	ImGuiWindowFlags popupFlags =
+		ImGuiWindowFlags_NoTitleBar |
+		ImGuiWindowFlags_NoResize |
+		ImGuiWindowFlags_NoMove |
+		ImGuiWindowFlags_NoCollapse |
+		ImGuiWindowFlags_NoSavedSettings |
+		ImGuiWindowFlags_NoFocusOnAppearing |
+		ImGuiWindowFlags_NoNav;
+
+	if (ImGui::Begin("##ConsoleSuggestions", nullptr, popupFlags))
+	{
+		// Keep suggestions popup on top
+		ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
+
+		// Header
+		ImGui::TextColored(ImVec4(0.5f, 1.0f, 0.5f, 1.0f), "Suggestions:");
+		ImGui::Separator();
+
+		// Render suggestion items
+		for (size_t i = 0; i < CurrentSuggestions.size(); ++i)
 		{
-			ImGui::TextColored(color, "> %s", CurrentSuggestions[i].c_str());
-		}
-		else
-		{
-			ImGui::TextColored(color, "  %s", CurrentSuggestions[i].c_str());
+			bool isSelected = (i == SelectedSuggestionIndex);
+
+			ImVec4 color = isSelected ? ImVec4(1.0f, 1.0f, 0.0f, 1.0f) : ImVec4(0.8f, 0.8f, 0.8f, 1.0f);
+			ImVec4 bgColor = isSelected ? ImVec4(0.3f, 0.3f, 0.0f, 0.5f) : ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+
+			// Highlight selected item with background
+			if (isSelected)
+			{
+				ImVec2 itemMin = ImGui::GetCursorScreenPos();
+				ImVec2 itemMax = ImVec2(itemMin.x + popupWidth - ImGui::GetStyle().WindowPadding.x * 2,
+				                         itemMin.y + itemHeight);
+				ImGui::GetWindowDrawList()->AddRectFilled(itemMin, itemMax, ImGui::ColorConvertFloat4ToU32(bgColor));
+			}
+
+			if (isSelected)
+			{
+				ImGui::TextColored(color, "> %s", CurrentSuggestions[i].c_str());
+			}
+			else
+			{
+				ImGui::TextColored(color, "  %s", CurrentSuggestions[i].c_str());
+			}
 		}
 	}
-	ImGui::Separator();
+	ImGui::End();
 }
 
 void jConsole::Render()
@@ -303,6 +384,9 @@ void jConsole::RenderLarge()
 
 	if (ImGui::Begin("Console##Large", nullptr, windowFlags))
 	{
+		// Keep console window on top
+		ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
+
 		// Header
 		ImGui::TextColored(ImVec4(1, 1, 0, 1), "Console (Large Mode)");
 		ImGui::Separator();
@@ -310,6 +394,9 @@ void jConsole::RenderLarge()
 		RenderLogOutput();
 		ImGui::Separator();
 		RenderInputField();
+
+		// Render suggestions popup (must be called inside Begin/End)
+		RenderSuggestions();
 	}
 	ImGui::End();
 }
@@ -336,6 +423,9 @@ void jConsole::RenderSmall()
 
 	if (ImGui::Begin("Console##Small", nullptr, windowFlags))
 	{
+		// Keep console window on top
+		ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
+
 		// Header
 		ImGui::TextColored(ImVec4(1, 1, 0, 1), "Console (Small Mode)");
 		ImGui::Separator();
@@ -343,6 +433,9 @@ void jConsole::RenderSmall()
 		RenderLogOutput();
 		ImGui::Separator();
 		RenderInputField();
+
+		// Render suggestions popup (must be called inside Begin/End)
+		RenderSuggestions();
 	}
 	ImGui::End();
 }
@@ -397,9 +490,6 @@ void jConsole::RenderInputField()
 		return;
 	}
 
-	// Render suggestions above input field
-	RenderSuggestions();
-
 	// Input field
 	ImGui::Text(">");
 	ImGui::SameLine();
@@ -427,6 +517,14 @@ void jConsole::RenderInputField()
 		{
 		case ImGuiInputTextFlags_CallbackAlways:
 		{
+			// Move cursor to end if autocomplete was applied
+			if (console->bNeedMoveCursorToEnd)
+			{
+				data->CursorPos = data->BufTextLen;
+				data->SelectionStart = data->SelectionEnd = data->CursorPos;
+				console->bNeedMoveCursorToEnd = false;
+			}
+
 			// Update suggestions as user types
 			std::string currentInput(data->Buf, data->BufTextLen);
 			console->UpdateSuggestions(currentInput);
@@ -537,6 +635,7 @@ void jConsole::RenderInputField()
 			// Clear suggestions
 			CurrentSuggestions.clear();
 			SelectedSuggestionIndex = -1;
+			LastInputForSuggestions.clear();
 
 			bNeedFocusInput = true;
 		}
@@ -562,6 +661,7 @@ void jConsole::RenderInputField()
 				// Clear suggestions
 				CurrentSuggestions.clear();
 				SelectedSuggestionIndex = -1;
+				LastInputForSuggestions.clear();
 
 				bNeedFocusInput = true;
 			}

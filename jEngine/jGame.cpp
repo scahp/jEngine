@@ -18,8 +18,8 @@
 #include "dxcapi.h"
 #include "RHI/jRaytracingScene.h"
 #include "Renderer/jDirectionalLightDrawCommandGenerator.h"
-#include "Console/jConsole.h"
-#include "Console/jConsoleVariable.h"
+#include "Code/Engine/ConsoleVariables/jConsole.h"
+#include "Code/Engine/ConsoleVariables/jConsoleVariable.h"
 #include "Renderer/jPointLightDrawCommandGenerator.h"
 #include "Renderer/jSpotLightDrawCommandGenerator.h"
 #include "PathTracingDataLoader/jPathTracingData.h"
@@ -29,7 +29,7 @@
 #include "FileLoader/jFile.h"
 
 #ifdef ENABLE_EDITOR_FEATURES
-#include "Editor/jEditor.h"
+#include "Code/Engine/jEditor.h"
 #endif
 
 jRHI* g_rhi = nullptr;

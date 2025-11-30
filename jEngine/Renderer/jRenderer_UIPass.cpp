@@ -9,10 +9,10 @@
 #include "Scene/Light/jSpotLight.h"
 #include "Scene/jObject.h"
 #include "jEngine.h"
-#include "Console/jConsole.h"
+#include "Code/Engine/ConsoleVariables/jConsole.h"
 
 #ifdef ENABLE_EDITOR_FEATURES
-#include "Editor/jEditor.h"
+#include "Code/Engine/jEditor.h"
 #endif
 
 // Helper functions for Copy/Paste context menus

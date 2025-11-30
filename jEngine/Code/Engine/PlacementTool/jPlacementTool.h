@@ -5,7 +5,7 @@
 
 #ifdef ENABLE_EDITOR_FEATURES
 
-#include "External/ImGuizmo/ImGuizmo.h"
+#include "Code/External/IMGUI/ImGuizmo/ImGuizmo.h"
 
 class jLight;
 class jObject;
