@@ -236,6 +236,19 @@ void IRenderer::UIPass()
 				ImGui::EndTabItem();
 			}
 
+#ifdef ENABLE_EDITOR_FEATURES
+			// Placement Tool Tab (Editor-only feature)
+			if (ImGui::BeginTabItem("Placement Tool"))
+			{
+				if (g_Editor)
+				{
+					auto mainCamera = jCamera::GetMainCamera();
+					g_Editor->Placement.RenderUI(mainCamera);
+				}
+				ImGui::EndTabItem();
+			}
+#endif
+
 			// Light Tab
 			if (ImGui::BeginTabItem("Light"))
 			{
@@ -265,15 +278,6 @@ void IRenderer::UIPass()
 						mainCamera->SetEulerAngle(eulerAngle);
 					});
 				}
-
-#ifdef ENABLE_EDITOR_FEATURES
-				// Placement Tool (Editor-only feature)
-				if (g_Editor)
-				{
-					auto mainCamera = jCamera::GetMainCamera();
-					g_Editor->Placement.RenderUI(mainCamera);
-				}
-#endif
 
 				ImGui::EndTabItem();
 			}

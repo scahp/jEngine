@@ -158,8 +158,12 @@ void jGame::Setup()
 		// Add to Placement Tool
 		if (g_Editor)
 		{
-			g_Editor->Placement.PlacedLights.push_back(DirectionalLight);
-			g_Editor->Placement.PlacedLightDebugObjects.push_back(DirectionalLightInfo->BillboardObject);
+			PlacedObjectInfo info;
+			info.Object = DirectionalLightInfo->BillboardObject;
+			info.Type = EPlacedObjectType::LIGHT;
+			info.LightType = EPlacementLightType::DIRECTIONAL;
+			info.LightPtr = DirectionalLight;
+			g_Editor->Placement.PlacedObjects.push_back(info);
 		}
 #endif
     }
@@ -173,8 +177,12 @@ void jGame::Setup()
 		// Add to Placement Tool
 		if (g_Editor)
 		{
-			g_Editor->Placement.PlacedLights.push_back(PointLight);
-			g_Editor->Placement.PlacedLightDebugObjects.push_back(PointLightInfo->BillboardObject);
+			PlacedObjectInfo info;
+			info.Object = PointLightInfo->BillboardObject;
+			info.Type = EPlacedObjectType::LIGHT;
+			info.LightType = EPlacementLightType::POINT;
+			info.LightPtr = PointLight;
+			g_Editor->Placement.PlacedObjects.push_back(info);
 		}
 #endif
     }
@@ -188,8 +196,12 @@ void jGame::Setup()
 		// Add to Placement Tool
 		if (g_Editor)
 		{
-			g_Editor->Placement.PlacedLights.push_back(SpotLight);
-			g_Editor->Placement.PlacedLightDebugObjects.push_back(SpotLightInfo->BillboardObject);
+			PlacedObjectInfo info;
+			info.Object = SpotLightInfo->BillboardObject;
+			info.Type = EPlacedObjectType::LIGHT;
+			info.LightType = EPlacementLightType::SPOT;
+			info.LightPtr = SpotLight;
+			g_Editor->Placement.PlacedObjects.push_back(info);
 		}
 #endif
     }
