@@ -67,12 +67,13 @@ public:
 	virtual void Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, int32 instanceCount = 1);
 
 	EPrimitiveType GetPrimitiveType() const { return GeometryDataPtr->GetPrimitiveType(); }
-	virtual void BindBuffers(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, bool InPositionOnly, const jVertexBuffer* InOverrideInstanceData = nullptr) const;
+    virtual void BindBuffers(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, bool InPositionOnly, const jVertexBuffer* InOverrideInstanceData = nullptr) const;
 	const std::vector<float>& GetVertices() const;
 	FORCEINLINE bool HasInstancing() const { return GeometryDataPtr->HasInstancing(); }
 	virtual bool IsSupportRaytracing() const;
 
     virtual void UpdateWorldMatrix() override;
+    virtual void OnTransformDirty() override;
 
 	std::shared_ptr<jRenderObjectGeometryData> GeometryDataPtr;
 

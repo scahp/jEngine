@@ -2,6 +2,8 @@
 #include "jObject.h"
 #include "jRenderObject.h"
 #include "jPrimitiveUtil.h"
+#include "RHI/jRHI.h"
+#include "RHI/jRaytracingScene.h"
 
 #ifdef ENABLE_EDITOR_FEATURES
 #include "Code/Engine/jEditor.h"
@@ -50,6 +52,10 @@ void jObject::AddObject(jObject* object)
 			s_StaticRenderObjects.push_back(RenderObject);
             if (!object->SkipShadowMapGen)
                 s_ShadowCasterRenderObject.push_back(RenderObject);
+
+            // Raytracing: notify new render object
+            if (g_rhi && g_rhi->RaytracingScene && RenderObject && RenderObject->IsSupportRaytracing())
+                g_rhi->RaytracingScene->MarkAdd(RenderObject);
 		}
 	}
 
@@ -85,6 +91,10 @@ void jObject::RemoveObject(jObject* object)
 			{
 				return (param == RenderObject);
 			});
+
+            // Raytracing: notify removal
+            if (g_rhi && g_rhi->RaytracingScene && RenderObject && RenderObject->IsSupportRaytracing())
+                g_rhi->RaytracingScene->MarkRemove(RenderObject);
 		}
 	}
 

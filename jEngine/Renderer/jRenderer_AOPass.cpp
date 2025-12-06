@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jRenderer.h"
 #include "jOptions.h"
 #include "Scene/jCamera.h"
@@ -618,11 +618,14 @@ std::shared_ptr<jTexture> jRenderer::RTAO()
 		}
 
 		static jOptions OldOptions = gOptions;
+		static uint64 OldRTSceneUpdateIndex = 0;
+		const uint64 CurrentRTSceneUpdateIndex = (RenderFrameContextPtr->RaytracingScene) ? RenderFrameContextPtr->RaytracingScene->GetSceneUpdateIndex() : 0;
 		static auto OldMatrix = m_sceneCB.projectionToWorld;
-		if (!gOptions.UseAccumulateRay || OldMatrix != m_sceneCB.projectionToWorld || OldOptions != gOptions)
+		if (!gOptions.UseAccumulateRay || OldMatrix != m_sceneCB.projectionToWorld || OldOptions != gOptions || OldRTSceneUpdateIndex != CurrentRTSceneUpdateIndex)
 		{
 			OldMatrix = m_sceneCB.projectionToWorld;
 			memcpy(&OldOptions, &gOptions, sizeof(gOptions));
+			OldRTSceneUpdateIndex = CurrentRTSceneUpdateIndex;
 			m_sceneCB.Clear = true;
 		}
 		else

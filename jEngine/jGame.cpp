@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jGame.h"
 #include "Math/Vector.h"
 #include "Scene/jCamera.h"
@@ -513,6 +513,23 @@ void jGame::Update(float deltaTime)
 
 	// Update object which have dirty flag
 	jObject::FlushDirtyState();
+
+    // Sync raytracing scene with placement/editor changes
+    if (GSupportRaytracing && g_rhi && g_rhi->RaytracingScene && g_rhi->RaytracingScene->ShouldUpdate())
+    {
+        jRatracingInitializer Initializer;
+        Initializer.RenderObjects = jObject::GetStaticRenderObject();
+
+        Initializer.CommandBuffer = g_rhi->BeginSingleTimeCommands();
+        g_rhi->RaytracingScene->CreateOrUpdateBLAS(Initializer);
+        g_rhi->EndSingleTimeCommands(Initializer.CommandBuffer);
+        g_rhi->Finish(); // todo : replace with proper UAV barrier
+
+        Initializer.CommandBuffer = g_rhi->BeginSingleTimeCommands();
+        g_rhi->RaytracingScene->CreateOrUpdateTLAS(Initializer);
+        g_rhi->EndSingleTimeCommands(Initializer.CommandBuffer);
+        g_rhi->Finish(); // todo : replace with proper UAV barrier
+    }
 
 	//// Render all objects by using selected renderer
 	//Renderer->Render(MainCamera);

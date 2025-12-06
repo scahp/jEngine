@@ -11,6 +11,8 @@
 #include "RHI/DX12/jVertexBuffer_DX12.h"
 #include "RHI/DX12/jIndexBuffer_DX12.h"
 #include "RHI/DX12/jBufferUtil_DX12.h"
+#include "RHI/jRHI.h"
+#include "RHI/jRaytracingScene.h"
 
 // jRenderObject static members
 jRenderObjectID jRenderObject::s_NextRenderObjectID = 1;  // Start from 1, 0 means no RenderObject
@@ -192,6 +194,12 @@ void jRenderObject::UpdateWorldMatrix()
     }
 
 	jSceneObject::UpdateWorldMatrix();
+}
+
+void jRenderObject::OnTransformDirty()
+{
+    if (g_rhi && g_rhi->RaytracingScene && IsSupportRaytracing())
+        g_rhi->RaytracingScene->MarkTransformDirty(this);
 }
 
 const std::vector<float>& jRenderObject::GetVertices() const

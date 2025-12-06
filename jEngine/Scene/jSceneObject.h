@@ -17,9 +17,9 @@ public:
 	jObject* Owner = nullptr;
 
 	// Transform accessors
-	FORCEINLINE void SetPos(const Vector& InPos) { Pos = InPos; SetDirtyFlags(EDirty::POS); }
-	FORCEINLINE void SetRot(const Vector& InRot) { Rot = InRot; SetDirtyFlags(EDirty::ROT); }
-	FORCEINLINE void SetScale(const Vector& InScale) { Scale = InScale; SetDirtyFlags(EDirty::SCALE); }
+	FORCEINLINE void SetPos(const Vector& InPos) { if (Pos.IsNearlyEqual(InPos)) return; Pos = InPos; SetDirtyFlags(EDirty::POS); }
+	FORCEINLINE void SetRot(const Vector& InRot) { if (Rot.IsNearlyEqual(InRot)) return; Rot = InRot; SetDirtyFlags(EDirty::ROT); }
+	FORCEINLINE void SetScale(const Vector& InScale) { if (Scale.IsNearlyEqual(InScale)) return; Scale = InScale; SetDirtyFlags(EDirty::SCALE); }
 	FORCEINLINE const Vector& GetPos() const { return Pos; }
 	FORCEINLINE const Vector& GetRot() const { return Rot; }
 	FORCEINLINE const Vector& GetScale() const { return Scale; }
@@ -45,6 +45,7 @@ protected:
 	{
 		using T = std::underlying_type<EDirty>::type;
 		DirtyFlags = static_cast<EDirty>(static_cast<T>(InEnum) | static_cast<T>(DirtyFlags));
+		OnTransformDirty();
 	}
 
 	void ClearDirtyFlags(EDirty InEnum)
@@ -59,4 +60,7 @@ protected:
 	Vector Pos = Vector::ZeroVector;
 	Vector Rot = Vector::ZeroVector;
 	Vector Scale = Vector::OneVector;
+
+	// Hook for subclasses to react to transform dirties (e.g., raytracing updates)
+	virtual void OnTransformDirty() {}
 };

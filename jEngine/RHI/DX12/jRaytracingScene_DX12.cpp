@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jRaytracingScene_DX12.h"
 #include "Scene/jRenderObject.h"
 #include "jCommandBufferManager_DX12.h"
@@ -7,15 +7,51 @@
 #include "jVertexBuffer_DX12.h"
 #include "jBufferUtil_DX12.h"
 #include "jOptions.h"
+#include <algorithm>
 
 void jRaytracingScene_DX12::CreateOrUpdateBLAS(const jRatracingInitializer& InInitializer)
 {
     auto CmdBuffer = (jCommandBuffer_DX12*)InInitializer.CommandBuffer;
-    std::vector<jRenderObject*> RTObjects;
-    for (int32 i = 0; i < InInitializer.RenderObjects.size(); ++i)
+    if (!CmdBuffer)
+        return;
+
+    // Decide worklist: use dirty queues when available, otherwise full rebuild from initializer
+    std::vector<jRenderObject*> WorkList;
+    std::unordered_set<jRenderObject*> Seen;
+
+    const bool bUseDirty = ShouldUpdate();
+    if (bUseDirty)
     {
-        jRenderObject* RObj = InInitializer.RenderObjects[i];
-        check(RObj->IsSupportRaytracing());
+        auto Append = [&](const std::unordered_set<jRenderObject*>& Src)
+        {
+            for (auto* Obj : Src)
+            {
+                if (Obj && Seen.insert(Obj).second)
+                    WorkList.push_back(Obj);
+            }
+        };
+        Append(PendingAdd);
+        Append(DirtyBLAS);
+    }
+    else
+    {
+        // Initial/full build path
+        for (auto* Obj : InInitializer.RenderObjects)
+        {
+            if (Obj && Seen.insert(Obj).second)
+                WorkList.push_back(Obj);
+        }
+        InstanceList.clear();
+        bForceTLASRebuild = true;
+    }
+
+    if (WorkList.empty())
+        return;
+
+    for (jRenderObject* RObj : WorkList)
+    {
+        if (!RObj || !RObj->IsSupportRaytracing())
+            continue;
 
         // Remove Old BLAS
         if (RObj->BottomLevelASBuffer)
@@ -128,7 +164,13 @@ void jRaytracingScene_DX12::CreateOrUpdateBLAS(const jRatracingInitializer& InIn
         g_rhi->UAVBarrier(CmdBuffer, RObj->BottomLevelASBuffer.get());
         CmdBuffer->FlushBarrierBatch();
 
-        InstanceList.push_back(RObj);
+        // Maintain unique instance list
+        if (std::find(InstanceList.begin(), InstanceList.end(), RObj) == InstanceList.end())
+            InstanceList.push_back(RObj);
+
+        bForceTLASRebuild = true;
+        PendingAdd.erase(RObj);
+        DirtyBLAS.erase(RObj);
     }
 }
 
@@ -138,6 +180,34 @@ void jRaytracingScene_DX12::CreateOrUpdateTLAS(const jRatracingInitializer& InIn
         return;
 
     auto CmdBuffer = (jCommandBuffer_DX12*)InInitializer.CommandBuffer;
+    if (!CmdBuffer)
+        return;
+
+    // Apply removals
+    if (!PendingRemove.empty())
+    {
+        for (jRenderObject* Obj : PendingRemove)
+        {
+            if (!Obj)
+                continue;
+
+            auto it = std::remove(InstanceList.begin(), InstanceList.end(), Obj);
+            InstanceList.erase(it, InstanceList.end());
+
+            if (Obj->BottomLevelASBuffer)
+            {
+                g_rhi->UAVBarrier(CmdBuffer, Obj->BottomLevelASBuffer.get());
+                CmdBuffer->FlushBarrierBatch();
+                Obj->BottomLevelASBuffer.reset();
+                Obj->ScratchASBuffer.reset();
+            }
+        }
+        PendingRemove.clear();
+        bForceTLASRebuild = true;
+    }
+
+    if (InstanceList.empty())
+        return;
 
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
     inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
@@ -150,7 +220,7 @@ void jRaytracingScene_DX12::CreateOrUpdateTLAS(const jRatracingInitializer& InIn
     g_rhi_dx12->Device->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &info);
     check(info.ResultDataMaxSizeInBytes);
 
-    const bool IsUpdate = !!ScratchTLASBufferPtr;
+    const bool IsUpdate = !!ScratchTLASBufferPtr && !bForceTLASRebuild;
     if (IsUpdate)
     {
         // UAV barrier for completion of previous command which are using TLASBufferPtr
@@ -222,4 +292,8 @@ void jRaytracingScene_DX12::CreateOrUpdateTLAS(const jRatracingInitializer& InIn
     // UAV barrier for completion of BuildRaytracingAccelerationStructure
     g_rhi->UAVBarrier(CmdBuffer, GetTLASBuffer<jBuffer_DX12>());
     CmdBuffer->FlushBarrierBatch();
+
+    DirtyTransform.clear();
+    bForceTLASRebuild = false;
+    BumpSceneUpdateIndex();
 }

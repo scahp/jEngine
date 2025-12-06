@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jRaytracingScene.h"
 #include "jRHIType.h"
 
@@ -9,4 +9,5 @@ jRaytracingScene::~jRaytracingScene()
     ScratchTLASBufferPtr.reset();
     InstanceUploadBufferPtr.reset();
     RaytracingOutputPtr.reset();
+    ClearDirtyFlags();
 }
