@@ -12,6 +12,10 @@
 #include "RHI/DX12/jIndexBuffer_DX12.h"
 #include "RHI/DX12/jBufferUtil_DX12.h"
 
+// jRenderObject static members
+jRenderObjectID jRenderObject::s_NextRenderObjectID = 1;  // Start from 1, 0 means no RenderObject
+std::unordered_map<jRenderObjectID, jRenderObject*> jRenderObject::s_RenderObjectIDMap;
+
 // jRenderObjectGeometryData
 jRenderObjectGeometryData::jRenderObjectGeometryData(const std::shared_ptr<jVertexStreamData>& vertexStream, const std::shared_ptr<jIndexStreamData>& indexStream)
 {
@@ -81,10 +85,15 @@ void jRenderObjectGeometryData::UpdateVertexStream(const std::shared_ptr<jVertex
 // jRenderObject
 jRenderObject::jRenderObject()
 {
+	// Assign unique RenderObjectID
+	RenderObjectID = s_NextRenderObjectID++;
+	s_RenderObjectIDMap[RenderObjectID] = this;
 }
 
 jRenderObject::~jRenderObject()
 {
+	// Remove from RenderObjectID map
+	s_RenderObjectIDMap.erase(RenderObjectID);
 }
 
 void jRenderObject::CreateRenderObject(const std::shared_ptr<jRenderObjectGeometryData>& InRenderObjectGeometryData)
@@ -175,17 +184,14 @@ bool jRenderObject::IsSupportRaytracing() const
 
 void jRenderObject::UpdateWorldMatrix()
 {
-    if (static_cast<int32>(DirtyFlags) & static_cast<int32>(EDirty::POS_ROT_SCALE))
+	// Check if update is needed before calling base class
+	const bool needsUpdate = (static_cast<int32>(DirtyFlags) & static_cast<int32>(EDirty::POS_ROT_SCALE)) != 0;
+    if (needsUpdate)
     {
-        auto posMatrix = Matrix::MakeTranslate(Pos);
-        auto rotMatrix = Matrix::MakeRotate(Rot);
-        auto scaleMatrix = Matrix::MakeScale(Scale);
-        World = posMatrix * rotMatrix * scaleMatrix;
-
         NeedToUpdateRenderObjectUniformParameters = true;
-
-        ClearDirtyFlags(EDirty::POS_ROT_SCALE);
     }
+
+	jSceneObject::UpdateWorldMatrix();
 }
 
 const std::vector<float>& jRenderObject::GetVertices() const
@@ -213,6 +219,8 @@ const std::shared_ptr<jShaderBindingInstance>& jRenderObject::CreateShaderBindin
         ubo.InvM = ubo.M.GetInverse();
         ubo.Metallic = gOptions.Metallic;
         ubo.Roughness = gOptions.Roughness;
+        ubo.ObjectID = Owner ? Owner->ObjectID : 0;
+        ubo.RenderObjectID = RenderObjectID;
 
         RenderObjectUniformParametersPtr = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
             jNameStatic("RenderObjectUniformParameters"), jLifeTimeType::MultiFrame, sizeof(jRenderObjectUniformBuffer)));
@@ -244,5 +252,13 @@ const std::shared_ptr<jShaderBindingInstance>& jRenderObject::CreateShaderBindin
  //   return g_rhi->CreateShaderBindingInstance(ShaderBindingArray);
 
     return RenderObjectShaderBindingInstance;
+}
+
+jRenderObject* jRenderObject::FindRenderObjectByID(jRenderObjectID id)
+{
+	auto it = s_RenderObjectIDMap.find(id);
+	if (it != s_RenderObjectIDMap.end())
+		return it->second;
+	return nullptr;
 }
 

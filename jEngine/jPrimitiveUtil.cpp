@@ -399,7 +399,7 @@ jBoundBoxObject* CreateBoundBox(jBoundBox boundBox, jObject* ownerObject, const 
 	auto renderObject = new jRenderObject();
 	object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>(vertexStreamData, nullptr);
 	renderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
-	object->RenderObjects.push_back(renderObject);
+	object->AddRenderObject(renderObject);
 	object->SkipShadowMapGen = true;
 	object->SkipUpdateShadowVolume = true;
 	object->OwnerObject = ownerObject;
@@ -524,7 +524,7 @@ jBoundSphereObject* CreateBoundSphere(jBoundSphere boundSphere, jObject* ownerOb
 	auto renderObject = new jRenderObject();
 	object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>(vertexStreamData, indexStreamData);
 	renderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
-	object->RenderObjects.push_back(renderObject);
+	object->AddRenderObject(renderObject);
 	object->SkipShadowMapGen = true;
 	object->SkipUpdateShadowVolume = true;
 	object->OwnerObject = ownerObject;
@@ -669,7 +669,7 @@ jQuadPrimitive* CreateQuad(const Vector& pos, const Vector& size, const Vector& 
 	auto object = new jQuadPrimitive();
 	auto RenderObject = CreateQuad_Internal(pos, size, scale, color);
 	object->RenderObjectGeometryDataPtr = RenderObject->GeometryDataPtr;
-	object->RenderObjects.push_back(RenderObject);
+	object->AddRenderObject(RenderObject);
 	RenderObject->IsTwoSided = true;
 	// object->CreateBoundBox();
 	return object;
@@ -800,7 +800,7 @@ jObject* CreateGizmo(const Vector& pos, const Vector& rot, const Vector& scale)
 	auto renderObject = new jRenderObject();
 	object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>(vertexStreamData, nullptr);
 	renderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
-	object->RenderObjects.push_back(renderObject);
+	object->AddRenderObject(renderObject);
 	renderObject->SetPos(pos);
 	renderObject->SetScale(scale);
 	// object->CreateBoundBox();
@@ -900,7 +900,7 @@ jObject* CreateTriangle(const Vector& pos, const Vector& size, const Vector& sca
 	auto renderObject = new jRenderObject();
     object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>(vertexStreamData, nullptr);
     renderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
-    object->RenderObjects.push_back(renderObject);
+    object->AddRenderObject(renderObject);
 	renderObject->SetPos(pos);
 	renderObject->SetScale(scale);
 	renderObject->IsTwoSided = true;
@@ -1150,7 +1150,7 @@ jObject* CreateCube(const Vector& pos, const Vector& size, const Vector& scale, 
 	auto renderObject = new jRenderObject();
     object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>(vertexStreamData, indexStreamData);
     renderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
-    object->RenderObjects.push_back(renderObject);
+    object->AddRenderObject(renderObject);
 	renderObject->SetPos(pos);
 	renderObject->SetScale(scale);
 	// object->CreateBoundBox();
@@ -1303,7 +1303,7 @@ jObject* CreateCapsule(const Vector& pos, float height, float radius, int32 slic
 	auto renderObject = new jRenderObject();
     object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>(vertexStreamData, indexStreamData);
     renderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
-    object->RenderObjects.push_back(renderObject);
+    object->AddRenderObject(renderObject);
 	renderObject->SetPos(pos);
 	renderObject->SetScale(scale);
 	// object->CreateBoundBox();
@@ -1435,7 +1435,7 @@ jConePrimitive* CreateCone(const Vector& pos, float height, float radius, int32 
 	auto renderObject = new jRenderObject();
     object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>(vertexStreamData, nullptr);
     renderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
-    object->RenderObjects.push_back(renderObject);
+    object->AddRenderObject(renderObject);
 	renderObject->SetPos(pos);
 	renderObject->SetScale(scale);
 	object->Height = height;
@@ -1607,7 +1607,7 @@ jObject* CreateCylinder(const Vector& pos, float height, float radius, int32 sli
     auto renderObject = new jRenderObject();
     object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>(vertexStreamData, positionOnlyVertexStreamData, indexStreamData);
     renderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
-    object->RenderObjects.push_back(renderObject);
+    object->AddRenderObject(renderObject);
     renderObject->SetPos(pos);
     renderObject->SetScale(scale);
     renderObject->MaterialPtr = GDefaultMaterial;
@@ -1749,7 +1749,7 @@ jObject* CreateSphere(const Vector& pos, float radius, uint32 slices, uint32 sta
     auto renderObject = new jRenderObject();
     object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>(vertexStreamData, positionOnlyVertexStreamData, indexStreamData);
     renderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
-    object->RenderObjects.push_back(renderObject);
+    object->AddRenderObject(renderObject);
     renderObject->SetPos(pos);
     renderObject->SetScale(scale);
     renderObject->MaterialPtr = GDefaultMaterial;
@@ -1807,7 +1807,7 @@ jUIQuadPrimitive* CreateUIQuad(const Vector2& pos, const Vector2& size, jTexture
 	auto renderObject = new jRenderObject();
     object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>(vertexStreamData, nullptr);
     renderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
-    object->RenderObjects.push_back(renderObject);
+    object->AddRenderObject(renderObject);
 	object->Pos = pos;
 	object->Size = size;
 
@@ -1841,7 +1841,7 @@ jFullscreenQuadPrimitive* CreateFullscreenQuad(jTexture* texture)
 	auto renderObject = new jRenderObject();
     object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>(vertexStreamData, nullptr);
     renderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
-    object->RenderObjects.push_back(renderObject);
+    object->AddRenderObject(renderObject);
 	return object;
 }
 
@@ -1896,7 +1896,7 @@ jSegmentPrimitive* CreateSegment(const Vector& start, const Vector& end, float t
 	auto renderObject = new jRenderObject();
     object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>(vertexStreamData, nullptr);
     renderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
-    object->RenderObjects.push_back(renderObject);
+    object->AddRenderObject(renderObject);
 	renderObject = renderObject;
 	renderObject->SetScale(Vector(time));
 	object->Time = time;
@@ -2086,7 +2086,7 @@ jGraph2D* CreateGraph2D(const Vector2& pos, const Vector2& size, const std::vect
 	auto renderObject = new jRenderObject();
     object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>(vertexStreamData, nullptr);
     renderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
-    object->RenderObjects.push_back(renderObject);
+    object->AddRenderObject(renderObject);
 	object->SethPos(pos);
 	object->SetGuardLineSize(size);
 	object->SetPoints(points);

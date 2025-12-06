@@ -8,8 +8,8 @@ struct RenderObjectUniformBuffer
     float4x4 InvM;
     float Metallic;
     float Roughness;
-    float padding0;
-    float padding1;
+    uint ObjectID;
+    uint RenderObjectID;
 };
 
 struct ViewUniformBuffer

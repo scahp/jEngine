@@ -38,6 +38,7 @@ struct jSceneRenderTarget : public std::enable_shared_from_this<jSceneRenderTarg
 
     static std::shared_ptr<jRenderTarget> AtmosphericShadow_RT;
     static std::shared_ptr<jRenderTarget> VBuffer_RT;
+    static std::shared_ptr<jRenderTarget> HitObject_RT;
 
     std::shared_ptr<jRenderTarget> ColorPtr;
     std::shared_ptr<jRenderTarget> DepthPtr;

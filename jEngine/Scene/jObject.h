@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include "jBoundPrimitiveType.h"
+#include "jObjectTypes.h"
 
 class jRenderObject;
 class jCamera;
@@ -14,6 +15,10 @@ class jObject
 public:
 	jObject();
 	virtual ~jObject();
+
+	// Object ID for picking
+	jObjectID GetObjectID() const { return ObjectID; }
+	static jObject* FindObjectByID(jObjectID id);
 
 	//////////////////////////////////////////////////////////////////////////
 	static void AddObject(jObject* object);
@@ -62,6 +67,9 @@ public:
 
 	bool HasInstancing() const;
 
+	// Add render object and automatically set Owner
+	void AddRenderObject(jRenderObject* renderObject);
+
 	std::shared_ptr<jRenderObjectGeometryData> RenderObjectGeometryDataPtr;
 	std::vector<jRenderObject*> RenderObjects;
 
@@ -80,7 +88,13 @@ public:
 	jBoundBox BoundBox;
 	jBoundSphere BoundSphere;
 
+	// Object ID for picking
+	jObjectID ObjectID = 0;
+
 //private:
+	static jObjectID s_NextObjectID;
+	static std::unordered_map<jObjectID, jObject*> s_ObjectIDMap;
+
 	static std::vector<jObject*> s_ShadowCasterObject;
 	static std::vector<jRenderObject*> s_ShadowCasterRenderObject;
 	static std::vector<jObject*> s_StaticObjects;

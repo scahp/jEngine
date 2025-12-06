@@ -68,6 +68,10 @@ public:
     virtual std::shared_ptr<jTexture> Denoise(const std::shared_ptr<jTexture>& InTexture, const char* InDenoiser, int32 InKernelSize, float InKernelSigma, float InBilateralSigma);
     virtual std::shared_ptr<jTexture> BlurSSGI(const std::shared_ptr<jRenderTarget>& InRenderTarget);
 
+    // Object Picking
+    virtual void HitObjectPass();
+    void RequestObjectPick(int32 mouseX, int32 mouseY);
+
     virtual void PostProcess();
 
     void SetupShadowPass();
@@ -87,6 +91,11 @@ public:
 
     // Current FrameIndex
     int32 FrameIndex = 0;
+
+    // Object Picking
+    bool bObjectPickRequested = false;
+    int32 PickMouseX = 0;
+    int32 PickMouseY = 0;
 
     // Thread per task for PassSetup
     const int32 MaxPassSetupTaskPerThreadCount = 100;

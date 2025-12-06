@@ -1123,6 +1123,9 @@ void jRenderer::Render()
             RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::BasePass, false);
             RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
         }
+
+        // Object picking pass (runs on mouse click only)
+        HitObjectPass();
     }
 
     {

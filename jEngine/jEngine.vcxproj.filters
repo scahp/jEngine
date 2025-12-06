@@ -190,6 +190,12 @@
     <ClInclude Include="Scene\jObject.h">
       <Filter>Code\Scene</Filter>
     </ClInclude>
+    <ClInclude Include="Scene\jObjectTypes.h">
+      <Filter>Code\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene\jSceneObject.h">
+      <Filter>Code\Scene</Filter>
+    </ClInclude>
     <ClInclude Include="Scene\jRenderObject.h">
       <Filter>Code\Scene</Filter>
     </ClInclude>
@@ -633,6 +639,9 @@
     <ClCompile Include="FileLoader\jModelLoader.cpp">
       <Filter>Code\FilerLoader</Filter>
     </ClCompile>
+    <ClCompile Include="Scene\jSceneObject.cpp">
+      <Filter>Code\Scene</Filter>
+    </ClCompile>
     <ClCompile Include="Scene\jRenderObject.cpp">
       <Filter>Code\Scene</Filter>
     </ClCompile>
@@ -898,6 +907,9 @@
       <Filter>Code\RHI</Filter>
     </ClCompile>
     <ClCompile Include="Renderer\jRenderer_AOPass.cpp">
+      <Filter>Code\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\jRenderer_HitObjectPass.cpp">
       <Filter>Code\Renderer</Filter>
     </ClCompile>
     <ClCompile Include="Renderer\jRenderer_AtmosphericShadowPass.cpp">

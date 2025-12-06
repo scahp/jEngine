@@ -23,6 +23,9 @@ std::shared_ptr<jRenderTarget> jSceneRenderTarget::AOProjection;
 std::shared_ptr<jRenderTarget> jSceneRenderTarget::GIProjection;
 std::shared_ptr<jRenderTarget> jSceneRenderTarget::SSGI_RT;
 std::shared_ptr<jRenderTarget> jSceneRenderTarget::SSGI_Accum_RT[3];
+std::shared_ptr<jRenderTarget> jSceneRenderTarget::AtmosphericShadow_RT;
+std::shared_ptr<jRenderTarget> jSceneRenderTarget::VBuffer_RT;
+std::shared_ptr<jRenderTarget> jSceneRenderTarget::HitObject_RT;
 
 // todo : remove this.
 #include "jPrimitiveUtil.h"

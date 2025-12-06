@@ -567,7 +567,43 @@ void jGame::Draw()
 
 void jGame::OnMouseButton()
 {
-	
+#ifdef ENABLE_EDITOR_FEATURES
+	// Handle object picking on left mouse button click
+	if (g_Editor && g_MouseState[EMouseButtonType::LEFT])
+	{
+		// Don't pick when manipulating Gizmo
+		if (ImGuizmo::IsUsing() || ImGuizmo::IsOver())
+			return;
+
+		// Don't pick when clicking on UI
+		if (ImGui::IsAnyItemHovered() || ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow))
+			return;
+
+		// Get current mouse position
+		double xpos, ypos;
+		if (IsUseVulkan())
+		{
+			GLFWwindow* window = static_cast<GLFWwindow*>(g_rhi->GetWindow());
+			glfwGetCursorPos(window, &xpos, &ypos);
+		}
+		else if (IsUseDX12())
+		{
+			POINT pt;
+			if (GetCursorPos(&pt))
+			{
+				HWND hwnd = (HWND)g_rhi->GetWindow();
+				ScreenToClient(hwnd, &pt);
+				xpos = pt.x;
+				ypos = pt.y;
+			}
+		}
+
+		// Request object picking
+		g_Editor->Placement.bPickRequested = true;
+		g_Editor->Placement.PickMouseX = (int32)xpos;
+		g_Editor->Placement.PickMouseY = (int32)ypos;
+	}
+#endif
 }
 
 void jGame::OnMouseMove(int32 xOffset, int32 yOffset)

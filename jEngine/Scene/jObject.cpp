@@ -3,6 +3,13 @@
 #include "jRenderObject.h"
 #include "jPrimitiveUtil.h"
 
+#ifdef ENABLE_EDITOR_FEATURES
+#include "Code/Engine/jEditor.h"
+#endif
+
+jObjectID jObject::s_NextObjectID = 1;  // Start from 1, 0 means no object
+std::unordered_map<jObjectID, jObject*> jObject::s_ObjectIDMap;
+
 std::vector<jObject*> jObject::s_ShadowCasterObject;
 std::vector<jRenderObject*> jObject::s_ShadowCasterRenderObject;
 std::vector<jObject*> jObject::s_StaticObjects;
@@ -32,15 +39,25 @@ void jObject::AddObject(jObject* object)
 		s_ShadowCasterObject.push_back(object);
 	}
 	s_StaticObjects.push_back(object);
-	
+
 	{
 		for (auto& RenderObject : object->RenderObjects)
 		{
+			// Ensure Owner is set for ObjectID picking
+			if (!RenderObject->Owner)
+				RenderObject->Owner = object;
+
 			s_StaticRenderObjects.push_back(RenderObject);
             if (!object->SkipShadowMapGen)
                 s_ShadowCasterRenderObject.push_back(RenderObject);
 		}
 	}
+
+#ifdef ENABLE_EDITOR_FEATURES
+	// Register with PlacementTool so all static objects appear in the placement list
+	if (g_Editor)
+		g_Editor->Placement.RegisterStaticObject(object);
+#endif
 }
 
 void jObject::RemoveObject(jObject* object)
@@ -70,6 +87,12 @@ void jObject::RemoveObject(jObject* object)
 			});
 		}
 	}
+
+#ifdef ENABLE_EDITOR_FEATURES
+	// Unregister from PlacementTool
+	if (g_Editor)
+		g_Editor->Placement.UnregisterStaticObject(object);
+#endif
 }
 
 void jObject::FlushDirtyState()
@@ -181,11 +204,17 @@ void jObject::RemoveUIDebugObject(jObject* object)
 //////////////////////////////////////////////////////////////////////////
 jObject::jObject()
 {
+	// Assign unique ObjectID
+	ObjectID = s_NextObjectID++;
+	s_ObjectIDMap[ObjectID] = this;
 }
 
 
 jObject::~jObject()
 {
+	// Remove from ObjectID map
+	s_ObjectIDMap.erase(ObjectID);
+
 	jObject::RemoveBoundBoxObject(BoundBoxObject);
 	delete BoundBoxObject;
 
@@ -195,6 +224,25 @@ jObject::~jObject()
 	for(auto& RenderObject : RenderObjects)
 		delete RenderObject;
 	RenderObjects.clear();
+}
+
+void jObject::AddRenderObject(jRenderObject* renderObject)
+{
+	if (!renderObject)
+		return;
+
+	// Set owner for ObjectID picking
+	renderObject->Owner = this;
+
+	RenderObjects.push_back(renderObject);
+}
+
+jObject* jObject::FindObjectByID(jObjectID id)
+{
+	auto it = s_ObjectIDMap.find(id);
+	if (it != s_ObjectIDMap.end())
+		return it->second;
+	return nullptr;
 }
 
 void jObject::Update(float deltaTime)

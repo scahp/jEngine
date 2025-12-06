@@ -9,6 +9,7 @@
 
 class jLight;
 class jObject;
+class jRenderObject;
 class jCamera;
 
 // Light type selection for placement
@@ -69,6 +70,21 @@ public:
 	// Placed Objects (unified for both Light and Shape)
 	std::vector<PlacedObjectInfo> PlacedObjects;
 	int32 SelectedPlacedObjectIndex = -1;
+	int32 SelectedRenderObjectIndex = -1;  // Index of selected RenderObject within selected jObject
+
+	// Object Picking via mouse click
+	jObject* PickedObject = nullptr;
+	void SelectObject(jObject* obj);
+	void SelectObject(jRenderObject* renderObj);
+
+	// Register a static object (called from jObject::AddObject)
+	void RegisterStaticObject(jObject* obj);
+	void UnregisterStaticObject(jObject* obj);
+
+	// Pick request state (set by mouse click, consumed by renderer)
+	bool bPickRequested = false;
+	int32 PickMouseX = 0;
+	int32 PickMouseY = 0;
 
 	// Gizmo settings
 	ImGuizmo::OPERATION GizmoOperation = ImGuizmo::TRANSLATE;
@@ -102,8 +118,10 @@ private:
 	void RenderLightTab(jCamera* mainCamera, float lightColorScale);
 	void RenderShapeTab(jCamera* mainCamera);
 	void RenderPlacedObjectsList(jCamera* mainCamera);
+	void RenderPlacedRenderObjectsList();
 	void RenderGizmoControls();
 	void RenderSelectedObjectProperties(jCamera* mainCamera);
+	void RenderSelectedRenderObjectProperties();
 
 	// Helper for light creation
 	void CreatePointLight(const Vector& position, jCamera* camera, float lightColorScale);

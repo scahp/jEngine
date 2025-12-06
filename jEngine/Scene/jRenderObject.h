@@ -2,6 +2,8 @@
 #include "Math\Vector.h"
 #include "Math\Matrix.h"
 #include "jBoundPrimitiveType.h"
+#include "jSceneObject.h"
+#include "jObjectTypes.h"
 
 struct jVertexBuffer;
 struct jIndexBuffer;
@@ -48,11 +50,15 @@ public:
 	bool bHasVertexBiTangent = false;
 };
 
-class jRenderObject
+class jRenderObject : public jSceneObject
 {
 public:
 	jRenderObject();
 	virtual ~jRenderObject();
+
+	// RenderObject ID for picking
+	jRenderObjectID RenderObjectID = 0;
+	static jRenderObject* FindRenderObjectByID(jRenderObjectID id);
 
     virtual void CreateRenderObject(const std::shared_ptr<jRenderObjectGeometryData>& InRenderObjectGeometryData);
 
@@ -66,8 +72,7 @@ public:
 	FORCEINLINE bool HasInstancing() const { return GeometryDataPtr->HasInstancing(); }
 	virtual bool IsSupportRaytracing() const;
 
-    void UpdateWorldMatrix();
-    Matrix World;
+    virtual void UpdateWorldMatrix() override;
 
 	std::shared_ptr<jRenderObjectGeometryData> GeometryDataPtr;
 
@@ -80,13 +85,6 @@ public:
 	template <typename T> T* GetScratchASBuffer() const { return (T*)ScratchASBuffer.get(); }
 	template <typename T> T* GetVertexAndIndexOffsetBuffer() const { return (T*)VertexAndIndexOffsetBuffer.get(); }
 
-	FORCEINLINE void SetPos(const Vector& InPos) { Pos = InPos; SetDirtyFlags(EDirty::POS); }
-	FORCEINLINE void SetRot(const Vector& InRot) { Rot = InRot; SetDirtyFlags(EDirty::ROT); }
-	FORCEINLINE void SetScale(const Vector& InScale) { Scale = InScale; SetDirtyFlags(EDirty::SCALE); }
-	FORCEINLINE const Vector& GetPos() const { return Pos; }
-	FORCEINLINE const Vector& GetRot() const { return Rot; }
-	FORCEINLINE const Vector& GetScale() const { return Scale; }
-
     bool IsTwoSided = false;
     bool IsHiddenBoundBox = false;
 	//////////////////////////////////////////////////////////////////////////
@@ -97,8 +95,8 @@ public:
 		Matrix InvM;
 		float Metallic;
 		float Roughness;
-		float Padding0;
-		float Padding1;
+		jObjectID ObjectID;
+		jRenderObjectID RenderObjectID;
 	};
 
 	//////////////////////////////////////////////////////////////////////////
@@ -110,30 +108,9 @@ public:
 	std::shared_ptr<jBuffer> TestUniformBuffer;
 
 private:
-	enum EDirty : int8
-	{
-		NONE	= 0,
-		POS		= 1,
-		ROT		= 1 << 1,
-		SCALE	= 1 << 2,
-		POS_ROT_SCALE = POS | ROT | SCALE,
-	};
-	EDirty DirtyFlags = EDirty::POS_ROT_SCALE;
-	void SetDirtyFlags(EDirty InEnum)
-	{
-		using T = std::underlying_type<EDirty>::type;
-		DirtyFlags = static_cast<EDirty>(static_cast<T>(InEnum) | static_cast<T>(DirtyFlags));
-	}
-	void ClearDirtyFlags(EDirty InEnum)
-	{
-		using T = std::underlying_type<EDirty>::type;
-		DirtyFlags = static_cast<EDirty>(static_cast<T>(InEnum) & (!static_cast<T>(DirtyFlags)));
-	}
-	FORCEINLINE void ClearDirtyFlags() { DirtyFlags = EDirty::NONE; }
-
-	Vector Pos = Vector::ZeroVector;
-	Vector Rot = Vector::ZeroVector;
-	Vector Scale = Vector::OneVector;
+	// RenderObjectID management
+	static jRenderObjectID s_NextRenderObjectID;
+	static std::unordered_map<jRenderObjectID, jRenderObject*> s_RenderObjectIDMap;
 
 	bool NeedToUpdateRenderObjectUniformParameters = false;
 	std::shared_ptr<IUniformBufferBlock> RenderObjectUniformParametersPtr;

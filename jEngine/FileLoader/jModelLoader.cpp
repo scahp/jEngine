@@ -380,7 +380,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 		StaticMeshRenderObject->SubMesh = subMesh;
 		StaticMeshRenderObject->MaterialPtr = meshData->Materials[subMesh.MaterialIndex];
 		StaticMeshRenderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
-		object->RenderObjects.push_back(StaticMeshRenderObject);
+		object->AddRenderObject(StaticMeshRenderObject);  // Use AddRenderObject to automatically set Owner
 	}
 
 	return object;

@@ -719,7 +719,16 @@ void jPlacementTool::RenderSelectedObjectProperties(jCamera* mainCamera)
 					// Use debug object position
 					if (selectedObjectInfo.Object && !selectedObjectInfo.Object->RenderObjects.empty())
 					{
-						objectPos = selectedObjectInfo.Object->RenderObjects[0]->GetPos();
+						// If a specific RenderObject is selected, use its position
+						if (SelectedRenderObjectIndex >= 0 && SelectedRenderObjectIndex < (int)selectedObjectInfo.Object->RenderObjects.size())
+						{
+							objectPos = selectedObjectInfo.Object->RenderObjects[SelectedRenderObjectIndex]->GetPos();
+						}
+						else
+						{
+							// Otherwise use first RenderObject as representative
+							objectPos = selectedObjectInfo.Object->RenderObjects[0]->GetPos();
+						}
 					}
 					else
 					{
@@ -761,11 +770,33 @@ void jPlacementTool::RenderSelectedObjectProperties(jCamera* mainCamera)
 			}
 			else if (selectedObjectInfo.Type == EPlacedObjectType::SHAPE)
 			{
-				// Get shape position
+				// Get shape transform (position, rotation, scale)
 				if (selectedObjectInfo.Object && !selectedObjectInfo.Object->RenderObjects.empty())
 				{
-					objectPos = selectedObjectInfo.Object->RenderObjects[0]->GetPos();
-					objectTransform = Matrix::MakeTranslate(objectPos);
+					jRenderObject* targetRenderObj = nullptr;
+
+					// If a specific RenderObject is selected, use its transform
+					if (SelectedRenderObjectIndex >= 0 && SelectedRenderObjectIndex < (int)selectedObjectInfo.Object->RenderObjects.size())
+					{
+						targetRenderObj = selectedObjectInfo.Object->RenderObjects[SelectedRenderObjectIndex];
+					}
+					else
+					{
+						// Otherwise use first RenderObject as representative
+						targetRenderObj = selectedObjectInfo.Object->RenderObjects[0];
+					}
+
+					if (targetRenderObj)
+					{
+						objectPos = targetRenderObj->GetPos();
+						Vector objectRot = targetRenderObj->GetRot();
+						Vector objectScale = targetRenderObj->GetScale();
+
+						auto posMatrix = Matrix::MakeTranslate(objectPos);
+						auto rotMatrix = Matrix::MakeRotate(objectRot);
+						auto scaleMatrix = Matrix::MakeScale(objectScale);
+						objectTransform = posMatrix * rotMatrix * scaleMatrix;
+					}
 				}
 			}
 
@@ -778,8 +809,13 @@ void jPlacementTool::RenderSelectedObjectProperties(jCamera* mainCamera)
 			if (ImGuizmo::Manipulate(viewMatrix, projMatrix, GizmoOperation, GizmoMode,
 									  matrixPtr, nullptr, snapPtr))
 			{
-				// Extract new position from matrix
-				Vector newPos(objectTransform.m[3][0], objectTransform.m[3][1], objectTransform.m[3][2]);
+				// Extract transform components from matrix
+				float translation[3], rotation[3], scale[3];
+				ImGuizmo::DecomposeMatrixToComponents(matrixPtr, translation, rotation, scale);
+
+				Vector newPos(translation[0], translation[1], translation[2]);
+				Vector newRot(rotation[0], rotation[1], rotation[2]);
+				Vector newScale(scale[0], scale[1], scale[2]);
 
 				// Apply to object based on type
 				if (selectedObjectInfo.Type == EPlacedObjectType::LIGHT)
@@ -836,10 +872,27 @@ void jPlacementTool::RenderSelectedObjectProperties(jCamera* mainCamera)
 				}
 				else if (selectedObjectInfo.Type == EPlacedObjectType::SHAPE)
 				{
-					// Update shape position
-					if (selectedObjectInfo.Object && !selectedObjectInfo.Object->RenderObjects.empty())
+					// Update shape transform (position, rotation, scale)
+					if (selectedObjectInfo.Object)
 					{
-						selectedObjectInfo.Object->RenderObjects[0]->SetPos(newPos);
+						// If a specific RenderObject is selected, only update that one
+						if (SelectedRenderObjectIndex >= 0 && SelectedRenderObjectIndex < (int)selectedObjectInfo.Object->RenderObjects.size())
+						{
+							jRenderObject* renderObj = selectedObjectInfo.Object->RenderObjects[SelectedRenderObjectIndex];
+							renderObj->SetPos(newPos);
+							renderObj->SetRot(newRot);
+							renderObj->SetScale(newScale);
+						}
+						else
+						{
+							// Otherwise apply to ALL RenderObjects
+							for (auto* renderObj : selectedObjectInfo.Object->RenderObjects)
+							{
+								renderObj->SetPos(newPos);
+								renderObj->SetRot(newRot);
+								renderObj->SetScale(newScale);
+							}
+						}
 					}
 				}
 			}
@@ -996,21 +1049,73 @@ void jPlacementTool::RenderSelectedObjectProperties(jCamera* mainCamera)
 		}
 		else if (selectedObjectInfo.Type == EPlacedObjectType::SHAPE)
 		{
-			// Display shape properties
+			// Display RenderObject list
 			if (selectedObjectInfo.Object && !selectedObjectInfo.Object->RenderObjects.empty())
 			{
-				Vector pos = selectedObjectInfo.Object->RenderObjects[0]->GetPos();
-				if (ImGui::SliderFloat3("Position", &pos.x, -500.0f, 500.0f))
+				ImGui::TextColored(ImVec4(0, 1, 1, 1), "RenderObjects: %d", (int)selectedObjectInfo.Object->RenderObjects.size());
+
+				// Show list of RenderObjects
+				ImGui::BeginChild("RenderObjectListRegion", ImVec2(0, 100), true);
+				for (int i = 0; i < (int)selectedObjectInfo.Object->RenderObjects.size(); ++i)
 				{
-					selectedObjectInfo.Object->RenderObjects[0]->SetPos(pos);
-				}
-				AddCopyPasteContextMenu("PlacedObjectPosContext", pos, [&selectedObjectInfo](float x, float y, float z) {
-					Vector newPos(x, y, z);
-					if (selectedObjectInfo.Object && !selectedObjectInfo.Object->RenderObjects.empty())
+					char renderObjLabel[64];
+					sprintf_s(renderObjLabel, "RenderObject [%d]", i);
+
+					if (ImGui::Selectable(renderObjLabel, SelectedRenderObjectIndex == i))
 					{
-						selectedObjectInfo.Object->RenderObjects[0]->SetPos(newPos);
+						SelectedRenderObjectIndex = i;
 					}
-				});
+				}
+				ImGui::EndChild();
+
+				// Display properties of selected RenderObject
+				jRenderObject* targetRenderObj = nullptr;
+				if (SelectedRenderObjectIndex >= 0 && SelectedRenderObjectIndex < (int)selectedObjectInfo.Object->RenderObjects.size())
+				{
+					targetRenderObj = selectedObjectInfo.Object->RenderObjects[SelectedRenderObjectIndex];
+				}
+				else
+				{
+					// Default to first RenderObject if none selected
+					targetRenderObj = selectedObjectInfo.Object->RenderObjects[0];
+					SelectedRenderObjectIndex = 0;
+				}
+
+				if (targetRenderObj)
+				{
+					ImGui::Separator();
+					ImGui::TextColored(ImVec4(1, 1, 0, 1), "Selected RenderObject [%d]:", SelectedRenderObjectIndex);
+
+					Vector pos = targetRenderObj->GetPos();
+					if (ImGui::SliderFloat3("Position", &pos.x, -500.0f, 500.0f))
+					{
+						targetRenderObj->SetPos(pos);
+					}
+					AddCopyPasteContextMenu("PlacedObjectPosContext", pos, [targetRenderObj](float x, float y, float z) {
+						Vector newPos(x, y, z);
+						targetRenderObj->SetPos(newPos);
+					});
+
+					Vector rot = targetRenderObj->GetRot();
+					if (ImGui::SliderFloat3("Rotation", &rot.x, -180.0f, 180.0f))
+					{
+						targetRenderObj->SetRot(rot);
+					}
+					AddCopyPasteContextMenu("PlacedObjectRotContext", rot, [targetRenderObj](float x, float y, float z) {
+						Vector newRot(x, y, z);
+						targetRenderObj->SetRot(newRot);
+					});
+
+					Vector scale = targetRenderObj->GetScale();
+					if (ImGui::SliderFloat3("Scale", &scale.x, 0.1f, 10.0f))
+					{
+						targetRenderObj->SetScale(scale);
+					}
+					AddCopyPasteContextMenu("PlacedObjectScaleContext", scale, [targetRenderObj](float x, float y, float z) {
+						Vector newScale(x, y, z);
+						targetRenderObj->SetScale(newScale);
+					});
+				}
 			}
 		}
 
@@ -1030,6 +1135,100 @@ void jPlacementTool::Clear()
 	CurrentTab = EPlacementTab::LIGHT;
 	SelectedLightType = EPlacementLightType::POINT;
 	SelectedShapeType = EPlacementShapeType::CUBE;
+}
+
+void jPlacementTool::RegisterStaticObject(jObject* obj)
+{
+	// Called from jObject::AddObject to register static objects
+	// This allows all static objects to appear in the placement list
+	if (!obj)
+		return;
+
+	// Add to PlacedObjects if not already present
+	if (std::find_if(PlacedObjects.begin(), PlacedObjects.end(),
+		[obj](const PlacedObjectInfo& info) { return info.Object == obj; }) == PlacedObjects.end())
+	{
+		PlacedObjectInfo info;
+		info.Object = obj;
+		info.Type = EPlacedObjectType::SHAPE;  // Static objects are shapes
+		PlacedObjects.push_back(info);
+	}
+}
+
+void jPlacementTool::UnregisterStaticObject(jObject* obj)
+{
+	// Called from jObject::RemoveObject to unregister static objects
+	if (!obj)
+		return;
+
+	auto it = std::find_if(PlacedObjects.begin(), PlacedObjects.end(),
+		[obj](const PlacedObjectInfo& info) { return info.Object == obj; });
+
+	if (it != PlacedObjects.end())
+	{
+		int32 index = static_cast<int32>(std::distance(PlacedObjects.begin(), it));
+		if (index == SelectedPlacedObjectIndex)
+			SelectedPlacedObjectIndex = -1;
+		else if (index < SelectedPlacedObjectIndex)
+			SelectedPlacedObjectIndex--;
+
+		PlacedObjects.erase(it);
+	}
+}
+
+void jPlacementTool::SelectObject(jObject* obj)
+{
+	if (!obj)
+	{
+		SelectedPlacedObjectIndex = -1;
+		SelectedRenderObjectIndex = -1;
+		return;
+	}
+
+	// Find the object in PlacedObjects list
+	auto it = std::find_if(PlacedObjects.begin(), PlacedObjects.end(),
+		[obj](const PlacedObjectInfo& info) { return info.Object == obj; });
+
+	if (it != PlacedObjects.end())
+	{
+		SelectedPlacedObjectIndex = static_cast<int32>(std::distance(PlacedObjects.begin(), it));
+		SelectedRenderObjectIndex = -1;  // Reset RenderObject selection
+	}
+	else
+	{
+		SelectedPlacedObjectIndex = -1;
+		SelectedRenderObjectIndex = -1;
+	}
+}
+
+void jPlacementTool::SelectObject(jRenderObject* renderObj)
+{
+	if (!renderObj || !renderObj->Owner)
+	{
+		SelectedPlacedObjectIndex = -1;
+		SelectedRenderObjectIndex = -1;
+		return;
+	}
+
+	// Get the owner jObject
+	jObject* ownerObj = renderObj->Owner;
+
+	// Find the RenderObject index within the owner's RenderObjects array
+	auto& renderObjects = ownerObj->RenderObjects;
+	auto it = std::find(renderObjects.begin(), renderObjects.end(), renderObj);
+
+	if (it != renderObjects.end())
+	{
+		SelectedRenderObjectIndex = static_cast<int32>(std::distance(renderObjects.begin(), it));
+
+		// Select the parent object as well
+		SelectObject(ownerObj);
+	}
+	else
+	{
+		SelectedPlacedObjectIndex = -1;
+		SelectedRenderObjectIndex = -1;
+	}
 }
 
 #endif // ENABLE_EDITOR_FEATURES
