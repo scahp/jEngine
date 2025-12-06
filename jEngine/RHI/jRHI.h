@@ -278,6 +278,17 @@ struct jImageBulkData
     std::vector<jImageSubResourceData> SubresourceFootprints;
 };
 
+struct jTextureCopyRegion
+{
+    int32 X = 0;
+    int32 Y = 0;
+    int32 Width = 0;
+    int32 Height = 0;
+    uint32 MipLevel = 0;
+    uint32 ArraySlice = 0;
+    uint32 DestRowPitchOverride = 0;    // 0이면 API 기본 규칙 사용 (DX12: 256 align)
+};
+
 struct jRaytracingDispatchData
 {
 	int32 Width = 0;
@@ -462,6 +473,8 @@ public:
     virtual void TransitionLayout(jCommandBuffer* commandBuffer, jBuffer* buffer, EResourceLayout newLayout) const { }
     virtual void UAVBarrier(jCommandBuffer* commandBuffer, jTexture* texture) const { }
     virtual void UAVBarrier(jCommandBuffer* commandBuffer, jBuffer* buffer) const { }
+
+    virtual void CopyTextureRegionToBuffer(jCommandBuffer* commandBuffer, jTexture* srcTexture, const jTextureCopyRegion& region, jBuffer* dstBuffer, uint64 dstOffset = 0) const { }
 
 	virtual void TransitionLayout(jTexture* texture, EResourceLayout newLayout) const { }
 	virtual void TransitionLayout(jBuffer* buffer, EResourceLayout newLayout) const { }
@@ -818,4 +831,3 @@ public:
 #define DEBUG_EVENT_NAME(Name, Line) Name##Line
 #define DEBUG_EVENT(RenderFrameContextPtr, Name) jGPUDebugEvent DEBUG_EVENT_NAME(DebugEvent_, __LINE__)(RenderFrameContextPtr->GetActiveCommandBuffer(), Name);
 #define DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, Name, ColorVec4) jGPUDebugEvent DEBUG_EVENT_NAME(DebugEvent_, __LINE__)(RenderFrameContextPtr->GetActiveCommandBuffer(), Name, ColorVec4);
-

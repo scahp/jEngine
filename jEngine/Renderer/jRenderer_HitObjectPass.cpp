@@ -12,14 +12,6 @@
 #include "Code/Engine/jEditor.h"
 #endif
 
-// Include DX12 API for readback
-// Note: These are always included to support IsUseDX12() runtime check
-#include "RHI/DX12/jRHI_DX12.h"
-#include "RHI/DX12/jBuffer_DX12.h"
-#include "RHI/DX12/jTexture_DX12.h"
-#include "RHI/DX12/jBufferUtil_DX12.h"
-#include "RHI/DX12/jCommandBufferManager_DX12.h"
-
 void jRenderer::RequestObjectPick(int32 mouseX, int32 mouseY)
 {
 	bObjectPickRequested = true;
@@ -159,75 +151,39 @@ void jRenderer::HitObjectPass()
 	}
 
 	// 8. Readback pixel at (PickMouseX, PickMouseY) and decode ObjectID
-	if (IsUseDX12())
-	{
-		ReadbackHitObjectDX12();
-	}
-	else
-	{
-		// Vulkan implementation - TODO
-		// Placeholder: Always deselect for now
-	#ifdef ENABLE_EDITOR_FEATURES
-		if (g_Editor)
-		{
-			g_Editor->Placement.SelectObject((jRenderObject*)nullptr);
-		}
-	#endif
-	}
+	ReadbackHitObject();
 }
 
-void jRenderer::ReadbackHitObjectDX12()
+void jRenderer::ReadbackHitObject()
 {
 	// Transition HitObject_RT to TRANSFER_SRC for copy
 	g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer()
 		, jSceneRenderTarget::HitObject_RT->GetTexture(), EResourceLayout::TRANSFER_SRC);
 
 	// Create readback buffer (4 bytes for RGBA8)
-	static std::shared_ptr<jBuffer_DX12> ReadbackBuffer;
+	static std::shared_ptr<jBuffer> ReadbackBuffer;
 	const uint64 ReadbackBufferSize = 4;  // RGBA8 = 4 bytes
 
 	if (!ReadbackBuffer)
 	{
-		ReadbackBuffer = std::shared_ptr<jBuffer_DX12>(
-			jBufferUtil_DX12::CreateBuffer(ReadbackBufferSize, 0
-				, EBufferCreateFlag::Readback
-				, EResourceLayout::TRANSFER_DST
-				, nullptr
-				, ReadbackBufferSize
-				, TEXT("HitObject_ReadbackBuffer")));
+		ReadbackBuffer = g_rhi->CreateRawBuffer(ReadbackBufferSize, 0
+			, EBufferCreateFlag::Readback
+			, EResourceLayout::TRANSFER_DST
+			, nullptr
+			, ReadbackBufferSize
+			, TEXT("HitObject_ReadbackBuffer"));
 	}
 
-	// Record copy to readback buffer
-	auto commandBuffer_DX12 = (jCommandBuffer_DX12*)RenderFrameContextPtr->GetActiveCommandBuffer();
-	auto hitObjectTexture_DX12 = (jTexture_DX12*)jSceneRenderTarget::HitObject_RT->GetTexture();
+	jTextureCopyRegion copyRegion;
+	copyRegion.X = PickMouseX;
+	copyRegion.Y = PickMouseY;
+	copyRegion.Width = 1;
+	copyRegion.Height = 1;
 
-	D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint = {};
-	footprint.Offset = 0;
-	footprint.Footprint.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	footprint.Footprint.Width = 1;
-	footprint.Footprint.Height = 1;
-	footprint.Footprint.Depth = 1;
-	footprint.Footprint.RowPitch = 256;  // Must be aligned to 256
-
-	D3D12_TEXTURE_COPY_LOCATION dst = {};
-	dst.pResource = (ID3D12Resource*)ReadbackBuffer->GetHandle();
-	dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-	dst.PlacedFootprint = footprint;
-
-	D3D12_TEXTURE_COPY_LOCATION src = {};
-	src.pResource = (ID3D12Resource*)hitObjectTexture_DX12->GetHandle();
-	src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-	src.SubresourceIndex = 0;
-
-	D3D12_BOX srcBox = {};
-	srcBox.left = PickMouseX;
-	srcBox.top = PickMouseY;
-	srcBox.right = PickMouseX + 1;
-	srcBox.bottom = PickMouseY + 1;
-	srcBox.front = 0;
-	srcBox.back = 1;
-
-	commandBuffer_DX12->CommandList->CopyTextureRegion(&dst, 0, 0, 0, &src, &srcBox);
+	g_rhi->CopyTextureRegionToBuffer(RenderFrameContextPtr->GetActiveCommandBuffer()
+		, jSceneRenderTarget::HitObject_RT->GetTexture()
+		, copyRegion
+		, ReadbackBuffer.get());
 
 	// Submit command buffer and wait until copy is complete before mapping
 	RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None, true);

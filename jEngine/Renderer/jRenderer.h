@@ -71,7 +71,7 @@ public:
     // Object Picking
     virtual void HitObjectPass();
     void RequestObjectPick(int32 mouseX, int32 mouseY);
-    void ReadbackHitObjectDX12();
+    void ReadbackHitObject();
 
     virtual void PostProcess();
 

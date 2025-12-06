@@ -1797,8 +1797,8 @@ void jRHI_Vulkan::EndSingleTimeCopyCommands(jCommandBuffer_Vulkan* commandBuffer
 
     const jQueue_Vulkan& CurrentQueue = GetQueue(CommandBuffer_Vulkan->Type);
 
-    auto Result = vkQueueSubmit(CurrentQueue.Queue, 1, &submitInfo, vkFence);
-    ensure(VK_SUCCESS == Result);
+	auto Result = vkQueueSubmit(CurrentQueue.Queue, 1, &submitInfo, vkFence);
+	ensure(VK_SUCCESS == Result);
 
 	if (bWaitUntilExecuteComplete)
 	{
@@ -1807,6 +1807,34 @@ void jRHI_Vulkan::EndSingleTimeCopyCommands(jCommandBuffer_Vulkan* commandBuffer
 	}
 
 	CopyCommandBufferManager->ReturnCommandBuffer(CommandBuffer_Vulkan);
+}
+
+void jRHI_Vulkan::CopyTextureRegionToBuffer(jCommandBuffer* commandBuffer, jTexture* srcTexture, const jTextureCopyRegion& region, jBuffer* dstBuffer, uint64 dstOffset) const
+{
+	check(commandBuffer);
+	check(srcTexture);
+	check(dstBuffer);
+
+	auto commandBuffer_Vulkan = (jCommandBuffer_Vulkan*)commandBuffer;
+	auto srcTexture_Vulkan = (jTexture_Vulkan*)srcTexture;
+	auto dstBuffer_Vulkan = (jBuffer_Vulkan*)dstBuffer;
+
+	const uint32 bytesPerPixel = (uint32)GetVulkanTexturePixelSize(srcTexture->Format);
+	const uint32 bufferRowLengthInTexels = region.DestRowPitchOverride ? (region.DestRowPitchOverride / bytesPerPixel) : region.Width;
+
+	VkBufferImageCopy copyRegion = {};
+	copyRegion.bufferOffset = dstOffset;
+	copyRegion.bufferRowLength = bufferRowLengthInTexels;
+	copyRegion.bufferImageHeight = 0;
+	copyRegion.imageSubresource.aspectMask = IsDepthFormat(srcTexture->Format) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+	copyRegion.imageSubresource.mipLevel = region.MipLevel;
+	copyRegion.imageSubresource.baseArrayLayer = region.ArraySlice;
+	copyRegion.imageSubresource.layerCount = 1;
+	copyRegion.imageOffset = { region.X, region.Y, 0 };
+	copyRegion.imageExtent = { (uint32)region.Width, (uint32)region.Height, 1 };
+
+	vkCmdCopyImageToBuffer(commandBuffer_Vulkan->GetRef(), srcTexture_Vulkan->Image, GetVulkanImageLayout(srcTexture_Vulkan->Layout)
+		, dstBuffer_Vulkan->Buffer, 1, &copyRegion);
 }
 
 void jRHI_Vulkan::TransitionLayout(jCommandBuffer* commandBuffer, jTexture* texture, EResourceLayout newLayout) const

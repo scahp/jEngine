@@ -1490,6 +1490,50 @@ void jRHI_DX12::ReleaseQueryTime(jQuery* queryTime) const
     delete queryTime_gl;
 }
 
+void jRHI_DX12::CopyTextureRegionToBuffer(jCommandBuffer* commandBuffer, jTexture* srcTexture, const jTextureCopyRegion& region, jBuffer* dstBuffer, uint64 dstOffset) const
+{
+    check(commandBuffer);
+    check(srcTexture);
+    check(dstBuffer);
+
+    auto commandBuffer_DX12 = (jCommandBuffer_DX12*)commandBuffer;
+    auto srcTexture_DX12 = (jTexture_DX12*)srcTexture;
+    auto dstBuffer_DX12 = (jBuffer_DX12*)dstBuffer;
+
+    const uint32 bytesPerPixel = (uint32)GetDX12TexturePixelSize(srcTexture->Format);
+    const uint32 rowPitch = region.DestRowPitchOverride
+        ? region.DestRowPitchOverride
+        : (uint32)Align((uint64)region.Width * bytesPerPixel, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+
+    D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint = {};
+    footprint.Offset = dstOffset;
+    footprint.Footprint.Format = GetDX12TextureFormat(srcTexture->Format);
+    footprint.Footprint.Width = region.Width;
+    footprint.Footprint.Height = region.Height;
+    footprint.Footprint.Depth = 1;
+    footprint.Footprint.RowPitch = rowPitch;
+
+    D3D12_TEXTURE_COPY_LOCATION dstLocation = {};
+    dstLocation.pResource = (ID3D12Resource*)dstBuffer_DX12->GetHandle();
+    dstLocation.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+    dstLocation.PlacedFootprint = footprint;
+
+    D3D12_TEXTURE_COPY_LOCATION srcLocation = {};
+    srcLocation.pResource = (ID3D12Resource*)srcTexture_DX12->GetHandle();
+    srcLocation.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+    srcLocation.SubresourceIndex = D3D12CalcSubresource(region.MipLevel, region.ArraySlice, 0, srcTexture->MipLevel, 1);
+
+    D3D12_BOX srcBox = {};
+    srcBox.left = region.X;
+    srcBox.top = region.Y;
+    srcBox.right = region.X + region.Width;
+    srcBox.bottom = region.Y + region.Height;
+    srcBox.front = 0;
+    srcBox.back = 1;
+
+    commandBuffer_DX12->CommandList->CopyTextureRegion(&dstLocation, 0, 0, 0, &srcLocation, &srcBox);
+}
+
 void jRHI_DX12::TransitionLayout(jCommandBuffer* commandBuffer, jTexture* texture, EResourceLayout newLayout) const
 {
     check(commandBuffer);

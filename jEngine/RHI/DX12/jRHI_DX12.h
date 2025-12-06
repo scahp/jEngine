@@ -407,6 +407,7 @@ public:
 
 	// Resource Barrier
 	virtual void TransitionLayout(jCommandBuffer* commandBuffer, jTexture* texture, EResourceLayout newLayout) const override;
+    virtual void CopyTextureRegionToBuffer(jCommandBuffer* commandBuffer, jTexture* srcTexture, const jTextureCopyRegion& region, jBuffer* dstBuffer, uint64 dstOffset = 0) const override;
     virtual void TransitionLayout(jCommandBuffer* commandBuffer, jBuffer* buffer, EResourceLayout newLayout) const override;
     virtual void UAVBarrier(jCommandBuffer* commandBuffer, jTexture* texture) const override;
     virtual void UAVBarrier(jCommandBuffer* commandBuffer, jBuffer* buffer) const override;
