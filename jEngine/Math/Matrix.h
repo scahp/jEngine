@@ -1,5 +1,6 @@
-﻿#pragma once
+#pragma once
 
+#include "CoreDefines.h"
 #include "Vector.h"
 #include <utility>
 
@@ -53,8 +54,22 @@ struct Matrix
 
 	FORCEINLINE Matrix& SetTranspose()
 	{
+#if USE_SSE
+		__m128 row0 = _mm_loadu_ps(&m[0][0]);
+		__m128 row1 = _mm_loadu_ps(&m[1][0]);
+		__m128 row2 = _mm_loadu_ps(&m[2][0]);
+		__m128 row3 = _mm_loadu_ps(&m[3][0]);
+
+		_MM_TRANSPOSE4_PS(row0, row1, row2, row3);
+
+		_mm_storeu_ps(&m[0][0], row0);
+		_mm_storeu_ps(&m[1][0], row1);
+		_mm_storeu_ps(&m[2][0], row2);
+		_mm_storeu_ps(&m[3][0], row3);
+#else
 		Swap(m01, m10); Swap(m02, m20); Swap(m03, m30);
 		Swap(m12, m21); Swap(m13, m31); Swap(m23, m32);
+#endif
 		return *this;
 	}
 
@@ -179,6 +194,23 @@ struct Matrix
 
 	FORCEINLINE const Matrix operator*(Matrix const& matrix) const
 	{
+#if USE_SSE
+		Matrix result;
+		__m128 a0 = _mm_loadu_ps(&m[0][0]);	// Column 0
+		__m128 a1 = _mm_loadu_ps(&m[1][0]);	// Column 1
+		__m128 a2 = _mm_loadu_ps(&m[2][0]);	// Column 2
+		__m128 a3 = _mm_loadu_ps(&m[3][0]);	// Column 3
+		for (int c = 0; c < 4; ++c)
+		{
+			__m128 bc = _mm_loadu_ps(&matrix.m[c][0]); // Column c of rhs
+			__m128 r = _mm_mul_ps(_mm_shuffle_ps(bc, bc, _MM_SHUFFLE(0, 0, 0, 0)), a0);
+			r = _mm_add_ps(r, _mm_mul_ps(_mm_shuffle_ps(bc, bc, _MM_SHUFFLE(1, 1, 1, 1)), a1));
+			r = _mm_add_ps(r, _mm_mul_ps(_mm_shuffle_ps(bc, bc, _MM_SHUFFLE(2, 2, 2, 2)), a2));
+			r = _mm_add_ps(r, _mm_mul_ps(_mm_shuffle_ps(bc, bc, _MM_SHUFFLE(3, 3, 3, 3)), a3));
+			_mm_storeu_ps(&result.m[c][0], r);
+		}
+		return result;
+#else
 		return Matrix(
 			m00 * matrix.m00 + m10 * matrix.m01 + m20 * matrix.m02 + m30 * matrix.m03,
             m01 * matrix.m00 + m11 * matrix.m01 + m21 * matrix.m02 + m31 * matrix.m03,
@@ -200,29 +232,14 @@ struct Matrix
 			m02 * matrix.m30 + m12 * matrix.m31 + m22 * matrix.m32 + m32 * matrix.m33,
 			m03 * matrix.m30 + m13 * matrix.m31 + m23 * matrix.m32 + m33 * matrix.m33
 		);
+#endif
 	}
 
 	FORCEINLINE const Matrix operator*=(Matrix const& matrix)
 	{
-		m00 = m00 * matrix.m00 + m10 * matrix.m01 + m20 * matrix.m02 + m30 * matrix.m03;
-		m10 = m00 * matrix.m10 + m10 * matrix.m11 + m20 * matrix.m12 + m30 * matrix.m13;
-		m20 = m00 * matrix.m20 + m10 * matrix.m21 + m20 * matrix.m22 + m30 * matrix.m23;
-		m30 = m00 * matrix.m30 + m10 * matrix.m31 + m20 * matrix.m32 + m30 * matrix.m33;
-
-		m01 = m01 * matrix.m00 + m11 * matrix.m01 + m21 * matrix.m02 + m31 * matrix.m03;
-		m11 = m01 * matrix.m10 + m11 * matrix.m11 + m21 * matrix.m12 + m31 * matrix.m13;
-		m21 = m01 * matrix.m20 + m11 * matrix.m21 + m21 * matrix.m22 + m31 * matrix.m23;
-		m31 = m01 * matrix.m30 + m11 * matrix.m31 + m21 * matrix.m32 + m31 * matrix.m33;
-
-		m02 = m02 * matrix.m00 + m12 * matrix.m01 + m22 * matrix.m02 + m32 * matrix.m03;
-		m12 = m02 * matrix.m10 + m12 * matrix.m11 + m22 * matrix.m12 + m32 * matrix.m13;
-		m22 = m02 * matrix.m20 + m12 * matrix.m21 + m22 * matrix.m22 + m32 * matrix.m23;
-		m32 = m02 * matrix.m30 + m12 * matrix.m31 + m22 * matrix.m32 + m32 * matrix.m33;
-
-		m03 = m03 * matrix.m00 + m13 * matrix.m01 + m23 * matrix.m02 + m33 * matrix.m03;
-		m13 = m03 * matrix.m10 + m13 * matrix.m11 + m23 * matrix.m12 + m33 * matrix.m13;
-		m23 = m03 * matrix.m20 + m13 * matrix.m21 + m23 * matrix.m22 + m33 * matrix.m23;
-		m33 = m03 * matrix.m30 + m13 * matrix.m31 + m23 * matrix.m32 + m33 * matrix.m33;
+		Matrix result = (*this) * matrix;
+		*this = result;
+		return *this;
 	}
 
 	// Transform
@@ -244,12 +261,32 @@ struct Matrix
 
 	FORCEINLINE Vector4 Transform(Vector4 const& vector) const
 	{
+#if USE_SSE
+		__m128 v = _mm_loadu_ps(&vector.x);
+
+		__m128 row0 = _mm_loadu_ps(&m[0][0]);
+		__m128 row1 = _mm_loadu_ps(&m[1][0]);
+		__m128 row2 = _mm_loadu_ps(&m[2][0]);
+		__m128 row3 = _mm_loadu_ps(&m[3][0]);
+
+		__m128 r0 = _mm_mul_ps(_mm_shuffle_ps(v, v, _MM_SHUFFLE(0, 0, 0, 0)), row0);
+		__m128 r1 = _mm_mul_ps(_mm_shuffle_ps(v, v, _MM_SHUFFLE(1, 1, 1, 1)), row1);
+		__m128 r2 = _mm_mul_ps(_mm_shuffle_ps(v, v, _MM_SHUFFLE(2, 2, 2, 2)), row2);
+		__m128 r3 = _mm_mul_ps(_mm_shuffle_ps(v, v, _MM_SHUFFLE(3, 3, 3, 3)), row3);
+
+		__m128 sum = _mm_add_ps(_mm_add_ps(r0, r1), _mm_add_ps(r2, r3));
+
+		Vector4 result;
+		_mm_storeu_ps(&result.x, sum);
+		return result;
+#else
 		return Vector4(
 			vector.x * m00 + vector.y * m10 + vector.z * m20 + vector.w * m30,
 			vector.x * m01 + vector.y * m11 + vector.z * m21 + vector.w * m31,
 			vector.x * m02 + vector.y * m12 + vector.z * m22 + vector.w * m32,
 			vector.x * m03 + vector.y * m13 + vector.z * m23 + vector.w * m33
 		);
+#endif
 	}
 
 	FORCEINLINE Vector InverseTransform(Vector const& vector) const
@@ -751,6 +788,25 @@ struct Matrix3
 
 	FORCEINLINE Matrix3 operator*(Matrix3 const& matrix) const
 	{
+#if USE_SSE
+		Matrix3 result;
+		__m128 a0 = _mm_setr_ps(m00, m10, m20, 0.0f); // Column 0
+		__m128 a1 = _mm_setr_ps(m01, m11, m21, 0.0f); // Column 1
+		__m128 a2 = _mm_setr_ps(m02, m12, m22, 0.0f); // Column 2
+		for (int c = 0; c < 3; ++c)
+		{
+			__m128 bc = _mm_setr_ps(matrix.m[c][0], matrix.m[c][1], matrix.m[c][2], 0.0f); // Column c
+			__m128 r = _mm_mul_ps(_mm_shuffle_ps(bc, bc, _MM_SHUFFLE(0, 0, 0, 0)), a0);
+			r = _mm_add_ps(r, _mm_mul_ps(_mm_shuffle_ps(bc, bc, _MM_SHUFFLE(1, 1, 1, 1)), a1));
+			r = _mm_add_ps(r, _mm_mul_ps(_mm_shuffle_ps(bc, bc, _MM_SHUFFLE(2, 2, 2, 2)), a2));
+			float tmp[4];
+			_mm_storeu_ps(tmp, r);
+			result.m[c][0] = tmp[0];
+			result.m[c][1] = tmp[1];
+			result.m[c][2] = tmp[2];
+		}
+		return result;
+#else
 		return Matrix3(
 			m00 * matrix.m00 + m10 * matrix.m01 + m20 * matrix.m02,
             m01 * matrix.m00 + m11 * matrix.m01 + m21 * matrix.m02,
@@ -764,22 +820,13 @@ struct Matrix3
 			m01 * matrix.m20 + m11 * matrix.m21 + m21 * matrix.m22,
 			m02 * matrix.m20 + m12 * matrix.m21 + m22 * matrix.m22
 		);
+#endif
 	}
 
 	FORCEINLINE Matrix3 operator*=(Matrix3 const& matrix)
 	{
-		m00 = m00 * matrix.m00 + m10 * matrix.m01 + m20 * matrix.m02;
-		m10 = m00 * matrix.m10 + m10 * matrix.m11 + m20 * matrix.m12;
-		m20 = m00 * matrix.m20 + m10 * matrix.m21 + m20 * matrix.m22;
-
-		m01 = m01 * matrix.m00 + m11 * matrix.m01 + m21 * matrix.m02;
-		m11 = m01 * matrix.m10 + m11 * matrix.m11 + m21 * matrix.m12;
-		m21 = m01 * matrix.m20 + m11 * matrix.m21 + m21 * matrix.m22;
-
-		m02 = m02 * matrix.m00 + m12 * matrix.m01 + m22 * matrix.m02;
-		m12 = m02 * matrix.m10 + m12 * matrix.m11 + m22 * matrix.m12;
-		m22 = m02 * matrix.m20 + m12 * matrix.m21 + m22 * matrix.m22;
-		
+		Matrix3 result = (*this) * matrix;
+		*this = result;
 		return *this;
 	}
 
@@ -787,11 +834,27 @@ struct Matrix3
 	// Transfrom
 	FORCEINLINE Vector Transform(Vector const& vector) const
 	{
+#if USE_SSE
+		__m128 v = _mm_setr_ps(vector.x, vector.y, vector.z, 0.0f);
+		__m128 c0 = _mm_setr_ps(m00, m10, m20, 0.0f);
+		__m128 c1 = _mm_setr_ps(m01, m11, m21, 0.0f);
+		__m128 c2 = _mm_setr_ps(m02, m12, m22, 0.0f);
+
+		__m128 r0 = _mm_mul_ps(_mm_shuffle_ps(v, v, _MM_SHUFFLE(0, 0, 0, 0)), c0);
+		__m128 r1 = _mm_mul_ps(_mm_shuffle_ps(v, v, _MM_SHUFFLE(1, 1, 1, 1)), c1);
+		__m128 r2 = _mm_mul_ps(_mm_shuffle_ps(v, v, _MM_SHUFFLE(2, 2, 2, 2)), c2);
+
+		__m128 sum = _mm_add_ps(_mm_add_ps(r0, r1), r2);
+		float tmp[4];
+		_mm_storeu_ps(tmp, sum);
+		return Vector(tmp[0], tmp[1], tmp[2]);
+#else
 		return Vector(
 			vector.x * m00 + vector.y * m10 + vector.z * m20,
 			vector.x * m01 + vector.y * m11 + vector.z * m21,
 			vector.x * m02 + vector.y * m12 + vector.z * m22
 		);
+#endif
 	}
 
 	FORCEINLINE Vector InverseTransform(Vector const& vector) const

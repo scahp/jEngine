@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 /*!
  * \file Vector.h
@@ -11,6 +11,7 @@
 */
 
 #include <math.h>
+#include "CoreDefines.h"
 #include "MathUtility.h"
 #include "Generic/TemplateUtility.h"
 
@@ -34,7 +35,16 @@ struct Vector
 
 	FORCEINLINE Vector operator*(float fValue) const
 	{
+#if USE_SSE
+		__m128 v = _mm_setr_ps(x, y, z, 0.0f);
+		__m128 s = _mm_set1_ps(fValue);
+		__m128 r = _mm_mul_ps(v, s);
+		float tmp[4];
+		_mm_storeu_ps(tmp, r);
+		return Vector(tmp[0], tmp[1], tmp[2]);
+#else
 		return Vector(x * fValue, y * fValue, z * fValue);
+#endif
 	}
 
 	/*!
@@ -55,51 +65,147 @@ struct Vector
 
 	FORCEINLINE Vector& operator*=(float fValue)
 	{
+#if USE_SSE
+		__m128 v = _mm_setr_ps(x, y, z, 0.0f);
+		__m128 s = _mm_set1_ps(fValue);
+		__m128 r = _mm_mul_ps(v, s);
+		float tmp[4];
+		_mm_storeu_ps(tmp, r);
+		x = tmp[0]; y = tmp[1]; z = tmp[2];
+#else
 		x *= fValue, y *= fValue, z *= fValue;
+#endif
 		return *this;
 	}
 
 	FORCEINLINE Vector operator+(float fValue) const
 	{
+#if USE_SSE
+		__m128 v = _mm_setr_ps(x, y, z, 0.0f);
+		__m128 s = _mm_set1_ps(fValue);
+		__m128 r = _mm_add_ps(v, s);
+		float tmp[4];
+		_mm_storeu_ps(tmp, r);
+		return Vector(tmp[0], tmp[1], tmp[2]);
+#else
 		return Vector(x + fValue, y + fValue, z + fValue);
+#endif
 	}
 
 	FORCEINLINE Vector& operator+=(float fValue)
 	{
+#if USE_SSE
+		__m128 v = _mm_setr_ps(x, y, z, 0.0f);
+		__m128 s = _mm_set1_ps(fValue);
+		__m128 r = _mm_add_ps(v, s);
+		float tmp[4];
+		_mm_storeu_ps(tmp, r);
+		x = tmp[0]; y = tmp[1]; z = tmp[2];
+#else
 		x += fValue, y += fValue, z += fValue;
+#endif
 		return *this;
 	}
 	
 	FORCEINLINE Vector operator+(Vector const& vector) const
 	{
+#if USE_SSE
+		__m128 a = _mm_setr_ps(x, y, z, 0.0f);
+		__m128 b = _mm_setr_ps(vector.x, vector.y, vector.z, 0.0f);
+		__m128 r = _mm_add_ps(a, b);
+		float tmp[4];
+		_mm_storeu_ps(tmp, r);
+		return Vector(tmp[0], tmp[1], tmp[2]);
+#else
 		return Vector(x + vector.x, y + vector.y, z + vector.z);
+#endif
 	}
 
 	FORCEINLINE Vector& operator+=(Vector const& vector)
 	{
+#if USE_SSE
+		__m128 a = _mm_setr_ps(x, y, z, 0.0f);
+		__m128 b = _mm_setr_ps(vector.x, vector.y, vector.z, 0.0f);
+		__m128 r = _mm_add_ps(a, b);
+		float tmp[4];
+		_mm_storeu_ps(tmp, r);
+		x = tmp[0]; y = tmp[1]; z = tmp[2];
+#else
 		x += vector.x, y += vector.y, z += vector.z;
+#endif
 		return *this;
 	}
 
+//    friend Vector& operator+=(Vector& lhs, const Vector& rhs)
+//    {
+//#if USE_SSE
+//        __m128 a = _mm_setr_ps(lhs.x, lhs.y, lhs.z, 0.0f);
+//        __m128 b = _mm_setr_ps(rhs.x, rhs.y, rhs.z, 0.0f);
+//        __m128 r = _mm_add_ps(a, b);
+//        float tmp[4];
+//        _mm_storeu_ps(tmp, r);
+//        lhs.x = tmp[0]; lhs.y = tmp[1]; lhs.z = tmp[2];
+//#else
+//		lhs.x += rhs.x, lhs.y += rhs.y, lhs.z += rhs.z;
+//#endif
+//        return lhs;
+//    }
+
 	FORCEINLINE Vector operator-(float fValue) const
 	{
+#if USE_SSE
+		__m128 v = _mm_setr_ps(x, y, z, 0.0f);
+		__m128 s = _mm_set1_ps(fValue);
+		__m128 r = _mm_sub_ps(v, s);
+		float tmp[4];
+		_mm_storeu_ps(tmp, r);
+		return Vector(tmp[0], tmp[1], tmp[2]);
+#else
 		return Vector(x - fValue, y - fValue, z - fValue);
+#endif
 	}
 
-	FORCEINLINE Vector& operator-(float fValue)
+	FORCEINLINE Vector& operator-=(float fValue)
 	{
+#if USE_SSE
+		__m128 v = _mm_setr_ps(x, y, z, 0.0f);
+		__m128 s = _mm_set1_ps(fValue);
+		__m128 r = _mm_sub_ps(v, s);
+		float tmp[4];
+		_mm_storeu_ps(tmp, r);
+		x = tmp[0]; y = tmp[1]; z = tmp[2];
+#else
 		x -= fValue, y -= fValue, z -= fValue;
+#endif
 		return *this;
 	}
 
 	FORCEINLINE Vector operator-(Vector const& vector) const
 	{
+#if USE_SSE
+		__m128 a = _mm_setr_ps(x, y, z, 0.0f);
+		__m128 b = _mm_setr_ps(vector.x, vector.y, vector.z, 0.0f);
+		__m128 r = _mm_sub_ps(a, b);
+		float tmp[4];
+		_mm_storeu_ps(tmp, r);
+		return Vector(tmp[0], tmp[1], tmp[2]);
+#else
 		return Vector(x - vector.x, y - vector.y, z - vector.z);
+#endif
 	}
 
 	FORCEINLINE Vector& operator-=(Vector const& vector)
 	{
+#if USE_SSE
+		__m128 a = _mm_setr_ps(x, y, z, 0.0f);
+		__m128 b = _mm_setr_ps(vector.x, vector.y, vector.z, 0.0f);
+		__m128 r = _mm_sub_ps(a, b);
+		float tmp[4];
+		_mm_storeu_ps(tmp, r);
+		x = tmp[0]; y = tmp[1]; z = tmp[2];
+#else
 		x -= vector.x, y -= vector.y, z -= vector.z;
+#endif
 		return *this;
 	}
 
@@ -109,7 +215,17 @@ struct Vector
 		if (::IsNearlyZero(fValue))
 			return Vector(ZeroType);
 
+#if USE_SSE
+		const float RScale = 1.0f / fValue;
+		__m128 v = _mm_setr_ps(x, y, z, 0.0f);
+		__m128 s = _mm_set1_ps(RScale);
+		__m128 r = _mm_mul_ps(v, s);
+		float tmp[4];
+		_mm_storeu_ps(tmp, r);
+		return Vector(tmp[0], tmp[1], tmp[2]);
+#else
 		return Vector(x / fValue, y / fValue, z / fValue);
+#endif
 	}
 
 	FORCEINLINE Vector& operator/=(float fValue)
@@ -118,7 +234,19 @@ struct Vector
 		if (::IsNearlyZero(fValue))
 			x = 0.0f, y = 0.0f, z = 0.0f;
 		else
+		{
+#if USE_SSE
+			const float RScale = 1.0f / fValue;
+			__m128 v = _mm_setr_ps(x, y, z, 0.0f);
+			__m128 s = _mm_set1_ps(RScale);
+			__m128 r = _mm_mul_ps(v, s);
+			float tmp[4];
+			_mm_storeu_ps(tmp, r);
+			x = tmp[0]; y = tmp[1]; z = tmp[2];
+#else
 			x /= fValue, y /= fValue, z /= fValue;
+#endif
+		}
 		return *this;
 	}
 
@@ -165,8 +293,19 @@ struct Vector
 
 	FORCEINLINE static float DotProduct(Vector const& A, Vector const& B)
 	{
+#if USE_SSE
+		__m128 a = _mm_setr_ps(A.x, A.y, A.z, 0.0f);
+		__m128 b = _mm_setr_ps(B.x, B.y, B.z, 0.0f);
+		__m128 mul = _mm_mul_ps(a, b);
+		__m128 shuf = _mm_shuffle_ps(mul, mul, _MM_SHUFFLE(2, 3, 0, 1));
+		__m128 sum = _mm_add_ps(mul, shuf);
+		shuf = _mm_movehl_ps(shuf, sum);
+		sum = _mm_add_ss(sum, shuf);
+		return _mm_cvtss_f32(sum);
+#else
 		auto const& result = A * B;
 		return (result.x + result.y + result.z);
+#endif
 	}
 
 	Vector CrossProduct(Vector const& vector) const
@@ -176,12 +315,35 @@ struct Vector
 
 	FORCEINLINE static Vector CrossProduct(Vector const& A, Vector const& B)
 	{
+#if USE_SSE
+		__m128 a = _mm_setr_ps(A.x, A.y, A.z, 0.0f);
+		__m128 b = _mm_setr_ps(B.x, B.y, B.z, 0.0f);
+		__m128 a_yzx = _mm_shuffle_ps(a, a, _MM_SHUFFLE(3, 0, 2, 1));
+		__m128 a_zxy = _mm_shuffle_ps(a, a, _MM_SHUFFLE(3, 1, 0, 2));
+		__m128 b_yzx = _mm_shuffle_ps(b, b, _MM_SHUFFLE(3, 0, 2, 1));
+		__m128 b_zxy = _mm_shuffle_ps(b, b, _MM_SHUFFLE(3, 1, 0, 2));
+		__m128 r = _mm_sub_ps(_mm_mul_ps(a_yzx, b_zxy), _mm_mul_ps(a_zxy, b_yzx));
+		float tmp[4];
+		_mm_storeu_ps(tmp, r);
+		return Vector(tmp[0], tmp[1], tmp[2]);
+#else
 		return Vector(A.y * B.z - B.y * A.z, A.z * B.x - B.z * A.x, A.x * B.y - B.x * A.y);
+#endif
 	}
 
 	FORCEINLINE float Length() const
 	{
+#if USE_SSE
+		__m128 v = _mm_setr_ps(x, y, z, 0.0f);
+		__m128 mul = _mm_mul_ps(v, v);
+		__m128 shuf = _mm_shuffle_ps(mul, mul, _MM_SHUFFLE(2, 3, 0, 1));
+		__m128 sum = _mm_add_ps(mul, shuf);
+		shuf = _mm_movehl_ps(shuf, sum);
+		sum = _mm_add_ss(sum, shuf);
+		return sqrtf(_mm_cvtss_f32(sum));
+#else
 		return sqrtf(x * x + y * y + z * z);
+#endif
 	}
 
 	FORCEINLINE static float Length(Vector const& A, Vector const& B)
@@ -191,7 +353,17 @@ struct Vector
 
 	FORCEINLINE float LengthSQ() const
 	{
+#if USE_SSE
+		__m128 v = _mm_setr_ps(x, y, z, 0.0f);
+		__m128 mul = _mm_mul_ps(v, v);
+		__m128 shuf = _mm_shuffle_ps(mul, mul, _MM_SHUFFLE(2, 3, 0, 1));
+		__m128 sum = _mm_add_ps(mul, shuf);
+		shuf = _mm_movehl_ps(shuf, sum);
+		sum = _mm_add_ss(sum, shuf);
+		return _mm_cvtss_f32(sum);
+#else
 		return x * x + y * y + z * z;
+#endif
 	}
 
 	FORCEINLINE static float LengthSQ(Vector const& A, Vector const& B)
@@ -217,10 +389,29 @@ struct Vector
 		}
 		else
 		{
+#if USE_SSE
+			__m128 v = _mm_setr_ps(x, y, z, 0.0f);
+			__m128 mul = _mm_mul_ps(v, v);
+			__m128 shuf = _mm_shuffle_ps(mul, mul, _MM_SHUFFLE(2, 3, 0, 1));
+			__m128 sum = _mm_add_ps(mul, shuf);
+			shuf = _mm_movehl_ps(shuf, sum);
+			sum = _mm_add_ss(sum, shuf);
+			__m128 half = _mm_set1_ps(0.5f);
+			__m128 three = _mm_set1_ps(1.5f);
+			__m128 invLen = _mm_rsqrt_ss(sum);
+			// One Newton-Raphson refinement for better accuracy
+			invLen = _mm_mul_ss(invLen, _mm_sub_ss(three, _mm_mul_ss(_mm_mul_ss(sum, half), _mm_mul_ss(invLen, invLen))));
+			__m128 invLenVec = _mm_shuffle_ps(invLen, invLen, _MM_SHUFFLE(0, 0, 0, 0));
+			__m128 result = _mm_mul_ps(v, invLenVec);
+			float tmp[4];
+			_mm_storeu_ps(tmp, result);
+			x = tmp[0]; y = tmp[1]; z = tmp[2];
+#else
 			float const length = 1.0f / Length();
 			x *= length;
 			y *= length;
 			z *= length;
+#endif
 		}
 
 		return *this;
@@ -275,12 +466,28 @@ struct Vector4
 
 	FORCEINLINE Vector4 operator*(float fValue) const
 	{
+#if USE_SSE
+		__m128 v = _mm_loadu_ps(&x);
+		__m128 s = _mm_set1_ps(fValue);
+		__m128 result = _mm_mul_ps(v, s);
+		Vector4 ret;
+		_mm_storeu_ps(&ret.x, result);
+		return ret;
+#else
 		return Vector4(x * fValue, y * fValue, z * fValue, w * fValue);
+#endif
 	}
 	
 	FORCEINLINE Vector4& operator*=(float fValue)
 	{
+#if USE_SSE
+		__m128 v = _mm_loadu_ps(&x);
+		__m128 s = _mm_set1_ps(fValue);
+		__m128 result = _mm_mul_ps(v, s);
+		_mm_storeu_ps(&x, result);
+#else
 		x *= fValue, y *= fValue, z *= fValue, w *= fValue;
+#endif
 		return *this;
 	}
 
@@ -291,56 +498,136 @@ struct Vector4
 	*/
 	FORCEINLINE Vector4 operator*(Vector4 const& vector) const
 	{
+#if USE_SSE
+		__m128 a = _mm_loadu_ps(&x);
+		__m128 b = _mm_loadu_ps(&vector.x);
+		__m128 result = _mm_mul_ps(a, b);
+		Vector4 ret;
+		_mm_storeu_ps(&ret.x, result);
+		return ret;
+#else
 		return Vector4(x * vector.x, y * vector.y, z * vector.z, w * vector.w);
+#endif
 	}
 
 	FORCEINLINE Vector4& operator*=(Vector4 const& vector)
 	{
+#if USE_SSE
+		__m128 a = _mm_loadu_ps(&x);
+		__m128 b = _mm_loadu_ps(&vector.x);
+		__m128 result = _mm_mul_ps(a, b);
+		_mm_storeu_ps(&x, result);
+#else
 		x *= vector.x, y *= vector.y, z *= vector.z, w *= vector.w;
+#endif
 		return *this;
 	}
 
 	FORCEINLINE Vector4 operator+(float fValue) const
 	{
+#if USE_SSE
+		__m128 v = _mm_loadu_ps(&x);
+		__m128 s = _mm_set1_ps(fValue);
+		__m128 result = _mm_add_ps(v, s);
+		Vector4 ret;
+		_mm_storeu_ps(&ret.x, result);
+		return ret;
+#else
 		return Vector4(x + fValue, y + fValue, z + fValue, w + fValue);
+#endif
 	}
 
 	FORCEINLINE Vector4& operator+=(float fValue)
 	{
+#if USE_SSE
+		__m128 v = _mm_loadu_ps(&x);
+		__m128 s = _mm_set1_ps(fValue);
+		__m128 result = _mm_add_ps(v, s);
+		_mm_storeu_ps(&x, result);
+#else
 		x += fValue, y += fValue, z += fValue, w += fValue;
+#endif
 		return *this;
 	}
 
 	FORCEINLINE Vector4 operator+(Vector4 const& vector) const
 	{
+#if USE_SSE
+		__m128 a = _mm_loadu_ps(&x);
+		__m128 b = _mm_loadu_ps(&vector.x);
+		__m128 result = _mm_add_ps(a, b);
+		Vector4 ret;
+		_mm_storeu_ps(&ret.x, result);
+		return ret;
+#else
 		return Vector4(x + vector.x, y + vector.y, z + vector.z, w + vector.w);
+#endif
 	}
 
 	FORCEINLINE Vector4& operator+=(Vector4 const& vector)
 	{
+#if USE_SSE
+		__m128 a = _mm_loadu_ps(&x);
+		__m128 b = _mm_loadu_ps(&vector.x);
+		__m128 result = _mm_add_ps(a, b);
+		_mm_storeu_ps(&x, result);
+#else
 		x += vector.x, y += vector.y, z += vector.z, w += vector.w;
+#endif
 		return *this;
 	}
 
 	FORCEINLINE Vector4 operator-(float fValue) const
 	{
+#if USE_SSE
+		__m128 v = _mm_loadu_ps(&x);
+		__m128 s = _mm_set1_ps(fValue);
+		__m128 result = _mm_sub_ps(v, s);
+		Vector4 ret;
+		_mm_storeu_ps(&ret.x, result);
+		return ret;
+#else
 		return Vector4(x - fValue, y - fValue, z - fValue, w - fValue);
+#endif
 	}
 
 	FORCEINLINE Vector4& operator-=(float fValue)
 	{
+#if USE_SSE
+		__m128 v = _mm_loadu_ps(&x);
+		__m128 s = _mm_set1_ps(fValue);
+		__m128 result = _mm_sub_ps(v, s);
+		_mm_storeu_ps(&x, result);
+#else
 		x -= fValue, y -= fValue, z -= fValue, w -= fValue;
+#endif
 		return *this;
 	}
 
 	FORCEINLINE Vector4 operator-(Vector4 const& vector) const
 	{
+#if USE_SSE
+		__m128 a = _mm_loadu_ps(&x);
+		__m128 b = _mm_loadu_ps(&vector.x);
+		__m128 result = _mm_sub_ps(a, b);
+		Vector4 ret;
+		_mm_storeu_ps(&ret.x, result);
+		return ret;
+#else
 		return Vector4(x - vector.x, y - vector.y, z - vector.z, w - vector.w);
+#endif
 	}
 
 	FORCEINLINE Vector4& operator-=(Vector4 const& vector)
 	{
+#if USE_SSE
+		__m128 a = _mm_loadu_ps(&x);
+		__m128 b = _mm_loadu_ps(&vector.x);
+		__m128 result = _mm_sub_ps(a, b);
+		_mm_storeu_ps(&x, result);
+#else
 		x -= vector.x, y -= vector.y, z -= vector.z, w -= vector.w;
+#endif
 		return *this;
 	}
 
@@ -352,8 +639,18 @@ struct Vector4
 		if (IsNearlyZero(fValue))
 			return Vector4(ZeroType);
 
+#if USE_SSE
+		const float RScale = 1.0f / fValue;
+		__m128 v = _mm_loadu_ps(&x);
+		__m128 s = _mm_set1_ps(RScale);
+		__m128 result = _mm_mul_ps(v, s);
+		Vector4 ret;
+		_mm_storeu_ps(&ret.x, result);
+		return ret;
+#else
 		const float RScale = 1.0f / fValue;
 		return Vector4(x * RScale, y * RScale, z * RScale, w * RScale);
+#endif
 #pragma warning( pop )
 	}
 
@@ -361,9 +658,21 @@ struct Vector4
 	{
 		JASSERT(!IsNearlyZero(fValue));
 		if (IsNearlyZero(fValue))
+		{
 			x = 0.0f, y = 0.0f, z = 0.0f, w = 0.0f;
+		}
 		else
+		{
+#if USE_SSE
+			const float RScale = 1.0f / fValue;
+			__m128 v = _mm_loadu_ps(&x);
+			__m128 s = _mm_set1_ps(RScale);
+			__m128 result = _mm_mul_ps(v, s);
+			_mm_storeu_ps(&x, result);
+#else
 			x /= fValue, y /= fValue, z /= fValue, w /= fValue;
+#endif
+		}
 		return *this;
 	}
 
@@ -407,7 +716,17 @@ struct Vector4
 
 	FORCEINLINE float Length() const
 	{
+#if USE_SSE
+		__m128 v = _mm_loadu_ps(&x);
+		__m128 mul = _mm_mul_ps(v, v);
+		__m128 shuf = _mm_shuffle_ps(mul, mul, _MM_SHUFFLE(2, 3, 0, 1));
+		__m128 sum = _mm_add_ps(mul, shuf);
+		shuf = _mm_movehl_ps(shuf, sum);
+		sum = _mm_add_ss(sum, shuf);
+		return sqrtf(_mm_cvtss_f32(sum));
+#else
 		return sqrtf(x * x + y * y + z * z + w * w);
+#endif
 	}
 
 	FORCEINLINE static float Length(Vector4 const& A, Vector4 const& B)
@@ -417,7 +736,17 @@ struct Vector4
 
 	FORCEINLINE float LengthSQ() const
 	{
+#if USE_SSE
+		__m128 v = _mm_loadu_ps(&x);
+		__m128 mul = _mm_mul_ps(v, v);
+		__m128 shuf = _mm_shuffle_ps(mul, mul, _MM_SHUFFLE(2, 3, 0, 1));
+		__m128 sum = _mm_add_ps(mul, shuf);
+		shuf = _mm_movehl_ps(shuf, sum);
+		sum = _mm_add_ss(sum, shuf);
+		return _mm_cvtss_f32(sum);
+#else
 		return x * x + y * y + z * z + w * w;
+#endif
 	}
 
 	FORCEINLINE static float LengthSQ(Vector4 const& A, Vector4 const& B)
@@ -443,11 +772,25 @@ struct Vector4
 		}
 		else
 		{
+#if USE_SSE
+			__m128 v = _mm_loadu_ps(&x);
+			__m128 mul = _mm_mul_ps(v, v);
+			__m128 shuf = _mm_shuffle_ps(mul, mul, _MM_SHUFFLE(2, 3, 0, 1));
+			__m128 sum = _mm_add_ps(mul, shuf);
+			shuf = _mm_movehl_ps(shuf, sum);
+			sum = _mm_add_ss(sum, shuf);
+			__m128 len = _mm_sqrt_ss(sum);
+			__m128 invLen = _mm_div_ss(_mm_set_ss(1.0f), len);
+			__m128 invLenVec = _mm_shuffle_ps(invLen, invLen, _MM_SHUFFLE(0, 0, 0, 0));
+			__m128 result = _mm_mul_ps(v, invLenVec);
+			_mm_storeu_ps(&x, result);
+#else
 			float const length = 1.0f / Length();
 			x *= length;
 			y *= length;
 			z *= length;
 			w *= length;
+#endif
 		}
 
 		return *this;
@@ -465,8 +808,19 @@ struct Vector4
 
 	FORCEINLINE static float DotProduct(Vector4 const& A, Vector4 const& B)
 	{
+#if USE_SSE
+		__m128 a = _mm_loadu_ps(&A.x);
+		__m128 b = _mm_loadu_ps(&B.x);
+		__m128 mul = _mm_mul_ps(a, b);
+		__m128 shuf = _mm_shuffle_ps(mul, mul, _MM_SHUFFLE(2, 3, 0, 1));
+		__m128 sum = _mm_add_ps(mul, shuf);
+		shuf = _mm_movehl_ps(shuf, sum);
+		sum = _mm_add_ss(sum, shuf);
+		return _mm_cvtss_f32(sum);
+#else
 		auto const& result = A * B;
 		return (result.x + result.y + result.z + result.w);
+#endif
 	}
 
 	union

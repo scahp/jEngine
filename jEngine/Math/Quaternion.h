@@ -40,20 +40,38 @@ struct Quaternion
     
 	FORCEINLINE Quaternion operator*(float value) const
 	{
+#if USE_SSE
+		__m128 v = _mm_setr_ps(x, y, z, w);
+		__m128 s = _mm_set1_ps(value);
+		__m128 r = _mm_mul_ps(v, s);
+		float tmp[4];
+		_mm_storeu_ps(tmp, r);
+		return Quaternion(tmp[0], tmp[1], tmp[2], tmp[3]);
+#else
 		return Quaternion(x * value
 			, y * value
 			, z * value
 			, w * value);
+#endif
 	}
 
     FORCEINLINE Quaternion operator/(float value) const
     {
 		check(!IsNearlyZero(value));
 		const float InvValue = 1.0f / value;
+#if USE_SSE
+		__m128 v = _mm_setr_ps(x, y, z, w);
+		__m128 s = _mm_set1_ps(InvValue);
+		__m128 r = _mm_mul_ps(v, s);
+		float tmp[4];
+		_mm_storeu_ps(tmp, r);
+		return Quaternion(tmp[0], tmp[1], tmp[2], tmp[3]);
+#else
         return Quaternion(x * InvValue
             , y * InvValue
             , z * InvValue
             , w * InvValue);
+#endif
     }
 
 	FORCEINLINE void SetInverse()
@@ -73,12 +91,26 @@ struct Quaternion
 
     FORCEINLINE float GetLengthSq() const
     {
+#if USE_SSE
+		__m128 v = _mm_setr_ps(x, y, z, w);
+		__m128 mul = _mm_mul_ps(v, v);
+		__m128 shuf = _mm_shuffle_ps(mul, mul, _MM_SHUFFLE(2, 3, 0, 1));
+		__m128 sum = _mm_add_ps(mul, shuf);
+		shuf = _mm_movehl_ps(shuf, sum);
+		sum = _mm_add_ss(sum, shuf);
+		return _mm_cvtss_f32(sum);
+#else
         return (x * x + y * y + z * z + w * w);
+#endif
     }
 
 	FORCEINLINE float GetLength() const
 	{
+#if USE_SSE
+		return sqrt(GetLengthSq());
+#else
 		return sqrt(x * x + y * y + z * z + w * w);
+#endif
 	}
 
 	FORCEINLINE void SetNormalize()
@@ -86,7 +118,17 @@ struct Quaternion
 		float Length = GetLength();
 		check(!IsNearlyZero(Length));
 
+#if USE_SSE
+		const float InvLength = 1.0f / Length;
+		__m128 v = _mm_setr_ps(x, y, z, w);
+		__m128 s = _mm_set1_ps(InvLength);
+		__m128 r = _mm_mul_ps(v, s);
+		float tmp[4];
+		_mm_storeu_ps(tmp, r);
+		x = tmp[0]; y = tmp[1]; z = tmp[2]; w = tmp[3];
+#else
 		x /= Length; y /= Length; z /= Length; w /= Length;
+#endif
 	}
 
 	FORCEINLINE Quaternion GetNormalize() const
@@ -94,7 +136,17 @@ struct Quaternion
         float Length = GetLength();
         check(!IsNearlyZero(Length));
 
+		const float InvLength = 1.0f / Length;
+#if USE_SSE
+		__m128 v = _mm_setr_ps(x, y, z, w);
+		__m128 s = _mm_set1_ps(InvLength);
+		__m128 r = _mm_mul_ps(v, s);
+		float tmp[4];
+		_mm_storeu_ps(tmp, r);
+		return Quaternion(tmp[0], tmp[1], tmp[2], tmp[3]);
+#else
 		return Quaternion(x / Length, y / Length, z / Length, w / Length);
+#endif
 	}
 
 	FORCEINLINE void SetRotation(Vector const& InAxis, float InRadian)

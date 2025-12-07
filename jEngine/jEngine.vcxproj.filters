@@ -933,17 +933,20 @@
     <ClCompile Include="External\PathTracingDataLoader\GLTFLoader.cpp">
       <Filter>Code\External\PathTracingDataLoader</Filter>
     </ClCompile>
-    <ClCompile Include="External\PathTracingDataLoader\PathTracingDataLoader.cpp">
-      <Filter>Code\External\PathTracingDataLoader</Filter>
-    </ClCompile>
-    <ClCompile Include="Math\Quaternion.cpp">
-      <Filter>Code\Math</Filter>
-    </ClCompile>
-    <ClCompile Include="External\PathTracingDataLoader\jPathTracingData.cpp">
-      <Filter>Code\External\PathTracingDataLoader</Filter>
-    </ClCompile>
-    <ClCompile Include="Scene\Light\jPathTracingLight.cpp">
-      <Filter>Code\Scene\Light</Filter>
+	<ClCompile Include="External\PathTracingDataLoader\PathTracingDataLoader.cpp">
+	  <Filter>Code\External\PathTracingDataLoader</Filter>
+	</ClCompile>
+	<ClCompile Include="Math\Quaternion.cpp">
+	  <Filter>Code\Math</Filter>
+	</ClCompile>
+	<ClCompile Include="Math\MathBench.cpp">
+	  <Filter>Code\Math</Filter>
+	</ClCompile>
+	<ClCompile Include="External\PathTracingDataLoader\jPathTracingData.cpp">
+	  <Filter>Code\External\PathTracingDataLoader</Filter>
+	</ClCompile>
+	<ClCompile Include="Scene\Light\jPathTracingLight.cpp">
+	  <Filter>Code\Scene\Light</Filter>
     </ClCompile>
     <ClCompile Include="Renderer\jRenderer_PathTracing.cpp">
       <Filter>Code\Renderer</Filter>

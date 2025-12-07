@@ -1,26 +1,11 @@
-﻿#ifndef PCH_H
+#ifndef PCH_H
 #define PCH_H
 
 #define NOMINMAX
 
 #include <windows.h>
 
-// Editor Features
-// Uncomment to enable editor-specific features like Placement Tool
-#define ENABLE_EDITOR_FEATURES
-
-#define LEFT_HANDED 1
-#define RIGHT_HANDED !LEFT_HANDED
-
-using int8 = char;
-using uint8 = unsigned char;
-using int16 = short;
-using uint16 = unsigned short;
-using int32 = int;
-using uint32 = unsigned int;
-using int64 = __int64;
-using uint64 = unsigned __int64;
-using tchar = wchar_t;
+#include "CoreDefines.h"
 
 #include <EASTL/vector.h>
 #include <EASTL/list.h>
@@ -73,28 +58,6 @@ FORCEINLINE uint64 XXH64(const T& InData, uint64 InSeed = 0)
 	static_assert(!std::is_pointer<T>::value, "Custom XXH64 function is Not allowed pointer type.");
 	return XXH64(&InData, sizeof(T), InSeed);
 }
-
-#if _DEBUG
-#define verify(x) JASSERT(x)
-#define JOK(a) (SUCCEEDED(a) ? true : (assert(!(#a)), false))
-#define JFAIL(a) (!JOK(a))
-#define JOK_E(a, errorBlob) (SUCCEEDED(a) ? true : [&errorBlob](){ if (errorBlob) {OutputDebugStringA((const char*)errorBlob->GetBufferPointer());} assert(!#a); return false; }())
-#define JFAIL_E(a, errorBlob) (!JOK_E(a, errorBlob))
-#define JASSERT(a) ((a) ? true : (assert(!(#a)), false))
-#define JMESSAGE(x) MessageBoxA(0, x, "", MB_OK)
-#define check(x) JASSERT(x)
-#define ensure(x) (((x) || (assert(!(#x)), false)))
-#else
-#define verify(x) (x)
-#define JOK(a) (SUCCEEDED(a))
-#define JFAIL(a) (!JOK(a))
-#define JOK_E(a, errorBlob) (SUCCEEDED(a))
-#define JFAIL_E(a, errorBlob) (!JOK_E(a, errorBlob))
-#define JASSERT(a) (a)
-#define JMESSAGE(a) (a)
-#define check(x) 
-#define ensure(x) (x)
-#endif
 
 #include "Math/MathUtility.h"
 
@@ -149,8 +112,6 @@ const uint32 LUMINANCE_HEIGHT = 512;
 
 constexpr int32 NUM_CASCADES = 3;
 constexpr int32 NUM_FRUSTUM_CORNERS = 8;
-
-#define FORCEINLINE __forceinline
 
 enum class EMouseButtonType
 {

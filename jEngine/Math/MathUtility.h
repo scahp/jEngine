@@ -1,5 +1,8 @@
 #pragma once
 
+#include "CoreDefines.h"
+#include <math.h>
+
 static constexpr float FLOAT_TOLERANCE = 0.00001f;
 static constexpr float PI = 3.141592653f;
 
