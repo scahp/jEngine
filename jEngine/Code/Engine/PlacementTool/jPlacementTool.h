@@ -70,7 +70,8 @@ public:
 	// Placed Objects (unified for both Light and Shape)
 	std::vector<PlacedObjectInfo> PlacedObjects;
 	int32 SelectedPlacedObjectIndex = -1;
-	int32 SelectedRenderObjectIndex = -1;  // Index of selected RenderObject within selected jObject
+	int32 SelectedRenderObjectIndex = -1;  // Index of selected RenderObject within selected jObject (deprecated for multi-selection)
+	std::vector<int32> SelectedRenderObjectIndices;  // Multiple selected RenderObject indices (for Shift+Click)
 
 	// Object Picking via mouse click
 	jObject* PickedObject = nullptr;

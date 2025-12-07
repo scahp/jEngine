@@ -55,6 +55,29 @@ namespace
 			Max(scale.z, MIN_SCALE)
 		);
 	}
+
+	// Check if an index is in the selection list
+	inline bool IsIndexSelected(const std::vector<int32>& indices, int32 index)
+	{
+		return std::find(indices.begin(), indices.end(), index) != indices.end();
+	}
+
+	// Toggle index in selection list (add if not present, remove if present)
+	inline void ToggleIndexInSelection(std::vector<int32>& indices, int32 index)
+	{
+		auto it = std::find(indices.begin(), indices.end(), index);
+		if (it != indices.end())
+			indices.erase(it);  // Remove if present
+		else
+			indices.push_back(index);  // Add if not present
+	}
+
+	// Add index to selection if not already present
+	inline void AddIndexToSelection(std::vector<int32>& indices, int32 index)
+	{
+		if (!IsIndexSelected(indices, index))
+			indices.push_back(index);
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -698,6 +721,8 @@ void jPlacementTool::RenderPlacedObjectsList(jCamera* mainCamera)
 			if (ImGui::Selectable(labelBuf, SelectedPlacedObjectIndex == i))
 			{
 				SelectedPlacedObjectIndex = i;
+				SelectedRenderObjectIndex = -1;  // Reset RenderObject selection when PlacedObject changes
+				SelectedRenderObjectIndices.clear();  // Clear multi-selection as well
 			}
 		}
 		ImGui::EndChild();
@@ -865,29 +890,65 @@ void jPlacementTool::RenderSelectedObjectProperties(jCamera* mainCamera)
 				if (selectedObjectInfo.Object && !selectedObjectInfo.Object->RenderObjects.empty())
 				{
 					jRenderObject* targetRenderObj = nullptr;
+					Vector objectRot = Vector::ZeroVector;
+					Vector objectScale = Vector::OneVector;
 
-					// If a specific RenderObject is selected, use its transform
+					// Determine which RenderObjects to use for gizmo position
 					if (SelectedRenderObjectIndex >= 0 && SelectedRenderObjectIndex < (int)selectedObjectInfo.Object->RenderObjects.size())
 					{
+						// Single selection: use that RenderObject
 						targetRenderObj = selectedObjectInfo.Object->RenderObjects[SelectedRenderObjectIndex];
+						objectPos = targetRenderObj->GetPos();
+						objectRot = targetRenderObj->GetRot();
+						objectScale = targetRenderObj->GetScale();
+					}
+					else if (!SelectedRenderObjectIndices.empty())
+					{
+						// Multi-selection: use average position of selected RenderObjects
+						Vector avgPos = Vector::ZeroVector;
+						int validCount = 0;
+
+						for (int idx : SelectedRenderObjectIndices)
+						{
+							if (idx >= 0 && idx < (int)selectedObjectInfo.Object->RenderObjects.size())
+							{
+								avgPos += selectedObjectInfo.Object->RenderObjects[idx]->GetPos();
+								validCount++;
+							}
+						}
+
+						if (validCount > 0)
+						{
+							objectPos = avgPos / (float)validCount;
+							// Use first selected object's rotation and scale for reference
+							int firstIdx = SelectedRenderObjectIndices[0];
+							if (firstIdx >= 0 && firstIdx < (int)selectedObjectInfo.Object->RenderObjects.size())
+							{
+								objectRot = selectedObjectInfo.Object->RenderObjects[firstIdx]->GetRot();
+								objectScale = selectedObjectInfo.Object->RenderObjects[firstIdx]->GetScale();
+							}
+						}
 					}
 					else
 					{
-						// Otherwise use first RenderObject as representative
-						targetRenderObj = selectedObjectInfo.Object->RenderObjects[0];
+						// No selection: use average position of ALL RenderObjects
+						Vector avgPos = Vector::ZeroVector;
+						for (auto* renderObj : selectedObjectInfo.Object->RenderObjects)
+						{
+							avgPos += renderObj->GetPos();
+						}
+						objectPos = avgPos / (float)selectedObjectInfo.Object->RenderObjects.size();
+
+						// Use first RenderObject's rotation and scale for reference
+						objectRot = selectedObjectInfo.Object->RenderObjects[0]->GetRot();
+						objectScale = selectedObjectInfo.Object->RenderObjects[0]->GetScale();
 					}
 
-					if (targetRenderObj)
-					{
-						objectPos = targetRenderObj->GetPos();
-						Vector objectRot = targetRenderObj->GetRot();
-						Vector objectScale = targetRenderObj->GetScale();
-
-						auto posMatrix = Matrix::MakeTranslate(objectPos);
-						auto rotMatrix = Matrix::MakeRotate(objectRot);
-						auto scaleMatrix = Matrix::MakeScale(objectScale);
-						objectTransform = posMatrix * rotMatrix * scaleMatrix;
-					}
+					// Build transform matrix
+					auto posMatrix = Matrix::MakeTranslate(objectPos);
+					auto rotMatrix = Matrix::MakeRotate(objectRot);
+					auto scaleMatrix = Matrix::MakeScale(objectScale);
+					objectTransform = posMatrix * rotMatrix * scaleMatrix;
 				}
 			}
 
@@ -995,7 +1056,7 @@ void jPlacementTool::RenderSelectedObjectProperties(jCamera* mainCamera)
 					// Update shape transform (position, rotation, scale)
 					if (selectedObjectInfo.Object)
 					{
-						// If a specific RenderObject is selected, only update that one
+						// Single selection: only update that one RenderObject
 						if (SelectedRenderObjectIndex >= 0 && SelectedRenderObjectIndex < (int)selectedObjectInfo.Object->RenderObjects.size())
 						{
 							jRenderObject* renderObj = selectedObjectInfo.Object->RenderObjects[SelectedRenderObjectIndex];
@@ -1003,9 +1064,23 @@ void jPlacementTool::RenderSelectedObjectProperties(jCamera* mainCamera)
 							renderObj->SetRot(newRot);
 							renderObj->SetScale(newScale);
 						}
+						// Multi-selection: update all selected RenderObjects
+						else if (!SelectedRenderObjectIndices.empty())
+						{
+							for (int idx : SelectedRenderObjectIndices)
+							{
+								if (idx >= 0 && idx < (int)selectedObjectInfo.Object->RenderObjects.size())
+								{
+									jRenderObject* renderObj = selectedObjectInfo.Object->RenderObjects[idx];
+									renderObj->SetPos(newPos);
+									renderObj->SetRot(newRot);
+									renderObj->SetScale(newScale);
+								}
+							}
+						}
+						// No selection: apply to ALL RenderObjects
 						else
 						{
-							// Otherwise apply to ALL RenderObjects
 							for (auto* renderObj : selectedObjectInfo.Object->RenderObjects)
 							{
 								renderObj->SetPos(newPos);
@@ -1173,6 +1248,25 @@ void jPlacementTool::RenderSelectedObjectProperties(jCamera* mainCamera)
 			if (selectedObjectInfo.Object && !selectedObjectInfo.Object->RenderObjects.empty())
 			{
 				ImGui::TextColored(ImVec4(0, 1, 1, 1), "RenderObjects: %d", (int)selectedObjectInfo.Object->RenderObjects.size());
+				ImGui::SameLine();
+				ImGui::TextColored(ImVec4(1, 1, 0, 1), "(Shift+Click for multi-select)");
+
+				// Select All / Deselect All buttons
+				if (ImGui::Button("Select All"))
+				{
+					SelectedRenderObjectIndices.clear();
+					for (int i = 0; i < (int)selectedObjectInfo.Object->RenderObjects.size(); ++i)
+					{
+						SelectedRenderObjectIndices.push_back(i);
+					}
+					SelectedRenderObjectIndex = -1;  // Clear single selection
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Deselect All"))
+				{
+					SelectedRenderObjectIndices.clear();
+					SelectedRenderObjectIndex = -1;
+				}
 
 				// Show list of RenderObjects
 				ImGui::BeginChild("RenderObjectListRegion", ImVec2(0, 100), true);
@@ -1181,29 +1275,45 @@ void jPlacementTool::RenderSelectedObjectProperties(jCamera* mainCamera)
 					char renderObjLabel[64];
 					sprintf_s(renderObjLabel, "RenderObject [%d]", i);
 
-					if (ImGui::Selectable(renderObjLabel, SelectedRenderObjectIndex == i))
+					// Check if this index is selected (either in single or multi-selection)
+					bool isSelected = (SelectedRenderObjectIndex == i) || IsIndexSelected(SelectedRenderObjectIndices, i);
+
+					if (ImGui::Selectable(renderObjLabel, isSelected))
 					{
-						SelectedRenderObjectIndex = i;
+						bool shiftPressed = ImGui::GetIO().KeyShift;
+
+						if (shiftPressed)
+						{
+							// Multi-selection mode: toggle in list
+							ToggleIndexInSelection(SelectedRenderObjectIndices, i);
+							SelectedRenderObjectIndex = -1;  // Clear single selection when using multi-selection
+						}
+						else
+						{
+							// Single selection mode: toggle single index
+							if (SelectedRenderObjectIndex == i)
+								SelectedRenderObjectIndex = -1;
+							else
+								SelectedRenderObjectIndex = i;
+
+							// Clear multi-selection when using single selection
+							SelectedRenderObjectIndices.clear();
+						}
 					}
 				}
 				ImGui::EndChild();
 
-				// Display properties of selected RenderObject
-				jRenderObject* targetRenderObj = nullptr;
-				if (SelectedRenderObjectIndex >= 0 && SelectedRenderObjectIndex < (int)selectedObjectInfo.Object->RenderObjects.size())
-				{
-					targetRenderObj = selectedObjectInfo.Object->RenderObjects[SelectedRenderObjectIndex];
-				}
-				else
-				{
-					// Default to first RenderObject if none selected
-					targetRenderObj = selectedObjectInfo.Object->RenderObjects[0];
-					SelectedRenderObjectIndex = 0;
-				}
+				// Display properties of selected RenderObject(s)
+				ImGui::Separator();
 
-				if (targetRenderObj)
+				// Check selection state
+				bool hasSingleSelection = (SelectedRenderObjectIndex >= 0 && SelectedRenderObjectIndex < (int)selectedObjectInfo.Object->RenderObjects.size());
+				bool hasMultiSelection = !SelectedRenderObjectIndices.empty();
+
+				if (hasSingleSelection)
 				{
-					ImGui::Separator();
+					// Single selection: display specific RenderObject properties
+					jRenderObject* targetRenderObj = selectedObjectInfo.Object->RenderObjects[SelectedRenderObjectIndex];
 					ImGui::TextColored(ImVec4(1, 1, 0, 1), "Selected RenderObject [%d]:", SelectedRenderObjectIndex);
 
 					Vector pos = targetRenderObj->GetPos();
@@ -1236,6 +1346,19 @@ void jPlacementTool::RenderSelectedObjectProperties(jCamera* mainCamera)
 						targetRenderObj->SetScale(newScale);
 					});
 				}
+				else if (hasMultiSelection)
+				{
+					// Multi-selection: show count only
+					ImGui::TextColored(ImVec4(1, 1, 0, 1), "Multi-Selection: %d RenderObjects selected", (int)SelectedRenderObjectIndices.size());
+					ImGui::Text("Gizmo transforms will apply to all selected RenderObjects");
+				}
+				else
+				{
+					// No selection - show info that all RenderObjects will be affected
+					ImGui::TextColored(ImVec4(0, 1, 1, 1), "No specific RenderObject selected");
+					ImGui::Text("Gizmo transforms will apply to ALL RenderObjects");
+					ImGui::Text("Click a RenderObject above to select a specific one");
+				}
 			}
 		}
 
@@ -1252,6 +1375,8 @@ void jPlacementTool::Clear()
 {
 	PlacedObjects.clear();
 	SelectedPlacedObjectIndex = -1;
+	SelectedRenderObjectIndex = -1;
+	SelectedRenderObjectIndices.clear();
 	CurrentTab = EPlacementTab::LIGHT;
 	SelectedLightType = EPlacementLightType::POINT;
 	SelectedShapeType = EPlacementShapeType::CUBE;
