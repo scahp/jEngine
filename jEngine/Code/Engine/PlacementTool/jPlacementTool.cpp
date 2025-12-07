@@ -14,6 +14,51 @@
 #include "jOptions.h"
 #include "ImGui/jImGui.h"
 
+//////////////////////////////////////////////////////////////////////////
+// Transform Validation Helpers
+//////////////////////////////////////////////////////////////////////////
+
+namespace
+{
+	// Validate if a float value is finite and not NaN
+	inline bool IsValidFloat(float value)
+	{
+		return !isnan(value) && !isinf(value) && isfinite(value);
+	}
+
+	// Validate if a scale value is valid (positive and above minimum threshold)
+	inline bool IsValidScale(float value)
+	{
+		constexpr float MIN_SCALE = 0.001f;
+		return IsValidFloat(value) && value > MIN_SCALE;
+	}
+
+	// Validate if a Vector contains valid float values
+	inline bool IsValidVector(const Vector& vec)
+	{
+		return IsValidFloat(vec.x) && IsValidFloat(vec.y) && IsValidFloat(vec.z);
+	}
+
+	// Validate if a Vector is suitable for scale (all components positive)
+	inline bool IsValidScaleVector(const Vector& vec)
+	{
+		return IsValidScale(vec.x) && IsValidScale(vec.y) && IsValidScale(vec.z);
+	}
+
+	// Clamp scale to minimum valid value
+	inline Vector ClampScale(const Vector& scale)
+	{
+		constexpr float MIN_SCALE = 0.001f;
+		return Vector(
+			Max(scale.x, MIN_SCALE),
+			Max(scale.y, MIN_SCALE),
+			Max(scale.z, MIN_SCALE)
+		);
+	}
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 jPlacementTool::jPlacementTool()
 {
 }
@@ -740,28 +785,74 @@ void jPlacementTool::RenderSelectedObjectProperties(jCamera* mainCamera)
 				if (selectedLight->GetLightType() == ELightType::DIRECTIONAL)
 				{
 					// Build rotation matrix from direction vector
-					Vector forward = objectDir.GetNormalize();
+					Vector forward = objectDir;
+					if (!IsValidVector(forward) || forward.IsNearlyZero())
+					{
+						// Fallback to default forward direction
+						forward = Vector(0, -1, 0);
+					}
+					else
+					{
+						forward = forward.GetNormalize();
+					}
+
 					Vector up = Vector(0, 1, 0);
 
-					if (fabsf(forward.DotProduct(up)) > 0.999f)
+					// More robust parallel vector check with multiple fallbacks
+					float dotProduct = fabsf(forward.DotProduct(up));
+					if (dotProduct > 0.999f)  // Nearly parallel
+					{
 						up = Vector(0, 0, 1);
+						// Check again with new up vector
+						dotProduct = fabsf(forward.DotProduct(up));
+						if (dotProduct > 0.999f)  // Still parallel
+						{
+							up = Vector(1, 0, 0);  // Last resort
+						}
+					}
 
-					Vector right = up.CrossProduct(forward).GetNormalize();
-					up = forward.CrossProduct(right).GetNormalize();
+					// Compute right vector and validate
+					Vector right = up.CrossProduct(forward);
+					if (right.IsNearlyZero())
+					{
+						// Cross product failed - vectors are parallel
+						JASSERT("Invalid rotation matrix - cross product is zero");
+						// Use identity rotation as fallback
+						objectTransform = Matrix::MakeTranslate(objectPos);
+					}
+					else
+					{
+						right = right.GetNormalize();
 
-					Matrix rotationMatrix = Matrix(IdentityType);
-					rotationMatrix.m[0][0] = right.x;
-					rotationMatrix.m[0][1] = right.y;
-					rotationMatrix.m[0][2] = right.z;
-					rotationMatrix.m[1][0] = up.x;
-					rotationMatrix.m[1][1] = up.y;
-					rotationMatrix.m[1][2] = up.z;
-					rotationMatrix.m[2][0] = forward.x;
-					rotationMatrix.m[2][1] = forward.y;
-					rotationMatrix.m[2][2] = forward.z;
+						// Recompute up vector and validate
+						up = forward.CrossProduct(right);
+						if (up.IsNearlyZero())
+						{
+							// Second cross product failed
+							JASSERT("Invalid rotation matrix - second cross product is zero");
+							// Use identity rotation as fallback
+							objectTransform = Matrix::MakeTranslate(objectPos);
+						}
+						else
+						{
+							up = up.GetNormalize();
 
-					Matrix translationMatrix = Matrix::MakeTranslate(objectPos);
-					objectTransform = translationMatrix * rotationMatrix;
+							// Build rotation matrix
+							Matrix rotationMatrix = Matrix(IdentityType);
+							rotationMatrix.m[0][0] = right.x;
+							rotationMatrix.m[0][1] = right.y;
+							rotationMatrix.m[0][2] = right.z;
+							rotationMatrix.m[1][0] = up.x;
+							rotationMatrix.m[1][1] = up.y;
+							rotationMatrix.m[1][2] = up.z;
+							rotationMatrix.m[2][0] = forward.x;
+							rotationMatrix.m[2][1] = forward.y;
+							rotationMatrix.m[2][2] = forward.z;
+
+							Matrix translationMatrix = Matrix::MakeTranslate(objectPos);
+							objectTransform = translationMatrix * rotationMatrix;
+						}
+					}
 				}
 				else
 				{
@@ -813,9 +904,38 @@ void jPlacementTool::RenderSelectedObjectProperties(jCamera* mainCamera)
 				float translation[3], rotation[3], scale[3];
 				ImGuizmo::DecomposeMatrixToComponents(matrixPtr, translation, rotation, scale);
 
+				// Validate decomposed transform values
+				bool isValid = true;
+				for (int i = 0; i < 3; ++i)
+				{
+					if (!IsValidFloat(translation[i]) || !IsValidFloat(rotation[i]) || !IsValidScale(scale[i]))
+					{
+						isValid = false;
+						break;
+					}
+				}
+
+				// If validation failed, log error and skip this frame's transform
+				if (!isValid)
+				{
+					JASSERT("Invalid transform detected from ImGuizmo - NaN or invalid values");
+#ifdef _DEBUG
+					char errorMsg[256];
+					sprintf_s(errorMsg, "Invalid transform: Pos(%.3f, %.3f, %.3f) Rot(%.3f, %.3f, %.3f) Scale(%.3f, %.3f, %.3f)",
+						translation[0], translation[1], translation[2],
+						rotation[0], rotation[1], rotation[2],
+						scale[0], scale[1], scale[2]);
+					OutputDebugStringA(errorMsg);
+#endif
+					return;  // Skip this transform update
+				}
+
 				Vector newPos(translation[0], translation[1], translation[2]);
 				Vector newRot(rotation[0], rotation[1], rotation[2]);
 				Vector newScale(scale[0], scale[1], scale[2]);
+
+				// Additional safety: Clamp scale to prevent extremely small values
+				newScale = ClampScale(newScale);
 
 				// Apply to object based on type
 				if (selectedObjectInfo.Type == EPlacedObjectType::LIGHT)
