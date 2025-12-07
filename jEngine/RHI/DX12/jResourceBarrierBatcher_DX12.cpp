@@ -33,12 +33,12 @@ void jResourceBarrierBatcher_DX12::AddTransition(jBuffer* InBuffer, EResourceLay
     check(Buffer_DX12->Buffer);
     check(Buffer_DX12->Buffer->IsValid());
 
-    const auto SrcLayout = GetDX12ResourceLayout(Buffer_DX12->Layout);
+    const auto SrcLayout = GetDX12ResourceLayout(Buffer_DX12->GetLayout());
     const auto DstLayout = GetDX12ResourceLayout(InNewLayout);
     if (SrcLayout == DstLayout)
         return;
 
-    Buffer_DX12->Layout = InNewLayout;
+    Buffer_DX12->SetLayout(InNewLayout);
 
     AddTransition_Internal(Buffer_DX12->Buffer->Get(), SrcLayout, DstLayout);
 }
@@ -46,17 +46,17 @@ void jResourceBarrierBatcher_DX12::AddTransition(jBuffer* InBuffer, EResourceLay
 void jResourceBarrierBatcher_DX12::AddTransition(jTexture* InTexture, EResourceLayout InNewLayout)
 {
     check(InTexture);
-    
+
     auto Texture_DX12 = (jTexture_DX12*)InTexture;
     check(Texture_DX12->Texture);
     check(Texture_DX12->Texture->IsValid());
 
-    const auto SrcLayout = GetDX12ResourceLayout(Texture_DX12->Layout);
+    const auto SrcLayout = GetDX12ResourceLayout(Texture_DX12->GetLayout());
     const auto DstLayout = GetDX12ResourceLayout(InNewLayout);
     if (SrcLayout == DstLayout)
         return;
 
-    Texture_DX12->Layout = InNewLayout;
+    Texture_DX12->SetLayout(InNewLayout);
 
     AddTransition_Internal(Texture_DX12->Texture->Get(), SrcLayout, DstLayout);
 }

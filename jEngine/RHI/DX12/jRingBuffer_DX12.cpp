@@ -26,7 +26,7 @@ void jRingBuffer_DX12::Create(uint64 totalSize, uint32 alignment /*= 16*/)
     desc.Alignment = 0;
 
     check(g_rhi_dx12);
-    Buffer = g_rhi_dx12->CreateUploadResource(&desc, D3D12_RESOURCE_STATE_GENERIC_READ);
+    Buffer = g_rhi_dx12->CreateUploadResource(&desc, EResourceLayout::READ_ONLY);
     if (!ensure(Buffer->Resource))
         return;
 

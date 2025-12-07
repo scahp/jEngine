@@ -225,6 +225,7 @@ void jRaytracingScene_DX12::CreateOrUpdateTLAS(const jRatracingInitializer& InIn
     {
         // UAV barrier for completion of previous command which are using TLASBufferPtr
         g_rhi->UAVBarrier(CmdBuffer, GetTLASBuffer<jBuffer_DX12>());
+        g_rhi->TransitionLayout(CmdBuffer, GetTLASBuffer<jBuffer_DX12>(), EResourceLayout::ACCELERATION_STRUCTURE);
         CmdBuffer->FlushBarrierBatch();
     }
     else

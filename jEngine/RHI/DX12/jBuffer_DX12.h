@@ -69,7 +69,8 @@ struct jBuffer_DX12 : public jBuffer
     virtual uint64 GetBufferSize() const { return (uint32)Size; }
     virtual uint64 GetOffset() const { return Offset; }
     FORCEINLINE uint64 GetGPUAddress() const { return Buffer->GetGPUVirtualAddress() + Offset; }
-    virtual EResourceLayout GetLayout() const { return Layout; }
+    virtual EResourceLayout GetLayout() const override { return Buffer ? Buffer->Layout : EResourceLayout::UNDEFINED; }
+    FORCEINLINE void SetLayout(EResourceLayout InNewLayout) { if (Buffer) Buffer->SetLayout(InNewLayout); }
 
     EBufferCreateFlag BufferCreateFlag = EBufferCreateFlag::NONE;
     uint64 Size = 0;
@@ -80,5 +81,4 @@ struct jBuffer_DX12 : public jBuffer
     jDescriptor_DX12 CBV;
     jDescriptor_DX12 SRV;
     jDescriptor_DX12 UAV;
-    EResourceLayout Layout = EResourceLayout::UNDEFINED;
 };

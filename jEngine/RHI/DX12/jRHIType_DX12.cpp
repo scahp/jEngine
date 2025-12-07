@@ -1,5 +1,10 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jRHI_DX12.h"
+
+std::shared_ptr<jCreatedResource> jCreatedResource::CreatedFromResourcePool(const jPlacedResource& InResource)
+{
+    return std::shared_ptr<jCreatedResource>(new jCreatedResource(EType::ResourcePool, InResource.PlacedSubResource, InResource.LastLayout));
+}
 
 void jCreatedResource::Free()
 {
@@ -8,12 +13,16 @@ void jCreatedResource::Free()
         if (ResourceType == jCreatedResource::EType::Standalone)
         {
             if (g_rhi_dx12)
-                g_rhi_dx12->DeallocatorMultiFrameStandaloneResource.Free(Resource);
+                g_rhi_dx12->DeallocatorMultiFrameStandaloneResource.Free(
+                    jPendingDeallocateResource(Resource, Layout)
+                );
         }
         else if (ResourceType == jCreatedResource::EType::ResourcePool)
         {
             if (g_rhi_dx12)
-                g_rhi_dx12->DeallocatorMultiFramePlacedResource.Free(Resource);
+                g_rhi_dx12->DeallocatorMultiFramePlacedResource.Free(
+                    jPendingDeallocateResource(Resource, Layout)
+                );
         }
         else if (ResourceType == jCreatedResource::EType::Swapchain)
         {

@@ -160,6 +160,8 @@ void jRenderer::ReadbackHitObject()
 	g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer()
 		, jSceneRenderTarget::HitObject_RT->GetTexture(), EResourceLayout::TRANSFER_SRC);
 
+	RenderFrameContextPtr->GetActiveCommandBuffer()->FlushBarrierBatch();
+
 	// Create readback buffer (4 bytes for RGBA8)
 	static std::shared_ptr<jBuffer> ReadbackBuffer;
 	const uint64 ReadbackBufferSize = 4;  // RGBA8 = 4 bytes

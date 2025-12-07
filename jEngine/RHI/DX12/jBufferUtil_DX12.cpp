@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jBufferUtil_DX12.h"
 #include "jRHI_DX12.h"
 #include "jBuffer_DX12.h"
@@ -8,23 +8,41 @@ namespace jBufferUtil_DX12
 {
 
 std::shared_ptr<jCreatedResource> CreateBufferInternal(uint64 InSize, uint64 InAlignment, EBufferCreateFlag InBufferCreateFlag
-    , D3D12_RESOURCE_STATES InInitialResourceState, const wchar_t* InResourceName)
+    , EResourceLayout InLayout, const wchar_t* InResourceName)
 {
+    D3D12_RESOURCE_STATES InLayout_DX12 = GetDX12ResourceLayout(InLayout);
     if (!!(InBufferCreateFlag & EBufferCreateFlag::AccelerationStructure))
     {
-        check(InInitialResourceState == D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE);
+        check(InLayout == EResourceLayout::ACCELERATION_STRUCTURE);
+        InLayout_DX12 = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
+        InLayout = EResourceLayout::ACCELERATION_STRUCTURE;
     }
     else if (!!(InBufferCreateFlag & EBufferCreateFlag::Readback))
     {
-        check(InInitialResourceState == D3D12_RESOURCE_STATE_COPY_DEST);
+        InLayout_DX12 = D3D12_RESOURCE_STATE_COPY_DEST;
+        InLayout = EResourceLayout::TRANSFER_DST;
     }
     else if (!!(InBufferCreateFlag & EBufferCreateFlag::CPUAccess))
     {
-        check(InInitialResourceState == D3D12_RESOURCE_STATE_GENERIC_READ);
+        InLayout_DX12 = D3D12_RESOURCE_STATE_GENERIC_READ;
+        InLayout = EResourceLayout::READ_ONLY;
+    }
+
+    if (!!(InBufferCreateFlag & EBufferCreateFlag::AccelerationStructure))
+    {
+        check(InLayout_DX12 == D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE);
+    }
+    else if (!!(InBufferCreateFlag & EBufferCreateFlag::Readback))
+    {
+        check(InLayout_DX12 == D3D12_RESOURCE_STATE_COPY_DEST);
+    }
+    else if (!!(InBufferCreateFlag & EBufferCreateFlag::CPUAccess))
+    {
+        check(InLayout_DX12 == D3D12_RESOURCE_STATE_GENERIC_READ);
     }
     else
     {
-        check(InInitialResourceState == D3D12_RESOURCE_STATE_COMMON);
+        check(InLayout_DX12 == D3D12_RESOURCE_STATE_COMMON);
     }
 
     InSize = (InAlignment > 0) ? Align(InSize, InAlignment) : InSize;
@@ -56,18 +74,18 @@ std::shared_ptr<jCreatedResource> CreateBufferInternal(uint64 InSize, uint64 InA
         ComPtr<ID3D12Resource> NewResource;
         const CD3DX12_HEAP_PROPERTIES& HeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_READBACK);
         JFAIL(g_rhi_dx12->Device->CreateCommittedResource(&HeapProperties, D3D12_HEAP_FLAG_NONE
-            , &resourceDesc, InInitialResourceState, nullptr, IID_PPV_ARGS(&NewResource)));
+            , &resourceDesc, InLayout_DX12, nullptr, IID_PPV_ARGS(&NewResource)));
 
-        CreatedResource = jCreatedResource::CreatedFromStandalone(NewResource);
+        CreatedResource = jCreatedResource::CreatedFromStandalone(NewResource, InLayout);
     }
     else if (!!(InBufferCreateFlag & EBufferCreateFlag::CPUAccess))
     {
         check(EBufferCreateFlag::NONE == (InBufferCreateFlag & EBufferCreateFlag::UAV));        // Not allowed Readback with UAV
-        CreatedResource = g_rhi_dx12->CreateUploadResource(&resourceDesc, InInitialResourceState);
+        CreatedResource = g_rhi_dx12->CreateUploadResource(&resourceDesc, InLayout);
     }
     else
     {
-        CreatedResource = g_rhi_dx12->CreateResource(&resourceDesc, InInitialResourceState);
+        CreatedResource = g_rhi_dx12->CreateResource(&resourceDesc, InLayout);
     }
 
     ensure(CreatedResource->Resource);
@@ -84,31 +102,11 @@ std::shared_ptr<jBuffer_DX12> CreateBuffer(uint64 InSize, uint64 InAlignment, EB
     // If the resource needed to be created with EBufferCreateFlag::AccelerationStructure, you must initialize the buffer resource state as ACCELERATION_STRUCTURE state.
     check(InLayout != EResourceLayout::ACCELERATION_STRUCTURE || (InLayout == EResourceLayout::ACCELERATION_STRUCTURE && !!(InBufferCreateFlag & EBufferCreateFlag::AccelerationStructure)));
 
-    EResourceLayout InitialLayout = EResourceLayout::UNDEFINED;
-    D3D12_RESOURCE_STATES InitialLayout_DX12 = GetDX12ResourceLayout(InitialLayout);
-    if (!!(InBufferCreateFlag & EBufferCreateFlag::AccelerationStructure))
-    {
-        check(InLayout == EResourceLayout::ACCELERATION_STRUCTURE);
-        InitialLayout_DX12 = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
-        InitialLayout = EResourceLayout::ACCELERATION_STRUCTURE;
-    }
-    else if (!!(InBufferCreateFlag & EBufferCreateFlag::Readback))
-    {
-        InitialLayout_DX12 = D3D12_RESOURCE_STATE_COPY_DEST;
-        InitialLayout = EResourceLayout::TRANSFER_DST;
-    }
-    else if (!!(InBufferCreateFlag & EBufferCreateFlag::CPUAccess))
-    {
-        InitialLayout_DX12 = D3D12_RESOURCE_STATE_GENERIC_READ;
-        InitialLayout = EResourceLayout::READ_ONLY;
-    }
-
-    std::shared_ptr<jCreatedResource> BufferInternal = CreateBufferInternal(InSize, InAlignment, InBufferCreateFlag, InitialLayout_DX12, InResourceName);
+    std::shared_ptr<jCreatedResource> BufferInternal = CreateBufferInternal(InSize, InAlignment, InBufferCreateFlag, InLayout, InResourceName);
     if (!BufferInternal->Resource)
         return nullptr;
 
     auto BufferPtr = std::make_shared<jBuffer_DX12>(BufferInternal, InSize, InAlignment, InBufferCreateFlag);
-    BufferPtr->Layout = InitialLayout;
     if (InResourceName)
     {
         // https://learn.microsoft.com/ko-kr/cpp/text/how-to-convert-between-various-string-types?view=msvc-170#example-convert-from-char-
@@ -135,7 +133,7 @@ std::shared_ptr<jBuffer_DX12> CreateBuffer(uint64 InSize, uint64 InAlignment, EB
         }
         else
         {
-            std::shared_ptr<jCreatedResource> StagingBuffer = CreateBufferInternal(InSize, InAlignment, EBufferCreateFlag::CPUAccess, D3D12_RESOURCE_STATE_GENERIC_READ, InResourceName);       // CPU Access should be created with 'D3D12_RESOURCE_STATE_GENERIC_READ'.
+            std::shared_ptr<jCreatedResource> StagingBuffer = CreateBufferInternal(InSize, InAlignment, EBufferCreateFlag::CPUAccess, EResourceLayout::READ_ONLY, InResourceName);       // CPU Access should be created with 'D3D12_RESOURCE_STATE_GENERIC_READ'.
             check(StagingBuffer->IsValid());
 
             void* MappedPointer = nullptr;
@@ -164,7 +162,7 @@ std::shared_ptr<jBuffer_DX12> CreateBuffer(uint64 InSize, uint64 InAlignment, EB
         }
     }
 
-    if (BufferPtr->Layout != InLayout)
+    if (BufferPtr->GetLayout() != InLayout)
     {
         g_rhi->TransitionLayout(BufferPtr.get(), InLayout);
     }
@@ -210,7 +208,7 @@ std::shared_ptr<jCreatedResource> CreateTexturenternal(uint32 InWidth, uint32 In
     TexDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
     TexDesc.Alignment = 0;
 
-    std::shared_ptr<jCreatedResource> ImageResource = g_rhi_dx12->CreateResource(&TexDesc, GetDX12ResourceLayout(InImageLayout), InClearValue);
+    std::shared_ptr<jCreatedResource> ImageResource = g_rhi_dx12->CreateResource(&TexDesc, InImageLayout, InClearValue);
     ensure(ImageResource->Resource);
 
     if (InResourceName && ImageResource->Resource)
@@ -250,7 +248,6 @@ std::shared_ptr<jTexture_DX12> CreateTexture(uint32 InWidth, uint32 InHeight, ui
     auto TexturePtr = std::make_shared<jTexture_DX12>(InType, InFormat, InWidth, InHeight, InArrayLayers
         , EMSAASamples::COUNT_1, InMipLevels, false, InClearValue, TextureInternal);
     check(TexturePtr);
-    TexturePtr->Layout = InImageLayout;
 
     if (InResourceName)
     {
@@ -288,7 +285,6 @@ std::shared_ptr<jTexture_DX12> CreateTexture(const std::shared_ptr<jCreatedResou
         , EMSAASamples::COUNT_1, (int32)desc.MipLevels, false, InClearValue, InTexture);
 
     check(TexturePtr);
-    TexturePtr->Layout = InImageLayout;
 
     if (InResourceName)
     {

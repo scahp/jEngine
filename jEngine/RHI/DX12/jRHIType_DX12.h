@@ -537,12 +537,13 @@ struct jCreatedResource : public std::enable_shared_from_this<jCreatedResource>
         Swapchain,          // no need release by me.
     };
 
-    static std::shared_ptr<jCreatedResource> CreatedFromStandalone(const ComPtr<ID3D12Resource>& InResource) { return std::shared_ptr<jCreatedResource>(new jCreatedResource(EType::Standalone, InResource)); }
-    static std::shared_ptr<jCreatedResource> CreatedFromResourcePool(const ComPtr<ID3D12Resource>& InResource) { return std::shared_ptr<jCreatedResource>(new jCreatedResource(EType::ResourcePool, InResource)); }
-    static std::shared_ptr<jCreatedResource> CreatedFromSwapchain(const ComPtr<ID3D12Resource>& InResource) { return std::shared_ptr<jCreatedResource>(new jCreatedResource(EType::Swapchain, InResource)); }
+    static std::shared_ptr<jCreatedResource> CreatedFromStandalone(const ComPtr<ID3D12Resource>& InResource, EResourceLayout InLayout) { return std::shared_ptr<jCreatedResource>(new jCreatedResource(EType::Standalone, InResource, InLayout)); }
+    static std::shared_ptr<jCreatedResource> CreatedFromResourcePool(const struct jPlacedResource& InResource);
+    static std::shared_ptr<jCreatedResource> CreatedFromSwapchain(const ComPtr<ID3D12Resource>& InResource, EResourceLayout InLayout) { return std::shared_ptr<jCreatedResource>(new jCreatedResource(EType::Swapchain, InResource, InLayout)); }
 
     EType ResourceType = EType::Standalone;
     ComPtr<ID3D12Resource> Resource;
+    EResourceLayout Layout = EResourceLayout::UNDEFINED;
 
     bool IsValid() const { return (nullptr != Resource.Get()); }
     ID3D12Resource* Get() const { return Resource.Get(); }
@@ -550,10 +551,14 @@ struct jCreatedResource : public std::enable_shared_from_this<jCreatedResource>
     uint64 GetGPUVirtualAddress() const { return Resource->GetGPUVirtualAddress(); }
     void Free();
 
+    // Layout management - stored and saved to Pool on Free()
+    void SetLayout(EResourceLayout InNewLayout) { Layout = InNewLayout; }
+
 private:
     // 생성자를 private으로 설정
     jCreatedResource() {}
     jCreatedResource(EType InType, const ComPtr<ID3D12Resource>& InResource) : ResourceType(InType), Resource(InResource) {}
+    jCreatedResource(EType InType, const ComPtr<ID3D12Resource>& InResource, EResourceLayout InLayout) : ResourceType(InType), Resource(InResource), Layout(InLayout) {}
 
     // 복사 생성자 및 할당 연산자를 삭제하여 복사 방지
     jCreatedResource(const jCreatedResource&) = delete;

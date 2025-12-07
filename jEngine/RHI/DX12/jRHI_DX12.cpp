@@ -405,9 +405,9 @@ bool jRHI_DX12::InitRHI()
     }
 
     PlacedResourcePool.Init();
-    DeallocatorMultiFrameStandaloneResource.FreeDelegate = [](ComPtr<ID3D12Resource> InData)
+    DeallocatorMultiFrameStandaloneResource.FreeDelegate = [](jPendingDeallocateResource InData)
         {
-            InData.Reset();
+            InData.Resource.Reset();
         };
 
     //////////////////////////////////////////////////////////////////////////
@@ -1753,7 +1753,7 @@ void jPlacedResourcePool::Release()
     }
 }
 
-void jPlacedResourcePool::Free(const ComPtr<ID3D12Resource>& InData)
+void jPlacedResourcePool::Free(const ComPtr<ID3D12Resource>& InData, EResourceLayout InLayout)
 {
     if (!InData)
         return;
@@ -1766,6 +1766,7 @@ void jPlacedResourcePool::Free(const ComPtr<ID3D12Resource>& InData)
         if (UsingPlacedResources.end() != it_find)
         {
             auto& PendingList = GetPendingPlacedResources(it_find->second.IsUploadResource, it_find->second.Size);
+            it_find->second.LastLayout = InLayout;  // Save layout before adding to pending list
             PendingList.push_back(it_find->second);
             UsingPlacedResources.erase(it_find);
             return;

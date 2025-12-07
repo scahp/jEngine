@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jSwapchain_DX12.h"
 #include "jRHIType_DX12.h"
 #include "jTexture_DX12.h"
@@ -79,7 +79,7 @@ bool jSwapchain_DX12::Create()
         if (JFAIL(SwapChain->GetBuffer(i, IID_PPV_ARGS(&NewResource))))
             return false;
 
-        std::shared_ptr<jCreatedResource> RenderTargetResource = jCreatedResource::CreatedFromSwapchain(NewResource);
+        std::shared_ptr<jCreatedResource> RenderTargetResource = jCreatedResource::CreatedFromSwapchain(NewResource, EResourceLayout::PRESENT_SRC);
 
         Images[i] = SwapchainImage;        
 
@@ -88,7 +88,6 @@ bool jSwapchain_DX12::Create()
         SwapchainImage->TexturePtr = TextureDX12Ptr;
 
         jBufferUtil_DX12::CreateRenderTargetView((jTexture_DX12*)SwapchainImage->TexturePtr.get());
-        TextureDX12Ptr->Layout = EResourceLayout::PRESENT_SRC;
     }
 
     return true;
@@ -139,7 +138,7 @@ bool jSwapchain_DX12::Resize(int32 InWidth, int32 InHeight)
         if (JFAIL(SwapChain->GetBuffer(i, IID_PPV_ARGS(&NewResource))))
             return false;
 
-        std::shared_ptr<jCreatedResource> RenderTargetResource = jCreatedResource::CreatedFromSwapchain(NewResource);
+        std::shared_ptr<jCreatedResource> RenderTargetResource = jCreatedResource::CreatedFromSwapchain(NewResource, EResourceLayout::UNDEFINED);
 
         auto TextureDX12Ptr = std::make_shared<jTexture_DX12>(
             ETextureType::TEXTURE_2D, GetDX12TextureFormat(DXGI_FORMAT_R8G8B8A8_UNORM), InWidth, InHeight, 1, EMSAASamples::COUNT_1, 1, false, jRTClearValue::Invalid, RenderTargetResource);
