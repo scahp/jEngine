@@ -635,8 +635,8 @@ struct Vector4
 	{
 #pragma warning( push )
 #pragma warning( disable : 4723 )
-		JASSERT(!IsNearlyZero(fValue));
-		if (IsNearlyZero(fValue))
+		JASSERT(!::IsNearlyZero(fValue));
+		if (::IsNearlyZero(fValue))
 			return Vector4(ZeroType);
 
 #if USE_SSE
@@ -656,8 +656,8 @@ struct Vector4
 
 	FORCEINLINE Vector4& operator/=(float fValue)
 	{
-		JASSERT(!IsNearlyZero(fValue));
-		if (IsNearlyZero(fValue))
+		JASSERT(!::IsNearlyZero(fValue));
+		if (::IsNearlyZero(fValue))
 		{
 			x = 0.0f, y = 0.0f, z = 0.0f, w = 0.0f;
 		}
@@ -881,8 +881,8 @@ struct Vector2
 	{
 #pragma warning( push )
 #pragma warning( disable : 4723 )
-        JASSERT(!IsNearlyZero(fValue));
-        if (IsNearlyZero(fValue))
+        JASSERT(!::IsNearlyZero(fValue));
+        if (::IsNearlyZero(fValue))
             return Vector2(ZeroType);
 
 		const float RScale = 1.0f / fValue;
@@ -902,8 +902,8 @@ struct Vector2
 
 	FORCEINLINE Vector2& operator/=(float fValue)
 	{
-		JASSERT(!IsNearlyZero(fValue));
-		if (IsNearlyZero(fValue))
+		JASSERT(!::IsNearlyZero(fValue));
+		if (::IsNearlyZero(fValue))
 			x = 0.0f, y = 0.0f;
 		else
 			x /= fValue, y /= fValue;

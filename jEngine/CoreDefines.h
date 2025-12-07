@@ -21,7 +21,7 @@
 	#endif
 #endif
 
-#define USE_SSE (1 && SUPPORT_SSE)
+#define USE_SSE (0 && SUPPORT_SSE)
 #define USE_SSE_VECTOR 0		// Not enough fast than NoSSE
 #define USE_SSE_MATRIX 1
 

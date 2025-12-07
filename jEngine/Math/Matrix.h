@@ -246,7 +246,7 @@ struct Matrix
 	FORCEINLINE Vector TransformPoint(Vector const& vector) const
 	{
 		Vector4 result = Transform(Vector4(vector, 1.0f));
-		if (IsNearlyZero(result.w))
+		if (::IsNearlyZero(result.w))
 			return result;
 		return result / result.w;
 	}
@@ -254,7 +254,7 @@ struct Matrix
     FORCEINLINE Vector TransformDirection(Vector const& vector) const
     {
         Vector4 result = Transform(Vector4(vector, 0.0f));
-        if (IsNearlyZero(result.w))
+        if (::IsNearlyZero(result.w))
             return result;
         return result / result.w;
     }
