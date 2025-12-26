@@ -3,7 +3,7 @@
 
 std::shared_ptr<jCreatedResource> jCreatedResource::CreatedFromResourcePool(const jPlacedResource& InResource)
 {
-    return std::shared_ptr<jCreatedResource>(new jCreatedResource(EType::ResourcePool, InResource.PlacedSubResource, InResource.LastLayout));
+    return std::shared_ptr<jCreatedResource>(new jCreatedResource(EType::ResourcePool, InResource.PlacedSubResource, InResource.LastLayout, InResource.ResourceName));
 }
 
 void jCreatedResource::Free()
@@ -14,7 +14,7 @@ void jCreatedResource::Free()
         {
             if (g_rhi_dx12)
                 g_rhi_dx12->DeallocatorMultiFrameStandaloneResource.Free(
-                    jPendingDeallocateResource(Resource, Layout)
+                    jPendingDeallocateResource(Resource, jPendingDeallocateResource::jInfo{.Layout = Layout, .ResourceName = ResourceName})
                 );
         }
         else if (ResourceType == jCreatedResource::EType::ResourcePool)
@@ -24,7 +24,7 @@ void jCreatedResource::Free()
                 const EPlacedResourceType PlacedResourceType = g_rhi_dx12->GetPlacedResourceType(Resource->GetDesc());
 
                 g_rhi_dx12->PlacedResourcePool[(int32)PlacedResourceType].DeallocatorMultiFramePlacedResource.Free(
-                    jPendingDeallocateResource(Resource, Layout)
+                    jPendingDeallocateResource(Resource, jPendingDeallocateResource::jInfo{ .Layout = Layout, .ResourceName = ResourceName })
                 );
             }
         }

@@ -237,7 +237,7 @@ void jRaytracingScene_DX12::CreateOrUpdateTLAS(const jRatracingInitializer& InIn
             , nullptr, 0, TEXT("TLAS Result Buffer")));
 
         InstanceUploadBufferPtr = std::shared_ptr<jBuffer>(jBufferUtil_DX12::CreateBuffer(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * InstanceList.size(), 0
-            , EBufferCreateFlag::CPUAccess, EResourceLayout::READ_ONLY, nullptr, 0, TEXT("TLAS Result Buffer")));
+            , EBufferCreateFlag::CPUAccess, EResourceLayout::READ_ONLY, nullptr, 0, TEXT("TLAS InstanceUploadBuffer")));
     }
 
     if (D3D12_RAYTRACING_INSTANCE_DESC* instanceDescs = (D3D12_RAYTRACING_INSTANCE_DESC*)InstanceUploadBufferPtr->Map())

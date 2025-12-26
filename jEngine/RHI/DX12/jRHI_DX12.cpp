@@ -1777,7 +1777,7 @@ void jPlacedResourcePool::Release()
     }
 }
 
-void jPlacedResourcePool::Free(const ComPtr<ID3D12Resource>& InData, EResourceLayout InLayout)
+void jPlacedResourcePool::Free(const ComPtr<ID3D12Resource>& InData, jPendingDeallocateResource::jInfo InInfo)
 {
     if (!InData)
         return;
@@ -1790,7 +1790,8 @@ void jPlacedResourcePool::Free(const ComPtr<ID3D12Resource>& InData, EResourceLa
         if (UsingPlacedResources.end() != it_find)
         {
             auto& PendingList = GetPendingPlacedResources(it_find->second.IsUploadResource, it_find->second.Size);
-            it_find->second.LastLayout = InLayout;  // Save layout before adding to pending list
+            it_find->second.LastLayout = InInfo.Layout;  // Save layout before adding to pending list
+            it_find->second.ResourceName = InInfo.ResourceName;
             PendingList.push_back(it_find->second);
             UsingPlacedResources.erase(it_find);
             return;

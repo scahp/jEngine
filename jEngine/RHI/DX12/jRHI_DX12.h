@@ -51,21 +51,28 @@ struct jPlacedResource
 	bool IsUploadResource = false;
 	EResourceLayout LastLayout = EResourceLayout::UNDEFINED;
     EPlacedResourceType ResourceType = EPlacedResourceType::MAX;
+	jName ResourceName;
 };
 
 // Resource with Layout for pending deallocation
 struct jPendingDeallocateResource
 {
     ComPtr<ID3D12Resource> Resource;
-    EResourceLayout Layout = EResourceLayout::UNDEFINED;
+
+	struct jInfo
+	{
+		EResourceLayout Layout = EResourceLayout::UNDEFINED;
+		jName ResourceName;
+	};
+	jInfo Info;
 
     jPendingDeallocateResource() = default;
-    jPendingDeallocateResource(const ComPtr<ID3D12Resource>& InResource, EResourceLayout InLayout)
-        : Resource(InResource), Layout(InLayout) {}
+    jPendingDeallocateResource(const ComPtr<ID3D12Resource>& InResource, jInfo InInfo)
+        : Resource(InResource), Info(InInfo) {}
 
     // Move constructor for efficiency
-    jPendingDeallocateResource(ComPtr<ID3D12Resource>&& InResource, EResourceLayout InLayout)
-        : Resource(std::move(InResource)), Layout(InLayout) {}
+    jPendingDeallocateResource(ComPtr<ID3D12Resource>&& InResource, jInfo InInfo)
+        : Resource(std::move(InResource)), Info(InInfo) {}
 };
 
 using jDeallocatorMultiFrameCreatedResource = jDeallocatorMultiFrameResource<jPendingDeallocateResource>;
@@ -126,7 +133,7 @@ struct jPlacedResourcePool
         return jPlacedResource();
     }
 
-    void Free(const ComPtr<ID3D12Resource>& InData, EResourceLayout InLayout);
+    void Free(const ComPtr<ID3D12Resource>& InData, jPendingDeallocateResource::jInfo InInfo);
 
     void AddUsingPlacedResource(const jPlacedResource InPlacedResource)
     {
@@ -140,7 +147,7 @@ struct jPlacedResourcePool
     // This will be called from 'jDeallocatorMultiFrameCreatedResource'
     void FreedFromPendingDelegateForCreatedResource(jPendingDeallocateResource InData)
     {
-        Free(InData.Resource, InData.Layout);
+        Free(InData.Resource, InData.Info);
     }
 
 	std::vector<jPlacedResource>& GetPendingPlacedResources(bool InIsUploadPlacedResource, size_t InSize)
@@ -249,7 +256,7 @@ public:
 	EPlacedResourceType GetPlacedResourceType(const D3D12_RESOURCE_DESC& InDesc) const;
 
 	template <typename T>
-	std::shared_ptr<jCreatedResource> CreateResource(T&& InDesc, EResourceLayout InLayout, D3D12_CLEAR_VALUE* InClearValue = nullptr)
+	std::shared_ptr<jCreatedResource> CreateResource(T&& InDesc, EResourceLayout InLayout, jName InResourceName, D3D12_CLEAR_VALUE* InClearValue = nullptr)
 	{
 		check(Device);
 
@@ -263,6 +270,7 @@ public:
 			jPlacedResource ReusePlacedResource = PlacedResourcePool[(int32)PlacedResourceType].Alloc(info.SizeInBytes, false);
 			if (ReusePlacedResource.IsValid())
 			{
+				ReusePlacedResource.ResourceName = InResourceName;
 				return jCreatedResource::CreatedFromResourcePool(ReusePlacedResource);
 			}
 			else
@@ -287,6 +295,7 @@ public:
                     NewPlacedResource.Size = info.SizeInBytes;
 					NewPlacedResource.LastLayout = InLayout;
 					NewPlacedResource.ResourceType = PlacedResourceType;
+					NewPlacedResource.ResourceName = InResourceName;
                     PlacedResourcePool[(int32)PlacedResourceType].AddUsingPlacedResource(NewPlacedResource);
 
 					return jCreatedResource::CreatedFromResourcePool(NewPlacedResource);
@@ -298,11 +307,11 @@ public:
         ComPtr<ID3D12Resource> NewResource;
 		JFAIL(Device->CreateCommittedResource(&HeapProperties, D3D12_HEAP_FLAG_NONE
 			, std::forward<T>(InDesc), GetDX12ResourceLayout(InLayout), InClearValue, IID_PPV_ARGS(&NewResource)));
-		return jCreatedResource::CreatedFromStandalone(NewResource, InLayout);
+		return jCreatedResource::CreatedFromStandalone(NewResource, InLayout, InResourceName);
 	}
 
     template <typename T>
-	std::shared_ptr<jCreatedResource> CreateUploadResource(T&& InDesc, EResourceLayout InLayout, D3D12_CLEAR_VALUE* InClearValue = nullptr)
+	std::shared_ptr<jCreatedResource> CreateUploadResource(T&& InDesc, EResourceLayout InLayout, jName InResourceName, D3D12_CLEAR_VALUE* InClearValue = nullptr)
     {
         check(Device);
 
@@ -316,6 +325,7 @@ public:
 			jPlacedResource ReusePlacedUploadResource = PlacedResourcePool[(int32)PlacedResourceType].Alloc(info.SizeInBytes, true);
 			if (ReusePlacedUploadResource.IsValid())
 			{
+				ReusePlacedUploadResource.ResourceName = InResourceName;
 				return jCreatedResource::CreatedFromResourcePool(ReusePlacedUploadResource);
 			}
 			else
@@ -340,6 +350,7 @@ public:
 					NewPlacedResource.Size = info.SizeInBytes;
 					NewPlacedResource.LastLayout = InLayout;
 					NewPlacedResource.ResourceType = PlacedResourceType;
+					NewPlacedResource.ResourceName = InResourceName;
 					PlacedResourcePool[(int32)PlacedResourceType].AddUsingPlacedResource(NewPlacedResource);
 
 					return jCreatedResource::CreatedFromResourcePool(NewPlacedResource);
@@ -351,7 +362,7 @@ public:
         ComPtr<ID3D12Resource> NewResource;
         JFAIL(Device->CreateCommittedResource(&HeapProperties, D3D12_HEAP_FLAG_NONE
             , std::forward<T>(InDesc), GetDX12ResourceLayout(InLayout), InClearValue, IID_PPV_ARGS(&NewResource)));
-		return jCreatedResource::CreatedFromStandalone(NewResource, InLayout);
+		return jCreatedResource::CreatedFromStandalone(NewResource, InLayout, InResourceName);
     }
 	//////////////////////////////////////////////////////////////////////////
 

@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jUniformBufferBlock_DX12.h"
 #include "jBufferUtil_DX12.h"
 #include "jRHI_DX12.h"
@@ -17,7 +17,7 @@ void jUniformBufferBlock_DX12::Init(size_t size)
 
     if (jLifeTimeType::MultiFrame == LifeType)
     {
-        BufferPtr = jBufferUtil_DX12::CreateBuffer(size, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT, EBufferCreateFlag::CPUAccess, EResourceLayout::GENERAL, nullptr, 0, TEXT("UniformBufferBlock"));
+        BufferPtr = jBufferUtil_DX12::CreateBuffer(size, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT, EBufferCreateFlag::CPUAccess, EResourceLayout::READ_ONLY, nullptr, 0, TEXT("UniformBufferBlock"));
         jBufferUtil_DX12::CreateConstantBufferView(BufferPtr.get());
     }
 }

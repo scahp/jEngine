@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jRingBuffer_DX12.h"
 #include "jBufferUtil_DX12.h"
 
@@ -26,7 +26,7 @@ void jRingBuffer_DX12::Create(uint64 totalSize, uint32 alignment /*= 16*/)
     desc.Alignment = 0;
 
     check(g_rhi_dx12);
-    Buffer = g_rhi_dx12->CreateUploadResource(&desc, EResourceLayout::READ_ONLY);
+    Buffer = g_rhi_dx12->CreateUploadResource(&desc, EResourceLayout::READ_ONLY, jName("RingBuffer"));
     if (!ensure(Buffer->Resource))
         return;
 

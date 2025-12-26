@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "jRHIType_DX12.h"
 #include "jDescriptorHeap_DX12.h"
 
@@ -305,7 +305,7 @@ namespace jBufferUtil_DX12
 {
 
 std::shared_ptr<jCreatedResource> CreateBufferInternal(uint64 InSize, uint64 InAlignment, EBufferCreateFlag InBufferCreateFlag
-    , EResourceLayout InLayout, const wchar_t* InResourceName = nullptr);
+    , EResourceLayout InLayout, const wchar_t* InResourceName = nullptr, jName InResourceName2 = jName());
 
 std::shared_ptr<jBuffer_DX12> CreateBuffer(uint64 InSize, uint64 InAlignment, EBufferCreateFlag InBufferCreateFlag
     , EResourceLayout InLayout, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr);
