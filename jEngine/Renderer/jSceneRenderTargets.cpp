@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jSceneRenderTargets.h"
 #include "RHI/jRenderTargetPool.h"
 #include "RHI/jSwapchain.h"
@@ -44,7 +44,7 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
         .SampleCount = g_rhi->GetSelectedMSAASamples(),
         .RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
         .TextureCreateFlag = ETextureCreateFlag::UAV,
-        .ResourceName = TEXT("ColorPtr")
+        .ResourceName = jNameStatic("ColorPtr")
     };
     ColorPtr = jRenderTargetPool::GetRenderTarget(ColorRTInfo);
 
@@ -61,7 +61,7 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
             .IsGenerateMipmap = false,
             .SampleCount = g_rhi->GetSelectedMSAASamples(),
             .RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
-            .ResourceName = TEXT("BloomSetup")
+            .ResourceName = jNameStatic("BloomSetup")
         };
         BloomSetup = jRenderTargetPool::GetRenderTarget(BloomSetupRTInfo);
 
@@ -81,7 +81,7 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
                 .IsGenerateMipmap = false,
                 .SampleCount = g_rhi->GetSelectedMSAASamples(),
                 .RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
-                .ResourceName = TempStr
+                .ResourceName = jName(TempStr)
             };
 
             DownSample[i] = jRenderTargetPool::GetRenderTarget(DownSampleRTInfo);
@@ -102,7 +102,7 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
                 .IsGenerateMipmap = false,
                 .SampleCount = g_rhi->GetSelectedMSAASamples(),
                 .RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
-                .ResourceName = TempStr
+                .ResourceName = jName(TempStr)
             };
 
             UpSample[i] = jRenderTargetPool::GetRenderTarget(UpSampleRTInfo);
@@ -120,7 +120,7 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
         .IsUseAsSubpassInput = gOptions.UseSubpass,
         .IsMemoryless = gOptions.UseMemoryless,
         .RTClearValue = jRTClearValue(1.0f, 0),
-        .ResourceName = TEXT("DepthPtr")
+        .ResourceName = jNameStatic("DepthPtr")
     };
     DepthPtr = jRenderTargetPool::GetRenderTarget(DepthRTInfo);
 
@@ -145,7 +145,7 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
         .SampleCount = g_rhi->GetSelectedMSAASamples(),
         .RTClearValue = jRTClearValue(0.0f, 0),
         .TextureCreateFlag = ETextureCreateFlag::UAV,
-        .ResourceName = TEXT("LinearDepthPtr")
+        .ResourceName = jNameStatic("LinearDepthPtr")
     };
     LinearDepthPtr = jRenderTargetPool::GetRenderTarget(LinearDepthRTInfo);
 
@@ -173,7 +173,7 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
             .IsMemoryless = false,
             .RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
             .TextureCreateFlag = ETextureCreateFlag::RTV | ETextureCreateFlag::UAV,
-            .ResourceName = L"AtmosphericShadowing"
+            .ResourceName = jNameStatic("AtmosphericShadowing")
         };
         AtmosphericShadowing = jRenderTargetPool::GetRenderTarget(Info);
     }
@@ -200,7 +200,7 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
                     .IsGenerateMipmap = false,
                     .SampleCount = EMSAASamples::COUNT_1,
                     .RTClearValue = RTClearValue,
-                    .ResourceName = TEXT("DirectionalLight_ShadowMap")
+                    .ResourceName = jNameStatic("DirectionalLight_ShadowMap")
                 };
                 ShadowMapPtr = jRenderTargetPool::GetRenderTarget(Info);
             }
@@ -215,7 +215,7 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
                     .IsGenerateMipmap = false,
                     .SampleCount = EMSAASamples::COUNT_1,
                     .RTClearValue = RTClearValue,
-                    .ResourceName = TEXT("PointLight_ShadowMap")
+                    .ResourceName = jNameStatic("PointLight_ShadowMap")
                 };
                 ShadowMapPtr = jRenderTargetPool::GetRenderTarget(Info);
             }
@@ -230,7 +230,7 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
                     .IsGenerateMipmap = false,
                     .SampleCount = EMSAASamples::COUNT_1,
                     .RTClearValue = RTClearValue,
-                    .ResourceName = TEXT("SpotLight_ShadowMap")
+                    .ResourceName = jNameStatic("SpotLight_ShadowMap")
                 };
                 ShadowMapPtr = jRenderTargetPool::GetRenderTarget(Info);
             }
@@ -258,7 +258,7 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
             .IsMemoryless = IsMemoryless,
             .RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
             .TextureCreateFlag = ETextureCreateFlag::NONE,
-            .ResourceName = TempStr
+            .ResourceName = jName(TempStr)
         };
         GBuffer[i] = jRenderTargetPool::GetRenderTarget(Info);
     }

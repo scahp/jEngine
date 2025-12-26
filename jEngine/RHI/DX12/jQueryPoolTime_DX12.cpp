@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jQueryPoolTime_DX12.h"
 #include "Profiler/jPerformanceProfile.h"
 #include "jBufferUtil_DX12.h"
@@ -12,7 +12,7 @@ bool jQueryPoolTime_DX12::Create()
 {
     const uint64 ReadbackBufferSize = MaxQueryTimeCount * jRHI::MaxWaitingQuerySet * sizeof(uint64);
     ReadbackBuffer = std::shared_ptr<jBuffer_DX12>(jBufferUtil_DX12::CreateBuffer(ReadbackBufferSize, 0, EBufferCreateFlag::Readback
-        , EResourceLayout::TRANSFER_DST, nullptr, ReadbackBufferSize, TEXT("QueryPoolTime_ReadbackBuffer")));
+        , EResourceLayout::TRANSFER_DST, nullptr, ReadbackBufferSize, jNameStatic("QueryPoolTime_ReadbackBuffer")));
 
     D3D12_QUERY_HEAP_DESC heapDesc = { };
     heapDesc.Count = MaxQueryTimeCount * jRHI::MaxWaitingQuerySet;

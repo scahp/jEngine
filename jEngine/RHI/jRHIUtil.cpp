@@ -51,7 +51,7 @@ std::shared_ptr<jRenderTarget> ConvertToCubeMap(jName InDestFilePath, Vector2i I
         .IsMemoryless = false,
         .RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
         .TextureCreateFlag = ETextureCreateFlag::RTV | ETextureCreateFlag::UAV,
-        .ResourceName = L"Cubemap"
+        .ResourceName = jNameStatic("Cubemap")
     };
     auto CubeMap = jRenderTargetPool::GetRenderTarget(Info);
     {
@@ -186,7 +186,7 @@ std::shared_ptr<jRenderTarget> GenerateIrradianceMap(jName InDestFilePath, Vecto
         .IsMemoryless = false,
         .RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
         .TextureCreateFlag = ETextureCreateFlag::RTV | ETextureCreateFlag::UAV,
-        .ResourceName = L"IrradianceMap"
+        .ResourceName = jNameStatic("IrradianceMap")
     };
     auto IrradianceMap = jRenderTargetPool::GetRenderTarget(Info);
     {
@@ -312,7 +312,7 @@ std::shared_ptr<jRenderTarget> GenerateFilteredEnvironmentMap(jName InDestFilePa
         .IsMemoryless = false,
         .RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
         .TextureCreateFlag = ETextureCreateFlag::RTV | ETextureCreateFlag::UAV,
-        .ResourceName = L"FilteredEnvMap"
+        .ResourceName = jNameStatic("FilteredEnvMap")
     };
     auto FilteredEnvMap = jRenderTargetPool::GetRenderTarget(Info);
     {

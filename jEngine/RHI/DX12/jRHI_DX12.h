@@ -489,11 +489,11 @@ public:
 
 	// Create Buffers
     virtual std::shared_ptr<jBuffer> CreateStructuredBuffer(uint64 InSize, uint64 InAlignment, uint64 InStride, EBufferCreateFlag InBufferCreateFlag
-        , EResourceLayout InInitialState, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr) const override;
+        , EResourceLayout InInitialState, const void* InData = nullptr, uint64 InDataSize = 0, jName InResourceName = jName()) const override;
 	virtual std::shared_ptr<jBuffer> CreateRawBuffer(uint64 InSize, uint64 InAlignment, EBufferCreateFlag InBufferCreateFlag
-		, EResourceLayout InInitialState, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr) const override;
+		, EResourceLayout InInitialState, const void* InData = nullptr, uint64 InDataSize = 0, jName InResourceName = jName()) const override;
 	virtual std::shared_ptr<jBuffer> CreateFormattedBuffer(uint64 InSize, uint64 InAlignment, ETextureFormat InFormat, EBufferCreateFlag InBufferCreateFlag
-		, EResourceLayout InInitialState, const void* InData = nullptr, uint64 InDataSize = 0, const wchar_t* InResourceName = nullptr) const override;
+		, EResourceLayout InInitialState, const void* InData = nullptr, uint64 InDataSize = 0, jName InResourceName = jName()) const override;
     virtual std::shared_ptr<IUniformBufferBlock> CreateUniformBufferBlock(jName InName, jLifeTimeType InLifeTimeType, size_t InSize = 0) const override;
     virtual std::shared_ptr<jVertexBuffer> CreateVertexBuffer(const std::shared_ptr<jVertexStreamData>& streamData) const override;
     virtual std::shared_ptr<jIndexBuffer> CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const override;
@@ -501,10 +501,10 @@ public:
 
 	// Create Images
 	virtual std::shared_ptr<jTexture> Create2DTexture(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag
-		, EResourceLayout InImageLayout = EResourceLayout::UNDEFINED, const jImageBulkData& InImageBulkData = {}, const jRTClearValue& InClearValue = jRTClearValue::Invalid, const wchar_t* InResourceName = nullptr) const override;
+		, EResourceLayout InImageLayout = EResourceLayout::UNDEFINED, const jImageBulkData& InImageBulkData = {}, const jRTClearValue& InClearValue = jRTClearValue::Invalid, jName InResourceName = jName()) const override;
 
     virtual std::shared_ptr<jTexture> CreateCubeTexture(uint32 InWidth, uint32 InHeight, uint32 InMipLevels, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag
-		, EResourceLayout InImageLayout = EResourceLayout::UNDEFINED, const jImageBulkData& InImageBulkData = {}, const jRTClearValue& InClearValue = jRTClearValue::Invalid, const wchar_t* InResourceName = nullptr) const override;
+		, EResourceLayout InImageLayout = EResourceLayout::UNDEFINED, const jImageBulkData& InImageBulkData = {}, const jRTClearValue& InClearValue = jRTClearValue::Invalid, jName InResourceName = jName()) const override;
 	//////////////////////////////////////////////////////////////////////////
 
 	virtual bool IsSupportVSync() const override;

@@ -1244,7 +1244,7 @@ std::shared_ptr<jIndexBuffer> jRHI_DX12::CreateIndexBuffer(const std::shared_ptr
 }
 
 std::shared_ptr<jTexture> jRHI_DX12::Create2DTexture(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag
-    , EResourceLayout InImageLayout, const jImageBulkData& InImageBulkData, const jRTClearValue& InClearValue, const wchar_t* InResourceName) const
+    , EResourceLayout InImageLayout, const jImageBulkData& InImageBulkData, const jRTClearValue& InClearValue, jName InResourceName) const
 {
     auto TexturePtr = jBufferUtil_DX12::CreateTexture(InWidth, InHeight, InArrayLayers, InMipLevels, 1, ETextureType::TEXTURE_2D, InFormat, InTextureCreateFlag, InImageLayout, InClearValue, InResourceName);
     if (InImageBulkData.ImageData.size() > 0)
@@ -1291,7 +1291,7 @@ std::shared_ptr<jTexture> jRHI_DX12::Create2DTexture(uint32 InWidth, uint32 InHe
 }
 
 std::shared_ptr<jTexture> jRHI_DX12::CreateCubeTexture(uint32 InWidth, uint32 InHeight, uint32 InMipLevels, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag
-    , EResourceLayout InImageLayout, const jImageBulkData& InImageBulkData, const jRTClearValue& InClearValue, const wchar_t* InResourceName) const
+    , EResourceLayout InImageLayout, const jImageBulkData& InImageBulkData, const jRTClearValue& InClearValue, jName InResourceName) const
 {
     auto TexturePtr = jBufferUtil_DX12::CreateTexture(InWidth, InHeight, 6, InMipLevels, 1, ETextureType::TEXTURE_CUBE, InFormat, InTextureCreateFlag, InImageLayout, InClearValue, InResourceName);
     if (InImageBulkData.ImageData.size() > 0)
@@ -1698,7 +1698,7 @@ jRaytracingScene* jRHI_DX12::CreateRaytracingScene() const
 }
 
 std::shared_ptr<jBuffer> jRHI_DX12::CreateStructuredBuffer(uint64 InSize, uint64 InAlignment, uint64 InStride, EBufferCreateFlag InBufferCreateFlag
-    , EResourceLayout InInitialState, const void* InData, uint64 InDataSize, const wchar_t* InResourceName) const
+    , EResourceLayout InInitialState, const void* InData /*= nullptr*/, uint64 InDataSize /*= 0*/, jName InResourceName /*= jName()*/) const
 {
     auto BufferPtr = jBufferUtil_DX12::CreateBuffer(InSize, InStride, InBufferCreateFlag, InInitialState
         , InData, InDataSize, InResourceName);
@@ -1714,7 +1714,7 @@ std::shared_ptr<jBuffer> jRHI_DX12::CreateStructuredBuffer(uint64 InSize, uint64
 }
 
 std::shared_ptr<jBuffer> jRHI_DX12::CreateRawBuffer(uint64 InSize, uint64 InAlignment, EBufferCreateFlag InBufferCreateFlag
-    , EResourceLayout InInitialState, const void* InData, uint64 InDataSize, const wchar_t* InResourceName) const
+    , EResourceLayout InInitialState, const void* InData /*= nullptr*/, uint64 InDataSize /*= 0*/, jName InResourceName /*= jName()*/) const
 {
     auto BufferPtr = jBufferUtil_DX12::CreateBuffer(InSize, InAlignment, InBufferCreateFlag, InInitialState
         , InData, InDataSize, InResourceName);
@@ -1730,7 +1730,7 @@ std::shared_ptr<jBuffer> jRHI_DX12::CreateRawBuffer(uint64 InSize, uint64 InAlig
 }
 
 std::shared_ptr<jBuffer> jRHI_DX12::CreateFormattedBuffer(uint64 InSize, uint64 InAlignment, ETextureFormat InFormat, EBufferCreateFlag InBufferCreateFlag
-    , EResourceLayout InInitialState, const void* InData, uint64 InDataSize, const wchar_t* InResourceName) const
+    , EResourceLayout InInitialState, const void* InData /*= nullptr*/, uint64 InDataSize /*= 0*/, jName InResourceName /*= jName()*/) const
 {
     auto BufferPtr = jBufferUtil_DX12::CreateBuffer(InSize, InAlignment, InBufferCreateFlag, InInitialState
         , InData, InDataSize, InResourceName);

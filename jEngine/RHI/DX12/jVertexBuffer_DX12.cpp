@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jVertexBuffer_DX12.h"
 #include "../jRenderFrameContext.h"
 #include "jBufferUtil_DX12.h"
@@ -35,7 +35,7 @@ bool jVertexBuffer_DX12::Initialize(const std::shared_ptr<jVertexStreamData>& In
 
         // Create vertex buffer
         stream.BufferPtr = g_rhi->CreateRawBuffer<jBuffer_DX12>(iter->GetBufferSize(), 0, EBufferCreateFlag::UAV, EResourceLayout::GENERAL
-            , iter->GetBufferData(), iter->GetBufferSize(), TEXT("VertexBuffer"));
+            , iter->GetBufferData(), iter->GetBufferSize(), jNameStatic("VertexBuffer"));
 
         jBuffer_DX12* Buffer_DX12 = stream.GetBuffer<jBuffer_DX12>();
 

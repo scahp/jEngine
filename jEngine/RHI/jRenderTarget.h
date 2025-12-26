@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "jTexture.h"
 
 struct jRenderTargetInfo
@@ -35,7 +35,7 @@ struct jRenderTargetInfo
     bool IsMemoryless = false;
     jRTClearValue RTClearValue = jRTClearValue::Invalid;
     ETextureCreateFlag TextureCreateFlag = ETextureCreateFlag::RTV;
-    const wchar_t* ResourceName = nullptr;
+    jName ResourceName;
 };
 
 struct jRenderTarget final : public std::enable_shared_from_this<jRenderTarget>

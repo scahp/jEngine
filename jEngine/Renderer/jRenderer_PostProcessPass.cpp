@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jRenderer.h"
 #include "jSceneRenderTargets.h"
 #include "RHI/jRenderTarget.h"
@@ -182,7 +182,7 @@ void jRenderer::PostProcess()
 					.SampleCount = g_rhi->GetSelectedMSAASamples(),
 					.RTClearValue = jRTClearValue::Invalid,
 					.TextureCreateFlag = (ETextureCreateFlag::RTV | ETextureCreateFlag::UAV),
-					.ResourceName = TEXT("g_EyeAdaptationARTPtr")
+					.ResourceName = jNameStatic("g_EyeAdaptationARTPtr")
 				};
 				g_EyeAdaptationARTPtr = jRenderTargetPool::GetRenderTarget(Info);
 			}
@@ -198,7 +198,7 @@ void jRenderer::PostProcess()
 					.SampleCount = g_rhi->GetSelectedMSAASamples(),
 					.RTClearValue = jRTClearValue::Invalid,
 					.TextureCreateFlag = (ETextureCreateFlag::RTV | ETextureCreateFlag::UAV),
-					.ResourceName = TEXT("g_EyeAdaptationBRTPtr")
+					.ResourceName = jNameStatic("g_EyeAdaptationBRTPtr")
 				};
 				g_EyeAdaptationBRTPtr = jRenderTargetPool::GetRenderTarget(Info);
 			}

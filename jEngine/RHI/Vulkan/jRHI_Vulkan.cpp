@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 
 #include "jRHI_Vulkan.h"
 
@@ -1439,7 +1439,7 @@ VkMemoryPropertyFlagBits jRHI_Vulkan::GetMemoryPropertyFlagBits(ETextureCreateFl
 }
 
 std::shared_ptr<jTexture> jRHI_Vulkan::Create2DTexture(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag
-    , EResourceLayout InImageLayout, const jImageBulkData& InImageBulkData, const jRTClearValue& InClearValue, const wchar_t* InResourceName) const
+    , EResourceLayout InImageLayout, const jImageBulkData& InImageBulkData, const jRTClearValue& InClearValue, jName InResourceName) const
 {
 	VkImageCreateFlagBits ImageCreateFlags{};
 	const VkMemoryPropertyFlagBits PropertyFlagBits = GetMemoryPropertyFlagBits(InTextureCreateFlag);
@@ -1486,7 +1486,7 @@ std::shared_ptr<jTexture> jRHI_Vulkan::Create2DTexture(uint32 InWidth, uint32 In
 }
 
 std::shared_ptr<jTexture> jRHI_Vulkan::CreateCubeTexture(uint32 InWidth, uint32 InHeight, uint32 InMipLevels, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag
-    , EResourceLayout InImageLayout, const jImageBulkData& InImageBulkData, const jRTClearValue& InClearValue, const wchar_t* InResourceName) const
+    , EResourceLayout InImageLayout, const jImageBulkData& InImageBulkData, const jRTClearValue& InClearValue, jName InResourceName) const
 {
 	VkImageCreateFlagBits ImageCreateFlags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
     const VkMemoryPropertyFlagBits PropertyFlagBits = GetMemoryPropertyFlagBits(InTextureCreateFlag);
@@ -2179,7 +2179,7 @@ jRaytracingScene* jRHI_Vulkan::CreateRaytracingScene() const
 }
 
 std::shared_ptr<jBuffer> jRHI_Vulkan::CreateBufferInternal(uint64 InSize, uint64 InAlignment, EBufferCreateFlag InBufferCreateFlag, EResourceLayout InInitialState
-	, const void* InData, uint64 InDataSize, const wchar_t* InResourceName) const
+	, const void* InData /*= nullptr*/, uint64 InDataSize /*= 0*/, jName InResourceName /*= jName()*/) const
 {
 	if (InAlignment > 0)
 		InSize = Align(InSize, InAlignment);
@@ -2242,7 +2242,7 @@ std::shared_ptr<jBuffer> jRHI_Vulkan::CreateBufferInternal(uint64 InSize, uint64
 		}
 		else
 		{
-			auto stagingBufferPtr = g_rhi->CreateRawBuffer<jBuffer_Vulkan>(InDataSize, InAlignment, EBufferCreateFlag::CPUAccess, EResourceLayout::TRANSFER_SRC, InData, InDataSize, TEXT("StagingBuffer"));
+			auto stagingBufferPtr = g_rhi->CreateRawBuffer<jBuffer_Vulkan>(InDataSize, InAlignment, EBufferCreateFlag::CPUAccess, EResourceLayout::TRANSFER_SRC, InData, InDataSize, jNameStatic("StagingBuffer"));
 			jBufferUtil_Vulkan::CopyBuffer(*stagingBufferPtr, *Buffer_Vulkan, InDataSize);
 		}
     }
@@ -2250,19 +2250,19 @@ std::shared_ptr<jBuffer> jRHI_Vulkan::CreateBufferInternal(uint64 InSize, uint64
 }
 
 std::shared_ptr<jBuffer> jRHI_Vulkan::CreateStructuredBuffer(uint64 InSize, uint64 InAlignment, uint64 InStride
-	, EBufferCreateFlag InBufferCreateFlag, EResourceLayout InInitialState, const void* InData, uint64 InDataSize , const wchar_t* InResourceName) const
+	, EBufferCreateFlag InBufferCreateFlag, EResourceLayout InInitialState, const void* InData /*= nullptr*/, uint64 InDataSize /*= 0*/ , jName InResourceName /*= jName()*/) const
 {
 	return CreateBufferInternal(InSize, InAlignment, InBufferCreateFlag, InInitialState, InData, InDataSize, InResourceName);
 }
 
 std::shared_ptr<jBuffer> jRHI_Vulkan::CreateRawBuffer(uint64 InSize, uint64 InAlignment, EBufferCreateFlag InBufferCreateFlag
-	, EResourceLayout InInitialState, const void* InData, uint64 InDataSize , const wchar_t* InResourceName) const
+	, EResourceLayout InInitialState, const void* InData /*= nullptr*/, uint64 InDataSize /*= 0*/ , jName InResourceName /*= jName()*/) const
 {
 	return CreateBufferInternal(InSize, InAlignment, InBufferCreateFlag, InInitialState, InData, InDataSize, InResourceName);
 }
 
 std::shared_ptr<jBuffer> jRHI_Vulkan::CreateFormattedBuffer(uint64 InSize, uint64 InAlignment, ETextureFormat InFormat
-	, EBufferCreateFlag InBufferCreateFlag, EResourceLayout InInitialState, const void* InData, uint64 InDataSize , const wchar_t* InResourceName) const
+	, EBufferCreateFlag InBufferCreateFlag, EResourceLayout InInitialState, const void* InData /*= nullptr*/, uint64 InDataSize /*= 0*/ , jName InResourceName /*= jName()*/) const
 {
 	return CreateBufferInternal(InSize, InAlignment, InBufferCreateFlag, InInitialState, InData, InDataSize, InResourceName);
 }

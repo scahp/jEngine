@@ -7,7 +7,42 @@ struct jName
 {
 private:
 	static robin_hood::unordered_map<uint32, std::shared_ptr<std::string>> s_NameTable;
+	static robin_hood::unordered_map<uint32, std::shared_ptr<std::wstring>> s_WideNameTable;
 	static jMutexRWLock Lock;
+
+	// Helper function: Convert wchar_t* to UTF-8 char*
+	static std::string WideToUtf8(const wchar_t* wstr, size_t wlen)
+	{
+		if (!wstr || wlen == 0)
+			return std::string();
+
+		// Calculate required buffer size
+		int utf8Size = WideCharToMultiByte(CP_UTF8, 0, wstr, static_cast<int>(wlen), nullptr, 0, nullptr, nullptr);
+		if (utf8Size <= 0)
+			return std::string();
+
+		// Convert to UTF-8
+		std::string result(utf8Size, '\0');
+		WideCharToMultiByte(CP_UTF8, 0, wstr, static_cast<int>(wlen), &result[0], utf8Size, nullptr, nullptr);
+		return result;
+	}
+
+	// Helper function: Convert UTF-8 char* to wchar_t*
+	static std::wstring Utf8ToWide(const char* str, size_t len)
+	{
+		if (!str || len == 0)
+			return std::wstring();
+
+		// Calculate required buffer size
+		int wideSize = MultiByteToWideChar(CP_UTF8, 0, str, static_cast<int>(len), nullptr, 0);
+		if (wideSize <= 0)
+			return std::wstring();
+
+		// Convert to UTF-16
+		std::wstring result(wideSize, L'\0');
+		MultiByteToWideChar(CP_UTF8, 0, str, static_cast<int>(len), &result[0], wideSize);
+		return result;
+	}
 
 public:
 	const static jName Invalid;
@@ -24,6 +59,7 @@ public:
 		NameHash = InNameHash;
 		NameString = nullptr;
 		NameStringLength = 0;
+		NameStringW = nullptr;
 	}
 
 	FORCEINLINE explicit jName(const char* pName)
@@ -39,6 +75,21 @@ public:
 	FORCEINLINE explicit jName(const std::string& name)
 	{
 		Set(name.c_str(), name.length());
+	}
+
+	FORCEINLINE explicit jName(const wchar_t* pName)
+	{
+		SetFromWide(pName, wcslen(pName));
+	}
+
+	FORCEINLINE explicit jName(const wchar_t* pName, size_t wlen)
+	{
+		SetFromWide(pName, wlen);
+	}
+
+	FORCEINLINE explicit jName(const std::wstring& name)
+	{
+		SetFromWide(name.c_str(), name.length());
 	}
 
 	FORCEINLINE jName(const jName& name)
@@ -90,6 +141,17 @@ public:
 		check(0);
 	}
 
+	FORCEINLINE void SetFromWide(const wchar_t* pName, size_t wlen)
+	{
+		check(pName);
+
+		// Convert wchar_t* to UTF-8 char*
+		std::string utf8String = WideToUtf8(pName, wlen);
+
+		// Use the existing Set function with UTF-8 string
+		Set(utf8String.c_str(), utf8String.length());
+	}
+
 	FORCEINLINE operator uint32() const
 	{
 		check(NameHash != -1);
@@ -110,8 +172,8 @@ public:
 	}
 
 	FORCEINLINE bool IsValid() const { return NameHash != -1; }
-	FORCEINLINE const char* ToStr() const 
-	{ 
+	FORCEINLINE const char* ToStr() const
+	{
 		if (!IsValid())
 			return nullptr;
 
@@ -130,6 +192,46 @@ public:
 			return it_find->second->c_str();
 		}
 	}
+
+	FORCEINLINE const wchar_t* ToWStr() const
+	{
+		if (!IsValid())
+			return nullptr;
+
+		// Return cached wchar_t* if available
+		if (NameStringW)
+			return NameStringW;
+
+		// Get UTF-8 string first
+		const char* utf8Str = ToStr();
+		if (!utf8Str)
+			return nullptr;
+
+		// Convert to wchar_t* and cache in s_WideNameTable
+		{
+			jScopeWriteLock sw(&Lock);
+
+			// Check again after acquiring write lock
+			const auto it_find_wide = s_WideNameTable.find(NameHash);
+			if (it_find_wide != s_WideNameTable.end())
+			{
+				NameStringW = it_find_wide->second->c_str();
+				return NameStringW;
+			}
+
+			// Convert and store
+			std::wstring wideString = Utf8ToWide(utf8Str, NameStringLength > 0 ? NameStringLength : strlen(utf8Str));
+			const auto it_ret = s_WideNameTable.emplace(NameHash, std::make_shared<std::wstring>(wideString));
+			if (it_ret.second)
+			{
+				NameStringW = it_ret.first->second->c_str();
+				return NameStringW;
+			}
+		}
+
+		return nullptr;
+	}
+
 	FORCEINLINE const size_t GetStringLength() const
 	{
 		if (!IsValid())
@@ -162,6 +264,7 @@ private:
 
 	uint32 NameHash = -1;
 	mutable const char* NameString = nullptr;
+	mutable const wchar_t* NameStringW = nullptr;
 	mutable size_t NameStringLength = 0;
 };
 
@@ -190,6 +293,18 @@ struct jPriorityName : public jName
     {}
 
     FORCEINLINE explicit jPriorityName(const std::string& name, uint32 InPriority)
+        : jName(name), Priority(InPriority)
+    {}
+
+    FORCEINLINE explicit jPriorityName(const wchar_t* pName, uint32 InPriority)
+        : jName(pName), Priority(InPriority)
+    {}
+
+    FORCEINLINE explicit jPriorityName(const wchar_t* pName, size_t size, uint32 InPriority)
+        : jName(pName, size), Priority(InPriority)
+    {}
+
+    FORCEINLINE explicit jPriorityName(const std::wstring& name, uint32 InPriority)
         : jName(name), Priority(InPriority)
     {}
 

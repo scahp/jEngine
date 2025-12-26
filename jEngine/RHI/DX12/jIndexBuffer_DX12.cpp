@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jIndexBuffer_DX12.h"
 #include "../jRenderFrameContext.h"
 #include "jBufferUtil_DX12.h"
@@ -49,7 +49,7 @@ bool jIndexBuffer_DX12::Initialize(const std::shared_ptr<jIndexStreamData>& InSt
 
     // Create index buffer
     BufferPtr = g_rhi->CreateFormattedBuffer<jBuffer_DX12>(bufferSize, 0, GetDX12TextureFormat(IndexType), EBufferCreateFlag::UAV
-        , EResourceLayout::GENERAL, InStreamData->Param->GetBufferData(), bufferSize, TEXT("IndexBuffer"));
+        , EResourceLayout::GENERAL, InStreamData->Param->GetBufferData(), bufferSize, jNameStatic("IndexBuffer"));
 
     // Create Index buffer View
     IBView.BufferLocation = BufferPtr->GetGPUAddress();

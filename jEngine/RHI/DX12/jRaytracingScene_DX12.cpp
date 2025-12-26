@@ -83,7 +83,7 @@ void jRaytracingScene_DX12::CreateOrUpdateBLAS(const jRatracingInitializer& InIn
             VertexIndexOffset = Vector2i(ROE->SubMesh.StartVertex, ROE->SubMesh.StartFace);
         }
         RObj->VertexAndIndexOffsetBuffer = g_rhi->CreateStructuredBuffer<jBuffer_DX12>(sizeof(Vector2i), 0, sizeof(Vector2i), EBufferCreateFlag::UAV
-            , EResourceLayout::GENERAL, &VertexIndexOffset, sizeof(Vector2i), TEXT("VertexAndIndexOffsetBuffer"));
+            , EResourceLayout::GENERAL, &VertexIndexOffset, sizeof(Vector2i), jNameStatic("VertexAndIndexOffsetBuffer"));
 
         // Set GeometryDesc
         D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc{};
@@ -138,10 +138,10 @@ void jRaytracingScene_DX12::CreateOrUpdateBLAS(const jRatracingInitializer& InIn
             continue;
 
         RObj->BottomLevelASBuffer = g_rhi->CreateRawBuffer<jBuffer_DX12>(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, 0
-            , EBufferCreateFlag::UAV | EBufferCreateFlag::AccelerationStructure, EResourceLayout::ACCELERATION_STRUCTURE, nullptr, 0, TEXT("BottomLevelAccelerationStructure"));
+            , EBufferCreateFlag::UAV | EBufferCreateFlag::AccelerationStructure, EResourceLayout::ACCELERATION_STRUCTURE, nullptr, 0, jNameStatic("BottomLevelAccelerationStructure"));
 
         RObj->ScratchASBuffer = g_rhi->CreateRawBuffer<jBuffer_DX12>(bottomLevelPrebuildInfo.ScratchDataSizeInBytes, 0
-            , EBufferCreateFlag::UAV | EBufferCreateFlag::AccelerationStructureBuildInput, EResourceLayout::GENERAL, nullptr, 0, TEXT("ScratchResourceGeometry"));
+            , EBufferCreateFlag::UAV | EBufferCreateFlag::AccelerationStructureBuildInput, EResourceLayout::GENERAL, nullptr, 0, jNameStatic("ScratchResourceGeometry"));
 
         // Transit Vertex & Index Buffer to SHADER_READ_ONLY layout for BuildRaytracingAccelerationStructure
         for (const auto& VertexStream : VertexBufferDX12->Streams)
@@ -231,13 +231,13 @@ void jRaytracingScene_DX12::CreateOrUpdateTLAS(const jRatracingInitializer& InIn
     else
     {
         ScratchTLASBufferPtr = std::shared_ptr<jBuffer>(jBufferUtil_DX12::CreateBuffer(info.ScratchDataSizeInBytes, 0, EBufferCreateFlag::UAV, EResourceLayout::UNDEFINED
-            , nullptr, 0, TEXT("TLAS Scratch Buffer")));
+            , nullptr, 0, jNameStatic("TLAS Scratch Buffer")));
 
         TLASBufferPtr = std::shared_ptr<jBuffer>(jBufferUtil_DX12::CreateBuffer(info.ResultDataMaxSizeInBytes, 0, EBufferCreateFlag::UAV | EBufferCreateFlag::AccelerationStructure, EResourceLayout::ACCELERATION_STRUCTURE
-            , nullptr, 0, TEXT("TLAS Result Buffer")));
+            , nullptr, 0, jNameStatic("TLAS Result Buffer")));
 
         InstanceUploadBufferPtr = std::shared_ptr<jBuffer>(jBufferUtil_DX12::CreateBuffer(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * InstanceList.size(), 0
-            , EBufferCreateFlag::CPUAccess, EResourceLayout::READ_ONLY, nullptr, 0, TEXT("TLAS InstanceUploadBuffer")));
+            , EBufferCreateFlag::CPUAccess, EResourceLayout::READ_ONLY, nullptr, 0, jNameStatic("TLAS InstanceUploadBuffer")));
     }
 
     if (D3D12_RAYTRACING_INSTANCE_DESC* instanceDescs = (D3D12_RAYTRACING_INSTANCE_DESC*)InstanceUploadBufferPtr->Map())

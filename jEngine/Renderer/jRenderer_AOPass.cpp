@@ -1173,12 +1173,12 @@ void jRenderer::SSGIAccumulatePass()
             .SampleCount = EMSAASamples::COUNT_1,
             .RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
             .TextureCreateFlag = ETextureCreateFlag::UAV,
-            .ResourceName = L"SSGI_Accum_0"
+            .ResourceName = jNameStatic("SSGI_Accum_0")
         };
         jSceneRenderTarget::SSGI_Accum_RT[0] = g_rhi->CreateRenderTarget(Info);
-        Info.ResourceName = L"SSGI_Accum_1";
+        Info.ResourceName = jNameStatic("SSGI_Accum_1");
         jSceneRenderTarget::SSGI_Accum_RT[1] = g_rhi->CreateRenderTarget(Info);
-        Info.ResourceName = L"SSGI_Accum_2";
+        Info.ResourceName = jNameStatic("SSGI_Accum_2");
         jSceneRenderTarget::SSGI_Accum_RT[2] = g_rhi->CreateRenderTarget(Info);
     }
 

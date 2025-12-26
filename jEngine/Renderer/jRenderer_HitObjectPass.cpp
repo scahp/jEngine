@@ -57,7 +57,7 @@ void jRenderer::HitObjectPass()
 				.SampleCount = EMSAASamples::COUNT_1,
 				.RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 0.0f),
 				.TextureCreateFlag = ETextureCreateFlag::RTV,
-				.ResourceName = TEXT("HitObject_RT")
+				.ResourceName = jNameStatic("HitObject_RT")
 			};
 			jSceneRenderTarget::HitObject_RT = g_rhi->CreateRenderTarget(HitObjectRTInfo);
 		}
@@ -173,7 +173,7 @@ void jRenderer::ReadbackHitObject()
 			, EResourceLayout::TRANSFER_DST
 			, nullptr
 			, ReadbackBufferSize
-			, TEXT("HitObject_ReadbackBuffer"));
+			, jNameStatic("HitObject_ReadbackBuffer"));
 	}
 
 	jTextureCopyRegion copyRegion;

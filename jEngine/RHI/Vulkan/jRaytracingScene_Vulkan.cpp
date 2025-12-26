@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jRaytracingScene_Vulkan.h"
 #include "jVertexBuffer_Vulkan.h"
 #include "Scene/jRenderObject.h"
@@ -50,7 +50,7 @@ void jRaytracingScene_Vulkan::CreateOrUpdateBLAS(const jRatracingInitializer& In
         }
 
         RObj->VertexAndIndexOffsetBuffer = g_rhi->CreateStructuredBuffer(sizeof(Vector2i), 0, sizeof(Vector2i), EBufferCreateFlag::UAV | EBufferCreateFlag::CPUAccess
-            , EResourceLayout::GENERAL, &VertexIndexOffset, sizeof(Vector2i), TEXT("VertexAndIndexOffsetBuffer"));
+            , EResourceLayout::GENERAL, &VertexIndexOffset, sizeof(Vector2i), jNameStatic("VertexAndIndexOffsetBuffer"));
 
         // Set GeometryDesc
         VkAccelerationStructureGeometryKHR geometry{};

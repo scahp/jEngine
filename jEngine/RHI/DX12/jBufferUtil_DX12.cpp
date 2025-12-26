@@ -8,7 +8,7 @@ namespace jBufferUtil_DX12
 {
 
 std::shared_ptr<jCreatedResource> CreateBufferInternal(uint64 InSize, uint64 InAlignment, EBufferCreateFlag InBufferCreateFlag
-    , EResourceLayout InLayout, const wchar_t* InResourceName, jName InResourceName2)
+    , EResourceLayout InLayout, jName InResourceName)
 {
     D3D12_RESOURCE_STATES InLayout_DX12 = GetDX12ResourceLayout(InLayout);
     if (!!(InBufferCreateFlag & EBufferCreateFlag::AccelerationStructure))
@@ -76,50 +76,38 @@ std::shared_ptr<jCreatedResource> CreateBufferInternal(uint64 InSize, uint64 InA
         JFAIL(g_rhi_dx12->Device->CreateCommittedResource(&HeapProperties, D3D12_HEAP_FLAG_NONE
             , &resourceDesc, InLayout_DX12, nullptr, IID_PPV_ARGS(&NewResource)));
 
-        CreatedResource = jCreatedResource::CreatedFromStandalone(NewResource, InLayout, InResourceName2);
+        CreatedResource = jCreatedResource::CreatedFromStandalone(NewResource, InLayout, InResourceName);
     }
     else if (!!(InBufferCreateFlag & EBufferCreateFlag::CPUAccess))
     {
         check(EBufferCreateFlag::NONE == (InBufferCreateFlag & EBufferCreateFlag::UAV));        // Not allowed Readback with UAV
-        CreatedResource = g_rhi_dx12->CreateUploadResource(&resourceDesc, InLayout, InResourceName2);
+        CreatedResource = g_rhi_dx12->CreateUploadResource(&resourceDesc, InLayout, InResourceName);
     }
     else
     {
-        CreatedResource = g_rhi_dx12->CreateResource(&resourceDesc, InLayout, InResourceName2);
+        CreatedResource = g_rhi_dx12->CreateResource(&resourceDesc, InLayout, InResourceName);
     }
 
     ensure(CreatedResource->Resource);
 
-    if (InResourceName && CreatedResource->Resource)
-        CreatedResource->Resource->SetName(InResourceName);
+    if (InResourceName.IsValid() && CreatedResource->Resource)
+        CreatedResource->Resource->SetName(InResourceName.ToWStr());
 
     return CreatedResource;
 }
 
 std::shared_ptr<jBuffer_DX12> CreateBuffer(uint64 InSize, uint64 InAlignment, EBufferCreateFlag InBufferCreateFlag
-    , EResourceLayout InLayout, const void* InData, uint64 InDataSize, const wchar_t* InResourceName)
+    , EResourceLayout InLayout, const void* InData /*= nullptr*/, uint64 InDataSize /*= 0*/, jName InResourceName /*= jName()*/)
 {
     // If the resource needed to be created with EBufferCreateFlag::AccelerationStructure, you must initialize the buffer resource state as ACCELERATION_STRUCTURE state.
     check(InLayout != EResourceLayout::ACCELERATION_STRUCTURE || (InLayout == EResourceLayout::ACCELERATION_STRUCTURE && !!(InBufferCreateFlag & EBufferCreateFlag::AccelerationStructure)));
 
-    jName ResourceName;
-    if (InResourceName)
-    {
-        // https://learn.microsoft.com/ko-kr/cpp/text/how-to-convert-between-various-string-types?view=msvc-170#example-convert-from-char-
-        char szResourceName[1024];
-        size_t OutLength = 0;
-        size_t origsize = wcslen(InResourceName) + 1;
-        const size_t newsize = origsize * 2;
-        wcstombs_s(&OutLength, szResourceName, newsize, InResourceName, _TRUNCATE);
-        ResourceName = jName(szResourceName);
-    }
-
-    std::shared_ptr<jCreatedResource> BufferInternal = CreateBufferInternal(InSize, InAlignment, InBufferCreateFlag, InLayout, InResourceName, ResourceName);
+    std::shared_ptr<jCreatedResource> BufferInternal = CreateBufferInternal(InSize, InAlignment, InBufferCreateFlag, InLayout, InResourceName);
     if (!BufferInternal->Resource)
         return nullptr;
 
     auto BufferPtr = std::make_shared<jBuffer_DX12>(BufferInternal, InSize, InAlignment, InBufferCreateFlag);
-    BufferPtr->ResourceName = ResourceName;
+    BufferPtr->ResourceName = InResourceName;
 
     const bool HasInitialData = InData && (InDataSize > 0);
     if (HasInitialData)
@@ -174,7 +162,7 @@ std::shared_ptr<jBuffer_DX12> CreateBuffer(uint64 InSize, uint64 InAlignment, EB
 }
 
 std::shared_ptr<jCreatedResource> CreateTexturenternal(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, uint32 InNumOfSample
-    , D3D12_RESOURCE_DIMENSION InType, DXGI_FORMAT InFormat, ETextureCreateFlag InTextureCreateFlag, EResourceLayout InImageLayout, D3D12_CLEAR_VALUE* InClearValue, const wchar_t* InResourceName)
+    , D3D12_RESOURCE_DIMENSION InType, DXGI_FORMAT InFormat, ETextureCreateFlag InTextureCreateFlag, EResourceLayout InImageLayout, D3D12_CLEAR_VALUE* InClearValue, jName InResourceName)
 {
     check(g_rhi_dx12);
     check(g_rhi_dx12->Device);
@@ -211,33 +199,21 @@ std::shared_ptr<jCreatedResource> CreateTexturenternal(uint32 InWidth, uint32 In
     TexDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
     TexDesc.Alignment = 0;
 
-    jName ResourceName;
-    if (InResourceName)
-    {
-        // https://learn.microsoft.com/ko-kr/cpp/text/how-to-convert-between-various-string-types?view=msvc-170#example-convert-from-char-
-        char szResourceName[1024];
-        size_t OutLength = 0;
-        size_t origsize = wcslen(InResourceName) + 1;
-        const size_t newsize = origsize * 2;
-        wcstombs_s(&OutLength, szResourceName, newsize, InResourceName, _TRUNCATE);
-        ResourceName = jName(szResourceName);
-    }
-
-    std::shared_ptr<jCreatedResource> ImageResource = g_rhi_dx12->CreateResource(&TexDesc, InImageLayout, ResourceName, InClearValue);
+    std::shared_ptr<jCreatedResource> ImageResource = g_rhi_dx12->CreateResource(&TexDesc, InImageLayout, InResourceName, InClearValue);
     
     ensure(ImageResource->Resource);
 
-    if (InResourceName && ImageResource->Resource)
+    if (InResourceName.IsValid() && ImageResource->Resource)
     {
-        ImageResource->Resource->SetName(InResourceName);
-        ImageResource->ResourceName = ResourceName;
+        ImageResource->Resource->SetName(InResourceName.ToWStr());
+        ImageResource->ResourceName = InResourceName;
     }
 
     return ImageResource;
 }
 
 std::shared_ptr<jTexture_DX12> CreateTexture(uint32 InWidth, uint32 InHeight, uint32 InArrayLayers, uint32 InMipLevels, uint32 InNumOfSample
-    , ETextureType InType, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag, EResourceLayout InImageLayout, const jRTClearValue& InClearValue, const wchar_t* InResourceName)
+    , ETextureType InType, ETextureFormat InFormat, ETextureCreateFlag InTextureCreateFlag, EResourceLayout InImageLayout, const jRTClearValue& InClearValue, jName InResourceName)
 {
     bool HasClearValue = false;
     D3D12_CLEAR_VALUE ClearValue{};
@@ -268,18 +244,8 @@ std::shared_ptr<jTexture_DX12> CreateTexture(uint32 InWidth, uint32 InHeight, ui
         , EMSAASamples::COUNT_1, InMipLevels, false, InClearValue, TextureInternal);
     check(TexturePtr);
 
-    if (InResourceName)
-    {
-        // https://learn.microsoft.com/ko-kr/cpp/text/how-to-convert-between-various-string-types?view=msvc-170#example-convert-from-char-
-        char szResourceName[1024];
-        size_t OutLength = 0;
-        size_t origsize = wcslen(InResourceName) + 1;
-        const size_t newsize = origsize * 2;
-        wcstombs_s(&OutLength, szResourceName, newsize, InResourceName, _TRUNCATE);
-
-        TexturePtr->ResourceName = jName(szResourceName);
-        TextureInternal->ResourceName = TexturePtr->ResourceName;
-    }
+    TexturePtr->ResourceName = InResourceName;
+    TextureInternal->ResourceName = InResourceName;
 
     if (IsDepthFormat(InFormat))
     {
@@ -298,25 +264,12 @@ std::shared_ptr<jTexture_DX12> CreateTexture(uint32 InWidth, uint32 InHeight, ui
     return TexturePtr;
 }
 
-std::shared_ptr<jTexture_DX12> CreateTexture(const std::shared_ptr<jCreatedResource>& InTexture, ETextureCreateFlag InTextureCreateFlag, EResourceLayout InImageLayout, const jRTClearValue& InClearValue, const wchar_t* InResourceName)
+std::shared_ptr<jTexture_DX12> CreateTexture(const std::shared_ptr<jCreatedResource>& InTexture, ETextureCreateFlag InTextureCreateFlag, EResourceLayout InImageLayout, const jRTClearValue& InClearValue, jName InResourceName)
 {
     const auto desc = InTexture->Resource->GetDesc();
     auto TexturePtr = std::make_shared<jTexture_DX12>(GetDX12TextureDemension(desc.Dimension, desc.DepthOrArraySize > 1), GetDX12TextureFormat(desc.Format), (int32)desc.Width, (int32)desc.Height, (int32)desc.DepthOrArraySize
         , EMSAASamples::COUNT_1, (int32)desc.MipLevels, false, InClearValue, InTexture);
-
-    check(TexturePtr);
-
-    if (InResourceName)
-    {
-        // https://learn.microsoft.com/ko-kr/cpp/text/how-to-convert-between-various-string-types?view=msvc-170#example-convert-from-char-
-        char szResourceName[1024];
-        size_t OutLength = 0;
-        size_t origsize = wcslen(InResourceName) + 1;
-        const size_t newsize = origsize * 2;
-        wcstombs_s(&OutLength, szResourceName, newsize, InResourceName, _TRUNCATE);
-
-        TexturePtr->ResourceName = jName(szResourceName);
-    }
+    TexturePtr->ResourceName = InResourceName;
 
     if (IsDepthFormat(GetDX12TextureFormat(desc.Format)))
     {

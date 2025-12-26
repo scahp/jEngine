@@ -1003,7 +1003,7 @@ void jGame::SpawnIndirectDrawPrimitives()
 
 			check(!GeometryDataPtr->IndirectCommandBufferPtr);
 			GeometryDataPtr->IndirectCommandBufferPtr = g_rhi->CreateStructuredBuffer(bufferSize, 0, sizeof(VkDrawIndirectCommand), EBufferCreateFlag::IndirectCommand, EResourceLayout::TRANSFER_DST
-				, indrectCommands.data(), bufferSize, TEXT("IndirectBuffer"));
+				, indrectCommands.data(), bufferSize, jName(TEXT("IndirectBuffer")));
         }
 
         jObject::AddObject(obj);
