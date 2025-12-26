@@ -1,0 +1,51 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Source code - Windows line endings (CRLF)
+*.cpp text eol=crlf
+*.c text eol=crlf
+*.h text eol=crlf
+*.hpp text eol=crlf
+*.cc text eol=crlf
+
+# Shaders - Windows line endings
+*.hlsl text eol=crlf
+*.glsl text eol=crlf
+
+# Project files - Windows line endings
+*.vcxproj text eol=crlf
+*.sln text eol=crlf
+*.filters text eol=crlf
+*.props text eol=crlf
+
+# Configuration files - Windows line endings
+*.xml text eol=crlf
+*.json text eol=crlf
+*.md text eol=crlf
+*.txt text eol=crlf
+
+# Shell scripts - Unix line endings
+*.sh text eol=lf
+
+# Binary files - no conversion
+*.dll binary
+*.exe binary
+*.lib binary
+*.obj binary
+*.pdb binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.bmp binary
+*.dds binary
+*.tga binary
+*.hdr binary
+*.exr binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.fbx binary
+*.gltf binary
+*.glb binary
+*.bin binary

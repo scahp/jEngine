@@ -46,7 +46,7 @@ layout(location = 3) in vec3 inTangent;
 layout(location = 4) in vec2 inTexCoord;
 
 /*
-// dvec3 °°Àº 64ºñÆ® vectors Àº locationÀ» ÇÏ³ª ´õ »ç¿ëÇÒ ¼ö ÀÖÀ½.
+// dvec3 ê°™ì€ 64ë¹„íŠ¸ vectors ì€ locationì„ í•˜ë‚˜ ë” ì‚¬ìš©í•  ìˆ˜ ìˆìŒ.
 layout(location = 0) in dvec3 inPosition;   // dvec3 is 64 bit vector.
 layout(location = 2) in vec3 inColor;
 */

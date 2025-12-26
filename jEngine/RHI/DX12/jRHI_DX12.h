@@ -34,6 +34,14 @@ using namespace DirectX;
 static const uint32 cbvCountPerFrame = 3;
 static constexpr DXGI_FORMAT BackbufferFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 
+enum class EPlacedResourceType : uint8
+{
+    Buffers = 0,
+    RTDSTextures,
+    NonRTDSTextures,
+    MAX,
+};
+
 struct jPlacedResource
 {
     bool IsValid() const { return Size > 0 && PlacedSubResource.Get(); }
@@ -42,6 +50,7 @@ struct jPlacedResource
     size_t Size = 0;
 	bool IsUploadResource = false;
 	EResourceLayout LastLayout = EResourceLayout::UNDEFINED;
+    EPlacedResourceType ResourceType = EPlacedResourceType::MAX;
 };
 
 // Resource with Layout for pending deallocation
@@ -95,7 +104,7 @@ struct jPlacedResourcePool
 		100 * 1024 * 1024,      // E100M
     };
 
-    void Init();
+    void Init(EPlacedResourceType InPlacedResourceType);
     void Release();
 
     const jPlacedResource Alloc(size_t InRequestedSize, bool InIsUploadResource)
@@ -158,6 +167,9 @@ struct jPlacedResourcePool
     std::map<ID3D12Resource*, jPlacedResource> UsingPlacedResources;
     std::vector<jPlacedResource> PendingPlacedResources[(int32)EPoolSizeType::MAX];
     std::vector<jPlacedResource> PendingUploadPlacedResources[(int32)EPoolSizeType::MAX];
+
+    EPlacedResourceType PlacedResourceType = EPlacedResourceType::MAX;
+	jDeallocatorMultiFrameCreatedResource DeallocatorMultiFramePlacedResource;
 };
 
 class jRHI_DX12 : public jRHI
@@ -233,19 +245,22 @@ public:
 	static constexpr uint64 GPlacedResourceSizeThreshold = 512 * 512 * 4;
 	static constexpr bool GIsUsePlacedResource = true;
 
-	jPlacedResourcePool PlacedResourcePool;
+	jPlacedResourcePool PlacedResourcePool[(int32)EPlacedResourceType::MAX];
+	EPlacedResourceType GetPlacedResourceType(const D3D12_RESOURCE_DESC& InDesc) const;
 
 	template <typename T>
 	std::shared_ptr<jCreatedResource> CreateResource(T&& InDesc, EResourceLayout InLayout, D3D12_CLEAR_VALUE* InClearValue = nullptr)
 	{
 		check(Device);
 
+        const EPlacedResourceType PlacedResourceType = GetPlacedResourceType(*InDesc);
+
         const bool IsAvailablePlacedResource = InLayout != EResourceLayout::ACCELERATION_STRUCTURE;		// AS resource can not transition, so not used placed resource
 		if (GIsUsePlacedResource && IsAvailablePlacedResource)
 		{
 			const D3D12_RESOURCE_ALLOCATION_INFO info = Device->GetResourceAllocationInfo(0, 1, InDesc);
 
-			jPlacedResource ReusePlacedResource = PlacedResourcePool.Alloc(info.SizeInBytes, false);
+			jPlacedResource ReusePlacedResource = PlacedResourcePool[(int32)PlacedResourceType].Alloc(info.SizeInBytes, false);
 			if (ReusePlacedResource.IsValid())
 			{
 				return jCreatedResource::CreatedFromResourcePool(ReusePlacedResource);
@@ -271,7 +286,8 @@ public:
                     NewPlacedResource.PlacedSubResource = NewResource;
                     NewPlacedResource.Size = info.SizeInBytes;
 					NewPlacedResource.LastLayout = InLayout;
-                    PlacedResourcePool.AddUsingPlacedResource(NewPlacedResource);
+					NewPlacedResource.ResourceType = PlacedResourceType;
+                    PlacedResourcePool[(int32)PlacedResourceType].AddUsingPlacedResource(NewPlacedResource);
 
 					return jCreatedResource::CreatedFromResourcePool(NewPlacedResource);
 				}
@@ -290,12 +306,14 @@ public:
     {
         check(Device);
 
+        const EPlacedResourceType PlacedResourceType = GetPlacedResourceType(*InDesc);        
+
 		const bool IsAvailablePlacedResource = InLayout != EResourceLayout::ACCELERATION_STRUCTURE;		// AS resource can not transition, so not used placed resource
 		if (GIsUsePlacedResource && IsAvailablePlacedResource)
 		{
 			const D3D12_RESOURCE_ALLOCATION_INFO info = Device->GetResourceAllocationInfo(0, 1, InDesc);
 
-			jPlacedResource ReusePlacedUploadResource = PlacedResourcePool.Alloc(info.SizeInBytes, true);
+			jPlacedResource ReusePlacedUploadResource = PlacedResourcePool[(int32)PlacedResourceType].Alloc(info.SizeInBytes, true);
 			if (ReusePlacedUploadResource.IsValid())
 			{
 				return jCreatedResource::CreatedFromResourcePool(ReusePlacedUploadResource);
@@ -321,7 +339,8 @@ public:
 					NewPlacedResource.PlacedSubResource = NewResource;
 					NewPlacedResource.Size = info.SizeInBytes;
 					NewPlacedResource.LastLayout = InLayout;
-					PlacedResourcePool.AddUsingPlacedResource(NewPlacedResource);
+					NewPlacedResource.ResourceType = PlacedResourceType;
+					PlacedResourcePool[(int32)PlacedResourceType].AddUsingPlacedResource(NewPlacedResource);
 
 					return jCreatedResource::CreatedFromResourcePool(NewPlacedResource);
 				}
@@ -452,7 +471,7 @@ public:
 
 	jMutexLock MultiFrameShaderBindingInstanceLock;
 	jDeallocatorMultiFrameShaderBindingInstance DeallocatorMultiFrameShaderBindingInstance;
-	jDeallocatorMultiFrameCreatedResource DeallocatorMultiFramePlacedResource;
+	// jDeallocatorMultiFrameCreatedResource DeallocatorMultiFramePlacedResource[(int32)EPlacedResourceType::MAX];
 	jDeallocatorMultiFrameCreatedResource DeallocatorMultiFrameStandaloneResource;
 
 	virtual jRaytracingScene* CreateRaytracingScene() const;

@@ -20,9 +20,13 @@ void jCreatedResource::Free()
         else if (ResourceType == jCreatedResource::EType::ResourcePool)
         {
             if (g_rhi_dx12)
-                g_rhi_dx12->DeallocatorMultiFramePlacedResource.Free(
+            {
+                const EPlacedResourceType PlacedResourceType = g_rhi_dx12->GetPlacedResourceType(Resource->GetDesc());
+
+                g_rhi_dx12->PlacedResourcePool[(int32)PlacedResourceType].DeallocatorMultiFramePlacedResource.Free(
                     jPendingDeallocateResource(Resource, Layout)
                 );
+            }
         }
         else if (ResourceType == jCreatedResource::EType::Swapchain)
         {

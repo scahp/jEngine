@@ -27,7 +27,7 @@ void jFile::SearchFilesRecursive(std::vector<std::string>& OutFiles, const std::
 			// Remove Current and Parent directory
             if (strcmp(findFileData.cFileName, ".") != 0 && strcmp(findFileData.cFileName, "..") != 0)
             {
-                SearchFilesRecursive(OutFiles, InTargetDirectory + "\\" + findFileData.cFileName, extensions); // Àç±Í È£Ãâ
+                SearchFilesRecursive(OutFiles, InTargetDirectory + "\\" + findFileData.cFileName, extensions); // ìž¬ê·€ í˜¸ì¶œ
             }
         }
         else 

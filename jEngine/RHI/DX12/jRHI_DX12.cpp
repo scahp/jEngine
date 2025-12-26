@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jRHI_DX12.h"
 #include "jShaderCompiler_DX12.h"
 #include <iomanip>
@@ -404,7 +404,9 @@ bool jRHI_DX12::InitRHI()
         }
     }
 
-    PlacedResourcePool.Init();
+    for(int32 i=0;i<(int32)EPlacedResourceType::MAX;++i)
+        PlacedResourcePool[i].Init((EPlacedResourceType)i);
+
     DeallocatorMultiFrameStandaloneResource.FreeDelegate = [](jPendingDeallocateResource InData)
         {
             InData.Resource.Reset();
@@ -601,11 +603,13 @@ void jRHI_DX12::ReleaseRHI()
 	SamplerStatePool.ReleaseAll();
     
     DeallocatorMultiFrameStandaloneResource.Release();
-    DeallocatorMultiFramePlacedResource.Release();
     DeallocatorMultiFrameShaderBindingInstance.Release();
     PlacedResourceDefaultHeap.Reset();
     PlacedResourceUploadHeap.Reset();
-    PlacedResourcePool.Release();
+    for (int32 i = 0; i < (int32)EPlacedResourceType::MAX; ++i)
+    {
+        PlacedResourcePool[i].Release();
+    }
 
 	{
         jScopeWriteLock s(&ShaderBindingPoolLock);
@@ -681,6 +685,23 @@ void jRHI_DX12::CalculateFrameStats()
 		//////////////////////////////////////////////////////////////////////////
 
         SetWindowText(m_hWnd, windowText.str().c_str());
+    }
+}
+
+
+EPlacedResourceType jRHI_DX12::GetPlacedResourceType(const D3D12_RESOURCE_DESC& InDesc) const
+{
+    if (InDesc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
+    {
+        return EPlacedResourceType::Buffers;
+    }
+    else if (0 != (InDesc.Flags & (D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)))
+    {
+        return EPlacedResourceType::RTDSTextures;
+    }
+    else
+    {
+        return EPlacedResourceType::NonRTDSTextures;
     }
 }
 
@@ -1731,20 +1752,23 @@ bool jRHI_DX12::IsSupportVSync() const
 
 //////////////////////////////////////////////////////////////////////////
 // jPlacedResourcePool
-void jPlacedResourcePool::Init()
+void jPlacedResourcePool::Init(EPlacedResourceType InPlacedResourceType)
 {
     // The allocator should be able to allocate memory larger than the PlacedResourceSizeThreshold. 
     check(g_rhi_dx12->GPlacedResourceSizeThreshold <= MemorySize[(int32)EPoolSizeType::MAX - 1]);
 
+    PlacedResourceType = InPlacedResourceType;
+
     check(g_rhi_dx12);
-    g_rhi_dx12->DeallocatorMultiFramePlacedResource.FreeDelegate
+    DeallocatorMultiFramePlacedResource.FreeDelegate
         = std::bind(&jPlacedResourcePool::FreedFromPendingDelegateForCreatedResource, this, std::placeholders::_1);
 }
 
 void jPlacedResourcePool::Release()
 {
     check(g_rhi_dx12);
-    g_rhi_dx12->DeallocatorMultiFramePlacedResource.FreeDelegate = nullptr;
+    DeallocatorMultiFramePlacedResource.Release();
+    DeallocatorMultiFramePlacedResource.FreeDelegate = nullptr;
 
     for (int32 i = 0; i < (int32)EPoolSizeType::MAX; ++i)
     {
