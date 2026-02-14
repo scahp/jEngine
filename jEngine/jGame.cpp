@@ -586,7 +586,7 @@ void jGame::OnMouseButton()
 {
 #ifdef ENABLE_EDITOR_FEATURES
 	// Handle object picking on left mouse button click
-	if (g_Editor && g_MouseState[EMouseButtonType::LEFT])
+	if (g_Editor && g_Editor->Placement.EnablePlacementMode && g_MouseState[EMouseButtonType::LEFT].Clicked)
 	{
 		// Don't pick when manipulating Gizmo
 		if (ImGuizmo::IsUsing() || ImGuizmo::IsOver())
@@ -625,7 +625,7 @@ void jGame::OnMouseButton()
 
 void jGame::OnMouseMove(int32 xOffset, int32 yOffset)
 {
-	if (g_MouseState[EMouseButtonType::LEFT])
+	if (g_MouseState[EMouseButtonType::LEFT].Down)
 	{
 #ifdef ENABLE_EDITOR_FEATURES
 		// Don't rotate camera when manipulating Gizmo
@@ -1010,4 +1010,3 @@ void jGame::SpawnIndirectDrawPrimitives()
         SpawnedObjects.push_back(obj);
     }
 }
-

@@ -238,11 +238,18 @@ void IRenderer::UIPass()
 			}
 
 #ifdef ENABLE_EDITOR_FEATURES
+			if (g_Editor)
+			{
+				// Placement mode is active only while the Placement Tool tab is open.
+				g_Editor->Placement.EnablePlacementMode = false;
+			}
+
 			// Placement Tool Tab (Editor-only feature)
 			if (ImGui::BeginTabItem("Placement Tool"))
 			{
 				if (g_Editor)
 				{
+					g_Editor->Placement.EnablePlacementMode = true;
 					auto mainCamera = jCamera::GetMainCamera();
 					g_Editor->Placement.RenderUI(mainCamera);
 				}

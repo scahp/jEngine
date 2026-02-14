@@ -7,6 +7,8 @@
 #include "Profiler/jPerformanceProfile.h"
 #include "RHI/DX12/jRHI_DX12.h"
 #include "jCommandlineArgument.h"
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3native.h>
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
@@ -162,6 +164,7 @@ void char_callback(GLFWwindow* window, uint32 codepoint)
 void cursor_position_callback(GLFWwindow* window, double x, double y)
 {
 	ImGui_ImplGlfw_CursorPosCallback(window, x, y);
+	UpdateMousePosition((int32)x, (int32)y);
 
 	static double xOld = -1.0;
 	static double yOld = -1.0;
@@ -192,25 +195,38 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 	else
 		return;
 
-	bool buttonDown = false;
+	jMouseButtonState& buttonState = g_MouseState[buttonType];
+	const uint64 eventTimeMS = GetInputTimeMS();
+	double xpos = 0.0;
+	double ypos = 0.0;
+	glfwGetCursorPos(window, &xpos, &ypos);
+	UpdateMousePosition((int32)xpos, (int32)ypos);
 	if (GLFW_PRESS == action)
 	{
 		const bool IsCapturedButtonInputOnUI = ImGui::IsAnyItemHovered() || ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow);
+		buttonState.SetDownState(!IsCapturedButtonInputOnUI, g_MousePosX, g_MousePosY, eventTimeMS);
 		if (!IsCapturedButtonInputOnUI)
 		{
-			buttonDown = true;
+			HWND hwnd = glfwGetWin32Window(window);
+			if (hwnd)
+				SetCapture(hwnd);
 		}
 	}
 	else if (GLFW_RELEASE == action)
 	{
-		buttonDown = false;
+		buttonState.SetDownState(false, g_MousePosX, g_MousePosY, eventTimeMS);
+		const bool anyButtonDown =
+			g_MouseState[EMouseButtonType::LEFT].Down ||
+			g_MouseState[EMouseButtonType::MIDDLE].Down ||
+			g_MouseState[EMouseButtonType::RIGHT].Down;
+		if (!anyButtonDown)
+			ReleaseCapture();
 	}
 	else
 	{
 		return;
 	}
 
-	g_MouseState[buttonType] = buttonDown;
 	g_Engine->OnMouseButton();
 }
 
@@ -226,6 +242,12 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 void window_focus_callback(GLFWwindow* window, int focused)
 {
 	ImGui_ImplGlfw_WindowFocusCallback(window, focused);
+	if (!focused)
+	{
+		g_KeyState.clear();
+		ResetMouseAllState();
+		ReleaseCapture();
+	}
 }
 
 void window_size_callback(GLFWwindow* window, int width, int height)

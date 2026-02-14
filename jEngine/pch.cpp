@@ -1,8 +1,15 @@
 #include "pch.h"
 
 std::map<int, bool> g_KeyState;
-std::map<EMouseButtonType, bool> g_MouseState;
+std::map<EMouseButtonType, jMouseButtonState> g_MouseState;
 float g_timeDeltaSecond = 0.0f;
+int32 g_MousePosX = 0;
+int32 g_MousePosY = 0;
+uint64 g_MouseClickMaxDurationMS = 250;
+uint64 g_MouseLongPressMinDurationMS = 500;
+uint64 g_MouseDoubleClickMaxDurationMS = 350;
+int32 g_MouseDragThresholdPx = 4;
+int32 g_MouseDoubleClickMaxDistancePx = 6;
 
 #pragma comment(lib, "vulkan-1.lib")
 

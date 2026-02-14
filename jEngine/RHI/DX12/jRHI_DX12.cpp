@@ -95,6 +95,11 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
     case WM_RBUTTONDOWN:
     case WM_MBUTTONDOWN:
     {
+        const uint64 eventTimeMS = GetInputTimeMS();
+        const int32 mouseX = (int32)(short)LOWORD(lParam);
+        const int32 mouseY = (int32)(short)HIWORD(lParam);
+        UpdateMousePosition(mouseX, mouseY);
+
         EMouseButtonType buttonType;
         if (WM_RBUTTONDOWN == message)
             buttonType = EMouseButtonType::RIGHT;
@@ -105,13 +110,17 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         else
             return 0;
 
-        bool buttonDown = false;
+        jMouseButtonState& buttonState = g_MouseState[buttonType];
         const bool IsCapturedButtonInputOnUI = ImGui::IsAnyItemHovered() || ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow);
         if (!IsCapturedButtonInputOnUI)
         {
-            buttonDown = true;
+            buttonState.SetDownState(true, g_MousePosX, g_MousePosY, eventTimeMS);
+            SetCapture(hWnd);
         }
-        g_MouseState[buttonType] = buttonDown;
+        else
+        {
+            buttonState.SetDownState(false, g_MousePosX, g_MousePosY, eventTimeMS);
+        }
         g_Engine->OnMouseButton();
         
         return 0;
@@ -120,6 +129,11 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
     case WM_RBUTTONUP:
     case WM_MBUTTONUP:
     {
+        const uint64 eventTimeMS = GetInputTimeMS();
+        const int32 mouseX = (int32)(short)LOWORD(lParam);
+        const int32 mouseY = (int32)(short)HIWORD(lParam);
+        UpdateMousePosition(mouseX, mouseY);
+
         EMouseButtonType buttonType;
         if (WM_RBUTTONUP == message)
             buttonType = EMouseButtonType::RIGHT;
@@ -130,7 +144,13 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         else
             return 0;
 
-        g_MouseState[buttonType] = false;
+        g_MouseState[buttonType].SetDownState(false, g_MousePosX, g_MousePosY, eventTimeMS);
+        const bool anyButtonDown =
+            g_MouseState[EMouseButtonType::LEFT].Down ||
+            g_MouseState[EMouseButtonType::MIDDLE].Down ||
+            g_MouseState[EMouseButtonType::RIGHT].Down;
+        if (!anyButtonDown)
+            ReleaseCapture();
         g_Engine->OnMouseButton();
 
         return 0;
@@ -139,6 +159,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
     {
         const int32 x = ((int)(short)LOWORD(lParam));
         const int32 y = ((int)(short)HIWORD(lParam));
+        UpdateMousePosition(x, y);
 
         static int32 xOld = -1;
         static int32 yOld = -1;
@@ -160,7 +181,8 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
     {
         // 포커스를 잃은 경우 입력 상태를 모두 릴리즈 시킴.
         g_KeyState.clear();
-        g_MouseState.clear();
+        ResetMouseAllState();
+        ReleaseCapture();
         return 0;
     }
     case WM_SIZE:

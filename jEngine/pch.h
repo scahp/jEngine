@@ -121,9 +121,172 @@ enum class EMouseButtonType
 	MAX
 };
 
+extern uint64 g_MouseClickMaxDurationMS;
+extern uint64 g_MouseLongPressMinDurationMS;
+extern uint64 g_MouseDoubleClickMaxDurationMS;
+extern int32 g_MouseDragThresholdPx;
+extern int32 g_MouseDoubleClickMaxDistancePx;
+
+struct jMouseButtonState
+{
+	bool Down = false;
+	bool Up = true;
+
+	// One-frame event flags
+	bool PressedThisFrame = false;		// !Down -> Down edge
+	bool ReleasedThisFrame = false;		// Down -> !Down edge
+	bool Clicked = false;				// ReleasedThisFrame && short click && !Dragged
+	bool DoubleClicked = false;			// Clicked and within double-click threshold
+	bool DragStartedThisFrame = false;	// Drag threshold crossed this frame
+	bool DragEndedThisFrame = false;	// Released after drag
+	bool LongPressedThisFrame = false;	// Released and press duration >= long-press threshold
+
+	// Continuous state
+	bool Dragged = false;
+	int32 PressedX = 0;					// Mouse position at button down
+	int32 PressedY = 0;
+	uint64 PressedTimeMS = 0;			// Timestamp at button down
+
+	// Double click tracking
+	bool HasLastClick = false;
+	int32 LastClickX = 0;
+	int32 LastClickY = 0;
+	uint64 LastClickTimeMS = 0;
+
+	FORCEINLINE void ResetFrameEvents()
+	{
+		PressedThisFrame = false;
+		ReleasedThisFrame = false;
+		Clicked = false;
+		DoubleClicked = false;
+		DragStartedThisFrame = false;
+		DragEndedThisFrame = false;
+		LongPressedThisFrame = false;
+	}
+
+	FORCEINLINE void ResetAll()
+	{
+		*this = jMouseButtonState();
+	}
+
+	void SetDownState(bool InDown, int32 InMouseX, int32 InMouseY, uint64 InEventTimeMS)
+	{
+		if (InDown)
+		{
+			if (!Down)
+			{
+				PressedX = InMouseX;
+				PressedY = InMouseY;
+				PressedTimeMS = InEventTimeMS;
+				PressedThisFrame = true;
+				Dragged = false;
+			}
+			Down = true;
+			Up = false;
+		}
+		else
+		{
+			if (Down)
+			{
+				ReleasedThisFrame = true;
+				DragEndedThisFrame = Dragged;
+
+				const uint64 PressDurationMS = (InEventTimeMS >= PressedTimeMS) ? (InEventTimeMS - PressedTimeMS) : 0;
+				const bool IsShortClick = (!Dragged && (PressDurationMS <= g_MouseClickMaxDurationMS));
+
+				Clicked = IsShortClick;
+				LongPressedThisFrame = (!Dragged && (PressDurationMS >= g_MouseLongPressMinDurationMS));
+
+				if (Clicked)
+				{
+					if (HasLastClick)
+					{
+						const uint64 ClickDeltaMS = (InEventTimeMS >= LastClickTimeMS) ? (InEventTimeMS - LastClickTimeMS) : std::numeric_limits<uint64>::max();
+						const int32 dx = InMouseX - LastClickX;
+						const int32 dy = InMouseY - LastClickY;
+						const int32 DistanceSq = dx * dx + dy * dy;
+						const int32 MaxDistanceSq = g_MouseDoubleClickMaxDistancePx * g_MouseDoubleClickMaxDistancePx;
+						DoubleClicked = (ClickDeltaMS <= g_MouseDoubleClickMaxDurationMS) && (DistanceSq <= MaxDistanceSq);
+					}
+
+					LastClickX = InMouseX;
+					LastClickY = InMouseY;
+					LastClickTimeMS = InEventTimeMS;
+					HasLastClick = true;
+				}
+			}
+
+			Down = false;
+			Up = true;
+			Dragged = false;
+		}
+	}
+
+	void UpdateDragState(int32 InMouseX, int32 InMouseY)
+	{
+		if (!Down || Dragged)
+			return;
+
+		const int32 dx = InMouseX - PressedX;
+		const int32 dy = InMouseY - PressedY;
+		const int32 distanceSq = dx * dx + dy * dy;
+		const int32 DragThresholdSq = g_MouseDragThresholdPx * g_MouseDragThresholdPx;
+		if (distanceSq >= DragThresholdSq)
+		{
+			Dragged = true;
+			DragStartedThisFrame = true;
+		}
+	}
+};
+
 extern std::map<int, bool> g_KeyState;
-extern std::map<EMouseButtonType, bool> g_MouseState;
+extern std::map<EMouseButtonType, jMouseButtonState> g_MouseState;
 extern float g_timeDeltaSecond;
+extern int32 g_MousePosX;
+extern int32 g_MousePosY;
+
+FORCEINLINE uint64 GetInputTimeMS()
+{
+	const auto now = std::chrono::steady_clock::now().time_since_epoch();
+	return (uint64)std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
+}
+
+FORCEINLINE void EnsureMouseButtonsInitialized()
+{
+	for (int32 i = 0; i < (int32)EMouseButtonType::MAX; ++i)
+	{
+		(void)g_MouseState[(EMouseButtonType)i];
+	}
+}
+
+FORCEINLINE void ResetMouseClickedState()
+{
+	EnsureMouseButtonsInitialized();
+	for (auto& iter : g_MouseState)
+	{
+		iter.second.ResetFrameEvents();
+	}
+}
+
+FORCEINLINE void ResetMouseAllState()
+{
+	EnsureMouseButtonsInitialized();
+	for (auto& iter : g_MouseState)
+	{
+		iter.second.ResetAll();
+	}
+}
+
+FORCEINLINE void UpdateMousePosition(int32 InMouseX, int32 InMouseY)
+{
+	EnsureMouseButtonsInitialized();
+	g_MousePosX = InMouseX;
+	g_MousePosY = InMouseY;
+	for (auto& iter : g_MouseState)
+	{
+		iter.second.UpdateDragState(InMouseX, InMouseY);
+	}
+}
 
 #define TRUE_PER_MS(WaitMS)\
 [waitMS = WaitMS]() -> bool\

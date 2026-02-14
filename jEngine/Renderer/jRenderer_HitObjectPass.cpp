@@ -21,15 +21,28 @@ void jRenderer::RequestObjectPick(int32 mouseX, int32 mouseY)
 
 void jRenderer::HitObjectPass()
 {
-	// Check for pick requests from PlacementTool
+	// HitObject picking is editor-only and should run only in Placement Mode.
 #ifdef ENABLE_EDITOR_FEATURES
-	if (g_Editor && g_Editor->Placement.bPickRequested)
+	if (!g_Editor || !g_Editor->Placement.EnablePlacementMode)
+	{
+		bObjectPickRequested = false;
+		if (g_Editor)
+		{
+			g_Editor->Placement.bPickRequested = false;
+		}
+		return;
+	}
+
+	// Check for pick requests from PlacementTool
+	if (g_Editor->Placement.bPickRequested)
 	{
 		bObjectPickRequested = true;
 		PickMouseX = g_Editor->Placement.PickMouseX;
 		PickMouseY = g_Editor->Placement.PickMouseY;
 		g_Editor->Placement.bPickRequested = false;  // Consume the request
 	}
+#else
+	return;
 #endif
 
 	if (!bObjectPickRequested)

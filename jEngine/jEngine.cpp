@@ -123,4 +123,5 @@ void jEngine::EndOfFrame()
 {
 	jPerformanceProfile::GetInstance().Update(g_timeDeltaSecond);
 	jRenderTargetPool::ReturnAllOneFrameRTs();
+	ResetMouseClickedState();
 }
