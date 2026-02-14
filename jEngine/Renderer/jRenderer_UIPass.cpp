@@ -10,6 +10,7 @@
 #include "Scene/jObject.h"
 #include "jEngine.h"
 #include "Code/Engine/ConsoleVariables/jConsole.h"
+#include <filesystem>
 
 #ifdef ENABLE_EDITOR_FEATURES
 #include "Code/Engine/jEditor.h"
@@ -18,6 +19,56 @@
 // Helper functions for Copy/Paste context menus
 namespace
 {
+	bool LaunchTracyProfiler(std::string& OutResolvedPath, std::string& OutLaunchArgs, std::string& OutError)
+	{
+#if defined(_WIN32)
+		namespace fs = std::filesystem;
+
+		char modulePath[MAX_PATH] = {};
+		const DWORD modulePathLen = GetModuleFileNameA(nullptr, modulePath, (DWORD)_countof(modulePath));
+		if (modulePathLen == 0)
+		{
+			OutError = "Failed to get module path.";
+			return false;
+		}
+
+		fs::path exeDir = fs::path(modulePath).parent_path();
+		std::vector<fs::path> candidates;
+		candidates.emplace_back(exeDir / ".." / ".." / "External" / "tracy" / "profiler" / "build_vs2022" / "Release" / "tracy-profiler.exe");
+		candidates.emplace_back(exeDir / ".." / ".." / ".." / "External" / "tracy" / "profiler" / "build_vs2022" / "Release" / "tracy-profiler.exe");
+		candidates.emplace_back(fs::current_path() / "External" / "tracy" / "profiler" / "build_vs2022" / "Release" / "tracy-profiler.exe");
+
+		for (const fs::path& candidate : candidates)
+		{
+			std::error_code ec;
+			const fs::path normalized = fs::weakly_canonical(candidate, ec);
+			const fs::path finalPath = ec ? candidate : normalized;
+
+			if (!fs::exists(finalPath))
+				continue;
+
+			OutResolvedPath = finalPath.string();
+			// Tracy profiler supports immediate connect via command line: -a <address> [-p <port>]
+			OutLaunchArgs = "-a 127.0.0.1 -p 8086";
+			HINSTANCE result = ShellExecuteA(nullptr, "open", OutResolvedPath.c_str(), OutLaunchArgs.c_str(), finalPath.parent_path().string().c_str(), SW_SHOWNORMAL);
+			if ((INT_PTR)result <= 32)
+			{
+				OutError = "Failed to launch tracy-profiler.exe.";
+				return false;
+			}
+			return true;
+		}
+
+		OutError = "tracy-profiler.exe not found in relative candidate paths.";
+		return false;
+#else
+		OutResolvedPath.clear();
+		OutLaunchArgs.clear();
+		OutError = "Trace connect launch is only supported on Windows.";
+		return false;
+#endif
+	}
+
 	// Usage: AddCopyPasteContextMenu("UniqueID", variableName);
 	// Call this right after ImGui::SliderFloat() or similar UI elements
 
@@ -367,6 +418,78 @@ void IRenderer::UIPass()
                 }
                 ImGui::EndTabItem();
             }
+
+			if (ImGui::BeginTabItem("Profiler"))
+			{
+				static std::string sTraceConnectMessage;
+				static std::string sTraceConnectPath;
+
+				ImGui::TextColored(ImVec4(1, 1, 0, 1), "Build-time (Read-only)");
+
+				const char* backendName = "Legacy";
+#if JPROFILE_BACKEND == JPROFILE_BACKEND_TRACY
+				backendName = "Tracy";
+#elif JPROFILE_BACKEND == JPROFILE_BACKEND_OPTICK
+				backendName = "Optick";
+#endif
+				ImGui::Text("Backend : %s", backendName);
+
+				bool externalCpuAvailable = (JPROFILE_EXTERNAL_CPU_AVAILABLE != 0);
+				ImGui::BeginDisabled(true);
+				ImGui::Checkbox("External CPU Profiler Available", &externalCpuAvailable);
+				bool localCpuWithExternal = (ENABLE_LOCAL_CPU_PROFILE_WITH_EXTERNAL != 0);
+				ImGui::Checkbox("Local CPU Profile With External", &localCpuWithExternal);
+				ImGui::EndDisabled();
+
+#if JPROFILE_BACKEND == JPROFILE_BACKEND_TRACY && JPROFILE_EXTERNAL_CPU_AVAILABLE
+				bool tracyConnected = TracyIsConnected;
+				ImGui::BeginDisabled(true);
+				ImGui::Checkbox("Tracy Connected", &tracyConnected);
+				ImGui::EndDisabled();
+
+				if (ImGui::Button("Trace Connect"))
+				{
+					std::string resolvedPath;
+					std::string launchArgs;
+					std::string error;
+					if (LaunchTracyProfiler(resolvedPath, launchArgs, error))
+					{
+						sTraceConnectPath = resolvedPath;
+						sTraceConnectMessage = "tracy-profiler.exe launched and auto-connect requested.";
+						if (!launchArgs.empty())
+							sTraceConnectPath += " " + launchArgs;
+					}
+					else
+					{
+						sTraceConnectMessage = error;
+					}
+				}
+				if (!sTraceConnectMessage.empty())
+					ImGui::TextWrapped("%s", sTraceConnectMessage.c_str());
+				if (!sTraceConnectPath.empty())
+					ImGui::TextWrapped("Path: %s", sTraceConnectPath.c_str());
+#endif
+
+				ImGui::Separator();
+				ImGui::TextColored(ImVec4(1, 1, 0, 1), "Runtime Options");
+
+				ImGui::Checkbox("EnableAppInfo", &g_jProfileRuntimeOptions.EnableAppInfo);
+				ImGui::Checkbox("EnableMessages", &g_jProfileRuntimeOptions.EnableMessages);
+				ImGui::Checkbox("EnablePlots", &g_jProfileRuntimeOptions.EnablePlots);
+				ImGui::BeginDisabled(true);
+				ImGui::Checkbox("Memory Tracking (Restart)", &g_jProfileRuntimeOptions.EnableMemoryTracking);
+				ImGui::EndDisabled();
+
+				ImGui::Separator();
+				ImGui::Text("Frame Image");
+				ImGui::Checkbox("Enable", &g_jProfileRuntimeOptions.EnableFrameImage);
+				ImGui::SliderInt("Capture Interval", &g_jProfileRuntimeOptions.FrameImageCaptureInterval, 1, 240);
+				ImGui::SliderInt("Max Width", &g_jProfileRuntimeOptions.FrameImageCaptureMaxWidth, 64, 1920);
+				ImGui::SliderInt("Source Frame Lag", &g_jProfileRuntimeOptions.FrameImageSourceFrameLag, 0, 16);
+				ImGui::Checkbox("Skip If Source Not Ready", &g_jProfileRuntimeOptions.FrameImageSkipIfSourceNotReady);
+
+				ImGui::EndTabItem();
+			}
 
 			if (GSupportRaytracing)
 			{

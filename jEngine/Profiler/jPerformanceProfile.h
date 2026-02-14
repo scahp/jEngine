@@ -1,9 +1,13 @@
-﻿#pragma once
+#pragma once
 #include <sysinfoapi.h>
+#include "Profiler/jProfilerBackend.h"
 
 #define ENABLE_PROFILE 1
 #define ENABLE_PROFILE_CPU (ENABLE_PROFILE && 1)
 #define ENABLE_PROFILE_GPU (ENABLE_PROFILE && 1)
+// When using external CPU profiler (e.g., Tracy), keep local CPU profile data for ImGui view.
+// Set to 0 to avoid duplicate CPU profiling cost.
+#define ENABLE_LOCAL_CPU_PROFILE_WITH_EXTERNAL 1
 
 static constexpr int32 MaxProfileFrame = 10;
 
@@ -92,8 +96,24 @@ public:
 };
 
 #if ENABLE_PROFILE_CPU
-#define SCOPE_CPU_PROFILE(Name) jScopedProfile_CPU Name##ScopedProfileCPU(jNameStatic(#Name));
-#define SCOPE_CPU_PROFILE_NAME(Name) jScopedProfile_CPU Name##ScopedProfileCPU(Name);
+	#if JPROFILE_USE_EXTERNAL_CPU
+		#define JPROFILE_CPU_PROFILE_CONCAT_IMPL(A, B) A##B
+		#define JPROFILE_CPU_PROFILE_CONCAT(A, B) JPROFILE_CPU_PROFILE_CONCAT_IMPL(A, B)
+		#if ENABLE_LOCAL_CPU_PROFILE_WITH_EXTERNAL
+			#define SCOPE_CPU_PROFILE(Name) \
+				JPROFILE_EXTERNAL_CPU_SCOPE_LITERAL(#Name); \
+				jScopedProfile_CPU JPROFILE_CPU_PROFILE_CONCAT(Name##ScopedProfileCPU_, __COUNTER__)(jNameStatic(#Name))
+			#define SCOPE_CPU_PROFILE_NAME(Name) \
+				JPROFILE_EXTERNAL_CPU_SCOPE_DYNAMIC_CSTR((Name).ToStr()); \
+				jScopedProfile_CPU JPROFILE_CPU_PROFILE_CONCAT(ScopedProfileCPU_, __COUNTER__)(Name)
+		#else
+			#define SCOPE_CPU_PROFILE(Name) JPROFILE_EXTERNAL_CPU_SCOPE_LITERAL(#Name)
+			#define SCOPE_CPU_PROFILE_NAME(Name) JPROFILE_EXTERNAL_CPU_SCOPE_DYNAMIC_CSTR((Name).ToStr())
+		#endif
+	#else
+		#define SCOPE_CPU_PROFILE(Name) jScopedProfile_CPU Name##ScopedProfileCPU(jNameStatic(#Name));
+		#define SCOPE_CPU_PROFILE_NAME(Name) jScopedProfile_CPU Name##ScopedProfileCPU(Name);
+	#endif
 #else
 #define SCOPE_CPU_PROFILE(Name)
 #define SCOPE_CPU_PROFILE_NAME(Name) 
@@ -217,6 +237,8 @@ public:
 	{
 		Profile.Name = jGPUPriorityName(name, s_priority.fetch_add(1), InRenderFrameContext->GetActiveCommandBuffer()->Type);
         Profile.Indent = ScopedProfilerGPUIndent.fetch_add(1);
+
+		ExternalGPUProfileScope = jProfileGPUZoneBegin(InRenderFrameContext, name.ToStr());
         
 		Profile.Query = jQueryTimePool::GetQueryTime(InRenderFrameContext->GetActiveCommandBuffer()->Type);
 		Profile.Query->BeginQuery(InRenderFrameContext->GetActiveCommandBuffer());
@@ -226,11 +248,13 @@ public:
 	{
 		Profile.Query->EndQuery(RenderFrameContextPtr.lock()->GetActiveCommandBuffer());
 		jProfile_GPU::WatingResultList[jProfile_GPU::CurrentWatingResultListIndex].emplace_back(Profile);
+		jProfileGPUZoneEnd(ExternalGPUProfileScope);
 		ScopedProfilerGPUIndent.fetch_add(-1);
 	}
 
 	std::weak_ptr<jRenderFrameContext> RenderFrameContextPtr;
 	jProfile_GPU Profile;
+	void* ExternalGPUProfileScope = nullptr;
 };
 
 #if ENABLE_PROFILE_GPU

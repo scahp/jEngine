@@ -218,6 +218,12 @@ ClientBin/
 *.dbproj.schemaview
 *.jfm
 *.pfx
+
+# Tracy generated build files (machine-local absolute paths inside generated vcxproj)
+jEngine/External/tracy/profiler/build_vs2022/
+!jEngine/External/tracy/profiler/build_vs2022/
+!jEngine/External/tracy/profiler/build_vs2022/Release/
+!jEngine/External/tracy/profiler/build_vs2022/Release/tracy-profiler.exe
 *.publishsettings
 orleans.codegen.cs
 

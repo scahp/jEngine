@@ -509,6 +509,7 @@ bool jRHI_Vulkan::InitRHI()
 	ComputeCommandBufferManager->CreatePool(ComputeQueue.QueueIndex);
 	CopyCommandBufferManager = new jCommandBufferManager_Vulkan(ECommandBufferType::COPY);
 	CopyCommandBufferManager->CreatePool(CopyQueue.QueueIndex);
+	jProfileGPUInitializeForRHI();
 
     // Pipeline cache
     VkPipelineCacheCreateInfo pipelineCacheCreateInfo = {};
@@ -592,6 +593,7 @@ bool jRHI_Vulkan::InitRHI()
 void jRHI_Vulkan::ReleaseRHI()
 {
 	Flush();
+	jProfileGPUShutdownForRHI();
 
 	jRHI::ReleaseRHI();
 
@@ -710,6 +712,7 @@ void jRHI_Vulkan::CleanupSwapChain()
 void jRHI_Vulkan::RecreateSwapChain()
 {
 	Flush();
+	jProfileMessage("Vulkan: RecreateSwapChain.");
 
 	int32 width = 0, height = 0;
     glfwGetFramebufferSize(Window, &width, &height);
@@ -1612,6 +1615,7 @@ std::shared_ptr<jRenderFrameContext> jRHI_Vulkan::BeginRenderFrame()
 	renderFrameContextPtr->SceneRenderTargetPtr = std::make_shared<jSceneRenderTarget>();
 	renderFrameContextPtr->SceneRenderTargetPtr->Create(Swapchain->GetSwapchainImage(CurrentFrameIndex), &jLight::GetLights());
 	renderFrameContextPtr->CurrentWaitSemaphore = Swapchain->Images[CurrentFrameIndex]->Available;
+	jProfileGPUBeginFrame(renderFrameContextPtr);
 
 	return renderFrameContextPtr;
 }
@@ -1658,6 +1662,7 @@ void jRHI_Vulkan::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& ren
  //   }
 
 	VkSemaphore signalSemaphore[] = { (VkSemaphore)Swapchain->Images[CurrentFrameIndex]->RenderFinished->GetHandle() };
+	jProfileGPUEndFrame(renderFrameContextPtr);
 	QueueSubmit(renderFrameContextPtr, Swapchain->Images[CurrentFrameIndex]->RenderFinished);
     
 	VkPresentInfoKHR presentInfo = {};

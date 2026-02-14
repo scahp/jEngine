@@ -121,6 +121,7 @@ void jEngine::OnMouseMove(int32 xOffset, int32 yOffset)
 
 void jEngine::EndOfFrame()
 {
+	jProfileFrameMark();
 	jPerformanceProfile::GetInstance().Update(g_timeDeltaSecond);
 	jRenderTargetPool::ReturnAllOneFrameRTs();
 	ResetMouseClickedState();

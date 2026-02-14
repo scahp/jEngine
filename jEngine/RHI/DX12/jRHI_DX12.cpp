@@ -476,6 +476,8 @@ bool jRHI_DX12::InitRHI()
     CopyCommandBufferManager = new jCommandBufferManager_DX12(ECommandBufferType::COPY);
     CopyCommandBufferManager->Initialize(Device);
 
+    jProfileGPUInitializeForRHI();
+
     // 4. Heap	
     RTVDescriptorHeaps.Initialize(EDescriptorHeapTypeDX12::RTV);
     DSVDescriptorHeaps.Initialize(EDescriptorHeapTypeDX12::DSV);
@@ -562,6 +564,8 @@ bool jRHI_DX12::InitRHI()
 void jRHI_DX12::ReleaseRHI()
 {
 	WaitForGPU();
+
+    jProfileGPUShutdownForRHI();
     
     jRHI::ReleaseRHI();
 
@@ -750,6 +754,7 @@ bool jRHI_DX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimi
     }
 
     WaitForGPU();
+    jProfileMessage("DX12: Swapchain resize.");
 
     Swapchain->Resize(InWidth, InHeight);
     CurrentFrameIndex = Swapchain->GetCurrentBackBufferIndex();
@@ -1062,6 +1067,7 @@ std::shared_ptr<jRenderFrameContext> jRHI_DX12::BeginRenderFrame()
     renderFrameContextPtr->FrameIndex = CurrentFrameIndex;
     renderFrameContextPtr->SceneRenderTargetPtr = std::make_shared<jSceneRenderTarget>();
     renderFrameContextPtr->SceneRenderTargetPtr->Create(CurrentSwapchainImage, &jLight::GetLights());
+	jProfileGPUBeginFrame(renderFrameContextPtr);
 
 	return renderFrameContextPtr;
 }
@@ -1091,6 +1097,7 @@ void jRHI_DX12::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& InRen
 	}
 
     ensure(hr == S_OK || hr == DXGI_STATUS_OCCLUDED || hr == DXGI_STATUS_CLIPPED);
+	jProfileGPUEndFrame(InRenderFrameContextPtr);
 
 	// CurrentFrameIndex = (CurrentFrameIndex + 1) % Swapchain->Images.size();
     CurrentFrameIndex = Swapchain->GetCurrentBackBufferIndex();

@@ -7,6 +7,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "jEngine", "jEngine.vcxproj"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MathBench", "MathBench.vcxproj", "{8A7F0F38-E6F1-447F-9F3F-6DB7D68FE6F9}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "tracy-profiler", "TracyProfiler.vcxproj", "{A4B489DF-0CCC-3035-ABD1-CF92C4FFFC2B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -21,6 +23,10 @@ Global
 		{8A7F0F38-E6F1-447F-9F3F-6DB7D68FE6F9}.Debug|x64.Build.0 = Debug|x64
 		{8A7F0F38-E6F1-447F-9F3F-6DB7D68FE6F9}.Release|x64.ActiveCfg = Release|x64
 		{8A7F0F38-E6F1-447F-9F3F-6DB7D68FE6F9}.Release|x64.Build.0 = Release|x64
+		{A4B489DF-0CCC-3035-ABD1-CF92C4FFFC2B}.Debug|x64.ActiveCfg = Debug|x64
+		{A4B489DF-0CCC-3035-ABD1-CF92C4FFFC2B}.Debug|x64.Build.0 = Debug|x64
+		{A4B489DF-0CCC-3035-ABD1-CF92C4FFFC2B}.Release|x64.ActiveCfg = Release|x64
+		{A4B489DF-0CCC-3035-ABD1-CF92C4FFFC2B}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
