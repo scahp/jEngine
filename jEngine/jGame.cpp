@@ -61,18 +61,18 @@ void jGame::ProcessInput(float deltaTime)
 	const float CurrentDistance = MoveDistancePerSecond * deltaTime;
 
 	// Process Key Event
-	if (g_KeyState['a'] || g_KeyState['A']) MainCamera->MoveShift(-CurrentDistance);
-	if (g_KeyState['d'] || g_KeyState['D']) MainCamera->MoveShift(CurrentDistance);
+	if (IsKeyDown(EInputKey::A)) MainCamera->MoveShift(-CurrentDistance);
+	if (IsKeyDown(EInputKey::D)) MainCamera->MoveShift(CurrentDistance);
 	//if (g_KeyState['1']) MainCamera->RotateForwardAxis(-0.1f);
 	//if (g_KeyState['2']) MainCamera->RotateForwardAxis(0.1f);
 	//if (g_KeyState['3']) MainCamera->RotateUpAxis(-0.1f);
 	//if (g_KeyState['4']) MainCamera->RotateUpAxis(0.1f);
 	//if (g_KeyState['5']) MainCamera->RotateRightAxis(-0.1f);
 	//if (g_KeyState['6']) MainCamera->RotateRightAxis(0.1f);
-	if (g_KeyState['w'] || g_KeyState['W']) MainCamera->MoveForward(CurrentDistance);
-	if (g_KeyState['s'] || g_KeyState['S']) MainCamera->MoveForward(-CurrentDistance);
-	if (g_KeyState['+']) MoveDistancePerSecond = Max(MoveDistancePerSecond + 10.0f, 0.0f);
-	if (g_KeyState['-']) MoveDistancePerSecond = Max(MoveDistancePerSecond - 10.0f, 0.0f);
+	if (IsKeyDown(EInputKey::W)) MainCamera->MoveForward(CurrentDistance);
+	if (IsKeyDown(EInputKey::S)) MainCamera->MoveForward(-CurrentDistance);
+	if (IsKeyDown(EInputKey::PLUS)) MoveDistancePerSecond = Max(MoveDistancePerSecond + 10.0f, 0.0f);
+	if (IsKeyDown(EInputKey::MINUS)) MoveDistancePerSecond = Max(MoveDistancePerSecond - 10.0f, 0.0f);
 
 #ifdef ENABLE_EDITOR_FEATURES
 	// Editor-specific input handling (e.g., Placement Tool)
@@ -586,7 +586,7 @@ void jGame::OnMouseButton()
 {
 #ifdef ENABLE_EDITOR_FEATURES
 	// Handle object picking on left mouse button click
-	if (g_Editor && g_Editor->Placement.EnablePlacementMode && g_MouseState[EMouseButtonType::LEFT].Clicked)
+	if (g_Editor && g_Editor->Placement.EnablePlacementMode && g_MouseState[MouseButtonIndex(EMouseButtonType::LEFT)].Clicked)
 	{
 		// Don't pick when manipulating Gizmo
 		if (ImGuizmo::IsUsing() || ImGuizmo::IsOver())
@@ -625,7 +625,7 @@ void jGame::OnMouseButton()
 
 void jGame::OnMouseMove(int32 xOffset, int32 yOffset)
 {
-	if (g_MouseState[EMouseButtonType::LEFT].Down)
+	if (g_MouseState[MouseButtonIndex(EMouseButtonType::LEFT)].Down)
 	{
 #ifdef ENABLE_EDITOR_FEATURES
 		// Don't rotate camera when manipulating Gizmo

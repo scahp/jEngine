@@ -121,6 +121,45 @@ enum class EMouseButtonType
 	MAX
 };
 
+enum class EInputKey : uint16
+{
+	UNKNOWN = 0,
+
+	A, B, C, D, E, F, G, H, I, J, K, L, M,
+	N, O, P, Q, R, S, T, U, V, W, X, Y, Z,
+
+	NUM0, NUM1, NUM2, NUM3, NUM4, NUM5, NUM6, NUM7, NUM8, NUM9,
+
+	PLUS,
+	MINUS,
+
+	SHIFT,
+	CTRL,
+	ALT,
+	DELETE_KEY,
+	ESCAPE,
+	SPACE,
+	ENTER,
+	TAB,
+
+	LEFT,
+	RIGHT,
+	UP,
+	DOWN,
+
+	MAX
+};
+
+FORCEINLINE constexpr size_t MouseButtonIndex(EMouseButtonType InButton)
+{
+	return static_cast<size_t>(InButton);
+}
+
+FORCEINLINE constexpr size_t InputKeyIndex(EInputKey InKey)
+{
+	return static_cast<size_t>(InKey);
+}
+
 extern uint64 g_MouseClickMaxDurationMS;
 extern uint64 g_MouseLongPressMinDurationMS;
 extern uint64 g_MouseDoubleClickMaxDurationMS;
@@ -239,11 +278,157 @@ struct jMouseButtonState
 	}
 };
 
-extern std::map<int, bool> g_KeyState;
-extern std::map<EMouseButtonType, jMouseButtonState> g_MouseState;
+extern std::array<bool, static_cast<size_t>(EInputKey::MAX)> g_KeyState;
+extern std::array<jMouseButtonState, static_cast<size_t>(EMouseButtonType::MAX)> g_MouseState;
 extern float g_timeDeltaSecond;
 extern int32 g_MousePosX;
 extern int32 g_MousePosY;
+
+FORCEINLINE bool IsKeyDown(EInputKey InKey)
+{
+	return g_KeyState[InputKeyIndex(InKey)];
+}
+
+FORCEINLINE void SetKeyDownState(EInputKey InKey, bool InDown)
+{
+	if (InKey != EInputKey::UNKNOWN)
+		g_KeyState[InputKeyIndex(InKey)] = InDown;
+}
+
+FORCEINLINE void ResetAllKeyState()
+{
+	g_KeyState.fill(false);
+}
+
+FORCEINLINE EInputKey ToInputKeyFromWin32(int32 InVK)
+{
+	switch (InVK)
+	{
+	case 'A': return EInputKey::A;
+	case 'B': return EInputKey::B;
+	case 'C': return EInputKey::C;
+	case 'D': return EInputKey::D;
+	case 'E': return EInputKey::E;
+	case 'F': return EInputKey::F;
+	case 'G': return EInputKey::G;
+	case 'H': return EInputKey::H;
+	case 'I': return EInputKey::I;
+	case 'J': return EInputKey::J;
+	case 'K': return EInputKey::K;
+	case 'L': return EInputKey::L;
+	case 'M': return EInputKey::M;
+	case 'N': return EInputKey::N;
+	case 'O': return EInputKey::O;
+	case 'P': return EInputKey::P;
+	case 'Q': return EInputKey::Q;
+	case 'R': return EInputKey::R;
+	case 'S': return EInputKey::S;
+	case 'T': return EInputKey::T;
+	case 'U': return EInputKey::U;
+	case 'V': return EInputKey::V;
+	case 'W': return EInputKey::W;
+	case 'X': return EInputKey::X;
+	case 'Y': return EInputKey::Y;
+	case 'Z': return EInputKey::Z;
+	case '0': return EInputKey::NUM0;
+	case '1': return EInputKey::NUM1;
+	case '2': return EInputKey::NUM2;
+	case '3': return EInputKey::NUM3;
+	case '4': return EInputKey::NUM4;
+	case '5': return EInputKey::NUM5;
+	case '6': return EInputKey::NUM6;
+	case '7': return EInputKey::NUM7;
+	case '8': return EInputKey::NUM8;
+	case '9': return EInputKey::NUM9;
+	case VK_OEM_PLUS:
+	case VK_ADD: return EInputKey::PLUS;
+	case VK_OEM_MINUS:
+	case VK_SUBTRACT: return EInputKey::MINUS;
+	case VK_SHIFT:
+	case VK_LSHIFT:
+	case VK_RSHIFT: return EInputKey::SHIFT;
+	case VK_CONTROL:
+	case VK_LCONTROL:
+	case VK_RCONTROL: return EInputKey::CTRL;
+	case VK_MENU:
+	case VK_LMENU:
+	case VK_RMENU: return EInputKey::ALT;
+	case VK_DELETE: return EInputKey::DELETE_KEY;
+	case VK_ESCAPE: return EInputKey::ESCAPE;
+	case VK_SPACE: return EInputKey::SPACE;
+	case VK_RETURN: return EInputKey::ENTER;
+	case VK_TAB: return EInputKey::TAB;
+	case VK_LEFT: return EInputKey::LEFT;
+	case VK_RIGHT: return EInputKey::RIGHT;
+	case VK_UP: return EInputKey::UP;
+	case VK_DOWN: return EInputKey::DOWN;
+	default: return EInputKey::UNKNOWN;
+	}
+}
+
+FORCEINLINE EInputKey ToInputKeyFromGLFW(int32 InGlfwKey)
+{
+	switch (InGlfwKey)
+	{
+	case GLFW_KEY_A: return EInputKey::A;
+	case GLFW_KEY_B: return EInputKey::B;
+	case GLFW_KEY_C: return EInputKey::C;
+	case GLFW_KEY_D: return EInputKey::D;
+	case GLFW_KEY_E: return EInputKey::E;
+	case GLFW_KEY_F: return EInputKey::F;
+	case GLFW_KEY_G: return EInputKey::G;
+	case GLFW_KEY_H: return EInputKey::H;
+	case GLFW_KEY_I: return EInputKey::I;
+	case GLFW_KEY_J: return EInputKey::J;
+	case GLFW_KEY_K: return EInputKey::K;
+	case GLFW_KEY_L: return EInputKey::L;
+	case GLFW_KEY_M: return EInputKey::M;
+	case GLFW_KEY_N: return EInputKey::N;
+	case GLFW_KEY_O: return EInputKey::O;
+	case GLFW_KEY_P: return EInputKey::P;
+	case GLFW_KEY_Q: return EInputKey::Q;
+	case GLFW_KEY_R: return EInputKey::R;
+	case GLFW_KEY_S: return EInputKey::S;
+	case GLFW_KEY_T: return EInputKey::T;
+	case GLFW_KEY_U: return EInputKey::U;
+	case GLFW_KEY_V: return EInputKey::V;
+	case GLFW_KEY_W: return EInputKey::W;
+	case GLFW_KEY_X: return EInputKey::X;
+	case GLFW_KEY_Y: return EInputKey::Y;
+	case GLFW_KEY_Z: return EInputKey::Z;
+	case GLFW_KEY_0: return EInputKey::NUM0;
+	case GLFW_KEY_1: return EInputKey::NUM1;
+	case GLFW_KEY_2: return EInputKey::NUM2;
+	case GLFW_KEY_3: return EInputKey::NUM3;
+	case GLFW_KEY_4: return EInputKey::NUM4;
+	case GLFW_KEY_5: return EInputKey::NUM5;
+	case GLFW_KEY_6: return EInputKey::NUM6;
+	case GLFW_KEY_7: return EInputKey::NUM7;
+	case GLFW_KEY_8: return EInputKey::NUM8;
+	case GLFW_KEY_9: return EInputKey::NUM9;
+	case GLFW_KEY_EQUAL:
+	case GLFW_KEY_KP_ADD: return EInputKey::PLUS;
+	case GLFW_KEY_MINUS:
+	case GLFW_KEY_KP_SUBTRACT: return EInputKey::MINUS;
+	case GLFW_KEY_LEFT_SHIFT:
+	case GLFW_KEY_RIGHT_SHIFT: return EInputKey::SHIFT;
+	case GLFW_KEY_LEFT_CONTROL:
+	case GLFW_KEY_RIGHT_CONTROL: return EInputKey::CTRL;
+	case GLFW_KEY_LEFT_ALT:
+	case GLFW_KEY_RIGHT_ALT: return EInputKey::ALT;
+	case GLFW_KEY_DELETE: return EInputKey::DELETE_KEY;
+	case GLFW_KEY_ESCAPE: return EInputKey::ESCAPE;
+	case GLFW_KEY_SPACE: return EInputKey::SPACE;
+	case GLFW_KEY_ENTER:
+	case GLFW_KEY_KP_ENTER: return EInputKey::ENTER;
+	case GLFW_KEY_TAB: return EInputKey::TAB;
+	case GLFW_KEY_LEFT: return EInputKey::LEFT;
+	case GLFW_KEY_RIGHT: return EInputKey::RIGHT;
+	case GLFW_KEY_UP: return EInputKey::UP;
+	case GLFW_KEY_DOWN: return EInputKey::DOWN;
+	default: return EInputKey::UNKNOWN;
+	}
+}
 
 FORCEINLINE uint64 GetInputTimeMS()
 {
@@ -253,10 +438,6 @@ FORCEINLINE uint64 GetInputTimeMS()
 
 FORCEINLINE void EnsureMouseButtonsInitialized()
 {
-	for (int32 i = 0; i < (int32)EMouseButtonType::MAX; ++i)
-	{
-		(void)g_MouseState[(EMouseButtonType)i];
-	}
 }
 
 FORCEINLINE void ResetMouseClickedState()
@@ -264,7 +445,7 @@ FORCEINLINE void ResetMouseClickedState()
 	EnsureMouseButtonsInitialized();
 	for (auto& iter : g_MouseState)
 	{
-		iter.second.ResetFrameEvents();
+		iter.ResetFrameEvents();
 	}
 }
 
@@ -273,7 +454,7 @@ FORCEINLINE void ResetMouseAllState()
 	EnsureMouseButtonsInitialized();
 	for (auto& iter : g_MouseState)
 	{
-		iter.second.ResetAll();
+		iter.ResetAll();
 	}
 }
 
@@ -284,7 +465,7 @@ FORCEINLINE void UpdateMousePosition(int32 InMouseX, int32 InMouseY)
 	g_MousePosY = InMouseY;
 	for (auto& iter : g_MouseState)
 	{
-		iter.second.UpdateDragState(InMouseX, InMouseY);
+		iter.UpdateDragState(InMouseX, InMouseY);
 	}
 }
 

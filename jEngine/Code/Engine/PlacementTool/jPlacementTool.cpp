@@ -101,7 +101,7 @@ void jPlacementTool::ProcessInput(float deltaTime, jCamera* mainCamera, float li
 
 	// Delete: Remove selected object
 	static bool wasDeletePressed = false;
-	if (g_KeyState[VK_DELETE])
+	if (IsKeyDown(EInputKey::DELETE_KEY))
 	{
 		if (!wasDeletePressed && SelectedPlacedObjectIndex >= 0 &&
 			SelectedPlacedObjectIndex < static_cast<int32>(PlacedObjects.size()))
@@ -128,9 +128,9 @@ void jPlacementTool::ProcessGizmoHotkeys()
 		static bool wasCtrlPressed = false;
 
 		// W: Translate mode
-		if (g_KeyState['w'] || g_KeyState['W'])
+		if (IsKeyDown(EInputKey::W))
 		{
-			if (!wasWPressed && g_KeyState[VK_SHIFT])  // Shift+W
+			if (!wasWPressed && IsKeyDown(EInputKey::SHIFT))  // Shift+W
 			{
 				GizmoOperation = ImGuizmo::TRANSLATE;
 			}
@@ -142,9 +142,9 @@ void jPlacementTool::ProcessGizmoHotkeys()
 		}
 
 		// E: Rotate mode
-		if (g_KeyState['e'] || g_KeyState['E'])
+		if (IsKeyDown(EInputKey::E))
 		{
-			if (!wasEPressed && g_KeyState[VK_SHIFT])  // Shift+E
+			if (!wasEPressed && IsKeyDown(EInputKey::SHIFT))  // Shift+E
 			{
 				GizmoOperation = ImGuizmo::ROTATE;
 			}
@@ -156,9 +156,9 @@ void jPlacementTool::ProcessGizmoHotkeys()
 		}
 
 		// R: Scale mode
-		if (g_KeyState['r'] || g_KeyState['R'])
+		if (IsKeyDown(EInputKey::R))
 		{
-			if (!wasRPressed && g_KeyState[VK_SHIFT])  // Shift+R
+			if (!wasRPressed && IsKeyDown(EInputKey::SHIFT))  // Shift+R
 			{
 				GizmoOperation = ImGuizmo::SCALE;
 			}
@@ -170,7 +170,7 @@ void jPlacementTool::ProcessGizmoHotkeys()
 		}
 
 		// Q: Toggle Local/World space
-		if (g_KeyState['q'] || g_KeyState['Q'])
+		if (IsKeyDown(EInputKey::Q))
 		{
 			if (!wasQPressed)
 			{
@@ -184,7 +184,7 @@ void jPlacementTool::ProcessGizmoHotkeys()
 		}
 
 		// Ctrl: Toggle snap
-		if (g_KeyState[VK_CONTROL])
+		if (IsKeyDown(EInputKey::CTRL))
 		{
 			if (!wasCtrlPressed)
 			{
@@ -207,7 +207,7 @@ void jPlacementTool::ProcessTypeSelectionHotkeys()
 	static bool wasJPressed = false;
 
 	// L: Select Point Light
-	if (g_KeyState['l'] || g_KeyState['L'])
+	if (IsKeyDown(EInputKey::L))
 	{
 		if (!wasLPressed)
 		{
@@ -222,7 +222,7 @@ void jPlacementTool::ProcessTypeSelectionHotkeys()
 	}
 
 	// K: Select Spot Light
-	if (g_KeyState['k'] || g_KeyState['K'])
+	if (IsKeyDown(EInputKey::K))
 	{
 		if (!wasKPressed)
 		{
@@ -237,7 +237,7 @@ void jPlacementTool::ProcessTypeSelectionHotkeys()
 	}
 
 	// J: Select Directional Light
-	if (g_KeyState['j'] || g_KeyState['J'])
+	if (IsKeyDown(EInputKey::J))
 	{
 		if (!wasJPressed)
 		{
@@ -256,7 +256,7 @@ void jPlacementTool::ProcessTypeSelectionHotkeys()
 	static bool wasMPressed = false;
 
 	// N: Select Cube
-	if (g_KeyState['n'] || g_KeyState['N'])
+	if (IsKeyDown(EInputKey::N))
 	{
 		if (!wasNPressed)
 		{
@@ -271,7 +271,7 @@ void jPlacementTool::ProcessTypeSelectionHotkeys()
 	}
 
 	// M: Select Sphere
-	if (g_KeyState['m'] || g_KeyState['M'])
+	if (IsKeyDown(EInputKey::M))
 	{
 		if (!wasMPressed)
 		{
@@ -290,7 +290,7 @@ void jPlacementTool::ProcessPlacementHotkeys(jCamera* mainCamera, float lightCol
 {
 	// P: Place selected object
 	static bool wasPPressed = false;
-	if (g_KeyState['p'] || g_KeyState['P'])
+	if (IsKeyDown(EInputKey::P))
 	{
 		if (!wasPPressed)
 		{

@@ -142,18 +142,18 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 {
 	ImGui_ImplGlfw_KeyCallback(window, key, scancode, action, mods);
 
-	const char* key_name = glfwGetKeyName(key, 0);
-	if (!key_name)
+	const EInputKey inputKey = ToInputKeyFromGLFW(key);
+	if (inputKey == EInputKey::UNKNOWN)
 		return;
 
 	if (GLFW_PRESS == action)
 	{
 		if (!ImGui::IsAnyItemActive())
-			g_KeyState[*key_name] = true;
+			SetKeyDownState(inputKey, true);
 	}
 	else if (GLFW_RELEASE == action)
 	{
-		g_KeyState[*key_name] = false;
+		SetKeyDownState(inputKey, false);
 	}
 }
 
@@ -195,7 +195,7 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 	else
 		return;
 
-	jMouseButtonState& buttonState = g_MouseState[buttonType];
+	jMouseButtonState& buttonState = g_MouseState[MouseButtonIndex(buttonType)];
 	const uint64 eventTimeMS = GetInputTimeMS();
 	double xpos = 0.0;
 	double ypos = 0.0;
@@ -216,9 +216,9 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 	{
 		buttonState.SetDownState(false, g_MousePosX, g_MousePosY, eventTimeMS);
 		const bool anyButtonDown =
-			g_MouseState[EMouseButtonType::LEFT].Down ||
-			g_MouseState[EMouseButtonType::MIDDLE].Down ||
-			g_MouseState[EMouseButtonType::RIGHT].Down;
+			g_MouseState[MouseButtonIndex(EMouseButtonType::LEFT)].Down ||
+			g_MouseState[MouseButtonIndex(EMouseButtonType::MIDDLE)].Down ||
+			g_MouseState[MouseButtonIndex(EMouseButtonType::RIGHT)].Down;
 		if (!anyButtonDown)
 			ReleaseCapture();
 	}
@@ -244,7 +244,7 @@ void window_focus_callback(GLFWwindow* window, int focused)
 	ImGui_ImplGlfw_WindowFocusCallback(window, focused);
 	if (!focused)
 	{
-		g_KeyState.clear();
+		ResetAllKeyState();
 		ResetMouseAllState();
 		ReleaseCapture();
 	}

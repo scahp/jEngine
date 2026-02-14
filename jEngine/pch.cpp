@@ -1,7 +1,7 @@
 #include "pch.h"
 
-std::map<int, bool> g_KeyState;
-std::map<EMouseButtonType, jMouseButtonState> g_MouseState;
+std::array<bool, static_cast<size_t>(EInputKey::MAX)> g_KeyState = {};
+std::array<jMouseButtonState, static_cast<size_t>(EMouseButtonType::MAX)> g_MouseState = {};
 float g_timeDeltaSecond = 0.0f;
 int32 g_MousePosX = 0;
 int32 g_MousePosY = 0;

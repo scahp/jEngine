@@ -33,6 +33,7 @@
 #include "jEngine.h"
 #include "jRaytracingScene_DX12.h"
 #include "jResourceBarrierBatcher_DX12.h"
+#include <dxgidebug.h>
 
 #define DX12_ENABLE_DEBUG_LAYER 0
 
@@ -83,12 +84,12 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 	case WM_KEYDOWN:
     {
         if (!ImGui::IsAnyItemActive())
-            g_KeyState[(int32)wParam] = true;
+            SetKeyDownState(ToInputKeyFromWin32((int32)wParam), true);
         return 0;
     }
 	case WM_KEYUP:
     {
-        g_KeyState[(int32)wParam] = false;
+        SetKeyDownState(ToInputKeyFromWin32((int32)wParam), false);
         return 0;
     }
     case WM_LBUTTONDOWN:
@@ -110,7 +111,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         else
             return 0;
 
-        jMouseButtonState& buttonState = g_MouseState[buttonType];
+        jMouseButtonState& buttonState = g_MouseState[MouseButtonIndex(buttonType)];
         const bool IsCapturedButtonInputOnUI = ImGui::IsAnyItemHovered() || ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow);
         if (!IsCapturedButtonInputOnUI)
         {
@@ -144,11 +145,11 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         else
             return 0;
 
-        g_MouseState[buttonType].SetDownState(false, g_MousePosX, g_MousePosY, eventTimeMS);
+        g_MouseState[MouseButtonIndex(buttonType)].SetDownState(false, g_MousePosX, g_MousePosY, eventTimeMS);
         const bool anyButtonDown =
-            g_MouseState[EMouseButtonType::LEFT].Down ||
-            g_MouseState[EMouseButtonType::MIDDLE].Down ||
-            g_MouseState[EMouseButtonType::RIGHT].Down;
+            g_MouseState[MouseButtonIndex(EMouseButtonType::LEFT)].Down ||
+            g_MouseState[MouseButtonIndex(EMouseButtonType::MIDDLE)].Down ||
+            g_MouseState[MouseButtonIndex(EMouseButtonType::RIGHT)].Down;
         if (!anyButtonDown)
             ReleaseCapture();
         g_Engine->OnMouseButton();
@@ -180,7 +181,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
     case WM_KILLFOCUS:
     {
         // 포커스를 잃은 경우 입력 상태를 모두 릴리즈 시킴.
-        g_KeyState.clear();
+        ResetAllKeyState();
         ResetMouseAllState();
         ReleaseCapture();
         return 0;
@@ -656,6 +657,16 @@ void jRHI_DX12::ReleaseRHI()
     Adapter.Reset();
     Factory.Reset();
     Device.Reset();
+
+#if defined(_DEBUG)
+    ComPtr<IDXGIDebug1> dxgiDebug;
+    if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgiDebug))) && dxgiDebug)
+    {
+        OutputDebugStringA("\n========== DXGI LIVE OBJECT REPORT BEGIN ==========\n");
+        dxgiDebug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_DETAIL);
+        OutputDebugStringA("========== DXGI LIVE OBJECT REPORT END ==========\n\n");
+    }
+#endif
 }
 
 void jRHI_DX12::CalculateFrameStats()
