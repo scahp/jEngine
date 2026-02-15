@@ -32,23 +32,6 @@
 #endif
 #endif
 
-// Optick integration point.
-#if JPROFILE_BACKEND == JPROFILE_BACKEND_OPTICK
-#if __has_include("optick_core.cpp")
-#include "optick_core.cpp"
-#include "optick_message.cpp"
-#include "optick_serialization.cpp"
-#include "optick_server.cpp"
-#include "optick_gpu.cpp"
-#include "optick_gpu.d3d12.cpp"
-#include "optick_gpu.vulkan.cpp"
-#include "optick_miniz.cpp"
-#include "optick_capi.cpp"
-#else
-#error "Optick backend selected, but Optick source files were not found."
-#endif
-#endif
-
 #if JPROFILE_BACKEND == JPROFILE_BACKEND_TRACY
 	#if __has_include("tracy/TracyD3D12.hpp")
 		#include "tracy/TracyD3D12.hpp"

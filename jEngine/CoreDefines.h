@@ -108,12 +108,10 @@ using uint64 = unsigned long long;
 
 #define JPROFILE_BACKEND_LEGACY 0
 #define JPROFILE_BACKEND_TRACY 1
-#define JPROFILE_BACKEND_OPTICK 2
 
 // Default profiler backend:
 // 0: legacy in-engine profiler
 // 1: Tracy
-// 2: Optick
 #ifndef JPROFILE_BACKEND
 #define JPROFILE_BACKEND JPROFILE_BACKEND_TRACY
 #endif
@@ -136,4 +134,3 @@ using uint64 = unsigned long long;
 // #endif
 
 //////////////////////////////////////////////////////////////////////////
-

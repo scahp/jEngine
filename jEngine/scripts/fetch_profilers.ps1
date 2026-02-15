@@ -16,12 +16,6 @@ try {
     } else {
         Write-Host "tracy already exists, skipping."
     }
-
-    if (-not (Test-Path "optick")) {
-        git clone --depth 1 https://github.com/bombomby/optick.git optick
-    } else {
-        Write-Host "optick already exists, skipping."
-    }
 }
 finally {
     Pop-Location

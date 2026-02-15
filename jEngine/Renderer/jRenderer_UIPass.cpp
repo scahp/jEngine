@@ -19,6 +19,23 @@
 // Helper functions for Copy/Paste context menus
 namespace
 {
+	bool IsCurrentProcessElevated()
+	{
+#if defined(_WIN32)
+		HANDLE token = nullptr;
+		if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token))
+			return false;
+
+		TOKEN_ELEVATION elevation = {};
+		DWORD size = 0;
+		const BOOL ok = GetTokenInformation(token, TokenElevation, &elevation, sizeof(elevation), &size);
+		CloseHandle(token);
+		return ok && (elevation.TokenIsElevated != 0);
+#else
+		return true;
+#endif
+	}
+
 	bool LaunchTracyProfiler(std::string& OutResolvedPath, std::string& OutLaunchArgs, std::string& OutError)
 	{
 #if defined(_WIN32)
@@ -429,8 +446,6 @@ void IRenderer::UIPass()
 				const char* backendName = "Legacy";
 #if JPROFILE_BACKEND == JPROFILE_BACKEND_TRACY
 				backendName = "Tracy";
-#elif JPROFILE_BACKEND == JPROFILE_BACKEND_OPTICK
-				backendName = "Optick";
 #endif
 				ImGui::Text("Backend : %s", backendName);
 
@@ -444,9 +459,18 @@ void IRenderer::UIPass()
 				ImGui::EndDisabled();
 
 #if JPROFILE_BACKEND == JPROFILE_BACKEND_TRACY && JPROFILE_EXTERNAL_CPU_AVAILABLE
+				const bool elevated = IsCurrentProcessElevated();
+				if (!elevated)
+				{
+					ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "Context switch/CPU Data needs administrator run on Windows.");
+					ImGui::TextWrapped("Run Visual Studio (or jEngine.exe) as administrator, then reconnect Tracy.");
+				}
+
 				bool tracyConnected = TracyIsConnected;
 				ImGui::BeginDisabled(true);
 				ImGui::Checkbox("Tracy Connected", &tracyConnected);
+				bool tracyRunAsAdmin = elevated;
+				ImGui::Checkbox("Run As Administrator", &tracyRunAsAdmin);
 				ImGui::EndDisabled();
 
 				if (ImGui::Button("Trace Connect"))
