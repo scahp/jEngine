@@ -439,6 +439,8 @@ void IRenderer::UIPass()
 				ImGui::Checkbox("External CPU Profiler Available", &externalCpuAvailable);
 				bool localCpuWithExternal = (ENABLE_LOCAL_CPU_PROFILE_WITH_EXTERNAL != 0);
 				ImGui::Checkbox("Local CPU Profile With External", &localCpuWithExternal);
+				bool tracySystemTracing = (JPROFILE_TRACY_ENABLE_SYSTEM_TRACING != 0);
+				ImGui::Checkbox("Tracy System Tracing", &tracySystemTracing);
 				ImGui::EndDisabled();
 
 #if JPROFILE_BACKEND == JPROFILE_BACKEND_TRACY && JPROFILE_EXTERNAL_CPU_AVAILABLE

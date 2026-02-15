@@ -118,6 +118,13 @@ using uint64 = unsigned long long;
 #define JPROFILE_BACKEND JPROFILE_BACKEND_TRACY
 #endif
 
+// Tracy system tracing controls automated OS-level data collection
+// (context switches / CPU data). Enable for richer CPU analysis.
+// Set to 0 if your local toolchain hits Tracy+MSVC debug build issues.
+#ifndef JPROFILE_TRACY_ENABLE_SYSTEM_TRACING
+#define JPROFILE_TRACY_ENABLE_SYSTEM_TRACING 1
+#endif
+
 //////////////////////////////////////////////////////////////////////////
 // Debug Configuration
 //////////////////////////////////////////////////////////////////////////
@@ -129,5 +136,4 @@ using uint64 = unsigned long long;
 // #endif
 
 //////////////////////////////////////////////////////////////////////////
-
 

@@ -17,9 +17,12 @@
 
 #if JPROFILE_BACKEND == JPROFILE_BACKEND_TRACY
 // Tracy is distributed as headers + a single translation unit.
-// Disable Tracy system tracing (ETW) to avoid /ZI constexpr issues on this project setup.
-#ifndef TRACY_NO_SYSTEM_TRACING
-#define TRACY_NO_SYSTEM_TRACING
+// System tracing controls context-switch / CPU data capture in Tracy.
+// Keep it configurable from CoreDefines.h for per-project stability tuning.
+#if !JPROFILE_TRACY_ENABLE_SYSTEM_TRACING
+	#ifndef TRACY_NO_SYSTEM_TRACING
+		#define TRACY_NO_SYSTEM_TRACING
+	#endif
 #endif
 
 #if __has_include("TracyClient.cpp")
