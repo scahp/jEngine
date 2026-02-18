@@ -1132,6 +1132,7 @@ void jRenderer::Render()
         PrepareHistoryDepth();
 
         AOPass();
+        SurfelGIPass();
         SSGIPass();
         SSGIAccumulatePass();
         AtmosphericShadow();

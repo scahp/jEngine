@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jOptions.h"
 
 std::vector<std::string> gPathTracingScenes;
@@ -47,6 +47,7 @@ jOptions::jOptions()
 	SSAOBias = AORadius / 20.0f;
 	AOIntensity = 1.0f;
 	UseSSGI = true;
+    UseSurfelGI = true;
 	UseSSGITemporalAccumulation = true;
 	ShowSSGIOnly = false;
 	UseSSGIAttenuation = false;
@@ -56,6 +57,34 @@ jOptions::jOptions()
     SSGIMaxDistance = 50.0f;
     SSGIRayCount = 4;
     SSGIResolutionScale = 0.5f;
+    SurfelGIMaxSurfels = 131072;
+    SurfelGISpawnBudgetPerFrame = 2048;
+    SurfelGITileSize = 8;
+    SurfelGIMergeDistanceScale = 1.5f;
+    SurfelGIRadiusScale = 0.5f;
+    SurfelGINormalThreshold = 0.8f;
+    SurfelGITTLInFrames = 120;
+    SurfelGIWorldGridCellSize = 30.0f;
+    SurfelGICascade1ScaleFromPrev = 2.0f;
+    SurfelGICellSurfelsPerCell = 2;
+    UseSurfelGICenterSpawnBias = true;
+    SurfelGINearKeepRadius = 60.0f;
+    SurfelGINearSpawnBias = 0.40f;
+    SurfelGIFrustumInteriorScale = 20.0f;
+    SurfelGIFarNearFactorThreshold = 0.15f;
+    SurfelGIFarMaxDistanceMultiplier = 1.25f;
+    SurfelGIReplaceNearDelta = 0.2f;
+    SurfelGIStaleAgeDivisor = 6.0f;
+    SurfelGISpawnHysteresisFrames = 8;
+    SurfelGIDeleteHysteresisFrames = 120;
+    ShowSurfelGIDebug = false;
+    ShowSurfelGIPlacedSurfels = true;
+    ShowSurfelGIStateDebug = false;
+    ShowSurfelGICellDebug = true;
+    ShowSurfelGICellGrid = true;
+    SurfelGIVisualizeNeighborCellRadius = 1;
+    SurfelGIVisualizeBlendWithScene = true;
+    SurfelGIVisualizeBlendAlpha = 0.35f;
 
     // SSGI Reprojection
     UseSSGIReprojection = true;

@@ -245,6 +245,7 @@ void IRenderer::UIPass()
 		ImGui::SetNextWindowPos(ImVec2(27.0f, 27.0f), ImGuiCond_FirstUseEver);
 		ImGui::SetNextWindowSize(ImVec2(350.0f, 682.0f), ImGuiCond_FirstUseEver);
 		ImGui::Begin(szTitle);
+        static bool bSelectSurfelGITabByDefault = true;
 			
 		if (ImGui::BeginTabBar("RHI"))
 		{
@@ -433,6 +434,79 @@ void IRenderer::UIPass()
                     AddCopyPasteContextMenu("SSGISigmaDepthContext", gOptions.SSGIATrousSigmaDepth);
                     ImGui::Unindent();
                 }
+                ImGui::EndTabItem();
+            }
+
+            const ImGuiTabItemFlags SurfelGITabFlags = bSelectSurfelGITabByDefault ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
+            if (ImGui::BeginTabItem("SurfelGI", nullptr, SurfelGITabFlags))
+            {
+                bSelectSurfelGITabByDefault = false;
+
+                auto DrawSliderInt60_40 = [](const char* label, int32* value, int32 minValue, int32 maxValue)
+                {
+                    const float availWidth = ImGui::GetContentRegionAvail().x;
+                    const float sliderWidth = availWidth * 0.6f;
+                    ImGui::PushID(label);
+                    ImGui::SetNextItemWidth(sliderWidth);
+                    ImGui::SliderInt("##Value", value, minValue, maxValue);
+                    ImGui::SameLine();
+                    ImGui::TextUnformatted(label);
+                    ImGui::PopID();
+                };
+
+                auto DrawSliderFloat60_40 = [](const char* label, float* value, float minValue, float maxValue)
+                {
+                    const float availWidth = ImGui::GetContentRegionAvail().x;
+                    const float sliderWidth = availWidth * 0.6f;
+                    ImGui::PushID(label);
+                    ImGui::SetNextItemWidth(sliderWidth);
+                    ImGui::SliderFloat("##Value", value, minValue, maxValue);
+                    ImGui::SameLine();
+                    ImGui::TextUnformatted(label);
+                    ImGui::PopID();
+                };
+
+                ImGui::Checkbox("Enable SurfelGI", &gOptions.UseSurfelGI);
+                if (gOptions.UseSurfelGI)
+                {
+                    ImGui::Indent();
+                    DrawSliderInt60_40("Surfel Max Pool", &gOptions.SurfelGIMaxSurfels, 4096, 1048576);
+                    DrawSliderInt60_40("Spawn Budget / Frame", &gOptions.SurfelGISpawnBudgetPerFrame, 64, 16384);
+                    DrawSliderInt60_40("Tile Size", &gOptions.SurfelGITileSize, 4, 32);
+                    DrawSliderFloat60_40("Merge Distance", &gOptions.SurfelGIMergeDistanceScale, 0.5f, 4.0f);
+                    DrawSliderFloat60_40("Surfel Radius Scale", &gOptions.SurfelGIRadiusScale, 0.25f, 2.5f);
+                    DrawSliderFloat60_40("Normal Threshold", &gOptions.SurfelGINormalThreshold, 0.0f, 1.0f);
+                    DrawSliderInt60_40("TTL Frames", &gOptions.SurfelGITTLInFrames, 1, 600);
+                    DrawSliderInt60_40("Spawn Hysteresis N", &gOptions.SurfelGISpawnHysteresisFrames, 1, 8);
+                    DrawSliderInt60_40("Delete Hysteresis K", &gOptions.SurfelGIDeleteHysteresisFrames, 1, 120);
+                    DrawSliderFloat60_40("Cascade0 Grid Size", &gOptions.SurfelGIWorldGridCellSize, 10.0f, 1000.0f);
+                    DrawSliderFloat60_40("Cascade1 Scale", &gOptions.SurfelGICascade1ScaleFromPrev, 1.0f, 6.0f);
+                    DrawSliderInt60_40("Surfels / Cell", &gOptions.SurfelGICellSurfelsPerCell, 1, 8);
+                    ImGui::Checkbox("Use Center Spawn Bias", &gOptions.UseSurfelGICenterSpawnBias);
+                    DrawSliderFloat60_40("Near Keep Radius", &gOptions.SurfelGINearKeepRadius, 0.0f, 300.0f);
+                    DrawSliderFloat60_40("Near Spawn Bias", &gOptions.SurfelGINearSpawnBias, 0.0f, 1.0f);
+                    DrawSliderFloat60_40("Frustum Interior Scale", &gOptions.SurfelGIFrustumInteriorScale, 1.0f, 40.0f);
+                    DrawSliderFloat60_40("Far NearFactor Threshold", &gOptions.SurfelGIFarNearFactorThreshold, 0.0f, 1.0f);
+                    DrawSliderFloat60_40("Far Distance Multiplier", &gOptions.SurfelGIFarMaxDistanceMultiplier, 1.0f, 3.0f);
+                    DrawSliderFloat60_40("Replace Near Delta", &gOptions.SurfelGIReplaceNearDelta, 0.0f, 1.0f);
+                    DrawSliderFloat60_40("Stale Age Divisor", &gOptions.SurfelGIStaleAgeDivisor, 1.0f, 24.0f);
+
+                    ImGui::Separator();
+                    ImGui::TextColored(ImVec4(1, 1, 0, 1), "Visualization");
+                    ImGui::Checkbox("Show Candidate Debug", &gOptions.ShowSurfelGIDebug);
+                    ImGui::Checkbox("Show Placed Surfels", &gOptions.ShowSurfelGIPlacedSurfels);
+                    ImGui::Checkbox("Show Surfel State Debug", &gOptions.ShowSurfelGIStateDebug);
+                    ImGui::Checkbox("Show Surfel Cell Debug", &gOptions.ShowSurfelGICellDebug);
+                    ImGui::Checkbox("Show Surfel Cell Grid", &gOptions.ShowSurfelGICellGrid);
+                    DrawSliderInt60_40("Neighbor Cell Radius", &gOptions.SurfelGIVisualizeNeighborCellRadius, 0, 3);
+                    ImGui::Checkbox("Blend With Scene", &gOptions.SurfelGIVisualizeBlendWithScene);
+                    if (gOptions.SurfelGIVisualizeBlendWithScene)
+                    {
+                        DrawSliderFloat60_40("Blend Alpha", &gOptions.SurfelGIVisualizeBlendAlpha, 0.0f, 1.0f);
+                    }
+                    ImGui::Unindent();
+                }
+
                 ImGui::EndTabItem();
             }
 

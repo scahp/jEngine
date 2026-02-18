@@ -53,6 +53,7 @@ struct jOptions
     float SSAOBias;
     float AOIntensity;
     bool UseSSGI;
+    bool UseSurfelGI;
     bool UseSSGITemporalAccumulation;
     bool ShowSSGIOnly;
     bool UseSSGIAttenuation;
@@ -62,6 +63,34 @@ struct jOptions
     float SSGIMaxDistance;
     int32 SSGIRayCount;
     float SSGIResolutionScale;
+    int32 SurfelGIMaxSurfels;
+    int32 SurfelGISpawnBudgetPerFrame;
+    int32 SurfelGITileSize;
+    float SurfelGIMergeDistanceScale;
+    float SurfelGIRadiusScale;
+    float SurfelGINormalThreshold;
+    int32 SurfelGITTLInFrames;
+    float SurfelGIWorldGridCellSize;
+    float SurfelGICascade1ScaleFromPrev;
+    int32 SurfelGICellSurfelsPerCell;
+    bool UseSurfelGICenterSpawnBias;
+    float SurfelGINearKeepRadius;
+    float SurfelGINearSpawnBias;
+    float SurfelGIFrustumInteriorScale;
+    float SurfelGIFarNearFactorThreshold;
+    float SurfelGIFarMaxDistanceMultiplier;
+    float SurfelGIReplaceNearDelta;
+    float SurfelGIStaleAgeDivisor;
+    int32 SurfelGISpawnHysteresisFrames;
+    int32 SurfelGIDeleteHysteresisFrames;
+    bool ShowSurfelGIDebug;
+    bool ShowSurfelGIPlacedSurfels;
+    bool ShowSurfelGIStateDebug;
+    bool ShowSurfelGICellDebug;
+    bool ShowSurfelGICellGrid;
+    int32 SurfelGIVisualizeNeighborCellRadius;
+    bool SurfelGIVisualizeBlendWithScene;
+    float SurfelGIVisualizeBlendAlpha;
 
     // SSGI Reprojection
     bool UseSSGIReprojection;

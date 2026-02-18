@@ -921,6 +921,9 @@
     <ClCompile Include="Renderer\jRenderer_UIPass.cpp">
       <Filter>Code\Renderer</Filter>
     </ClCompile>
+    <ClCompile Include="Renderer\jRenderer_SurfelGI.cpp">
+      <Filter>Code\Renderer</Filter>
+    </ClCompile>
     <ClCompile Include="External\xxHash\xxhash.c">
       <Filter>Code\External\xxHash</Filter>
     </ClCompile>
@@ -1161,6 +1164,12 @@
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
     <None Include="Resource\Shaders\hlsl\SSGI_ATrous_cs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\SurfelGI_cs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\SurfelGIVisualize_cs.hlsl">
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
   </ItemGroup>
