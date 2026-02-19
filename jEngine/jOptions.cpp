@@ -65,8 +65,14 @@ jOptions::jOptions()
     SurfelGINormalThreshold = 0.8f;
     SurfelGITTLInFrames = 120;
     SurfelGIWorldGridCellSize = 30.0f;
-    SurfelGICascade1ScaleFromPrev = 2.0f;
-    SurfelGICellSurfelsPerCell = 2;
+    for (int32 i = 0; i < SURFEL_GI_CASCADE_COUNT; ++i)
+    {
+        SurfelGICascadeCellScaleFromPrev[i] = (i == 0) ? 1.0f : 2.0f;
+        SurfelGICascadeStartDistance[i] = (i == 0) ? 0.0f : (float)(i * 600.0f);
+        SurfelGICascadeRadiusScale[i] = (i == 0) ? 1.0f : 2.0f;
+        SurfelGISurfelsPerCell[i] = Min(8, 2 + i);
+        SurfelGIOverlapAllowance[i] = 0.1f;
+    }
     UseSurfelGICenterSpawnBias = true;
     SurfelGINearKeepRadius = 60.0f;
     SurfelGINearSpawnBias = 0.40f;
@@ -81,6 +87,7 @@ jOptions::jOptions()
     ShowSurfelGIPlacedSurfels = true;
     ShowSurfelGIStateDebug = false;
     ShowSurfelGICellDebug = true;
+    ShowSurfelGIUnderfilledCellDebug = false;
     ShowSurfelGICellGrid = true;
     SurfelGIVisualizeNeighborCellRadius = 1;
     SurfelGIVisualizeBlendWithScene = true;

@@ -17,6 +17,11 @@ extern const char* GAOResolution[3];
 extern const char* GWaitPrerequsiteGraphicsQueueTask[4];
 extern const char* GAOType[3];
 
+#ifndef SURFEL_GI_CASCADE_COUNT
+#define SURFEL_GI_CASCADE_COUNT 3
+#endif
+#define SURFEL_GI_CASCADE_PACKED_COUNT ((SURFEL_GI_CASCADE_COUNT + 3) / 4)
+
 struct jOptions
 {
     jOptions();
@@ -71,8 +76,11 @@ struct jOptions
     float SurfelGINormalThreshold;
     int32 SurfelGITTLInFrames;
     float SurfelGIWorldGridCellSize;
-    float SurfelGICascade1ScaleFromPrev;
-    int32 SurfelGICellSurfelsPerCell;
+    float SurfelGICascadeCellScaleFromPrev[SURFEL_GI_CASCADE_COUNT];
+    float SurfelGICascadeStartDistance[SURFEL_GI_CASCADE_COUNT];
+    float SurfelGICascadeRadiusScale[SURFEL_GI_CASCADE_COUNT];
+    int32 SurfelGISurfelsPerCell[SURFEL_GI_CASCADE_COUNT];
+    float SurfelGIOverlapAllowance[SURFEL_GI_CASCADE_COUNT];
     bool UseSurfelGICenterSpawnBias;
     float SurfelGINearKeepRadius;
     float SurfelGINearSpawnBias;
@@ -87,6 +95,7 @@ struct jOptions
     bool ShowSurfelGIPlacedSurfels;
     bool ShowSurfelGIStateDebug;
     bool ShowSurfelGICellDebug;
+    bool ShowSurfelGIUnderfilledCellDebug;
     bool ShowSurfelGICellGrid;
     int32 SurfelGIVisualizeNeighborCellRadius;
     bool SurfelGIVisualizeBlendWithScene;

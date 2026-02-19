@@ -443,7 +443,7 @@ struct Vector
 	};	
 };
 
-struct Vector4
+struct alignas(16) Vector4
 {
 	static const Vector4 OneVector;
 	static const Vector4 ZeroVector;
@@ -1138,3 +1138,6 @@ FORCEINLINE Vector4 Max(const Vector4& A, const Vector4& B)
     return Vector4(Max(A.x, B.x), Max(A.y, B.y), Max(A.z, B.z), Max(A.w, B.w));
 }
 //////////////////////////////////////////////////////////////////////////
+
+static_assert(alignof(Vector4) == 16, "Vector4 must be 16-byte aligned");
+static_assert(sizeof(Vector4) == 16, "Vector4 must be 16 bytes");

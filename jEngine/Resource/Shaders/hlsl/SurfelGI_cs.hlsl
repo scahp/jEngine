@@ -1,5 +1,15 @@
 #include "common.hlsl"
 
+#ifndef SURFEL_GI_AGE_CONSUME_SCALE
+    // Compile-time knob: 2.0 means surfel ages are consumed twice as fast.
+    #define SURFEL_GI_AGE_CONSUME_SCALE 2.0
+#endif
+
+#ifndef SURFEL_GI_CASCADE_COUNT
+    #define SURFEL_GI_CASCADE_COUNT 3
+#endif
+#define SURFEL_GI_CASCADE_PACKED_COUNT ((SURFEL_GI_CASCADE_COUNT + 3) / 4)
+
 struct CommonComputeUniformBuffer
 {
     float4x4 InvP;
@@ -26,13 +36,14 @@ struct CommonComputeUniformBuffer
     int SpawnBudget;
     int TTLInFrames;
     float GridCellSize;
-    float Cascade1Scale;
+    float4 CascadeCellScaleFromPrevPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeStartDistancePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeRadiusScalePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
     int SpawnHysteresisFrames;
     int DeleteHysteresisFrames;
     float RadiusScale;
-    int SurfelsPerCell;
-    int Padding0;
-    int Padding1;
+    float4 SurfelsPerCellPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 OverlapAllowancePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
 };
 
 struct SurfelData
@@ -90,6 +101,16 @@ uint GetCellCount(uint maxSurfels, uint desiredSlotsPerCell)
     return max(1u, maxSurfels / slotsPerCell);
 }
 
+uint GetDesiredSlotsPerCell(uint cascadeIndex)
+{
+    const uint c = min(cascadeIndex, (uint)(SURFEL_GI_CASCADE_COUNT - 1));
+    const uint packIndex = c >> 2u;
+    const uint lane = c & 3u;
+    const float4 packed = ComputeCommon.SurfelsPerCellPacked[packIndex];
+    const float value = (lane == 0u) ? packed.x : ((lane == 1u) ? packed.y : ((lane == 2u) ? packed.z : packed.w));
+    return max((uint)round(value), 1u);
+}
+
 uint HashCellWithCascade(int3 cellCoord, uint cascadeIndex)
 {
     uint h = Hash3(cellCoord);
@@ -103,6 +124,92 @@ uint GetCellBaseIndex(int3 cellCoord, uint maxSurfels, uint desiredSlotsPerCell,
     const uint cellCount = GetCellCount(maxSurfels, desiredSlotsPerCell);
     const uint cellHash = HashCellWithCascade(cellCoord, cascadeIndex) % cellCount;
     return cellHash * slotsPerCell;
+}
+
+float GetCascadeScale(uint cascadeIndex)
+{
+    float scale = 1.0;
+    [loop] for (uint i = 1u; i <= cascadeIndex && i < (uint)SURFEL_GI_CASCADE_COUNT; ++i)
+    {
+        const uint packIndex = i >> 2u;
+        const uint lane = i & 3u;
+        const float4 packed = ComputeCommon.CascadeCellScaleFromPrevPacked[packIndex];
+        const float value = (lane == 0u) ? packed.x : ((lane == 1u) ? packed.y : ((lane == 2u) ? packed.z : packed.w));
+        scale *= max(value, 1.0);
+    }
+    return scale;
+}
+
+float GetCascadeRadiusScale(uint cascadeIndex)
+{
+    float scale = 1.0;
+    [loop] for (uint i = 1u; i <= cascadeIndex && i < (uint)SURFEL_GI_CASCADE_COUNT; ++i)
+    {
+        const uint packIndex = i >> 2u;
+        const uint lane = i & 3u;
+        const float4 packed = ComputeCommon.CascadeRadiusScalePacked[packIndex];
+        const float value = (lane == 0u) ? packed.x : ((lane == 1u) ? packed.y : ((lane == 2u) ? packed.z : packed.w));
+        scale *= max(value, 0.05);
+    }
+    return scale;
+}
+
+uint GetCascadeIndexByDistance(float cameraDistance)
+{
+    uint cascade = 0u;
+    [loop] for (uint i = 1u; i < (uint)SURFEL_GI_CASCADE_COUNT; ++i)
+    {
+        const uint packIndex = i >> 2u;
+        const uint lane = i & 3u;
+        const float4 packed = ComputeCommon.CascadeStartDistancePacked[packIndex];
+        const float startDistance = (lane == 0u) ? packed.x : ((lane == 1u) ? packed.y : ((lane == 2u) ? packed.z : packed.w));
+        if (cameraDistance >= max(startDistance, 0.0))
+            cascade = i;
+    }
+    return cascade;
+}
+
+float GetCascadeSeparationScale(uint cascadeIndex)
+{
+    const uint c = min(cascadeIndex, (uint)(SURFEL_GI_CASCADE_COUNT - 1));
+    const uint packIndex = c >> 2u;
+    const uint lane = c & 3u;
+    const float4 packed = ComputeCommon.OverlapAllowancePacked[packIndex];
+    float allowance = (lane == 0u) ? packed.x : ((lane == 1u) ? packed.y : ((lane == 2u) ? packed.z : packed.w));
+    allowance = clamp(allowance, 0.0, 0.95);
+    // Larger allowance -> smaller required separation -> more overlap permitted.
+    return max(1.0 - allowance, 0.05);
+}
+
+uint GetConsumedAge(float lastSeenFrame)
+{
+    const float rawAge = abs((float)ComputeCommon.FrameNumber - lastSeenFrame);
+    return (uint)(rawAge * SURFEL_GI_AGE_CONSUME_SCALE);
+}
+
+bool IsRadiusCompatible(float existingRadius, float candidateRadius)
+{
+    const float a = max(existingRadius, 0.001);
+    const float b = max(candidateRadius, 0.001);
+    const float ratio = max(a, b) / min(a, b);
+    // Avoid reusing surfels whose radius diverged too much.
+    return ratio <= 1.5;
+}
+
+bool IsBoundarySurfel(float3 surfelPos, float boundaryBand)
+{
+    const float3 surfelViewPos = mul(ComputeCommon.V, float4(surfelPos, 1.0)).xyz;
+    const float cameraDistance = length(surfelViewPos);
+    [loop] for (uint i = 1u; i < (uint)SURFEL_GI_CASCADE_COUNT; ++i)
+    {
+        const uint packIndex = i >> 2u;
+        const uint lane = i & 3u;
+        const float4 packed = ComputeCommon.CascadeStartDistancePacked[packIndex];
+        const float startDistance = (lane == 0u) ? packed.x : ((lane == 1u) ? packed.y : ((lane == 2u) ? packed.z : packed.w));
+        if (abs(cameraDistance - startDistance) <= boundaryBand)
+            return true;
+    }
+    return false;
 }
 
 bool IsDormantSurfel(SurfelData s)
@@ -161,10 +268,10 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 
     const float nearFactor = saturate(1.0 - abs(viewPos.z) / max(ComputeCommon.MaxDistance, 0.001));
     const uint maxSurfels = max((uint)ComputeCommon.MaxSurfels, 1u);
-    const uint desiredSlotsPerCell = max((uint)ComputeCommon.SurfelsPerCell, 1u);
-    const uint slotsPerCell = GetSlotsPerCell(maxSurfels, desiredSlotsPerCell);
     const uint deleteHysteresis = max((uint)ComputeCommon.DeleteHysteresisFrames, 1u);
     const uint ttl = max((uint)ComputeCommon.TTLInFrames, 1u);
+    const float cascade0CellSize = max(ComputeCommon.GridCellSize, 0.1);
+    const float cascadeBoundaryBand = max(cascade0CellSize * 0.5, 1.0);
 
     const uint tileSize = max((uint)ComputeCommon.TileSize, 1u);
     const uint2 tileCoord = uint2(pixel) / tileSize;
@@ -193,10 +300,10 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         SurfelData cleanupSurfel = SurfelPool[cleanupIndex];
         if (cleanupSurfel.Extra.y > 0.5)
         {
-            const uint cleanupCascade = (uint)round(cleanupSurfel.Extra.w);
-            const float cleanupCellSize = max(ComputeCommon.GridCellSize, 0.1);
-            const uint cleanupAge = (uint)abs((float)ComputeCommon.FrameNumber - cleanupSurfel.NormalSeenFrame.w);
-            if (cleanupAge > max(ttl, deleteHysteresis))
+            const uint cleanupCascade = min((uint)round(cleanupSurfel.Extra.w), (uint)(SURFEL_GI_CASCADE_COUNT - 1));
+            const float cleanupCellSize = cascade0CellSize * GetCascadeScale(cleanupCascade);
+            const uint cleanupAge = GetConsumedAge(cleanupSurfel.NormalSeenFrame.w);
+            if (cleanupAge > max(ttl, deleteHysteresis) && !IsBoundarySurfel(cleanupSurfel.PositionRadius.xyz, cascadeBoundaryBand))
             {
                 const int3 cleanupCellCoord = int3(floor(cleanupSurfel.PositionRadius.xyz / cleanupCellSize));
                 MarkDormantSurfel(cleanupSurfel, cleanupCellCoord, cleanupCascade, (uint)ComputeCommon.FrameNumber);
@@ -211,11 +318,15 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         return;
     }
 
-    const float cascade0CellSize = max(ComputeCommon.GridCellSize, 0.1);
-    const uint cascadeIndex = 0u;
-    const float cellSize = cascade0CellSize;
-    const float cascadeRadiusScale = 1.0;
+    const float cameraDistance = length(viewPos);
+    const uint cascadeIndex = GetCascadeIndexByDistance(cameraDistance);
+    const float cascadeScale = GetCascadeScale(cascadeIndex);
+    const float cellSize = cascade0CellSize * cascadeScale;
+    const float cascadeRadiusScale = GetCascadeRadiusScale(cascadeIndex);
+    const float separationScale = GetCascadeSeparationScale(cascadeIndex);
     float radius = max(ComputeCommon.MinRadius, 0.001) * max(ComputeCommon.RadiusScale, 0.05) * cascadeRadiusScale;
+    const uint desiredSlotsPerCell = GetDesiredSlotsPerCell(cascadeIndex);
+    const uint slotsPerCell = GetSlotsPerCell(maxSurfels, desiredSlotsPerCell);
 
     const int3 cellCoord = int3(floor(worldPos / cellSize));
 
@@ -258,6 +369,8 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 
                             const float3 dormantPos = candidate.PositionRadius.xyz;
                             const float dormantRadius = max(candidate.PositionRadius.w, 0.001);
+                            if (!IsRadiusCompatible(dormantRadius, radius))
+                                continue;
                             const float dormantThreshold = max(dormantRadius, radius) * max(ComputeCommon.MergeDistanceScale, 0.001)
                                 * ((dormantCellHash == currentCellHash) ? 1.35 : 0.95);
                             const float dormantDistance = distance(dormantPos, worldPos);
@@ -273,14 +386,11 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                         const uint candidateCascade = (uint)round(candidate.Extra.w);
                         if (candidateCascade != cascadeIndex)
                         {
-                            candidate.Extra.y = 0.0;
-                            candidate.Extra.z = 0.0;
-                            SurfelPool[queryIndex] = candidate;
                             continue;
                         }
 
-                        const float candAge = abs((float)ComputeCommon.FrameNumber - candidate.NormalSeenFrame.w);
-                        if ((uint)candAge > ttl)
+                        const uint candAge = GetConsumedAge(candidate.NormalSeenFrame.w);
+                        if (candAge > ttl && !IsBoundarySurfel(candidate.PositionRadius.xyz, cascadeBoundaryBand))
                         {
                             const int3 staleCellCoord = int3(floor(candidate.PositionRadius.xyz / cellSize));
                             MarkDormantSurfel(candidate, staleCellCoord, cascadeIndex, (uint)ComputeCommon.FrameNumber);
@@ -298,6 +408,8 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                             continue;
 
                         const float candidateRadius = max(candidate.PositionRadius.w, 0.001);
+                        if (!IsRadiusCompatible(candidateRadius, radius))
+                            continue;
                         const float candidateThreshold = max(candidateRadius, radius) * max(ComputeCommon.MergeDistanceScale, 0.001);
                         const float candidateDistance = distance(candidatePos, worldPos);
 
@@ -340,15 +452,11 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                 const uint slotCascade = (uint)round(slotSurfel.Extra.w);
                 if (slotCascade != cascadeIndex)
                 {
-                    slotSurfel.Extra.y = 0.0;
-                    slotSurfel.Extra.z = 0.0;
-                    SurfelPool[slotIndex] = slotSurfel;
-                    bestPlacementIndex = slotIndex;
-                    break;
+                    continue;
                 }
 
-                const uint slotAge = (uint)abs((float)ComputeCommon.FrameNumber - slotSurfel.NormalSeenFrame.w);
-                if (slotAge > max(ttl, deleteHysteresis))
+                const uint slotAge = GetConsumedAge(slotSurfel.NormalSeenFrame.w);
+                if (slotAge > max(ttl, deleteHysteresis) && !IsBoundarySurfel(slotSurfel.PositionRadius.xyz, cascadeBoundaryBand))
                 {
                     const int3 slotCellCoord = int3(floor(slotSurfel.PositionRadius.xyz / cellSize));
                     MarkDormantSurfel(slotSurfel, slotCellCoord, cascadeIndex, (uint)ComputeCommon.FrameNumber);
@@ -391,14 +499,11 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                                 const uint neighborCascade = (uint)round(neighborSurfel.Extra.w);
                                 if (neighborCascade != cascadeIndex)
                                 {
-                                    neighborSurfel.Extra.y = 0.0;
-                                    neighborSurfel.Extra.z = 0.0;
-                                    SurfelPool[neighborIndex] = neighborSurfel;
                                     continue;
                                 }
 
-                                const uint neighborAge = (uint)abs((float)ComputeCommon.FrameNumber - neighborSurfel.NormalSeenFrame.w);
-                                if (neighborAge > ttl)
+                                const uint neighborAge = GetConsumedAge(neighborSurfel.NormalSeenFrame.w);
+                                if (neighborAge > ttl && !IsBoundarySurfel(neighborSurfel.PositionRadius.xyz, cascadeBoundaryBand))
                                 {
                                     const int3 staleNeighborCellCoord = int3(floor(neighborSurfel.PositionRadius.xyz / cellSize));
                                     MarkDormantSurfel(neighborSurfel, staleNeighborCellCoord, cascadeIndex, (uint)ComputeCommon.FrameNumber);
@@ -412,7 +517,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                                     continue;
 
                                 const float neighborRadius = max(neighborSurfel.PositionRadius.w, 0.001);
-                                const float minSeparation = (slotRadius + neighborRadius) * 0.9;
+                                const float minSeparation = (slotRadius + neighborRadius) * separationScale;
                                 const float centerDistance = distance(slotPos, neighborPos);
                                 overlapPenalty += max(minSeparation - centerDistance, 0.0);
                             }
@@ -460,6 +565,8 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 
                     const float3 probePos = probeSurfel.PositionRadius.xyz;
                     const float probeRadius = max(probeSurfel.PositionRadius.w, 0.001);
+                    if (!IsRadiusCompatible(probeRadius, radius))
+                        continue;
                     const float probeThreshold = max(probeRadius, radius) * max(ComputeCommon.MergeDistanceScale, 0.001)
                         * ((dormantCellHash == currentCellHash) ? 1.45 : 0.9);
                     const float probeDistance = distance(probePos, worldPos);
@@ -490,13 +597,12 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         const uint currentCascade = (uint)round(current.Extra.w);
         if (currentCascade != cascadeIndex)
         {
-            current.Extra.y = 0.0;
-            current.Extra.z = 0.0;
-            SurfelPool[index] = current;
+            DebugOutput[pixel] = float4(0.0, 0.0, 0.0, 1.0);
+            return;
         }
     }
     const float lastSeenFrame = current.NormalSeenFrame.w;
-    const uint ageFrames = (uint)abs((float)ComputeCommon.FrameNumber - lastSeenFrame);
+    const uint ageFrames = GetConsumedAge(lastSeenFrame);
 
     const float3 currentPos = current.PositionRadius.xyz;
     const float3 currentViewPos = mul(ComputeCommon.V, float4(currentPos, 1.0)).xyz;
@@ -507,7 +613,8 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     const uint effectiveTTLBase = isNearKeepSurfel ? ttl : max(1u, (uint)round((float)ttl * lerp(0.25, 1.0, currentNearFactor)));
     const uint effectiveTTL = max(effectiveTTLBase, deleteHysteresis);
     const bool alive = (current.Extra.y > 0.5) && (ageFrames <= effectiveTTL);
-    if ((current.Extra.y > 0.5) && !alive)
+    const bool currentIsBoundary = IsBoundarySurfel(currentPos, cascadeBoundaryBand);
+    if ((current.Extra.y > 0.5) && !alive && !currentIsBoundary)
     {
         const int3 retiredCellCoord = int3(floor(currentPos / cellSize));
         MarkDormantSurfel(current, retiredCellCoord, cascadeIndex, (uint)ComputeCommon.FrameNumber);
@@ -519,6 +626,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 
     const float distanceThreshold = max(currentRadius, radius) * max(ComputeCommon.MergeDistanceScale, 0.001);
     const bool canMerge = alive
+        && IsRadiusCompatible(currentRadius, radius)
         && (distance(currentPos, worldPos) < distanceThreshold)
         && (dot(currentNormal, worldNormal) >= ComputeCommon.NormalThreshold);
 
@@ -537,6 +645,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     }
 
     const bool dormantReusable = IsDormantSurfel(current)
+        && IsRadiusCompatible(currentRadius, radius)
         && (dot(currentNormal, worldNormal) >= ComputeCommon.NormalThreshold)
         && (distance(currentPos, worldPos) < distanceThreshold * 1.25);
     if (dormantReusable)
@@ -567,7 +676,8 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     const bool replaceFarSurfel = alive && !canMerge
         && (nearFactor > currentNearFactor + ComputeCommon.ReplaceNearDelta)
         && (currentVeryFar || staleEnough)
-        && !isNearKeepSurfel;
+        && !isNearKeepSurfel
+        && !currentIsBoundary;
 
     // If near area is starving, steal a far/old surfel slot from sparse random probes.
     bool stealFarSurfel = false;
@@ -587,18 +697,16 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
             const uint probeCascade = (uint)round(probeSurfel.Extra.w);
             if (probeCascade != cascadeIndex)
             {
-                probeSurfel.Extra.y = 0.0;
-                probeSurfel.Extra.z = 0.0;
-                SurfelPool[probeIndex] = probeSurfel;
                 continue;
             }
 
-            const float probeAgeF = abs((float)ComputeCommon.FrameNumber - probeSurfel.NormalSeenFrame.w);
-            const uint probeAge = (uint)probeAgeF;
+            const uint probeAge = GetConsumedAge(probeSurfel.NormalSeenFrame.w);
             const float3 probeViewPos = mul(ComputeCommon.V, float4(probeSurfel.PositionRadius.xyz, 1.0)).xyz;
             const float probeDist = length(probeViewPos);
             const bool probeNearKeep = probeDist <= max(ComputeCommon.NearKeepRadius, 0.0);
             if (probeNearKeep)
+                continue;
+            if (IsBoundarySurfel(probeSurfel.PositionRadius.xyz, cascadeBoundaryBand))
                 continue;
 
             const float probeNearFactor = saturate(1.0 - abs(probeViewPos.z) / max(ComputeCommon.MaxDistance, 0.001));
@@ -639,8 +747,8 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                         if (neighborCascade != cascadeIndex)
                             continue;
 
-                        const uint neighborAge = (uint)abs((float)ComputeCommon.FrameNumber - neighborSurfel.NormalSeenFrame.w);
-                        if (neighborAge > ttl)
+                        const uint neighborAge = GetConsumedAge(neighborSurfel.NormalSeenFrame.w);
+                        if (neighborAge > ttl && !IsBoundarySurfel(neighborSurfel.PositionRadius.xyz, cascadeBoundaryBand))
                         {
                             const int3 staleNeighborCellCoord = int3(floor(neighborSurfel.PositionRadius.xyz / cellSize));
                             MarkDormantSurfel(neighborSurfel, staleNeighborCellCoord, cascadeIndex, (uint)ComputeCommon.FrameNumber);
@@ -654,7 +762,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                             continue;
 
                         const float neighborRadius = max(neighborSurfel.PositionRadius.w, 0.001);
-                        const float minSeparation = (neighborRadius + radius) * 0.9;
+                        const float minSeparation = (neighborRadius + radius) * separationScale;
                         const float candidateDistance = distance(worldPos, neighborPos);
                         if (candidateDistance < minSeparation)
                         {
@@ -704,6 +812,8 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                             continue;
 
                         const float historicalRadius = max(historical.PositionRadius.w, 0.001);
+                        if (!IsRadiusCompatible(historicalRadius, radius))
+                            continue;
                         const float historicalThreshold = max(historicalRadius, radius) * max(ComputeCommon.MergeDistanceScale, 0.001) * 1.8;
                         const float historicalDistance = distance(historicalPos, worldPos);
                         if (historicalDistance > historicalThreshold)

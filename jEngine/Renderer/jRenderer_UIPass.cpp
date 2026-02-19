@@ -480,8 +480,24 @@ void IRenderer::UIPass()
                     DrawSliderInt60_40("Spawn Hysteresis N", &gOptions.SurfelGISpawnHysteresisFrames, 1, 8);
                     DrawSliderInt60_40("Delete Hysteresis K", &gOptions.SurfelGIDeleteHysteresisFrames, 1, 120);
                     DrawSliderFloat60_40("Cascade0 Grid Size", &gOptions.SurfelGIWorldGridCellSize, 10.0f, 1000.0f);
-                    DrawSliderFloat60_40("Cascade1 Scale", &gOptions.SurfelGICascade1ScaleFromPrev, 1.0f, 6.0f);
-                    DrawSliderInt60_40("Surfels / Cell", &gOptions.SurfelGICellSurfelsPerCell, 1, 8);
+                    for (int32 cascade = 1; cascade < SURFEL_GI_CASCADE_COUNT; ++cascade)
+                    {
+                        char label[64];
+                        sprintf_s(label, "Cascade%d Cell Scale", cascade);
+                        DrawSliderFloat60_40(label, &gOptions.SurfelGICascadeCellScaleFromPrev[cascade], 1.0f, 6.0f);
+                        sprintf_s(label, "Cascade%d Start Distance", cascade);
+                        DrawSliderFloat60_40(label, &gOptions.SurfelGICascadeStartDistance[cascade], 0.0f, 4000.0f);
+                        sprintf_s(label, "Cascade%d Radius Scale", cascade);
+                        DrawSliderFloat60_40(label, &gOptions.SurfelGICascadeRadiusScale[cascade], 0.25f, 4.0f);
+                    }
+                    for (int32 cascade = 0; cascade < SURFEL_GI_CASCADE_COUNT; ++cascade)
+                    {
+                        char label[64];
+                        sprintf_s(label, "Cascade%d Surfels / Cell", cascade);
+                        DrawSliderInt60_40(label, &gOptions.SurfelGISurfelsPerCell[cascade], 1, 8);
+                        sprintf_s(label, "Cascade%d Overlap Allow", cascade);
+                        DrawSliderFloat60_40(label, &gOptions.SurfelGIOverlapAllowance[cascade], 0.1f, 0.9f);
+                    }
                     ImGui::Checkbox("Use Center Spawn Bias", &gOptions.UseSurfelGICenterSpawnBias);
                     DrawSliderFloat60_40("Near Keep Radius", &gOptions.SurfelGINearKeepRadius, 0.0f, 300.0f);
                     DrawSliderFloat60_40("Near Spawn Bias", &gOptions.SurfelGINearSpawnBias, 0.0f, 1.0f);
@@ -497,6 +513,7 @@ void IRenderer::UIPass()
                     ImGui::Checkbox("Show Placed Surfels", &gOptions.ShowSurfelGIPlacedSurfels);
                     ImGui::Checkbox("Show Surfel State Debug", &gOptions.ShowSurfelGIStateDebug);
                     ImGui::Checkbox("Show Surfel Cell Debug", &gOptions.ShowSurfelGICellDebug);
+                    ImGui::Checkbox("Show Underfilled Cell Debug", &gOptions.ShowSurfelGIUnderfilledCellDebug);
                     ImGui::Checkbox("Show Surfel Cell Grid", &gOptions.ShowSurfelGICellGrid);
                     DrawSliderInt60_40("Neighbor Cell Radius", &gOptions.SurfelGIVisualizeNeighborCellRadius, 0, 3);
                     ImGui::Checkbox("Blend With Scene", &gOptions.SurfelGIVisualizeBlendWithScene);
