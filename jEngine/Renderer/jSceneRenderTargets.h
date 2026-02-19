@@ -36,6 +36,7 @@ struct jSceneRenderTarget : public std::enable_shared_from_this<jSceneRenderTarg
     static std::shared_ptr<jRenderTarget> SSGI_RT;
     static std::shared_ptr<jRenderTarget> SSGI_Accum_RT[3];
     static std::shared_ptr<jRenderTarget> SurfelGI_Debug_RT;
+    static std::shared_ptr<jRenderTarget> SurfelGI_Attempt_RT;
 
     static std::shared_ptr<jRenderTarget> AtmosphericShadow_RT;
     static std::shared_ptr<jRenderTarget> VBuffer_RT;

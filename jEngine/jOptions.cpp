@@ -89,6 +89,7 @@ jOptions::jOptions()
     ShowSurfelGICellDebug = true;
     ShowSurfelGIUnderfilledCellDebug = false;
     ShowSurfelGICellGrid = true;
+    ShowSurfelGISpawnAttemptDebug = false;
     SurfelGIVisualizeNeighborCellRadius = 1;
     SurfelGIVisualizeBlendWithScene = true;
     SurfelGIVisualizeBlendAlpha = 0.35f;

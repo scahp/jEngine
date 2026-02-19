@@ -62,6 +62,25 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
         };
         jSceneRenderTarget::SurfelGI_Debug_RT = g_rhi->CreateRenderTarget(Info);
     }
+
+    if (!jSceneRenderTarget::SurfelGI_Attempt_RT
+        || jSceneRenderTarget::SurfelGI_Attempt_RT->Info.Width != Width
+        || jSceneRenderTarget::SurfelGI_Attempt_RT->Info.Height != Height)
+    {
+        jRenderTargetInfo Info = {
+            .Type = ETextureType::TEXTURE_2D,
+            .Format = ETextureFormat::R11G11B10F,
+            .Width = Width,
+            .Height = Height,
+            .LayerCount = 1,
+            .IsGenerateMipmap = false,
+            .SampleCount = EMSAASamples::COUNT_1,
+            .RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
+            .TextureCreateFlag = ETextureCreateFlag::UAV,
+            .ResourceName = jNameStatic("SurfelGI_Attempt_RT")
+        };
+        jSceneRenderTarget::SurfelGI_Attempt_RT = g_rhi->CreateRenderTarget(Info);
+    }
 }
 }
 
@@ -75,7 +94,7 @@ void jRenderer::SurfelGIPass()
     DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "SurfelGIPass", Vector4(0.25f, 0.85f, 0.4f, 1.0f));
 
     EnsureSurfelGIResources(RenderFrameContextPtr);
-    if (!GSurfelPoolBuffer || !jSceneRenderTarget::SurfelGI_Debug_RT)
+    if (!GSurfelPoolBuffer || !jSceneRenderTarget::SurfelGI_Debug_RT || !jSceneRenderTarget::SurfelGI_Attempt_RT)
         return;
     struct alignas(16) jFloat4
     {
@@ -210,6 +229,7 @@ void jRenderer::SurfelGIPass()
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->LinearDepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelPoolBuffer.get(), EResourceLayout::UAV);
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::SurfelGI_Debug_RT->GetTexture(), EResourceLayout::UAV);
+    g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::SurfelGI_Attempt_RT->GetTexture(), EResourceLayout::UAV);
 
     int32 BindingPoint = 0;
     jShaderBindingArray ShaderBindingArray;
@@ -239,6 +259,9 @@ void jRenderer::SurfelGIPass()
 
     ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE,
         ResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::SurfelGI_Debug_RT->GetTexture(), nullptr)));
+
+    ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE,
+        ResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::SurfelGI_Attempt_RT->GetTexture(), nullptr)));
 
     auto CurrentBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
 
@@ -283,8 +306,9 @@ void jRenderer::SurfelGIPass()
 
     g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelPoolBuffer.get());
     g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::SurfelGI_Debug_RT->GetTexture());
+    g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::SurfelGI_Attempt_RT->GetTexture());
 
-    if (gOptions.ShowSurfelGIPlacedSurfels)
+    if (gOptions.ShowSurfelGIPlacedSurfels || gOptions.ShowSurfelGISpawnAttemptDebug)
     {
         struct alignas(16) jSurfelGIVisualizeUniformBuffer
         {
@@ -303,7 +327,7 @@ void jRenderer::SurfelGIPass()
             int32 ShowCellDebug;
             int32 ShowUnderfilledCellDebug;
             int32 ShowCellGrid;
-            int32 Padding0;
+            int32 ShowSpawnAttemptDebug;
         };
         static_assert((sizeof(jSurfelGIVisualizeUniformBuffer) % 16) == 0, "jSurfelGIVisualizeUniformBuffer size must be 16-byte aligned");
 
@@ -344,13 +368,14 @@ void jRenderer::SurfelGIPass()
         VisualizeUniformData.ShowCellDebug = gOptions.ShowSurfelGICellDebug ? 1 : 0;
         VisualizeUniformData.ShowUnderfilledCellDebug = gOptions.ShowSurfelGIUnderfilledCellDebug ? 1 : 0;
         VisualizeUniformData.ShowCellGrid = gOptions.ShowSurfelGICellGrid ? 1 : 0;
-        VisualizeUniformData.Padding0 = 0;
+        VisualizeUniformData.ShowSpawnAttemptDebug = gOptions.ShowSurfelGISpawnAttemptDebug ? 1 : 0;
 
         auto VisualizeUniformBuffer = std::shared_ptr<IUniformBufferBlock>(
             g_rhi->CreateUniformBufferBlock(jNameStatic("SurfelGIVisualizeUniformBuffer"), jLifeTimeType::OneFrame, sizeof(VisualizeUniformData)));
         VisualizeUniformBuffer->UpdateBufferData(&VisualizeUniformData, sizeof(VisualizeUniformData));
 
         g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelPoolBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
+        g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::SurfelGI_Attempt_RT->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
 
         {
             DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "SurfelGI Dispatch Visualize", Vector4(0.15f, 0.75f, 0.95f, 1.0f));
@@ -374,7 +399,10 @@ void jRenderer::SurfelGIPass()
                     InOutShaderBindingArray.Add(jShaderBinding::Create(3, 1, EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::COMPUTE,
                         InOutResourceInlineAllactor.Alloc<jBufferResource>(GSurfelPoolBuffer.get())));
 
-                    InOutShaderBindingArray.Add(jShaderBinding::Create(4, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE,
+                    InOutShaderBindingArray.Add(jShaderBinding::Create(4, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::COMPUTE,
+                        InOutResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::SurfelGI_Attempt_RT->GetTexture(), nullptr)));
+
+                    InOutShaderBindingArray.Add(jShaderBinding::Create(5, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE,
                         InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(VisualizeUniformBuffer.get()), true));
                 },
                 [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
@@ -459,7 +487,8 @@ void jRenderer::SurfelGIPass()
         }
     }
 
-    if (gOptions.ShowSurfelGIDebug || (gOptions.ShowSurfelGIPlacedSurfels && !gOptions.SurfelGIVisualizeBlendWithScene))
+    if (gOptions.ShowSurfelGIDebug
+        || ((gOptions.ShowSurfelGIPlacedSurfels || gOptions.ShowSurfelGISpawnAttemptDebug) && !gOptions.SurfelGIVisualizeBlendWithScene))
     {
         DebugRTs.push_back(jSceneRenderTarget::SurfelGI_Debug_RT->GetTexturePtr());
     }

@@ -515,6 +515,7 @@ void IRenderer::UIPass()
                     ImGui::Checkbox("Show Surfel Cell Debug", &gOptions.ShowSurfelGICellDebug);
                     ImGui::Checkbox("Show Underfilled Cell Debug", &gOptions.ShowSurfelGIUnderfilledCellDebug);
                     ImGui::Checkbox("Show Surfel Cell Grid", &gOptions.ShowSurfelGICellGrid);
+                    ImGui::Checkbox("Show Spawn Attempt Points", &gOptions.ShowSurfelGISpawnAttemptDebug);
                     DrawSliderInt60_40("Neighbor Cell Radius", &gOptions.SurfelGIVisualizeNeighborCellRadius, 0, 3);
                     ImGui::Checkbox("Blend With Scene", &gOptions.SurfelGIVisualizeBlendWithScene);
                     if (gOptions.SurfelGIVisualizeBlendWithScene)

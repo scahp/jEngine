@@ -24,6 +24,7 @@ std::shared_ptr<jRenderTarget> jSceneRenderTarget::GIProjection;
 std::shared_ptr<jRenderTarget> jSceneRenderTarget::SSGI_RT;
 std::shared_ptr<jRenderTarget> jSceneRenderTarget::SSGI_Accum_RT[3];
 std::shared_ptr<jRenderTarget> jSceneRenderTarget::SurfelGI_Debug_RT;
+std::shared_ptr<jRenderTarget> jSceneRenderTarget::SurfelGI_Attempt_RT;
 std::shared_ptr<jRenderTarget> jSceneRenderTarget::AtmosphericShadow_RT;
 std::shared_ptr<jRenderTarget> jSceneRenderTarget::VBuffer_RT;
 std::shared_ptr<jRenderTarget> jSceneRenderTarget::HitObject_RT;
@@ -305,6 +306,8 @@ void jSceneRenderTarget::Return()
         SSGI_RT->Return();
     if (SurfelGI_Debug_RT)
         SurfelGI_Debug_RT->Return();
+    if (SurfelGI_Attempt_RT)
+        SurfelGI_Attempt_RT->Return();
 }
 
 std::shared_ptr<jRenderTarget> jSceneRenderTarget::GetShadowMap(const jLight* InLight) const

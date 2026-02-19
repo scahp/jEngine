@@ -97,6 +97,7 @@ struct jOptions
     bool ShowSurfelGICellDebug;
     bool ShowSurfelGIUnderfilledCellDebug;
     bool ShowSurfelGICellGrid;
+    bool ShowSurfelGISpawnAttemptDebug;
     int32 SurfelGIVisualizeNeighborCellRadius;
     bool SurfelGIVisualizeBlendWithScene;
     float SurfelGIVisualizeBlendAlpha;

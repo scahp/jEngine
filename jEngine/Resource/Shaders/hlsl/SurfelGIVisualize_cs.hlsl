@@ -22,7 +22,7 @@ struct VisualizeUniformBuffer
     int ShowCellDebug;
     int ShowUnderfilledCellDebug;
     int ShowCellGrid;
-    int Padding0;
+    int ShowSpawnAttemptDebug;
 };
 
 struct SurfelData
@@ -38,8 +38,9 @@ Texture2D DepthTexture : register(t1, space0);
 SamplerState DepthTextureSampler : register(s1, space0);
 Texture2D LinearDepthTexture : register(t2, space0);
 StructuredBuffer<SurfelData> SurfelPool : register(t3, space0);
+Texture2D SpawnAttemptTexture : register(t4, space0);
 
-cbuffer VisualizeCommon : register(b4, space0)
+cbuffer VisualizeCommon : register(b5, space0)
 {
     VisualizeUniformBuffer VisualizeCommon;
 }
@@ -329,6 +330,34 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         const float lineWidth = 0.02;
         const float lineMask = 1.0 - smoothstep(lineWidth, lineWidth * 2.5, nearestEdge);
         visualizeColor = lerp(visualizeColor, float3(1.0, 1.0, 1.0), lineMask * 0.85);
+    }
+
+    if (VisualizeCommon.ShowSpawnAttemptDebug != 0)
+    {
+        float bestAttemptStrength = 0.0;
+        float3 bestAttemptColor = float3(0.0, 0.0, 0.0);
+        [unroll] for (int dy = -1; dy <= 1; ++dy)
+        {
+            [unroll] for (int dx = -1; dx <= 1; ++dx)
+            {
+                const int2 samplePixel = clamp(pixel + int2(dx, dy), int2(0, 0), screenSize - 1);
+                const float3 sampleColor = SpawnAttemptTexture.Load(int3(samplePixel, 0)).xyz;
+                const float luma = max(sampleColor.x, max(sampleColor.y, sampleColor.z));
+                const float dist2 = (float)(dx * dx + dy * dy);
+                const float falloff = (dist2 <= 0.0) ? 1.0 : ((dist2 <= 1.0) ? 0.6 : 0.3);
+                const float strength = luma * falloff;
+                if (strength > bestAttemptStrength)
+                {
+                    bestAttemptStrength = strength;
+                    bestAttemptColor = sampleColor;
+                }
+            }
+        }
+
+        if (bestAttemptStrength > 0.001)
+        {
+            visualizeColor = lerp(visualizeColor, bestAttemptColor, saturate(bestAttemptStrength));
+        }
     }
 
     Result[pixel] = float4(visualizeColor, 1.0);

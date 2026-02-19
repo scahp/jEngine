@@ -69,6 +69,19 @@ cbuffer ComputeCommon : register(b4, space0)
 
 RWStructuredBuffer<SurfelData> SurfelPool : register(u5, space0);
 RWTexture2D<float4> DebugOutput : register(u6, space0);
+RWTexture2D<float4> AttemptOutput : register(u7, space0);
+
+static const float3 ATTEMPT_COLOR_GATE_PASS                 = float3(1.00, 0.25, 0.05); // orange
+static const float3 ATTEMPT_COLOR_CASCADE_MISMATCH          = float3(1.00, 1.00, 1.00); // white
+static const float3 ATTEMPT_COLOR_MERGED                    = float3(0.00, 1.00, 0.00); // green
+static const float3 ATTEMPT_COLOR_DORMANT_REUSED            = float3(0.20, 0.60, 1.00); // cyan-blue
+static const float3 ATTEMPT_COLOR_HISTORICAL_REUSED         = float3(0.60, 0.20, 1.00); // violet
+static const float3 ATTEMPT_COLOR_HYSTERESIS_WAIT           = float3(0.00, 0.00, 0.80); // deep blue
+static const float3 ATTEMPT_COLOR_REJECTED_MIN_SEPARATION   = float3(1.00, 1.00, 0.00); // yellow
+static const float3 ATTEMPT_COLOR_REJECTED_NO_REPLACE       = float3(0.00, 0.30, 1.00); // blue
+static const float3 ATTEMPT_COLOR_SPAWN_NEW                 = float3(1.00, 0.00, 0.00); // red
+static const float3 ATTEMPT_COLOR_REPLACED_FAR              = float3(0.00, 1.00, 1.00); // cyan
+static const float3 ATTEMPT_COLOR_STEAL_FAR                 = float3(1.00, 0.00, 1.00); // magenta
 
 uint HashU32(uint x)
 {
@@ -247,8 +260,10 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     if (rawDepth <= 0.0)
     {
         DebugOutput[pixel] = float4(0.0, 0.0, 0.0, 1.0);
+        AttemptOutput[pixel] = float4(0.0, 0.0, 0.0, 1.0);
         return;
     }
+    AttemptOutput[pixel] = float4(0.0, 0.0, 0.0, 1.0);
 
     const float3 viewPos = CalcViewPositionFromDepth(DepthTexture, DepthTextureSampler, uv, ComputeCommon.InvP);
     const float3 worldPos = mul(ComputeCommon.InvV, float4(viewPos, 1.0)).xyz;
@@ -312,6 +327,9 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         }
     }
     const float stochasticPick = (float)(pixelHash & 1023u) / 1023.0;
+    const bool passesSpawnGate = (stochasticPick <= spawnProb);
+    if (passesSpawnGate)
+        AttemptOutput[pixel] = float4(ATTEMPT_COLOR_GATE_PASS, 1.0);
     if (stochasticPick > spawnProb)
     {
         DebugOutput[pixel] = float4(0.0, 0.0, 0.0, 1.0);
@@ -597,6 +615,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         const uint currentCascade = (uint)round(current.Extra.w);
         if (currentCascade != cascadeIndex)
         {
+            AttemptOutput[pixel] = float4(ATTEMPT_COLOR_CASCADE_MISMATCH, 1.0);
             DebugOutput[pixel] = float4(0.0, 0.0, 0.0, 1.0);
             return;
         }
@@ -640,6 +659,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         current.Extra.w = (float)cascadeIndex;
         SurfelPool[index] = current;
 
+        AttemptOutput[pixel] = float4(ATTEMPT_COLOR_MERGED, 1.0);
         DebugOutput[pixel] = float4(0.0, 1.0, 0.0, 1.0);
         return;
     }
@@ -663,6 +683,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         current.Extra.w = (float)cascadeIndex;
         SurfelPool[index] = current;
 
+        AttemptOutput[pixel] = float4(ATTEMPT_COLOR_DORMANT_REUSED, 1.0);
         DebugOutput[pixel] = float4(0.2, 0.6, 1.0, 1.0);
         return;
     }
@@ -845,6 +866,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
             historical.Extra.w = (float)cascadeIndex;
             SurfelPool[bestHistoricalIndex] = historical;
 
+            AttemptOutput[pixel] = float4(ATTEMPT_COLOR_HISTORICAL_REUSED, 1.0);
             DebugOutput[pixel] = float4(0.2, 0.6, 1.0, 1.0);
             return;
         }
@@ -856,6 +878,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         {
             current.Extra.z = (float)pendingSpawnStreak;
             SurfelPool[index] = current;
+            AttemptOutput[pixel] = float4(ATTEMPT_COLOR_HYSTERESIS_WAIT, 1.0);
             DebugOutput[pixel] = float4(0.0, 0.0, 0.5, 1.0);
             return;
         }
@@ -871,6 +894,8 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         s.AlbedoWeight = float4(albedo, 1.0);
         s.Extra = float4(stealFarSurfel ? 4.0 : (replaceFarSurfel ? 3.0 : 0.0), 1.0, 0.0, (float)cascadeIndex);
         SurfelPool[index] = s;
+        AttemptOutput[pixel] = float4(stealFarSurfel ? ATTEMPT_COLOR_STEAL_FAR
+            : (replaceFarSurfel ? ATTEMPT_COLOR_REPLACED_FAR : ATTEMPT_COLOR_SPAWN_NEW), 1.0);
 
         DebugOutput[pixel] = stealFarSurfel ? float4(1.0, 0.0, 1.0, 1.0)
             : (replaceFarSurfel ? float4(0.0, 1.0, 1.0, 1.0)
@@ -878,6 +903,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     }
     else
     {
+        AttemptOutput[pixel] = float4(violatesMinSeparation ? ATTEMPT_COLOR_REJECTED_MIN_SEPARATION : ATTEMPT_COLOR_REJECTED_NO_REPLACE, 1.0);
         DebugOutput[pixel] = violatesMinSeparation ? float4(1.0, 1.0, 0.0, 1.0) : float4(0.0, 0.0, 1.0, 1.0);
     }
 }
