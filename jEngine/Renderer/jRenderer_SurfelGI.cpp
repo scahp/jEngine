@@ -18,8 +18,27 @@ struct jSurfelGPU
     Vector4 Extra = Vector4(0.0f, 0.0f, 0.0f, 0.0f);
 };
 
+struct alignas(16) jVisibleCellGPU
+{
+    int32 CellX = 0;
+    int32 CellY = 0;
+    int32 CellZ = 0;
+    int32 Cascade = 0;
+};
+
+struct alignas(16) jVisibleCellCounterGPU
+{
+    uint32 Count = 0;
+    uint32 Padding0 = 0;
+    uint32 Padding1 = 0;
+    uint32 Padding2 = 0;
+};
+
 std::shared_ptr<jBuffer> GSurfelPoolBuffer;
 int32 GSurfelPoolMaxCount = 0;
+std::shared_ptr<jBuffer> GVisibleCellWorklistBuffer;
+std::shared_ptr<jBuffer> GVisibleCellCounterBuffer;
+int32 GVisibleCellWorklistCapacity = 0;
 
 void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
 {
@@ -81,6 +100,37 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
         };
         jSceneRenderTarget::SurfelGI_Attempt_RT = g_rhi->CreateRenderTarget(Info);
     }
+
+    const int32 MaxVisibleCells = Max(1, Width * Height);
+    if (!GVisibleCellWorklistBuffer || GVisibleCellWorklistCapacity != MaxVisibleCells)
+    {
+        GVisibleCellWorklistCapacity = MaxVisibleCells;
+        std::vector<jVisibleCellGPU> InitialWorklist;
+        InitialWorklist.resize((size_t)MaxVisibleCells);
+        GVisibleCellWorklistBuffer = g_rhi->CreateStructuredBuffer(
+            sizeof(jVisibleCellGPU) * (uint64)MaxVisibleCells,
+            0,
+            sizeof(jVisibleCellGPU),
+            EBufferCreateFlag::UAV,
+            EResourceLayout::GENERAL,
+            InitialWorklist.data(),
+            sizeof(jVisibleCellGPU) * (uint64)MaxVisibleCells,
+            jNameStatic("SurfelGI_VisibleCellWorklist"));
+    }
+
+    if (!GVisibleCellCounterBuffer)
+    {
+        jVisibleCellCounterGPU CounterInit = {};
+        GVisibleCellCounterBuffer = g_rhi->CreateStructuredBuffer(
+            sizeof(jVisibleCellCounterGPU),
+            0,
+            sizeof(jVisibleCellCounterGPU),
+            EBufferCreateFlag::UAV,
+            EResourceLayout::GENERAL,
+            &CounterInit,
+            sizeof(jVisibleCellCounterGPU),
+            jNameStatic("SurfelGI_VisibleCellCounter"));
+    }
 }
 }
 
@@ -94,7 +144,8 @@ void jRenderer::SurfelGIPass()
     DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "SurfelGIPass", Vector4(0.25f, 0.85f, 0.4f, 1.0f));
 
     EnsureSurfelGIResources(RenderFrameContextPtr);
-    if (!GSurfelPoolBuffer || !jSceneRenderTarget::SurfelGI_Debug_RT || !jSceneRenderTarget::SurfelGI_Attempt_RT)
+    if (!GSurfelPoolBuffer || !jSceneRenderTarget::SurfelGI_Debug_RT || !jSceneRenderTarget::SurfelGI_Attempt_RT
+        || !GVisibleCellWorklistBuffer || !GVisibleCellCounterBuffer)
         return;
     struct alignas(16) jFloat4
     {
@@ -227,6 +278,8 @@ void jRenderer::SurfelGIPass()
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::NORMAL)->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::ALBEDO)->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->LinearDepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+    g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GVisibleCellWorklistBuffer.get(), EResourceLayout::UAV);
+    g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GVisibleCellCounterBuffer.get(), EResourceLayout::UAV);
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelPoolBuffer.get(), EResourceLayout::UAV);
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::SurfelGI_Debug_RT->GetTexture(), EResourceLayout::UAV);
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::SurfelGI_Attempt_RT->GetTexture(), EResourceLayout::UAV);
@@ -298,6 +351,151 @@ void jRenderer::SurfelGIPass()
     const int32 Height = RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->Info.Height;
     const int32 GroupX = (Width + 7) / 8;
     const int32 GroupY = (Height + 7) / 8;
+
+    {
+        jShaderBindingArray ClearBindingArray;
+        jShaderBindingResourceInlineAllocator ClearResourceAllocator;
+        ClearBindingArray.Add(jShaderBinding::Create(0, 1, EShaderBindingType::BUFFER_UAV, EShaderAccessStageFlag::COMPUTE,
+            ClearResourceAllocator.Alloc<jBufferResource>(GVisibleCellCounterBuffer.get())));
+
+        auto ClearBindingInstance = g_rhi->CreateShaderBindingInstance(ClearBindingArray, jShaderBindingInstanceType::SingleFrame);
+
+        jShaderInfo ClearShaderInfo;
+        ClearShaderInfo.SetName(jNameStatic("SurfelGIClearVisibleCellCounter_CS"));
+        ClearShaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/SurfelGIClearVisibleCellCounter_cs.hlsl"));
+        ClearShaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
+        ClearShaderInfo.SetEntryPoint(jNameStatic("main"));
+        jShader* ClearShader = g_rhi->CreateShader(ClearShaderInfo);
+
+        jShaderBindingLayoutArray ClearLayoutArray;
+        ClearLayoutArray.Add(ClearBindingInstance->ShaderBindingsLayouts);
+        jPipelineStateInfo* ClearPSO = g_rhi->CreateComputePipelineStateInfo(ClearShader, ClearLayoutArray, {});
+        ClearPSO->Bind(RenderFrameContextPtr);
+
+        jShaderBindingInstanceArray ClearInstanceArray;
+        ClearInstanceArray.Add(ClearBindingInstance.get());
+
+        jShaderBindingInstanceCombiner ClearCombiner;
+        ClearCombiner.ShaderBindingInstanceArray = &ClearInstanceArray;
+        ClearCombiner.DescriptorSetHandles.Add(ClearBindingInstance->GetHandle());
+
+        g_rhi->BindComputeShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), ClearPSO, ClearCombiner, 0);
+        DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "SurfelGI Dispatch ClearVisibleCellCounter", Vector4(0.55f, 0.55f, 0.95f, 1.0f));
+        SCOPE_GPU_PROFILE(RenderFrameContextPtr, SurfelGI_DispatchClearVisibleCellCounter);
+        g_rhi->DispatchCompute(RenderFrameContextPtr, 1, 1, 1);
+    }
+
+    g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), GVisibleCellCounterBuffer.get());
+
+    {
+        jShaderBindingArray CollectBindingArray;
+        jShaderBindingResourceInlineAllocator CollectResourceAllocator;
+        int32 CollectBindingPoint = 0;
+
+        CollectBindingArray.Add(jShaderBinding::Create(CollectBindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE,
+            CollectResourceAllocator.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), SamplerState)));
+        CollectBindingArray.Add(jShaderBinding::Create(CollectBindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE,
+            CollectResourceAllocator.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
+        CollectBindingArray.Add(jShaderBinding::Create(CollectBindingPoint++, 1, EShaderBindingType::BUFFER_UAV, EShaderAccessStageFlag::COMPUTE,
+            CollectResourceAllocator.Alloc<jBufferResource>(GVisibleCellWorklistBuffer.get())));
+        CollectBindingArray.Add(jShaderBinding::Create(CollectBindingPoint++, 1, EShaderBindingType::BUFFER_UAV, EShaderAccessStageFlag::COMPUTE,
+            CollectResourceAllocator.Alloc<jBufferResource>(GVisibleCellCounterBuffer.get())));
+
+        auto CollectBindingInstance = g_rhi->CreateShaderBindingInstance(CollectBindingArray, jShaderBindingInstanceType::SingleFrame);
+
+        jShaderInfo CollectShaderInfo;
+        CollectShaderInfo.SetName(jNameStatic("SurfelGIVisibleCellCollect_CS"));
+        CollectShaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/SurfelGIVisibleCellCollect_cs.hlsl"));
+        CollectShaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
+        CollectShaderInfo.SetEntryPoint(jNameStatic("main"));
+        jShader* CollectShader = g_rhi->CreateShader(CollectShaderInfo);
+
+        jShaderBindingLayoutArray CollectLayoutArray;
+        CollectLayoutArray.Add(CollectBindingInstance->ShaderBindingsLayouts);
+        jPipelineStateInfo* CollectPSO = g_rhi->CreateComputePipelineStateInfo(CollectShader, CollectLayoutArray, {});
+        CollectPSO->Bind(RenderFrameContextPtr);
+
+        jShaderBindingInstanceArray CollectInstanceArray;
+        CollectInstanceArray.Add(CollectBindingInstance.get());
+
+        jShaderBindingInstanceCombiner CollectCombiner;
+        CollectCombiner.ShaderBindingInstanceArray = &CollectInstanceArray;
+        CollectCombiner.DescriptorSetHandles.Add(CollectBindingInstance->GetHandle());
+        if (const std::vector<uint32>* DynamicOffsets = CollectBindingInstance->GetDynamicOffsets())
+        {
+            if (!DynamicOffsets->empty())
+            {
+                CollectCombiner.DynamicOffsets.Add((void*)DynamicOffsets->data(), (int32)DynamicOffsets->size());
+            }
+        }
+
+        g_rhi->BindComputeShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), CollectPSO, CollectCombiner, 0);
+        DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "SurfelGI Dispatch CollectVisibleCells", Vector4(0.25f, 0.65f, 0.95f, 1.0f));
+        SCOPE_GPU_PROFILE(RenderFrameContextPtr, SurfelGI_DispatchCollectVisibleCells);
+        g_rhi->DispatchCompute(RenderFrameContextPtr, GroupX, GroupY, 1);
+    }
+
+    g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), GVisibleCellWorklistBuffer.get());
+    g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), GVisibleCellCounterBuffer.get());
+    g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GVisibleCellWorklistBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
+    g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GVisibleCellCounterBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
+
+    {
+        jShaderBindingArray RefreshBindingArray;
+        jShaderBindingResourceInlineAllocator RefreshResourceAllocator;
+        int32 RefreshBindingPoint = 0;
+
+        RefreshBindingArray.Add(jShaderBinding::Create(RefreshBindingPoint++, 1, EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::COMPUTE,
+            RefreshResourceAllocator.Alloc<jBufferResource>(GVisibleCellWorklistBuffer.get())));
+        RefreshBindingArray.Add(jShaderBinding::Create(RefreshBindingPoint++, 1, EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::COMPUTE,
+            RefreshResourceAllocator.Alloc<jBufferResource>(GVisibleCellCounterBuffer.get())));
+        RefreshBindingArray.Add(jShaderBinding::Create(RefreshBindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE,
+            RefreshResourceAllocator.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
+        RefreshBindingArray.Add(jShaderBinding::Create(RefreshBindingPoint++, 1, EShaderBindingType::BUFFER_UAV, EShaderAccessStageFlag::COMPUTE,
+            RefreshResourceAllocator.Alloc<jBufferResource>(GSurfelPoolBuffer.get())));
+
+        auto RefreshBindingInstance = g_rhi->CreateShaderBindingInstance(RefreshBindingArray, jShaderBindingInstanceType::SingleFrame);
+
+        jShaderInfo RefreshShaderInfo;
+        RefreshShaderInfo.SetName(jNameStatic("SurfelGIRefreshVisibleCellSurfels_CS"));
+        RefreshShaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/SurfelGIRefreshVisibleCellSurfels_cs.hlsl"));
+        RefreshShaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
+        RefreshShaderInfo.SetEntryPoint(jNameStatic("main"));
+        jShader* RefreshShader = g_rhi->CreateShader(RefreshShaderInfo);
+
+        jShaderBindingLayoutArray RefreshLayoutArray;
+        RefreshLayoutArray.Add(RefreshBindingInstance->ShaderBindingsLayouts);
+        jPipelineStateInfo* RefreshPSO = g_rhi->CreateComputePipelineStateInfo(RefreshShader, RefreshLayoutArray, {});
+        RefreshPSO->Bind(RenderFrameContextPtr);
+
+        jShaderBindingInstanceArray RefreshInstanceArray;
+        RefreshInstanceArray.Add(RefreshBindingInstance.get());
+
+        jShaderBindingInstanceCombiner RefreshCombiner;
+        RefreshCombiner.ShaderBindingInstanceArray = &RefreshInstanceArray;
+        RefreshCombiner.DescriptorSetHandles.Add(RefreshBindingInstance->GetHandle());
+        if (const std::vector<uint32>* DynamicOffsets = RefreshBindingInstance->GetDynamicOffsets())
+        {
+            if (!DynamicOffsets->empty())
+            {
+                RefreshCombiner.DynamicOffsets.Add((void*)DynamicOffsets->data(), (int32)DynamicOffsets->size());
+            }
+        }
+
+        g_rhi->BindComputeShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), RefreshPSO, RefreshCombiner, 0);
+        const int32 RefreshGroupX = (GVisibleCellWorklistCapacity + 63) / 64;
+        DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "SurfelGI Dispatch RefreshVisibleCellSurfels", Vector4(0.75f, 0.8f, 0.25f, 1.0f));
+        SCOPE_GPU_PROFILE(RenderFrameContextPtr, SurfelGI_DispatchRefreshVisibleCellSurfels);
+        g_rhi->DispatchCompute(RenderFrameContextPtr, Max(1, RefreshGroupX), 1, 1);
+    }
+
+    g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelPoolBuffer.get());
+    g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GVisibleCellWorklistBuffer.get(), EResourceLayout::UAV);
+    g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GVisibleCellCounterBuffer.get(), EResourceLayout::UAV);
+
+    ComputePipelineStateInfo->Bind(RenderFrameContextPtr);
+    g_rhi->BindComputeShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), ComputePipelineStateInfo, ShaderBindingInstanceCombiner, 0);
+
     {
         DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "SurfelGI Dispatch PlaceUpdate", Vector4(0.2f, 0.9f, 0.35f, 1.0f));
         SCOPE_GPU_PROFILE(RenderFrameContextPtr, SurfelGI_DispatchPlaceUpdate);
