@@ -79,6 +79,9 @@ struct jOptions
     float SurfelGICascadeCellScaleFromPrev[SURFEL_GI_CASCADE_COUNT];
     float SurfelGICascadeStartDistance[SURFEL_GI_CASCADE_COUNT];
     float SurfelGICascadeRadiusScale[SURFEL_GI_CASCADE_COUNT];
+    int32 SurfelGIClipmapGridDimX[SURFEL_GI_CASCADE_COUNT];
+    int32 SurfelGIClipmapGridDimY[SURFEL_GI_CASCADE_COUNT];
+    int32 SurfelGIClipmapGridDimZ[SURFEL_GI_CASCADE_COUNT];
     int32 SurfelGISurfelsPerCell[SURFEL_GI_CASCADE_COUNT];
     float SurfelGIOverlapAllowance[SURFEL_GI_CASCADE_COUNT];
     bool UseSurfelGICenterSpawnBias;

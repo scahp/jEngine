@@ -28,6 +28,8 @@ struct CommonComputeUniformBuffer
     int FrameNumber;
     int TileSize;
     int MaxSurfels;
+    int SurfelPageSize;
+    int SurfelPageTableCapacity;
     int SpawnBudget;
     int TTLInFrames;
     float GridCellSize;
@@ -37,6 +39,9 @@ struct CommonComputeUniformBuffer
     int SpawnHysteresisFrames;
     int DeleteHysteresisFrames;
     float RadiusScale;
+    float4 CascadeClipmapGridDimXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeClipmapGridDimYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeClipmapGridDimZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
     float4 SurfelsPerCellPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
     float4 OverlapAllowancePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
 };

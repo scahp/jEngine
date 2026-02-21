@@ -4,6 +4,7 @@
     #define SURFEL_GI_CASCADE_COUNT 3
 #endif
 #define SURFEL_GI_CASCADE_PACKED_COUNT ((SURFEL_GI_CASCADE_COUNT + 3) / 4)
+#define SURFEL_GI_ENABLE_OVERFLOW 0
 
 struct VisualizeUniformBuffer
 {
@@ -14,7 +15,12 @@ struct VisualizeUniformBuffer
     float GridCellSize;
     float4 CascadeCellScaleFromPrevPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
     float4 CascadeStartDistancePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeClipmapGridDimXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeClipmapGridDimYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeClipmapGridDimZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
     int MaxSurfels;
+    int SurfelPageSize;
+    int SurfelPageTableCapacity;
     int NeighborCellRadius;
     int BlendWithScene;
     int ShowStateDebug;
@@ -33,21 +39,11 @@ struct SurfelData
     float4 Extra;
 };
 
-struct OverflowHead
+struct SurfelCellPageEntry
 {
-    int Head;
-    int Padding0;
-    int Padding1;
-    int Padding2;
-};
-
-struct OverflowNode
-{
-    SurfelData Surfel;
-    int Next;
-    int Padding0;
-    int Padding1;
-    int Padding2;
+    int4 CellCascade;
+    uint State;
+    uint3 Padding;
 };
 
 RWTexture2D<float4> Result : register(u0, space0);
@@ -56,8 +52,7 @@ SamplerState DepthTextureSampler : register(s1, space0);
 Texture2D LinearDepthTexture : register(t2, space0);
 StructuredBuffer<SurfelData> SurfelPool : register(t3, space0);
 Texture2D SpawnAttemptTexture : register(t4, space0);
-StructuredBuffer<OverflowHead> OverflowHeads : register(t6, space0);
-StructuredBuffer<OverflowNode> OverflowNodes : register(t7, space0);
+StructuredBuffer<SurfelCellPageEntry> SurfelCellPageTable : register(t6, space0);
 
 cbuffer VisualizeCommon : register(b5, space0)
 {
@@ -115,7 +110,8 @@ float3 RadiusDebugColor(float radius)
 
 uint GetSlotsPerCell(uint maxSurfels, uint desiredSlotsPerCell)
 {
-    const uint clampedDesired = clamp(desiredSlotsPerCell, 1u, 8u);
+    const uint maxSlotsPerCell = min(max((uint)VisualizeCommon.SurfelPageSize, 1u), 8u);
+    const uint clampedDesired = clamp(desiredSlotsPerCell, 1u, maxSlotsPerCell);
     return min(max(1u, maxSurfels), clampedDesired);
 }
 
@@ -123,6 +119,12 @@ uint GetCellCount(uint maxSurfels, uint desiredSlotsPerCell)
 {
     const uint slotsPerCell = GetSlotsPerCell(maxSurfels, desiredSlotsPerCell);
     return max(1u, maxSurfels / slotsPerCell);
+}
+
+int PositiveModulo(int value, int divisor)
+{
+    const int m = value % divisor;
+    return (m < 0) ? (m + divisor) : m;
 }
 
 uint GetCascadePartitionOffset(uint maxSurfels, uint cascadeIndex)
@@ -160,14 +162,80 @@ uint HashCellWithCascade(int3 cellCoord, uint cascadeIndex)
     return HashU32(h);
 }
 
-uint GetCellBaseIndex(int3 cellCoord, uint maxSurfels, uint desiredSlotsPerCell, uint cascadeIndex)
+int3 GetClipmapGridDim(uint cellCount, uint cascadeIndex)
 {
-    const uint cascadeOffset = GetCascadePartitionOffset(maxSurfels, cascadeIndex);
+    const uint c = min(cascadeIndex, (uint)(SURFEL_GI_CASCADE_COUNT - 1));
+    const uint packIndex = c >> 2u;
+    const uint lane = c & 3u;
+    const float4 packedX = VisualizeCommon.CascadeClipmapGridDimXPacked[packIndex];
+    const float4 packedY = VisualizeCommon.CascadeClipmapGridDimYPacked[packIndex];
+    const float4 packedZ = VisualizeCommon.CascadeClipmapGridDimZPacked[packIndex];
+    const float dimXf = (lane == 0u) ? packedX.x : ((lane == 1u) ? packedX.y : ((lane == 2u) ? packedX.z : packedX.w));
+    const float dimYf = (lane == 0u) ? packedY.x : ((lane == 1u) ? packedY.y : ((lane == 2u) ? packedY.z : packedY.w));
+    const float dimZf = (lane == 0u) ? packedZ.x : ((lane == 1u) ? packedZ.y : ((lane == 2u) ? packedZ.z : packedZ.w));
+    uint dimX = max((uint)round(dimXf), 1u);
+    uint dimY = max((uint)round(dimYf), 1u);
+    uint dimZ = max((uint)round(dimZf), 1u);
+    const uint capacity = max(1u, dimX * dimY * dimZ);
+    if (capacity < cellCount)
+    {
+        const uint xy = max(1u, dimX * dimY);
+        dimZ = max(dimZ, (cellCount + xy - 1u) / xy);
+    }
+    return int3((int)dimX, (int)dimY, (int)dimZ);
+}
+
+float GetCascadeScale(uint cascadeIndex);
+
+uint GetClipmapLocalLinearIndex(int3 cellCoord, uint maxSurfels, uint desiredSlotsPerCell, uint cascadeIndex)
+{
     const uint cascadeCapacity = GetCascadePartitionCapacity(maxSurfels, cascadeIndex);
-    const uint slotsPerCell = GetSlotsPerCell(cascadeCapacity, desiredSlotsPerCell);
     const uint cellCount = GetCellCount(cascadeCapacity, desiredSlotsPerCell);
-    const uint cellHash = Hash3(cellCoord) % cellCount;
-    return cascadeOffset + cellHash * slotsPerCell;
+    const int3 gridDim = GetClipmapGridDim(cellCount, cascadeIndex);
+    const float cellSize = max(VisualizeCommon.GridCellSize, 0.1) * GetCascadeScale(cascadeIndex);
+    const float3 cameraWorldPos = mul(VisualizeCommon.InvV, float4(0.0, 0.0, 0.0, 1.0)).xyz;
+    const int3 cameraCell = int3(floor(cameraWorldPos / cellSize));
+    const int3 originCell = cameraCell - (gridDim / 2);
+    const int3 local = cellCoord - originCell;
+    const int3 wrappedLocal = int3(
+        PositiveModulo(local.x, max(gridDim.x, 1)),
+        PositiveModulo(local.y, max(gridDim.y, 1)),
+        PositiveModulo(local.z, max(gridDim.z, 1)));
+    const uint linearIndex = (uint)(wrappedLocal.x + wrappedLocal.y * gridDim.x + wrappedLocal.z * gridDim.x * gridDim.y);
+    return (linearIndex < cellCount) ? linearIndex : (linearIndex % cellCount);
+}
+
+uint GetPageTableCapacity()
+{
+    return max((uint)VisualizeCommon.SurfelPageTableCapacity, 1u);
+}
+
+uint GetPageSize(uint maxSurfels)
+{
+    return min(max((uint)VisualizeCommon.SurfelPageSize, 1u), maxSurfels);
+}
+
+bool TryGetCellBaseIndex(int3 cellCoord, uint maxSurfels, uint cascadeIndex, out uint outCellBaseIndex)
+{
+    const uint capacity = GetPageTableCapacity();
+    const uint hash = HashCellWithCascade(cellCoord, cascadeIndex) % capacity;
+    [loop] for (uint probe = 0u; probe < capacity; ++probe)
+    {
+        const uint pageIndex = (hash + probe) % capacity;
+        const SurfelCellPageEntry e = SurfelCellPageTable[pageIndex];
+        if (e.State == 0u)
+            return false;
+        if (e.State == 2u && all(e.CellCascade.xyz == cellCoord) && ((uint)e.CellCascade.w == cascadeIndex))
+        {
+            const uint pageSize = GetPageSize(maxSurfels);
+            const uint base = pageIndex * pageSize;
+            if (base >= maxSurfels)
+                return false;
+            outCellBaseIndex = base;
+            return true;
+        }
+    }
+    return false;
 }
 
 uint GetCascadeBucketCount(uint maxSurfels, uint cascadeIndex)
@@ -190,8 +258,8 @@ uint GetCascadeBucketOffset(uint maxSurfels, uint cascadeIndex)
 uint GetCellBucketIndex(int3 cellCoord, uint maxSurfels, uint desiredSlotsPerCell, uint cascadeIndex)
 {
     const uint localBucketCount = GetCellCount(GetCascadePartitionCapacity(maxSurfels, cascadeIndex), desiredSlotsPerCell);
-    const uint localHash = Hash3(cellCoord) % localBucketCount;
-    return GetCascadeBucketOffset(maxSurfels, cascadeIndex) + localHash;
+    const uint localLinearIndex = GetClipmapLocalLinearIndex(cellCoord, maxSurfels, desiredSlotsPerCell, cascadeIndex);
+    return GetCascadeBucketOffset(maxSurfels, cascadeIndex) + (localLinearIndex % localBucketCount);
 }
 
 float GetCascadeScale(uint cascadeIndex)
@@ -268,7 +336,9 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                 [loop] for (int x = -neighborRadius; x <= neighborRadius; ++x)
                 {
                     const int3 queryCellCoord = baseCellCoord + int3(x, y, z);
-                    const uint baseIndex = GetCellBaseIndex(queryCellCoord, maxSurfels, desiredSlotsPerCell, cascadeIndex);
+                    uint baseIndex = 0u;
+                    if (!TryGetCellBaseIndex(queryCellCoord, maxSurfels, cascadeIndex, baseIndex))
+                        continue;
                     [loop] for (uint slot = 0u; slot < slotsPerCell; ++slot)
                     {
                         const uint surfelIndex = baseIndex + slot;
@@ -330,6 +400,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                         }
                     }
 
+#if SURFEL_GI_ENABLE_OVERFLOW
                     const uint bucketIndex = min(GetCellBucketIndex(queryCellCoord, maxSurfels, desiredSlotsPerCell, cascadeIndex), maxSurfels - 1u);
                     int overflowNode = OverflowHeads[bucketIndex].Head;
                     [loop] for (uint iter = 0u; iter < 24u && overflowNode >= 0; ++iter)
@@ -381,6 +452,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 
                         overflowNode = node.Next;
                     }
+#endif
                 }
             }
         }
@@ -407,10 +479,11 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         const uint debugDesiredSlots = GetDesiredSlotsPerCell(debugCascadeIndex);
         const uint debugCascadeCapacity = GetCascadePartitionCapacity(maxSurfels, debugCascadeIndex);
         const uint debugSlotsPerCell = GetSlotsPerCell(debugCascadeCapacity, debugDesiredSlots);
-        const uint debugBaseIndex = GetCellBaseIndex(debugCellCoord, maxSurfels, debugDesiredSlots, debugCascadeIndex);
+        uint debugBaseIndex = 0u;
+        const bool hasDebugCellPage = TryGetCellBaseIndex(debugCellCoord, maxSurfels, debugCascadeIndex, debugBaseIndex);
 
         uint aliveCount = 0u;
-        [loop] for (uint slot = 0u; slot < debugSlotsPerCell; ++slot)
+        [loop] for (uint slot = 0u; slot < debugSlotsPerCell && hasDebugCellPage; ++slot)
         {
             const uint surfelIndex = debugBaseIndex + slot;
             const SurfelData s = SurfelPool[surfelIndex];

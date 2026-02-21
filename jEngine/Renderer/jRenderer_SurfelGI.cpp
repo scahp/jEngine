@@ -34,50 +34,26 @@ struct alignas(16) jVisibleCellCounterGPU
     uint32 Padding2 = 0;
 };
 
-struct alignas(16) jOverflowHeadGPU
+struct alignas(16) jSurfelCellPageEntryGPU
 {
-    int32 Head = -1;
-    int32 Padding0 = 0;
-    int32 Padding1 = 0;
-    int32 Padding2 = 0;
-};
-
-struct alignas(16) jOverflowNodeGPU
-{
-    jSurfelGPU Surfel;
-    int32 Next = -1;
-    int32 Padding0 = 0;
-    int32 Padding1 = 0;
-    int32 Padding2 = 0;
-};
-
-struct alignas(16) jOverflowAllocCounterGPU
-{
-    uint32 Count = 0;
+    int32 CellX = 0;
+    int32 CellY = 0;
+    int32 CellZ = 0;
+    int32 Cascade = 0;
+    uint32 State = 0;
     uint32 Padding0 = 0;
     uint32 Padding1 = 0;
     uint32 Padding2 = 0;
 };
 
-struct alignas(16) jOverflowStatsGPU
-{
-    uint32 InsertCount = 0;
-    uint32 ReuseCount = 0;
-    uint32 RejectChainLimit = 0;
-    uint32 MaxObservedChainLength = 0;
-};
-
 std::shared_ptr<jBuffer> GSurfelPoolBuffer;
 int32 GSurfelPoolMaxCount = 0;
+int32 GSurfelPageSize = 8;
 std::shared_ptr<jBuffer> GVisibleCellWorklistBuffer;
 std::shared_ptr<jBuffer> GVisibleCellCounterBuffer;
 int32 GVisibleCellWorklistCapacity = 0;
-std::shared_ptr<jBuffer> GSurfelOverflowHeadBuffer;
-std::shared_ptr<jBuffer> GSurfelOverflowNodeBuffer;
-std::shared_ptr<jBuffer> GSurfelOverflowAllocCounterBuffer;
-std::shared_ptr<jBuffer> GSurfelOverflowStatsBuffer;
-std::shared_ptr<jBuffer> GSurfelPerfectCellFlagsBuffer;
-int32 GSurfelOverflowNodeCapacity = 0;
+std::shared_ptr<jBuffer> GSurfelCellPageTableBuffer;
+int32 GSurfelCellPageTableCapacity = 0;
 
 void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
 {
@@ -98,6 +74,24 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
             InitialPool.data(),
             sizeof(jSurfelGPU) * (uint64)MaxSurfels,
             jNameStatic("SurfelGI_Pool"));
+    }
+
+    const int32 PageCount = Max(1, GSurfelPoolMaxCount / Max(1, GSurfelPageSize));
+    if (!GSurfelCellPageTableBuffer || GSurfelCellPageTableCapacity != PageCount)
+    {
+        GSurfelCellPageTableCapacity = PageCount;
+        std::vector<jSurfelCellPageEntryGPU> InitialEntries;
+        InitialEntries.resize((size_t)PageCount);
+
+        GSurfelCellPageTableBuffer = g_rhi->CreateStructuredBuffer(
+            sizeof(jSurfelCellPageEntryGPU) * (uint64)PageCount,
+            0,
+            sizeof(jSurfelCellPageEntryGPU),
+            EBufferCreateFlag::UAV,
+            EResourceLayout::GENERAL,
+            InitialEntries.data(),
+            sizeof(jSurfelCellPageEntryGPU) * (uint64)PageCount,
+            jNameStatic("SurfelGI_CellPageTable"));
     }
 
     const int32 Width = InRenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->Info.Width;
@@ -171,72 +165,6 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
             jNameStatic("SurfelGI_VisibleCellCounter"));
     }
 
-    if (!GSurfelOverflowHeadBuffer || !GSurfelOverflowNodeBuffer || !GSurfelOverflowAllocCounterBuffer || !GSurfelOverflowStatsBuffer || !GSurfelPerfectCellFlagsBuffer
-        || GSurfelPoolMaxCount != GSurfelOverflowNodeCapacity)
-    {
-        std::vector<jOverflowHeadGPU> InitialHeads;
-        InitialHeads.resize((size_t)GSurfelPoolMaxCount);
-        for (jOverflowHeadGPU& Head : InitialHeads)
-            Head.Head = -1;
-        GSurfelOverflowHeadBuffer = g_rhi->CreateStructuredBuffer(
-            sizeof(jOverflowHeadGPU) * (uint64)GSurfelPoolMaxCount,
-            0,
-            sizeof(jOverflowHeadGPU),
-            EBufferCreateFlag::UAV,
-            EResourceLayout::GENERAL,
-            InitialHeads.data(),
-            sizeof(jOverflowHeadGPU) * (uint64)GSurfelPoolMaxCount,
-            jNameStatic("SurfelGI_OverflowHeads"));
-
-        GSurfelOverflowNodeCapacity = GSurfelPoolMaxCount;
-        std::vector<jOverflowNodeGPU> InitialNodes;
-        InitialNodes.resize((size_t)GSurfelOverflowNodeCapacity);
-        for (jOverflowNodeGPU& Node : InitialNodes)
-            Node.Next = -1;
-        GSurfelOverflowNodeBuffer = g_rhi->CreateStructuredBuffer(
-            sizeof(jOverflowNodeGPU) * (uint64)GSurfelOverflowNodeCapacity,
-            0,
-            sizeof(jOverflowNodeGPU),
-            EBufferCreateFlag::UAV,
-            EResourceLayout::GENERAL,
-            InitialNodes.data(),
-            sizeof(jOverflowNodeGPU) * (uint64)GSurfelOverflowNodeCapacity,
-            jNameStatic("SurfelGI_OverflowNodes"));
-
-        jOverflowAllocCounterGPU OverflowCounterInit = {};
-        GSurfelOverflowAllocCounterBuffer = g_rhi->CreateStructuredBuffer(
-            sizeof(jOverflowAllocCounterGPU),
-            0,
-            sizeof(jOverflowAllocCounterGPU),
-            EBufferCreateFlag::UAV,
-            EResourceLayout::GENERAL,
-            &OverflowCounterInit,
-            sizeof(jOverflowAllocCounterGPU),
-            jNameStatic("SurfelGI_OverflowAllocCounter"));
-
-        jOverflowStatsGPU OverflowStatsInit = {};
-        GSurfelOverflowStatsBuffer = g_rhi->CreateStructuredBuffer(
-            sizeof(jOverflowStatsGPU),
-            0,
-            sizeof(jOverflowStatsGPU),
-            EBufferCreateFlag::UAV,
-            EResourceLayout::GENERAL,
-            &OverflowStatsInit,
-            sizeof(jOverflowStatsGPU),
-            jNameStatic("SurfelGI_OverflowStats"));
-
-        std::vector<uint32> InitialPerfectFlags;
-        InitialPerfectFlags.resize((size_t)GSurfelPoolMaxCount);
-        GSurfelPerfectCellFlagsBuffer = g_rhi->CreateStructuredBuffer(
-            sizeof(uint32) * (uint64)GSurfelPoolMaxCount,
-            0,
-            sizeof(uint32),
-            EBufferCreateFlag::UAV,
-            EResourceLayout::GENERAL,
-            InitialPerfectFlags.data(),
-            sizeof(uint32) * (uint64)GSurfelPoolMaxCount,
-            jNameStatic("SurfelGI_PerfectCellFlags"));
-    }
 }
 }
 
@@ -251,9 +179,7 @@ void jRenderer::SurfelGIPass()
 
     EnsureSurfelGIResources(RenderFrameContextPtr);
     if (!GSurfelPoolBuffer || !jSceneRenderTarget::SurfelGI_Debug_RT || !jSceneRenderTarget::SurfelGI_Attempt_RT
-        || !GVisibleCellWorklistBuffer || !GVisibleCellCounterBuffer
-        || !GSurfelOverflowHeadBuffer || !GSurfelOverflowNodeBuffer || !GSurfelOverflowAllocCounterBuffer || !GSurfelOverflowStatsBuffer
-        || !GSurfelPerfectCellFlagsBuffer)
+        || !GVisibleCellWorklistBuffer || !GVisibleCellCounterBuffer || !GSurfelCellPageTableBuffer)
         return;
     struct alignas(16) jFloat4
     {
@@ -287,6 +213,8 @@ void jRenderer::SurfelGIPass()
         int32 FrameNumber;
         int32 TileSize;
         int32 MaxSurfels;
+        int32 SurfelPageSize;
+        int32 SurfelPageTableCapacity;
         int32 SpawnBudget;
         int32 TTLInFrames;
         float GridCellSize;
@@ -297,6 +225,9 @@ void jRenderer::SurfelGIPass()
         int32 DeleteHysteresisFrames;
         float RadiusScale;
         float PaddingAfterRadiusScale;
+        jFloat4 CascadeClipmapGridDimXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+        jFloat4 CascadeClipmapGridDimYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+        jFloat4 CascadeClipmapGridDimZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
         jFloat4 SurfelsPerCellPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
         jFloat4 OverlapAllowancePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
     };
@@ -342,6 +273,8 @@ void jRenderer::SurfelGIPass()
     UniformData.FrameNumber = (int32)g_rhi->GetCurrentFrameNumber();
     UniformData.TileSize = Max(1, gOptions.SurfelGITileSize);
     UniformData.MaxSurfels = GSurfelPoolMaxCount;
+    UniformData.SurfelPageSize = Max(1, GSurfelPageSize);
+    UniformData.SurfelPageTableCapacity = Max(1, GSurfelCellPageTableCapacity);
     UniformData.SpawnBudget = Max(1, gOptions.SurfelGISpawnBudgetPerFrame);
     UniformData.TTLInFrames = Max(1, gOptions.SurfelGITTLInFrames);
     UniformData.GridCellSize = Max(0.1f, gOptions.SurfelGIWorldGridCellSize);
@@ -350,6 +283,9 @@ void jRenderer::SurfelGIPass()
         UniformData.CascadeCellScaleFromPrevPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
         UniformData.CascadeStartDistancePacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
         UniformData.CascadeRadiusScalePacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
+        UniformData.CascadeClipmapGridDimXPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
+        UniformData.CascadeClipmapGridDimYPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
+        UniformData.CascadeClipmapGridDimZPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
         UniformData.SurfelsPerCellPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
         UniformData.OverlapAllowancePacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
     }
@@ -374,6 +310,9 @@ void jRenderer::SurfelGIPass()
     UniformData.RadiusScale = Max(0.05f, gOptions.SurfelGIRadiusScale);
     for (int32 cascade = 0; cascade < SURFEL_GI_CASCADE_COUNT; ++cascade)
     {
+        SetPackedCascadeValue(UniformData.CascadeClipmapGridDimXPacked, cascade, (float)Clamp(gOptions.SurfelGIClipmapGridDimX[cascade], 4, 512));
+        SetPackedCascadeValue(UniformData.CascadeClipmapGridDimYPacked, cascade, (float)Clamp(gOptions.SurfelGIClipmapGridDimY[cascade], 4, 512));
+        SetPackedCascadeValue(UniformData.CascadeClipmapGridDimZPacked, cascade, (float)Clamp(gOptions.SurfelGIClipmapGridDimZ[cascade], 4, 512));
         SetPackedCascadeValue(UniformData.SurfelsPerCellPacked, cascade, (float)Clamp(gOptions.SurfelGISurfelsPerCell[cascade], 1, 8));
         SetPackedCascadeValue(UniformData.OverlapAllowancePacked, cascade, Clamp(gOptions.SurfelGIOverlapAllowance[cascade], 0.0f, 0.95f));
     }
@@ -388,12 +327,8 @@ void jRenderer::SurfelGIPass()
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->LinearDepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GVisibleCellWorklistBuffer.get(), EResourceLayout::UAV);
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GVisibleCellCounterBuffer.get(), EResourceLayout::UAV);
-    g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelOverflowHeadBuffer.get(), EResourceLayout::UAV);
-    g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelOverflowNodeBuffer.get(), EResourceLayout::UAV);
-    g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelOverflowAllocCounterBuffer.get(), EResourceLayout::UAV);
-    g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelOverflowStatsBuffer.get(), EResourceLayout::UAV);
-    g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelPerfectCellFlagsBuffer.get(), EResourceLayout::UAV);
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelPoolBuffer.get(), EResourceLayout::UAV);
+    g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelCellPageTableBuffer.get(), EResourceLayout::UAV);
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::SurfelGI_Debug_RT->GetTexture(), EResourceLayout::UAV);
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::SurfelGI_Attempt_RT->GetTexture(), EResourceLayout::UAV);
 
@@ -428,20 +363,8 @@ void jRenderer::SurfelGIPass()
 
     ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE,
         ResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::SurfelGI_Attempt_RT->GetTexture(), nullptr)));
-
     ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::BUFFER_UAV, EShaderAccessStageFlag::COMPUTE,
-        ResourceInlineAllactor.Alloc<jBufferResource>(GSurfelOverflowHeadBuffer.get())));
-
-    ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::BUFFER_UAV, EShaderAccessStageFlag::COMPUTE,
-        ResourceInlineAllactor.Alloc<jBufferResource>(GSurfelOverflowNodeBuffer.get())));
-
-    ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::BUFFER_UAV, EShaderAccessStageFlag::COMPUTE,
-        ResourceInlineAllactor.Alloc<jBufferResource>(GSurfelOverflowAllocCounterBuffer.get())));
-
-    ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::BUFFER_UAV, EShaderAccessStageFlag::COMPUTE,
-        ResourceInlineAllactor.Alloc<jBufferResource>(GSurfelOverflowStatsBuffer.get())));
-    ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::BUFFER_UAV, EShaderAccessStageFlag::COMPUTE,
-        ResourceInlineAllactor.Alloc<jBufferResource>(GSurfelPerfectCellFlagsBuffer.get())));
+        ResourceInlineAllactor.Alloc<jBufferResource>(GSurfelCellPageTableBuffer.get())));
 
     auto CurrentBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
 
@@ -566,6 +489,7 @@ void jRenderer::SurfelGIPass()
     g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), GVisibleCellCounterBuffer.get());
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GVisibleCellWorklistBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GVisibleCellCounterBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
+    g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelCellPageTableBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
 
     {
         jShaderBindingArray RefreshBindingArray;
@@ -580,10 +504,8 @@ void jRenderer::SurfelGIPass()
             RefreshResourceAllocator.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
         RefreshBindingArray.Add(jShaderBinding::Create(RefreshBindingPoint++, 1, EShaderBindingType::BUFFER_UAV, EShaderAccessStageFlag::COMPUTE,
             RefreshResourceAllocator.Alloc<jBufferResource>(GSurfelPoolBuffer.get())));
-        RefreshBindingArray.Add(jShaderBinding::Create(RefreshBindingPoint++, 1, EShaderBindingType::BUFFER_UAV, EShaderAccessStageFlag::COMPUTE,
-            RefreshResourceAllocator.Alloc<jBufferResource>(GSurfelOverflowHeadBuffer.get())));
-        RefreshBindingArray.Add(jShaderBinding::Create(RefreshBindingPoint++, 1, EShaderBindingType::BUFFER_UAV, EShaderAccessStageFlag::COMPUTE,
-            RefreshResourceAllocator.Alloc<jBufferResource>(GSurfelOverflowNodeBuffer.get())));
+        RefreshBindingArray.Add(jShaderBinding::Create(RefreshBindingPoint++, 1, EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::COMPUTE,
+            RefreshResourceAllocator.Alloc<jBufferResource>(GSurfelCellPageTableBuffer.get())));
 
         auto RefreshBindingInstance = g_rhi->CreateShaderBindingInstance(RefreshBindingArray, jShaderBindingInstanceType::SingleFrame);
 
@@ -623,6 +545,54 @@ void jRenderer::SurfelGIPass()
     g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelPoolBuffer.get());
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GVisibleCellWorklistBuffer.get(), EResourceLayout::UAV);
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GVisibleCellCounterBuffer.get(), EResourceLayout::UAV);
+    g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelCellPageTableBuffer.get(), EResourceLayout::UAV);
+
+    {
+        jShaderBindingArray CleanupBindingArray;
+        jShaderBindingResourceInlineAllocator CleanupResourceAllocator;
+        int32 CleanupBindingPoint = 0;
+
+        CleanupBindingArray.Add(jShaderBinding::Create(CleanupBindingPoint++, 1, EShaderBindingType::BUFFER_UAV, EShaderAccessStageFlag::COMPUTE,
+            CleanupResourceAllocator.Alloc<jBufferResource>(GSurfelPoolBuffer.get())));
+        CleanupBindingArray.Add(jShaderBinding::Create(CleanupBindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE,
+            CleanupResourceAllocator.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
+
+        auto CleanupBindingInstance = g_rhi->CreateShaderBindingInstance(CleanupBindingArray, jShaderBindingInstanceType::SingleFrame);
+
+        jShaderInfo CleanupShaderInfo;
+        CleanupShaderInfo.SetName(jNameStatic("SurfelGICleanup_CS"));
+        CleanupShaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/SurfelGICleanup_cs.hlsl"));
+        CleanupShaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
+        CleanupShaderInfo.SetEntryPoint(jNameStatic("main"));
+        jShader* CleanupShader = g_rhi->CreateShader(CleanupShaderInfo);
+
+        jShaderBindingLayoutArray CleanupLayoutArray;
+        CleanupLayoutArray.Add(CleanupBindingInstance->ShaderBindingsLayouts);
+        jPipelineStateInfo* CleanupPSO = g_rhi->CreateComputePipelineStateInfo(CleanupShader, CleanupLayoutArray, {});
+        CleanupPSO->Bind(RenderFrameContextPtr);
+
+        jShaderBindingInstanceArray CleanupInstanceArray;
+        CleanupInstanceArray.Add(CleanupBindingInstance.get());
+
+        jShaderBindingInstanceCombiner CleanupCombiner;
+        CleanupCombiner.ShaderBindingInstanceArray = &CleanupInstanceArray;
+        CleanupCombiner.DescriptorSetHandles.Add(CleanupBindingInstance->GetHandle());
+        if (const std::vector<uint32>* DynamicOffsets = CleanupBindingInstance->GetDynamicOffsets())
+        {
+            if (!DynamicOffsets->empty())
+            {
+                CleanupCombiner.DynamicOffsets.Add((void*)DynamicOffsets->data(), (int32)DynamicOffsets->size());
+            }
+        }
+
+        g_rhi->BindComputeShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), CleanupPSO, CleanupCombiner, 0);
+        const int32 CleanupGroupX = (GSurfelPoolMaxCount + 63) / 64;
+        DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "SurfelGI Dispatch Cleanup", Vector4(0.8f, 0.35f, 0.35f, 1.0f));
+        SCOPE_GPU_PROFILE(RenderFrameContextPtr, SurfelGI_DispatchCleanup);
+        g_rhi->DispatchCompute(RenderFrameContextPtr, Max(1, CleanupGroupX), 1, 1);
+    }
+
+    g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelPoolBuffer.get());
 
     ComputePipelineStateInfo->Bind(RenderFrameContextPtr);
     g_rhi->BindComputeShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), ComputePipelineStateInfo, ShaderBindingInstanceCombiner, 0);
@@ -634,11 +604,7 @@ void jRenderer::SurfelGIPass()
     }
 
     g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelPoolBuffer.get());
-    g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelOverflowHeadBuffer.get());
-    g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelOverflowNodeBuffer.get());
-    g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelOverflowAllocCounterBuffer.get());
-    g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelOverflowStatsBuffer.get());
-    g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelPerfectCellFlagsBuffer.get());
+    g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelCellPageTableBuffer.get());
     g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::SurfelGI_Debug_RT->GetTexture());
     g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::SurfelGI_Attempt_RT->GetTexture());
 
@@ -653,7 +619,12 @@ void jRenderer::SurfelGIPass()
             float GridCellSize;
             jFloat4 CascadeCellScaleFromPrevPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
             jFloat4 CascadeStartDistancePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+            jFloat4 CascadeClipmapGridDimXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+            jFloat4 CascadeClipmapGridDimYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+            jFloat4 CascadeClipmapGridDimZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
             int32 MaxSurfels;
+            int32 SurfelPageSize;
+            int32 SurfelPageTableCapacity;
             int32 NeighborCellRadius;
             int32 BlendWithScene;
             int32 ShowStateDebug;
@@ -675,6 +646,9 @@ void jRenderer::SurfelGIPass()
         {
             VisualizeUniformData.CascadeCellScaleFromPrevPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
             VisualizeUniformData.CascadeStartDistancePacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
+            VisualizeUniformData.CascadeClipmapGridDimXPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
+            VisualizeUniformData.CascadeClipmapGridDimYPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
+            VisualizeUniformData.CascadeClipmapGridDimZPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
             VisualizeUniformData.SurfelsPerCellPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
         }
         auto SetPackedVisualizeValue = [](jFloat4* packedArray, int32 cascade, float value)
@@ -690,8 +664,13 @@ void jRenderer::SurfelGIPass()
         {
             SetPackedVisualizeValue(VisualizeUniformData.CascadeCellScaleFromPrevPacked, cascade, (cascade == 0) ? 1.0f : Max(1.0f, gOptions.SurfelGICascadeCellScaleFromPrev[cascade]));
             SetPackedVisualizeValue(VisualizeUniformData.CascadeStartDistancePacked, cascade, CascadeStartDistanceSanitized[cascade]);
+            SetPackedVisualizeValue(VisualizeUniformData.CascadeClipmapGridDimXPacked, cascade, (float)Clamp(gOptions.SurfelGIClipmapGridDimX[cascade], 4, 512));
+            SetPackedVisualizeValue(VisualizeUniformData.CascadeClipmapGridDimYPacked, cascade, (float)Clamp(gOptions.SurfelGIClipmapGridDimY[cascade], 4, 512));
+            SetPackedVisualizeValue(VisualizeUniformData.CascadeClipmapGridDimZPacked, cascade, (float)Clamp(gOptions.SurfelGIClipmapGridDimZ[cascade], 4, 512));
         }
         VisualizeUniformData.MaxSurfels = GSurfelPoolMaxCount;
+        VisualizeUniformData.SurfelPageSize = Max(1, GSurfelPageSize);
+        VisualizeUniformData.SurfelPageTableCapacity = Max(1, GSurfelCellPageTableCapacity);
         VisualizeUniformData.NeighborCellRadius = Clamp(gOptions.SurfelGIVisualizeNeighborCellRadius, 0, 3);
         VisualizeUniformData.BlendWithScene = gOptions.SurfelGIVisualizeBlendWithScene ? 1 : 0;
         VisualizeUniformData.ShowStateDebug = gOptions.ShowSurfelGIStateDebug ? 1 : 0;
@@ -709,8 +688,7 @@ void jRenderer::SurfelGIPass()
         VisualizeUniformBuffer->UpdateBufferData(&VisualizeUniformData, sizeof(VisualizeUniformData));
 
         g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelPoolBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
-        g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelOverflowHeadBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
-        g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelOverflowNodeBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
+        g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelCellPageTableBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
         g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::SurfelGI_Attempt_RT->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
 
         {
@@ -740,12 +718,8 @@ void jRenderer::SurfelGIPass()
 
                     InOutShaderBindingArray.Add(jShaderBinding::Create(5, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE,
                         InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(VisualizeUniformBuffer.get()), true));
-
                     InOutShaderBindingArray.Add(jShaderBinding::Create(6, 1, EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::COMPUTE,
-                        InOutResourceInlineAllactor.Alloc<jBufferResource>(GSurfelOverflowHeadBuffer.get())));
-
-                    InOutShaderBindingArray.Add(jShaderBinding::Create(7, 1, EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::COMPUTE,
-                        InOutResourceInlineAllactor.Alloc<jBufferResource>(GSurfelOverflowNodeBuffer.get())));
+                        InOutResourceInlineAllactor.Alloc<jBufferResource>(GSurfelCellPageTableBuffer.get())));
                 },
                 [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
                 {

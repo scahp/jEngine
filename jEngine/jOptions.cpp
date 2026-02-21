@@ -70,6 +70,9 @@ jOptions::jOptions()
         SurfelGICascadeCellScaleFromPrev[i] = (i == 0) ? 1.0f : 2.0f;
         SurfelGICascadeStartDistance[i] = (i == 0) ? 0.0f : (float)(i * 600.0f);
         SurfelGICascadeRadiusScale[i] = (i == 2) ? 4.0f : ((i == 0) ? 1.0f : 2.0f);
+        SurfelGIClipmapGridDimX[i] = (i == 0) ? 64 : 48;
+        SurfelGIClipmapGridDimY[i] = (i == 0) ? 64 : 48;
+        SurfelGIClipmapGridDimZ[i] = (i == 0) ? 32 : 24;
         SurfelGISurfelsPerCell[i] = (i == 0) ? 4 : ((i == 1) ? 3 : 4);
         SurfelGIOverlapAllowance[i] = 0.1f;
     }

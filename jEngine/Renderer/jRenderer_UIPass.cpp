@@ -493,6 +493,16 @@ void IRenderer::UIPass()
                     for (int32 cascade = 0; cascade < SURFEL_GI_CASCADE_COUNT; ++cascade)
                     {
                         char label[64];
+                        sprintf_s(label, "Cascade%d Clipmap Dim X", cascade);
+                        DrawSliderInt60_40(label, &gOptions.SurfelGIClipmapGridDimX[cascade], 8, 256);
+                        sprintf_s(label, "Cascade%d Clipmap Dim Y", cascade);
+                        DrawSliderInt60_40(label, &gOptions.SurfelGIClipmapGridDimY[cascade], 8, 256);
+                        sprintf_s(label, "Cascade%d Clipmap Dim Z", cascade);
+                        DrawSliderInt60_40(label, &gOptions.SurfelGIClipmapGridDimZ[cascade], 4, 128);
+                    }
+                    for (int32 cascade = 0; cascade < SURFEL_GI_CASCADE_COUNT; ++cascade)
+                    {
+                        char label[64];
                         sprintf_s(label, "Cascade%d Surfels / Cell", cascade);
                         DrawSliderInt60_40(label, &gOptions.SurfelGISurfelsPerCell[cascade], 1, 8);
                         sprintf_s(label, "Cascade%d Overlap Allow", cascade);

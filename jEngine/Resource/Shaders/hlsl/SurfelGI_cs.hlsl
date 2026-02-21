@@ -9,6 +9,10 @@
     #define SURFEL_GI_CASCADE_COUNT 3
 #endif
 #define SURFEL_GI_CASCADE_PACKED_COUNT ((SURFEL_GI_CASCADE_COUNT + 3) / 4)
+#define SURFEL_GI_ENABLE_OVERFLOW 0
+#define SURFEL_GI_ENABLE_PERFECT_RELOCATION 0
+#define SURFEL_GI_ENABLE_REPLACE_FAR 0
+#define SURFEL_GI_ENABLE_STEAL_FAR 0
 
 struct CommonComputeUniformBuffer
 {
@@ -33,6 +37,8 @@ struct CommonComputeUniformBuffer
     int FrameNumber;
     int TileSize;
     int MaxSurfels;
+    int SurfelPageSize;
+    int SurfelPageTableCapacity;
     int SpawnBudget;
     int TTLInFrames;
     float GridCellSize;
@@ -42,6 +48,9 @@ struct CommonComputeUniformBuffer
     int SpawnHysteresisFrames;
     int DeleteHysteresisFrames;
     float RadiusScale;
+    float4 CascadeClipmapGridDimXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeClipmapGridDimYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeClipmapGridDimZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
     float4 SurfelsPerCellPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
     float4 OverlapAllowancePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
 };
@@ -54,37 +63,11 @@ struct SurfelData
     float4 Extra;
 };
 
-struct OverflowHead
+struct SurfelCellPageEntry
 {
-    int Head;
-    int Padding0;
-    int Padding1;
-    int Padding2;
-};
-
-struct OverflowNode
-{
-    SurfelData Surfel;
-    int Next;
-    int Padding0;
-    int Padding1;
-    int Padding2;
-};
-
-struct OverflowAllocCounter
-{
-    uint Count;
-    uint Padding0;
-    uint Padding1;
-    uint Padding2;
-};
-
-struct OverflowStats
-{
-    uint InsertCount;
-    uint ReuseCount;
-    uint RejectChainLimit;
-    uint MaxObservedChainLength;
+    int4 CellCascade;
+    uint State;
+    uint3 Padding;
 };
 
 Texture2D DepthTexture : register(t0, space0);
@@ -103,11 +86,7 @@ cbuffer ComputeCommon : register(b4, space0)
 RWStructuredBuffer<SurfelData> SurfelPool : register(u5, space0);
 RWTexture2D<float4> DebugOutput : register(u6, space0);
 RWTexture2D<float4> AttemptOutput : register(u7, space0);
-RWStructuredBuffer<OverflowHead> OverflowHeads : register(u8, space0);
-RWStructuredBuffer<OverflowNode> OverflowNodes : register(u9, space0);
-RWStructuredBuffer<OverflowAllocCounter> OverflowAllocCounterBuffer : register(u10, space0);
-RWStructuredBuffer<OverflowStats> OverflowStatsBuffer : register(u11, space0);
-RWStructuredBuffer<uint> PerfectCellFlagsBuffer : register(u12, space0);
+RWStructuredBuffer<SurfelCellPageEntry> SurfelCellPageTable : register(u8, space0);
 
 // High-contrast palette for SpawnAttempt visualization.
 static const float3 ATTEMPT_COLOR_GATE_PASS                 = float3(1.00, 0.00, 1.00); // magenta
@@ -120,7 +99,6 @@ static const float3 ATTEMPT_COLOR_REJECTED_MIN_SEPARATION   = float3(1.00, 1.00,
 static const float3 ATTEMPT_COLOR_REJECTED_NO_CREATE_PATH   = float3(1.00, 0.00, 0.00); // red
 static const float3 ATTEMPT_COLOR_REJECTED_OCCUPANCY_GATE   = float3(0.00, 0.00, 0.00); // black
 static const float3 ATTEMPT_COLOR_REJECTED_NO_WRITABLE_SLOT = float3(0.30, 1.00, 0.00); // neon green
-static const float3 ATTEMPT_COLOR_OVERFLOW_INSERT           = float3(0.00, 0.55, 1.00); // sky blue
 static const float3 ATTEMPT_COLOR_RELOCATE_IN_CELL          = float3(1.00, 0.65, 0.00); // amber
 static const float3 ATTEMPT_COLOR_REJECTED_PERFECT_OUT_OF_CELL = float3(0.00, 1.00, 1.00); // cyan
 static const float3 ATTEMPT_COLOR_REJECTED_PERFECT_OVERLAP     = float3(1.00, 0.25, 0.00); // vivid orange
@@ -130,8 +108,6 @@ static const float3 ATTEMPT_COLOR_SPAWN_NEW                 = float3(1.00, 1.00,
 static const float3 ATTEMPT_COLOR_REPLACED_FAR              = float3(0.35, 0.35, 0.35); // gray
 static const float3 ATTEMPT_COLOR_STEAL_FAR                 = float3(0.00, 0.50, 0.00); // dark green
 
-static const uint MAX_OVERFLOW_CHAIN_LENGTH = 24u;
-static const uint MAX_OVERFLOW_CHAIN_SCAN = 48u;
 
 uint HashU32(uint x)
 {
@@ -154,7 +130,8 @@ uint Hash3(int3 v)
 
 uint GetSlotsPerCell(uint maxSurfels, uint desiredSlotsPerCell)
 {
-    const uint clampedDesired = clamp(desiredSlotsPerCell, 1u, 8u);
+    const uint maxSlotsPerCell = min(max((uint)ComputeCommon.SurfelPageSize, 1u), 8u);
+    const uint clampedDesired = clamp(desiredSlotsPerCell, 1u, maxSlotsPerCell);
     return min(max(1u, maxSurfels), clampedDesired);
 }
 
@@ -162,6 +139,12 @@ uint GetCellCount(uint maxSurfels, uint desiredSlotsPerCell)
 {
     const uint slotsPerCell = GetSlotsPerCell(maxSurfels, desiredSlotsPerCell);
     return max(1u, maxSurfels / slotsPerCell);
+}
+
+int PositiveModulo(int value, int divisor)
+{
+    const int m = value % divisor;
+    return (m < 0) ? (m + divisor) : m;
 }
 
 uint GetCascadePartitionOffset(uint maxSurfels, uint cascadeIndex)
@@ -199,14 +182,124 @@ uint HashCellWithCascade(int3 cellCoord, uint cascadeIndex)
     return HashU32(h);
 }
 
-uint GetCellBaseIndex(int3 cellCoord, uint maxSurfels, uint desiredSlotsPerCell, uint cascadeIndex)
+int3 GetClipmapGridDim(uint cellCount, uint cascadeIndex)
 {
-    const uint cascadeOffset = GetCascadePartitionOffset(maxSurfels, cascadeIndex);
+    const uint c = min(cascadeIndex, (uint)(SURFEL_GI_CASCADE_COUNT - 1));
+    const uint packIndex = c >> 2u;
+    const uint lane = c & 3u;
+    const float4 packedX = ComputeCommon.CascadeClipmapGridDimXPacked[packIndex];
+    const float4 packedY = ComputeCommon.CascadeClipmapGridDimYPacked[packIndex];
+    const float4 packedZ = ComputeCommon.CascadeClipmapGridDimZPacked[packIndex];
+    const float dimXf = (lane == 0u) ? packedX.x : ((lane == 1u) ? packedX.y : ((lane == 2u) ? packedX.z : packedX.w));
+    const float dimYf = (lane == 0u) ? packedY.x : ((lane == 1u) ? packedY.y : ((lane == 2u) ? packedY.z : packedY.w));
+    const float dimZf = (lane == 0u) ? packedZ.x : ((lane == 1u) ? packedZ.y : ((lane == 2u) ? packedZ.z : packedZ.w));
+    uint dimX = max((uint)round(dimXf), 1u);
+    uint dimY = max((uint)round(dimYf), 1u);
+    uint dimZ = max((uint)round(dimZf), 1u);
+    const uint capacity = max(1u, dimX * dimY * dimZ);
+    if (capacity < cellCount)
+    {
+        const uint xy = max(1u, dimX * dimY);
+        dimZ = max(dimZ, (cellCount + xy - 1u) / xy);
+    }
+    return int3((int)dimX, (int)dimY, (int)dimZ);
+}
+
+float GetCascadeScale(uint cascadeIndex);
+
+uint GetClipmapLocalLinearIndex(int3 cellCoord, uint maxSurfels, uint desiredSlotsPerCell, uint cascadeIndex)
+{
     const uint cascadeCapacity = GetCascadePartitionCapacity(maxSurfels, cascadeIndex);
-    const uint slotsPerCell = GetSlotsPerCell(cascadeCapacity, desiredSlotsPerCell);
     const uint cellCount = GetCellCount(cascadeCapacity, desiredSlotsPerCell);
-    const uint cellHash = Hash3(cellCoord) % cellCount;
-    return cascadeOffset + cellHash * slotsPerCell;
+    const int3 gridDim = GetClipmapGridDim(cellCount, cascadeIndex);
+    const float cellSize = max(ComputeCommon.GridCellSize, 0.1) * GetCascadeScale(cascadeIndex);
+    const float3 cameraWorldPos = mul(ComputeCommon.InvV, float4(0.0, 0.0, 0.0, 1.0)).xyz;
+    const int3 cameraCell = int3(floor(cameraWorldPos / cellSize));
+    const int3 originCell = cameraCell - (gridDim / 2);
+    const int3 local = cellCoord - originCell;
+    const int3 wrappedLocal = int3(
+        PositiveModulo(local.x, max(gridDim.x, 1)),
+        PositiveModulo(local.y, max(gridDim.y, 1)),
+        PositiveModulo(local.z, max(gridDim.z, 1)));
+    const uint linearIndex = (uint)(wrappedLocal.x + wrappedLocal.y * gridDim.x + wrappedLocal.z * gridDim.x * gridDim.y);
+    return (linearIndex < cellCount) ? linearIndex : (linearIndex % cellCount);
+}
+
+uint GetPageTableCapacity()
+{
+    return max((uint)ComputeCommon.SurfelPageTableCapacity, 1u);
+}
+
+uint GetPageSize(uint maxSurfels)
+{
+    return min(max((uint)ComputeCommon.SurfelPageSize, 1u), maxSurfels);
+}
+
+bool PageEntryMatches(uint pageIndex, int3 cellCoord, uint cascadeIndex)
+{
+    const SurfelCellPageEntry e = SurfelCellPageTable[pageIndex];
+    if (e.State != 2u)
+        return false;
+    return all(e.CellCascade.xyz == cellCoord) && ((uint)e.CellCascade.w == cascadeIndex);
+}
+
+bool TryGetOrCreatePageIndex(int3 cellCoord, uint cascadeIndex, bool allowCreate, out uint outPageIndex)
+{
+    const uint capacity = GetPageTableCapacity();
+    const uint hash = HashCellWithCascade(cellCoord, cascadeIndex) % capacity;
+    [loop] for (uint probe = 0u; probe < capacity; ++probe)
+    {
+        const uint pageIndex = (hash + probe) % capacity;
+        const uint state = SurfelCellPageTable[pageIndex].State;
+        if (state == 2u)
+        {
+            if (PageEntryMatches(pageIndex, cellCoord, cascadeIndex))
+            {
+                outPageIndex = pageIndex;
+                return true;
+            }
+            continue;
+        }
+
+        if (state == 0u)
+        {
+            if (!allowCreate)
+                return false;
+
+            uint claimedPrev = 0u;
+            InterlockedCompareExchange(SurfelCellPageTable[pageIndex].State, 0u, 1u, claimedPrev);
+            if (claimedPrev == 0u)
+            {
+                SurfelCellPageTable[pageIndex].CellCascade = int4(cellCoord, (int)cascadeIndex);
+                SurfelCellPageTable[pageIndex].State = 2u;
+                outPageIndex = pageIndex;
+                return true;
+            }
+
+            if (PageEntryMatches(pageIndex, cellCoord, cascadeIndex))
+            {
+                outPageIndex = pageIndex;
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+bool TryGetCellBaseIndex(int3 cellCoord, uint maxSurfels, uint cascadeIndex, bool allowCreate, out uint outCellBaseIndex)
+{
+    uint pageIndex = 0u;
+    if (!TryGetOrCreatePageIndex(cellCoord, cascadeIndex, allowCreate, pageIndex))
+        return false;
+
+    const uint pageSize = GetPageSize(maxSurfels);
+    const uint base = pageIndex * pageSize;
+    if (base >= maxSurfels)
+        return false;
+
+    outCellBaseIndex = base;
+    return true;
 }
 
 uint GetCascadeBucketCount(uint maxSurfels, uint cascadeIndex)
@@ -229,8 +322,8 @@ uint GetCascadeBucketOffset(uint maxSurfels, uint cascadeIndex)
 uint GetCellBucketIndex(int3 cellCoord, uint maxSurfels, uint desiredSlotsPerCell, uint cascadeIndex)
 {
     const uint localBucketCount = GetCellCount(GetCascadePartitionCapacity(maxSurfels, cascadeIndex), desiredSlotsPerCell);
-    const uint localHash = Hash3(cellCoord) % localBucketCount;
-    return GetCascadeBucketOffset(maxSurfels, cascadeIndex) + localHash;
+    const uint localLinearIndex = GetClipmapLocalLinearIndex(cellCoord, maxSurfels, desiredSlotsPerCell, cascadeIndex);
+    return GetCascadeBucketOffset(maxSurfels, cascadeIndex) + (localLinearIndex % localBucketCount);
 }
 
 float GetCascadeScale(uint cascadeIndex)
@@ -294,6 +387,12 @@ uint GetConsumedAge(float lastSeenFrame)
     return (uint)(rawAge * SURFEL_GI_AGE_CONSUME_SCALE);
 }
 
+uint GetConsumedAgeWithCascadeBias(float lastSeenFrame, uint surfelCascade, uint targetCascade)
+{
+    const uint baseAge = GetConsumedAge(lastSeenFrame);
+    return (surfelCascade == targetCascade) ? baseAge : (baseAge * 2u);
+}
+
 bool IsRadiusCompatible(float existingRadius, float candidateRadius)
 {
     const float a = max(existingRadius, 0.001);
@@ -352,7 +451,9 @@ float ComputeHardOverlapPenaltyAtPosition(float3 candidatePos, float candidateRa
             [loop] for (int nx = -1; nx <= 1; ++nx)
             {
                 const int3 neighborCell = cellCoord + int3(nx, ny, nz);
-                const uint neighborBaseIndex = GetCellBaseIndex(neighborCell, maxSurfels, desiredSlotsPerCell, cascadeIndex);
+                uint neighborBaseIndex = 0u;
+                if (!TryGetCellBaseIndex(neighborCell, maxSurfels, cascadeIndex, false, neighborBaseIndex))
+                    continue;
                 [loop] for (uint neighborSlot = 0u; neighborSlot < slotsPerCell; ++neighborSlot)
                 {
                     const uint neighborIndex = neighborBaseIndex + neighborSlot;
@@ -375,6 +476,7 @@ float ComputeHardOverlapPenaltyAtPosition(float3 candidatePos, float candidateRa
                     overlapPenalty += max(noOverlapDistance - d, 0.0);
                 }
 
+#if SURFEL_GI_ENABLE_OVERFLOW
                 const uint neighborBucketIndex = min(GetCellBucketIndex(neighborCell, maxSurfels, desiredSlotsPerCell, cascadeIndex), maxSurfels - 1u);
                 int overflowNode = OverflowHeads[neighborBucketIndex].Head;
                 [loop] for (uint iter = 0u; iter < 24u && overflowNode >= 0; ++iter)
@@ -400,6 +502,7 @@ float ComputeHardOverlapPenaltyAtPosition(float3 candidatePos, float candidateRa
                     const float d = distance(candidatePos, neighborSurfel.PositionRadius.xyz);
                     overlapPenalty += max(noOverlapDistance - d, 0.0);
                 }
+#endif
             }
         }
     }
@@ -476,24 +579,6 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     const float spawnProb = saturate(spawnProbBase + spawnProbBoost);
 
     const uint pixelHash = HashU32((uint)pixel.x * 1973u ^ (uint)pixel.y * 9277u ^ (uint)ComputeCommon.FrameNumber * 26699u);
-    // Opportunistic pool aging so off-screen surfels can still enter dormant state.
-    if ((pixelHash & 31u) == 0u)
-    {
-        const uint cleanupIndex = HashU32(pixelHash ^ 0x51ed270bu) % maxSurfels;
-        SurfelData cleanupSurfel = SurfelPool[cleanupIndex];
-        if (cleanupSurfel.Extra.y > 0.5)
-        {
-            const uint cleanupCascade = min((uint)round(cleanupSurfel.Extra.w), (uint)(SURFEL_GI_CASCADE_COUNT - 1));
-            const float cleanupCellSize = cascade0CellSize * GetCascadeScale(cleanupCascade);
-            const uint cleanupAge = GetConsumedAge(cleanupSurfel.NormalSeenFrame.w);
-            if (!disableTTLDeactivation && cleanupAge > max(ttl, deleteHysteresis) && !IsBoundarySurfel(cleanupSurfel.PositionRadius.xyz, cascadeBoundaryBand))
-            {
-                const int3 cleanupCellCoord = int3(floor(cleanupSurfel.PositionRadius.xyz / cleanupCellSize));
-                MarkDormantSurfel(cleanupSurfel, cleanupCellCoord, cleanupCascade, (uint)ComputeCommon.FrameNumber);
-                SurfelPool[cleanupIndex] = cleanupSurfel;
-            }
-        }
-    }
     const float stochasticPick = (float)(pixelHash & 1023u) / 1023.0;
     const bool passesSpawnGate = (stochasticPick <= spawnProb);
     if (passesSpawnGate)
@@ -517,9 +602,13 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     const uint cascadePoolCount = GetCascadePartitionCapacity(maxSurfels, cascadeIndex);
     const int3 cellCoord = int3(floor(worldPos / cellSize));
     const uint currentCellHash = HashCellWithCascade(cellCoord, cascadeIndex);
-    const uint cellBaseIndex = GetCellBaseIndex(cellCoord, maxSurfels, desiredSlotsPerCell, cascadeIndex);
-    const uint bucketIndex = min(GetCellBucketIndex(cellCoord, maxSurfels, desiredSlotsPerCell, cascadeIndex), maxSurfels - 1u);
-    const bool perfectCellSettled = (PerfectCellFlagsBuffer[bucketIndex] & 1u) != 0u;
+    uint cellBaseIndex = 0u;
+    if (!TryGetCellBaseIndex(cellCoord, maxSurfels, cascadeIndex, true, cellBaseIndex))
+    {
+        AttemptOutput[pixel] = float4(ATTEMPT_COLOR_REJECTED_NO_WRITABLE_SLOT, 1.0);
+        DebugOutput[pixel] = float4(0.0, 0.0, 0.0, 1.0);
+        return;
+    }
     uint index = cellBaseIndex;
     float3 spawnPosition = worldPos;
 
@@ -623,7 +712,9 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                         [loop] for (int nx = -1; nx <= 1; ++nx)
                         {
                             const int3 neighborCell = cellCoord + int3(nx, ny, nz);
-                            const uint neighborBaseIndex = GetCellBaseIndex(neighborCell, maxSurfels, desiredSlotsPerCell, cascadeIndex);
+                            uint neighborBaseIndex = 0u;
+                            if (!TryGetCellBaseIndex(neighborCell, maxSurfels, cascadeIndex, false, neighborBaseIndex))
+                                continue;
 
                             [loop] for (uint neighborSlot = 0u; neighborSlot < slotsPerCell; ++neighborSlot)
                             {
@@ -736,6 +827,14 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         const uint currentCascade = (uint)round(current.Extra.w);
         if (currentCascade != cascadeIndex)
         {
+            const uint mismatchAge = GetConsumedAgeWithCascadeBias(current.NormalSeenFrame.w, currentCascade, cascadeIndex);
+            if (!disableTTLDeactivation && mismatchAge > max(ttl, deleteHysteresis))
+            {
+                const float mismatchCellSize = cascade0CellSize * GetCascadeScale(currentCascade);
+                const int3 mismatchCellCoord = int3(floor(current.PositionRadius.xyz / mismatchCellSize));
+                MarkDormantSurfel(current, mismatchCellCoord, currentCascade, (uint)ComputeCommon.FrameNumber);
+                SurfelPool[index] = current;
+            }
             AttemptOutput[pixel] = float4(ATTEMPT_COLOR_CASCADE_MISMATCH, 1.0);
             DebugOutput[pixel] = float4(0.0, 0.0, 0.0, 1.0);
             return;
@@ -809,8 +908,8 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         return;
     }
 
-    // Overflow-chain merge path: when main bucket slots are saturated, try reusing
-    // a compatible overflow surfel for this bucket before giving up.
+    // Overflow-chain merge path: disabled in clipmap direct-mapping mode.
+#if SURFEL_GI_ENABLE_OVERFLOW
     {
         int overflowNode = OverflowHeads[bucketIndex].Head;
         bool foundOverflowMerge = false;
@@ -876,6 +975,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
             return;
         }
     }
+#endif
 
     // Quick local occupancy probe.
     uint localAliveCountFast = 0u;
@@ -914,6 +1014,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         }
     }
     {
+#if SURFEL_GI_ENABLE_OVERFLOW
         int overflowNode = OverflowHeads[bucketIndex].Head;
         [loop] for (uint iter = 0u; iter < 32u && overflowNode >= 0; ++iter)
         {
@@ -941,6 +1042,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
             }
             overflowNode = node.Next;
         }
+#endif
     }
     const uint desiredLocalCountFast = min(desiredSlotsPerCell, slotsPerCell);
     const bool isLocalUnderfilledFast = (localAliveCountFast < desiredLocalCountFast);
@@ -952,7 +1054,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     const uint staleDivisor = max(1u, (uint)round(max(ComputeCommon.StaleAgeDivisor, 1.0)));
     const bool staleEnough = ageFrames > max(2u, ttl / staleDivisor);
     // When a near candidate collides with an occupied slot, favor replacing far/stale surfels.
-    bool replaceFarSurfel = alive && !canMerge
+    bool replaceFarSurfel = (SURFEL_GI_ENABLE_REPLACE_FAR != 0) && alive && !canMerge
         && (nearFactor > currentNearFactor + ComputeCommon.ReplaceNearDelta)
         && (currentVeryFar || staleEnough)
         && !isNearKeepSurfel
@@ -961,7 +1063,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     // If near area is starving, steal a far/old surfel slot from sparse random probes.
     bool stealFarSurfel = false;
     uint stealIndex = index;
-    if (!canSpawn && !replaceFarSurfel && nearFactor > 0.55)
+    if ((SURFEL_GI_ENABLE_STEAL_FAR != 0) && !canSpawn && !replaceFarSurfel && nearFactor > 0.55)
     {
         float bestEvictScore = -1.0;
 
@@ -1014,7 +1116,9 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                 [loop] for (int nx = -1; nx <= 1 && !violatesMinSeparation; ++nx)
                 {
                     const int3 neighborCell = cellCoord + int3(nx, ny, nz);
-                    const uint neighborBaseIndex = GetCellBaseIndex(neighborCell, maxSurfels, desiredSlotsPerCell, cascadeIndex);
+                    uint neighborBaseIndex = 0u;
+                    if (!TryGetCellBaseIndex(neighborCell, maxSurfels, cascadeIndex, false, neighborBaseIndex))
+                        continue;
                     [loop] for (uint neighborSlot = 0u; neighborSlot < slotsPerCell; ++neighborSlot)
                     {
                         const uint neighborIndex = neighborBaseIndex + neighborSlot;
@@ -1051,6 +1155,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                     }
                     if (!violatesMinSeparation)
                     {
+#if SURFEL_GI_ENABLE_OVERFLOW
                         const uint neighborBucketIndex = min(GetCellBucketIndex(neighborCell, maxSurfels, desiredSlotsPerCell, cascadeIndex), maxSurfels - 1u);
                         int overflowNode = OverflowHeads[neighborBucketIndex].Head;
                         [loop] for (uint iter = 0u; iter < 24u && overflowNode >= 0 && !violatesMinSeparation; ++iter)
@@ -1090,6 +1195,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                             }
                             overflowNode = node.Next;
                         }
+#endif
                     }
                 }
             }
@@ -1108,7 +1214,9 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                 [loop] for (int nx = -1; nx <= 1 && !overlapsAny; ++nx)
                 {
                     const int3 neighborCell = cellCoord + int3(nx, ny, nz);
-                    const uint neighborBaseIndex = GetCellBaseIndex(neighborCell, maxSurfels, desiredSlotsPerCell, cascadeIndex);
+                    uint neighborBaseIndex = 0u;
+                    if (!TryGetCellBaseIndex(neighborCell, maxSurfels, cascadeIndex, false, neighborBaseIndex))
+                        continue;
                     [loop] for (uint neighborSlot = 0u; neighborSlot < slotsPerCell; ++neighborSlot)
                     {
                         const uint neighborIndex = neighborBaseIndex + neighborSlot;
@@ -1133,6 +1241,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                     }
                     if (!overlapsAny)
                     {
+#if SURFEL_GI_ENABLE_OVERFLOW
                         const uint neighborBucketIndex = min(GetCellBucketIndex(neighborCell, maxSurfels, desiredSlotsPerCell, cascadeIndex), maxSurfels - 1u);
                         int overflowNode = OverflowHeads[neighborBucketIndex].Head;
                         [loop] for (uint iter = 0u; iter < 24u && overflowNode >= 0 && !overlapsAny; ++iter)
@@ -1168,6 +1277,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                                 overlapsAny = true;
                             overflowNode = node.Next;
                         }
+#endif
                     }
                 }
             }
@@ -1178,7 +1288,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     bool spawnHasNoHardOverlap = (ComputeHardOverlapPenaltyAtPosition(spawnPosition, radius, 0xffffffffu, cellCoord, cellSize, maxSurfels, desiredSlotsPerCell, slotsPerCell, cascadeIndex) <= 0.0);
     const bool spawnIsPerfectPosition = spawnHasNoHardOverlap;
     const bool perfectUnderfilledSpawn = canSpawn && spawnIsPerfectPosition;
-    const bool perfectRelocationOnly = spawnIsPerfectPosition && !perfectCellSettled && !canSpawn && !replaceFarSurfel && !stealFarSurfel;
+    const bool perfectRelocationOnly = spawnIsPerfectPosition && !canSpawn && !replaceFarSurfel && !stealFarSurfel;
     const bool shouldCreateOrReplace = (canSpawn || replaceFarSurfel || stealFarSurfel || perfectRelocationOnly)
         && (!violatesMinSeparation || perfectUnderfilledSpawn || perfectRelocationOnly);
     if (shouldCreateOrReplace)
@@ -1253,6 +1363,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         // local surfel before dormant/historical reuse paths.
         uint localAliveCountWriteEarly = localAliveCount;
         {
+#if SURFEL_GI_ENABLE_OVERFLOW
             int overflowNode = OverflowHeads[bucketIndex].Head;
             [loop] for (uint iter = 0u; iter < 32u && overflowNode >= 0; ++iter)
             {
@@ -1273,12 +1384,13 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                 }
                 overflowNode = node.Next;
             }
+#endif
         }
         const uint desiredLocalCountWriteEarly = min(desiredSlotsPerCell, slotsPerCell);
         const bool cellIsFullNow = (localAliveCountWriteEarly >= desiredLocalCountWriteEarly);
         (void)desiredLocalCountWriteEarly;
         (void)cellIsFullNow;
-        if (spawnIsPerfectPosition && !perfectCellSettled)
+        if ((SURFEL_GI_ENABLE_PERFECT_RELOCATION != 0) && spawnIsPerfectPosition)
         {
             uint bestOverlapIndex = 0xffffffffu;
             float bestOverlapPenalty = 0.0;
@@ -1317,9 +1429,6 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                 relocated.AlbedoWeight = float4(albedo, 1.0);
                 relocated.Extra = float4(8.0, 1.0, 0.0, (float)cascadeIndex);
                 SurfelPool[bestOverlapIndex] = relocated;
-                uint perfectOld = 0u;
-                InterlockedOr(PerfectCellFlagsBuffer[bucketIndex], 1u, perfectOld);
-
                 AttemptOutput[pixel] = float4(ATTEMPT_COLOR_RELOCATE_IN_CELL, 1.0);
                 DebugOutput[pixel] = float4(1.0, 0.65, 0.0, 1.0);
                 return;
@@ -1452,6 +1561,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
             localAliveCountWrite++;
         }
         {
+#if SURFEL_GI_ENABLE_OVERFLOW
             int overflowNode = OverflowHeads[bucketIndex].Head;
             [loop] for (uint iter = 0u; iter < 32u && overflowNode >= 0; ++iter)
             {
@@ -1472,6 +1582,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                 }
                 overflowNode = node.Next;
             }
+#endif
         }
         const uint desiredLocalCountWrite = min(desiredSlotsPerCell, slotsPerCell);
         const bool canWriteByCellOccupancy = (localAliveCountWrite < desiredLocalCountWrite);
@@ -1480,7 +1591,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
             // Perfect position maintenance:
             // if the cell is full but spawn position is perfect, relocate one overlapping local
             // surfel to this perfect position.
-            if (spawnIsPerfectPosition && !perfectCellSettled)
+            if ((SURFEL_GI_ENABLE_PERFECT_RELOCATION != 0) && spawnIsPerfectPosition)
             {
                 uint bestOverlapIndex = 0xffffffffu;
                 float bestOverlapPenalty = 0.0;
@@ -1519,9 +1630,6 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                     relocated.AlbedoWeight = float4(albedo, 1.0);
                     relocated.Extra = float4(8.0, 1.0, 0.0, (float)cascadeIndex);
                     SurfelPool[bestOverlapIndex] = relocated;
-                    uint perfectOld = 0u;
-                    InterlockedOr(PerfectCellFlagsBuffer[bucketIndex], 1u, perfectOld);
-
                     AttemptOutput[pixel] = float4(ATTEMPT_COLOR_RELOCATE_IN_CELL, 1.0);
                     DebugOutput[pixel] = float4(1.0, 0.65, 0.0, 1.0);
                     return;
@@ -1567,7 +1675,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                 const uint slotCascade = (uint)round(slotSurfel.Extra.w);
                 const int3 slotCellCoord = int3(floor(slotSurfel.PositionRadius.xyz / cellSize));
                 const bool isForeignSlot = (slotCascade != cascadeIndex) || any(slotCellCoord != cellCoord);
-                const uint slotAge = GetConsumedAge(slotSurfel.NormalSeenFrame.w);
+                const uint slotAge = GetConsumedAgeWithCascadeBias(slotSurfel.NormalSeenFrame.w, slotCascade, cascadeIndex);
                 const float3 slotViewPos = mul(ComputeCommon.V, float4(slotSurfel.PositionRadius.xyz, 1.0)).xyz;
                 const float slotDistance = length(slotViewPos);
                 const bool slotNearKeep = slotDistance <= max(ComputeCommon.NearKeepRadius, 0.0);
@@ -1585,91 +1693,6 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         }
         if (!foundWritableSlot)
         {
-            // Overflow chain policy:
-            // 1) try reusing dead/tombstoned node in current bucket chain
-            // 2) if chain too long reject (protect traversal cost)
-            // 3) else append new node from linear allocator
-            uint chainLength = 0u;
-            uint reusableNodeIndex = 0xffffffffu;
-            int overflowNode = OverflowHeads[bucketIndex].Head;
-            [loop] for (uint iter = 0u; iter < MAX_OVERFLOW_CHAIN_SCAN && overflowNode >= 0; ++iter)
-            {
-                const uint nodeIndex = (uint)overflowNode;
-                if (nodeIndex >= maxSurfels)
-                    break;
-
-                const OverflowNode node = OverflowNodes[nodeIndex];
-                const SurfelData s = node.Surfel;
-                chainLength++;
-                if (reusableNodeIndex == 0xffffffffu && s.Extra.y <= 0.5)
-                    reusableNodeIndex = nodeIndex;
-                overflowNode = node.Next;
-            }
-
-            uint ignoredOriginal = 0u;
-            InterlockedMax(OverflowStatsBuffer[0].MaxObservedChainLength, chainLength, ignoredOriginal);
-
-            SurfelData overflowSurfel;
-            overflowSurfel.PositionRadius = float4(spawnPosition, radius);
-            overflowSurfel.NormalSeenFrame = float4(worldNormal, (float)ComputeCommon.FrameNumber);
-            overflowSurfel.AlbedoWeight = float4(albedo, 1.0);
-            overflowSurfel.Extra = float4(7.0, 1.0, 0.0, (float)cascadeIndex);
-
-            if (reusableNodeIndex != 0xffffffffu)
-            {
-                OverflowNode node = OverflowNodes[reusableNodeIndex];
-                node.Surfel = overflowSurfel;
-                OverflowNodes[reusableNodeIndex] = node;
-                if (spawnIsPerfectPosition)
-                {
-                    uint perfectOld = 0u;
-                    InterlockedOr(PerfectCellFlagsBuffer[bucketIndex], 1u, perfectOld);
-                }
-
-                uint reuseOriginal = 0u;
-                InterlockedAdd(OverflowStatsBuffer[0].ReuseCount, 1u, reuseOriginal);
-                AttemptOutput[pixel] = float4(ATTEMPT_COLOR_OVERFLOW_INSERT, 1.0);
-                DebugOutput[pixel] = float4(1.0, 1.0, 0.0, 1.0);
-                return;
-            }
-
-            if (chainLength >= MAX_OVERFLOW_CHAIN_LENGTH)
-            {
-                uint rejectOriginal = 0u;
-                InterlockedAdd(OverflowStatsBuffer[0].RejectChainLimit, 1u, rejectOriginal);
-                AttemptOutput[pixel] = float4(ATTEMPT_COLOR_REJECTED_NO_WRITABLE_SLOT, 1.0);
-                DebugOutput[pixel] = float4(0.0, 0.0, 1.0, 1.0);
-                return;
-            }
-
-            const uint overflowCapacity = maxSurfels;
-            uint nodeIndex = 0u;
-            InterlockedAdd(OverflowAllocCounterBuffer[0].Count, 1u, nodeIndex);
-            if (nodeIndex < overflowCapacity)
-            {
-                int oldHead = -1;
-                InterlockedExchange(OverflowHeads[bucketIndex].Head, (int)nodeIndex, oldHead);
-
-                OverflowNode node;
-                node.Surfel = overflowSurfel;
-                node.Next = oldHead;
-                node.Padding0 = 0;
-                node.Padding1 = 0;
-                node.Padding2 = 0;
-                OverflowNodes[nodeIndex] = node;
-                if (spawnIsPerfectPosition)
-                {
-                    uint perfectOld = 0u;
-                    InterlockedOr(PerfectCellFlagsBuffer[bucketIndex], 1u, perfectOld);
-                }
-
-                uint insertOriginal = 0u;
-                InterlockedAdd(OverflowStatsBuffer[0].InsertCount, 1u, insertOriginal);
-                AttemptOutput[pixel] = float4(ATTEMPT_COLOR_OVERFLOW_INSERT, 1.0);
-                DebugOutput[pixel] = float4(1.0, 1.0, 0.0, 1.0);
-                return;
-            }
-
             AttemptOutput[pixel] = float4(ATTEMPT_COLOR_REJECTED_NO_WRITABLE_SLOT, 1.0);
             DebugOutput[pixel] = float4(0.0, 0.0, 1.0, 1.0);
             return;
@@ -1682,11 +1705,6 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         s.AlbedoWeight = float4(albedo, 1.0);
         s.Extra = float4(stealFarSurfel ? 4.0 : (replaceFarSurfel ? 3.0 : 0.0), 1.0, 0.0, (float)cascadeIndex);
         SurfelPool[index] = s;
-        if (spawnIsPerfectPosition)
-        {
-            uint perfectOld = 0u;
-            InterlockedOr(PerfectCellFlagsBuffer[bucketIndex], 1u, perfectOld);
-        }
         AttemptOutput[pixel] = float4(stealFarSurfel ? ATTEMPT_COLOR_STEAL_FAR
             : (replaceFarSurfel ? ATTEMPT_COLOR_REPLACED_FAR
             : (spawnIsPerfectPosition ? ATTEMPT_COLOR_PERFECT_POSITION : ATTEMPT_COLOR_SPAWN_NEW)), 1.0);
