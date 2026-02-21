@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "Core/jResourceContainer.h"
 
 struct IUniformBufferBlock;
@@ -233,7 +233,7 @@ struct jShaderBinding
 
 struct jShaderBindingArray
 {
-    static constexpr int32 NumOfInlineData = 10;
+    static constexpr int32 NumOfInlineData = 15;
 
     template <typename... T>
     void Add(T... args)
