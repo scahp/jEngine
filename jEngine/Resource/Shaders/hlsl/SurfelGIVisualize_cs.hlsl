@@ -33,12 +33,31 @@ struct SurfelData
     float4 Extra;
 };
 
+struct OverflowHead
+{
+    int Head;
+    int Padding0;
+    int Padding1;
+    int Padding2;
+};
+
+struct OverflowNode
+{
+    SurfelData Surfel;
+    int Next;
+    int Padding0;
+    int Padding1;
+    int Padding2;
+};
+
 RWTexture2D<float4> Result : register(u0, space0);
 Texture2D DepthTexture : register(t1, space0);
 SamplerState DepthTextureSampler : register(s1, space0);
 Texture2D LinearDepthTexture : register(t2, space0);
 StructuredBuffer<SurfelData> SurfelPool : register(t3, space0);
 Texture2D SpawnAttemptTexture : register(t4, space0);
+StructuredBuffer<OverflowHead> OverflowHeads : register(t6, space0);
+StructuredBuffer<OverflowNode> OverflowNodes : register(t7, space0);
 
 cbuffer VisualizeCommon : register(b5, space0)
 {
@@ -106,6 +125,24 @@ uint GetCellCount(uint maxSurfels, uint desiredSlotsPerCell)
     return max(1u, maxSurfels / slotsPerCell);
 }
 
+uint GetCascadePartitionOffset(uint maxSurfels, uint cascadeIndex)
+{
+    const uint cascadeCount = (uint)SURFEL_GI_CASCADE_COUNT;
+    const uint c = min(cascadeIndex, cascadeCount);
+    const uint base = maxSurfels / cascadeCount;
+    const uint rem = maxSurfels % cascadeCount;
+    return base * c + min(c, rem);
+}
+
+uint GetCascadePartitionCapacity(uint maxSurfels, uint cascadeIndex)
+{
+    const uint cascadeCount = (uint)SURFEL_GI_CASCADE_COUNT;
+    const uint c = min(cascadeIndex, cascadeCount - 1u);
+    const uint base = maxSurfels / cascadeCount;
+    const uint rem = maxSurfels % cascadeCount;
+    return max(1u, base + ((c < rem) ? 1u : 0u));
+}
+
 uint GetDesiredSlotsPerCell(uint cascadeIndex)
 {
     const uint c = min(cascadeIndex, (uint)(SURFEL_GI_CASCADE_COUNT - 1));
@@ -125,10 +162,36 @@ uint HashCellWithCascade(int3 cellCoord, uint cascadeIndex)
 
 uint GetCellBaseIndex(int3 cellCoord, uint maxSurfels, uint desiredSlotsPerCell, uint cascadeIndex)
 {
-    const uint slotsPerCell = GetSlotsPerCell(maxSurfels, desiredSlotsPerCell);
-    const uint cellCount = GetCellCount(maxSurfels, desiredSlotsPerCell);
-    const uint cellHash = HashCellWithCascade(cellCoord, cascadeIndex) % cellCount;
-    return cellHash * slotsPerCell;
+    const uint cascadeOffset = GetCascadePartitionOffset(maxSurfels, cascadeIndex);
+    const uint cascadeCapacity = GetCascadePartitionCapacity(maxSurfels, cascadeIndex);
+    const uint slotsPerCell = GetSlotsPerCell(cascadeCapacity, desiredSlotsPerCell);
+    const uint cellCount = GetCellCount(cascadeCapacity, desiredSlotsPerCell);
+    const uint cellHash = Hash3(cellCoord) % cellCount;
+    return cascadeOffset + cellHash * slotsPerCell;
+}
+
+uint GetCascadeBucketCount(uint maxSurfels, uint cascadeIndex)
+{
+    const uint desiredSlotsPerCell = GetDesiredSlotsPerCell(cascadeIndex);
+    const uint cascadeCapacity = GetCascadePartitionCapacity(maxSurfels, cascadeIndex);
+    return GetCellCount(cascadeCapacity, desiredSlotsPerCell);
+}
+
+uint GetCascadeBucketOffset(uint maxSurfels, uint cascadeIndex)
+{
+    uint offset = 0u;
+    [loop] for (uint i = 0u; i < cascadeIndex && i < (uint)SURFEL_GI_CASCADE_COUNT; ++i)
+    {
+        offset += GetCascadeBucketCount(maxSurfels, i);
+    }
+    return offset;
+}
+
+uint GetCellBucketIndex(int3 cellCoord, uint maxSurfels, uint desiredSlotsPerCell, uint cascadeIndex)
+{
+    const uint localBucketCount = GetCellCount(GetCascadePartitionCapacity(maxSurfels, cascadeIndex), desiredSlotsPerCell);
+    const uint localHash = Hash3(cellCoord) % localBucketCount;
+    return GetCascadeBucketOffset(maxSurfels, cascadeIndex) + localHash;
 }
 
 float GetCascadeScale(uint cascadeIndex)
@@ -195,7 +258,8 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         const float cellSize = cascade0CellSize * cascadeScale;
         const int3 baseCellCoord = int3(floor(worldPos / cellSize));
         const uint desiredSlotsPerCell = GetDesiredSlotsPerCell(cascadeIndex);
-        const uint slotsPerCell = GetSlotsPerCell(maxSurfels, desiredSlotsPerCell);
+        const uint cascadeCapacity = GetCascadePartitionCapacity(maxSurfels, cascadeIndex);
+        const uint slotsPerCell = GetSlotsPerCell(cascadeCapacity, desiredSlotsPerCell);
 
         [loop] for (int z = -neighborRadius; z <= neighborRadius; ++z)
         {
@@ -265,6 +329,58 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                             }
                         }
                     }
+
+                    const uint bucketIndex = min(GetCellBucketIndex(queryCellCoord, maxSurfels, desiredSlotsPerCell, cascadeIndex), maxSurfels - 1u);
+                    int overflowNode = OverflowHeads[bucketIndex].Head;
+                    [loop] for (uint iter = 0u; iter < 24u && overflowNode >= 0; ++iter)
+                    {
+                        const uint nodeIndex = (uint)overflowNode;
+                        if (nodeIndex >= maxSurfels)
+                            break;
+
+                        const OverflowNode node = OverflowNodes[nodeIndex];
+                        const SurfelData s = node.Surfel;
+                        const bool isDormant = (s.Extra.y < 0.5) && (abs(s.Extra.x - 5.0) < 0.5);
+                        if (s.Extra.y < 0.5 && !isDormant)
+                        {
+                            overflowNode = node.Next;
+                            continue;
+                        }
+                        if (isDormant && VisualizeCommon.ShowStateDebug == 0)
+                        {
+                            overflowNode = node.Next;
+                            continue;
+                        }
+
+                        const uint surfelCascade = (uint)round(s.Extra.w);
+                        if (surfelCascade == cascadeIndex)
+                        {
+                            const float3 surfelPos = s.PositionRadius.xyz;
+                            const int3 surfelCellCoord = int3(floor(surfelPos / cellSize));
+                            if (all(surfelCellCoord == queryCellCoord))
+                            {
+                                const float surfelRadius = max(s.PositionRadius.w, 0.0001);
+                                const float3 delta = worldPos - surfelPos;
+                                const float d2 = dot(delta, delta);
+                                const float r2 = surfelRadius * surfelRadius;
+
+                                if (d2 <= r2 && d2 < bestDist2)
+                                {
+                                    bestDist2 = d2;
+                                    if (VisualizeCommon.ShowCellDebug != 0)
+                                    {
+                                        bestColor = CellDebugColor(surfelCellCoord, surfelCascade);
+                                    }
+                                    else
+                                    {
+                                        bestColor = RadiusDebugColor(surfelRadius);
+                                    }
+                                }
+                            }
+                        }
+
+                        overflowNode = node.Next;
+                    }
                 }
             }
         }
@@ -289,7 +405,8 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         const float debugCellSizeForOcc = cascade0CellSize * debugCascadeScale;
         const int3 debugCellCoord = int3(floor(worldPos / debugCellSizeForOcc));
         const uint debugDesiredSlots = GetDesiredSlotsPerCell(debugCascadeIndex);
-        const uint debugSlotsPerCell = GetSlotsPerCell(maxSurfels, debugDesiredSlots);
+        const uint debugCascadeCapacity = GetCascadePartitionCapacity(maxSurfels, debugCascadeIndex);
+        const uint debugSlotsPerCell = GetSlotsPerCell(debugCascadeCapacity, debugDesiredSlots);
         const uint debugBaseIndex = GetCellBaseIndex(debugCellCoord, maxSurfels, debugDesiredSlots, debugCascadeIndex);
 
         uint aliveCount = 0u;

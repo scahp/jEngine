@@ -69,8 +69,8 @@ jOptions::jOptions()
     {
         SurfelGICascadeCellScaleFromPrev[i] = (i == 0) ? 1.0f : 2.0f;
         SurfelGICascadeStartDistance[i] = (i == 0) ? 0.0f : (float)(i * 600.0f);
-        SurfelGICascadeRadiusScale[i] = (i == 0) ? 1.0f : 2.0f;
-        SurfelGISurfelsPerCell[i] = Min(8, 2 + i);
+        SurfelGICascadeRadiusScale[i] = (i == 2) ? 4.0f : ((i == 0) ? 1.0f : 2.0f);
+        SurfelGISurfelsPerCell[i] = (i == 0) ? 4 : ((i == 1) ? 3 : 4);
         SurfelGIOverlapAllowance[i] = 0.1f;
     }
     UseSurfelGICenterSpawnBias = true;
