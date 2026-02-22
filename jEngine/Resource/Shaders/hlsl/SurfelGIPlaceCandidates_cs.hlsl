@@ -39,11 +39,11 @@ struct CommonComputeUniformBuffer
     int SpawnHysteresisFrames;
     int DeleteHysteresisFrames;
     float RadiusScale;
+    float FaceMarginRadiusScale;
     float4 CascadeClipmapGridDimXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
     float4 CascadeClipmapGridDimYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
     float4 CascadeClipmapGridDimZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
     float4 SurfelsPerCellPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 OverlapAllowancePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
 };
 
 struct SurfelData
@@ -103,12 +103,6 @@ uint GetDesiredSlotsPerCell(uint cascadeIndex)
     return max((uint)round(value), 1u);
 }
 
-uint GetConsumedAge(float lastSeenFrame)
-{
-    const float rawAge = abs((float)ComputeCommon.FrameNumber - lastSeenFrame);
-    return (uint)rawAge;
-}
-
 [numthreads(64, 1, 1)]
 void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 {
@@ -143,7 +137,6 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 
     uint writeIndex = base;
     bool foundInactive = false;
-    uint oldestAge = 0u;
 
     [loop] for (uint i = 0u; i < desiredSlots; ++i)
     {
@@ -156,12 +149,6 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
             writeIndex = idx;
             foundInactive = true;
             break;
-        }
-        const uint age = GetConsumedAge(s.NormalSeenFrame.w);
-        if (age > oldestAge)
-        {
-            oldestAge = age;
-            writeIndex = idx;
         }
     }
 

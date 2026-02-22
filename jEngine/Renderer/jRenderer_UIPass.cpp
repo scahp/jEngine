@@ -475,6 +475,7 @@ void IRenderer::UIPass()
                     DrawSliderInt60_40("Tile Size", &gOptions.SurfelGITileSize, 4, 32);
                     DrawSliderFloat60_40("Merge Distance", &gOptions.SurfelGIMergeDistanceScale, 0.5f, 4.0f);
                     DrawSliderFloat60_40("Surfel Radius Scale", &gOptions.SurfelGIRadiusScale, 0.25f, 2.5f);
+                    DrawSliderFloat60_40("Face Margin Radius Scale", &gOptions.SurfelGIFaceMarginRadiusScale, 0.0f, 1.0f);
                     DrawSliderFloat60_40("Normal Threshold", &gOptions.SurfelGINormalThreshold, 0.0f, 1.0f);
                     DrawSliderInt60_40("TTL Frames", &gOptions.SurfelGITTLInFrames, 1, 600);
                     DrawSliderInt60_40("Spawn Hysteresis N", &gOptions.SurfelGISpawnHysteresisFrames, 1, 8);
@@ -504,9 +505,7 @@ void IRenderer::UIPass()
                     {
                         char label[64];
                         sprintf_s(label, "Cascade%d Surfels / Cell", cascade);
-                        DrawSliderInt60_40(label, &gOptions.SurfelGISurfelsPerCell[cascade], 1, 8);
-                        sprintf_s(label, "Cascade%d Overlap Allow", cascade);
-                        DrawSliderFloat60_40(label, &gOptions.SurfelGIOverlapAllowance[cascade], 0.1f, 0.9f);
+                        DrawSliderInt60_40(label, &gOptions.SurfelGISurfelsPerCell[cascade], 1, 10);
                     }
                     ImGui::Checkbox("Use Center Spawn Bias", &gOptions.UseSurfelGICenterSpawnBias);
                     DrawSliderFloat60_40("Near Keep Radius", &gOptions.SurfelGINearKeepRadius, 0.0f, 300.0f);

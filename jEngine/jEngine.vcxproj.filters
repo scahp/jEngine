@@ -1169,6 +1169,33 @@
     <None Include="Resource\Shaders\hlsl\SurfelGI_cs.hlsl">
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
+    <None Include="Resource\Shaders\hlsl\SurfelGIVisibleCellCollect_cs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\SurfelGIRefreshVisibleCellSurfels_cs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\SurfelGICleanup_cs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\SurfelGIClearVisibleCellCounter_cs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\SurfelGIClearCandidates_cs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\SurfelGIClearStats_cs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\SurfelGIGatherCandidates_cs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\SurfelGIPlaceCandidates_cs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\ApplySurfelGIVisualize_cs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
     <None Include="Resource\Shaders\hlsl\SurfelGIVisualize_cs.hlsl">
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>

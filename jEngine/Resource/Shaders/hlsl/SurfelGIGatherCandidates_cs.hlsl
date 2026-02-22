@@ -39,11 +39,11 @@ struct CommonComputeUniformBuffer
     int SpawnHysteresisFrames;
     int DeleteHysteresisFrames;
     float RadiusScale;
+    float FaceMarginRadiusScale;
     float4 CascadeClipmapGridDimXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
     float4 CascadeClipmapGridDimYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
     float4 CascadeClipmapGridDimZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
     float4 SurfelsPerCellPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 OverlapAllowancePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
 };
 
 struct SurfelData
@@ -262,10 +262,11 @@ float ComputeCenterProximityScore(float3 worldPos, int3 cellCoord, float cellSiz
     return (useCenterSpawnBias != 0) ? (1.0 - saturate(centerDistance)) : 1.0;
 }
 
-float ComposeReservoirPriority(float nonOverlapNeighborScore, float overlapFaceScore, float interiorPriority, float centerPriority)
+float ComposeReservoirPriority(float nonOverlapNeighborScore, float overlapFaceScore)
 {
     // Strict non-overlap mode: only candidates without measurable overlap survive.
-    const float noOverlapGate = (overlapFaceScore >= 0.999) ? 1.0 : 0.0;
+    const bool isStrictNonOverlapCandidate = (overlapFaceScore >= 0.999);
+    const float noOverlapGate = isStrictNonOverlapCandidate ? 1.0 : 0.0;
     return saturate(noOverlapGate * nonOverlapNeighborScore);
 }
 
@@ -353,8 +354,8 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 
     const float centerPriority = ComputeCenterProximityScore(worldPos, cellCoord, cellSize, ComputeCommon.UseCenterSpawnBias);
     const float3 cellLocal = frac(worldPos / max(cellSize, 0.001));
-    const float edgeDistance = min(min(min(cellLocal.x, 1.0 - cellLocal.x), min(cellLocal.y, 1.0 - cellLocal.y)), min(cellLocal.z, 1.0 - cellLocal.z));
-    const float faceMargin = radius * 0.5;
+    // Margin is a radius-relative band: radius * FaceMarginRadiusScale.
+    const float faceMargin = radius * max(ComputeCommon.FaceMarginRadiusScale, 0.0);
     const float distToNegX = cellLocal.x * cellSize;
     const float distToPosX = (1.0 - cellLocal.x) * cellSize;
     const float distToNegY = cellLocal.y * cellSize;
@@ -377,7 +378,6 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         InterlockedAdd(SurfelGIStatsBuffer[0].ReservoirRejectedCount, 1u, prevRejected);
         return;
     }
-    const float interiorPriority = saturate((edgeDistance - 0.12) / 0.38);
     const float separationPriority = ComputeNonOverlapScoreNeighbor27(activeNeighborCount, minSeparationNorm);
     const float overlapFaceScore = ComputeOverlapFaceCount(overlapPenalty, radius);
 
@@ -387,7 +387,8 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     {
         // First placement path: prefer candidates with less than 2 overlapped faces, then center proximity.
         const float overlapFaceCount = (1.0 - overlapFaceScore) * 6.0;
-        if (overlapFaceCount >= 2.0)
+        const bool exceedsFirstPlacementOverlapFaceLimit = (overlapFaceCount >= 2.0);
+        if (exceedsFirstPlacementOverlapFaceLimit)
         {
             uint prevRejected = 0u;
             InterlockedAdd(SurfelGIStatsBuffer[0].ReservoirRejectedCount, 1u, prevRejected);
@@ -397,7 +398,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     }
     else
     {
-        finalPriority = ComposeReservoirPriority(separationPriority, overlapFaceScore, interiorPriority, centerPriority);
+        finalPriority = ComposeReservoirPriority(separationPriority, overlapFaceScore);
     }
 
     const uint priority = (uint)(finalPriority * 16777215.0);

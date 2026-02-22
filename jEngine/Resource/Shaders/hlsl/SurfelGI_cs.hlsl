@@ -47,11 +47,11 @@ struct CommonComputeUniformBuffer
     int SpawnHysteresisFrames;
     int DeleteHysteresisFrames;
     float RadiusScale;
+    float FaceMarginRadiusScale;
     float4 CascadeClipmapGridDimXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
     float4 CascadeClipmapGridDimYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
     float4 CascadeClipmapGridDimZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
     float4 SurfelsPerCellPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 OverlapAllowancePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
 };
 
 struct SurfelData
@@ -124,7 +124,7 @@ uint Hash3(int3 v)
 
 uint GetSlotsPerCell(uint maxSurfels, uint desiredSlotsPerCell)
 {
-    const uint maxSlotsPerCell = min(max((uint)ComputeCommon.SurfelPageSize, 1u), 8u);
+    const uint maxSlotsPerCell = min(max((uint)ComputeCommon.SurfelPageSize, 1u), 10u);
     const uint clampedDesired = clamp(desiredSlotsPerCell, 1u, maxSlotsPerCell);
     return min(max(1u, maxSurfels), clampedDesired);
 }
@@ -363,18 +363,6 @@ uint GetCascadeIndexByDistance(float cameraDistance)
     return cascade;
 }
 
-float GetCascadeSeparationScale(uint cascadeIndex)
-{
-    const uint c = min(cascadeIndex, (uint)(SURFEL_GI_CASCADE_COUNT - 1));
-    const uint packIndex = c >> 2u;
-    const uint lane = c & 3u;
-    const float4 packed = ComputeCommon.OverlapAllowancePacked[packIndex];
-    float allowance = (lane == 0u) ? packed.x : ((lane == 1u) ? packed.y : ((lane == 2u) ? packed.z : packed.w));
-    allowance = clamp(allowance, 0.0, 0.95);
-    // Larger allowance -> smaller required separation -> more overlap permitted.
-    return max(1.0 - allowance, 0.05);
-}
-
 uint GetConsumedAge(float lastSeenFrame)
 {
     const float rawAge = abs((float)ComputeCommon.FrameNumber - lastSeenFrame);
@@ -588,7 +576,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     const float cascadeScale = GetCascadeScale(cascadeIndex);
     const float cellSize = cascade0CellSize * cascadeScale;
     const float cascadeRadiusScale = GetCascadeRadiusScale(cascadeIndex);
-    const float separationScale = GetCascadeSeparationScale(cascadeIndex);
+    const float separationScale = 1.0;
     float radius = max(ComputeCommon.MinRadius, 0.001) * max(ComputeCommon.RadiusScale, 0.05) * cascadeRadiusScale;
     const uint desiredSlotsPerCell = GetDesiredSlotsPerCell(cascadeIndex);
     const uint slotsPerCell = GetSlotsPerCell(maxSurfels, desiredSlotsPerCell);

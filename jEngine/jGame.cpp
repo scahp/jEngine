@@ -96,6 +96,20 @@ void jGame::Setup()
         static jConsoleVariableBool* cvar_SurfelGIReservoirEnable = new jConsoleVariableBool("r.surfelgi.reservoir.enable", &gOptions.SurfelGIReservoirEnable, "Enable SurfelGI reservoir gather/place pipeline");
         static jConsoleVariableInt* cvar_SurfelGIReservoirPerCellLimit = new jConsoleVariableInt("r.surfelgi.reservoir.per_cell_limit", &gOptions.SurfelGIReservoirPerCellLimit, "SurfelGI reservoir per-cell page size limit");
         static jConsoleVariableFloat* cvar_SurfelGIReservoirTableCapacityScale = new jConsoleVariableFloat("r.surfelgi.reservoir.table_capacity_scale", &gOptions.SurfelGIReservoirTableCapacityScale, "SurfelGI reservoir page table capacity scale");
+        static jConsoleVariableFloat* cvar_SurfelGIFaceMarginRadiusScale = new jConsoleVariableFloat("r.surfelgi.face_margin_radius_scale", &gOptions.SurfelGIFaceMarginRadiusScale, "SurfelGI reservoir candidate face margin radius scale");
+        static jConsoleVariableInt* cvar_SurfelGISurfelsPerCell[SURFEL_GI_CASCADE_COUNT] = {};
+        for (int32 cascade = 0; cascade < SURFEL_GI_CASCADE_COUNT; ++cascade)
+        {
+            char surfelsPerCellName[128];
+            char surfelsPerCellDesc[128];
+            sprintf_s(surfelsPerCellName, "r.surfelgi.cascade%d.surfels_per_cell", cascade);
+            sprintf_s(surfelsPerCellDesc, "SurfelGI cascade %d desired surfels per cell", cascade);
+
+            if (!cvar_SurfelGISurfelsPerCell[cascade])
+            {
+                cvar_SurfelGISurfelsPerCell[cascade] = new jConsoleVariableInt(surfelsPerCellName, &gOptions.SurfelGISurfelsPerCell[cascade], surfelsPerCellDesc);
+            }
+        }
 		static jConsoleVariableInt* cvar_SSGIRayCount = new jConsoleVariableInt("r.ssgi.raycount", &gOptions.SSGIRayCount, "SSGI ray count per pixel");
 		static jConsoleVariableFloat* cvar_SSGIIntensity = new jConsoleVariableFloat("r.ssgi.intensity", &gOptions.SSGIIntensity, "SSGI intensity multiplier");
 

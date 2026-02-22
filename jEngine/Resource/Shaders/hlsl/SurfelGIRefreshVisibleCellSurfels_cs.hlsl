@@ -40,11 +40,11 @@ struct CommonComputeUniformBuffer
     int SpawnHysteresisFrames;
     int DeleteHysteresisFrames;
     float RadiusScale;
+    float FaceMarginRadiusScale;
     float4 CascadeClipmapGridDimXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
     float4 CascadeClipmapGridDimYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
     float4 CascadeClipmapGridDimZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
     float4 SurfelsPerCellPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 OverlapAllowancePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
 };
 
 struct SurfelData

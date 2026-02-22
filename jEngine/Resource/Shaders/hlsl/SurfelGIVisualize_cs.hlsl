@@ -110,7 +110,7 @@ float3 RadiusDebugColor(float radius)
 
 uint GetSlotsPerCell(uint maxSurfels, uint desiredSlotsPerCell)
 {
-    const uint maxSlotsPerCell = min(max((uint)VisualizeCommon.SurfelPageSize, 1u), 8u);
+    const uint maxSlotsPerCell = min(max((uint)VisualizeCommon.SurfelPageSize, 1u), 10u);
     const uint clampedDesired = clamp(desiredSlotsPerCell, 1u, maxSlotsPerCell);
     return min(max(1u, maxSurfels), clampedDesired);
 }

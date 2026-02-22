@@ -62,6 +62,7 @@ jOptions::jOptions()
     SurfelGITileSize = 8;
     SurfelGIMergeDistanceScale = 1.5f;
     SurfelGIRadiusScale = 0.5f;
+    SurfelGIFaceMarginRadiusScale = 0.5f;
     SurfelGINormalThreshold = 0.8f;
     SurfelGITTLInFrames = 120;
     SurfelGIWorldGridCellSize = 30.0f;
@@ -76,7 +77,6 @@ jOptions::jOptions()
         SurfelGIClipmapGridDimY[i] = (i == 0) ? 64 : 48;
         SurfelGIClipmapGridDimZ[i] = (i == 0) ? 32 : 24;
         SurfelGISurfelsPerCell[i] = ReservoirPerCellDefault;
-        SurfelGIOverlapAllowance[i] = 0.1f;
     }
     UseSurfelGICenterSpawnBias = true;
     SurfelGINearKeepRadius = 60.0f;

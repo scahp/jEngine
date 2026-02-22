@@ -339,12 +339,11 @@ void jRenderer::SurfelGIPass()
         int32 SpawnHysteresisFrames;
         int32 DeleteHysteresisFrames;
         float RadiusScale;
-        float PaddingAfterRadiusScale;
+        float FaceMarginRadiusScale;
         jFloat4 CascadeClipmapGridDimXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
         jFloat4 CascadeClipmapGridDimYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
         jFloat4 CascadeClipmapGridDimZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
         jFloat4 SurfelsPerCellPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        jFloat4 OverlapAllowancePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
     };
     static_assert((sizeof(jSurfelGIUniformBuffer) % 16) == 0, "jSurfelGIUniformBuffer size must be 16-byte aligned");
 
@@ -402,9 +401,8 @@ void jRenderer::SurfelGIPass()
         UniformData.CascadeClipmapGridDimYPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
         UniformData.CascadeClipmapGridDimZPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
         UniformData.SurfelsPerCellPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        UniformData.OverlapAllowancePacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
     }
-    UniformData.PaddingAfterRadiusScale = 0.0f;
+    UniformData.FaceMarginRadiusScale = Clamp(gOptions.SurfelGIFaceMarginRadiusScale, 0.0f, 2.0f);
     auto SetPackedCascadeValue = [](jFloat4* packedArray, int32 cascade, float value)
     {
         const int32 packIndex = cascade / 4;
@@ -428,8 +426,7 @@ void jRenderer::SurfelGIPass()
         SetPackedCascadeValue(UniformData.CascadeClipmapGridDimXPacked, cascade, (float)Clamp(gOptions.SurfelGIClipmapGridDimX[cascade], 4, 512));
         SetPackedCascadeValue(UniformData.CascadeClipmapGridDimYPacked, cascade, (float)Clamp(gOptions.SurfelGIClipmapGridDimY[cascade], 4, 512));
         SetPackedCascadeValue(UniformData.CascadeClipmapGridDimZPacked, cascade, (float)Clamp(gOptions.SurfelGIClipmapGridDimZ[cascade], 4, 512));
-        SetPackedCascadeValue(UniformData.SurfelsPerCellPacked, cascade, (float)Clamp(gOptions.SurfelGISurfelsPerCell[cascade], 1, 8));
-        SetPackedCascadeValue(UniformData.OverlapAllowancePacked, cascade, Clamp(gOptions.SurfelGIOverlapAllowance[cascade], 0.0f, 0.95f));
+        SetPackedCascadeValue(UniformData.SurfelsPerCellPacked, cascade, (float)Clamp(gOptions.SurfelGISurfelsPerCell[cascade], 1, 10));
     }
 
     auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(
@@ -1048,7 +1045,7 @@ void jRenderer::SurfelGIPass()
         VisualizeUniformData.ShowStateDebug = gOptions.ShowSurfelGIStateDebug ? 1 : 0;
         for (int32 cascade = 0; cascade < SURFEL_GI_CASCADE_COUNT; ++cascade)
         {
-            SetPackedVisualizeValue(VisualizeUniformData.SurfelsPerCellPacked, cascade, (float)Clamp(gOptions.SurfelGISurfelsPerCell[cascade], 1, 8));
+            SetPackedVisualizeValue(VisualizeUniformData.SurfelsPerCellPacked, cascade, (float)Clamp(gOptions.SurfelGISurfelsPerCell[cascade], 1, 10));
         }
         VisualizeUniformData.ShowCellDebug = gOptions.ShowSurfelGICellDebug ? 1 : 0;
         VisualizeUniformData.ShowUnderfilledCellDebug = gOptions.ShowSurfelGIUnderfilledCellDebug ? 1 : 0;

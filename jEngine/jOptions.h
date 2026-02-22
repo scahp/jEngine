@@ -73,6 +73,9 @@ struct jOptions
     int32 SurfelGITileSize;
     float SurfelGIMergeDistanceScale;
     float SurfelGIRadiusScale;
+    // Candidate face margin = candidate radius * SurfelGIFaceMarginRadiusScale.
+    // Used to reject candidates too close to multiple cell faces (edge/corner crowding).
+    float SurfelGIFaceMarginRadiusScale;
     float SurfelGINormalThreshold;
     int32 SurfelGITTLInFrames;
     float SurfelGIWorldGridCellSize;
@@ -83,7 +86,6 @@ struct jOptions
     int32 SurfelGIClipmapGridDimY[SURFEL_GI_CASCADE_COUNT];
     int32 SurfelGIClipmapGridDimZ[SURFEL_GI_CASCADE_COUNT];
     int32 SurfelGISurfelsPerCell[SURFEL_GI_CASCADE_COUNT];
-    float SurfelGIOverlapAllowance[SURFEL_GI_CASCADE_COUNT];
     bool UseSurfelGICenterSpawnBias;
     float SurfelGINearKeepRadius;
     float SurfelGINearSpawnBias;
