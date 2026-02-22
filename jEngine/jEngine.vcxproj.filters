@@ -553,6 +553,10 @@
     <ClInclude Include="Code\Engine\ConsoleVariables\jConsoleVariable.h">
       <Filter>Code\Engine\ConsoleVariables</Filter>
     </ClInclude>
+    <ClInclude Include="CoreDefines.h" />
+    <ClInclude Include="Generic\TemplateUtility.h" />
+    <ClInclude Include="jBoundPrimitiveType.h" />
+    <ClInclude Include="Profiler\jProfilerBackend.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -936,20 +940,20 @@
     <ClCompile Include="External\PathTracingDataLoader\GLTFLoader.cpp">
       <Filter>Code\External\PathTracingDataLoader</Filter>
     </ClCompile>
-	<ClCompile Include="External\PathTracingDataLoader\PathTracingDataLoader.cpp">
-	  <Filter>Code\External\PathTracingDataLoader</Filter>
-	</ClCompile>
-	<ClCompile Include="Math\Quaternion.cpp">
-	  <Filter>Code\Math</Filter>
-	</ClCompile>
-	<ClCompile Include="Math\MathBench.cpp">
-	  <Filter>Code\Math</Filter>
-	</ClCompile>
-	<ClCompile Include="External\PathTracingDataLoader\jPathTracingData.cpp">
-	  <Filter>Code\External\PathTracingDataLoader</Filter>
-	</ClCompile>
-	<ClCompile Include="Scene\Light\jPathTracingLight.cpp">
-	  <Filter>Code\Scene\Light</Filter>
+    <ClCompile Include="External\PathTracingDataLoader\PathTracingDataLoader.cpp">
+      <Filter>Code\External\PathTracingDataLoader</Filter>
+    </ClCompile>
+    <ClCompile Include="Math\Quaternion.cpp">
+      <Filter>Code\Math</Filter>
+    </ClCompile>
+    <ClCompile Include="Math\MathBench.cpp">
+      <Filter>Code\Math</Filter>
+    </ClCompile>
+    <ClCompile Include="External\PathTracingDataLoader\jPathTracingData.cpp">
+      <Filter>Code\External\PathTracingDataLoader</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene\Light\jPathTracingLight.cpp">
+      <Filter>Code\Scene\Light</Filter>
     </ClCompile>
     <ClCompile Include="Renderer\jRenderer_PathTracing.cpp">
       <Filter>Code\Renderer</Filter>
@@ -968,6 +972,9 @@
     </ClCompile>
     <ClCompile Include="Code\Engine\ConsoleVariables\jConsoleVariable.cpp">
       <Filter>Code\Engine\ConsoleVariables</Filter>
+    </ClCompile>
+    <ClCompile Include="Profiler\jProfilerBackend.cpp">
+      <Filter>Code</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1164,9 +1171,6 @@
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
     <None Include="Resource\Shaders\hlsl\SSGI_ATrous_cs.hlsl">
-      <Filter>Resource\Shaders\hlsl</Filter>
-    </None>
-    <None Include="Resource\Shaders\hlsl\SurfelGI_cs.hlsl">
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
     <None Include="Resource\Shaders\hlsl\SurfelGIVisibleCellCollect_cs.hlsl">

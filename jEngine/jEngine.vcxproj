@@ -383,15 +383,15 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClCompile Include="jPrimitiveUtil.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Material\jMaterial.cpp" />
-	<ClCompile Include="Math\Matrix.cpp" />
-	<ClCompile Include="Math\Plane.cpp" />
-	<ClCompile Include="Math\Quaternion.cpp" />
-	<ClCompile Include="Math\MathBench.cpp">
+    <ClCompile Include="Math\Matrix.cpp" />
+    <ClCompile Include="Math\Plane.cpp" />
+    <ClCompile Include="Math\Quaternion.cpp" />
+    <ClCompile Include="Math\MathBench.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </ClCompile>
-	<ClCompile Include="Math\Vector.cpp" />
-	<ClCompile Include="pch.cpp">
+    <ClCompile Include="Math\Vector.cpp" />
+    <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
@@ -814,10 +814,6 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
       <FileType>Document</FileType>
     </None>
     <None Include="Resource\Shaders\hlsl\SSGI_cs.hlsl">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <FileType>Document</FileType>
-    </None>
-    <None Include="Resource\Shaders\hlsl\SurfelGI_cs.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <FileType>Document</FileType>
     </None>
