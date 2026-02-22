@@ -92,6 +92,9 @@ struct jOptions
     float SurfelGIFarMaxDistanceMultiplier;
     float SurfelGIReplaceNearDelta;
     float SurfelGIStaleAgeDivisor;
+    bool SurfelGIReservoirEnable;
+    int32 SurfelGIReservoirPerCellLimit;
+    float SurfelGIReservoirTableCapacityScale;
     int32 SurfelGISpawnHysteresisFrames;
     int32 SurfelGIDeleteHysteresisFrames;
     bool ShowSurfelGIDebug;

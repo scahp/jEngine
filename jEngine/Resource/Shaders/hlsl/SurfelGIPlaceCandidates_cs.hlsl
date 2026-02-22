@@ -23,9 +23,6 @@ struct CommonComputeUniformBuffer
     float FarMaxDistanceMultiplier;
     float ReplaceNearDelta;
     float StaleAgeDivisor;
-    float MismatchAgeScale;
-    int PageEvictMinAgeFrames;
-    int CleanupSliceCount;
     float MinRadius;
     float MaxDistance;
     int FrameNumber;
@@ -72,8 +69,8 @@ struct SurfelGIStats
     uint TTLRetireCount;
     uint PageGCCount;
     uint PageEvictCount;
-    uint Padding0;
-    uint Padding1;
+    uint ReservoirOverflowCount;
+    uint ReservoirRejectedCount;
 };
 
 struct SurfelCandidate
@@ -94,6 +91,16 @@ RWStructuredBuffer<SurfelGIStats> SurfelGIStatsBuffer : register(u5, space0);
 cbuffer ComputeCommon : register(b6, space0)
 {
     CommonComputeUniformBuffer ComputeCommon;
+}
+
+uint GetDesiredSlotsPerCell(uint cascadeIndex)
+{
+    const uint c = min(cascadeIndex, (uint)(SURFEL_GI_CASCADE_COUNT - 1));
+    const uint packIndex = c >> 2u;
+    const uint lane = c & 3u;
+    const float4 packed = ComputeCommon.SurfelsPerCellPacked[packIndex];
+    const float value = (lane == 0u) ? packed.x : ((lane == 1u) ? packed.y : ((lane == 2u) ? packed.z : packed.w));
+    return max((uint)round(value), 1u);
 }
 
 uint GetConsumedAge(float lastSeenFrame)
@@ -128,6 +135,8 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 
     const uint maxSurfels = max((uint)ComputeCommon.MaxSurfels, 1u);
     const uint pageSize = min(max((uint)ComputeCommon.SurfelPageSize, 1u), maxSurfels);
+    const uint pageCascade = (uint)clamp(pageEntry.CellCascade.w, 0, SURFEL_GI_CASCADE_COUNT - 1);
+    const uint desiredSlots = min(GetDesiredSlotsPerCell(pageCascade), pageSize);
     const uint base = pageIndex * pageSize;
     if (base >= maxSurfels)
         return;
@@ -136,7 +145,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     bool foundInactive = false;
     uint oldestAge = 0u;
 
-    [loop] for (uint i = 0u; i < pageSize; ++i)
+    [loop] for (uint i = 0u; i < desiredSlots; ++i)
     {
         const uint idx = base + i;
         if (idx >= maxSurfels)
@@ -156,9 +165,36 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         }
     }
 
-    SurfelData outSurfel = c.Surfel;
-    outSurfel.NormalSeenFrame.w = (float)ComputeCommon.FrameNumber;
-    outSurfel.Extra.y = 1.0;
+    // Reservoir policy: do not replace already active surfels.
+    // Place only when an inactive slot exists in the page.
+    if (!foundInactive)
+        return;
+
+    const SurfelData existing = SurfelPool[writeIndex];
+    const bool isDormantReuse = (existing.Extra.y <= 0.5) && (abs(existing.Extra.x - 5.0) < 0.5);
+    SurfelData outSurfel;
+    if (isDormantReuse)
+    {
+        // Re-activate dormant surfel in-place and blend attributes toward winner candidate.
+        outSurfel = existing;
+        const float oldWeight = max(existing.AlbedoWeight.w, 1.0);
+        const float newWeight = min(oldWeight + 1.0, 64.0);
+        const float blend = 1.0 / newWeight;
+        outSurfel.NormalSeenFrame.xyz = normalize(lerp(existing.NormalSeenFrame.xyz, c.Surfel.NormalSeenFrame.xyz, blend));
+        outSurfel.NormalSeenFrame.w = (float)ComputeCommon.FrameNumber;
+        outSurfel.AlbedoWeight.xyz = lerp(existing.AlbedoWeight.xyz, c.Surfel.AlbedoWeight.xyz, blend);
+        outSurfel.AlbedoWeight.w = newWeight;
+        outSurfel.Extra.x = 6.0;      // "revived dormant" for Surfel state debug (blue).
+        outSurfel.Extra.y = 1.0;
+        outSurfel.Extra.z = 0.0;
+        outSurfel.Extra.w = (float)pageCascade;
+    }
+    else
+    {
+        outSurfel = c.Surfel;
+        outSurfel.NormalSeenFrame.w = (float)ComputeCommon.FrameNumber;
+        outSurfel.Extra.y = 1.0;
+    }
     SurfelPool[writeIndex] = outSurfel;
 
     uint oldValue = 0u;

@@ -10,7 +10,6 @@
 #endif
 #define SURFEL_GI_CASCADE_PACKED_COUNT ((SURFEL_GI_CASCADE_COUNT + 3) / 4)
 #define SURFEL_GI_ENABLE_OVERFLOW 0
-#define SURFEL_GI_ENABLE_PERFECT_RELOCATION 0
 #define SURFEL_GI_ENABLE_REPLACE_FAR 0
 #define SURFEL_GI_ENABLE_STEAL_FAR 0
 
@@ -99,11 +98,6 @@ static const float3 ATTEMPT_COLOR_REJECTED_MIN_SEPARATION   = float3(1.00, 1.00,
 static const float3 ATTEMPT_COLOR_REJECTED_NO_CREATE_PATH   = float3(1.00, 0.00, 0.00); // red
 static const float3 ATTEMPT_COLOR_REJECTED_OCCUPANCY_GATE   = float3(0.00, 0.00, 0.00); // black
 static const float3 ATTEMPT_COLOR_REJECTED_NO_WRITABLE_SLOT = float3(0.30, 1.00, 0.00); // neon green
-static const float3 ATTEMPT_COLOR_RELOCATE_IN_CELL          = float3(1.00, 0.65, 0.00); // amber
-static const float3 ATTEMPT_COLOR_REJECTED_PERFECT_OUT_OF_CELL = float3(0.00, 1.00, 1.00); // cyan
-static const float3 ATTEMPT_COLOR_REJECTED_PERFECT_OVERLAP     = float3(1.00, 0.25, 0.00); // vivid orange
-static const float3 ATTEMPT_COLOR_REJECTED_RELOC_NO_SOURCE     = float3(0.00, 0.20, 1.00); // strong blue
-static const float3 ATTEMPT_COLOR_PERFECT_POSITION             = float3(0.20, 1.00, 0.20); // bright green
 static const float3 ATTEMPT_COLOR_SPAWN_NEW                 = float3(1.00, 1.00, 1.00); // white
 static const float3 ATTEMPT_COLOR_REPLACED_FAR              = float3(0.35, 0.35, 0.35); // gray
 static const float3 ATTEMPT_COLOR_STEAL_FAR                 = float3(0.00, 0.50, 0.00); // dark green
@@ -1285,12 +1279,8 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         violatesMinSeparation = overlapsAny;
     }
 
-    bool spawnHasNoHardOverlap = (ComputeHardOverlapPenaltyAtPosition(spawnPosition, radius, 0xffffffffu, cellCoord, cellSize, maxSurfels, desiredSlotsPerCell, slotsPerCell, cascadeIndex) <= 0.0);
-    const bool spawnIsPerfectPosition = spawnHasNoHardOverlap;
-    const bool perfectUnderfilledSpawn = canSpawn && spawnIsPerfectPosition;
-    const bool perfectRelocationOnly = spawnIsPerfectPosition && !canSpawn && !replaceFarSurfel && !stealFarSurfel;
-    const bool shouldCreateOrReplace = (canSpawn || replaceFarSurfel || stealFarSurfel || perfectRelocationOnly)
-        && (!violatesMinSeparation || perfectUnderfilledSpawn || perfectRelocationOnly);
+    const bool shouldCreateOrReplace = (canSpawn || replaceFarSurfel || stealFarSurfel)
+        && !violatesMinSeparation;
     if (shouldCreateOrReplace)
     {
         // Cell-aware policy:
@@ -1358,84 +1348,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         const uint desiredLocalCount = min(desiredSlotsPerCell, slotsPerCell);
         const bool isCellUnderfilled = (localAliveCount < desiredLocalCount);
 
-        // Priority rule: perfect relocation first.
-        // If cell is full and current spawn position is perfect, try relocating an overlapping
-        // local surfel before dormant/historical reuse paths.
-        uint localAliveCountWriteEarly = localAliveCount;
-        {
-#if SURFEL_GI_ENABLE_OVERFLOW
-            int overflowNode = OverflowHeads[bucketIndex].Head;
-            [loop] for (uint iter = 0u; iter < 32u && overflowNode >= 0; ++iter)
-            {
-                const uint nodeIndex = (uint)overflowNode;
-                if (nodeIndex >= maxSurfels)
-                    break;
-                const OverflowNode node = OverflowNodes[nodeIndex];
-                const SurfelData s = node.Surfel;
-                if (s.Extra.y > 0.5)
-                {
-                    const uint nodeCascade = (uint)round(s.Extra.w);
-                    if (nodeCascade == cascadeIndex)
-                    {
-                        const int3 nodeCellCoord = int3(floor(s.PositionRadius.xyz / cellSize));
-                        if (all(nodeCellCoord == cellCoord))
-                            localAliveCountWriteEarly++;
-                    }
-                }
-                overflowNode = node.Next;
-            }
-#endif
-        }
-        const uint desiredLocalCountWriteEarly = min(desiredSlotsPerCell, slotsPerCell);
-        const bool cellIsFullNow = (localAliveCountWriteEarly >= desiredLocalCountWriteEarly);
-        (void)desiredLocalCountWriteEarly;
-        (void)cellIsFullNow;
-        if ((SURFEL_GI_ENABLE_PERFECT_RELOCATION != 0) && spawnIsPerfectPosition)
-        {
-            uint bestOverlapIndex = 0xffffffffu;
-            float bestOverlapPenalty = 0.0;
-            float bestRelocateScore = -1.0;
-            [loop] for (uint slot = 0u; slot < slotsPerCell; ++slot)
-            {
-                const uint slotIndex = cellBaseIndex + slot;
-                const SurfelData slotSurfel = SurfelPool[slotIndex];
-                if (slotSurfel.Extra.y <= 0.5)
-                    continue;
-                if ((uint)round(slotSurfel.Extra.w) != cascadeIndex)
-                    continue;
-
-                const int3 slotCellCoord = int3(floor(slotSurfel.PositionRadius.xyz / cellSize));
-                if (any(slotCellCoord != cellCoord))
-                    continue;
-
-                const float overlapPenalty = ComputeHardOverlapPenaltyAtPosition(
-                    slotSurfel.PositionRadius.xyz, slotSurfel.PositionRadius.w, slotIndex,
-                    cellCoord, cellSize, maxSurfels, desiredSlotsPerCell, slotsPerCell, cascadeIndex);
-                const uint slotAge = GetConsumedAge(slotSurfel.NormalSeenFrame.w);
-                const float relocateScore = overlapPenalty * 1024.0 + min((float)slotAge, 1024.0) * 0.01;
-                if (relocateScore > bestRelocateScore)
-                {
-                    bestRelocateScore = relocateScore;
-                    bestOverlapPenalty = overlapPenalty;
-                    bestOverlapIndex = slotIndex;
-                }
-            }
-
-            if (bestOverlapIndex != 0xffffffffu)
-            {
-                SurfelData relocated = SurfelPool[bestOverlapIndex];
-                relocated.PositionRadius = float4(spawnPosition, radius);
-                relocated.NormalSeenFrame = float4(worldNormal, (float)ComputeCommon.FrameNumber);
-                relocated.AlbedoWeight = float4(albedo, 1.0);
-                relocated.Extra = float4(8.0, 1.0, 0.0, (float)cascadeIndex);
-                SurfelPool[bestOverlapIndex] = relocated;
-                AttemptOutput[pixel] = float4(ATTEMPT_COLOR_RELOCATE_IN_CELL, 1.0);
-                DebugOutput[pixel] = float4(1.0, 0.65, 0.0, 1.0);
-                return;
-            }
-        }
-
-        if (!perfectRelocationOnly && isCellUnderfilled && foundLocalDormant)
+        if (isCellUnderfilled && foundLocalDormant)
         {
             SurfelData historical = SurfelPool[bestLocalDormantIndex];
             const float oldWeight = max(historical.AlbedoWeight.w, 1.0);
@@ -1456,14 +1369,14 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
             return;
         }
 
-        const bool preferDirectSpawnInUnderfilledCell = (!perfectRelocationOnly) && isCellUnderfilled && !foundLocalDormant && localHasVacancy;
+        const bool preferDirectSpawnInUnderfilledCell = isCellUnderfilled && !foundLocalDormant && localHasVacancy;
 
         // Before creating a new red surfel, try reactivating a previously used local surfel.
         // Skip this path when cell is underfilled and can accept direct spawn.
         bool foundHistorical = false;
         uint bestHistoricalIndex = index;
         float bestHistoricalDistance = 1e20;
-        if (!preferDirectSpawnInUnderfilledCell && !spawnIsPerfectPosition)
+        if (!preferDirectSpawnInUnderfilledCell)
         {
             [loop] for (uint slot = 0u; slot < slotsPerCell; ++slot)
             {
@@ -1527,7 +1440,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         const uint spawnHysteresis = max((uint)ComputeCommon.SpawnHysteresisFrames, 1u);
         const bool currentDormant = IsDormantSurfel(current);
         const uint pendingSpawnStreak = currentDormant ? spawnHysteresis : min((uint)current.Extra.z + 1u, 255u);
-        if (!perfectRelocationOnly && !preferDirectSpawnInUnderfilledCell && pendingSpawnStreak < spawnHysteresis)
+        if (!preferDirectSpawnInUnderfilledCell && pendingSpawnStreak < spawnHysteresis)
         {
             current.Extra.z = (float)pendingSpawnStreak;
             SurfelPool[index] = current;
@@ -1588,58 +1501,6 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         const bool canWriteByCellOccupancy = (localAliveCountWrite < desiredLocalCountWrite);
         if (!canWriteByCellOccupancy)
         {
-            // Perfect position maintenance:
-            // if the cell is full but spawn position is perfect, relocate one overlapping local
-            // surfel to this perfect position.
-            if ((SURFEL_GI_ENABLE_PERFECT_RELOCATION != 0) && spawnIsPerfectPosition)
-            {
-                uint bestOverlapIndex = 0xffffffffu;
-                float bestOverlapPenalty = 0.0;
-                float bestRelocateScore = -1.0;
-                [loop] for (uint slot = 0u; slot < slotsPerCell; ++slot)
-                {
-                    const uint slotIndex = cellBaseIndex + slot;
-                    const SurfelData slotSurfel = SurfelPool[slotIndex];
-                    if (slotSurfel.Extra.y <= 0.5)
-                        continue;
-                    if ((uint)round(slotSurfel.Extra.w) != cascadeIndex)
-                        continue;
-
-                    const int3 slotCellCoord = int3(floor(slotSurfel.PositionRadius.xyz / cellSize));
-                    if (any(slotCellCoord != cellCoord))
-                        continue;
-
-                    const float overlapPenalty = ComputeHardOverlapPenaltyAtPosition(
-                        slotSurfel.PositionRadius.xyz, slotSurfel.PositionRadius.w, slotIndex,
-                        cellCoord, cellSize, maxSurfels, desiredSlotsPerCell, slotsPerCell, cascadeIndex);
-                    const uint slotAge = GetConsumedAge(slotSurfel.NormalSeenFrame.w);
-                    const float relocateScore = overlapPenalty * 1024.0 + min((float)slotAge, 1024.0) * 0.01;
-                    if (relocateScore > bestRelocateScore)
-                    {
-                        bestRelocateScore = relocateScore;
-                        bestOverlapPenalty = overlapPenalty;
-                        bestOverlapIndex = slotIndex;
-                    }
-                }
-
-                if (bestOverlapIndex != 0xffffffffu)
-                {
-                    SurfelData relocated = SurfelPool[bestOverlapIndex];
-                    relocated.PositionRadius = float4(spawnPosition, radius);
-                    relocated.NormalSeenFrame = float4(worldNormal, (float)ComputeCommon.FrameNumber);
-                    relocated.AlbedoWeight = float4(albedo, 1.0);
-                    relocated.Extra = float4(8.0, 1.0, 0.0, (float)cascadeIndex);
-                    SurfelPool[bestOverlapIndex] = relocated;
-                    AttemptOutput[pixel] = float4(ATTEMPT_COLOR_RELOCATE_IN_CELL, 1.0);
-                    DebugOutput[pixel] = float4(1.0, 0.65, 0.0, 1.0);
-                    return;
-                }
-
-                AttemptOutput[pixel] = float4(ATTEMPT_COLOR_REJECTED_RELOC_NO_SOURCE, 1.0);
-                DebugOutput[pixel] = float4(0.0, 0.2, 1.0, 1.0);
-                return;
-            }
-
             AttemptOutput[pixel] = float4(ATTEMPT_COLOR_REJECTED_OCCUPANCY_GATE, 1.0);
             DebugOutput[pixel] = float4(0.0, 0.0, 1.0, 1.0);
             return;
@@ -1707,7 +1568,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         SurfelPool[index] = s;
         AttemptOutput[pixel] = float4(stealFarSurfel ? ATTEMPT_COLOR_STEAL_FAR
             : (replaceFarSurfel ? ATTEMPT_COLOR_REPLACED_FAR
-            : (spawnIsPerfectPosition ? ATTEMPT_COLOR_PERFECT_POSITION : ATTEMPT_COLOR_SPAWN_NEW)), 1.0);
+            : ATTEMPT_COLOR_SPAWN_NEW), 1.0);
 
         DebugOutput[pixel] = stealFarSurfel ? float4(1.0, 0.0, 1.0, 1.0)
             : (replaceFarSurfel ? float4(0.0, 1.0, 1.0, 1.0)
@@ -1716,13 +1577,6 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     else
     {
         float3 noCreateColor = ATTEMPT_COLOR_REJECTED_NO_CREATE_PATH;
-        if (spawnIsPerfectPosition)
-            noCreateColor = ATTEMPT_COLOR_PERFECT_POSITION;
-        if (!violatesMinSeparation && !canSpawn && !replaceFarSurfel && !stealFarSurfel)
-        {
-            if (!spawnHasNoHardOverlap)
-                noCreateColor = ATTEMPT_COLOR_REJECTED_PERFECT_OVERLAP;
-        }
 
         AttemptOutput[pixel] = float4(violatesMinSeparation ? ATTEMPT_COLOR_REJECTED_MIN_SEPARATION : noCreateColor, 1.0);
         DebugOutput[pixel] = violatesMinSeparation ? float4(1.0, 1.0, 0.0, 1.0) : float4(noCreateColor, 1.0);

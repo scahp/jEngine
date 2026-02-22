@@ -65,6 +65,8 @@ jOptions::jOptions()
     SurfelGINormalThreshold = 0.8f;
     SurfelGITTLInFrames = 120;
     SurfelGIWorldGridCellSize = 30.0f;
+    const int32 ReservoirPerCellDefault = 10;
+    SurfelGIReservoirPerCellLimit = ReservoirPerCellDefault;
     for (int32 i = 0; i < SURFEL_GI_CASCADE_COUNT; ++i)
     {
         SurfelGICascadeCellScaleFromPrev[i] = (i == 0) ? 1.0f : 2.0f;
@@ -73,7 +75,7 @@ jOptions::jOptions()
         SurfelGIClipmapGridDimX[i] = (i == 0) ? 64 : 48;
         SurfelGIClipmapGridDimY[i] = (i == 0) ? 64 : 48;
         SurfelGIClipmapGridDimZ[i] = (i == 0) ? 32 : 24;
-        SurfelGISurfelsPerCell[i] = (i == 0) ? 4 : ((i == 1) ? 3 : 4);
+        SurfelGISurfelsPerCell[i] = ReservoirPerCellDefault;
         SurfelGIOverlapAllowance[i] = 0.1f;
     }
     UseSurfelGICenterSpawnBias = true;
@@ -84,6 +86,8 @@ jOptions::jOptions()
     SurfelGIFarMaxDistanceMultiplier = 1.25f;
     SurfelGIReplaceNearDelta = 0.2f;
     SurfelGIStaleAgeDivisor = 6.0f;
+    SurfelGIReservoirEnable = true;
+    SurfelGIReservoirTableCapacityScale = 1.0f;
     SurfelGISpawnHysteresisFrames = 8;
     SurfelGIDeleteHysteresisFrames = 120;
     ShowSurfelGIDebug = false;

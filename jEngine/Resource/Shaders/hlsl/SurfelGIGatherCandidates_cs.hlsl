@@ -23,9 +23,6 @@ struct CommonComputeUniformBuffer
     float FarMaxDistanceMultiplier;
     float ReplaceNearDelta;
     float StaleAgeDivisor;
-    float MismatchAgeScale;
-    int PageEvictMinAgeFrames;
-    int CleanupSliceCount;
     float MinRadius;
     float MaxDistance;
     int FrameNumber;
@@ -72,8 +69,8 @@ struct SurfelGIStats
     uint TTLRetireCount;
     uint PageGCCount;
     uint PageEvictCount;
-    uint Padding0;
-    uint Padding1;
+    uint ReservoirOverflowCount;
+    uint ReservoirRejectedCount;
 };
 
 struct SurfelCandidate
@@ -248,6 +245,30 @@ float SampleLinearDepthClamped(int2 pixel, int2 screenSize)
     return LinearDepthTexture.Load(int3(clampedPixel, 0)).x;
 }
 
+float ComputeOverlapFaceCount(float overlapPenalty, float candidateRadius)
+{
+    return (overlapPenalty <= 0.0001) ? 1.0 : saturate(1.0 - overlapPenalty / max(candidateRadius, 0.001));
+}
+
+float ComputeNonOverlapScoreNeighbor27(uint activeNeighborCount, float minSeparationNorm)
+{
+    return (activeNeighborCount == 0u) ? 1.0 : saturate(minSeparationNorm * 0.5);
+}
+
+float ComputeCenterProximityScore(float3 worldPos, int3 cellCoord, float cellSize, int useCenterSpawnBias)
+{
+    const float3 cellCenter = (float3(cellCoord) + 0.5) * cellSize;
+    const float centerDistance = distance(worldPos, cellCenter) / max(cellSize * 0.8660254, 0.001);
+    return (useCenterSpawnBias != 0) ? (1.0 - saturate(centerDistance)) : 1.0;
+}
+
+float ComposeReservoirPriority(float nonOverlapNeighborScore, float overlapFaceScore, float interiorPriority, float centerPriority)
+{
+    // Strict non-overlap mode: only candidates without measurable overlap survive.
+    const float noOverlapGate = (overlapFaceScore >= 0.999) ? 1.0 : 0.0;
+    return saturate(noOverlapGate * nonOverlapNeighborScore);
+}
+
 [numthreads(8, 8, 1)]
 void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 {
@@ -294,13 +315,21 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 
     uint pageIndex = 0u;
     if (!TryGetOrCreatePageIndex(cellCoord, cascadeIndex, pageIndex))
+    {
+        uint prevOverflow = 0u;
+        InterlockedAdd(SurfelGIStatsBuffer[0].ReservoirOverflowCount, 1u, prevOverflow);
         return;
+    }
 
     const uint pageSize = GetPageSize(maxSurfels);
     const uint desiredSlots = min(GetDesiredSlotsPerCell(cascadeIndex), pageSize);
     const uint base = pageIndex * pageSize;
     if (base >= maxSurfels)
+    {
+        uint prevOverflow = 0u;
+        InterlockedAdd(SurfelGIStatsBuffer[0].ReservoirOverflowCount, 1u, prevOverflow);
         return;
+    }
 
     float overlapPenalty = 0.0;
     float minSeparationNorm = 1e9;
@@ -322,21 +351,62 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         activeNeighborCount++;
     }
 
-    const float3 cellCenter = (float3(cellCoord) + 0.5) * cellSize;
-    const float centerDistance = distance(worldPos, cellCenter) / max(cellSize * 0.8660254, 0.001);
-    const float centerPriority = (ComputeCommon.UseCenterSpawnBias != 0) ? (1.0 - saturate(centerDistance)) : 1.0;
+    const float centerPriority = ComputeCenterProximityScore(worldPos, cellCoord, cellSize, ComputeCommon.UseCenterSpawnBias);
     const float3 cellLocal = frac(worldPos / max(cellSize, 0.001));
     const float edgeDistance = min(min(min(cellLocal.x, 1.0 - cellLocal.x), min(cellLocal.y, 1.0 - cellLocal.y)), min(cellLocal.z, 1.0 - cellLocal.z));
-    const float boundaryMarginNorm = clamp((radius / max(cellSize, 0.001)) + 0.02, 0.08, 0.40);
-    if (activeNeighborCount == 0u && edgeDistance < boundaryMarginNorm)
+    const float faceMargin = radius * 0.5;
+    const float distToNegX = cellLocal.x * cellSize;
+    const float distToPosX = (1.0 - cellLocal.x) * cellSize;
+    const float distToNegY = cellLocal.y * cellSize;
+    const float distToPosY = (1.0 - cellLocal.y) * cellSize;
+    const float distToNegZ = cellLocal.z * cellSize;
+    const float distToPosZ = (1.0 - cellLocal.z) * cellSize;
+    uint facesInsideMargin = 0u;
+    facesInsideMargin += (distToNegX < faceMargin) ? 1u : 0u;
+    facesInsideMargin += (distToPosX < faceMargin) ? 1u : 0u;
+    facesInsideMargin += (distToNegY < faceMargin) ? 1u : 0u;
+    facesInsideMargin += (distToPosY < faceMargin) ? 1u : 0u;
+    facesInsideMargin += (distToNegZ < faceMargin) ? 1u : 0u;
+    facesInsideMargin += (distToPosZ < faceMargin) ? 1u : 0u;
+
+    // Allow one placement face to violate the margin, but reject edge/corner cases
+    // where candidate gets too close to multiple faces at once.
+    if (facesInsideMargin > 1u)
+    {
+        uint prevRejected = 0u;
+        InterlockedAdd(SurfelGIStatsBuffer[0].ReservoirRejectedCount, 1u, prevRejected);
         return;
+    }
     const float interiorPriority = saturate((edgeDistance - 0.12) / 0.38);
-    const float separationPriority = (activeNeighborCount == 0u) ? 1.0 : saturate(minSeparationNorm * 0.5);
-    const float collisionPriority = (overlapPenalty <= 0.0001) ? 1.0 : saturate(1.0 - overlapPenalty / max(radius, 0.001));
-    const float finalPriority = saturate((separationPriority * 0.65 + collisionPriority * 0.15 + interiorPriority * 0.20) * centerPriority);
+    const float separationPriority = ComputeNonOverlapScoreNeighbor27(activeNeighborCount, minSeparationNorm);
+    const float overlapFaceScore = ComputeOverlapFaceCount(overlapPenalty, radius);
+
+    const bool isFirstPlacement = (activeNeighborCount == 0u);
+    float finalPriority = 0.0;
+    if (isFirstPlacement)
+    {
+        // First placement path: prefer candidates with less than 2 overlapped faces, then center proximity.
+        const float overlapFaceCount = (1.0 - overlapFaceScore) * 6.0;
+        if (overlapFaceCount >= 2.0)
+        {
+            uint prevRejected = 0u;
+            InterlockedAdd(SurfelGIStatsBuffer[0].ReservoirRejectedCount, 1u, prevRejected);
+            return;
+        }
+        finalPriority = centerPriority;
+    }
+    else
+    {
+        finalPriority = ComposeReservoirPriority(separationPriority, overlapFaceScore, interiorPriority, centerPriority);
+    }
+
     const uint priority = (uint)(finalPriority * 16777215.0);
     if (priority == 0u)
+    {
+        uint prevRejected = 0u;
+        InterlockedAdd(SurfelGIStatsBuffer[0].ReservoirRejectedCount, 1u, prevRejected);
         return;
+    }
 
     SurfelCandidate c;
     c.Surfel.PositionRadius = float4(worldPos, radius);
@@ -370,5 +440,6 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     }
 
     AttemptOutput[pixel] = float4(1.0, 1.0, 1.0, 1.0);
-    DebugOutput[pixel] = float4(collisionPriority, centerPriority, saturate((float)priority / 16777215.0), 1.0);
+    DebugOutput[pixel] = float4(overlapFaceScore, centerPriority, saturate((float)priority / 16777215.0), 1.0);
 }
+

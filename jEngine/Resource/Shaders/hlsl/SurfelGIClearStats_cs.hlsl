@@ -6,8 +6,8 @@ struct SurfelGIStats
     uint TTLRetireCount;
     uint PageGCCount;
     uint PageEvictCount;
-    uint Padding0;
-    uint Padding1;
+    uint ReservoirOverflowCount;
+    uint ReservoirRejectedCount;
 };
 
 RWStructuredBuffer<SurfelGIStats> StatsBuffer : register(u0, space0);
@@ -23,7 +23,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
     s.TTLRetireCount = 0u;
     s.PageGCCount = 0u;
     s.PageEvictCount = 0u;
-    s.Padding0 = 0u;
-    s.Padding1 = 0u;
+    s.ReservoirOverflowCount = 0u;
+    s.ReservoirRejectedCount = 0u;
     StatsBuffer[0] = s;
 }

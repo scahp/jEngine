@@ -93,6 +93,9 @@ void jGame::Setup()
 		static jConsoleVariableBool* cvar_UseVRS = new jConsoleVariableBool("r.vrs", &gOptions.UseVRS, "Enable Variable Rate Shading");
 		static jConsoleVariableBool* cvar_UseSSGI = new jConsoleVariableBool("r.ssgi.enable", &gOptions.UseSSGI, "Enable Screen Space Global Illumination");
         static jConsoleVariableBool* cvar_UseSurfelGI = new jConsoleVariableBool("r.surfelgi.enable", &gOptions.UseSurfelGI, "Enable SurfelGI prototype pool update");
+        static jConsoleVariableBool* cvar_SurfelGIReservoirEnable = new jConsoleVariableBool("r.surfelgi.reservoir.enable", &gOptions.SurfelGIReservoirEnable, "Enable SurfelGI reservoir gather/place pipeline");
+        static jConsoleVariableInt* cvar_SurfelGIReservoirPerCellLimit = new jConsoleVariableInt("r.surfelgi.reservoir.per_cell_limit", &gOptions.SurfelGIReservoirPerCellLimit, "SurfelGI reservoir per-cell page size limit");
+        static jConsoleVariableFloat* cvar_SurfelGIReservoirTableCapacityScale = new jConsoleVariableFloat("r.surfelgi.reservoir.table_capacity_scale", &gOptions.SurfelGIReservoirTableCapacityScale, "SurfelGI reservoir page table capacity scale");
 		static jConsoleVariableInt* cvar_SSGIRayCount = new jConsoleVariableInt("r.ssgi.raycount", &gOptions.SSGIRayCount, "SSGI ray count per pixel");
 		static jConsoleVariableFloat* cvar_SSGIIntensity = new jConsoleVariableFloat("r.ssgi.intensity", &gOptions.SSGIIntensity, "SSGI intensity multiplier");
 
