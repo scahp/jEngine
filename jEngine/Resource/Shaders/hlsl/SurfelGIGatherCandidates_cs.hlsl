@@ -4,6 +4,11 @@
     #define SURFEL_GI_CASCADE_COUNT 3
 #endif
 #define SURFEL_GI_CASCADE_PACKED_COUNT ((SURFEL_GI_CASCADE_COUNT + 3) / 4)
+#ifndef SURFEL_GI_ENABLE_STATE1_RETRY
+    // 1: handle State==1 (allocating) with short spin/retry to reduce duplicate page allocations.
+    // 0: keep legacy behavior (skip allocating slots and continue probing).
+    #define SURFEL_GI_ENABLE_STATE1_RETRY 1
+#endif
 
 struct CommonComputeUniformBuffer
 {
@@ -201,6 +206,31 @@ bool PageEntryMatches(uint pageIndex, int3 cellCoord, uint cascadeIndex)
     return all(e.CellCascade.xyz == cellCoord) && ((uint)e.CellCascade.w == cascadeIndex);
 }
 
+bool TryClaimPageEntry(uint pageIndex, int3 cellCoord, uint cascadeIndex, out uint outPageIndex)
+{
+    uint claimedPrev = 0u;
+    InterlockedCompareExchange(SurfelCellPageTable[pageIndex].State, 0u, 1u, claimedPrev);
+    if (claimedPrev == 0u)
+    {
+        SurfelCellPageTable[pageIndex].CellCascade = int4(cellCoord, (int)cascadeIndex);
+#if SURFEL_GI_ENABLE_STATE1_RETRY
+        // Publish payload before flipping state to ACTIVE.
+        DeviceMemoryBarrier();
+#endif
+        SurfelCellPageTable[pageIndex].State = 2u;
+        outPageIndex = pageIndex;
+        return true;
+    }
+
+    if (PageEntryMatches(pageIndex, cellCoord, cascadeIndex))
+    {
+        outPageIndex = pageIndex;
+        return true;
+    }
+
+    return false;
+}
+
 bool TryGetOrCreatePageIndex(int3 cellCoord, uint cascadeIndex, out uint outPageIndex)
 {
     const uint capacity = GetPageTableCapacity();
@@ -218,22 +248,41 @@ bool TryGetOrCreatePageIndex(int3 cellCoord, uint cascadeIndex, out uint outPage
             }
             continue;
         }
+
+        #if SURFEL_GI_ENABLE_STATE1_RETRY
+        if (state == 1u)
+        {
+            uint resolvedState = 1u;
+            [loop] for (uint spin = 0u; spin < 64u; ++spin)
+            {
+                resolvedState = SurfelCellPageTable[pageIndex].State;
+                if (resolvedState != 1u)
+                    break;
+            }
+
+            if (resolvedState == 2u)
+            {
+                if (PageEntryMatches(pageIndex, cellCoord, cascadeIndex))
+                {
+                    outPageIndex = pageIndex;
+                    return true;
+                }
+                continue;
+            }
+
+            if (resolvedState == 0u)
+            {
+                if (TryClaimPageEntry(pageIndex, cellCoord, cascadeIndex, outPageIndex))
+                    return true;
+            }
+            continue;
+        }
+        #endif
+
         if (state == 0u)
         {
-            uint claimedPrev = 0u;
-            InterlockedCompareExchange(SurfelCellPageTable[pageIndex].State, 0u, 1u, claimedPrev);
-            if (claimedPrev == 0u)
-            {
-                SurfelCellPageTable[pageIndex].CellCascade = int4(cellCoord, (int)cascadeIndex);
-                SurfelCellPageTable[pageIndex].State = 2u;
-                outPageIndex = pageIndex;
+            if (TryClaimPageEntry(pageIndex, cellCoord, cascadeIndex, outPageIndex))
                 return true;
-            }
-            if (PageEntryMatches(pageIndex, cellCoord, cascadeIndex))
-            {
-                outPageIndex = pageIndex;
-                return true;
-            }
         }
     }
     return false;
@@ -443,4 +492,3 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     AttemptOutput[pixel] = float4(1.0, 1.0, 1.0, 1.0);
     DebugOutput[pixel] = float4(overlapFaceScore, centerPriority, saturate((float)priority / 16777215.0), 1.0);
 }
-
