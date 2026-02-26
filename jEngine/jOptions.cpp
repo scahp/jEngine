@@ -97,9 +97,15 @@ jOptions::jOptions()
     ShowSurfelGIUnderfilledCellDebug = false;
     ShowSurfelGICellGrid = true;
     ShowSurfelGISpawnAttemptDebug = false;
+    ShowSurfelGIIrradianceDebug = true;
+    SurfelGIInlineRayEnable = true;
+    SurfelGIInlineRayCount = 2;
+    SurfelGIInlineRayMaxDistance = 5000.0f;
+    SurfelGIInlineRayNormalBias = 1.0f;
+    SurfelGIInlineRayHistoryBlend = 0.85f;
     SurfelGIVisualizeNeighborCellRadius = 1;
     SurfelGIVisualizeBlendWithScene = true;
-    SurfelGIVisualizeBlendAlpha = 0.35f;
+    SurfelGIVisualizeBlendAlpha = 1.0f;
 
     // SSGI Reprojection
     UseSSGIReprojection = true;

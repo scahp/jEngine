@@ -191,6 +191,7 @@ public:
 	// 1. Device
 	ComPtr<IDXGIAdapter3> Adapter;
 	ComPtr<ID3D12Device5> Device;
+    ComPtr<ID3D12CommandSignature> DispatchComputeCommandSignature;
     uint32 Options = 0;
 	ComPtr<IDXGIFactory5> Factory;
 
@@ -447,6 +448,7 @@ public:
     virtual void DrawIndirect(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, jBuffer* buffer, int32 startIndex, int32 drawCount) const override;
     virtual void DrawElementsIndirect(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, jBuffer* buffer, int32 startIndex, int32 drawCount) const override;
 	virtual void DispatchCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ) const override;
+	virtual void DispatchComputeIndirect(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, jBuffer* buffer, uint32 bufferOffset) const override;
 	virtual void DispatchRay(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jRaytracingDispatchData& InDispatchData) const override;
 
 	virtual void* GetWindow() const override { return m_hWnd; }

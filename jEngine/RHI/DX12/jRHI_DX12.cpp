@@ -558,6 +558,18 @@ bool jRHI_DX12::InitRHI()
     if (GSupportRaytracing)
         RaytracingScene = CreateRaytracingScene();
 
+    {
+        D3D12_INDIRECT_ARGUMENT_DESC IndirectArgumentDesc = {};
+        IndirectArgumentDesc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH;
+
+        D3D12_COMMAND_SIGNATURE_DESC DispatchIndirectSignatureDesc = {};
+        DispatchIndirectSignatureDesc.ByteStride = sizeof(D3D12_DISPATCH_ARGUMENTS);
+        DispatchIndirectSignatureDesc.NumArgumentDescs = 1;
+        DispatchIndirectSignatureDesc.pArgumentDescs = &IndirectArgumentDesc;
+        if (JFAIL(Device->CreateCommandSignature(&DispatchIndirectSignatureDesc, nullptr, IID_PPV_ARGS(&DispatchComputeCommandSignature))))
+            return false;
+    }
+
     return true;
 }
 
@@ -660,6 +672,7 @@ void jRHI_DX12::ReleaseRHI()
 
     Adapter.Reset();
     Factory.Reset();
+    DispatchComputeCommandSignature.Reset();
     Device.Reset();
 
 #if defined(_DEBUG)
@@ -1487,6 +1500,36 @@ void jRHI_DX12::DispatchCompute(const std::shared_ptr<jRenderFrameContext>& InRe
 #endif // USE_RESOURCE_BARRIER_BATCHER
 
     CommandBuffer_DX12->CommandList->Dispatch(numGroupsX, numGroupsY, numGroupsZ);
+}
+
+void jRHI_DX12::DispatchComputeIndirect(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, jBuffer* buffer, uint32 bufferOffset) const
+{
+    auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
+    check(CommandBuffer_DX12);
+    check(CommandBuffer_DX12->CommandList);
+    check(buffer);
+    check(bufferOffset % 4 == 0);
+    check(DispatchComputeCommandSignature);
+
+    TransitionLayout(InRenderFrameContext->GetActiveCommandBuffer(), buffer, EResourceLayout::READ_ONLY);
+#if USE_RESOURCE_BARRIER_BATCHER
+    BarrierBatcher->Flush(InRenderFrameContext->GetActiveCommandBuffer());
+    CommandBuffer_DX12->FlushBarrierBatch();
+#endif // USE_RESOURCE_BARRIER_BATCHER
+
+    auto Buffer_DX12 = (jBuffer_DX12*)buffer;
+    check(Buffer_DX12);
+    check(Buffer_DX12->Buffer);
+    check(Buffer_DX12->Buffer->IsValid());
+    check((bufferOffset + sizeof(D3D12_DISPATCH_ARGUMENTS)) <= Buffer_DX12->GetBufferSize());
+
+    CommandBuffer_DX12->CommandList->ExecuteIndirect(
+        DispatchComputeCommandSignature.Get(),
+        1,
+        Buffer_DX12->Buffer->Get(),
+        bufferOffset,
+        nullptr,
+        0);
 }
 
 void jRHI_DX12::DispatchRay(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jRaytracingDispatchData& InDispatchData) const

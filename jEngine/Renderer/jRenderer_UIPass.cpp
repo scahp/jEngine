@@ -517,6 +517,17 @@ void IRenderer::UIPass()
                     DrawSliderFloat60_40("Stale Age Divisor", &gOptions.SurfelGIStaleAgeDivisor, 1.0f, 24.0f);
 
                     ImGui::Separator();
+                    ImGui::TextColored(ImVec4(1, 1, 0, 1), "Inline Ray Gather");
+                    ImGui::Checkbox("Enable Inline Ray Gather", &gOptions.SurfelGIInlineRayEnable);
+                    if (gOptions.SurfelGIInlineRayEnable)
+                    {
+                        DrawSliderInt60_40("Inline Ray Count", &gOptions.SurfelGIInlineRayCount, 1, 16);
+                        DrawSliderFloat60_40("Inline Ray Max Distance", &gOptions.SurfelGIInlineRayMaxDistance, 10.0f, 5000.0f);
+                        DrawSliderFloat60_40("Inline Ray Normal Bias", &gOptions.SurfelGIInlineRayNormalBias, 0.001f, 10.0f);
+                        DrawSliderFloat60_40("Inline Ray History Blend", &gOptions.SurfelGIInlineRayHistoryBlend, 0.0f, 0.99f);
+                    }
+
+                    ImGui::Separator();
                     ImGui::TextColored(ImVec4(1, 1, 0, 1), "Visualization");
                     ImGui::Checkbox("Show Candidate Debug", &gOptions.ShowSurfelGIDebug);
                     ImGui::Checkbox("Show Placed Surfels", &gOptions.ShowSurfelGIPlacedSurfels);
@@ -525,11 +536,12 @@ void IRenderer::UIPass()
                     ImGui::Checkbox("Show Underfilled Cell Debug", &gOptions.ShowSurfelGIUnderfilledCellDebug);
                     ImGui::Checkbox("Show Surfel Cell Grid", &gOptions.ShowSurfelGICellGrid);
                     ImGui::Checkbox("Show Spawn Attempt Points", &gOptions.ShowSurfelGISpawnAttemptDebug);
+                    ImGui::Checkbox("Show Surfel Irradiance", &gOptions.ShowSurfelGIIrradianceDebug);
                     DrawSliderInt60_40("Neighbor Cell Radius", &gOptions.SurfelGIVisualizeNeighborCellRadius, 0, 3);
                     ImGui::Checkbox("Blend With Scene", &gOptions.SurfelGIVisualizeBlendWithScene);
                     if (gOptions.SurfelGIVisualizeBlendWithScene)
                     {
-                        DrawSliderFloat60_40("Blend Alpha", &gOptions.SurfelGIVisualizeBlendAlpha, 0.0f, 1.0f);
+                        DrawSliderFloat60_40("Blend Alpha (1=Overwrite Surfel)", &gOptions.SurfelGIVisualizeBlendAlpha, 0.0f, 1.0f);
                     }
                     ImGui::Unindent();
                 }

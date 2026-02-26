@@ -1194,6 +1194,9 @@
     <None Include="Resource\Shaders\hlsl\SurfelGIGatherCandidates_cs.hlsl">
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
+    <None Include="Resource\Shaders\hlsl\SurfelGIGatherIrradianceInlineRay_cs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
     <None Include="Resource\Shaders\hlsl\SurfelGIPlaceCandidates_cs.hlsl">
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>

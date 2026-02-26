@@ -7,7 +7,7 @@ void jResourceBarrierBatcher_Vulkan::AddUAV(jBuffer* InBuffer)
     VkMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;       // Global memroy invalidation
     barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
 
 	// todo : need to control pipeline stage
 	const auto SrcStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
@@ -20,7 +20,7 @@ void jResourceBarrierBatcher_Vulkan::AddUAV(jTexture* InTexture)
     VkMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;       // Global memroy invalidation
     barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
 
 	// todo : need to control pipeline stage
 	const auto SrcStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;

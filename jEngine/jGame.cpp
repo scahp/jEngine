@@ -97,6 +97,11 @@ void jGame::Setup()
         static jConsoleVariableInt* cvar_SurfelGIReservoirPerCellLimit = new jConsoleVariableInt("r.surfelgi.reservoir.per_cell_limit", &gOptions.SurfelGIReservoirPerCellLimit, "SurfelGI reservoir per-cell page size limit");
         static jConsoleVariableFloat* cvar_SurfelGIReservoirTableCapacityScale = new jConsoleVariableFloat("r.surfelgi.reservoir.table_capacity_scale", &gOptions.SurfelGIReservoirTableCapacityScale, "SurfelGI reservoir page table capacity scale");
         static jConsoleVariableFloat* cvar_SurfelGIFaceMarginRadiusScale = new jConsoleVariableFloat("r.surfelgi.face_margin_radius_scale", &gOptions.SurfelGIFaceMarginRadiusScale, "SurfelGI reservoir candidate face margin radius scale");
+        static jConsoleVariableBool* cvar_SurfelGIInlineRayEnable = new jConsoleVariableBool("r.surfelgi.inline_ray.enable", &gOptions.SurfelGIInlineRayEnable, "Enable SurfelGI inline ray irradiance gather pass");
+        static jConsoleVariableInt* cvar_SurfelGIInlineRayCount = new jConsoleVariableInt("r.surfelgi.inline_ray.count", &gOptions.SurfelGIInlineRayCount, "SurfelGI inline ray count per surfel");
+        static jConsoleVariableFloat* cvar_SurfelGIInlineRayMaxDistance = new jConsoleVariableFloat("r.surfelgi.inline_ray.max_distance", &gOptions.SurfelGIInlineRayMaxDistance, "SurfelGI inline ray max trace distance");
+        static jConsoleVariableFloat* cvar_SurfelGIInlineRayNormalBias = new jConsoleVariableFloat("r.surfelgi.inline_ray.normal_bias", &gOptions.SurfelGIInlineRayNormalBias, "SurfelGI inline ray origin normal bias");
+        static jConsoleVariableFloat* cvar_SurfelGIInlineRayHistoryBlend = new jConsoleVariableFloat("r.surfelgi.inline_ray.history_blend", &gOptions.SurfelGIInlineRayHistoryBlend, "SurfelGI inline ray temporal history blend");
         static jConsoleVariableInt* cvar_SurfelGISurfelsPerCell[SURFEL_GI_CASCADE_COUNT] = {};
         for (int32 cascade = 0; cascade < SURFEL_GI_CASCADE_COUNT; ++cascade)
         {

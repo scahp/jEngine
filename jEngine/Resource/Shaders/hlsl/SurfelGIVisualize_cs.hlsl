@@ -29,6 +29,8 @@ struct VisualizeUniformBuffer
     int ShowUnderfilledCellDebug;
     int ShowCellGrid;
     int ShowSpawnAttemptDebug;
+    int ShowIrradianceDebug;
+    int3 Padding0;
 };
 
 struct SurfelData
@@ -46,6 +48,11 @@ struct SurfelCellPageEntry
     uint3 Padding;
 };
 
+struct SurfelIrradianceData
+{
+    float4 IrradianceAndWeight;
+};
+
 RWTexture2D<float4> Result : register(u0, space0);
 Texture2D DepthTexture : register(t1, space0);
 SamplerState DepthTextureSampler : register(s1, space0);
@@ -53,6 +60,7 @@ Texture2D LinearDepthTexture : register(t2, space0);
 StructuredBuffer<SurfelData> SurfelPool : register(t3, space0);
 Texture2D SpawnAttemptTexture : register(t4, space0);
 StructuredBuffer<SurfelCellPageEntry> SurfelCellPageTable : register(t6, space0);
+StructuredBuffer<SurfelIrradianceData> SurfelIrradianceBuffer : register(t7, space0);
 
 cbuffer VisualizeCommon : register(b5, space0)
 {
@@ -106,6 +114,19 @@ float3 RadiusDebugColor(float radius)
     if (t < c3.w)
         return lerp(c2.xyz, c3.xyz, saturate((t - c2.w) / max(c3.w - c2.w, 0.0001)));
     return lerp(c3.xyz, c4.xyz, saturate((t - c3.w) / max(c4.w - c3.w, 0.0001)));
+}
+
+float3 IrradianceDebugColor(float3 irradiance, float historyWeight)
+{
+    if (historyWeight < 0.01)
+        return float3(1.0, 0.0, 1.0);
+
+    const float luminance = dot(irradiance, float3(0.2126, 0.7152, 0.0722));
+    const float mappedLuma = saturate(log2(1.0 + luminance) / log2(1.0 + 16.0));
+    const float3 chroma = (luminance > 1e-5) ? (irradiance / luminance) : float3(0.0, 0.0, 0.0);
+    const float3 gammaCorrected = pow(saturate(chroma * mappedLuma), 1.0 / 2.2);
+    const float confidence = saturate(0.3 + historyWeight / 12.0);
+    return lerp(float3(0.06, 0.06, 0.06), gammaCorrected, confidence);
 }
 
 uint GetSlotsPerCell(uint maxSurfels, uint desiredSlotsPerCell)
@@ -319,6 +340,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 
     float bestDist2 = 1e38;
     float3 bestColor = float3(0.0, 0.0, 0.0);
+    float surfelMask = 0.0;
 
     [loop] for (uint cascadeIndex = 0u; cascadeIndex < (uint)SURFEL_GI_CASCADE_COUNT; ++cascadeIndex)
     {
@@ -366,7 +388,13 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                         if (d2 <= r2 && d2 < bestDist2)
                         {
                             bestDist2 = d2;
-                            if (VisualizeCommon.ShowCellDebug != 0)
+                            surfelMask = 1.0;
+                            if (VisualizeCommon.ShowIrradianceDebug != 0)
+                            {
+                                const float4 irradianceAndWeight = SurfelIrradianceBuffer[surfelIndex].IrradianceAndWeight;
+                                bestColor = IrradianceDebugColor(max(irradianceAndWeight.xyz, 0.0), irradianceAndWeight.w);
+                            }
+                            else if (VisualizeCommon.ShowCellDebug != 0)
                             {
                                 bestColor = CellDebugColor(surfelCellCoord, surfelCascade);
                             }
@@ -375,7 +403,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                                 bestColor = RadiusDebugColor(surfelRadius);
                             }
 
-                            if (VisualizeCommon.ShowStateDebug != 0 && VisualizeCommon.ShowCellDebug == 0)
+                            if (VisualizeCommon.ShowStateDebug != 0 && VisualizeCommon.ShowCellDebug == 0 && VisualizeCommon.ShowIrradianceDebug == 0)
                             {
                                 const float state = s.Extra.x;
                                 float3 stateTint = float3(1.0, 1.0, 1.0);
@@ -471,7 +499,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         visualizeColor = float3(v * 0.08, v * 0.08, v * 0.08);
     }
 
-    if (VisualizeCommon.ShowUnderfilledCellDebug != 0)
+    if (VisualizeCommon.ShowUnderfilledCellDebug != 0 && VisualizeCommon.ShowIrradianceDebug == 0)
     {
         const float debugCascadeScale = GetCascadeScale(debugCascadeIndex);
         const float debugCellSizeForOcc = cascade0CellSize * debugCascadeScale;
@@ -511,7 +539,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         }
     }
 
-    if (VisualizeCommon.ShowCellGrid != 0)
+    if (VisualizeCommon.ShowCellGrid != 0 && VisualizeCommon.ShowIrradianceDebug == 0)
     {
         const float3 gridCoord = worldPos / max(debugCellSize, 0.001);
         const float3 fracCoord = frac(gridCoord);
@@ -550,5 +578,5 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         }
     }
 
-    Result[pixel] = float4(visualizeColor, 1.0);
+    Result[pixel] = float4(visualizeColor, surfelMask);
 }

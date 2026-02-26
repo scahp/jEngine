@@ -73,6 +73,11 @@ struct SurfelGIStats
     uint ReservoirRejectedCount;
 };
 
+struct SurfelIrradianceData
+{
+    float4 IrradianceAndWeight;
+};
+
 struct SurfelCandidate
 {
     SurfelData Surfel;
@@ -87,6 +92,7 @@ StructuredBuffer<uint> WinnerIndexBuffer : register(t2, space0);
 StructuredBuffer<SurfelCellPageEntry> SurfelCellPageTable : register(t3, space0);
 RWStructuredBuffer<SurfelData> SurfelPool : register(u4, space0);
 RWStructuredBuffer<SurfelGIStats> SurfelGIStatsBuffer : register(u5, space0);
+RWStructuredBuffer<SurfelIrradianceData> SurfelIrradianceBuffer : register(u7, space0);
 
 cbuffer ComputeCommon : register(b6, space0)
 {
@@ -183,6 +189,10 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         outSurfel.Extra.y = 1.0;
     }
     SurfelPool[writeIndex] = outSurfel;
+
+    SurfelIrradianceData outIrradiance;
+    outIrradiance.IrradianceAndWeight = float4(0.0, 0.0, 0.0, 0.0);
+    SurfelIrradianceBuffer[writeIndex] = outIrradiance;
 
     uint oldValue = 0u;
     InterlockedAdd(SurfelGIStatsBuffer[0].ActiveCount, 1u, oldValue);

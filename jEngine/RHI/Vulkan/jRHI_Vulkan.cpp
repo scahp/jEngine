@@ -1328,6 +1328,23 @@ void jRHI_Vulkan::DispatchCompute(const std::shared_ptr<jRenderFrameContext>& In
 	vkCmdDispatch((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), numGroupsX, numGroupsY, numGroupsZ);
 }
 
+void jRHI_Vulkan::DispatchComputeIndirect(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, jBuffer* buffer, uint32 bufferOffset) const
+{
+    check(InRenderFrameContext);
+    check(InRenderFrameContext->GetActiveCommandBuffer());
+    check(buffer);
+
+#if USE_RESOURCE_BARRIER_BATCHER
+    BarrierBatcher->Flush(InRenderFrameContext->GetActiveCommandBuffer());
+    InRenderFrameContext->GetActiveCommandBuffer()->FlushBarrierBatch();
+#endif // USE_RESOURCE_BARRIER_BATCHER
+
+    vkCmdDispatchIndirect(
+        (VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(),
+        (VkBuffer)buffer->GetHandle(),
+        (VkDeviceSize)bufferOffset);
+}
+
 void jRHI_Vulkan::DispatchRay(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jRaytracingDispatchData& InDispatchData) const
 {
     check(InRenderFrameContext);
