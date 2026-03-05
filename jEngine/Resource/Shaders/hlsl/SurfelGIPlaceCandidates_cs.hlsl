@@ -44,6 +44,18 @@ struct CommonComputeUniformBuffer
     float4 CascadeClipmapGridDimYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
     float4 CascadeClipmapGridDimZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
     float4 SurfelsPerCellPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeOriginCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeOriginCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeOriginCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeRingOffsetXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeRingOffsetYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeRingOffsetZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeCellBasePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeCellCountPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeDeltaCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeDeltaCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeDeltaCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeClearAllPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
 };
 
 struct SurfelData
@@ -52,13 +64,6 @@ struct SurfelData
     float4 NormalSeenFrame;
     float4 AlbedoWeight;
     float4 Extra;
-};
-
-struct SurfelCellPageEntry
-{
-    int4 CellCascade;
-    uint State;
-    uint3 Padding;
 };
 
 struct SurfelGIStats
@@ -89,7 +94,7 @@ struct SurfelCandidate
 StructuredBuffer<SurfelCandidate> CandidateBuffer : register(t0, space0);
 StructuredBuffer<uint> WinnerScoreBuffer : register(t1, space0);
 StructuredBuffer<uint> WinnerIndexBuffer : register(t2, space0);
-StructuredBuffer<SurfelCellPageEntry> SurfelCellPageTable : register(t3, space0);
+StructuredBuffer<uint> SurfelCellPageTable : register(t3, space0);
 RWStructuredBuffer<SurfelData> SurfelPool : register(u4, space0);
 RWStructuredBuffer<SurfelGIStats> SurfelGIStatsBuffer : register(u5, space0);
 RWStructuredBuffer<SurfelIrradianceData> SurfelIrradianceBuffer : register(u7, space0);
@@ -109,23 +114,55 @@ uint GetDesiredSlotsPerCell(uint cascadeIndex)
     return max((uint)round(value), 1u);
 }
 
+float GetPackedFloat(float4 packedArray[SURFEL_GI_CASCADE_PACKED_COUNT], uint cascadeIndex)
+{
+    const uint c = min(cascadeIndex, (uint)(SURFEL_GI_CASCADE_COUNT - 1));
+    const uint packIndex = c >> 2u;
+    const uint lane = c & 3u;
+    const float4 packed = packedArray[packIndex];
+    return (lane == 0u) ? packed.x : ((lane == 1u) ? packed.y : ((lane == 2u) ? packed.z : packed.w));
+}
+
+uint GetPackedUint(float4 packedArray[SURFEL_GI_CASCADE_PACKED_COUNT], uint cascadeIndex)
+{
+    return (uint)round(GetPackedFloat(packedArray, cascadeIndex));
+}
+
+uint GetCascadeCellBase(uint cascadeIndex)
+{
+    return GetPackedUint(ComputeCommon.CascadeCellBasePacked, cascadeIndex);
+}
+
+uint GetCascadeCellCount(uint cascadeIndex)
+{
+    return max(GetPackedUint(ComputeCommon.CascadeCellCountPacked, cascadeIndex), 1u);
+}
+
+uint GetCascadeIndexFromCellLinear(uint cellLinear)
+{
+    [loop] for (uint cascade = 0u; cascade < (uint)SURFEL_GI_CASCADE_COUNT; ++cascade)
+    {
+        const uint base = GetCascadeCellBase(cascade);
+        const uint count = GetCascadeCellCount(cascade);
+        if (cellLinear >= base && cellLinear < (base + count))
+            return cascade;
+    }
+    return (uint)(SURFEL_GI_CASCADE_COUNT - 1);
+}
+
 [numthreads(64, 1, 1)]
 void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 {
-    const uint pageIndex = GlobalInvocationID.x;
+    const uint cellLinear = GlobalInvocationID.x;
     const uint pageCapacity = max((uint)ComputeCommon.SurfelPageTableCapacity, 1u);
-    if (pageIndex >= pageCapacity)
+    if (cellLinear >= pageCapacity)
         return;
 
-    const uint winnerScore = WinnerScoreBuffer[pageIndex];
+    const uint winnerScore = WinnerScoreBuffer[cellLinear];
     if (winnerScore == 0u)
         return;
 
-    const SurfelCellPageEntry pageEntry = SurfelCellPageTable[pageIndex];
-    if (pageEntry.State != 2u)
-        return;
-
-    const uint winnerIndex = WinnerIndexBuffer[pageIndex];
+    const uint winnerIndex = WinnerIndexBuffer[cellLinear];
     if (winnerIndex == 0xffffffffu)
         return;
 
@@ -135,9 +172,11 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 
     const uint maxSurfels = max((uint)ComputeCommon.MaxSurfels, 1u);
     const uint pageSize = min(max((uint)ComputeCommon.SurfelPageSize, 1u), maxSurfels);
-    const uint pageCascade = (uint)clamp(pageEntry.CellCascade.w, 0, SURFEL_GI_CASCADE_COUNT - 1);
+    const uint pageCascade = GetCascadeIndexFromCellLinear(cellLinear);
     const uint desiredSlots = min(GetDesiredSlotsPerCell(pageCascade), pageSize);
-    const uint base = pageIndex * pageSize;
+    if (cellLinear > ((maxSurfels - 1u) / max(pageSize, 1u)))
+        return;
+    const uint base = cellLinear * pageSize;
     if (base >= maxSurfels)
         return;
 

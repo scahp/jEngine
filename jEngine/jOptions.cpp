@@ -66,7 +66,7 @@ jOptions::jOptions()
     SurfelGINormalThreshold = 0.8f;
     SurfelGITTLInFrames = 120;
     SurfelGIWorldGridCellSize = 30.0f;
-    const int32 ReservoirPerCellDefault = 10;
+    const int32 ReservoirPerCellDefault = 5;
     SurfelGIReservoirPerCellLimit = ReservoirPerCellDefault;
     for (int32 i = 0; i < SURFEL_GI_CASCADE_COUNT; ++i)
     {

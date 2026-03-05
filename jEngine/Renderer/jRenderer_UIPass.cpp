@@ -470,7 +470,7 @@ void IRenderer::UIPass()
                 if (gOptions.UseSurfelGI)
                 {
                     ImGui::Indent();
-                    DrawSliderInt60_40("Surfel Max Pool", &gOptions.SurfelGIMaxSurfels, 4096, 1048576);
+                    DrawSliderInt60_40("Surfel Max Pool", &gOptions.SurfelGIMaxSurfels, 4096, 2097152);
                     DrawSliderInt60_40("Spawn Budget / Frame", &gOptions.SurfelGISpawnBudgetPerFrame, 64, 16384);
                     DrawSliderInt60_40("Tile Size", &gOptions.SurfelGITileSize, 4, 32);
                     DrawSliderFloat60_40("Merge Distance", &gOptions.SurfelGIMergeDistanceScale, 0.5f, 4.0f);
@@ -505,7 +505,7 @@ void IRenderer::UIPass()
                     {
                         char label[64];
                         sprintf_s(label, "Cascade%d Surfels / Cell", cascade);
-                        DrawSliderInt60_40(label, &gOptions.SurfelGISurfelsPerCell[cascade], 1, 10);
+                        DrawSliderInt60_40(label, &gOptions.SurfelGISurfelsPerCell[cascade], 1, 5);
                     }
                     ImGui::Checkbox("Use Center Spawn Bias", &gOptions.UseSurfelGICenterSpawnBias);
                     DrawSliderFloat60_40("Near Keep Radius", &gOptions.SurfelGINearKeepRadius, 0.0f, 300.0f);

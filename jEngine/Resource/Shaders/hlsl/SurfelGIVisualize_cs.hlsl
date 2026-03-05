@@ -25,6 +25,14 @@ struct VisualizeUniformBuffer
     int BlendWithScene;
     int ShowStateDebug;
     float4 SurfelsPerCellPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeOriginCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeOriginCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeOriginCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeRingOffsetXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeRingOffsetYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeRingOffsetZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeCellBasePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeCellCountPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
     int ShowCellDebug;
     int ShowUnderfilledCellDebug;
     int ShowCellGrid;
@@ -41,13 +49,6 @@ struct SurfelData
     float4 Extra;
 };
 
-struct SurfelCellPageEntry
-{
-    int4 CellCascade;
-    uint State;
-    uint3 Padding;
-};
-
 struct SurfelIrradianceData
 {
     float4 IrradianceAndWeight;
@@ -59,7 +60,7 @@ SamplerState DepthTextureSampler : register(s1, space0);
 Texture2D LinearDepthTexture : register(t2, space0);
 StructuredBuffer<SurfelData> SurfelPool : register(t3, space0);
 Texture2D SpawnAttemptTexture : register(t4, space0);
-StructuredBuffer<SurfelCellPageEntry> SurfelCellPageTable : register(t6, space0);
+StructuredBuffer<uint> SurfelCellPageTable : register(t6, space0);
 StructuredBuffer<SurfelIrradianceData> SurfelIrradianceBuffer : register(t7, space0);
 
 cbuffer VisualizeCommon : register(b5, space0)
@@ -131,7 +132,7 @@ float3 IrradianceDebugColor(float3 irradiance, float historyWeight)
 
 uint GetSlotsPerCell(uint maxSurfels, uint desiredSlotsPerCell)
 {
-    const uint maxSlotsPerCell = min(max((uint)VisualizeCommon.SurfelPageSize, 1u), 10u);
+    const uint maxSlotsPerCell = min(max((uint)VisualizeCommon.SurfelPageSize, 1u), 5u);
     const uint clampedDesired = clamp(desiredSlotsPerCell, 1u, maxSlotsPerCell);
     return min(max(1u, maxSurfels), clampedDesired);
 }
@@ -226,37 +227,97 @@ uint GetClipmapLocalLinearIndex(int3 cellCoord, uint maxSurfels, uint desiredSlo
     return (linearIndex < cellCount) ? linearIndex : (linearIndex % cellCount);
 }
 
-uint GetPageTableCapacity()
-{
-    return max((uint)VisualizeCommon.SurfelPageTableCapacity, 1u);
-}
-
 uint GetPageSize(uint maxSurfels)
 {
     return min(max((uint)VisualizeCommon.SurfelPageSize, 1u), maxSurfels);
 }
 
+float GetPackedFloat(float4 packedArray[SURFEL_GI_CASCADE_PACKED_COUNT], uint cascadeIndex)
+{
+    const uint c = min(cascadeIndex, (uint)(SURFEL_GI_CASCADE_COUNT - 1));
+    const uint packIndex = c >> 2u;
+    const uint lane = c & 3u;
+    const float4 packed = packedArray[packIndex];
+    return (lane == 0u) ? packed.x : ((lane == 1u) ? packed.y : ((lane == 2u) ? packed.z : packed.w));
+}
+
+uint GetPackedUint(float4 packedArray[SURFEL_GI_CASCADE_PACKED_COUNT], uint cascadeIndex)
+{
+    return (uint)round(GetPackedFloat(packedArray, cascadeIndex));
+}
+
+int GetPackedInt(float4 packedArray[SURFEL_GI_CASCADE_PACKED_COUNT], uint cascadeIndex)
+{
+    return (int)round(GetPackedFloat(packedArray, cascadeIndex));
+}
+
+int3 ModWrap3(int3 v, int3 dim)
+{
+    int3 r = v % dim;
+    if (r.x < 0) r.x += dim.x;
+    if (r.y < 0) r.y += dim.y;
+    if (r.z < 0) r.z += dim.z;
+    return r;
+}
+
+int3 GetCascadeDimDirect(uint cascadeIndex)
+{
+    const int dimX = max(GetPackedInt(VisualizeCommon.CascadeClipmapGridDimXPacked, cascadeIndex), 1);
+    const int dimY = max(GetPackedInt(VisualizeCommon.CascadeClipmapGridDimYPacked, cascadeIndex), 1);
+    const int dimZ = max(GetPackedInt(VisualizeCommon.CascadeClipmapGridDimZPacked, cascadeIndex), 1);
+    return int3(dimX, dimY, dimZ);
+}
+
+int3 GetCascadeOriginCell(uint cascadeIndex)
+{
+    return int3(
+        GetPackedInt(VisualizeCommon.CascadeOriginCellXPacked, cascadeIndex),
+        GetPackedInt(VisualizeCommon.CascadeOriginCellYPacked, cascadeIndex),
+        GetPackedInt(VisualizeCommon.CascadeOriginCellZPacked, cascadeIndex));
+}
+
+int3 GetCascadeRingOffset(uint cascadeIndex)
+{
+    return int3(
+        GetPackedInt(VisualizeCommon.CascadeRingOffsetXPacked, cascadeIndex),
+        GetPackedInt(VisualizeCommon.CascadeRingOffsetYPacked, cascadeIndex),
+        GetPackedInt(VisualizeCommon.CascadeRingOffsetZPacked, cascadeIndex));
+}
+
+uint GetCascadeCellBase(uint cascadeIndex)
+{
+    return GetPackedUint(VisualizeCommon.CascadeCellBasePacked, cascadeIndex);
+}
+
+bool TryWorldCellToLinear(int3 worldCell, uint cascadeIndex, out uint outCellLinear)
+{
+    const int3 dim = GetCascadeDimDirect(cascadeIndex);
+    const int3 local = worldCell - GetCascadeOriginCell(cascadeIndex);
+    if (any(local < 0) || any(local >= dim))
+        return false;
+
+    const int3 phys = ModWrap3(local + GetCascadeRingOffset(cascadeIndex), dim);
+    const uint localLinear = (uint)(phys.x + dim.x * (phys.y + dim.y * phys.z));
+    outCellLinear = GetCascadeCellBase(cascadeIndex) + localLinear;
+    return true;
+}
+
 bool TryGetCellBaseIndex(int3 cellCoord, uint maxSurfels, uint cascadeIndex, out uint outCellBaseIndex)
 {
-    const uint capacity = GetPageTableCapacity();
-    const uint hash = HashCellWithCascade(cellCoord, cascadeIndex) % capacity;
-    [loop] for (uint probe = 0u; probe < capacity; ++probe)
-    {
-        const uint pageIndex = (hash + probe) % capacity;
-        const SurfelCellPageEntry e = SurfelCellPageTable[pageIndex];
-        if (e.State == 0u)
-            return false;
-        if (e.State == 2u && all(e.CellCascade.xyz == cellCoord) && ((uint)e.CellCascade.w == cascadeIndex))
-        {
-            const uint pageSize = GetPageSize(maxSurfels);
-            const uint base = pageIndex * pageSize;
-            if (base >= maxSurfels)
-                return false;
-            outCellBaseIndex = base;
-            return true;
-        }
-    }
-    return false;
+    uint cellLinear = 0u;
+    if (!TryWorldCellToLinear(cellCoord, cascadeIndex, cellLinear))
+        return false;
+    if (cellLinear >= max((uint)VisualizeCommon.SurfelPageTableCapacity, 1u))
+        return false;
+
+    const uint pageSize = GetPageSize(maxSurfels);
+    if (cellLinear > ((maxSurfels - 1u) / max(pageSize, 1u)))
+        return false;
+    const uint base = cellLinear * pageSize;
+    if (base >= maxSurfels)
+        return false;
+    outCellBaseIndex = base;
+    return true;
 }
 
 uint GetCascadeBucketCount(uint maxSurfels, uint cascadeIndex)

@@ -3,6 +3,9 @@
 #ifndef SURFEL_GI_AGE_CONSUME_SCALE
     #define SURFEL_GI_AGE_CONSUME_SCALE 2.0
 #endif
+#ifndef SURFEL_GI_BOUNDARY_CLEANUP_BAND_SCALE
+    #define SURFEL_GI_BOUNDARY_CLEANUP_BAND_SCALE 1.0
+#endif
 
 #ifndef SURFEL_GI_CASCADE_COUNT
     #define SURFEL_GI_CASCADE_COUNT 3
@@ -48,6 +51,18 @@ struct CommonComputeUniformBuffer
     float4 CascadeClipmapGridDimYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
     float4 CascadeClipmapGridDimZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
     float4 SurfelsPerCellPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeOriginCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeOriginCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeOriginCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeRingOffsetXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeRingOffsetYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeRingOffsetZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeCellBasePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeCellCountPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeDeltaCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeDeltaCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeDeltaCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeClearAllPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
 };
 
 struct SurfelData
@@ -58,12 +73,18 @@ struct SurfelData
     float4 Extra;
 };
 
-cbuffer ComputeCommon : register(b1, space0)
+struct SurfelIrradianceData
+{
+    float4 IrradianceAndWeight;
+};
+
+cbuffer ComputeCommon : register(b2, space0)
 {
     CommonComputeUniformBuffer ComputeCommon;
 }
 
 RWStructuredBuffer<SurfelData> SurfelPool : register(u0, space0);
+RWStructuredBuffer<SurfelIrradianceData> SurfelIrradianceBuffer : register(u1, space0);
 
 uint HashU32(uint x)
 {
@@ -150,6 +171,14 @@ void MarkDormantSurfel(inout SurfelData s, int3 cellCoord, uint cascadeIndex)
     s.Extra.w = (float)cascadeIndex;
 }
 
+void ResetSurfelHard(inout SurfelData s)
+{
+    s.PositionRadius = float4(0.0, 0.0, 0.0, 0.0);
+    s.NormalSeenFrame = float4(0.0, 0.0, 0.0, 0.0);
+    s.AlbedoWeight = float4(0.0, 0.0, 0.0, 0.0);
+    s.Extra = float4(0.0, 0.0, 0.0, 0.0);
+}
+
 [numthreads(64, 1, 1)]
 void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 {
@@ -159,13 +188,27 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         return;
 
     SurfelData s = SurfelPool[surfelIndex];
-    if (s.Extra.y <= 0.5)
-        return;
-
     const uint ttl = max((uint)ComputeCommon.TTLInFrames, 1u);
     const uint deleteHysteresis = max((uint)ComputeCommon.DeleteHysteresisFrames, 1u);
     const float cascade0CellSize = max(ComputeCommon.GridCellSize, 0.1);
-    const float cascadeBoundaryBand = max(cascade0CellSize * 0.5, 1.0);
+    const float cascadeBoundaryBand = max(cascade0CellSize * SURFEL_GI_BOUNDARY_CLEANUP_BAND_SCALE, 1.0);
+
+    if (s.Extra.y <= 0.5)
+    {
+        // Purge very old inactive/dormant slots to keep allocation state clean.
+        const uint inactiveAgeFrames = GetConsumedAge(s.NormalSeenFrame.w);
+        const uint inactivePurgeFrames = max(ttl * 4u, deleteHysteresis * 2u);
+        if (inactiveAgeFrames > inactivePurgeFrames)
+        {
+            ResetSurfelHard(s);
+            SurfelPool[surfelIndex] = s;
+
+            SurfelIrradianceData ir;
+            ir.IrradianceAndWeight = float4(0.0, 0.0, 0.0, 0.0);
+            SurfelIrradianceBuffer[surfelIndex] = ir;
+        }
+        return;
+    }
 
     const uint surfelCascade = min((uint)round(s.Extra.w), (uint)(SURFEL_GI_CASCADE_COUNT - 1));
     const float3 surfelPos = s.PositionRadius.xyz;
@@ -188,5 +231,9 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         const int3 cellCoord = int3(floor(surfelPos / cellSize));
         MarkDormantSurfel(s, cellCoord, surfelCascade);
         SurfelPool[surfelIndex] = s;
+
+        SurfelIrradianceData ir;
+        ir.IrradianceAndWeight = float4(0.0, 0.0, 0.0, 0.0);
+        SurfelIrradianceBuffer[surfelIndex] = ir;
     }
 }
