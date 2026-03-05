@@ -62,6 +62,9 @@ StructuredBuffer<SurfelData> SurfelPool : register(t3, space0);
 Texture2D SpawnAttemptTexture : register(t4, space0);
 StructuredBuffer<uint> SurfelCellPageTable : register(t6, space0);
 StructuredBuffer<SurfelIrradianceData> SurfelIrradianceBuffer : register(t7, space0);
+StructuredBuffer<uint> WinnerScoreBuffer : register(t8, space0);
+StructuredBuffer<uint> WinnerIndexBuffer : register(t9, space0);
+Texture2D GBufferNormalTexture : register(t10, space0);
 
 cbuffer VisualizeCommon : register(b5, space0)
 {
@@ -391,6 +394,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 
     const float3 viewPos = CalcViewPositionFromDepth(DepthTexture, DepthTextureSampler, uv, VisualizeCommon.InvP);
     const float3 worldPos = mul(VisualizeCommon.InvV, float4(viewPos, 1.0)).xyz;
+    const float3 worldNormal = normalize(GBufferNormalTexture.SampleLevel(DepthTextureSampler, uv, 0).xyz * 2.0 - 1.0);
     const float cascade0CellSize = max(VisualizeCommon.GridCellSize, 0.1);
     const float cameraDistance = length(viewPos);
     const uint debugCascadeIndex = GetCascadeIndexByDistance(cameraDistance);
@@ -402,6 +406,9 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     float bestDist2 = 1e38;
     float3 bestColor = float3(0.0, 0.0, 0.0);
     float surfelMask = 0.0;
+    int bestCascadeIndex = -1;
+    float bestGridDist2 = 1e38;
+    int gridCascadeIndex = -1;
 
     [loop] for (uint cascadeIndex = 0u; cascadeIndex < (uint)SURFEL_GI_CASCADE_COUNT; ++cascadeIndex)
     {
@@ -446,10 +453,17 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                         const float d2 = dot(delta, delta);
                         const float r2 = surfelRadius * surfelRadius;
 
+                        if (d2 < bestGridDist2)
+                        {
+                            bestGridDist2 = d2;
+                            gridCascadeIndex = (int)cascadeIndex;
+                        }
+
                         if (d2 <= r2 && d2 < bestDist2)
                         {
                             bestDist2 = d2;
                             surfelMask = 1.0;
+                            bestCascadeIndex = (int)cascadeIndex;
                             if (VisualizeCommon.ShowIrradianceDebug != 0)
                             {
                                 const float4 irradianceAndWeight = SurfelIrradianceBuffer[surfelIndex].IrradianceAndWeight;
@@ -524,9 +538,17 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                                 const float d2 = dot(delta, delta);
                                 const float r2 = surfelRadius * surfelRadius;
 
+                                if (d2 < bestGridDist2)
+                                {
+                                    bestGridDist2 = d2;
+                                    gridCascadeIndex = (int)cascadeIndex;
+                                }
+
                                 if (d2 <= r2 && d2 < bestDist2)
                                 {
                                     bestDist2 = d2;
+                                    surfelMask = 1.0;
+                                    bestCascadeIndex = (int)cascadeIndex;
                                     if (VisualizeCommon.ShowCellDebug != 0)
                                     {
                                         bestColor = CellDebugColor(surfelCellCoord, surfelCascade);
@@ -572,6 +594,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         const bool hasDebugCellPage = TryGetCellBaseIndex(debugCellCoord, maxSurfels, debugCascadeIndex, debugBaseIndex);
 
         uint aliveCount = 0u;
+        bool hasNormalMismatch = false;
         [loop] for (uint slot = 0u; slot < debugSlotsPerCell && hasDebugCellPage; ++slot)
         {
             const uint surfelIndex = debugBaseIndex + slot;
@@ -585,24 +608,50 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 
             const int3 surfelCellCoord = int3(floor(s.PositionRadius.xyz / debugCellSizeForOcc));
             if (any(surfelCellCoord != debugCellCoord))
+            {
                 continue;
+            }
+
+            const float3 surfelNormal = normalize(s.NormalSeenFrame.xyz);
+            if (dot(surfelNormal, worldNormal) < 0.7)
+                hasNormalMismatch = true;
 
             aliveCount++;
         }
 
-        if (aliveCount < debugDesiredSlots)
+        if (hasNormalMismatch)
         {
-            // Warm highlight: cell has room for more surfels but is currently underfilled.
+            // At least one surfel normal in this debug cell is significantly different from current world normal.
+            const float3 normalMismatchTint = float3(1.0, 0.1, 0.8);
+            visualizeColor = lerp(visualizeColor, normalMismatchTint, 0.6);
+        }
+        else if (aliveCount < debugDesiredSlots)
+        {
+            // Underfilled-cell reason hint:
+            // blue  -> no winner for this cell (likely priority/rejection path),
+            // yellow-> winner exists, but cell is still underfilled (placement/path mismatch).
+            uint debugCellLinear = 0u;
+            const bool hasDebugCellLinear = TryWorldCellToLinear(debugCellCoord, debugCascadeIndex, debugCellLinear);
+            bool hasWinner = false;
+            if (hasDebugCellLinear && debugCellLinear < max((uint)VisualizeCommon.SurfelPageTableCapacity, 1u))
+            {
+                const uint winnerScore = WinnerScoreBuffer[debugCellLinear];
+                const uint winnerIndex = WinnerIndexBuffer[debugCellLinear];
+                hasWinner = (winnerScore > 0u) && (winnerIndex != 0xffffffffu);
+            }
+
             const float fillRatio = (float)aliveCount / max((float)debugDesiredSlots, 1.0);
             const float intensity = saturate((1.0 - fillRatio) * 0.85 + 0.15);
-            const float3 underfilledTint = float3(1.0, 0.45, 0.1);
+            const float3 underfilledTint = hasWinner ? float3(1.0, 0.9, 0.2) : float3(0.15, 0.6, 1.0);
             visualizeColor = lerp(visualizeColor, underfilledTint, intensity * 0.7);
         }
     }
 
     if (VisualizeCommon.ShowCellGrid != 0 && VisualizeCommon.ShowIrradianceDebug == 0)
     {
-        const float3 gridCoord = worldPos / max(debugCellSize, 0.001);
+        const uint resolvedGridCascadeIndex = (gridCascadeIndex >= 0) ? (uint)gridCascadeIndex : debugCascadeIndex;
+        const float gridCellSize = cascade0CellSize * GetCascadeScale(resolvedGridCascadeIndex);
+        const float3 gridCoord = worldPos / max(gridCellSize, 0.001);
         const float3 fracCoord = frac(gridCoord);
         const float3 edgeDist = min(fracCoord, 1.0 - fracCoord);
         const float nearestEdge = min(edgeDist.x, min(edgeDist.y, edgeDist.z));

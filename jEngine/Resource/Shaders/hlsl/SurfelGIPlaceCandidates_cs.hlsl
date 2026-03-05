@@ -4,6 +4,10 @@
     #define SURFEL_GI_CASCADE_COUNT 3
 #endif
 #define SURFEL_GI_CASCADE_PACKED_COUNT ((SURFEL_GI_CASCADE_COUNT + 3) / 4)
+// Temp toggle: allow replacing active surfel when candidate normal is very different.
+#define SURFEL_GI_ENABLE_NORMAL_MISMATCH_REPLACE 0
+// Replace only when normals are almost opposite (full flip): dot < -0.9.
+#define SURFEL_GI_NORMAL_MISMATCH_REPLACE_DOT_THRESHOLD -0.9
 
 struct CommonComputeUniformBuffer
 {
@@ -182,6 +186,11 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 
     uint writeIndex = base;
     bool foundInactive = false;
+    bool foundNormalMismatchReplace = false;
+#if SURFEL_GI_ENABLE_NORMAL_MISMATCH_REPLACE
+    const float3 candidateNormal = normalize(c.Surfel.NormalSeenFrame.xyz);
+    const float normalMismatchDotThreshold = clamp(SURFEL_GI_NORMAL_MISMATCH_REPLACE_DOT_THRESHOLD, -1.0, 0.999);
+#endif
 
     [loop] for (uint i = 0u; i < desiredSlots; ++i)
     {
@@ -195,20 +204,37 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
             foundInactive = true;
             break;
         }
+
+#if SURFEL_GI_ENABLE_NORMAL_MISMATCH_REPLACE
+        if (foundNormalMismatchReplace)
+            continue;
+
+        const uint surfelCascade = (uint)round(s.Extra.w);
+        if (surfelCascade != pageCascade)
+            continue;
+
+        const float3 existingNormal = normalize(s.NormalSeenFrame.xyz);
+        if (dot(existingNormal, candidateNormal) < normalMismatchDotThreshold)
+        {
+            writeIndex = idx;
+            foundNormalMismatchReplace = true;
+        }
+#endif
     }
 
-    // Reservoir policy: do not replace already active surfels.
-    // Place only when an inactive slot exists in the page.
-    if (!foundInactive)
+    // Prefer inactive slot placement. If none exists, allow replacement when normal mismatch is large.
+    if (!foundInactive && !foundNormalMismatchReplace)
         return;
 
     const SurfelData existing = SurfelPool[writeIndex];
     const bool isDormantReuse = (existing.Extra.y <= 0.5) && (abs(existing.Extra.x - 5.0) < 0.5);
+    const bool isNormalMismatchReplace = (!foundInactive && foundNormalMismatchReplace);
     SurfelData outSurfel;
     if (isDormantReuse)
     {
         // Re-activate dormant surfel in-place and blend attributes toward winner candidate.
         outSurfel = existing;
+        outSurfel.PositionRadius = c.Surfel.PositionRadius;
         const float oldWeight = max(existing.AlbedoWeight.w, 1.0);
         const float newWeight = min(oldWeight + 1.0, 64.0);
         const float blend = 1.0 / newWeight;
@@ -226,6 +252,8 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         outSurfel = c.Surfel;
         outSurfel.NormalSeenFrame.w = (float)ComputeCommon.FrameNumber;
         outSurfel.Extra.y = 1.0;
+        if (isNormalMismatchReplace)
+            outSurfel.Extra.x = 7.0;      // "normal mismatch replaced" for debug.
     }
     SurfelPool[writeIndex] = outSurfel;
 
@@ -233,6 +261,14 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     outIrradiance.IrradianceAndWeight = float4(0.0, 0.0, 0.0, 0.0);
     SurfelIrradianceBuffer[writeIndex] = outIrradiance;
 
-    uint oldValue = 0u;
-    InterlockedAdd(SurfelGIStatsBuffer[0].ActiveCount, 1u, oldValue);
+    if (isNormalMismatchReplace)
+    {
+        uint oldMismatch = 0u;
+        InterlockedAdd(SurfelGIStatsBuffer[0].MismatchCount, 1u, oldMismatch);
+    }
+    else
+    {
+        uint oldValue = 0u;
+        InterlockedAdd(SurfelGIStatsBuffer[0].ActiveCount, 1u, oldValue);
+    }
 }

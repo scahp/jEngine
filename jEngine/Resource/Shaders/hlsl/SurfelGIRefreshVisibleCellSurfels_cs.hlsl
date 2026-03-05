@@ -354,22 +354,39 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     if (!TryGetCellBaseIndex(cellCoord, maxSurfels, cascadeIndex, cellBaseIndex))
         return;
     const float cellSize = max(ComputeCommon.GridCellSize, 0.1) * GetCascadeScale(cascadeIndex);
+    const uint cellHash = HashCellWithCascade(cellCoord, cascadeIndex);
 
     [loop] for (uint slot = 0u; slot < slotsPerCell; ++slot)
     {
         const uint surfelIndex = cellBaseIndex + slot;
         SurfelData s = SurfelPool[surfelIndex];
-        if (s.Extra.y <= 0.5)
-            continue;
         if ((uint)round(s.Extra.w) != cascadeIndex)
             continue;
 
-        const int3 surfelCellCoord = int3(floor(s.PositionRadius.xyz / cellSize));
-        if (any(surfelCellCoord != cellCoord))
+        if (s.Extra.y > 0.5)
+        {
+            const int3 surfelCellCoord = int3(floor(s.PositionRadius.xyz / cellSize));
+            if (any(surfelCellCoord != cellCoord))
+                continue;
+
+            s.NormalSeenFrame.w = (float)ComputeCommon.FrameNumber;
+            s.Extra.y = 1.0;
+            SurfelPool[surfelIndex] = s;
+            continue;
+        }
+
+        const bool isDormant = (abs(s.Extra.x - 5.0) < 0.5);
+        if (!isDormant)
+            continue;
+        const int3 dormantCellCoord = int3(floor(s.PositionRadius.xyz / cellSize));
+        const bool hashMatch = (asuint(s.Extra.z) == cellHash);
+        const bool posCellMatch = all(dormantCellCoord == cellCoord);
+        if (!hashMatch && !posCellMatch)
             continue;
 
+        // Keep dormant slots alive while their owning cell is visible,
+        // but do not reactivate them here (placement pass decides that).
         s.NormalSeenFrame.w = (float)ComputeCommon.FrameNumber;
-        s.Extra.y = 1.0;
         SurfelPool[surfelIndex] = s;
     }
 
@@ -384,13 +401,32 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 
         OverflowNode node = OverflowNodes[nodeIndex];
         SurfelData s = node.Surfel;
-        if (s.Extra.y > 0.5 && (uint)round(s.Extra.w) == cascadeIndex)
+        if ((uint)round(s.Extra.w) != cascadeIndex)
+        {
+            overflowNode = node.Next;
+            continue;
+        }
+
+        if (s.Extra.y > 0.5)
         {
             const int3 surfelCellCoord = int3(floor(s.PositionRadius.xyz / cellSize));
             if (all(surfelCellCoord == cellCoord))
             {
                 s.NormalSeenFrame.w = (float)ComputeCommon.FrameNumber;
                 s.Extra.y = 1.0;
+                node.Surfel = s;
+                OverflowNodes[nodeIndex] = node;
+            }
+        }
+        else
+        {
+            const bool isDormant = (abs(s.Extra.x - 5.0) < 0.5);
+            const int3 dormantCellCoord = int3(floor(s.PositionRadius.xyz / cellSize));
+            const bool hashMatch = (asuint(s.Extra.z) == cellHash);
+            const bool posCellMatch = all(dormantCellCoord == cellCoord);
+            if (isDormant && (hashMatch || posCellMatch))
+            {
+                s.NormalSeenFrame.w = (float)ComputeCommon.FrameNumber;
                 node.Surfel = s;
                 OverflowNodes[nodeIndex] = node;
             }

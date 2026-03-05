@@ -5,6 +5,8 @@
 #endif
 #define SURFEL_GI_CASCADE_PACKED_COUNT ((SURFEL_GI_CASCADE_COUNT + 3) / 4)
 #define SURFEL_GI_BOUNDARY_BAND_SCALE 1.0
+// Temp debug switch: 0 keeps candidate placement on primary cascade only.
+#define SURFEL_GI_ENABLE_BOUNDARY_OVERLAP 0
 #ifndef SURFEL_GI_ENABLE_STATE1_RETRY
     // 1: handle State==1 (allocating) with short spin/retry to reduce duplicate page allocations.
     // 0: keep legacy behavior (skip allocating slots and continue probing).
@@ -416,6 +418,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 
     uint cascadeIndex = primaryCascadeIndex;
     int3 cellCoord = primaryCellCoord;
+#if SURFEL_GI_ENABLE_BOUNDARY_OVERLAP
     uint boundaryLowCascade = 0u;
     uint boundaryHighCascade = 0u;
     if (TryGetBoundaryCascadePair(cameraDistance, boundaryLowCascade, boundaryHighCascade))
@@ -433,6 +436,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
             }
         }
     }
+#endif
     const float cellSize = cascade0CellSize * GetCascadeScale(cascadeIndex);
     const float radius = max(ComputeCommon.MinRadius, 0.001) * max(ComputeCommon.RadiusScale, 0.05) * GetCascadeRadiusScale(cascadeIndex);
 
@@ -469,6 +473,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     float overlapPenalty = 0.0;
     float minSeparationNorm = 1e9;
     uint activeNeighborCount = 0u;
+    float3 neighborNormalSum = float3(0.0, 0.0, 0.0);
     [loop] for (uint i = 0u; i < desiredSlots; ++i)
     {
         const uint idx = base + i;
@@ -484,6 +489,20 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         overlapPenalty += max(pairRadius - d, 0.0);
         minSeparationNorm = min(minSeparationNorm, d / max(pairRadius, 0.001));
         activeNeighborCount++;
+        neighborNormalSum += normalize(s.NormalSeenFrame.xyz);
+    }
+
+    float cellNormalConsistencyScore = 1.0;
+    if (activeNeighborCount > 0u)
+    {
+        const float n2 = dot(neighborNormalSum, neighborNormalSum);
+        if (n2 > 1e-6)
+        {
+            const float3 cellDominantNormal = neighborNormalSum * rsqrt(n2);
+            const float normalDot = dot(cellDominantNormal, worldNormal);
+            const float normalThreshold = clamp(ComputeCommon.NormalThreshold, -1.0, 0.999);
+            cellNormalConsistencyScore = max(0.1, saturate((normalDot - normalThreshold) / max(1.0 - normalThreshold, 1e-4)));
+        }
     }
 
     const float centerPriority = ComputeCenterProximityScore(worldPos, cellCoord, cellSize, ComputeCommon.UseCenterSpawnBias);
@@ -534,6 +553,8 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     {
         finalPriority = ComposeReservoirPriority(separationPriority, overlapFaceScore);
     }
+    // Bias winner selection toward candidates aligned with already placed surfel normals in this cell.
+    finalPriority *= cellNormalConsistencyScore;
 
     const uint priority = (uint)(finalPriority * 16777215.0);
     if (priority == 0u)

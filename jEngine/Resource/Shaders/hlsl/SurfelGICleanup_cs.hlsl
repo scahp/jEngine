@@ -195,6 +195,14 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 
     if (s.Extra.y <= 0.5)
     {
+        const bool isDormant = (abs(s.Extra.x - 5.0) < 0.5);
+        if (isDormant)
+        {
+            // Dormant slots are still valid reuse candidates.
+            // Do not hard-purge them in cleanup to avoid popping while visible.
+            return;
+        }
+
         // Purge very old inactive/dormant slots to keep allocation state clean.
         const uint inactiveAgeFrames = GetConsumedAge(s.NormalSeenFrame.w);
         const uint inactivePurgeFrames = max(ttl * 4u, deleteHysteresis * 2u);

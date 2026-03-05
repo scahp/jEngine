@@ -6,6 +6,8 @@
 #define SURFEL_GI_CASCADE_PACKED_COUNT ((SURFEL_GI_CASCADE_COUNT + 3) / 4)
 #define SURFEL_GI_VISIBLE_CELL_WORKLIST_MULTIPLIER 2u
 #define SURFEL_GI_BOUNDARY_BAND_SCALE 1.0
+// Temp debug switch: 0 keeps a single cascade assignment (no boundary dual emit).
+#define SURFEL_GI_ENABLE_BOUNDARY_OVERLAP 0
 
 struct CommonComputeUniformBuffer
 {
@@ -252,6 +254,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 
     EmitVisibleCell(primaryCellCoord, primaryCascadeIndex, maxVisibleCells);
 
+#if SURFEL_GI_ENABLE_BOUNDARY_OVERLAP
     uint boundaryLowCascade = 0u;
     uint boundaryHighCascade = 0u;
     if (TryGetBoundaryCascadePair(cameraDistance, boundaryLowCascade, boundaryHighCascade))
@@ -264,4 +267,5 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                 EmitVisibleCell(secondaryCellCoord, secondaryCascadeIndex, maxVisibleCells);
         }
     }
+#endif
 }
