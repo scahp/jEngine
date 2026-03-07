@@ -56,7 +56,8 @@ void jRenderer_PathTracing::PathTracing()
 {
 	if (!RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr
 		|| RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr->Width != (int32)SCR_WIDTH
-		|| RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr->Height != (int32)SCR_HEIGHT)
+		|| RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr->Height != (int32)SCR_HEIGHT
+		|| RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr->Format != ETextureFormat::RGBA32F)
 	{
 		RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr = g_rhi->Create2DTexture((uint32)SCR_WIDTH, (uint32)SCR_HEIGHT, (uint32)1, (uint32)1
 			, ETextureFormat::RGBA32F, ETextureCreateFlag::UAV, EResourceLayout::UAV);

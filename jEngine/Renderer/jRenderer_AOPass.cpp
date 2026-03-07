@@ -635,7 +635,8 @@ std::shared_ptr<jTexture> jRenderer::RTAO()
 
 		if (!RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr
 			|| RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr->Width != (int32)RayRTWidth
-			|| RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr->Height != (int32)RayRTHeight)
+			|| RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr->Height != (int32)RayRTHeight
+			|| RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr->Format != ETextureFormat::RG16F)
 		{
 			RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr = g_rhi->Create2DTexture((uint32)RayRTWidth, (uint32)RayRTHeight, (uint32)1, (uint32)1
 				, ETextureFormat::RG16F, ETextureCreateFlag::UAV, EResourceLayout::UAV);
