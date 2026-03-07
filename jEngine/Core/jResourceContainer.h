@@ -1,7 +1,7 @@
 #pragma once
 
 // Temporary array for one frame data
-template <typename T, int32 NumOfInlineData = 10>
+template <typename T, int32 NumOfInlineData = 15>
 struct jResourceContainer
 {
     jResourceContainer<T, NumOfInlineData>() = default;

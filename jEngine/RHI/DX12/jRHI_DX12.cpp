@@ -1234,6 +1234,56 @@ void jRHI_DX12::BindComputeShaderBindingInstances(const jCommandBuffer* InComman
         check(CommandBuffer_DX12);
 
         const jShaderBindingInstanceArray& ShaderBindingInstanceArray = *(InShaderBindingInstanceCombiner.ShaderBindingInstanceArray);
+
+        int32 NumOfDescriptor = 0;
+        int32 NumOfSamplerDescriptor = 0;
+        for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
+        {
+            jShaderBindingInstance_DX12* Instance = (jShaderBindingInstance_DX12*)ShaderBindingInstanceArray[i];
+            NumOfDescriptor += (int32)Instance->Descriptors.size();
+            NumOfSamplerDescriptor += (int32)Instance->SamplerDescriptors.size();
+        }
+
+        bool NeedSetDescriptorHeapsAgain = false;
+        if (!CommandBuffer_DX12->OnlineDescriptorHeap->CanAllocate(NumOfDescriptor))
+        {
+            const ID3D12DescriptorHeap* PrevDescriptorHeap = CommandBuffer_DX12->OnlineDescriptorHeap->GetHeap();
+            CommandBuffer_DX12->OnlineDescriptorHeap->Release();
+            CommandBuffer_DX12->OnlineDescriptorHeap = ((jRHI_DX12*)this)->OnlineDescriptorHeapManager.Alloc(EDescriptorHeapTypeDX12::CBV_SRV_UAV);
+            check(CommandBuffer_DX12->OnlineDescriptorHeap->CanAllocate(NumOfDescriptor));
+            if (PrevDescriptorHeap != CommandBuffer_DX12->OnlineDescriptorHeap->GetHeap())
+            {
+                NeedSetDescriptorHeapsAgain = true;
+            }
+        }
+
+        if (!CommandBuffer_DX12->OnlineSamplerDescriptorHeap->CanAllocate(NumOfSamplerDescriptor))
+        {
+            const ID3D12DescriptorHeap* PrevDescriptorHeap = CommandBuffer_DX12->OnlineSamplerDescriptorHeap->GetHeap();
+            CommandBuffer_DX12->OnlineSamplerDescriptorHeap->Release();
+            CommandBuffer_DX12->OnlineSamplerDescriptorHeap = ((jRHI_DX12*)this)->OnlineDescriptorHeapManager.Alloc(EDescriptorHeapTypeDX12::SAMPLER);
+            check(CommandBuffer_DX12->OnlineSamplerDescriptorHeap->CanAllocate(NumOfSamplerDescriptor));
+            if (PrevDescriptorHeap != CommandBuffer_DX12->OnlineSamplerDescriptorHeap->GetHeap())
+            {
+                NeedSetDescriptorHeapsAgain = true;
+            }
+        }
+
+        if (NeedSetDescriptorHeapsAgain)
+        {
+            ensure(CommandBuffer_DX12->OnlineDescriptorHeap && CommandBuffer_DX12->OnlineSamplerDescriptorHeap
+                || (!CommandBuffer_DX12->OnlineDescriptorHeap && !CommandBuffer_DX12->OnlineSamplerDescriptorHeap));
+            if (CommandBuffer_DX12->OnlineDescriptorHeap && CommandBuffer_DX12->OnlineSamplerDescriptorHeap)
+            {
+                ID3D12DescriptorHeap* ppHeaps[] =
+                {
+                    CommandBuffer_DX12->OnlineDescriptorHeap->GetHeap(),
+                    CommandBuffer_DX12->OnlineSamplerDescriptorHeap->GetHeap()
+                };
+                CommandBuffer_DX12->CommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+            }
+        }
+
         CommandBuffer_DX12->CommandList->SetComputeRootSignature(jShaderBindingLayout_DX12::CreateRootSignature(ShaderBindingInstanceArray, EShaderAccessStageFlag::COMPUTE | EShaderAccessStageFlag::ALL_RAYTRACING));
 
         int32 RootParameterIndex = 0;

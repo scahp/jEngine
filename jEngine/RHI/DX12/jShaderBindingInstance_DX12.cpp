@@ -429,9 +429,10 @@ void jShaderBindingInstance_DX12::CopyToOnlineDescriptorHeap(jCommandBuffer_DX12
 
     if (SamplerDescriptors.size() > 0)
     {
-        check(Descriptors.size() <= 200);
+        check(SamplerDescriptors.size() <= 200);
         jResourceContainer<D3D12_CPU_DESCRIPTOR_HANDLE, 200> DestSamplerDescriptor;
-        InCommandList->OnlineSamplerDescriptorHeap->AllocToResourceContainer(DestSamplerDescriptor, (int32)SamplerDescriptors.size());
+        const bool IsAllocSuccess = InCommandList->OnlineSamplerDescriptorHeap->AllocToResourceContainer(DestSamplerDescriptor, (int32)SamplerDescriptors.size());
+        check(IsAllocSuccess);
 
         g_rhi_dx12->Device->CopyDescriptors((uint32)DestSamplerDescriptor.NumOfData, &DestSamplerDescriptor[0], nullptr
             , (uint32)SamplerDescriptorsOnlyCPU.size(), &SamplerDescriptorsOnlyCPU[0], nullptr, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
