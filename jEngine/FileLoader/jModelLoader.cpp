@@ -251,6 +251,41 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 
 		ai_real Opacity = 1.0f;
 		material->Get(AI_MATKEY_OPACITY, Opacity);
+        newMeshMaterial->bRaytracingAlphaTest = (material->GetTextureCount(aiTextureType_OPACITY) > 0);
+        newMeshMaterial->RaytracingAlphaCutoff = 0.5f;
+
+        // Legacy fallback: if only scalar opacity exists, treat as alpha-cutout candidate.
+        if (Opacity < 0.999f)
+        {
+            newMeshMaterial->bRaytracingAlphaTest = true;
+            newMeshMaterial->RaytracingAlphaCutoff = (float)Opacity;
+        }
+
+        aiString AlphaMode;
+        if (material->Get(AI_MATKEY_GLTF_ALPHAMODE, AlphaMode) == aiReturn_SUCCESS)
+        {
+            const char* AlphaModeStr = AlphaMode.C_Str();
+            if (AlphaModeStr && _stricmp(AlphaModeStr, "OPAQUE") == 0)
+            {
+                newMeshMaterial->bRaytracingAlphaTest = false;
+            }
+            else if (AlphaModeStr && _stricmp(AlphaModeStr, "MASK") == 0)
+            {
+                newMeshMaterial->bRaytracingAlphaTest = true;
+
+                ai_real AlphaCutoff = 0.5f;
+                if (material->Get(AI_MATKEY_GLTF_ALPHACUTOFF, AlphaCutoff) == aiReturn_SUCCESS)
+                {
+                    newMeshMaterial->RaytracingAlphaCutoff = (float)AlphaCutoff;
+                }
+            }
+            else if (AlphaModeStr && _stricmp(AlphaModeStr, "BLEND") == 0)
+            {
+                // Current HWRT DI path does not support translucent blending.
+                // Keep alpha-test disabled for BLEND mode.
+                newMeshMaterial->bRaytracingAlphaTest = false;
+            }
+        }
 
 		ai_real Reflectivity = 0.0f;
 		material->Get(AI_MATKEY_REFLECTIVITY, Reflectivity);

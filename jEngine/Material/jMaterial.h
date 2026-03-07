@@ -58,10 +58,11 @@ public:
     bool HasAlbedoTexture() const { return TexData[(int32)EMaterialTextureType::Albedo].Texture; }
     bool IsUseSphericalMap() const { return bUseSphericalMap; }
     bool IsUseSRGBAlbedoTexture() const { return TexData[(int32)EMaterialTextureType::Albedo].Texture ? TexData[(int32)EMaterialTextureType::Albedo].Texture->sRGB : false; }
+    bool IsRaytracingAlphaTestEnabled() const { return bRaytracingAlphaTest; }
     jTexture* GetTexture(EMaterialTextureType InType) const;
     template <typename T> T* GetTexture(EMaterialTextureType InType) const { return (T*)(GetTexture(InType)); }
-
     jSamplerStateInfo* GetTextureSamplerState(EMaterialTextureType InType) const;
+
     TextureData TexData[static_cast<int32>(EMaterialTextureType::Max)];
     
     // Material specific uniform buffer data which is depend on material what data was set.
@@ -69,6 +70,8 @@ public:
     std::shared_ptr<IUniformBufferBlock> MaterialDataUniformBufferPtr;
 
     bool bUseSphericalMap = false;
+    bool bRaytracingAlphaTest = false;
+    float RaytracingAlphaCutoff = 0.5f;
 
     const std::shared_ptr<jShaderBindingInstance>& CreateShaderBindingInstance();
     std::shared_ptr<jShaderBindingInstance> ShaderBindingInstance = nullptr;

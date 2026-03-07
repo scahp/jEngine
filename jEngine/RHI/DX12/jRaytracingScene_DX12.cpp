@@ -7,6 +7,7 @@
 #include "jVertexBuffer_DX12.h"
 #include "jBufferUtil_DX12.h"
 #include "jOptions.h"
+#include "Material/jMaterial.h"
 #include <algorithm>
 
 void jRaytracingScene_DX12::CreateOrUpdateBLAS(const jRatracingInitializer& InInitializer)
@@ -119,9 +120,14 @@ void jRaytracingScene_DX12::CreateOrUpdateBLAS(const jRatracingInitializer& InIn
         geometryDesc.Triangles.VertexBuffer.StartAddress = VertexStart;
         geometryDesc.Triangles.VertexBuffer.StrideInBytes = VertexBufferDX12->Streams[0].Stride;
 
-        // Opaque로 지오메트를 등록하면, 히트 쉐이더에서 더이상 쉐이더를 만들지 않을 것이므로 최적화에 좋다.
-        geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
-        //geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
+        // OPAQUE geometry skips AnyHit. Enable NON-OPAQUE only for alpha-cutout candidates.
+        const jMaterial* Material = RObj->MaterialPtr.get();
+        const bool UseAlphaCutout = Material
+            && Material->HasAlbedoTexture()
+            && Material->IsRaytracingAlphaTestEnabled();
+        geometryDesc.Flags = UseAlphaCutout
+            ? D3D12_RAYTRACING_GEOMETRY_FLAG_NONE
+            : D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
 
         // Create Raytracing PrebuildInfo
         D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO bottomLevelPrebuildInfo{};
