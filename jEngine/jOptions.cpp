@@ -9,8 +9,25 @@ int32 gSelectedSceneIndex = 0;
 const char* GDenoisers[(int32)EDenoiser::MAX] = { "None", "Gaussian", "GaussianSeparable", "Bilateral", "BilateralPS", "A-Trous" };
 const char* GAOResolution[3] = { "100", "75", "50" };
 extern const char* GAOType[3] = { "NoAO", "RTAO", "SSAO" };
+const char* GHWRTDebugViewModes[14] = {
+    "Shaded",
+    "Triangle Edge",
+    "UV",
+    "UV Grid",
+    "Primitive ID",
+    "Barycentric",
+    "Texel Density",
+    "World Normal",
+    "Geometric Normal",
+    "Albedo Texture",
+    "Normal Texture",
+    "RM Texture",
+    "Mip Level",
+    "Opaque/NonOpaque"
+};
 
 static_assert(_countof(GDenoisers) == (int32)EDenoiser::MAX, "EDenoiser count mismatch");
+static_assert(_countof(GHWRTDebugViewModes) == 14, "GHWRTDebugViewModes count mismatch");
 
 jOptions gOptions;
 
@@ -25,6 +42,14 @@ jOptions::jOptions()
 	ShowGrid = false;
 	UseWaveIntrinsics = false;
 	UseDeferredRenderer = true;
+	UseHWRTDirectLighting = false;
+    HWRTDebugViewMode = 0;
+    HWRTDebugLineWidth = 0.02f;
+    HWRTDebugUVScale = 16.0f;
+    HWRTDebugPrimitiveIDScale = 1.0f;
+    HWRTForceMipLevel0 = false;
+    HWRTNormalBias = 1.0f;
+    HWRTShadowRayStartOffset = 0.001f;
 	UseSubpass = false;
 	UseMemoryless = true;
 	ShowDebugObject = false;
@@ -46,8 +71,8 @@ jOptions::jOptions()
 	AORadius = 50.0f;
 	SSAOBias = AORadius / 20.0f;
 	AOIntensity = 1.0f;
-	UseSSGI = true;
-    UseSurfelGI = true;
+	UseSSGI = false;
+    UseSurfelGI = false;
 	UseSSGITemporalAccumulation = true;
 	ShowSSGIOnly = false;
 	UseSSGIAttenuation = false;

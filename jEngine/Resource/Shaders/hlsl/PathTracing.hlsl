@@ -76,7 +76,7 @@ SamplerState DefaultSamplerState : register(s3, space0);
 TextureCube EnvTexture : register(s4, space0);
 
 StructuredBuffer<uint2> VertexIndexOffsetArray[] : register(t0, space1);
-StructuredBuffer<uint> IndexBindlessArray[] : register(t0, space2);
+Buffer<uint> IndexBindlessArray[] : register(t0, space2);
 StructuredBuffer<RenderObjectUniformBuffer> RenderObjParamArray[] : register(t0, space3);
 ByteAddressBuffer VerticesBindlessArray[] : register(t0, space4);
 ConstantBuffer<MaterialUniformBuffer> MaterialBindlessArray[] : register(b0, space5);
@@ -154,7 +154,7 @@ float3 HitWorldPosition()
 
 void GetShaderBindingResources(
     inout StructuredBuffer<uint2> VertexIndexOffsetBuffer,
-    inout StructuredBuffer<uint> IndexBuffer,
+    inout Buffer<uint> IndexBuffer,
     inout StructuredBuffer<RenderObjectUniformBuffer> RenderObjParam,
     inout ByteAddressBuffer VerticesBuffer,
     inout MaterialUniformBuffer MaterialBuffer,
@@ -484,7 +484,7 @@ void MeshClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 {
     // SRV_UAV DescHeap
     StructuredBuffer<uint2> VertexIndexOffset;
-    StructuredBuffer<uint> IndexBindless;
+    Buffer<uint> IndexBindless;
     StructuredBuffer<RenderObjectUniformBuffer> RenderObjParam;
     ByteAddressBuffer VerticesBindless;
     MaterialUniformBuffer MaterialBindless;
@@ -568,7 +568,7 @@ void LightClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 {
     // SRV_UAV DescHeap
     StructuredBuffer<uint2> VertexIndexOffset;
-    StructuredBuffer<uint> IndexBindless;
+    Buffer<uint> IndexBindless;
     StructuredBuffer<RenderObjectUniformBuffer> RenderObjParam;
     ByteAddressBuffer VerticesBindless;
     MaterialUniformBuffer MaterialBindless;

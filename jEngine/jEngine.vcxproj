@@ -408,6 +408,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClCompile Include="Renderer\jRenderer_SurfelGI.cpp" />
     <ClCompile Include="Renderer\jRenderer_HitObjectPass.cpp" />
     <ClCompile Include="Renderer\jRenderer_AtmosphericShadowPass.cpp" />
+    <ClCompile Include="Renderer\jRenderer_HWRTDIPass.cpp" />
     <ClCompile Include="Renderer\jRenderer_PathTracing.cpp" />
     <ClCompile Include="Renderer\jRenderer_PostProcessPass.cpp" />
     <ClCompile Include="Renderer\jRenderer_UIPass.cpp" />
@@ -788,6 +789,10 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
   </ItemGroup>
   <ItemGroup>
     <None Include="Resource\Shaders\hlsl\PathTracing.hlsl">
+      <FileType>Document</FileType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </None>
+    <None Include="Resource\Shaders\hlsl\HWRT_DI.hlsl">
       <FileType>Document</FileType>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </None>

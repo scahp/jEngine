@@ -9,6 +9,7 @@
 #include "Scene/Light/jSpotLight.h"
 #include "Scene/jObject.h"
 #include "jEngine.h"
+#include "RHI/jRaytracingScene.h"
 #include "Code/Engine/ConsoleVariables/jConsole.h"
 #include <filesystem>
 
@@ -235,7 +236,19 @@ namespace
 void IRenderer::UIPass()
 {
 	check(g_ImGUI);
-	g_ImGUI->NewFrame([]()
+    const bool HasRenderFrameContext = (RenderFrameContextPtr != nullptr);
+    const bool HasRaytracingScene = HasRenderFrameContext && (RenderFrameContextPtr->RaytracingScene != nullptr);
+    const bool IsRaytracingSceneValid = HasRaytracingScene && RenderFrameContextPtr->RaytracingScene->IsValid();
+    const bool IsForwardRenderer = HasRenderFrameContext && RenderFrameContextPtr->UseForwardRenderer;
+    const bool IsHWRTDirectLightingActive = gOptions.UseHWRTDirectLighting
+        && gOptions.UseRaytracing
+        && GSupportRaytracing
+        && HasRenderFrameContext
+        && HasRaytracingScene
+        && IsRaytracingSceneValid
+        && !IsForwardRenderer;
+
+	g_ImGUI->NewFrame([=]()
 	{
 		Vector4 clear_color(0.45f, 0.55f, 0.60f, 1.00f);
 
@@ -245,15 +258,16 @@ void IRenderer::UIPass()
 		ImGui::SetNextWindowPos(ImVec2(27.0f, 27.0f), ImGuiCond_FirstUseEver);
 		ImGui::SetNextWindowSize(ImVec2(350.0f, 682.0f), ImGuiCond_FirstUseEver);
 		ImGui::Begin(szTitle);
-        static bool bSelectSurfelGITabByDefault = true;
+        static bool bSelectHWRTTabByDefault = true;
+        static bool bSelectSurfelGITabByDefault = false;
 			
 		if (ImGui::BeginTabBar("RHI"))
 		{
 			if (ImGui::BeginTabItem("Default")) 
 			{
-	#if USE_VARIABLE_SHADING_RATE_TIER2
+#if USE_VARIABLE_SHADING_RATE_TIER2
 				ImGui::Checkbox("UseVRS", &gOptions.UseVRS);
-	#endif
+#endif
 				//ImGui::Checkbox("ShowVRSArea", &gOptions.ShowVRSArea);
 				//ImGui::Checkbox("ShowGrid", &gOptions.ShowGrid);
 				//ImGui::Checkbox("UseWaveIntrinsics", &gOptions.UseWaveIntrinsics);
@@ -268,11 +282,11 @@ void IRenderer::UIPass()
 					}
 					else
 					{
-						ImGui::BeginDisabled(true);
+                        ImGui::BeginDisabled(true);
 						ImGui::Checkbox("[ReadOnly]UseDeferredRenderer", &gOptions.UseDeferredRenderer);
 						ImGui::Checkbox("[VulkanOnly]UseSubpass", &gOptions.UseSubpass);
 						ImGui::Checkbox("[VulkanOnly]UseMemoryless", &gOptions.UseMemoryless);
-						ImGui::EndDisabled();
+                        ImGui::EndDisabled();
 					}
 				}
 				{
@@ -305,6 +319,75 @@ void IRenderer::UIPass()
 
 				ImGui::EndTabItem();
 			}
+
+            const ImGuiTabItemFlags HWRTTabFlags = bSelectHWRTTabByDefault ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
+            if (ImGui::BeginTabItem("HWRT", nullptr, HWRTTabFlags))
+            {
+                bSelectHWRTTabByDefault = false;
+
+                if (GSupportRaytracing)
+                {
+                    ImGui::Checkbox("UseHWRTDirectLighting", &gOptions.UseHWRTDirectLighting);
+                }
+                else
+                {
+                    ImGui::BeginDisabled(true);
+                    ImGui::Checkbox("[ReadOnly]UseHWRTDirectLighting", &gOptions.UseHWRTDirectLighting);
+                    ImGui::EndDisabled();
+                    ImGui::TextUnformatted("Current RHI does not support hardware ray tracing.");
+                }
+
+                ImGui::Separator();
+                ImGui::Text("Direct Lighting Active : %s", IsHWRTDirectLightingActive ? "YES" : "NO");
+                int32 HWRTDebugMode = gOptions.HWRTDebugViewMode;
+                if (HWRTDebugMode < 0 || HWRTDebugMode >= (int32)_countof(GHWRTDebugViewModes))
+                {
+                    HWRTDebugMode = 0;
+                    gOptions.HWRTDebugViewMode = 0;
+                }
+
+                if (ImGui::BeginCombo("DebugView", GHWRTDebugViewModes[HWRTDebugMode], ImGuiComboFlags_None))
+                {
+                    for (int32 i = 0; i < (int32)_countof(GHWRTDebugViewModes); ++i)
+                    {
+                        const bool IsSelected = (gOptions.HWRTDebugViewMode == i);
+                        if (ImGui::Selectable(GHWRTDebugViewModes[i], IsSelected))
+                            gOptions.HWRTDebugViewMode = i;
+                        if (IsSelected)
+                            ImGui::SetItemDefaultFocus();
+                    }
+                    ImGui::EndCombo();
+                }
+                ImGui::SliderFloat("DebugLineWidth", &gOptions.HWRTDebugLineWidth, 0.001f, 0.1f, "%.4f");
+                ImGui::SliderFloat("DebugUVScale", &gOptions.HWRTDebugUVScale, 1.0f, 128.0f, "%.1f");
+                ImGui::SliderFloat("DebugPrimitiveIDScale", &gOptions.HWRTDebugPrimitiveIDScale, 0.1f, 16.0f, "%.2f");
+                ImGui::Checkbox("ForceMipLevel0", &gOptions.HWRTForceMipLevel0);
+                ImGui::SliderFloat("NormalBias", &gOptions.HWRTNormalBias, 0.0f, 50.0f, "%.5f");
+                ImGui::SliderFloat("ShadowRayStartOffset", &gOptions.HWRTShadowRayStartOffset, 0.0f, 50.0f, "%.5f");
+
+                bool ConditionUseHWRTDirectLighting = gOptions.UseHWRTDirectLighting;
+                bool ConditionUseRaytracing = gOptions.UseRaytracing;
+                bool ConditionSupportRaytracing = GSupportRaytracing;
+                bool ConditionHasRenderFrameContext = HasRenderFrameContext;
+                bool ConditionHasRaytracingScene = HasRaytracingScene;
+                bool ConditionRaytracingSceneValid = IsRaytracingSceneValid;
+                bool ConditionNotForwardRenderer = !IsForwardRenderer;
+                ImGui::BeginDisabled(true);
+                ImGui::Checkbox("Cond: gOptions.UseHWRTDirectLighting", &ConditionUseHWRTDirectLighting);
+                ImGui::Checkbox("Cond: gOptions.UseRaytracing", &ConditionUseRaytracing);
+                ImGui::Checkbox("Cond: GSupportRaytracing", &ConditionSupportRaytracing);
+                ImGui::Checkbox("Cond: RenderFrameContext", &ConditionHasRenderFrameContext);
+                ImGui::Checkbox("Cond: RaytracingScene", &ConditionHasRaytracingScene);
+                ImGui::Checkbox("Cond: RaytracingScene->IsValid", &ConditionRaytracingSceneValid);
+                ImGui::Checkbox("Cond: !UseForwardRenderer", &ConditionNotForwardRenderer);
+                ImGui::EndDisabled();
+
+                ImGui::Separator();
+                ImGui::TextUnformatted("DispatchRays based direct lighting path.");
+                ImGui::TextUnformatted("Primary ray hits geometry and shades without GBuffer lighting.");
+
+                ImGui::EndTabItem();
+            }
 
 #ifdef ENABLE_EDITOR_FEATURES
 			if (g_Editor)

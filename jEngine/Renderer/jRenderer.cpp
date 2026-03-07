@@ -832,6 +832,8 @@ void jRenderer::BasePass()
     if (BasePassSetupCompleteEvent.valid())
         BasePassSetupCompleteEvent.wait();
 
+    const bool UseHWRTDirectLighting = IsUseHWRTDirectLighting();
+
     {
         SCOPE_CPU_PROFILE(BasePass);
         SCOPE_GPU_PROFILE(RenderFrameContextPtr, BasePass);
@@ -864,7 +866,7 @@ void jRenderer::BasePass()
             }
 
             // Draw Light : subpass 1
-            if (!RenderFrameContextPtr->UseForwardRenderer && gOptions.UseSubpass)
+            if (!RenderFrameContextPtr->UseForwardRenderer && gOptions.UseSubpass && !UseHWRTDirectLighting)
             {
                 g_rhi->NextSubpass(RenderFrameContextPtr->GetActiveCommandBuffer());
                 DeferredLightPass_TodoRefactoring(BaseRenderPass);
@@ -875,7 +877,21 @@ void jRenderer::BasePass()
 
         if (!RenderFrameContextPtr->UseForwardRenderer && !gOptions.UseSubpass)
         {
-            DeferredLightPass_TodoRefactoring(BaseRenderPass);
+            if (UseHWRTDirectLighting)
+            {
+                if (!HWRTDirectLightingPass())
+                {
+                    DeferredLightPass_TodoRefactoring(BaseRenderPass);
+                }
+            }
+            else
+            {
+                DeferredLightPass_TodoRefactoring(BaseRenderPass);
+            }
+        }
+        else if (!RenderFrameContextPtr->UseForwardRenderer && UseHWRTDirectLighting)
+        {
+            HWRTDirectLightingPass();
         }
         //BasepassOcclusionTest.EndQuery(RenderFrameContextPtr->GetActiveCommandBuffer());
     }
@@ -1020,7 +1036,9 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
 
 void jRenderer::Render()
 {
-    SCOPE_CPU_PROFILE(Render);
+	SCOPE_CPU_PROFILE(Render);
+
+    const bool UseHWRTDirectLighting = IsUseHWRTDirectLighting();
 
     {
         SCOPE_CPU_PROFILE(PoolReset);
@@ -1131,15 +1149,18 @@ void jRenderer::Render()
     {
         PrepareHistoryDepth();
 
-        AOPass();
-        SurfelGIPass();
-        SSGIPass();
-        SSGIAccumulatePass();
+        if (!UseHWRTDirectLighting)
+        {
+            AOPass();
+            SurfelGIPass();
+            SSGIPass();
+            SSGIAccumulatePass();
+        }
         AtmosphericShadow();
     }
 
     // Apply SSGI
-    if (gOptions.UseSSGI && jSceneRenderTarget::SSGI_RT)
+    if (!UseHWRTDirectLighting && gOptions.UseSSGI && jSceneRenderTarget::SSGI_RT)
     {
         DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "ApplySSGI", Vector4(0.0f, 0.5f, 0.8f, 1.0f));
 

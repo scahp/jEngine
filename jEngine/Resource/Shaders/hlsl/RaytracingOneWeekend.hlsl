@@ -36,7 +36,7 @@ SamplerState PBRSamplerState : register(s4, space0);
 TextureCube<float4> IrradianceMapArray[] : register(t0, space1);
 TextureCube<float4> PrefilteredEnvMapArray[] : register(t0, space2);
 StructuredBuffer<uint2> VertexIndexOffsetArray[] : register(t0, space3);
-StructuredBuffer<uint> IndexBindlessArray[] : register(t0, space4);
+Buffer<uint> IndexBindlessArray[] : register(t0, space4);
 StructuredBuffer<RenderObjectUniformBuffer> RenderObjParamArray[] : register(t0, space5);
 ByteAddressBuffer VerticesBindlessArray[] : register(t0, space6);
 Texture2D AlbedoTextureArray[] : register(t0, space7);
@@ -125,7 +125,7 @@ void GetShaderBindingResources(
     inout TextureCube<float4> IrradianceMap,
     inout TextureCube<float4> PrefilteredEnvMap,
     inout StructuredBuffer<uint2> VertexIndexOffset,
-    inout StructuredBuffer<uint> IndexBindless,
+    inout Buffer<uint> IndexBindless,
     inout StructuredBuffer<RenderObjectUniformBuffer> RenderObjParam,
     inout ByteAddressBuffer VerticesBindless,
     inout Texture2D AlbedoTexture,
@@ -318,7 +318,7 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
     TextureCube<float4> IrradianceMap;
     TextureCube<float4> PrefilteredEnvMap;
     StructuredBuffer<uint2> VertexIndexOffset;
-    StructuredBuffer<uint> IndexBindless;
+    Buffer<uint> IndexBindless;
     StructuredBuffer<RenderObjectUniformBuffer> RenderObjParam;
     ByteAddressBuffer VerticesBindless;
     Texture2D AlbedoTexture;

@@ -919,6 +919,9 @@
     <ClCompile Include="Renderer\jRenderer_AtmosphericShadowPass.cpp">
       <Filter>Code\Renderer</Filter>
     </ClCompile>
+    <ClCompile Include="Renderer\jRenderer_HWRTDIPass.cpp">
+      <Filter>Code\Renderer</Filter>
+    </ClCompile>
     <ClCompile Include="Renderer\jRenderer_PostProcessPass.cpp">
       <Filter>Code\Renderer</Filter>
     </ClCompile>
@@ -1150,6 +1153,9 @@
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
     <None Include="Resource\Shaders\hlsl\PathTracing.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\HWRT_DI.hlsl">
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
     <None Include="Resource\Shaders\hlsl\SimpleTonemap_ps.hlsl">
