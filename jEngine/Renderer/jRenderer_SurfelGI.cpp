@@ -2,6 +2,14 @@
 #include "jRenderer.h"
 #include "jOptions.h"
 #include "Scene/jCamera.h"
+#include "Scene/jObject.h"
+#include "Scene/jRenderObject.h"
+#include "Scene/Light/jLight.h"
+#include "Scene/Light/jDirectionalLight.h"
+#include "Scene/Light/jPointLight.h"
+#include "Scene/Light/jSpotLight.h"
+#include "Material/jMaterial.h"
+#include "FileLoader/jImageFileLoader.h"
 #include "jSceneRenderTargets.h"
 #include "Profiler/jPerformanceProfile.h"
 #include "RHI/jRenderFrameContext.h"
@@ -10,6 +18,8 @@
 #include "RHI/jRaytracingScene.h"
 #include <cmath>
 #include <limits>
+#include <array>
+#include <unordered_map>
 
 namespace
 {
@@ -84,6 +94,50 @@ struct jSurfelClipmapCascadeRuntimeState
     int32 RingOffsetZ = 0;
 };
 
+struct alignas(16) jSurfelGIHWRTDISceneConstantBuffer
+{
+    Matrix ProjectionToWorld;
+    Vector CameraPosition;
+    float NormalBias = 0.1f;
+    uint32 NumLights = 0;
+    uint32 DebugViewMode = 0;
+    uint32 ForceMipLevel0 = 0;
+    uint32 RenderWidth = 0;
+    float DebugLineWidth = 0.02f;
+    float DebugUVScale = 16.0f;
+    float DebugPrimitiveIDScale = 1.0f;
+    float ShadowRayStartOffset = 0.001f;
+    uint32 RenderHeight = 0;
+    float Padding0 = 0.0f;
+    float Padding1 = 0.0f;
+    float Padding2 = 0.0f;
+};
+static_assert((sizeof(jSurfelGIHWRTDISceneConstantBuffer) % 16) == 0, "jSurfelGIHWRTDISceneConstantBuffer size must be 16-byte aligned");
+
+struct alignas(16) jSurfelGIHWRTDIMaterialInstanceUniform
+{
+    uint32 MaterialFlags = 0;
+    uint32 AlbedoSamplerIndex = 0;
+    uint32 NormalSamplerIndex = 0;
+    uint32 RMSamplerIndex = 0;
+    float AlphaCutoff = 0.5f;
+    float Padding0 = 0.0f;
+    float Padding1 = 0.0f;
+    float Padding2 = 0.0f;
+};
+static_assert((sizeof(jSurfelGIHWRTDIMaterialInstanceUniform) % 16) == 0, "jSurfelGIHWRTDIMaterialInstanceUniform size must be 16-byte aligned");
+
+enum : uint32
+{
+    SurfelGI_HWRTDI_MaterialFlag_HasAlbedoTexture = 1u << 0,
+    SurfelGI_HWRTDI_MaterialFlag_HasNormalTexture = 1u << 1,
+    SurfelGI_HWRTDI_MaterialFlag_HasRMTexture = 1u << 2,
+    SurfelGI_HWRTDI_MaterialFlag_UseSRGBAlbedoTexture = 1u << 3,
+    SurfelGI_HWRTDI_MaterialFlag_IsSkyMaterial = 1u << 4,
+    SurfelGI_HWRTDI_MaterialFlag_UseAlphaCutout = 1u << 5,
+    SurfelGI_HWRTDI_MaterialFlag_NonOpaqueGeometry = 1u << 6
+};
+
 std::shared_ptr<jBuffer> GSurfelPoolBuffer;
 int32 GSurfelPoolMaxCount = 0;
 std::shared_ptr<jBuffer> GSurfelIrradianceBuffer;
@@ -119,6 +173,324 @@ FORCEINLINE int32 PositiveModuloInt32(int32 value, int32 divisor)
         return 0;
     const int32 m = value % divisor;
     return (m < 0) ? (m + divisor) : m;
+}
+
+bool DispatchSurfelGIHWRTDIGather(
+    const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr,
+    jCamera* InMainCamera,
+    const std::shared_ptr<IUniformBufferBlock>& InGatherUniformBuffer)
+{
+    if (!InRenderFrameContextPtr || !InMainCamera || !InGatherUniformBuffer)
+        return false;
+
+    auto* RaytracingScene = InRenderFrameContextPtr->RaytracingScene;
+    if (!RaytracingScene || !RaytracingScene->TLASBufferPtr || RaytracingScene->InstanceList.empty())
+        return false;
+
+    const EShaderAccessStageFlag BindingShaderStageFlag = EShaderAccessStageFlag::COMPUTE;
+
+    std::vector<const jBuffer*> VertexAndIndexOffsetBuffers;
+    std::vector<const jBuffer*> IndexBuffers;
+    std::vector<const jBuffer*> RenderObjectBuffers;
+    std::vector<const jBuffer*> VertexBuffers;
+    std::vector<const IUniformBufferBlock*> MaterialInstanceBuffers;
+    std::vector<jTextureResourceBindless::jTextureBindData> AlbedoTextures;
+    std::vector<jTextureResourceBindless::jTextureBindData> NormalTextures;
+    std::vector<jTextureResourceBindless::jTextureBindData> RMTextures;
+    std::vector<const jSamplerStateInfo*> AlbedoSamplerStates;
+    std::vector<const jSamplerStateInfo*> NormalSamplerStates;
+    std::vector<const jSamplerStateInfo*> RMSamplerStates;
+    std::vector<jHWRTDIPackedLight> PackedLights;
+    std::vector<std::shared_ptr<IUniformBufferBlock>> RefCountMaintainer;
+    std::shared_ptr<jBuffer> PackedLightBuffer;
+
+    VertexAndIndexOffsetBuffers.reserve(RaytracingScene->InstanceList.size());
+    IndexBuffers.reserve(RaytracingScene->InstanceList.size());
+    RenderObjectBuffers.reserve(RaytracingScene->InstanceList.size());
+    VertexBuffers.reserve(RaytracingScene->InstanceList.size());
+    MaterialInstanceBuffers.reserve(RaytracingScene->InstanceList.size());
+    AlbedoTextures.reserve(RaytracingScene->InstanceList.size());
+    NormalTextures.reserve(RaytracingScene->InstanceList.size());
+    RMTextures.reserve(RaytracingScene->InstanceList.size());
+    AlbedoSamplerStates.reserve(RaytracingScene->InstanceList.size());
+    NormalSamplerStates.reserve(RaytracingScene->InstanceList.size());
+    RMSamplerStates.reserve(RaytracingScene->InstanceList.size());
+    PackedLights.reserve(jLight::GetLights().size());
+
+    const auto CreateOneFrameUniformBuffer = [&](jName Name, const void* Data, uint32 Size)
+    {
+        auto UniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(Name, jLifeTimeType::OneFrame, Size));
+        UniformBuffer->UpdateBufferData(Data, Size);
+        RefCountMaintainer.push_back(UniformBuffer);
+        return UniformBuffer;
+    };
+
+    std::unordered_map<const jSamplerStateInfo*, uint32> AlbedoSamplerIndexMap;
+    std::unordered_map<const jSamplerStateInfo*, uint32> NormalSamplerIndexMap;
+    std::unordered_map<const jSamplerStateInfo*, uint32> RMSamplerIndexMap;
+    AlbedoSamplerIndexMap.reserve(RaytracingScene->InstanceList.size());
+    NormalSamplerIndexMap.reserve(RaytracingScene->InstanceList.size());
+    RMSamplerIndexMap.reserve(RaytracingScene->InstanceList.size());
+
+    const auto GetOrAddSamplerIndex = [](std::vector<const jSamplerStateInfo*>& InSamplerStates
+        , std::unordered_map<const jSamplerStateInfo*, uint32>& InSamplerIndexMap
+        , const jSamplerStateInfo* InSamplerState) -> uint32
+    {
+        check(InSamplerState);
+
+        auto It = InSamplerIndexMap.find(InSamplerState);
+        if (It != InSamplerIndexMap.end())
+            return It->second;
+
+        const uint32 NewIndex = (uint32)InSamplerStates.size();
+        InSamplerStates.push_back(InSamplerState);
+        InSamplerIndexMap.emplace(InSamplerState, NewIndex);
+        return NewIndex;
+    };
+
+    for (jRenderObject* RenderObject : RaytracingScene->InstanceList)
+    {
+        if (!RenderObject || !RenderObject->GeometryDataPtr || !RenderObject->IsSupportRaytracing())
+            return false;
+
+        RenderObject->CreateShaderBindingInstance();
+
+        VertexAndIndexOffsetBuffers.push_back(RenderObject->VertexAndIndexOffsetBuffer.get());
+        IndexBuffers.push_back(RenderObject->GeometryDataPtr->IndexBufferPtr->GetBuffer());
+        RenderObjectBuffers.push_back(RenderObject->TestUniformBuffer.get());
+        VertexBuffers.push_back(RenderObject->GeometryDataPtr->VertexBufferPtr->GetBuffer(0));
+
+        const jMaterial* Material = RenderObject->MaterialPtr ? RenderObject->MaterialPtr.get() : GDefaultMaterial.get();
+        if (!Material)
+            return false;
+
+        jSurfelGIHWRTDIMaterialInstanceUniform MaterialUniform;
+        if (Material->TexData[(int32)jMaterial::EMaterialTextureType::Albedo].Texture)
+            MaterialUniform.MaterialFlags |= SurfelGI_HWRTDI_MaterialFlag_HasAlbedoTexture;
+        if (Material->TexData[(int32)jMaterial::EMaterialTextureType::Normal].Texture)
+            MaterialUniform.MaterialFlags |= SurfelGI_HWRTDI_MaterialFlag_HasNormalTexture;
+        if (Material->TexData[(int32)jMaterial::EMaterialTextureType::Metallic].Texture)
+            MaterialUniform.MaterialFlags |= SurfelGI_HWRTDI_MaterialFlag_HasRMTexture;
+        if (Material->IsUseSRGBAlbedoTexture())
+            MaterialUniform.MaterialFlags |= SurfelGI_HWRTDI_MaterialFlag_UseSRGBAlbedoTexture;
+
+        const bool IsSkyMaterial = Material->IsUseSphericalMap();
+        if (IsSkyMaterial)
+            MaterialUniform.MaterialFlags |= SurfelGI_HWRTDI_MaterialFlag_IsSkyMaterial;
+
+        const bool UseAlphaCutout = !IsSkyMaterial
+            && Material->HasAlbedoTexture()
+            && Material->IsRaytracingAlphaTestEnabled();
+        if (UseAlphaCutout)
+        {
+            MaterialUniform.MaterialFlags |= SurfelGI_HWRTDI_MaterialFlag_UseAlphaCutout;
+            MaterialUniform.MaterialFlags |= SurfelGI_HWRTDI_MaterialFlag_NonOpaqueGeometry;
+        }
+        MaterialUniform.AlphaCutoff = Clamp(Material->RaytracingAlphaCutoff, 0.0f, 1.0f);
+
+        const jSamplerStateInfo* AlbedoSamplerState = Material->GetTextureSamplerState(jMaterial::EMaterialTextureType::Albedo);
+        const jSamplerStateInfo* NormalSamplerState = Material->GetTextureSamplerState(jMaterial::EMaterialTextureType::Normal);
+        const jSamplerStateInfo* RMSamplerState = Material->GetTextureSamplerState(jMaterial::EMaterialTextureType::Metallic);
+        MaterialUniform.AlbedoSamplerIndex = GetOrAddSamplerIndex(AlbedoSamplerStates, AlbedoSamplerIndexMap, AlbedoSamplerState);
+        MaterialUniform.NormalSamplerIndex = GetOrAddSamplerIndex(NormalSamplerStates, NormalSamplerIndexMap, NormalSamplerState);
+        MaterialUniform.RMSamplerIndex = GetOrAddSamplerIndex(RMSamplerStates, RMSamplerIndexMap, RMSamplerState);
+
+        auto MaterialUniformBuffer = CreateOneFrameUniformBuffer(jNameStatic("SurfelGI_HWRTDI_MaterialInstance"), &MaterialUniform, sizeof(MaterialUniform));
+        MaterialInstanceBuffers.push_back(MaterialUniformBuffer.get());
+
+        AlbedoTextures.push_back({ Material->GetTexture(jMaterial::EMaterialTextureType::Albedo), nullptr, 0 });
+        NormalTextures.push_back({ Material->GetTexture(jMaterial::EMaterialTextureType::Normal), nullptr, 0 });
+        RMTextures.push_back({ Material->GetTexture(jMaterial::EMaterialTextureType::Metallic), nullptr, 0 });
+    }
+
+    for (jLight* Light : jLight::GetLights())
+    {
+        if (!Light)
+            continue;
+
+        switch (Light->Type)
+        {
+        case ELightType::DIRECTIONAL:
+        {
+            const auto* DirectionalLight = static_cast<jDirectionalLight*>(Light);
+            const jDirectionalLightUniformBufferData& LightData = DirectionalLight->GetLightData();
+            jHWRTDIPackedLight PackedLight;
+            PackedLight.ColorAndType = Vector4(LightData.Color.x, LightData.Color.y, LightData.Color.z, (float)static_cast<uint32>(ELightType::DIRECTIONAL));
+            PackedLight.DirectionAndPenumbra = Vector4(LightData.Direction.x, LightData.Direction.y, LightData.Direction.z, 0.0f);
+            PackedLights.push_back(PackedLight);
+            break;
+        }
+        case ELightType::POINT:
+        {
+            const auto* PointLight = static_cast<jPointLight*>(Light);
+            const jPointLightUniformBufferData& LightData = PointLight->GetLightData();
+            jHWRTDIPackedLight PackedLight;
+            PackedLight.ColorAndType = Vector4(LightData.Color.x, LightData.Color.y, LightData.Color.z, (float)static_cast<uint32>(ELightType::POINT));
+            PackedLight.PositionAndMaxDistance = Vector4(LightData.Position.x, LightData.Position.y, LightData.Position.z, LightData.MaxDistance);
+            PackedLights.push_back(PackedLight);
+            break;
+        }
+        case ELightType::SPOT:
+        {
+            const auto* SpotLight = static_cast<jSpotLight*>(Light);
+            const jSpotLightUniformBufferData& LightData = SpotLight->GetLightData();
+            jHWRTDIPackedLight PackedLight;
+            PackedLight.ColorAndType = Vector4(LightData.Color.x, LightData.Color.y, LightData.Color.z, (float)static_cast<uint32>(ELightType::SPOT));
+            PackedLight.PositionAndMaxDistance = Vector4(LightData.Position.x, LightData.Position.y, LightData.Position.z, LightData.MaxDistance);
+            PackedLight.DirectionAndPenumbra = Vector4(LightData.Direction.x, LightData.Direction.y, LightData.Direction.z, LightData.PenumbraRadian);
+            PackedLight.UmbraAndPadding = Vector4(LightData.UmbraRadian, 0.0f, 0.0f, 0.0f);
+            PackedLights.push_back(PackedLight);
+            break;
+        }
+        default:
+            break;
+        }
+    }
+    const uint32 NumPackedLights = (uint32)PackedLights.size();
+    if (PackedLights.empty())
+    {
+        PackedLights.push_back(jHWRTDIPackedLight());
+    }
+    const uint32 PackedLightCount = (uint32)PackedLights.size();
+    const uint64 PackedLightBufferSize = (uint64)sizeof(jHWRTDIPackedLight) * (uint64)PackedLightCount;
+    PackedLightBuffer = g_rhi->CreateStructuredBuffer(PackedLightBufferSize, 0, sizeof(jHWRTDIPackedLight), EBufferCreateFlag::UAV
+        , EResourceLayout::GENERAL, PackedLights.data(), PackedLightBufferSize, jNameStatic("SurfelGI_HWRTDI_PackedLightBuffer"));
+    check(PackedLightBuffer);
+
+    jSurfelGIHWRTDISceneConstantBuffer SceneCB;
+    SceneCB.ProjectionToWorld = InMainCamera->GetInverseViewProjectionMatrix();
+    SceneCB.CameraPosition = InMainCamera->Pos;
+    SceneCB.NormalBias = (gOptions.HWRTNormalBias > 0.0f) ? gOptions.HWRTNormalBias : 0.0f;
+    SceneCB.ShadowRayStartOffset = (gOptions.HWRTShadowRayStartOffset > 0.0f) ? gOptions.HWRTShadowRayStartOffset : 0.0f;
+    SceneCB.RenderWidth = (uint32)SCR_WIDTH;
+    SceneCB.RenderHeight = (uint32)SCR_HEIGHT;
+    SceneCB.DebugViewMode = 0u;
+    SceneCB.DebugLineWidth = Max(gOptions.HWRTDebugLineWidth, 0.0005f);
+    SceneCB.DebugUVScale = Max(gOptions.HWRTDebugUVScale, 1.0f);
+    SceneCB.DebugPrimitiveIDScale = Max(gOptions.HWRTDebugPrimitiveIDScale, 0.1f);
+    SceneCB.ForceMipLevel0 = gOptions.HWRTForceMipLevel0 ? 1u : 0u;
+    SceneCB.NumLights = NumPackedLights;
+
+    auto SceneUniformBuffer = CreateOneFrameUniformBuffer(jNameStatic("SurfelGI_HWRTDI_SceneData"), &SceneCB, sizeof(SceneCB));
+
+    jShaderBindingArray GlobalShaderBindingArray;
+    jShaderBindingResourceInlineAllocator ResourceInlineAllocator;
+    GlobalShaderBindingArray.Add(jShaderBinding::Create(0, 1, EShaderBindingType::ACCELERATION_STRUCTURE_SRV, BindingShaderStageFlag
+        , ResourceInlineAllocator.Alloc<jBufferResource>(RaytracingScene->TLASBufferPtr.get()), true));
+    GlobalShaderBindingArray.Add(jShaderBinding::Create(1, 1, EShaderBindingType::TEXTURE_UAV, BindingShaderStageFlag
+        , ResourceInlineAllocator.Alloc<jTextureResource>(InRenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), nullptr)));
+    GlobalShaderBindingArray.Add(jShaderBinding::Create(2, 1, EShaderBindingType::UNIFORMBUFFER, BindingShaderStageFlag
+        , ResourceInlineAllocator.Alloc<jUniformBufferResource>(SceneUniformBuffer.get()), true));
+
+    const jSamplerStateInfo* HWRTDISamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+        , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT
+        , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
+    GlobalShaderBindingArray.Add(jShaderBinding::Create(3, 1, EShaderBindingType::SAMPLER, BindingShaderStageFlag
+        , ResourceInlineAllocator.Alloc<jSamplerResource>(HWRTDISamplerState)));
+
+    jTexture* EnvTexture = jSceneRenderTarget::CubeEnvMap2 ? jSceneRenderTarget::CubeEnvMap2 : GWhiteCubeTexture.get();
+    GlobalShaderBindingArray.Add(jShaderBinding::Create(4, 1, EShaderBindingType::TEXTURE_SRV, BindingShaderStageFlag
+        , ResourceInlineAllocator.Alloc<jTextureResource>(EnvTexture, nullptr)));
+    GlobalShaderBindingArray.Add(jShaderBinding::Create(5, 1, EShaderBindingType::BUFFER_SRV, BindingShaderStageFlag
+        , ResourceInlineAllocator.Alloc<jBufferResource>(PackedLightBuffer.get())));
+    auto GlobalShaderBindingInstance = g_rhi->CreateShaderBindingInstance(GlobalShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
+
+    jShaderBindingArray BindlessShaderBindingArray[11];
+    BindlessShaderBindingArray[0].Add(jShaderBinding::CreateBindless(0, (uint32)VertexAndIndexOffsetBuffers.size(), EShaderBindingType::BUFFER_SRV, BindingShaderStageFlag
+        , ResourceInlineAllocator.Alloc<jBufferResourceBindless>(VertexAndIndexOffsetBuffers), false));
+    BindlessShaderBindingArray[1].Add(jShaderBinding::CreateBindless(0, (uint32)IndexBuffers.size(), EShaderBindingType::BUFFER_SRV, BindingShaderStageFlag
+        , ResourceInlineAllocator.Alloc<jBufferResourceBindless>(IndexBuffers), false));
+    BindlessShaderBindingArray[2].Add(jShaderBinding::CreateBindless(0, (uint32)RenderObjectBuffers.size(), EShaderBindingType::BUFFER_SRV, BindingShaderStageFlag
+        , ResourceInlineAllocator.Alloc<jBufferResourceBindless>(RenderObjectBuffers), false));
+    BindlessShaderBindingArray[3].Add(jShaderBinding::CreateBindless(0, (uint32)VertexBuffers.size(), EShaderBindingType::BUFFER_SRV, BindingShaderStageFlag
+        , ResourceInlineAllocator.Alloc<jBufferResourceBindless>(VertexBuffers), false));
+    BindlessShaderBindingArray[4].Add(jShaderBinding::CreateBindless(0, (uint32)MaterialInstanceBuffers.size(), EShaderBindingType::UNIFORMBUFFER, BindingShaderStageFlag
+        , ResourceInlineAllocator.Alloc<jUniformBufferResourceBindless>(MaterialInstanceBuffers)));
+    BindlessShaderBindingArray[5].Add(jShaderBinding::CreateBindless(0, (uint32)AlbedoTextures.size(), EShaderBindingType::TEXTURE_SRV, BindingShaderStageFlag
+        , ResourceInlineAllocator.Alloc<jTextureResourceBindless>(AlbedoTextures)));
+    BindlessShaderBindingArray[6].Add(jShaderBinding::CreateBindless(0, (uint32)NormalTextures.size(), EShaderBindingType::TEXTURE_SRV, BindingShaderStageFlag
+        , ResourceInlineAllocator.Alloc<jTextureResourceBindless>(NormalTextures)));
+    BindlessShaderBindingArray[7].Add(jShaderBinding::CreateBindless(0, (uint32)RMTextures.size(), EShaderBindingType::TEXTURE_SRV, BindingShaderStageFlag
+        , ResourceInlineAllocator.Alloc<jTextureResourceBindless>(RMTextures)));
+    BindlessShaderBindingArray[8].Add(jShaderBinding::CreateBindless(0, (uint32)AlbedoSamplerStates.size(), EShaderBindingType::SAMPLER, BindingShaderStageFlag
+        , ResourceInlineAllocator.Alloc<jSamplerResourceBindless>(AlbedoSamplerStates)));
+    BindlessShaderBindingArray[9].Add(jShaderBinding::CreateBindless(0, (uint32)NormalSamplerStates.size(), EShaderBindingType::SAMPLER, BindingShaderStageFlag
+        , ResourceInlineAllocator.Alloc<jSamplerResourceBindless>(NormalSamplerStates)));
+    BindlessShaderBindingArray[10].Add(jShaderBinding::CreateBindless(0, (uint32)RMSamplerStates.size(), EShaderBindingType::SAMPLER, BindingShaderStageFlag
+        , ResourceInlineAllocator.Alloc<jSamplerResourceBindless>(RMSamplerStates)));
+    std::array<std::shared_ptr<jShaderBindingInstance>, 11> BindlessShaderBindingInstances;
+    for (int32 i = 0; i < (int32)BindlessShaderBindingInstances.size(); ++i)
+    {
+        BindlessShaderBindingInstances[(size_t)i] = g_rhi->CreateShaderBindingInstance(BindlessShaderBindingArray[i], jShaderBindingInstanceType::SingleFrame);
+    }
+
+    jShaderBindingArray SurfelGatherBindingArray;
+    SurfelGatherBindingArray.Add(jShaderBinding::Create(0, 1, EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::COMPUTE,
+        ResourceInlineAllocator.Alloc<jBufferResource>(GSurfelGIActiveIndexBuffer.get())));
+    SurfelGatherBindingArray.Add(jShaderBinding::Create(1, 1, EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::COMPUTE,
+        ResourceInlineAllocator.Alloc<jBufferResource>(GSurfelGIActiveCounterBuffer.get())));
+    SurfelGatherBindingArray.Add(jShaderBinding::Create(2, 1, EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::COMPUTE,
+        ResourceInlineAllocator.Alloc<jBufferResource>(GSurfelPoolBuffer.get())));
+    SurfelGatherBindingArray.Add(jShaderBinding::Create(3, 1, EShaderBindingType::BUFFER_UAV, EShaderAccessStageFlag::COMPUTE,
+        ResourceInlineAllocator.Alloc<jBufferResource>(GSurfelIrradianceBuffer.get())));
+    SurfelGatherBindingArray.Add(jShaderBinding::Create(4, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE,
+        ResourceInlineAllocator.Alloc<jUniformBufferResource>(InGatherUniformBuffer.get()), true));
+    auto SurfelGatherBindingInstance = g_rhi->CreateShaderBindingInstance(SurfelGatherBindingArray, jShaderBindingInstanceType::SingleFrame);
+
+    jShaderBindingLayoutArray LayoutArray;
+    LayoutArray.Add(GlobalShaderBindingInstance->ShaderBindingsLayouts);
+    for (int32 i = 0; i < (int32)BindlessShaderBindingInstances.size(); ++i)
+    {
+        LayoutArray.Add(BindlessShaderBindingInstances[(size_t)i]->ShaderBindingsLayouts);
+    }
+    LayoutArray.Add(SurfelGatherBindingInstance->ShaderBindingsLayouts);
+
+    jShaderInfo IrradianceGatherShaderInfo;
+    IrradianceGatherShaderInfo.SetName(jNameStatic("SurfelGIGatherIrradianceHWRTDI_CS"));
+    IrradianceGatherShaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/HWRT_DI.hlsl"));
+    IrradianceGatherShaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
+    IrradianceGatherShaderInfo.SetEntryPoint(jNameStatic("SurfelGIGatherIrradianceHWRT_CS"));
+    jShader* IrradianceGatherShader = g_rhi->CreateShader(IrradianceGatherShaderInfo);
+    jPipelineStateInfo* IrradianceGatherPSO = g_rhi->CreateComputePipelineStateInfo(IrradianceGatherShader, LayoutArray, {});
+    IrradianceGatherPSO->Bind(InRenderFrameContextPtr);
+
+    jShaderBindingInstanceArray InstanceArray;
+    InstanceArray.Add(GlobalShaderBindingInstance.get());
+    for (int32 i = 0; i < (int32)BindlessShaderBindingInstances.size(); ++i)
+    {
+        InstanceArray.Add(BindlessShaderBindingInstances[(size_t)i].get());
+    }
+    InstanceArray.Add(SurfelGatherBindingInstance.get());
+
+    jShaderBindingInstanceCombiner ShaderBindingCombiner;
+    ShaderBindingCombiner.ShaderBindingInstanceArray = &InstanceArray;
+    for (int32 i = 0; i < InstanceArray.NumOfData; ++i)
+    {
+        ShaderBindingCombiner.DescriptorSetHandles.Add(InstanceArray[i]->GetHandle());
+        if (const std::vector<uint32>* DynamicOffsets = InstanceArray[i]->GetDynamicOffsets())
+        {
+            if (!DynamicOffsets->empty())
+            {
+                ShaderBindingCombiner.DynamicOffsets.Add((void*)DynamicOffsets->data(), (int32)DynamicOffsets->size());
+            }
+        }
+    }
+
+    g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), PackedLightBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
+    g_rhi->BindComputeShaderBindingInstances(InRenderFrameContextPtr->GetActiveCommandBuffer(), IrradianceGatherPSO, ShaderBindingCombiner, 0);
+    const jName RHIName = g_rhi->GetRHIName();
+    const bool SupportsComputeIndirectDispatch = (RHIName == jNameStatic("Vulkan")) || (RHIName == jNameStatic("DirectX12"));
+    if (SupportsComputeIndirectDispatch)
+    {
+        g_rhi->DispatchComputeIndirect(InRenderFrameContextPtr, GSurfelGIInlineRayDispatchArgsBuffer.get(), 0);
+    }
+    else
+    {
+        const int32 FallbackGatherGroupX = (Max(1, GSurfelGIActiveIndexCapacity) + 63) / 64;
+        g_rhi->DispatchCompute(InRenderFrameContextPtr, Max(1, FallbackGatherGroupX), 1, 1);
+    }
+
+    return true;
 }
 
 void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
@@ -1207,6 +1579,7 @@ void jRenderer::SurfelGIPass()
 
     const bool CanGatherIrradianceInlineRay = gOptions.SurfelGIInlineRayEnable
         && gOptions.UseRaytracing
+        && GSupportInlineRaytracing
         && RenderFrameContextPtr->RaytracingScene
         && RenderFrameContextPtr->RaytracingScene->IsValid()
         && RenderFrameContextPtr->RaytracingScene->TLASBufferPtr;
@@ -1358,51 +1731,24 @@ void jRenderer::SurfelGIPass()
 
         struct alignas(16) jSurfelGIInlineRayGatherUniformBuffer
         {
-            Matrix V;
-            Matrix P;
-            Matrix InvP;
-            Matrix InvV;
             uint32 MaxSurfels = 0;
             uint32 RayCount = 0;
             float MaxRayDistance = 0.0f;
             float NormalBias = 0.0f;
             float HistoryBlend = 0.0f;
-            float HitDepthThickness = 0.0f;
             int32 FrameNumber = 0;
-            float Padding0 = 0.0f;
-            jFloat4 SkyColor = { 0.0f, 0.0f, 0.0f, 0.0f };
-            jFloat4 SunDirectionAndIntensity = { 0.0f, 0.0f, -1.0f, 0.0f };
-            jFloat4 SunColor = { 0.0f, 0.0f, 0.0f, 0.0f };
+            uint32 Padding0 = 0;
+            uint32 Padding1 = 0;
         };
         static_assert((sizeof(jSurfelGIInlineRayGatherUniformBuffer) % 16) == 0, "jSurfelGIInlineRayGatherUniformBuffer size must be 16-byte aligned");
 
         jSurfelGIInlineRayGatherUniformBuffer GatherUniformData;
-        GatherUniformData.V = MainCamera->View;
-        GatherUniformData.P = MainCamera->Projection;
-        GatherUniformData.InvP = MainCamera->Projection.GetInverse();
-        GatherUniformData.InvV = MainCamera->View.GetInverse();
         GatherUniformData.MaxSurfels = (uint32)Max(1, GSurfelPoolMaxCount);
         GatherUniformData.RayCount = (uint32)Clamp(gOptions.SurfelGIInlineRayCount, 1, 16);
         GatherUniformData.MaxRayDistance = Max(10.0f, gOptions.SurfelGIInlineRayMaxDistance);
         GatherUniformData.NormalBias = Max(0.001f, gOptions.SurfelGIInlineRayNormalBias);
         GatherUniformData.HistoryBlend = Clamp(gOptions.SurfelGIInlineRayHistoryBlend, 0.0f, 0.99f);
-        GatherUniformData.HitDepthThickness = 25.0f;
         GatherUniformData.FrameNumber = UniformData.FrameNumber;
-        const Vector SkyColor = Vector(0.02f, 0.03f, 0.05f) + gOptions.DirectionalLightColor * 0.08f;
-        const Vector SunDirection = gOptions.DefaultSunDir.GetNormalize();
-        GatherUniformData.SkyColor = { Max(0.0f, SkyColor.x), Max(0.0f, SkyColor.y), Max(0.0f, SkyColor.z), 1.0f };
-        GatherUniformData.SunDirectionAndIntensity = {
-            SunDirection.x,
-            SunDirection.y,
-            SunDirection.z,
-            Max(0.0f, gOptions.DirectionalLightIntensity * 0.05f)
-        };
-        GatherUniformData.SunColor = {
-            Max(0.0f, gOptions.DirectionalLightColor.x),
-            Max(0.0f, gOptions.DirectionalLightColor.y),
-            Max(0.0f, gOptions.DirectionalLightColor.z),
-            1.0f
-        };
 
         auto GatherUniformBuffer = std::shared_ptr<IUniformBufferBlock>(
             g_rhi->CreateUniformBufferBlock(jNameStatic("SurfelGIInlineRayGatherUniformBuffer"), jLifeTimeType::OneFrame, sizeof(GatherUniformData)));
@@ -1413,69 +1759,10 @@ void jRenderer::SurfelGIPass()
         g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelPoolBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
         g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelIrradianceBuffer.get(), EResourceLayout::UAV);
 
-        jShaderBindingArray IrradianceGatherBindingArray;
-        jShaderBindingResourceInlineAllocator IrradianceGatherResourceAllocator;
-        int32 IrradianceGatherBindingPoint = 0;
-        IrradianceGatherBindingArray.Add(jShaderBinding::Create(IrradianceGatherBindingPoint++, 1, EShaderBindingType::ACCELERATION_STRUCTURE_SRV, EShaderAccessStageFlag::COMPUTE,
-            IrradianceGatherResourceAllocator.Alloc<jBufferResource>(RenderFrameContextPtr->RaytracingScene->TLASBufferPtr.get()), true));
-        IrradianceGatherBindingArray.Add(jShaderBinding::Create(IrradianceGatherBindingPoint++, 1, EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::COMPUTE,
-            IrradianceGatherResourceAllocator.Alloc<jBufferResource>(GSurfelGIActiveIndexBuffer.get())));
-        IrradianceGatherBindingArray.Add(jShaderBinding::Create(IrradianceGatherBindingPoint++, 1, EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::COMPUTE,
-            IrradianceGatherResourceAllocator.Alloc<jBufferResource>(GSurfelGIActiveCounterBuffer.get())));
-        IrradianceGatherBindingArray.Add(jShaderBinding::Create(IrradianceGatherBindingPoint++, 1, EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::COMPUTE,
-            IrradianceGatherResourceAllocator.Alloc<jBufferResource>(GSurfelPoolBuffer.get())));
-        IrradianceGatherBindingArray.Add(jShaderBinding::Create(IrradianceGatherBindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE,
-            IrradianceGatherResourceAllocator.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), SamplerState)));
-        IrradianceGatherBindingArray.Add(jShaderBinding::Create(IrradianceGatherBindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE,
-            IrradianceGatherResourceAllocator.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::NORMAL)->GetTexture(), SamplerState)));
-        IrradianceGatherBindingArray.Add(jShaderBinding::Create(IrradianceGatherBindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE,
-            IrradianceGatherResourceAllocator.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::ALBEDO)->GetTexture(), SamplerState)));
-        IrradianceGatherBindingArray.Add(jShaderBinding::Create(IrradianceGatherBindingPoint++, 1, EShaderBindingType::BUFFER_UAV, EShaderAccessStageFlag::COMPUTE,
-            IrradianceGatherResourceAllocator.Alloc<jBufferResource>(GSurfelIrradianceBuffer.get())));
-        IrradianceGatherBindingArray.Add(jShaderBinding::Create(IrradianceGatherBindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE,
-            IrradianceGatherResourceAllocator.Alloc<jUniformBufferResource>(GatherUniformBuffer.get()), true));
-
-        auto IrradianceGatherBindingInstance = g_rhi->CreateShaderBindingInstance(IrradianceGatherBindingArray, jShaderBindingInstanceType::SingleFrame);
-
-        jShaderInfo IrradianceGatherShaderInfo;
-        IrradianceGatherShaderInfo.SetName(jNameStatic("SurfelGIGatherIrradianceInlineRay_CS"));
-        IrradianceGatherShaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/SurfelGIGatherIrradianceInlineRay_cs.hlsl"));
-        IrradianceGatherShaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
-        IrradianceGatherShaderInfo.SetEntryPoint(jNameStatic("main"));
-        jShader* IrradianceGatherShader = g_rhi->CreateShader(IrradianceGatherShaderInfo);
-
-        jShaderBindingLayoutArray IrradianceGatherLayoutArray;
-        IrradianceGatherLayoutArray.Add(IrradianceGatherBindingInstance->ShaderBindingsLayouts);
-        jPipelineStateInfo* IrradianceGatherPSO = g_rhi->CreateComputePipelineStateInfo(IrradianceGatherShader, IrradianceGatherLayoutArray, {});
-        IrradianceGatherPSO->Bind(RenderFrameContextPtr);
-
-        jShaderBindingInstanceArray IrradianceGatherInstanceArray;
-        IrradianceGatherInstanceArray.Add(IrradianceGatherBindingInstance.get());
-
-        jShaderBindingInstanceCombiner IrradianceGatherCombiner;
-        IrradianceGatherCombiner.ShaderBindingInstanceArray = &IrradianceGatherInstanceArray;
-        IrradianceGatherCombiner.DescriptorSetHandles.Add(IrradianceGatherBindingInstance->GetHandle());
-        if (const std::vector<uint32>* DynamicOffsets = IrradianceGatherBindingInstance->GetDynamicOffsets())
         {
-            if (!DynamicOffsets->empty())
-            {
-                IrradianceGatherCombiner.DynamicOffsets.Add((void*)DynamicOffsets->data(), (int32)DynamicOffsets->size());
-            }
-        }
-
-        g_rhi->BindComputeShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), IrradianceGatherPSO, IrradianceGatherCombiner, 0);
-        DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "SurfelGI GatherIrradiance InlineRay", Vector4(0.2f, 0.65f, 0.95f, 1.0f));
-        SCOPE_GPU_PROFILE(RenderFrameContextPtr, SurfelGI_DispatchGatherIrradianceInlineRay);
-        const jName RHIName = g_rhi->GetRHIName();
-        const bool SupportsComputeIndirectDispatch = (RHIName == jNameStatic("Vulkan")) || (RHIName == jNameStatic("DirectX12"));
-        if (SupportsComputeIndirectDispatch)
-        {
-            g_rhi->DispatchComputeIndirect(RenderFrameContextPtr, GSurfelGIInlineRayDispatchArgsBuffer.get(), 0);
-        }
-        else
-        {
-            const int32 FallbackGatherGroupX = (Max(1, GSurfelGIActiveIndexCapacity) + 63) / 64;
-            g_rhi->DispatchCompute(RenderFrameContextPtr, Max(1, FallbackGatherGroupX), 1, 1);
+            DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "SurfelGI GatherIrradiance HWRTDI", Vector4(0.2f, 0.65f, 0.95f, 1.0f));
+            SCOPE_GPU_PROFILE(RenderFrameContextPtr, SurfelGI_DispatchGatherIrradianceInlineRay);
+            DispatchSurfelGIHWRTDIGather(RenderFrameContextPtr, MainCamera, GatherUniformBuffer);
         }
 
         g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelIrradianceBuffer.get());

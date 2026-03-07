@@ -268,8 +268,8 @@ void IRenderer::UIPass()
 		ImGui::SetNextWindowPos(ImVec2(27.0f, 27.0f), ImGuiCond_FirstUseEver);
 		ImGui::SetNextWindowSize(ImVec2(350.0f, 682.0f), ImGuiCond_FirstUseEver);
 		ImGui::Begin(szTitle);
-        static bool bSelectHWRTTabByDefault = true;
-        static bool bSelectSurfelGITabByDefault = false;
+        static bool bSelectHWRTTabByDefault = false;
+        static bool bSelectSurfelGITabByDefault = true;
 			
 		if (ImGui::BeginTabBar("RHI"))
 		{
@@ -650,7 +650,7 @@ void IRenderer::UIPass()
                     DrawSliderFloat60_40("Stale Age Divisor", &gOptions.SurfelGIStaleAgeDivisor, 1.0f, 24.0f);
 
                     ImGui::Separator();
-                    ImGui::TextColored(ImVec4(1, 1, 0, 1), "Inline Ray Gather");
+                    ImGui::TextColored(ImVec4(1, 1, 0, 1), "Inline Ray Gather (HWRT DI)");
                     ImGui::Checkbox("Enable Inline Ray Gather", &gOptions.SurfelGIInlineRayEnable);
                     if (gOptions.SurfelGIInlineRayEnable)
                     {

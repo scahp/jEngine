@@ -7,18 +7,18 @@ struct SceneConstantBuffer
     float4x4 projectionToWorld;
     float3 cameraPosition;
     float normalBias;
-    uint numDirectionalLights;
-    uint numPointLights;
-    uint numSpotLights;
+    uint numLights;
     uint debugViewMode;
+    uint forceMipLevel0;
+    uint renderWidth;
     float debugLineWidth;
     float debugUVScale;
     float debugPrimitiveIDScale;
-    uint forceMipLevel0;
     float shadowRayStartOffset;
-    uint renderWidth;
     uint renderHeight;
     float padding0;
+    float padding1;
+    float padding2;
 };
 
 struct MaterialInstanceUniform
@@ -62,9 +62,20 @@ Texture2D RMTextureArray[] : register(t0, space8);
 SamplerState AlbedoSamplerArray[] : register(s0, space9);
 SamplerState NormalSamplerArray[] : register(s0, space10);
 SamplerState RMSamplerArray[] : register(s0, space11);
-ConstantBuffer<jDirectionalLightUniformBuffer> DirectionalLightArray[] : register(b0, space12);
-ConstantBuffer<jPointLightUniformBufferData> PointLightArray[] : register(b0, space13);
-ConstantBuffer<jSpotLightUniformBufferData> SpotLightArray[] : register(b0, space14);
+
+struct HWRTDILightData
+{
+    float4 ColorAndType;               // rgb: color, w: ELightType (1: directional, 2: point, 3: spot)
+    float4 PositionAndMaxDistance;     // xyz: position, w: max distance
+    float4 DirectionAndPenumbra;       // xyz: direction, w: penumbra radian
+    float4 UmbraAndPadding;            // x: umbra radian
+};
+
+StructuredBuffer<HWRTDILightData> LightBuffer : register(t5, space0);
+
+static const uint HWRTDI_LightType_Directional = 1u;
+static const uint HWRTDI_LightType_Point = 2u;
+static const uint HWRTDI_LightType_Spot = 3u;
 
 typedef BuiltInTriangleIntersectionAttributes MyAttributes;
 
@@ -523,79 +534,76 @@ bool TraceShadowRay(in float3 Origin, in float3 Direction, in float TMax)
     return (ShadowRayQuery.CommittedStatus() == COMMITTED_NOTHING);
 }
 
-float3 EvaluateDirectionalLights(in SurfaceData Surface, in float3 ViewDir)
+float3 EvaluateUnifiedLights(in SurfaceData Surface, in float3 ViewDir)
 {
     float3 Result = 0.0;
-    for (uint i = 0; i < g_sceneCB.numDirectionalLights; ++i)
+    const uint NumLights = g_sceneCB.numLights;
+    for (uint i = 0; i < NumLights; ++i)
     {
-        const jDirectionalLightUniformBuffer Light = DirectionalLightArray[i];
-        const float3 L = normalize(-Light.Direction);
-        const float NdotL = saturate(dot(Surface.WorldNormal, L));
-        if (NdotL <= 0.0)
-            continue;
+        const HWRTDILightData Light = LightBuffer[i];
+        const uint LightType = (uint)round(Light.ColorAndType.w);
+        const float3 LightColor = Light.ColorAndType.xyz;
 
-        const float3 ShadowOrigin = Surface.WorldPos + Surface.WorldNormal * g_sceneCB.normalBias;
-        if (!TraceShadowRay(ShadowOrigin, L, 100000.0))
-            continue;
+        if (LightType == HWRTDI_LightType_Directional)
+        {
+            const float3 L = normalize(-Light.DirectionAndPenumbra.xyz);
+            const float NdotL = saturate(dot(Surface.WorldNormal, L));
+            if (NdotL <= 0.0)
+                continue;
 
-        Result += PBR(L, Surface.WorldNormal, ViewDir, Surface.Albedo, Light.Color, 1.0, Surface.Metallic, Surface.Roughness);
-    }
-    return Result;
-}
+            const float3 ShadowOrigin = Surface.WorldPos + Surface.WorldNormal * g_sceneCB.normalBias;
+            if (!TraceShadowRay(ShadowOrigin, L, 100000.0))
+                continue;
 
-float3 EvaluatePointLights(in SurfaceData Surface, in float3 ViewDir)
-{
-    float3 Result = 0.0;
-    for (uint i = 0; i < g_sceneCB.numPointLights; ++i)
-    {
-        const jPointLightUniformBufferData Light = PointLightArray[i];
-        float3 ToLight = Light.Position - Surface.WorldPos;
-        const float DistanceToLight = length(ToLight);
-        if (DistanceToLight <= 0.001 || DistanceToLight > Light.MaxDistance)
-            continue;
+            Result += PBR(L, Surface.WorldNormal, ViewDir, Surface.Albedo, LightColor, 1.0, Surface.Metallic, Surface.Roughness);
+        }
+        else if (LightType == HWRTDI_LightType_Point)
+        {
+            float3 ToLight = Light.PositionAndMaxDistance.xyz - Surface.WorldPos;
+            const float DistanceToLight = length(ToLight);
+            const float MaxDistance = max(Light.PositionAndMaxDistance.w, 0.001);
+            if (DistanceToLight <= 0.001 || DistanceToLight > MaxDistance)
+                continue;
 
-        const float3 L = ToLight / DistanceToLight;
-        const float NdotL = saturate(dot(Surface.WorldNormal, L));
-        if (NdotL <= 0.0)
-            continue;
+            const float3 L = ToLight / DistanceToLight;
+            const float NdotL = saturate(dot(Surface.WorldNormal, L));
+            if (NdotL <= 0.0)
+                continue;
 
-        const float3 ShadowOrigin = Surface.WorldPos + Surface.WorldNormal * g_sceneCB.normalBias;
-        if (!TraceShadowRay(ShadowOrigin, L, DistanceToLight - g_sceneCB.normalBias))
-            continue;
+            const float3 ShadowOrigin = Surface.WorldPos + Surface.WorldNormal * g_sceneCB.normalBias;
+            if (!TraceShadowRay(ShadowOrigin, L, DistanceToLight - g_sceneCB.normalBias))
+                continue;
 
-        const float Attenuation = DistanceAttenuation2(DistanceToLight * DistanceToLight, 1.0 / Light.MaxDistance);
-        Result += PBR(L, Surface.WorldNormal, ViewDir, Surface.Albedo, Light.Color, DistanceToLight, Surface.Metallic, Surface.Roughness) * Attenuation;
-    }
-    return Result;
-}
+            const float Attenuation = DistanceAttenuation2(DistanceToLight * DistanceToLight, 1.0 / MaxDistance);
+            Result += PBR(L, Surface.WorldNormal, ViewDir, Surface.Albedo, LightColor, DistanceToLight, Surface.Metallic, Surface.Roughness) * Attenuation;
+        }
+        else if (LightType == HWRTDI_LightType_Spot)
+        {
+            float3 ToLight = Light.PositionAndMaxDistance.xyz - Surface.WorldPos;
+            const float DistanceToLight = length(ToLight);
+            const float MaxDistance = max(Light.PositionAndMaxDistance.w, 0.001);
+            if (DistanceToLight <= 0.001 || DistanceToLight > MaxDistance)
+                continue;
 
-float3 EvaluateSpotLights(in SurfaceData Surface, in float3 ViewDir)
-{
-    float3 Result = 0.0;
-    for (uint i = 0; i < g_sceneCB.numSpotLights; ++i)
-    {
-        const jSpotLightUniformBufferData Light = SpotLightArray[i];
-        float3 ToLight = Light.Position - Surface.WorldPos;
-        const float DistanceToLight = length(ToLight);
-        if (DistanceToLight <= 0.001 || DistanceToLight > Light.MaxDistance)
-            continue;
+            const float3 L = ToLight / DistanceToLight;
+            const float NdotL = saturate(dot(Surface.WorldNormal, L));
+            if (NdotL <= 0.0)
+                continue;
 
-        const float3 L = ToLight / DistanceToLight;
-        const float NdotL = saturate(dot(Surface.WorldNormal, L));
-        if (NdotL <= 0.0)
-            continue;
+            const float Penumbra = Light.DirectionAndPenumbra.w;
+            const float Umbra = Light.UmbraAndPadding.x;
+            const float LightRadian = acos(saturate(dot(L, -Light.DirectionAndPenumbra.xyz)));
+            const float Attenuation = DistanceAttenuation2(DistanceToLight * DistanceToLight, 1.0 / MaxDistance)
+                * DiretionalFalloff(LightRadian, Penumbra, Umbra);
+            if (Attenuation <= 0.0)
+                continue;
 
-        const float LightRadian = acos(saturate(dot(L, -Light.Direction)));
-        const float Attenuation = DistanceAttenuation2(DistanceToLight * DistanceToLight, 1.0 / Light.MaxDistance)
-            * DiretionalFalloff(LightRadian, Light.PenumbraRadian, Light.UmbraRadian);
-        if (Attenuation <= 0.0)
-            continue;
+            const float3 ShadowOrigin = Surface.WorldPos + Surface.WorldNormal * g_sceneCB.normalBias;
+            if (!TraceShadowRay(ShadowOrigin, L, DistanceToLight - g_sceneCB.normalBias))
+                continue;
 
-        const float3 ShadowOrigin = Surface.WorldPos + Surface.WorldNormal * g_sceneCB.normalBias;
-        if (!TraceShadowRay(ShadowOrigin, L, DistanceToLight - g_sceneCB.normalBias))
-            continue;
-
-        Result += PBR(L, Surface.WorldNormal, ViewDir, Surface.Albedo, Light.Color, DistanceToLight, Surface.Metallic, Surface.Roughness) * Attenuation;
+            Result += PBR(L, Surface.WorldNormal, ViewDir, Surface.Albedo, LightColor, DistanceToLight, Surface.Metallic, Surface.Roughness) * Attenuation;
+        }
     }
     return Result;
 }
@@ -612,20 +620,23 @@ void GenerateCameraRay(in uint2 Index, in uint2 RenderDimensions, out float3 Ori
     Direction = normalize(World.xyz - Origin);
 }
 
-float3 EvaluateSurfaceRadiance(in SurfaceData Surface, in MyAttributes Attr)
+float3 EvaluateSurfaceRadianceFromViewPosition(in SurfaceData Surface, in MyAttributes Attr, in float3 ViewPosition)
 {
     if (g_sceneCB.debugViewMode != 0u)
     {
         return EvaluateDebugViewColor(Surface, Attr);
     }
 
-    const float3 ViewDir = normalize(g_sceneCB.cameraPosition - Surface.WorldPos);
+    const float3 ViewDir = normalize(ViewPosition - Surface.WorldPos);
 
     float3 Radiance = 0.0;
-    Radiance += EvaluateDirectionalLights(Surface, ViewDir);
-    Radiance += EvaluatePointLights(Surface, ViewDir);
-    Radiance += EvaluateSpotLights(Surface, ViewDir);
+    Radiance += EvaluateUnifiedLights(Surface, ViewDir);
     return Radiance;
+}
+
+float3 EvaluateSurfaceRadiance(in SurfaceData Surface, in MyAttributes Attr)
+{
+    return EvaluateSurfaceRadianceFromViewPosition(Surface, Attr, g_sceneCB.cameraPosition);
 }
 
 [numthreads(8, 8, 1)]
@@ -735,4 +746,137 @@ void PrimaryMissShader(inout RayPayload Payload)
 void ShadowMissShader(inout RayPayload Payload)
 {
     Payload.Visibility = 1;
+}
+
+struct SurfelGIData
+{
+    float4 PositionRadius;
+    float4 NormalSeenFrame;
+    float4 AlbedoWeight;
+    float4 Extra;
+};
+
+struct SurfelGIIrradianceData
+{
+    float4 IrradianceAndWeight;
+};
+
+struct SurfelGIActiveCounter
+{
+    uint Count;
+    uint3 Padding;
+};
+
+struct SurfelGIGatherUniformBuffer
+{
+    uint MaxSurfels;
+    uint RayCount;
+    float MaxRayDistance;
+    float NormalBias;
+    float HistoryBlend;
+    int FrameNumber;
+    uint Padding0;
+    uint Padding1;
+};
+
+StructuredBuffer<uint> SurfelGIActiveSurfelIndexBuffer : register(t0, space12);
+StructuredBuffer<SurfelGIActiveCounter> SurfelGIActiveSurfelCounterBuffer : register(t1, space12);
+StructuredBuffer<SurfelGIData> SurfelGIPool : register(t2, space12);
+RWStructuredBuffer<SurfelGIIrradianceData> SurfelGIIrradianceBuffer : register(u3, space12);
+ConstantBuffer<SurfelGIGatherUniformBuffer> g_surfelGatherCB : register(b4, space12);
+
+uint InitSurfelGatherSeed(uint SurfelIndex, uint FrameNumber)
+{
+    uint Seed = SurfelIndex * 747796405u + FrameNumber * 2891336453u + 277803737u;
+    RandomHash(Seed);
+    return Seed;
+}
+
+float3 EvaluateSurfelGatherMissRadiance(in float3 WorldDir)
+{
+    return EnvTexture.SampleLevel(DefaultSamplerState, normalize(WorldDir), 0.0).rgb;
+}
+
+[numthreads(64, 1, 1)]
+void SurfelGIGatherIrradianceHWRT_CS(uint3 DispatchThreadID : SV_DispatchThreadID)
+{
+    const uint ActiveSurfelLinearIndex = DispatchThreadID.x;
+    const uint ActiveSurfelCount = SurfelGIActiveSurfelCounterBuffer[0].Count;
+    if (ActiveSurfelLinearIndex >= ActiveSurfelCount)
+        return;
+
+    const uint SurfelIndex = SurfelGIActiveSurfelIndexBuffer[ActiveSurfelLinearIndex];
+    if (SurfelIndex >= max(g_surfelGatherCB.MaxSurfels, 1u))
+        return;
+
+    const SurfelGIData Surfel = SurfelGIPool[SurfelIndex];
+    float3 ReceiverNormal = Surfel.NormalSeenFrame.xyz;
+    const float ReceiverNormalLenSq = dot(ReceiverNormal, ReceiverNormal);
+    if (ReceiverNormalLenSq <= 1e-6)
+        return;
+    ReceiverNormal *= rsqrt(ReceiverNormalLenSq);
+
+    const float3 ReceiverWorldPos = Surfel.PositionRadius.xyz;
+    const uint RayCount = max(g_surfelGatherCB.RayCount, 1u);
+    const float OriginBias = max(g_surfelGatherCB.NormalBias, 0.001);
+    const float TMin = max(OriginBias * 0.25, 0.001);
+    const float TMax = max(g_surfelGatherCB.MaxRayDistance, TMin + 0.001);
+    const float3 RayOrigin = ReceiverWorldPos + ReceiverNormal * OriginBias;
+
+    uint Seed = InitSurfelGatherSeed(SurfelIndex, (uint)max(g_surfelGatherCB.FrameNumber, 0));
+    float3 AccumulatedLi = 0.0;
+
+    [loop] for (uint RayIndex = 0u; RayIndex < RayCount; ++RayIndex)
+    {
+        const float3 LocalDir = CosWeightedSampleHemisphere(Seed);
+        const float3 WorldDir = normalize(ToWorld(ReceiverNormal, LocalDir));
+
+        RayDesc Ray;
+        Ray.Origin = RayOrigin;
+        Ray.Direction = WorldDir;
+        Ray.TMin = TMin;
+        Ray.TMax = TMax;
+
+        RayQuery<RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH> GatherRayQuery;
+        GatherRayQuery.TraceRayInline(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, HWRTDI_RAY_MASK_SCENE, Ray);
+        while (GatherRayQuery.Proceed())
+        {
+            if (GatherRayQuery.CandidateType() == CANDIDATE_NON_OPAQUE_TRIANGLE)
+            {
+                const uint CandidateInstanceIdx = GatherRayQuery.CandidateInstanceIndex();
+                const uint CandidatePrimitiveIdx = GatherRayQuery.CandidatePrimitiveIndex();
+                const float2 CandidateBarycentrics = GatherRayQuery.CandidateTriangleBarycentrics();
+                if (IsRayHitRejectedByMaterial(CandidateInstanceIdx, CandidatePrimitiveIdx, CandidateBarycentrics))
+                    continue;
+
+                GatherRayQuery.CommitNonOpaqueTriangleHit();
+            }
+        }
+
+        const uint CommittedStatus = GatherRayQuery.CommittedStatus();
+        if (CommittedStatus == COMMITTED_TRIANGLE_HIT)
+        {
+            const uint InstanceIdx = GatherRayQuery.CommittedInstanceIndex();
+            const uint PrimitiveIdx = GatherRayQuery.CommittedPrimitiveIndex();
+            const float2 Barycentrics = GatherRayQuery.CommittedTriangleBarycentrics();
+            const float HitRayT = GatherRayQuery.CommittedRayT();
+            const float3 HitWorldPos = RayOrigin + WorldDir * HitRayT;
+            const MyAttributes Attr = MakeAttributesFromBarycentrics(Barycentrics);
+            const SurfaceData Surface = GetSurfaceDataInternal(InstanceIdx, PrimitiveIdx, Attr, HitWorldPos);
+            AccumulatedLi += EvaluateSurfaceRadianceFromViewPosition(Surface, Attr, ReceiverWorldPos);
+        }
+        else
+        {
+            AccumulatedLi += EvaluateSurfelGatherMissRadiance(WorldDir);
+        }
+    }
+
+    const float3 CurrentIrradiance = PI * (AccumulatedLi / (float)RayCount);
+    const SurfelGIIrradianceData Prev = SurfelGIIrradianceBuffer[SurfelIndex];
+    const float HistoryBlend = saturate(g_surfelGatherCB.HistoryBlend);
+
+    SurfelGIIrradianceData OutData;
+    OutData.IrradianceAndWeight.xyz = lerp(CurrentIrradiance, Prev.IrradianceAndWeight.xyz, HistoryBlend);
+    OutData.IrradianceAndWeight.w = max(0.0, lerp((float)RayCount, Prev.IrradianceAndWeight.w, HistoryBlend));
+    SurfelGIIrradianceBuffer[SurfelIndex] = OutData;
 }

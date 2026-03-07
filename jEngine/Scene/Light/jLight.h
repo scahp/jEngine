@@ -12,6 +12,15 @@ enum class ELightType
 	MAX
 };
 
+struct alignas(16) jHWRTDIPackedLight
+{
+    Vector4 ColorAndType = Vector4(0.0f, 0.0f, 0.0f, -1.0f);            // xyz: color, w: ELightType
+    Vector4 PositionAndMaxDistance = Vector4(0.0f, 0.0f, 0.0f, 0.0f);   // xyz: position, w: max distance
+    Vector4 DirectionAndPenumbra = Vector4(0.0f, -1.0f, 0.0f, 0.0f);    // xyz: direction, w: penumbra
+    Vector4 UmbraAndPadding = Vector4(0.0f, 0.0f, 0.0f, 0.0f);          // x: umbra
+};
+static_assert((sizeof(jHWRTDIPackedLight) % 16) == 0, "jHWRTDIPackedLight size must be 16-byte aligned");
+
 struct jShader;
 struct jTexture;
 class jCamera;

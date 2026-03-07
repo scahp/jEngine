@@ -23,18 +23,18 @@ namespace
         Matrix ProjectionToWorld;
         Vector CameraPosition;
         float NormalBias = 0.1f;
-        uint32 NumDirectionalLights = 0;
-        uint32 NumPointLights = 0;
-        uint32 NumSpotLights = 0;
+        uint32 NumLights = 0;
         uint32 DebugViewMode = 0;
+        uint32 ForceMipLevel0 = 0;
+        uint32 RenderWidth = 0;
         float DebugLineWidth = 0.02f;
         float DebugUVScale = 16.0f;
         float DebugPrimitiveIDScale = 1.0f;
-        uint32 ForceMipLevel0 = 0;
         float ShadowRayStartOffset = 0.001f;
-        uint32 RenderWidth = 0;
         uint32 RenderHeight = 0;
         float Padding0 = 0.0f;
+        float Padding1 = 0.0f;
+        float Padding2 = 0.0f;
     };
 
     struct jHWRTDIMaterialInstanceUniform
@@ -247,10 +247,9 @@ namespace
         std::vector<const jSamplerStateInfo*> AlbedoSamplerStates;
         std::vector<const jSamplerStateInfo*> NormalSamplerStates;
         std::vector<const jSamplerStateInfo*> RMSamplerStates;
-        std::vector<const IUniformBufferBlock*> DirectionalLightBuffers;
-        std::vector<const IUniformBufferBlock*> PointLightBuffers;
-        std::vector<const IUniformBufferBlock*> SpotLightBuffers;
+        std::vector<jHWRTDIPackedLight> PackedLights;
         std::vector<std::shared_ptr<IUniformBufferBlock>> RefCountMaintainer;
+        std::shared_ptr<jBuffer> PackedLightBuffer;
 
         const auto CreateOneFrameUniformBuffer = [&](jName Name, const void* Data, uint32 Size)
         {
@@ -271,6 +270,7 @@ namespace
         AlbedoSamplerStates.reserve(RaytracingScene->InstanceList.size());
         NormalSamplerStates.reserve(RaytracingScene->InstanceList.size());
         RMSamplerStates.reserve(RaytracingScene->InstanceList.size());
+        PackedLights.reserve(jLight::GetLights().size());
 
         std::unordered_map<const jSamplerStateInfo*, uint32> AlbedoSamplerIndexMap;
         std::unordered_map<const jSamplerStateInfo*, uint32> NormalSamplerIndexMap;
@@ -347,9 +347,6 @@ namespace
             RMTextures.push_back({ Material->GetTexture(jMaterial::EMaterialTextureType::Metallic), nullptr, 0 });
         }
 
-        uint32 NumDirectionalLights = 0;
-        uint32 NumPointLights = 0;
-        uint32 NumSpotLights = 0;
         for (jLight* Light : jLight::GetLights())
         {
             if (!Light)
@@ -360,54 +357,51 @@ namespace
             case ELightType::DIRECTIONAL:
             {
                 const auto* DirectionalLight = static_cast<jDirectionalLight*>(Light);
-                auto UniformBuffer = CreateOneFrameUniformBuffer(jNameStatic("HWRTDI_DirectionalLight"), &DirectionalLight->GetLightData(), sizeof(jDirectionalLightUniformBufferData));
-                DirectionalLightBuffers.push_back(UniformBuffer.get());
-                ++NumDirectionalLights;
+                const jDirectionalLightUniformBufferData& LightData = DirectionalLight->GetLightData();
+                jHWRTDIPackedLight PackedLight;
+                PackedLight.ColorAndType = Vector4(LightData.Color.x, LightData.Color.y, LightData.Color.z, (float)static_cast<uint32>(ELightType::DIRECTIONAL));
+                PackedLight.DirectionAndPenumbra = Vector4(LightData.Direction.x, LightData.Direction.y, LightData.Direction.z, 0.0f);
+                PackedLights.push_back(PackedLight);
                 break;
             }
             case ELightType::POINT:
             {
                 const auto* PointLight = static_cast<jPointLight*>(Light);
-                auto UniformBuffer = CreateOneFrameUniformBuffer(jNameStatic("HWRTDI_PointLight"), &PointLight->GetLightData(), sizeof(jPointLightUniformBufferData));
-                PointLightBuffers.push_back(UniformBuffer.get());
-                ++NumPointLights;
+                const jPointLightUniformBufferData& LightData = PointLight->GetLightData();
+                jHWRTDIPackedLight PackedLight;
+                PackedLight.ColorAndType = Vector4(LightData.Color.x, LightData.Color.y, LightData.Color.z, (float)static_cast<uint32>(ELightType::POINT));
+                PackedLight.PositionAndMaxDistance = Vector4(LightData.Position.x, LightData.Position.y, LightData.Position.z, LightData.MaxDistance);
+                PackedLights.push_back(PackedLight);
                 break;
             }
             case ELightType::SPOT:
             {
                 const auto* SpotLight = static_cast<jSpotLight*>(Light);
-                auto UniformBuffer = CreateOneFrameUniformBuffer(jNameStatic("HWRTDI_SpotLight"), &SpotLight->GetLightData(), sizeof(jSpotLightUniformBufferData));
-                SpotLightBuffers.push_back(UniformBuffer.get());
-                ++NumSpotLights;
+                const jSpotLightUniformBufferData& LightData = SpotLight->GetLightData();
+                jHWRTDIPackedLight PackedLight;
+                PackedLight.ColorAndType = Vector4(LightData.Color.x, LightData.Color.y, LightData.Color.z, (float)static_cast<uint32>(ELightType::SPOT));
+                PackedLight.PositionAndMaxDistance = Vector4(LightData.Position.x, LightData.Position.y, LightData.Position.z, LightData.MaxDistance);
+                PackedLight.DirectionAndPenumbra = Vector4(LightData.Direction.x, LightData.Direction.y, LightData.Direction.z, LightData.PenumbraRadian);
+                PackedLight.UmbraAndPadding = Vector4(LightData.UmbraRadian, 0.0f, 0.0f, 0.0f);
+                PackedLights.push_back(PackedLight);
                 break;
             }
             default:
                 break;
             }
         }
+        const uint32 NumPackedLights = (uint32)PackedLights.size();
+        if (PackedLights.empty())
+        {
+            PackedLights.push_back(jHWRTDIPackedLight());
+        }
+        const uint32 PackedLightCount = (uint32)PackedLights.size();
+        const uint64 PackedLightBufferSize = (uint64)sizeof(jHWRTDIPackedLight) * (uint64)PackedLightCount;
+        PackedLightBuffer = g_rhi->CreateStructuredBuffer(PackedLightBufferSize, 0, sizeof(jHWRTDIPackedLight), EBufferCreateFlag::UAV
+            , EResourceLayout::GENERAL, PackedLights.data(), PackedLightBufferSize, jNameStatic("HWRTDI_PackedLightBuffer"));
+        check(PackedLightBuffer);
 
-        if (DirectionalLightBuffers.empty())
-        {
-            const jDirectionalLightUniformBufferData DummyLightData = {};
-            auto UniformBuffer = CreateOneFrameUniformBuffer(jNameStatic("HWRTDI_DirectionalLightDummy"), &DummyLightData, sizeof(DummyLightData));
-            DirectionalLightBuffers.push_back(UniformBuffer.get());
-        }
-        if (PointLightBuffers.empty())
-        {
-            const jPointLightUniformBufferData DummyLightData = {};
-            auto UniformBuffer = CreateOneFrameUniformBuffer(jNameStatic("HWRTDI_PointLightDummy"), &DummyLightData, sizeof(DummyLightData));
-            PointLightBuffers.push_back(UniformBuffer.get());
-        }
-        if (SpotLightBuffers.empty())
-        {
-            const jSpotLightUniformBufferData DummyLightData = {};
-            auto UniformBuffer = CreateOneFrameUniformBuffer(jNameStatic("HWRTDI_SpotLightDummy"), &DummyLightData, sizeof(DummyLightData));
-            SpotLightBuffers.push_back(UniformBuffer.get());
-        }
-
-        SceneCB.NumDirectionalLights = NumDirectionalLights;
-        SceneCB.NumPointLights = NumPointLights;
-        SceneCB.NumSpotLights = NumSpotLights;
+        SceneCB.NumLights = NumPackedLights;
 
         auto SceneUniformBuffer = CreateOneFrameUniformBuffer(jNameStatic("HWRTDI_SceneData"), &SceneCB, sizeof(SceneCB));
         ShaderBindingArray.Add(jShaderBinding::Create(2, 1, EShaderBindingType::UNIFORMBUFFER, BindingShaderStageFlag
@@ -422,10 +416,12 @@ namespace
         jTexture* EnvTexture = jSceneRenderTarget::CubeEnvMap2 ? jSceneRenderTarget::CubeEnvMap2 : GWhiteCubeTexture.get();
         ShaderBindingArray.Add(jShaderBinding::Create(4, 1, EShaderBindingType::TEXTURE_SRV, BindingShaderStageFlag
             , ResourceInlineAllocator.Alloc<jTextureResource>(EnvTexture, nullptr)));
+        ShaderBindingArray.Add(jShaderBinding::Create(5, 1, EShaderBindingType::BUFFER_SRV, BindingShaderStageFlag
+            , ResourceInlineAllocator.Alloc<jBufferResource>(PackedLightBuffer.get())));
 
         std::shared_ptr<jShaderBindingInstance> GlobalShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
 
-        jShaderBindingArray BindlessShaderBindingArray[14];
+        jShaderBindingArray BindlessShaderBindingArray[11];
         BindlessShaderBindingArray[0].Add(jShaderBinding::CreateBindless(0, (uint32)VertexAndIndexOffsetBuffers.size(), EShaderBindingType::BUFFER_SRV, BindingShaderStageFlag
             , ResourceInlineAllocator.Alloc<jBufferResourceBindless>(VertexAndIndexOffsetBuffers), false));
         BindlessShaderBindingArray[1].Add(jShaderBinding::CreateBindless(0, (uint32)IndexBuffers.size(), EShaderBindingType::BUFFER_SRV, BindingShaderStageFlag
@@ -448,12 +444,6 @@ namespace
             , ResourceInlineAllocator.Alloc<jSamplerResourceBindless>(NormalSamplerStates)));
         BindlessShaderBindingArray[10].Add(jShaderBinding::CreateBindless(0, (uint32)RMSamplerStates.size(), EShaderBindingType::SAMPLER, BindingShaderStageFlag
             , ResourceInlineAllocator.Alloc<jSamplerResourceBindless>(RMSamplerStates)));
-        BindlessShaderBindingArray[11].Add(jShaderBinding::CreateBindless(0, (uint32)DirectionalLightBuffers.size(), EShaderBindingType::UNIFORMBUFFER, BindingShaderStageFlag
-            , ResourceInlineAllocator.Alloc<jUniformBufferResourceBindless>(DirectionalLightBuffers)));
-        BindlessShaderBindingArray[12].Add(jShaderBinding::CreateBindless(0, (uint32)PointLightBuffers.size(), EShaderBindingType::UNIFORMBUFFER, BindingShaderStageFlag
-            , ResourceInlineAllocator.Alloc<jUniformBufferResourceBindless>(PointLightBuffers)));
-        BindlessShaderBindingArray[13].Add(jShaderBinding::CreateBindless(0, (uint32)SpotLightBuffers.size(), EShaderBindingType::UNIFORMBUFFER, BindingShaderStageFlag
-            , ResourceInlineAllocator.Alloc<jUniformBufferResourceBindless>(SpotLightBuffers)));
 
         std::shared_ptr<jShaderBindingInstance> GlobalShaderBindingInstanceBindless[_countof(BindlessShaderBindingArray)];
         for (int32 i = 0; i < _countof(BindlessShaderBindingArray); ++i)
@@ -487,6 +477,7 @@ namespace
         }
         ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
 
+        g_rhi->TransitionLayout(CmdBuffer, PackedLightBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
         g_rhi->TransitionLayout(CmdBuffer, HWRTDIOutput, EResourceLayout::UAV);
 
         if (InUseInlineRayQuery)
