@@ -6,6 +6,7 @@
 #include "assimp/postprocess.h"
 #include "assimp/scene.h"
 #include "assimp/Exporter.hpp"
+#include "assimp/GltfMaterial.h"
 #include "Scene/jMeshObject.h"
 #include "Math/Vector.h"
 #include "Scene/jRenderObject.h"
@@ -177,8 +178,42 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 				}
 				return ETextureAddressMode::REPEAT;
 			};
+            auto FuncTextureFilter = [](uint32 InFilter, bool InIsMinFilter)
+            {
+                switch (InFilter)
+                {
+                case 9728u: return ETextureFilter::NEAREST;                 // GL_NEAREST
+                case 9729u: return ETextureFilter::LINEAR;                  // GL_LINEAR
+                case 9984u: return ETextureFilter::NEAREST_MIPMAP_NEAREST;  // GL_NEAREST_MIPMAP_NEAREST
+                case 9985u: return ETextureFilter::LINEAR_MIPMAP_NEAREST;   // GL_LINEAR_MIPMAP_NEAREST
+                case 9986u: return ETextureFilter::NEAREST_MIPMAP_LINEAR;   // GL_NEAREST_MIPMAP_LINEAR
+                case 9987u: return ETextureFilter::LINEAR_MIPMAP_LINEAR;    // GL_LINEAR_MIPMAP_LINEAR
+                default:
+                    break;
+                }
+                return InIsMinFilter ? ETextureFilter::LINEAR_MIPMAP_LINEAR : ETextureFilter::LINEAR;
+            };
 			curTexData.TextureAddressModeU = FuncTextureAddressMode(mode[0]);
 			curTexData.TextureAddressModeV = FuncTextureAddressMode(mode[1]);
+
+            uint32 MinFilter = 0;
+            uint32 MagFilter = 0;
+#if defined(AI_MATKEY_GLTF_MAPPINGFILTER_MIN) && defined(AI_MATKEY_GLTF_MAPPINGFILTER_MAG)
+            if (material->Get(AI_MATKEY_GLTF_MAPPINGFILTER_MIN(curTexType, 0), MinFilter) == aiReturn_SUCCESS)
+            {
+                curTexData.MinificationFilter = FuncTextureFilter(MinFilter, true);
+            }
+            if (material->Get(AI_MATKEY_GLTF_MAPPINGFILTER_MAG(curTexType, 0), MagFilter) == aiReturn_SUCCESS)
+            {
+                curTexData.MagnificationFilter = FuncTextureFilter(MagFilter, false);
+            }
+#endif
+
+            ai_real Anisotropy = 1.0f;
+            if (material->Get(AI_MATKEY_ANISOTROPY_FACTOR, Anisotropy) == aiReturn_SUCCESS)
+            {
+                curTexData.MaxAnisotropy = (Anisotropy > 1.0f) ? (float)Anisotropy : 1.0f;
+            }
 
 			std::string FilePath;
 			if (materialRootDir)

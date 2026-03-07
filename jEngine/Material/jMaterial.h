@@ -3,6 +3,7 @@
 
 struct jTexture;
 struct jShaderBindingInstance;
+struct jSamplerStateInfo;
 
 struct jMaterialData
 {
@@ -38,6 +39,15 @@ public:
         jTexture* Texture = nullptr;
         ETextureAddressMode TextureAddressModeU = ETextureAddressMode::REPEAT;
         ETextureAddressMode TextureAddressModeV = ETextureAddressMode::REPEAT;
+        ETextureFilter MinificationFilter = ETextureFilter::LINEAR_MIPMAP_LINEAR;
+        ETextureFilter MagnificationFilter = ETextureFilter::LINEAR;
+        float MaxAnisotropy = 1.0f;
+        mutable jSamplerStateInfo* SamplerState = nullptr;
+        mutable ETextureAddressMode CachedSamplerAddressModeU = ETextureAddressMode::MAX;
+        mutable ETextureAddressMode CachedSamplerAddressModeV = ETextureAddressMode::MAX;
+        mutable ETextureFilter CachedMinificationFilter = ETextureFilter::MAX;
+        mutable ETextureFilter CachedMagnificationFilter = ETextureFilter::MAX;
+        mutable float CachedMaxAnisotropy = -1.0f;
 
         const jTexture* GetTexture() const
         {
@@ -51,6 +61,7 @@ public:
     jTexture* GetTexture(EMaterialTextureType InType) const;
     template <typename T> T* GetTexture(EMaterialTextureType InType) const { return (T*)(GetTexture(InType)); }
 
+    jSamplerStateInfo* GetTextureSamplerState(EMaterialTextureType InType) const;
     TextureData TexData[static_cast<int32>(EMaterialTextureType::Max)];
     
     // Material specific uniform buffer data which is depend on material what data was set.
