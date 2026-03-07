@@ -9,6 +9,7 @@ int32 gSelectedSceneIndex = 0;
 const char* GDenoisers[(int32)EDenoiser::MAX] = { "None", "Gaussian", "GaussianSeparable", "Bilateral", "BilateralPS", "A-Trous" };
 const char* GAOResolution[3] = { "100", "75", "50" };
 extern const char* GAOType[3] = { "NoAO", "RTAO", "SSAO" };
+const char* GHWRTDirectLightingModes[2] = { "DispatchRays", "Inline RayQuery" };
 const char* GHWRTDebugViewModes[14] = {
     "Shaded",
     "Triangle Edge",
@@ -27,6 +28,7 @@ const char* GHWRTDebugViewModes[14] = {
 };
 
 static_assert(_countof(GDenoisers) == (int32)EDenoiser::MAX, "EDenoiser count mismatch");
+static_assert(_countof(GHWRTDirectLightingModes) == 2, "GHWRTDirectLightingModes count mismatch");
 static_assert(_countof(GHWRTDebugViewModes) == 14, "GHWRTDebugViewModes count mismatch");
 
 jOptions gOptions;
@@ -43,6 +45,7 @@ jOptions::jOptions()
 	UseWaveIntrinsics = false;
 	UseDeferredRenderer = true;
 	UseHWRTDirectLighting = false;
+    HWRTDirectLightingMode = 0;
     HWRTDebugViewMode = 0;
     HWRTDebugLineWidth = 0.02f;
     HWRTDebugUVScale = 16.0f;

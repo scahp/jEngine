@@ -8,6 +8,13 @@
 #include "jBufferUtil_Vulkan.h"
 #include "jCommandBufferManager_Vulkan.h"
 #include "jOptions.h"
+#include "Material/jMaterial.h"
+
+namespace
+{
+    static constexpr uint8 HWRTDI_InstanceMask_Scene = 0x01;
+    static constexpr uint8 HWRTDI_InstanceMask_Sky = 0x02;
+}
 
 void jRaytracingScene_Vulkan::CreateOrUpdateBLAS(const jRatracingInitializer& InInitializer)
 {
@@ -53,9 +60,16 @@ void jRaytracingScene_Vulkan::CreateOrUpdateBLAS(const jRatracingInitializer& In
             , EResourceLayout::GENERAL, &VertexIndexOffset, sizeof(Vector2i), jNameStatic("VertexAndIndexOffsetBuffer"));
 
         // Set GeometryDesc
+        const jMaterial* Material = RObj->MaterialPtr.get();
+        const bool IsSkyMaterial = Material && Material->IsUseSphericalMap();
+        const bool UseAlphaCutout = !IsSkyMaterial
+            && Material
+            && Material->HasAlbedoTexture()
+            && Material->IsRaytracingAlphaTestEnabled();
+
         VkAccelerationStructureGeometryKHR geometry{};
         geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
-        geometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+        geometry.flags = UseAlphaCutout ? 0 : VK_GEOMETRY_OPAQUE_BIT_KHR;
         //geometry.flags = 0;
         geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
         geometry.geometry.triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
@@ -208,7 +222,9 @@ void jRaytracingScene_Vulkan::CreateOrUpdateTLAS(const jRatracingInitializer& In
 
         MappedPointer[i].instanceShaderBindingTableRecordOffset = RObj->RayTracingHitGroupIndex;
         MappedPointer[i].instanceCustomIndex = i;
-        MappedPointer[i].mask = 0xFF;
+        const jMaterial* Material = RObj->MaterialPtr.get();
+        const bool IsSkyMaterial = Material && Material->IsUseSphericalMap();
+        MappedPointer[i].mask = IsSkyMaterial ? HWRTDI_InstanceMask_Sky : HWRTDI_InstanceMask_Scene;
         MappedPointer[i].flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FRONT_COUNTERCLOCKWISE_BIT_KHR;
         MappedPointer[i].accelerationStructureReference = RObj->GetBottomLevelASBuffer<jBuffer_Vulkan>()->DeviceAddress;
         for (int32 k = 0; k < 3; ++k)

@@ -92,6 +92,8 @@ void jGame::Setup()
 		// External variable examples (connected to gOptions)
 		static jConsoleVariableBool* cvar_UseVRS = new jConsoleVariableBool("r.vrs", &gOptions.UseVRS, "Enable Variable Rate Shading");
 		static jConsoleVariableBool* cvar_UseSSGI = new jConsoleVariableBool("r.ssgi.enable", &gOptions.UseSSGI, "Enable Screen Space Global Illumination");
+        static jConsoleVariableBool* cvar_UseHWRTDirectLighting = new jConsoleVariableBool("r.hwrt.direct_lighting.enable", &gOptions.UseHWRTDirectLighting, "Enable HWRT direct lighting path");
+        static jConsoleVariableInt* cvar_HWRTDirectLightingMode = new jConsoleVariableInt("r.hwrt.direct_lighting.mode", &gOptions.HWRTDirectLightingMode, "HWRT direct lighting mode (0=DispatchRays, 1=InlineRayQuery)");
         static jConsoleVariableBool* cvar_UseSurfelGI = new jConsoleVariableBool("r.surfelgi.enable", &gOptions.UseSurfelGI, "Enable SurfelGI prototype pool update");
         static jConsoleVariableBool* cvar_SurfelGIReservoirEnable = new jConsoleVariableBool("r.surfelgi.reservoir.enable", &gOptions.SurfelGIReservoirEnable, "Enable SurfelGI reservoir gather/place pipeline");
         static jConsoleVariableInt* cvar_SurfelGIReservoirPerCellLimit = new jConsoleVariableInt("r.surfelgi.reservoir.per_cell_limit", &gOptions.SurfelGIReservoirPerCellLimit, "SurfelGI reservoir per-cell page size limit");

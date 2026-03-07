@@ -210,8 +210,10 @@ bool jRHI_Vulkan::InitRHI()
 
 #if USE_RAYTRACING
 		GSupportRaytracing = jVulkanDeviceUtil::IsSupportRaytracing(availableExtensions);
+		GSupportInlineRaytracing = GSupportRaytracing;
 #else // USE_RAYTRACING
 		GSupportRaytracing = false;
+		GSupportInlineRaytracing = false;
 #endif // USE_RAYTRACING
 
 		// Check if is enabled that the both 'Non-uniform indexing' and 'Update after bind' flags for resources.

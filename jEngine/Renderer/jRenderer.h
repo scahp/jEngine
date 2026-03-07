@@ -59,6 +59,8 @@ public:
     void DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass);
     bool IsUseHWRTDirectLighting() const;
     bool HWRTDirectLightingPass();
+    bool HWRTDispatchRaysDirectLightingPass();
+    bool HWRTInlineDirectLightingPass();
 
     virtual void AtmosphericShadow();
     

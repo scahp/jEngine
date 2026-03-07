@@ -539,6 +539,7 @@ extern class jEngine* g_Engine;
 
 extern bool GUseRealTimeShaderUpdate;
 extern bool GSupportRaytracing;
+extern bool GSupportInlineRaytracing;
 extern int32 GMaxCheckCountForRealTimeShaderUpdate;
 extern int32 GSleepMSForRealTimeShaderUpdate;
 

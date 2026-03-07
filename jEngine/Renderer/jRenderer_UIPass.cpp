@@ -240,6 +240,16 @@ void IRenderer::UIPass()
     const bool HasRaytracingScene = HasRenderFrameContext && (RenderFrameContextPtr->RaytracingScene != nullptr);
     const bool IsRaytracingSceneValid = HasRaytracingScene && RenderFrameContextPtr->RaytracingScene->IsValid();
     const bool IsForwardRenderer = HasRenderFrameContext && RenderFrameContextPtr->UseForwardRenderer;
+    const bool IsHWRTInlineSupported = GSupportInlineRaytracing;
+    if (!IsHWRTInlineSupported && gOptions.HWRTDirectLightingMode != 0)
+    {
+        gOptions.HWRTDirectLightingMode = 0;
+    }
+    int32 ResolvedHWRTDirectLightingMode = Clamp(gOptions.HWRTDirectLightingMode, 0, 1);
+    if (ResolvedHWRTDirectLightingMode == 1 && !IsHWRTInlineSupported)
+    {
+        ResolvedHWRTDirectLightingMode = 0;
+    }
     const bool IsHWRTDirectLightingActive = gOptions.UseHWRTDirectLighting
         && gOptions.UseRaytracing
         && GSupportRaytracing
@@ -339,6 +349,37 @@ void IRenderer::UIPass()
 
                 ImGui::Separator();
                 ImGui::Text("Direct Lighting Active : %s", IsHWRTDirectLightingActive ? "YES" : "NO");
+                if (!IsHWRTInlineSupported)
+                {
+                    ImGui::TextUnformatted("Inline RayQuery : Unsupported (fallback to DispatchRays)");
+                }
+
+                int32 HWRTDirectLightingMode = Clamp(gOptions.HWRTDirectLightingMode, 0, 1);
+                if (HWRTDirectLightingMode == 1 && !IsHWRTInlineSupported)
+                {
+                    HWRTDirectLightingMode = 0;
+                    gOptions.HWRTDirectLightingMode = 0;
+                }
+
+                if (ImGui::BeginCombo("DirectLightingMode", GHWRTDirectLightingModes[HWRTDirectLightingMode], ImGuiComboFlags_None))
+                {
+                    for (int32 i = 0; i < (int32)_countof(GHWRTDirectLightingModes); ++i)
+                    {
+                        if (i == 1 && !IsHWRTInlineSupported)
+                            continue;
+
+                        const bool IsSelected = (HWRTDirectLightingMode == i);
+                        if (ImGui::Selectable(GHWRTDirectLightingModes[i], IsSelected))
+                        {
+                            gOptions.HWRTDirectLightingMode = i;
+                            HWRTDirectLightingMode = i;
+                        }
+                        if (IsSelected)
+                            ImGui::SetItemDefaultFocus();
+                    }
+                    ImGui::EndCombo();
+                }
+
                 int32 HWRTDebugMode = gOptions.HWRTDebugViewMode;
                 if (HWRTDebugMode < 0 || HWRTDebugMode >= (int32)_countof(GHWRTDebugViewModes))
                 {
@@ -372,10 +413,12 @@ void IRenderer::UIPass()
                 bool ConditionHasRaytracingScene = HasRaytracingScene;
                 bool ConditionRaytracingSceneValid = IsRaytracingSceneValid;
                 bool ConditionNotForwardRenderer = !IsForwardRenderer;
+                bool ConditionInlineRaytracingSupport = IsHWRTInlineSupported;
                 ImGui::BeginDisabled(true);
                 ImGui::Checkbox("Cond: gOptions.UseHWRTDirectLighting", &ConditionUseHWRTDirectLighting);
                 ImGui::Checkbox("Cond: gOptions.UseRaytracing", &ConditionUseRaytracing);
                 ImGui::Checkbox("Cond: GSupportRaytracing", &ConditionSupportRaytracing);
+                ImGui::Checkbox("Cond: GSupportInlineRaytracing", &ConditionInlineRaytracingSupport);
                 ImGui::Checkbox("Cond: RenderFrameContext", &ConditionHasRenderFrameContext);
                 ImGui::Checkbox("Cond: RaytracingScene", &ConditionHasRaytracingScene);
                 ImGui::Checkbox("Cond: RaytracingScene->IsValid", &ConditionRaytracingSceneValid);
@@ -383,7 +426,14 @@ void IRenderer::UIPass()
                 ImGui::EndDisabled();
 
                 ImGui::Separator();
-                ImGui::TextUnformatted("DispatchRays based direct lighting path.");
+                if (ResolvedHWRTDirectLightingMode == 1 && IsHWRTInlineSupported)
+                {
+                    ImGui::TextUnformatted("Inline RayQuery based direct lighting path.");
+                }
+                else
+                {
+                    ImGui::TextUnformatted("DispatchRays based direct lighting path.");
+                }
                 ImGui::TextUnformatted("Primary ray hits geometry and shades without GBuffer lighting.");
 
                 ImGui::EndTabItem();

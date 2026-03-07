@@ -16,7 +16,9 @@ struct SceneConstantBuffer
     float debugPrimitiveIDScale;
     uint forceMipLevel0;
     float shadowRayStartOffset;
-    float3 padding0;
+    uint renderWidth;
+    uint renderHeight;
+    float padding0;
 };
 
 struct MaterialInstanceUniform
@@ -36,6 +38,7 @@ static const uint HWRTDI_MaterialFlag_UseSRGBAlbedoTexture = 1u << 3;
 static const uint HWRTDI_MaterialFlag_IsSkyMaterial = 1u << 4;
 static const uint HWRTDI_MaterialFlag_UseAlphaCutout = 1u << 5;
 static const uint HWRTDI_MaterialFlag_NonOpaqueGeometry = 1u << 6;
+static const uint HWRTDI_RAY_MASK_SCENE = 0x01u;
 
 bool HasMaterialFlag(in MaterialInstanceUniform MaterialInstance, in uint Flag)
 {
@@ -89,6 +92,7 @@ struct SurfaceData
     float NormalMipLevel;
     float RMMipLevel;
     uint MaterialFlags;
+    uint PrimitiveIdx;
 };
 
 float3 HashPrimitiveColor(in uint PrimitiveIdx)
@@ -131,7 +135,7 @@ float3 EvaluateDebugViewColor(in SurfaceData Surface, in MyAttributes Attr)
     }
     if (Mode == 4u)
     {
-        return HashPrimitiveColor(PrimitiveIndex());
+        return HashPrimitiveColor(Surface.PrimitiveIdx);
     }
     if (Mode == 5u)
     {
@@ -257,7 +261,7 @@ float ComputeApproxTextureMipLevel(
     const float TexelWorldArea = WorldArea / max(UVArea * TexelCount, 1e-8);
 
     const float DistanceToCamera = max(length(WorldPos - g_sceneCB.cameraPosition), 1e-3);
-    const float PixelWorldRadius = DistanceToCamera / max((float)DispatchRaysDimensions().y, 1.0);
+    const float PixelWorldRadius = DistanceToCamera / max((float)g_sceneCB.renderHeight, 1.0);
     const float PixelWorldArea = PixelWorldRadius * PixelWorldRadius;
     const float FootprintTexels = PixelWorldArea / max(TexelWorldArea, 1e-8);
 
@@ -365,7 +369,14 @@ float3 GetShadingNormal(
     return normalize(mul(TBN, TangentSpaceNormal));
 }
 
-SurfaceData GetSurfaceData(in uint InstanceIdx, in MyAttributes Attr)
+MyAttributes MakeAttributesFromBarycentrics(in float2 Barycentrics)
+{
+    MyAttributes Attr;
+    Attr.barycentrics = Barycentrics;
+    return Attr;
+}
+
+SurfaceData GetSurfaceDataInternal(in uint InstanceIdx, in uint PrimitiveIdx, in MyAttributes Attr, in float3 WorldPos)
 {
     SurfaceData Surface = (SurfaceData)0;
 
@@ -374,9 +385,10 @@ SurfaceData GetSurfaceData(in uint InstanceIdx, in MyAttributes Attr)
     jVertex Vertex2;
     RenderObjectUniformBuffer RenderObjParam;
     MaterialInstanceUniform MaterialInstance;
-    GetTriangleVertices(InstanceIdx, PrimitiveIndex(), Vertex0, Vertex1, Vertex2, RenderObjParam, MaterialInstance);
+    GetTriangleVertices(InstanceIdx, PrimitiveIdx, Vertex0, Vertex1, Vertex2, RenderObjParam, MaterialInstance);
 
-    Surface.WorldPos = HitWorldPosition();
+    Surface.WorldPos = WorldPos;
+    Surface.PrimitiveIdx = PrimitiveIdx;
     Surface.UV = HitAttribute(Vertex0.TexCoord, Vertex1.TexCoord, Vertex2.TexCoord, Attr);
     Surface.MaterialFlags = MaterialInstance.materialFlags;
     Surface.GeometricWorldNormal = ComputeFaceWorldNormal(Vertex0, Vertex1, Vertex2, RenderObjParam);
@@ -440,6 +452,44 @@ SurfaceData GetSurfaceData(in uint InstanceIdx, in MyAttributes Attr)
     return Surface;
 }
 
+SurfaceData GetSurfaceData(in uint InstanceIdx, in MyAttributes Attr)
+{
+    return GetSurfaceDataInternal(InstanceIdx, PrimitiveIndex(), Attr, HitWorldPosition());
+}
+
+bool IsRayHitRejectedByMaterial(in uint InstanceIdx, in uint PrimitiveIdx, in float2 Barycentrics)
+{
+    jVertex Vertex0;
+    jVertex Vertex1;
+    jVertex Vertex2;
+    RenderObjectUniformBuffer RenderObjParam;
+    MaterialInstanceUniform MaterialInstance;
+    GetTriangleVertices(InstanceIdx, PrimitiveIdx, Vertex0, Vertex1, Vertex2, RenderObjParam, MaterialInstance);
+
+    if (HasMaterialFlag(MaterialInstance, HWRTDI_MaterialFlag_HasAlbedoTexture)
+        && HasMaterialFlag(MaterialInstance, HWRTDI_MaterialFlag_UseAlphaCutout))
+    {
+        const MyAttributes Attr = MakeAttributesFromBarycentrics(Barycentrics);
+        const float2 UV = HitAttribute(Vertex0.TexCoord, Vertex1.TexCoord, Vertex2.TexCoord, Attr);
+        const float Alpha = SampleAlbedoTexture(InstanceIdx, MaterialInstance, UV, 0.0).a;
+        if (Alpha < saturate(MaterialInstance.alphaCutoff))
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool RequiresShadowMaterialRejectTest(in uint InstanceIdx)
+{
+    const MaterialInstanceUniform MaterialInstance = MaterialInstanceArray[InstanceIdx];
+
+    const bool UseAlphaCutout = HasMaterialFlag(MaterialInstance, HWRTDI_MaterialFlag_HasAlbedoTexture)
+        && HasMaterialFlag(MaterialInstance, HWRTDI_MaterialFlag_UseAlphaCutout);
+    return UseAlphaCutout;
+}
+
 bool TraceShadowRay(in float3 Origin, in float3 Direction, in float TMax)
 {
     const float RayStartOffset = max(g_sceneCB.shadowRayStartOffset, 0.0);
@@ -451,9 +501,26 @@ bool TraceShadowRay(in float3 Origin, in float3 Direction, in float TMax)
     Ray.TMin = TMin;
     Ray.TMax = max(TMax, Ray.TMin);
 
-    RayPayload Payload = (RayPayload)0;
-    TraceRay(Scene, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, ~0, 0, 0, 1, Ray, Payload);
-    return Payload.Visibility != 0;
+    RayQuery<RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH> ShadowRayQuery;
+    ShadowRayQuery.TraceRayInline(Scene, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, HWRTDI_RAY_MASK_SCENE, Ray);
+    while (ShadowRayQuery.Proceed())
+    {
+        if (ShadowRayQuery.CandidateType() == CANDIDATE_NON_OPAQUE_TRIANGLE)
+        {
+            const uint CandidateInstanceIdx = ShadowRayQuery.CandidateInstanceIndex();
+            const uint CandidatePrimitiveIdx = ShadowRayQuery.CandidatePrimitiveIndex();
+            if (RequiresShadowMaterialRejectTest(CandidateInstanceIdx))
+            {
+                const float2 CandidateBarycentrics = ShadowRayQuery.CandidateTriangleBarycentrics();
+                if (IsRayHitRejectedByMaterial(CandidateInstanceIdx, CandidatePrimitiveIdx, CandidateBarycentrics))
+                    continue;
+            }
+
+            ShadowRayQuery.CommitNonOpaqueTriangleHit();
+        }
+    }
+
+    return (ShadowRayQuery.CommittedStatus() == COMMITTED_NOTHING);
 }
 
 float3 EvaluateDirectionalLights(in SurfaceData Surface, in float3 ViewDir)
@@ -533,9 +600,9 @@ float3 EvaluateSpotLights(in SurfaceData Surface, in float3 ViewDir)
     return Result;
 }
 
-void GenerateCameraRay(uint2 Index, out float3 Origin, out float3 Direction)
+void GenerateCameraRay(in uint2 Index, in uint2 RenderDimensions, out float3 Origin, out float3 Direction)
 {
-    float2 ScreenPos = ((float2)Index + 0.5f) / DispatchRaysDimensions().xy * 2.0 - 1.0;
+    float2 ScreenPos = ((float2)Index + 0.5f) / (float2)RenderDimensions * 2.0 - 1.0;
     ScreenPos.y = -ScreenPos.y;
 
     float4 World = mul(g_sceneCB.projectionToWorld, float4(ScreenPos, 0.0, 1.0));
@@ -545,62 +612,11 @@ void GenerateCameraRay(uint2 Index, out float3 Origin, out float3 Direction)
     Direction = normalize(World.xyz - Origin);
 }
 
-[shader("raygeneration")]
-void RaygenShader()
+float3 EvaluateSurfaceRadiance(in SurfaceData Surface, in MyAttributes Attr)
 {
-    float3 Origin;
-    float3 Direction;
-    GenerateCameraRay(DispatchRaysIndex().xy, Origin, Direction);
-
-    RayDesc Ray;
-    Ray.Origin = Origin;
-    Ray.Direction = Direction;
-    Ray.TMin = 0.001;
-    Ray.TMax = 100000.0;
-
-    RayPayload Payload = (RayPayload)0;
-    TraceRay(Scene, RAY_FLAG_NONE, ~0, 0, 0, 0, Ray, Payload);
-    RenderTarget[DispatchRaysIndex().xy] = float4(Payload.Radiance, 1.0);
-}
-
-[shader("anyhit")]
-void PrimaryAnyHitShader(inout RayPayload Payload, in MyAttributes Attr)
-{
-    jVertex Vertex0;
-    jVertex Vertex1;
-    jVertex Vertex2;
-    RenderObjectUniformBuffer RenderObjParam;
-    MaterialInstanceUniform MaterialInstance;
-    GetTriangleVertices(InstanceIndex(), PrimitiveIndex(), Vertex0, Vertex1, Vertex2, RenderObjParam, MaterialInstance);
-
-    if (HasMaterialFlag(MaterialInstance, HWRTDI_MaterialFlag_IsSkyMaterial))
-    {
-        IgnoreHit();
-        return;
-    }
-
-    if (HasMaterialFlag(MaterialInstance, HWRTDI_MaterialFlag_HasAlbedoTexture)
-        && HasMaterialFlag(MaterialInstance, HWRTDI_MaterialFlag_UseAlphaCutout))
-    {
-        const float2 UV = HitAttribute(Vertex0.TexCoord, Vertex1.TexCoord, Vertex2.TexCoord, Attr);
-        const float Alpha = SampleAlbedoTexture(InstanceIndex(), MaterialInstance, UV, 0.0).a;
-        if (Alpha < saturate(MaterialInstance.alphaCutoff))
-        {
-            IgnoreHit();
-            return;
-        }
-    }
-}
-
-[shader("closesthit")]
-void PrimaryClosestHitShader(inout RayPayload Payload, in MyAttributes Attr)
-{
-    const SurfaceData Surface = GetSurfaceData(InstanceIndex(), Attr);
-
     if (g_sceneCB.debugViewMode != 0u)
     {
-        Payload.Radiance = EvaluateDebugViewColor(Surface, Attr);
-        return;
+        return EvaluateDebugViewColor(Surface, Attr);
     }
 
     const float3 ViewDir = normalize(g_sceneCB.cameraPosition - Surface.WorldPos);
@@ -609,8 +625,92 @@ void PrimaryClosestHitShader(inout RayPayload Payload, in MyAttributes Attr)
     Radiance += EvaluateDirectionalLights(Surface, ViewDir);
     Radiance += EvaluatePointLights(Surface, ViewDir);
     Radiance += EvaluateSpotLights(Surface, ViewDir);
+    return Radiance;
+}
 
-    Payload.Radiance = Radiance;
+[numthreads(8, 8, 1)]
+void InlineRayQueryCS(uint3 DispatchThreadID : SV_DispatchThreadID)
+{
+    const uint2 Pixel = DispatchThreadID.xy;
+    if (Pixel.x >= g_sceneCB.renderWidth || Pixel.y >= g_sceneCB.renderHeight)
+        return;
+
+    float3 Origin;
+    float3 Direction;
+    GenerateCameraRay(Pixel, uint2(g_sceneCB.renderWidth, g_sceneCB.renderHeight), Origin, Direction);
+
+    RayDesc Ray;
+    Ray.Origin = Origin;
+    Ray.Direction = Direction;
+    Ray.TMin = 0.001;
+    Ray.TMax = 100000.0;
+
+    RayQuery<RAY_FLAG_NONE> PrimaryRayQuery;
+    PrimaryRayQuery.TraceRayInline(Scene, RAY_FLAG_NONE, HWRTDI_RAY_MASK_SCENE, Ray);
+    while (PrimaryRayQuery.Proceed())
+    {
+        if (PrimaryRayQuery.CandidateType() == CANDIDATE_NON_OPAQUE_TRIANGLE)
+        {
+            const uint CandidateInstanceIdx = PrimaryRayQuery.CandidateInstanceIndex();
+            const uint CandidatePrimitiveIdx = PrimaryRayQuery.CandidatePrimitiveIndex();
+            const float2 CandidateBarycentrics = PrimaryRayQuery.CandidateTriangleBarycentrics();
+
+            if (IsRayHitRejectedByMaterial(CandidateInstanceIdx, CandidatePrimitiveIdx, CandidateBarycentrics))
+                continue;
+
+            PrimaryRayQuery.CommitNonOpaqueTriangleHit();
+        }
+    }
+
+    float3 Radiance = 0.0;
+    if (PrimaryRayQuery.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
+    {
+        const uint InstanceIdx = PrimaryRayQuery.CommittedInstanceIndex();
+        const uint PrimitiveIdx = PrimaryRayQuery.CommittedPrimitiveIndex();
+        const float2 Barycentrics = PrimaryRayQuery.CommittedTriangleBarycentrics();
+        const MyAttributes Attr = MakeAttributesFromBarycentrics(Barycentrics);
+        const float HitT = PrimaryRayQuery.CommittedRayT();
+        const float3 WorldPos = Origin + Direction * HitT;
+        const SurfaceData Surface = GetSurfaceDataInternal(InstanceIdx, PrimitiveIdx, Attr, WorldPos);
+        Radiance = EvaluateSurfaceRadiance(Surface, Attr);
+    }
+
+    RenderTarget[Pixel] = float4(Radiance, 1.0);
+}
+
+[shader("raygeneration")]
+void RaygenShader()
+{
+    float3 Origin;
+    float3 Direction;
+    GenerateCameraRay(DispatchRaysIndex().xy, DispatchRaysDimensions().xy, Origin, Direction);
+
+    RayDesc Ray;
+    Ray.Origin = Origin;
+    Ray.Direction = Direction;
+    Ray.TMin = 0.001;
+    Ray.TMax = 100000.0;
+
+    RayPayload Payload = (RayPayload)0;
+    TraceRay(Scene, RAY_FLAG_NONE, HWRTDI_RAY_MASK_SCENE, 0, 0, 0, Ray, Payload);
+    RenderTarget[DispatchRaysIndex().xy] = float4(Payload.Radiance, 1.0);
+}
+
+[shader("anyhit")]
+void PrimaryAnyHitShader(inout RayPayload Payload, in MyAttributes Attr)
+{
+    if (IsRayHitRejectedByMaterial(InstanceIndex(), PrimitiveIndex(), Attr.barycentrics))
+    {
+        IgnoreHit();
+        return;
+    }
+}
+
+[shader("closesthit")]
+void PrimaryClosestHitShader(inout RayPayload Payload, in MyAttributes Attr)
+{
+    const SurfaceData Surface = GetSurfaceData(InstanceIndex(), Attr);
+    Payload.Radiance = EvaluateSurfaceRadiance(Surface, Attr);
 }
 
 [shader("anyhit")]

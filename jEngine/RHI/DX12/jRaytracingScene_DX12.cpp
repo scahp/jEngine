@@ -10,6 +10,12 @@
 #include "Material/jMaterial.h"
 #include <algorithm>
 
+namespace
+{
+    static constexpr uint8 HWRTDI_InstanceMask_Scene = 0x01;
+    static constexpr uint8 HWRTDI_InstanceMask_Sky = 0x02;
+}
+
 void jRaytracingScene_DX12::CreateOrUpdateBLAS(const jRatracingInitializer& InInitializer)
 {
     auto CmdBuffer = (jCommandBuffer_DX12*)InInitializer.CommandBuffer;
@@ -122,7 +128,9 @@ void jRaytracingScene_DX12::CreateOrUpdateBLAS(const jRatracingInitializer& InIn
 
         // OPAQUE geometry skips AnyHit. Enable NON-OPAQUE only for alpha-cutout candidates.
         const jMaterial* Material = RObj->MaterialPtr.get();
-        const bool UseAlphaCutout = Material
+        const bool IsSkyMaterial = Material && Material->IsUseSphericalMap();
+        const bool UseAlphaCutout = !IsSkyMaterial
+            && Material
             && Material->HasAlbedoTexture()
             && Material->IsRaytracingAlphaTestEnabled();
         geometryDesc.Flags = UseAlphaCutout
@@ -255,7 +263,9 @@ void jRaytracingScene_DX12::CreateOrUpdateTLAS(const jRatracingInitializer& InIn
 
             instanceDescs[i].InstanceID = i;
             instanceDescs[i].InstanceContributionToHitGroupIndex = RObj->RayTracingHitGroupIndex;
-            instanceDescs[i].InstanceMask = 0xFF;
+            const jMaterial* Material = RObj->MaterialPtr.get();
+            const bool IsSkyMaterial = Material && Material->IsUseSphericalMap();
+            instanceDescs[i].InstanceMask = IsSkyMaterial ? HWRTDI_InstanceMask_Sky : HWRTDI_InstanceMask_Scene;
             instanceDescs[i].AccelerationStructure = RObj->GetBottomLevelASBuffer<jBuffer_DX12>()->GetGPUAddress();
             for (int32 k = 0; k < 3; ++k)
             {

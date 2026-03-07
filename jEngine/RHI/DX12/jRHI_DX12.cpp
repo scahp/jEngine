@@ -506,9 +506,11 @@ bool jRHI_DX12::InitRHI()
 
 #if USE_RAYTRACING
     GSupportRaytracing = featureSupportData.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED;
+    GSupportInlineRaytracing = featureSupportData.RaytracingTier >= D3D12_RAYTRACING_TIER_1_1;
     // GSupportRaytracing = false; // temp
 #else // USE_RAYTRACING
     GSupportRaytracing = false;
+    GSupportInlineRaytracing = false;
 #endif // USE_RAYTRACING
 
     // Create InstanceVertexBuffer for cube map six face

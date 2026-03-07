@@ -17,6 +17,7 @@ extern const char* GAOResolution[3];
 extern const char* GWaitPrerequsiteGraphicsQueueTask[4];
 extern const char* GAOType[3];
 extern const char* GHWRTDebugViewModes[14];
+extern const char* GHWRTDirectLightingModes[2];
 
 #ifndef SURFEL_GI_CASCADE_COUNT
 #define SURFEL_GI_CASCADE_COUNT 3
@@ -39,6 +40,7 @@ struct jOptions
     bool UseWaveIntrinsics;
     bool UseDeferredRenderer;
     bool UseHWRTDirectLighting;
+    int32 HWRTDirectLightingMode;
     int32 HWRTDebugViewMode;
     float HWRTDebugLineWidth;
     float HWRTDebugUVScale;
