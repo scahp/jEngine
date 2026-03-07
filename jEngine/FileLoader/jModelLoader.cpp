@@ -435,7 +435,12 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
         streamParam->Name = jName("Index");
         streamParam->Data.resize(meshData->Faces.size());
         streamParam->Stride = sizeof(uint16) * 3;
-        memcpy(&streamParam->Data[0], &meshData->Faces[0], meshData->Faces.size() * sizeof(uint16));
+        for (size_t i = 0; i < meshData->Faces.size(); ++i)
+        {
+            const uint32 indexValue = meshData->Faces[i];
+            JASSERT(indexValue <= 0xFFFFu);
+            streamParam->Data[i] = static_cast<uint16>(indexValue);
+        }
         indexStreamData->Param = streamParam;
 	}
 
