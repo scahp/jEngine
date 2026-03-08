@@ -4,6 +4,9 @@
     #define SURFEL_GI_CASCADE_COUNT 3
 #endif
 #define SURFEL_GI_CASCADE_PACKED_COUNT ((SURFEL_GI_CASCADE_COUNT + 3) / 4)
+#define SURFEL_GI_GUIDE_DIM 4
+#define SURFEL_GI_GUIDE_LOBE_COUNT (SURFEL_GI_GUIDE_DIM * SURFEL_GI_GUIDE_DIM)
+#define SURFEL_GI_GUIDE_TOTAL_FLOATS (SURFEL_GI_GUIDE_LOBE_COUNT + SURFEL_GI_GUIDE_DIM)
 // Temp toggle: allow replacing active surfel when candidate normal is very different.
 #define SURFEL_GI_ENABLE_NORMAL_MISMATCH_REPLACE 0
 // Replace only when normals are almost opposite (full flip): dot < -0.9.
@@ -104,6 +107,7 @@ StructuredBuffer<uint> SurfelCellPageTable : register(t3, space0);
 RWStructuredBuffer<SurfelData> SurfelPool : register(u4, space0);
 RWStructuredBuffer<SurfelGIStats> SurfelGIStatsBuffer : register(u5, space0);
 RWStructuredBuffer<SurfelIrradianceData> SurfelIrradianceBuffer : register(u7, space0);
+RWStructuredBuffer<float> SurfelGuidingBuffer : register(u8, space0);
 
 cbuffer ComputeCommon : register(b6, space0)
 {
@@ -264,6 +268,11 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     outIrradiance.MSMEData0 = float4(0.0, 0.0, 0.0, 0.0);
     outIrradiance.MSMEData1 = float4(0.0, 0.0, 0.0, 0.0);
     SurfelIrradianceBuffer[writeIndex] = outIrradiance;
+    const uint guidingBaseIndex = writeIndex * SURFEL_GI_GUIDE_TOTAL_FLOATS;
+    [unroll] for (uint guideIndex = 0u; guideIndex < SURFEL_GI_GUIDE_TOTAL_FLOATS; ++guideIndex)
+    {
+        SurfelGuidingBuffer[guidingBaseIndex + guideIndex] = 0.0;
+    }
 
     if (isNormalMismatchReplace)
     {

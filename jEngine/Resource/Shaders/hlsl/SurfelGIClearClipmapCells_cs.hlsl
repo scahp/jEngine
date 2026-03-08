@@ -2,6 +2,9 @@
     #define SURFEL_GI_CASCADE_COUNT 3
 #endif
 #define SURFEL_GI_CASCADE_PACKED_COUNT ((SURFEL_GI_CASCADE_COUNT + 3) / 4)
+#define SURFEL_GI_GUIDE_DIM 4
+#define SURFEL_GI_GUIDE_LOBE_COUNT (SURFEL_GI_GUIDE_DIM * SURFEL_GI_GUIDE_DIM)
+#define SURFEL_GI_GUIDE_TOTAL_FLOATS (SURFEL_GI_GUIDE_LOBE_COUNT + SURFEL_GI_GUIDE_DIM)
 
 struct CommonComputeUniformBuffer
 {
@@ -74,8 +77,9 @@ struct SurfelIrradianceData
 RWStructuredBuffer<SurfelData> SurfelPool : register(u0, space0);
 RWStructuredBuffer<uint> CellSurfelCount : register(u1, space0);
 RWStructuredBuffer<SurfelIrradianceData> SurfelIrradianceBuffer : register(u2, space0);
+RWStructuredBuffer<float> SurfelGuidingBuffer : register(u3, space0);
 
-cbuffer ComputeCommon : register(b3, space0)
+cbuffer ComputeCommon : register(b4, space0)
 {
     CommonComputeUniformBuffer ComputeCommon;
 }
@@ -243,5 +247,10 @@ void main(uint3 DTid : SV_DispatchThreadID)
         ir.MSMEData0 = float4(0.0, 0.0, 0.0, 0.0);
         ir.MSMEData1 = float4(0.0, 0.0, 0.0, 0.0);
         SurfelIrradianceBuffer[surfelIndex] = ir;
+        const uint guidingBaseIndex = surfelIndex * SURFEL_GI_GUIDE_TOTAL_FLOATS;
+        [unroll] for (uint guideIndex = 0u; guideIndex < SURFEL_GI_GUIDE_TOTAL_FLOATS; ++guideIndex)
+        {
+            SurfelGuidingBuffer[guidingBaseIndex + guideIndex] = 0.0;
+        }
     }
 }

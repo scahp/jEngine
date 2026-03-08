@@ -1153,6 +1153,7 @@ void jRenderer::Render()
         {
             AOPass();
             SurfelGIPass();
+            SurfelGIResolvePass();
             SSGIPass();
             SSGIAccumulatePass();
         }
@@ -1240,6 +1241,11 @@ void jRenderer::Render()
                 return g_rhi->CreateShader(shaderInfo);
             }
         );
+    }
+
+    if (!UseHWRTDirectLighting)
+    {
+        ApplySurfelGI();
     }
 
     PostProcess();

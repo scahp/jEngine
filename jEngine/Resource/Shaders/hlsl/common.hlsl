@@ -258,22 +258,25 @@ float Random_0_1(inout uint seed)
 //  - https://pbr-book.org/4ed/Sampling_Algorithms/Sampling_Multidimensional_Functions#SampleCosineHemisphere
 //  - https://github.com/knightcrawler25/GLSL-PathTracer/blob/master/src/shaders/common/disney.glsl
 //  - https://github.com/phgphg777/DXR-PathTracer/blob/master/DXRPathTracer/sampling.hlsli
-float3 CosWeightedSampleHemisphere(inout uint RandomSeed)
+float3 CosWeightedSampleHemisphereFromUniform(float2 Rand)
 {
-    float rand1 = Random_0_1(RandomSeed);
-    float rand2 = Random_0_1(RandomSeed);
-
     float3 SampleDir = 0;
 
     // Sampling on disk
-    float r = sqrt(rand1); // for cosine weight. - check out the grpah of sqrt(x)
-    float phi = TWO_PI * rand2;
+    float r = sqrt(Rand.x); // for cosine weight. - check out the grpah of sqrt(x)
+    float phi = TWO_PI * Rand.y;
     SampleDir.x = r * cos(phi);
     SampleDir.y = r * sin(phi);
 
     // Then z is evaluated by using 'Pythagorean theorem'.
     SampleDir.z = sqrt(max(0.0f, 1.0f - r * r));
     return SampleDir;
+}
+
+float3 CosWeightedSampleHemisphere(inout uint RandomSeed)
+{
+    const float2 Rand = float2(Random_0_1(RandomSeed), Random_0_1(RandomSeed));
+    return CosWeightedSampleHemisphereFromUniform(Rand);
 }
 
 float3 UniformSampleHemisphere(inout uint RandomSeed)
@@ -328,4 +331,36 @@ float3 ToWorld(in float3 WorldN, in float3 LocalN)
     float3 T, B;
     MakeTB_From_N(WorldN, T, B);
     return ToWorld(T, B, WorldN, LocalN);
+}
+
+float SafeU01(float x)
+{
+    return clamp(x, 1e-6, 1.0 - 1e-6);
+}
+
+float2 HemiOctSquareEncode(float3 d)
+{
+    const float invL1 = rcp(abs(d.x) + abs(d.y) + max(d.z, 0.0));
+    const float2 p = d.xy * invL1;
+    const float2 q = float2(p.x + p.y, p.x - p.y);
+    return q * 0.5 + 0.5;
+}
+
+float3 HemiOctSquareDecode(float2 uv)
+{
+    const float2 q = uv * 2.0 - 1.0;
+    const float2 p = float2(q.x + q.y, q.x - q.y) * 0.5;
+    const float z = max(0.0, 1.0 - abs(p.x) - abs(p.y));
+    return normalize(float3(p.x, p.y, z));
+}
+
+float HemiOctSquareJacobian(float2 uv)
+{
+    const float2 q = uv * 2.0 - 1.0;
+    const float2 p = float2(q.x + q.y, q.x - q.y) * 0.5;
+    const float z = 1.0 - abs(p.x) - abs(p.y);
+    const float3 v = float3(p.x, p.y, z);
+    const float r2 = max(dot(v, v), 1e-12);
+    const float invR = rsqrt(r2);
+    return 2.0 * invR * invR * invR;
 }

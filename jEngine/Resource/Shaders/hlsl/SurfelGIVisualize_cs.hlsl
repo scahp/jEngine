@@ -10,6 +10,7 @@ struct VisualizeUniformBuffer
 {
     float4x4 InvP;
     float4x4 InvV;
+    float4x4 ViewProj;
     float2 ScreenSize;
     float BlendAlpha;
     float GridCellSize;
@@ -39,6 +40,8 @@ struct VisualizeUniformBuffer
     int ShowSpawnAttemptDebug;
     int ShowIrradianceDebug;
     int IrradianceDebugMode;
+    int ShowHoverRayDebug;
+    float HoverRayLength;
     int2 Padding0;
 };
 
@@ -57,6 +60,14 @@ struct SurfelIrradianceData
     float4 MSMEData1;
 };
 
+#define SURFEL_GI_HOVER_DEBUG_MAX_RAYS 16
+
+struct SurfelHoverRayDebugData
+{
+    float4 OriginAndCount;
+    float4 RayDirAndType[SURFEL_GI_HOVER_DEBUG_MAX_RAYS];
+};
+
 RWTexture2D<float4> Result : register(u0, space0);
 Texture2D DepthTexture : register(t1, space0);
 SamplerState DepthTextureSampler : register(s1, space0);
@@ -68,6 +79,7 @@ StructuredBuffer<SurfelIrradianceData> SurfelIrradianceBuffer : register(t7, spa
 StructuredBuffer<uint> WinnerScoreBuffer : register(t8, space0);
 StructuredBuffer<uint> WinnerIndexBuffer : register(t9, space0);
 Texture2D GBufferNormalTexture : register(t10, space0);
+StructuredBuffer<SurfelHoverRayDebugData> HoverRayDebugBuffer : register(t11, space0);
 
 cbuffer VisualizeCommon : register(b5, space0)
 {
@@ -147,6 +159,29 @@ float3 MSMEStateDebugColor(float count, float vbbr, float inconsistency)
     const float countVis = saturate(count / 32.0);
     const float inconsistencyVis = saturate(inconsistency / 2.0);
     return saturate(float3(countVis, vbbr, inconsistencyVis));
+}
+
+bool ProjectWorldToScreenUV(float3 worldPos, out float2 outUV)
+{
+    const float4 clipPos = mul(VisualizeCommon.ViewProj, float4(worldPos, 1.0));
+    if (clipPos.w <= 1e-5)
+    {
+        outUV = 0.0;
+        return false;
+    }
+
+    const float2 ndc = clipPos.xy / clipPos.w;
+    outUV = float2(ndc.x * 0.5 + 0.5, -ndc.y * 0.5 + 0.5);
+    return all(outUV >= -0.25) && all(outUV <= 1.25);
+}
+
+float DistanceToSegmentPixels(float2 pixelUV, float2 aUV, float2 bUV, float2 screenSize)
+{
+    const float2 pa = (pixelUV - aUV) * screenSize;
+    const float2 ba = (bUV - aUV) * screenSize;
+    const float denom = max(dot(ba, ba), 1e-5);
+    const float h = saturate(dot(pa, ba) / denom);
+    return length(pa - ba * h);
 }
 
 uint GetSlotsPerCell(uint maxSurfels, uint desiredSlotsPerCell)
@@ -727,6 +762,50 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         if (bestAttemptStrength > 0.001)
         {
             visualizeColor = lerp(visualizeColor, bestAttemptColor, saturate(bestAttemptStrength));
+        }
+    }
+
+    if (VisualizeCommon.ShowHoverRayDebug != 0)
+    {
+        const SurfelHoverRayDebugData hoverRayDebug = HoverRayDebugBuffer[0];
+        const uint hoverRayCount = min((uint)round(hoverRayDebug.OriginAndCount.w), (uint)SURFEL_GI_HOVER_DEBUG_MAX_RAYS);
+        if (hoverRayCount > 0u)
+        {
+            const float2 pixelUV = (float2(pixel) + 0.5) / float2(screenSize);
+            float2 originUV = 0.0;
+            if (ProjectWorldToScreenUV(hoverRayDebug.OriginAndCount.xyz, originUV))
+            {
+                float3 rayOverlayColor = float3(0.0, 0.0, 0.0);
+                float rayOverlayAlpha = 0.0;
+
+                [loop] for (uint rayIndex = 0u; rayIndex < hoverRayCount; ++rayIndex)
+                {
+                    const float4 rayDirAndType = hoverRayDebug.RayDirAndType[rayIndex];
+                    const float3 rayEnd = rayDirAndType.xyz;
+                    float2 rayEndUV = 0.0;
+                    if (!ProjectWorldToScreenUV(rayEnd, rayEndUV))
+                        continue;
+
+                    const float distancePx = DistanceToSegmentPixels(pixelUV, originUV, rayEndUV, VisualizeCommon.ScreenSize);
+                    const float lineMask = 1.0 - smoothstep(0.75, 2.5, distancePx);
+                    if (lineMask <= 0.0)
+                        continue;
+
+                    const float3 rayColor = (rayDirAndType.w > 0.5) ? float3(1.0, 0.15, 0.1) : float3(0.15, 0.4, 1.0);
+                    rayOverlayColor += rayColor * lineMask;
+                    rayOverlayAlpha = saturate(rayOverlayAlpha + lineMask * 0.85);
+                }
+
+                const float originDistPx = length((pixelUV - originUV) * VisualizeCommon.ScreenSize);
+                const float originMask = 1.0 - smoothstep(1.0, 4.0, originDistPx);
+                rayOverlayColor += float3(1.0, 1.0, 1.0) * originMask;
+                rayOverlayAlpha = saturate(rayOverlayAlpha + originMask);
+
+                if (rayOverlayAlpha > 0.0)
+                {
+                    visualizeColor = lerp(visualizeColor, saturate(rayOverlayColor), saturate(rayOverlayAlpha));
+                }
+            }
         }
     }
 

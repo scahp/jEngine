@@ -126,11 +126,14 @@ jOptions::jOptions()
     ShowSurfelGICellGrid = true;
     ShowSurfelGISpawnAttemptDebug = false;
     ShowSurfelGIIrradianceDebug = true;
+    ShowSurfelGIHoverRayDebug = false;
     SurfelGIInlineRayEnable = true;
+    SurfelGIInlineRayGuideEnable = true;
     SurfelGIInlineRayCount = 2;
     SurfelGIInlineRayMaxDistance = 5000.0f;
     SurfelGIInlineRayNormalBias = 1.0f;
     SurfelGIInlineRayHistoryBlend = 0.85f;
+    SurfelGIIntensity = 1.0f;
     SurfelGIIrradianceDebugMode = 0;
     SurfelGIVisualizeNeighborCellRadius = 1;
     SurfelGIVisualizeBlendWithScene = true;

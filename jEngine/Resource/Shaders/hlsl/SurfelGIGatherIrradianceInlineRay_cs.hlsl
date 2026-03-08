@@ -15,6 +15,12 @@ struct SurfelIrradianceData
     float4 MSMEData1;
 };
 
+#define SURFEL_GI_GUIDE_DIM 4
+#define SURFEL_GI_GUIDE_LOBE_COUNT (SURFEL_GI_GUIDE_DIM * SURFEL_GI_GUIDE_DIM)
+#define SURFEL_GI_GUIDE_TOTAL_FLOATS (SURFEL_GI_GUIDE_LOBE_COUNT + SURFEL_GI_GUIDE_DIM)
+#define SURFEL_GI_GUIDE_LEARNING_RATE 0.02
+#define SURFEL_GI_GUIDE_MAX_BLEND 0.9
+
 struct SurfelActiveCounter
 {
     uint Count;
@@ -32,6 +38,7 @@ struct SurfelGIInlineRayGatherUniformBuffer
     float MaxRayDistance;
     float NormalBias;
     float HistoryBlend;
+    uint UseGuiding;
     float HitDepthThickness;
     int FrameNumber;
     float Padding0;
@@ -51,8 +58,9 @@ SamplerState GBufferNormalSampler : register(s5, space0);
 Texture2D GBufferAlbedoTexture : register(t6, space0);
 SamplerState GBufferAlbedoSampler : register(s6, space0);
 RWStructuredBuffer<SurfelIrradianceData> SurfelIrradianceBuffer : register(u7, space0);
+RWStructuredBuffer<float> SurfelGuidingBuffer : register(u8, space0);
 
-cbuffer GatherUniform : register(b8, space0)
+cbuffer GatherUniform : register(b9, space0)
 {
     SurfelGIInlineRayGatherUniformBuffer Gather;
 }
@@ -128,6 +136,12 @@ struct MSMEState
     float Inconsistency;
 };
 
+struct GuidedSample
+{
+    float3 LocalDir;
+    float2 UV;
+};
+
 float ComputeMSMEShortWindowBlend(uint sampleCount, float historyBlend)
 {
     const float baseBlend = (1.0 - saturate(historyBlend)) * (max((float)sampleCount, 1.0) / 4.0);
@@ -167,6 +181,131 @@ MSMEState RunMSME(float3 y, MSMEState dataIn, float shortWindowBlend)
     return data;
 }
 
+uint GetGuidingBaseIndex(uint surfelIndex)
+{
+    return surfelIndex * SURFEL_GI_GUIDE_TOTAL_FLOATS;
+}
+
+float GetGuidingTotalMass(uint surfelIndex)
+{
+    const uint baseIndex = GetGuidingBaseIndex(surfelIndex) + SURFEL_GI_GUIDE_LOBE_COUNT;
+    float total = 0.0;
+    [unroll] for (uint row = 0u; row < SURFEL_GI_GUIDE_DIM; ++row)
+    {
+        total += max(0.0, SurfelGuidingBuffer[baseIndex + row]);
+    }
+    return total;
+}
+
+float GetGuidingPDF(uint surfelIndex, float2 uv, float totalMass)
+{
+    if (totalMass <= 1e-6)
+        return 0.0;
+
+    const uint cellX = min((uint)floor(uv.x * SURFEL_GI_GUIDE_DIM), (uint)(SURFEL_GI_GUIDE_DIM - 1));
+    const uint cellY = min((uint)floor(uv.y * SURFEL_GI_GUIDE_DIM), (uint)(SURFEL_GI_GUIDE_DIM - 1));
+    const uint cellIndex = cellY * SURFEL_GI_GUIDE_DIM + cellX;
+    const uint baseIndex = GetGuidingBaseIndex(surfelIndex);
+    const float weight = max(0.0, SurfelGuidingBuffer[baseIndex + cellIndex]);
+    const float jacobian = HemiOctSquareJacobian(uv);
+    return (weight / totalMass) * ((float)SURFEL_GI_GUIDE_LOBE_COUNT / jacobian);
+}
+
+int SampleGuidingLobeIndex(uint surfelIndex, float u, float totalMass)
+{
+    if (totalMass <= 1e-6)
+        return -1;
+
+    const uint baseIndex = GetGuidingBaseIndex(surfelIndex);
+    const uint rowSumBaseIndex = baseIndex + SURFEL_GI_GUIDE_LOBE_COUNT;
+    float target = clamp(u * totalMass, 0.0, totalMass);
+    uint selectedRow = 0u;
+
+    [unroll] for (uint row = 0u; row < SURFEL_GI_GUIDE_DIM; ++row)
+    {
+        const float weight = max(0.0, SurfelGuidingBuffer[rowSumBaseIndex + row]);
+        if (target <= weight || row == (uint)(SURFEL_GI_GUIDE_DIM - 1))
+        {
+            selectedRow = row;
+            break;
+        }
+        target -= weight;
+    }
+
+    const uint rowBaseIndex = baseIndex + selectedRow * SURFEL_GI_GUIDE_DIM;
+    uint selectedCol = 0u;
+    [unroll] for (uint col = 0u; col < SURFEL_GI_GUIDE_DIM; ++col)
+    {
+        const float weight = max(0.0, SurfelGuidingBuffer[rowBaseIndex + col]);
+        if (target <= weight || col == (uint)(SURFEL_GI_GUIDE_DIM - 1))
+        {
+            selectedCol = col;
+            break;
+        }
+        target -= weight;
+    }
+
+    return (int)(selectedRow * SURFEL_GI_GUIDE_DIM + selectedCol);
+}
+
+float UpdateGuidingFromSample(uint surfelIndex, float2 uv, float luminance)
+{
+    const float2 gridPos = uv * SURFEL_GI_GUIDE_DIM - 0.5;
+    const float2 basePos = floor(gridPos);
+    const float2 fraction = frac(gridPos);
+    const uint baseIndex = GetGuidingBaseIndex(surfelIndex);
+    const uint rowSumBaseIndex = baseIndex + SURFEL_GI_GUIDE_LOBE_COUNT;
+    float massDiff = 0.0;
+
+    [unroll] for (int y = 0; y <= 1; ++y)
+    {
+        [unroll] for (int x = 0; x <= 1; ++x)
+        {
+            const int cellX = (int)basePos.x + x;
+            const int cellY = (int)basePos.y + y;
+            if (cellX < 0 || cellX >= SURFEL_GI_GUIDE_DIM || cellY < 0 || cellY >= SURFEL_GI_GUIDE_DIM)
+                continue;
+
+            const float weightX = (x == 0) ? (1.0 - fraction.x) : fraction.x;
+            const float weightY = (y == 0) ? (1.0 - fraction.y) : fraction.y;
+            const float target = luminance * weightX * weightY;
+            const uint cellIndex = (uint)cellY * SURFEL_GI_GUIDE_DIM + (uint)cellX;
+            const float oldValue = SurfelGuidingBuffer[baseIndex + cellIndex];
+            const float newValue = lerp(oldValue, target, SURFEL_GI_GUIDE_LEARNING_RATE);
+            SurfelGuidingBuffer[baseIndex + cellIndex] = newValue;
+
+            const float diff = newValue - oldValue;
+            SurfelGuidingBuffer[rowSumBaseIndex + (uint)cellY] += diff;
+            massDiff += diff;
+        }
+    }
+
+    return massDiff;
+}
+
+GuidedSample SampleGuidedDirection(uint surfelIndex, float totalMass, float guideBlend, inout uint seed)
+{
+    const float4 randoms = float4(SafeU01(Random_0_1(seed)), SafeU01(Random_0_1(seed)), SafeU01(Random_0_1(seed)), SafeU01(Random_0_1(seed)));
+    GuidedSample result;
+
+    if (totalMass > 1e-6 && guideBlend > 0.0 && randoms.w < guideBlend)
+    {
+        const int lobeIndex = SampleGuidingLobeIndex(surfelIndex, randoms.z, totalMass);
+        if (lobeIndex >= 0)
+        {
+            const uint col = (uint)lobeIndex % SURFEL_GI_GUIDE_DIM;
+            const uint row = (uint)lobeIndex / SURFEL_GI_GUIDE_DIM;
+            result.UV = float2(((float)col + randoms.x) / SURFEL_GI_GUIDE_DIM, ((float)row + randoms.y) / SURFEL_GI_GUIDE_DIM);
+            result.LocalDir = HemiOctSquareDecode(result.UV);
+            return result;
+        }
+    }
+
+    result.LocalDir = CosWeightedSampleHemisphereFromUniform(randoms.xy);
+    result.UV = HemiOctSquareEncode(result.LocalDir);
+    return result;
+}
+
 [numthreads(64, 1, 1)]
 void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 {
@@ -194,13 +333,32 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     const float3 rayOrigin = surfel.PositionRadius.xyz + normal * originBias;
     const float3 fallbackColor = max(surfel.AlbedoWeight.xyz, float3(0.03, 0.03, 0.03));
 
+    const SurfelIrradianceData prev = SurfelIrradianceBuffer[surfelIndex];
+    const float prevCount = max(prev.IrradianceAndCount.w, 0.0);
+    float guidingMass = GetGuidingTotalMass(surfelIndex);
+    const float guideRamp = saturate(prevCount / 16.0);
+    const float guideBlend = (Gather.UseGuiding != 0 && guidingMass > 1e-5) ? min(SURFEL_GI_GUIDE_MAX_BLEND * guideRamp, SURFEL_GI_GUIDE_MAX_BLEND) : 0.0;
+
     uint seed = InitGatherSeed(surfelIndex, (uint)max(Gather.FrameNumber, 0));
-    float3 accumulatedLi = 0.0;
+    float3 accumulatedIrradiance = 0.0;
 
     [loop] for (uint rayIndex = 0u; rayIndex < rayCount; ++rayIndex)
     {
-        const float3 localDir = CosWeightedSampleHemisphere(seed);
+        const GuidedSample guidedSample = SampleGuidedDirection(surfelIndex, guidingMass, guideBlend, seed);
+        const float3 localDir = guidedSample.LocalDir;
+        const float2 guideUV = guidedSample.UV;
+        const float cosTerm = max(0.0, localDir.z);
+        if (cosTerm <= 1e-6)
+            continue;
+
+        const float pdfCos = cosTerm / PI;
+        const float pdfGuide = (guideBlend > 0.0) ? GetGuidingPDF(surfelIndex, guideUV, guidingMass) : 0.0;
+        const float mixPdf = lerp(pdfCos, pdfGuide, guideBlend);
+        if (mixPdf <= 1e-6)
+            continue;
+
         const float3 worldDir = normalize(ToWorld(normal, localDir));
+        float3 sampleLi = 0.0;
 
         RayDesc rayDesc;
         rayDesc.Origin = rayOrigin;
@@ -217,18 +375,21 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         const uint committedStatus = rayQuery.CommittedStatus();
         if (committedStatus == COMMITTED_NOTHING)
         {
-            accumulatedLi += EvaluateMissRadiance(worldDir);
+            sampleLi = EvaluateMissRadiance(worldDir);
         }
         else if (committedStatus == COMMITTED_TRIANGLE_HIT)
         {
             const float hitRayT = rayQuery.CommittedRayT();
             const float3 hitWorldPos = rayOrigin + worldDir * hitRayT;
-            accumulatedLi += EvaluateHitRadiance(surfel.PositionRadius.xyz, hitWorldPos, hitRayT, fallbackColor);
+            sampleLi = EvaluateHitRadiance(surfel.PositionRadius.xyz, hitWorldPos, hitRayT, fallbackColor);
         }
+
+        accumulatedIrradiance += sampleLi * (cosTerm / mixPdf);
+        const float sampleLuminance = dot(sampleLi, float3(0.2126, 0.7152, 0.0722)) * cosTerm;
+        guidingMass = max(guidingMass + UpdateGuidingFromSample(surfelIndex, guideUV, sampleLuminance), 0.0);
     }
 
-    const float3 currentIrradiance = PI * (accumulatedLi / (float)rayCount);
-    const SurfelIrradianceData prev = SurfelIrradianceBuffer[surfelIndex];
+    const float3 currentIrradiance = accumulatedIrradiance / (float)rayCount;
     MSMEState state;
     state.Mean = prev.IrradianceAndCount.xyz;
     state.ShortMean = prev.MSMEData0.xyz;
@@ -236,7 +397,6 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     state.Variance = max(prev.MSMEData1.xyz, 0.0);
     state.Inconsistency = clamp(prev.MSMEData1.w, 0.0, 10.0);
 
-    const float prevCount = max(prev.IrradianceAndCount.w, 0.0);
     const float shortWindowBlend = ComputeMSMEShortWindowBlend(rayCount, Gather.HistoryBlend);
     if (prevCount < 32.0)
     {

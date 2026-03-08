@@ -118,11 +118,14 @@ struct jOptions
     bool ShowSurfelGICellGrid;
     bool ShowSurfelGISpawnAttemptDebug;
     bool ShowSurfelGIIrradianceDebug;
+    bool ShowSurfelGIHoverRayDebug;
     bool SurfelGIInlineRayEnable;
+    bool SurfelGIInlineRayGuideEnable;
     int32 SurfelGIInlineRayCount;
     float SurfelGIInlineRayMaxDistance;
     float SurfelGIInlineRayNormalBias;
     float SurfelGIInlineRayHistoryBlend;
+    float SurfelGIIntensity;
     int32 SurfelGIIrradianceDebugMode;
     int32 SurfelGIVisualizeNeighborCellRadius;
     bool SurfelGIVisualizeBlendWithScene;

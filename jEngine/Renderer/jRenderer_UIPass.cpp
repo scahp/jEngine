@@ -654,11 +654,13 @@ void IRenderer::UIPass()
                     ImGui::Checkbox("Enable Inline Ray Gather", &gOptions.SurfelGIInlineRayEnable);
                     if (gOptions.SurfelGIInlineRayEnable)
                     {
+                        ImGui::Checkbox("Enable Guiding", &gOptions.SurfelGIInlineRayGuideEnable);
                         DrawSliderInt60_40("Inline Ray Count", &gOptions.SurfelGIInlineRayCount, 1, 16);
                         DrawSliderFloat60_40("Inline Ray Max Distance", &gOptions.SurfelGIInlineRayMaxDistance, 10.0f, 5000.0f);
                         DrawSliderFloat60_40("Inline Ray Normal Bias", &gOptions.SurfelGIInlineRayNormalBias, 0.001f, 10.0f);
                         DrawSliderFloat60_40("MSME History Blend", &gOptions.SurfelGIInlineRayHistoryBlend, 0.0f, 0.99f);
                     }
+                    DrawSliderFloat60_40("Surfel GI Intensity", &gOptions.SurfelGIIntensity, 0.0f, 8.0f);
 
                     ImGui::Separator();
                     ImGui::TextColored(ImVec4(1, 1, 0, 1), "Visualization");
@@ -670,6 +672,7 @@ void IRenderer::UIPass()
                     ImGui::Checkbox("Show Surfel Cell Grid", &gOptions.ShowSurfelGICellGrid);
                     ImGui::Checkbox("Show Spawn Attempt Points", &gOptions.ShowSurfelGISpawnAttemptDebug);
                     ImGui::Checkbox("Show Surfel Irradiance", &gOptions.ShowSurfelGIIrradianceDebug);
+                    ImGui::Checkbox("Show Hover Ray Debug", &gOptions.ShowSurfelGIHoverRayDebug);
                     if (gOptions.ShowSurfelGIIrradianceDebug)
                     {
                         static const char* GIrradianceDebugModes[] =
