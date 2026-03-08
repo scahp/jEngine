@@ -38,7 +38,8 @@ struct VisualizeUniformBuffer
     int ShowCellGrid;
     int ShowSpawnAttemptDebug;
     int ShowIrradianceDebug;
-    int3 Padding0;
+    int IrradianceDebugMode;
+    int2 Padding0;
 };
 
 struct SurfelData
@@ -51,7 +52,9 @@ struct SurfelData
 
 struct SurfelIrradianceData
 {
-    float4 IrradianceAndWeight;
+    float4 IrradianceAndCount;
+    float4 MSMEData0;
+    float4 MSMEData1;
 };
 
 RWTexture2D<float4> Result : register(u0, space0);
@@ -131,6 +134,19 @@ float3 IrradianceDebugColor(float3 irradiance, float historyWeight)
     const float3 gammaCorrected = pow(saturate(chroma * mappedLuma), 1.0 / 2.2);
     const float confidence = saturate(0.3 + historyWeight / 12.0);
     return lerp(float3(0.06, 0.06, 0.06), gammaCorrected, confidence);
+}
+
+float3 MSMEScalarDebugColor(float value)
+{
+    const float t = saturate(value);
+    return lerp(float3(0.05, 0.08, 0.20), float3(1.0, 0.22, 0.10), t);
+}
+
+float3 MSMEStateDebugColor(float count, float vbbr, float inconsistency)
+{
+    const float countVis = saturate(count / 32.0);
+    const float inconsistencyVis = saturate(inconsistency / 2.0);
+    return saturate(float3(countVis, vbbr, inconsistencyVis));
 }
 
 uint GetSlotsPerCell(uint maxSurfels, uint desiredSlotsPerCell)
@@ -466,8 +482,34 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                             bestCascadeIndex = (int)cascadeIndex;
                             if (VisualizeCommon.ShowIrradianceDebug != 0)
                             {
-                                const float4 irradianceAndWeight = SurfelIrradianceBuffer[surfelIndex].IrradianceAndWeight;
-                                bestColor = IrradianceDebugColor(max(irradianceAndWeight.xyz, 0.0), irradianceAndWeight.w);
+                                const SurfelIrradianceData irradianceData = SurfelIrradianceBuffer[surfelIndex];
+                                const float3 meanIrradiance = max(irradianceData.IrradianceAndCount.xyz, 0.0);
+                                const float3 shortMeanIrradiance = max(irradianceData.MSMEData0.xyz, 0.0);
+                                const float3 variance = max(irradianceData.MSMEData1.xyz, 0.0);
+                                const float count = irradianceData.IrradianceAndCount.w;
+                                const float vbbr = irradianceData.MSMEData0.w;
+                                const float inconsistency = irradianceData.MSMEData1.w;
+
+                                if (VisualizeCommon.IrradianceDebugMode == 1)
+                                {
+                                    bestColor = IrradianceDebugColor(shortMeanIrradiance, count);
+                                }
+                                else if (VisualizeCommon.IrradianceDebugMode == 2)
+                                {
+                                    bestColor = IrradianceDebugColor(variance, 1.0);
+                                }
+                                else if (VisualizeCommon.IrradianceDebugMode == 3)
+                                {
+                                    bestColor = MSMEScalarDebugColor(saturate(inconsistency / 2.0));
+                                }
+                                else if (VisualizeCommon.IrradianceDebugMode == 4)
+                                {
+                                    bestColor = MSMEStateDebugColor(count, vbbr, inconsistency);
+                                }
+                                else
+                                {
+                                    bestColor = IrradianceDebugColor(meanIrradiance, count);
+                                }
                             }
                             else if (VisualizeCommon.ShowCellDebug != 0)
                             {

@@ -258,20 +258,19 @@ float Random_0_1(inout uint seed)
 //  - https://pbr-book.org/4ed/Sampling_Algorithms/Sampling_Multidimensional_Functions#SampleCosineHemisphere
 //  - https://github.com/knightcrawler25/GLSL-PathTracer/blob/master/src/shaders/common/disney.glsl
 //  - https://github.com/phgphg777/DXR-PathTracer/blob/master/DXRPathTracer/sampling.hlsli
-// Sampling cosine weighted vector in Hemisphere
 float3 CosWeightedSampleHemisphere(inout uint RandomSeed)
 {
     float rand1 = Random_0_1(RandomSeed);
     float rand2 = Random_0_1(RandomSeed);
-    
+
     float3 SampleDir = 0;
-    
+
     // Sampling on disk
     float r = sqrt(rand1); // for cosine weight. - check out the grpah of sqrt(x)
     float phi = TWO_PI * rand2;
     SampleDir.x = r * cos(phi);
     SampleDir.y = r * sin(phi);
-    
+
     // Then z is evaluated by using 'Pythagorean theorem'.
     SampleDir.z = sqrt(max(0.0f, 1.0f - r * r));
     return SampleDir;

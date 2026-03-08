@@ -123,6 +123,7 @@ struct jOptions
     float SurfelGIInlineRayMaxDistance;
     float SurfelGIInlineRayNormalBias;
     float SurfelGIInlineRayHistoryBlend;
+    int32 SurfelGIIrradianceDebugMode;
     int32 SurfelGIVisualizeNeighborCellRadius;
     bool SurfelGIVisualizeBlendWithScene;
     float SurfelGIVisualizeBlendAlpha;

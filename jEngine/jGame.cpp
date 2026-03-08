@@ -103,7 +103,8 @@ void jGame::Setup()
         static jConsoleVariableInt* cvar_SurfelGIInlineRayCount = new jConsoleVariableInt("r.surfelgi.inline_ray.count", &gOptions.SurfelGIInlineRayCount, "SurfelGI inline ray count per surfel");
         static jConsoleVariableFloat* cvar_SurfelGIInlineRayMaxDistance = new jConsoleVariableFloat("r.surfelgi.inline_ray.max_distance", &gOptions.SurfelGIInlineRayMaxDistance, "SurfelGI inline ray max trace distance");
         static jConsoleVariableFloat* cvar_SurfelGIInlineRayNormalBias = new jConsoleVariableFloat("r.surfelgi.inline_ray.normal_bias", &gOptions.SurfelGIInlineRayNormalBias, "SurfelGI inline ray origin normal bias");
-        static jConsoleVariableFloat* cvar_SurfelGIInlineRayHistoryBlend = new jConsoleVariableFloat("r.surfelgi.inline_ray.history_blend", &gOptions.SurfelGIInlineRayHistoryBlend, "SurfelGI inline ray temporal history blend");
+        static jConsoleVariableFloat* cvar_SurfelGIInlineRayHistoryBlend = new jConsoleVariableFloat("r.surfelgi.inline_ray.history_blend", &gOptions.SurfelGIInlineRayHistoryBlend, "SurfelGI inline ray MSME short-window control");
+        static jConsoleVariableInt* cvar_SurfelGIIrradianceDebugMode = new jConsoleVariableInt("r.surfelgi.visualize.irradiance_mode", &gOptions.SurfelGIIrradianceDebugMode, "SurfelGI irradiance visualize mode (0=mean, 1=short_mean, 2=variance, 3=inconsistency, 4=count_vbbr)");
         static jConsoleVariableInt* cvar_SurfelGISurfelsPerCell[SURFEL_GI_CASCADE_COUNT] = {};
         for (int32 cascade = 0; cascade < SURFEL_GI_CASCADE_COUNT; ++cascade)
         {

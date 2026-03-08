@@ -33,7 +33,9 @@ struct jSurfelGPU
 
 struct alignas(16) jSurfelIrradianceGPU
 {
-    Vector4 IrradianceAndWeight = Vector4(0.0f, 0.0f, 0.0f, 0.0f);
+    Vector4 IrradianceAndCount = Vector4(0.0f, 0.0f, 0.0f, 0.0f);
+    Vector4 MSMEData0 = Vector4(0.0f, 0.0f, 0.0f, 0.0f);
+    Vector4 MSMEData1 = Vector4(0.0f, 0.0f, 0.0f, 0.0f);
 };
 
 struct alignas(16) jVisibleCellGPU
@@ -1805,9 +1807,9 @@ void jRenderer::SurfelGIPass()
             int32 ShowCellGrid;
             int32 ShowSpawnAttemptDebug;
             int32 ShowIrradianceDebug;
+            int32 IrradianceDebugMode;
             int32 Padding0;
             int32 Padding1;
-            int32 Padding2;
         };
         static_assert((sizeof(jSurfelGIVisualizeUniformBuffer) % 16) == 0, "jSurfelGIVisualizeUniformBuffer size must be 16-byte aligned");
 
@@ -1874,9 +1876,9 @@ void jRenderer::SurfelGIPass()
         VisualizeUniformData.ShowCellGrid = gOptions.ShowSurfelGICellGrid ? 1 : 0;
         VisualizeUniformData.ShowSpawnAttemptDebug = gOptions.ShowSurfelGISpawnAttemptDebug ? 1 : 0;
         VisualizeUniformData.ShowIrradianceDebug = gOptions.ShowSurfelGIIrradianceDebug ? 1 : 0;
+        VisualizeUniformData.IrradianceDebugMode = Clamp(gOptions.SurfelGIIrradianceDebugMode, 0, 4);
         VisualizeUniformData.Padding0 = 0;
         VisualizeUniformData.Padding1 = 0;
-        VisualizeUniformData.Padding2 = 0;
 
         auto VisualizeUniformBuffer = std::shared_ptr<IUniformBufferBlock>(
             g_rhi->CreateUniformBufferBlock(jNameStatic("SurfelGIVisualizeUniformBuffer"), jLifeTimeType::OneFrame, sizeof(VisualizeUniformData)));

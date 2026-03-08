@@ -657,7 +657,7 @@ void IRenderer::UIPass()
                         DrawSliderInt60_40("Inline Ray Count", &gOptions.SurfelGIInlineRayCount, 1, 16);
                         DrawSliderFloat60_40("Inline Ray Max Distance", &gOptions.SurfelGIInlineRayMaxDistance, 10.0f, 5000.0f);
                         DrawSliderFloat60_40("Inline Ray Normal Bias", &gOptions.SurfelGIInlineRayNormalBias, 0.001f, 10.0f);
-                        DrawSliderFloat60_40("Inline Ray History Blend", &gOptions.SurfelGIInlineRayHistoryBlend, 0.0f, 0.99f);
+                        DrawSliderFloat60_40("MSME History Blend", &gOptions.SurfelGIInlineRayHistoryBlend, 0.0f, 0.99f);
                     }
 
                     ImGui::Separator();
@@ -670,6 +670,31 @@ void IRenderer::UIPass()
                     ImGui::Checkbox("Show Surfel Cell Grid", &gOptions.ShowSurfelGICellGrid);
                     ImGui::Checkbox("Show Spawn Attempt Points", &gOptions.ShowSurfelGISpawnAttemptDebug);
                     ImGui::Checkbox("Show Surfel Irradiance", &gOptions.ShowSurfelGIIrradianceDebug);
+                    if (gOptions.ShowSurfelGIIrradianceDebug)
+                    {
+                        static const char* GIrradianceDebugModes[] =
+                        {
+                            "Mean",
+                            "Short Mean",
+                            "Variance",
+                            "Inconsistency",
+                            "Count / VBBR"
+                        };
+                        const int32 IrradianceDebugModeCount = (int32)(sizeof(GIrradianceDebugModes) / sizeof(GIrradianceDebugModes[0]));
+                        gOptions.SurfelGIIrradianceDebugMode = Clamp(gOptions.SurfelGIIrradianceDebugMode, 0, IrradianceDebugModeCount - 1);
+                        if (ImGui::BeginCombo("Irradiance Debug Mode", GIrradianceDebugModes[gOptions.SurfelGIIrradianceDebugMode], ImGuiComboFlags_None))
+                        {
+                            for (int32 mode = 0; mode < IrradianceDebugModeCount; ++mode)
+                            {
+                                const bool isSelected = (gOptions.SurfelGIIrradianceDebugMode == mode);
+                                if (ImGui::Selectable(GIrradianceDebugModes[mode], isSelected))
+                                    gOptions.SurfelGIIrradianceDebugMode = mode;
+                                if (isSelected)
+                                    ImGui::SetItemDefaultFocus();
+                            }
+                            ImGui::EndCombo();
+                        }
+                    }
                     DrawSliderInt60_40("Neighbor Cell Radius", &gOptions.SurfelGIVisualizeNeighborCellRadius, 0, 3);
                     ImGui::Checkbox("Blend With Scene", &gOptions.SurfelGIVisualizeBlendWithScene);
                     if (gOptions.SurfelGIVisualizeBlendWithScene)

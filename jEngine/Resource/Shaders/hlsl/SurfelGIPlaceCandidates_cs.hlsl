@@ -84,7 +84,9 @@ struct SurfelGIStats
 
 struct SurfelIrradianceData
 {
-    float4 IrradianceAndWeight;
+    float4 IrradianceAndCount;
+    float4 MSMEData0;
+    float4 MSMEData1;
 };
 
 struct SurfelCandidate
@@ -258,7 +260,9 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     SurfelPool[writeIndex] = outSurfel;
 
     SurfelIrradianceData outIrradiance;
-    outIrradiance.IrradianceAndWeight = float4(0.0, 0.0, 0.0, 0.0);
+    outIrradiance.IrradianceAndCount = float4(0.0, 0.0, 0.0, 0.0);
+    outIrradiance.MSMEData0 = float4(0.0, 0.0, 0.0, 0.0);
+    outIrradiance.MSMEData1 = float4(0.0, 0.0, 0.0, 0.0);
     SurfelIrradianceBuffer[writeIndex] = outIrradiance;
 
     if (isNormalMismatchReplace)

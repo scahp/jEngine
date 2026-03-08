@@ -66,7 +66,9 @@ struct SurfelData
 
 struct SurfelIrradianceData
 {
-    float4 IrradianceAndWeight;
+    float4 IrradianceAndCount;
+    float4 MSMEData0;
+    float4 MSMEData1;
 };
 
 RWStructuredBuffer<SurfelData> SurfelPool : register(u0, space0);
@@ -237,7 +239,9 @@ void main(uint3 DTid : SV_DispatchThreadID)
         SurfelPool[surfelIndex] = s;
 
         SurfelIrradianceData ir;
-        ir.IrradianceAndWeight = float4(0.0, 0.0, 0.0, 0.0);
+        ir.IrradianceAndCount = float4(0.0, 0.0, 0.0, 0.0);
+        ir.MSMEData0 = float4(0.0, 0.0, 0.0, 0.0);
+        ir.MSMEData1 = float4(0.0, 0.0, 0.0, 0.0);
         SurfelIrradianceBuffer[surfelIndex] = ir;
     }
 }

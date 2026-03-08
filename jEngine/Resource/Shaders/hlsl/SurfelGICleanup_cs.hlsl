@@ -75,7 +75,9 @@ struct SurfelData
 
 struct SurfelIrradianceData
 {
-    float4 IrradianceAndWeight;
+    float4 IrradianceAndCount;
+    float4 MSMEData0;
+    float4 MSMEData1;
 };
 
 cbuffer ComputeCommon : register(b2, space0)
@@ -212,7 +214,9 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
             SurfelPool[surfelIndex] = s;
 
             SurfelIrradianceData ir;
-            ir.IrradianceAndWeight = float4(0.0, 0.0, 0.0, 0.0);
+            ir.IrradianceAndCount = float4(0.0, 0.0, 0.0, 0.0);
+            ir.MSMEData0 = float4(0.0, 0.0, 0.0, 0.0);
+            ir.MSMEData1 = float4(0.0, 0.0, 0.0, 0.0);
             SurfelIrradianceBuffer[surfelIndex] = ir;
         }
         return;
@@ -241,7 +245,9 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         SurfelPool[surfelIndex] = s;
 
         SurfelIrradianceData ir;
-        ir.IrradianceAndWeight = float4(0.0, 0.0, 0.0, 0.0);
+        ir.IrradianceAndCount = float4(0.0, 0.0, 0.0, 0.0);
+        ir.MSMEData0 = float4(0.0, 0.0, 0.0, 0.0);
+        ir.MSMEData1 = float4(0.0, 0.0, 0.0, 0.0);
         SurfelIrradianceBuffer[surfelIndex] = ir;
     }
 }

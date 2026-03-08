@@ -758,7 +758,9 @@ struct SurfelGIData
 
 struct SurfelGIIrradianceData
 {
-    float4 IrradianceAndWeight;
+    float4 IrradianceAndCount;
+    float4 MSMEData0;
+    float4 MSMEData1;
 };
 
 struct SurfelGIActiveCounter
@@ -795,6 +797,54 @@ uint InitSurfelGatherSeed(uint SurfelIndex, uint FrameNumber)
 float3 EvaluateSurfelGatherMissRadiance(in float3 WorldDir)
 {
     return EnvTexture.SampleLevel(DefaultSamplerState, normalize(WorldDir), 0.0).rgb;
+}
+
+struct SurfelGIMSMEState
+{
+    float3 Mean;
+    float3 ShortMean;
+    float VBBR;
+    float3 Variance;
+    float Inconsistency;
+};
+
+float ComputeMSMEShortWindowBlend(uint SampleCount, float HistoryBlend)
+{
+    const float BaseBlend = (1.0 - saturate(HistoryBlend)) * (max((float)SampleCount, 1.0) / 4.0);
+    return clamp(BaseBlend, 0.01, 0.10);
+}
+
+SurfelGIMSMEState RunMSME(float3 Y, SurfelGIMSMEState DataIn, float ShortWindowBlend)
+{
+    SurfelGIMSMEState Data = DataIn;
+
+    const float3 Dev = sqrt(max(float3(1e-5, 1e-5, 1e-5), Data.Variance));
+    const float3 HighThreshold = float3(0.1, 0.1, 0.1) + Data.ShortMean + Dev * 8.0;
+    const float3 YClamped = min(Y, HighThreshold);
+
+    const float3 Delta = YClamped - Data.ShortMean;
+    Data.ShortMean = lerp(Data.ShortMean, YClamped, ShortWindowBlend);
+    const float3 Delta2 = YClamped - Data.ShortMean;
+
+    const float VarianceBlend = ShortWindowBlend * 0.5;
+    Data.Variance = lerp(Data.Variance, Delta * Delta2, VarianceBlend);
+    Data.Variance = max(Data.Variance, 0.0);
+
+    const float3 DevNew = sqrt(max(float3(1e-5, 1e-5, 1e-5), Data.Variance));
+    const float3 ShortDiff = Data.Mean - Data.ShortMean;
+    const float RelativeDiff = dot(float3(0.299, 0.587, 0.114), abs(ShortDiff) / max(float3(1e-5, 1e-5, 1e-5), DevNew));
+    Data.Inconsistency = lerp(Data.Inconsistency, RelativeDiff, 0.08);
+
+    const float3 Term = (0.5 * Data.ShortMean) / max(float3(1e-5, 1e-5, 1e-5), DevNew);
+    const float VarianceBasedBlendReduction = clamp(dot(float3(0.299, 0.587, 0.114), Term), 1.0 / 32.0, 1.0);
+
+    const float CatchUpFactor = smoothstep(0.0, 1.0, RelativeDiff * max(0.02, Data.Inconsistency - 0.2));
+    float CatchUpBlend = clamp(CatchUpFactor, 1.0 / 256.0, 1.0);
+    CatchUpBlend *= Data.VBBR;
+    Data.VBBR = lerp(Data.VBBR, VarianceBasedBlendReduction, 0.1);
+
+    Data.Mean = lerp(Data.Mean, YClamped, saturate(CatchUpBlend));
+    return Data;
 }
 
 [numthreads(64, 1, 1)]
@@ -873,10 +923,32 @@ void SurfelGIGatherIrradianceHWRT_CS(uint3 DispatchThreadID : SV_DispatchThreadI
 
     const float3 CurrentIrradiance = PI * (AccumulatedLi / (float)RayCount);
     const SurfelGIIrradianceData Prev = SurfelGIIrradianceBuffer[SurfelIndex];
-    const float HistoryBlend = saturate(g_surfelGatherCB.HistoryBlend);
+    SurfelGIMSMEState State;
+    State.Mean = Prev.IrradianceAndCount.xyz;
+    State.ShortMean = Prev.MSMEData0.xyz;
+    State.VBBR = clamp(Prev.MSMEData0.w, 1.0 / 32.0, 1.0);
+    State.Variance = max(Prev.MSMEData1.xyz, 0.0);
+    State.Inconsistency = clamp(Prev.MSMEData1.w, 0.0, 10.0);
+
+    const float PrevCount = max(Prev.IrradianceAndCount.w, 0.0);
+    const float ShortWindowBlend = ComputeMSMEShortWindowBlend(RayCount, g_surfelGatherCB.HistoryBlend);
+    if (PrevCount < 32.0)
+    {
+        const float Blend = 1.0 / (1.0 + PrevCount);
+        State.Mean = lerp(State.Mean, CurrentIrradiance, Blend);
+        State.ShortMean = lerp(State.ShortMean, CurrentIrradiance, Blend);
+        State.Variance = lerp(State.Variance, float3(1.0, 1.0, 1.0), Blend);
+        State.VBBR = max(State.VBBR, 1.0);
+        State.Inconsistency = max(State.Inconsistency, 1.0);
+    }
+    else
+    {
+        State = RunMSME(CurrentIrradiance, State, ShortWindowBlend);
+    }
 
     SurfelGIIrradianceData OutData;
-    OutData.IrradianceAndWeight.xyz = lerp(CurrentIrradiance, Prev.IrradianceAndWeight.xyz, HistoryBlend);
-    OutData.IrradianceAndWeight.w = max(0.0, lerp((float)RayCount, Prev.IrradianceAndWeight.w, HistoryBlend));
+    OutData.IrradianceAndCount = float4(State.Mean, min(PrevCount + 1.0, 200.0));
+    OutData.MSMEData0 = float4(State.ShortMean, State.VBBR);
+    OutData.MSMEData1 = float4(State.Variance, State.Inconsistency);
     SurfelGIIrradianceBuffer[SurfelIndex] = OutData;
 }

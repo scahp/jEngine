@@ -10,7 +10,9 @@ struct SurfelData
 
 struct SurfelIrradianceData
 {
-    float4 IrradianceAndWeight;
+    float4 IrradianceAndCount;
+    float4 MSMEData0;
+    float4 MSMEData1;
 };
 
 struct SurfelActiveCounter
@@ -117,6 +119,54 @@ float3 EvaluateHitRadiance(float3 receiverWorldPos, float3 hitWorldPos, float hi
     return max(sampledHitAlbedo, fallbackColor * 0.25) * bounce;
 }
 
+struct MSMEState
+{
+    float3 Mean;
+    float3 ShortMean;
+    float VBBR;
+    float3 Variance;
+    float Inconsistency;
+};
+
+float ComputeMSMEShortWindowBlend(uint sampleCount, float historyBlend)
+{
+    const float baseBlend = (1.0 - saturate(historyBlend)) * (max((float)sampleCount, 1.0) / 4.0);
+    return clamp(baseBlend, 0.01, 0.10);
+}
+
+MSMEState RunMSME(float3 y, MSMEState dataIn, float shortWindowBlend)
+{
+    MSMEState data = dataIn;
+
+    const float3 dev = sqrt(max(float3(1e-5, 1e-5, 1e-5), data.Variance));
+    const float3 highThreshold = float3(0.1, 0.1, 0.1) + data.ShortMean + dev * 8.0;
+    const float3 yClamped = min(y, highThreshold);
+
+    const float3 delta = yClamped - data.ShortMean;
+    data.ShortMean = lerp(data.ShortMean, yClamped, shortWindowBlend);
+    const float3 delta2 = yClamped - data.ShortMean;
+
+    const float varianceBlend = shortWindowBlend * 0.5;
+    data.Variance = lerp(data.Variance, delta * delta2, varianceBlend);
+    data.Variance = max(data.Variance, 0.0);
+
+    const float3 devNew = sqrt(max(float3(1e-5, 1e-5, 1e-5), data.Variance));
+    const float3 shortDiff = data.Mean - data.ShortMean;
+    const float relativeDiff = dot(float3(0.299, 0.587, 0.114), abs(shortDiff) / max(float3(1e-5, 1e-5, 1e-5), devNew));
+    data.Inconsistency = lerp(data.Inconsistency, relativeDiff, 0.08);
+
+    const float3 term = (0.5 * data.ShortMean) / max(float3(1e-5, 1e-5, 1e-5), devNew);
+    const float varianceBasedBlendReduction = clamp(dot(float3(0.299, 0.587, 0.114), term), 1.0 / 32.0, 1.0);
+
+    const float catchUpFactor = smoothstep(0.0, 1.0, relativeDiff * max(0.02, data.Inconsistency - 0.2));
+    float catchUpBlend = clamp(catchUpFactor, 1.0 / 256.0, 1.0);
+    catchUpBlend *= data.VBBR;
+    data.VBBR = lerp(data.VBBR, varianceBasedBlendReduction, 0.1);
+
+    data.Mean = lerp(data.Mean, yClamped, saturate(catchUpBlend));
+    return data;
+}
+
 [numthreads(64, 1, 1)]
 void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 {
@@ -179,10 +229,32 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 
     const float3 currentIrradiance = PI * (accumulatedLi / (float)rayCount);
     const SurfelIrradianceData prev = SurfelIrradianceBuffer[surfelIndex];
-    const float historyBlend = saturate(Gather.HistoryBlend);
+    MSMEState state;
+    state.Mean = prev.IrradianceAndCount.xyz;
+    state.ShortMean = prev.MSMEData0.xyz;
+    state.VBBR = clamp(prev.MSMEData0.w, 1.0 / 32.0, 1.0);
+    state.Variance = max(prev.MSMEData1.xyz, 0.0);
+    state.Inconsistency = clamp(prev.MSMEData1.w, 0.0, 10.0);
+
+    const float prevCount = max(prev.IrradianceAndCount.w, 0.0);
+    const float shortWindowBlend = ComputeMSMEShortWindowBlend(rayCount, Gather.HistoryBlend);
+    if (prevCount < 32.0)
+    {
+        const float blend = 1.0 / (1.0 + prevCount);
+        state.Mean = lerp(state.Mean, currentIrradiance, blend);
+        state.ShortMean = lerp(state.ShortMean, currentIrradiance, blend);
+        state.Variance = lerp(state.Variance, float3(1.0, 1.0, 1.0), blend);
+        state.VBBR = max(state.VBBR, 1.0);
+        state.Inconsistency = max(state.Inconsistency, 1.0);
+    }
+    else
+    {
+        state = RunMSME(currentIrradiance, state, shortWindowBlend);
+    }
 
     SurfelIrradianceData outData;
-    outData.IrradianceAndWeight.xyz = lerp(currentIrradiance, prev.IrradianceAndWeight.xyz, historyBlend);
-    outData.IrradianceAndWeight.w = max(0.0, lerp((float)rayCount, prev.IrradianceAndWeight.w, historyBlend));
+    outData.IrradianceAndCount = float4(state.Mean, min(prevCount + 1.0, 200.0));
+    outData.MSMEData0 = float4(state.ShortMean, state.VBBR);
+    outData.MSMEData1 = float4(state.Variance, state.Inconsistency);
     SurfelIrradianceBuffer[surfelIndex] = outData;
 }
