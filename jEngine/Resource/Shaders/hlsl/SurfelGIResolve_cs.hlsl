@@ -5,6 +5,9 @@
 #endif
 #define SURFEL_GI_CASCADE_PACKED_COUNT ((SURFEL_GI_CASCADE_COUNT + 3) / 4)
 
+// This shader is the bridge between surfel-space lighting and pixel-space shading.
+// Earlier passes store irradiance on surfels; this pass asks which surfels should influence
+// the current screen pixel and combines their irradiance into a screen-space texture.
 struct ResolveUniformBuffer
 {
     float4x4 InvP;
@@ -27,6 +30,9 @@ struct ResolveUniformBuffer
     int SurfelPageSize;
     int SurfelPageTableCapacity;
     int NeighborCellRadius;
+    float ResolveSoftness;
+    float ResolveWarmupSamples;
+    float2 Padding0;
 };
 
 struct SurfelData
@@ -58,6 +64,8 @@ cbuffer ResolveCommon : register(b6, space0)
     ResolveUniformBuffer ResolveCommon;
 }
 
+// Cascade parameters are packed 4-at-a-time on the CPU to keep the uniform buffer compact.
+// These helpers unpack the lane that belongs to the current cascade index.
 float GetPackedFloat(float4 packedArray[SURFEL_GI_CASCADE_PACKED_COUNT], uint cascadeIndex)
 {
     const uint c = min(cascadeIndex, (uint)(SURFEL_GI_CASCADE_COUNT - 1));
@@ -155,6 +163,8 @@ uint GetCascadeCellBase(uint cascadeIndex)
 
 bool TryWorldCellToLinear(int3 worldCell, uint cascadeIndex, out uint outCellLinear)
 {
+    // Clipmap cascades behave like scrolling ring buffers in world space.
+    // "local" is the logical cell coordinate, "phys" is the wrapped location inside the ring.
     const int3 dim = GetCascadeDimDirect(cascadeIndex);
     const int3 local = worldCell - GetCascadeOriginCell(cascadeIndex);
     if (any(local < 0) || any(local >= dim))
@@ -188,16 +198,26 @@ bool TryGetCellBaseIndex(int3 cellCoord, uint maxSurfels, uint cascadeIndex, out
 
 float ComputeSurfelWeight(float3 pixelWorldPos, float3 pixelWorldNormal, SurfelData surfel, SurfelIrradianceData irradiance)
 {
+    // Resolve is intentionally conservative: a surfel should only influence pixels that look like
+    // they lie on the same local surface patch. We therefore combine:
+    // - plane distance: reject pixels far away from the surfel's tangent plane
+    // - radial distance: reject pixels outside the surfel's footprint
+    // - normal alignment: avoid mixing unrelated surface orientations
+    // - receiver facing: avoid using the back side of the surfel too strongly
+    // - confidence: favor surfels whose temporal history has matured
     const float3 surfelNormal = normalize(surfel.NormalSeenFrame.xyz);
     const float surfelRadius = max(surfel.PositionRadius.w, 0.001);
+    const float resolveSoftness = max(ResolveCommon.ResolveSoftness, 0.1);
+    const float planeExtent = surfelRadius * (1.25 * resolveSoftness);
+    const float radialExtent = surfelRadius * (2.0 * resolveSoftness);
     const float3 delta = pixelWorldPos - surfel.PositionRadius.xyz;
     const float planeDistance = abs(dot(delta, surfelNormal));
     const float3 tangentOffset = delta - surfelNormal * dot(delta, surfelNormal);
     const float radialDistance = length(tangentOffset);
     const float normalAlignment = saturate(dot(pixelWorldNormal, surfelNormal));
     const float receiverFacing = saturate(dot(surfelNormal, normalize(pixelWorldPos - surfel.PositionRadius.xyz)) * 0.5 + 0.5);
-    const float planeWeight = saturate(1.0 - planeDistance / (surfelRadius * 1.25));
-    const float radialWeight = saturate(1.0 - radialDistance / (surfelRadius * 2.0));
+    const float planeWeight = saturate(1.0 - planeDistance / max(planeExtent, 0.001));
+    const float radialWeight = saturate(1.0 - radialDistance / max(radialExtent, 0.001));
     const float confidenceWeight = saturate(irradiance.IrradianceAndCount.w / 16.0);
     return planeWeight * radialWeight * normalAlignment * receiverFacing * confidenceWeight;
 }
@@ -205,6 +225,8 @@ float ComputeSurfelWeight(float3 pixelWorldPos, float3 pixelWorldNormal, SurfelD
 [numthreads(8, 8, 1)]
 void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 {
+    // Reconstruct the pixel's world-space surface point first. Every later resolve decision is
+    // made relative to this point.
     const int2 pixel = int2(GlobalInvocationID.xy);
     const int2 screenSize = int2(ResolveCommon.ScreenSize);
     if (pixel.x >= screenSize.x || pixel.y >= screenSize.y)
@@ -236,6 +258,8 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     float3 irradianceSum = 0.0;
     float weightSum = 0.0;
 
+    // Search nearby cells in every cascade. This is effectively a sparse neighborhood query over
+    // the surfel clipmap. The same cell-lookup logic is shared with visualization / hover select.
     [loop] for (uint cascadeIndex = 0u; cascadeIndex < (uint)SURFEL_GI_CASCADE_COUNT; ++cascadeIndex)
     {
         const float cellSize = cascade0CellSize * GetCascadeScale(cascadeIndex);
@@ -270,7 +294,11 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                             continue;
 
                         const SurfelIrradianceData irradiance = SurfelIrradianceBuffer[surfelIndex];
-                        const float3 surfelIrradiance = max(irradiance.IrradianceAndCount.xyz, 0.0);
+                        // IrradianceAndCount.xyz stores the MSME long-term mean. That is the stable
+                        // lighting value meant for downstream shading.
+                        const float warmupSamples = max(ResolveCommon.ResolveWarmupSamples, 0.0);
+                        const float maturity = (warmupSamples > 0.0) ? saturate(irradiance.IrradianceAndCount.w / warmupSamples) : 1.0;
+                        const float3 surfelIrradiance = max(irradiance.IrradianceAndCount.xyz, 0.0) * maturity;
                         const float weight = ComputeSurfelWeight(worldPos, worldNormal, surfel, irradiance);
                         if (weight <= 1e-5)
                             continue;
@@ -283,6 +311,8 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         }
     }
 
+    // The resolve output is irradiance per pixel. ApplySurfelGI_cs.hlsl converts this into
+    // reflected diffuse light by multiplying it with albedo / PI.
     const float3 resolvedIrradiance = (weightSum > 1e-5) ? (irradianceSum / weightSum) : float3(0.0, 0.0, 0.0);
     Result[pixel] = float4(resolvedIrradiance, 1.0);
 }

@@ -655,7 +655,11 @@ void IRenderer::UIPass()
                     if (gOptions.SurfelGIInlineRayEnable)
                     {
                         ImGui::Checkbox("Enable Guiding", &gOptions.SurfelGIInlineRayGuideEnable);
+                        if (gOptions.SurfelGIInlineRayGuideEnable)
+                            ImGui::Checkbox("Use Average Guide Scalar", &gOptions.SurfelGIUseAverageGuideScalar);
                         DrawSliderInt60_40("Inline Ray Count", &gOptions.SurfelGIInlineRayCount, 1, 16);
+                        DrawSliderInt60_40("New Surfel Bootstrap Rays", &gOptions.SurfelGINewSurfelBootstrapRayCount, 1, 32);
+                        DrawSliderFloat60_40("Radiance Scale", &gOptions.SurfelGIRadianceScale, 0.0f, 8.0f);
                         DrawSliderFloat60_40("Inline Ray Max Distance", &gOptions.SurfelGIInlineRayMaxDistance, 10.0f, 5000.0f);
                         DrawSliderFloat60_40("Inline Ray Normal Bias", &gOptions.SurfelGIInlineRayNormalBias, 0.001f, 10.0f);
                         DrawSliderFloat60_40("MSME History Blend", &gOptions.SurfelGIInlineRayHistoryBlend, 0.0f, 0.99f);
@@ -673,6 +677,8 @@ void IRenderer::UIPass()
                     ImGui::Checkbox("Show Spawn Attempt Points", &gOptions.ShowSurfelGISpawnAttemptDebug);
                     ImGui::Checkbox("Show Surfel Irradiance", &gOptions.ShowSurfelGIIrradianceDebug);
                     ImGui::Checkbox("Show Hover Ray Debug", &gOptions.ShowSurfelGIHoverRayDebug);
+                    if (gOptions.ShowSurfelGIHoverRayDebug)
+                        ImGui::Checkbox("Use Hit Radiance Color", &gOptions.ShowSurfelGIHoverRayHitRadianceColor);
                     if (gOptions.ShowSurfelGIIrradianceDebug)
                     {
                         static const char* GIrradianceDebugModes[] =
@@ -699,6 +705,8 @@ void IRenderer::UIPass()
                         }
                     }
                     DrawSliderInt60_40("Neighbor Cell Radius", &gOptions.SurfelGIVisualizeNeighborCellRadius, 0, 3);
+                    DrawSliderFloat60_40("Resolve Softness", &gOptions.SurfelGIResolveSoftness, 0.5f, 4.0f);
+                    DrawSliderFloat60_40("Resolve Warmup Samples", &gOptions.SurfelGIResolveWarmupSamples, 0.0f, 16.0f);
                     ImGui::Checkbox("Blend With Scene", &gOptions.SurfelGIVisualizeBlendWithScene);
                     if (gOptions.SurfelGIVisualizeBlendWithScene)
                     {

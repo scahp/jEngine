@@ -780,12 +780,15 @@ struct SurfelGIGatherUniformBuffer
 {
     uint MaxSurfels;
     uint RayCount;
+    uint BootstrapRayCount;
+    uint UseAverageGuideScalar;
     float MaxRayDistance;
+    float RadianceScale;
     float NormalBias;
     float HistoryBlend;
     uint UseGuiding;
     int FrameNumber;
-    uint Padding1;
+    uint Padding0;
 };
 
 struct SurfelGIHoverSelection
@@ -800,7 +803,17 @@ struct SurfelGIHoverRayDebug
 {
     float4 OriginAndCount;
     float4 RayDirAndType[SURFEL_GI_HOVER_DEBUG_MAX_RAYS];
+    float4 RayColor[SURFEL_GI_HOVER_DEBUG_MAX_RAYS];
 };
+
+float3 GetHoverRayDebugColorFromRadiance(float3 radiance)
+{
+    const float3 c = max(radiance, 0.0);
+    const float maxChannel = max(c.x, max(c.y, c.z));
+    if (maxChannel <= 1e-5)
+        return float3(0.0, 0.0, 0.0);
+    return saturate(c / maxChannel);
+}
 
 StructuredBuffer<uint> SurfelGIActiveSurfelIndexBuffer : register(t0, space12);
 StructuredBuffer<SurfelGIActiveCounter> SurfelGIActiveSurfelCounterBuffer : register(t1, space12);
@@ -820,9 +833,13 @@ uint InitSurfelGatherSeed(uint SurfelIndex, uint FrameNumber)
 
 float3 EvaluateSurfelGatherMissRadiance(in float3 WorldDir)
 {
-    return EnvTexture.SampleLevel(DefaultSamplerState, normalize(WorldDir), 0.0).rgb;
+    return 0.0;
 }
 
+// MSME = multi-state moment estimation.
+// In practice we track one "stable" long-term average (Mean), one "reactive" short-term
+// average (ShortMean), plus enough metadata to estimate whether the new sample is noise
+// or a real lighting change. Resolve/apply use Mean as the surfel's final irradiance.
 struct SurfelGIMSMEState
 {
     float3 Mean;
@@ -839,36 +856,56 @@ struct SurfelGIGuidedSample
     uint IsGuided;
 };
 
+// HistoryBlend is exposed as a user-facing control, but MSME needs a small short-window blend.
+// This helper maps the "artist" parameter into the more technical short-term update strength.
 float ComputeMSMEShortWindowBlend(uint SampleCount, float HistoryBlend)
 {
     const float BaseBlend = (1.0 - saturate(HistoryBlend)) * (max((float)SampleCount, 1.0) / 4.0);
     return clamp(BaseBlend, 0.01, 0.10);
 }
 
+// One MSME update step for a single surfel.
+//
+// Intuition:
+// - clamp obvious fireflies before they poison history
+// - keep a short-term mean that follows the latest trend quickly
+// - keep a long-term mean that moves only when the change looks consistent
+// - use variance and mean disagreement to decide how much the long-term mean should catch up
 SurfelGIMSMEState RunMSME(float3 Y, SurfelGIMSMEState DataIn, float ShortWindowBlend)
 {
     SurfelGIMSMEState Data = DataIn;
 
+    // Firefly clamp: very bright one-off samples are limited relative to the current short-term
+    // estimate and its variance. This keeps a single bad ray from destabilizing the history.
     const float3 Dev = sqrt(max(float3(1e-5, 1e-5, 1e-5), Data.Variance));
     const float3 HighThreshold = float3(0.1, 0.1, 0.1) + Data.ShortMean + Dev * 8.0;
     const float3 YClamped = min(Y, HighThreshold);
 
+    // ShortMean tracks the recent trend and therefore reacts first to lighting changes.
     const float3 Delta = YClamped - Data.ShortMean;
     Data.ShortMean = lerp(Data.ShortMean, YClamped, ShortWindowBlend);
     const float3 Delta2 = YClamped - Data.ShortMean;
 
+    // Variance is updated from the change around the short-term mean.
+    // We use it later to tell "normal Monte-Carlo noise" from "real lighting changed".
     const float VarianceBlend = ShortWindowBlend * 0.5;
     Data.Variance = lerp(Data.Variance, Delta * Delta2, VarianceBlend);
     Data.Variance = max(Data.Variance, 0.0);
 
+    // If Mean and ShortMean disagree by more than the expected variance, inconsistency rises.
+    // This is the signal that tells the long-term mean it may need to catch up.
     const float3 DevNew = sqrt(max(float3(1e-5, 1e-5, 1e-5), Data.Variance));
     const float3 ShortDiff = Data.Mean - Data.ShortMean;
     const float RelativeDiff = dot(float3(0.299, 0.587, 0.114), abs(ShortDiff) / max(float3(1e-5, 1e-5, 1e-5), DevNew));
     Data.Inconsistency = lerp(Data.Inconsistency, RelativeDiff, 0.08);
 
+    // VBBR (variance-based blend reduction) slows the long-term mean when variance is high.
+    // The noisier the incoming estimate, the more conservative Mean should be.
     const float3 Term = (0.5 * Data.ShortMean) / max(float3(1e-5, 1e-5, 1e-5), DevNew);
     const float VarianceBasedBlendReduction = clamp(dot(float3(0.299, 0.587, 0.114), Term), 1.0 / 32.0, 1.0);
 
+    // Catch-up is stronger when the short-term history keeps disagreeing with the long-term one.
+    // Multiplying by VBBR prevents us from chasing pure noise too aggressively.
     const float CatchUpFactor = smoothstep(0.0, 1.0, RelativeDiff * max(0.02, Data.Inconsistency - 0.2));
     float CatchUpBlend = clamp(CatchUpFactor, 1.0 / 256.0, 1.0);
     CatchUpBlend *= Data.VBBR;
@@ -883,6 +920,9 @@ uint GetSurfelGIGuidingBaseIndex(uint SurfelIndex)
     return SurfelIndex * SURFEL_GI_GUIDE_TOTAL_FLOATS;
 }
 
+// Guiding storage layout per surfel:
+// - first GUIDE_DIM * GUIDE_DIM floats: lobe masses on a hemi-octahedral 2D grid
+// - last GUIDE_DIM floats: row sums used to sample the grid efficiently
 float GetSurfelGIGuidingTotalMass(uint SurfelIndex)
 {
     const uint BaseIndex = GetSurfelGIGuidingBaseIndex(SurfelIndex) + SURFEL_GI_GUIDE_LOBE_COUNT;
@@ -908,6 +948,8 @@ float GetSurfelGIGuidingPDF(uint SurfelIndex, float2 UV, float TotalMass)
     return (Weight / TotalMass) * ((float)SURFEL_GI_GUIDE_LOBE_COUNT / Jacobian);
 }
 
+// Sample the 2D guide grid by first choosing a row from row sums and then a column from the row.
+// This is cheap and avoids scanning the entire grid for every ray.
 int SampleSurfelGIGuidingLobeIndex(uint SurfelIndex, float U, float TotalMass)
 {
     if (TotalMass <= 1e-6)
@@ -947,6 +989,9 @@ int SampleSurfelGIGuidingLobeIndex(uint SurfelIndex, float U, float TotalMass)
 
 float UpdateSurfelGIGuidingFromSample(uint SurfelIndex, float2 UV, float Luminance)
 {
+    // The guiding grid stores an importance map, not a strict probability distribution.
+    // We write the current sample back using bilinear splatting so neighboring lobes receive
+    // a smooth amount of energy instead of producing a blocky distribution.
     const float2 GridPos = UV * SURFEL_GI_GUIDE_DIM - 0.5;
     const float2 BasePos = floor(GridPos);
     const float2 Fraction = frac(GridPos);
@@ -982,6 +1027,9 @@ float UpdateSurfelGIGuidingFromSample(uint SurfelIndex, float2 UV, float Luminan
 
 SurfelGIGuidedSample SampleSurfelGIGuidedDirection(uint SurfelIndex, float TotalMass, float GuideBlend, inout uint Seed)
 {
+    // GuideBlend decides how often we trust the learned distribution over cosine sampling.
+    // We still keep cosine sampling in the mixture so the estimator stays robust and does
+    // not collapse too early to a wrong direction.
     const float4 Randoms = float4(SafeU01(Random_0_1(Seed)), SafeU01(Random_0_1(Seed)), SafeU01(Random_0_1(Seed)), SafeU01(Random_0_1(Seed)));
     SurfelGIGuidedSample Result;
 
@@ -1008,6 +1056,8 @@ SurfelGIGuidedSample SampleSurfelGIGuidedDirection(uint SurfelIndex, float Total
 [numthreads(64, 1, 1)]
 void SurfelGIGatherIrradianceHWRT_CS(uint3 DispatchThreadID : SV_DispatchThreadID)
 {
+    // ActiveSurfelIndexBuffer is built by earlier passes. Gather only runs for compacted, active
+    // surfels so the ray budget is spent on surfels that matter this frame.
     const uint ActiveSurfelLinearIndex = DispatchThreadID.x;
     const uint ActiveSurfelCount = SurfelGIActiveSurfelCounterBuffer[0].Count;
     if (ActiveSurfelLinearIndex >= ActiveSurfelCount)
@@ -1025,7 +1075,6 @@ void SurfelGIGatherIrradianceHWRT_CS(uint3 DispatchThreadID : SV_DispatchThreadI
     ReceiverNormal *= rsqrt(ReceiverNormalLenSq);
 
     const float3 ReceiverWorldPos = Surfel.PositionRadius.xyz;
-    const uint RayCount = max(g_surfelGatherCB.RayCount, 1u);
     const float OriginBias = max(g_surfelGatherCB.NormalBias, 0.001);
     const float TMin = max(OriginBias * 0.25, 0.001);
     const float TMax = max(g_surfelGatherCB.MaxRayDistance, TMin + 0.001);
@@ -1033,8 +1082,13 @@ void SurfelGIGatherIrradianceHWRT_CS(uint3 DispatchThreadID : SV_DispatchThreadI
     const SurfelGIHoverSelection HoverSelection = SurfelGIHoverSelectionBuffer[0];
     const bool CaptureHoverRays = (HoverSelection.Valid != 0u) && (HoverSelection.SurfelIndex == SurfelIndex);
 
+    // Temporal state from previous frames. PrevCount is used both as confidence and as a guide
+    // ramp so newly created surfels start in a conservative mode before guiding/history mature.
     const SurfelGIIrradianceData Prev = SurfelGIIrradianceBuffer[SurfelIndex];
     const float PrevCount = max(Prev.IrradianceAndCount.w, 0.0);
+    const uint BaseRayCount = max(g_surfelGatherCB.RayCount, 1u);
+    const uint BootstrapRayCount = max(g_surfelGatherCB.BootstrapRayCount, 1u);
+    const uint RayCount = (PrevCount < 1.0) ? max(BaseRayCount, BootstrapRayCount) : BaseRayCount;
     float GuidingMass = GetSurfelGIGuidingTotalMass(SurfelIndex);
     const float GuideRamp = saturate(PrevCount / 16.0);
     const float GuideBlend = (g_surfelGatherCB.UseGuiding != 0 && GuidingMass > 1e-5) ? min(SURFEL_GI_GUIDE_MAX_BLEND * GuideRamp, SURFEL_GI_GUIDE_MAX_BLEND) : 0.0;
@@ -1045,10 +1099,14 @@ void SurfelGIGatherIrradianceHWRT_CS(uint3 DispatchThreadID : SV_DispatchThreadI
     if (CaptureHoverRays)
     {
         HoverRayDebug.OriginAndCount = float4(ReceiverWorldPos, 0.0);
+        HoverRayDebug.RayDirAndType[0] = float4(ReceiverNormal, 2.0);
+        HoverRayDebug.RayColor[0] = float4(0.15, 1.0, 0.2, 1.0);
     }
 
     [loop] for (uint RayIndex = 0u; RayIndex < RayCount; ++RayIndex)
     {
+        // Sample a local hemisphere direction. Depending on GuideBlend, this comes either from
+        // the learned guide grid or from the baseline cosine-weighted distribution.
         const SurfelGIGuidedSample GuidedSample = SampleSurfelGIGuidedDirection(SurfelIndex, GuidingMass, GuideBlend, Seed);
         const float3 LocalDir = GuidedSample.LocalDir;
         const float2 GuideUV = GuidedSample.UV;
@@ -1056,6 +1114,8 @@ void SurfelGIGatherIrradianceHWRT_CS(uint3 DispatchThreadID : SV_DispatchThreadI
         if (CosTerm <= 1e-6)
             continue;
 
+        // We evaluate the sample with the mixture PDF because directions may come from either
+        // source. This keeps the estimator unbiased when guiding is enabled.
         const float PdfCos = CosTerm / PI;
         const float PdfGuide = (GuideBlend > 0.0) ? GetSurfelGIGuidingPDF(SurfelIndex, GuideUV, GuidingMass) : 0.0;
         const float MixPdf = lerp(PdfCos, PdfGuide, GuideBlend);
@@ -1064,7 +1124,6 @@ void SurfelGIGatherIrradianceHWRT_CS(uint3 DispatchThreadID : SV_DispatchThreadI
 
         const float3 WorldDir = normalize(ToWorld(ReceiverNormal, LocalDir));
         float3 SampleLi = 0.0;
-        float3 RayDebugEndWorldPos = RayOrigin + WorldDir * TMax;
 
         RayDesc Ray;
         Ray.Origin = RayOrigin;
@@ -1072,8 +1131,8 @@ void SurfelGIGatherIrradianceHWRT_CS(uint3 DispatchThreadID : SV_DispatchThreadI
         Ray.TMin = TMin;
         Ray.TMax = TMax;
 
-        RayQuery<RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH> GatherRayQuery;
-        GatherRayQuery.TraceRayInline(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, HWRTDI_RAY_MASK_SCENE, Ray);
+    RayQuery<RAY_FLAG_CULL_BACK_FACING_TRIANGLES> GatherRayQuery;
+        GatherRayQuery.TraceRayInline(Scene, RAY_FLAG_NONE, HWRTDI_RAY_MASK_SCENE, Ray);
         while (GatherRayQuery.Proceed())
         {
             if (GatherRayQuery.CandidateType() == CANDIDATE_NON_OPAQUE_TRIANGLE)
@@ -1096,7 +1155,6 @@ void SurfelGIGatherIrradianceHWRT_CS(uint3 DispatchThreadID : SV_DispatchThreadI
             const float2 Barycentrics = GatherRayQuery.CommittedTriangleBarycentrics();
             const float HitRayT = GatherRayQuery.CommittedRayT();
             const float3 HitWorldPos = RayOrigin + WorldDir * HitRayT;
-            RayDebugEndWorldPos = HitWorldPos;
             const MyAttributes Attr = MakeAttributesFromBarycentrics(Barycentrics);
             const SurfaceData Surface = GetSurfaceDataInternal(InstanceIdx, PrimitiveIdx, Attr, HitWorldPos);
             SampleLi = EvaluateSurfaceRadianceFromViewPosition(Surface, Attr, ReceiverWorldPos);
@@ -1106,22 +1164,32 @@ void SurfelGIGatherIrradianceHWRT_CS(uint3 DispatchThreadID : SV_DispatchThreadI
             SampleLi = EvaluateSurfelGatherMissRadiance(WorldDir);
         }
 
-        if (CaptureHoverRays && RayIndex < SURFEL_GI_HOVER_DEBUG_MAX_RAYS)
+        SampleLi *= max(g_surfelGatherCB.RadianceScale, 0.0);
+
+        const uint DebugRayIndex = RayIndex + 1u;
+        if (CaptureHoverRays && DebugRayIndex < SURFEL_GI_HOVER_DEBUG_MAX_RAYS)
         {
-            HoverRayDebug.RayDirAndType[RayIndex] = float4(RayDebugEndWorldPos, (GuidedSample.IsGuided != 0u) ? 1.0 : 0.0);
+            // Store the fired direction itself. Visualize turns this into a fixed-length line so
+            // the debug view stays readable even when the true hit point is off-screen.
+            HoverRayDebug.RayDirAndType[DebugRayIndex] = float4(WorldDir, (GuidedSample.IsGuided != 0u) ? 1.0 : 0.0);
+            HoverRayDebug.RayColor[DebugRayIndex] = float4(GetHoverRayDebugColorFromRadiance(SampleLi), 1.0);
         }
 
         AccumulatedIrradiance += SampleLi * (CosTerm / MixPdf);
-        const float SampleLuminance = dot(SampleLi, float3(0.2126, 0.7152, 0.0722)) * CosTerm;
+        const float SampleLuminance = ((g_surfelGatherCB.UseAverageGuideScalar != 0u)
+            ? ((SampleLi.x + SampleLi.y + SampleLi.z) / 3.0)
+            : dot(SampleLi, float3(0.2126, 0.7152, 0.0722))) * CosTerm;
         GuidingMass = max(GuidingMass + UpdateSurfelGIGuidingFromSample(SurfelIndex, GuideUV, SampleLuminance), 0.0);
     }
 
     if (CaptureHoverRays)
     {
-        HoverRayDebug.OriginAndCount.w = min((float)RayCount, (float)SURFEL_GI_HOVER_DEBUG_MAX_RAYS);
+        HoverRayDebug.OriginAndCount.w = min((float)(RayCount + 1u), (float)SURFEL_GI_HOVER_DEBUG_MAX_RAYS);
         SurfelGIHoverRayDebugBuffer[0] = HoverRayDebug;
     }
 
+    // The per-frame Monte-Carlo estimate for this surfel. MSME decides how aggressively this
+    // estimate should influence the long-term history.
     const float3 CurrentIrradiance = AccumulatedIrradiance / (float)RayCount;
     SurfelGIMSMEState State;
     State.Mean = Prev.IrradianceAndCount.xyz;
@@ -1133,6 +1201,8 @@ void SurfelGIGatherIrradianceHWRT_CS(uint3 DispatchThreadID : SV_DispatchThreadI
     const float ShortWindowBlend = ComputeMSMEShortWindowBlend(RayCount, g_surfelGatherCB.HistoryBlend);
     if (PrevCount < 32.0)
     {
+        // Newly created surfels do not yet have a trustworthy temporal history.
+        // Warm up quickly so they converge to a usable value before MSME becomes selective.
         const float Blend = 1.0 / (1.0 + PrevCount);
         State.Mean = lerp(State.Mean, CurrentIrradiance, Blend);
         State.ShortMean = lerp(State.ShortMean, CurrentIrradiance, Blend);
@@ -1146,6 +1216,8 @@ void SurfelGIGatherIrradianceHWRT_CS(uint3 DispatchThreadID : SV_DispatchThreadI
     }
 
     SurfelGIIrradianceData OutData;
+    // Count is deliberately capped. We only need a rough confidence estimate, not an ever-growing
+    // exact sample count that would eventually become numerically meaningless.
     OutData.IrradianceAndCount = float4(State.Mean, min(PrevCount + 1.0, 200.0));
     OutData.MSMEData0 = float4(State.ShortMean, State.VBBR);
     OutData.MSMEData1 = float4(State.Variance, State.Inconsistency);

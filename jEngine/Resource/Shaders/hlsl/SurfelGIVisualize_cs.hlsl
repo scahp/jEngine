@@ -6,6 +6,12 @@
 #define SURFEL_GI_CASCADE_PACKED_COUNT ((SURFEL_GI_CASCADE_COUNT + 3) / 4)
 #define SURFEL_GI_ENABLE_OVERFLOW 0
 
+// This shader is purely for debugging and teaching the system.
+// It visualizes several very different concepts:
+// - clipmap occupancy / underfilled cells
+// - spawn attempts and placement behavior
+// - MSME irradiance state per surfel
+// - hovered-surface ray segments fired by the inline-ray gather pass
 struct VisualizeUniformBuffer
 {
     float4x4 InvP;
@@ -41,8 +47,9 @@ struct VisualizeUniformBuffer
     int ShowIrradianceDebug;
     int IrradianceDebugMode;
     int ShowHoverRayDebug;
+    int ShowHoverRayRadianceColor;
     float HoverRayLength;
-    int2 Padding0;
+    int Padding0;
 };
 
 struct SurfelData
@@ -66,6 +73,7 @@ struct SurfelHoverRayDebugData
 {
     float4 OriginAndCount;
     float4 RayDirAndType[SURFEL_GI_HOVER_DEBUG_MAX_RAYS];
+    float4 RayColor[SURFEL_GI_HOVER_DEBUG_MAX_RAYS];
 };
 
 RWTexture2D<float4> Result : register(u0, space0);
@@ -137,6 +145,8 @@ float3 RadiusDebugColor(float radius)
 
 float3 IrradianceDebugColor(float3 irradiance, float historyWeight)
 {
+    // Compress a wide radiance range into something viewable while still preserving hue.
+    // A nearly empty history is colored magenta so "uninitialized" surfels stand out immediately.
     if (historyWeight < 0.01)
         return float3(1.0, 0.0, 1.0);
 
@@ -163,6 +173,7 @@ float3 MSMEStateDebugColor(float count, float vbbr, float inconsistency)
 
 bool ProjectWorldToScreenUV(float3 worldPos, out float2 outUV)
 {
+    // Used by hover-ray debug to project 3D ray endpoints onto the debug image.
     const float4 clipPos = mul(VisualizeCommon.ViewProj, float4(worldPos, 1.0));
     if (clipPos.w <= 1e-5)
     {
@@ -173,6 +184,42 @@ bool ProjectWorldToScreenUV(float3 worldPos, out float2 outUV)
     const float2 ndc = clipPos.xy / clipPos.w;
     outUV = float2(ndc.x * 0.5 + 0.5, -ndc.y * 0.5 + 0.5);
     return all(outUV >= -0.25) && all(outUV <= 1.25);
+}
+
+bool ProjectWorldToScreenUVLoose(float3 worldPos, out float2 outUV)
+{
+    const float4 clipPos = mul(VisualizeCommon.ViewProj, float4(worldPos, 1.0));
+    if (abs(clipPos.w) <= 1e-5)
+    {
+        outUV = 0.0;
+        return false;
+    }
+
+    const float2 ndc = clipPos.xy / clipPos.w;
+    outUV = float2(ndc.x * 0.5 + 0.5, -ndc.y * 0.5 + 0.5);
+    return (clipPos.w > 1e-5);
+}
+
+bool TryProjectHoverRaySegment(float3 originWorldPos, float3 endWorldPos, float hoverRayLength, out float2 outOriginUV, out float2 outEndUV)
+{
+    bool originValid = ProjectWorldToScreenUVLoose(originWorldPos, outOriginUV);
+    bool endValid = ProjectWorldToScreenUVLoose(endWorldPos, outEndUV);
+
+    if (!originValid)
+        return false;
+
+    if (!endValid)
+    {
+        const float3 rayDir = normalize(endWorldPos - originWorldPos);
+        const float3 fallbackEndWorldPos = originWorldPos + rayDir * max(hoverRayLength, 1.0);
+        endValid = ProjectWorldToScreenUVLoose(fallbackEndWorldPos, outEndUV);
+        if (!endValid)
+            return false;
+    }
+
+    outOriginUV = clamp(outOriginUV, float2(-0.05, -0.05), float2(1.05, 1.05));
+    outEndUV = clamp(outEndUV, float2(-0.05, -0.05), float2(1.05, 1.05));
+    return true;
 }
 
 float DistanceToSegmentPixels(float2 pixelUV, float2 aUV, float2 bUV, float2 screenSize)
@@ -767,13 +814,16 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 
     if (VisualizeCommon.ShowHoverRayDebug != 0)
     {
+        // HoverRayDebugBuffer[0] is written by the gather pass for exactly one surfel: the surfel
+        // chosen by the hover-select pass. Each entry stores a world-space direction and a type:
+        // 0 = baseline/cosine, 1 = guided, 2 = surfel normal debug.
         const SurfelHoverRayDebugData hoverRayDebug = HoverRayDebugBuffer[0];
         const uint hoverRayCount = min((uint)round(hoverRayDebug.OriginAndCount.w), (uint)SURFEL_GI_HOVER_DEBUG_MAX_RAYS);
         if (hoverRayCount > 0u)
         {
             const float2 pixelUV = (float2(pixel) + 0.5) / float2(screenSize);
             float2 originUV = 0.0;
-            if (ProjectWorldToScreenUV(hoverRayDebug.OriginAndCount.xyz, originUV))
+            if (ProjectWorldToScreenUVLoose(hoverRayDebug.OriginAndCount.xyz, originUV))
             {
                 float3 rayOverlayColor = float3(0.0, 0.0, 0.0);
                 float rayOverlayAlpha = 0.0;
@@ -781,17 +831,31 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                 [loop] for (uint rayIndex = 0u; rayIndex < hoverRayCount; ++rayIndex)
                 {
                     const float4 rayDirAndType = hoverRayDebug.RayDirAndType[rayIndex];
-                    const float3 rayEnd = rayDirAndType.xyz;
+                    float3 rayDir = rayDirAndType.xyz;
+                    const float rayDirLenSq = dot(rayDir, rayDir);
+                    if (rayDirLenSq <= 1e-6)
+                        continue;
+                    rayDir *= rsqrt(rayDirLenSq);
+                    const float rayLength = (rayDirAndType.w > 1.5) ? max(VisualizeCommon.HoverRayLength * 0.35, 5.0) : max(VisualizeCommon.HoverRayLength, 5.0);
+                    const float3 rayEnd = hoverRayDebug.OriginAndCount.xyz + rayDir * rayLength;
                     float2 rayEndUV = 0.0;
-                    if (!ProjectWorldToScreenUV(rayEnd, rayEndUV))
+                    float2 clippedOriginUV = 0.0;
+                    if (!TryProjectHoverRaySegment(hoverRayDebug.OriginAndCount.xyz, rayEnd, VisualizeCommon.HoverRayLength, clippedOriginUV, rayEndUV))
                         continue;
 
-                    const float distancePx = DistanceToSegmentPixels(pixelUV, originUV, rayEndUV, VisualizeCommon.ScreenSize);
+                    const float distancePx = DistanceToSegmentPixels(pixelUV, clippedOriginUV, rayEndUV, VisualizeCommon.ScreenSize);
                     const float lineMask = 1.0 - smoothstep(0.75, 2.5, distancePx);
                     if (lineMask <= 0.0)
                         continue;
 
-                    const float3 rayColor = (rayDirAndType.w > 0.5) ? float3(1.0, 0.15, 0.1) : float3(0.15, 0.4, 1.0);
+                    // Green = surfel normal, red = guide-selected ray, blue = cosine-weighted baseline ray.
+                    float3 rayColor = float3(0.15, 0.4, 1.0);
+                    if (rayDirAndType.w > 1.5)
+                        rayColor = float3(0.15, 1.0, 0.2);
+                    else if (rayDirAndType.w > 0.5)
+                        rayColor = float3(1.0, 0.15, 0.1);
+                    else if (VisualizeCommon.ShowHoverRayRadianceColor != 0)
+                        rayColor = saturate(hoverRayDebug.RayColor[rayIndex].xyz);
                     rayOverlayColor += rayColor * lineMask;
                     rayOverlayAlpha = saturate(rayOverlayAlpha + lineMask * 0.85);
                 }

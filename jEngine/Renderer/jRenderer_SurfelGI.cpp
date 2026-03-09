@@ -23,10 +23,37 @@
 
 namespace
 {
+/*
+ * CPU-side overview of the SurfelGI pipeline implemented in this file.
+ *
+ * 1. Build and maintain a clipmapped surfel pool in world space.
+ *    - surfels are partitioned by cascade and stored in paged cell slots
+ *    - only visible / recently relevant cells are refreshed every frame
+ *
+ * 2. Gather incoming radiance for active surfels.
+ *    - each active surfel shoots a small number of inline rays
+ *    - the result is accumulated into a temporal history buffer
+ *    - the current history model is MSME (mean / short mean / variance / inconsistency / vbbr)
+ *    - optional guiding biases future rays toward bright directions discovered in previous frames
+ *
+ * 3. Resolve surfel-space lighting back to pixels.
+ *    - every screen pixel looks up nearby surfels in the clipmap
+ *    - their irradiance is blended with geometric and confidence weights
+ *    - the result is written into a screen-space irradiance texture
+ *
+ * 4. Apply the resolved irradiance to scene color.
+ *    - final contribution is diffuse indirect lighting: irradiance * albedo / PI
+ *
+ * 5. Provide debug views.
+ *    - surfel placement / occupancy / irradiance state visualization
+ *    - hovered-surface ray debug that shows the actual rays fired this frame
+ */
 constexpr int32 SURFEL_GI_GUIDE_DIM = 4;
 constexpr int32 SURFEL_GI_GUIDE_TOTAL_FLOATS = SURFEL_GI_GUIDE_DIM * SURFEL_GI_GUIDE_DIM + SURFEL_GI_GUIDE_DIM;
 constexpr int32 SURFEL_GI_HOVER_DEBUG_MAX_RAYS = 16;
 
+// Packed GPU representation of one surfel stored in the global surfel pool.
+// The HLSL side reads the same layout directly, so field order matters.
 struct jSurfelGPU
 {
     Vector4 PositionRadius = Vector4(0.0f, 0.0f, 0.0f, 0.0f);
@@ -35,6 +62,9 @@ struct jSurfelGPU
     Vector4 Extra = Vector4(0.0f, 0.0f, 0.0f, 0.0f);
 };
 
+// Temporal lighting state stored per surfel.
+// IrradianceAndCount.xyz is the long-term irradiance used by resolve/apply.
+// MSMEData0 / MSMEData1 store the extra state needed by the MSME update.
 struct alignas(16) jSurfelIrradianceGPU
 {
     Vector4 IrradianceAndCount = Vector4(0.0f, 0.0f, 0.0f, 0.0f);
@@ -98,8 +128,12 @@ struct alignas(16) jSurfelGIHoverRayDebugGPU
 {
     Vector4 OriginAndCount = Vector4(0.0f, 0.0f, 0.0f, 0.0f);
     Vector4 RayDirAndType[SURFEL_GI_HOVER_DEBUG_MAX_RAYS] = {};
+    Vector4 RayColor[SURFEL_GI_HOVER_DEBUG_MAX_RAYS] = {};
 };
 
+// Runtime state that maps a world-space clipmap coordinate to the physical ring-buffer
+// location used by the current frame. This is updated on the CPU and packed into several
+// uniform buffers so that every shader can perform the same cell lookup deterministically.
 struct jSurfelClipmapCascadeRuntimeState
 {
     bool Initialized = false;
@@ -158,6 +192,13 @@ enum : uint32
     SurfelGI_HWRTDI_MaterialFlag_NonOpaqueGeometry = 1u << 6
 };
 
+// Global GPU resources owned by the SurfelGI system.
+// The names reflect the major pipeline phases:
+// - pool / page table: persistent world-space surfel storage
+// - irradiance / guiding: temporal lighting state per surfel
+// - worklists / candidates / winners: transient placement and maintenance data
+// - active / dispatch args: compact list of surfels that need inline-ray gathering
+// - hover buffers: optional debug path for "show me the rays of the surfel under the mouse"
 std::shared_ptr<jBuffer> GSurfelPoolBuffer;
 int32 GSurfelPoolMaxCount = 0;
 std::shared_ptr<jBuffer> GSurfelIrradianceBuffer;
@@ -202,6 +243,9 @@ FORCEINLINE int32 PositiveModuloInt32(int32 value, int32 divisor)
 bool TryGetClientMousePosition(int32& OutMouseX, int32& OutMouseY)
 {
 #if defined(_WIN32)
+    // Hover-ray debug is expressed in client-space pixels, so this helper converts the
+    // OS cursor position into the render window's local coordinates and rejects positions
+    // outside the current client rect.
     HWND WindowHandle = (HWND)g_rhi->GetWindow();
     if (!WindowHandle)
         return false;
@@ -903,6 +947,23 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
 
 void jRenderer::SurfelGIPass()
 {
+    /*
+     * Main SurfelGI simulation / update pass.
+     *
+     * High-level order inside this function:
+     * - make sure all persistent resources exist and match the current settings
+     * - pack the clipmap state into uniform buffers
+     * - clear / collect / refresh visible cells
+     * - clean up stale surfels and build placement candidates
+     * - place winning candidates into the surfel pool
+     * - build the active surfel list for inline-ray gathering
+     * - optionally select the hovered surfel for debug visualization
+     * - gather irradiance with inline rays and update MSME history
+     * - run the debug visualization pass
+     *
+     * This is the "surfel-space" half of the system. It stops at producing surfel irradiance.
+     * The later resolve/apply passes turn that surfel-space data into a screen-space result.
+     */
     if (!gOptions.UseSurfelGI)
         return;
 
@@ -2006,19 +2067,25 @@ void jRenderer::SurfelGIPass()
         {
             uint32 MaxSurfels = 0;
             uint32 RayCount = 0;
+            uint32 BootstrapRayCount = 0;
+            uint32 UseAverageGuideScalar = 0;
             float MaxRayDistance = 0.0f;
+            float RadianceScale = 1.0f;
             float NormalBias = 0.0f;
             float HistoryBlend = 0.0f;
             uint32 UseGuiding = 0;
             int32 FrameNumber = 0;
-            uint32 Padding1 = 0;
+            uint32 Padding0 = 0;
         };
         static_assert((sizeof(jSurfelGIInlineRayGatherUniformBuffer) % 16) == 0, "jSurfelGIInlineRayGatherUniformBuffer size must be 16-byte aligned");
 
         jSurfelGIInlineRayGatherUniformBuffer GatherUniformData;
         GatherUniformData.MaxSurfels = (uint32)Max(1, GSurfelPoolMaxCount);
         GatherUniformData.RayCount = (uint32)Clamp(gOptions.SurfelGIInlineRayCount, 1, 16);
+        GatherUniformData.BootstrapRayCount = (uint32)Clamp(gOptions.SurfelGINewSurfelBootstrapRayCount, 1, 32);
+        GatherUniformData.UseAverageGuideScalar = gOptions.SurfelGIUseAverageGuideScalar ? 1u : 0u;
         GatherUniformData.MaxRayDistance = Max(10.0f, gOptions.SurfelGIInlineRayMaxDistance);
+        GatherUniformData.RadianceScale = Max(0.0f, gOptions.SurfelGIRadianceScale);
         GatherUniformData.NormalBias = Max(0.001f, gOptions.SurfelGIInlineRayNormalBias);
         GatherUniformData.HistoryBlend = Clamp(gOptions.SurfelGIInlineRayHistoryBlend, 0.0f, 0.99f);
         GatherUniformData.UseGuiding = gOptions.SurfelGIInlineRayGuideEnable ? 1u : 0u;
@@ -2087,9 +2154,9 @@ void jRenderer::SurfelGIPass()
             int32 ShowIrradianceDebug;
             int32 IrradianceDebugMode;
             int32 ShowHoverRayDebug;
+            int32 ShowHoverRayRadianceColor;
             float HoverRayLength;
             int32 Padding0;
-            int32 Padding1;
         };
         static_assert((sizeof(jSurfelGIVisualizeUniformBuffer) % 16) == 0, "jSurfelGIVisualizeUniformBuffer size must be 16-byte aligned");
 
@@ -2159,9 +2226,9 @@ void jRenderer::SurfelGIPass()
         VisualizeUniformData.ShowIrradianceDebug = gOptions.ShowSurfelGIIrradianceDebug ? 1 : 0;
         VisualizeUniformData.IrradianceDebugMode = Clamp(gOptions.SurfelGIIrradianceDebugMode, 0, 4);
         VisualizeUniformData.ShowHoverRayDebug = gOptions.ShowSurfelGIHoverRayDebug ? 1 : 0;
+        VisualizeUniformData.ShowHoverRayRadianceColor = gOptions.ShowSurfelGIHoverRayHitRadianceColor ? 1 : 0;
         VisualizeUniformData.HoverRayLength = Max(gOptions.SurfelGIWorldGridCellSize * 1.25f, 10.0f);
         VisualizeUniformData.Padding0 = 0;
-        VisualizeUniformData.Padding1 = 0;
 
         auto VisualizeUniformBuffer = std::shared_ptr<IUniformBufferBlock>(
             g_rhi->CreateUniformBufferBlock(jNameStatic("SurfelGIVisualizeUniformBuffer"), jLifeTimeType::OneFrame, sizeof(VisualizeUniformData)));
@@ -2305,6 +2372,16 @@ void jRenderer::SurfelGIPass()
 
 void jRenderer::SurfelGIResolvePass()
 {
+    /*
+     * Convert world-space surfel lighting into a screen-space irradiance buffer.
+     *
+     * Every pixel reconstructs its world position/normal, searches nearby surfel cells across
+     * cascades, and blends the surfels that appear to describe the same local surface.
+     *
+     * Important distinction:
+     * - SurfelGIPass() computes lighting "on surfels"
+     * - SurfelGIResolvePass() answers "which surfels should influence this pixel?"
+     */
     if (!gOptions.UseSurfelGI || !GSurfelPoolBuffer || !GSurfelIrradianceBuffer || !GSurfelCellPageTableBuffer)
         return;
     if (!RenderFrameContextPtr || !RenderFrameContextPtr->SceneRenderTargetPtr)
@@ -2346,6 +2423,10 @@ void jRenderer::SurfelGIResolvePass()
         int32 SurfelPageSize;
         int32 SurfelPageTableCapacity;
         int32 NeighborCellRadius;
+        float ResolveSoftness;
+        float ResolveWarmupSamples;
+        float Padding1;
+        float Padding2;
     };
     static_assert((sizeof(jSurfelGIResolveUniformBuffer) % 16) == 0, "jSurfelGIResolveUniformBuffer size must be 16-byte aligned");
 
@@ -2397,6 +2478,8 @@ void jRenderer::SurfelGIResolvePass()
     ResolveUniformData.SurfelPageSize = Max(1, GSurfelPageSize);
     ResolveUniformData.SurfelPageTableCapacity = Max(1, GSurfelCellPageTableCapacity);
     ResolveUniformData.NeighborCellRadius = Clamp(gOptions.SurfelGIVisualizeNeighborCellRadius, 0, 3);
+    ResolveUniformData.ResolveSoftness = Max(0.1f, gOptions.SurfelGIResolveSoftness);
+    ResolveUniformData.ResolveWarmupSamples = Max(0.0f, gOptions.SurfelGIResolveWarmupSamples);
 
     auto ResolveUniformBuffer = g_rhi->CreateUniformBufferBlock(jNameStatic("SurfelGIResolveUniformBuffer"), jLifeTimeType::OneFrame, sizeof(ResolveUniformData));
     ResolveUniformBuffer->UpdateBufferData(&ResolveUniformData, sizeof(ResolveUniformData));
@@ -2442,6 +2525,16 @@ void jRenderer::SurfelGIResolvePass()
 
 void jRenderer::ApplySurfelGI()
 {
+    /*
+     * Final shading step for SurfelGI.
+     *
+     * SurfelGI_Resolve_RT stores irradiance, not reflected radiance. To turn irradiance into
+     * diffuse lighting, the compute shader multiplies it by albedo / PI and scales it by the
+     * user-controlled intensity value before adding it to scene color.
+     *
+     * We copy the current color target first to avoid read/write hazards while dispatching the
+     * compute shader into ColorPtr.
+     */
     if (!gOptions.UseSurfelGI || !jSceneRenderTarget::SurfelGI_Resolve_RT)
         return;
     if (!RenderFrameContextPtr || !RenderFrameContextPtr->SceneRenderTargetPtr)

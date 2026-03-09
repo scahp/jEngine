@@ -160,6 +160,71 @@ uint GetCascadeIndexFromCellLinear(uint cellLinear)
     return (uint)(SURFEL_GI_CASCADE_COUNT - 1);
 }
 
+float3 SafeNormalize3(float3 v, float3 fallback)
+{
+    const float lenSq = dot(v, v);
+    return (lenSq > 1e-6) ? (v * rsqrt(lenSq)) : fallback;
+}
+
+float ComputeIrradianceSeedWeight(SurfelData candidateSurfel, SurfelData neighborSurfel, SurfelIrradianceData neighborIrradiance)
+{
+    const float3 candidateNormal = SafeNormalize3(candidateSurfel.NormalSeenFrame.xyz, float3(0.0, 1.0, 0.0));
+    const float3 neighborNormal = SafeNormalize3(neighborSurfel.NormalSeenFrame.xyz, candidateNormal);
+    const float normalWeight = saturate(dot(candidateNormal, neighborNormal));
+    const float3 delta = candidateSurfel.PositionRadius.xyz - neighborSurfel.PositionRadius.xyz;
+    const float dist = length(delta);
+    const float combinedRadius = max(candidateSurfel.PositionRadius.w + neighborSurfel.PositionRadius.w, 0.001);
+    const float distanceWeight = saturate(1.0 - dist / max(combinedRadius * 2.0, 0.001));
+    const float confidenceWeight = saturate(neighborIrradiance.IrradianceAndCount.w / 8.0);
+    return normalWeight * distanceWeight * confidenceWeight;
+}
+
+bool TrySeedIrradianceFromActiveCellSurfels(uint base, uint desiredSlots, uint maxSurfels, uint pageCascade, uint ignoreIndex, SurfelData candidateSurfel, out SurfelIrradianceData outSeed)
+{
+    float3 weightedIrradiance = 0.0;
+    float weightSum = 0.0;
+
+    [loop] for (uint i = 0u; i < desiredSlots; ++i)
+    {
+        const uint idx = base + i;
+        if (idx >= maxSurfels)
+            break;
+        if (idx == ignoreIndex)
+            continue;
+
+        const SurfelData neighborSurfel = SurfelPool[idx];
+        if (neighborSurfel.Extra.y <= 0.5)
+            continue;
+        if ((uint)round(neighborSurfel.Extra.w) != pageCascade)
+            continue;
+
+        const SurfelIrradianceData neighborIrradiance = SurfelIrradianceBuffer[idx];
+        if (neighborIrradiance.IrradianceAndCount.w <= 0.01)
+            continue;
+
+        const float weight = ComputeIrradianceSeedWeight(candidateSurfel, neighborSurfel, neighborIrradiance);
+        if (weight <= 1e-5)
+            continue;
+
+        weightedIrradiance += max(neighborIrradiance.IrradianceAndCount.xyz, 0.0) * weight;
+        weightSum += weight;
+    }
+
+    if (weightSum <= 1e-5)
+    {
+        outSeed.IrradianceAndCount = float4(0.0, 0.0, 0.0, 0.0);
+        outSeed.MSMEData0 = float4(0.0, 0.0, 0.0, 0.0);
+        outSeed.MSMEData1 = float4(0.0, 0.0, 0.0, 0.0);
+        return false;
+    }
+
+    const float3 seededIrradiance = weightedIrradiance / weightSum;
+    outSeed.IrradianceAndCount = float4(seededIrradiance, 1.0);
+    outSeed.MSMEData0 = float4(seededIrradiance, 1.0);
+    outSeed.MSMEData1 = float4(0.0, 0.0, 0.0, 1.0);
+    return true;
+}
+
 [numthreads(64, 1, 1)]
 void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 {
@@ -238,16 +303,12 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     SurfelData outSurfel;
     if (isDormantReuse)
     {
-        // Re-activate dormant surfel in-place and blend attributes toward winner candidate.
+        // Re-activate dormant surfel in-place using the winner candidate's fresh attributes.
         outSurfel = existing;
         outSurfel.PositionRadius = c.Surfel.PositionRadius;
-        const float oldWeight = max(existing.AlbedoWeight.w, 1.0);
-        const float newWeight = min(oldWeight + 1.0, 64.0);
-        const float blend = 1.0 / newWeight;
-        outSurfel.NormalSeenFrame.xyz = normalize(lerp(existing.NormalSeenFrame.xyz, c.Surfel.NormalSeenFrame.xyz, blend));
+        outSurfel.NormalSeenFrame.xyz = c.Surfel.NormalSeenFrame.xyz;
         outSurfel.NormalSeenFrame.w = (float)ComputeCommon.FrameNumber;
-        outSurfel.AlbedoWeight.xyz = lerp(existing.AlbedoWeight.xyz, c.Surfel.AlbedoWeight.xyz, blend);
-        outSurfel.AlbedoWeight.w = newWeight;
+        outSurfel.AlbedoWeight = c.Surfel.AlbedoWeight;
         outSurfel.Extra.x = 6.0;      // "revived dormant" for Surfel state debug (blue).
         outSurfel.Extra.y = 1.0;
         outSurfel.Extra.z = 0.0;
@@ -264,9 +325,12 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     SurfelPool[writeIndex] = outSurfel;
 
     SurfelIrradianceData outIrradiance;
-    outIrradiance.IrradianceAndCount = float4(0.0, 0.0, 0.0, 0.0);
-    outIrradiance.MSMEData0 = float4(0.0, 0.0, 0.0, 0.0);
-    outIrradiance.MSMEData1 = float4(0.0, 0.0, 0.0, 0.0);
+    if (!TrySeedIrradianceFromActiveCellSurfels(base, desiredSlots, maxSurfels, pageCascade, writeIndex, outSurfel, outIrradiance))
+    {
+        outIrradiance.IrradianceAndCount = float4(0.0, 0.0, 0.0, 0.0);
+        outIrradiance.MSMEData0 = float4(0.0, 0.0, 0.0, 0.0);
+        outIrradiance.MSMEData1 = float4(0.0, 0.0, 0.0, 0.0);
+    }
     SurfelIrradianceBuffer[writeIndex] = outIrradiance;
     const uint guidingBaseIndex = writeIndex * SURFEL_GI_GUIDE_TOTAL_FLOATS;
     [unroll] for (uint guideIndex = 0u; guideIndex < SURFEL_GI_GUIDE_TOTAL_FLOATS; ++guideIndex)

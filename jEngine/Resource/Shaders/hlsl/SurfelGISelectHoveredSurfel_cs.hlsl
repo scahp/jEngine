@@ -5,6 +5,9 @@
 #endif
 #define SURFEL_GI_CASCADE_PACKED_COUNT ((SURFEL_GI_CASCADE_COUNT + 3) / 4)
 
+// This pass selects the surfel that best corresponds to the mouse cursor's current surface point.
+// The gather pass uses the result to capture only one surfel's rays, which keeps the debug path
+// cheap and easy to understand.
 struct HoverSelectUniformBuffer
 {
     float4x4 InvP;
@@ -193,6 +196,8 @@ bool TryGetCellBaseIndex(int3 cellCoord, uint maxSurfels, uint cascadeIndex, out
 [numthreads(1, 1, 1)]
 void main(uint3 DispatchThreadID : SV_DispatchThreadID)
 {
+    // Reset both outputs on the GPU every frame. This avoids relying on CPU-side buffer uploads
+    // and guarantees that "no hovered surfel" is represented explicitly.
     HoverSelectionData Result = (HoverSelectionData)0;
     HoverRayDebugData HoverRayDebug = (HoverRayDebugData)0;
     Result.SurfelIndex = 0xffffffffu;
@@ -232,6 +237,8 @@ void main(uint3 DispatchThreadID : SV_DispatchThreadID)
     float bestDist2 = 1e38;
     uint bestSurfelIndex = 0xffffffffu;
 
+    // Search the same neighborhood shape used by resolve/visualize so the picked surfel matches
+    // what the user is looking at in other debug views.
     [loop] for (uint cascadeIndex = 0u; cascadeIndex < (uint)SURFEL_GI_CASCADE_COUNT; ++cascadeIndex)
     {
         const float cellSize = cascade0CellSize * GetCascadeScale(cascadeIndex);
