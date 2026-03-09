@@ -527,7 +527,10 @@ void jPlacementTool::DeletePlacedObject(int32 index)
 	}
 
 	// Remove from list
-	PlacedObjects.erase(PlacedObjects.begin() + index);
+	if (PlacedObjects.size() > 0)
+	{
+		PlacedObjects.erase(PlacedObjects.begin() + index);
+	}
 
 	// Reset selection
 	SelectedPlacedObjectIndex = -1;
