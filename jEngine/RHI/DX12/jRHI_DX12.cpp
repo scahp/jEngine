@@ -69,6 +69,36 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+    const bool IsAltEnterSystemKeyDownMessage = (message == WM_SYSKEYDOWN) && (wParam == VK_RETURN);
+    if (IsAltEnterSystemKeyDownMessage)
+    {
+        const bool IsAltModifierPressed = !!(HIWORD(lParam) & KF_ALTDOWN);
+        const bool WasEnterKeyPreviouslyDown = !!(lParam & (1 << 30));
+        if (IsAltModifierPressed && !WasEnterKeyPreviouslyDown && g_rhi_dx12)
+        {
+            const bool WasExclusiveFullscreen = g_rhi_dx12->bIsExclusiveFullscreen;
+            const bool WasBorderlessFullscreen = g_rhi_dx12->bIsBorderlessFullscreen;
+            char buffer[256] = {};
+            sprintf_s(buffer, "[Fullscreen] Alt+Enter request fullscreen=%d borderless=%d exclusive=%d pendingBorderless=%d pendingExclusive=%d\r\n"
+                , g_rhi_dx12->IsSwapchainFullscreen() ? 1 : 0
+                , g_rhi_dx12->bIsBorderlessFullscreen ? 1 : 0
+                , g_rhi_dx12->bIsExclusiveFullscreen ? 1 : 0
+                , g_rhi_dx12->bPendingToggleBorderlessFullscreen ? 1 : 0
+                , g_rhi_dx12->bPendingToggleExclusiveFullscreen ? 1 : 0);
+            OutputDebugStringA(buffer);
+
+            if (g_rhi_dx12->IsSwapchainFullscreen() && !WasExclusiveFullscreen && !WasBorderlessFullscreen)
+            {
+                g_rhi_dx12->SyncFullscreenModeState();
+                OutputDebugStringA("[Fullscreen] Alt+Enter external exclusive transition detected, sync only\r\n");
+                return 0;
+            }
+
+            g_rhi_dx12->ToggleExclusiveFullscreen();
+            return 0;
+        }
+    }
+
     if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
         return true;
 
@@ -379,6 +409,8 @@ bool jRHI_DX12::InitRHI()
     HRESULT hr = factory.As(&Factory);
     if (SUCCEEDED(hr))
     {
+        Factory->MakeWindowAssociation(m_hWnd, DXGI_MWA_NO_ALT_ENTER | DXGI_MWA_NO_WINDOW_CHANGES);
+
         BOOL allowTearing = false;
         hr = Factory->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &allowTearing, sizeof(allowTearing));
 
@@ -488,6 +520,8 @@ bool jRHI_DX12::InitRHI()
     Swapchain = new jSwapchain_DX12();
     Swapchain->Create();
     CurrentFrameIndex = Swapchain->GetCurrentBackBufferIndex();
+    if (Factory)
+        Factory->MakeWindowAssociation(m_hWnd, DXGI_MWA_NO_ALT_ENTER | DXGI_MWA_NO_WINDOW_CHANGES);
 
     OneFrameUniformRingBuffers.resize(Swapchain->GetNumOfSwapchain());
     for (jRingBuffer_DX12*& iter : OneFrameUniformRingBuffers)
@@ -762,12 +796,7 @@ bool jRHI_DX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimi
     JASSERT(InWidth > 0);
     JASSERT(InHeight > 0);
 
-    {
-        char szTemp[126];
-        sprintf_s(szTemp, sizeof(szTemp), "Called OnHandleResized %d %d\n", InWidth, InHeight);
-        OutputDebugStringA(szTemp);
-    }
-
+    SyncFullscreenModeState();
     WaitForGPU();
     jProfileMessage("DX12: Swapchain resize.");
 
@@ -775,6 +804,290 @@ bool jRHI_DX12::OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimi
     CurrentFrameIndex = Swapchain->GetCurrentBackBufferIndex();
 
     return true;
+}
+
+void jRHI_DX12::ToggleBorderlessFullscreen()
+{
+    ++FullscreenToggleRequestSerial;
+    bPendingToggleBorderlessFullscreen = true;
+    bPendingToggleExclusiveFullscreen = false;
+
+    char buffer[256] = {};
+    sprintf_s(buffer, "[Fullscreen] Queue borderless request=%u pendingBorderless=%d pendingExclusive=%d fullscreen=%d borderless=%d exclusive=%d\r\n"
+        , FullscreenToggleRequestSerial
+        , bPendingToggleBorderlessFullscreen ? 1 : 0
+        , bPendingToggleExclusiveFullscreen ? 1 : 0
+        , IsSwapchainFullscreen() ? 1 : 0
+        , bIsBorderlessFullscreen ? 1 : 0
+        , bIsExclusiveFullscreen ? 1 : 0);
+    OutputDebugStringA(buffer);
+}
+
+void jRHI_DX12::ToggleExclusiveFullscreen()
+{
+    ++FullscreenToggleRequestSerial;
+    bPendingToggleExclusiveFullscreen = true;
+    bPendingToggleBorderlessFullscreen = false;
+
+    char buffer[256] = {};
+    sprintf_s(buffer, "[Fullscreen] Queue exclusive request=%u pendingBorderless=%d pendingExclusive=%d fullscreen=%d borderless=%d exclusive=%d\r\n"
+        , FullscreenToggleRequestSerial
+        , bPendingToggleBorderlessFullscreen ? 1 : 0
+        , bPendingToggleExclusiveFullscreen ? 1 : 0
+        , IsSwapchainFullscreen() ? 1 : 0
+        , bIsBorderlessFullscreen ? 1 : 0
+        , bIsExclusiveFullscreen ? 1 : 0);
+    OutputDebugStringA(buffer);
+}
+
+bool jRHI_DX12::IsAllowedPresentResult(HRESULT InResult) const
+{
+    return InResult == S_OK
+        || InResult == DXGI_STATUS_OCCLUDED
+        || InResult == DXGI_STATUS_CLIPPED
+        || InResult == DXGI_STATUS_MODE_CHANGE_IN_PROGRESS;
+}
+
+bool jRHI_DX12::IsSwapchainFullscreen() const
+{
+    if (!Swapchain || !Swapchain->SwapChain)
+        return false;
+
+    BOOL IsFullscreen = FALSE;
+    const HRESULT hr = Swapchain->SwapChain->GetFullscreenState(&IsFullscreen, nullptr);
+    return SUCCEEDED(hr) && !!IsFullscreen;
+}
+
+void jRHI_DX12::SyncFullscreenModeState()
+{
+    const bool IsExclusiveFullscreen = IsSwapchainFullscreen();
+    if (IsExclusiveFullscreen)
+    {
+        bIsExclusiveFullscreen = true;
+        bIsBorderlessFullscreen = false;
+        FullscreenMode = EFullscreenMode::Exclusive;
+        return;
+    }
+
+    if (bIsBorderlessFullscreen)
+    {
+        bIsExclusiveFullscreen = false;
+        FullscreenMode = EFullscreenMode::Borderless;
+        return;
+    }
+
+    bIsExclusiveFullscreen = false;
+    FullscreenMode = EFullscreenMode::Windowed;
+}
+
+void jRHI_DX12::ResizeSwapchainToClientArea()
+{
+    RECT clientRect = {};
+    GetClientRect(m_hWnd, &clientRect);
+    const int32 Width = Max<int32>(clientRect.right - clientRect.left, 1);
+    const int32 Height = Max<int32>(clientRect.bottom - clientRect.top, 1);
+    Swapchain->Resize(Width, Height);
+    CurrentFrameIndex = Swapchain->GetCurrentBackBufferIndex();
+}
+
+void jRHI_DX12::ExecuteBorderlessFullscreenToggle()
+{
+    if (!Swapchain || !Swapchain->SwapChain)
+        return;
+
+    SyncFullscreenModeState();
+    ++FullscreenToggleExecuteSerial;
+    {
+        char buffer[256] = {};
+        sprintf_s(buffer, "[Fullscreen] Execute borderless #%u before fullscreen=%d borderless=%d exclusive=%d\r\n"
+            , FullscreenToggleExecuteSerial
+            , IsSwapchainFullscreen() ? 1 : 0
+            , bIsBorderlessFullscreen ? 1 : 0
+            , bIsExclusiveFullscreen ? 1 : 0);
+        OutputDebugStringA(buffer);
+    }
+
+    WaitForGPU();
+
+    IDXGISwapChain3* SwapChainHandle = Swapchain->SwapChain.Get();
+    if (IsSwapchainFullscreen())
+    {
+        const HRESULT hr = SwapChainHandle->SetFullscreenState(FALSE, nullptr);
+        ensure(hr == S_OK || hr == DXGI_STATUS_MODE_CHANGE_IN_PROGRESS);
+        if (SUCCEEDED(hr))
+            bIsExclusiveFullscreen = false;
+    }
+
+    if (!bIsBorderlessFullscreen)
+    {
+        WindowedStyle = GetWindowLongPtr(m_hWnd, GWL_STYLE);
+        WindowedExStyle = GetWindowLongPtr(m_hWnd, GWL_EXSTYLE);
+        WindowedPlacement.length = sizeof(WINDOWPLACEMENT);
+        bHasSavedWindowedPlacement = !!GetWindowPlacement(m_hWnd, &WindowedPlacement);
+
+        const LONG_PTR BorderlessStyle = WindowedStyle & ~(WS_CAPTION | WS_THICKFRAME);
+        const LONG_PTR BorderlessExStyle = WindowedExStyle & ~(WS_EX_DLGMODALFRAME | WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE | WS_EX_STATICEDGE);
+        SetWindowLongPtr(m_hWnd, GWL_STYLE, BorderlessStyle);
+        SetWindowLongPtr(m_hWnd, GWL_EXSTYLE, BorderlessExStyle);
+
+        MONITORINFO monitorInfo = {};
+        monitorInfo.cbSize = sizeof(MONITORINFO);
+        GetMonitorInfo(MonitorFromWindow(m_hWnd, MONITOR_DEFAULTTONEAREST), &monitorInfo);
+        const RECT& MonitorRect = monitorInfo.rcMonitor;
+        SetWindowPos(m_hWnd, HWND_TOP,
+            MonitorRect.left, MonitorRect.top,
+            MonitorRect.right - MonitorRect.left,
+            MonitorRect.bottom - MonitorRect.top,
+            SWP_FRAMECHANGED | SWP_NOOWNERZORDER);
+
+        bIsBorderlessFullscreen = true;
+        FullscreenMode = EFullscreenMode::Borderless;
+    }
+    else
+    {
+        SetWindowLongPtr(m_hWnd, GWL_STYLE, WindowedStyle);
+        SetWindowLongPtr(m_hWnd, GWL_EXSTYLE, WindowedExStyle);
+
+        if (bHasSavedWindowedPlacement)
+            SetWindowPlacement(m_hWnd, &WindowedPlacement);
+
+        SetWindowPos(m_hWnd, nullptr, 0, 0, 0, 0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+
+        bIsBorderlessFullscreen = false;
+        FullscreenMode = EFullscreenMode::Windowed;
+    }
+
+    ResizeSwapchainToClientArea();
+    SyncFullscreenModeState();
+
+    {
+        char buffer[256] = {};
+        sprintf_s(buffer, "[Fullscreen] Execute borderless #%u after fullscreen=%d borderless=%d exclusive=%d size=%d x %d\r\n"
+            , FullscreenToggleExecuteSerial
+            , IsSwapchainFullscreen() ? 1 : 0
+            , bIsBorderlessFullscreen ? 1 : 0
+            , bIsExclusiveFullscreen ? 1 : 0
+            , SCR_WIDTH
+            , SCR_HEIGHT);
+        OutputDebugStringA(buffer);
+    }
+}
+
+void jRHI_DX12::ExecuteExclusiveFullscreenToggle()
+{
+    if (!Swapchain || !Swapchain->SwapChain)
+        return;
+
+    SyncFullscreenModeState();
+    ++FullscreenToggleExecuteSerial;
+    {
+        char buffer[256] = {};
+        sprintf_s(buffer, "[Fullscreen] Execute exclusive #%u before fullscreen=%d borderless=%d exclusive=%d\r\n"
+            , FullscreenToggleExecuteSerial
+            , IsSwapchainFullscreen() ? 1 : 0
+            , bIsBorderlessFullscreen ? 1 : 0
+            , bIsExclusiveFullscreen ? 1 : 0);
+        OutputDebugStringA(buffer);
+    }
+
+    WaitForGPU();
+
+    IDXGISwapChain3* SwapChainHandle = Swapchain->SwapChain.Get();
+    if (!bIsExclusiveFullscreen)
+    {
+        if (bIsBorderlessFullscreen)
+        {
+            SetWindowLongPtr(m_hWnd, GWL_STYLE, WindowedStyle);
+            SetWindowLongPtr(m_hWnd, GWL_EXSTYLE, WindowedExStyle);
+
+            if (bHasSavedWindowedPlacement)
+                SetWindowPlacement(m_hWnd, &WindowedPlacement);
+
+            SetWindowPos(m_hWnd, nullptr, 0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+
+            bIsBorderlessFullscreen = false;
+            FullscreenMode = EFullscreenMode::Windowed;
+        }
+
+        DXGI_SWAP_CHAIN_DESC1 SwapChainDesc = {};
+        if (SUCCEEDED(SwapChainHandle->GetDesc1(&SwapChainDesc)))
+        {
+            ComPtr<IDXGIOutput> Output;
+            if (SUCCEEDED(SwapChainHandle->GetContainingOutput(&Output)))
+            {
+                DXGI_MODE_DESC RequestedMode = {};
+                RequestedMode.Width = SwapChainDesc.Width ? SwapChainDesc.Width : SCR_WIDTH;
+                RequestedMode.Height = SwapChainDesc.Height ? SwapChainDesc.Height : SCR_HEIGHT;
+                RequestedMode.Format = BackbufferFormat;
+                RequestedMode.RefreshRate.Numerator = 0;
+                RequestedMode.RefreshRate.Denominator = 0;
+                RequestedMode.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
+                RequestedMode.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
+
+                DXGI_MODE_DESC MatchedMode = RequestedMode;
+                if (FAILED(Output->FindClosestMatchingMode(&RequestedMode, &MatchedMode, Device.Get())))
+                    MatchedMode = RequestedMode;
+
+                if (SUCCEEDED(SwapChainHandle->ResizeTarget(&MatchedMode)))
+                {
+                    const HRESULT hr = SwapChainHandle->SetFullscreenState(TRUE, Output.Get());
+                    ensure(hr == S_OK || hr == DXGI_STATUS_MODE_CHANGE_IN_PROGRESS);
+                    if (SUCCEEDED(hr))
+                    {
+                        bIsExclusiveFullscreen = true;
+                        bIsBorderlessFullscreen = false;
+                        FullscreenMode = EFullscreenMode::Exclusive;
+                        Swapchain->Resize((int32)MatchedMode.Width, (int32)MatchedMode.Height);
+                        CurrentFrameIndex = Swapchain->GetCurrentBackBufferIndex();
+                    }
+                }
+            }
+        }
+    }
+    else
+    {
+        const HRESULT hr = SwapChainHandle->SetFullscreenState(FALSE, nullptr);
+        ensure(hr == S_OK || hr == DXGI_STATUS_MODE_CHANGE_IN_PROGRESS);
+        if (SUCCEEDED(hr))
+        {
+            bIsExclusiveFullscreen = false;
+            FullscreenMode = bIsBorderlessFullscreen ? EFullscreenMode::Borderless : EFullscreenMode::Windowed;
+            ResizeSwapchainToClientArea();
+        }
+    }
+
+    SyncFullscreenModeState();
+
+    {
+        char buffer[256] = {};
+        sprintf_s(buffer, "[Fullscreen] Execute exclusive #%u after fullscreen=%d borderless=%d exclusive=%d size=%d x %d\r\n"
+            , FullscreenToggleExecuteSerial
+            , IsSwapchainFullscreen() ? 1 : 0
+            , bIsBorderlessFullscreen ? 1 : 0
+            , bIsExclusiveFullscreen ? 1 : 0
+            , SCR_WIDTH
+            , SCR_HEIGHT);
+        OutputDebugStringA(buffer);
+    }
+}
+
+void jRHI_DX12::ProcessPendingFullscreenToggle()
+{
+    if (bPendingToggleBorderlessFullscreen)
+    {
+        OutputDebugStringA("[Fullscreen] Process pending borderless\r\n");
+        bPendingToggleBorderlessFullscreen = false;
+        ExecuteBorderlessFullscreenToggle();
+    }
+
+    if (bPendingToggleExclusiveFullscreen)
+    {
+        OutputDebugStringA("[Fullscreen] Process pending exclusive\r\n");
+        bPendingToggleExclusiveFullscreen = false;
+        ExecuteExclusiveFullscreenToggle();
+    }
 }
 
 jCommandBuffer_DX12* jRHI_DX12::BeginSingleTimeCommands() const
@@ -1064,6 +1377,8 @@ void jRHI_DX12::RemovePipelineStateInfo(size_t InHash)
 std::shared_ptr<jRenderFrameContext> jRHI_DX12::BeginRenderFrame()
 {
 	SCOPE_CPU_PROFILE(BeginRenderFrame);
+    SyncFullscreenModeState();
+    ProcessPendingFullscreenToggle();
 
 	//////////////////////////////////////////////////////////////////////////
 	// Acquire new swapchain image
@@ -1108,10 +1423,11 @@ void jRHI_DX12::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& InRen
     }
     else
 	{
-		hr = Swapchain->SwapChain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
+        const UINT PresentFlags = IsSwapchainFullscreen() ? 0u : DXGI_PRESENT_ALLOW_TEARING;
+		hr = Swapchain->SwapChain->Present(0, PresentFlags);
 	}
 
-    ensure(hr == S_OK || hr == DXGI_STATUS_OCCLUDED || hr == DXGI_STATUS_CLIPPED);
+    ensure(IsAllowedPresentResult(hr));
 	jProfileGPUEndFrame(InRenderFrameContextPtr);
 
 	// CurrentFrameIndex = (CurrentFrameIndex + 1) % Swapchain->Images.size();

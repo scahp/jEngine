@@ -186,6 +186,12 @@ class jRHI_DX12 : public jRHI
 {
 public:
     static constexpr UINT MaxFrameCount = 3;
+    enum class EFullscreenMode : uint8
+    {
+        Windowed = 0,
+        Borderless,
+        Exclusive,
+    };
 
 	jRHI_DX12();
 	virtual ~jRHI_DX12();
@@ -371,6 +377,15 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 
 	virtual bool OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimized) override;
+    virtual void ToggleBorderlessFullscreen() override;
+    virtual void ToggleExclusiveFullscreen() override;
+    void ProcessPendingFullscreenToggle();
+    void ResizeSwapchainToClientArea();
+    void ExecuteBorderlessFullscreenToggle();
+    void ExecuteExclusiveFullscreenToggle();
+    void SyncFullscreenModeState();
+    bool IsAllowedPresentResult(HRESULT InResult) const;
+    bool IsSwapchainFullscreen() const;
 
     virtual jCommandBuffer_DX12* BeginSingleTimeCommands() const override;
     virtual void EndSingleTimeCommands(jCommandBuffer* commandBuffer) const override;
@@ -486,9 +501,20 @@ public:
 	virtual void Finish() const override;
 
 	jMutexLock MultiFrameShaderBindingInstanceLock;
-	jDeallocatorMultiFrameShaderBindingInstance DeallocatorMultiFrameShaderBindingInstance;
+    jDeallocatorMultiFrameShaderBindingInstance DeallocatorMultiFrameShaderBindingInstance;
 	// jDeallocatorMultiFrameCreatedResource DeallocatorMultiFramePlacedResource[(int32)EPlacedResourceType::MAX];
 	jDeallocatorMultiFrameCreatedResource DeallocatorMultiFrameStandaloneResource;
+    bool bPendingToggleBorderlessFullscreen = false;
+    bool bPendingToggleExclusiveFullscreen = false;
+    bool bIsBorderlessFullscreen = false;
+    bool bIsExclusiveFullscreen = false;
+    EFullscreenMode FullscreenMode = EFullscreenMode::Windowed;
+    uint32 FullscreenToggleRequestSerial = 0;
+    uint32 FullscreenToggleExecuteSerial = 0;
+    LONG_PTR WindowedStyle = 0;
+    LONG_PTR WindowedExStyle = 0;
+    WINDOWPLACEMENT WindowedPlacement = { sizeof(WINDOWPLACEMENT) };
+    bool bHasSavedWindowedPlacement = false;
 
 	virtual jRaytracingScene* CreateRaytracingScene() const;
 

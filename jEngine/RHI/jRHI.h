@@ -508,6 +508,8 @@ public:
 	virtual void IncrementFrameNumber() {}
 	virtual bool IsSupportVSync() const { return false; }
 	virtual bool OnHandleResized(uint32 InWidth, uint32 InHeight, bool InIsMinimized) { return false; }
+	virtual void ToggleBorderlessFullscreen() {}
+	virtual void ToggleExclusiveFullscreen() {}
 	virtual jRaytracingScene* CreateRaytracingScene() const { return nullptr; }
 	virtual jCommandBuffer* BeginSingleTimeCommands() const { return nullptr; }
     virtual void EndSingleTimeCommands(jCommandBuffer* commandBuffer) const { }

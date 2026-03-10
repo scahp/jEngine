@@ -50,8 +50,8 @@ bool jSwapchain_DX12::Create()
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
     swapChainDesc.SampleDesc.Count = 1;
-    swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH | DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING
-        | DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
+    swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH
+        | DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
 
     check(g_rhi_dx12);
     check(!!g_rhi_dx12->m_hWnd);
@@ -102,17 +102,19 @@ bool jSwapchain_DX12::Resize(int32 InWidth, int32 InHeight)
 {
     if (ensure(SwapChain))
     {
+        const UINT ResizeWidth = (InWidth > 0) ? (UINT)InWidth : 0u;
+        const UINT ResizeHeight = (InHeight > 0) ? (UINT)InHeight : 0u;
+        const DXGI_FORMAT ResizeFormat = (ResizeWidth > 0 && ResizeHeight > 0) ? DXGI_FORMAT_R8G8B8A8_UNORM : DXGI_FORMAT_UNKNOWN;
+
         for (int32 i = 0; i < g_rhi_dx12->MaxFrameCount; ++i)
         {
             jSwapchainImage* SwapchainImage = Images[i];
             SwapchainImage->TexturePtr.reset();
         }
 
-        SwapChain->SetFullscreenState(false, nullptr);
-        HRESULT hr = SwapChain->ResizeBuffers(g_rhi_dx12->MaxFrameCount, InWidth, InHeight, DXGI_FORMAT_R8G8B8A8_UNORM
+        HRESULT hr = SwapChain->ResizeBuffers(g_rhi_dx12->MaxFrameCount, ResizeWidth, ResizeHeight, ResizeFormat
             , DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH |
-            DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING |
-            DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT);
+            DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING);
 
         if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
         {
@@ -130,6 +132,14 @@ bool jSwapchain_DX12::Resize(int32 InWidth, int32 InHeight)
         }
     }
 
+    DXGI_SWAP_CHAIN_DESC1 SwapChainDesc = {};
+    if (JFAIL(SwapChain->GetDesc1(&SwapChainDesc)))
+        return false;
+
+    const int32 ActualWidth = Max<int32>((int32)SwapChainDesc.Width, 1);
+    const int32 ActualHeight = Max<int32>((int32)SwapChainDesc.Height, 1);
+    Extent = Vector2i(ActualWidth, ActualHeight);
+
     for (int32 i = 0; i < g_rhi_dx12->MaxFrameCount; ++i)
     {
         jSwapchainImage* SwapchainImage = Images[i];
@@ -141,7 +151,7 @@ bool jSwapchain_DX12::Resize(int32 InWidth, int32 InHeight)
         std::shared_ptr<jCreatedResource> RenderTargetResource = jCreatedResource::CreatedFromSwapchain(NewResource, EResourceLayout::UNDEFINED);
 
         auto TextureDX12Ptr = std::make_shared<jTexture_DX12>(
-            ETextureType::TEXTURE_2D, GetDX12TextureFormat(DXGI_FORMAT_R8G8B8A8_UNORM), InWidth, InHeight, 1, EMSAASamples::COUNT_1, 1, false, jRTClearValue::Invalid, RenderTargetResource);
+            ETextureType::TEXTURE_2D, GetDX12TextureFormat(DXGI_FORMAT_R8G8B8A8_UNORM), ActualWidth, ActualHeight, 1, EMSAASamples::COUNT_1, 1, false, jRTClearValue::Invalid, RenderTargetResource);
         SwapchainImage->TexturePtr = TextureDX12Ptr;
 
         jBufferUtil_DX12::CreateRenderTargetView((jTexture_DX12*)SwapchainImage->TexturePtr.get());

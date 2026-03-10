@@ -275,6 +275,13 @@ void IRenderer::UIPass()
 		{
 			if (ImGui::BeginTabItem("Default")) 
 			{
+                if (IsUseDX12() && ImGui::Button("Toggle Borderless Fullscreen"))
+                    g_rhi->ToggleBorderlessFullscreen();
+                if (IsUseDX12() && ImGui::Button("Toggle Exclusive Fullscreen"))
+                    g_rhi->ToggleExclusiveFullscreen();
+                if (IsUseDX12())
+                    ImGui::Separator();
+
 #if USE_VARIABLE_SHADING_RATE_TIER2
 				ImGui::Checkbox("UseVRS", &gOptions.UseVRS);
 #endif
