@@ -605,6 +605,7 @@ void IRenderer::UIPass()
                     ImGui::Indent();
                     DrawSliderInt60_40("Surfel Max Pool", &gOptions.SurfelGIMaxSurfels, 4096, 2097152);
                     DrawSliderInt60_40("Spawn Budget / Frame", &gOptions.SurfelGISpawnBudgetPerFrame, 64, 16384);
+                    ImGui::Checkbox("Use Tile Based Sampling", &gOptions.UseSurfelGITileBasedSampling);
                     DrawSliderInt60_40("Tile Size", &gOptions.SurfelGITileSize, 4, 32);
                     DrawSliderFloat60_40("Merge Distance", &gOptions.SurfelGIMergeDistanceScale, 0.5f, 4.0f);
                     DrawSliderFloat60_40("Surfel Radius Scale", &gOptions.SurfelGIRadiusScale, 0.25f, 2.5f);

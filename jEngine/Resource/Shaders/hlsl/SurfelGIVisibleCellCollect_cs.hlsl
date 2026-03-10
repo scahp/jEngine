@@ -238,6 +238,13 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     if (pixel.x >= screenSize.x || pixel.y >= screenSize.y)
         return;
 
+    const int tileSize = max(ComputeCommon.TileSize, 1);
+    const int2 dispatchSize = max((screenSize + (tileSize - 1)) / tileSize, int2(1, 1));
+    const int2 tileCoord = pixel / tileSize;
+    const int2 samplePixel = min(tileCoord * tileSize + int2(tileSize / 2, tileSize / 2), screenSize - 1);
+    if (any(pixel != samplePixel))
+        return;
+
     const float2 uv = (float2(pixel) + 0.5) / float2(screenSize);
     const float rawDepth = DepthTexture.SampleLevel(DepthTextureSampler, uv, 0).x;
     if (rawDepth <= 0.0)
@@ -246,7 +253,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     const float3 viewPos = CalcViewPositionFromDepth(DepthTexture, DepthTextureSampler, uv, ComputeCommon.InvP);
     const float3 worldPos = mul(ComputeCommon.InvV, float4(viewPos, 1.0)).xyz;
     const float cameraDistance = length(viewPos);
-    const uint maxVisibleCells = (uint)max(screenSize.x * screenSize.y * (int)SURFEL_GI_VISIBLE_CELL_WORKLIST_MULTIPLIER, 1);
+    const uint maxVisibleCells = (uint)max(dispatchSize.x * dispatchSize.y * (int)SURFEL_GI_VISIBLE_CELL_WORKLIST_MULTIPLIER, 1);
     uint primaryCascadeIndex = 0u;
     int3 primaryCellCoord = int3(0, 0, 0);
     if (!TrySelectCascadeForWorldPos(worldPos, cameraDistance, primaryCascadeIndex, primaryCellCoord))

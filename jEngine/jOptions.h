@@ -81,6 +81,7 @@ struct jOptions
     float SSGIResolutionScale;
     int32 SurfelGIMaxSurfels;
     int32 SurfelGISpawnBudgetPerFrame;
+    bool UseSurfelGITileBasedSampling;
     int32 SurfelGITileSize;
     float SurfelGIMergeDistanceScale;
     float SurfelGIRadiusScale;

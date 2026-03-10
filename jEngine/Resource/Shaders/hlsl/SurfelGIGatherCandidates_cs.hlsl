@@ -375,9 +375,18 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     if (pixel.x >= screenSize.x || pixel.y >= screenSize.y)
         return;
 
-    const uint candidateIndex = (uint)(pixel.y * screenSize.x + pixel.x);
+    const int tileSize = max(ComputeCommon.TileSize, 1);
+    const int2 dispatchSize = max((screenSize + (tileSize - 1)) / tileSize, int2(1, 1));
+    const int2 tileCoord = pixel / tileSize;
+    const int2 samplePixel = min(tileCoord * tileSize + int2(tileSize / 2, tileSize / 2), screenSize - 1);
+
     AttemptOutput[pixel] = float4(0.0, 0.0, 0.0, 1.0);
     DebugOutput[pixel] = float4(0.0, 0.0, 0.0, 1.0);
+
+    if (any(pixel != samplePixel))
+        return;
+
+    const uint candidateIndex = (uint)(tileCoord.y * dispatchSize.x + tileCoord.x);
 
     const float2 uv = (float2(pixel) + 0.5) / float2(screenSize);
     const float rawDepth = DepthTexture.SampleLevel(DepthTextureSampler, uv, 0).x;
@@ -399,7 +408,8 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     const float normalEdge = 1.0 - saturate(0.5 * (dot(worldNormal, normalRight) + dot(worldNormal, normalDown)));
     const float complexity = saturate(depthEdge * ComputeCommon.DepthEdgeScale + normalEdge * ComputeCommon.NormalEdgeScale);
     const float nearFactor = saturate(1.0 - abs(viewPos.z) / max(ComputeCommon.MaxDistance, 0.001));
-    const float spawnProb = saturate((0.08 + nearFactor * 0.42 + complexity * 0.55) * saturate((float)ComputeCommon.SpawnBudget / max((ComputeCommon.ScreenSize.x * ComputeCommon.ScreenSize.y) * 0.2, 1.0)));
+    const float sampleCount = max((float)(dispatchSize.x * dispatchSize.y), 1.0);
+    const float spawnProb = saturate((0.08 + nearFactor * 0.42 + complexity * 0.55) * saturate((float)ComputeCommon.SpawnBudget / max(sampleCount * 0.2, 1.0)));
     const uint pixelHash = HashU32((uint)pixel.x * 1973u ^ (uint)pixel.y * 9277u ^ (uint)ComputeCommon.FrameNumber * 26699u);
     if (((float)(pixelHash & 1023u) / 1023.0) > spawnProb)
         return;

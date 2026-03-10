@@ -232,6 +232,17 @@ constexpr int32 SURFEL_GI_MAX_SURFELS_HARD_CAP = 2097152;
 constexpr int32 SURFEL_GI_MAX_SLOTS_PER_CELL = 5;
 constexpr int32 SURFEL_GI_VISIBLE_CELL_WORKLIST_MULTIPLIER = 2;
 
+int32 GetSurfelGIEffectiveTileSize()
+{
+    return gOptions.UseSurfelGITileBasedSampling ? Max(1, gOptions.SurfelGITileSize) : 1;
+}
+
+int32 GetSurfelGISampleDispatchDim(int32 InExtent)
+{
+    const int32 TileSize = GetSurfelGIEffectiveTileSize();
+    return Max(1, (InExtent + TileSize - 1) / TileSize);
+}
+
 FORCEINLINE int32 PositiveModuloInt32(int32 value, int32 divisor)
 {
     if (divisor <= 0)
@@ -816,7 +827,9 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
         jSceneRenderTarget::SurfelGI_Attempt_RT = g_rhi->CreateRenderTarget(Info);
     }
 
-    const int32 CandidateCapacity = Max(1, Width * Height);
+    const int32 SampleDispatchWidth = GetSurfelGISampleDispatchDim(Width);
+    const int32 SampleDispatchHeight = GetSurfelGISampleDispatchDim(Height);
+    const int32 CandidateCapacity = Max(1, SampleDispatchWidth * SampleDispatchHeight);
     if (!GSurfelGICandidateBuffer || GSurfelGICandidateCapacity != CandidateCapacity)
     {
         GSurfelGICandidateCapacity = CandidateCapacity;
@@ -901,7 +914,7 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
             jNameStatic("SurfelGI_ReservoirStats"));
     }
 
-    const int64 MaxVisibleCells64 = (int64)Width * (int64)Height * (int64)SURFEL_GI_VISIBLE_CELL_WORKLIST_MULTIPLIER;
+    const int64 MaxVisibleCells64 = (int64)SampleDispatchWidth * (int64)SampleDispatchHeight * (int64)SURFEL_GI_VISIBLE_CELL_WORKLIST_MULTIPLIER;
     const int32 MaxVisibleCells = Max(1, (int32)Min<int64>(MaxVisibleCells64, (int64)std::numeric_limits<int32>::max()));
     if (!GVisibleCellWorklistBuffer || GVisibleCellWorklistCapacity != MaxVisibleCells)
     {
@@ -1079,7 +1092,7 @@ void jRenderer::SurfelGIPass()
     UniformData.MinRadius = 15.0f;
     UniformData.MaxDistance = gOptions.SSGIMaxDistance;
     UniformData.FrameNumber = (int32)g_rhi->GetCurrentFrameNumber();
-    UniformData.TileSize = Max(1, gOptions.SurfelGITileSize);
+    UniformData.TileSize = GetSurfelGIEffectiveTileSize();
     UniformData.MaxSurfels = GSurfelPoolMaxCount;
     UniformData.SurfelPageSize = Max(1, GSurfelPageSize);
     UniformData.SurfelPageTableCapacity = Max(1, GSurfelCellPageTableCapacity);

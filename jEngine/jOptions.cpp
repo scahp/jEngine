@@ -87,6 +87,7 @@ jOptions::jOptions()
     SSGIResolutionScale = 0.5f;
     SurfelGIMaxSurfels = 131072;
     SurfelGISpawnBudgetPerFrame = 2048;
+    UseSurfelGITileBasedSampling = true;
     SurfelGITileSize = 8;
     SurfelGIMergeDistanceScale = 1.5f;
     SurfelGIRadiusScale = 0.5f;
